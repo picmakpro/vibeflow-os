@@ -102,21 +102,41 @@ install_module() {
     backup_module "$mod"
   fi
 
-  # Skill files
+  # Type 1 — Single-skill module : SKILL.md at module root
   if [ -f "$module_dir/SKILL.md" ]; then
     mkdir -p ".claude/skills/$mod"
     cp "$module_dir/SKILL.md" ".claude/skills/$mod/SKILL.md"
     log "  copied SKILL.md → .claude/skills/$mod/"
   fi
 
-  # Agent files (module type = agent)
+  # Type 2 — Multi-skills module : skills/<name>/SKILL.md (e.g., skill-creator with 2 nested skills)
+  if [ -d "$module_dir/skills" ]; then
+    for skill_dir in "$module_dir/skills/"*/; do
+      [ -d "$skill_dir" ] || continue
+      skill_name=$(basename "$skill_dir")
+      mkdir -p ".claude/skills/$skill_name"
+      cp -r "$skill_dir"* ".claude/skills/$skill_name/" 2>/dev/null || true
+      log "  copied nested skill → .claude/skills/$skill_name/"
+    done
+  fi
+
+  # Type 3 — Agent module : AGENT.md → .claude/agents/<mod>.md
   if [ -f "$module_dir/AGENT.md" ]; then
     mkdir -p ".claude/agents"
     cp "$module_dir/AGENT.md" ".claude/agents/${mod}.md"
     log "  copied AGENT.md → .claude/agents/${mod}.md"
   fi
 
-  if [ -d "$module_dir/references" ]; then
+  # Type 4 — Doc-only module : content/ → docs/<mod>/
+  if [ -d "$module_dir/content" ]; then
+    local doc_target="docs/$mod"
+    mkdir -p "$doc_target"
+    cp -r "$module_dir/content/"* "$doc_target/" 2>/dev/null || true
+    log "  copied content/ → $doc_target/ (doc module)"
+  fi
+
+  # References folder at module root (companion to root SKILL.md)
+  if [ -d "$module_dir/references" ] && [ -f "$module_dir/SKILL.md" ]; then
     mkdir -p ".claude/skills/$mod/references"
     cp -r "$module_dir/references/"* ".claude/skills/$mod/references/" 2>/dev/null || true
     log "  copied references/ → .claude/skills/$mod/references/"
