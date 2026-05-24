@@ -1,0 +1,11 @@
+# Whitelist des versions Claude Code testees avec vibeflow-os
+# Maintenu manuellement apres validation de chaque nouvelle version
+# Format : 1 version par ligne (semver-like)
+
+2.0.40
+2.0.41
+2.0.42
+2.0.43
+2.0.44
+2.0.45
+2.0.46
