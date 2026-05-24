@@ -109,6 +109,13 @@ install_module() {
     log "  copied SKILL.md → .claude/skills/$mod/"
   fi
 
+  # Agent files (module type = agent)
+  if [ -f "$module_dir/AGENT.md" ]; then
+    mkdir -p ".claude/agents"
+    cp "$module_dir/AGENT.md" ".claude/agents/${mod}.md"
+    log "  copied AGENT.md → .claude/agents/${mod}.md"
+  fi
+
   if [ -d "$module_dir/references" ]; then
     mkdir -p ".claude/skills/$mod/references"
     cp -r "$module_dir/references/"* ".claude/skills/$mod/references/" 2>/dev/null || true
