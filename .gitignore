@@ -1,0 +1,24 @@
+# macOS
+.DS_Store
+._*
+
+# Backups
+*.bak
+*.bak-*
+.backups/
+
+# Cache local
+.vibeflow-cache/
+
+# Logs
+*.log
+logs/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Python cache
+__pycache__/
+*.pyc

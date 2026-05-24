@@ -1,0 +1,308 @@
+---
+name: consolidator
+description: Consolide la memoire structuree d'un lab VibeFlow (registres ADR/LEARNINGS/BLOCKERS/ITERATION_LOG/EVALS) sur 4 piliers — Indexation (header strict + colonne #Ligne), Archivage (3 criteres statut/age/refs, hook SessionEnd async), Fusion (deduplication LLM-based des doublons), Promotion (learning -> rule semi-auto avec validation humaine). Utiliser ce skill quand un registre depasse 800 lignes, quand des doublons d'IDs apparaissent, au rythme mensuel pour entretien, lors d'un /checkpoint, ou via /consolidate. Reference ADR-032 + ADR-009 + ADR-029. Iron Law : "La lecture d'un registre = lecture de l'index uniquement par defaut".
+---
+
+# Skill : Consolidator — Consolidation Memoire 4 Piliers
+
+> **Iron Law** : *"La lecture d'un registre = lecture de l'index uniquement par defaut. Lire le body entier est un anti-pattern qui pollue le contexte."*
+>
+> **Reference** : ADR-032 (Session 046, packaging consolidation) + ADR-009 (architecture memoire tiered) + ADR-029 (densite ≤500L)
+
+---
+
+## Pourquoi ce skill
+
+Les registres memoire d'un lab VibeFlow grossissent inexorablement en mode append-only (`/session-close` ADR-019). Sans consolidation active :
+
+1. **Bloat contextuel** — registres >1500L = explosion du contexte agent a chaque lecture
+2. **Index sous-exploite** — sans colonne `#Ligne`, l'index oblige l'agent a parcourir le body
+3. **Collisions d'IDs** — sessions paralleles produisent des doublons (LRN-090 vu en double dans le Lab)
+4. **Pipeline `learning -> rule` dormant** — la promotion existe en template mais n'opere jamais
+5. **Pas d'archivage** — entrees `RESOLU`/`OBSOLETE`/`SUPERSEDED` s'accumulent indefiniment
+
+Ce skill orchestre 4 mecanismes complementaires qui maintiennent la memoire scalable a travers les sessions.
+
+---
+
+## Quand l'invoquer
+
+- **Auto (hook)** : SessionEnd async declenche `scripts/archive.sh` (pilier 2 uniquement, non destructif)
+- **Manuel mensuel** : `/consolidate` lance les 4 piliers en mode `--dry-run` puis applique apres validation
+- **Trigger immediat** :
+  - Un registre depasse 800 lignes -> `/consolidate --register=LEARNINGS`
+  - Doublons d'IDs detectes -> `/consolidate --pillar=fusion`
+  - Pendant `/checkpoint` -> pilier 1 (reindexation) + pilier 4 (proposition promotions)
+- **Surtout pas** : pendant une session active de coding feature (le hook async suffit)
+
+---
+
+## Workflow (4 modes)
+
+Le skill opere en 4 modes selon le pilier cible. Tous acceptent `--dry-run` (defaut) et `--apply`.
+
+```
+/consolidate                    # 4 piliers en dry-run
+/consolidate --apply            # 4 piliers applique apres validation
+/consolidate --pillar=index     # reindexation uniquement
+/consolidate --pillar=archive   # archivage uniquement
+/consolidate --pillar=fusion    # detection + propositions fusion
+/consolidate --pillar=promote   # detection candidats promotion
+/consolidate --register=ADR     # cible un seul registre
+```
+
+---
+
+## Pilier 1 — Indexation (convention + script)
+
+**Iron Law cle** : *index header strict avec colonne `#Ligne` pour Read offset cible*.
+
+### Convention rédactionnelle (obligatoire dans templates v2)
+
+```markdown
+## Index
+
+| ID | Date | Titre | Tags | #Ligne | Resume |
+|----|------|-------|------|--------|--------|
+| ADR-031 | 2026-05-17 | Garde-fou support runtime | guard,frontmatter | 2050 | Verifier doc avant inventer convention |
+```
+
+**Regles** :
+- 1 entree = 1 ligne, ≤ 200 caracteres
+- `#Ligne` pointe vers la ligne de debut de section body (`## ADR-XXX : ...`)
+- Tags ≤ 3, separes par virgule
+- Resume ≤ 80 caracteres, 1 phrase
+
+### Comment l'agent lit un registre (pattern force)
+
+```
+1. Read(ADR.md, offset=1, limit=50)         # index header uniquement (~30 entrees)
+2. [Reperer l'ID dans l'index]
+3. Read(ADR.md, offset=2050, limit=40)      # body de l'entree ciblee
+4. [JAMAIS Read(ADR.md) entier]
+```
+
+### Script `reindex.sh`
+
+Regenere l'index header de tous les registres en scannant les sections `## XXX-YYY :`. Met a jour la colonne `#Ligne` automatiquement. Voir `scripts/reindex.sh`.
+
+### Quand declencher
+
+- `PostToolUse(Edit, path: .claude/memory/*.md)` -> reindex auto async
+- Manuel : `/consolidate --pillar=index`
+
+### Detail
+
+Voir `references/indexation.md`.
+
+---
+
+## Pilier 2 — Archivage automatique (hook SessionEnd async)
+
+**Heuristique d'archivage en 3 criteres combines** (AND, pas OR — eviter faux positifs) :
+
+| Critere | Definition | Seuil par defaut |
+|---------|------------|------------------|
+| Statut | Champ `**Statut** :` explicite | `RESOLU`, `OBSOLETE`, `SUPERSEDED`, `Deprecee`, `Archivee` |
+| Age | Date entree | > 90 jours |
+| Refs recentes | Mention dans ITERATION_LOG / autres registres / git log | 0 ref dans les 5 dernieres sessions |
+
+Une entree archivee est **deplacee** vers `.claude/memory/archive/<registre>-archive.md` (pas supprimee). L'index principal est mis a jour avec `Statut: Archivee -> voir archive`.
+
+### Hook SessionEnd async (mature)
+
+```json
+"SessionEnd": [{
+  "hooks": [{
+    "type": "command",
+    "command": "test -x .claude/scripts/archive.sh && .claude/scripts/archive.sh --async",
+    "async": true,
+    "_comment": "ADR-032 pilier 2 — archivage non bloquant en fin de session"
+  }]
+}]
+```
+
+### Detail
+
+Voir `references/archivage.md` + `scripts/archive.sh`.
+
+---
+
+## Pilier 3 — Fusion LLM-based (skill manuel)
+
+**Approche** : pas d'embeddings, pas de clustering ML. Le LLM lit les candidats et decide. Pattern eprouve par Anthropic Auto Dream (2026) et grandamenium/dream-skill.
+
+### Pipeline fusion
+
+1. **Detection** : `scripts/detect-duplicates.sh` scanne les registres et sort une liste de **candidats fusion** par signaux faciles :
+   - IDs identiques (collision reelle — bloquant)
+   - Titres tres similaires (Jaccard > 0.7 sur tokens)
+   - Tags identiques + meme categorie
+   - Dates proches (< 7j) + tags identiques
+2. **Proposition** : l'agent (Claude) lit les N candidats et propose pour chacun :
+   - **Merge** (fusion en une seule entree, ID le plus ancien conserve)
+   - **Keep** (faux positif, garder distincts)
+   - **Archive** (l'un des deux est obsolete)
+3. **Application** : apres validation humaine, ecriture des merges + mise a jour index + reindex.
+
+### Quand declencher
+
+- Manuel uniquement : `/consolidate --pillar=fusion`
+- Recommande : rythme mensuel ou au /checkpoint
+
+### Detail
+
+Voir `references/fusion.md`.
+
+---
+
+## Pilier 4 — Promotion learning -> rule (semi-auto)
+
+**Vigilance ADR-031** : aucune primitive native Anthropic n'auto-promote. Pattern publie : MindStudio "Learnings Loop" (semi-auto, validation humaine).
+
+### Pipeline promotion
+
+1. **Detection** : `scripts/detect-promotions.sh` scanne LEARNINGS.md et sort candidats selon :
+   - Frequence : meme tag/theme present dans ≥ 3 learnings
+   - Operationnel : presence de mots-cles d'instruction (`toujours`, `jamais`, `eviter`, `forcer`)
+   - Non encore encode : champ `Encode dans:` = `Non encode`
+2. **Draft auto** : pour chaque candidat, l'agent (Claude) genere un draft rule dans `.claude/rules/_draft/[slug].md` avec frontmatter `paths:` propose.
+3. **Validation humaine** : le user revoit chaque draft, valide ou rejette.
+4. **Promotion finale** : draft valide -> `.claude/rules/[slug].md`, learnings sources marques `Encode dans: .claude/rules/[slug].md`, learnings archives si redondants.
+
+### Quand declencher
+
+- Manuel uniquement : `/consolidate --pillar=promote`
+- Recommande : trimestriel ou au /checkpoint majeur
+
+### Iron Law promotion
+
+> **Aucun ecriture dans `.claude/rules/*.md` (path final) sans validation humaine.** Les drafts vont dans `_draft/` exclusivement. ADR-031 vigilance : ne pas inventer un auto-write rule.
+
+### Detail
+
+Voir `references/promotion.md`.
+
+---
+
+## Orchestration des 4 piliers
+
+Le skill orchestre les 4 piliers dans cet ordre quand `/consolidate` est invoque sans flag :
+
+```
+Phase 1 — Audit (read-only, < 30s)
+  - detect-duplicates.sh   -> liste candidats fusion
+  - detect-promotions.sh   -> liste candidats promotion
+  - taille des registres   -> alerte si > seuil
+
+Phase 2 — Indexation (idempotent)
+  - reindex.sh             -> regenere index header de chaque registre
+
+Phase 3 — Archivage (3 criteres AND)
+  - archive.sh --dry-run   -> liste entrees archivables
+  - validation             -> apply ou skip
+
+Phase 4 — Fusion (interactive)
+  - presenter candidats au user
+  - merge propose -> validation -> ecriture
+
+Phase 5 — Promotion (interactive)
+  - presenter candidats au user
+  - drafts generes dans .claude/rules/_draft/
+  - validation humaine differee
+```
+
+Phases 4 et 5 sont **toujours interactives** (validation user obligatoire).
+
+---
+
+## Outputs
+
+A la fin d'une consolidation, le skill produit un rapport `reports/consolidation/YYYY-MM-DD-consolidation.md` :
+
+```markdown
+# Consolidation YYYY-MM-DD
+
+## Pilier 1 — Indexation
+- ADR.md : 31 -> 31 entrees (0 ajoute, 0 archive, colonne #Ligne mise a jour)
+- LEARNINGS.md : 95 -> 95 entrees
+
+## Pilier 2 — Archivage
+- ADR.md : 2 entrees archivees (ADR-022 Differee + ADR-005 ancien)
+- BLOCKERS.md : 1 entree archivee (BLK-002 RESOLU + > 90j)
+
+## Pilier 3 — Fusion
+- LRN-090 + LRN-091 (Mobile) merged into LRN-090 + LRN-091 (Packaging) renames vers LRN-096/097
+
+## Pilier 4 — Promotion
+- Draft cree : .claude/rules/_draft/no-console-in-prod.md (source LRN-032)
+- Draft cree : .claude/rules/_draft/agent-density-ceiling.md (sources LRN-099 + LRN-100)
+```
+
+---
+
+## Iron Laws (recapitulatif)
+
+1. **Lecture d'un registre = lecture de l'index uniquement par defaut.**
+2. **Archivage = 3 criteres AND, jamais 1 seul.**
+3. **Fusion = decision LLM, pas embeddings ML.**
+4. **Promotion = draft + validation humaine OBLIGATOIRE, jamais auto-write dans `.claude/rules/`.**
+5. **Hook SessionEnd async UNIQUEMENT pour archivage** (pilier 2). Les piliers 3-4 sont manuels.
+
+---
+
+## Pre-requis d'installation
+
+Pour qu'un lab puisse utiliser ce skill :
+
+1. Templates registres v2 deployes (avec colonne `#Ligne` dans l'index)
+2. `.claude/scripts/{reindex,archive,detect-duplicates,detect-promotions}.sh` executables
+3. Hook SessionEnd async configure dans `.claude/settings.json` (ou `settings.local.json`)
+4. Trigger `/consolidate` cree dans `.claude/commands/` (optionnel mais recommande)
+5. CLAUDE.md du projet mentionne l'Iron Law `Lecture index uniquement par defaut`
+
+Voir `references/installation.md` (a creer si besoin).
+
+---
+
+## References
+
+- `references/indexation.md` — convention index header + script reindex
+- `references/archivage.md` — 3 criteres archivage + heuristique anti-faux-positifs
+- `references/fusion.md` — pipeline fusion LLM-based + prompts type
+- `references/promotion.md` — pipeline promotion semi-auto + rule frontmatter
+
+- ADR-032 (parent) — design et raisonnement complet
+- ADR-009 — architecture memoire tiered (parent historique)
+- ADR-019 — /session-close + lifecycle hooks
+- ADR-029 — charte densite (Skill ≤500L)
+- ADR-031 — vigilance support runtime des conventions
+- LRN-019 — append-only ne scale pas
+- LRN-060 — la capitalisation structuree est le moat VibeFlow
+- Anthropic doc memory : https://code.claude.com/docs/en/memory (MEMORY.md 200L pattern officiel)
+- grandamenium/dream-skill — pattern Stop hook + 4 phases
+- MindStudio Learnings Loop — pattern promotion semi-auto
+
+---
+
+## Scripts livres
+
+- `scripts/reindex.sh` — regenere index header avec colonne #Ligne (idempotent)
+- `scripts/archive.sh` — archive selon 3 criteres AND (statut/age/refs)
+- `scripts/detect-duplicates.sh` — sort candidats fusion (IDs collision + similarites titre/tags)
+- `scripts/detect-promotions.sh` — sort candidats promotion (frequence + operationnel + non-encode)
+
+Tous les scripts acceptent `--dry-run` (defaut) et `--apply`. Sortie en JSON pour parsing.
+
+---
+
+## Limites connues
+
+- **Race condition** si 2 sessions paralleles ecrivent dans le meme registre + hook SessionEnd async lance archive.sh sur l'une -> conflit possible. Mitigation : lock file `.claude/memory/.lock` cree par archive.sh.
+- **Conventions ADR vs DECISIONS** : le skill supporte les 2 (frontmatter `register_naming: adr | decisions` dans `.claude/skills/consolidator/config.yaml`).
+- **Pas de detection semantique fine** pour la fusion : un learning sur "tests" et un autre sur "verification" ne seront pas detectes comme doublons (par design, le LLM tranche en phase 3).
+- **Promotion full-auto impossible** par design ADR-031.
+
+---
+
+*Skill version 1.0 — Cree Session 046 (2026-05-23) — Cobaye VibeFlow Lab.*
