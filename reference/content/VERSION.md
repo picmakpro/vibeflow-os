@@ -1,8 +1,8 @@
 # VERSION
 
-**VibeFlow-Reference** : v2.0
-**Date de release** : 2026-05-19
-**Type** : Release majeure (saut Core v4.0 → v4.1)
+**VibeFlow-Reference** : v2.1
+**Date de release** : 2026-05-28
+**Type** : Enrichissement additif (Core v4.1 → v4.2 — ajout principe P9 « Modulariser pour la cognition »)
 
 ## Contenu
 

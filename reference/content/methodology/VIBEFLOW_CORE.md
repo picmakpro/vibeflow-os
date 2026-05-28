@@ -1,6 +1,6 @@
 # VIBEFLOW_CORE
 ## Le systeme d'exploitation universel pour piloter des projets avec l'IA
-### Edition Mai 2026 (v4.1)  -  Document canonique fondateur
+### Edition Mai 2026 (v4.2)  -  Document canonique fondateur
 
 ---
 
@@ -11,13 +11,15 @@
 > **Hierarchie de lecture** : lire VIBEFLOW_CORE d'abord, puis le fork specifique au domaine. En cas de divergence, VIBEFLOW_CORE fait autorite.
 
 > **Edition Mai 2026 (v4.1)** : enrichissement additif sur la base v4.0 (Avril 2026). Les 8 principes P1-P8 sont intacts. 7 zones renforcees : charte de densite agents, architecture skills natif (bootstrap-skills vs on-demand), garde-fou meta runtime, pattern Adversarial Plan-Review, Iron Law fresh-evidence + criteres binaires, halt conditions + anti-drift, meta-procedures `safe-execute` et `god-execution`. Voir section 12 Changelog pour le detail.
+>
+> **Edition Mai 2026 (v4.2)** : ajout du principe **P9 — Modulariser pour la cognition** (enrichissement additif, P1-P8 intacts). Origine : doctrine Architecture Logicielle AI-Safe (ADR-035 Lab, diagnostic terrain). Voir P9 (section 2) + skill `software-architecture`.
 
 ---
 
 ## Table des matieres
 
 1. Pourquoi VibeFlow existe
-2. Les 8 principes universels (contrats testables)
+2. Les 9 principes universels (contrats testables)
 3. L'architecture universelle en 5 composants (avec charte de densite et architecture skills)
 4. Les 5 registres standards
 5. Le principe P-Evaluer en detail
@@ -59,9 +61,9 @@ C'est l'integration de ces quatre capacites qui fait la force de VibeFlow. Un sy
 
 ---
 
-## 2. Les 8 principes universels
+## 2. Les 9 principes universels
 
-**Les 8 principes sont formules comme des contrats testables** : pour chaque principe, un critere binaire (OK / KO) permet de verifier son application sur le terrain. Un principe n'est pas une intention, c'est une promesse verifiable.
+**Les 9 principes sont formules comme des contrats testables** : pour chaque principe, un critere binaire (OK / KO) permet de verifier son application sur le terrain. Un principe n'est pas une intention, c'est une promesse verifiable.
 
 ### P1  -  Capitaliser
 
@@ -154,6 +156,23 @@ Un projet peut avoir P1 applique en partie ou pas du tout. Le critere est public
 - **P8 Evaluer** repond a la question *"le raisonnement produit est-il le bon ?"* (pas hallucine, pas biaise par le framing, toujours pertinent dans le temps)
 
 Un output peut passer P5 (techniquement correct) et echouer P8 (contenu hallucine ou desuet). Le principe est detaille section 5.
+
+### P9  -  Modulariser pour la cognition (NOUVEAU v4.2)
+
+**Contrat** : aucune unite de travail (fichier de code, document, specification, tache) ne depasse sa capacite cognitive utile. **Une responsabilite par unite.** Les frontieres entre unites sont declarees explicitement ET **enforced par la machine, pas par la prose**. Un garde-fou qui n'est pas execute par un mecanisme automatique (gate, hook, lint, controle d'acces) n'existe pas.
+
+**Critere d'application (testable)** :
+- [ ] Seuil de taille defini ET controle automatiquement par type d'unite (code : ≤ 300 lignes/fichier, cible 150-200 ; document : section ≤ 50-100 lignes ; tache : ≤ 30-60 min)
+- [ ] Chaque unite a une responsabilite unique (test : "combien de raisons distinctes la feraient changer ?" = 1)
+- [ ] Les frontieres/dependances autorisees sont declarees ET verifiees par un mecanisme automatique (lint, CI, permissions), pas seulement ecrites
+- [ ] Tout garde-fou structurant est machine-enforced (exit code, blocage CI/hook) — la prose seule ne compte pas
+- [ ] Pour un projet existant en dette : un playbook de restructuration est suivi (stabiliser le filet de verification AVANT toute migration)
+
+**Pourquoi P9 n'est pas P2** :
+- **P2 Structurer le contexte** concerne ce qu'on INJECTE a l'agent/la session (le briefing, la constitution courte).
+- **P9 Modulariser** concerne la structure de l'ARTEFACT produit (le code, le document) lui-meme.
+
+Un projet peut respecter P2 (contexte minimal) et violer P9 (god files non maintenables). Origine empirique : un projet ou l'IA "cassait du code ailleurs" a chaque modification — cause racine = fichiers trop gros + frontieres non enforced + filet de verification non fonctionnel, pas un defaut de design. La specialisation par domaine (dev : seuil 300L, SOLID/SoC, eslint-boundaries, Stop hook ; non-dev : transposition par mapping semantique) est portee par les forks et le skill `software-architecture` (ADR-035 Lab).
 
 ---
 
@@ -736,6 +755,7 @@ Les halt conditions et anti-drift mechanisms s'appliquent obligatoirement en `go
 
 | Version | Date | Changements |
 |---------|------|-------------|
+| **v4.2 (CORE)** | 2026-05-28 | **Ajout P9 — Modulariser pour la cognition** (enrichissement additif, P1-P8 intacts). Aucune unite (fichier, document, tache) ne depasse sa capacite cognitive ; une responsabilite par unite ; frontieres enforced par la machine, pas par la prose. Origine : doctrine Architecture Logicielle AI-Safe (ADR-035 Lab, diagnostic terrain "l'IA casse du code ailleurs" = god files + frontieres non enforced + filet de verification non fonctionnel). Specialisation dev via skill `software-architecture` ; transposition non-dev via mapping semantique (P7). |
 | **v4.1 (CORE)** | 2026-05-18 | **Enrichissement Mai 2026**  -  7 zones additives, 8 principes P1-P8 intacts. (A) Charte de densite agents (Agent ≤250L / SKILL.md ≤500L / Bootstrap ≤2000 tokens, base preuve empirique context rot Chroma 2025). (B) Architecture skills natif 3 niveaux (meta-universel via bootstrap.md / contextuel via frontmatter / on-demand via 1% Rule). (C) Garde-fou meta runtime : verifier le support avant d'inventer une convention frontmatter. (D) Pattern Adversarial Plan-Review (2 agents distincts en sessions fraiches + Judge si divergence). (E) Iron Law "no-claim-without-fresh-evidence" + criteres de succes binaires (exit code) vs narratifs. (F) Halt conditions (5 codes universels) + Anti-drift mechanisms (7 mecanismes). (G) Meta-procedures structurees `safe-execute` (5 phases mono-tache) et `god-execution` (8 phases multi-sprints autonome). |
 | **v4.0 (CORE)** | 2026-04-22 | **Refonte majeure BDR-023**  -  extraction du Core depuis VIBEFLOW_PHILOSOPHY + VIBEFLOW_V3_CLAUDE_CODE. Principes formules comme contrats testables. Ajout P8 Evaluer (8e principe). Ajout 5e registre EVALS. Ajout section "Humain dans la boucle" avec 4 circuit breakers. Positionnement canonique : tronc commun pour tous les forks (DevFlow, BusinessFlow, ContentFlow, etc.). |
 | v3 (pre-Core) | 2026-02 | VIBEFLOW_V3_CLAUDE_CODE  -  7 principes + 4 registres (focus dev web avec Claude Code) |
@@ -754,6 +774,6 @@ Les halt conditions et anti-drift mechanisms s'appliquent obligatoirement en `go
 
 ---
 
-*VibeFlow Core  -  Piloter. Executer. Capitaliser. Structurer. Orchestrer. Clarifier. Verifier. Iterer. Transposer. Evaluer.*
+*VibeFlow Core  -  Piloter. Executer. Capitaliser. Structurer. Orchestrer. Clarifier. Verifier. Iterer. Transposer. Evaluer. Modulariser.*
 
 *La connaissance qui ne se capitalise pas est une connaissance perdue. Le raisonnement qui ne s'evalue pas est un raisonnement biaise qui s'ignore. (v4.1) Le claim sans fresh evidence est une illusion de completion. La convention sans support runtime est une illusion de structure.*

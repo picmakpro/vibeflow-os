@@ -135,6 +135,13 @@ install_module() {
     log "  copied content/ → $doc_target/ (doc module)"
   fi
 
+  # Type 5 — Rules : rules/*.md → .claude/rules/ (rules path-scopées auto-chargées par Claude Code)
+  if [ -d "$module_dir/rules" ]; then
+    mkdir -p ".claude/rules"
+    cp "$module_dir/rules/"*.md ".claude/rules/" 2>/dev/null || true
+    log "  copied rules/ → .claude/rules/"
+  fi
+
   # References folder at module root (companion to root SKILL.md)
   if [ -d "$module_dir/references" ] && [ -f "$module_dir/SKILL.md" ]; then
     mkdir -p ".claude/skills/$mod/references"
@@ -219,6 +226,14 @@ uninstall_module() {
     for f in "$CACHE_DIR/$mod/scripts/"*.sh; do
       name=$(basename "$f")
       [ -f ".claude/scripts/$name" ] && rm ".claude/scripts/$name" && log "  removed .claude/scripts/$name"
+    done
+  fi
+
+  # Remove rules (only those owned by this module)
+  if [ -d "$CACHE_DIR/$mod/rules" ]; then
+    for f in "$CACHE_DIR/$mod/rules/"*.md; do
+      name=$(basename "$f")
+      [ -f ".claude/rules/$name" ] && rm ".claude/rules/$name" && log "  removed .claude/rules/$name"
     done
   fi
 

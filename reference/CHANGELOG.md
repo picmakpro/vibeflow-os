@@ -1,5 +1,14 @@
 # CHANGELOG — reference
 
+## [v2.1.0] — 2026-05-28
+
+### Ajout du principe P9 dans VIBEFLOW_CORE (v4.1 → v4.2)
+
+- `VIBEFLOW_CORE.md` : **9 principes** désormais (P1-P8 intacts + **P9 — Modulariser pour la cognition**).
+- P9 : aucune unité (fichier, document, tâche) ne dépasse sa capacité cognitive ; une responsabilité par unité ; frontières enforced par la machine, pas par la prose.
+- Origine : doctrine Architecture Logicielle AI-Safe (ADR-035 Lab). Spécialisation dev via le module `software-architecture` ; transposition non-dev via mapping sémantique (P7).
+- `content/VERSION.md` aligné (Core v4.2, 9 principes).
+
 ## [v2.0.0] — 2026-05-24
 
 ### Initial release dans vibeflow-os (version 2.0 héritée du Lab Session 044+)
