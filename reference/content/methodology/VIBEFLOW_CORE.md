@@ -157,6 +157,8 @@ Un projet peut avoir P1 applique en partie ou pas du tout. Le critere est public
 
 Un output peut passer P5 (techniquement correct) et echouer P8 (contenu hallucine ou desuet). Le principe est detaille section 5.
 
+**Outillage de P8 par-process (v4.2, ADR-036 Lab)** : le skill `audit-architecture` operationnalise P8 *au niveau de chaque process generateur* (brief -> output). Il derive une structure d'audit multi-couches (`Dimension x Auditeur independant x Rubric x Verdict bloquant x Anti-boucle`) et la force via une *architecture de refus* (l'agent terminal refuse de finaliser sans verdict VALIDE). Le juge-LLM a rubric y est le mecanisme d'enforcement du qualitatif — c'est P8 rendu systematique et non plus seulement trimestriel. `audit-architecture` est a P8 ce que `software-architecture` est a P9.
+
 ### P9  -  Modulariser pour la cognition (NOUVEAU v4.2)
 
 **Contrat** : aucune unite de travail (fichier de code, document, specification, tache) ne depasse sa capacite cognitive utile. **Une responsabilite par unite.** Les frontieres entre unites sont declarees explicitement ET **enforced par la machine, pas par la prose**. Un garde-fou qui n'est pas execute par un mecanisme automatique (gate, hook, lint, controle d'acces) n'existe pas.

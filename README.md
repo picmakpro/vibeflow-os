@@ -15,10 +15,11 @@ Ce repo héberge les **modules réutilisables** de la méthodologie VibeFlow, di
 |--------|---------|------|-------------|
 | [`consolidator/`](./consolidator/) | v1.0.0 | single-skill + scripts | Consolidation mémoire 4 piliers (Indexation / Archivage / Fusion / Promotion) — ADR-032 |
 | [`infrastructure-audit/`](./infrastructure-audit/) | v1.0.0 | single-skill + scripts | Audit automatique infrastructure (hooks, scripts, drift Anthropic) — détecte régressions après update Claude Code |
-| [`validator/`](./validator/) | v1.0.0 | agent-only | Agent `vibeflow-validator` (garant alignement technique méthodo ↔ labs) |
+| [`validator/`](./validator/) | v1.1.0 | agent-only | Agent `vibeflow-validator` (garant alignement technique méthodo ↔ labs) — 5 phases dont audit architecture des process |
 | [`skill-creator/`](./skill-creator/) | v1.0.0 | agent + 2 skills | Pattern "agent minimal + 2 skills composables" (Anthropic + workflow) — LRN-101 |
-| [`reference/`](./reference/) | v2.1.0 | doc-only | Documentation méthodologique complète (VIBEFLOW_CORE **v4.2 — 9 principes, +P9** + 11 patterns + 33 templates + 1 exemple) |
+| [`reference/`](./reference/) | v2.1.1 | doc-only | Documentation méthodologique complète (VIBEFLOW_CORE **v4.2 — 9 principes, +P9** + pointeur P8↔audit-architecture + 11 patterns + 33 templates + 1 exemple) |
 | [`software-architecture/`](./software-architecture/) | v1.0.0 | single-skill + rules + scripts | Doctrine Architecture Logicielle AI-Safe (SOLID/SoC, anti-god-files ≤300L, gates machine-enforced, playbook restructuration brownfield) — ADR-035 |
+| [`audit-architecture/`](./audit-architecture/) | v1.0.0 | single-skill + references | Concepteur d'**architecture d'audit** : dérive depuis un brief la structure d'audit multi-couches d'un process et la force (universel : contenu / dossier / code / vente). Spécialise P8 — ADR-036 |
 
 ## Types de modules supportés (depuis v2.0.0)
 
@@ -93,6 +94,7 @@ Chaque module a sa propre version. Le repo global est tagué à la version du de
 | v1.2.1 | 2026-05-24 | Fix vibeflow-update.sh handle AGENT.md |
 | **v2.0.0** | 2026-05-24 | **+ skill-creator (multi-skills), + reference (doc-only), nouveau type module supporté** |
 | **v2.1.0** | 2026-05-28 | **+ software-architecture (skill+rules+scripts), + type distribuable `rules/` dans l'installer, Core v4.2 (ajout P9), reference v2.1.0** |
+| **v2.2.0** | 2026-06-03 | **+ audit-architecture (méta-skill concepteur de structures d'audit multi-couches), validator v1.1.0 (Phase 4 scan des process) — ADR-036** |
 
 ---
 
@@ -123,6 +125,7 @@ Chaque module a sa propre version. Le repo global est tagué à la version du de
 - ADR-032 : Système de Consolidation Mémoire 4 piliers
 - ADR-033 : Création repo vibeflow-os (Session 047)
 - ADR-035 : Doctrine Architecture Logicielle AI-Safe — module software-architecture + P9 Core (Session 049)
+- ADR-036 : Doctrine Audit Architecture — module audit-architecture + validator Phase 4 (Session 050)
 - LRN-101 : Pattern "agent minimal + 2 skills composables"
 - LRN-106 : Audit avant fix
 - LRN-107 : Repo central versionné > zip ad-hoc

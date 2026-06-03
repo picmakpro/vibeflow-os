@@ -1,5 +1,12 @@
 # CHANGELOG — reference
 
+## [v2.1.1] — 2026-06-03
+
+### Pointeur P8 — outillage par-process (ADR-036 Lab)
+
+- `VIBEFLOW_CORE.md` section P8 : ajout d'un pointeur additif vers le module `audit-architecture` (opérationnalise P8 au niveau de chaque process générateur via structures d'audit multi-couches). Décision : pas de nouveau principe Core — `audit-architecture` est à P8 ce que `software-architecture` est à P9.
+- P1-P9 intacts. Ajout strictement additif.
+
 ## [v2.1.0] — 2026-05-28
 
 ### Ajout du principe P9 dans VIBEFLOW_CORE (v4.1 → v4.2)

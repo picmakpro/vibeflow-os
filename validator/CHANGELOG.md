@@ -1,5 +1,16 @@
 # CHANGELOG — validator
 
+## [v1.1.0] — 2026-06-03
+
+### Ajout — Phase 4 : Audit architecture des process (ADR-036)
+
+- Skill `audit-architecture` ajouté au frontmatter `skills:` (6 skills désormais).
+- Nouvelle **Phase 4 — Audit architecture des process** (mode scan de lab) : énumère les process générateurs (brief→output), reconstitue leur structure d'audit actuelle, diffère avec la cible (méthode 4 temps), reporte les process sous-audités.
+- L'ancienne Phase 4 (Synthèse) devient **Phase 5**. Procédure désormais en 5 phases.
+- Description + output template + table de délégation + pré-requis mis à jour.
+- Conforme ADR-031 : conçoit et propose, ne matérialise pas (détecter ≠ corriger).
+- 203 lignes (charte ADR-029 ≤250L respectée).
+
 ## [v1.0.0] — 2026-05-24
 
 ### Initial release
