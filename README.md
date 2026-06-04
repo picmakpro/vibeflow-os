@@ -1,7 +1,7 @@
 # vibeflow-os
 
 > **Modules VibeFlow distribués aux labs** — repo central versionné pour réplication méthodologique.
-> Privé. Maintenu par [@picmakpro](https://github.com/picmakpro).
+> Public (source-available, licence propriétaire). Maintenu par [@picmakpro](https://github.com/picmakpro).
 
 ---
 
@@ -102,7 +102,7 @@ Chaque module a sa propre version. Le repo global est tagué à la version du de
 
 ## Sécurité
 
-- Repo privé
+- Repo public **source-available** : code et historique visibles, licence propriétaire « All rights reserved » (aucun droit de réutilisation accordé)
 - Scripts shell + Python uniquement (auditables ligne par ligne)
 - Pas de dépendances tierces non vérifiées
 - Tests automatisés pour chaque script (`scripts/tests/test-*.sh`)
