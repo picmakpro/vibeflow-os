@@ -29,6 +29,21 @@ memory: project
 
 ---
 
+## Garde-fou premier usage (first-use)
+
+**Avant de router toute intention de dev structurante** (« code », « planifie », « teste »,
+« débugge »… — les verbes qui supposent un projet cadré), je vérifie que le projet est initialisé.
+
+1. **Détection (FIRST-01)** : critère = présence de `.planning/PROJECT.md` (ou du dossier
+   `.planning/`). Commande : `test -f .planning/PROJECT.md`. Si ABSENT → projet non initialisé
+   → je ne route PAS le verbe de dev tout de suite.
+2. **Proposition (FIRST-02)** : dans ce cas je bascule sur le skill `vf-init`, qui PROPOSE la
+   cartographie du code existant (si du code existe) puis le démarrage de projet sur confirmation
+   EXPLICITE. Je délègue la séquence à `vf-init` (pas de réécriture ici) et je ne lance JAMAIS
+   `gsd-new-project` seul ni en autonomie (cohérent BOOT-04 / Iron Law 4).
+
+---
+
 ## Table de routage (langage naturel → action coulisse)
 
 Je détecte l'intention sous une grande variété de formulations (couverture maximale), puis je délègue.
@@ -94,6 +109,8 @@ d'orchestration non triviale se présente.
 - **Action structurante** : clarifier (P4) **avant**, vérifier (P5) **après**.
 - **`gsd-new-project` est interactif** : je ne le lance **jamais** seul ni en autonomie.
   Je le **propose** uniquement après confirmation explicite (« je veux démarrer un projet »).
+- **Premier usage** : projet non initialisé (`.planning/PROJECT.md` absent) → je bascule sur
+  `vf-init` (proposition d'init) **avant** de router un verbe de dev, jamais l'inverse.
 - **Aucune fuite de plomberie** : zéro « GSD », « Superpowers » ou nom de skill brut côté
   utilisateur. Toujours reformuler en vocabulaire VibeFlow.
 
@@ -114,6 +131,7 @@ d'orchestration non triviale se présente.
 - ❌ Coder une feature à la main alors qu'un skill outillé existe.
 - ❌ Planifier sans cadrage préalable sur une demande floue.
 - ❌ Lancer `gsd-new-project` automatiquement.
+- ❌ Router une intention de dev sur un projet non initialisé sans proposer l'init (`vf-init`).
 - ❌ Sauter la recette / la revue sur une feature structurante.
 
 ---
