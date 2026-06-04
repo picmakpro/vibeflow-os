@@ -20,6 +20,7 @@ Ce repo héberge les **modules réutilisables** de la méthodologie VibeFlow, di
 | [`reference/`](./reference/) | v2.1.1 | doc-only | Documentation méthodologique complète (VIBEFLOW_CORE **v4.2 — 9 principes, +P9** + pointeur P8↔audit-architecture + 11 patterns + 33 templates + 1 exemple) |
 | [`software-architecture/`](./software-architecture/) | v1.0.0 | single-skill + rules + scripts | Doctrine Architecture Logicielle AI-Safe (SOLID/SoC, anti-god-files ≤300L, gates machine-enforced, playbook restructuration brownfield) — ADR-035 |
 | [`audit-architecture/`](./audit-architecture/) | v1.0.0 | single-skill + references | Concepteur d'**architecture d'audit** : dérive depuis un brief la structure d'audit multi-couches d'un process et la force (universel : contenu / dossier / code / vente). Spécialise P8 — ADR-036 |
+| [`feature-dev-gates/`](./feature-dev-gates/) | v1.0.0 | rules-only | 2 gates de dev de feature **path-scopés** (Nyquist : commande de vérif auto par critère ; Decision Coverage : chaque ADR/DEC couverte). Filet déterministe qui s'active dès qu'on code une feature — import GSD, ADR-037 |
 
 ## Types de modules supportés (depuis v2.0.0)
 
@@ -95,6 +96,7 @@ Chaque module a sa propre version. Le repo global est tagué à la version du de
 | **v2.0.0** | 2026-05-24 | **+ skill-creator (multi-skills), + reference (doc-only), nouveau type module supporté** |
 | **v2.1.0** | 2026-05-28 | **+ software-architecture (skill+rules+scripts), + type distribuable `rules/` dans l'installer, Core v4.2 (ajout P9), reference v2.1.0** |
 | **v2.2.0** | 2026-06-03 | **+ audit-architecture (méta-skill concepteur de structures d'audit multi-couches), validator v1.1.0 (Phase 4 scan des process) — ADR-036** |
+| **v2.3.0** | 2026-06-03 | **+ feature-dev-gates (rules-only) : gates Nyquist + Decision Coverage path-scopés, import GSD — ADR-037** |
 
 ---
 
@@ -126,6 +128,7 @@ Chaque module a sa propre version. Le repo global est tagué à la version du de
 - ADR-033 : Création repo vibeflow-os (Session 047)
 - ADR-035 : Doctrine Architecture Logicielle AI-Safe — module software-architecture + P9 Core (Session 049)
 - ADR-036 : Doctrine Audit Architecture — module audit-architecture + validator Phase 4 (Session 050)
+- ADR-037 : Adoption Nyquist Layer + Decision Coverage Gate (import GSD) — module feature-dev-gates (Session 051)
 - LRN-101 : Pattern "agent minimal + 2 skills composables"
 - LRN-106 : Audit avant fix
 - LRN-107 : Repo central versionné > zip ad-hoc
