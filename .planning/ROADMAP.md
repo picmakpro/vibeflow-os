@@ -81,7 +81,9 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. L'agent détecte l'absence de `.planning/` au premier usage.
   2. Il propose map-codebase puis new-project sur confirmation (jamais `gsd-new-project` seul).
-**Plans**: TBD
+**Plans**: 1 plan (1 wave)
+Plans:
+- [ ] 06-01-PLAN.md — garde-fou first-use dans AGENT.md (détection `.planning/PROJECT.md` absent → délégation vf-init, new-project jamais seul) + axe de test T7 (FIRST-01, FIRST-02)
 
 ## Progress
 
@@ -95,4 +97,4 @@ Plans:
 | 3. Engine scope-aware | Install UX | 0/2 | Not started | - |
 | 4. Skill /vibeflow-install | Install UX | 0/2 | Not started | - |
 | 5. Packaging plugin | Install UX | 0/2 | Planned | - |
-| 6. dev-orchestrator first-use | Install UX | 0/TBD | Not started | - |
+| 6. dev-orchestrator first-use | Install UX | 0/1 | Planned | - |
