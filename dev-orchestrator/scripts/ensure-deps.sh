@@ -28,7 +28,9 @@ set -uo pipefail
 
 # ---------- Variables ----------
 DRY_RUN="${VF_ENSURE_DRY_RUN:-}"
+AUTO_MAP="${VF_ENSURE_AUTO_MAP:-}"
 GSD_VERSION_FILE="$HOME/.claude/get-shit-done/VERSION"
+PLUGINS_CACHE_DIR="$HOME/.claude/plugins/cache"
 
 # ---------- Helpers ----------
 log() {
@@ -83,10 +85,84 @@ ensure_gsd() {
   return 0
 }
 
+# ---------- Superpowers (BOOT-02 / BOOT-03) ----------
+
+# Détecte Superpowers : présent dans la liste des plugins OU dossier en cache.
+detect_superpowers() {
+  if command -v claude >/dev/null 2>&1 && claude plugin list 2>/dev/null | grep -q superpowers; then
+    return 0
+  fi
+  [ -d "$PLUGINS_CACHE_DIR" ] && find "$PLUGINS_CACHE_DIR" -type d -name 'superpowers*' 2>/dev/null | grep -q .
+}
+
+ensure_superpowers() {
+  if detect_superpowers; then
+    log "Superpowers déjà présent (skip)."
+    return 0
+  fi
+
+  # Prérequis : CLI claude sur le PATH. Absent → étape manuelle TUI, jamais d'échec silencieux.
+  if ! command -v claude >/dev/null 2>&1; then
+    err "CLI claude introuvable — Superpowers ne peut pas être auto-installé."
+    log "Étape manuelle Superpowers (dans la TUI Claude Code) :"
+    log "  /plugin install superpowers@claude-plugins-official"
+    return 0
+  fi
+
+  log "Superpowers absent — installation via plugin (non-interactif)..."
+  if run_cmd claude plugin install superpowers@claude-plugins-official --scope user; then
+    log "Superpowers installé via plugin."
+    return 0
+  fi
+
+  # Fallback : ajouter le marketplace puis re-tenter l'install.
+  log "Install directe KO — tentative via marketplace..."
+  if run_cmd claude plugin marketplace add anthropics/claude-plugins-official &&
+    run_cmd claude plugin install superpowers@claude-plugins-official --scope user; then
+    log "Superpowers installé via marketplace + plugin."
+    return 0
+  fi
+
+  # Toujours KO → étape manuelle (jamais d'échec silencieux).
+  err "L'auto-install Superpowers a échoué (directe + marketplace)."
+  log "Étape manuelle Superpowers (dans la TUI Claude Code) :"
+  log "  /plugin install superpowers@claude-plugins-official"
+  return 0
+}
+
+# ---------- Garde-fou init (BOOT-04) ----------
+
+# Détecte un codebase dans le cwd (fichiers de code courants à la racine ou un niveau sous src/).
+detect_codebase() {
+  find . -maxdepth 2 \
+    \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.py' \
+    -o -name '*.go' -o -name '*.swift' -o -name '*.rs' -o -name '*.java' \) \
+    2>/dev/null | grep -q .
+}
+
+# IMPORTANT : ne lance JAMAIS gsd-new-project (interactif). Se contente d'inviter à confirmer.
+guard_init() {
+  if detect_codebase; then
+    if [ -n "$AUTO_MAP" ]; then
+      log "Codebase détecté + VF_ENSURE_AUTO_MAP=1 → gsd-map-codebase est lançable (non-interactif)."
+    else
+      log "Projet dev détecté — l'agent proposera l'init (gsd-new-project sur confirmation seulement)."
+    fi
+  fi
+}
+
 # ---------- Main ----------
 main() {
   log "Bootstrap dépendances (mode=$([ -n "$DRY_RUN" ] && echo dry-run || echo apply))"
   ensure_gsd
+  ensure_superpowers
+  guard_init
+
+  # Résumé final clair de l'état des deux piliers.
+  local gsd_state sp_state
+  gsd_state=$(detect_gsd && echo "présent" || echo "manquant (étape manuelle affichée)")
+  sp_state=$(detect_superpowers && echo "présent" || echo "manquant (étape manuelle affichée)")
+  log "Résumé : GSD=$gsd_state ; Superpowers=$sp_state"
   return 0
 }
 
