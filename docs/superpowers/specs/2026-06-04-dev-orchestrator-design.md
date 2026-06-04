@@ -113,13 +113,38 @@ Lean : **≤250 lignes** (charte densité VibeFlow). Contenu :
 
 ## 7. Composant — Bootstrap d'auto-installation (`ensure-deps.sh`, D3)
 
-Branché sur `vibeflow-update.sh` (install du module) + garde-fou SessionStart léger :
+**Faisabilité étudiée (2026-06-04) : les deux dépendances sont auto-installables en
+non-interactif.** Étapes manuelles affichées uniquement si un prérequis (Node/npm ou
+le CLI `claude`) manque.
 
-1. Détecte GSD (`which gsd-sdk`) → si absent : `npm i -g get-shit-done-cc` (ou source équivalente).
-2. Détecte Superpowers (plugin) → si absent : l'installe.
-3. **Idempotent** : ne réinstalle pas si présent ; log clair de ce qui a été fait.
-4. Si du code existe → `map-codebase` peut tourner automatiquement (non-interactif).
-5. `gsd-new-project` (interactif) **ne se lance jamais seul** : l'agent propose
+Branché sur `vibeflow-update.sh` (install du module) + garde-fou SessionStart léger.
+
+### 7.1 GSD
+- Détection : `which gsd-sdk` (sinon `~/.claude/get-shit-done/VERSION`).
+- Auto-install non-interactif : `npx -y get-shit-done-cc@latest --claude --global`
+  - L'installeur `bin/install.js` est interactif par défaut mais les flags `--claude`
+    (runtime) et `--global` (scope) bypassent les prompts `readline` (`install.js:81-114`).
+- Prérequis : Node.js/npm sur le PATH. Si absent → afficher étapes manuelles (installer
+  Node, puis relancer).
+- Note migration : package historique `get-shit-done-cc` (v1.40.0, prouvé localement) ;
+  nouveau home `@opengsd/gsd-core` (repo `gsd-build/get-shit-done` archivé →
+  `open-gsd/gsd-core`). Pinner `get-shit-done-cc`, surveiller la bascule.
+
+### 7.2 Superpowers
+- Détection : présence du plugin sous `~/.claude/plugins/cache/.../superpowers/` ou
+  `claude plugin list | grep superpowers`.
+- Auto-install non-interactif : `claude plugin install superpowers@claude-plugins-official --scope user`
+  - Fallback marketplace : `claude plugin marketplace add anthropics/claude-plugins-official`
+    (déjà connue par défaut dans `known_marketplaces.json`).
+- Prérequis : CLI `claude` sur le PATH. Si absent → afficher l'étape manuelle TUI :
+  `/plugin install superpowers@claude-plugins-official`.
+
+### 7.3 Règles communes
+1. **Idempotent** : ne réinstalle pas si présent ; log clair de ce qui a été fait.
+2. **Vérifie les exit codes** : un échec d'auto-install bascule sur l'affichage des
+   étapes manuelles (jamais d'échec silencieux).
+3. Si du code existe → `map-codebase` peut tourner automatiquement (non-interactif).
+4. `gsd-new-project` (interactif) **ne se lance jamais seul** : l'agent propose
    « Je détecte un projet dev — je l'initialise ? » et n'agit que sur confirmation.
 
 ## 8. Vérification / qualité
