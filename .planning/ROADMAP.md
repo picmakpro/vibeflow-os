@@ -69,7 +69,10 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. `plugin.json` + `marketplace.json` valides ; le plugin bundle modules + skill + engine + manifeste.
   2. `claude plugin marketplace add picmakpro/vibeflow-os` + `install vibeflow` fonctionnent en zéro-auth (repo public).
-**Plans**: TBD
+**Plans**: 2 plans (2 waves — Plan 02 CONFIRMATION-GATED / non-autonome)
+Plans:
+- [ ] 05-01-PLAN.md — `.claude-plugin/plugin.json` + `marketplace.json` (calque Superpowers) + câblage VIBEFLOW_CACHE=${CLAUDE_PLUGIN_ROOT} dans le skill + doc d'install 2-commandes (PLUG-01, PLUG-02)
+- [ ] 05-02-PLAN.md — checklist pré-public + flip repo public + validation marketplace add/install zéro-auth — CONFIRMÉ HORS-AGENT (PLUG-03, PLUG-04)
 
 #### Phase 6: dev-orchestrator first-use
 **Goal**: Au 1er usage, l'agent détecte un projet non GSD-initialisé et propose l'init.
@@ -91,5 +94,5 @@ Plans:
 | 2. Manifeste & résolveur | Install UX | 2/2 | Complete | 2026-06-04 |
 | 3. Engine scope-aware | Install UX | 0/2 | Not started | - |
 | 4. Skill /vibeflow-install | Install UX | 0/2 | Not started | - |
-| 5. Packaging plugin | Install UX | 0/TBD | Not started | - |
+| 5. Packaging plugin | Install UX | 0/2 | Planned | - |
 | 6. dev-orchestrator first-use | Install UX | 0/TBD | Not started | - |
