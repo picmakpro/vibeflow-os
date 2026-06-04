@@ -52,10 +52,10 @@
 
 ### Skill /vibeflow-install + auto-lancement (Phase 4)
 
-- [ ] **INST-01**: Toggle scope (single-select user/project/local).
-- [ ] **INST-02**: Toggle modules (multi-select) avec description issue des `module.json`.
-- [ ] **INST-03**: Récap des dépendances auto-résolues avant install.
-- [ ] **INST-04**: Orchestration de l'install au scope choisi (modules + GSD + Superpowers).
+- [x] **INST-01**: Toggle scope (single-select user/project/local).
+- [x] **INST-02**: Toggle modules (multi-select) avec description issue des `module.json`.
+- [x] **INST-03**: Récap des dépendances auto-résolues avant install.
+- [x] **INST-04**: Orchestration de l'install au scope choisi (modules + GSD + Superpowers).
 - [ ] **INST-05**: Hook `SessionStart` + marqueur de 1er lancement → ouvre l'UX automatiquement (ID8).
 
 ### Packaging plugin (Phase 5)
@@ -109,10 +109,10 @@
 | SCOPE-02 | Phase 3 | Complete |
 | SCOPE-03 | Phase 3 | Complete |
 | SCOPE-04 | Phase 3 | Complete |
-| INST-01 | Phase 4 | Pending |
-| INST-02 | Phase 4 | Pending |
-| INST-03 | Phase 4 | Pending |
-| INST-04 | Phase 4 | Pending |
+| INST-01 | Phase 4 | Complete |
+| INST-02 | Phase 4 | Complete |
+| INST-03 | Phase 4 | Complete |
+| INST-04 | Phase 4 | Complete |
 | INST-05 | Phase 4 | Pending |
 | PLUG-01 | Phase 5 | Pending |
 | PLUG-02 | Phase 5 | Pending |
