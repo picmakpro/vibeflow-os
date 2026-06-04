@@ -31,8 +31,8 @@
 
 ### Vérification
 
-- [ ] **VERIF-01**: `tests/test-dev-orchestrator.sh` couvre génération d'index, idempotence de `ensure-deps`, couverture du routage, mapping `/vf-*` non orphelin.
-- [ ] **VERIF-02**: Gates de densité respectés (agent ≤250L, skills ≤500L), vérifiés par `wc -l` dans le test du module (`check-file-size.sh` n'audite pas les `.md` : regex code sans `.md`).
+- [x] **VERIF-01**: `tests/test-dev-orchestrator.sh` couvre génération d'index, idempotence de `ensure-deps`, couverture du routage, mapping `/vf-*` non orphelin.
+- [x] **VERIF-02**: Gates de densité respectés (agent ≤250L, skills ≤500L), vérifiés par `wc -l` dans le test du module (`check-file-size.sh` n'audite pas les `.md` : regex code sans `.md`).
 
 ## v2 Requirements
 
@@ -65,8 +65,8 @@
 | BOOT-02 | Phase 1 | Complete |
 | BOOT-03 | Phase 1 | Complete |
 | BOOT-04 | Phase 1 | Complete |
-| VERIF-01 | Phase 1 | Pending |
-| VERIF-02 | Phase 1 | Pending |
+| VERIF-01 | Phase 1 | Complete |
+| VERIF-02 | Phase 1 | Complete |
 
 **Coverage:**
 - v1 requirements: 14 total
