@@ -21,8 +21,8 @@ fournit trois briques complémentaires :
    reformule toutes les sorties en vocabulaire VibeFlow (rapport de sprint, feuille de route…).
 2. **Verbes `/vf-*`** (`skills/vf-*/`) — points d'entrée utilisateur explicites
    (`vf-dev`, `vf-plan`, `vf-execute`, `vf-test`, `vf-review`, `vf-debug`, `vf-ship`,
-   `vf-auto`, `vf-progress`, `vf-quick`, `vf-brainstorm`, `vf-init`). Chaque verbe délègue à
-   une cible canonique unique et partage exactement les mêmes cibles que l'agent.
+   `vf-auto`, `vf-progress`, `vf-quick`, `vf-brainstorm`, `vf-init`, `vf-map`). Chaque verbe
+   délègue à une cible canonique unique et partage exactement les mêmes cibles que l'agent.
 3. **Scripts** (`scripts/`) — bootstrap et indexation :
    - `ensure-deps.sh` : auto-install non-interactif et **idempotent** de GSD + Superpowers
      (fallback manuel si Node/npm ou CLI `claude` manquent — jamais d'échec silencieux).
@@ -36,7 +36,7 @@ fournit trois briques complémentaires :
 ```
 dev-orchestrator/
 ├── AGENT.md                       # agent vibeflow-dev (≤250L, dense)
-├── skills/vf-*/SKILL.md           # 12 verbes utilisateur /vf-* (≤500L chacun)
+├── skills/vf-*/SKILL.md           # 13 verbes utilisateur /vf-* (≤500L chacun)
 ├── scripts/
 │   ├── ensure-deps.sh             # bootstrap deps (idempotent, dry-run testable)
 │   ├── build-gsd-index.sh         # index factuel (VF_INDEX_OUT surchargeable)
@@ -81,6 +81,9 @@ L'utilisateur parle normalement ; l'agent `vibeflow-dev` route :
 
 | Vous dites… | Coulisse (invisible) |
 |---|---|
+| « initialise », « démarre VibeFlow », « on commence par quoi ? » | bootstrap des dépendances + proposition d'init |
+| « cartographie le code », « c'est quoi ce repo ? », « explique l'archi » | cartographie du code |
+| « démarre un nouveau projet », « repartir de zéro » | démarrage de projet (sur confirmation) |
 | « réfléchis à… », « et si on… » | exploration / idéation |
 | « planifie », « cadre cette feature » | cadrage puis plan de travail |
 | « code ça », « implémente la feature X » | exécution du plan |
@@ -93,9 +96,18 @@ L'utilisateur parle normalement ; l'agent `vibeflow-dev` route :
 
 ### Verbes explicites `/vf-*`
 
-Pour invoquer directement : `vf-init` (bootstrap), `vf-brainstorm`, `vf-plan`,
-`vf-execute`, `vf-quick`, `vf-test`, `vf-review`, `vf-debug`, `vf-auto`, `vf-ship`,
-`vf-progress`, `vf-dev` (aiguilleur générique).
+Pour invoquer directement : `vf-init` (bootstrap + démarrage de projet),
+`vf-map` (cartographie d'un code existant), `vf-brainstorm`, `vf-plan`, `vf-execute`,
+`vf-quick`, `vf-test`, `vf-review`, `vf-debug`, `vf-auto`, `vf-ship`, `vf-progress`,
+`vf-dev` (aiguilleur générique).
+
+### Parcours types
+
+- **Premier contact (dossier vierge)** : `vf-init` → amorce les dépendances, puis propose
+  de démarrer un projet (sur confirmation).
+- **Projet existant** : `vf-map` (comprendre l'existant) → `vf-plan` → `vf-execute` → `vf-test`.
+- **Tâche unique rapide** : `vf-quick` (ou dites simplement « corrige ce typo »).
+- **En autonomie totale** : `vf-auto` enchaîne plan → exécution → recette tout seul.
 
 ### Bootstrap des dépendances
 

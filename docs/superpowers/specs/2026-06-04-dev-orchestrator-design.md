@@ -48,7 +48,8 @@ dev-orchestrator/
 │   ├── vf-auto/                  # → gsd-autonomous
 │   ├── vf-ship/                  # → gsd-ship
 │   ├── vf-progress/              # → gsd-progress
-│   └── vf-init/                  # bootstrap : ensure-deps + offre d'init projet
+│   ├── vf-init/                  # bootstrap : ensure-deps + offre d'init projet
+│   └── vf-map/                   # → gsd-map-codebase (cartographie d'un code existant)
 └── scripts/
     ├── ensure-deps.sh            # détecte + installe GSD (npm) + superpowers (plugin), idempotent
     ├── build-gsd-index.sh        # parse les SKILL.md/workflows GSD → references/gsd-skills-index.md
