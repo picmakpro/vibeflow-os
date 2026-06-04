@@ -19,8 +19,8 @@
 
 ### Abstraction
 
-- [ ] **ABS-01**: Un set complet de commandes `/vf-*` mappe vers GSD/superpowers/bootstrap, invocables par l'utilisateur ET par l'agent en autonomie.
-- [ ] **ABS-02**: Une traduction de vocabulaire masque les termes GSD (ex. « SUMMARY » → « rapport de sprint »).
+- [x] **ABS-01**: Un set complet de commandes `/vf-*` mappe vers GSD/superpowers/bootstrap, invocables par l'utilisateur ET par l'agent en autonomie.
+- [x] **ABS-02**: Une traduction de vocabulaire masque les termes GSD (ex. « SUMMARY » → « rapport de sprint »).
 
 ### Bootstrap auto-install
 
@@ -59,8 +59,8 @@
 | ROUT-04 | Phase 1 | Complete |
 | IDX-01 | Phase 1 | Complete |
 | IDX-02 | Phase 1 | Complete |
-| ABS-01 | Phase 1 | Pending |
-| ABS-02 | Phase 1 | Pending |
+| ABS-01 | Phase 1 | Complete |
+| ABS-02 | Phase 1 | Complete |
 | BOOT-01 | Phase 1 | Complete |
 | BOOT-02 | Phase 1 | Complete |
 | BOOT-03 | Phase 1 | Complete |
