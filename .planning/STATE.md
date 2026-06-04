@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Scaffolding `.planning/` terminé, prêt pour plan-phase 1
-last_updated: "2026-06-04T14:38:58.515Z"
+last_updated: "2026-06-04T14:43:17.151Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 5
-  completed_plans: 1
-  percent: 20
+  completed_plans: 2
+  percent: 40
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 ## Current Position
 
 Phase: 1 of 1 (dev-orchestrator)
-Plan: 1 of 5 in current phase
+Plan: 2 of 5 in current phase
 Status: Ready to execute
 Last activity: 2026-06-04
 
-Progress: [██░░░░░░░░] 20%
+Progress: [████░░░░░░] 40%
 
 ## Performance Metrics
 
@@ -46,6 +46,7 @@ Progress: [██░░░░░░░░] 20%
 |-------|-------|-------|----------|
 | 1. dev-orchestrator | 0/5 | - | - |
 | Phase 01-dev-orchestrator P01 | 10min | 2 tasks | 6 files |
+| Phase 01 P02 | 10 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -57,6 +58,8 @@ Recent decisions affecting current work:
 - [Phase 1]: D4 — index 100% auto-généré, ordre pipeline documenté dans l'agent.
 - [Phase 1]: D3 — install auto des deps, init projet sur confirmation seulement.
 - [Phase ?]: Index GSD trié alphabétiquement pour diff déterministe + idempotence vérifiable (Plan 01-01)
+- [Phase ?]: [Phase 1]: ensure-deps.sh utilise set -uo pipefail (sans -e) car les détections reposent sur des exit non-zéro normaux (Plan 01-02)
+- [Phase ?]: [Phase 1]: Contrat de test VF_ENSURE_DRY_RUN=1 pour valider l'idempotence sans réseau (Plan 01-02)
 
 ### Pending Todos
 
@@ -74,6 +77,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-04T14:38:41.088Z
+Last session: 2026-06-04T14:43:00.820Z
 Stopped at: Scaffolding `.planning/` terminé, prêt pour plan-phase 1
 Resume file: None

@@ -26,7 +26,7 @@ Le module est ensuite branchable sur n'importe quel lab via `vibeflow-update.sh`
 
 Plans:
 - [x] 01-01-PLAN.md — Scaffolding module + générateur d'index (`build-gsd-index.sh` → `gsd-skills-index.md`) [wave 1]
-- [ ] 01-02-PLAN.md — Bootstrap auto-install (`ensure-deps.sh` + fallback manuel, BOOT-01..04) [wave 1]
+- [x] 01-02-PLAN.md — Bootstrap auto-install (`ensure-deps.sh` + fallback manuel, BOOT-01..04) [wave 1]
 - [ ] 01-03-PLAN.md — Agent `vibeflow-dev` (`AGENT.md`) + doctrine pipeline (`references/GSD-PIPELINE.md`, ROUT-01..04) [wave 2]
 - [ ] 01-04-PLAN.md — Couche d'abstraction : 12 skills `/vf-*` + traduction de vocabulaire (ABS-01..02) [wave 3]
 - [ ] 01-05-PLAN.md — Vérification (`tests/`) + intégration `vibeflow-update.sh` + README (VERIF-01..02) [wave 4]
