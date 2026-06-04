@@ -13,6 +13,8 @@
 #   T5 — Densité (VERIF-02) MESURÉE PAR wc -l UNIQUEMENT : AGENT.md ≤250L, chaque skill ≤500L.
 #        (NE PAS appeler le contrôleur de taille générique qui ignore les .md.)
 #   T6 — Install end-to-end via vibeflow-update.sh (best-effort, SKIP si non réalisable).
+#   T7 — Garde-fou first-use présent dans AGENT.md : détection .planning + délégation vf-init
+#        + new-project encadré (régression FIRST-01/FIRST-02 ; fichier filtré des commentaires).
 #
 # Convention : asserts numérotés, helpers ok()/ko()/skip(), exit 0 si tout passe
 # (SKIP non bloquant), exit 1 si au moins un KO. Calqué sur le pattern de test du repo.
@@ -267,6 +269,22 @@ else
     skip "T6 install e2e : install non réalisable dans l'environnement (best-effort)"
   fi
   rm -rf "$LAB"
+fi
+
+# ---------------------------------------------------------------------------
+# T7 — Garde-fou first-use présent dans AGENT.md (régression FIRST-01/FIRST-02)
+# ---------------------------------------------------------------------------
+# Présence du garde-fou sur fichier FILTRÉ des commentaires (hygiène grep-gate : un simple
+# commentaire ne doit pas suffire). Pas de check densité ici (T5 le fait déjà via wc -l).
+has_marker=$("$GREP" -v '^#' "$AGENT_FILE" | "$GREP" -ci 'first-use\|premier usage')
+has_detect=0; "$GREP" -q -- '.planning' "$AGENT_FILE" && has_detect=1
+has_vfinit=0; "$GREP" -q -- 'vf-init'   "$AGENT_FILE" && has_vfinit=1
+has_noauto=$("$GREP" -v '^#' "$AGENT_FILE" | "$GREP" -ci 'new-project')
+
+if [ "${has_marker:-0}" -ge 1 ] && [ "$has_detect" -eq 1 ] && [ "$has_vfinit" -eq 1 ] && [ "${has_noauto:-0}" -ge 1 ]; then
+  ok "T7 first-use : garde-fou présent (détection .planning + délégation vf-init + new-project encadré)"
+else
+  ko "T7 first-use : garde-fou incomplet dans AGENT.md (marker=$has_marker detect=$has_detect vfinit=$has_vfinit noauto=$has_noauto)"
 fi
 
 # ---------------------------------------------------------------------------
