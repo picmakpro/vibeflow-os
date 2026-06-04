@@ -1,167 +1,112 @@
 # INSTALL — vibeflow-os
 
-> Guide d'installation des modules vibeflow-os dans un lab existant.
+> Guide d'installation de VibeFlow comme **plugin Claude Code**.
 
 ---
 
 ## Pré-requis
 
-- Accès en lecture au repo `picmakpro/vibeflow-os` (privé) via `gh CLI` ou SSH key
-- Lab cible avec structure standard : `.claude/skills/`, `.claude/scripts/`, `.claude/memory/`
-- `bash 4+`, `python3 3.8+`, `awk`, `grep`, `sed` (macOS/Linux)
+- **Claude Code** à jour (commande `claude plugin` disponible).
+- `bash 4+`, `python3 3.8+`, `awk`, `grep`, `sed` (macOS/Linux) — utilisés par l'engine bundlé.
+
+Aucun accès privé, aucun clone, aucune auth `gh` ne sont requis pour installer le plugin.
 
 ---
 
-## Méthode 1 — Install via script vibeflow-update.sh (recommandée)
-
-### Étape 1 — Cloner le repo en cache local
+## Installation (2 commandes)
 
 ```bash
-cd /chemin/vers/votre-lab
-git clone --depth 1 https://github.com/picmakpro/vibeflow-os.git .vibeflow-cache
+claude plugin marketplace add picmakpro/vibeflow-os
+claude plugin install vibeflow
 ```
 
-Le dossier `.vibeflow-cache/` doit être ajouté à `.gitignore` du lab (c'est un cache, pas du code de projet).
+- La 1ère commande ajoute le marketplace VibeFlow (le repo GitHub `picmakpro/vibeflow-os` héberge
+  son propre `marketplace.json`).
+- La 2nde installe le plugin `vibeflow` : Claude Code copie le bundle (modules + skill `installer/`
+  + engine `_internal/` + hook) dans son cache local de plugins.
 
-### Étape 2 — Installer le script vibeflow-update.sh
-
-```bash
-mkdir -p .claude/scripts
-cp .vibeflow-cache/_internal/vibeflow-update.sh .claude/scripts/
-chmod +x .claude/scripts/vibeflow-update.sh
-```
-
-### Étape 3 — Installer un module
-
-```bash
-.claude/scripts/vibeflow-update.sh install consolidator
-```
-
-Cela copie :
-- `.vibeflow-cache/consolidator/SKILL.md` → `.claude/skills/consolidator/SKILL.md`
-- `.vibeflow-cache/consolidator/references/` → `.claude/skills/consolidator/references/`
-- `.vibeflow-cache/consolidator/scripts/*.sh` → `.claude/scripts/`
-- Crée `.claude/scripts/.vibeflow-installed` (registre des modules installés)
-
-### Étape 4 — Configurer les hooks (optionnel mais recommandé)
-
-Le module `consolidator` propose un hook `SessionEnd` async qui appelle `archive.sh`. Pour l'activer, ajouter dans `.claude/settings.json` ou `settings.local.json` :
-
-```json
-"hooks": {
-  "SessionEnd": [{
-    "hooks": [{
-      "type": "command",
-      "command": "test -x .claude/scripts/archive.sh && .claude/scripts/archive.sh --async --threshold-days=90 >/dev/null 2>&1 &"
-    }]
-  }]
-}
-```
-
-Voir `.vibeflow-cache/consolidator/SKILL.md` pour les autres hooks proposés.
+Aucune édition de `settings.json`, aucun script à lancer manuellement.
 
 ---
 
-## Méthode 2 — Install manuelle (sans script)
+## Auto-lancement (1er lancement)
 
-Si tu préfères contrôler chaque copie :
+Charger un plugin équivaut à un restart de Claude Code. À la **session suivante**, le hook
+`SessionStart` du plugin détecte qu'aucun marqueur `scripts/.vibeflow-installed` n'existe → il
+ouvre **automatiquement** l'UX `/vibeflow-install` :
 
-```bash
-git clone --depth 1 https://github.com/picmakpro/vibeflow-os.git /tmp/vibeflow-os
-cp -r /tmp/vibeflow-os/consolidator/SKILL.md .claude/skills/consolidator/
-cp -r /tmp/vibeflow-os/consolidator/references .claude/skills/consolidator/
-cp /tmp/vibeflow-os/consolidator/scripts/*.sh .claude/scripts/
-chmod +x .claude/scripts/*.sh
-```
+1. **Toggle scope** (single-select) : compte (`user`) / projet (`project`) / projet sans commit
+   (`local`). Le scope choisi s'applique partout (modules VibeFlow + dépendances).
+2. **Toggle modules** (multi-select) : la liste est peuplée depuis le catalogue (chaque module +
+   sa description 1 ligne).
+3. **Auto-résolution + récap** : la fermeture transitive des `requires` est calculée et
+   **récapitulée** avant toute install.
+4. **Install scopée** : les modules sélectionnés sont posés au scope choisi.
+
+Une fois l'install terminée, le marqueur est posé et l'auto-lancement ne se redéclenche plus.
+
+### Re-configurer / ajouter un module
+
+`/vibeflow-install` reste invocable à la main pour changer de scope, ajouter ou retirer un module ;
+les dépendances sont re-résolues automatiquement à chaque passage.
 
 ---
 
 ## Mises à jour
 
-### Vérifier les versions disponibles
-
 ```bash
-.claude/scripts/vibeflow-update.sh status
+claude plugin update vibeflow
 ```
 
-Sortie type :
-```
-Module           Installed  Available  Status
-consolidator     v1.0.0     v1.0.1     Update available
-infrastructure-  -          v1.0.0     Not installed
-```
-
-### Update un module
-
-```bash
-.claude/scripts/vibeflow-update.sh update consolidator
-```
-
-Le script :
-1. Tire les derniers commits du cache `.vibeflow-cache/`
-2. Backup l'installation actuelle dans `.claude/.backups/`
-3. Copie les nouveaux fichiers
-4. Met à jour `.claude/scripts/.vibeflow-installed`
-
-### Update tous
-
-```bash
-.claude/scripts/vibeflow-update.sh update --all
-```
-
-### Rollback
-
-```bash
-.claude/scripts/vibeflow-update.sh rollback consolidator
-```
+Récupère la dernière version publiée du plugin depuis le marketplace, puis re-passer par
+`/vibeflow-install` si tu veux activer de nouveaux modules apparus dans le catalogue.
 
 ---
 
-## Désinstallation d'un module
+## Désinstallation
 
 ```bash
-.claude/scripts/vibeflow-update.sh uninstall consolidator
+claude plugin uninstall vibeflow
 ```
 
-Le script supprime les fichiers installés et l'entrée dans `.vibeflow-installed`. Le cache `.vibeflow-cache/` reste intact (utile pour re-installer plus tard).
+Cela retire le plugin (skill + hook + bundle) du cache de Claude Code. Les modules déjà copiés
+dans un scope (`.claude/skills/`, `.claude/agents/`, etc.) restent en place ; les retirer
+manuellement si besoin.
 
 ---
 
 ## Sécurité
 
-- Tous les scripts sont **idempotents** (peuvent être ré-exécutés sans casser l'installation)
-- Tous les `--apply` créent un backup automatique
-- Les modules sont **distribués en lecture seule** (le script `vibeflow-update.sh` ne pousse jamais de modifications vers le repo central)
-- Pour proposer une modification : fork + PR sur `picmakpro/vibeflow-os`
+- L'engine et les modules sont des scripts **shell + Python** auditables ligne par ligne.
+- Tous les scripts d'install sont **idempotents** (ré-exécutables sans casser l'installation).
+- Les copies créent un backup automatique avant écrasement.
+- Le hook `SessionStart` ne fait que **lire** un marqueur et émettre du JSON : aucune écriture,
+  aucun effet de bord.
 
 ---
 
 ## Troubleshooting
 
-### "Permission denied" sur scripts
+### `claude plugin` introuvable
+
+Mettre Claude Code à jour : la commande `plugin` doit être disponible.
+
+### Le plugin ne s'auto-lance pas
+
+L'auto-lancement se déclenche à la **session suivant** l'install (restart). Vérifier qu'aucun
+marqueur `scripts/.vibeflow-installed` n'existe déjà (sinon le hook reste volontairement
+silencieux). On peut toujours lancer `/vibeflow-install` à la main.
+
+### Le marketplace n'est pas trouvé
 
 ```bash
-chmod +x .claude/scripts/*.sh .claude/scripts/tests/*.sh
+claude plugin marketplace add picmakpro/vibeflow-os
+claude plugin marketplace list
 ```
 
-### Cache désynchronisé
+### Réinstaller le plugin
 
 ```bash
-rm -rf .vibeflow-cache
-git clone --depth 1 https://github.com/picmakpro/vibeflow-os.git .vibeflow-cache
-```
-
-### Module corrompu
-
-```bash
-.claude/scripts/vibeflow-update.sh rollback <module>
-# OU
-.claude/scripts/vibeflow-update.sh reinstall <module>
-```
-
-### Auth GitHub échoue
-
-```bash
-gh auth status
-gh auth login  # si nécessaire
+claude plugin uninstall vibeflow
+claude plugin install vibeflow
 ```
