@@ -20,6 +20,7 @@ Ce repo héberge les **modules réutilisables** de la méthodologie VibeFlow, di
 | [`reference/`](./reference/) | v2.1.1 | doc-only | Documentation méthodologique complète (VIBEFLOW_CORE **v4.2 — 9 principes, +P9** + pointeur P8↔audit-architecture + 11 patterns + 33 templates + 1 exemple) |
 | [`software-architecture/`](./software-architecture/) | v1.0.0 | single-skill + rules + scripts | Doctrine Architecture Logicielle AI-Safe (SOLID/SoC, anti-god-files ≤300L, gates machine-enforced, playbook restructuration brownfield) — ADR-035 |
 | [`audit-architecture/`](./audit-architecture/) | v1.0.0 | single-skill + references | Concepteur d'**architecture d'audit** : dérive depuis un brief la structure d'audit multi-couches d'un process et la force (universel : contenu / dossier / code / vente). Spécialise P8 — ADR-036 |
+| [`dev-orchestrator/`](./dev-orchestrator/) | v1.0.0 | agent + skills + scripts | Orchestrateur de développement (VFDO) : agent routeur `vibeflow-dev` + verbes `/vf-*` + index GSD auto-généré. Route le **langage naturel** vers les skills GSD/Superpowers (cadrage → livraison) sans exposer la plomberie — références D7 sous `.claude/agents/dev-orchestrator-references/` |
 
 ## Types de modules supportés (depuis v2.0.0)
 
