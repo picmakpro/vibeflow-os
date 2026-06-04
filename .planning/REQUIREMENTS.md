@@ -32,7 +32,7 @@
 ### Vérification
 
 - [ ] **VERIF-01**: `tests/test-dev-orchestrator.sh` couvre génération d'index, idempotence de `ensure-deps`, couverture du routage, mapping `/vf-*` non orphelin.
-- [ ] **VERIF-02**: Gates de densité respectés (agent ≤250L, skills ≤500L) via `check-file-size.sh`.
+- [ ] **VERIF-02**: Gates de densité respectés (agent ≤250L, skills ≤500L), vérifiés par `wc -l` dans le test du module (`check-file-size.sh` n'audite pas les `.md` : regex code sans `.md`).
 
 ## v2 Requirements
 
