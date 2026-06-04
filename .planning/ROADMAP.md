@@ -43,7 +43,10 @@ Plans:
   1. `--scope user` cible `~/.claude/` ; `project`/`local` cible `./.claude/` ; `local` ajoute au `.gitignore`.
   2. Les modules sont installés depuis le cache du plugin (plus de `git clone`).
   3. `ensure-deps.sh` installe GSD + Superpowers au scope demandé.
-**Plans**: TBD
+**Plans**: 2 plans (1 wave — parallèles, fichiers disjoints)
+Plans:
+- [ ] 03-01-PLAN.md — vibeflow-update.sh scope-aware : TARGET_ROOT + suppression clone + gitignore local + résolveur câblé + test isolé (SCOPE-01, SCOPE-02, SCOPE-04)
+- [ ] 03-02-PLAN.md — ensure-deps.sh scopé (GSD --global/--local, Superpowers --scope) + test 3 scopes en dry-run (SCOPE-03)
 
 #### Phase 4: Skill /vibeflow-install + auto-lancement
 **Goal**: Le skill interactif (toggles scope + modules, récap déps, orchestration) + auto-lancement au 1er démarrage.
@@ -83,7 +86,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1. dev-orchestrator | vfdo-v1.0 | 5/5 | Complete | 2026-06-04 |
 | 2. Manifeste & résolveur | Install UX | 2/2 | Complete | 2026-06-04 |
-| 3. Engine scope-aware | Install UX | 0/TBD | Not started | - |
+| 3. Engine scope-aware | Install UX | 0/2 | Not started | - |
 | 4. Skill /vibeflow-install | Install UX | 0/TBD | Not started | - |
 | 5. Packaging plugin | Install UX | 0/TBD | Not started | - |
 | 6. dev-orchestrator first-use | Install UX | 0/TBD | Not started | - |
