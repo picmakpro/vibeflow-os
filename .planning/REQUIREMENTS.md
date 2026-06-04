@@ -47,7 +47,7 @@
 
 - [x] **SCOPE-01**: `vibeflow-update.sh` accepte `--scope user|project|local` → résout `TARGET_ROOT` (`~/.claude` vs `./.claude`).
 - [x] **SCOPE-02**: Source des modules = cache du plugin (plus de `git clone .vibeflow-cache`).
-- [ ] **SCOPE-03**: `ensure-deps.sh` scopé : GSD `--global`/`--local`, Superpowers `--scope user|project|local`.
+- [x] **SCOPE-03**: `ensure-deps.sh` scopé : GSD `--global`/`--local`, Superpowers `--scope user|project|local`.
 - [x] **SCOPE-04**: Scope `local` → ajout des chemins installés au `.gitignore`.
 
 ### Skill /vibeflow-install + auto-lancement (Phase 4)
@@ -107,7 +107,7 @@
 | MANIF-02 | Phase 2 | Complete |
 | SCOPE-01 | Phase 3 | Complete |
 | SCOPE-02 | Phase 3 | Complete |
-| SCOPE-03 | Phase 3 | Pending |
+| SCOPE-03 | Phase 3 | Complete |
 | SCOPE-04 | Phase 3 | Complete |
 | INST-01 | Phase 4 | Pending |
 | INST-02 | Phase 4 | Pending |

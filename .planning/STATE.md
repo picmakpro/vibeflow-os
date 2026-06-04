@@ -4,14 +4,14 @@ milestone: install-ux
 milestone_name: Install UX
 status: verifying
 stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-06-04T17:34:50.610Z"
+last_updated: "2026-06-04T17:38:31.265Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 3
-  percent: 75
+  completed_plans: 4
+  percent: 100
 ---
 
 # Project State
@@ -30,7 +30,7 @@ Plan: 2 of 2 in current phase
 Status: Phase complete — ready for verification
 Last activity: 2026-06-04
 
-Progress: [████████░░] 75%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Progress: [████████░░] 75%
 | Phase 02-manifeste-resolveur P01 | 5min | 2 tasks | 8 files |
 | Phase 02-manifeste-resolveur P02 | ~5min | 2 tasks | 2 files |
 | Phase 03-engine-scope-aware P01 | 3min | 3 tasks | 2 files |
+| Phase 03 P02 | 6min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,7 @@ Recent decisions affecting current work:
 - [Phase ?]: Engine défaut LEGACY=project (rétro-compat ./.claude) ; skill /vibeflow-install passe toujours VF_SCOPE explicite (cohérence ID4)
 - [Phase ?]: docs/<mod>/ doc-only laissé hors TARGET_ROOT (relatif au cwd projet)
 - [Phase ?]: Plus de git clone/pull : source = cache local (require_cache) ; sync = no-op explicite
+- [Phase ?]: ensure-deps scope-aware via VF_SCOPE (GSD --global/--local, Superpowers --scope), VF_ENSURE_FORCE dry-run only, defaut LEGACY user (ID4)
 
 ### Pending Todos
 
@@ -89,6 +91,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-04T17:34:33.794Z
+Last session: 2026-06-04T17:38:25.512Z
 Stopped at: Completed 02-02-PLAN.md
 Resume file: None
