@@ -14,7 +14,7 @@ Skill **spécial** (bootstrap interne, pas une délégation à un skill GSD). S�
 
 1. **Amorcer les dépendances** : invoquer le bootstrap `scripts/ensure-deps.sh`
    (auto-install non-interactif de GSD + Superpowers, idempotent, fallback manuel).
-   En production (install D7), le chemin est `.claude/agents/dev-orchestrator/scripts/ensure-deps.sh`.
+   En production, l'installeur copie les scripts à plat : le chemin est `.claude/scripts/ensure-deps.sh`.
 2. **Si du code existe déjà** dans le dossier : proposer la **cartographie du code**
    (`gsd-map-codebase`, non-interactif) pour comprendre l'existant.
 3. **Démarrage d'un nouveau projet** : proposer `gsd-new-project` **UNIQUEMENT sur
