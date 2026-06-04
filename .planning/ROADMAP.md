@@ -32,7 +32,7 @@ Spec : `docs/superpowers/specs/2026-06-04-install-ux-design.md`.
   2. Le résolveur, donné une sélection, retourne la fermeture transitive correcte (validator → +consolidator +infrastructure-audit).
 **Plans**: 2 plans (2 waves)
 Plans:
-- [ ] 02-01-PLAN.md — 8 module.json (name, version, type, description, requires) pour les 8 modules (MANIF-01)
+- [x] 02-01-PLAN.md — 8 module.json (name, version, type, description, requires) pour les 8 modules (MANIF-01)
 - [ ] 02-02-PLAN.md — résolveur de fermeture transitive `_internal/resolve-deps.sh` + test (MANIF-02)
 
 #### Phase 3: Engine scope-aware
