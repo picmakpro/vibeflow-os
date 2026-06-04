@@ -60,8 +60,10 @@ ni cloner de repo.
 
 **Auto-lancement (ID8)** : le plugin embarque un hook `SessionStart` (`hooks/hooks.json` +
 script `hooks/session-start`, sur le modèle Superpowers) qui :
-- vérifie un **marqueur de premier lancement** (ex. absence de `~/.claude/.vibeflow-installed` ET
-  de `./.claude/scripts/.vibeflow-installed`) ;
+- vérifie un **marqueur de premier lancement** = le registre que l'engine écrit déjà,
+  `$TARGET_ROOT/scripts/.vibeflow-installed` : absence de `~/.claude/scripts/.vibeflow-installed`
+  (scope user) ET de `./.claude/scripts/.vibeflow-installed` (scope project/local). Le hook LIT
+  ces marqueurs ; c'est l'install qui les pose (pas de nouveau fichier sentinelle) ;
 - si premier lancement → émet `{"hookSpecificOutput": {"hookEventName": "SessionStart",
   "additionalContext": "<instruction: lance l'UX d'install VibeFlow maintenant>"}}` → l'agent
   ouvre l'UX automatiquement ;
