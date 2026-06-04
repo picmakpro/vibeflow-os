@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: install-ux
 milestone_name: Install UX
-status: executing
+status: verifying
 stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-06-04T17:13:22.318Z"
-last_activity: 2026-06-04 — Plan 02-02 complété (résolveur de deps transitives + test)
+last_updated: "2026-06-04T17:34:50.610Z"
+last_activity: 2026-06-04
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 100
+  total_plans: 4
+  completed_plans: 3
+  percent: 75
 ---
 
 # Project State
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 
 Phase: 2 of 6 (Manifeste & résolveur) — milestone Install UX
 Plan: 2 of 2 in current phase
-Status: Executing
-Last activity: 2026-06-04 — Plan 02-02 complété (résolveur de deps transitives + test)
+Status: Phase complete — ready for verification
+Last activity: 2026-06-04
 
-Progress: [██████████] 100%
+Progress: [████████░░] 75%
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [██████████] 100%
 | Phase 01-dev-orchestrator P05 | ~10min | 2 tasks | 4 files |
 | Phase 02-manifeste-resolveur P01 | 5min | 2 tasks | 8 files |
 | Phase 02-manifeste-resolveur P02 | ~5min | 2 tasks | 2 files |
+| Phase 03-engine-scope-aware P01 | 3min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -68,6 +69,9 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 1]: Modules AGENT — references sous .claude/agents/<mod>-references/ (D7), index régénéré à l'install via VF_INDEX_OUT (IDX-02) (Plan 01-05)
 - [Phase ?]: [Phase 1]: Densité des .md mesurée par wc -l, jamais le contrôleur de taille générique qui ignore les .md (Plan 01-05)
 - [Phase ?]: module.json: requires[] = prérequis module réels uniquement, ENGINE (vibeflow-update.sh) exclu
+- [Phase ?]: Engine défaut LEGACY=project (rétro-compat ./.claude) ; skill /vibeflow-install passe toujours VF_SCOPE explicite (cohérence ID4)
+- [Phase ?]: docs/<mod>/ doc-only laissé hors TARGET_ROOT (relatif au cwd projet)
+- [Phase ?]: Plus de git clone/pull : source = cache local (require_cache) ; sync = no-op explicite
 
 ### Pending Todos
 
@@ -85,6 +89,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-04T17:13:22.314Z
+Last session: 2026-06-04T17:34:33.794Z
 Stopped at: Completed 02-02-PLAN.md
 Resume file: None

@@ -45,10 +45,10 @@
 
 ### Engine scope-aware (Phase 3)
 
-- [ ] **SCOPE-01**: `vibeflow-update.sh` accepte `--scope user|project|local` → résout `TARGET_ROOT` (`~/.claude` vs `./.claude`).
-- [ ] **SCOPE-02**: Source des modules = cache du plugin (plus de `git clone .vibeflow-cache`).
+- [x] **SCOPE-01**: `vibeflow-update.sh` accepte `--scope user|project|local` → résout `TARGET_ROOT` (`~/.claude` vs `./.claude`).
+- [x] **SCOPE-02**: Source des modules = cache du plugin (plus de `git clone .vibeflow-cache`).
 - [ ] **SCOPE-03**: `ensure-deps.sh` scopé : GSD `--global`/`--local`, Superpowers `--scope user|project|local`.
-- [ ] **SCOPE-04**: Scope `local` → ajout des chemins installés au `.gitignore`.
+- [x] **SCOPE-04**: Scope `local` → ajout des chemins installés au `.gitignore`.
 
 ### Skill /vibeflow-install + auto-lancement (Phase 4)
 
@@ -105,10 +105,10 @@
 | VERIF-02 | Phase 1 | Complete |
 | MANIF-01 | Phase 2 | Complete |
 | MANIF-02 | Phase 2 | Complete |
-| SCOPE-01 | Phase 3 | Pending |
-| SCOPE-02 | Phase 3 | Pending |
+| SCOPE-01 | Phase 3 | Complete |
+| SCOPE-02 | Phase 3 | Complete |
 | SCOPE-03 | Phase 3 | Pending |
-| SCOPE-04 | Phase 3 | Pending |
+| SCOPE-04 | Phase 3 | Complete |
 | INST-01 | Phase 4 | Pending |
 | INST-02 | Phase 4 | Pending |
 | INST-03 | Phase 4 | Pending |

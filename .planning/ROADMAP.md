@@ -45,7 +45,7 @@ Plans:
   3. `ensure-deps.sh` installe GSD + Superpowers au scope demandé.
 **Plans**: 2 plans (1 wave — parallèles, fichiers disjoints)
 Plans:
-- [ ] 03-01-PLAN.md — vibeflow-update.sh scope-aware : TARGET_ROOT + suppression clone + gitignore local + résolveur câblé + test isolé (SCOPE-01, SCOPE-02, SCOPE-04)
+- [x] 03-01-PLAN.md — vibeflow-update.sh scope-aware : TARGET_ROOT + suppression clone + gitignore local + résolveur câblé + test isolé (SCOPE-01, SCOPE-02, SCOPE-04)
 - [ ] 03-02-PLAN.md — ensure-deps.sh scopé (GSD --global/--local, Superpowers --scope) + test 3 scopes en dry-run (SCOPE-03)
 
 #### Phase 4: Skill /vibeflow-install + auto-lancement
