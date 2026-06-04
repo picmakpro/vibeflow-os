@@ -1,0 +1,7 @@
+{
+  "name": "consolidator",
+  "version": "v1.0.0",
+  "type": "single-skill+scripts",
+  "description": "Consolidation de la mémoire projet sur 4 piliers.",
+  "requires": []
+}
