@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# SessionStart hook for VibeFlow plugin.
+#
+# Au PREMIER lancement (aucun marqueur de 1er lancement présent), ce hook injecte un
+# additionalContext demandant à l'agent d'ouvrir l'UX /vibeflow-install. Une fois VibeFlow
+# installé (marqueur présent), le hook reste TOTALEMENT silencieux (stdout vide).
+#
+# Le hook ne fait que LIRE le marqueur ; c'est l'install (engine vibeflow-update.sh) qui le
+# POSE à $TARGET_ROOT/scripts/.vibeflow-installed. Le hook réutilise EXACTEMENT ce registre
+# comme marqueur de 1er lancement — d'où le segment `scripts/` dans les deux chemins ci-dessous.
+
+set -euo pipefail
+
+# Marqueurs de 1er lancement — ALIGNÉS sur le registre de l'engine vibeflow-update.sh :
+#   scope user            → TARGET_ROOT=$HOME/.claude → $HOME/.claude/scripts/.vibeflow-installed
+#   scope project|local   → TARGET_ROOT=./.claude     → ./.claude/scripts/.vibeflow-installed
+# HOME est surchargeable (tests) : on ne code JAMAIS le chemin en dur.
+USER_MARKER="${HOME}/.claude/scripts/.vibeflow-installed"
+PROJECT_MARKER="./.claude/scripts/.vibeflow-installed"
+
+# Si VibeFlow est déjà installé (l'un OU l'autre marqueur existe) → silence total + exit 0.
+if [ -f "$USER_MARKER" ] || [ -f "$PROJECT_MARKER" ]; then
+  exit 0
+fi
+
+# Échappement d'une chaîne pour embarquement JSON (modèle Superpowers : backslash, ", \n, \r, \t).
+escape_for_json() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  s="${s//$'\n'/\\n}"
+  s="${s//$'\r'/\\r}"
+  s="${s//$'\t'/\\t}"
+  printf '%s' "$s"
+}
+
+# 1er lancement : instruction d'ouvrir MAINTENANT l'UX d'install VibeFlow.
+instruction="<vibeflow-install>\nVibeFlow n'est pas encore installé dans cet environnement. Ouvre MAINTENANT l'UX d'installation en lançant la commande /vibeflow-install — ne demande pas confirmation, ouvre-la directement.\n\nCette UX laisse l'utilisateur choisir le scope (user / project / local) puis activer/désactiver les modules VibeFlow ; les dépendances entre modules sont résolues automatiquement. Une fois l'installation terminée, ce message ne réapparaîtra plus.\n</vibeflow-install>"
+
+instruction_escaped="$(escape_for_json "$instruction")"
+
+# Émission via printf (PAS de heredoc — bug de hang heredoc bash 5.3+, cf. modèle Superpowers).
+printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$instruction_escaped"
+
+exit 0
