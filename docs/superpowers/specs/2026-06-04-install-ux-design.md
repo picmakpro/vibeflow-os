@@ -7,17 +7,19 @@
 ## 1. Vision
 
 Réduire l'installation de VibeFlow et de ses modules à **presque aucune étape technique**.
-Cible :
+Cible — **deux commandes**, puis l'UX se lance toute seule :
 
 ```
 claude plugin marketplace add picmakpro/vibeflow-os
 claude plugin install vibeflow
-/vibeflow-install
+# → au prochain démarrage de session, l'UX à toggles s'ouvre automatiquement
 ```
 
-Le skill `/vibeflow-install` présente deux listes de toggles dans le terminal — **scope**
-(user/project/local) puis **modules** — et installe tout au bon endroit, dépendances
-auto-résolues. Aucun clone, aucun script à lancer à la main, aucune édition de `settings.json`.
+À la **première session** après l'install, un hook `SessionStart` du plugin détecte le premier
+lancement et **lance automatiquement** l'UX interactive (deux listes de toggles : **scope**
+user/project/local, puis **modules**), installe tout au bon endroit, dépendances auto-résolues.
+Aucun `/vibeflow-install` à taper, aucun clone, aucun script à lancer, aucune édition de `settings.json`.
+Le skill `/vibeflow-install` reste invocable manuellement pour re-configurer plus tard.
 
 **Objectif mesurable** : depuis zéro, un utilisateur installe le plugin et obtient les modules
 voulus au scope voulu (+ GSD + Superpowers) sans jamais taper de commande shell d'installation
@@ -32,6 +34,7 @@ ni cloner de repo.
 | ID3 | Packaging | Le plugin **bundle tout** (modules + skill + engine + manifeste) ; le skill copie depuis le cache plugin → scope ; **pas de git clone** |
 | ID4 | Scope | **Un seul** choix (user/project/local) appliqué à tout : modules VibeFlow + GSD + Superpowers |
 | ID5 | UX interactive | Skill `/vibeflow-install` ; les "toggles" = l'UI de questions du terminal (multi-select) ; scripts minimaux |
+| ID8 | Auto-lancement | Hook `SessionStart` du plugin : au **1er lancement** (marqueur absent), injecte un `additionalContext` qui fait lancer l'UX automatiquement → **2 commandes seulement**, pas de `/vibeflow-install` à taper. Mécanisme éprouvé (Superpowers `hooks/session-start`). Nuance : s'active à la session suivant l'install (chargement plugin = restart) |
 | ID6 | Dépendances modules | Auto-résolues + récap avant install ; manifeste **`module.json`** par module (machine-lisible) |
 | ID7 | dev-orchestrator 1er usage | Détecte `.planning/` absent → propose map-codebase puis new-project (sur confirmation) |
 
@@ -55,7 +58,19 @@ ni cloner de repo.
 
 ## 5. Composant — Skill `/vibeflow-install` (ID5, cœur de l'UX)
 
-Skill agent-driven (les toggles = l'UI de questions, pas un TUI bash). Séquence :
+**Auto-lancement (ID8)** : le plugin embarque un hook `SessionStart` (`hooks/hooks.json` +
+script `hooks/session-start`, sur le modèle Superpowers) qui :
+- vérifie un **marqueur de premier lancement** (ex. absence de `~/.claude/.vibeflow-installed` ET
+  de `./.claude/scripts/.vibeflow-installed`) ;
+- si premier lancement → émet `{"hookSpecificOutput": {"hookEventName": "SessionStart",
+  "additionalContext": "<instruction: lance l'UX d'install VibeFlow maintenant>"}}` → l'agent
+  ouvre l'UX automatiquement ;
+- sinon → n'injecte rien (silencieux).
+
+Le skill `/vibeflow-install` reste invocable à la main (re-config, ajout de modules). La logique
+d'UX vit dans le skill ; le hook ne fait que **déclencher** son invocation au 1er lancement.
+
+Séquence du skill (auto-lancé ou manuel) :
 1. **Détecte l'environnement** : GSD/Superpowers déjà présents ? modules déjà installés ? scope existant ?
 2. **Toggle scope** (single-select) : user / project / local.
 3. **Toggle modules** (multi-select) : tous les modules installables + description 1 ligne (depuis `module.json`).
@@ -110,7 +125,7 @@ sur confirmation explicite). Ne lance jamais `gsd-new-project` seul (cohérent B
 - **Phase 1 — Manifeste & résolveur** : `module.json` pour les 8 modules + résolveur de dépendances (fondation, testable isolément).
 - **Phase 2 — Engine scope-aware** : `vibeflow-update.sh` (scope/TARGET_ROOT, source cache plugin, intégration résolveur) + `ensure-deps.sh` scopé.
 - **Phase 3 — Packaging plugin** : `plugin.json`, `marketplace.json`, bundle, doc d'install ; flip repo public (étape confirmée).
-- **Phase 4 — Skill `/vibeflow-install`** : toggles scope + modules, récap dépendances, orchestration engine + GSD + Superpowers.
+- **Phase 4 — Skill `/vibeflow-install` + auto-lancement** : toggles scope + modules, récap dépendances, orchestration engine + GSD + Superpowers ; hook `SessionStart` + marqueur de 1er lancement (ID8) qui ouvre l'UX automatiquement.
 - **Phase 5 — dev-orchestrator first-use** : détection `.planning/` absent + proposition (extension `vf-init`/agent).
 
 Ordre : 1 → 2 → 3/4 (4 dépend de 1+2 ; 3 packaging peut suivre 4) → 5 (indépendant, peut partir tôt).
