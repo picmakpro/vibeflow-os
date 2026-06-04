@@ -22,20 +22,20 @@ Le module est ensuite branchable sur n'importe quel lab via `vibeflow-update.sh`
   3. `references/gsd-skills-index.md` est généré depuis les skills GSD réellement installés (aucun nom inventé) et se régénère sur update.
   4. Les verbes `/vf-*` existent, mappent vers une cible réelle, et sont invocables par l'agent en autonomie (dont `gsd-autonomous`).
   5. `test-dev-orchestrator.sh` passe à 100% et les gates de densité (agent ≤250L, skills ≤500L) sont verts.
-**Plans**: 5 plans en 3 waves
+**Plans**: 5 plans en 4 waves
 
 Plans:
 - [ ] 01-01-PLAN.md — Scaffolding module + générateur d'index (`build-gsd-index.sh` → `gsd-skills-index.md`) [wave 1]
 - [ ] 01-02-PLAN.md — Bootstrap auto-install (`ensure-deps.sh` + fallback manuel, BOOT-01..04) [wave 1]
 - [ ] 01-03-PLAN.md — Agent `vibeflow-dev` (`AGENT.md`) + doctrine pipeline (`references/GSD-PIPELINE.md`, ROUT-01..04) [wave 2]
-- [ ] 01-04-PLAN.md — Couche d'abstraction : 12 skills `/vf-*` + traduction de vocabulaire (ABS-01..02) [wave 2]
-- [ ] 01-05-PLAN.md — Vérification (`tests/`) + intégration `vibeflow-update.sh` + README (VERIF-01..02) [wave 3]
+- [ ] 01-04-PLAN.md — Couche d'abstraction : 12 skills `/vf-*` + traduction de vocabulaire (ABS-01..02) [wave 3]
+- [ ] 01-05-PLAN.md — Vérification (`tests/`) + intégration `vibeflow-update.sh` + README (VERIF-01..02) [wave 4]
 
 ## Progress
 
 **Execution Order:**
 Phase unique : 1
-Waves : {01, 02} → {03, 04} → {05}
+Waves : {01, 02} → {03} → {04} → {05}
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
