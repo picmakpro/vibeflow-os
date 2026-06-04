@@ -17,6 +17,42 @@ réimplémente RIEN — pas de TUI bash, pas de logique de copie, pas de gitigno
 Ce skill est de la **PROSE agent-driven** : le routage/UX réel se valide en session (comme le
 first-use). Seules les briques déléguées sont testées unitairement.
 
+## Câblage du cache (à appliquer pour CHAQUE délégation — étapes 1, 3, 4, 5)
+
+En contexte plugin, Claude Code fournit `${CLAUDE_PLUGIN_ROOT}` : le chemin absolu du dossier
+d'install du plugin (= le **cache**). C'est là que vivent les modules, leurs `module.json` à la
+racine, et le dossier `_internal/` (engine + résolveur). L'engine attend ce chemin dans deux
+variables :
+
+- `VIBEFLOW_CACHE` — source unique du cache pour `vibeflow-update.sh` (`status`, `install`).
+- `VF_MODULES_ROOT` — racine des modules pour `build-module-catalog.sh` et `resolve-deps.sh`.
+
+**Convention de résolution (avec fallback dev)** — toujours exporter ces variables ainsi avant
+de déléguer à un script :
+
+```sh
+VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT:-<racine du repo vibeflow-os cloné en dev>}"
+VF_MODULES_ROOT="${CLAUDE_PLUGIN_ROOT:-<racine du repo vibeflow-os cloné en dev>}"
+```
+
+- **En plugin installé** : `${CLAUDE_PLUGIN_ROOT}` est défini → les deux variables pointent sur le
+  cache bundlé.
+- **En dev (repo cloné, pas plugin)** : `CLAUDE_PLUGIN_ROOT` est absent → le fallback pointe les
+  deux variables sur la racine du repo `vibeflow-os` (comportement déjà supporté par les scripts :
+  `VF_MODULES_ROOT` défaut = racine repo ; `VIBEFLOW_CACHE` défaut `.vibeflow-cache`, donc en dev
+  on le pointe explicitement sur la racine du repo).
+
+Concrètement, par étape :
+
+- **étape 1 (status)** : `VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT:-…}" vibeflow-update.sh status`
+- **étape 3 (catalogue)** : `VF_MODULES_ROOT="${CLAUDE_PLUGIN_ROOT:-…}" build-module-catalog.sh`
+- **étape 4 (résolveur)** : `VF_MODULES_ROOT="${CLAUDE_PLUGIN_ROOT:-…}" resolve-deps.sh …`
+- **étape 5 (install)** :
+  `VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT:-…}" vibeflow-update.sh --scope <s> install --with-deps <module>`
+
+`_internal/resolve-deps.sh` est **bundlé dans le plugin** (présent dans le cache `${CLAUDE_PLUGIN_ROOT}`)
+→ `--with-deps` fonctionne réellement après une install plugin (lève le warning Phase 3).
+
 ## Séquence
 
 1. **Détection environnement.** GSD / Superpowers présents ? Modules déjà installés
