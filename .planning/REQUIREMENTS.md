@@ -67,8 +67,8 @@
 
 ### dev-orchestrator first-use (Phase 6)
 
-- [ ] **FIRST-01**: L'agent détecte l'absence de `.planning/` (projet non GSD-initialisé) au 1er usage.
-- [ ] **FIRST-02**: Il propose map-codebase puis new-project sur confirmation (jamais `gsd-new-project` seul).
+- [x] **FIRST-01**: L'agent détecte l'absence de `.planning/` (projet non GSD-initialisé) au 1er usage.
+- [x] **FIRST-02**: Il propose map-codebase puis new-project sur confirmation (jamais `gsd-new-project` seul).
 
 ## v2 Requirements
 
@@ -118,8 +118,8 @@
 | PLUG-02 | Phase 5 | Complete |
 | PLUG-03 | Phase 5 | Pending |
 | PLUG-04 | Phase 5 | Pending |
-| FIRST-01 | Phase 6 | Pending |
-| FIRST-02 | Phase 6 | Pending |
+| FIRST-01 | Phase 6 | Complete |
+| FIRST-02 | Phase 6 | Complete |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓

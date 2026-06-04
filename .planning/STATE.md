@@ -4,14 +4,14 @@ milestone: install-ux
 milestone_name: Install UX
 status: verifying
 stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-06-04T18:18:45.956Z"
+last_updated: "2026-06-04T18:37:18.110Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 5
-  completed_phases: 3
-  total_plans: 8
-  completed_plans: 7
-  percent: 88
+  completed_phases: 5
+  total_plans: 9
+  completed_plans: 9
+  percent: 100
 ---
 
 # Project State
@@ -30,7 +30,7 @@ Plan: 2 of 2 in current phase
 Status: Phase complete — ready for verification
 Last activity: 2026-06-04
 
-Progress: [█████████░] 88%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -57,6 +57,7 @@ Progress: [█████████░] 88%
 | Phase 04 P01 | ~1 min | 2 tasks | 3 files |
 | Phase 04 P02 | 5min | 2 tasks | 3 files |
 | Phase 05 P01 | 2 | 3 tasks | 5 files |
+| Phase 06 P01 | 1min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,8 @@ Recent decisions affecting current work:
 - [Phase ?]: Plus de git clone/pull : source = cache local (require_cache) ; sync = no-op explicite
 - [Phase ?]: ensure-deps scope-aware via VF_SCOPE (GSD --global/--local, Superpowers --scope), VF_ENSURE_FORCE dry-run only, defaut LEGACY user (ID4)
 - [Phase ?]: Hook VibeFlow pointe directement le script bash; marqueur 1er lancement aligné sur registre engine scripts/.vibeflow-installed
+- [Phase 06]: Garde-fou first-use placé avant la table de routage (point de décision router-vs-proposer)
+- [Phase 06]: Séquence d'init non dupliquée : délégation au skill vf-init existant
 
 ### Pending Todos
 
@@ -95,6 +98,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-04T18:18:42.806Z
+Last session: 2026-06-04T18:36:28.459Z
 Stopped at: Completed 02-02-PLAN.md
 Resume file: None

@@ -83,7 +83,7 @@ Plans:
   2. Il propose map-codebase puis new-project sur confirmation (jamais `gsd-new-project` seul).
 **Plans**: 1 plan (1 wave)
 Plans:
-- [ ] 06-01-PLAN.md — garde-fou first-use dans AGENT.md (détection `.planning/PROJECT.md` absent → délégation vf-init, new-project jamais seul) + axe de test T7 (FIRST-01, FIRST-02)
+- [x] 06-01-PLAN.md — garde-fou first-use dans AGENT.md (détection `.planning/PROJECT.md` absent → délégation vf-init, new-project jamais seul) + axe de test T7 (FIRST-01, FIRST-02)
 
 ## Progress
 
