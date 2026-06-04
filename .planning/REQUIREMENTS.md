@@ -60,8 +60,8 @@
 
 ### Packaging plugin (Phase 5)
 
-- [ ] **PLUG-01**: `.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json` valides.
-- [ ] **PLUG-02**: Le plugin bundle modules + skill + engine + manifeste.
+- [x] **PLUG-01**: `.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json` valides.
+- [x] **PLUG-02**: Le plugin bundle modules + skill + engine + manifeste.
 - [ ] **PLUG-03**: Repo `vibeflow-os` rendu public (étape délibérée confirmée).
 - [ ] **PLUG-04**: `claude plugin marketplace add` + `install` fonctionnent en zéro-auth (validé).
 
@@ -114,8 +114,8 @@
 | INST-03 | Phase 4 | Complete |
 | INST-04 | Phase 4 | Complete |
 | INST-05 | Phase 4 | Complete |
-| PLUG-01 | Phase 5 | Pending |
-| PLUG-02 | Phase 5 | Pending |
+| PLUG-01 | Phase 5 | Complete |
+| PLUG-02 | Phase 5 | Complete |
 | PLUG-03 | Phase 5 | Pending |
 | PLUG-04 | Phase 5 | Pending |
 | FIRST-01 | Phase 6 | Pending |
