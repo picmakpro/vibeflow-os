@@ -149,6 +149,14 @@ install_module() {
     log "  copied references/ → .claude/skills/$mod/references/"
   fi
 
+  # References folder for AGENT modules (D7) : un module agent (AGENT.md sans SKILL.md racine)
+  # embarque ses references sous .claude/agents/<mod>-references/ (chargées on-demand par l'agent).
+  if [ -d "$module_dir/references" ] && [ -f "$module_dir/AGENT.md" ]; then
+    mkdir -p ".claude/agents/${mod}-references"
+    cp -r "$module_dir/references/"* ".claude/agents/${mod}-references/" 2>/dev/null || true
+    log "  copied references/ → .claude/agents/${mod}-references/"
+  fi
+
   # Scripts (top-level + tests subdir)
   if [ -d "$module_dir/scripts" ]; then
     mkdir -p ".claude/scripts"
@@ -164,6 +172,18 @@ install_module() {
     log "  copied scripts/ → .claude/scripts/"
   fi
 
+  # Hook post-install (IDX-02 / D7) : si le module fournit build-gsd-index.sh, régénérer
+  # l'index factuel in-place dans le dossier references agent. Best-effort : ne JAMAIS
+  # faire échouer l'install si GSD est absent (l'index sera régénéré plus tard).
+  if [ -f "$module_dir/scripts/build-gsd-index.sh" ] && [ -f ".claude/scripts/build-gsd-index.sh" ]; then
+    if VF_INDEX_OUT=".claude/agents/${mod}-references/gsd-skills-index.md" \
+       bash ".claude/scripts/build-gsd-index.sh" >/dev/null 2>&1; then
+      log "  index régénéré → .claude/agents/${mod}-references/gsd-skills-index.md"
+    else
+      log "  (index non régénéré — GSD absent, best-effort)"
+    fi
+  fi
+
   mark_installed "$mod" "$version"
   log "✓ $mod $version installé"
 }
@@ -176,6 +196,9 @@ backup_module() {
   local bdir="$BACKUP_DIR/$mod-$ts"
   mkdir -p "$bdir"
   [ -d ".claude/skills/$mod" ] && cp -r ".claude/skills/$mod" "$bdir/skills"
+  # Agent module : AGENT.md installé + son dossier references (D7)
+  [ -f ".claude/agents/${mod}.md" ] && { mkdir -p "$bdir/agents"; cp ".claude/agents/${mod}.md" "$bdir/agents/"; }
+  [ -d ".claude/agents/${mod}-references" ] && cp -r ".claude/agents/${mod}-references" "$bdir/agent-references"
   # Scripts (les scripts du module sont mélangés avec les autres — backup uniquement les nommés dans le module)
   if [ -d "$CACHE_DIR/$mod/scripts" ]; then
     mkdir -p "$bdir/scripts"
@@ -219,6 +242,16 @@ uninstall_module() {
   if [ -d ".claude/skills/$mod" ]; then
     rm -rf ".claude/skills/$mod"
     log "  removed .claude/skills/$mod"
+  fi
+
+  # Remove agent module (AGENT.md installé + dossier references D7)
+  if [ -f ".claude/agents/${mod}.md" ]; then
+    rm -f ".claude/agents/${mod}.md"
+    log "  removed .claude/agents/${mod}.md"
+  fi
+  if [ -d ".claude/agents/${mod}-references" ]; then
+    rm -rf ".claude/agents/${mod}-references"
+    log "  removed .claude/agents/${mod}-references"
   fi
 
   # Remove scripts (only those owned by this module)
