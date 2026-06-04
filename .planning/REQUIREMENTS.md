@@ -7,10 +7,10 @@
 
 ### Routing & Agent
 
-- [ ] **ROUT-01**: L'agent `vibeflow-dev` route ≥11 intentions en langage naturel vers le bon skill GSD/superpowers (table de routage).
-- [ ] **ROUT-02**: L'agent embarque l'ordre canonique du pipeline GSD + bonnes pratiques (détail dans `references/GSD-PIPELINE.md`, chargé on-demand).
-- [ ] **ROUT-03**: L'agent ne nomme jamais « GSD » à l'utilisateur et reframe les sorties en vocabulaire VibeFlow.
-- [ ] **ROUT-04**: L'agent est distribué via `AGENT.md` et installé en `.claude/agents/dev-orchestrator.md` par `vibeflow-update.sh`.
+- [x] **ROUT-01**: L'agent `vibeflow-dev` route ≥11 intentions en langage naturel vers le bon skill GSD/superpowers (table de routage).
+- [x] **ROUT-02**: L'agent embarque l'ordre canonique du pipeline GSD + bonnes pratiques (détail dans `references/GSD-PIPELINE.md`, chargé on-demand).
+- [x] **ROUT-03**: L'agent ne nomme jamais « GSD » à l'utilisateur et reframe les sorties en vocabulaire VibeFlow.
+- [x] **ROUT-04**: L'agent est distribué via `AGENT.md` et installé en `.claude/agents/dev-orchestrator.md` par `vibeflow-update.sh`.
 
 ### Index GSD
 
@@ -53,10 +53,10 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ROUT-01 | Phase 1 | Pending |
-| ROUT-02 | Phase 1 | Pending |
-| ROUT-03 | Phase 1 | Pending |
-| ROUT-04 | Phase 1 | Pending |
+| ROUT-01 | Phase 1 | Complete |
+| ROUT-02 | Phase 1 | Complete |
+| ROUT-03 | Phase 1 | Complete |
+| ROUT-04 | Phase 1 | Complete |
 | IDX-01 | Phase 1 | Complete |
 | IDX-02 | Phase 1 | Complete |
 | ABS-01 | Phase 1 | Pending |
