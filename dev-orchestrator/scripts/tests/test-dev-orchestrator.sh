@@ -90,6 +90,51 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# T2b — ensure-deps scopé (dry-run FORCÉ, sans réseau) — SCOPE-03
+# ---------------------------------------------------------------------------
+# VF_ENSURE_FORCE=1 (en plus de VF_ENSURE_DRY_RUN=1) court-circuite l'early-return de détection :
+# les commandes scopées sont donc LOGUÉES même si GSD/Superpowers sont déjà installés sur la machine
+# (cas dev/CI courant — sans FORCE, l'early-return skip masquerait les flags → faux-négatif).
+# FORCE ne fait que loguer via run_cmd : AUCUN appel réseau ni install (dry-run uniquement).
+ENS="$MOD/scripts/ensure-deps.sh"
+t2b_fail=0
+
+# (user|project|local) → flags GSD + Superpowers attendus.
+# user → --global / --scope user ; project → --local / --scope project ; local → --local / --scope local.
+assert_scope() {
+  local scope="$1" gsd_flag="$2" sp_flag="$3" out
+  out=$(VF_ENSURE_DRY_RUN=1 VF_ENSURE_FORCE=1 VF_SCOPE="$scope" bash "$ENS" 2>&1)
+  if echo "$out" | "$GREP" -q -- "$gsd_flag" && echo "$out" | "$GREP" -q -- "$sp_flag"; then
+    ok "T2b scope=$scope : GSD $gsd_flag + Superpowers $sp_flag logués (dry-run forcé)"
+  else
+    ko "T2b scope=$scope : flags attendus absents ($gsd_flag / $sp_flag)"
+    t2b_fail=$((t2b_fail+1))
+  fi
+}
+
+assert_scope user    "--global" "--scope user"
+assert_scope project "--local"  "--scope project"
+assert_scope local   "--local"  "--scope local"
+
+# Rétro-compat : sans VF_SCOPE (dry-run forcé) → défaut LEGACY user (--global / --scope user).
+out_default=$(VF_ENSURE_DRY_RUN=1 VF_ENSURE_FORCE=1 bash "$ENS" 2>&1)
+if echo "$out_default" | "$GREP" -q -- "--global" && echo "$out_default" | "$GREP" -q -- "--scope user"; then
+  ok "T2b rétro-compat : sans VF_SCOPE → --global + --scope user (défaut LEGACY)"
+else
+  ko "T2b rétro-compat : défaut LEGACY user attendu (--global / --scope user)"
+  t2b_fail=$((t2b_fail+1))
+fi
+
+# Validation : scope invalide rejeté AVANT effet de bord (exit≠0). Pas besoin de FORCE (validation en tête).
+VF_ENSURE_DRY_RUN=1 VF_SCOPE=bogus bash "$ENS" >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+  ok "T2b validation : VF_SCOPE=bogus rejeté (exit≠0 avant effet de bord)"
+else
+  ko "T2b validation : VF_SCOPE=bogus aurait dû être rejeté (exit≠0)"
+  t2b_fail=$((t2b_fail+1))
+fi
+
+# ---------------------------------------------------------------------------
 # T3 — Routage AGENT.md : ≥11 cibles DISTINCTES ET ≥11 lignes d'intentions NL
 # ---------------------------------------------------------------------------
 AGENT="$AGENT_FILE"
