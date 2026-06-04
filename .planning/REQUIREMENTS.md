@@ -41,7 +41,7 @@
 ### Manifeste & résolveur (Phase 2)
 
 - [x] **MANIF-01**: Chaque module a un `module.json` (name, version, type, description, `requires[]`) — source machine-lisible.
-- [ ] **MANIF-02**: Un résolveur calcule la fermeture transitive des `requires` (ex. validator → consolidator + infrastructure-audit).
+- [x] **MANIF-02**: Un résolveur calcule la fermeture transitive des `requires` (ex. validator → consolidator + infrastructure-audit).
 
 ### Engine scope-aware (Phase 3)
 
@@ -104,7 +104,7 @@
 | VERIF-01 | Phase 1 | Complete |
 | VERIF-02 | Phase 1 | Complete |
 | MANIF-01 | Phase 2 | Complete |
-| MANIF-02 | Phase 2 | Pending |
+| MANIF-02 | Phase 2 | Complete |
 | SCOPE-01 | Phase 3 | Pending |
 | SCOPE-02 | Phase 3 | Pending |
 | SCOPE-03 | Phase 3 | Pending |

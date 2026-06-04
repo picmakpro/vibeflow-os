@@ -33,7 +33,7 @@ Spec : `docs/superpowers/specs/2026-06-04-install-ux-design.md`.
 **Plans**: 2 plans (2 waves)
 Plans:
 - [x] 02-01-PLAN.md — 8 module.json (name, version, type, description, requires) pour les 8 modules (MANIF-01)
-- [ ] 02-02-PLAN.md — résolveur de fermeture transitive `_internal/resolve-deps.sh` + test (MANIF-02)
+- [x] 02-02-PLAN.md — résolveur de fermeture transitive `_internal/resolve-deps.sh` + test (MANIF-02)
 
 #### Phase 3: Engine scope-aware
 **Goal**: `vibeflow-update.sh` + `ensure-deps.sh` installent au scope choisi, depuis le cache du plugin.
@@ -82,7 +82,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1. dev-orchestrator | vfdo-v1.0 | 5/5 | Complete | 2026-06-04 |
-| 2. Manifeste & résolveur | Install UX | 0/2 | Planned | - |
+| 2. Manifeste & résolveur | Install UX | 2/2 | Complete | 2026-06-04 |
 | 3. Engine scope-aware | Install UX | 0/TBD | Not started | - |
 | 4. Skill /vibeflow-install | Install UX | 0/TBD | Not started | - |
 | 5. Packaging plugin | Install UX | 0/TBD | Not started | - |
