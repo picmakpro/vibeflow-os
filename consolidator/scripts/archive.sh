@@ -219,7 +219,7 @@ scan_register() {
 
 # ---------- Main ----------
 total=0
-for f in "$MEMORY_DIR"/ADR.md "$MEMORY_DIR"/LEARNINGS.md "$MEMORY_DIR"/BLOCKERS.md "$MEMORY_DIR"/EVALS.md "$MEMORY_DIR"/DECISIONS.md; do
+for f in "$MEMORY_DIR"/ADR.md "$MEMORY_DIR"/BDR.md "$MEMORY_DIR"/LEARNINGS.md "$MEMORY_DIR"/BLOCKERS.md "$MEMORY_DIR"/EVALS.md "$MEMORY_DIR"/DECISIONS.md; do
   [ -f "$f" ] || continue
   scan_register "$f" || true
 done

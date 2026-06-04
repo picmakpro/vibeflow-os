@@ -43,13 +43,22 @@ for arg in "$@"; do
 done
 
 # ---------- Helpers ----------
+# Fork config optionnelle : un lab peut surcharger/etendre les mappings registres
+# en definissant register_file_custom() et id_pattern_custom() dans ce fichier.
+REGISTERS_CONF="${VIBEFLOW_REGISTERS_CONF:-.claude/scripts/registers.conf.sh}"
+[ -f "$REGISTERS_CONF" ] && . "$REGISTERS_CONF"
+
 log() {
   echo "[reindex.sh] $*" >&2
 }
 
 register_file() {
+  if command -v register_file_custom >/dev/null 2>&1; then
+    local c; c="$(register_file_custom "$1")"; [ -n "$c" ] && { echo "$c"; return; }
+  fi
   case "$1" in
     ADR)            echo "$MEMORY_DIR/ADR.md" ;;
+    BDR)            echo "$MEMORY_DIR/BDR.md" ;;
     LEARNINGS)      echo "$MEMORY_DIR/LEARNINGS.md" ;;
     BLOCKERS)       echo "$MEMORY_DIR/BLOCKERS.md" ;;
     ITERATION_LOG)  echo "$MEMORY_DIR/ITERATION_LOG.md" ;;
@@ -61,8 +70,12 @@ register_file() {
 }
 
 id_pattern() {
+  if command -v id_pattern_custom >/dev/null 2>&1; then
+    local c; c="$(id_pattern_custom "$1")"; [ -n "$c" ] && { echo "$c"; return; }
+  fi
   case "$1" in
     ADR|DECISIONS)         echo "ADR-[0-9]+|DEC-[0-9]+" ;;
+    BDR)                   echo "BDR-[0-9]+" ;;
     LEARNINGS)             echo "LRN-[0-9]+" ;;
     BLOCKERS)              echo "BLK-[0-9]+" ;;
     EVALS)                 echo "EVAL-[0-9]+" ;;
