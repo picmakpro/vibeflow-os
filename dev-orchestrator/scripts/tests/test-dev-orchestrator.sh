@@ -25,6 +25,20 @@ set -uo pipefail
 MOD="$(cd "$(dirname "$0")/../.." && pwd)"
 REPO="$(cd "$MOD/.." && pwd)"
 
+# Détection de la disposition : source (dev-orchestrator/) vs lab installé (.claude/).
+# - Source : AGENT.md + references/ à la racine du module.
+# - Lab installé : agent à plat dans agents/dev-orchestrator.md, references sous
+#   agents/dev-orchestrator-references/ (D7). skills/ et scripts/ sont identiques aux deux.
+if [ -f "$MOD/AGENT.md" ]; then
+  AGENT_FILE="$MOD/AGENT.md"
+  REFS_DIR="$MOD/references"
+elif [ -f "$MOD/agents/dev-orchestrator.md" ]; then
+  AGENT_FILE="$MOD/agents/dev-orchestrator.md"
+  REFS_DIR="$MOD/agents/dev-orchestrator-references"
+else
+  echo "  ✗ Impossible de localiser l'agent (ni source AGENT.md, ni lab agents/dev-orchestrator.md)"; exit 1
+fi
+
 pass=0; fail=0; skipped=0
 ok()   { echo "  ✓ $1"; pass=$((pass+1)); }
 ko()   { echo "  ✗ $1"; fail=$((fail+1)); }
@@ -78,7 +92,7 @@ fi
 # ---------------------------------------------------------------------------
 # T3 — Routage AGENT.md : ≥11 cibles DISTINCTES ET ≥11 lignes d'intentions NL
 # ---------------------------------------------------------------------------
-AGENT="$MOD/AGENT.md"
+AGENT="$AGENT_FILE"
 # (a) cibles distinctes (hors lignes commentaire), via liste canonique connue.
 distinct_targets=$("$GREP" -v '^#' "$AGENT" \
   | "$GREP" -Eo 'brainstorm(ing)?|gsd-discuss-phase|gsd-plan-phase|gsd-execute-phase|gsd-quick|gsd-fast|gsd-verify-work|gsd-code-review|gsd-debug|gsd-autonomous|gsd-ship|gsd-progress|gsd-map-codebase' \
@@ -101,7 +115,7 @@ fi
 # ---------------------------------------------------------------------------
 # Index de référence des cibles gsd-* : index disque s'il contient des skills,
 # sinon fixture embarquée (12 cibles canoniques) pour ne jamais produire de faux négatif.
-INDEX_DISK="$MOD/references/gsd-skills-index.md"
+INDEX_DISK="$REFS_DIR/gsd-skills-index.md"
 index_has_skills=0
 if [ -f "$INDEX_DISK" ] && "$GREP" -Eq 'gsd-[a-z0-9-]+' "$INDEX_DISK"; then
   index_has_skills=1

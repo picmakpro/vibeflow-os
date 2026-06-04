@@ -10,6 +10,11 @@
 - README : section Usage enrichie — routage NL init/map, parcours types (premier contact,
   projet existant, tâche rapide, autonomie), verbe `vf-map`.
 
+### Corrigé
+- `test-dev-orchestrator.sh` portable : détecte la disposition source (`AGENT.md` + `references/`
+  à la racine) vs lab installé (`agents/dev-orchestrator.md` + `agents/<mod>-references/`, D7).
+  Le test shippé ne produit plus de faux échecs quand il est lancé depuis un lab.
+
 ## [v1.0.0] — 2026-06-04
 
 ### Module initial complet (5 plans, phase 01-dev-orchestrator)
