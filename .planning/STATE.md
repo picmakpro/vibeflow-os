@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: verifying
-stopped_at: Scaffolding `.planning/` terminé, prêt pour plan-phase 1
-last_updated: "2026-06-04T14:58:23.299Z"
+milestone: install-ux
+milestone_name: Install UX
+status: planning
+stopped_at: Milestone Install UX scaffolté (phases 2-6), prêt pour plan-phase 2
+last_updated: "2026-06-04"
 last_activity: 2026-06-04
 progress:
-  total_phases: 1
+  total_phases: 6
   completed_phases: 1
   total_plans: 5
   completed_plans: 5
-  percent: 100
+  percent: 17
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-04)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Phase 1 — dev-orchestrator
+**Current focus:** Milestone Install UX — Phase 2 (Manifeste & résolveur)
 
 ## Current Position
 
-Phase: 1 of 1 (dev-orchestrator)
-Plan: 5 of 5 in current phase
-Status: Phase complete — ready for verification
-Last activity: 2026-06-04
+Phase: 2 of 6 (Manifeste & résolveur) — milestone Install UX
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-06-04 — Milestone Install UX scaffolté (ROADMAP/REQUIREMENTS depuis le spec)
 
-Progress: [██████████] 100%
+Progress: [██░░░░░░░░] 17% (1/6 phases)
 
 ## Performance Metrics
 

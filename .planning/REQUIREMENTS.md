@@ -34,6 +34,42 @@
 - [x] **VERIF-01**: `tests/test-dev-orchestrator.sh` couvre génération d'index, idempotence de `ensure-deps`, couverture du routage, mapping `/vf-*` non orphelin.
 - [x] **VERIF-02**: Gates de densité respectés (agent ≤250L, skills ≤500L), vérifiés par `wc -l` dans le test du module (`check-file-size.sh` n'audite pas les `.md` : regex code sans `.md`).
 
+## Milestone 2 — Install UX (active)
+
+> Spec : `docs/superpowers/specs/2026-06-04-install-ux-design.md`
+
+### Manifeste & résolveur (Phase 2)
+
+- [ ] **MANIF-01**: Chaque module a un `module.json` (name, version, type, description, `requires[]`) — source machine-lisible.
+- [ ] **MANIF-02**: Un résolveur calcule la fermeture transitive des `requires` (ex. validator → consolidator + infrastructure-audit).
+
+### Engine scope-aware (Phase 3)
+
+- [ ] **SCOPE-01**: `vibeflow-update.sh` accepte `--scope user|project|local` → résout `TARGET_ROOT` (`~/.claude` vs `./.claude`).
+- [ ] **SCOPE-02**: Source des modules = cache du plugin (plus de `git clone .vibeflow-cache`).
+- [ ] **SCOPE-03**: `ensure-deps.sh` scopé : GSD `--global`/`--local`, Superpowers `--scope user|project|local`.
+- [ ] **SCOPE-04**: Scope `local` → ajout des chemins installés au `.gitignore`.
+
+### Skill /vibeflow-install + auto-lancement (Phase 4)
+
+- [ ] **INST-01**: Toggle scope (single-select user/project/local).
+- [ ] **INST-02**: Toggle modules (multi-select) avec description issue des `module.json`.
+- [ ] **INST-03**: Récap des dépendances auto-résolues avant install.
+- [ ] **INST-04**: Orchestration de l'install au scope choisi (modules + GSD + Superpowers).
+- [ ] **INST-05**: Hook `SessionStart` + marqueur de 1er lancement → ouvre l'UX automatiquement (ID8).
+
+### Packaging plugin (Phase 5)
+
+- [ ] **PLUG-01**: `.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json` valides.
+- [ ] **PLUG-02**: Le plugin bundle modules + skill + engine + manifeste.
+- [ ] **PLUG-03**: Repo `vibeflow-os` rendu public (étape délibérée confirmée).
+- [ ] **PLUG-04**: `claude plugin marketplace add` + `install` fonctionnent en zéro-auth (validé).
+
+### dev-orchestrator first-use (Phase 6)
+
+- [ ] **FIRST-01**: L'agent détecte l'absence de `.planning/` (projet non GSD-initialisé) au 1er usage.
+- [ ] **FIRST-02**: Il propose map-codebase puis new-project sur confirmation (jamais `gsd-new-project` seul).
+
 ## v2 Requirements
 
 ### Vocabulaire & UX
@@ -67,11 +103,27 @@
 | BOOT-04 | Phase 1 | Complete |
 | VERIF-01 | Phase 1 | Complete |
 | VERIF-02 | Phase 1 | Complete |
+| MANIF-01 | Phase 2 | Pending |
+| MANIF-02 | Phase 2 | Pending |
+| SCOPE-01 | Phase 3 | Pending |
+| SCOPE-02 | Phase 3 | Pending |
+| SCOPE-03 | Phase 3 | Pending |
+| SCOPE-04 | Phase 3 | Pending |
+| INST-01 | Phase 4 | Pending |
+| INST-02 | Phase 4 | Pending |
+| INST-03 | Phase 4 | Pending |
+| INST-04 | Phase 4 | Pending |
+| INST-05 | Phase 4 | Pending |
+| PLUG-01 | Phase 5 | Pending |
+| PLUG-02 | Phase 5 | Pending |
+| PLUG-03 | Phase 5 | Pending |
+| PLUG-04 | Phase 5 | Pending |
+| FIRST-01 | Phase 6 | Pending |
+| FIRST-02 | Phase 6 | Pending |
 
 **Coverage:**
-- v1 requirements: 14 total
-- Mapped to phases: 14
-- Unmapped: 0 ✓
+- Milestone 1 (v1) : 14 requirements — Complete ✓
+- Milestone 2 (Install UX) : 17 requirements — mappés aux phases 2-6, 0 non-mappé ✓
 
 ---
 *Requirements defined: 2026-06-04*
