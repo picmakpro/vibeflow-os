@@ -57,7 +57,10 @@ Plans:
   2. Les dépendances sont auto-résolues et récapitulées avant install.
   3. L'install s'effectue au scope choisi (modules + GSD + Superpowers).
   4. Un hook `SessionStart` ouvre l'UX automatiquement au 1er lancement (marqueur).
-**Plans**: TBD
+**Plans**: 2 plans (1 wave — parallèles, fichiers disjoints)
+Plans:
+- [ ] 04-01-PLAN.md — catalogue modules `build-module-catalog.sh` + skill `/vibeflow-install` (toggles scope+modules, récap déps, orchestration scope-aware) + test (INST-01..04)
+- [ ] 04-02-PLAN.md — hook `SessionStart` + marqueur de 1er lancement (modèle Superpowers) + test isolé (INST-05)
 
 #### Phase 5: Packaging plugin
 **Goal**: VibeFlow installable comme plugin Claude Code (marketplace), repo public.
@@ -87,6 +90,6 @@ Plans:
 | 1. dev-orchestrator | vfdo-v1.0 | 5/5 | Complete | 2026-06-04 |
 | 2. Manifeste & résolveur | Install UX | 2/2 | Complete | 2026-06-04 |
 | 3. Engine scope-aware | Install UX | 0/2 | Not started | - |
-| 4. Skill /vibeflow-install | Install UX | 0/TBD | Not started | - |
+| 4. Skill /vibeflow-install | Install UX | 0/2 | Not started | - |
 | 5. Packaging plugin | Install UX | 0/TBD | Not started | - |
 | 6. dev-orchestrator first-use | Install UX | 0/TBD | Not started | - |
