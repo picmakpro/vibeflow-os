@@ -60,7 +60,7 @@ Plans:
 **Plans**: 2 plans (1 wave — parallèles, fichiers disjoints)
 Plans:
 - [x] 04-01-PLAN.md — catalogue modules `build-module-catalog.sh` + skill `/vibeflow-install` (toggles scope+modules, récap déps, orchestration scope-aware) + test (INST-01..04)
-- [ ] 04-02-PLAN.md — hook `SessionStart` + marqueur de 1er lancement (modèle Superpowers) + test isolé (INST-05)
+- [x] 04-02-PLAN.md — hook `SessionStart` + marqueur de 1er lancement (modèle Superpowers) + test isolé (INST-05)
 
 #### Phase 5: Packaging plugin
 **Goal**: VibeFlow installable comme plugin Claude Code (marketplace), repo public.

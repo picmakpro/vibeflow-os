@@ -56,7 +56,7 @@
 - [x] **INST-02**: Toggle modules (multi-select) avec description issue des `module.json`.
 - [x] **INST-03**: Récap des dépendances auto-résolues avant install.
 - [x] **INST-04**: Orchestration de l'install au scope choisi (modules + GSD + Superpowers).
-- [ ] **INST-05**: Hook `SessionStart` + marqueur de 1er lancement → ouvre l'UX automatiquement (ID8).
+- [x] **INST-05**: Hook `SessionStart` + marqueur de 1er lancement → ouvre l'UX automatiquement (ID8).
 
 ### Packaging plugin (Phase 5)
 
@@ -113,7 +113,7 @@
 | INST-02 | Phase 4 | Complete |
 | INST-03 | Phase 4 | Complete |
 | INST-04 | Phase 4 | Complete |
-| INST-05 | Phase 4 | Pending |
+| INST-05 | Phase 4 | Complete |
 | PLUG-01 | Phase 5 | Pending |
 | PLUG-02 | Phase 5 | Pending |
 | PLUG-03 | Phase 5 | Pending |
