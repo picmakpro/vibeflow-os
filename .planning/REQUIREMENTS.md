@@ -14,8 +14,8 @@
 
 ### Index GSD
 
-- [ ] **IDX-01**: `build-gsd-index.sh` parse les `SKILL.md` des skills `gsd-*` installés → `references/gsd-skills-index.md` (factuel uniquement, aucun nom inventé).
-- [ ] **IDX-02**: L'index se régénère à l'install/update du module et lors d'un drift GSD détecté.
+- [x] **IDX-01**: `build-gsd-index.sh` parse les `SKILL.md` des skills `gsd-*` installés → `references/gsd-skills-index.md` (factuel uniquement, aucun nom inventé).
+- [x] **IDX-02**: L'index se régénère à l'install/update du module et lors d'un drift GSD détecté.
 
 ### Abstraction
 
@@ -57,8 +57,8 @@
 | ROUT-02 | Phase 1 | Pending |
 | ROUT-03 | Phase 1 | Pending |
 | ROUT-04 | Phase 1 | Pending |
-| IDX-01 | Phase 1 | Pending |
-| IDX-02 | Phase 1 | Pending |
+| IDX-01 | Phase 1 | Complete |
+| IDX-02 | Phase 1 | Complete |
 | ABS-01 | Phase 1 | Pending |
 | ABS-02 | Phase 1 | Pending |
 | BOOT-01 | Phase 1 | Pending |
