@@ -1,0 +1,7 @@
+{
+  "name": "reference",
+  "version": "v2.1.1",
+  "type": "doc-only",
+  "description": "Documentation méthodologique VibeFlow (module doc-only).",
+  "requires": []
+}

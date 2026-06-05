@@ -1,0 +1,22 @@
+{
+  "name": "vibeflow",
+  "displayName": "VibeFlow",
+  "version": "2.3.0",
+  "description": "Orchestrateur de développement Claude Code : modules toggables (dev, audit, validator…) + engine d'install scopé, posés via une UX à toggles.",
+  "author": {
+    "name": "picmakpro"
+  },
+  "homepage": "https://github.com/picmakpro/vibeflow-os",
+  "repository": "https://github.com/picmakpro/vibeflow-os",
+  "license": "UNLICENSED",
+  "keywords": [
+    "vibeflow",
+    "gsd",
+    "orchestrator",
+    "modules",
+    "install",
+    "claude-code"
+  ],
+  "skills": "./installer",
+  "hooks": "./installer/hooks/hooks.json"
+}

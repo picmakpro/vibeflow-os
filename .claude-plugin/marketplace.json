@@ -1,0 +1,20 @@
+{
+  "name": "vibeflow-os",
+  "description": "Marketplace officiel de VibeFlow : orchestrateur de développement Claude Code à modules toggables.",
+  "owner": {
+    "name": "picmakpro"
+  },
+  "plugins": [
+    {
+      "name": "vibeflow",
+      "description": "Orchestrateur de développement Claude Code : modules toggables (dev, audit, validator…) + engine d'install scopé, posés via une UX à toggles.",
+      "version": "2.3.0",
+      "source": "./",
+      "category": "development",
+      "homepage": "https://github.com/picmakpro/vibeflow-os",
+      "author": {
+        "name": "picmakpro"
+      }
+    }
+  ]
+}

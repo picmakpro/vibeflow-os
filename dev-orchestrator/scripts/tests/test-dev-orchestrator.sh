@@ -13,6 +13,8 @@
 #   T5 — Densité (VERIF-02) MESURÉE PAR wc -l UNIQUEMENT : AGENT.md ≤250L, chaque skill ≤500L.
 #        (NE PAS appeler le contrôleur de taille générique qui ignore les .md.)
 #   T6 — Install end-to-end via vibeflow-update.sh (best-effort, SKIP si non réalisable).
+#   T7 — Garde-fou first-use présent dans AGENT.md : détection .planning + délégation vf-init
+#        + new-project encadré (régression FIRST-01/FIRST-02 ; fichier filtré des commentaires).
 #
 # Convention : asserts numérotés, helpers ok()/ko()/skip(), exit 0 si tout passe
 # (SKIP non bloquant), exit 1 si au moins un KO. Calqué sur le pattern de test du repo.
@@ -87,6 +89,51 @@ if [ "$r1" -eq 0 ] && [ "$r2" -eq 0 ]; then
   ok "T2 idempotence : ensure-deps dry-run run1=$r1 run2=$r2 (no-op stable)"
 else
   ko "T2 idempotence : exit run1=$r1 run2=$r2 (attendu 0/0)"
+fi
+
+# ---------------------------------------------------------------------------
+# T2b — ensure-deps scopé (dry-run FORCÉ, sans réseau) — SCOPE-03
+# ---------------------------------------------------------------------------
+# VF_ENSURE_FORCE=1 (en plus de VF_ENSURE_DRY_RUN=1) court-circuite l'early-return de détection :
+# les commandes scopées sont donc LOGUÉES même si GSD/Superpowers sont déjà installés sur la machine
+# (cas dev/CI courant — sans FORCE, l'early-return skip masquerait les flags → faux-négatif).
+# FORCE ne fait que loguer via run_cmd : AUCUN appel réseau ni install (dry-run uniquement).
+ENS="$MOD/scripts/ensure-deps.sh"
+t2b_fail=0
+
+# (user|project|local) → flags GSD + Superpowers attendus.
+# user → --global / --scope user ; project → --local / --scope project ; local → --local / --scope local.
+assert_scope() {
+  local scope="$1" gsd_flag="$2" sp_flag="$3" out
+  out=$(VF_ENSURE_DRY_RUN=1 VF_ENSURE_FORCE=1 VF_SCOPE="$scope" bash "$ENS" 2>&1)
+  if echo "$out" | "$GREP" -q -- "$gsd_flag" && echo "$out" | "$GREP" -q -- "$sp_flag"; then
+    ok "T2b scope=$scope : GSD $gsd_flag + Superpowers $sp_flag logués (dry-run forcé)"
+  else
+    ko "T2b scope=$scope : flags attendus absents ($gsd_flag / $sp_flag)"
+    t2b_fail=$((t2b_fail+1))
+  fi
+}
+
+assert_scope user    "--global" "--scope user"
+assert_scope project "--local"  "--scope project"
+assert_scope local   "--local"  "--scope local"
+
+# Rétro-compat : sans VF_SCOPE (dry-run forcé) → défaut LEGACY user (--global / --scope user).
+out_default=$(VF_ENSURE_DRY_RUN=1 VF_ENSURE_FORCE=1 bash "$ENS" 2>&1)
+if echo "$out_default" | "$GREP" -q -- "--global" && echo "$out_default" | "$GREP" -q -- "--scope user"; then
+  ok "T2b rétro-compat : sans VF_SCOPE → --global + --scope user (défaut LEGACY)"
+else
+  ko "T2b rétro-compat : défaut LEGACY user attendu (--global / --scope user)"
+  t2b_fail=$((t2b_fail+1))
+fi
+
+# Validation : scope invalide rejeté AVANT effet de bord (exit≠0). Pas besoin de FORCE (validation en tête).
+VF_ENSURE_DRY_RUN=1 VF_SCOPE=bogus bash "$ENS" >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+  ok "T2b validation : VF_SCOPE=bogus rejeté (exit≠0 avant effet de bord)"
+else
+  ko "T2b validation : VF_SCOPE=bogus aurait dû être rejeté (exit≠0)"
+  t2b_fail=$((t2b_fail+1))
 fi
 
 # ---------------------------------------------------------------------------
@@ -222,6 +269,22 @@ else
     skip "T6 install e2e : install non réalisable dans l'environnement (best-effort)"
   fi
   rm -rf "$LAB"
+fi
+
+# ---------------------------------------------------------------------------
+# T7 — Garde-fou first-use présent dans AGENT.md (régression FIRST-01/FIRST-02)
+# ---------------------------------------------------------------------------
+# Présence du garde-fou sur fichier FILTRÉ des commentaires (hygiène grep-gate : un simple
+# commentaire ne doit pas suffire). Pas de check densité ici (T5 le fait déjà via wc -l).
+has_marker=$("$GREP" -v '^#' "$AGENT_FILE" | "$GREP" -ci 'first-use\|premier usage')
+has_detect=0; "$GREP" -q -- '.planning' "$AGENT_FILE" && has_detect=1
+has_vfinit=0; "$GREP" -q -- 'vf-init'   "$AGENT_FILE" && has_vfinit=1
+has_noauto=$("$GREP" -v '^#' "$AGENT_FILE" | "$GREP" -ci 'new-project')
+
+if [ "${has_marker:-0}" -ge 1 ] && [ "$has_detect" -eq 1 ] && [ "$has_vfinit" -eq 1 ] && [ "${has_noauto:-0}" -ge 1 ]; then
+  ok "T7 first-use : garde-fou présent (détection .planning + délégation vf-init + new-project encadré)"
+else
+  ko "T7 first-use : garde-fou incomplet dans AGENT.md (marker=$has_marker detect=$has_detect vfinit=$has_vfinit noauto=$has_noauto)"
 fi
 
 # ---------------------------------------------------------------------------

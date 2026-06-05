@@ -1,7 +1,7 @@
 # vibeflow-os
 
 > **Modules VibeFlow distribués aux labs** — repo central versionné pour réplication méthodologique.
-> Privé. Maintenu par [@picmakpro](https://github.com/picmakpro).
+> Public (source-available, licence propriétaire). Maintenu par [@picmakpro](https://github.com/picmakpro).
 
 ---
 
@@ -38,41 +38,42 @@ Chaque module a obligatoirement : `VERSION` (semver), `CHANGELOG.md`, `README.md
 
 ---
 
-## Installation dans un lab
+## Installation
 
-### Première installation
-
-```bash
-cd /chemin/vers/votre-lab
-git clone --depth 1 https://github.com/picmakpro/vibeflow-os.git .vibeflow-cache
-cp .vibeflow-cache/_internal/vibeflow-update.sh .claude/scripts/
-chmod +x .claude/scripts/vibeflow-update.sh
-.claude/scripts/vibeflow-update.sh install --all
-```
-
-### Installer un module spécifique
+VibeFlow s'installe comme **plugin Claude Code**, en deux commandes :
 
 ```bash
-.claude/scripts/vibeflow-update.sh install consolidator
-.claude/scripts/vibeflow-update.sh install skill-creator
-.claude/scripts/vibeflow-update.sh install reference
+claude plugin marketplace add picmakpro/vibeflow-os
+claude plugin install vibeflow
 ```
 
-### Status / mises à jour
+Aucun clone, aucun script à lancer, aucune édition de `settings.json`.
+
+### Auto-lancement (1er lancement)
+
+À la **session suivante** (charger un plugin = restart de Claude Code), le hook `SessionStart`
+détecte le 1er lancement — le marqueur `scripts/.vibeflow-installed` est absent — et **ouvre
+automatiquement** l'UX `/vibeflow-install` :
+
+- **Toggle scope** (single-select) : compte (`user`) / projet (`project`) / projet sans commit (`local`).
+- **Toggle modules** (multi-select) : la liste sort du catalogue (chaque module + sa description).
+- **Dépendances auto-résolues** : la fermeture transitive des `requires` est calculée et récapitulée
+  avant toute install.
+
+Une fois VibeFlow installé, ce message ne réapparaît plus.
+
+### Re-configurer / ajouter un module
+
+`/vibeflow-install` reste invocable à la main à tout moment pour changer de scope, ajouter ou
+retirer un module (les dépendances sont re-résolues automatiquement).
+
+### Mise à jour
 
 ```bash
-.claude/scripts/vibeflow-update.sh status
-.claude/scripts/vibeflow-update.sh update consolidator
-.claude/scripts/vibeflow-update.sh update --all
+claude plugin update vibeflow
 ```
 
-### Rollback
-
-```bash
-.claude/scripts/vibeflow-update.sh rollback consolidator
-```
-
-Voir [INSTALL.md](./INSTALL.md) pour les détails.
+Voir [INSTALL.md](./INSTALL.md) pour les détails (désinstallation, troubleshooting).
 
 ---
 
@@ -101,7 +102,7 @@ Chaque module a sa propre version. Le repo global est tagué à la version du de
 
 ## Sécurité
 
-- Repo privé
+- Repo public **source-available** : code et historique visibles, licence propriétaire « All rights reserved » (aucun droit de réutilisation accordé)
 - Scripts shell + Python uniquement (auditables ligne par ligne)
 - Pas de dépendances tierces non vérifiées
 - Tests automatisés pour chaque script (`scripts/tests/test-*.sh`)

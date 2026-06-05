@@ -1,0 +1,7 @@
+{
+  "name": "dev-orchestrator",
+  "version": "v1.1.0",
+  "type": "agent+skills",
+  "description": "Orchestrateur de développement : route le langage naturel vers le pipeline.",
+  "requires": []
+}

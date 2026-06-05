@@ -1,0 +1,7 @@
+{
+  "name": "audit-architecture",
+  "version": "v1.0.0",
+  "type": "single-skill+references",
+  "description": "Audit d'architecture logicielle d'un codebase.",
+  "requires": []
+}

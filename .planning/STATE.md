@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
+milestone: install-ux
+milestone_name: Install UX
 status: verifying
-stopped_at: Scaffolding `.planning/` terminé, prêt pour plan-phase 1
-last_updated: "2026-06-04T14:58:23.299Z"
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-06-04T18:37:18.110Z"
 last_activity: 2026-06-04
 progress:
-  total_phases: 1
-  completed_phases: 1
-  total_plans: 5
-  completed_plans: 5
+  total_phases: 5
+  completed_phases: 5
+  total_plans: 9
+  completed_plans: 9
   percent: 100
 ---
 
@@ -21,12 +21,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-04)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Phase 1 — dev-orchestrator
+**Current focus:** Milestone Install UX — Phase 2 (Manifeste & résolveur)
 
 ## Current Position
 
-Phase: 1 of 1 (dev-orchestrator)
-Plan: 5 of 5 in current phase
+Phase: 2 of 6 (Manifeste & résolveur) — milestone Install UX
+Plan: 2 of 2 in current phase
 Status: Phase complete — ready for verification
 Last activity: 2026-06-04
 
@@ -50,6 +50,14 @@ Progress: [██████████] 100%
 | Phase 01-dev-orchestrator P03 | 12 min | 2 tasks | 2 files |
 | Phase 01 P04 | ~6 min | 2 tasks | 13 files |
 | Phase 01-dev-orchestrator P05 | ~10min | 2 tasks | 4 files |
+| Phase 02-manifeste-resolveur P01 | 5min | 2 tasks | 8 files |
+| Phase 02-manifeste-resolveur P02 | ~5min | 2 tasks | 2 files |
+| Phase 03-engine-scope-aware P01 | 3min | 3 tasks | 2 files |
+| Phase 03 P02 | 6min | 2 tasks | 2 files |
+| Phase 04 P01 | ~1 min | 2 tasks | 3 files |
+| Phase 04 P02 | 5min | 2 tasks | 3 files |
+| Phase 05 P01 | 2 | 3 tasks | 5 files |
+| Phase 06 P01 | 1min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -65,6 +73,14 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 1]: Contrat de test VF_ENSURE_DRY_RUN=1 pour valider l'idempotence sans réseau (Plan 01-02)
 - [Phase ?]: [Phase 1]: Modules AGENT — references sous .claude/agents/<mod>-references/ (D7), index régénéré à l'install via VF_INDEX_OUT (IDX-02) (Plan 01-05)
 - [Phase ?]: [Phase 1]: Densité des .md mesurée par wc -l, jamais le contrôleur de taille générique qui ignore les .md (Plan 01-05)
+- [Phase ?]: module.json: requires[] = prérequis module réels uniquement, ENGINE (vibeflow-update.sh) exclu
+- [Phase ?]: Engine défaut LEGACY=project (rétro-compat ./.claude) ; skill /vibeflow-install passe toujours VF_SCOPE explicite (cohérence ID4)
+- [Phase ?]: docs/<mod>/ doc-only laissé hors TARGET_ROOT (relatif au cwd projet)
+- [Phase ?]: Plus de git clone/pull : source = cache local (require_cache) ; sync = no-op explicite
+- [Phase ?]: ensure-deps scope-aware via VF_SCOPE (GSD --global/--local, Superpowers --scope), VF_ENSURE_FORCE dry-run only, defaut LEGACY user (ID4)
+- [Phase ?]: Hook VibeFlow pointe directement le script bash; marqueur 1er lancement aligné sur registre engine scripts/.vibeflow-installed
+- [Phase 06]: Garde-fou first-use placé avant la table de routage (point de décision router-vs-proposer)
+- [Phase 06]: Séquence d'init non dupliquée : délégation au skill vf-init existant
 
 ### Pending Todos
 
@@ -82,6 +98,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-04T14:58:04.693Z
-Stopped at: Scaffolding `.planning/` terminé, prêt pour plan-phase 1
+Last session: 2026-06-04T18:36:28.459Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None
