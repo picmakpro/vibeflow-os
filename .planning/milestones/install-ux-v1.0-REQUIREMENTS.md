@@ -62,8 +62,8 @@
 
 - [x] **PLUG-01**: `.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json` valides.
 - [x] **PLUG-02**: Le plugin bundle modules + skill + engine + manifeste.
-- [x] **PLUG-03**: Repo `vibeflow-os` rendu public (étape délibérée confirmée).
-- [x] **PLUG-04**: `claude plugin marketplace add` + `install` fonctionnent en zéro-auth (validé).
+- [ ] **PLUG-03**: Repo `vibeflow-os` rendu public (étape délibérée confirmée).
+- [ ] **PLUG-04**: `claude plugin marketplace add` + `install` fonctionnent en zéro-auth (validé).
 
 ### dev-orchestrator first-use (Phase 6)
 
@@ -116,8 +116,8 @@
 | INST-05 | Phase 4 | Complete |
 | PLUG-01 | Phase 5 | Complete |
 | PLUG-02 | Phase 5 | Complete |
-| PLUG-03 | Phase 5 | Complete |
-| PLUG-04 | Phase 5 | Complete |
+| PLUG-03 | Phase 5 | Pending |
+| PLUG-04 | Phase 5 | Pending |
 | FIRST-01 | Phase 6 | Complete |
 | FIRST-02 | Phase 6 | Complete |
 

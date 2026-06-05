@@ -1,5 +1,33 @@
 # Milestones — VibeFlow Dev Orchestrator (VFDO)
 
+## ✅ install-ux-v1.0 — Installation plugin + UX à toggles (2026-06-05)
+
+**Tag git :** `install-ux-v1.0` · **Release repo** `v2.4.0` · **PR** #2 (mergée)
+
+**Périmètre :** 5 phases (2-6) · 9 plans · 39 commits atomiques
+
+### Livré
+- **Plugin Claude Code** — `.claude-plugin/plugin.json` + `marketplace.json` : installation en **2 commandes** (`marketplace add picmakpro/vibeflow-os` + `install vibeflow`), **validé zéro-auth** sur repo public.
+- **Auto-lancement** — hook `SessionStart` (`installer/hooks/`) qui ouvre l'UX `/vibeflow-install` au 1er lancement (marqueur `scripts/.vibeflow-installed`), silencieux ensuite.
+- **Skill `/vibeflow-install`** — UX à toggles (scope user/project/local → modules), récap des dépendances auto-résolues, install scopée. Délègue à l'engine (zéro réimplémentation).
+- **Engine scope-aware** — `vibeflow-update.sh` (`--scope`, `TARGET_ROOT`, clone git supprimé, `.gitignore` local) + `ensure-deps.sh` scopé (GSD `--global`/`--local`, Superpowers `--scope`). Rétro-compat préservée.
+- **Manifeste & résolveur** — `module.json` ×8 + `resolve-deps.sh` (fermeture transitive des dépendances).
+- **dev-orchestrator first-use** — garde-fou dans `AGENT.md` : détecte `.planning/` absent → propose l'init via `vf-init`.
+
+### Requirements (17/17 complétés)
+MANIF-01..02 · SCOPE-01..04 · INST-01..05 · PLUG-01..04 · FIRST-01..02
+
+### Décisions clés
+- Plugin embarque tout (modules = données bundlées, `${CLAUDE_PLUGIN_ROOT}` = cache) — pas de double-chargement.
+- Un seul scope (user/project/local) appliqué à tout ; le skill passe toujours `VF_SCOPE` explicite (cohérence ID4).
+- Repo rendu **public source-available** (LICENSE propriétaire conservée — flip fait par le mainteneur, droits admin).
+
+### Process GSD (dogfooding)
+brainstorm → spec → new-milestone → 5× (plan → **plan-check** → exécution → vérif). Le plan-check a attrapé de **vrais blockers** aux phases 3 / 4 / 5 (faux-négatif dry-run, marqueur cassé, hook cassé en contexte plugin) — tous corrigés avant exécution.
+
+### Vérification runtime
+Repo public confirmé · `marketplace add` + `install vibeflow` **zéro-auth OK** (puis env de dev nettoyé) · tests isolés (vrai `~/.claude` jamais touché) · scan secrets CLEAN.
+
 ## ✅ vfdo-v1.0 — Module dev-orchestrator (2026-06-04)
 
 **Tag git :** `vfdo-v1.0` · **Embarqué dans la release repo** `v2.3.0`

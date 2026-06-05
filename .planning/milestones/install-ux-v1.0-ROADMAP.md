@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **vfdo-v1.0** — Module dev-orchestrator (Phase 1) — clôturé 2026-06-04
-- ✅ **install-ux-v1.0** — Phases 2-6 — clôturé 2026-06-05 (plugin + skill à toggles + scope) — release `v2.4.0`
+- 🚧 **Install UX** — Phases 2-6 (en cours) — install plugin + skill à toggles + scope
 
 ## Phases
 
@@ -94,7 +94,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1. dev-orchestrator | vfdo-v1.0 | 5/5 | Complete | 2026-06-04 |
 | 2. Manifeste & résolveur | Install UX | 2/2 | Complete | 2026-06-04 |
-| 3. Engine scope-aware | Install UX | 2/2 | Complete | 2026-06-05 |
-| 4. Skill /vibeflow-install | Install UX | 2/2 | Complete | 2026-06-05 |
-| 5. Packaging plugin | Install UX | 2/2 | Complete | 2026-06-05 |
-| 6. dev-orchestrator first-use | Install UX | 1/1 | Complete | 2026-06-05 |
+| 3. Engine scope-aware | Install UX | 0/2 | Not started | - |
+| 4. Skill /vibeflow-install | Install UX | 0/2 | Not started | - |
+| 5. Packaging plugin | Install UX | 0/2 | Planned | - |
+| 6. dev-orchestrator first-use | Install UX | 0/1 | Planned | - |
