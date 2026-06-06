@@ -23,17 +23,21 @@ claude plugin install vibeflow
 - La 1ère commande ajoute le marketplace VibeFlow (le repo GitHub `picmakpro/vibeflow-os` héberge
   son propre `marketplace.json`).
 - La 2nde installe le plugin `vibeflow` : Claude Code copie le bundle (modules + skill `installer/`
-  + engine `_internal/` + hook) dans son cache local de plugins.
+  + engine `_internal/`) dans son cache local de plugins.
 
 Aucune édition de `settings.json`, aucun script à lancer manuellement.
 
 ---
 
-## Auto-lancement (1er lancement)
+## Configuration (lancement manuel)
 
-Charger un plugin équivaut à un restart de Claude Code. À la **session suivante**, le hook
-`SessionStart` du plugin détecte qu'aucun marqueur `scripts/.vibeflow-installed` n'existe → il
-ouvre **automatiquement** l'UX `/vibeflow-install` :
+Une fois le plugin installé, **lance toi-même** l'UX de configuration depuis Claude Code :
+
+```
+/vibeflow-install
+```
+
+L'UX déroule alors :
 
 1. **Toggle scope** (single-select) : compte (`user`) / projet (`project`) / projet sans commit
    (`local`). Le scope choisi s'applique partout (modules VibeFlow + dépendances).
@@ -43,7 +47,10 @@ ouvre **automatiquement** l'UX `/vibeflow-install` :
    **récapitulée** avant toute install.
 4. **Install scopée** : les modules sélectionnés sont posés au scope choisi.
 
-Une fois l'install terminée, le marqueur est posé et l'auto-lancement ne se redéclenche plus.
+> **Le lancement est toujours manuel.** Il n'y a **pas** d'ouverture automatique au démarrage de
+> session : tu tapes `/vibeflow-install` quand tu veux installer ou re-configurer. (Une tentative
+> d'auto-lancement via un hook `SessionStart` a existé puis a été retirée car son déclenchement
+> n'était pas fiable.)
 
 ### Re-configurer / ajouter un module
 
@@ -69,7 +76,7 @@ Récupère la dernière version publiée du plugin depuis le marketplace, puis r
 claude plugin uninstall vibeflow
 ```
 
-Cela retire le plugin (skill + hook + bundle) du cache de Claude Code. Les modules déjà copiés
+Cela retire le plugin (skill + bundle) du cache de Claude Code. Les modules déjà copiés
 dans un scope (`.claude/skills/`, `.claude/agents/`, etc.) restent en place ; les retirer
 manuellement si besoin.
 
@@ -80,8 +87,8 @@ manuellement si besoin.
 - L'engine et les modules sont des scripts **shell + Python** auditables ligne par ligne.
 - Tous les scripts d'install sont **idempotents** (ré-exécutables sans casser l'installation).
 - Les copies créent un backup automatique avant écrasement.
-- Le hook `SessionStart` ne fait que **lire** un marqueur et émettre du JSON : aucune écriture,
-  aucun effet de bord.
+- Le plugin **n'enregistre aucun hook** : il n'exécute rien au démarrage de session. Tout part de
+  ton invocation manuelle de `/vibeflow-install`.
 
 ---
 
@@ -91,11 +98,20 @@ manuellement si besoin.
 
 Mettre Claude Code à jour : la commande `plugin` doit être disponible.
 
-### Le plugin ne s'auto-lance pas
+### L'UX d'install ne s'ouvre pas au démarrage
 
-L'auto-lancement se déclenche à la **session suivant** l'install (restart). Vérifier qu'aucun
-marqueur `scripts/.vibeflow-installed` n'existe déjà (sinon le hook reste volontairement
-silencieux). On peut toujours lancer `/vibeflow-install` à la main.
+C'est **normal** : VibeFlow ne s'ouvre **jamais** tout seul. Le lancement est manuel.
+
+➡️ **Tape `/vibeflow-install`** dans Claude Code.
+
+Si la commande n'est pas reconnue, vérifie que le plugin est bien installé et que la session a été
+redémarrée après `claude plugin install` :
+
+```bash
+claude plugin list
+```
+
+Le skill `vibeflow-install` doit y apparaître.
 
 ### Le marketplace n'est pas trouvé
 

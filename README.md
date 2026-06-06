@@ -49,18 +49,21 @@ claude plugin install vibeflow
 
 Aucun clone, aucun script à lancer, aucune édition de `settings.json`.
 
-### Auto-lancement (1er lancement)
+### Configuration (lancement manuel)
 
-À la **session suivante** (charger un plugin = restart de Claude Code), le hook `SessionStart`
-détecte le 1er lancement — le marqueur `scripts/.vibeflow-installed` est absent — et **ouvre
-automatiquement** l'UX `/vibeflow-install` :
+Une fois le plugin installé, **lance toi-même** l'UX de configuration :
+
+```
+/vibeflow-install
+```
 
 - **Toggle scope** (single-select) : compte (`user`) / projet (`project`) / projet sans commit (`local`).
 - **Toggle modules** (multi-select) : la liste sort du catalogue (chaque module + sa description).
 - **Dépendances auto-résolues** : la fermeture transitive des `requires` est calculée et récapitulée
   avant toute install.
 
-Une fois VibeFlow installé, ce message ne réapparaît plus.
+> Le lancement est **toujours manuel** : tape `/vibeflow-install` quand tu veux installer ou
+> re-configurer. Il n'y a pas d'ouverture automatique au démarrage de session.
 
 ### Re-configurer / ajouter un module
 
@@ -99,6 +102,7 @@ Chaque module a sa propre version. Le repo global est tagué à la version du de
 | **v2.2.0** | 2026-06-03 | **+ audit-architecture (méta-skill concepteur de structures d'audit multi-couches), validator v1.1.0 (Phase 4 scan des process) — ADR-036** |
 | **v2.3.0** | 2026-06-04 | **+ dev-orchestrator (agent routeur VibeFlow → GSD + Superpowers, 13 verbes `/vf-*`, index auto) — milestone vfdo-v1.0** |
 | **v2.4.0** | 2026-06-05 | **Installation en 2 commandes : plugin Claude Code + skill `/vibeflow-install` à toggles (scope user/project/local), auto-lancement, manifeste de dépendances — milestone install-ux-v1.0** |
+| **v2.4.1** | 2026-06-06 | **Retrait de l'auto-lancement (hook `SessionStart`) : déclenchement non fiable → `/vibeflow-install` redevient 100% manuel, doc alignée** |
 
 ---
 

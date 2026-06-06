@@ -1,7 +1,7 @@
 {
   "name": "vibeflow",
   "displayName": "VibeFlow",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "Orchestrateur de développement Claude Code : modules toggables (dev, audit, validator…) + engine d'install scopé, posés via une UX à toggles.",
   "author": {
     "name": "picmakpro"
@@ -17,6 +17,5 @@
     "install",
     "claude-code"
   ],
-  "skills": "./installer",
-  "hooks": "./installer/hooks/hooks.json"
+  "skills": "./installer"
 }
