@@ -158,11 +158,10 @@ Lab principal (privé) : [vibeflow-lab](https://github.com/picmakpro/vibeflow-la
 
 ---
 
-## 👤 Auteur
+## 👤 Auteurs
 
-VibeFlow et sa méthodologie sont conçus et maintenus par **Samuel Neveu** — [@Samuel-Learnity](https://github.com/Samuel-Learnity).
-
-Repo distribué et publié sous le compte [@picmakpro](https://github.com/picmakpro).
+- **[@picmakpro](https://github.com/picmakpro)** — créateur et mainteneur de la méthodologie VibeFlow et de la plupart des modules (gouvernance, audits, `skill-creator`, `consolidator`, `reference`…). Propriétaire du repo.
+- **Samuel Neveu — [@Samuel-Learnity](https://github.com/Samuel-Learnity)** — partie workflow de développement : le module `dev-orchestrator` et l'expérience langage naturel → pipeline.
 
 ---
 
