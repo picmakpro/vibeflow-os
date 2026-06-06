@@ -1,139 +1,173 @@
-# vibeflow-os
+<div align="center">
 
-> **Modules VibeFlow distribués aux labs** — repo central versionné pour réplication méthodologique.
-> Public (source-available, licence propriétaire). Maintenu par [@picmakpro](https://github.com/picmakpro).
+# VibeFlow OS
 
----
+**English** · [Français](./README.fr.md)
 
-## Quoi
+**Turn Claude Code into a development orchestrator driven by plain language.**
 
-Ce repo héberge les **modules réutilisables** de la méthodologie VibeFlow, distribués via un script `vibeflow-update.sh` installé dans chaque lab branché.
+Say _"help me build this feature"_ — and the whole pipeline kicks off: scoping → plan → execution → tests → delivery. Without ever typing a technical command or knowing what runs under the hood.
 
-## Modules
+[![Version](https://img.shields.io/badge/version-2.4.1-2563eb)](./VERSION)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
+[![Modules](https://img.shields.io/badge/modules-8-16a34a)](#-modules)
+[![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
-| Module | Version | Type | Description |
-|--------|---------|------|-------------|
-| [`consolidator/`](./plugin/consolidator/) | v1.0.0 | single-skill + scripts | Consolidation mémoire 4 piliers (Indexation / Archivage / Fusion / Promotion) — ADR-032 |
-| [`infrastructure-audit/`](./plugin/infrastructure-audit/) | v1.0.0 | single-skill + scripts | Audit automatique infrastructure (hooks, scripts, drift Anthropic) — détecte régressions après update Claude Code |
-| [`validator/`](./plugin/validator/) | v1.1.0 | agent-only | Agent `vibeflow-validator` (garant alignement technique méthodo ↔ labs) — 5 phases dont audit architecture des process |
-| [`skill-creator/`](./plugin/skill-creator/) | v1.0.0 | agent + 2 skills | Pattern "agent minimal + 2 skills composables" (Anthropic + workflow) — LRN-101 |
-| [`reference/`](./plugin/reference/) | v2.1.1 | doc-only | Documentation méthodologique complète (VIBEFLOW_CORE **v4.2 — 9 principes, +P9** + pointeur P8↔audit-architecture + 11 patterns + 33 templates + 1 exemple) |
-| [`software-architecture/`](./plugin/software-architecture/) | v1.0.0 | single-skill + rules + scripts | Doctrine Architecture Logicielle AI-Safe (SOLID/SoC, anti-god-files ≤300L, gates machine-enforced, playbook restructuration brownfield) — ADR-035 |
-| [`audit-architecture/`](./plugin/audit-architecture/) | v1.0.0 | single-skill + references | Concepteur d'**architecture d'audit** : dérive depuis un brief la structure d'audit multi-couches d'un process et la force (universel : contenu / dossier / code / vente). Spécialise P8 — ADR-036 |
-| [`dev-orchestrator/`](./plugin/dev-orchestrator/) | v1.1.0 | agent + skills + scripts | Orchestrateur de développement (VFDO) : agent routeur `vibeflow-dev` + 13 verbes `/vf-*` + index GSD auto-généré. Route le **langage naturel** vers les skills GSD/Superpowers (cadrage → livraison) sans exposer la plomberie — références D7 sous `.claude/agents/dev-orchestrator-references/` |
+[Install](#-install) · [Modules](#-modules) · [How it works](#-how-it-works) · [Author](#-author)
 
-## Types de modules supportés (depuis v2.0.0)
-
-| Type | Structure module | Cible installation |
-|------|------------------|---------------------|
-| **single-skill** | `<mod>/SKILL.md` + optionnel `references/`, `scripts/` | `.claude/skills/<mod>/` + `.claude/scripts/` |
-| **multi-skills** | `<mod>/skills/<name>/SKILL.md` (multiple) | `.claude/skills/<name>/` (chaque skill séparément) |
-| **agent-only** | `<mod>/AGENT.md` | `.claude/agents/<mod>.md` |
-| **doc-only** | `<mod>/content/` | `docs/<mod>/` |
-| **rules** | `<mod>/rules/*.md` | `.claude/rules/` (rules path-scopées auto-chargées) |
-
-Les types sont composables (ex: `skill-creator` = agent + multi-skills ; `software-architecture` = skill + rules + scripts).
-
-Chaque module a obligatoirement : `VERSION` (semver), `CHANGELOG.md`, `README.md`.
+</div>
 
 ---
 
-## Installation
+## ✨ What it is
 
-VibeFlow s'installe comme **plugin Claude Code**, en deux commandes :
+**VibeFlow OS** is the distribution repo for **VibeFlow** — an AI-assisted development methodology, packaged as a **Claude Code plugin** with toggleable modules.
+
+You don't learn a new CLI. You just talk. A **router agent** understands your intent and dispatches it to the right tool (GSD, Superpowers, audits…), rephrasing everything in a consistent VibeFlow vocabulary. The plumbing stays invisible.
+
+```text
+You  ›  help me add Google auth
+        VibeFlow runs: scoping → roadmap → sprint → tests
+        ↳ no /gsd-*, no /sp-* to learn
+
+You  ›  where are we?
+        VibeFlow: sprint report + next step
+
+You  ›  debug this crash
+        VibeFlow: systematic debugging, state persisted across resets
+```
+
+Beyond dev orchestration, VibeFlow ships **governance** modules: software-architecture audits, infrastructure audits, memory consolidation, methodology-alignment validation — each enabled à la carte.
+
+---
+
+## 🚀 Install
+
+VibeFlow installs as a **Claude Code plugin** in two commands — no clone, no script, no `settings.json` edits:
 
 ```bash
 claude plugin marketplace add picmakpro/vibeflow-os
 claude plugin install vibeflow
 ```
 
-Aucun clone, aucun script à lancer, aucune édition de `settings.json`.
-
-### Configuration (lancement manuel)
-
-Une fois le plugin installé, **lance toi-même** l'UX de configuration :
+Then, **inside Claude Code**, launch the configuration UX whenever you want:
 
 ```
 /vibeflow-install
 ```
 
-- **Toggle scope** (single-select) : compte (`user`) / projet (`project`) / projet sans commit (`local`).
-- **Toggle modules** (multi-select) : la liste sort du catalogue (chaque module + sa description).
-- **Dépendances auto-résolues** : la fermeture transitive des `requires` est calculée et récapitulée
-  avant toute install.
+The UX walks you through:
 
-> Le lancement est **toujours manuel** : tape `/vibeflow-install` quand tu veux installer ou
-> re-configurer. Il n'y a pas d'ouverture automatique au démarrage de session.
+| Step | What happens |
+|------|--------------|
+| **Scope** | Choose where to install: account (`user`), project (`project`), or project without commit (`local`). |
+| **Modules** | Pick which modules to enable — the list is populated from the catalog, each with its description. |
+| **Dependencies** | The transitive closure of `requires` is computed and summarized **before** any install. |
 
-### Re-configurer / ajouter un module
+> Launch is **100% manual**: VibeFlow never opens on its own at session start. Type `/vibeflow-install` to install or re-configure (change scope, add/remove a module — dependencies are re-resolved each time).
 
-`/vibeflow-install` reste invocable à la main à tout moment pour changer de scope, ajouter ou
-retirer un module (les dépendances sont re-résolues automatiquement).
-
-### Mise à jour
-
-```bash
-claude plugin update vibeflow
-```
-
-Voir [INSTALL.md](./INSTALL.md) pour les détails (désinstallation, troubleshooting).
+**Update:** `claude plugin update vibeflow` · **Details / troubleshooting:** [INSTALL.md](./INSTALL.md)
 
 ---
 
-## Convention versioning
+## 📦 Modules
 
-- **Semver** : `vMAJOR.MINOR.PATCH`
-- **MAJOR** : breaking change (convention frontmatter, format registre, structure module)
-- **MINOR** : nouveau module ou nouvelle capacité majeure
-- **PATCH** : bugfix scripts ou amélioration doc
+8 independently toggleable modules. Each has its own version, `CHANGELOG.md`, and `README.md`.
 
-Chaque module a sa propre version. Le repo global est tagué à la version du dernier changement majeur.
-
-### Historique versions repo
-
-| Version | Date | Changement |
-|---------|------|------------|
-| v1.0.0 | 2026-05-23 | Initial release : consolidator |
-| v1.1.0 | 2026-05-24 | + infrastructure-audit |
-| v1.2.0 | 2026-05-24 | + validator (agent-only) |
-| v1.2.1 | 2026-05-24 | Fix vibeflow-update.sh handle AGENT.md |
-| **v2.0.0** | 2026-05-24 | **+ skill-creator (multi-skills), + reference (doc-only), nouveau type module supporté** |
-| **v2.1.0** | 2026-05-28 | **+ software-architecture (skill+rules+scripts), + type distribuable `rules/` dans l'installer, Core v4.2 (ajout P9), reference v2.1.0** |
-| **v2.2.0** | 2026-06-03 | **+ audit-architecture (méta-skill concepteur de structures d'audit multi-couches), validator v1.1.0 (Phase 4 scan des process) — ADR-036** |
-| **v2.3.0** | 2026-06-04 | **+ dev-orchestrator (agent routeur VibeFlow → GSD + Superpowers, 13 verbes `/vf-*`, index auto) — milestone vfdo-v1.0** |
-| **v2.4.0** | 2026-06-05 | **Installation en 2 commandes : plugin Claude Code + skill `/vibeflow-install` à toggles (scope user/project/local), auto-lancement, manifeste de dépendances — milestone install-ux-v1.0** |
-| **v2.4.1** | 2026-06-06 | **Retrait de l'auto-lancement (hook `SessionStart` non fiable) → `/vibeflow-install` 100% manuel ; clean des reliquats de dev ; distribuable isolé sous `plugin/` (`source: ./plugin`) pour exclure `.planning/` + `docs/` du bundle** |
+| Module | Ver. | Type | What it does |
+|--------|:----:|------|--------------|
+| **[dev-orchestrator](./plugin/dev-orchestrator/)** | `1.1.0` | agent + skills + scripts | ⭐ The core. Router agent `vibeflow-dev` + 13 `/vf-*` verbs + auto-generated GSD index. Routes **plain language** to GSD/Superpowers skills (scoping → delivery), without exposing the plumbing. |
+| **[software-architecture](./plugin/software-architecture/)** | `1.0.0` | skill + rules + scripts | AI-Safe software architecture doctrine: SOLID/SoC, anti-god-files (≤300 LoC), machine-enforced gates, brownfield restructuring playbook. |
+| **[audit-architecture](./plugin/audit-architecture/)** | `1.0.0` | skill + references | Designer of **audit architectures**: derives, from a brief, the multi-layer audit structure of a process (content / folder / code / sales). |
+| **[infrastructure-audit](./plugin/infrastructure-audit/)** | `1.0.0` | skill + scripts | Automatic audit of the Claude Code infra (hooks, scripts, Anthropic drift) — catches regressions after an update. |
+| **[validator](./plugin/validator/)** | `1.1.0` | agent-only | Agent `vibeflow-validator`: guardian of technical alignment between methodology and projects, in 5 phases (incl. process-architecture audit). |
+| **[consolidator](./plugin/consolidator/)** | `1.0.0` | skill + scripts | Structured-memory consolidation across 4 pillars: indexing / archiving / merging / promotion. |
+| **[skill-creator](./plugin/skill-creator/)** | `1.0.0` | agent + skills | The "minimal agent + 2 composable skills" pattern for creating new skills (Anthropic base + workflow). |
+| **[reference](./plugin/reference/)** | `2.1.1` | doc-only | Full methodology documentation: VibeFlow Core (9 principles) + 11 patterns + 33 templates + 1 end-to-end example. |
 
 ---
 
-## Sécurité
+## 🛠 How it works
 
-- Repo public **source-available** : code et historique visibles, licence propriétaire « All rights reserved » (aucun droit de réutilisation accordé)
-- Scripts shell + Python uniquement (auditables ligne par ligne)
-- Pas de dépendances tierces non vérifiées
-- Tests automatisés pour chaque script (`scripts/tests/test-*.sh`)
-- skill-creator (Anthropic) sous licence MIT, contenu Anthropic original conservé
+### One UX, multiple scopes
+
+The installer places each module exactly where Claude Code expects it, based on its type:
+
+| Module type | Structure | Install target |
+|-------------|-----------|----------------|
+| **single-skill** | `<mod>/SKILL.md` (+ `references/`, `scripts/`) | `.claude/skills/<mod>/` |
+| **multi-skills** | `<mod>/skills/<name>/SKILL.md` | `.claude/skills/<name>/` (each) |
+| **agent-only** | `<mod>/AGENT.md` | `.claude/agents/<mod>.md` |
+| **doc-only** | `<mod>/content/` | `docs/<mod>/` |
+| **rules** | `<mod>/rules/*.md` | `.claude/rules/` (path-scoped, auto-loaded) |
+
+Types are **composable**: `dev-orchestrator` = agent + skills + scripts; `software-architecture` = skill + rules + scripts.
+
+### Anti-hallucination by design
+
+Routing relies on a **factual index auto-generated** from the frontmatter of the skills present on disk — never written by hand. The agent cannot invent a command name that doesn't exist.
 
 ---
 
-## Gouvernance
+## 🔒 Security
 
-- ADR doit accompagner toute modification structurante (côté Lab VibeFlow)
-- Modifications testées dans le Lab VibeFlow (cobaye) avant release
-- Tag GitHub Release = changelog officiel
-- Cycle de release rapide (multiple releases par session quand justifié)
+- **Source-available**: code and history are public, proprietary license ("All rights reserved", no reuse rights granted).
+- **Shell + Python scripts only** — auditable line by line, no unverified third-party dependencies.
+- **Idempotent**: every install script can be re-run without breaking the install, with an automatic backup before overwrite.
+- **Zero hooks**: the plugin registers nothing at session start. Everything starts from your manual invocation.
+- **Tests**: every script is covered (`scripts/tests/test-*.sh`).
 
 ---
 
-## Références
+## 🧭 Versioning & governance
 
-- [VibeFlow Lab](https://github.com/picmakpro/vibeflow-lab) (privé) — Lab principal
-- ADR-029 : Charte de densité agents
-- ADR-031 : Garde-fou support runtime
-- ADR-032 : Système de Consolidation Mémoire 4 piliers
-- ADR-033 : Création repo vibeflow-os (Session 047)
-- ADR-035 : Doctrine Architecture Logicielle AI-Safe — module software-architecture + P9 Core (Session 049)
-- ADR-036 : Doctrine Audit Architecture — module audit-architecture + validator Phase 4 (Session 050)
-- LRN-101 : Pattern "agent minimal + 2 skills composables"
-- LRN-106 : Audit avant fix
-- LRN-107 : Repo central versionné > zip ad-hoc
+**Semver** per module (`vMAJOR.MINOR.PATCH`) — MAJOR = breaking change, MINOR = new module/capability, PATCH = bugfix or docs. The global repo is tagged to the version of the last major change. Each GitHub release = the official changelog.
+
+<details>
+<summary><strong>Repo version history</strong></summary>
+
+| Version | Date | Change |
+|---------|------|--------|
+| `v1.0.0` | 2026-05-23 | Initial release: consolidator |
+| `v1.1.0` | 2026-05-24 | + infrastructure-audit |
+| `v1.2.0` | 2026-05-24 | + validator (agent-only) |
+| `v1.2.1` | 2026-05-24 | Fix `vibeflow-update.sh` (handle `AGENT.md`) |
+| `v2.0.0` | 2026-05-24 | + skill-creator (multi-skills), + reference (doc-only), new module type |
+| `v2.1.0` | 2026-05-28 | + software-architecture, `rules/` type in the installer, Core v4.2 (P9) |
+| `v2.2.0` | 2026-06-03 | + audit-architecture, validator v1.1.0 (Phase 4 process scan) |
+| `v2.3.0` | 2026-06-04 | + dev-orchestrator (NL router → GSD + Superpowers, 13 `/vf-*` verbs) |
+| `v2.4.0` | 2026-06-05 | Two-command install: Claude Code plugin + `/vibeflow-install` with toggles |
+| `v2.4.1` | 2026-06-06 | `/vibeflow-install` fully manual, distributable isolated under `plugin/`, cleanup |
+
+</details>
+
+<details>
+<summary><strong>Methodology references (ADR / LRN)</strong></summary>
+
+- **ADR-032** — 4-pillar memory consolidation system
+- **ADR-033** — Creation of the vibeflow-os repo
+- **ADR-035** — AI-Safe software architecture doctrine (software-architecture module + Core P9)
+- **ADR-036** — Audit architecture doctrine (audit-architecture module + validator Phase 4)
+- **LRN-101** — "Minimal agent + 2 composable skills" pattern
+- **LRN-106** — Audit before fix
+- **LRN-107** — Central versioned repo > ad-hoc zip
+
+Main lab (private): [vibeflow-lab](https://github.com/picmakpro/vibeflow-lab) — structural changes are tested there before release.
+
+</details>
+
+---
+
+## 👤 Author
+
+VibeFlow and its methodology are designed and maintained by **Samuel Neveu** — [@Samuel-Learnity](https://github.com/Samuel-Learnity).
+
+Repo distributed and published under the [@picmakpro](https://github.com/picmakpro) account.
+
+---
+
+## 📄 License
+
+Source-available under a proprietary license — see [LICENSE](./LICENSE). The code and history are public, but no reuse, modification, or distribution rights are granted.
+
+> The `skill-creator` module reuses original Anthropic content under the MIT license.
