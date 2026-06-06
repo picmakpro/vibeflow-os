@@ -1,20 +1,36 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-06-04
+**Analysis Date:** 2026-06-06 (restructuration plugin/ — voir note ci-dessous)
 
 ## Directory Layout
 
+> **Restructuration (2026-06-06)** : tout le distribuable a été isolé sous `plugin/` et
+> `marketplace.json` pointe `source: "./plugin"`. `.planning/` et `docs/` restent à la racine du
+> repo et **ne sont plus distribués** dans le bundle plugin. Les modules détaillés plus bas vivent
+> désormais sous `plugin/<module>/` (affichés à l'indentation racine pour la lisibilité).
+
 ```
-vibeflow-os/
+vibeflow-os/                  # repo root = marketplace
 ├── README.md                 # Overview, module table, installation guide
-├── INSTALL.md                # Detailed installation walkthrough (2 methods)
+├── INSTALL.md                # Detailed installation walkthrough
 ├── VERSION                   # Global repo version (semver)
-├── LICENSE                   # License file
-├── .gitignore                # Git ignore patterns (includes .vibeflow-cache)
+├── LICENSE
+├── .gitignore                # includes .vibeflow-cache
+├── .planning/                # GSD internal state — NOT distributed (hors bundle)
+├── docs/                     # Dev specs — NOT distributed (hors bundle)
+├── .claude-plugin/
+│   └── marketplace.json      # Marketplace manifest → plugin source: "./plugin"
 │
-├── _internal/
-│   └── vibeflow-update.sh    # [CORE] Universal installer/updater for all module types
-│
+└── plugin/                   # ★ THE DISTRIBUTED BUNDLE — everything below lives here
+    ├── .claude-plugin/
+    │   └── plugin.json       # Plugin manifest (skills: ./installer)
+    ├── installer/            # [ENTRY] /vibeflow-install skill + build-module-catalog.sh
+    └── _internal/
+        ├── vibeflow-update.sh    # [CORE] Universal installer/updater for all module types
+        └── resolve-deps.sh       # Dependency transitive-closure resolver
+
+# --- modules ci-dessous : tous sous plugin/<module>/ ---
+
 ├── consolidator/             # v1.0.0 — Memory consolidation 4-pillar system
 │   ├── VERSION
 │   ├── CHANGELOG.md

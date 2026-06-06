@@ -102,7 +102,7 @@ Chaque module a sa propre version. Le repo global est tagué à la version du de
 | **v2.2.0** | 2026-06-03 | **+ audit-architecture (méta-skill concepteur de structures d'audit multi-couches), validator v1.1.0 (Phase 4 scan des process) — ADR-036** |
 | **v2.3.0** | 2026-06-04 | **+ dev-orchestrator (agent routeur VibeFlow → GSD + Superpowers, 13 verbes `/vf-*`, index auto) — milestone vfdo-v1.0** |
 | **v2.4.0** | 2026-06-05 | **Installation en 2 commandes : plugin Claude Code + skill `/vibeflow-install` à toggles (scope user/project/local), auto-lancement, manifeste de dépendances — milestone install-ux-v1.0** |
-| **v2.4.1** | 2026-06-06 | **Retrait de l'auto-lancement (hook `SessionStart`) : déclenchement non fiable → `/vibeflow-install` redevient 100% manuel, doc alignée** |
+| **v2.4.1** | 2026-06-06 | **Retrait de l'auto-lancement (hook `SessionStart` non fiable) → `/vibeflow-install` 100% manuel ; clean des reliquats de dev ; distribuable isolé sous `plugin/` (`source: ./plugin`) pour exclure `.planning/` + `docs/` du bundle** |
 
 ---
 
