@@ -8,7 +8,7 @@
 
 Say _"help me build this feature"_ — and the whole pipeline kicks off: scoping → plan → execution → tests → delivery. Without ever typing a technical command or knowing what runs under the hood.
 
-[![Version](https://img.shields.io/badge/version-2.4.1-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.4.2-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-8-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -138,6 +138,7 @@ Routing relies on a **factual index auto-generated** from the frontmatter of the
 | `v2.3.0` | 2026-06-04 | + dev-orchestrator (NL router → GSD + Superpowers, 13 `/vf-*` verbs) |
 | `v2.4.0` | 2026-06-05 | Two-command install: Claude Code plugin + `/vibeflow-install` with toggles |
 | `v2.4.1` | 2026-06-06 | `/vibeflow-install` fully manual, distributable isolated under `plugin/`, cleanup |
+| `v2.4.2` | 2026-06-06 | `uninstall --all` engine command + uninstall flow in `/vibeflow-install` + two-layer uninstall docs |
 
 </details>
 

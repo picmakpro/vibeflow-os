@@ -4,7 +4,8 @@ description: >
   Utiliser au tout premier lancement de VibeFlow après l'installation du plugin (l'utilisateur
   lance manuellement `/vibeflow-install`), ou quand l'utilisateur dit
   « installe VibeFlow », « configure les modules », « ajoute un module », « change de scope »,
-  « re-configure VibeFlow », ou veut choisir où installer (compte / projet / projet sans commit).
+  « re-configure VibeFlow », « désinstalle un module », « désinstalle VibeFlow », « retire tout »,
+  ou veut choisir où installer (compte / projet / projet sans commit).
   Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 
@@ -89,6 +90,27 @@ Concrètement, par étape :
 
 6. **Récap final + prochaines étapes.** Confirmer ce qui a été posé et où, puis amorcer la suite
    en vocabulaire VibeFlow (ex. « dis "aide-moi à dev" pour démarrer »).
+
+## Désinstallation (déléguée — même câblage de cache)
+
+Quand l'utilisateur veut **retirer** un ou tous les modules, déléguer à l'engine (jamais de `rm`
+manuel) avec **le même `VIBEFLOW_CACHE` et le même `--scope`** que pour l'install — le scope DOIT
+correspondre à celui où les modules ont été posés (sinon l'engine cherche au mauvais endroit).
+
+- **Un module** :
+  `VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT:-…}" vibeflow-update.sh --scope <s> uninstall <module>`
+- **Tout** :
+  `VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT:-…}" vibeflow-update.sh --scope <s> uninstall --all`
+  (lit le registre `<scope>/.claude/scripts/.vibeflow-installed` et retire chaque module : skills,
+  agent + references D7, scripts et rules qui lui appartiennent ; backup automatique avant chaque
+  retrait).
+
+> **Ordre critique à rappeler à l'utilisateur (ORDRE-01).** Pour une désinstallation *complète* de
+> VibeFlow, retirer les **modules d'abord** (`uninstall --all`), **puis** le plugin
+> (`claude plugin uninstall vibeflow`). Si le plugin part en premier, le cache
+> `${CLAUDE_PLUGIN_ROOT}` disparaît et l'engine ne peut plus identifier les scripts/rules à
+> retirer proprement. GSD/Superpowers (dépendances externes) ne sont **jamais** désinstallés
+> automatiquement — le préciser et laisser le choix à l'utilisateur.
 
 ## Garde-fous
 

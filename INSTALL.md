@@ -72,13 +72,58 @@ Récupère la dernière version publiée du plugin depuis le marketplace, puis r
 
 ## Désinstallation
 
+L'install se fait en **deux couches**, et il faut les retirer dans le bon ordre :
+
+| Couche | Contenu | Retirée par `claude plugin uninstall vibeflow` ? |
+|--------|---------|:---:|
+| **Plugin** | Le bundle dans le cache Claude Code (skill `installer/` + engine `_internal/` + sources des modules) | ✅ oui |
+| **Modules déployés** | Les copies posées dans ton scope : `.claude/skills/`, `.claude/agents/<mod>.md`, `.claude/agents/<mod>-references/`, `.claude/scripts/`, `.claude/rules/`, `docs/` | ❌ **non** |
+
+`claude plugin uninstall vibeflow` ne retire **que** le plugin : les modules déjà copiés dans un
+scope restent actifs. Pour une désinstallation **propre et complète**, retire d'abord les modules,
+puis le plugin.
+
+### Ordre recommandé
+
+**1. Retirer les modules** (tant que le plugin — donc l'engine — est encore présent) :
+
+```
+/vibeflow-install
+```
+
+Demande la désinstallation (« désinstalle VibeFlow » / « retire tel module »). En coulisse, le
+skill délègue à l'engine :
+
+```bash
+# tous les modules installés (lit le registre .vibeflow-installed)
+vibeflow-update.sh --scope <user|project|local> uninstall --all
+
+# ou un seul module
+vibeflow-update.sh --scope <user|project|local> uninstall <module>
+```
+
+Chaque retrait supprime skills / agent + references / scripts / rules appartenant au module et
+crée un **backup automatique** avant suppression. Le `--scope` doit être **celui utilisé à
+l'install**.
+
+**2. Retirer le plugin :**
+
 ```bash
 claude plugin uninstall vibeflow
 ```
 
-Cela retire le plugin (skill + bundle) du cache de Claude Code. Les modules déjà copiés
-dans un scope (`.claude/skills/`, `.claude/agents/`, etc.) restent en place ; les retirer
-manuellement si besoin.
+> ⚠️ **N'inverse pas l'ordre.** Si tu retires le plugin en premier, le cache
+> (`${CLAUDE_PLUGIN_ROOT}`) disparaît et l'engine ne peut plus identifier les scripts/rules à
+> nettoyer. Il faudrait alors retirer les fichiers résiduels à la main dans `.claude/`.
+
+### Dépendances externes (GSD / Superpowers)
+
+Elles ne sont **jamais désinstallées automatiquement** (l'engine ne touche qu'aux modules
+VibeFlow). Si tu veux aussi les retirer :
+
+- **Superpowers** : `claude plugin uninstall superpowers`
+- **GSD** : installé hors VibeFlow via `npx get-shit-done-cc` — le retirer selon sa propre
+  procédure (typiquement en supprimant `~/.claude/get-shit-done/` et les skills `gsd-*` déposés).
 
 ---
 

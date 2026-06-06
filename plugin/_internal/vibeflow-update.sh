@@ -8,6 +8,7 @@
 #   ./vibeflow-update.sh [--scope ...] update <module>                      # Met à jour un module installé
 #   ./vibeflow-update.sh [--scope ...] update --all                         # Met à jour tous les modules installés
 #   ./vibeflow-update.sh [--scope ...] uninstall <module>                   # Désinstalle un module
+#   ./vibeflow-update.sh [--scope ...] uninstall --all                      # Désinstalle TOUS les modules installés (lit le registre)
 #   ./vibeflow-update.sh [--scope ...] rollback <module>                    # Restore depuis backup
 #   ./vibeflow-update.sh [--scope ...] status                               # Liste modules installés + versions
 #   ./vibeflow-update.sh sync                                               # No-op (source = cache, plus de git)
@@ -489,8 +490,29 @@ case "$cmd" in
     fi
     ;;
   uninstall)
-    [ -n "$arg" ] || err "Usage: uninstall <module>"
-    uninstall_module "$arg"
+    if [ "$arg" = "--all" ]; then
+      # uninstall --all : retire TOUS les modules listés dans le registre.
+      # On fige la liste AVANT la boucle : uninstall_module → mark_uninstalled réécrit le
+      # registre à chaque itération, donc on itère sur un snapshot, pas sur le fichier muté.
+      if [ -f "$INSTALLED_REGISTRY" ]; then
+        _to_remove=()
+        while IFS='=' read -r mod _ver; do
+          [ -n "$mod" ] && _to_remove+=("$mod")
+        done < "$INSTALLED_REGISTRY"
+        if [ "${#_to_remove[@]}" -eq 0 ]; then
+          log "Aucun module installé (registre vide) — rien à désinstaller."
+        else
+          for mod in "${_to_remove[@]}"; do uninstall_module "$mod"; done
+          log "✓ ${#_to_remove[@]} module(s) désinstallé(s)"
+        fi
+      else
+        log "Aucun module installé (pas de registre) — rien à désinstaller."
+      fi
+    elif [ -n "$arg" ]; then
+      uninstall_module "$arg"
+    else
+      err "Usage: uninstall <module> | uninstall --all"
+    fi
     ;;
   rollback)
     [ -n "$arg" ] || err "Usage: rollback <module>"

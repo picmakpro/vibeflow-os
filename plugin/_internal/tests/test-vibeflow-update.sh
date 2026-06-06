@@ -176,6 +176,44 @@ fi
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
+# T6 (uninstall --all) — installe 2 modules puis les retire tous d'un coup
+# ---------------------------------------------------------------------------
+# Vérifie : après `uninstall --all`, les artefacts des 2 modules sont retirés ET le registre
+# .vibeflow-installed est vide (aucune entrée résiduelle).
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+if prepare_module "$CACHE" "dev-orchestrator" && prepare_module "$CACHE" "consolidator"; then
+  # Install des 2 modules (scope project → ./.claude du lab).
+  (cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" install dev-orchestrator >/dev/null 2>&1)
+  (cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" install consolidator >/dev/null 2>&1)
+  # Retrait global.
+  (cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" uninstall --all >/dev/null 2>&1)
+  miss=0
+  # Artefacts des 2 modules retirés.
+  [ ! -f "$LAB/.claude/agents/dev-orchestrator.md" ] \
+    || { ko "T6 uninstall --all : agent dev-orchestrator encore présent"; miss=1; }
+  [ ! -d "$LAB/.claude/agents/dev-orchestrator-references" ] \
+    || { ko "T6 uninstall --all : references dev-orchestrator encore présentes"; miss=1; }
+  [ ! -d "$LAB/.claude/skills/consolidator" ] \
+    || { ko "T6 uninstall --all : skill consolidator encore présent"; miss=1; }
+  # Registre vide (plus aucune ligne module=version).
+  REG="$LAB/.claude/scripts/.vibeflow-installed"
+  if [ -f "$REG" ]; then
+    n=$("$GREP" -cE '^[a-zA-Z]' "$REG" || true)
+    [ "${n:-0}" -eq 0 ] \
+      || { ko "T6 uninstall --all : registre non vide ($n entrée(s) résiduelle(s))"; miss=1; }
+  fi
+  [ "$miss" -eq 0 ] \
+    && ok "T6 uninstall --all : 2 modules installés puis tous retirés, registre vide"
+else
+  skip "T6 uninstall --all : dev-orchestrator/consolidator non copiables dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
 # Garde-fou final : le vrai ~/.claude est inchangé (snapshot récursif avant=après).
 # ---------------------------------------------------------------------------
 HOME_AFTER=$(find "$HOME/.claude" -type f 2>/dev/null | wc -l | tr -d ' ')

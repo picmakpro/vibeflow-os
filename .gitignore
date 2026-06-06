@@ -10,6 +10,20 @@
 # Cache local
 .vibeflow-cache/
 
+# Artefacts d'install locale (le repo est la SOURCE des modules, PAS un lab :
+# lancer l'engine en scope project/local y déposerait des copies du distribuable).
+.claude/
+docs/reference/
+
+# Registre + temporaires de l'engine
+.vibeflow-installed
+*.tmp
+
+# Dépendances / environnements (au cas où un module ajoute de l'outillage)
+node_modules/
+.venv/
+venv/
+
 # Logs
 *.log
 logs/
