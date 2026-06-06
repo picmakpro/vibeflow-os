@@ -13,14 +13,14 @@ Ce repo héberge les **modules réutilisables** de la méthodologie VibeFlow, di
 
 | Module | Version | Type | Description |
 |--------|---------|------|-------------|
-| [`consolidator/`](./consolidator/) | v1.0.0 | single-skill + scripts | Consolidation mémoire 4 piliers (Indexation / Archivage / Fusion / Promotion) — ADR-032 |
-| [`infrastructure-audit/`](./infrastructure-audit/) | v1.0.0 | single-skill + scripts | Audit automatique infrastructure (hooks, scripts, drift Anthropic) — détecte régressions après update Claude Code |
-| [`validator/`](./validator/) | v1.1.0 | agent-only | Agent `vibeflow-validator` (garant alignement technique méthodo ↔ labs) — 5 phases dont audit architecture des process |
-| [`skill-creator/`](./skill-creator/) | v1.0.0 | agent + 2 skills | Pattern "agent minimal + 2 skills composables" (Anthropic + workflow) — LRN-101 |
-| [`reference/`](./reference/) | v2.1.1 | doc-only | Documentation méthodologique complète (VIBEFLOW_CORE **v4.2 — 9 principes, +P9** + pointeur P8↔audit-architecture + 11 patterns + 33 templates + 1 exemple) |
-| [`software-architecture/`](./software-architecture/) | v1.0.0 | single-skill + rules + scripts | Doctrine Architecture Logicielle AI-Safe (SOLID/SoC, anti-god-files ≤300L, gates machine-enforced, playbook restructuration brownfield) — ADR-035 |
-| [`audit-architecture/`](./audit-architecture/) | v1.0.0 | single-skill + references | Concepteur d'**architecture d'audit** : dérive depuis un brief la structure d'audit multi-couches d'un process et la force (universel : contenu / dossier / code / vente). Spécialise P8 — ADR-036 |
-| [`dev-orchestrator/`](./dev-orchestrator/) | v1.1.0 | agent + skills + scripts | Orchestrateur de développement (VFDO) : agent routeur `vibeflow-dev` + 13 verbes `/vf-*` + index GSD auto-généré. Route le **langage naturel** vers les skills GSD/Superpowers (cadrage → livraison) sans exposer la plomberie — références D7 sous `.claude/agents/dev-orchestrator-references/` |
+| [`consolidator/`](./plugin/consolidator/) | v1.0.0 | single-skill + scripts | Consolidation mémoire 4 piliers (Indexation / Archivage / Fusion / Promotion) — ADR-032 |
+| [`infrastructure-audit/`](./plugin/infrastructure-audit/) | v1.0.0 | single-skill + scripts | Audit automatique infrastructure (hooks, scripts, drift Anthropic) — détecte régressions après update Claude Code |
+| [`validator/`](./plugin/validator/) | v1.1.0 | agent-only | Agent `vibeflow-validator` (garant alignement technique méthodo ↔ labs) — 5 phases dont audit architecture des process |
+| [`skill-creator/`](./plugin/skill-creator/) | v1.0.0 | agent + 2 skills | Pattern "agent minimal + 2 skills composables" (Anthropic + workflow) — LRN-101 |
+| [`reference/`](./plugin/reference/) | v2.1.1 | doc-only | Documentation méthodologique complète (VIBEFLOW_CORE **v4.2 — 9 principes, +P9** + pointeur P8↔audit-architecture + 11 patterns + 33 templates + 1 exemple) |
+| [`software-architecture/`](./plugin/software-architecture/) | v1.0.0 | single-skill + rules + scripts | Doctrine Architecture Logicielle AI-Safe (SOLID/SoC, anti-god-files ≤300L, gates machine-enforced, playbook restructuration brownfield) — ADR-035 |
+| [`audit-architecture/`](./plugin/audit-architecture/) | v1.0.0 | single-skill + references | Concepteur d'**architecture d'audit** : dérive depuis un brief la structure d'audit multi-couches d'un process et la force (universel : contenu / dossier / code / vente). Spécialise P8 — ADR-036 |
+| [`dev-orchestrator/`](./plugin/dev-orchestrator/) | v1.1.0 | agent + skills + scripts | Orchestrateur de développement (VFDO) : agent routeur `vibeflow-dev` + 13 verbes `/vf-*` + index GSD auto-généré. Route le **langage naturel** vers les skills GSD/Superpowers (cadrage → livraison) sans exposer la plomberie — références D7 sous `.claude/agents/dev-orchestrator-references/` |
 
 ## Types de modules supportés (depuis v2.0.0)
 

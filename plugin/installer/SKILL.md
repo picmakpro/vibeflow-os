@@ -31,16 +31,17 @@ variables :
 de déléguer à un script :
 
 ```sh
-VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT:-<racine du repo vibeflow-os cloné en dev>}"
-VF_MODULES_ROOT="${CLAUDE_PLUGIN_ROOT:-<racine du repo vibeflow-os cloné en dev>}"
+VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT:-<racine du repo vibeflow-os cloné en dev>/plugin}"
+VF_MODULES_ROOT="${CLAUDE_PLUGIN_ROOT:-<racine du repo vibeflow-os cloné en dev>/plugin}"
 ```
 
 - **En plugin installé** : `${CLAUDE_PLUGIN_ROOT}` est défini → les deux variables pointent sur le
   cache bundlé.
 - **En dev (repo cloné, pas plugin)** : `CLAUDE_PLUGIN_ROOT` est absent → le fallback pointe les
-  deux variables sur la racine du repo `vibeflow-os` (comportement déjà supporté par les scripts :
-  `VF_MODULES_ROOT` défaut = racine repo ; `VIBEFLOW_CACHE` défaut `.vibeflow-cache`, donc en dev
-  on le pointe explicitement sur la racine du repo).
+  deux variables sur le sous-dossier `plugin/` du repo `vibeflow-os` (qui contient les modules +
+  `_internal/`). Comportement déjà supporté par les scripts : `VF_MODULES_ROOT` défaut =
+  `$(dirname "$0")/..` qui résout précisément sur `plugin/` ; `VIBEFLOW_CACHE` défaut
+  `.vibeflow-cache`, donc en dev on le pointe explicitement sur `plugin/`.
 
 Concrètement, par étape :
 
