@@ -8,9 +8,9 @@
 
 Say _"help me build this feature"_ — and the whole pipeline kicks off: scoping → plan → execution → tests → delivery. Without ever typing a technical command or knowing what runs under the hood.
 
-[![Version](https://img.shields.io/badge/version-2.4.2-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.5.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
-[![Modules](https://img.shields.io/badge/modules-8-16a34a)](#-modules)
+[![Modules](https://img.shields.io/badge/modules-9-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
 [Install](#-install) · [Modules](#-modules) · [How it works](#-how-it-works) · [Author](#-author)
@@ -72,7 +72,7 @@ The UX walks you through:
 
 ## 📦 Modules
 
-8 independently toggleable modules. Each has its own version, `CHANGELOG.md`, and `README.md`.
+9 independently toggleable modules. Each has its own version, `CHANGELOG.md`, and `README.md`.
 
 | Module | Ver. | Type | What it does |
 |--------|:----:|------|--------------|
@@ -84,6 +84,7 @@ The UX walks you through:
 | **[consolidator](./plugin/consolidator/)** | `1.0.0` | skill + scripts | Structured-memory consolidation across 4 pillars: indexing / archiving / merging / promotion. |
 | **[skill-creator](./plugin/skill-creator/)** | `1.0.0` | agent + skills | The "minimal agent + 2 composable skills" pattern for creating new skills (Anthropic base + workflow). |
 | **[reference](./plugin/reference/)** | `2.1.1` | doc-only | Full methodology documentation: VibeFlow Core (9 principles) + 11 patterns + 33 templates + 1 end-to-end example. |
+| **[planning-core](./plugin/planning-core/)** | `1.0.0` | skill + references | Universal planning & documentation backbone: lays down the common `.planning/` trunk (PROJECT/STATE/ROADMAP/REQUIREMENTS/MILESTONES/phases), **adapted to each lab's domain** — never imposed. The forward/present layer, complementary to the memory registries. |
 
 ---
 
@@ -139,6 +140,7 @@ Routing relies on a **factual index auto-generated** from the frontmatter of the
 | `v2.4.0` | 2026-06-05 | Two-command install: Claude Code plugin + `/vibeflow-install` with toggles |
 | `v2.4.1` | 2026-06-06 | `/vibeflow-install` fully manual, distributable isolated under `plugin/`, cleanup |
 | `v2.4.2` | 2026-06-06 | `uninstall --all` engine command + uninstall flow in `/vibeflow-install` + two-layer uninstall docs |
+| `v2.5.0` | 2026-06-10 | + planning-core (universal `.planning/` backbone, domain-adaptive, 3 rigor profiles) — ADR-038 |
 
 </details>
 

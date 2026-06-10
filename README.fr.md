@@ -8,9 +8,9 @@
 
 Dis _« aide-moi à dev cette feature »_ — et tout le pipeline se déclenche : cadrage → plan → exécution → tests → livraison. Sans jamais taper une commande technique ni savoir ce qui tourne en coulisse.
 
-[![Version](https://img.shields.io/badge/version-2.4.2-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.5.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
-[![Modules](https://img.shields.io/badge/modules-8-16a34a)](#-modules)
+[![Modules](https://img.shields.io/badge/modules-9-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
 [Installation](#-installation) · [Modules](#-modules) · [Comment ça marche](#-comment-ça-marche) · [Auteur](#-auteur)
@@ -72,7 +72,7 @@ L'UX déroule :
 
 ## 📦 Modules
 
-8 modules activables indépendamment. Chacun a sa propre version, son `CHANGELOG.md` et son `README.md`.
+9 modules activables indépendamment. Chacun a sa propre version, son `CHANGELOG.md` et son `README.md`.
 
 | Module | Ver. | Type | Ce qu'il fait |
 |--------|:----:|------|---------------|
@@ -84,6 +84,7 @@ L'UX déroule :
 | **[consolidator](./plugin/consolidator/)** | `1.0.0` | skill + scripts | Consolidation de la mémoire structurée sur 4 piliers : indexation / archivage / fusion / promotion. |
 | **[skill-creator](./plugin/skill-creator/)** | `1.0.0` | agent + skills | Pattern « agent minimal + 2 skills composables » pour créer de nouveaux skills (base Anthropic + workflow). |
 | **[reference](./plugin/reference/)** | `2.1.1` | doc-only | Documentation méthodologique complète : VibeFlow Core (9 principes) + 11 patterns + 33 templates + 1 exemple de bout en bout. |
+| **[planning-core](./plugin/planning-core/)** | `1.0.0` | skill + references | Socle de planning & documentation universel : pose le tronc commun `.planning/` (PROJECT/STATE/ROADMAP/REQUIREMENTS/MILESTONES/phases), **adapté à la logique métier de chaque lab** — jamais imposé. La couche avant/présent, complémentaire des registres mémoire. |
 
 ---
 
@@ -139,6 +140,7 @@ Le routage repose sur un **index factuel auto-généré** depuis le frontmatter 
 | `v2.4.0` | 2026-06-05 | Installation en 2 commandes : plugin Claude Code + `/vibeflow-install` à toggles |
 | `v2.4.1` | 2026-06-06 | `/vibeflow-install` 100 % manuel, distribuable isolé sous `plugin/`, clean reliquats |
 | `v2.4.2` | 2026-06-06 | Commande engine `uninstall --all` + flux de désinstallation dans `/vibeflow-install` + doc désinstallation 2 couches |
+| `v2.5.0` | 2026-06-10 | + planning-core (socle `.planning/` universel, adaptatif par métier, 3 profils de rigueur) — ADR-038 |
 
 </details>
 

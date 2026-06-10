@@ -1,0 +1,18 @@
+{
+  "planning_version": "1.0",
+  "project_code": "[CODE]",
+  "profile": "leger",
+  "domain": "[dev | contenu | vente | dossier | design | recherche | autre]",
+  "domain_extension": null,
+  "options": {
+    "requirements_tracking": false,
+    "phases_trace": false,
+    "milestones_archive": false,
+    "verification_step": false,
+    "gates": false
+  },
+  "memory_bridge": {
+    "enabled": false,
+    "registries_path": ".claude/memory"
+  }
+}
