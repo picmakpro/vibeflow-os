@@ -8,9 +8,9 @@
 
 Dis _« aide-moi à dev cette feature »_ — et tout le pipeline se déclenche : cadrage → plan → exécution → tests → livraison. Sans jamais taper une commande technique ni savoir ce qui tourne en coulisse.
 
-[![Version](https://img.shields.io/badge/version-2.6.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.7.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
-[![Modules](https://img.shields.io/badge/modules-9-16a34a)](#-modules)
+[![Modules](https://img.shields.io/badge/modules-10-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
 [Installation](#-installation) · [Modules](#-modules) · [Comment ça marche](#-comment-ça-marche) · [Auteur](#-auteur)
@@ -72,11 +72,12 @@ L'UX déroule :
 
 ## 📦 Modules
 
-9 modules activables indépendamment. Chacun a sa propre version, son `CHANGELOG.md` et son `README.md`.
+10 modules activables indépendamment. Chacun a sa propre version, son `CHANGELOG.md` et son `README.md`.
 
 | Module | Ver. | Type | Ce qu'il fait |
 |--------|:----:|------|---------------|
-| **[dev-orchestrator](./plugin/dev-orchestrator/)** | `1.1.0` | agent + skills + scripts | ⭐ Le cœur. Agent routeur `vibeflow-dev` + 13 verbes `/vf-*` + index GSD auto-généré. Route le **langage naturel** vers les skills GSD/Superpowers (cadrage → livraison), sans exposer la plomberie. |
+| **[conductor](./plugin/conductor/)** | `1.0.0` | agent + skills + scripts + references | 🧭 La porte d'entrée. Agent méta `vibeflow-conductor` (gardien) : crée/configure un lab dans **n'importe quel métier** (`vf-new-lab`), installe/vérifie/met à jour, migre sur évolution de doctrine (`vf-calibrate`), reçoit les escalades de cohérence. Pas appelé en continu — config/audit/migration. |
+| **[dev-orchestrator](./plugin/dev-orchestrator/)** | `1.1.0` | agent + skills + scripts | ⭐ Le cœur dev. Agent routeur `vibeflow-dev` + 13 verbes `/vf-*` + index GSD auto-généré. Route le **langage naturel** vers les skills GSD/Superpowers (cadrage → livraison), sans exposer la plomberie. |
 | **[software-architecture](./plugin/software-architecture/)** | `1.0.0` | skill + rules + scripts | Doctrine d'architecture logicielle AI-Safe : SOLID/SoC, anti-god-files (≤300 L), gates *machine-enforced*, playbook de restructuration brownfield. |
 | **[audit-architecture](./plugin/audit-architecture/)** | `1.0.0` | skill + references | Concepteur d'**architecture d'audit** : dérive depuis un brief la structure d'audit multi-couches d'un process (contenu / dossier / code / vente). |
 | **[infrastructure-audit](./plugin/infrastructure-audit/)** | `1.0.0` | skill + scripts | Audit automatique de l'infra Claude Code (hooks, scripts, drift Anthropic) — détecte les régressions après une mise à jour. |
@@ -142,6 +143,7 @@ Le routage repose sur un **index factuel auto-généré** depuis le frontmatter 
 | `v2.4.2` | 2026-06-06 | Commande engine `uninstall --all` + flux de désinstallation dans `/vibeflow-install` + doc désinstallation 2 couches |
 | `v2.5.0` | 2026-06-10 | + planning-core (socle `.planning/` universel, adaptatif par métier, 3 profils de rigueur) — ADR-038 |
 | `v2.6.0` | 2026-06-11 | planning-core v1.1.0 : garde-fou de fraîcheur (`check-planning-state.sh`) + détection métier + bootstrap opt-in + exemple non-dev travaillé |
+| `v2.7.0` | 2026-06-11 | + conductor (orchestrateur méta/gardien) : bootstrap de lab universel (tout métier), propagation update + migration, protocole d'escalade sous-agents |
 
 </details>
 
