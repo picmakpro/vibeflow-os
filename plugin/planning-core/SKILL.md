@@ -50,7 +50,8 @@ métier) est dans `references/GUIDE.md`. Charger on-demand.
 
 1. **Lire le métier du lab AVANT de scaffolder.** Lire `CLAUDE.md`, le `docs/` existant, les
    registres `.claude/memory/`, et déduire : *quel métier ? quelle granularité de travail ?*
-   Ne jamais présumer « dev ». Si la logique métier n'est pas claire → **une question courte**.
+   Ne jamais présumer « dev ». Appliquer les heuristiques de `references/domain-detection.md`
+   (jugement, pas détection figée). Si la logique métier n'est pas claire → **une question courte**.
 
 2. **Choisir le profil de rigueur** (`references/PROFILES.md`) selon le métier détecté. Le
    **proposer** à l'utilisateur (pré-coché), ne pas l'imposer. Léger par défaut pour les métiers
@@ -73,6 +74,9 @@ métier) est dans `references/GUIDE.md`. Charger on-demand.
 
 ## Séquence — Maintenance (`.planning/` déjà là)
 
+- **Vérifier la fraîcheur** : `scripts/check-planning-state.sh` (advisory) signale un `STATE.md`
+  périmé ou un `.planning/` absent — utilisable manuellement, au `/checkpoint`, ou en hook
+  SessionStart opt-in (wiring dans `references/domain-detection.md`).
 - **Mettre à jour `STATE.md`** en priorité (position courante, % d'avancement, focus, todos).
 - À la clôture d'une étape : écrire son `SUMMARY.md` ; à l'ouverture : son `PLAN.md`.
 - À la livraison d'un jalon : archiver dans `MILESTONES.md` + `milestones/`.
@@ -109,4 +113,7 @@ métier) est dans `references/GUIDE.md`. Charger on-demand.
 - `references/GUIDE.md` — doctrine : tronc commun, anti-biais, adaptation par logique métier, pont mémoire.
 - `references/PROFILES.md` — les 3 profils de rigueur + mapping métier → profil.
 - `references/bridge-memory.md` — articulation `.planning/` (forward) ↔ registres `.claude/memory/` (capitalisation).
+- `references/domain-detection.md` — heuristiques métier → profil + extension, et auto-infusion à l'install.
+- `references/example-lab-contenu.md` — exemple complet d'un socle adapté à un lab NON-dev (preuve d'universalité).
 - `references/templates/` — les 8 gabarits universels à instancier (à adapter, jamais à copier tel quel).
+- `scripts/check-planning-state.sh` — garde-fou de fraîcheur de la clé de voûte (advisory, exit codes pour hook).

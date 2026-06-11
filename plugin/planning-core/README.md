@@ -4,7 +4,7 @@
 > lab — la couche qui répond à « où va-t-on, où en est-on, qu'a-t-on décidé » — **adapté à la
 > logique métier**, jamais imposé.
 
-**Type** : `skill + references` · **Version** : v1.0.0 · **Dépend de** : rien.
+**Type** : `skill + references + scripts` · **Version** : v1.1.0 · **Dépend de** : rien.
 
 ---
 
@@ -53,6 +53,14 @@ profil, et pose `.planning/` adapté. En maintenance, il tient `STATE.md` à jou
 dupliqués. Le pont est défini dans `references/bridge-memory.md`. `planning-core` fonctionne **seul**
 si le lab n'a pas (encore) de registres mémoire.
 
+## Garder le socle vivant (moteur léger)
+
+`scripts/check-planning-state.sh` est un garde-fou **advisory** (jamais bloquant) qui signale un
+`STATE.md` périmé ou un `.planning/` absent. Utilisable à la main, au `/checkpoint`, ou via un hook
+SessionStart **opt-in** (wiring documenté dans `references/domain-detection.md`, jamais auto-injecté).
+C'est ce qui amorce un lab fraîchement installé **sans rien imposer** : le garde-fou surface le
+manque, le skill pose un socle adapté au métier.
+
 ## Contenu du module
 
 ```
@@ -62,5 +70,10 @@ planning-core/
     GUIDE.md                   # doctrine : tronc, anti-biais, adaptation métier
     PROFILES.md                # 3 profils + mapping métier → profil
     bridge-memory.md           # pont planning ↔ registres mémoire
+    domain-detection.md        # heuristiques métier → profil + auto-infusion (hook opt-in)
+    example-lab-contenu.md     # exemple complet d'un socle adapté à un lab NON-dev
     templates/                 # 8 gabarits universels neutres-métier
+  scripts/
+    check-planning-state.sh    # garde-fou fraîcheur de STATE.md (advisory)
+    tests/test-planning-core.sh
 ```

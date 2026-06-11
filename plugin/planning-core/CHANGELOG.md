@@ -1,5 +1,26 @@
 # Changelog — planning-core
 
+## v1.1.0 — 2026-06-11
+
+Phases 3-5 (moteur léger universel + auto-infusion + preuve d'universalité). **Sans toucher
+`dev-orchestrator`.**
+
+### Ajouté
+- **Moteur léger (Phase 3)** : `scripts/check-planning-state.sh` — garde-fou de fraîcheur de la
+  clé de voûte `STATE.md` (advisory, portable macOS/Linux, exit codes pour hook). Détecte
+  `.planning/` absent (lab non amorcé), STATE absent, STATE périmé. + `scripts/tests/` (6/6 PASS).
+- **Auto-infusion + détection métier (Phase 4)** : `references/domain-detection.md` — heuristiques
+  de *jugement* (jamais déterministes) pour inférer le métier → profil + extension, et amorcer un
+  lab fraîchement installé **sans rien imposer** (le garde-fou surface l'absence de socle, le skill
+  pose un socle adapté). Wiring d'un hook SessionStart opt-in documenté (jamais auto-injecté).
+- **Preuve d'universalité (Phase 5)** : `references/example-lab-contenu.md` — exemple complet d'un
+  socle `.planning/` adapté à un lab NON-dev (éditorial, profil standard, extension `editorial/`).
+- Skill `vf-planning` câblé sur ces 3 références + le script.
+
+### Notes
+- Type module : `skill + references` → `skill + references + scripts`.
+- La maintenance reste **assistée** (advisory), pas automatique forcée — cohérent « structure d'abord ».
+
 ## v1.0.0 — 2026-06-10
 
 Release initiale. Socle de planning & gestion documentaire **universel** extrait de la logique

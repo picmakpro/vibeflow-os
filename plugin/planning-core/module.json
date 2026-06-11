@@ -1,7 +1,7 @@
 {
   "name": "planning-core",
-  "version": "v1.0.0",
-  "type": "skill + references",
+  "version": "v1.1.0",
+  "type": "skill + references + scripts",
   "description": "Socle de planning & gestion documentaire universel : pose le tronc commun .planning/ (PROJECT/REQUIREMENTS/ROADMAP/STATE/MILESTONES/phases), adapté à la logique métier de chaque lab — jamais imposé.",
   "requires": []
 }

@@ -8,7 +8,7 @@
 
 Dis _« aide-moi à dev cette feature »_ — et tout le pipeline se déclenche : cadrage → plan → exécution → tests → livraison. Sans jamais taper une commande technique ni savoir ce qui tourne en coulisse.
 
-[![Version](https://img.shields.io/badge/version-2.5.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.6.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-9-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -84,7 +84,7 @@ L'UX déroule :
 | **[consolidator](./plugin/consolidator/)** | `1.0.0` | skill + scripts | Consolidation de la mémoire structurée sur 4 piliers : indexation / archivage / fusion / promotion. |
 | **[skill-creator](./plugin/skill-creator/)** | `1.0.0` | agent + skills | Pattern « agent minimal + 2 skills composables » pour créer de nouveaux skills (base Anthropic + workflow). |
 | **[reference](./plugin/reference/)** | `2.1.1` | doc-only | Documentation méthodologique complète : VibeFlow Core (9 principes) + 11 patterns + 33 templates + 1 exemple de bout en bout. |
-| **[planning-core](./plugin/planning-core/)** | `1.0.0` | skill + references | Socle de planning & documentation universel : pose le tronc commun `.planning/` (PROJECT/STATE/ROADMAP/REQUIREMENTS/MILESTONES/phases), **adapté à la logique métier de chaque lab** — jamais imposé. La couche avant/présent, complémentaire des registres mémoire. |
+| **[planning-core](./plugin/planning-core/)** | `1.1.0` | skill + references + scripts | Socle de planning & documentation universel : pose le tronc commun `.planning/` (PROJECT/STATE/ROADMAP/REQUIREMENTS/MILESTONES/phases), **adapté à la logique métier de chaque lab** — jamais imposé. Couche avant/présent, complémentaire des registres mémoire. Garde-fou de fraîcheur + détection métier + exemple non-dev. |
 
 ---
 
@@ -141,6 +141,7 @@ Le routage repose sur un **index factuel auto-généré** depuis le frontmatter 
 | `v2.4.1` | 2026-06-06 | `/vibeflow-install` 100 % manuel, distribuable isolé sous `plugin/`, clean reliquats |
 | `v2.4.2` | 2026-06-06 | Commande engine `uninstall --all` + flux de désinstallation dans `/vibeflow-install` + doc désinstallation 2 couches |
 | `v2.5.0` | 2026-06-10 | + planning-core (socle `.planning/` universel, adaptatif par métier, 3 profils de rigueur) — ADR-038 |
+| `v2.6.0` | 2026-06-11 | planning-core v1.1.0 : garde-fou de fraîcheur (`check-planning-state.sh`) + détection métier + bootstrap opt-in + exemple non-dev travaillé |
 
 </details>
 
