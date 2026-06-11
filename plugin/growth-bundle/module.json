@@ -1,0 +1,7 @@
+{
+  "name": "growth-bundle",
+  "version": "v1.0.0",
+  "type": "doc-only",
+  "description": "Bundle métier growth/acquisition (GrowthFlow) : blueprints agents + extension PAR CANAL + dérivation pour vf-new-lab.",
+  "requires": ["planning-core", "consolidator", "audit-architecture", "validator"]
+}

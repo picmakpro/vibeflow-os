@@ -8,9 +8,9 @@
 
 Say _"help me build this feature"_ — and the whole pipeline kicks off: scoping → plan → execution → tests → delivery. Without ever typing a technical command or knowing what runs under the hood.
 
-[![Version](https://img.shields.io/badge/version-2.7.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.8.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
-[![Modules](https://img.shields.io/badge/modules-10-16a34a)](#-modules)
+[![Modules](https://img.shields.io/badge/modules-13-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
 [Install](#-install) · [Modules](#-modules) · [How it works](#-how-it-works) · [Author](#-author)
@@ -72,11 +72,11 @@ The UX walks you through:
 
 ## 📦 Modules
 
-10 independently toggleable modules. Each has its own version, `CHANGELOG.md`, and `README.md`.
+13 independently toggleable modules (10 core + 3 domain bundles). Each has its own version, `CHANGELOG.md`, and `README.md`.
 
 | Module | Ver. | Type | What it does |
 |--------|:----:|------|--------------|
-| **[conductor](./plugin/conductor/)** | `1.0.0` | agent + skills + scripts + references | 🧭 The front door. Meta agent `vibeflow-conductor` (guardian): create/configure a lab in **any domain** (`vf-new-lab`), install/verify/update, migrate on doctrine change (`vf-calibrate`), receive coherence escalations. Not always-on — config/audit/migration only. |
+| **[conductor](./plugin/conductor/)** | `1.1.0` | agent + skills + scripts + references | 🧭 The front door. Meta agent `vibeflow-conductor` (guardian): create/configure a lab in **any domain** (`vf-new-lab`, bundle-aware), install/verify/update, migrate on doctrine change (`vf-calibrate`), receive coherence escalations. Not always-on — config/audit/migration only. |
 | **[dev-orchestrator](./plugin/dev-orchestrator/)** | `1.1.0` | agent + skills + scripts | ⭐ The dev core. Router agent `vibeflow-dev` + 13 `/vf-*` verbs + auto-generated GSD index. Routes **plain language** to GSD/Superpowers skills (scoping → delivery), without exposing the plumbing. |
 | **[software-architecture](./plugin/software-architecture/)** | `1.0.0` | skill + rules + scripts | AI-Safe software architecture doctrine: SOLID/SoC, anti-god-files (≤300 LoC), machine-enforced gates, brownfield restructuring playbook. |
 | **[audit-architecture](./plugin/audit-architecture/)** | `1.0.0` | skill + references | Designer of **audit architectures**: derives, from a brief, the multi-layer audit structure of a process (content / folder / code / sales). |
@@ -86,6 +86,9 @@ The UX walks you through:
 | **[skill-creator](./plugin/skill-creator/)** | `1.0.0` | agent + skills | The "minimal agent + 2 composable skills" pattern for creating new skills (Anthropic base + workflow). |
 | **[reference](./plugin/reference/)** | `2.1.1` | doc-only | Full methodology documentation: VibeFlow Core (9 principles) + 11 patterns + 33 templates + 1 end-to-end example. |
 | **[planning-core](./plugin/planning-core/)** | `1.1.0` | skill + references + scripts | Universal planning & documentation backbone: lays down the common `.planning/` trunk (PROJECT/STATE/ROADMAP/REQUIREMENTS/MILESTONES/phases), **adapted to each lab's domain** — never imposed. Forward/present layer, complementary to memory registries. Freshness guard + domain detection + non-dev example. |
+| 📦 **[business-pilot-bundle](./plugin/business-pilot-bundle/)** | `1.0.0` | doc-only (bundle) | Métier bundle: ready chassis to pilot a business (3 agent blueprints commercial/delivery/finance + `business/` extension + canon registries). Instantiated by `vf-new-lab`. |
+| 📦 **[content-bundle](./plugin/content-bundle/)** | `1.0.0` | doc-only (bundle) | Métier bundle: editorial chain brief→deliverable→distribution (3 blueprints strategist/scriptwriter/repurposer + `editorial/` extension + blocking clarity gate). Instantiated by `vf-new-lab`. |
+| 📦 **[growth-bundle](./plugin/growth-bundle/)** | `1.0.0` | doc-only (bundle) | Métier bundle: growth/acquisition **organized per channel** (3 blueprints channel-strategist/copywriter/analyst + `growth/channels/` extension + GDPR guardrails). Instantiated by `vf-new-lab`. |
 
 ---
 
@@ -144,6 +147,7 @@ Routing relies on a **factual index auto-generated** from the frontmatter of the
 | `v2.5.0` | 2026-06-10 | + planning-core (universal `.planning/` backbone, domain-adaptive, 3 rigor profiles) — ADR-038 |
 | `v2.6.0` | 2026-06-11 | planning-core v1.1.0: freshness guard (`check-planning-state.sh`) + domain detection + opt-in bootstrap + non-dev worked example |
 | `v2.7.0` | 2026-06-11 | + conductor (meta orchestrator/guardian): universal lab bootstrap (any domain), update propagation + migration, sub-agent escalation protocol |
+| `v2.8.0` | 2026-06-11 | + 3 domain bundles (business-pilot / content / growth-per-channel) + conductor v1.1.0 (bundle-aware `vf-new-lab`, broken-pointer fix) |
 
 </details>
 

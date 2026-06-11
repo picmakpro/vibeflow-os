@@ -30,7 +30,8 @@ L'utilisateur connaît son métier mieux que nous. On ne lui impose pas un gabar
 
 ### 1. Cadrage (5 questions max — ce que l'utilisateur sait déjà)
 
-Poser de façon resserrée (une passe, pas un interrogatoire). Détail dans `references/bootstrap-method.md`.
+Poser de façon resserrée (une passe, pas un interrogatoire). Détail dans la référence `bootstrap-method.md`
+(installée en `.claude/agents/conductor-references/bootstrap-method.md`).
 
 1. **Métier / domaine du lab** — « C'est un lab pour quoi ? » (ex. acquisition, contenu, vente, dossier…)
 2. **Process & livrables récurrents** — « Qu'est-ce que tu produis/fais de façon répétée ? »
@@ -53,6 +54,13 @@ Depuis les réponses, déduire :
 - **Modules VibeFlow pertinents** — typiquement `planning-core` + `consolidator` + `audit-architecture`
   + `validator`. **Pas `dev-orchestrator`** sauf si le métier est le code.
 
+> **Mode bundle métier (raccourci recommandé)** : si un bundle métier est installé (présence de
+> `docs/<metier>-bundle/` — ex. `business-pilot-bundle`, `content-bundle`, `growth-bundle`), NE PAS
+> dériver de zéro. Lire `docs/<metier>-bundle/content/BUNDLE.md` (profil, extension, vocabulaire,
+> liste d'agents, flux d'instanciation) + `content/domain/extension-spec.md` + `content/registres.md`,
+> et utiliser les blueprints `content/agents/*.blueprint.md` comme base des agents métier. Le bundle
+> porte déjà le châssis conforme (P1-P9, registres, auditeurs câblés) — **on instancie, on n'invente pas**.
+
 ### 3. Scaffolding (déléguer, ne pas réinventer)
 
 Poser, dans l'ordre :
@@ -60,7 +68,10 @@ Poser, dans l'ordre :
 2. **Modules** — déléguer à `vibeflow-install` (sélection dérivée à l'étape 2, scope au choix).
 3. **Socle planning** — déléguer à `vf-planning` (profil + extension de domaine).
 4. **Registres mémoire** — DECISIONS / LEARNINGS / BLOCKERS / JOURNAL (depuis `reference` si installé).
-5. **Agents métier** — créer les 2-3 agents dérivés (charte densité ≤250L ; via `skill-creator` si besoin).
+5. **Agents métier** — si un bundle est présent : **instancier** chaque `content/agents/*.blueprint.md`
+   en agent natif réel dans `.claude/agents/` (≤250L, adapté au cadrage). Sinon : créer 2-3 agents
+   dérivés (pattern business-agent). Dans les deux cas, créer les skills déclarés en frontmatter
+   `skills:` qui manquent via `skill-creator`.
 6. **Garde-fous** — câbler `vibeflow-validator` + `audit-architecture` (auditeurs toujours présents).
 7. **Stamp framework** — enregistrer la version du framework dans le lab (`framework-version.sh stamp`)
    pour la détection d'update ultérieure.
@@ -93,5 +104,6 @@ qualifiés · ton direct, cible CTO · vocabulaire : séquence, ICP, RDV, offre.
 
 ## Références (on-demand)
 
-- `references/bootstrap-method.md` — méthode de cadrage + dérivation détaillée.
+- `bootstrap-method.md` (installé en `.claude/agents/conductor-references/`) — méthode de cadrage + dérivation détaillée.
 - planning-core `PROFILES.md` / `domain-detection.md` / `example-lab-contenu.md` — adaptation par métier.
+- Bundles métier installés (`docs/<metier>-bundle/content/BUNDLE.md`) — châssis prêt à instancier (business-pilot / content / growth).

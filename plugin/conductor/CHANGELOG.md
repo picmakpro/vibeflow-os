@@ -1,5 +1,20 @@
 # Changelog — conductor
 
+## v1.1.0 — 2026-06-11
+
+`vf-new-lab` rendu **bundle-aware** + correction d'un pointeur cassé.
+
+### Corrigé
+- Pointeur cassé : `vf-new-lab` référençait `references/bootstrap-method.md` (introuvable au runtime
+  car le skill et les references s'installent à des emplacements distincts) → pointe désormais vers
+  `.claude/agents/conductor-references/bootstrap-method.md` (emplacement réel d'install).
+
+### Ajouté
+- Mode bundle métier : si un bundle est installé (`docs/<metier>-bundle/`), `vf-new-lab` lit son
+  `content/BUNDLE.md` et **instancie** les blueprints `content/agents/*.blueprint.md` au lieu de
+  dériver de zéro — le châssis conforme est déjà porté par le bundle. Compatible business-pilot /
+  content / growth.
+
 ## v1.0.0 — 2026-06-11
 
 Release initiale. Agent méta orchestrateur central + gardien du framework, distribué dans chaque lab.
