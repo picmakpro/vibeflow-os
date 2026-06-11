@@ -1,6 +1,6 @@
 {
   "name": "infrastructure-audit",
-  "version": "v1.0.0",
+  "version": "v1.0.1",
   "type": "single-skill+scripts",
   "description": "Garde-fou technique des labs (drift Anthropic, intégrité scripts).",
   "requires": []

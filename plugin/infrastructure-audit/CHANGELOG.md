@@ -1,5 +1,13 @@
 # CHANGELOG — infrastructure-audit
 
+## [v1.0.1] — 2026-06-11
+
+### Corrigé
+- `audit-infra.sh` : portabilité Bash Windows (msys 5.2). `${#array[@]:-0}` (modificateur de défaut
+  sur une longueur de tableau) provoquait `bad substitution` et cassait les axes 2 (hooks) et 3
+  (scripts) → remplacé par `${#array[@]}` (lignes 180, 181, 229). Détecté par l'audit du lab Permis
+  Clair (Windows). `bash -n` OK, exécution `--quick` vérifiée.
+
 ## [v1.0.0] — 2026-05-24
 
 ### Initial release

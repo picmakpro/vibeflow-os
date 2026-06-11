@@ -177,8 +177,8 @@ except: print(0)
   "axis": "hooks",
   "settings_files_audited": $files_json,
   "total_hooks": $total_hooks,
-  "errors_count": ${#errors[@]:-0},
-  "warnings_count": ${#warnings[@]:-0}
+  "errors_count": ${#errors[@]},
+  "warnings_count": ${#warnings[@]}
 }
 EOF
 }
@@ -226,7 +226,7 @@ audit_scripts() {
     deps_json="[$(printf '"%s",' "${deps_missing[@]}" | sed 's/,$//')]"
   fi
   local syntax_errs_count=0
-  [ ${#syntax_errs[@]:-0} -gt 0 ] && syntax_errs_count=${#syntax_errs[@]}
+  [ ${#syntax_errs[@]} -gt 0 ] && syntax_errs_count=${#syntax_errs[@]}
   cat <<EOF
 {
   "axis": "scripts",
