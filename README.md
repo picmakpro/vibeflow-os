@@ -8,7 +8,7 @@
 
 Say _"help me build this feature"_ — and the whole pipeline kicks off: scoping → plan → execution → tests → delivery. Without ever typing a technical command or knowing what runs under the hood.
 
-[![Version](https://img.shields.io/badge/version-2.8.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.9.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-13-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -92,6 +92,23 @@ The UX walks you through:
 
 ---
 
+## ⌨️ Commands
+
+Native slash commands shipped by the plugin (available as soon as it's enabled — `commands/` is auto-discovered):
+
+| Command | Does |
+|---------|------|
+| `/vibeflow [request]` | Front door — delegates to the **vibeflow-conductor** agent (create/configure/verify/update/migrate the lab). |
+| `/vf-new-lab [domain]` | Create a lab in any domain (instantiates a métier bundle if present). |
+| `/vf-planning` | Lay down or refresh the `.planning/` backbone; answers "where are we?". |
+| `/vf-calibrate` | Check framework drift and migrate the lab (human-validated). |
+| `/vf-audit` | Full conformance audit via the **vibeflow-validator** agent. |
+| `/vibeflow-install` | Install/toggle modules (scope-aware installer skill). |
+
+> Agents (`vibeflow-conductor`, `vibeflow-validator`) are not directly typeable — these commands are their explicit entry points. A command guides you to `/vibeflow-install` first if the underlying module isn't installed yet.
+
+---
+
 ## 🛠 How it works
 
 ### One UX, multiple scopes
@@ -148,6 +165,7 @@ Routing relies on a **factual index auto-generated** from the frontmatter of the
 | `v2.6.0` | 2026-06-11 | planning-core v1.1.0: freshness guard (`check-planning-state.sh`) + domain detection + opt-in bootstrap + non-dev worked example |
 | `v2.7.0` | 2026-06-11 | + conductor (meta orchestrator/guardian): universal lab bootstrap (any domain), update propagation + migration, sub-agent escalation protocol |
 | `v2.8.0` | 2026-06-11 | + 3 domain bundles (business-pilot / content / growth-per-channel) + conductor v1.1.0 (bundle-aware `vf-new-lab`, broken-pointer fix) |
+| `v2.9.0` | 2026-06-11 | + native slash commands (`/vibeflow`, `/vf-new-lab`, `/vf-planning`, `/vf-calibrate`, `/vf-audit`) — explicit entry points for the methodology agents/skills |
 
 </details>
 

@@ -8,7 +8,7 @@
 
 Dis _« aide-moi à dev cette feature »_ — et tout le pipeline se déclenche : cadrage → plan → exécution → tests → livraison. Sans jamais taper une commande technique ni savoir ce qui tourne en coulisse.
 
-[![Version](https://img.shields.io/badge/version-2.8.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.9.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-13-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -92,6 +92,23 @@ L'UX déroule :
 
 ---
 
+## ⌨️ Commandes
+
+Slash commands natives livrées par le plugin (disponibles dès qu'il est activé — `commands/` auto-découvert) :
+
+| Commande | Rôle |
+|----------|------|
+| `/vibeflow [demande]` | Porte d'entrée — délègue à l'agent **vibeflow-conductor** (créer/configurer/vérifier/mettre à jour/migrer le lab). |
+| `/vf-new-lab [métier]` | Créer un lab dans n'importe quel métier (instancie un bundle métier si présent). |
+| `/vf-planning` | Poser ou rafraîchir le socle `.planning/` ; répond à « où en est-on ? ». |
+| `/vf-calibrate` | Détecter le drift framework et migrer le lab (validation humaine). |
+| `/vf-audit` | Audit de conformité complet via l'agent **vibeflow-validator**. |
+| `/vibeflow-install` | Installer/activer des modules (skill installeur scope-aware). |
+
+> Les agents (`vibeflow-conductor`, `vibeflow-validator`) ne se tapent pas directement — ces commandes sont leurs points d'entrée explicites. Une commande renvoie vers `/vibeflow-install` si le module sous-jacent n'est pas encore installé.
+
+---
+
 ## 🛠 Comment ça marche
 
 ### Une UX, plusieurs scopes
@@ -148,6 +165,7 @@ Le routage repose sur un **index factuel auto-généré** depuis le frontmatter 
 | `v2.6.0` | 2026-06-11 | planning-core v1.1.0 : garde-fou de fraîcheur (`check-planning-state.sh`) + détection métier + bootstrap opt-in + exemple non-dev travaillé |
 | `v2.7.0` | 2026-06-11 | + conductor (orchestrateur méta/gardien) : bootstrap de lab universel (tout métier), propagation update + migration, protocole d'escalade sous-agents |
 | `v2.8.0` | 2026-06-11 | + 3 bundles métier (business-pilot / content / growth-par-canal) + conductor v1.1.0 (`vf-new-lab` bundle-aware, fix pointeur cassé) |
+| `v2.9.0` | 2026-06-11 | + slash commands natives (`/vibeflow`, `/vf-new-lab`, `/vf-planning`, `/vf-calibrate`, `/vf-audit`) — points d'entrée explicites des agents/skills méthodo |
 
 </details>
 
