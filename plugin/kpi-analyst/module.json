@@ -1,0 +1,7 @@
+{
+  "name": "kpi-analyst",
+  "version": "v1.0.0",
+  "type": "agent + skill + scripts + references",
+  "description": "Déduit les vrais KPIs métier d'un lab : schéma stable validé une fois + valeurs extraites de façon déterministe, publiées dans le registre KPIS.md pour le dashboard du Hub. Jamais de chiffre inventé.",
+  "requires": ["planning-core", "consolidator"]
+}

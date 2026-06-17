@@ -1,0 +1,34 @@
+# CHANGELOG — kpi-analyst
+
+## [v1.0.0] — 2026-06-17
+
+### Initial release — Agent KPIs métier déduits (zone H / R5 du Hub, côté lab)
+
+Premier module qui fait émerger les **vrais KPIs métier** d'un lab et les publie pour le dashboard du Hub.
+
+**Agent natif Claude Code**
+- `vibeflow-kpi-analyst` (sonnet, `memory: project`, skill `kpi-analyst` préchargé). ≤250L (charte ADR-029).
+- Déclencheurs : activation du lab, hook `SessionEnd` (incrémental), invocation manuelle.
+
+**Skill**
+- `kpi-analyst` — méthode 4 temps (Comprendre → Structurer → Acquérir[Tier 2] → Publier). ≤500L.
+
+**Scripts (enforcement déterministe)**
+- `kpis-writer.sh` — assembleur idempotent de `KPIS.md` depuis `schema.json` + extracteurs.
+- `extractor-template.sh` — gabarit d'extracteur déterministe (1 KPI, sortie JSON contractuelle).
+- `tests/test-kpis-writer.sh` — 9 tests (schéma, agrégation, garde-fou source→low, robustesse, idempotence). 9/9 ✅.
+
+**Références** : contrat de données (mappe les 2 tables Hub), barème confidence↔source + EVALS, KPIs par
+domaine, Tier 2 acquisition human-gated, hook SessionEnd.
+
+### Décisions de conception (vs brief initial `AGENT_KPI_METIER_BRIEF.md`)
+
+- **Séparation schéma / valeurs** : schéma gelé+validé (`lab_kpi_configs`) vs valeurs time-series (`kpis`).
+  Évite la dérive des `key` qui casserait la série temporelle du Hub.
+- **Extraction machine-enforced** : l'agent écrit des extracteurs une fois, puis les exécute — pas de
+  re-déduction LLM (idempotence réelle, doctrine « enforcement > prose »).
+- **2 tiers** : Tier 1 (interne, zéro accès externe) livré ; Tier 2 (connecteurs externes) documenté,
+  **human-gated**, non construit — de-risque la livraison et la sécurité.
+- **`KPIS.md` = 6e registre canon** (`.claude/memory/`), cohérent avec DECISIONS/LEARNINGS/BLOCKERS/JOURNAL/EVALS.
+- **Module unique partagé** paramétré par domaine (bundles), jamais dupliqué par lab.
+- **Confidence ↔ source** : sans source vérifiable → `low` + grisé ; jamais de chiffre inventé.
