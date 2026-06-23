@@ -56,12 +56,14 @@ nfix=$(printf '%s\n' "$fix_out" | command grep -c .)
 [ "$nfix" -eq 2 ] && ok "fixture : 2 modules listés" \
   || ko "fixture : attendu 2 modules, obtenu $nfix"
 
-# ---------- Cas repo réel : exactement 8 modules, validator + sa description présents ----------
+# ---------- Cas repo réel : 1 ligne par module.json présent, validator + sa description ----------
 real_out=$(VF_MODULES_ROOT="$REPO_ROOT" bash "$SCRIPT" 2>/dev/null)
 
 nreal=$(printf '%s\n' "$real_out" | command grep -c .)
-[ "$nreal" -eq 8 ] && ok "repo réel : 8 modules listés" \
-  || ko "repo réel : attendu 8 modules, obtenu $nreal"
+# Attendu = nombre réel de module.json sur le disque (robuste à l'ajout de modules ; ≥ 8 socle initial).
+ndisk=$(find "$REPO_ROOT" -mindepth 2 -maxdepth 2 -name module.json | command grep -c .)
+{ [ "$nreal" -eq "$ndisk" ] && [ "$nreal" -ge 8 ]; } && ok "repo réel : $nreal modules listés (= $ndisk module.json sur disque)" \
+  || ko "repo réel : attendu $ndisk modules (≥8), obtenu $nreal"
 
 # validator présent ET avec une description non vide
 vline=$(printf '%s\n' "$real_out" | command grep '^validator	' || true)

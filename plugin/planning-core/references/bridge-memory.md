@@ -54,6 +54,16 @@ Un `SUMMARY.md` d'étape peut révéler un **pattern réutilisable** → il est 
 - ❌ Dupliquer un BLOCKER dans `.planning/` : un blocage *en cours* se note dans `STATE.md` (todos),
   un blocage *capitalisé* va en BLOCKERS — pas les deux avec le même contenu.
 
+## Labs à compartiments
+
+Les 4 ponts s'appliquent **à l'identique au niveau compartiment** : le `STATE.md`/`BOARD.md` d'un
+compartiment alimente le JOURNAL du lab à la clôture ; ses décisions structurantes remontent en
+DECISIONS. Le plan d'un compartiment **référence** une décision (`→ DEC-XXX`), il ne la recopie jamais.
+Le terrain montre souvent le problème **inverse** de la cannibalisation : faute de plan, l'état courant
+squatte le JOURNAL et les statuts « À FAIRE » squattent le registre de décisions. Poser un plan fin
+**désengorge** la mémoire. Détail : `compartments.md` § 4. Test : *« faux demain → plan ; survit à la
+livraison → mémoire ».*
+
 ## Si le lab n'a pas (encore) de registres mémoire
 
 Le socle `.planning/` fonctionne **seul**. Le pont est alors dormant : les décisions restent dans

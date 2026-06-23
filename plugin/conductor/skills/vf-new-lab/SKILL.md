@@ -53,6 +53,11 @@ Depuis les réponses, déduire :
   « copywriter-acquisition », un agent « analyste-campagne »). Pattern : business-agent générique.
 - **Modules VibeFlow pertinents** — typiquement `planning-core` + `consolidator` + `audit-architecture`
   + `validator`. **Pas `dev-orchestrator`** sauf si le métier est le code.
+- **Topologie du lab** — mono-objectif (un seul fil) ou **à compartiments** (plusieurs projets internes /
+  clients / process) ? Si à compartiments : identifier chacun, le **typer** `deliverable` (a une fin) /
+  `continuous` (se renouvelle) / infra (suivi intrinsèque), et appliquer le **seuil d'autonomie** pour
+  savoir lesquels méritent leur propre plan. Référence : planning-core `references/compartments.md`.
+  **Ne pas créer un `.planning/` pour chaque compartiment par défaut** (sur-ingénierie).
 
 > **Mode bundle métier (raccourci recommandé)** : si un bundle métier est installé (présence de
 > `docs/<metier>-bundle/` — ex. `business-pilot-bundle`, `content-bundle`, `growth-bundle`), NE PAS
@@ -66,7 +71,10 @@ Depuis les réponses, déduire :
 Poser, dans l'ordre :
 1. **`CLAUDE.md` du lab** — constitution métier (WHY/WHAT/HOW) en vocabulaire de l'utilisateur.
 2. **Modules** — déléguer à `vibeflow-install` (sélection dérivée à l'étape 2, scope au choix).
-3. **Socle planning** — déléguer à `vf-planning` (profil + extension de domaine).
+3. **Socle planning** — déléguer à `vf-planning` (profil + extension de domaine). Lab à compartiments :
+   poser le `.planning/` du **lab** en mode *steering + `INDEX.md`* (jamais de ROADMAP global) ; puis un
+   socle **par compartiment qualifié**, typé `deliverable` (roadmap+phases) ou `continuous`
+   (`BOARD.md` + cadence). Compartiments sous le seuil / infra → simple ligne dans `INDEX.md`.
 4. **Registres mémoire** — DECISIONS / LEARNINGS / BLOCKERS / JOURNAL (depuis `reference` si installé).
 5. **Agents métier** — si un bundle est présent : **instancier** chaque `content/agents/*.blueprint.md`
    en agent natif réel dans `.claude/agents/` (≤250L, adapté au cadrage). Sinon : créer 2-3 agents
@@ -101,6 +109,8 @@ qualifiés · ton direct, cible CTO · vocabulaire : séquence, ICP, RDV, offre.
 - **Ne jamais demander ce qu'on peut dériver.** 5 questions max ; le reste se déduit.
 - **Toujours câbler les auditeurs** — pas de lab sans filet de cohérence.
 - **Toujours stamper la version framework** — sinon pas de détection d'update plus tard.
+- **Jamais un `.planning/` par compartiment systématique** — steering lab + INDEX, plan seulement
+  pour les compartiments au-dessus du seuil d'autonomie (cf. `compartments.md`).
 
 ## Références (on-demand)
 

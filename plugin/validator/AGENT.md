@@ -65,6 +65,9 @@ Délègue séquentiellement :
 
 1. `dette-detector` (7 signaux de dette documentaire)
 2. `consolidator` mode `--audit` (4 piliers : index/archive/fusion/promotion)
+3. **Dette de planning (8e signal)** — si `planning-core` est installé et le lab a des compartiments :
+   `bash .claude/scripts/detect-planning-debt.sh --root projects` (advisory). Signale les compartiments
+   actifs sans plan au-dessus du seuil d'autonomie → proposer typage + `/vf-planning`.
 
 Sortie : liste consolidée de la dette (par sévérité).
 

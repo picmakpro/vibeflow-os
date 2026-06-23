@@ -28,6 +28,30 @@
 5. **Re-stamp** — `framework-version.sh stamp` (sinon drift fantôme).
 6. **Re-audit** — `vibeflow-validator` (5 phases) confirme l'alignement. Score < seuil → corriger.
 
+## 2bis. Recette : migration planning v2 (compartiments) — SANS PERTE DE DONNÉES
+
+Quand un lab adopte **planning-core v2** (steering lab + plan conditionnel typé), on **n'écrase rien** :
+on adopte les patterns existants et on archive proprement. Classée *breaking-doctrine* (nouvelle
+topologie), donc snapshot + validation humaine obligatoires.
+
+1. **Détecter la dette** : `planning-core/scripts/detect-planning-debt.sh --root <projects>` liste les
+   compartiments actifs sans plan au-dessus du seuil. C'est le point de départ du diff.
+2. **Recenser + classer** chaque compartiment : `deliverable` / `continuous` / infra (suivi intrinsèque
+   → **pas** de plan). Cf. planning-core `references/compartments.md`.
+3. **Récupérer l'existant comme matière première** (jamais jeter) :
+   - un `PLAN.md` / `README` d'état / `HANDOFF` déjà présent → son **état courant** alimente le nouveau
+     `STATE.md` (ou `BOARD.md` si `continuous`) ; sa **trajectoire** → `ROADMAP.md` (deliverable) ou les
+     colonnes du board (continuous).
+   - l'ancien fichier est **déplacé** en `<compartiment>/.planning/_archive/`, **pas supprimé**.
+4. **Désengorger la mémoire** : l'état courant qui squattait le JOURNAL et les décisions ouvertes
+   (« À FAIRE ») du registre **migrent vers le plan** ; la décision durable **reste** en mémoire, le plan
+   la **référence** (`→ DEC-XXX`). On déplace, on ne duplique pas.
+5. **Poser `INDEX.md`** au niveau lab, pointant vers tous les plans + listant les compartiments infra.
+6. **Re-stamp + re-audit** (étapes standard ci-dessous).
+
+> Garantie zéro perte : tout fichier existant est soit **promu** dans la nouvelle structure, soit
+> **archivé** sous `_archive/`. Aucune suppression. Snapshot global avant (étape 1 de la recette §2).
+
 ## 3. Surfaçage opt-in à l'ouverture de session (façon GSD)
 
 Pour que l'utilisateur **voie** qu'une mise à jour le concerne (comme GSD le montrait dans le repo),

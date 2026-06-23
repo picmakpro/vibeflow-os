@@ -54,3 +54,9 @@
 - ITERATION_LOG format Session (sans index) non géré (acceptable, format spécial)
 - Compteurs JSON peuvent afficher "0\n0" cosmétiquement quand fichier vide (non bloquant)
 - BLK-005 : 32 LRN orphelins (index sans body) préservés mais à compléter ultérieurement
+
+## v1.1.0 — 2026-06-04
+
+- reindex.sh : support BDR (registre fork BusinessFlow) dans les mappings par defaut + mecanisme de fork-config optionnel (`registers.conf.sh` sourced, surcharges `register_file_custom`/`id_pattern_custom`) — remontee BLK-005 point 4 du BFL.
+- archive.sh : BDR.md ajoute a la liste des registres scannes.
+- infrastructure-audit : whitelist Claude Code 2.1.162.

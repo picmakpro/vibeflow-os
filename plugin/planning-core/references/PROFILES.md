@@ -19,6 +19,12 @@
 | `phases/NN/VERIFICATION.md` | — | optionnel | ✅ |
 | Extension de domaine (`codebase/`, `editorial/`…) | — | optionnel | ✅ |
 | Gates (Nyquist, Decision Coverage…) | — | — | ✅ (cf. module `feature-dev-gates`) |
+| `INDEX.md` (lab à compartiments) | ⚑ selon topologie | ⚑ selon topologie | ⚑ selon topologie |
+| `BOARD.md` (compartiment `continuous`) | ⚑ selon type | ⚑ selon type | ⚑ selon type |
+
+> ⚑ **Axe orthogonal au profil : la topologie** (cf. `compartments.md`). `INDEX.md` apparaît dès que le
+> lab a plusieurs compartiments (steering lab). `BOARD.md` remplace `ROADMAP.md`+`MILESTONES` pour un
+> compartiment typé `continuous`. Le profil règle la *rigueur* ; la topologie règle *où vivent les plans*.
 
 ---
 

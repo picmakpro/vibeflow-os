@@ -1,5 +1,27 @@
 # Changelog — planning-core
 
+## v2.0.0 — 2026-06-23
+
+Topologie à **compartiments** : un lab multi-projets a un *steering* au niveau lab + un plan
+**conditionnel et typé** par compartiment. Corrige l'angle mort « tout linéaire » de la v1 et la
+question « faut-il un planning partout ? ». Fondé sur RES-127 (GSD, Kiro, Cline Memory Bank, SAFe) +
+terrain BusinessFlow (OBS-014). **Rétrocompatible** : un lab mono-objectif garde son `.planning/` unique.
+
+### Ajouté
+- **`references/compartments.md`** — doctrine : steering lab + `INDEX.md` (jamais de ROADMAP global) ;
+  plan conditionnel au **seuil d'autonomie** (machine-vérifiable) ; typage **`deliverable`** (roadmap+
+  phases) vs **`continuous`** (board+cadence, pas de roadmap) ; cas hybride ; loi de non-cannibalisation
+  (« faux demain → plan ; survit à la livraison → mémoire ») ; migration sans perte.
+- **`templates/INDEX.template.md`** (tableau de bord lab) + **`templates/BOARD.template.md`** (compartiment
+  `continuous`).
+- **`scripts/detect-planning-debt.sh`** (+ tests 7/7 PASS) — 8e signal de dette : compartiment **actif +
+  sans plan + au-dessus du seuil**. Advisory, jamais bloquant. Câblé dans `vibeflow-validator` (Phase 3).
+- `config.template.json` v2.0 : champs `scope`, `type`, `compartments.autonomy_threshold`.
+
+### Modifié
+- `SKILL.md` : section « lab mono-objectif vs à compartiments » + étape 3bis + références.
+- `PROFILES.md` : axe orthogonal topologie (INDEX/BOARD). `bridge-memory.md` : ponts au niveau compartiment.
+
 ## v1.1.0 — 2026-06-11
 
 Phases 3-5 (moteur léger universel + auto-infusion + preuve d'universalité). **Sans toucher

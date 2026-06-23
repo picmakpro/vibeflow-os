@@ -16,6 +16,7 @@ new-lab → install-modules → planning → verify(validator) → [vie du lab] 
 | Création du lab | skill `vf-new-lab` | « monter le lab » |
 | Pose des modules | skill `vibeflow-install` | « installer VibeFlow » |
 | Socle planning/doc | skill `vf-planning` | « mettre en place le suivi » |
+| ↳ *(lab à compartiments)* | steering lab + `INDEX.md` + plan typé par compartiment qualifié | « cadrer chaque projet du lab » |
 | Vérification | agent `vibeflow-validator` (Task) | « vérifier que tout est aligné » |
 | Recalibration | skill `vf-calibrate` | « mettre à jour le lab » |
 
@@ -40,6 +41,8 @@ de campagnes). Là, ce sont les **agents métier** du lab qui travaillent. Le co
 
 - Tout lab configuré embarque ses **auditeurs** (validator + audit-architecture) — pas de filet, pas
   de lab.
+- Lab à compartiments : **steering lab + INDEX**, plan seulement pour les compartiments au-dessus du
+  seuil d'autonomie. Jamais de `ROADMAP.md` global, jamais un `.planning/` par compartiment systématique.
 - Toute opération de **migration** : snapshot avant + re-stamp version + re-audit après.
 - **Jamais** de correction/migration silencieuse (ADR-031).
 - **Jamais** de forme dev plaquée sur un lab non-dev.

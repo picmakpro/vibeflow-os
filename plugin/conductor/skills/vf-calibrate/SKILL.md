@@ -46,6 +46,12 @@ Lire les `CHANGELOG.md` des modules concernés + l'historique du framework. **Cl
 changement : *bugfix / nouvelle capacité / **breaking-doctrine*** (structure, registres, principes).
 Détail dans `references/migration-playbook.md`.
 
+> **Cas planning v2 (compartiments)** — si planning-core passe en v2 (topologie *steering lab + plan
+> conditionnel typé*), c'est un *breaking-doctrine* : appliquer la **recette §2bis** du
+> `migration-playbook.md` (détection de dette via `detect-planning-debt.sh` → typage deliverable/
+> continuous → récupération de l'existant en `_archive/` → désengorgement mémoire → `INDEX.md`).
+> **Sans perte de données** : on promeut ou on archive, jamais on supprime.
+
 ### 3. Proposer un plan de migration (jamais l'appliquer en silence)
 
 Pour les changements **structure/doctrine**, produire un plan explicite :

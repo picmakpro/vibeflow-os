@@ -46,6 +46,29 @@ métier) est dans `references/GUIDE.md`. Charger on-demand.
 
 ---
 
+## Lab mono-objectif vs lab à compartiments (v2)
+
+Deux topologies. **Ne pas plaquer la mauvaise.**
+
+- **Lab mono-objectif** (un seul fil de travail) → **un seul `.planning/`** à la racine. C'est le cas
+  par défaut, comportement inchangé.
+- **Lab à compartiments** (plusieurs projets internes / clients / process — ex. `projects/*`) →
+  **steering au niveau lab + plan conditionnel par compartiment**. Règle :
+  - Le **lab** porte `PROJECT.md` (identité) + `STATE.md` (focus transverse) + **`INDEX.md`**
+    (tableau de bord qui POINTE vers les plans). **Jamais de `ROADMAP.md` global** (plan mort).
+  - Un **compartiment** reçoit son propre socle `.planning/` **seulement s'il passe le seuil
+    d'autonomie**, et **typé** :
+    - **`deliverable`** (a une fin) → `STATE` + `ROADMAP` + phases/MILESTONES selon profil ;
+    - **`continuous`** (se renouvelle) → `STATE` + **`BOARD.md`** (colonnes + WIP + cadence), **pas de
+      roadmap**.
+  - Sous le seuil, ou infra à suivi intrinsèque (`finance/`, `pipeline/`…) → **pas de plan**, juste une
+    ligne dans `INDEX.md`.
+
+> Doctrine complète (seuil d'autonomie chiffré, cas hybride, non-cannibalisation, migration sans perte) :
+> **`references/compartments.md`**. Charger dès qu'un lab a plusieurs projets/compartiments.
+
+---
+
 ## Séquence — Mise en place (`.planning/` absent)
 
 1. **Lire le métier du lab AVANT de scaffolder.** Lire `CLAUDE.md`, le `docs/` existant, les
@@ -65,6 +88,12 @@ métier) est dans `references/GUIDE.md`. Charger on-demand.
      `editorial/` (contenu), `pipeline/` (vente), `dossiers/` (montage de dossier), etc.
      **Le nom et le contenu suivent le métier, jamais l'inverse.** Aucune extension imposée.
 
+3bis. **Si le lab est à compartiments** (plusieurs projets/clients/process — ex. `projects/*`) :
+   poser le `.planning/` du **lab** en mode *steering + `INDEX.md`* (pas de ROADMAP global) ; puis pour
+   chaque compartiment, appliquer le **seuil d'autonomie** et le **typer** `deliverable`/`continuous`
+   avant de lui poser (ou non) son propre socle. Détail : `references/compartments.md`. Gabarits :
+   `templates/INDEX.template.md` (lab) + `templates/BOARD.template.md` (compartiment continuous).
+
 4. **Établir le pont mémoire** (`references/bridge-memory.md`) : `.planning/` = couche *avant/présent*
    (vivante) ; les registres `.claude/memory/` = couche *capitalisation* (figée). Définir où les
    décisions clés de `PROJECT.md` remontent en ADR/DECISIONS et où `STATE.md` alimente le JOURNAL —
@@ -77,6 +106,9 @@ métier) est dans `references/GUIDE.md`. Charger on-demand.
 - **Vérifier la fraîcheur** : `scripts/check-planning-state.sh` (advisory) signale un `STATE.md`
   périmé ou un `.planning/` absent — utilisable manuellement, au `/checkpoint`, ou en hook
   SessionStart opt-in (wiring dans `references/domain-detection.md`).
+- **Détecter la dette de planning** (labs à compartiments) : `scripts/detect-planning-debt.sh`
+  (advisory) liste les compartiments **actifs + sans plan + au-dessus du seuil d'autonomie**. Alerte,
+  jamais bloquant. À lancer au `/checkpoint` ou via `vibeflow-validator`.
 - **Mettre à jour `STATE.md`** en priorité (position courante, % d'avancement, focus, todos).
 - À la clôture d'une étape : écrire son `SUMMARY.md` ; à l'ouverture : son `PLAN.md`.
 - À la livraison d'un jalon : archiver dans `MILESTONES.md` + `milestones/`.
@@ -115,5 +147,7 @@ métier) est dans `references/GUIDE.md`. Charger on-demand.
 - `references/bridge-memory.md` — articulation `.planning/` (forward) ↔ registres `.claude/memory/` (capitalisation).
 - `references/domain-detection.md` — heuristiques métier → profil + extension, et auto-infusion à l'install.
 - `references/example-lab-contenu.md` — exemple complet d'un socle adapté à un lab NON-dev (preuve d'universalité).
-- `references/templates/` — les 8 gabarits universels à instancier (à adapter, jamais à copier tel quel).
+- `references/compartments.md` — planning hiérarchique : steering lab + INDEX + plan conditionnel typé (deliverable/continuous), seuil d'autonomie, non-cannibalisation, migration sans perte (v2).
+- `references/templates/` — les gabarits universels à instancier (à adapter, jamais à copier tel quel), dont `INDEX.template.md` (lab) + `BOARD.template.md` (compartiment continuous).
 - `scripts/check-planning-state.sh` — garde-fou de fraîcheur de la clé de voûte (advisory, exit codes pour hook).
+- `scripts/detect-planning-debt.sh` — détection de compartiment actif sans plan au-dessus du seuil (advisory).

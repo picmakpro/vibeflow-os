@@ -1,5 +1,18 @@
 # Changelog — conductor
 
+## v1.2.0 — 2026-06-23
+
+Câblage de la **topologie à compartiments** (planning-core v2.0.0) dans l'init, l'update et le pipeline.
+
+### Ajouté / Modifié
+- `vf-new-lab` : étape de dérivation « topologie du lab » (mono-objectif vs compartiments) + typage
+  `deliverable`/`continuous`/infra + seuil d'autonomie ; scaffolding *steering lab + INDEX + plan par
+  compartiment qualifié*. Garde-fou « jamais un `.planning/` par compartiment systématique ».
+- `vf-calibrate` : cas **planning v2** (breaking-doctrine) routé vers la recette de migration sans perte.
+- `references/migration-playbook.md` : recette **§2bis migration planning v2 sans perte de données**
+  (détection de dette → typage → récupération de l'existant en `_archive/` → désengorgement mémoire → INDEX).
+- `references/conductor-pipeline.md` : étape compartiments + garde-fou transverse.
+
 ## v1.1.0 — 2026-06-11
 
 `vf-new-lab` rendu **bundle-aware** + correction d'un pointeur cassé.
