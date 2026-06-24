@@ -1,5 +1,26 @@
 # Changelog — conductor
 
+## v1.3.0 — 2026-06-24
+
+`vf-new-lab` évolue en **Lab Factory clarification-first** (pipeline 7 phases). L'init ne pose plus un
+squelette : elle clarifie en profondeur (gate machine-enforced), dérive un manifeste de capacités, et
+**fabrique** les skills + auditeurs. Rétrocompatible (toujours invocable « crée un lab »), profondeur
+adaptative au profil.
+
+### Ajouté
+- **Clarification-first** : Phase Triage (greenfield/brownfield + profil adaptatif) → Scan brownfield
+  (explorer) → élicitation section par section avec **menu numéroté** (pattern BMAD) → **Gate A**
+  (`[À CLARIFIER]` bloquant sur `LAB_BRIEF.md`). Refs `elicitation-methods.md` + `completeness-gate.md`.
+- **T2 — Manifeste de capacités** : dérive les capacités (savoir/compétence/procédure), **Gate B**
+  (justification obligatoire), proportionnalité au profil. Ref `capability-manifest.md` +
+  `scripts/proportion-capabilities.sh` (tests 9/9).
+- **T3 — Fan-out skill-creator** : fabrication parallèle (N × skill-creator, un par capacité P0) +
+  anti-slop (gate capacité + eval par skill + critique de complétude). Ref `skill-fanout.md`.
+- **T4 — Ficelage auditeurs** : un auditeur par procédure générative via `audit-architecture` (verdict
+  bloquant). Ref `procedure-audit-wiring.md`.
+- **T5 — Assemblage** : agents câblés sur les skills fabriqués, planning v2 compartiments, 5 registres
+  (dont EVALS), garde-fous, stamp. Récap adaptatif (pédagogique en mode découverte).
+
 ## v1.2.0 — 2026-06-23
 
 Câblage de la **topologie à compartiments** (planning-core v2.0.0) dans l'init, l'update et le pipeline.

@@ -3,117 +3,196 @@ name: vf-new-lab
 description: >
   Utiliser pour créer/initialiser un NOUVEAU lab VibeFlow dans n'importe quel métier — « crée un lab
   d'acquisition », « monte un lab de contenu », « initialise un lab pour mon agence », « je veux un
-  espace VibeFlow pour [métier] ». Pilote un cadrage court (ce que l'utilisateur sait déjà : métier,
-  process, objectifs, contraintes, vocabulaire) puis dérive et pose le lab adapté. NE PRÉSUME JAMAIS
-  « dev ». Invocable par l'utilisateur ET par l'agent `vibeflow-conductor`.
+  espace VibeFlow pour [métier] ». Moteur clarification-first + Lab Factory : clarifie en profondeur
+  (gate machine-enforced), dérive un manifeste de capacités, FABRIQUE les skills en parallèle
+  (fan-out skill-creator), ficelle les auditeurs des procédures, puis assemble un lab opérationnel —
+  pas un squelette. NE PRÉSUME JAMAIS « dev ». Invocable par l'utilisateur ET par `vibeflow-conductor`.
 ---
 
-# vf-new-lab — Bootstrap de lab universel
+# vf-new-lab — Lab Factory (init clarification-first + fabrication des capacités)
 
-> **Mission** : transformer ce que l'utilisateur **sait déjà de son métier** en un lab VibeFlow propre,
-> configuré, avec ses garde-fous — sans qu'il ait à connaître la plomberie du framework.
+> **Mission** : transformer un projet flou en un lab VibeFlow **opérationnel et sur-mesure** — clarifié
+> en profondeur, **peuplé de ses skills**, ses procédures **déjà auditées**, sa structure dérivée du
+> brief (jamais plaquée d'un gabarit). On ne livre pas un squelette : on **compile un lab**.
 >
-> **Iron Law** : *« Le lab épouse le métier de l'utilisateur. On ne plaque aucune forme (dev ou autre).
-> On ne demande que ce qu'il sait déjà. »*
+> **Iron Law 1 (clarté)** : *« AUCUNE DÉRIVATION TANT QU'UN MARQUEUR [À CLARIFIER] SUBSISTE. »* La
+> clarté est un gate **machine-enforced** (marqueur présent/absent), pas une consigne en prose.
+> **Iron Law 2 (fabrication)** : *« On fabrique les capacités JUSTIFIÉES par le brief, jamais le plus
+> possible. Une capacité sans justification = pas de skill. »*
 
-Skill **prose agent-driven**. Il ne code pas le métier : il **dérive une structure** et délègue aux
-modules outillés (planning-core, installeur, reference). Cadrage court, scaffolding adapté.
-
----
-
-## Principe : install chirurgicale
-
-L'utilisateur connaît son métier mieux que nous. On ne lui impose pas un gabarit : on lui pose
-**5 questions qu'il sait déjà répondre**, puis le lab se construit autour. Tout le reste est dérivé.
-
-## Séquence
-
-### 1. Cadrage (5 questions max — ce que l'utilisateur sait déjà)
-
-Poser de façon resserrée (une passe, pas un interrogatoire). Détail dans la référence `bootstrap-method.md`
-(installée en `.claude/agents/conductor-references/bootstrap-method.md`).
-
-1. **Métier / domaine du lab** — « C'est un lab pour quoi ? » (ex. acquisition, contenu, vente, dossier…)
-2. **Process & livrables récurrents** — « Qu'est-ce que tu produis/fais de façon répétée ? »
-   (ex. séquences cold email, campagnes ads, landing pages…)
-3. **Objectif** — « Qu'est-ce que ce lab doit rendre possible ? » (la valeur cœur)
-4. **Contraintes** — outils, cibles, ton, réglementaire, délais.
-5. **Vocabulaire métier** — les 3-5 termes que le lab doit parler (pour ne pas plaquer un jargon importé).
-
-> Si l'utilisateur a déjà tout dit en langage naturel, NE PAS re-questionner : extraire les réponses
-> de ce qu'il a écrit et confirmer en une ligne.
-
-### 2. Dérivation (sans rien imposer)
-
-Depuis les réponses, déduire :
-- **Profil de rigueur** (léger / standard / complet) — via `planning-core` (`PROFILES.md`).
-- **Extension de domaine** — le sous-dossier propre au métier (`acquisition/`, `editorial/`,
-  `pipeline/`, `dossiers/`…), nommé d'après le vocabulaire réel.
-- **Agents métier** à créer (2-3 max) — paramétrés sur les process cités (ex. un agent
-  « copywriter-acquisition », un agent « analyste-campagne »). Pattern : business-agent générique.
-- **Modules VibeFlow pertinents** — typiquement `planning-core` + `consolidator` + `audit-architecture`
-  + `validator`. **Pas `dev-orchestrator`** sauf si le métier est le code.
-- **Topologie du lab** — mono-objectif (un seul fil) ou **à compartiments** (plusieurs projets internes /
-  clients / process) ? Si à compartiments : identifier chacun, le **typer** `deliverable` (a une fin) /
-  `continuous` (se renouvelle) / infra (suivi intrinsèque), et appliquer le **seuil d'autonomie** pour
-  savoir lesquels méritent leur propre plan. Référence : planning-core `references/compartments.md`.
-  **Ne pas créer un `.planning/` pour chaque compartiment par défaut** (sur-ingénierie).
-
-> **Mode bundle métier (raccourci recommandé)** : si un bundle métier est installé (présence de
-> `docs/<metier>-bundle/` — ex. `business-pilot-bundle`, `content-bundle`, `growth-bundle`), NE PAS
-> dériver de zéro. Lire `docs/<metier>-bundle/content/BUNDLE.md` (profil, extension, vocabulaire,
-> liste d'agents, flux d'instanciation) + `content/domain/extension-spec.md` + `content/registres.md`,
-> et utiliser les blueprints `content/agents/*.blueprint.md` comme base des agents métier. Le bundle
-> porte déjà le châssis conforme (P1-P9, registres, auditeurs câblés) — **on instancie, on n'invente pas**.
-
-### 3. Scaffolding (déléguer, ne pas réinventer)
-
-Poser, dans l'ordre :
-1. **`CLAUDE.md` du lab** — constitution métier (WHY/WHAT/HOW) en vocabulaire de l'utilisateur.
-2. **Modules** — déléguer à `vibeflow-install` (sélection dérivée à l'étape 2, scope au choix).
-3. **Socle planning** — déléguer à `vf-planning` (profil + extension de domaine). Lab à compartiments :
-   poser le `.planning/` du **lab** en mode *steering + `INDEX.md`* (jamais de ROADMAP global) ; puis un
-   socle **par compartiment qualifié**, typé `deliverable` (roadmap+phases) ou `continuous`
-   (`BOARD.md` + cadence). Compartiments sous le seuil / infra → simple ligne dans `INDEX.md`.
-4. **Registres mémoire** — DECISIONS / LEARNINGS / BLOCKERS / JOURNAL (depuis `reference` si installé).
-5. **Agents métier** — si un bundle est présent : **instancier** chaque `content/agents/*.blueprint.md`
-   en agent natif réel dans `.claude/agents/` (≤250L, adapté au cadrage). Sinon : créer 2-3 agents
-   dérivés (pattern business-agent). Dans les deux cas, créer les skills déclarés en frontmatter
-   `skills:` qui manquent via `skill-creator`.
-6. **Garde-fous** — câbler `vibeflow-validator` + `audit-architecture` (auditeurs toujours présents).
-7. **Stamp framework** — enregistrer la version du framework dans le lab (`framework-version.sh stamp`)
-   pour la détection d'update ultérieure.
-
-### 4. Récap
-
-Montrer l'arbo posée, le métier capté, les agents créés, et **la première action métier** proposée
-en vocabulaire du lab (ex. « lance ta première séquence d'acquisition »).
+Skill **prose agent-driven** + **orchestrateur** : il clarifie, dérive, puis **délègue** la fabrication
+aux modules outillés (`skill-creator` en parallèle, `audit-architecture`, `planning-core`, installeur).
 
 ---
 
-## Exemple — lab « acquisition »
+## Pipeline (7 phases)
 
-Réponses : *acquisition B2B · séquences cold email + campagnes LinkedIn Ads · générer des RDV
-qualifiés · ton direct, cible CTO · vocabulaire : séquence, ICP, RDV, offre.*
-→ Profil **standard** · extension **`acquisition/`** (ICP.md, SEQUENCES.md, OFFRES.md) · agents
-**copywriter-sequences** + **analyste-campagnes** · modules planning-core + consolidator + validator
-· `.planning/` avec ROADMAP en « campagnes » et REQUIREMENTS en objectifs d'acquisition.
-**Zéro fichier dev, zéro sprint de code.**
+```
+0. TRIAGE        → greenfield|brownfield ? + profil (power user|découvre) → mode adaptatif
+1. SCAN          → (brownfield) cartographie autonome AVANT toute question (délègue explorer)
+2. CLARIFICATION → brief construit SECTION PAR SECTION, menu numéroté sur sections critiques
+3. GATE A        → tant qu'un [À CLARIFIER] subsiste dans le brief → retour 2. Sinon → 4.
+4. MANIFESTE     → dériver les capacités (savoir/compétence/procédure) + GATE B + proportionner
+5. FAN-OUT       → fabriquer les skills en parallèle (N × skill-creator) + anti-slop
+6. FICELAGE      → câbler un auditeur par procédure générative (audit-architecture)
+7. ASSEMBLAGE    → CLAUDE.md, modules, planning v2, 5 registres, agents câblés, garde-fous, stamp + récap
+```
+
+Les phases 0-3 sont la **clarté** ; 4-6 la **fabrication** ; 7 l'**assemblage**. Profondeur **adaptative
+au profil** : un lab léger fait une clarification courte + 1-3 capacités ; un lab riche va jusqu'à
+9-20 capacités. L'utilisateur peut sortir (`x`) à tout moment — la dette restante est listée, jamais masquée.
+
+---
+
+## Phase 0 — Triage (2 questions, jamais plus)
+
+1. **Greenfield ou brownfield ?** — « Ce lab part de zéro, ou pilote un projet/codebase/process existant ? »
+2. **Profil** — déduire (ne pas interroger frontalement) si l'utilisateur **maîtrise** VibeFlow (power
+   user) ou le **découvre**. Indices : vocabulaire, mention des registres/principes.
+
+> **Mode adaptatif** : power user → clarification sèche, dense, sans pédagogie. Découvre → chaque section
+> **enseigne le pattern** au passage (« 💡 Pourquoi : … »), l'init devient onboarding méthodo. Profil non
+> figé : monter/descendre en densité selon les réponses ; détecter la **fatigue cognitive** et resserrer.
+
+## Phase 1 — Scan (brownfield uniquement)
+
+**Iron Law brownfield** : *« On ne demande JAMAIS ce que le projet dit déjà. »*
+1. Déléguer un **scan autonome** à l'agent `explorer` (read-only) : stack, structure, conventions, dette.
+2. Produire un **état des lieux** (≤1 écran) + **pré-remplir** le brief avec ce qui est dérivable.
+3. N'ouvrir l'élicitation que sur les trous que le projet ne dit pas (intention, objectif, non-périmètre…).
+
+Greenfield : sauter, tout est à clarifier. **Si le scan ne dérive rien d'exploitable** (repo quasi-vide
+marqué brownfield par erreur) → **basculer en greenfield** et le signaler.
+
+## Phase 2 — Clarification (élicitation section par section)
+
+Construire `docs/LAB_BRIEF.md` **une section à la fois**. Chaque section : `✅ clair` ou
+`[À CLARIFIER: question]`. Sections canoniques + critères de clôture : `references/completeness-gate.md`.
+
+| # | Section | # | Section |
+|---|---------|---|---------|
+| 1 | Problème / valeur cœur | 5 | Process & livrables récurrents |
+| 2 | Métier & vocabulaire | 6 | Contraintes |
+| 3 | Parties prenantes | 7 | Définition de fini / succès |
+| 4 | Périmètre & non-périmètre | 8 | Gates métier & EVALS |
+
+**Mécanique (pattern BMAD)** : sur les sections critiques (problème, périmètre, gates), présenter le
+contenu rédigé par l'agent **puis un menu numéroté** :
+
+```
+Section [N] — [titre] : [contenu proposé]
+  1. ✅ Continuer (section claire)   2. 🔍 Pré-mortem   3. 🔄 Inversion
+  4. 👥 Parties prenantes   5. ❓ Socratique   r. ↻ autres méthodes   x. ⏹ terminer
+→ Choisis un chiffre, ou écris ta réponse/correction :
+```
+
+L'utilisateur **choisit un chiffre, ne rédige rien** — l'agent creuse sous l'angle choisi, met à jour la
+section, ré-affiche le menu jusqu'à `1` ou `x`. Méthodes détaillées : `references/elicitation-methods.md`.
+Sections non critiques : question directe, pas de menu.
+
+## Phase 3 — Gate A (clarté du brief, machine-enforced)
+
+```bash
+grep -nE '^\s*\[À CLARIFIER:' docs/LAB_BRIEF.md   # ancré début de ligne — voir completeness-gate.md
+```
+- **≥1 marqueur** → bloque. Lister les trous + leur risque, retour Phase 2 sur ces points. Pas de suite.
+- **0 marqueur** → passer au manifeste.
+- Sortie forcée (`x`) avec marqueurs → brief livré **avec dette** + ouvrir un BLOCKER. **Mode dégradé** :
+  les phases 4-7 ne dérivent que des sections `✅` ; rien qui touche une section `[À CLARIFIER]` (backlog).
+
+## Phase 4 — Manifeste de capacités (+ Gate B)
+
+Dériver du brief les **capacités à fabriquer**, classées en 3 natures — **savoir** (connaître),
+**compétence** (savoir-faire), **procédure** (workflow répétable). Écrire `docs/CAPABILITY_MANIFEST.md`.
+Détail + schéma d'entrée + proportionnalité : `references/capability-manifest.md`.
+
+- **Gate B** : aucune capacité ne part au fan-out sans nature + justification (rattachée à une section du
+  brief) + critère de succès. Une capacité injustifiée = `[À CLARIFIER]`, **pas un skill de plus**.
+- **Proportionner** au profil (`scripts/proportion-capabilities.sh`) : léger 1-3 · standard 4-8 ·
+  complet 9-20. Au-delà → P0/P1/P2 ; seules les **P0 partent au fan-out**, le reste en backlog (logué).
+- L'utilisateur **valide/édite** la liste (Red Team possible : « lesquelles en trop / manquantes ? »).
+
+## Phase 5 — Fan-out skill-creator (fabrication parallèle)
+
+Pour chaque capacité **P0** validée : lancer une invocation **`skill-creator`** comme **sous-agent**
+(outil `Task`, `subagent_type: skill-creator`), **une par capacité**, **en parallèle** (plusieurs
+tool-uses dans un seul message ; par vagues de 5-6 si gros manifeste). **Si `Task` ou le sous-agent
+skill-creator est indisponible → fallback séquentiel** (invoquer skill-creator l'un après l'autre).
+Le prompt d'invocation **doit injecter** : (a) destination forcée `.claude/skills/<nom>/` (nature META,
+ignorer la distinction LIVRABLE du template) ; (b) « escalade ton attribution en retournant la liste
+`skill → agents suggérés` dans ton message final à `vf-new-lab` » (ne pas compter sur le placeholder
+`[ORCHESTRATING_AGENT]`). Détail : `references/skill-fanout.md`.
+
+**Anti-slop** : (1) gate de capacité + orthogonalité déjà passés (Gate B) ; (2) **eval par skill** borné
+(**max 3 passes** ; au-delà → `[À RETRAVAILLER]` + backlog, on continue le reste) ; (3) **critique de
+complétude** après le fan-out, **déléguée à un sous-agent frais** (reviewer/explorer, pas l'orchestrateur
+juge-et-partie) : « quelle capacité sans skill ? lequel redondant ? ». `skill-creator` **n'attribue
+pas** : il escalade → l'attribution se fait en Phase 7.
+
+> Cas limite : **0 capacité P0** → pas de fan-out ; on assume un lab squelette (le signaler au récap,
+> proposer d'ajouter des capacités plus tard via skill-creator à la demande).
+
+## Phase 6 — Ficelage des auditeurs
+
+Pour chaque capacité de nature **procédure** avec `auditeur requis: oui` (procédure **générative**) :
+déléguer à `audit-architecture` la **conception** de la structure d'audit (Dimension × Auditeur
+indépendant × Rubric × **Verdict bloquant** × Anti-boucle). `audit-architecture` *conçoit et propose*
+(son Iron Law / ADR-031 : il ne matérialise pas seul) ; **c'est `vf-new-lab` qui matérialise** l'auditeur
+en Phase 7 — la **validation du manifeste en Phase 4 fait office de feu vert humain** (ADR-031 respecté).
+Détail : `references/procedure-audit-wiring.md`. **Pas de verdict bloquant → pas d'audit.** Ne pas
+sur-ficeler : seules les procédures dont la qualité de l'output compte.
+
+## Phase 7 — Assemblage & scaffolding
+
+Dériver puis poser (déléguer, ne pas réinventer) :
+1. **`CLAUDE.md`** du lab — constitution métier en vocabulaire utilisateur (< 150 lignes, **P2**).
+2. **Modules** — `vibeflow-install` (résoudre deps : `resolve-deps.sh`). Typiquement `planning-core` +
+   `consolidator` + `audit-architecture` + `validator`. **Pas `dev-orchestrator`** sauf métier = code.
+3. **Socle planning** — `vf-planning`. **Lab à compartiments** : `.planning/` du lab en *steering +
+   `INDEX.md`* (jamais de ROADMAP global) ; un socle par compartiment **qualifié** (seuil d'autonomie),
+   typé `deliverable` (roadmap+phases) ou `continuous` (`BOARD.md` + cadence). Sous le seuil / infra →
+   ligne d'`INDEX.md`. Réf : planning-core `references/compartments.md`. **Jamais un `.planning/` par
+   compartiment systématique.**
+4. **5 registres mémoire** — DECISIONS / LEARNINGS / BLOCKERS / JOURNAL / **EVALS** (depuis `reference`).
+   EVALS posé dès l'init (registre du principe **P8 Évaluer**), partie intégrante du socle.
+5. **Agents métier** (2-3, pattern business-agent ; ou instanciés depuis un bundle si présent) —
+   **câbler les skills fabriqués** (Phases 5-6) dans leur frontmatter `skills:` (attribution décidée ici,
+   d'après les escalades du fan-out).
+6. **Garde-fous** — `vibeflow-validator` + `audit-architecture` (auditeurs toujours présents).
+7. **Stamp framework** — `framework-version.sh stamp` (rendu **visible au récap**).
+
+> **Bundle métier (raccourci)** : si un bundle est installé (`docs/<metier>-bundle/`), s'en servir comme
+> **bibliothèque** — piocher blueprints d'agents + manifeste de capacités suggéré — **jamais comme moule**.
+> Le brief clarifié fait autorité en cas de divergence.
+
+### Récap (et ancrage)
+
+Montrer : l'arbo, le métier capté, **les skills fabriqués + leur attribution**, les procédures auditées,
+la **première action métier** proposée. En **mode découverte** : mini-récap pédagogique (P1-P9, 5
+registres, auditeurs, comment les actionner). Lister la **dette** éventuelle (capacités backlog,
+`[À RETRAVAILLER]`, marqueurs restants si sortie forcée).
 
 ---
 
 ## Garde-fous
 
-- **Ne jamais présumer dev.** Lire le métier, choisir l'extension d'après le vocabulaire réel.
-- **Ne jamais sur-configurer.** Un lab léger reste léger ; on n'ajoute que ce qui sert au métier.
-- **Ne jamais demander ce qu'on peut dériver.** 5 questions max ; le reste se déduit.
-- **Toujours câbler les auditeurs** — pas de lab sans filet de cohérence.
-- **Toujours stamper la version framework** — sinon pas de détection d'update plus tard.
-- **Jamais un `.planning/` par compartiment systématique** — steering lab + INDEX, plan seulement
-  pour les compartiments au-dessus du seuil d'autonomie (cf. `compartments.md`).
+- **Jamais dériver/fabriquer avec un marqueur `[À CLARIFIER]` ouvert** (Gate A puis Gate B).
+- **Jamais fabriquer une capacité injustifiée** ni dépasser le plafond du profil (anti-slop).
+- **Jamais présumer dev** ; extension & vocabulaire viennent du brief réel.
+- **Jamais un `.planning/` par compartiment systématique** ; jamais de ROADMAP global de lab.
+- **Jamais d'auditeur sans verdict bloquant** sur une procédure générative.
+- **Toujours câbler les auditeurs** du lab + **stamper la version**.
+- **Toujours offrir la sortie `x`** et afficher la dette en sortant ; adapter la densité au profil.
 
 ## Références (on-demand)
 
-- `bootstrap-method.md` (installé en `.claude/agents/conductor-references/`) — méthode de cadrage + dérivation détaillée.
-- planning-core `PROFILES.md` / `domain-detection.md` / `example-lab-contenu.md` — adaptation par métier.
-- Bundles métier installés (`docs/<metier>-bundle/content/BUNDLE.md`) — châssis prêt à instancier (business-pilot / content / growth).
+- `references/elicitation-methods.md` — les 8 méthodes du menu numéroté (clarification).
+- `references/completeness-gate.md` — critères de clôture par section + Gate A (brief) + Gate B (manifeste).
+- `references/capability-manifest.md` — dériver/justifier/proportionner les capacités (savoir/compétence/procédure).
+- `references/skill-fanout.md` — fabrication parallèle des skills + anti-slop + attribution.
+- `references/procedure-audit-wiring.md` — câbler un auditeur par procédure générative (audit-architecture).
+- `conductor/references/bootstrap-method.md` — méthode de cadrage/dérivation.
+- planning-core `references/PROFILES.md` / `domain-detection.md` / **`compartments.md`** (topologie
+  compartiments : seuil d'autonomie, typage deliverable/continuous, INDEX) — chargé en Phase 7. Bundles : `docs/<metier>-bundle/`.
+- `scripts/proportion-capabilities.sh` — plafond conseillé de capacités P0 selon le profil.
+- Outils délégués (chemins) : `_internal/resolve-deps.sh` (deps modules), `conductor/scripts/framework-version.sh` (stamp).

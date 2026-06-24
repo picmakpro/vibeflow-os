@@ -13,7 +13,7 @@ new-lab → install-modules → planning → verify(validator) → [vie du lab] 
 
 | Étape | Action coulisse | Vocabulaire utilisateur |
 |-------|-----------------|-------------------------|
-| Création du lab | skill `vf-new-lab` | « monter le lab » |
+| Création du lab | skill `vf-new-lab` (**Lab Factory** : clarifie → manifeste de capacités → fabrique skills + auditeurs → assemble) | « monter le lab » |
 | Pose des modules | skill `vibeflow-install` | « installer VibeFlow » |
 | Socle planning/doc | skill `vf-planning` | « mettre en place le suivi » |
 | ↳ *(lab à compartiments)* | steering lab + `INDEX.md` + plan typé par compartiment qualifié | « cadrer chaque projet du lab » |
