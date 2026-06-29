@@ -72,7 +72,9 @@ The UX walks you through:
 
 ## 📦 Modules
 
-13 independently toggleable modules (10 core + 3 domain bundles). Each has its own version, `CHANGELOG.md`, and `README.md`.
+13 modules total. Each has its own version, `CHANGELOG.md`, and `README.md`.
+
+> **At install (since v2.13.0)**: `conductor` is the **mandatory baseline**, installed by default (with its safety net: planning-core, validator, consolidator, infrastructure-audit) — not a choice. Then **a single choice**: *development lab* (`dev-orchestrator`) or *new tailor-made domain lab* via `/vf-new-lab`. The **3 domain bundles** (business-pilot / content / growth) are **WIP and not offered at install** (`proposable:false`); they'll be re-offered once complete. Other modules remain available as advanced à-la-carte ("add &lt;module&gt;").
 
 | Module | Ver. | Type | What it does |
 |--------|:----:|------|--------------|

@@ -145,7 +145,13 @@ sur-ficeler : seules les procédures dont la qualité de l'output compte.
 ## Phase 7 — Assemblage & scaffolding
 
 Dériver puis poser (déléguer, ne pas réinventer) :
-1. **`CLAUDE.md`** du lab — constitution métier en vocabulaire utilisateur (< 150 lignes, **P2**).
+1. **`CLAUDE.md` + externalisation doc (ADR-042)** — l'init du `CLAUDE.md` **déclenche** l'externalisation
+   de la doc : le `CLAUDE.md` est une **constitution** (< 150 lignes, **P2**) qui **POINTE** vers la doc,
+   ne la duplique JAMAIS. Lancer `conductor/scripts/scaffold-docs.sh <compartiments-qualifiés>` → crée
+   `docs/_transverse/` (doc transverse) + un `docs/<projet>/` **par compartiment qualifié** (même seuil
+   d'autonomie que les `.planning/` — proportionné, **jamais un `docs/<projet>/` par micro-dossier**). Le
+   `CLAUDE.md` mappe ensuite la doc transverse → `@docs/_transverse/` et **chaque compartiment →
+   `@docs/<projet>/`**. Détail : `references/doc-externalization.md`.
 2. **Modules** — `vibeflow-install` (résoudre deps : `resolve-deps.sh`). Typiquement `planning-core` +
    `consolidator` + `audit-architecture` + `validator`. **Pas `dev-orchestrator`** sauf métier = code.
 3. **Socle planning** — `vf-planning`. **Lab à compartiments** : `.planning/` du lab en *steering +
@@ -159,7 +165,11 @@ Dériver puis poser (déléguer, ne pas réinventer) :
    **câbler les skills fabriqués** (Phases 5-6) dans leur frontmatter `skills:` (attribution décidée ici,
    d'après les escalades du fan-out).
 6. **Garde-fous** — `vibeflow-validator` + `audit-architecture` (auditeurs toujours présents).
-7. **Stamp framework** — `framework-version.sh stamp` (rendu **visible au récap**).
+7. **Commandes d'incarnation (ADR-042)** — balayer **tous** les agents posés :
+   `VF_TARGET_ROOT=<.claude> conductor/scripts/generate-agent-commands.sh`. Génère une `/agent` par
+   agent (métier + gouvernance) qui l'**incarne dans la fenêtre principale** (session courante), pas en
+   sous-agent. Idempotent (ne réécrit pas une commande existante). Détail : `references/agent-command-incarnation.md`.
+8. **Stamp framework** — `framework-version.sh stamp` (rendu **visible au récap**).
 
 > **Bundle métier (raccourci)** : si un bundle est installé (`docs/<metier>-bundle/`), s'en servir comme
 > **bibliothèque** — piocher blueprints d'agents + manifeste de capacités suggéré — **jamais comme moule**.
@@ -181,6 +191,10 @@ registres, auditeurs, comment les actionner). Lister la **dette** éventuelle (c
 - **Jamais présumer dev** ; extension & vocabulaire viennent du brief réel.
 - **Jamais un `.planning/` par compartiment systématique** ; jamais de ROADMAP global de lab.
 - **Jamais d'auditeur sans verdict bloquant** sur une procédure générative.
+- **Jamais inliner la doc dans le `CLAUDE.md`** : externaliser sous `docs/` et y **pointer** (`@docs/...`) ;
+  doc contextuelle `docs/<projet>/` réservée aux **compartiments qualifiés** (ADR-042).
+- **Toujours générer une commande d'incarnation `/agent` par agent posé** (fenêtre principale, pas Task) ;
+  ne jamais écraser une commande existante (ADR-042).
 - **Toujours câbler les auditeurs** du lab + **stamper la version**.
 - **Toujours offrir la sortie `x`** et afficher la dette en sortant ; adapter la densité au profil.
 
@@ -191,6 +205,9 @@ registres, auditeurs, comment les actionner). Lister la **dette** éventuelle (c
 - `references/capability-manifest.md` — dériver/justifier/proportionner les capacités (savoir/compétence/procédure).
 - `references/skill-fanout.md` — fabrication parallèle des skills + anti-slop + attribution.
 - `references/procedure-audit-wiring.md` — câbler un auditeur par procédure générative (audit-architecture).
+- `references/doc-externalization.md` — externalisation doc + topologie contextuelle `docs/_transverse/` + `docs/<projet>/` (ADR-042).
+- `references/agent-command-incarnation.md` — commandes `/agent` d'incarnation fenêtre principale vs sous-agent (ADR-042).
+- `conductor/scripts/scaffold-docs.sh` (squelette doc) + `conductor/scripts/generate-agent-commands.sh` (commandes d'incarnation).
 - `conductor/references/bootstrap-method.md` — méthode de cadrage/dérivation.
 - planning-core `references/PROFILES.md` / `domain-detection.md` / **`compartments.md`** (topologie
   compartiments : seuil d'autonomie, typage deliverable/continuous, INDEX) — chargé en Phase 7. Bundles : `docs/<metier>-bundle/`.

@@ -13,16 +13,24 @@ ko() { echo "  ✗ $1"; fail=$((fail+1)); }
 
 echo "== test-build-module-catalog =="
 
-# ---------- Fixture isolée : 2 modules avec module.json + 1 dossier SANS module.json ----------
+# ---------- Fixture isolée : optionnels + 1 mandatory + 1 proposable:false + 1 sans manifeste ----------
 FIX=$(mktemp -d)
 trap 'rm -rf "$FIX"' EXIT
 
-mkdir -p "$FIX/zeta" "$FIX/alpha" "$FIX/sans-manifeste"
+mkdir -p "$FIX/zeta" "$FIX/alpha" "$FIX/boss" "$FIX/cache" "$FIX/sans-manifeste"
 cat > "$FIX/zeta/module.json" <<'JSON'
 { "name": "zeta", "version": "v1.0.0", "type": "single-skill", "description": "Module Zeta de test.", "requires": [] }
 JSON
 cat > "$FIX/alpha/module.json" <<'JSON'
 { "name": "alpha", "version": "v1.0.0", "type": "single-skill", "description": "Module Alpha de test.", "requires": [] }
+JSON
+# Module obligatoire (baseline) — doit sortir avec role=mandatory.
+cat > "$FIX/boss/module.json" <<'JSON'
+{ "name": "boss", "version": "v1.0.0", "type": "agent", "description": "Module Boss obligatoire.", "mandatory": true, "requires": [] }
+JSON
+# Module non proposable (WIP) — doit être EXCLU du catalogue.
+cat > "$FIX/cache/module.json" <<'JSON'
+{ "name": "cache", "version": "v1.0.0", "type": "doc-only", "description": "Module caché WIP.", "proposable": false, "requires": [] }
 JSON
 # Dossier volontairement SANS module.json — doit être exclu du catalogue.
 : > "$FIX/sans-manifeste/README.md"
@@ -41,6 +49,13 @@ else
   ok "fixture : dossier sans module.json exclu"
 fi
 
+# (b2) module proposable:false EXCLU (jamais de ligne 'cache')
+if printf '%s\n' "$fix_out" | command grep -q '^cache	'; then
+  ko "fixture : un module proposable:false ne doit PAS apparaître"
+else
+  ok "fixture : module proposable:false exclu (WIP)"
+fi
+
 # (c) chaque ligne a une description non vide (champ 2 après TAB)
 desc_ok=1
 while IFS= read -r line; do
@@ -51,19 +66,45 @@ done <<< "$fix_out"
 [ "$desc_ok" -eq 1 ] && ok "fixture : chaque ligne a une description non vide" \
   || ko "fixture : au moins une description vide"
 
-# Compte de modules de la fixture = 2 (alpha + zeta)
-nfix=$(printf '%s\n' "$fix_out" | command grep -c .)
-[ "$nfix" -eq 2 ] && ok "fixture : 2 modules listés" \
-  || ko "fixture : attendu 2 modules, obtenu $nfix"
+# (d) colonne role : boss=mandatory, alpha/zeta=optional
+bossrole=$(printf '%s\n' "$fix_out" | command grep '^boss	' | cut -f3)
+[ "$bossrole" = "mandatory" ] && ok "fixture : boss marqué mandatory" \
+  || ko "fixture : boss attendu role=mandatory, obtenu [$bossrole]"
+alpharole=$(printf '%s\n' "$fix_out" | command grep '^alpha	' | cut -f3)
+[ "$alpharole" = "optional" ] && ok "fixture : alpha marqué optional (défaut)" \
+  || ko "fixture : alpha attendu role=optional, obtenu [$alpharole]"
 
-# ---------- Cas repo réel : 1 ligne par module.json présent, validator + sa description ----------
+# Compte de modules de la fixture = 3 (alpha + boss + zeta ; cache exclu)
+nfix=$(printf '%s\n' "$fix_out" | command grep -c .)
+[ "$nfix" -eq 3 ] && ok "fixture : 3 modules listés (cache exclu)" \
+  || ko "fixture : attendu 3 modules, obtenu $nfix"
+
+# ---------- Cas repo réel : 1 ligne par module.json proposable ; conductor=mandatory ----------
 real_out=$(VF_MODULES_ROOT="$REPO_ROOT" bash "$SCRIPT" 2>/dev/null)
 
 nreal=$(printf '%s\n' "$real_out" | command grep -c .)
-# Attendu = nombre réel de module.json sur le disque (robuste à l'ajout de modules ; ≥ 8 socle initial).
+# Attendu = nombre de module.json sur disque MOINS ceux marqués proposable:false (bundles WIP).
 ndisk=$(find "$REPO_ROOT" -mindepth 2 -maxdepth 2 -name module.json | command grep -c .)
-{ [ "$nreal" -eq "$ndisk" ] && [ "$nreal" -ge 8 ]; } && ok "repo réel : $nreal modules listés (= $ndisk module.json sur disque)" \
-  || ko "repo réel : attendu $ndisk modules (≥8), obtenu $nreal"
+nhidden=$(find "$REPO_ROOT" -mindepth 2 -maxdepth 2 -name module.json -exec jq -r '.proposable == false' {} \; | command grep -c '^true$' || true)
+nexpected=$((ndisk - nhidden))
+{ [ "$nreal" -eq "$nexpected" ] && [ "$nreal" -ge 8 ]; } && ok "repo réel : $nreal modules listés (= $ndisk sur disque − $nhidden non proposables)" \
+  || ko "repo réel : attendu $nexpected modules (≥8), obtenu $nreal"
+
+# conductor présent ET marqué mandatory (baseline obligatoire)
+cline=$(printf '%s\n' "$real_out" | command grep '^conductor	' || true)
+crole=$(printf '%s' "$cline" | cut -f3)
+if [ -n "$cline" ] && [ "$crole" = "mandatory" ]; then
+  ok "repo réel : conductor présent et mandatory"
+else
+  ko "repo réel : conductor mandatory attendu, obtenu [$cline]"
+fi
+
+# bundles (proposable:false) absents du catalogue
+if printf '%s\n' "$real_out" | command grep -qE '^(growth-bundle|content-bundle|business-pilot-bundle)	'; then
+  ko "repo réel : aucun bundle ne doit apparaître (proposable:false)"
+else
+  ok "repo réel : bundles exclus du catalogue"
+fi
 
 # validator présent ET avec une description non vide
 vline=$(printf '%s\n' "$real_out" | command grep '^validator	' || true)

@@ -47,9 +47,10 @@ VF_MODULES_ROOT="${CLAUDE_PLUGIN_ROOT:-<racine du repo vibeflow-os cloné en dev
 Concrètement, par étape :
 
 - **étape 1 (status)** : `VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT:-…}" vibeflow-update.sh status`
-- **étape 3 (catalogue)** : `VF_MODULES_ROOT="${CLAUDE_PLUGIN_ROOT:-…}" build-module-catalog.sh`
-- **étape 4 (résolveur)** : `VF_MODULES_ROOT="${CLAUDE_PLUGIN_ROOT:-…}" resolve-deps.sh …`
-- **étape 5 (install)** :
+- **étapes 3–4 (catalogue → baseline + type de lab)** : `VF_MODULES_ROOT="${CLAUDE_PLUGIN_ROOT:-…}" build-module-catalog.sh`
+  (le catalogue distingue `role=mandatory` posé d'office de `role=optional` proposé au choix)
+- **étape 5 (résolveur + install)** :
+  `VF_MODULES_ROOT="${CLAUDE_PLUGIN_ROOT:-…}" resolve-deps.sh …` puis
   `VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT:-…}" vibeflow-update.sh --scope <s> install --with-deps <module>`
 
 `_internal/resolve-deps.sh` est **bundlé dans le plugin** (présent dans le cache `${CLAUDE_PLUGIN_ROOT}`)
@@ -67,29 +68,46 @@ Concrètement, par étape :
    s'applique à tout — modules VibeFlow + GSD + Superpowers). Reframe pour l'utilisateur :
    compte (user) / projet (project) / projet sans commit (local).
 
-3. **Toggle modules (INST-02 — multi-select).** Peupler la liste à partir de
-   `build-module-catalog.sh` (`VF_MODULES_ROOT` = cache du plugin) : chaque entrée = nom + la
-   description 1 ligne issue de son `module.json`. **Aucun nom de module en dur** — tout sort du
-   catalogue.
+3. **Baseline obligatoire — conductor posé d'office (INST-02a).** Lire le catalogue
+   (`build-module-catalog.sh`, `VF_MODULES_ROOT` = cache) : il émet `name<TAB>description<TAB>role`.
+   Les entrées **`role == mandatory`** (aujourd'hui : `conductor`, le gardien méta du lab) sont
+   posées **automatiquement** avec leurs deps — **on ne les met PAS dans un toggle** : un lab sans
+   son orchestrateur méta n'a pas de filet de cohérence. On **informe** l'utilisateur (« je pose le
+   socle de gouvernance »), on ne lui demande pas de choisir. **Aucun nom de module en dur** : la
+   liste des mandatory sort du catalogue (`role`).
 
-4. **Auto-résolution + récap (INST-03).** Passer la sélection à `resolve-deps.sh`
-   (`VF_MODULES_ROOT` = cache) pour la **fermeture transitive** des `requires`, puis
-   **RÉCAPITULER explicitement** à l'utilisateur ce que ça entraîne (ex. « validator entraîne
-   aussi consolidator + infrastructure-audit ») **AVANT** toute install. L'utilisateur voit la
-   liste complète des modules qui seront posés.
+4. **Choix du type de lab (INST-02b — single-select).** Une fois le socle posé, **un seul** choix
+   structurant, via l'UI de questions (pas un TUI bash) :
+   - **Lab de développement** → poser le module `dev-orchestrator` (entrée `optional` du catalogue)
+     + amorcer ses dépendances de dev.
+   - **Nouveau lab (autre métier)** → ne rien poser de plus ici : la suite passe par **`/vf-new-lab`**
+     (porté par `conductor`, déjà posé), qui mène la clarification du métier et **câble lui-même**
+     les modules pertinents (auditeurs, planning, etc.). On ne présume jamais « dev ».
 
-5. **Install scopée (INST-04 — déléguée, scope unique partout).**
-   - **Modules VibeFlow** → `vibeflow-update.sh --scope <s> install --with-deps <module>` (ou
-     itérer la fermeture déjà résolue), avec `VIBEFLOW_CACHE` pointant sur le cache du plugin.
+   > **Ne JAMAIS proposer un métier figé (growth, content, business…) comme s'il était prêt.** Les
+   > bundles métier incomplets sont marqués `proposable:false` → ils n'apparaissent même pas au
+   > catalogue. Le seul chemin métier offert est `vf-new-lab`, qui construit le lab sur mesure.
+   >
+   > **À-la-carte avancé (optionnel).** Un utilisateur averti qui demande explicitement un module
+   > `optional` précis (ex. « ajoute kpi-analyst ») peut l'obtenir — on liste alors les entrées
+   > `optional` du catalogue. Ce n'est PAS le chemin par défaut du premier usage.
+
+5. **Install scopée (INST-04 — déléguée, scope unique partout).** Résoudre la fermeture transitive
+   des `requires` via `resolve-deps.sh` (`VF_MODULES_ROOT` = cache) et **récapituler** ce qui sera
+   posé **AVANT** d'installer (ex. « conductor entraîne planning-core + validator »).
+   - **Modules VibeFlow** → `vibeflow-update.sh --scope <s> install --with-deps <module>` (conductor
+     d'office, puis `dev-orchestrator` si branche dev), `VIBEFLOW_CACHE` = cache du plugin.
      `--with-deps` recâble lui-même le résolveur côté engine.
-   - **GSD + Superpowers** → `VF_SCOPE=<s> ensure-deps.sh` (si dev-orchestrator est sélectionné,
-     ou sur demande). **PASSER TOUJOURS un VF_SCOPE explicite** = `<s>`, le scope choisi à
-     l'étape 2 (cohérence **ID4** — on ne laisse jamais le défaut LEGACY décider).
+   - **GSD + Superpowers** → `VF_SCOPE=<s> ensure-deps.sh` (uniquement si `dev-orchestrator` est posé,
+     ou sur demande). **PASSER TOUJOURS un VF_SCOPE explicite** = `<s>` (cohérence **ID4**).
    - Scope `local` → le `.gitignore` est géré **par l'engine** (SCOPE-04, déjà fait) : ne pas le
      réimplémenter, juste le mentionner à l'utilisateur (« rien ne sera committé »).
 
-6. **Récap final + prochaines étapes.** Confirmer ce qui a été posé et où, puis amorcer la suite
-   en vocabulaire VibeFlow (ex. « dis "aide-moi à dev" pour démarrer »).
+6. **Récap final + prochaine étape (context-aware).** Confirmer ce qui a été posé et où, puis amorcer
+   la suite selon la branche choisie :
+   - **Branche dev** → « dis "aide-moi à dev" pour démarrer ».
+   - **Branche nouveau lab** → enchaîner sur **`/vf-new-lab [métier]`** (ou inviter l'utilisateur à le
+     lancer) pour la phase de clarification et la construction du lab sur mesure.
 
 ## Désinstallation (déléguée — même câblage de cache)
 
@@ -99,6 +117,9 @@ correspondre à celui où les modules ont été posés (sinon l'engine cherche a
 
 - **Un module** :
   `VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT:-…}" vibeflow-update.sh --scope <s> uninstall <module>`
+  — **sauf un module `mandatory`** (conductor) : ne pas le retirer à l'unité (il porte la gouvernance
+  du lab). Il ne part qu'avec une désinstallation complète (`uninstall --all`). Si l'utilisateur
+  insiste, le prévenir que le lab perd son orchestrateur méta.
 - **Tout** :
   `VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT:-…}" vibeflow-update.sh --scope <s> uninstall --all`
   (lit le registre `<scope>/.claude/scripts/.vibeflow-installed` et retire chaque module : skills,
@@ -117,6 +138,11 @@ correspondre à celui où les modules ont été posés (sinon l'engine cherche a
 - **`VF_SCOPE` explicite partout** : ne jamais s'appuyer sur le défaut LEGACY de l'engine
   (`project`) ni de `ensure-deps.sh` (`user`). Un scope unique, choisi une fois, propagé à
   l'engine **et** à `ensure-deps.sh` (ID4).
+- **Baseline non négociable** : tout module `role=mandatory` du catalogue (conductor) est posé
+  d'office, jamais soumis à un toggle. Le premier usage offre **un seul** choix structurant —
+  *lab de développement* vs *nouveau lab métier (`vf-new-lab`)* — pas une liste brute de modules.
+- **Jamais proposer un module `proposable:false`** : exclu du catalogue par construction (bundles
+  métier WIP). Ne le reproposer qu'une fois finalisé (repasser `proposable` à true / l'omettre).
 - **Ne réimplémente jamais** une brique : route et délègue (catalogue, `resolve-deps.sh`,
   `vibeflow-update.sh --scope`, `ensure-deps.sh` via `VF_SCOPE`).
 - **Reframe en vocabulaire VibeFlow** ; ne nomme jamais GSD ni Superpowers à l'utilisateur

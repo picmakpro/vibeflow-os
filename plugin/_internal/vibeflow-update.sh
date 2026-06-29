@@ -191,6 +191,7 @@ gitignore_add_paths() {
   # Agent module (D7) : AGENT.md + dossier references.
   if [ -f "$module_dir/AGENT.md" ]; then
     gitignore_add_one ".claude/agents/${mod}.md"
+    gitignore_add_one ".claude/commands/${mod}.md"
     [ -d "$module_dir/references" ] && gitignore_add_one ".claude/agents/${mod}-references/"
   fi
   # Rules réellement posées.
@@ -204,6 +205,31 @@ gitignore_add_paths() {
     for f in "$module_dir/scripts/"*.sh; do
       [ -f "$f" ] && gitignore_add_one ".claude/scripts/$(basename "$f")"
     done
+  fi
+}
+
+# ---------- Commande d'incarnation (ADR-042) ----------
+# Après pose d'un agent, générer sa commande slash `/agent` (incarnation FENÊTRE PRINCIPALE).
+# Best-effort : ne JAMAIS faire échouer l'install si le générateur est absent. Idempotent
+# (le générateur n'écrase jamais une commande existante).
+find_command_generator() {
+  local c
+  c="$TARGET_ROOT/scripts/generate-agent-commands.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  c="$CACHE_DIR/conductor/scripts/generate-agent-commands.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  echo ""
+}
+
+generate_agent_command_for() {
+  local mod="$1" gen
+  gen="$(find_command_generator)"
+  if [ -z "$gen" ]; then
+    log "  (commande d'incarnation non générée — generate-agent-commands.sh absent, best-effort)"
+    return 0
+  fi
+  if VF_TARGET_ROOT="$TARGET_ROOT" bash "$gen" --agent "$mod" >/dev/null 2>&1; then
+    log "  commande d'incarnation → $TARGET_ROOT/commands/${mod}.md"
+  else
+    log "  (commande d'incarnation non générée pour $mod — best-effort)"
   fi
 }
 
@@ -311,6 +337,12 @@ install_module() {
     fi
   fi
 
+  # Commande d'incarnation (ADR-042) : tout agent posé devient invocable nativement via `/<mod>`
+  # dans la fenêtre principale. Après la copie des scripts ci-dessus, le générateur est dispo.
+  if [ -f "$module_dir/AGENT.md" ]; then
+    generate_agent_command_for "$mod"
+  fi
+
   # SCOPE-04 : en scope local seulement, ajouter les chemins installés au ./.gitignore.
   gitignore_add_paths "$mod"
 
@@ -382,6 +414,12 @@ uninstall_module() {
   if [ -d "$TARGET_ROOT/agents/${mod}-references" ]; then
     rm -rf "$TARGET_ROOT/agents/${mod}-references"
     log "  removed $TARGET_ROOT/agents/${mod}-references"
+  fi
+
+  # Commande d'incarnation générée (ADR-042) : la retirer avec l'agent.
+  if [ -f "$TARGET_ROOT/commands/${mod}.md" ]; then
+    rm -f "$TARGET_ROOT/commands/${mod}.md"
+    log "  removed $TARGET_ROOT/commands/${mod}.md"
   fi
 
   # Remove scripts (only those owned by this module)

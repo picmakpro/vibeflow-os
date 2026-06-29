@@ -3,5 +3,7 @@
   "version": "v1.0.0",
   "type": "doc-only",
   "description": "Bundle métier business-pilot : blueprints agents (commercial/delivery/finance) + dérivation pour vf-new-lab — piloter un business sous gouvernance VibeFlow.",
+  "proposable": false,
+  "proposable_reason": "WIP — pas assez complet ; sera reproposé une fois finalisé.",
   "requires": ["planning-core", "consolidator", "audit-architecture", "validator"]
 }

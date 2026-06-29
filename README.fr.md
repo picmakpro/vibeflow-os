@@ -72,7 +72,9 @@ L'UX déroule :
 
 ## 📦 Modules
 
-13 modules activables indépendamment (10 cœur + 3 bundles métier). Chacun a sa propre version, son `CHANGELOG.md` et son `README.md`.
+13 modules au total. Chacun a sa propre version, son `CHANGELOG.md` et son `README.md`.
+
+> **À l'installation (depuis v2.13.0)** : `conductor` est le **socle obligatoire** posé d'office (avec son filet : planning-core, validator, consolidator, infrastructure-audit) — pas un choix. Ensuite, **un seul choix** : *lab de développement* (`dev-orchestrator`) ou *nouveau lab métier sur mesure* via `/vf-new-lab`. Les **3 bundles métier** (business-pilot / content / growth) sont **WIP et non proposés à l'install** (`proposable:false`) ; ils seront reproposés une fois finalisés. Les autres modules restent disponibles en à-la-carte avancé (« ajoute &lt;module&gt; »).
 
 | Module | Ver. | Type | Ce qu'il fait |
 |--------|:----:|------|---------------|

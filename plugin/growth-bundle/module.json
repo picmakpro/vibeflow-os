@@ -3,5 +3,7 @@
   "version": "v1.0.0",
   "type": "doc-only",
   "description": "Bundle métier growth/acquisition (GrowthFlow) : blueprints agents + extension PAR CANAL + dérivation pour vf-new-lab.",
+  "proposable": false,
+  "proposable_reason": "WIP — pas assez complet ; sera reproposé une fois finalisé.",
   "requires": ["planning-core", "consolidator", "audit-architecture", "validator"]
 }

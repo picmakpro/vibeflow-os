@@ -7,8 +7,8 @@
   "plugins": [
     {
       "name": "vibeflow",
-      "description": "Orchestrateur de développement Claude Code : modules toggables (dev, audit, validator, kpi-analyst…) + engine d'install scopé, posés via une UX à toggles.",
-      "version": "2.12.0",
+      "description": "Orchestrateur Claude Code à modules : socle de gouvernance (conductor) posé d'office, puis un choix — lab de développement ou nouveau lab métier sur mesure (vf-new-lab) — via une UX guidée.",
+      "version": "2.13.0",
       "source": "./plugin",
       "category": "development",
       "homepage": "https://github.com/picmakpro/vibeflow-os",
