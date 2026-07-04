@@ -6,13 +6,13 @@ Les **5 registres canoniques** stockent la memoire de ton systeme :
 
 | Registre | Fichier | Role |
 |----------|---------|------|
-| **Decisions** | `.claude/memory/BDR.md` (ou ADR) | Choix structurants + raisonnement |
+| **Decisions** | `.claude/memory/DECISIONS.md` | Choix structurants + raisonnement |
 | **Apprentissages** | `.claude/memory/LEARNINGS.md` | Patterns reutilisables observes |
 | **Blocages** | `.claude/memory/BLOCKERS.md` | Frictions + hypotheses eliminees |
 | **Journal** | `.claude/memory/JOURNAL.md` | Trace chronologique factuelle des sessions |
 | **Evaluations** | `.claude/memory/EVALS.md` | Qualite cognitive des outputs IA (taux d'hallucination) |
 
-**Note** : "BDR" et "ADR" designent la meme chose — un Business/Architecture Decision Record. Le nom change selon le fork (BusinessFlow utilise BDR, DevFlow utilise ADR).
+**Note** : le canon est `DECISIONS.md` avec des IDs `DEC-XXX`. Les anciens forks nommaient ce registre `ADR.md` (DevFlow) ou `BDR.md` (BusinessFlow) — variantes legacy tolerees en lecture, plus jamais prescrites pour un nouveau systeme.
 
 ## Pourquoi
 
@@ -27,10 +27,10 @@ Avec les registres :
 
 ## Comment
 
-### Format BDR (decision)
+### Format DEC (decision)
 
 ```markdown
-## BDR-XXX — [Titre court de la decision]
+## DEC-XXX — [Titre court de la decision]
 
 **Date** : YYYY-MM-DD
 **Statut** : Active | Revisee | Abandonnee
@@ -62,7 +62,7 @@ J+90 (verifier si la decision tient ou doit etre revisee).
 ## LRN-XXX — [Pattern observe]
 
 **Date** : YYYY-MM-DD
-**Sources** : [BDR-XX, BLK-YY, projet/sprint d'origine]
+**Sources** : [DEC-XX, BLK-YY, projet/sprint d'origine]
 
 ### Contexte
 
@@ -112,7 +112,7 @@ J+90 (verifier si la decision tient ou doit etre revisee).
 - Objectif initial : ...
 - Ce qui a ete fait : ...
 - Ce qui n'a pas marche : ...
-- BDR/LRN/BLK crees : ...
+- DEC/LRN/BLK crees : ...
 - Prochaine session : ...
 ```
 
@@ -139,7 +139,7 @@ Confiance : Haute | Moyenne | Basse | A re-auditer
 > **Sophie K. capitalise une decision pedagogique :**
 
 ```markdown
-## BDR-007 — Refus systematique des eleves debutants adultes en cours collectif
+## DEC-007 — Refus systematique des eleves debutants adultes en cours collectif
 
 **Date** : 2026-04-15
 **Statut** : Active
@@ -169,19 +169,19 @@ basique). Un adulte vrai debutant casse la dynamique pour les 4 autres.
 2026-07-15. Verifier si la regle se confirme.
 ```
 
-Trois mois plus tard, quand Sophie hesite a faire une exception, elle ouvre BDR-007. Elle relit son raisonnement. Elle decide en connaissance de cause.
+Trois mois plus tard, quand Sophie hesite a faire une exception, elle ouvre DEC-007. Elle relit son raisonnement. Elle decide en connaissance de cause.
 
 ## Regle d'or
 
-**Toute decision structurante = une BDR avant execution.**
+**Toute decision structurante = une entree DEC avant execution.**
 **Tout pattern observe sur >= 2 cas = un LEARNING.**
 **Toute friction qui coute > 30 min = un BLOCKER.**
 
-Si une decision est prise sans BDR, **elle n'existe pas** — elle reviendra hanter le systeme dans 3 mois sans qu'on sache pourquoi elle a ete prise.
+Si une decision est prise sans entree DEC, **elle n'existe pas** — elle reviendra hanter le systeme dans 3 mois sans qu'on sache pourquoi elle a ete prise.
 
 ## Anti-patterns
 
 - **Registre append-only sans index** : a 200+ entrees, devient illisible. Toujours indexer en haut du fichier.
-- **BDR redigee apres execution** : perd 80 % de sa valeur (le raisonnement est rationalise apres coup, pas verifie avant).
+- **DEC redigee apres execution** : perd 80 % de sa valeur (le raisonnement est rationalise apres coup, pas verifie avant).
 - **LRN sans regle generalisable** : ce n'est plus un apprentissage, c'est une anecdote.
 - **Journal qui resume** : doit rester factuel. La synthese va dans LEARNINGS.

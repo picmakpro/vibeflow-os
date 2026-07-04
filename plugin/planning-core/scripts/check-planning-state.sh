@@ -9,8 +9,9 @@
 # Conçu pour 3 usages :
 #   - manuel :        check-planning-state.sh
 #   - au /checkpoint : intégré dans l'audit de cohérence
-#   - en hook (opt-in): SessionStart → surface un rappel si STATE absent/périmé.
-#     (Le wiring du hook est DOCUMENTÉ, jamais auto-injecté dans settings.json.)
+#   - en hook :       SessionStart → surface un rappel si STATE absent/périmé.
+#     (Depuis ADR-043 : câblé AUTOMATIQUEMENT dans settings.json à l'install du module
+#      via hooks/hooks.json + merge-hooks.sh — advisory, jamais bloquant, `|| true`.)
 #
 # Usage:
 #   check-planning-state.sh [--path <dir>] [--max-age-days <N>] [--quiet]

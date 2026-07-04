@@ -49,7 +49,7 @@ n'est pas une préférence de style : c'est un **facteur causal** de la qualité
 
 ### Tier 3 — Revue d'architecture (gate de release)
 - Composition globale du système, couplage inter-domaines.
-- Tout marqueur de dette `[DEBT]` doit être soit fermé, soit converti en ADR + règle.
+- Tout marqueur de dette `[DEBT]` doit être soit fermé, soit converti en décision (DEC) + règle.
 
 ## Quand m'invoquer (1% Rule)
 

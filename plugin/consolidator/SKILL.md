@@ -1,6 +1,6 @@
 ---
 name: consolidator
-description: Consolide la memoire structuree d'un lab VibeFlow (registres ADR/LEARNINGS/BLOCKERS/ITERATION_LOG/EVALS) sur 4 piliers — Indexation (header strict + colonne #Ligne), Archivage (3 criteres statut/age/refs, hook SessionEnd async), Fusion (deduplication LLM-based des doublons), Promotion (learning -> rule semi-auto avec validation humaine). Utiliser ce skill quand un registre depasse 800 lignes, quand des doublons d'IDs apparaissent, au rythme mensuel pour entretien, lors d'un /checkpoint, ou via /consolidate. Reference ADR-032 + ADR-009 + ADR-029. Iron Law : "La lecture d'un registre = lecture de l'index uniquement par defaut".
+description: Consolide la memoire structuree d'un lab VibeFlow (registres DECISIONS/LEARNINGS/BLOCKERS/JOURNAL/EVALS) sur 4 piliers — Indexation (header strict + colonne #Ligne), Archivage (3 criteres statut/age/refs, hook SessionEnd async), Fusion (deduplication LLM-based des doublons), Promotion (learning -> rule semi-auto avec validation humaine). Utiliser ce skill quand un registre depasse 800 lignes, quand des doublons d'IDs apparaissent, au rythme mensuel pour entretien, lors d'un /checkpoint, ou via /consolidate. Reference ADR-032 + ADR-009 + ADR-029. Iron Law : "La lecture d'un registre = lecture de l'index uniquement par defaut".
 ---
 
 # Skill : Consolidator — Consolidation Memoire 4 Piliers
@@ -48,7 +48,7 @@ Le skill opere en 4 modes selon le pilier cible. Tous acceptent `--dry-run` (def
 /consolidate --pillar=archive   # archivage uniquement
 /consolidate --pillar=fusion    # detection + propositions fusion
 /consolidate --pillar=promote   # detection candidats promotion
-/consolidate --register=ADR     # cible un seul registre
+/consolidate --register=DECISIONS # cible un seul registre
 ```
 
 ---
@@ -62,24 +62,23 @@ Le skill opere en 4 modes selon le pilier cible. Tous acceptent `--dry-run` (def
 ```markdown
 ## Index
 
-| ID | Date | Titre | Tags | #Ligne | Resume |
-|----|------|-------|------|--------|--------|
-| ADR-031 | 2026-05-17 | Garde-fou support runtime | guard,frontmatter | 2050 | Verifier doc avant inventer convention |
+| ID | Date | Titre | #Ligne | Resume |
+|----|------|-------|--------|--------|
+| DEC-031 | 2026-05-17 | Garde-fou support runtime | 2050 | Verifier doc avant inventer convention |
 ```
 
 **Regles** :
 - 1 entree = 1 ligne, ≤ 200 caracteres
-- `#Ligne` pointe vers la ligne de debut de section body (`## ADR-XXX : ...`)
-- Tags ≤ 3, separes par virgule
+- `#Ligne` pointe vers la ligne de debut de section body (`## DEC-XXX : ...`)
 - Resume ≤ 80 caracteres, 1 phrase
 
 ### Comment l'agent lit un registre (pattern force)
 
 ```
-1. Read(ADR.md, offset=1, limit=50)         # index header uniquement (~30 entrees)
+1. Read(DECISIONS.md, offset=1, limit=50)   # index header uniquement (~30 entrees)
 2. [Reperer l'ID dans l'index]
-3. Read(ADR.md, offset=2050, limit=40)      # body de l'entree ciblee
-4. [JAMAIS Read(ADR.md) entier]
+3. Read(DECISIONS.md, offset=2050, limit=40) # body de l'entree ciblee
+4. [JAMAIS Read(DECISIONS.md) entier]
 ```
 
 ### Script `reindex.sh`
@@ -109,18 +108,20 @@ Voir `references/indexation.md`.
 
 Une entree archivee est **deplacee** vers `.claude/memory/archive/<registre>-archive.md` (pas supprimee). L'index principal est mis a jour avec `Statut: Archivee -> voir archive`.
 
-### Hook SessionEnd async (mature)
+### Hook SessionEnd async (cable AUTOMATIQUEMENT — ADR-043)
 
-```json
-"SessionEnd": [{
-  "hooks": [{
-    "type": "command",
-    "command": "test -x .claude/scripts/archive.sh && .claude/scripts/archive.sh --async",
-    "async": true,
-    "_comment": "ADR-032 pilier 2 — archivage non bloquant en fin de session"
-  }]
-}]
-```
+Depuis v1.2.0, ce hook (et les 3 autres ci-dessous) est POSE PAR L'INSTALL du module :
+le fragment `hooks/hooks.json` du module est merge dans `.claude/settings.json` par
+`merge-hooks.sh` (engine). Rien a copier-coller. La desinstallation retire les entrees.
+
+| Hook | Evenement | Script | Role |
+|------|-----------|--------|------|
+| Guard lecture | PreToolUse(Read) | `guard-read-registres.sh` | DENY toute lecture d'un registre canonique sans offset/limit (>150 lignes) — Iron Law index-first machine-enforced |
+| Index auto | PostToolUse(Edit\|Write) | `post-edit-reindex.sh` | reindex --apply sur le registre edite (l'index ne derive plus ; cree le bloc `## Index` s'il manque) |
+| Lint format | SessionStart(startup) | `check-registres.sh --hook` | Signale registres non conformes (index absent, #Ligne manquante, orphelins, doublons) |
+| Archivage | SessionEnd | `archive.sh --async --apply` | ADR-032 pilier 2 — non bloquant, non destructif |
+
+Gate init : `check-registres.sh --strict` (exit 1 = init non conclue, cf. vf-new-lab Gate C).
 
 ### Detail
 
@@ -224,11 +225,11 @@ A la fin d'une consolidation, le skill produit un rapport `reports/consolidation
 # Consolidation YYYY-MM-DD
 
 ## Pilier 1 — Indexation
-- ADR.md : 31 -> 31 entrees (0 ajoute, 0 archive, colonne #Ligne mise a jour)
+- DECISIONS.md : 31 -> 31 entrees (0 ajoute, 0 archive, colonne #Ligne mise a jour)
 - LEARNINGS.md : 95 -> 95 entrees
 
 ## Pilier 2 — Archivage
-- ADR.md : 2 entrees archivees (ADR-022 Differee + ADR-005 ancien)
+- DECISIONS.md : 2 entrees archivees (DEC-022 Differee + DEC-005 ancienne)
 - BLOCKERS.md : 1 entree archivee (BLK-002 RESOLU + > 90j)
 
 ## Pilier 3 — Fusion
@@ -255,11 +256,14 @@ A la fin d'une consolidation, le skill produit un rapport `reports/consolidation
 
 Pour qu'un lab puisse utiliser ce skill :
 
-1. Templates registres v2 deployes (avec colonne `#Ligne` dans l'index)
-2. `.claude/scripts/{reindex,archive,detect-duplicates,detect-promotions}.sh` executables
-3. Hook SessionEnd async configure dans `.claude/settings.json` (ou `settings.local.json`)
+1. Templates registres v2 deployes (avec colonne `#Ligne` dans l'index) — sinon
+   `reindex.sh --all --apply` cree les blocs `## Index` manquants (bootstrap ADR-043)
+2. `.claude/scripts/{reindex,archive,detect-duplicates,detect-promotions,guard-read-registres,post-edit-reindex,check-registres}.sh` executables (poses par l'install)
+3. Hooks de gouvernance dans `.claude/settings.json` — POSES AUTOMATIQUEMENT par l'install
+   du module (hooks/hooks.json + merge-hooks.sh, ADR-043) ; verifier : `grep guard-read-registres .claude/settings.json`
 4. Trigger `/consolidate` cree dans `.claude/commands/` (optionnel mais recommande)
 5. CLAUDE.md du projet mentionne l'Iron Law `Lecture index uniquement par defaut`
+   (desormais machine-enforced par le guard PreToolUse — la prose seule ne suffisait pas)
 
 Voir `references/installation.md` (a creer si besoin).
 
@@ -299,7 +303,7 @@ Tous les scripts acceptent `--dry-run` (defaut) et `--apply`. Sortie en JSON pou
 ## Limites connues
 
 - **Race condition** si 2 sessions paralleles ecrivent dans le meme registre + hook SessionEnd async lance archive.sh sur l'une -> conflit possible. Mitigation : lock file `.claude/memory/.lock` cree par archive.sh.
-- **Conventions ADR vs DECISIONS** : le skill supporte les 2 (frontmatter `register_naming: adr | decisions` dans `.claude/skills/consolidator/config.yaml`).
+- **Conventions ADR vs DECISIONS** : le canon est `DECISIONS.md` ; le skill lit encore `ADR.md` (legacy) via frontmatter `register_naming: adr | decisions` dans `.claude/skills/consolidator/config.yaml`.
 - **Pas de detection semantique fine** pour la fusion : un learning sur "tests" et un autre sur "verification" ne seront pas detectes comme doublons (par design, le LLM tranche en phase 3).
 - **Promotion full-auto impossible** par design ADR-031.
 

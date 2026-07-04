@@ -16,17 +16,16 @@ L'index existant des registres VibeFlow (tableau Markdown en tete) :
 ```markdown
 ## Index
 
-| ID | Date | Titre | Tags | #Ligne | Resume |
-|----|------|-------|------|--------|--------|
-| ADR-031 | 2026-05-17 | Garde-fou support runtime | guard,frontmatter | 2050 | Verifier doc avant inventer convention |
-| ADR-032 | 2026-05-23 | Consolidation Memoire 4 piliers | memory,consolidation | 2138 | 4 mecanismes pour eviter bloat append-only |
+| ID | Date | Titre | #Ligne | Resume |
+|----|------|-------|--------|--------|
+| DEC-031 | 2026-05-17 | Garde-fou support runtime | 2050 | Verifier doc avant inventer convention |
+| DEC-032 | 2026-05-23 | Consolidation Memoire 4 piliers | 2138 | 4 mecanismes pour eviter bloat append-only |
 ```
 
 ### Specifications
 
 - **Entree** = 1 ligne, ≤ 200 caracteres
 - **`#Ligne`** : pointe vers `## XXX-YYY :` du body (ligne de debut de section)
-- **Tags** : ≤ 3, virgules sans espaces
 - **Resume** : ≤ 80 caracteres, 1 phrase imperative
 - **Tri** : par date desc (plus recent en haut)
 
@@ -41,7 +40,7 @@ L'index existant des registres VibeFlow (tableau Markdown en tete) :
 
 ## Pourquoi pas d'AST-aware Read ?
 
-Issue GitHub anthropics/claude-code #34304 (FEATURE Structural File Reading AST-aware) ouverte mais **non implementee**. Le hack `PreToolUse(Read)` qui forcerait offset/limit n'est pas supporte (hooks ne modifient pas `tool_input`). Donc convention rédactionnelle + discipline = seule solution mature.
+Issue GitHub anthropics/claude-code #34304 (FEATURE Structural File Reading AST-aware) ouverte mais **non implementee**. Un hook `PreToolUse(Read)` ne peut pas modifier `tool_input` (donc pas forcer offset/limit a la place de l'agent), mais il peut **bloquer** une lecture non ciblee via `permissionDecision: "deny"`. Depuis consolidator v1.2.0, le script `guard-read-registres.sh` (pose par l'install, cable automatiquement dans `settings.json`) refuse tout Read d'un registre canonique sans `offset`/`limit` au-dela de 150 lignes (ADR-043). La convention redactionnelle reste necessaire ; le hook la rend machine-enforced.
 
 ## Script reindex.sh
 
@@ -74,7 +73,7 @@ Dans le `CLAUDE.md` du projet, section "Lecture des registres" :
 
 **La lecture d'un registre = lecture de l'index uniquement par defaut.**
 
-Pour ADR.md, LEARNINGS.md, BLOCKERS.md, EVALS.md, ITERATION_LOG.md :
+Pour DECISIONS.md, LEARNINGS.md, BLOCKERS.md, EVALS.md, JOURNAL.md :
 
 1. Toujours commencer par `Read(file, offset=1, limit=50)` (index seul)
 2. Reperer l'ID + colonne `#Ligne` dans l'index
@@ -94,12 +93,12 @@ cp -r .claude/memory .claude/memory.backup-pre-consolidator
 .claude/scripts/reindex.sh --apply --all
 
 # 3. Verifier que les body sont intacts (diff sur sections body uniquement)
-diff -u .claude/memory.backup-pre-consolidator/ADR.md .claude/memory/ADR.md | grep "^[+-]## "
+diff -u .claude/memory.backup-pre-consolidator/DECISIONS.md .claude/memory/DECISIONS.md | grep "^[+-]## "
 ```
 
 ## Anti-patterns
 
 - ❌ Ajouter une entree au body sans mettre a jour l'index (resoudre via PostToolUse hook)
 - ❌ Editer l'index manuellement (le script doit etre source de verite)
-- ❌ Mettre plus d'informations dans l'index que les 6 colonnes (le but est la concision)
+- ❌ Mettre plus d'informations dans l'index que les 5 colonnes (le but est la concision)
 - ❌ Indexer un body de section sans header `## XXX-YYY :` standard

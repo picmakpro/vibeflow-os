@@ -71,18 +71,18 @@ Quand tu construis ton systeme :
 3. Adapte a ton contexte (vocabulaire, mandat, contraintes)
 4. Verifie ton resultat avec l'exemple fictif `examples/PetitsCoursFlow/.claude/agents/`
 
-### Cas 2 - Tu te demandes si tu dois creer une BDR
+### Cas 2 - Tu te demandes si tu dois creer une decision (DEC)
 
 1. Ouvre `methodology/patterns/06-capitalisation.md`
 2. Verifie les 5 declencheurs canoniques
-3. Si declencheur present : utilise le template `methodology/templates/memory/adr-template.md`
+3. Si declencheur present : utilise le template `methodology/templates/memory/decisions-template.md`
 
 ### Cas 3 - Tu veux forker la methodologie pour ton domaine
 
 1. Ouvre `methodology/patterns/07-transposition.md`
 2. Suis les 5 etapes de transposition
 3. Reference `methodology/vocabulary/forks-mapping.md` pour les exemples canoniques
-4. Documente ton fork dans une BDR
+4. Documente ton fork dans une decision (DEC)
 
 ### Cas 4 - Tu doutes du sens d'un terme
 
@@ -140,4 +140,4 @@ Voir `LICENSE.md` pour le detail.
 
 Si une question methodologique persiste apres consultation de cette archive, c'est probablement une question structurante - elle merite d'etre soulevee dans ton accompagnement (DWY) ou en session.
 
-Pas de question methodologique stupide. Mais pas de question methodologique sans BDR derriere si elle revient deux fois.
+Pas de question methodologique stupide. Mais pas de question methodologique sans decision (DEC) derriere si elle revient deux fois.

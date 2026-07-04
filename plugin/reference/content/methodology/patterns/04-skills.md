@@ -116,12 +116,12 @@ Les 2 agents partagent **la meme** connaissance pricing. Si Maxime augmente ses 
 - **Skill = wiki sans regles** : "voici tout ce qui existe sur le sujet" → trop volumineux, agent skip
 - **Skill specifique a un agent** : si un seul agent l'utilise, ce n'est pas un skill, c'est une connaissance interne de l'agent
 - **Skill qui contient des regles dures** : les regles dures vont dans la constitution + interdits, pas dans un skill
-- **Skill qui change tout le temps** : si le contenu bouge tous les 3 jours, il manque un BDR pour stabiliser
+- **Skill qui change tout le temps** : si le contenu bouge tous les 3 jours, il manque une DEC pour stabiliser
 
 ## Quand creer un skill
 
 - Au moins **2 agents** consomment la meme connaissance
-- Le savoir est **stable** (changements rares, traces par BDR)
+- Le savoir est **stable** (changements rares, traces par DEC)
 - Le savoir est **specialisable** (clairement borne, pas une encyclopedie)
 - Le savoir est **operationnel** (on peut s'en servir pour decider)
 

@@ -1,6 +1,6 @@
 # consolidator — Consolidation Mémoire 4 Piliers
 
-> Skill VibeFlow qui maintient les registres mémoire structurés (ADR / LEARNINGS / BLOCKERS / EVALS / ITERATION_LOG) scalables et propres au fil des sessions.
+> Skill VibeFlow qui maintient les registres mémoire structurés (DECISIONS / LEARNINGS / BLOCKERS / EVALS / JOURNAL) scalables et propres au fil des sessions.
 
 **Version** : v1.0.0
 **Référence** : ADR-032 du Lab VibeFlow
@@ -43,7 +43,7 @@ Voir [INSTALL.md du repo racine](../INSTALL.md).
 ### Reindex apply (préserve Date + Resume + orphelins)
 
 ```bash
-.claude/scripts/reindex.sh --register=ADR --apply
+.claude/scripts/reindex.sh --register=DECISIONS --apply
 # Backup auto. Idempotent.
 ```
 

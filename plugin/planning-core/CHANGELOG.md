@@ -65,3 +65,13 @@ GSD `.planning/`, débarrassé du couplage dev et rendu adaptatif par métier.
   SessionEnd, mise à jour auto) est un incrément ultérieur (« moteur »).
 - Origine : ADR-038 (candidate). Complémentaire du module dev `dev-orchestrator` (qui produit un
   `.planning/` dev via GSD) — `planning-core` est l'étage universel en dessous.
+
+
+## [v2.1.0] — 2026-07-04 (ADR-043)
+
+### Ajouté
+- `hooks/hooks.json` — SessionStart → `check-planning-state.sh || true` posé AUTOMATIQUEMENT
+  à l'install (advisory, jamais bloquant). Fin du « wiring documenté, jamais auto-injecté ».
+
+### Modifié
+- Canon DECISIONS/DEC-XXX dans les références (bridge-memory, GUIDE, compartments, templates).

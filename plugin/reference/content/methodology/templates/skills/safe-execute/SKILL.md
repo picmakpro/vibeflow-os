@@ -1,6 +1,6 @@
 ---
 name: safe-execute
-description: Procedure stricte en 5 phases (Clarifier → Planifier → Verifier plan → Implementer → Verifier impl) pour executer une tache complexe sans foncer dans le code. Anti-gap entre source de verite visuelle projet (maquettes, designs canoniques), spec ecrite (PRD) et plan d'execution (IMPLEMENTATION_PLAN). Phase 3 BLOQUE Phase 4 tant que l'alignement triple sources n'est pas verifie. Activer via /safe-execute. Triggers : "safe-execute", "procedure stricte", "execution securisee", "implemente sans foncer", "Sprint Xbis", "/safe-execute", "5 phases", "gate Phase 3", "alignement PRD design IMPL_PLAN", taches multi-fichiers (≥ 3 fichiers impactes), taches qui touchent des invariants projet (cf REFERENCE.md ou ADR cles), implementation d'une User Story Sprint avec design canonique correspondant.
+description: Procedure stricte en 5 phases (Clarifier → Planifier → Verifier plan → Implementer → Verifier impl) pour executer une tache complexe sans foncer dans le code. Anti-gap entre source de verite visuelle projet (maquettes, designs canoniques), spec ecrite (PRD) et plan d'execution (IMPLEMENTATION_PLAN). Phase 3 BLOQUE Phase 4 tant que l'alignement triple sources n'est pas verifie. Activer via /safe-execute. Triggers : "safe-execute", "procedure stricte", "execution securisee", "implemente sans foncer", "Sprint Xbis", "/safe-execute", "5 phases", "gate Phase 3", "alignement PRD design IMPL_PLAN", taches multi-fichiers (≥ 3 fichiers impactes), taches qui touchent des invariants projet (cf REFERENCE.md ou DEC cles), implementation d'une User Story Sprint avec design canonique correspondant.
 allowed-tools: Read, Grep, Glob, Bash, Write, Edit, Skill
 ---
 
@@ -22,7 +22,7 @@ Le skill `safe-execute` est le **chapeau orchestrateur** qui chaine 5 phases dis
 | `when-stuck` | Dispatcher quand bloque > 30 min | (orthogonal — peut etre invoque a toute phase) |
 | `debugger` | Debug systematique 4 phases | (orthogonal — pour les bugs isoles, pas l'execution feature) |
 
-Reference projet : `CLAUDE.md` (workflow standard Clarifier → Planifier → Implementer → Verifier → Documenter, etendu a 5 phases ici), source de verite visuelle projet (par convention sous `docs/design/*.html` ou equivalent), ADR cle du projet sur la primaute de la source visuelle en cas de conflit avec la spec ecrite.
+Reference projet : `CLAUDE.md` (workflow standard Clarifier → Planifier → Implementer → Verifier → Documenter, etendu a 5 phases ici), source de verite visuelle projet (par convention sous `docs/design/*.html` ou equivalent), decision (DEC) cle du projet sur la primaute de la source visuelle en cas de conflit avec la spec ecrite.
 
 ---
 
@@ -48,7 +48,7 @@ Ne PAS utiliser pour : bugfix 1 ligne (→ `debugger`), question pure, lecture/e
 |-------|----------|----------------|---------------|
 | **1 — Clarifier** | Spec executable (qui/quoi/pourquoi/criteres/scope/dependances) | Spec markdown 5-10 lignes validee par l'utilisateur | 5-10 min |
 | **2 — Planifier** | Decomposition sous-taches + graphe dependances + contrats sub-agents draft + sources a verifier Phase 3 | Plan structure (markdown ou TodoList) sur disque | 10-15 min |
-| **3 — Verifier plan** ⚠️ | Check triple sources PRD ↔ source visuelle canonique ↔ IMPLEMENTATION_PLAN + check invariants/ADR/BLK + sub-agents corrects | `ALIGNMENT_OK` explicite ou `ALIGNMENT_HIT — STOP` (bloque Phase 4) | 5-15 min |
+| **3 — Verifier plan** ⚠️ | Check triple sources PRD ↔ source visuelle canonique ↔ IMPLEMENTATION_PLAN + check invariants/DEC/BLK + sub-agents corrects | `ALIGNMENT_OK` explicite ou `ALIGNMENT_HIT — STOP` (bloque Phase 4) | 5-15 min |
 | **4 — Implementer** | Delegation aux sub-agents en mode Lead + commits chunk par chunk + evidence fraiche | Tous les chunks committed avec evidence | Variable (1h a 1 jour) |
 | **5 — Verifier impl** | Gates CI (tests + lint + types) + Visual Review si UI + reviewer agent + Iron Law completion | Checklist post-impl 100% + resume final | 10-30 min |
 
@@ -99,7 +99,7 @@ Output structure markdown (5-10 lignes) valide par l'utilisateur :
 1. **Sous-taches** : liste numerotee, ordre d'execution, agent responsable (backend/frontend/tester/devops)
 2. **Graphe de dependances** : matrix simple (T1 → T2, T2 ⊥ T3, etc.) pour identifier la parallelisation possible
 3. **Contrats sub-agents draft** : pour chaque sous-tache deleguee, prompt brouillon (entree, sortie attendue, contraintes — cf. `.claude/agents/contracts.md`)
-4. **Sources a verifier en Phase 3** : liste exhaustive des sources qui devront etre croisees en Phase 3 (PRD section X, fichier design canonique, IMPLEMENTATION_PLAN Sprint N, ADR-XXX, invariants projet, BLK-XXX actifs)
+4. **Sources a verifier en Phase 3** : liste exhaustive des sources qui devront etre croisees en Phase 3 (PRD section X, fichier design canonique, IMPLEMENTATION_PLAN Sprint N, DEC-XXX, invariants projet, BLK-XXX actifs)
 
 ### Gate de sortie Phase 2
 
@@ -118,14 +118,14 @@ Plan persiste sur disque (markdown ou TodoList interne) avec les 4 sections comp
 | Source | Pourquoi | Action |
 |--------|----------|--------|
 | **PRD** (`docs/PRD.md`, `docs/REFERENCE.md`) | Verite produit + technique | Grep section pertinente + lecture |
-| **Source de verite visuelle projet** (maquette HTML canonique, design system, Figma exporte — cf. ADR cle du projet) | Source de verite visuelle (prime sur PRD ecrit en cas de conflit) | Grep + lecture fichier(s) correspondant a la feature |
+| **Source de verite visuelle projet** (maquette HTML canonique, design system, Figma exporte — cf. decision (DEC) cle du projet) | Source de verite visuelle (prime sur PRD ecrit en cas de conflit) | Grep + lecture fichier(s) correspondant a la feature |
 | **IMPLEMENTATION_PLAN** (`docs/IMPLEMENTATION_PLAN.md`) | Verite Sprint en cours + decoupage chunks | Lire section Sprint N |
 
 **Regle d'or** : si la source visuelle canonique contredit le PRD ou l'IMPLEMENTATION_PLAN, **la source visuelle gagne** (sauf risque juridique → arbitrage humain). Cas d'ecole : IMPLEMENTATION_PLAN disait "form sur landing Sprint 1", la maquette canonique n'avait aucun `<form>` → le plan etait faux. Phase 3 aurait detecte le gap avant tout code.
 
 ### Checks complementaires (non negociables)
 
-- **Invariants projet** : la tache touche-t-elle un invariant (REFERENCE.md section Invariants, ADR cles) ? Si oui, ADR existante valide la modification ? (sinon → STOP, escalade)
+- **Invariants projet** : la tache touche-t-elle un invariant (REFERENCE.md section Invariants, DEC cles) ? Si oui, DEC existante valide la modification ? (sinon → STOP, escalade)
 - **Architecture feature-first** : les nouveaux fichiers respectent l'organisation par bounded-context ? Aucun import cross-feature hors `lib/contracts/` (ou equivalent) ?
 - **BLK actifs** : la tache est-elle impactee par un BLK ouvert ? (grep `.claude/memory/BLOCKERS.md`)
 - **Garde-fous metier** : si la tache touche un flow critique (paiement, securite, RGPD, calcul reglementaire), les seuils de qualite (recall, precision, latence) restent-ils respectes ? (cf. EVAL applicable)
@@ -138,7 +138,7 @@ ALIGNMENT_OK
   - PRD : [section verifiee]
   - Source visuelle : [fichier verifie]
   - IMPLEMENTATION_PLAN : [Sprint N section verifiee]
-  - Invariants/ADR/BLK : [aucun hit OU hits resolus]
+  - Invariants/DEC/BLK : [aucun hit OU hits resolus]
   - Sub-agents : [tous corrects]
   → GO Phase 4
 ```

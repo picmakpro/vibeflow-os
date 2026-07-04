@@ -1,5 +1,11 @@
 # CHANGELOG — skill-creator
 
+## [v1.0.1] — 2026-07-04 (ADR-043)
+
+### Modifié
+- Canon DECISIONS.md/JOURNAL.md fixé (ADR.md/ITERATION_LOG.md legacy acceptés en lecture) ;
+  placeholder `[REFERENCER_ADR]` → `[REFERENCER_DECISION]`.
+
 ## [v1.0.0] — 2026-05-24
 
 ### Initial release dans vibeflow-os

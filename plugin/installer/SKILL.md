@@ -22,7 +22,7 @@ first-use). Seules les briques déléguées sont testées unitairement.
 
 En contexte plugin, Claude Code fournit `${CLAUDE_PLUGIN_ROOT}` : le chemin absolu du dossier
 d'install du plugin (= le **cache**). C'est là que vivent les modules, leurs `module.json` à la
-racine, et le dossier `_internal/` (engine + résolveur). L'engine attend ce chemin dans deux
+racine, et le dossier `_internal/` (engine + résolveur + `merge-hooks.sh`, le câbleur de hooks ADR-043). L'engine attend ce chemin dans deux
 variables :
 
 - `VIBEFLOW_CACHE` — source unique du cache pour `vibeflow-update.sh` (`status`, `install`).

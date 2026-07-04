@@ -20,7 +20,7 @@
 | A privilegier | A eviter | Pourquoi |
 |---------------|----------|----------|
 | Decision structurante | Choix important | "Structurante" = qui change la structure du systeme. Plus precis. |
-| BDR / ADR | Note de decision | Format standard, sigle reconnu, indexable. |
+| DEC (registre DECISIONS) | Note de decision | Format standard, sigle reconnu, indexable. |
 | Statut Active / Revisee / Abandonnee | Ouvert / Ferme | Cycle de vie clair, pas binaire. |
 | Revision prevue J+90 | TBD / a confirmer | Date explicite force le retour. |
 
@@ -104,4 +104,4 @@ A privilegier :
 
 ## Note sur le francais
 
-VibeFlow est nee en francais. Garder une orthographe correcte (accents, cedilles) est une regle de qualite — mais selon ton contexte technique (terminal sans support UTF-8, contraintes systeme), une version sans accents peut etre acceptable. Choisir une convention par fork et la documenter en BDR.
+VibeFlow est nee en francais. Garder une orthographe correcte (accents, cedilles) est une regle de qualite — mais selon ton contexte technique (terminal sans support UTF-8, contraintes systeme), une version sans accents peut etre acceptable. Choisir une convention par fork et la documenter en DEC.

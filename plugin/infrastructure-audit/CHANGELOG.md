@@ -1,5 +1,11 @@
 # CHANGELOG — infrastructure-audit
 
+## [v1.1.0] — 2026-07-04 (ADR-043)
+
+### Ajouté
+- `hooks/hooks.json` — SessionStart → `audit-infra.sh --quick --if-older-than=14d || true`
+  posé AUTOMATIQUEMENT à l'install (avant : snippet à copier-coller).
+
 ## [v1.0.1] — 2026-06-11
 
 ### Corrigé

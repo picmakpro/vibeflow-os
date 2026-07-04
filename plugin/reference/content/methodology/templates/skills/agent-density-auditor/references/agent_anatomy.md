@@ -80,13 +80,13 @@ deploiement (→ `production`), recherche externe (→ `deep-researcher`).
 
 1. AUCUN SECRET dans le code — toujours `.env` + secret manager
 2. AUCUNE QUERY brute concatenee — toujours parametrees ou via ORM
-3. AUCUNE TABLE sans RLS active (sauf justification + ADR)
+3. AUCUNE TABLE sans RLS active (sauf justification + DEC)
 4. AUCUNE MIGRATION sans snapshot ni rollback plan documente
 5. AUCUNE CLAIM "feature finie" sans evidence verifiee (skill `verification-before-completion`)
 
 # Workflow
 
-1. **Lire** : `docs/REFERENCE.md` + plan sprint + ADR pertinentes
+1. **Lire** : `docs/REFERENCE.md` + plan sprint + decisions (DEC) pertinentes
 2. **Clarifier** : si feature ambigue, invoquer `clarity-feature` avant code
 3. **Implementer** : si `tdd_mode: enabled`, suivre Red-Green-Refactor (`tdd` skill)
 4. **Securiser** : verifier checklist `security` (RLS, sanitization, secrets)
@@ -108,7 +108,7 @@ Detail workflow : `_reference/backend-knowledge.md#sprint-workflow`.
 # Escalation
 
 Remonter a l'Architect si :
-- Conflit entre 2 ADR → arbitrage necessaire
+- Conflit entre 2 decisions (DEC) → arbitrage necessaire
 - Schema change > 3 tables impactees → review architecturale
 - Performance dB degradation > 20% → deep research requise
 - Decision securite non couverte par `security` skill
@@ -118,7 +118,7 @@ Remonter a l'Architect si :
 Sprint backend livre :
 - PR avec migrations + tests + docs CHANGELOG
 - Resume dans `reports/sprints/sprint-XXX.md` (via `reporter`)
-- ADR si decision structurante
+- DEC si decision structurante
 
 # References
 
@@ -201,7 +201,7 @@ Avant de valider un agent, verifier :
 - [ ] Workflow ≤ 5 etapes (pointeurs vers skills pour le detail)
 - [ ] Skills disponibles en table claire
 - [ ] Escalation explicite (conditions de remontee)
-- [ ] References vers `_reference/` et ADR
+- [ ] References vers `_reference/` et DECISIONS
 - [ ] Total body ≤ 250 lignes (validate_gate.sh exit 0)
 
 ## References

@@ -62,12 +62,12 @@ skills: [security, pricing-knowledge]
 
 ## Output (format strict)
 
-GO / NO-GO / QUESTIONS, justifie par reference a BDR-001 (ICP) +
-BDR-003 (format mission) + LRN pertinents.
+GO / NO-GO / QUESTIONS, justifie par reference a DEC-001 (ICP) +
+DEC-003 (format mission) + LRN pertinents.
 
 ## Memoire
 
-- Lit BDR.md et LEARNINGS.md a chaque invocation
+- Lit DECISIONS.md et LEARNINGS.md a chaque invocation
 - Capitalise un nouveau pattern observe en LRN si applicable
 
 ## Contraintes
@@ -81,7 +81,7 @@ BDR-003 (format mission) + LRN pertinents.
 
 1. **Un agent = une mission**. Si tu hesites a creer un agent qui fait deux choses, cree deux agents.
 2. **L'agent produit un format strict**. Pas de texte libre. Verdict structure.
-3. **L'agent lit les registres avant de decider**. La constitution + BDR + LEARNINGS sont ses sources de verite.
+3. **L'agent lit les registres avant de decider**. La constitution + DECISIONS + LEARNINGS sont ses sources de verite.
 4. **L'agent escalade quand il doute**. Mieux vaut une question au humain qu'une hallucination.
 
 ### Charte de densite (v4.1)
@@ -150,8 +150,8 @@ Si RETOUR-CLIENT : liste des 3-5 questions a poser au client.
 
 ## Memoire
 
-- Lit BDR-002 (ICP studio : startups SaaS B2B uniquement)
-- Lit BDR-005 (briefs sous 800 EUR refuses systematiquement)
+- Lit DEC-002 (ICP studio : startups SaaS B2B uniquement)
+- Lit DEC-005 (briefs sous 800 EUR refuses systematiquement)
 - Capitalise les patterns de briefs flous en LRN
 
 ## Contraintes

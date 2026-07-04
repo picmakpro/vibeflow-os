@@ -1,6 +1,6 @@
 {
   "name": "software-architecture",
-  "version": "v1.0.0",
+  "version": "v1.1.0",
   "type": "single-skill+scripts",
   "description": "Garde-fou d'architecture logicielle (taille fichiers, règles).",
   "requires": []

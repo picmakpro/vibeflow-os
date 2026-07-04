@@ -59,7 +59,7 @@ Cet OS capitalise tout.
 - Pas plus de 28 eleves recurrents (au-dela, qualite chute)
 - Tous les contenus newsletter passent par l'agent `editor-music`
 - Toute decision pedagogique structurante (changement de methode, refus
-  d'eleve) est documentee en BDR AVANT execution
+  d'eleve) est documentee en DEC AVANT execution
 
 ## 3. Taches types
 
@@ -90,4 +90,4 @@ C'est tout. 30 lignes. Lisible en 2 minutes. **L'agent qualifie un nouvel eleve 
 - Quand un **interdit** doit etre ajoute (apres une derive observee)
 - Quand une **tache type** devient recurrente et merite d'etre documentee
 
-Toute mise a jour de la constitution doit pointer vers une **BDR** qui justifie le changement (Pattern 06).
+Toute mise a jour de la constitution doit pointer vers une **DEC** qui justifie le changement (Pattern 06).

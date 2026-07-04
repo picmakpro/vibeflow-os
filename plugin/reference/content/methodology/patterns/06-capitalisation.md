@@ -16,7 +16,7 @@ La plupart des solopreneurs et petites equipes perdent 50 a 80 % de ce qu'ils ap
 - On avait deja eu cette friction de paiement il y a 6 mois — on refait le meme diagnostic.
 
 Avec la capitalisation systematique :
-- Toute decision est revisitable (BDR documentee + revision a J+90)
+- Toute decision est revisitable (DEC documentee + revision a J+90)
 - Tout pattern est applicable (LRN extrait des patterns d'au moins 2 cas)
 - Toute friction est evitable (BLK documente la cause racine et le contournement)
 - Tout sprint laisse une trace (JOURNAL chronologique factuel)
@@ -28,7 +28,7 @@ Avec la capitalisation systematique :
 
 | Declencheur | Action obligatoire |
 |-------------|---------------------|
-| **Decision structurante** | Creer une BDR AVANT execution |
+| **Decision structurante** | Creer une DEC AVANT execution |
 | **Pattern observe sur >= 2 cas** | Creer un LRN |
 | **Friction qui coute > 30 min** | Creer un BLK |
 | **Cloture de session** | Mettre a jour JOURNAL |
@@ -40,13 +40,13 @@ Avec la capitalisation systematique :
 Action en cours
     |
     v
-Verifier les BDR/LRN/BLK existants (1 min)
+Verifier les DEC/LRN/BLK existants (1 min)
     |
     v
 Decider en connaissance de cause
     |
     v
-Si decision structurante → BDR avant execution
+Si decision structurante → DEC avant execution
     |
     v
 Executer
@@ -65,21 +65,21 @@ Cloture session → JOURNAL mis a jour
 
 ### Anti-derive : la revision a J+90
 
-Toute BDR doit fixer une **date de revision** (typiquement J+90). A cette date, on relit la BDR et on tranche :
+Toute DEC doit fixer une **date de revision** (typiquement J+90). A cette date, on relit la DEC et on tranche :
 - **Active** : la decision tient, on garde
-- **Revisee** : le contexte a change, on amende et on cree BDR-X.bis
+- **Revisee** : le contexte a change, on amende et on cree DEC-X.bis
 - **Abandonnee** : la decision ne tient plus, on documente pourquoi et on l'archive
 
-Sans cette revision, les BDR deviennent des "yes-men" : on les ecrit, on les oublie, elles ne servent plus.
+Sans cette revision, les DEC deviennent des "yes-men" : on les ecrit, on les oublie, elles ne servent plus.
 
 ## Exemple fictif
 
-> **Atelier Demo apprend qu'il refusait les briefs entre 800 et 1500 EUR par habitude, sans BDR explicite. Resultat : les freelances internes ne savaient pas pourquoi et acceptaient parfois des briefs sous le seuil.**
+> **Atelier Demo apprend qu'il refusait les briefs entre 800 et 1500 EUR par habitude, sans DEC explicite. Resultat : les freelances internes ne savaient pas pourquoi et acceptaient parfois des briefs sous le seuil.**
 
 Capitalisation :
 
 ```markdown
-## BDR-008 — Seuil minimum brief : 1500 EUR HT
+## DEC-008 — Seuil minimum brief : 1500 EUR HT
 
 **Date** : 2026-04-22
 **Statut** : Active
@@ -120,7 +120,7 @@ Ensuite, l'apprentissage extrait :
 ## LRN-014 — Sous le seuil de rentabilite, tout brief perd de la valeur
 
 **Date** : 2026-04-22
-**Sources** : BDR-008, missions n°22 / 23 / 24 / 27 / 31
+**Sources** : DEC-008, missions n°22 / 23 / 24 / 27 / 31
 
 ### Contexte
 
@@ -144,15 +144,15 @@ S'applique a : tous les forks (consultant, studio, freelance, formateur).
 La methode pour calculer le seuil change ; le principe reste.
 ```
 
-3 mois plus tard, quand un freelance interne hesite sur un brief 1100 EUR, il consulte BDR-008 et LRN-014, comprend pourquoi le seuil existe, refuse le brief sans avoir besoin de demander au manager.
+3 mois plus tard, quand un freelance interne hesite sur un brief 1100 EUR, il consulte DEC-008 et LRN-014, comprend pourquoi le seuil existe, refuse le brief sans avoir besoin de demander au manager.
 
 ## Anti-patterns
 
 - **Capitalisation differree** : "je le ferai plus tard" → le pattern est perdu
-- **BDR ecrite apres execution** : perd 80 % de sa valeur (rationalisation post hoc)
+- **DEC ecrite apres execution** : perd 80 % de sa valeur (rationalisation post hoc)
 - **LRN sans regle generalisable** : ce n'est qu'une anecdote
-- **Registres orphelins** : LRN qui ne reference aucune BDR (perte de tracabilite)
-- **Revision oubliee** : BDR figee a vie sans contre-verification
+- **Registres orphelins** : LRN qui ne reference aucune DEC (perte de tracabilite)
+- **Revision oubliee** : DEC figee a vie sans contre-verification
 
 ## Quand NE PAS capitaliser
 
@@ -183,7 +183,7 @@ Regle : **formuler les criteres en termes binaires AVANT execution, pas apres**.
 
 Exemple :
 - Narratif : "le pricing est coherent" → ambigu, source de derive
-- Binaire : "le pricing affiche correspond au prix declare dans `BDR-008`" → verifiable, decidable
+- Binaire : "le pricing affiche correspond au prix declare dans `DEC-008`" → verifiable, decidable
 
 ## Anti-drift mechanisms pour execution autonome multi-cycles (v4.1)
 

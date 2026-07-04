@@ -1,6 +1,6 @@
 {
   "name": "feature-dev-gates",
-  "version": "v1.0.0",
+  "version": "v1.0.1",
   "type": "rules",
   "description": "Gates de développement de feature (ADR-037) : Nyquist Layer (commande de vérif auto par critère) + Decision Coverage (chaque ADR/DEC couverte). Rule path-scopée, activation conditionnelle sur le code.",
   "requires": []

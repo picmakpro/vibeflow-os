@@ -1,0 +1,13 @@
+{
+  "description": "Porte blindée Iron Law 300L (ADR-035 + ADR-043) : édition d'un fichier de code >= 300 lignes bloquée sans découpe ou dette tracée.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/guard-file-size.sh" }
+        ]
+      }
+    ]
+  }
+}

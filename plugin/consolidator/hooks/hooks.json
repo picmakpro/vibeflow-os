@@ -1,0 +1,36 @@
+{
+  "description": "Gouvernance mémoire machine-enforced (ADR-032 + ADR-043) : lecture index-first bloquante, index auto-maintenu, lint format au démarrage, archivage en fin de session.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/guard-read-registres.sh" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/post-edit-reindex.sh" }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-registres.sh --hook || true" }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/archive.sh --async --apply || true" }
+        ]
+      }
+    ]
+  }
+}

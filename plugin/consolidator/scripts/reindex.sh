@@ -336,6 +336,47 @@ PYEOF
     fi
   } > "$idx_tmp"
 
+  # Bootstrap (ADR-043) : si le registre n'a pas encore de bloc '## Index' (registre
+  # fraîchement créé, template v1, sortie d'init non conforme), l'INSÉRER après le titre
+  # H1 (ou en fin de fichier à défaut), puis relancer une passe complète : l'insertion
+  # décale les numéros de ligne du body, la 2e passe recalcule les #Ligne justes.
+  if ! grep -q '^## Index' "$file"; then
+    local boot_tmp
+    boot_tmp=$(mktemp)
+    awk -v idx_file="$idx_tmp" '
+      BEGIN { inserted = 0 }
+      {
+        print
+        if (!inserted && $0 ~ /^# /) {
+          print ""
+          print "## Index"
+          print ""
+          while ((getline line < idx_file) > 0) print line
+          close(idx_file)
+          print ""
+          print "---"
+          inserted = 1
+        }
+      }
+      END {
+        if (!inserted) {
+          print ""
+          print "## Index"
+          print ""
+          while ((getline line < idx_file) > 0) print line
+          close(idx_file)
+          print ""
+          print "---"
+        }
+      }
+    ' "$file" > "$boot_tmp"
+    mv "$boot_tmp" "$file"
+    rm -f "$idx_tmp" "$orphans_tmp" "$tmp"
+    log "$register_name: bloc '## Index' cree (bootstrap) — 2e passe pour recaler les #Ligne"
+    reindex_one "$register_name"
+    return $?
+  fi
+
   # Rewrite file
   awk -v idx_file="$idx_tmp" '
     BEGIN { state = "before" }

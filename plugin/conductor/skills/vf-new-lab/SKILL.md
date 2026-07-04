@@ -159,8 +159,11 @@ Dériver puis poser (déléguer, ne pas réinventer) :
    typé `deliverable` (roadmap+phases) ou `continuous` (`BOARD.md` + cadence). Sous le seuil / infra →
    ligne d'`INDEX.md`. Réf : planning-core `references/compartments.md`. **Jamais un `.planning/` par
    compartiment systématique.**
-4. **5 registres mémoire** — DECISIONS / LEARNINGS / BLOCKERS / JOURNAL / **EVALS** (depuis `reference`).
-   EVALS posé dès l'init (registre du principe **P8 Évaluer**), partie intégrante du socle.
+4. **5 registres mémoire** — DECISIONS / LEARNINGS / BLOCKERS / JOURNAL / **EVALS** (depuis `reference`,
+   templates `memory/*-template.md` — registre décisions : `decisions-template.md`, IDs `DEC-XXX`).
+   EVALS posé dès l'init (registre du principe **P8 Évaluer**), partie intégrante du socle. Après la
+   pose, **indexer par la machine** : `bash .claude/scripts/reindex.sh --all --apply` (crée/recale le
+   bloc `## Index` + colonne `#Ligne` de chaque registre — ne jamais rédiger un index à la main).
 5. **Agents métier** (2-3, pattern business-agent ; ou instanciés depuis un bundle si présent) —
    **câbler les skills fabriqués** (Phases 5-6) dans leur frontmatter `skills:` (attribution décidée ici,
    d'après les escalades du fan-out).
@@ -170,6 +173,14 @@ Dériver puis poser (déléguer, ne pas réinventer) :
    agent (métier + gouvernance) qui l'**incarne dans la fenêtre principale** (session courante), pas en
    sous-agent. Idempotent (ne réécrit pas une commande existante). Détail : `references/agent-command-incarnation.md`.
 8. **Stamp framework** — `framework-version.sh stamp` (rendu **visible au récap**).
+9. **GATE C — Conformité machine (ADR-043, BLOQUANT)** — l'init ne se conclut PAS tant que :
+   `bash .claude/scripts/check-registres.sh --strict` sort en **exit 0** (5 registres canon présents,
+   `## Index` + colonne `#Ligne`, IDs cohérents index↔body, zéro doublon) **ET** que les hooks de
+   gouvernance sont câblés : `grep -q guard-read-registres .claude/settings.json` (posés automatiquement
+   par `vibeflow-install` via `hooks/hooks.json` + `merge-hooks.sh` — s'ils manquent, réinstaller le
+   module `consolidator`, ne JAMAIS les recopier à la main). En cas d'échec : corriger
+   (`reindex.sh --all --apply`, re-poser le registre manquant) puis relancer le gate. **Comme le Gate A,
+   ce grep/script est la preuve — pas ton impression que « ça a l'air bon ».**
 
 > **Bundle métier (raccourci)** : si un bundle est installé (`docs/<metier>-bundle/`), s'en servir comme
 > **bibliothèque** — piocher blueprints d'agents + manifeste de capacités suggéré — **jamais comme moule**.

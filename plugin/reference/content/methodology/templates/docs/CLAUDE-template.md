@@ -32,7 +32,7 @@ Skills on-demand (invocation explicite) : `clarity-feature`, `skill-creator`, `a
 - JAMAIS de secrets dans le code (utiliser .env)
 - TOUJOURS valider les inputs avec Zod
 - TOUJOURS gerer les erreurs (pas de throw non catche)
-- TOUJOURS documenter les decisions significatives (ADR)
+- TOUJOURS documenter les decisions significatives (DEC-XXX dans DECISIONS.md)
 - JAMAIS de console.log en production
 
 ---
@@ -49,7 +49,7 @@ Ce projet suit l'architecture par feature (colocation) :
 
 | Registre | Fichier | Usage |
 |----------|---------|-------|
-| **ADR** | `.claude/memory/ADR.md` | Decisions architecturales |
+| **DECISIONS** | `.claude/memory/DECISIONS.md` | Decisions structurantes (DEC-XXX) |
 | **Blockers** | `.claude/memory/BLOCKERS.md` | Obstacles et resolutions |
 | **Learnings** | `.claude/memory/LEARNINGS.md` | Apprentissages capitalises |
 | **Vendors** | `.claude/memory/VENDORS.md` | Fournisseurs externes |
@@ -141,7 +141,7 @@ La documentation detaillee des MCP doit etre dans des rules contextuelles (`.cla
 
 | Situation | Action |
 |-----------|--------|
-| Nouvelle decision significative | → ADR |
+| Nouvelle decision significative | → DECISIONS (DEC-XXX) |
 | Bug > 30min a resoudre | → BLOCKERS (+ LEARNING associe a la resolution) |
 | Pattern reutilisable decouvert | → LEARNINGS |
 | Nouveau service externe | → VENDORS |

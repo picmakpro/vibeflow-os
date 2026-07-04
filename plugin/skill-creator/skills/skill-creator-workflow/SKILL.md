@@ -9,9 +9,9 @@ description: Use whenever the skill-creator agent executes its 5-phase workflow 
 [A PERSONNALISER] — Avant utilisation :
   - Remplacer "[NOM_LAB]" par le nom de ton Lab
   - Remplacer "[ORCHESTRATING_AGENT]" par l'agent qui valide Phase 5 (editor-architect / strategist / lead / architect / orchestrator)
-  - Section "STACK TECHNIQUE FIGEE" en bas : referencer ADR si applicable, sinon supprimer la section
+  - Section "STACK TECHNIQUE FIGEE" en bas : referencer la decision (DEC) si applicable, sinon supprimer la section
   - Distinction META vs LIVRABLE : conserver si ton Lab distribue des templates aux projets cibles, sinon simplifier
-  - Adapter les paths memoire (ITERATION_LOG.md vs JOURNAL.md, ADR.md vs DECISIONS.md) aux conventions du Lab
+  - Paths memoire canon : JOURNAL.md et DECISIONS.md (ITERATION_LOG.md / ADR.md legacy acceptes en lecture)
 -->
 
 ## Principes fondateurs
@@ -197,7 +197,7 @@ Retourne : resume en 5 bullets max + path du fichier produit.
 
 - [ ] **Type clair** (META ou LIVRABLE — si applicable) : skill au bon endroit
 - [ ] **Pertinence du sujet** : chaque section fait sens vis-a-vis du domaine natif
-- [ ] **Coherence stack figee** : aucun outil non figé pour skills LIVRABLES (ou ADR proposee)
+- [ ] **Coherence stack figee** : aucun outil non figé pour skills LIVRABLES (ou DEC proposee)
 - [ ] **Clarte actionnable** : zero generalite "il faut bien faire"
 - [ ] **Densite references** : 10+ elements precis (commandes, flags, versions, paths, URLs, chiffres)
 - [ ] **Pas de doublon** avec skill existant (grep final dans `.claude/skills/` ET `methodology/templates/skills/`)
@@ -233,13 +233,13 @@ Si critere echoue → iteration (retour Phase 3 ou 4). Pas d'escalation d'un liv
 **Impact sur CLAUDE.md / methodologie** :
 - Apparaitre dans SKILLS de CLAUDE.md ? [oui/non]
 - Section a enrichir dans la doc methodo ? [oui/non + section]
-- ADR necessaire ? [oui/non]
+- Decision (DEC) necessaire ? [oui/non]
 
 **Action attendue de [ORCHESTRATING_AGENT]** :
 1. Valider le skill (ou demander iteration ciblee)
 2. Decider des agents a qui attribuer (modifier frontmatter `skills:`)
 3. Mettre a jour CLAUDE.md / methodologie si necessaire
-4. Decider si ADR requise
+4. Decider si une decision (DEC) est requise
 ```
 
 ---
@@ -278,17 +278,17 @@ Si critere echoue → iteration (retour Phase 3 ou 4). Pas d'escalation d'un liv
 
 <!--
 [A PERSONNALISER] :
-Si ton Lab a une stack figee documentee (ADR / decision architecturale), remplacer ce bloc
-par la reference a cette ADR + le tableau de la stack.
+Si ton Lab a une stack figee documentee (decision architecturale DEC-XXX), remplacer ce bloc
+par la reference a cette decision + le tableau de la stack.
 
 Exemple :
-> Reference obligatoire pour les skills LIVRABLES (voir ADR-XXX) :
+> Reference obligatoire pour les skills LIVRABLES (voir DEC-XXX) :
 > Next.js 14 + Supabase + Stripe + Anthropic SDK + Tailwind + shadcn/ui
 
 Sinon, supprimer integralement cette section.
 -->
 
-(Si applicable) Reference obligatoire pour les skills LIVRABLES. Voir ADR de stack figee dans `.claude/memory/ADR.md` du Lab.
+(Si applicable) Reference obligatoire pour les skills LIVRABLES. Voir la decision de stack figee dans `.claude/memory/DECISIONS.md` du Lab.
 
 ---
 

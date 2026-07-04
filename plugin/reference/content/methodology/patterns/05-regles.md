@@ -54,7 +54,7 @@ sous `client/`.
 ## Action en cas de violation
 
 1. Stopper l'ecriture
-2. Afficher le motif avec reference a la BDR concernee
+2. Afficher le motif avec reference a la DEC concernee
 3. Demander validation explicite avant de proceder
 ```
 

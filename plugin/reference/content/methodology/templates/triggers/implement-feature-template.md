@@ -22,7 +22,7 @@ Le Clarity Feature Agent produit une **feature spec clarifiee** avec :
 - User Story complete (Qui/Quoi/Pourquoi)
 - Criteres d'acceptation mesurables
 - Scope explicite (in/out)
-- Coherence validee (PRD, ADR, features existantes)
+- Coherence validee (PRD, DECISIONS, features existantes)
 - Evaluation de faisabilite + risques
 
 **Si la spec est deja claire et complete** → passer directement a la Phase 1.
@@ -38,4 +38,4 @@ Le Clarity Feature Agent produit une **feature spec clarifiee** avec :
 6. VISUAL REVIEW : Chrome MCP — boucler jusqu'a pass complet
 
 ### Phase 3 : DOCUMENTATION
-7. DOCUMENTER : ADR/BLOCKER/LEARNING si applicable
+7. DOCUMENTER : DEC/BLOCKER/LEARNING si applicable

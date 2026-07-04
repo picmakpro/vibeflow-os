@@ -38,7 +38,7 @@ Pour chaque god file, dans l'ordre de priorité :
 
 ## Vague 4 — Frontières en mode erreur
 1. Passer eslint-plugin-boundaries de `warn` à `error`. Retirer le grandfather.
-2. Fermer tous les marqueurs `[DEBT]` : chacun devient une règle ou une ADR.
+2. Fermer tous les marqueurs `[DEBT]` : chacun devient une règle ou une décision (DEC).
 
 ## Vague 5 — Outillage de navigation (optionnel, APRÈS décomposition)
 1. Une fois le code découpé, ajouter un MCP de navigation par LSP (ex : Serena) si pertinent.

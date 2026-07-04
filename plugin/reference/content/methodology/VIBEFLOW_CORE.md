@@ -70,9 +70,9 @@ C'est l'integration de ces quatre capacites qui fait la force de VibeFlow. Un sy
 **Contrat** : chaque decision structurante, chaque apprentissage reutilisable, chaque blocage de plus de 30 min est trace dans le registre correspondant **avec le raisonnement complet, pas seulement le resultat**.
 
 **Critere d'application (testable)** :
-- [ ] Au moins 1 entree BDR/DECISIONS cree par sprint de travail
+- [ ] Au moins 1 entree DECISIONS (DEC-XXX) cree par sprint de travail
 - [ ] Au moins 1 entree LEARNINGS cree par sprint de travail
-- [ ] Aucune decision mentionnee en session sans reference BDR dans les 48h
+- [ ] Aucune decision mentionnee en session sans reference DEC dans les 48h
 - [ ] Un nouveau collaborateur (humain ou IA) peut comprendre une decision historique en lisant l'entree correspondante seule
 
 Un projet peut avoir P1 applique en partie ou pas du tout. Le critere est public et auditable.
@@ -252,7 +252,7 @@ Principe : **savoir = cerveau, outils = bras, agents = mains**. Les trois sont d
 
 **5 registres standards** de capitalisation (voir section 4 pour le detail) :
 
-- **BDR / DECISIONS**  -  choix structurants avec raisonnement
+- **DECISIONS**  -  choix structurants avec raisonnement
 - **LEARNINGS**  -  apprentissages qui changent la facon de faire
 - **BLOCKERS**  -  obstacles rencontres et solutions
 - **JOURNAL**  -  trace factuelle des sessions
@@ -274,11 +274,13 @@ Des conventions **scopees**, chargees automatiquement quand elles sont pertinent
 
 | Registre | Contenu | Frequence minimale | Format |
 |----------|---------|--------------------|--------|
-| **BDR / DECISIONS** | Choix structurants avec raisonnement complet, options eliminees, consequences | A chaque decision structurante | Entree datee + IDs (BDR-XXX ou ADR-XXX) |
+| **DECISIONS** | Choix structurants avec raisonnement complet, options eliminees, consequences | A chaque decision structurante | Entree datee + ID (DEC-XXX) |
 | **LEARNINGS** | Decouvertes qui changent la facon de faire, patterns reutilisables | A chaque apprentissage | Entree datee + ID (LRN-XXX) |
 | **BLOCKERS** | Obstacles > 30 min, hypotheses eliminees, solution trouvee | A chaque blocage > 30 min | Entree datee + ID (BLK-XXX) |
 | **JOURNAL** | Trace factuelle de chaque session : ce qui a ete fait, quand, avec quel resultat | A chaque session | Entree chronologique |
 | **EVALS** *(NEW)* | Evaluations qualite cognitive des outputs (hallucinations, biais, derive, pertinence dans le temps) | Minimum 1 par sprint + revues trimestrielles | Entree datee + ID (EVAL-XXX) |
+
+> Canon : le registre decisions s'appelle `DECISIONS.md` avec des IDs `DEC-XXX` (les anciens forks `ADR.md`/`BDR.md` restent lus par les scripts — legacy).
 
 ### Regles de gestion universelles
 
@@ -286,13 +288,13 @@ Des conventions **scopees**, chargees automatiquement quand elles sont pertinent
 2. **Archivage**  -  quand une entree devient obsolete ou operationnellement caduque, la deplacer dans `archive/` en conservant l'ID. Ne pas supprimer.
 3. **Rotation aux jalons**  -  a chaque jalon majeur (fin MVP, V2, fin de trimestre) : passer en revue les registres, archiver les entrees historiques, consolider les patterns.
 4. **Lien inter-registres**  -  un BLOCKER resolu genere souvent un LEARNING. Un LEARNING peut etre promu en regle. Les IDs inter-referencent.
-5. **Unicite du raisonnement**  -  chaque entree BDR contient le **pourquoi**, pas seulement le **quoi**. Sans raisonnement, l'entree ne sert plus apres quelques semaines.
+5. **Unicite du raisonnement**  -  chaque entree DECISIONS contient le **pourquoi**, pas seulement le **quoi**. Sans raisonnement, l'entree ne sert plus apres quelques semaines.
 
 ### Dimensionnement par maturite de projet
 
 | Maturite | Registres actifs | Frequence minimale |
 |----------|------------------|--------------------|
-| Solopreneur debutant | BDR + LEARNINGS suffisent pour demarrer | Hebdo |
+| Solopreneur debutant | DECISIONS + LEARNINGS suffisent pour demarrer | Hebdo |
 | Projet 1-3 mois | Ajouter BLOCKERS + JOURNAL | Par sprint |
 | Projet > 3 mois ou multi-personnes | Les 5 registres actifs | Continu |
 | Production publique (formation, produit, infra) | Les 5 registres + audit externe | Mensuel + trimestriel EVALS |
@@ -337,7 +339,7 @@ Cout : temps humain. Limite : echantillonnage peut rater les derives isolees.
 
 30 jours apres une decision structurante, confronter la prediction a la realite observee.
 
-Exemple : BDR-017 prevoit 50 ventes beta en 6 semaines. A J+42, que dit la realite ? Si l'ecart est > 30%, une entree EVAL documente la derive et ajuste la methodologie.
+Exemple : DEC-017 prevoit 50 ventes beta en 6 semaines. A J+42, que dit la realite ? Si l'ecart est > 30%, une entree EVAL documente la derive et ajuste la methodologie.
 
 Cout : discipline (c'est le plus dur a maintenir). Limite : retrospectif, pas preventif.
 
@@ -347,7 +349,7 @@ Cout : discipline (c'est le plus dur a maintenir). Limite : retrospectif, pas pr
 ## EVAL-XXX : [Titre court]
 
 **Date** : YYYY-MM-DD
-**Output evalue** : [path du fichier OU description : "BDR-017 prevision 50 ventes beta"]
+**Output evalue** : [path du fichier OU description : "DEC-017 prevision 50 ventes beta"]
 **Contexte** : [quand l'output a ete produit]
 **Methode eval** : LLM-as-Judge | Cross-check humain | Confrontation realite | Manuelle structuree
 **Score qualitatif** : [rubrique + score]
@@ -362,7 +364,7 @@ Cout : discipline (c'est le plus dur a maintenir). Limite : retrospectif, pas pr
 [ ] Keep  -  l'output reste valide
 [ ] Correct  -  corriger l'output (lien vers correction)
 [ ] Deprecate  -  marquer l'output comme obsolete, remplacer
-[ ] Escalation  -  decision structurante requise (creer BDR)
+[ ] Escalation  -  decision structurante requise (creer une entree DEC-XXX)
 
 ### Learning associe
 [LRN-XXX si l'evaluation genere un pattern reutilisable]
@@ -372,7 +374,7 @@ Cout : discipline (c'est le plus dur a maintenir). Limite : retrospectif, pas pr
 
 | Type d'output | Frequence P-Evaluer |
 |---------------|---------------------|
-| Decision structurante (BDR) | Confrontation realite a J+30 |
+| Decision structurante (DEC) | Confrontation realite a J+30 |
 | Prediction quantitative (KPI, plan) | J+30, J+60, J+90 |
 | Template ou contenu produit | Trimestriel |
 | Script agentique (agent, skill) | A chaque update majeur |
@@ -394,7 +396,7 @@ Cout : discipline (c'est le plus dur a maintenir). Limite : retrospectif, pas pr
 
 Plus un outil est percu comme competent, moins l'humain le remet en question. Un humain qui delegue a un LLM "intelligent" va progressivement relire moins attentivement  -  les erreurs, meme evidentes, passent.
 
-**Manifestation VibeFlow** : un BDR signee machinalement apres 30 secondes de lecture. Une analyse acceptee sans verification des sources citees. Un contrat valide sans relire les clauses critiques.
+**Manifestation VibeFlow** : une entree DECISIONS signee machinalement apres 30 secondes de lecture. Une analyse acceptee sans verification des sources citees. Un contrat valide sans relire les clauses critiques.
 
 **Risque 2  -  Delegation Feedback Loop**
 
@@ -418,7 +420,7 @@ Perdre la capacite de faire soi-meme quand l'IA echoue. C'est le pilote d'avion 
 
 Certaines taches doivent rester humaines par design, meme si elles sont deleguables :
 - Les decisions engageant la responsabilite legale ou financiere
-- Les arbitrages strategiques structurants (BDR)
+- Les arbitrages strategiques structurants (DECISIONS)
 - La relation client en phase critique (litige, escalade)
 - Les evaluations P-Evaluer cross-check (ne pas evaluer un LLM avec le meme LLM en boucle fermee)
 
@@ -448,9 +450,9 @@ Pour les environnements techniques (Claude Code, agents sur systeme de fichiers)
 
 Exemples : delete de > 10 fichiers, commit sur main, deploiement production, envoi email de masse.
 
-**Circuit breaker 2  -  Revue BDR trimestrielle humaine seule**
+**Circuit breaker 2  -  Revue DECISIONS trimestrielle humaine seule**
 
-Tous les 3 mois, le createur bloque 2h pour relire seul (sans Claude) les BDR du trimestre. Objectif : verifier la coherence globale, detecter les decisions incoherentes entre elles, et challenger ce qui a ete valide par automatisme.
+Tous les 3 mois, le createur bloque 2h pour relire seul (sans Claude) les decisions (DEC) du trimestre. Objectif : verifier la coherence globale, detecter les decisions incoherentes entre elles, et challenger ce qui a ete valide par automatisme.
 
 **Circuit breaker 3  -  Test d'alternative mensuel**
 
@@ -549,7 +551,7 @@ Le contenu genere des leads. Le business les convertit. Le growth les fait gross
 | Terme | Definition simple | Fonction structurelle |
 |-------|-------------------|----------------------|
 | **Constitution** | Le document fondateur d'un projet (< 150 lignes) | Porte le Pourquoi / Ce que / Comment |
-| **Registre** | Un carnet structure de memoire (BDR, LEARNINGS, BLOCKERS, JOURNAL, EVALS) | Capitalise un type specifique de connaissance |
+| **Registre** | Un carnet structure de memoire (DECISIONS, LEARNINGS, BLOCKERS, JOURNAL, EVALS) | Capitalise un type specifique de connaissance |
 | **Agent** | Un specialiste (humain ou IA) avec mandat et contrat formels | Execute dans son domaine de competence |
 | **Orchestrateur** | L'agent central qui planifie, delegue et reconcilie (ne produit jamais) | Pilote, ne fait pas le travail operationnel |
 | **Skill** | Une base de connaissance specialisee injectable a la demande | Dote un agent d'une expertise specifique |
@@ -566,7 +568,7 @@ Le contenu genere des leads. Le business les convertit. Le growth les fait gross
 
 | Registre | Abreviation ID | Synonyme | Contenu |
 |----------|---------------|---------|---------|
-| Decisions | BDR-XXX ou ADR-XXX | Decision Record | Choix structurants + raisonnement |
+| Decisions | DEC-XXX | Decision Record | Choix structurants + raisonnement |
 | Apprentissages | LRN-XXX | Learning Record | Patterns reutilisables |
 | Blocages | BLK-XXX | Blocker Record | Obstacles + solutions |
 | Journal |  -  | Session Log | Trace chronologique factuelle |
@@ -574,8 +576,8 @@ Le contenu genere des leads. Le business les convertit. Le growth les fait gross
 
 ### 8.3  -  Mots specifiques par domaine (extrait)
 
-- **BusinessFlow** : BDR au lieu d'ADR, "sprint strategique" au lieu de "sprint", "initiative" au lieu de "feature", "obstacle" au lieu de "bug", "rollout" au lieu de "deploy"
-- **DevFlow** : ADR (Architecture Decision Record), sprint dev, feature, bug, deploy
+- **BusinessFlow** : "sprint strategique" au lieu de "sprint", "initiative" au lieu de "feature", "obstacle" au lieu de "bug", "rollout" au lieu de "deploy"
+- **DevFlow** : sprint dev, feature, bug, deploy
 - **ContentFlow** : edition au lieu de sprint, script au lieu de feature, friction au lieu de bug, publish au lieu de deploy
 - **GrowthFlow** : experiment au lieu de sprint, campaign au lieu de feature, leak au lieu de bug, launch au lieu de deploy
 
@@ -596,8 +598,8 @@ Ces terminologies locales ne contredisent pas le Core  -  elles l'implementent.
 
 | Niveau | Caracteristique | Registres actifs | Agents actifs | Cycles |
 |--------|----------------|------------------|---------------|--------|
-| **L0  -  Demarrage** | Constitution ecrite + 1 ou 2 registres | BDR + LEARNINGS | 1 orchestrateur | Cycles informels |
-| **L1  -  Operationnel** | 4 registres actifs + processus documente | BDR + LEARNINGS + BLOCKERS + JOURNAL | Orchestrateur + 2-3 specialistes | Sprints definis |
+| **L0  -  Demarrage** | Constitution ecrite + 1 ou 2 registres | DECISIONS + LEARNINGS | 1 orchestrateur | Cycles informels |
+| **L1  -  Operationnel** | 4 registres actifs + processus documente | DECISIONS + LEARNINGS + BLOCKERS + JOURNAL | Orchestrateur + 2-3 specialistes | Sprints definis |
 | **L2  -  Mature** | Les 5 registres + EVALS en routine | Les 5 | Orchestrateur + 5+ specialistes + skills | Checkpoints tous les 2 sprints |
 | **L3  -  Industriel** | Multi-domaines, connexions inter-systemes | Les 5 + archives | Orchestrateurs multiples + 10+ specialistes | Checkpoints + revues trimestrielles EVALS |
 
@@ -607,7 +609,7 @@ Le Core ne demande pas L3. Il demande L1 minimum. L2 est la cible pour un projet
 
 ```
 Jour 1 : ecrire une constitution de 1 page (30 min)
-Jour 2 : creer BDR.md et LEARNINGS.md vides (5 min)
+Jour 2 : creer DECISIONS.md et LEARNINGS.md vides (5 min)
 Jour 3 : commencer a capitaliser la premiere decision structurante
 Semaine 2 : premier LEARNING capitalise
 Mois 1 : premier checkpoint, evaluation de l'implementation
@@ -687,7 +689,7 @@ VibeFlow est au plus haut niveau du spectre. C'est le systeme qui rend l'Agentic
 | **5. Execution** | Sprint par sprint, atomic commits, context reset entre sprints |
 | **6. Verification Code + Tests** | Exit code 0 sur les gates techniques avant de passer au sprint suivant |
 | **7. Verification Visuelle** | Si livrable visible (UI, contenu, design) : snapshot + comparaison vs critere |
-| **8. Commit + Loop** | Capitaliser (BDR/LRN/EVAL) puis boucler ou s'arreter selon halt conditions |
+| **8. Commit + Loop** | Capitaliser (DEC/LRN/EVAL) puis boucler ou s'arreter selon halt conditions |
 
 **Iron Law** : si une halt condition est declenchee (voir section 13), arret immediat et escalation humaine. Pas de "je passe outre".
 
@@ -772,7 +774,7 @@ Les halt conditions et anti-drift mechanisms s'appliquent obligatoirement en `go
 - **DEVFLOW_V4_CLAUDE_CODE.md**  -  Fork domaine dev web : specificites Claude Code, MCP, Task tool, hooks, stack CI/CD. S'appuie sur CORE.
 - **QUICKSTART.md**  -  Resume executif 1 page de la methodologie appliquee au dev.
 - **TEMPLATE_FACTORY.md**  -  Usine a templates pour generer des systemes agentiques specialises.
-- **templates/memory/**  -  Templates des 5 registres (BDR, LEARNINGS, BLOCKERS, VENDORS, EVALS).
+- **templates/memory/**  -  Templates des 5 registres (DECISIONS, LEARNINGS, BLOCKERS, VENDORS, EVALS).
 
 ---
 

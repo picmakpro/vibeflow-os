@@ -7,3 +7,9 @@
   - **Nyquist** : commande de vérification automatisée par critère d'acceptation (avant le code).
   - **Decision Coverage** : chaque décision (ADR/DEC) couverte par une tâche/contrat.
 - Origine : benchmark GSD vs DevFlow V4 (Session 051). Principe enforcement > prose (LRN-118).
+
+
+## [v1.0.1] — 2026-07-04 (ADR-043)
+
+### Modifié
+- Decision Coverage Gate : référence registre unifiée « (DEC-XXX) » (canon DECISIONS).

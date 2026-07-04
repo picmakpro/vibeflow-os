@@ -26,17 +26,20 @@ Ce skill audite l'infrastructure en 4 axes complémentaires.
 .claude/scripts/vibeflow-update.sh install infrastructure-audit
 ```
 
-Ensuite, ajouter le hook SessionStart dans `.claude/settings.json` :
+Le hook SessionStart est POSÉ AUTOMATIQUEMENT à l'install (ADR-043) via `hooks/hooks.json`
+mergé dans `.claude/settings.json` :
 
 ```json
 "SessionStart": [{
   "matcher": "startup",
   "hooks": [{
     "type": "command",
-    "command": "test -x .claude/scripts/audit-infra.sh && .claude/scripts/audit-infra.sh --quick --if-older-than=14d 2>&1 | head -20 || true"
+    "command": "bash .claude/scripts/audit-infra.sh --quick --if-older-than=14d || true"
   }]
 }]
 ```
+
+(Rien à copier — vérifier avec `grep audit-infra .claude/settings.json`.)
 
 ---
 

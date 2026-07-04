@@ -41,4 +41,4 @@ Les exemples fictifs s'appuient sur des personas inventes : *Sophie K., professe
 
 ## Avertissement
 
-Ces patterns sont des **manieres de faire eprouvees**, pas des recettes a suivre a la lettre. Adapte chaque pattern a ton contexte. Si un pattern entre en collision avec une realite specifique de ton activite, c'est un signal : creer une decision (BDR/ADR) qui documente l'ecart.
+Ces patterns sont des **manieres de faire eprouvees**, pas des recettes a suivre a la lettre. Adapte chaque pattern a ton contexte. Si un pattern entre en collision avec une realite specifique de ton activite, c'est un signal : creer une decision (DEC-XXX) qui documente l'ecart.

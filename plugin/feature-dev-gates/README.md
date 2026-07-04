@@ -8,7 +8,7 @@ Deux **gates de développement de feature**, machine-enforced via une rule **pat
 Importés du framework GSD, alignés sur le principe **enforcement > prose** (LRN-118).
 
 - **Gate Nyquist** : chaque critère d'acceptation doit avoir une **commande de vérification automatisée** (pass/fail) AVANT le code → empêche la complétion hallucinée.
-- **Gate Decision Coverage** : chaque décision (ADR/DEC-XXX) doit être portée par une tâche/contrat → empêche la dérive décision↔code.
+- **Gate Decision Coverage** : chaque décision (DEC-XXX) doit être portée par une tâche/contrat → empêche la dérive décision↔code.
 
 ## Pourquoi une rule path-scopée
 

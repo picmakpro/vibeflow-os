@@ -11,7 +11,7 @@ Format : Light (10 min, par defaut) ou Complet (30 min, tous les 4 sprints)
 - [ ] CLAUDE.md a jour et respecte
 - [ ] REFERENCE.md reflete l'etat reel
 - [ ] CONTEXT.md a jour
-- [ ] ADR couvre toutes les decisions majeures
+- [ ] DECISIONS couvre toutes les decisions majeures
 - [ ] BLOCKERS documente pour chaque bug > 30min
 - [ ] LEARNINGS enrichi regulierement
 - [ ] VENDORS a jour
@@ -38,8 +38,8 @@ Format : Light (10 min, par defaut) ou Complet (30 min, tous les 4 sprints)
 > A executer systematiquement au checkpoint. Etape complete obligatoire aux jalons majeurs (fin MVP, V2, etc.).
 
 ### Audit des registres
-- [ ] Compter les entrees par registre (ADR, LEARNINGS, BLOCKERS, VENDORS)
-- [ ] Identifier les ADR depreciees ou supersedees → candidats archivage
+- [ ] Compter les entrees par registre (DECISIONS, LEARNINGS, BLOCKERS, VENDORS)
+- [ ] Identifier les decisions (DEC) depreciees ou supersedees → candidats archivage
 - [ ] Identifier les learnings encodes dans des rules → candidats archivage
 - [ ] Identifier les blockers resolus depuis > 5 sprints → candidats archivage
 
@@ -51,7 +51,7 @@ Format : Light (10 min, par defaut) ou Complet (30 min, tous les 4 sprints)
 ### Seuils d'alerte
 | Registre | Normal | Rotation necessaire |
 |----------|--------|---------------------|
-| ADR.md | < 15 actives | > 15 actives |
+| DECISIONS.md | < 15 actives | > 15 actives |
 | LEARNINGS.md | < 20 actifs | > 20 actifs |
 | BLOCKERS.md | < 10 non resolus | > 10 non resolus |
 

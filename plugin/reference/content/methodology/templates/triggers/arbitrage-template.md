@@ -15,7 +15,7 @@ Utilise : `think hard` — Evaluation multi-criteres
 | Option C | | |
 
 ## Criteres de Selection
-- Alignement ADR existantes
+- Alignement decisions (DEC) existantes
 - Absence dans BLOCKERS (pas deja echoue)
 - Application LEARNINGS
 - Cout de mise en oeuvre
@@ -27,5 +27,5 @@ Utilise : `think hard` — Evaluation multi-criteres
 ## Consequences
 [Impacts positifs et negatifs]
 
-## ADR
-→ Creer ADR-XXX si decision structurante
+## Decision
+→ Creer DEC-XXX si decision structurante

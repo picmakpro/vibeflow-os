@@ -12,7 +12,7 @@
 | **Regarde** | l'avant + le présent | le passé (capitalisation) |
 | **Question** | « où va-t-on, où en est-on ? » | « qu'a-t-on décidé/appris/bloqué ? » |
 | **Nature** | vivant, réécrit en continu | figé, append-only, indexé |
-| **Exemples** | STATE, ROADMAP, PROJECT, phases | ADR/DECISIONS, LEARNINGS, BLOCKERS, JOURNAL, EVALS |
+| **Exemples** | STATE, ROADMAP, PROJECT, phases | DECISIONS, LEARNINGS, BLOCKERS, JOURNAL, EVALS |
 | **Durée de vie** | le projet en cours | transverse, cross-projet |
 
 Ce ne sont **pas** deux copies du même contenu : ce sont deux fonctions différentes.
@@ -21,14 +21,14 @@ Ce ne sont **pas** deux copies du même contenu : ce sont deux fonctions différ
 
 Une info ne doit vivre qu'à **un** endroit. Les ponts ci-dessous sont des **flux**, pas des copies.
 
-### Pont 1 — Décisions : `PROJECT.md` → ADR / DECISIONS
+### Pont 1 — Décisions : `PROJECT.md` → DECISIONS
 
 `PROJECT.md` porte une table **Key Decisions** (D1, D2…) = décisions *courantes du projet*, avec
 rationale et statut. Quand une décision devient **structurante et durable** (elle dépasse le projet,
-elle engage l'archi ou la méthodo), elle est **promue** en ADR/DECISIONS dans la mémoire.
+elle engage l'archi ou la méthodo), elle est **promue** en DECISIONS dans la mémoire.
 
-- Dans `.planning/` : on garde le `D-NN` avec un pointeur (« → ADR-0xx »).
-- Dans la mémoire : l'ADR porte le détail canonique.
+- Dans `.planning/` : on garde le `D-NN` avec un pointeur (« → DEC-0xx »).
+- Dans la mémoire : l'entrée DEC porte le détail canonique.
 - Le module `consolidator` (pilier *Promotion*) outille cette remontée si présent.
 
 ### Pont 2 — Avancement : `STATE.md` → JOURNAL
@@ -49,7 +49,7 @@ Un `SUMMARY.md` d'étape peut révéler un **pattern réutilisable** → il est 
 
 ## Anti-doublons (à ne jamais faire)
 
-- ❌ Recopier les ADR dans `PROJECT.md` (ou l'inverse).
+- ❌ Recopier les entrées DECISIONS dans `PROJECT.md` (ou l'inverse).
 - ❌ Tenir un historique long dans `STATE.md` (c'est le rôle du JOURNAL).
 - ❌ Dupliquer un BLOCKER dans `.planning/` : un blocage *en cours* se note dans `STATE.md` (todos),
   un blocage *capitalisé* va en BLOCKERS — pas les deux avec le même contenu.

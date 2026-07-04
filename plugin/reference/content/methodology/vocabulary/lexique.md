@@ -28,7 +28,7 @@
 
 | Registre | Sigle | Role |
 |----------|-------|------|
-| Decisions | BDR / ADR | Choix structurants + raisonnement + revision a J+90 |
+| Decisions | DEC (legacy : BDR / ADR) | Choix structurants + raisonnement + revision a J+90 |
 | Apprentissages | LRN | Patterns observes et generalises |
 | Blocages | BLK | Frictions + hypotheses eliminees + solutions |
 | Journal | JOURNAL | Trace chronologique factuelle des sessions |
@@ -67,7 +67,7 @@
 | Rituel | Cadence | Role |
 |--------|---------|------|
 | **Capitalisation** | A chaque session | Mise a jour des registres |
-| **Revision BDR** | J+90 par defaut | Verifier que la decision tient toujours |
+| **Revision DEC** | J+90 par defaut | Verifier que la decision tient toujours |
 | **Checkpoint** | Hebdo / mensuel | Audit dette + coherence systeme |
 | **Audit qualite agent** | Mensuel | Test cas piegeux + creation EVAL |
 

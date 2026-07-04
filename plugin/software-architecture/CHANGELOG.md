@@ -9,3 +9,15 @@ Initial release (ADR-035).
 - `rules/production-code-architecture.md` : rule path-scopée (`src/**`, `app/**`, `lib/**`, `features/**`).
 - `scripts/check-file-size.sh` : gate de taille (250L warn / 300L block) + test.
 - Origine : diagnostic d'architecture Permis Clair (2026-05-27).
+
+
+## [v1.1.0] — 2026-07-04 (ADR-043)
+
+### Ajouté
+- `guard-file-size.sh` — hook PreToolUse(Edit|Write) : DENY l'édition d'un fichier de code
+  ≥ 300 lignes sans marqueur `vibeflow:allow-large-file` (porte blindée Iron Law ADR-035).
+- `hooks/hooks.json` — gate câblé AUTOMATIQUEMENT dans settings.json à l'install
+  (avant : « optionnel mais recommandé » à brancher soi-même = jamais branché).
+
+### Tests
+- `test-guard-file-size.sh` (6).

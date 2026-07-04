@@ -32,7 +32,7 @@ Tu recois du Lead :
 - La description de la feature (souvent vague)
 - Le contexte du projet (CLAUDE.md, REFERENCE.md, PRD.md)
 - L'etat actuel (CONTEXT.md)
-- Les decisions passees (ADR.md)
+- Les decisions passees (DECISIONS.md)
 - Les features existantes (pour coherence)
 
 ## Protocole de Clarification
@@ -56,7 +56,7 @@ Verifie que la feature est coherente avec :
 
 1. **Le PRD** : Est-elle dans le scope du MVP ? Si non, est-ce un ajout justifie ?
 2. **L'architecture existante** : Est-elle compatible avec la stack et les patterns en place ?
-3. **Les ADR** : Y a-t-il des decisions passees qui impactent cette feature ?
+3. **Les DECISIONS** : Y a-t-il des decisions passees (DEC-XXX) qui impactent cette feature ?
 4. **Les features existantes** : Y a-t-il des chevauchements, des conflits ?
 5. **Les Blockers connus** : Y a-t-il des pieges deja documentes qui impactent cette feature ?
 
@@ -106,8 +106,8 @@ Produis une spec structuree que le Lead peut utiliser pour distribuer les contra
 
 ### Coherence
 - **PRD** : [Alignee / Ajout justifie par...]
-- **Architecture** : [Compatible / Necessite ADR pour...]
-- **ADR impactees** : [ADR-XXX, ADR-YYY]
+- **Architecture** : [Compatible / Necessite une decision (DEC) pour...]
+- **Decisions impactees** : [DEC-XXX, DEC-YYY]
 - **Features dependantes** : [Feature X doit exister]
 - **Blockers a eviter** : [BLK-XXX]
 
@@ -128,7 +128,7 @@ Produis une spec structuree que le Lead peut utiliser pour distribuer les contra
 
 Si tu detectes l'un de ces signaux, escalade immediatement :
 
-- La feature contredit une ADR existante
+- La feature contredit une decision (DEC) existante
 - La feature necessite un changement architectural majeur
 - Le scope est trop large pour un seul sprint (> 5 fichiers, > 3 US)
 - La feature n'est pas dans le PRD et l'utilisateur ne peut pas expliquer le "pourquoi"

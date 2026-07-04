@@ -13,7 +13,7 @@
 
 ## Décisions prises en cours de route
 
-- [décision + rationale → si structurante, promue en D-NN / ADR (voir bridge-memory.md)]
+- [décision + rationale → si structurante, promue en D-NN / DEC (voir bridge-memory.md)]
 
 ## Écarts vs plan
 

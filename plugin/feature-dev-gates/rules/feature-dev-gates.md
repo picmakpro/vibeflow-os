@@ -32,7 +32,7 @@ paths:
 
 ## Gate 2 — Decision Coverage (traçabilité décision → code)
 
-**Chaque décision applicable (ADR / DEC-XXX + décisions de la spec) DOIT être portée par le travail en cours — pas oubliée en chemin.**
+**Chaque décision applicable (DEC-XXX + décisions de la spec) DOIT être portée par le travail en cours — pas oubliée en chemin.**
 
 - Avant de coder, identifier les décisions qui contraignent cette feature (stack imposée, emplacement fichiers, pattern obligatoire…).
 - Si une décision applicable n'est couverte par aucune tâche/contrat → la rattacher avant de continuer.

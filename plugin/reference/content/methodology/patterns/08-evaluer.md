@@ -13,7 +13,7 @@ Les 7 premiers principes structurent le travail (constituer, capitaliser, transp
 L'hallucination n'est pas un bug. C'est une propriete statistique des LLMs : la capacite a produire un raisonnement assure et faux est leur mode de fonctionnement, pas un defaut.
 
 Sans evaluation systematique :
-- Une BDR signee machinalement apres 30 secondes (biais d'automatisation)
+- Une entree DECISIONS signee machinalement apres 30 secondes (biais d'automatisation)
 - Un template cree il y a 6 mois qui reflete des prix, des regles, un contexte obsoletes
 - Un agent qui produit des outputs "bons selon sa rubrique interne" mais la rubrique a derive
 - Une analyse acceptee sans verifier les chiffres ou les sources citees
@@ -65,7 +65,7 @@ Cout : temps humain. Limite : l'echantillonnage peut rater une derive isolee.
 
 30 jours apres une decision structurante, confronter la prediction a la realite observee.
 
-Exemple : une BDR prevoit 50 ventes beta en 6 semaines. A J+42, que dit la realite ? Si l'ecart est > 30%, une entree EVAL documente la derive et ajuste la methodologie.
+Exemple : une DEC prevoit 50 ventes beta en 6 semaines. A J+42, que dit la realite ? Si l'ecart est > 30%, une entree EVAL documente la derive et ajuste la methodologie.
 
 Cout : discipline (c'est le plus dur a maintenir). Limite : retrospectif, pas preventif.
 
@@ -73,7 +73,7 @@ Cout : discipline (c'est le plus dur a maintenir). Limite : retrospectif, pas pr
 
 | Type d'output | Frequence P-Evaluer |
 |---------------|---------------------|
-| Decision structurante (BDR) | Confrontation realite a J+30 |
+| Decision structurante (DEC) | Confrontation realite a J+30 |
 | Prediction quantitative (KPI, plan) | J+30, J+60, J+90 |
 | Template ou contenu produit | Trimestriel |
 | Script agentique (agent, skill) | A chaque update majeur |
@@ -86,7 +86,7 @@ Cout : discipline (c'est le plus dur a maintenir). Limite : retrospectif, pas pr
 ## EVAL-XXX : [Titre court]
 
 **Date** : YYYY-MM-DD
-**Output evalue** : [path du fichier OU description : "BDR-017 prevision 50 ventes beta"]
+**Output evalue** : [path du fichier OU description : "DEC-017 prevision 50 ventes beta"]
 **Contexte** : [quand l'output a ete produit]
 **Methode eval** : LLM-as-Judge | Cross-check humain | Confrontation realite | Manuelle structuree
 **Score qualitatif** : [rubrique + score]
@@ -101,7 +101,7 @@ Cout : discipline (c'est le plus dur a maintenir). Limite : retrospectif, pas pr
 [ ] Keep : l'output reste valide
 [ ] Correct : corriger l'output (lien vers correction)
 [ ] Deprecate : marquer l'output comme obsolete, remplacer
-[ ] Escalation : decision structurante requise (creer BDR)
+[ ] Escalation : decision structurante requise (creer une entree DEC-XXX)
 
 ### Learning associe
 [LRN-XXX si l'evaluation genere un pattern reutilisable]
@@ -129,7 +129,7 @@ Maxime configure 2 methodes d'evaluation :
 
 **EVAL-002** : proposition pour une PME industrielle. Score 5/5. Action : Keep.
 
-**EVAL-003** : proposition pour un coach. Score 2/5. Anomalie : l'agent a invente une reference client ("notre methodologie deployee chez plus de 50 cabinets") qui n'existe pas. Action : Deprecate cette tournure dans le prompt de base de l'agent. Escalation BDR.
+**EVAL-003** : proposition pour un coach. Score 2/5. Anomalie : l'agent a invente une reference client ("notre methodologie deployee chez plus de 50 cabinets") qui n'existe pas. Action : Deprecate cette tournure dans le prompt de base de l'agent. Escalation DEC.
 
 ### Capitalisation au bout de 3 mois
 
@@ -166,7 +166,7 @@ S'applique a : tous les agents customer-facing (proposition, sales, content mark
 
 ## Quand evaluer
 
-- **Toujours** pour les decisions structurantes (BDR) : confrontation realite a J+30
+- **Toujours** pour les decisions structurantes (DEC) : confrontation realite a J+30
 - **A chaque update** d'un agent ou d'un skill : verifier que la nouvelle version ne degrade pas
 - **Trimestriel** pour les templates et contenus produits il y a > 90 jours
 - **Mensuel** pour tout output public (formation, produit, contrat) : la derive cote ici est lue par des tiers

@@ -1,5 +1,28 @@
 # CHANGELOG — consolidator
 
+## [v1.2.0] — 2026-07-04 (ADR-043 — gouvernance scripturale)
+
+### Ajouté
+- `guard-read-registres.sh` — hook PreToolUse(Read) : DENY toute lecture d'un registre canonique
+  sans offset/limit au-delà de 150 lignes. L'Iron Law index-first est machine-enforced.
+- `check-registres.sh` — lint format (## Index + #Ligne, cohérence index↔body, doublons).
+  Modes `--strict` (gate init vf-new-lab Gate C) / `--hook` (SessionStart informatif).
+- `post-edit-reindex.sh` — hook PostToolUse(Edit|Write) : reindex --apply automatique du registre
+  édité + rotation des backups (3 max). L'index ne dérive plus.
+- `hooks/hooks.json` — les 4 hooks (guard-read, post-edit-reindex, check-registres, archive
+  SessionEnd) sont MERGÉS AUTOMATIQUEMENT dans `.claude/settings.json` à l'install (merge-hooks.sh).
+
+### Modifié
+- `reindex.sh` — bootstrap : crée le bloc `## Index` s'il est absent (registre v1/sortie d'init),
+  avec 2e passe pour recaler les #Ligne. Avant, --apply était silencieusement sans effet.
+- `detect-duplicates.sh` — couvre désormais DECISIONS.md (gap).
+- Canon DECISIONS.md/DEC-XXX dans SKILL/README/références ; spec index alignée sur reindex.sh
+  (5 colonnes, sans Tags) ; note obsolète « PreToolUse(Read) pas supporté » corrigée (le deny EST
+  supporté — vérifié doc Claude Code 2.1.201).
+
+### Tests
+- `test-guard-read-registres.sh` (8), `test-check-registres.sh` (8) + non-régression 14/14.
+
 ## [v1.0.0] — 2026-05-24
 
 ### Initial release

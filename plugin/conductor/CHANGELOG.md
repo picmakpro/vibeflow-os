@@ -72,3 +72,15 @@ Comble 4 trous identifiés à l'audit du plugin (cf. README).
 - Respecte ADR-031 (détecter/proposer, jamais corriger/migrer sans validation humaine), ADR-029
   (densité), ADR-030 (skills natifs, déléguer sans réimplémenter).
 - Ne fait JAMAIS le travail métier — il configure et garde le lab.
+
+
+## [v1.5.0] — 2026-07-04 (ADR-043)
+
+### Ajouté
+- vf-new-lab Phase 7 **GATE C — Conformité machine (BLOQUANT)** : l'init ne se conclut pas sans
+  `check-registres.sh --strict` exit 0 + hooks de gouvernance présents dans settings.json.
+- Phase 7 point 4 : après pose des registres, indexation par la machine
+  (`reindex.sh --all --apply`) — jamais d'index rédigé à la main.
+
+### Modifié
+- Canon DECISIONS.md/DEC-XXX (references/contracts.md).

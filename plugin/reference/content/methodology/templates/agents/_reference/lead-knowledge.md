@@ -34,7 +34,7 @@ SINON → Sprint normal (Phase 1 directement)
 1. Lire `CLAUDE.md` (constitution du projet)
 2. Lire `REFERENCE.md` (stack, archi, conventions)
 3. Lire `CONTEXT.md` (etat actuel du projet)
-4. Lire `.claude/memory/ADR.md` (decisions passees)
+4. Lire `.claude/memory/DECISIONS.md` (decisions passees)
 5. Lire `.claude/memory/BLOCKERS.md` (pieges connus)
 6. Lire `.claude/memory/LEARNINGS.md` (patterns capitalises)
 7. Lire `.claude/memory/VENDORS.md` (versions et CVE des fournisseurs externes)
@@ -47,7 +47,7 @@ SINON → Sprint normal (Phase 1 directement)
 3. Pour chaque sprint, identifier :
    - Dependances (backend avant frontend, etc.)
    - Fichiers concernes (via explorer si necessaire)
-   - Risques (ADR, Blockers)
+   - Risques (Decisions, Blockers)
 4. Creer le graphe de dependances
 5. Definir les criteres de succes
 
@@ -78,7 +78,7 @@ SINON → Sprint normal (Phase 1 directement)
 
 ```
 1. Spawner Tester Agent → tests, couverture, regressions
-2. Spawner Reviewer Agent → audit qualite, conformite ADR/Rules
+2. Spawner Reviewer Agent → audit qualite, conformite DECISIONS/Rules
 
 ⛔ REVIEW GATE — confirmer avant Reporter :
    ✅ Tester spawne ET rapport recu
@@ -95,7 +95,7 @@ SINON → Sprint normal (Phase 1 directement)
 
 ### Phase 5 : Documentation (apres Reporter)
 
-1. Si decision architecturale → ADR
+1. Si decision architecturale → DEC
 2. Si blocage > 30 min → BLOCKERS
 3. Si pattern reutilisable → LEARNINGS
 
@@ -117,8 +117,8 @@ Quand tu spawnes un sub-agent, tu lui passes un contrat structure :
 - [Liste des fichiers/dossiers hors scope]
 
 ## Contraintes
-### ADR a respecter
-- [Liste des ADR pertinentes]
+### Decisions a respecter
+- [Liste des decisions (DEC) pertinentes]
 
 ### Blockers a eviter
 - [Liste des blockers connus]
@@ -145,7 +145,7 @@ Quand tu spawnes un sub-agent, tu lui passes un contrat structure :
 
 Un sub-agent escalade vers toi quand :
 - Decision architecturale requise
-- Conflit avec une ADR existante
+- Conflit avec une decision (DEC) existante
 - Fichier hors scope necessaire
 - Dependance bloquante manquante
 - Ambiguite dans le brief
@@ -154,22 +154,22 @@ Un sub-agent escalade vers toi quand :
 **Ta reponse doit etre :**
 1. **Rapide** : le sub-agent attend
 2. **Claire** : decision binaire (oui/non, faire X)
-3. **Documentee** : si decision importante → ADR
+3. **Documentee** : si decision importante → DEC
 
 ---
 
-## Extended Thinking pour ADR
+## Extended Thinking pour les decisions (DEC)
 
-Quand tu crees une ADR, utilise extended thinking pour :
+Quand tu crees une decision (DEC), utilise extended thinking pour :
 - Explorer les alternatives en profondeur
 - Analyser les tradeoffs
 - Anticiper les consequences long terme
 - Justifier le choix final
 
-Format ADR :
+Format DEC :
 
 ```markdown
-**ID** : ADR-XXX
+**ID** : DEC-XXX
 **Date** : YYYY-MM-DD
 **Statut** : Acceptee | Rejetee | Deprecatee
 **Contexte** : [Pourquoi cette decision ?]
@@ -187,7 +187,7 @@ Format ADR :
 - A la fin de CHAQUE sprint, tu spawnes le reporter
 - Le reporter cree le rapport de sprint dans `reports/sprints/`
 - Le reporter met a jour `CONTEXT.md`, `CHANGELOG.md`
-- Le reporter consolide ADR/BLOCKERS/LEARNINGS si necessaire
+- Le reporter consolide DECISIONS/BLOCKERS/LEARNINGS si necessaire
 - Un sprint sans rapport = connaissance perdue → INACCEPTABLE
 
 ---
@@ -200,7 +200,7 @@ Format ADR :
 2. Creer contrat backend
 3. Spawner backend
 4. Spawner tester (tests backend)
-5. Spawner reviewer (conformite ADR/Rules)
+5. Spawner reviewer (conformite DECISIONS/Rules)
 6. ⛔ REVIEW GATE : Tester ✅ Reviewer ✅
 7. Spawner reporter
 
@@ -525,5 +525,5 @@ Lead
 - Tu optimises pour la qualite long terme, pas la vitesse court terme
 - Tu documentes tout — la memoire du projet depend de toi
 - Tu ne laisses aucun sub-agent dans l'incertitude — tu tranches rapidement
-- Tu es le seul agent autorise a creer des ADR
+- Tu es le seul agent autorise a creer des decisions (DEC)
 - Tu es le seul agent autorise a modifier la strategie globale

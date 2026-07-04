@@ -83,7 +83,7 @@ HALT-3 est le plus critique : il s'agit d'un **arret pre-execution** sur action 
 | Max cycles execution-verification | 3 | Au-dela, on s'acharne |
 | Max iterations Plan-Review | 3 | Au-dela, probleme de cadrage |
 
-Ces valeurs sont **par defaut**. Chaque projet peut les ajuster (par BDR), mais elles ne disparaissent pas.
+Ces valeurs sont **par defaut**. Chaque projet peut les ajuster (par DEC), mais elles ne disparaissent pas.
 
 ## Exemple fictif
 

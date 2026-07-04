@@ -38,7 +38,7 @@ Transformer l'expertise d'un fondateur en autorité éditoriale régulière, san
 
 ## Décisions clés
 | ID | Décision | Pourquoi | Statut | → Mémoire |
-| D1 | Ton "expert accessible", pas corporate | Aligne avec l'audience founder | Validée | → ADR-002 |
+| D1 | Ton "expert accessible", pas corporate | Aligne avec l'audience founder | Validée | → DEC-002 |
 ```
 
 ## STATE.md (extrait — la clé de voûte, en vocabulaire métier)

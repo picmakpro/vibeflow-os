@@ -1,0 +1,13 @@
+{
+  "description": "Audit infrastructure périodique au démarrage de session (ADR-031 + ADR-043) : détecte drift runtime/hooks/scripts si le dernier snapshot date de plus de 14 jours.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/audit-infra.sh --quick --if-older-than=14d || true" }
+        ]
+      }
+    ]
+  }
+}

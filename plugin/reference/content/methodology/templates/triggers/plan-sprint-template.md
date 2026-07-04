@@ -18,7 +18,7 @@ Spawner l'Explorer Agent pour scanner la codebase :
 
 ### Etape 2 : Analyse (Lead, think hard)
 1. Lire les User Stories prevues
-2. Verifier ADR applicables
+2. Verifier decisions (DEC) applicables
 3. Verifier BLOCKERS pour pieges connus
 4. Verifier LEARNINGS pour patterns a appliquer
 5. Si MCP disponible : verifier etat DB, erreurs recentes
@@ -43,4 +43,4 @@ Creer un contrat formel pour chaque sub-agent
 1. Plan avec graphe de dependances
 2. Contrats pour chaque sub-agent
 3. Risques identifies avec mitigations
-4. ADR si nouvelles decisions
+4. DEC si nouvelles decisions

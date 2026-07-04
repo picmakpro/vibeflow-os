@@ -50,8 +50,8 @@ Exemples :
 
 ## Contraintes
 
-### ADR a respecter
-[Liste des ADR pertinentes que l'agent DOIT suivre]
+### Decisions a respecter
+[Liste des decisions (DEC-XXX) pertinentes que l'agent DOIT suivre]
 
 Exemples :
 - ADR-003 : Minimum 1 test par Server Action
@@ -165,7 +165,7 @@ Exemples :
 
 **Escalade immediatement vers le Lead si :**
 - Decision architecturale requise
-- Conflit avec une ADR existante
+- Conflit avec une decision (DEC) existante
 - Fichier hors scope necessaire
 - Dependance bloquante manquante
 - Ambiguite dans le brief
@@ -180,7 +180,7 @@ Exemples :
 [Description precise en 1-2 phrases]
 
 **Contexte :**
-[Fichiers, ADR, tentatives]
+[Fichiers, decisions (DEC), tentatives]
 
 **Options considerees :**
 1. [Option A avec pros/cons]
@@ -281,7 +281,7 @@ Un sub-agent doit escalader vers le Lead dans les cas suivants :
 | Situation | Action | Bloquant ? |
 |-----------|--------|------------|
 | **Decision architecturale** | Escalader immediatement | OUI |
-| **Conflit avec ADR** | Escalader immediatement | OUI |
+| **Conflit avec une decision (DEC)** | Escalader immediatement | OUI |
 | **Fichier hors scope necessaire** | Escalader immediatement | OUI |
 | **Dependance bloquante manquante** | Escalader immediatement | OUI |
 | **Ambiguite dans le brief** | Escalader immediatement | OUI |
@@ -299,7 +299,7 @@ Un sub-agent doit escalader vers le Lead dans les cas suivants :
 
 **Contexte :**
 - Fichiers concernes : [Liste]
-- ADR pertinentes : [ADR-XXX]
+- Decisions pertinentes : [DEC-XXX]
 - Tentatives : [Ce qui a ete essaye]
 
 **Options considerees :**
@@ -339,9 +339,9 @@ Le Lead doit repondre **rapidement** (< 10 min) avec une decision **claire** :
 **Action immediate :**
 [Ce que le sub-agent doit faire maintenant]
 
-**ADR a creer ?**
-OUI → ADR-XXX (je la cree maintenant)
-NON → Decision mineure, pas besoin d'ADR
+**Decision a creer ?**
+OUI → DEC-XXX (je la cree maintenant)
+NON → Decision mineure, pas besoin d'entree DEC
 ```
 
 ---
@@ -359,7 +359,7 @@ NON → Decision mineure, pas besoin d'ADR
 | **Escalations** | Repondre rapidement aux escalations (< 10 min) |
 | **Reconciliation** | Verifier la coherence inter-agents (ex: types partages) |
 | **Arbitrage** | Trancher en cas de conflit (ex: backend vs frontend) |
-| **Documentation** | Creer les ADR pour les decisions architecturales |
+| **Documentation** | Creer les entrees DECISIONS pour les decisions architecturales |
 | **Visual Review** | Utiliser Chrome MCP pour verifier visuellement les features UI |
 | **Reporter** | Spawner OBLIGATOIREMENT le Reporter en fin de sprint |
 
@@ -372,7 +372,7 @@ NON → Decision mineure, pas besoin d'ADR
 | Implementer une feature backend | **backend** | Schema DB, Server Actions, validation |
 | Implementer une feature frontend | **frontend** | Composants UI, pages, integration donnees |
 | Ecrire des tests | **tester** | Tests unitaires, integration, e2e |
-| Auditer la qualite | **reviewer** | Conformite ADR/Rules, coherence types |
+| Auditer la qualite | **reviewer** | Conformite DECISIONS/Rules, coherence types |
 | Valider avant deploy | **production** | Production Gate, score GO/NO-GO |
 | Produire un rapport de sprint | **reporter** | Obligatoire en fin de sprint |
 | Tache simple (< 5 min) | **Aucun** | Le Lead fait lui-meme |
@@ -394,7 +394,7 @@ NON → Decision mineure, pas besoin d'ADR
 
 - Si un agent tourne en rond (> 3 iterations sans progres) → pivoter ou abandonner
 - Si une recherche ne produit rien d'actionnable → documenter le neant et passer a autre chose
-- Si les observations contredisent la methodologie → creer une ADR, pas ignorer
+- Si les observations contredisent la methodologie → creer une decision (DEC-XXX), pas ignorer
 
 ---
 
@@ -403,7 +403,7 @@ NON → Decision mineure, pas besoin d'ADR
 Apres chaque session orchestree, le Lead :
 
 1. **Met a jour `ITERATION_LOG.md`** (`.claude/memory/ITERATION_LOG.md`)
-2. **Cree les ADR** si decisions architecturales (`.claude/memory/ADR.md`)
+2. **Cree les entrees DEC** si decisions architecturales (`.claude/memory/DECISIONS.md`)
 3. **Cree les BLOCKERS** si blocages > 30 min (`.claude/memory/BLOCKERS.md`)
 4. **Cree les LEARNINGS** si patterns reutilisables (`.claude/memory/LEARNINGS.md`)
 5. **Deplace les idees emergentes** dans `docs/IDEAS.md`
@@ -450,7 +450,7 @@ Implementer la feature "User Management" : CRUD complet pour les utilisateurs.
 
 ## Contraintes
 
-### ADR a respecter
+### Decisions a respecter
 - ADR-003 : Minimum 1 test par Server Action (le tester s'en occupera)
 - ADR-005 : Utiliser Zod pour toute validation
 
@@ -570,7 +570,7 @@ Implementer la page "User Management" : liste des utilisateurs + formulaire crea
 
 ## Contraintes
 
-### ADR a respecter
+### Decisions a respecter
 - ADR-003 : Minimum 1 test render par composant (le tester s'en occupera)
 - ADR-005 : Utiliser le meme schema Zod que le backend pour validation
 
@@ -663,7 +663,7 @@ Avant de spawner un sub-agent, le Lead doit verifier :
 
 - [ ] Le contrat est complet (Mission, Scope, Contraintes, Dependances, Criteres de Succes)
 - [ ] Les dependances sont resolues (ex: backend termine avant frontend)
-- [ ] Les ADR/Blockers/Learnings pertinents sont identifies
+- [ ] Les Decisions/Blockers/Learnings pertinents sont identifies
 - [ ] Le timeout est realiste
 - [ ] Le format de retour est clair
 - [ ] Le protocole d'escalation est rappele

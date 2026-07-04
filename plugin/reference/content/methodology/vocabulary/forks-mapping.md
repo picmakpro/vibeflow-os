@@ -52,12 +52,12 @@ Utilise tes nouveaux mots pendant 2 semaines complettes. Note les frictions :
 
 Si un mot grince, change-le. Le bon vocabulaire est celui qui passe la barriere de l'usage spontane.
 
-### Etape 5 - Formaliser via BDR
+### Etape 5 - Formaliser via une decision (DEC)
 
-Documente ton fork dans une BDR. Format minimum :
+Documente ton fork dans une DEC. Format minimum :
 
 ```markdown
-## BDR-XXX - Vocabulaire du fork [NomFlow]
+## DEC-XXX - Vocabulaire du fork [NomFlow]
 
 **Date** : YYYY-MM-DD
 **Statut** : Active
@@ -81,11 +81,11 @@ Documente ton fork dans une BDR. Format minimum :
 
 - **Sur-fitting** : creer 8 nouveaux concepts qui n'existent pas dans le Core -> tu n'es plus dans la methodologie, tu en as cree une autre
 - **Sous-fitting** : garder le vocabulaire DevFlow sur un metier non-tech -> friction permanente
-- **Mapping non-documente** : changer les mots sans BDR -> dans 6 mois, plus personne ne se souvient pourquoi on dit "EDR" au lieu de "BDR"
+- **Mapping non-documente** : changer les mots sans DEC -> dans 6 mois, plus personne ne se souvient pourquoi on dit "EDR" au lieu de "BDR"
 - **Multi-vocabulaire dans le meme systeme** : utiliser "sprint" et "trimestre" en parallele -> incoherence des registres
 
 ## Regle d'or
 
 **Un fork = un mapping fige + documente + revisable.**
 
-Tu peux reviser le mapping (BDR de revision a J+90) si l'usage revele des frictions. Mais a un instant T, le vocabulaire de ton fork est unique et coherent.
+Tu peux reviser le mapping (DEC de revision a J+90) si l'usage revele des frictions. Mais a un instant T, le vocabulaire de ton fork est unique et coherent.

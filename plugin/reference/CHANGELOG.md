@@ -1,5 +1,14 @@
 # CHANGELOG — reference
 
+## [v2.2.0] — 2026-07-04 (ADR-043 — canon DECISIONS)
+
+### Modifié
+- `templates/memory/adr-template.md` → **`decisions-template.md`** : DECISIONS.md, IDs DEC-XXX,
+  index canonique v2 (`| ID | Date | Titre | #Ligne | Resume |`).
+- Canon DECISIONS.md/DEC-XXX propagé : VIBEFLOW_CORE, patterns (01-11), CLAUDE-template,
+  templates agents (lead/reviewer/tester/contracts/reporter/clarity-feature), triggers, lexique.
+  ADR.md/BDR.md rétrogradés en legacy (lus par les scripts, plus jamais prescrits).
+
 ## [v2.1.1] — 2026-06-03
 
 ### Pointeur P8 — outillage par-process (ADR-036 Lab)

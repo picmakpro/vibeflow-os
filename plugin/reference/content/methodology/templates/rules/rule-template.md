@@ -12,8 +12,8 @@ paths:
 
 # Regles [NOM_DOMAINE]
 
-## ADR Applicables
-- **ADR-XXX** : [Titre] — [Impact sur ce domaine]
+## Decisions Applicables
+- **DEC-XXX** : [Titre] — [Impact sur ce domaine]
 
 ## Patterns Obligatoires
 [Patterns specifiques a ce domaine]

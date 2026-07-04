@@ -31,7 +31,7 @@ pas en jargon importé.]
 ## Décisions clés
 
 > Décisions *courantes du projet*. Quand l'une devient structurante/durable → la promouvoir en
-> ADR/DECISIONS (mémoire) et garder ici un pointeur. Voir `bridge-memory.md`.
+> DECISIONS (DEC-XXX, mémoire) et garder ici un pointeur. Voir `bridge-memory.md`.
 
 | ID | Décision | Pourquoi | Statut | → Mémoire |
 |----|----------|----------|--------|-----------|

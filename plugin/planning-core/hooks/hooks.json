@@ -1,0 +1,13 @@
+{
+  "description": "État du socle planning injecté au démarrage de session (advisory, jamais bloquant) — ADR-040 + ADR-043.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-planning-state.sh || true" }
+        ]
+      }
+    ]
+  }
+}

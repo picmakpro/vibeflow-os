@@ -33,6 +33,7 @@ done
 register_file() {
   local name="$1"
   case "$name" in
+    DECISIONS)  echo "$MEMORY_DIR/DECISIONS.md" ;;
     ADR)        echo "$MEMORY_DIR/ADR.md" ;;
     LEARNINGS)  echo "$MEMORY_DIR/LEARNINGS.md" ;;
     BLOCKERS)   echo "$MEMORY_DIR/BLOCKERS.md" ;;
@@ -131,7 +132,7 @@ echo "  \"timestamp\": \"$(date -Iseconds 2>/dev/null || date)\","
 echo "  \"collisions\": ["
 
 first=true
-for r in ADR LEARNINGS BLOCKERS EVALS; do
+for r in DECISIONS ADR LEARNINGS BLOCKERS EVALS; do
   [ -n "$TARGET_REGISTER" ] && [ "$TARGET_REGISTER" != "$r" ] && continue
   f=$(register_file "$r")
   [ -f "$f" ] || continue
@@ -151,7 +152,7 @@ echo "  ],"
 
 echo "  \"similar_titles\": ["
 first=true
-for r in ADR LEARNINGS BLOCKERS EVALS; do
+for r in DECISIONS ADR LEARNINGS BLOCKERS EVALS; do
   [ -n "$TARGET_REGISTER" ] && [ "$TARGET_REGISTER" != "$r" ] && continue
   f=$(register_file "$r")
   [ -f "$f" ] || continue

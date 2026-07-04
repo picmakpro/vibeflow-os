@@ -236,8 +236,8 @@ Creer les 4 registres vides et commencer a capitaliser des la premiere session. 
 
 | Instance | Domaine | Specificite |
 |----------|---------|-------------|
-| **DevFlow** | Developpement | ADR / sprint dev / feature / bug / deploy |
-| **BusinessFlow** | Business | BDR / sprint strategique / initiative / obstacle / rollout |
+| **DevFlow** | Developpement | Sprint dev / feature / bug / deploy |
+| **BusinessFlow** | Business | Sprint strategique / initiative / obstacle / rollout |
 | **ContentFlow** | Contenu | Edition / script / friction / publish |
 | **GrowthFlow** | Marketing | Experiment / campaign / leak / launch |
 | **DesignFlow** | Design | Itération / mockup / inconsistance / release |

@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# check-registres.sh — Lint machine du format canonique des registres mémoire (ADR-043).
+# Détecte ce qui passait silencieusement : registre sans index, index sans colonne #Ligne,
+# entrées non indexées, IDs dupliqués, registre canonique manquant après init.
+#
+# Usage:
+#   check-registres.sh                       # lint les registres présents · exit 1 si non conforme
+#   check-registres.sh --strict              # GATE init : exige AUSSI l'existence des 5 registres canon
+#   check-registres.sh --hook                # SessionStart : informatif, sortie compacte, exit 0 toujours
+#   check-registres.sh --memory-dir=PATH     # défaut .claude/memory
+#
+# Checks par registre :
+#   C1 — header `## Index` présent (40 premières lignes)
+#   C2 — tableau d'index avec colonne `#Ligne` (format canonique v2, cf. consolidator/indexation)
+#   C3 — cohérence IDs index <-> body (via reindex.sh --audit : 0 orphelin exigé)
+#   C4 — aucun ID dupliqué dans le body
+#
+# Canon : DECISIONS LEARNINGS BLOCKERS JOURNAL EVALS · Legacy lus : ADR BDR ITERATION_LOG
+# (en --strict, un legacy présent compte comme substitut de son canon, avec avertissement).
+#
+# Codes de sortie : 0 = conforme · 1 = non conforme (ou registre canon manquant en --strict)
+
+set -uo pipefail
+
+MEMORY_DIR="${MEMORY_DIR:-.claude/memory}"
+STRICT=false
+HOOK_MODE=false
+
+for arg in "$@"; do
+  case "$arg" in
+    --strict)        STRICT=true ;;
+    --hook)          HOOK_MODE=true ;;
+    --memory-dir=*)  MEMORY_DIR="${arg#*=}" ;;
+    -h|--help)       grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
+    *)               echo "[check-registres] arg inconnu : $arg" >&2; exit 1 ;;
+  esac
+done
+
+REINDEX="$(dirname "$0")/reindex.sh"
+PROBLEMS=()
+WARNINGS=()
+
+id_pattern_for() {
+  case "$1" in
+    DECISIONS)             echo '(DEC|ADR)-[0-9]+' ;;
+    ADR)                   echo '(ADR|DEC)-[0-9]+' ;;
+    BDR)                   echo 'BDR-[0-9]+' ;;
+    LEARNINGS)             echo 'LRN-[0-9]+' ;;
+    BLOCKERS)              echo 'BLK-[0-9]+' ;;
+    EVALS)                 echo 'EVAL-[0-9]+' ;;
+    JOURNAL|ITERATION_LOG) echo 'Session [0-9]+' ;;
+    *)                     echo '[A-Z]+-[0-9]+' ;;
+  esac
+}
+
+check_register() {
+  local name="$1" file="$2"
+  local pat; pat="$(id_pattern_for "$name")"
+
+  # C1 — header ## Index
+  if ! head -40 "$file" | grep -q '^## Index'; then
+    PROBLEMS+=("$name : pas de header '## Index' (format canonique v2 requis)")
+    return
+  fi
+
+  # C2 — colonne #Ligne dans le tableau d'index
+  if ! head -60 "$file" | grep -E '^\|' | head -5 | grep -q '#Ligne'; then
+    PROBLEMS+=("$name : index sans colonne '#Ligne' (lecture ciblée impossible — regénérer : reindex.sh --register=$name --apply)")
+  fi
+
+  # C3 — cohérence IDs index <-> body (reindex --audit)
+  if [ -f "$REINDEX" ]; then
+    local audit orph_idx orph_body
+    audit="$(MEMORY_DIR="$MEMORY_DIR" bash "$REINDEX" "--register=$name" --audit 2>/dev/null)" || audit=""
+    if [ -n "$audit" ]; then
+      orph_idx="$(echo "$audit" | sed -n 's/.*"orphans_index_no_body": \([0-9]*\).*/\1/p' | head -1)"
+      orph_body="$(echo "$audit" | sed -n 's/.*"orphans_body_no_index": \([0-9]*\).*/\1/p' | head -1)"
+      [ "${orph_idx:-0}" -gt 0 ] 2>/dev/null && PROBLEMS+=("$name : $orph_idx entrée(s) d'index sans body")
+      [ "${orph_body:-0}" -gt 0 ] 2>/dev/null && PROBLEMS+=("$name : $orph_body entrée(s) de body non indexée(s) (reindex.sh --register=$name --apply)")
+    fi
+  fi
+
+  # C4 — IDs dupliqués dans le body
+  local dups
+  dups="$(grep -oE "^## ($pat)" "$file" 2>/dev/null | sed 's/^## //' | sort | uniq -d | tr '\n' ' ')"
+  [ -n "${dups// /}" ] && PROBLEMS+=("$name : ID(s) dupliqué(s) dans le body : $dups")
+}
+
+# ---------- Lint des registres présents ----------
+ALL_KNOWN="DECISIONS LEARNINGS BLOCKERS JOURNAL EVALS ADR BDR ITERATION_LOG"
+found_any=false
+for name in $ALL_KNOWN; do
+  file="$MEMORY_DIR/$name.md"
+  [ -f "$file" ] || continue
+  found_any=true
+  check_register "$name" "$file"
+done
+
+# ---------- Strict : les 5 registres canon doivent exister ----------
+if [ "$STRICT" = true ]; then
+  declare_missing() { PROBLEMS+=("registre canon manquant : $MEMORY_DIR/$1.md"); }
+  [ -f "$MEMORY_DIR/DECISIONS.md" ] || { { [ -f "$MEMORY_DIR/ADR.md" ] || [ -f "$MEMORY_DIR/BDR.md" ]; } && WARNINGS+=("DECISIONS.md absent — legacy ADR/BDR présent (migration conseillée : /vf-calibrate)") || declare_missing "DECISIONS"; }
+  [ -f "$MEMORY_DIR/JOURNAL.md" ]   || { [ -f "$MEMORY_DIR/ITERATION_LOG.md" ] && WARNINGS+=("JOURNAL.md absent — legacy ITERATION_LOG présent (migration conseillée : /vf-calibrate)") || declare_missing "JOURNAL"; }
+  for name in LEARNINGS BLOCKERS EVALS; do
+    [ -f "$MEMORY_DIR/$name.md" ] || declare_missing "$name"
+  done
+elif [ "$found_any" = false ]; then
+  # Hors strict, un lab sans aucun registre n'est pas une erreur (lab non initialisé).
+  [ "$HOOK_MODE" = true ] || echo "[check-registres] aucun registre dans $MEMORY_DIR — rien à vérifier"
+  exit 0
+fi
+
+# ---------- Rapport ----------
+n="${#PROBLEMS[@]}"
+if [ "$HOOK_MODE" = true ]; then
+  # SessionStart : compact, seulement si problème (injecté en contexte de session).
+  if [ "$n" -gt 0 ]; then
+    echo "[check-registres] ⚠ $n non-conformité(s) registres :"
+    for p in "${PROBLEMS[@]}"; do echo "  - $p"; done
+    echo "  Corriger : bash .claude/scripts/reindex.sh --all --apply · détail : check-registres.sh"
+  fi
+  exit 0
+fi
+
+for w in "${WARNINGS[@]+"${WARNINGS[@]}"}"; do echo "[check-registres] ⚠ $w"; done
+if [ "$n" -gt 0 ]; then
+  echo "[check-registres] ✗ $n non-conformité(s) :"
+  for p in "${PROBLEMS[@]}"; do echo "  - $p"; done
+  exit 1
+fi
+echo "[check-registres] ✓ registres conformes (format canonique v2)"
+exit 0

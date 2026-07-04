@@ -27,7 +27,7 @@ Resultat : les angles morts du plan sont detectes **avant execution**, pas decou
 
 | Type de plan | Couple reviewer recommande |
 |--------------|---------------------------|
-| Plan strategique (BDR, business) | `reviewer` + `validator` |
+| Plan strategique (DECISIONS, business) | `reviewer` + `validator` |
 | Plan de production technique | `reviewer` + `production-readiness` |
 | Plan de feature dev | `reviewer` + `tester` |
 | Plan editorial / contenu | `reviewer` + `editorial-style-validator` |
@@ -157,7 +157,7 @@ Resultat : 1 cycle d'Adversarial Plan-Review a evite une dette commerciale (deli
 | Type de decision | Plan-Review obligatoire ? |
 |------------------|---------------------------|
 | Plan structurant (impact > 1 semaine de travail) | OUI |
-| Plan strategique (decision BDR) | OUI |
+| Plan strategique (decision DEC) | OUI |
 | Plan en execution autonome `god-execution` | OUI (phase 4) |
 | Plan de routine (sprint dev classique) | NON (workflow standard suffit) |
 | Plan trivial (< 1h de travail) | NON |

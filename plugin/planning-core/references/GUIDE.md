@@ -62,7 +62,7 @@ justifie. **La rigueur est un curseur, pas un défaut maximal.**
 
 `.planning/` (avant/présent) et `.claude/memory/` (capitalisation/passé) sont **complémentaires**, pas
 concurrents. Le pont est défini dans `bridge-memory.md`. Règle d'or : **une information a un seul
-propriétaire.** Les décisions structurantes *durables* vivent en ADR/DECISIONS ; les décisions
+propriétaire.** Les décisions structurantes *durables* vivent en DECISIONS (DEC-XXX) ; les décisions
 *courantes du projet* vivent dans `PROJECT.md` et remontent en mémoire quand elles deviennent
 structurantes. Jamais les deux à la fois.
 

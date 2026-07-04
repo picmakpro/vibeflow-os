@@ -20,7 +20,7 @@ effort: high
   - Remplacer "[NOM_LAB]" par le nom de ton Lab (ex: "BusinessFlow", "MarketingFlow", "DevFlow", "MonProjet")
   - Remplacer "[ORCHESTRATING_AGENT]" par le nom de l'agent qui recevra l'escalation Phase 5
     (typiquement : `editor-architect`, `strategist`, `lead`, `architect`, `orchestrator`)
-  - Si ton Lab a une stack figee documentee (via ADR/decision), referencer cette ADR a la regle 5
+  - Si ton Lab a une stack figee documentee (via une decision DEC-XXX), referencer cette decision a la regle 5
     et ajouter une section "STACK TECHNIQUE FIGEE" en bas. Sinon, supprimer cette regle.
   - Si ton Lab distingue skills META (interne) vs LIVRABLES (template projet cible), garder la
     regle 4 et adapter les paths. Sinon, supprimer la regle 4 et utiliser uniquement `.claude/skills/`.
@@ -64,10 +64,10 @@ En cas de doute → escalade [ORCHESTRATING_AGENT] avant Phase 1.
 <!--
 [A PERSONNALISER] :
 Si ton Lab a une stack figee (decision architecturale qui contraint les choix techniques des skills LIVRABLES),
-referencer ici l'ADR correspondante. Sinon, supprimer cette regle.
+referencer ici la decision (DEC) correspondante. Sinon, supprimer cette regle.
 -->
 
-Tout skill LIVRABLE doit s'aligner sur la stack figee [REFERENCER_ADR]. Deviation → escalade [ORCHESTRATING_AGENT] AVANT Phase 1 pour creation ADR justifiant la deviation.
+Tout skill LIVRABLE doit s'aligner sur la stack figee [REFERENCER_DECISION]. Deviation → escalade [ORCHESTRATING_AGENT] AVANT Phase 1 pour creation d'une decision (DEC) justifiant la deviation.
 
 <!-- Source: ../skills/skill-creator-workflow/SKILL.md pour le workflow complet 5 phases -->
 <!-- Source: ../skills/skill-creator/SKILL.md pour le moteur Anthropic officiel -->
@@ -113,7 +113,7 @@ Resume :
 3. JAMAIS modifier frontmatter `skills:` d'un autre agent ([ORCHESTRATING_AGENT] le fait)
 4. JAMAIS livrer un skill generique (chaque paragraphe : reference OU chiffre OU exemple OU anti-pattern)
 5. JAMAIS colorer artificiellement un sujet agnostique avec folklore [NOM_LAB]
-6. JAMAIS ecraser skill existant sans ADR (archiver l'ancien dans `.archive/`)
+6. JAMAIS ecraser skill existant sans decision (DEC) (archiver l'ancien dans `.archive/`)
 7. JAMAIS devier de la stack figee sans escalade [ORCHESTRATING_AGENT] (si stack figee applicable)
 8. TOUJOURS conserver le workspace de recherche (`<skill-name>-workspace/`)
 9. TOUJOURS utiliser skill Anthropic `skill-creator` comme moteur de drafting
@@ -125,7 +125,7 @@ Resume :
 
 <!--
 [A PERSONNALISER] : adapter les paths aux conventions de ton Lab.
-Si ton Lab utilise des noms differents (ex: DECISIONS.md vs ADR.md, JOURNAL.md vs ITERATION_LOG.md), adapter.
+Canon : DECISIONS.md et JOURNAL.md (les anciens noms ADR.md / ITERATION_LOG.md restent acceptes en lecture — legacy).
 -->
 
 - `.claude/memory/ITERATION_LOG.md` : nom skill, type META/LIVRABLE, facettes, volume recherche, duree

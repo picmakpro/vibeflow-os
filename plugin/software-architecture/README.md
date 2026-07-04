@@ -32,8 +32,10 @@ Spécialise le principe Core **P9 — Modulariser pour la cognition**.
 .claude/scripts/vibeflow-update.sh install software-architecture
 ```
 
-Puis brancher le gate (optionnel mais recommandé) dans `.claude/settings.json` (hook PreToolUse
-ou Stop) : `bash .claude/scripts/check-file-size.sh --staged` (voir en-tête du script).
+Le gate est CÂBLÉ AUTOMATIQUEMENT à l'install (ADR-043) : hook `PreToolUse(Edit|Write)` →
+`guard-file-size.sh` (deny si fichier de code ≥ 300 lignes sans marqueur `vibeflow:allow-large-file`),
+mergé dans `.claude/settings.json` via `hooks/hooks.json` + `merge-hooks.sh`. Pour la CI/pre-commit,
+brancher en plus `bash .claude/scripts/check-file-size.sh --staged` (voir en-tête du script).
 
 ## Deux usages
 

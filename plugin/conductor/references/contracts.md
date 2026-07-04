@@ -20,7 +20,7 @@
 | Dérive de densité / hallucination | un agent > 250L, des noms de skills inventés |
 | Drift de framework | la version du lab ne correspond plus à la structure attendue |
 | Dette critique | registres désynchronisés, process générateur sans garde-fou |
-| Décision structurante non tracée | un choix d'archi pris sans ADR/DECISION |
+| Décision structurante non tracée | un choix d'archi pris sans entrée DECISIONS (DEC-XXX) |
 
 > Un sous-agent **ne corrige pas** un problème hors de son périmètre : il le **remonte**. Mieux vaut
 > escalader que deviner (cohérent avec l'Iron Law du conductor).
@@ -42,7 +42,7 @@
 2. **Déléguer l'audit** : pour tout ce qui touche conformité/structure/doctrine → `vibeflow-validator`
    (5 phases). Le conductor ne réaudite pas à la main.
 3. **Proposer une remédiation** — jamais l'appliquer sans validation humaine (ADR-031).
-4. **Tracer** : si une décision structurante émerge → ADR/DECISION ; si un pattern → LEARNING.
+4. **Tracer** : si une décision structurante émerge → DECISIONS (DEC-XXX) ; si un pattern → LEARNING.
 
 ## Frontière de responsabilité
 

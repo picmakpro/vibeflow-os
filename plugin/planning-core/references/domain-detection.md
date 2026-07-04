@@ -17,7 +17,7 @@ deviner. Mieux vaut un profil léger + une question qu'un profil complet imposé
 ## Où lire les signaux (par ordre de force)
 
 1. **`CLAUDE.md` / charte du lab** — la source la plus forte : que dit le lab de sa propre mission ?
-2. **Registres `.claude/memory/`** — de quoi parlent les ADR/LEARNINGS ? (code ? contenu ? vente ?)
+2. **Registres `.claude/memory/`** — de quoi parlent les DECISIONS/LEARNINGS ? (code ? contenu ? vente ?)
 3. **`docs/` et `README`** — vocabulaire dominant.
 4. **Structure de fichiers** — signal *faible*, à croiser, jamais décisif seul.
 

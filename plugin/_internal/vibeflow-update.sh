@@ -233,6 +233,62 @@ generate_agent_command_for() {
   fi
 }
 
+# ---------- Hooks de gouvernance (ADR-043) ----------
+# Un module peut déclarer hooks/hooks.json (format Claude Code, placeholder {{VF_SCRIPTS}}).
+# L'install MERGE le fragment dans le settings.json du scope ; l'uninstall le retire.
+# La gouvernance est posée par la machine — plus jamais un snippet à copier-coller.
+find_hooks_merger() {
+  local c
+  c="$CACHE_DIR/_internal/merge-hooks.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  c="$(dirname "$0")/merge-hooks.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  echo ""
+}
+
+scripts_prefix_for_scope() {
+  # Chemins LITTÉRAUX dans settings.json (expansés par le harness à l'exécution du hook).
+  case "$VF_SCOPE" in
+    user) printf '%s' '"$HOME"/.claude/scripts' ;;
+    *)    printf '%s' '"$CLAUDE_PROJECT_DIR"/.claude/scripts' ;;
+  esac
+}
+
+merge_module_hooks() {
+  local mod="$1"
+  local fragment="$CACHE_DIR/$mod/hooks/hooks.json"
+  [ -f "$fragment" ] || return 0
+  local merger
+  merger="$(find_hooks_merger)"
+  if [ -z "$merger" ]; then
+    log "  ERROR: merge-hooks.sh introuvable — hooks de $mod NON câblés (gouvernance absente !)"
+    return 0
+  fi
+  # Backup du settings avant toute écriture.
+  if [ -f "$TARGET_ROOT/settings.json" ]; then
+    mkdir -p "$BACKUP_DIR"
+    cp "$TARGET_ROOT/settings.json" "$BACKUP_DIR/settings-$(date +%Y%m%d-%H%M%S).json"
+  fi
+  if bash "$merger" merge "$fragment" --settings "$TARGET_ROOT/settings.json" --scripts-prefix "$(scripts_prefix_for_scope)"; then
+    log "  hooks mergés → $TARGET_ROOT/settings.json"
+  else
+    log "  ERROR: merge hooks ÉCHOUÉ pour $mod — gouvernance NON câblée (corriger settings.json puis réinstaller)"
+  fi
+}
+
+remove_module_hooks() {
+  local mod="$1"
+  local fragment="$CACHE_DIR/$mod/hooks/hooks.json"
+  [ -f "$fragment" ] || return 0
+  [ -f "$TARGET_ROOT/settings.json" ] || return 0
+  local merger
+  merger="$(find_hooks_merger)"
+  [ -n "$merger" ] || { log "  (retrait hooks impossible — merge-hooks.sh absent)"; return 0; }
+  if bash "$merger" remove "$fragment" --settings "$TARGET_ROOT/settings.json"; then
+    log "  hooks retirés de $TARGET_ROOT/settings.json"
+  else
+    log "  (retrait hooks échoué pour $mod — best-effort, nettoyer settings.json à la main)"
+  fi
+}
+
 # ---------- Install ----------
 install_module() {
   local mod="$1"
@@ -343,6 +399,9 @@ install_module() {
     generate_agent_command_for "$mod"
   fi
 
+  # Hooks de gouvernance (ADR-043) : fragment hooks/hooks.json → mergé dans settings.json.
+  merge_module_hooks "$mod"
+
   # SCOPE-04 : en scope local seulement, ajouter les chemins installés au ./.gitignore.
   gitignore_add_paths "$mod"
 
@@ -437,6 +496,9 @@ uninstall_module() {
       [ -f "$TARGET_ROOT/rules/$name" ] && rm "$TARGET_ROOT/rules/$name" && log "  removed $TARGET_ROOT/rules/$name"
     done
   fi
+
+  # Hooks de gouvernance (ADR-043) : retirer les entrées du module de settings.json.
+  remove_module_hooks "$mod"
 
   mark_uninstalled "$mod"
   log "✓ $mod désinstallé"

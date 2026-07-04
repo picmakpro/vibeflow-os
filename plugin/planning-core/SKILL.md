@@ -96,7 +96,7 @@ Deux topologies. **Ne pas plaquer la mauvaise.**
 
 4. **Établir le pont mémoire** (`references/bridge-memory.md`) : `.planning/` = couche *avant/présent*
    (vivante) ; les registres `.claude/memory/` = couche *capitalisation* (figée). Définir où les
-   décisions clés de `PROJECT.md` remontent en ADR/DECISIONS et où `STATE.md` alimente le JOURNAL —
+   décisions clés de `PROJECT.md` remontent en DECISIONS et où `STATE.md` alimente le JOURNAL —
    **sans dupliquer**.
 
 5. **Récap** : montrer l'arbo posée, le profil, et la prochaine action en vocabulaire du lab.
@@ -134,7 +134,7 @@ Deux topologies. **Ne pas plaquer la mauvaise.**
 
 - ❌ Scaffolder un `.planning/` dev complet sur un lab de contenu « parce que c'est le template ».
 - ❌ Créer `REQUIREMENTS.md` + `phases/` pour un lab où le travail n'est pas découpé en exigences.
-- ❌ Recopier les ADR dans `PROJECT.md` (doublon mémoire).
+- ❌ Recopier les entrées DECISIONS dans `PROJECT.md` (doublon mémoire).
 - ❌ Démarrer le scaffolding sans avoir lu `CLAUDE.md` / le métier du lab.
 - ❌ Laisser `STATE.md` se périmer (c'est la clé de voûte — toujours le rafraîchir).
 

@@ -40,7 +40,7 @@ Ouvrir le fichier et faire un **rechercher-remplacer global** :
 |------------|---------------|---------|
 | `[NOM_LAB]` | Nom de ton Lab | `BusinessFlow`, `MarketingFlow`, `DevFlow`, `MonProjet` |
 | `[ORCHESTRATING_AGENT]` | Nom de l'agent orchestrateur de ton Lab | `editor-architect`, `strategist`, `lead`, `architect`, `orchestrator` |
-| `[REFERENCER_ADR]` (si stack figée) | Référence ADR | `ADR-003`, `ADR-018`, ou supprimer la règle 5 |
+| `[REFERENCER_DECISION]` (si stack figée) | Référence décision | `DEC-003`, `DEC-018`, ou supprimer la règle 5 |
 
 **Frontmatter** (section `skills:`) :
 
@@ -55,7 +55,7 @@ Si tu n'as pas de skill de recherche dédié au domaine, **supprimer la 3ème li
 
 **Règles à conserver / supprimer** :
 - **Règle 4 (META vs LIVRABLE)** : conserver si ton Lab distribue des templates aux projets cibles (genre VibeFlow → projets dérivés). Sinon, supprimer la règle entière.
-- **Règle 5 (stack figée)** : conserver si ton Lab a une stack technique figée par ADR. Sinon, supprimer.
+- **Règle 5 (stack figée)** : conserver si ton Lab a une stack technique figée par décision (DEC). Sinon, supprimer.
 
 ### 2.2 — Workflow `.claude/skills/skill-creator-workflow/SKILL.md`
 
@@ -73,7 +73,7 @@ Le tableau actuel propose 6 familles génériques (Technique / Workflow / Métho
 
 **Paths mémoire** (section finale "Capitalisation obligatoire") :
 
-Si ton Lab utilise des conventions différentes (ex: `DECISIONS.md` au lieu de `ADR.md`, `JOURNAL.md` au lieu de `ITERATION_LOG.md`), adapter.
+Canon : `DECISIONS.md` et `JOURNAL.md` (`ADR.md` / `ITERATION_LOG.md` legacy acceptés en lecture).
 
 ### 2.3 — Skill Anthropic `.claude/skills/skill-creator/`
 
@@ -99,7 +99,7 @@ Le frontmatter doit :
 ### 3.2 — Vérifier qu'il ne reste plus de placeholder
 
 ```bash
-grep -rn "\[NOM_LAB\]\|\[ORCHESTRATING_AGENT\]\|\[REFERENCER_ADR\]\|\[A PERSONNALISER\]" \
+grep -rn "\[NOM_LAB\]\|\[ORCHESTRATING_AGENT\]\|\[REFERENCER_DECISION\]\|\[A PERSONNALISER\]" \
   "$LAB_ROOT/.claude/agents/skill-creator.md" \
   "$LAB_ROOT/.claude/skills/skill-creator-workflow/SKILL.md"
 ```
