@@ -12,6 +12,8 @@
 ```yaml
 ---
 name: business-pilot-commercial
+description: >-
+  Pilote le pipeline commercial du lab — qualification des leads, propositions, pricing — sans jamais facturer ni coder. Use when un lead entre au pipeline, une proposition ou un devis est à préparer, une décision tarifaire est à instruire, ou lors d'une revue de pipeline.
 model: sonnet
 memory: project
 skills:

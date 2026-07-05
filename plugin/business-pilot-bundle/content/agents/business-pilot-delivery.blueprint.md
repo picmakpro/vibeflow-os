@@ -11,6 +11,8 @@
 ```yaml
 ---
 name: business-pilot-delivery
+description: >-
+  Exécute et suit la livraison des prestations vendues — onboarding, jalons, SLA, satisfaction — avec gate de vérification avant tout envoi. Use when une opportunité gagnée passe en delivery, un jalon arrive à échéance, un livrable est prêt à envoyer, ou un signal d'upsell ou de churn apparaît.
 model: sonnet
 memory: project
 skills:

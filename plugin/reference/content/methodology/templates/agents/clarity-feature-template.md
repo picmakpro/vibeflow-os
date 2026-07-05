@@ -3,6 +3,7 @@ name: clarity-feature
 description: Clarifie une feature avant implementation — valide completude, coherence business, faisabilite technique
 model: sonnet
 effort: high
+memory: project
 ---
 
 # Clarity Feature Agent — Clarification Pre-Implementation

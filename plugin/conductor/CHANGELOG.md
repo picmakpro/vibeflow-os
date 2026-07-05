@@ -1,5 +1,39 @@
 # Changelog — conductor
 
+## [v1.6.0] — 2026-07-05 (ADR-044 — agents natifs machine-enforced)
+
+### Ajouté
+- `check-agents.sh` — lint machine de la conformité NATIVE des agents (.claude/agents/*.md) :
+  frontmatter présent, name/description/model/memory requis, enums valides (référentiel doc
+  officielle 2026-07-05), skills déclarés EXISTANTS (--strict), champs inconnus signalés (typos),
+  BUDGET DE PRÉCHARGEMENT (skills: injecte le SKILL.md entier au startup — warn > 200L/skill,
+  erreur > 1200L cumulées VF_PRELOAD_MAX, erreur si disable-model-invocation, warn si context:fork).
+- `guard-agent-write.sh` — hook PreToolUse(Write) : un agent non natif ne peut plus être ÉCRIT
+  dans .claude/agents/ (deny avec erreurs précises + squelette canonique).
+- `hooks/hooks.json` — guard Write + check-agents SessionStart posés automatiquement à l'install.
+- vf-new-lab Phase 7 : squelette frontmatter canonique OBLIGATOIRE (point 5) + règle de chargement
+  du contexte (précharger ≤ 200L systématiques, on-demand sinon) + format de retour standard et
+  pont d'escalade C4 dans le body de chaque agent + **Gate C étendu** (check-agents --strict).
+
+### Décision
+- contracts.md n'est PAS posé à l'init (pas un mécanisme runtime — sa valeur, format de retour +
+  escalade, vit dans le body des agents et pointe vers conductor-references/contracts.md).
+
+### Tests
+- `test-check-agents.sh` (14 : lint 10 + guard 4).
+
+
+## [v1.5.0] — 2026-07-04 (ADR-043)
+
+### Ajouté
+- vf-new-lab Phase 7 **GATE C — Conformité machine (BLOQUANT)** : l'init ne se conclut pas sans
+  `check-registres.sh --strict` exit 0 + hooks de gouvernance présents dans settings.json.
+- Phase 7 point 4 : après pose des registres, indexation par la machine
+  (`reindex.sh --all --apply`) — jamais d'index rédigé à la main.
+
+### Modifié
+- Canon DECISIONS.md/DEC-XXX (references/contracts.md).
+
 ## v1.3.0 — 2026-06-24
 
 `vf-new-lab` évolue en **Lab Factory clarification-first** (pipeline 7 phases). L'init ne pose plus un
@@ -72,15 +106,3 @@ Comble 4 trous identifiés à l'audit du plugin (cf. README).
 - Respecte ADR-031 (détecter/proposer, jamais corriger/migrer sans validation humaine), ADR-029
   (densité), ADR-030 (skills natifs, déléguer sans réimplémenter).
 - Ne fait JAMAIS le travail métier — il configure et garde le lab.
-
-
-## [v1.5.0] — 2026-07-04 (ADR-043)
-
-### Ajouté
-- vf-new-lab Phase 7 **GATE C — Conformité machine (BLOQUANT)** : l'init ne se conclut pas sans
-  `check-registres.sh --strict` exit 0 + hooks de gouvernance présents dans settings.json.
-- Phase 7 point 4 : après pose des registres, indexation par la machine
-  (`reindex.sh --all --apply`) — jamais d'index rédigé à la main.
-
-### Modifié
-- Canon DECISIONS.md/DEC-XXX (references/contracts.md).

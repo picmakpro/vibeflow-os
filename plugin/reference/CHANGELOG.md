@@ -1,5 +1,11 @@
 # CHANGELOG — reference
 
+## [v2.2.1] — 2026-07-05 (ADR-044)
+
+### Corrigé
+- 7 templates d'agents (business-agent, clarity-feature, lead, explorer, tester, reporter,
+  reviewer) : `memory: project` ajouté au frontmatter (souveraineté mémoire, charte ADR-044).
+
 ## [v2.2.0] — 2026-07-04 (ADR-043 — canon DECISIONS)
 
 ### Modifié

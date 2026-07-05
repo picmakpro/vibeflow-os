@@ -2,6 +2,7 @@
 name: reporter
 description: Sub-agent reporter. Cloture chaque sprint en consolidant le rapport, l'index CONTEXT, le CHANGELOG et les registres memoire (DECISIONS, BLOCKERS, LEARNINGS, VENDORS, EVALS). Spawne obligatoirement par le Lead apres REVIEW GATE verte. Ne touche aucun code, aucun test, aucune configuration projet.
 model: sonnet
+memory: project
 ---
 
 # Mandat

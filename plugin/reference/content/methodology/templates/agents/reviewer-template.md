@@ -4,6 +4,7 @@ description: Sub-agent reviewer. Audit qualite du code produit en fin de sprint 
 model: sonnet
 skills:
   - debugger
+memory: project
 ---
 
 # Mandat

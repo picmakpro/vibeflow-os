@@ -6,6 +6,7 @@ effort: medium
 skills:
   - [SKILL_DOMAINE_1]
   - [SKILL_DOMAINE_2]
+memory: project
 ---
 
 # Business Agent — [DOMAINE]

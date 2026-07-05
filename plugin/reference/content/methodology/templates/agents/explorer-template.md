@@ -2,6 +2,7 @@
 name: explorer
 description: Sub-agent explorer en lecture seule. Scanne la codebase pour identifier les fichiers impactes par une feature, lister les TODO/FIXME, analyser les dependances entre fichiers et auditer la structure projet. Utilise uniquement Read, Glob, Grep et Bash en mode read-only. Ne modifie JAMAIS aucun fichier. Sortie structuree obligatoire (jamais de texte libre).
 model: haiku
+memory: project
 ---
 
 # Mandat

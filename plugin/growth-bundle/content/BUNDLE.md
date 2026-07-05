@@ -97,7 +97,7 @@ l'enjeu de vérification machine d'un projet de code. Le socle `.planning/` pos�
 5. **Registres mémoire** — pose les 5 registres canon (DECISIONS / LEARNINGS / BLOCKERS / JOURNAL /
    EVALS) selon `content/registres.md` (chacun démarre par un index tableau).
 6. **Instanciation des agents** — pour CHAQUE blueprint de `content/agents/`, crée
-   `.claude/agents/<nom>.md` ≤250L : recopie le frontmatter cible (name/model/memory/skills), la
+   `.claude/agents/<nom>.md` ≤250L : recopie le frontmatter cible (name/description/model/memory/skills — gate `check-agents.sh`, ADR-044), la
    Mission, le Workflow et les Contraintes ; **crée les skills déclarés via `skill-creator`** s'ils
    n'existent pas (le savoir ne s'inline pas dans l'agent — ADR-029).
 7. **Câblage des auditeurs (filet obligatoire)** — installe/active l'agent `vibeflow-validator` et

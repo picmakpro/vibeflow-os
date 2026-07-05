@@ -11,6 +11,8 @@
 ```yaml
 ---
 name: business-pilot-finance
+description: >-
+  Pilote revenus, facturation préparée, rentabilité et prévisions — le lab prépare, l'humain exécute dans les outils. Use when une facture est à préparer, une business review est due, une prévision est à réviser, ou un seuil d'alerte (impayé, cash, marge) est franchi.
 model: sonnet
 memory: project
 skills:

@@ -165,22 +165,49 @@ Dériver puis poser (déléguer, ne pas réinventer) :
    pose, **indexer par la machine** : `bash .claude/scripts/reindex.sh --all --apply` (crée/recale le
    bloc `## Index` + colonne `#Ligne` de chaque registre — ne jamais rédiger un index à la main).
 5. **Agents métier** (2-3, pattern business-agent ; ou instanciés depuis un bundle si présent) —
-   **câbler les skills fabriqués** (Phases 5-6) dans leur frontmatter `skills:` (attribution décidée ici,
-   d'après les escalades du fan-out).
+   chaque agent posé porte le **frontmatter canonique COMPLET (ADR-044, vérifié machine)** :
+   ```yaml
+   ---
+   name: <kebab-case, = nom du fichier>
+   description: <QUAND utiliser cet agent — c'est le déclencheur du routage automatique ; inclure « Use when… »>
+   model: <sonnet|opus|haiku|fable|inherit — choix JUSTIFIÉ par la mission>
+   memory: project        # souveraineté mémoire — cross-session, versionnable
+   skills: [<skills EXISTANTS — fabriqués Phases 5-6 ou créés via skill-creator, JAMAIS une promesse>]
+   effort: <optionnel : low|medium|high|xhigh|max>
+   tools: <optionnel : restreindre si l'agent est en lecture/analyse>
+   ---
+   ```
+   **Câbler les skills fabriqués** (Phases 5-6) dans `skills:` (attribution décidée ici, d'après les
+   escalades du fan-out). Un agent sans `description` n'est JAMAIS auto-routé ; un skill déclaré mais
+   non créé est une hallucination (Gate C le bloque).
+   **Règle de chargement du contexte (ADR-044, vérité runtime)** : `skills:` injecte le SKILL.md
+   ENTIER au startup de l'agent ; le on-demand est le défaut natif (description seule au startup,
+   ~zéro coût ; contenu chargé à l'invocation ; `references/` à la demande via Read). Donc :
+   **précharger UNIQUEMENT les skills courts (≤ 200L) utilisés à chaque mission de l'agent** ;
+   tout le reste vit en on-demand avec une `description` déclenchable ; budget préchargé cumulé
+   ≤ 1200 lignes par agent (gate machine `check-agents.sh`). Le **body** de chaque agent se termine par le
+   format de retour standard (`**Statut** : FAIT|PARTIEL|BLOQUÉ · **Livrable** · **Décisions (DEC-XXX)**
+   · **Reste/risques**) et le pont d'escalade C4 (`@.claude/agents/conductor-references/contracts.md`)
+   — Claude Code n'a aucun contrat natif agent↔sous-agent, cette convention est la seule couche.
 6. **Garde-fous** — `vibeflow-validator` + `audit-architecture` (auditeurs toujours présents).
 7. **Commandes d'incarnation (ADR-042)** — balayer **tous** les agents posés :
    `VF_TARGET_ROOT=<.claude> conductor/scripts/generate-agent-commands.sh`. Génère une `/agent` par
    agent (métier + gouvernance) qui l'**incarne dans la fenêtre principale** (session courante), pas en
    sous-agent. Idempotent (ne réécrit pas une commande existante). Détail : `references/agent-command-incarnation.md`.
 8. **Stamp framework** — `framework-version.sh stamp` (rendu **visible au récap**).
-9. **GATE C — Conformité machine (ADR-043, BLOQUANT)** — l'init ne se conclut PAS tant que :
-   `bash .claude/scripts/check-registres.sh --strict` sort en **exit 0** (5 registres canon présents,
-   `## Index` + colonne `#Ligne`, IDs cohérents index↔body, zéro doublon) **ET** que les hooks de
-   gouvernance sont câblés : `grep -q guard-read-registres .claude/settings.json` (posés automatiquement
-   par `vibeflow-install` via `hooks/hooks.json` + `merge-hooks.sh` — s'ils manquent, réinstaller le
-   module `consolidator`, ne JAMAIS les recopier à la main). En cas d'échec : corriger
-   (`reindex.sh --all --apply`, re-poser le registre manquant) puis relancer le gate. **Comme le Gate A,
-   ce grep/script est la preuve — pas ton impression que « ça a l'air bon ».**
+9. **GATE C — Conformité machine (ADR-043 + ADR-044, BLOQUANT)** — l'init ne se conclut PAS tant que
+   les TROIS vérifications machine ne passent pas :
+   1. `bash .claude/scripts/check-registres.sh --strict` → **exit 0** (5 registres canon présents,
+      `## Index` + colonne `#Ligne`, IDs cohérents index↔body, zéro doublon) ;
+   2. `bash .claude/scripts/check-agents.sh --strict` → **exit 0** (chaque agent : frontmatter natif
+      complet name/description/model/memory, enums valides, skills déclarés EXISTANTS, budget de
+      préchargement respecté) ;
+   3. hooks de gouvernance câblés : `grep -q guard-read-registres .claude/settings.json` (posés
+      automatiquement par `vibeflow-install` via `hooks/hooks.json` + `merge-hooks.sh` — s'ils
+      manquent, réinstaller le module, ne JAMAIS les recopier à la main).
+   En cas d'échec : corriger (`reindex.sh --all --apply`, compléter le frontmatter, créer le skill
+   manquant via skill-creator) puis relancer le gate. **Comme le Gate A, ces scripts sont la preuve —
+   pas ton impression que « ça a l'air bon ».**
 
 > **Bundle métier (raccourci)** : si un bundle est installé (`docs/<metier>-bundle/`), s'en servir comme
 > **bibliothèque** — piocher blueprints d'agents + manifeste de capacités suggéré — **jamais comme moule**.

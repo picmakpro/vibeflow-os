@@ -1,5 +1,10 @@
 # CHANGELOG — growth-bundle
 
+## [v1.0.1] — 2026-07-05 (ADR-044)
+
+### Corrigé
+- BUNDLE.md : l'énumération d'instanciation inclut `description` (idem content-bundle).
+
 Toutes les évolutions notables de ce bundle métier sont consignées ici.
 Format : [SemVer]. Dates : YYYY-MM-DD.
 

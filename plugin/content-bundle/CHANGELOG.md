@@ -1,5 +1,11 @@
 # CHANGELOG — content-bundle
 
+## [v1.0.1] — 2026-07-05 (ADR-044)
+
+### Corrigé
+- BUNDLE.md : l'énumération d'instanciation inclut `description` (le frontmatter cible des
+  blueprints l'avait, mais la consigne de recopie l'omettait — les agents sortaient muets).
+
 ## [v1.0.0] — 2026-06-11
 
 ### Création du bundle métier content (ContentFlow)

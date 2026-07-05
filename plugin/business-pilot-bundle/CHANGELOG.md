@@ -1,5 +1,12 @@
 # CHANGELOG — business-pilot-bundle
 
+## [v1.1.0] — 2026-07-05 (ADR-044)
+
+### Corrigé
+- Les 3 blueprints (commercial/delivery/finance) reçoivent une `description:` dans le frontmatter
+  cible — sans elle, les agents instanciés n'étaient JAMAIS auto-routés par le runtime.
+- BUNDLE.md : l'énumération d'instanciation inclut `description` (obligatoire, gate check-agents).
+
 Toutes les évolutions notables de ce bundle métier. Convention de versionnage : SemVer (`vMAJEUR.MINEUR.CORRECTIF`).
 
 ---
