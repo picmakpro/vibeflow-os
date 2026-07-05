@@ -6,14 +6,16 @@
 # Câblage (posé automatiquement par l'install du module consolidator) :
 #   PreToolUse · matcher "Read" · command: bash .claude/scripts/guard-read-registres.sh
 #
-# Règle :
+# Règle (resserrée BLK-007 : valider les VALEURS des paramètres, pas leur présence —
+# un Read(offset=1) sans limit, ou limit=100000, lisait tout le fichier) :
 #   - fichier lu ∈ {DECISIONS,LEARNINGS,BLOCKERS,EVALS,JOURNAL}.md (+ legacy ADR/BDR/ITERATION_LOG)
 #     sous .claude/memory/ (hors archive/)
-#   - ET l'appel Read ne précise NI offset NI limit
 #   - ET le registre dépasse VF_GUARD_MAX_LINES (défaut 150) lignes
+#   - ET la fenêtre de lecture n'est pas bornée : limit ABSENT, ou limit > VF_GUARD_MAX_READ
+#     (défaut 60) — offset seul ne borne RIEN.
 #   → BLOQUE (permissionDecision "deny") avec la marche à suivre index-first.
-#   Tout le reste passe (lecture d'index avec limit, lecture ciblée offset/limit,
-#   petits registres, fichiers hors registres, archives).
+#   Passe : lecture bornée (limit ≤ 60, avec ou sans offset), petits registres (≤ 150),
+#   fichiers hors registres, archives.
 #
 # NB : le programme python est passé en -c (PAS en heredoc sur stdin) — le payload JSON
 # du hook arrive sur stdin et doit rester lisible par json.load(sys.stdin).
@@ -36,10 +38,6 @@ except Exception:
 tool_input = payload.get("tool_input") or {}
 file_path = tool_input.get("file_path") or ""
 if not file_path:
-    sys.exit(0)
-
-# Lecture ciblée (offset et/ou limit fournis) : toujours autorisée.
-if tool_input.get("offset") is not None or tool_input.get("limit") is not None:
     sys.exit(0)
 
 REGISTRES = {
@@ -72,12 +70,34 @@ except OSError:
 if n_lines <= max_lines:
     sys.exit(0)
 
+# BLK-007 : ce qui borne une lecture, c est la VALEUR de limit — pas la présence d un
+# paramètre. offset seul = lecture jusqu au bout ; limit énorme = fenêtre non bornée.
+max_read = 60
+try:
+    max_read = int(os.environ.get("VF_GUARD_MAX_READ", "60"))
+except ValueError:
+    pass
+
+limit = tool_input.get("limit")
+try:
+    limit = int(limit) if limit is not None else None
+except (TypeError, ValueError):
+    limit = None
+
+if limit is not None and 0 < limit <= max_read:
+    sys.exit(0)
+
+if limit is None:
+    cause = "appel sans limit (un offset seul ne borne rien : lecture jusqu au bout du fichier)"
+else:
+    cause = f"limit={limit} > plafond {max_read}"
 reason = (
-    f"Lecture non ciblée d un registre interdite ({base} : {n_lines} lignes). "
-    "Règle index-first (consolidator) : 1) lis l index en en-tête — Read(file_path, limit=40) ; "
-    "2) repère la colonne #Ligne de l entrée visée ; "
-    "3) lis uniquement cette entrée — Read(file_path, offset=<#Ligne>, limit=<taille entrée>). "
-    "Un registre ne se charge jamais en entier hors checkpoint."
+    f"Lecture non bornée d un registre interdite ({base} : {n_lines} lignes — {cause}). "
+    f"Règle index-first (consolidator) : 1) lis l index en en-tête — Read(file_path, limit=40) ; "
+    f"2) repère la colonne #Ligne de l entrée visée ; "
+    f"3) lis uniquement cette entrée — Read(file_path, offset=<#Ligne>, limit=<taille entrée, ≤ {max_read}>). "
+    f"Entrée plus longue que {max_read} lignes : enchaîne plusieurs fenêtres. "
+    f"Un registre ne se charge jamais en entier hors checkpoint."
 )
 print(json.dumps({
     "hookSpecificOutput": {

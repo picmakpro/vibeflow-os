@@ -156,7 +156,7 @@ for si, seg in enumerate(segments):
     reason = (
         f"Lecture non ciblée d un registre via Bash interdite ({base} : {n} lignes). "
         "Règle index-first (consolidator) : 1) lis l index — Read(file_path, limit=40) ; "
-        "2) repère la colonne #Ligne ; 3) cible — Read(file_path, offset=<#Ligne>, limit=<N>) "
+        "2) repère la colonne #Ligne ; 3) cible — Read(file_path, offset=<#Ligne>, limit=<N, ≤60>) "
         "ou `sed -n <a>,<b>p` / `grep -n <ID>`. Un registre ne se charge jamais en entier "
         "hors checkpoint."
     )

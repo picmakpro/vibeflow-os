@@ -40,7 +40,7 @@ L'index existant des registres VibeFlow (tableau Markdown en tete) :
 
 ## Pourquoi pas d'AST-aware Read ?
 
-Issue GitHub anthropics/claude-code #34304 (FEATURE Structural File Reading AST-aware) ouverte mais **non implementee**. Un hook `PreToolUse(Read)` ne peut pas modifier `tool_input` (donc pas forcer offset/limit a la place de l'agent), mais il peut **bloquer** une lecture non ciblee via `permissionDecision: "deny"`. Depuis consolidator v1.2.0, le script `guard-read-registres.sh` (pose par l'install, cable automatiquement dans `settings.json`) refuse tout Read d'un registre canonique sans `offset`/`limit` au-dela de 150 lignes (ADR-043). La convention redactionnelle reste necessaire ; le hook la rend machine-enforced.
+Issue GitHub anthropics/claude-code #34304 (FEATURE Structural File Reading AST-aware) ouverte mais **non implementee**. Un hook `PreToolUse(Read)` ne peut pas modifier `tool_input` (donc pas forcer offset/limit a la place de l'agent), mais il peut **bloquer** une lecture non ciblee via `permissionDecision: "deny"`. Depuis consolidator v1.3.1, le script `guard-read-registres.sh` (pose par l'install, cable automatiquement dans `settings.json`) refuse tout Read NON BORNE d'un registre canonique au-dela de 150 lignes : `limit` absent (un `offset` seul ne borne rien — faille BLK-007) ou `limit` > 60 (`VF_GUARD_MAX_READ`). Le guard valide les VALEURS des parametres, pas leur presence (ADR-043 + BLK-006/007). La convention redactionnelle reste necessaire ; le hook la rend machine-enforced.
 
 ## Script reindex.sh
 

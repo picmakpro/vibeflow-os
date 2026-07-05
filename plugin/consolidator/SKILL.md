@@ -116,7 +116,7 @@ le fragment `hooks/hooks.json` du module est merge dans `.claude/settings.json` 
 
 | Hook | Evenement | Script | Role |
 |------|-----------|--------|------|
-| Guard lecture | PreToolUse(Read) | `guard-read-registres.sh` | DENY toute lecture d'un registre canonique sans offset/limit (>150 lignes) — Iron Law index-first machine-enforced |
+| Guard lecture | PreToolUse(Read) | `guard-read-registres.sh` | DENY toute lecture NON BORNEE d'un registre canonique >150 lignes : limit absent (offset seul ne borne rien, BLK-007) ou limit > 60 (`VF_GUARD_MAX_READ`) — Iron Law index-first machine-enforced |
 | Guard shell | PreToolUse(Bash) | `guard-bash-registres.sh` | Ferme le contournement shell (BLK-006) : DENY `cat`/`less`/`head -n +1`… d'un registre long ; grep/sed -n plage/head borne/pipelines limites/ecritures restent libres. Limite assumee : python -c/node -e inline non couverts (garde-fou, pas sandbox) |
 | Index auto | PostToolUse(Edit\|Write\|Bash) | `post-edit-reindex.sh` | reindex --apply sur le registre edite (l'index ne derive plus ; cree le bloc `## Index` s'il manque). Couvre aussi les appends shell `cat >> registre` |
 | Lint format | SessionStart(startup) | `check-registres.sh --hook` | Signale registres non conformes (index absent, #Ligne manquante, orphelins, doublons) |

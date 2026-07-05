@@ -1,5 +1,18 @@
 # CHANGELOG — consolidator
 
+## [v1.3.1] — 2026-07-05 (BLK-007 — fenêtre de lecture bornée par VALEUR)
+
+### Corrigé
+- `guard-read-registres.sh` — la v1.2.0 autorisait dès qu'`offset` OU `limit` était PRÉSENT :
+  `Read(offset=1)` sans limit (ou `limit=100000`) lisait tout le registre (contournement
+  terrain, 2e faille après BLK-006). Règle resserrée : lecture d'un registre > 150 lignes
+  autorisée UNIQUEMENT si `limit` est fourni ET ≤ `VF_GUARD_MAX_READ` (défaut 60, surchargeable).
+  Un guard valide les VALEURS des paramètres, jamais leur présence.
+
+### Tests
+- test-guard-read-registres : +3 (offset seul → deny ; limit=100000 → deny ; frontière 60/61).
+
+
 ## [v1.3.0] — 2026-07-05 (BLK-006 — contournement shell fermé)
 
 ### Ajouté

@@ -2,13 +2,16 @@
 # test-guard-read-registres.sh — Suite du guard PreToolUse(Read) index-first (ADR-043).
 #
 # T1 — registre long lu sans offset/limit → DENY (JSON permissionDecision)
-# T2 — lecture avec limit (index) → allow
-# T3 — lecture avec offset (entrée ciblée) → allow
+# T2 — lecture avec limit borné (index) → allow
+# T3 — lecture offset + limit borné (entrée ciblée) → allow
 # T4 — registre court (≤ 150 lignes) → allow
 # T5 — fichier hors .claude/memory → allow
 # T6 — registre en archive/ → allow
 # T7 — stdin invalide → allow silencieux (fail-open, exit 0)
 # T8 — legacy ADR.md long → DENY (labs non migrés couverts)
+# T9 — BLK-007a : offset SEUL (sans limit) → DENY (fenêtre non bornée)
+# T10 — BLK-007b : limit énorme (100000) → DENY (plafond VF_GUARD_MAX_READ)
+# T11 — limit juste au-dessus du plafond (61 vs 60) → DENY ; au plafond (60) → allow
 
 set -uo pipefail
 
@@ -75,6 +78,27 @@ fi
 # T8 — legacy ADR.md → deny
 OUT="$(run_guard "$(payload "$MEM/ADR.md")")"
 echo "$OUT" | grep -q '"permissionDecision": *"deny"' && ok "T8 legacy ADR.md long → deny" || ko "T8 deny legacy attendu"
+
+# T9 — BLK-007a : offset seul, sans limit → deny (la faille : Read(offset=1) lisait tout)
+OUT="$(run_guard "$(payload "$MEM/DECISIONS.md" ',"offset":1')")"
+if echo "$OUT" | grep -q '"permissionDecision": *"deny"' && echo "$OUT" | grep -q "ne borne rien"; then
+  ok "T9 offset seul (sans limit) → deny (BLK-007a)"
+else
+  ko "T9 deny attendu pour offset seul, obtenu : ${OUT:-<vide>}"
+fi
+
+# T10 — BLK-007b : limit énorme → deny
+OUT="$(run_guard "$(payload "$MEM/DECISIONS.md" ',"offset":1,"limit":100000')")"
+echo "$OUT" | grep -q '"permissionDecision": *"deny"' && ok "T10 limit=100000 → deny (BLK-007b)" || ko "T10 deny attendu, obtenu : ${OUT:-<vide>}"
+
+# T11 — frontière du plafond (défaut 60)
+OUT_61="$(run_guard "$(payload "$MEM/DECISIONS.md" ',"limit":61')")"
+OUT_60="$(run_guard "$(payload "$MEM/DECISIONS.md" ',"limit":60')")"
+if echo "$OUT_61" | grep -q '"permissionDecision": *"deny"' && [ -z "$OUT_60" ]; then
+  ok "T11 limit=61 → deny · limit=60 → allow (frontière plafond)"
+else
+  ko "T11 frontière plafond (61: ${OUT_61:-allow} · 60: ${OUT_60:-allow})"
+fi
 
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
