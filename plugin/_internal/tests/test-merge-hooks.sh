@@ -145,6 +145,32 @@ else
   ko "T5b uninstall → hooks retirés"
 fi
 
+# ---------- T7 : changement de matcher entre versions du fragment → pas de doublon ----------
+S7="$WORK/t7/settings.json"
+mkdir -p "$WORK/t7"
+FRAG_V1="$WORK/frag-v1.json"
+FRAG_V2="$WORK/frag-v2.json"
+cat > "$FRAG_V1" <<'EOF'
+{ "hooks": { "PostToolUse": [ { "matcher": "Edit|Write", "hooks": [ { "type": "command", "command": "bash {{VF_SCRIPTS}}/post-edit-reindex.sh" } ] } ] } }
+EOF
+cat > "$FRAG_V2" <<'EOF'
+{ "hooks": { "PostToolUse": [ { "matcher": "Edit|Write|Bash", "hooks": [ { "type": "command", "command": "bash {{VF_SCRIPTS}}/post-edit-reindex.sh" } ] } ] } }
+EOF
+bash "$MERGER" merge "$FRAG_V1" --settings "$S7" --scripts-prefix "$PREFIX" 2>/dev/null
+bash "$MERGER" merge "$FRAG_V2" --settings "$S7" --scripts-prefix "$PREFIX" 2>/dev/null
+if python3 -c "
+import json, sys
+d = json.load(open('$S7'))
+groups = d['hooks']['PostToolUse']
+cmds = [h['command'] for g in groups for h in g['hooks']]
+assert sum(1 for c in cmds if 'post-edit-reindex.sh' in c) == 1, f'doublon cross-matcher : {cmds}'
+assert [g['matcher'] for g in groups] == ['Edit|Write|Bash'], f'ancien groupe non purgé : {groups}'
+" 2>/dev/null; then
+  ok "T7 upgrade de matcher (Edit|Write → Edit|Write|Bash) → 1 seule entrée, ancien groupe purgé"
+else
+  ko "T7 dédup cross-matcher à l'upgrade"
+fi
+
 # ---------- T6 : settings corrompu → échec propre ----------
 S6="$WORK/t6/settings.json"
 mkdir -p "$WORK/t6"

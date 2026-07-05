@@ -117,7 +117,8 @@ le fragment `hooks/hooks.json` du module est merge dans `.claude/settings.json` 
 | Hook | Evenement | Script | Role |
 |------|-----------|--------|------|
 | Guard lecture | PreToolUse(Read) | `guard-read-registres.sh` | DENY toute lecture d'un registre canonique sans offset/limit (>150 lignes) — Iron Law index-first machine-enforced |
-| Index auto | PostToolUse(Edit\|Write) | `post-edit-reindex.sh` | reindex --apply sur le registre edite (l'index ne derive plus ; cree le bloc `## Index` s'il manque) |
+| Guard shell | PreToolUse(Bash) | `guard-bash-registres.sh` | Ferme le contournement shell (BLK-006) : DENY `cat`/`less`/`head -n +1`… d'un registre long ; grep/sed -n plage/head borne/pipelines limites/ecritures restent libres. Limite assumee : python -c/node -e inline non couverts (garde-fou, pas sandbox) |
+| Index auto | PostToolUse(Edit\|Write\|Bash) | `post-edit-reindex.sh` | reindex --apply sur le registre edite (l'index ne derive plus ; cree le bloc `## Index` s'il manque). Couvre aussi les appends shell `cat >> registre` |
 | Lint format | SessionStart(startup) | `check-registres.sh --hook` | Signale registres non conformes (index absent, #Ligne manquante, orphelins, doublons) |
 | Archivage | SessionEnd | `archive.sh --async --apply` | ADR-032 pilier 2 — non bloquant, non destructif |
 
@@ -258,7 +259,7 @@ Pour qu'un lab puisse utiliser ce skill :
 
 1. Templates registres v2 deployes (avec colonne `#Ligne` dans l'index) — sinon
    `reindex.sh --all --apply` cree les blocs `## Index` manquants (bootstrap ADR-043)
-2. `.claude/scripts/{reindex,archive,detect-duplicates,detect-promotions,guard-read-registres,post-edit-reindex,check-registres}.sh` executables (poses par l'install)
+2. `.claude/scripts/{reindex,archive,detect-duplicates,detect-promotions,guard-read-registres,guard-bash-registres,post-edit-reindex,check-registres}.sh` executables (poses par l'install)
 3. Hooks de gouvernance dans `.claude/settings.json` — POSES AUTOMATIQUEMENT par l'install
    du module (hooks/hooks.json + merge-hooks.sh, ADR-043) ; verifier : `grep guard-read-registres .claude/settings.json`
 4. Trigger `/consolidate` cree dans `.claude/commands/` (optionnel mais recommande)

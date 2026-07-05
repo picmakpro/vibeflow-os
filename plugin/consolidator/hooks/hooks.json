@@ -7,11 +7,17 @@
         "hooks": [
           { "type": "command", "command": "bash {{VF_SCRIPTS}}/guard-read-registres.sh" }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/guard-bash-registres.sh" }
+        ]
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write",
+        "matcher": "Edit|Write|Bash",
         "hooks": [
           { "type": "command", "command": "bash {{VF_SCRIPTS}}/post-edit-reindex.sh" }
         ]

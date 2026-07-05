@@ -1,5 +1,26 @@
 # CHANGELOG — consolidator
 
+## [v1.3.0] — 2026-07-05 (BLK-006 — contournement shell fermé)
+
+### Ajouté
+- `guard-bash-registres.sh` — hook PreToolUse(Bash) : le guard Read seul ne protégeait que le
+  chemin nominal (contournement terrain : `cat .claude/memory/DECISIONS.md`). DENY des lectures
+  pleines shell (cat/less/more/bat/nl/tac/vi…, head/tail non bornés) d'un registre > 150 lignes ;
+  lectures ciblées (grep, sed -n plage, head ≤ 150), pipelines limités en aval (`cat X | head -20`)
+  et écritures (`>>`, tee) restent libres. Limite assumée : interpréteurs inline (python -c) non
+  couverts — garde-fou déterministe contre le chemin de moindre résistance, pas une sandbox.
+
+### Modifié
+- `post-edit-reindex.sh` — couvre le tool Bash : un append shell (`cat >> DECISIONS.md`, `tee -a`)
+  recale aussi l'index (matcher PostToolUse étendu à `Edit|Write|Bash`).
+- `hooks/hooks.json` — + matcher Bash (guard) ; PostToolUse `Edit|Write` → `Edit|Write|Bash`.
+- Engine `merge-hooks.sh` : dédup cross-matcher au merge — un upgrade qui change le matcher d'un
+  hook (ex. `Edit|Write` → `Edit|Write|Bash`) purge l'ancien groupe au lieu de dupliquer l'exécution.
+
+### Tests
+- `test-guard-bash-registres.sh` (14 : guard 12 + post-edit Bash 2) ; test-merge-hooks + T7 (upgrade matcher).
+
+
 ## [v1.2.0] — 2026-07-04 (ADR-043 — gouvernance scripturale)
 
 ### Ajouté

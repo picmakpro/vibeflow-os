@@ -124,9 +124,17 @@ if mode == "merge":
                 resolved = dict(h)
                 resolved["command"] = h.get("command", "").replace("{{VF_SCRIPTS}}", prefix)
                 own = set(SCRIPT_RE.findall(resolved["command"]))
-                # Idempotence : retirer toute entrée référençant les mêmes scripts avant d'ajouter.
-                target["hooks"] = [x for x in target["hooks"] if not references(x, own)]
+                # Idempotence : retirer toute entrée référençant les mêmes scripts dans TOUS
+                # les groupes de l'événement (pas seulement le groupe cible) — sinon un
+                # changement de matcher entre deux versions du fragment (ex. "Edit|Write" →
+                # "Edit|Write|Bash") laisserait l'ancienne entrée et exécuterait le hook 2x.
+                for eg in ev:
+                    if isinstance(eg, dict):
+                        eg["hooks"] = [x for x in eg.get("hooks", []) or [] if not references(x, own)]
                 target["hooks"].append(resolved)
+        # Purger les groupes vidés par la dédup cross-matcher (mutation EN PLACE : `ev`
+        # doit rester la même liste pour les groupes suivants du fragment).
+        ev[:] = [g2 for g2 in ev if not isinstance(g2, dict) or g2.get("hooks")]
 else:  # remove
     basenames = frag_basenames()
     if not basenames:

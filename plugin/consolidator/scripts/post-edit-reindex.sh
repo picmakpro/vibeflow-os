@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-# post-edit-reindex.sh — Hook PostToolUse(Edit|Write) : si le fichier modifié est un
-# registre mémoire canonique, régénère son index (#Ligne) via reindex.sh --apply.
+# post-edit-reindex.sh — Hook PostToolUse(Edit|Write|Bash) : si un registre mémoire
+# canonique a été modifié, régénère son index (#Ligne) via reindex.sh --apply.
 # L'index ne peut plus dériver du body : il est maintenu par la machine (ADR-043).
 #
 # Câblage (posé automatiquement par l'install du module consolidator) :
-#   PostToolUse · matcher "Edit|Write" · command: bash .claude/scripts/post-edit-reindex.sh
+#   PostToolUse · matcher "Edit|Write|Bash" · command: bash .claude/scripts/post-edit-reindex.sh
+#
+# Edit/Write : le registre = tool_input.file_path. Bash (BLK-006) : détecte une ÉCRITURE
+# vers un registre dans la commande (`>>`/`>` ou `tee [-a]` visant le registre) — un
+# `cat >> DECISIONS.md << EOF` recale donc aussi l'index.
 #
 # Fail-open : toute erreur → exit 0 silencieux (un hook de maintenance ne casse jamais le flux).
 
@@ -13,12 +17,30 @@ set -uo pipefail
 command -v python3 >/dev/null 2>&1 || exit 0
 
 FILE_PATH="$(python3 -c '
-import json, sys
+import json, os, re, sys
 try:
     p = json.load(sys.stdin)
-    print((p.get("tool_input") or {}).get("file_path") or "")
 except Exception:
     print("")
+    sys.exit(0)
+ti = p.get("tool_input") or {}
+if p.get("tool_name") == "Bash":
+    cmd = ti.get("command") or ""
+    reg = (r"(?P<path>[^\s\"\x27<>|;&]*\.claude/memory/"
+           r"(?:DECISIONS|ADR|BDR|LEARNINGS|BLOCKERS|EVALS|JOURNAL|ITERATION_LOG)\.md)")
+    hit = ""
+    for m in re.finditer(reg, cmd):
+        path = m.group("path")
+        before = cmd[:m.start()]
+        # Ecriture = redirection juste avant le chemin, ou tee visant le chemin.
+        if re.search(r">{1,2}\s*$", before) or re.search(r"\btee\s+(-a\s+)?$", before):
+            hit = path
+            break
+    if hit and not os.path.isabs(hit):
+        hit = os.path.join(p.get("cwd") or ".", hit)
+    print(hit)
+else:
+    print(ti.get("file_path") or "")
 ' 2>/dev/null)" || exit 0
 
 [ -n "$FILE_PATH" ] || exit 0
