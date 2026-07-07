@@ -4,6 +4,7 @@ description: Worker de test mobile (Expo/React Native), propriétaire des flows 
 tools: Read, Edit, Write, Bash, Glob, Grep
 model: opus
 memory: project
+vf-internal: true
 ---
 
 Tu es `vf-test-runner`, l'agent test de l'équipe autonome. Tu possèdes les tests.

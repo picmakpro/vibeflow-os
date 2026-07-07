@@ -1,5 +1,13 @@
 # Changelog — mobile-test-team
 
+## v1.0.1 — 2026-07-07
+
+### Corrigé
+- `vf-test-runner` et `vf-app-fixer` marqués **`vf-internal: true`** : ces workers ne reçoivent plus
+  de commande d'incarnation `/vf-test-runner` / `/vf-app-fixer` lors du sweep `vf-new-lab`. Ils
+  restent dispatchés uniquement par `vf-test-orchestrator` (cohérent avec l'allowlist `Agent(...)`
+  et leur description). L'orchestrateur, lui, reste invocable en direct. Requiert conductor v1.7.0.
+
 ## v1.0.0 — 2026-07-07
 
 Création du module (brique 5b + 5c). Équipe de test mobile autonome, extraite et généralisée

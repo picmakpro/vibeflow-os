@@ -71,6 +71,20 @@ Si la demande est vide, salue brièvement dans le rôle de **$name** et demande 
 EOF
 }
 
+# Un agent est-il déclaré INTERNE (worker dispatché uniquement par un orchestrateur) ?
+# Convention VibeFlow : `vf-internal: true` dans le frontmatter. Un worker interne ne doit
+# JAMAIS recevoir de commande d'incarnation `/<name>` — il n'est pas destiné à l'usage direct.
+# Défense en profondeur avec l'allowlist `Agent(...)` de l'orchestrateur (Pattern 12).
+is_internal_agent() {
+  local agent_file="$1"
+  # Ne lit que le frontmatter (jusqu'au 2e '---'), insensible aux espaces autour de la valeur.
+  awk '
+    NR==1 && $0!="---" { exit 1 }
+    NR>1 && $0=="---"  { exit 1 }
+    /^vf-internal:[[:space:]]*true[[:space:]]*$/ { exit 0 }
+  ' "$agent_file"
+}
+
 # Génère la commande d'un agent (idempotent : skip si elle existe déjà).
 generate_one() {
   local name="$1"
@@ -78,6 +92,10 @@ generate_one() {
   local cmd_file="$COMMANDS_DIR/$name.md"
   if [ ! -f "$agent_file" ]; then
     log "agent introuvable, ignoré : $agent_file"
+    return 0
+  fi
+  if is_internal_agent "$agent_file"; then
+    log "agent interne (vf-internal), pas de commande d'incarnation : $name"
     return 0
   fi
   if [ -f "$cmd_file" ]; then

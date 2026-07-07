@@ -1,5 +1,12 @@
 # CHANGELOG — reference
 
+## [v2.3.1] — 2026-07-07
+
+### Ajouté
+- Pattern 12 — note « Limite connue » complétée par la **convention `vf-internal: true`** : 3e couche
+  de cloisonnement (allowlist de dispatch + description dissuasive + absence de surface utilisateur
+  via le skip du générateur de commandes d'incarnation).
+
 ## [v2.3.0] — 2026-07-07
 
 ### Ajouté
