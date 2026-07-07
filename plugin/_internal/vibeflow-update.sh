@@ -356,6 +356,42 @@ ensure_mandatory_baseline() {
   done
 }
 
+# ---------- Modules retirés (convergence, CONS-01) ----------
+# Un module supprimé du parc (ex. feature-dev-gates, fusionné dans software-architecture) laisse des
+# artefacts ORPHELINS dans les labs qui l'avaient installé. uninstall_module lit les artefacts DEPUIS
+# le cache — absent pour un module retiré — donc le nettoyage s'appuie sur un manifeste EN DUR :
+# _internal/retired-modules.txt (format `module:artefact` relatif à TARGET_ROOT, une ligne/artefact ;
+# `#` = commentaire). Idempotent : ne retire que ce qui existe encore. Appelé à `update --all`.
+find_retired_manifest() {
+  local c
+  c="$CACHE_DIR/_internal/retired-modules.txt"; [ -f "$c" ] && { echo "$c"; return 0; }
+  c="$(dirname "$0")/retired-modules.txt"; [ -f "$c" ] && { echo "$c"; return 0; }
+  echo ""
+}
+
+cleanup_retired_modules() {
+  local manifest
+  manifest="$(find_retired_manifest)"
+  [ -n "$manifest" ] || return 0
+  local line mod artifact target in_registry
+  while IFS= read -r line; do
+    case "$line" in ''|\#*) continue ;; esac
+    mod="${line%%:*}"
+    artifact="${line#*:}"
+    [ -n "$mod" ] && [ -n "$artifact" ] || continue
+    target="$TARGET_ROOT/$artifact"
+    in_registry="no"
+    [ "$(module_version_installed "$mod")" = "—" ] || in_registry="yes"
+    # Rien à faire si ni artefact orphelin ni entrée de registre pour ce module.
+    if [ ! -e "$target" ] && [ "$in_registry" = "no" ]; then
+      continue
+    fi
+    log "Module retiré '$mod' détecté dans ce lab → nettoyage (convergence)"
+    [ -e "$target" ] && rm -rf "$target" && log "  removed $target"
+    [ "$in_registry" = "yes" ] && mark_uninstalled "$mod"
+  done < "$manifest"
+}
+
 # ---------- Install ----------
 install_module() {
   local mod="$1"
@@ -663,6 +699,10 @@ case "$cmd" in
   update)
     if [ "$arg" = "--all" ]; then
       require_cache
+      # Convergence AVANT la boucle : désenregistrer + nettoyer les modules retirés du parc
+      # (CONS-01). Sinon la boucle tenterait d'`update_module` un module absent du cache
+      # (install_module → err → abort) avant d'atteindre le nettoyage.
+      cleanup_retired_modules
       if [ -f "$INSTALLED_REGISTRY" ]; then
         while IFS='=' read -r mod ver; do
           [ -n "$mod" ] && update_module "$mod"

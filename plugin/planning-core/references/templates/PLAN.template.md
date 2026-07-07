@@ -19,7 +19,7 @@
 ## Comment on vérifie (recette)
 
 > Pour chaque critère, la façon de constater qu'il est satisfait. En profil complet, c'est une
-> commande/contrôle automatisé (cf. gate Nyquist du module `feature-dev-gates`).
+> commande/contrôle automatisé (cf. gate Nyquist du module `software-architecture`).
 
 - [Critère 1] → [moyen de vérification]
 

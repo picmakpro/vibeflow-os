@@ -42,7 +42,7 @@ que **un critère observable à l'écran exige une vérif réelle (Maestro)**, p
 unitaire (extension mobile du Gate Nyquist, ADR-037), et pointe vers la boucle test+fix.
 
 C'est le mécanisme qui transforme la doctrine de documentation passive en **règle active pendant
-le dev** — le même patron que `feature-dev-gates`.
+le dev** — le même patron que les gates de `software-architecture` (rule path-scopée).
 
 ## La boucle (résumé)
 

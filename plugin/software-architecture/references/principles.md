@@ -62,7 +62,7 @@ d'extension spéculatif pour un futur imaginé.
 non-régression d'abord), tout critère d'acceptation **mesurable**. Moins pertinent pour du glue-code
 trivial ou de l'exploration jetable.
 
-**Articulation VibeFlow.** Le **Gate Nyquist** (module `feature-dev-gates`) exige une **commande de
+**Articulation VibeFlow.** Le **Gate Nyquist** (rule `production-code-architecture` de ce module) exige une **commande de
 vérification automatisée par critère AVANT le code** : TDD en est la forme la plus stricte (le test
 qui échoue EST cette commande). La vérification 3 couches du Tier 1 (syntaxe → intention → régression)
 en est l'exécution.

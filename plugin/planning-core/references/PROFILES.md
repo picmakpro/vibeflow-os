@@ -18,7 +18,7 @@
 | `phases/NN/PLAN.md` + `SUMMARY.md` | optionnel | ✅ | ✅ |
 | `phases/NN/VERIFICATION.md` | — | optionnel | ✅ |
 | Extension de domaine (`codebase/`, `editorial/`…) | — | optionnel | ✅ |
-| Gates (Nyquist, Decision Coverage…) | — | — | ✅ (cf. module `feature-dev-gates`) |
+| Gates (Nyquist, Decision Coverage…) | — | — | ✅ (cf. module `software-architecture`) |
 | `INDEX.md` (lab à compartiments) | ⚑ selon topologie | ⚑ selon topologie | ⚑ selon topologie |
 | `BOARD.md` (compartiment `continuous`) | ⚑ selon type | ⚑ selon type | ⚑ selon type |
 
@@ -55,7 +55,7 @@ prend la forme du métier.
 
 **Ce qu'il ajoute au standard** : extension de domaine systématique (`codebase/` pour le dev),
 `VERIFICATION.md` de fin de phase, et l'activation des **gates** machine-enforced (Nyquist Layer,
-Decision Coverage) — qui vivent dans les modules dédiés (`feature-dev-gates`, `software-architecture`).
+Decision Coverage) — qui vivent dans le module `software-architecture` (rule `production-code-architecture`).
 
 **Esprit** : rien ne passe sans être vérifié et tracé. Réservé aux contextes qui le justifient.
 

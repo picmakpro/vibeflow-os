@@ -214,6 +214,46 @@ fi
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
+# T7 (cleanup modules retirés) — un lab qui avait feature-dev-gates converge à update --all
+# ---------------------------------------------------------------------------
+# Simule un lab ayant installé un module DEPUIS RETIRÉ (feature-dev-gates) : rule orpheline +
+# entrée de registre. Après `update --all`, l'orphelin doit disparaître ET le registre être nettoyé,
+# SANS casser un module valide encore installé (consolidator).
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+MANIFEST_SRC="$INTERNAL_DIR/retired-modules.txt"
+if prepare_module "$CACHE" "consolidator" && [ -f "$MANIFEST_SRC" ]; then
+  # Le manifeste des modules retirés doit vivre dans le cache (comme en prod, bundlé).
+  mkdir -p "$CACHE/_internal"
+  cp "$MANIFEST_SRC" "$CACHE/_internal/retired-modules.txt"
+  # Install d'un module valide (crée le registre).
+  (cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" install consolidator >/dev/null 2>&1)
+  # Simuler l'état "feature-dev-gates encore installé" : artefact orphelin + entrée registre.
+  mkdir -p "$LAB/.claude/rules"
+  echo "# orphan" > "$LAB/.claude/rules/feature-dev-gates.md"
+  echo "feature-dev-gates=v1.0.1" >> "$LAB/.claude/scripts/.vibeflow-installed"
+  # Convergence.
+  (cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" update --all >/dev/null 2>&1)
+  miss=0
+  [ ! -f "$LAB/.claude/rules/feature-dev-gates.md" ] \
+    || { ko "T7 cleanup : rule orpheline feature-dev-gates.md encore présente"; miss=1; }
+  REG="$LAB/.claude/scripts/.vibeflow-installed"
+  if [ -f "$REG" ] && "$GREP" -q "^feature-dev-gates=" "$REG"; then
+    ko "T7 cleanup : entrée registre feature-dev-gates non retirée"; miss=1
+  fi
+  # Module valide toujours là (le nettoyage n'a rien cassé).
+  [ -d "$LAB/.claude/skills/consolidator" ] \
+    || { ko "T7 cleanup : consolidator (module valide) cassé par le nettoyage"; miss=1; }
+  [ "$miss" -eq 0 ] \
+    && ok "T7 cleanup : module retiré (rule orpheline + registre) nettoyé à update --all, module valide intact"
+else
+  skip "T7 cleanup : consolidator non copiable ou manifeste retired-modules.txt absent"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
 # Garde-fou final : le vrai ~/.claude est inchangé (snapshot récursif avant=après).
 # ---------------------------------------------------------------------------
 HOME_AFTER=$(find "$HOME/.claude" -type f 2>/dev/null | wc -l | tr -d ' ')
