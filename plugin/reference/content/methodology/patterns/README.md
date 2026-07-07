@@ -1,8 +1,8 @@
 # Patterns architecturaux VibeFlow
 
-> Les **11 patterns universels** de la methodologie, illustres par des exemples fictifs.
+> Les **12 patterns universels** de la methodologie, illustres par des exemples fictifs.
 > Ce dossier explique COMMENT VibeFlow s'incarne. Pas COPIER : INSPIRER.
-> Edition Mai 2026 (v4.1)  -  patterns 09, 10, 11 ajoutes.
+> Edition Mai 2026 (v4.1)  -  patterns 09, 10, 11 ajoutes. Juillet 2026  -  pattern 12 ajoute.
 
 ## Comment lire ces patterns
 
@@ -30,13 +30,15 @@ Les exemples fictifs s'appuient sur des personas inventes : *Sophie K., professe
 | **9** | **Meta-procedures** | **`09-meta-procedures.md`** | **`safe-execute` (5 phases mono-tache) + `god-execution` (8 phases autonome)** | **v4.1 NOUVEAU** |
 | **10** | **Adversarial Plan-Review** | **`10-plan-review-adversarial.md`** | **Anti-echo-chamber : 2 agents reviewers + Judge si divergence** | **v4.1 NOUVEAU** |
 | **11** | **Halt conditions** | **`11-halt-conditions.md`** | **5 codes universels d'arret immediat en execution autonome** | **v4.1 NOUVEAU** |
+| **12** | **Cloisonnement par outils** | **`12-cloisonnement-outils.md`** | **Juge n'ecrit jamais / worker n'escalade jamais : garanties au niveau `tools:`** | **NOUVEAU** |
 
 ## Carte de lecture par usage
 
 - **Decouvrir VibeFlow** : lire 1 → 2 → 6 → 3 dans cet ordre.
 - **Mettre en place une instance** : 1 → 2 → 3 → 4 → 5 → 6.
 - **Construire un fork (nouveau domaine)** : 7 + 8.
-- **Operer en autonomie rigoureuse** (v4.1) : 9 + 10 + 11 (a lire ensemble).
+- **Operer en autonomie rigoureuse** (v4.1) : 9 + 10 + 11 + 12 (a lire ensemble).
+- **Concevoir des agents surs** : 3 + 12.
 - **Auditer un projet existant** : 2 + 6 + 8 + 10.
 
 ## Avertissement
