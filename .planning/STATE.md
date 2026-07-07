@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: dev-doctrine
 milestone_name: Doctrine dev & consolidation
-status: verifying
-stopped_at: Phase 8 complète (PASS) — milestone dev-doctrine livré, ship en attente (VERSION racine + tag)
+status: shipped
+stopped_at: Milestone dev-doctrine SHIPPED — release v2.20.0 (tag v2.20.0 poussé, PR #9 mergée)
 last_updated: "2026-07-07T00:00:00.000Z"
 last_activity: 2026-07-07
 progress:

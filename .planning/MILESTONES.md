@@ -1,9 +1,9 @@
 # Milestones — VibeFlow Dev Orchestrator (VFDO)
 
-## 🚧 dev-doctrine — Doctrine dev & consolidation (phases livrées 2026-07-07, ship en attente)
+## ✅ dev-doctrine — Doctrine dev & consolidation (2026-07-07)
 
-**Statut :** 2 phases PASS (goal-backward) sur branche `feat/dev-doctrine-phase7` · ship (VERSION
-racine + tag + PR) en attente · **Spec :** `docs/superpowers/specs/2026-07-07-dev-doctrine-consolidation-design.md`
+**Tag git :** `v2.20.0` · **PR** #9 (mergée) · **Statut :** SHIPPED
+**Spec :** `docs/superpowers/specs/2026-07-07-dev-doctrine-consolidation-design.md`
 
 **Périmètre :** 2 phases · 6 plans · 12 requirements (PHIL-01..08, CONS-01..04) — **tous complétés**.
 
