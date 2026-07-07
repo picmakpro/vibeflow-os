@@ -1,0 +1,15 @@
+{
+  "bundleIdBase": "com.exemple.monapp",
+  "debugSuffix": "",
+  "android": {
+    "avdName": "Pixel_7_API_34"
+  },
+  "ios": {
+    "preferredSimulator": "iPhone 17 Pro"
+  },
+  "maestroFlowsDir": ".maestro",
+  "maestroBin": "~/.maestro/bin/maestro",
+  "reportsDir": "test-runs",
+  "metroPort": 8081,
+  "javaHome": ""
+}
