@@ -194,18 +194,27 @@ gitignore_add_paths() {
     gitignore_add_one ".claude/commands/${mod}.md"
     [ -d "$module_dir/references" ] && gitignore_add_one ".claude/agents/${mod}-references/"
   fi
+  # Multi-agents module : agents/<name>.md.
+  if [ -d "$module_dir/agents" ]; then
+    for f in "$module_dir/agents/"*.md; do
+      [ -f "$f" ] && gitignore_add_one ".claude/agents/$(basename "$f")"
+    done
+    [ -d "$module_dir/references" ] && [ ! -f "$module_dir/SKILL.md" ] && gitignore_add_one ".claude/agents/${mod}-references/"
+  fi
   # Rules réellement posées.
   if [ -d "$module_dir/rules" ]; then
     for f in "$module_dir/rules/"*.md; do
       [ -f "$f" ] && gitignore_add_one ".claude/rules/$(basename "$f")"
     done
   fi
-  # Scripts réellement posés.
+  # Scripts réellement posés (shell + Node).
   if [ -d "$module_dir/scripts" ]; then
-    for f in "$module_dir/scripts/"*.sh; do
+    for f in "$module_dir/scripts/"*.sh "$module_dir/scripts/"*.mjs "$module_dir/scripts/"*.js; do
       [ -f "$f" ] && gitignore_add_one ".claude/scripts/$(basename "$f")"
     done
   fi
+  # Config template posé à côté d'un SKILL.md racine.
+  [ -d "$module_dir/config" ] && [ -f "$module_dir/SKILL.md" ] && gitignore_add_one ".claude/skills/$mod/config/"
 }
 
 # ---------- Commande d'incarnation (ADR-042) ----------
@@ -334,6 +343,17 @@ install_module() {
     log "  copied AGENT.md → $TARGET_ROOT/agents/${mod}.md"
   fi
 
+  # Type 3b — Multi-agents module : agents/<name>.md → $TARGET_ROOT/agents/<name>.md (chacun)
+  # Symétrique du multi-skills (skills/<name>/). Un module peut livrer plusieurs agents.
+  if [ -d "$module_dir/agents" ]; then
+    mkdir -p "$TARGET_ROOT/agents"
+    for agent_md in "$module_dir/agents/"*.md; do
+      [ -f "$agent_md" ] || continue
+      cp "$agent_md" "$TARGET_ROOT/agents/$(basename "$agent_md")"
+      log "  copied agent → $TARGET_ROOT/agents/$(basename "$agent_md")"
+    done
+  fi
+
   # Type 4 — Doc-only module : content/ → docs/<mod>/
   # EXCEPTION scope : la doc reste relative au cwd PROJET (ce n'est pas du .claude),
   # donc PAS rebasée sur TARGET_ROOT même en scope user.
@@ -358,18 +378,26 @@ install_module() {
     log "  copied references/ → $TARGET_ROOT/skills/$mod/references/"
   fi
 
-  # References folder for AGENT modules (D7) : un module agent (AGENT.md sans SKILL.md racine)
-  # embarque ses references sous $TARGET_ROOT/agents/<mod>-references/ (chargées on-demand).
-  if [ -d "$module_dir/references" ] && [ -f "$module_dir/AGENT.md" ]; then
+  # References folder for AGENT modules (D7) : un module agent (AGENT.md ou agents/ sans SKILL.md
+  # racine) embarque ses references sous $TARGET_ROOT/agents/<mod>-references/ (chargées on-demand).
+  if [ -d "$module_dir/references" ] && { [ -f "$module_dir/AGENT.md" ] || [ -d "$module_dir/agents" ]; } && [ ! -f "$module_dir/SKILL.md" ]; then
     mkdir -p "$TARGET_ROOT/agents/${mod}-references"
     cp -r "$module_dir/references/"* "$TARGET_ROOT/agents/${mod}-references/" 2>/dev/null || true
     log "  copied references/ → $TARGET_ROOT/agents/${mod}-references/"
   fi
 
-  # Scripts (top-level + tests subdir)
+  # Config folder at module root (companion to root SKILL.md) : templates de config projet.
+  # Posé sous le dossier skill du module ; l'utilisateur copie le .example.json vers son projet.
+  if [ -d "$module_dir/config" ] && [ -f "$module_dir/SKILL.md" ]; then
+    mkdir -p "$TARGET_ROOT/skills/$mod/config"
+    cp -r "$module_dir/config/"* "$TARGET_ROOT/skills/$mod/config/" 2>/dev/null || true
+    log "  copied config/ → $TARGET_ROOT/skills/$mod/config/"
+  fi
+
+  # Scripts (top-level + tests subdir) : shell (.sh) et Node (.mjs/.js).
   if [ -d "$module_dir/scripts" ]; then
     mkdir -p "$TARGET_ROOT/scripts"
-    for f in "$module_dir/scripts/"*.sh; do
+    for f in "$module_dir/scripts/"*.sh "$module_dir/scripts/"*.mjs "$module_dir/scripts/"*.js; do
       [ -f "$f" ] && cp "$f" "$TARGET_ROOT/scripts/" && chmod +x "$TARGET_ROOT/scripts/$(basename "$f")"
     done
     if [ -d "$module_dir/scripts/tests" ]; then
@@ -470,6 +498,14 @@ uninstall_module() {
     rm -f "$TARGET_ROOT/agents/${mod}.md"
     log "  removed $TARGET_ROOT/agents/${mod}.md"
   fi
+  # Remove multi-agents (only those owned by this module)
+  if [ -d "$CACHE_DIR/$mod/agents" ]; then
+    for f in "$CACHE_DIR/$mod/agents/"*.md; do
+      [ -f "$f" ] || continue
+      name=$(basename "$f")
+      [ -f "$TARGET_ROOT/agents/$name" ] && rm "$TARGET_ROOT/agents/$name" && log "  removed $TARGET_ROOT/agents/$name"
+    done
+  fi
   if [ -d "$TARGET_ROOT/agents/${mod}-references" ]; then
     rm -rf "$TARGET_ROOT/agents/${mod}-references"
     log "  removed $TARGET_ROOT/agents/${mod}-references"
@@ -481,9 +517,10 @@ uninstall_module() {
     log "  removed $TARGET_ROOT/commands/${mod}.md"
   fi
 
-  # Remove scripts (only those owned by this module)
+  # Remove scripts (only those owned by this module : shell + Node)
   if [ -d "$CACHE_DIR/$mod/scripts" ]; then
-    for f in "$CACHE_DIR/$mod/scripts/"*.sh; do
+    for f in "$CACHE_DIR/$mod/scripts/"*.sh "$CACHE_DIR/$mod/scripts/"*.mjs "$CACHE_DIR/$mod/scripts/"*.js; do
+      [ -f "$f" ] || continue
       name=$(basename "$f")
       [ -f "$TARGET_ROOT/scripts/$name" ] && rm "$TARGET_ROOT/scripts/$name" && log "  removed $TARGET_ROOT/scripts/$name"
     done

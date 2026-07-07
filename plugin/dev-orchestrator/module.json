@@ -1,7 +1,7 @@
 {
   "name": "dev-orchestrator",
-  "version": "v1.1.0",
+  "version": "v1.2.0",
   "type": "agent+skills",
-  "description": "Orchestrateur de développement : route le langage naturel vers le pipeline.",
+  "description": "Orchestrateur de développement : route le langage naturel vers le pipeline. Inclut le verbe vf-decide (panel de décision) et la doctrine des garde-fous de boucle autonome.",
   "requires": []
 }

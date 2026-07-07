@@ -8,9 +8,9 @@
 
 Dis _« aide-moi à dev cette feature »_ — et tout le pipeline se déclenche : cadrage → plan → exécution → tests → livraison. Sans jamais taper une commande technique ni savoir ce qui tourne en coulisse.
 
-[![Version](https://img.shields.io/badge/version-2.9.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.17.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
-[![Modules](https://img.shields.io/badge/modules-13-16a34a)](#-modules)
+[![Modules](https://img.shields.io/badge/modules-15-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
 [Installation](#-installation) · [Modules](#-modules) · [Comment ça marche](#-comment-ça-marche) · [Auteur](#-auteur)
@@ -72,21 +72,23 @@ L'UX déroule :
 
 ## 📦 Modules
 
-13 modules au total. Chacun a sa propre version, son `CHANGELOG.md` et son `README.md`.
+15 modules au total. Chacun a sa propre version, son `CHANGELOG.md` et son `README.md`.
 
-> **À l'installation (depuis v2.13.0)** : `conductor` est le **socle obligatoire** posé d'office (avec son filet : planning-core, validator, consolidator, infrastructure-audit) — pas un choix. Ensuite, **un seul choix** : *lab de développement* (`dev-orchestrator`) ou *nouveau lab métier sur mesure* via `/vf-new-lab`. Les **3 bundles métier** (business-pilot / content / growth) sont **WIP et non proposés à l'install** (`proposable:false`) ; ils seront reproposés une fois finalisés. Les autres modules restent disponibles en à-la-carte avancé (« ajoute &lt;module&gt; »).
+> **À l'installation (depuis v2.13.0)** : `conductor` est le **socle obligatoire** posé d'office (avec son filet : planning-core, validator, consolidator, infrastructure-audit) — pas un choix. Ensuite, **un seul choix** : *lab de développement* (`dev-orchestrator`) ou *nouveau lab métier sur mesure* via `/vf-new-lab`. Les **3 bundles métier** (business-pilot / content / growth) sont **WIP et non proposés à l'install** (`proposable:false`) ; ils seront reproposés une fois finalisés. Les autres modules restent disponibles en à-la-carte avancé (« ajoute &lt;module&gt; »). Les modules **mobile-test** et **mobile-test-team** sont des add-ons à-la-carte avancés pour les projets mobiles.
 
 | Module | Ver. | Type | Ce qu'il fait |
 |--------|:----:|------|---------------|
 | **[conductor](./plugin/conductor/)** | `1.1.0` | agent + skills + scripts + references | 🧭 La porte d'entrée. Agent méta `vibeflow-conductor` (gardien) : crée/configure un lab dans **n'importe quel métier** (`vf-new-lab`, bundle-aware), installe/vérifie/met à jour, migre sur évolution de doctrine (`vf-calibrate`), reçoit les escalades de cohérence. Pas appelé en continu — config/audit/migration. |
-| **[dev-orchestrator](./plugin/dev-orchestrator/)** | `1.1.0` | agent + skills + scripts | ⭐ Le cœur dev. Agent routeur `vibeflow-dev` + 13 verbes `/vf-*` + index GSD auto-généré. Route le **langage naturel** vers les skills GSD/Superpowers (cadrage → livraison), sans exposer la plomberie. |
+| **[dev-orchestrator](./plugin/dev-orchestrator/)** | `1.2.0` | agent + skills + scripts | ⭐ Le cœur dev. Agent routeur `vibeflow-dev` + 14 verbes `/vf-*` (dont le panel de décision `vf-decide`) + index GSD auto-généré + doctrine des garde-fous de boucle autonome. Route le **langage naturel** vers les skills GSD/Superpowers (cadrage → livraison), sans exposer la plomberie. |
+| **[mobile-test](./plugin/mobile-test/)** | `1.0.0` | skill + script + config | 📱 Test réel d'app mobile (simulateur iOS / émulateur Android) : détection de cible, build-si-absent, régression Maestro, rapport horodaté + artefacts, diagnostic visuel des échecs via `mobile-mcp`. Piloté par config, sans constante projet. **Expérimental** jusqu'au premier vrai run vert. |
+| **[mobile-test-team](./plugin/mobile-test-team/)** | `1.0.0` | agents + rules | 🤖 Boucle autonome test→fix mobile : `vf-test-orchestrator` + workers cloisonnés par outils (`vf-test-runner` / `vf-app-fixer`, Pattern 12), pour que le mode autonome atteigne « l'app marche vraiment », pas juste des tests unitaires verts. Une règle path-scopée déclenche la doctrine de vérification réelle pendant le code. Requiert `mobile-test`. **Expérimental**. |
 | **[software-architecture](./plugin/software-architecture/)** | `1.0.0` | skill + rules + scripts | Doctrine d'architecture logicielle AI-Safe : SOLID/SoC, anti-god-files (≤300 L), gates *machine-enforced*, playbook de restructuration brownfield. |
 | **[audit-architecture](./plugin/audit-architecture/)** | `1.0.0` | skill + references | Concepteur d'**architecture d'audit** : dérive depuis un brief la structure d'audit multi-couches d'un process (contenu / dossier / code / vente). |
 | **[infrastructure-audit](./plugin/infrastructure-audit/)** | `1.0.0` | skill + scripts | Audit automatique de l'infra Claude Code (hooks, scripts, drift Anthropic) — détecte les régressions après une mise à jour. |
 | **[validator](./plugin/validator/)** | `1.1.0` | agent-only | Agent `vibeflow-validator` : garant de l'alignement technique méthodo ↔ projets, en 5 phases (dont audit d'architecture des process). |
 | **[consolidator](./plugin/consolidator/)** | `1.0.0` | skill + scripts | Consolidation de la mémoire structurée sur 4 piliers : indexation / archivage / fusion / promotion. |
 | **[skill-creator](./plugin/skill-creator/)** | `1.0.0` | agent + skills | Pattern « agent minimal + 2 skills composables » pour créer de nouveaux skills (base Anthropic + workflow). |
-| **[reference](./plugin/reference/)** | `2.1.1` | doc-only | Documentation méthodologique complète : VibeFlow Core (9 principes) + 11 patterns + 33 templates + 1 exemple de bout en bout. |
+| **[reference](./plugin/reference/)** | `2.3.0` | doc-only | Documentation méthodologique complète : VibeFlow Core (9 principes) + 12 patterns (dont le cloisonnement par outils) + 33 templates + 1 exemple de bout en bout. |
 | **[planning-core](./plugin/planning-core/)** | `1.1.0` | skill + references + scripts | Socle de planning & documentation universel : pose le tronc commun `.planning/` (PROJECT/STATE/ROADMAP/REQUIREMENTS/MILESTONES/phases), **adapté à la logique métier de chaque lab** — jamais imposé. Couche avant/présent, complémentaire des registres mémoire. Garde-fou de fraîcheur + détection métier + exemple non-dev. |
 | 📦 **[business-pilot-bundle](./plugin/business-pilot-bundle/)** | `1.0.0` | doc-only (bundle) | Bundle métier : châssis prêt pour piloter un business (3 blueprints commercial/delivery/finance + extension `business/` + registres canon). Instancié par `vf-new-lab`. |
 | 📦 **[content-bundle](./plugin/content-bundle/)** | `1.0.0` | doc-only (bundle) | Bundle métier : chaîne éditoriale brief→livrable→distribution (3 blueprints strategist/scriptwriter/repurposer + extension `editorial/` + gate clarté bloquant). Instancié par `vf-new-lab`. |
@@ -168,6 +170,15 @@ Le routage repose sur un **index factuel auto-généré** depuis le frontmatter 
 | `v2.7.0` | 2026-06-11 | + conductor (orchestrateur méta/gardien) : bootstrap de lab universel (tout métier), propagation update + migration, protocole d'escalade sous-agents |
 | `v2.8.0` | 2026-06-11 | + 3 bundles métier (business-pilot / content / growth-par-canal) + conductor v1.1.0 (`vf-new-lab` bundle-aware, fix pointeur cassé) |
 | `v2.9.0` | 2026-06-11 | + slash commands natives (`/vibeflow`, `/vf-new-lab`, `/vf-planning`, `/vf-calibrate`, `/vf-audit`) — points d'entrée explicites des agents/skills méthodo |
+| `v2.10.0` | 2026-06-17 | + kpi-analyst (KPIs métier : déduits, déterministes, sourcés) |
+| `v2.11.0` | 2026-06-23 | planning-core v2.0.0 : topologie à compartiments + harmonisation branche main |
+| `v2.12.0` | 2026-06-24 | vf-new-lab v1.3.0 : Lab Factory, clarification-first |
+| `v2.13.0` | 2026-06-29 | Init : externalisation doc contextuelle + commandes d'incarnation native (ADR-042) |
+| `v2.14.0` | 2026-07-04 | Gouvernance scripturale : hooks auto-câblés + canon DECISIONS + guards registres (ADR-043) |
+| `v2.15.0` | 2026-07-05 | Guard Bash registres : fermeture du contournement shell (BLK-006) |
+| `v2.15.1` | 2026-07-05 | Guard Read : fenêtre bornée par VALEUR, pas par présence (BLK-007) |
+| `v2.16.0` | 2026-07-05 | Agents natifs machine-enforced + doctrine de chargement contexte (ADR-044) |
+| `v2.17.0` | 2026-07-07 | + mobile-test + mobile-test-team (boucle autonome test→fix mobile), dev-orchestrator v1.2.0 (vf-decide + garde-fous autonomes), reference v2.3.0 (Pattern 12), support engine multi-agents |
 
 </details>
 

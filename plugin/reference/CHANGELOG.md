@@ -1,5 +1,15 @@
 # CHANGELOG — reference
 
+## [v2.3.0] — 2026-07-07
+
+### Ajouté
+- **Pattern 12 — Cloisonnement par outils** (`content/methodology/patterns/12-cloisonnement-outils.md`).
+  Formalise « un juge n'écrit jamais / un worker n'escalade jamais » : des garanties portées au
+  niveau du frontmatter `tools:`, en défense en profondeur avec les règles de domaine. Complète le
+  Pattern 03 (Agents) et sert de support technique aux garde-fous anti-triche des boucles autonomes.
+  Extrait du track « équipe d'agents » (revizapp). Promotion en décision numérotée (DEC-XXX) : à confirmer.
+- README des patterns : table mise à jour (12 patterns), carte de lecture « Concevoir des agents sûrs » (3 + 12).
+
 ## [v2.2.1] — 2026-07-05 (ADR-044)
 
 ### Corrigé

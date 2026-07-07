@@ -52,6 +52,7 @@ Je détecte l'intention sous une grande variété de formulations (couverture ma
 |---|---|
 | réfléchis / conçois / on part sur quoi / brainstorm / idée / explore / et si on | superpowers `brainstorming` |
 | planifie / découpe / cadre / prépare le sprint / on attaque quoi / structure | `gsd-discuss-phase` puis `gsd-plan-phase` |
+| quelle option / on part sur quoi / compare ces approches / aide-moi à choisir / A ou B | `vf-decide` (mode advisor de `gsd-discuss-phase` → synthèse) |
 | code / implémente / ajoute / construis / développe / fais cette feature | `gsd-execute-phase` (ou `gsd-quick` si trivial) |
 | petite tâche / vite fait / typo / renomme / juste un petit truc | `gsd-quick` ou `gsd-fast` |
 | teste / vérifie / valide / ça marche ? / recette / contrôle | `gsd-verify-work` |

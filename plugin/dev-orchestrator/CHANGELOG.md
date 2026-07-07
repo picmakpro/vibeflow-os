@@ -1,5 +1,22 @@
 # CHANGELOG — dev-orchestrator
 
+## [v1.2.0] — 2026-07-07
+
+### Ajouté
+- **Verbe `/vf-decide`** — panel de décision pour trancher une zone grise technique (compare
+  des options, produit un tableau comparatif sourcé + reco). Délègue au **mode advisor de
+  `gsd-discuss-phase`** (qui orchestre le panel de recherche décisionnelle) — on route vers le
+  skill canonique, jamais vers un agent en direct. Porte le total à **14 verbes `/vf-*`**. Ajouté
+  à la table de routage de `vibeflow-dev` et à `vocabulary-map.md` (« advisor » → panel de décision).
+- **Référence `references/autonomous-guardrails.md`** — doctrine des 5 garde-fous de boucle
+  autonome (anti-thrash N=3, anti-régression revert, arrêt vert/plafond, séparation anti-triche,
+  rapport de synthèse). Branchée sur `vf-auto` (section « Garde-fous (non supervisé) »). Extraite
+  et généralisée depuis le track « équipe d'agents » (revizapp, couche B).
+
+### Note
+- La séparation anti-triche s'appuie sur le **Pattern 12 — Cloisonnement par outils**
+  (module `reference`).
+
 ## [v1.1.0] — 2026-06-04
 
 ### Ajouté
