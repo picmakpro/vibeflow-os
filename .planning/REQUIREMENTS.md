@@ -70,6 +70,29 @@
 - [x] **FIRST-01**: L'agent détecte l'absence de `.planning/` (projet non GSD-initialisé) au 1er usage.
 - [x] **FIRST-02**: Il propose map-codebase puis new-project sur confirmation (jamais `gsd-new-project` seul).
 
+## Milestone 3 — Doctrine dev & consolidation (active)
+
+> Spec : `docs/superpowers/specs/2026-07-07-dev-doctrine-consolidation-design.md`
+> Origine : audit du parc de modules vs `dev-orchestrator`.
+
+### Philosophies de dev (Phase 7)
+
+- [x] **PHIL-01**: `software-architecture/references/principles.md` existe et porte **DRY** comme contrat vérifiable (test → signal → remède), distinct de « dry-run ».
+- [x] **PHIL-02**: `principles.md` porte **KISS** et **YAGNI** (frères de DRY, même format).
+- [x] **PHIL-03**: **Clean Architecture** est nommée en place dans `solid-soc.md` (section couches = Dependency Rule).
+- [x] **PHIL-04**: **Clean Code** est nommée en place dans `solid-soc.md` (petites unités, `Result<T>`, contrats typés).
+- [x] **PHIL-05**: Une **carte TDD** (Red-Green-Refactor + quand l'appliquer) renvoie au skill canonique `superpowers:test-driven-development` / `tdd` et s'articule au Gate Nyquist — sans dupliquer la mécanique (DD3).
+- [x] **PHIL-06**: `SKILL.md` câble DRY/KISS-YAGNI/Clean Code en **Tier 2** (audit de sprint), ajoute une ligne TDD en Tier 1, référence `principles.md`, et étend le frontmatter `description`. Aucun faux gate machine (DD4).
+- [x] **PHIL-07**: `universal-vs-dev.md` étend la table universelle avec DRY/KISS/YAGNI (transposition non-dev).
+- [x] **PHIL-08**: `software-architecture` : `module.json` (description + bump v1.2.0) + CHANGELOG + README mis à jour ; densité `.md` sous seuils ADR-029.
+
+### Consolidation des doublons (Phase 8)
+
+- [ ] **CONS-01**: Un seul foyer de rule de gates de code — `feature-dev-gates` fusionné dans `software-architecture` (ou déprécié avec plan de migration), plus de doublon de globs.
+- [ ] **CONS-02**: `audit-architecture` renvoie aux modules au lieu de dupliquer (Instance C `examples-cross-domain.md:44-61`) ; sa `module.json` legacy corrigée.
+- [ ] **CONS-03**: Les 3 axiomes (enforcement>prose, filet fonctionnel, preuve avant done) ont une source unique + renvois.
+- [ ] **CONS-04**: Invariant vérifié — `dev-orchestrator` reste un pur routeur, aucune doctrine injectée (DD1).
+
 ## v2 Requirements
 
 ### Vocabulaire & UX
@@ -120,11 +143,24 @@
 | PLUG-04 | Phase 5 | Complete |
 | FIRST-01 | Phase 6 | Complete |
 | FIRST-02 | Phase 6 | Complete |
+| PHIL-01 | Phase 7 | Complete |
+| PHIL-02 | Phase 7 | Complete |
+| PHIL-03 | Phase 7 | Complete |
+| PHIL-04 | Phase 7 | Complete |
+| PHIL-05 | Phase 7 | Complete |
+| PHIL-06 | Phase 7 | Complete |
+| PHIL-07 | Phase 7 | Complete |
+| PHIL-08 | Phase 7 | Complete |
+| CONS-01 | Phase 8 | Pending |
+| CONS-02 | Phase 8 | Pending |
+| CONS-03 | Phase 8 | Pending |
+| CONS-04 | Phase 8 | Pending |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
 - Milestone 2 (Install UX) : 17 requirements — mappés aux phases 2-6, 0 non-mappé ✓
+- Milestone 3 (Doctrine dev & consolidation) : 12 requirements — mappés aux phases 7-8, 0 non-mappé ✓
 
 ---
 *Requirements defined: 2026-06-04*
-*Last updated: 2026-06-04 after initial definition*
+*Last updated: 2026-07-07 — ajout Milestone 3 (doctrine dev & consolidation)*

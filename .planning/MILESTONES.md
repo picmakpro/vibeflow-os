@@ -1,5 +1,18 @@
 # Milestones — VibeFlow Dev Orchestrator (VFDO)
 
+## 🚧 dev-doctrine — Doctrine dev & consolidation (ouvert 2026-07-07)
+
+**Statut :** planning · **Spec :** `docs/superpowers/specs/2026-07-07-dev-doctrine-consolidation-design.md`
+
+**Périmètre prévu :** 2 phases · 12 requirements (PHIL-01..08, CONS-01..04).
+
+**Origine :** audit du parc de modules vs `dev-orchestrator` (`scratchpad/AUDIT-modules-vs-dev-orchestrator.md`) — constat : `dev-orchestrator` est un pur routeur sans doctrine ; les philosophies de dev (DRY absent, Clean Archi/Clean Code non nommés, TDD sans carte) et les doublons se concentrent dans le cluster qualité.
+
+- **Phase 7 — Philosophies de dev** : enrichir `software-architecture` (DRY/KISS/YAGNI, nommer Clean Architecture + Clean Code, carte TDD → skill canonique, câblage Tier 2 honnête).
+- **Phase 8 — Consolidation** : fusionner/déprécier `feature-dev-gates`, dé-dupliquer `audit-architecture`, factoriser les 3 axiomes. Invariant : `dev-orchestrator` reste un pur routeur.
+
+---
+
 ## ✅ install-ux-v1.0 — Installation plugin + UX à toggles (2026-06-05)
 
 **Tag git :** `install-ux-v1.0` · **Release repo** `v2.4.0` · **PR** #2 (mergée)

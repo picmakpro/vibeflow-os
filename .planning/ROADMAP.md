@@ -4,6 +4,7 @@
 
 - ✅ **vfdo-v1.0** — Module dev-orchestrator (Phase 1) — clôturé 2026-06-04
 - ✅ **install-ux-v1.0** — Phases 2-6 — clôturé 2026-06-05 (plugin + skill à toggles + scope) — release `v2.4.0`
+- 🚧 **dev-doctrine** — Phases 7-8 — doctrine dev (SOLID/DRY/KISS/YAGNI/Clean Archi/Clean Code/TDD) + consolidation des doublons qualité
 
 ## Phases
 
@@ -85,10 +86,43 @@ Plans:
 Plans:
 - [x] 06-01-PLAN.md — garde-fou first-use dans AGENT.md (détection `.planning/PROJECT.md` absent → délégation vf-init, new-project jamais seul) + axe de test T7 (FIRST-01, FIRST-02)
 
+### 🚧 Doctrine dev & consolidation (Phases 7-8)
+
+**Milestone Goal:** Combler les philosophies de dev manquantes (DRY absent ; Clean Architecture,
+Clean Code non nommés ; TDD sans carte) dans le foyer `software-architecture`, puis consolider les
+doublons du cluster qualité (`software-architecture` / `feature-dev-gates` / `audit-architecture`).
+`dev-orchestrator` reste un pur routeur (invariant).
+Spec : `docs/superpowers/specs/2026-07-07-dev-doctrine-consolidation-design.md`.
+
+#### Phase 7: Philosophies de dev
+**Goal**: Enrichir `software-architecture` — DRY/KISS/YAGNI écrits, Clean Architecture + Clean Code nommés, carte TDD renvoyant au skill canonique, câblage Tier 2 honnête. Sans dupliquer l'existant.
+**Depends on**: — (module déjà en place)
+**Requirements**: PHIL-01..08
+**Success Criteria** (what must be TRUE):
+  1. `principles.md` porte DRY + KISS + YAGNI (contrats vérifiables) + une carte TDD renvoyant au skill canonique.
+  2. Clean Architecture (Dependency Rule) et Clean Code sont **nommés** dans `solid-soc.md`.
+  3. `SKILL.md` câble DRY/KISS-YAGNI/Clean Code en Tier 2, référence `principles.md`, étend le frontmatter — **aucun faux gate machine**.
+  4. `module.json` bumpé v1.2.0 + CHANGELOG/README ; densité `.md` sous seuils ADR-029.
+**Plans**: 2 plans (2 waves) — ✅ complétés, vérif goal-backward PASS (`07-VERIFICATION.md`)
+Plans:
+- [x] 07-01-PLAN.md — nommage Clean Archi/Clean Code + `principles.md` (DRY/KISS/YAGNI + carte TDD) + table universelle (PHIL-01..05, 07)
+- [x] 07-02-PLAN.md — câblage Tier 2 `SKILL.md` + release-meta module v1.2.0 (PHIL-06, 08)
+
+#### Phase 8: Consolidation des doublons
+**Goal**: Assainir le cluster qualité — fusionner/déprécier `feature-dev-gates` dans un foyer de gates unique, dé-dupliquer `audit-architecture` (renvois au lieu de re-description), factoriser les 3 axiomes, corriger les descriptions legacy.
+**Depends on**: Phase 7
+**Requirements**: CONS-01..04
+**Success Criteria** (what must be TRUE):
+  1. Un seul foyer de rule de gates de code (plus de doublon de globs `src/** app/** lib/** features/**`).
+  2. `audit-architecture` renvoie au lieu de dupliquer ; sa `module.json` legacy corrigée.
+  3. Les 3 axiomes (enforcement>prose, filet fonctionnel, preuve avant done) ont une source unique.
+  4. Invariant vérifié : `dev-orchestrator` inchangé (pur routeur).
+**Plans**: à découper (`discuss-phase` puis `plan-phase` — fusion de module = rétro-compat déps/install à cadrer)
+
 ## Progress
 
 **Execution Order:**
-1 ✅ → 2 → 3 → 4 → 5 ; 6 indépendant (peut partir tôt)
+1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → **7 → 8**
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -98,3 +132,5 @@ Plans:
 | 4. Skill /vibeflow-install | Install UX | 2/2 | Complete | 2026-06-05 |
 | 5. Packaging plugin | Install UX | 2/2 | Complete | 2026-06-05 |
 | 6. dev-orchestrator first-use | Install UX | 1/1 | Complete | 2026-06-05 |
+| 7. Philosophies de dev | dev-doctrine | 2/2 | Complete | 2026-07-07 |
+| 8. Consolidation des doublons | dev-doctrine | 0/? | Planned | — |

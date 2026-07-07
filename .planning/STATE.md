@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: install-ux
-milestone_name: Install UX
-status: verifying
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-06-04T18:37:18.110Z"
-last_activity: 2026-06-04
+milestone: dev-doctrine
+milestone_name: Doctrine dev & consolidation
+status: executing
+stopped_at: Phase 7 complète (PASS) — prête pour Phase 8 (consolidation)
+last_updated: "2026-07-07T00:00:00.000Z"
+last_activity: 2026-07-07
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 9
-  completed_plans: 9
-  percent: 100
+  total_phases: 2
+  completed_phases: 1
+  total_plans: 2
+  completed_plans: 2
+  percent: 50
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-04)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Milestone Install UX — Phase 2 (Manifeste & résolveur)
+**Current focus:** Milestone Doctrine dev & consolidation — Phase 8 (Consolidation des doublons)
 
 ## Current Position
 
-Phase: 2 of 6 (Manifeste & résolveur) — milestone Install UX
-Plan: 2 of 2 in current phase
-Status: Phase complete — ready for verification
-Last activity: 2026-06-04
+Phase: 8 of 8 (Consolidation des doublons) — milestone dev-doctrine
+Plan: Phase 7 livrée (2/2, PASS) ; Phase 8 à cadrer (`discuss-phase` puis `plan-phase`)
+Status: Executing — Phase 7 complète, Phase 8 non démarrée
+Last activity: 2026-07-07
 
-Progress: [██████████] 100%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
