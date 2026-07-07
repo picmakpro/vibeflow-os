@@ -1,5 +1,19 @@
 # Changelog — software-architecture
 
+## [v1.3.0] — 2026-07-07 (ADR-037 absorbé)
+
+### Ajouté
+- **Gates de développement de feature** dans `rules/production-code-architecture.md` : **Gate Nyquist**
+  (preuve/commande de vérif avant code) + **Gate Decision Coverage** (traçabilité DEC → code). Repris
+  fidèlement de l'ex-module `feature-dev-gates` (ADR-037), désormais **fusionné ici** — foyer unique
+  de la rule de code (structure + gates), au lieu de deux rules path-scopées sur les mêmes globs.
+- `SKILL.md` Tier 1 : mention des 2 gates.
+
+### Migration
+- Le module `feature-dev-gates` est **retiré** (cf. `_internal/retired-modules.txt`). Les labs qui
+  l'avaient installé voient leur rule orpheline `rules/feature-dev-gates.md` **nettoyée** au prochain
+  `update --all` (convergence vers la version finale).
+
 ## [v1.2.0] — 2026-07-07 (ADR-035 étendu)
 
 ### Ajouté

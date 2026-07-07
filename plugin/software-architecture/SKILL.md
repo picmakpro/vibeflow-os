@@ -42,6 +42,7 @@ n'est pas une préférence de style : c'est un **facteur causal** de la qualité
 - **Frontières** : eslint-plugin-boundaries (ce qui peut importer quoi). Mode `warn` → `error`.
 - **Vérification 3 couches avant tout « done »** : (1) syntaxe (compile/lint vert) → (2) intention (la modif reflète la spec) → (3) régression (tests + typecheck verts). Cf. skill `verification-before-completion`.
 - **Test-first (TDD) quand le critère est mesurable** : écrire la commande de vérif / le test qui échoue AVANT le code (Gate Nyquist). Mécanique : carte TDD dans `references/principles.md` → skill canonique `tdd`.
+- **Gates de feature** (portés par la rule `production-code-architecture`, path-scopée) : **Gate Nyquist** (preuve avant code) + **Gate Decision Coverage** (chaque décision DEC-XXX portée par une tâche). Absorbés de l'ex-module `feature-dev-gates` (ADR-037).
 
 ### Tier 2 — Audit de patterns (checkpoint de sprint)
 

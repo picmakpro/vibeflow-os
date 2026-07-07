@@ -1,8 +1,8 @@
 # software-architecture (module vibeflow-os)
 
 > **Type** : single-skill + rules + scripts (composable)
-> **Version** : v1.2.0
-> **ADR** : ADR-035 (Doctrine Architecture Logicielle AI-Safe)
+> **Version** : v1.3.0
+> **ADR** : ADR-035 (Doctrine Architecture Logicielle AI-Safe) + ADR-037 absorbé (gates Nyquist / Decision Coverage)
 
 Doctrine d'**architecture logicielle AI-safe** : empêcher l'IA de « casser du code ailleurs »
 en posant une fondation saine (responsabilité unique, frontières claires, seuil de taille) et
