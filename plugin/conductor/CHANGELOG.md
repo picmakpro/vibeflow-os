@@ -1,5 +1,20 @@
 # Changelog — conductor
 
+## [v1.8.0] — 2026-07-07
+
+### Ajouté
+- **Mise à jour du plugin en un geste** — commande `/vf-update` + skill `vf-update`.
+  - `check-plugin-update.sh` — compare la version installée (`installed_plugins.json`) au **dernier
+    tag GitHub** (`git ls-remote --tags`, source de vérité depuis la discipline de tags), écrit un
+    cache `~/.cache/vibeflow/update-check.json`.
+  - `update-banner.sh` — hook **SessionStart** : signale « mise à jour disponible X → Y, lance
+    /vf-update » depuis le cache, puis rafraîchit le cache en tâche de fond. Câblé dans `hooks.json`.
+  - `vf-update-run.sh` — re-matérialise les modules installés depuis le **cache le plus récent**
+    (localisé lui-même, car la session courante garde l'ancien `${CLAUDE_PLUGIN_ROOT}`).
+  - Le skill orchestre les **deux couches** sous confirmation (ADR-031) : `claude plugin update
+    vibeflow` (marketplace) puis engine `update --all` (modules), + rappel de redémarrage.
+  - Tests : `test-vf-update.sh` (bandeau + sélection semver du cache) — 4/4.
+
 ## [v1.7.0] — 2026-07-07
 
 ### Ajouté

@@ -8,7 +8,7 @@
 
 Say _"help me build this feature"_ — and the whole pipeline kicks off: scoping → plan → execution → tests → delivery. Without ever typing a technical command or knowing what runs under the hood.
 
-[![Version](https://img.shields.io/badge/version-2.18.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.19.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-15-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -78,7 +78,7 @@ The UX walks you through:
 
 | Module | Ver. | Type | What it does |
 |--------|:----:|------|--------------|
-| **[conductor](./plugin/conductor/)** | `1.7.0` | agent + skills + scripts + references | 🧭 The front door. Meta agent `vibeflow-conductor` (guardian): create/configure a lab in **any domain** (`vf-new-lab`, bundle-aware), install/verify/update, migrate on doctrine change (`vf-calibrate`), receive coherence escalations. Not always-on — config/audit/migration only. |
+| **[conductor](./plugin/conductor/)** | `1.8.0` | agent + skills + scripts + references | 🧭 The front door. Meta agent `vibeflow-conductor` (guardian): create/configure a lab in **any domain** (`vf-new-lab`, bundle-aware), install/verify/update, migrate on doctrine change (`vf-calibrate`), receive coherence escalations. Not always-on — config/audit/migration only. |
 | **[dev-orchestrator](./plugin/dev-orchestrator/)** | `1.2.0` | agent + skills + scripts | ⭐ The dev core. Router agent `vibeflow-dev` + 14 `/vf-*` verbs (incl. `vf-decide` decision panel) + auto-generated GSD index + autonomous-loop guardrails doctrine. Routes **plain language** to GSD/Superpowers skills (scoping → delivery), without exposing the plumbing. |
 | **[mobile-test](./plugin/mobile-test/)** | `1.0.0` | skill + script + config | 📱 Real mobile app testing (iOS simulator / Android emulator): target detection, build-if-absent, Maestro regression, timestamped report + artifacts, visual failure diagnosis via `mobile-mcp`. Config-driven, no project constants. **Experimental** until first real green run. |
 | **[mobile-test-team](./plugin/mobile-test-team/)** | `1.0.1` | agents + rules | 🤖 Autonomous mobile test→fix loop: `vf-test-orchestrator` + tool-compartmentalized workers (`vf-test-runner` / `vf-app-fixer`, Pattern 12), so autonomous mode reaches "the app actually works", not just green unit tests. Path-scoped rule fires the real-verification doctrine while coding. Requires `mobile-test`. **Experimental**. |
@@ -108,6 +108,7 @@ Native slash commands shipped by the plugin (available as soon as it's enabled �
 | `/vf-calibrate` | Check framework drift and migrate the lab (human-validated). |
 | `/vf-audit` | Full conformance audit via the **vibeflow-validator** agent. |
 | `/vibeflow-install` | Install/toggle modules (scope-aware installer skill). |
+| `/vf-update` | Update VibeFlow — plugin (marketplace cache) + installed modules — to the latest published version, with changelog and confirmation. A SessionStart banner flags a new version when one exists. |
 
 > Agents (`vibeflow-conductor`, `vibeflow-validator`) are not directly typeable — these commands are their explicit entry points. A command guides you to `/vibeflow-install` first if the underlying module isn't installed yet.
 
@@ -180,6 +181,7 @@ Routing relies on a **factual index auto-generated** from the frontmatter of the
 | `v2.16.0` | 2026-07-05 | Machine-enforced native agents + context-loading doctrine (ADR-044) |
 | `v2.17.0` | 2026-07-07 | + mobile-test + mobile-test-team (autonomous mobile test→fix loop), dev-orchestrator v1.2.0 (vf-decide + autonomous guardrails), reference v2.3.0 (Pattern 12), multi-agent engine support |
 | `v2.18.0` | 2026-07-07 | Release discipline (`vf-internal` convention: internal workers get no incarnation command; conductor v1.7.0) + repo tagging rule & guard (`scripts/check-release-tag.sh`, path-scoped rule) |
+| `v2.19.0` | 2026-07-07 | `/vf-update` command + SessionStart update banner: one-shot two-layer update (plugin marketplace cache + installed modules), latest detected from GitHub tags (conductor v1.8.0) |
 
 </details>
 
