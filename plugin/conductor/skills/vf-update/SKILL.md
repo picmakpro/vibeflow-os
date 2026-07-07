@@ -48,8 +48,12 @@ seront mis à jour. Continuer ? ». Gère les flags de `$ARGUMENTS` :
 
 ### 4 — Exécution (après OK)
 
-a. **Couche plugin** : `claude plugin update vibeflow`. Si le CLI `claude` est absent ou échoue,
-   signale-le et donne la commande manuelle (`claude plugin update vibeflow`) — puis continue en 4b
+a. **Couche plugin** : `claude plugin update vibeflow@vibeflow-os`. **Toujours l'identifiant
+   complet `<plugin>@<marketplace>`** : le nom nu (`claude plugin update vibeflow`) peut échouer par
+   « Plugin not found » quand le cache de catalogue est périmé. Si le CLI `claude` est absent ou
+   échoue, signale-le, donne la commande manuelle, et — en cas de « not found » persistant — la
+   parade : `claude plugin marketplace update vibeflow-os` (ou supprimer le cache
+   `~/.claude/plugins/plugin-catalog-cache.json`, régénéré au prochain appel). Puis continue en 4b
    (les modules peuvent quand même être re-matérialisés depuis le cache le plus récent).
 
 b. **Couche modules** : `bash <S>/vf-update-run.sh`. Le script localise **lui-même** le cache le

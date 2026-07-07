@@ -61,9 +61,17 @@ les dépendances sont re-résolues automatiquement à chaque passage.
 
 ## Mises à jour
 
+Le plus simple, une fois le plugin installé : la commande **`/vf-update`** (met à jour le plugin
+**et** les modules installés, avec confirmation). En ligne de commande :
+
 ```bash
-claude plugin update vibeflow
+claude plugin update vibeflow@vibeflow-os
 ```
+
+> Utilise **toujours l'identifiant complet `vibeflow@vibeflow-os`**. Le nom nu
+> (`claude plugin update vibeflow`) peut renvoyer « Plugin not found » quand le cache de catalogue
+> est périmé — dans ce cas : `claude plugin marketplace update vibeflow-os`, ou supprime
+> `~/.claude/plugins/plugin-catalog-cache.json` (régénéré au prochain appel).
 
 Récupère la dernière version publiée du plugin depuis le marketplace, puis re-passer par
 `/vibeflow-install` si tu veux activer de nouveaux modules apparus dans le catalogue.
