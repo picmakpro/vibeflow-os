@@ -37,6 +37,7 @@
 | map-codebase | cartographie du code |
 | new-project | démarrage de projet |
 | progress / next | point d'avancement |
+| advisor / researcher / advisor panel | panel de décision |
 | STATE / STATE.md | état du projet |
 | REQUIREMENTS / requirements | exigences |
 | plan / planner agent | (interne — ne pas exposer) |
