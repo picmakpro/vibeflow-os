@@ -8,7 +8,7 @@
 
 Dis _« aide-moi à dev cette feature »_ — et tout le pipeline se déclenche : cadrage → plan → exécution → tests → livraison. Sans jamais taper une commande technique ni savoir ce qui tourne en coulisse.
 
-[![Version](https://img.shields.io/badge/version-2.18.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.19.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-15-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -78,7 +78,7 @@ L'UX déroule :
 
 | Module | Ver. | Type | Ce qu'il fait |
 |--------|:----:|------|---------------|
-| **[conductor](./plugin/conductor/)** | `1.7.0` | agent + skills + scripts + references | 🧭 La porte d'entrée. Agent méta `vibeflow-conductor` (gardien) : crée/configure un lab dans **n'importe quel métier** (`vf-new-lab`, bundle-aware), installe/vérifie/met à jour, migre sur évolution de doctrine (`vf-calibrate`), reçoit les escalades de cohérence. Pas appelé en continu — config/audit/migration. |
+| **[conductor](./plugin/conductor/)** | `1.8.0` | agent + skills + scripts + references | 🧭 La porte d'entrée. Agent méta `vibeflow-conductor` (gardien) : crée/configure un lab dans **n'importe quel métier** (`vf-new-lab`, bundle-aware), installe/vérifie/met à jour, migre sur évolution de doctrine (`vf-calibrate`), reçoit les escalades de cohérence. Pas appelé en continu — config/audit/migration. |
 | **[dev-orchestrator](./plugin/dev-orchestrator/)** | `1.2.0` | agent + skills + scripts | ⭐ Le cœur dev. Agent routeur `vibeflow-dev` + 14 verbes `/vf-*` (dont le panel de décision `vf-decide`) + index GSD auto-généré + doctrine des garde-fous de boucle autonome. Route le **langage naturel** vers les skills GSD/Superpowers (cadrage → livraison), sans exposer la plomberie. |
 | **[mobile-test](./plugin/mobile-test/)** | `1.0.0` | skill + script + config | 📱 Test réel d'app mobile (simulateur iOS / émulateur Android) : détection de cible, build-si-absent, régression Maestro, rapport horodaté + artefacts, diagnostic visuel des échecs via `mobile-mcp`. Piloté par config, sans constante projet. **Expérimental** jusqu'au premier vrai run vert. |
 | **[mobile-test-team](./plugin/mobile-test-team/)** | `1.0.1` | agents + rules | 🤖 Boucle autonome test→fix mobile : `vf-test-orchestrator` + workers cloisonnés par outils (`vf-test-runner` / `vf-app-fixer`, Pattern 12), pour que le mode autonome atteigne « l'app marche vraiment », pas juste des tests unitaires verts. Une règle path-scopée déclenche la doctrine de vérification réelle pendant le code. Requiert `mobile-test`. **Expérimental**. |
@@ -108,6 +108,7 @@ Slash commands natives livrées par le plugin (disponibles dès qu'il est activ�
 | `/vf-calibrate` | Détecter le drift framework et migrer le lab (validation humaine). |
 | `/vf-audit` | Audit de conformité complet via l'agent **vibeflow-validator**. |
 | `/vibeflow-install` | Installer/activer des modules (skill installeur scope-aware). |
+| `/vf-update` | Mettre à jour VibeFlow — plugin (cache marketplace) + modules installés — vers la dernière version publiée, avec changelog et confirmation. Un bandeau au démarrage signale une nouvelle version dès qu'il en existe une. |
 
 > Les agents (`vibeflow-conductor`, `vibeflow-validator`) ne se tapent pas directement — ces commandes sont leurs points d'entrée explicites. Une commande renvoie vers `/vibeflow-install` si le module sous-jacent n'est pas encore installé.
 
@@ -180,6 +181,7 @@ Le routage repose sur un **index factuel auto-généré** depuis le frontmatter 
 | `v2.16.0` | 2026-07-05 | Agents natifs machine-enforced + doctrine de chargement contexte (ADR-044) |
 | `v2.17.0` | 2026-07-07 | + mobile-test + mobile-test-team (boucle autonome test→fix mobile), dev-orchestrator v1.2.0 (vf-decide + garde-fous autonomes), reference v2.3.0 (Pattern 12), support engine multi-agents |
 | `v2.18.0` | 2026-07-07 | Discipline de release (convention `vf-internal` : les workers internes n'ont plus de commande d'incarnation ; conductor v1.7.0) + règle de tagging & guard du repo (`scripts/check-release-tag.sh`, règle path-scopée) |
+| `v2.19.0` | 2026-07-07 | Commande `/vf-update` + bandeau de mise à jour au démarrage : update deux couches en un geste (cache marketplace du plugin + modules installés), dernière version détectée via les tags GitHub (conductor v1.8.0) |
 
 </details>
 
