@@ -20,6 +20,8 @@ LAB="$TMP/.claude"
 mkdir -p "$LAB/agents"
 printf 'name: alpha\ndescription: Agent de test alpha.\n\nCorps alpha.\n' > "$LAB/agents/alpha.md"
 printf 'name: beta\n\nCorps beta sans description.\n' > "$LAB/agents/beta.md"
+# Worker interne (vf-internal: true) : ne doit JAMAIS produire de commande d'incarnation.
+printf -- '---\nname: gamma\ndescription: Worker interne de test.\nvf-internal: true\n---\n\nCorps gamma.\n' > "$LAB/agents/gamma.md"
 # Bruit : un dossier -references ne doit PAS produire de commande.
 mkdir -p "$LAB/agents/alpha-references"
 printf 'x\n' > "$LAB/agents/alpha-references/note.md"
@@ -28,6 +30,7 @@ VF_TARGET_ROOT="$LAB" bash "$GEN" >/dev/null 2>&1
 ok "commande alpha créée"                 "$(exists "$LAB/commands/alpha.md")"
 ok "commande beta créée"                  "$(exists "$LAB/commands/beta.md")"
 ok "pas de commande pour -references"     "$([ ! -e "$LAB/commands/note.md" ] && echo true || echo false)"
+ok "pas de commande pour agent vf-internal" "$([ ! -e "$LAB/commands/gamma.md" ] && echo true || echo false)"
 ok "commande référence @agents/alpha.md"  "$(has "$LAB/commands/alpha.md" "@.claude/agents/alpha.md")"
 ok "commande dit fenêtre principale"      "$(has "$LAB/commands/alpha.md" "fenêtre principale")"
 ok "commande interdit sous-agent Task"    "$(has "$LAB/commands/alpha.md" "sans** déléguer")"

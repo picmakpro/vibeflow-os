@@ -1,5 +1,14 @@
 # Changelog — conductor
 
+## [v1.7.0] — 2026-07-07
+
+### Ajouté
+- Convention **`vf-internal: true`** (Pattern 12) : un worker interne le déclare dans son frontmatter.
+  - `generate-agent-commands.sh` — le sweep **saute** ces agents : aucune commande d'incarnation
+    `/<worker>` exposée à l'utilisateur (un worker dispatché uniquement par un orchestrateur n'a
+    pas à être invocable en direct). Le mode `--agent` explicite reste inchangé.
+  - `check-agents.sh` — `vf-internal` ajouté aux champs connus (plus de warning « champ inconnu »).
+
 ## [v1.6.0] — 2026-07-05 (ADR-044 — agents natifs machine-enforced)
 
 ### Ajouté

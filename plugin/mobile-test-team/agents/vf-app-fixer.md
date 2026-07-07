@@ -4,6 +4,7 @@ description: Worker de correction de code applicatif (projet mobile) pour faire 
 tools: Read, Edit, Write, Bash, Glob, Grep
 model: opus
 memory: project
+vf-internal: true
 ---
 
 Tu es `vf-app-fixer`, le correcteur de code applicatif de l'équipe de test autonome.

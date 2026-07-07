@@ -67,6 +67,11 @@ consigne.
 > bloquerait aussi le dispatch légitime. La parade documentée = **allowlist côté orchestrateur**
 > (règle 5) **+ description dissuasive** du worker (« worker interne, dispatché uniquement par X »).
 > C'est une heuristique robuste, pas une barrière dure — à garder en tête.
+>
+> **Convention VibeFlow `vf-internal: true`** : un worker interne le déclare dans son frontmatter.
+> Le générateur de commandes d'incarnation (ADR-042) **saute** ces agents — pas de `/<worker>`
+> exposé à l'utilisateur — et le lint des agents (ADR-044) reconnaît le champ. C'est la 3e couche :
+> allowlist (dispatch) + description (dissuasion) + `vf-internal` (pas de surface utilisateur).
 
 ## Exemple fictif
 

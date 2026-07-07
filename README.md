@@ -8,7 +8,7 @@
 
 Say _"help me build this feature"_ — and the whole pipeline kicks off: scoping → plan → execution → tests → delivery. Without ever typing a technical command or knowing what runs under the hood.
 
-[![Version](https://img.shields.io/badge/version-2.17.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.18.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-15-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -78,17 +78,17 @@ The UX walks you through:
 
 | Module | Ver. | Type | What it does |
 |--------|:----:|------|--------------|
-| **[conductor](./plugin/conductor/)** | `1.1.0` | agent + skills + scripts + references | 🧭 The front door. Meta agent `vibeflow-conductor` (guardian): create/configure a lab in **any domain** (`vf-new-lab`, bundle-aware), install/verify/update, migrate on doctrine change (`vf-calibrate`), receive coherence escalations. Not always-on — config/audit/migration only. |
+| **[conductor](./plugin/conductor/)** | `1.7.0` | agent + skills + scripts + references | 🧭 The front door. Meta agent `vibeflow-conductor` (guardian): create/configure a lab in **any domain** (`vf-new-lab`, bundle-aware), install/verify/update, migrate on doctrine change (`vf-calibrate`), receive coherence escalations. Not always-on — config/audit/migration only. |
 | **[dev-orchestrator](./plugin/dev-orchestrator/)** | `1.2.0` | agent + skills + scripts | ⭐ The dev core. Router agent `vibeflow-dev` + 14 `/vf-*` verbs (incl. `vf-decide` decision panel) + auto-generated GSD index + autonomous-loop guardrails doctrine. Routes **plain language** to GSD/Superpowers skills (scoping → delivery), without exposing the plumbing. |
 | **[mobile-test](./plugin/mobile-test/)** | `1.0.0` | skill + script + config | 📱 Real mobile app testing (iOS simulator / Android emulator): target detection, build-if-absent, Maestro regression, timestamped report + artifacts, visual failure diagnosis via `mobile-mcp`. Config-driven, no project constants. **Experimental** until first real green run. |
-| **[mobile-test-team](./plugin/mobile-test-team/)** | `1.0.0` | agents + rules | 🤖 Autonomous mobile test→fix loop: `vf-test-orchestrator` + tool-compartmentalized workers (`vf-test-runner` / `vf-app-fixer`, Pattern 12), so autonomous mode reaches "the app actually works", not just green unit tests. Path-scoped rule fires the real-verification doctrine while coding. Requires `mobile-test`. **Experimental**. |
+| **[mobile-test-team](./plugin/mobile-test-team/)** | `1.0.1` | agents + rules | 🤖 Autonomous mobile test→fix loop: `vf-test-orchestrator` + tool-compartmentalized workers (`vf-test-runner` / `vf-app-fixer`, Pattern 12), so autonomous mode reaches "the app actually works", not just green unit tests. Path-scoped rule fires the real-verification doctrine while coding. Requires `mobile-test`. **Experimental**. |
 | **[software-architecture](./plugin/software-architecture/)** | `1.0.0` | skill + rules + scripts | AI-Safe software architecture doctrine: SOLID/SoC, anti-god-files (≤300 LoC), machine-enforced gates, brownfield restructuring playbook. |
 | **[audit-architecture](./plugin/audit-architecture/)** | `1.0.0` | skill + references | Designer of **audit architectures**: derives, from a brief, the multi-layer audit structure of a process (content / folder / code / sales). |
 | **[infrastructure-audit](./plugin/infrastructure-audit/)** | `1.0.0` | skill + scripts | Automatic audit of the Claude Code infra (hooks, scripts, Anthropic drift) — catches regressions after an update. |
 | **[validator](./plugin/validator/)** | `1.1.0` | agent-only | Agent `vibeflow-validator`: guardian of technical alignment between methodology and projects, in 5 phases (incl. process-architecture audit). |
 | **[consolidator](./plugin/consolidator/)** | `1.0.0` | skill + scripts | Structured-memory consolidation across 4 pillars: indexing / archiving / merging / promotion. |
 | **[skill-creator](./plugin/skill-creator/)** | `1.0.0` | agent + skills | The "minimal agent + 2 composable skills" pattern for creating new skills (Anthropic base + workflow). |
-| **[reference](./plugin/reference/)** | `2.3.0` | doc-only | Full methodology documentation: VibeFlow Core (9 principles) + 12 patterns (incl. tool-compartmentalization) + 33 templates + 1 end-to-end example. |
+| **[reference](./plugin/reference/)** | `2.3.1` | doc-only | Full methodology documentation: VibeFlow Core (9 principles) + 12 patterns (incl. tool-compartmentalization) + 33 templates + 1 end-to-end example. |
 | **[planning-core](./plugin/planning-core/)** | `1.1.0` | skill + references + scripts | Universal planning & documentation backbone: lays down the common `.planning/` trunk (PROJECT/STATE/ROADMAP/REQUIREMENTS/MILESTONES/phases), **adapted to each lab's domain** — never imposed. Forward/present layer, complementary to memory registries. Freshness guard + domain detection + non-dev example. |
 | 📦 **[business-pilot-bundle](./plugin/business-pilot-bundle/)** | `1.0.0` | doc-only (bundle) | Métier bundle: ready chassis to pilot a business (3 agent blueprints commercial/delivery/finance + `business/` extension + canon registries). Instantiated by `vf-new-lab`. |
 | 📦 **[content-bundle](./plugin/content-bundle/)** | `1.0.0` | doc-only (bundle) | Métier bundle: editorial chain brief→deliverable→distribution (3 blueprints strategist/scriptwriter/repurposer + `editorial/` extension + blocking clarity gate). Instantiated by `vf-new-lab`. |
@@ -179,6 +179,7 @@ Routing relies on a **factual index auto-generated** from the frontmatter of the
 | `v2.15.1` | 2026-07-05 | Read guard: window bounded by VALUE, not presence (BLK-007) |
 | `v2.16.0` | 2026-07-05 | Machine-enforced native agents + context-loading doctrine (ADR-044) |
 | `v2.17.0` | 2026-07-07 | + mobile-test + mobile-test-team (autonomous mobile test→fix loop), dev-orchestrator v1.2.0 (vf-decide + autonomous guardrails), reference v2.3.0 (Pattern 12), multi-agent engine support |
+| `v2.18.0` | 2026-07-07 | Release discipline (`vf-internal` convention: internal workers get no incarnation command; conductor v1.7.0) + repo tagging rule & guard (`scripts/check-release-tag.sh`, path-scoped rule) |
 
 </details>
 

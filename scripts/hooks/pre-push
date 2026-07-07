@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# pre-push — Discipline de release : si on pousse `main`, la VERSION racine doit être taggée.
+#
+# Ne bloque QUE les push vers main (les branches de feature poussent librement — le tag vient
+# après le merge). Opt-in, non installé par défaut. Activation une seule fois :
+#   git config core.hooksPath scripts/hooks
+set -euo pipefail
+root="$(git rev-parse --show-toplevel)"
+blocked=0
+while read -r _localref _localsha remoteref _remotesha; do
+  case "$remoteref" in
+    refs/heads/main)
+      bash "$root/scripts/check-release-tag.sh" || blocked=1
+      ;;
+  esac
+done
+[ "$blocked" -eq 0 ] || {
+  echo "[pre-push] push vers main bloqué : release non taggée (voir ci-dessus)." >&2
+  exit 1
+}
+exit 0

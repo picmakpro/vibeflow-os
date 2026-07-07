@@ -59,9 +59,10 @@ hook = os.environ[\"VF_HOOK\"] == \"true\"
 single = os.environ[\"VF_SINGLE\"]
 
 # Champs officiels Claude Code (docs sub-agents, 2026-07-05) — base du lint.
+# + convention VibeFlow : vf-internal (worker interne — pas de commande d'incarnation, cf. Pattern 12).
 KNOWN = {\"name\", \"description\", \"tools\", \"disallowedTools\", \"model\", \"permissionMode\",
          \"maxTurns\", \"skills\", \"mcpServers\", \"hooks\", \"memory\", \"background\", \"effort\",
-         \"isolation\", \"color\", \"initialPrompt\"}
+         \"isolation\", \"color\", \"initialPrompt\", \"vf-internal\"}
 MODELS = {\"sonnet\", \"opus\", \"haiku\", \"fable\", \"inherit\"}
 MEMORY = {\"user\", \"project\", \"local\"}
 EFFORT = {\"low\", \"medium\", \"high\", \"xhigh\", \"max\"}
