@@ -88,10 +88,10 @@
 
 ### Consolidation des doublons (Phase 8)
 
-- [ ] **CONS-01**: Un seul foyer de rule de gates de code — `feature-dev-gates` fusionné dans `software-architecture` (ou déprécié avec plan de migration), plus de doublon de globs.
-- [ ] **CONS-02**: `audit-architecture` renvoie aux modules au lieu de dupliquer (Instance C `examples-cross-domain.md:44-61`) ; sa `module.json` legacy corrigée.
-- [ ] **CONS-03**: Les 3 axiomes (enforcement>prose, filet fonctionnel, preuve avant done) ont une source unique + renvois.
-- [ ] **CONS-04**: Invariant vérifié — `dev-orchestrator` reste un pur routeur, aucune doctrine injectée (DD1).
+- [x] **CONS-01**: Un seul foyer de rule de gates de code — `feature-dev-gates` fusionné dans `software-architecture` (ou déprécié avec plan de migration), plus de doublon de globs.
+- [x] **CONS-02**: `audit-architecture` renvoie aux modules au lieu de dupliquer (Instance C `examples-cross-domain.md:44-61`) ; sa `module.json` legacy corrigée.
+- [x] **CONS-03**: Les 3 axiomes (enforcement>prose, filet fonctionnel, preuve avant done) ont une source unique + renvois.
+- [x] **CONS-04**: Invariant vérifié — `dev-orchestrator` reste un pur routeur, aucune doctrine injectée (DD1).
 
 ## v2 Requirements
 
@@ -151,10 +151,10 @@
 | PHIL-06 | Phase 7 | Complete |
 | PHIL-07 | Phase 7 | Complete |
 | PHIL-08 | Phase 7 | Complete |
-| CONS-01 | Phase 8 | Pending |
-| CONS-02 | Phase 8 | Pending |
-| CONS-03 | Phase 8 | Pending |
-| CONS-04 | Phase 8 | Pending |
+| CONS-01 | Phase 8 | Complete |
+| CONS-02 | Phase 8 | Complete |
+| CONS-03 | Phase 8 | Complete |
+| CONS-04 | Phase 8 | Complete |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓

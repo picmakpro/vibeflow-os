@@ -117,7 +117,12 @@ Plans:
   2. `audit-architecture` renvoie au lieu de dupliquer ; sa `module.json` legacy corrigée.
   3. Les 3 axiomes (enforcement>prose, filet fonctionnel, preuve avant done) ont une source unique.
   4. Invariant vérifié : `dev-orchestrator` inchangé (pur routeur).
-**Plans**: à découper (`discuss-phase` puis `plan-phase` — fusion de module = rétro-compat déps/install à cadrer)
+**Plans**: 4 plans — ✅ complétés, vérif goal-backward PASS (`08-VERIFICATION.md`)
+Plans:
+- [x] 08-01-PLAN.md — fusion gates Nyquist+Decision Coverage → software-architecture v1.3.0 (CONS-01)
+- [x] 08-02-PLAN.md — suppression feature-dev-gates + `cleanup_retired_modules` engine + test T7 + doc refs (CONS-01)
+- [x] 08-03-PLAN.md — reference/AXIOMES-ENFORCEMENT.md source unique + renvois (CONS-03)
+- [x] 08-04-PLAN.md — dé-dup Instance C audit-architecture + fix description legacy v1.0.1 (CONS-02)
 
 ## Progress
 
@@ -133,4 +138,4 @@ Plans:
 | 5. Packaging plugin | Install UX | 2/2 | Complete | 2026-06-05 |
 | 6. dev-orchestrator first-use | Install UX | 1/1 | Complete | 2026-06-05 |
 | 7. Philosophies de dev | dev-doctrine | 2/2 | Complete | 2026-07-07 |
-| 8. Consolidation des doublons | dev-doctrine | 0/? | Planned | — |
+| 8. Consolidation des doublons | dev-doctrine | 4/4 | Complete | 2026-07-07 |

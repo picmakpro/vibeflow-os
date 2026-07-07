@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: dev-doctrine
 milestone_name: Doctrine dev & consolidation
-status: executing
-stopped_at: Phase 7 complète (PASS) — prête pour Phase 8 (consolidation)
+status: verifying
+stopped_at: Phase 8 complète (PASS) — milestone dev-doctrine livré, ship en attente (VERSION racine + tag)
 last_updated: "2026-07-07T00:00:00.000Z"
 last_activity: 2026-07-07
 progress:
   total_phases: 2
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 50
+  completed_phases: 2
+  total_plans: 6
+  completed_plans: 6
+  percent: 100
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-04)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Milestone Doctrine dev & consolidation — Phase 8 (Consolidation des doublons)
+**Current focus:** Milestone Doctrine dev & consolidation — LIVRÉ (ship en attente)
 
 ## Current Position
 
-Phase: 8 of 8 (Consolidation des doublons) — milestone dev-doctrine
-Plan: Phase 7 livrée (2/2, PASS) ; Phase 8 à cadrer (`discuss-phase` puis `plan-phase`)
-Status: Executing — Phase 7 complète, Phase 8 non démarrée
+Phase: 8 of 8 (Consolidation des doublons) — milestone dev-doctrine COMPLET
+Plan: Phase 7 (2/2 PASS) + Phase 8 (4/4 PASS) livrées sur branche `feat/dev-doctrine-phase7`
+Status: Verifying — les 2 phases PASS ; reste le ship (VERSION racine + tag + PR)
 Last activity: 2026-07-07
 
-Progress: [█████░░░░░] 50%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 

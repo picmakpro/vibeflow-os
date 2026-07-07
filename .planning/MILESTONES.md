@@ -1,10 +1,17 @@
 # Milestones — VibeFlow Dev Orchestrator (VFDO)
 
-## 🚧 dev-doctrine — Doctrine dev & consolidation (ouvert 2026-07-07)
+## 🚧 dev-doctrine — Doctrine dev & consolidation (phases livrées 2026-07-07, ship en attente)
 
-**Statut :** planning · **Spec :** `docs/superpowers/specs/2026-07-07-dev-doctrine-consolidation-design.md`
+**Statut :** 2 phases PASS (goal-backward) sur branche `feat/dev-doctrine-phase7` · ship (VERSION
+racine + tag + PR) en attente · **Spec :** `docs/superpowers/specs/2026-07-07-dev-doctrine-consolidation-design.md`
 
-**Périmètre prévu :** 2 phases · 12 requirements (PHIL-01..08, CONS-01..04).
+**Périmètre :** 2 phases · 6 plans · 12 requirements (PHIL-01..08, CONS-01..04) — **tous complétés**.
+
+**Livré :** `software-architecture` v1.1.0 → **v1.3.0** (SOLID déjà là + DRY/KISS/YAGNI, Clean Archi/Clean
+Code nommés, carte TDD, gates Nyquist+Decision Coverage absorbés). Module `feature-dev-gates`
+**supprimé** + `cleanup_retired_modules` engine (convergence, test T7). `audit-architecture` **v1.0.1**
+(Instance C dé-dupliquée, description legacy corrigée). `reference/AXIOMES-ENFORCEMENT.md` (source
+unique des 3 axiomes). Invariant `dev-orchestrator` intact.
 
 **Origine :** audit du parc de modules vs `dev-orchestrator` (`scratchpad/AUDIT-modules-vs-dev-orchestrator.md`) — constat : `dev-orchestrator` est un pur routeur sans doctrine ; les philosophies de dev (DRY absent, Clean Archi/Clean Code non nommés, TDD sans carte) et les doublons se concentrent dans le cluster qualité.
 
