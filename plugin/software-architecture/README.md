@@ -1,12 +1,14 @@
 # software-architecture (module vibeflow-os)
 
 > **Type** : single-skill + rules + scripts (composable)
-> **Version** : v1.0.0
+> **Version** : v1.2.0
 > **ADR** : ADR-035 (Doctrine Architecture Logicielle AI-Safe)
 
 Doctrine d'**architecture logicielle AI-safe** : empêcher l'IA de « casser du code ailleurs »
 en posant une fondation saine (responsabilité unique, frontières claires, seuil de taille) et
-des garde-fous **machine-enforced** (le seul type qui tienne).
+des garde-fous **machine-enforced** (le seul type qui tienne). Foyer des **philosophies de dev** du
+parc : SOLID, DRY, KISS, YAGNI, Clean Architecture (Dependency Rule), Clean Code, et une carte TDD
+(renvoyant au skill canonique).
 
 Spécialise le principe Core **P9 — Modulariser pour la cognition**.
 
@@ -15,7 +17,7 @@ Spécialise le principe Core **P9 — Modulariser pour la cognition**.
 | Fichier | Cible installation | Rôle |
 |---------|--------------------|------|
 | `SKILL.md` | `.claude/skills/software-architecture/SKILL.md` | Doctrine : Iron Law, Red Flags, validation 3 tiers |
-| `references/*.md` | `.claude/skills/software-architecture/references/` | SOLID/SoC, anti-patterns, playbook restructuration, universel vs dev |
+| `references/*.md` | `.claude/skills/software-architecture/references/` | SOLID + Clean Architecture + Clean Code (`solid-soc.md`), DRY/KISS/YAGNI + carte TDD (`principles.md`), anti-patterns, playbook restructuration, universel vs dev |
 | `rules/production-code-architecture.md` | `.claude/rules/` | Rule **path-scopée** (`src/**`, `app/**`, `lib/**`, `features/**`) |
 | `scripts/check-file-size.sh` | `.claude/scripts/` | Gate de taille de fichier (250L warn / 300L block) |
 

@@ -1,6 +1,6 @@
 ---
 name: software-architecture
-description: Architecture logicielle AI-safe. Invoquer dès qu'on crée/édite du code, qu'un fichier grossit, qu'on planifie un refactor/restructuration, ou qu'on sent une dette structurelle (god file, couplage, frontières floues). Applique SOLID/SRP/SoC, le seuil de taille 300L, et des garde-fous machine-enforced.
+description: Architecture logicielle AI-safe. Invoquer dès qu'on crée/édite du code, qu'un fichier grossit, qu'on planifie un refactor/restructuration, ou qu'on sent une dette structurelle (god file, couplage, frontières floues). Applique les philosophies de dev — SOLID/SRP/SoC, DRY, KISS, YAGNI, Clean Architecture (Dependency Rule), Clean Code, et une carte TDD — le seuil de taille 300L, et des garde-fous machine-enforced.
 ---
 
 # Architecture Logicielle AI-Safe
@@ -41,10 +41,19 @@ n'est pas une préférence de style : c'est un **facteur causal** de la qualité
 - **Cycles d'import** : détection (madge / dependency-cruiser). Cycle = interdit.
 - **Frontières** : eslint-plugin-boundaries (ce qui peut importer quoi). Mode `warn` → `error`.
 - **Vérification 3 couches avant tout « done »** : (1) syntaxe (compile/lint vert) → (2) intention (la modif reflète la spec) → (3) régression (tests + typecheck verts). Cf. skill `verification-before-completion`.
+- **Test-first (TDD) quand le critère est mesurable** : écrire la commande de vérif / le test qui échoue AVANT le code (Gate Nyquist). Mécanique : carte TDD dans `references/principles.md` → skill canonique `tdd`.
 
 ### Tier 2 — Audit de patterns (checkpoint de sprint)
+
+> Ces principes de conception s'auditent au **jugement** (LLM-judge / revue), pas par un gate
+> machine : un principe de conception ne se compile pas. Honnêteté de l'Iron Law — on ne câble pas
+> un faux gate ; on inscrit un item d'audit nommé.
+
 - Checklist SOLID (voir `references/solid-soc.md`).
-- Zones de séparation des préoccupations (domaine / application / infrastructure) non mélangées.
+- Zones de séparation des préoccupations = **Clean Architecture** (domaine / application / infrastructure) non mélangées ; Dependency Rule respectée.
+- **DRY** : pas de duplication de *connaissance* (une règle métier = une source de vérité) — sans tomber dans la fausse abstraction (voir `references/principles.md`).
+- **KISS / YAGNI** : solution la plus simple qui marche ; aucun code spéculatif « au cas où » (voir `references/principles.md`).
+- **Clean Code** : noms révélateurs d'intention, petites unités, erreurs typées (`Result<T>`).
 - Détection des anti-patterns (voir `references/anti-patterns.md`) : god file, god class, feature envy, couplage circulaire.
 
 ### Tier 3 — Revue d'architecture (gate de release)
@@ -69,7 +78,8 @@ Si une situation correspond MÊME à 1% à l'un de ces cas, invoquer ce skill :
 
 ## Références (chargement à la demande)
 
-- `references/solid-soc.md` — SOLID + séparation des préoccupations + structure de dossiers.
+- `references/solid-soc.md` — SOLID + Clean Architecture (Dependency Rule) + Clean Code + structure de dossiers.
+- `references/principles.md` — DRY + KISS + YAGNI (contrats vérifiables) + carte TDD (renvoi au skill canonique).
 - `references/anti-patterns.md` — Catalogue d'anti-patterns + signaux + remède.
 - `references/restructuration-playbook.md` — Playbook brownfield 6 vagues (généralisé).
 - `references/universal-vs-dev.md` — Ce qui est universel (transposable non-dev) vs dev-spécifique. Spécialise P9.
