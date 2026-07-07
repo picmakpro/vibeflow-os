@@ -21,6 +21,7 @@ content/
 │   ├── VIBEFLOW_CORE.md                    # Bible méthodologique v4.1 (8 principes P1-P8)
 │   ├── VIBEFLOW_PHILOSOPHY.md              # Philosophie
 │   ├── VIBEFLOW_EXPLAINED.md               # Vulgarisation avec analogies
+│   ├── AXIOMES-ENFORCEMENT.md              # 3 axiomes transverses (enforcement>prose, filet fonctionnel, preuve avant done)
 │   ├── patterns/                           # 11 patterns architecturaux universels
 │   │   ├── 01-constitution.md
 │   │   ├── 02-registres.md

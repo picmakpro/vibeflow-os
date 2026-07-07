@@ -1,0 +1,7 @@
+# Manifeste des modules RETIRÉS du parc vibeflow-os.
+# Format : module:artefact  (artefact relatif à TARGET_ROOT, ex. ./.claude ou ~/.claude)
+# Une ligne par artefact orphelin. `#` = commentaire.
+# Traité par `vibeflow-update.sh update --all` → cleanup_retired_modules (convergence).
+#
+# feature-dev-gates : fusionné dans software-architecture v1.3.0 (gates Nyquist + Decision Coverage).
+feature-dev-gates:rules/feature-dev-gates.md

@@ -8,7 +8,7 @@
 
 Say _"help me build this feature"_ — and the whole pipeline kicks off: scoping → plan → execution → tests → delivery. Without ever typing a technical command or knowing what runs under the hood.
 
-[![Version](https://img.shields.io/badge/version-2.19.2-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.20.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-15-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -82,8 +82,8 @@ The UX walks you through:
 | **[dev-orchestrator](./plugin/dev-orchestrator/)** | `1.2.0` | agent + skills + scripts | ⭐ The dev core. Router agent `vibeflow-dev` + 14 `/vf-*` verbs (incl. `vf-decide` decision panel) + auto-generated GSD index + autonomous-loop guardrails doctrine. Routes **plain language** to GSD/Superpowers skills (scoping → delivery), without exposing the plumbing. |
 | **[mobile-test](./plugin/mobile-test/)** | `1.0.0` | skill + script + config | 📱 Real mobile app testing (iOS simulator / Android emulator): target detection, build-if-absent, Maestro regression, timestamped report + artifacts, visual failure diagnosis via `mobile-mcp`. Config-driven, no project constants. **Experimental** until first real green run. |
 | **[mobile-test-team](./plugin/mobile-test-team/)** | `1.0.1` | agents + rules | 🤖 Autonomous mobile test→fix loop: `vf-test-orchestrator` + tool-compartmentalized workers (`vf-test-runner` / `vf-app-fixer`, Pattern 12), so autonomous mode reaches "the app actually works", not just green unit tests. Path-scoped rule fires the real-verification doctrine while coding. Requires `mobile-test`. **Experimental**. |
-| **[software-architecture](./plugin/software-architecture/)** | `1.0.0` | skill + rules + scripts | AI-Safe software architecture doctrine: SOLID/SoC, anti-god-files (≤300 LoC), machine-enforced gates, brownfield restructuring playbook. |
-| **[audit-architecture](./plugin/audit-architecture/)** | `1.0.0` | skill + references | Designer of **audit architectures**: derives, from a brief, the multi-layer audit structure of a process (content / folder / code / sales). |
+| **[software-architecture](./plugin/software-architecture/)** | `1.3.0` | skill + rules + scripts | AI-Safe software architecture doctrine + **dev philosophies home**: SOLID, DRY, KISS, YAGNI, Clean Architecture, Clean Code, TDD card; anti-god-files (≤300 LoC), machine-enforced gates (**Nyquist + Decision Coverage** absorbed), brownfield playbook. |
+| **[audit-architecture](./plugin/audit-architecture/)** | `1.0.1` | skill + references | Designer of **audit architectures**: derives, from a brief, the multi-layer audit structure of a process (content / folder / code / sales). |
 | **[infrastructure-audit](./plugin/infrastructure-audit/)** | `1.0.0` | skill + scripts | Automatic audit of the Claude Code infra (hooks, scripts, Anthropic drift) — catches regressions after an update. |
 | **[validator](./plugin/validator/)** | `1.1.0` | agent-only | Agent `vibeflow-validator`: guardian of technical alignment between methodology and projects, in 5 phases (incl. process-architecture audit). |
 | **[consolidator](./plugin/consolidator/)** | `1.0.0` | skill + scripts | Structured-memory consolidation across 4 pillars: indexing / archiving / merging / promotion. |
@@ -184,6 +184,7 @@ Routing relies on a **factual index auto-generated** from the frontmatter of the
 | `v2.19.0` | 2026-07-07 | `/vf-update` command + SessionStart update banner: one-shot two-layer update (plugin marketplace cache + installed modules), latest detected from GitHub tags (conductor v1.8.0) |
 | `v2.19.1` | 2026-07-07 | Fix: `vf-update` + docs use the fully-qualified `vibeflow@vibeflow-os` id for `claude plugin update` (bare name can fail "Plugin not found" on a stale catalog cache), with troubleshooting note (conductor v1.8.1) |
 | `v2.19.2` | 2026-07-07 | Fix: `/vf-update` now enforces the mandatory baseline — a `mandatory` module published after a lab's setup (e.g. `conductor` on a pre-v2.13.0 lab) was skipped forever, so its scripts & hooks (the SessionStart update banner) were never wired; `update` also re-syncs governance for up-to-date modules (idempotent) (conductor v1.8.2) |
+| `v2.20.0` | 2026-07-07 | Dev doctrine milestone: `software-architecture` **v1.3.0** = the dev-philosophies home (DRY/KISS/YAGNI added, Clean Architecture/Clean Code named, TDD card, **Nyquist + Decision Coverage gates absorbed**); module `feature-dev-gates` **removed** + engine cleanup of retired modules (orphan rule cleaned on `update --all`, test T7); `audit-architecture` **v1.0.1** (Instance C de-duplicated, legacy description fixed); `reference` single source for the 3 enforcement axioms |
 
 </details>
 

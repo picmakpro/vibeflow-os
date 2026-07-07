@@ -1,7 +1,7 @@
 {
   "name": "software-architecture",
-  "version": "v1.1.0",
+  "version": "v1.3.0",
   "type": "single-skill+scripts",
-  "description": "Garde-fou d'architecture logicielle (taille fichiers, règles).",
+  "description": "Doctrine d'architecture logicielle AI-safe : SOLID, DRY, KISS, YAGNI, Clean Architecture, Clean Code, carte TDD, gates de feature (Nyquist + Decision Coverage) + garde-fous machine (seuil 300L).",
   "requires": []
 }

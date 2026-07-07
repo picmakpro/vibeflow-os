@@ -1,5 +1,16 @@
 # Changelog — audit-architecture
 
+## [v1.0.1] — 2026-07-07 (consolidation)
+
+### Modifié
+- `references/examples-cross-domain.md` (Instance C) : ne **re-spécifie** plus les mécaniques des
+  autres modules (≤300L, check-file-size, tests, review, infra) — elle les **nomme et renvoie** au
+  module propriétaire (`software-architecture`, `infrastructure-audit`). Le cadrage pédagogique
+  porte/filet/agent/caméra est conservé. Supprime la duplication de contenu (audit CONS-02).
+- `module.json` : description legacy erronée (« Audit d'architecture logicielle d'un codebase »)
+  corrigée → méta-skill universel concepteur d'architectures d'audit (ADR-036).
+- Renvoi vers la source unique des axiomes transverses (`reference/` → `AXIOMES-ENFORCEMENT.md`).
+
 ## v1.0.0 — 2026-06-03
 
 Initial release (ADR-036).

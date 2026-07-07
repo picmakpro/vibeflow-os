@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: install-ux
-milestone_name: Install UX
+milestone: dev-doctrine
+milestone_name: Doctrine dev & consolidation
 status: verifying
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-06-04T18:37:18.110Z"
-last_activity: 2026-06-04
+stopped_at: Phase 8 complète (PASS) — milestone dev-doctrine livré, ship en attente (VERSION racine + tag)
+last_updated: "2026-07-07T00:00:00.000Z"
+last_activity: 2026-07-07
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 9
-  completed_plans: 9
+  total_phases: 2
+  completed_phases: 2
+  total_plans: 6
+  completed_plans: 6
   percent: 100
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-04)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Milestone Install UX — Phase 2 (Manifeste & résolveur)
+**Current focus:** Milestone Doctrine dev & consolidation — LIVRÉ (ship en attente)
 
 ## Current Position
 
-Phase: 2 of 6 (Manifeste & résolveur) — milestone Install UX
-Plan: 2 of 2 in current phase
-Status: Phase complete — ready for verification
-Last activity: 2026-06-04
+Phase: 8 of 8 (Consolidation des doublons) — milestone dev-doctrine COMPLET
+Plan: Phase 7 (2/2 PASS) + Phase 8 (4/4 PASS) livrées sur branche `feat/dev-doctrine-phase7`
+Status: Verifying — les 2 phases PASS ; reste le ship (VERSION racine + tag + PR)
+Last activity: 2026-07-07
 
 Progress: [██████████] 100%
 

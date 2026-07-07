@@ -22,6 +22,9 @@ C'est vrai pour un fichier de code, un document, une spécification, une tâche,
 | **Spec avant exécution** | Explore → Plan → Validate → Execute | écrire le plan, le faire relire, puis seulement agir |
 | **Garde-fou machine > prose** | hook/CI/lint bloquant | workflow d'approbation, permissions système (pas une note) |
 | **Tâches atomiques** | commit par étape, session ≤ 60 min | livrables découpés, points de validation fréquents |
+| **DRY (source unique de vérité)** | 1 connaissance = 1 module/fonction/constante | 1 fait = 1 document canonique ; pas de copie divergente |
+| **KISS (simplicité)** | la solution la plus simple qui marche | le process/livrable le plus simple qui atteint l'objectif |
+| **YAGNI (pas de spéculatif)** | pas de code « au cas où » | pas de section/étape pour un futur besoin imaginé |
 
 ## Ce qui est DEV-SPÉCIFIQUE (ne pas transposer tel quel)
 
