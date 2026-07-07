@@ -1,5 +1,13 @@
 # Changelog — conductor
 
+## [v1.8.1] — 2026-07-07
+
+### Corrigé
+- Skill `vf-update` : la couche plugin utilise désormais l'**identifiant complet**
+  `claude plugin update vibeflow@vibeflow-os` (le nom nu peut échouer par « Plugin not found »
+  quand le cache de catalogue est périmé) + parade documentée (`marketplace update` / purge du
+  `plugin-catalog-cache.json`). Constaté en conditions réelles lors du premier update 2.4.1 → 2.19.0.
+
 ## [v1.8.0] — 2026-07-07
 
 ### Ajouté
