@@ -1,5 +1,5 @@
 {
-  "description": "Conformité native des agents machine-enforced (ADR-044) : écriture d'un agent non natif bloquée, lint au démarrage de session.",
+  "description": "Conformité native des agents machine-enforced (ADR-044) : écriture d'un agent non natif bloquée, lint au démarrage de session. + Bandeau de mise à jour du plugin (signale une nouvelle version publiée, invite à /vf-update).",
   "hooks": {
     "PreToolUse": [
       {
@@ -13,7 +13,8 @@
       {
         "matcher": "startup",
         "hooks": [
-          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-agents.sh --hook || true" }
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-agents.sh --hook || true" },
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/update-banner.sh || true" }
         ]
       }
     ]
