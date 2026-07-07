@@ -103,6 +103,8 @@ DÉTERMINISTE  ←────────────────────�
 
 Comment trancher script vs juge : `references/enforcement-spectrum.md`. Comment écrire une bonne rubric scorée : `references/rubric-design.md`.
 
+> Les 3 axiomes transverses (enforcement > prose / filet fonctionnel / preuve avant done) ont leur **formulation canonique** dans `reference/` → `methodology/AXIOMES-ENFORCEMENT.md`. Ce module les applique au niveau *conception d'audits* ; il ne les redéfinit pas.
+
 ---
 
 ## La matérialisation — forcer la structure dans le lab

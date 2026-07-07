@@ -238,6 +238,9 @@ Le flag `--if-older-than=14d` evite de lancer l'audit a chaque session (cher). L
 3. **Un WARNING ignore est une ERROR en gestation.** Toujours adresser ou justifier.
 4. **Tests scripts integres au pipeline.** Un script non teste = un script casse en puissance.
 
+> Ces lois sont l'application infra des **axiomes d'enforcement** transverses (enforcement > prose,
+> preuve avant done). Formulation canonique : `reference/` → `methodology/AXIOMES-ENFORCEMENT.md`.
+
 ---
 
 ## Pre-requis installation

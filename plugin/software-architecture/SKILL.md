@@ -13,7 +13,7 @@ description: Architecture logicielle AI-safe. Invoquer dès qu'on crée/édite d
 
 **AUCUN FICHIER DE CODE > 300 LIGNES SANS PLAN DE DÉCOUPE. UNE RESPONSABILITÉ PAR UNITÉ. LES FRONTIÈRES SONT ENFORCED PAR LA MACHINE, PAS PAR LA PROSE.**
 
-Corollaire : un garde-fou qui n'est pas exécuté par la machine (CI, hook, lint, gate) n'existe pas. Une règle écrite que le développeur (ou l'IA) peut ignorer N'EST PAS un garde-fou.
+Corollaire : un garde-fou qui n'est pas exécuté par la machine (CI, hook, lint, gate) n'existe pas. Une règle écrite que le développeur (ou l'IA) peut ignorer N'EST PAS un garde-fou. (= **Axiome 1 d'enforcement** ; formulation canonique et transverse : `reference/` → `methodology/AXIOMES-ENFORCEMENT.md`.)
 
 ## Pourquoi (le lien avec l'IA qui « casse du code »)
 
