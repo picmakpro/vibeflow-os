@@ -298,6 +298,64 @@ remove_module_hooks() {
   fi
 }
 
+# ---------- Scripts (posés au TARGET_ROOT/scripts) ----------
+# Copie les scripts d'un module (shell + Node) + le sous-dossier tests/. Extrait d'install_module
+# pour être réutilisable par la resync gouvernance (update version inchangée).
+copy_module_scripts() {
+  local mod="$1"
+  local module_dir="$CACHE_DIR/$mod"
+  [ -d "$module_dir/scripts" ] || return 0
+  mkdir -p "$TARGET_ROOT/scripts"
+  for f in "$module_dir/scripts/"*.sh "$module_dir/scripts/"*.mjs "$module_dir/scripts/"*.js; do
+    [ -f "$f" ] && cp "$f" "$TARGET_ROOT/scripts/" && chmod +x "$TARGET_ROOT/scripts/$(basename "$f")"
+  done
+  if [ -d "$module_dir/scripts/tests" ]; then
+    mkdir -p "$TARGET_ROOT/scripts/tests/fixtures"
+    cp -r "$module_dir/scripts/tests/"*.sh "$TARGET_ROOT/scripts/tests/" 2>/dev/null || true
+    cp -r "$module_dir/scripts/tests/fixtures/"* "$TARGET_ROOT/scripts/tests/fixtures/" 2>/dev/null || true
+    chmod +x "$TARGET_ROOT"/scripts/tests/*.sh 2>/dev/null || true
+  fi
+  log "  copied scripts/ → $TARGET_ROOT/scripts/"
+}
+
+# Resync gouvernance légère (Fix B) : re-pose les scripts + re-merge les hooks d'un module SANS
+# backup ni re-copie complète. Appelée quand la version est INCHANGÉE — rend /vf-update
+# auto-réparateur si un hooks.json a dérivé (nouveau hook posé sans bump de VERSION du module).
+# Idempotent : merge-hooks dédup par basename, la copie de scripts écrase à l'identique.
+sync_module_governance() {
+  local mod="$1"
+  copy_module_scripts "$mod"
+  merge_module_hooks "$mod"
+}
+
+# ---------- Baseline obligatoire (INST-02a) ----------
+# Un module module.json avec "mandatory": true est un INVARIANT du lab (aujourd'hui : conductor,
+# le socle de gouvernance). Data-driven, AUCUN nom de module en dur.
+module_is_mandatory() {
+  local mod="$1"
+  local mj="$CACHE_DIR/$mod/module.json"
+  [ -f "$mj" ] || return 1
+  grep -Eq '"mandatory"[[:space:]]*:[[:space:]]*true' "$mj"
+}
+
+# ensure_mandatory_baseline : garantit que tout module `mandatory` est présent dans le lab.
+# Corrige la lacune où `update --all` n'itère que sur le registre : un module mandatory publié
+# APRÈS la config d'un lab (ex. conductor arrivé en v2.7.0) n'y atterrissait jamais — donc ni ses
+# scripts ni ses hooks (bandeau de mise à jour). Installe la fermeture transitive des manquants.
+ensure_mandatory_baseline() {
+  require_cache
+  local mod m
+  for mod in $(list_available_modules); do
+    module_is_mandatory "$mod" || continue
+    [ "$(module_version_installed "$mod")" = "—" ] || continue
+    log "Baseline (INST-02a) : module obligatoire '$mod' absent du lab → installation"
+    while IFS= read -r m; do
+      [ -n "$m" ] || continue
+      [ "$(module_version_installed "$m")" = "—" ] && install_module "$m"
+    done < <(resolve_closure "$mod")
+  done
+}
+
 # ---------- Install ----------
 install_module() {
   local mod="$1"
@@ -395,19 +453,7 @@ install_module() {
   fi
 
   # Scripts (top-level + tests subdir) : shell (.sh) et Node (.mjs/.js).
-  if [ -d "$module_dir/scripts" ]; then
-    mkdir -p "$TARGET_ROOT/scripts"
-    for f in "$module_dir/scripts/"*.sh "$module_dir/scripts/"*.mjs "$module_dir/scripts/"*.js; do
-      [ -f "$f" ] && cp "$f" "$TARGET_ROOT/scripts/" && chmod +x "$TARGET_ROOT/scripts/$(basename "$f")"
-    done
-    if [ -d "$module_dir/scripts/tests" ]; then
-      mkdir -p "$TARGET_ROOT/scripts/tests/fixtures"
-      cp -r "$module_dir/scripts/tests/"*.sh "$TARGET_ROOT/scripts/tests/" 2>/dev/null || true
-      cp -r "$module_dir/scripts/tests/fixtures/"* "$TARGET_ROOT/scripts/tests/fixtures/" 2>/dev/null || true
-      chmod +x "$TARGET_ROOT"/scripts/tests/*.sh 2>/dev/null || true
-    fi
-    log "  copied scripts/ → $TARGET_ROOT/scripts/"
-  fi
+  copy_module_scripts "$mod"
 
   # Hook post-install (IDX-02 / D7) : si le module fournit build-gsd-index.sh, régénérer
   # l'index factuel in-place dans le dossier references agent. Best-effort : ne JAMAIS
@@ -574,7 +620,11 @@ update_module() {
   fi
 
   if [ "$installed" = "$available" ]; then
-    log "$mod déjà à jour ($installed)"
+    # Version inchangée : pas de re-copie complète, mais on RE-SYNCHRONISE la gouvernance
+    # (scripts + hooks). Rend /vf-update auto-réparateur si un hooks.json a dérivé sans bump
+    # de VERSION — idempotent, best-effort.
+    log "$mod déjà à jour ($installed) — resync gouvernance (scripts + hooks)"
+    sync_module_governance "$mod"
     return 0
   fi
 
@@ -617,6 +667,10 @@ case "$cmd" in
         while IFS='=' read -r mod ver; do
           [ -n "$mod" ] && update_module "$mod"
         done < "$INSTALLED_REGISTRY"
+        # Lab initialisé : garantir la baseline obligatoire (INST-02a). Un module `mandatory`
+        # publié après la config du lab (conductor) est ainsi rattrapé au lieu d'être ignoré
+        # à vie — c'est ce qui posait ses scripts + hooks manquants (bandeau /vf-update).
+        ensure_mandatory_baseline
       else
         log "Aucun module installé"
       fi

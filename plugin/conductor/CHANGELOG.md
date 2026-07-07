@@ -1,5 +1,25 @@
 # Changelog — conductor
 
+## [v1.8.2] — 2026-07-07
+
+### Corrigé
+- Engine d'update (`vibeflow-update.sh`) : `update --all` (donc `/vf-update`) **garantit
+  désormais la baseline obligatoire** (INST-02a). Un module `mandatory` publié après la
+  configuration d'un lab — typiquement `conductor` lui-même sur un lab antérieur à v2.13.0 —
+  était **ignoré à vie** : `update --all` n'itérait que sur le registre `.vibeflow-installed`,
+  donc ni les scripts ni les hooks du module manquant n'étaient posés. Conséquence directe :
+  le **bandeau de mise à jour** (`update-banner.sh`, SessionStart) ne pouvait jamais s'afficher.
+  Nouvelle fonction `ensure_mandatory_baseline` : installe la fermeture transitive des modules
+  `mandatory` absents (data-driven via `module.json`, **aucun nom de module en dur**).
+
+### Durci
+- `update <module>` sur un module **déjà à jour** re-synchronise désormais sa gouvernance
+  (re-pose les scripts + re-merge les hooks, idempotent) au lieu de sortir tôt (`return 0`) —
+  `/vf-update` devient auto-réparateur si un `hooks.json` a dérivé sans bump de `VERSION`.
+- Tests : `test-vf-update.sh` couvre la baseline `mandatory` (module absent rattrapé + closure)
+  et la resync gouvernance (hook re-mergé à version inchangée). Extraction DRY de
+  `copy_module_scripts` (partagée entre install et resync).
+
 ## [v1.8.1] — 2026-07-07
 
 ### Corrigé
