@@ -45,19 +45,23 @@
 
 **Brief** : une user story. **Output** : du code en production. **Point de non-retour** : le merge / le déploiement.
 
-La métaphore défensive « porte blindée / agent / caméra / filet » est **l'instance dev** du primitif. Chaque image = une couche :
+La métaphore défensive « porte / filet / agent / caméra » est **l'instance dev** du primitif : 4 couches,
+chacune **possédée par un module dédié**. Ce tableau les NOMME et RENVOIE au module propriétaire — il ne
+re-spécifie pas leur mécanique (elle vit, à jour, dans le module).
 
-| Métaphore | # | Couche (dimension) | Auditeur | Enforcement | Verdict |
-|-----------|---|--------------------|----------|-------------|---------|
-| 🚪 **Porte blindée** | 1 | **Forme / structure** (taille ≤300 L, frontières, pas de secret) | pre-commit / PreToolUse hook | **script** (check-file-size, protect-files) | exit 0/2 |
-| 🪂 **Filet de sécurité** | 2 | **Véracité / non-régression** (le code marche, rien de cassé) | suite de tests | **test/lint/typecheck** (filet FONCTIONNEL) | vert/rouge |
-| 👮 **Agent de sécurité** | 3 | **Fond / intention + sécurité** (la modif reflète la spec, pas de faille) | reviewer agent (PR) | **rubric LLM** (pr-review, security-review) | review verdict |
-| 📹 **Caméras** | 4 | **Dérive / observabilité** (drift archi, dette, prod) | infrastructure-audit / observabilité | audit périodique + monitoring | snapshot diff |
+| Métaphore | # | Couche (dimension) | Module propriétaire de la mécanique |
+|-----------|---|--------------------|-------------------------------------|
+| 🚪 **Porte blindée** | 1 | Forme / structure | `software-architecture` — rule `production-code-architecture` + gate de taille |
+| 🪂 **Filet de sécurité** | 2 | Véracité / non-régression (filet FONCTIONNEL) | `software-architecture` — Gate Nyquist ; skills `tdd` + `verification-before-completion` |
+| 👮 **Agent de sécurité** | 3 | Fond / intention + sécurité | revue de code / sécurité (`pr-review`, `security-review`) |
+| 📹 **Caméras** | 4 | Dérive / observabilité | `infrastructure-audit` |
 
 - **Ordre** : porte (instantanée) → filet (rapide) → agent (PR) → caméras (continu).
-- **Agent terminal** : la CI / l'agent de merge REFUSE de merger sans tests verts + review VALIDE.
-- **Le filet AVANT tout** : un filet de tests cassé invalide la couche 2 → réparer le filet avant de continuer (cause racine Permis Clair, LRN-118).
-- **Universel ↔ dev** : porte=script, filet=tests, agent=juge-LLM, caméras=audit périodique. Exactement les 4 mécanismes du spectre d'enforcement, mappés sur 4 dimensions de code.
+- **Les 4 = les 4 mécanismes du spectre d'enforcement** (script ↔ test ↔ rubric LLM ↔ audit périodique),
+  mappés sur 4 dimensions de code. Les **axiomes transverses** (enforcement > prose, filet avant tout,
+  preuve avant *done*) ont leur formulation canonique dans `reference/` → `methodology/AXIOMES-ENFORCEMENT.md`.
+- **But de l'exemple** : montrer que le primitif d'audit *dérive* aussi l'instance code — pas re-documenter
+  chaque module. Pour la spec exacte d'une couche, ouvrir son module propriétaire.
 
 ---
 
