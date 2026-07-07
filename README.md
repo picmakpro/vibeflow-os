@@ -8,9 +8,9 @@
 
 Say _"help me build this feature"_ — and the whole pipeline kicks off: scoping → plan → execution → tests → delivery. Without ever typing a technical command or knowing what runs under the hood.
 
-[![Version](https://img.shields.io/badge/version-2.9.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.17.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
-[![Modules](https://img.shields.io/badge/modules-13-16a34a)](#-modules)
+[![Modules](https://img.shields.io/badge/modules-15-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
 [Install](#-install) · [Modules](#-modules) · [How it works](#-how-it-works) · [Author](#-author)
