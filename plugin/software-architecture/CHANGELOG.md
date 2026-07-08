@@ -1,5 +1,19 @@
 # Changelog — software-architecture
 
+## [v1.4.0] — 2026-07-08 (ADR-045)
+
+### Ajouté
+- **Règle path-scopée `rules/doc-research-before-debug.md`** : rend obligatoire une phase de
+  recherche documentaire (context7 + issues GitHub / release notes) **avant** tout debug empirique
+  intensif, dès qu'un bug touche une lib/framework/natif/version d'OS-SDK ou qu'un correctif a déjà
+  échoué. Sortie = pistes priorisées et sourcées (fix robuste → hack fragile, tout hack arbitré).
+  Source unique **référencée** (non dupliquée) par `vf-debug`, `vibeflow-dev`, `vf-test-orchestrator`,
+  `vf-app-fixer` et le template `debugger`. Prolonge LRN-106 « Audit avant fix ».
+
+### Corrigé
+- `module.json` : `type` passé à `single-skill+rules+scripts` (le module shippait déjà une rule
+  path-scopée — métadonnée alignée sur la réalité).
+
 ## [v1.3.0] — 2026-07-07 (ADR-037 absorbé)
 
 ### Ajouté

@@ -48,7 +48,7 @@ Vérifie :
 
 **Bloquant** : ERROR détectée → arrêter audit, exiger remédiation manuelle.
 
-### Phase 2 — Audit densité agents
+### Phase 2 — Audit densité + conformité agents
 
 Délègue à `agent-density-auditor`.
 
@@ -57,7 +57,21 @@ Vérifie :
 - Tous les `.claude/skills/*/SKILL.md` ≤ 500 lignes
 - Bootstrap SessionStart ≤ 2000 tokens
 
-**Action si fail** : proposer migration via `agent-density-auditor --mode=plan`.
+**Conformité recherche-doc avant debug (ADR-045)** — exécute le lint déterministe :
+
+```
+bash .claude/scripts/check-debug-research.sh
+```
+
+Il repère les briques de dépannage du lab (`.claude/skills/*/SKILL.md` + `.claude/agents/*.md` dont
+le name/description matche `debug|diagnos|dépannage|crash|stack trace`) et vérifie que chacune porte
+une **phase de recherche documentaire avant le fix** (renvoi à `doc-research-before-debug`,
+heading « Recherche documentaire », ou mention `context7`). Un `✗` = brique debug qui part en
+empirique sans chercher une cause connue → finding bloquant de cette phase (agrégé au score). Un `⚠`
+= wrapper qui délègue sans marqueur explicite (à durcir).
+
+**Action si fail** : proposer migration via `agent-density-auditor --mode=plan` (densité) ; pour la
+recherche-doc, proposer d'ajouter la pré-étape / le renvoi à la règle dans les briques signalées.
 
 ### Phase 3 — Audit dette documentaire + mémoire
 
@@ -140,8 +154,9 @@ Rapport `reports/validator/YYYY-MM-DD-validator.md` :
 - Scripts : N tests pass / M fail
 - Drift snapshot : aucun / N changements
 
-## Phase 2 — Densité agents
+## Phase 2 — Densité + conformité agents
 - Agents conformes ADR-029 : N / M
+- Recherche-doc avant debug (ADR-045) : N briques debug conformes / M · [briques signalées]
 - Refonte recommandée : [liste]
 
 ## Phase 3 — Dette + mémoire
@@ -201,6 +216,7 @@ Si je détecte que le lab est désaligné avec la méthodologie de référence (
 - ADR-031 — Vigilance support runtime
 - ADR-032 — Consolidation Mémoire 4 piliers
 - ADR-036 — Doctrine Audit Architecture (skill `audit-architecture`, Phase 4)
+- ADR-045 — Recherche documentaire avant debug (gate `check-debug-research.sh`, Phase 2)
 - LRN-105 — 4 piliers complémentaires
 - LRN-106 — Audit avant fix
 - Repo : `picmakpro/vibeflow-os` v1.1.0+

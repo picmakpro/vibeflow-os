@@ -26,6 +26,9 @@ déclarer une phase mobile « faite ».
 1. **Baseline verte** : à chaque tour, mémoriser l'ensemble des flows verts + le SHA git.
 2. **Anti-régression** : un changement qui refait échouer un flow vert est **reverté** (monotonie).
 3. **Anti-thrash** : `maxAttemptsPerFlow` (défaut 3) tentatives par flow, puis abandon documenté.
+   Sur un flow déjà tenté (ou un échec lib/framework/natif/version), une **recherche documentaire**
+   précède les tentatives suivantes (`maxResearchRoundsPerFlow`, défaut 2) — elle ne consomme pas de
+   tentative de fix mais ne rouvre pas le compteur une fois épuisé (ADR-045, garde-fou 6).
 4. **Arrêt** : tout vert **ou** plafond temps/tokens **ou** tous les restants abandonnés.
 5. **Cloisonnement** : `vf-test-runner` écrit les tests (jamais le code) ; `vf-app-fixer` écrit le
    code (jamais les tests). Aucun assert n'est jamais affaibli. (Pattern 12.)
@@ -39,6 +42,7 @@ déclarer une phase mobile « faite ».
 | Le fix exigerait une action destructive (force-push, rollback prod) | **HALT-3** → stop, confirmation humaine |
 | Un fix touche des fichiers hors périmètre du plan | **HALT-5** → stop, diff, validation |
 | Ressource manquante (pas de cible bootée, build impossible) | **HALT-4** → stop, rapport de blocage |
+| Info manquante : cause probable = lib/framework/natif/version, non documentée côté worker (`doc-research-required`) | **HALT-4 (léger)** → suspend le fix, recherche doc portée par le niveau qui a le web (ADR-045), puis reprise |
 
 ## Options de projet (à lire, pas à présumer)
 

@@ -22,17 +22,18 @@ Une phase (ou un ensemble de flows) à faire passer au vert, avec ses critères 
 
 ## Config (optionnelle, par projet)
 
-Lis `night-run.json` à la racine du projet s'il existe : `maxWallClockMinutes`, `maxTokens`, `maxAttemptsPerFlow` (défaut 3), `revertOnRegression` (défaut true). Absent → défauts. Schéma documenté dans la doctrine `autonomous-guardrails.md`.
+Lis `night-run.json` à la racine du projet s'il existe : `maxWallClockMinutes`, `maxTokens`, `maxAttemptsPerFlow` (défaut 3), `maxResearchRoundsPerFlow` (défaut 2), `revertOnRegression` (défaut true). Absent → défauts. Schéma documenté dans la doctrine `autonomous-guardrails.md`.
 
 ## La boucle
 
 1. Dispatche `vf-test-runner` : il assure la couverture (écrit les flows manquants pour les critères non couverts) puis lance la suite via le pipeline mobile. Récupère les résultats.
 2. Enregistre la **baseline** : l'ensemble des flows VERTS à ce tour (anti-régression). Note le SHA git courant.
 3. Pour chaque flow ROUGE (dans la limite du budget) :
-   a. Dispatche `vf-app-fixer` avec l'échec + son diagnostic. Il corrige le code app et commit atomique (si le projet autorise les commits).
+   a. **Gate recherche documentaire (ADR-045)** — AVANT de (re)dispatcher `vf-app-fixer` sur un flow **déjà tenté au moins une fois**, OU dès que `vf-app-fixer` te remonte `doc-research-required`, OU si l'échec touche visiblement une lib/framework/natif/version d'OS-SDK : ne relance PAS un fix aveugle. `vf-app-fixer` n'a **pas** le web (cloisonné) ; toi non plus. Fais porter la recherche documentaire (context7 + issues GitHub / release notes) par le niveau qui a le web — escalade au pilote/`vf-auto` — pour obtenir des pistes **priorisées et sourcées**, puis redispatche `vf-app-fixer` avec ces pistes. La recherche est bornée par `maxResearchRoundsPerFlow` (défaut 2), **ne consomme pas** de tentative de fix, mais compte dans le budget temps/tokens. C'est un **HALT léger** analogue à HALT-4 (ressource manquante : ici, une info manquante).
+   b. Dispatche `vf-app-fixer` avec l'échec + son diagnostic (et les pistes doc si recherche faite). Il corrige le code app et commit atomique (si le projet autorise les commits).
 4. Re-dispatche `vf-test-runner` (re-test complet).
    - **Anti-régression** : si un flow de la baseline verte est retombé rouge, revert le dernier fix (`git revert` ou `git reset --hard` sur le commit fautif) et marque ce fix comme inefficace (ne pas le rejouer à l'identique).
-   - **Anti-thrash** : compteur par flow encore rouge. À `maxAttemptsPerFlow` tentatives sans succès, ABANDONNE ce flow, documente-le, passe au suivant (halt local, cf. HALT-2).
+   - **Anti-thrash** : compteur par flow encore rouge. À `maxAttemptsPerFlow` tentatives sans succès, ABANDONNE ce flow, documente-le, passe au suivant (halt local, cf. HALT-2). La recherche documentaire (gate 3.a) **précède** les tentatives et ne rouvre pas ce compteur une fois épuisé.
 5. Répète 3-4 jusqu'à : **tous les critères verts**, OU **plafond temps/tokens**, OU **tous les échecs restants abandonnés**.
 
 ## Halt conditions (Pattern 11)
