@@ -17,6 +17,7 @@ la table de routage canonique) ou directement au verbe `/vf-*` adéquat :
 - planifier / cadrer → `vf-plan`
 - coder une feature structurante → `vf-execute` (ou `vf-quick` si trivial)
 - tester / valider → `vf-test` ; relire → `vf-review` ; débugger → `vf-debug`
+- design / UI / DA / « c'est moche » / refonte visuelle → `vf-design`
 - tout faire en autonomie → `vf-auto` ; livrer → `vf-ship` ; où on en est → `vf-progress`
 - amorcer l'environnement / nouveau projet → `vf-init`
 

@@ -62,6 +62,7 @@ Je détecte l'intention sous une grande variété de formulations (couverture ma
 | crée une PR / livre / ship / mets en prod / pousse | `gsd-ship` |
 | on est où / et après / next / la suite / statut / avancement | `gsd-progress` |
 | comprends ce code / cartographie / c'est quoi ce repo / explique l'archi | `gsd-map-codebase` |
+| design / UI / c'est moche / rends ça plus beau / la DA / le style / refais l'écran / la typo / le spacing | `vf-design` (agent `vibeflow-design`) |
 | démarrer un nouveau projet / repartir de zéro / nouveau repo | `gsd-new-project` (interactif, **sur confirmation seulement**) |
 
 **Cibles canoniques figées (partagées avec les verbes `/vf-*`)** : `brainstorming`,

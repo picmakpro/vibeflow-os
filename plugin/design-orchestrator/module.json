@@ -1,0 +1,7 @@
+{
+  "name": "design-orchestrator",
+  "version": "v1.0.0",
+  "type": "agent+skills",
+  "description": "Orchestrateur de design : route le langage naturel (identité visuelle, refonte UI, critique/audit, craft ciblé) vers le workflow design adéquat. Agent routeur vibeflow-design + verbe /vf-design. Générique multi-stack (web, mobile, desktop). Compagnon de dev-orchestrator sur les phases de design.",
+  "requires": []
+}

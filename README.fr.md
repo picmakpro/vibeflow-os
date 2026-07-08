@@ -8,9 +8,9 @@
 
 Dis _« aide-moi à dev cette feature »_ — et tout le pipeline se déclenche : cadrage → plan → exécution → tests → livraison. Sans jamais taper une commande technique ni savoir ce qui tourne en coulisse.
 
-[![Version](https://img.shields.io/badge/version-2.20.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.21.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
-[![Modules](https://img.shields.io/badge/modules-15-16a34a)](#-modules)
+[![Modules](https://img.shields.io/badge/modules-16-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
 [Installation](#-installation) · [Modules](#-modules) · [Comment ça marche](#-comment-ça-marche) · [Auteur](#-auteur)
@@ -72,14 +72,15 @@ L'UX déroule :
 
 ## 📦 Modules
 
-15 modules au total. Chacun a sa propre version, son `CHANGELOG.md` et son `README.md`.
+16 modules au total. Chacun a sa propre version, son `CHANGELOG.md` et son `README.md`.
 
 > **À l'installation (depuis v2.13.0)** : `conductor` est le **socle obligatoire** posé d'office (avec son filet : planning-core, validator, consolidator, infrastructure-audit) — pas un choix. Ensuite, **un seul choix** : *lab de développement* (`dev-orchestrator`) ou *nouveau lab métier sur mesure* via `/vf-new-lab`. Les **3 bundles métier** (business-pilot / content / growth) sont **WIP et non proposés à l'install** (`proposable:false`) ; ils seront reproposés une fois finalisés. Les autres modules restent disponibles en à-la-carte avancé (« ajoute &lt;module&gt; »). Les modules **mobile-test** et **mobile-test-team** sont des add-ons à-la-carte avancés pour les projets mobiles.
 
 | Module | Ver. | Type | Ce qu'il fait |
 |--------|:----:|------|---------------|
 | **[conductor](./plugin/conductor/)** | `1.8.2` | agent + skills + scripts + references | 🧭 La porte d'entrée. Agent méta `vibeflow-conductor` (gardien) : crée/configure un lab dans **n'importe quel métier** (`vf-new-lab`, bundle-aware), installe/vérifie/met à jour, migre sur évolution de doctrine (`vf-calibrate`), reçoit les escalades de cohérence. Pas appelé en continu — config/audit/migration. |
-| **[dev-orchestrator](./plugin/dev-orchestrator/)** | `1.2.0` | agent + skills + scripts | ⭐ Le cœur dev. Agent routeur `vibeflow-dev` + 14 verbes `/vf-*` (dont le panel de décision `vf-decide`) + index GSD auto-généré + doctrine des garde-fous de boucle autonome. Route le **langage naturel** vers les skills GSD/Superpowers (cadrage → livraison), sans exposer la plomberie. |
+| **[dev-orchestrator](./plugin/dev-orchestrator/)** | `1.3.0` | agent + skills + scripts | ⭐ Le cœur dev. Agent routeur `vibeflow-dev` + 14 verbes `/vf-*` (dont le panel de décision `vf-decide`) + routage des phases de design vers `/vf-design` + index GSD auto-généré + doctrine des garde-fous de boucle autonome. Route le **langage naturel** vers les skills GSD/Superpowers (cadrage → livraison), sans exposer la plomberie. Installe `design-orchestrator` d'office. |
+| **[design-orchestrator](./plugin/design-orchestrator/)** | `1.0.0` | agent + skills | 🎨 Le compagnon design. Agent routeur `vibeflow-design` + verbe `/vf-design` : route le **langage naturel** design (définir la DA, refonte UI, critique/audit, craft ciblé) vers le bon workflow. **Générique multi-stack** (web / mobile / desktop) — produit des specs + tokens, pas du code framework-locké. Chaîne d'outils design (référentiel UX, direction créative, atelier de craft) pilotée en coulisse avec dégradation gracieuse. Installé d'office avec `dev-orchestrator`. |
 | **[mobile-test](./plugin/mobile-test/)** | `1.0.0` | skill + script + config | 📱 Test réel d'app mobile (simulateur iOS / émulateur Android) : détection de cible, build-si-absent, régression Maestro, rapport horodaté + artefacts, diagnostic visuel des échecs via `mobile-mcp`. Piloté par config, sans constante projet. **Expérimental** jusqu'au premier vrai run vert. |
 | **[mobile-test-team](./plugin/mobile-test-team/)** | `1.0.1` | agents + rules | 🤖 Boucle autonome test→fix mobile : `vf-test-orchestrator` + workers cloisonnés par outils (`vf-test-runner` / `vf-app-fixer`, Pattern 12), pour que le mode autonome atteigne « l'app marche vraiment », pas juste des tests unitaires verts. Une règle path-scopée déclenche la doctrine de vérification réelle pendant le code. Requiert `mobile-test`. **Expérimental**. |
 | **[software-architecture](./plugin/software-architecture/)** | `1.3.0` | skill + rules + scripts | Doctrine d'architecture logicielle AI-Safe + **foyer des philosophies de dev** : SOLID, DRY, KISS, YAGNI, Clean Architecture, Clean Code, carte TDD ; anti-god-files (≤300 L), gates *machine-enforced* (**Nyquist + Decision Coverage** absorbés), playbook brownfield. |
@@ -185,6 +186,7 @@ Le routage repose sur un **index factuel auto-généré** depuis le frontmatter 
 | `v2.19.1` | 2026-07-07 | Correctif : `vf-update` + docs utilisent l'identifiant complet `vibeflow@vibeflow-os` pour `claude plugin update` (le nom nu peut échouer « Plugin not found » sur un cache de catalogue périmé), avec note de dépannage (conductor v1.8.1) |
 | `v2.19.2` | 2026-07-07 | Correctif : `/vf-update` fait désormais respecter le socle obligatoire — un module `mandatory` publié après la config d'un lab (ex. `conductor` sur un lab antérieur à v2.13.0) était ignoré à vie, ses scripts & hooks (le bandeau de mise à jour SessionStart) jamais câblés ; `update` re-synchronise aussi la gouvernance des modules à jour (idempotent) (conductor v1.8.2) |
 | `v2.20.0` | 2026-07-07 | Milestone doctrine dev : `software-architecture` **v1.3.0** = foyer des philosophies de dev (DRY/KISS/YAGNI ajoutés, Clean Architecture/Clean Code nommés, carte TDD, **gates Nyquist + Decision Coverage absorbés**) ; module `feature-dev-gates` **supprimé** + nettoyage moteur des modules retirés (rule orpheline nettoyée à `update --all`, test T7) ; `audit-architecture` **v1.0.1** (Instance C dé-dupliquée, description legacy corrigée) ; `reference` source unique des 3 axiomes d'enforcement |
+| `v2.21.0` | 2026-07-08 | + **design-orchestrator** v1.0.0 : agent routeur `vibeflow-design` + verbe `/vf-design` (langage naturel design → workflow), **générique multi-stack** (web/mobile/desktop), chaîne d'outils design pilotée en coulisse avec dégradation gracieuse ; `dev-orchestrator` **v1.3.0** route les phases de design vers `/vf-design` et installe `design-orchestrator` d'office (`requires`) |
 
 </details>
 
