@@ -1,5 +1,17 @@
 # CHANGELOG — dev-orchestrator
 
+## [v1.3.0] — 2026-07-08
+
+### Ajouté
+- **Routage des phases de design → `/vf-design`.** Nouvelle ligne dans la table de routage de
+  `vibeflow-dev` (« design / UI / c'est moche / la DA / le style / refais l'écran / la typo /
+  le spacing » → verbe `vf-design`, agent `vibeflow-design`) et dans le point d'entrée `vf-dev`.
+  Un cycle de développement couvre désormais explicitement la phase de design sans quitter le
+  vocabulaire VibeFlow.
+- **Dépendance `design-orchestrator`** (`requires`) : le module design est **installé d'office**
+  avec `dev-orchestrator`. Tout lab de développement dispose de `/vf-design` sans action
+  supplémentaire (résolveur de deps transitif → `install --with-deps`).
+
 ## [v1.2.0] — 2026-07-07
 
 ### Ajouté

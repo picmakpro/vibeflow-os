@@ -8,9 +8,9 @@
 
 Say _"help me build this feature"_ — and the whole pipeline kicks off: scoping → plan → execution → tests → delivery. Without ever typing a technical command or knowing what runs under the hood.
 
-[![Version](https://img.shields.io/badge/version-2.20.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.21.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
-[![Modules](https://img.shields.io/badge/modules-15-16a34a)](#-modules)
+[![Modules](https://img.shields.io/badge/modules-16-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
 [Install](#-install) · [Modules](#-modules) · [How it works](#-how-it-works) · [Author](#-author)
@@ -72,14 +72,15 @@ The UX walks you through:
 
 ## 📦 Modules
 
-15 modules total. Each has its own version, `CHANGELOG.md`, and `README.md`.
+16 modules total. Each has its own version, `CHANGELOG.md`, and `README.md`.
 
 > **At install (since v2.13.0)**: `conductor` is the **mandatory baseline**, installed by default (with its safety net: planning-core, validator, consolidator, infrastructure-audit) — not a choice. Then **a single choice**: *development lab* (`dev-orchestrator`) or *new tailor-made domain lab* via `/vf-new-lab`. The **3 domain bundles** (business-pilot / content / growth) are **WIP and not offered at install** (`proposable:false`); they'll be re-offered once complete. Other modules remain available as advanced à-la-carte ("add &lt;module&gt;"). The **mobile-test** and **mobile-test-team** modules are advanced à-la-carte add-ons for mobile projects.
 
 | Module | Ver. | Type | What it does |
 |--------|:----:|------|--------------|
 | **[conductor](./plugin/conductor/)** | `1.8.2` | agent + skills + scripts + references | 🧭 The front door. Meta agent `vibeflow-conductor` (guardian): create/configure a lab in **any domain** (`vf-new-lab`, bundle-aware), install/verify/update, migrate on doctrine change (`vf-calibrate`), receive coherence escalations. Not always-on — config/audit/migration only. |
-| **[dev-orchestrator](./plugin/dev-orchestrator/)** | `1.2.0` | agent + skills + scripts | ⭐ The dev core. Router agent `vibeflow-dev` + 14 `/vf-*` verbs (incl. `vf-decide` decision panel) + auto-generated GSD index + autonomous-loop guardrails doctrine. Routes **plain language** to GSD/Superpowers skills (scoping → delivery), without exposing the plumbing. |
+| **[dev-orchestrator](./plugin/dev-orchestrator/)** | `1.3.0` | agent + skills + scripts | ⭐ The dev core. Router agent `vibeflow-dev` + 14 `/vf-*` verbs (incl. `vf-decide` decision panel) + design-phase routing to `/vf-design` + auto-generated GSD index + autonomous-loop guardrails doctrine. Routes **plain language** to GSD/Superpowers skills (scoping → delivery), without exposing the plumbing. Installs `design-orchestrator` by default. |
+| **[design-orchestrator](./plugin/design-orchestrator/)** | `1.0.0` | agent + skills | 🎨 The design companion. Router agent `vibeflow-design` + `/vf-design` verb: routes **plain language** design intent (define art direction, redesign UI, critique/audit, targeted craft) to the right workflow. **Stack-agnostic** (web / mobile / desktop) — outputs specs + tokens, not framework-locked code. Design toolchain (UX reference, creative direction, craft studio) piloted behind the scenes with graceful degradation. Installed by default with `dev-orchestrator`. |
 | **[mobile-test](./plugin/mobile-test/)** | `1.0.0` | skill + script + config | 📱 Real mobile app testing (iOS simulator / Android emulator): target detection, build-if-absent, Maestro regression, timestamped report + artifacts, visual failure diagnosis via `mobile-mcp`. Config-driven, no project constants. **Experimental** until first real green run. |
 | **[mobile-test-team](./plugin/mobile-test-team/)** | `1.0.1` | agents + rules | 🤖 Autonomous mobile test→fix loop: `vf-test-orchestrator` + tool-compartmentalized workers (`vf-test-runner` / `vf-app-fixer`, Pattern 12), so autonomous mode reaches "the app actually works", not just green unit tests. Path-scoped rule fires the real-verification doctrine while coding. Requires `mobile-test`. **Experimental**. |
 | **[software-architecture](./plugin/software-architecture/)** | `1.3.0` | skill + rules + scripts | AI-Safe software architecture doctrine + **dev philosophies home**: SOLID, DRY, KISS, YAGNI, Clean Architecture, Clean Code, TDD card; anti-god-files (≤300 LoC), machine-enforced gates (**Nyquist + Decision Coverage** absorbed), brownfield playbook. |
@@ -185,6 +186,7 @@ Routing relies on a **factual index auto-generated** from the frontmatter of the
 | `v2.19.1` | 2026-07-07 | Fix: `vf-update` + docs use the fully-qualified `vibeflow@vibeflow-os` id for `claude plugin update` (bare name can fail "Plugin not found" on a stale catalog cache), with troubleshooting note (conductor v1.8.1) |
 | `v2.19.2` | 2026-07-07 | Fix: `/vf-update` now enforces the mandatory baseline — a `mandatory` module published after a lab's setup (e.g. `conductor` on a pre-v2.13.0 lab) was skipped forever, so its scripts & hooks (the SessionStart update banner) were never wired; `update` also re-syncs governance for up-to-date modules (idempotent) (conductor v1.8.2) |
 | `v2.20.0` | 2026-07-07 | Dev doctrine milestone: `software-architecture` **v1.3.0** = the dev-philosophies home (DRY/KISS/YAGNI added, Clean Architecture/Clean Code named, TDD card, **Nyquist + Decision Coverage gates absorbed**); module `feature-dev-gates` **removed** + engine cleanup of retired modules (orphan rule cleaned on `update --all`, test T7); `audit-architecture` **v1.0.1** (Instance C de-duplicated, legacy description fixed); `reference` single source for the 3 enforcement axioms |
+| `v2.21.0` | 2026-07-08 | + **design-orchestrator** v1.0.0: router agent `vibeflow-design` + `/vf-design` verb (plain-language design intent → workflow), **stack-agnostic** (web/mobile/desktop), design toolchain piloted behind the scenes with graceful degradation; `dev-orchestrator` **v1.3.0** routes design phases to `/vf-design` and installs `design-orchestrator` by default (`requires`) |
 
 </details>
 
