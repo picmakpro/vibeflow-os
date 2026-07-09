@@ -1,5 +1,19 @@
 # CHANGELOG — dev-orchestrator
 
+## [v1.5.0] — 2026-07-09
+
+Équipe manager de mission (pattern Reviz généralisé — spec 2026-07-09, ADR-046).
+
+- **4 agents natifs** (`agents/`) : `vf-dev-manager` (sommet — planifie, décide via panels,
+  distribue, contrôle de flux entre étages) + workers internes `vf-coder` (cycle d'étape),
+  `vf-reviewer` (revue sans écriture), `vf-auditer` (audit sécu/dette sans écriture).
+  Conformes ADR-044 ; workers `vf-internal: true` (Pattern 12).
+- **Contrats de mission** (`references/mission-contracts.md`) : brief main→manager, rapport
+  manager→main, signaux « mission », seuil `SEUIL_EQUIPE` — source unique (DRY).
+- **Router** : détection de mission + proposition de l'équipe (heuristique 7, jamais d'office).
+- **vf-auto** : aiguillage taille — court → boucle autonome inline, long → équipe.
+- **Tests** : T8-T11 (conformité agents, contrats, routage, généricité).
+
 ## [v1.4.0] — 2026-07-08 (ADR-045)
 
 ### Ajouté

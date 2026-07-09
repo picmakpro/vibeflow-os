@@ -5,7 +5,7 @@
 > un **index factuel auto-généré**. L'utilisateur ne parle que VibeFlow ; la plomberie
 > GSD/Superpowers reste invisible.
 
-**Version** : v1.0.0
+**Version** : v1.5.0
 **Type** : agent + multi-skills + scripts
 
 ---
@@ -108,6 +108,14 @@ Pour invoquer directement : `vf-init` (bootstrap + démarrage de projet),
 - **Projet existant** : `vf-map` (comprendre l'existant) → `vf-plan` → `vf-execute` → `vf-test`.
 - **Tâche unique rapide** : `vf-quick` (ou dites simplement « corrige ce typo »).
 - **En autonomie totale** : `vf-auto` enchaîne plan → exécution → recette tout seul.
+
+### Équipe manager de mission (v1.5.0)
+
+Pour les missions multi-étapes, le router propose de déléguer à `vf-dev-manager` : la
+conversation principale reste légère, le manager planifie/décide/distribue, et les workers
+(`vf-coder`, `vf-reviewer`, `vf-auditer`) travaillent chacun dans un contexte minimal isolé.
+`vf-auto` bascule automatiquement vers l'équipe au-delà de `SEUIL_EQUIPE` étapes restantes ou
+sur signal de durée (« la nuit »). Contrats et seuil : `references/mission-contracts.md`.
 
 ### Bootstrap des dépendances
 
