@@ -5,7 +5,7 @@
 > un **index factuel auto-généré**. L'utilisateur ne parle que VibeFlow ; la plomberie
 > GSD/Superpowers reste invisible.
 
-**Version** : v1.0.0
+**Version** : v1.5.0
 **Type** : agent + multi-skills + scripts
 
 ---
@@ -36,6 +36,11 @@ fournit trois briques complémentaires :
 ```
 dev-orchestrator/
 ├── AGENT.md                       # agent vibeflow-dev (≤250L, dense)
+├── agents/                        # équipe manager de mission (v1.5.0)
+│   ├── vf-dev-manager.md          # manager de mission — exposé
+│   ├── vf-coder.md                # worker interne (vf-internal: true)
+│   ├── vf-reviewer.md             # worker interne (vf-internal: true)
+│   └── vf-auditer.md              # worker interne (vf-internal: true)
 ├── skills/vf-*/SKILL.md           # 13 verbes utilisateur /vf-* (≤500L chacun)
 ├── scripts/
 │   ├── ensure-deps.sh             # bootstrap deps (idempotent, dry-run testable)
@@ -44,7 +49,9 @@ dev-orchestrator/
 └── references/                    # doctrine + index chargés on-demand par l'agent
     ├── GSD-PIPELINE.md
     ├── gsd-skills-index.md         # auto-généré (NE PAS ÉDITER)
-    └── vocabulary-map.md
+    ├── vocabulary-map.md
+    ├── mission-contracts.md        # contrats Brief/Rapport de mission + SEUIL_EQUIPE
+    └── autonomous-guardrails.md    # garde-fous du mode autonome
 ```
 
 ---
@@ -109,6 +116,14 @@ Pour invoquer directement : `vf-init` (bootstrap + démarrage de projet),
 - **Tâche unique rapide** : `vf-quick` (ou dites simplement « corrige ce typo »).
 - **En autonomie totale** : `vf-auto` enchaîne plan → exécution → recette tout seul.
 
+### Équipe manager de mission (v1.5.0)
+
+Pour les missions multi-étapes, le router propose de déléguer à `vf-dev-manager` : la
+conversation principale reste légère, le manager planifie/décide/distribue, et les workers
+(`vf-coder`, `vf-reviewer`, `vf-auditer`) travaillent chacun dans un contexte minimal isolé.
+`vf-auto` bascule automatiquement vers l'équipe au-delà de `SEUIL_EQUIPE` étapes restantes ou
+sur signal de durée (« la nuit »). Contrats et seuil : `references/mission-contracts.md`.
+
 ### Bootstrap des dépendances
 
 `vf-init` (ou l'agent au premier contact) lance `ensure-deps.sh` : auto-install
@@ -125,7 +140,12 @@ bash dev-orchestrator/scripts/tests/test-dev-orchestrator.sh
 
 Couvre 4 axes (VERIF-01) — index non vide, idempotence `ensure-deps`, ≥11 intentions routées
 vers des cibles distinctes, aucun mapping `/vf-*` orphelin — plus les gates de densité
-(VERIF-02 : agent ≤250L, skills ≤500L, mesurés par `wc -l`). Exit 0 si tout passe
+(VERIF-02 : agent ≤250L, skills ≤500L, mesurés par `wc -l`). S'y ajoutent, pour l'équipe
+manager de mission (v1.5.0), T8/T8b (conformité des 4 agents natifs : frontmatter, densité,
+`vf-internal` sur les 3 workers / absent du manager exposé — Pattern 12), T9 (contrats de
+mission : source unique `mission-contracts.md` + 3 renvois DRY), T10 (routage mission dans
+`AGENT.md` + aiguillage taille dans `vf-auto` sur `SEUIL_EQUIPE`) et T11 (généricité : aucun
+résidu spécifique à un lab dans `agents/`). Au total T1-T11. Exit 0 si tout passe
 (les SKIP, ex. GSD absent, ne font pas échouer la suite).
 
 ---

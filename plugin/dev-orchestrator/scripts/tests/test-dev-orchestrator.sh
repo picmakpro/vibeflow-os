@@ -15,6 +15,10 @@
 #   T6 — Install end-to-end via vibeflow-update.sh (best-effort, SKIP si non réalisable).
 #   T7 — Garde-fou first-use présent dans AGENT.md : détection .planning + délégation vf-init
 #        + new-project encadré (régression FIRST-01/FIRST-02 ; fichier filtré des commentaires).
+#   T8/T8b — Équipe manager : 4 agents conformes (frontmatter, densité, vf-internal — Pattern 12).
+#   T9 — Contrats de mission : source unique + 3 renvois (DRY).
+#   T10 — Routage mission (AGENT.md) + aiguillage taille (vf-auto, SEUIL_EQUIPE).
+#   T11 — Généricité : aucun résidu Reviz dans agents/ (DM5).
 #
 # Convention : asserts numérotés, helpers ok()/ko()/skip(), exit 0 si tout passe
 # (SKIP non bloquant), exit 1 si au moins un KO. Calqué sur le pattern de test du repo.
@@ -201,6 +205,7 @@ for skill_md in "$MOD"/skills/vf-*/SKILL.md; do
     case "$t" in
       brainstorming) : ;;            # superpowers — accepté
       ensure-deps)   : ;;            # bootstrap interne — accepté
+      gsd-sdk)       : ;;            # CLI d'état GSD — pas un skill
       gsd-*)
         if ! target_known "$t"; then
           ko "T4 mapping : $vfname → cible orpheline « $t » (absente de l'index/fixture)"
@@ -285,6 +290,81 @@ if [ "${has_marker:-0}" -ge 1 ] && [ "$has_detect" -eq 1 ] && [ "$has_vfinit" -e
   ok "T7 first-use : garde-fou présent (détection .planning + délégation vf-init + new-project encadré)"
 else
   ko "T7 first-use : garde-fou incomplet dans AGENT.md (marker=$has_marker detect=$has_detect vfinit=$has_vfinit noauto=$has_noauto)"
+fi
+
+# ---------------------------------------------------------------------------
+# T8 — Équipe manager : 4 agents natifs conformes (spec 2026-07-09, ADR-044/029)
+# ---------------------------------------------------------------------------
+TEAM_AGENTS="vf-dev-manager vf-coder vf-reviewer vf-auditer"
+WORKERS="vf-coder vf-reviewer vf-auditer"
+t8_ok=1
+for a in $TEAM_AGENTS; do
+  f="$MOD/agents/$a.md"
+  if [ ! -f "$f" ]; then ko "T8 agents : $a.md introuvable dans $MOD/agents/"; t8_ok=0; continue; fi
+  for field in description model memory; do
+    "$GREP" -q "^${field}:" "$f" || { ko "T8 agents : $a.md sans champ $field"; t8_ok=0; }
+  done
+  a_lines=$(wc -l < "$f" | tr -d ' ')
+  [ "${a_lines:-999}" -le 250 ] || { ko "T8 agents : $a.md dépasse 250 lignes ($a_lines)"; t8_ok=0; }
+done
+[ "$t8_ok" -eq 1 ] && ok "T8 agents : 4 agents de l'équipe présents, frontmatter complet, ≤250L"
+
+# T8b — vf-internal : présent sur les 3 workers, absent du manager (Pattern 12)
+t8b_ok=1
+for w in $WORKERS; do
+  "$GREP" -q "^vf-internal: true" "$MOD/agents/$w.md" 2>/dev/null || { ko "T8b vf-internal manquant : $w"; t8b_ok=0; }
+done
+if "$GREP" -q "^vf-internal:" "$MOD/agents/vf-dev-manager.md" 2>/dev/null; then
+  ko "T8b : vf-dev-manager déclaré vf-internal (doit rester exposé)"; t8b_ok=0
+fi
+[ "$t8b_ok" -eq 1 ] && ok "T8b vf-internal : workers internes marqués, manager exposé"
+
+# ---------------------------------------------------------------------------
+# T9 — Contrats de mission : source unique + renvois (DRY)
+# ---------------------------------------------------------------------------
+CONTRACTS="$REFS_DIR/mission-contracts.md"
+if [ -f "$CONTRACTS" ]; then
+  if "$GREP" -qi "Brief de mission" "$CONTRACTS" && "$GREP" -qi "Rapport de mission" "$CONTRACTS" \
+     && "$GREP" -q "SEUIL_EQUIPE" "$CONTRACTS"; then
+    ok "T9 contrats : mission-contracts.md présent (Brief + Rapport + SEUIL_EQUIPE)"
+  else
+    ko "T9 contrats : mission-contracts.md incomplet (Brief/Rapport/SEUIL_EQUIPE manquant)"
+  fi
+  renvois=0
+  "$GREP" -q "mission-contracts" "$AGENT_FILE" && renvois=$((renvois+1))
+  "$GREP" -q "mission-contracts" "$MOD/skills/vf-auto/SKILL.md" && renvois=$((renvois+1))
+  "$GREP" -q "mission-contracts" "$MOD/agents/vf-dev-manager.md" && renvois=$((renvois+1))
+  if [ "$renvois" -eq 3 ]; then
+    ok "T9 renvois : router + vf-auto + manager renvoient aux contrats (3/3)"
+  else
+    ko "T9 renvois : $renvois/3 renvois vers mission-contracts.md"
+  fi
+else
+  ko "T9 contrats : $CONTRACTS introuvable"
+fi
+
+# ---------------------------------------------------------------------------
+# T10 — Détection mission (router) + aiguillage taille (vf-auto)
+# ---------------------------------------------------------------------------
+if "$GREP" -q "vf-dev-manager" "$AGENT_FILE"; then
+  ok "T10 router : AGENT.md route les missions vers vf-dev-manager"
+else
+  ko "T10 router : aucune mention de vf-dev-manager dans AGENT.md"
+fi
+if "$GREP" -q "SEUIL_EQUIPE" "$MOD/skills/vf-auto/SKILL.md" \
+   && "$GREP" -q "vf-dev-manager" "$MOD/skills/vf-auto/SKILL.md"; then
+  ok "T10 vf-auto : aiguillage taille présent (SEUIL_EQUIPE → vf-dev-manager)"
+else
+  ko "T10 vf-auto : aiguillage taille absent de vf-auto/SKILL.md"
+fi
+
+# ---------------------------------------------------------------------------
+# T11 — Généricité : aucun résidu Reviz dans les agents livrés (DM5)
+# ---------------------------------------------------------------------------
+if [ -d "$MOD/agents" ] && "$GREP" -rqE "docs/_mission|revizapp|Reviz" "$MOD/agents/" 2>/dev/null; then
+  ko "T11 généricité : résidu Reviz détecté dans agents/ (docs/_mission|revizapp|Reviz)"
+else
+  ok "T11 généricité : aucun chemin/nom Reviz dans agents/"
 fi
 
 # ---------------------------------------------------------------------------

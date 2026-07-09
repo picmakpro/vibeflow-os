@@ -8,7 +8,7 @@
 
 Dis _« aide-moi à dev cette feature »_ — et tout le pipeline se déclenche : cadrage → plan → exécution → tests → livraison. Sans jamais taper une commande technique ni savoir ce qui tourne en coulisse.
 
-[![Version](https://img.shields.io/badge/version-2.22.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.23.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-16-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -188,6 +188,7 @@ Le routage repose sur un **index factuel auto-généré** depuis le frontmatter 
 | `v2.20.0` | 2026-07-07 | Milestone doctrine dev : `software-architecture` **v1.3.0** = foyer des philosophies de dev (DRY/KISS/YAGNI ajoutés, Clean Architecture/Clean Code nommés, carte TDD, **gates Nyquist + Decision Coverage absorbés**) ; module `feature-dev-gates` **supprimé** + nettoyage moteur des modules retirés (rule orpheline nettoyée à `update --all`, test T7) ; `audit-architecture` **v1.0.1** (Instance C dé-dupliquée, description legacy corrigée) ; `reference` source unique des 3 axiomes d'enforcement |
 | `v2.21.0` | 2026-07-08 | + **design-orchestrator** v1.0.0 : agent routeur `vibeflow-design` + verbe `/vf-design` (langage naturel design → workflow), **générique multi-stack** (web/mobile/desktop), chaîne d'outils design pilotée en coulisse avec dégradation gracieuse ; `dev-orchestrator` **v1.3.0** route les phases de design vers `/vf-design` et installe `design-orchestrator` d'office (`requires`) |
 | `v2.22.0` | 2026-07-08 | **Recherche-doc avant debug (ADR-045)** : phase de recherche documentaire obligatoire (context7 + issues GitHub / release notes) **avant** tout debug empirique intensif, dès qu'un bug touche une lib/framework/natif/version d'OS-SDK ou qu'un correctif a déjà échoué. Nouvelle règle canonique path-scopée `doc-research-before-debug` (`software-architecture` **v1.4.0**), **référencée** (non dupliquée) par `vf-debug` (pré-étape) + le routage `vibeflow-dev` + 6ᵉ garde-fou autonome avec `maxResearchRoundsPerFlow` (`dev-orchestrator` **v1.4.0**), la boucle de test mobile (gate `vf-test-orchestrator` + remontée `doc-research-required` de `vf-app-fixer`, `mobile-test-team` **v1.1.0**), et la Phase 0 du template `debugger` (`reference` **v2.4.0**) ; nouveau contrôle machine `check-debug-research.sh` branché en Phase 2 du validator (`conductor` **v1.9.0**, `validator` **v1.2.0**) |
+| `v2.23.0` | 2026-07-09 | Équipe manager de mission (ADR-046) : vf-dev-manager + workers spécialisés (arborescence à contexte minimal), détection de mission par le router, bascule taille de vf-auto (dev-orchestrator v1.5.0) |
 
 </details>
 

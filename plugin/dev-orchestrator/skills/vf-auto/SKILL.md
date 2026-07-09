@@ -9,6 +9,24 @@ description: >
 
 # vf-auto — Mode autonome
 
+## Étape 0 — Aiguillage : moteur direct ou équipe
+
+Détermine N = étapes restantes ciblées (`gsd-sdk query roadmap.analyze` — étapes non complètes
+dans le périmètre demandé). Applique le seuil canonique `SEUIL_EQUIPE` (défini dans
+`references/mission-contracts.md`, installé sous
+`.claude/agents/dev-orchestrator-references/mission-contracts.md`) :
+
+- **N < SEUIL_EQUIPE ET aucun signal de durée** (« la nuit », « débrouille-toi jusqu'au bout »,
+  longue absence) → **moteur direct** : poursuis ce skill ci-dessous (mission courte, moins chère).
+- **N ≥ SEUIL_EQUIPE OU signal de durée** → **équipe** : dispatche l'agent `vf-dev-manager`
+  (outil Task) avec le brief de mission du contrat, puis NE poursuis PAS ce skill — le manager
+  tient la boucle et rend le rapport de mission. Le signal de durée GAGNE en cas d'ambiguïté.
+
+Annonce le choix en une ligne, en vocabulaire VibeFlow (« mission courte, traitement direct » /
+« mission longue, je déploie l'équipe »), sans nommer la plomberie.
+
+## Moteur direct (mission courte)
+
 Invoque le skill **`gsd-autonomous`** (enchaîne cadrage → plan → exécution par étape pour
 toutes les étapes restantes).
 
