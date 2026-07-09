@@ -1,5 +1,18 @@
 # CHANGELOG — validator
 
+## [v1.2.0] — 2026-07-08 (ADR-045)
+
+### Ajouté
+- **Contrôle « recherche documentaire avant debug » (ADR-045) en Phase 2.** Le validator exécute
+  désormais `bash .claude/scripts/check-debug-research.sh` : il repère les briques de dépannage du
+  lab (skills/agents dont name/description matche `debug|diagnos|dépannage|crash|stack trace`) et
+  vérifie que chacune porte une phase de recherche documentaire avant le fix (renvoi à
+  `doc-research-before-debug`, heading « Recherche documentaire », ou mention `context7`). `✗` =
+  finding bloquant agrégé au score ; `⚠` = wrapper qui délègue sans marqueur.
+- Phase 2 renommée « Densité + conformité agents ». Output template + Références (ADR-045) mis à jour.
+- Le script est fourni par `conductor` (`check-debug-research.sh`) — le validator délègue, ne
+  réimplémente pas (Iron Law 2).
+
 ## [v1.1.0] — 2026-06-03
 
 ### Ajout — Phase 4 : Audit architecture des process (ADR-036)

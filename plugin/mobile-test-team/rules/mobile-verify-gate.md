@@ -49,3 +49,10 @@ ni ne supprime jamais un assert** pour « faire passer ». Un test qui échoue s
 problème : on corrige le code, ou on consigne l'échec — jamais on ne mutile la preuve.
 Détail : `agents/<...>-references/test-loop-protocol.md` et la doctrine
 `autonomous-guardrails.md`.
+
+## Recherche documentaire avant fix intensif (ADR-045)
+
+Sur un échec lié à une **lib/framework/natif/version d'OS-SDK**, ou après un correctif déjà
+infructueux, la **recherche documentaire précède** le fix empirique (voir la règle
+`doc-research-before-debug`). Le worker `vf-app-fixer` est cloisonné sans web : il remonte
+`doc-research-required` plutôt que de bricoler ; l'orchestrateur fait porter la recherche.

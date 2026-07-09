@@ -1,7 +1,7 @@
 # Garde-fous des boucles autonomes
 
 > **Rôle** : référence chargée on-demand par `vf-auto` (et par toute boucle de
-> test/correction non supervisée, ex. le module `mobile-test`). Formalise les cinq
+> test/correction non supervisée, ex. le module `mobile-test`). Formalise les six
 > garde-fous qui rendent une boucle autonome **sûre, non-tricheuse et terminante**.
 >
 > **Origine** : doctrine extraite du track « équipe d'agents » (revizapp), généralisée.
@@ -15,12 +15,13 @@
 
 Un agent laissé en autonomie sur « rends les tests verts » a deux échappatoires
 dégénérées : (1) **tricher** en affaiblissant le test au lieu de corriger le code, et
-(2) **boucler à l'infini** sur un échec qu'il ne sait pas résoudre. Les cinq garde-fous
-ci-dessous ferment ces deux portes.
+(2) **boucler à l'infini** sur un échec qu'il ne sait pas résoudre. Les six garde-fous
+ci-dessous ferment ces deux portes (les cinq premiers) et empêchent le tâtonnement aveugle
+quand la cause est déjà documentée (le sixième).
 
 ---
 
-## Les 5 garde-fous
+## Les 6 garde-fous
 
 ### 1. Anti-thrash — abandon après N tentatives
 
@@ -63,6 +64,23 @@ message clair). En fin de boucle, un **rapport de synthèse** récapitule : diff
 tests passés/abandonnés, régressions revertées, budget consommé. C'est ce que l'utilisateur
 lit au réveil — pas les logs bruts.
 
+### 6. Recherche documentaire avant debug empirique (ADR-045)
+
+Sur un échec lié à une **lib / un framework / du code natif / une version d'OS-SDK**, ou
+**après un premier correctif infructueux**, la boucle fait **d'abord** une recherche documentaire
+(context7 + issues GitHub / release notes) pour trouver une **cause connue** avant de tâtonner.
+
+- La recherche **précède** les tentatives ; elle **ne consomme pas** de slot `maxAttemptsPerFlow`
+  mais **ne l'augmente pas** non plus. Elle est bornée par `maxResearchRoundsPerFlow` (défaut **2**)
+  et compte dans le budget global temps/tokens (garde-fou 3).
+- On ne part en **empirique** que si la recherche ne donne rien. Compteur de tentatives épuisé →
+  **HALT normal** : la recherche ne rouvre pas le budget, elle rend les tentatives *informées*.
+- Un worker **sans accès web** (ex. `vf-app-fixer`) ne bricole jamais : il **remonte
+  `doc-research-required`** à l'orchestrateur (qui a le web) et s'arrête. Miroir de la règle
+  anti-triche « rien committé, explique ».
+
+Détail : règle path-scopée `doc-research-before-debug` (module `software-architecture`).
+
 ---
 
 ## Schéma de config (optionnel, par projet)
@@ -75,6 +93,7 @@ ci-dessus.
   "maxWallClockMinutes": 180,
   "maxTokens": null,
   "maxAttemptsPerFlow": 3,
+  "maxResearchRoundsPerFlow": 2,
   "revertOnRegression": true
 }
 ```

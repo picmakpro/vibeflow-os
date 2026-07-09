@@ -30,6 +30,37 @@ Les correctifs aleatoires :
 
 ## Protocole de Travail
 
+### Phase 0 : Recherche Documentaire (préalable obligatoire conditionnel)
+
+**Objectif** : trouver une cause CONNUE avant de tâtonner. Un bug de lib/framework/natif/version a
+souvent une issue GitHub ou une note de version qui le documente — la chercher coûte quelques
+minutes, la deviner coûte des cycles (ADR-045, prolonge LRN-106 « Audit avant fix »).
+
+**Déclencheurs (l'un suffit)** :
+- Le bug implique une **dépendance tierce**, une **API de framework**, du **code natif**, ou son
+  apparition **dépend d'une version d'OS / de SDK**.
+- Un **correctif a déjà échoué** sur le même symptôme (≥ 1 tentative infructueuse).
+
+**Action** :
+1. **context7** — `resolve-library-id` puis `query-docs` sur la/les lib(s) : comportement documenté,
+   breaking changes, correctifs postérieurs.
+2. **WebSearch / WebFetch** — issues GitHub (numéro, statut, **versions affectées ET corrigées**),
+   release notes, compatibilité OS/SDK. Chercher l'erreur exacte entre guillemets.
+
+**Si tu n'as PAS d'outil web** (`WebSearch`/`WebFetch`/context7 absents de ton contexte) : ne devine
+pas. **Remonte `doc-research-required`** avec la question précise à l'orchestrateur qui, lui, a le
+web, et arrête-toi (miroir de la règle anti-triche « rien committé, explique »).
+
+**Anti-thrash** : cette phase **précède** les tentatives et ne consomme pas une des « 3+ tentatives »
+de fix (Phase 4), mais compte dans le budget global temps/tokens. On ne passe en empirique
+(Phase 1) que si la recherche ne donne rien.
+
+**Sortie Phase 0** : pistes **priorisées et sourcées** (fix robuste → contournement → hack fragile,
+tout hack à faire arbitrer avant application, ADR-031), OU « rien de documenté → passage en
+investigation empirique ».
+
+---
+
 ### Phase 1 : Investigation de la Cause Racine
 
 **Objectif** : Comprendre le QUOI et le POURQUOI avant d'agir.
@@ -134,14 +165,16 @@ Les correctifs aleatoires :
 
 ---
 
-## Red Flags — Retour Immediat a Phase 1
+## Red Flags — Retour Immediat a Phase 0/1
 
-Si l'une de ces pensees apparait, STOP et revenir a Phase 1 :
+Si l'une de ces pensees apparait, STOP et revenir a la phase adequate :
 
 - "Correctif rapide pour l'instant, j'investiguerai plus tard"
 - "Je vais juste essayer de changer X et voir si ca marche"
 - "Je vais sauter le test, je verifierai manuellement"
 - "Encore une tentative" (apres 2+ echecs deja)
+- "C'est surement un bug de version, je vais contourner" **sans avoir lu l'issue / la note de
+  version** → retour **Phase 0** (recherche documentaire d'abord)
 - Chaque correctif revele de nouveaux problemes ailleurs → probleme architectural
 
 Ces signaux indiquent qu'on a saute l'investigation. Le debug aleatoire est TOUJOURS plus lent que le debug systematique.

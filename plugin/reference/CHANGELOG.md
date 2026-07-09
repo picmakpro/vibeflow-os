@@ -1,5 +1,15 @@
 # CHANGELOG — reference
 
+## [v2.4.0] — 2026-07-08 (ADR-045)
+
+### Ajouté
+- **Template `debugger` : Phase 0 — Recherche Documentaire** (préalable obligatoire conditionnel)
+  insérée avant la Phase 1. Sur un bug de lib/framework/natif/version, ou après un fix déjà échoué,
+  la recherche (context7 + issues GitHub / release notes) précède l'investigation empirique. Fallback
+  explicite : un contexte **sans outil web** remonte `doc-research-required` au lieu de deviner.
+  Nouvelle entrée « Red Flags » (contourner un bug de version sans lire l'issue → retour Phase 0).
+  La recherche ne consomme pas une des « 3+ tentatives » de fix mais compte dans le budget global.
+
 ## [v2.3.1] — 2026-07-07
 
 ### Ajouté

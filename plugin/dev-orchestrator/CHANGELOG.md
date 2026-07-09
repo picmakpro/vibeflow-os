@@ -1,5 +1,20 @@
 # CHANGELOG — dev-orchestrator
 
+## [v1.4.0] — 2026-07-08 (ADR-045)
+
+### Ajouté
+- **Recherche documentaire avant debug** (ADR-045), câblée dans trois briques :
+  - `skills/vf-debug/SKILL.md` : **pré-étape obligatoire** avant la délégation à `gsd-debug` — si
+    déclencheur (lib/framework/natif/version, ou fix déjà échoué), recherche context7 + issues
+    GitHub d'abord, pistes priorisées et sourcées.
+  - `AGENT.md` (`vibeflow-dev`) : la route « débugge » passe par le gate recherche-doc ; nouvelle
+    heuristique de routage n°6 (le pilote a l'héritage web, il porte la recherche que les workers
+    cloisonnés remontent via `doc-research-required`).
+  - `references/autonomous-guardrails.md` : **6ᵉ garde-fou** « recherche doc avant debug empirique »
+    + champ `maxResearchRoundsPerFlow` (défaut 2) au schéma `night-run.json` — la recherche précède
+    les tentatives, ne consomme pas de slot `maxAttemptsPerFlow`, mais compte dans le budget global.
+- Règle canonique référencée : `doc-research-before-debug` (module `software-architecture`).
+
 ## [v1.3.0] — 2026-07-08
 
 ### Ajouté

@@ -1,5 +1,21 @@
 # Changelog — mobile-test-team
 
+## v1.1.0 — 2026-07-08 (ADR-045)
+
+### Ajouté
+- **Gate recherche documentaire dans la boucle test+fix** (ADR-045) :
+  - `vf-test-orchestrator` : avant de (re)dispatcher `vf-app-fixer` sur un flow **déjà tenté**, ou
+    dès réception d'un `doc-research-required`, ou sur un échec lib/framework/natif/version →
+    suspend le fix aveugle, fait porter la recherche (context7 + issues GitHub) par le niveau qui a
+    le web, puis redispatche avec des pistes. HALT léger analogue à HALT-4. Config
+    `maxResearchRoundsPerFlow` (défaut 2).
+  - `vf-app-fixer` : **3ᵉ état de remontée `doc-research-required`** — worker cloisonné sans web,
+    il ne bricole plus un contournement à l'aveugle sur un bug documentable ; il remonte la question
+    précise et s'arrête (miroir de « rien committé, explique »).
+  - `references/test-loop-protocol.md` : ligne HALT-4 (léger) + invariant anti-thrash mis à jour.
+  - `rules/mobile-verify-gate.md` : section « Recherche documentaire avant fix intensif », renvoi à
+    la règle `doc-research-before-debug`.
+
 ## v1.0.1 — 2026-07-07
 
 ### Corrigé

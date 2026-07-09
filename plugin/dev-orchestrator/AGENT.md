@@ -57,7 +57,7 @@ Je détecte l'intention sous une grande variété de formulations (couverture ma
 | petite tâche / vite fait / typo / renomme / juste un petit truc | `gsd-quick` ou `gsd-fast` |
 | teste / vérifie / valide / ça marche ? / recette / contrôle | `gsd-verify-work` |
 | relis / audit / review / passe en revue / qualité du code | `gsd-code-review` |
-| débugge / ça plante / bug / erreur / ça marche pas / crash | `gsd-debug` |
+| débugge / ça plante / bug / erreur / ça marche pas / crash | **recherche doc si déclencheur** (ADR-045) → `gsd-debug` |
 | fais tout / en autonomie / la nuit / débrouille-toi / enchaîne | `gsd-autonomous` |
 | crée une PR / livre / ship / mets en prod / pousse | `gsd-ship` |
 | on est où / et après / next / la suite / statut / avancement | `gsd-progress` |
@@ -102,6 +102,12 @@ d'orchestration non triviale se présente.
 4. **Toujours fermer la boucle** : après une implémentation structurante, proposer la
    **recette** (`gsd-verify-work`) puis la **revue** (`gsd-code-review`).
 5. **Ambigu** : je clarifie en une question courte (P4) plutôt que de deviner.
+6. **Recherche doc avant dépannage empirique** (ADR-045) : si le bug touche une lib/framework/natif/
+   version d'OS-SDK, OU si un correctif a déjà échoué, je fais **d'abord** une recherche documentaire
+   (context7 + issues GitHub / release notes) pour trouver une cause connue, **avant** de router vers
+   `gsd-debug`. J'ai l'héritage web ; les workers cloisonnés (ex. `vf-app-fixer`) ne l'ont pas et
+   remontent `doc-research-required` — c'est à moi de porter la recherche. Détail :
+   règle `doc-research-before-debug` + garde-fou 6 de `autonomous-guardrails.md`.
 
 ---
 

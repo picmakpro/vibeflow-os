@@ -8,7 +8,7 @@
 
 Say _"help me build this feature"_ — and the whole pipeline kicks off: scoping → plan → execution → tests → delivery. Without ever typing a technical command or knowing what runs under the hood.
 
-[![Version](https://img.shields.io/badge/version-2.21.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.22.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-16-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -187,6 +187,7 @@ Routing relies on a **factual index auto-generated** from the frontmatter of the
 | `v2.19.2` | 2026-07-07 | Fix: `/vf-update` now enforces the mandatory baseline — a `mandatory` module published after a lab's setup (e.g. `conductor` on a pre-v2.13.0 lab) was skipped forever, so its scripts & hooks (the SessionStart update banner) were never wired; `update` also re-syncs governance for up-to-date modules (idempotent) (conductor v1.8.2) |
 | `v2.20.0` | 2026-07-07 | Dev doctrine milestone: `software-architecture` **v1.3.0** = the dev-philosophies home (DRY/KISS/YAGNI added, Clean Architecture/Clean Code named, TDD card, **Nyquist + Decision Coverage gates absorbed**); module `feature-dev-gates` **removed** + engine cleanup of retired modules (orphan rule cleaned on `update --all`, test T7); `audit-architecture` **v1.0.1** (Instance C de-duplicated, legacy description fixed); `reference` single source for the 3 enforcement axioms |
 | `v2.21.0` | 2026-07-08 | + **design-orchestrator** v1.0.0: router agent `vibeflow-design` + `/vf-design` verb (plain-language design intent → workflow), **stack-agnostic** (web/mobile/desktop), design toolchain piloted behind the scenes with graceful degradation; `dev-orchestrator` **v1.3.0** routes design phases to `/vf-design` and installs `design-orchestrator` by default (`requires`) |
+| `v2.22.0` | 2026-07-08 | **Doc-research-before-debug (ADR-045)**: mandatory documentary-research phase (context7 + GitHub issues / release notes) **before** intensive empirical debug, whenever a bug touches a lib/framework/native/OS-SDK version or a fix already failed. New canonical path-scoped rule `doc-research-before-debug` (`software-architecture` **v1.4.0**), referenced — not duplicated — by `vf-debug` (pre-step) + `vibeflow-dev` routing + 6th autonomous guardrail with `maxResearchRoundsPerFlow` (`dev-orchestrator` **v1.4.0**), the mobile test loop (`vf-test-orchestrator` gate + `vf-app-fixer` `doc-research-required` escalation, `mobile-test-team` **v1.1.0**), and the `debugger` template Phase 0 (`reference` **v2.4.0**); new machine check `check-debug-research.sh` wired into validator Phase 2 (`conductor` **v1.9.0**, `validator` **v1.2.0**) |
 
 </details>
 

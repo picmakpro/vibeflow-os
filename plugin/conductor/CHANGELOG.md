@@ -1,5 +1,15 @@
 # Changelog — conductor
 
+## [v1.9.0] — 2026-07-08 (ADR-045)
+
+### Ajouté
+- **Lint `scripts/check-debug-research.sh`** : gate déterministe de la présence d'une phase de
+  recherche documentaire avant debug dans les briques de dépannage d'un lab (ADR-045). Même contrat
+  que `check-agents.sh` : `--strict` / `--hook` / `--file`, symboles `✓ ✗ ⚠`, exit 0/1, fail-open
+  si `python3` absent. Consommé par le `vibeflow-validator` en Phase 2 et branché en advisory
+  SessionStart (`--hook || true`) dans `hooks/hooks.json`.
+- Suite de tests `scripts/tests/test-check-debug-research.sh` (9 cas, tous verts).
+
 ## [v1.8.2] — 2026-07-07
 
 ### Corrigé
