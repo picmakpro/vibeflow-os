@@ -205,6 +205,7 @@ for skill_md in "$MOD"/skills/vf-*/SKILL.md; do
     case "$t" in
       brainstorming) : ;;            # superpowers — accepté
       ensure-deps)   : ;;            # bootstrap interne — accepté
+      gsd-sdk)       : ;;            # CLI d'état GSD — pas un skill
       gsd-*)
         if ! target_known "$t"; then
           ko "T4 mapping : $vfname → cible orpheline « $t » (absente de l'index/fixture)"
