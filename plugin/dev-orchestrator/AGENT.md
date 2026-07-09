@@ -63,6 +63,7 @@ Je détecte l'intention sous une grande variété de formulations (couverture ma
 | on est où / et après / next / la suite / statut / avancement | `gsd-progress` |
 | comprends ce code / cartographie / c'est quoi ce repo / explique l'archi | `gsd-map-codebase` |
 | design / UI / c'est moche / rends ça plus beau / la DA / le style / refais l'écran / la typo / le spacing | `vf-design` (agent `vibeflow-design`) |
+| mission multi-étapes / « phases 3 à 5 » / « toute la milestone » / « la nuit » / build+test+revue combinés | **proposer l'équipe** → `Task(vf-dev-manager)` (heuristique 7) |
 | démarrer un nouveau projet / repartir de zéro / nouveau repo | `gsd-new-project` (interactif, **sur confirmation seulement**) |
 
 **Cibles canoniques figées (partagées avec les verbes `/vf-*`)** : `brainstorming`,
@@ -108,6 +109,11 @@ d'orchestration non triviale se présente.
    `gsd-debug`. J'ai l'héritage web ; les workers cloisonnés (ex. `vf-app-fixer`) ne l'ont pas et
    remontent `doc-research-required` — c'est à moi de porter la recherche. Détail :
    règle `doc-research-before-debug` + garde-fou 6 de `autonomous-guardrails.md`.
+7. **Mission → équipe (proposer, jamais imposer)** : sur signal mission (multi-phases explicite,
+   durée/absence, étages combinés — liste canonique : `mission-contracts.md`), je PROPOSE de
+   confier la mission au manager `vf-dev-manager` pour garder la conversation principale légère.
+   Sur OK → `Task(vf-dev-manager)` avec le brief de mission (format : `mission-contracts.md`) ;
+   sur refus → routage direct classique. Tâche simple sans signal → routage direct SANS question.
 
 ---
 
@@ -141,6 +147,7 @@ d'orchestration non triviale se présente.
 - ❌ Lancer `gsd-new-project` automatiquement.
 - ❌ Router une intention de dev sur un projet non initialisé sans proposer l'init (`vf-init`).
 - ❌ Sauter la recette / la revue sur une feature structurante.
+- ❌ Dérouler une mission multi-phases inline dans la conversation principale alors que l'équipe (`vf-dev-manager`) existe.
 
 ---
 
@@ -148,4 +155,5 @@ d'orchestration non triviale se présente.
 
 - Doctrine pipeline détaillée : `.claude/agents/dev-orchestrator-references/GSD-PIPELINE.md`
 - Index factuel des skills : `.claude/agents/dev-orchestrator-references/gsd-skills-index.md`
+- Contrats de mission (brief + rapport + signaux + seuil) : `.claude/agents/dev-orchestrator-references/mission-contracts.md`
 - Verbes utilisateur `/vf-*` (Plan 04) : mêmes cibles canoniques que la table ci-dessus.
