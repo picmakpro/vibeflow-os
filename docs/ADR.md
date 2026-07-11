@@ -13,6 +13,7 @@
 | ID | Date | Titre | Statut |
 |----|------|-------|--------|
 | ADR-046 | 2026-07-09 | Équipe manager de mission — arborescence à contexte minimal | Validée |
+| ADR-047 | 2026-07-11 | skill-creator dans la baseline d'install (dépendance du conductor) | Validée |
 
 ---
 
@@ -83,3 +84,64 @@ seuil) ; ~10-30 % de tokens en plus sur une mission (rechargement de contexte pa
 
 - Aucune rule nouvelle (DM4 : détection côté agent, pas de gate machine). Les gates existants
   s'appliquent : `check-agents.sh` (ADR-044), densité (ADR-029).
+
+---
+
+## ADR-047 : skill-creator dans la baseline d'install (dépendance du conductor)
+
+**Date** : 2026-07-11
+**Statut** : Validée
+**Décideur** : Willy (retour terrain sur l'install d'un nouveau lab)
+**Contexte** : release v2.24.0 — conductor v1.10.0
+
+### Problème
+
+À l'installation d'un nouveau lab, la partie « installation des skills » n'utilise jamais le
+skill-creator, alors qu'il devrait être posé d'office comme le conductor et le validator — y compris
+pour des skills personnalisés / procédures internes, qui doivent eux aussi passer par sa pipeline
+(recherche → draft → eval → itère) pour rester pertinents et fondés sur les données.
+
+Diagnostic : `skill-creator/AGENT.md` s'auto-déclare « Sole authorized channel for skill creation in
+this Lab » ; `vf-new-lab` (Lab Factory, ADR-041 Lab) Phase 5 fait un fan-out
+`subagent_type: skill-creator` ; le Gate C exige « créer le skill manquant via skill-creator ». MAIS
+`skill-creator` n'était ni `mandatory`, ni dans `conductor.requires` (seulement planning-core +
+validator), ni dans la liste « Typiquement » de la Phase 7 → l'agent n'était **jamais installé** → le
+fan-out tombait sur un `subagent_type` inexistant. La doctrine du canal unique existait ; son moteur
+n'était jamais posé (capacité fantôme, régression silencieuse).
+
+### Options Considérées
+
+| Option | Avantages | Inconvénients |
+|--------|-----------|---------------|
+| `skill-creator` marqué `mandatory: true` | Posé d'office indépendamment | Sémantiquement faux (il n'est pas un orchestrateur baseline) ; incohérent avec le pattern validator |
+| **`skill-creator` ajouté à `conductor.requires` (retenue)** | Convention existante (comme validator) ; tiré d'office par la fermeture transitive du conductor `mandatory` ; sémantiquement juste (outil dont le conductor a besoin pour fabriquer un lab) | Aucun notable |
+| Laisser en `optional` à-la-carte | Statu quo | Ne corrige rien — le fan-out reste cassé au premier `vf-new-lab` |
+
+### Décision
+
+1. **`skill-creator` ajouté à `conductor.requires`**, au même titre que `validator`. Le conductor
+   étant `mandatory`, sa fermeture transitive (tirée par `--with-deps` à chaque install) inclut
+   désormais `skill-creator` → posé d'office avant toute création de lab. `skill-creator` reste
+   `optional` au catalogue (pas mandatory lui-même) : exactement le statut de `validator`.
+2. **Cohérence documentaire** : `vf-new-lab` Phase 7 point 2 liste `skill-creator` ; garde-fou
+   « jamais rédiger un skill à la main — canal unique, même pour une procédure interne » ;
+   `installer/SKILL.md` récap d'exemple de la fermeture du conductor.
+
+### Conséquences
+
+**Positives** : le canal unique de création de skills est toujours présent dès l'install ; `vf-new-lab`
+fabrique réellement les capacités du lab (fan-out opérationnel) ; ajout/màj de skill plus tard passe
+aussi par l'eval du skill-creator (qualité). **Négatives** : un module de plus dans la baseline
+(coût disque/contexte marginal, assumé). **Migration** : les labs déjà installés reçoivent
+skill-creator via `vibeflow-update --all`.
+
+### Code Impacté
+
+- `plugin/conductor/module.json` — `skill-creator` ajouté aux `requires` (v1.9.0 → v1.10.0)
+- `plugin/conductor/skills/vf-new-lab/SKILL.md` — Phase 7 point 2 + garde-fou canal unique
+- `plugin/installer/SKILL.md` — récap d'exemple de la fermeture du conductor
+- `plugin/.claude-plugin/plugin.json` + `VERSION` racine — v2.23.0 → v2.24.0
+
+### Rules Associées
+
+- Aucune rule nouvelle (mécanisme = résolveur de deps existant). Gates inchangés.

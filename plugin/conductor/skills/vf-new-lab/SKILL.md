@@ -153,7 +153,9 @@ Dériver puis poser (déléguer, ne pas réinventer) :
    `CLAUDE.md` mappe ensuite la doc transverse → `@docs/_transverse/` et **chaque compartiment →
    `@docs/<projet>/`**. Détail : `references/doc-externalization.md`.
 2. **Modules** — `vibeflow-install` (résoudre deps : `resolve-deps.sh`). Typiquement `planning-core` +
-   `consolidator` + `audit-architecture` + `validator`. **Pas `dev-orchestrator`** sauf métier = code.
+   `consolidator` + `audit-architecture` + `validator` + **`skill-creator`** (canal unique de création
+   de skills — posé d'office car dépendance du conductor `mandatory`, donc disponible dès la Phase 5).
+   **Pas `dev-orchestrator`** sauf métier = code.
 3. **Socle planning** — `vf-planning`. **Lab à compartiments** : `.planning/` du lab en *steering +
    `INDEX.md`* (jamais de ROADMAP global) ; un socle par compartiment **qualifié** (seuil d'autonomie),
    typé `deliverable` (roadmap+phases) ou `continuous` (`BOARD.md` + cadence). Sous le seuil / infra →
@@ -225,6 +227,9 @@ registres, auditeurs, comment les actionner). Lister la **dette** éventuelle (c
 ## Garde-fous
 
 - **Jamais dériver/fabriquer avec un marqueur `[À CLARIFIER]` ouvert** (Gate A puis Gate B).
+- **Jamais rédiger un skill à la main** : toute création OU mise à jour de skill — y compris une
+  procédure interne ou un skill « sur-mesure » — passe par `skill-creator` (canal unique : recherche →
+  draft → eval → itère). Le pipeline vaut même sur des données de procédures qu'on a déjà en interne.
 - **Jamais fabriquer une capacité injustifiée** ni dépasser le plafond du profil (anti-slop).
 - **Jamais présumer dev** ; extension & vocabulaire viennent du brief réel.
 - **Jamais un `.planning/` par compartiment systématique** ; jamais de ROADMAP global de lab.
