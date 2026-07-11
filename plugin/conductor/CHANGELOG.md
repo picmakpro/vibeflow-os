@@ -1,5 +1,23 @@
 # Changelog — conductor
 
+## [v1.10.0] — 2026-07-11 (ADR-047 — skill-creator dans la baseline)
+
+### Ajouté
+- `module.json` : **`skill-creator` ajouté aux `requires`**. C'est l'outil que `vf-new-lab` invoque
+  en Phase 5 (fan-out `subagent_type: skill-creator`) et que le Gate C exige pour créer un skill
+  manquant. Il est le **canal unique de création de skills** (« Sole authorized channel for skill
+  creation ») — donc une **dépendance dure** du conductor, au même titre que `validator`. Comme le
+  conductor est `mandatory`, `skill-creator` est désormais **posé d'office à chaque install** (sa
+  fermeture transitive est tirée par `--with-deps`), avant toute création de lab.
+
+### Corrigé
+- Régression silencieuse : `vf-new-lab` fanned out vers un `subagent_type: skill-creator` **jamais
+  installé** (absent de `requires` ET de la liste « Typiquement » de la Phase 7). Les skills du lab
+  étaient donc soit non fabriqués, soit rédigés à la main hors pipeline (perte de l'eval/qualité).
+- `vf-new-lab` Phase 7 (point 2) : `skill-creator` ajouté à la liste des modules typiques + garde-fou
+  explicite « jamais rédiger un skill à la main — canal unique skill-creator, même pour une procédure
+  interne ». `installer/SKILL.md` : récap d'exemple de la fermeture du conductor mis à jour.
+
 ## [v1.9.0] — 2026-07-08 (ADR-045)
 
 ### Ajouté

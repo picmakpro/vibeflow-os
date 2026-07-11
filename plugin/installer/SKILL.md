@@ -94,7 +94,7 @@ Concrètement, par étape :
 
 5. **Install scopée (INST-04 — déléguée, scope unique partout).** Résoudre la fermeture transitive
    des `requires` via `resolve-deps.sh` (`VF_MODULES_ROOT` = cache) et **récapituler** ce qui sera
-   posé **AVANT** d'installer (ex. « conductor entraîne planning-core + validator »).
+   posé **AVANT** d'installer (ex. « conductor entraîne planning-core + validator + skill-creator »).
    - **Modules VibeFlow** → `vibeflow-update.sh --scope <s> install --with-deps <module>` (conductor
      d'office, puis `dev-orchestrator` si branche dev), `VIBEFLOW_CACHE` = cache du plugin.
      `--with-deps` recâble lui-même le résolveur côté engine.

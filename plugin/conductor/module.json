@@ -1,11 +1,12 @@
 {
   "name": "conductor",
-  "version": "v1.9.0",
+  "version": "v1.10.0",
   "type": "agent + skills + scripts + references",
   "description": "Orchestrateur méta et gardien du lab : crée/configure un lab dans n'importe quel métier, installe/vérifie/met à jour, migre sur évolution de doctrine, et reçoit les escalades de cohérence des sous-agents.",
   "mandatory": true,
   "requires": [
     "planning-core",
-    "validator"
+    "validator",
+    "skill-creator"
   ]
 }
