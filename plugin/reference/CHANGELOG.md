@@ -1,5 +1,15 @@
 # CHANGELOG — reference
 
+## [v2.5.0] — 2026-07-16 (ADR-048 — orchestrateur métier)
+
+### Ajouté
+- `templates/skills/metier-orchestration/` — skill préchargeable (≤200L) de la **boucle de mission** de
+  l'orchestrateur métier : contexte (index-first) → cartographie → clarification → planification →
+  exécution (délégation) → vérification adversariale → navette bornée → capitalisation + mise à jour
+  `.planning/`. + 3 references (mission-loop, verification-types, delegation-protocol).
+- `templates/agents/orchestrator-template.md` — orchestrateur métier générique parametré (≤250L, P3,
+  distinct du conductor méta et du dev-orchestrator). Consommé par `vf-new-lab` dès ≥2 agents métier.
+
 ## [v2.4.0] — 2026-07-08 (ADR-045)
 
 ### Ajouté

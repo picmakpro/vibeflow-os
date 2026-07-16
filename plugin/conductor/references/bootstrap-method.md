@@ -26,6 +26,7 @@ questions — extraire les réponses et confirmer en une ligne. On ne demande ja
 | Métier opérationnel découpé (contenu, vente, acquisition, dossier) | profil **standard** + extension dédiée |
 | Métier = code / produit technique | profil **complet** + `dev-orchestrator` (seul cas dev) |
 | Process cités | 2-3 agents métier max, paramétrés (pattern business-agent) |
+| **≥2 agents métier posés** | **+ un orchestrateur métier** (`orchestrator-template` + skill `metier-orchestration`), distinct du conductor méta et du dev-orchestrator (ADR-048). Métier = code → ce rôle est `dev-orchestrator`, ne pas doubler. |
 | Vocabulaire | nom de l'extension (`acquisition/`, `editorial/`, `pipeline/`, `dossiers/`…) |
 
 > L'extension n'est **jamais** un catalogue fermé : on la nomme d'après le vocabulaire réel. Voir
@@ -36,6 +37,11 @@ questions — extraire les réponses et confirmer en une ligne. On ne demande ja
 Quel que soit le métier : `CLAUDE.md` métier + socle `.planning/` (planning-core) + registres mémoire
 + **auditeurs câblés** (`vibeflow-validator` + `audit-architecture`) + **stamp de version framework**
 (pour la détection d'update). Un lab sans auditeurs n'est pas un lab VibeFlow.
+
+**Dès qu'il y a ≥2 agents métier** : on pose **en plus** un **orchestrateur métier** (chef d'orchestre du
+travail quotidien — planifie, délègue, fait vérifier, réconcilie, met à jour le planning ; ne produit
+jamais). C'est le porteur du principe P3 côté métier ; sans lui, la coordination retombe dans le vide
+(le conductor est méta et ne fait pas le travail métier). Voir ADR-048.
 
 ## 4. Ce qu'on ne fait pas
 
@@ -52,7 +58,9 @@ Quel que soit le métier : `CLAUDE.md` métier + socle `.planning/` (planning-co
 Dérivation (sans re-questionner, tout est dit) :
 - Profil **standard** ; extension **`acquisition/`** (`ICP.md`, `SEQUENCES.md`, `OFFRES.md`, `CANAUX.md`).
 - Agents : **copywriter-sequences** (rédige les séquences au ton défini) + **analyste-campagnes**
-  (lit les métriques, propose des itérations).
+  (lit les métriques, propose des itérations) → **2 spécialistes, donc + un orchestrateur métier**
+  **`pilote-acquisition`** (skill `metier-orchestration` : planifie une campagne, délègue au copywriter et
+  à l'analyste, fait vérifier, réconcilie, met à jour `.planning/` — ne rédige/n'analyse jamais lui-même).
 - Modules : planning-core + consolidator + audit-architecture + validator. **Pas** dev-orchestrator.
 - `.planning/` : ROADMAP en « campagnes », REQUIREMENTS en objectifs d'acquisition (taux de RDV, etc.).
 - Garde-fous câblés, version framework stampée. **Zéro fichier dev.**

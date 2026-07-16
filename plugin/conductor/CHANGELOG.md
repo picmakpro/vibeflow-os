@@ -1,5 +1,17 @@
 # Changelog — conductor
 
+## [v1.11.0] — 2026-07-16 (ADR-048 — orchestrateur métier systématique)
+
+### Ajouté
+- `vf-new-lab` Phase 7 **point 5bis** : dès **≥2 agents métier**, pose d'office un **orchestrateur métier**
+  (copie verbatim du skill `metier-orchestration` + instanciation de `orchestrator-template.md` parametré
+  au métier). Seuil < 2 → pas d'orchestrateur ; métier = code → rôle tenu par `dev-orchestrator` (pas de doublon).
+- `references/bootstrap-method.md` : règle de dérivation « ≥2 agents → orchestrateur métier » + exemple mis à jour.
+
+### Corrigé
+- Renvoi circulaire : les bundles pointaient « l'orchestration » vers le conductor, qui ne fait pas le travail
+  métier. L'orchestration métier est désormais portée par l'orchestrateur métier posé ; le conductor reste méta.
+
 ## [v1.10.0] — 2026-07-11 (ADR-047 — skill-creator dans la baseline)
 
 ### Ajouté

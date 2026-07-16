@@ -1,6 +1,6 @@
 {
   "name": "content-bundle",
-  "version": "v1.0.1",
+  "version": "v1.1.0",
   "type": "doc-only",
   "description": "Bundle métier content (ContentFlow) : blueprints agents (strategist/scriptwriter/repurposer) + dérivation pour vf-new-lab — chaîne éditoriale brief→livrable→distribution.",
   "proposable": false,

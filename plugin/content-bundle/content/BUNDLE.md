@@ -71,8 +71,11 @@ savoir déporté en skills via frontmatter `skills:`, jamais inliné). Blueprint
 | **scriptwriter** | Rédacteur/idéateur : produit 3 hooks puis rédige le livrable complet selon l'angle validé. | sonnet | `agents/scriptwriter.blueprint.md` |
 | **repurposer** | Repurposing/distribution : décline une pièce validée en variantes multi-plateformes. | sonnet | `agents/repurposer.blueprint.md` |
 
-Aucun de ces agents n'orchestre (P3) et aucun ne code, jamais. L'orchestration est **déléguée au
-module `conductor`** (`vibeflow-conductor`). Les agents escaladent au conductor hors de leur scope.
+Aucun de ces agents n'orchestre (P3) et aucun ne code, jamais. Comme le lab a ≥2 spécialistes,
+`vf-new-lab` pose **en plus un orchestrateur métier** (`chef-editorial`, skill `metier-orchestration`,
+ADR-048) : il pilote une pièce/campagne de bout en bout — planifie, délègue au strategist/scriptwriter/
+repurposer, fait vérifier (adversarial), réconcilie, met à jour `.planning/` — **sans jamais produire**.
+Le `conductor` reste **méta** (config/audit/migration + escalades C4), il ne fait pas ce travail métier.
 
 ## 6. Modules recommandés
 
@@ -82,10 +85,11 @@ module `conductor`** (`vibeflow-conductor`). Les agents escaladent au conductor 
 | `consolidator` | consolidation mémoire 4 piliers ; promotion `PROJECT.D-NN` → DECISIONS |
 | `audit-architecture` | **gate de clarté** bloquant sur le générateur brief→output (P8) |
 | `validator` | agent `vibeflow-validator` — filet de cohérence/conformité (5 phases) |
-| `conductor` | orchestration + `vf-new-lab` (point d'entrée d'instanciation) |
+| `conductor` | **méta** : config/audit/migration + `vf-new-lab` + escalades C4 (PAS l'orchestration métier) |
+| orchestrateur métier `chef-editorial` | **orchestration métier** (posé d'office car ≥2 spécialistes, ADR-048) |
 | `reference` | source canonique des principes Core + registres (si présent) |
 
-**Pas de `dev-orchestrator`** : le métier n'est pas le code.
+**Pas de `dev-orchestrator`** : le métier n'est pas le code (ce rôle-là serait le dev-orchestrator).
 
 ## 7. Spécificités métier à matérialiser (NON négociables)
 

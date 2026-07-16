@@ -1,5 +1,12 @@
 # CHANGELOG — growth-bundle
 
+## [v1.1.0] — 2026-07-16 (ADR-048 — orchestrateur métier)
+
+### Modifié
+- Contradiction levée : `channel-strategist` est déclaré explicitement comme l'**orchestrateur métier** du
+  bundle (instance du pattern ADR-048, câblé au skill `metier-orchestration`) — plus de « aucun orchestrateur
+  re-codé » qui contredisait son rôle. Le `conductor` reste méta.
+
 ## [v1.0.1] — 2026-07-05 (ADR-044)
 
 ### Corrigé

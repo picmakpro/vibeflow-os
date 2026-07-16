@@ -21,6 +21,7 @@ description: >
 model: opus
 memory: project
 skills:
+  - metier-orchestration           # Boucle de mission de l'orchestrateur métier (ADR-048) — copié verbatim par vf-new-lab, préchargé
   - growth-channel-orchestration   # À créer via skill-creator (arbitrage CAC/ROAS, ICE, allocation, duplication _TEMPLATE)
   - audit-architecture             # Gate à verdict bloquant avant lancement de campagne (P8)
 ---
