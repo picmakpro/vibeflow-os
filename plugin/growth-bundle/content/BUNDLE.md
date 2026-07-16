@@ -58,7 +58,7 @@ l'enjeu de vérification machine d'un projet de code. Le socle `.planning/` pos�
 
 | Agent | Modèle | Rôle (1 ligne) |
 |---|---|---|
-| **channel-strategist** | opus | Orchestrateur growth : maintient le niveau global, décide activation/kill de canal selon CAC/ROAS comparés, alloue budget, priorise les expériences (ICE), crée un canal en dupliquant `_TEMPLATE/`. **NE RÉDIGE NI N'ANALYSE lui-même.** |
+| **channel-strategist** | opus | **Orchestrateur métier** du lab growth (instance du pattern ADR-048 : câblé au skill `metier-orchestration`). Maintient le niveau global, décide activation/kill de canal selon CAC/ROAS comparés, alloue budget, priorise les expériences (ICE), crée un canal en dupliquant `_TEMPLATE/`. Planifie, **délègue** au copywriter et à l'analyst, fait vérifier, réconcilie, met à jour `.planning/`. **NE RÉDIGE NI N'ANALYSE lui-même** (P3). |
 | **copywriter-sequences** | sonnet | Rédige/itère les séquences & créatives **par canal**, ancré sur l'ICP **local** + offres activées ; variantes A/B, zéro slop IA ; range tout dans `growth/channels/<canal>/`. **Ne décide pas l'allocation.** |
 | **campaign-analyst** | sonnet | Renseigne METRICS par canal, calcule CAC/ROAS, tient EXPERIMENTS (verdict GO/ITERATE/KILL), remonte LEARNINGS **par canal** (tag-canal obligatoire). **N'invente jamais de métrique.** |
 
@@ -74,11 +74,12 @@ l'enjeu de vérification machine d'un projet de code. Le socle `.planning/` pos�
 | `consolidator` | Indexation + archivage + fusion + promotion des registres (pont planning↔mémoire). **Requis.** |
 | `audit-architecture` | Skill du filet : gate anti-slop à verdict bloquant sur les générateurs brief→output. **Requis.** |
 | `validator` | Agent `vibeflow-validator` — garant de l'alignement lab ↔ méthodologie. **Requis.** |
-| `conductor` | Orchestration méta (`vf-new-lab`, migration, escalades). Présent de fait (porte `vf-new-lab`). |
-| `reference` | Source canonique `VIBEFLOW_CORE.md` + templates de registres. Recommandé. |
+| `conductor` | **Méta** : config/audit/migration + escalades C4. Présent de fait (porte `vf-new-lab`). **PAS** l'orchestration métier. |
+| `reference` | Source canonique `VIBEFLOW_CORE.md` + templates de registres (dont skill `metier-orchestration`). Recommandé. |
 
-> **Pas de `dev-orchestrator`** : le métier n'est pas le code. L'orchestration de lab est déléguée au
-> `conductor` ; **aucun orchestrateur n'est re-codé** par le bundle.
+> **Pas de `dev-orchestrator`** : le métier n'est pas le code. L'**orchestration métier** est portée par
+> `channel-strategist` (l'orchestrateur métier du bundle, ADR-048, câblé au skill `metier-orchestration`) ;
+> le `conductor` reste **méta** (structure du lab), il ne fait pas le travail growth quotidien.
 
 ## 7. Flux d'instanciation (consommé par `vf-new-lab`)
 

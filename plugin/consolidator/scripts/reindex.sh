@@ -253,11 +253,26 @@ reindex_one() {
   fi
 
   # APPLY mode
-  local tmp backup
+  local tmp backup backup_dir base keep
   tmp=$(mktemp)
-  backup="${file}.bak-reindex-$(date +%Y%m%d-%H%M%S)"
+  # Backups ISOLÉS dans un sous-dossier dédié gitignoré (ADR-049) — ne polluent plus les registres.
+  backup_dir="$(dirname "$file")/.backups"
+  mkdir -p "$backup_dir"
+  # .gitignore auto-suffisant : ignore tout le contenu (les backups) mais se conserve lui-même.
+  # Le lab cible n'a donc RIEN à configurer — aucun backup n'entre dans git.
+  [ -f "$backup_dir/.gitignore" ] || printf '*\n!.gitignore\n' > "$backup_dir/.gitignore"
+  base="$(basename "$file")"
+  backup="$backup_dir/${base}.bak-reindex-$(date +%Y%m%d-%H%M%S)"
   cp "$file" "$backup"
   log "Backup: $backup"
+  # Rotation INTÉGRÉE (ADR-049) : ne garder que les N derniers backups de CE registre (défaut 3).
+  # Dans reindex lui-même => TOUT --apply purge (plus seulement le hook post-edit).
+  # Portable bash 3.2 (macOS) : pas de mapfile ; while-read + process substitution.
+  keep="${VF_BACKUP_KEEP:-3}"
+  local _old
+  while IFS= read -r _old; do
+    [ -n "$_old" ] && rm -f "$_old"
+  done < <(ls -1t "$backup_dir/${base}.bak-reindex-"* 2>/dev/null | tail -n +"$((keep+1))")
 
   # Detect orphans: IDs in old index but without body (LRN-106 — must preserve)
   local index_ids body_ids orphans

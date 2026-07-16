@@ -1,5 +1,18 @@
 # CHANGELOG — consolidator
 
+## [v1.4.0] — 2026-07-16 (ADR-049 — backups mémoire isolés + rotation intégrée)
+
+### Corrigé
+- `reindex.sh --apply` : les backups ne polluent plus `.claude/memory/` (14 fichiers / 1,6 Mo mesurés
+  dans un lab réel, dont 8 committés). Ils sont désormais **isolés dans `.claude/memory/.backups/`**
+  avec un **`.gitignore` auto-suffisant** (`*` + `!.gitignore`) → jamais committés, sans config du lab.
+- **Rotation intégrée dans `reindex.sh`** (garde N derniers, défaut 3, `VF_BACKUP_KEEP`) → **tout**
+  `--apply` purge, plus seulement le hook `post-edit-reindex.sh` (dont la rotation dupliquée est retirée).
+- Portabilité : rotation en bash 3.2 (macOS) — pas de `mapfile`.
+
+### Tests
+- `test-consolidator.sh` T7 (isolation racine / rotation 3 / gitignore auto). 17 tests au total.
+
 ## [v1.3.1] — 2026-07-05 (BLK-007 — fenêtre de lecture bornée par VALEUR)
 
 ### Corrigé

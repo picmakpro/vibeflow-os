@@ -95,6 +95,20 @@ output=$(cd "$WORK_DIR" && MEMORY_DIR=".claude/memory" "$WORK_DIR/.claude/script
 assert "T6.1 — LRN-002 candidate operational" "$output" '"lrn_id": "LRN-002"'
 
 echo ""
+echo "=== T7 — reindex.sh --apply : backups isolés + rotation + gitignore (ADR-049) ==="
+# 4 applies successifs → doit garder 3 backups max, dans .backups/, jamais à la racine memory/.
+for _n in 1 2 3 4; do
+  (cd "$WORK_DIR" && MEMORY_DIR=".claude/memory" "$WORK_DIR/.claude/scripts/reindex.sh" --register=LEARNINGS --apply >/dev/null 2>&1)
+  sleep 1.1
+done
+root_baks=$(ls -1 "$WORK_DIR/.claude/memory/"*.bak-reindex-* 2>/dev/null | wc -l | tr -d ' ')
+assert "T7.1 — AUCUN backup à la racine memory/ (isolation)" "$root_baks" "0"
+kept=$(ls -1 "$WORK_DIR/.claude/memory/.backups/"*.bak-reindex-* 2>/dev/null | wc -l | tr -d ' ')
+assert "T7.2 — rotation garde 3 backups max dans .backups/" "$kept" "3"
+gi=$(cat "$WORK_DIR/.claude/memory/.backups/.gitignore" 2>/dev/null | tr -d '\n')
+assert "T7.3 — .gitignore auto-suffisant dans .backups/" "$gi" "*!.gitignore"
+
+echo ""
 echo "================================"
 echo "BILAN : $PASS PASS / $FAIL FAIL / $((PASS + FAIL)) tests"
 echo "================================"

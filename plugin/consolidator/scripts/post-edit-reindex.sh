@@ -68,11 +68,7 @@ REINDEX="$(dirname "$0")/reindex.sh"
 [ -f "$REINDEX" ] || exit 0
 
 # MEMORY_DIR = dossier réel du fichier édité (le lab peut être ouvert depuis n'importe quel cwd).
+# reindex.sh --apply isole désormais les backups dans <memory>/.backups/ (gitignoré) ET les
+# fait tourner (garde 3) lui-même (ADR-049) — ce hook n'a plus de rotation à faire.
 MEMORY_DIR="$PARENT" bash "$REINDEX" "--register=$REGISTER" --apply >/dev/null 2>&1 || true
-
-# Rotation des backups de reindex (un par --apply) : déclenché à chaque édition de registre,
-# on ne garde que les 3 plus récents par registre pour ne pas polluer .claude/memory/.
-ls -1t "$PARENT/$BASE".bak-reindex-* 2>/dev/null | tail -n +4 | while IFS= read -r old; do
-  rm -f "$old"
-done
 exit 0

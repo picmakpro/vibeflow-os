@@ -1,5 +1,12 @@
 # CHANGELOG — business-pilot-bundle
 
+## [v1.2.0] — 2026-07-16 (ADR-048 — orchestrateur métier)
+
+### Modifié
+- Doctrine d'orchestration réconciliée : les 3 agents produisent, un **orchestrateur métier** (`business-pilot`,
+  skill `metier-orchestration`) est posé d'office (≥2 spécialistes) pour planifier/déléguer/vérifier/réconcilier/
+  mettre à jour `.planning/`. Le `conductor` redevient strictement méta (plus « l'orchestration »).
+
 ## [v1.1.0] — 2026-07-05 (ADR-044)
 
 ### Corrigé
