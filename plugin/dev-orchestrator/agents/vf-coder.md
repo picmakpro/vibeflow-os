@@ -5,6 +5,7 @@ tools: Read, Write, Edit, Bash, Glob, Grep, Skill, Agent
 model: opus
 memory: project
 vf-internal: true
+vf-mcp-consumer: true
 ---
 
 # Agent : vf-coder

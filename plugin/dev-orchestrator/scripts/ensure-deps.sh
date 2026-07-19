@@ -177,6 +177,51 @@ ensure_superpowers() {
   return 0
 }
 
+# ---------- Patch MCP de gsd-executor (ADR-051) ----------
+# gsd-executor N'APPARTIENT PAS au plugin VibeFlow : il est fourni par GSD et posé dans
+# ~/.claude/agents/gsd-executor.md (ou ./.claude/agents en scope local). Son `tools:` ne liste,
+# côté MCP, que `mcp__context7__*` — donc, dispatché en sous-agent, il est aveugle au serveur MCP
+# du projet (XcodeBuildMCP, etc.). VibeFlow le PATCHE après l'install de GSD, dans le même esprit
+# que build-gsd-index.sh post-traite déjà GSD. Idempotent + best-effort + re-jouable : rejoué à
+# chaque run, il ré-affirme l'injection même après qu'une réinstall GSD a réécrit le fichier.
+patch_gsd_executor_mcp() {
+  local injector
+  injector="$(dirname "$0")/inject-mcp-tools.sh"
+  if [ ! -f "$injector" ]; then
+    log "gsd-executor : inject-mcp-tools.sh introuvable à côté de ce script — patch MCP sauté (best-effort)."
+    return 0
+  fi
+
+  # Chercher gsd-executor.md aux emplacements connus (global d'abord, puis local projet).
+  local candidates=("$HOME/.claude/agents/gsd-executor.md" "./.claude/agents/gsd-executor.md")
+  local found=""
+  local c
+  for c in "${candidates[@]}"; do
+    [ -f "$c" ] && found="$c" && break
+  done
+  if [ -z "$found" ]; then
+    log "gsd-executor.md introuvable (GSD pas encore posé ?) — patch MCP différé (best-effort)."
+    return 0
+  fi
+
+  # --force : gsd-executor ne porte pas le flag vf-mcp-consumer (fichier hors plugin). Source des
+  # serveurs = ./.mcp.json du lab. En dry-run ensure-deps, propager --dry-run (aucune écriture).
+  # (Pas de tableau d'args : incompatible bash 3.2/macOS sous set -u quand il est vide.)
+  local rc
+  if [ -n "$DRY_RUN" ]; then
+    bash "$injector" --target "$found" --mcp-json "./.mcp.json" --force --dry-run
+    rc=$?
+  else
+    bash "$injector" --target "$found" --mcp-json "./.mcp.json" --force
+    rc=$?
+  fi
+  if [ "$rc" -eq 0 ]; then
+    log "gsd-executor : serveurs MCP du lab injectés dans son tools: (ADR-051) → $found"
+  else
+    log "gsd-executor : injection MCP best-effort (voir inject-mcp-tools.sh)."
+  fi
+}
+
 # ---------- Garde-fou init (BOOT-04) ----------
 
 # Détecte un codebase dans le cwd (fichiers de code courants à la racine ou un niveau sous src/).
@@ -203,6 +248,8 @@ main() {
   log "Bootstrap dépendances (mode=$([ -n "$DRY_RUN" ] && echo dry-run || echo apply))"
   ensure_gsd
   ensure_superpowers
+  # ADR-051 : après l'install GSD, patcher le tools: de gsd-executor avec les serveurs MCP du lab.
+  patch_gsd_executor_mcp
   guard_init
 
   # Résumé final clair de l'état des deux piliers.

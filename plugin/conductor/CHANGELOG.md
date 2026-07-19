@@ -1,5 +1,16 @@
 # Changelog — conductor
 
+## [v1.11.1] — 2026-07-19 (ADR-051)
+
+### Ajouté
+- **`check-agents.sh`** : `vf-mcp-consumer` ajouté au set `KNOWN` des champs frontmatter reconnus —
+  le flag qui marque un agent exécutant recevant l'allowlist MCP dérivée du lab (ADR-051) n'est plus
+  signalé « champ inconnu ». Le sélecteur `vf-mcp-consumer` EST le point d'enforcement de l'injection
+  (data-driven, aucun nom d'agent en dur).
+- **`skills/vf-calibrate`** : étape « ré-affirmer l'allowlist MCP » — quand le `./.mcp.json` du lab
+  gagne/perd un serveur **sans** bump de module, re-jouer `inject-mcp-tools.sh` (agents flaggés +
+  `gsd-executor`). Rappel du redémarrage de session requis.
+
 ## [v1.11.0] — 2026-07-16 (ADR-048 — orchestrateur métier systématique)
 
 ### Ajouté

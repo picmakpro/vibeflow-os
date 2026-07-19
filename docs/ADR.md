@@ -17,6 +17,7 @@
 | ADR-048 | 2026-07-16 | Orchestrateur métier systématique (≥2 agents) + skill boucle de mission | Validée |
 | ADR-049 | 2026-07-16 | Backups mémoire isolés + rotation intégrée (anti-pollution registres) | Validée |
 | ADR-050 | 2026-07-16 | Hooks planning : lecture index-first au start + mise à jour bloquante au end | Validée |
+| ADR-051 | 2026-07-19 | Allowlist MCP des agents exécutants dérivée du lab (injection à l'install) | Validée |
 
 ---
 
@@ -300,3 +301,88 @@ charge progressive. Premier hook `Stop` du plugin.
 ### Rules Associées
 
 - Réutilise le pattern de blocage `PreToolUse`→`permissionDecision: deny` (ADR-043) transposé à `Stop`.
+
+---
+
+## ADR-051 : Allowlist MCP des agents exécutants dérivée du lab (injection à l'install)
+
+**Date** : 2026-07-19
+**Statut** : Validée
+**Décideur** : Samuel (brief de correction + choix « A+B complet » verrouillé en session)
+**Contexte** : release v2.26.0 — dev-orchestrator v1.6.0, mobile-test-team v1.2.0, conductor v1.11.1
+
+### Problème
+
+Un sous-agent dispatché via l'outil `Task` **n'hérite pas** des serveurs MCP de la session : côté
+MCP, il ne voit que ce que son `tools:` autorise explicitement. Les agents **exécutants** de VibeFlow
+(`vf-coder`, `vf-app-fixer`, `vf-test-runner`, `vf-test-orchestrator`) portent une allowlist `tools:`
+**fermée** sans entrée MCP. Conséquence : sur tout lab dont le projet s'appuie sur un serveur MCP
+(XcodeBuildMCP pour l'iOS natif, mais aussi mobile-mcp, une DB, un navigateur, un cloud), l'agent qui
+**compile/teste/corrige** ne voit pas l'outil `mcp__<serveur>__*`. Seule la fenêtre principale l'a —
+ce qui casse la délégation autonome (`vf-auto`, `vf-dev-manager`). Symptôme réel observé : un lab iOS
+Swift où `vf-coder` a rapporté à tort « XcodeBuildMCP absent, redémarrer Claude Code ».
+
+Le même mal touche `gsd-executor`, mais **il n'appartient pas au plugin** (fourni par GSD, posé dans
+`~/.claude/agents/`).
+
+### Contrainte technique décisive
+
+Le glob générique **`mcp__*` n'est PAS accepté dans `tools:`** (doc officielle Claude Code : il
+n'existe qu'en `disallowedTools`). Seule la forme **par-serveur** `mcp__<serveur>__*` est admise en
+allowlist (précédent : `mcp__context7__*`, déjà présent dans plusieurs agents GSD). Le correctif « une
+ligne wildcard » du brief initial est donc **impossible** : il faut nommer chaque serveur — sans pour
+autant clouer un serveur stack-spécifique (XcodeBuildMCP est Apple ; `dev-orchestrator` est
+multi-stack) dans un agent générique.
+
+### Options Considérées
+
+| Option | Avantages | Inconvénients |
+|--------|-----------|---------------|
+| Hardcoder `mcp__XcodeBuildMCP__*` dans les agents | Immédiat | Couple les agents génériques à Apple ; ne couvre pas les MCP métier ; contredit le multi-stack |
+| A seul — liste statique curatée de serveurs par défaut | Aucune logique d'install | Ne couvre pas un MCP custom non listé ; noms stack-spécifiques dans des agents génériques |
+| **A+B — défaut minimal + injection dérivée du lab (retenue)** | Vraiment générique (n'importe quel serveur déclaré) ; moindre privilège par lab ; zéro nom en dur | Logique d'install à écrire + un flag agent |
+
+### Décision
+
+1. **Sélecteur data-driven** : les agents exécutants portent `vf-mcp-consumer: true` (analogue à
+   `mandatory:` / `vf-internal:`). Les agents de planif/revue/audit (`vf-dev-manager`, `vf-reviewer`,
+   `vf-auditer`) **restent inchangés** (moindre privilège — ils ne compilent jamais). Champ ajouté au
+   `KNOWN` de `check-agents.sh`.
+2. **Injecteur idempotent** `dev-orchestrator/scripts/inject-mcp-tools.sh` : lit les serveurs du
+   `./.mcp.json` du lab et injecte `mcp__<serveur>__*` dans le `tools:` des fichiers flaggés (ou d'un
+   fichier `--force` pour `gsd-executor`). Aucun nom de serveur ni d'agent en dur. Best-effort.
+3. **Câblage** : hook post-install dans `vibeflow-update.sh` (à chaque pose d'agents) ; patch
+   `gsd-executor` dans `ensure-deps.sh` après l'install GSD (re-jouable → auto-réparateur après une
+   réinstall GSD) ; ré-affirmation dans `/vf-calibrate` quand le `.mcp.json` évolue sans bump.
+
+### Conséquences
+
+**Positives** : la délégation autonome fonctionne sur tout lab à MCP (iOS, mobile, métier) ; moindre
+privilège réel (chaque lab n'obtient que ses serveurs déclarés) ; générique et sans dépendance Apple
+imposée ; enforcement machine cohérent avec la philosophie « scope-aware ».
+**Négatives** : le `tools:` est lu au **démarrage de session** → un **redémarrage de Claude Code** est
+requis après (ré)install pour que l'allowlist prenne (documenté dans les CHANGELOGs) ; la source est
+le `./.mcp.json` **projet** — un serveur configuré uniquement au niveau user n'est pas injecté (par
+conception : moindre privilège, alignement sur le brief).
+
+### Cloisonnement anti-triche (Pattern 12) — inchangé
+
+La séparation `Read/Write/Edit` entre `vf-test-runner` (écrit les tests) et `vf-app-fixer` (écrit le
+code) reste le garde-fou. On n'injecte que des serveurs de **build/test** déclarés par le lab, pas
+d'accès web/doc : `vf-app-fixer` conserve son interdiction ADR-045 (pas de context7/web ; escalade
+`doc-research-required`). Orthogonal, vérifié.
+
+### Code Impacté
+
+- `plugin/dev-orchestrator/scripts/inject-mcp-tools.sh` (nouveau) + `scripts/tests/test-inject-mcp-tools.sh` (nouveau, 10 cas)
+- `plugin/dev-orchestrator/agents/vf-coder.md` — flag `vf-mcp-consumer: true`
+- `plugin/mobile-test-team/agents/` — `vf-app-fixer.md`, `vf-test-runner.md`, `vf-test-orchestrator.md` — flag
+- `plugin/conductor/scripts/check-agents.sh` — `KNOWN += vf-mcp-consumer`
+- `plugin/_internal/vibeflow-update.sh` — `find_mcp_injector` + `inject_lab_mcp_into_agents` (hook post-install)
+- `plugin/dev-orchestrator/scripts/ensure-deps.sh` — `patch_gsd_executor_mcp` (post-install GSD)
+- `plugin/conductor/skills/vf-calibrate/SKILL.md` — étape de ré-affirmation MCP
+
+### Rules Associées
+
+- Aucune rule nouvelle. Gate machine existant : `check-agents.sh` (ADR-044) accepte le flag ; le
+  sélecteur `vf-mcp-consumer` EST le point d'enforcement (data-driven, aucun nom en dur).

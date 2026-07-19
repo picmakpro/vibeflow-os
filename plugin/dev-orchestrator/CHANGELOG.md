@@ -1,5 +1,27 @@
 # CHANGELOG — dev-orchestrator
 
+## [v1.6.0] — 2026-07-19 (ADR-051)
+
+Allowlist MCP des agents exécutants dérivée du lab — les sous-agents voient enfin les serveurs MCP
+du projet (XcodeBuildMCP, mobile-mcp, DB métier…).
+
+### Ajouté
+- **`scripts/inject-mcp-tools.sh`** : injecteur idempotent. Lit les serveurs du `./.mcp.json` du lab
+  et injecte `mcp__<serveur>__*` dans le `tools:` des agents flaggés `vf-mcp-consumer: true` (ou d'un
+  fichier `--force`). Aucun nom de serveur ni d'agent en dur ; best-effort (python3/`.mcp.json`
+  absents → no-op) ; `--dry-run`. Le glob `mcp__*` étant **refusé** en allowlist `tools:` (seul
+  `disallowedTools` l'accepte), l'injection par-serveur est la seule voie générique.
+- **`scripts/tests/test-inject-mcp-tools.sh`** : 10 cas (dossier, idempotence, `--force`, refus sans
+  flag, no-op sans `.mcp.json`, hérite-tout, `--servers`, tri déterministe) — tous verts.
+- **`agents/vf-coder.md`** : flag `vf-mcp-consumer: true` (exécutant : build/test).
+- **`scripts/ensure-deps.sh`** : `patch_gsd_executor_mcp` — après l'install GSD, injecte les serveurs
+  du lab dans `~/.claude/agents/gsd-executor.md` (`--force`, hors plugin). Re-jouable → auto-réparateur
+  après une réinstall GSD.
+
+### Note
+- Le `tools:` d'un agent est lu au **démarrage de session** : **redémarrer Claude Code** après
+  (ré)install pour que la nouvelle allowlist prenne effet.
+
 ## [v1.5.0] — 2026-07-09
 
 Équipe manager de mission (pattern Reviz généralisé — spec 2026-07-09, ADR-046).

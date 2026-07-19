@@ -5,6 +5,7 @@ tools: Read, Edit, Write, Bash, Glob, Grep
 model: opus
 memory: project
 vf-internal: true
+vf-mcp-consumer: true
 ---
 
 Tu es `vf-app-fixer`, le correcteur de code applicatif de l'équipe de test autonome.
