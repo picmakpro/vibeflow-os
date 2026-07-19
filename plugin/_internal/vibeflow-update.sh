@@ -242,7 +242,7 @@ generate_agent_command_for() {
   fi
 }
 
-# ---------- Injection MCP dérivée du lab (ADR-047) ----------
+# ---------- Injection MCP dérivée du lab (ADR-051) ----------
 # Un sous-agent (Task) n'hérite PAS des serveurs MCP de la session : il ne voit, côté MCP, que ce
 # que son `tools:` autorise (`mcp__<serveur>__*`). Les agents exécutants (flag vf-mcp-consumer:true)
 # doivent donc recevoir les serveurs que le LAB déclare dans son ./.mcp.json. Data-driven (aucun nom
@@ -265,7 +265,7 @@ inject_lab_mcp_into_agents() {
   # Source = ./.mcp.json du LAB (cwd projet), quel que soit le scope (les serveurs MCP du projet y
   # vivent, pas dans TARGET_ROOT). Absent → le script no-op de lui-même.
   if bash "$injector" --target "$TARGET_ROOT/agents" --mcp-json "./.mcp.json" >/dev/null 2>&1; then
-    log "  serveurs MCP du lab injectés dans les agents exécutants flaggés (vf-mcp-consumer, ADR-047)"
+    log "  serveurs MCP du lab injectés dans les agents exécutants flaggés (vf-mcp-consumer, ADR-051)"
   else
     log "  (injection MCP best-effort — voir inject-mcp-tools.sh)"
   fi
@@ -538,7 +538,7 @@ install_module() {
     generate_agent_command_for "$mod"
   fi
 
-  # Injection MCP dérivée du lab (ADR-047) : si ce module a posé des agents, injecter dans les
+  # Injection MCP dérivée du lab (ADR-051) : si ce module a posé des agents, injecter dans les
   # exécutants flaggés (vf-mcp-consumer) les serveurs MCP que le lab déclare dans ./.mcp.json.
   # Le balayage est filtré par le flag → les agents planif/revue/audit restent inchangés.
   if [ -f "$module_dir/AGENT.md" ] || [ -d "$module_dir/agents" ]; then

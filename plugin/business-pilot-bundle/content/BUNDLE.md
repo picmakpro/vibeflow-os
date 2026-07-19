@@ -66,8 +66,10 @@ Chacun s'instancie en agent natif **≤ 250 lignes** (ADR-029) ; le savoir est *
 - Le **commercial** ne facture jamais → transmet au **finance**.
 - Le **delivery** ne négocie/ne code jamais → escalade upsell au **commercial**.
 - Le **finance** ne négocie jamais → alerte, n'engage pas.
-- **Aucun** des trois n'orchestre : l'orchestration est au **conductor** (P3 — l'orchestrateur ne
-  produit jamais ; ici les agents produisent et n'orchestrent jamais).
+- **Aucun** des trois n'orchestre : ils **produisent** dans leur domaine. Comme le lab a ≥2 spécialistes,
+  `vf-new-lab` pose **en plus un orchestrateur métier** (`business-pilot`, skill `metier-orchestration`,
+  ADR-048) qui planifie/délègue/fait vérifier/réconcilie/met à jour le planning — **sans jamais produire**
+  (P3). Le `conductor` reste **méta** (config/audit/migration + escalades C4), il ne fait pas ce travail métier.
 
 ## 6. Modules recommandés
 
@@ -77,10 +79,12 @@ Chacun s'instancie en agent natif **≤ 250 lignes** (ADR-029) ; le savoir est *
 | `consolidator` | Tenir la mémoire propre (index/archive/fusion/promotion D-NN → DEC). |
 | `audit-architecture` | **Filet P8** : verdict bloquant sur les générateurs brief→output (pricing, propositions, prévisions). |
 | `validator` | Agent `vibeflow-validator` — audit de cohérence lab ↔ doctrine. |
-| `conductor` | **Orchestration** + réception des escalades (déjà présent : c'est lui qui exécute `vf-new-lab`). |
+| `conductor` | **Méta** : config/audit/migration + réception des escalades C4 (déjà présent : c'est lui qui exécute `vf-new-lab`). **PAS** l'orchestration métier quotidienne. |
+| orchestrateur métier `business-pilot` | **Orchestration métier** (posé d'office car ≥2 spécialistes, ADR-048) : pilote les missions, délègue aux 3 agents, fait vérifier, met à jour `.planning/`. |
 
 > **PAS** `dev-orchestrator` (le métier n'est pas le code). **Ne pas créer** d'agent strategist ni
-> d'agent auditor : l'arbitrage est au `conductor`, l'audit au `validator` + `audit-architecture`.
+> d'agent auditor séparés : l'arbitrage métier est à l'**orchestrateur métier** (`business-pilot`),
+> l'arbitrage de **structure** au `conductor`, l'audit au `validator` + `audit-architecture`.
 
 ## 7. Châssis doctrine ré-embarqué (référencé, non dupliqué)
 

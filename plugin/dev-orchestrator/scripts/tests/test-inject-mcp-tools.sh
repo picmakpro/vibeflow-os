@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# test-inject-mcp-tools.sh — Suite de vérification de inject-mcp-tools.sh (ADR-047).
+# test-inject-mcp-tools.sh — Suite de vérification de inject-mcp-tools.sh (ADR-051).
 #
 # Couvre :
 #   T1 — Mode dossier : injecte dans l'agent flaggé vf-mcp-consumer, laisse les autres INTACTS.
@@ -186,5 +186,5 @@ fi
 echo ""
 echo "  Bilan : $pass OK, $fail KO"
 [ "$fail" -eq 0 ] || exit 1
-echo "  ✓ inject-mcp-tools.sh conforme (ADR-047)"
+echo "  ✓ inject-mcp-tools.sh conforme (ADR-051)"
 exit 0

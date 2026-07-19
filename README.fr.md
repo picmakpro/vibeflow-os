@@ -8,7 +8,7 @@
 
 Dis _« aide-moi à dev cette feature »_ — et tout le pipeline se déclenche : cadrage → plan → exécution → tests → livraison. Sans jamais taper une commande technique ni savoir ce qui tourne en coulisse.
 
-[![Version](https://img.shields.io/badge/version-2.24.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.26.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-16-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -189,7 +189,9 @@ Le routage repose sur un **index factuel auto-généré** depuis le frontmatter 
 | `v2.21.0` | 2026-07-08 | + **design-orchestrator** v1.0.0 : agent routeur `vibeflow-design` + verbe `/vf-design` (langage naturel design → workflow), **générique multi-stack** (web/mobile/desktop), chaîne d'outils design pilotée en coulisse avec dégradation gracieuse ; `dev-orchestrator` **v1.3.0** route les phases de design vers `/vf-design` et installe `design-orchestrator` d'office (`requires`) |
 | `v2.22.0` | 2026-07-08 | **Recherche-doc avant debug (ADR-045)** : phase de recherche documentaire obligatoire (context7 + issues GitHub / release notes) **avant** tout debug empirique intensif, dès qu'un bug touche une lib/framework/natif/version d'OS-SDK ou qu'un correctif a déjà échoué. Nouvelle règle canonique path-scopée `doc-research-before-debug` (`software-architecture` **v1.4.0**), **référencée** (non dupliquée) par `vf-debug` (pré-étape) + le routage `vibeflow-dev` + 6ᵉ garde-fou autonome avec `maxResearchRoundsPerFlow` (`dev-orchestrator` **v1.4.0**), la boucle de test mobile (gate `vf-test-orchestrator` + remontée `doc-research-required` de `vf-app-fixer`, `mobile-test-team` **v1.1.0**), et la Phase 0 du template `debugger` (`reference` **v2.4.0**) ; nouveau contrôle machine `check-debug-research.sh` branché en Phase 2 du validator (`conductor` **v1.9.0**, `validator` **v1.2.0**) |
 | `v2.23.0` | 2026-07-09 | Équipe manager de mission (ADR-046) : vf-dev-manager + workers spécialisés (arborescence à contexte minimal), détection de mission par le router, bascule taille de vf-auto (dev-orchestrator v1.5.0) |
-| `v2.24.0` | 2026-07-19 | Allowlist MCP des agents exécutants dérivée du lab (ADR-047) : les sous-agents voient enfin les serveurs MCP du projet (XcodeBuildMCP, mobile-mcp, DB métier…) via le flag `vf-mcp-consumer` + injection idempotente à l'install depuis `.mcp.json` ; `gsd-executor` patché après l'install GSD (dev-orchestrator v1.6.0, mobile-test-team v1.2.0, conductor v1.9.1) |
+| `v2.24.0` | 2026-07-11 | skill-creator ajouté à la baseline d'install du conductor (ADR-047) : le canal unique de création de skills est désormais posé d'office via la fermeture transitive du conductor — corrige le fan-out de `vf-new-lab` vers un sous-agent jamais installé (conductor v1.10.0) |
+| `v2.25.0` | 2026-07-16 | Orchestrateur métier systématique + durcissement gouvernance (ADR-048/049/050) : `vf-new-lab` pose un orchestrateur métier dès ≥2 agents métier + skill de boucle de mission ; backups mémoire isolés avec rotation intégrée ; hooks planning (lecture index-first au start, mise à jour bloquante au end) (conductor v1.11.0) |
+| `v2.26.0` | 2026-07-19 | Allowlist MCP des agents exécutants dérivée du lab (ADR-051) : les sous-agents voient enfin les serveurs MCP du projet (XcodeBuildMCP, mobile-mcp, DB métier…) via le flag `vf-mcp-consumer` + injection idempotente à l'install depuis `.mcp.json` ; `gsd-executor` patché après l'install GSD (dev-orchestrator v1.6.0, mobile-test-team v1.2.0, conductor v1.11.1) |
 
 </details>
 

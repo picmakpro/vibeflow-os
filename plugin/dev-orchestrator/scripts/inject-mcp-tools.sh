@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # inject-mcp-tools.sh — Injecte les serveurs MCP déclarés par le lab dans le `tools:` des agents
-#                        exécutants (ADR-047).
+#                        exécutants (ADR-051).
 #
 # Problème résolu : un sous-agent (Task) n'hérite PAS des serveurs MCP de la session. Il ne voit,
 # côté MCP, que ce que son `tools:` autorise explicitement (`mcp__<serveur>__*`). Les agents
@@ -35,7 +35,7 @@
 # Appelé par : vibeflow-update.sh (hook post-install, agents flaggés) · ensure-deps.sh (gsd-executor,
 #              --force post-install GSD) · /vf-calibrate (re-injection sur évolution du .mcp.json).
 #
-# Référence : ADR-047 (allowlist MCP dérivée du lab), Pattern 12 (cloisonnement inchangé : on
+# Référence : ADR-051 (allowlist MCP dérivée du lab), Pattern 12 (cloisonnement inchangé : on
 #             n'injecte que des serveurs de build/test, pas d'accès web/doc).
 
 set -uo pipefail

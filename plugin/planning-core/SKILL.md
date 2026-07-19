@@ -114,8 +114,15 @@ Deux topologies. **Ne pas plaquer la mauvaise.**
 - À la livraison d'un jalon : archiver dans `MILESTONES.md` + `milestones/`.
 - Promouvoir les décisions structurantes de `PROJECT.md` vers la mémoire (pont).
 
-> L'**automatisation** de cette maintenance (hook SessionEnd, mise à jour auto de STATE) est un
-> incrément ultérieur (« moteur »). Ce module v1 pose la **structure** et la **discipline manuelle**.
+> **Automatisation livrée (v2.2.0, ADR-050)** — la maintenance n'est plus seulement une discipline
+> manuelle, elle est machine-enforced par 3 hooks :
+> - **SessionStart** : `planning-context.sh` injecte un **digest index-first** (INDEX du lab, ou STATE
+>   borné en mono) + `detect-planning-debt.sh` surface le 8e signal de dette.
+> - **UserPromptSubmit** : `planning-task-context.sh` injecte le `STATE.md` **du compartiment que vise la
+>   tâche** (jamais tous — structuration du contexte).
+> - **Stop** : `guard-planning-updated.sh` **bloque** la fin de session si des livrables ont changé sans
+>   mise à jour du planning (dette) — avec anti-boucle, échappatoire `.session-noop`, toggle
+>   `VF_PLANNING_STOP=block|warn|off`.
 
 ---
 

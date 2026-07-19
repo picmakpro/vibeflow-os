@@ -60,7 +60,7 @@ single = os.environ[\"VF_SINGLE\"]
 
 # Champs officiels Claude Code (docs sub-agents, 2026-07-05) — base du lint.
 # + conventions VibeFlow : vf-internal (worker interne — pas de commande d'incarnation, cf. Pattern 12) ;
-#   vf-mcp-consumer (agent exécutant recevant l'allowlist MCP dérivée du lab à l'install, ADR-047).
+#   vf-mcp-consumer (agent exécutant recevant l'allowlist MCP dérivée du lab à l'install, ADR-051).
 KNOWN = {\"name\", \"description\", \"tools\", \"disallowedTools\", \"model\", \"permissionMode\",
          \"maxTurns\", \"skills\", \"mcpServers\", \"hooks\", \"memory\", \"background\", \"effort\",
          \"isolation\", \"color\", \"initialPrompt\", \"vf-internal\", \"vf-mcp-consumer\"}

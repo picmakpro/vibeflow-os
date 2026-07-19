@@ -1,6 +1,6 @@
 # CHANGELOG — dev-orchestrator
 
-## [v1.6.0] — 2026-07-19 (ADR-047)
+## [v1.6.0] — 2026-07-19 (ADR-051)
 
 Allowlist MCP des agents exécutants dérivée du lab — les sous-agents voient enfin les serveurs MCP
 du projet (XcodeBuildMCP, mobile-mcp, DB métier…).

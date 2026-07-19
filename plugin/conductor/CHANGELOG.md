@@ -1,15 +1,45 @@
 # Changelog — conductor
 
-## [v1.9.1] — 2026-07-19 (ADR-047)
+## [v1.11.1] — 2026-07-19 (ADR-051)
 
 ### Ajouté
 - **`check-agents.sh`** : `vf-mcp-consumer` ajouté au set `KNOWN` des champs frontmatter reconnus —
-  le flag qui marque un agent exécutant recevant l'allowlist MCP dérivée du lab (ADR-047) n'est plus
+  le flag qui marque un agent exécutant recevant l'allowlist MCP dérivée du lab (ADR-051) n'est plus
   signalé « champ inconnu ». Le sélecteur `vf-mcp-consumer` EST le point d'enforcement de l'injection
   (data-driven, aucun nom d'agent en dur).
 - **`skills/vf-calibrate`** : étape « ré-affirmer l'allowlist MCP » — quand le `./.mcp.json` du lab
   gagne/perd un serveur **sans** bump de module, re-jouer `inject-mcp-tools.sh` (agents flaggés +
   `gsd-executor`). Rappel du redémarrage de session requis.
+
+## [v1.11.0] — 2026-07-16 (ADR-048 — orchestrateur métier systématique)
+
+### Ajouté
+- `vf-new-lab` Phase 7 **point 5bis** : dès **≥2 agents métier**, pose d'office un **orchestrateur métier**
+  (copie verbatim du skill `metier-orchestration` + instanciation de `orchestrator-template.md` parametré
+  au métier). Seuil < 2 → pas d'orchestrateur ; métier = code → rôle tenu par `dev-orchestrator` (pas de doublon).
+- `references/bootstrap-method.md` : règle de dérivation « ≥2 agents → orchestrateur métier » + exemple mis à jour.
+
+### Corrigé
+- Renvoi circulaire : les bundles pointaient « l'orchestration » vers le conductor, qui ne fait pas le travail
+  métier. L'orchestration métier est désormais portée par l'orchestrateur métier posé ; le conductor reste méta.
+
+## [v1.10.0] — 2026-07-11 (ADR-047 — skill-creator dans la baseline)
+
+### Ajouté
+- `module.json` : **`skill-creator` ajouté aux `requires`**. C'est l'outil que `vf-new-lab` invoque
+  en Phase 5 (fan-out `subagent_type: skill-creator`) et que le Gate C exige pour créer un skill
+  manquant. Il est le **canal unique de création de skills** (« Sole authorized channel for skill
+  creation ») — donc une **dépendance dure** du conductor, au même titre que `validator`. Comme le
+  conductor est `mandatory`, `skill-creator` est désormais **posé d'office à chaque install** (sa
+  fermeture transitive est tirée par `--with-deps`), avant toute création de lab.
+
+### Corrigé
+- Régression silencieuse : `vf-new-lab` fanned out vers un `subagent_type: skill-creator` **jamais
+  installé** (absent de `requires` ET de la liste « Typiquement » de la Phase 7). Les skills du lab
+  étaient donc soit non fabriqués, soit rédigés à la main hors pipeline (perte de l'eval/qualité).
+- `vf-new-lab` Phase 7 (point 2) : `skill-creator` ajouté à la liste des modules typiques + garde-fou
+  explicite « jamais rédiger un skill à la main — canal unique skill-creator, même pour une procédure
+  interne ». `installer/SKILL.md` : récap d'exemple de la fermeture du conductor mis à jour.
 
 ## [v1.9.0] — 2026-07-08 (ADR-045)
 

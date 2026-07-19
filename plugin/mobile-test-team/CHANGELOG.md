@@ -1,6 +1,6 @@
 # Changelog — mobile-test-team
 
-## v1.2.0 — 2026-07-19 (ADR-047)
+## v1.2.0 — 2026-07-19 (ADR-051)
 
 ### Ajouté
 - **Allowlist MCP dérivée du lab** sur les 3 agents de la boucle : `vf-test-orchestrator`,

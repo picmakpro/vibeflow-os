@@ -1,11 +1,27 @@
 {
-  "description": "État du socle planning injecté au démarrage de session (advisory, jamais bloquant) — ADR-040 + ADR-043.",
+  "description": "Planning machine-enforced (ADR-040 + ADR-043 + ADR-050) : au démarrage, fraîcheur + digest index-first injecté + 8e signal de dette ; à la tâche, STATE du compartiment ciblé ; en fin de session, garde-fou bloquant si le planning n'est pas à jour.",
   "hooks": {
     "SessionStart": [
       {
         "matcher": "startup",
         "hooks": [
-          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-planning-state.sh || true" }
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-planning-state.sh || true" },
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/planning-context.sh || true" },
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/detect-planning-debt.sh || true" }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/planning-task-context.sh || true" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/guard-planning-updated.sh" }
         ]
       }
     ]

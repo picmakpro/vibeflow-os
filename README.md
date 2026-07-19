@@ -8,7 +8,7 @@
 
 Say _"help me build this feature"_ — and the whole pipeline kicks off: scoping → plan → execution → tests → delivery. Without ever typing a technical command or knowing what runs under the hood.
 
-[![Version](https://img.shields.io/badge/version-2.24.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.26.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-16-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -189,7 +189,9 @@ Routing relies on a **factual index auto-generated** from the frontmatter of the
 | `v2.21.0` | 2026-07-08 | + **design-orchestrator** v1.0.0: router agent `vibeflow-design` + `/vf-design` verb (plain-language design intent → workflow), **stack-agnostic** (web/mobile/desktop), design toolchain piloted behind the scenes with graceful degradation; `dev-orchestrator` **v1.3.0** routes design phases to `/vf-design` and installs `design-orchestrator` by default (`requires`) |
 | `v2.22.0` | 2026-07-08 | **Doc-research-before-debug (ADR-045)**: mandatory documentary-research phase (context7 + GitHub issues / release notes) **before** intensive empirical debug, whenever a bug touches a lib/framework/native/OS-SDK version or a fix already failed. New canonical path-scoped rule `doc-research-before-debug` (`software-architecture` **v1.4.0**), referenced — not duplicated — by `vf-debug` (pre-step) + `vibeflow-dev` routing + 6th autonomous guardrail with `maxResearchRoundsPerFlow` (`dev-orchestrator` **v1.4.0**), the mobile test loop (`vf-test-orchestrator` gate + `vf-app-fixer` `doc-research-required` escalation, `mobile-test-team` **v1.1.0**), and the `debugger` template Phase 0 (`reference` **v2.4.0**); new machine check `check-debug-research.sh` wired into validator Phase 2 (`conductor` **v1.9.0**, `validator` **v1.2.0**) |
 | `v2.23.0` | 2026-07-09 | Mission manager team (ADR-046): vf-dev-manager + specialized workers (minimal-context tree), mission detection in the router, size-based vf-auto dispatch (dev-orchestrator v1.5.0) |
-| `v2.24.0` | 2026-07-19 | Lab-derived MCP allowlist for executing agents (ADR-047): subagents now see the project's MCP servers (XcodeBuildMCP, mobile-mcp, business DB…) via `vf-mcp-consumer` flag + idempotent install-time injection from `.mcp.json`; `gsd-executor` patched post-GSD-install (dev-orchestrator v1.6.0, mobile-test-team v1.2.0, conductor v1.9.1) |
+| `v2.24.0` | 2026-07-11 | skill-creator added to the conductor install baseline (ADR-047): the sole authorized skill-creation channel is now installed by default via the conductor's transitive closure — fixes `vf-new-lab`'s fan-out to a never-installed subagent (conductor v1.10.0) |
+| `v2.25.0` | 2026-07-16 | Systematic domain orchestrator + governance hardening (ADR-048/049/050): `vf-new-lab` lays down a domain orchestrator from ≥2 domain agents + mission-loop skill; isolated memory backups with integrated rotation; planning hooks (index-first read at start, blocking update at end) (conductor v1.11.0) |
+| `v2.26.0` | 2026-07-19 | Lab-derived MCP allowlist for executing agents (ADR-051): subagents now see the project's MCP servers (XcodeBuildMCP, mobile-mcp, business DB…) via the `vf-mcp-consumer` flag + idempotent install-time injection from `.mcp.json`; `gsd-executor` patched post-GSD-install (dev-orchestrator v1.6.0, mobile-test-team v1.2.0, conductor v1.11.1) |
 
 </details>
 

@@ -65,7 +65,7 @@ Pour les changements **structure/doctrine**, produire un plan explicite :
 
 1. **Snapshot avant** (le lab est sauvegardé).
 2. Rafraîchir les modules : `vibeflow-update.sh update <module>` (manuel, par module).
-3. **Ré-affirmer l'allowlist MCP des agents exécutants** (ADR-047) : si le lab a gagné (ou perdu)
+3. **Ré-affirmer l'allowlist MCP des agents exécutants** (ADR-051) : si le lab a gagné (ou perdu)
    un serveur MCP dans son `./.mcp.json` **sans** bump de module (l'`update` ne re-copie pas les
    agents à version inchangée), re-jouer l'injection idempotente sur les agents flaggés
    `vf-mcp-consumer` :

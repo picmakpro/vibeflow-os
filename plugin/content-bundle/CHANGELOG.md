@@ -1,5 +1,11 @@
 # CHANGELOG — content-bundle
 
+## [v1.1.0] — 2026-07-16 (ADR-048 — orchestrateur métier)
+
+### Modifié
+- Doctrine d'orchestration réconciliée : un **orchestrateur métier** (`chef-editorial`, skill
+  `metier-orchestration`) est posé d'office (≥2 spécialistes) ; le `conductor` redevient strictement méta.
+
 ## [v1.0.1] — 2026-07-05 (ADR-044)
 
 ### Corrigé

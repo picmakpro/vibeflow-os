@@ -153,7 +153,9 @@ Dériver puis poser (déléguer, ne pas réinventer) :
    `CLAUDE.md` mappe ensuite la doc transverse → `@docs/_transverse/` et **chaque compartiment →
    `@docs/<projet>/`**. Détail : `references/doc-externalization.md`.
 2. **Modules** — `vibeflow-install` (résoudre deps : `resolve-deps.sh`). Typiquement `planning-core` +
-   `consolidator` + `audit-architecture` + `validator`. **Pas `dev-orchestrator`** sauf métier = code.
+   `consolidator` + `audit-architecture` + `validator` + **`skill-creator`** (canal unique de création
+   de skills — posé d'office car dépendance du conductor `mandatory`, donc disponible dès la Phase 5).
+   **Pas `dev-orchestrator`** sauf métier = code.
 3. **Socle planning** — `vf-planning`. **Lab à compartiments** : `.planning/` du lab en *steering +
    `INDEX.md`* (jamais de ROADMAP global) ; un socle par compartiment **qualifié** (seuil d'autonomie),
    typé `deliverable` (roadmap+phases) ou `continuous` (`BOARD.md` + cadence). Sous le seuil / infra →
@@ -189,6 +191,27 @@ Dériver puis poser (déléguer, ne pas réinventer) :
    format de retour standard (`**Statut** : FAIT|PARTIEL|BLOQUÉ · **Livrable** · **Décisions (DEC-XXX)**
    · **Reste/risques**) et le pont d'escalade C4 (`@.claude/agents/conductor-references/contracts.md`)
    — Claude Code n'a aucun contrat natif agent↔sous-agent, cette convention est la seule couche.
+5bis. **Orchestrateur métier (ADR-048) — posé d'office dès ≥2 agents métier.** Un lab à ≥2 spécialistes a
+   besoin d'un **chef d'orchestre métier** : sinon la coordination (qui fait quoi, dans quel ordre, qui
+   vérifie et réconcilie) n'est portée par personne — le `conductor` est **méta** et ne fait PAS le travail
+   métier. On pose donc, distinct du conductor :
+   - **Le skill (générique, verbatim)** : copier
+     `${CLAUDE_PLUGIN_ROOT}/reference/content/methodology/templates/skills/metier-orchestration/`
+     (SKILL.md + `references/`) dans `.claude/skills/metier-orchestration/`. Il encode la **boucle de
+     mission** (contexte → cartographie → clarification → planification → délégation → vérification
+     adversariale → navette bornée → capitalisation + mise à jour `.planning/`). ≤200L → **préchargeable**.
+   - **L'agent (parametré au métier)** : instancier
+     `${CLAUDE_PLUGIN_ROOT}/reference/content/methodology/templates/agents/orchestrator-template.md` →
+     `.claude/agents/<orchestrateur-metier>.md`, en remplaçant `[orchestrateur-metier]` (nom kebab marié au
+     métier), `[METIER]`, `[SPÉCIALISTES]` (les agents posés au point 5) et `[GATES MÉTIER]` (section
+     « Gates métier & EVALS » du brief). Frontmatter canonique ADR-044, `skills: [metier-orchestration]`
+     préchargé (+ un éventuel skill de savoir métier ≤200L).
+   - **Câblage** : les agents spécialistes deviennent ses **délégués** (mandat écrit via `Task`) ;
+     l'orchestrateur devient le **point d'entrée** des missions métier. Sa Phase 0 lit le `.planning/`
+     (index-first) et sa Phase 7 le met à jour → cohérent avec les hooks planning-core (Patch C).
+   > **Seuil** : **< 2 agents métier** (lab mono-agent) → pas d'orchestrateur (surcoût inutile, l'unique
+   > agent est l'exécutant). **Métier = code** → ce rôle est déjà tenu par `dev-orchestrator` (ADR-046) :
+   > **ne pas doubler**. L'orchestrateur métier respecte P3 (ne produit jamais) et ADR-029 (≤250L).
 6. **Garde-fous** — `vibeflow-validator` + `audit-architecture` (auditeurs toujours présents).
 7. **Commandes d'incarnation (ADR-042)** — balayer **tous** les agents posés :
    `VF_TARGET_ROOT=<.claude> conductor/scripts/generate-agent-commands.sh`. Génère une `/agent` par
@@ -225,6 +248,9 @@ registres, auditeurs, comment les actionner). Lister la **dette** éventuelle (c
 ## Garde-fous
 
 - **Jamais dériver/fabriquer avec un marqueur `[À CLARIFIER]` ouvert** (Gate A puis Gate B).
+- **Jamais rédiger un skill à la main** : toute création OU mise à jour de skill — y compris une
+  procédure interne ou un skill « sur-mesure » — passe par `skill-creator` (canal unique : recherche →
+  draft → eval → itère). Le pipeline vaut même sur des données de procédures qu'on a déjà en interne.
 - **Jamais fabriquer une capacité injustifiée** ni dépasser le plafond du profil (anti-slop).
 - **Jamais présumer dev** ; extension & vocabulaire viennent du brief réel.
 - **Jamais un `.planning/` par compartiment systématique** ; jamais de ROADMAP global de lab.

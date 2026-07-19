@@ -1,5 +1,23 @@
 # Changelog — planning-core
 
+## [v2.2.0] — 2026-07-16 (ADR-050 — hooks planning : lecture au start + maj bloquante au end)
+
+### Ajouté
+- `planning-context.sh` (**SessionStart**) : injecte un **digest index-first** — lab à compartiments →
+  `INDEX.md` (+ directive « lis le STATE du compartiment ciblé ») ; lab mono → `STATE.md` borné. Comble
+  le gap : `check-planning-state.sh` ne faisait que signaler la fraîcheur, sans injecter de contexte.
+- `planning-task-context.sh` (**UserPromptSubmit**) : une fois la tâche connue, injecte le `STATE.md`
+  **du compartiment que la tâche vise** (borné) — jamais tous les compartiments (anti-saturation).
+- `guard-planning-updated.sh` (**Stop, BLOQUANT**) : bloque la fin de session (exit 2) si des livrables
+  ont changé sans mise à jour du `.planning/`. Garde-fous anti-piège : anti-boucle (`stop_hook_active`),
+  échappatoire `.planning/.session-noop` (one-shot), toggle `VF_PLANNING_STOP=block|warn|off`, fail-open
+  hors git / sans `.planning/`. Premier hook `Stop` du plugin.
+- `hooks/hooks.json` : SessionStart enrichi (+ `detect-planning-debt.sh`, 8e signal désormais surfacé
+  automatiquement) + UserPromptSubmit + Stop.
+
+### Tests
+- `test-planning-hooks.sh` (20 : Stop 9 scénarios + injection contexte 8 + task-context 3).
+
 ## [v2.1.0] — 2026-07-04 (ADR-043)
 
 ### Ajouté

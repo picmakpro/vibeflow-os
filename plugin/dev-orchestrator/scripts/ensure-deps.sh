@@ -177,7 +177,7 @@ ensure_superpowers() {
   return 0
 }
 
-# ---------- Patch MCP de gsd-executor (ADR-047) ----------
+# ---------- Patch MCP de gsd-executor (ADR-051) ----------
 # gsd-executor N'APPARTIENT PAS au plugin VibeFlow : il est fourni par GSD et posé dans
 # ~/.claude/agents/gsd-executor.md (ou ./.claude/agents en scope local). Son `tools:` ne liste,
 # côté MCP, que `mcp__context7__*` — donc, dispatché en sous-agent, il est aveugle au serveur MCP
@@ -216,7 +216,7 @@ patch_gsd_executor_mcp() {
     rc=$?
   fi
   if [ "$rc" -eq 0 ]; then
-    log "gsd-executor : serveurs MCP du lab injectés dans son tools: (ADR-047) → $found"
+    log "gsd-executor : serveurs MCP du lab injectés dans son tools: (ADR-051) → $found"
   else
     log "gsd-executor : injection MCP best-effort (voir inject-mcp-tools.sh)."
   fi
@@ -248,7 +248,7 @@ main() {
   log "Bootstrap dépendances (mode=$([ -n "$DRY_RUN" ] && echo dry-run || echo apply))"
   ensure_gsd
   ensure_superpowers
-  # ADR-047 : après l'install GSD, patcher le tools: de gsd-executor avec les serveurs MCP du lab.
+  # ADR-051 : après l'install GSD, patcher le tools: de gsd-executor avec les serveurs MCP du lab.
   patch_gsd_executor_mcp
   guard_init
 
