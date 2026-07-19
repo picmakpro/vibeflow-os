@@ -1,5 +1,23 @@
 # Changelog — mobile-test-team
 
+## v1.2.0 — 2026-07-19 (ADR-047)
+
+### Ajouté
+- **Allowlist MCP dérivée du lab** sur les 3 agents de la boucle : `vf-test-orchestrator`,
+  `vf-test-runner`, `vf-app-fixer` portent `vf-mcp-consumer: true`. À l'install (hook
+  `vibeflow-update.sh`) ou à `/vf-calibrate`, les serveurs MCP déclarés dans le `./.mcp.json` du lab
+  (ex. `mobile-mcp` pour le diagnostic visuel) sont injectés dans leur `tools:` — ces workers voyaient
+  jusqu'ici une allowlist fermée et étaient aveugles au MCP du projet. Mécanique dans dev-orchestrator
+  v1.6.0 (`inject-mcp-tools.sh`), aucun serveur en dur.
+
+### Inchangé (vérifié)
+- **Cloisonnement anti-triche (Pattern 12)** intact : la séparation `Read/Write/Edit` entre
+  `vf-test-runner` (tests) et `vf-app-fixer` (code) reste le garde-fou ; on n'injecte que des serveurs
+  de build/test, pas d'accès web/doc — `vf-app-fixer` garde son interdiction ADR-045 (pas de context7).
+
+### Note
+- Le `tools:` étant lu au démarrage de session, **redémarrer Claude Code** après (ré)install.
+
 ## v1.1.0 — 2026-07-08 (ADR-045)
 
 ### Ajouté

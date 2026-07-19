@@ -65,10 +65,21 @@ Pour les changements **structure/doctrine**, produire un plan explicite :
 
 1. **Snapshot avant** (le lab est sauvegardé).
 2. Rafraîchir les modules : `vibeflow-update.sh update <module>` (manuel, par module).
-3. Appliquer la migration structurelle validée (déléguer au migrateur / `software-architecture`
+3. **Ré-affirmer l'allowlist MCP des agents exécutants** (ADR-047) : si le lab a gagné (ou perdu)
+   un serveur MCP dans son `./.mcp.json` **sans** bump de module (l'`update` ne re-copie pas les
+   agents à version inchangée), re-jouer l'injection idempotente sur les agents flaggés
+   `vf-mcp-consumer` :
+   ```sh
+   .claude/scripts/inject-mcp-tools.sh --target .claude/agents --mcp-json ./.mcp.json
+   ```
+   Et, si GSD est présent, ré-affirmer aussi `gsd-executor` (relancer `ensure-deps.sh` suffit — il
+   appelle le patch, ou directement `inject-mcp-tools.sh --target ~/.claude/agents/gsd-executor.md
+   --mcp-json ./.mcp.json --force`). **Redémarrage de Claude Code requis** ensuite : le `tools:` des
+   agents est lu au démarrage de session.
+4. Appliquer la migration structurelle validée (déléguer au migrateur / `software-architecture`
    `/restructure` si réorganisation de fichiers).
-4. **Re-stamper** la version framework : `framework-version.sh stamp`.
-5. **Re-auditer** : déléguer à `vibeflow-validator` (5 phases) pour confirmer l'alignement.
+5. **Re-stamper** la version framework : `framework-version.sh stamp`.
+6. **Re-auditer** : déléguer à `vibeflow-validator` (5 phases) pour confirmer l'alignement.
 
 ### 5. Synthèse
 

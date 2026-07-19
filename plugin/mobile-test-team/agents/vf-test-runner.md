@@ -5,6 +5,7 @@ tools: Read, Edit, Write, Bash, Glob, Grep
 model: opus
 memory: project
 vf-internal: true
+vf-mcp-consumer: true
 ---
 
 Tu es `vf-test-runner`, l'agent test de l'équipe autonome. Tu possèdes les tests.
