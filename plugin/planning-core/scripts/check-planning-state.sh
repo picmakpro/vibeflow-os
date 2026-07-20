@@ -59,17 +59,24 @@ if [ ! -f "$STATE_FILE" ]; then
 fi
 
 # 3. Fraîcheur : lire last_updated dans le frontmatter YAML.
-last_updated=$(grep -m1 '^last_updated:' "$STATE_FILE" | sed -E 's/^last_updated:[[:space:]]*"?([0-9]{4}-[0-9]{2}-[0-9]{2}).*/\1/')
+# Extraction par grep -oE (tolère les dates non paddées type 2026-7-5) : l'ancien sed
+# laissait passer la LIGNE ENTIÈRE quand la date ne matchait pas → message d'erreur confus
+# (« Impossible de parser last_updated='last_updated: 2026-7-5' »).
+raw_date=$(grep -m1 '^last_updated:' "$STATE_FILE" | grep -oE '[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}' | head -1)
 
-if [ -z "$last_updated" ]; then
+if [ -z "$raw_date" ]; then
   say "STATE.md présent mais sans 'last_updated' lisible (YYYY-MM-DD). Ajouter le champ au frontmatter."
   exit 1
 fi
 
+# Normaliser en YYYY-MM-DD (zéro-padding mois/jour) — 10# force la base 10 (piège octal de 08/09).
+y=${raw_date%%-*}; md=${raw_date#*-}; m=${md%%-*}; d=${md#*-}
+last_updated=$(printf '%04d-%02d-%02d' "$((10#$y))" "$((10#$m))" "$((10#$d))")
+
 ep_then=$(date_to_epoch "$last_updated")
 ep_now=$(today_epoch)
 if [ -z "$ep_then" ]; then
-  say "Impossible de parser last_updated='$last_updated'. Vérifier le format YYYY-MM-DD."
+  say "Impossible de parser last_updated='$last_updated' (valeur extraite : '$raw_date'). Vérifier le format YYYY-MM-DD."
   exit 1
 fi
 

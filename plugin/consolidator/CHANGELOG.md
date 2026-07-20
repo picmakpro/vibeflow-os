@@ -1,5 +1,49 @@
 # CHANGELOG — consolidator
 
+## [v1.5.0] — 2026-07-20 (audit robustesse hooks — 16 findings corrigés, 2 pertes de données évitées)
+
+### Corrigé — intégrité des données
+- **`reindex.sh` : perte de body silencieuse** (CSL-01) — un registre avec `## Index` sans `---` de
+  fermeture voyait tout son body détruit par `--apply` (déclenché automatiquement par le hook
+  PostToolUse, backups rotationnés en 3 éditions → perte définitive). Pré-garde fail-open : sans
+  terminateur, la réécriture est ANNULÉE + check C1bis dans check-registres.
+- **`archive.sh` : doublons systématiques** (CSL-02) — chaque SessionEnd ré-appendait les mêmes
+  entrées dans `archive/` (1→2→3 démontrés). Garde d'idempotence par ID avant append.
+- **`reindex.sh` : `#Ligne` faux après chaque append** (CSL-08) — les positions étaient extraites
+  avant réécriture ; l'insertion décalait le body → tout l'édifice index-first pointait à côté.
+  2e passe de recalage convergente ; test : chaque `#Ligne` == position `grep -n` réelle.
+- **`reindex.sh` : lost update en concurrence** (CSL-09) — 2 sessions simultanées → un body
+  définitivement perdu (démontré). Verrou `mkdir` atomique (stale 60s), skip silencieux si occupé.
+
+### Corrigé — faux positifs des guards (lecture/écriture registres)
+- `guard-bash-registres.sh` : `grep -n 'open' <registre>` et tout motif valant un lecteur (cat,
+  view…) était DENY (CSL-04) → matching en position de commande uniquement ; le contenu des
+  heredocs n'est plus analysé (documenter la règle ne la déclenche plus, CSL-05) ; cible
+  d'écriture quotée `>> "<registre>"` n'est plus bloquée (CSL-06).
+- `post-edit-reindex.sh` : symétrique — l'écriture quotée déclenche bien le reindex désormais
+  (CSL-07) ; filtre parent corrigé (`*.claude/memory` ne matche plus `my.claude/memory`, CSL-12).
+- `guard-read-registres.sh` : `os.path.normpath` + comparaison de parent exacte (CSL-12),
+  traversée `archive/../` fermée.
+
+### Corrigé — cycle de vie & performance
+- **`archive.sh --async` était un flag mort** (CSL-03) : SessionEnd synchrone, 92s mesurés sur gros
+  lab → tué par le timeout hook 60s (archive partielle + lock fuité). Vrai async : re-exec nohup +
+  disown, exit 0 immédiat, garde anti-refork. Verrou mkdir atomique + trap quoté (CSL-14) ;
+  compteur exact, `[ -d memory ] || exit 0` anti-pollution, rotation du log (CSL-15).
+- C3 (références récentes) cumule désormais `ITERATION_LOG.md` ET `JOURNAL.md` — les labs canon
+  DECISIONS/JOURNAL n'archivaient plus sur un critère aveugle (CSL-10).
+- Préfiltre pur-bash avant python3 sur les 3 hooks par-appel : ~24ms vs ~100ms sur le chemin
+  hors-registre, surensemble strict justifié en commentaire (CSL-13).
+- `hooks/hooks.json` : `|| true` sur le seul PostToolUse (install cassée = silence, pas du bruit
+  à chaque Edit/Write/Bash) ; les 2 PreToolUse bloquants restent sans (CSL-11).
+- `check-registres.sh` : bornes C1/C2 portées à 200 lignes (gros préambules), C2 cherche `#Ligne`
+  après `## Index` en awk sans pipe (CSL-16).
+
+### Tests
+- 4 suites, 84 checks, 100% PASS sous /bin/bash 3.2 : test-consolidator 40/40,
+  test-guard-bash-registres 20/20, test-guard-read-registres 14/14, test-check-registres 10/10.
+  Repro contre-validée sur les versions HEAD (CSL-01/02/08 reproduits avant fix).
+
 ## [v1.4.0] — 2026-07-16 (ADR-049 — backups mémoire isolés + rotation intégrée)
 
 ### Corrigé

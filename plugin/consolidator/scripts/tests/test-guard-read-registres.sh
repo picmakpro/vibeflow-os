@@ -12,6 +12,9 @@
 # T9 — BLK-007a : offset SEUL (sans limit) → DENY (fenêtre non bornée)
 # T10 — BLK-007b : limit énorme (100000) → DENY (plafond VF_GUARD_MAX_READ)
 # T11 — limit juste au-dessus du plafond (61 vs 60) → DENY ; au plafond (60) → allow
+# T12 (CSL-12) — dossier "my.claude/memory" (suffixe accidentel) → allow (faux positif démontré)
+# T13 (CSL-12) — traversée "archive/../DECISIONS.md" normalisée → DENY (contournement fermé)
+# T14 — fichier non-registre DANS .claude/memory → allow (préfiltre CSL-13 + python traversés)
 
 set -uo pipefail
 
@@ -99,6 +102,24 @@ if echo "$OUT_61" | grep -q '"permissionDecision": *"deny"' && [ -z "$OUT_60" ];
 else
   ko "T11 frontière plafond (61: ${OUT_61:-allow} · 60: ${OUT_60:-allow})"
 fi
+
+# T12 (CSL-12) — "my.claude/memory" n'est PAS ".claude/memory" (frontière de chemin)
+mkdir -p "$WORK/lab2/my.claude/memory"
+long_file "$WORK/lab2/my.claude/memory/DECISIONS.md"
+OUT="$(run_guard "$(payload "$WORK/lab2/my.claude/memory/DECISIONS.md")")"
+[ -z "$OUT" ] && ok "T12 (CSL-12) my.claude/memory → allow (plus de faux positif)" \
+  || ko "T12 (CSL-12) allow attendu : $OUT"
+
+# T13 (CSL-12) — normpath ferme la traversée archive/../
+OUT="$(run_guard "$(payload "$MEM/archive/../DECISIONS.md")")"
+echo "$OUT" | grep -q '"permissionDecision": *"deny"' && ok "T13 (CSL-12) traversée archive/../ → deny" \
+  || ko "T13 (CSL-12) deny attendu : ${OUT:-<vide>}"
+
+# T14 — fichier non-registre DANS .claude/memory : passe le préfiltre CSL-13,
+# le python doit toujours laisser passer.
+long_file "$MEM/notes.md"
+OUT="$(run_guard "$(payload "$MEM/notes.md")")"
+[ -z "$OUT" ] && ok "T14 non-registre dans .claude/memory → allow" || ko "T14 allow attendu : $OUT"
 
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="

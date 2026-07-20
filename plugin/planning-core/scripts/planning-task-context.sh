@@ -7,7 +7,12 @@
 # les compartiments : seulement celui qui est pertinent, borné.
 #
 # Ne fait rien si : lab mono (pas de .planning/INDEX.md — le SessionStart a déjà injecté STATE),
-# aucun compartiment ne matche le prompt, ou python3 absent. Fail-open, jamais bloquant.
+# aucun compartiment ne matche le prompt, match ambigu, ou python3 absent. Fail-open, jamais bloquant.
+#
+# Ce hook tourne à CHAQUE prompt → découverte par globs BORNÉS (jamais ** récursif, qui
+# marcherait tout le repo — node_modules compris — à chaque frappe), et matching par
+# FRONTIÈRE DE MOT (une sous-chaîne nue ferait matcher « informations » → formation et
+# présenterait le mauvais STATE au modèle comme « ta tâche vise… » : désinformation active).
 #
 # Câblage (posé à l'install du module) : UserPromptSubmit → bash planning-task-context.sh
 set -uo pipefail
@@ -22,6 +27,7 @@ printf '%s' "$INPUT" | python3 -c '
 import json, sys, glob, os, re
 
 MAX_LINES = 40
+MIN_TOKEN = 4   # taille minimale des tokens de nom (anti faux positifs sur mots courts)
 
 try:
     data = json.load(sys.stdin)
@@ -32,9 +38,15 @@ prompt = (data.get("prompt") or "").lower()
 if not prompt.strip():
     sys.exit(0)
 
-# Découvrir les compartiments : tout <dir>/.planning/STATE.md sauf le .planning/ racine du lab.
-states = [p for p in glob.glob("**/.planning/STATE.md", recursive=True)
-          if os.path.normpath(p) != os.path.normpath(".planning/STATE.md")]
+# Découvrir les compartiments par globs BORNÉS — jamais ** récursif (tournerait sur tout
+# le repo à chaque prompt). Profondeurs couvertes : <comp>/ et <groupe>/<comp>/ (dont
+# projects/<comp>/), dédupliquées par chemin normalisé.
+seen = {}
+for pat in ("*/.planning/STATE.md", "*/*/.planning/STATE.md", "projects/*/.planning/STATE.md"):
+    for p in glob.glob(pat):
+        seen[os.path.normpath(p)] = True
+seen.pop(os.path.normpath(".planning/STATE.md"), None)  # jamais le .planning racine du lab
+states = sorted(seen)  # ordre déterministe (plus jamais tributaire de la traversée du glob)
 if not states:
     sys.exit(0)
 
@@ -43,22 +55,35 @@ def name_of(p):
     parts = os.path.normpath(p).split(os.sep)
     return parts[-3] if len(parts) >= 3 else ""
 
-# Matcher : le nom du compartiment (ou un segment de son chemin) apparaît dans le prompt.
-best = None
-for p in states:
-    nm = name_of(p)
-    if not nm:
-        continue
-    # tokens du nom (sépare kebab/snake) — match si un token >=3 lettres est dans le prompt
-    tokens = [t for t in re.split(r"[-_/ ]+", nm.lower()) if len(t) >= 3]
-    if nm.lower() in prompt or any(t in prompt for t in tokens):
-        best = (nm, p)
-        break
+def word_in(w, text):
+    # Frontière de mot : « informations » ne matche plus « formation » (sous-chaîne interdite).
+    return re.search(r"\b" + re.escape(w) + r"\b", text) is not None
 
-if not best:
+def score(nm):
+    # (2, len) si le nom complet apparaît en mot entier ; sinon (1, len du meilleur token) ;
+    # (0, 0) sans match. Nom exact > token entier, puis le plus long gagne.
+    nml = nm.lower()
+    if len(nml) >= 3 and word_in(nml, prompt):
+        return (2, len(nml))
+    best = 0
+    for t in re.split(r"[-_/ ]+", nml):
+        if len(t) >= MIN_TOKEN and len(t) > best and word_in(t, prompt):
+            best = len(t)
+    return (1, best) if best else (0, 0)
+
+# Scorer TOUS les candidats, tri déterministe : score décroissant puis chemin alphabétique.
+scored = sorted(((score(name_of(p)), p) for p in states if name_of(p)),
+                key=lambda x: (-x[0][0], -x[0][1], x[1]))
+scored = [s for s in scored if s[0][0] > 0]
+if not scored:
+    sys.exit(0)
+# Égalité parfaite entre deux compartiments distincts = ambigu -> silence (fail-open) :
+# mieux vaut ne rien injecter que présenter le mauvais STATE comme la tâche en cours.
+if len(scored) >= 2 and scored[0][0] == scored[1][0]:
     sys.exit(0)
 
-nm, path = best
+path = scored[0][1]
+nm = name_of(path)
 try:
     with open(path, encoding="utf-8") as f:
         lines = f.read().splitlines()

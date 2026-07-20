@@ -1,5 +1,5 @@
 {
-  "description": "Planning machine-enforced (ADR-040 + ADR-043 + ADR-050) : au démarrage, fraîcheur + digest index-first injecté + 8e signal de dette ; à la tâche, STATE du compartiment ciblé ; en fin de session, garde-fou bloquant si le planning n'est pas à jour.",
+  "description": "Planning machine-enforced (ADR-040 + ADR-043 + ADR-050) : au démarrage, fraîcheur + digest index-first injecté + 8e signal de dette + baseline de session (attribution des changements) ; à la tâche, STATE du compartiment ciblé ; en fin de session, garde-fou bloquant si le planning n'est pas à jour.",
   "hooks": {
     "SessionStart": [
       {
@@ -8,6 +8,11 @@
           { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-planning-state.sh || true" },
           { "type": "command", "command": "bash {{VF_SCRIPTS}}/planning-context.sh || true" },
           { "type": "command", "command": "bash {{VF_SCRIPTS}}/detect-planning-debt.sh || true" }
+        ]
+      },
+      {
+        "hooks": [
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/planning-session-snapshot.sh || true" }
         ]
       }
     ],

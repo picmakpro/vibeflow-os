@@ -12,6 +12,13 @@
 #   - Mode --apply : preserve Date + Resume existants en parsant le body
 #   - Idempotent. Backup auto avant --apply.
 #
+# v3 (fiabilisation CSL 2026-07) :
+#   - CSL-01 : pre-garde fail-open — un bloc '## Index' sans terminateur '---' n'est
+#     JAMAIS reecrit (l'awk de reecriture aurait avale tout le body)
+#   - CSL-08 : 2e passe de recalage quand le bloc index change de taille (les #Ligne
+#     etaient extraits AVANT reecriture → decales par l'insertion de lignes d'index)
+#   - CSL-09 : verrou mkdir atomique par registre (anti lost-update entre 2 sessions)
+#
 # Reference : ADR-032 pilier 1 (Indexation) + LRN-106 (audit before fix)
 
 set -euo pipefail
@@ -50,6 +57,12 @@ REGISTERS_CONF="${VIBEFLOW_REGISTERS_CONF:-.claude/scripts/registers.conf.sh}"
 
 log() {
   echo "[reindex.sh] $*" >&2
+}
+
+# Libere le verrou CSL-09 (no-op si non pris). Jamais bloquant : fail-open.
+release_reindex_lock() {
+  [ -n "${1:-}" ] && rm -rf "$1" 2>/dev/null
+  return 0
 }
 
 register_file() {
@@ -215,6 +228,8 @@ audit_register() {
 # ---------- Dry-run / Apply mode ----------
 reindex_one() {
   local register_name="$1"
+  # pass=2 : passe de recalage CSL-08 (pas de nouveau backup, pas de 3e passe).
+  local pass="${2:-1}"
   local file
   file=$(register_file "$register_name")
 
@@ -225,6 +240,33 @@ reindex_one() {
 
   local pat
   pat=$(id_pattern "$register_name")
+
+  # CSL-09 : verrou atomique anti « lost update ». Deux sessions qui font un
+  # read-modify-write simultane du meme registre : le mv du dernier ecrase le body
+  # ajoute par l'autre (perte definitive). mkdir est atomique → verrou pris pour
+  # TOUTE la sequence extraction → mv. Occupe → skip silencieux (fail-open : le
+  # prochain edit du registre recalera l'index via le hook post-edit).
+  local lock_dir="" lock_mtime lock_age
+  if [ "$APPLY_MODE" = true ]; then
+    lock_dir="$file.lock.d"
+    if ! mkdir "$lock_dir" 2>/dev/null; then
+      # mtime portable — GNU d'abord (l'ordre inverse renvoie silencieusement
+      # le mount point sur GNU stat).
+      lock_mtime=$(stat -c %Y "$lock_dir" 2>/dev/null || stat -f %m "$lock_dir" 2>/dev/null || echo 0)
+      lock_age=$(( $(date +%s) - lock_mtime ))
+      if [ "$lock_age" -ge 60 ]; then
+        # Verrou perime (process tue en plein vol) : on le casse, une seule retentative.
+        rm -rf "$lock_dir" 2>/dev/null || true
+        if ! mkdir "$lock_dir" 2>/dev/null; then
+          log "$register_name: lock occupe, skip (reindex concurrent)"
+          return 0
+        fi
+      else
+        log "$register_name: lock occupe (${lock_age}s), skip (reindex concurrent)"
+        return 0
+      fi
+    fi
+  fi
 
   local sections
   sections=$(extract_body_sections "$file" "$pat")
@@ -253,26 +295,45 @@ reindex_one() {
   fi
 
   # APPLY mode
+  # CSL-01 (pre-garde fail-open) : un bloc '## Index' present mais JAMAIS referme par
+  # une ligne '---' ferait tout perdre — l'awk de reecriture resterait en etat
+  # in_index et jetterait le body ENTIER. Dans ce cas : ne RIEN reecrire
+  # (check-registres.sh signale l'anomalie, la reparation est humaine).
+  # Sans '## Index' du tout → chemin bootstrap plus bas (qui insere bloc + '---').
+  local idx_state
+  idx_state=$(awk 'f && /^---$/ {print "ok"; exit} /^## Index/ {f=1} END {if (!f) print "noindex"}' "$file")
+  if [ -z "$idx_state" ]; then
+    release_reindex_lock "$lock_dir"
+    log "$register_name: bloc '## Index' sans terminateur '---' — reecriture ANNULEE (fail-open)"
+    echo "{\"register\":\"$register_name\",\"mode\":\"skipped\",\"reason\":\"index_sans_terminateur\"}"
+    return 0
+  fi
+
   local tmp backup backup_dir base keep
+  backup=""
   tmp=$(mktemp)
   # Backups ISOLÉS dans un sous-dossier dédié gitignoré (ADR-049) — ne polluent plus les registres.
-  backup_dir="$(dirname "$file")/.backups"
-  mkdir -p "$backup_dir"
-  # .gitignore auto-suffisant : ignore tout le contenu (les backups) mais se conserve lui-même.
-  # Le lab cible n'a donc RIEN à configurer — aucun backup n'entre dans git.
-  [ -f "$backup_dir/.gitignore" ] || printf '*\n!.gitignore\n' > "$backup_dir/.gitignore"
-  base="$(basename "$file")"
-  backup="$backup_dir/${base}.bak-reindex-$(date +%Y%m%d-%H%M%S)"
-  cp "$file" "$backup"
-  log "Backup: $backup"
-  # Rotation INTÉGRÉE (ADR-049) : ne garder que les N derniers backups de CE registre (défaut 3).
-  # Dans reindex lui-même => TOUT --apply purge (plus seulement le hook post-edit).
-  # Portable bash 3.2 (macOS) : pas de mapfile ; while-read + process substitution.
-  keep="${VF_BACKUP_KEEP:-3}"
-  local _old
-  while IFS= read -r _old; do
-    [ -n "$_old" ] && rm -f "$_old"
-  done < <(ls -1t "$backup_dir/${base}.bak-reindex-"* 2>/dev/null | tail -n +"$((keep+1))")
+  # Pass 2 (recalage CSL-08) : pas de nouveau backup — celui de la passe 1 (fichier
+  # original) fait foi ; un backup intermediaire l'ecraserait (meme seconde).
+  if [ "$pass" -eq 1 ]; then
+    backup_dir="$(dirname "$file")/.backups"
+    mkdir -p "$backup_dir"
+    # .gitignore auto-suffisant : ignore tout le contenu (les backups) mais se conserve lui-même.
+    # Le lab cible n'a donc RIEN à configurer — aucun backup n'entre dans git.
+    [ -f "$backup_dir/.gitignore" ] || printf '*\n!.gitignore\n' > "$backup_dir/.gitignore"
+    base="$(basename "$file")"
+    backup="$backup_dir/${base}.bak-reindex-$(date +%Y%m%d-%H%M%S)"
+    cp "$file" "$backup"
+    log "Backup: $backup"
+    # Rotation INTÉGRÉE (ADR-049) : ne garder que les N derniers backups de CE registre (défaut 3).
+    # Dans reindex lui-même => TOUT --apply purge (plus seulement le hook post-edit).
+    # Portable bash 3.2 (macOS) : pas de mapfile ; while-read + process substitution.
+    keep="${VF_BACKUP_KEEP:-3}"
+    local _old
+    while IFS= read -r _old; do
+      [ -n "$_old" ] && rm -f "$_old"
+    done < <(ls -1t "$backup_dir/${base}.bak-reindex-"* 2>/dev/null | tail -n +"$((keep+1))")
+  fi
 
   # Detect orphans: IDs in old index but without body (LRN-106 — must preserve)
   local index_ids body_ids orphans
@@ -387,12 +448,16 @@ PYEOF
     ' "$file" > "$boot_tmp"
     mv "$boot_tmp" "$file"
     rm -f "$idx_tmp" "$orphans_tmp" "$tmp"
+    # Le verrou CSL-09 est libere AVANT la recursion (elle le reprend elle-meme).
+    release_reindex_lock "$lock_dir"
     log "$register_name: bloc '## Index' cree (bootstrap) — 2e passe pour recaler les #Ligne"
     reindex_one "$register_name"
     return $?
   fi
 
   # Rewrite file
+  local old_total new_total
+  old_total=$(wc -l < "$file" | tr -d ' ')
   awk -v idx_file="$idx_tmp" '
     BEGIN { state = "before" }
     state == "before" {
@@ -417,6 +482,7 @@ PYEOF
   ' "$file" > "$tmp"
 
   mv "$tmp" "$file"
+  new_total=$(wc -l < "$file" | tr -d ' ')
   local orphan_count
   if [ -n "$orphans" ]; then
     orphan_count=$(echo "$orphans" | grep -c "." 2>/dev/null) || orphan_count=0
@@ -426,6 +492,19 @@ PYEOF
   # Strip whitespace/newlines defensively
   orphan_count=$(echo "$orphan_count" | tr -d '\n ')
   rm -f "$idx_tmp" "$orphans_tmp"
+  release_reindex_lock "$lock_dir"
+
+  # CSL-08 : les #Ligne de l'index ont ete extraits du fichier AVANT reecriture. Si le
+  # bloc index a change de taille (entree ajoutee/retiree, migration v1→v2), tout le
+  # body a glisse d'autant → chaque #Ligne ecrit est faux, et tout l'edifice
+  # index-first repose sur ces nombres. Une 2e passe sur le fichier FINAL recale les
+  # positions ; elle converge (a entrees egales, le bloc index garde ensuite sa taille).
+  if [ "$pass" -eq 1 ] && [ "$new_total" -ne "$old_total" ]; then
+    log "$register_name: bloc index redimensionne ($old_total → $new_total lignes) — 2e passe de recalage des #Ligne"
+    reindex_one "$register_name" 2
+    return $?
+  fi
+
   log "$register_name: index regenere ($count entrees body + $orphan_count orphan(s) preserve(s))"
 
   echo "{\"register\":\"$register_name\",\"entries_count\":$count,\"orphans_preserved\":$orphan_count,\"mode\":\"applied\",\"backup\":\"$backup\"}"

@@ -1,5 +1,53 @@
 # Changelog — planning-core
 
+## [v2.3.0] — 2026-07-20 (ADR-050 amendée — attribution de session : fix faux positifs du guard Stop)
+
+### Corrigé (retour terrain Samuel : « faux positifs quasi systématiques » du guard Stop)
+- **`guard-planning-updated.sh` v2 — raisonne en « changé pendant CETTE session »**, plus en état
+  du working tree. La v1 ne regardait que `git status --porcelain` alors que Stop se déclenche à
+  CHAQUE fin de tour (et `stop_hook_active` retombe après chaque message utilisateur) → deux faux
+  positifs systématiques : un `STATE.md` mis à jour **puis committé** (flow GSD/dev-orchestrator)
+  devenait invisible → blocage à tort à chaque tour ; du **dirt préexistant** au démarrage était
+  attribué à la session. Désormais :
+  - Signaux « planning mis à jour » LARGES (un seul suffit) : committé pendant la session
+    (`git log --since=début`, commits tiers d'un pull/merge exclus par committer-date) ∪ sale
+    (porcelain) ∪ mtime strictement postérieur au début (couvre `.planning/` gitignoré, GSD).
+  - Attribution « livrable changé » STRICTE : committé dans la fenêtre de session ∪ dirt absent
+    de la baseline ou au statut/hash blob modifié. Le dirt préexistant n'est JAMAIS attribué.
+  - **Au pire UN blocage par session** (marqueur `.blocked` + anti-boucle `stop_hook_active`) ;
+    baseline absente/périmée (>48h), arbre >400 entrées sales → fail-open ; le motif cite les
+    livrables attribués et annonce le one-shot.
+  - Latence par tour maîtrisée : boucle bash sans spawn + UN awk (join baseline↔porcelain) +
+    UN `git hash-object` batch + `find -newer` sur la baseline (zéro stat par fichier).
+- **`detect-planning-debt.sh`** (PLN-01) : find non bornés sans exclusion `node_modules`/`.venv`/
+  `vendor` + un stat PAR fichier → minutes de gel au SessionStart sur repo dev réel, hook tué au
+  timeout. Désormais : prunes systématiques, volume en early-exit (`head -n MIN | wc -l`),
+  activité en O(1) (`-mtime -N | head -1`), plus aucun stat par fichier.
+- **`planning-task-context.sh`** (PLN-02/03) : glob récursif `**` du repo entier à CHAQUE prompt
+  (0,7-3,8s mesurés) → globs bornés dédupliqués ; matching par sous-chaîne nue (« les
+  inFORMATIONs » injectait le compartiment `formation`, « pARTage » injectait `art` — le mauvais
+  STATE présenté comme celui de la tâche) → frontières de mot, scoring de tous les candidats,
+  tie-break déterministe, ambiguïté parfaite → silence.
+- **`planning-context.sh`** (PLN-04/05) : `--path`/`--max-lines` sans valeur → boucle infinie
+  jusqu'au timeout → `"${2:?}"` ; INDEX > 80 lignes tronqué sans le signaler → mention explicite.
+- **`check-planning-state.sh`** (PLN-06) : date non paddée (`2026-7-5`) → extraction robuste +
+  normalisation (piège octal évité), message d'erreur ne citant que la valeur.
+
+### Ajouté
+- **`planning-session-snapshot.sh`** (**SessionStart, toutes sources**, first-wins au compact) :
+  baseline de session (epoch + HEAD de départ + porcelain hashé, cap 200 hash / 2000 entrées)
+  dans `$TMPDIR/vibeflow-planning-guard/` (rotation 7 jours). Fondation de l'attribution du guard.
+- `hooks/hooks.json` : nouveau groupe SessionStart sans matcher pour la baseline (merge vérifié
+  idempotent).
+
+### Tests
+- `test-planning-hooks.sh` : section guard réécrite (9 → 21 scénarios, 33 checks au total) —
+  couvre les 2 faux positifs v1, l'attribution par hash, le one-shot `.blocked`, le first-wins
+  compact, la baseline périmée, `.planning` gitignoré (mtime), le fail-open sans baseline.
+  Variable `BASH_BIN` pour exécution forcée /bin/bash 3.2.
+- `test-planning-context-hardening.sh` créé (20 checks PLN-02/03/04/05) ; `test-planning-core.sh`
+  6 → 14 ; `test-detect-planning-debt.sh` 7 → 10 (garde anti-gel 3000 fichiers).
+
 ## [v2.2.0] — 2026-07-16 (ADR-050 — hooks planning : lecture au start + maj bloquante au end)
 
 ### Ajouté

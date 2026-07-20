@@ -1,6 +1,6 @@
 {
   "name": "software-architecture",
-  "version": "v1.4.0",
+  "version": "v1.5.0",
   "type": "single-skill+rules+scripts",
   "description": "Doctrine d'architecture logicielle AI-safe : SOLID, DRY, KISS, YAGNI, Clean Architecture, Clean Code, carte TDD, gates de feature (Nyquist + Decision Coverage) + garde-fous machine (seuil 300L).",
   "requires": []

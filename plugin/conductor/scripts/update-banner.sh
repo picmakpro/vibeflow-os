@@ -26,8 +26,15 @@ PY
 fi
 
 # 2) Rafraîchit le cache en arrière-plan (n'affecte que la prochaine session ; détaché, silencieux).
+# ⚠ setsid n'existe pas sur macOS, et son échec en arrière-plan est ASYNCHRONE : l'ancien
+# pattern `( setsid … & ) || fallback` sortait toujours 0 → le fallback ne se déclenchait
+# jamais → cache jamais rafraîchi sur macOS (bandeau mort, démontré). On teste la présence
+# de setsid AVANT, et on ferme stdin (un git qui tenterait un prompt échoue au lieu de pendre).
 if [ -x "$DIR/check-plugin-update.sh" ]; then
-  ( setsid "$DIR/check-plugin-update.sh" >/dev/null 2>&1 & ) 2>/dev/null \
-    || ( "$DIR/check-plugin-update.sh" >/dev/null 2>&1 & )
+  if command -v setsid >/dev/null 2>&1; then
+    ( setsid "$DIR/check-plugin-update.sh" </dev/null >/dev/null 2>&1 & ) 2>/dev/null || true
+  else
+    ( "$DIR/check-plugin-update.sh" </dev/null >/dev/null 2>&1 & ) 2>/dev/null || true
+  fi
 fi
 exit 0

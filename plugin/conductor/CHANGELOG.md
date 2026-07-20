@@ -1,5 +1,20 @@
 # Changelog — conductor
 
+## [v1.11.2] — 2026-07-20 (audit robustesse hooks)
+
+### Corrigé
+- **`update-banner.sh` : le rafraîchissement du cache était MORT sur macOS** — `setsid` n'existe
+  pas sur macOS et son échec (127) en arrière-plan est asynchrone : le pattern
+  `( setsid … & ) || fallback` sortait toujours 0 → le fallback ne se déclenchait jamais → cache
+  jamais rafraîchi (démontré : cache local figé au 12/07). Désormais : `command -v setsid` testé
+  AVANT, stdin fermé (`</dev/null`). Vérifié e2e : cache réécrit avec données fraîches.
+- `check-plugin-update.sh` : `GIT_TERMINAL_PROMPT=0` sur le `ls-remote` — un repo privé sans
+  credential helper échoue proprement au lieu de pendre sur un prompt en tâche de fond.
+- `guard-agent-write.sh` : préfiltre pur-bash avant python3 (~6ms vs ~90ms sur tout Write sans
+  rapport avec `.claude/` — le hook tourne sur CHAQUE Write du lab ; surensemble strict justifié
+  en commentaire) ; frontière de chemin exacte (`my.claude/agents` ne matche plus — même classe
+  de faux positif que consolidator CSL-12) + `normpath`.
+
 ## [v1.11.1] — 2026-07-19 (ADR-051)
 
 ### Ajouté

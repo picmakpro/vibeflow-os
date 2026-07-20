@@ -1,5 +1,25 @@
 # CHANGELOG — infrastructure-audit
 
+## [v1.2.0] — 2026-07-20 (audit robustesse hooks — convergence du gate 14 jours)
+
+### Corrigé
+- **Le gate `--if-older-than=14d` ne convergeait jamais** : il ne s'appliquait que si un SNAPSHOT
+  existait, or `--quick` n'en écrit pas → tout lab sans snapshot manuel subissait l'audit complet
+  (17 lignes injectées au contexte) à CHAQUE SessionStart. Désormais `--quick` réussi pose un stamp
+  `.last-audit` et le gate porte sur le plus récent de {stamp, snapshot}.
+- **Compteurs mensongers** : les détections python (`ERR|…`/`WARN|…`) fuyaient brutes sur stdout
+  sans jamais alimenter `errors_count`/`warnings_count` (toujours 0). Désormais capturées, comptées
+  et émises dans un tableau JSON `detections` parseable.
+- `--if-older-than=2w` : erreur bash (`integer expression expected`) → sanitisation, fail-open
+  silencieux. Ordre `stat` GNU-first (`stat -c %Y || stat -f %m`) — l'ordre BSD-first renvoyait
+  silencieusement le mount point sur GNU/Linux.
+- `known-versions.txt` complété (2.1.163 → 2.1.215) + règle `semver_ge` : version plus récente que
+  la dernière validée = `version_known: true` avec `version_note` explicite (fin du
+  `version_known: false` permanent).
+
+### Tests
+- `test-audit-infra.sh` créé (8 checks, 100% PASS sous /bin/bash 3.2).
+
 ## [v1.1.0] — 2026-07-04 (ADR-043)
 
 ### Ajouté

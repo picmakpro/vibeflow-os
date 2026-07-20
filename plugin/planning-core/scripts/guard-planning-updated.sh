@@ -1,22 +1,33 @@
 #!/usr/bin/env bash
-# guard-planning-updated.sh — Hook Stop : bloque la fin de session si le planning est en dette.
+# guard-planning-updated.sh — Hook Stop : bloque (au plus UNE fois par session) si des livrables
+# ont changé PENDANT LA SESSION sans aucune mise à jour du .planning/.
 #
-# Rôle (ADR-050) : un `.planning/` pas à jour est de la dette. Si des LIVRABLES ont changé
-# pendant la session mais qu'AUCUN `.planning/STATE.md` n'a été mis à jour, on bloque l'arrêt
-# une fois et on demande la mise à jour (Phase 7 de la boucle de mission, skill metier-orchestration).
+# v2 (ADR-050 amendée 2026-07-20 — fix faux positifs) : Stop se déclenche à CHAQUE fin de tour
+# assistant, et la v1 ne regardait que `git status --porcelain` → deux faux positifs
+# systématiques :
+#   1. STATE.md mis à jour PUIS COMMITTÉ pendant la session (flow GSD / dev-orchestrator)
+#      → invisible du porcelain → bloqué à tort, à chaque tour.
+#   2. Dirt PRÉEXISTANT au démarrage (livrable déjà sale avant la session) → attribué à tort
+#      à la session.
+# La v2 s'appuie sur la BASELINE écrite au SessionStart par planning-session-snapshot.sh
+# (epoch + HEAD de départ + porcelain hashé) et raisonne en « changé pendant CETTE session ».
 #
-# Event : Stop. Blocage = exit 2 (stderr renvoyé à Claude, qui continue). C'est le SEUL event
-# capable de bloquer réellement la fin de session (SessionEnd est un cleanup non bloquant).
+# Signaux « planning mis à jour » (LARGES — un seul suffit pour autoriser) :
+#   a. fichier .planning/** committé pendant la session (git log --since=début, HEAD_départ..HEAD)
+#   b. fichier .planning/** actuellement sale (porcelain)
+#   c. fichier .planning/** avec mtime >= début de session (couvre .planning gitignoré, GSD, scripts)
+# Attribution « livrable changé » (STRICTE — preuve que c'est CETTE session requise) :
+#   a. livrable committé pendant la session (fenêtre --since : les commits tiers rapatriés
+#      par un pull/merge ont une committer date antérieure → exclus)
+#   b. livrable sale ABSENT de la baseline, ou dont le statut / le contenu (hash blob) a changé
 #
 # GARDE-FOUS ANTI-PIÈGE (obligatoires) :
-#   - anti-boucle : si `stop_hook_active` est déjà vrai (on continue DÉJÀ suite à un blocage
-#     précédent), on n'arrête plus JAMAIS → au pire un seul blocage par session, jamais de trappe.
-#   - ne bloque QUE si : repo git + un `.planning/` existe + des livrables ont changé + le planning
-#     n'a PAS changé. Session read-only / config / hors-git → jamais bloquée.
-#   - échappatoire explicite : marqueur `.planning/.session-noop` ou `.session-noop` → autorise
-#     (l'utilisateur affirme « rien à noter »). Consommé (one-shot).
-#   - toggle : VF_PLANNING_STOP = block (défaut) | warn (avertit, n'arrête pas) | off (désactivé).
-#
+#   - anti-boucle `stop_hook_active` + marqueur <session>.blocked → au pire UN blocage par
+#     session, même après un nouveau message utilisateur (stop_hook_active retombe à false).
+#   - baseline absente / illisible / périmée (>48h) → fail-open (jamais de blocage à l'aveugle).
+#   - échappatoire `.session-noop` (racine ou dans un .planning/, one-shot) ;
+#     toggle VF_PLANNING_STOP = block (défaut) | warn | off.
+#   - > 400 entrées porcelain → attribution working-tree abandonnée (fail-open partiel).
 # Fail-open partout : toute condition non réunie ou toute erreur → exit 0 (autorise l'arrêt).
 set -uo pipefail
 
@@ -32,47 +43,178 @@ MODE="${VF_PLANNING_STOP:-block}"
 
 # --- Doit être un repo git (sinon on ne sait pas ce qui a changé → pas de trappe) ---
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
+TOP=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+[ -n "$TOP" ] || exit 0
+cd "$TOP" 2>/dev/null || exit 0
 
-# --- Un socle .planning/ doit exister quelque part (lab amorcé) ---
-has_planning=$(find . -type d -name .planning -not -path '*/.git/*' 2>/dev/null | head -1)
-[ -n "$has_planning" ] || exit 0
+# --- Un socle .planning/ doit exister (lab amorcé) — recherche bornée (Stop tourne à chaque tour) ---
+PLANNING_DIRS=$(find . -maxdepth 4 \( -name .git -o -name node_modules \) -prune -o -type d -name .planning -print 2>/dev/null | head -20)
+[ -n "$PLANNING_DIRS" ] || exit 0
 
-# --- Échappatoire : marqueur "rien à noter" (consommé) ---
-for marker in ".planning/.session-noop" ".session-noop"; do
-  if [ -f "$marker" ]; then
-    rm -f "$marker" 2>/dev/null || true
-    exit 0
-  fi
-done
-
-# --- Qu'est-ce qui a changé ? (working tree) ---
-changes="$(git status --porcelain 2>/dev/null || true)"
-[ -n "$changes" ] || exit 0   # rien n'a changé → rien à tracer → autorise
-
-deliverable_changed=0
-planning_changed=0
-while IFS= read -r line; do
-  [ -n "$line" ] || continue
-  path="${line:3}"                              # retire "XY " (statut porcelain)
-  case "$path" in *" -> "*) path="${path##* -> }";; esac   # rename → cible
-  case "$path" in
-    .planning/*|*/.planning/*) planning_changed=1 ;;       # planning mis à jour
-    .claude/*|*/.claude/*)     : ;;                        # méta (registres, config) → ignoré
-    *)                         deliverable_changed=1 ;;    # livrable métier
-  esac
+# --- Échappatoire : marqueur « rien à noter » (consommé, one-shot) ---
+consume_marker() { if [ -f "$1" ]; then rm -f "$1" 2>/dev/null || true; return 0; fi; return 1; }
+consume_marker ".session-noop" && exit 0
+while IFS= read -r d; do
+  [ -n "$d" ] || continue
+  consume_marker "$d/.session-noop" && exit 0
 done <<EOF
-$changes
+$PLANNING_DIRS
 EOF
 
-# --- Décision : livrables changés MAIS planning pas mis à jour → dette ---
-if [ "$deliverable_changed" -eq 1 ] && [ "$planning_changed" -eq 0 ]; then
-  REASON="⛔ Planning pas à jour (dette). Des livrables ont changé cette session mais aucun .planning/STATE.md n'a été mis à jour. Avant de terminer : mets à jour le STATE.md du compartiment concerné (état, ce qui vient d'être livré, prochaines étapes) — Phase 7 de la boucle de mission. Si vraiment rien à noter : crée le marqueur .planning/.session-noop. Désactiver ce garde-fou : VF_PLANNING_STOP=off ; simple avertissement : VF_PLANNING_STOP=warn."
-  if [ "$MODE" = "warn" ]; then
-    echo "[planning-guard] $REASON"          # advisory : n'arrête pas
-    exit 0
+# --- Baseline de session (écrite au SessionStart par planning-session-snapshot.sh) ---
+SID=$(printf '%s' "$INPUT" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1 | tr -cd 'A-Za-z0-9._-')
+[ -n "$SID" ] || exit 0
+DIR="${TMPDIR:-/tmp}/vibeflow-planning-guard"
+KEY=$(printf '%s' "$TOP" | cksum 2>/dev/null | awk '{print $1}')
+[ -n "$KEY" ] || exit 0
+SNAP="$DIR/${KEY}-${SID}.snap"
+BLOCKED="$DIR/${KEY}-${SID}.blocked"
+[ -f "$BLOCKED" ] && exit 0          # déjà bloqué une fois cette session → plus jamais
+[ -f "$SNAP" ] || exit 0             # pas de baseline → fail-open
+
+EPOCH=$(sed -n '1p' "$SNAP" 2>/dev/null | tr -cd '0-9')
+BASE_HEAD=$(sed -n '2p' "$SNAP" 2>/dev/null | tr -cd 'A-Za-z0-9')
+[ -n "$EPOCH" ] || exit 0
+NOW=$(date +%s 2>/dev/null | tr -cd '0-9')
+[ -n "$NOW" ] || exit 0
+[ $((NOW - EPOCH)) -le 172800 ] || exit 0   # baseline > 48h → périmée, fail-open
+
+# --- Classification d'un chemin ---
+classify() { # $1 path → planning|meta|deliverable
+  case "$1" in
+    .planning/*|*/.planning/*) echo planning ;;
+    .claude/*|*/.claude/*)     echo meta ;;
+    .DS_Store|*/.DS_Store)     echo meta ;;
+    *)                         echo deliverable ;;
+  esac
+}
+
+# --- Signal 1 : ce qui a été COMMITTÉ pendant la session (fenêtre committer-date) ---
+RANGE=""
+if git rev-parse -q --verify HEAD >/dev/null 2>&1; then
+  if [ "$BASE_HEAD" = "none" ]; then
+    RANGE="HEAD"                                  # repo sans commit au départ
+  elif git cat-file -e "$BASE_HEAD" 2>/dev/null; then
+    RANGE="$BASE_HEAD..HEAD"
   fi
-  echo "$REASON" >&2                          # block : stderr renvoyé à Claude
-  exit 2
+fi
+COMMITTED=""
+if [ -n "$RANGE" ]; then
+  COMMITTED=$(git log --since="@$EPOCH" --no-merges --name-only --pretty=format: $RANGE 2>/dev/null | grep -v '^$' | sort -u | head -2000 || true)
 fi
 
-exit 0
+planning_changed=0
+deliverables=""
+if [ -n "$COMMITTED" ]; then
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    case "$(classify "$p")" in
+      planning)    planning_changed=1 ;;
+      deliverable) deliverables="$deliverables
+$p" ;;
+    esac
+  done <<EOF
+$COMMITTED
+EOF
+fi
+[ "$planning_changed" -eq 1 ] && exit 0          # planning committé pendant la session → OK
+
+# --- Signal 2 + attribution : porcelain actuel comparé à la baseline ---
+# Latence maîtrisée (Stop tourne à chaque tour) : une boucle bash sans spawn, puis UN seul
+# awk (join baseline↔porcelain) et UN seul git hash-object batch pour les candidats.
+PORCELAIN=$(git status --porcelain 2>/dev/null || true)
+PCOUNT=$(printf '%s\n' "$PORCELAIN" | grep -c . || true)
+CANDIDATES=""                                    # "XY<TAB>path" des livrables sales
+if [ -n "$PORCELAIN" ]; then
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    xy="${line:0:2}"
+    p="${line:3}"
+    case "$p" in *" -> "*) p="${p##* -> }" ;; esac
+    case "$p" in
+      .planning/*|*/.planning/*) planning_changed=1 ;;
+      .claude/*|*/.claude/*)     : ;;
+      .DS_Store|*/.DS_Store)     : ;;
+      *) CANDIDATES="$CANDIDATES
+$xy	$p" ;;
+    esac
+  done <<EOF
+$PORCELAIN
+EOF
+fi
+[ "$planning_changed" -eq 1 ] && exit 0          # planning sale dans le working tree → OK
+
+if [ -n "$CANDIDATES" ] && [ "$PCOUNT" -le 400 ] 2>/dev/null; then
+  # Join en une passe : ATTR = attribué direct (absent de la baseline, ou statut changé) ;
+  # CAND = présent à statut identique → le contenu (hash blob) tranchera.
+  JOIN=$(printf '%s\n' "$CANDIDATES" | grep -v '^$' | awk -F'\t' '
+    FNR==NR { if (NF>=3) { h[$3]=$1; s[$3]=$2 } ; next }
+    NF>=2 {
+      xy=$1; p=$2
+      if (!(p in s))      { print "ATTR\t-\t" p }
+      else if (s[p]!=xy)  { print "ATTR\t-\t" p }
+      else if (h[p]!="-") { print "CAND\t" h[p] "\t" p }
+    }' "$SNAP" - 2>/dev/null || true)
+  TAB="$(printf '\t')"
+  cand_paths=()
+  cand_hashes=()
+  if [ -n "$JOIN" ]; then
+    while IFS="$TAB" read -r tag hh pp; do
+      [ -n "${pp:-}" ] || continue
+      case "$tag" in
+        ATTR) deliverables="$deliverables
+$pp" ;;                                        # né pendant la session ou statut changé
+        CAND) if [ -f "$pp" ]; then
+                cand_paths[${#cand_paths[@]}]="$pp"
+                cand_hashes[${#cand_hashes[@]}]="$hh"
+              fi ;;
+      esac
+    done <<EOF
+$JOIN
+EOF
+  fi
+  if [ "${#cand_paths[@]}" -gt 0 ]; then
+    HASHES=$(git hash-object -- "${cand_paths[@]}" 2>/dev/null || true)
+    i=0
+    while IFS= read -r hgot; do
+      if [ -n "$hgot" ] && [ "$i" -lt "${#cand_hashes[@]}" ] && [ "$hgot" != "${cand_hashes[$i]}" ]; then
+        deliverables="$deliverables
+${cand_paths[$i]}"                              # contenu modifié pendant la session
+      fi
+      i=$((i+1))
+    done <<EOF
+$HASHES
+EOF
+  fi
+fi
+
+# --- Signal 3 : un fichier .planning touché depuis le début de session (mtime) ---
+# Couvre .planning gitignoré, mises à jour par GSD/scripts, etc. Référence temporelle :
+# le fichier baseline LUI-MÊME (créé à l'ouverture de session) via find -newer — un seul
+# spawn par dossier .planning, pas de stat par fichier (latence : Stop tourne à chaque tour).
+# -newer est STRICT (>) : un .planning écrit dans la même seconde que l'ouverture de
+# session appartient à l'état antérieur, pas à la session.
+while IFS= read -r d; do
+  [ -n "$d" ] || continue
+  hit=$(find "$d" -type f -newer "$SNAP" -print 2>/dev/null | head -1)
+  [ -n "$hit" ] && exit 0                        # planning touché pendant la session → OK
+done <<EOF
+$PLANNING_DIRS
+EOF
+
+# --- Décision : des livrables attribués à CETTE session, et aucun signal planning → dette ---
+ATTRIBUTED=$(printf '%s\n' "$deliverables" | grep -v '^$' | sort -u || true)
+[ -n "$ATTRIBUTED" ] || exit 0
+NB=$(printf '%s\n' "$ATTRIBUTED" | grep -c . || true)
+SAMPLE=$(printf '%s\n' "$ATTRIBUTED" | head -3 | tr '\n' ' ' | sed 's/ $//')
+
+REASON="⛔ Planning non mis à jour : $NB livrable(s) ont changé PENDANT cette session ($SAMPLE) sans aucune mise à jour d'un .planning/. Mets à jour le STATE.md du compartiment concerné (état, ce qui vient d'être livré, prochaines étapes — Phase 7 de la boucle de mission), puis termine. Si vraiment rien à noter : crée le marqueur .planning/.session-noop. Ce garde ne bloquera plus cette session. Toggles : VF_PLANNING_STOP=warn|off."
+
+if [ "$MODE" = "warn" ]; then
+  echo "[planning-guard] $REASON"                # advisory : n'arrête pas
+  exit 0
+fi
+mkdir -p "$DIR" 2>/dev/null || true
+: > "$BLOCKED" 2>/dev/null || true               # au pire UN blocage par session
+echo "$REASON" >&2                               # block : stderr renvoyé à Claude
+exit 2

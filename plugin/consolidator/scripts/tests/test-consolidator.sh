@@ -8,6 +8,18 @@
 #   T4 — archive.sh --dry-run détecte BLK RÉSOLU + skip ACTIF
 #   T5 — detect-duplicates.sh détecte collisions IDs
 #   T6 — detect-promotions.sh sort candidats operational + cluster
+#   T7 — reindex.sh --apply : backups isolés + rotation + gitignore (ADR-049)
+#
+# Fiabilisation CSL :
+#   T-CSL01 — reindex --apply refuse un '## Index' sans terminateur '---' (body préservé)
+#   T-CSL08 — après append + apply, chaque #Ligne de l'index == position réelle du body
+#   T-CSL09 — verrou mkdir : apply concurrent skippé, verrou périmé cassé puis libéré
+#   T-CSL02 — archive --apply idempotent (pas de doublons dans l'archive)
+#   T-CSL03 — archive --async se détache (exit immédiat + travail fait en arrière-plan)
+#   T-CSL10 — C3 lit aussi JOURNAL.md (réf récente → skip archivage)
+#   T-CSL14 — lock archive : actif → skip, périmé → cassé, libéré en sortie
+#   T-CSL15 — compteur exact, pas de « 0 » parasite, aucune création hors lab, rotation log
+#   T-CSL11 — hooks.json : `|| true` sur le PostToolUse uniquement
 #
 # Usage: ./test-consolidator.sh
 # Exit code: 0 si tous tests passent, 1 si au moins 1 échec
@@ -107,6 +119,180 @@ kept=$(ls -1 "$WORK_DIR/.claude/memory/.backups/"*.bak-reindex-* 2>/dev/null | w
 assert "T7.2 — rotation garde 3 backups max dans .backups/" "$kept" "3"
 gi=$(cat "$WORK_DIR/.claude/memory/.backups/.gitignore" 2>/dev/null | tr -d '\n')
 assert "T7.3 — .gitignore auto-suffisant dans .backups/" "$gi" "*!.gitignore"
+
+SCRIPTS="$WORK_DIR/.claude/scripts"
+
+# Fixture registre DECISIONS canonique v2 (index + '---' + body)
+mk_dec() {
+  cat > "$1" <<'EOF'
+# Decisions
+
+## Index
+
+| ID | Date | Titre | #Ligne | Resume |
+|----|------|-------|--------|--------|
+| DEC-001 | 2026-07-01 | Premiere | 11 | Premiere entree. |
+
+---
+
+## DEC-001 : Premiere
+
+**Date** : 2026-07-01
+
+### Contexte
+
+Premiere entree.
+EOF
+}
+
+echo ""
+echo "=== T-CSL01 — reindex --apply refuse un '## Index' sans terminateur '---' ==="
+R1="$WORK_DIR/csl01"; mkdir -p "$R1/.claude/memory"
+cat > "$R1/.claude/memory/DECISIONS.md" <<'EOF'
+# Decisions
+
+## Index
+
+| ID | Date | Titre | #Ligne | Resume |
+|----|------|-------|--------|--------|
+| DEC-001 | 2026-07-01 | Premiere | 10 | Premiere entree. |
+
+## DEC-001 : Premiere
+
+**Date** : 2026-07-01
+
+Contenu precieux du body.
+EOF
+cp "$R1/.claude/memory/DECISIONS.md" "$R1/avant.md"
+output=$(cd "$R1" && MEMORY_DIR=".claude/memory" "$SCRIPTS/reindex.sh" --register=DECISIONS --apply 2>&1)
+assert "T-CSL01.1 — réécriture annulée (raison signalée)" "$output" "index_sans_terminateur"
+same=$(cmp -s "$R1/avant.md" "$R1/.claude/memory/DECISIONS.md" && echo identique || echo different)
+assert "T-CSL01.2 — fichier strictement intact (body préservé)" "$same" "identique"
+
+echo ""
+echo "=== T-CSL08 — #Ligne == position réelle après append + apply ==="
+R8="$WORK_DIR/csl08"; mkdir -p "$R8/.claude/memory"
+mk_dec "$R8/.claude/memory/DECISIONS.md"
+cat >> "$R8/.claude/memory/DECISIONS.md" <<'EOF'
+
+## DEC-002 : Deuxieme
+
+**Date** : 2026-07-02
+
+### Contexte
+
+Deuxieme entree.
+EOF
+(cd "$R8" && MEMORY_DIR=".claude/memory" "$SCRIPTS/reindex.sh" --register=DECISIONS --apply >/dev/null 2>&1)
+rows=$(grep -c "^| DEC-" "$R8/.claude/memory/DECISIONS.md" || echo 0)
+assert "T-CSL08.1 — 2 entrées indexées" "$rows" "2"
+bad=0
+while IFS='|' read -r _ f_id _fd _ft f_line _fr; do
+  cid=$(echo "$f_id" | tr -d ' ')
+  cline=$(echo "$f_line" | tr -d ' ')
+  [ -n "$cid" ] || continue
+  actual=$(grep -n "^## $cid " "$R8/.claude/memory/DECISIONS.md" | head -1 | cut -d: -f1)
+  if [ "$actual" != "$cline" ]; then
+    bad=$((bad + 1))
+    echo "     (écart $cid : index=$cline réel=$actual)"
+  fi
+done < <(grep "^| DEC-" "$R8/.claude/memory/DECISIONS.md")
+assert "T-CSL08.2 — chaque #Ligne de l'index == position grep -n du body" "$bad" "0"
+
+echo ""
+echo "=== T-CSL09 — verrou reindex : concurrent skippé, périmé cassé ==="
+R9="$WORK_DIR/csl09"; mkdir -p "$R9/.claude/memory"
+mk_dec "$R9/.claude/memory/DECISIONS.md"
+mkdir "$R9/.claude/memory/DECISIONS.md.lock.d"
+cp "$R9/.claude/memory/DECISIONS.md" "$R9/avant.md"
+output=$(cd "$R9" && MEMORY_DIR=".claude/memory" "$SCRIPTS/reindex.sh" --register=DECISIONS --apply 2>&1)
+assert "T-CSL09.1 — verrou actif → skip signalé" "$output" "lock occupe"
+same=$(cmp -s "$R9/avant.md" "$R9/.claude/memory/DECISIONS.md" && echo identique || echo different)
+assert "T-CSL09.2 — fichier non réécrit sous verrou" "$same" "identique"
+touch -t 202001010000 "$R9/.claude/memory/DECISIONS.md.lock.d"
+output=$(cd "$R9" && MEMORY_DIR=".claude/memory" "$SCRIPTS/reindex.sh" --register=DECISIONS --apply 2>&1)
+assert "T-CSL09.3 — verrou périmé cassé → apply passe" "$output" '"mode":"applied"'
+lock_left=$([ -d "$R9/.claude/memory/DECISIONS.md.lock.d" ] && echo present || echo absent)
+assert "T-CSL09.4 — verrou libéré après apply" "$lock_left" "absent"
+
+echo ""
+echo "=== T-CSL02 — archive --apply idempotent (pas de doublons) ==="
+A2="$WORK_DIR/csl02"; mkdir -p "$A2/.claude/memory"
+cp "$FIXTURES_DIR/BLOCKERS-mini.md" "$A2/.claude/memory/BLOCKERS.md"
+(cd "$A2" && MEMORY_DIR=".claude/memory" "$SCRIPTS/archive.sh" --apply --threshold-days=1 >/dev/null 2>&1)
+(cd "$A2" && MEMORY_DIR=".claude/memory" "$SCRIPTS/archive.sh" --apply --threshold-days=1 >/dev/null 2>&1)
+occ=$(grep -c "^## BLK-001" "$A2/.claude/memory/archive/BLOCKERS-archive.md" 2>/dev/null || echo 0)
+assert "T-CSL02.1 — BLK-001 présent UNE seule fois après 2 applies" "$occ" "1"
+
+echo ""
+echo "=== T-CSL03 — archive --async : détaché réel + garde anti-refork ==="
+A3="$WORK_DIR/csl03"; mkdir -p "$A3/.claude/memory"
+cp "$FIXTURES_DIR/BLOCKERS-mini.md" "$A3/.claude/memory/BLOCKERS.md"
+(cd "$A3" && MEMORY_DIR=".claude/memory" "$SCRIPTS/archive.sh" --async --apply --threshold-days=1 >/dev/null 2>&1)
+rc=$?
+assert "T-CSL03.1 — le hook rend la main immédiatement (exit 0)" "$rc" "0"
+found=non
+for _i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+  if grep -q "^## BLK-001" "$A3/.claude/memory/archive/BLOCKERS-archive.md" 2>/dev/null; then found=oui; break; fi
+  sleep 0.5
+done
+assert "T-CSL03.2 — l'archivage s'exécute en arrière-plan" "$found" "oui"
+A3b="$WORK_DIR/csl03b"; mkdir -p "$A3b/.claude/memory"
+cp "$FIXTURES_DIR/BLOCKERS-mini.md" "$A3b/.claude/memory/BLOCKERS.md"
+(cd "$A3b" && VF_ARCHIVE_BG=1 MEMORY_DIR=".claude/memory" "$SCRIPTS/archive.sh" --async --apply --threshold-days=1 >/dev/null 2>&1)
+sync_done=$(grep -q "^## BLK-001" "$A3b/.claude/memory/archive/BLOCKERS-archive.md" 2>/dev/null && echo oui || echo non)
+assert "T-CSL03.3 — garde VF_ARCHIVE_BG : l'enfant travaille en synchrone (pas de re-fork)" "$sync_done" "oui"
+
+echo ""
+echo "=== T-CSL10 — C3 lit aussi JOURNAL.md (labs canon) ==="
+A10="$WORK_DIR/csl10"; mkdir -p "$A10/.claude/memory"
+cp "$FIXTURES_DIR/BLOCKERS-mini.md" "$A10/.claude/memory/BLOCKERS.md"
+printf '# Journal\n\n## Session 1\n\nTravail en cours sur BLK-001 (toujours actif).\n' > "$A10/.claude/memory/JOURNAL.md"
+output=$(cd "$A10" && MEMORY_DIR=".claude/memory" "$SCRIPTS/archive.sh" --dry-run --threshold-days=1 2>&1)
+assert "T-CSL10.1 — réf dans JOURNAL.md → skip" "$output" "BLK-001: 1 refs recentes, skip"
+blk001_arch=$(echo "$output" | grep -c "BLK-001: C1=ok" || echo 0)
+assert "T-CSL10.2 — BLK-001 PAS archivable malgré C1/C2 ok" "$blk001_arch" "0"
+
+echo ""
+echo "=== T-CSL14 — lock archive : actif → skip, périmé → cassé + libéré ==="
+A14="$WORK_DIR/csl14"; mkdir -p "$A14/.claude/memory"
+cp "$FIXTURES_DIR/BLOCKERS-mini.md" "$A14/.claude/memory/BLOCKERS.md"
+mkdir "$A14/.claude/memory/.archive.lock.d"
+output=$(cd "$A14" && MEMORY_DIR=".claude/memory" "$SCRIPTS/archive.sh" --dry-run --threshold-days=1 2>&1)
+assert "T-CSL14.1 — lock frais → skip" "$output" "lock actif"
+touch -t 202001010000 "$A14/.claude/memory/.archive.lock.d"
+output=$(cd "$A14" && MEMORY_DIR=".claude/memory" "$SCRIPTS/archive.sh" --dry-run --threshold-days=1 2>&1)
+assert "T-CSL14.2 — lock périmé cassé → scan effectué" "$output" "BLK-001: C1=ok"
+lock_left=$([ -d "$A14/.claude/memory/.archive.lock.d" ] && echo present || echo absent)
+assert "T-CSL14.3 — lock libéré en sortie (trap)" "$lock_left" "absent"
+
+echo ""
+echo "=== T-CSL15 — compteur, stdout propre, non-pollution, rotation log ==="
+A15="$WORK_DIR/csl15"; mkdir -p "$A15/.claude/memory"
+cp "$FIXTURES_DIR/BLOCKERS-mini.md" "$A15/.claude/memory/BLOCKERS.md"
+output=$(cd "$A15" && MEMORY_DIR=".claude/memory" "$SCRIPTS/archive.sh" --apply --threshold-days=1 2>&1)
+assert "T-CSL15.1 — compteur exact dans le bilan" "$output" "done (1 entree(s) archivee(s))"
+stray=$(echo "$output" | grep -cx "0" || true)
+assert "T-CSL15.2 — aucun « 0 » parasite sur stdout" "$stray" "0"
+A15b="$WORK_DIR/csl15b"; mkdir -p "$A15b"
+(cd "$A15b" && "$SCRIPTS/archive.sh" --apply >/dev/null 2>&1)
+polluted=$([ -d "$A15b/.claude" ] && echo oui || echo non)
+assert "T-CSL15.3 — répertoire non initialisé : AUCUNE création" "$polluted" "non"
+A15c="$WORK_DIR/csl15c"; mkdir -p "$A15c/.claude/memory" "$A15c/.claude/logs"
+cp "$FIXTURES_DIR/BLOCKERS-mini.md" "$A15c/.claude/memory/BLOCKERS.md"
+i=1; while [ "$i" -le 600 ]; do echo "vieille ligne $i"; i=$((i+1)); done > "$A15c/.claude/logs/archive.log"
+(cd "$A15c" && MEMORY_DIR=".claude/memory" "$SCRIPTS/archive.sh" --dry-run --threshold-days=1 >/dev/null 2>&1)
+log_lines=$(wc -l < "$A15c/.claude/logs/archive.log" | tr -d ' ')
+rot_ok=$([ "$log_lines" -le 300 ] && echo oui || echo "non ($log_lines lignes)")
+assert "T-CSL15.4 — rotation log (600 → ≤ 300 lignes)" "$rot_ok" "oui"
+
+echo ""
+echo "=== T-CSL11 — hooks.json : || true sur le PostToolUse uniquement ==="
+HJ="hooks/hooks.json"
+post_ok=$(grep -c 'post-edit-reindex.sh || true' "$HJ" || echo 0)
+assert "T-CSL11.1 — PostToolUse tolère une install cassée (|| true)" "$post_ok" "1"
+pre_bad=$(grep -E 'guard-(read|bash)-registres\.sh \|\| true' "$HJ" | wc -l | tr -d ' ')
+assert "T-CSL11.2 — les 2 PreToolUse bloquants restent SANS || true" "$pre_bad" "0"
 
 echo ""
 echo "================================"

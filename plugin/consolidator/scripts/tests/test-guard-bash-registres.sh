@@ -19,6 +19,14 @@
 # Post-edit-reindex en mode Bash :
 #   T13 — append `>>` vers un registre → l'index est régénéré
 #   T14 — commande Bash qui LIT le registre (grep) → index NON régénéré (pas d'écriture)
+#
+# Fiabilisation CSL :
+#   T15 (CSL-04) — nom de lecteur plein en ARGUMENT (`grep -n 'open'`, `grep -c cat`) → allow
+#   T16 (CSL-04) — lecteur plein derrière un wrapper (nohup/env/command) → deny maintenu
+#   T17 (CSL-05) — heredoc qui CITE `cat <registre>` (écriture ailleurs) → allow
+#   T18 (CSL-06) — écriture vers cible quotée (`>> "<registre>"`) → allow
+#   T19 — régression : lecture avec argument quoté (`cat "<registre>"`) → deny maintenu
+#   T20 (CSL-07) — post-edit-reindex : append Bash vers cible QUOTÉE → index régénéré
 
 set -uo pipefail
 
@@ -121,6 +129,56 @@ if grep -q '^## Index' "$MEM/EVALS.md"; then
   ko "T14 lecture Bash a déclenché un reindex (écriture attendue seulement)"
 else
   ok "T14 lecture Bash (grep) → pas de reindex"
+fi
+
+# ---------- Fiabilisation CSL ----------
+
+# T15 (CSL-04) — un nom de FULL_READER en position d'ARGUMENT est une recherche
+# ciblée légitime, pas une lecture pleine (faux positifs démontrés).
+OUT1="$(run_guard "grep -n 'open' $D")"
+OUT2="$(run_guard "grep -c cat $D")"
+{ [ -z "$OUT1" ] && [ -z "$OUT2" ]; } && ok "T15 (CSL-04) grep -n 'open' / grep -c cat → allow" \
+  || ko "T15 (CSL-04) allow attendu (open: ${OUT1:-ok} · cat: ${OUT2:-ok})"
+
+# T16 (CSL-04) — le lecteur plein derrière un wrapper reste en position de commande.
+OUT1="$(run_guard "nohup cat $D")"
+OUT2="$(run_guard "env VAR=1 cat $D")"
+OUT3="$(run_guard "command cat $D")"
+{ is_deny "$OUT1" && is_deny "$OUT2" && is_deny "$OUT3"; } && ok "T16 (CSL-04) nohup/env/command cat → deny maintenu" \
+  || ko "T16 (CSL-04) deny attendu derrière wrapper"
+
+# T17 (CSL-05) — une doc qui CITE `cat <registre>` dans un heredoc n'est pas une lecture.
+OUT="$(run_guard "cat > $WORK/lab/doc.md << 'EOF'
+Pour lire un registre en entier (interdit) :
+cat $D
+EOF")"
+[ -z "$OUT" ] && ok "T17 (CSL-05) heredoc citant cat <registre> → allow" || ko "T17 (CSL-05) allow attendu : $OUT"
+
+# T18 (CSL-06) — l'exclusion écriture tolère la cible quotée.
+OUT1="$(run_guard "cat $WORK/lab/notes.md >> \"$D\"")"
+OUT2="$(run_guard "cat $WORK/lab/notes.md >> '$D'")"
+{ [ -z "$OUT1" ] && [ -z "$OUT2" ]; } && ok "T18 (CSL-06) append vers cible quotée → allow" \
+  || ko "T18 (CSL-06) allow attendu (dq: ${OUT1:-ok} · sq: ${OUT2:-ok})"
+
+# T19 — régression : la LECTURE d'un registre quoté doit toujours être bloquée.
+OUT="$(run_guard "cat \"$D\"")"
+is_deny "$OUT" && ok "T19 lecture argument quoté → deny maintenu" || ko "T19 deny attendu : ${OUT:-<vide>}"
+
+# T20 (CSL-07) — post-edit-reindex détecte l'écriture Bash vers une cible QUOTÉE.
+cat > "$MEM/JOURNAL.md" <<'EOF'
+# Journal
+
+## Session 1 : Init
+
+**Date** : 2026-07-01
+Contenu.
+EOF
+python3 -c "import json,sys; print(json.dumps({'tool_name':'Bash','cwd':sys.argv[2],'tool_input':{'command':sys.argv[1]}}))" \
+  "echo 'ligne' >> \"$MEM/JOURNAL.md\"" "$WORK/lab" | bash "$POST_EDIT" 2>/dev/null
+if grep -q '^## Index' "$MEM/JOURNAL.md" && grep -q '#Ligne' "$MEM/JOURNAL.md"; then
+  ok "T20 (CSL-07) append Bash vers cible quotée → index régénéré"
+else
+  ko "T20 (CSL-07) index non régénéré après append quoté"
 fi
 
 echo ""

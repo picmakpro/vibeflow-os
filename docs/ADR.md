@@ -16,7 +16,7 @@
 | ADR-047 | 2026-07-11 | skill-creator dans la baseline d'install (dépendance du conductor) | Validée |
 | ADR-048 | 2026-07-16 | Orchestrateur métier systématique (≥2 agents) + skill boucle de mission | Validée |
 | ADR-049 | 2026-07-16 | Backups mémoire isolés + rotation intégrée (anti-pollution registres) | Validée |
-| ADR-050 | 2026-07-16 | Hooks planning : lecture index-first au start + mise à jour bloquante au end | Validée |
+| ADR-050 | 2026-07-16 | Hooks planning : lecture index-first au start + mise à jour bloquante au end | Validée — amendée 2026-07-20 (attribution de session, fix faux positifs) |
 | ADR-051 | 2026-07-19 | Allowlist MCP des agents exécutants dérivée du lab (injection à l'install) | Validée |
 
 ---
@@ -301,6 +301,25 @@ charge progressive. Premier hook `Stop` du plugin.
 ### Rules Associées
 
 - Réutilise le pattern de blocage `PreToolUse`→`permissionDecision: deny` (ADR-043) transposé à `Stop`.
+
+### Amendement 2026-07-20 — attribution de session (fix faux positifs terrain)
+
+**Constat terrain (Samuel, dev vibeflow-os via GSD/dev-orchestrator)** : le guard v1 ne regardait que
+`git status --porcelain` alors que `Stop` se déclenche **à chaque fin de tour** (et `stop_hook_active`
+retombe à `false` après chaque nouveau message utilisateur). Deux faux positifs quasi systématiques :
+(1) un `STATE.md` mis à jour **puis committé** pendant la session devient invisible du porcelain →
+blocage à tort à chaque tour ; (2) du **dirt préexistant** au démarrage est attribué à tort à la session.
+
+**Correction (v2)** : nouveau hook SessionStart `planning-session-snapshot.sh` (toutes sources,
+first-wins au compact) écrit une **baseline de session** (epoch + HEAD de départ + porcelain hashé) dans
+`$TMPDIR/vibeflow-planning-guard/`. Le guard raisonne désormais en « changé pendant CETTE session » :
+signaux planning **larges** (committé dans la fenêtre `git log --since=début` ∪ sale ∪ mtime strictement
+postérieur au début — couvre `.planning/` gitignoré) ; attribution livrables **stricte** (committé dans la
+fenêtre — les commits tiers rapatriés par pull/merge sont exclus par committer-date — ∪ dirt absent de la
+baseline ou au hash blob modifié). Marqueur `<session>.blocked` : au pire **un blocage par session**.
+Baseline absente/périmée (>48h) ou arbre massivement sale (>400 entrées) → fail-open. L'asymétrie
+large/strict minimise structurellement les faux positifs (un faux négatif coûte une note de planning,
+un faux positif coûte la confiance dans le garde-fou + des tokens).
 
 ---
 
