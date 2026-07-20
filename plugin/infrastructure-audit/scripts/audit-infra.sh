@@ -13,7 +13,7 @@
 #   ./audit-infra.sh --axis=runtime|hooks|scripts|drift
 #   ./audit-infra.sh --snapshot                 # genere INFRASTRUCTURE_SNAPSHOT.md
 #   ./audit-infra.sh --diff                     # compare snapshot courant vs .prev
-#   ./audit-infra.sh --if-older-than=14d        # skip si snapshot < 14j
+#   ./audit-infra.sh --if-older-than=14d        # skip si dernier audit (stamp ou snapshot) < 14j
 #
 # Reference : skill infrastructure-audit + ADR-031
 
@@ -24,6 +24,10 @@ SCRIPTS_DIR="$CLAUDE_DIR/scripts"
 SNAPSHOT="$CLAUDE_DIR/INFRASTRUCTURE_SNAPSHOT.md"
 SNAPSHOT_PREV="${SNAPSHOT}.prev"
 KNOWN_VERSIONS="$SCRIPTS_DIR/known-versions.txt"
+# Stamp du dernier audit (INF-01) : --quick n'ecrit jamais de snapshot, donc sans ce
+# fichier le gate --if-older-than ne s'appliquait jamais et chaque SessionStart
+# subissait l'audit complet. Dotfile local au lab (a gitignorer, sans gravite sinon).
+STAMP="$CLAUDE_DIR/.last-audit"
 
 MODE="full"
 AXIS=""
@@ -46,19 +50,40 @@ done
 log() { echo "[audit-infra] $*" >&2; }
 
 # ---------- if-older-than guard ----------
-if [ -n "$IF_OLDER_THAN" ] && [ -f "$SNAPSHOT" ]; then
-  # Strip 'd' suffix
+# Le gate d'age porte sur le plus RECENT de {stamp .last-audit, snapshot} (INF-01).
+# Valeur malformee (ex: 2w) → gate ignore silencieusement, l'audit tourne (INF-04 :
+# fail-open explicite, plus de "[: 2w: integer expression expected" sur stderr).
+if [ -n "$IF_OLDER_THAN" ]; then
   days="${IF_OLDER_THAN%d}"
-  # Get snapshot age in days
-  snapshot_mtime=$(stat -f %m "$SNAPSHOT" 2>/dev/null || stat -c %Y "$SNAPSHOT" 2>/dev/null || echo 0)
-  age_days=$(( ($(date +%s) - snapshot_mtime) / 86400 ))
-  if [ "$age_days" -lt "$days" ]; then
-    log "Snapshot recent ($age_days j < $days j), skip audit"
-    exit 0
+  case "$days" in
+    ''|*[!0-9]*) days="" ;;
+  esac
+  if [ -n "$days" ]; then
+    ref_mtime=0
+    for ref in "$SNAPSHOT" "$STAMP"; do
+      [ -f "$ref" ] || continue
+      # stat GNU d'abord : sur GNU, `stat -f %m` renvoie silencieusement le point de
+      # montage (mode filesystem) — l'ordre inverse donnerait un mtime faux sans erreur.
+      m=$(stat -c %Y "$ref" 2>/dev/null || stat -f %m "$ref" 2>/dev/null || echo 0)
+      case "$m" in ''|*[!0-9]*) m=0 ;; esac
+      [ "$m" -gt "$ref_mtime" ] && ref_mtime=$m
+    done
+    if [ "$ref_mtime" -gt 0 ]; then
+      age_days=$(( ($(date +%s) - ref_mtime) / 86400 ))
+      if [ "$age_days" -lt "$days" ]; then
+        log "Dernier audit recent ($age_days j < $days j), skip"
+        exit 0
+      fi
+    fi
   fi
 fi
 
 # ---------- Axe 1 : Runtime ----------
+# Vrai si $1 >= $2 (semver X.Y.Z, tri numerique portable BSD+GNU).
+semver_ge() {
+  [ "$(printf '%s\n%s\n' "$1" "$2" | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)" = "$1" ]
+}
+
 audit_runtime() {
   log "Axe 1 — Runtime Claude Code"
 
@@ -70,8 +95,21 @@ audit_runtime() {
   fi
 
   local version_known="false"
-  if [ -f "$KNOWN_VERSIONS" ] && grep -q "^$claude_version$" "$KNOWN_VERSIONS" 2>/dev/null; then
-    version_known="true"
+  local version_note=""
+  if [ "$claude_version" != "unknown" ] && [ -f "$KNOWN_VERSIONS" ]; then
+    if grep -q "^$claude_version$" "$KNOWN_VERSIONS" 2>/dev/null; then
+      version_known="true"
+    else
+      # INF-05 : une version PLUS RECENTE que la derniere validee est consideree known
+      # (avec mention) — sinon chaque release Claude Code re-injecte "version_known:
+      # false" en permanence tant que la whitelist n'est pas re-editee a la main.
+      local last_known
+      last_known=$(grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' "$KNOWN_VERSIONS" 2>/dev/null | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+      if [ -n "$last_known" ] && semver_ge "$claude_version" "$last_known"; then
+        version_known="true"
+        version_note="$claude_version > derniere version validee ($last_known), supposee compatible"
+      fi
+    fi
   fi
 
   cat <<EOF
@@ -79,6 +117,7 @@ audit_runtime() {
   "axis": "runtime",
   "claude_version": "$claude_version",
   "version_known": $version_known,
+  "version_note": "$version_note",
   "tools_natifs_hardcoded": ["Read", "Write", "Edit", "Bash", "Skill", "Task", "WebFetch"],
   "hooks_events_hardcoded": ["SessionStart", "SessionEnd", "PreCompact", "Stop", "PreToolUse", "PostToolUse", "Notification", "UserPromptSubmit"]
 }
@@ -86,14 +125,23 @@ EOF
 }
 
 # ---------- Axe 2 : Hooks ----------
+# Accumulateur de detections (INF-02) : une ligne formatee par probleme releve.
+# Portee dynamique : `detections` est la variable locale de audit_hooks.
+det_add() {
+  detections="${detections}${detections:+
+}$1"
+}
+
 audit_hooks() {
   log "Axe 2 — Hooks contract"
 
   local known_events="SessionStart SessionEnd PreCompact Stop PreToolUse PostToolUse Notification UserPromptSubmit"
-  local errors=()
-  local warnings=()
+  local errors_count=0
+  local warnings_count=0
+  local detections=""
   local files_audited=()
   local total_hooks=0
+  local sf py_out sev code detail src
 
   for sf in "$CLAUDE_DIR/settings.json" "$CLAUDE_DIR/settings.local.json"; do
     [ -f "$sf" ] || continue
@@ -101,12 +149,15 @@ audit_hooks() {
 
     # JSON valide ?
     if ! python3 -c "import json; json.load(open('$sf'))" 2>/dev/null; then
-      errors+=("'$sf' : JSON invalide")
+      errors_count=$((errors_count + 1))
+      det_add "ERR json_invalid : $sf"
       continue
     fi
 
-    # Parse hooks via python
-    python3 - "$sf" "$known_events" <<'PYEOF' 2>/dev/null
+    # Parse hooks via python — sortie CAPTUREE puis comptee (INF-02) : avant, les
+    # lignes ERR|/WARN| fuyaient brutes sur stdout et errors_count restait a 0
+    # (l'audit mentait). Le format d'echange reste SEV|code|detail|source.
+    py_out="$(python3 - "$sf" "$known_events" 2>/dev/null <<'PYEOF'
 import json
 import sys
 import os
@@ -147,6 +198,19 @@ for event, configs in hooks.items():
                             print(f"WARN|script_not_executable|{path}|{sf}")
                         break
 PYEOF
+)"
+
+    # Comptage + formatage des detections (boucle dans le shell courant via heredoc,
+    # pas de pipe : un `| while` perdrait les compteurs dans un sous-shell).
+    while IFS='|' read -r sev code detail src; do
+      [ -n "$sev" ] || continue
+      case "$sev" in
+        ERR)  errors_count=$((errors_count + 1));     det_add "ERR $code : $detail ($src)" ;;
+        WARN) warnings_count=$((warnings_count + 1)); det_add "WARN $code : $detail ($src)" ;;
+      esac
+    done <<EOF_DET
+$py_out
+EOF_DET
   done
 
   # Count hooks
@@ -172,13 +236,20 @@ except: print(0)
   if [ ${#files_audited[@]} -gt 0 ]; then
     files_json="[$(printf '"%s",' "${files_audited[@]}" | sed 's/,$//')]"
   fi
+  # Tableau JSON des detections : echappement minimal (backslash puis quotes),
+  # une chaine par ligne accumulee.
+  local det_json="[]"
+  if [ -n "$detections" ]; then
+    det_json="[$(printf '%s\n' "$detections" | sed 's/\\/\\\\/g; s/"/\\"/g; s/^/"/; s/$/",/' | tr -d '\n' | sed 's/,$//')]"
+  fi
   cat <<EOF
 {
   "axis": "hooks",
   "settings_files_audited": $files_json,
   "total_hooks": $total_hooks,
-  "errors_count": ${#errors[@]},
-  "warnings_count": ${#warnings[@]}
+  "errors_count": $errors_count,
+  "warnings_count": $warnings_count,
+  "detections": $det_json
 }
 EOF
 }
@@ -317,6 +388,9 @@ case "$MODE" in
     log "Audit quick"
     audit_runtime
     audit_hooks
+    # INF-01 : --quick n'ecrit pas de snapshot — poser un stamp pour que le gate
+    # --if-older-than s'applique aux sessions suivantes (sinon audit a CHAQUE start).
+    touch "$STAMP" 2>/dev/null || true
     ;;
   axis)
     case "$AXIS" in

@@ -10,7 +10,10 @@
 #   check-registres.sh --memory-dir=PATH     # défaut .claude/memory
 #
 # Checks par registre :
-#   C1 — header `## Index` présent (40 premières lignes)
+#   C1 — header `## Index` présent (200 premières lignes — CSL-16 : head -40 déclarait
+#        à tort « sans index » les registres à gros préambule)
+#   C1bis — bloc '## Index' refermé par une ligne '---' (CSL-01 : sans terminateur,
+#        reindex --apply refuse la réécriture pour ne pas avaler le body)
 #   C2 — tableau d'index avec colonne `#Ligne` (format canonique v2, cf. consolidator/indexation)
 #   C3 — cohérence IDs index <-> body (via reindex.sh --audit : 0 orphelin exigé)
 #   C4 — aucun ID dupliqué dans le body
@@ -57,14 +60,24 @@ check_register() {
   local name="$1" file="$2"
   local pat; pat="$(id_pattern_for "$name")"
 
-  # C1 — header ## Index
-  if ! head -40 "$file" | grep -q '^## Index'; then
+  # C1 — header ## Index (borne 200 — CSL-16 : head -40 était trop court pour les
+  # registres à gros préambule, faussement déclarés « sans index »)
+  local idx_ln
+  idx_ln="$(awk 'NR<=200 && /^## Index/ {print NR; exit}' "$file")"
+  if [ -z "$idx_ln" ]; then
     PROBLEMS+=("$name : pas de header '## Index' (format canonique v2 requis)")
     return
   fi
 
-  # C2 — colonne #Ligne dans le tableau d'index
-  if ! head -60 "$file" | grep -E '^\|' | head -5 | grep -q '#Ligne'; then
+  # C1bis — terminateur '---' après '## Index' (CSL-01) : sans lui, l'awk de
+  # réécriture de reindex avalerait tout le body — reindex refuse donc d'appliquer.
+  if [ -z "$(awk -v s="$idx_ln" 'NR>s && /^---$/ {print "ok"; exit}' "$file")" ]; then
+    PROBLEMS+=("$name : bloc '## Index' sans ligne '---' de fermeture (reindex refusera la réécriture)")
+  fi
+
+  # C2 — colonne #Ligne dans le tableau d'index (cherché APRÈS '## Index', borne
+  # 200 lignes — CSL-16 : head -60 depuis le début du fichier ratait l'index)
+  if ! awk -v s="$idx_ln" 'NR>=s && NR<=s+200 && /^\|/ {c++; if (index($0, "#Ligne")) found=1; if (c>=5) exit} END {exit found ? 0 : 1}' "$file"; then
     PROBLEMS+=("$name : index sans colonne '#Ligne' (lecture ciblée impossible — regénérer : reindex.sh --register=$name --apply)")
   fi
 

@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # test-check-registres.sh — Suite du lint format registres (ADR-043).
 #
-# T1 — registre conforme (## Index + #Ligne + IDs cohérents) → exit 0
+# T1 — registre conforme (## Index + '---' + #Ligne + IDs cohérents) → exit 0
 # T2 — registre sans '## Index' → exit 1
 # T3 — index sans colonne #Ligne → exit 1
 # T4 — entrée de body non indexée → exit 1
 # T5 — ID dupliqué dans le body → exit 1
 # T6 — --strict avec les 5 registres canon absents → exit 1 ; présents et conformes → exit 0
 # T7 — --hook : exit 0 même non conforme, sortie compacte signalant le problème
+# T8 (CSL-16) — registre conforme à gros préambule (150 lignes) → exit 0 (head -40/-60 le rejetait)
+# T9 (CSL-01) — '## Index' sans ligne '---' de fermeture → exit 1 (reindex refuserait la réécriture)
 
 set -uo pipefail
 
@@ -25,6 +27,8 @@ trap 'rm -rf "$WORK"' EXIT
 
 conforming_register() {
   # $1 = fichier · $2 = préfixe ID (DEC, LRN...)
+  # Format canonique v2 : le bloc index est REFERMÉ par '---' (CSL-01 — sans ce
+  # terminateur, reindex --apply refuse la réécriture et check-registres signale).
   cat > "$1" <<EOF
 # Registre
 
@@ -33,6 +37,8 @@ conforming_register() {
 | ID | Date | Titre | #Ligne | Resume |
 |----|------|-------|--------|--------|
 | ${2}-001 | 2026-07-01 | Premiere entree | 12 | Resume court |
+
+---
 
 ## ${2}-001 : Premiere entree
 
@@ -68,6 +74,8 @@ cat > "$M3/DECISIONS.md" <<'EOF'
 | ID | Date | Titre | Statut |
 |----|------|-------|--------|
 | DEC-001 | 2026-07-01 | Entree | fait |
+
+---
 
 ## DEC-001 : Entree
 
@@ -121,6 +129,8 @@ cat > "$M6b/JOURNAL.md" <<'EOF'
 |----|------|-------|--------|--------|
 | Session 1 | 2026-07-01 | Init | 12 | Premiere session |
 
+---
+
 ## Session 1 : Init
 
 Contenu.
@@ -137,6 +147,55 @@ if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "non-conformité"; then
   ok "T7 --hook : exit 0 + signalement compact du problème"
 else
   ko "T7 --hook (rc=$RC, out=${OUT:-<vide>})"
+fi
+
+# T8 (CSL-16) — gros préambule (150 lignes) avant un index conforme → exit 0
+M8="$WORK/t8"; mkdir -p "$M8"
+{
+  echo "# Registre a gros preambule"
+  i=1
+  while [ "$i" -le 150 ]; do echo "> ligne de preambule $i"; i=$((i+1)); done
+  cat <<'EOF'
+
+## Index
+
+| ID | Date | Titre | #Ligne | Resume |
+|----|------|-------|--------|--------|
+| DEC-001 | 2026-07-01 | Premiere entree | 160 | Resume court |
+
+---
+
+## DEC-001 : Premiere entree
+
+Contenu.
+EOF
+} > "$M8/DECISIONS.md"
+if bash "$CHECK" --memory-dir="$M8" >/dev/null 2>&1; then
+  ok "T8 (CSL-16) préambule 150 lignes + index conforme → exit 0"
+else
+  ko "T8 (CSL-16) registre à gros préambule faussement déclaré non conforme"
+fi
+
+# T9 (CSL-01) — '## Index' présent mais jamais refermé par '---' → exit 1 + message dédié
+M9="$WORK/t9"; mkdir -p "$M9"
+cat > "$M9/DECISIONS.md" <<'EOF'
+# Registre
+
+## Index
+
+| ID | Date | Titre | #Ligne | Resume |
+|----|------|-------|--------|--------|
+| DEC-001 | 2026-07-01 | Premiere entree | 10 | Resume court |
+
+## DEC-001 : Premiere entree
+
+Contenu.
+EOF
+OUT="$(bash "$CHECK" --memory-dir="$M9" 2>/dev/null)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "sans ligne '---' de fermeture"; then
+  ok "T9 (CSL-01) index sans terminateur '---' → exit 1 + signalement"
+else
+  ko "T9 (CSL-01) attendu exit 1 + message terminateur (rc=$RC, out=${OUT:-<vide>})"
 fi
 
 echo ""

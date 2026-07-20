@@ -114,15 +114,20 @@ Deux topologies. **Ne pas plaquer la mauvaise.**
 - À la livraison d'un jalon : archiver dans `MILESTONES.md` + `milestones/`.
 - Promouvoir les décisions structurantes de `PROJECT.md` vers la mémoire (pont).
 
-> **Automatisation livrée (v2.2.0, ADR-050)** — la maintenance n'est plus seulement une discipline
-> manuelle, elle est machine-enforced par 3 hooks :
+> **Automatisation livrée (v2.2.0, ADR-050 ; durcie v2.3.0)** — la maintenance n'est plus seulement une
+> discipline manuelle, elle est machine-enforced par 4 hooks :
 > - **SessionStart** : `planning-context.sh` injecte un **digest index-first** (INDEX du lab, ou STATE
->   borné en mono) + `detect-planning-debt.sh` surface le 8e signal de dette.
+>   borné en mono) + `detect-planning-debt.sh` surface le 8e signal de dette + `planning-session-snapshot.sh`
+>   photographie la **baseline de session** (epoch, HEAD de départ, porcelain hashé).
 > - **UserPromptSubmit** : `planning-task-context.sh` injecte le `STATE.md` **du compartiment que vise la
 >   tâche** (jamais tous — structuration du contexte).
-> - **Stop** : `guard-planning-updated.sh` **bloque** la fin de session si des livrables ont changé sans
->   mise à jour du planning (dette) — avec anti-boucle, échappatoire `.session-noop`, toggle
->   `VF_PLANNING_STOP=block|warn|off`.
+> - **Stop** : `guard-planning-updated.sh` **bloque** si des livrables ont changé **pendant la session**
+>   sans mise à jour du planning. L'attribution se fait contre la baseline (commits de la session via
+>   `git log --since`, dirt nouveau ou au hash modifié) — le dirt préexistant n'est JAMAIS attribué, un
+>   `STATE.md` mis à jour **puis committé** (flow GSD/dev-orchestrator) est bien reconnu, et le signal
+>   mtime couvre un `.planning/` gitignoré. Au pire **un seul blocage par session** (marqueur `.blocked`
+>   + anti-boucle `stop_hook_active`), échappatoire `.session-noop`, baseline absente/périmée → fail-open,
+>   toggle `VF_PLANNING_STOP=block|warn|off`.
 
 ---
 

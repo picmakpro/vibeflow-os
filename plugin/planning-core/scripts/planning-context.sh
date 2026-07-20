@@ -22,10 +22,12 @@ set -uo pipefail
 PLANNING_DIR=".planning"
 MAX_LINES=45
 
+# NB : ${2:?} obligatoire (convention des scripts frères) — un ${2:-défaut} + shift 2 sans
+# valeur ne consommait rien et bouclait à l'infini (gel du SessionStart jusqu'au timeout).
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --path) PLANNING_DIR="${2:-.planning}"; shift 2 ;;
-    --max-lines) MAX_LINES="${2:-45}"; shift 2 ;;
+    --path) PLANNING_DIR="${2:?--path nécessite une valeur}"; shift 2 ;;
+    --max-lines) MAX_LINES="${2:?--max-lines nécessite une valeur}"; shift 2 ;;
     -h|--help) grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *) shift ;;
   esac
@@ -39,6 +41,8 @@ STATE_FILE="$PLANNING_DIR/STATE.md"
 
 if [ -f "$INDEX_FILE" ]; then
   # --- Lab à compartiments : index-first ---
+  INDEX_MAX=80
+  total=$(wc -l < "$INDEX_FILE" | tr -d ' ')
   echo "## 📍 Contexte planning (injecté — lab à compartiments)"
   echo ""
   echo "Voici l'INDEX des compartiments du lab. **Avant d'agir sur un compartiment, lis d'abord son"
@@ -46,8 +50,10 @@ if [ -f "$INDEX_FILE" ]; then
   echo "du contexte). Le STATE du compartiment ciblé te sera injecté automatiquement quand ta tâche sera connue."
   echo ""
   echo '```'
-  head -n 80 "$INDEX_FILE"
+  head -n "$INDEX_MAX" "$INDEX_FILE"
   echo '```'
+  # Signaler la troncature (comme le chemin mono STATE) : sinon le modèle croit avoir tout l'INDEX.
+  [ "$total" -gt "$INDEX_MAX" ] && echo "_(…tronqué — \`Read $INDEX_FILE\` pour la suite.)_"
   exit 0
 fi
 

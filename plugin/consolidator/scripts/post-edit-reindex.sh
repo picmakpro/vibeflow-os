@@ -7,16 +7,28 @@
 #   PostToolUse · matcher "Edit|Write|Bash" · command: bash .claude/scripts/post-edit-reindex.sh
 #
 # Edit/Write : le registre = tool_input.file_path. Bash (BLK-006) : détecte une ÉCRITURE
-# vers un registre dans la commande (`>>`/`>` ou `tee [-a]` visant le registre) — un
-# `cat >> DECISIONS.md << EOF` recale donc aussi l'index.
+# vers un registre dans la commande (`>>`/`>` ou `tee [-a]` visant le registre — cible
+# quotée comprise, CSL-07) — un `cat >> DECISIONS.md << EOF` recale donc aussi l'index.
 #
 # Fail-open : toute erreur → exit 0 silencieux (un hook de maintenance ne casse jamais le flux).
 
 set -uo pipefail
 
+# CSL-13 : préfiltre pur bash AVANT le spawn python3 (~80-120 ms payés sinon sur CHAQUE
+# Edit/Write/Bash, même hors registres). SURENSEMBLE STRICT du domaine d'action du
+# python : il ne retourne un chemin que si celui-ci contient .claude/memory/<REGISTRE>.md
+# (REG_RE côté Bash, filtre parent/base côté Edit/Write) — la sous-chaîne littérale
+# « .claude/memory/ » est donc présente dans le payload JSON dès qu'une action est due
+# (l'encodeur JSON standard n'échappe ni « . » ni « / »). Skip sans perte sinon.
+PAYLOAD="$(cat 2>/dev/null || true)"
+case "$PAYLOAD" in
+  *'.claude/memory/'*) : ;;
+  *) exit 0 ;;
+esac
+
 command -v python3 >/dev/null 2>&1 || exit 0
 
-FILE_PATH="$(python3 -c '
+FILE_PATH="$(printf '%s' "$PAYLOAD" | python3 -c '
 import json, os, re, sys
 try:
     p = json.load(sys.stdin)
@@ -33,7 +45,10 @@ if p.get("tool_name") == "Bash":
         path = m.group("path")
         before = cmd[:m.start()]
         # Ecriture = redirection juste avant le chemin, ou tee visant le chemin.
-        if re.search(r">{1,2}\s*$", before) or re.search(r"\btee\s+(-a\s+)?$", before):
+        # CSL-07 : tolerer une quote ouvrante avant la cible (`>> "REG"`) — symetrique
+        # de l exclusion ecriture du guard Bash (CSL-06), sinon l index ne se recalait
+        # jamais apres un append quote.
+        if re.search(r">{1,2}\s*[\"\x27]?$", before) or re.search(r"\btee\s+(-a\s+)?[\"\x27]?$", before):
             hit = path
             break
     if hit and not os.path.isabs(hit):
@@ -47,8 +62,11 @@ else:
 
 BASE="$(basename "$FILE_PATH")"
 PARENT="$(dirname "$FILE_PATH")"
+# Registre canonique = DIRECTEMENT sous .claude/memory (frontière de chemin exigée,
+# symétrique CSL-12 : le motif `*.claude/memory` matchait aussi "my.claude/memory"
+# et aurait réindexé — donc réécrit — un fichier hors registres).
 case "$PARENT" in
-  *.claude/memory) : ;;
+  .claude/memory|*/.claude/memory) : ;;
   *) exit 0 ;;
 esac
 

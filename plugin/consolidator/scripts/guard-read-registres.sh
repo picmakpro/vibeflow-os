@@ -20,14 +20,31 @@
 # NB : le programme python est passé en -c (PAS en heredoc sur stdin) — le payload JSON
 # du hook arrive sur stdin et doit rester lisible par json.load(sys.stdin).
 #
+# LIMITES ASSUMÉES (CSL-12) : comparaison de chemin sensible à la casse (sur APFS
+# insensible à la casse, un chemin .CLAUDE/MEMORY passerait) ; pas de résolution de
+# symlinks ; os.path.normpath neutralise les traversées simples (./, //, a/../b) —
+# les contournements exotiques restent hors périmètre d'un garde-fou déterministe.
+#
 # Fail-open : toute erreur interne → allow (exit 0 silencieux). Un garde-fou cassé
 # ne doit jamais bloquer le travail.
 
 set -uo pipefail
 
+# CSL-13 : préfiltre pur bash AVANT le spawn python3 (~80-120 ms payés sinon sur CHAQUE
+# Read, même hors registres). SURENSEMBLE STRICT du domaine de deny du python : celui-ci
+# ne peut denier que si le parent du chemin normalisé se termine par .claude/memory, ce
+# qui exige la sous-chaîne littérale « .claude/memory/ » dans file_path — donc dans le
+# payload JSON (l'encodeur JSON standard n'échappe ni « . » ni « / »). Un payload sans
+# cette sous-chaîne ⇒ le python sortirait 0 de toute façon : le skip est sans perte.
+PAYLOAD="$(cat 2>/dev/null || true)"
+case "$PAYLOAD" in
+  *'.claude/memory/'*) : ;;
+  *) exit 0 ;;
+esac
+
 command -v python3 >/dev/null 2>&1 || exit 0
 
-python3 -c '
+printf '%s' "$PAYLOAD" | python3 -c '
 import json, os, sys
 
 try:
@@ -46,13 +63,17 @@ REGISTRES = {
     "ADR.md", "BDR.md", "ITERATION_LOG.md",
 }
 
-norm = file_path.replace("\\\\", "/")
+# CSL-12 : normpath neutralise ./, // et a/../b AVANT analyse (sinon un chemin
+# traversant contournait le guard, et un suffixe accidentel le declenchait).
+norm = os.path.normpath(file_path.replace("\\\\", "/"))
 base = os.path.basename(norm)
 parent = os.path.dirname(norm)
 if base not in REGISTRES:
     sys.exit(0)
-# Registre canonique = directement sous .claude/memory/ (l archive reste libre).
-if not parent.endswith(".claude/memory"):
+# Registre canonique = DIRECTEMENT sous .claude/memory/ (l archive reste libre).
+# CSL-12 : frontiere de chemin exigee — endswith(".claude/memory") seul matchait
+# aussi un dossier "my.claude/memory" (faux positif demontre).
+if not (parent == ".claude/memory" or parent.endswith("/.claude/memory")):
     sys.exit(0)
 
 max_lines = 150

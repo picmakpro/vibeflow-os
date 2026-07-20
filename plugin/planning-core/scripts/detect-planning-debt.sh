@@ -6,6 +6,8 @@
 #   1. ACTIF        — activité récente (fichier modifié dans la fenêtre --active-window)
 #   2. SANS PLAN    — ni .planning/, ni STATE.md/BOARD.md/ROADMAP.md/PLAN.md à sa racine
 #   3. AU-DESSUS DU SEUIL D'AUTONOMIE — volume ≥ --min-tasks fichiers (proxy de complexité)
+# Les dossiers vendorés/générés (.git, node_modules, .venv, vendor, dist, build, .next) sont
+# ÉLAGUÉS : ils ne comptent ni dans le volume ni dans l'activité (un npm install ≠ du travail).
 #
 # Philosophie : on n'impose PAS un plan partout (sur-ingénierie). On signale seulement les
 # compartiments qui en MÉRITENT un et n'en ont pas. Alerte → l'agent propose /vf-planning.
@@ -44,21 +46,12 @@ if [ ! -d "$ROOT" ]; then
   exit 3
 fi
 
-# --- mtime portable (BSD macOS / GNU Linux) ---
-file_mtime() {
-  stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null
-}
-now_epoch() { date +%s; }
-
-# Plus récent mtime d'un dossier (hors .git), 0 si vide.
-newest_mtime() {
-  local dir="$1" newest=0 m
-  while IFS= read -r f; do
-    m=$(file_mtime "$f"); [ -n "$m" ] || continue
-    [ "$m" -gt "$newest" ] && newest="$m"
-  done < <(find "$dir" -type f -not -path '*/.git/*' 2>/dev/null)
-  echo "$newest"
-}
+# --- find borné : élaguer les dossiers vendorés/générés AVANT la descente (-prune, pas filtre post).
+# POURQUOI : un node_modules réel = des dizaines de milliers de fichiers → gel du SessionStart
+# (hook tué au timeout) + effets sémantiques (fichiers vendorés comptés dans --min-tasks,
+# npm install récent rendant le compartiment « actif »). Ce hook doit rester quasi instantané.
+# Expansion NON quotée voulue aux sites d'appel (mots fixes sans espace, `(` passé en argument à find).
+PRUNE_VENDOR='( -type d ( -name .git -o -name node_modules -o -name .venv -o -name vendor -o -name dist -o -name build -o -name .next ) ) -prune'
 
 has_plan() {
   local dir="$1"
@@ -69,29 +62,27 @@ has_plan() {
   return 1
 }
 
-NOW=$(now_epoch)
 debt_found=0
 debt_list=""
 
 for dir in "$ROOT"/*/; do
   [ -d "$dir" ] || continue
-  name=$(basename "$dir")
 
-  # 3. Volume (seuil d'autonomie) — proxy : nb de fichiers hors .git
-  files=$(find "$dir" -type f -not -path '*/.git/*' 2>/dev/null | wc -l | tr -d ' ')
-  [ "$files" -ge "$MIN_TASKS" ] || continue
-
-  # 2. Sans plan ?
+  # 2. Sans plan ? — test O(1), le moins cher : éliminer d'abord sans aucun parcours.
   if has_plan "$dir"; then continue; fi
 
-  # 1. Actif ? (activité dans la fenêtre)
-  nm=$(newest_mtime "$dir")
-  [ "$nm" -gt 0 ] || continue
-  age_days=$(( (NOW - nm) / 86400 ))
-  [ "$age_days" -le "$ACTIVE_WINDOW" ] || continue
+  # 3. Volume (seuil d'autonomie) — early-exit : on veut seulement savoir si ≥ MIN_TASKS,
+  #    head coupe le flux dès le seuil atteint (jamais de comptage exhaustif de l'arbre).
+  files=$(find "$dir" $PRUNE_VENDOR -o -type f -print 2>/dev/null | head -n "$MIN_TASKS" | wc -l | tr -d ' ')
+  [ "$files" -ge "$MIN_TASKS" ] || continue
+
+  # 1. Actif ? — O(1) : l'EXISTENCE d'un fichier modifié dans la fenêtre suffit,
+  #    head -n 1 stoppe find au premier trouvé (aucun stat spawné par fichier).
+  recent=$(find "$dir" $PRUNE_VENDOR -o -type f -mtime -"$ACTIVE_WINDOW" -print 2>/dev/null | head -n 1)
+  [ -n "$recent" ] || continue
 
   debt_found=1
-  debt_list="${debt_list}  - ${dir%/} — actif (dernière activité il y a ${age_days}j), ${files} fichiers, AUCUN plan → typer (deliverable/continuous) + /vf-planning"$'\n'
+  debt_list="${debt_list}  - ${dir%/} — actif (activité < ${ACTIVE_WINDOW}j), ≥ ${MIN_TASKS} fichiers, AUCUN plan → typer (deliverable/continuous) + /vf-planning"$'\n'
 done
 
 if [ "$debt_found" -eq 1 ]; then

@@ -19,7 +19,7 @@
       {
         "matcher": "Edit|Write|Bash",
         "hooks": [
-          { "type": "command", "command": "bash {{VF_SCRIPTS}}/post-edit-reindex.sh" }
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/post-edit-reindex.sh || true" }
         ]
       }
     ],

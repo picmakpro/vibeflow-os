@@ -1,5 +1,26 @@
 # Changelog — software-architecture
 
+## [v1.5.0] — 2026-07-20 (audit robustesse hooks — fix faux positifs guard 300L)
+
+### Corrigé
+- **`guard-file-size.sh` réécrit : le guard juge désormais le RÉSULTAT de l'édition, plus l'ancien
+  état du disque.** Trois défauts démontrés corrigés : (1) le guard bloquait sa propre remédiation
+  (Write d'un refactor conforme 150L sur un chemin ≥300L = deny ; Edit ajoutant le marqueur
+  d'échappatoire = deny → boucle deny/retry) ; (2) contournable en croissance (fichier 299L + Edit
+  ×1000L = allow, Write neuf 2000L = allow) ; (3) fail-closed sur erreur interne (fichier illisible
+  → deny à tort). Désormais : Write mesuré sur `tool_input.content` ; Edit : marqueur dans
+  `new_string` = allow, delta ≤ 0 (rétrécit) = toujours allow, résultat estimé ≥ seuil = deny ;
+  toute exception interne → allow (fail-open strict — seul le deny explicite bloque).
+- `check-file-size.sh` : `mapfile` (bash 4+) cassait `--staged`/`--all` sous bash 3.2 macOS
+  (rc=127, pre-commit mort) → boucle `read` portable. Off-by-one : fichier de 300 lignes sans
+  newline finale compté 299 → comptage `awk END{print NR}` / `splitlines()`.
+- Performance : un seul spawn python3 par Edit/Write (parse + décision + deny fusionnés),
+  préfiltre bash sans spawn si stdin sans `file_path`.
+
+### Tests
+- `test-guard-file-size.sh` 6 → 15 checks (payloads réalistes old_string/new_string/content) ;
+  `test-check-file-size.sh` 4 → 9 checks. 100% PASS sous /bin/bash 3.2.
+
 ## [v1.4.0] — 2026-07-08 (ADR-045)
 
 ### Ajouté

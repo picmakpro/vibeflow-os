@@ -19,7 +19,16 @@ set -uo pipefail
 
 command -v python3 >/dev/null 2>&1 || exit 0
 
-CHECKER="$(dirname "$0")/check-agents.sh" VF_GUARD=1 python3 -c "
+# Préfiltre pur-bash (latence : ce hook tourne sur CHAQUE Write du lab) : le deny n'est
+# possible que si file_path pointe sous .claude/agents → tout payload concerné contient la
+# sous-chaîne '.claude' (surensemble strict, séparateurs / et \\ inclus). Sinon : 0 spawn.
+INPUT="$(cat 2>/dev/null || true)"
+case "$INPUT" in
+  *'.claude'*) : ;;
+  *) exit 0 ;;
+esac
+
+printf '%s' "$INPUT" | CHECKER="$(dirname "$0")/check-agents.sh" VF_GUARD=1 python3 -c "
 import json, os, subprocess, sys, tempfile
 
 try:
@@ -30,8 +39,9 @@ except Exception:
 ti = payload.get(\"tool_input\") or {}
 fp = (ti.get(\"file_path\") or \"\").replace(\"\\\\\", \"/\")
 base = os.path.basename(fp)
-parent = os.path.dirname(fp)
-if (not parent.endswith(\".claude/agents\")
+parent = os.path.normpath(os.path.dirname(fp)) if fp else \"\"
+# Frontière exacte : 'my.claude/agents' ne doit PAS matcher (faux positif de suffixe).
+if (not (parent == \".claude/agents\" or parent.endswith(\"/.claude/agents\"))
         or not base.endswith(\".md\")
         or base in (\"contracts.md\", \"README.md\", \"AGENTS.md\")):
     sys.exit(0)

@@ -40,7 +40,11 @@ check_one() {
   [ -f "$f" ] || return 0
   is_code_file "$f" || return 0
   local n
-  n=$(wc -l < "$f" | tr -d ' ')
+  # awk END{NR} compte la derniere ligne meme sans newline finale (wc -l la rate :
+  # un fichier de 300 lignes sans \n final comptait 299 et passait le gate).
+  # Fichier illisible → 0 (fail-open).
+  n=$(awk 'END { print NR }' "$f" 2>/dev/null || echo 0)
+  [ -n "$n" ] || n=0
   if [ "$n" -ge "$BLOCK" ]; then
     if has_optout "$f"; then
       echo "  ⚠ $f : $n lignes (≥ $BLOCK) — toléré (marqueur vibeflow:allow-large-file = DETTE)"
@@ -66,11 +70,23 @@ collect_all() {
   done
 }
 
+# Compat bash 3.2 (macOS /bin/bash) : mapfile/readarray n'existent pas (rc=127,
+# pre-commit cassé) — remplir le tableau via une boucle read. Portée dynamique :
+# `files` est le tableau local de main().
+append_files() {
+  local line
+  while IFS= read -r line; do
+    if [ -n "$line" ]; then
+      files[${#files[@]}]="$line"
+    fi
+  done
+}
+
 main() {
   local files=()
   case "${1:-}" in
-    --staged) mapfile -t files < <(collect_staged) ;;
-    --all)    mapfile -t files < <(collect_all) ;;
+    --staged) append_files < <(collect_staged) ;;
+    --all)    append_files < <(collect_all) ;;
     "")       echo "Usage: check-file-size.sh --staged | --all | <file...>" >&2; exit 0 ;;
     *)        files=("$@") ;;
   esac

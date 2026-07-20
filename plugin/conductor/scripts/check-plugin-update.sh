@@ -40,7 +40,9 @@ fi
 installed="${installed#v}"
 
 # --- Dernière version publiée : le plus grand tag vX.Y.Z du dépôt (ls-remote, sans clone) ---
-latest="$(git ls-remote --tags --refs "$REPO_URL" 2>/dev/null \
+# GIT_TERMINAL_PROMPT=0 : repo privé sans credential helper → échec propre au lieu d'un
+# prompt qui pendrait en tâche de fond.
+latest="$(GIT_TERMINAL_PROMPT=0 git ls-remote --tags --refs "$REPO_URL" 2>/dev/null \
   | awk -F/ '{print $NF}' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)"
 latest="${latest#v}"
 

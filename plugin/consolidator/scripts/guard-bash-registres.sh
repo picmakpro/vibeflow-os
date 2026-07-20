@@ -9,14 +9,17 @@
 # Règle — DENY si la commande Bash fait une LECTURE PLEINE d'un registre canonique
 # (.claude/memory/{DECISIONS,LEARNINGS,BLOCKERS,EVALS,JOURNAL,ADR,BDR,ITERATION_LOG}.md,
 # hors archive/) qui dépasse VF_GUARD_MAX_LINES (150) lignes :
-#   - lecteur plein (cat, less, more, bat, nl, tac, strings, vi/vim/nano, open…) sur le registre ;
+#   - lecteur plein (cat, less, more, bat, nl, tac, strings, vi/vim/nano, open…) sur le
+#     registre, UNIQUEMENT en position de COMMANDE (CSL-04 : `grep -n open REG` est un
+#     motif de recherche légitime, pas un lecteur) ;
 #   - head/tail NON borné (`-n +K`, N > 150) sur le registre.
 # Reste AUTORISÉ (lecture ciblée ou écriture) :
 #   - grep/rg, wc, ls, stat, git, diff, sed/awk (plages ciblées) ;
 #   - head/tail borné (N ≤ 150, ou défaut 10 lignes) ;
 #   - pipeline dont un segment AVAL limite la sortie (`cat X | head -20`, `… | grep`) ;
-#   - écritures/appends (`>> registre`, `> registre`, `tee -a registre`) — l'index est
-#     ensuite recalé par post-edit-reindex (qui couvre aussi Bash) ;
+#   - écritures/appends (`>> registre`, `> registre` — cible quotée comprise, CSL-06 —
+#     `tee -a registre`) — l'index est ensuite recalé par post-edit-reindex ;
+#   - contenu de heredoc (CSL-05 : une doc qui CITE `cat registre` n'est pas une lecture) ;
 #   - petits registres (≤ 150 lignes), archives, fichiers hors registres.
 #
 # LIMITE ASSUMÉE (documentée BLK-006) : cette barrière est un garde-fou déterministe contre
@@ -27,9 +30,21 @@
 
 set -uo pipefail
 
+# CSL-13 : préfiltre pur bash AVANT le spawn python3 (~80-120 ms payés sinon sur CHAQUE
+# commande Bash, même sans rapport avec un registre). SURENSEMBLE STRICT du domaine de
+# deny du python : celui-ci ne peut denier que si REG_RE matche la commande, ce qui
+# exige la sous-chaîne littérale « .claude/memory/ » — présente telle quelle dans le
+# payload JSON (l'encodeur JSON standard n'échappe ni « . » ni « / »). Un payload sans
+# cette sous-chaîne ⇒ le python sortirait 0 de toute façon : le skip est sans perte.
+PAYLOAD="$(cat 2>/dev/null || true)"
+case "$PAYLOAD" in
+  *'.claude/memory/'*) : ;;
+  *) exit 0 ;;
+esac
+
 command -v python3 >/dev/null 2>&1 || exit 0
 
-python3 -c '
+printf '%s' "$PAYLOAD" | python3 -c '
 import json, os, re, sys
 
 try:
@@ -43,6 +58,11 @@ if not cmd:
     sys.exit(0)
 cwd = payload.get("cwd") or "."
 
+# CSL-05 : le contenu d un heredoc est du TEXTE, pas des commandes — une doc qui cite
+# `cat REG` ne doit pas bloquer. Troncature au premier marqueur << ; une ecriture
+# `>> REG << EOF` garde sa cible AVANT le marqueur, donc reste couverte plus bas.
+cmd = cmd.split("<<", 1)[0]
+
 # Chemin de registre canonique DIRECTEMENT sous .claude/memory/ (archive/ ne matche pas).
 REG_RE = re.compile(
     r"(?P<path>[^\s\"\x27<>|;&]*\.claude/memory/"
@@ -55,6 +75,8 @@ FULL_READERS = {"cat", "less", "more", "bat", "nl", "tac", "strings", "pv",
                 "vi", "vim", "view", "nano", "emacs", "open", "column"}
 LIMITERS = {"grep", "rg", "ugrep", "egrep", "fgrep", "wc", "ls", "stat", "git",
             "diff", "md5", "md5sum", "shasum", "sed", "awk", "cut", "sort", "uniq", "jq"}
+# CSL-04 : wrappers transparents — la commande reelle vient APRES eux.
+WRAPPERS = {"sudo", "env", "command", "nohup", "time", "xargs", "nice", "stdbuf", "caffeinate"}
 
 max_lines = 150
 try:
@@ -78,6 +100,28 @@ def tokens(seg):
         return shlex.split(seg, posix=True)
     except ValueError:
         return seg.split()
+
+def command_positions(toks):
+    """CSL-04 : indices des tokens en position de COMMANDE — debut de segment, ou
+    apres un wrapper (sudo/env/nohup/xargs...) en sautant ses options et les
+    affectations VAR=val. Un nom de lecteur plein en position d ARGUMENT (motif
+    grep, nom de fichier) ne declenche plus le deny."""
+    out = []
+    i = 0
+    n = len(toks)
+    while i < n:
+        t = toks[i]
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", t):
+            i += 1
+            continue
+        out.append(i)
+        if os.path.basename(t) in WRAPPERS:
+            i += 1
+            while i < n and toks[i].startswith("-"):
+                i += 1
+            continue
+        break
+    return out
 
 def head_tail_unbounded(toks, i):
     """True si le head/tail en position i lit plus de max_lines (ou -n +K = tout)."""
@@ -130,14 +174,15 @@ for si, seg in enumerate(segments):
         continue
     path = m.group("path")
     # Ecriture/append vers le registre : ce n est pas une lecture.
-    if re.search(r">{1,2}\s*" + re.escape(path), seg):
+    # CSL-06 : tolerer une quote ouvrante avant la cible (`>> "REG"`).
+    if re.search(r">{1,2}\s*[\"\x27]?" + re.escape(path), seg):
         continue
     toks = tokens(seg)
     if any(os.path.basename(t) == "tee" for t in toks):
         continue
     full_read = False
-    for i, t in enumerate(toks):
-        name = os.path.basename(t)
+    for i in command_positions(toks):
+        name = os.path.basename(toks[i])
         if name in FULL_READERS:
             full_read = True
             break
