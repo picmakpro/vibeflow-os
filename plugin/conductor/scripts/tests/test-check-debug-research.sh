@@ -114,6 +114,35 @@ fi
 reset_sk
 if run_check >/dev/null 2>&1; then ok "T9 aucune brique → exit 0"; else ko "T9 exit non-0 sur répertoire vide"; fi
 
+# ---------- durcissements audit S061 (CND-06) ----------
+
+# T10 — 'crash-free' (KPI mobile) et 'Diagnostique la santé du funnel' ne sont PAS du dépannage
+reset_sk
+skill "perf-mobile" "Surveille le crash-free rate et les KPI de stabilite de l app" "Rapporte les metriques."
+skill "funnel-sante" "Diagnostique la sante du funnel d acquisition et propose des optimisations" "Analyse le funnel."
+if run_check >/dev/null 2>&1; then
+  ok "T10 crash-free / diagnostic métier → hors périmètre (CND-06)"
+else
+  ko "T10 faux positif : $(run_check 2>&1 | tail -2)"
+fi
+
+# T11 — 'diagnostic' + contexte bug/erreur reste bien capturé
+reset_sk
+skill "vrai-depannage" "Diagnostique les erreurs de build et remonte la cause racine" "Corrige direct."
+RC=0; run_check >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 1 ] && ok "T11 diagnostic + erreur → toujours capturé" || ko "T11 faux négatif (rc=$RC)"
+
+# T12 — dogfood : les briques debug-adjacentes LIVRÉES passent le linter livré
+reset_sk
+DOGFOOD_FAIL=""
+for f in "$SCRIPTS_DIR/../../mobile-test-team/agents/vf-test-runner.md" \
+         "$SCRIPTS_DIR/../../mobile-test-team/agents/vf-app-fixer.md" \
+         "$SCRIPTS_DIR/../../mobile-test-team/agents/vf-test-orchestrator.md"; do
+  [ -f "$f" ] || continue
+  bash "$CHECK" --file "$f" >/dev/null 2>&1 || DOGFOOD_FAIL="$DOGFOOD_FAIL $(basename "$f")"
+done
+[ -z "$DOGFOOD_FAIL" ] && ok "T12 dogfood : briques mobile-test-team conformes au linter livré" || ko "T12 briques livrées flaguées :$DOGFOOD_FAIL"
+
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
 [ "$fail" -eq 0 ]

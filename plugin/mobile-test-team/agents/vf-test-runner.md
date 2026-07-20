@@ -48,3 +48,7 @@ Rapporte au test-orchestrator, en **structuré** (donnée, pas message humain) :
 - Flows ajoutés (chemins).
 - Résultats par flow : pass/fail, durée, et pour chaque échec le diagnostic (erreur Maestro, écran, artefacts, cause probable app vs test).
 - Chemin du rapport et du dossier d'artefacts.
+
+Avant tout diagnostic empirique d'un échec suspect d'être un bug d'outillage (Maestro, Expo,
+simulateur, natif) : applique la règle `doc-research-before-debug` (ADR-045) — une cause connue
+documentée (issue, release note) se cherche AVANT de creuser à la main.

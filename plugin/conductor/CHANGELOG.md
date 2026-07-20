@@ -1,5 +1,31 @@
 # Changelog — conductor
 
+## [v1.11.3] — 2026-07-20 (audit robustesse hooks — 2e vague, gate agents fiabilisé)
+
+### Corrigé
+- **`check-agents.sh` (parseur YAML minimal → 2 faux positifs bloquants + 1 contournement)** :
+  scalaires quotés (`name: "x"`, parfois OBLIGATOIRES en YAML) rejetés « invalide » → déquotage ;
+  `description:` en plain scalar multi-ligne perdue (« champ requis manquant ») → typage différé ;
+  `skills:` en chaîne plate (`skills: a, b`) sautait silencieusement TOUT le gate anti-hallucination
+  même en `--strict` → normalisation en liste. BOM UTF-8 toléré (`utf-8-sig`).
+- **`guard-agent-write.sh`** : anti-trappe fail-closed — un crash interne du checker (rc≠0 SANS
+  diagnostic ✗) produisait un deny générique sur un agent conforme → désormais fail-open ;
+  portée restreinte au LAB COURANT (en install user-scope, un agent perso `~/.claude/agents` ou
+  un autre projet n'est plus soumis à la doctrine du lab) avec `realpath` des deux côtés
+  (piège symlink macOS /var→/private/var) ; `--skills-dir` dérivé du lab CIBLE du file_path
+  (verdict indépendant du CWD du hook) ; limites assumées documentées en tête.
+- **`check-debug-research.sh`** : filet de signature resserré — `crash-free` (KPI mobile) et
+  `diagnos` isolé (« Diagnostique la santé du funnel », « pass/fail + diagnostic ») ne sont plus
+  du dépannage (`diagnos` exige une co-occurrence bug/erreur/panne) ; la brique livrée
+  `vf-test-runner` (mobile-test-team) n'est plus flaguée à chaque SessionStart.
+- `check-plugin-update.sh` : verrou mkdir (stale 300s) contre les instances parallèles, bornes
+  réseau `http.lowSpeedLimit/Time` (TCP qui rampe > 1 min sinon), écriture du cache atomique.
+
+### Tests
+- `test-check-agents.sh` 14 → 20 (quotes, multi-ligne, skills chaîne + --strict, BOM, crash
+  checker → fail-open, hors-lab → allow) ; `test-check-debug-research.sh` 9 → 12 (crash-free,
+  diagnostic métier, dogfood briques mobile-test-team contre le linter livré).
+
 ## [v1.11.2] — 2026-07-20 (audit robustesse hooks)
 
 ### Corrigé

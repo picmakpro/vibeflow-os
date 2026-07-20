@@ -90,22 +90,30 @@ def parse_frontmatter(text):
                 items = [x.strip().strip(chr(34)).strip(chr(39)) for x in val[1:-1].split(\",\") if x.strip()]
                 fm[current_key] = items
             elif val == \"\" or val == \">\" or val == \"|\":
-                fm[current_key] = [] if val == \"\" else val
+                # val vide : typage DIFFERE (str par defaut, converti en liste a la 1re puce) —
+                # un plain scalar multi-ligne indente est du YAML valide (etait perdu avant).
+                fm[current_key] = \"\" if val == \"\" else val
             else:
+                # Dequotage des scalaires : name: \"x\" / model: 'sonnet' sont du YAML valide
+                # (parfois OBLIGATOIRE, ex. description contenant ': ') — le runtime les accepte.
+                if len(val) >= 2 and val[0] == val[-1] and val[0] in (chr(34), chr(39)):
+                    val = val[1:-1]
                 fm[current_key] = val
         elif current_key is not None:
             item = re.match(r\"^\s+-\s+(.+?)(\s+#.*)?$\", line)
             if item and isinstance(fm.get(current_key), list):
-                fm[current_key].append(item.group(1).strip())
+                fm[current_key].append(item.group(1).strip().strip(chr(34)).strip(chr(39)))
+            elif item and fm.get(current_key) == \"\":
+                fm[current_key] = [item.group(1).strip().strip(chr(34)).strip(chr(39))]
             elif line.startswith(\"  \") and isinstance(fm.get(current_key), str):
-                fm[current_key] = fm[current_key] + \" \" + line.strip()
+                fm[current_key] = (fm[current_key] + \" \" + line.strip()).strip()
         i += 1
-    return None  # frontmatter jamais fermé
+    return None  # frontmatter jamais ferme
 
 def check_file(path):
     base = os.path.basename(path)
     try:
-        text = open(path, encoding=\"utf-8\").read()
+        text = open(path, encoding=\"utf-8-sig\").read()   # utf-8-sig : tolere un BOM d origine externe
     except OSError as e:
         errors.append(f\"{base} : illisible ({e})\")
         return
@@ -158,6 +166,10 @@ def check_file(path):
         errors.append(f\"{base} : maxTurns invalide ({mt}) — entier attendu\")
 
     skills = fm.get(\"skills\")
+    # Gate anti-contournement : skills en chaine plate (skills: a, b) = YAML valide → normaliser
+    # en liste, sinon existence/budget/disable-model-invocation etaient silencieusement sautes.
+    if isinstance(skills, str) and skills.strip() and skills not in (\">\", \"|\"):
+        skills = [s.strip() for s in skills.split(\",\") if s.strip()]
     if not skills:
         warnings.append(f\"{base} : aucun skill cable — agent sans expertise injectee (recommande : skills:)\")
     elif isinstance(skills, list) and os.path.isdir(skills_dir):

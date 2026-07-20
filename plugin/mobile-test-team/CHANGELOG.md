@@ -1,5 +1,14 @@
 # Changelog — mobile-test-team
 
+## v1.2.1 — 2026-07-20 (conformité ADR-045)
+
+### Corrigé
+- `agents/vf-test-runner.md` : renvoi explicite à la règle `doc-research-before-debug` (ADR-045)
+  avant tout diagnostic empirique d'un échec suspect d'être un bug d'outillage (Maestro, Expo,
+  simulateur, natif). La brique passait sous le filet resserré du linter (conductor v1.11.3),
+  le renvoi la rend conforme par contenu, pas seulement par exclusion de signature — et c'est
+  doctrinalement juste : une cause connue documentée se cherche avant de creuser à la main.
+
 ## v1.2.0 — 2026-07-19 (ADR-051)
 
 ### Ajouté

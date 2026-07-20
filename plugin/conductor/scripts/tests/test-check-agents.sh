@@ -180,9 +180,15 @@ if run_check >/dev/null 2>&1; then ok "T10 contracts.md/README.md ignorés"; els
 rm -f "$AG"/*.md
 
 # ---------- guard-agent-write ----------
+# Le guard ne s'applique qu'au LAB COURANT (CND-05) : les payloads ciblent $WORK/lab et le
+# guard est exécuté avec cwd = $WORK/lab (comme le hook réel, cwd = racine du projet).
+mkdir -p "$WORK/lab/.claude/agents"
 payload_write() {
   # $1 = file_path · $2 = fichier contenant le content
   python3 -c "import json,sys; print(json.dumps({'tool_name':'Write','tool_input':{'file_path':sys.argv[1],'content':open(sys.argv[2]).read()}}))" "$1" "$2"
+}
+run_guard() { # $1 payload sur stdin — exécute le guard depuis le lab
+  ( cd "$WORK/lab" && bash "$GUARD" 2>/dev/null )
 }
 
 BAD="$WORK/bad-content.md"
@@ -198,22 +204,89 @@ memory: project
 corps
 EOF
 
-OUT="$(payload_write "$WORK/lab/.claude/agents/nouvel-agent.md" "$BAD" | bash "$GUARD" 2>/dev/null)"
+OUT="$(payload_write "$WORK/lab/.claude/agents/nouvel-agent.md" "$BAD" | run_guard)"
 if echo "$OUT" | grep -q '"permissionDecision": *"deny"' && echo "$OUT" | grep -q "Squelette canonique"; then
   ok "T11 Write agent non natif → deny avec squelette"
 else
   ko "T11 deny attendu : ${OUT:-<vide>}"
 fi
 
-OUT="$(payload_write "$WORK/lab/.claude/agents/nouvel-agent.md" "$GOOD" | bash "$GUARD" 2>/dev/null)"
+OUT="$(payload_write "$WORK/lab/.claude/agents/nouvel-agent.md" "$GOOD" | run_guard)"
 [ -z "$OUT" ] && ok "T12 Write agent conforme → allow" || ko "T12 allow attendu : $OUT"
 
-OUT1="$(payload_write "$WORK/lab/docs/note.md" "$BAD" | bash "$GUARD" 2>/dev/null)"
-OUT2="$(payload_write "$WORK/lab/.claude/agents/contracts.md" "$BAD" | bash "$GUARD" 2>/dev/null)"
+OUT1="$(payload_write "$WORK/lab/docs/note.md" "$BAD" | run_guard)"
+OUT2="$(payload_write "$WORK/lab/.claude/agents/contracts.md" "$BAD" | run_guard)"
 { [ -z "$OUT1" ] && [ -z "$OUT2" ]; } && ok "T13 hors agents/ + contracts.md → allow" || ko "T13 allow attendu"
 
-OUT="$(echo 'pas du json' | bash "$GUARD" 2>/dev/null)"; RC=$?
+OUT="$(echo 'pas du json' | run_guard)"; RC=$?
 { [ "$RC" -eq 0 ] && [ -z "$OUT" ]; } && ok "T14 stdin invalide → fail-open" || ko "T14 fail-open (rc=$RC)"
+
+# ---------- durcissements audit S061 (CND-01..05, CND-10) ----------
+
+# T15 — CND-01 : frontmatter YAML quoté (parfaitement valide) → conforme
+cat > "$AG/quoted.md" <<'EOF'
+---
+name: "quoted"
+description: "Use when: un cycle de vente demarre et il faut analyser les relances du lab."
+model: 'sonnet'
+memory: "project"
+---
+corps
+EOF
+if run_check >/dev/null 2>&1; then ok "T15 scalaires YAML quotés → conforme (CND-01)"; else ko "T15 faux positif sur quotes : $(run_check 2>&1 | tail -3)"; fi
+rm -f "$AG"/*.md
+
+# T16 — CND-02 : description en plain scalar multi-ligne → conforme
+cat > "$AG/multiline.md" <<'EOF'
+---
+name: multiline
+description:
+  Analyse les ventes du lab et prepare les relances commerciales.
+  Use when un cycle de vente demarre ou quand un prospect relance.
+model: sonnet
+memory: project
+---
+corps
+EOF
+if run_check >/dev/null 2>&1; then ok "T16 description multi-ligne (plain scalar) → conforme (CND-02)"; else ko "T16 faux positif multi-ligne : $(run_check 2>&1 | tail -3)"; fi
+rm -f "$AG"/*.md
+
+# T17 — CND-03 : skills en chaîne plate ne contourne plus le gate --strict
+cat > "$AG/chaine.md" <<'EOF'
+---
+name: chaine
+description: Agent declarant ses skills en chaine plate, pour tester le contournement du gate.
+model: sonnet
+memory: project
+skills: skill-fantome, petit-skill
+---
+corps
+EOF
+RC_STRICT=0; run_check --strict >/dev/null 2>&1 || RC_STRICT=$?
+[ "$RC_STRICT" -eq 1 ] && ok "T17 skills: en chaîne + --strict → gate actif (CND-03)" || ko "T17 gate contourné (rc=$RC_STRICT)"
+rm -f "$AG"/*.md
+
+# T18 — CND-10 : BOM UTF-8 devant le frontmatter → conforme
+printf '\xef\xbb\xbf' > "$AG/bom.md"
+cat >> "$AG/bom.md" <<'EOF'
+---
+name: bom
+description: Agent avec BOM UTF-8 d origine externe, pour tester la tolerance d encodage.
+model: sonnet
+memory: project
+---
+corps
+EOF
+if run_check >/dev/null 2>&1; then ok "T18 BOM UTF-8 toléré (CND-10)"; else ko "T18 faux positif BOM"; fi
+rm -f "$AG"/*.md
+
+# T19 — CND-04 : crash interne du checker → ALLOW (anti-trappe), pas un deny générique
+OUT="$(payload_write "$WORK/lab/.claude/agents/nouvel-agent.md" "$GOOD" | ( cd "$WORK/lab" && VF_PRELOAD_WARN=abc bash "$GUARD" 2>/dev/null ))"
+[ -z "$OUT" ] && ok "T19 checker cassé (env corrompu) → fail-open (CND-04)" || ko "T19 deny aveugle : $OUT"
+
+# T20 — CND-05 : agent HORS du lab courant (perso user-level, autre projet) → allow
+OUT="$(payload_write "$WORK/ailleurs/.claude/agents/perso.md" "$BAD" | run_guard)"
+[ -z "$OUT" ] && ok "T20 agent hors lab courant → allow (CND-05)" || ko "T20 doctrine imposée hors lab : $OUT"
 
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
