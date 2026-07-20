@@ -66,8 +66,12 @@ single = os.environ[\"VF_SINGLE\"]
 
 NOT_AGENTS = {\"contracts.md\", \"README.md\", \"AGENTS.md\"}
 
-# Une brique est 'de dépannage' si name/description matche ce motif.
-DEBUG_RE = re.compile(r\"debug|diagnos|d[ée]pannage|crash|stack ?trace|[cç]a plante\", re.I)
+# Une brique est 'de dépannage' si name/description matche ce motif. Resserré (audit S061) :
+# 'crash-free' (KPI mobile) et 'diagnos' isolé ('Diagnostique la santé du funnel', 'pass/fail +
+# diagnostic') ne sont PAS du dépannage — 'diagnos' ne compte qu'en co-occurrence bug/erreur/panne.
+DEBUG_RE = re.compile(r\"\bdebug|d[ée]pannage|crash(?!-free)|stack ?trace|[cç]a plante\", re.I)
+DIAG_RE = re.compile(r\"diagnos\", re.I)
+DIAG_CTX_RE = re.compile(r\"\b(bug|bogue|erreur|error|panne|incident|d[ée]faillance)\", re.I)
 # Marqueurs de présence d'une phase recherche documentaire.
 RESEARCH_RE = re.compile(r\"doc-research-before-debug|recherche documentaire|context7|resolve-library-id|query-docs\", re.I)
 # Wrapper mince qui délègue (heuristique) — sans marqueur, c'est un warning ciblé.
@@ -105,7 +109,9 @@ def check_file(path):
     desc = field(fm, \"description\")
     # Signature debug cherchée dans name + description (routage), pas dans tout le corps.
     signature = (name + \" \" + desc) if (name or desc) else text[:400]
-    if not DEBUG_RE.search(signature):
+    is_debug = bool(DEBUG_RE.search(signature)) or (
+        bool(DIAG_RE.search(signature)) and bool(DIAG_CTX_RE.search(signature)))
+    if not is_debug:
         return  # pas une brique de dépannage — hors périmètre
     checked += 1
     if RESEARCH_RE.search(text):

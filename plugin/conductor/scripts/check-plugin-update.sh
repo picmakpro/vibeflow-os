@@ -18,6 +18,23 @@ PLUGIN_ID="${VF_PLUGIN_ID:-vibeflow@vibeflow-os}"
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/vibeflow"
 CACHE_FILE="$CACHE_DIR/update-check.json"
 
+# --- Verrou : une seule vérification à la fois (update-banner peut relancer vite) ---
+mkdir -p "$CACHE_DIR" 2>/dev/null || exit 0
+LOCK_DIR="$CACHE_DIR/.check.lock"
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  # Verrou occupé : casser s'il est périmé (> 300s — process tué), sinon céder la place.
+  lock_m=$(stat -c %Y "$LOCK_DIR" 2>/dev/null || stat -f %m "$LOCK_DIR" 2>/dev/null || echo 0)
+  case "$lock_m" in ''|*[!0-9]*) lock_m=0 ;; esac
+  now=$(date +%s 2>/dev/null || echo 0)
+  if [ "$now" -gt 0 ] && [ $((now - lock_m)) -gt 300 ]; then
+    rmdir "$LOCK_DIR" 2>/dev/null || true
+    mkdir "$LOCK_DIR" 2>/dev/null || exit 0
+  else
+    exit 0
+  fi
+fi
+trap 'rmdir "$LOCK_DIR" 2>/dev/null' EXIT INT TERM
+
 # --- Version installée : installed_plugins.json (structuré), fallback `claude plugin list` ---
 installed=""
 IP="$HOME/.claude/plugins/installed_plugins.json"
@@ -41,8 +58,10 @@ installed="${installed#v}"
 
 # --- Dernière version publiée : le plus grand tag vX.Y.Z du dépôt (ls-remote, sans clone) ---
 # GIT_TERMINAL_PROMPT=0 : repo privé sans credential helper → échec propre au lieu d'un
-# prompt qui pendrait en tâche de fond.
-latest="$(GIT_TERMINAL_PROMPT=0 git ls-remote --tags --refs "$REPO_URL" 2>/dev/null \
+# prompt qui pendrait en tâche de fond. lowSpeed* : borne un réseau qui rampe (TCP connect
+# vers une IP non routable peut tenir > 1 min sans ça).
+latest="$(GIT_TERMINAL_PROMPT=0 git -c http.lowSpeedLimit=1 -c http.lowSpeedTime=10 \
+    ls-remote --tags --refs "$REPO_URL" 2>/dev/null \
   | awk -F/ '{print $NF}' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)"
 latest="${latest#v}"
 
@@ -62,7 +81,8 @@ fi
 
 checked_at="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo unknown)"
 json="{\"update_available\":$update_available,\"installed\":\"${installed:-unknown}\",\"latest\":\"$latest\",\"checked_at\":\"$checked_at\"}"
-mkdir -p "$CACHE_DIR" 2>/dev/null || true
-printf '%s\n' "$json" > "$CACHE_FILE" 2>/dev/null || true
+# Écriture atomique : jamais de cache à moitié écrit (lu par le bandeau de la session suivante).
+{ printf '%s\n' "$json" > "$CACHE_FILE.tmp.$$" && mv -f "$CACHE_FILE.tmp.$$" "$CACHE_FILE"; } 2>/dev/null \
+  || rm -f "$CACHE_FILE.tmp.$$" 2>/dev/null || true
 [ "${1:-}" = "--print" ] && printf '%s\n' "$json"
 exit 0
