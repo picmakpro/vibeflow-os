@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: dev-doctrine
 milestone_name: Doctrine dev & consolidation
-status: shipped
-stopped_at: Milestone dev-doctrine SHIPPED — release v2.20.0 (tag v2.20.0 poussé, PR #9 mergée)
-last_updated: "2026-07-07T00:00:00.000Z"
+status: verifying
+stopped_at: Phase 9 context gathered
+last_updated: "2026-07-20T15:23:36.861Z"
 last_activity: 2026-07-07
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_phases: 8
+  completed_phases: 7
+  total_plans: 15
+  completed_plans: 15
+  percent: 88
 ---
 
 # Project State
@@ -98,6 +98,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-04T18:36:28.459Z
-Stopped at: Completed 02-02-PLAN.md
-Resume file: None
+Last session: 2026-07-20T15:23:36.856Z
+Stopped at: Phase 9 context gathered
+Resume file: .planning/phases/VFDO-09-spike-transposition-jcode-m-moire-swarm/09-CONTEXT.md
