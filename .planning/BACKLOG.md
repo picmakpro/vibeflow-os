@@ -40,3 +40,54 @@ direct (agent `vibeflow-dev` + `/vf-*`).
 
 **Déclencheur de resurgence :** apparition d'un vrai cas d'agent spécialisé (de domaine) à
 distribuer aux utilisateurs.
+
+## Combler les gaps de couverture inspirés du catalogue `agency-agents`
+**Capturé :** 2026-07-20 · **À explorer :** au prochain arbitrage d'extension de périmètre
+
+> **Source :** [`msitarzewski/agency-agents`](https://github.com/msitarzewski/agency-agents) —
+> catalogue MIT de 230+ agents-personas Claude Code (`.md` + frontmatter YAML natif), rangés en
+> ~12 divisions. Companion app multi-outils :
+> [`msitarzewski/agency-agents-app`](https://github.com/msitarzewski/agency-agents-app).
+> Modèle « catalogue plat sans orchestration » — **à ne PAS importer tel quel** (densité
+> incompatible ADR-029, aucune gouvernance `conductor`). Valeur = **source d'inspiration et de
+> personas à distiller**, surtout pour élargir vers des labs non-dev.
+
+**Cadrage.** Le cœur VibeFlow (Engineering, Design, Project Management, Marketing/Content) est
+déjà couvert et **supérieur** (orchestration gouvernée vs catalogue). Rien à importer là. Ce qui
+suit ne concerne que les gaps réels, distillés depuis leur taxonomie.
+
+**Mapping divisions → modules (au 2026-07-20) :**
+
+| Division agency-agents | Module VibeFlow | Statut |
+|---|---|---|
+| Engineering | `dev-orchestrator`, `software-architecture` | ✅ Couvert |
+| Design | `design-orchestrator` | ✅ Couvert |
+| Project Management | `planning-core`, `conductor`, `kpi-analyst`, `consolidator` | ✅ Couvert |
+| Marketing / Content | `content-bundle`, `growth-bundle` | ✅ Couvert |
+| Testing | `mobile-test`(-team) | 🟡 Mobile only, expérimental |
+| Security | `vf-auditer`, `infrastructure-audit`, `audit-architecture` | 🟡 Audit oui ; pas incident/compliance |
+| Sales | `business-pilot-bundle` (blueprint commercial) | 🟡 Granularité fine à dériver |
+| Product | `planning-core` + `business-pilot-bundle` | 🟡 Pas de module product first-class |
+| Paid Media | `growth-bundle` (crochet par canal) | 🟡 Crochet oui, blueprints non |
+| Support | — | ❌ Manquant |
+| Spatial / Game / Healthcare / GIS / Academic | `vf-new-lab` (dérivation) | ❌ Niche, pas de module |
+
+**Pistes priorisées (valeur/effort décroissant) :**
+1. **`web-test-team`** — test-team web/e2e (Playwright) calqué sur `mobile-test-team`
+   (Pattern 12, workers cloisonnés). Comble un trou de **notre propre chaîne dev** (seul test réel
+   = mobile). Usage interne immédiat → priorité #1.
+2. **Extensions Sales + Paid Media** des bundles existants — crochets déjà présents
+   (`business-pilot-bundle`, `growth-bundle/par-canal`), il ne manque que des blueprints. Leurs
+   personas SDR/discovery/proposal et PPC/programmatic sont directement inspirants à distiller.
+3. **`SupportFlow`** — nouveau bundle métier (customer service / analytics / legal) si l'on vise
+   les labs non-dev. Aucun équivalent aujourd'hui.
+
+**Ce qu'on n'en prend PAS :** le catalogue plat, la densité, tout copier-coller direct dans
+`plugin/`. Chaque geste passe par `check-agents.sh` (ADR-044) + ADR-029 + le brainstorming de
+périmètre avant tout code.
+
+**Pourquoi différé :** aucun besoin bloquant aujourd'hui ; le cœur couvre l'usage courant. C'est
+de l'élargissement de périmètre, à arbitrer selon la stratégie produit.
+
+**Déclencheur de resurgence :** décision d'élargir VibeFlow (test web dans la chaîne dev, ou
+ouverture à des labs non-dev Sales/Support/Paid).
