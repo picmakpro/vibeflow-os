@@ -15,6 +15,9 @@
 #   dag.sh mark   --file=F --id=N --status=running|done|failed            # + recalcule la frontiere
 #   dag.sh reopen --file=F --id=N                                         # re-entree : noeud + dependants
 #   dag.sh status --file=F                                                # compteurs + frontiere (JSON)
+#   dag.sh tree   --file=F                                                # rendu ARBRE lisible (glyphes + connecteurs)
+#
+# Glyphes de statut (rendu `tree`) : ● done · ◐ running · ○ ready · · blocked · ✗ failed.
 #
 # Reference : ADR-053 + .planning/phases/VFDO-09-*/09-CADRAGE-swarm.md §3.
 
@@ -23,7 +26,7 @@ set -uo pipefail
 ACTION=""; FILE=""; ID=""; STEP=""; STAGE=""; DEPS=""; STATUS=""
 for arg in "$@"; do
   case "$arg" in
-    init|add|ready|mark|reopen|status) ACTION="$arg" ;;
+    init|add|ready|mark|reopen|status|tree) ACTION="$arg" ;;
     --file=*)   FILE="${arg#*=}" ;;
     --id=*)     ID="${arg#*=}" ;;
     --step=*)   STEP="${arg#*=}" ;;
@@ -36,7 +39,7 @@ for arg in "$@"; do
 done
 
 [ -n "$FILE" ] || { echo '{"error": "file-required"}' >&2; exit 1; }
-[ -n "$ACTION" ] || { echo "Usage: $0 {init|add|ready|mark|reopen|status} --file=F [...]" >&2; exit 1; }
+[ -n "$ACTION" ] || { echo "Usage: $0 {init|add|ready|mark|reopen|status|tree} --file=F [...]" >&2; exit 1; }
 
 python3 - "$ACTION" "$FILE" "$ID" "$STEP" "$STAGE" "$DEPS" "$STATUS" <<'PYEOF'
 import sys, os, json
@@ -151,6 +154,49 @@ if action == "status":
         counts[n["status"]] = counts.get(n["status"], 0) + 1
     emit({"file": file, "total": len(nodes), "counts": counts,
           "ready": [n["id"] for n in nodes if n["status"] == "ready"]})
+    sys.exit(0)
+
+if action == "tree":
+    # Rendu ARBRE lisible du plan de bataille (PAS du JSON) : le manager l'affiche tel quel.
+    # Racines = noeuds sans deps ; enfants = noeuds qui dependent du courant, indentes via des
+    # connecteurs style `tree`. Un noeud a plusieurs parents apparait sous chacun (accepte).
+    # Invariant dur : un cycle NE DOIT JAMAIS boucler a l'infini → on suit le chemin courant
+    # (set des ancetres) et sur une re-visite on marque `(cycle)` puis on coupe la branche.
+    GLYPH = {"done": "●", "running": "◐", "ready": "○", "blocked": "·", "failed": "✗"}
+    children = {n["id"]: [] for n in nodes}
+    for n in nodes:
+        for d in n["deps"]:
+            if d in children:  # une dep vers un id connu = arete parent -> enfant
+                children[d].append(n["id"])
+    roots = [n["id"] for n in nodes if not n["deps"]]
+    if not roots and nodes:  # graphe 100% cyclique : aucune racine → on part de tous les noeuds
+        roots = [n["id"] for n in nodes]
+    lines = []
+
+    def label(node_id):
+        n = idx[node_id]
+        return f"{GLYPH.get(n['status'], '?')} {node_id}  {n['step']}  [{n['status']}]"
+
+    def walk(node_id, prefix, connector, path):
+        if node_id in path:  # cycle sur ce chemin : on signale et on s'arrete (borne la profondeur)
+            lines.append(f"{prefix}{connector}{GLYPH.get(idx[node_id]['status'], '?')} {node_id}  (cycle)")
+            return
+        lines.append(f"{prefix}{connector}{label(node_id)}")
+        # le prefixe des enfants prolonge la colonne du connecteur courant
+        if connector == "":
+            child_prefix = prefix            # racine : pas d'indentation
+        elif connector == "└─ ":
+            child_prefix = prefix + "   "     # dernier enfant : espaces
+        else:
+            child_prefix = prefix + "│  "     # enfant du milieu : barre de continuite
+        kids = children.get(node_id, [])
+        for i, kid in enumerate(kids):
+            last = i == len(kids) - 1
+            walk(kid, child_prefix, "└─ " if last else "├─ ", path | {node_id})
+
+    for root in roots:
+        walk(root, "", "", set())
+    print("\n".join(lines))
     sys.exit(0)
 
 emit({"error": "unknown-action", "action": action})

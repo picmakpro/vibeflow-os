@@ -4,6 +4,7 @@
 # T1 init + add (ready/blocked selon deps) · T2 mark done promeut la frontière
 # T3 reopen = ré-entrée (dépendants transitifs remis blocked) · T4 collision d'id remappée
 # T5 mark id inconnu / statut invalide → erreur · T6 status compteurs
+# T9 tree = rendu arbre (ids + connecteurs) · T10 tree borne les cycles (pas de hang)
 #
 # Exit 0 si tout passe, 1 sinon.
 
@@ -19,6 +20,20 @@ PASS=0; FAIL=0
 assert()     { if [[ "$2" == *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: $3"; echo "     obtenu:  $2"; FAIL=$((FAIL+1)); fi; }
 assert_not() { if [[ "$2" != *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1 (a trouvé « $3 »)"; FAIL=$((FAIL+1)); fi; }
 assert_exit(){ if [ "$2" -eq "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1 (exit $2 ≠ $3)"; FAIL=$((FAIL+1)); fi; }
+# run_bounded — exécute une commande sous une limite de temps portable (macOS n'a pas `timeout`).
+# stdout est renvoyé ; le code retour est celui de la commande, ou ≠0 si un watchdog a dû la tuer
+# (⇒ un `tree` qui bouclerait à l'infini ferait échouer le test au lieu de figer la suite).
+run_bounded() {
+  local out; out="$(mktemp)"
+  "$@" >"$out" 2>/dev/null &
+  local pid=$!
+  ( sleep 5; kill -9 "$pid" 2>/dev/null ) &
+  local watcher=$!
+  wait "$pid" 2>/dev/null; local rc=$?
+  kill "$watcher" 2>/dev/null
+  cat "$out"; rm -f "$out"
+  return "$rc"
+}
 
 echo "=== T1 — init + add (ready/blocked) ==="
 "$SCRIPT" init --file="$F" >/dev/null
@@ -68,6 +83,29 @@ python3 -c "import json; d=json.load(open('$C')); [n.__setitem__('deps',['B']) f
 out=$("$SCRIPT" reopen --file="$C" --id=A)
 assert_not "T8.1 — A absent de ses propres dépendants" "$out" '"dependents_reset": ['$'\n''    "A"'
 assert "T8.2 — B bien listé" "$out" '"B"'
+
+echo "=== T9 — tree rend l'arbre (ids + connecteur └─) ==="
+T="$WORK_DIR/t.dag.json"; "$SCRIPT" init --file="$T" >/dev/null
+"$SCRIPT" add --file="$T" --id=E1 --step=cadrage >/dev/null
+"$SCRIPT" add --file="$T" --id=E2 --step=dev --deps=E1 >/dev/null
+"$SCRIPT" add --file="$T" --id=E3 --step=revue --deps=E2 >/dev/null
+"$SCRIPT" mark --file="$T" --id=E1 --status=done >/dev/null
+"$SCRIPT" mark --file="$T" --id=E2 --status=done >/dev/null
+tree_out=$("$SCRIPT" tree --file="$T")
+assert "T9.1 — E1 présent"            "$tree_out" 'E1'
+assert "T9.2 — E2 présent"            "$tree_out" 'E2'
+assert "T9.3 — E3 présent"            "$tree_out" 'E3'
+assert "T9.4 — connecteur └─ présent" "$tree_out" '└─'
+
+echo "=== T10 — tree borne les cycles (pas de hang, marqueur cycle) ==="
+CY="$WORK_DIR/cy.dag.json"; "$SCRIPT" init --file="$CY" >/dev/null
+"$SCRIPT" add --file="$CY" --id=A --step=a >/dev/null
+"$SCRIPT" add --file="$CY" --id=B --step=b --deps=A >/dev/null
+# force un cycle A→B / B→A (add refuse les deps inconnues → on l'injecte via python, comme T8)
+python3 -c "import json; d=json.load(open('$CY')); [n.__setitem__('deps',['B']) for n in d['nodes'] if n['id']=='A']; json.dump(d,open('$CY','w'))"
+tree_out=$(run_bounded "$SCRIPT" tree --file="$CY"); rc=$?
+assert_exit "T10.1 — tree termine (exit 0, pas de hang)" "$rc" 0
+assert "T10.2 — cycle signalé" "$tree_out" '(cycle)'
 
 echo ""
 echo "=================================="
