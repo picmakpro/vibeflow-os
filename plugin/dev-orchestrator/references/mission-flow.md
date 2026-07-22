@@ -2,8 +2,24 @@
 
 > Source de vérité des 3 patterns de sûreté du contrôle de flux de mission. Le `vf-dev-manager` s'y
 > conforme ; les workers appliquent le **contrat de rapport typé** (Pattern C). Réalisé par **fichiers
-> d'état + discipline** (pas de bus temps réel — hors runtime Claude Code). Scripts : `.claude/scripts/driver-lock.sh`,
-> `.claude/scripts/dag.sh`.
+> d'état + discipline** (pas de bus temps réel — hors runtime Claude Code). Scripts : `"$S"/driver-lock.sh`,
+> `"$S"/dag.sh`.
+
+---
+
+## Résolution des scripts (`$S`) — scope-robuste (user OU projet)
+
+Un lab est installé sous **un seul** scope (ID4 : user → `$HOME/.claude`, project/local → `./.claude`).
+Les scripts vivent donc là où le module a été posé — **jamais présumer `./.claude`**. Au tout début de
+mission, résous le dossier une fois et note-le `$S` (premier existant) :
+
+```bash
+S="$( for d in "$HOME/.claude/scripts" "./.claude/scripts" "${CLAUDE_PLUGIN_ROOT:-}/dev-orchestrator/scripts"; do
+        [ -f "$d/dag.sh" ] && { printf '%s' "$d"; break; }; done )"
+```
+
+Toutes les commandes ci-dessous utilisent `"$S"/…`. (Sans cette cascade, un lab installé en scope
+**user** chercherait à tort dans `./.claude/scripts` — script introuvable.)
 
 ---
 
@@ -16,19 +32,19 @@ ADR-048/049). Acquisition **atomique** (`mkdir`). Le manager est l'unique porteu
 
 1. **Acquérir AVANT de planifier/dispatcher** — dès que la mission est cadrée, avant le premier worker :
    ```bash
-   .claude/scripts/driver-lock.sh acquire --owner="<session_id|task_id>" --step="<étape ou 'mission'>"
+   "$S"/driver-lock.sh acquire --owner="<session_id|task_id>" --step="<étape ou 'mission'>"
    ```
    - `acquired: true` → piloter. `acquired: false` (`held_by`) → **une autre mission pilote déjà** :
      ne pas dispatcher, remonter à l'humain (ou attendre). `recovered: true` → un lock périmé a été
      élagué (le porteur précédent est mort) ; consigner la reprise dans `STATE.md ### Decisions`.
 2. **Heartbeat ENTRE les étapes** — à chaque relecture ROADMAP/STATE entre deux étapes :
    ```bash
-   .claude/scripts/driver-lock.sh heartbeat --owner="<id>"
+   "$S"/driver-lock.sh heartbeat --owner="<id>"
    ```
    Sans heartbeat frais, le lock est considéré périmé après `VF_DRIVER_TTL` (défaut 1800 s).
 3. **Relâcher À LA CLÔTURE — succès, échec OU abandon** (release « RAII » porté par le prompt) :
    ```bash
-   .claude/scripts/driver-lock.sh release --owner="<id>"
+   "$S"/driver-lock.sh release --owner="<id>"
    ```
    Le release est un **geste de sortie garanti**, jamais conditionnel. C'est la dernière action avant le
    rapport de mission.
@@ -49,23 +65,23 @@ Le plan de bataille n'est plus une liste ordonnée : c'est un **graphe persistan
 
 1. **Construire le graphe** au moment du plan de bataille (un nœud par étape/étage, `deps` explicites) :
    ```bash
-   .claude/scripts/dag.sh init --file="$DAG"
-   .claude/scripts/dag.sh add  --file="$DAG" --id=cadrage --step="cadrage étape 9"
-   .claude/scripts/dag.sh add  --file="$DAG" --id=code --step="dev" --deps=cadrage
-   .claude/scripts/dag.sh add  --file="$DAG" --id=revue --step="revue" --deps=code
+   "$S"/dag.sh init --file="$DAG"
+   "$S"/dag.sh add  --file="$DAG" --id=cadrage --step="cadrage étape 9"
+   "$S"/dag.sh add  --file="$DAG" --id=code --step="dev" --deps=cadrage
+   "$S"/dag.sh add  --file="$DAG" --id=revue --step="revue" --deps=code
    ```
    Collision d'id → remap déterministe `id::stage` (pas d'échec).
 2. **Dispatcher la frontière** — au lieu de dérouler linéairement :
    ```bash
-   .claude/scripts/dag.sh ready --file="$DAG"     # → liste des nœuds dispatchables MAINTENANT
+   "$S"/dag.sh ready --file="$DAG"     # → liste des nœuds dispatchables MAINTENANT
    ```
    Marquer `running` au dispatch, `done`/`failed` au retour du worker :
    ```bash
-   .claude/scripts/dag.sh mark --file="$DAG" --id=code --status=done   # promeut les blocked dont deps sont done
+   "$S"/dag.sh mark --file="$DAG" --id=code --status=done   # promeut les blocked dont deps sont done
    ```
 3. **Ré-entrée** — un correctif remonté par la revue/l'audit qui **rouvre** une étape :
    ```bash
-   .claude/scripts/dag.sh reopen --file="$DAG" --id=code   # code + ses dépendants (revue…) repassent blocked/ready
+   "$S"/dag.sh reopen --file="$DAG" --id=code   # code + ses dépendants (revue…) repassent blocked/ready
    ```
    Le manager **ré-entre** alors dans la boucle `ready → dispatch` au lieu de continuer tout droit. C'est la
    boucle `fix → re-revue` de `vf-coder` rendue explicite et robuste.

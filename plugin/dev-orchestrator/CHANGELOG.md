@@ -8,12 +8,16 @@
   étape en parallèle (protège les backups isolés ADR-048/049). `vf-dev-manager` l'acquiert avant tout
   dispatch, rafraîchit le heartbeat entre étapes, le relâche à la clôture. 26 tests (dont concurrence réelle).
 - **Pattern B — DAG de tâches** : `scripts/dag.sh` (nœuds `ready`/`blocked`, frontière dispatchable,
-  `reopen` = ré-entrée avec reset transitif des dépendants, remap `id::stage` sur collision). Le plan de
-  bataille du manager devient un graphe persistant. 19 tests.
+  `reopen` = ré-entrée avec reset transitif des dépendants, remap `id::stage` sur collision, commande
+  `tree` = rendu arbre du plan de bataille avec passe orpheline pour composants cycliques). Le plan de
+  bataille du manager devient un graphe persistant. 29 tests.
 - **Pattern C — Rapports de worker typés** : `vf-coder`/`vf-reviewer`/`vf-auditer` (+ `vf-test-orchestrator`
   du module mobile-test-team) terminent par `{statut, findings[{action: auto-fix|no-op|ask-user}],
   noeuds_debloques}` → contrôle de flux déterministe côté manager (raffine ADR-031).
 - `references/mission-flow.md` : protocole complet A/B/C (source de vérité).
+- **Résolution de scripts scope-robuste** : le manager résout `$S` (cascade `$HOME/.claude/scripts` →
+  `./.claude/scripts` → plugin root) au lieu de présumer `./.claude` — le swarm fonctionne quel que soit
+  le scope d'install du lab (user OU projet, ID4). Sans ça, un lab en scope user ne trouvait pas les scripts.
 
 ### Note
 - Pas de RAII machine (un agent LLM peut mourir sans release) → la récupération de claim périmé

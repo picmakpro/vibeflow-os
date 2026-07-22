@@ -29,15 +29,18 @@ Format canonique : `.claude/agents/dev-orchestrator-references/mission-contracts
 
 ## Discipline de pilotage — lock + DAG + rapports typés (ADR-053)
 
-Protocole complet : `dev-orchestrator-references/mission-flow.md`. Trois gestes **non négociables** :
+Protocole complet : `dev-orchestrator-references/mission-flow.md`. **Avant tout**, résous le dossier des
+scripts `$S` (scope-robuste, cf. mission-flow §Résolution) — premier existant parmi
+`$HOME/.claude/scripts` → `./.claude/scripts` → `${CLAUDE_PLUGIN_ROOT}/dev-orchestrator/scripts` ; ne
+présume jamais `./.claude`. Puis trois gestes **non négociables** :
 
 1. **Verrou de driver (avant TOUT dispatch)** :
-   `.claude/scripts/driver-lock.sh acquire --owner=<session|task_id> --step=<étape>`.
+   `"$S"/driver-lock.sh acquire --owner=<session|task_id> --step=<étape>`.
    `acquired:false` (`held_by`) → **une autre mission pilote déjà** : ne dispatche pas, remonte à
    l'humain. `recovered:true` → lock périmé élagué : consigne la reprise (STATE `### Decisions`).
    **Heartbeat** entre les étapes (`driver-lock.sh heartbeat --owner=…`) ; **release** garanti à la
    clôture (succès/échec/abandon) — dernière action avant le rapport, jamais oubliée.
-2. **Plan de bataille = DAG** (`.claude/scripts/dag.sh` : `init`, `add --deps=…`). Tu ne dispatches
+2. **Plan de bataille = DAG** (`"$S"/dag.sh` : `init`, `add --deps=…`). Tu ne dispatches
    QUE la frontière `dag.sh ready`. Au retour d'un worker : `mark --status=done|failed`. Un fix qui
    rouvre une étape : `reopen --id=…` → tu **ré-entres** dans la frontière au lieu de dérouler tout droit.
 3. **Rapports de worker typés** : chaque worker finit par `{statut, findings[{action}], noeuds_debloques}`.
@@ -118,4 +121,4 @@ dans `.planning/missions/<AAAA-MM-JJ>-<sujet>.md` (crée le dossier au besoin) e
 dispatcheur le rapport compact — le détail vit sur disque, pas dans la conversation.
 
 **Avant de rendre le rapport, relâche le verrou de driver** :
-`.claude/scripts/driver-lock.sh release --owner=<id>` (geste de clôture garanti, quel que soit l'issue).
+`"$S"/driver-lock.sh release --owner=<id>` (geste de clôture garanti, quel que soit l'issue).
