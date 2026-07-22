@@ -51,9 +51,26 @@ if [ "$MODE" = "merge" ] && [ -z "$PREFIX" ]; then
   err "--scripts-prefix requis en mode merge"
 fi
 
-command -v python3 >/dev/null 2>&1 || err "python3 requis (manipulation JSON fiable)"
+# Résolution d'interpréteur Python (ADR-052) : sous Windows, le `python3` du PATH peut être le
+# stub Microsoft Store (App Execution Alias : `command -v` réussit mais l'exécution pend/échoue
+# en non-TTY) et l'installeur python.org ne fournit QUE `python.exe` (pas de `python3.exe`).
+# → sonde d'EXÉCUTION réelle (gardée par `timeout` là où il existe : Git Bash oui, macOS non),
+#   candidats `python3` puis `python`, rejet des chemins WindowsApps (stub).
+PYBIN=""
+PY3_PROBE='import sys; sys.exit(0 if sys.version_info[0]>=3 else 1)'   # python2 passerait `-c ''` mais casse les f-strings
+for cand in python3 python; do
+  command -v "$cand" >/dev/null 2>&1 || continue
+  case "$(command -v "$cand" 2>/dev/null)" in *WindowsApps*) continue ;; esac
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 5 "$cand" -c "$PY3_PROBE" >/dev/null 2>&1 || continue
+  else
+    "$cand" -c "$PY3_PROBE" >/dev/null 2>&1 || continue
+  fi
+  PYBIN="$cand"; break
+done
+[ -n "$PYBIN" ] || err "python3 requis (manipulation JSON fiable) — Windows : installer depuis python.org en cochant « Add to PATH » (le stub Microsoft Store 'python3' ne suffit pas)"
 
-MODE="$MODE" FRAGMENT="$FRAGMENT" SETTINGS="$SETTINGS" PREFIX="$PREFIX" python3 - <<'PYEOF'
+MODE="$MODE" FRAGMENT="$FRAGMENT" SETTINGS="$SETTINGS" PREFIX="$PREFIX" "$PYBIN" - <<'PYEOF'
 import json, os, re, sys, tempfile
 
 mode = os.environ["MODE"]

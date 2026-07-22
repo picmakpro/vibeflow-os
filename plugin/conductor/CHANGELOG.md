@@ -1,5 +1,19 @@
 # Changelog — conductor
 
+## [v1.11.4] — 2026-07-22 (portabilité Windows — ADR-052)
+
+### Corrigé
+- **`check-plugin-update.sh`** : strip du `\r` sur la capture de version installée (python/claude
+  natifs Windows émettent du CRLF) — un CR brut non échappé aurait produit un cache JSON invalide
+  et tué le bandeau update SessionStart sur les postes Windows.
+- **`framework-version.sh`** : `norm()` retire tout `\r` résiduel + wrapper `jqx` sur le call site —
+  sous un jq Windows natif (sorties CRLF en mode texte), `drift` comparait `"2.27.1\r"` à `"2.27.1"`
+  et signalait un écart en continu (faux RETARD structurel).
+- **`vf-calibrate` / `vf-new-lab` (SKILL.md)** : mentions de scripts au nom nu ou au préfixe
+  incohérent (3 formes différentes pour `framework-version.sh` dans le même document) → chemins
+  qualifiés au point d'usage (`.claude/scripts/…`, `${CLAUDE_PLUGIN_ROOT}/_internal/…`). Un nom nu
+  force l'exécutant à deviner parmi ~10 dossiers `scripts/` (bug d'install vécu, ADR-052).
+
 ## [v1.11.3] — 2026-07-20 (audit robustesse hooks — 2e vague, gate agents fiabilisé)
 
 ### Corrigé

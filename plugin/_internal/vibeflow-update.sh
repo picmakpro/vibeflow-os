@@ -379,6 +379,7 @@ ensure_mandatory_baseline() {
     [ "$(module_version_installed "$mod")" = "—" ] || continue
     log "Baseline (INST-02a) : module obligatoire '$mod' absent du lab → installation"
     while IFS= read -r m; do
+      m="${m%$'\r'}"   # ceinture ADR-052 : jamais de nom de module \r-suffixé (résolveur sous jq Windows)
       [ -n "$m" ] || continue
       [ "$(module_version_installed "$m")" = "—" ] && install_module "$m"
     done < <(resolve_closure "$mod")
@@ -724,6 +725,7 @@ case "$cmd" in
       [ -n "$deps_target" ] || err "Usage: install --with-deps <module>"
       require_cache
       while IFS= read -r m; do
+        m="${m%$'\r'}"   # ceinture ADR-052 : jamais de nom de module \r-suffixé (résolveur sous jq Windows)
         [ -n "$m" ] && install_module "$m"
       done < <(resolve_closure "$deps_target")
     elif [ -n "$arg" ]; then

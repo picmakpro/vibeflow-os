@@ -405,3 +405,80 @@ d'accès web/doc : `vf-app-fixer` conserve son interdiction ADR-045 (pas de cont
 
 - Aucune rule nouvelle. Gate machine existant : `check-agents.sh` (ADR-044) accepte le flag ; le
   sélecteur `vf-mcp-consumer` EST le point d'enforcement (data-driven, aucun nom en dur).
+
+---
+
+## ADR-052 : Portabilité Windows — normalisation CRLF, préflight prérequis, gate de synchro versions
+
+**Date** : 2026-07-22
+**Statut** : Validée
+**Décideur** : Willy (rapport terrain de deux élèves de la formation, Windows 11 + Git Bash, protocole rejouable ; cause racine reproduite au byte près en local)
+**Contexte** : release v2.28.0 — conductor v1.11.4, kpi-analyst v1.0.1
+
+### Problème
+
+Install bloquée sur Windows 11 (Claude Code v2.1.217, plugin 2.27.1), 5 causes tracées :
+
+1. **jq absent de Git Bash** (jamais inclus par Git for Windows) et documenté NULLE PART comme
+   prérequis (`INSTALL.md` listait « bash, python3, awk, grep, sed (macOS/Linux) ») — angle mort de
+   dev : macOS 15 livre `/usr/bin/jq` en natif. Pire : `resolve-deps.sh` n'avait AUCUN guard — sans
+   jq, la process substitution avalait « command not found » et rendait une fermeture INCOMPLÈTE
+   avec exit 0 (install silencieusement amputée).
+2. **Le jq Windows natif écrit en mode texte** (chaque `\n` → `\r\n`, by design, non corrigeable par
+   version — le flag `-b` est opt-in par appel et absent de jq 1.6). `$()` ne retire que le `\n`
+   final → `\r` fantôme : `resolve-deps.sh` cherchait `planning-core\r` (crash en pleine boucle,
+   symptôme exact du rapport), le catalogue dégradait `conductor` en `optional` et faisait fuiter
+   les bundles `proposable:false` (comparaisons `= "true"` cassées — corruption SILENCIEUSE, rc=0),
+   `framework-version.sh drift` signalait un écart permanent, `kpis-writer.sh` persistait
+   `"domain": "generic\r"` DANS la donnée (KPIS.md, ingéré par le Hub).
+3. **`installer/SKILL.md` invoquait ses scripts par nom nu** (12+ sites, chemin correct donné une
+   seule fois hors point d'usage) → le LLM exécutant devinait parmi ~10 dossiers `scripts/`
+   (`installer/build-module-catalog.sh` deviné, inexistant). Même patron dans `vf-calibrate`
+   (3 conventions pour le même script) et `vf-new-lab`.
+4. **Fiche marketplace + badges README dérivés de 2 releases** (2.26.0 affiché / 2.27.1 réel,
+   16 modules affichés / 17 réels) — `check-release-tag.sh` ne vérifiait que VERSION ↔ tag.
+5. **`merge-hooks.sh` codait `python3` en dur** : sous Windows le `python3` du PATH peut être le
+   stub Microsoft Store (App Execution Alias : `command -v` réussit, l'exécution PEND en non-TTY)
+   et python.org ne fournit pas de `python3.exe` → module installé SANS ses hooks de gouvernance
+   (perte silencieuse, seule trace stderr).
+
+### Décision — défense en profondeur, 4 couches
+
+1. **Wrapper canonique `jqx() ( set -o pipefail; command jq "$@" | tr -d '\r'; )`** dans les 5
+   scripts exécutant jq (resolve-deps, build-module-catalog, framework-version, kpis-writer,
+   extractor-template) — normalisation CONSOMMATEUR, version-agnostique (jq 1.6→1.8.x), propage le
+   code retour. Règle : **jq brut interdit hors définition du wrapper** (gate T7 du test). Guards
+   `command -v jq` partout, message avec commande d'install par OS. `resolve-deps.sh` passe en
+   capture explicite : un échec jq est BRUYANT, plus jamais une fermeture vide.
+2. **Préflight** (`installer/scripts/preflight.sh`, étape 0 BLOQUANTE de `/vibeflow-install`) :
+   git, jq (+ sonde CRLF informative), python3 RÉEL (sonde d'exécution `timeout`-gardée sous
+   Windows, rejet des chemins `WindowsApps`, candidats `python3` → `python`). Même résolution
+   d'interpréteur dans `merge-hooks.sh`.
+3. **`.gitattributes` eol=lf** (sh/py/json/md/yml — prime sur l'`autocrlf=true` par défaut de
+   l'installeur Git for Windows) + **chemins pleinement qualifiés au point d'usage** dans
+   `installer/SKILL.md` (table d'invocations exactes, pattern du contre-exemple vertueux
+   `vf-update`), `vf-calibrate`, `vf-new-lab`, `commands/vf-calibrate.md`.
+4. **Gate `check-version-sync.sh`** (appelé par `check-release-tag.sh` au pre-push) : VERSION ↔
+   plugin.json ↔ marketplace.json ↔ badges/texte des 2 README ↔ compte réel de `module.json`.
+   Parsing grep/sed volontaire (le gate tourne sans jq). + ceinture `${m%$'\r'}` dans les 2
+   boucles while-read de `vibeflow-update.sh`.
+
+### Tests
+
+`plugin/_internal/tests/test-windows-crlf.sh` (nouveau) : shim jq-CRLF (awk suffixe `\r\n`, fidèle
+au binaire Windows) + PATH minimal sans jq — reproduit les DEUX pannes terrain sur macOS/Linux sans
+poste Windows. T1-T2 fermeture complète LF pur · T3-T5 mandatory conservé + WIP exclus + TSV pur ·
+T6 drift sans faux RETARD · T7 gate anti-régression jq nu · T8-T9 échec bruyant + message par OS.
+
+### Restes assumés (candidats de suivi, hors périmètre)
+
+- Les hooks runtime fail-open (7 scripts) + `check-agents.sh --strict` (Gate C de vf-new-lab)
+  codent `python3` en dur : sous Windows sans python3 exposé, protections inactives (fail-open,
+  jamais bloquant). Généraliser la résolution d'interpréteur = refactor séparé sur du code durci
+  S060-S061, à faire à froid.
+- Validation terrain réelle : protocole rejouable fourni aux deux testeurs Windows du rapport.
+
+### Rules Associées
+
+- Aucune rule nouvelle. Gates machine : T7 de `test-windows-crlf.sh` (interdiction du jq nu dans
+  les 5 scripts) + `check-version-sync.sh` (pre-push via `check-release-tag.sh`).

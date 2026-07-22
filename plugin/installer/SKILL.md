@@ -18,7 +18,7 @@ réimplémente RIEN — pas de TUI bash, pas de logique de copie, pas de gitigno
 Ce skill est de la **PROSE agent-driven** : le routage/UX réel se valide en session (comme le
 first-use). Seules les briques déléguées sont testées unitairement.
 
-## Câblage du cache (à appliquer pour CHAQUE délégation — étapes 1, 3, 4, 5)
+## Câblage du cache (à appliquer pour CHAQUE délégation — étapes 0, 1, 3, 4, 5)
 
 En contexte plugin, Claude Code fournit `${CLAUDE_PLUGIN_ROOT}` : le chemin absolu du dossier
 d'install du plugin (= le **cache**). C'est là que vivent les modules, leurs `module.json` à la
@@ -44,22 +44,32 @@ VF_MODULES_ROOT="${CLAUDE_PLUGIN_ROOT:-<racine du repo vibeflow-os cloné en dev
   `$(dirname "$0")/..` qui résout précisément sur `plugin/` ; `VIBEFLOW_CACHE` défaut
   `.vibeflow-cache`, donc en dev on le pointe explicitement sur `plugin/`.
 
-Concrètement, par étape :
+**Chemins réels des briques dans le cache** — les scripts ne sont PAS à la racine du cache et le
+repo contient une dizaine de dossiers `scripts/` différents : **toujours invoquer par le chemin
+complet ci-dessous, jamais par le nom nu** (un nom nu force l'exécutant à deviner le dossier —
+bug d'install vécu sur le terrain, ADR-052) :
 
-- **étape 1 (status)** : `VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT:-…}" vibeflow-update.sh status`
-- **étapes 3–4 (catalogue → baseline + type de lab)** : `VF_MODULES_ROOT="${CLAUDE_PLUGIN_ROOT:-…}" build-module-catalog.sh`
-  (le catalogue distingue `role=mandatory` posé d'office de `role=optional` proposé au choix)
-- **étape 5 (résolveur + install)** :
-  `VF_MODULES_ROOT="${CLAUDE_PLUGIN_ROOT:-…}" resolve-deps.sh …` puis
-  `VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT:-…}" vibeflow-update.sh --scope <s> install --with-deps <module>`
+| Brique | Invocation exacte |
+|---|---|
+| Préflight prérequis (étape 0) | `bash "$VIBEFLOW_CACHE/installer/scripts/preflight.sh"` |
+| Catalogue modules (étapes 3–4) | `VF_MODULES_ROOT="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/installer/scripts/build-module-catalog.sh"` |
+| Résolveur de deps (étape 5) | `VF_MODULES_ROOT="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/resolve-deps.sh" <modules…>` |
+| Engine status/install/uninstall | `VIBEFLOW_CACHE="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/vibeflow-update.sh" …` |
+| Bootstrap GSD/Superpowers (étape 5, branche dev) | `VF_SCOPE=<s> bash "$VIBEFLOW_CACHE/dev-orchestrator/scripts/ensure-deps.sh"` |
 
 `_internal/resolve-deps.sh` est **bundlé dans le plugin** (présent dans le cache `${CLAUDE_PLUGIN_ROOT}`)
 → `--with-deps` fonctionne réellement après une install plugin (lève le warning Phase 3).
 
 ## Séquence
 
+0. **Préflight prérequis (ADR-052).** Lancer `bash "$VIBEFLOW_CACHE/installer/scripts/preflight.sh"`.
+   S'il échoue (exit 1) : montrer TEL QUEL le diagnostic `[preflight]` à l'utilisateur (il contient
+   la commande d'installation par OS — ex. Windows : `winget install jqlang.jq`) et **S'ARRÊTER LÀ**.
+   S'il passe (exit 0) mais émet des lignes `⚠` : les montrer aussi (limitations runtime à connaître).
+   Ne jamais tenter le catalogue ni une install avec un prérequis dur manquant.
+
 1. **Détection environnement.** GSD / Superpowers présents ? Modules déjà installés
-   (`vibeflow-update.sh status`, avec `VIBEFLOW_CACHE` = cache du plugin) ? Un scope déjà
+   (engine `status` — invocation exacte dans la table « Chemins réels » ci-dessus) ? Un scope déjà
    utilisé précédemment ? Sert à pré-cocher / informer, pas à décider à la place de l'utilisateur.
 
 2. **Toggle scope (INST-01 — single-select).** Proposer **un seul** choix parmi
@@ -69,7 +79,7 @@ Concrètement, par étape :
    compte (user) / projet (project) / projet sans commit (local).
 
 3. **Baseline obligatoire — conductor posé d'office (INST-02a).** Lire le catalogue
-   (`build-module-catalog.sh`, `VF_MODULES_ROOT` = cache) : il émet `name<TAB>description<TAB>role`.
+   (invocation exacte dans la table « Chemins réels » ci-dessus) : il émet `name<TAB>description<TAB>role`.
    Les entrées **`role == mandatory`** (aujourd'hui : `conductor`, le gardien méta du lab) sont
    posées **automatiquement** avec leurs deps — **on ne les met PAS dans un toggle** : un lab sans
    son orchestrateur méta n'a pas de filet de cohérence. On **informe** l'utilisateur (« je pose le
@@ -93,13 +103,14 @@ Concrètement, par étape :
    > `optional` du catalogue. Ce n'est PAS le chemin par défaut du premier usage.
 
 5. **Install scopée (INST-04 — déléguée, scope unique partout).** Résoudre la fermeture transitive
-   des `requires` via `resolve-deps.sh` (`VF_MODULES_ROOT` = cache) et **récapituler** ce qui sera
-   posé **AVANT** d'installer (ex. « conductor entraîne planning-core + validator + skill-creator »).
-   - **Modules VibeFlow** → `vibeflow-update.sh --scope <s> install --with-deps <module>` (conductor
-     d'office, puis `dev-orchestrator` si branche dev), `VIBEFLOW_CACHE` = cache du plugin.
+   des `requires` via le résolveur (invocation exacte dans la table ci-dessus) et **récapituler** ce qui
+   sera posé **AVANT** d'installer (ex. « conductor entraîne planning-core + validator + skill-creator »).
+   - **Modules VibeFlow** → `VIBEFLOW_CACHE="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/vibeflow-update.sh" --scope <s> install --with-deps <module>`
+     (conductor d'office, puis `dev-orchestrator` si branche dev).
      `--with-deps` recâble lui-même le résolveur côté engine.
-   - **GSD + Superpowers** → `VF_SCOPE=<s> ensure-deps.sh` (uniquement si `dev-orchestrator` est posé,
-     ou sur demande). **PASSER TOUJOURS un VF_SCOPE explicite** = `<s>` (cohérence **ID4**).
+   - **GSD + Superpowers** → `VF_SCOPE=<s> bash "$VIBEFLOW_CACHE/dev-orchestrator/scripts/ensure-deps.sh"`
+     (uniquement si `dev-orchestrator` est posé, ou sur demande).
+     **PASSER TOUJOURS un VF_SCOPE explicite** = `<s>` (cohérence **ID4**).
    - Scope `local` → le `.gitignore` est géré **par l'engine** (SCOPE-04, déjà fait) : ne pas le
      réimplémenter, juste le mentionner à l'utilisateur (« rien ne sera committé »).
 
@@ -116,12 +127,12 @@ manuel) avec **le même `VIBEFLOW_CACHE` et le même `--scope`** que pour l'inst
 correspondre à celui où les modules ont été posés (sinon l'engine cherche au mauvais endroit).
 
 - **Un module** :
-  `VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT:-…}" vibeflow-update.sh --scope <s> uninstall <module>`
+  `VIBEFLOW_CACHE="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/vibeflow-update.sh" --scope <s> uninstall <module>`
   — **sauf un module `mandatory`** (conductor) : ne pas le retirer à l'unité (il porte la gouvernance
   du lab). Il ne part qu'avec une désinstallation complète (`uninstall --all`). Si l'utilisateur
   insiste, le prévenir que le lab perd son orchestrateur méta.
 - **Tout** :
-  `VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT:-…}" vibeflow-update.sh --scope <s> uninstall --all`
+  `VIBEFLOW_CACHE="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/vibeflow-update.sh" --scope <s> uninstall --all`
   (lit le registre `<scope>/.claude/scripts/.vibeflow-installed` et retire chaque module : skills,
   agent + references D7, scripts et rules qui lui appartiennent ; backup automatique avant chaque
   retrait).
@@ -144,6 +155,7 @@ correspondre à celui où les modules ont été posés (sinon l'engine cherche a
 - **Jamais proposer un module `proposable:false`** : exclu du catalogue par construction (bundles
   métier WIP). Ne le reproposer qu'une fois finalisé (repasser `proposable` à true / l'omettre).
 - **Ne réimplémente jamais** une brique : route et délègue (catalogue, `resolve-deps.sh`,
-  `vibeflow-update.sh --scope`, `ensure-deps.sh` via `VF_SCOPE`).
+  `vibeflow-update.sh --scope`, `ensure-deps.sh` via `VF_SCOPE` — invocations exactes : table
+  « Chemins réels » ci-dessus).
 - **Reframe en vocabulaire VibeFlow** ; ne nomme jamais GSD ni Superpowers à l'utilisateur
   (cohérent vf-init / ABS-02).

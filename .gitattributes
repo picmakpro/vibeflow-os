@@ -1,0 +1,13 @@
+# ADR-052 — Portabilité Windows : les fichiers exécutés/parsés par bash DOIVENT arriver en LF
+# au checkout, quel que soit le core.autocrlf de l'utilisateur (les attributs PRIMENT sur la
+# config git locale — cf. git-scm/gitattributes, ShellCheck SC1017). Sans ça, un clone
+# marketplace sous Windows (autocrlf=true, défaut de l'installeur Git for Windows) livrerait
+# des scripts CRLF : `/usr/bin/env bash^M: bad interpreter`.
+*.sh   text eol=lf
+*.py   text eol=lf
+*.js   text eol=lf
+*.mjs  text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf

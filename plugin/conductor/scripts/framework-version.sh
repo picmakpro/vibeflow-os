@@ -42,14 +42,20 @@ done
 say() { [ "$QUIET" -eq 1 ] || echo "[framework-version] $*"; }
 record_file() { echo "$LAB_ROOT/.claude/.vibeflow-framework-version"; }
 
-# Normalise "v2.6.0" / "2.6.0" → "2.6.0"
-norm() { echo "${1#v}"; }
+# Normalise "v2.6.0" / "2.6.0" → "2.6.0". Retire aussi tout \r résiduel : le jq Windows natif
+# écrit en mode texte (\n → \r\n) et `$()` ne retire que le \n final — sans ce strip, la
+# comparaison `[ "$cur" = "$rec" ]` du drift serait structurellement fausse sous Git Bash (ADR-052).
+norm() { local s="${1#v}"; printf '%s\n' "${s//$'\r'/}"; }
+
+# jqx — wrapper jq (ADR-052) : neutralise le CRLF du jq Windows natif au plus près de la source
+# (norm() strip aussi : ceinture, couvre les fallbacks VERSION lus par head -1).
+jqx() ( set -o pipefail; command jq "$@" | tr -d '\r'; )
 
 current_version() {
   [ -n "$FORCE_VERSION" ] && { norm "$FORCE_VERSION"; return; }
   local pj="$PLUGIN_ROOT/.claude-plugin/plugin.json"
   if [ -n "$PLUGIN_ROOT" ] && [ -f "$pj" ] && command -v jq >/dev/null 2>&1; then
-    norm "$(jq -r '.version // empty' "$pj")"; return
+    norm "$(jqx -r '.version // empty' "$pj")"; return
   fi
   # Fallbacks : VERSION à la racine du plugin, puis du repo.
   for f in "$PLUGIN_ROOT/VERSION" "$PLUGIN_ROOT/../VERSION"; do

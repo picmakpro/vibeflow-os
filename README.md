@@ -8,9 +8,9 @@
 
 Say _"help me build this feature"_ — and the whole pipeline kicks off: scoping → plan → execution → tests → delivery. Without ever typing a technical command or knowing what runs under the hood.
 
-[![Version](https://img.shields.io/badge/version-2.26.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.28.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
-[![Modules](https://img.shields.io/badge/modules-16-16a34a)](#-modules)
+[![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
 [Install](#-install) · [Modules](#-modules) · [How it works](#-how-it-works) · [Author](#-author)
@@ -72,7 +72,7 @@ The UX walks you through:
 
 ## 📦 Modules
 
-16 modules total. Each has its own version, `CHANGELOG.md`, and `README.md`.
+17 modules total. Each has its own version, `CHANGELOG.md`, and `README.md`.
 
 > **At install (since v2.13.0)**: `conductor` is the **mandatory baseline**, installed by default (with its safety net: planning-core, validator, consolidator, infrastructure-audit) — not a choice. Then **a single choice**: *development lab* (`dev-orchestrator`) or *new tailor-made domain lab* via `/vf-new-lab`. The **3 domain bundles** (business-pilot / content / growth) are **WIP and not offered at install** (`proposable:false`); they'll be re-offered once complete. Other modules remain available as advanced à-la-carte ("add &lt;module&gt;"). The **mobile-test** and **mobile-test-team** modules are advanced à-la-carte add-ons for mobile projects.
 
@@ -140,7 +140,7 @@ Routing relies on a **factual index auto-generated** from the frontmatter of the
 ## 🔒 Security
 
 - **Source-available**: code and history are public, proprietary license ("All rights reserved", no reuse rights granted).
-- **Shell + Python scripts only** — auditable line by line, no unverified third-party dependencies.
+- **Shell + Python scripts, plus the standard `jq` tool** (JSON manifest parsing) — auditable line by line. System prerequisites are listed in [INSTALL.md](./INSTALL.md) (Windows/Git Bash notes included).
 - **Idempotent**: every install script can be re-run without breaking the install, with an automatic backup before overwrite.
 - **Zero hooks**: the plugin registers nothing at session start. Everything starts from your manual invocation.
 - **Tests**: every script is covered (`scripts/tests/test-*.sh`).
@@ -192,6 +192,9 @@ Routing relies on a **factual index auto-generated** from the frontmatter of the
 | `v2.24.0` | 2026-07-11 | skill-creator added to the conductor install baseline (ADR-047): the sole authorized skill-creation channel is now installed by default via the conductor's transitive closure — fixes `vf-new-lab`'s fan-out to a never-installed subagent (conductor v1.10.0) |
 | `v2.25.0` | 2026-07-16 | Systematic domain orchestrator + governance hardening (ADR-048/049/050): `vf-new-lab` lays down a domain orchestrator from ≥2 domain agents + mission-loop skill; isolated memory backups with integrated rotation; planning hooks (index-first read at start, blocking update at end) (conductor v1.11.0) |
 | `v2.26.0` | 2026-07-19 | Lab-derived MCP allowlist for executing agents (ADR-051): subagents now see the project's MCP servers (XcodeBuildMCP, mobile-mcp, business DB…) via the `vf-mcp-consumer` flag + idempotent install-time injection from `.mcp.json`; `gsd-executor` patched post-GSD-install (dev-orchestrator v1.6.0, mobile-test-team v1.2.0, conductor v1.11.1) |
+| `v2.27.0` | 2026-07-20 | Planning guard by session attribution + global hook hardening (ADR-050 amended) — robustness audit wave 1 across all harness hooks (planning-core v2.3.0, consolidator v1.5.0, software-architecture v1.5.0, conductor v1.11.2) |
+| `v2.27.1` | 2026-07-20 | Hook-robustness audit wave 2: agents gate made reliable (conductor v1.11.3) |
+| `v2.28.0` | 2026-07-22 | **Windows portability (ADR-052)**: CRLF-normalizing `jqx` wrapper across the engine (native Windows jq broke installs: `planning-core\r`), install preflight (jq + real-python3 probe vs Store stub) with per-OS hints, `.gitattributes eol=lf`, fully-qualified script paths in `installer/SKILL.md`, python resolution in `merge-hooks.sh`, version-sync release gate (marketplace/badges can no longer drift) — root-caused from a field report by two Windows students (conductor v1.11.4, kpi-analyst v1.0.1) |
 
 </details>
 

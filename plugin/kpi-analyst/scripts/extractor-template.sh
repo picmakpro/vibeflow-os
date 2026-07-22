@@ -14,6 +14,10 @@
 #   - TOUJOURS citer la source (fichier/dossier/section) qui justifie le chiffre.
 set -euo pipefail
 
+command -v jq >/dev/null 2>&1 || { echo "[extractor] jq introuvable (requis)" >&2; exit 1; }
+# jqx — wrapper jq obligatoire (ADR-052) : neutralise le CRLF du jq Windows natif (mode texte).
+jqx() ( set -o pipefail; command jq "$@" | tr -d '\r'; )
+
 # ── À PERSONNALISER ─────────────────────────────────────────────────────────────────────────────
 KEY="ca_realise"                       # doit correspondre à une key du schema.json
 SOURCE="business/pipeline/clients/"    # chemin/section qui justifie la valeur
@@ -25,8 +29,8 @@ value=""   # ← remplir par le calcul réel
 # ── Émission normalisée ─────────────────────────────────────────────────────────────────────────
 if [ -z "${value}" ]; then
   # Donnée absente : on NE devine PAS. low + null, à confirmer.
-  jq -nc --arg k "$KEY" --arg s "$SOURCE" '{key:$k, value:null, source:$s, confidence:"low"}'
+  jqx -nc --arg k "$KEY" --arg s "$SOURCE" '{key:$k, value:null, source:$s, confidence:"low"}'
 else
-  jq -nc --arg k "$KEY" --argjson v "$value" --arg s "$SOURCE" \
+  jqx -nc --arg k "$KEY" --argjson v "$value" --arg s "$SOURCE" \
     '{key:$k, value:$v, source:$s, confidence:"high"}'
 fi

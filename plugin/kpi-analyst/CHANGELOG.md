@@ -1,5 +1,13 @@
 # CHANGELOG — kpi-analyst
 
+## [v1.0.1] — 2026-07-22 (portabilité Windows — ADR-052)
+
+### Corrigé
+- **`kpis-writer.sh` + `extractor-template.sh`** : wrapper `jqx` (`jq | tr -d '\r'`) sur les 12
+  invocations — sous un jq Windows natif, un `\r` résiduel s'encodait DANS la donnée persistée
+  (`"domain": "generic\r"` de KPIS.md, registre ingéré par le Hub) via `--arg`, et chaque ligne du
+  bloc JSON/index héritait d'un CRLF. Guard `command -v jq` ajouté au gabarit extracteur.
+
 ## [v1.0.0] — 2026-06-17
 
 ### Initial release — Agent KPIs métier déduits (zone H / R5 du Hub, côté lab)

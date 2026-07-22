@@ -8,9 +8,9 @@
 
 Dis _« aide-moi à dev cette feature »_ — et tout le pipeline se déclenche : cadrage → plan → exécution → tests → livraison. Sans jamais taper une commande technique ni savoir ce qui tourne en coulisse.
 
-[![Version](https://img.shields.io/badge/version-2.26.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.28.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
-[![Modules](https://img.shields.io/badge/modules-16-16a34a)](#-modules)
+[![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
 [Installation](#-installation) · [Modules](#-modules) · [Comment ça marche](#-comment-ça-marche) · [Auteur](#-auteur)
@@ -72,7 +72,7 @@ L'UX déroule :
 
 ## 📦 Modules
 
-16 modules au total. Chacun a sa propre version, son `CHANGELOG.md` et son `README.md`.
+17 modules au total. Chacun a sa propre version, son `CHANGELOG.md` et son `README.md`.
 
 > **À l'installation (depuis v2.13.0)** : `conductor` est le **socle obligatoire** posé d'office (avec son filet : planning-core, validator, consolidator, infrastructure-audit) — pas un choix. Ensuite, **un seul choix** : *lab de développement* (`dev-orchestrator`) ou *nouveau lab métier sur mesure* via `/vf-new-lab`. Les **3 bundles métier** (business-pilot / content / growth) sont **WIP et non proposés à l'install** (`proposable:false`) ; ils seront reproposés une fois finalisés. Les autres modules restent disponibles en à-la-carte avancé (« ajoute &lt;module&gt; »). Les modules **mobile-test** et **mobile-test-team** sont des add-ons à-la-carte avancés pour les projets mobiles.
 
@@ -140,7 +140,7 @@ Le routage repose sur un **index factuel auto-généré** depuis le frontmatter 
 ## 🔒 Sécurité
 
 - **Source-available** : code et historique publics, licence propriétaire (« All rights reserved », aucun droit de réutilisation accordé).
-- **Scripts shell + Python uniquement** — auditables ligne par ligne, aucune dépendance tierce non vérifiée.
+- **Scripts shell + Python, plus l'outil standard `jq`** (lecture des manifestes JSON) — auditables ligne par ligne. Prérequis système listés dans [INSTALL.md](./INSTALL.md) (notes Windows/Git Bash incluses).
 - **Idempotent** : chaque script d'install est ré-exécutable sans casser l'installation, avec backup automatique avant écrasement.
 - **Zéro hook** : le plugin n'enregistre rien au démarrage de session. Tout part de ton invocation manuelle.
 - **Tests** : chaque script est couvert (`scripts/tests/test-*.sh`).
@@ -192,6 +192,9 @@ Le routage repose sur un **index factuel auto-généré** depuis le frontmatter 
 | `v2.24.0` | 2026-07-11 | skill-creator ajouté à la baseline d'install du conductor (ADR-047) : le canal unique de création de skills est désormais posé d'office via la fermeture transitive du conductor — corrige le fan-out de `vf-new-lab` vers un sous-agent jamais installé (conductor v1.10.0) |
 | `v2.25.0` | 2026-07-16 | Orchestrateur métier systématique + durcissement gouvernance (ADR-048/049/050) : `vf-new-lab` pose un orchestrateur métier dès ≥2 agents métier + skill de boucle de mission ; backups mémoire isolés avec rotation intégrée ; hooks planning (lecture index-first au start, mise à jour bloquante au end) (conductor v1.11.0) |
 | `v2.26.0` | 2026-07-19 | Allowlist MCP des agents exécutants dérivée du lab (ADR-051) : les sous-agents voient enfin les serveurs MCP du projet (XcodeBuildMCP, mobile-mcp, DB métier…) via le flag `vf-mcp-consumer` + injection idempotente à l'install depuis `.mcp.json` ; `gsd-executor` patché après l'install GSD (dev-orchestrator v1.6.0, mobile-test-team v1.2.0, conductor v1.11.1) |
+| `v2.27.0` | 2026-07-20 | Guard planning par attribution de session + durcissement global des hooks (ADR-050 amendée) — audit de robustesse vague 1 sur tous les hooks du harnais (planning-core v2.3.0, consolidator v1.5.0, software-architecture v1.5.0, conductor v1.11.2) |
+| `v2.27.1` | 2026-07-20 | Audit de robustesse des hooks vague 2 : gate agents fiabilisé (conductor v1.11.3) |
+| `v2.28.0` | 2026-07-22 | **Portabilité Windows (ADR-052)** : wrapper `jqx` normalisant le CRLF dans tout l'engine (le jq Windows natif cassait l'install : `planning-core\r`), préflight d'install (jq + sonde python3 réel vs stub Store) avec commandes par OS, `.gitattributes eol=lf`, chemins de scripts pleinement qualifiés dans `installer/SKILL.md`, résolution python dans `merge-hooks.sh`, gate de synchro des versions (fiche marketplace/badges ne peuvent plus dériver) — cause racine remontée par le rapport terrain de deux élèves sous Windows (conductor v1.11.4, kpi-analyst v1.0.1) |
 
 </details>
 
