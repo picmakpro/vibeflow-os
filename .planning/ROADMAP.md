@@ -139,10 +139,11 @@ Source : `.planning/research/jcode-memory-swarm-transposition-NOTE.md`.
 réel, et statuer go/no-go. Volet swarm (lock de driver + DAG) = second spike indépendant, conditionné à des
 collisions observées sur les backups isolés (ADR-048/049).
 **Depends on**: — (R&D exploratoire, hors chaîne de release)
-**Requirements**: RND-01, RND-02 (à formaliser au discuss-phase)
+**Requirements**: RND-01, RND-02
 **Success Criteria** (what must be TRUE):
-  1. Le format mémoire enrichi (5 champs) est prototypé sur ≥1 lab témoin et le `consolidator` sait le tenir
-     à jour **automatiquement** (sinon → no-go documenté).
+  1. Le format mémoire enrichi (3 gestes : `trust`/`confidence`/`superseded_by`) est prototypé sur ≥1 lab
+     témoin et le `consolidator` sait le tenir à jour **automatiquement** — round-trip lit→recalcule→réécrit
+     sans édition humaine, entrée `superseded_by` archivée sans suppression (sinon → no-go documenté).
   2. Les demi-vies de décroissance sont re-calibrées pour l'usage VibeFlow multi-métiers (pas les valeurs
      jcode brutes).
   3. Une décision go/no-go écrite tranche : (a) écrire un ADR + toucher le format officiel, ou (b) archiver.
@@ -150,8 +151,8 @@ collisions observées sur les backups isolés (ADR-048/049).
      pas observées en pratique.
 **Plans**: à cadrer (`/gsd:discuss-phase 9` puis `plan-phase`)
 Plans:
-- [ ] 09-01 — spike frontmatter mémoire enrichi + règle décroissance `consolidator` sur lab témoin (RND-01)
-- [ ] 09-02 — mesure coût de maintenance + note go/no-go (RND-02)
+- [ ] 09-01 — spike frontmatter mémoire enrichi (3 gestes) + règle décroissance `consolidator` sur lab témoin (RND-01)
+- [ ] 09-02 — mesure coût de maintenance + note go/no-go mémoire + mini-cadrage écrit du volet swarm (lock de driver + DAG, non implémenté) (RND-02)
 
 ## Progress
 

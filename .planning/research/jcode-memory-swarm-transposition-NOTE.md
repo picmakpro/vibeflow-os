@@ -1,11 +1,18 @@
-# Note d'architecture — Transposition jcode → VibeFlow (mémoire + swarm)
+# Note d'architecture — Transpositions externes → VibeFlow
 
 > **Date** : 2026-07-20
-> **Source** : [1jehuang/jcode](https://github.com/1jehuang/jcode) @ `master` (harness d'agent Rust, MIT, ~9.4k ★)
-> **Périmètre** : deux modules disséqués — `crates/jcode-base/src/memory/` (+ crate `jcode-memory-types`)
-> et `crates/jcode-app-core/src/tool/communicate/` (swarm).
-> **Objet** : ce qui est **transposable** dans VibeFlow, et à quel coût, compte tenu que VibeFlow
-> **roule sur Claude Code** (pas de sidecar natif, pas de bus temps réel entre sous-agents).
+> **Objet** : ce qui est **transposable** dans VibeFlow depuis des harness/outils externes, et à quel coût,
+> compte tenu que VibeFlow **roule sur Claude Code** (pas de sidecar natif, pas de bus temps réel entre
+> sous-agents). Principe directeur : *on transpose le schéma de données et la discipline de cycle de vie,
+> jamais le runtime.*
+>
+> **Sources disséquées :**
+> - **§0–5 — [1jehuang/jcode](https://github.com/1jehuang/jcode)** @ `master` (harness d'agent Rust, MIT,
+>   ~9.4k ★) : modules `crates/jcode-base/src/memory/` (+ crate `jcode-memory-types`) et
+>   `crates/jcode-app-core/src/tool/communicate/` (swarm). → **mémoire + swarm**.
+> - **§6 — [kunchenguid/no-mistakes](https://github.com/kunchenguid/no-mistakes)** @ `main` (proxy git de
+>   qualité, Go, MIT, ~6.7k ★) : skill `/no-mistakes`, pipeline `.no-mistakes.yaml`. → **discipline de clôture
+>   (review → ship)**.
 
 ---
 
@@ -220,3 +227,128 @@ Un **spike** ciblé (voir Phase 9 au ROADMAP) : prototyper les **3 gestes mémoi
 témoin**, mesurer l'effort de maintenance réel, décider go/no-go avant d'écrire un ADR et de toucher le
 format mémoire officiel. Le volet swarm (lock de driver + DAG) est un **second spike** indépendant, à
 prioriser seulement si les backups isolés (ADR-048/049) montrent des collisions en pratique.
+
+---
+
+## 6. Annexe — Transposition no-mistakes → VibeFlow (gate qualité au push)
+
+> **Source** : [kunchenguid/no-mistakes](https://github.com/kunchenguid/no-mistakes) @ `main`
+> (proxy git de qualité, Go, MIT, ~6.7k ★, v1.40.0). Disséqué : skill `/no-mistakes`
+> (`skills/no-mistakes/SKILL.md`), pipeline `.no-mistakes.yaml`, `docs/.../reference/repo-config.md`.
+> **Nature** : source **différente** de jcode — pas mémoire/swarm mais **discipline de clôture**
+> (review → ship). Annexée ici car elle sert la même thèse : *on transpose le schéma et la discipline,
+> pas le runtime.* Le runtime de no-mistakes (proxy git en daemon Go) est hors d'atteinte d'un plugin
+> Claude Code ; ce qui se transpose, c'est **où** et **comment** il place ses gates.
+
+### 6.1 Ce que fait no-mistakes
+
+Un **proxy git**. Au lieu de `git push origin`, on pousse sur un remote `no-mistakes`, ce qui déclenche —
+**dans un worktree jetable isolé, non-bloquant** — un pipeline ordonné :
+
+```
+rebase → review → test → document → lint → push → PR → CI
+```
+
+Rien n'atteint le vrai remote tant que tout n'est pas vert ; une **PR propre** est ouverte à la fin.
+Trois points d'entrée : `git push no-mistakes`, un TUI, et une **skill `/no-mistakes`** pilotée par l'agent.
+C'est le **même métier que l'équipe dev VibeFlow** (`vf-dev-manager → vf-coder / vf-reviewer / vf-auditer /
+vf-test-orchestrator`), mais packagé selon 4 idées que VibeFlow n'a pas encore formalisées.
+
+### 6.2 Taxonomie de findings à 3 niveaux (le cœur intéressant)
+
+Chaque gate rend une table `findings` (`id`, `severity`, `file`, `description`, **`action`**) où l'`action`
+tranche le traitement :
+
+| `action` | Sens | Traitement |
+|---|---|---|
+| **`auto-fix`** | mécanique, faible risque | corrigé **automatiquement** (`respond --action fix`) |
+| **`no-op`** | informatif seulement | ignoré |
+| **`ask-user`** | **défie l'intention** ou le comportement produit | **escaladé à l'humain**, jamais tranché seul par l'agent |
+
+Et un **budget d'auto-fix par étape**, machine-réglable dans `.no-mistakes.yaml` :
+
+```yaml
+auto_fix:
+  lint: 5        # 5 tentatives auto avant pause
+  test: 3
+  document: 3
+  review: 0      # 0 = désactivé → tout finding review passe en ask-user
+```
+
+→ C'est un **raffinement direct d'ADR-031** (« jamais de fix sans validation humaine ») : au lieu du binaire
+actuel, un modèle **à deux étages** — *auto-fix mécanique autorisé + escalade obligatoire sur tout ce qui
+touche l'intention/la logique/la sécurité* — avec un **cran de sûreté par étape** (`review: 0` force la revue
+humaine). Transposable dans le contrat de la boucle `vf-coder` ↔ `vf-reviewer` : le reviewer **type** chaque
+finding (`auto-fix`/`no-op`/`ask-user`), le coder n'applique seul que les `auto-fix`, borné par un budget.
+
+### 6.3 L'`--intent` comme entrée de première classe de la revue
+
+no-mistakes rend l'argument `--intent` **obligatoire** : « ce que l'utilisateur cherchait à accomplir », en ses
+propres termes, décisions et compromis inclus. Il sert à **distinguer les choix délibérés des erreurs** pendant
+la revue (un reviewer sans l'intention prend une décision assumée pour un bug). VibeFlow a cette donnée mais
+**dispersée** (GSD `discuss-phase`, `--intent` implicite). Geste transposable : **passer un intent explicite à
+`vf-reviewer`** pour qu'il juge le diff *contre l'objectif*, pas seulement dans l'absolu. Croise le champ
+`intent` de la mémoire jcode (§1) — même intuition : l'intention est une donnée, pas un sous-entendu.
+
+### 6.4 Gate au push, pas à l'intention
+
+Chez VibeFlow la chaîne qualité est déclenchée par **commande/intent** (`/vf-ship`, `/vf-review`) → donc
+**contournable** : on peut pousser sans y passer. no-mistakes rend le pipeline **non-bypassable** en
+s'accrochant à la frontière du push. Or VibeFlow a **déjà l'infra** : `scripts/hooks` avec un `pre-push` qui
+bloque les push vers `main` (aujourd'hui limité à la vérif de tag de release, cf. `check-release-tag.sh`).
+Geste transposable : **étendre ce `pre-push` en vrai gate qualité** (au minimum : diff non revu → refus de
+push sur `main`), en le câblant sur `vf-ship`. C'est le chaînon manquant entre `vf-ship` et la règle
+non-négociable de release. Les états de sortie de no-mistakes cartographient proprement le besoin :
+`checks-passed` (vert, PR prête, **non fusionnée**) vs `passed` (fusionnée) → **handoff propre à l'humain pour
+le merge**, aligné ADR-031.
+
+### 6.5 Sécurité : la config d'exécution vient de la branche de confiance
+
+Détail crucial et directement pertinent pour VibeFlow : le daemon lit **toujours `commands` et `agent` depuis
+la branche par défaut**, **jamais depuis la branche poussée** (opt-in `allow_repo_commands`, dev solo
+uniquement) → un contributeur ne peut pas injecter de commande shell via sa branche en revue. C'est
+**exactement la doctrine d'ADR-047** (allowlist MCP des agents exécutants dérivée du lab, v2.24.0) : *la config
+d'exécution provient d'une source de confiance, jamais de l'artefact en cours de revue.* → **Renfort externe
+d'ADR-047**, à citer comme précédent ; et garde-fou à vérifier partout où un agent exécutant VibeFlow tire une
+commande d'un fichier de projet potentiellement modifié dans le cycle en cours.
+
+### 6.6 Custody de branche ↔ claim de driver (croisement avec §3.2)
+
+no-mistakes a un modèle de **custody** de branche (`sync` / `continue_active_run` / `recover_custody`) qui
+répond à « qui pilote cette branche maintenant ? » et sait **récupérer une custody périmée** (course terminale
+non publiée). C'est le **même problème** que le *claim de driver unique* + *récupération de claim périmé*
+transposés de jcode en §3.2 / §4. Deux sources indépendantes convergent → **signal fort** que le lock de
+driver `vf-dev-manager` doit livrer sa **récupération de lock mort** dès le premier jet (sinon manager crashé =
+missions gelées).
+
+### 6.7 Table de synthèse « adopter / différer / rejeter »
+
+| Concept no-mistakes | Verdict | Où dans VibeFlow |
+|---|---|---|
+| Taxonomie `auto-fix` / `no-op` / `ask-user` | **ADOPTER** | contrat de findings `vf-reviewer` → boucle `vf-coder` (raffine ADR-031) |
+| Budget d'auto-fix par étape (`review: 0`) | **ADOPTER** | cran de sûreté machine dans la boucle fix→re-revue |
+| `--intent` obligatoire en entrée de revue | **ADOPTER** | passer l'intent explicite à `vf-reviewer` (croise GSD `discuss-phase`) |
+| Gate au `pre-push` sur `main` | **ADOPTER** | étendre `scripts/hooks` + `check-release-tag.sh`, câblé sur `vf-ship` |
+| Config d'exécution lue depuis branche de confiance | **ADOPTER (renfort)** | précédent externe d'ADR-047 ; à auditer partout où un exécutant lit une commande de projet |
+| États `checks-passed` vs `passed` (PR prête ≠ mergée) | **ADOPTER** | contrat de sortie `vf-ship` : vert + PR, merge = geste humain |
+| Custody de branche + récupération périmée | **ADOPTER** | conforte le lock de driver `vf-dev-manager` (§3.2) — livrer la recovery d'emblée |
+| Worktree jetable **unique** pour tout le pipeline | **DIFFÉRER** | VibeFlow isole **par agent** (`isolation: worktree`) ; utile surtout pour `vf-auto` nocturne |
+| Mode `--yes` (piloter tous les gates, y compris `ask-user`) | **DIFFÉRER** | pendant de `vf-auto` en autonomie, mais casse l'escalade → à borner |
+| Le proxy git en daemon Go (remote `no-mistakes`) | **REJETER** | VibeFlow est un plugin Claude Code, pas un proxy git ; on reprend **où** sont les gates, pas le runtime |
+| Fallback agent-agnostic (codex/cursor/copilot…) | **REJETER** | VibeFlow est Claude-Code-locké par design |
+
+### 6.8 Prochain pas proposé (pour la phase)
+
+**Spike indépendant du volet mémoire/swarm** — la brique la plus rentable est le couple **§6.2 (taxonomie de
+fix à 3 niveaux + budget par étape)** et **§6.4 (gate au `pre-push`)**, car elles adressent le vrai manque de
+VibeFlow : *l'enforcement au bon endroit* et *une granularité de fix plus fine qu'ADR-031*. Concrètement :
+
+1. Prototyper le **typage des findings** (`auto-fix`/`no-op`/`ask-user`) dans le rapport de `vf-reviewer` et
+   la règle d'application côté `vf-coder`, sur un lab témoin — mesurer combien de va-et-vient humain on
+   économise sans affaiblir l'escalade.
+2. Étendre le `pre-push` existant à un **gate qualité minimal sur `main`** (diff non revu → refus), câblé sur
+   `vf-ship` ; garder `check-release-tag.sh` comme brique.
+3. Le reste (§6.3 intent-en-entrée, §6.5 renfort ADR-047, §6.6 custody) sont des **durcissements** à verser
+   dans les ADR concernés, pas un spike. §6.6 en particulier **conforte** le second spike swarm de §5.
+
+Comme pour jcode : **rien ici ne touche le socle `conductor` sans ADR**. C'est une R&D, pas une release.

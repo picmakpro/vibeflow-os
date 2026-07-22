@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: dev-doctrine
-milestone_name: Doctrine dev & consolidation
-status: verifying
-stopped_at: Phase 9 context gathered
-last_updated: "2026-07-20T15:23:36.861Z"
-last_activity: 2026-07-07
+milestone: memory-swarm-rnd
+milestone_name: R&D mémoire & swarm
+status: planning
+stopped_at: Phase 9 context gathered — ready for planning
+last_updated: "2026-07-22"
+last_activity: 2026-07-22
 progress:
-  total_phases: 8
-  completed_phases: 7
-  total_plans: 15
-  completed_plans: 15
-  percent: 88
+  total_phases: 1
+  completed_phases: 0
+  total_plans: 2
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-04)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Milestone Doctrine dev & consolidation — LIVRÉ (ship en attente)
+**Current focus:** Phase 9 (R&D memory-swarm-rnd) — contexte cadré (2026-07-20), prêt à planifier. Milestone Doctrine dev & consolidation **SHIPPED v2.20.0** (tag + PR #9, clôturé 2026-07-07).
 
 ## Current Position
 
-Phase: 8 of 8 (Consolidation des doublons) — milestone dev-doctrine COMPLET
-Plan: Phase 7 (2/2 PASS) + Phase 8 (4/4 PASS) livrées sur branche `feat/dev-doctrine-phase7`
-Status: Verifying — les 2 phases PASS ; reste le ship (VERSION racine + tag + PR)
-Last activity: 2026-07-07
+Phase: 9 (Spike transposition jcode mémoire+swarm) — milestone memory-swarm-rnd
+Plan: aucun plan encore — contexte cadré (`09-CONTEXT.md`), prêt à planifier
+Status: Planning — spike R&D hors chaîne de release
+Last activity: 2026-07-22
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
