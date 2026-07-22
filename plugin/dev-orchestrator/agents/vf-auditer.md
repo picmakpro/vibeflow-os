@@ -37,3 +37,7 @@ Les corrections repartent à `vf-coder` (via `vf-dev-manager`).
 
 Findings classés par sévérité, chacun avec la menace/dette, l'emplacement et la remédiation
 suggérée. Verdict : conforme / findings à traiter. Renvoie à `vf-dev-manager`.
+
+**Termine par le bloc typé** (contrat ADR-053, cf. `dev-orchestrator-references/mission-flow.md`) :
+`{ "statut": "passed|gaps_found|human_needed|blocked", "findings": [{ "severity": "…", "action": "auto-fix|no-op|ask-user", "ref": "emplacement" }], "noeuds_debloques": [] }`.
+`conforme` = `passed` ; findings à traiter = `gaps_found` ; une menace sécurité/données → `action: ask-user`.

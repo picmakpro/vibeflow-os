@@ -51,3 +51,7 @@ debug empirique QUE si la recherche n'a rien donné.
 Renvoie à `vf-dev-manager` : sous-phases exécutées, verdict revue (PASS / bloquants restants),
 commits produits (SHA), fichiers touchés, et tout point nécessitant une décision (zone grise)
 ou l'attention de l'utilisateur.
+
+**Termine par le bloc typé** (contrat ADR-053, cf. `dev-orchestrator-references/mission-flow.md`) :
+`{ "statut": "passed|gaps_found|human_needed|blocked", "findings": [{ "severity": "…", "action": "auto-fix|no-op|ask-user", "ref": "fichier:ligne" }], "noeuds_debloques": ["<id DAG>"] }`.
+Un point qui défie l'intention/la logique/la sécurité → `action: ask-user` (escalade, jamais tranché seul).

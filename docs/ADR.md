@@ -19,6 +19,7 @@
 | ADR-050 | 2026-07-16 | Hooks planning : lecture index-first au start + mise à jour bloquante au end | Validée — amendée 2026-07-20 (attribution de session, fix faux positifs) |
 | ADR-051 | 2026-07-19 | Allowlist MCP des agents exécutants dérivée du lab (injection à l'install) | Validée |
 | ADR-052 | 2026-07-22 | Frontmatter mémoire enrichi — trust + confidence à décroissance par catégorie + supersession non destructive | Validée |
+| ADR-053 | 2026-07-22 | Volet swarm — lock de driver unique + DAG ready/blocked + rapports de worker typés | Validée |
 
 ---
 
@@ -484,3 +485,49 @@ La mémoire fichier de VibeFlow (`memory/*.md` : `name` / `description` / `metad
 ### Rules Associées
 
 - S'appuie sur ADR-031 (jamais de destruction/fix sans validation humaine — la supersession EN EST l'application) et ADR-049 (backups mémoire isolés — l'archivage réutilise `.backups/`). Aucune rule nouvelle avant implémentation.
+
+---
+
+## ADR-053 : Volet swarm — lock de driver unique + DAG ready/blocked + rapports de worker typés
+
+**Date** : 2026-07-22
+**Statut** : **Validée** (Samuel, 2026-07-22) — périmètre **A+B+C complet** choisi explicitement, le garde-fou YAGNI du cadrage (« pas avant collisions observées ») est **levé en connaissance de cause**.
+**Décideur** : Samuel
+**Contexte** : Phase 9 (memory-swarm-rnd). Source : `.planning/phases/VFDO-09-*/09-CADRAGE-swarm.md` (transposition swarm jcode §2 + custody no-mistakes §6.6). Cible : module `dev-orchestrator` (équipe `vf-dev-manager` & workers).
+
+### Problème
+
+L'équipe VibeFlow est un **dispatch-and-join** (`Task`), pas des acteurs concurrents. Trois fragilités : (1) **collision de pilotage** — deux missions/sessions qui pilotent la même étape en parallèle se marchent dessus sur les backups isolés (ADR-048/049) ; (2) le **plan de bataille** du manager est une **liste linéaire** — un correctif qui rouvre une étape ne « ré-entre » pas proprement dans le dispatch ; (3) les **rapports de worker sont en prose** — le manager interprète du texte au lieu d'un contrôle de flux déterministe. jcode (verrous + DAG) **et** no-mistakes (custody) convergent : la réponse est une **discipline de verrous + fichiers d'état**, pas un bus temps réel.
+
+### Options Considérées
+
+| Option | Avantages | Inconvénients |
+|--------|-----------|---------------|
+| Statu quo (dispatch-and-join, plan linéaire, rapport prose) | Zéro coût | Collisions possibles, ré-entrée fragile, contrôle de flux non déterministe |
+| Bus temps réel (UDS/channels/dm façon jcode) | Coordination riche | **Hors runtime** Claude Code (pas de socket entre sous-agents) — rejeté |
+| **Discipline de verrous + fichiers d'état (A+B+C, retenue)** | Réalisable sans socket, sûr par construction, aligné doctrine | Refonte du contrôle de flux du manager + scripts d'état + typage des 4 workers |
+
+### Décision
+
+1. **Pattern A — Lock de driver unique** : script `driver-lock.sh` (acquisition **atomique** par `mkdir` de `.planning/DRIVER.lock/`, méta owner/étape/heartbeat). `vf-dev-manager` **acquiert avant de dispatcher**, **rafraîchit le heartbeat entre étapes**, **relâche à la clôture** (succès/échec/abandon — release « RAII » porté par le prompt). **Récupération de claim périmé livrée d'emblée** : un lock dont le heartbeat dépasse le TTL (`VF_DRIVER_TTL`, défaut 1800 s) est élagué et ré-acquis, reprise consignée. *(Limite assumée : pas de vrai RAII machine — un agent LLM peut mourir sans release ; le TTL+heartbeat est le filet, d'où recovery obligatoire.)*
+2. **Pattern B — DAG ready/blocked** : le plan de bataille devient un graphe persistant (`dag.sh` + `<mission>.dag.json`), nœuds `{id, étape, étage, deps[], status ∈ blocked|ready|running|done|failed}`. Le manager dispatche **la frontière `ready`** (deps `done`) ; un fix qui **rouvre** une étape repasse le nœud (et ses dépendants) à `ready` → **ré-entrée**. Remap déterministe `id::scope` sur collision d'id.
+3. **Pattern C — Rapports de worker typés** : `vf-coder`/`vf-reviewer`/`vf-auditer`/`vf-test-orchestrator` rendent `{statut ∈ passed|gaps_found|human_needed|blocked, findings[{severity, action ∈ auto-fix|no-op|ask-user}], nœuds_débloqués[]}` (aligne les statuts existants de `*-VERIFICATION.md` + la taxonomie d'action de la note §6.2). Le manager fait un **contrôle de flux déterministe** dessus.
+
+Protocole détaillé (source de vérité) : `plugin/dev-orchestrator/references/mission-flow.md`.
+
+### Conséquences
+
+**Positives** : plus de collision de pilotage (lock atomique + recovery) ; ré-entrée robuste (boucle fix→re-revue explicite) ; contrôle de flux déterministe (fin de l'interprétation de prose) ; sûr par construction, sans socket.
+**Négatives** : le release du lock dépend du prompt (pas de RAII machine) → **recovery obligatoire** ; refonte du manager + 4 workers typés (2 modules touchés : `dev-orchestrator` + `mobile-test-team`) ; état supplémentaire dans `.planning/`.
+
+### Code Impacté
+
+- **Nouveau** `plugin/dev-orchestrator/scripts/driver-lock.sh` + `dag.sh` (+ tests `test-driver-lock.sh`, `test-dag.sh`).
+- **Nouveau** `plugin/dev-orchestrator/references/mission-flow.md` (protocole A/B/C, contrat de rapport).
+- `agents/vf-dev-manager.md` — acquisition/heartbeat/release + pilotage par DAG + consommation des rapports typés.
+- `agents/vf-coder.md` / `vf-reviewer.md` / `vf-auditer.md` — section « Retour » typée. `mobile-test-team/agents/vf-test-orchestrator.md` — idem.
+- Bump `dev-orchestrator` v1.6.0 → v1.7.0 ; `mobile-test-team` bump mineur. Gate `check-agents.sh` sur chaque agent modifié.
+
+### Rules Associées
+
+- S'appuie sur ADR-048/049 (backups isolés — le lock protège leur intégrité), ADR-044 (agents machine-enforced — les agents modifiés repassent `check-agents.sh`), ADR-031 (la taxonomie `ask-user` raffine « jamais de fix sans validation humaine »). Aucune rule nouvelle.

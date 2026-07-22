@@ -1,5 +1,24 @@
 # CHANGELOG — dev-orchestrator
 
+## [v1.7.0] — 2026-07-22 (ADR-053 — volet swarm : lock de driver + DAG + rapports typés)
+
+### Ajouté
+- **Pattern A — Lock de driver unique** : `scripts/driver-lock.sh` (acquisition atomique par `mkdir`,
+  heartbeat, release, **récupération de claim périmé** via TTL). Empêche deux missions de piloter la même
+  étape en parallèle (protège les backups isolés ADR-048/049). `vf-dev-manager` l'acquiert avant tout
+  dispatch, rafraîchit le heartbeat entre étapes, le relâche à la clôture. 26 tests (dont concurrence réelle).
+- **Pattern B — DAG de tâches** : `scripts/dag.sh` (nœuds `ready`/`blocked`, frontière dispatchable,
+  `reopen` = ré-entrée avec reset transitif des dépendants, remap `id::stage` sur collision). Le plan de
+  bataille du manager devient un graphe persistant. 19 tests.
+- **Pattern C — Rapports de worker typés** : `vf-coder`/`vf-reviewer`/`vf-auditer` (+ `vf-test-orchestrator`
+  du module mobile-test-team) terminent par `{statut, findings[{action: auto-fix|no-op|ask-user}],
+  noeuds_debloques}` → contrôle de flux déterministe côté manager (raffine ADR-031).
+- `references/mission-flow.md` : protocole complet A/B/C (source de vérité).
+
+### Note
+- Pas de RAII machine (un agent LLM peut mourir sans release) → la récupération de claim périmé
+  (heartbeat + TTL) est **obligatoire**, pas optionnelle. Réalisé par fichiers d'état, sans bus temps réel.
+
 ## [v1.6.0] — 2026-07-19 (ADR-051)
 
 Allowlist MCP des agents exécutants dérivée du lab — les sous-agents voient enfin les serveurs MCP
