@@ -1,5 +1,18 @@
 # Changelog — conductor
 
+## [v1.12.0] — 2026-07-22 (détection de migration legacy, scope-aware)
+
+### Ajouté
+- **`check-legacy.sh`** : préflight scope-aware qui détecte si un lab est sur l'ANCIENNE méthode
+  (pré ADR-052/053). Inspecte **les deux** racines (`$HOME/.claude` = user, `./.claude` = projet/local,
+  ID4) et, par module concerné installé, signale `legacy` (version < minimum : dev-orchestrator v1.7.0,
+  consolidator v1.5.0) ou `drift` (version OK mais artefacts manquants). Sortie humaine (nudge) ou
+  `--print` JSON. Exit 0 toujours (informatif). 8 tests.
+- **`update-banner.sh`** (hook SessionStart) étendu : fusionne en **un seul** `systemMessage` le nudge de
+  mise à jour du plugin ET le nudge de méthode legacy (via `check-legacy.sh`). Un lab déjà à la bonne
+  version de plugin mais aux modules non migrés est désormais détecté au démarrage. Boucle fermée : un
+  `drift` détecté est réparé par `/vf-update` (`sync_module_governance` re-copie les artefacts).
+
 ## [v1.11.3] — 2026-07-20 (audit robustesse hooks — 2e vague, gate agents fiabilisé)
 
 ### Corrigé

@@ -1,10 +1,6 @@
 {
   "name": "mobile-test-team",
-<<<<<<< HEAD
   "version": "v1.3.0",
-=======
-  "version": "v1.3.0",
->>>>>>> 10d3743 (feat(swarm ADR-053): lock de driver + DAG ready/blocked + rapports typés (dev-orchestrator v1.7.0))
   "type": "agents + rules",
   "description": "Équipe de test mobile autonome : la boucle test → corrige → re-test (vf-test-orchestrator + workers cloisonnés vf-test-runner / vf-app-fixer, Pattern 12) qui manquait pour qu'un mode autonome aille jusqu'à « l'app marche vraiment ». Rule path-scopée qui invoque la doctrine de vérification réelle dès qu'on développe du mobile. Statut expérimental jusqu'au premier run réel vert.",
   "requires": ["mobile-test"]
