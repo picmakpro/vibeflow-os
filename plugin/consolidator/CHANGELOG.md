@@ -1,5 +1,39 @@
 # CHANGELOG — consolidator
 
+## [v1.6.0] — 2026-07-22 (ADR-052 — pilier 5 : mémoire vivante à décroissance + supersession)
+
+### Ajouté
+- **Pilier 5 — Mémoire vivante** : nouvelle couche mémoire **fichier-par-entrée**
+  (`.claude/memory/knowledge/`, format frontmatter natif Claude Code), distincte des registres d'audit
+  tabulaires (piliers 1-4, **inchangés**). Porte le savoir vivant du lab (user/feedback/project/reference),
+  dont la fiabilité décroît dans le temps.
+- `scripts/decay-pass.sh` : passe idempotente `--dry-run`/`--apply` qui applique les **3 gestes** ADR-052 —
+  `trust` normalisé, `confidence` base préservée + `effective_confidence` recalculée par demi-vie de
+  catégorie (`feedback` 365 / `user` 180 / `reference` 120 / `project` 30 j), et supersession **non
+  destructive** (`superseded_by` → déplacement vers `archive/`, jamais de suppression — ADR-031). Seuil de
+  rétrogradation `needs_review` (défaut `effective_confidence < 0.2`) = flag, jamais suppression. Backups
+  isolés ADR-049 avant `--apply`.
+- `scripts/tests/test-decay.sh` : 27 tests (dry-run sans effet de bord, base préservée, idempotence,
+  supersession non destructive, hygiène/backups/no-op, + régressions de revue : listes YAML préservées,
+  archive homonyme jamais écrasée, date future bornée).
+
+### Durci (revue de code)
+- **Archive non écrasante** : une supersession vers un slug déjà présent dans `archive/` ne détruit plus
+  l'archive existante — la nouvelle est suffixée `.superseded-<ts>.md` (garantie ADR-031 renforcée).
+- **Préservation non lossy** des blocs YAML inconnus (listes, mappings) : réémis verbatim au lieu d'être
+  corrompus en `key: value`.
+- **Bornage** : `age` ≥ 0 et `effective_confidence` ∈ [0,1] — une date `created` future ne gonfle plus la
+  confiance. Normalisation CRLF/BOM avant parse. Réparations (trust/confidence/created invalides) tracées
+  en `warnings`.
+- Template de format `templates/memory/knowledge-entry-template.md` (+ miroir `plugin/reference/`) et
+  référence `references/memoire-vivante.md`.
+- `/consolidate --pillar=decay` + Phase 6 dans l'orchestration.
+
+### Note
+- La décroissance est **batch** (au `/consolidate`), pas par-tour : Claude Code n'expose pas de hook
+  par-tour fiable (pipeline par-tour de jcode explicitement différé). `reindex.sh`/`archive.sh` ne sont
+  pas modifiés (couplés au format tabulaire).
+
 ## [v1.5.0] — 2026-07-20 (audit robustesse hooks — 16 findings corrigés, 2 pertes de données évitées)
 
 ### Corrigé — intégrité des données

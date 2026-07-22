@@ -18,7 +18,7 @@
 | ADR-049 | 2026-07-16 | Backups mémoire isolés + rotation intégrée (anti-pollution registres) | Validée |
 | ADR-050 | 2026-07-16 | Hooks planning : lecture index-first au start + mise à jour bloquante au end | Validée — amendée 2026-07-20 (attribution de session, fix faux positifs) |
 | ADR-051 | 2026-07-19 | Allowlist MCP des agents exécutants dérivée du lab (injection à l'install) | Validée |
-| ADR-052 | 2026-07-22 | Frontmatter mémoire enrichi — trust + confidence à décroissance par catégorie + supersession non destructive | **Proposée** |
+| ADR-052 | 2026-07-22 | Frontmatter mémoire enrichi — trust + confidence à décroissance par catégorie + supersession non destructive | Validée |
 
 ---
 
@@ -412,9 +412,26 @@ d'accès web/doc : `vf-app-fixer` conserve son interdiction ADR-045 (pas de cont
 ## ADR-052 : Frontmatter mémoire enrichi — trust + confidence à décroissance par catégorie + supersession non destructive
 
 **Date** : 2026-07-22
-**Statut** : **Proposée** — issue du spike Phase 9 (verdict GO). Rien ne touche le format mémoire officiel ni `plugin/consolidator/` avant validation humaine (ADR-031).
-**Décideur** : proposé par le spike `memory-swarm-rnd` — **à valider par Samuel**
+**Statut** : **Validée** (Samuel, 2026-07-22) — implémentation dans `plugin/consolidator/` autorisée.
+**Décideur** : Samuel — validée sur la base du spike Phase 9 (verdict GO) + panel de recalibration des demi-vies
 **Contexte** : Phase 9 (R&D, hors chaîne de release). Source : `.planning/research/jcode-memory-swarm-transposition-NOTE.md` + `.planning/phases/VFDO-09-*/09-GO-NOGO-memoire.md`. Panel de recalibration des demi-vies exécuté en session.
+
+### Précision de périmètre (validée 2026-07-22, avant implémentation)
+
+La cartographie du module a révélé **deux systèmes mémoire distincts** que la note du spike conflatait :
+- **Registres d'audit tabulaires** (`DECISIONS.md`, `LEARNINGS.md`, `BLOCKERS.md`, `ADR.md`…) — trace
+  historique **permanente**, gérée par `reindex.sh`/`archive.sh`. Une décision datée ne « perd pas en
+  confiance » → **la décroissance n'a pas de sens ici. Ces registres restent INCHANGÉS.**
+- **Mémoire vivante fichier-par-entrée** (un `.md`/fait, frontmatter `name`/`metadata.type` — le format
+  natif de la mémoire Claude Code) — le **savoir vivant** de l'agent sur le lab (qui est l'user, ses
+  préférences, faits projet, pointeurs). Sa fiabilité **évolue** → **c'est la cible réelle de l'ADR.**
+
+**Décision de périmètre** : introduire cette mémoire vivante comme **nouvelle couche versionnée dans le lab**
+(`.claude/memory/knowledge/` : `MEMORY.md` d'index + `<slug>.md` + `archive/`), **à côté** des registres
+d'audit — pas à leur place. Elle est gouvernée par une **passe dédiée** du `consolidator` (nouveau script,
+pas une extension de `reindex.sh`/`archive.sh` qui sont couplés au format tabulaire). Choix retenu pour la
+fidélité à jcode (un nœud riche par mémoire), l'alignement sur le format plateforme Claude Code (pérennité)
+et la séparation nette audit vs savoir vivant (maintenabilité).
 
 ### Problème
 
@@ -445,7 +462,7 @@ La mémoire fichier de VibeFlow (`memory/*.md` : `name` / `description` / `metad
 3. **Demi-vies recalibrées multi-métiers** (post-panel) : `feedback` **365 j** (le moat — inchangé) / `user` **180 j** / `reference` **120 j** / `project` **30 j**. Le `project` **revient à 30 j** (le rallongement à 45 j du spike inversait le sens pour de l'état volatil — deadlines, sprints, tendances périment en jours/semaines : consensus du panel).
 4. **Formule** (sans access-boost, `reinforced[]` différé) : `effective_confidence = confidence × 0.5 ^ (age_jours / demi_vie[type])`.
 5. **Supersession = déplacement** vers `archive/` + `status: superseded` (jamais de suppression — ADR-031). `confidence` reste la **base** ; la décroissance vit dans le champ **dérivé** `effective_confidence` (idempotence : ne pas écraser la base).
-6. **Point d'intégration** : la décroissance devient une **règle du pilier Indexation** du skill `consolidator` (passe **batch**, pas par-tour — pas de nouveau composant). Un **seuil de rétrogradation** (ex. `effective_confidence < 0.2` → flag « à revérifier », pas suppression) est à fixer à l'implémentation.
+6. **Point d'intégration** : un **script dédié** (`decay-pass.sh`, pattern Python-inline du module) applique la décroissance sur `.claude/memory/knowledge/`, exposé comme **pilier 5 du `consolidator`** (« Mémoire vivante », `/consolidate --pillar=decay`) — passe **batch**, pas par-tour. `reindex.sh`/`archive.sh` ne sont **pas** modifiés (couplés au format tabulaire). **Seuil de rétrogradation** retenu : `effective_confidence < 0.2` (`VF_DECAY_REVIEW_THRESHOLD`) → flag `needs_review: true`, jamais suppression.
 
 ### Limites reconnues (panel) — hors périmètre de ce GO
 
@@ -456,11 +473,13 @@ La mémoire fichier de VibeFlow (`memory/*.md` : `name` / `description` / `metad
 **Positives** : fiabilité et fraîcheur explicites ; retrait non destructif conforme ADR-031 ; coût de maintenance humain **nul** (passe idempotente prouvée) ; aucun runtime requis (batch consolidator) ; format fichier préservé (une entrée = un `.md`, pas de base binaire).
 **Négatives** : +7 lignes de frontmatter par entrée (densité ADR-029 : mesuré ≤ ~12 lignes/entrée, sous les seuils) ; la décroissance ne s'applique qu'à la **passe** `consolidator`, pas en continu (accepté — pas de hook par-tour fiable) ; les demi-vies restent des heuristiques à affiner empiriquement.
 
-### Code Impacté — **SI validée** (rien de fait à ce stade)
+### Code Impacté
 
-- Format `memory/*.md` officiel + template `docs/reference/.../memory/adr-template.md` (et miroir `plugin/reference/`)
-- Skill `plugin/consolidator/` — règle de décroissance + archivage au pilier Indexation (réutilise `reindex.sh` / `archive.sh` existants, pas le prototype Python jetable `spike/decay-pass.py`)
-- Doc de format mémoire (frontmatter enrichi + seuil de rétrogradation)
+- **Nouveau** `plugin/consolidator/scripts/decay-pass.sh` (+ suite `scripts/tests/test-decay.sh`) — passe de décroissance + supersession sur `.claude/memory/knowledge/`, modes `--dry-run`/`--apply`, idempotente. S'inspire de l'algo `spike/decay-pass.py` (référence, pas réutilisé tel quel).
+- **Nouveau** template + doc de format de la mémoire vivante : `docs/reference/methodology/templates/memory/knowledge-entry-template.md` (+ miroir `plugin/reference/`).
+- `plugin/consolidator/SKILL.md` + `references/indexation.md` — documente le geste décroissance (pilier Indexation) et la couche mémoire vivante.
+- `reindex.sh` / `archive.sh` — **inchangés** (registres tabulaires d'audit, hors périmètre).
+- Bump `plugin/consolidator/VERSION` + `module.json` + `CHANGELOG.md` (nouvelle capacité → minor).
 
 ### Rules Associées
 
