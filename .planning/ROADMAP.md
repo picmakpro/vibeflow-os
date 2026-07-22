@@ -151,8 +151,8 @@ collisions observées sur les backups isolés (ADR-048/049).
      pas observées en pratique.
 **Plans**: à cadrer (`/gsd:discuss-phase 9` puis `plan-phase`)
 Plans:
-- [ ] 09-01 — spike frontmatter mémoire enrichi (3 gestes) + règle décroissance `consolidator` sur lab témoin (RND-01)
-- [ ] 09-02 — mesure coût de maintenance + note go/no-go mémoire + mini-cadrage écrit du volet swarm (lock de driver + DAG, non implémenté) (RND-02)
+- [x] 09-01 — spike frontmatter mémoire enrichi (3 gestes) + règle décroissance `consolidator` sur lab témoin (RND-01) → **GO** (round-trip idempotent + archivage non destructif vérifiés, `spike/`)
+- [x] 09-02 — note go/no-go mémoire (verdict + demi-vies recalibrées, `09-GO-NOGO-memoire.md`) + mini-cadrage écrit du volet swarm non implémenté (`09-CADRAGE-swarm.md`) (RND-02)
 
 ## Progress
 

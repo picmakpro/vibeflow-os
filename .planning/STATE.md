@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: memory-swarm-rnd
 milestone_name: R&D mémoire & swarm
-status: planning
-stopped_at: Phase 9 context gathered — ready for planning
+status: spike-done
+stopped_at: Phase 9 spike exécuté — verdict GO (mémoire), swarm cadré non implémenté
 last_updated: "2026-07-22"
 last_activity: 2026-07-22
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 0
-  percent: 0
+  completed_plans: 2
+  percent: 100
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-04)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Phase 9 (R&D memory-swarm-rnd) — contexte cadré (2026-07-20), prêt à planifier. Milestone Doctrine dev & consolidation **SHIPPED v2.20.0** (tag + PR #9, clôturé 2026-07-07).
+**Current focus:** Phase 9 (R&D memory-swarm-rnd) — **spike exécuté 2026-07-22, verdict GO mémoire** (voir `09-GO-NOGO-memoire.md`). Prochain pas hors phase : écrire un ADR sous validation humaine avant de toucher le format officiel. Milestone Doctrine dev & consolidation **SHIPPED v2.20.0** (tag + PR #9, clôturé 2026-07-07).
 
 ## Current Position
 
 Phase: 9 (Spike transposition jcode mémoire+swarm) — milestone memory-swarm-rnd
-Plan: aucun plan encore — contexte cadré (`09-CONTEXT.md`), prêt à planifier
-Status: Planning — spike R&D hors chaîne de release
+Plan: spike exécuté — livrables `09-GO-NOGO-memoire.md`, `09-CADRAGE-swarm.md`, prototype `spike/`
+Status: Spike terminé — R&D hors chaîne de release, aucun changement du format officiel (attend ADR)
 Last activity: 2026-07-22
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██████████] 100% (spike)
 
 ## Performance Metrics
 
