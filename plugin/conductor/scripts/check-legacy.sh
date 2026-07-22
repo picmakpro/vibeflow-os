@@ -26,7 +26,7 @@ REQ = {
     "dev-orchestrator": {"min": "1.7.0", "artifacts": [
         "scripts/dag.sh", "scripts/driver-lock.sh",
         "agents/dev-orchestrator-references/mission-flow.md"]},
-    "consolidator":     {"min": "1.5.0", "artifacts": ["scripts/decay-pass.sh"]},
+    "consolidator":     {"min": "1.6.0", "artifacts": ["scripts/decay-pass.sh"]},
 }
 
 def ver_tuple(v):
