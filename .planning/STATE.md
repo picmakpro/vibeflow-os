@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-04)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Phase 9 (R&D memory-swarm-rnd) — **spike exécuté 2026-07-22, verdict GO mémoire** (voir `09-GO-NOGO-memoire.md`). Prochain pas hors phase : écrire un ADR sous validation humaine avant de toucher le format officiel. Milestone Doctrine dev & consolidation **SHIPPED v2.20.0** (tag + PR #9, clôturé 2026-07-07).
+**Current focus:** Phase 9 (R&D memory-swarm-rnd) — spike GO + **ADR-052 rédigé (statut Proposée)** après panel de recalibration (`docs/ADR.md`). **Attend validation humaine** (ADR-031) avant tout changement du format mémoire officiel ou de `plugin/consolidator/`. Milestone Doctrine dev & consolidation **SHIPPED v2.20.0** (tag + PR #9, clôturé 2026-07-07).
 
 ## Current Position
 
