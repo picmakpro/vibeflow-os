@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: memory-swarm-rnd
 milestone_name: R&D mémoire & swarm
 status: implemented
-stopped_at: ADR-052 validé + implémenté (consolidator v1.6.0, pilier 5) — non shippé
+stopped_at: ADR-052 validé + implémenté (consolidator v1.6.0 + swarm v1.7.0) — SHIPPÉ v2.28.0
 last_updated: "2026-07-22"
 last_activity: 2026-07-22
 progress:
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-04)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Phase 9 (memory-swarm-rnd) — spike GO → **ADR-052 VALIDÉ + IMPLÉMENTÉ**. Le `consolidator` gagne un **pilier 5 « Mémoire vivante »** (v1.6.0) : couche fichier-par-entrée `.claude/memory/knowledge/` à décroissance de confiance + supersession non destructive (`scripts/decay-pass.sh`, 27 tests, revue de code passée). **Non shippé** (bump VERSION racine + tag à faire si distribution voulue). Volet swarm : cadré, non implémenté. Milestone Doctrine dev & consolidation **SHIPPED v2.20.0**.
+**Current focus:** Phase 9 (memory-swarm-rnd) — spike GO → **ADR-052 VALIDÉ + IMPLÉMENTÉ**. Le `consolidator` gagne un **pilier 5 « Mémoire vivante »** (v1.6.0) : couche fichier-par-entrée `.claude/memory/knowledge/` à décroissance de confiance + supersession non destructive (`scripts/decay-pass.sh`, 27 tests, revue de code passée). **SHIPPÉ v2.28.0** (ADR-052 mémoire vivante + ADR-053 swarm : lock + DAG + rapports typés). Volet swarm implémenté et dogfoodé. Milestone Doctrine dev & consolidation **SHIPPED v2.20.0**.
 
 ## Current Position
 

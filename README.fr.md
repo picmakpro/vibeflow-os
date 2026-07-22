@@ -8,7 +8,7 @@
 
 Dis _« aide-moi à dev cette feature »_ — et tout le pipeline se déclenche : cadrage → plan → exécution → tests → livraison. Sans jamais taper une commande technique ni savoir ce qui tourne en coulisse.
 
-[![Version](https://img.shields.io/badge/version-2.26.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.28.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-16-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -192,6 +192,9 @@ Le routage repose sur un **index factuel auto-généré** depuis le frontmatter 
 | `v2.24.0` | 2026-07-11 | skill-creator ajouté à la baseline d'install du conductor (ADR-047) : le canal unique de création de skills est désormais posé d'office via la fermeture transitive du conductor — corrige le fan-out de `vf-new-lab` vers un sous-agent jamais installé (conductor v1.10.0) |
 | `v2.25.0` | 2026-07-16 | Orchestrateur métier systématique + durcissement gouvernance (ADR-048/049/050) : `vf-new-lab` pose un orchestrateur métier dès ≥2 agents métier + skill de boucle de mission ; backups mémoire isolés avec rotation intégrée ; hooks planning (lecture index-first au start, mise à jour bloquante au end) (conductor v1.11.0) |
 | `v2.26.0` | 2026-07-19 | Allowlist MCP des agents exécutants dérivée du lab (ADR-051) : les sous-agents voient enfin les serveurs MCP du projet (XcodeBuildMCP, mobile-mcp, DB métier…) via le flag `vf-mcp-consumer` + injection idempotente à l'install depuis `.mcp.json` ; `gsd-executor` patché après l'install GSD (dev-orchestrator v1.6.0, mobile-test-team v1.2.0, conductor v1.11.1) |
+| `v2.27.0` | 2026-07-20 | Guard planning par attribution de session (ADR-050 amendée) + durcissement global des hooks du harnais (29 findings corrigés, 282 checks verts) (planning-core, software-architecture, conductor) |
+| `v2.27.1` | 2026-07-20 | Gate agents fiabilisé (2e vague audit hooks conductor : parseur YAML, anti-trappe fail-closed, portée lab, filet debug-research) (conductor v1.11.3) |
+| `v2.28.0` | 2026-07-22 | R&D mémoire-swarm shippée (ADR-052/053) : consolidator **v1.6.0** pilier mémoire vivante (couche `knowledge/` fichier-par-entrée, décroissance par demi-vie de catégorie + supersession non destructive, `decay-pass.sh`) ; dev-orchestrator **v1.7.0** contrôle de flux swarm (lock de driver unique + DAG ready/blocked avec rendu `tree` + rapports de worker typés, résolution de scripts scope-robuste) ; conductor **v1.12.0** détection legacy scope-aware + nudge SessionStart ; mobile-test-team **v1.3.0** rapports typés ; fix engine uninstall (skills imbriqués + tests) |
 
 </details>
 
