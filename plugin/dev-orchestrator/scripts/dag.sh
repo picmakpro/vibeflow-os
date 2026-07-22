@@ -169,9 +169,8 @@ if action == "tree":
             if d in children:  # une dep vers un id connu = arete parent -> enfant
                 children[d].append(n["id"])
     roots = [n["id"] for n in nodes if not n["deps"]]
-    if not roots and nodes:  # graphe 100% cyclique : aucune racine → on part de tous les noeuds
-        roots = [n["id"] for n in nodes]
     lines = []
+    rendered = set()  # noeuds deja imprimes en pleine ligne (sert a la passe orpheline ci-dessous)
 
     def label(node_id):
         n = idx[node_id]
@@ -179,8 +178,9 @@ if action == "tree":
 
     def walk(node_id, prefix, connector, path):
         if node_id in path:  # cycle sur ce chemin : on signale et on s'arrete (borne la profondeur)
-            lines.append(f"{prefix}{connector}{GLYPH.get(idx[node_id]['status'], '?')} {node_id}  (cycle)")
+            lines.append(f"{prefix}{connector}{label(node_id)}  (cycle)")
             return
+        rendered.add(node_id)
         lines.append(f"{prefix}{connector}{label(node_id)}")
         # le prefixe des enfants prolonge la colonne du connecteur courant
         if connector == "":
@@ -196,6 +196,12 @@ if action == "tree":
 
     for root in roots:
         walk(root, "", "", set())
+    # passe orpheline : un sous-graphe 100% cyclique (aucun noeud sans deps) coexistant avec une
+    # vraie racine n'est atteint par aucun `walk` ci-dessus → on le rend aussi comme pseudo-racine,
+    # jamais d'omission silencieuse (couvre aussi le graphe entierement cyclique : roots vide).
+    for n in nodes:
+        if n["id"] not in rendered:
+            walk(n["id"], "", "", set())
     print("\n".join(lines))
     sys.exit(0)
 

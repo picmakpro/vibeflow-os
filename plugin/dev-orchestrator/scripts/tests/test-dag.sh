@@ -107,6 +107,21 @@ tree_out=$(run_bounded "$SCRIPT" tree --file="$CY"); rc=$?
 assert_exit "T10.1 — tree termine (exit 0, pas de hang)" "$rc" 0
 assert "T10.2 — cycle signalé" "$tree_out" '(cycle)'
 
+echo "=== T11 — tree rend les composants orphelins (cycle isolé + vraie racine) ==="
+# ROOT (racine réelle) coexiste avec un sous-graphe 100% cyclique C1⇄C2 (aucun sans-deps).
+# Sans la passe orpheline, C1/C2 disparaîtraient silencieusement de l'arbre.
+OR="$WORK_DIR/orphan.dag.json"; "$SCRIPT" init --file="$OR" >/dev/null
+"$SCRIPT" add --file="$OR" --id=ROOT --step=r  >/dev/null
+"$SCRIPT" add --file="$OR" --id=C1   --step=c1 >/dev/null
+"$SCRIPT" add --file="$OR" --id=C2   --step=c2 --deps=C1 >/dev/null
+# force le cycle C1→C2 / C2→C1 (comme T8/T10) → C1 n'est plus une racine
+python3 -c "import json; d=json.load(open('$OR')); [n.__setitem__('deps',['C2']) for n in d['nodes'] if n['id']=='C1']; json.dump(d,open('$OR','w'))"
+tree_out=$(run_bounded "$SCRIPT" tree --file="$OR"); rc=$?
+assert_exit "T11.1 — tree termine (exit 0)" "$rc" 0
+assert "T11.2 — racine ROOT rendue"          "$tree_out" 'ROOT'
+assert "T11.3 — orphelin C1 rendu"           "$tree_out" 'C1'
+assert "T11.4 — orphelin C2 rendu"           "$tree_out" 'C2'
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
