@@ -605,10 +605,23 @@ uninstall_module() {
   log "Désinstallation $mod (scope=$VF_SCOPE → $TARGET_ROOT)..."
   backup_module "$mod"
 
-  # Remove skill dir
+  # Remove skill dir (Type 1 — skill mono)
   if [ -d "$TARGET_ROOT/skills/$mod" ]; then
     rm -rf "$TARGET_ROOT/skills/$mod"
     log "  removed $TARGET_ROOT/skills/$mod"
+  fi
+
+  # Remove nested skills (Type 2 — skills/<name>/, symétrique de l'install). On ne retire QUE les
+  # skills que CE module possède (lus depuis le cache), jamais celui d'un autre module.
+  if [ -d "$CACHE_DIR/$mod/skills" ]; then
+    for skill_dir in "$CACHE_DIR/$mod/skills/"*/; do
+      [ -d "$skill_dir" ] || continue
+      skill_name=$(basename "$skill_dir")
+      if [ -d "$TARGET_ROOT/skills/$skill_name" ]; then
+        rm -rf "$TARGET_ROOT/skills/$skill_name"
+        log "  removed $TARGET_ROOT/skills/$skill_name"
+      fi
+    done
   fi
 
   # Remove agent module (AGENT.md installé + dossier references D7)
@@ -642,6 +655,23 @@ uninstall_module() {
       name=$(basename "$f")
       [ -f "$TARGET_ROOT/scripts/$name" ] && rm "$TARGET_ROOT/scripts/$name" && log "  removed $TARGET_ROOT/scripts/$name"
     done
+    # Miroir de copy_module_scripts : retirer aussi tests/ + fixtures/ de CE module, puis élaguer
+    # les dossiers s'ils sont vides. rmdir (jamais rm -rf) car scripts/ et tests/ sont partagés.
+    if [ -d "$CACHE_DIR/$mod/scripts/tests" ]; then
+      for f in "$CACHE_DIR/$mod/scripts/tests/"*.sh; do
+        [ -f "$f" ] || continue
+        name=$(basename "$f")
+        [ -f "$TARGET_ROOT/scripts/tests/$name" ] && rm "$TARGET_ROOT/scripts/tests/$name" && log "  removed $TARGET_ROOT/scripts/tests/$name"
+      done
+      for f in "$CACHE_DIR/$mod/scripts/tests/fixtures/"*; do
+        [ -e "$f" ] || continue
+        name=$(basename "$f")
+        [ -e "$TARGET_ROOT/scripts/tests/fixtures/$name" ] && rm -rf "$TARGET_ROOT/scripts/tests/fixtures/$name" && log "  removed $TARGET_ROOT/scripts/tests/fixtures/$name"
+      done
+      rmdir "$TARGET_ROOT/scripts/tests/fixtures" 2>/dev/null || true
+      rmdir "$TARGET_ROOT/scripts/tests" 2>/dev/null || true
+    fi
+    rmdir "$TARGET_ROOT/scripts" 2>/dev/null || true
   fi
 
   # Remove rules (only those owned by this module)
