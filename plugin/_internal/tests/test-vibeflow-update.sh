@@ -199,6 +199,13 @@ if prepare_module "$CACHE" "dev-orchestrator" && prepare_module "$CACHE" "consol
     || { ko "T6 uninstall --all : references dev-orchestrator encore présentes"; miss=1; }
   [ ! -d "$LAB/.claude/skills/consolidator" ] \
     || { ko "T6 uninstall --all : skill consolidator encore présent"; miss=1; }
+  # Skills IMBRIQUÉS du module agent (Type 2 : skills/vf-*/) — le trou historique : l'uninstall
+  # ne retirait que skills/<mod>, laissant les vf-* orphelins.
+  [ ! -d "$LAB/.claude/skills/vf-dev" ] \
+    || { ko "T6 uninstall --all : skill imbriqué vf-dev encore présent"; miss=1; }
+  # Sous-dossier scripts/tests/ du module retiré (miroir de copy_module_scripts).
+  [ ! -f "$LAB/.claude/scripts/tests/test-dag.sh" ] \
+    || { ko "T6 uninstall --all : test-dag.sh (scripts/tests/) encore présent"; miss=1; }
   # Registre vide (plus aucune ligne module=version).
   REG="$LAB/.claude/scripts/.vibeflow-installed"
   if [ -f "$REG" ]; then

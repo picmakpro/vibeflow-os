@@ -52,3 +52,7 @@ Respecte les conventions du projet (CLAUDE.md, rules). Si le projet interdit le 
 ## Rapport de synthèse
 
 Écris un rapport (dans le `reportsDir` configuré, ou `test-runs/`) : phase + verdict global (vert / partiel / bloqué) ; par critère : couvert par quel(s) flow(s), vert/rouge ; **diff global** (`git diff <baseline-sha>..HEAD --stat`) ; commits atomiques (SHA + message + flow) ; flows ajoutés par le runner (à relire) ; abandons anti-thrash ; régressions évitées. Renvoie à l'appelant un résumé compact : verdict, nb critères verts/total, commits, abandons, chemin du rapport.
+
+**Termine par le bloc typé** (contrat de rapport de worker, ADR-053) pour un contrôle de flux déterministe côté `vf-dev-manager` :
+`{ "statut": "passed|gaps_found|human_needed|blocked", "findings": [{ "severity": "…", "action": "auto-fix|no-op|ask-user", "ref": "flow/critère" }], "noeuds_debloques": ["<id DAG>"] }`.
+Mapping : vert = `passed` ; partiel = `gaps_found` ; bloqué (baseline rouge, budget épuisé) = `blocked`.

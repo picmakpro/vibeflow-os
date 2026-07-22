@@ -1,5 +1,12 @@
 # Changelog — mobile-test-team
 
+## v1.3.0 — 2026-07-22 (ADR-053 — rapport de worker typé)
+
+### Ajouté
+- `vf-test-orchestrator` termine désormais son rapport par le **bloc typé** du contrat de rapport de worker
+  (ADR-053) : `{statut, findings[{action}], noeuds_debloques}` — mapping vert=`passed`, partiel=`gaps_found`,
+  bloqué=`blocked`. Permet à `vf-dev-manager` un contrôle de flux déterministe sur la boucle de test mobile.
+
 ## v1.2.1 — 2026-07-20 (conformité ADR-045)
 
 ### Corrigé

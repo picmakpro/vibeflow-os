@@ -1,0 +1,27 @@
+# Évidence spike Phase 9 — reproductible : python3 seed-lab.py lab-temoin && python3 decay-pass.py lab-temoin --today 2026-07-22
+
+Seeded 5 entrées + MEMORY.md dans lab-temoin
+
+>>> PASSE 1 (jcode-brut) — lit -> recalcule -> réécrit + archive supersession
+# Passe consolidator (prototype) — jcode — today=2026-07-22
+# lab: lab-temoin
+
+  RÉÉCRIT commits-francais-scroll-off.md   type=feedback   trust=high   conf 0.95->eff 0.6498  (age 200j / HL 365j)
+  RÉÉCRIT reference-rtk-proxy.md           type=reference  trust=medium conf 0.7->eff 0.2475  (age 90j / HL 60j)
+  ARCHIVE reviz-appele-willhunting.md      -> archive/  (superseded_by=reviz-is-willhosting)
+  RÉÉCRIT reviz-is-willhosting.md          type=project    trust=high   conf 0.9->eff 0.6665  (age 13j / HL 30j)
+  RÉÉCRIT user-freelance-multi-metiers.md  type=user       trust=medium conf 0.8->eff 0.3175  (age 120j / HL 90j)
+
+# Archivées (non destructif) : 1
+  - reviz-appele-willhunting.md (superseded_by reviz-is-willhosting) conservée dans archive/
+
+>>> PASSE 2 (round-trip idempotent, aucune édition humaine entre les deux)
+# Passe consolidator (prototype) — jcode — today=2026-07-22
+# lab: lab-temoin
+
+  RÉÉCRIT commits-francais-scroll-off.md   type=feedback   trust=high   conf 0.95->eff 0.6498  (age 200j / HL 365j)
+  RÉÉCRIT reference-rtk-proxy.md           type=reference  trust=medium conf 0.7->eff 0.2475  (age 90j / HL 60j)
+  RÉÉCRIT reviz-is-willhosting.md          type=project    trust=high   conf 0.9->eff 0.6665  (age 13j / HL 30j)
+  RÉÉCRIT user-freelance-multi-metiers.md  type=user       trust=medium conf 0.8->eff 0.3175  (age 120j / HL 90j)
+
+# Archivées (non destructif) : 0

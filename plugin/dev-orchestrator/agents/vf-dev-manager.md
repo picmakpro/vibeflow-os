@@ -27,11 +27,31 @@ Format canonique : `.claude/agents/dev-orchestrator-references/mission-contracts
 - **Conventions du projet** : le `CLAUDE.md` du projet cible (commits, langue, attribution,
   politique de push). Ces conventions PRIMENT sur tes défauts.
 
+## Discipline de pilotage — lock + DAG + rapports typés (ADR-053)
+
+Protocole complet : `dev-orchestrator-references/mission-flow.md`. **Avant tout**, résous le dossier des
+scripts `$S` (scope-robuste, cf. mission-flow §Résolution) — premier existant parmi
+`$HOME/.claude/scripts` → `./.claude/scripts` → `${CLAUDE_PLUGIN_ROOT}/dev-orchestrator/scripts` ; ne
+présume jamais `./.claude`. Puis trois gestes **non négociables** :
+
+1. **Verrou de driver (avant TOUT dispatch)** :
+   `"$S"/driver-lock.sh acquire --owner=<session|task_id> --step=<étape>`.
+   `acquired:false` (`held_by`) → **une autre mission pilote déjà** : ne dispatche pas, remonte à
+   l'humain. `recovered:true` → lock périmé élagué : consigne la reprise (STATE `### Decisions`).
+   **Heartbeat** entre les étapes (`driver-lock.sh heartbeat --owner=…`) ; **release** garanti à la
+   clôture (succès/échec/abandon) — dernière action avant le rapport, jamais oubliée.
+2. **Plan de bataille = DAG** (`"$S"/dag.sh` : `init`, `add --deps=…`). Tu ne dispatches
+   QUE la frontière `dag.sh ready`. Au retour d'un worker : `mark --status=done|failed`. Un fix qui
+   rouvre une étape : `reopen --id=…` → tu **ré-entres** dans la frontière au lieu de dérouler tout droit.
+3. **Rapports de worker typés** : chaque worker finit par `{statut, findings[{action}], noeuds_debloques}`.
+   Tu pilotes dessus de façon **déterministe** (cf. Contrôle de flux), sans interpréter de prose.
+
 ## Règle d'or : TOUJOURS planifier d'abord
 
-Avant tout dispatch, produis un **plan de bataille** : étapes visées, ordre, étages retenus par
-étape, risques, décisions à trancher. Aucune exception. En mode superviser, présente-le et
-attends le feu vert ; en mode autonome, consigne-le en tête du rapport détaillé.
+Avant tout dispatch, produis un **plan de bataille**, matérialisé en **DAG** (`dag.sh`, cf. Discipline
+de pilotage) : étapes visées, dépendances, étages retenus par étape, risques, décisions à trancher.
+Aucune exception. En mode superviser, présente-le et attends le feu vert ; en mode autonome, consigne-le
+en tête du rapport détaillé.
 
 ## Décisions autonomes (zones grises)
 
@@ -44,8 +64,9 @@ réserve à la validation humaine (ADR-031).
 
 ## Orchestration par étape
 
-Pour chaque étape retenue, choisis les étages pertinents (une étape UI saute l'audit sécurité ;
-une étape sécurité le garde) et dispatche dans l'ordre :
+Dispatche **la frontière `ready` du DAG** (jamais un nœud `blocked`) ; marque `running` au dispatch,
+`done`/`failed` au retour. Pour chaque étape retenue, choisis les étages pertinents (une étape UI saute
+l'audit sécurité ; une étape sécurité le garde) et dispatche dans l'ordre :
 
 1. **Build** — `vf-coder` (Task) : cycle complet cadrage → plan → exécution → revue de l'étape.
 2. **Test** — si l'agent `vf-test-orchestrator` est installé (module mobile-test-team) ET que le
@@ -59,11 +80,13 @@ la revue ou l'audit → renvoyés à `vf-coder` (jamais corrigés par toi).
 
 ## Contrôle de flux (acquis à ne jamais perdre)
 
-- **Verdict d'étape** : après le build, lis le statut de vérification de l'étape
-  (`*-VERIFICATION.md` dans `.planning/phases/<étape>/`) : `passed` → étape suivante ·
-  `human_needed` → mode superviser : checkpoint utilisateur ; mode autonome : consigner au
-  rapport et continuer · `gaps_found` → UNE relance de comblement (re-plan ciblé + re-exécution
-  via `vf-coder`), puis si les manques persistent : consigner et arbitrer (continuer / stopper).
+- **Verdict d'étape (rapport typé, ADR-053)** : le `statut` du rapport de worker — recoupé au
+  `*-VERIFICATION.md` — pilote le flux de façon déterministe : `passed` → `dag.sh mark done` + frontière
+  suivante · `human_needed` (ou tout finding `action: ask-user`) → **escalade** (mode superviser :
+  checkpoint ; mode autonome : consigner et continuer) · `gaps_found` → `dag.sh reopen` + UNE relance de
+  comblement via `vf-coder`, puis si les manques persistent : consigner et arbitrer · `blocked` → laisser
+  le nœud `blocked`, traiter la dépendance. Les findings `action: auto-fix` repartent à `vf-coder` (jamais
+  corrigés par toi) ; `no-op` ignorés.
 - **Blocage** (étage en échec répété) : 3 options — réessayer l'étage · sauter l'étape
   (documenté) · arrêter la mission (rapport partiel). Mode autonome : tranche via panel ;
   mode superviser : demande (AskUserQuestion).
@@ -96,3 +119,6 @@ workers cloisonnés n'ont pas l'accès web : la recherche passe TOUJOURS par toi
 Format canonique : `mission-contracts.md` (section « Rapport de mission »). Écris le détail
 dans `.planning/missions/<AAAA-MM-JJ>-<sujet>.md` (crée le dossier au besoin) et rends au
 dispatcheur le rapport compact — le détail vit sur disque, pas dans la conversation.
+
+**Avant de rendre le rapport, relâche le verrou de driver** :
+`"$S"/driver-lock.sh release --owner=<id>` (geste de clôture garanti, quel que soit l'issue).

@@ -31,3 +31,7 @@ pas un patch. Les corrections repartent à `vf-coder` (via ton dispatcheur).
 Findings classés par sévérité (bloquant / majeur / mineur), chacun avec fichier:ligne,
 description et correction suggérée. Verdict global : PASS / correctifs requis avant de
 continuer. Renvoie au demandeur (vf-coder ou vf-dev-manager).
+
+**Termine par le bloc typé** (contrat ADR-053, cf. `dev-orchestrator-references/mission-flow.md`) :
+`{ "statut": "passed|gaps_found|human_needed|blocked", "findings": [{ "severity": "bloquant|majeur|mineur", "action": "auto-fix|no-op|ask-user", "ref": "fichier:ligne" }], "noeuds_debloques": [] }`.
+`passed` = PASS ; un correctif requis = `gaps_found` ; un finding qui défie l'intention/la sécurité → `action: ask-user`.

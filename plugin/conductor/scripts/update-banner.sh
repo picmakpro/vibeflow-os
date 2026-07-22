@@ -1,27 +1,49 @@
 #!/usr/bin/env bash
-# update-banner.sh — Hook SessionStart : signale (bandeau) qu'une mise à jour vibeflow est dispo.
+# update-banner.sh — Hook SessionStart : signale (bandeau) qu'une action VibeFlow est dispo.
 #
-# Lit le cache écrit par check-plugin-update.sh (session PRÉCÉDENTE → lecture instantanée, ne bloque
-# jamais le démarrage) puis relance la vérification en tâche de fond pour la prochaine session.
-# Émet un JSON { "systemMessage": ... } si une mise à jour est dispo — sinon rien. Toujours exit 0.
+# Deux signaux fusionnés en UN seul systemMessage (jamais deux JSON) :
+#   1. Mise à jour du PLUGIN — lit le cache écrit par check-plugin-update.sh (session précédente →
+#      lecture instantanée, ne bloque jamais le démarrage).
+#   2. Méthode LEGACY — check-legacy.sh (scope-aware, instantané, sans réseau) : un lab déjà à la
+#      bonne version de plugin peut avoir des modules non migrés (pré ADR-052/053). Nudge /vf-update.
+# Émet le JSON seulement s'il y a quelque chose à dire — sinon rien. Toujours exit 0.
 set -uo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 CACHE_FILE="${XDG_CACHE_HOME:-$HOME/.cache}/vibeflow/update-check.json"
 
-# 1) Bandeau depuis le cache existant (n'attend aucun réseau).
-if [ -f "$CACHE_FILE" ] && command -v python3 >/dev/null 2>&1; then
-  python3 - "$CACHE_FILE" <<'PY' 2>/dev/null || true
-import json, sys
+# Signal 2 (synchrone, négligeable : lit un registre + stat quelques fichiers).
+LEGACY_JSON=""
+[ -x "$DIR/check-legacy.sh" ] && LEGACY_JSON="$(bash "$DIR/check-legacy.sh" --print 2>/dev/null || true)"
+
+if command -v python3 >/dev/null 2>&1; then
+  CACHE_FILE="$CACHE_FILE" LEGACY_JSON="$LEGACY_JSON" python3 <<'PY' 2>/dev/null || true
+import json, os
+msgs = []
+# 1) mise à jour du plugin (depuis le cache)
 try:
-    c = json.load(open(sys.argv[1]))
-    if c.get("update_available"):
-        i, l = c.get("installed", "?"), c.get("latest", "?")
-        print(json.dumps({
-            "systemMessage": f"VibeFlow : mise à jour disponible {i} → {l}. Lance /vf-update pour mettre à jour le plugin et les modules installés."
-        }, ensure_ascii=False))
+    cf = os.environ.get("CACHE_FILE", "")
+    if cf and os.path.isfile(cf):
+        c = json.load(open(cf))
+        if c.get("update_available"):
+            msgs.append(f"mise à jour disponible {c.get('installed','?')} → {c.get('latest','?')}")
 except Exception:
     pass
+# 2) méthode legacy / drift d'artefacts (scope-aware)
+try:
+    lj = os.environ.get("LEGACY_JSON", "")
+    if lj:
+        d = json.loads(lj)
+        if d.get("verdict") == "action-needed":
+            mods = sorted({m["module"] for s in d.get("scopes", [])
+                           for m in s["modules"] if m["status"] != "current"})
+            msgs.append("nouvelle méthode disponible (" + ", ".join(mods) + ")")
+except Exception:
+    pass
+if msgs:
+    print(json.dumps({"systemMessage": "VibeFlow : " + " ; ".join(msgs)
+                      + ". Lance /vf-update pour mettre à jour le plugin et les modules installés."},
+                     ensure_ascii=False))
 PY
 fi
 

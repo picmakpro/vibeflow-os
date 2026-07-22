@@ -8,7 +8,7 @@
 
 Say _"help me build this feature"_ — and the whole pipeline kicks off: scoping → plan → execution → tests → delivery. Without ever typing a technical command or knowing what runs under the hood.
 
-[![Version](https://img.shields.io/badge/version-2.26.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.28.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-16-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -192,6 +192,9 @@ Routing relies on a **factual index auto-generated** from the frontmatter of the
 | `v2.24.0` | 2026-07-11 | skill-creator added to the conductor install baseline (ADR-047): the sole authorized skill-creation channel is now installed by default via the conductor's transitive closure — fixes `vf-new-lab`'s fan-out to a never-installed subagent (conductor v1.10.0) |
 | `v2.25.0` | 2026-07-16 | Systematic domain orchestrator + governance hardening (ADR-048/049/050): `vf-new-lab` lays down a domain orchestrator from ≥2 domain agents + mission-loop skill; isolated memory backups with integrated rotation; planning hooks (index-first read at start, blocking update at end) (conductor v1.11.0) |
 | `v2.26.0` | 2026-07-19 | Lab-derived MCP allowlist for executing agents (ADR-051): subagents now see the project's MCP servers (XcodeBuildMCP, mobile-mcp, business DB…) via the `vf-mcp-consumer` flag + idempotent install-time injection from `.mcp.json`; `gsd-executor` patched post-GSD-install (dev-orchestrator v1.6.0, mobile-test-team v1.2.0, conductor v1.11.1) |
+| `v2.27.0` | 2026-07-20 | Session-attributed planning guard (ADR-050 amended) + global hardening of the harness hooks (29 findings fixed, 282 checks green) (planning-core, software-architecture, conductor) |
+| `v2.27.1` | 2026-07-20 | Hardened agent gate (2nd wave of the conductor hooks audit: YAML parser, fail-closed anti-bypass, lab scope, debug-research safety net) (conductor v1.11.3) |
+| `v2.28.0` | 2026-07-22 | Memory-swarm R&D shipped (ADR-052/053): consolidator **v1.6.0** living-memory pillar (per-entry `knowledge/` layer, category half-life decay + non-destructive supersession, `decay-pass.sh`); dev-orchestrator **v1.7.0** swarm control-flow (single-driver lock + ready/blocked DAG with `tree` render + typed worker reports, scope-robust script resolution); conductor **v1.12.0** scope-aware legacy detection + SessionStart nudge; mobile-test-team **v1.3.0** typed reports; engine uninstall fix (nested skills + tests) |
 
 </details>
 
