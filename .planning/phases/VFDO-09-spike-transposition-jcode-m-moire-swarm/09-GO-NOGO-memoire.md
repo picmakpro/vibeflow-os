@@ -49,6 +49,11 @@ demi-vie de nature s'y transpose sans distorsion :
 
 ## 3. Demi-vies **recalibrées** pour VibeFlow multi-métiers (livrable D-04)
 
+> **Mise à jour post-panel (2026-07-22)** : un panel adversarial de recalibration a corrigé `project`
+> **45 → 30 j** (le rallongement inversait le sens pour de l'état volatil : deadlines/sprints/tendances
+> périment en jours/semaines). Valeurs et raisonnement définitifs → **ADR-052** (`docs/ADR.md`), qui prime.
+> Le tableau ci-dessous reflète la proposition initiale du spike (`project` à 45 j).
+
 Les valeurs jcode sont calibrées pour un **harness de code** (« les faits de codebase périment vite »). VibeFlow
 opère des **labs multi-métiers** (dev, iOS, marketing, contenu, business) : la cadence de péremption y est plus
 lente pour tout ce qui n'est pas de l'état de code, et la capitalisation de feedback est la valeur cœur.
