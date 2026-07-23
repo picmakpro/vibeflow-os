@@ -18,6 +18,9 @@
 | ADR-049 | 2026-07-16 | Backups mémoire isolés + rotation intégrée (anti-pollution registres) | Validée |
 | ADR-050 | 2026-07-16 | Hooks planning : lecture index-first au start + mise à jour bloquante au end | Validée — amendée 2026-07-20 (attribution de session, fix faux positifs) |
 | ADR-051 | 2026-07-19 | Allowlist MCP des agents exécutants dérivée du lab (injection à l'install) | Validée |
+| ADR-052 | 2026-07-22 | Frontmatter mémoire enrichi — trust + confidence à décroissance par catégorie + supersession non destructive | Validée |
+| ADR-053 | 2026-07-22 | Volet swarm — lock de driver unique + DAG ready/blocked + rapports de worker typés | Validée |
+| ADR-054 | 2026-07-23 | Portabilité Windows — normalisation CRLF, préflight, gardes réellement actives, gate de synchro versions | Validée (2 rapports terrain intégrés) |
 
 ---
 
@@ -408,77 +411,220 @@ d'accès web/doc : `vf-app-fixer` conserve son interdiction ADR-045 (pas de cont
 
 ---
 
-## ADR-052 : Portabilité Windows — normalisation CRLF, préflight prérequis, gate de synchro versions
+## ADR-052 : Frontmatter mémoire enrichi — trust + confidence à décroissance par catégorie + supersession non destructive
 
 **Date** : 2026-07-22
-**Statut** : Validée
-**Décideur** : Willy (rapport terrain de deux élèves de la formation, Windows 11 + Git Bash, protocole rejouable ; cause racine reproduite au byte près en local)
-**Contexte** : release v2.28.0 — conductor v1.11.4, kpi-analyst v1.0.1
+**Statut** : **Validée** (Samuel, 2026-07-22) — implémentation dans `plugin/consolidator/` autorisée.
+**Décideur** : Samuel — validée sur la base du spike Phase 9 (verdict GO) + panel de recalibration des demi-vies
+**Contexte** : Phase 9 (R&D, hors chaîne de release). Source : `.planning/research/jcode-memory-swarm-transposition-NOTE.md` + `.planning/phases/VFDO-09-*/09-GO-NOGO-memoire.md`. Panel de recalibration des demi-vies exécuté en session.
+
+### Précision de périmètre (validée 2026-07-22, avant implémentation)
+
+La cartographie du module a révélé **deux systèmes mémoire distincts** que la note du spike conflatait :
+- **Registres d'audit tabulaires** (`DECISIONS.md`, `LEARNINGS.md`, `BLOCKERS.md`, `ADR.md`…) — trace
+  historique **permanente**, gérée par `reindex.sh`/`archive.sh`. Une décision datée ne « perd pas en
+  confiance » → **la décroissance n'a pas de sens ici. Ces registres restent INCHANGÉS.**
+- **Mémoire vivante fichier-par-entrée** (un `.md`/fait, frontmatter `name`/`metadata.type` — le format
+  natif de la mémoire Claude Code) — le **savoir vivant** de l'agent sur le lab (qui est l'user, ses
+  préférences, faits projet, pointeurs). Sa fiabilité **évolue** → **c'est la cible réelle de l'ADR.**
+
+**Décision de périmètre** : introduire cette mémoire vivante comme **nouvelle couche versionnée dans le lab**
+(`.claude/memory/knowledge/` : `MEMORY.md` d'index + `<slug>.md` + `archive/`), **à côté** des registres
+d'audit — pas à leur place. Elle est gouvernée par une **passe dédiée** du `consolidator` (nouveau script,
+pas une extension de `reindex.sh`/`archive.sh` qui sont couplés au format tabulaire). Choix retenu pour la
+fidélité à jcode (un nœud riche par mémoire), l'alignement sur le format plateforme Claude Code (pérennité)
+et la séparation nette audit vs savoir vivant (maintenabilité).
 
 ### Problème
 
-Install bloquée sur Windows 11 (Claude Code v2.1.217, plugin 2.27.1), 5 causes tracées :
+La mémoire fichier de VibeFlow (`memory/*.md` : `name` / `description` / `metadata.type` + liens `[[slug]]`) est une **liste plate sans fiabilité ni fraîcheur**. Trois manques : (1) rien ne distingue un fait **dit** par l'utilisateur d'un fait **inféré** ; (2) rien ne fait **périmer** un fait obsolète (un fait de codebase et une correction durable ont le même poids éternel) ; (3) la seule façon de retirer un souvenir est la **suppression manuelle** — destructive, contraire à ADR-031. jcode (harness Rust) modélise nativement `trust` / `confidence` décroissante / supersession. Le spike Phase 9 a **prouvé mécaniquement** (critère binaire D-05) que les 3 gestes minimaux se transposent **sans runtime** : une passe batch idempotente lit→recalcule→réécrit sans édition humaine, et une entrée `superseded_by` est archivée sans destruction.
 
-1. **jq absent de Git Bash** (jamais inclus par Git for Windows) et documenté NULLE PART comme
-   prérequis (`INSTALL.md` listait « bash, python3, awk, grep, sed (macOS/Linux) ») — angle mort de
-   dev : macOS 15 livre `/usr/bin/jq` en natif. Pire : `resolve-deps.sh` n'avait AUCUN guard — sans
-   jq, la process substitution avalait « command not found » et rendait une fermeture INCOMPLÈTE
-   avec exit 0 (install silencieusement amputée).
-2. **Le jq Windows natif écrit en mode texte** (chaque `\n` → `\r\n`, by design, non corrigeable par
-   version — le flag `-b` est opt-in par appel et absent de jq 1.6). `$()` ne retire que le `\n`
-   final → `\r` fantôme : `resolve-deps.sh` cherchait `planning-core\r` (crash en pleine boucle,
-   symptôme exact du rapport), le catalogue dégradait `conductor` en `optional` et faisait fuiter
-   les bundles `proposable:false` (comparaisons `= "true"` cassées — corruption SILENCIEUSE, rc=0),
-   `framework-version.sh drift` signalait un écart permanent, `kpis-writer.sh` persistait
-   `"domain": "generic\r"` DANS la donnée (KPIS.md, ingéré par le Hub).
-3. **`installer/SKILL.md` invoquait ses scripts par nom nu** (12+ sites, chemin correct donné une
-   seule fois hors point d'usage) → le LLM exécutant devinait parmi ~10 dossiers `scripts/`
-   (`installer/build-module-catalog.sh` deviné, inexistant). Même patron dans `vf-calibrate`
-   (3 conventions pour le même script) et `vf-new-lab`.
-4. **Fiche marketplace + badges README dérivés de 2 releases** (2.26.0 affiché / 2.27.1 réel,
-   16 modules affichés / 17 réels) — `check-release-tag.sh` ne vérifiait que VERSION ↔ tag.
-5. **`merge-hooks.sh` codait `python3` en dur** : sous Windows le `python3` du PATH peut être le
-   stub Microsoft Store (App Execution Alias : `command -v` réussit, l'exécution PEND en non-TTY)
-   et python.org ne fournit pas de `python3.exe` → module installé SANS ses hooks de gouvernance
-   (perte silencieuse, seule trace stderr).
+### Options Considérées
 
-### Décision — défense en profondeur, 4 couches
+| Option | Avantages | Inconvénients |
+|--------|-----------|---------------|
+| Statu quo (liste plate) | Zéro coût | Pas de fiabilité, pas de péremption, retrait = suppression destructive (anti ADR-031) |
+| Copier tout jcode (embeddings + RRF + graphe + pipeline par-tour) | Rappel sémantique riche | **Hors runtime** Claude Code (pas d'embeddings intra-session, pas de hook par-tour fiable) — rejeté §note |
+| **3 gestes minimaux + décroissance batch dans `consolidator` (retenue)** | Prouvé sans runtime, coût humain nul (idempotent), aligné ADR-031 | Ajoute 5 champs saisis + 2 dérivés au frontmatter (densité à tenir) |
 
-1. **Wrapper canonique `jqx() ( set -o pipefail; command jq "$@" | tr -d '\r'; )`** dans les 5
-   scripts exécutant jq (resolve-deps, build-module-catalog, framework-version, kpis-writer,
-   extractor-template) — normalisation CONSOMMATEUR, version-agnostique (jq 1.6→1.8.x), propage le
-   code retour. Règle : **jq brut interdit hors définition du wrapper** (gate T7 du test). Guards
-   `command -v jq` partout, message avec commande d'install par OS. `resolve-deps.sh` passe en
-   capture explicite : un échec jq est BRUYANT, plus jamais une fermeture vide.
-2. **Préflight** (`installer/scripts/preflight.sh`, étape 0 BLOQUANTE de `/vibeflow-install`) :
-   git, jq (+ sonde CRLF informative), python3 RÉEL (sonde d'exécution `timeout`-gardée sous
-   Windows, rejet des chemins `WindowsApps`, candidats `python3` → `python`). Même résolution
-   d'interpréteur dans `merge-hooks.sh`.
-3. **`.gitattributes` eol=lf** (sh/py/json/md/yml — prime sur l'`autocrlf=true` par défaut de
-   l'installeur Git for Windows) + **chemins pleinement qualifiés au point d'usage** dans
-   `installer/SKILL.md` (table d'invocations exactes, pattern du contre-exemple vertueux
-   `vf-update`), `vf-calibrate`, `vf-new-lab`, `commands/vf-calibrate.md`.
-4. **Gate `check-version-sync.sh`** (appelé par `check-release-tag.sh` au pre-push) : VERSION ↔
-   plugin.json ↔ marketplace.json ↔ badges/texte des 2 README ↔ compte réel de `module.json`.
-   Parsing grep/sed volontaire (le gate tourne sans jq). + ceinture `${m%$'\r'}` dans les 2
-   boucles while-read de `vibeflow-update.sh`.
+### Décision
 
-### Tests
+1. **Frontmatter enrichi** du format `memory/*.md` (5 saisis + 2 dérivés) :
+   ```yaml
+   metadata: { type: user | feedback | project | reference }
+   trust: high | medium | low        # qui affirme (high=dit / medium=observé / low=inféré)
+   confidence: 0.0–1.0               # base, posée à la création/renforcement (non lossy)
+   created: YYYY-MM-DD               # ancre de la décroissance
+   status: active | superseded       # supersession non destructive
+   superseded_by: <slug>             # vide si active
+   effective_confidence: 0.0–1.0     # DÉRIVÉ — recalculé à chaque passe (non saisi)
+   last_decay_pass: YYYY-MM-DD       # DÉRIVÉ — traçabilité
+   ```
+2. **Mapping catégories jcode → types VibeFlow (1:1)** : `Correction`→`feedback`, `Preference`→`user`, `Entity`→`reference`, `Fact`→`project`. `Custom` non transposé (retombe sur `project`).
+3. **Demi-vies recalibrées multi-métiers** (post-panel) : `feedback` **365 j** (le moat — inchangé) / `user` **180 j** / `reference` **120 j** / `project` **30 j**. Le `project` **revient à 30 j** (le rallongement à 45 j du spike inversait le sens pour de l'état volatil — deadlines, sprints, tendances périment en jours/semaines : consensus du panel).
+4. **Formule** (sans access-boost, `reinforced[]` différé) : `effective_confidence = confidence × 0.5 ^ (age_jours / demi_vie[type])`.
+5. **Supersession = déplacement** vers `archive/` + `status: superseded` (jamais de suppression — ADR-031). `confidence` reste la **base** ; la décroissance vit dans le champ **dérivé** `effective_confidence` (idempotence : ne pas écraser la base).
+6. **Point d'intégration** : un **script dédié** (`decay-pass.sh`, pattern Python-inline du module) applique la décroissance sur `.claude/memory/knowledge/`, exposé comme **pilier 5 du `consolidator`** (« Mémoire vivante », `/consolidate --pillar=decay`) — passe **batch**, pas par-tour. `reindex.sh`/`archive.sh` ne sont **pas** modifiés (couplés au format tabulaire). **Seuil de rétrogradation** retenu : `effective_confidence < 0.2` (`VF_DECAY_REVIEW_THRESHOLD`) → flag `needs_review: true`, jamais suppression.
 
-`plugin/_internal/tests/test-windows-crlf.sh` (nouveau) : shim jq-CRLF (awk suffixe `\r\n`, fidèle
-au binaire Windows) + PATH minimal sans jq — reproduit les DEUX pannes terrain sur macOS/Linux sans
-poste Windows. T1-T2 fermeture complète LF pur · T3-T5 mandatory conservé + WIP exclus + TSV pur ·
-T6 drift sans faux RETARD · T7 gate anti-régression jq nu · T8-T9 échec bruyant + message par OS.
+### Limites reconnues (panel) — hors périmètre de ce GO
 
-### Restes assumés (candidats de suivi, hors périmètre)
+`reference` et `project` restent des **buckets à deux vitesses** (ticket éphémère vs infra permanente ; deadline volatile vs insight durable). Extensions **candidates ultérieures, non décidées ici** : sous-type volatil court `signal` (~14–21 j) pour marketing/contenu ; champ `expires_at` (**couperet dur** pour devis/certificats, là où l'exponentielle modélise mal une date d'expiration) ; épinglage `pin` de la master-data non-décroissante ; reset d'âge au ré-accès (= `reinforced[]` / access-boost jcode, déjà différé). Ces pistes ne bloquent pas le GO minimal.
 
-- Les hooks runtime fail-open (7 scripts) + `check-agents.sh --strict` (Gate C de vf-new-lab)
-  codent `python3` en dur : sous Windows sans python3 exposé, protections inactives (fail-open,
-  jamais bloquant). Généraliser la résolution d'interpréteur = refactor séparé sur du code durci
-  S060-S061, à faire à froid.
-- Validation terrain réelle : protocole rejouable fourni aux deux testeurs Windows du rapport.
+### Conséquences
+
+**Positives** : fiabilité et fraîcheur explicites ; retrait non destructif conforme ADR-031 ; coût de maintenance humain **nul** (passe idempotente prouvée) ; aucun runtime requis (batch consolidator) ; format fichier préservé (une entrée = un `.md`, pas de base binaire).
+**Négatives** : +7 lignes de frontmatter par entrée (densité ADR-029 : mesuré ≤ ~12 lignes/entrée, sous les seuils) ; la décroissance ne s'applique qu'à la **passe** `consolidator`, pas en continu (accepté — pas de hook par-tour fiable) ; les demi-vies restent des heuristiques à affiner empiriquement.
+
+### Code Impacté
+
+- **Nouveau** `plugin/consolidator/scripts/decay-pass.sh` (+ suite `scripts/tests/test-decay.sh`) — passe de décroissance + supersession sur `.claude/memory/knowledge/`, modes `--dry-run`/`--apply`, idempotente. S'inspire de l'algo `spike/decay-pass.py` (référence, pas réutilisé tel quel).
+- **Nouveau** template + doc de format de la mémoire vivante : `docs/reference/methodology/templates/memory/knowledge-entry-template.md` (+ miroir `plugin/reference/`).
+- `plugin/consolidator/SKILL.md` + `references/indexation.md` — documente le geste décroissance (pilier Indexation) et la couche mémoire vivante.
+- `reindex.sh` / `archive.sh` — **inchangés** (registres tabulaires d'audit, hors périmètre).
+- Bump `plugin/consolidator/VERSION` + `module.json` + `CHANGELOG.md` (nouvelle capacité → minor).
 
 ### Rules Associées
 
-- Aucune rule nouvelle. Gates machine : T7 de `test-windows-crlf.sh` (interdiction du jq nu dans
-  les 5 scripts) + `check-version-sync.sh` (pre-push via `check-release-tag.sh`).
+- S'appuie sur ADR-031 (jamais de destruction/fix sans validation humaine — la supersession EN EST l'application) et ADR-049 (backups mémoire isolés — l'archivage réutilise `.backups/`). Aucune rule nouvelle avant implémentation.
+
+---
+
+## ADR-053 : Volet swarm — lock de driver unique + DAG ready/blocked + rapports de worker typés
+
+**Date** : 2026-07-22
+**Statut** : **Validée** (Samuel, 2026-07-22) — périmètre **A+B+C complet** choisi explicitement, le garde-fou YAGNI du cadrage (« pas avant collisions observées ») est **levé en connaissance de cause**.
+**Décideur** : Samuel
+**Contexte** : Phase 9 (memory-swarm-rnd). Source : `.planning/phases/VFDO-09-*/09-CADRAGE-swarm.md` (transposition swarm jcode §2 + custody no-mistakes §6.6). Cible : module `dev-orchestrator` (équipe `vf-dev-manager` & workers).
+
+### Problème
+
+L'équipe VibeFlow est un **dispatch-and-join** (`Task`), pas des acteurs concurrents. Trois fragilités : (1) **collision de pilotage** — deux missions/sessions qui pilotent la même étape en parallèle se marchent dessus sur les backups isolés (ADR-048/049) ; (2) le **plan de bataille** du manager est une **liste linéaire** — un correctif qui rouvre une étape ne « ré-entre » pas proprement dans le dispatch ; (3) les **rapports de worker sont en prose** — le manager interprète du texte au lieu d'un contrôle de flux déterministe. jcode (verrous + DAG) **et** no-mistakes (custody) convergent : la réponse est une **discipline de verrous + fichiers d'état**, pas un bus temps réel.
+
+### Options Considérées
+
+| Option | Avantages | Inconvénients |
+|--------|-----------|---------------|
+| Statu quo (dispatch-and-join, plan linéaire, rapport prose) | Zéro coût | Collisions possibles, ré-entrée fragile, contrôle de flux non déterministe |
+| Bus temps réel (UDS/channels/dm façon jcode) | Coordination riche | **Hors runtime** Claude Code (pas de socket entre sous-agents) — rejeté |
+| **Discipline de verrous + fichiers d'état (A+B+C, retenue)** | Réalisable sans socket, sûr par construction, aligné doctrine | Refonte du contrôle de flux du manager + scripts d'état + typage des 4 workers |
+
+### Décision
+
+1. **Pattern A — Lock de driver unique** : script `driver-lock.sh` (acquisition **atomique** par `mkdir` de `.planning/DRIVER.lock/`, méta owner/étape/heartbeat). `vf-dev-manager` **acquiert avant de dispatcher**, **rafraîchit le heartbeat entre étapes**, **relâche à la clôture** (succès/échec/abandon — release « RAII » porté par le prompt). **Récupération de claim périmé livrée d'emblée** : un lock dont le heartbeat dépasse le TTL (`VF_DRIVER_TTL`, défaut 1800 s) est élagué et ré-acquis, reprise consignée. *(Limite assumée : pas de vrai RAII machine — un agent LLM peut mourir sans release ; le TTL+heartbeat est le filet, d'où recovery obligatoire.)*
+2. **Pattern B — DAG ready/blocked** : le plan de bataille devient un graphe persistant (`dag.sh` + `<mission>.dag.json`), nœuds `{id, étape, étage, deps[], status ∈ blocked|ready|running|done|failed}`. Le manager dispatche **la frontière `ready`** (deps `done`) ; un fix qui **rouvre** une étape repasse le nœud (et ses dépendants) à `ready` → **ré-entrée**. Remap déterministe `id::scope` sur collision d'id.
+3. **Pattern C — Rapports de worker typés** : `vf-coder`/`vf-reviewer`/`vf-auditer`/`vf-test-orchestrator` rendent `{statut ∈ passed|gaps_found|human_needed|blocked, findings[{severity, action ∈ auto-fix|no-op|ask-user}], nœuds_débloqués[]}` (aligne les statuts existants de `*-VERIFICATION.md` + la taxonomie d'action de la note §6.2). Le manager fait un **contrôle de flux déterministe** dessus.
+
+Protocole détaillé (source de vérité) : `plugin/dev-orchestrator/references/mission-flow.md`.
+
+### Conséquences
+
+**Positives** : plus de collision de pilotage (lock atomique + recovery) ; ré-entrée robuste (boucle fix→re-revue explicite) ; contrôle de flux déterministe (fin de l'interprétation de prose) ; sûr par construction, sans socket.
+**Négatives** : le release du lock dépend du prompt (pas de RAII machine) → **recovery obligatoire** ; refonte du manager + 4 workers typés (2 modules touchés : `dev-orchestrator` + `mobile-test-team`) ; état supplémentaire dans `.planning/`.
+
+### Code Impacté
+
+- **Nouveau** `plugin/dev-orchestrator/scripts/driver-lock.sh` + `dag.sh` (+ tests `test-driver-lock.sh`, `test-dag.sh`).
+- **Nouveau** `plugin/dev-orchestrator/references/mission-flow.md` (protocole A/B/C, contrat de rapport).
+- `agents/vf-dev-manager.md` — acquisition/heartbeat/release + pilotage par DAG + consommation des rapports typés.
+- `agents/vf-coder.md` / `vf-reviewer.md` / `vf-auditer.md` — section « Retour » typée. `mobile-test-team/agents/vf-test-orchestrator.md` — idem.
+- Bump `dev-orchestrator` v1.6.0 → v1.7.0 ; `mobile-test-team` bump mineur. Gate `check-agents.sh` sur chaque agent modifié.
+
+### Rules Associées
+
+- S'appuie sur ADR-048/049 (backups isolés — le lock protège leur intégrité), ADR-044 (agents machine-enforced — les agents modifiés repassent `check-agents.sh`), ADR-031 (la taxonomie `ask-user` raffine « jamais de fix sans validation humaine »). Aucune rule nouvelle.
+
+---
+
+## ADR-054 : Portabilité Windows — normalisation CRLF, préflight, gardes réellement actives, gate de synchro versions
+
+**Date** : 2026-07-23
+**Statut** : Validée (2 rapports terrain intégrés)
+**Décideur** : Willy (2 rapports terrain rejouables de deux élèves de la formation, Windows 11 + Git Bash ; causes racines reproduites en local)
+**Contexte** : release v2.29.0 — conductor v1.12.1, consolidator v1.6.1, software-architecture v1.5.1, planning-core v2.3.1, kpi-analyst v1.0.1
+
+### Problème (rapport 1 — install, 2026-07-22)
+
+1. **jq absent de Git Bash** (jamais inclus par Git for Windows) et documenté NULLE PART comme
+   prérequis — angle mort de dev : macOS 15 livre `/usr/bin/jq` en natif. Pire : `resolve-deps.sh`
+   n'avait AUCUN guard — sans jq, la process substitution avalait « command not found » et rendait
+   une fermeture INCOMPLÈTE avec exit 0 (install silencieusement amputée).
+2. **Le jq Windows natif écrit en mode texte** (chaque `\n` → `\r\n`, by design, non corrigeable
+   par version — le flag `-b` est opt-in par appel et absent de jq 1.6). `$()` ne retire que le
+   `\n` final → `\r` fantôme : `resolve-deps.sh` cherchait `planning-core\r` (crash en pleine
+   boucle, symptôme exact du rapport), le catalogue dégradait `conductor` en `optional` et faisait
+   fuiter les bundles `proposable:false` (comparaisons `= "true"` cassées — corruption SILENCIEUSE,
+   rc=0), `framework-version.sh drift` signalait un écart permanent, `kpis-writer.sh` persistait
+   `"domain": "generic\r"` DANS la donnée (KPIS.md, ingéré par le Hub).
+3. **`installer/SKILL.md` invoquait ses scripts par nom nu** (12+ sites) → le LLM exécutant
+   devinait parmi ~10 dossiers `scripts/` (`installer/build-module-catalog.sh` deviné, inexistant).
+4. **Fiche marketplace + badges README dérivés de 2 releases** — `check-release-tag.sh` ne
+   vérifiait que VERSION ↔ tag.
+5. **`merge-hooks.sh` codait `python3` en dur** : sous Windows le `python3` du PATH peut être le
+   stub Microsoft Store (App Execution Alias : `command -v` réussit, l'exécution PEND ou sort en 49
+   sans stdout) et python.org ne fournit pas de `python3.exe` → module installé SANS ses hooks de
+   gouvernance (perte silencieuse).
+
+### Problème (rapport 2 — runtime, 2026-07-23, amendement)
+
+6. **Gardes runtime inertes en paraissant installées.** Les hooks fail-open (`command -v python3
+   || exit 0`) ne testent que la PRÉSENCE : sur Windows le stub Store la satisfait → la branche
+   de repli n'est JAMAIS atteinte, le `python3 -c` réel meurt en silence (rc 49, stdout vide),
+   l'appel est autorisé. Cas le plus grave signalé : env d'install ≠ env des hooks → harnais
+   complet, correctement câblé, entièrement inopérant, sans signal. Principe du rapporteur adopté :
+   « une protection annoncée n'est pas une protection tant qu'une tentative de violation n'a pas
+   échoué sous nos yeux ».
+7. **Préfiltre CSL-13 aveugle aux antislashs.** Les 3 scripts consolidator (guard-read,
+   guard-bash, post-edit-reindex) préfiltrent sur la sous-chaîne `.claude/memory/` (slashes) AVANT
+   le spawn python. Un chemin Windows arrive en antislashs (JSON-échappés `\\`) → préfiltre
+   court-circuite → le python — qui normalisait justement les antislashs (`replace("\\","/")`,
+   CSL-12) — n'est jamais atteint. Le traitement Windows existait derrière une porte jamais
+   ouverte. (`guard-agent-write` épargné : son motif `.claude` n'a pas de barre.)
+8. Annexe : `bash` peut être ABSENT du PATH Windows (seul `Git\cmd` y figure) tout en existant
+   (`Git\bin\bash.exe`) → contrôle préflight ajouté.
+
+### Décision — défense en profondeur
+
+1. **Wrapper `jqx() ( set -o pipefail; command jq "$@" | tr -d '\r'; )`** dans les 5 scripts jq —
+   normalisation CONSOMMATEUR, version-agnostique, code retour propagé. Règle : jq nu interdit
+   (gate T7 de `test-windows-crlf.sh`). Guards + messages d'install par OS ; `resolve-deps.sh` en
+   capture explicite (échec jq BRUYANT).
+2. **Préflight** (`installer/scripts/preflight.sh`, étape 0 BLOQUANTE) : git, jq (+ sonde CRLF
+   informative), python3 RÉEL (sonde d'exécution `timeout`-gardée, rejet `WindowsApps`, version ≥3,
+   candidats `python3`→`python`, état « py seul » = KO), `bash` dans le PATH. Même résolution dans
+   `merge-hooks.sh`.
+3. **Résolution d'interpréteur dans les hooks runtime** (amendement) : détection par CHEMIN — zéro
+   spawn ajouté au budget latence — `case "$(command -v python3)" in ''|*WindowsApps*)` → repli
+   `python`, sinon fail-open inchangé. Appliquée aux 8 scripts de hooks python3.
+4. **Préfiltres CSL-13 compatibles antislashs** (amendement) : normalisation du payload pour le
+   MATCH uniquement (`${PAYLOAD//\\//}`) — le python reçoit toujours le payload original. Le
+   surensemble strict redevient vrai sur Windows.
+5. **Signal de garde inactive** (amendement, suggestion du rapporteur adoptée) :
+   `probe-memory-guards.sh` (SessionStart consolidator, advisory) — sonde d'EXÉCUTION une fois par
+   session ; si aucun interpréteur utilisable : « ⚠ gardes mémoire INACTIVES : python injoignable ».
+6. **`.gitattributes` eol=lf** + **chemins pleinement qualifiés** au point d'usage (installer,
+   vf-calibrate, vf-new-lab — pattern du contre-exemple vertueux vf-update).
+7. **Gate `check-version-sync.sh`** (pre-push via check-release-tag) : VERSION ↔ plugin.json ↔
+   marketplace.json ↔ badges/texte des 2 README ↔ compte réel de module.json.
+8. **Licence — grant élèves** (décision Willy) : un élève de la formation est un « authorized
+   lab » : usage via le plugin ET réutilisation/adaptation d'éléments de modules dans ses dépôts
+   PRIVÉS pour ses propres labs ; redistribution/publication/revente interdites. LICENSE amendée.
+
+### Tests
+
+`plugin/_internal/tests/test-windows-crlf.sh` (shim jq-CRLF + PATH sans jq, 10 asserts, gate T7) +
+`plugin/consolidator/scripts/tests/test-windows-guards.sh` (amendement : payload antislashs → deny
+effectif ; stub `WindowsApps/python3` factice → repli `python` ; aucun python → fail-open + signal
+du probe). Rejouables sur macOS/Linux sans poste Windows.
+
+### Restes assumés
+
+- Comportement pré-existant observé : `install --with-deps` en scope `local` dans un dossier
+  non-git s'arrête après le 1er module (rc=1, sans message ni registre) — identique sur main.
+- Issue #20 : mode `--dry-run`/manifeste fichier-par-fichier avant pose (demande des mêmes
+  testeurs, revue à deux avant écriture).
+- Validation terrain réelle par les 2 testeurs Windows au tag v2.29.0 (protocole fourni).
+
+### Rules Associées
+
+- Aucune rule nouvelle. Gates machine : T7 (jq nu interdit) + `check-version-sync.sh` (pre-push) +
+  `test-windows-guards.sh` (gardes actives sous chemins Windows).

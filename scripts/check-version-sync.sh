@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check-version-sync.sh — Gate de cohérence des sources de version/compteur du repo (ADR-052).
+# check-version-sync.sh — Gate de cohérence des sources de version/compteur du repo (ADR-054).
 #
 # La fiche marketplace vue par l'utilisateur (marketplace.json) et les badges README avaient
 # dérivé de 2 releases par rapport à VERSION/plugin.json (vécu terrain 2026-07 : fiche 2.26.0,

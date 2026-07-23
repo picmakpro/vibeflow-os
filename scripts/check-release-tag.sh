@@ -43,7 +43,7 @@ if $REMOTE && [ -z "$(git ls-remote --tags origin "refs/tags/$tag" 2>/dev/null)"
   exit 1
 fi
 
-# Cohérence inter-fichiers (ADR-052) : la fiche marketplace et les badges README avaient dérivé
+# Cohérence inter-fichiers (ADR-054) : la fiche marketplace et les badges README avaient dérivé
 # de 2 releases (fiche 2.26.0 / installé 2.27.1, vécu terrain). Délégué à check-version-sync.sh.
 SYNC="$ROOT/scripts/check-version-sync.sh"
 if [ -f "$SYNC" ]; then

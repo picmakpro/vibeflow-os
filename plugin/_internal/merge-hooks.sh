@@ -51,7 +51,7 @@ if [ "$MODE" = "merge" ] && [ -z "$PREFIX" ]; then
   err "--scripts-prefix requis en mode merge"
 fi
 
-# Résolution d'interpréteur Python (ADR-052) : sous Windows, le `python3` du PATH peut être le
+# Résolution d'interpréteur Python (ADR-054) : sous Windows, le `python3` du PATH peut être le
 # stub Microsoft Store (App Execution Alias : `command -v` réussit mais l'exécution pend/échoue
 # en non-TTY) et l'installeur python.org ne fournit QUE `python.exe` (pas de `python3.exe`).
 # → sonde d'EXÉCUTION réelle (gardée par `timeout` là où il existe : Git Bash oui, macOS non),

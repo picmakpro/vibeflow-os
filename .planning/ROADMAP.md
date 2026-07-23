@@ -4,7 +4,8 @@
 
 - ✅ **vfdo-v1.0** — Module dev-orchestrator (Phase 1) — clôturé 2026-06-04
 - ✅ **install-ux-v1.0** — Phases 2-6 — clôturé 2026-06-05 (plugin + skill à toggles + scope) — release `v2.4.0`
-- 🚧 **dev-doctrine** — Phases 7-8 — doctrine dev (SOLID/DRY/KISS/YAGNI/Clean Archi/Clean Code/TDD) + consolidation des doublons qualité
+- ✅ **dev-doctrine** — Phases 7-8 — doctrine dev (SOLID/DRY/KISS/YAGNI/Clean Archi/Clean Code/TDD) + consolidation des doublons qualité — clôturé 2026-07-07 — release `v2.20.0`
+- 🔬 **memory-swarm-rnd** — Phase 9 — R&D : transposition du modèle mémoire + patterns swarm de jcode (spike, pas release)
 
 ## Phases
 
@@ -124,10 +125,39 @@ Plans:
 - [x] 08-03-PLAN.md — reference/AXIOMES-ENFORCEMENT.md source unique + renvois (CONS-03)
 - [x] 08-04-PLAN.md — dé-dup Instance C audit-architecture + fix description legacy v1.0.1 (CONS-02)
 
+### 🔬 R&D mémoire & swarm (Phase 9)
+
+**Milestone Goal:** Évaluer, par spike sur lab témoin, la transposition du modèle mémoire riche de jcode
+(trust/confidence/décroissance/supersession/arêtes typées) et de ses patterns swarm de sûreté
+(lock de driver unique, DAG ready/blocked) dans le `consolidator` et l'équipe `vf-dev-manager`.
+**Ne produit PAS de release** — décision go/no-go avant tout ADR ou changement du format mémoire officiel.
+Source : `.planning/research/jcode-memory-swarm-transposition-NOTE.md`.
+
+#### Phase 9: Spike transposition jcode (mémoire + swarm)
+**Goal**: Prototyper les 3 gestes mémoire les moins chers (frontmatter `trust`/`confidence`/`superseded_by`
++ règle de décroissance par catégorie dans `consolidator`) sur un lab témoin, mesurer le coût de maintenance
+réel, et statuer go/no-go. Volet swarm (lock de driver + DAG) = second spike indépendant, conditionné à des
+collisions observées sur les backups isolés (ADR-048/049).
+**Depends on**: — (R&D exploratoire, hors chaîne de release)
+**Requirements**: RND-01, RND-02
+**Success Criteria** (what must be TRUE):
+  1. Le format mémoire enrichi (3 gestes : `trust`/`confidence`/`superseded_by`) est prototypé sur ≥1 lab
+     témoin et le `consolidator` sait le tenir à jour **automatiquement** — round-trip lit→recalcule→réécrit
+     sans édition humaine, entrée `superseded_by` archivée sans suppression (sinon → no-go documenté).
+  2. Les demi-vies de décroissance sont re-calibrées pour l'usage VibeFlow multi-métiers (pas les valeurs
+     jcode brutes).
+  3. Une décision go/no-go écrite tranche : (a) écrire un ADR + toucher le format officiel, ou (b) archiver.
+  4. Le volet swarm est cadré (lock de driver + DAG) mais **non implémenté** tant que les collisions ne sont
+     pas observées en pratique.
+**Plans**: à cadrer (`/gsd:discuss-phase 9` puis `plan-phase`)
+Plans:
+- [x] 09-01 — spike frontmatter mémoire enrichi (3 gestes) + règle décroissance `consolidator` sur lab témoin (RND-01) → **GO** (round-trip idempotent + archivage non destructif vérifiés, `spike/`)
+- [x] 09-02 — note go/no-go mémoire (verdict + demi-vies recalibrées, `09-GO-NOGO-memoire.md`) + mini-cadrage écrit du volet swarm non implémenté (`09-CADRAGE-swarm.md`) (RND-02)
+
 ## Progress
 
 **Execution Order:**
-1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → **7 → 8**
+1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 🔬 (R&D, hors release)**
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -139,3 +169,4 @@ Plans:
 | 6. dev-orchestrator first-use | Install UX | 1/1 | Complete | 2026-06-05 |
 | 7. Philosophies de dev | dev-doctrine | 2/2 | Complete | 2026-07-07 |
 | 8. Consolidation des doublons | dev-doctrine | 4/4 | Complete | 2026-07-07 |
+| 9. Spike transposition jcode | memory-swarm-rnd | 0/2 | Not started (R&D) | — |

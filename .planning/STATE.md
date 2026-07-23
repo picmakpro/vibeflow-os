@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: dev-doctrine
-milestone_name: Doctrine dev & consolidation
-status: shipped
-stopped_at: Milestone dev-doctrine SHIPPED — release v2.20.0 (tag v2.20.0 poussé, PR #9 mergée)
-last_updated: "2026-07-07T00:00:00.000Z"
-last_activity: 2026-07-07
+milestone: memory-swarm-rnd
+milestone_name: R&D mémoire & swarm
+status: implemented
+stopped_at: ADR-052 validé + implémenté (consolidator v1.6.0 + swarm v1.7.0) — SHIPPÉ v2.28.0
+last_updated: "2026-07-22"
+last_activity: 2026-07-22
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  total_phases: 1
+  completed_phases: 1
+  total_plans: 2
+  completed_plans: 2
   percent: 100
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-04)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Milestone Doctrine dev & consolidation — LIVRÉ (ship en attente)
+**Current focus:** Phase 9 (memory-swarm-rnd) — spike GO → **ADR-052 VALIDÉ + IMPLÉMENTÉ**. Le `consolidator` gagne un **pilier 5 « Mémoire vivante »** (v1.6.0) : couche fichier-par-entrée `.claude/memory/knowledge/` à décroissance de confiance + supersession non destructive (`scripts/decay-pass.sh`, 27 tests, revue de code passée). **SHIPPÉ v2.28.0** (ADR-052 mémoire vivante + ADR-053 swarm : lock + DAG + rapports typés). Volet swarm implémenté et dogfoodé. Milestone Doctrine dev & consolidation **SHIPPED v2.20.0**.
 
 ## Current Position
 
-Phase: 8 of 8 (Consolidation des doublons) — milestone dev-doctrine COMPLET
-Plan: Phase 7 (2/2 PASS) + Phase 8 (4/4 PASS) livrées sur branche `feat/dev-doctrine-phase7`
-Status: Verifying — les 2 phases PASS ; reste le ship (VERSION racine + tag + PR)
-Last activity: 2026-07-07
+Phase: 9 (Spike transposition jcode mémoire+swarm) — milestone memory-swarm-rnd
+Plan: spike GO → ADR-052 validé → implémenté (consolidator v1.6.0, pilier 5 mémoire vivante)
+Status: Implémenté + revue de code passée (27 tests decay + 17 non-régression) — non shippé
+Last activity: 2026-07-22
 
-Progress: [██████████] 100%
+Progress: [██████████] 100% (implémenté, non shippé)
 
 ## Performance Metrics
 
@@ -98,6 +98,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-04T18:36:28.459Z
-Stopped at: Completed 02-02-PLAN.md
-Resume file: None
+Last session: 2026-07-20T15:23:36.856Z
+Stopped at: Phase 9 context gathered
+Resume file: .planning/phases/VFDO-09-spike-transposition-jcode-m-moire-swarm/09-CONTEXT.md

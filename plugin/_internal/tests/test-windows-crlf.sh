@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# test-windows-crlf.sh — Portabilité Windows (ADR-052). Reproduit les DEUX pannes du rapport
+# test-windows-crlf.sh — Portabilité Windows (ADR-054). Reproduit les DEUX pannes du rapport
 # terrain 2026-07-22 (Windows 11 + Git Bash) SANS poste Windows :
 #   A. jq Windows natif émettant du CRLF (mode texte) → shim `jq` qui suffixe \r\n à chaque ligne
 #   B. jq totalement absent du PATH → PATH minimal sans jq
@@ -18,7 +18,7 @@ pass=0; fail=0
 ok() { echo "  ✓ $1"; pass=$((pass+1)); }
 ko() { echo "  ✗ $1"; fail=$((fail+1)); }
 
-echo "== test-windows-crlf (ADR-052) =="
+echo "== test-windows-crlf (ADR-054) =="
 
 REAL_JQ="$(command -v jq)" || { echo "jq requis pour lancer ce test" >&2; exit 2; }
 CR="$(printf '\r')"
@@ -118,7 +118,7 @@ done
 if [ "$raw" -eq 0 ]; then
   ok "T7 gate : aucun jq nu hors wrapper jqx dans les 5 scripts"
 else
-  ko "T7 gate : invocation(s) jq nue(s) détectée(s) — utiliser jqx (ADR-052)"
+  ko "T7 gate : invocation(s) jq nue(s) détectée(s) — utiliser jqx (ADR-054)"
 fi
 
 # ---------- T8-T9 : jq ABSENT → échec BRUYANT + message d'install par OS ----------

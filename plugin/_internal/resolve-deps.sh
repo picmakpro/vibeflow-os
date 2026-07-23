@@ -17,11 +17,11 @@ log() { echo "[resolve-deps] $*" >&2; }
 err() { echo "[resolve-deps] ERROR: $*" >&2; exit 1; }
 
 # Prérequis dur : jq (parse des module.json). Sans ce guard, la process substitution avalait
-# l'échec « command not found » et rendait une fermeture INCOMPLÈTE avec exit 0 (ADR-052).
+# l'échec « command not found » et rendait une fermeture INCOMPLÈTE avec exit 0 (ADR-054).
 command -v jq >/dev/null 2>&1 || err "jq introuvable — prérequis de l'engine (parse des module.json).
   Installer : macOS 'brew install jq' (natif depuis macOS 15) · Windows (Git Bash) 'winget install jqlang.jq' · Debian/Ubuntu 'sudo apt-get install jq'"
 
-# jqx — wrapper jq OBLIGATOIRE (ADR-052) : le jq Windows natif écrit en mode texte (\n → \r\n) ;
+# jqx — wrapper jq OBLIGATOIRE (ADR-054) : le jq Windows natif écrit en mode texte (\n → \r\n) ;
 # un \r résiduel dans un nom de module fabrique un chemin introuvable (« planning-core\r »).
 # Subshell + pipefail locaux : propage le code retour de jq sans imposer pipefail à l'appelant.
 jqx() ( set -o pipefail; command jq "$@" | tr -d '\r'; )

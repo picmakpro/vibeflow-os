@@ -1,4 +1,4 @@
-# ADR-052 — Portabilité Windows : les fichiers exécutés/parsés par bash DOIVENT arriver en LF
+# ADR-054 — Portabilité Windows : les fichiers exécutés/parsés par bash DOIVENT arriver en LF
 # au checkout, quel que soit le core.autocrlf de l'utilisateur (les attributs PRIMENT sur la
 # config git locale — cf. git-scm/gitattributes, ShellCheck SC1017). Sans ça, un clone
 # marketplace sous Windows (autocrlf=true, défaut de l'installeur Git for Windows) livrerait

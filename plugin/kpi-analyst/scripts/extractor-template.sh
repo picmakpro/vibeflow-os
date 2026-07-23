@@ -15,7 +15,7 @@
 set -euo pipefail
 
 command -v jq >/dev/null 2>&1 || { echo "[extractor] jq introuvable (requis)" >&2; exit 1; }
-# jqx — wrapper jq obligatoire (ADR-052) : neutralise le CRLF du jq Windows natif (mode texte).
+# jqx — wrapper jq obligatoire (ADR-054) : neutralise le CRLF du jq Windows natif (mode texte).
 jqx() ( set -o pipefail; command jq "$@" | tr -d '\r'; )
 
 # ── À PERSONNALISER ─────────────────────────────────────────────────────────────────────────────

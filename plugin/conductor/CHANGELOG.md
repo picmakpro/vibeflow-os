@@ -1,6 +1,6 @@
 # Changelog — conductor
 
-## [v1.11.4] — 2026-07-22 (portabilité Windows — ADR-052)
+## [v1.12.1] — 2026-07-23 (portabilité Windows — ADR-054)
 
 ### Corrigé
 - **`check-plugin-update.sh`** : strip du `\r` sur la capture de version installée (python/claude
@@ -12,7 +12,25 @@
 - **`vf-calibrate` / `vf-new-lab` (SKILL.md)** : mentions de scripts au nom nu ou au préfixe
   incohérent (3 formes différentes pour `framework-version.sh` dans le même document) → chemins
   qualifiés au point d'usage (`.claude/scripts/…`, `${CLAUDE_PLUGIN_ROOT}/_internal/…`). Un nom nu
-  force l'exécutant à deviner parmi ~10 dossiers `scripts/` (bug d'install vécu, ADR-052).
+  force l'exécutant à deviner parmi ~10 dossiers `scripts/` (bug d'install vécu, ADR-054).
+- **Hooks python3 (2e rapport terrain Windows)** : résolution d'interpréteur par CHEMIN (rejet du
+  stub Microsoft Store `WindowsApps`, repli `python`, zéro spawn ajouté) dans `guard-agent-write.sh`,
+  `check-agents.sh`, `check-debug-research.sh`, `update-banner.sh`, `check-plugin-update.sh` — le
+  stub passe `command -v python3` : les gardes étaient inertes en paraissant installées (ADR-054).
+
+## [v1.12.0] — 2026-07-22 (détection de migration legacy, scope-aware)
+
+### Ajouté
+- **`check-legacy.sh`** : préflight scope-aware qui détecte si un lab est sur l'ANCIENNE méthode
+  (pré ADR-052/053). Inspecte **les deux** racines (`$HOME/.claude` = user, `./.claude` = projet/local,
+  ID4) et, par module concerné installé, signale `legacy` (version < minimum : dev-orchestrator v1.7.0,
+  consolidator v1.5.0) ou `drift` (version OK mais artefacts manquants). Sortie humaine (nudge) ou
+  `--print` JSON. Exit 0 toujours (informatif). 8 tests.
+- **`update-banner.sh`** (hook SessionStart) étendu : fusionne en **un seul** `systemMessage` le nudge de
+  mise à jour du plugin ET le nudge de méthode legacy (via `check-legacy.sh`). Un lab déjà à la bonne
+  version de plugin mais aux modules non migrés est désormais détecté au démarrage. Boucle fermée : un
+  `drift` détecté est réparé par `/vf-update` (`sync_module_governance` re-copie les artefacts).
+>>>>>>> origin/main
 
 ## [v1.11.3] — 2026-07-20 (audit robustesse hooks — 2e vague, gate agents fiabilisé)
 

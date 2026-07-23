@@ -93,6 +93,21 @@
 - [x] **CONS-03**: Les 3 axiomes (enforcement>prose, filet fonctionnel, preuve avant done) ont une source unique + renvois.
 - [x] **CONS-04**: Invariant vérifié — `dev-orchestrator` reste un pur routeur, aucune doctrine injectée (DD1).
 
+### R&D mémoire & swarm (Phase 9)
+
+> Spike **R&D hors chaîne de release** — décision go/no-go, aucun changement du format mémoire officiel ni du
+> socle `conductor` sans ADR. Source : `.planning/research/jcode-memory-swarm-transposition-NOTE.md` (§0–5).
+
+- [x] **RND-01**: Le frontmatter mémoire enrichi (3 gestes — `trust` high/medium/low, `confidence` 0–1 +
+  règle de **décroissance par catégorie**, `superseded_by` non destructif) est prototypé sur ≥1 lab témoin et
+  le `consolidator` sait le tenir à jour **automatiquement** : round-trip lit→recalcule→réécrit sans édition
+  humaine, ET une entrée `superseded_by` archivée (statut basculé, contenu conservé — pas supprimée). Sinon →
+  no-go documenté avec la raison.
+- [x] **RND-02**: Une **note go/no-go écrite** tranche (a) écrire un ADR + toucher le format officiel, ou (b)
+  archiver — avec les demi-vies de décroissance **re-calibrées** pour l'usage VibeFlow multi-métiers (pas les
+  valeurs jcode brutes), ET un **mini-cadrage écrit du volet swarm** (lock de driver unique RAII + DAG
+  ready/blocked), **non implémenté** tant que des collisions ne sont pas observées (ADR-048/049).
+
 ## v2 Requirements
 
 ### Vocabulaire & UX
@@ -155,11 +170,14 @@
 | CONS-02 | Phase 8 | Complete |
 | CONS-03 | Phase 8 | Complete |
 | CONS-04 | Phase 8 | Complete |
+| RND-01 | Phase 9 | Spike done — GO (round-trip + archivage vérifiés) |
+| RND-02 | Phase 9 | Done — note go/no-go + demi-vies recalibrées + cadrage swarm |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
 - Milestone 2 (Install UX) : 17 requirements — mappés aux phases 2-6, 0 non-mappé ✓
 - Milestone 3 (Doctrine dev & consolidation) : 12 requirements — mappés aux phases 7-8, 0 non-mappé ✓
+- Milestone 4 (memory-swarm-rnd / R&D) : 2 requirements — mappés à la phase 9, 0 non-mappé ✓
 
 ---
 *Requirements defined: 2026-06-04*

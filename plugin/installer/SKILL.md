@@ -47,7 +47,7 @@ VF_MODULES_ROOT="${CLAUDE_PLUGIN_ROOT:-<racine du repo vibeflow-os cloné en dev
 **Chemins réels des briques dans le cache** — les scripts ne sont PAS à la racine du cache et le
 repo contient une dizaine de dossiers `scripts/` différents : **toujours invoquer par le chemin
 complet ci-dessous, jamais par le nom nu** (un nom nu force l'exécutant à deviner le dossier —
-bug d'install vécu sur le terrain, ADR-052) :
+bug d'install vécu sur le terrain, ADR-054) :
 
 | Brique | Invocation exacte |
 |---|---|
@@ -62,7 +62,7 @@ bug d'install vécu sur le terrain, ADR-052) :
 
 ## Séquence
 
-0. **Préflight prérequis (ADR-052).** Lancer `bash "$VIBEFLOW_CACHE/installer/scripts/preflight.sh"`.
+0. **Préflight prérequis (ADR-054).** Lancer `bash "$VIBEFLOW_CACHE/installer/scripts/preflight.sh"`.
    S'il échoue (exit 1) : montrer TEL QUEL le diagnostic `[preflight]` à l'utilisateur (il contient
    la commande d'installation par OS — ex. Windows : `winget install jqlang.jq`) et **S'ARRÊTER LÀ**.
    S'il passe (exit 0) mais émet des lignes `⚠` : les montrer aussi (limitations runtime à connaître).

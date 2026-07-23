@@ -44,10 +44,10 @@ record_file() { echo "$LAB_ROOT/.claude/.vibeflow-framework-version"; }
 
 # Normalise "v2.6.0" / "2.6.0" → "2.6.0". Retire aussi tout \r résiduel : le jq Windows natif
 # écrit en mode texte (\n → \r\n) et `$()` ne retire que le \n final — sans ce strip, la
-# comparaison `[ "$cur" = "$rec" ]` du drift serait structurellement fausse sous Git Bash (ADR-052).
+# comparaison `[ "$cur" = "$rec" ]` du drift serait structurellement fausse sous Git Bash (ADR-054).
 norm() { local s="${1#v}"; printf '%s\n' "${s//$'\r'/}"; }
 
-# jqx — wrapper jq (ADR-052) : neutralise le CRLF du jq Windows natif au plus près de la source
+# jqx — wrapper jq (ADR-054) : neutralise le CRLF du jq Windows natif au plus près de la source
 # (norm() strip aussi : ceinture, couvre les fallbacks VERSION lus par head -1).
 jqx() ( set -o pipefail; command jq "$@" | tr -d '\r'; )
 

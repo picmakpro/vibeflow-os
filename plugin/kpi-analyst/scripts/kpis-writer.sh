@@ -24,7 +24,7 @@ err() { echo "[kpis-writer] ERROR: $*" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || err "jq introuvable (requis).
   Installer : macOS 'brew install jq' (natif depuis macOS 15) · Windows (Git Bash) 'winget install jqlang.jq' · Debian/Ubuntu 'sudo apt-get install jq'"
 
-# jqx — wrapper jq OBLIGATOIRE (ADR-052) : le jq Windows natif écrit en mode texte (\n → \r\n) ;
+# jqx — wrapper jq OBLIGATOIRE (ADR-054) : le jq Windows natif écrit en mode texte (\n → \r\n) ;
 # un \r résiduel contaminerait une DONNÉE PERSISTÉE (KPIS.md, ingéré par le Hub) via --arg.
 # Subshell + pipefail locaux : propage le code retour de jq sans imposer pipefail à l'appelant.
 jqx() ( set -o pipefail; command jq "$@" | tr -d '\r'; )

@@ -30,7 +30,7 @@ err() { echo "[build-module-catalog] ERROR: $*" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || err "jq introuvable (requis pour parser les module.json).
   Installer : macOS 'brew install jq' (natif depuis macOS 15) · Windows (Git Bash) 'winget install jqlang.jq' · Debian/Ubuntu 'sudo apt-get install jq'"
 
-# jqx — wrapper jq OBLIGATOIRE (ADR-052) : le jq Windows natif écrit en mode texte (\n → \r\n).
+# jqx — wrapper jq OBLIGATOIRE (ADR-054) : le jq Windows natif écrit en mode texte (\n → \r\n).
 # Un \r résiduel casse les comparaisons `= "true"` ci-dessous : conductor serait dégradé en
 # `optional` et les bundles WIP (`proposable:false`) fuiraient dans le catalogue — silencieusement.
 # Subshell + pipefail locaux : propage le code retour de jq sans imposer pipefail à l'appelant.

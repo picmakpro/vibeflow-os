@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# preflight.sh — Vérification des prérequis système AVANT toute install VibeFlow (ADR-052).
+# preflight.sh — Vérification des prérequis système AVANT toute install VibeFlow (ADR-054).
 #
 # Contrôles :
 #   1. bash (version, informatif) et git (dur)
@@ -38,7 +38,7 @@ fi
 if command -v jq >/dev/null 2>&1; then
   ver="$(jq --version 2>/dev/null | tr -d '\r')"
   # Sonde CRLF : le jq Windows natif écrit en mode texte (\n → \r\n). L'engine normalise
-  # désormais toutes ses captures (wrapper jqx, ADR-052) → informatif, plus bloquant.
+  # désormais toutes ses captures (wrapper jqx, ADR-054) → informatif, plus bloquant.
   if printf '{}' | jq -c . 2>/dev/null | LC_ALL=C grep -q "$(printf '\r')"; then
     ok "jq ${ver:-?} (sorties CRLF détectées — normalisées automatiquement par l'engine)"
   else
@@ -76,7 +76,7 @@ elif py_probe python; then
   warn "python3 indisponible mais python $(py_version python) utilisable — l'install s'adapte (merge-hooks), MAIS les hooks de gouvernance runtime invoquent 'python3' (fail-open : protections inactives tant que python3 n'est pas exposé dans le PATH de Git Bash)."
 elif [ "$IS_WINDOWS" -eq 1 ] && command -v py >/dev/null 2>&1 && py -3 -c '' >/dev/null 2>&1; then
   # KO et pas warn : l'engine invoque `python3`/`python`, jamais `py` — l'install perdrait ses
-  # hooks de gouvernance en silence (cause n°5 de l'ADR-052).
+  # hooks de gouvernance en silence (cause n°5 de l'ADR-054).
   ko "Python présent uniquement via le lanceur 'py' — INSUFFISANT : l'engine invoque 'python3'/'python'. Réinstaller depuis python.org en cochant « Add to PATH » (ou exposer python.exe dans le PATH de Git Bash)."
 else
   ko "python3 introuvable ou inutilisable — REQUIS (câblage des hooks de gouvernance). Windows : installer depuis python.org en cochant « Add to PATH » (le stub Microsoft Store 'python3' du PATH n'est PAS un vrai interpréteur)."

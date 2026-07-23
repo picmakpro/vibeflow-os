@@ -54,7 +54,7 @@ fi
 if [ -z "$installed" ] && command -v claude >/dev/null 2>&1; then
   installed="$(claude plugin list 2>/dev/null | awk '/vibeflow@vibeflow-os/{f=1} f&&/Version:/{print $2; exit}')"
 fi
-installed="${installed%$'\r'}"   # ADR-052 : python/claude natifs Windows émettent du CRLF ; un CR brut casserait le JSON du cache
+installed="${installed%$'\r'}"   # ADR-054 : python/claude natifs Windows émettent du CRLF ; un CR brut casserait le JSON du cache
 installed="${installed#v}"
 
 # --- Dernière version publiée : le plus grand tag vX.Y.Z du dépôt (ls-remote, sans clone) ---

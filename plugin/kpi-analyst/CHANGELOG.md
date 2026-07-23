@@ -1,6 +1,6 @@
 # CHANGELOG — kpi-analyst
 
-## [v1.0.1] — 2026-07-22 (portabilité Windows — ADR-052)
+## [v1.0.1] — 2026-07-22 (portabilité Windows — ADR-054)
 
 ### Corrigé
 - **`kpis-writer.sh` + `extractor-template.sh`** : wrapper `jqx` (`jq | tr -d '\r'`) sur les 12

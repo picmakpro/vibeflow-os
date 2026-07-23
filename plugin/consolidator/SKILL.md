@@ -1,9 +1,9 @@
 ---
 name: consolidator
-description: Consolide la memoire structuree d'un lab VibeFlow (registres DECISIONS/LEARNINGS/BLOCKERS/JOURNAL/EVALS) sur 4 piliers — Indexation (header strict + colonne #Ligne), Archivage (3 criteres statut/age/refs, hook SessionEnd async), Fusion (deduplication LLM-based des doublons), Promotion (learning -> rule semi-auto avec validation humaine). Utiliser ce skill quand un registre depasse 800 lignes, quand des doublons d'IDs apparaissent, au rythme mensuel pour entretien, lors d'un /checkpoint, ou via /consolidate. Reference ADR-032 + ADR-009 + ADR-029. Iron Law : "La lecture d'un registre = lecture de l'index uniquement par defaut".
+description: Consolide la memoire structuree d'un lab VibeFlow (registres DECISIONS/LEARNINGS/BLOCKERS/JOURNAL/EVALS) sur 5 piliers — Indexation (header strict + colonne #Ligne), Archivage (3 criteres statut/age/refs, hook SessionEnd async), Fusion (deduplication LLM-based des doublons), Promotion (learning -> rule semi-auto avec validation humaine), Memoire vivante (decroissance de confiance par categorie + supersession non destructive de la couche fichier-par-entree .claude/memory/knowledge/, ADR-052). Utiliser ce skill quand un registre depasse 800 lignes, quand des doublons d'IDs apparaissent, au rythme mensuel pour entretien, lors d'un /checkpoint, ou via /consolidate. Reference ADR-032 + ADR-009 + ADR-029 + ADR-052. Iron Law : "La lecture d'un registre = lecture de l'index uniquement par defaut".
 ---
 
-# Skill : Consolidator — Consolidation Memoire 4 Piliers
+# Skill : Consolidator — Consolidation Memoire 5 Piliers
 
 > **Iron Law** : *"La lecture d'un registre = lecture de l'index uniquement par defaut. Lire le body entier est un anti-pattern qui pollue le contexte."*
 >
@@ -48,6 +48,7 @@ Le skill opere en 4 modes selon le pilier cible. Tous acceptent `--dry-run` (def
 /consolidate --pillar=archive   # archivage uniquement
 /consolidate --pillar=fusion    # detection + propositions fusion
 /consolidate --pillar=promote   # detection candidats promotion
+/consolidate --pillar=decay     # memoire vivante : decroissance + supersession (couche knowledge/)
 /consolidate --register=DECISIONS # cible un seul registre
 ```
 
@@ -187,9 +188,46 @@ Voir `references/promotion.md`.
 
 ---
 
-## Orchestration des 4 piliers
+## Pilier 5 — Memoire vivante (decroissance + supersession)
 
-Le skill orchestre les 4 piliers dans cet ordre quand `/consolidate` est invoque sans flag :
+> **Couche distincte** (ADR-052) : la memoire vivante est un systeme **fichier-par-entree**
+> (`.claude/memory/knowledge/` : `MEMORY.md` + `<slug>.md` + `archive/`), au format frontmatter natif
+> Claude Code — **pas** les registres tabulaires des piliers 1-4. Elle porte le **savoir vivant** de
+> l'agent sur le lab (user, preferences, faits projet, pointeurs), dont la fiabilite **decroit**. Les
+> registres d'audit (DECISIONS/LEARNINGS…) ne decroissent PAS et ne sont jamais touches par ce pilier.
+
+### Les 3 gestes (script `decay-pass.sh`)
+
+1. **trust** normalise en `high|medium|low` (defaut `medium`) — qui affirme le fait.
+2. **confidence** : base 0..1 **preservee** + `effective_confidence` recalculee par demi-vie de categorie :
+   `effective = confidence × 0.5 ^ (age_jours / demi_vie[type])`.
+   Demi-vies (ADR-052) : `feedback` 365 / `user` 180 / `reference` 120 / `project` 30 (fallback 30 j).
+   Sous le seuil `VF_DECAY_REVIEW_THRESHOLD` (0.2) -> flag `needs_review: true` (**jamais** suppression).
+3. **superseded_by** : supersession NON destructive -> l'entree est **deplacee vers `archive/`**
+   (`status: superseded`, contenu conserve — ADR-031).
+
+### Proprietes
+
+- **Idempotent** : 2e passe a date egale = base preservee, effective identique, 0 archivage parasite.
+- **Batch, pas par-tour** : Claude Code n'expose pas de hook par-tour fiable ; la passe tourne au
+  `/consolidate`, comme les autres piliers (pipeline par-tour de jcode explicitement differe).
+- **Backups isoles ADR-049** avant `--apply` (`.backups/` + rotation, defaut 3).
+
+### Quand declencher
+
+- Manuel : `/consolidate --pillar=decay`
+- Recommande : rythme mensuel / `/checkpoint`, avec les autres piliers.
+
+### Detail
+
+Voir `references/memoire-vivante.md` + `scripts/decay-pass.sh`. Format d'entree :
+`templates/memory/knowledge-entry-template.md`.
+
+---
+
+## Orchestration des 5 piliers
+
+Le skill orchestre les 5 piliers dans cet ordre quand `/consolidate` est invoque sans flag :
 
 ```
 Phase 1 — Audit (read-only, < 30s)
@@ -212,6 +250,10 @@ Phase 5 — Promotion (interactive)
   - presenter candidats au user
   - drafts generes dans .claude/rules/_draft/
   - validation humaine differee
+
+Phase 6 — Memoire vivante (decroissance, si .claude/memory/knowledge/ existe)
+  - decay-pass.sh --dry-run  -> effective_confidence + entrees needs_review + superseded
+  - validation               -> apply (reecrit les actifs, archive les superseded)
 ```
 
 Phases 4 et 5 sont **toujours interactives** (validation user obligatoire).
@@ -249,7 +291,8 @@ A la fin d'une consolidation, le skill produit un rapport `reports/consolidation
 2. **Archivage = 3 criteres AND, jamais 1 seul.**
 3. **Fusion = decision LLM, pas embeddings ML.**
 4. **Promotion = draft + validation humaine OBLIGATOIRE, jamais auto-write dans `.claude/rules/`.**
-5. **Hook SessionEnd async UNIQUEMENT pour archivage** (pilier 2). Les piliers 3-4 sont manuels.
+5. **Hook SessionEnd async UNIQUEMENT pour archivage** (pilier 2). Les piliers 3-5 sont manuels.
+6. **Memoire vivante = decroissance batch (jamais par-tour) ; supersession = archive (jamais suppression).**
 
 ---
 
@@ -276,8 +319,10 @@ Voir `references/installation.md` (a creer si besoin).
 - `references/archivage.md` — 3 criteres archivage + heuristique anti-faux-positifs
 - `references/fusion.md` — pipeline fusion LLM-based + prompts type
 - `references/promotion.md` — pipeline promotion semi-auto + rule frontmatter
+- `references/memoire-vivante.md` — couche fichier-par-entree + decroissance + supersession (ADR-052)
 
 - ADR-032 (parent) — design et raisonnement complet
+- ADR-052 — frontmatter memoire enrichi (trust/confidence/decroissance/supersession)
 - ADR-009 — architecture memoire tiered (parent historique)
 - ADR-019 — /session-close + lifecycle hooks
 - ADR-029 — charte densite (Skill ≤500L)
@@ -296,6 +341,7 @@ Voir `references/installation.md` (a creer si besoin).
 - `scripts/archive.sh` — archive selon 3 criteres AND (statut/age/refs)
 - `scripts/detect-duplicates.sh` — sort candidats fusion (IDs collision + similarites titre/tags)
 - `scripts/detect-promotions.sh` — sort candidats promotion (frequence + operationnel + non-encode)
+- `scripts/decay-pass.sh` — decroissance de confiance + supersession de la memoire vivante (idempotent, ADR-052)
 
 Tous les scripts acceptent `--dry-run` (defaut) et `--apply`. Sortie en JSON pour parsing.
 

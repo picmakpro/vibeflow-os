@@ -11,7 +11,7 @@
 - **Windows** : Git for Windows requis (Claude Code y exécute bash via Git Bash). `jq` n'y est
   **pas** inclus → `winget install jqlang.jq`. Python : installer depuis **python.org** en cochant
   « Add to PATH » (le raccourci `python3` du Microsoft Store n'est PAS un vrai interpréteur).
-  Le jq Windows natif émet du CRLF : l'engine le neutralise automatiquement (ADR-052).
+  Le jq Windows natif émet du CRLF : l'engine le neutralise automatiquement (ADR-054).
 
 `/vibeflow-install` commence par un **préflight** qui vérifie ces prérequis et affiche la commande
 d'installation exacte s'il en manque un.
