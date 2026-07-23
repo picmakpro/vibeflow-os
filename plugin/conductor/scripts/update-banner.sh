@@ -16,8 +16,14 @@ CACHE_FILE="${XDG_CACHE_HOME:-$HOME/.cache}/vibeflow/update-check.json"
 LEGACY_JSON=""
 [ -x "$DIR/check-legacy.sh" ] && LEGACY_JSON="$(bash "$DIR/check-legacy.sh" --print 2>/dev/null || true)"
 
-if command -v python3 >/dev/null 2>&1; then
-  CACHE_FILE="$CACHE_FILE" LEGACY_JSON="$LEGACY_JSON" python3 <<'PY' 2>/dev/null || true
+# ADR-054 : stub Microsoft Store — `python3` présent dans le PATH mais inerte. Détection par
+# CHEMIN (zéro spawn), repli `python` ; sinon pas de bandeau (advisory).
+PYBIN=python3
+case "$(command -v python3 2>/dev/null)" in
+  ''|*WindowsApps*) command -v python >/dev/null 2>&1 && PYBIN=python || PYBIN="" ;;
+esac
+if [ -n "$PYBIN" ]; then
+  CACHE_FILE="$CACHE_FILE" LEGACY_JSON="$LEGACY_JSON" "$PYBIN" <<'PY' 2>/dev/null || true
 import json, os
 msgs = []
 # 1) mise à jour du plugin (depuis le cache)

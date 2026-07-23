@@ -5,7 +5,7 @@ argument-hint: "[optionnel : précision sur ce qu'on recalibre]"
 
 Invoque le skill **`vf-calibrate`** (propagation d'update + migration) : $ARGUMENTS
 
-Le skill détecte l'écart de version framework ↔ lab (`framework-version.sh drift`), lit ce qui a
+Le skill détecte l'écart de version framework ↔ lab (`.claude/scripts/framework-version.sh drift`), lit ce qui a
 changé (en distinguant bugfix / nouvelle capacité / breaking-doctrine), propose un plan de migration
 explicite, l'applique **sous validation humaine** (ADR-031, snapshot avant/après), re-stampe la
 version et déclenche un ré-audit via `vibeflow-validator`.

@@ -1,5 +1,12 @@
 # Changelog — software-architecture
 
+## [v1.5.1] — 2026-07-23 (portabilité Windows — ADR-054)
+
+### Corrigé
+- **`guard-file-size.sh`** : le stub Microsoft Store `python3` (présent dans le PATH mais inerte)
+  rendait le guard 300L muet sous Windows sans jamais déclencher son repli fail-open. Résolution
+  d'interpréteur par CHEMIN (zéro spawn ajouté, rejet `WindowsApps`, repli `python`).
+
 ## [v1.5.0] — 2026-07-20 (audit robustesse hooks — fix faux positifs guard 300L)
 
 ### Corrigé

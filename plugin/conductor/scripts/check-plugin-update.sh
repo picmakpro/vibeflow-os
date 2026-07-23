@@ -38,8 +38,14 @@ trap 'rmdir "$LOCK_DIR" 2>/dev/null' EXIT INT TERM
 # --- Version installée : installed_plugins.json (structuré), fallback `claude plugin list` ---
 installed=""
 IP="$HOME/.claude/plugins/installed_plugins.json"
-if [ -f "$IP" ] && command -v python3 >/dev/null 2>&1; then
-  installed="$(python3 - "$IP" "$PLUGIN_ID" <<'PY' 2>/dev/null
+# ADR-054 : stub Microsoft Store — `python3` présent dans le PATH mais inerte. Détection par
+# CHEMIN (zéro spawn), repli `python` ; sinon fallback `claude plugin list` ci-dessous.
+PYBIN=python3
+case "$(command -v python3 2>/dev/null)" in
+  ''|*WindowsApps*) command -v python >/dev/null 2>&1 && PYBIN=python || PYBIN="" ;;
+esac
+if [ -f "$IP" ] && [ -n "$PYBIN" ]; then
+  installed="$("$PYBIN" - "$IP" "$PLUGIN_ID" <<'PY' 2>/dev/null
 import json, sys
 try:
     d = json.load(open(sys.argv[1]))
@@ -54,6 +60,7 @@ fi
 if [ -z "$installed" ] && command -v claude >/dev/null 2>&1; then
   installed="$(claude plugin list 2>/dev/null | awk '/vibeflow@vibeflow-os/{f=1} f&&/Version:/{print $2; exit}')"
 fi
+installed="${installed%$'\r'}"   # ADR-054 : python/claude natifs Windows émettent du CRLF ; un CR brut casserait le JSON du cache
 installed="${installed#v}"
 
 # --- Dernière version publiée : le plus grand tag vX.Y.Z du dépôt (ls-remote, sans clone) ---
