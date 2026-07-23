@@ -17,6 +17,9 @@
 # Câblage (posé à l'install du module) : UserPromptSubmit → bash planning-task-context.sh
 set -uo pipefail
 
+# Lab à compartiments uniquement (sinon le digest mono du SessionStart suffit).
+[ -f ".planning/INDEX.md" ] || exit 0
+
 # ADR-054 : le `python3` du PATH Windows peut être le stub Microsoft Store — présent
 # (`command -v` réussit) mais inerte à l'exécution. Détection par CHEMIN (zéro spawn),
 # repli `python` ; sinon fail-open inchangé.
@@ -24,8 +27,6 @@ PYBIN=python3
 case "$(command -v python3 2>/dev/null)" in
   ''|*WindowsApps*) if command -v python >/dev/null 2>&1; then PYBIN=python; else exit 0; fi ;;
 esac
-# Lab à compartiments uniquement (sinon le digest mono du SessionStart suffit).
-[ -f ".planning/INDEX.md" ] || exit 0
 
 INPUT="$(cat)"
 

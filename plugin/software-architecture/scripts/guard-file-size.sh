@@ -25,13 +25,6 @@
 
 set -uo pipefail
 
-# ADR-054 : le `python3` du PATH Windows peut être le stub Microsoft Store — présent
-# (`command -v` réussit) mais inerte à l'exécution. Détection par CHEMIN (zéro spawn),
-# repli `python` ; sinon fail-open inchangé.
-PYBIN=python3
-case "$(command -v python3 2>/dev/null)" in
-  ''|*WindowsApps*) if command -v python >/dev/null 2>&1; then PYBIN=python; else exit 0; fi ;;
-esac
 
 # Préfiltre trivial sans spawn : payload sans file_path → rien à mesurer
 # (couvre aussi le stdin invalide : allow silencieux immédiat).
@@ -39,6 +32,14 @@ INPUT="$(cat 2>/dev/null || true)"
 case "$INPUT" in
   *file_path*) ;;
   *) exit 0 ;;
+esac
+
+# ADR-054 : le `python3` du PATH Windows peut être le stub Microsoft Store — présent
+# (`command -v` réussit) mais inerte à l'exécution. Détection par CHEMIN (zéro spawn),
+# repli `python` ; sinon fail-open inchangé.
+PYBIN=python3
+case "$(command -v python3 2>/dev/null)" in
+  ''|*WindowsApps*) if command -v python >/dev/null 2>&1; then PYBIN=python; else exit 0; fi ;;
 esac
 
 # NB : programme passé en -c (sans apostrophes) ; le payload est rejoué sur le stdin
