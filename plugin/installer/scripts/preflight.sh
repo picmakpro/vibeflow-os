@@ -33,6 +33,14 @@ if command -v git >/dev/null 2>&1; then
 else
   ko "git introuvable — requis (Claude Code sous Windows requiert Git for Windows)."
 fi
+# bash dans le PATH (annexe rapport terrain ADR-054 : certains postes n'ont que Git\cmd dans le
+# PATH — git.exe sans bash.exe. Ce préflight tourne pourtant, car lancé par chemin absolu ; mais
+# les hooks du harnais invoquent `bash …` par le PATH).
+if command -v bash >/dev/null 2>&1; then
+  ok "bash présent dans le PATH"
+else
+  warn "bash ABSENT du PATH — les hooks invoquent 'bash <script>' : ajouter <Git>\\bin au PATH Windows (ou vérifier CLAUDE_CODE_GIT_BASH_PATH), sinon les hooks de gouvernance ne s'exécuteront pas."
+fi
 
 # ── 2. jq — prérequis DUR de l'engine (parse des module.json) ───────────────────────────────────
 if command -v jq >/dev/null 2>&1; then

@@ -23,7 +23,13 @@
 
 set -uo pipefail
 
-command -v python3 >/dev/null 2>&1 || exit 0
+# ADR-054 : le `python3` du PATH Windows peut être le stub Microsoft Store — présent
+# (`command -v` réussit) mais inerte à l'exécution. Détection par CHEMIN (zéro spawn),
+# repli `python` ; sinon fail-open inchangé.
+PYBIN=python3
+case "$(command -v python3 2>/dev/null)" in
+  ''|*WindowsApps*) if command -v python >/dev/null 2>&1; then PYBIN=python; else exit 0; fi ;;
+esac
 
 # Préfiltre pur-bash (latence : ce hook tourne sur CHAQUE Write du lab) : le deny n'est
 # possible que si file_path pointe sous .claude/agents → tout payload concerné contient la
@@ -34,7 +40,7 @@ case "$INPUT" in
   *) exit 0 ;;
 esac
 
-printf '%s' "$INPUT" | CHECKER="$(dirname "$0")/check-agents.sh" VF_GUARD=1 python3 -c "
+printf '%s' "$INPUT" | CHECKER="$(dirname "$0")/check-agents.sh" VF_GUARD=1 "$PYBIN" -c "
 import json, os, subprocess, sys, tempfile
 
 try:

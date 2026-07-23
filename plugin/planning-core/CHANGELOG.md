@@ -1,5 +1,14 @@
 # Changelog — planning-core
 
+## [v2.3.1] — 2026-07-23 (portabilité Windows — ADR-054)
+
+### Corrigé
+- **`planning-task-context.sh`** : le stub Microsoft Store `python3` (présent dans le PATH mais
+  inerte) rendait le contexte de tâche muet sous Windows sans jamais déclencher son repli
+  fail-open. Résolution d'interpréteur par CHEMIN (zéro spawn ajouté, rejet `WindowsApps`,
+  repli `python`). Le hook Stop (`guard-planning-updated.sh`) n'est pas concerné : zéro
+  dépendance python/jq par construction.
+
 ## [v2.3.0] — 2026-07-20 (ADR-050 amendée — attribution de session : fix faux positifs du guard Stop)
 
 ### Corrigé (retour terrain Samuel : « faux positifs quasi systématiques » du guard Stop)

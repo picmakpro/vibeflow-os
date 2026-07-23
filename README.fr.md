@@ -139,7 +139,7 @@ Le routage repose sur un **index factuel auto-généré** depuis le frontmatter 
 
 ## 🔒 Sécurité
 
-- **Source-available** : code et historique publics, licence propriétaire (« All rights reserved », aucun droit de réutilisation accordé).
+- **Source-available** : code et historique publics, licence propriétaire — réutilisation privée accordée aux élèves de la formation, voir [LICENSE](./LICENSE).
 - **Scripts shell + Python, plus l'outil standard `jq`** (lecture des manifestes JSON) — auditables ligne par ligne. Prérequis système listés dans [INSTALL.md](./INSTALL.md) (notes Windows/Git Bash incluses).
 - **Idempotent** : chaque script d'install est ré-exécutable sans casser l'installation, avec backup automatique avant écrasement.
 - **Zéro hook** : le plugin n'enregistre rien au démarrage de session. Tout part de ton invocation manuelle.
@@ -225,6 +225,6 @@ Lab principal (privé) : [vibeflow-lab](https://github.com/picmakpro/vibeflow-la
 
 ## 📄 Licence
 
-Source-available sous licence propriétaire — voir [LICENSE](./LICENSE). Le code et l'historique sont publics, mais aucun droit de réutilisation, de modification ou de distribution n'est accordé.
+Source-available sous licence propriétaire — voir [LICENSE](./LICENSE). Le code et l'historique sont publics ; les élèves de la formation disposent d'un droit de réutilisation privée (adapter des éléments de modules dans leurs dépôts privés) ; redistribution et revente restent interdites.
 
 > Le module `skill-creator` réutilise du contenu Anthropic original sous licence MIT.

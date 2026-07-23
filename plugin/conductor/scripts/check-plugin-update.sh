@@ -38,8 +38,14 @@ trap 'rmdir "$LOCK_DIR" 2>/dev/null' EXIT INT TERM
 # --- Version installée : installed_plugins.json (structuré), fallback `claude plugin list` ---
 installed=""
 IP="$HOME/.claude/plugins/installed_plugins.json"
-if [ -f "$IP" ] && command -v python3 >/dev/null 2>&1; then
-  installed="$(python3 - "$IP" "$PLUGIN_ID" <<'PY' 2>/dev/null
+# ADR-054 : stub Microsoft Store — `python3` présent dans le PATH mais inerte. Détection par
+# CHEMIN (zéro spawn), repli `python` ; sinon fallback `claude plugin list` ci-dessous.
+PYBIN=python3
+case "$(command -v python3 2>/dev/null)" in
+  ''|*WindowsApps*) command -v python >/dev/null 2>&1 && PYBIN=python || PYBIN="" ;;
+esac
+if [ -f "$IP" ] && [ -n "$PYBIN" ]; then
+  installed="$("$PYBIN" - "$IP" "$PLUGIN_ID" <<'PY' 2>/dev/null
 import json, sys
 try:
     d = json.load(open(sys.argv[1]))
