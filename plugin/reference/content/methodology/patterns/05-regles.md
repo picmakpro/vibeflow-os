@@ -4,14 +4,23 @@
 
 Une **regle auto-scopee** est une convention qui se charge **automatiquement** quand on travaille sur certains fichiers ou dans certains dossiers. Elle ne polue pas le contexte global — elle apparait au moment juste.
 
-Format : un fichier `.claude/rules/<nom>.md` avec frontmatter `paths:` qui declenche le chargement.
+Format : un fichier `.claude/rules/<nom>.md`. Le frontmatter décide **quand** il se charge :
+
+| Frontmatter | Chargement | Tier |
+|---|---|---|
+| **avec** `paths:` | à la lecture d'un fichier correspondant — absente du contexte le reste du temps | Tier 2 / 3 |
+| **sans** `paths:` | inconditionnel au lancement de la session, à la priorité de `CLAUDE.md` | Tier 1 |
+
+Le mot « auto-scopée » désigne le premier régime. Une règle **sans** `paths:` n'est pas
+scopée du tout : elle est globale et coûte du contexte à chaque session — d'où la règle de
+densité qui l'accompagne (voir Anti-patterns).
 
 ## Pourquoi
 
 Le piege courant : tout mettre dans la constitution. Resultat : 600 lignes, l'agent skip, les regles ne s'appliquent pas.
 
 Les regles auto-scopees resolvent ca :
-- Les **regles globales** (toujours actives) restent dans la constitution
+- Les **regles globales** (toujours actives) vivent dans la constitution OU dans un fichier `.claude/rules/` **sans** `paths:` — les deux se chargent inconditionnellement
 - Les **regles contextuelles** (specifiques a un sous-systeme) sont auto-chargees quand on travaille dessus
 
 Quand l'agent edite un fichier `client/facturation/`, les regles `client/facturation/rules.md` se chargent automatiquement. Quand il revient sur du contenu, ces regles disparaissent du contexte.
@@ -22,7 +31,7 @@ Quand l'agent edite un fichier `client/facturation/`, les regles `client/factura
 
 | Tier | Quoi | Ou |
 |------|------|-----|
-| **Tier 1 — Globales** | Identite, langue, format, interdits absolus | `.claude/rules/global.md` (toujours active) |
+| **Tier 1 — Globales** | Identite, langue, format, interdits absolus | `.claude/rules/<nom>.md` **sans** `paths:` — chargée à chaque session |
 | **Tier 2 — Par domaine** | Conventions metier d'un sous-systeme | `.claude/rules/<domaine>.md` (path-scopee) |
 | **Tier 3 — Par feature** | Regles tres specifiques a une zone du projet | Dans le sous-dossier directement |
 
