@@ -20,6 +20,7 @@
 | ADR-051 | 2026-07-19 | Allowlist MCP des agents exécutants dérivée du lab (injection à l'install) | Validée |
 | ADR-052 | 2026-07-22 | Frontmatter mémoire enrichi — trust + confidence à décroissance par catégorie + supersession non destructive | Validée |
 | ADR-053 | 2026-07-22 | Volet swarm — lock de driver unique + DAG ready/blocked + rapports de worker typés | Validée |
+| ADR-054 | 2026-07-25 | Frontière d'altitude entre planning-core et le moteur de planning GSD — un projet = un seul moteur | Validée |
 
 ---
 
@@ -531,3 +532,72 @@ Protocole détaillé (source de vérité) : `plugin/dev-orchestrator/references/
 ### Rules Associées
 
 - S'appuie sur ADR-048/049 (backups isolés — le lock protège leur intégrité), ADR-044 (agents machine-enforced — les agents modifiés repassent `check-agents.sh`), ADR-031 (la taxonomie `ask-user` raffine « jamais de fix sans validation humaine »). Aucune rule nouvelle.
+
+---
+
+## ADR-054 : Frontière d'altitude entre `planning-core` et le moteur de planning GSD
+
+**Date** : 2026-07-25
+**Statut** : Validée
+**Décideur** : Samuel (constat : « le vf-planning est en concurrence directe avec le planning de GSD »)
+**Contexte** : release v2.29.0 — planning-core v2.4.0
+
+### Problème
+
+`vf-planning` et la chaîne GSD produisent **les mêmes fichiers** dans **le même dossier** avec des
+frontmatters **incompatibles** : `planning_version` + `progress.total_steps` d'un côté,
+`gsd_state_version` + `progress.total_phases/total_plans` de l'autre. Le premier moteur qui écrit rend
+l'autre aveugle (`gsd-sdk query`, `gsd-health`, `gsd-session-state.sh` ne lisent pas le format
+`planning-core`, et réciproquement). S'y ajoutent une double injection `SessionStart`
+(`gsd-session-state.sh` + `check-planning-state.sh` + `planning-context.sh`) et une concurrence au
+matching sémantique : la description de `vf-planning` revendiquait « fais-moi une feuille de route »
+et « où en est-on ? », face à `gsd-new-project` et `gsd-progress`.
+
+Le recouvrement dépassait le tronc : compartiments vs `gsd-workstreams`/`workspace`, pont mémoire vs
+`gsd-extract-learnings`/`graphify`/`thread`, fraîcheur vs `gsd-health`.
+
+### Options Considérées
+
+| Option | Verdict |
+|---|---|
+| GSD moteur unique sur tous les labs | Rejetée — `roadmapper`/`phases`/`requirements` sont taillés pour le code ; casse les 4 bundles non-dev |
+| Bascule sur la présence de GSD au lieu du métier | Rejetée — un lab contenu avec GSD installé hériterait d'un planning dev |
+| GSD gagne partout où il a un équivalent | Rejetée — perd l'enforcement automatique et le lien aux registres VibeFlow |
+| Coexistence documentée | Rejetée — c'est l'état de départ ; l'ambiguïté de déclenchement reste entière |
+| Détecteur bash du métier | Rejetée — heurte `domain-detection.md` : un lab de contenu peut avoir un `package.json` |
+| **Frontière d'altitude** | **Retenue** — test unique et vérifiable : « ça concerne un projet, ou le lab ? » |
+
+### Décision
+
+1. **Un projet de code a un seul moteur de planning : GSD.** `planning-core` ne génère plus aucun
+   artefact de projet sur un lab dev ; il redirige vers le verbe `/vf-*` (jamais un `gsd-*` en
+   entrée de chaîne).
+2. **`planning-core` garde l'altitude lab** (`INDEX.md`, typage `deliverable`/`continuous`, seuil
+   d'autonomie, dette) et **la couche à côté** (pont mémoire vers `.claude/memory/`), plus **le socle
+   complet des labs non-dev** — où GSD n'est ni installé ni pertinent.
+3. **Le métier reste du jugement** ; seul le fait « un moteur GSD est-il en place » est outillé
+   (`detect-gsd-engine.sh`, 4 exits par ordre de priorité).
+4. **Exception assumée — le `Stop` guard reste bloquant** : `guard-planning-updated.sh` ne génère
+   rien, il vérifie une propriété du *résultat* quel qu'en soit l'auteur. GSD n'a aucun équivalent
+   bloquant (`gsd-health` signale à la demande).
+5. **Aucune réécriture d'un `.planning/` existant** (ADR-031) : le cas migration avertit et propose,
+   l'utilisateur décide.
+
+### Conséquences
+
+**Positives** : plus de format concurrent dans un même `.planning/` ; fin de la double injection au
+démarrage ; le déclenchement est désambiguïsé côté description, pas seulement côté exécution ;
+`planning-core` retrouve un périmètre défendable (le lab, la mémoire, l'enforcement) au lieu d'un
+tronc universel qui doublonnait le moteur de dev. **Négatives / risque** : les labs dev déjà porteurs
+d'un `.planning/` de facture `planning-core` restent en format non lisible par l'outillage de dev — et
+aucune migration automatique n'existe (`gsd-import --from` n'importe qu'un plan isolé). Mitigation :
+exit 2 dédié, protocole de reprise documenté, geste humain assisté.
+
+### Code Impacté
+
+- `plugin/planning-core/scripts/detect-gsd-engine.sh` (nouveau) + son test
+- `plugin/planning-core/scripts/{check-planning-state.sh, planning-context.sh}` (flag `--defer-to-gsd`)
+- `plugin/planning-core/hooks/hooks.json` (SessionStart : `--defer-to-gsd`)
+- `plugin/planning-core/SKILL.md` (description rescopée + étape 0 + séquences A/B)
+- `plugin/planning-core/references/{gsd-handoff.md (nouveau), domain-detection.md}`
+- `plugin/commands/vf-planning.md`
