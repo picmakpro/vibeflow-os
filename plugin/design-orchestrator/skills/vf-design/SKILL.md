@@ -28,6 +28,10 @@ l'agent `vibeflow-design`** (qui porte la table de routage canonique et la doctr
 - explorer une direction / inspiration → **DESIGN-WORKFLOW** (intent INSPIRATION)
 - craft ciblé (spacing, typo, couleur, motion, copy, responsive) → **DESIGN-WORKFLOW** (QUICK FIX)
 
+Le **contrat UI** et la **revue UI** (`gsd-ui-phase`, `gsd-ui-review`) n'ont **pas de verbe
+dédié** : l'agent les route en interne depuis ce verbe, qui est donc leur seule porte d'entrée.
+Seule la maquette jetable a la sienne — `/vf-sketch`.
+
 **Ne réimplémente jamais** la logique d'un outil design : route et délègue.
 **Générique** : produit des specs + tokens adaptés à la stack, jamais du code framework-locké imposé.
 **Reframe toute sortie en vocabulaire VibeFlow** (cf. `design-vocabulary-map.md`). Ne nomme jamais

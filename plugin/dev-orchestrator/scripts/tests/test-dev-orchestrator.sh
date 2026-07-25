@@ -6,7 +6,13 @@
 #        (SKIP explicite si aucun skill gsd-* présent sur la machine).
 #   T2 — ensure-deps.sh idempotent (2 runs en dry-run = no-op, exit 0 aux deux).
 #   T3 — La table de routage de AGENT.md couvre ≥11 intentions :
-#        (a) ≥11 cibles DISTINCTES, (b) ≥11 lignes d'intentions NL dans la table.
+#        (a) ≥11 VERBES /vf-* DISTINCTS, (b) ≥11 lignes d'intentions NL dans la table.
+#        /!\ Changement de sémantique (étape 12, D-09) : (a) comptait auparavant les cibles
+#        gsd-* canoniques citées dans l'agent. VERB-01 interdit désormais toute cible gsd-*
+#        dans la table — l'agent route vers un VERBE, le verbe connaît sa cible. Compter des
+#        cibles reviendrait à exiger le résidu que l'étape supprime ; la couverture de routage
+#        est donc mesurée sur les verbes, à seuil identique (≥11). L'absence de gsd-* dans la
+#        table est asserte par T13.
 #   T4 — Chaque skill /vf-* mappe vers une cible existante (aucun orphelin) :
 #        gsd-X vérifié contre gsd-skills-index.md (fixture de secours si index vide),
 #        brainstorming (superpowers) et ensure-deps (bootstrap interne) acceptés.
@@ -19,11 +25,21 @@
 #   T9 — Contrats de mission : source unique + 3 renvois (DRY).
 #   T10 — Routage mission (AGENT.md) + aiguillage taille (vf-auto, SEUIL_EQUIPE).
 #   T11 — Généricité : aucun résidu Reviz dans agents/ (DM5).
+#   T12 — Anti-collision des descriptions de verbes (les deux modules).
+#   T13 — Préséance : la rule globale existe, est conforme et est référencée.
+#   T14 — Exhaustivité du routage : intent-routing.md couvre l'index, et chaque cible
+#         portée par un verbe est bien citée dans le corps de ce verbe.
+#
+# Correspondance avec les noms de la spec de routage fin (2026-07-25) :
+#   T12 (ici) = T11 (spec) · T13 (ici) = T12 (spec) · T14 (ici) = T13 (spec).
+# Le T11 (ici) EXISTE DÉJÀ — généricité / anti-résidu Reviz (DM5) — et n'est PAS renuméroté :
+# renuméroter un test de non-régression ferait perdre sa trace dans l'historique. La numérotation
+# locale est donc décalée d'un cran par rapport à la spec, à dessein.
 #
 # Convention : asserts numérotés, helpers ok()/ko()/skip(), exit 0 si tout passe
 # (SKIP non bloquant), exit 1 si au moins un KO. Calqué sur le pattern de test du repo.
 #
-# Référence : VERIF-01, VERIF-02, IDX-02, D4, D7.
+# Référence : VERIF-01, VERIF-02, IDX-02, D4, D7, VERB-01→VERB-05.
 
 set -uo pipefail
 
@@ -141,12 +157,16 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# T3 — Routage AGENT.md : ≥11 cibles DISTINCTES ET ≥11 lignes d'intentions NL
+# T3 — Routage AGENT.md : ≥11 VERBES DISTINCTS ET ≥11 lignes d'intentions NL
 # ---------------------------------------------------------------------------
+# D-09 (étape 12) : (a) comptait les cibles gsd-* canoniques citées dans l'agent. VERB-01 les
+# bannit de la table de routage — l'agent route vers un verbe, le verbe connaît sa cible. Le
+# compteur porte donc sur les VERBES /vf-* distincts de la table, à seuil inchangé (≥11).
 AGENT="$AGENT_FILE"
-# (a) cibles distinctes (hors lignes commentaire), via liste canonique connue.
+# (a) verbes distincts cités dans les lignes de table (hors lignes commentaire).
 distinct_targets=$("$GREP" -v '^#' "$AGENT" \
-  | "$GREP" -Eo 'brainstorm(ing)?|gsd-discuss-phase|gsd-plan-phase|gsd-execute-phase|gsd-quick|gsd-fast|gsd-verify-work|gsd-code-review|gsd-debug|gsd-autonomous|gsd-ship|gsd-progress|gsd-map-codebase' \
+  | "$GREP" -E '^\|' \
+  | "$GREP" -Eo '/vf-[a-z0-9-]+' \
   | sort -u | wc -l | tr -d ' ')
 # (b) lignes d'intentions NL = lignes de la table de routage (| intention | action |)
 #     hors header (« Intention ») et hors séparateur (|---|).
@@ -156,23 +176,32 @@ intent_lines=$("$GREP" -E '^\|' "$AGENT" \
   | "$GREP" -c '|')
 
 if [ "${distinct_targets:-0}" -ge 11 ] && [ "${intent_lines:-0}" -ge 11 ]; then
-  ok "T3 routage : $distinct_targets cibles distinctes ET $intent_lines lignes d'intentions NL (≥11/≥11)"
+  ok "T3 routage : $distinct_targets verbes distincts ET $intent_lines lignes d'intentions NL (≥11/≥11)"
 else
-  ko "T3 routage : cibles distinctes=$distinct_targets, lignes intentions=$intent_lines (attendu ≥11 chacun)"
+  ko "T3 routage : verbes distincts=$distinct_targets, lignes intentions=$intent_lines (attendu ≥11 chacun)"
 fi
 
 # ---------------------------------------------------------------------------
 # T4 — Mapping /vf-* non orphelin (robuste à un index vide via fixture)
 # ---------------------------------------------------------------------------
 # Index de référence des cibles gsd-* : index disque s'il contient des skills,
-# sinon fixture embarquée (12 cibles canoniques) pour ne jamais produire de faux négatif.
+# sinon fixture embarquée pour ne jamais produire de faux négatif.
 INDEX_DISK="$REFS_DIR/gsd-skills-index.md"
 index_has_skills=0
 if [ -f "$INDEX_DISK" ] && "$GREP" -Eq 'gsd-[a-z0-9-]+' "$INDEX_DISK"; then
   index_has_skills=1
 fi
-# Fixture canonique (12 cibles gsd-* connues du pipeline).
-FIXTURE_TARGETS="gsd-discuss-phase gsd-plan-phase gsd-execute-phase gsd-quick gsd-fast gsd-verify-work gsd-code-review gsd-debug gsd-autonomous gsd-ship gsd-progress gsd-map-codebase gsd-new-project"
+# Fixture canonique : TOUTES les cibles portées par un verbe /vf-*, pipeline historique compris.
+# Elle sert quand l'index disque est absent (CI, poste sans GSD) ET quand l'index versionné est en
+# retard sur la chaîne réelle — sans elle, chaque verbe ajouté sort « orphelin » hors poste de dev.
+# gsd-ingest-docs / gsd-import : place réservée pour /vf-ingest (étape 13), la fixture les connaît
+# avant que le verbe n'existe.
+FIXTURE_TARGETS="gsd-discuss-phase gsd-plan-phase gsd-mvp-phase gsd-execute-phase gsd-quick gsd-fast gsd-verify-work gsd-code-review gsd-debug gsd-autonomous gsd-ship gsd-pr-branch gsd-progress gsd-map-codebase gsd-new-project \
+gsd-secure-phase gsd-add-tests gsd-audit-uat gsd-audit-fix gsd-validate-phase gsd-forensics \
+gsd-inbox gsd-new-milestone gsd-complete-milestone gsd-milestone-summary gsd-audit-milestone \
+gsd-phase gsd-undo gsd-review-backlog gsd-capture gsd-cleanup gsd-resume-work gsd-pause-work \
+gsd-docs-update gsd-extract-learnings gsd-graphify gsd-explore gsd-spike gsd-spec-phase \
+gsd-sketch gsd-ingest-docs gsd-import"
 
 # Vérifie qu'une cible gsd-X est connue (index disque ou fixture).
 target_known() {
@@ -365,6 +394,198 @@ if [ -d "$MOD/agents" ] && "$GREP" -rqE "docs/_mission|revizapp|Reviz" "$MOD/age
   ko "T11 généricité : résidu Reviz détecté dans agents/ (docs/_mission|revizapp|Reviz)"
 else
   ok "T11 généricité : aucun chemin/nom Reviz dans agents/"
+fi
+
+# ---------------------------------------------------------------------------
+# T12 — Anti-collision : démarcations croisées des descriptions (= T11 de la spec)
+# ---------------------------------------------------------------------------
+# La description d'un verbe EST le code du routeur de niveau 1 : c'est elle qui départage deux
+# gestes voisins au matching. Le contrôle porte sur les groupes à recouvrement lexical avéré
+# (D-07) : réciprocité STRICTE à l'intérieur d'un groupe, unilatérale admise ailleurs. Un
+# contrôle universel produirait des faux positifs sur les renvois génériques de vf-dev.
+# Les deux modules sont lus (dev + design) : la démarcation sketch/design/spike les traverse.
+
+# Localise le SKILL.md d'un verbe : module courant, puis module design (source ou lab à plat).
+skill_file() {
+  local v="$1"
+  [ -f "$MOD/skills/$v/SKILL.md" ] && { echo "$MOD/skills/$v/SKILL.md"; return 0; }
+  [ -f "$REPO/design-orchestrator/skills/$v/SKILL.md" ] && { echo "$REPO/design-orchestrator/skills/$v/SKILL.md"; return 0; }
+  return 1
+}
+
+# Description du frontmatter, aplatie sur une ligne (bloc scalaire « description: > » compris).
+verb_desc() {
+  awk '/^description:/{f=1;print;next} f&&/^[A-Za-z_-]+:/{exit} f&&/^---[[:space:]]*$/{exit} f{print}' "$1" | tr '\n' ' '
+}
+
+# Groupes de collision (D-07). Réciprocité stricte à l'intérieur de chaque groupe.
+COLLISION_GROUPS="
+vf-test:vf-testgen
+vf-review:vf-gaps
+vf-brainstorm:vf-explore:vf-spike:vf-spec
+vf-map:vf-learn
+vf-progress:vf-resume
+vf-debug:vf-forensics
+vf-plan:vf-phase
+vf-ship:vf-inbox
+vf-sketch:vf-design:vf-spike
+vf-test:vf-spike
+vf-progress:vf-gaps
+"
+
+t12_fail=0
+t12_groups=0
+for group in $COLLISION_GROUPS; do
+  members="$(echo "$group" | tr ':' ' ')"
+  # Un verbe absent du disque : KO côté dev, SKIP si le module design n'est pas là.
+  missing=""
+  for m in $members; do skill_file "$m" >/dev/null || missing="$missing $m"; done
+  if [ -n "$missing" ]; then
+    case "$missing" in
+      *vf-design*|*vf-sketch*) skip "T12 groupe [$members] : module design absent —$missing" ;;
+      *) ko "T12 groupe [$members] : verbe(s) introuvable(s) —$missing"; t12_fail=$((t12_fail+1)) ;;
+    esac
+    continue
+  fi
+  t12_groups=$((t12_groups+1))
+  for a in $members; do
+    desc_a="$(verb_desc "$(skill_file "$a")")"
+    cites=0
+    for b in $members; do
+      [ "$a" = "$b" ] && continue
+      case "$desc_a" in *"/$b"*) ;; *) continue ;; esac
+      cites=$((cites+1))
+      # Réciprocité : b doit repousser vers a.
+      desc_b="$(verb_desc "$(skill_file "$b")")"
+      case "$desc_b" in
+        *"/$a"*) : ;;
+        *) ko "T12 réciprocité : /$a repousse vers /$b, mais /$b ne repousse pas vers /$a"
+           t12_fail=$((t12_fail+1)) ;;
+      esac
+    done
+    if [ "$cites" -eq 0 ]; then
+      ko "T12 démarcation : /$a ne cite aucun voisin du groupe [$members]"
+      t12_fail=$((t12_fail+1))
+    fi
+  done
+done
+
+# Groupe 6 — unilatéral par construction : /vf-audit appartient au module validator et n'est pas
+# modifiable ici (D-01). vf-gaps doit le nommer ; la réciprocité est assurée par la chasse gardée.
+if f_gaps="$(skill_file vf-gaps)"; then
+  case "$(verb_desc "$f_gaps")" in
+    *"/vf-audit"*) : ;;
+    *) ko "T12 collision 6 : vf-gaps ne renvoie pas l'audit de conformité du lab vers /vf-audit"
+       t12_fail=$((t12_fail+1)) ;;
+  esac
+else
+  ko "T12 collision 6 : vf-gaps introuvable"; t12_fail=$((t12_fail+1))
+fi
+
+# Chasse gardée : aucune description de verbe ne CAPTE l'audit de conformité du lab. On n'inspecte
+# que la zone de capture (avant le premier contre-exemple « ✘ ») — les contre-exemples, eux, ont le
+# droit et le devoir de nommer /vf-audit.
+GUARD_RE='conformité (du lab|méthodologique)|audite (le|ce) lab|audite les agents|densité des agents'
+guard_hits=0
+for sm in "$MOD"/skills/vf-*/SKILL.md "$REPO"/design-orchestrator/skills/vf-*/SKILL.md; do
+  [ -f "$sm" ] || continue
+  d="$(verb_desc "$sm")"
+  if echo "${d%%✘*}" | "$GREP" -qiE "$GUARD_RE"; then
+    ko "T12 chasse gardée : $(basename "$(dirname "$sm")") capte l'audit de conformité du lab (réservé à /vf-audit)"
+    guard_hits=$((guard_hits+1)); t12_fail=$((t12_fail+1))
+  fi
+done
+
+if [ "$t12_fail" -eq 0 ]; then
+  ok "T12 anti-collision : $t12_groups groupe(s) à réciprocité stricte + renvoi /vf-audit + chasse gardée"
+fi
+
+# ---------------------------------------------------------------------------
+# T13 — Préséance des verbes : rule globale conforme et référencée (= T12 de la spec)
+# ---------------------------------------------------------------------------
+# Source : $MOD/rules/ en source comme en lab (l'installeur pose rules/*.md sous .claude/rules/).
+RULE="$MOD/rules/vf-verb-precedence.md"
+t13_fail=0
+if [ ! -f "$RULE" ]; then
+  ko "T13 préséance : $RULE introuvable"; t13_fail=$((t13_fail+1))
+else
+  # Rule GLOBALE (Tier 1) : pas de frontmatter paths: — une intention n'a pas de chemin de fichier.
+  if "$GREP" -qE '^[[:space:]]*paths:' "$RULE"; then
+    ko "T13 préséance : la rule déclare paths: — elle ne serait chargée qu'à la lecture d'un fichier correspondant"
+    t13_fail=$((t13_fail+1))
+  fi
+  rule_lines=$(wc -l < "$RULE" | tr -d ' ')
+  if [ "${rule_lines:-999}" -gt 40 ]; then
+    ko "T13 préséance : rule = ${rule_lines}L (>40, elle est chargée en permanence)"; t13_fail=$((t13_fail+1))
+  fi
+  "$GREP" -q 'vf-verb-precedence' "$AGENT_FILE" || {
+    ko "T13 préséance : AGENT.md ne référence pas la rule"; t13_fail=$((t13_fail+1)); }
+fi
+# Assertion complémentaire de T3 (VERB-01) : la table de routage ne cite AUCUNE cible interne.
+table_gsd=$("$GREP" -E '^\|' "$AGENT_FILE" | "$GREP" -cE 'gsd-[a-z0-9-]+')
+if [ "${table_gsd:-0}" -ne 0 ]; then
+  ko "T13 table propre : $table_gsd ligne(s) de la table de routage citent une cible gsd-* (VERB-01)"
+  t13_fail=$((t13_fail+1))
+fi
+[ "$t13_fail" -eq 0 ] && ok "T13 préséance : rule globale (${rule_lines}L, sans paths:) référencée par l'agent, table sans cible interne"
+
+# ---------------------------------------------------------------------------
+# T14 — Exhaustivité du routage (= T13 de la spec)
+# ---------------------------------------------------------------------------
+# (a) Chaque skill gsd-* de l'index factuel est routé par intent-routing.md.
+# (b) Durcissement D-03 : toute cible portée par un VERBE dans intent-routing.md est réellement
+#     citée dans le corps de ce verbe. Sans ça, la table pourrait promettre un routage que le
+#     verbe ne fait pas. Les lignes « — (agent) » sont exclues : pas de verbe, délégation directe.
+ROUTING="$REFS_DIR/intent-routing.md"
+t14_fail=0
+if [ ! -f "$ROUTING" ]; then
+  ko "T14 exhaustivité : $ROUTING introuvable"; t14_fail=$((t14_fail+1))
+else
+  # (a) — comparaison sur les lignes « | gsd-… | » de l'index (évite les faux positifs gsd-index/gsd-sdk).
+  if [ -f "$INDEX_DISK" ]; then
+    indexed=$("$GREP" -Eo '^\|[[:space:]]*`?gsd-[a-z0-9-]+' "$INDEX_DISK" | "$GREP" -Eo 'gsd-[a-z0-9-]+' | sort -u)
+  else
+    indexed=""
+  fi
+  if [ -z "$indexed" ]; then
+    skip "T14 exhaustivité (a) : index factuel vide — GSD non installé (pas un échec)"
+  else
+    missing_routed=""
+    n_indexed=0
+    for s in $indexed; do
+      n_indexed=$((n_indexed+1))
+      "$GREP" -q -- "$s" "$ROUTING" || missing_routed="$missing_routed $s"
+    done
+    if [ -n "$missing_routed" ]; then
+      ko "T14 exhaustivité (a) : skill(s) de l'index non routé(s) par intent-routing.md —$missing_routed"
+      t14_fail=$((t14_fail+1))
+    else
+      ok "T14 exhaustivité (a) : $n_indexed skill(s) de l'index tous routés par intent-routing.md"
+    fi
+  fi
+
+  # (b) — cible promise = cible citée par le verbe qui la porte.
+  broken=""
+  while IFS='|' read -r _ _intent verbe cible _rest; do
+    v=$(echo "$verbe" | "$GREP" -oE '/vf-[a-z0-9-]+' | head -1)
+    [ -n "$v" ] || continue                     # ligne « — (agent) » ou hors table de routage
+    tgts=$(echo "$cible" | "$GREP" -Eo 'gsd-[a-z0-9-]+' | sort -u)
+    [ -n "$tgts" ] || continue
+    vname="${v#/}"
+    vfile="$(skill_file "$vname")" || {
+      # Verbe absent du poste : place réservée (ex. /vf-ingest, étape 13) ou module non installé.
+      skip "T14 (b) : $vname introuvable — cibles non vérifiées : $(echo $tgts)"
+      continue; }
+    for t in $tgts; do
+      "$GREP" -q -- "$t" "$vfile" || broken="$broken ${vname}→${t}"
+    done
+  done < <("$GREP" -E '^\|' "$ROUTING" | "$GREP" -v -E '^\|[[:space:]]*-{2,}' | "$GREP" -v -iE '^\|[[:space:]]*Intention')
+  if [ -n "$broken" ]; then
+    ko "T14 exhaustivité (b) : cible(s) promise(s) par la doctrine mais absente(s) du corps du verbe —$broken"
+    t14_fail=$((t14_fail+1))
+  else
+    ok "T14 exhaustivité (b) : chaque cible portée par un verbe est citée dans le corps de ce verbe"
+  fi
 fi
 
 # ---------------------------------------------------------------------------

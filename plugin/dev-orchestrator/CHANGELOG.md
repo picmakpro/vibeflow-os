@@ -1,5 +1,63 @@
 # CHANGELOG — dev-orchestrator
 
+## [v1.8.0] — 2026-07-25 (routage fin : 31 verbes, préséance, doctrine exhaustive)
+
+Le module ne couvrait que 14 intentions sur les ~65 gestes de la chaîne interne : tout le reste
+n'avait pas de porte d'entrée et se jouait au hasard du matching sémantique. Cette version pose
+les **trois niveaux de routage** de la spec `2026-07-25-routage-fin-verbes-vf-design.md`.
+
+### Ajouté
+
+- **17 verbes** neufs (le module en compte **31**), chacun un délégateur mince vers sa cible :
+  - *amont & cadrage* — `/vf-explore` (idée floue), `/vf-spike` (code jetable), `/vf-spec` (le QUOI) ;
+  - *qualité & audits* — `/vf-testgen`, `/vf-gaps` (dette et recettes en souffrance), `/vf-secure`,
+    `/vf-forensics` (post-mortem de cycle), `/vf-inbox` (issues et PR entrantes) ;
+  - *cycle de vie projet* — `/vf-milestone`, `/vf-phase`, `/vf-undo`, `/vf-backlog`, `/vf-cleanup` ;
+  - *contexte & session* — `/vf-resume`, `/vf-pause`, `/vf-docs`, `/vf-learn`.
+- **`rules/vf-verb-precedence.md`** — rule **globale (Tier 1)**, 40 L : une intention de dev entre
+  dans la chaîne **par un verbe**, jamais par un skill interne appelé en direct. Échappatoire
+  cadrée + pièges connus. Volontairement **sans `paths:`** (voir *Prérequis* ci-dessous).
+- **`references/intent-routing.md`** — doctrine de routage exhaustive (intention → verbe → cible),
+  couvrant **100 %** des skills de l'index factuel, y compris les gestes d'outillage sans verbe
+  dédié. Chargée **on-demand** : coût contexte nul le reste du temps.
+- **Tests** : `T12` anti-collision (réciprocité stricte sur les groupes de collision, chasse gardée
+  de `/vf-audit`, les deux modules lus), `T13` préséance (rule conforme, référencée, table de
+  routage sans cible interne), `T14` exhaustivité (index entièrement routé + toute cible promise
+  par la doctrine est bien citée par le verbe qui la porte).
+
+### Modifié
+
+- **Descriptions des 15 verbes existants** réécrites sur un gabarit unique : formulations FR
+  réelles, contre-exemples nommant les voisins (`✘ … → /vf-…`), portée d'invocation. C'est la
+  description qui départage deux gestes proches — elle est le code du routeur, pas de la doc.
+- **`AGENT.md` refondu** : la table de routage associe une intention à un **verbe**, plus jamais à
+  une cible interne (218 L, groupée par famille). L'idée floue part désormais vers `/vf-explore` et
+  non plus vers la conception d'une solution. Renvois ajoutés vers la rule de préséance et vers
+  `intent-routing.md`.
+- **`vf-dev`** (point d'entrée générique) : sa mini-table ne connaissait que les 14 anciens verbes ;
+  elle aiguille désormais par famille vers les 31.
+- **`T3`** compte maintenant les **verbes** distincts de la table de routage (seuil inchangé, ≥ 11).
+  Il comptait des cibles `gsd-*` — ce que le nouveau contrat interdit précisément dans la table.
+- **Fixture `FIXTURE_TARGETS` (T4)** étendue à **toutes** les cibles portées par un verbe. Sans
+  cela, chaque verbe ajouté sortait « orphelin » sur un poste sans chaîne interne installée : le
+  test passait en local et échouait en CI.
+
+### Prérequis
+
+- **Claude Code ≥ v2.1.198** — c'est la version qui apporte le mécanisme natif `.claude/rules/`,
+  sans lequel le niveau 2 (préséance) n'est pas opérant.
+- Une rule **sans** frontmatter `paths:` est chargée **inconditionnellement au lancement**, à la
+  même priorité que `CLAUDE.md` ; une rule **avec** `paths:` n'est chargée qu'à la lecture d'un
+  fichier correspondant. `vf-verb-precedence.md` doit donc rester **sans `paths:`** : une intention
+  n'a pas de chemin de fichier, elle est inscopable par construction. (`paths` est le seul champ
+  documenté — source : documentation officielle Claude Code, `memory.md`.)
+
+### Non compris
+
+- `/vf-ingest` (intégration de specs et de plans existants) arrive à l'**étape suivante** : sa
+  place est réservée dans la doctrine et dans la fixture de test, son verbe n'est pas encore écrit.
+- Aucun bump de la version racine ni tag : la release est portée par la clôture du jalon.
+
 ## [v1.7.0] — 2026-07-22 (ADR-053 — volet swarm : lock de driver + DAG + rapports typés)
 
 ### Ajouté
