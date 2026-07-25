@@ -14,7 +14,7 @@
 
 ## 0. Correction de l'évaluation initiale (je me suis trompé)
 
-L'analyse du **code réel** de reviz (pas du spec) invalide deux de mes arguments initiaux :
+L'analyse du **code réel** de projet source (pas du spec) invalide deux de mes arguments initiaux :
 
 - ❌ *« 7 agents = budget densité ADR-029 explosé »* → **faux**. Les agents font 25–47 lignes
   (262 au total). Ce sont des orchestrateurs fins, exactement l'esprit ADR-029.
@@ -23,13 +23,13 @@ L'analyse du **code réel** de reviz (pas du spec) invalide deux de mes argument
   plusieurs agents, gère les retours review/audit, marque *done*, enchaîne. Objet différent,
   absent de VibeFlow. C'est le chaînon manquant pour « aller jusqu'au bout ».
 
-Angle manqué : reviz contient **deux** systèmes d'agents sédimentés et contradictoires —
+Angle manqué : projet source contient **deux** systèmes d'agents sédimentés et contradictoires —
 (A) personas + Jira + `overnight_autonomous` (push/PR/auto-merge cloud), (B) les 7 agents GSD
-(`.planning/` local, livraison différée). Le `CLAUDE.md` de reviz dit « never use local markdown
+(`.planning/` local, livraison différée). Le `CLAUDE.md` de projet source dit « never use local markdown
 files for tracking », ce qui **contredit** les 7 agents. On n'importe **que** l'esprit du système
 B ; le système A (couplé Jira/cloud/push) est **hors périmètre**.
 
-Ce qui reste valide de l'éval : un seul sommet ; pas de parité `.agent/` ; contraintes reviz
+Ce qui reste valide de l'éval : un seul sommet ; pas de parité `.agent/` ; contraintes projet source
 (no-push, no-mention-IA) = options de projet.
 
 ---
@@ -39,7 +39,7 @@ Ce qui reste valide de l'éval : un seul sommet ; pas de parité `.agent/` ; con
 La couche d'orchestration autonome **existe déjà** dans la méthodo VibeFlow, mais seulement en
 **documentation** (module `reference`), pas en **capacité exécutable** :
 
-| Doctrine existante | Rôle | Équivalent reviz |
+| Doctrine existante | Rôle | Équivalent projet source |
 |--------------------|------|------------------|
 | **Pattern 09 — `god-execution`** (8 phases) | Orchestration autonome multi-sprints | l'agent `manager` |
 | **Pattern 09 — `safe-execute`** (5 phases) | Tâche unitaire rigoureuse | — |
@@ -47,12 +47,12 @@ La couche d'orchestration autonome **existe déjà** dans la méthodo VibeFlow, 
 | **Pattern 10 — Adversarial Plan-Review** | 2 reviewers + Judge | panel de décision |
 | **Pattern 12 — Cloisonnement outils** (posé brique 3) | Workers/juges cloisonnés | tools: des 7 agents |
 
-`god-execution` est **plus complet** que le manager reviz (il a la phase Plan-Review adversarial
+`god-execution` est **plus complet** que le manager projet source (il a la phase Plan-Review adversarial
 et la vérif visuelle explicite). Sa **phase 7 « Vérif Visuelle »** (snapshot + comparaison au
 critère) **est** le module `mobile-test` qu'on a posé — mais rien ne les relie aujourd'hui.
 
 **Conclusion** : la brique 5 = **matérialiser `god-execution` en exécutable** et le **câbler** sur
-les briques déjà posées. On ne copie pas reviz ; reviz est la preuve que le pattern tient.
+les briques déjà posées. On ne copie pas projet source ; projet source est la preuve que le pattern tient.
 
 ---
 
@@ -124,7 +124,7 @@ Le mode orchestration **applique les halt conditions (Pattern 11)** comme garde-
 - Réutilise `vf-decide` (plan-review/zones grises) et la doctrine `autonomous-guardrails.md`.
 
 ### 5b — Boucle test+fix matérialisée (les bras)
-Trois agents **fins et cloisonnés** (Pattern 12), généralisés depuis reviz :
+Trois agents **fins et cloisonnés** (Pattern 12), généralisés depuis projet source :
 - **`vf-test-orchestrator`** : tient la boucle (baseline verte, anti-régression revert, anti-thrash
   N=3, arrêt vert/plafond), dispatche les 2 workers, produit le rapport de synthèse. Halt-aware.
 - **`vf-test-runner`** : possède les tests, écrit la couverture manquante, **n'affaiblit jamais un
@@ -147,15 +147,15 @@ transforme « le code est écrit » en « l'app marche vraiment ».
 | D2 | Workers `test-runner`/`app-fixer` = agents ? | agents cloisonnés / skills | **Agents** — le cloisonnement anti-triche (Pattern 12) exige des `tools:` restreints, impossible en skill. |
 | D3 | Mode orchestration = nouveau `vf-orchestrate` ou montée en gamme de `vf-auto` ? | nouveau verbe / enrichir vf-auto | **Enrichir `vf-auto`** (il délègue déjà à l'autonomie) + référence protocole. Évite un verbe de plus. |
 | D4 | Rapport `god-execution` vs `gsd-autonomous` ? | — | **TRANCHÉ** : `gsd-autonomous` = déjà le cerveau multi-phases (via `vf-auto`). Ne pas réimplémenter. Le manque = la vérif réelle + boucle fix (5b/5c). Voir §1bis. |
-| D5 | Contraintes reviz (no-push, no-mention-IA) | option projet / ignorer | **Option de projet** + HALT-3 sur push. |
+| D5 | Contraintes projet source (no-push, no-mention-IA) | option projet / ignorer | **Option de projet** + HALT-3 sur push. |
 
 ---
 
-## 6. Généralisation (retrait du revizapp)
+## 6. Généralisation (retrait du projet source)
 
 - Chemins `.agent/`, `docs/_mission/`, `.maestro/` en dur → paramètres (le module `mobile-test`
   gère déjà sa config).
-- Règles reviz (i18n, THEME, bundle id) → **retirées** des corps d'agents (elles viennent du
+- Règles projet source (i18n, THEME, bundle id) → **retirées** des corps d'agents (elles viennent du
   `CLAUDE.md`/RULES du projet cible, pas de VibeFlow).
 - « jamais de push » → option de projet, pas une constante.
 - Nommage : préfixe `vf-` partout, descriptions FR, « invocable utilisateur ET agent ».
@@ -169,7 +169,7 @@ transforme « le code est écrit » en « l'app marche vraiment ».
    testable isolément sur un projet mobile.
 3. **5a** (mode orchestration dans `vf-auto` + référence protocole) : le cerveau qui compose tout.
 4. **5c** (câblage vérif visuelle) : relie 5a à `mobile-test`.
-5. **Preuve** : run réel `god-execution` sur une phase à faible enjeu d'un projet mobile (reviz),
+5. **Preuve** : run réel `god-execution` sur une phase à faible enjeu d'un projet mobile (projet source),
    de bout en bout, jusqu'au *done*.
 
 ---
@@ -177,7 +177,7 @@ transforme « le code est écrit » en « l'app marche vraiment ».
 ## 8. Critère de preuve (sans lui, la brique n'est pas « faite »)
 
 Le point le plus risqué — **un sous-agent qui invoque des skills GSD ET spawne d'autres
-sous-agents en cascade** — n'est prouvé nulle part (le spec reviz dit « à valider en run réel »).
+sous-agents en cascade** — n'est prouvé nulle part (le spec projet source dit « à valider en run réel »).
 La brique 5 n'est déclarée fonctionnelle qu'après **un run réel** où `vf-auto` en mode
 orchestration pilote une phase entière (plan → exécution → test réel → fix → *done*) sans
 intervention, avec au moins un cycle de fix et un arrêt propre. Tant que ce run n'existe pas,

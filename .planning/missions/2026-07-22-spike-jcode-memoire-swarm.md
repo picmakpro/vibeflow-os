@@ -9,7 +9,7 @@
 
 ## Plan de bataille (consigné avant exécution)
 
-1. Matérialiser le lab témoin en fixture reproductible (graine = entrée réelle `reviz` + 4 synthétiques
+1. Matérialiser le lab témoin en fixture reproductible (graine = entrée réelle `projet source` + 4 synthétiques
    calibrées couvrant les 4 types), sans polluer la mémoire de session vivante.
 2. Prototype de passe `consolidator` isolé (hors `plugin/consolidator/`) : lit → normalise `trust` → recalcule
    `confidence` effective par demi-vie → archive `superseded_by` non destructif → réécrit → rapporte.
@@ -29,7 +29,7 @@ consignées par écrit pour validation humaine ultérieure via ADR (ADR-031).
 
 ## Ce qui a été prototypé (RND-01)
 
-- **Fixture lab témoin** : `spike/lab-temoin/` — 5 entrées (1 réelle `reviz-is-willhosting` recopiée + 4
+- **Fixture lab témoin** : `spike/lab-temoin/` — 5 entrées (1 réelle `projet-alpha-emplacement` recopiée + 4
   synthétiques : feedback/user/reference/project, dont 1 `superseded_by`). Seeder : `spike/seed-lab.py`.
 - **Passe consolidator prototype** : `spike/decay-pass.py` — 3 gestes :
   - `trust` (high/medium/low) normalisé ;
@@ -43,7 +43,7 @@ consignées par écrit pour validation humaine ultérieure via ADR (ADR-031).
 | Critère | Résultat |
 |---|---|
 | Round-trip lit→recalcule→réécrit sur **toutes** les entrées, sans édition humaine | ✅ 4 réécrites + 1 via supersession ; passe 2 **idempotente** (base préservée, eff. identique, 0 archivage parasite) |
-| Entrée `superseded_by` archivée (statut basculé, contenu conservé, pas supprimée) | ✅ `reviz-appele-willhunting.md` → `archive/`, `status: superseded`, corps intact |
+| Entrée `superseded_by` archivée (statut basculé, contenu conservé, pas supprimée) | ✅ `projet-alpha-emplacement-obsolete.md` → `archive/`, `status: superseded`, corps intact |
 
 → Recommandation : **écrire un ADR** (frontmatter enrichi + règle de décroissance dans `consolidator`), sous
 validation humaine, avant de toucher le format officiel. Le GO porte **strictement** sur les 3 gestes minimaux.

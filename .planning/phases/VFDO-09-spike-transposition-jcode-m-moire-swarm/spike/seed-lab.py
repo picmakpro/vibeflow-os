@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Seed du lab témoin (fixture reproductible) pour le spike Phase 9.
-Graine = l'entrée RÉELLE de la mémoire de session de ce repo (reviz-is-willhosting,
+Graine = l'entrée RÉELLE de la mémoire de session de ce repo (projet-alpha-emplacement,
 type project) + 4 entrées synthétiques calibrées couvrant les 4 types VibeFlow.
 Une entrée est marquée `superseded_by` pour tester l'archivage non destructif.
 
@@ -12,9 +12,9 @@ import sys, os
 
 ENTRIES = {
     # --- entrée RÉELLE recopiée de ~/.claude/projects/.../memory/ (type project) ---
-    "reviz-is-willhosting.md": """---
-name: reviz-is-willhosting
-description: "Le projet « Reviz » de Samuel vit dans ~/Documents/dev/WillHosting (pas WillHunting)"
+    "projet-alpha-emplacement.md": """---
+name: projet-alpha-emplacement
+description: "Le projet « Alpha » de Samuel vit dans ~/dev/projet-alpha (pas projet Bêta)"
 metadata:
   node_type: memory
   type: project
@@ -25,8 +25,8 @@ status: active
 superseded_by:
 ---
 
-Quand Samuel parle de « Reviz » (app mobile, Expo/Supabase), le repo est
-`~/Documents/dev/WillHosting`. Pattern d'équipe d'agents généralisé dans vibeflow-os v2.23.0.
+Quand Samuel parle de « Alpha » (app mobile, Expo/Supabase), le repo est
+`~/dev/projet-alpha`. Pattern d'équipe d'agents généralisé dans vibeflow-os v2.23.0.
 """,
     # --- feedback (ex-Correction, HL long : le moat VibeFlow) ---
     "commits-francais-scroll-off.md": """---
@@ -80,9 +80,9 @@ RTK (Rust Token Killer) réécrit les commandes CLI pour économiser des tokens.
 `rtk gain` = analytics ; `rtk proxy <cmd>` = commande brute non filtrée.
 """,
     # --- project SUPERSEDED (test archivage non destructif) ---
-    "reviz-appele-willhunting.md": """---
-name: reviz-appele-willhunting
-description: "ANCIENNE croyance erronée : Reviz serait dans ~/Documents/dev/WillHunting"
+    "projet-alpha-emplacement-obsolete.md": """---
+name: projet-alpha-emplacement-obsolete
+description: "ANCIENNE croyance erronée : projet source serait dans ~/Documents/dev/projet Bêta"
 metadata:
   node_type: memory
   type: project
@@ -90,19 +90,19 @@ trust: low
 confidence: 0.6
 created: 2026-04-13
 status: active
-superseded_by: reviz-is-willhosting
+superseded_by: projet-alpha-emplacement
 ---
 
-Note initiale (erronée) : le repo de Reviz aurait été « WillHunting ». Corrigé : c'est WillHosting.
-Conservée pour trace, remplacée par [[reviz-is-willhosting]].
+Note initiale (erronée) : le repo de projet source aurait été « projet Bêta ». Corrigé : c'est projet Alpha.
+Conservée pour trace, remplacée par [[projet-alpha-emplacement]].
 """,
 }
 
-MEMORY_MD = """- [Reviz = WillHosting](reviz-is-willhosting.md) — repo de Reviz = ~/Documents/dev/WillHosting
+MEMORY_MD = """- [projet source = projet Alpha](projet-alpha-emplacement.md) — repo de projet source = ~/dev/projet-alpha
 - [Commits FR Scroll-Off](commits-francais-scroll-off.md) — commits français, zéro mention IA
 - [User freelance multi-métiers](user-freelance-multi-metiers.md) — portefeuille de projets hétérogènes
 - [RTK proxy](reference-rtk-proxy.md) — proxy CLI token-optimisé
-- [Reviz = WillHunting](reviz-appele-willhunting.md) — SUPERSEDED par reviz-is-willhosting
+- [projet source = projet Bêta](projet-alpha-emplacement-obsolete.md) — SUPERSEDED par projet-alpha-emplacement
 """
 
 def main():

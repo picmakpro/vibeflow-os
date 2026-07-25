@@ -1,15 +1,15 @@
 # Spec consolidée : équipe d'agents autonome (test + dev) et intégration dans vibeflow-os
 
 > **[RESSOURCE IMPORTÉE — vibeflow-os]** Copie de référence du track « Équipe d'agents autonome »
-> conçu et implémenté sur le projet client **revizapp**. Importé le 2026-07-07 depuis
-> `WillHosting/.planning/test-tooling/VIBEFLOW-OS-INTEGRATION.md`.
+> conçu et implémenté sur le projet client **projet source**. Importé le 2026-07-07 depuis
+> `projet Alpha/.planning/test-tooling/VIBEFLOW-OS-INTEGRATION.md`.
 > Ce document est une **entrée de recherche** : la source de vérité pour ce qui est réellement
 > retenu et intégré dans vibeflow-os est l'évaluation associée, pas ce fichier.
-> Ne pas exécuter tel quel — plusieurs décisions sont spécifiques à revizapp (voir évaluation).
+> Ne pas exécuter tel quel — plusieurs décisions sont spécifiques à projet source (voir évaluation).
 
 > Source de vérité unique du track « Équipe d'agents autonome ». Consolide SPEC-fondation-A.md, SPEC-B.md, SPEC-C.md.
 > Date : 2026-07-06. Auteur : Samuel.
-> **Objectif de ce document** : décrire exactement l'architecture définie et implémentée sur revizapp, pour (1) l'ajouter à **vibeflow-os** en tant que module « équipe d'agents » (avec l'agent `manager` au sommet), et (2) améliorer l'existant vibeflow là où il recoupe cette archi.
+> **Objectif de ce document** : décrire exactement l'architecture définie et implémentée sur projet source, pour (1) l'ajouter à **vibeflow-os** en tant que module « équipe d'agents » (avec l'agent `manager` au sommet), et (2) améliorer l'existant vibeflow là où il recoupe cette archi.
 
 ---
 
@@ -43,7 +43,7 @@ manager  (lit ROADMAP + dette + scope ; planifie ; décide via panel ; distribue
 ## 2. Décisions verrouillées (brainstorming 2026-07-06)
 
 ### Transverses
-- **Livraison différée** : le remote `origin` est le repo du client (`github.com/aversag/revizapp`). Aucun `git push` avant le paiement final. Commits locaux uniquement, **sans aucune mention d'IA/Claude** (pas de trailer Co-Authored-By), sans référence à `.planning`.
+- **Livraison différée** : le remote `origin` est le repo du client (`github.com/aversag/projet source`). Aucun `git push` avant le paiement final. Commits locaux uniquement, **sans aucune mention d'IA/Claude** (pas de trailer Co-Authored-By), sans référence à `.planning`.
 - **Parité `.agent/` <-> `.claude/`** : tout skill/agent existe dans `.agent/` (canonique livrable) ET dans `.claude/` (miroir exécutable), via symlink. Enforcé par script + husky.
 - **Portabilité** : aucune valeur machine-dépendante en dur ; tout en config versionnée.
 
@@ -109,7 +109,7 @@ Résumé du rôle de chaque agent : voir SPEC-B.md et SPEC-C.md (les corps des a
 - `maestro` n'est pas dans le PATH d'un shell non interactif -> résolution via `config.maestroBin` puis `~/.maestro/bin/maestro`.
 - `JAVA_HOME` absent -> détection (`/usr/libexec/java_home`, openjdk@17 homebrew), passé en env à Maestro.
 - `expo run:ios/android` **ne rend jamais la main** (garde Metro attaché) -> lancement détaché + polling d'install + nettoyage du groupe de process.
-- Bundle id réel : `com.guillaumeaversa.revizapp` (PAS de suffixe `.dev` ; le README `.maestro` était faux). Corrigé dans les flows.
+- Bundle id réel : `com.guillaumeaversa.projet source` (PAS de suffixe `.dev` ; le README `.maestro` était faux). Corrigé dans les flows.
 - `assertVisible`/`tapOn` n'acceptent pas `timeout:` (seul `extendedWaitUntil`). Corrigé.
 
 ---
@@ -145,7 +145,7 @@ Résumé du rôle de chaque agent : voir SPEC-B.md et SPEC-C.md (les corps des a
 - **Généraliser la parité** : la convention symlink `.agent/` <-> `.claude/` + le check husky devraient devenir le mécanisme de packaging standard de vibeflow-os (un seul contenu, deux runners).
 
 ### Points de vigilance pour le portage
-- Les chemins/valeurs propres à revizapp (bundle id, AVD, sources `docs/_mission/`, `.planning/`) doivent devenir des **paramètres** dans vibeflow-os (config par projet), pas des constantes.
+- Les chemins/valeurs propres à projet source (bundle id, AVD, sources `docs/_mission/`, `.planning/`) doivent devenir des **paramètres** dans vibeflow-os (config par projet), pas des constantes.
 - La délégation exacte skill-vs-agent GSD depuis un sous-agent est à re-valider dans l'environnement vibeflow-os (elle dépend des outils exposés aux sous-agents).
 - La contrainte « pas de mention d'IA dans les commits » est spécifique au repo client ; dans vibeflow-os, en faire une **option de projet**.
 
