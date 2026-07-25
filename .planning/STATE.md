@@ -92,6 +92,14 @@ Progress: [██████░░░░] 2/3 phases (13 non cadrée)
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
 
+- **2026-07-25 — Programme d'audit croisé livré en 3 releases** (v2.32.0 → v2.34.0, rapports
+  dans `reports/`) : (1) enforcement branché — CI, gates exit 3, scission ADR-031/ADR-056 ;
+  (2) **bascule agentique** (arbitrage Samuel, spec
+  `docs/superpowers/specs/2026-07-25-suppression-facade-vf-design.md`) — façade vf-* supprimée,
+  dev-orchestrator v2.x, manager avec digest/next steps/hygiène doc, gouvernance proportionnée
+  au profil ; (3) universalisation — team-kernel transverse (conductor), équipe design,
+  content-bundle matérialisé `proposable:true`, pipelining N/N+1, lab express, ADR-057.
+
 - [Phase 1]: D4 — index 100% auto-généré, ordre pipeline documenté dans l'agent.
 - [Phase 1]: D3 — install auto des deps, init projet sur confirmation seulement.
 - [Phase ?]: Index GSD trié alphabétiquement pour diff déterministe + idempotence vérifiable (Plan 01-01)
