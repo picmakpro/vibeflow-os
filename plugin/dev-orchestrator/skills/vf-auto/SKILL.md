@@ -1,10 +1,14 @@
 ---
 name: vf-auto
 description: >
-  Utiliser quand l'utilisateur délègue l'enchaînement complet sans supervision — « fais
-  tout », « en autonomie », « la nuit », « débrouille-toi », « enchaîne les étapes »,
-  « va jusqu'au bout tout seul ». Le périmètre est déjà cadré. Invocable par l'utilisateur
-  ET par l'agent en autonomie.
+  Utiliser quand l'utilisateur délègue l'enchaînement complet **sans supervision** — « fais
+  tout », « en autonomie », « la nuit », « débrouille-toi », « enchaîne les étapes », « va
+  jusqu'au bout tout seul », « je reviens demain matin, avance ». Le périmètre est déjà
+  cadré : la boucle enchaîne cadrage → plan → exécution étape après étape, avec garde-fous.
+  ✘ pas pour exécuter une seule étape déjà planifiée → /vf-execute · ✘ pas pour une tâche
+  triviale d'un seul commit → /vf-quick · ✘ pas pour **arrêter** en gardant le contexte
+  avant de partir → /vf-pause · ✘ pas pour savoir où en est le projet → /vf-progress.
+  Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 
 # vf-auto — Mode autonome

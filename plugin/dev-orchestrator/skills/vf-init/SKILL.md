@@ -1,11 +1,16 @@
 ---
 name: vf-init
 description: >
-  Utiliser au tout premier contact avec VibeFlow ou un nouveau dossier — « initialise »,
-  « démarre VibeFlow », « configure l'environnement », « prépare le projet », « on commence
-  par quoi ? », ou avant tout autre verbe /vf-* si l'environnement n'est pas prêt. Amorce
-  les dépendances et propose l'init projet. Invocable par l'utilisateur ET par l'agent en
-  autonomie.
+  Utiliser au tout premier contact avec un dossier de **code** — « démarre le projet »,
+  « initialise le repo », « configure l'environnement de dev », « on part de zéro », « y a
+  rien encore ici », ou avant tout autre verbe /vf-* si l'environnement n'est pas prêt.
+  Amorce les dépendances puis, sur confirmation explicite, lance le démarrage du projet de
+  code.
+  ✘ pas pour cadrer le premier lot de travail d'un projet déjà amorcé → /vf-plan · ✘ pas
+  pour ouvrir un nouveau jalon sur un projet déjà démarré → /vf-milestone · ✘ pas pour
+  poser le socle documentaire d'un lab (structurer la doc, le cadre, le suivi d'un lab
+  non-dev) → /vf-planning · ✘ pas pour comprendre un code déjà présent → /vf-map.
+  Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 
 # vf-init — Bootstrap de l'environnement

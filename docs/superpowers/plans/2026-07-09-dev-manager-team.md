@@ -635,8 +635,8 @@ fi
 # ---------------------------------------------------------------------------
 # T11 — Généricité : aucun résidu spécifique dans les agents livrés (DM5)
 # ---------------------------------------------------------------------------
-if [ -d "$MOD/agents" ] && "$GREP" -rqE "docs/_mission|projet source|projet source" "$MOD/agents/" 2>/dev/null; then
-  ko "T11 généricité : résidu spécifique détecté dans agents/ (docs/_mission|projet source|projet source)"
+if [ -d "$MOD/agents" ] && "$GREP" -rqE "docs/_mission" "$MOD/agents/" 2>/dev/null; then
+  ko "T11 généricité : résidu spécifique détecté dans agents/ (docs/_mission)"
 else
   ok "T11 généricité : aucun chemin spécifique dans agents/"
 fi

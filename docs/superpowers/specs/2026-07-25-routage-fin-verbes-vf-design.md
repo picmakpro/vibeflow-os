@@ -2,7 +2,7 @@
 
 > **Date** : 2026-07-25
 > **Modules** : `dev-orchestrator` (v1.7.0 → v1.8.0), `design-orchestrator` (+1 verbe)
-> **Problème** : l'orchestrateur route grossièrement et ~50 des 70 skills GSD n'ont aucune
+> **Problème** : l'orchestrateur route grossièrement et ~50 des 65 skills GSD n'ont aucune
 > porte d'entrée VibeFlow.
 
 ---
@@ -27,7 +27,7 @@ Alors qu'il existe un verbe `/vf-map` qui fait exactement cette délégation. Co
 
 ### 1.2 Aucune préséance des verbes VibeFlow sur les skills GSD
 
-Les 70 skills `gsd-*` sont chargés **en même temps** que les 14 `/vf-*` dans une session d'un
+Les 65 skills `gsd-*` sont chargés **en même temps** que les 14 `/vf-*` dans une session d'un
 lab installé. Sur « map ma codebase », Claude arbitre entre `vf-map` et `gsd-map-codebase` sur
 la seule base des descriptions. Rien ne garantit que VibeFlow gagne — et quand GSD gagne, la
 promesse structurante du produit tombe : la plomberie fuite, le vocabulaire n'est pas reframé.
@@ -95,7 +95,7 @@ Contenu :
 
 ### 2.3 Niveau 3 — `references/intent-routing.md`
 
-Table exhaustive `intention → verbe /vf-* → cible GSD` couvrant **les 70 skills de
+Table exhaustive `intention → verbe /vf-* → cible GSD` couvrant **les 65 skills de
 `gsd-skills-index.md`**. Les ~35 sans verbe dédié y sont routés directement par l'agent.
 Chargé on-demand, comme `GSD-PIPELINE.md` et `mission-contracts.md` — coût contexte nul en
 session normale.
@@ -116,7 +116,7 @@ celui-ci est un **inventaire factuel** des skills présents sur la machine ;
 |---|---|---|
 | `vf-secure` | `gsd-secure-phase` | « audite la sécu », « vérifie les failles », « threat model » |
 | `vf-testgen` | `gsd-add-tests` | « écris les tests », « il manque des tests », « couvre cette étape » |
-| `vf-audit` | `gsd-audit-uat`, `gsd-audit-fix`, `gsd-validate-phase` | « audite le projet », « qu'est-ce qui traîne », « comble les trous » |
+| `vf-gaps` | `gsd-audit-uat`, `gsd-audit-fix`, `gsd-validate-phase` | « qu'est-ce qui traîne », « comble les trous », « ce qui reste à vérifier » |
 | `vf-forensics` | `gsd-forensics` | « pourquoi ça a foiré », « post-mortem », « analyse l'échec » |
 | `vf-inbox` | `gsd-inbox` | « trie les issues », « les PR en attente », « la inbox GitHub » |
 
@@ -175,6 +175,7 @@ interne de l'agent `vibeflow-design`) — pas de verbe supplémentaire.
 | `vf-map` (cartographie du code) vs `vf-learn` (graphe de connaissance) | Contre-exemples croisés. |
 | `vf-progress` (où on en est) vs `vf-resume` (recharger le contexte d'une session passée) | Contre-exemples croisés. |
 | `vf-ingest` (un cadrage écrit → étapes) vs `vf-docs` (le code → la doc) vs `vf-phase` (édition manuelle d'étapes) | Contre-exemples croisés : `vf-ingest` part **d'un document existant**, `vf-docs` part **du code**, `vf-phase` part **d'une intention directe sans document**. |
+| **`vf-gaps` (trous de vérification du projet) vs `/vf-audit` (conformité méthodologique du lab)** | Collision découverte en exécution : `plugin/commands/vf-audit.md` existe déjà et délègue à `vibeflow-validator`. Le nom initialement prévu au design (`vf-audit`) est abandonné au profit de **`vf-gaps`** ; `/vf-audit` garde sa chasse gardée « conformité du lab ». Démarcation **unilatérale** (`vf-gaps` renvoie vers `/vf-audit`, l'inverse n'est pas exigé — `/vf-audit` est une commande, pas un verbe du gabarit). |
 
 ---
 
@@ -311,7 +312,7 @@ de plus, il suppose le gabarit de description et la rule de préséance en place
 
 | Étape | Périmètre | Exigences |
 |---|---|---|
-| **Phase 12 — Routage fin & couverture des verbes** | §§ 2-6 : 3 niveaux de routage, 18 verbes (hors `vf-ingest`), rule de préséance, `intent-routing.md`, réécriture des 14 descriptions, tests T4/T11/T12/T13 | `VERB-01..05` |
+| **Phase 12 — Routage fin & couverture des verbes** | §§ 2-6 : 3 niveaux de routage, 18 verbes (17 dev dont `vf-gaps` + `vf-sketch` en design ; `vf-ingest` exclu et sa place réservée), rule de préséance, `intent-routing.md`, réécriture des 14 descriptions, tests T4 + T12/T13/T14 (T11 étant déjà pris par la généricité anti-résidu spécifique) | `VERB-01..05` |
 | **Phase 13 — Pont spec → feuille de route** | § 7 : verbe `/vf-ingest` (2 grains), découverte des specs non intégrées, manifest, garde-fous, enchaînement depuis `vf-brainstorm` | `BRDG-01..03` |
 
 La release (bump racine + tag) est portée par la Phase 13, qui clôt le milestone.

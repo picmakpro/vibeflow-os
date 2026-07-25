@@ -1,7 +1,7 @@
 {
   "name": "dev-orchestrator",
-  "version": "v1.7.0",
+  "version": "v1.8.1",
   "type": "agent+skills",
-  "description": "Orchestrateur de développement : route le langage naturel vers le pipeline. Inclut l'équipe manager de mission (vf-dev-manager + vf-coder/vf-reviewer/vf-auditer, arborescence à contexte minimal), le verbe vf-decide (panel de décision), le routage des phases de design vers /vf-design et la doctrine des garde-fous de boucle autonome.",
+  "description": "Orchestrateur de développement : route le langage naturel vers le pipeline, par une porte d'entrée unique — 31 verbes /vf-* couvrant tout le cycle (cadrage, construction, qualité et audits, cycle de vie, contexte et session), une rule globale de préséance des verbes et une doctrine de routage exhaustive chargée on-demand. Inclut l'équipe manager de mission (vf-dev-manager + vf-coder/vf-reviewer/vf-auditer, arborescence à contexte minimal), le routage des phases de design vers /vf-design et la doctrine des garde-fous de boucle autonome.",
   "requires": ["design-orchestrator"]
 }

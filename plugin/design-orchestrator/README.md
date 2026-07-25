@@ -1,11 +1,11 @@
 # design-orchestrator — Orchestrateur de design (VFDO-design)
 
 > Module VibeFlow qui route les requêtes de **design en langage naturel** vers le bon workflow —
-> via un **agent routeur** (`vibeflow-design`), le verbe **`/vf-design`** et une chaîne d'outils
-> design pilotée en coulisse. L'utilisateur ne parle que VibeFlow ; la plomberie (référentiel UX,
-> direction créative, atelier de craft) reste invisible.
+> via un **agent routeur** (`vibeflow-design`), les verbes **`/vf-design`** et **`/vf-sketch`**, et
+> une chaîne d'outils design pilotée en coulisse. L'utilisateur ne parle que VibeFlow ; la plomberie
+> (référentiel UX, direction créative, atelier de craft) reste invisible.
 
-**Version** : v1.0.0
+**Version** : v1.1.0
 **Type** : agent + skills
 
 ---
@@ -19,8 +19,11 @@ sous-jacents**. Le module fournit :
 1. **Agent `vibeflow-design`** (`AGENT.md`) — le cerveau routeur. Il porte la table de routage
    (intention NL → geste coulisse), la doctrine (DA avant refonte, diagnostic avant geste,
    vérification après craft) et la **généricité multi-stack**.
-2. **Verbe `/vf-design`** (`skills/vf-design/`) — thin delegator à description riche en wording,
-   auto-invocable en langage naturel.
+2. **Verbes `/vf-design` et `/vf-sketch`** (`skills/`) — délégateurs minces à description riche en
+   wording, auto-invocables en langage naturel. `/vf-design` est le point d'entrée design (DA,
+   refonte, critique, craft) ; `/vf-sketch` couvre la **maquette jetable** (« montre-moi à quoi ça
+   ressemblerait »), le seul geste que l'utilisateur formule assez spontanément pour mériter sa
+   propre porte. Contrat UI et revue UI restent routés en interne depuis `/vf-design`.
 3. **Références on-demand** (`references/`) — workflow quotidien (`DESIGN-WORKFLOW.md`),
    initialisation de la DA (`DA-INIT.md`), chaîne d'outils + dégradation (`design-toolchain.md`),
    reframe (`design-vocabulary-map.md`), templates génériques.

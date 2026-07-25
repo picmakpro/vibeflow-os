@@ -1,5 +1,17 @@
 # Changelog — conductor
 
+## [v1.12.2] — 2026-07-25 (gabarit de description sur les trois verbes)
+
+### Corrigé
+- **`vf-calibrate` / `vf-update` / `vf-new-lab`** alignés sur le gabarit de description issu de
+  l'étape 12 (contre-exemples nommant les verbes voisins + portée d'invocation). Sans eux, ces
+  trois verbes restaient hors du dispositif de démarcation : `vf-calibrate` et `vf-update`
+  revendiquaient tous deux littéralement « mets à jour VibeFlow », sans rien pour les départager
+  au déclenchement. La frontière est désormais explicite — `vf-update` **installe** la nouvelle
+  version, `vf-calibrate` **réaligne la structure du lab** une fois celle-ci posée.
+- Collisions également démarquées vers l'extérieur du module : `/vf-new-lab` ↔ `/vf-init`
+  (dossier de code) et `/vf-new-lab` ↔ `/vf-planning` (socle documentaire).
+
 ## [v1.12.1] — 2026-07-23 (portabilité Windows — ADR-054)
 
 ### Corrigé

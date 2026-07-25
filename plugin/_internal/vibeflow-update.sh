@@ -488,7 +488,10 @@ install_module() {
     log "  copied content/ → $doc_target/ (doc module, hors TARGET_ROOT)"
   fi
 
-  # Type 5 — Rules : rules/*.md → $TARGET_ROOT/rules/ (rules path-scopées auto-chargées)
+  # Type 5 — Rules : rules/*.md → $TARGET_ROOT/rules/
+  # Deux régimes selon le frontmatter : AVEC `paths:` → chargée à la lecture d'un fichier
+  # correspondant (auto-scopée, Tier 2) ; SANS `paths:` → chargée inconditionnellement au
+  # lancement, à la priorité de CLAUDE.md (globale, Tier 1). Voir patterns/05-regles.md.
   if [ -d "$module_dir/rules" ]; then
     mkdir -p "$TARGET_ROOT/rules"
     cp "$module_dir/rules/"*.md "$TARGET_ROOT/rules/" 2>/dev/null || true

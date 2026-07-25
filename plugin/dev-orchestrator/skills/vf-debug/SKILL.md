@@ -1,10 +1,14 @@
 ---
 name: vf-debug
 description: >
-  Utiliser quand quelque chose est cassé et qu'il faut diagnostiquer la cause racine —
-  « débugge », « ça plante », « j'ai un bug », « erreur », « ça marche pas », « crash »,
-  « stack trace ». Débogage systématique avec état persistant à travers les resets de
-  contexte. Invocable par l'utilisateur ET par l'agent en autonomie.
+  Utiliser quand quelque chose est cassé **maintenant** et qu'il faut trouver la cause
+  racine — « débugge », « ça plante », « j'ai un bug », « erreur », « ça marche pas »,
+  « crash », « stack trace », « ça marchait hier ». Débogage systématique avec état
+  persistant à travers les resets de contexte, précédé d'une recherche documentaire.
+  ✘ pas pour comprendre pourquoi un cycle de travail a déraillé (post-mortem) →
+  /vf-forensics · ✘ pas pour écrire les tests qui manquent → /vf-testgen · ✘ pas pour une
+  revue de qualité générale → /vf-review.
+  Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 
 # vf-debug — Dépannage

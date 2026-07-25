@@ -5,6 +5,11 @@ description: >
   « /vf-update », ou en réaction au bandeau « mise à jour disponible » au démarrage de session.
   Compare la version installée au dernier tag publié, montre le changelog, puis met à jour le
   plugin (cache marketplace) et les modules installés, sous validation humaine.
+  ✘ pas pour réaligner la **structure** d'un lab sur une doctrine qui a évolué, une fois la
+  nouvelle version posée → /vf-calibrate · ✘ pas pour ajouter, retirer ou re-choisir des
+  modules → /vibeflow-install · ✘ pas pour mettre à jour la documentation d'un projet →
+  /vf-docs.
+  Invocable par l'utilisateur ET par `vibeflow-conductor`.
 ---
 
 # vf-update — Mise à jour du plugin & des modules

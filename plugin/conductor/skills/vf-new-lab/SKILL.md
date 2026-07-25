@@ -6,7 +6,11 @@ description: >
   espace VibeFlow pour [métier] ». Moteur clarification-first + Lab Factory : clarifie en profondeur
   (gate machine-enforced), dérive un manifeste de capacités, FABRIQUE les skills en parallèle
   (fan-out skill-creator), ficelle les auditeurs des procédures, puis assemble un lab opérationnel —
-  pas un squelette. NE PRÉSUME JAMAIS « dev ». Invocable par l'utilisateur ET par `vibeflow-conductor`.
+  pas un squelette. NE PRÉSUME JAMAIS « dev ».
+  ✘ pas pour remettre à niveau un lab qui existe déjà → /vf-calibrate · ✘ pas pour amorcer un
+  dossier de **code** et son démarrage de projet → /vf-init · ✘ pas pour poser le socle
+  documentaire d'un lab déjà créé → /vf-planning.
+  Invocable par l'utilisateur ET par `vibeflow-conductor`.
 ---
 
 # vf-new-lab — Lab Factory (init clarification-first + fabrication des capacités)

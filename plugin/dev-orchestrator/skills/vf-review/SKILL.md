@@ -1,10 +1,14 @@
 ---
 name: vf-review
 description: >
-  Utiliser quand l'utilisateur veut une relecture qualité du code produit — « relis »,
-  « audit », « review », « passe en revue », « qualité du code », « cherche les bugs ».
-  Cible les fichiers modifiés pendant une étape (bugs, sécurité, qualité). Invocable par
-  l'utilisateur ET par l'agent en autonomie (après vf-test, avant vf-ship).
+  Utiliser quand l'utilisateur veut une relecture qualité d'un **diff** — « relis »,
+  « review », « passe en revue », « qualité du code », « cherche les bugs », « regarde ce
+  que t'as écrit », « t'as rien cassé ? ». Cible les fichiers modifiés pendant une étape :
+  bugs, sécurité, qualité.
+  ✘ pas pour les recettes en souffrance et la dette d'étape → /vf-gaps · ✘ pas pour un
+  audit de sécurité approfondi → /vf-secure · ✘ pas pour écrire les tests manquants →
+  /vf-testgen.
+  Invocable par l'utilisateur ET par l'agent en autonomie (après vf-test, avant vf-ship).
 ---
 
 # vf-review — Revue de code

@@ -100,7 +100,7 @@ Fix CSS/style, déplacement d'un élément, ajustement spacing, une couleur, une
 | 5 | Capture AVANT (si modif visuelle et rendu disponible) | ✅ | ✅ | ✅ |
 | 6 | **Direction créative** (web) | ❌ | ✅ | ✅ |
 | 7 | **Revue / critique** de la cible (diagnostic) | si CRITIQUE | ✅ | ✅ |
-| 8 | **Exploration** (idéation) | ❌ | ❌ | ✅ |
+| 8 | **Exploration** (directions visuelles) | ❌ | ❌ | ✅ |
 | 9 | Brief structuré (UX avant code) | ❌ | ❌ | ✅ |
 
 > **Règle de vie** : toujours **diagnostic + plan AVANT d'implémenter** (sauf QUICK FIX <2 fichiers).
