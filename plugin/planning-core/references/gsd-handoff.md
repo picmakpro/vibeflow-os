@@ -16,7 +16,7 @@ Pour trancher n'importe quel geste : **est-ce que ça concerne un projet, ou le 
 |---|---|
 | `PROJECT.md`, `ROADMAP.md`, `REQUIREMENTS.md`, `STATE.md`, `MILESTONES.md`, `phases/NN/*`, `config.json`, `codebase/` d'un projet dev | **GSD** |
 | Santé du `.planning/` d'un projet, learnings de phase, workstreams parallèles | **GSD** |
-| `INDEX.md` du lab, typage `deliverable`/`continuous`, `BOARD.md`, seuil d'autonomie, dette de compartiment | **planning-core** |
+| `INDEX.md` du lab, typage `deliverable`/`continuous`, `BOARD.md`, seuil d'autonomie, dette de planning | **planning-core** |
 | Promotion des décisions vers `.claude/memory/` (pont mémoire) | **planning-core** |
 | Socle complet d'un lab **non-dev** | **planning-core** |
 | `Stop` guard bloquant (`guard-planning-updated.sh`) | **planning-core** — exception motivée |
@@ -35,11 +35,11 @@ Sur un lab dev, ces intentions **ne sont pas traitées** par `vf-planning`. Elle
 | où en est-on, statut, avancement, la suite, next | `/vf-progress` |
 | cadrer une étape, découper, préparer le sprint, planifier la feature | `/vf-plan` |
 | comprendre le code existant, cartographier, « c'est quoi ce repo » | `/vf-map` |
-| clôturer un jalon, archiver le milestone, démarrer le suivant | `/vf-progress` (qui route la clôture) |
-| vérifier la santé du `.planning/`, réparer une incohérence | `/vf-progress` |
+| clôturer un jalon, archiver le milestone, démarrer le suivant | `/vf-milestone` |
+| vérifier la santé du `.planning/`, réparer une incohérence | — (agent) : aucun verbe dédié à ce jour, l'intention part au routeur de dev |
 
 **Toujours un verbe `/vf-*`, jamais un `gsd-*` en entrée de chaîne** — Iron Law de
-`rules/vf-verb-precedence.md`. Ne jamais nommer GSD à l'utilisateur.
+`dev-orchestrator/rules/vf-verb-precedence.md`. Ne jamais nommer GSD à l'utilisateur.
 
 ## Ce que `vf-planning` fait encore sur un lab dev
 
@@ -48,7 +48,7 @@ La **couche lab**, et rien d'autre :
 1. `INDEX.md` du lab et son actualisation (tableau de bord qui POINTE vers les plans).
 2. Typage des compartiments (`deliverable` / `continuous`) et application du seuil d'autonomie —
    voir `compartments.md`.
-3. Surface de la dette de compartiment (`detect-planning-debt.sh`).
+3. Surface de la dette de planning (`detect-planning-debt.sh`).
 4. Pont mémoire vers `.claude/memory/` — voir `bridge-memory.md`.
 
 Un compartiment dev reçoit son `.planning/` **écrit par GSD** (via `/vf-init` depuis ce
