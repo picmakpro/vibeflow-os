@@ -99,8 +99,9 @@ if prepare_module "$CACHE" "dev-orchestrator"; then
   miss=0
   [ -f "$LAB/.claude/agents/dev-orchestrator.md" ] \
     || { ko "T2 project : ./.claude/agents/dev-orchestrator.md manquant"; miss=1; }
-  # Rétro-compat references D7 (au moins les 3 references canoniques).
-  for ref in GSD-PIPELINE.md gsd-skills-index.md vocabulary-map.md; do
+  # Rétro-compat references D7 (au moins les 3 references canoniques — v2.0.0 :
+  # vocabulary-map supprimée avec la façade, intent-routing la remplace comme canon).
+  for ref in GSD-PIPELINE.md gsd-skills-index.md intent-routing.md; do
     [ -f "$LAB/.claude/agents/dev-orchestrator-references/$ref" ] \
       || { ko "T2 project : references/$ref manquant (rétro-compat D7)"; miss=1; }
   done

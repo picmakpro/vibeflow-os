@@ -1,5 +1,10 @@
 # Changelog — planning-core
 
+## [v2.5.0] — 2026-07-25
+
+### Ajouté
+- Stop-hook proportionné au profil : `warn` par défaut en profil léger (lu dans `.planning/config.json`), `block` sinon ; `VF_PLANNING_STOP` prime toujours, fallback sûr. 4 tests de garde ajoutés. Renvois dev basculés sur les briques gsd (modèle agentique).
+
 ## [v2.4.1] — 2026-07-25
 
 ### Corrigé

@@ -1,5 +1,10 @@
 # CHANGELOG — validator
 
+## [v1.3.0] — 2026-07-25
+
+### Ajouté
+- Phase 4 (méta-audit d'architecture des process) opt-in : sautée en profil léger avec score renormalisé sur les phases exécutées, activable via `--full`. Cadences réalistes pour un lab solo.
+
 ## [v1.2.1] — 2026-07-25
 
 ### Corrigé

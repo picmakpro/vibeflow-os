@@ -5,6 +5,29 @@ dernières entrées et pointent ici). Chaque module a par ailleurs son propre `C
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.33.0] — 2026-07-25
+
+**Vague 2 de l'audit croisé — bascule agentique** (arbitrage Samuel, spec
+`docs/superpowers/specs/2026-07-25-suppression-facade-vf-design.md`) :
+
+- **dev-orchestrator v2.0.0 (breaking)** : les 29 verbes-façades `/vf-*` disparaissent — GSD
+  redevient l'interface directe du quotidien. L'agent `vibeflow-dev` détecte l'intention et
+  invoque les briques directement (carte d'intention **unique**, fin de la table ×4, de la rule
+  de préséance et du reframe de vocabulaire). Survivent `vf-auto` (porte d'autonomie) et
+  `vf-dev` (incarner l'agent). Tests refondus (26 OK), README et pipeline réécrits.
+- **Manager agentique** : brief en langage naturel mappé par le manager, **digest de mission**
+  ≤ 30 lignes par mandat (amortit ~100-200k tokens de relecture par étape), hygiène
+  documentaire déclenchée aux bons moments (drift → nœud `gsd-docs-update`), next step ferme
+  en fin de mission, rapports de workers réduits au bloc typé (détail sur disque).
+- **ADR-045 en 1 saut (mobile-test-team v1.4.0)** : `vf-test-orchestrator` porte lui-même la
+  recherche documentaire (WebSearch/context7) — fin de l'escalade à 3 étages.
+- **Gouvernance proportionnée au profil** (planning-core v2.5.0, validator v1.3.0,
+  consolidator v1.7.0, conductor v1.13.0) : Stop-hook `warn` en profil léger (lu dans
+  `.planning/config.json`, machine-enforced, 4 tests), validator Phase 4 opt-in avec score
+  renormalisé, EVALS créé à la première éval réelle en léger, cadences réalistes pour un solo.
+- Références externes alignées (conductor, design-orchestrator, planning-core, commands) ;
+  messaging racine basculé « modèle agentique ».
+
 ## [v2.32.0] — 2026-07-25
 
 **Vague 1 de l'audit croisé du 2026-07-25** (5 audits parallèles, rapports dans `reports/`) —
