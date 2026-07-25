@@ -80,7 +80,7 @@ Progress: [██████░░░░] 62% (3 phases, 8/13 plans livrés)
 - 2026-07-25 : **Phase 14** (Frontière d'altitude planning-core / moteur GSD) ajoutée au milestone vf-routing.
   Constat déclencheur : `vf-planning` et la chaîne GSD produisaient les mêmes fichiers dans le même dossier
   avec des frontmatters **incompatibles** (`planning_version` vs `gsd_state_version`) — deux moteurs de
-  planning concurrents. Décision : ADR-054, frontière d'altitude (un projet = un seul moteur ; VibeFlow tient
+  planning concurrents. Décision : ADR-055, frontière d'altitude (un projet = un seul moteur ; VibeFlow tient
   le lab et l'enforcement). Requirements ALTI-01..05, 6 plans sur 4 vagues, indépendante des Phases 12 et 13.
 - 2026-07-25 : compteurs de `progress` corrigés — ils affichaient `total_plans: 0` alors que la Phase 12
   comptait déjà 6 plans dont 1 livré (12-01). Réel : 12 plans posés (6 en Phase 12, 6 en Phase 14), 1 livré.

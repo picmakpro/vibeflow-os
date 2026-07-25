@@ -1,6 +1,6 @@
 # Changelog — planning-core
 
-## [v2.4.0] — 2026-07-25 (ADR-054 — frontière d'altitude avec le moteur de planning de développement)
+## [v2.4.0] — 2026-07-25 (ADR-055 — frontière d'altitude avec le moteur de planning de développement)
 
 **Le conflit** : `vf-planning` et la chaîne de développement produisaient **les mêmes fichiers** dans
 **le même dossier** avec des frontmatters **incompatibles** (`planning_version` + `progress.total_steps`
@@ -48,6 +48,14 @@ côté** (pont mémoire, enforcement), et le **socle complet des labs non-dev**.
 ### Tests
 94 assertions vertes, 0 échec (`detect-gsd-engine` 12, `detect-planning-debt` 10,
 `planning-context-hardening` 20, `planning-core` 14, `planning-hooks` 38).
+## [v2.3.1] — 2026-07-23 (portabilité Windows — ADR-054)
+
+### Corrigé
+- **`planning-task-context.sh`** : le stub Microsoft Store `python3` (présent dans le PATH mais
+  inerte) rendait le contexte de tâche muet sous Windows sans jamais déclencher son repli
+  fail-open. Résolution d'interpréteur par CHEMIN (zéro spawn ajouté, rejet `WindowsApps`,
+  repli `python`). Le hook Stop (`guard-planning-updated.sh`) n'est pas concerné : zéro
+  dépendance python/jq par construction.
 
 ## [v2.3.0] — 2026-07-20 (ADR-050 amendée — attribution de session : fix faux positifs du guard Stop)
 

@@ -147,7 +147,7 @@ Créer `plugin/planning-core/scripts/detect-gsd-engine.sh` :
 #!/usr/bin/env bash
 # detect-gsd-engine.sh — Le MOTEUR de planning GSD est-il en place sur ce lab ?
 #
-# Rôle (ADR-054) : répondre à une question FACTUELLE, jamais à une question de métier.
+# Rôle (ADR-055) : répondre à une question FACTUELLE, jamais à une question de métier.
 # Le métier d'un lab relève du JUGEMENT du skill (references/domain-detection.md) — un
 # détecteur bash s'y tromperait (un lab de contenu peut avoir un package.json). Ce script
 # ne dit donc PAS « ce lab est dev » : il dit « il y a (ou non) un moteur GSD en place »,
@@ -271,7 +271,7 @@ Lire d'abord la fin de `test-planning-hooks.sh` pour repérer le bloc de résum�
 insérer les cas **juste avant** :
 
 ```bash
-# --- ADR-054 : --defer-to-gsd met fin à la double injection SessionStart ---
+# --- ADR-055 : --defer-to-gsd met fin à la double injection SessionStart ---
 DETECT_TMP=$(mktemp -d)
 FAKE_GSD2="$DETECT_TMP/gsd-home"; mkdir -p "$FAKE_GSD2"
 
@@ -354,7 +354,7 @@ Ajouter le cas dans la boucle `while`, avant le `-h|--help` :
 Puis, juste après la définition de `say()` et **avant** le test `if [ ! -d "$PLANNING_DIR" ]` :
 
 ```bash
-# --- ADR-054 : ne pas doubler le digest de GSD ---
+# --- ADR-055 : ne pas doubler le digest de GSD ---
 # Si le moteur GSD est actif, gsd-session-state.sh porte déjà le signal de fraîcheur de ce
 # projet : on se retire en silence (exit 0). Appelé avec --defer-to-gsd depuis hooks.json
 # uniquement — l'usage manuel et le /checkpoint gardent le comportement complet.
@@ -375,7 +375,7 @@ le `*) shift ;;` existant. Puis, après la ligne `[ -d "$PLANNING_DIR" ] || exit
 de `INDEX_FILE` / `STATE_FILE` :
 
 ```bash
-# --- ADR-054 : altitude lab uniquement quand GSD tient le projet ---
+# --- ADR-055 : altitude lab uniquement quand GSD tient le projet ---
 # Lab à compartiments (INDEX.md présent) → l'INDEX est de l'altitude LAB, GSD ne le produit
 # pas : on injecte. Lab mono-projet sous moteur GSD → gsd-session-state.sh a déjà injecté
 # l'état du projet : on se retire pour ne pas payer le contexte deux fois.
@@ -399,7 +399,7 @@ commandes (laisser `detect-planning-debt.sh` intact — la dette de compartiment
           { "type": "command", "command": "bash {{VF_SCRIPTS}}/planning-context.sh --defer-to-gsd || true" },
 ```
 
-Mettre à jour le champ `description` du fichier pour citer ADR-054 à côté des ADR déjà listées.
+Mettre à jour le champ `description` du fichier pour citer ADR-055 à côté des ADR déjà listées.
 
 - [ ] **Étape 6 : lancer les tests pour vérifier qu'ils passent**
 
@@ -587,7 +587,7 @@ Insérer cette section **juste avant** `## Séquence — Mise en place` :
 
 ## Étape 0 — Qui tient le planning de ce lab ? (TOUJOURS en premier)
 
-> **Iron Law du rescope (ADR-054)** : *« Un projet de code a un seul moteur de planning : GSD.
+> **Iron Law du rescope (ADR-055)** : *« Un projet de code a un seul moteur de planning : GSD.
 > VibeFlow tient l'altitude au-dessus (le lab) et la couche à côté (mémoire, enforcement) — jamais
 > la même. »*
 
@@ -643,7 +643,7 @@ Puis ajouter, après la section maintenance :
 Ajouter aux **Garde-fous** :
 
 ```markdown
-- **Ne jamais poser le tronc d'un projet de code** (ADR-054). Sur un lab dev, la charte, la feuille
+- **Ne jamais poser le tronc d'un projet de code** (ADR-055). Sur un lab dev, la charte, la feuille
   de route, les exigences, l'état et les étapes appartiennent au moteur de développement — on
   redirige vers le verbe, on ne génère pas.
 ```
@@ -662,7 +662,7 @@ Ajouter aux **Références** :
 
 ```markdown
 - `references/gsd-handoff.md` — frontière d'altitude avec le moteur de dev : test unique, table de
-  redirection intention → verbe, périmètre résiduel sur lab dev, protocole de migration (ADR-054).
+  redirection intention → verbe, périmètre résiduel sur lab dev, protocole de migration (ADR-055).
 - `scripts/detect-gsd-engine.sh` — fait vérifiable « un moteur de planning est-il en place » (advisory).
 ```
 
@@ -694,7 +694,7 @@ universel non-dev, ou couche lab au-dessus de GSD."
 
 ---
 
-### Task 5 : Périphérie — commande, détection de domaine, ADR-054
+### Task 5 : Périphérie — commande, détection de domaine, ADR-055
 
 **Files :**
 - Modify : `plugin/commands/vf-planning.md`
@@ -736,7 +736,7 @@ Si le module `planning-core` n'est pas installé, lance d'abord `vibeflow-instal
 Insérer après la « Grille de lecture », avant « Auto-infusion à l'installation » :
 
 ```markdown
-## Bascule dev → moteur de développement (ADR-054)
+## Bascule dev → moteur de développement (ADR-055)
 
 La première ligne de la grille (« Code source, stack technique, tests, `src/`, build → Dev ») ne
 conduit **plus** à scaffolder un tronc `.planning/`. Sur un lab dev, le planning du projet appartient
@@ -749,20 +749,20 @@ verdict : un lab de contenu qui héberge un site web les déclenche et reste non
 cette référence est intact — on lit le sens du lab, pas sa surface.
 ```
 
-- [ ] **Étape 3 : ajouter ADR-054 à l'index de `docs/ADR.md`**
+- [ ] **Étape 3 : ajouter ADR-055 à l'index de `docs/ADR.md`**
 
 Ajouter la ligne à la suite de celle d'ADR-053 dans le tableau d'index :
 
 ```markdown
-| ADR-054 | 2026-07-25 | Frontière d'altitude entre planning-core et le moteur de planning GSD — un projet = un seul moteur | Validée |
+| ADR-055 | 2026-07-25 | Frontière d'altitude entre planning-core et le moteur de planning GSD — un projet = un seul moteur | Validée |
 ```
 
-- [ ] **Étape 4 : écrire le corps de l'ADR-054**
+- [ ] **Étape 4 : écrire le corps de l'ADR-055**
 
 Ajouter en fin de `docs/ADR.md`, en suivant exactement le gabarit d'ADR-050 :
 
 ```markdown
-## ADR-054 : Frontière d'altitude entre `planning-core` et le moteur de planning GSD
+## ADR-055 : Frontière d'altitude entre `planning-core` et le moteur de planning GSD
 
 **Date** : 2026-07-25
 **Statut** : Validée
@@ -833,12 +833,12 @@ exit 2 dédié, protocole de reprise documenté, geste humain assisté.
 - [ ] **Étape 5 : vérifier**
 
 ```bash
-grep -n "ADR-054" docs/ADR.md | head
+grep -n "ADR-055" docs/ADR.md | head
 grep -n "où en est-on" plugin/commands/vf-planning.md   # doit ne RIEN renvoyer
 grep -n "vf-progress\|vf-init" plugin/commands/vf-planning.md
 ```
 
-Attendu : ADR-054 présent à l'index **et** en corps ; plus aucune revendication de « où en est-on ? »
+Attendu : ADR-055 présent à l'index **et** en corps ; plus aucune revendication de « où en est-on ? »
 dans la commande ; les verbes de redirection cités.
 
 - [ ] **Étape 6 : commit**
@@ -873,7 +873,7 @@ Commande /vf-planning et domain-detection.md alignés."
 réécrire la `description` pour refléter le rescope :
 
 ```json
-  "description": "Socle de planning & gestion documentaire des labs NON-DEV (tronc commun .planning/ adapté au métier) + altitude LAB sur tous les labs : index des projets, compartiments typés deliverable/continuous, seuil d'autonomie, dette, pont mémoire et enforcement par hooks. Sur un lab dev, le planning du projet appartient au moteur de développement — ce module redirige (ADR-054).",
+  "description": "Socle de planning & gestion documentaire des labs NON-DEV (tronc commun .planning/ adapté au métier) + altitude LAB sur tous les labs : index des projets, compartiments typés deliverable/continuous, seuil d'autonomie, dette, pont mémoire et enforcement par hooks. Sur un lab dev, le planning du projet appartient au moteur de développement — ce module redirige (ADR-055).",
 ```
 
 - [ ] **Étape 2 : entrée de CHANGELOG du module**
@@ -882,7 +882,7 @@ Ajouter en tête de `plugin/planning-core/CHANGELOG.md`, en suivant le format de
 (les relire d'abord pour calquer le style exact) :
 
 ```markdown
-## v2.4.0 — Rescope : frontière d'altitude avec le moteur de développement (ADR-054)
+## v2.4.0 — Rescope : frontière d'altitude avec le moteur de développement (ADR-055)
 
 **Le conflit** : `vf-planning` et la chaîne de dev produisaient les mêmes fichiers dans le même
 dossier avec des frontmatters incompatibles (`planning_version` vs `gsd_state_version`) — le premier
@@ -904,7 +904,7 @@ côté** (pont mémoire, enforcement), et le **socle complet des labs non-dev**.
   nommant `/vf-init`, `/vf-progress`, `/vf-plan`, `/vf-map`), étape 0 de branchement, séquences A
   (socle universel non-dev) et B (couche lab au-dessus du moteur de dev).
 - **Inchangé** — `guard-planning-updated.sh` reste **bloquant** sur tous les labs : il ne génère rien,
-  il vérifie un résultat. Exception motivée d'ADR-054.
+  il vérifie un résultat. Exception motivée d'ADR-055.
 - **Inchangé** — les 4 bundles non-dev (`content`, `business-pilot`, `growth`, `kpi-analyst`) : tous
   passent par la séquence A, aucune régression.
 - **Limite connue** — pas de migration automatique d'un `.planning/` existant : `gsd-import --from`
@@ -915,7 +915,7 @@ côté** (pont mémoire, enforcement), et le **socle complet des labs non-dev**.
 
 Le README porte encore `**Version** : v1.1.0` alors que le module est en v2.3.0 — corriger en
 `v2.4.0` au passage. Ajuster l'accroche et la section « L'idée » : le socle universel concerne les
-labs **non-dev**, et sur un lab dev le module tient l'altitude lab et redirige (citer ADR-054 et
+labs **non-dev**, et sur un lab dev le module tient l'altitude lab et redirige (citer ADR-055 et
 `references/gsd-handoff.md`).
 
 - [ ] **Étape 4 : bump du plugin (les 3 fichiers + les 2 README)**
@@ -957,7 +957,7 @@ git add VERSION plugin/.claude-plugin/plugin.json .claude-plugin/marketplace.jso
         README.md README.fr.md \
         plugin/planning-core/VERSION plugin/planning-core/module.json \
         plugin/planning-core/CHANGELOG.md plugin/planning-core/README.md
-git commit -m "release: v2.29.0 — rescope vf-planning, frontière d'altitude avec GSD (ADR-054)"
+git commit -m "release: v2.29.0 — rescope vf-planning, frontière d'altitude avec GSD (ADR-055)"
 ```
 
 - [ ] **Étape 7 : tag annoté après merge sur `main` (règle non négociable du `CLAUDE.md`)**
@@ -965,7 +965,7 @@ git commit -m "release: v2.29.0 — rescope vf-planning, frontière d'altitude a
 À faire **après** le merge, pas avant :
 
 ```bash
-git tag -a v2.29.0 -m "v2.29.0 — rescope vf-planning : frontière d'altitude avec le moteur GSD (ADR-054)"
+git tag -a v2.29.0 -m "v2.29.0 — rescope vf-planning : frontière d'altitude avec le moteur GSD (ADR-055)"
 git push origin v2.29.0
 bash scripts/check-release-tag.sh --remote
 ```

@@ -258,7 +258,7 @@ Plans:
 - [x] 14-02-PLAN.md — `references/gsd-handoff.md` : doctrine d'altitude + table intention → verbe + protocole de migration (ALTI-04)
 - [x] 14-03-PLAN.md — `--defer-to-gsd` sur 2 hooks : fin de la double injection SessionStart, défaut inchangé (ALTI-03)
 - [x] 14-04-PLAN.md — `SKILL.md` : description désarmée + étape 0 + séquences A/B (ALTI-02)
-- [x] 14-05-PLAN.md — commande, `domain-detection.md`, ADR-054 au registre (ALTI-04)
+- [x] 14-05-PLAN.md — commande, `domain-detection.md`, ADR-055 au registre (ALTI-04)
 - [x] 14-06-PLAN.md — release : module v2.4.0, racine v2.29.0, tag annoté poussé (ALTI-05)
 
 ## Progress

@@ -166,7 +166,7 @@ Spec : `docs/superpowers/specs/2026-07-25-routage-fin-verbes-vf-design.md`.
 
 ### Phase 14 — Frontière d'altitude `planning-core` / moteur GSD
 
-Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. ADR-054.
+Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. ADR-055.
 
 - [x] **ALTI-01**: `scripts/detect-gsd-engine.sh` répond au **fait** « un moteur de planning GSD est-il en
   place ? » via 4 exits évalués par ordre de priorité (1 chaîne absente, 0 moteur actif, 2 migration à
@@ -183,7 +183,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   intacts) et l'`INDEX.md` du lab reste injecté — c'est de l'altitude lab, GSD ne le produit pas.
 - [x] **ALTI-04**: La doctrine est tracée et outillée : `references/gsd-handoff.md` (test unique, table
   intention → verbe, périmètre résiduel, protocole de migration), `domain-detection.md` amendé (le métier
-  reste du jugement), commande `/vf-planning` alignée, ADR-054 au registre. `guard-planning-updated.sh` reste
+  reste du jugement), commande `/vf-planning` alignée, ADR-055 au registre. `guard-planning-updated.sh` reste
   **bloquant** (exception motivée) et aucun `.planning/` existant n'est jamais réécrit (ADR-031).
 - [x] **ALTI-05**: Non-régression prouvée : les 4 bundles non-dev (`content`, `business-pilot`, `growth`,
   `kpi-analyst`) passent par la séquence A sans changement, la suite de tests du module est verte,
@@ -285,4 +285,4 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 
 ---
 *Requirements defined: 2026-06-04*
-*Last updated: 2026-07-25 — ajout Phase 14 au Milestone 6 (ALTI-01→05 : frontière d'altitude planning-core / moteur GSD, ADR-054)*
+*Last updated: 2026-07-25 — ajout Phase 14 au Milestone 6 (ALTI-01→05 : frontière d'altitude planning-core / moteur GSD, ADR-055)*

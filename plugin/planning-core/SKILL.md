@@ -73,7 +73,7 @@ Deux topologies. **Ne pas plaquer la mauvaise.**
 
 ## Étape 0 — Qui tient le planning de ce lab ? (TOUJOURS en premier)
 
-> **Iron Law du rescope (ADR-054)** : *« Un projet de code a un seul propriétaire de planning : le
+> **Iron Law du rescope (ADR-055)** : *« Un projet de code a un seul propriétaire de planning : le
 > moteur de développement. VibeFlow tient l'altitude au-dessus (le lab) et la couche à côté
 > (mémoire, enforcement) — jamais la même. »*
 
@@ -195,7 +195,7 @@ la table de redirection intention → verbe y vit, et ne se duplique pas ici.
   référence, on ne la recopie pas dans `.planning/`.
 - **Ne jamais sur-documenter** : le tronc minimal viable (`STATE` + `PROJECT` + `ROADMAP`) suffit pour
   un lab léger. On n'ajoute un artefact que s'il sert.
-- **Ne jamais poser le tronc d'un projet de code** (ADR-054). Sur un lab dev, la charte, la
+- **Ne jamais poser le tronc d'un projet de code** (ADR-055). Sur un lab dev, la charte, la
   trajectoire, les exigences, l'état et les étapes appartiennent au moteur de développement — on
   redirige vers le verbe, on ne génère pas.
 - **Adapter le vocabulaire** au métier du lab (le projet est francophone — sortie en français).
@@ -227,6 +227,6 @@ la table de redirection intention → verbe y vit, et ne se duplique pas ici.
 - `references/templates/` — les gabarits universels à instancier (à adapter, jamais à copier tel quel), dont `INDEX.template.md` (lab) + `BOARD.template.md` (compartiment continuous).
 - `scripts/check-planning-state.sh` — garde-fou de fraîcheur de la clé de voûte (advisory, exit codes pour hook).
 - `references/gsd-handoff.md` — frontière d'altitude avec le moteur de dev : test unique, table de
-  redirection intention → verbe, périmètre résiduel sur lab dev, protocole de migration (ADR-054).
+  redirection intention → verbe, périmètre résiduel sur lab dev, protocole de migration (ADR-055).
 - `scripts/detect-planning-debt.sh` — détection de compartiment actif sans plan au-dessus du seuil (advisory).
 - `scripts/detect-gsd-engine.sh` — fait vérifiable « un moteur de planning est-il en place » (advisory).

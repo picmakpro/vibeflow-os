@@ -27,7 +27,8 @@
       {
         "matcher": "startup",
         "hooks": [
-          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-registres.sh --hook || true" }
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-registres.sh --hook || true" },
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/probe-memory-guards.sh || true" }
         ]
       }
     ],

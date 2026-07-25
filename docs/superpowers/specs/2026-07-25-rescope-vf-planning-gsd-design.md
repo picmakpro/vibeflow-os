@@ -2,7 +2,7 @@
 
 > **Date** : 2026-07-25
 > **Modules** : `planning-core` (v2.3.0 → v2.4.0), `plugin/commands/vf-planning.md`
-> **ADR à ouvrir** : ADR-054
+> **ADR à ouvrir** : ADR-055
 > **Problème** : `vf-planning` et la chaîne GSD génèrent les **mêmes fichiers** dans le **même
 > dossier** avec des **formats incompatibles**. Sur un lab dev, ce sont deux moteurs de planning
 > concurrents.
@@ -191,7 +191,7 @@ existant — le contenu appartient à l'utilisateur.
   (part à `/vf-progress` sur lab dev).
 - `references/domain-detection.md` — ajouter la section « bascule dev → GSD » et le signal factuel du
   §3.1, en réaffirmant que le métier reste du jugement.
-- `docs/ADR.md` — **ADR-054** : frontière d'altitude entre `planning-core` et le moteur GSD.
+- `docs/ADR.md` — **ADR-055** : frontière d'altitude entre `planning-core` et le moteur GSD.
 - `CHANGELOG.md` + `README.md` du module ; bump `VERSION` v2.3.0 → **v2.4.0** (capacité rescopée →
   minor) ; bump racine + tag annoté (règle non négociable du `CLAUDE.md`).
 

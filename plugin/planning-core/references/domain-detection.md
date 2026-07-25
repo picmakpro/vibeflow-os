@@ -37,7 +37,7 @@ deviner. Mieux vaut un profil léger + une question qu'un profil complet imposé
 > Les noms d'extension sont des **exemples**. Si le métier d'un lab ne colle à aucune ligne, le skill
 > nomme l'extension d'après le vocabulaire réel du lab — il n'a pas de catalogue fermé à appliquer.
 
-## Bascule dev → moteur de développement (ADR-054)
+## Bascule dev → moteur de développement (ADR-055)
 
 La première ligne de la grille (« Code source, stack technique, tests, `src/`, build → Dev ») ne
 conduit **plus** à scaffolder un tronc `.planning/`. Elle reste une **lecture du métier** valide ;

@@ -18,7 +18,7 @@
 #   planning-context.sh [--path <dir>] [--max-lines <N>] [--defer-to-gsd]
 # Defaults: --path .planning  --max-lines 45
 #
-# --defer-to-gsd (ADR-054) : opt-in, câblé dans hooks.json uniquement. Sur un lab MONO dont le
+# --defer-to-gsd (ADR-055) : opt-in, câblé dans hooks.json uniquement. Sur un lab MONO dont le
 # moteur GSD est actif, gsd-session-state.sh a déjà injecté l'état du projet → on se retire pour
 # ne pas payer le contexte deux fois. Un lab À COMPARTIMENTS garde son injection : l'INDEX.md est
 # de l'altitude LAB, GSD ne le produit pas. SANS ce flag, le comportement est strictement inchangé.
@@ -46,7 +46,7 @@ done
 INDEX_FILE="$PLANNING_DIR/INDEX.md"
 STATE_FILE="$PLANNING_DIR/STATE.md"
 
-# --- ADR-054 : altitude lab uniquement quand GSD tient le projet ---
+# --- ADR-055 : altitude lab uniquement quand GSD tient le projet ---
 # Lab à compartiments (INDEX.md présent) → l'INDEX est de l'altitude LAB, GSD ne le produit
 # pas : on injecte. Lab mono-projet sous moteur GSD → gsd-session-state.sh a déjà injecté
 # l'état du projet : on se retire pour ne pas payer le contexte deux fois.

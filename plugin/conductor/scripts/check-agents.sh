@@ -46,10 +46,15 @@ for arg in "$@"; do
   prev="$arg"
 done
 
-command -v python3 >/dev/null 2>&1 || { echo "[check-agents] python3 requis" >&2; exit 0; }
+# ADR-054 : stub Microsoft Store — `python3` présent dans le PATH mais inerte. Détection par
+# CHEMIN (zéro spawn), repli `python` ; sinon message + exit 0 (advisory, comme avant).
+PYBIN=python3
+case "$(command -v python3 2>/dev/null)" in
+  ''|*WindowsApps*) if command -v python >/dev/null 2>&1; then PYBIN=python; else echo "[check-agents] python3 requis" >&2; exit 0; fi ;;
+esac
 
 VF_AGENTS_DIR="$AGENTS_DIR" VF_SKILLS_DIR="$SKILLS_DIR" VF_STRICT="$STRICT" \
-VF_HOOK="$HOOK_MODE" VF_SINGLE="$SINGLE_FILE" python3 -c "
+VF_HOOK="$HOOK_MODE" VF_SINGLE="$SINGLE_FILE" "$PYBIN" -c "
 import glob, os, re, sys
 
 agents_dir = os.environ[\"VF_AGENTS_DIR\"]

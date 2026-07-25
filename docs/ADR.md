@@ -20,7 +20,8 @@
 | ADR-051 | 2026-07-19 | Allowlist MCP des agents exécutants dérivée du lab (injection à l'install) | Validée |
 | ADR-052 | 2026-07-22 | Frontmatter mémoire enrichi — trust + confidence à décroissance par catégorie + supersession non destructive | Validée |
 | ADR-053 | 2026-07-22 | Volet swarm — lock de driver unique + DAG ready/blocked + rapports de worker typés | Validée |
-| ADR-054 | 2026-07-25 | Frontière d'altitude entre planning-core et le moteur de planning GSD — un projet = un seul moteur | Validée |
+| ADR-054 | 2026-07-23 | Portabilité Windows — normalisation CRLF, préflight, gardes réellement actives, gate de synchro versions | Validée (2 rapports terrain intégrés) |
+| ADR-055 | 2026-07-25 | Frontière d'altitude entre planning-core et le moteur de planning GSD — un projet = un seul moteur | Validée |
 
 ---
 
@@ -535,7 +536,103 @@ Protocole détaillé (source de vérité) : `plugin/dev-orchestrator/references/
 
 ---
 
-## ADR-054 : Frontière d'altitude entre `planning-core` et le moteur de planning GSD
+## ADR-054 : Portabilité Windows — normalisation CRLF, préflight, gardes réellement actives, gate de synchro versions
+
+**Date** : 2026-07-23
+**Statut** : Validée (2 rapports terrain intégrés)
+**Décideur** : Willy (2 rapports terrain rejouables de deux élèves de la formation, Windows 11 + Git Bash ; causes racines reproduites en local)
+**Contexte** : release v2.29.0 — conductor v1.12.1, consolidator v1.6.1, software-architecture v1.5.1, planning-core v2.3.1, kpi-analyst v1.0.1
+
+### Problème (rapport 1 — install, 2026-07-22)
+
+1. **jq absent de Git Bash** (jamais inclus par Git for Windows) et documenté NULLE PART comme
+   prérequis — angle mort de dev : macOS 15 livre `/usr/bin/jq` en natif. Pire : `resolve-deps.sh`
+   n'avait AUCUN guard — sans jq, la process substitution avalait « command not found » et rendait
+   une fermeture INCOMPLÈTE avec exit 0 (install silencieusement amputée).
+2. **Le jq Windows natif écrit en mode texte** (chaque `\n` → `\r\n`, by design, non corrigeable
+   par version — le flag `-b` est opt-in par appel et absent de jq 1.6). `$()` ne retire que le
+   `\n` final → `\r` fantôme : `resolve-deps.sh` cherchait `planning-core\r` (crash en pleine
+   boucle, symptôme exact du rapport), le catalogue dégradait `conductor` en `optional` et faisait
+   fuiter les bundles `proposable:false` (comparaisons `= "true"` cassées — corruption SILENCIEUSE,
+   rc=0), `framework-version.sh drift` signalait un écart permanent, `kpis-writer.sh` persistait
+   `"domain": "generic\r"` DANS la donnée (KPIS.md, ingéré par le Hub).
+3. **`installer/SKILL.md` invoquait ses scripts par nom nu** (12+ sites) → le LLM exécutant
+   devinait parmi ~10 dossiers `scripts/` (`installer/build-module-catalog.sh` deviné, inexistant).
+4. **Fiche marketplace + badges README dérivés de 2 releases** — `check-release-tag.sh` ne
+   vérifiait que VERSION ↔ tag.
+5. **`merge-hooks.sh` codait `python3` en dur** : sous Windows le `python3` du PATH peut être le
+   stub Microsoft Store (App Execution Alias : `command -v` réussit, l'exécution PEND ou sort en 49
+   sans stdout) et python.org ne fournit pas de `python3.exe` → module installé SANS ses hooks de
+   gouvernance (perte silencieuse).
+
+### Problème (rapport 2 — runtime, 2026-07-23, amendement)
+
+6. **Gardes runtime inertes en paraissant installées.** Les hooks fail-open (`command -v python3
+   || exit 0`) ne testent que la PRÉSENCE : sur Windows le stub Store la satisfait → la branche
+   de repli n'est JAMAIS atteinte, le `python3 -c` réel meurt en silence (rc 49, stdout vide),
+   l'appel est autorisé. Cas le plus grave signalé : env d'install ≠ env des hooks → harnais
+   complet, correctement câblé, entièrement inopérant, sans signal. Principe du rapporteur adopté :
+   « une protection annoncée n'est pas une protection tant qu'une tentative de violation n'a pas
+   échoué sous nos yeux ».
+7. **Préfiltre CSL-13 aveugle aux antislashs.** Les 3 scripts consolidator (guard-read,
+   guard-bash, post-edit-reindex) préfiltrent sur la sous-chaîne `.claude/memory/` (slashes) AVANT
+   le spawn python. Un chemin Windows arrive en antislashs (JSON-échappés `\\`) → préfiltre
+   court-circuite → le python — qui normalisait justement les antislashs (`replace("\\","/")`,
+   CSL-12) — n'est jamais atteint. Le traitement Windows existait derrière une porte jamais
+   ouverte. (`guard-agent-write` épargné : son motif `.claude` n'a pas de barre.)
+8. Annexe : `bash` peut être ABSENT du PATH Windows (seul `Git\cmd` y figure) tout en existant
+   (`Git\bin\bash.exe`) → contrôle préflight ajouté.
+
+### Décision — défense en profondeur
+
+1. **Wrapper `jqx() ( set -o pipefail; command jq "$@" | tr -d '\r'; )`** dans les 5 scripts jq —
+   normalisation CONSOMMATEUR, version-agnostique, code retour propagé. Règle : jq nu interdit
+   (gate T7 de `test-windows-crlf.sh`). Guards + messages d'install par OS ; `resolve-deps.sh` en
+   capture explicite (échec jq BRUYANT).
+2. **Préflight** (`installer/scripts/preflight.sh`, étape 0 BLOQUANTE) : git, jq (+ sonde CRLF
+   informative), python3 RÉEL (sonde d'exécution `timeout`-gardée, rejet `WindowsApps`, version ≥3,
+   candidats `python3`→`python`, état « py seul » = KO), `bash` dans le PATH. Même résolution dans
+   `merge-hooks.sh`.
+3. **Résolution d'interpréteur dans les hooks runtime** (amendement) : détection par CHEMIN — zéro
+   spawn ajouté au budget latence — `case "$(command -v python3)" in ''|*WindowsApps*)` → repli
+   `python`, sinon fail-open inchangé. Appliquée aux 8 scripts de hooks python3.
+4. **Préfiltres CSL-13 compatibles antislashs** (amendement) : normalisation du payload pour le
+   MATCH uniquement (`${PAYLOAD//\\//}`) — le python reçoit toujours le payload original. Le
+   surensemble strict redevient vrai sur Windows.
+5. **Signal de garde inactive** (amendement, suggestion du rapporteur adoptée) :
+   `probe-memory-guards.sh` (SessionStart consolidator, advisory) — sonde d'EXÉCUTION une fois par
+   session ; si aucun interpréteur utilisable : « ⚠ gardes mémoire INACTIVES : python injoignable ».
+6. **`.gitattributes` eol=lf** + **chemins pleinement qualifiés** au point d'usage (installer,
+   vf-calibrate, vf-new-lab — pattern du contre-exemple vertueux vf-update).
+7. **Gate `check-version-sync.sh`** (pre-push via check-release-tag) : VERSION ↔ plugin.json ↔
+   marketplace.json ↔ badges/texte des 2 README ↔ compte réel de module.json.
+8. **Licence — grant élèves** (décision Willy) : un élève de la formation est un « authorized
+   lab » : usage via le plugin ET réutilisation/adaptation d'éléments de modules dans ses dépôts
+   PRIVÉS pour ses propres labs ; redistribution/publication/revente interdites. LICENSE amendée.
+
+### Tests
+
+`plugin/_internal/tests/test-windows-crlf.sh` (shim jq-CRLF + PATH sans jq, 10 asserts, gate T7) +
+`plugin/consolidator/scripts/tests/test-windows-guards.sh` (amendement : payload antislashs → deny
+effectif ; stub `WindowsApps/python3` factice → repli `python` ; aucun python → fail-open + signal
+du probe). Rejouables sur macOS/Linux sans poste Windows.
+
+### Restes assumés
+
+- Comportement pré-existant observé : `install --with-deps` en scope `local` dans un dossier
+  non-git s'arrête après le 1er module (rc=1, sans message ni registre) — identique sur main.
+- Issue #20 : mode `--dry-run`/manifeste fichier-par-fichier avant pose (demande des mêmes
+  testeurs, revue à deux avant écriture).
+- Validation terrain réelle par les 2 testeurs Windows au tag v2.29.0 (protocole fourni).
+
+### Rules Associées
+
+- Aucune rule nouvelle. Gates machine : T7 (jq nu interdit) + `check-version-sync.sh` (pre-push) +
+  `test-windows-guards.sh` (gardes actives sous chemins Windows).
+
+---
+
+## ADR-055 : Frontière d'altitude entre `planning-core` et le moteur de planning GSD
 
 **Date** : 2026-07-25
 **Statut** : Validée
@@ -608,3 +705,4 @@ exit 2 dédié, protocole de reprise documenté, geste humain assisté.
   et on propose, on ne réécrit pas un `.planning/` existant. Confirme ADR-050 (le `Stop` guard reste
   bloquant, seule exception au retrait de `planning-core` du terrain projet) et ADR-040 (le 8e signal
   de dette reste porté par `planning-core`, à l'altitude lab). Aucune rule nouvelle.
+

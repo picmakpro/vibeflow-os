@@ -16,6 +16,16 @@ set -euo pipefail
 log() { echo "[resolve-deps] $*" >&2; }
 err() { echo "[resolve-deps] ERROR: $*" >&2; exit 1; }
 
+# Prérequis dur : jq (parse des module.json). Sans ce guard, la process substitution avalait
+# l'échec « command not found » et rendait une fermeture INCOMPLÈTE avec exit 0 (ADR-054).
+command -v jq >/dev/null 2>&1 || err "jq introuvable — prérequis de l'engine (parse des module.json).
+  Installer : macOS 'brew install jq' (natif depuis macOS 15) · Windows (Git Bash) 'winget install jqlang.jq' · Debian/Ubuntu 'sudo apt-get install jq'"
+
+# jqx — wrapper jq OBLIGATOIRE (ADR-054) : le jq Windows natif écrit en mode texte (\n → \r\n) ;
+# un \r résiduel dans un nom de module fabrique un chemin introuvable (« planning-core\r »).
+# Subshell + pipefail locaux : propage le code retour de jq sans imposer pipefail à l'appelant.
+jqx() ( set -o pipefail; command jq "$@" | tr -d '\r'; )
+
 ROOT="${VF_MODULES_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 
 [ "$#" -ge 1 ] || err "usage: resolve-deps.sh <module> [<module> ...]"
@@ -36,11 +46,14 @@ while [ "${#queue[@]}" -gt 0 ]; do
   manifest="$ROOT/$mod/module.json"
   [ -f "$manifest" ] || err "module inconnu : '$mod' (manifeste absent : $manifest)"
 
-  # Enfiler les requires non encore vus.
+  # Enfiler les requires non encore vus. Capture explicite (pas de process substitution) :
+  # un échec de jq (JSON invalide, binaire cassé) doit être BRUYANT, pas une fermeture vide.
+  deps="$(jqx -r '.requires[]?' "$manifest")" \
+    || err "lecture des requires impossible (échec du parseur JSON) : $manifest"
   while IFS= read -r dep; do
     [ -n "$dep" ] || continue
     is_seen "$dep" || queue+=("$dep")
-  done < <(jq -r '.requires[]?' "$manifest")
+  done <<< "$deps"
 done
 
 # Émettre la fermeture : un par ligne, triée, dédupliquée.

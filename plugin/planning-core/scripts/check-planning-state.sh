@@ -17,7 +17,7 @@
 #   check-planning-state.sh [--path <dir>] [--max-age-days <N>] [--quiet] [--defer-to-gsd]
 # Defaults: --path .planning  --max-age-days 7
 #
-# --defer-to-gsd (ADR-054) : opt-in, câblé dans hooks.json uniquement. Si le moteur GSD est
+# --defer-to-gsd (ADR-055) : opt-in, câblé dans hooks.json uniquement. Si le moteur GSD est
 # actif sur ce projet, gsd-session-state.sh porte déjà le signal de fraîcheur → on se retire
 # en silence (exit 0). SANS ce flag, le comportement est strictement inchangé.
 #
@@ -44,7 +44,7 @@ done
 
 say() { [ "$QUIET" -eq 1 ] || echo "[planning-state] $*"; }
 
-# --- ADR-054 : ne pas doubler le digest de GSD ---
+# --- ADR-055 : ne pas doubler le digest de GSD ---
 # Si le moteur GSD est actif, gsd-session-state.sh porte déjà le signal de fraîcheur de ce
 # projet : on se retire en silence (exit 0). Appelé avec --defer-to-gsd depuis hooks.json
 # uniquement — l'usage manuel et le /checkpoint gardent le comportement complet.

@@ -37,14 +37,23 @@ set -uo pipefail
 # payload JSON (l'encodeur JSON standard n'échappe ni « . » ni « / »). Un payload sans
 # cette sous-chaîne ⇒ le python sortirait 0 de toute façon : le skip est sans perte.
 PAYLOAD="$(cat 2>/dev/null || true)"
+# ADR-054 : les chemins Windows arrivent en ANTISLASHS — simples, ou doublés par l'échappement
+# JSON (`.claude\\memory\\`). Sans ces motifs, le préfiltre court-circuitait le python (qui, lui,
+# normalise les antislashs — CSL-12) : garde inerte sous Windows, en paraissant installée.
 case "$PAYLOAD" in
-  *'.claude/memory/'*) : ;;
+  *'.claude/memory/'*|*'.claude\memory\'*|*'.claude\\memory\\'*) : ;;
   *) exit 0 ;;
 esac
 
-command -v python3 >/dev/null 2>&1 || exit 0
+# ADR-054 : le `python3` du PATH Windows peut être le stub Microsoft Store — présent (`command -v`
+# réussit) mais inerte à l'exécution. Détection par CHEMIN (zéro spawn ajouté au budget CSL-13),
+# repli `python` ; sinon fail-open inchangé, signalé par probe-memory-guards.sh au SessionStart.
+PYBIN=python3
+case "$(command -v python3 2>/dev/null)" in
+  ''|*WindowsApps*) if command -v python >/dev/null 2>&1; then PYBIN=python; else exit 0; fi ;;
+esac
 
-printf '%s' "$PAYLOAD" | python3 -c '
+printf '%s' "$PAYLOAD" | "$PYBIN" -c '
 import json, os, sys
 
 try:
@@ -65,7 +74,9 @@ REGISTRES = {
 
 # CSL-12 : normpath neutralise ./, // et a/../b AVANT analyse (sinon un chemin
 # traversant contournait le guard, et un suffixe accidentel le declenchait).
-norm = os.path.normpath(file_path.replace("\\\\", "/"))
+# ADR-054 : après json.load, un chemin Windows porte des antislashs SIMPLES — l ancien
+# replace("\\\\","/") (double, artefact de quoting) ne remplaçait rien : normalisation morte.
+norm = os.path.normpath(file_path.replace("\\", "/"))
 base = os.path.basename(norm)
 parent = os.path.dirname(norm)
 if base not in REGISTRES:

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # detect-gsd-engine.sh — Le MOTEUR de planning GSD est-il en place sur ce lab ?
 #
-# Rôle (ADR-054) : répondre à une question FACTUELLE, jamais à une question de métier.
+# Rôle (ADR-055) : répondre à une question FACTUELLE, jamais à une question de métier.
 # Le métier d'un lab relève du JUGEMENT du skill (references/domain-detection.md) — un
 # détecteur bash s'y tromperait (un lab de contenu peut avoir un package.json). Ce script
 # ne dit donc PAS « ce lab est dev » : il dit « il y a (ou non) un moteur GSD en place »,

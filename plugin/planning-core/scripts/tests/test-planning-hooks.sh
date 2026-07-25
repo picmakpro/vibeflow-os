@@ -167,7 +167,7 @@ has "$out" "acquisition" "T1 compartiment ciblé détecté"; has "$out" "séquen
 out=$(printf '{"prompt":"quelle heure"}' | "$BASH_BIN" "$PT"); [ -z "$out" ] && ok "T2 aucun match → silencieux" || ko "T2 devrait être vide"
 cd "$M"; out=$(printf '{"prompt":"tache A"}' | "$BASH_BIN" "$PT"); [ -z "$out" ] && ok "T3 lab mono → silencieux" || ko "T3 devrait être vide"
 
-echo "=== ADR-054 : --defer-to-gsd met fin à la double injection SessionStart ==="
+echo "=== ADR-055 : --defer-to-gsd met fin à la double injection SessionStart ==="
 DETECT_TMP=$(mktemp -d)
 FAKE_GSD2="$DETECT_TMP/gsd-home"; mkdir -p "$FAKE_GSD2"
 
