@@ -136,19 +136,19 @@ Spec : `docs/superpowers/specs/2026-07-25-routage-fin-verbes-vf-design.md`.
 
 ### Phase 12 — Routage fin & couverture complète des verbes `/vf-*`
 
-- [ ] **VERB-01**: La table de routage de `AGENT.md` mappe chaque intention vers un **verbe `/vf-*`**
+- [x] **VERB-01**: La table de routage de `AGENT.md` mappe chaque intention vers un **verbe `/vf-*`**
   (plus aucune cible `gsd-*` en entrée de chaîne) ; `AGENT.md` reste ≤ 250 L.
-- [ ] **VERB-02**: 18 nouveaux verbes `/vf-*` sont livrés dans `dev-orchestrator` (`vf-secure`, `vf-testgen`,
-  `vf-audit`, `vf-forensics`, `vf-inbox`, `vf-milestone`, `vf-phase`, `vf-undo`, `vf-backlog`, `vf-cleanup`,
+- [~] **VERB-02** *(partiel — 17/18, `vf-ingest` soldé en Phase 13)*: 18 nouveaux verbes `/vf-*` sont livrés dans `dev-orchestrator` (`vf-secure`, `vf-testgen`,
+  `vf-gaps`, `vf-forensics`, `vf-inbox`, `vf-milestone`, `vf-phase`, `vf-undo`, `vf-backlog`, `vf-cleanup`,
   `vf-resume`, `vf-pause`, `vf-docs`, `vf-learn`, `vf-explore`, `vf-spike`, `vf-spec`, `vf-ingest`) + `vf-sketch`
   dans `design-orchestrator` ; chacun délègue à une cible GSD existante, aucun ne réimplémente sa logique.
-- [ ] **VERB-03**: Les 32 descriptions de skills (14 réécrites + 18 nouvelles) suivent le gabarit déclencheur —
+- [x] **VERB-03**: Les 32 descriptions de skills (14 réécrites + 18 nouvelles) suivent le gabarit déclencheur —
   formulations FR réelles + contre-exemples nommant les verbes voisins ; les 5 groupes de collision identifiés
   sont démarqués.
-- [ ] **VERB-04**: Une rule de préséance globale (`rules/vf-verb-precedence.md`, ≤ 40 L, sans `paths:`) est
+- [x] **VERB-04**: Une rule de préséance globale (`rules/vf-verb-precedence.md`, ≤ 40 L, sans `paths:`) est
   livrée et installée en `.claude/rules/` : aucun skill `gsd-*` ni `superpowers:*` n'est invoqué en entrée de
   chaîne ni nommé à l'utilisateur.
-- [ ] **VERB-05**: `references/intent-routing.md` couvre **100 %** des skills listés dans
+- [x] **VERB-05**: `references/intent-routing.md` couvre **100 %** des skills listés dans
   `gsd-skills-index.md` (chargé on-demand) ; les tests du module passent, fixture T4 étendue aux nouvelles
   cibles + T11 (anti-collision), T12 (préséance), T13 (exhaustivité).
 
@@ -261,11 +261,11 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | GSDM-04 | Phase 11 | Not started (GATE Phase 10) |
 | GSDM-05 | Phase 11 | Not started (GATE Phase 10) |
 | GSDM-06 | Phase 11 | Not started (GATE Phase 10) |
-| VERB-01 | Phase 12 | Not started |
-| VERB-02 | Phase 12 | Not started |
-| VERB-03 | Phase 12 | Not started |
-| VERB-04 | Phase 12 | Not started |
-| VERB-05 | Phase 12 | Not started |
+| VERB-01 | Phase 12 | Done |
+| VERB-02 | Phase 12 | Partiel — 17/18 verbes (`vf-audit` → **`vf-gaps`**, collision avec la commande d'audit de lab) ; `vf-ingest` en Phase 13 |
+| VERB-03 | Phase 12 | Done — 33 descriptions, 11 groupes à réciprocité stricte |
+| VERB-04 | Phase 12 | Done — rule globale 40 L |
+| VERB-05 | Phase 12 | Done — 65/65 skills routés, 25 OK / 0 KO / 1 SKIP |
 | BRDG-01 | Phase 13 | Not started |
 | BRDG-02 | Phase 13 | Not started |
 | BRDG-03 | Phase 13 | Not started |

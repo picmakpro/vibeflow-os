@@ -203,15 +203,37 @@ qu'aucun skill `gsd-*` ne gagne l'arbitrage en entrée de chaîne.
      `/vf-*`. `AGENT.md` reste ≤ 250 L (déport de la doctrine exhaustive dans `references/intent-routing.md`).
   2. 19 verbes sont livrés (18 dans `dev-orchestrator`, `vf-sketch` dans `design-orchestrator`), chacun
      déléguant à une cible GSD existante — aucune logique d'outil réimplémentée.
-  3. Les 32 descriptions suivent le gabarit déclencheur (formulations FR réelles + contre-exemples nommant
-     les voisins), et les 5 groupes de collision identifiés (`vf-test`/`vf-testgen`, `vf-review`/`vf-audit`,
-     le quatuor amont, `vf-map`/`vf-learn`, `vf-progress`/`vf-resume`) sont démarqués.
+  3. Les 33 descriptions suivent le gabarit déclencheur (formulations FR réelles + contre-exemples nommant
+     les voisins), et les groupes de collision identifiés (`vf-test`/`vf-testgen`, `vf-review`/`vf-gaps`,
+     le quatuor amont, `vf-map`/`vf-learn`, `vf-progress`/`vf-resume`, `vf-gaps`/`/vf-audit`) sont démarqués.
   4. `rules/vf-verb-precedence.md` (≤ 40 L, globale) est installée en `.claude/rules/` et interdit
      l'invocation directe d'un `gsd-*`/`superpowers:*` en entrée de chaîne.
   5. `intent-routing.md` couvre 100 % des skills de `gsd-skills-index.md` ; les tests du module passent —
-     **fixture T4 étendue aux nouvelles cibles** (sinon orphelins hors poste de dev), + T11 (anti-collision),
-     T12 (préséance), T13 (exhaustivité).
-**Plans**: à cadrer (`/gsd:discuss-phase 12` puis `plan-phase`)
+     **fixture T4 étendue aux nouvelles cibles** (sinon orphelins hors poste de dev), + T12 (anti-collision),
+     T13 (préséance), T14 (exhaustivité).
+**Plans**: 6 plans (3 vagues) — ✅ complétés. Livré : **31 verbes** dans `dev-orchestrator` (14 → 31) et 2
+dans `design-orchestrator`, `AGENT.md` 218 L, rule 40 L, `intent-routing.md` 65/65 skills routés,
+suite de tests 25 OK / 0 KO / 1 SKIP (le SKIP est `vf-ingest`, attendu en Phase 13).
+Release `v2.31.0` — dev-orchestrator v1.8.1, design-orchestrator v1.1.0, conductor v1.12.2.
+Plans:
+- [x] 12-01 — fondations : gabarit de description + doctrine `intent-routing.md` + rule de préséance (VERB-01, VERB-04, VERB-05)
+- [x] 12-02 — 17 verbes `/vf-*` neufs dans `dev-orchestrator` (VERB-02)
+- [x] 12-03 — verbe `/vf-sketch` dans `design-orchestrator` (VERB-02)
+- [x] 12-04 — réécriture des 14 descriptions existantes sur le gabarit + démarcations croisées (VERB-03)
+- [x] 12-05 — table de routage de l'agent vers les verbes + point d'entrée générique (VERB-01)
+- [x] 12-06 — trois axes de vérification machine (T12/T13/T14) + fixture T4 étendue (VERB-05)
+
+**Écarts assumés** (tracés) : le verbe prévu `vf-audit` s'appelle **`vf-gaps`** — `/vf-audit` était déjà
+pris par l'audit de conformité du lab (`plugin/commands/vf-audit.md` → `vibeflow-validator`). Le bloc
+« cibles canoniques figées » de `AGENT.md` a été supprimé plutôt que conservé (D-09) : le maintenir aurait
+exigé le résidu même que VERB-01 supprime ; T3 mesure désormais la couverture sur les verbes, à seuil
+identique. Les axes de test portent les numéros T12/T13/T14 et non T11/T12/T13 : `T11` était déjà pris par
+l'axe de généricité (DM5).
+
+**Soldes livrés dans la foulée** : bornage de T5/T11 au module (en lab, `skills/` et `agents/` sont plats
+et partagés), correction des deux textes qui décrivaient mal le chargement des rules (installeur + Pattern
+05), gabarit de description sur les trois verbes du `conductor`, frontière d'altitude ADR-055 portée par
+les cinq verbes `.planning`-centrés, et purge des mentions d'un projet tiers dans tout le dépôt (public).
 
 #### Phase 13: Pont spec → feuille de route (`/vf-ingest`)
 **Goal**: Outiller le passage d'un cadrage écrit aux étapes de la feuille de route — une spec devient des
@@ -264,7 +286,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 🔬 (R&D, hors release)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 🚧 → 13 🚧 (chantier indépendant de 10-11)** ; **14 🚧 indépendante (ni de 12 ni de 13 : ses 4 verbes cibles existent déjà)**
+1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 🔬 (R&D, hors release)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 🚧** ; **14 ✅ (indépendante)**
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -279,6 +301,6 @@ Plans:
 | 9. Spike transposition jcode | memory-swarm-rnd | 0/2 | Not started (R&D) | — |
 | 10. Étude & faisabilité migration GSD | gsd-migration | 0/? | Not planned yet | — |
 | 11. Intégration migration GSD | gsd-migration | 0/? | Not planned yet (GATE Phase 10) | — |
-| 12. Routage fin & verbes /vf-* | vf-routing | 1/6 | In progress (12-01 livré) | — |
+| 12. Routage fin & verbes /vf-* | vf-routing | 6/6 | Complete — release `v2.31.0` | 2026-07-25 |
 | 13. Pont spec → feuille de route | vf-routing | 0/? | Not planned yet (dépend Phase 12) | — |
-| 14. Frontière d'altitude planning-core / GSD | vf-routing | 7/7 | Complete (tag à poser après merge) | 2026-07-25 |
+| 14. Frontière d'altitude planning-core / GSD | vf-routing | 7/7 | Complete — release `v2.30.0` (ADR-055) | 2026-07-25 |

@@ -2,9 +2,9 @@
 
 ## 🚧 vf-routing — Routage fin & verbes VibeFlow (créé 2026-07-25)
 
-**Statut :** ACTIF — non planifié · **Spec :** `docs/superpowers/specs/2026-07-25-routage-fin-verbes-vf-design.md`
+**Statut :** ACTIF — 2 phases sur 3 livrées (12 ✅ `v2.31.0`, 14 ✅ `v2.30.0`) · **Spec :** `docs/superpowers/specs/2026-07-25-routage-fin-verbes-vf-design.md`
 
-**Périmètre :** 2 phases · requirements VERB-01..05, BRDG-01..03.
+**Périmètre :** 3 phases · requirements VERB-01..05, BRDG-01..03, ALTI-01..05.
 
 **But :** Deux trous constatés sur le module `dev-orchestrator` v1.7.0. **(1)** La table de routage de
 l'agent mappe l'intention directement sur la cible GSD au lieu du verbe `/vf-*` correspondant — deux
@@ -13,9 +13,22 @@ skills `gsd-*` chargés en parallèle. **(2)** 14 verbes couvrent 12 cibles : ~5
 porte d'entrée. La Phase 12 pose trois niveaux de routage (descriptions déclencheuses, rule de préséance
 globale, doctrine exhaustive on-demand) et 19 verbes. La Phase 13 ferme le seul maillon non outillé du
 cycle : `/vf-ingest`, qui transforme une spec en étapes de la feuille de route via les moteurs GSD
-existants.
+existants. La **Phase 14**, ajoutée en cours de milestone, traite un troisième trou découvert au passage :
+`vf-planning` et la chaîne de développement produisaient les mêmes fichiers dans le même dossier avec des
+frontmatters incompatibles — deux moteurs de planning concurrents (ADR-055, frontière d'altitude).
 
-**Prochaine action :** `/gsd:discuss-phase 12` puis `plan-phase`.
+**Livré**
+
+- **Phase 12** — release `v2.31.0`. 31 verbes dans `dev-orchestrator` (14 → 31), 2 dans
+  `design-orchestrator`. Trois niveaux de routage : descriptions déclencheuses à contre-exemples croisés,
+  rule globale de préséance (40 L), doctrine `intent-routing.md` couvrant 65/65 skills. `AGENT.md` ne cite
+  plus aucune cible interne. Tests 25 OK / 0 KO / 1 SKIP.
+  *Écart tracé* : le verbe prévu `vf-audit` s'appelle **`vf-gaps`** (collision avec la commande d'audit de
+  conformité du lab). `VERB-02` reste **partiel** : 17/18 verbes, `vf-ingest` soldé en Phase 13.
+- **Phase 14** — release `v2.30.0`, **ADR-055**. Un projet de code a un seul moteur de planning ;
+  `planning-core` garde l'altitude lab, la mémoire et le socle des labs non-dev. planning-core v2.4.0.
+
+**Prochaine action :** `/gsd:discuss-phase 13` puis `plan-phase` (pont `/vf-ingest`).
 
 ## 🚧 gsd-migration — Migration package GSD (créé 2026-07-25)
 
