@@ -1,7 +1,7 @@
 # Table de traduction de vocabulaire — outils design → VibeFlow
 
-> **Rôle** : référence consultée par `vibeflow-design` et par le verbe `/vf-design` pour
-> **reframer toute sortie** avant de la présenter à l'utilisateur.
+> **Rôle** : référence consultée par `vibeflow-design` et par les verbes `/vf-design` et
+> `/vf-sketch` pour **reframer toute sortie** avant de la présenter à l'utilisateur.
 >
 > **Iron Law** : *l'utilisateur ne lit jamais un nom d'outil design brut — il ne parle que VibeFlow.*
 
@@ -14,7 +14,7 @@
 | `ui-ux-pro-max` / design intelligence base | référentiel UX (interne — ne pas nommer) |
 | `frontend-design` | direction créative (interne — ne pas nommer) |
 | `impeccable` / craft commands | atelier de craft (interne — ne pas nommer) |
-| `superpowers:brainstorming` | conception de solution (le label « idéation » appartient à `/vf-explore`) |
+| `superpowers:brainstorming` | exploration de directions — **jamais** « idéation », label du verbe `/vf-explore` (module dev) |
 | `gsd-sketch` / sketch / mockup | maquette jetable / esquisse |
 | `polish` / craft pass | passe de finition |
 | `critique` / `audit` | revue design / audit visuel |

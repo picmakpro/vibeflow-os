@@ -76,6 +76,28 @@ livré dans le module**. C'est le contrat que les vagues 2 et 3 appliquent mot p
 ### D-06 — Déviations tracées, pas silencieuses
 D-01 et D-02 sont reportées dans la spec et dans `REQUIREMENTS.md` (VERB-02) : le document de
 design reste la source de vérité, il n'est pas laissé en contradiction avec le livré.
+
+### D-07 — Réciprocité stricte sur les groupes canoniques, unilatérale ailleurs
+Le gabarit pose la réciprocité comme inconditionnelle (« si A repousse vers B, B repousse vers A »)
+avec une seule exception déclarée (`/vf-audit`, D-01). L'application littérale à l'état final
+demanderait ~30 arêtes supplémentaires, donc ~30 descriptions alourdies — chargées en permanence —
+pour un gain de routage nul sur des paires sans recouvrement lexical réel.
+
+**Décision** (prise en vague 2, sur constat de revue) :
+
+- **Réciprocité obligatoire** sur les **6 groupes de collision canoniques** de la matrice, plus les
+  démarcations additionnelles à recouvrement lexical avéré (`debug`↔`forensics`, `plan`↔`phase`,
+  `ship`↔`inbox`, `sketch`↔`design`↔`spike`, `test`↔`spike`, `progress`↔`gaps`). C'est le périmètre
+  que T12 contrôle.
+- **Unilatérale admise ailleurs**, par économie de description : le contre-exemple n'existe que du
+  côté où le recouvrement se produit réellement.
+- **Cibles hors module non croisables par construction** : `/vf-audit` (module `validator`) et
+  `/vf-planning` (module `planning-core`) reçoivent des renvois sans en émettre. Ces deux modules
+  ne sont pas touchés par l'étape 12.
+
+Conséquence pour 12-06 : T12 assert la réciprocité **sur la liste des groupes ci-dessus**, pas sur
+toutes les paires citées. Un contrôle universel produirait des faux positifs, notamment sur les
+renvois génériques de `vf-dev`.
 </decisions>
 
 <constraints>

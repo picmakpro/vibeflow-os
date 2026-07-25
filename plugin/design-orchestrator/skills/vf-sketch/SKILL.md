@@ -26,8 +26,8 @@ Reframe toute sortie en vocabulaire VibeFlow : « sketch » → **maquette jetab
 œuvre passe par `/vf-design` (direction artistique, système de design, craft) puis par le cycle de
 développement normal.
 
-Frontière avec `/vf-spike` (module dev) : le jetable est **visuel** ici (à quoi ça ressemblerait),
-**fonctionnel** là-bas (est-ce que ça marche techniquement).
+Frontière avec `/vf-spike` (module dev, s'il est installé) : le jetable est **visuel** ici (à quoi
+ça ressemblerait), **fonctionnel** là-bas (est-ce que ça marche techniquement).
 
 Enchaînement typique : `vf-sketch` (on voit les options) → `/vf-design` (on cadre et on craft) →
 `/vf-execute`.

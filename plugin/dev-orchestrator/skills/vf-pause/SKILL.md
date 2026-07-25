@@ -5,8 +5,9 @@ description: >
   m'arrête là », « note où on en est », « je coupe, garde le contexte », « on reprendra
   demain », « handoff », « faut que je parte, sauvegarde l'état ». Fige une passation
   lisible : ce qui était en cours, ce qui bloque, la prochaine action.
-  ✘ pas pour reprendre le fil à la session suivante → /vf-resume · ✘ pas pour livrer un
-  travail terminé → /vf-ship · ✘ pas pour un point d'avancement → /vf-progress.
+  ✘ pas pour reprendre le fil à la session suivante → /vf-resume · ✘ pas pour continuer à
+  avancer pendant l'absence → /vf-auto · ✘ pas pour livrer un travail terminé → /vf-ship ·
+  ✘ pas pour un point d'avancement → /vf-progress.
   Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 

@@ -3,7 +3,7 @@ name: vf-dev
 description: >
   Utiliser **en dernier recours**, quand la demande de dev ne désigne aucun geste précis —
   « aide-moi à avancer », « pilote-moi ça », « je sais pas quel geste il faut », « fais ce
-  qu'il faut », « occupe-toi de ce projet », « débrouille cette histoire ». Point d'entrée
+  qu'il faut », « occupe-toi de ce projet », « démêle cette histoire ». Point d'entrée
   générique : analyse l'intention, puis délègue au verbe qui la porte réellement.
   ✘ pas quand le geste est identifiable — passer directement par le verbe : /vf-plan,
   /vf-execute, /vf-debug, /vf-test… · ✘ pas pour enchaîner tout le reste sans supervision →

@@ -20,8 +20,8 @@ Délègue, selon la demande :
 - `gsd-graphify` — **construire, interroger et inspecter** le graphe de connaissance du projet
   (« pourquoi cette décision ? », « qu'est-ce qui dépend de quoi ? »).
 
-Reframe toute sortie en vocabulaire VibeFlow : « learnings » → **apprentissages**, « knowledge
-graph » → **graphe de connaissance**, « phase » → **étape/sprint**
+Reframe toute sortie en vocabulaire VibeFlow : « extract-learnings » → **apprentissages**,
+« knowledge graph » → **graphe de connaissance**, « phase » → **étape/sprint**
 (cf. `vocabulary-map.md`). Ne nomme jamais GSD ni ces cibles à l'utilisateur.
 
 Frontière avec `/vf-map` : là-bas on lit **le code** pour comprendre le système ; ici on lit

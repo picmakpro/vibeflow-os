@@ -24,8 +24,8 @@ Délègue, selon ce qui est demandé :
   que ce soit réparé, pas seulement listé.
 
 Reframe toute sortie en vocabulaire VibeFlow : « UAT » → **recette**, « phase » → **étape/sprint**,
-« audit » → **état des manques** (cf. `vocabulary-map.md`). Ne nomme jamais GSD ni ces cibles à
-l'utilisateur.
+« audit-uat / validate-phase / audit-fix » → **état des manques** (cf. `vocabulary-map.md`). Ne
+nomme jamais GSD ni ces cibles à l'utilisateur.
 
 ## Frontière avec `/vf-audit` — chasse gardée
 
