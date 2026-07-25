@@ -13,7 +13,16 @@
 # UNE sonde d'exécution réelle par session (budget SessionStart — jamais par tool call, les gardes
 # gardent leur détection par chemin à zéro spawn). Silence = tout va bien. Advisory : exit 0
 # toujours (wiring `|| true` en plus).
+#
+# VG-7 (F13) : la sonde ne vérifiait QUE l'interpréteur Python, jamais le câblage des gardes —
+# son silence valait « tout va bien » même gardes absentes. Elle vérifie désormais AUSSI que les
+# trois scripts de garde sont posés à côté d'elle (même dossier d'install, copy_module_scripts).
+# `--strict` (usage gate/CI, PAS le hook) : exit 1 si au moins un signal émis.
 set -uo pipefail
+
+STRICT=false
+[ "${1:-}" = "--strict" ] && STRICT=true
+FINDINGS=0
 
 probe() {
   # Exécution réelle, version ≥ 3 exigée ; timeout-gardée là où timeout existe (Git Bash : oui ;
@@ -30,5 +39,19 @@ probe() {
 
 if ! probe python3 && ! probe python; then
   echo "⚠ VibeFlow : gardes mémoire INACTIVES — python3/python injoignable depuis les hooks (stub Microsoft Store ou Python absent). Lecture index-first et réindexation des registres sont en fail-open : elles ne protègent RIEN tant qu'un vrai Python n'est pas dans le PATH de Git Bash (installer depuis python.org en cochant « Add to PATH »)."
+  FINDINGS=$((FINDINGS + 1))
 fi
+
+# Câblage : les gardes existent-elles là où l'install les pose (même dossier que ce probe) ?
+DIR="$(cd "$(dirname "$0")" && pwd)"
+missing=""
+for g in guard-read-registres.sh guard-bash-registres.sh post-edit-reindex.sh; do
+  [ -f "$DIR/$g" ] || missing="${missing}${missing:+, }$g"
+done
+if [ -n "$missing" ]; then
+  echo "⚠ VibeFlow : gardes mémoire NON POSÉES — script(s) manquant(s) dans $DIR : $missing. Réinstaller le module consolidator (/vf-update) pour restaurer la protection des registres."
+  FINDINGS=$((FINDINGS + 1))
+fi
+
+if $STRICT && [ "$FINDINGS" -gt 0 ]; then exit 1; fi
 exit 0

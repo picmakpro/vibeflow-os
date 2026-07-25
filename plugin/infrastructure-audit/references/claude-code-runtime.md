@@ -68,7 +68,7 @@ Verifier conventions actives :
 - `model:` (opus/sonnet/haiku)
 - `memory: project` (memoire persistante agent)
 
-ADR-031 : NE PAS inventer de convention non documentee. Toujours croiser avec doc officielle.
+ADR-056 : NE PAS inventer de convention non documentee. Toujours croiser avec doc officielle.
 
 ---
 

@@ -1,5 +1,10 @@
 # Changelog — software-architecture
 
+## [v1.5.2] — 2026-07-25
+
+### Corrigé
+- `check-file-size.sh` sans argument → exit 3 au lieu d'un vert non mérité (F13) ; `--staged`/`--all` vides restent exit 0 (pre-commit légitime).
+
 ## [v1.5.1] — 2026-07-23 (portabilité Windows — ADR-054)
 
 ### Corrigé

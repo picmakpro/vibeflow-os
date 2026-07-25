@@ -236,7 +236,7 @@ VibeFlow distingue desormais **3 niveaux de chargement** d'un skill, du plus uni
 
 **1% Rule (Anthropic)** : si une situation correspond meme a 1% a la description d'un skill, le skill doit etre invoque. Mieux vaut sur-trigger un skill que de l'ignorer quand il est pertinent.
 
-**Garde-fou critique (v4.1, ADR-031)** : avant d'inventer une nouvelle convention frontmatter ou un nouveau mecanisme de chargement, **verifier que le runtime cible le supporte**. Inventer une convention non supportee = creer une illusion de structure qui ne s'execute pas.
+**Garde-fou critique (v4.1, ADR-056)** : avant d'inventer une nouvelle convention frontmatter ou un nouveau mecanisme de chargement, **verifier que le runtime cible le supporte**. Inventer une convention non supportee = creer une illusion de structure qui ne s'execute pas.
 
 ### 3.3  -  Savoir expert
 

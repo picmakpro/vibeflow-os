@@ -1,5 +1,10 @@
 # CHANGELOG — content-bundle
 
+## [v1.1.1] — 2026-07-25
+
+### Corrigé
+- Le gate `human-validator` est explicitement marqué « à fabriquer au ficelage du lab » (skill-creator + Gate C) au lieu d'être invoqué comme existant (F16).
+
 ## [v1.1.0] — 2026-07-16 (ADR-048 — orchestrateur métier)
 
 ### Modifié

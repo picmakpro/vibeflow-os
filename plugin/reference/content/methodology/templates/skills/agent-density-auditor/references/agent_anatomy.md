@@ -40,11 +40,11 @@ skills:
 ---
 ```
 
-**Regles frontmatter (ADR-031)** :
+**Regles frontmatter (ADR-056)** :
 - `name` : unique dans le projet, lowercase, kebab-case
 - `description` : ≤ 1024 chars, "pushy" (cf. skill-creator) — doit favoriser le trigger
 - `model` : `opus` (orchestration / decision lourde) | `sonnet` (execution standard) | `haiku` (validation rapide)
-- `skills:` : convention Claude Code **native** (ADR-031). Une seule liste plate. Les skills universels (safe-execute, verification-before-completion, dette-detector, when-stuck) sont charges via SessionStart hook + `.claude/bootstrap.md` — pas besoin de les declarer ici.
+- `skills:` : convention Claude Code **native** (ADR-056). Une seule liste plate. Les skills universels (safe-execute, verification-before-completion, dette-detector, when-stuck) sont charges via SessionStart hook + `.claude/bootstrap.md` — pas besoin de les declarer ici.
 - **Champs deprecated** (ne JAMAIS utiliser) : `bootstrap_skills`, `on_demand_skills`, `contextual` — non lus par Claude Code, sources d'erreurs.
 
 ## Exemple complet — Agent `backend` conforme (~180L)
@@ -193,7 +193,7 @@ Le `_reference/` est lu par l'agent **uniquement quand il en a besoin** (l'agent
 
 Avant de valider un agent, verifier :
 
-- [ ] Frontmatter complet (name, description, model, `skills:` natif ADR-031 — pas de champ deprecated)
+- [ ] Frontmatter complet (name, description, model, `skills:` natif ADR-056 — pas de champ deprecated)
 - [ ] Description "pushy" (mots-cles trigger explicites)
 - [ ] Mandat ≤ 5 lignes
 - [ ] Perimetre clair (fait / ne fait pas)

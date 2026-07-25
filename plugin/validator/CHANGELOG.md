@@ -1,5 +1,10 @@
 # CHANGELOG — validator
 
+## [v1.2.1] — 2026-07-25
+
+### Corrigé
+- Suppression des 3 skills fantômes du frontmatter (agent-density-auditor / dette-detector / checkpoint, F3) : phases 2-3 s'appuient sur les briques réellement livrées (`check-agents.sh --strict`, grille des 7 signaux, consolidator --audit) ; `/checkpoint` → `/vf-audit` ; référence ADR-056.
+
 ## [v1.2.0] — 2026-07-08 (ADR-045)
 
 ### Ajouté

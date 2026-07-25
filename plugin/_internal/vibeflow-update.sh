@@ -297,8 +297,11 @@ merge_module_hooks() {
   local merger
   merger="$(find_hooks_merger)"
   if [ -z "$merger" ]; then
+    # VG-3 : ce `return 0` faisait sortir l'install en succès après une gouvernance absente —
+    # le lab existait en croyant avoir ses hooks. L'échec se propage désormais (set -e → abort,
+    # mark_installed jamais atteint : le registre ne ment pas).
     log "  ERROR: merge-hooks.sh introuvable — hooks de $mod NON câblés (gouvernance absente !)"
-    return 0
+    return 1
   fi
   # Backup du settings avant toute écriture.
   if [ -f "$TARGET_ROOT/settings.json" ]; then
@@ -309,6 +312,7 @@ merge_module_hooks() {
     log "  hooks mergés → $TARGET_ROOT/settings.json"
   else
     log "  ERROR: merge hooks ÉCHOUÉ pour $mod — gouvernance NON câblée (corriger settings.json puis réinstaller)"
+    return 1  # VG-3 : l'échec se propage (plus de succès silencieux sans gouvernance)
   fi
 }
 

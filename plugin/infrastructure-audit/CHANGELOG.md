@@ -1,5 +1,10 @@
 # CHANGELOG — infrastructure-audit
 
+## [v1.2.1] — 2026-07-25
+
+### Modifié
+- Scission ADR-031/ADR-056 : toutes les références « vigilance support runtime » passent à ADR-056 ; `audit-infra.sh` gagne `--strict` (lab absent → exit 3, ERROR → exit 1) ; `/checkpoint` → `/vf-audit`.
+
 ## [v1.2.0] — 2026-07-20 (audit robustesse hooks — convergence du gate 14 jours)
 
 ### Corrigé

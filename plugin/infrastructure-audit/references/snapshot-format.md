@@ -122,7 +122,7 @@ Le snapshot precedent (`.prev`) est garde en permanence pour diff. Pour les snap
 
 - Au premier install vibeflow-os : baseline
 - Apres chaque update Claude Code : nouveau snapshot + diff vs precedent
-- Au /checkpoint : audit complet inclut snapshot + diff
+- Au /vf-audit : audit complet inclut snapshot + diff
 - Apres install/update d'un module vibeflow-os
 - Forced via `--snapshot`
 
@@ -138,7 +138,7 @@ Le snapshot precedent (`.prev`) est garde en permanence pour diff. Pour les snap
 | Hook event deprecated | WARNING | Migration a planifier |
 | Script disparu du lab | ERROR | Module corrompu ou desinstalle ? |
 | Module vibeflow-os update dispo | WARNING ou INFO | Selon semver (major/minor) |
-| Convention frontmatter change | ERROR | ADR-031, peut casser tous les agents |
+| Convention frontmatter change | ERROR | ADR-056, peut casser tous les agents |
 | Skill auparavant present disparu | WARNING | Cause a investiguer |
 
 ---

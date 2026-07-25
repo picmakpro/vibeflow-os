@@ -1,5 +1,10 @@
 # CHANGELOG — kpi-analyst
 
+## [v1.0.2] — 2026-07-25
+
+### Modifié
+- Le « Hub » est défini comme dashboard central externe **optionnel** — le registre KPIS.md reste pleinement utilisable en standalone.
+
 ## [v1.0.1] — 2026-07-22 (portabilité Windows — ADR-054)
 
 ### Corrigé

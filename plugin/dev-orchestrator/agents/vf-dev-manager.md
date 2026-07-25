@@ -65,18 +65,30 @@ réserve à la validation humaine (ADR-031).
 ## Orchestration par étape
 
 Dispatche **la frontière `ready` du DAG** (jamais un nœud `blocked`) ; marque `running` au dispatch,
-`done`/`failed` au retour. Pour chaque étape retenue, choisis les étages pertinents (une étape UI saute
-l'audit sécurité ; une étape sécurité le garde) et dispatche dans l'ordre :
+`done`/`failed` au retour. **La frontière se dispatche en PARALLÈLE** : si `dag.sh ready` renvoie
+≥ 2 nœuds dont les périmètres de fichiers sont disjoints (déclare le périmètre de chaque nœud
+dans le plan de bataille au moment du `dag.sh add`), dispatche-les dans **un seul message**
+(plusieurs Task). Périmètres incertains ou chevauchants → séquentiel, ou `isolation: worktree`.
+HALT-5 (drift de scope) reste le filet.
+
+Pour chaque étape retenue, choisis les étages pertinents (une étape UI saute l'audit sécurité ;
+une étape sécurité le garde) :
 
 1. **Build** — `vf-coder` (Task) : cycle complet cadrage → plan → exécution → revue de l'étape.
-2. **Test** — si l'agent `vf-test-orchestrator` est installé (module mobile-test-team) ET que le
-   projet est mobile (Expo/React Native) → dispatche-le (boucle test → fix → re-test). Sinon la
-   recette passe par le skill `gsd-verify-work` ; à défaut reste sur les gates techniques et
-   signale la limite au rapport.
-3. **Audit** — `vf-auditer` (Task) si l'étape touche sécurité, données sensibles ou infra.
+2. **Vérification — en PARALLÈLE dans un seul message après le build** (deux juges read-only,
+   aucun risque de collision) :
+   - **Test** — si l'agent `vf-test-orchestrator` est installé (module mobile-test-team) ET que le
+     projet est mobile (Expo/React Native) → dispatche-le (boucle test → fix → re-test). Sinon la
+     recette passe par le skill `gsd-verify-work` ; à défaut reste sur les gates techniques et
+     signale la limite au rapport.
+   - **Audit** — `vf-auditer` (Task) si l'étape touche sécurité, données sensibles ou infra.
+   Au retour : fusionne et déduplique les findings des juges, puis UN SEUL `dag.sh reopen` si
+   correctifs — jamais un reopen par juge.
 
 Entre les étages : un compte rendu qui révèle une décision → panel. Des correctifs remontés par
-la revue ou l'audit → renvoyés à `vf-coder` (jamais corrigés par toi).
+la revue ou l'audit → renvoyés à `vf-coder` (jamais corrigés par toi). **Pas de double revue** :
+si le rapport typé de `vf-coder` est `passed` avec verdict revue PASS, ne re-dispatche pas de
+revue de code sur la même étape — seuls Test/Audit s'ajoutent.
 
 ## Contrôle de flux (acquis à ne jamais perdre)
 

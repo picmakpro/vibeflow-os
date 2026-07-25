@@ -42,8 +42,16 @@ GREP="$(command -v grep)"
 
 echo "== test-vibeflow-update (engine: $INSTALLER) =="
 
-# Snapshot RÉCURSIF du vrai ~/.claude AVANT la suite (garde-fou anti-pollution).
-HOME_BEFORE=$(find "$HOME/.claude" -type f 2>/dev/null | wc -l | tr -d ' ')
+# Snapshot du vrai ~/.claude AVANT la suite (garde-fou anti-pollution) — RESTREINT aux
+# sous-chemins que l'engine sait écrire (agents/skills/scripts/rules/commands/settings.json).
+# Un find sur TOUT ~/.claude était flaky : Claude Code lui-même y écrit en continu pendant la
+# suite (projects/, todos/, logs…) → faux positif « POLLUÉ » sans aucun lien avec l'engine.
+snapshot_home_claude() {
+  find "$HOME/.claude/agents" "$HOME/.claude/skills" "$HOME/.claude/scripts" \
+       "$HOME/.claude/rules" "$HOME/.claude/commands" "$HOME/.claude/settings.json" \
+       -type f 2>/dev/null | wc -l | tr -d ' '
+}
+HOME_BEFORE=$(snapshot_home_claude)
 
 # Helper : prépare un cache de test avec un module copié depuis le repo.
 # Usage : prepare_module <cache_dir> <module>
@@ -261,13 +269,41 @@ fi
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
+# T8 (VG-3) — module avec hooks mais merge-hooks.sh INTROUVABLE → install ÉCHOUE (exit ≠ 0)
+# et le module n'est PAS marqué installé (le lab ne peut plus croire avoir sa gouvernance).
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+# Engine copié SEUL dans un dossier isolé : ni $CACHE/_internal/merge-hooks.sh ni le repli
+# $(dirname $0)/merge-hooks.sh n'existent → merge_module_hooks doit propager l'échec.
+mkdir -p "$LAB/engine" "$CACHE/hooked/scripts" "$CACHE/hooked/hooks"
+cp "$INSTALLER" "$LAB/engine/vibeflow-update.sh"
+echo v1.0.0 > "$CACHE/hooked/VERSION"
+printf '{"name":"hooked","version":"v1.0.0"}\n' > "$CACHE/hooked/module.json"
+printf '#!/usr/bin/env bash\necho x\n' > "$CACHE/hooked/scripts/hooked.sh"
+printf '{"hooks":{"SessionStart":[{"matcher":"startup","hooks":[{"type":"command","command":"bash {{VF_SCRIPTS}}/hooked.sh || true"}]}]}}\n' > "$CACHE/hooked/hooks/hooks.json"
+rc=0
+(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+   bash "$LAB/engine/vibeflow-update.sh" install hooked >/dev/null 2>&1) || rc=$?
+miss=0
+[ "$rc" -ne 0 ] \
+  || { ko "T8 VG-3 : install exit 0 malgré la gouvernance non câblée (merger absent)"; miss=1; }
+if [ -f "$LAB/.claude/scripts/.vibeflow-installed" ] \
+   && "$GREP" -q '^hooked=' "$LAB/.claude/scripts/.vibeflow-installed"; then
+  ko "T8 VG-3 : module marqué installé alors que ses hooks ne sont pas câblés"; miss=1
+fi
+[ "$miss" -eq 0 ] \
+  && ok "T8 VG-3 : merger absent → install échoue (rc=$rc) et registre non menteur"
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
 # Garde-fou final : le vrai ~/.claude est inchangé (snapshot récursif avant=après).
 # ---------------------------------------------------------------------------
-HOME_AFTER=$(find "$HOME/.claude" -type f 2>/dev/null | wc -l | tr -d ' ')
+HOME_AFTER=$(snapshot_home_claude)
 if [ "$HOME_BEFORE" = "$HOME_AFTER" ]; then
-  ok "Garde-fou : ~/.claude intact ($HOME_AFTER fichiers récursifs avant=après)"
+  ok "Garde-fou : ~/.claude intact ($HOME_AFTER fichiers dans les zones engine avant=après)"
 else
-  ko "Garde-fou : ~/.claude POLLUÉ (avant=$HOME_BEFORE, après=$HOME_AFTER)"
+  ko "Garde-fou : ~/.claude POLLUÉ (avant=$HOME_BEFORE, après=$HOME_AFTER — zones agents/skills/scripts/rules/commands/settings)"
 fi
 
 # ---------------------------------------------------------------------------

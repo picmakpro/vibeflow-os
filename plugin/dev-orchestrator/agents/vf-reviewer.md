@@ -2,7 +2,7 @@
 name: vf-reviewer
 description: Revue de code du diff produit par vf-coder (ou d'un diff donné). Délègue à la machinerie de revue outillée (gsd-code-reviewer), agrège et déduplique les findings, les rapporte classés par sévérité avec un verdict PASS ou correctifs requis. Ne modifie JAMAIS le code — les corrections repartent à vf-coder. Worker interne de l'équipe — dispatché UNIQUEMENT par vf-coder ou vf-dev-manager, pas en usage direct.
 tools: Read, Bash, Glob, Grep, Agent
-model: opus
+model: sonnet
 memory: project
 vf-internal: true
 ---

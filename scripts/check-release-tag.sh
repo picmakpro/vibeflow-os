@@ -45,10 +45,14 @@ fi
 
 # Cohérence inter-fichiers (ADR-054) : la fiche marketplace et les badges README avaient dérivé
 # de 2 releases (fiche 2.26.0 / installé 2.27.1, vécu terrain). Délégué à check-version-sync.sh.
+# F23 : l'absence du script délégué désactivait silencieusement la moitié du gate — désormais
+# c'est une erreur d'intégrité (exit 2), pas un skip.
 SYNC="$ROOT/scripts/check-version-sync.sh"
-if [ -f "$SYNC" ]; then
-  bash "$SYNC" >/dev/null 2>&1 || { bash "$SYNC" >&2 || true; exit 1; }
+if [ ! -f "$SYNC" ]; then
+  echo "[check-release-tag] ✗ scripts/check-version-sync.sh introuvable — gate de synchro non exécutable (intégrité du repo)" >&2
+  exit 2
 fi
+bash "$SYNC" >/dev/null 2>&1 || { bash "$SYNC" >&2 || true; exit 1; }
 
 suffix=""; $REMOTE && suffix=" (poussé sur origin)"
 echo "[check-release-tag] ✓ VERSION=$raw ↔ tag $tag${suffix}"

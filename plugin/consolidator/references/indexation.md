@@ -78,7 +78,7 @@ Pour DECISIONS.md, LEARNINGS.md, BLOCKERS.md, EVALS.md, JOURNAL.md :
 1. Toujours commencer par `Read(file, offset=1, limit=50)` (index seul)
 2. Reperer l'ID + colonne `#Ligne` dans l'index
 3. `Read(file, offset=#Ligne, limit=40)` pour le detail
-4. JAMAIS de Read(file) entier sauf au /checkpoint ou /consolidate
+4. JAMAIS de Read(file) entier sauf au /vf-audit ou /consolidate
 ```
 
 ## Migration des registres existants

@@ -1,6 +1,6 @@
 ---
 name: agent-density-auditor
-description: Audit, plan migration, applique et garde la densite des prompts systeme d'agents Claude Code selon la charte VibeFlow ADR-029 (Agent ≤250L / SKILL.md ≤500L / Bootstrap SessionStart ≤2000 tokens). Use this skill whenever the user mentions agent density, agent too long, heavy agent, prompt size, agent refactoring, agent diet, "reduire prompt systeme", "couper un agent", "alleger agent", OR whenever creating/editing files in `.claude/agents/*.md`, OR whenever auditing a VibeFlow / DevFlow project, OR when the user invokes `/checkpoint`, OR when Initializer generates new agents and needs a validation gate. Even if the user doesn't say "density" explicitly, trigger if they show a long agent file (>250 lines) or ask why an agent "hallucinates" / "drifts" — density bloat is the most common root cause per ADR-029.
+description: Audit, plan migration, applique et garde la densite des prompts systeme d'agents Claude Code selon la charte VibeFlow ADR-029 (Agent ≤250L / SKILL.md ≤500L / Bootstrap SessionStart ≤2000 tokens). Use this skill whenever the user mentions agent density, agent too long, heavy agent, prompt size, agent refactoring, agent diet, "reduire prompt systeme", "couper un agent", "alleger agent", OR whenever creating/editing files in `.claude/agents/*.md`, OR whenever auditing a VibeFlow / DevFlow project, OR when the user invokes `/vf-audit`, OR when Initializer generates new agents and needs a validation gate. Even if the user doesn't say "density" explicitly, trigger if they show a long agent file (>250 lines) or ask why an agent "hallucinates" / "drifts" — density bloat is the most common root cause per ADR-029.
 model: sonnet
 ---
 
@@ -22,7 +22,7 @@ Quatre modes selon le besoin :
 | **gate** | Validation automatique post-edit (hook PreToolUse, Initializer) | Exit 0 (conforme) / 1 (violation) |
 
 **Triggers explicites** :
-- `/checkpoint` → mode `measure` sur tout `.claude/agents/`
+- `/vf-audit` → mode `measure` sur tout `.claude/agents/`
 - Initializer apres generation agents → mode `gate` (bloque si violation)
 - User : "mon agent backend est trop long" → mode `plan`
 - User : "applique le plan de migration" → mode `apply`

@@ -61,7 +61,7 @@ si le lab n'a pas (encore) de registres mémoire.
 ## Garder le socle vivant (moteur léger)
 
 `scripts/check-planning-state.sh` est un garde-fou **advisory** (jamais bloquant) qui signale un
-`STATE.md` périmé ou un `.planning/` absent. Utilisable à la main, au `/checkpoint`, ou via un hook
+`STATE.md` périmé ou un `.planning/` absent. Utilisable à la main, au `/vf-audit`, ou via un hook
 SessionStart **opt-in** (wiring documenté dans `references/domain-detection.md`, jamais auto-injecté).
 C'est ce qui amorce un lab fraîchement installé **sans rien imposer** : le garde-fou surface le
 manque, le skill pose un socle adapté au métier.

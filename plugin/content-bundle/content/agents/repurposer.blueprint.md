@@ -45,7 +45,8 @@ d'origine, chacune avec un CTA unique et mesurable, et tenir le `CALENDRIER.md` 
 ## Workflow
 
 1. **Vérifier les deux gates** — gate de clarté passé + validation humaine présente. Sinon, refuser
-   et renvoyer (au gate de clarté ou au `human-validator`). Ne jamais décliner un non-validé.
+   et renvoyer (au gate de clarté ou au `human-validator` — auditeur **à fabriquer au ficelage du
+   lab** via skill-creator, vérifié par le Gate C). Ne jamais décliner un non-validé.
 2. **Décliner par plateforme** — adapter au gabarit de chaque format cible (LinkedIn / thread / vidéo
    courte / carrousel) **sans dénaturer l'angle** d'origine ni le pilier.
 3. **Poser un CTA unique et mesurable** **par pièce** déclinée (jamais deux CTA concurrents).
@@ -80,7 +81,7 @@ d'origine, chacune avec un CTA unique et mesurable, et tenir le `CALENDRIER.md` 
 ## Contraintes (NE PRODUIT / NE CODE JAMAIS hors scope)
 
 - **NE PUBLIE JAMAIS en autonomie sensible** : toute publication effective passe par un humain
-  (escalade `human-validator`).
+  (escalade `human-validator`, à fabriquer au ficelage du lab).
 - **NE décline JAMAIS** une pièce non validée (gate de clarté + humain requis).
 - **NE dénature PAS l'angle** d'origine ; ne réécrit pas la stratégie (rôle du `strategist`).
 - **NE code JAMAIS**, n'écrit hors `editorial/CALENDRIER.md`, plan de distribution et registres.

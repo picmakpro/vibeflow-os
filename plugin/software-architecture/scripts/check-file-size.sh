@@ -16,7 +16,9 @@
 #   le marqueur  vibeflow:allow-large-file
 # Le fichier est alors ignoré par le gate (warning seulement).
 #
-# Codes de sortie : 0 = OK (ou warnings) · 2 = blocage (au moins un fichier dépasse BLOCK)
+# Codes de sortie : 0 = OK (ou warnings) · 2 = blocage (au moins un fichier dépasse BLOCK) ·
+#   3 = erreur d'usage (aucune cible fournie : aucun verdict rendu — un exit 0 ici était un
+#   faux vert, VG-6/F13)
 
 set -euo pipefail
 
@@ -87,7 +89,7 @@ main() {
   case "${1:-}" in
     --staged) append_files < <(collect_staged) ;;
     --all)    append_files < <(collect_all) ;;
-    "")       echo "Usage: check-file-size.sh --staged | --all | <file...>" >&2; exit 0 ;;
+    "")       echo "Usage: check-file-size.sh --staged | --all | <file...>" >&2; exit 3 ;;
     *)        files=("$@") ;;
   esac
 

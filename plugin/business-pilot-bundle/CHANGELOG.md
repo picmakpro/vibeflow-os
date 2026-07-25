@@ -1,5 +1,10 @@
 # CHANGELOG — business-pilot-bundle
 
+## [v1.2.1] — 2026-07-25
+
+### Corrigé
+- Le gate `quality-gate-client` est explicitement marqué « à fabriquer au ficelage du lab » au lieu d'être invoqué comme existant (F16).
+
 ## [v1.2.0] — 2026-07-16 (ADR-048 — orchestrateur métier)
 
 ### Modifié

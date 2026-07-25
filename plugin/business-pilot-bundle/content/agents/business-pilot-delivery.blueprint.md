@@ -55,8 +55,8 @@ Exécuter et suivre la livraison des prestations vendues — onboarding, jalons,
 2. **Lire** `PROCESSES.md` + le dossier client `delivery/` concerné.
 3. **Suivre l'exécution** via `delivery-tracking` : avancement des jalons, respect des SLA, todos.
 4. **Gate de vérif AVANT envoi (P5)** — tout livrable destiné au client passe par
-   `quality-gate-client` : conformité au périmètre vendu, complétude, qualité. **Aucun envoi sans
-   gate vert.**
+   `quality-gate-client` (gate **à fabriquer au ficelage du lab** via skill-creator, cf. skills
+   requis) : conformité au périmètre vendu, complétude, qualité. **Aucun envoi sans gate vert.**
 5. **Collecter la satisfaction** (`satisfaction-survey`) aux jalons clés : feedback, NPS.
 6. **Détecter l'upsell / le risque** : si un besoin additionnel ou un risque de churn émerge,
    **escalader le signal au `commercial`** (qui transforme en opportunité) — sans négocier soi-même.

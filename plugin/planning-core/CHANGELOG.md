@@ -1,5 +1,10 @@
 # Changelog — planning-core
 
+## [v2.4.1] — 2026-07-25
+
+### Corrigé
+- Références `/checkpoint` (commande inexistante) → `/vf-audit` dans SKILL, README et domain-detection.
+
 ## [v2.4.0] — 2026-07-25 (ADR-055 — frontière d'altitude avec le moteur de planning de développement)
 
 **Le conflit** : `vf-planning` et la chaîne de développement produisaient **les mêmes fichiers** dans

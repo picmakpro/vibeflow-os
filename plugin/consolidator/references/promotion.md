@@ -126,7 +126,7 @@ Avant d'accepter un draft, verifier :
 
 ## Quand declencher
 
-- **Trimestriel** ou au /checkpoint majeur
+- **Trimestriel** ou au /vf-audit majeur
 - **Manuel** : `/consolidate --pillar=promote`
 - **Apres un cluster de learnings sur meme theme** : la detection sort souvent un candidat naturel
 

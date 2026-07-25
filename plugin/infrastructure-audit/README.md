@@ -14,7 +14,7 @@ Anthropic met à jour Claude Code régulièrement. Sans audit périodique :
 - Hooks deprecated → ne s'exécutent plus
 - Scripts qui dépendent de tools retirés → plantent silencieusement
 - Conventions frontmatter qui changent → agents ne chargent plus correctement
-- Conventions inventées (ADR-031) → semblent marcher jusqu'au prochain update
+- Conventions inventées (ADR-056) → semblent marcher jusqu'au prochain update
 
 Ce skill audite l'infrastructure en 4 axes complémentaires.
 

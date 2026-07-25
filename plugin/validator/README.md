@@ -54,7 +54,7 @@ Task(subagent_type="vibeflow-validator", prompt="Audit complet")
 
 ### Cas d'usage
 
-- **À chaque /checkpoint** (auto via trigger update)
+- **À chaque /vf-audit** (auto via trigger update)
 - **Après update Claude Code** (snapshot infra + diff)
 - **Avant release module vibeflow-os** (gate qualité)
 - **Quand un agent semble dériver** (premier suspect = densité)

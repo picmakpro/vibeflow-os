@@ -147,11 +147,11 @@ la table de redirection intention → verbe y vit, et ne se duplique pas ici.
 ## Séquence A (suite) — Maintenance du socle universel (`.planning/` déjà là)
 
 - **Vérifier la fraîcheur** : `scripts/check-planning-state.sh` (advisory) signale un `STATE.md`
-  périmé ou un `.planning/` absent — utilisable manuellement, au `/checkpoint`, ou en hook
+  périmé ou un `.planning/` absent — utilisable manuellement, au `/vf-audit`, ou en hook
   SessionStart opt-in (wiring dans `references/domain-detection.md`).
 - **Détecter la dette de planning** (labs à compartiments) : `scripts/detect-planning-debt.sh`
   (advisory) liste les compartiments **actifs + sans plan + au-dessus du seuil d'autonomie**. Alerte,
-  jamais bloquant. À lancer au `/checkpoint` ou via `vibeflow-validator`.
+  jamais bloquant. À lancer au `/vf-audit` ou via `vibeflow-validator`.
 - **Mettre à jour `STATE.md`** en priorité (position courante, % d'avancement, focus, todos).
 - À la clôture d'une étape : écrire son `SUMMARY.md` ; à l'ouverture : son `PLAN.md`.
 - À la livraison d'un jalon : archiver dans `MILESTONES.md` + `milestones/`.

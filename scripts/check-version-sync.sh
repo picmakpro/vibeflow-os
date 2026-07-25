@@ -13,8 +13,13 @@
 #   4. badge version README.fr.md
 #   5. compteur de modules : badges + texte des 2 README vs nombre réel de plugin/*/module.json
 #
+# Sources comparées par MODULE (VG-2 : le gate comptait les fichiers module.json sans jamais
+# lire les versions — « sources synchronisées » affirmait plus large que ce qui était vérifié) :
+#   6. plugin/<mod>/VERSION ↔ plugin/<mod>/module.json .version (triade par module)
+#
 # Parsing grep/sed VOLONTAIREMENT (pas de jq : ce gate doit tourner même sans jq installé).
-# Codes de sortie : 0 = synchro · 1 = dérive détectée · 2 = erreur d'usage
+# Codes de sortie : 0 = synchro · 1 = dérive détectée · 2 = erreur d'usage ·
+#   3 = INDÉTERMINÉ (aucun plugin/*/module.json découvert : cible absente, aucun verdict — F13)
 set -uo pipefail
 
 # Racine dérivée de l'emplacement du script (scripts/ vit à la racine) — PAS du cwd :
@@ -43,6 +48,12 @@ for f in README.md README.fr.md; do
 done
 
 real=$(ls -d "$ROOT"/plugin/*/module.json 2>/dev/null | grep -c .)
+# Contrat de découverte (F13) : zéro module découvert = zéro verdict. Un « ✓ synchronisées »
+# rendu sans avoir rien compté serait un faux vert (exit 3 = INDÉTERMINÉ, distinct de 0).
+if [ "$real" -eq 0 ]; then
+  echo "[check-version-sync] ✗ INDÉTERMINÉ : aucun plugin/*/module.json découvert sous $ROOT — cible absente, aucun verdict rendu" >&2
+  exit 3
+fi
 for f in README.md README.fr.md; do
   b="$(badge_modules "$ROOT/$f")"
   if [ "$b" = "$real" ]; then ok "$f badge modules $b"; else ko "$f badge modules='$b' ≠ réel=$real (plugin/*/module.json)"; fi
@@ -51,6 +62,21 @@ t="$(grep -o '[0-9][0-9]* modules total' "$ROOT/README.md" | head -1 | grep -o '
 if [ -n "$t" ] && [ "$t" != "$real" ]; then ko "README.md texte '$t modules total' ≠ réel=$real"; fi
 t="$(grep -o '[0-9][0-9]* modules au total' "$ROOT/README.fr.md" | head -1 | grep -o '^[0-9]*')"
 if [ -n "$t" ] && [ "$t" != "$real" ]; then ko "README.fr.md texte '$t modules au total' ≠ réel=$real"; fi
+
+# 6. Triade par module (VG-2) : plugin/<mod>/VERSION ↔ module.json .version. C'est la dérive
+# qui a fait mentir le tableau README sur 13 modules (F1) sans qu'aucun gate ne la voie.
+mod_fail=0
+for mj in "$ROOT"/plugin/*/module.json; do
+  mod_dir="$(dirname "$mj")"; mod="$(basename "$mod_dir")"
+  vfile="$mod_dir/VERSION"
+  if [ ! -f "$vfile" ]; then ko "plugin/$mod : fichier VERSION absent (module.json présent)"; mod_fail=1; continue; fi
+  mv_ver="$(tr -d 'v[:space:]' < "$vfile")"
+  mj_ver="$(json_version "$mj" | tr -d 'v[:space:]')"
+  if [ -z "$mv_ver" ] || [ -z "$mj_ver" ]; then ko "plugin/$mod : version illisible (VERSION='$mv_ver', module.json='$mj_ver')"; mod_fail=1
+  elif [ "$mv_ver" != "$mj_ver" ]; then ko "plugin/$mod : VERSION=$mv_ver ≠ module.json=$mj_ver"; mod_fail=1
+  fi
+done
+[ "$mod_fail" -eq 0 ] && ok "triade par module : $real modules VERSION ↔ module.json alignés"
 
 if [ "$FAIL" -eq 1 ]; then
   echo "[check-version-sync] dérive détectée — synchroniser AVANT release (canon = VERSION racine)." >&2

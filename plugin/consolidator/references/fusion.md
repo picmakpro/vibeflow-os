@@ -104,7 +104,7 @@ Resolution : renommer le plus recent en LRN-096 (premier ID libre)
 
 ## Quand declencher
 
-- **Au /checkpoint** : detection automatique, propositions affichees au user
+- **Au /vf-audit** : detection automatique, propositions affichees au user
 - **Manuel** : `/consolidate --pillar=fusion`
 - **Apres un /session-close** ou apparait une nouvelle entree avec ID conflictuel : detection immediate
 

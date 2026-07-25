@@ -14,6 +14,7 @@
 #   check-debug-research.sh --file <x.md>     # une seule brique
 #   check-debug-research.sh --agents-dir=PATH # défaut .claude/agents
 #   check-debug-research.sh --skills-dir=PATH # défaut .claude/skills
+#   check-debug-research.sh --allow-empty     # avec --strict : tolère une cible vide (sinon exit 3)
 #
 # Une brique est « de dépannage » si son name/description matche : debug|diagnos|dépannage|
 #   depannage|crash|stack trace|ça plante|ca plante. Elle est CONFORME si son corps mentionne la
@@ -25,7 +26,8 @@
 # BLOQUANT (exit 1) : une brique debug SANS marqueur de recherche documentaire.
 # WARNING : brique debug qui délègue sans marqueur explicite (ERROR en --strict).
 #
-# Codes de sortie : 0 = conforme (ou hook, ou rien à vérifier) · 1 = non conforme
+# Codes de sortie : 0 = conforme (ou hook, ou rien à vérifier) · 1 = non conforme ·
+#   3 = INDÉTERMINÉ (--strict sur cible absente/vide : aucune brique découverte, aucun verdict — F13)
 # Fail-open : python3 absent → exit 0 silencieux (ne bloque pas la session).
 
 set -uo pipefail
@@ -34,12 +36,14 @@ AGENTS_DIR=".claude/agents"
 SKILLS_DIR=".claude/skills"
 STRICT=false
 HOOK_MODE=false
+ALLOW_EMPTY=false
 SINGLE_FILE=""
 
 for arg in "$@"; do
   case "$arg" in
     --strict)         STRICT=true ;;
     --hook)           HOOK_MODE=true ;;
+    --allow-empty)    ALLOW_EMPTY=true ;;
     --file)           : ;; # valeur au prochain arg — géré ci-dessous
     --agents-dir=*)   AGENTS_DIR="${arg#*=}" ;;
     --skills-dir=*)   SKILLS_DIR="${arg#*=}" ;;
@@ -60,13 +64,14 @@ case "$(command -v python3 2>/dev/null)" in
 esac
 
 VF_AGENTS_DIR="$AGENTS_DIR" VF_SKILLS_DIR="$SKILLS_DIR" VF_STRICT="$STRICT" \
-VF_HOOK="$HOOK_MODE" VF_SINGLE="$SINGLE_FILE" "$PYBIN" -c "
+VF_HOOK="$HOOK_MODE" VF_SINGLE="$SINGLE_FILE" VF_ALLOW_EMPTY="$ALLOW_EMPTY" "$PYBIN" -c "
 import glob, os, re, sys
 
 agents_dir = os.environ[\"VF_AGENTS_DIR\"]
 skills_dir = os.environ[\"VF_SKILLS_DIR\"]
 strict = os.environ[\"VF_STRICT\"] == \"true\"
 hook = os.environ[\"VF_HOOK\"] == \"true\"
+allow_empty = os.environ[\"VF_ALLOW_EMPTY\"] == \"true\"
 single = os.environ[\"VF_SINGLE\"]
 
 NOT_AGENTS = {\"contracts.md\", \"README.md\", \"AGENTS.md\"}
@@ -136,6 +141,11 @@ else:
     files += [f for f in sorted(glob.glob(os.path.join(agents_dir, \"*.md\")))
               if os.path.basename(f) not in NOT_AGENTS]
     if not files:
+        # Contrat de decouverte (F13, vacuous green) : en --strict, zero brique = zero verdict.
+        # exit 3 = INDETERMINE, distinct de 0 = CONFORME. --allow-empty pour les cas legitimes.
+        if strict and not allow_empty and not hook:
+            print(f\"[check-debug-research] ✗ INDETERMINE : aucune brique dans {skills_dir}/{agents_dir} — cible absente ou vide, aucun verdict rendu (--allow-empty pour tolerer)\")
+            sys.exit(3)
         if not hook:
             print(f\"[check-debug-research] aucune brique dans {skills_dir}/{agents_dir} — rien a verifier\")
         sys.exit(0)

@@ -1,5 +1,10 @@
 # Changelog — mobile-test-team
 
+## v1.3.1 — 2026-07-25
+
+### Corrigé
+- Agents de la boucle en sonnet ; globs de `mobile-verify-gate.md` resserrés sur des marqueurs discriminants mobile (`app/**/_layout.tsx`, `src/screens/**`, `.maestro/**`) — la rule ne se charge plus sur les projets Next.js.
+
 ## v1.3.0 — 2026-07-22 (ADR-053 — rapport de worker typé)
 
 ### Ajouté
