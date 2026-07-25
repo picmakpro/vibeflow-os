@@ -9,6 +9,7 @@ description: >
   ✘ pas pour ajouter / réordonner une étape dans la feuille de route → /vf-phase · ✘ pas
   pour archiver les vieux dossiers d'étapes → /vf-cleanup · ✘ pas pour savoir où on en est
   aujourd'hui → /vf-progress.
+  ✘ pas pour les jalons du **lab** lui-même, ou d'un lab non-dev sans moteur de planning de code → /vf-planning.
   Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 

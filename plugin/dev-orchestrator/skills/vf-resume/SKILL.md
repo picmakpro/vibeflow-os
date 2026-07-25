@@ -9,6 +9,7 @@ description: >
   ✘ pas pour un point d'avancement / savoir ce qui vient après → /vf-progress · ✘ pas pour
   noter où on s'arrête avant de couper → /vf-pause · ✘ pas pour annuler du travail →
   /vf-undo.
+  ✘ pas pour reprendre le fil d'un **lab** non-dev, hors projet de code → /vf-planning.
   Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 

@@ -8,6 +8,7 @@ description: >
   ✘ pas pour reprendre le fil à la session suivante → /vf-resume · ✘ pas pour continuer à
   avancer pendant l'absence → /vf-auto · ✘ pas pour livrer un travail terminé → /vf-ship ·
   ✘ pas pour un point d'avancement → /vf-progress.
+  ✘ pas pour consigner l'état d'un **lab** non-dev, hors projet de code → /vf-planning.
   Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 

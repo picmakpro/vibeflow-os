@@ -8,6 +8,7 @@ description: >
   qu'elle contient.
   ✘ pas pour cadrer et découper le contenu d'une étape → /vf-plan · ✘ pas pour ouvrir ou
   clore un jalon → /vf-milestone · ✘ pas pour annuler du travail déjà fait → /vf-undo.
+  ✘ pas pour structurer le suivi du **lab** lui-même, ou d'un lab non-dev → /vf-planning.
   Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 

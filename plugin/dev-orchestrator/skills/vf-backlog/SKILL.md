@@ -9,6 +9,7 @@ description: >
   ✘ pas pour creuser une idée encore floue → /vf-explore · ✘ pas pour trier les issues et
   PR entrantes du dépôt → /vf-inbox · ✘ pas pour cadrer un lot de travail à faire →
   /vf-plan.
+  ✘ pas pour la réserve d'idées du **lab** lui-même, ou d'un lab non-dev → /vf-planning.
   Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 
