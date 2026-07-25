@@ -11,7 +11,7 @@ description: >
   route. Générique multi-stack (web, mobile, desktop).
   ✘ pas pour une maquette jetable d'exploration (« montre-moi à quoi ça ressemblerait ») →
   /vf-sketch · ✘ pas pour un prototype de code jetable qui répond à une question technique →
-  /vf-spike · ✘ pas pour construire l'écran une fois la direction validée → /vf-execute.
+  gsd-spike · ✘ pas pour construire l'écran une fois la direction validée → gsd-execute-phase.
   Invocable par l'utilisateur ET par l'agent en autonomie ET par le routeur de développement sur
   une phase de design.
 ---

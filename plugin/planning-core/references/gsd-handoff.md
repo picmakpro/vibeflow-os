@@ -25,21 +25,23 @@ Pour trancher n'importe quel geste : **est-ce que ça concerne un projet, ou le 
 *résultat* — « des livrables ont changé, le planning suit-il ? » — quel qu'en soit l'auteur, GSD ou
 humain. Il ne concurrence donc aucun producteur, et GSD n'offre aucun équivalent bloquant.
 
-## Table de redirection — intention → verbe
+## Table de redirection — intention → brique GSD
 
-Sur un lab dev, ces intentions **ne sont pas traitées** par `vf-planning`. Elles partent au verbe.
+Sur un lab dev, ces intentions **ne sont pas traitées** par `vf-planning`. Elles partent à la
+brique GSD correspondante (directement, ou via l'agent `vibeflow-dev` qui détecte l'intention).
 
 | L'utilisateur demande | Rediriger vers |
 |---|---|
-| démarrer le projet, poser la charte, faire la feuille de route, lister les exigences | `/vf-init` |
-| où en est-on, statut, avancement, la suite, next | `/vf-progress` |
-| cadrer une étape, découper, préparer le sprint, planifier la feature | `/vf-plan` |
-| comprendre le code existant, cartographier, « c'est quoi ce repo » | `/vf-map` |
-| clôturer un jalon, archiver le milestone, démarrer le suivant | `/vf-progress` |
-| vérifier la santé du `.planning/`, réparer une incohérence | — (agent) : aucun verbe dédié à ce jour, l'intention part au routeur de dev |
+| démarrer le projet, poser la charte, faire la feuille de route, lister les exigences | le démarrage de projet : `gsd-new-project` (garde-fou first-use de l'agent `vibeflow-dev`) |
+| où en est-on, statut, avancement, la suite, next | `gsd-progress` |
+| cadrer une étape, découper, préparer le sprint, planifier la feature | cadrage + plan : `gsd-discuss-phase` puis `gsd-plan-phase` |
+| comprendre le code existant, cartographier, « c'est quoi ce repo » | `gsd-map-codebase` |
+| clôturer un jalon, archiver le milestone, démarrer le suivant | `gsd-complete-milestone`, puis `gsd-new-milestone` |
+| vérifier la santé du `.planning/`, réparer une incohérence | `gsd-health` |
 
-**Toujours un verbe `/vf-*`, jamais un `gsd-*` en entrée de chaîne** — Iron Law de
-`dev-orchestrator/rules/vf-verb-precedence.md`. Ne jamais nommer GSD à l'utilisateur.
+Les skills `gsd-*` sont l'interface directe du moteur de planning dev ; sur une intention ambiguë,
+l'agent `vibeflow-dev` tranche via la carte canonique
+(`dev-orchestrator/references/intent-routing.md`).
 
 ## Ce que `vf-planning` fait encore sur un lab dev
 
@@ -51,7 +53,7 @@ La **couche lab**, et rien d'autre :
 3. Surface de la dette de planning (`detect-planning-debt.sh`).
 4. Pont mémoire vers `.claude/memory/` — voir `bridge-memory.md`.
 
-Un compartiment dev reçoit son `.planning/` **écrit par GSD** (via `/vf-init` depuis ce
+Un compartiment dev reçoit son `.planning/` **écrit par GSD** (via `gsd-new-project` depuis ce
 compartiment). `vf-planning` ne pose jamais le tronc d'un projet de code.
 
 ## Protocole de migration (exit 2)
@@ -65,7 +67,7 @@ compartiment). `vf-planning` ne pose jamais le tronc d'un projet de code.
    déclenche un exit 2 et reste **non-dev** : dans ce cas, séquence universelle, fin de l'histoire.
 3. **Si le lab est bien dev** : exposer le constat en langage utilisateur — « le suivi de ce projet
    est dans un format que l'outillage de développement ne sait pas lire » — et **proposer**
-   `/vf-init` pour que le moteur reprenne la main.
+   `gsd-new-project` pour que le moteur reprenne la main.
 4. **Ce qui se perd, le dire.** Les compteurs `progress.total_steps` et le champ `profile` n'ont pas
    d'équivalent GSD. Les décisions clés de `PROJECT.md` méritent d'être promues en mémoire (pont)
    **avant** la reprise. Le dire à l'utilisateur, le laisser décider.
