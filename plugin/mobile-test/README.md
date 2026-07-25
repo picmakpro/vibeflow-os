@@ -131,4 +131,4 @@ fait, considère le module comme une base solide mais à confirmer.
 - Notes de portabilité : `references/portability-notes.md`
 - Doctrine des boucles autonomes : `dev-orchestrator/references/autonomous-guardrails.md`
 - Cloisonnement par outils : Pattern 12 (`reference/content/methodology/patterns/12-cloisonnement-outils.md`)
-- Spec d'origine (recherche) : `.planning/research/agent-team-spec-revizapp.md`
+- Spec d'origine (recherche) : `.planning/research/agent-team-spec.md`

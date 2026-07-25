@@ -105,7 +105,7 @@ du projet (XcodeBuildMCP, mobile-mcp, DB métier…).
 
 ## [v1.5.0] — 2026-07-09
 
-Équipe manager de mission (pattern Reviz généralisé — spec 2026-07-09, ADR-046).
+Équipe manager de mission (pattern généralisé — spec 2026-07-09, ADR-046).
 
 - **4 agents natifs** (`agents/`) : `vf-dev-manager` (sommet — planifie, décide via panels,
   distribue, contrôle de flux entre étages) + workers internes `vf-coder` (cycle d'étape),
@@ -155,7 +155,7 @@ du projet (XcodeBuildMCP, mobile-mcp, DB métier…).
 - **Référence `references/autonomous-guardrails.md`** — doctrine des 5 garde-fous de boucle
   autonome (anti-thrash N=3, anti-régression revert, arrêt vert/plafond, séparation anti-triche,
   rapport de synthèse). Branchée sur `vf-auto` (section « Garde-fous (non supervisé) »). Extraite
-  et généralisée depuis le track « équipe d'agents » (revizapp, couche B).
+  et généralisée depuis le track « équipe d'agents » (couche B).
 
 ### Note
 - La séparation anti-triche s'appuie sur le **Pattern 12 — Cloisonnement par outils**
