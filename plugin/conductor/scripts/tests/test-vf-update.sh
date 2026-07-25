@@ -9,13 +9,20 @@ TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 echo "== update-banner.sh =="
 export XDG_CACHE_HOME="$TMP/cache"
 mkdir -p "$XDG_CACHE_HOME/vibeflow"
+# ISOLATION (P1-e) : update-banner → check-legacy scanne $HOME/.claude (scope user) ET ./.claude
+# (scope projet, cwd). Sans sandbox, le verdict dépendait du poste : un vrai ~/.claude avec des
+# modules en legacy/drift ajoutait « nouvelle méthode disponible » au bandeau → « silencieux si
+# à jour » rouge ou vert selon la machine. HOME stub + cwd neutre = déterministe partout.
+FAKE_HOME="$TMP/home"; WORKDIR="$TMP/work"
+mkdir -p "$FAKE_HOME" "$WORKDIR"
+run_banner() { (cd "$WORKDIR" && HOME="$FAKE_HOME" bash "$DIR/update-banner.sh" 2>/dev/null); }
 echo '{"update_available":true,"installed":"2.4.1","latest":"2.18.0","checked_at":"x"}' > "$XDG_CACHE_HOME/vibeflow/update-check.json"
-out="$(bash "$DIR/update-banner.sh" 2>/dev/null)"
+out="$(run_banner)"
 ok "émet un systemMessage si update dispo"  "$(echo "$out" | grep -q 'systemMessage' && echo true || echo false)"
 ok "cite installé → latest (2.4.1 → 2.18.0)" "$(echo "$out" | grep -q '2.4.1' && echo "$out" | grep -q '2.18.0' && echo true || echo false)"
 
 echo '{"update_available":false,"installed":"2.18.0","latest":"2.18.0","checked_at":"x"}' > "$XDG_CACHE_HOME/vibeflow/update-check.json"
-out="$(bash "$DIR/update-banner.sh" 2>/dev/null)"
+out="$(run_banner)"
 ok "silencieux si à jour"                    "$(echo "$out" | grep -q 'systemMessage' && echo false || echo true)"
 
 echo "== vf-update-run.sh (sélection du cache semver le plus récent) =="

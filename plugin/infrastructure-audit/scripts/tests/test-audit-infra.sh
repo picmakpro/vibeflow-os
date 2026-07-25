@@ -125,6 +125,25 @@ else
   ko "T6 whitelist toujours périmée (2.1.215 absent)"
 fi
 
+# T7 — VG-5 (F13) : --strict sans .claude → exit 3 (INDÉTERMINÉ, plus de JSON à zéro en vert)
+EMPTY="$WORK/no-lab"; mkdir -p "$EMPTY"
+run_in "$EMPTY" "$BASH_BIN" "$SCRIPT" --strict --quick >/dev/null 2>&1
+rc=$?
+[ "$rc" -eq 3 ] && ok "T7 VG-5 : --strict + .claude absent → exit 3 INDÉTERMINÉ" || ko "T7 --strict sans cible devrait sortir 3, obtenu rc=$rc"
+
+# T8 — VG-5 : --strict avec finding ERROR (script de hook manquant) → exit 1
+run_in "$LAB_ERR" "$BASH_BIN" "$SCRIPT" --strict --axis=hooks >/dev/null 2>&1
+rc=$?
+[ "$rc" -eq 1 ] && ok "T8 VG-5 : --strict + ERROR hooks → exit 1 (le finding porte enfin un exit code)" || ko "T8 --strict avec ERROR devrait sortir 1, obtenu rc=$rc"
+
+# T9 — VG-5 : --strict sur lab propre → exit 0 ; défaut (sans --strict) sur lab cassé → exit 0 (compat)
+run_in "$LAB" "$BASH_BIN" "$SCRIPT" --strict --axis=hooks >/dev/null 2>&1
+rc=$?
+[ "$rc" -eq 0 ] && ok "T9a VG-5 : --strict sur lab propre → exit 0" || ko "T9a lab propre devrait sortir 0 en strict, obtenu rc=$rc"
+run_in "$LAB_ERR" "$BASH_BIN" "$SCRIPT" --axis=hooks >/dev/null 2>&1
+rc=$?
+[ "$rc" -eq 0 ] && ok "T9b VG-5 : défaut (advisory) inchangé → exit 0 même avec ERROR" || ko "T9b advisory devrait rester 0, obtenu rc=$rc"
+
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
 [ "$fail" -eq 0 ]

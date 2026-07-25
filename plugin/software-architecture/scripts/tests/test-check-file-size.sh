@@ -80,5 +80,10 @@ else
   ko "ARC-04 : impossible d'initialiser le repo git de test"
 fi
 
+# 9. VG-6 (F13) : aucun argument → erreur d'usage exit 3 (avant : exit 0 = faux vert)
+"$BASH_BIN" "$SCRIPT" >/dev/null 2>&1
+rc=$?
+[ "$rc" -eq 3 ] && ok "VG-6 : sans argument → exit 3 (erreur d'usage, plus de faux vert)" || ko "VG-6 : sans argument devrait sortir 3, obtenu rc=$rc"
+
 echo "== résultat : $pass OK / $fail KO =="
 [ "$fail" -eq 0 ]

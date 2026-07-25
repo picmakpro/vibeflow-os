@@ -288,6 +288,18 @@ OUT="$(payload_write "$WORK/lab/.claude/agents/nouvel-agent.md" "$GOOD" | ( cd "
 OUT="$(payload_write "$WORK/ailleurs/.claude/agents/perso.md" "$BAD" | run_guard)"
 [ -z "$OUT" ] && ok "T20 agent hors lab courant → allow (CND-05)" || ko "T20 doctrine imposée hors lab : $OUT"
 
+# T21 — F13 (vacuous green) : --strict sur cible vide → exit 3 (INDÉTERMINÉ, pas un vert)
+RC=0; run_check --strict >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 3 ] && ok "T21 --strict + aucun agent → exit 3 INDÉTERMINÉ (F13)" || ko "T21 cible vide devrait sortir 3, obtenu rc=$RC"
+
+# T22 — F13 : --strict --allow-empty sur cible vide → exit 0 (opt-in explicite)
+RC=0; run_check --strict --allow-empty >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] && ok "T22 --strict --allow-empty + aucun agent → exit 0 (opt-in)" || ko "T22 --allow-empty devrait sortir 0, obtenu rc=$RC"
+
+# T23 — compat : mode défaut (sans --strict) sur cible vide → exit 0 inchangé (labs sans agents)
+RC=0; run_check >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] && ok "T23 défaut + aucun agent → exit 0 (compat labs)" || ko "T23 défaut devrait rester 0, obtenu rc=$RC"
+
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
 [ "$fail" -eq 0 ]

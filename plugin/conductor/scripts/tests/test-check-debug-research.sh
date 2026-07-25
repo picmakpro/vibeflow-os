@@ -143,6 +143,15 @@ for f in "$SCRIPTS_DIR/../../mobile-test-team/agents/vf-test-runner.md" \
 done
 [ -z "$DOGFOOD_FAIL" ] && ok "T12 dogfood : briques mobile-test-team conformes au linter livré" || ko "T12 briques livrées flaguées :$DOGFOOD_FAIL"
 
+# T13 — F13 (vacuous green) : --strict sur cible vide → exit 3 (INDÉTERMINÉ, pas un vert)
+reset_sk
+RC=0; run_check --strict >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 3 ] && ok "T13 --strict + aucune brique → exit 3 INDÉTERMINÉ (F13)" || ko "T13 cible vide devrait sortir 3, obtenu rc=$RC"
+
+# T14 — F13 : --strict --allow-empty sur cible vide → exit 0 (opt-in explicite)
+RC=0; run_check --strict --allow-empty >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] && ok "T14 --strict --allow-empty + aucune brique → exit 0 (opt-in)" || ko "T14 --allow-empty devrait sortir 0, obtenu rc=$RC"
+
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
 [ "$fail" -eq 0 ]
