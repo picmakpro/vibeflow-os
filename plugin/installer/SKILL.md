@@ -70,13 +70,24 @@ bug d'install vécu sur le terrain, ADR-054) :
 
 1. **Détection environnement.** GSD / Superpowers présents ? Modules déjà installés
    (engine `status` — invocation exacte dans la table « Chemins réels » ci-dessus) ? Un scope déjà
-   utilisé précédemment ? Sert à pré-cocher / informer, pas à décider à la place de l'utilisateur.
+   utilisé précédemment ? **Le cwd est-il un repo git ?** (`git rev-parse --is-inside-work-tree`)
+   — cette détection **pré-sélectionne** le scope de l'étape 2. Elle sert à pré-cocher / informer,
+   pas à décider à la place de l'utilisateur.
 
-2. **Toggle scope (INST-01 — single-select).** Proposer **un seul** choix parmi
-   `user` / `project` / `local`, via l'UI de questions du terminal (AskUserQuestion / toggles),
-   **PAS** un TUI bash. Un et un seul scope est retenu (cohérence **ID4** : le même scope
-   s'applique à tout — modules VibeFlow + GSD + Superpowers). Reframe pour l'utilisateur :
-   compte (user) / projet (project) / projet sans commit (local).
+2. **Scope pré-sélectionné (INST-01 — confirmation en une touche).** Ne PAS poser un choix à
+   froid entre 3 options que le nouvel utilisateur ne sait pas arbitrer : la détection (étape 1)
+   **pré-sélectionne** —
+   - cwd = repo git → **`project` pré-coché** ;
+   - pas de repo git → **`user` pré-coché** ;
+   - un scope déjà utilisé précédemment (registre) **prime** sur la règle git.
+
+   La question devient une **confirmation** via l'UI de questions du terminal (AskUserQuestion /
+   toggles, **PAS** un TUI bash) : le choix pré-coché en première option + **une ligne
+   d'explication** du pourquoi (ex. « Ce dossier est un repo git → j'installe dans le projet,
+   versionné avec lui. On confirme ? »), les autres scopes en options secondaires — dont `local`
+   (projet sans commit), expliqué d'une ligne s'il est affiché. Un et un seul scope est retenu
+   (cohérence **ID4** : le même scope s'applique à tout — modules VibeFlow + GSD + Superpowers).
+   Reframe pour l'utilisateur : compte (user) / projet (project) / projet sans commit (local).
 
 3. **Baseline obligatoire — conductor posé d'office (INST-02a).** Lire le catalogue
    (invocation exacte dans la table « Chemins réels » ci-dessus) : il émet `name<TAB>description<TAB>role`.
@@ -149,6 +160,9 @@ correspondre à celui où les modules ont été posés (sinon l'engine cherche a
 - **`VF_SCOPE` explicite partout** : ne jamais s'appuyer sur le défaut LEGACY de l'engine
   (`project`) ni de `ensure-deps.sh` (`user`). Un scope unique, choisi une fois, propagé à
   l'engine **et** à `ensure-deps.sh` (ID4).
+- **Scope pré-sélectionné, jamais un choix à froid** : la détection (repo git → `project`, sinon
+  `user`, scope précédent prioritaire) pré-coche ; l'utilisateur **confirme en une touche** avec
+  une ligne d'explication — il garde toujours la main pour choisir un autre scope.
 - **Baseline non négociable** : tout module `role=mandatory` du catalogue (conductor) est posé
   d'office, jamais soumis à un toggle. Le premier usage offre **un seul** choix structurant —
   *lab de développement* vs *nouveau lab métier (`vf-new-lab`)* — pas une liste brute de modules.

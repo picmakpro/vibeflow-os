@@ -7,6 +7,9 @@ description: >
   (gate machine-enforced), dérive un manifeste de capacités, FABRIQUE les skills en parallèle
   (fan-out skill-creator), ficelle les auditeurs des procédures, puis assemble un lab opérationnel —
   pas un squelette. NE PRÉSUME JAMAIS « dev ».
+  Mode EXPRESS intégré (lab opérationnel ≤ 15 min, 3 questions max, dégradé assumé) quand
+  l'utilisateur exprime l'urgence ou la légèreté — « ce soir », « vite », « simple », « juste pour
+  tester » — ou le demande explicitement.
   ✘ pas pour remettre à niveau un lab qui existe déjà → /vf-calibrate · ✘ pas pour amorcer un
   dossier de **code** et son démarrage de projet → brique `gsd-new-project` du moteur de dev ·
   ✘ pas pour poser le socle documentaire d'un lab déjà créé → /vf-planning.
@@ -46,10 +49,20 @@ Les phases 0-3 sont la **clarté** ; 4-6 la **fabrication** ; 7 l'**assemblage**
 au profil** : un lab léger fait une clarification courte + 1-3 capacités ; un lab riche va jusqu'à
 9-20 capacités. L'utilisateur peut sortir (`x`) à tout moment — la dette restante est listée, jamais masquée.
 
+> **Mode express** (proposé au triage sur signal d'urgence, ou demandé) : les phases 0-4 sont
+> remplacées par **3 questions** + une dérivation dégradée ASSUMÉE, le fan-out part en tâche de
+> fond, **Gate C reste intact**. Contrat complet : section « Mode express » ci-dessous.
+
 ---
 
-## Phase 0 — Triage (2 questions, jamais plus)
+## Phase 0 — Triage (2 questions, jamais plus — + détection express)
 
+0. **Détection express (avant tout)** — si la demande exprime l'**urgence ou la légèreté**
+   (« ce soir », « vite », « simple », « juste pour tester », « rapide », « sans cérémonie »)
+   OU si l'utilisateur demande explicitement le mode express → proposer :
+   « **Express** (lab opérationnel en ≤ 15 min, 3 questions, le reste dérivé et marqué à affiner)
+   ou **parcours complet** ? ». S'il choisit express → basculer sur la section
+   **« Mode express »** ci-dessous (elle remplace les phases 0-4). Sinon, parcours standard :
 1. **Greenfield ou brownfield ?** — « Ce lab part de zéro, ou pilote un projet/codebase/process existant ? »
 2. **Profil** — déduire (ne pas interroger frontalement) si l'utilisateur **maîtrise** VibeFlow (power
    user) ou le **découvre**. Indices : vocabulaire, mention des registres/principes.
@@ -263,9 +276,72 @@ registres, auditeurs, comment les actionner). Lister la **dette** éventuelle (c
 
 ---
 
+## Mode express — lab opérationnel en ≤ 15 minutes (dégradé ASSUMÉ)
+
+> **Contrat** : time-to-first-value ≤ 15 min (audit 2026-07-25, section F). **3 questions maximum**,
+> tout le reste est **dérivé** — et cette dérivation est assumée et affichée, jamais masquée.
+> S'appuie intégralement sur la **gouvernance proportionnée** (v2.33.0, profil `leger`) : on ne
+> réinvente rien, on pose le profil et l'aval se proportionne tout seul.
+
+### Les 3 questions (jamais plus)
+
+1. **Métier du lab** — « Ce lab fait quoi, comme métier ? » (réponse libre courte).
+2. **Objectif** — « Son objectif, en une phrase ? »
+3. **Capacités prioritaires** — « Les 1 à 3 choses qu'il doit savoir faire en premier ? »
+
+Aucune relance, aucun menu d'élicitation, aucune section à valider une à une. **Seule exception** :
+si l'une des 3 réponses est inexploitable (vide, contradictoire), poser `[À CLARIFIER]` dessus et
+redemander — c'est l'unique cas de question supplémentaire.
+
+### Dérivation dégradée (le reste du brief)
+
+- Écrire `docs/LAB_BRIEF.md` avec les 8 sections canoniques : celles couvertes par les 3 réponses
+  sont `✅` ; **toutes les autres sont remplies par déduction** (depuis le métier + l'objectif) et
+  marquées **`[DÉRIVÉ — à affiner]`** — PAS `[À CLARIFIER]` : une déduction assumée n'est pas un trou.
+- **Profil `leger` posé d'office** dans `.planning/config.json` (clé `profile`) — c'est lui qui
+  proportionne tout l'aval, déjà câblé en v2.33.0 : plafond 1-3 capacités, Stop-hook en warn,
+  validator Phase 4 opt-in, registre EVALS différé à la première éval réelle.
+
+### Gates en express
+
+- **Gate A (assoupli)** : les `[DÉRIVÉ — à affiner]` **ne bloquent pas** (le grep du gate ne matche
+  que `[À CLARIFIER:` — un `[DÉRIVÉ]` passe par construction). Seul un `[À CLARIFIER]` portant sur
+  **l'une des 3 réponses données** bloque → retour question ciblée, rien d'autre.
+- **Gate B (assoupli)** : les capacités sortent de la réponse 3 telles quelles — justification =
+  « demandée à l'init express », critère de succès dérivé de l'objectif. Plafond du profil
+  `leger` : **3 max** ; au-delà → backlog, logué au récap.
+- **Gate C — INTACT, non négociable** : les trois vérifications machine (`check-registres.sh --strict`,
+  `check-agents.sh --strict`, hooks de gouvernance câblés) **ne se négocient JAMAIS**, express ou pas.
+  La seule souplesse est celle que les scripts accordent déjà au profil `leger` (EVALS absent =
+  avertissement) — elle vient des scripts, jamais d'un contournement.
+
+### Fabrication en tâche de fond
+
+Lancer le fan-out `skill-creator` (Phase 5, 1-3 capacités) **en arrière-plan** (sous-agents
+`run_in_background`) puis enchaîner IMMÉDIATEMENT l'assemblage (Phase 7 allégée : CLAUDE.md,
+modules, socle planning profil `leger`, registres, Gate C). **L'utilisateur peut commencer à
+travailler pendant la fabrication** ; à la notification de fin, câbler les skills livrés
+(attribution) et le signaler en une ligne. Phase 6 (ficelage auditeurs) : uniquement si une
+capacité est une procédure générative — sinon sauter.
+
+### Récap final — « dette d'express » (obligatoire)
+
+Le récap liste **honnêtement** :
+1. les 3 réponses sur lesquelles le lab est construit ;
+2. chaque section `[DÉRIVÉ — à affiner]` du brief, avec ce qui a été déduit ;
+3. les capacités reportées en backlog (si plus de 3 demandées) et les auditeurs non ficelés ;
+4. **comment affiner plus tard** : `/vf-calibrate` reprend chaque `[DÉRIVÉ — à affiner]` et
+   remonte le lab vers `standard`/`complet` quand le besoin se confirme — l'express est un point
+   de départ assumé, pas un plafond.
+
+---
+
 ## Garde-fous
 
-- **Jamais dériver/fabriquer avec un marqueur `[À CLARIFIER]` ouvert** (Gate A puis Gate B).
+- **Jamais dériver/fabriquer avec un marqueur `[À CLARIFIER]` ouvert** (Gate A puis Gate B). En
+  express, un `[DÉRIVÉ — à affiner]` n'est **pas** un `[À CLARIFIER]` : il ne bloque pas.
+- **Express** : jamais plus de **3 questions** ; jamais un **Gate C** affaibli ; jamais une
+  dérivation masquée — tout `[DÉRIVÉ — à affiner]` figure au récap de dette (+ `/vf-calibrate`).
 - **Jamais rédiger un skill à la main** : toute création OU mise à jour de skill — y compris une
   procédure interne ou un skill « sur-mesure » — passe par `skill-creator` (canal unique : recherche →
   draft → eval → itère). Le pipeline vaut même sur des données de procédures qu'on a déjà en interne.
