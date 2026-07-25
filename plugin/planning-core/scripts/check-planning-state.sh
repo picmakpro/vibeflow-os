@@ -14,8 +14,12 @@
 #      via hooks/hooks.json + merge-hooks.sh — advisory, jamais bloquant, `|| true`.)
 #
 # Usage:
-#   check-planning-state.sh [--path <dir>] [--max-age-days <N>] [--quiet]
+#   check-planning-state.sh [--path <dir>] [--max-age-days <N>] [--quiet] [--defer-to-gsd]
 # Defaults: --path .planning  --max-age-days 7
+#
+# --defer-to-gsd (ADR-055) : opt-in, câblé dans hooks.json uniquement. Si le moteur GSD est
+# actif sur ce projet, gsd-session-state.sh porte déjà le signal de fraîcheur → on se retire
+# en silence (exit 0). SANS ce flag, le comportement est strictement inchangé.
 #
 # Exit codes (pour un hook qui veut router) :
 #   0 = OK (frais)        1 = STATE périmé        2 = STATE absent
@@ -25,18 +29,31 @@ set -uo pipefail
 PLANNING_DIR=".planning"
 MAX_AGE_DAYS=7
 QUIET=0
+DEFER_TO_GSD=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --path) PLANNING_DIR="${2:?--path nécessite une valeur}"; shift 2 ;;
     --max-age-days) MAX_AGE_DAYS="${2:?--max-age-days nécessite une valeur}"; shift 2 ;;
     --quiet) QUIET=1; shift ;;
+    --defer-to-gsd) DEFER_TO_GSD=1; shift ;;
     -h|--help) grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *) echo "[check-planning-state] argument inconnu : $1" >&2; exit 64 ;;
   esac
 done
 
 say() { [ "$QUIET" -eq 1 ] || echo "[planning-state] $*"; }
+
+# --- ADR-055 : ne pas doubler le digest de GSD ---
+# Si le moteur GSD est actif, gsd-session-state.sh porte déjà le signal de fraîcheur de ce
+# projet : on se retire en silence (exit 0). Appelé avec --defer-to-gsd depuis hooks.json
+# uniquement — l'usage manuel et le /checkpoint gardent le comportement complet.
+if [ "$DEFER_TO_GSD" -eq 1 ]; then
+  DETECT="$(dirname "$0")/detect-gsd-engine.sh"
+  if [ -f "$DETECT" ]; then
+    bash "$DETECT" --quiet --path "$PLANNING_DIR" && exit 0
+  fi
+fi
 
 # --- Conversion YYYY-MM-DD → epoch, portable BSD (macOS) ET GNU (Linux) ---
 date_to_epoch() {

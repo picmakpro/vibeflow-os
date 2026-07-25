@@ -7,7 +7,14 @@
 ## Pré-requis
 
 - **Claude Code** à jour (commande `claude plugin` disponible).
-- `bash 4+`, `python3 3.8+`, `awk`, `grep`, `sed` (macOS/Linux) — utilisés par l'engine bundlé.
+- `bash ≥ 3.2`, `jq ≥ 1.6`, `python3 ≥ 3.8`, `awk`, `grep`, `sed` — utilisés par l'engine bundlé.
+- **Windows** : Git for Windows requis (Claude Code y exécute bash via Git Bash). `jq` n'y est
+  **pas** inclus → `winget install jqlang.jq`. Python : installer depuis **python.org** en cochant
+  « Add to PATH » (le raccourci `python3` du Microsoft Store n'est PAS un vrai interpréteur).
+  Le jq Windows natif émet du CRLF : l'engine le neutralise automatiquement (ADR-054).
+
+`/vibeflow-install` commence par un **préflight** qui vérifie ces prérequis et affiche la commande
+d'installation exacte s'il en manque un.
 
 Aucun accès privé, aucun clone, aucune auth `gh` ne sont requis pour installer le plugin.
 
@@ -137,7 +144,8 @@ VibeFlow). Si tu veux aussi les retirer :
 
 ## Sécurité
 
-- L'engine et les modules sont des scripts **shell + Python** auditables ligne par ligne.
+- L'engine et les modules sont des scripts **shell + Python** (plus `jq`, outil standard, pour
+  lire les manifestes JSON) — auditables ligne par ligne.
 - Tous les scripts d'install sont **idempotents** (ré-exécutables sans casser l'installation).
 - Les copies créent un backup automatique avant écrasement.
 - Le plugin **n'enregistre aucun hook** : il n'exécute rien au démarrage de session. Tout part de

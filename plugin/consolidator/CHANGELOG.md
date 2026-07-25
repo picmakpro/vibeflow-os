@@ -1,5 +1,28 @@
 # CHANGELOG — consolidator
 
+## [v1.6.1] — 2026-07-23 (portabilité Windows — ADR-054, 2e rapport terrain)
+
+### Corrigé
+- **Préfiltres CSL-13 aveugles aux antislashs** (`guard-read-registres.sh`, `guard-bash-registres.sh`,
+  `post-edit-reindex.sh`) : le match `.claude/memory/` (slashes) court-circuitait le python — qui,
+  lui, normalisait les antislashs (CSL-12) — dès qu'un chemin Windows arrivait (`.claude\\memory\\`,
+  JSON-échappé). Gardes et réindexation inertes sous Windows en paraissant installées. Motifs
+  antislashs (simple + JSON-échappé) ajoutés ; le python reçoit toujours le payload original.
+- **Stub Microsoft Store `python3`** : présent dans le PATH (`command -v` réussit) mais inerte —
+  le repli fail-open n'était jamais atteint. Résolution d'interpréteur par CHEMIN (zéro spawn
+  ajouté, rejet `WindowsApps`, repli `python`) dans les 3 hooks + `reindex.sh` (qui, sans
+  interpréteur, échoue désormais BRUYAMMENT au lieu d'un silence).
+- **`post-edit-reindex.sh`** : normalisation des antislashs du `file_path` extrait — sans ça, le
+  filtre parent/base ne matchait jamais un chemin Edit/Write Windows et l'index n'était pas recalé.
+
+### Ajouté
+- **`probe-memory-guards.sh`** (hook SessionStart, advisory) : UNE sonde d'exécution réelle par
+  session dans l'environnement RÉEL des hooks — si aucun Python utilisable : « ⚠ gardes mémoire
+  INACTIVES ». Suggestion du rapport terrain adoptée telle quelle : une protection annoncée n'est
+  pas une protection tant qu'un refus n'a pas été observé ; à défaut, l'inactivité doit se voir.
+- `tests/test-windows-guards.sh` : payload antislashs → deny effectif · stub WindowsApps → repli
+  `python` · aucun interpréteur → fail-open + signal du probe.
+
 ## [v1.6.0] — 2026-07-22 (ADR-052 — pilier 5 : mémoire vivante à décroissance + supersession)
 
 ### Ajouté

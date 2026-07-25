@@ -69,7 +69,7 @@ Pour les changements **structure/doctrine**, produire un plan explicite :
 ### 4. Appliquer sous contrôle
 
 1. **Snapshot avant** (le lab est sauvegardé).
-2. Rafraîchir les modules : `vibeflow-update.sh update <module>` (manuel, par module).
+2. Rafraîchir les modules : `VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT}" bash "${CLAUDE_PLUGIN_ROOT}/_internal/vibeflow-update.sh" update <module>` (manuel, par module).
 3. **Ré-affirmer l'allowlist MCP des agents exécutants** (ADR-051) : si le lab a gagné (ou perdu)
    un serveur MCP dans son `./.mcp.json` **sans** bump de module (l'`update` ne re-copie pas les
    agents à version inchangée), re-jouer l'injection idempotente sur les agents flaggés
@@ -77,13 +77,13 @@ Pour les changements **structure/doctrine**, produire un plan explicite :
    ```sh
    .claude/scripts/inject-mcp-tools.sh --target .claude/agents --mcp-json ./.mcp.json
    ```
-   Et, si GSD est présent, ré-affirmer aussi `gsd-executor` (relancer `ensure-deps.sh` suffit — il
-   appelle le patch, ou directement `inject-mcp-tools.sh --target ~/.claude/agents/gsd-executor.md
+   Et, si GSD est présent, ré-affirmer aussi `gsd-executor` (relancer `.claude/scripts/ensure-deps.sh` suffit — il
+   appelle le patch, ou directement `.claude/scripts/inject-mcp-tools.sh --target ~/.claude/agents/gsd-executor.md
    --mcp-json ./.mcp.json --force`). **Redémarrage de Claude Code requis** ensuite : le `tools:` des
    agents est lu au démarrage de session.
 4. Appliquer la migration structurelle validée (déléguer au migrateur / `software-architecture`
    `/restructure` si réorganisation de fichiers).
-5. **Re-stamper** la version framework : `framework-version.sh stamp`.
+5. **Re-stamper** la version framework : `bash .claude/scripts/framework-version.sh stamp`.
 6. **Re-auditer** : déléguer à `vibeflow-validator` (5 phases) pour confirmer l'alignement.
 
 ### 5. Synthèse
@@ -94,7 +94,7 @@ Rapport court : ce qui a été migré, ce qui reste, prochain audit conseillé.
 
 ## Surfaçage à l'ouverture de session (opt-in)
 
-`scripts/framework-version.sh drift --quiet` est conçu pour un **hook SessionStart opt-in** : il
+`.claude/scripts/framework-version.sh drift --quiet` est conçu pour un **hook SessionStart opt-in** : il
 signale *« le framework a pris de l'avance, lance /vf-calibrate »* sans rien forcer (`|| true`,
 jamais bloquant). Wiring documenté dans `references/migration-playbook.md` — **jamais auto-injecté**
 dans `settings.json` (respect du principe « zéro hook imposé »).
@@ -113,4 +113,4 @@ dans `settings.json` (respect du principe « zéro hook imposé »).
 ## Références (on-demand)
 
 - `references/migration-playbook.md` — classification des changements + recettes de migration + wiring hook.
-- `scripts/framework-version.sh` — current / recorded / stamp / drift.
+- `.claude/scripts/framework-version.sh` (matérialisé dans le lab à l'install) — current / recorded / stamp / drift.

@@ -21,14 +21,23 @@ set -uo pipefail
 # « .claude/memory/ » est donc présente dans le payload JSON dès qu'une action est due
 # (l'encodeur JSON standard n'échappe ni « . » ni « / »). Skip sans perte sinon.
 PAYLOAD="$(cat 2>/dev/null || true)"
+# ADR-054 : les chemins Windows arrivent en ANTISLASHS — simples, ou doublés par l'échappement
+# JSON (`.claude\\memory\\`). Sans ces motifs, le préfiltre court-circuitait le python (qui, lui,
+# normalise les antislashs) : réindexation inerte sous Windows, en paraissant installée.
 case "$PAYLOAD" in
-  *'.claude/memory/'*) : ;;
+  *'.claude/memory/'*|*'.claude\memory\'*|*'.claude\\memory\\'*) : ;;
   *) exit 0 ;;
 esac
 
-command -v python3 >/dev/null 2>&1 || exit 0
+# ADR-054 : le `python3` du PATH Windows peut être le stub Microsoft Store — présent (`command -v`
+# réussit) mais inerte à l'exécution. Détection par CHEMIN (zéro spawn ajouté), repli `python` ;
+# sinon fail-open inchangé, signalé par probe-memory-guards.sh au SessionStart.
+PYBIN=python3
+case "$(command -v python3 2>/dev/null)" in
+  ''|*WindowsApps*) if command -v python >/dev/null 2>&1; then PYBIN=python; else exit 0; fi ;;
+esac
 
-FILE_PATH="$(printf '%s' "$PAYLOAD" | python3 -c '
+FILE_PATH="$(printf '%s' "$PAYLOAD" | "$PYBIN" -c '
 import json, os, re, sys
 try:
     p = json.load(sys.stdin)
@@ -55,7 +64,9 @@ if p.get("tool_name") == "Bash":
         hit = os.path.join(p.get("cwd") or ".", hit)
     print(hit)
 else:
-    print(ti.get("file_path") or "")
+    # ADR-054 : normaliser les antislashs Windows — sans ça, le filtre parent/base en aval
+    # ne matche jamais un chemin Edit/Write style `C:\...\.claude\memory\X.md`.
+    print((ti.get("file_path") or "").replace("\\", "/"))
 ' 2>/dev/null)" || exit 0
 
 [ -n "$FILE_PATH" ] || exit 0

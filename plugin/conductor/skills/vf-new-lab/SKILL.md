@@ -151,16 +151,21 @@ sur-ficeler : seules les procédures dont la qualité de l'output compte.
 Dériver puis poser (déléguer, ne pas réinventer) :
 1. **`CLAUDE.md` + externalisation doc (ADR-042)** — l'init du `CLAUDE.md` **déclenche** l'externalisation
    de la doc : le `CLAUDE.md` est une **constitution** (< 150 lignes, **P2**) qui **POINTE** vers la doc,
-   ne la duplique JAMAIS. Lancer `conductor/scripts/scaffold-docs.sh <compartiments-qualifiés>` → crée
+   ne la duplique JAMAIS. Lancer `bash "${CLAUDE_PLUGIN_ROOT}/conductor/scripts/scaffold-docs.sh" <compartiments-qualifiés>`
+   (cache plugin — les modules ne sont pas encore posés à cette phase) → crée
    `docs/_transverse/` (doc transverse) + un `docs/<projet>/` **par compartiment qualifié** (même seuil
    d'autonomie que les `.planning/` — proportionné, **jamais un `docs/<projet>/` par micro-dossier**). Le
    `CLAUDE.md` mappe ensuite la doc transverse → `@docs/_transverse/` et **chaque compartiment →
    `@docs/<projet>/`**. Détail : `references/doc-externalization.md`.
-2. **Modules** — `vibeflow-install` (résoudre deps : `resolve-deps.sh`). Typiquement `planning-core` +
+2. **Modules** — `vibeflow-install` (résoudre deps : `"${CLAUDE_PLUGIN_ROOT}/_internal/resolve-deps.sh"` —
+   voir la table d'invocations exactes du skill `vibeflow-install`). Typiquement `planning-core` +
    `consolidator` + `audit-architecture` + `validator` + **`skill-creator`** (canal unique de création
    de skills — posé d'office car dépendance du conductor `mandatory`, donc disponible dès la Phase 5).
    **Pas `dev-orchestrator`** sauf métier = code.
-3. **Socle planning** — `vf-planning`. **Lab à compartiments** : `.planning/` du lab en *steering +
+3. **Socle planning** — **qualifier le métier d'abord** (ADR-055) : *lab non-dev* → `vf-planning` pose le
+   socle adapté au métier ; *lab de code* → le socle du **projet** appartient au moteur de développement,
+   router `/vf-init` (`vf-planning` n'y pose plus le tronc, il tient l'altitude lab et redirige).
+   **Lab à compartiments** (quel que soit le métier) : `.planning/` du lab en *steering +
    `INDEX.md`* (jamais de ROADMAP global) ; un socle par compartiment **qualifié** (seuil d'autonomie),
    typé `deliverable` (roadmap+phases) ou `continuous` (`BOARD.md` + cadence). Sous le seuil / infra →
    ligne d'`INDEX.md`. Réf : planning-core `references/compartments.md`. **Jamais un `.planning/` par
@@ -218,10 +223,10 @@ Dériver puis poser (déléguer, ne pas réinventer) :
    > **ne pas doubler**. L'orchestrateur métier respecte P3 (ne produit jamais) et ADR-029 (≤250L).
 6. **Garde-fous** — `vibeflow-validator` + `audit-architecture` (auditeurs toujours présents).
 7. **Commandes d'incarnation (ADR-042)** — balayer **tous** les agents posés :
-   `VF_TARGET_ROOT=<.claude> conductor/scripts/generate-agent-commands.sh`. Génère une `/agent` par
+   `VF_TARGET_ROOT=<.claude> bash "${CLAUDE_PLUGIN_ROOT}/conductor/scripts/generate-agent-commands.sh"`. Génère une `/agent` par
    agent (métier + gouvernance) qui l'**incarne dans la fenêtre principale** (session courante), pas en
    sous-agent. Idempotent (ne réécrit pas une commande existante). Détail : `references/agent-command-incarnation.md`.
-8. **Stamp framework** — `framework-version.sh stamp` (rendu **visible au récap**).
+8. **Stamp framework** — `bash .claude/scripts/framework-version.sh stamp` (rendu **visible au récap**).
 9. **GATE C — Conformité machine (ADR-043 + ADR-044, BLOQUANT)** — l'init ne se conclut PAS tant que
    les TROIS vérifications machine ne passent pas :
    1. `bash .claude/scripts/check-registres.sh --strict` → **exit 0** (5 registres canon présents,
@@ -232,7 +237,7 @@ Dériver puis poser (déléguer, ne pas réinventer) :
    3. hooks de gouvernance câblés : `grep -q guard-read-registres .claude/settings.json` (posés
       automatiquement par `vibeflow-install` via `hooks/hooks.json` + `merge-hooks.sh` — s'ils
       manquent, réinstaller le module, ne JAMAIS les recopier à la main).
-   En cas d'échec : corriger (`reindex.sh --all --apply`, compléter le frontmatter, créer le skill
+   En cas d'échec : corriger (`bash .claude/scripts/reindex.sh --all --apply`, compléter le frontmatter, créer le skill
    manquant via skill-creator) puis relancer le gate. **Comme le Gate A, ces scripts sont la preuve —
    pas ton impression que « ça a l'air bon ».**
 

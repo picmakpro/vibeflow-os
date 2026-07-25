@@ -1,14 +1,16 @@
 ---
 name: vf-planning
 description: >
-  Utiliser pour mettre en place ou tenir à jour la gestion de planning, de documentation et de
-  contexte d'un lab — quel que soit son métier (dev, contenu, vente, design, montage de dossier,
-  recherche…). Se déclenche quand l'utilisateur dit « structure la doc du projet », « mets en
-  place le suivi / le planning », « on perd le fil / le contexte », « où on en est ? », « fais-moi
-  une feuille de route », « pose le cadre du projet », « initialise le .planning », ou quand un lab
-  fraîchement installé n'a pas encore de socle de planning. NE PAS confondre avec le cadrage de
-  sprint dev (`vf-plan` du dev-orchestrator) : ce skill pose la STRUCTURE documentaire universelle,
-  pas l'exécution dev. Invocable par l'utilisateur ET par un agent en autonomie.
+  Utiliser pour poser ou tenir à jour le socle de planning et de documentation d'un lab NON-DEV —
+  contenu, vente, growth, design, montage de dossier, recherche : « structure la doc de ce lab »,
+  « mets en place le suivi », « on perd le fil / le contexte », « pose le cadre du lab »,
+  « initialise le .planning ». Utiliser aussi, sur TOUT lab y compris dev, pour l'altitude LAB :
+  « fais l'index de mes projets », « quel compartiment suit quoi », « ce client mérite-t-il son
+  propre plan », « remonte les décisions en mémoire », « qu'est-ce qui traîne sans plan ».
+  ✘ PAS pour le planning d'un projet de code — la charte, la trajectoire, les exigences, l'état
+  et les étapes d'un projet dev appartiennent au moteur de développement : démarrage →
+  `/vf-init`, état et avancement → `/vf-progress`, cadrage d'une étape → `/vf-plan`, comprendre
+  l'existant → `/vf-map`. Invocable par l'utilisateur ET par un agent en autonomie.
 ---
 
 # vf-planning — Socle de planning & documentation universel
@@ -69,7 +71,48 @@ Deux topologies. **Ne pas plaquer la mauvaise.**
 
 ---
 
-## Séquence — Mise en place (`.planning/` absent)
+## Étape 0 — Qui tient le planning de ce lab ? (TOUJOURS en premier)
+
+> **Iron Law du rescope (ADR-055)** : *« Un projet de code a un seul propriétaire de planning : le
+> moteur de développement. VibeFlow tient l'altitude au-dessus (le lab) et la couche à côté
+> (mémoire, enforcement) — jamais la même. »*
+
+Avant toute autre chose, croiser **un fait** et **un jugement**.
+
+1. **Le fait** — lancer `scripts/detect-gsd-engine.sh`. Il ne dit PAS si le lab est dev : il dit
+   si un **moteur de planning de développement** est en place.
+
+   Les exits sont listés dans l'**ordre où le script les évalue** — le premier qui matche gagne, un lab
+   pouvant satisfaire plusieurs situations à la fois. Le marqueur lu est une clé du **frontmatter** de
+   `STATE.md`, jamais une chaîne trouvée ailleurs dans le fichier.
+
+   | Exit | Signification | Suite |
+   |---|---|---|
+   | `1` | chaîne de dev absente de la machine | → si le métier est dev, proposer l'amorçage via `/vf-init` ; **ne jamais** scaffolder un tronc dev à la main |
+   | `0` | moteur de dev actif sur ce `.planning/` | → **Séquence B**, couche lab uniquement |
+   | `2` | socle `planning-core` + code alentour | → juger le métier, puis protocole de migration (`references/gsd-handoff.md`) |
+   | `3` | aucun moteur en place | → le jugement métier décide seul |
+
+2. **Le jugement** — appliquer `references/domain-detection.md` (lire `CLAUDE.md`, les registres, le
+   vocabulaire dominant). Le métier n'est **jamais** déduit d'un `package.json` seul.
+
+3. **Brancher** :
+   - **Lab non-dev** → **Séquence A** (socle universel) ci-dessous. Comportement historique intact.
+   - **Lab dev** → **Séquence B** : appliquer **uniquement** la couche lab (`INDEX.md`, typage des
+     compartiments, pont mémoire, surface de la dette) et **rediriger** toute demande portant sur un
+     projet vers son verbe, selon la table de `references/gsd-handoff.md`. Ne pas générer la charte,
+     la trajectoire, les exigences, l'état ni les étapes d'un projet de code.
+
+**Sur un lab dev à compartiments** : le lab reçoit `INDEX.md` + `STATE.md` de steering (à nous) ;
+chaque compartiment dev reçoit son `.planning/` **écrit par le moteur de dev**, depuis ce
+compartiment. Les deux couches ne se croisent sur aucun fichier.
+
+Charger `references/gsd-handoff.md` dès que l'exit vaut 0 ou 2, ou que le jugement conclut « dev » :
+la table de redirection intention → verbe y vit, et ne se duplique pas ici.
+
+---
+
+## Séquence A — Socle universel, lab non-dev (`.planning/` absent)
 
 1. **Lire le métier du lab AVANT de scaffolder.** Lire `CLAUDE.md`, le `docs/` existant, les
    registres `.claude/memory/`, et déduire : *quel métier ? quelle granularité de travail ?*
@@ -101,7 +144,7 @@ Deux topologies. **Ne pas plaquer la mauvaise.**
 
 5. **Récap** : montrer l'arbo posée, le profil, et la prochaine action en vocabulaire du lab.
 
-## Séquence — Maintenance (`.planning/` déjà là)
+## Séquence A (suite) — Maintenance du socle universel (`.planning/` déjà là)
 
 - **Vérifier la fraîcheur** : `scripts/check-planning-state.sh` (advisory) signale un `STATE.md`
   périmé ou un `.planning/` absent — utilisable manuellement, au `/checkpoint`, ou en hook
@@ -129,6 +172,18 @@ Deux topologies. **Ne pas plaquer la mauvaise.**
 >   + anti-boucle `stop_hook_active`), échappatoire `.session-noop`, baseline absente/périmée → fail-open,
 >   toggle `VF_PLANNING_STOP=block|warn|off`.
 
+## Séquence B — Couche lab au-dessus du moteur de dev (lab dev)
+
+1. **Ne générer aucun artefact de projet.** Le tronc d'un projet de code (charte, trajectoire,
+   exigences, état, étapes) appartient au moteur de développement — jamais à ce skill.
+2. **Poser ou rafraîchir l'altitude lab** si le lab a plusieurs compartiments : `INDEX.md`, typage
+   `deliverable`/`continuous`, seuil d'autonomie (`references/compartments.md`).
+3. **Surface de la dette** : `scripts/detect-planning-debt.sh` (advisory).
+4. **Pont mémoire** : promouvoir les décisions structurantes vers `.claude/memory/`
+   (`references/bridge-memory.md`) — référencer, jamais recopier.
+5. **Rediriger** ce qui concerne un projet vers son verbe (table de `references/gsd-handoff.md`),
+   en vocabulaire VibeFlow, sans jamais nommer l'outillage sous-jacent.
+
 ---
 
 ## Garde-fous (anti-biais)
@@ -140,6 +195,9 @@ Deux topologies. **Ne pas plaquer la mauvaise.**
   référence, on ne la recopie pas dans `.planning/`.
 - **Ne jamais sur-documenter** : le tronc minimal viable (`STATE` + `PROJECT` + `ROADMAP`) suffit pour
   un lab léger. On n'ajoute un artefact que s'il sert.
+- **Ne jamais poser le tronc d'un projet de code** (ADR-055). Sur un lab dev, la charte, la
+  trajectoire, les exigences, l'état et les étapes appartiennent au moteur de développement — on
+  redirige vers le verbe, on ne génère pas.
 - **Adapter le vocabulaire** au métier du lab (le projet est francophone — sortie en français).
 
 ## Anti-patterns
@@ -149,6 +207,12 @@ Deux topologies. **Ne pas plaquer la mauvaise.**
 - ❌ Recopier les entrées DECISIONS dans `PROJECT.md` (doublon mémoire).
 - ❌ Démarrer le scaffolding sans avoir lu `CLAUDE.md` / le métier du lab.
 - ❌ Laisser `STATE.md` se périmer (c'est la clé de voûte — toujours le rafraîchir).
+- ❌ Écrire un `STATE.md` au format `planning_version:` dans un `.planning/` que l'outillage de dev
+  pilote (les deux frontmatters sont incompatibles — le premier qui écrit rend l'autre aveugle).
+- ❌ Réécrire ou convertir un `.planning/` existant pour « aligner le format » (ADR-031 : on avertit
+  et on propose, l'utilisateur décide).
+- ❌ Répondre soi-même à une demande d'état ou d'avancement sur un lab dev, au lieu de rediriger
+  vers `/vf-progress`.
 
 ---
 
@@ -162,4 +226,7 @@ Deux topologies. **Ne pas plaquer la mauvaise.**
 - `references/compartments.md` — planning hiérarchique : steering lab + INDEX + plan conditionnel typé (deliverable/continuous), seuil d'autonomie, non-cannibalisation, migration sans perte (v2).
 - `references/templates/` — les gabarits universels à instancier (à adapter, jamais à copier tel quel), dont `INDEX.template.md` (lab) + `BOARD.template.md` (compartiment continuous).
 - `scripts/check-planning-state.sh` — garde-fou de fraîcheur de la clé de voûte (advisory, exit codes pour hook).
+- `references/gsd-handoff.md` — frontière d'altitude avec le moteur de dev : test unique, table de
+  redirection intention → verbe, périmètre résiduel sur lab dev, protocole de migration (ADR-055).
 - `scripts/detect-planning-debt.sh` — détection de compartiment actif sans plan au-dessus du seuil (advisory).
+- `scripts/detect-gsd-engine.sh` — fait vérifiable « un moteur de planning est-il en place » (advisory).

@@ -1,6 +1,6 @@
 # Changelog — conductor
 
-## [v1.12.1] — 2026-07-25 (gabarit de description sur les trois verbes)
+## [v1.12.2] — 2026-07-25 (gabarit de description sur les trois verbes)
 
 ### Corrigé
 - **`vf-calibrate` / `vf-update` / `vf-new-lab`** alignés sur le gabarit de description issu de
@@ -11,6 +11,24 @@
   version, `vf-calibrate` **réaligne la structure du lab** une fois celle-ci posée.
 - Collisions également démarquées vers l'extérieur du module : `/vf-new-lab` ↔ `/vf-init`
   (dossier de code) et `/vf-new-lab` ↔ `/vf-planning` (socle documentaire).
+
+## [v1.12.1] — 2026-07-23 (portabilité Windows — ADR-054)
+
+### Corrigé
+- **`check-plugin-update.sh`** : strip du `\r` sur la capture de version installée (python/claude
+  natifs Windows émettent du CRLF) — un CR brut non échappé aurait produit un cache JSON invalide
+  et tué le bandeau update SessionStart sur les postes Windows.
+- **`framework-version.sh`** : `norm()` retire tout `\r` résiduel + wrapper `jqx` sur le call site —
+  sous un jq Windows natif (sorties CRLF en mode texte), `drift` comparait `"2.27.1\r"` à `"2.27.1"`
+  et signalait un écart en continu (faux RETARD structurel).
+- **`vf-calibrate` / `vf-new-lab` (SKILL.md)** : mentions de scripts au nom nu ou au préfixe
+  incohérent (3 formes différentes pour `framework-version.sh` dans le même document) → chemins
+  qualifiés au point d'usage (`.claude/scripts/…`, `${CLAUDE_PLUGIN_ROOT}/_internal/…`). Un nom nu
+  force l'exécutant à deviner parmi ~10 dossiers `scripts/` (bug d'install vécu, ADR-054).
+- **Hooks python3 (2e rapport terrain Windows)** : résolution d'interpréteur par CHEMIN (rejet du
+  stub Microsoft Store `WindowsApps`, repli `python`, zéro spawn ajouté) dans `guard-agent-write.sh`,
+  `check-agents.sh`, `check-debug-research.sh`, `update-banner.sh`, `check-plugin-update.sh` — le
+  stub passe `command -v python3` : les gardes étaient inertes en paraissant installées (ADR-054).
 
 ## [v1.12.0] — 2026-07-22 (détection de migration legacy, scope-aware)
 
@@ -24,6 +42,7 @@
   mise à jour du plugin ET le nudge de méthode legacy (via `check-legacy.sh`). Un lab déjà à la bonne
   version de plugin mais aux modules non migrés est désormais détecté au démarrage. Boucle fermée : un
   `drift` détecté est réparé par `/vf-update` (`sync_module_governance` re-copie les artefacts).
+>>>>>>> origin/main
 
 ## [v1.11.3] — 2026-07-20 (audit robustesse hooks — 2e vague, gate agents fiabilisé)
 

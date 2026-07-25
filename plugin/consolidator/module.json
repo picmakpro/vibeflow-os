@@ -1,6 +1,6 @@
 {
   "name": "consolidator",
-  "version": "v1.6.0",
+  "version": "v1.6.1",
   "type": "single-skill+scripts",
   "description": "Consolidation de la mémoire projet sur 4 piliers + fork-config registres (BDR + surcharges custom).",
   "requires": []

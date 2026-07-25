@@ -3,11 +3,11 @@
 ## [v1.8.1] — 2026-07-25 (soldes de l'étape 12)
 
 ### Corrigé
-- **Frontière d'altitude (ADR-054)** portée par les descriptions : `vf-milestone`, `vf-phase`,
+- **Frontière d'altitude (ADR-055)** portée par les descriptions : `vf-milestone`, `vf-phase`,
   `vf-backlog`, `vf-resume` et `vf-pause` opèrent sur le `.planning/` d'un **projet de code** —
   ils renvoient désormais vers `/vf-planning` pour l'altitude **lab** et les labs non-dev.
   `/vf-plan`, `/vf-init`, `/vf-progress`, `/vf-docs`, `/vf-cleanup` et `/vf-dev` le faisaient
-  déjà ; les cinq manquants fermaient mal la frontière que l'ADR-054 venait de poser.
+  déjà ; les cinq manquants fermaient mal la frontière que l'ADR-055 venait de poser.
 - **T5 et T11 bornés au module.** Les deux axes balayaient tout `skills/` et `agents/`, plats et
   partagés entre modules en lab installé : un fichier d'un module voisin pouvait faire rougir la
   suite du `dev-orchestrator`. T5 réutilise `owned_verb()` ; T11 est borné à l'agent, ses

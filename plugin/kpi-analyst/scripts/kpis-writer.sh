@@ -21,7 +21,13 @@ set -euo pipefail
 log() { echo "[kpis-writer] $*" >&2; }
 err() { echo "[kpis-writer] ERROR: $*" >&2; exit 1; }
 
-command -v jq >/dev/null 2>&1 || err "jq introuvable (requis)"
+command -v jq >/dev/null 2>&1 || err "jq introuvable (requis).
+  Installer : macOS 'brew install jq' (natif depuis macOS 15) · Windows (Git Bash) 'winget install jqlang.jq' · Debian/Ubuntu 'sudo apt-get install jq'"
+
+# jqx — wrapper jq OBLIGATOIRE (ADR-054) : le jq Windows natif écrit en mode texte (\n → \r\n) ;
+# un \r résiduel contaminerait une DONNÉE PERSISTÉE (KPIS.md, ingéré par le Hub) via --arg.
+# Subshell + pipefail locaux : propage le code retour de jq sans imposer pipefail à l'appelant.
+jqx() ( set -o pipefail; command jq "$@" | tr -d '\r'; )
 
 LAB="" DOMAIN=""
 SCHEMA=".claude/kpi/schema.json"
@@ -42,8 +48,8 @@ done
 
 [ -n "$LAB" ] || err "--lab <slug> requis"
 [ -f "$SCHEMA" ] || err "schéma introuvable : $SCHEMA (l'agent doit le poser après validation humaine)"
-jq empty "$SCHEMA" 2>/dev/null || err "schéma JSON invalide : $SCHEMA"
-[ -n "$DOMAIN" ] || DOMAIN=$(jq -r '.domain // "generic"' "$SCHEMA")
+jqx empty "$SCHEMA" 2>/dev/null || err "schéma JSON invalide : $SCHEMA"
+[ -n "$DOMAIN" ] || DOMAIN=$(jqx -r '.domain // "generic"' "$SCHEMA")
 
 # ── 1. Collecter les valeurs : exécuter chaque extracteur, valider sa sortie JSON ───────────────
 VALUES="[]"
@@ -52,23 +58,23 @@ if [ -d "$EXTRACTORS" ]; then
     [ -f "$ex" ] || continue
     line=$(bash "$ex" 2>/dev/null || true)
     [ -n "$line" ] || { log "extracteur sans sortie, ignoré : $(basename "$ex")"; continue; }
-    echo "$line" | jq -e 'has("key") and has("value")' >/dev/null 2>&1 || {
+    echo "$line" | jqx -e 'has("key") and has("value")' >/dev/null 2>&1 || {
       log "sortie invalide (manque key/value), ignoré : $(basename "$ex")"; continue; }
     # Normaliser : source/confidence par défaut si absents (garde-fou : pas de source → low).
-    norm=$(echo "$line" | jq -c '{
+    norm=$(echo "$line" | jqx -c '{
       key, value,
       source: (.source // ""),
       confidence: (.confidence // (if (.source // "") == "" then "low" else "medium" end)),
       trend: (.trend // null)
     }')
-    VALUES=$(echo "$VALUES" | jq -c --argjson v "$norm" '. + [$v]')
+    VALUES=$(echo "$VALUES" | jqx -c --argjson v "$norm" '. + [$v]')
   done
 fi
 
 GENERATED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # ── 2. Construire le payload machine (schema + values) ──────────────────────────────────────────
-PAYLOAD=$(jq -n \
+PAYLOAD=$(jqx -n \
   --arg lab "$LAB" --arg domain "$DOMAIN" --arg at "$GENERATED_AT" \
   --slurpfile schemaFile "$SCHEMA" \
   --argjson values "$VALUES" '
@@ -83,7 +89,7 @@ PAYLOAD=$(jq -n \
   }')
 
 # ── 3. Index lisible (convention consolidator : index en tête) ──────────────────────────────────
-INDEX=$(echo "$PAYLOAD" | jq -r '
+INDEX=$(echo "$PAYLOAD" | jqx -r '
   .schema as $s
   | "| key | label | value | unit | confidence | source |\n|-----|-------|-------|------|------------|--------|\n"
     + ([ .values[] as $v
@@ -115,8 +121,8 @@ mkdir -p "$(dirname "$OUT")"
   echo "## Données (source de vérité machine — ingérée par le Hub)"
   echo
   echo '```json'
-  echo "$PAYLOAD" | jq .
+  echo "$PAYLOAD" | jqx .
   echo '```'
 } > "$OUT"
 
-log "écrit : $OUT ($(echo "$VALUES" | jq 'length') valeur(s), $(echo "$PAYLOAD" | jq '.schema | length') KPI(s) au schéma)"
+log "écrit : $OUT ($(echo "$VALUES" | jqx 'length') valeur(s), $(echo "$PAYLOAD" | jqx '.schema | length') KPI(s) au schéma)"

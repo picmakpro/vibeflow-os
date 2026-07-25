@@ -8,9 +8,9 @@
 
 Dis _« aide-moi à dev cette feature »_ — et tout le pipeline se déclenche : cadrage → plan → exécution → tests → livraison. Sans jamais taper une commande technique ni savoir ce qui tourne en coulisse.
 
-[![Version](https://img.shields.io/badge/version-2.28.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.30.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
-[![Modules](https://img.shields.io/badge/modules-16-16a34a)](#-modules)
+[![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
 [Installation](#-installation) · [Modules](#-modules) · [Comment ça marche](#-comment-ça-marche) · [Auteur](#-auteur)
@@ -72,7 +72,7 @@ L'UX déroule :
 
 ## 📦 Modules
 
-16 modules au total. Chacun a sa propre version, son `CHANGELOG.md` et son `README.md`.
+17 modules au total. Chacun a sa propre version, son `CHANGELOG.md` et son `README.md`.
 
 > **À l'installation (depuis v2.13.0)** : `conductor` est le **socle obligatoire** posé d'office (avec son filet : planning-core, validator, consolidator, infrastructure-audit) — pas un choix. Ensuite, **un seul choix** : *lab de développement* (`dev-orchestrator`) ou *nouveau lab métier sur mesure* via `/vf-new-lab`. Les **3 bundles métier** (business-pilot / content / growth) sont **WIP et non proposés à l'install** (`proposable:false`) ; ils seront reproposés une fois finalisés. Les autres modules restent disponibles en à-la-carte avancé (« ajoute &lt;module&gt; »). Les modules **mobile-test** et **mobile-test-team** sont des add-ons à-la-carte avancés pour les projets mobiles.
 
@@ -90,7 +90,7 @@ L'UX déroule :
 | **[consolidator](./plugin/consolidator/)** | `1.0.0` | skill + scripts | Consolidation de la mémoire structurée sur 4 piliers : indexation / archivage / fusion / promotion. |
 | **[skill-creator](./plugin/skill-creator/)** | `1.0.0` | agent + skills | Pattern « agent minimal + 2 skills composables » pour créer de nouveaux skills (base Anthropic + workflow). |
 | **[reference](./plugin/reference/)** | `2.3.1` | doc-only | Documentation méthodologique complète : VibeFlow Core (9 principes) + 12 patterns (dont le cloisonnement par outils) + 33 templates + 1 exemple de bout en bout. |
-| **[planning-core](./plugin/planning-core/)** | `1.1.0` | skill + references + scripts | Socle de planning & documentation universel : pose le tronc commun `.planning/` (PROJECT/STATE/ROADMAP/REQUIREMENTS/MILESTONES/phases), **adapté à la logique métier de chaque lab** — jamais imposé. Couche avant/présent, complémentaire des registres mémoire. Garde-fou de fraîcheur + détection métier + exemple non-dev. |
+| **[planning-core](./plugin/planning-core/)** | `2.4.0` | skill + references + scripts | Socle de planning & documentation du lab : pose le tronc commun `.planning/` d'un lab **non-dev** (PROJECT/STATE/ROADMAP/REQUIREMENTS/MILESTONES/phases), adapté à son métier — jamais imposé — et tient l'**altitude lab** partout : index des projets, compartiments typés, détection de dette, pont mémoire, fraîcheur machine-enforced. Sur un projet de code, le planning du projet appartient au moteur de développement : ce module redirige au lieu de produire un format concurrent (ADR-055). |
 | 📦 **[business-pilot-bundle](./plugin/business-pilot-bundle/)** | `1.0.0` | doc-only (bundle) | Bundle métier : châssis prêt pour piloter un business (3 blueprints commercial/delivery/finance + extension `business/` + registres canon). Instancié par `vf-new-lab`. |
 | 📦 **[content-bundle](./plugin/content-bundle/)** | `1.0.0` | doc-only (bundle) | Bundle métier : chaîne éditoriale brief→livrable→distribution (3 blueprints strategist/scriptwriter/repurposer + extension `editorial/` + gate clarté bloquant). Instancié par `vf-new-lab`. |
 | 📦 **[growth-bundle](./plugin/growth-bundle/)** | `1.0.0` | doc-only (bundle) | Bundle métier : growth/acquisition **organisé par canal** (3 blueprints channel-strategist/copywriter/analyst + extension `growth/channels/` + garde-fous RGPD). Instancié par `vf-new-lab`. |
@@ -105,7 +105,7 @@ Slash commands natives livrées par le plugin (disponibles dès qu'il est activ�
 |----------|------|
 | `/vibeflow [demande]` | Porte d'entrée — délègue à l'agent **vibeflow-conductor** (créer/configurer/vérifier/mettre à jour/migrer le lab). |
 | `/vf-new-lab [métier]` | Créer un lab dans n'importe quel métier (instancie un bundle métier si présent). |
-| `/vf-planning` | Poser ou rafraîchir le socle `.planning/` ; répond à « où en est-on ? ». |
+| `/vf-planning` | Poser ou rafraîchir le socle `.planning/` d'un lab non-dev, et l'altitude lab partout (index des projets, compartiments, pont mémoire). Sur un projet de code, redirige vers le verbe de développement. |
 | `/vf-calibrate` | Détecter le drift framework et migrer le lab (validation humaine). |
 | `/vf-audit` | Audit de conformité complet via l'agent **vibeflow-validator**. |
 | `/vibeflow-install` | Installer/activer des modules (skill installeur scope-aware). |
@@ -139,8 +139,8 @@ Le routage repose sur un **index factuel auto-généré** depuis le frontmatter 
 
 ## 🔒 Sécurité
 
-- **Source-available** : code et historique publics, licence propriétaire (« All rights reserved », aucun droit de réutilisation accordé).
-- **Scripts shell + Python uniquement** — auditables ligne par ligne, aucune dépendance tierce non vérifiée.
+- **Source-available** : code et historique publics, licence propriétaire — réutilisation privée accordée aux élèves de la formation, voir [LICENSE](./LICENSE).
+- **Scripts shell + Python, plus l'outil standard `jq`** (lecture des manifestes JSON) — auditables ligne par ligne. Prérequis système listés dans [INSTALL.md](./INSTALL.md) (notes Windows/Git Bash incluses).
 - **Idempotent** : chaque script d'install est ré-exécutable sans casser l'installation, avec backup automatique avant écrasement.
 - **Zéro hook** : le plugin n'enregistre rien au démarrage de session. Tout part de ton invocation manuelle.
 - **Tests** : chaque script est couvert (`scripts/tests/test-*.sh`).
@@ -195,6 +195,8 @@ Le routage repose sur un **index factuel auto-généré** depuis le frontmatter 
 | `v2.27.0` | 2026-07-20 | Guard planning par attribution de session (ADR-050 amendée) + durcissement global des hooks du harnais (29 findings corrigés, 282 checks verts) (planning-core, software-architecture, conductor) |
 | `v2.27.1` | 2026-07-20 | Gate agents fiabilisé (2e vague audit hooks conductor : parseur YAML, anti-trappe fail-closed, portée lab, filet debug-research) (conductor v1.11.3) |
 | `v2.28.0` | 2026-07-22 | R&D mémoire-swarm shippée (ADR-052/053) : consolidator **v1.6.0** pilier mémoire vivante (couche `knowledge/` fichier-par-entrée, décroissance par demi-vie de catégorie + supersession non destructive, `decay-pass.sh`) ; dev-orchestrator **v1.7.0** contrôle de flux swarm (lock de driver unique + DAG ready/blocked avec rendu `tree` + rapports de worker typés, résolution de scripts scope-robuste) ; conductor **v1.12.0** détection legacy scope-aware + nudge SessionStart ; mobile-test-team **v1.3.0** rapports typés ; fix engine uninstall (skills imbriqués + tests) |
+| `v2.30.0` | 2026-07-25 | Frontière d'altitude entre le planning VibeFlow et le moteur de planning de développement (ADR-055) : planning-core **v2.4.0** — `vf-planning` ne pose plus le tronc d'un projet de code (frontmatters `STATE.md` incompatibles, double injection `SessionStart`, concurrence au matching), il tient l'altitude lab et redirige vers le bon verbe ; nouveau `detect-gsd-engine.sh` (fait seul, 4 exits priorisés, marqueur borné au frontmatter), doctrine `references/gsd-handoff.md`, flag opt-in `--defer-to-gsd` sur deux hooks (défaut inchangé), guard Stop bloquant conservé en exception motivée ; `vf-new-lab` + routage conductor + 3 README réalignés |
+| `v2.29.0` | 2026-07-23 | **Portabilité Windows (ADR-054)** : wrapper `jqx` normalisant le CRLF dans tout l'engine (le jq Windows natif cassait l'install : `planning-core\r`, corruption silencieuse du catalogue), préflight d'install (jq + sonde d'EXÉCUTION python3 vs stub Store + bash dans le PATH) avec commandes par OS, `.gitattributes eol=lf`, chemins de scripts pleinement qualifiés, résolution python dans `merge-hooks.sh` **et dans les hooks de garde runtime** (le stub Store passe `command -v python3` : gardes inertes en silence), préfiltres mémoire compatibles antislashs (les chemins Windows n'atteignaient jamais le python qui savait les traiter), signal SessionStart quand les gardes sont inactives, gate de synchro des versions, droit de réutilisation privée pour les élèves (licence) — causes racines remontées par deux rapports terrain rejouables d'élèves sous Windows (conductor v1.12.1, consolidator v1.6.1, software-architecture v1.5.1, planning-core v2.3.1, kpi-analyst v1.0.1) |
 
 </details>
 
@@ -224,6 +226,6 @@ Lab principal (privé) : [vibeflow-lab](https://github.com/picmakpro/vibeflow-la
 
 ## 📄 Licence
 
-Source-available sous licence propriétaire — voir [LICENSE](./LICENSE). Le code et l'historique sont publics, mais aucun droit de réutilisation, de modification ou de distribution n'est accordé.
+Source-available sous licence propriétaire — voir [LICENSE](./LICENSE). Le code et l'historique sont publics ; les élèves de la formation disposent d'un droit de réutilisation privée (adapter des éléments de modules dans leurs dépôts privés) ; redistribution et revente restent interdites.
 
 > Le module `skill-creator` réutilise du contenu Anthropic original sous licence MIT.

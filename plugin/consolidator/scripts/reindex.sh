@@ -24,6 +24,14 @@
 set -euo pipefail
 
 MEMORY_DIR="${MEMORY_DIR:-.claude/memory}"
+
+# ADR-054 : stub Microsoft Store — `python3` présent dans le PATH Windows mais inerte à
+# l'exécution. Détection par CHEMIN, repli `python` ; aucun interpréteur → erreur BRUYANTE
+# (un reindex sans python est inopérant : jamais de « réussite » silencieuse).
+PYBIN=python3
+case "$(command -v python3 2>/dev/null)" in
+  ''|*WindowsApps*) if command -v python >/dev/null 2>&1; then PYBIN=python; else echo "[reindex] ERROR: python3/python introuvable (ou stub Microsoft Store) — requis" >&2; exit 1; fi ;;
+esac
 DRY_RUN=true
 AUDIT_MODE=false
 APPLY_MODE=false
@@ -115,7 +123,7 @@ extract_body_ids() {
 extract_body_sections() {
   local file="$1"
   local pat="$2"
-  python3 - "$file" "$pat" <<'PYEOF' 2>/dev/null
+  "$PYBIN" - "$file" "$pat" <<'PYEOF' 2>/dev/null
 import re
 import sys
 
@@ -347,7 +355,7 @@ reindex_one() {
   local orphans_tmp
   orphans_tmp=$(mktemp)
   if [ -n "$orphans" ]; then
-    python3 - "$file" "$orphans_tmp" <<PYEOF
+    "$PYBIN" - "$file" "$orphans_tmp" <<PYEOF
 import re
 import sys
 

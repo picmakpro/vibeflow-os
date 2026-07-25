@@ -167,6 +167,57 @@ has "$out" "acquisition" "T1 compartiment ciblé détecté"; has "$out" "séquen
 out=$(printf '{"prompt":"quelle heure"}' | "$BASH_BIN" "$PT"); [ -z "$out" ] && ok "T2 aucun match → silencieux" || ko "T2 devrait être vide"
 cd "$M"; out=$(printf '{"prompt":"tache A"}' | "$BASH_BIN" "$PT"); [ -z "$out" ] && ok "T3 lab mono → silencieux" || ko "T3 devrait être vide"
 
+echo "=== ADR-055 : --defer-to-gsd met fin à la double injection SessionStart ==="
+DETECT_TMP=$(mktemp -d)
+FAKE_GSD2="$DETECT_TMP/gsd-home"; mkdir -p "$FAKE_GSD2"
+
+mk_gsd_lab() { # <dir> — lab mono-projet dont le planning appartient à GSD
+  mkdir -p "$1/.planning"
+  printf -- '---\ngsd_state_version: 1.0\nlast_updated: "%s"\n---\n\n# État\n' "$(date +%Y-%m-%d)" \
+    > "$1/.planning/STATE.md"
+}
+
+# Cas A : check-planning-state --defer-to-gsd sur un lab sous GSD → silencieux, exit 0.
+LAB="$DETECT_TMP/a"; mk_gsd_lab "$LAB"
+out=$( cd "$LAB" && GSD_HOME="$FAKE_GSD2" "$BASH_BIN" "$SCRIPTS/check-planning-state.sh" --defer-to-gsd 2>&1 )
+code=$?
+if [ "$code" -eq 0 ] && [ -z "$out" ]; then
+  ok "D-A check-planning-state se tait sous moteur GSD"
+else
+  ko "D-A check-planning-state devait se taire — exit $code, sortie: '$out'"
+fi
+
+# Cas B : SANS le flag, le comportement est inchangé (il parle).
+out=$( cd "$LAB" && GSD_HOME="$FAKE_GSD2" "$BASH_BIN" "$SCRIPTS/check-planning-state.sh" 2>&1 )
+if [ -n "$out" ]; then ok "D-B comportement par défaut inchangé"
+else ko "D-B sans flag, le script devait parler"; fi
+
+# Cas C : planning-context --defer-to-gsd sur un lab MONO sous GSD → aucune injection.
+out=$( cd "$LAB" && GSD_HOME="$FAKE_GSD2" "$BASH_BIN" "$PC" --defer-to-gsd 2>&1 )
+if [ -z "$out" ]; then ok "D-C planning-context n'injecte rien en mono-projet GSD"
+else ko "D-C planning-context devait rester muet — sortie: '$out'"; fi
+
+# Cas D : ALTITUDE LAB — avec un INDEX.md, l'injection a lieu MALGRÉ le flag.
+LAB="$DETECT_TMP/d"; mk_gsd_lab "$LAB"
+printf '# Index du lab\n\n| Compartiment | Statut |\n|---|---|\n| client-a | actif |\n' \
+  > "$LAB/.planning/INDEX.md"
+out=$( cd "$LAB" && GSD_HOME="$FAKE_GSD2" "$BASH_BIN" "$PC" --defer-to-gsd 2>&1 )
+if echo "$out" | grep -q "client-a"; then
+  ok "D-D altitude lab : l'INDEX est injecté même sous GSD"
+else
+  ko "D-D l'INDEX du lab devait être injecté — sortie: '$out'"
+fi
+
+# Cas E : lab NON-dev (pas de moteur GSD) → le flag ne change rien, ça parle.
+LAB="$DETECT_TMP/e"; mkdir -p "$LAB/.planning"
+printf -- '---\nplanning_version: 1.0\nlast_updated: "%s"\n---\n\n# État\n' "$(date +%Y-%m-%d)" \
+  > "$LAB/.planning/STATE.md"
+out=$( cd "$LAB" && GSD_HOME="$FAKE_GSD2" "$BASH_BIN" "$PC" --defer-to-gsd 2>&1 )
+if [ -n "$out" ]; then ok "D-E lab non-dev : injection préservée"
+else ko "D-E lab non-dev, l'injection devait avoir lieu"; fi
+
+rm -rf "$DETECT_TMP"
+
 echo ""
 echo "== BILAN : $PASS PASS / $FAIL FAIL =="
 [ "$FAIL" -eq 0 ]

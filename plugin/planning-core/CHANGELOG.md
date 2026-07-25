@@ -1,5 +1,62 @@
 # Changelog — planning-core
 
+## [v2.4.0] — 2026-07-25 (ADR-055 — frontière d'altitude avec le moteur de planning de développement)
+
+**Le conflit** : `vf-planning` et la chaîne de développement produisaient **les mêmes fichiers** dans
+**le même dossier** avec des frontmatters **incompatibles** (`planning_version` + `progress.total_steps`
+d'un côté, `gsd_state_version` + `progress.total_phases/total_plans` de l'autre). Le premier moteur qui
+écrivait rendait l'autre aveugle. S'y ajoutaient une double injection `SessionStart` et une concurrence
+au matching sémantique : la description revendiquait « fais-moi une feuille de route » et « où en est-on ? ».
+
+**La règle** : un projet de code a **un seul** moteur de planning. `planning-core` tient désormais
+l'altitude **lab** (index des projets, compartiments typés, seuil d'autonomie, dette), la couche **à
+côté** (pont mémoire, enforcement), et le **socle complet des labs non-dev**.
+
+### Ajouté
+- **`scripts/detect-gsd-engine.sh`** — répond au **fait** « un moteur de planning est-il en place ? »,
+  4 exits évalués par ordre de priorité. **N'infère aucun métier** : le métier reste du jugement
+  (`domain-detection.md`), les signaux de code déclenchent un examen, jamais un verdict. Le marqueur lu
+  est une clé du **frontmatter** de `STATE.md`, jamais une chaîne trouvée ailleurs dans le fichier.
+- **`references/gsd-handoff.md`** — test unique (« projet, ou lab ? »), table de partage, table de
+  redirection intention → verbe, périmètre résiduel sur lab dev, protocole de migration.
+- **Flag `--defer-to-gsd`** sur `check-planning-state.sh` et `planning-context.sh`, câblé dans
+  `hooks/hooks.json` : fin de la double injection au démarrage. L'`INDEX.md` du lab **reste injecté** —
+  c'est de l'altitude lab, le moteur de dev ne le produit pas.
+
+### Changé
+- **`SKILL.md`** — description rescopée : les intentions de projet dev partent, avec contre-exemples
+  nommant `/vf-init`, `/vf-progress`, `/vf-plan`, `/vf-map`. Étape 0 de branchement (un fait + un
+  jugement), puis séquence A (socle universel non-dev) ou séquence B (couche lab).
+- **`references/domain-detection.md`** — la première ligne de grille (code → dev) ne conduit plus à
+  scaffolder un tronc ; le principe anti-détecteur est réaffirmé, pas renié.
+- **Périphérie** — commande `/vf-planning`, `vf-new-lab` (qualification du métier + route `/vf-init`),
+  table de routage du `conductor`, et les 3 README alignés.
+
+### Inchangé (délibérément)
+- **`guard-planning-updated.sh` reste bloquant** sur tous les labs. Exception motivée : il ne génère
+  rien, il vérifie une propriété du *résultat* quel qu'en soit l'auteur — et le moteur de dev n'offre
+  aucun équivalent bloquant.
+- **Comportement par défaut** des scripts : `--defer-to-gsd` est opt-in, l'usage manuel et le
+  `/checkpoint` sont intacts. Un cas de test dédié verrouille cette non-régression.
+- **Les 4 bundles non-dev** (`content`, `business-pilot`, `growth`, `kpi-analyst`) : tous en séquence A.
+
+### Limite connue
+- **Pas de migration automatique** d'un `.planning/` existant : `gsd-import --from` n'importe qu'un plan
+  isolé, pas un socle entier. L'exit 2 signale, le skill avertit et propose — l'utilisateur décide
+  (ADR-031). Les compteurs `progress.total_steps` et le champ `profile` n'ont pas d'équivalent.
+
+### Tests
+94 assertions vertes, 0 échec (`detect-gsd-engine` 12, `detect-planning-debt` 10,
+`planning-context-hardening` 20, `planning-core` 14, `planning-hooks` 38).
+## [v2.3.1] — 2026-07-23 (portabilité Windows — ADR-054)
+
+### Corrigé
+- **`planning-task-context.sh`** : le stub Microsoft Store `python3` (présent dans le PATH mais
+  inerte) rendait le contexte de tâche muet sous Windows sans jamais déclencher son repli
+  fail-open. Résolution d'interpréteur par CHEMIN (zéro spawn ajouté, rejet `WindowsApps`,
+  repli `python`). Le hook Stop (`guard-planning-updated.sh`) n'est pas concerné : zéro
+  dépendance python/jq par construction.
+
 ## [v2.3.0] — 2026-07-20 (ADR-050 amendée — attribution de session : fix faux positifs du guard Stop)
 
 ### Corrigé (retour terrain Samuel : « faux positifs quasi systématiques » du guard Stop)
