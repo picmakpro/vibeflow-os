@@ -1,5 +1,10 @@
 # Changelog — mobile-test
 
+## v1.0.1 — 2026-07-25
+
+### Modifié
+- ADR-057 : frontière explicite dans la description — recette réelle sur cible mobile = ce skill ; recette conversationnelle = gsd-verify-work ; boucle autonome = mobile-test-team.
+
 ## v1.0.0 — 2026-07-07
 
 Création du module. Pipeline de test mobile réel (iOS simulateur / Android émulateur),

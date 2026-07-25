@@ -1,5 +1,10 @@
 # Changelog — conductor
 
+## [v1.14.0] — 2026-07-25
+
+### Ajouté
+- Team-kernel : `dag.sh` + `driver-lock.sh` extraits du dev-orchestrator en socle transverse (`references/team-kernel.md`, contrat universel manager/workers/juges). Mode **lab express** ≤ 15 min dans vf-new-lab (3 questions, [DÉRIVÉ] assumé, Gate C intact, dette d'express). ADR-057 : détecteur `check-overlaps.sh` des recouvrements avec les briques tierces (advisory, 7 paires, 14 tests).
+
 ## [v1.13.0] — 2026-07-25
 
 ### Ajouté
