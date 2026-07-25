@@ -88,3 +88,37 @@ jobs:
       - name: check-release-tag (main uniquement — VERSION doit être taggée et poussée)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: bash scripts/check-release-tag.sh --remote
+
+  lab-frais:
+    name: Lab frais (install baseline + Gate C — leçon UAT 2026-07-25, F2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer la baseline dans un lab vierge avec le vrai engine
+        run: |
+          set -eu
+          LAB="$(mktemp -d)"
+          echo "LAB=$LAB" >> "$GITHUB_ENV"
+          cd "$LAB" && git init -q
+          # fermeture transitive de conductor = la baseline mandatory réelle
+          closure=$(cd "$GITHUB_WORKSPACE" && bash plugin/_internal/resolve-deps.sh conductor)
+          echo "== baseline : $closure =="
+          for m in $closure; do
+            VIBEFLOW_CACHE="$GITHUB_WORKSPACE/plugin" VF_SCOPE=project \
+              bash "$GITHUB_WORKSPACE/plugin/_internal/vibeflow-update.sh" install "$m"
+          done
+
+      - name: "Gate C du lab frais : la baseline doit passer ses propres gates SANS intervention"
+        run: |
+          set -eu
+          cd "$LAB"
+          echo "== check-agents --strict sur les agents installés =="
+          bash .claude/scripts/check-agents.sh --strict
+          echo "== check-registres --strict (registres canoniques posés ?) =="
+          # tolérance : un lab tout juste installé n'a pas encore de .planning ; le gate
+          # doit rendre un verdict propre (0 ou 3+message), jamais un crash
+          bash .claude/scripts/check-registres.sh --strict --allow-empty || rc=$?; rc=${rc:-0}
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ]; then echo "::error::check-registres rc=$rc inattendu"; exit 1; fi
+          echo "== hooks de gouvernance présents dans settings.json =="
+          grep -q "guard" .claude/settings.json
