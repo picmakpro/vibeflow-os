@@ -99,8 +99,9 @@ ci-dessus.
 
 ---
 
-## Reframe utilisateur
+## Formulation côté utilisateur
 
-Ne jamais exposer « garde-fou anti-thrash » en jargon : parler de **« la boucle abandonne
-un point bloqué après 3 essais »**, **« aucun test vert n'est jamais cassé »**,
-**« rapport de synthèse au réveil »**. Voir `vocabulary-map.md`.
+Le jargon interne peut apparaître, mais rester pédagogue : « garde-fou anti-thrash » se dit
+aussi **« la boucle abandonne un point bloqué après 3 essais »**, anti-régression
+**« aucun test vert n'est jamais cassé »**, traçabilité **« rapport de synthèse au réveil »**.
+La clarté prime sur la traduction (spec 2026-07-25 — fin de la règle de reframe).

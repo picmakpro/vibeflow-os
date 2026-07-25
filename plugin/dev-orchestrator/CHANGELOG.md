@@ -1,5 +1,42 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.0.0] — 2026-07-25
+
+**BREAKING — bascule vers le modèle agentique** (spec
+`2026-07-25-suppression-facade-vf-design.md`, arbitrage direct après l'audit croisé vague 2 :
+la façade de verbes doublait un catalogue gsd-* qui reste exposé en session — la concurrence
+de routage qu'elle prétendait résoudre était celle qu'elle créait).
+
+### Supprimé
+- **Les 29 verbes-façades `/vf-*`** (tout `skills/` sauf `vf-auto`, et `vf-dev` réduit à
+  l'incarnation de l'agent) : les briques gsd-* redeviennent l'interface directe du quotidien,
+  leurs descriptions déclenchent nativement, sans couche de synonymes.
+- **La rule de préséance** (`rules/vf-verb-precedence.md`) et les matrices de renvois négatifs
+  croisés entre descriptions — n'ont plus d'objet sans la façade.
+- **Le reframe** (`vocabulary-map.md` et le boilerplate « Ne nomme jamais GSD » ×30) : le
+  vocabulaire GSD peut apparaître, la clarté prime sur la traduction.
+- Les tests de collision/préséance/synchro de table (anciens T3-verbes, T12, T13) — remplacés
+  par les tests du modèle agentique (voir README §Tests).
+
+### Ajouté / Modifié
+- **Carte d'intention unique** : `references/intent-routing.md` refondu de « table des 31
+  verbes » en « carte intention → brique gsd / équipe » — seule source de routage, consommée
+  on-demand par les 2 agents.
+- **Manager agentique** (`vf-dev-manager`) : détection d'intention (brief en langage naturel
+  brut mappé via la carte), **next steps** proposés depuis ROADMAP/STATE en fin d'étape et de
+  mission, **hygiène documentaire** à critères explicites (fin d'étape, décision structurante,
+  drift détecté — jamais au fil de l'eau), **digest de mission** ≤ 30 lignes par mandat
+  (amortit les relectures intégrales de `.planning/` par étage).
+- **`AGENT.md` (vibeflow-dev)** refondu : intention → brique gsd directe, raccourcis dominants
+  + carte exhaustive on-demand, garde-fou first-use conservé (FIRST-01/02, BOOT-04).
+- **ADR-045 côté mobile en 1 saut** : les workers cloisonnés remontent
+  `doc-research-required` directement à l'orchestrateur qui porte le web — plus de relais en
+  cascade.
+- **Rapports allégés** : les workers rendent le bloc typé + le strict nécessaire, le détail va
+  sur disque (`.planning/missions/`) — le manager pilote sur le bloc typé seul.
+- `module.json` / README / tests réécrits pour le modèle agentique (2 skills survivants,
+  équipe de mission, carte unique).
+
 ## [v1.8.2] — 2026-07-25
 
 ### Modifié

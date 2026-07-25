@@ -5,9 +5,9 @@ description: >
   tout », « en autonomie », « la nuit », « débrouille-toi », « enchaîne les étapes », « va
   jusqu'au bout tout seul », « je reviens demain matin, avance ». Le périmètre est déjà
   cadré : la boucle enchaîne cadrage → plan → exécution étape après étape, avec garde-fous.
-  ✘ pas pour exécuter une seule étape déjà planifiée → /vf-execute · ✘ pas pour une tâche
-  triviale d'un seul commit → /vf-quick · ✘ pas pour **arrêter** en gardant le contexte
-  avant de partir → /vf-pause · ✘ pas pour savoir où en est le projet → /vf-progress.
+  ✘ pas pour exécuter une seule étape déjà planifiée → gsd-execute-phase · ✘ pas pour une
+  tâche triviale d'un seul commit → gsd-quick · ✘ pas pour **arrêter** en gardant le contexte
+  → gsd-pause-work · ✘ pas pour savoir où en est le projet → gsd-progress.
   Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 
@@ -26,19 +26,16 @@ dans le périmètre demandé). Applique le seuil canonique `SEUIL_EQUIPE` (défi
   (outil Task) avec le brief de mission du contrat, puis NE poursuis PAS ce skill — le manager
   tient la boucle et rend le rapport de mission. Le signal de durée GAGNE en cas d'ambiguïté.
 
-Annonce le choix en une ligne, en vocabulaire VibeFlow (« mission courte, traitement direct » /
-« mission longue, je déploie l'équipe »), sans nommer la plomberie.
+Annonce le choix en une ligne (« mission courte, traitement direct » / « mission longue,
+je déploie l'équipe »).
 
 ## Moteur direct (mission courte)
 
 Invoque le skill **`gsd-autonomous`** (enchaîne cadrage → plan → exécution par étape pour
 toutes les étapes restantes).
 
-Reframe toute sortie en vocabulaire VibeFlow : « autonomous » → **mode autonome**,
-« phase » → **étape/sprint** (cf. `vocabulary-map.md`).
-Ne nomme jamais GSD ni Superpowers.
-
-Pré-requis : périmètre déjà cadré. Sinon passer par **`vf-plan`** d'abord.
+Pré-requis : périmètre déjà cadré. Sinon passer par `gsd-discuss-phase` + `gsd-plan-phase`
+d'abord.
 
 ## Garde-fous (non supervisé)
 
