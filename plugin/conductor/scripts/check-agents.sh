@@ -12,6 +12,7 @@
 #   check-agents.sh --hook              # SessionStart : compact, exit 0 toujours
 #   check-agents.sh --file <agent.md>   # un seul fichier (utilisé par guard-agent-write)
 #   check-agents.sh --agents-dir=PATH   # défaut .claude/agents
+#   check-agents.sh --allow-empty       # avec --strict : tolère une cible vide (sinon exit 3)
 #
 # BLOQUANT : frontmatter absent · name absent/invalide · description absente ·
 #   model absent ou hors {sonnet,opus,haiku,fable,inherit,claude-*} · memory absente ou hors
@@ -19,7 +20,8 @@
 # WARNING : skills absent · skill déclaré introuvable (ERROR en --strict) · description < 30c ·
 #   tools absent (hérite tout) · champ inconnu · name ≠ nom de fichier.
 #
-# Codes de sortie : 0 = conforme · 1 = non conforme
+# Codes de sortie : 0 = conforme · 1 = non conforme · 3 = INDÉTERMINÉ (--strict sur cible
+#   absente/vide : aucun verdict rendu — un vert sans rien vérifier serait un faux vert, F13).
 
 set -uo pipefail
 
@@ -27,12 +29,14 @@ AGENTS_DIR=".claude/agents"
 SKILLS_DIR=".claude/skills"
 STRICT=false
 HOOK_MODE=false
+ALLOW_EMPTY=false
 SINGLE_FILE=""
 
 for arg in "$@"; do
   case "$arg" in
     --strict)         STRICT=true ;;
     --hook)           HOOK_MODE=true ;;
+    --allow-empty)    ALLOW_EMPTY=true ;;
     --file)           : ;; # valeur au prochain arg — géré ci-dessous
     --agents-dir=*)   AGENTS_DIR="${arg#*=}" ;;
     --skills-dir=*)   SKILLS_DIR="${arg#*=}" ;;
@@ -54,13 +58,14 @@ case "$(command -v python3 2>/dev/null)" in
 esac
 
 VF_AGENTS_DIR="$AGENTS_DIR" VF_SKILLS_DIR="$SKILLS_DIR" VF_STRICT="$STRICT" \
-VF_HOOK="$HOOK_MODE" VF_SINGLE="$SINGLE_FILE" "$PYBIN" -c "
+VF_HOOK="$HOOK_MODE" VF_SINGLE="$SINGLE_FILE" VF_ALLOW_EMPTY="$ALLOW_EMPTY" "$PYBIN" -c "
 import glob, os, re, sys
 
 agents_dir = os.environ[\"VF_AGENTS_DIR\"]
 skills_dir = os.environ[\"VF_SKILLS_DIR\"]
 strict = os.environ[\"VF_STRICT\"] == \"true\"
 hook = os.environ[\"VF_HOOK\"] == \"true\"
+allow_empty = os.environ[\"VF_ALLOW_EMPTY\"] == \"true\"
 single = os.environ[\"VF_SINGLE\"]
 
 # Champs officiels Claude Code (docs sub-agents, 2026-07-05) — base du lint.
@@ -221,6 +226,11 @@ else:
     files = sorted(glob.glob(os.path.join(agents_dir, \"*.md\")))
     files = [f for f in files if os.path.basename(f) not in NOT_AGENTS]
     if not files:
+        # Contrat de decouverte (F13, vacuous green) : en --strict, zero cible = zero verdict.
+        # exit 3 = INDETERMINE, distinct de 0 = CONFORME. --allow-empty pour les cas legitimes.
+        if strict and not allow_empty and not hook:
+            print(f\"[check-agents] ✗ INDETERMINE : aucun agent dans {agents_dir} — cible absente ou vide, aucun verdict rendu (--allow-empty pour tolerer)\")
+            sys.exit(3)
         if not hook:
             print(f\"[check-agents] aucun agent dans {agents_dir} — rien a verifier\")
         sys.exit(0)

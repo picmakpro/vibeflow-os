@@ -14,6 +14,12 @@
 #   ./audit-infra.sh --snapshot                 # genere INFRASTRUCTURE_SNAPSHOT.md
 #   ./audit-infra.sh --diff                     # compare snapshot courant vs .prev
 #   ./audit-infra.sh --if-older-than=14d        # skip si dernier audit (stamp ou snapshot) < 14j
+#   ./audit-infra.sh --strict                   # GATE (VG-5, F13) : cible absente → exit 3 ·
+#                                               #   findings ERROR/tests KO → exit 1 (sinon advisory exit 0)
+#
+# Codes de sortie : 0 = OK (ou advisory) · 1 = findings bloquants (--strict) ·
+#   3 = INDÉTERMINÉ (--strict et $CLAUDE_DIR absent : rien d'audité, aucun verdict)
+# NB : --strict s'applique aux modes full/quick/axis (pas snapshot/diff, qui restent advisory).
 #
 # Reference : skill infrastructure-audit + ADR-031
 
@@ -32,12 +38,17 @@ STAMP="$CLAUDE_DIR/.last-audit"
 MODE="full"
 AXIS=""
 IF_OLDER_THAN=""
+STRICT=false
+# Accumulateur strict (VG-5) : les axes y versent leurs findings bloquants. Portée globale —
+# valable pour les modes qui appellent les axes DANS le shell courant (full/quick/axis).
+STRICT_ERRORS=0
 
 for arg in "$@"; do
   case "$arg" in
     --quick)             MODE="quick" ;;
     --snapshot)          MODE="snapshot" ;;
     --diff)              MODE="diff" ;;
+    --strict)            STRICT=true ;;
     --axis=*)            AXIS="${arg#*=}"; MODE="axis" ;;
     --if-older-than=*)   IF_OLDER_THAN="${arg#*=}" ;;
     -h|--help)
@@ -48,6 +59,13 @@ for arg in "$@"; do
 done
 
 log() { echo "[audit-infra] $*" >&2; }
+
+# Contrat de découverte (F13, vacuous green) : sans $CLAUDE_DIR, toutes les boucles d'audit
+# sont sautées et l'exit 0 serait un vert non mérité. En --strict : exit 3 = INDÉTERMINÉ.
+if $STRICT && [ ! -d "$CLAUDE_DIR" ]; then
+  log "✗ INDÉTERMINÉ : $CLAUDE_DIR absent — rien à auditer, aucun verdict rendu (exit 3)"
+  exit 3
+fi
 
 # ---------- if-older-than guard ----------
 # Le gate d'age porte sur le plus RECENT de {stamp .last-audit, snapshot} (INF-01).
@@ -252,6 +270,7 @@ except: print(0)
   "detections": $det_json
 }
 EOF
+  STRICT_ERRORS=$((STRICT_ERRORS + errors_count))
 }
 
 # ---------- Axe 3 : Scripts ----------
@@ -310,6 +329,7 @@ audit_scripts() {
   "tests_fail": $tests_fail
 }
 EOF
+  STRICT_ERRORS=$((STRICT_ERRORS + syntax_errs_count + tests_fail + ${#deps_missing[@]}))
 }
 
 # ---------- Snapshot ----------
@@ -414,3 +434,10 @@ case "$MODE" in
     log "Pour generer snapshot : ./audit-infra.sh --snapshot"
     ;;
 esac
+
+# Verdict --strict (VG-5) : les findings ERROR portés jusque-là uniquement par le JSON
+# deviennent un exit code — un agent/CI peut enfin bloquer dessus.
+if $STRICT && [ "$STRICT_ERRORS" -gt 0 ]; then
+  log "✗ --strict : $STRICT_ERRORS finding(s) bloquant(s) (voir JSON ci-dessus)"
+  exit 1
+fi
