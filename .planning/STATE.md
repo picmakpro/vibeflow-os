@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: vf-routing
 milestone_name: Routage fin & verbes VibeFlow
 status: in_progress
-stopped_at: "Phase 14 COMPLÈTE (7 plans) sur feat/rescope-vf-planning-alti — release v2.29.0 commitée, TAG NON POSÉ (à créer après merge sur main : git tag -a v2.29.0). Travail Phase 12 séparé sur feat/phase-12-verbes (12 commits, non cadré via discuss-phase 12). Backup de l'état mélangé : backup/mission-complete-20260725."
+stopped_at: "Phases 12 et 14 COMPLÈTES et publiées sur main — tags v2.31.0 (routage fin) et v2.30.0 (frontière d'altitude, ADR-055) poussés. Reste : Phase 13 (pont /vf-ingest) non cadrée."
 last_updated: "2026-07-25"
 last_activity: 2026-07-25
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 2
   total_plans: 13
-  completed_plans: 8
-  percent: 62
+  completed_plans: 13
+  percent: 67
 ---
 
 # Project State
@@ -25,21 +25,23 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 
 ## Current Position
 
-Phase: 14 (Frontière d'altitude planning-core / moteur GSD — rescope de `vf-planning`) — milestone vf-routing
-Plan: 14-01 → 14-07 livrés (branche `feat/rescope-vf-planning-alti`), release v2.29.0 commitée. Spec + plan détaillé :
-`docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`,
-`docs/superpowers/plans/2026-07-25-rescope-vf-planning-gsd.md`.
-Status: Complete — 7/7 plans livrés, tag à poser après merge
+Phase: 13 (Pont spec → feuille de route, `/vf-ingest`) — milestone vf-routing
+Plan: aucun — phase non cadrée. Prochaine action `/gsd:discuss-phase 13` puis `plan-phase`.
+Status: Not planned yet
 Last activity: 2026-07-25
 
-Tests : 92 assertions vertes, 0 échec (detect-gsd-engine 12, detect-planning-debt 10,
-context-hardening 20, planning-core 14, planning-hooks 38). `check-agents.sh` OK.
+**Phases 12 et 14 livrées et publiées sur `main`** :
+- Phase 12 (Routage fin & verbes `/vf-*`) — 6/6 plans · release **`v2.31.0`** · dev-orchestrator v1.8.1,
+  design-orchestrator v1.1.0, conductor v1.12.2. 31 verbes dans `dev-orchestrator` (14 → 31), 2 dans
+  `design-orchestrator`. Tests 25 OK / 0 KO / 1 SKIP (le SKIP est `vf-ingest`, attendu en Phase 13).
+- Phase 14 (Frontière d'altitude `planning-core` / moteur GSD) — 7/7 plans · release **`v2.30.0`** ·
+  **ADR-055** (renuméroté au merge : `ADR-054` était déjà pris par la portabilité Windows publiée en
+  v2.29.0). planning-core v2.4.0. 92 assertions vertes.
 
-Note : Phase 12 en cours (12-01 livré, 12-02→12-06 restants), Phase 13 non cadrée, Phase 14 indépendante des deux.
 Milestone `gsd-migration` (Phases 10-11) reste ouvert et **en attente** — chantier indépendant, non bloquant.
 Milestone précédent memory-swarm-rnd **SHIPPÉ v2.28.0** (ADR-052 mémoire vivante + ADR-053 swarm).
 
-Progress: [██████░░░░] 62% (3 phases, 8/13 plans livrés)
+Progress: [██████░░░░] 2/3 phases (13 non cadrée)
 
 ## Performance Metrics
 
