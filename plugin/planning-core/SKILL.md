@@ -82,12 +82,16 @@ Avant toute autre chose, croiser **un fait** et **un jugement**.
 1. **Le fait** — lancer `scripts/detect-gsd-engine.sh`. Il ne dit PAS si le lab est dev : il dit
    si un **moteur de planning de développement** est en place.
 
+   Les exits sont listés dans l'**ordre où le script les évalue** — le premier qui matche gagne, un lab
+   pouvant satisfaire plusieurs situations à la fois. Le marqueur lu est une clé du **frontmatter** de
+   `STATE.md`, jamais une chaîne trouvée ailleurs dans le fichier.
+
    | Exit | Signification | Suite |
    |---|---|---|
+   | `1` | chaîne de dev absente de la machine | → si le métier est dev, proposer l'amorçage via `/vf-init` ; **ne jamais** scaffolder un tronc dev à la main |
    | `0` | moteur de dev actif sur ce `.planning/` | → **Séquence B**, couche lab uniquement |
    | `2` | socle `planning-core` + code alentour | → juger le métier, puis protocole de migration (`references/gsd-handoff.md`) |
    | `3` | aucun moteur en place | → le jugement métier décide seul |
-   | `1` | chaîne de dev absente de la machine | → si le métier est dev, proposer l'amorçage via `/vf-init` ; **ne jamais** scaffolder un tronc dev à la main |
 
 2. **Le jugement** — appliquer `references/domain-detection.md` (lire `CLAUDE.md`, les registres, le
    vocabulaire dominant). Le métier n'est **jamais** déduit d'un `package.json` seul.
