@@ -35,7 +35,7 @@ Sur un lab dev, ces intentions **ne sont pas traitées** par `vf-planning`. Elle
 | où en est-on, statut, avancement, la suite, next | `/vf-progress` |
 | cadrer une étape, découper, préparer le sprint, planifier la feature | `/vf-plan` |
 | comprendre le code existant, cartographier, « c'est quoi ce repo » | `/vf-map` |
-| clôturer un jalon, archiver le milestone, démarrer le suivant | `/vf-milestone` |
+| clôturer un jalon, archiver le milestone, démarrer le suivant | `/vf-progress` |
 | vérifier la santé du `.planning/`, réparer une incohérence | — (agent) : aucun verbe dédié à ce jour, l'intention part au routeur de dev |
 
 **Toujours un verbe `/vf-*`, jamais un `gsd-*` en entrée de chaîne** — Iron Law de
