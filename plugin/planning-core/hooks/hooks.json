@@ -1,12 +1,12 @@
 {
-  "description": "Planning machine-enforced (ADR-040 + ADR-043 + ADR-050) : au démarrage, fraîcheur + digest index-first injecté + 8e signal de dette + baseline de session (attribution des changements) ; à la tâche, STATE du compartiment ciblé ; en fin de session, garde-fou bloquant si le planning n'est pas à jour.",
+  "description": "Planning machine-enforced (ADR-040 + ADR-043 + ADR-050 + ADR-054) : au démarrage, fraîcheur + digest index-first injecté + 8e signal de dette + baseline de session (attribution des changements) ; à la tâche, STATE du compartiment ciblé ; en fin de session, garde-fou bloquant si le planning n'est pas à jour. ADR-054 : fraîcheur et digest se retirent quand le moteur GSD tient déjà le projet (la dette de compartiment et le garde-fou de fin de session restent : altitude lab).",
   "hooks": {
     "SessionStart": [
       {
         "matcher": "startup",
         "hooks": [
-          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-planning-state.sh || true" },
-          { "type": "command", "command": "bash {{VF_SCRIPTS}}/planning-context.sh || true" },
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-planning-state.sh --defer-to-gsd || true" },
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/planning-context.sh --defer-to-gsd || true" },
           { "type": "command", "command": "bash {{VF_SCRIPTS}}/detect-planning-debt.sh || true" }
         ]
       },

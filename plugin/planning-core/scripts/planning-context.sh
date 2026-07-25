@@ -15,12 +15,18 @@
 # Fail-open : jamais bloquant, toute erreur → exit 0 silencieux.
 #
 # Usage:
-#   planning-context.sh [--path <dir>] [--max-lines <N>]
+#   planning-context.sh [--path <dir>] [--max-lines <N>] [--defer-to-gsd]
 # Defaults: --path .planning  --max-lines 45
+#
+# --defer-to-gsd (ADR-054) : opt-in, câblé dans hooks.json uniquement. Sur un lab MONO dont le
+# moteur GSD est actif, gsd-session-state.sh a déjà injecté l'état du projet → on se retire pour
+# ne pas payer le contexte deux fois. Un lab À COMPARTIMENTS garde son injection : l'INDEX.md est
+# de l'altitude LAB, GSD ne le produit pas. SANS ce flag, le comportement est strictement inchangé.
 set -uo pipefail
 
 PLANNING_DIR=".planning"
 MAX_LINES=45
+DEFER_TO_GSD=0
 
 # NB : ${2:?} obligatoire (convention des scripts frères) — un ${2:-défaut} + shift 2 sans
 # valeur ne consommait rien et bouclait à l'infini (gel du SessionStart jusqu'au timeout).
@@ -28,6 +34,7 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --path) PLANNING_DIR="${2:?--path nécessite une valeur}"; shift 2 ;;
     --max-lines) MAX_LINES="${2:?--max-lines nécessite une valeur}"; shift 2 ;;
+    --defer-to-gsd) DEFER_TO_GSD=1; shift ;;
     -h|--help) grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *) shift ;;
   esac
@@ -38,6 +45,19 @@ done
 
 INDEX_FILE="$PLANNING_DIR/INDEX.md"
 STATE_FILE="$PLANNING_DIR/STATE.md"
+
+# --- ADR-054 : altitude lab uniquement quand GSD tient le projet ---
+# Lab à compartiments (INDEX.md présent) → l'INDEX est de l'altitude LAB, GSD ne le produit
+# pas : on injecte. Lab mono-projet sous moteur GSD → gsd-session-state.sh a déjà injecté
+# l'état du projet : on se retire pour ne pas payer le contexte deux fois.
+# NB : ce bloc doit rester APRÈS la définition de $INDEX_FILE — sinon la condition teste une
+# variable vide et le lab à compartiments perd son injection (régression silencieuse).
+if [ "$DEFER_TO_GSD" -eq 1 ] && [ ! -f "$INDEX_FILE" ]; then
+  DETECT="$(dirname "$0")/detect-gsd-engine.sh"
+  if [ -f "$DETECT" ]; then
+    bash "$DETECT" --quiet --path "$PLANNING_DIR" && exit 0
+  fi
+fi
 
 if [ -f "$INDEX_FILE" ]; then
   # --- Lab à compartiments : index-first ---
