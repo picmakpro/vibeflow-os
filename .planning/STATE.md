@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: vf-routing
 milestone_name: Routage fin & verbes VibeFlow
-status: not_planned
-stopped_at: Milestone vf-routing créé (Phases 12-13) — spec validée et commitée, à cadrer via discuss-phase 12
+status: in_progress
+stopped_at: Phase 14 créée et planifiée (6 plans, 4 vagues) — rescope de vf-planning, frontière d'altitude avec le moteur GSD (ADR-054). Prête à exécuter. Phase 12 : plan 12-01 livré, 12-02→12-06 restants. Phase 13 non cadrée.
 last_updated: "2026-07-25"
 last_activity: 2026-07-25
 progress:
-  total_phases: 2
+  total_phases: 3
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 12
+  completed_plans: 1
+  percent: 8
 ---
 
 # Project State
@@ -25,15 +25,18 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 
 ## Current Position
 
-Phase: 12 (Routage fin & couverture complète des verbes `/vf-*`) — milestone vf-routing
-Plan: aucun — spec validée et commitée (`docs/superpowers/specs/2026-07-25-routage-fin-verbes-vf-design.md`), phases posées, pas encore cadrées
-Status: Not planned yet — prochaine action `/gsd:discuss-phase 12` puis `plan-phase`
+Phase: 14 (Frontière d'altitude planning-core / moteur GSD — rescope de `vf-planning`) — milestone vf-routing
+Plan: 6 plans posés sur 4 vagues, aucun exécuté. Spec + plan détaillé validés et commités
+(`docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`,
+`docs/superpowers/plans/2026-07-25-rescope-vf-planning-gsd.md`).
+Status: Planned — prête à exécuter (vague 1 : 14-01 et 14-02 en parallèle)
 Last activity: 2026-07-25
 
-Note : milestone `gsd-migration` (Phases 10-11) reste ouvert et **en attente** — chantier indépendant, non bloquant.
+Note : Phase 12 en cours (12-01 livré, 12-02→12-06 restants), Phase 13 non cadrée, Phase 14 indépendante des deux.
+Milestone `gsd-migration` (Phases 10-11) reste ouvert et **en attente** — chantier indépendant, non bloquant.
 Milestone précédent memory-swarm-rnd **SHIPPÉ v2.28.0** (ADR-052 mémoire vivante + ADR-053 swarm).
 
-Progress: [░░░░░░░░░░] 0% (2 phases, non planifiées)
+Progress: [█░░░░░░░░░] 8% (3 phases, 1/12 plans livrés)
 
 ## Performance Metrics
 
@@ -71,6 +74,13 @@ Progress: [░░░░░░░░░░] 0% (2 phases, non planifiées)
 - 2026-07-25 : Milestone **vf-routing** créé. Phase 12 (Routage fin & couverture complète des verbes `/vf-*`)
   + Phase 13 (Pont spec → feuille de route, `/vf-ingest`) ajoutées. Requirements VERB-01..05, BRDG-01..03.
   Devient le milestone actif ; `gsd-migration` reste ouvert en attente (chantiers indépendants).
+- 2026-07-25 : **Phase 14** (Frontière d'altitude planning-core / moteur GSD) ajoutée au milestone vf-routing.
+  Constat déclencheur : `vf-planning` et la chaîne GSD produisaient les mêmes fichiers dans le même dossier
+  avec des frontmatters **incompatibles** (`planning_version` vs `gsd_state_version`) — deux moteurs de
+  planning concurrents. Décision : ADR-054, frontière d'altitude (un projet = un seul moteur ; VibeFlow tient
+  le lab et l'enforcement). Requirements ALTI-01..05, 6 plans sur 4 vagues, indépendante des Phases 12 et 13.
+- 2026-07-25 : compteurs de `progress` corrigés — ils affichaient `total_plans: 0` alors que la Phase 12
+  comptait déjà 6 plans dont 1 livré (12-01). Réel : 12 plans posés (6 en Phase 12, 6 en Phase 14), 1 livré.
 
 ### Decisions
 
