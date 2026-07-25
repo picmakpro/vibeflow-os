@@ -1,10 +1,13 @@
 ---
 name: vf-decide
 description: >
-  Utiliser quand l'utilisateur doit trancher une zone grise technique et veut un avis
-  argumenté plutôt qu'un choix arbitraire — « quelle option ? », « on part sur quoi ? »,
-  « compare ces approches », « aide-moi à choisir », « bibliothèque X ou Y ? »,
-  « c'est mieux de faire A ou B ? ». Produit un tableau comparatif sourcé + une reco.
+  Utiliser quand les options sont **déjà identifiées** et qu'il faut trancher avec un avis
+  argumenté plutôt qu'au hasard — « quelle option ? », « compare ces approches », « aide-moi
+  à choisir », « bibliothèque X ou Y ? », « c'est mieux de faire A ou B ? », « on prend
+  laquelle ? ». Produit un tableau comparatif sourcé et une recommandation motivée.
+  ✘ pas pour concevoir la solution quand aucune option n'existe encore → /vf-brainstorm ·
+  ✘ pas pour cadrer un sprint entier (plusieurs décisions + périmètre) → /vf-plan · ✘ pas
+  pour répondre à la question en écrivant du code jetable → /vf-spike.
   Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 

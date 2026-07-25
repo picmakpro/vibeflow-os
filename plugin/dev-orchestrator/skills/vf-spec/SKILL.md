@@ -8,7 +8,8 @@ description: >
   nominaux, cas limites, ce qui est hors sujet.
   ✘ pas pour le COMMENT et le découpage en tâches → /vf-plan · ✘ pas pour l'idéation amont
   sur une idée floue → /vf-explore · ✘ pas pour concevoir la solution technique →
-  /vf-brainstorm · ✘ pas pour documenter ce qui existe déjà → /vf-docs.
+  /vf-brainstorm · ✘ pas pour répondre à la question par du code jetable → /vf-spike ·
+  ✘ pas pour documenter ce qui existe déjà → /vf-docs.
   Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 

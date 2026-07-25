@@ -1,10 +1,14 @@
 ---
 name: vf-progress
 description: >
-  Utiliser quand l'utilisateur veut connaître l'état d'avancement ou la suite — « on est
-  où ? », « et après ? », « next », « la suite », « statut », « avancement », « qu'est-ce
-  qu'il reste ». Point d'avancement et routage de l'intention libre. Invocable par
-  l'utilisateur ET par l'agent en autonomie.
+  Utiliser quand l'utilisateur veut savoir **où en est le projet de code** ou ce qui vient
+  ensuite — « on est où ? », « et après ? », « next », « la suite », « statut »,
+  « avancement », « qu'est-ce qu'il reste ». Point d'avancement sur la feuille de route et
+  routage de l'intention libre.
+  ✘ pas pour recharger le contexte d'une session passée → /vf-resume · ✘ pas pour lister
+  les manques et la dette → /vf-gaps · ✘ pas pour l'état d'un lab non-dev ou de son socle
+  documentaire → /vf-planning.
+  Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 
 # vf-progress — Point d'avancement

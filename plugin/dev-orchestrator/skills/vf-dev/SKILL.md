@@ -1,11 +1,14 @@
 ---
 name: vf-dev
 description: >
-  Utiliser quand l'utilisateur exprime une demande de dev en langage naturel sans
-  préciser l'étape — « code ça », « on s'occupe de la feature X », « occupe-toi de ce
-  projet », « aide-moi à avancer » — ou quand l'intention est ambiguë et doit être
-  routée. Point d'entrée générique de VibeFlow : analyse l'intention puis délègue au
-  bon verbe. Invocable par l'utilisateur ET par l'agent en autonomie.
+  Utiliser **en dernier recours**, quand la demande de dev ne désigne aucun geste précis —
+  « occupe-toi de ce projet », « aide-moi à avancer », « pilote-moi ça », « je sais pas quel
+  geste il faut », « fais ce qu'il faut », « on s'occupe de la feature X ». Point d'entrée
+  générique : analyse l'intention, puis délègue au verbe qui la porte réellement.
+  ✘ pas quand le geste est identifiable — passer directement par le verbe : /vf-plan,
+  /vf-execute, /vf-debug, /vf-test… · ✘ pas pour enchaîner tout le reste sans supervision →
+  /vf-auto · ✘ pas pour un simple point d'avancement → /vf-progress.
+  Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 
 # vf-dev — Point d'entrée générique

@@ -1,9 +1,13 @@
 ---
 name: vf-execute
 description: >
-  Utiliser quand un plan de travail existe et qu'il faut le construire — « code »,
-  « implémente », « ajoute cette feature », « construis », « développe », « exécute le
-  plan ». Demande structurante avec impact (pas un one-liner trivial → voir vf-quick).
+  Utiliser quand un plan de travail existe et qu'il faut le construire **pour de vrai** —
+  « code », « implémente », « ajoute cette feature », « construis », « développe »,
+  « exécute le plan », « vas-y, fais-le ». Demande structurante avec impact, livrée en
+  commits atomiques.
+  ✘ pas pour un one-liner trivial sans impact → /vf-quick · ✘ pas pour une expérimentation
+  jetable qui répond à une question → /vf-spike · ✘ pas pour enchaîner toutes les étapes
+  restantes sans supervision → /vf-auto.
   Invocable par l'utilisateur ET par l'agent en autonomie (après vf-plan, avant vf-test).
 ---
 

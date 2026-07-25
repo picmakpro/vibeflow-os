@@ -8,8 +8,12 @@ description: >
   « on part sur quel style », « définis l'identité visuelle / la direction artistique »,
   « extrais un design system », « responsive cassé ». Point d'entrée design de VibeFlow : détecte
   l'intention (définir la DA / modifier l'UI / critiquer / craft ciblé), détecte la stack, puis
-  route. Générique multi-stack (web, mobile, desktop). Invocable par l'utilisateur ET par l'agent
-  en autonomie ET par le routeur de développement sur une phase de design.
+  route. Générique multi-stack (web, mobile, desktop).
+  ✘ pas pour une maquette jetable d'exploration (« montre-moi à quoi ça ressemblerait ») →
+  /vf-sketch · ✘ pas pour un prototype de code jetable qui répond à une question technique →
+  /vf-spike · ✘ pas pour construire l'écran une fois la direction validée → /vf-execute.
+  Invocable par l'utilisateur ET par l'agent en autonomie ET par le routeur de développement sur
+  une phase de design.
 ---
 
 # vf-design — Point d'entrée design

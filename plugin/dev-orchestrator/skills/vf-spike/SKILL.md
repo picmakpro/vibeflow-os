@@ -7,8 +7,9 @@ description: >
   « on essaie et on jette », « je veux voir si cette lib tient la charge ». Expérimentation
   cadrée et sacrifiable, dont le livrable est une réponse — pas une feature.
   ✘ pas pour idéer sans écrire de code → /vf-explore · ✘ pas pour concevoir la solution sur
-  le papier → /vf-brainstorm · ✘ pas pour implémenter pour de vrai → /vf-execute · ✘ pas
-  pour une maquette visuelle jetable → /vf-sketch.
+  le papier → /vf-brainstorm · ✘ pas pour figer le QUOI attendu → /vf-spec · ✘ pas pour
+  implémenter pour de vrai → /vf-execute · ✘ pas pour une maquette visuelle jetable →
+  /vf-sketch.
   Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 
