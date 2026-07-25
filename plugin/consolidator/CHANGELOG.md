@@ -1,5 +1,10 @@
 # CHANGELOG — consolidator
 
+## [v1.6.2] — 2026-07-25
+
+### Corrigé
+- Références `/checkpoint` (commande inexistante) → `/vf-audit` ; `probe-memory-guards.sh` vérifie désormais le câblage réel des 3 gardes (+ mode `--strict`).
+
 ## [v1.6.1] — 2026-07-23 (portabilité Windows — ADR-054, 2e rapport terrain)
 
 ### Corrigé

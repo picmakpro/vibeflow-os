@@ -5,6 +5,31 @@ dernières entrées et pointent ici). Chaque module a par ailleurs son propre `C
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.32.0] — 2026-07-25
+
+**Vague 1 de l'audit croisé du 2026-07-25** (5 audits parallèles, rapports dans `reports/`) —
+le framework s'applique enfin sa propre doctrine d'enforcement :
+
+- **CI GitHub Actions** : 31 suites de tests + `check-agents --strict` + gates de release,
+  branchés sur push/PR. Fin du « vert non mérité » : 7 gates sortaient exit 0 sur cible
+  absente → doctrine exit 3 = indéterminé (`--strict`/`--allow-empty`), engine d'install qui
+  avorte si le merge des hooks de gouvernance échoue. Test rouge et test flaky corrigés
+  (isolation HOME/cwd).
+- **Équipe de mission optimisée** : workers et juges en sonnet (fin du tout-opus), dispatch
+  **parallèle** de la frontière DAG et des juges (revue ∥ audit), fin de la double revue,
+  cadrage non-interactif explicite de `vf-coder` (plus de checkpoint interactif mort).
+- **Chasse aux fantômes** : les 3 skills inexistants du frontmatter validator (F3), la commande
+  `/checkpoint` citée dans 13 fichiers (→ `/vf-audit`), les gates `human-validator` /
+  `quality-gate-client` des bundles marqués « à fabriquer » (F16), le chemin `assets/` cassé du
+  template skill-creator (F4, dédupliqué → pointeur).
+- **ADR assainies** : définitions canoniques des 9 ADR héritées les plus citées ;
+  **scission ADR-031/ADR-056** (validation humaine vs vigilance runtime — un même identifiant
+  portait deux doctrines).
+- **Versions honnêtes** : 13 versions fausses du tableau README corrigées, « 14 verbes » → 31,
+  kpi-analyst ajouté, historique dédupliqué vers ce CHANGELOG, `scripts/bump.sh` (générateur
+  idempotent), globs mobile discriminants (fin des faux positifs Next.js), messaging
+  « dev + design + Lab Factory ». 14 modules patch-bumpés.
+
 ## [v2.31.1] — 2026-07-25
 
 **Alignement des fichiers de version** : `software-architecture` et `kpi-analyst` ont livré leurs

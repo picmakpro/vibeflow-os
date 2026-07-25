@@ -1,5 +1,10 @@
 # CHANGELOG — dev-orchestrator
 
+## [v1.8.2] — 2026-07-25
+
+### Modifié
+- Audit 2026-07-25 vague 1 : workers et juges en sonnet (doctrine model-profiles), cadrage non-interactif explicite de vf-coder (`--auto`, plus de checkpoint mort), dispatch parallèle de la frontière DAG et des juges (revue ∥ audit, fusion des findings, un seul reopen), fin de la double revue ; exception panel en mission documentée (vf-decide).
+
 ## [v1.8.1] — 2026-07-25 (soldes de l'étape 12)
 
 ### Corrigé

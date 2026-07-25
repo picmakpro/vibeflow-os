@@ -1,5 +1,10 @@
 # CHANGELOG — reference
 
+## [v2.5.1] — 2026-07-25
+
+### Corrigé
+- Déduplication du template skill-creator (copie verbatim de 485 L référençant des ressources absentes, F4) → pointeur vers le module canonique ; sauvetage de `adr-template.md` ; scission ADR-031/ADR-056 répercutée (VIBEFLOW_CORE, templates lead/CLAUDE/agent_anatomy).
+
 ## [v2.5.0] — 2026-07-16 (ADR-048 — orchestrateur métier)
 
 ### Ajouté

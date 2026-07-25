@@ -1,5 +1,10 @@
 # Changelog — conductor
 
+## [v1.12.3] — 2026-07-25
+
+### Corrigé
+- Gates `check-agents.sh` / `check-debug-research.sh` : mode `--strict` — cible vide → exit 3 (indéterminé ≠ conforme, F13), opt-out `--allow-empty` ; défauts et câblages hook inchangés.
+
 ## [v1.12.2] — 2026-07-25 (gabarit de description sur les trois verbes)
 
 ### Corrigé

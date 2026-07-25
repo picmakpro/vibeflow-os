@@ -1,7 +1,7 @@
 {
   "name": "vibeflow",
   "displayName": "VibeFlow",
-  "version": "2.31.1",
+  "version": "2.32.0",
   "description": "Orchestrateur Claude Code piloté au langage naturel : dev + design aujourd'hui (31 verbes /vf-*), autres métiers fabriqués sur mesure via la Lab Factory (vf-new-lab + skill-creator), bundles content/growth/business en préparation. Modules toggables (gouvernance, audits, validator, kpi-analyst…) + engine d'install scopé, posés via une UX à toggles.",
   "author": {
     "name": "picmakpro"
