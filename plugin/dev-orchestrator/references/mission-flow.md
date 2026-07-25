@@ -14,9 +14,14 @@ Les scripts vivent donc là où le module a été posé — **jamais présumer `
 mission, résous le dossier une fois et note-le `$S` (premier existant) :
 
 ```bash
-S="$( for d in "$HOME/.claude/scripts" "./.claude/scripts" "${CLAUDE_PLUGIN_ROOT:-}/conductor/scripts" "${CLAUDE_PLUGIN_ROOT:-}/dev-orchestrator/scripts"; do
+S="$( for d in "./.claude/scripts" "$HOME/.claude/scripts" "${CLAUDE_PLUGIN_ROOT:-}/conductor/scripts" "${CLAUDE_PLUGIN_ROOT:-}/dev-orchestrator/scripts"; do
         [ -f "$d/dag.sh" ] && { printf '%s' "$d"; break; }; done )"
 ```
+
+> **Le lab courant PRIME** : `./.claude/scripts` d'abord — sur une machine bi-scope
+> (user + projet), préférer le scope user ferait tourner la mission avec des scripts d'une
+> autre version que celle du lab, silencieusement. Un lab en scope user n'a pas de
+> `./.claude/scripts` : la cascade retombe naturellement sur `$HOME`.
 
 > Depuis la v2.34.0, `dag.sh` et `driver-lock.sh` vivent dans le **team-kernel** hébergé par le
 > conductor (`conductor-references/team-kernel.md`) — transverse à tous les métiers. Le fallback

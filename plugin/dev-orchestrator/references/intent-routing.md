@@ -139,10 +139,18 @@ l'inverse : on n'édite pas l'index pour faire tomber une couverture juste.
 
 ## Couverture
 
-Ce fichier route **l'intégralité** des skills listés dans `gsd-skills-index.md`. La vérification
-est machine (`test-dev-orchestrator.sh`, test d'exhaustivité) et se fait **contre l'index**, pas
-contre un nombre figé : ajouter un skill à la chaîne interne sans le router ici fait échouer la
-suite.
+Ce fichier route **l'intégralité** des skills listés dans `gsd-skills-index.md`, via trois
+canaux — tous vérifiés machine (`test-dev-orchestrator.sh`, test d'exhaustivité contre
+l'index ; ajouter un skill interne sans le router fait échouer la suite) :
+
+1. **Routage direct** : la brique apparaît dans une table ci-dessus (cas général).
+2. **Porté par un skill du module** : `gsd-autonomous` n'apparaît pas dans les tables — il est
+   routé PAR le skill `vf-auto` (aiguillage seuil), seule entrée légitime.
+3. **Délégué au module design** : `gsd-ui-phase` / `gsd-ui-review` sont routés par la chaîne
+   design (`vf-design` → agent `vibeflow-design`), pas par cette carte.
+
+Toute nouvelle exception doit être écrite ICI (et couverte par le test) — pas seulement dans
+la whitelist du test.
 
 L'index versionné peut être **en retard** sur la machine — l'installeur le régénère à chaque
 install. Ce fichier route donc le **sur-ensemble** : ce que liste l'index versionné **plus** ce qui
@@ -153,4 +161,5 @@ une entrée manquante casse le routage : on préfère la première.
 
 - `GSD-PIPELINE.md` — l'ordre canonique du cycle (quoi après quoi), et non quelle intention mène où.
 - `mission-contracts.md` — brief et rapport de mission quand le travail part à l'équipe.
-- Spec de la bascule : `docs/superpowers/specs/2026-07-25-suppression-facade-vf-design.md`.
+- Spec de la bascule : `docs/superpowers/specs/2026-07-25-suppression-facade-vf-design.md`
+  *(provenance — chemin du repo source vibeflow-os, non résolu dans un lab installé)*.
