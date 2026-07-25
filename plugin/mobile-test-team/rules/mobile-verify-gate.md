@@ -1,17 +1,17 @@
 ---
 paths:
-  - "app/**/*.tsx"
-  - "app/**/*.ts"
+  - "app/**/_layout.tsx"
   - "src/screens/**"
-  - "src/features/**"
-  - "src/components/**/*.tsx"
   - ".maestro/**"
 ---
 
 # Règle — Gate de vérification réelle (mobile)
 
-> Rule **path-scopée** : se charge automatiquement dès qu'on touche du code d'écran mobile
-> (Expo / React Native) ou un flow de test. Sur un projet non-mobile, elle reste dormante.
+> Rule **path-scopée** sur des marqueurs **discriminants mobile** : `app/**/_layout.tsx`
+> (convention expo-router — Next.js App Router utilise `layout.tsx` sans underscore),
+> `src/screens/**` et `.maestro/**`. Les globs génériques (`app/**/*.tsx`,
+> `src/components/**`) sont volontairement exclus : ils matchaient tout projet Next.js et
+> chargeaient la règle sur des projets web. Sur un projet non-mobile, elle reste dormante.
 > Elle rend **active** — au moment du dev, sans invocation manuelle — la doctrine de vérification
 > réelle et de boucle autonome. Principe VibeFlow : *enforcement > prose*.
 >
