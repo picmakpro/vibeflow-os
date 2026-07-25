@@ -5,6 +5,28 @@ dernières entrées et pointent ici). Chaque module a par ailleurs son propre `C
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.36.0] — 2026-07-26
+
+**Recettes réelles (UAT) sur labs vierges + corrections** — deux labs sandbox installés par le
+vrai engine et joués par des agents neufs (rapport : `reports/uat/2026-07-25-uat-express-et-dev.md`) :
+
+- **Verdicts** : le mode express tient son contrat (~11 min 30 < 15 min, fabrication réelle
+  d'un skill avec 2 évals PASS en tâche de fond, Gate C 3/3) ; le protocole de mission
+  (lock → DAG → pipelining N/N+1 → rapports typés → reopen → release) est **exécutable par un
+  agent qui ne l'a pas écrit**, scripts du kernel conformes à 100 % (mission pomodoro réelle,
+  7 commits, app fonctionnelle démontrée).
+- **16 frictions corrigées**, dont 3 bloquantes : un lab frais échouait son propre
+  `check-agents --strict` (skills plugin déclarés, résolution par nom de dossier — corrigée
+  par frontmatter `name:`) ; templates de registres absents de la baseline (embarqués dans
+  consolidator v1.8.0) ; cascade `$S` qui préférait le scope user au lab courant. Doctrine
+  `human_needed` en autonome tranchée : **geler le nœud porteur**, jamais « continuer ».
+- **Dépendance team-kernel déclarée** : `requires: conductor` sur les 5 modules consommateurs
+  (fermeture resolve-deps incomplète depuis l'extraction v2.34.0).
+- **CI : job « lab frais »** — installe la baseline dans un lab vierge et exige qu'elle passe
+  ses propres gates sans intervention (la CI testait le repo, pas l'expérience installée).
+- 9 modules bumpés (conductor v1.14.1, consolidator v1.8.0, validator v1.3.1,
+  dev-orchestrator v2.1.1, planning-core v2.5.1, design-orchestrator v1.2.1, bundles ×3 v2.0.1).
+
 ## [v2.35.0] — 2026-07-25
 
 **La promesse multi-métier est tenue : les 3 bundles métier sont des modules réels** (fin du

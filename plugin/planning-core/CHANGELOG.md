@@ -1,5 +1,10 @@
 # Changelog — planning-core
 
+## [v2.5.1] — 2026-07-26
+
+### Corrigé
+- `gsd-handoff.md` : renvoi vers le chemin d'install D7 réel de la carte d'intention (au lieu du chemin du repo source).
+
 ## [v2.5.0] — 2026-07-25
 
 ### Ajouté

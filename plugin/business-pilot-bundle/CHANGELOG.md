@@ -1,5 +1,10 @@
 # CHANGELOG — business-pilot-bundle
 
+## [v2.0.1] — 2026-07-26
+
+### Corrigé
+- `requires` += `conductor` (team-kernel, dépendance non déclarée).
+
 ## [v2.0.0] — 2026-07-25 — Matérialisation : de doc-only à module installable (team-kernel)
 
 Bascule majeure : le bundle n'est plus un plan de fabrication (`doc-only`, `proposable: false`)

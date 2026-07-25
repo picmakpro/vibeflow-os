@@ -1,5 +1,10 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.2.1] — 2026-07-26
+
+### Corrigé
+- `requires` += `conductor` : le manager design consomme le team-kernel (dag.sh/driver-lock.sh) — dépendance non déclarée depuis l'extraction v2.34.0.
+
 ## [v1.2.0] — 2026-07-25 (équipe de mission design — team-kernel)
 
 ### Ajouté

@@ -1,5 +1,10 @@
 # CHANGELOG — consolidator
 
+## [v1.8.0] — 2026-07-26
+
+### Ajouté
+- Templates de registres embarqués (`references/templates-memoire/`, 5 templates posés à l'install — un lab frais n'a plus à rétro-dériver le format canonique, F1 UAT). Corrigé : `reindex.sh` comptages normalisés sur registre vide (F7) ; strays legacy `*.bak-reindex-*` rapatriés dans `.backups/` (F8).
+
 ## [v1.7.0] — 2026-07-25
 
 ### Ajouté

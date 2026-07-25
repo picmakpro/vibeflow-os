@@ -1,5 +1,10 @@
 # CHANGELOG — validator
 
+## [v1.3.1] — 2026-07-26
+
+### Corrigé
+- `requires` += `audit-architecture` : la Phase 4 (même opt-in) en a besoin — la baseline fraîchement installée passait en échec son propre Gate C.2 (F2 UAT).
+
 ## [v1.3.0] — 2026-07-25
 
 ### Ajouté
