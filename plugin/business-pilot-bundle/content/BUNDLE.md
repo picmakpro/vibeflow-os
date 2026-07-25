@@ -1,5 +1,13 @@
 # MANIFESTE — Bundle métier `business-pilot`
 
+> **⚑ Matérialisé le 2026-07-25** — ce document reste la **trace de conception** du bundle ;
+> le réel vit désormais dans `agents/` (équipe installable sur le team-kernel :
+> `vf-business-manager` + `vf-business-commercial` / `vf-business-delivery` /
+> `vf-business-finance` + `quality-gate-client`) et `skills/vf-business/` (point d'entrée
+> métier). Les blueprints ci-dessous ne sont plus la voie d'instanciation primaire :
+> `vf-new-lab` installe le module et n'instancie plus à la main. Le gate qualité « à
+> fabriquer » (§8) est désormais LIVRÉ comme agent juge read-only.
+
 > Fichier **source de dérivation** lu par `vf-new-lab` (module `conductor`) pour instancier un lab de
 > pilotage de business. Il déclare le métier, le profil de planning, l'extension de domaine, le
 > vocabulaire natif, les agents à poser, les modules requis et le **flux d'instanciation**.

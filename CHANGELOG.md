@@ -5,6 +5,25 @@ dernières entrées et pointent ici). Chaque module a par ailleurs son propre `C
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.35.0] — 2026-07-25
+
+**La promesse multi-métier est tenue : les 3 bundles métier sont des modules réels** (fin du
+doc-only), chacun avec une équipe complète sur le team-kernel, un juge read-only à rubric /100
+avec critères éliminatoires, des Iron Laws machine-testées et une suite de tests dédiée :
+
+- **growth-bundle v2.0.0 (`proposable: true`)** : `vf-growth-manager` (DAG stratégie →
+  production → gate → humain → analyse par campagne) + channel-strategist / copywriter-sequences /
+  campaign-analyst + `growth-quality-judge` (claims sourcés ET consentement/anti-spam
+  éliminatoires). Tout envoi réel human-gated ; l'analyste refuse toute campagne sans preuve
+  de lancement humain ; métriques sourcées ou `low` (Iron Law kpi-analyst). 12 tests.
+- **business-pilot-bundle v2.0.0 (`proposable: true`)** : `vf-business-manager` (DAG
+  commercial → delivery → gate → humain → finance par dossier client) + commercial / delivery /
+  finance + **`quality-gate-client`** — le gate « à fabriquer » du finding F16 enfin livré
+  (périmètre vendu et montants sourcés éliminatoires, seuil 80). Double Iron Law : aucun envoi
+  client sans validation humaine, aucun chiffre financier inventé. 14 tests.
+- Le catalogue d'install propose désormais les **3 bundles** ; messaging racine et tableaux
+  README alignés sur le réel (équipes, versions, types).
+
 ## [v2.34.0] — 2026-07-25
 
 **Vague 3 de l'audit croisé — universalisation** (clôt le programme d'audit du 2026-07-25) :

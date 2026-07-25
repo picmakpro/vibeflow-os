@@ -8,7 +8,7 @@
 
 Say _"help me build this feature"_ — and the whole pipeline kicks off: scoping → plan → execution → tests → delivery. Without ever typing a technical command or knowing what runs under the hood. Other domains get their own tailor-made lab via the Lab Factory (`vf-new-lab`).
 
-[![Version](https://img.shields.io/badge/version-2.34.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.35.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -37,7 +37,7 @@ You  ›  debug this crash
         VibeFlow: systematic debugging, state persisted across resets
 ```
 
-Today VibeFlow orchestrates **dev and design** through an **agentic model**: the `vibeflow-dev` agent detects intent and invokes the GSD toolchain directly, with a mission team for long runs. Other domains are built as **tailor-made labs** through the Lab Factory (`vf-new-lab` + `skill-creator`); the **content bundle is available** (a full team on the team-kernel); growth / business bundles are **in preparation**. Beyond orchestration, VibeFlow ships **governance** modules: software-architecture audits, infrastructure audits, memory consolidation, methodology-alignment validation — each enabled à la carte.
+Today VibeFlow orchestrates **dev and design** through an **agentic model**: the `vibeflow-dev` agent detects intent and invokes the GSD toolchain directly, with a mission team for long runs. Other domains are built as **tailor-made labs** through the Lab Factory (`vf-new-lab` + `skill-creator`); the **content, growth and business-pilot bundles are available** (full teams on the team-kernel). Beyond orchestration, VibeFlow ships **governance** modules: software-architecture audits, infrastructure audits, memory consolidation, methodology-alignment validation — each enabled à la carte.
 
 ---
 
@@ -92,9 +92,9 @@ The UX walks you through:
 | **[reference](./plugin/reference/)** | `2.5.1` | doc-only | Full methodology documentation: VibeFlow Core (9 principles) + 12 patterns (incl. tool-compartmentalization) + 33 templates + 1 end-to-end example. |
 | **[planning-core](./plugin/planning-core/)** | `2.5.0` | skill + references + scripts | Lab planning & documentation backbone: lays down the common `.planning/` trunk of a **non-dev** lab (PROJECT/STATE/ROADMAP/REQUIREMENTS/MILESTONES/phases), adapted to its domain — never imposed — and holds **lab-level altitude** everywhere: project index, typed compartments, planning-debt detection, memory bridge, hook-enforced freshness. On a code project, the project planning belongs to the development engine: this module redirects instead of producing a competing format (ADR-055). |
 | **[kpi-analyst](./plugin/kpi-analyst/)** | `1.0.2` | agent + skill + scripts + references | 📈 Deduces a lab's **real business KPIs**: a stable schema validated once + values extracted deterministically, published to the `KPIS.md` registry for the Hub dashboard. Never an invented number. |
-| 📦 **[business-pilot-bundle](./plugin/business-pilot-bundle/)** | `1.2.0` | doc-only (bundle) | Métier bundle: ready chassis to pilot a business (3 agent blueprints commercial/delivery/finance + `business/` extension + canon registries). Instantiated by `vf-new-lab`. |
-| 📦 **[content-bundle](./plugin/content-bundle/)** | `1.1.0` | doc-only (bundle) | Métier bundle: editorial chain brief→deliverable→distribution (3 blueprints strategist/scriptwriter/repurposer + `editorial/` extension + blocking clarity gate). Instantiated by `vf-new-lab`. |
-| 📦 **[growth-bundle](./plugin/growth-bundle/)** | `1.1.0` | doc-only (bundle) | Métier bundle: growth/acquisition **organized per channel** (3 blueprints channel-strategist/copywriter/analyst + `growth/channels/` extension + GDPR guardrails). Instantiated by `vf-new-lab`. |
+| 📦 **[business-pilot-bundle](./plugin/business-pilot-bundle/)** | `2.0.0` | agents + skill + scripts | Métier bundle, **full team on the team-kernel**: `vf-business-manager` + commercial/delivery/finance workers + `quality-gate-client` judge (sold-scope & sourced-amounts eliminatory, threshold 80). Twin Iron Laws: no client send without human validation, no invented financial figure. Entry skill `vf-business`. |
+| 📦 **[content-bundle](./plugin/content-bundle/)** | `2.0.0` | agents + skill + scripts | Métier bundle, **full team on the team-kernel**: `vf-content-manager` + strategist/writer/repurposer workers + `content-clarity-judge` (sourced-figures eliminatory, threshold 80). Publication always human-gated. Entry skill `vf-content`. |
+| 📦 **[growth-bundle](./plugin/growth-bundle/)** | `2.0.0` | agents + skill + scripts | Métier bundle, **full team on the team-kernel**: `vf-growth-manager` + channel-strategist/copywriter/analyst workers + `growth-quality-judge` (sourced claims & consent/anti-spam eliminatory). Every real send (email, ad spend, outreach) human-gated; metrics sourced or `low`. Entry skill `vf-growth`. |
 
 ---
 
