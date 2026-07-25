@@ -1,5 +1,65 @@
 # CHANGELOG — content-bundle
 
+## [v2.0.0] — 2026-07-25 — Matérialisation : de doc-only à module installable (team-kernel)
+
+Bascule majeure : le bundle n'est plus un plan de fabrication (`doc-only`, `proposable: false`)
+mais un **module installable** — la première équipe métier non-dev complète sur le team-kernel
+(preuve d'universalité du framework, audit 2026-07-25).
+
+### Ajouté
+- **`agents/vf-content-manager.md`** (opus, memory: project) — manager de mission content sur le
+  kernel : brief en langage naturel, lecture de `LIGNE-EDITORIALE`/`CALENDRIER`/registres,
+  plan de bataille en DAG (5 nœuds par pièce : cadrage → rédaction → clarté → humain →
+  déclinaison) + verrou de driver (`$S`), dispatch **parallèle** des pièces indépendantes
+  (périmètres disjoints par construction), digest ≤30L par mandat, contrôle de flux sur
+  rapports typés, halt conditions (5 codes P11). Définition du « vert » content : gate de
+  clarté auto-contrôlé + score du juge ≥ 80/100 sans éliminatoire + **validation humaine
+  explicite AVANT toute distribution** (ADR-031 — nœud `humain(p)` en `human_needed`, jamais
+  auto-validé, aucun mode ne le contourne).
+- **3 workers sonnet cloisonnés** (Pattern 12 : `vf-internal`, tools sans Task/Agent/Skill,
+  périmètre d'écriture strict par étage) issus des blueprints, qui restent dans `content/`
+  comme trace de conception :
+  - `vf-content-strategist` (← strategist.blueprint) — fiche de cadrage : un angle unique
+    justifié contre AUDIENCE/LIGNE, structure hook▸contexte▸mécanisme▸implication▸CTA,
+    format confirmé. Écrit uniquement `pieces/<slug>/cadrage.md` + registres.
+  - `vf-content-writer` (← scriptwriter.blueprint) — 3 hooks + livrable complet, aucune
+    affirmation chiffrée non sourcée, auto-contrôle 4 critères. Écrit uniquement
+    `pieces/<slug>/piece.md` + registres.
+  - `vf-content-repurposer` (← repurposer.blueprint) — déclinaisons multi-plateformes d'une
+    pièce VERTE uniquement (refus sinon), un CTA par variante, tient `editorial/CALENDRIER.md`.
+    Ne publie jamais — la publication effective est remise à l'humain.
+- **`agents/content-clarity-judge.md`** (sonnet, read-only : tools `Read, Glob, Grep`, sans
+  Write/Edit) — le gate de clarté des blueprints matérialisé en **juge frais** : rubric /100
+  explicite (chiffres sourcés 25 — éliminatoire —, jargon 15, take-away 15, ton 15, CTA unique
+  10, fidélité au cadrage 10, gabarit 10), seuil 80, verdict typé avec findings cités.
+- **`skills/vf-content/SKILL.md`** — point d'entrée du métier (« écris un post », « décline cet
+  article », « prépare le calendrier », « lance la prod en autonomie ») : aiguillage geste
+  simple (chaîne courte orchestrée depuis le skill) vs mission (`SEUIL_EQUIPE_CONTENT = 3`
+  pièces ou signal de durée → `vf-content-manager`), garde first-use si `editorial/` absent.
+- **`scripts/tests/test-content-bundle.sh`** — suite machine (12 tests) : agents présents +
+  frontmatter, densité ADR-029, `check-agents.sh --strict` vert, juge sans Write/Edit,
+  cloisonnement Pattern 12, manager sans périmètre de production, DIGEST + rapports typés,
+  validation humaine non contournable (manager + repurposer + skill), aiguillage du skill,
+  cohérence module.json/VERSION, encart de matérialisation, rubric du juge.
+
+### Modifié
+- `module.json` : type `doc-only` → `agents + skill + scripts` ; **`proposable: true`** (le
+  module est réellement fini et vert — plus un WIP caché).
+- `content/BUNDLE.md` : encart de matérialisation en tête — le document reste la trace de
+  conception ; le réel vit dans `agents/` et `skills/`.
+- `README.md` : réécrit pour refléter le module réel (équipe, chaîne, tests).
+
+### Décisions de design
+- Le « human-validator » des blueprints n'est **pas un agent** : c'est l'étape de validation
+  humaine, orchestrée par le manager (statut `human_needed`) — conforme à la doctrine
+  « la publication est TOUJOURS human-gated » (ADR-031).
+- Le gate de clarté, couche d'audit dans les blueprints, devient un **juge read-only du
+  kernel** (P8 : évaluation scorée par juge frais, machine-cloisonnée par les tools) — même
+  esprit, forme kernel.
+- Convention de production : une pièce = un dossier `pieces/<AAAA-MM-JJ>-<slug>/`
+  (`cadrage.md` / `piece.md` / `variantes.md`), périmètres d'écriture disjoints par étage
+  ET par pièce → dispatch parallèle sûr par construction.
+
 ## [v1.1.1] — 2026-07-25
 
 ### Corrigé

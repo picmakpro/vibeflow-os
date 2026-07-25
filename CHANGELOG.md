@@ -5,6 +5,30 @@ dernières entrées et pointent ici). Chaque module a par ailleurs son propre `C
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.34.0] — 2026-07-25
+
+**Vague 3 de l'audit croisé — universalisation** (clôt le programme d'audit du 2026-07-25) :
+
+- **Team-kernel (conductor v1.14.0)** : `dag.sh` + `driver-lock.sh` extraits en socle
+  transverse, `team-kernel.md` pose le contrat universel (invariants du kernel — lock, DAG,
+  rapports typés, HALT, digest, cloisonnement — vs paramètres du métier : spécialistes,
+  définition du « vert », gates). Le dev-orchestrator devient l'implémentation de référence.
+- **Équipe design (design-orchestrator v1.2.0)** : première instanciation non-dev —
+  `vf-design-manager` + `vf-crafter` + `vf-design-judge` (juge frais, rubric /100 : DA /40 +
+  copy/hiérarchie/couleur/typo/spacing/accessibilité, seuil 70, 3 tours max).
+- **Bundle content matérialisé (content-bundle v2.0.0, `proposable: true`)** : de doc-only à
+  module installable — manager + strategist/writer/repurposer + juge de clarté (chiffres
+  sourcés éliminatoires, seuil 80), publication toujours human-gated, 12 tests. Preuve
+  d'universalité : le catalogue d'install le propose désormais.
+- **Pipelining N/N+1 (dev-orchestrator v2.1.0)** : discuss/plan/execute modélisés par étape
+  dans le DAG, cadrage+plan de N+1 pendant l'exécution de N, plan provisoire re-validé.
+- **Lab express (conductor)** : opérationnel en ≤ 15 min — 3 questions, dérivations `[DÉRIVÉ]`
+  assumées, Gate C intact (test anti-régression), fabrication en tâche de fond, dette
+  d'express affichée. Scope d'install pré-sélectionné (installer).
+- **ADR-057 — frontières outillées avec les briques tierces** : `check-overlaps.sh` (advisory,
+  7 paires, doctrine F13), abandon du « sole authorized channel », frontières descriptives
+  (debug, revues, skill-creator, mobile, brainstorm).
+
 ## [v2.33.0] — 2026-07-25
 
 **Vague 2 de l'audit croisé — bascule agentique** (arbitrage Samuel, spec

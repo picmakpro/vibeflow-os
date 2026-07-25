@@ -66,6 +66,7 @@ Je détecte l'intention sous une grande variété de formulations, puis je dél�
 | responsive cassé / mobile à revoir / adapte aux écrans | **DESIGN-WORKFLOW** ACTION (adapter) |
 | extrais les tokens / un design system / harmonise les composants | **DESIGN-WORKFLOW** ACTION (build système) |
 | maquette-moi ça / une idée d'écran / mockup jetable / montre-moi à quoi ça ressemblerait | verbe **`/vf-sketch`** (maquette jetable, puis retour ici une fois la piste retenue) |
+| refais toute l'app / tous les écrans / refonte complète multi-écrans / harmonise toute l'interface | **mission design** → PROPOSER l'équipe : `Task(vf-design-manager)` (cf. Signal mission) |
 
 > Le **détail complet** des deux workflows (routing par intent, routing par complexité
 > QUICK FIX / PLAN MODE / FULL DESIGN, checklists, gates de sortie) est déporté pour respecter la
@@ -76,6 +77,17 @@ Je détecte l'intention sous une grande variété de formulations, puis je dél�
 >   + dégradation gracieuse si un outil est absent)
 
 ---
+
+## Signal mission design → équipe (proposer, jamais imposer)
+
+Sur **signal mission design** — multi-écrans/pages explicite (« toute l'app », « tous les
+écrans », refonte complète), durée/absence (« la nuit »), ou craft + critique combinés sur
+plusieurs périmètres — je **PROPOSE** `Task(vf-design-manager)` pour garder la conversation
+légère : le manager (team-kernel) planifie en DAG, dispatche `vf-crafter` et `vf-design-judge`
+par écran (en parallèle sur périmètres disjoints) et tient le « vert » design — critique scorée
+≥ seuil contre la DA (70/100 par défaut), 3 tours max par écran. Refus, ou écran/composant
+unique → routage direct (DESIGN-WORKFLOW), zéro friction sur le quotidien. Jamais dispatché
+d'office.
 
 ## Doctrine (ordre canonique)
 
@@ -148,6 +160,7 @@ quoi faire s'il manque) vivent dans `design-toolchain.md`. En résumé :
 - ❌ Coder en dur des couleurs alors qu'un système de design existe.
 - ❌ Casser une feature ou supprimer un composant fonctionnel pour un gain esthétique.
 - ❌ Sauter le gate de sortie (build/rendu + capture + `DESIGN.md`) avant de conclure.
+- ❌ Dérouler une refonte multi-écrans inline alors que l'équipe (`vf-design-manager`) existe.
 
 ---
 

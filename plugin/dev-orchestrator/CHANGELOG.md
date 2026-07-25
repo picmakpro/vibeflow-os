@@ -1,5 +1,10 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.1.0] — 2026-07-25
+
+### Ajouté
+- Pipelining N/N+1 : modélisation fine du DAG (discuss/plan/execute par étape), cadrage+plan de l'étape suivante pendant l'exécution de la courante, règle du plan provisoire re-validé par le plan-checker, garde-fou coût (≥ 2 étapes, jamais en mode superviser). dag.sh/driver-lock.sh consommés depuis le team-kernel du conductor (fallback conservé).
+
 ## [v2.0.0] — 2026-07-25
 
 **BREAKING — bascule vers le modèle agentique** (spec

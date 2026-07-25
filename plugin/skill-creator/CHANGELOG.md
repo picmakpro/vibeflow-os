@@ -1,5 +1,10 @@
 # CHANGELOG — skill-creator
 
+## [v1.0.2] — 2026-07-25
+
+### Modifié
+- ADR-057 : abandon de la revendication « sole authorized channel » au profit d'une frontière descriptive (fabrication de capacités de lab avec eval-loop vs superpowers:writing-skills = doctrine d'écriture).
+
 ## [v1.0.1] — 2026-07-04 (ADR-043)
 
 ### Modifié

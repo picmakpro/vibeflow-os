@@ -5,6 +5,9 @@ description: >
   « teste l'app sur le simulateur », « lance une régression mobile avant le sprint »,
   « valide ce fix sur l'émulateur », « reproduis ce bug mobile ». Couvre la préparation
   autonome de la cible, la régression Maestro et le diagnostic visuel sur échec (mobile-mcp).
+  Frontière (ADR-057) : ce skill = la recette RÉELLE sur cible mobile (simulateur/émulateur,
+  Maestro) ; la recette conversationnelle d'une feature = gsd-verify-work ; la boucle autonome
+  test+fix = l'équipe mobile-test-team.
   Statut : expérimental (voir README du module). Invocable par l'utilisateur ET en autonomie.
 ---
 

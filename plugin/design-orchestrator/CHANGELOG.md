@@ -1,5 +1,23 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.2.0] — 2026-07-25 (équipe de mission design — team-kernel)
+
+### Ajouté
+
+- **Équipe de mission design** (`agents/`) — première instanciation NON-dev du team-kernel
+  (`conductor-references/team-kernel.md`) : `vf-design-manager` (opus — plan de bataille en DAG,
+  lock de driver, dispatch parallèle sur écrans disjoints, digest ≤ 30 lignes, contrôle de flux
+  sur rapports typés, halt conditions), `vf-crafter` (sonnet, interne, sans Task — production
+  d'UN écran via la chaîne d'outils design, specs + tokens multi-stack) et `vf-design-judge`
+  (sonnet, interne, sans Write/Edit — critique scorée /100 : conformité DA /40 + 6 dimensions
+  /10). « Vert » design = score ≥ 70/100 ; 3 tours max de craft→re-critique par écran.
+- **Heuristique de proposition** dans `AGENT.md` : sur signal mission design (multi-écrans,
+  refonte complète, « toute l'app »), `vibeflow-design` PROPOSE `Task(vf-design-manager)` —
+  jamais d'office ; écran unique → routage direct inchangé.
+- **Suite de tests** `scripts/tests/test-design-orchestrator.sh` : présence + conformité des
+  3 agents (check-agents --strict), cloisonnement par tools (Pattern 12), densité ADR-029,
+  câblage kernel (dag/driver-lock/digest/seuil) et heuristique de routage.
+
 ## [v1.1.1] — 2026-07-25
 
 ### Modifié

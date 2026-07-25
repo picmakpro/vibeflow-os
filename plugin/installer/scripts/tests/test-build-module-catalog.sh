@@ -99,11 +99,17 @@ else
   ko "repo réel : conductor mandatory attendu, obtenu [$cline]"
 fi
 
-# bundles (proposable:false) absents du catalogue
-if printf '%s\n' "$real_out" | command grep -qE '^(growth-bundle|content-bundle|business-pilot-bundle)	'; then
-  ko "repo réel : aucun bundle ne doit apparaître (proposable:false)"
+# bundles encore WIP (proposable:false) absents du catalogue — content-bundle est
+# matérialisé (proposable:true, v2.0.0) et DOIT y apparaître
+if printf '%s\n' "$real_out" | command grep -qE '^(growth-bundle|business-pilot-bundle)	'; then
+  ko "repo réel : les bundles WIP ne doivent pas apparaître (proposable:false)"
 else
-  ok "repo réel : bundles exclus du catalogue"
+  ok "repo réel : bundles WIP exclus du catalogue"
+fi
+if printf '%s\n' "$real_out" | command grep -qE '^content-bundle	'; then
+  ok "repo réel : content-bundle (matérialisé, proposable:true) présent au catalogue"
+else
+  ko "repo réel : content-bundle manquant au catalogue alors que proposable:true"
 fi
 
 # validator présent ET avec une description non vide
