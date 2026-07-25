@@ -1,5 +1,12 @@
 # BUNDLE — ContentFlow (métier *content*)
 
+> **⚑ Matérialisé le 2026-07-25** — ce document reste la **trace de conception** du bundle ;
+> le réel vit désormais dans `agents/` (équipe installable sur le team-kernel :
+> `vf-content-manager` + `vf-content-strategist` / `vf-content-writer` /
+> `vf-content-repurposer` + `content-clarity-judge`) et `skills/vf-content/` (point
+> d'entrée métier). Les blueprints ci-dessous ne sont plus la voie d'instanciation
+> primaire : `vf-new-lab` installe le module et n'instancie plus à la main.
+
 > **Manifeste de bundle métier.** Document lu par `vf-new-lab` (module `conductor`) pour instancier un
 > lab de **création de contenu** complet et gouverné — chaîne **brief → livrable → distribution** —
 > sans aucune hypothèse dev, avec son filet d'audit.

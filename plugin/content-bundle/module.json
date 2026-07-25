@@ -1,10 +1,9 @@
 {
   "name": "content-bundle",
-  "version": "v1.1.1",
-  "type": "doc-only",
-  "description": "Bundle métier content (ContentFlow) : blueprints agents (strategist/scriptwriter/repurposer) + dérivation pour vf-new-lab — chaîne éditoriale brief→livrable→distribution.",
-  "proposable": false,
-  "proposable_reason": "WIP — pas assez complet ; sera reproposé une fois finalisé.",
+  "version": "v2.0.0",
+  "type": "agents + skill + scripts",
+  "description": "Équipe content installable sur le team-kernel (ContentFlow) : manager de mission vf-content-manager (DAG + verrou de driver, dispatch parallèle des pièces indépendantes, digest par mandat, rapports typés, validation humaine avant toute distribution) + workers cloisonnés vf-content-strategist / vf-content-writer / vf-content-repurposer + juge frais read-only content-clarity-judge (rubric de clarté /100, chiffre non sourcé éliminatoire), et le skill d'entrée vf-content (geste simple vs mission). Les blueprints d'origine restent dans content/ comme trace de conception lisible par vf-new-lab.",
+  "proposable": true,
   "requires": [
     "planning-core",
     "consolidator",
