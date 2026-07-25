@@ -90,6 +90,42 @@ Le plan de bataille n'est plus une liste ordonnée : c'est un **graphe persistan
    Le manager **ré-entre** alors dans la boucle `ready → dispatch` au lieu de continuer tout droit. C'est la
    boucle `fix → re-revue` de `vf-coder` rendue explicite et robuste.
 
+### Modélisation fine — pipelining N/N+1 (audit 2026-07-25)
+
+Un nœud unique par étape est **trop gros** : il sérialise tout, alors que le cadrage + plan de
+l'étape N+1 ne dépendent le plus souvent que de la **ROADMAP**, pas de l'exécution de N. Modéliser
+**3 nœuds par étape** — `discuss(N) → plan(N) → execute(N)` — plus les nœuds de vérification
+(`test(N)`, `audit(N)`), et laisser la frontière `ready` exposer le parallélisme.
+
+**Dépendances canoniques :**
+
+| Nœud | deps | Conséquence |
+|---|---|---|
+| `discuss(N+1)` | — (la ROADMAP seule) | dispatchable dès que le manager a son plan de bataille |
+| `plan(N+1)` | `discuss(N+1)` | peut être produit **pendant** `execute(N)` → marqué provisoire |
+| `execute(N+1)` | `plan(N+1)` **ET** `execute(N)` | périmètres de code potentiellement chevauchants |
+| `test(N)` ∥ `audit(N)` | `execute(N)` | juges read-only, dispatchés en parallèle |
+
+Exception : si les périmètres de fichiers de N et N+1 sont **déclarés disjoints** au plan de
+bataille, `execute(N+1)` peut s'affranchir de la dep sur `execute(N)` (exécutions chevauchantes).
+
+```bash
+"$S"/dag.sh add --file="$DAG" --id=discuss-10 --step="cadrage étape 10"                    # aucune dep : ready immédiat
+"$S"/dag.sh add --file="$DAG" --id=plan-10    --step="plan étape 10"      --deps=discuss-10
+"$S"/dag.sh add --file="$DAG" --id=exec-10    --step="exécution étape 10" --deps=plan-10,exec-9
+```
+
+**Règle de provisoire (non négociable)** : un `plan(N+1)` produit pendant qu'`execute(N)` tourne
+est marqué **« provisoire »** (plan de bataille + STATE). Au moment de dispatcher `execute(N+1)`,
+si `execute(N)` a modifié les hypothèses — fichiers touchés hors du périmètre prévu, décisions
+structurantes au rapport typé — le manager **re-valide** le plan via le plan-checker existant
+(`gsd-plan-phase` re-vérifie) avant dispatch. **Jamais d'exécution sur un plan provisoire non
+re-validé.** Si les hypothèses n'ont pas bougé, le plan est promu tel quel (constat consigné).
+
+**Garde-fou coût** : le pipelining N/N+1 ne s'active que si la mission compte **≥ 2 étapes
+restantes** ET que le mode le permet — jamais en mode superviser étape-par-étape (le checkpoint
+humain de N barre tout dispatch anticipé de N+1).
+
 ---
 
 ## Pattern C — Contrat de rapport de worker typé

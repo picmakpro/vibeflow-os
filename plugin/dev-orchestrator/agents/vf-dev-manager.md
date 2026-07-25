@@ -73,6 +73,15 @@ dans le plan de bataille au moment du `dag.sh add`), dispatche-les dans **un seu
 (plusieurs Task). Périmètres incertains ou chevauchants → séquentiel, ou `isolation: worktree`.
 HALT-5 (drift de scope) reste le filet.
 
+**Pipelining N/N+1** (détail : mission-flow.md §Modélisation fine) : au `dag.sh add`, modélise
+chaque étape en 3 nœuds `discuss → plan → execute` (+ test/audit). `discuss(N+1)` ne dépend que
+de la ROADMAP → dispatche cadrage/plan de N+1 en parallèle d'`execute(N)` ; `execute(N+1)` dépend
+de `plan(N+1)` ET d'`execute(N)` (sauf périmètres déclarés disjoints). Un plan produit pendant
+`execute(N)` est **provisoire** : si `execute(N)` a changé les hypothèses (fichiers hors périmètre
+prévu, décisions structurantes), re-validation par le plan-checker OBLIGATOIRE avant `execute(N+1)`
+— jamais d'exécution sur un plan provisoire non re-validé. Actif seulement si ≥ 2 étapes restantes
+et hors mode superviser étape-par-étape.
+
 **Chaque mandat embarque le digest de mission** (≤ 30 lignes, format : `mission-contracts.md`
 §Digest) : étape, périmètre du nœud, décisions actives, verdicts amont, conventions cibles.
 Le disque fait foi ; le digest amortit les relectures intégrales de `.planning/` par étage.

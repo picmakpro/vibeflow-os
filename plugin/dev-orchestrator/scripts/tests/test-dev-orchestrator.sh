@@ -31,6 +31,9 @@
 #         par un fichier du module.
 #   T14 — Exhaustivité du routage : chaque skill de l'index factuel est routé par
 #         intent-routing.md (carte intention → brique, sans colonne verbe).
+#   T15 — Pipelining N/N+1 (audit 2026-07-25) : mission-flow.md modélise le DAG fin
+#         (discuss/plan/execute par étape, règle de provisoire) et vf-dev-manager.md
+#         y renvoie avec la consigne compacte.
 #
 # Historique de numérotation : T3/T12/T13/T14 ont changé de sémantique à la v2.0.0 (les
 # anciens tests de collision de descriptions, de préséance et de synchro de la table vf-dev
@@ -563,6 +566,29 @@ else
     fi
   fi
   [ "$t14_fail" -eq 0 ] && [ "${routed_count:-0}" -ge 30 ] && ok "T14 plancher : $routed_count briques gsd-* distinctes routées (≥30)"
+fi
+
+# ---------------------------------------------------------------------------
+# T15 — Pipelining N/N+1 : modélisation fine du DAG (audit 2026-07-25)
+# ---------------------------------------------------------------------------
+# mission-flow.md doit porter la modélisation 3-nœuds-par-étape (discuss/plan/execute) avec la
+# règle de provisoire ; vf-dev-manager.md doit porter la consigne compacte et y renvoyer.
+MFLOW="$REFS_DIR/mission-flow.md"
+if [ -f "$MFLOW" ]; then
+  if "$GREP" -qi 'provisoire' "$MFLOW" && "$GREP" -qE 'discuss\(N\+1\)' "$MFLOW"; then
+    ok "T15 pipelining : mission-flow.md modélise N/N+1 (discuss(N+1) + règle de provisoire)"
+  else
+    ko "T15 pipelining : modélisation N/N+1 absente de mission-flow.md (provisoire / discuss(N+1))"
+  fi
+  MGR="$MOD/agents/vf-dev-manager.md"
+  if [ -f "$MGR" ] && "$GREP" -qi 'pipelining' "$MGR" && "$GREP" -qi 'provisoire' "$MGR" \
+     && "$GREP" -q 'mission-flow' "$MGR"; then
+    ok "T15 pipelining : vf-dev-manager.md porte la consigne et renvoie à mission-flow.md"
+  else
+    ko "T15 pipelining : consigne pipelining/provisoire ou renvoi mission-flow absent de vf-dev-manager.md"
+  fi
+else
+  ko "T15 pipelining : $MFLOW introuvable"
 fi
 
 # ---------------------------------------------------------------------------
