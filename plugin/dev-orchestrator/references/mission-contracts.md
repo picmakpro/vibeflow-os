@@ -18,13 +18,34 @@ MISSION
 - Budget : <optionnel : temps / tentatives ; sinon défauts du manager>
 ```
 
-Le manager relit lui-même `.planning/ROADMAP.md`, `.planning/STATE.md`, `.planning/PROJECT.md` —
-le brief ne les paraphrase jamais.
+Le brief peut aussi être du **langage naturel brut** (« finis la milestone, la nuit ») : le
+manager le mappe lui-même vers périmètre/mode/contraintes via la carte d'intention
+(`intent-routing.md`) — il demande (AskUserQuestion) seulement si le périmètre reste
+inexploitable. Le manager relit lui-même `.planning/ROADMAP.md`, `.planning/STATE.md`,
+`.planning/PROJECT.md` — le brief ne les paraphrase jamais.
+
+## Digest de mission (manager → workers)
+
+Le disque reste la source de vérité, mais chaque mandat de worker **embarque un digest ≤ 30
+lignes** qui amortit les relectures intégrales de `.planning/` à chaque étage (audit
+2026-07-25 : 100-200k tokens de pure relecture par étape sans lui) :
+
+```
+DIGEST (cache — le disque fait foi)
+- Mission : <objectif en 1 ligne> · Mode : <superviser|autonome>
+- Étape courante : <n° + objectif + critères de succès>
+- Périmètre de fichiers du nœud : <déclaré au dag add>
+- Décisions actives : <2-5 lignes — panels tranchés, contraintes session>
+- Verdicts amont utiles : <revue/audit/test pertinents pour ce mandat>
+- Conventions cibles : <2-3 lignes du CLAUDE.md projet qui engagent ce mandat>
+```
+
+Le worker lit le digest D'ABORD, et ne relit du disque que ce que son mandat exige
+(index-first). Un digest contredit par le disque → le disque gagne, et le worker le signale.
 
 ## Rapport de mission (manager → main)
 
-Retour **compact**, en vocabulaire VibeFlow (jamais « GSD »/« Superpowers » — cf.
-`vocabulary-map.md`). Le détail vit sur disque, pas dans la conversation.
+Retour **compact**. Le détail vit sur disque, pas dans la conversation.
 
 ```
 RAPPORT DE MISSION
