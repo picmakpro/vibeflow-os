@@ -14,9 +14,13 @@ Les scripts vivent donc là où le module a été posé — **jamais présumer `
 mission, résous le dossier une fois et note-le `$S` (premier existant) :
 
 ```bash
-S="$( for d in "$HOME/.claude/scripts" "./.claude/scripts" "${CLAUDE_PLUGIN_ROOT:-}/dev-orchestrator/scripts"; do
+S="$( for d in "$HOME/.claude/scripts" "./.claude/scripts" "${CLAUDE_PLUGIN_ROOT:-}/conductor/scripts" "${CLAUDE_PLUGIN_ROOT:-}/dev-orchestrator/scripts"; do
         [ -f "$d/dag.sh" ] && { printf '%s' "$d"; break; }; done )"
 ```
+
+> Depuis la v2.34.0, `dag.sh` et `driver-lock.sh` vivent dans le **team-kernel** hébergé par le
+> conductor (`conductor-references/team-kernel.md`) — transverse à tous les métiers. Le fallback
+> dev-orchestrator reste pour les caches antérieurs.
 
 Toutes les commandes ci-dessous utilisent `"$S"/…`. (Sans cette cascade, un lab installé en scope
 **user** chercherait à tort dans `./.claude/scripts` — script introuvable.)
