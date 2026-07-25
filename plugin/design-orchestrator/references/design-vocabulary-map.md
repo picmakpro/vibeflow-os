@@ -14,7 +14,8 @@
 | `ui-ux-pro-max` / design intelligence base | référentiel UX (interne — ne pas nommer) |
 | `frontend-design` | direction créative (interne — ne pas nommer) |
 | `impeccable` / craft commands | atelier de craft (interne — ne pas nommer) |
-| `superpowers:brainstorming` | exploration / idéation |
+| `superpowers:brainstorming` | conception de solution (le label « idéation » appartient à `/vf-explore`) |
+| `gsd-sketch` / sketch / mockup | maquette jetable / esquisse |
 | `polish` / craft pass | passe de finition |
 | `critique` / `audit` | revue design / audit visuel |
 | DESIGN.md | direction artistique (DA) / bible visuelle |

@@ -7,7 +7,8 @@ description: >
   s'installe ». Produit ou rafraîchit la doc du projet, vérifiée contre le code réel et
   non contre ce qu'on croit avoir livré.
   ✘ pas pour comprendre un code existant → /vf-map · ✘ pas pour extraire les décisions et
-  les apprentissages → /vf-learn · ✘ pas pour figer le périmètre d'une feature → /vf-spec.
+  les apprentissages → /vf-learn · ✘ pas pour figer le périmètre d'une feature → /vf-spec ·
+  ✘ pas pour le socle documentaire et de suivi d'un lab non-dev → /vf-planning.
   Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 

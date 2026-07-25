@@ -7,7 +7,8 @@ description: >
   où ? », « audite le projet ». Balaie les recettes en souffrance et les validations
   manquantes sur toutes les étapes, classe les manques, puis propose de les corriger.
   ✘ pas pour relire un diff → /vf-review · ✘ pas pour auditer la conformité du lab, ses
-  agents ou sa densité → /vf-audit · ✘ pas pour comprendre pourquoi un cycle a déraillé →
+  agents ou sa densité → /vf-audit · ✘ pas pour un simple point d'avancement sur la feuille
+  de route → /vf-progress · ✘ pas pour comprendre pourquoi un cycle a déraillé →
   /vf-forensics · ✘ pas pour les failles de sécurité → /vf-secure.
   Invocable par l'utilisateur ET par l'agent en autonomie.
 ---

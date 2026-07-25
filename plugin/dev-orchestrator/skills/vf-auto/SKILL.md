@@ -6,8 +6,8 @@ description: >
   jusqu'au bout tout seul », « je reviens demain matin, avance ». Le périmètre est déjà
   cadré : la boucle enchaîne cadrage → plan → exécution étape après étape, avec garde-fous.
   ✘ pas pour exécuter une seule étape déjà planifiée → /vf-execute · ✘ pas pour une tâche
-  triviale d'un seul commit → /vf-quick · ✘ pas pour savoir où en est le projet →
-  /vf-progress.
+  triviale d'un seul commit → /vf-quick · ✘ pas pour **arrêter** en gardant le contexte
+  avant de partir → /vf-pause · ✘ pas pour savoir où en est le projet → /vf-progress.
   Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 

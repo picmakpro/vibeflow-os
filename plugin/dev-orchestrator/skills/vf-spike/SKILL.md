@@ -8,8 +8,9 @@ description: >
   cadrée et sacrifiable, dont le livrable est une réponse — pas une feature.
   ✘ pas pour idéer sans écrire de code → /vf-explore · ✘ pas pour concevoir la solution sur
   le papier → /vf-brainstorm · ✘ pas pour figer le QUOI attendu → /vf-spec · ✘ pas pour
-  implémenter pour de vrai → /vf-execute · ✘ pas pour une maquette visuelle jetable →
-  /vf-sketch.
+  **constater** qu'un travail livré fonctionne (recette) → /vf-test · ✘ pas pour implémenter
+  pour de vrai → /vf-execute · ✘ pas pour une maquette visuelle jetable → /vf-sketch ·
+  ✘ pas pour explorer une direction visuelle → /vf-design.
   Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 

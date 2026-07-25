@@ -6,8 +6,9 @@ description: >
   à choisir », « bibliothèque X ou Y ? », « c'est mieux de faire A ou B ? », « on prend
   laquelle ? ». Produit un tableau comparatif sourcé et une recommandation motivée.
   ✘ pas pour concevoir la solution quand aucune option n'existe encore → /vf-brainstorm ·
-  ✘ pas pour cadrer un sprint entier (plusieurs décisions + périmètre) → /vf-plan · ✘ pas
-  pour répondre à la question en écrivant du code jetable → /vf-spike.
+  ✘ pas pour débroussailler une idée encore floue → /vf-explore · ✘ pas pour cadrer un
+  sprint entier (plusieurs décisions + périmètre) → /vf-plan · ✘ pas pour répondre à la
+  question en écrivant du code jetable → /vf-spike.
   Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 

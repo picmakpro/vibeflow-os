@@ -1,13 +1,13 @@
 ---
 name: vf-cleanup
 description: >
-  Utiliser quand le dossier de suivi s'encombre et qu'il faut ranger — « fais le ménage »,
-  « archive les vieux dossiers », « ça commence à être le bordel dans le planning »,
-  « range les étapes terminées », « nettoie tout ce qui est fini ». Archive les dossiers
-  d'étapes des jalons déjà clos pour garder un espace de travail lisible.
+  Utiliser quand les dossiers d'étapes s'accumulent et qu'il faut ranger — « fais le
+  ménage », « archive les vieux dossiers d'étapes », « y a trop de vieux sprints qui
+  traînent », « range les étapes terminées », « nettoie tout ce qui est fini ». Archive les
+  dossiers d'étapes des jalons déjà clos pour garder un espace de travail lisible.
   ✘ pas pour clore un jalon (audit + bilan + archivage) → /vf-milestone · ✘ pas pour
   annuler du travail → /vf-undo · ✘ pas pour retirer une étape de la feuille de route →
-  /vf-phase.
+  /vf-phase · ✘ pas pour le socle de suivi d'un lab non-dev → /vf-planning.
   Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 

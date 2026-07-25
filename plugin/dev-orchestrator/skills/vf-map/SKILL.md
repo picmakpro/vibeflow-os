@@ -7,8 +7,8 @@ description: >
   « ça marche comment ce truc ? ». Produit une cartographie structurée (stack,
   architecture, conventions, tests, points d'attention).
   ✘ pas pour extraire les décisions passées ou le graphe de connaissance → /vf-learn ·
-  ✘ pas pour écrire ou rafraîchir la doc du projet → /vf-docs · ✘ pas pour relire la
-  qualité d'un diff → /vf-review.
+  ✘ pas pour écrire ou rafraîchir la doc du projet → /vf-docs · ✘ pas pour comprendre
+  pourquoi **ça plante** → /vf-debug · ✘ pas pour relire la qualité d'un diff → /vf-review.
   Invocable par l'utilisateur ET par l'agent en autonomie (typiquement avant un plan sur un
   projet existant).
 ---

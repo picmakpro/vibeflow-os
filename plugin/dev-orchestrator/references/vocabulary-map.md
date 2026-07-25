@@ -39,10 +39,10 @@ approximativement ici, c'est faire dérailler le routage : chacun garde son prop
 | Terme GSD | Terme VibeFlow | Ce qui le déclenche |
 |---|---|---|
 | brainstorming (superpowers) | **conception de solution** | une idée **déjà formulée** — on dessine le comment |
-| explore | **idéation** (socratique) | une intuition **floue** — on questionne pour la rendre formulable |
-| spike | **expérimentation jetable** | une hypothèse technique — on écrit du code **qu'on jette** |
-| spec-phase | **périmètre figé** | un accord de principe — on fige le **QUOI** |
-| mvp-phase | version minimale qui marche | la plus petite tranche livrable d'une étape |
+| explore / idea routing | **idéation** (socratique) / orientation de l'idée | une intuition **floue** — on questionne pour la rendre formulable |
+| spike / frontier mode | **expérimentation jetable** / proposition d'expérimentation | une hypothèse technique — on écrit du code **qu'on jette** |
+| spec-phase / scope | **périmètre figé** / périmètre | un accord de principe — on fige le **QUOI** |
+| mvp-phase / MVP phase | version minimale qui marche | la plus petite tranche livrable d'une étape |
 | advisor / researcher / advisor panel | panel de décision | des options déjà identifiées à départager |
 
 ### Construction & livraison
@@ -54,7 +54,7 @@ approximativement ici, c'est faire dérailler le routage : chacun garde son prop
 | quick / fast | tâche express |
 | autonomous | mode autonome |
 | ship | livraison |
-| pr-branch | branche de livraison |
+| pr-branch / PR branch | branche de livraison |
 | new-project | démarrage de projet |
 
 ### Qualité, recette & audits
@@ -69,6 +69,7 @@ approximativement ici, c'est faire dérailler le routage : chacun garde son prop
 | secure-phase / threat model | audit de sécurité d'étape / modèle de menaces |
 | debug | dépannage |
 | forensics | post-mortem de cycle |
+| workflow (cycle interne) | cycle de travail |
 | inbox / triage | arrivées du dépôt / tri |
 
 ### Cycle de vie & contexte
@@ -83,12 +84,12 @@ approximativement ici, c'est faire dérailler le routage : chacun garde son prop
 | backlog / review-backlog | réserve |
 | cleanup | ménage |
 | progress / next | point d'avancement |
+| map-codebase / codebase map | cartographie du code |
 | resume-work | reprise de contexte |
 | pause-work / handoff | passation |
 | docs-update | mise à jour de la doc |
 | extract-learnings | apprentissages |
 | graphify / knowledge graph | graphe de connaissance |
-| sketch / mockup | maquette jetable / esquisse |
 
 ### Jamais exposé
 
