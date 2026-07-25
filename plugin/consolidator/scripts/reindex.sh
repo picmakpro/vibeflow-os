@@ -67,6 +67,17 @@ log() {
   echo "[reindex.sh] $*" >&2
 }
 
+# F7 (UAT 2026-07) : `grep -c` imprime DEJA « 0 » ET sort en code 1 sur zero correspondance —
+# le pattern `$(... | grep -c X || echo 0)` fabriquait alors « 0\n0 » (log corrompu
+# « LEARNINGS: 0\n0 entrees », JSON invalide "entries_count":0\n0). Compteur normalise :
+# lit stdin, garde la premiere suite de chiffres, defaut 0 — toujours UNE valeur propre.
+count_lines() {
+  local n
+  n=$(grep -c "$1" 2>/dev/null || true)
+  n="${n%%[!0-9]*}"
+  printf '%s' "${n:-0}"
+}
+
 # Libere le verrou CSL-09 (no-op si non pris). Jamais bloquant : fail-open.
 release_reindex_lock() {
   [ -n "${1:-}" ] && rm -rf "$1" 2>/dev/null
@@ -197,16 +208,16 @@ audit_register() {
   body_ids=$(extract_body_ids "$file" "$pat" || true)
 
   local count_index count_body
-  count_index=$(echo "$index_ids" | grep -c "." 2>/dev/null || echo 0)
-  count_body=$(echo "$body_ids" | grep -c "." 2>/dev/null || echo 0)
+  count_index=$(echo "$index_ids" | count_lines ".")
+  count_body=$(echo "$body_ids" | count_lines ".")
 
   local orphans_in_index orphans_in_body
   orphans_in_index=$(comm -23 <(echo "$index_ids") <(echo "$body_ids") 2>/dev/null | grep -v "^$" || true)
   orphans_in_body=$(comm -13 <(echo "$index_ids") <(echo "$body_ids") 2>/dev/null | grep -v "^$" || true)
 
   local count_orphans count_undocumented
-  count_orphans=$(echo "$orphans_in_index" | grep -c "." 2>/dev/null || echo 0)
-  count_undocumented=$(echo "$orphans_in_body" | grep -c "." 2>/dev/null || echo 0)
+  count_orphans=$(echo "$orphans_in_index" | count_lines ".")
+  count_undocumented=$(echo "$orphans_in_body" | count_lines ".")
 
   log "$register_name: $count_index index, $count_body bodies, $count_orphans orphan(s) index sans body, $count_undocumented body(s) sans index"
 
@@ -280,7 +291,7 @@ reindex_one() {
   sections=$(extract_body_sections "$file" "$pat")
 
   local count
-  count=$(echo "$sections" | grep -c "|" 2>/dev/null || echo 0)
+  count=$(echo "$sections" | count_lines "|")
 
   log "$register_name: $count entrees body detectees"
 
@@ -330,6 +341,15 @@ reindex_one() {
     # Le lab cible n'a donc RIEN à configurer — aucun backup n'entre dans git.
     [ -f "$backup_dir/.gitignore" ] || printf '*\n!.gitignore\n' > "$backup_dir/.gitignore"
     base="$(basename "$file")"
+    # F8 (UAT 2026-07) : d'anciennes versions du module (≤ v2.23) posaient le backup À CÔTÉ
+    # du registre (`<REG>.md.bak-reindex-*`) — un lab passé par un vieux cache en garde des
+    # strays. Unification ADR-049 : tout stray legacy est rapatrié dans .backups/ AVANT la
+    # rotation, qui s'applique donc aussi à lui. Idempotent, best-effort.
+    local _stray
+    for _stray in "$file".bak-reindex-*; do
+      [ -e "$_stray" ] || continue
+      mv -f "$_stray" "$backup_dir/" 2>/dev/null || true
+    done
     backup="$backup_dir/${base}.bak-reindex-$(date +%Y%m%d-%H%M%S)"
     cp "$file" "$backup"
     log "Backup: $backup"

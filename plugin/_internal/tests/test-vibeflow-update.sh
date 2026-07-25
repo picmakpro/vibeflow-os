@@ -154,14 +154,15 @@ fi
 # reproduit ce bundling en copiant le résolveur dans $CACHE/_internal/.
 LAB="$(mktemp -d)"
 CACHE="$LAB/cache"
-CLOSURE="validator consolidator infrastructure-audit"
+# audit-architecture requis par validator depuis UAT F2 (Phase 4, même opt-in).
+CLOSURE="validator consolidator infrastructure-audit audit-architecture"
 copy_ok=1
 for m in $CLOSURE; do
   prepare_module "$CACHE" "$m" || { copy_ok=0; break; }
   [ -f "$CACHE/$m/module.json" ] || { copy_ok=0; break; }
 done
 if [ "$copy_ok" -eq 0 ]; then
-  skip "T5 résolveur : module.json de validator/consolidator/infrastructure-audit non copiables"
+  skip "T5 résolveur : module.json de validator/consolidator/infrastructure-audit/audit-architecture non copiables"
 elif [ ! -f "$RESOLVER" ]; then
   skip "T5 résolveur : resolve-deps.sh introuvable dans le repo ($RESOLVER)"
 else
@@ -179,8 +180,10 @@ else
     || { ko "T5 résolveur : consolidator (dépendance) non installé"; miss=1; }
   [ -f "$LAB/.claude/skills/infrastructure-audit/SKILL.md" ] \
     || { ko "T5 résolveur : infrastructure-audit (dépendance) non installé"; miss=1; }
+  [ -f "$LAB/.claude/skills/audit-architecture/SKILL.md" ] \
+    || { ko "T5 résolveur : audit-architecture (dépendance, UAT F2) non installé"; miss=1; }
   [ "$miss" -eq 0 ] \
-    && ok "T5 résolveur : --with-deps validator installe la fermeture {validator, consolidator, infrastructure-audit} (résolveur RÉELLEMENT exercé)"
+    && ok "T5 résolveur : --with-deps validator installe la fermeture {validator, consolidator, infrastructure-audit, audit-architecture} (résolveur RÉELLEMENT exercé)"
 fi
 rm -rf "$LAB"
 

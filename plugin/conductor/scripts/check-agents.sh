@@ -20,6 +20,10 @@
 # WARNING : skills absent · skill déclaré introuvable (ERROR en --strict) · description < 30c ·
 #   tools absent (hérite tout) · champ inconnu · name ≠ nom de fichier.
 #
+# Résolution d'un skill déclaré (UAT F2) : d'abord par NOM DE DOSSIER (.claude/skills/<s>/SKILL.md),
+# sinon par le frontmatter `name:` des SKILL.md installés — un skill peut porter un name différent
+# de son dossier (ex. module planning-core → skill `vf-planning`).
+#
 # Codes de sortie : 0 = conforme · 1 = non conforme · 3 = INDÉTERMINÉ (--strict sur cible
 #   absente/vide : aucun verdict rendu — un vert sans rien vérifier serait un faux vert, F13).
 
@@ -120,6 +124,32 @@ def parse_frontmatter(text):
         i += 1
     return None  # frontmatter jamais ferme
 
+# UAT F2 : carte frontmatter name: → chemin SKILL.md, construite paresseusement UNE fois.
+# Un skill declare se resout par NOM DE DOSSIER d abord, puis par ce name: (un module peut
+# installer son skill sous un dossier != name, ex. planning-core → vf-planning).
+_skill_name_map = None
+def skill_name_map():
+    global _skill_name_map
+    if _skill_name_map is None:
+        _skill_name_map = {}
+        for sk_path in sorted(glob.glob(os.path.join(skills_dir, \"*\", \"SKILL.md\"))):
+            try:
+                sk_fm = parse_frontmatter(open(sk_path, encoding=\"utf-8-sig\").read())
+            except OSError:
+                continue
+            if not sk_fm:
+                continue
+            sk_name = sk_fm.get(\"name\")
+            if isinstance(sk_name, str) and sk_name:
+                _skill_name_map.setdefault(sk_name, sk_path)
+    return _skill_name_map
+
+def resolve_skill(s):
+    sk = os.path.join(skills_dir, s, \"SKILL.md\")
+    if os.path.isfile(sk):
+        return sk
+    return skill_name_map().get(s, \"\")
+
 def check_file(path):
     base = os.path.basename(path)
     try:
@@ -190,9 +220,9 @@ def check_file(path):
         preload_max = int(os.environ.get(\"VF_PRELOAD_MAX\", \"1200\"))
         total_lines = 0
         for s in skills:
-            sk = os.path.join(skills_dir, s, \"SKILL.md\")
-            if not os.path.isfile(sk):
-                msg = f\"{base} : skill declare introuvable — {s} (le creer via skill-creator, jamais le laisser en promesse)\"
+            sk = resolve_skill(s)
+            if not sk:
+                msg = f\"{base} : skill declare introuvable — {s} (ni dossier .claude/skills/{s}/, ni frontmatter name: correspondant ; le creer via skill-creator, jamais le laisser en promesse)\"
                 (errors if strict else warnings).append(msg)
                 continue
             try:
