@@ -78,6 +78,21 @@ for mj in "$ROOT"/plugin/*/module.json; do
 done
 [ "$mod_fail" -eq 0 ] && ok "triade par module : $real modules VERSION ↔ module.json alignés"
 
+# 7. Historique des README : la première entrée citée doit être la VERSION courante.
+#    Vécu terrain 2026-07-26 : les « 3 dernières entrées » des README étaient restées figées
+#    5 releases en arrière (v2.31.1 affichée en tête pour un repo en v2.36.0) — aucun gate
+#    ne regardait cette section, seule zone de version des README non couverte.
+for r in README.md README.fr.md; do
+  top_hist="$(grep -o '| `v[0-9][0-9.]*`' "$ROOT/$r" | head -1 | tr -d '|` v')"
+  if [ -z "$top_hist" ]; then
+    ko "$r : aucune entrée d'historique détectée (section « dernières entrées » attendue)"
+  elif [ "$top_hist" != "$canon" ]; then
+    ko "$r : historique en tête = v$top_hist ≠ VERSION v$canon (rafraîchir les 3 dernières entrées)"
+  else
+    ok "$r historique en tête v$top_hist"
+  fi
+done
+
 if [ "$FAIL" -eq 1 ]; then
   echo "[check-version-sync] dérive détectée — synchroniser AVANT release (canon = VERSION racine)." >&2
   exit 1

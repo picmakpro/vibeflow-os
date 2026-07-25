@@ -156,9 +156,9 @@ Full version history: **[CHANGELOG.md](./CHANGELOG.md)** — the README only kee
 
 | Version | Date | Change |
 |---------|------|--------|
-| `v2.31.1` | 2026-07-25 | Version-file alignment: the `VERSION` files of `software-architecture` (v1.5.1) and `kpi-analyst` (v1.0.1) caught up with their v2.29.0 changelogs — the version registry now tells the truth. |
-| `v2.31.0` | 2026-07-25 | Fine-grained intent routing: three routing levels (trigger-dense descriptions, global verb-precedence rule, on-demand routing doctrine). 19 new `/vf-*` verbs — dev-orchestrator goes from 14 to 31, design-orchestrator gains `/vf-sketch` (dev-orchestrator v1.8.1, design-orchestrator v1.1.0, conductor v1.12.2). |
-| `v2.30.0` | 2026-07-25 | Altitude boundary between VibeFlow planning and the development planning engine (ADR-055): `vf-planning` holds lab-level altitude and redirects code-project planning to the dev verb (planning-core v2.4.0). |
+| `v2.36.0` | 2026-07-26 | Real-world UAT on blank labs (express mode ✓ under 15 min; mission protocol executable by a third-party agent ✓) — 16 frictions fixed, `human_needed` doctrine settled (freeze the node), new "fresh lab" CI job: the baseline must pass its own gates from a blank install. |
+| `v2.35.0` | 2026-07-25 | The multi-domain promise delivered: all 3 métier bundles are real modules (content / growth / business-pilot v2.0.0, full teams on the team-kernel, read-only judges with eliminatory criteria, `quality-gate-client` shipped). |
+| `v2.34.0` | 2026-07-25 | Universalization: transverse team-kernel (conductor), design mission team (first non-dev instantiation), N/N+1 pipelining in the DAG, express lab mode (≤ 15 min, Gate C intact), ADR-057 tooled boundaries with third-party bricks. |
 
 <details>
 <summary><strong>Methodology references (ADR / LRN)</strong></summary>
