@@ -1,5 +1,25 @@
 # Backlog — idées différées (hors milestone courant)
 
+## Convergence de contenu à l'update de module (manifeste par module)
+**Capturé :** 2026-07-26 · **Origine :** update réel de la machine 2.23.0 → 2.36.0
+
+L'engine `update` re-matérialise le contenu du module mais **ne supprime pas** les fichiers que
+la nouvelle version ne livre plus : les 12 verbes-façades de dev-orchestrator v1.x ont survécu
+à l'update v2.1.1 dans `~/.claude/skills/` (nettoyés à la main), ressuscitant le double
+catalogue que la bascule agentique a tué. Remède proposé : l'engine écrit un **manifeste des
+chemins posés** par module à l'install (`.claude/scripts/.vibeflow-manifest-<module>`), et
+`update` supprime les chemins de l'ancien manifeste absents du nouveau (avec backup). Tests :
+update d'un module dont une skill a disparu → skill retirée du lab.
+
+## check-agents : périmètre des agents tiers (gsd-*, autres chaînes)
+**Capturé :** 2026-07-26 · **Origine :** sanity check machine post-update
+
+`check-agents.sh --strict` sur `~/.claude/agents` remonte 66 non-conformités — toutes sur les
+agents `gsd-*` (chaîne tierce qui ne suit pas la charte ADR-044). Les agents VibeFlow sont
+conformes. Remède proposé : liste d'exclusion de préfixes tiers (`--exclude-prefix=gsd-` par
+défaut documenté, ou lecture d'un `.vibeflow-charter-scope`) pour que le gate juge la charte
+VibeFlow sur les agents VibeFlow — cohérent avec la leçon UAT « baseline vs lab ».
+
 ## Skill-installer global (multi-agents)
 **Capturé :** 2026-06-04 · **À explorer :** après le milestone « Install UX »
 
