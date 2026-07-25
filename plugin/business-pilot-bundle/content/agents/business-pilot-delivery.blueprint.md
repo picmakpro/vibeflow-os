@@ -17,7 +17,7 @@ model: sonnet
 memory: project
 skills:
   - delivery-tracking         # suivi onboarding/jalons/SLA paramétrables — à créer via skill-creator
-  - quality-gate-client       # gate de vérif avant envoi d'un livrable client — à créer via skill-creator
+  - quality-gate-client       # gate de vérif avant envoi — LIVRÉ par le module (agents/quality-gate-client.md, juge read-only)
   - satisfaction-survey       # collecte feedback/NPS + lecture des signaux — à créer via skill-creator
 ---
 ```
@@ -55,8 +55,11 @@ Exécuter et suivre la livraison des prestations vendues — onboarding, jalons,
 2. **Lire** `PROCESSES.md` + le dossier client `delivery/` concerné.
 3. **Suivre l'exécution** via `delivery-tracking` : avancement des jalons, respect des SLA, todos.
 4. **Gate de vérif AVANT envoi (P5)** — tout livrable destiné au client passe par
-   `quality-gate-client` (gate **à fabriquer au ficelage du lab** via skill-creator, cf. skills
-   requis) : conformité au périmètre vendu, complétude, qualité. **Aucun envoi sans gate vert.**
+   `quality-gate-client` (depuis la matérialisation 2026-07-25, ce gate est **LIVRÉ par le
+   module** comme agent juge frais read-only — `agents/quality-gate-client.md`, rubric /100 —
+   plus rien à fabriquer via skill-creator) : conformité au périmètre vendu, complétude,
+   qualité, cohérence des montants avec les sources. **Aucun envoi sans gate vert PUIS
+   validation humaine.**
 5. **Collecter la satisfaction** (`satisfaction-survey`) aux jalons clés : feedback, NPS.
 6. **Détecter l'upsell / le risque** : si un besoin additionnel ou un risque de churn émerge,
    **escalader le signal au `commercial`** (qui transforme en opportunité) — sans négocier soi-même.

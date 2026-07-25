@@ -1,93 +1,115 @@
-# business-pilot-bundle
+# business-pilot-bundle — Équipe business sur le team-kernel (business-pilot)
 
-> Module **doc-only** du plugin **vibeflow-os**. Un *bundle métier* : il ne s'installe pas comme un
-> agent unique, il porte des **blueprints** que `vf-new-lab` lit et **instancie** en un lab métier
-> complet, gouverné, avec son filet d'audit.
+> Module **installable** du plugin vibeflow-os : l'équipe métier de **pilotage business**
+> construite sur le team-kernel (manager → workers → gate). Il transforme un lab VibeFlow en
+> **poste de pilotage gouverné** couvrant la chaîne **Offre → Pipeline commercial → Delivery →
+> Revenus**, avec dispatch parallèle des dossiers clients et deux Iron Laws non négociables :
+> **aucun envoi client sans validation humaine** et **aucun chiffre financier inventé**.
 
 ---
 
-## Ce qu'est ce bundle
+## Ce que le module installe
 
-`business-pilot-bundle` est un **paquet de doctrine métier** pour piloter un **business généraliste**
-sous gouvernance VibeFlow : offres, pipeline commercial, delivery des prestations, revenus.
+| Pièce | Rôle | Modèle | Cloisonnement |
+|---|---|---|---|
+| `vf-business-manager` | manager de mission : DAG + verrou de driver (nœuds par dossier client : commercial → delivery → gate qualité → humain → finance), dispatch parallèle des dossiers indépendants, digest par mandat, contrôle de flux sur rapports typés, orchestration de la validation humaine | opus | exposé — **ne produit jamais** (pas d'Edit, aucune production) |
+| `vf-business-commercial` | qualification/scoring, propositions/devis/relances **rédigés** (jamais envoyés), montants sourcés, tient `PIPELINE.md` | sonnet | `vf-internal`, écrit uniquement `PIPELINE.md` + `pipeline/{leads,prospects,clients}/` |
+| `vf-business-delivery` | jalons/SLA, **préparation** des livrables clients, satisfaction, signaux upsell/churn | sonnet | `vf-internal`, écrit uniquement `pipeline/{delivery,completed}/` |
+| `quality-gate-client` | juge frais du gate qualité : rubric **/100**, seuil **80**, **montant non sourcé** et **hors périmètre vendu** éliminatoires, verdict typé | sonnet | `vf-internal`, **read-only** (tools sans Write/Edit) |
+| `vf-business-finance` | factures/relances/prévisions **préparées** (l'humain envoie), Iron Law « aucun chiffre inventé » alignée kpi-analyst, EVAL systématique (P8) | sonnet | `vf-internal`, écrit uniquement `business/finance/` + `CLIENTS.md` |
+| skill `vf-business` | point d'entrée métier : geste simple vs mission (seuil 3 dossiers/actions ou signal de durée) | — | — |
 
-Il fournit, sous forme de **documentation instanciable** (jamais de code applicatif) :
+## La chaîne (et sa définition du « vert »)
 
-- un **manifeste** (`content/BUNDLE.md`) qui décrit le métier, le profil de planning, l'extension de
-  domaine et le **flux d'instanciation** ;
-- **3 blueprints d'agents métier** prêts à instancier (`content/agents/`), chacun conçu pour tenir en
-  **≤ 250 lignes** une fois posé (charte densité ADR-029) ;
-- la **spécification de l'extension de domaine** `business/` à scaffolder (`content/domain/`) ;
-- la **spécification des 5 registres mémoire canon** et du pont planning↔mémoire (`content/registres.md`).
+```
+BRIEF ─▶ vf-business-commercial ─▶ vf-business-delivery ─▶ quality-gate-client (≥80/100)
+      ─▶ VALIDATION HUMAINE (jamais auto-validée) ─▶ vf-business-finance ─▶ l'humain envoie/émet
+```
 
-## Pour quel métier
+Un livrable client n'est **vert** que si : auto-contrôle du worker passé + score du gate
+≥ 80/100 sans critère éliminatoire + **validation humaine explicite** — et même vert, le lab
+ne l'envoie pas : il le marque « prêt à envoyer », **l'humain envoie dans ses outils**
+(ADR-031 + LRN-068 : le lab prépare et documente, l'exécution réelle — envoi de facture,
+signature, encaissement — reste hors lab). Tout nœud produisant un livrable client (une
+proposition commerciale comprise) insère gate + humain avant l'étape suivante.
 
-Pour un **opérateur de business** (agence, freelance structuré, studio, cabinet, petit éditeur de
-service) qui veut un poste de pilotage IA gouverné couvrant la chaîne :
+## Les deux Iron Laws
 
-**Offre → Pipeline commercial → Delivery → Revenus**, le tout tracé et capitalisé.
+1. **Aucun envoi client sans validation humaine** — devis, proposition, livrable, relance,
+   facture : `human_needed` systématique, aucun mode (autonome compris) ne le contourne.
+2. **Aucun chiffre financier inventé** — chaque montant est extrait d'une source citée
+   (`OFFERS.md`/`PRICING.md`, dossier client, `CLIENTS.md`, registre `KPIS.md` du module
+   **kpi-analyst** quand il est installé — source à privilégier pour CA/encours/marge) ou
+   marqué `confidence: low` « à confirmer ». Un montant non sourcé est **éliminatoire** au gate.
 
-Vocabulaire natif du lab (P7 — transposer, pas copier) :
+## Deux régimes d'usage
 
-| Terme métier | Sens |
-|---|---|
-| **Sprint stratégique** | Cycle court de pilotage (équiv. d'une itération de roadmap métier). |
-| **Initiative** | Chantier métier à valeur (lancer une offre, ouvrir un canal, fiabiliser le delivery). |
-| **Obstacle** | Ce qui bloque l'avancée d'une initiative (équiv. métier d'un blocker). |
-| **Rollout** | Mise en production d'une décision métier (nouvelle offre, nouveau pricing, nouveau process). |
+- **Geste simple** (« qualifie ce lead », « prépare la facture ») : le skill `vf-business`
+  déroule la chaîne courte — worker concerné, gate qualité si livrable client, validation
+  humaine, envoi par l'humain.
+- **Mission** (≥ 3 dossiers/actions ou signal de durée : « la semaine », « en autonomie ») :
+  `vf-business-manager` prend le pilotage — plan de bataille en DAG par dossier client,
+  verrou de driver, **dispatch parallèle** des dossiers indépendants (périmètres d'écriture
+  disjoints par construction : une étape de pipeline = un propriétaire), digest ≤ 30 lignes
+  par mandat, halt conditions, rapport de mission avec file d'attente de validation.
 
-## Comment `vf-new-lab` l'utilise
+## Prérequis côté lab
 
-Quand l'utilisateur demande « monte-moi un lab pour piloter mon business », le skill `vf-new-lab`
-(module `conductor`) :
-
-1. **Détecte** que le métier correspond à `business-pilot` (ou l'utilisateur le désigne).
-2. **Lit `content/BUNDLE.md`** de ce bundle comme source de dérivation (au lieu de tout réinventer).
-3. **Instancie** chaque blueprint de `content/agents/` en un agent natif Claude Code dans
-   `.claude/agents/` du lab cible (≤ 250 lignes, savoir déporté en `skills:`).
-4. **Scaffolde** l'extension de domaine `business/` selon `content/domain/extension-spec.md`, via
-   `planning-core` (profil `standard`).
-5. **Pose** les 5 registres mémoire canon selon `content/registres.md`.
-6. **Câble le filet** : agent `vibeflow-validator` + skill `audit-architecture`.
-7. **Stampe** la version du framework dans le lab.
-
-> Détail pas-à-pas du flux : section *Flux d'instanciation* de `content/BUNDLE.md`.
+Le lab doit porter le référentiel business (`.planning/business/` : `PIPELINE.md` — index lu
+en premier —, `OFFERS.md`, `PROCESSES.md`, `CLIENTS.md`, `STRATEGY.md`, arbo `pipeline/`) —
+posé par `vf-planning` (profil standard, spec : `content/domain/extension-spec.md`) ou
+`vf-new-lab`. Le skill a un garde first-use : référentiel absent → proposition de poser le
+socle d'abord (mode dégradé possible, signalé). Les scripts du kernel (`dag.sh`,
+`driver-lock.sh`, `check-agents.sh`) viennent du module `conductor` (socle obligatoire).
 
 ## Contenu du module
 
 ```
 business-pilot-bundle/
-├── module.json                 # déclaration (doc-only, requires planning-core/consolidator/audit-architecture/validator)
-├── VERSION                     # v1.0.0
-├── CHANGELOG.md
-├── README.md                   # ce fichier
-└── content/
-    ├── BUNDLE.md               # MANIFESTE + flux d'instanciation (lu par vf-new-lab)
-    ├── agents/
-    │   ├── business-pilot-commercial.blueprint.md
-    │   ├── business-pilot-delivery.blueprint.md
-    │   └── business-pilot-finance.blueprint.md
-    ├── domain/
-    │   └── extension-spec.md   # structure exacte de l'extension business/
-    └── registres.md            # 5 registres canon + IDs + pont planning↔mémoire
+  module.json                    agents + skill + scripts · proposable
+  VERSION / CHANGELOG.md / README.md
+  agents/
+    vf-business-manager.md       ★ manager de mission (opus, team-kernel)
+    vf-business-commercial.md    worker pipeline/propositions (sonnet, vf-internal)
+    vf-business-delivery.md      worker jalons/livrables (sonnet, vf-internal)
+    vf-business-finance.md       worker factures/prévisions (sonnet, vf-internal)
+    quality-gate-client.md       gate frais read-only (sonnet, vf-internal)
+  skills/
+    vf-business/SKILL.md         point d'entrée métier (aiguillage simple vs mission)
+  scripts/
+    tests/test-business-pilot-bundle.sh  suite machine (14 tests)
+  content/                       ← TRACE DE CONCEPTION (matérialisée le 2026-07-25)
+    BUNDLE.md                    manifeste d'origine, lu par vf-new-lab
+    agents/*.blueprint.md        blueprints d'origine des 3 workers
+    domain/extension-spec.md     structure exacte de l'extension business/
+    registres.md                 5 registres canon + IDs + pont planning↔mémoire
 ```
+
+## Vérification machine
+
+```bash
+bash plugin/business-pilot-bundle/scripts/tests/test-business-pilot-bundle.sh
+bash plugin/conductor/scripts/check-agents.sh --strict --agents-dir=plugin/business-pilot-bundle/agents
+```
+
+La suite verrouille notamment : le gate sans Write/Edit, le manager sans périmètre de
+production, le cloisonnement Pattern 12 des workers, les rapports typés + DIGEST, la
+**non-contournabilité de la validation humaine ET de l'envoi client** (T8 + T13), et le
+**zéro chiffre inventé** (T14 : Iron Law finance + manager, éliminatoire au gate).
 
 ## Dépendances
 
-| Module | Rôle dans le lab instancié |
-|---|---|
-| `planning-core` | Socle `.planning/` (STATE/PROJECT/ROADMAP/config) + extension de domaine `business/`. |
-| `consolidator` | Indexation/archivage/fusion/promotion des registres mémoire. |
-| `audit-architecture` | Filet P8 : verdict bloquant sur les générateurs brief→output (pricing, propositions, prévisions). |
-| `validator` | Agent `vibeflow-validator` — audit de cohérence lab ↔ méthodologie. |
+`planning-core` (socle `.planning/` + extension `business/`), `consolidator` (registres,
+promotion de décisions), `audit-architecture` (audit du process générateur, P8), `validator`
+(filet de conformité). Kernel d'orchestration : module `conductor` (toujours présent).
+Optionnel mais recommandé : `kpi-analyst` (le pilier finance consomme `KPIS.md` et ses
+extracteurs déterministes — même Iron Law des deux côtés).
 
-L'**orchestration** est assurée par le module **`conductor`** (vibeflow-conductor) : ce bundle **ne
-re-code pas d'orchestrateur** et les agents métier **ne font pas l'orchestration** — ils escaladent
-au conductor.
+## Châssis doctrinal
 
-## Ce que ce bundle n'est PAS
-
-- ❌ Un agent installable directement (l'installeur ne gère qu'1 `AGENT.md`/module ; ici les agents
-  sont des **blueprints** instanciés par `vf-new-lab`).
-- ❌ Du code applicatif (aucune hypothèse « dev », pas de `codebase/`).
-- ❌ Un orchestrateur (rôle du `conductor`) ni un auditeur (rôle de `validator` + `audit-architecture`).
+Team-kernel (`conductor-references/team-kernel.md`) : verrou de driver, DAG, rapports typés,
+digest, halt conditions, cloisonnement par tools. Principes Core P1/P3/P4/P5/P7/P8/P9
+référencés, jamais redupliqués. Densité ADR-029 (agents ≤ 250L, skill ≤ 500L), agents natifs
+machine-enforced ADR-044, validation humaine ADR-031, exécution réelle hors lab LRN-068.
+Vocabulaire métier natif (P7) : Sprint stratégique · Initiative · Obstacle · Rollout ·
+dossier client · pipeline · jalon.
