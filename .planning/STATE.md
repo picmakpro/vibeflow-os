@@ -99,6 +99,8 @@ Recent decisions affecting current work:
   dev-orchestrator v2.x, manager avec digest/next steps/hygiène doc, gouvernance proportionnée
   au profil ; (3) universalisation — team-kernel transverse (conductor), équipe design,
   content-bundle matérialisé `proposable:true`, pipelining N/N+1, lab express, ADR-057.
+  Prolongé par **v2.35.0** : growth-bundle et business-pilot-bundle matérialisés à leur tour
+  (quality-gate-client livré) — les 3 bundles métier sont réels, promesse multi-métier tenue.
 
 - [Phase 1]: D4 — index 100% auto-généré, ordre pipeline documenté dans l'agent.
 - [Phase 1]: D3 — install auto des deps, init projet sur confirmation seulement.
