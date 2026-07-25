@@ -1,5 +1,36 @@
 # Milestones — VibeFlow Dev Orchestrator (VFDO)
 
+## 🚧 vf-routing — Routage fin & verbes VibeFlow (créé 2026-07-25)
+
+**Statut :** ACTIF — non planifié · **Spec :** `docs/superpowers/specs/2026-07-25-routage-fin-verbes-vf-design.md`
+
+**Périmètre :** 2 phases · requirements VERB-01..05, BRDG-01..03.
+
+**But :** Deux trous constatés sur le module `dev-orchestrator` v1.7.0. **(1)** La table de routage de
+l'agent mappe l'intention directement sur la cible GSD au lieu du verbe `/vf-*` correspondant — deux
+sources de vérité par intention, et rien ne garantit qu'un verbe VibeFlow gagne l'arbitrage face aux 70
+skills `gsd-*` chargés en parallèle. **(2)** 14 verbes couvrent 12 cibles : ~50 skills GSD n'ont aucune
+porte d'entrée. La Phase 12 pose trois niveaux de routage (descriptions déclencheuses, rule de préséance
+globale, doctrine exhaustive on-demand) et 19 verbes. La Phase 13 ferme le seul maillon non outillé du
+cycle : `/vf-ingest`, qui transforme une spec en étapes de la feuille de route via les moteurs GSD
+existants.
+
+**Prochaine action :** `/gsd:discuss-phase 12` puis `plan-phase`.
+
+## 🚧 gsd-migration — Migration package GSD (créé 2026-07-25)
+
+**Statut :** EN COURS — non planifié · **Requirement source :** VOC-02
+
+**Périmètre :** 2 phases · requirements GSDM-01..06.
+
+**But :** Basculer la dépendance GSD `get-shit-done-cc` → `@opengsd/gsd-core` sans casser l'auto-install,
+l'index factuel ni le routage. On sépare **l'étude** (Phase 10 : surface d'impact, maturité du package
+cible, note go/no-go) de **l'intégration** (Phase 11 : bascule outillée + non-régression isolée + release
+taggée). **Phase 11 conditionnée au GO de la Phase 10** — un no-go documenté archive le chantier sans
+toucher le code.
+
+**Prochaine action :** `/gsd:discuss-phase 10` puis `plan-phase`.
+
 ## ✅ dev-doctrine — Doctrine dev & consolidation (2026-07-07)
 
 **Tag git :** `v2.20.0` · **PR** #9 (mergée) · **Statut :** SHIPPED

@@ -14,7 +14,7 @@
 | Option | Description | Selected |
 |--------|-------------|----------|
 | Ce repo (vibeflow-os) | Mémoire de session de ce repo. Peu d'entrées, boucle courte, zéro risque prod. | ✓ |
-| Un lab réel connecté | WillHosting/Reviz, LinkedinBot… mesure plus réaliste mais projet vivant à isoler. | |
+| Un lab réel connecté | projet Alpha/projet source, LinkedinBot… mesure plus réaliste mais projet vivant à isoler. | |
 | Lab témoin jetable dédié | Lab factice ~15-20 entrées synthétiques. Contrôle total, entrées moins authentiques. | |
 
 **User's choice:** Ce repo (vibeflow-os)

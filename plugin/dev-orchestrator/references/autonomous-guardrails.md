@@ -4,8 +4,7 @@
 > test/correction non supervisée, ex. le module `mobile-test`). Formalise les six
 > garde-fous qui rendent une boucle autonome **sûre, non-tricheuse et terminante**.
 >
-> **Origine** : doctrine extraite du track « équipe d'agents » (revizapp), généralisée.
-> Voir `.planning/research/agent-team-spec-revizapp.md` (couche B).
+> **Origine** : doctrine extraite du track « équipe d'agents », généralisée à tout lab.
 >
 > **Iron Law** : *une boucle autonome ne triche jamais et s'arrête toujours proprement.*
 

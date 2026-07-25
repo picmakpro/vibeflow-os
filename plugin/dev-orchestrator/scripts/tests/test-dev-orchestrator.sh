@@ -18,7 +18,7 @@
 #   T8/T8b — Équipe manager : 4 agents conformes (frontmatter, densité, vf-internal — Pattern 12).
 #   T9 — Contrats de mission : source unique + 3 renvois (DRY).
 #   T10 — Routage mission (AGENT.md) + aiguillage taille (vf-auto, SEUIL_EQUIPE).
-#   T11 — Généricité : aucun résidu Reviz dans agents/ (DM5).
+#   T11 — Généricité : aucun renvoi vers un chemin absent d'un lab installé (DM5).
 #
 # Convention : asserts numérotés, helpers ok()/ko()/skip(), exit 0 si tout passe
 # (SKIP non bloquant), exit 1 si au moins un KO. Calqué sur le pattern de test du repo.
@@ -359,12 +359,12 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# T11 — Généricité : aucun résidu Reviz dans les agents livrés (DM5)
+# T11 — Généricité : aucun renvoi vers un chemin absent d'un lab installé (DM5)
 # ---------------------------------------------------------------------------
-if [ -d "$MOD/agents" ] && "$GREP" -rqE "docs/_mission|revizapp|Reviz" "$MOD/agents/" 2>/dev/null; then
-  ko "T11 généricité : résidu Reviz détecté dans agents/ (docs/_mission|revizapp|Reviz)"
+if [ -d "$MOD/agents" ] && "$GREP" -rqE "\.planning/research/|docs/_mission" "$MOD/agents/" 2>/dev/null; then
+  ko "T11 généricité : renvoi vers un chemin non installé en lab (docs/_mission|.planning/research/)"
 else
-  ok "T11 généricité : aucun chemin/nom Reviz dans agents/"
+  ok "T11 généricité : aucun renvoi vers un chemin absent d'un lab"
 fi
 
 # ---------------------------------------------------------------------------

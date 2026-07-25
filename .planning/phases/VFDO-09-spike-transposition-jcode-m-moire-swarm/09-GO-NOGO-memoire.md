@@ -14,7 +14,7 @@ Le critère binaire D-05 est **mécaniquement vrai sur les deux points**, sans �
 | Critère D-05 | Résultat | Preuve |
 |---|---|---|
 | Une passe `consolidator` **lit → recalcule → réécrit** les 3 champs (`trust`/`confidence`/`superseded_by`) sur **toutes** les entrées du lab témoin, sans édition humaine | ✅ | 5 entrées : 4 réécrites en place, 1 traitée par la voie supersession ; passe 2 **idempotente** (base `confidence` préservée, `effective_confidence` recalculée à l'identique, 0 archivage parasite) |
-| Une entrée `superseded_by` est **archivée** (statut basculé, contenu conservé — pas supprimée) | ✅ | `reviz-appele-willhunting.md` → `archive/`, `status: superseded`, corps intégralement conservé |
+| Une entrée `superseded_by` est **archivée** (statut basculé, contenu conservé — pas supprimée) | ✅ | `projet-alpha-emplacement-obsolete.md` → `archive/`, `status: superseded`, corps intégralement conservé |
 
 Évidence reproductible : `spike/run-output.txt` (rejouable via `seed-lab.py` + `decay-pass.py`).
 Prototype : `spike/decay-pass.py` (passe isolée, **non** intégrée à `plugin/consolidator/`).
@@ -72,7 +72,7 @@ Effet mesuré sur la fixture (age constant, `today=2026-07-22`) :
 | commits-francais-scroll-off | feedback | 200 j | 0.6498 | 0.6498 |
 | user-freelance-multi-metiers | user | 120 j | 0.3175 | **0.5040** |
 | reference-rtk-proxy | reference | 90 j | 0.2475 | **0.4162** |
-| reviz-is-willhosting | project | 13 j | 0.6665 | **0.7367** |
+| projet-alpha-emplacement | project | 13 j | 0.6665 | **0.7367** |
 
 → La recalibration évite qu'une préférence utilisateur ou un pointeur de référence encore valides ne tombent
 sous un seuil de rétrogradation trop tôt dans un lab non-dev à cadence lente.

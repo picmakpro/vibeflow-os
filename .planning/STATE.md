@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: memory-swarm-rnd
-milestone_name: R&D mémoire & swarm
-status: implemented
-stopped_at: ADR-052 validé + implémenté (consolidator v1.6.0 + swarm v1.7.0) — SHIPPÉ v2.28.0
-last_updated: "2026-07-22"
-last_activity: 2026-07-22
+milestone: vf-routing
+milestone_name: Routage fin & verbes VibeFlow
+status: in_progress
+stopped_at: "Phase 14 COMPLÈTE (7 plans) sur feat/rescope-vf-planning-alti — release v2.29.0 commitée, TAG NON POSÉ (à créer après merge sur main : git tag -a v2.29.0). Travail Phase 12 séparé sur feat/phase-12-verbes (12 commits, non cadré via discuss-phase 12). Backup de l'état mélangé : backup/mission-complete-20260725."
+last_updated: "2026-07-25"
+last_activity: 2026-07-25
 progress:
-  total_phases: 1
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 100
+  total_phases: 3
+  completed_phases: 0
+  total_plans: 13
+  completed_plans: 8
+  percent: 62
 ---
 
 # Project State
@@ -25,12 +25,21 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 
 ## Current Position
 
-Phase: 9 (Spike transposition jcode mémoire+swarm) — milestone memory-swarm-rnd
-Plan: spike GO → ADR-052 validé → implémenté (consolidator v1.6.0, pilier 5 mémoire vivante)
-Status: Implémenté + revue de code passée (27 tests decay + 17 non-régression) — non shippé
-Last activity: 2026-07-22
+Phase: 14 (Frontière d'altitude planning-core / moteur GSD — rescope de `vf-planning`) — milestone vf-routing
+Plan: 14-01 → 14-07 livrés (branche `feat/rescope-vf-planning-alti`), release v2.29.0 commitée. Spec + plan détaillé :
+`docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`,
+`docs/superpowers/plans/2026-07-25-rescope-vf-planning-gsd.md`.
+Status: Complete — 7/7 plans livrés, tag à poser après merge
+Last activity: 2026-07-25
 
-Progress: [██████████] 100% (implémenté, non shippé)
+Tests : 92 assertions vertes, 0 échec (detect-gsd-engine 12, detect-planning-debt 10,
+context-hardening 20, planning-core 14, planning-hooks 38). `check-agents.sh` OK.
+
+Note : Phase 12 en cours (12-01 livré, 12-02→12-06 restants), Phase 13 non cadrée, Phase 14 indépendante des deux.
+Milestone `gsd-migration` (Phases 10-11) reste ouvert et **en attente** — chantier indépendant, non bloquant.
+Milestone précédent memory-swarm-rnd **SHIPPÉ v2.28.0** (ADR-052 mémoire vivante + ADR-053 swarm).
+
+Progress: [██████░░░░] 62% (3 phases, 8/13 plans livrés)
 
 ## Performance Metrics
 
@@ -61,6 +70,21 @@ Progress: [██████████] 100% (implémenté, non shippé)
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- 2026-07-25 : Milestone **gsd-migration** créé (VOC-02 promu). Phase 10 (Étude & faisabilité migration GSD)
+  + Phase 11 (Intégration, GATE Phase 10) ajoutées à la feuille de route. Requirements GSDM-01..06.
+- 2026-07-25 : Milestone **vf-routing** créé. Phase 12 (Routage fin & couverture complète des verbes `/vf-*`)
+  + Phase 13 (Pont spec → feuille de route, `/vf-ingest`) ajoutées. Requirements VERB-01..05, BRDG-01..03.
+  Devient le milestone actif ; `gsd-migration` reste ouvert en attente (chantiers indépendants).
+- 2026-07-25 : **Phase 14** (Frontière d'altitude planning-core / moteur GSD) ajoutée au milestone vf-routing.
+  Constat déclencheur : `vf-planning` et la chaîne GSD produisaient les mêmes fichiers dans le même dossier
+  avec des frontmatters **incompatibles** (`planning_version` vs `gsd_state_version`) — deux moteurs de
+  planning concurrents. Décision : ADR-055, frontière d'altitude (un projet = un seul moteur ; VibeFlow tient
+  le lab et l'enforcement). Requirements ALTI-01..05, 6 plans sur 4 vagues, indépendante des Phases 12 et 13.
+- 2026-07-25 : compteurs de `progress` corrigés — ils affichaient `total_plans: 0` alors que la Phase 12
+  comptait déjà 6 plans dont 1 livré (12-01). Réel : 12 plans posés (6 en Phase 12, 6 en Phase 14), 1 livré.
+
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
@@ -84,11 +108,11 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+- Cadrer la Phase 10 (`/gsd:discuss-phase 10`) : inventaire surface d'impact GSD + caractérisation `@opengsd/gsd-core`.
 
 ### Blockers/Concerns
 
-- Migration package GSD `get-shit-done-cc` → `@opengsd/gsd-core` à surveiller (v2, VOC-02).
+- Migration package GSD `get-shit-done-cc` → `@opengsd/gsd-core` : désormais **milestone actif `gsd-migration`** (VOC-02). Le go/no-go de la Phase 10 dépend de la maturité/parité du package cible sur npm — à vérifier en premier.
 
 ## Deferred Items
 

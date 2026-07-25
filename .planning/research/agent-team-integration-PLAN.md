@@ -1,14 +1,14 @@
-# Plan d'intégration — « équipe d'agents » (revizapp) → VibeFlow-os
+# Plan d'intégration — « équipe d'agents » (projet source) → VibeFlow-os
 
-> Compagnon de `agent-team-spec-revizapp.md` (la ressource source) et de l'évaluation associée.
+> Compagnon de `agent-team-spec.md` (la ressource source) et de l'évaluation associée.
 > Date : 2026-07-07. Statut : **IMPLÉMENTÉ (2026-07-07)** — les 4 briques sont posées et vérifiées
 > (voir § État de réalisation en fin de document). Le module `mobile-test` reste **expérimental**
 > jusqu'à un run réel vert dans un contexte VibeFlow.
-> Périmètre validé par Samuel : les 4 briques ci-dessous. Rejeté : hiérarchie 7-agents, parité `.agent/`, contraintes de livraison revizapp.
+> Périmètre validé par Samuel : les 4 briques ci-dessous. Rejeté : hiérarchie 7-agents, parité `.agent/`, contraintes de livraison du client.
 
 ## ⚠️ Révision 2026-07-07 — une 5e brique manquait
 
-L'analyse du **code réel** de reviz (et non du seul spec) a révélé que ce plan avait **raté la
+L'analyse du **code réel** de projet source (et non du seul spec) a révélé que ce plan avait **raté la
 capacité centrale** : la **couche d'orchestration autonome** (le rôle `manager` + boucle
 test+fix), sans laquelle « fais la phase X en auto » ne va **pas** jusqu'au bout. Deux arguments
 de l'évaluation initiale étaient erronés (densité, doublon). Voir le cadrage dédié :
@@ -17,7 +17,7 @@ les pièces que la brique 5 composera.
 
 ## 0. Principe directeur
 
-On **n'importe pas** l'archi revizapp. On **extrait 4 capacités** et on les recâble selon les conventions VibeFlow (router-jamais-réimplémenter, ADR-029 densité, installeur scope-aware, modules toggables). Tout ce qui est spécifique à revizapp (bundle id, `.agent/`, `docs/_mission/`, `.dev`, livraison client) devient **config ou disparaît**.
+On **n'importe pas** l'archi du projet source. On **extrait 4 capacités** et on les recâble selon les conventions VibeFlow (router-jamais-réimplémenter, ADR-029 densité, installeur scope-aware, modules toggables). Tout ce qui est spécifique au projet source (bundle id, `.agent/`, `docs/_mission/`, `.dev`, livraison client) devient **config ou disparaît**.
 
 Ordre de valeur : **A (module mobile-test) > B (garde-fous) > cloisonnement > vf-decide.**
 
@@ -40,18 +40,18 @@ plugin/mobile-test/
 ├── CHANGELOG.md
 ├── SKILL.md                          # skill `vf-mobile-test` (porté de mobile-test-pipeline)
 ├── scripts/
-│   └── mobile-test-run.mjs           # porté de revizapp, dé-revizappisé
+│   └── mobile-test-run.mjs           # porté de projet source, dé-spécifié
 ├── config/
-│   └── mobile-test.example.json      # template de config (placeholders, pas de valeurs revizapp)
+│   └── mobile-test.example.json      # template de config (placeholders, pas de valeurs projet source)
 └── references/
     └── portability-notes.md          # les apprentissages durs (maestro/PATH, JAVA_HOME, expo run détaché…)
 ```
 
 ### Tâches de portage (le vrai travail — pas un copier-coller)
 1. **Dé-hardcoder le chemin de config.** Le script fait `CONFIG_PATH = join(ROOT, '.agent', 'config', 'mobile-test.json')`. VibeFlow n'a pas de `.agent/`. → Résolution en cascade : `--config <path>` > `$VF_MOBILE_TEST_CONFIG` > `./.vibeflow/mobile-test.json` > `./mobile-test.json`. Le script échoue avec un message clair + pointe vers `mobile-test.example.json` si rien trouvé.
-2. **Paramétrer toutes les valeurs projet.** `bundleIdBase`, `debugSuffix`, `android.avdName`, `ios.preferredSimulator`, `maestroFlowsDir`, `maestroBin`, `reportsDir` → tous dans la config, aucune valeur en dur. (Déjà le cas côté config revizapp ; à garantir côté code.)
-3. **Corriger la dette `.dev`.** Le SKILL.md revizapp dit « la cible réelle est `...revizapp.dev` » alors que le spec conclut `debugSuffix: ""` (README `.maestro` faux). → La doc portée ne mentionne le suffixe **que** comme concept piloté par `debugSuffix`, sans valeur en dur, sans exemple trompeur.
-4. **Neutraliser les chemins revizapp** dans le SKILL.md : `docs/_mission/test-runs` → `reportsDir` (config), `.agent/scripts/...` → `${module}/scripts/...` ou chemin résolu, retirer les noms de flows revizapp (`login_smoke`…) → exemples génériques.
+2. **Paramétrer toutes les valeurs projet.** `bundleIdBase`, `debugSuffix`, `android.avdName`, `ios.preferredSimulator`, `maestroFlowsDir`, `maestroBin`, `reportsDir` → tous dans la config, aucune valeur en dur. (Déjà le cas côté config projet source ; à garantir côté code.)
+3. **Corriger la dette `.dev`.** Le SKILL.md projet source dit « la cible réelle est `...projet source.dev` » alors que le spec conclut `debugSuffix: ""` (README `.maestro` faux). → La doc portée ne mentionne le suffixe **que** comme concept piloté par `debugSuffix`, sans valeur en dur, sans exemple trompeur.
+4. **Neutraliser les chemins projet source** dans le SKILL.md : `docs/_mission/test-runs` → `reportsDir` (config), `.agent/scripts/...` → `${module}/scripts/...` ou chemin résolu, retirer les noms de flows projet source (`login_smoke`…) → exemples génériques.
 5. **Retirer la section « Portabilité (livrable client) »** du SKILL (référence à la parité `.agent/`, hors périmètre) et la remplacer par un pointeur vers `references/portability-notes.md`.
 6. **Renommer le skill** `mobile-test-pipeline` → `vf-mobile-test` (cohérence des verbes `vf-*`), description en français, mention « Invocable par l'utilisateur ET par l'agent en autonomie », reframe vocabulaire.
 
@@ -59,14 +59,14 @@ plugin/mobile-test/
 Node, `maestro` (CLI), `xcrun simctl`/`adb`, un JDK (JAVA_HOME), Expo/RN côté projet, MCP `mobile-mcp` (diagnostic visuel, déjà dans l'environnement de Samuel). Le README liste ces pré-requis ; le script dégrade proprement si absents (message explicite).
 
 ### Vérification (avant de dire « intégré »)
-Le spec le signale : la boucle n'est validée que sur revizapp. → **Run réel** sur un projet mobile test (idéalement revizapp lui-même en pointant la config dessus) : `detect` → `run --platform ios` build-from-zero → rapport généré. Tant que ce run n'est pas vert, le module reste en statut « expérimental » dans le README.
+Le spec le signale : la boucle n'est validée que sur projet source. → **Run réel** sur un projet mobile test (idéalement projet source lui-même en pointant la config dessus) : `detect` → `run --platform ios` build-from-zero → rapport généré. Tant que ce run n'est pas vert, le module reste en statut « expérimental » dans le README.
 
 ---
 
 ## Brique 2 — Doctrine de garde-fous autonomes 🥈
 
 ### Objectif
-Rendre **toute** boucle autonome VibeFlow (`vf-auto`, et la boucle test du module mobile) sûre et non-tricheuse. Généralise la couche B de revizapp sans importer ses 3 agents.
+Rendre **toute** boucle autonome VibeFlow (`vf-auto`, et la boucle test du module mobile) sûre et non-tricheuse. Généralise la couche B de projet source sans importer ses 3 agents.
 
 ### Nature
 Une **référence** chargée on-demand + branchements légers. Pas de nouvel agent.
@@ -79,7 +79,7 @@ Une **référence** chargée on-demand + branchements légers. Pas de nouvel age
   4. **Séparation anti-triche** : qui écrit/modifie les tests ≠ qui corrige le code ; **jamais** affaiblir un assert pour « passer ». (Matérialisé par le cloisonnement d'outils — brique 3.)
   5. **Traçabilité** : commit atomique par correctif + rapport de synthèse (diff global) en fin de boucle.
 - **Modifier** `plugin/dev-orchestrator/skills/vf-auto/SKILL.md` — ajouter un renvoi : « En mode autonome non supervisé, applique `autonomous-guardrails.md`. » (le skill reste thin).
-- **Config** : réutiliser la forme de `night-run.json` de revizapp comme **schéma documenté** dans la référence (`maxWallClockMinutes`, `maxTokens`, `maxAttemptsPerFlow`, `revertOnRegression`) — le module mobile-test lira un `night-run.json` optionnel du projet.
+- **Config** : réutiliser la forme de `night-run.json` de projet source comme **schéma documenté** dans la référence (`maxWallClockMinutes`, `maxTokens`, `maxAttemptsPerFlow`, `revertOnRegression`) — le module mobile-test lira un `night-run.json` optionnel du projet.
 - **Bump** `dev-orchestrator` v1.1.0 → v1.2.0.
 
 ---
@@ -87,7 +87,7 @@ Une **référence** chargée on-demand + branchements légers. Pas de nouvel age
 ## Brique 3 — Convention de cloisonnement par outils 🥉
 
 ### Objectif
-Codifier le pattern de sécurité de revizapp comme **convention d'archi VibeFlow**, réutilisable pour tout futur agent, et support technique de l'anti-triche (brique 2).
+Codifier le pattern de sécurité de projet source comme **convention d'archi VibeFlow**, réutilisable pour tout futur agent, et support technique de l'anti-triche (brique 2).
 
 ### Règle
 - **Un juge n'écrit jamais** : un agent de revue/audit a `Read, Bash, Glob, Grep, Task` — **pas** de `Write`/`Edit`. (cf. `vibeflow-validator` qui est déjà un juge.)
@@ -133,7 +133,7 @@ Chaque brique livrée doit être **expliquée pour l'utilisateur**, en français
 1. **Cadrage + plan de sprint** de ce périmètre (brancher sur le vrai flux `vf-plan`).
 2. **Sprint 1 — Brique 3 + 4** (doc + skill thin, faible risque, rapide). Valide le moule.
 3. **Sprint 2 — Brique 2** (garde-fous : référence + branchement vf-auto).
-4. **Sprint 3 — Brique 1** (module mobile-test : portage + dé-revizappisation + README). Le plus gros.
+4. **Sprint 3 — Brique 1** (module mobile-test : portage + dé-dé-spécification + README). Le plus gros.
 5. **Vérification** : run réel du pipeline mobile ; recette conversationnelle ; audit `vibeflow-validator` (densité ADR-029, dette doc).
 6. **Bump versions** + CHANGELOG + éventuelle nouvelle milestone.
 
