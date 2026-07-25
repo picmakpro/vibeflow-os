@@ -601,3 +601,10 @@ exit 2 dédié, protocole de reprise documenté, geste humain assisté.
 - `plugin/planning-core/SKILL.md` (description rescopée + étape 0 + séquences A/B)
 - `plugin/planning-core/references/{gsd-handoff.md (nouveau), domain-detection.md}`
 - `plugin/commands/vf-planning.md`
+
+### Rules Associées
+
+- S'appuie sur ADR-031 (« jamais de fix sans validation humaine ») pour le cas migration : on avertit
+  et on propose, on ne réécrit pas un `.planning/` existant. Confirme ADR-050 (le `Stop` guard reste
+  bloquant, seule exception au retrait de `planning-core` du terrain projet) et ADR-040 (le 8e signal
+  de dette reste porté par `planning-core`, à l'altitude lab). Aucune rule nouvelle.

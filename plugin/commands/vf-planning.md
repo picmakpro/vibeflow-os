@@ -10,8 +10,9 @@ Le skill commence **toujours** par déterminer qui tient le planning de ce lab (
 - **lab non-dev** (contenu, vente, growth, design, dossier, recherche) → il pose ou maintient le
   tronc `.planning/` adapté au métier (`PROJECT`, `STATE` ★ clé de voûte, `ROADMAP`, etc.) — jamais
   une forme dev imposée ;
-- **lab dev** → il n'écrit **pas** le planning du projet : il tient l'altitude lab (index des
-  projets, typage des compartiments, pont mémoire, dette) et redirige vers le bon verbe.
+- **lab dev** → il n'écrit **pas** le planning du projet : il tient l'altitude lab — index des
+  projets et typage des compartiments si le lab en a plusieurs, pont mémoire, dette — et redirige
+  vers le bon verbe.
 
 Pour un projet de code : démarrage → `/vf-init`, état et avancement → `/vf-progress`, cadrage d'une
 étape → `/vf-plan`, comprendre l'existant → `/vf-map`.

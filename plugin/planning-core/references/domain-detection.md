@@ -42,14 +42,15 @@ deviner. Mieux vaut un profil léger + une question qu'un profil complet imposé
 La première ligne de la grille (« Code source, stack technique, tests, `src/`, build → Dev ») ne
 conduit **plus** à scaffolder un tronc `.planning/`. Elle reste une **lecture du métier** valide ;
 c'est sa **conséquence** qui change. Sur un lab dev, le planning du projet appartient au moteur de
-développement ; `vf-planning` tient l'altitude lab et redirige. Voir `gsd-handoff.md`.
+développement ; `vf-planning` tient l'altitude lab et redirige. Voir `references/gsd-handoff.md`.
 
 Ce que cela ne change pas : **le métier reste du jugement.** `scripts/detect-gsd-engine.sh` n'infère
 aucun métier — il constate un fait (« un moteur de planning est-il en place ? »). Ses signaux de code
 (`package.json`, `go.mod`, `*.xcodeproj`…) servent à déclencher un **examen**, jamais à rendre un
-verdict : un lab de contenu qui héberge un site web les déclenche, sort en **exit 2**, et **reste
-non-dev** — le jugement de cette référence tranche seul, et il conclut « contenu ». Le principe de
-cette référence est intact : on lit le sens du lab, pas sa surface.
+verdict : un lab de contenu qui héberge un site web les déclenche, sort en **exit 2** s'il porte déjà
+un socle de facture `planning-core` (**exit 3** sinon), et **reste non-dev dans les deux cas** — le
+jugement de cette référence tranche seul, et il conclut « contenu ». Le principe de cette référence
+est intact : on lit le sens du lab, pas sa surface.
 
 ## Auto-infusion à l'installation (bootstrap léger, universel)
 
