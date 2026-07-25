@@ -6,7 +6,7 @@
 
 | Artefact | Nature | Taille |
 |---|---|---|
-| `plugin/dev-orchestrator/references/intent-routing.md` | doctrine de routage, chargée on-demand | 159 L |
+| `plugin/dev-orchestrator/references/intent-routing.md` | doctrine de routage, chargée on-demand | 163 L |
 | `plugin/dev-orchestrator/rules/vf-verb-precedence.md` | rule globale Tier 1 (nouveau dossier `rules/`) | **40 L** (cap : 40) |
 | `.planning/phases/12-routage-fin-verbes/12-DESCRIPTION-TEMPLATE.md` | gabarit de description — artefact de planification, **non livré dans le module** | — |
 

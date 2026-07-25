@@ -42,6 +42,11 @@ C'est le **seul** mécanisme qui départage deux skills proches au matching. Un 
 nomme pas de verbe cible ne compte pas. La démarcation doit être **croisée** : si A repousse vers B,
 B repousse vers A.
 
+> **Une seule exception — la paire 6.** `/vf-audit` appartient au module `validator` et **ne doit pas
+> être modifié** (décision D-01). Sa réciprocité est assurée autrement : par la *chasse gardée* —
+> aucune description `/vf-*` ne capte l'intention d'audit de conformité du lab. Éditer
+> `plugin/commands/vf-audit.md` pour « croiser » la démarcation serait une violation de D-01.
+
 ### 3. Portée d'invocation
 
 Phrase conservée telle quelle, en fin de description :

@@ -2,7 +2,7 @@
 
 > **Rôle** : la table de correspondance complète entre ce que l'utilisateur formule, le verbe
 > VibeFlow qui porte cette intention, et la brique interne qui l'exécute. C'est le **seul** fichier
-> du module qui connaît la totalité des noms de skills internes.
+> du module qui **décide du routage** de la totalité des noms de skills internes.
 >
 > **Chargement on-demand** — comme `GSD-PIPELINE.md` et `mission-contracts.md`, ce fichier n'est
 > **pas** chargé en session normale. L'agent `vibeflow-dev` le consulte quand une intention ne tombe
@@ -159,5 +159,5 @@ une entrée manquante casse le routage : on préfère la première.
 
 - `rules/vf-verb-precedence.md` — la règle qui rend ce routage obligatoire.
 - `vocabulary-map.md` — le reframe à appliquer à toute sortie avant de la présenter.
-- `GSD-PIPELINE.md` — l'ordre canonique du cycle (quoi après quoi), et non plus quoi pour quelle intention.
+- `GSD-PIPELINE.md` — l'ordre canonique du cycle (quoi après quoi), et non pas quelle intention mène où.
 - `mission-contracts.md` — brief et rapport de mission quand le travail part à l'équipe.
