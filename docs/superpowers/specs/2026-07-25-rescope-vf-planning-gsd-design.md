@@ -128,7 +128,7 @@ satisfaire plusieurs situations à la fois :
 | 1 | `1` | Chaîne GSD absente de la machine | Aucun moteur disponible. Si le jugement métier dit « dev » → proposer l'amorçage via `/vf-init`, **ne pas** scaffolder un tronc dev à la main. Si non-dev → séquence universelle |
 | 2 | `0` | Chaîne GSD installée **et** `STATE.md` porte `gsd_state_version` | Moteur actif → **couche lab uniquement**, aucune génération de tronc |
 | 3 | `2` | Chaîne installée, `.planning/` de facture `planning-core` (`planning_version`), et des signaux de code sont présents | **Signalement de migration** → avertir et proposer, jamais réécrire (§3.4) |
-| 4 | `3` | Chaîne installée, pas de `.planning/` | Le jugement métier décide : dev → rediriger vers `/vf-init` ; non-dev → séquence universelle |
+| 4 | `3` | Chaîne installée, **aucun moteur en place** : pas de `.planning/`, ou un `.planning/` sans marqueur GSD et sans signal de code | Terrain libre — le jugement métier décide seul : dev → rediriger vers `/vf-init` ; non-dev → séquence universelle |
 
 Advisory : jamais bloquant, `|| true` en hook. Marqueur de détection = première clé du frontmatter
 de `STATE.md`, signal binaire et stable.
