@@ -176,6 +176,40 @@ else
   ko "T8 (CSL-16) registre à gros préambule faussement déclaré non conforme"
 fi
 
+# T10 — gouvernance proportionnée : --strict + EVALS absent
+#   a. profil léger (VF_LAB_PROFILE=leger) → warning, exit 0
+#   b. profil standard → registre canon manquant, exit 1 (comportement historique)
+M10="$WORK/t10"; mkdir -p "$M10"
+conforming_register "$M10/DECISIONS.md" "DEC"
+conforming_register "$M10/LEARNINGS.md" "LRN"
+conforming_register "$M10/BLOCKERS.md" "BLK"
+cat > "$M10/JOURNAL.md" <<'EOF'
+# Journal
+
+## Index
+
+| ID | Date | Titre | #Ligne | Resume |
+|----|------|-------|--------|--------|
+| Session 1 | 2026-07-01 | Init | 12 | Premiere session |
+
+---
+
+## Session 1 : Init
+
+Contenu.
+EOF
+OUT="$(VF_LAB_PROFILE=leger bash "$CHECK" --strict --memory-dir="$M10" 2>/dev/null)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "profil léger"; then
+  ok "T10a --strict + profil léger : EVALS absent → warning, exit 0"
+else
+  ko "T10a attendu exit 0 + warning profil léger (rc=$RC, out=${OUT:-<vide>})"
+fi
+if VF_LAB_PROFILE=standard bash "$CHECK" --strict --memory-dir="$M10" >/dev/null 2>&1; then
+  ko "T10b profil standard, EVALS absent accepté (devrait rester exigé)"
+else
+  ok "T10b --strict + profil standard : EVALS absent → exit 1 (historique)"
+fi
+
 # T9 (CSL-01) — '## Index' présent mais jamais refermé par '---' → exit 1 + message dédié
 M9="$WORK/t9"; mkdir -p "$M9"
 cat > "$M9/DECISIONS.md" <<'EOF'

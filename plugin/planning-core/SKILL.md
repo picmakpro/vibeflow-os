@@ -9,8 +9,9 @@ description: >
   propre plan », « remonte les décisions en mémoire », « qu'est-ce qui traîne sans plan ».
   ✘ PAS pour le planning d'un projet de code — la charte, la trajectoire, les exigences, l'état
   et les étapes d'un projet dev appartiennent au moteur de développement : démarrage →
-  `/vf-init`, état et avancement → `/vf-progress`, cadrage d'une étape → `/vf-plan`, comprendre
-  l'existant → `/vf-map`. Invocable par l'utilisateur ET par un agent en autonomie.
+  gsd-new-project (garde-fou first-use de l'agent vibeflow-dev), état et avancement →
+  gsd-progress, cadrage d'une étape → gsd-discuss-phase puis gsd-plan-phase, comprendre
+  l'existant → gsd-map-codebase. Invocable par l'utilisateur ET par un agent en autonomie.
 ---
 
 # vf-planning — Socle de planning & documentation universel
@@ -88,7 +89,7 @@ Avant toute autre chose, croiser **un fait** et **un jugement**.
 
    | Exit | Signification | Suite |
    |---|---|---|
-   | `1` | chaîne de dev absente de la machine | → si le métier est dev, proposer l'amorçage via `/vf-init` ; **ne jamais** scaffolder un tronc dev à la main |
+   | `1` | chaîne de dev absente de la machine | → si le métier est dev, proposer l'amorçage du projet (gsd-new-project via l'agent `vibeflow-dev`) ; **ne jamais** scaffolder un tronc dev à la main |
    | `0` | moteur de dev actif sur ce `.planning/` | → **Séquence B**, couche lab uniquement |
    | `2` | socle `planning-core` + code alentour | → juger le métier, puis protocole de migration (`references/gsd-handoff.md`) |
    | `3` | aucun moteur en place | → le jugement métier décide seul |
@@ -164,13 +165,18 @@ la table de redirection intention → verbe y vit, et ne se duplique pas ici.
 >   photographie la **baseline de session** (epoch, HEAD de départ, porcelain hashé).
 > - **UserPromptSubmit** : `planning-task-context.sh` injecte le `STATE.md` **du compartiment que vise la
 >   tâche** (jamais tous — structuration du contexte).
-> - **Stop** : `guard-planning-updated.sh` **bloque** si des livrables ont changé **pendant la session**
->   sans mise à jour du planning. L'attribution se fait contre la baseline (commits de la session via
+> - **Stop** : `guard-planning-updated.sh` signale (ou bloque) si des livrables ont changé **pendant la
+>   session** sans mise à jour du planning. **Sévérité proportionnée au profil de rigueur du lab**
+>   (gouvernance proportionnée, audit 2026-07-25) : le hook lit la clé `"profile"` de
+>   `.planning/config.json` (source canonique, posée à l'init — cf. `references/PROFILES.md`) —
+>   profil **léger** (lab solo/exploratoire) → **`warn` par défaut** (advisory, n'arrête jamais) ;
+>   profils **standard/complet** → **`block` par défaut** ; config absente ou profil illisible →
+>   `block` (fallback sûr). La variable `VF_PLANNING_STOP=block|warn|off` reste l'**override** et
+>   prime toujours sur le profil. L'attribution se fait contre la baseline (commits de la session via
 >   `git log --since`, dirt nouveau ou au hash modifié) — le dirt préexistant n'est JAMAIS attribué, un
 >   `STATE.md` mis à jour **puis committé** (flow GSD/dev-orchestrator) est bien reconnu, et le signal
 >   mtime couvre un `.planning/` gitignoré. Au pire **un seul blocage par session** (marqueur `.blocked`
->   + anti-boucle `stop_hook_active`), échappatoire `.session-noop`, baseline absente/périmée → fail-open,
->   toggle `VF_PLANNING_STOP=block|warn|off`.
+>   + anti-boucle `stop_hook_active`), échappatoire `.session-noop`, baseline absente/périmée → fail-open.
 
 ## Séquence B — Couche lab au-dessus du moteur de dev (lab dev)
 
@@ -212,7 +218,7 @@ la table de redirection intention → verbe y vit, et ne se duplique pas ici.
 - ❌ Réécrire ou convertir un `.planning/` existant pour « aligner le format » (ADR-031 : on avertit
   et on propose, l'utilisateur décide).
 - ❌ Répondre soi-même à une demande d'état ou d'avancement sur un lab dev, au lieu de rediriger
-  vers `/vf-progress`.
+  vers `gsd-progress`.
 
 ---
 

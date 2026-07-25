@@ -19,8 +19,17 @@
 | `phases/NN/VERIFICATION.md` | — | optionnel | ✅ |
 | Extension de domaine (`codebase/`, `editorial/`…) | — | optionnel | ✅ |
 | Gates (Nyquist, Decision Coverage…) | — | — | ✅ (cf. module `software-architecture`) |
+| Hook Stop « planning à jour » (`guard-planning-updated.sh`) | `warn` (advisory) | `block` | `block` |
 | `INDEX.md` (lab à compartiments) | ⚑ selon topologie | ⚑ selon topologie | ⚑ selon topologie |
 | `BOARD.md` (compartiment `continuous`) | ⚑ selon type | ⚑ selon type | ⚑ selon type |
+
+> **Où vit le profil, qui le lit** : la source canonique est la clé `"profile"` de
+> `.planning/config.json` (posée à l'init, miroir informatif dans le frontmatter de `STATE.md`).
+> Les garde-fous machine la lisent directement — le hook Stop `guard-planning-updated.sh` passe en
+> `warn` quand tous les `.planning/` du lab sont en profil `leger`, et reste en `block` sinon
+> (config absente ou illisible → `block`, fallback sûr). `VF_PLANNING_STOP=block|warn|off` prime
+> toujours (override manuel). La gouvernance est **proportionnée** : un lab solo/léger est averti,
+> jamais bloqué (audit 2026-07-25).
 
 > ⚑ **Axe orthogonal au profil : la topologie** (cf. `compartments.md`). `INDEX.md` apparaît dès que le
 > lab a plusieurs compartiments (steering lab). `BOARD.md` remplace `ROADMAP.md`+`MILESTONES` pour un

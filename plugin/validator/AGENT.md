@@ -23,7 +23,21 @@ skills:
 - Après chaque update Claude Code (snapshot infrastructure + diff)
 - Avant chaque release de module vibeflow-os (gate qualité)
 - Quand un agent semble "halluciner" ou "dériver" (premier suspect = densité, ADR-029)
-- Périodiquement (recommandé : 1× par mois pour les labs actifs)
+- Périodiquement — **cadence proportionnée au lab** : à chaque release ou gros jalon (le rythme
+  naturel d'un lab solo) ; mensuel pour les labs d'équipe actifs
+
+---
+
+## Gouvernance proportionnée au profil du lab
+
+L'ampleur de l'audit suit le **profil de rigueur** du lab (audit 2026-07-25) :
+
+- **Lecture du profil** : clé `"profile"` de `.planning/config.json` (source canonique posée par
+  `vf-planning` — `leger` | `standard` | `complet`). Config absente ou profil illisible → traiter
+  comme `standard` (comportement historique).
+- **Profil `leger`** : Phases 1-3 + 5 seulement. La **Phase 4 est sautée** (opt-in) — activable à la
+  demande explicite via `--full`.
+- **Profils `standard`/`complet`** ou invocation avec `--full` : les 5 phases.
 
 ---
 
@@ -88,7 +102,14 @@ Sortie : liste consolidée de la dette (par sévérité).
 
 **Action si dette critique** : proposer `/consolidate` interactive.
 
-### Phase 4 — Audit architecture des process
+### Phase 4 — Audit architecture des process (opt-in selon profil)
+
+**Exécutée si** le lab est en profil `standard`/`complet` **OU** sur demande explicite (`--full`).
+**En profil `leger`** : la phase est **sautée** — le rapport porte la ligne exacte
+« Phase 4 sautée (profil léger — activable via --full) » et le **score se calcule sur les phases
+réellement exécutées** (renormalisé — jamais de pénalité fantôme pour une phase non lancée).
+Rationale : un méta-audit d'architectures d'audit n'a pas de valeur pour un lab solo à 2-3 process ;
+il en a pour un lab d'équipe aux pipelines génératifs multiples.
 
 Délègue à `audit-architecture` (skill chargé via frontmatter). Mode **scan de lab** :
 
@@ -104,8 +125,9 @@ Sortie : liste des process sous-audités (par sévérité) + structure cible **p
 
 Génère rapport `reports/validator/YYYY-MM-DD-validator.md` avec :
 
-- Score global (0-100)
-- Findings par phase
+- Score global (0-100) — **calculé sur les phases exécutées uniquement** (une phase sautée par
+  profil est renormalisée hors du dénominateur, jamais comptée 0)
+- Findings par phase (une phase sautée est mentionnée comme telle, pas silencieuse)
 - Actions recommandées (par priorité)
 - Status `PASS` / `WARN` / `FAIL`
 
@@ -167,6 +189,8 @@ Rapport `reports/validator/YYYY-MM-DD-validator.md` :
 - Process énumérés : N
 - Process sous-audités : [liste + dimension manquante]
 - Structures cibles proposées : [résumé]
+<!-- En profil léger, cette section contient la seule ligne :
+     « Phase 4 sautée (profil léger — activable via --full) » -->
 
 ## Phase 5 — Recommandations
 1. [Action prioritaire]
@@ -174,7 +198,8 @@ Rapport `reports/validator/YYYY-MM-DD-validator.md` :
 ...
 
 ## Prochaine session
-Date prochain audit recommandé : YYYY-MM-DD (+30j)
+Prochain audit recommandé : à la prochaine release ou au prochain gros jalon (lab solo) ;
+YYYY-MM-DD (+30j) pour un lab d'équipe actif
 ```
 
 ---
