@@ -19,7 +19,9 @@ puis une **synthèse comparative** avec recommandation motivée.
 
 En coulisse, délègue au **mode advisor de `gsd-discuss-phase`** — c'est lui qui orchestre le
 panel de recherche décisionnelle (plusieurs advisors indépendants selon l'enjeu) et en
-consolide les résultats. On route vers le skill canonique, jamais vers un agent en direct.
+consolide les résultats. Depuis la conversation principale, on route vers ce skill canonique.
+(Exception assumée : en mission, `vf-dev-manager` dispatche les advisors en direct via Task —
+même mécanique de panel, sans re-passer par la couche skill.)
 
 ## Sortie attendue
 
