@@ -69,6 +69,32 @@ skip() { echo "  ⊘ SKIP $1"; skipped=$((skipped+1)); }
 # grep insensible à l'alias zsh (ugrep) : on force le binaire système.
 GREP="$(command -v grep)"
 
+# ---------------------------------------------------------------------------
+# Périmètre : les verbes /vf-* POSSÉDÉS par ce module (+ son compagnon design)
+# ---------------------------------------------------------------------------
+# En lab installé, `.claude/skills/` est PLAT et PARTAGÉ par tous les modules (conductor —
+# socle obligatoire —, validator, planning-core…). Auditer un verbe étranger produirait un KO chez
+# l'utilisateur pour un fichier qu'on ne peut pas corriger d'ici, et vert en source : le piège n° 1
+# déplacé d'un cran. La liste de propriété est la colonne « Verbe » de la doctrine de routage —
+# c'est le fichier du module qui déclare ce qu'il porte, elle se met donc à jour toute seule quand
+# un verbe est ajouté. (Une denylist des verbes des autres modules pourrirait au module suivant.)
+ROUTING="$REFS_DIR/intent-routing.md"
+OWNED_VERBS=""
+if [ -f "$ROUTING" ]; then
+  OWNED_VERBS=$("$GREP" -E '^\|' "$ROUTING" \
+    | "$GREP" -v -E '^\|[[:space:]]*-{2,}' \
+    | "$GREP" -v -iE '^\|[[:space:]]*Intention' \
+    | awk -F'|' '{print $3}' \
+    | "$GREP" -oE '/vf-[a-z0-9-]+' | sed 's|^/||' | sort -u | tr '\n' ' ')
+fi
+# Doctrine absente ou illisible : on retombe sur le comportement historique (tout auditer).
+# Ce n'est pas silencieux — T14 échoue déjà bruyamment dans ce cas.
+owned_verb() {
+  [ -z "$OWNED_VERBS" ] && return 0
+  case " $OWNED_VERBS " in *" $1 "*) return 0 ;; esac
+  return 1
+}
+
 echo "== test-dev-orchestrator (module: $MOD) =="
 
 # ---------------------------------------------------------------------------
@@ -223,6 +249,8 @@ checked=0
 for skill_md in "$MOD"/skills/vf-*/SKILL.md; do
   [ -f "$skill_md" ] || continue
   vfname="$(basename "$(dirname "$skill_md")")"
+  # En lab, skills/ est partagé : on n'audite que les verbes de ce chantier (voir OWNED_VERBS).
+  owned_verb "$vfname" || continue
   # Extrait toutes les cibles référencées dans le corps : gsd-X, brainstorming, ensure-deps.
   targets=$("$GREP" -Eo 'gsd-[a-z0-9-]+|brainstorming|ensure-deps' "$skill_md" | sort -u)
   if [ -z "$targets" ]; then
@@ -524,13 +552,18 @@ t12_desc=0
 for sm in "$MOD"/skills/vf-*/SKILL.md "$REPO"/design-orchestrator/skills/vf-*/SKILL.md; do
   [ -f "$sm" ] || continue
   vname="$(basename "$(dirname "$sm")")"
+  # Verbes des autres modules (conductor, validator, planning-core…) : hors périmètre, ils ne
+  # suivent pas ce gabarit et ne sont pas modifiables d'ici (D-01).
+  owned_verb "$vname" || continue
   d="$(verb_desc "$sm")"
   t12_desc=$((t12_desc+1))
   if echo "${d%%✘*}" | "$GREP" -qiE "$GUARD_RE"; then
     ko "T12 chasse gardée : $vname capte l'audit de conformité du lab (réservé à /vf-audit)"
     t12_fail=$((t12_fail+1))
   fi
-  if ! echo "$d" | "$GREP" -qE '✘.*/vf-[a-z0-9-]+'; then
+  # Le contre-exemple doit NOMMER un verbe : « ✘ … → /vf-… » dans le même segment (jusqu'au ✘
+  # suivant). Un ✘ de forme libre suivi n'importe où d'un /vf-… ne départage rien.
+  if ! echo "$d" | "$GREP" -qE '✘[^✘]*→[[:space:]]*/vf-[a-z0-9-]+'; then
     ko "T12 démarcation : $vname ne repousse aucune intention voisine (✘ … → /vf-…)"
     t12_fail=$((t12_fail+1))
   fi
@@ -576,7 +609,7 @@ fi
 # (b) Durcissement D-03 : toute cible portée par un VERBE dans intent-routing.md est réellement
 #     citée dans le corps de ce verbe. Sans ça, la table pourrait promettre un routage que le
 #     verbe ne fait pas. Les lignes « — (agent) » sont exclues : pas de verbe, délégation directe.
-ROUTING="$REFS_DIR/intent-routing.md"
+# ($ROUTING est défini en tête du script : c'est aussi la source de la liste de propriété.)
 t14_fail=0
 if [ ! -f "$ROUTING" ]; then
   ko "T14 exhaustivité : $ROUTING introuvable"; t14_fail=$((t14_fail+1))
