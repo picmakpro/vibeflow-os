@@ -1,5 +1,15 @@
 # BUNDLE — Manifeste métier GrowthFlow (growth / acquisition)
 
+> **⚑ Matérialisé le 2026-07-25** — ce document reste la **trace de conception** du bundle ;
+> le réel vit désormais dans `agents/` (équipe installable sur le team-kernel :
+> `vf-growth-manager` + `channel-strategist` / `copywriter-sequences` /
+> `campaign-analyst` + `growth-quality-judge`) et `skills/vf-growth/` (point d'entrée
+> métier). Les blueprints ci-dessous ne sont plus la voie d'instanciation primaire :
+> `vf-new-lab` installe le module et n'instancie plus à la main. Note de conception : le
+> `channel-strategist` opus-orchestrateur des blueprints (ADR-048) est recadré en **worker
+> sonnet** de stratégie canal/ICP — l'orchestration est portée par `vf-growth-manager`
+> (team-kernel) ; les décisions de kill/budget restent humaines.
+
 > **Fichier lu par `vf-new-lab`** (module `conductor`) pour instancier un lab growth complet.
 > Source de vérité du bundle : métier, profil planning, extension, vocabulaire, agents, modules,
 > et **flux d'instanciation**. Tout le reste du bundle (blueprints, extension-spec, registres) en découle.
