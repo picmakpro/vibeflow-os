@@ -168,24 +168,24 @@ Spec : `docs/superpowers/specs/2026-07-25-routage-fin-verbes-vf-design.md`.
 
 Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. ADR-054.
 
-- [ ] **ALTI-01**: `scripts/detect-gsd-engine.sh` répond au **fait** « un moteur de planning GSD est-il en
+- [x] **ALTI-01**: `scripts/detect-gsd-engine.sh` répond au **fait** « un moteur de planning GSD est-il en
   place ? » via 4 exits évalués par ordre de priorité (1 chaîne absente, 0 moteur actif, 2 migration à
   examiner, 3 terrain libre). Il **n'infère aucun métier** — les signaux de code déclenchent un examen, jamais
   un verdict ; 10 cas de test passent, dont la primauté du marqueur GSD sur les signaux de code.
-- [ ] **ALTI-02**: La description de `vf-planning` ne revendique plus aucune intention de projet dev
+- [x] **ALTI-02**: La description de `vf-planning` ne revendique plus aucune intention de projet dev
   (« feuille de route », « où en est-on ») et nomme ses voisins en contre-exemples (`/vf-init`,
   `/vf-progress`, `/vf-plan`, `/vf-map`) ; le SKILL porte une étape 0 de branchement (fait + jugement) et deux
   séquences — A (socle universel non-dev) et B (couche lab). Sur un lab dev, **aucun** artefact de projet
   (`PROJECT`, `ROADMAP`, `REQUIREMENTS`, `STATE`, `phases/`) n'est généré.
-- [ ] **ALTI-03**: La double injection `SessionStart` est terminée : le flag `--defer-to-gsd` (opt-in, câblé
+- [x] **ALTI-03**: La double injection `SessionStart` est terminée : le flag `--defer-to-gsd` (opt-in, câblé
   dans `hooks/hooks.json` uniquement) fait taire `check-planning-state.sh` et `planning-context.sh` sous
   moteur GSD. Le comportement **par défaut** de ces scripts est inchangé (usage manuel et `/checkpoint`
   intacts) et l'`INDEX.md` du lab reste injecté — c'est de l'altitude lab, GSD ne le produit pas.
-- [ ] **ALTI-04**: La doctrine est tracée et outillée : `references/gsd-handoff.md` (test unique, table
+- [x] **ALTI-04**: La doctrine est tracée et outillée : `references/gsd-handoff.md` (test unique, table
   intention → verbe, périmètre résiduel, protocole de migration), `domain-detection.md` amendé (le métier
   reste du jugement), commande `/vf-planning` alignée, ADR-054 au registre. `guard-planning-updated.sh` reste
   **bloquant** (exception motivée) et aucun `.planning/` existant n'est jamais réécrit (ADR-031).
-- [ ] **ALTI-05**: Non-régression prouvée : les 4 bundles non-dev (`content`, `business-pilot`, `growth`,
+- [x] **ALTI-05**: Non-régression prouvée : les 4 bundles non-dev (`content`, `business-pilot`, `growth`,
   `kpi-analyst`) passent par la séquence A sans changement, la suite de tests du module est verte,
   `check-agents.sh` OK, JSON valides ; release bumpée (module v2.4.0, racine v2.29.0) + **tag annoté poussé**
   (`scripts/check-release-tag.sh --remote` → ✓).
@@ -269,11 +269,11 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | BRDG-01 | Phase 13 | Not started |
 | BRDG-02 | Phase 13 | Not started |
 | BRDG-03 | Phase 13 | Not started |
-| ALTI-01 | Phase 14 | Not started |
-| ALTI-02 | Phase 14 | Not started |
-| ALTI-03 | Phase 14 | Not started |
-| ALTI-04 | Phase 14 | Not started |
-| ALTI-05 | Phase 14 | Not started |
+| ALTI-01 | Phase 14 | Complete |
+| ALTI-02 | Phase 14 | Complete |
+| ALTI-03 | Phase 14 | Complete |
+| ALTI-04 | Phase 14 | Complete |
+| ALTI-05 | Phase 14 | Complete |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓

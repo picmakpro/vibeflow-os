@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: vf-routing
 milestone_name: Routage fin & verbes VibeFlow
 status: in_progress
-stopped_at: "Phase 14 : plans 14-01→14-05 livrés (92 assertions vertes, check-agents OK), sur branche feat/rescope-vf-planning-alti. M1 tranché et corrigé (marqueur borné au frontmatter). 14-06 (release) EN ATTENTE DE VALIDATION HUMAINE : numéro de version + tag. Deux décisions ouvertes : démêler les commits Phase 12 de la branche, et traiter le trou vf-new-lab (hors périmètre de la phase)."
+stopped_at: "Phase 14 COMPLÈTE (7 plans) sur feat/rescope-vf-planning-alti — release v2.29.0 commitée, TAG NON POSÉ (à créer après merge sur main : git tag -a v2.29.0). Travail Phase 12 séparé sur feat/phase-12-verbes (12 commits, non cadré via discuss-phase 12). Backup de l'état mélangé : backup/mission-complete-20260725."
 last_updated: "2026-07-25"
 last_activity: 2026-07-25
 progress:
   total_phases: 3
   completed_phases: 0
-  total_plans: 12
-  completed_plans: 6
-  percent: 50
+  total_plans: 13
+  completed_plans: 8
+  percent: 62
 ---
 
 # Project State
@@ -26,11 +26,10 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 ## Current Position
 
 Phase: 14 (Frontière d'altitude planning-core / moteur GSD — rescope de `vf-planning`) — milestone vf-routing
-Plan: 14-01 → 14-05 livrés (branche `feat/rescope-vf-planning-alti`). 14-06 (release) non exécuté —
-`autonomous: false`. Spec + plan détaillé :
+Plan: 14-01 → 14-07 livrés (branche `feat/rescope-vf-planning-alti`), release v2.29.0 commitée. Spec + plan détaillé :
 `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`,
 `docs/superpowers/plans/2026-07-25-rescope-vf-planning-gsd.md`.
-Status: In progress — 5/6 plans, release en attente de validation humaine
+Status: Complete — 7/7 plans livrés, tag à poser après merge
 Last activity: 2026-07-25
 
 Tests : 92 assertions vertes, 0 échec (detect-gsd-engine 12, detect-planning-debt 10,
@@ -40,7 +39,7 @@ Note : Phase 12 en cours (12-01 livré, 12-02→12-06 restants), Phase 13 non ca
 Milestone `gsd-migration` (Phases 10-11) reste ouvert et **en attente** — chantier indépendant, non bloquant.
 Milestone précédent memory-swarm-rnd **SHIPPÉ v2.28.0** (ADR-052 mémoire vivante + ADR-053 swarm).
 
-Progress: [█░░░░░░░░░] 8% (3 phases, 1/12 plans livrés)
+Progress: [██████░░░░] 62% (3 phases, 8/13 plans livrés)
 
 ## Performance Metrics
 

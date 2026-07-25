@@ -8,7 +8,7 @@
 
 Dis _« aide-moi à dev cette feature »_ — et tout le pipeline se déclenche : cadrage → plan → exécution → tests → livraison. Sans jamais taper une commande technique ni savoir ce qui tourne en coulisse.
 
-[![Version](https://img.shields.io/badge/version-2.28.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.29.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-16-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -90,7 +90,7 @@ L'UX déroule :
 | **[consolidator](./plugin/consolidator/)** | `1.0.0` | skill + scripts | Consolidation de la mémoire structurée sur 4 piliers : indexation / archivage / fusion / promotion. |
 | **[skill-creator](./plugin/skill-creator/)** | `1.0.0` | agent + skills | Pattern « agent minimal + 2 skills composables » pour créer de nouveaux skills (base Anthropic + workflow). |
 | **[reference](./plugin/reference/)** | `2.3.1` | doc-only | Documentation méthodologique complète : VibeFlow Core (9 principes) + 12 patterns (dont le cloisonnement par outils) + 33 templates + 1 exemple de bout en bout. |
-| **[planning-core](./plugin/planning-core/)** | `1.1.0` | skill + references + scripts | Socle de planning & documentation universel : pose le tronc commun `.planning/` (PROJECT/STATE/ROADMAP/REQUIREMENTS/MILESTONES/phases), **adapté à la logique métier de chaque lab** — jamais imposé. Couche avant/présent, complémentaire des registres mémoire. Garde-fou de fraîcheur + détection métier + exemple non-dev. |
+| **[planning-core](./plugin/planning-core/)** | `2.4.0` | skill + references + scripts | Socle de planning & documentation du lab : pose le tronc commun `.planning/` d'un lab **non-dev** (PROJECT/STATE/ROADMAP/REQUIREMENTS/MILESTONES/phases), adapté à son métier — jamais imposé — et tient l'**altitude lab** partout : index des projets, compartiments typés, détection de dette, pont mémoire, fraîcheur machine-enforced. Sur un projet de code, le planning du projet appartient au moteur de développement : ce module redirige au lieu de produire un format concurrent (ADR-054). |
 | 📦 **[business-pilot-bundle](./plugin/business-pilot-bundle/)** | `1.0.0` | doc-only (bundle) | Bundle métier : châssis prêt pour piloter un business (3 blueprints commercial/delivery/finance + extension `business/` + registres canon). Instancié par `vf-new-lab`. |
 | 📦 **[content-bundle](./plugin/content-bundle/)** | `1.0.0` | doc-only (bundle) | Bundle métier : chaîne éditoriale brief→livrable→distribution (3 blueprints strategist/scriptwriter/repurposer + extension `editorial/` + gate clarté bloquant). Instancié par `vf-new-lab`. |
 | 📦 **[growth-bundle](./plugin/growth-bundle/)** | `1.0.0` | doc-only (bundle) | Bundle métier : growth/acquisition **organisé par canal** (3 blueprints channel-strategist/copywriter/analyst + extension `growth/channels/` + garde-fous RGPD). Instancié par `vf-new-lab`. |
@@ -195,6 +195,7 @@ Le routage repose sur un **index factuel auto-généré** depuis le frontmatter 
 | `v2.27.0` | 2026-07-20 | Guard planning par attribution de session (ADR-050 amendée) + durcissement global des hooks du harnais (29 findings corrigés, 282 checks verts) (planning-core, software-architecture, conductor) |
 | `v2.27.1` | 2026-07-20 | Gate agents fiabilisé (2e vague audit hooks conductor : parseur YAML, anti-trappe fail-closed, portée lab, filet debug-research) (conductor v1.11.3) |
 | `v2.28.0` | 2026-07-22 | R&D mémoire-swarm shippée (ADR-052/053) : consolidator **v1.6.0** pilier mémoire vivante (couche `knowledge/` fichier-par-entrée, décroissance par demi-vie de catégorie + supersession non destructive, `decay-pass.sh`) ; dev-orchestrator **v1.7.0** contrôle de flux swarm (lock de driver unique + DAG ready/blocked avec rendu `tree` + rapports de worker typés, résolution de scripts scope-robuste) ; conductor **v1.12.0** détection legacy scope-aware + nudge SessionStart ; mobile-test-team **v1.3.0** rapports typés ; fix engine uninstall (skills imbriqués + tests) |
+| `v2.29.0` | 2026-07-25 | Frontière d'altitude entre le planning VibeFlow et le moteur de planning de développement (ADR-054) : planning-core **v2.4.0** — `vf-planning` ne pose plus le tronc d'un projet de code (frontmatters `STATE.md` incompatibles, double injection `SessionStart`, concurrence au matching), il tient l'altitude lab et redirige vers le bon verbe ; nouveau `detect-gsd-engine.sh` (fait seul, 4 exits priorisés, marqueur borné au frontmatter), doctrine `references/gsd-handoff.md`, flag opt-in `--defer-to-gsd` sur deux hooks (défaut inchangé), guard Stop bloquant conservé en exception motivée ; `vf-new-lab` + routage conductor + 3 README réalignés |
 
 </details>
 

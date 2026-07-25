@@ -8,7 +8,7 @@
 
 Say _"help me build this feature"_ — and the whole pipeline kicks off: scoping → plan → execution → tests → delivery. Without ever typing a technical command or knowing what runs under the hood.
 
-[![Version](https://img.shields.io/badge/version-2.28.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.29.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-16-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -90,7 +90,7 @@ The UX walks you through:
 | **[consolidator](./plugin/consolidator/)** | `1.0.0` | skill + scripts | Structured-memory consolidation across 4 pillars: indexing / archiving / merging / promotion. |
 | **[skill-creator](./plugin/skill-creator/)** | `1.0.0` | agent + skills | The "minimal agent + 2 composable skills" pattern for creating new skills (Anthropic base + workflow). |
 | **[reference](./plugin/reference/)** | `2.3.1` | doc-only | Full methodology documentation: VibeFlow Core (9 principles) + 12 patterns (incl. tool-compartmentalization) + 33 templates + 1 end-to-end example. |
-| **[planning-core](./plugin/planning-core/)** | `1.1.0` | skill + references + scripts | Universal planning & documentation backbone: lays down the common `.planning/` trunk (PROJECT/STATE/ROADMAP/REQUIREMENTS/MILESTONES/phases), **adapted to each lab's domain** — never imposed. Forward/present layer, complementary to memory registries. Freshness guard + domain detection + non-dev example. |
+| **[planning-core](./plugin/planning-core/)** | `2.4.0` | skill + references + scripts | Lab planning & documentation backbone: lays down the common `.planning/` trunk of a **non-dev** lab (PROJECT/STATE/ROADMAP/REQUIREMENTS/MILESTONES/phases), adapted to its domain — never imposed — and holds **lab-level altitude** everywhere: project index, typed compartments, planning-debt detection, memory bridge, hook-enforced freshness. On a code project, the project planning belongs to the development engine: this module redirects instead of producing a competing format (ADR-054). |
 | 📦 **[business-pilot-bundle](./plugin/business-pilot-bundle/)** | `1.0.0` | doc-only (bundle) | Métier bundle: ready chassis to pilot a business (3 agent blueprints commercial/delivery/finance + `business/` extension + canon registries). Instantiated by `vf-new-lab`. |
 | 📦 **[content-bundle](./plugin/content-bundle/)** | `1.0.0` | doc-only (bundle) | Métier bundle: editorial chain brief→deliverable→distribution (3 blueprints strategist/scriptwriter/repurposer + `editorial/` extension + blocking clarity gate). Instantiated by `vf-new-lab`. |
 | 📦 **[growth-bundle](./plugin/growth-bundle/)** | `1.0.0` | doc-only (bundle) | Métier bundle: growth/acquisition **organized per channel** (3 blueprints channel-strategist/copywriter/analyst + `growth/channels/` extension + GDPR guardrails). Instantiated by `vf-new-lab`. |
@@ -195,6 +195,7 @@ Routing relies on a **factual index auto-generated** from the frontmatter of the
 | `v2.27.0` | 2026-07-20 | Session-attributed planning guard (ADR-050 amended) + global hardening of the harness hooks (29 findings fixed, 282 checks green) (planning-core, software-architecture, conductor) |
 | `v2.27.1` | 2026-07-20 | Hardened agent gate (2nd wave of the conductor hooks audit: YAML parser, fail-closed anti-bypass, lab scope, debug-research safety net) (conductor v1.11.3) |
 | `v2.28.0` | 2026-07-22 | Memory-swarm R&D shipped (ADR-052/053): consolidator **v1.6.0** living-memory pillar (per-entry `knowledge/` layer, category half-life decay + non-destructive supersession, `decay-pass.sh`); dev-orchestrator **v1.7.0** swarm control-flow (single-driver lock + ready/blocked DAG with `tree` render + typed worker reports, scope-robust script resolution); conductor **v1.12.0** scope-aware legacy detection + SessionStart nudge; mobile-test-team **v1.3.0** typed reports; engine uninstall fix (nested skills + tests) |
+| `v2.29.0` | 2026-07-25 | Altitude boundary between VibeFlow planning and the development planning engine (ADR-054): planning-core **v2.4.0** — `vf-planning` no longer lays down a code project's trunk (incompatible `STATE.md` frontmatters, duplicated `SessionStart` injection, semantic-matching collision), it now holds lab-level altitude and redirects to the right verb; new `detect-gsd-engine.sh` (fact-only, 4 prioritized exits, frontmatter-bounded marker), `references/gsd-handoff.md` doctrine, opt-in `--defer-to-gsd` on two hooks (default behavior unchanged), blocking Stop guard kept as a motivated exception; `vf-new-lab` + conductor routing + 3 READMEs realigned |
 
 </details>
 
