@@ -101,6 +101,9 @@ Recent decisions affecting current work:
   content-bundle matérialisé `proposable:true`, pipelining N/N+1, lab express, ADR-057.
   Prolongé par **v2.35.0** : growth-bundle et business-pilot-bundle matérialisés à leur tour
   (quality-gate-client livré) — les 3 bundles métier sont réels, promesse multi-métier tenue.
+  **v2.36.0** : recettes UAT réelles sur labs vierges (express ~11 min 30 ✓ ; protocole de
+  mission exécutable par un agent tiers ✓) — 16 frictions corrigées, job CI « lab frais »
+  (la baseline doit passer ses propres gates depuis un lab vierge).
 
 - [Phase 1]: D4 — index 100% auto-généré, ordre pipeline documenté dans l'agent.
 - [Phase 1]: D3 — install auto des deps, init projet sur confirmation seulement.
