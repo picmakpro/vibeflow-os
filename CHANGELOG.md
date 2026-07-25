@@ -5,6 +5,16 @@ dernières entrées et pointent ici). Chaque module a par ailleurs son propre `C
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.36.1] — 2026-07-26
+
+**Refonte vitrine des README** (FR+EN), inspirée d'ECC (spécificité, tables) et GSD (accroche
+par le problème) : dev-first, 3 diagrammes mermaid (cycle spec-driven, équipe de mission avec
+rapports typés et nœud gelé, architecture kernel/orchestrateurs/gouvernance), efficience
+chiffrée et mémoire en avant, tableau des 17 modules replié en `<details>`. Corrections :
+note « bundles WIP » périmée, Hub kpi-analyst adouci, handle GitHub de Samuel. Gate :
+`check-version-sync` invariant n°7 — l'historique README en tête doit être la VERSION
+courante (c'est lui qui a exigé cette entrée).
+
 ## [v2.36.0] — 2026-07-26
 
 **Recettes réelles (UAT) sur labs vierges + corrections** — deux labs sandbox installés par le

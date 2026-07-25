@@ -10,7 +10,7 @@
 intent, runs the pipeline (scoping → plan → execution → proof), and **machine gates** verify —
 not promises.
 
-[![Version](https://img.shields.io/badge/version-2.36.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.36.1-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -214,9 +214,9 @@ Full history: **[CHANGELOG.md](./CHANGELOG.md)** — the README keeps the last 3
 
 | Version | Date | Change |
 |---------|------|--------|
+| `v2.36.1` | 2026-07-26 | README storefront overhaul: dev-first, 3 mermaid diagrams (spec-driven cycle, mission team, architecture), efficiency/memory upfront, collapsed module table — plus a new gate invariant: the top history entry must match the current VERSION. |
 | `v2.36.0` | 2026-07-26 | Real-world UAT on blank labs (express mode ✓ under 15 min; mission protocol executable by a third-party agent ✓) — 16 frictions fixed, `human_needed` doctrine settled (freeze the node), new "fresh lab" CI job: the baseline must pass its own gates from a blank install. |
 | `v2.35.0` | 2026-07-25 | The multi-domain promise delivered: all 3 métier bundles are real modules (content / growth / business-pilot v2.0.0, full teams on the team-kernel, read-only judges with eliminatory criteria, `quality-gate-client` shipped). |
-| `v2.34.0` | 2026-07-25 | Universalization: transverse team-kernel (conductor), design mission team (first non-dev instantiation), N/N+1 pipelining in the DAG, express lab mode (≤ 15 min, Gate C intact), ADR-057 tooled boundaries with third-party bricks. |
 
 <details>
 <summary><strong>Methodology references (ADR / LRN)</strong></summary>
