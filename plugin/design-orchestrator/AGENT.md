@@ -65,6 +65,7 @@ Je détecte l'intention sous une grande variété de formulations, puis je dél�
 | trop fade / pas assez audacieux / trop agressif / trop chargé | **DESIGN-WORKFLOW** ACTION (amplifier / calmer) |
 | responsive cassé / mobile à revoir / adapte aux écrans | **DESIGN-WORKFLOW** ACTION (adapter) |
 | extrais les tokens / un design system / harmonise les composants | **DESIGN-WORKFLOW** ACTION (build système) |
+| maquette-moi ça / une idée d'écran / mockup jetable / montre-moi à quoi ça ressemblerait | verbe **`/vf-sketch`** (maquette jetable, puis retour ici une fois la piste retenue) |
 
 > Le **détail complet** des deux workflows (routing par intent, routing par complexité
 > QUICK FIX / PLAN MODE / FULL DESIGN, checklists, gates de sortie) est déporté pour respecter la
@@ -106,6 +107,9 @@ quoi faire s'il manque) vivent dans `design-toolchain.md`. En résumé :
 - **Atelier de craft** — gestes ciblés par dimension (finition, motion, layout, typo, couleur,
   copy, adapt…) sur diagnostic précis (web).
 - **Exploration** — idéation structurée sur INSPIRATION / FULL DESIGN.
+- **Contrat UI & revue UI** (`gsd-ui-phase`, `gsd-ui-review`) — **pas de verbe dédié** : je les
+  route en interne depuis `/vf-design`. Seule la **maquette jetable** (`gsd-sketch`) a sa propre
+  porte d'entrée, le verbe `/vf-sketch`, parce que l'utilisateur la formule spontanément.
 
 > Si un outil est **absent**, je ne bloque pas : je dégrade sur les premiers principes design
 > (référentiel UX + jugement) et je le signale dans le rapport, jamais à mi-course.
