@@ -5,6 +5,9 @@
 > Gestion : lire l'index d'abord, charger le détail d'une ADR seulement si nécessaire.
 > Les ADR antérieures à ce registre (ADR-001 → ADR-045) prédatent sa création : leur trace
 > vit dans les CHANGELOG des modules, les rules et les specs (`docs/superpowers/specs/`).
+> Les plus citées d'entre elles ont désormais une **définition canonique** ci-dessous
+> (section « ADR héritées ») — audit 2026-07-25 : 325 citations sans définition, et un
+> même identifiant (ADR-031) qui portait deux doctrines. La scission est actée en ADR-056.
 
 ---
 
@@ -22,6 +25,25 @@
 | ADR-053 | 2026-07-22 | Volet swarm — lock de driver unique + DAG ready/blocked + rapports de worker typés | Validée |
 | ADR-054 | 2026-07-23 | Portabilité Windows — normalisation CRLF, préflight, gardes réellement actives, gate de synchro versions | Validée (2 rapports terrain intégrés) |
 | ADR-055 | 2026-07-25 | Frontière d'altitude entre planning-core et le moteur de planning GSD — un projet = un seul moteur | Validée |
+| ADR-056 | 2026-07-25 | Vigilance support runtime (scission du double emploi d'ADR-031) | Validée |
+
+### ADR héritées les plus citées (définitions canoniques)
+
+| ID | Titre canonique |
+|----|-----------------|
+| ADR-029 | Charte densité : agents ≤ 250 lignes, skills ≤ 500, bootstrap ≤ 2000 tokens |
+| ADR-030 | Architecture skills (révisée) : déléguer aux skills outillés, ne jamais réimplémenter |
+| ADR-031 | Jamais de fix / suppression / matérialisation sans validation humaine |
+| ADR-032 | Consolidation mémoire : registres indexés, 4 piliers (indexation / archivage / fusion / promotion) |
+| ADR-036 | Doctrine d'architecture d'audit : tout process générateur a une structure d'audit multi-couches |
+| ADR-037 | Gate Nyquist de vérification réelle ; fusion feature-dev-gates → software-architecture |
+| ADR-040 | Dette de planning = 8e signal de dette, porté par planning-core à l'altitude lab |
+| ADR-044 | Agents natifs machine-enforced : `check-agents.sh` (description + model + memory requis, `vf-internal`) |
+| ADR-045 | Recherche documentaire AVANT tout debug intensif (lib/framework/natif/version, ou 1er fix échoué) |
+
+> Ces définitions sont la référence en cas de doute ; le détail historique vit dans les
+> CHANGELOG des modules et `docs/superpowers/specs/`. **ADR-031 ne désigne QUE la validation
+> humaine** — l'ancien second emploi (« vigilance support runtime ») est ADR-056.
 
 ---
 
@@ -706,3 +728,33 @@ exit 2 dédié, protocole de reprise documenté, geste humain assisté.
   bloquant, seule exception au retrait de `planning-core` du terrain projet) et ADR-040 (le 8e signal
   de dette reste porté par `planning-core`, à l'altitude lab). Aucune rule nouvelle.
 
+
+---
+
+## ADR-056 : Vigilance support runtime (scission du double emploi d'ADR-031)
+
+**Date** : 2026-07-25 · **Statut** : Validée
+
+### Contexte
+
+L'audit du 2026-07-25 a révélé qu'**ADR-031 portait deux doctrines incompatibles** selon les
+fichiers : « jamais de fix sans validation humaine » (CLAUDE.md, conductor, validator,
+vf-decide…) et « vigilance support runtime » (VIBEFLOW_CORE v4.1 §3.2, infrastructure-audit,
+templates frontmatter). 325 citations, zéro définition : toute référence était ambiguë.
+
+### Décision
+
+- **ADR-031 ne désigne QUE la validation humaine** : détecter et proposer, jamais corriger /
+  supprimer / matérialiser sans feu vert explicite de l'humain.
+- **ADR-056 reprend la vigilance support runtime** : avant d'inventer une convention
+  (frontmatter, hook, mécanisme de chargement), **vérifier que le runtime Claude Code la
+  supporte réellement** — une convention non supportée crée une illusion de structure qui ne
+  s'exécute pas. Corollaires : `skills:` en liste plate native (pas de champ deprecated
+  `bootstrap_skills`/`on_demand_skills`), croiser toute convention avec la doc officielle,
+  re-vérifier après chaque update Claude Code (module infrastructure-audit).
+
+### Conséquences
+
+Les emplois « runtime » d'ADR-031 sont réécrits en ADR-056 dans : VIBEFLOW_CORE.md,
+infrastructure-audit (SKILL, README, références), templates lead/CLAUDE/agent_anatomy,
+validator. Les CHANGELOG historiques conservent l'ancienne numérotation.

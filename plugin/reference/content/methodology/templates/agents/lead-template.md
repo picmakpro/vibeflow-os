@@ -59,7 +59,7 @@ Tu es le chef d'orchestre du projet. Tu planifies, coordonnes les sub-agents, ar
 | `skill-creator` | on-demand | besoin de creer/iterer un skill projet |
 | `agent-density-auditor` | on-demand | audit densite agents (ADR-029) avant commit `.claude/agents/*.md` |
 
-> Le Lead est volontairement **sans bootstrap contextuel** : il doit rester pur orchestrateur (ADR-030). L'expertise domaine vit dans les sub-agents et Gardiens qu'il invoque. Le frontmatter ci-dessus suit la convention Claude Code native (`skills:` flat, ADR-031) — pas de `bootstrap_skills` ni `on_demand_skills` declares en YAML.
+> Le Lead est volontairement **sans bootstrap contextuel** : il doit rester pur orchestrateur (ADR-030). L'expertise domaine vit dans les sub-agents et Gardiens qu'il invoque. Le frontmatter ci-dessus suit la convention Claude Code native (`skills:` flat, ADR-056) — pas de `bootstrap_skills` ni `on_demand_skills` declares en YAML.
 
 # Routing des escalations sub-agent
 

@@ -1,13 +1,13 @@
 ---
 name: infrastructure-audit
-description: Audit automatique de l'infrastructure technique d'un lab VibeFlow (Claude Code runtime, hooks lifecycle, scripts, drift Anthropic). Detecte les regressions apres mise a jour Claude Code ou conventions Anthropic. Genere un INFRASTRUCTURE_SNAPSHOT.md date pour comparaison delta. Utiliser ce skill au /vf-audit, apres mise a jour Claude Code, ou via hook SessionStart periodique (>14j depuis dernier audit). Reference ADR-031 + ADR-032 + LRN-106.
+description: Audit automatique de l'infrastructure technique d'un lab VibeFlow (Claude Code runtime, hooks lifecycle, scripts, drift Anthropic). Detecte les regressions apres mise a jour Claude Code ou conventions Anthropic. Genere un INFRASTRUCTURE_SNAPSHOT.md date pour comparaison delta. Utiliser ce skill au /vf-audit, apres mise a jour Claude Code, ou via hook SessionStart periodique (>14j depuis dernier audit). Reference ADR-056 + ADR-032 + LRN-106.
 ---
 
 # Skill : Infrastructure Audit — Garde-fou technique des labs
 
 > **Iron Law** : *"Une infrastructure non auditee est une infrastructure qui derive silencieusement."*
 >
-> **Reference** : ADR-031 (vigilance support runtime) + ADR-032 (consolidation memoire) + LRN-106 (audit avant fix)
+> **Reference** : ADR-056 (vigilance support runtime) + ADR-032 (consolidation memoire) + LRN-106 (audit avant fix)
 
 ---
 
@@ -18,7 +18,7 @@ Anthropic met a jour Claude Code regulierement. Des conventions changent (hooks 
 1. **Hooks qui ne s'executent plus** (nouvel evenement lifecycle ajoute, ancien deprecated)
 2. **Scripts qui plantent** silencieusement (regex devenue obsolete, format settings.json change)
 3. **Tools natifs disparus** (ex : Read offset/limit retire, Skill tool refactored)
-4. **Conventions inventees** qui semblent marcher mais ne sont pas supportees (ADR-031 — toujours verifier le support runtime)
+4. **Conventions inventees** qui semblent marcher mais ne sont pas supportees (ADR-056 — toujours verifier le support runtime)
 
 Ce skill orchestre un audit en 4 axes complementaires.
 
@@ -259,7 +259,7 @@ Le flag `--if-older-than=14d` evite de lancer l'audit a chaque session (cher). L
 - `references/hooks-contract.md` — axe 2
 - `references/scripts-integrity.md` — axe 3
 - `references/snapshot-format.md` — axe 4
-- ADR-031 — vigilance support runtime
+- ADR-056 — vigilance support runtime
 - ADR-032 — consolidation memoire
 - LRN-106 — audit avant fix
 - Anthropic doc Claude Code hooks : https://docs.claude.com/en/docs/claude-code/hooks
