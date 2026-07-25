@@ -8,7 +8,7 @@ description: >
   ✘ pas pour réaligner la **structure** d'un lab sur une doctrine qui a évolué, une fois la
   nouvelle version posée → /vf-calibrate · ✘ pas pour ajouter, retirer ou re-choisir des
   modules → /vibeflow-install · ✘ pas pour mettre à jour la documentation d'un projet →
-  /vf-docs.
+  gsd-docs-update.
   Invocable par l'utilisateur ET par `vibeflow-conductor`.
 ---
 
@@ -77,4 +77,5 @@ prochain démarrage de session.
   cadrés). ADR-031.
 - **Best-effort réseau** : une détection impossible n'est jamais une erreur bloquante.
 - **Ne jamais downgrader** : l'engine saute les modules déjà à jour (comparaison de version).
-- Parle du **plugin VibeFlow**, jamais de la plomberie interne (GSD/Superpowers).
+- Périmètre : le **plugin VibeFlow** et ses modules. La chaîne d'outils interne (GSD/Superpowers)
+  a sa propre mise à jour (`gsd-update`) — hors périmètre de ce skill.

@@ -26,8 +26,13 @@
 #     session, même après un nouveau message utilisateur (stop_hook_active retombe à false).
 #   - baseline absente / illisible / périmée (>48h) → fail-open (jamais de blocage à l'aveugle).
 #   - échappatoire `.session-noop` (racine ou dans un .planning/, one-shot) ;
-#     toggle VF_PLANNING_STOP = block (défaut) | warn | off.
+#     toggle VF_PLANNING_STOP = block | warn | off (override — prime sur le profil).
 #   - > 400 entrées porcelain → attribution working-tree abandonnée (fail-open partiel).
+# MODE PAR DÉFAUT PROPORTIONNÉ AU PROFIL (audit 2026-07-25, gouvernance proportionnée) :
+#   sans VF_PLANNING_STOP, le profil de rigueur du lab décide — lu dans la clé "profile" de
+#   <.planning>/config.json (source canonique posée par vf-planning, cf. PROFILES.md) :
+#   "leger" → warn (advisory) · "standard"/"complet" → block · config absente ou profil
+#   illisible → block (fallback sûr). Plusieurs .planning : un seul profil non-léger → block.
 # Fail-open partout : toute condition non réunie ou toute erreur → exit 0 (autorise l'arrêt).
 set -uo pipefail
 
@@ -38,7 +43,7 @@ case "$INPUT" in
   *'"stop_hook_active": true'*|*'"stop_hook_active":true'*) exit 0 ;;
 esac
 
-MODE="${VF_PLANNING_STOP:-block}"
+MODE="${VF_PLANNING_STOP:-}"
 [ "$MODE" = "off" ] && exit 0
 
 # --- Doit être un repo git (sinon on ne sait pas ce qui a changé → pas de trappe) ---
@@ -50,6 +55,29 @@ cd "$TOP" 2>/dev/null || exit 0
 # --- Un socle .planning/ doit exister (lab amorcé) — recherche bornée (Stop tourne à chaque tour) ---
 PLANNING_DIRS=$(find . -maxdepth 4 \( -name .git -o -name node_modules \) -prune -o -type d -name .planning -print 2>/dev/null | head -20)
 [ -n "$PLANNING_DIRS" ] || exit 0
+
+# --- Mode effectif : override env > profil du lab > block (fallback sûr) ---
+# Sans VF_PLANNING_STOP, la clé "profile" de <.planning>/config.json décide :
+# tous les profils lus valent "leger" → warn ; un seul non-léger, ou aucun profil
+# lisible → block. Proportionne le garde au profil sans rien changer aux overrides.
+if [ -z "$MODE" ]; then
+  MODE="block"
+  while IFS= read -r d; do
+    [ -n "$d" ] || continue
+    cfg="$d/config.json"
+    [ -f "$cfg" ] || continue
+    prof=$(sed -n 's/.*"profile"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$cfg" 2>/dev/null | head -1)
+    [ -n "$prof" ] || continue
+    if [ "$prof" = "leger" ]; then
+      MODE="warn"
+    else
+      MODE="block"
+      break
+    fi
+  done <<EOF
+$PLANNING_DIRS
+EOF
+fi
 
 # --- Échappatoire : marqueur « rien à noter » (consommé, one-shot) ---
 consume_marker() { if [ -f "$1" ]; then rm -f "$1" 2>/dev/null || true; return 0; fi; return 1; }
@@ -208,7 +236,7 @@ ATTRIBUTED=$(printf '%s\n' "$deliverables" | grep -v '^$' | sort -u || true)
 NB=$(printf '%s\n' "$ATTRIBUTED" | grep -c . || true)
 SAMPLE=$(printf '%s\n' "$ATTRIBUTED" | head -3 | tr '\n' ' ' | sed 's/ $//')
 
-REASON="⛔ Planning non mis à jour : $NB livrable(s) ont changé PENDANT cette session ($SAMPLE) sans aucune mise à jour d'un .planning/. Mets à jour le STATE.md du compartiment concerné (état, ce qui vient d'être livré, prochaines étapes — Phase 7 de la boucle de mission), puis termine. Si vraiment rien à noter : crée le marqueur .planning/.session-noop. Ce garde ne bloquera plus cette session. Toggles : VF_PLANNING_STOP=warn|off."
+REASON="⛔ Planning non mis à jour : $NB livrable(s) ont changé PENDANT cette session ($SAMPLE) sans aucune mise à jour d'un .planning/. Mets à jour le STATE.md du compartiment concerné (état, ce qui vient d'être livré, prochaines étapes — Phase 7 de la boucle de mission), puis termine. Si vraiment rien à noter : crée le marqueur .planning/.session-noop. Ce garde ne bloquera plus cette session. Toggles : VF_PLANNING_STOP=warn|off (profil léger dans .planning/config.json → warn par défaut)."
 
 if [ "$MODE" = "warn" ]; then
   echo "[planning-guard] $REASON"                # advisory : n'arrête pas

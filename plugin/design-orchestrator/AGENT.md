@@ -107,7 +107,7 @@ quoi faire s'il manque) vivent dans `design-toolchain.md`. En résumé :
 - **Atelier de craft** — gestes ciblés par dimension (finition, motion, layout, typo, couleur,
   copy, adapt…) sur diagnostic précis (web).
 - **Exploration** — exploration structurée de directions visuelles sur INSPIRATION / FULL DESIGN
-  (jamais « idéation » : ce label appartient au verbe `/vf-explore`, module dev).
+  (jamais « idéation » : ce label désigne le geste dev `gsd-explore`, hors périmètre design).
 - **Contrat UI & revue UI** (`gsd-ui-phase`, `gsd-ui-review`) — **pas de verbe dédié** : je les
   route en interne depuis `/vf-design`. Seule la **maquette jetable** (`gsd-sketch`) a sa propre
   porte d'entrée, le verbe `/vf-sketch`, parce que l'utilisateur la formule spontanément.

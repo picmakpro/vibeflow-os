@@ -1,5 +1,10 @@
 # CHANGELOG — consolidator
 
+## [v1.7.0] — 2026-07-25
+
+### Ajouté
+- `check-registres.sh --strict` proportionné au profil : EVALS absent = warning en profil léger (exigé sinon). Cadences reformulées : à la release / au jalon (labs solo), mensuel/trimestriel (labs d'équipe actifs).
+
 ## [v1.6.2] — 2026-07-25
 
 ### Corrigé

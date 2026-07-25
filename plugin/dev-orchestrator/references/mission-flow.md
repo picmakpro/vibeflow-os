@@ -90,8 +90,11 @@ Le plan de bataille n'est plus une liste ordonnée : c'est un **graphe persistan
 
 ## Pattern C — Contrat de rapport de worker typé
 
-Les workers (`vf-coder`, `vf-reviewer`, `vf-auditer`, `vf-test-orchestrator`) **terminent leur retour** par
-un bloc typé (en plus de leur prose), pour un contrôle de flux **déterministe** côté manager :
+Les workers (`vf-coder`, `vf-reviewer`, `vf-auditer`, `vf-test-orchestrator`) **rendent le bloc
+typé + le strict nécessaire** : le détail (analyse, findings développés) va **sur disque**
+(`.planning/missions/`, rapports d'étape), pas dans le retour de conversation — le manager
+a consigne de ne piloter que sur le bloc typé, la prose libre est du volume mort (audit
+2026-07-25). Contrôle de flux **déterministe** côté manager :
 
 ```json
 {

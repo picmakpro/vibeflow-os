@@ -8,8 +8,8 @@ description: >
   (fan-out skill-creator), ficelle les auditeurs des procédures, puis assemble un lab opérationnel —
   pas un squelette. NE PRÉSUME JAMAIS « dev ».
   ✘ pas pour remettre à niveau un lab qui existe déjà → /vf-calibrate · ✘ pas pour amorcer un
-  dossier de **code** et son démarrage de projet → /vf-init · ✘ pas pour poser le socle
-  documentaire d'un lab déjà créé → /vf-planning.
+  dossier de **code** et son démarrage de projet → brique `gsd-new-project` du moteur de dev ·
+  ✘ pas pour poser le socle documentaire d'un lab déjà créé → /vf-planning.
   Invocable par l'utilisateur ET par `vibeflow-conductor`.
 ---
 
@@ -39,7 +39,7 @@ aux modules outillés (`skill-creator` en parallèle, `audit-architecture`, `pla
 4. MANIFESTE     → dériver les capacités (savoir/compétence/procédure) + GATE B + proportionner
 5. FAN-OUT       → fabriquer les skills en parallèle (N × skill-creator) + anti-slop
 6. FICELAGE      → câbler un auditeur par procédure générative (audit-architecture)
-7. ASSEMBLAGE    → CLAUDE.md, modules, planning v2, 5 registres, agents câblés, garde-fous, stamp + récap
+7. ASSEMBLAGE    → CLAUDE.md, modules, planning v2, registres (EVALS selon profil), agents câblés, garde-fous, stamp + récap
 ```
 
 Les phases 0-3 sont la **clarté** ; 4-6 la **fabrication** ; 7 l'**assemblage**. Profondeur **adaptative
@@ -164,17 +164,23 @@ Dériver puis poser (déléguer, ne pas réinventer) :
    **Pas `dev-orchestrator`** sauf métier = code.
 3. **Socle planning** — **qualifier le métier d'abord** (ADR-055) : *lab non-dev* → `vf-planning` pose le
    socle adapté au métier ; *lab de code* → le socle du **projet** appartient au moteur de développement,
-   router `/vf-init` (`vf-planning` n'y pose plus le tronc, il tient l'altitude lab et redirige).
+   router la brique **`gsd-new-project`** (`vf-planning` n'y pose plus le tronc, il tient l'altitude lab
+   et redirige — carte : `dev-orchestrator/references/intent-routing.md`).
    **Lab à compartiments** (quel que soit le métier) : `.planning/` du lab en *steering +
    `INDEX.md`* (jamais de ROADMAP global) ; un socle par compartiment **qualifié** (seuil d'autonomie),
    typé `deliverable` (roadmap+phases) ou `continuous` (`BOARD.md` + cadence). Sous le seuil / infra →
    ligne d'`INDEX.md`. Réf : planning-core `references/compartments.md`. **Jamais un `.planning/` par
    compartiment systématique.**
-4. **5 registres mémoire** — DECISIONS / LEARNINGS / BLOCKERS / JOURNAL / **EVALS** (depuis `reference`,
-   templates `memory/*-template.md` — registre décisions : `decisions-template.md`, IDs `DEC-XXX`).
-   EVALS posé dès l'init (registre du principe **P8 Évaluer**), partie intégrante du socle. Après la
-   pose, **indexer par la machine** : `bash .claude/scripts/reindex.sh --all --apply` (crée/recale le
-   bloc `## Index` + colonne `#Ligne` de chaque registre — ne jamais rédiger un index à la main).
+4. **Registres mémoire** — DECISIONS / LEARNINGS / BLOCKERS / JOURNAL (+ **EVALS** selon profil) (depuis
+   `reference`, templates `memory/*-template.md` — registre décisions : `decisions-template.md`, IDs
+   `DEC-XXX`). **EVALS est proportionné au profil** (gouvernance proportionnée, audit 2026-07-25) :
+   - **profil `standard`/`complet`** → EVALS posé dès l'init (registre du principe **P8 Évaluer**),
+     partie intégrante du socle ;
+   - **profil `leger`** → EVALS **optionnel à l'init** : il est créé **à la première éval réelle**
+     (première entrée `EVAL-001`), pas vide d'avance. Les gates métier & EVALS du brief (section 8)
+     restent définis — seul le registre attend d'avoir quelque chose à consigner.
+   Après la pose, **indexer par la machine** : `bash .claude/scripts/reindex.sh --all --apply` (crée/recale
+   le bloc `## Index` + colonne `#Ligne` de chaque registre — ne jamais rédiger un index à la main).
 5. **Agents métier** (2-3, pattern business-agent ; ou instanciés depuis un bundle si présent) —
    chaque agent posé porte le **frontmatter canonique COMPLET (ADR-044, vérifié machine)** :
    ```yaml
@@ -229,8 +235,11 @@ Dériver puis poser (déléguer, ne pas réinventer) :
 8. **Stamp framework** — `bash .claude/scripts/framework-version.sh stamp` (rendu **visible au récap**).
 9. **GATE C — Conformité machine (ADR-043 + ADR-044, BLOQUANT)** — l'init ne se conclut PAS tant que
    les TROIS vérifications machine ne passent pas :
-   1. `bash .claude/scripts/check-registres.sh --strict` → **exit 0** (5 registres canon présents,
-      `## Index` + colonne `#Ligne`, IDs cohérents index↔body, zéro doublon) ;
+   1. `bash .claude/scripts/check-registres.sh --strict` → **exit 0** (registres canon présents,
+      `## Index` + colonne `#Ligne`, IDs cohérents index↔body, zéro doublon). Le script lit le profil
+      du lab (`.planning/config.json`, clé `profile`, ou env `VF_LAB_PROFILE`) : en profil **léger**,
+      un `EVALS.md` absent est un **avertissement** (créé à la première éval réelle), pas un échec ;
+      en standard/complet les 5 registres restent exigés ;
    2. `bash .claude/scripts/check-agents.sh --strict` → **exit 0** (chaque agent : frontmatter natif
       complet name/description/model/memory, enums valides, skills déclarés EXISTANTS, budget de
       préchargement respecté) ;

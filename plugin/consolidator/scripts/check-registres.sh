@@ -21,6 +21,11 @@
 # Canon : DECISIONS LEARNINGS BLOCKERS JOURNAL EVALS · Legacy lus : ADR BDR ITERATION_LOG
 # (en --strict, un legacy présent compte comme substitut de son canon, avec avertissement).
 #
+# Gouvernance proportionnée (audit 2026-07-25) : en --strict, si le profil du lab est "leger"
+# (env VF_LAB_PROFILE, sinon clé "profile" de .planning/config.json), un EVALS.md ABSENT est un
+# avertissement — le registre est créé à la première éval réelle, pas à l'init. Tous les autres
+# registres canon restent exigés ; profil absent/illisible → comportement historique (EVALS requis).
+#
 # Codes de sortie : 0 = conforme · 1 = non conforme (ou registre canon manquant en --strict)
 
 set -uo pipefail
@@ -42,6 +47,12 @@ done
 REINDEX="$(dirname "$0")/reindex.sh"
 PROBLEMS=()
 WARNINGS=()
+
+# Profil de rigueur du lab : VF_LAB_PROFILE prime, sinon .planning/config.json (clé "profile").
+LAB_PROFILE="${VF_LAB_PROFILE:-}"
+if [ -z "$LAB_PROFILE" ] && [ -f ".planning/config.json" ]; then
+  LAB_PROFILE="$(sed -n 's/.*"profile"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' .planning/config.json 2>/dev/null | head -1)"
+fi
 
 id_pattern_for() {
   case "$1" in
@@ -114,9 +125,16 @@ if [ "$STRICT" = true ]; then
   declare_missing() { PROBLEMS+=("registre canon manquant : $MEMORY_DIR/$1.md"); }
   [ -f "$MEMORY_DIR/DECISIONS.md" ] || { { [ -f "$MEMORY_DIR/ADR.md" ] || [ -f "$MEMORY_DIR/BDR.md" ]; } && WARNINGS+=("DECISIONS.md absent — legacy ADR/BDR présent (migration conseillée : /vf-calibrate)") || declare_missing "DECISIONS"; }
   [ -f "$MEMORY_DIR/JOURNAL.md" ]   || { [ -f "$MEMORY_DIR/ITERATION_LOG.md" ] && WARNINGS+=("JOURNAL.md absent — legacy ITERATION_LOG présent (migration conseillée : /vf-calibrate)") || declare_missing "JOURNAL"; }
-  for name in LEARNINGS BLOCKERS EVALS; do
+  for name in LEARNINGS BLOCKERS; do
     [ -f "$MEMORY_DIR/$name.md" ] || declare_missing "$name"
   done
+  if [ ! -f "$MEMORY_DIR/EVALS.md" ]; then
+    if [ "$LAB_PROFILE" = "leger" ]; then
+      WARNINGS+=("EVALS.md absent — profil léger : registre optionnel à l'init, créé à la première éval réelle")
+    else
+      declare_missing "EVALS"
+    fi
+  fi
 elif [ "$found_any" = false ]; then
   # Hors strict, un lab sans aucun registre n'est pas une erreur (lab non initialisé).
   [ "$HOOK_MODE" = true ] || echo "[check-registres] aucun registre dans $MEMORY_DIR — rien à vérifier"

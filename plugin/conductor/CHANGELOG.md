@@ -1,5 +1,10 @@
 # Changelog — conductor
 
+## [v1.13.0] — 2026-07-25
+
+### Ajouté
+- Gouvernance proportionnée au profil : en profil léger, le registre EVALS n'est plus posé à l'init (créé à la première éval réelle) — gates A/B/C intacts. Références basculées sur le modèle agentique (gsd-progress, gsd-new-project…).
+
 ## [v1.12.3] — 2026-07-25
 
 ### Corrigé

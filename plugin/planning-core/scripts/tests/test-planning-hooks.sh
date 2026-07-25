@@ -148,6 +148,40 @@ has "$ERR" "fichier-cite.md" "G19 le motif de blocage cite le livrable attribué
 has "$ERR" "ne bloquera plus cette session" "G19b le motif annonce le blocage one-shot"
 git add -A; git commit -qm g19
 
+# G20-G23 : mode par défaut proportionné au profil (.planning/config.json, clé "profile")
+RP="$WORK/repo-profil"; mkdir -p "$RP/.planning"; cd "$RP"
+git init -q; git config user.email t@t.co; git config user.name t
+printf '# STATE\n' > .planning/STATE.md
+printf '{\n  "planning_version": "2.0",\n  "profile": "leger"\n}\n' > .planning/config.json
+echo base > livrable.md; git add -A; git commit -qm init
+# G20 : profil léger → warn par défaut (advisory : autorise + message stdout)
+new_session s20
+echo modif >> livrable.md
+OUTW=$(printf '{"session_id":"s20","stop_hook_active":false}' | "$BASH_BIN" "$G" 2>/dev/null); RCW=$?
+if [ "$RCW" = "0" ] && echo "$OUTW" | grep -q "planning-guard"; then
+  ok "G20 profil léger → warn par défaut (exit 0 + avertissement)"
+else
+  ko "G20 profil léger → warn attendu (exit=$RCW, out=${OUTW:-<vide>})"
+fi
+# G21 : l'override env prime sur le profil léger → block
+guard_is s20 2 "G21 VF_PLANNING_STOP=block prime sur le profil léger → BLOQUE" "VF_PLANNING_STOP=block"
+# G22 : profil standard → block par défaut (config committée AVANT la session,
+# sinon le config.json sale compte comme « planning mis à jour » → faux négatif)
+printf '{\n  "profile": "standard"\n}\n' > .planning/config.json
+git add -A; git commit -qm profil-standard
+new_session s22
+sleep 1
+echo modif2 >> livrable.md
+guard_is s22 2 "G22 profil standard → block par défaut"
+git add -A; git commit -qm g22
+# G23 : config.json sans profil lisible → fallback block
+printf '{\n  "planning_version": "2.0"\n}\n' > .planning/config.json
+git add -A; git commit -qm profil-illisible
+new_session s23
+sleep 1
+echo modif3 >> livrable.md
+guard_is s23 2 "G23 profil illisible → fallback block"
+
 echo "=== planning-context.sh (SessionStart) ==="
 M="$WORK/mono"; mkdir -p "$M/.planning"; cd "$M"
 printf 'last_updated: 2026-07-16\n# STATE\n## En cours\n- tache A\n' > .planning/STATE.md

@@ -1,5 +1,10 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.1.1] — 2026-07-25
+
+### Modifié
+- Suit la bascule agentique du dev-orchestrator v2.0.0 : les renvois vers les verbes dev supprimés pointent vers les briques gsd réelles ; le reframe dev est abandonné, la table de vocabulaire ne gouverne plus que la chaîne design.
+
 ## [v1.1.0] — 2026-07-25 (verbe `/vf-sketch` + démarcations croisées)
 
 ### Ajouté

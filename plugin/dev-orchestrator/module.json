@@ -1,7 +1,7 @@
 {
   "name": "dev-orchestrator",
-  "version": "v1.8.2",
+  "version": "v2.0.0",
   "type": "agent+skills",
-  "description": "Orchestrateur de développement : route le langage naturel vers le pipeline, par une porte d'entrée unique — 31 verbes /vf-* couvrant tout le cycle (cadrage, construction, qualité et audits, cycle de vie, contexte et session), une rule globale de préséance des verbes et une doctrine de routage exhaustive chargée on-demand. Inclut l'équipe manager de mission (vf-dev-manager + vf-coder/vf-reviewer/vf-auditer, arborescence à contexte minimal), le routage des phases de design vers /vf-design et la doctrine des garde-fous de boucle autonome.",
+  "description": "Orchestrateur de développement en modèle agentique : l'agent vibeflow-dev détecte l'intention en langage naturel et invoque directement les briques gsd-*/superpowers installées (carte d'intention unique, next steps depuis la feuille de route, hygiène documentaire, garde-fou first-use). Inclut l'équipe de mission (vf-dev-manager — DAG, lock de driver, rapports typés, digest de mission, dispatch parallèle revue ∥ audit — + workers sonnet vf-coder/vf-reviewer/vf-auditer), 2 skills (vf-auto : porte d'autonomie avec seuil équipe ; vf-dev : point d'entrée générique) et la doctrine des garde-fous de boucle autonome.",
   "requires": ["design-orchestrator"]
 }

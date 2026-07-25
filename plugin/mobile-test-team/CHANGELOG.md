@@ -1,5 +1,10 @@
 # Changelog — mobile-test-team
 
+## v1.4.0 — 2026-07-25
+
+### Ajouté
+- ADR-045 en 1 saut : vf-test-orchestrator gagne WebSearch/WebFetch et porte lui-même la recherche documentaire (context7 + issues GitHub) — fin de l'escalade à 3 étages en pleine boucle de nuit. Le cloisonnement anti-triche (code/tests) est inchangé.
+
 ## v1.3.1 — 2026-07-25
 
 ### Corrigé

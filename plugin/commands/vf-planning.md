@@ -12,9 +12,10 @@ Le skill commence **toujours** par déterminer qui tient le planning de ce lab (
   une forme dev imposée ;
 - **lab dev** → il n'écrit **pas** le planning du projet : il tient l'altitude lab — index des
   projets et typage des compartiments si le lab en a plusieurs, pont mémoire, dette — et redirige
-  vers le bon verbe.
+  vers la bonne brique GSD (ou l'agent `vibeflow-dev`).
 
-Pour un projet de code : démarrage → `/vf-init`, état et avancement → `/vf-progress`, cadrage d'une
-étape → `/vf-plan`, comprendre l'existant → `/vf-map`.
+Pour un projet de code : démarrage → `gsd-new-project` (garde-fou first-use de l'agent
+`vibeflow-dev`), état et avancement → `gsd-progress`, cadrage d'une étape → `gsd-discuss-phase`
+puis `gsd-plan-phase`, comprendre l'existant → `gsd-map-codebase`.
 
 Si le module `planning-core` n'est pas installé, lance d'abord `vibeflow-install`.
