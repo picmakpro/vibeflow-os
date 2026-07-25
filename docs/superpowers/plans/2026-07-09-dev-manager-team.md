@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ajouter l'équipe manager (vf-dev-manager + vf-coder/vf-reviewer/vf-auditer) au module `dev-orchestrator`, avec détection de mission par le router et bascule taille dans `vf-auto` — pattern Reviz généralisé, spec `docs/superpowers/specs/2026-07-09-dev-manager-team-design.md`.
+**Goal:** Ajouter l'équipe manager (vf-dev-manager + vf-coder/vf-reviewer/vf-auditer) au module `dev-orchestrator`, avec détection de mission par le router et bascule taille dans `vf-auto` — pattern d'origine généralisé, spec `docs/superpowers/specs/2026-07-09-dev-manager-team-design.md`.
 
 **Architecture:** 4 agents natifs Claude Code dans `plugin/dev-orchestrator/agents/` (le manager orchestre, les 3 workers `vf-internal` exécutent en contexte isolé) + 1 référence partagée `mission-contracts.md` (contrats brief/rapport, signaux mission, seuil de bascule — source unique DRY). Le router `AGENT.md` gagne une ligne de routage « mission » (propose, ne dispatche jamais d'office) ; `vf-auto` gagne un aiguillage en tête (court → `gsd-autonomous` inline, long → manager). L'engine d'install gère déjà `agents/` (Type 3b, `vibeflow-update.sh:440`) et génère les commandes d'incarnation en sautant les `vf-internal` — aucun travail engine.
 
@@ -13,7 +13,7 @@
 - **ADR-029 (densité)** : chaque agent ≤ 250 lignes (`wc -l`), skills ≤ 500 lignes.
 - **ADR-044 (agents natifs)** : frontmatter avec `description` (≥ 30c, dit quand l'utiliser) + `model` + `memory` obligatoires ; validé par `bash plugin/conductor/scripts/check-agents.sh --file <agent.md>`.
 - **Pattern 12** : workers internes → `vf-internal: true` (pas de commande d'incarnation) ; le manager est exposé (PAS de `vf-internal`).
-- **DM5 (généricité)** : AUCUN chemin ni nom Reviz (`docs/_mission`, `revizapp`, `Reviz`) dans les fichiers livrés ; conventions `.planning/` de GSD ; les règles de livraison viennent du CLAUDE.md du projet cible.
+- **DM5 (généricité)** : AUCUN chemin ni nom spécifique (`docs/_mission`) dans les fichiers livrés ; conventions `.planning/` de GSD ; les règles de livraison viennent du CLAUDE.md du projet cible.
 - **DRY** : les contrats de mission, signaux et seuil vivent UNIQUEMENT dans `references/mission-contracts.md` — partout ailleurs, renvoi.
 - **Vocabulaire** : tout output destiné à l'utilisateur final en vocabulaire VibeFlow (jamais « GSD »/« Superpowers ») ; les corps d'agents peuvent nommer les rouages GSD en interne (comme l'existant).
 - **Langue** : tout en français, commits en français cohérents avec l'historique.
@@ -633,12 +633,12 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# T11 — Généricité : aucun résidu Reviz dans les agents livrés (DM5)
+# T11 — Généricité : aucun résidu spécifique dans les agents livrés (DM5)
 # ---------------------------------------------------------------------------
-if [ -d "$MOD/agents" ] && "$GREP" -rqE "docs/_mission|revizapp|Reviz" "$MOD/agents/" 2>/dev/null; then
-  ko "T11 généricité : résidu Reviz détecté dans agents/ (docs/_mission|revizapp|Reviz)"
+if [ -d "$MOD/agents" ] && "$GREP" -rqE "docs/_mission" "$MOD/agents/" 2>/dev/null; then
+  ko "T11 généricité : résidu spécifique détecté dans agents/ (docs/_mission)"
 else
-  ok "T11 généricité : aucun chemin/nom Reviz dans agents/"
+  ok "T11 généricité : aucun chemin spécifique dans agents/"
 fi
 ```
 
@@ -650,7 +650,7 @@ Dans le commentaire d'en-tête du script (liste T1-T7), ajouter après la ligne 
 #   T8/T8b — Équipe manager : 4 agents conformes (frontmatter, densité, vf-internal — Pattern 12).
 #   T9 — Contrats de mission : source unique + 3 renvois (DRY).
 #   T10 — Routage mission (AGENT.md) + aiguillage taille (vf-auto, SEUIL_EQUIPE).
-#   T11 — Généricité : aucun résidu Reviz dans agents/ (DM5).
+#   T11 — Généricité : aucun résidu spécifique dans agents/ (DM5).
 ```
 
 - [ ] **Step 3: Lancer la suite complète**
@@ -698,7 +698,7 @@ Lire `plugin/dev-orchestrator/CHANGELOG.md` et ajouter en tête (sous le titre, 
 ```markdown
 ## v1.5.0 — 2026-07-09
 
-Équipe manager de mission (pattern Reviz généralisé — spec 2026-07-09, ADR-046).
+Équipe manager de mission (pattern d'origine généralisé — spec 2026-07-09, ADR-046).
 
 - **4 agents natifs** (`agents/`) : `vf-dev-manager` (sommet — planifie, décide via panels,
   distribue, contrôle de flux entre étages) + workers internes `vf-coder` (cycle d'étape),

@@ -312,7 +312,7 @@ de plus, il suppose le gabarit de description et la rule de préséance en place
 
 | Étape | Périmètre | Exigences |
 |---|---|---|
-| **Phase 12 — Routage fin & couverture des verbes** | §§ 2-6 : 3 niveaux de routage, 18 verbes (17 dev dont `vf-gaps` + `vf-sketch` en design ; `vf-ingest` exclu et sa place réservée), rule de préséance, `intent-routing.md`, réécriture des 14 descriptions, tests T4 + T12/T13/T14 (T11 étant déjà pris par la généricité anti-résidu Reviz) | `VERB-01..05` |
+| **Phase 12 — Routage fin & couverture des verbes** | §§ 2-6 : 3 niveaux de routage, 18 verbes (17 dev dont `vf-gaps` + `vf-sketch` en design ; `vf-ingest` exclu et sa place réservée), rule de préséance, `intent-routing.md`, réécriture des 14 descriptions, tests T4 + T12/T13/T14 (T11 étant déjà pris par la généricité anti-résidu spécifique) | `VERB-01..05` |
 | **Phase 13 — Pont spec → feuille de route** | § 7 : verbe `/vf-ingest` (2 grains), découverte des specs non intégrées, manifest, garde-fous, enchaînement depuis `vf-brainstorm` | `BRDG-01..03` |
 
 La release (bump racine + tag) est portée par la Phase 13, qui clôt le milestone.

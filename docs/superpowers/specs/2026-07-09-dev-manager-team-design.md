@@ -3,7 +3,7 @@
 > Date : 2026-07-09
 > Statut : design validé (brainstorming)
 > Repo : vibeflow-os
-> Origine : pattern d'orchestration éprouvé sur le projet Reviz (`WillHosting/.claude/agents/` :
+> Origine : pattern d'orchestration éprouvé sur un projet interne (`<projet-source>/.claude/agents/` :
 > manager / coder / reviewer / auditer / test-orchestrator)
 
 ## 1. Vision
@@ -12,7 +12,7 @@ Aujourd'hui, VibeFlow pilote le dev via un **router** (`vibeflow-dev`) qui invoq
 dans le contexte courant. Sur une mission multi-étapes, ce contexte gonfle, se fait compacter, et
 la conversation principale devient illisible.
 
-Cible : reproduire l'arborescence Reviz — **une seule conversation main** (tout le contexte
+Cible : reproduire l'arborescence d'origine — **une seule conversation main** (tout le contexte
 utilisateur), un **manager** dispatché en sous-agent qui planifie/décide/distribue, et des
 **workers spécialisés** à contexte minimal qui font le travail :
 
@@ -42,9 +42,9 @@ VibeFlow embarquée** (ADR-045, ADR-031, vocabulaire) là où `gsd-autonomous` e
 |---|---|
 | `gsd-autonomous` tourne inline — tout s'accumule dans le contexte invoquant | `~/.claude/get-shit-done/workflows/autonomous.md` (Skill() flat invocations) |
 | Son contrôle de flux est éprouvé : routing VERIFICATION, gap-closure 1 retry, handle_blocker, lifecycle | `autonomous.md` steps 3d, 4, 5, 6 |
-| Le `coder` Reviz invoque les mêmes skills GSD — qualité par phase identique | `WillHosting/.claude/agents/coder.md:12-21` |
-| Les agents Reviz sont spécifiques (chemins `docs/_mission/`, règles client revizapp) | `manager.md:10`, `coder.md:35` |
-| La test-team mobile existe déjà, portage exact de la boucle test Reviz | `plugin/mobile-test-team/agents/` |
+| Le `coder` d'origine invoque les mêmes skills GSD — qualité par phase identique | `<projet-source>/.claude/agents/coder.md:12-21` |
+| Les agents d'origine sont spécifiques (chemins `docs/_mission/`, règles spécifiques au client) | `manager.md:10`, `coder.md:35` |
+| La test-team mobile existe déjà, portage exact de la boucle de test d'origine | `plugin/mobile-test-team/agents/` |
 | `dev-orchestrator` n'a pas de dossier `agents/` aujourd'hui | arborescence du module |
 
 **Positionnement** : le manager remplace la **boucle externe** de `gsd-autonomous` (itération des
@@ -59,13 +59,13 @@ interne** GSD tel quel. Les deux moteurs coexistent (bascule selon la taille, §
 | DM2 | Moteur autonome | **Bascule selon la taille** dans `vf-auto` : 1-2 phases → `gsd-autonomous` (inline, moins cher) ; ≥ 3 phases OU signal durée (« la nuit ») → manager. Seuil = constante nommée, ajustable. |
 | DM3 | Packaging | **Extension de `dev-orchestrator`** (pas de nouveau module) : `agents/` + `references/mission-contracts.md` dans le module existant. Un seul module « cerveau dev ». |
 | DM4 | Invocation | **Le router détecte et propose** — pas de verbe neuf. `vibeflow-dev` repère les signaux « mission » et propose le manager (AskUserQuestion) ; jamais de dispatch d'office. |
-| DM5 | Généricité | Zéro chemin ni règle Reviz en dur : conventions `.planning/` de GSD ; les règles de livraison viennent du CLAUDE.md du projet cible. |
+| DM5 | Généricité | Zéro chemin ni règle spécifique en dur : conventions `.planning/` de GSD ; les règles de livraison viennent du CLAUDE.md du projet cible. |
 | DM6 | Contrôle de flux | Le manager **reprend** les acquis de `gsd-autonomous` : routing sur VERIFICATION.md (passed / gaps_found / human_needed), gap-closure limité à 1 retry, handle_blocker 3 options (retry / skip / stop), re-lecture ROADMAP entre phases, lifecycle audit→complete→cleanup. |
 
 ## 4. Les 4 agents (`plugin/dev-orchestrator/agents/`)
 
 Tous conformes ADR-044 (frontmatter `description` + `model` + `memory`, validés
-`check-agents.sh`) et ADR-029 (≤ 250 lignes ; les originaux Reviz font 25-56 lignes).
+`check-agents.sh`) et ADR-029 (≤ 250 lignes ; les agents d'origine font 25-56 lignes).
 
 | Agent | Rôle | `vf-internal` | Hérite de |
 |---|---|---|---|
@@ -172,7 +172,7 @@ module installé ET projet mobile ; sinon `gsd-verify-work`. Aucune dépendance 
 5. `grep` de l'aiguillage taille dans `vf-auto/SKILL.md` (seuil nommé + signal durée).
 6. `grep` de la ligne de routage mission dans `AGENT.md` du router.
 7. `test-dev-orchestrator.sh` vert avec les nouveaux cas.
-8. Aucun chemin Reviz (`docs/_mission`, revizapp) dans les agents livrés.
+8. Aucun chemin externe (`docs/_mission`) dans les agents livrés.
 
 ## 10. Risques
 
