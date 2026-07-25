@@ -667,6 +667,25 @@ else
   else
     ok "T14 exhaustivité (b) : $pairs couple(s) verbe→cible vérifié(s), chacun cité par son verbe"
   fi
+
+  # (c) — contre-poids de la borne de propriété : un verbe livré mais absent de la doctrine sort du
+  # périmètre d'audit (OWNED_VERBS) SANS BRUIT. Oublier une ligne de table désarmerait alors les
+  # contrôles de ce verbe. Vérifiable en SOURCE uniquement — en lab, skills/ est plat et partagé,
+  # l'égalité verbes-sur-disque / verbes-déclarés n'y a aucun sens.
+  if [ -n "$OWNED_VERBS" ] && [ -f "$MOD/AGENT.md" ]; then
+    undeclared=""
+    for d in "$MOD"/skills/vf-*/; do
+      [ -d "$d" ] || continue
+      v="$(basename "$d")"
+      owned_verb "$v" || undeclared="$undeclared $v"
+    done
+    if [ -n "$undeclared" ]; then
+      ko "T14 (c) : verbe(s) du module absent(s) de intent-routing.md — donc NON audités —$undeclared"
+      t14_fail=$((t14_fail+1))
+    else
+      ok "T14 (c) : tous les verbes du module sont déclarés dans la doctrine (périmètre d'audit complet)"
+    fi
+  fi
 fi
 
 # ---------------------------------------------------------------------------
