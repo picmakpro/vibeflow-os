@@ -101,7 +101,8 @@ Le `conductor` reste **méta** (config/audit/migration + escalades C4), il ne fa
   4. **Ton non-alarmiste** (pas de peur ni de superlatif gratuit).
   → Verdict `BLOQUANT` : une pièce qui échoue ne passe pas à l'étape humaine. (Voir `registres.md`
   pour la capitalisation des verdicts en EVALS.)
-- **Étape `human-validator` NON négociable** *avant publication* : aucune pièce n'est distribuée sans
+- **Étape `human-validator` NON négociable** *avant publication* (auditeur **à fabriquer au
+  ficelage du lab** via skill-creator — vérifié par le Gate C) : aucune pièce n'est distribuée sans
   validation humaine explicite. Le `repurposer` ne déclenche aucune distribution sensible en autonomie.
 - **Sourcing gouverné** : seules les sources **tier-1 autorisées** (listées dans
   `editorial/LIGNE-EDITORIALE.md`) sont citables ; toute citation chiffrée renvoie à sa **source
