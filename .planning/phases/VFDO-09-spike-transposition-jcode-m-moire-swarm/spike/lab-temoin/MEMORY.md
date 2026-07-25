@@ -1,5 +1,5 @@
-- [Reviz = WillHosting](reviz-is-willhosting.md) — repo de Reviz = ~/Documents/dev/WillHosting
+- [Alpha — emplacement du repo](projet-alpha-emplacement.md) — repo = ~/dev/projet-alpha
 - [Commits FR Scroll-Off](commits-francais-scroll-off.md) — commits français, zéro mention IA
 - [User freelance multi-métiers](user-freelance-multi-metiers.md) — portefeuille de projets hétérogènes
 - [RTK proxy](reference-rtk-proxy.md) — proxy CLI token-optimisé
-- [Reviz = WillHunting](reviz-appele-willhunting.md) — SUPERSEDED par reviz-is-willhosting
+- [Alpha — emplacement obsolète](projet-alpha-emplacement-obsolete.md) — SUPERSEDED par projet-alpha-emplacement

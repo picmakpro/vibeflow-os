@@ -61,7 +61,7 @@
 ## v1.0.0 — 2026-07-07
 
 Création du module (brique 5b + 5c). Équipe de test mobile autonome, extraite et généralisée
-depuis le track « équipe d'agents » (revizapp), câblée sur la doctrine VibeFlow existante.
+depuis le track « équipe d'agents », câblée sur la doctrine VibeFlow existante.
 
 - **3 agents cloisonnés** (Pattern 12) : `vf-test-orchestrator` (boucle + garde-fous + halt),
   `vf-test-runner` (tests seuls, pas de `Task`), `vf-app-fixer` (code seul, pas de `Task`).
@@ -71,7 +71,7 @@ depuis le track « équipe d'agents » (revizapp), câblée sur la doctrine Vibe
 - **Référence** `test-loop-protocol.md` : protocole de boucle + mapping halt conditions, insertion
   dans le flux `god-execution`/`vf-auto`.
 
-### Généralisation vs source revizapp
+### Généralisation vs source d'origine
 
 - Retrait des constantes projet (bundle id, i18n, THEME, dossiers `.agent/`/`docs/_mission/`).
 - « jamais de push » et « pas de mention d'IA dans les commits » → **options de projet** lues dans

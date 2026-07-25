@@ -22,7 +22,7 @@ d'implémentation du volet swarm. Le socle `conductor` n'est pas touché sans AD
 ### Lab témoin
 - **D-01:** Prototyper sur **ce repo (vibeflow-os)** — sa mémoire de session
   (`~/.claude/projects/-Users-samuel-Documents-dev-vibeflow-os/memory/`, dont `MEMORY.md` +
-  `reviz-is-willhosting.md`). Boucle courte, zéro risque sur un lab de prod. Contrepartie assumée :
+  `projet-alpha-emplacement.md`). Boucle courte, zéro risque sur un lab de prod. Contrepartie assumée :
   peu d'entrées → signal de coût de maintenance faible ; compenser en ajoutant quelques entrées
   synthétiques calibrées (mix des 4 catégories) si nécessaire pour rendre la mesure significative.
 

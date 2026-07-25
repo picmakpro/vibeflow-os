@@ -48,7 +48,7 @@ même mal et n'embarque aucune doctrine VibeFlow (ADR-045, ADR-031, vocabulaire)
 
 ### Raisonnement
 
-> Pattern éprouvé sur le projet Reviz (`WillHosting/.claude/agents/`) : main → manager →
+> Pattern éprouvé sur un projet interne (`<projet-source>/.claude/agents/`) : main → manager →
 > workers spécialisés, chacun à contexte minimal scopé. Analyse comparative avec
 > `gsd-autonomous` : même machinerie GSD par phase (qualité identique sur une phase), mais
 > l'inline dégrade sur les runs longs (compaction) là où les contextes frais des workers
@@ -66,7 +66,7 @@ même mal et n'embarque aucune doctrine VibeFlow (ADR-045, ADR-031, vocabulaire)
 3. **Packaging (DM3)** : extension du module `dev-orchestrator` (pas de nouveau module).
 4. **Invocation (DM4)** : le router détecte les signaux mission et PROPOSE l'équipe — jamais
    de dispatch d'office, pas de verbe nouveau.
-5. **Généricité (DM5)** : zéro chemin/règle Reviz ; conventions `.planning/` de GSD ; les
+5. **Généricité (DM5)** : zéro chemin ni règle spécifique ; conventions `.planning/` de GSD ; les
    règles de livraison viennent du CLAUDE.md du projet cible.
 6. **Contrôle de flux (DM6)** : le manager reprend les mécanismes éprouvés de gsd-autonomous.
 

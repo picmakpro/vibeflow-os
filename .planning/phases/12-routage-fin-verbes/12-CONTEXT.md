@@ -60,7 +60,7 @@ Phase 12 livre donc **18 verbes** : 17 dans `dev-orchestrator` + `vf-sketch` dan
 `dev-orchestrator`), soldé en Phase 13.
 
 ### D-03 — Numérotation des tests
-Le `T11` du script existant est **déjà pris** (généricité / anti-résidu Reviz, DM5) et n'est pas
+Le `T11` du script existant est **déjà pris** (généricité / anti-résidu projet source, DM5) et n'est pas
 renuméroté. Les nouveaux tests sont **T12** (anti-collision), **T13** (préséance), **T14**
 (exhaustivité), avec en commentaire d'en-tête la correspondance vers les noms de la spec
 (T11/T12/T13).
