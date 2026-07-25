@@ -65,6 +65,29 @@ LAB="$TMP/lab8"; mk_state "$LAB" "gsd_state_version"
 LAB="$TMP/lab10"; mk_state "$LAB" "planning_version"; echo 'module x' > "$LAB/go.mod"
 ( cd "$LAB" && GSD_HOME="$FAKE_GSD" bash "$DETECT" --quiet ); check_exit "signal de code go.mod" 2 $?
 
+# --- Cas 11-12 : le marqueur est une clé du FRONTMATTER, pas une chaîne du fichier (M1) ---
+# Un grep non borné prendrait un `gsd_state_version:` cité dans le corps pour le marqueur réel et
+# sortirait 0 « moteur actif » sur un socle planning-core — les deux hooks qui câblent ce script en
+# `&& exit 0` se retireraient alors à tort.
+
+# Cas 11 : socle planning-core citant gsd_state_version en colonne 1 DANS LE CORPS + code → 2, pas 0.
+LAB="$TMP/lab11"; mkdir -p "$LAB/.planning"
+{
+  printf -- '---\nplanning_version: 1.0\nlast_updated: "2026-07-25"\n---\n\n'
+  printf '# État\n\nFormat attendu par l'"'"'outillage de dev :\n\n```yaml\n'
+  printf 'gsd_state_version: 1.0\n```\n'
+} > "$LAB/.planning/STATE.md"
+echo '{}' > "$LAB/package.json"
+( cd "$LAB" && GSD_HOME="$FAKE_GSD" bash "$DETECT" --quiet ); check_exit "marqueur GSD hors frontmatter ignoré" 2 $?
+
+# Cas 12 : symétrique — planning_version cité hors frontmatter n'est pas non plus un marqueur.
+LAB="$TMP/lab12"; mkdir -p "$LAB/.planning"
+{
+  printf -- '---\ngsd_state_version: 1.0\n---\n\n# État\n\nAncien format :\n\n'
+  printf 'planning_version: 1.0\n'
+} > "$LAB/.planning/STATE.md"
+( cd "$LAB" && GSD_HOME="$FAKE_GSD" bash "$DETECT" --quiet ); check_exit "frontmatter GSD prime sur mention en corps" 0 $?
+
 echo ""
 echo "== résultat : $PASS ok, $FAIL ko =="
 [ "$FAIL" -eq 0 ]

@@ -43,8 +43,23 @@ fi
 
 STATE_FILE="$PLANNING_DIR/STATE.md"
 
+# Le marqueur du moteur est une clé du FRONTMATTER, pas une chaîne du fichier. Un `grep` non borné
+# prendrait un `gsd_state_version:` cité dans le CORPS (bloc d'exemple YAML, doc inline) pour le
+# marqueur réel : le script sortirait « moteur actif » sur un socle planning-core, et les deux hooks
+# qui le câblent en `&& exit 0` se retireraient à tort. D'où la borne.
+# Modèle : extract_frontmatter_field() dans plugin/dev-orchestrator/scripts/build-gsd-index.sh.
+# Réimplémenté localement et non sourcé : planning-core ne dépend d'aucun module (`requires: []`).
+has_frontmatter_key() { # <file> <key>
+  awk -v key="$2" '
+    NR == 1 && $0 ~ /^---[[:space:]]*$/   { in_fm = 1; next }
+    in_fm && $0 ~ /^---[[:space:]]*$/     { exit }
+    in_fm && $0 ~ "^" key ":[[:space:]]*" { found = 1; exit }
+    END { exit (found ? 0 : 1) }
+  ' "$1"
+}
+
 # --- Priorité 2 : moteur GSD actif ? (marqueur = clé du frontmatter) ---
-if [ -f "$STATE_FILE" ] && grep -qE '^gsd_state_version:' "$STATE_FILE" 2>/dev/null; then
+if [ -f "$STATE_FILE" ] && has_frontmatter_key "$STATE_FILE" gsd_state_version; then
   say "Moteur GSD actif — le planning de ce projet appartient à GSD."
   exit 0
 fi
@@ -62,7 +77,7 @@ has_code_signal() {
   return 1
 }
 
-if [ -f "$STATE_FILE" ] && grep -qE '^planning_version:' "$STATE_FILE" 2>/dev/null; then
+if [ -f "$STATE_FILE" ] && has_frontmatter_key "$STATE_FILE" planning_version; then
   if has_code_signal; then
     say "Socle de facture planning-core en présence de code — migration à examiner (ne rien réécrire)."
     exit 2
