@@ -21,6 +21,11 @@
 #   T-CSL15 — compteur exact, pas de « 0 » parasite, aucune création hors lab, rotation log
 #   T-CSL11 — hooks.json : `|| true` sur le PostToolUse uniquement
 #
+# Frictions UAT vf-new-lab (2026-07) :
+#   T-F1 — templates de registres embarqués (references/templates-memoire/, 5 fichiers, index v2)
+#   T-F7 — reindex sur registre à 0 entrée : compteurs propres (pas de « 0\n0 », JSON valide)
+#   T-F8 — strays legacy *.bak-reindex-* à côté des registres rapatriés dans .backups/
+#
 # Usage: ./test-consolidator.sh
 # Exit code: 0 si tous tests passent, 1 si au moins 1 échec
 
@@ -293,6 +298,52 @@ post_ok=$(grep -c 'post-edit-reindex.sh || true' "$HJ" || echo 0)
 assert "T-CSL11.1 — PostToolUse tolère une install cassée (|| true)" "$post_ok" "1"
 pre_bad=$(grep -E 'guard-(read|bash)-registres\.sh \|\| true' "$HJ" | wc -l | tr -d ' ')
 assert "T-CSL11.2 — les 2 PreToolUse bloquants restent SANS || true" "$pre_bad" "0"
+
+echo ""
+echo "=== T-F1 — templates de registres embarqués (references/templates-memoire, UAT F1) ==="
+TPL="references/templates-memoire"
+missing=""
+for t in decisions learnings blockers journal evals; do
+  [ -f "$TPL/$t-template.md" ] || missing="$missing $t"
+done
+assert "T-F1.1 — les 5 templates présents (decisions learnings blockers journal evals)" "${missing:-aucun}" "aucun"
+noligne=$(grep -L '#Ligne' "$TPL"/*-template.md 2>/dev/null | wc -l | tr -d ' ')
+assert "T-F1.2 — chaque template porte un index canonique v2 (colonne #Ligne)" "$noligne" "0"
+nocible=$(grep -L 'Fichier cible : `.claude/memory/' "$TPL"/*-template.md 2>/dev/null | wc -l | tr -d ' ')
+assert "T-F1.3 — chaque template déclare sa cible sous .claude/memory/ (F6)" "$nocible" "0"
+
+echo ""
+echo "=== T-F7 — reindex sur registre à 0 entrée : compteurs propres (UAT F7) ==="
+F7="$WORK_DIR/f7"; mkdir -p "$F7/.claude/memory"
+cat > "$F7/.claude/memory/LEARNINGS.md" <<'EOF'
+# Learnings
+
+## Index
+
+| ID | Date | Titre | #Ligne | Resume |
+|----|------|-------|--------|--------|
+
+---
+EOF
+output=$(cd "$F7" && MEMORY_DIR=".claude/memory" "$SCRIPTS/reindex.sh" --register=LEARNINGS --apply 2>&1)
+assert "T-F7.1 — JSON valide sur registre vide (entries_count:0 d'un seul tenant)" "$output" '"entries_count":0,'
+assert "T-F7.2 — log « 0 entrees » sur UNE seule ligne" "$output" "LEARNINGS: 0 entrees body detectees"
+stray0=$(echo "$output" | grep -cx "0" || true)
+assert "T-F7.3 — aucun « 0 » parasite seul sur sa ligne" "$stray0" "0"
+audit=$(cd "$F7" && MEMORY_DIR=".claude/memory" "$SCRIPTS/reindex.sh" --register=LEARNINGS --audit 2>&1)
+assert "T-F7.4 — audit registre vide : index_count entier propre" "$audit" '"index_count": 0,'
+assert "T-F7.5 — audit registre vide : body_count entier propre" "$audit" '"body_count": 0,'
+
+echo ""
+echo "=== T-F8 — strays legacy *.bak-reindex-* rapatriés dans .backups/ (UAT F8) ==="
+F8D="$WORK_DIR/f8"; mkdir -p "$F8D/.claude/memory"
+mk_dec "$F8D/.claude/memory/DECISIONS.md"
+printf 'vieux backup legacy (engine <= v2.23)\n' > "$F8D/.claude/memory/DECISIONS.md.bak-reindex-20250101-000000"
+(cd "$F8D" && MEMORY_DIR=".claude/memory" "$SCRIPTS/reindex.sh" --register=DECISIONS --apply >/dev/null 2>&1)
+left=$(ls -1 "$F8D/.claude/memory/"*.bak-reindex-* 2>/dev/null | wc -l | tr -d ' ')
+assert "T-F8.1 — plus AUCUN stray à côté des registres après --apply" "$left" "0"
+migrated=$([ -f "$F8D/.claude/memory/.backups/DECISIONS.md.bak-reindex-20250101-000000" ] && echo oui || echo non)
+assert "T-F8.2 — le stray legacy est rapatrié (pas détruit) dans .backups/" "$migrated" "oui"
 
 echo ""
 echo "================================"

@@ -161,11 +161,20 @@ sur-ficeler : seules les procédures dont la qualité de l'output compte.
 
 ## Phase 7 — Assemblage & scaffolding
 
+> **Résolution des scripts (même cascade que le team-kernel)** : toute invocation de script se
+> résout **`.claude/scripts/` du lab si présent** (posé par l'install des modules), **sinon
+> `${CLAUDE_PLUGIN_ROOT}/conductor/scripts/`** (cache plugin). Ne JAMAIS présumer que
+> `${CLAUDE_PLUGIN_ROOT}` est défini dans un lab — après l'étape 2 (modules posés), la forme
+> `bash .claude/scripts/<script>.sh` est la voie normale. Les internals de l'engine
+> (`_internal/resolve-deps.sh`…) se résolvent via la table d'invocations du skill
+> `vibeflow-install` (qui localise le cache réel).
+
 Dériver puis poser (déléguer, ne pas réinventer) :
 1. **`CLAUDE.md` + externalisation doc (ADR-042)** — l'init du `CLAUDE.md` **déclenche** l'externalisation
    de la doc : le `CLAUDE.md` est une **constitution** (< 150 lignes, **P2**) qui **POINTE** vers la doc,
-   ne la duplique JAMAIS. Lancer `bash "${CLAUDE_PLUGIN_ROOT}/conductor/scripts/scaffold-docs.sh" <compartiments-qualifiés>`
-   (cache plugin — les modules ne sont pas encore posés à cette phase) → crée
+   ne la duplique JAMAIS. Lancer `scaffold-docs.sh <compartiments-qualifiés>` (cascade ci-dessus ;
+   à cette étape les modules ne sont pas encore posés → le fallback cache
+   `"${CLAUDE_PLUGIN_ROOT}/conductor/scripts/scaffold-docs.sh"` est le chemin attendu) → crée
    `docs/_transverse/` (doc transverse) + un `docs/<projet>/` **par compartiment qualifié** (même seuil
    d'autonomie que les `.planning/` — proportionné, **jamais un `docs/<projet>/` par micro-dossier**). Le
    `CLAUDE.md` mappe ensuite la doc transverse → `@docs/_transverse/` et **chaque compartiment →
@@ -184,9 +193,13 @@ Dériver puis poser (déléguer, ne pas réinventer) :
    typé `deliverable` (roadmap+phases) ou `continuous` (`BOARD.md` + cadence). Sous le seuil / infra →
    ligne d'`INDEX.md`. Réf : planning-core `references/compartments.md`. **Jamais un `.planning/` par
    compartiment systématique.**
-4. **Registres mémoire** — DECISIONS / LEARNINGS / BLOCKERS / JOURNAL (+ **EVALS** selon profil) (depuis
-   `reference`, templates `memory/*-template.md` — registre décisions : `decisions-template.md`, IDs
-   `DEC-XXX`). **EVALS est proportionné au profil** (gouvernance proportionnée, audit 2026-07-25) :
+4. **Registres mémoire — les registres vivent sous `.claude/memory/`** (un fichier
+   `.claude/memory/<NOM>.md` par registre : DECISIONS / LEARNINGS / BLOCKERS / JOURNAL
+   (+ **EVALS** selon profil)). Les instancier depuis les templates **INSTALLÉS** du
+   `consolidator` (module de la baseline, propriétaire de la machinerie des registres) :
+   `.claude/skills/consolidator/references/templates-memoire/<registre>-template.md`
+   — registre décisions : `decisions-template.md`, IDs `DEC-XXX`.
+   **EVALS est proportionné au profil** (gouvernance proportionnée, audit 2026-07-25) :
    - **profil `standard`/`complet`** → EVALS posé dès l'init (registre du principe **P8 Évaluer**),
      partie intégrante du socle ;
    - **profil `leger`** → EVALS **optionnel à l'init** : il est créé **à la première éval réelle**
@@ -242,7 +255,8 @@ Dériver puis poser (déléguer, ne pas réinventer) :
    > **ne pas doubler**. L'orchestrateur métier respecte P3 (ne produit jamais) et ADR-029 (≤250L).
 6. **Garde-fous** — `vibeflow-validator` + `audit-architecture` (auditeurs toujours présents).
 7. **Commandes d'incarnation (ADR-042)** — balayer **tous** les agents posés :
-   `VF_TARGET_ROOT=<.claude> bash "${CLAUDE_PLUGIN_ROOT}/conductor/scripts/generate-agent-commands.sh"`. Génère une `/agent` par
+   `VF_TARGET_ROOT=<.claude> bash .claude/scripts/generate-agent-commands.sh` (cascade : sinon
+   `"${CLAUDE_PLUGIN_ROOT}/conductor/scripts/generate-agent-commands.sh"`). Génère une `/agent` par
    agent (métier + gouvernance) qui l'**incarne dans la fenêtre principale** (session courante), pas en
    sous-agent. Idempotent (ne réécrit pas une commande existante). Détail : `references/agent-command-incarnation.md`.
 8. **Stamp framework** — `bash .claude/scripts/framework-version.sh stamp` (rendu **visible au récap**).
@@ -298,6 +312,11 @@ redemander — c'est l'unique cas de question supplémentaire.
 - Écrire `docs/LAB_BRIEF.md` avec les 8 sections canoniques : celles couvertes par les 3 réponses
   sont `✅` ; **toutes les autres sont remplies par déduction** (depuis le métier + l'objectif) et
   marquées **`[DÉRIVÉ — à affiner]`** — PAS `[À CLARIFIER]` : une déduction assumée n'est pas un trou.
+- **Le marqueur s'écrit VERBATIM `[DÉRIVÉ — à affiner]`** (casse, accents, tiret cadratin, espaces
+  — exactement cette chaîne), partout où une dérivation apparaît : brief, manifeste, capacités,
+  CLAUDE.md. Il est **greppable** — le Gate A express et `/vf-calibrate` s'appuient dessus
+  (`grep -F '[DÉRIVÉ — à affiner]'`). Aucune variante (`[DERIVE]`, `[dérivé — a affiner]`,
+  reformulation libre) : une variante échappe au gate ET à la reprise de calibration.
 - **Profil `leger` posé d'office** dans `.planning/config.json` (clé `profile`) — c'est lui qui
   proportionne tout l'aval, déjà câblé en v2.33.0 : plafond 1-3 capacités, Stop-hook en warn,
   validator Phase 4 opt-in, registre EVALS différé à la première éval réelle.
@@ -318,11 +337,28 @@ redemander — c'est l'unique cas de question supplémentaire.
 ### Fabrication en tâche de fond
 
 Lancer le fan-out `skill-creator` (Phase 5, 1-3 capacités) **en arrière-plan** (sous-agents
-`run_in_background`) puis enchaîner IMMÉDIATEMENT l'assemblage (Phase 7 allégée : CLAUDE.md,
-modules, socle planning profil `leger`, registres, Gate C). **L'utilisateur peut commencer à
-travailler pendant la fabrication** ; à la notification de fin, câbler les skills livrés
-(attribution) et le signaler en une ligne. Phase 6 (ficelage auditeurs) : uniquement si une
-capacité est une procédure générative — sinon sauter.
+`run_in_background`) puis enchaîner IMMÉDIATEMENT la **Phase 7 allégée**. Allégée ≠ amputée —
+liste EXPLICITE et COMPLÈTE des sous-étapes conservées (numérotation Phase 7) :
+1. `CLAUDE.md` + externalisation doc (7.1) ;
+2. modules (7.2 — baseline, garde-fous 7.6 inclus par la même install) ;
+3. socle planning profil `leger` (7.3) ;
+4. registres mémoire sous `.claude/memory/` + reindex machine (7.4) ;
+5. **agents métier** (7.5, frontmatter canonique ADR-044 ; attribution des skills complétée à la
+   notification de fabrication) ;
+6. **commandes d'incarnation `/agent`** pour TOUS les agents posés (7.7) ;
+7. **stamp framework** (7.8, visible au récap) ;
+8. **Gate C** (7.9 — intact, voir ordonnancement ci-dessous).
+Seuls sont conditionnels : l'orchestrateur métier (7.5bis — seulement si ≥2 agents métier) et la
+Phase 6 (ficelage auditeurs — uniquement si une capacité est une procédure générative).
+**L'utilisateur peut commencer à travailler pendant la fabrication** ; à la notification de fin,
+câbler les skills livrés (attribution) et le signaler en une ligne.
+
+**Ordonnancement Gate C ↔ fabrication de fond** : le **Gate C FINAL se relance après le câblage
+post-notification** de la fabrication (attribution des skills livrés) — c'est LUI qui conclut
+l'init. Un passage intermédiaire pendant que le fan-out travaille est permis, et alors : un
+**C.2 rouge portant sur un skill encore en fabrication est ATTENDU et non bloquant avant la
+livraison** — le **consigner** (dette du récap / BLOCKER léger), **pas le corriger** (le skill
+arrive ; en fabriquer un doublon à la main violerait le canal unique `skill-creator`).
 
 ### Récap final — « dette d'express » (obligatoire)
 
@@ -341,7 +377,8 @@ Le récap liste **honnêtement** :
 - **Jamais dériver/fabriquer avec un marqueur `[À CLARIFIER]` ouvert** (Gate A puis Gate B). En
   express, un `[DÉRIVÉ — à affiner]` n'est **pas** un `[À CLARIFIER]` : il ne bloque pas.
 - **Express** : jamais plus de **3 questions** ; jamais un **Gate C** affaibli ; jamais une
-  dérivation masquée — tout `[DÉRIVÉ — à affiner]` figure au récap de dette (+ `/vf-calibrate`).
+  dérivation masquée — tout `[DÉRIVÉ — à affiner]` (marqueur VERBATIM, greppable) figure au récap
+  de dette (+ `/vf-calibrate`).
 - **Jamais rédiger un skill à la main** : toute création OU mise à jour de skill — y compris une
   procédure interne ou un skill « sur-mesure » — passe par `skill-creator` (canal unique : recherche →
   draft → eval → itère). Le pipeline vaut même sur des données de procédures qu'on a déjà en interne.
@@ -370,4 +407,6 @@ Le récap liste **honnêtement** :
 - planning-core `references/PROFILES.md` / `domain-detection.md` / **`compartments.md`** (topologie
   compartiments : seuil d'autonomie, typage deliverable/continuous, INDEX) — chargé en Phase 7. Bundles : `docs/<metier>-bundle/`.
 - `scripts/proportion-capabilities.sh` — plafond conseillé de capacités P0 selon le profil.
-- Outils délégués (chemins) : `_internal/resolve-deps.sh` (deps modules), `conductor/scripts/framework-version.sh` (stamp).
+- Outils délégués : `_internal/resolve-deps.sh` (deps modules — via la table du skill
+  `vibeflow-install`) ; `framework-version.sh` (stamp — cascade Phase 7 : `.claude/scripts/` du
+  lab si présent, sinon `${CLAUDE_PLUGIN_ROOT}/conductor/scripts/`).

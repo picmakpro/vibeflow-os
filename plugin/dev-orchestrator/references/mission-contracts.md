@@ -69,7 +69,10 @@ Tâche simple sans signal → routage direct **sans question** (zéro friction s
 
 ## Seuil de bascule (vf-auto)
 
-`SEUIL_EQUIPE = 3` — N = étapes restantes ciblées (`gsd-sdk query roadmap.analyze`) :
+`SEUIL_EQUIPE = 3` — N = étapes restantes ciblées, comptées via `gsd-sdk query roadmap.analyze`
+(**prérequis non garanti** : si `gsd-sdk` est absent de la machine, fallback documenté —
+compter les cases non cochées du périmètre dans `.planning/ROADMAP.md` : `grep -c '^- \[ \]'`
+ou équivalent ; jamais de blocage silencieux sur l'outil manquant) :
 
 - **N < SEUIL_EQUIPE ET aucun signal de durée** → moteur direct (boucle autonome inline, moins chère).
 - **N ≥ SEUIL_EQUIPE OU signal de durée** → équipe (`Task(vf-dev-manager)` avec le brief ci-dessus).

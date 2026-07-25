@@ -20,6 +20,13 @@
 # Résolution plugin-root (cache du plugin) : --plugin-root > $CLAUDE_PLUGIN_ROOT > $VIBEFLOW_CACHE.
 # lab-root défaut = "." (cwd du lab). Le fichier d'enregistrement : <lab-root>/.claude/.vibeflow-framework-version
 #
+# Fallback lab (UAT F3) : sans plugin-root (CLAUDE_PLUGIN_ROOT/VIBEFLOW_CACHE vides — cas normal
+# d'un `bash .claude/scripts/framework-version.sh stamp` depuis un lab), la version courante se lit
+# dans le registre posé par l'engine : <lab-root>/.claude/scripts/.vibeflow-installed
+# (une ligne `module=version` par module) — ligne du socle `conductor` (mandatory, c'est lui qui
+# livre ce script). Les DEUX côtés du drift (current et recorded) résolvent par la même cascade :
+# la comparaison reste cohérente. `stamp` ne sort donc plus en erreur dans un lab installé.
+#
 # Exit codes (drift) : 0 = à jour OU inconnu (advisory)  1 = retard détecté (recalibration conseillée)
 set -uo pipefail
 
@@ -61,6 +68,14 @@ current_version() {
   for f in "$PLUGIN_ROOT/VERSION" "$PLUGIN_ROOT/../VERSION"; do
     [ -f "$f" ] && { norm "$(head -1 "$f")"; return; }
   done
+  # Fallback lab (UAT F3) : registre d'install de l'engine (module=version par ligne).
+  # La version du socle `conductor` sert de version de méthode quand le cache plugin est
+  # hors de portée — même cascade des deux côtés du drift, comparaison cohérente.
+  local reg="$LAB_ROOT/.claude/scripts/.vibeflow-installed" line
+  if [ -f "$reg" ]; then
+    line="$(grep -E '^conductor=' "$reg" 2>/dev/null | head -1)"
+    [ -n "$line" ] && { norm "${line#conductor=}"; return; }
+  fi
   echo ""
 }
 

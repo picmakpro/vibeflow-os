@@ -1,10 +1,11 @@
 {
   "name": "business-pilot-bundle",
-  "version": "v2.0.0",
+  "version": "v2.0.1",
   "type": "agents + skill + scripts",
   "description": "Équipe business installable sur le team-kernel (business-pilot) : manager de mission vf-business-manager (DAG + verrou de driver — nœuds par dossier client : commercial → delivery → gate qualité → humain → finance —, dispatch parallèle des dossiers indépendants, digest par mandat, rapports typés) + workers cloisonnés vf-business-commercial / vf-business-delivery / vf-business-finance + gate frais read-only quality-gate-client (rubric /100, montant non sourcé et hors-périmètre-vendu éliminatoires), et le skill d'entrée vf-business (geste simple vs mission). Deux Iron Laws : aucun envoi client sans validation humaine, aucun chiffre financier inventé (adossé à kpi-analyst quand il est installé). Les blueprints d'origine restent dans content/ comme trace de conception lisible par vf-new-lab.",
   "proposable": true,
   "requires": [
+    "conductor",
     "planning-core",
     "consolidator",
     "audit-architecture",

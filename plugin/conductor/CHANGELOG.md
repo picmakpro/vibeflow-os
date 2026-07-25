@@ -1,5 +1,10 @@
 # Changelog — conductor
 
+## [v1.14.1] — 2026-07-26
+
+### Corrigé
+- Recettes UAT sur labs vierges : `vibeflow-install` retiré du frontmatter (commande plugin, pas skill de lab) ; `check-agents.sh` résout les skills déclarés aussi par leur frontmatter `name:` ; `framework-version.sh stamp` retombe sur `.vibeflow-installed` en lab isolé ; vf-new-lab — cascade de résolution des scripts prescrite, Phase 7 express explicite, chemin `.claude/memory/` écrit, ordonnancement Gate C ↔ fabrication de fond spécifié, marqueur `[DÉRIVÉ — à affiner]` verbatim.
+
 ## [v1.14.0] — 2026-07-25
 
 ### Ajouté

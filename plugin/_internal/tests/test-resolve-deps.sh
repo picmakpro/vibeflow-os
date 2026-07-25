@@ -12,10 +12,12 @@ ko()   { echo "  ✗ $1"; fail=$((fail+1)); }
 
 echo "== test-resolve-deps =="
 
-# 1. validator → fermeture transitive {consolidator, infrastructure-audit, validator} (triée, 3 lignes)
+# 1. validator → fermeture transitive {audit-architecture, consolidator, infrastructure-audit,
+#    validator} (triée, 4 lignes — audit-architecture requis depuis UAT F2 : la Phase 4 du
+#    validator, même opt-in, en a besoin ; la baseline s'élargit d'un module, assumé)
 out=$(bash "$SCRIPT" validator 2>/dev/null)
-exp=$(printf 'consolidator\ninfrastructure-audit\nvalidator')
-[ "$out" = "$exp" ] && ok "validator → consolidator, infrastructure-audit, validator (3 lignes triées)" \
+exp=$(printf 'audit-architecture\nconsolidator\ninfrastructure-audit\nvalidator')
+[ "$out" = "$exp" ] && ok "validator → audit-architecture, consolidator, infrastructure-audit, validator (4 lignes triées)" \
   || ko "validator: attendu [$exp] obtenu [$out]"
 
 # 2. consolidator (sans requires) → lui-même seul (1 ligne)

@@ -51,5 +51,15 @@ printf '%s\n' "3.1.0" > "$LAB/.claude/.vibeflow-framework-version"
 rm "$PLUG/.claude-plugin/plugin.json"; printf 'v2.9.0\n' > "$PLUG/VERSION"
 eq "current via fallback VERSION" "2.9.0" "$(bash "$FV" current --plugin-root "$PLUG")"
 
+# --- UAT F3 : stamp en LAB, sans plugin-root, via le registre engine .vibeflow-installed ---
+LAB2="$TMP/lab2"; mkdir -p "$LAB2/.claude/scripts"
+printf 'planning-core=v2.5.0\nconductor=v1.14.0\n' > "$LAB2/.claude/scripts/.vibeflow-installed"
+( CLAUDE_PLUGIN_ROOT= VIBEFLOW_CACHE= bash "$FV" stamp --lab-root "$LAB2" --quiet ); code "stamp lab sans plugin-root = 0 (F3, fallback registre)" 0 $?
+eq "recorded après stamp lab (F3) = version du socle conductor" "1.14.0" "$(bash "$FV" recorded --lab-root "$LAB2")"
+( CLAUDE_PLUGIN_ROOT= VIBEFLOW_CACHE= bash "$FV" drift --lab-root "$LAB2" --quiet ); code "drift lab (même cascade des deux côtés) = 0" 0 $?
+# lab jamais installé (aucun registre) ET aucun plugin-root → stamp échoue toujours proprement
+LAB3="$TMP/lab3"; mkdir -p "$LAB3"
+( CLAUDE_PLUGIN_ROOT= VIBEFLOW_CACHE= bash "$FV" stamp --lab-root "$LAB3" --quiet 2>/dev/null ); code "stamp sans registre ni plugin-root = 1" 1 $?
+
 echo "== résultat : $PASS passés, $FAIL échoués =="
 [ "$FAIL" -eq 0 ]

@@ -300,6 +300,40 @@ RC=0; run_check --strict --allow-empty >/dev/null 2>&1 || RC=$?
 RC=0; run_check >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 0 ] && ok "T23 défaut + aucun agent → exit 0 (compat labs)" || ko "T23 défaut devrait rester 0, obtenu rc=$RC"
 
+# T24 — UAT F2 : skill déclaré par son frontmatter name: (≠ nom de dossier) → résolu en --strict
+# (ex. réel : module planning-core installé sous .claude/skills/planning-core/ avec name: vf-planning)
+mkdir -p "$SK/planning-core"
+printf -- '---\nname: vf-planning\ndescription: socle planning du lab, name different du dossier\n---\ncontenu court\n' > "$SK/planning-core/SKILL.md"
+cat > "$AG/routeur.md" <<'EOF'
+---
+name: routeur
+description: Agent declarant un skill par son name frontmatter et non par son dossier, pour tester la resolution.
+model: sonnet
+memory: project
+skills:
+  - vf-planning
+---
+corps
+EOF
+RC=0; run_check --strict >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] && ok "T24 skill résolu par frontmatter name: (vf-planning → planning-core/) en --strict" || ko "T24 résolution par name: échouée (rc=$RC) : $(run_check --strict 2>&1 | tail -3)"
+
+# T24b — un skill réellement absent (ni dossier ni name:) reste une ERREUR en --strict
+cat > "$AG/routeur.md" <<'EOF'
+---
+name: routeur
+description: Agent declarant un skill totalement inexistant, pour verifier que le gate reste actif.
+model: sonnet
+memory: project
+skills:
+  - skill-vraiment-fantome
+---
+corps
+EOF
+RC=0; run_check --strict >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 1 ] && ok "T24b skill inexistant (ni dossier ni name:) → toujours ERREUR en --strict" || ko "T24b gate affaibli (rc=$RC)"
+rm -f "$AG"/*.md; rm -rf "$SK/planning-core"
+
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
 [ "$fail" -eq 0 ]

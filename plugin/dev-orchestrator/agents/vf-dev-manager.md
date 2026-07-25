@@ -33,8 +33,10 @@ dispatcher quoi que ce soit.
 
 Protocole complet : `dev-orchestrator-references/mission-flow.md`. **Avant tout**, résous le dossier des
 scripts `$S` (scope-robuste, cf. mission-flow §Résolution) — premier existant parmi
-`$HOME/.claude/scripts` → `./.claude/scripts` → `${CLAUDE_PLUGIN_ROOT}/dev-orchestrator/scripts` ; ne
-présume jamais `./.claude`. Puis trois gestes **non négociables** :
+`./.claude/scripts` → `$HOME/.claude/scripts` → `${CLAUDE_PLUGIN_ROOT}/conductor/scripts` →
+`${CLAUDE_PLUGIN_ROOT}/dev-orchestrator/scripts` (le lab courant PRIME sur le scope user : sur
+une machine bi-scope, prendre les scripts du user divergerait silencieusement de la version du
+lab). Puis trois gestes **non négociables** :
 
 1. **Verrou de driver (avant TOUT dispatch)** :
    `"$S"/driver-lock.sh acquire --owner=<session|task_id> --step=<étape>`.
@@ -110,7 +112,10 @@ revue de code sur la même étape — seuls Test/Audit s'ajoutent.
 - **Verdict d'étape (rapport typé, ADR-053)** : le `statut` du rapport de worker — recoupé au
   `*-VERIFICATION.md` — pilote le flux de façon déterministe : `passed` → `dag.sh mark done` + frontière
   suivante · `human_needed` (ou tout finding `action: ask-user`) → **escalade** (mode superviser :
-  checkpoint ; mode autonome : consigner et continuer) · `gaps_found` → `dag.sh reopen` + UNE relance de
+  checkpoint ; mode autonome : **GELER le nœud porteur** — le laisser `blocked`/`failed`, consigner
+  l'escalade au rapport, et ne poursuivre QUE les nœuds indépendants ; jamais « continuer » sur un
+  finding qui défie l'intention/la sécurité — cohérent Pattern C « jamais tranché seul ») ·
+  `gaps_found` → `dag.sh reopen` + UNE relance de
   comblement via `vf-coder`, puis si les manques persistent : consigner et arbitrer · `blocked` → laisser
   le nœud `blocked`, traiter la dépendance. Les findings `action: auto-fix` repartent à `vf-coder` (jamais
   corrigés par toi) ; `no-op` ignorés.

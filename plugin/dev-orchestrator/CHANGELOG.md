@@ -1,5 +1,10 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.1.1] — 2026-07-26
+
+### Corrigé
+- Recette dev en lab sandbox : cascade `$S` — le lab courant prime sur le scope user (divergence de version silencieuse) et les deux énoncés sont alignés ; doctrine `human_needed` en autonome tranchée (geler le nœud porteur, jamais « continuer ») ; fallback documenté si `gsd-sdk` absent ; les 3 exceptions de routage écrites dans la carte ; `requires` += `conductor` (team-kernel).
+
 ## [v2.1.0] — 2026-07-25
 
 ### Ajouté

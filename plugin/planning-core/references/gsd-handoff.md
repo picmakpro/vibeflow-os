@@ -41,7 +41,7 @@ brique GSD correspondante (directement, ou via l'agent `vibeflow-dev` qui détec
 
 Les skills `gsd-*` sont l'interface directe du moteur de planning dev ; sur une intention ambiguë,
 l'agent `vibeflow-dev` tranche via la carte canonique
-(`dev-orchestrator/references/intent-routing.md`).
+(chemin d'install D7 : `.claude/agents/dev-orchestrator-references/intent-routing.md`).
 
 ## Ce que `vf-planning` fait encore sur un lab dev
 

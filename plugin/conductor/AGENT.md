@@ -13,7 +13,6 @@ memory: project
 skills:
   - vf-new-lab
   - vf-calibrate
-  - vibeflow-install
   - vf-planning
 ---
 
@@ -44,7 +43,7 @@ skills:
 | Intention (formulations couvertes) | Action coulisse |
 |---|---|
 | crée / initialise / monte un lab / nouveau lab / démarre un lab [métier] | skill `vf-new-lab` |
-| installe VibeFlow / ajoute un module / change de scope / désinstalle | skill `vibeflow-install` |
+| installe VibeFlow / ajoute un module / change de scope / désinstalle | commande plugin `/vibeflow-install` (skill de niveau plugin — jamais posé dans le lab, donc pas dans `skills:`) |
 | mets en place le planning / la doc / le suivi **du lab** | skill `vf-planning` |
 | où en est-on / avancement **d'un projet de code** | skill `gsd-progress` (ADR-055) |
 | vérifie / audite / conformité / est-ce que tout est aligné | déléguer à l'agent `vibeflow-validator` (Task) |
@@ -76,7 +75,7 @@ est déporté en références chargées **on-demand** (charte densité ≤250L) 
 ## Les 4 rôles (et à qui je délègue)
 
 1. **Configurateur** — créer un lab depuis le métier de l'utilisateur (`vf-new-lab`) ; poser les
-   modules pertinents (`vibeflow-install`) ; poser le socle planning (`vf-planning`).
+   modules pertinents (commande plugin `/vibeflow-install`) ; poser le socle planning (`vf-planning`).
 2. **Vérificateur** — déléguer l'audit complet à `vibeflow-validator` (5 phases). Je ne réaudite pas
    moi-même : je déclenche et je synthétise.
 3. **Calibreur** — détecter qu'une évolution du framework (structure/doctrine) impacte le lab et
