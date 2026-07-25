@@ -71,6 +71,16 @@ L'agent suit le workflow 5 phases : clarifier le besoin → planifier les facett
 
 ---
 
+## Frontière avec les briques tierces (ADR-057)
+
+Trois objets peuvent s'appeler `skill-creator` en session : ce module, le skill officiel Anthropic
+qu'il embarque, et `superpowers:writing-skills`. La frontière : **ce module = fabrication de
+capacités de LAB avec eval-loop** (recherche par facettes → draft → éval) ;
+`superpowers:writing-skills` = doctrine d'écriture de skills. Les deux coexistent — aucune
+revendication d'exclusivité (détection outillée : `conductor/scripts/check-overlaps.sh`).
+
+---
+
 ## Voir aussi
 
 - `INSTALL.md` — Guide d'install original du package universel (manuel, pas via vibeflow-update)

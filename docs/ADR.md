@@ -26,6 +26,7 @@
 | ADR-054 | 2026-07-23 | Portabilité Windows — normalisation CRLF, préflight, gardes réellement actives, gate de synchro versions | Validée (2 rapports terrain intégrés) |
 | ADR-055 | 2026-07-25 | Frontière d'altitude entre planning-core et le moteur de planning GSD — un projet = un seul moteur | Validée |
 | ADR-056 | 2026-07-25 | Vigilance support runtime (scission du double emploi d'ADR-031) | Validée |
+| ADR-057 | 2026-07-25 | Frontières avec les briques tierces — détection outillée des recouvrements | Validée |
 
 ### ADR héritées les plus citées (définitions canoniques)
 
@@ -758,3 +759,90 @@ templates frontmatter). 325 citations, zéro définition : toute référence ét
 Les emplois « runtime » d'ADR-031 sont réécrits en ADR-056 dans : VIBEFLOW_CORE.md,
 infrastructure-audit (SKILL, README, références), templates lead/CLAUDE/agent_anatomy,
 validator. Les CHANGELOG historiques conservent l'ancienne numérotation.
+
+---
+
+## ADR-057 : Frontières avec les briques tierces — détection outillée des recouvrements
+
+**Date** : 2026-07-25
+**Statut** : Validée
+**Décideur** : Samuel (audit complet 2026-07-25, sections C et G.17)
+**Contexte** : branche feat/v3-team-kernel — concurrence de routage avec les briques tierces
+
+### Problème
+
+Des briques VibeFlow/GSD entrent en concurrence de déclenchement avec des briques TIERCES
+présentes en session — que VibeFlow ne contrôle pas et ne peut pas dé-publier :
+
+- **3 objets nommés `skill-creator`** (module VibeFlow, skill officiel Anthropic embarqué,
+  `superpowers:writing-skills`), avec une revendication « Sole authorized channel for skill
+  creation » défendue par rien : aucune machine ne l'applique, les briques tierces ne la lisent pas.
+- **`gsd-debug` vs `superpowers:systematic-debugging`** (« Use when encountering ANY bug ») :
+  deux candidates au premier geste de dépannage.
+- **6 entrées de revue possibles** : `gsd-code-review`, `feature-dev:code-reviewer`,
+  `/code-review` natif, `superpowers:requesting-code-review`…
+- **Recette mobile** : skill `mobile-test` vs `/vf-test` → `gsd-verify-work` vs équipe
+  `mobile-test-team`.
+
+La préséance par prose ne tient pas : rien ne l'exécute, et les descriptions tierces continuent
+de matcher au routage sémantique.
+
+### Options Considérées
+
+| Option | Verdict |
+|---|---|
+| Dé-publier / désinstaller les briques tierces | Rejetée — hors de portée : superpowers, feature-dev et le natif appartiennent à l'utilisateur / à Anthropic |
+| Renforcer la prose de préséance (« sole authorized channel », rules) | Rejetée — c'est l'état de départ ; une prose que rien n'exécute ne désambiguïse rien |
+| Renommer les briques VibeFlow pour éviter tout mot commun | Rejetée — mutile les descriptions : le routage sémantique a besoin des mots du domaine |
+| **Frontière descriptive + détecteur machine** | **Retenue** — même méthode qu'ADR-055 : frontière DÉTECTÉE PAR SCRIPT + doctrine courte |
+
+### Décision
+
+1. **VibeFlow ne revendique jamais l'exclusivité contre une brique tierce.** Il (a) évite le
+   recouvrement dans SES PROPRES descriptions (déclencheurs disjoints), (b) documente la
+   frontière là où le recouvrement demeure (qui est canon pour quoi), (c) fournit un détecteur
+   machine.
+2. **`check-overlaps.sh` (conductor)** inventorie les paires de recouvrement CONNUES (table
+   interne : brique VibeFlow/GSD ↔ brique tierce ↔ frontière canonique en une ligne) et, pour
+   chaque paire dont les DEUX côtés sont présents dans le lab (skills projet/user, agents,
+   plugins installés), affiche la frontière. **Advisory par défaut : exit 0 toujours.**
+   `--strict` → exit 1 si un recouvrement SANS frontière documentée est détecté (heuristique :
+   deux briques locales sur une même racine debug/review/skill-creat) ; cible locale absente en
+   `--strict` → exit 3 (INDÉTERMINÉ, F13).
+3. **Abandon assumé de la revendication « sole authorized channel »** du skill-creator au profit
+   d'une frontière descriptive : le module VibeFlow = **fabrication de capacités de LAB avec
+   eval-loop** (recherche par facettes → draft → éval) ; `superpowers:writing-skills` =
+   **doctrine d'écriture de skills**. Les deux coexistent.
+4. **Frontières canoniques initiales** (table du script) :
+   - `systematic-debugging` = méthode dans la session courante ; `gsd-debug` = état persistant
+     cross-session (canon dès que le debug survit à un reset de contexte).
+   - `gsd-code-review` = canon dans un projet GSD ; `feature-dev:code-reviewer` / `/code-review`
+     natif / `requesting-code-review` = revue hors chaîne GSD.
+   - `mobile-test` = preuve sur cible mobile réelle (simulateur/émulateur, Maestro) ;
+     `gsd-verify-work` = recette conversationnelle ; boucle autonome = équipe `mobile-test-team`.
+   - `superpowers:brainstorming` = concevoir une idée avant d'implémenter ; `gsd-explore` =
+     exploration socratique et routage d'idée.
+
+### Conséquences
+
+**Positives** : la frontière devient vérifiable (inventaire machine au lieu de 4 tables de prose
+à synchroniser) ; la revendication indéfendable du skill-creator disparaît au profit d'une
+coexistence assumée ; tout nouveau recouvrement à racine sensible est signalé avant de devenir
+une ambiguïté de routage en session. **Négatives / risque** : la table interne est un inventaire
+statique — un recouvrement hors racines connues (debug/review/skill-creat) n'est pas détecté par
+l'heuristique ; l'advisory ne force rien (choix délibéré : VibeFlow ne bloque pas une session à
+cause d'une brique qu'il ne contrôle pas). Mitigation : enrichir la table au fil des audits.
+
+### Code Impacté
+
+- `plugin/conductor/scripts/check-overlaps.sh` (nouveau) +
+  `plugin/conductor/scripts/tests/test-check-overlaps.sh` (nouveau)
+- `plugin/skill-creator/AGENT.md` + `plugin/skill-creator/README.md` (abandon « sole authorized
+  channel » → frontière descriptive)
+- `plugin/mobile-test/SKILL.md` (frontière dans la description)
+
+### Rules Associées
+
+- Applique la méthode ADR-055 (frontière détectée par script + doctrine courte, pas de prose de
+  préséance) au périmètre des briques tierces. Respecte F13 (vacuous green) : `--strict` sur
+  cible vide sort 3, jamais un vert. Aucune rule nouvelle.
