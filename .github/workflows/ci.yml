@@ -1,0 +1,90 @@
+# CI vibeflow-os — le repo se soumet enfin à ses propres gates (audit 2026-07-25 : F13/F14/P1-b).
+#
+# Principe (contrat de découverte, F13) : chaque job ASSERTE que sa découverte est non vide
+# avant de rendre un verdict — 0 suite trouvée ou 0 dossier d'agents trouvé = échec, jamais
+# un vert par absence de cible (« vacuous green »).
+#
+# check-release-tag ne tourne que sur main : une branche de feature porte légitimement une
+# VERSION dont le tag n'existe pas encore (le tag est posé après merge, cf. CLAUDE.md).
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  tests:
+    name: Suites de tests (découverte non vide)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dépendances (bash, jq, python3)
+        run: |
+          bash --version | head -1
+          jq --version
+          python3 --version
+
+      - name: Découvrir et lancer toutes les suites
+        run: |
+          set -u
+          suites=$(find plugin scripts -type f -path '*/tests/test-*.sh' | sort)
+          count=$(printf '%s\n' "$suites" | grep -c . || true)
+          echo "== $count suite(s) découverte(s) =="
+          # Assertion de découverte non vide (F13) : 0 suite = échec, pas un vert.
+          if [ "$count" -eq 0 ]; then
+            echo "::error::aucune suite de tests découverte (pattern */tests/test-*.sh) — la CI refuse de rendre un verdict vide"
+            exit 1
+          fi
+          fail=0
+          while IFS= read -r t; do
+            [ -n "$t" ] || continue
+            echo "::group::$t"
+            if bash "$t"; then
+              echo "PASS $t"
+            else
+              rc=$?
+              echo "::error::FAIL(rc=$rc) $t"
+              fail=$((fail + 1))
+            fi
+            echo "::endgroup::"
+          done <<EOF
+          $suites
+          EOF
+          echo "== bilan : $count suite(s), $fail échec(s) =="
+          [ "$fail" -eq 0 ]
+
+  gates:
+    name: Gates de qualité (mode strict)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # historique + tags complets (check-release-tag)
+
+      - name: check-agents --strict sur chaque plugin/*/agents (découverte non vide)
+        run: |
+          set -u
+          found=0
+          fail=0
+          for d in plugin/*/agents; do
+            [ -d "$d" ] || continue
+            found=$((found + 1))
+            echo "== $d =="
+            # --strict : skills déclarés doivent exister + cible vide → exit 3 (INDÉTERMINÉ ≠ vert)
+            bash plugin/conductor/scripts/check-agents.sh --strict --agents-dir="$d" || fail=$((fail + 1))
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "::error::aucun dossier plugin/*/agents découvert — la CI refuse de rendre un verdict vide"
+            exit 1
+          fi
+          echo "== $found dossier(s) d'agents vérifié(s), $fail échec(s) =="
+          [ "$fail" -eq 0 ]
+
+      - name: check-version-sync (canon VERSION ↔ plugin.json ↔ marketplace ↔ badges ↔ triade par module)
+        run: bash scripts/check-version-sync.sh
+
+      - name: check-release-tag (main uniquement — VERSION doit être taggée et poussée)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: bash scripts/check-release-tag.sh --remote
