@@ -1,8 +1,11 @@
 # planning-core
 
-> **Socle de planning & gestion documentaire universel.** Pose le tronc commun `.planning/` d'un
-> lab — la couche qui répond à « où va-t-on, où en est-on, qu'a-t-on décidé » — **adapté à la
-> logique métier**, jamais imposé.
+> **Socle de planning & gestion documentaire du lab.** Pose le tronc commun `.planning/` d'un lab
+> **non-dev** — adapté à sa logique métier, jamais imposé — et tient l'**altitude lab** sur tous les
+> labs : index des projets, compartiments typés, pont mémoire, enforcement par hooks.
+>
+> Sur un lab de code, le planning du **projet** appartient au moteur de développement : ce module
+> redirige vers le verbe adéquat au lieu de produire un format concurrent (ADR-054).
 
 **Type** : `skill + references + scripts` · **Version** : v1.1.0 · **Dépend de** : rien.
 
@@ -43,9 +46,11 @@ La rigueur est un curseur — on prend le minimum qui sert. Détail : `reference
 
 ## Utilisation
 
-Une fois le module installé, invoquer le skill : « **mets en place le planning du projet** »,
-« structure la doc », « où en est-on ? ». Le skill `vf-planning` lit le métier du lab, propose un
-profil, et pose `.planning/` adapté. En maintenance, il tient `STATE.md` à jour et trace les étapes.
+Une fois le module installé, invoquer le skill : « **mets en place le suivi de ce lab** »,
+« structure la doc », « fais l'index de mes projets ». Le skill `vf-planning` commence par déterminer
+qui tient le planning du lab, puis pose le socle adapté au métier (lab non-dev) ou se limite à
+l'altitude lab en redirigeant vers le verbe de projet (lab de code). En maintenance, il tient
+`STATE.md` à jour et trace les étapes.
 
 ## Cohabitation avec la mémoire
 

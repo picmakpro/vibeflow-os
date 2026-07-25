@@ -105,7 +105,7 @@ Slash commands natives livrées par le plugin (disponibles dès qu'il est activ�
 |----------|------|
 | `/vibeflow [demande]` | Porte d'entrée — délègue à l'agent **vibeflow-conductor** (créer/configurer/vérifier/mettre à jour/migrer le lab). |
 | `/vf-new-lab [métier]` | Créer un lab dans n'importe quel métier (instancie un bundle métier si présent). |
-| `/vf-planning` | Poser ou rafraîchir le socle `.planning/` ; répond à « où en est-on ? ». |
+| `/vf-planning` | Poser ou rafraîchir le socle `.planning/` d'un lab non-dev, et l'altitude lab partout (index des projets, compartiments, pont mémoire). Sur un projet de code, redirige vers le verbe de développement. |
 | `/vf-calibrate` | Détecter le drift framework et migrer le lab (validation humaine). |
 | `/vf-audit` | Audit de conformité complet via l'agent **vibeflow-validator**. |
 | `/vibeflow-install` | Installer/activer des modules (skill installeur scope-aware). |

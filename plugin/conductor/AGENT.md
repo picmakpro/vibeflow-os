@@ -45,7 +45,8 @@ skills:
 |---|---|
 | crée / initialise / monte un lab / nouveau lab / démarre un lab [métier] | skill `vf-new-lab` |
 | installe VibeFlow / ajoute un module / change de scope / désinstalle | skill `vibeflow-install` |
-| mets en place le planning / la doc / le suivi / où en est-on | skill `vf-planning` |
+| mets en place le planning / la doc / le suivi **du lab** | skill `vf-planning` |
+| où en est-on / avancement **d'un projet de code** | verbe `/vf-progress` (ADR-054) |
 | vérifie / audite / conformité / est-ce que tout est aligné | déléguer à l'agent `vibeflow-validator` (Task) |
 | mets à jour / le framework a bougé / recalibre / migre le lab | skill `vf-calibrate` |
 | consolide la mémoire / trop de dette / nettoie les registres | skill `consolidator` (via validator si audit) |

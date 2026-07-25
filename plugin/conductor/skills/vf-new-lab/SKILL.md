@@ -156,7 +156,10 @@ Dériver puis poser (déléguer, ne pas réinventer) :
    `consolidator` + `audit-architecture` + `validator` + **`skill-creator`** (canal unique de création
    de skills — posé d'office car dépendance du conductor `mandatory`, donc disponible dès la Phase 5).
    **Pas `dev-orchestrator`** sauf métier = code.
-3. **Socle planning** — `vf-planning`. **Lab à compartiments** : `.planning/` du lab en *steering +
+3. **Socle planning** — **qualifier le métier d'abord** (ADR-054) : *lab non-dev* → `vf-planning` pose le
+   socle adapté au métier ; *lab de code* → le socle du **projet** appartient au moteur de développement,
+   router `/vf-init` (`vf-planning` n'y pose plus le tronc, il tient l'altitude lab et redirige).
+   **Lab à compartiments** (quel que soit le métier) : `.planning/` du lab en *steering +
    `INDEX.md`* (jamais de ROADMAP global) ; un socle par compartiment **qualifié** (seuil d'autonomie),
    typé `deliverable` (roadmap+phases) ou `continuous` (`BOARD.md` + cadence). Sous le seuil / infra →
    ligne d'`INDEX.md`. Réf : planning-core `references/compartments.md`. **Jamais un `.planning/` par
