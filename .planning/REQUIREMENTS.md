@@ -108,12 +108,69 @@
   valeurs jcode brutes), ET un **mini-cadrage écrit du volet swarm** (lock de driver unique RAII + DAG
   ready/blocked), **non implémenté** tant que des collisions ne sont pas observées (ADR-048/049).
 
+## Milestone gsd-migration — Migration package GSD (VOC-02)
+
+### Phase 10 — Étude & faisabilité
+
+- [ ] **GSDM-01**: La surface d'usage GSD dans VibeFlow est inventoriée exhaustivement — chaque point de
+  contact (`ensure-deps.sh`, `build-gsd-index.sh`, binaire `gsd-sdk`, chemins `~/.claude/get-shit-done/`,
+  pins `PROJECT.md`, hooks, références docs) listé avec le changement attendu.
+- [ ] **GSDM-02**: Le package cible `@opengsd/gsd-core` est caractérisé — existence/stabilité npm, commande
+  d'install non-interactive équivalente, nom du binaire, structure de dossier, parité fonctionnelle des
+  skills/SDK consommés ; écarts documentés.
+- [ ] **GSDM-03**: Une note go/no-go écrite tranche — (a) migrer maintenant (stratégie + fenêtre de compat),
+  (b) attendre (déclencheur de resurgence explicite), ou (c) archiver.
+
+### Phase 11 — Intégration (conditionnée au GO de la Phase 10)
+
+- [ ] **GSDM-04**: `ensure-deps.sh` et les pins (`PROJECT.md`) installent `@opengsd/gsd-core` en
+  non-interactif, idempotent, avec fallback manuel ; `get-shit-done-cc` n'est plus référencé.
+- [ ] **GSDM-05**: L'index factuel (`build-gsd-index.sh`) est régénéré depuis le nouveau package/binaire
+  (zéro hallucination) et les références docs pointent la nouvelle source.
+- [ ] **GSDM-06**: Non-régression prouvée en isolé (dry-run 3 scopes + idempotence, vrai `~/.claude` intact) ;
+  CHANGELOG/README à jour ; release bumpée + tag annoté poussé (`check-release-tag.sh --remote` → ✓).
+
+## Milestone vf-routing — Routage fin & couverture des verbes
+
+Spec : `docs/superpowers/specs/2026-07-25-routage-fin-verbes-vf-design.md`.
+
+### Phase 12 — Routage fin & couverture complète des verbes `/vf-*`
+
+- [ ] **VERB-01**: La table de routage de `AGENT.md` mappe chaque intention vers un **verbe `/vf-*`**
+  (plus aucune cible `gsd-*` en entrée de chaîne) ; `AGENT.md` reste ≤ 250 L.
+- [ ] **VERB-02**: 18 nouveaux verbes `/vf-*` sont livrés dans `dev-orchestrator` (`vf-secure`, `vf-testgen`,
+  `vf-audit`, `vf-forensics`, `vf-inbox`, `vf-milestone`, `vf-phase`, `vf-undo`, `vf-backlog`, `vf-cleanup`,
+  `vf-resume`, `vf-pause`, `vf-docs`, `vf-learn`, `vf-explore`, `vf-spike`, `vf-spec`, `vf-ingest`) + `vf-sketch`
+  dans `design-orchestrator` ; chacun délègue à une cible GSD existante, aucun ne réimplémente sa logique.
+- [ ] **VERB-03**: Les 32 descriptions de skills (14 réécrites + 18 nouvelles) suivent le gabarit déclencheur —
+  formulations FR réelles + contre-exemples nommant les verbes voisins ; les 5 groupes de collision identifiés
+  sont démarqués.
+- [ ] **VERB-04**: Une rule de préséance globale (`rules/vf-verb-precedence.md`, ≤ 40 L, sans `paths:`) est
+  livrée et installée en `.claude/rules/` : aucun skill `gsd-*` ni `superpowers:*` n'est invoqué en entrée de
+  chaîne ni nommé à l'utilisateur.
+- [ ] **VERB-05**: `references/intent-routing.md` couvre **100 %** des skills listés dans
+  `gsd-skills-index.md` (chargé on-demand) ; les tests du module passent, fixture T4 étendue aux nouvelles
+  cibles + T11 (anti-collision), T12 (préséance), T13 (exhaustivité).
+
+### Phase 13 — Pont spec → feuille de route
+
+- [ ] **BRDG-01**: `/vf-ingest` intègre une spec `docs/superpowers/specs/*.md` à la feuille de route via
+  `gsd-ingest-docs --mode merge` (étapes + exigences), et un plan `docs/superpowers/plans/*.md` via
+  `gsd-import --from` — sans réimplémenter ni contourner les moteurs.
+- [ ] **BRDG-02**: Le verbe découvre les specs/plans **non encore intégrés** (chemin non cité dans
+  `ROADMAP.md`), détecte le grain (spec vs plan) et construit le manifest YAML attendu par le moteur —
+  l'utilisateur n'écrit aucun manifest à la main.
+- [ ] **BRDG-03**: Les garde-fous sont préservés et vérifiés : gate BLOCKER jamais contourné, confirmation
+  humaine avant toute écriture dans `.planning/` (ADR-031), `--mode merge` par défaut sur projet existant,
+  cap 50 documents signalé ; `vf-brainstorm` propose `/vf-ingest` en fin de cadrage.
+
 ## v2 Requirements
 
 ### Vocabulaire & UX
 
 - **VOC-01**: Traduction exhaustive de tous les artefacts GSD en vocabulaire VibeFlow.
 - **VOC-02**: Migration automatique `get-shit-done-cc` → `@opengsd/gsd-core` quand la bascule npm est stable.
+  → **Promu en milestone `gsd-migration`** (Phases 10-11, requirements GSDM-01..06).
 
 ## Out of Scope
 
@@ -172,13 +229,29 @@
 | CONS-04 | Phase 8 | Complete |
 | RND-01 | Phase 9 | Spike done — GO (round-trip + archivage vérifiés) |
 | RND-02 | Phase 9 | Done — note go/no-go + demi-vies recalibrées + cadrage swarm |
+| GSDM-01 | Phase 10 | Not started |
+| GSDM-02 | Phase 10 | Not started |
+| GSDM-03 | Phase 10 | Not started |
+| GSDM-04 | Phase 11 | Not started (GATE Phase 10) |
+| GSDM-05 | Phase 11 | Not started (GATE Phase 10) |
+| GSDM-06 | Phase 11 | Not started (GATE Phase 10) |
+| VERB-01 | Phase 12 | Not started |
+| VERB-02 | Phase 12 | Not started |
+| VERB-03 | Phase 12 | Not started |
+| VERB-04 | Phase 12 | Not started |
+| VERB-05 | Phase 12 | Not started |
+| BRDG-01 | Phase 13 | Not started |
+| BRDG-02 | Phase 13 | Not started |
+| BRDG-03 | Phase 13 | Not started |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
 - Milestone 2 (Install UX) : 17 requirements — mappés aux phases 2-6, 0 non-mappé ✓
 - Milestone 3 (Doctrine dev & consolidation) : 12 requirements — mappés aux phases 7-8, 0 non-mappé ✓
 - Milestone 4 (memory-swarm-rnd / R&D) : 2 requirements — mappés à la phase 9, 0 non-mappé ✓
+- Milestone 5 (gsd-migration) : 6 requirements — mappés aux phases 10-11, 0 non-mappé ✓
+- Milestone 6 (vf-routing) : 8 requirements — mappés aux phases 12-13, 0 non-mappé ✓
 
 ---
 *Requirements defined: 2026-06-04*
-*Last updated: 2026-07-07 — ajout Milestone 3 (doctrine dev & consolidation)*
+*Last updated: 2026-07-25 — ajout Milestone 6 (vf-routing : routage fin + pont spec→feuille de route)*
