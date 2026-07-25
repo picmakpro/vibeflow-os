@@ -196,18 +196,23 @@ fi
 # retard sur la chaîne réelle — sans elle, chaque verbe ajouté sort « orphelin » hors poste de dev.
 # gsd-ingest-docs / gsd-import : place réservée pour /vf-ingest (étape 13), la fixture les connaît
 # avant que le verbe n'existe.
+# gsd-sketch / gsd-ui-phase / gsd-ui-review : cibles du module design. En lab installé, les skills
+# des deux modules cohabitent à plat sous .claude/skills/ — la boucle ci-dessous les ramasse donc
+# aussi. Les omettre rendrait la suite rouge chez l'utilisateur et verte ici : le piège n° 1.
 FIXTURE_TARGETS="gsd-discuss-phase gsd-plan-phase gsd-mvp-phase gsd-execute-phase gsd-quick gsd-fast gsd-verify-work gsd-code-review gsd-debug gsd-autonomous gsd-ship gsd-pr-branch gsd-progress gsd-map-codebase gsd-new-project \
 gsd-secure-phase gsd-add-tests gsd-audit-uat gsd-audit-fix gsd-validate-phase gsd-forensics \
 gsd-inbox gsd-new-milestone gsd-complete-milestone gsd-milestone-summary gsd-audit-milestone \
 gsd-phase gsd-undo gsd-review-backlog gsd-capture gsd-cleanup gsd-resume-work gsd-pause-work \
 gsd-docs-update gsd-extract-learnings gsd-graphify gsd-explore gsd-spike gsd-spec-phase \
-gsd-sketch gsd-ingest-docs gsd-import"
+gsd-sketch gsd-ui-phase gsd-ui-review gsd-ingest-docs gsd-import"
 
 # Vérifie qu'une cible gsd-X est connue (index disque ou fixture).
+# Comparaison à frontière de mot : sans elle, « gsd-review » serait déclaré connu par la seule
+# présence de « gsd-review-backlog » dans l'index (préfixes : gsd-review, gsd-phase, gsd-import…).
 target_known() {
   local t="$1"
   if [ "$index_has_skills" -eq 1 ]; then
-    "$GREP" -q -- "$t" "$INDEX_DISK" && return 0
+    "$GREP" -qE -- "${t}([^a-z0-9-]|$)" "$INDEX_DISK" && return 0
   fi
   case " $FIXTURE_TARGETS " in *" $t "*) return 0 ;; esac
   return 1
@@ -293,11 +298,14 @@ else
   if (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install dev-orchestrator >/dev/null 2>&1); then
     miss=0
     [ -f "$LAB/.claude/agents/dev-orchestrator.md" ] || { ko "T6 install : .claude/agents/dev-orchestrator.md manquant"; miss=1; }
-    for ref in GSD-PIPELINE.md gsd-skills-index.md vocabulary-map.md; do
+    for ref in GSD-PIPELINE.md gsd-skills-index.md vocabulary-map.md intent-routing.md; do
       [ -f "$LAB/.claude/agents/dev-orchestrator-references/$ref" ] || { ko "T6 install : references/$ref manquant"; miss=1; }
     done
+    # La rule de préséance (niveau 2) doit être posée sous .claude/rules/ : sans elle, la doctrine
+    # existe en source mais n'est jamais chargée dans le lab — T13 ne le verrait pas, il lit la source.
+    [ -f "$LAB/.claude/rules/vf-verb-precedence.md" ] || { ko "T6 install : .claude/rules/vf-verb-precedence.md manquant"; miss=1; }
     if [ "$miss" -eq 0 ]; then
-      ok "T6 install e2e : agent + dev-orchestrator-references/{GSD-PIPELINE,gsd-skills-index,vocabulary-map}.md présents"
+      ok "T6 install e2e : agent + references (dont intent-routing) + rules/vf-verb-precedence.md présents"
     fi
   else
     skip "T6 install e2e : install non réalisable dans l'environnement (best-effort)"
@@ -433,71 +441,103 @@ vf-test:vf-spike
 vf-progress:vf-gaps
 "
 
+# Verbes du module design : leur absence n'est pas un échec (module non installé).
+DESIGN_VERBS="vf-design vf-sketch"
+is_design_verb() { case " $DESIGN_VERBS " in *" $1 "*) return 0 ;; esac; return 1; }
+
+# « $1 (description) repousse-t-elle vers le verbe $2 ? », à frontière de mot :
+# /vf-test est un préfixe de /vf-testgen, /vf-plan de /vf-planning — sans la frontière, une
+# démarcation supprimée resterait verte parce que sa voisine porte le même début de nom.
+cites_verb() { echo "$1" | "$GREP" -qE "/${2}([^a-z0-9-]|$)"; }
+
 t12_fail=0
 t12_groups=0
 for group in $COLLISION_GROUPS; do
   members="$(echo "$group" | tr ':' ' ')"
-  # Un verbe absent du disque : KO côté dev, SKIP si le module design n'est pas là.
-  missing=""
-  for m in $members; do skill_file "$m" >/dev/null || missing="$missing $m"; done
+  # Un verbe absent du disque : SKIP si SEULS des verbes design manquent (module non installé),
+  # KO dès qu'un verbe du module courant manque — sinon un groupe mixte masquerait la régression.
+  missing=""; missing_dev=""
+  for m in $members; do
+    skill_file "$m" >/dev/null && continue
+    missing="$missing $m"
+    is_design_verb "$m" || missing_dev="$missing_dev $m"
+  done
   if [ -n "$missing" ]; then
-    case "$missing" in
-      *vf-design*|*vf-sketch*) skip "T12 groupe [$members] : module design absent —$missing" ;;
-      *) ko "T12 groupe [$members] : verbe(s) introuvable(s) —$missing"; t12_fail=$((t12_fail+1)) ;;
-    esac
+    if [ -n "$missing_dev" ]; then
+      ko "T12 groupe [$members] : verbe(s) du module introuvable(s) —$missing_dev"; t12_fail=$((t12_fail+1))
+    else
+      skip "T12 groupe [$members] : module design absent —$missing"
+    fi
     continue
   fi
   t12_groups=$((t12_groups+1))
+  # Un verbe muet (aucun voisin cité) est signalé une fois ; on n'ajoute pas de KO de réciprocité
+  # à son encontre, ce serait le même défaut compté deux fois.
+  silent=""
   for a in $members; do
     desc_a="$(verb_desc "$(skill_file "$a")")"
     cites=0
     for b in $members; do
       [ "$a" = "$b" ] && continue
-      case "$desc_a" in *"/$b"*) ;; *) continue ;; esac
-      cites=$((cites+1))
-      # Réciprocité : b doit repousser vers a.
-      desc_b="$(verb_desc "$(skill_file "$b")")"
-      case "$desc_b" in
-        *"/$a"*) : ;;
-        *) ko "T12 réciprocité : /$a repousse vers /$b, mais /$b ne repousse pas vers /$a"
-           t12_fail=$((t12_fail+1)) ;;
-      esac
+      cites_verb "$desc_a" "$b" && cites=$((cites+1))
     done
     if [ "$cites" -eq 0 ]; then
       ko "T12 démarcation : /$a ne cite aucun voisin du groupe [$members]"
-      t12_fail=$((t12_fail+1))
+      t12_fail=$((t12_fail+1)); silent="$silent $a"
     fi
+  done
+  for a in $members; do
+    desc_a="$(verb_desc "$(skill_file "$a")")"
+    for b in $members; do
+      [ "$a" = "$b" ] && continue
+      case " $silent " in *" $b "*) continue ;; esac   # déjà signalé comme muet
+      cites_verb "$desc_a" "$b" || continue
+      # Réciprocité : b doit repousser vers a.
+      if ! cites_verb "$(verb_desc "$(skill_file "$b")")" "$a"; then
+        ko "T12 réciprocité : /$a repousse vers /$b, mais /$b ne repousse pas vers /$a"
+        t12_fail=$((t12_fail+1))
+      fi
+    done
   done
 done
 
 # Groupe 6 — unilatéral par construction : /vf-audit appartient au module validator et n'est pas
 # modifiable ici (D-01). vf-gaps doit le nommer ; la réciprocité est assurée par la chasse gardée.
 if f_gaps="$(skill_file vf-gaps)"; then
-  case "$(verb_desc "$f_gaps")" in
-    *"/vf-audit"*) : ;;
-    *) ko "T12 collision 6 : vf-gaps ne renvoie pas l'audit de conformité du lab vers /vf-audit"
-       t12_fail=$((t12_fail+1)) ;;
-  esac
+  cites_verb "$(verb_desc "$f_gaps")" "vf-audit" || {
+    ko "T12 collision 6 : vf-gaps ne renvoie pas l'audit de conformité du lab vers /vf-audit"
+    t12_fail=$((t12_fail+1)); }
 else
   ko "T12 collision 6 : vf-gaps introuvable"; t12_fail=$((t12_fail+1))
 fi
 
-# Chasse gardée : aucune description de verbe ne CAPTE l'audit de conformité du lab. On n'inspecte
-# que la zone de capture (avant le premier contre-exemple « ✘ ») — les contre-exemples, eux, ont le
-# droit et le devoir de nommer /vf-audit.
+# Chasse gardée + interdit n°6 du gabarit, sur TOUTES les descriptions des deux modules :
+#  (a) aucune ne CAPTE l'audit de conformité du lab (réservé à /vf-audit) — on n'inspecte que la
+#      zone de capture, avant le premier « ✘ » : les contre-exemples, eux, ont le droit et le
+#      devoir de nommer /vf-audit ;
+#  (b) chacune repousse au moins une intention voisine (« ✘ … → /vf-… »). Une description qui
+#      capte tout ne départage rien — c'est le mode d'échec principal du chantier, et il touche
+#      aussi les 20 verbes hors groupes de collision. Ce contrôle-là est universel : il ne dit
+#      rien de la réciprocité, il n'entre donc pas en conflit avec D-07.
 GUARD_RE='conformité (du lab|méthodologique)|audite (le|ce) lab|audite les agents|densité des agents'
-guard_hits=0
+t12_desc=0
 for sm in "$MOD"/skills/vf-*/SKILL.md "$REPO"/design-orchestrator/skills/vf-*/SKILL.md; do
   [ -f "$sm" ] || continue
+  vname="$(basename "$(dirname "$sm")")"
   d="$(verb_desc "$sm")"
+  t12_desc=$((t12_desc+1))
   if echo "${d%%✘*}" | "$GREP" -qiE "$GUARD_RE"; then
-    ko "T12 chasse gardée : $(basename "$(dirname "$sm")") capte l'audit de conformité du lab (réservé à /vf-audit)"
-    guard_hits=$((guard_hits+1)); t12_fail=$((t12_fail+1))
+    ko "T12 chasse gardée : $vname capte l'audit de conformité du lab (réservé à /vf-audit)"
+    t12_fail=$((t12_fail+1))
+  fi
+  if ! echo "$d" | "$GREP" -qE '✘.*/vf-[a-z0-9-]+'; then
+    ko "T12 démarcation : $vname ne repousse aucune intention voisine (✘ … → /vf-…)"
+    t12_fail=$((t12_fail+1))
   fi
 done
 
 if [ "$t12_fail" -eq 0 ]; then
-  ok "T12 anti-collision : $t12_groups groupe(s) à réciprocité stricte + renvoi /vf-audit + chasse gardée"
+  ok "T12 anti-collision : $t12_groups groupe(s) à réciprocité stricte, $t12_desc description(s) avec contre-exemple + chasse gardée"
 fi
 
 # ---------------------------------------------------------------------------
@@ -554,7 +594,8 @@ else
     n_indexed=0
     for s in $indexed; do
       n_indexed=$((n_indexed+1))
-      "$GREP" -q -- "$s" "$ROUTING" || missing_routed="$missing_routed $s"
+      # Frontière de mot : « gsd-review » ne doit pas être déclaré routé par « gsd-review-backlog ».
+      "$GREP" -qE -- "${s}([^a-z0-9-]|$)" "$ROUTING" || missing_routed="$missing_routed $s"
     done
     if [ -n "$missing_routed" ]; then
       ko "T14 exhaustivité (a) : skill(s) de l'index non routé(s) par intent-routing.md —$missing_routed"
@@ -566,6 +607,7 @@ else
 
   # (b) — cible promise = cible citée par le verbe qui la porte.
   broken=""
+  pairs=0
   while IFS='|' read -r _ _intent verbe cible _rest; do
     v=$(echo "$verbe" | "$GREP" -oE '/vf-[a-z0-9-]+' | head -1)
     [ -n "$v" ] || continue                     # ligne « — (agent) » ou hors table de routage
@@ -577,14 +619,20 @@ else
       skip "T14 (b) : $vname introuvable — cibles non vérifiées : $(echo $tgts)"
       continue; }
     for t in $tgts; do
-      "$GREP" -q -- "$t" "$vfile" || broken="$broken ${vname}→${t}"
+      pairs=$((pairs+1))
+      "$GREP" -qE -- "${t}([^a-z0-9-]|$)" "$vfile" || broken="$broken ${vname}→${t}"
     done
   done < <("$GREP" -E '^\|' "$ROUTING" | "$GREP" -v -E '^\|[[:space:]]*-{2,}' | "$GREP" -v -iE '^\|[[:space:]]*Intention')
   if [ -n "$broken" ]; then
     ko "T14 exhaustivité (b) : cible(s) promise(s) par la doctrine mais absente(s) du corps du verbe —$broken"
     t14_fail=$((t14_fail+1))
+  elif [ "$pairs" -eq 0 ]; then
+    # Plancher anti-test-vacant : zéro couple vérifié = le parsing de la table a cessé de mordre
+    # (colonnes déplacées, format changé), pas « tout va bien ».
+    ko "T14 exhaustivité (b) : aucun couple verbe→cible extrait de intent-routing.md (format de table changé ?)"
+    t14_fail=$((t14_fail+1))
   else
-    ok "T14 exhaustivité (b) : chaque cible portée par un verbe est citée dans le corps de ce verbe"
+    ok "T14 exhaustivité (b) : $pairs couple(s) verbe→cible vérifié(s), chacun cité par son verbe"
   fi
 fi
 

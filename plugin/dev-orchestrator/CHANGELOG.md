@@ -27,7 +27,7 @@ les **trois niveaux de routage** de la spec `2026-07-25-routage-fin-verbes-vf-de
 
 ### Modifié
 
-- **Descriptions des 15 verbes existants** réécrites sur un gabarit unique : formulations FR
+- **Descriptions des 14 verbes existants** réécrites sur un gabarit unique : formulations FR
   réelles, contre-exemples nommant les voisins (`✘ … → /vf-…`), portée d'invocation. C'est la
   description qui départage deux gestes proches — elle est le code du routeur, pas de la doc.
 - **`AGENT.md` refondu** : la table de routage associe une intention à un **verbe**, plus jamais à

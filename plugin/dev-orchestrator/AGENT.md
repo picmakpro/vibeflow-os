@@ -211,7 +211,7 @@ d'orchestration non triviale se présente.
 ## Références (chemin d'install D7)
 
 - Doctrine de routage exhaustive : `.claude/agents/dev-orchestrator-references/intent-routing.md`
-- Préséance des verbes : `rules/vf-verb-precedence.md` (rule globale, chargée en permanence)
+- Préséance des verbes : `.claude/rules/vf-verb-precedence.md` (rule globale, chargée en permanence)
 - Doctrine pipeline détaillée : `.claude/agents/dev-orchestrator-references/GSD-PIPELINE.md`
 - Index factuel des skills installés : `.claude/agents/dev-orchestrator-references/gsd-skills-index.md`
 - Contrats de mission (brief + rapport + signaux + seuil) : `.claude/agents/dev-orchestrator-references/mission-contracts.md`
