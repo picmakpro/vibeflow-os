@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: vf-routing
 milestone_name: Routage fin & verbes VibeFlow
 status: in_progress
-stopped_at: Phase 14 créée et planifiée (6 plans, 4 vagues) — rescope de vf-planning, frontière d'altitude avec le moteur GSD (ADR-054). Prête à exécuter. Phase 12 : plan 12-01 livré, 12-02→12-06 restants. Phase 13 non cadrée.
+stopped_at: "Phase 14 : plans 14-01→14-05 livrés (92 assertions vertes, check-agents OK), sur branche feat/rescope-vf-planning-alti. M1 tranché et corrigé (marqueur borné au frontmatter). 14-06 (release) EN ATTENTE DE VALIDATION HUMAINE : numéro de version + tag. Deux décisions ouvertes : démêler les commits Phase 12 de la branche, et traiter le trou vf-new-lab (hors périmètre de la phase)."
 last_updated: "2026-07-25"
 last_activity: 2026-07-25
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 12
-  completed_plans: 1
-  percent: 8
+  completed_plans: 6
+  percent: 50
 ---
 
 # Project State
@@ -26,11 +26,15 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 ## Current Position
 
 Phase: 14 (Frontière d'altitude planning-core / moteur GSD — rescope de `vf-planning`) — milestone vf-routing
-Plan: 6 plans posés sur 4 vagues, aucun exécuté. Spec + plan détaillé validés et commités
-(`docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`,
-`docs/superpowers/plans/2026-07-25-rescope-vf-planning-gsd.md`).
-Status: Planned — prête à exécuter (vague 1 : 14-01 et 14-02 en parallèle)
+Plan: 14-01 → 14-05 livrés (branche `feat/rescope-vf-planning-alti`). 14-06 (release) non exécuté —
+`autonomous: false`. Spec + plan détaillé :
+`docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`,
+`docs/superpowers/plans/2026-07-25-rescope-vf-planning-gsd.md`.
+Status: In progress — 5/6 plans, release en attente de validation humaine
 Last activity: 2026-07-25
+
+Tests : 92 assertions vertes, 0 échec (detect-gsd-engine 12, detect-planning-debt 10,
+context-hardening 20, planning-core 14, planning-hooks 38). `check-agents.sh` OK.
 
 Note : Phase 12 en cours (12-01 livré, 12-02→12-06 restants), Phase 13 non cadrée, Phase 14 indépendante des deux.
 Milestone `gsd-migration` (Phases 10-11) reste ouvert et **en attente** — chantier indépendant, non bloquant.

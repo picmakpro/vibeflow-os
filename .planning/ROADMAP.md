@@ -254,11 +254,11 @@ a désormais un seul moteur (GSD) ; `planning-core` tient l'altitude lab et la c
      verte, `check-agents.sh` OK ; release bumpée + **tag annoté poussé** (`check-release-tag.sh --remote` → ✓).
 **Plans**: 6 plans (4 waves) — portés depuis `docs/superpowers/plans/2026-07-25-rescope-vf-planning-gsd.md`
 Plans:
-- [ ] 14-01-PLAN.md — `detect-gsd-engine.sh` : fait vérifiable « un moteur est-il en place », 4 exits + 10 tests (ALTI-01)
-- [ ] 14-02-PLAN.md — `references/gsd-handoff.md` : doctrine d'altitude + table intention → verbe + protocole de migration (ALTI-04)
-- [ ] 14-03-PLAN.md — `--defer-to-gsd` sur 2 hooks : fin de la double injection SessionStart, défaut inchangé (ALTI-03)
-- [ ] 14-04-PLAN.md — `SKILL.md` : description désarmée + étape 0 + séquences A/B (ALTI-02)
-- [ ] 14-05-PLAN.md — commande, `domain-detection.md`, ADR-054 au registre (ALTI-04)
+- [x] 14-01-PLAN.md — `detect-gsd-engine.sh` : fait vérifiable « un moteur est-il en place », 4 exits + 10 tests (ALTI-01)
+- [x] 14-02-PLAN.md — `references/gsd-handoff.md` : doctrine d'altitude + table intention → verbe + protocole de migration (ALTI-04)
+- [x] 14-03-PLAN.md — `--defer-to-gsd` sur 2 hooks : fin de la double injection SessionStart, défaut inchangé (ALTI-03)
+- [x] 14-04-PLAN.md — `SKILL.md` : description désarmée + étape 0 + séquences A/B (ALTI-02)
+- [x] 14-05-PLAN.md — commande, `domain-detection.md`, ADR-054 au registre (ALTI-04)
 - [ ] 14-06-PLAN.md — release : module v2.4.0, racine v2.29.0, tag annoté poussé (ALTI-05)
 
 ## Progress
@@ -281,4 +281,4 @@ Plans:
 | 11. Intégration migration GSD | gsd-migration | 0/? | Not planned yet (GATE Phase 10) | — |
 | 12. Routage fin & verbes /vf-* | vf-routing | 1/6 | In progress (12-01 livré) | — |
 | 13. Pont spec → feuille de route | vf-routing | 0/? | Not planned yet (dépend Phase 12) | — |
-| 14. Frontière d'altitude planning-core / GSD | vf-routing | 0/6 | Planned (6 plans, 4 waves) | — |
+| 14. Frontière d'altitude planning-core / GSD | vf-routing | 5/6 | In progress (14-06 release en attente de validation) | — |
