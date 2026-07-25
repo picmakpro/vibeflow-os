@@ -24,7 +24,7 @@
 #   T8/T8b — Équipe manager : 4 agents conformes (frontmatter, densité, vf-internal — Pattern 12).
 #   T9 — Contrats de mission : source unique + 3 renvois (DRY).
 #   T10 — Routage mission (AGENT.md) + aiguillage taille (vf-auto, SEUIL_EQUIPE).
-#   T11 — Généricité : aucun résidu Reviz dans agents/ (DM5).
+#   T11 — Généricité : aucun renvoi vers un chemin absent d'un lab installé (DM5).
 #   T12 — Anti-collision des descriptions de verbes (les deux modules).
 #   T13 — Préséance : la rule globale existe, est conforme et est référencée.
 #   T14 — Exhaustivité du routage : intent-routing.md couvre l'index, et chaque cible
@@ -32,7 +32,7 @@
 #
 # Correspondance avec les noms de la spec de routage fin (2026-07-25) :
 #   T12 (ici) = T11 (spec) · T13 (ici) = T12 (spec) · T14 (ici) = T13 (spec).
-# Le T11 (ici) EXISTE DÉJÀ — généricité / anti-résidu Reviz (DM5) — et n'est PAS renuméroté :
+# Le T11 (ici) EXISTE DÉJÀ — généricité (DM5) — et n'est PAS renuméroté :
 # renuméroter un test de non-régression ferait perdre sa trace dans l'historique. La numérotation
 # locale est donc décalée d'un cran par rapport à la spec, à dessein.
 #
@@ -298,6 +298,8 @@ skills_over=0
 skills_total=0
 for f in "$MOD"/skills/vf-*/SKILL.md; do
   [ -f "$f" ] || continue
+  # En lab, skills/ est partagé entre modules : on n'audite que nos verbes (voir OWNED_VERBS).
+  owned_verb "$(basename "$(dirname "$f")")" || continue
   skills_total=$((skills_total+1))
   n=$(wc -l < "$f" | tr -d ' ')
   if [ "$n" -gt 500 ]; then
@@ -424,12 +426,27 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# T11 — Généricité : aucun résidu Reviz dans les agents livrés (DM5)
+# T11 — Généricité : aucun renvoi vers un chemin absent d'un lab installé (DM5)
 # ---------------------------------------------------------------------------
-if [ -d "$MOD/agents" ] && "$GREP" -rqE "docs/_mission|revizapp|Reviz" "$MOD/agents/" 2>/dev/null; then
-  ko "T11 généricité : résidu Reviz détecté dans agents/ (docs/_mission|revizapp|Reviz)"
+# Le module est distribué : ce qu'il livre ne doit référencer QUE des chemins qui existent
+# chez l'utilisateur. Un renvoi vers `.planning/research/` ou `docs/_mission/` (dossiers du
+# dépôt de développement, jamais installés) est un lien mort en lab — c'est le défaut réel,
+# indépendamment du nom du projet qui l'a introduit.
+#
+# Périmètre BORNÉ au module : en lab, agents/ est partagé entre tous les modules installés.
+# On n'audite que ce que ce module possède — son agent, ses references, ses 4 agents d'équipe.
+t11_targets="$AGENT_FILE"
+[ -d "$REFS_DIR" ] && t11_targets="$t11_targets $REFS_DIR"
+for a in vf-dev-manager vf-coder vf-reviewer vf-auditer; do
+  [ -f "$MOD/agents/$a.md" ] && t11_targets="$t11_targets $MOD/agents/$a.md"
+done
+# shellcheck disable=SC2086
+if "$GREP" -rqE '\.planning/research/|docs/_mission' $t11_targets 2>/dev/null; then
+  # shellcheck disable=SC2086
+  hit=$("$GREP" -rlE '\.planning/research/|docs/_mission' $t11_targets 2>/dev/null | head -3 | tr '\n' ' ')
+  ko "T11 généricité : renvoi vers un chemin non installé en lab — $hit"
 else
-  ok "T11 généricité : aucun chemin/nom Reviz dans agents/"
+  ok "T11 généricité : aucun renvoi vers un chemin absent d'un lab (périmètre borné au module)"
 fi
 
 # ---------------------------------------------------------------------------
