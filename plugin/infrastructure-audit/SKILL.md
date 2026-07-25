@@ -1,6 +1,6 @@
 ---
 name: infrastructure-audit
-description: Audit automatique de l'infrastructure technique d'un lab VibeFlow (Claude Code runtime, hooks lifecycle, scripts, drift Anthropic). Detecte les regressions apres mise a jour Claude Code ou conventions Anthropic. Genere un INFRASTRUCTURE_SNAPSHOT.md date pour comparaison delta. Utiliser ce skill au /checkpoint, apres mise a jour Claude Code, ou via hook SessionStart periodique (>14j depuis dernier audit). Reference ADR-031 + ADR-032 + LRN-106.
+description: Audit automatique de l'infrastructure technique d'un lab VibeFlow (Claude Code runtime, hooks lifecycle, scripts, drift Anthropic). Detecte les regressions apres mise a jour Claude Code ou conventions Anthropic. Genere un INFRASTRUCTURE_SNAPSHOT.md date pour comparaison delta. Utiliser ce skill au /vf-audit, apres mise a jour Claude Code, ou via hook SessionStart periodique (>14j depuis dernier audit). Reference ADR-031 + ADR-032 + LRN-106.
 ---
 
 # Skill : Infrastructure Audit — Garde-fou technique des labs
@@ -26,7 +26,7 @@ Ce skill orchestre un audit en 4 axes complementaires.
 
 ## Quand l'invoquer
 
-- **Au /checkpoint** : audit complet (toutes les 5-10 sessions)
+- **Au /vf-audit** : audit complet (toutes les 5-10 sessions)
 - **Hook SessionStart** : audit rapide si > 14 jours depuis dernier check
 - **Apres update Claude Code** : audit forced pour comparer snapshot avant/apres
 - **Avant un release de module vibeflow-os** : valider que le module ne casse rien
@@ -186,9 +186,9 @@ Voir `references/snapshot-format.md`.
 
 ---
 
-## Integration au /checkpoint
+## Integration au /vf-audit
 
-Le trigger `/checkpoint` peut inclure une etape "Audit infrastructure" :
+Le trigger `/vf-audit` peut inclure une etape "Audit infrastructure" :
 
 1. `audit-infra.sh` -> rapport complet
 2. Si warnings/erreurs : bloquer le checkpoint et exiger correction

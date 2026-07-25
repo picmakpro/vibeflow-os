@@ -45,7 +45,7 @@ premier — Iron Law consolidator : « lecture d'un registre = lecture de l'inde
 
 - IDs **séquentiels, jamais réutilisés** (append-only).
 - Dates **YYYY-MM-DD**. Tout en **français**, nommage **kebab-case** pour les canaux.
-- **Tag-canal** : `[canal:<nom>]` ou `[canal:global]`. Format imposé, contrôlé au /checkpoint.
+- **Tag-canal** : `[canal:<nom>]` ou `[canal:global]`. Format imposé, contrôlé au /vf-audit.
 
 ## 3. Ce que chaque agent capitalise
 

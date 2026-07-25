@@ -137,7 +137,7 @@ Cf test-consolidator.sh du module consolidator pour le pattern de reference.
 
 ## Workflow recommande
 
-1. Audit complet hebdomadaire ou au /checkpoint
+1. Audit complet hebdomadaire ou au /vf-audit
 2. Si finding ERROR : bloquer le checkpoint, exiger correction
 3. Si finding WARNING : noter dans le rapport, decider au cas par cas
 4. Mettre a jour `INFRASTRUCTURE_SNAPSHOT.md` apres correction

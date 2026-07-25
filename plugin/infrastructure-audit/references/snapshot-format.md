@@ -122,7 +122,7 @@ Le snapshot precedent (`.prev`) est garde en permanence pour diff. Pour les snap
 
 - Au premier install vibeflow-os : baseline
 - Apres chaque update Claude Code : nouveau snapshot + diff vs precedent
-- Au /checkpoint : audit complet inclut snapshot + diff
+- Au /vf-audit : audit complet inclut snapshot + diff
 - Apres install/update d'un module vibeflow-os
 - Forced via `--snapshot`
 

@@ -59,7 +59,7 @@ On veut qu'un lab fraîchement installé **s'amorce proprement** sans rien force
 1. À l'install du module, `.planning/` n'existe pas encore (c'est voulu — on ne scaffolde pas à
    l'aveugle au moment du `cp`).
 2. Le **garde-fou** `scripts/check-planning-state.sh` détecte l'absence de `.planning/` (exit 3) et
-   le **surface** — en `/checkpoint`, ou via un hook SessionStart **opt-in** (wiring documenté, jamais
+   le **surface** — en `/vf-audit`, ou via un hook SessionStart **opt-in** (wiring documenté, jamais
    auto-injecté dans `settings.json`).
 3. L'utilisateur (ou un agent en autonomie) invoque alors `/vf-planning`, qui détecte le métier
    (cette grille) et pose le socle adapté.

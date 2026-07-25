@@ -1,6 +1,6 @@
 ---
 name: consolidator
-description: Consolide la memoire structuree d'un lab VibeFlow (registres DECISIONS/LEARNINGS/BLOCKERS/JOURNAL/EVALS) sur 5 piliers — Indexation (header strict + colonne #Ligne), Archivage (3 criteres statut/age/refs, hook SessionEnd async), Fusion (deduplication LLM-based des doublons), Promotion (learning -> rule semi-auto avec validation humaine), Memoire vivante (decroissance de confiance par categorie + supersession non destructive de la couche fichier-par-entree .claude/memory/knowledge/, ADR-052). Utiliser ce skill quand un registre depasse 800 lignes, quand des doublons d'IDs apparaissent, au rythme mensuel pour entretien, lors d'un /checkpoint, ou via /consolidate. Reference ADR-032 + ADR-009 + ADR-029 + ADR-052. Iron Law : "La lecture d'un registre = lecture de l'index uniquement par defaut".
+description: Consolide la memoire structuree d'un lab VibeFlow (registres DECISIONS/LEARNINGS/BLOCKERS/JOURNAL/EVALS) sur 5 piliers — Indexation (header strict + colonne #Ligne), Archivage (3 criteres statut/age/refs, hook SessionEnd async), Fusion (deduplication LLM-based des doublons), Promotion (learning -> rule semi-auto avec validation humaine), Memoire vivante (decroissance de confiance par categorie + supersession non destructive de la couche fichier-par-entree .claude/memory/knowledge/, ADR-052). Utiliser ce skill quand un registre depasse 800 lignes, quand des doublons d'IDs apparaissent, au rythme mensuel pour entretien, lors d'un /vf-audit, ou via /consolidate. Reference ADR-032 + ADR-009 + ADR-029 + ADR-052. Iron Law : "La lecture d'un registre = lecture de l'index uniquement par defaut".
 ---
 
 # Skill : Consolidator — Consolidation Memoire 5 Piliers
@@ -32,7 +32,7 @@ Ce skill orchestre 4 mecanismes complementaires qui maintiennent la memoire scal
 - **Trigger immediat** :
   - Un registre depasse 800 lignes -> `/consolidate --register=LEARNINGS`
   - Doublons d'IDs detectes -> `/consolidate --pillar=fusion`
-  - Pendant `/checkpoint` -> pilier 1 (reindexation) + pilier 4 (proposition promotions)
+  - Pendant `/vf-audit` -> pilier 1 (reindexation) + pilier 4 (proposition promotions)
 - **Surtout pas** : pendant une session active de coding feature (le hook async suffit)
 
 ---
@@ -151,7 +151,7 @@ Voir `references/archivage.md` + `scripts/archive.sh`.
 ### Quand declencher
 
 - Manuel uniquement : `/consolidate --pillar=fusion`
-- Recommande : rythme mensuel ou au /checkpoint
+- Recommande : rythme mensuel ou au /vf-audit
 
 ### Detail
 
@@ -176,7 +176,7 @@ Voir `references/fusion.md`.
 ### Quand declencher
 
 - Manuel uniquement : `/consolidate --pillar=promote`
-- Recommande : trimestriel ou au /checkpoint majeur
+- Recommande : trimestriel ou au /vf-audit majeur
 
 ### Iron Law promotion
 
@@ -216,7 +216,7 @@ Voir `references/promotion.md`.
 ### Quand declencher
 
 - Manuel : `/consolidate --pillar=decay`
-- Recommande : rythme mensuel / `/checkpoint`, avec les autres piliers.
+- Recommande : rythme mensuel / `/vf-audit`, avec les autres piliers.
 
 ### Detail
 
