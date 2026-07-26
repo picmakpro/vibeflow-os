@@ -83,7 +83,7 @@ for _c in "$_GSD_ROOT/gsd-core/bin/gsd-tools.cjs" \
 done
 if   [ -n "$GSD_TOOLS" ];                  then gsd_run() { node "$GSD_TOOLS" "$@"; }
 elif command -v gsd-tools >/dev/null 2>&1; then GSD_TOOLS="$(command -v gsd-tools)"; gsd_run() { "$GSD_TOOLS" "$@"; }
-else echo "ERROR: gsd-tools.cjs introuvable. Installer : npx -y @opengsd/gsd-core@latest --claude --global" >&2; exit 1; fi
+else echo "ERROR: gsd-tools.cjs introuvable. Installer : npx -y "@opengsd/gsd-core@^1" --claude --global" >&2; exit 1; fi
 ```
 `gsd_run roadmap analyze` remplace l'ancien appel direct. **Prérequis non garanti** : si
 `gsd_run` ne peut pas se résoudre (bloc `else` ci-dessus), fallback documenté — compter les cases

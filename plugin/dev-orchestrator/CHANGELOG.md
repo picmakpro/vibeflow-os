@@ -1,5 +1,12 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.3.1] — 2026-07-26
+
+### Sécurité
+- Plafond semver sur l'install GSD : `@opengsd/gsd-core@^1` au lieu de `@latest` (arbitrage
+  post-audit Phase 11) — fraîcheur conservée dans la majeure 1.x, mais un saut de majeure
+  (breaking ou compromission d'un fork jeune) ne s'installe jamais sans décision humaine.
+
 ## [v2.3.0] — 2026-07-26
 
 ### Ajouté

@@ -160,7 +160,10 @@ ensure_gsd() {
   fi
 
   log "GSD absent — installation via npx (non-interactif, scope=$SCOPE → $GSD_SCOPE_FLAG)..."
-  if run_cmd npx -y @opengsd/gsd-core@latest --claude "$GSD_SCOPE_FLAG"; then
+  # Plafond semver "^1" (arbitrage 2026-07-26, audit Phase 11) : toujours le dernier 1.x —
+# fraîcheur sans pin figé — mais un saut de MAJEURE (breaking ou compromission d'un fork
+# jeune) ne s'installe jamais seul : il redevient une décision humaine.
+if run_cmd npx -y "@opengsd/gsd-core@^1" --claude "$GSD_SCOPE_FLAG"; then
     log "GSD installé via npx."
     log_legacy_cleanup_if_needed
     return 0
@@ -169,7 +172,7 @@ ensure_gsd() {
   # Échec de l'install → bascule sur étapes manuelles (pas d'échec silencieux).
   err "L'auto-install GSD a échoué."
   log "Étape manuelle GSD :"
-  log "  npx -y @opengsd/gsd-core@latest --claude $GSD_SCOPE_FLAG"
+  log "  npx -y \"@opengsd/gsd-core@^1\" --claude $GSD_SCOPE_FLAG"
   log_legacy_cleanup_if_needed
   return 0
 }
