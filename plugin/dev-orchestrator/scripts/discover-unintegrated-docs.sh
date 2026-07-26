@@ -21,9 +21,11 @@
 #   <planning>/phases/** est EXCLU : ce sont des sorties du moteur, pas des entrées.
 #
 # Règle de citation : un document est « intégré » si son basename (extension .md incluse), borné
-# à droite (fin de ligne ou caractère hors [0-9A-Za-z._-]), apparaît dans une ligne d'un registre.
-# Jamais de match sur le stem, jamais par préfixe de dossier. Une ligne de registre contenant un
-# glob (ex. docs/superpowers/specs/*.md) est ignorée comme source de citation.
+# des DEUX côtés (début/fin de ligne ou caractère hors [0-9A-Za-z._-]), apparaît dans une ligne
+# d'un registre. Jamais de match sur le stem, jamais par préfixe de dossier, jamais sur un
+# basename plus long se terminant par le sien (ex. redesign.md ne cite pas design.md). Une ligne
+# de registre contenant un glob (ex. docs/superpowers/specs/*.md) est ignorée comme source de
+# citation.
 #
 # Env (surcharge — testabilité, modèle VF_GSD_SKILLS_DIR de build-gsd-index.sh) :
 #   VF_INGEST_SOURCES_DIR   (défaut <path>/docs/superpowers) — racine contenant specs/ et plans/
@@ -45,7 +47,12 @@ QUIET=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --path) ROOT="${2:?--path nécessite une valeur}"; shift 2 ;;
+    --path)
+      if [ "$#" -lt 2 ]; then
+        echo "[discover-unintegrated-docs] --path nécessite une valeur" >&2
+        exit 64
+      fi
+      ROOT="$2"; shift 2 ;;
     --quiet) QUIET=1; shift ;;
     -h|--help) grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *) echo "[discover-unintegrated-docs] argument inconnu : $1" >&2; exit 64 ;;
@@ -67,9 +74,9 @@ if [ ! -d "$PLANNING_DIR" ]; then
 fi
 
 # --- Collecte des documents source (grain, chemin relatif à --path) ---
-DOCS_TMP="$(mktemp)"
-REG_TMP="$(mktemp)"
-OUT_TMP="$(mktemp)"
+DOCS_TMP="$(mktemp)" || { echo "[discover-unintegrated-docs] mktemp a échoué" >&2; exit 64; }
+REG_TMP="$(mktemp)" || { echo "[discover-unintegrated-docs] mktemp a échoué" >&2; rm -f "$DOCS_TMP"; exit 64; }
+OUT_TMP="$(mktemp)" || { echo "[discover-unintegrated-docs] mktemp a échoué" >&2; rm -f "$DOCS_TMP" "$REG_TMP"; exit 64; }
 trap 'rm -f "$DOCS_TMP" "$REG_TMP" "$OUT_TMP"' EXIT
 
 for f in "$SPECS_DIR"/*.md; do printf 'spec\t%s\n' "$f" >> "$DOCS_TMP"; done
@@ -86,18 +93,27 @@ for r in "$PLANNING_DIR/ROADMAP.md" "$PLANNING_DIR/REQUIREMENTS.md" "$PLANNING_D
   [ -f "$r" ] && cat "$r" >> "$REG_TMP"
 done
 
-# Un document est cité si son basename, borné à droite, apparaît dans une ligne NON glob d'un
-# registre. Padding d'un espace en fin de ligne : évite l'ancrage $ à l'intérieur d'une alternative
-# ERE (portabilité awk POSIX), la borne droite est alors toujours "caractère hors [0-9A-Za-z._-]".
+# Un document est cité si son basename, borné des DEUX côtés (par le début/fin de ligne ou un
+# caractère hors [0-9A-Za-z._-]), apparaît dans une ligne NON glob d'un registre. Padding d'un
+# espace en début ET en fin de ligne : évite l'ancrage ^/$ à l'intérieur d'une alternative ERE
+# (portabilité awk POSIX), les bornes sont alors toujours "caractère hors [0-9A-Za-z._-]".
+# Tous les métacaractères ERE actifs du basename sont échappés caractère par caractère (pas de
+# gsub global sur une classe : piège à écrire correctement en awk POSIX portable).
 is_cited() { # <basename>
   awk -v base="$1" '
     BEGIN {
-      esc = base
-      gsub(/\./, "\\.", esc)
-      pat = esc "[^0-9A-Za-z._-]"
+      special = "\\.[]()*+?{}|^$"
+      esc = ""
+      n = length(base)
+      for (i = 1; i <= n; i++) {
+        c = substr(base, i, 1)
+        if (index(special, c) > 0) esc = esc "\\" c
+        else esc = esc c
+      }
+      pat = "[^0-9A-Za-z._-]" esc "[^0-9A-Za-z._-]"
     }
     index($0, "/*") > 0 { next }
-    { line = $0 " "; if (line ~ pat) { found = 1; exit } }
+    { line = " " $0 " "; if (line ~ pat) { found = 1; exit } }
     END { exit (found ? 0 : 1) }
   ' "$REG_TMP"
 }

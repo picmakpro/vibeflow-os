@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # test-discover-unintegrated-docs.sh — Suite de vérification de discover-unintegrated-docs.sh
-#                                       (BRDG-02, plan 13-01).
+#                                       (BRDG-02, plan 13-01 + fix-13-01).
 #
-# Un cas par piège (12 assertions). Fixtures isolées via mktemp -d + --path, jamais sur le repo réel.
+# Un cas par piège (16 assertions). Fixtures isolées via mktemp -d + --path, jamais sur le repo réel.
 # Modèle de structure : plugin/planning-core/scripts/tests/test-detect-gsd-engine.sh.
 
 set -uo pipefail
@@ -111,6 +111,39 @@ if [ "$rc" -eq 3 ] && [ -z "$out" ]; then ok "11 corpus entièrement cité → e
 # === Cas 12 — Argument inconnu → exit 64 ========================================================
 bash "$SCRIPT" --nope >/dev/null 2>&1; rc=$?
 if [ "$rc" -eq 64 ]; then ok "12 argument inconnu → exit 64"; else ko "12 argument inconnu → exit 64" "rc=$rc"; fi
+
+# === Cas 13 — Suffixe strict : design.md non cité, un registre citant redesign.md → non intégré ===
+D="$(mk_root c13)"
+echo '# spec' > "$D/docs/superpowers/specs/design.md"
+printf 'Voir docs/redesign.md pour contexte\n' > "$D/.planning/ROADMAP.md"
+out="$(bash "$SCRIPT" --path "$D")"; rc=$?
+expected="$(printf 'spec\tdocs/superpowers/specs/design.md')"
+if [ "$rc" -eq 0 ] && [ "$out" = "$expected" ]; then ok "13 suffixe strict — design.md non cité malgré redesign.md dans un registre"; else ko "13 suffixe strict — design.md non cité malgré redesign.md dans un registre" "rc=$rc out=[$out] attendu=[$expected]"; fi
+
+# === Cas 14 — Borne droite : alpha.md non cité, un registre contenant alpha.mdx → non intégré ====
+D="$(mk_root c14)"
+echo '# spec' > "$D/docs/superpowers/specs/alpha.md"
+printf 'Voir docs/alpha.mdx pour contexte\n' > "$D/.planning/ROADMAP.md"
+out="$(bash "$SCRIPT" --path "$D")"; rc=$?
+expected="$(printf 'spec\tdocs/superpowers/specs/alpha.md')"
+if [ "$rc" -eq 0 ] && [ "$out" = "$expected" ]; then ok "14 borne droite — alpha.md non cité malgré alpha.mdx dans un registre"; else ko "14 borne droite — alpha.md non cité malgré alpha.mdx dans un registre" "rc=$rc out=[$out] attendu=[$expected]"; fi
+
+# === Cas 15 — Métacaractère ERE dans le basename → pas de match parasite (pattern non corrompu) ===
+D="$(mk_root c15)"
+echo '# spec' > "$D/docs/superpowers/specs/notes[draft.md"
+printf 'Voir les notes.pdf du projet.\n' > "$D/.planning/ROADMAP.md"
+out="$(bash "$SCRIPT" --path "$D")"; rc=$?
+expected="$(printf 'spec\tdocs/superpowers/specs/notes[draft.md')"
+if [ "$rc" -eq 0 ] && [ "$out" = "$expected" ]; then ok "15 métacaractère dans le basename — pas de match parasite"; else ko "15 métacaractère dans le basename — pas de match parasite" "rc=$rc out=[$out] attendu=[$expected]"; fi
+
+# === Cas 16 — --quiet silencieux sur stdout ET stderr, exit conforme ===========================
+D="$(mk_root c16)"
+echo '# spec' > "$D/docs/superpowers/specs/2026-01-16-quiet-design.md"
+printf 'Spec : docs/superpowers/specs/2026-01-16-quiet-design.md\n' > "$D/.planning/ROADMAP.md"
+errfile="$TMP/c16.err"
+out="$(bash "$SCRIPT" --path "$D" --quiet 2>"$errfile")"; rc=$?
+err="$(cat "$errfile")"
+if [ "$rc" -eq 3 ] && [ -z "$out" ] && [ -z "$err" ]; then ok "16 --quiet silencieux sur stdout et stderr (exit 3)"; else ko "16 --quiet silencieux sur stdout et stderr (exit 3)" "rc=$rc out=[$out] err=[$err]"; fi
 
 echo ""
 echo "== résultat : $PASS ok, $FAIL ko =="
