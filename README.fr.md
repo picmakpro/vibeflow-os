@@ -10,7 +10,7 @@ Orchestration agentique **spec-driven** pour Claude Code : tu parles normalement
 détecte l'intention, déroule le pipeline (cadrage → plan → exécution → preuve), et des **gates
 machine** vérifient — pas des promesses.
 
-[![Version](https://img.shields.io/badge/version-2.37.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.38.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -82,6 +82,16 @@ qui défie l'intention ou la sécurité **gèle le nœud** et remonte à l'humai
 matin. Le même kernel fait tourner **6 équipes** : dev, design, mobile, content, growth,
 business.
 
+### L'efficience, chiffrée
+
+| Levier | Effet |
+|---|---|
+| **Workers & juges en sonnet**, opus réservé au manager | le gros du volume au juste prix |
+| **Digest de mission ≤ 30 lignes** par mandat | ~100-200k tokens de relecture évités par étape |
+| **Dispatch parallèle** : juges ∥, nœuds DAG disjoints ∥ | le mur d'attente séquentiel tombe |
+| **Pipelining N/N+1** : cadrage+plan de l'étape suivante pendant l'exécution | zéro temps mort entre étapes |
+| **Chargement on-demand** (règle du 1 %) | doctrine hors contexte tant qu'elle ne sert pas |
+
 ---
 
 ## 🧪 Au-delà du dev — un lab pour chaque métier
@@ -118,15 +128,6 @@ Chaque module embarque une **documentation niveau framework dans son README** �
 installation, démarrer, usage, référence complète — liée depuis
 [le tableau des modules](#-modules).
 
-### L'efficience, chiffrée
-
-| Levier | Effet |
-|---|---|
-| **Workers & juges en sonnet**, opus réservé au manager | le gros du volume au juste prix |
-| **Digest de mission ≤ 30 lignes** par mandat | ~100-200k tokens de relecture évités par étape |
-| **Dispatch parallèle** : juges ∥, nœuds DAG disjoints ∥ | le mur d'attente séquentiel tombe |
-| **Pipelining N/N+1** : cadrage+plan de l'étape suivante pendant l'exécution | zéro temps mort entre étapes |
-| **Chargement on-demand** (règle du 1 %) | doctrine hors contexte tant qu'elle ne sert pas |
 
 ---
 
@@ -255,9 +256,9 @@ Historique complet : **[CHANGELOG.md](./CHANGELOG.md)** — le README garde les 
 
 | Version | Date | Changement |
 |---------|------|------------|
+| `v2.38.0` | 2026-07-26 | Doc niveau framework, module par module : le README de chaque module devient sa documentation canonique (installation, démarrer, usage, référence, limites — 10 modules montés au standard, en-têtes Version gatés 17/17), plus une section vitrine création de lab & design. |
 | `v2.37.0` | 2026-07-26 | Milestone `vf-routing` clos : le pont spec → feuille de route est livré (Phase 13) — découverte outillée des cadrages non intégrés + doctrine d'ingestion portée par l'agent (`ingestion-flow.md`), aucun verbe-façade ressuscité, confirmation ADR-031 verrouillée nominativement dans les deux agents. |
 | `v2.36.2` | 2026-07-26 | Remédiation vérité-doc : README de modules réalignés sur le réel (validator 5 audits, conductor documente enfin le team-kernel, reference en Core v4.2 / 12 patterns / 5 skills), correctifs du registre ADR, et `check-version-sync` gate désormais les en-têtes Version des modules + le compte de suites CI (grep mort → échec bruyant). |
-| `v2.36.1` | 2026-07-26 | Refonte vitrine des README : dev-first, 3 diagrammes mermaid (cycle spec-driven, équipe de mission, architecture), efficience/mémoire en avant, tableau des modules replié — et nouvel invariant de gate : l'historique en tête doit être la VERSION courante. |
 
 <details>
 <summary><strong>Références méthodologiques (ADR / LRN)</strong></summary>

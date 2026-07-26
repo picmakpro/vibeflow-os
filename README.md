@@ -10,7 +10,7 @@
 intent, runs the pipeline (scoping → plan → execution → proof), and **machine gates** verify —
 not promises.
 
-[![Version](https://img.shields.io/badge/version-2.37.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.38.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -81,6 +81,16 @@ conditions, anti-thrash (3 attempts), anti-regression (automatic revert), and an
 challenges intent or security **freezes the node** and escalates to the human — even at 3 AM.
 The same kernel powers **6 teams**: dev, design, mobile, content, growth, business.
 
+### Efficiency, quantified
+
+| Lever | Effect |
+|---|---|
+| **Sonnet workers & judges**, opus reserved for the manager | bulk volume at the right price |
+| **Mission digest ≤ 30 lines** per mandate | ~100-200k re-reading tokens saved per step |
+| **Parallel dispatch**: judges ∥, disjoint DAG nodes ∥ | the sequential wait-wall falls |
+| **N/N+1 pipelining**: next step scoped+planned during current execution | zero dead time between steps |
+| **On-demand loading** (1% rule) | doctrine stays out of context until it's needed |
+
 ---
 
 ## 🧪 Beyond dev — a lab for any domain
@@ -114,15 +124,6 @@ flowchart LR
 Each module ships **framework-grade documentation in its README** — installation, get
 started, usage, full reference — linked from [the modules table](#-modules).
 
-### Efficiency, quantified
-
-| Lever | Effect |
-|---|---|
-| **Sonnet workers & judges**, opus reserved for the manager | bulk volume at the right price |
-| **Mission digest ≤ 30 lines** per mandate | ~100-200k re-reading tokens saved per step |
-| **Parallel dispatch**: judges ∥, disjoint DAG nodes ∥ | the sequential wait-wall falls |
-| **N/N+1 pipelining**: next step scoped+planned during current execution | zero dead time between steps |
-| **On-demand loading** (1% rule) | doctrine stays out of context until it's needed |
 
 ---
 
@@ -250,9 +251,9 @@ Full history: **[CHANGELOG.md](./CHANGELOG.md)** — the README keeps the last 3
 
 | Version | Date | Change |
 |---------|------|--------|
+| `v2.38.0` | 2026-07-26 | Framework-grade docs, module by module: every module README becomes its canonical documentation (install, get started, usage, full reference, limits — 10 modules brought to standard, version headers gated 17/17), plus a storefront section on lab creation & design. |
 | `v2.37.0` | 2026-07-26 | `vf-routing` milestone closed: spec → roadmap bridge shipped (Phase 13) — tooled discovery of unintegrated specs/plans + agent-carried ingestion doctrine (`ingestion-flow.md`), no façade verb resurrected, ADR-031 confirmation nominatively locked in both agents. |
 | `v2.36.2` | 2026-07-26 | Doc-truth remediation: module READMEs realigned with reality (validator 5 audits, conductor finally documents the team-kernel, reference at Core v4.2 / 12 patterns / 5 skills), ADR registry fixes, and `check-version-sync` now gates module README version headers + CI suite counts (dead grep fails loudly). |
-| `v2.36.1` | 2026-07-26 | README storefront overhaul: dev-first, 3 mermaid diagrams (spec-driven cycle, mission team, architecture), efficiency/memory upfront, collapsed module table — plus a new gate invariant: the top history entry must match the current VERSION. |
 
 <details>
 <summary><strong>Methodology references (ADR / LRN)</strong></summary>

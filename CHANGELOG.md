@@ -5,6 +5,22 @@ dernières entrées et pointent ici). Chaque module a par ailleurs son propre `C
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.38.0] — 2026-07-26
+
+**Documentation niveau framework, module par module.** Le README de chaque module devient sa
+documentation canonique — même structure partout : tagline, Type/Version/Dépendances, Quoi,
+**Installation** (prérequis réels, ordre d'install explicite), **Démarrer** (premier usage
+guidé en 5 min), **Usage**, **Référence** exhaustive vérifiée sur disque, **Limites**. 10
+modules montés au standard (design-orchestrator, kpi-analyst, mobile-test, mobile-test-team,
+skill-creator, audit-architecture, infrastructure-audit et les 3 bundles métier — qui
+déclarent désormais leur en-tête Version, gaté 17/17). Pas de dossier de doc parallèle : une
+seule source, zéro nouvelle surface de drift. Vitrine racine (FR+EN) : nouvelle section
+« Au-delà du dev — un lab pour chaque métier » (pipeline `/vf-new-lab` en mermaid, design en
+équipe avec juge frais /100, bundles métier, kpi-analyst) + hub de doc vers les README de
+modules. Embarque aussi : lexique P3-P8 réaligné sur le Core v4.2 canonique (reference
+v2.5.2, arbitrage 2026-07-26). Découverte tracée en Limites d'infrastructure-audit :
+`known-versions.txt` n'est jamais posé par l'engine (fail-open, pose manuelle).
+
 ## [v2.37.0] — 2026-07-26
 
 **Clôture du milestone `vf-routing` — le pont spec → feuille de route est livré** (Phase 13,
