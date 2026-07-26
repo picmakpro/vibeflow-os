@@ -24,7 +24,25 @@ set -euo pipefail
 SKILLS_DIR="${VF_GSD_SKILLS_DIR:-$HOME/.claude/skills}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUT="${VF_INDEX_OUT:-$SCRIPT_DIR/../references/gsd-skills-index.md}"
-WORKFLOWS_DIR="${VF_GSD_WORKFLOWS_DIR:-$HOME/.claude/get-shit-done/workflows}"
+
+# Fenêtre de compat dual-layout (D-01, 11-CONTEXT.md), même cascade que detect-gsd-engine.sh :
+# projet-local gsd-core > $CLAUDE_CONFIG_DIR|$HOME gsd-core > legacy get-shit-done > défaut.
+# VF_GSD_WORKFLOWS_DIR explicite reste toujours prioritaire (source surchargeable pour les tests).
+default_workflows_dir() {
+  local root claude_home
+  root="${TARGET_PATH:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+  claude_home="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+  if [ -d "$root/.claude/gsd-core/workflows" ]; then
+    echo "$root/.claude/gsd-core/workflows"
+  elif [ -d "$claude_home/gsd-core/workflows" ]; then
+    echo "$claude_home/gsd-core/workflows"
+  elif [ -d "$claude_home/get-shit-done/workflows" ]; then
+    echo "$claude_home/get-shit-done/workflows"
+  else
+    echo "$claude_home/gsd-core/workflows"
+  fi
+}
+WORKFLOWS_DIR="${VF_GSD_WORKFLOWS_DIR:-$(default_workflows_dir)}"
 
 # ---------- Helpers ----------
 log() {

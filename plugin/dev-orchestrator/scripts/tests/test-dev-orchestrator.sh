@@ -133,6 +133,62 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# T1b/T1c/T1d — dual-layout WORKFLOWS_DIR (D-01, 11-CONTEXT.md)
+# ---------------------------------------------------------------------------
+# T1b : $HOME redirigé, gsd-core/workflows/ peuplé (2 .md), pas de skills → section « source
+# secondaire » présente avec les 2 noms. Puis même test en legacy get-shit-done/workflows/.
+T1B_HOME="$(mktemp -d)"
+mkdir -p "$T1B_HOME/.claude/gsd-core/workflows" "$T1B_HOME/empty-skills"
+echo "# wf-a" > "$T1B_HOME/.claude/gsd-core/workflows/wf-a.md"
+echo "# wf-b" > "$T1B_HOME/.claude/gsd-core/workflows/wf-b.md"
+T1B_OUT="$(mktemp)"
+if env -u VF_GSD_WORKFLOWS_DIR HOME="$T1B_HOME" VF_GSD_SKILLS_DIR="$T1B_HOME/empty-skills" VF_INDEX_OUT="$T1B_OUT" bash "$MOD/scripts/build-gsd-index.sh" >/dev/null 2>&1 \
+  && "$GREP" -q "## Workflows GSD (source secondaire)" "$T1B_OUT" && "$GREP" -q "wf-a" "$T1B_OUT" && "$GREP" -q "wf-b" "$T1B_OUT"; then
+  ok "T1b workflows : gsd-core/workflows/ sous \$HOME détecté (2 workflows listés)"
+else
+  ko "T1b workflows : gsd-core/workflows/ sous \$HOME non détecté"
+fi
+rm -rf "$T1B_HOME/.claude/gsd-core"
+mkdir -p "$T1B_HOME/.claude/get-shit-done/workflows"
+echo "# wf-legacy" > "$T1B_HOME/.claude/get-shit-done/workflows/wf-legacy.md"
+T1B_OUT2="$(mktemp)"
+if env -u VF_GSD_WORKFLOWS_DIR HOME="$T1B_HOME" VF_GSD_SKILLS_DIR="$T1B_HOME/empty-skills" VF_INDEX_OUT="$T1B_OUT2" bash "$MOD/scripts/build-gsd-index.sh" >/dev/null 2>&1 \
+  && "$GREP" -q "## Workflows GSD (source secondaire)" "$T1B_OUT2" && "$GREP" -q "wf-legacy" "$T1B_OUT2"; then
+  ok "T1b workflows : legacy get-shit-done/workflows/ sous \$HOME détecté (repli)"
+else
+  ko "T1b workflows : legacy get-shit-done/workflows/ sous \$HOME non détecté"
+fi
+rm -f "$T1B_OUT" "$T1B_OUT2"; rm -rf "$T1B_HOME"
+
+# T1c (DISCRIMINANT — D1) : $HOME vide, payload projet-local (cwd) sous .claude/gsd-core/workflows/.
+T1C_HOME="$(mktemp -d)"
+T1C_PROJ="$(mktemp -d)"
+mkdir -p "$T1C_PROJ/.claude/gsd-core/workflows" "$T1C_HOME/empty-skills"
+echo "# wf-proj" > "$T1C_PROJ/.claude/gsd-core/workflows/wf-proj.md"
+T1C_OUT="$(mktemp)"
+if ( cd "$T1C_PROJ" && env -u VF_GSD_WORKFLOWS_DIR HOME="$T1C_HOME" VF_GSD_SKILLS_DIR="$T1C_HOME/empty-skills" VF_INDEX_OUT="$T1C_OUT" bash "$MOD/scripts/build-gsd-index.sh" >/dev/null 2>&1 ) \
+  && "$GREP" -q "## Workflows GSD (source secondaire)" "$T1C_OUT" && "$GREP" -q "wf-proj" "$T1C_OUT"; then
+  ok "T1c (DISCRIMINANT) workflows : gsd-core/workflows/ projet-local trouvé, \$HOME vide"
+else
+  ko "T1c (DISCRIMINANT) workflows : cascade projet-local KO — implémentation \$HOME-only ?"
+fi
+rm -f "$T1C_OUT"; rm -rf "$T1C_HOME" "$T1C_PROJ"
+
+# T1d : CLAUDE_CONFIG_DIR distinct de $HOME/.claude, aucun payload projet-local → résolu via elle.
+T1D_HOME="$(mktemp -d)"
+T1D_CCD="$(mktemp -d)"
+mkdir -p "$T1D_HOME/.claude" "$T1D_HOME/empty-skills" "$T1D_CCD/gsd-core/workflows"
+echo "# wf-ccd" > "$T1D_CCD/gsd-core/workflows/wf-ccd.md"
+T1D_OUT="$(mktemp)"
+if env -u VF_GSD_WORKFLOWS_DIR HOME="$T1D_HOME" CLAUDE_CONFIG_DIR="$T1D_CCD" VF_GSD_SKILLS_DIR="$T1D_HOME/empty-skills" VF_INDEX_OUT="$T1D_OUT" bash "$MOD/scripts/build-gsd-index.sh" >/dev/null 2>&1 \
+  && "$GREP" -q "## Workflows GSD (source secondaire)" "$T1D_OUT" && "$GREP" -q "wf-ccd" "$T1D_OUT"; then
+  ok "T1d workflows : résolution via CLAUDE_CONFIG_DIR"
+else
+  ko "T1d workflows : CLAUDE_CONFIG_DIR non honoré"
+fi
+rm -f "$T1D_OUT"; rm -rf "$T1D_HOME" "$T1D_CCD"
+
+# ---------------------------------------------------------------------------
 # T2 — ensure-deps.sh idempotent (dry-run, 2 runs, exit 0 aux deux)
 # ---------------------------------------------------------------------------
 VF_ENSURE_DRY_RUN=1 bash "$MOD/scripts/ensure-deps.sh" >/dev/null 2>&1
@@ -185,6 +241,87 @@ if [ $? -ne 0 ]; then
 else
   ko "T2b validation : VF_SCOPE=bogus aurait dû être rejeté (exit≠0)"
 fi
+
+# ---------------------------------------------------------------------------
+# T2c/T2d/T2e/T2f — piège n°1, nettoyage legacy (ADR-031), garde Node ≥ 22, dual-layout (D1)
+# ---------------------------------------------------------------------------
+
+# T2c — detect_gsd() ne contient plus AUCUN test PATH (piège n°1 neutralisé — preuve directe).
+if [ "$("$GREP" -c 'command -v gsd' "$ENS")" -eq 0 ]; then
+  ok "T2c piège n°1 : aucun 'command -v gsd' dans ensure-deps.sh"
+else
+  ko "T2c piège n°1 : 'command -v gsd' encore présent dans ensure-deps.sh"
+fi
+
+# T2d — detect_gsd_legacy() : les 3 commandes de nettoyage sont LOGUÉES, jamais exécutées (ADR-031).
+T2D_HOME="$(mktemp -d)"
+mkdir -p "$T2D_HOME/.claude/get-shit-done"
+echo "1.42.3" > "$T2D_HOME/.claude/get-shit-done/VERSION"
+T2D_BIN="$(mktemp -d)"
+T2D_TRACE_FILE="$(mktemp)"
+cat > "$T2D_BIN/npm" <<'SH'
+#!/usr/bin/env bash
+echo "npm $*" >> "$T2D_TRACE_FILE"
+exit 1
+SH
+cat > "$T2D_BIN/node" <<'SH'
+#!/usr/bin/env bash
+echo "node $*" >> "$T2D_TRACE_FILE"
+exit 1
+SH
+chmod +x "$T2D_BIN/npm" "$T2D_BIN/node"
+T2D_OUT=$(env -u VF_ENSURE_DRY_RUN -u VF_ENSURE_FORCE HOME="$T2D_HOME" PATH="$T2D_BIN:/usr/bin:/bin" T2D_TRACE_FILE="$T2D_TRACE_FILE" bash "$ENS" 2>&1)
+if echo "$T2D_OUT" | "$GREP" -q "npm uninstall -g get-shit-done-cc" \
+   && echo "$T2D_OUT" | "$GREP" -q "npm uninstall -g @gsd-build/sdk" \
+   && echo "$T2D_OUT" | "$GREP" -q "rm -rf ~/.claude/get-shit-done" \
+   && { [ ! -s "$T2D_TRACE_FILE" ] || ! "$GREP" -q "uninstall" "$T2D_TRACE_FILE"; }; then
+  ok "T2d legacy cleanup : 3 commandes affichées (log), jamais exécutées (trace sans 'uninstall')"
+else
+  ko "T2d legacy cleanup : affichage ou non-exécution non prouvés"
+fi
+rm -rf "$T2D_HOME" "$T2D_BIN"; rm -f "$T2D_TRACE_FILE"
+
+# T2e — Garde Node ≥ 22 : Node 18 détecté → npx jamais tenté, message Node ≥ 22 logué.
+T2E_HOME="$(mktemp -d)"
+T2E_BIN="$(mktemp -d)"
+T2E_NPX_TRACE="$(mktemp)"
+cat > "$T2E_BIN/npm" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+cat > "$T2E_BIN/node" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = "-e" ]; then echo "18"; elif [ "$1" = "--version" ]; then echo "v18.0.0"; fi
+exit 0
+SH
+cat > "$T2E_BIN/npx" <<'SH'
+#!/usr/bin/env bash
+echo "npx-invoked $*" >> "$T2E_NPX_TRACE"
+exit 0
+SH
+chmod +x "$T2E_BIN/npm" "$T2E_BIN/node" "$T2E_BIN/npx"
+T2E_OUT=$(env -u VF_ENSURE_FORCE HOME="$T2E_HOME" PATH="$T2E_BIN:/usr/bin:/bin" T2E_NPX_TRACE="$T2E_NPX_TRACE" VF_ENSURE_DRY_RUN=1 bash "$ENS" 2>&1)
+if echo "$T2E_OUT" | "$GREP" -q "Node ≥ 22" && [ ! -s "$T2E_NPX_TRACE" ]; then
+  ok "T2e garde Node : Node 18 détecté → npx jamais invoqué, message Node ≥ 22 logué"
+else
+  ko "T2e garde Node : garde absente ou npx invoqué malgré Node <22"
+fi
+rm -rf "$T2E_HOME" "$T2E_BIN"; rm -f "$T2E_NPX_TRACE"
+
+# T2f (DISCRIMINANT — D1) : $HOME vide, payload gsd-core posé à l'échelle PROJET (cwd) →
+# detect_gsd() doit renvoyer vrai (pas de tentative de réinstall). Doit échouer avec une
+# implémentation qui ne teste que $HOME/.claude/gsd-core/VERSION.
+T2F_HOME="$(mktemp -d)"
+T2F_PROJ="$(mktemp -d)"
+mkdir -p "$T2F_PROJ/.claude/gsd-core"
+echo "1.8.0" > "$T2F_PROJ/.claude/gsd-core/VERSION"
+T2F_OUT=$(cd "$T2F_PROJ" && env -u VF_ENSURE_FORCE HOME="$T2F_HOME" VF_ENSURE_DRY_RUN=1 bash "$ENS" 2>&1)
+if echo "$T2F_OUT" | "$GREP" -q "GSD déjà présent" && ! echo "$T2F_OUT" | "$GREP" -q "GSD absent — installation"; then
+  ok "T2f (DISCRIMINANT) : gsd-core projet-local détecté, \$HOME vide — pas de tentative de réinstall"
+else
+  ko "T2f (DISCRIMINANT) : détection projet-local KO — implémentation \$HOME-only ?"
+fi
+rm -rf "$T2F_HOME" "$T2F_PROJ"
 
 # ---------------------------------------------------------------------------
 # T3 — AGENT.md : ≤250L, table d'intentions fournie, zéro verbe supprimé
