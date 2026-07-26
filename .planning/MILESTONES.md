@@ -39,11 +39,18 @@ frontmatters incompatibles — deux moteurs de planning concurrents (ADR-055, fr
 13-02 câblage agent, vérif goal-backward PASS), échappatoire ADR-031 fermée (v2.2.1),
 release `v2.37.0` taggée.
 
-## 🚧 gsd-migration — Migration package GSD (créé 2026-07-25)
+## ✅ gsd-migration — Migration package GSD (créé 2026-07-25, clos 2026-07-26)
 
-**Statut :** PHASES LIVRÉES (2026-07-26) — Phase 10 (étude, GO humain) et Phase 11 (intégration, 6 vagues)
-exécutées et vérifiées. **Reste à faire pour clore : la release racine (bump + tag), réservée à une
-validation humaine.** · **Requirement source :** VOC-02
+**Statut :** SHIPPED — release `v2.39.0` · **Tag git :** `v2.39.0` · **Requirement source :** VOC-02
+
+**Livré :** bascule `get-shit-done-cc` (déprécié, mainteneur disparu) → `@opengsd/gsd-core@^1`
+(successeur communautaire, plafond semver post-audit). Étude Phase 10 en 3 documents (spike
+sandbox, arbitrage SDK → `gsd-tools`, cohabitation hooks prouvée) puis mission Phase 11 en 6
+vagues (26 commits) : piège `command -v gsd-sdk` neutralisé, layout dual, routage `gsd-onboard`,
+canal « une seule voix » (gsd-next / mempalace non routés), correctif merge-hooks + suite
+`test-gsd-cohabitation`, `model_profile: balanced` explicite. dev-orchestrator v2.3.1,
+planning-core v2.5.2, conductor v1.14.2. Étapes destructives chez l'utilisateur : affichées,
+jamais exécutées (ADR-031, prouvé par sentinelle).
 
 **Périmètre :** 2 phases · requirements GSDM-01..06.
 
@@ -53,7 +60,7 @@ cible, note go/no-go) de **l'intégration** (Phase 11 : bascule outillée + non-
 taggée). **Phase 11 conditionnée au GO de la Phase 10** — un no-go documenté archive le chantier sans
 toucher le code.
 
-**Prochaine action :** `/gsd:discuss-phase 10` puis `plan-phase`.
+**Clos** — reste un geste utilisateur hors repo : la migration réelle des machines legacy (accompagnée par `ensure-deps.sh`).
 
 ## ✅ hors-milestone — Audit croisé, bascule agentique & universalisation (v2.32.0 → v2.36.1, 2026-07-25/26)
 

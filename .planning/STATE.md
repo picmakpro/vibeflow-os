@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
 status: awaiting-release
-stopped_at: "Phase 11 « Intégration migration GSD » LIVRÉE et VÉRIFIÉE en mission d'équipe (2026-07-26) : 6 vagues, 25 commits, bascule get-shit-done-cc (déprécié) → @opengsd/gsd-core v1.8.x. Vérification goal-backward PASS sur les 3 critères, 39/39 suites vertes, check-version-sync vert, audit sans bloquant. RESTE : (1) la RELEASE RACINE (bump VERSION + tag annoté) réservée à validation humaine — VERSION est encore v2.38.0 ; (2) ARBITRAGE HUMAIN OUVERT sur la posture supply-chain (npx @opengsd/gsd-core@latest sans plafond de version majeure ni vérification d'intégrité répétée — l'audit note que le risque a AUGMENTÉ en passant d'un paquet mort/figé à un fork actif de 2 mois) ; (3) migration réelle de cette machine (encore en layout legacy) = geste utilisateur post-release."
+stopped_at: "Milestone gsd-migration CLOS et SHIPPÉ v2.39.0 (2026-07-26) : bascule @opengsd/gsd-core@^1 livrée (mission 6 vagues, 26 commits) + plafond semver post-audit. Tous les milestones ouverts sont clos. Reste : migration réelle des machines legacy (geste utilisateur accompagné) et sortie d'expérimental de mobile-test."
 last_updated: "2026-07-26"
 last_activity: 2026-07-26
 progress:
@@ -21,11 +21,9 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26 — charte rouverte : 17 modules, D2/D6 renversées)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** **Phase 11 (migration GSD) EN MISSION** — dossier d'étude complet
-(`10-ETUDE.md` + `10-SOLUTIONS.md` + `10-APPROFONDISSEMENT.md`) : parité prouvée, arbitrage SDK
-tranché (`gsd-tools` — le paquet `@opengsd/gsd-sdk` est déprécié), cohabitation hooks prouvée
-saine au dry-run (+ correctif préventif spécifié), runbook labs legacy (piège `command -v
-gsd-sdk` neutralisé), 6 vagues spécifiées au diff près. GO validé par Samuel le 2026-07-26.
+**Current focus:** Milestone `gsd-migration` **SHIPPÉ `v2.39.0`** (2026-07-26) — VibeFlow tourne
+sur `@opengsd/gsd-core@^1`. Plus aucun milestone ouvert. Chantiers candidats : sortie
+d'expérimental de `mobile-test`(-team), dette backlog (known-versions.txt, brick_routed).
 
 ## Current Position
 

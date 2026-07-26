@@ -15,6 +15,25 @@ de groupes mixtes lors du merge de hooks — un groupe qui mélange des scripts 
 différentes n'est plus recyclé, un nouveau groupe est créé à la place. Entrée non taggée : ne
 déclenche pas de release, sera absorbée par le prochain bump de `VERSION` racine.
 
+## [v2.39.0] — 2026-07-26
+
+**Migration du moteur GSD : `get-shit-done-cc` → `@opengsd/gsd-core@^1`** (clôture du milestone
+`gsd-migration`, VOC-02). L'original est déprécié et abandonné ; VibeFlow bascule sur le
+successeur communautaire — à parité fonctionnelle prouvée sur install réelle sandbox — avec un
+**plafond semver `^1`** (fraîcheur sans pin figé, saut de majeure = décision humaine, arbitrage
+post-audit). Livré en mission d'équipe (6 vagues, 26 commits) : `ensure-deps.sh` migré (piège
+`command -v gsd-sdk` neutralisé, layout dual `gsd-core`/legacy, étapes destructives affichées
+jamais exécutées — ADR-031 prouvé par sentinelle), références SDK → **`gsd-tools`** (le paquet
+`@opengsd/gsd-sdk` est lui-même déprécié ; parité des 3 requêtes prouvée), routage **`gsd-onboard`**
+pour le brownfield (BOOT-04 conservé), canal « une seule voix » (`gsd-next` et `gsd-mempalace-*`
+délibérément non routés, frontières machine dans `check-overlaps`), durcissement `merge-hooks.sh`
+(matching ancré + fin de co-location, prouvé rouge→vert) + nouvelle suite `test-gsd-cohabitation`
+sur le settings.json réel de l'installeur, `model_profile: balanced` explicite (doctrine
+« planner=opus, workers=sonnet » machine-enforced côté moteur). 39 suites vertes, dry-run 3 scopes,
+vérification goal-backward PASS, audit sécurité sans bloquant. Modules : dev-orchestrator v2.3.1,
+planning-core v2.5.2, conductor v1.14.2. Dossier d'étude complet dans
+`.planning/phases/10-etude-migration-gsd/`.
+
 ## [v2.38.0] — 2026-07-26
 
 **Documentation niveau framework, module par module.** Le README de chaque module devient sa

@@ -38,11 +38,10 @@ l'intention et invoque les briques directement — plus de couche de verbes-syno
 
 ### Active
 
-- [ ] Phase 13 — Pont spec → feuille de route, **sans verbe** : découverte outillée (13-01) +
-      câblage de l'ingestion dans l'agent (13-02) — clôt le milestone `vf-routing`
-- [ ] Milestone `gsd-migration` (en attente) : `get-shit-done-cc` → `@opengsd/gsd-core`,
-      go/no-go d'abord (Phase 10)
 - [ ] Sortie du statut expérimental de `mobile-test`(-team) : premier run réel vert tracé
+
+*(La Phase 13 / milestone `vf-routing` a shippé en `v2.37.0` ; la migration GSD / milestone
+`gsd-migration` a shippé en `v2.39.0` — tous les milestones ouverts sont clos au 2026-07-26.)*
 
 ### Out of Scope
 

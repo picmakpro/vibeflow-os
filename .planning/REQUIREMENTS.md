@@ -118,16 +118,16 @@
 - [x] **GSDM-02** *(2026-07-26 — `10-ETUDE.md` §2, sourcé npm/GitHub/tarball)*: Le package cible `@opengsd/gsd-core` est caractérisé — existence/stabilité npm, commande
   d'install non-interactive équivalente, nom du binaire, structure de dossier, parité fonctionnelle des
   skills/SDK consommés ; écarts documentés.
-- [~] **GSDM-03** *(note écrite `10-ETUDE.md` §5 — recommandation GO, validation humaine du GO en attente pour ouvrir la Phase 11)*: Une note go/no-go écrite tranche — (a) migrer maintenant (stratégie + fenêtre de compat),
+- [x] **GSDM-03** *(GO validé par Samuel le 2026-07-26 — `10-APPROFONDISSEMENT.md`)*: Une note go/no-go écrite tranche — (a) migrer maintenant (stratégie + fenêtre de compat),
   (b) attendre (déclencheur de resurgence explicite), ou (c) archiver.
 
 ### Phase 11 — Intégration (conditionnée au GO de la Phase 10)
 
-- [ ] **GSDM-04**: `ensure-deps.sh` et les pins (`PROJECT.md`) installent `@opengsd/gsd-core` en
+- [x] **GSDM-04** *(Phase 11, 2026-07-26 — plafond `@^1`)*: `ensure-deps.sh` et les pins (`PROJECT.md`) installent `@opengsd/gsd-core` en
   non-interactif, idempotent, avec fallback manuel ; `get-shit-done-cc` n'est plus référencé.
-- [ ] **GSDM-05**: L'index factuel (`build-gsd-index.sh`) est régénéré depuis le nouveau package/binaire
+- [x] **GSDM-05** *(Phase 11 — index 71 entrées diffé nom à nom contre le payload réel)*: L'index factuel (`build-gsd-index.sh`) est régénéré depuis le nouveau package/binaire
   (zéro hallucination) et les références docs pointent la nouvelle source.
-- [ ] **GSDM-06**: Non-régression prouvée en isolé (dry-run 3 scopes + idempotence, vrai `~/.claude` intact) ;
+- [x] **GSDM-06** *(Phase 11 + release `v2.39.0` taggée)*: Non-régression prouvée en isolé (dry-run 3 scopes + idempotence, vrai `~/.claude` intact) ;
   CHANGELOG/README à jour ; release bumpée + tag annoté poussé (`check-release-tag.sh --remote` → ✓).
 
 ## Milestone vf-routing — Routage fin & couverture des verbes
@@ -274,10 +274,10 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | RND-02 | Phase 9 | Done — note go/no-go + demi-vies recalibrées + cadrage swarm |
 | GSDM-01 | Phase 10 | Done — inventaire 5 familles de points de contact (10-ETUDE.md §1) |
 | GSDM-02 | Phase 10 | Done — cible caractérisée : successeur communautaire dominant, parité totale, chemins/bins changés (10-ETUDE.md §2) |
-| GSDM-03 | Phase 10 | Note écrite et **renforcée par spike réel** (10-SOLUTIONS.md : parité SDK prouvée, 4 correctifs seulement) — GO confirmé, décision humaine en attente |
-| GSDM-04 | Phase 11 | Not started (GATE Phase 10) |
-| GSDM-05 | Phase 11 | Not started (GATE Phase 10) |
-| GSDM-06 | Phase 11 | Not started (GATE Phase 10) |
+| GSDM-03 | Phase 10 | Done — GO validé par Samuel (2026-07-26) |
+| GSDM-04 | Phase 11 | Done — @opengsd/gsd-core@^1, piège detect_gsd neutralisé, legacy affiché jamais exécuté |
+| GSDM-05 | Phase 11 | Done — index 71 entrées, gsd-tools, routage onboard + canal une-seule-voix |
+| GSDM-06 | Phase 11 | Done — 39 suites + test-gsd-cohabitation, dry-run 3 scopes, release v2.39.0 |
 | VERB-01 | Phase 12 | Done |
 | VERB-02 | Phase 12 | Livré v2.31.0 (17/18 verbes) — **caduc depuis v2.33.0** (façade supprimée) |
 | VERB-03 | Phase 12 | Done — 33 descriptions, 11 groupes à réciprocité stricte |
