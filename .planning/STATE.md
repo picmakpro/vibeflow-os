@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: vf-routing
-milestone_name: Routage fin & verbes VibeFlow
-status: shipped
-stopped_at: "Milestone vf-routing CLOS et SHIPPÉ v2.37.0 (2026-07-26, tag annoté poussé) : Phase 13 livrée en mission d'équipe (13-01 découverte outillée + 13-02 câblage agent), échappatoire ADR-031 fermée (ligne nominative dans vf-dev-manager, module v2.2.1). Chantiers restants : milestone gsd-migration (en attente, Phase 10 à cadrer) et divergence lexique P3-P8 à arbitrer."
+milestone: gsd-migration
+milestone_name: Migration package GSD
+status: awaiting-release
+stopped_at: "Phase 11 « Intégration migration GSD » LIVRÉE et VÉRIFIÉE en mission d'équipe (2026-07-26) : 6 vagues, 25 commits, bascule get-shit-done-cc (déprécié) → @opengsd/gsd-core v1.8.x. Vérification goal-backward PASS sur les 3 critères, 39/39 suites vertes, check-version-sync vert, audit sans bloquant. RESTE : (1) la RELEASE RACINE (bump VERSION + tag annoté) réservée à validation humaine — VERSION est encore v2.38.0 ; (2) ARBITRAGE HUMAIN OUVERT sur la posture supply-chain (npx @opengsd/gsd-core@latest sans plafond de version majeure ni vérification d'intégrité répétée — l'audit note que le risque a AUGMENTÉ en passant d'un paquet mort/figé à un fork actif de 2 mois) ; (3) migration réelle de cette machine (encore en layout legacy) = geste utilisateur post-release."
 last_updated: "2026-07-26"
 last_activity: 2026-07-26
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 15
-  completed_plans: 15
+  total_phases: 2
+  completed_phases: 2
+  total_plans: 6
+  completed_plans: 6
   percent: 100
 ---
 
@@ -108,6 +108,26 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
 
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
+
+- **2026-07-26 — Résolution de `gsd-tools` par CASCADE, jamais par chemin en dur** (mission Phase 11,
+  tranchée sur panel de recherche documentaire). Le dossier d'étude prescrivait
+  `node "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/gsd-core/bin/gsd-tools.cjs"`. Preuve contraire :
+  l'installeur gsd-core 1.8.0 gère un scope `--local` qui dépose le payload sous
+  `<projet>/.claude/gsd-core/`, or `ensure-deps.sh` dérive justement un `GSD_SCOPE_FLAG`
+  `--global`/`--local` — le chemin en dur ratait donc DÉJÀ une population d'utilisateurs que notre
+  propre engine sait créer. Forme retenue : l'ordre du snippet officiel amont
+  (`_runtime-launcher.snippet.sh`), en variante Claude-only. Corollaires : `gsd-tools` sort exit 0
+  même en erreur métier → tester le JSON (`.error`), jamais `$?` ; `VERSION` dérivé du chemin
+  résolu ; ne jamais installer `@next` (dist-tag amont périmé : 1.7.0-rc.6 < latest 1.8.0).
+- **2026-07-26 — Non-mixité GÉNÉRALE des groupes de hooks** (mission Phase 11, arbitrage manager).
+  `merge-hooks.sh` ne fusionne plus jamais les hooks VibeFlow dans un groupe qu'il ne possède pas
+  intégralement — y compris un groupe tiers, pas seulement gsd. L'option étroite (restreindre aux
+  hooks gsd-managés) aurait affaibli un correctif déjà spécifié ; le risque prouvé (un outil voisin
+  qui supprime des ENTRÉES ENTIÈRES) n'est pas propre à gsd-core, et l'invariant est symétrique (à
+  la désinstallation, notre `remove` cesse de muter un groupe d'autrui). Conséquence assumée : T2 de
+  `test-merge-hooks.sh` a été réécrit — son assertion `len(read_groups)==1` encodait l'ancien
+  comportement ; la garantie qu'elle protégeait réellement (anti-prolifération de groupes) est
+  conservée explicitement.
 
 - **2026-07-26 — Citation canonique restaurée pour le jalon `vfdo-v1.0`** : la spec
   `2026-06-04-dev-orchestrator-design.md` n'était citée que dans `.planning/phases/01-*/**` (des sorties

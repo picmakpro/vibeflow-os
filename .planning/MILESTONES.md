@@ -41,7 +41,9 @@ release `v2.37.0` taggée.
 
 ## 🚧 gsd-migration — Migration package GSD (créé 2026-07-25)
 
-**Statut :** EN ATTENTE — non planifié, chantier indépendant non bloquant · **Requirement source :** VOC-02
+**Statut :** PHASES LIVRÉES (2026-07-26) — Phase 10 (étude, GO humain) et Phase 11 (intégration, 6 vagues)
+exécutées et vérifiées. **Reste à faire pour clore : la release racine (bump + tag), réservée à une
+validation humaine.** · **Requirement source :** VOC-02
 
 **Périmètre :** 2 phases · requirements GSDM-01..06.
 
