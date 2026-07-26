@@ -134,7 +134,7 @@ Repo public confirmé · `marketplace add` + `install vibeflow` **zéro-auth OK*
 
 ## ✅ vfdo-v1.0 — Module dev-orchestrator (2026-06-04)
 
-**Tag git :** `vfdo-v1.0` · **Embarqué dans la release repo** `v2.3.0`
+**Tag git :** `vfdo-v1.0` · **Embarqué dans la release repo** `v2.3.0` · **Spec :** `docs/superpowers/specs/2026-06-04-dev-orchestrator-design.md`
 
 **Périmètre :** 1 phase · 5 plans · ~10 tasks + 1 incrément (`vf-map`) · 18 commits atomiques
 
