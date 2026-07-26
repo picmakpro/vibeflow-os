@@ -1,5 +1,14 @@
 # Changelog — conductor
 
+## [v1.14.2] — 2026-07-26
+
+### Ajouté
+- `check-overlaps.sh` (ADR-057) : 3 nouvelles paires documentées dans la table des
+  recouvrements connus — `consolidator × gsd-mempalace-capture`, `consolidator ×
+  gsd-mempalace-recall` (consolidator = canon mémoire de lab, in-repo) et `vibeflow-dev ×
+  gsd-next` (vibeflow-dev = front door unique du lab, agent routeur). Tests T15/T16 ajoutés en
+  couverture (Phase 11, vague 11-03).
+
 ## [v1.14.1] — 2026-07-26
 
 ### Corrigé
