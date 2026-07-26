@@ -3,7 +3,7 @@
 > **Module doc-only** : référence canonique de la méthodologie VibeFlow.
 > 70 fichiers (608 KB) — méthodologie + 11 patterns + 4 skills + 33 templates + 1 exemple complet.
 
-**Version** : v2.0.0 (release majeure mai 2026 — alignement VibeFlow Core v4.1)
+**Version** : v2.5.1 (release majeure mai 2026 — alignement VibeFlow Core v4.1)
 **Source** : `distributions/VibeFlow-Reference-v2/VibeFlow-Reference-v2.0.zip`
 
 ---

@@ -5,7 +5,7 @@
 > marche vraiment »** sur simulateur/émulateur. Trois agents cloisonnés + une **rule path-scopée**
 > qui invoque la doctrine de vérification réelle **automatiquement** dès qu'on développe du mobile.
 
-**Version** : v1.0.0
+**Version** : v1.4.0
 **Type** : agents + rules
 **Requires** : `mobile-test` (le pipeline mécanique qu'elle pilote)
 **Statut** : ⚠️ **expérimental** — l'orchestration de sous-agents imbriqués doit être prouvée par un

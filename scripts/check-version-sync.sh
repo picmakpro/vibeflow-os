@@ -58,10 +58,17 @@ for f in README.md README.fr.md; do
   b="$(badge_modules "$ROOT/$f")"
   if [ "$b" = "$real" ]; then ok "$f badge modules $b"; else ko "$f badge modules='$b' ≠ réel=$real (plugin/*/module.json)"; fi
 done
-t="$(grep -o '[0-9][0-9]* modules total' "$ROOT/README.md" | head -1 | grep -o '^[0-9]*')"
-if [ -n "$t" ] && [ "$t" != "$real" ]; then ko "README.md texte '$t modules total' ≠ réel=$real"; fi
-t="$(grep -o '[0-9][0-9]* modules au total' "$ROOT/README.fr.md" | head -1 | grep -o '^[0-9]*')"
-if [ -n "$t" ] && [ "$t" != "$real" ]; then ko "README.fr.md texte '$t modules au total' ≠ réel=$real"; fi
+# Phrase « N modules » du corps des README. Vécu 2026-07-26 : l'ancien grep ('N modules total')
+# ne matchait plus la formulation issue de la refonte v2.36.1 et le contrôle était SAUTÉ EN
+# SILENCE (garde [ -n "$t" ]) — un gate qui ne trouve pas sa cible doit le dire, pas se taire.
+t="$(grep -o '[0-9][0-9]* modules, each versioned' "$ROOT/README.md" | head -1 | grep -o '^[0-9]*')"
+if [ -z "$t" ]; then ko "README.md : phrase « N modules, each versioned » introuvable (reformulée ? réaligner ce grep)"
+elif [ "$t" != "$real" ]; then ko "README.md texte '$t modules' ≠ réel=$real"
+else ok "README.md texte $t modules"; fi
+t="$(grep -o '[0-9][0-9]* modules, chacun versionné' "$ROOT/README.fr.md" | head -1 | grep -o '^[0-9]*')"
+if [ -z "$t" ]; then ko "README.fr.md : phrase « N modules, chacun versionné » introuvable (reformulée ? réaligner ce grep)"
+elif [ "$t" != "$real" ]; then ko "README.fr.md texte '$t modules' ≠ réel=$real"
+else ok "README.fr.md texte $t modules"; fi
 
 # 6. Triade par module (VG-2) : plugin/<mod>/VERSION ↔ module.json .version. C'est la dérive
 # qui a fait mentir le tableau README sur 13 modules (F1) sans qu'aucun gate ne la voie.
@@ -91,6 +98,37 @@ for r in README.md README.fr.md; do
   else
     ok "$r historique en tête v$top_hist"
   fi
+done
+
+# 8. En-tête « **Version** » des README de modules ↔ VERSION du module. Vécu 2026-07-26 :
+#    seule zone de version du repo qu'aucun gate ne regardait — dérive constatée sur 14/14
+#    modules qui en déclarent une (conductor affichait v1.0.0 pour v1.14.1). Un README sans
+#    ligne « **Version** » n'est pas fautif (les bundles n'en déclarent pas) — on ne vérifie
+#    que ce qui est déclaré.
+hdr_fail=0; hdr_n=0
+for mj in "$ROOT"/plugin/*/module.json; do
+  mod_dir="$(dirname "$mj")"; mod="$(basename "$mod_dir")"
+  [ -f "$mod_dir/README.md" ] && [ -f "$mod_dir/VERSION" ] || continue
+  hline="$(grep '\*\*Version\*\*' "$mod_dir/README.md" | head -1)"
+  [ -n "$hline" ] || continue
+  hdr_n=$((hdr_n+1))
+  mv_ver="$(tr -d 'v[:space:]' < "$mod_dir/VERSION")"
+  h_ver="$(echo "$hline" | grep -o 'v[0-9][0-9.]*' | head -1 | tr -d 'v')"
+  if [ "$h_ver" != "$mv_ver" ]; then
+    ko "plugin/$mod/README.md : en-tête Version v$h_ver ≠ VERSION v$mv_ver"; hdr_fail=1
+  fi
+done
+[ "$hdr_fail" -eq 0 ] && ok "en-tête Version des README de modules : $hdr_n déclarés, tous alignés"
+
+# 9. Compte de suites de tests cité par les README racine ↔ suites réellement découvertes par
+#    la CI (même commande de découverte que .github/workflows/ci.yml). Même famille que le
+#    point précédent : « 36 suites » affiché pour 37 réelles, chiffre jamais gaté.
+suites_real="$(find "$ROOT/plugin" "$ROOT/scripts" -path '*/tests/test-*.sh' 2>/dev/null | grep -c .)"
+for r in README.md README.fr.md; do
+  s="$(grep -o '[0-9][0-9]* suites' "$ROOT/$r" | head -1 | grep -o '^[0-9]*')"
+  if [ -z "$s" ]; then ko "$r : aucune mention « N suites » trouvée (reformulée ? réaligner ce grep)"
+  elif [ "$s" != "$suites_real" ]; then ko "$r : '$s suites' ≠ réel=$suites_real (find */tests/test-*.sh)"
+  else ok "$r suites $s"; fi
 done
 
 if [ "$FAIL" -eq 1 ]; then

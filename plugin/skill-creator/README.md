@@ -3,7 +3,7 @@
 > **Module multi-composants** : 1 agent natif + 2 skills externes.
 > Pattern issu de VideoFlow-Lab, généralisé Session 045 (LRN-101) puis packagé pour distribution cross-labs Session 047.
 
-**Version** : v1.0.0
+**Version** : v1.0.2
 **Source originale** : `output/skill-creator-universal/` du VibeFlow Lab (LRN-101, Session 045)
 
 ---

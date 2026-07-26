@@ -4,7 +4,7 @@
 > *configuration* du lab — créer, installer, vérifier, mettre à jour, migrer — dans **n'importe quel
 > métier**. Pas appelé en continu : il intervient aux moments de config, d'audit et de migration.
 
-**Type** : `agent + skills + scripts + references` · **Version** : v1.0.0 · **Dépend de** : `planning-core`, `validator`.
+**Type** : `agent + skills + scripts + references` · **Version** : v1.14.1 · **Dépend de** : `planning-core`, `validator`.
 
 ---
 

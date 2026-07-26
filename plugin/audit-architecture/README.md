@@ -1,7 +1,7 @@
 # audit-architecture (module vibeflow-os)
 
 > **Type** : single-skill + references
-> **Version** : v1.0.0
+> **Version** : v1.0.1
 > **ADR** : ADR-036 (Doctrine Audit Architecture — structures d'audit multi-couches universelles)
 
 Méta-skill **concepteur d'architecture d'audit**. Pour N'IMPORTE QUEL process qui transforme

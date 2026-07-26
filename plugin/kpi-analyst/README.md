@@ -4,7 +4,7 @@
 > CA, leads, MRR, vues, engagement — au lieu de compteurs méta, et les tient à jour de façon
 > **déterministe** pour le dashboard du Hub.
 
-**Version** : v1.0.0
+**Version** : v1.0.2
 **Type** : `agent + skill + scripts + references`
 **Dépendances** : `planning-core`, `consolidator`
 **Iron Law** : *« Aucun chiffre inventé. Chaque KPI porte sa source. Le schéma est gelé+validé ; les valeurs viennent d'un extracteur déterministe, pas du raisonnement LLM. »*

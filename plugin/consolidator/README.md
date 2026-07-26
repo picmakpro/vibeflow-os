@@ -2,7 +2,7 @@
 
 > Skill VibeFlow qui maintient les registres mémoire structurés (DECISIONS / LEARNINGS / BLOCKERS / EVALS / JOURNAL) scalables et propres au fil des sessions.
 
-**Version** : v1.0.0
+**Version** : v1.8.0
 **Référence** : ADR-032 du Lab VibeFlow
 **Iron Law** : *"La lecture d'un registre = lecture de l'index uniquement par défaut."*
 

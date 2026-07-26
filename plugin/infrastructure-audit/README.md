@@ -2,7 +2,7 @@
 
 > Skill VibeFlow qui détecte automatiquement les régressions techniques d'un lab après mise à jour Claude Code ou conventions Anthropic.
 
-**Version** : v1.0.0
+**Version** : v1.2.1
 **Iron Law** : *"Une infrastructure non auditée est une infrastructure qui dérive silencieusement."*
 
 ---

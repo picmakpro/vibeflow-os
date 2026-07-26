@@ -5,7 +5,7 @@
 > un **rapport horodaté + artefacts**, et te laisse **diagnostiquer visuellement** les échecs via
 > `mobile-mcp`. Un noyau mécanique scripté, une couche jugement portée par l'agent.
 
-**Version** : v1.0.0
+**Version** : v1.0.1
 **Type** : skill + script + config
 **Statut** : ⚠️ **expérimental** — validé sur le projet d'origine, à re-confirmer par un run réel
 dans ton contexte avant de le considérer « intégré » (voir § Statut).

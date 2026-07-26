@@ -5,7 +5,7 @@
 > une chaîne d'outils design pilotée en coulisse. L'utilisateur ne parle que VibeFlow ; la plomberie
 > (référentiel UX, direction créative, atelier de craft) reste invisible.
 
-**Version** : v1.2.0
+**Version** : v1.2.1
 **Type** : agent + skills + équipe de mission
 
 ---

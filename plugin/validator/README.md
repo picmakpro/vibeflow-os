@@ -2,7 +2,7 @@
 
 > Agent natif Claude Code qui orchestre les 4 audits du package vibeflow-os pour garantir qu'un lab reste fidèle à la méthodologie VibeFlow malgré l'évolution Anthropic, l'append-only des registres et la dette inévitable.
 
-**Version** : v1.0.0
+**Version** : v1.3.1
 **Densité** : 183 lignes (charte ADR-029 ≤250L)
 **Iron Law** : *"Détecter et signaler. Ne jamais corriger sans validation humaine."* (ADR-031)
 
