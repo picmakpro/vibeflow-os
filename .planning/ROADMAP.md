@@ -235,24 +235,30 @@ et partagés), correction des deux textes qui décrivaient mal le chargement des
 05), gabarit de description sur les trois verbes du `conductor`, frontière d'altitude ADR-055 portée par
 les cinq verbes `.planning`-centrés, et purge des mentions d'un projet tiers dans tout le dépôt (public).
 
-#### Phase 13: Pont spec → feuille de route (`/vf-ingest`)
+#### Phase 13: Pont spec → feuille de route (ingestion portée par l'agent)
+
+> Redéfinie le 2026-07-26 : la phase avait été écrite autour du verbe `/vf-ingest`, or la façade `/vf-*`
+> a été supprimée en v2.33.0 (bascule agentique, spec `2026-07-25-suppression-facade-vf-design.md`).
+> La capacité est désormais portée par l'agent `vibeflow-dev` — aucun verbe-façade n'est créé.
+
 **Goal**: Outiller le passage d'un cadrage écrit aux étapes de la feuille de route — une spec devient des
 étapes + des exigences, un plan devient le plan d'une étape — en déléguant aux moteurs GSD existants et
 sans contourner leurs garde-fous.
-**Depends on**: Phase 12 (le verbe suppose le gabarit de description et la rule de préséance en place)
+**Depends on**: Phase 12 (carte d'intention unique de `vibeflow-dev` en place)
 **Requirements**: BRDG-01, BRDG-02, BRDG-03
 **Success Criteria** (what must be TRUE):
-  1. `/vf-ingest` traite les deux grains : spec → `gsd-ingest-docs --mode merge` (étapes + exigences),
-     plan → `gsd-import --from` (PLAN.md d'une étape) — sans réimplémenter de parseur maison.
-  2. Le verbe découvre les specs/plans non encore intégrés (chemin absent de `ROADMAP.md`), détecte le grain
-     et construit le manifest YAML : l'utilisateur n'écrit jamais de manifest à la main.
+  1. L'agent `vibeflow-dev` traite les deux grains : spec → `gsd-ingest-docs --mode merge` (étapes +
+     exigences), plan → `gsd-import --from` (PLAN.md d'une étape) — sans réimplémenter de parseur maison.
+  2. La découverte des specs/plans non encore intégrés est **outillée** (`discover-unintegrated-docs.sh` :
+     chemin non cité dans les 6 registres, détection du grain) ; l'agent construit le manifest YAML —
+     l'utilisateur n'écrit jamais de manifest à la main.
   3. Gate BLOCKER jamais contourné, confirmation humaine avant toute écriture dans `.planning/` (ADR-031),
      `--mode merge` par défaut sur projet existant, cap 50 documents signalé.
-  4. `vf-brainstorm` propose `/vf-ingest` en fin de cadrage — le cycle `vf-brainstorm → vf-ingest → vf-plan
-     → vf-execute` est bouclé, plus aucune spec orpheline.
-  5. Release livrée : CHANGELOG/README des deux modules à jour, bump racine + **tag annoté poussé**
+  4. En fin de cadrage (brainstorm → spec écrite), l'agent propose l'ingestion comme next step — plus
+     aucune spec orpheline, sans ressusciter le cycle de verbes supprimé en v2.33.0.
+  5. Release livrée : CHANGELOG/README des modules à jour, bump racine + **tag annoté poussé**
      (`scripts/check-release-tag.sh --remote` → ✓).
-**Plans**: à cadrer (`/gsd:discuss-phase 13` puis `plan-phase`)
+**Plans**: 13-01 (découverte outillée — plan écrit, à exécuter) · 13-02 (câblage dans l'agent — à planifier)
 
 #### Phase 14: Frontière d'altitude planning-core / moteur GSD (rescope de `vf-planning`)
 **Goal**: Faire cesser la concurrence entre `vf-planning` et le moteur de planning GSD — deux moteurs

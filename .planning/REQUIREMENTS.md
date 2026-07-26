@@ -154,15 +154,19 @@ Spec : `docs/superpowers/specs/2026-07-25-routage-fin-verbes-vf-design.md`.
 
 ### Phase 13 — Pont spec → feuille de route
 
-- [ ] **BRDG-01**: `/vf-ingest` intègre une spec `docs/superpowers/specs/*.md` à la feuille de route via
-  `gsd-ingest-docs --mode merge` (étapes + exigences), et un plan `docs/superpowers/plans/*.md` via
-  `gsd-import --from` — sans réimplémenter ni contourner les moteurs.
-- [ ] **BRDG-02**: Le verbe découvre les specs/plans **non encore intégrés** (chemin non cité dans
-  `ROADMAP.md`), détecte le grain (spec vs plan) et construit le manifest YAML attendu par le moteur —
-  l'utilisateur n'écrit aucun manifest à la main.
+> Redéfinie le 2026-07-26 : la façade `/vf-*` ayant été supprimée (v2.33.0, bascule agentique), la
+> capacité d'ingestion est portée par l'agent `vibeflow-dev` — pas de verbe `/vf-ingest`.
+
+- [ ] **BRDG-01**: L'agent `vibeflow-dev` intègre une spec `docs/superpowers/specs/*.md` à la feuille de
+  route via `gsd-ingest-docs --mode merge` (étapes + exigences), et un plan `docs/superpowers/plans/*.md`
+  via `gsd-import --from` — sans réimplémenter ni contourner les moteurs.
+- [ ] **BRDG-02**: La découverte des specs/plans **non encore intégrés** est outillée
+  (`discover-unintegrated-docs.sh` : chemin non cité dans les 6 registres — ROADMAP, REQUIREMENTS,
+  MILESTONES, PROJECT, `milestones/*.md`, `docs/ADR.md` —, détection du grain spec vs plan) ; l'agent
+  construit le manifest YAML attendu par le moteur — l'utilisateur n'écrit aucun manifest à la main.
 - [ ] **BRDG-03**: Les garde-fous sont préservés et vérifiés : gate BLOCKER jamais contourné, confirmation
   humaine avant toute écriture dans `.planning/` (ADR-031), `--mode merge` par défaut sur projet existant,
-  cap 50 documents signalé ; `vf-brainstorm` propose `/vf-ingest` en fin de cadrage.
+  cap 50 documents signalé ; en fin de cadrage, l'agent propose l'ingestion comme next step.
 
 ### Phase 14 — Frontière d'altitude `planning-core` / moteur GSD
 
