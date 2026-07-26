@@ -32,7 +32,7 @@ PLANNING_DIR=".planning"
 #   4. défaut — nomme le futur (gsd-core) dans les messages d'erreur, pas le passé
 default_gsd_home() {
   local root claude_home
-  root="${TARGET_PATH:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+  root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
   claude_home="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
   if [ -d "$root/.claude/gsd-core" ]; then
     echo "$root/.claude/gsd-core"

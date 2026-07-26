@@ -59,7 +59,7 @@ FORCE="${VF_ENSURE_FORCE:-}"
 # (D-01 : antérieur au scope --local).
 default_gsd_home_new() {
   local root claude_home
-  root="${TARGET_PATH:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+  root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
   claude_home="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
   if [ -d "$root/.claude/gsd-core" ]; then
     echo "$root/.claude/gsd-core"
