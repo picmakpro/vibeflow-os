@@ -166,9 +166,8 @@ Recent decisions affecting current work:
 - Combler le trou de couverture du **filtre glob** de `discover-unintegrated-docs.sh` : le mutant
   « filtre retiré » survit à la suite (16 ok quand même). Effet possible = faux négatif, jamais faux
   positif — donc pas de ré-ingestion silencieuse, priorité basse.
-- Arbitrer la divergence doctrine distribuée : intitulés P3-P8 de
-  `plugin/reference/content/methodology/vocabulary/lexique.md` ≠ `VIBEFLOW_CORE.md` v4.2
-  (« Specialiser » n'existe plus comme principe) — signalée le 2026-07-26, décision humaine requise.
+- ~~Divergence lexique P3-P8~~ **tranchée le 2026-07-26** (commit b835ffd) : le Core v4.2 est
+  canonique, lexique réaligné, module reference v2.5.2 — part avec la prochaine release.
 - *(milestone `gsd-migration`, en attente)* Cadrer la Phase 10 (`/gsd:discuss-phase 10`) : inventaire
   surface d'impact GSD + caractérisation `@opengsd/gsd-core`.
 
