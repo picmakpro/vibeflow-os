@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: vf-routing
 milestone_name: Routage fin & verbes VibeFlow
-status: in_progress
-stopped_at: "Phase 13 EXÉCUTÉE de bout en bout le 2026-07-26 (mission d'équipe) : 13-01 (découverte outillée) + 13-02 (câblage agent) livrés, vérif goal-backward PASS, module dev-orchestrator v2.2.0. Les 3 phases du milestone vf-routing sont désormais complètes côté code. RESTE : la release de clôture (bump racine + tag annoté), réservée à validation humaine — elle N'A PAS été faite. Repo en v2.36.2."
+status: shipped
+stopped_at: "Milestone vf-routing CLOS et SHIPPÉ v2.37.0 (2026-07-26, tag annoté poussé) : Phase 13 livrée en mission d'équipe (13-01 découverte outillée + 13-02 câblage agent), échappatoire ADR-031 fermée (ligne nominative dans vf-dev-manager, module v2.2.1). Chantiers restants : milestone gsd-migration (en attente, Phase 10 à cadrer) et divergence lexique P3-P8 à arbitrer."
 last_updated: "2026-07-26"
 last_activity: 2026-07-26
 progress:
@@ -21,19 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26 — charte rouverte : 17 modules, D2/D6 renversées)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** **Release de clôture du milestone `vf-routing`** — les 3 phases (12, 13, 14) sont
-complètes côté code. La Phase 13 a été livrée le 2026-07-26 : le fait est outillé par
-`discover-unintegrated-docs.sh` (13-01) et la doctrine `references/ingestion-flow.md` est câblée dans
-l'agent `vibeflow-dev` (13-02), sans aucun verbe-façade.
+**Current focus:** Milestone `vf-routing` **SHIPPÉ `v2.37.0`** (2026-07-26). Prochain chantier à
+arbitrer : cadrer la Phase 10 (milestone `gsd-migration`, en attente) et/ou trancher la divergence
+doctrinale lexique P3-P8 vs Core v4.2.
 
 ## Current Position
 
-Phase: 13 **complète (hors release)** — milestone vf-routing
+Phase: 13 **complète — shippée `v2.37.0`** — milestone vf-routing CLOS
 Plans: 13-01 ✅ (découverte outillée, BRDG-02) · 13-02 ✅ (câblage agent, BRDG-01/BRDG-03).
 Vérification goal-backward **PASS** (`13-VERIFICATION.md`) : 4/4 critères dans le mandat, 3/3 BRDG,
 22/22 must-haves, 0 blocker. Suites : 16 ok · 30 OK/0 KO · 10 OK · check-agents ✓ · check-version-sync ✓.
 Module `dev-orchestrator` bumpé **v2.2.0** ; `VERSION` racine volontairement **intouchée** (v2.36.2).
-Status: **Prochaine action = release de clôture** (bump racine + tag annoté poussé) — décision humaine.
+Status: Milestone clos — release `v2.37.0` publiée et taggée le 2026-07-26.
 Last activity: 2026-07-26 (mission d'équipe : exécution complète de la Phase 13)
 
 **Phases 12 et 14 livrées et publiées sur `main`** :
@@ -53,7 +52,7 @@ conductor v1.14.1 · planning-core v2.5.1 · consolidator v1.8.0.
 Milestone `gsd-migration` (Phases 10-11) reste ouvert et **en attente** — chantier indépendant, non bloquant.
 Milestone précédent memory-swarm-rnd **SHIPPÉ v2.28.0** (ADR-052 mémoire vivante + ADR-053 swarm).
 
-Progress: [██████████] 3/3 phases — code complet, release de clôture en attente
+Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
 
 ## Performance Metrics
 

@@ -10,7 +10,7 @@ Orchestration agentique **spec-driven** pour Claude Code : tu parles normalement
 détecte l'intention, déroule le pipeline (cadrage → plan → exécution → preuve), et des **gates
 machine** vérifient — pas des promesses.
 
-[![Version](https://img.shields.io/badge/version-2.36.2-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.37.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -217,9 +217,9 @@ Historique complet : **[CHANGELOG.md](./CHANGELOG.md)** — le README garde les 
 
 | Version | Date | Changement |
 |---------|------|------------|
+| `v2.37.0` | 2026-07-26 | Milestone `vf-routing` clos : le pont spec → feuille de route est livré (Phase 13) — découverte outillée des cadrages non intégrés + doctrine d'ingestion portée par l'agent (`ingestion-flow.md`), aucun verbe-façade ressuscité, confirmation ADR-031 verrouillée nominativement dans les deux agents. |
 | `v2.36.2` | 2026-07-26 | Remédiation vérité-doc : README de modules réalignés sur le réel (validator 5 audits, conductor documente enfin le team-kernel, reference en Core v4.2 / 12 patterns / 5 skills), correctifs du registre ADR, et `check-version-sync` gate désormais les en-têtes Version des modules + le compte de suites CI (grep mort → échec bruyant). |
 | `v2.36.1` | 2026-07-26 | Refonte vitrine des README : dev-first, 3 diagrammes mermaid (cycle spec-driven, équipe de mission, architecture), efficience/mémoire en avant, tableau des modules replié — et nouvel invariant de gate : l'historique en tête doit être la VERSION courante. |
-| `v2.36.0` | 2026-07-26 | Recettes réelles (UAT) sur labs vierges (mode express ✓ sous 15 min ; protocole de mission exécutable par un agent tiers ✓) — 16 frictions corrigées, doctrine `human_needed` tranchée (geler le nœud), job CI « lab frais » : la baseline doit passer ses propres gates depuis un lab vierge. |
 
 <details>
 <summary><strong>Références méthodologiques (ADR / LRN)</strong></summary>

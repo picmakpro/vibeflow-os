@@ -1,8 +1,8 @@
 # Milestones — VibeFlow Dev Orchestrator (VFDO)
 
-## 🚧 vf-routing — Routage fin & verbes VibeFlow (créé 2026-07-25)
+## ✅ vf-routing — Routage fin & verbes VibeFlow (créé 2026-07-25, clos 2026-07-26)
 
-**Statut :** ACTIF — 2 phases sur 3 livrées (12 ✅ `v2.31.0`, 14 ✅ `v2.30.0`) · **Spec :** `docs/superpowers/specs/2026-07-25-routage-fin-verbes-vf-design.md`
+**Statut :** SHIPPED — 3 phases livrées (12 ✅ `v2.31.0`, 14 ✅ `v2.30.0`, 13 ✅ `v2.37.0`) · **Tag git :** `v2.37.0` · **Spec :** `docs/superpowers/specs/2026-07-25-routage-fin-verbes-vf-design.md`
 
 **Périmètre :** 3 phases · requirements VERB-01..05, BRDG-01..03, ALTI-01..05.
 
@@ -35,8 +35,9 @@ frontmatters incompatibles — deux moteurs de planning concurrents (ADR-055, fr
   `planning-core` garde l'altitude lab, la mémoire et le socle des labs non-dev. planning-core v2.4.0
   (v2.5.1 au 2026-07-26).
 
-**Prochaine action :** `/gsd:execute-phase 13` (plan 13-01, découverte outillée), puis `plan-phase` pour
-13-02 (câblage de l'ingestion dans l'agent).
+**Clos le 2026-07-26** — Phase 13 livrée en mission d'équipe (13-01 découverte outillée +
+13-02 câblage agent, vérif goal-backward PASS), échappatoire ADR-031 fermée (v2.2.1),
+release `v2.37.0` taggée.
 
 ## 🚧 gsd-migration — Migration package GSD (créé 2026-07-25)
 

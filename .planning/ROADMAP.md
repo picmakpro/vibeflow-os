@@ -7,7 +7,7 @@
 - ✅ **dev-doctrine** — Phases 7-8 — doctrine dev (SOLID/DRY/KISS/YAGNI/Clean Archi/Clean Code/TDD) + consolidation des doublons qualité — clôturé 2026-07-07 — release `v2.20.0`
 - ✅ **memory-swarm-rnd** — Phase 9 — R&D : transposition du modèle mémoire + patterns swarm de jcode — spike GO, shippé `v2.28.0` (ADR-052 mémoire vivante + ADR-053 swarm)
 - 🚧 **gsd-migration** — Phases 10-11 — migration du package GSD `get-shit-done-cc` → `@opengsd/gsd-core` (VOC-02) : étude de faisabilité + go/no-go, puis intégration outillée
-- 🚧 **vf-routing** — Phases 12-14 — routage fin des intentions (verbes `/vf-*` à l'origine ; carte d'intention agentique depuis la bascule v2.33.0), couverture complète des skills GSD, pont spec → feuille de route, et frontière d'altitude avec le moteur de planning GSD
+- ✅ **vf-routing** — Phases 12-14 — clos 2026-07-26, release `v2.37.0` — routage fin des intentions (verbes `/vf-*` à l'origine ; carte d'intention agentique depuis la bascule v2.33.0), couverture complète des skills GSD, pont spec → feuille de route, et frontière d'altitude avec le moteur de planning GSD
 
 ## Phases
 
@@ -327,5 +327,5 @@ Plans:
 | 10. Étude & faisabilité migration GSD | gsd-migration | 0/? | Not planned yet | — |
 | 11. Intégration migration GSD | gsd-migration | 0/? | Not planned yet (GATE Phase 10) | — |
 | 12. Routage fin & verbes /vf-* | vf-routing | 6/6 | Complete — release `v2.31.0` | 2026-07-25 |
-| 13. Pont spec → feuille de route | vf-routing | 2/2 | Complete (hors release) — module v2.2.0, vérif PASS | 2026-07-26 |
+| 13. Pont spec → feuille de route | vf-routing | 2/2 | Complete — release `v2.37.0` — module v2.2.0, vérif PASS | 2026-07-26 |
 | 14. Frontière d'altitude planning-core / GSD | vf-routing | 7/7 | Complete — release `v2.30.0` (ADR-055) | 2026-07-25 |

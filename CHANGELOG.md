@@ -5,6 +5,23 @@ dernières entrées et pointent ici). Chaque module a par ailleurs son propre `C
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.37.0] — 2026-07-26
+
+**Clôture du milestone `vf-routing` — le pont spec → feuille de route est livré** (Phase 13,
+exécutée en mission d'équipe). Une spec ou un plan écrit devient des étapes de la feuille de
+route **sans quitter le modèle agentique** : le fait est outillé par
+`discover-unintegrated-docs.sh` (quels cadrages ne sont pas encore intégrés — 6 registres de
+citation, détection du grain spec/plan, 16 cas de test, revue à coût d'erreur asymétrique :
+2 bloquants trouvés et corrigés), et l'agent `vibeflow-dev` porte la doctrine
+`references/ingestion-flow.md` (typage en prose, manifest YAML construit par l'agent,
+délégation `gsd-ingest-docs --mode merge` / `gsd-import`, gate BLOCKER jamais contourné,
+cap 50 signalé). **Aucun verbe-façade recréé** — la phase, écrite avant la bascule agentique
+autour d'un `/vf-ingest`, a été redéfinie sans verbe. La confirmation humaine ADR-031 précède
+tout appel d'ingestion, ancrée **nominativement** dans `vibeflow-dev` ET `vf-dev-manager`
+(échappatoire trouvée par l'audit BRDG-03, fermée en v2.2.1 du module). `dev-orchestrator`
+v2.2.1. Premier usage réel de l'outil : une citation canonique perdue à l'archivage du jalon
+`vfdo-v1.0` retrouvée et restaurée. Les 3 phases du milestone (12, 13, 14) sont complètes.
+
 ## [v2.36.2] — 2026-07-26
 
 **Remédiation de l'audit « périmé »** (planning + docs, 5 commits). Côté distribution :
