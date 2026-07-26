@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+# discover-unintegrated-docs.sh — Quels cadrages écrits ne sont pas encore intégrés à la feuille
+#                                  de route ? (BRDG-02)
+#
+# Rôle (ADR-055 §3) : répondre au FAIT, jamais au métier. Ce script ne dit PAS si un document est
+# un ADR, une SPEC, un PRD ou un DOC — ça reste du jugement porté par l'agent (vibeflow-dev, plan
+# 13-02). Il dit seulement : « ce document existe sous docs/superpowers/{specs,plans}/, et aucun
+# registre ne le cite » — et à quel GRAIN il appartient (spec | plan).
+#
+# Usage:
+#   discover-unintegrated-docs.sh [--path <dir>] [--quiet]
+# Defaults: --path .
+#
+# Sources scannées (grain) :
+#   <sources>/specs/*.md  → grain spec
+#   <sources>/plans/*.md  → grain plan
+#
+# Registres de citation consultés :
+#   <planning>/ROADMAP.md, <planning>/REQUIREMENTS.md, <planning>/MILESTONES.md,
+#   <planning>/PROJECT.md, <planning>/milestones/*.md, <adr>
+#   <planning>/phases/** est EXCLU : ce sont des sorties du moteur, pas des entrées.
+#
+# Règle de citation : un document est « intégré » si son basename (extension .md incluse), borné
+# à droite (fin de ligne ou caractère hors [0-9A-Za-z._-]), apparaît dans une ligne d'un registre.
+# Jamais de match sur le stem, jamais par préfixe de dossier. Une ligne de registre contenant un
+# glob (ex. docs/superpowers/specs/*.md) est ignorée comme source de citation.
+#
+# Env (surcharge — testabilité, modèle VF_GSD_SKILLS_DIR de build-gsd-index.sh) :
+#   VF_INGEST_SOURCES_DIR   (défaut <path>/docs/superpowers) — racine contenant specs/ et plans/
+#   VF_INGEST_PLANNING_DIR  (défaut <path>/.planning)        — racine des registres GSD
+#   VF_INGEST_ADR_FILE      (défaut <path>/docs/ADR.md)      — registre hors chaîne GSD
+#
+# Sortie : une ligne par document non intégré, "grain<TAB>chemin" (chemin relatif à --path),
+# triée. Rien d'autre — pas de prose, pas d'en-tête.
+#
+# Exit codes :
+#   0  = au moins un document non intégré (listé sur stdout)
+#   3  = rien à intégrer (corpus vide, corpus entièrement cité, ou .planning/ absent)
+#   64 = argument inconnu
+set -uo pipefail
+shopt -s nullglob
+
+ROOT="."
+QUIET=0
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --path) ROOT="${2:?--path nécessite une valeur}"; shift 2 ;;
+    --quiet) QUIET=1; shift ;;
+    -h|--help) grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
+    *) echo "[discover-unintegrated-docs] argument inconnu : $1" >&2; exit 64 ;;
+  esac
+done
+
+SOURCES_ROOT="${VF_INGEST_SOURCES_DIR:-$ROOT/docs/superpowers}"
+PLANNING_DIR="${VF_INGEST_PLANNING_DIR:-$ROOT/.planning}"
+ADR_FILE="${VF_INGEST_ADR_FILE:-$ROOT/docs/ADR.md}"
+SPECS_DIR="$SOURCES_ROOT/specs"
+PLANS_DIR="$SOURCES_ROOT/plans"
+
+say() { [ "$QUIET" -eq 1 ] || echo "[discover-unintegrated-docs] $*" >&2; }
+
+# --- .planning/ absent : pas de moteur de planning, rien à évaluer contre ---
+if [ ! -d "$PLANNING_DIR" ]; then
+  say "$PLANNING_DIR absent — aucun registre à consulter."
+  exit 3
+fi
+
+# --- Collecte des documents source (grain, chemin relatif à --path) ---
+DOCS_TMP="$(mktemp)"
+REG_TMP="$(mktemp)"
+OUT_TMP="$(mktemp)"
+trap 'rm -f "$DOCS_TMP" "$REG_TMP" "$OUT_TMP"' EXIT
+
+for f in "$SPECS_DIR"/*.md; do printf 'spec\t%s\n' "$f" >> "$DOCS_TMP"; done
+for f in "$PLANS_DIR"/*.md; do printf 'plan\t%s\n' "$f" >> "$DOCS_TMP"; done
+
+if [ ! -s "$DOCS_TMP" ]; then
+  say "Aucun document source sous $SPECS_DIR ou $PLANS_DIR."
+  exit 3
+fi
+
+# --- Concaténation des registres existants (les lignes glob sont filtrées au moment du match) ---
+for r in "$PLANNING_DIR/ROADMAP.md" "$PLANNING_DIR/REQUIREMENTS.md" "$PLANNING_DIR/MILESTONES.md" \
+         "$PLANNING_DIR/PROJECT.md" "$PLANNING_DIR/milestones"/*.md "$ADR_FILE"; do
+  [ -f "$r" ] && cat "$r" >> "$REG_TMP"
+done
+
+# Un document est cité si son basename, borné à droite, apparaît dans une ligne NON glob d'un
+# registre. Padding d'un espace en fin de ligne : évite l'ancrage $ à l'intérieur d'une alternative
+# ERE (portabilité awk POSIX), la borne droite est alors toujours "caractère hors [0-9A-Za-z._-]".
+is_cited() { # <basename>
+  awk -v base="$1" '
+    BEGIN {
+      esc = base
+      gsub(/\./, "\\.", esc)
+      pat = esc "[^0-9A-Za-z._-]"
+    }
+    index($0, "/*") > 0 { next }
+    { line = $0 " "; if (line ~ pat) { found = 1; exit } }
+    END { exit (found ? 0 : 1) }
+  ' "$REG_TMP"
+}
+
+while IFS="$(printf '\t')" read -r grain path; do
+  [ -z "$grain" ] && continue
+  base="$(basename "$path")"
+  if is_cited "$base"; then
+    continue
+  fi
+  rel="$path"
+  case "$rel" in
+    "$ROOT"/*) rel="${rel#"$ROOT"/}" ;;
+  esac
+  printf '%s\t%s\n' "$grain" "$rel" >> "$OUT_TMP"
+done < "$DOCS_TMP"
+
+if [ ! -s "$OUT_TMP" ]; then
+  say "Corpus entièrement cité — rien à intégrer."
+  exit 3
+fi
+
+[ "$QUIET" -eq 1 ] && exit 0
+
+LC_ALL=C sort "$OUT_TMP"
+exit 0
