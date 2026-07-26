@@ -88,6 +88,50 @@ LAB="$TMP/lab12"; mkdir -p "$LAB/.planning"
 } > "$LAB/.planning/STATE.md"
 ( cd "$LAB" && GSD_HOME="$FAKE_GSD" bash "$DETECT" --quiet ); check_exit "frontmatter GSD prime sur mention en corps" 0 $?
 
+# --- Cas 13-19 : dual-layout GSD_HOME (D-01, amendement D1) — GSD_HOME NON fourni, résolution
+# par défaut testée. mk_state pose un STATE.md GSD-actif (gsd_state_version) pour que « exit 0 »
+# soit la preuve indirecte que le dossier attendu a bien été trouvé par la cascade.
+
+# Cas 13 : $HOME redirigé, seul .claude/gsd-core/ présent (pas de get-shit-done/) → gsd-core trouvé.
+LAB="$TMP/lab13"; mk_state "$LAB" "gsd_state_version"
+FAKE_HOME13="$TMP/home13"; mkdir -p "$FAKE_HOME13/.claude/gsd-core"
+( cd "$LAB" && env -u GSD_HOME HOME="$FAKE_HOME13" bash "$DETECT" --quiet ); check_exit "cas 13 : gsd-core seul sous \$HOME → trouvé" 0 $?
+
+# Cas 14 : $HOME redirigé, seul .claude/get-shit-done/ présent (layout legacy pur) → trouvé (repli).
+LAB="$TMP/lab14"; mk_state "$LAB" "gsd_state_version"
+FAKE_HOME14="$TMP/home14"; mkdir -p "$FAKE_HOME14/.claude/get-shit-done"
+( cd "$LAB" && env -u GSD_HOME HOME="$FAKE_HOME14" bash "$DETECT" --quiet ); check_exit "cas 14 : legacy seul sous \$HOME → trouvé (repli)" 0 $?
+
+# Cas 15 : $HOME redirigé, aucun des deux dossiers → chaîne GSD absente → exit 1.
+LAB="$TMP/lab15"; mk_state "$LAB" "gsd_state_version"
+FAKE_HOME15="$TMP/home15"; mkdir -p "$FAKE_HOME15"
+( cd "$LAB" && env -u GSD_HOME HOME="$FAKE_HOME15" bash "$DETECT" --quiet ); check_exit "cas 15 : rien sous \$HOME → absent" 1 $?
+
+# Cas 16 : les deux dossiers présents sous $HOME → gsd-core gagne (priorité explicite).
+LAB="$TMP/lab16"; mk_state "$LAB" "gsd_state_version"
+FAKE_HOME16="$TMP/home16"; mkdir -p "$FAKE_HOME16/.claude/gsd-core" "$FAKE_HOME16/.claude/get-shit-done"
+( cd "$LAB" && env -u GSD_HOME HOME="$FAKE_HOME16" bash "$DETECT" --quiet ); check_exit "cas 16 : gsd-core prime sur legacy sous \$HOME" 0 $?
+
+# Cas 17 (DISCRIMINANT — D1) : $HOME vide, payload posé à l'échelle PROJET (cwd), pas sous $HOME.
+# Doit échouer avec une implémentation qui ne teste que $HOME.
+LAB="$TMP/lab17"; mk_state "$LAB" "gsd_state_version"
+mkdir -p "$LAB/.claude/gsd-core"
+FAKE_HOME17="$TMP/home17"; mkdir -p "$FAKE_HOME17"
+( cd "$LAB" && env -u GSD_HOME HOME="$FAKE_HOME17" bash "$DETECT" --quiet ); check_exit "cas 17 (DISCRIMINANT) : gsd-core projet-local trouvé, \$HOME vide" 0 $?
+
+# Cas 18 : les deux présents (projet-local ET \$HOME/.claude/gsd-core) → projet-local gagne.
+LAB="$TMP/lab18"; mk_state "$LAB" "gsd_state_version"
+mkdir -p "$LAB/.claude/gsd-core"
+FAKE_HOME18="$TMP/home18"; mkdir -p "$FAKE_HOME18/.claude/gsd-core"
+( cd "$LAB" && env -u GSD_HOME HOME="$FAKE_HOME18" bash "$DETECT" --quiet ); check_exit "cas 18 : projet-local prime sur \$HOME" 0 $?
+
+# Cas 19 : CLAUDE_CONFIG_DIR distinct de \$HOME/.claude, aucun payload projet-local → résolu via
+# CLAUDE_CONFIG_DIR (preuve que la variable est honorée, pas seulement \$HOME/.claude en dur).
+LAB="$TMP/lab19"; mk_state "$LAB" "gsd_state_version"
+FAKE_HOME19="$TMP/home19"; mkdir -p "$FAKE_HOME19/.claude"
+FAKE_CCD19="$TMP/ccd19"; mkdir -p "$FAKE_CCD19/gsd-core"
+( cd "$LAB" && env -u GSD_HOME HOME="$FAKE_HOME19" CLAUDE_CONFIG_DIR="$FAKE_CCD19" bash "$DETECT" --quiet ); check_exit "cas 19 : résolution via CLAUDE_CONFIG_DIR" 0 $?
+
 echo ""
 echo "== résultat : $PASS ok, $FAIL ko =="
 [ "$FAIL" -eq 0 ]

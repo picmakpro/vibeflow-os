@@ -21,7 +21,30 @@
 set -uo pipefail
 
 PLANNING_DIR=".planning"
-GSD_HOME="${GSD_HOME:-$HOME/.claude/get-shit-done}"
+
+# Fenêtre de compat dual-layout (D-01, 11-CONTEXT.md) : gsd-core (nouveau) prioritaire, legacy
+# get-shit-done en repli. Cascade à 4 niveaux, résolue uniquement si GSD_HOME n'est pas déjà
+# fourni par l'environnement (préserve les appels qui fixent GSD_HOME explicitement) :
+#   1. <projet>/.claude/gsd-core     — scope --local de gsd-core 1.8.0 (payload projet)
+#   2. $CLAUDE_CONFIG_DIR|$HOME/.claude/gsd-core — scope --global de gsd-core
+#   3. $CLAUDE_CONFIG_DIR|$HOME/.claude/get-shit-done — legacy (pas de variante projet-local :
+#      antérieur au scope --local, aucune preuve qu'il ait pu être posé à l'échelle projet)
+#   4. défaut — nomme le futur (gsd-core) dans les messages d'erreur, pas le passé
+default_gsd_home() {
+  local root claude_home
+  root="${TARGET_PATH:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+  claude_home="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+  if [ -d "$root/.claude/gsd-core" ]; then
+    echo "$root/.claude/gsd-core"
+  elif [ -d "$claude_home/gsd-core" ]; then
+    echo "$claude_home/gsd-core"
+  elif [ -d "$claude_home/get-shit-done" ]; then
+    echo "$claude_home/get-shit-done"
+  else
+    echo "$claude_home/gsd-core"
+  fi
+}
+GSD_HOME="${GSD_HOME:-$(default_gsd_home)}"
 QUIET=0
 
 while [ "$#" -gt 0 ]; do
