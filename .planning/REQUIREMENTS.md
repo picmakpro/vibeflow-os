@@ -274,7 +274,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | RND-02 | Phase 9 | Done — note go/no-go + demi-vies recalibrées + cadrage swarm |
 | GSDM-01 | Phase 10 | Done — inventaire 5 familles de points de contact (10-ETUDE.md §1) |
 | GSDM-02 | Phase 10 | Done — cible caractérisée : successeur communautaire dominant, parité totale, chemins/bins changés (10-ETUDE.md §2) |
-| GSDM-03 | Phase 10 | Note écrite — GO recommandé avec fenêtre de compat ; décision humaine en attente |
+| GSDM-03 | Phase 10 | Note écrite et **renforcée par spike réel** (10-SOLUTIONS.md : parité SDK prouvée, 4 correctifs seulement) — GO confirmé, décision humaine en attente |
 | GSDM-04 | Phase 11 | Not started (GATE Phase 10) |
 | GSDM-05 | Phase 11 | Not started (GATE Phase 10) |
 | GSDM-06 | Phase 11 | Not started (GATE Phase 10) |
