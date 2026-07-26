@@ -58,7 +58,7 @@ l'intention et invoque les briques directement — plus de couche de verbes-syno
 - Discipline de release **non négociable** : tout bump de `VERSION` racine = tag annoté `vX.Y.Z`
   poussé (`scripts/check-release-tag.sh --remote` → ✓) + triade par module + badges/historique
   des 2 README (gate `check-version-sync.sh`).
-- Dépendances externes : GSD (`get-shit-done-cc`, npm) + Superpowers (plugin) — auto-installées
+- Dépendances externes : GSD (`@opengsd/gsd-core`, npm) + Superpowers (plugin) — auto-installées
   par `ensure-deps.sh` (versions locales : voir l'install du lab, pins non gelés dans la charte).
 - Registres de vérité : `docs/ADR.md` (ADR-046+ complets, définitions canoniques des héritées),
   `docs/superpowers/specs/` (9 documents), `.planning/` (ce dossier), `reports/` (audits).
