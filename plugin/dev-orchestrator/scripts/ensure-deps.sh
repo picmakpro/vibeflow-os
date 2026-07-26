@@ -2,7 +2,9 @@
 # ensure-deps.sh — Bootstrap auto-install non-interactif des dépendances (dev-orchestrator)
 #
 # Vision §1 / D3 : rendre les deux dépendances invisibles et auto-installées.
-#   - GSD          → via npm (npx get-shit-done-cc), flag --claude + flag de scope dérivé (non-interactif).
+#   - GSD          → via npm (npx @opengsd/gsd-core), flag --claude + flag de scope dérivé (non-interactif).
+#                    Dual-layout pendant la fenêtre de compat : détection VERSION file gsd-core
+#                    prioritaire, get-shit-done legacy en repli (jamais de test PATH — piège #1).
 #   - Superpowers  → via plugin Claude Code (claude plugin install --scope <scope>).
 #
 # Garde-fou (D3 / BOOT-04) : ce script NE LANCE JAMAIS `gsd-new-project` (interactif).
@@ -50,7 +52,24 @@ SCOPE="${VF_SCOPE:-user}"
 # 1 → en DRY-RUN, court-circuite l'early-return de détection pour loguer la cmd scopée (sans installer).
 # Sans effet hors dry-run (jamais d'install forcée).
 FORCE="${VF_ENSURE_FORCE:-}"
-GSD_VERSION_FILE="$HOME/.claude/get-shit-done/VERSION"
+# Fenêtre de compat dual-layout (D-01/D3, 11-CONTEXT.md) : le VERSION file du nouveau layout est
+# DÉRIVÉ de la même cascade que GSD_HOME (detect-gsd-engine.sh/build-gsd-index.sh), jamais une
+# constante $HOME figée — un chemin $HOME-only raterait le scope --local de gsd-core 1.8.0, qui
+# dépose le payload sous <projet>/.claude/gsd-core/. Pas de variante projet-local pour le legacy
+# (D-01 : antérieur au scope --local).
+default_gsd_home_new() {
+  local root claude_home
+  root="${TARGET_PATH:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+  claude_home="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+  if [ -d "$root/.claude/gsd-core" ]; then
+    echo "$root/.claude/gsd-core"
+  else
+    echo "$claude_home/gsd-core"
+  fi
+}
+GSD_HOME_NEW="$(default_gsd_home_new)"
+GSD_VERSION_FILE_NEW="$GSD_HOME_NEW/VERSION"                                    # D3 : dérivé, pas figé
+GSD_VERSION_FILE_LEGACY="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/get-shit-done/VERSION"
 PLUGINS_CACHE_DIR="$HOME/.claude/plugins/cache"
 
 # ---------- Helpers ----------
@@ -94,9 +113,18 @@ run_cmd() {
 
 # ---------- GSD (BOOT-01 / BOOT-03) ----------
 
-# Détecte GSD : binaire gsd-sdk sur le PATH OU fichier VERSION présent.
+# Détecte GSD : cascade fichier VERSION UNIQUEMENT (jamais de test PATH — piège n°1). Un shim
+# legacy (ex. gsd-sdk) peut rester sur le PATH après migration : un `command -v` ferait toujours
+# renvoyer vrai et gsd-core ne serait jamais installé (panne silencieuse et durable).
 detect_gsd() {
-  command -v gsd-sdk >/dev/null 2>&1 || [ -f "$GSD_VERSION_FILE" ]
+  [ -f "$GSD_VERSION_FILE_NEW" ] || [ -f "$GSD_VERSION_FILE_LEGACY" ]
+}
+
+# Legacy détecté = le VERSION file de l'ancien layout existe (le nouveau peut coexister ou non —
+# la coexistence n'est pas garantie propre, Phase 10). Sert à déclencher l'affichage du nettoyage
+# manuel (ADR-031), indépendamment du succès de l'install gsd-core.
+detect_gsd_legacy() {
+  [ -f "$GSD_VERSION_FILE_LEGACY" ]
 }
 
 ensure_gsd() {
@@ -104,6 +132,7 @@ ensure_gsd() {
   # qui ne fait que loguer la cmd scopée, sans installer). Mode normal : comportement inchangé.
   if detect_gsd && ! { [ -n "$DRY_RUN" ] && [ -n "$FORCE" ]; }; then
     log "GSD déjà présent (skip)."
+    log_legacy_cleanup_if_needed
     return 0
   fi
 
@@ -113,20 +142,49 @@ ensure_gsd() {
     log "Étape manuelle GSD :"
     log "  1. Installer Node.js (https://nodejs.org) puis vérifier : npm --version"
     log "  2. Relancer ce script : ./ensure-deps.sh"
+    log_legacy_cleanup_if_needed
+    return 0
+  fi
+
+  # Garde Node ≥ 22 (BOOT-01) : gsd-core cible Node 22+, une install sur un Node trop ancien
+  # échouerait côté paquet — mieux vaut basculer tôt sur l'étape manuelle avec un message clair.
+  local node_major
+  node_major="$(node -e 'process.stdout.write(String(process.versions.node.split(".")[0]))' 2>/dev/null || echo 0)"
+  if [ "${node_major:-0}" -lt 22 ] 2>/dev/null; then
+    err "Node $(node --version 2>/dev/null || echo '?') détecté — @opengsd/gsd-core requiert Node ≥ 22."
+    log "Étape manuelle GSD :"
+    log "  1. Mettre à jour Node.js vers 22+ (https://nodejs.org) puis vérifier : node --version"
+    log "  2. Relancer ce script : ./ensure-deps.sh"
+    log_legacy_cleanup_if_needed
     return 0
   fi
 
   log "GSD absent — installation via npx (non-interactif, scope=$SCOPE → $GSD_SCOPE_FLAG)..."
-  if run_cmd npx -y get-shit-done-cc@latest --claude "$GSD_SCOPE_FLAG"; then
+  if run_cmd npx -y @opengsd/gsd-core@latest --claude "$GSD_SCOPE_FLAG"; then
     log "GSD installé via npx."
+    log_legacy_cleanup_if_needed
     return 0
   fi
 
   # Échec de l'install → bascule sur étapes manuelles (pas d'échec silencieux).
   err "L'auto-install GSD a échoué."
   log "Étape manuelle GSD :"
-  log "  npx -y get-shit-done-cc@latest --claude $GSD_SCOPE_FLAG"
+  log "  npx -y @opengsd/gsd-core@latest --claude $GSD_SCOPE_FLAG"
+  log_legacy_cleanup_if_needed
   return 0
+}
+
+# Affiche (jamais n'exécute — ADR-031) les 3 étapes de nettoyage manuel de l'ancien layout quand
+# des artefacts legacy sont détectés (le VERSION file legacy existe). L'installeur amont de
+# gsd-core nettoie hooks/commands/skills legacy à l'install, mais PAS les paquets npm globaux ni
+# l'arbre ~/.claude/get-shit-done/ — cette responsabilité reste manuelle.
+log_legacy_cleanup_if_needed() {
+  if detect_gsd_legacy; then
+    log "Artefacts legacy détectés (~/.claude/get-shit-done/) — nettoyage manuel recommandé :"
+    log "  npm uninstall -g get-shit-done-cc"
+    log "  npm uninstall -g @gsd-build/sdk"
+    log "  rm -rf ~/.claude/get-shit-done"
+  fi
 }
 
 # ---------- Superpowers (BOOT-02 / BOOT-03) ----------
