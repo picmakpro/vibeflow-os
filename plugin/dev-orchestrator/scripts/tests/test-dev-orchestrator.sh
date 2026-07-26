@@ -34,7 +34,10 @@
 #         PLUS, aucun dossier de verbe supprimé dans skills/, aucun verbe supprimé référencé
 #         par un fichier du module.
 #   T14 — Exhaustivité du routage : chaque skill de l'index factuel est routé par
-#         intent-routing.md (carte intention → brique, sans colonne verbe).
+#         intent-routing.md (carte intention → brique, sans colonne verbe), sauf exemption
+#         explicite (INTENTIONALLY_UNROUTED — canal 4, ADR-057).
+#   T14b — (DISCRIMINANT) l'exemption INTENTIONALLY_UNROUTED est bornée aux 3 noms exacts
+#         (gsd-next, gsd-mempalace-capture, gsd-mempalace-recall), pas un passe-droit générique.
 #   T15 — Pipelining N/N+1 (audit 2026-07-25) : mission-flow.md modélise le DAG fin
 #         (discuss/plan/execute par étape, règle de provisoire) et vf-dev-manager.md
 #         y renvoie avec la consigne compacte.
@@ -717,6 +720,15 @@ else
   # l'intention design vers vf-design/vibeflow-design, qui pilote gsd-ui-phase/gsd-ui-review
   # en interne ; les auditer ici ferait rougir la suite pour un routage qui existe ailleurs).
   DESIGN_DELEGATED="gsd-ui-phase gsd-ui-review"
+  # Briques volontairement NON routées (canal 4, intent-routing.md) — sémantique différente de
+  # DESIGN_DELEGATED : ces skills ne sont PAS considérés « routés », ils sont EXEMPTÉS de
+  # l'obligation de routage. Toute nouvelle exception doit être écrite dans intent-routing.md
+  # §Couverture ET ici (règle du fichier, canal 4).
+  INTENTIONALLY_UNROUTED="gsd-next gsd-mempalace-capture gsd-mempalace-recall"
+  is_intentionally_unrouted() {
+    case " $INTENTIONALLY_UNROUTED " in *" $1 "*) return 0 ;; esac
+    return 1
+  }
   brick_routed() {
     local s="$1"
     "$GREP" -qE -- "${s}([^a-z0-9-]|$)" "$ROUTING" && return 0
@@ -733,6 +745,7 @@ else
     n_indexed=0
     for s in $indexed; do
       n_indexed=$((n_indexed+1))
+      is_intentionally_unrouted "$s" && continue
       # Frontière de mot : « gsd-review » ne doit pas être déclaré routé par « gsd-review-backlog ».
       brick_routed "$s" || missing_routed="$missing_routed $s"
     done
@@ -744,6 +757,25 @@ else
     fi
   fi
   [ "$t14_fail" -eq 0 ] && [ "${routed_count:-0}" -ge 30 ] && ok "T14 plancher : $routed_count briques gsd-* distinctes routées (≥30)"
+
+  # -------------------------------------------------------------------------
+  # T14b (DISCRIMINANT) — l'exemption INTENTIONALLY_UNROUTED est bornée aux 3 noms exacts,
+  # pas un passe-droit générique. Fixture d'index injectée : gsd-next (exempté, canal 4) +
+  # gsd-inconnu-xyz (ni exempté ni routé — doit être signalé manquant). Réutilise
+  # is_intentionally_unrouted()/brick_routed() tels que définis et exécutés ci-dessus dans
+  # CE run (pas une réimplémentation indépendante).
+  # -------------------------------------------------------------------------
+  fixture_indexed="gsd-next gsd-inconnu-xyz"
+  fixture_missing=""
+  for s in $fixture_indexed; do
+    is_intentionally_unrouted "$s" && continue
+    brick_routed "$s" || fixture_missing="$fixture_missing $s"
+  done
+  if echo "$fixture_missing" | "$GREP" -q 'gsd-inconnu-xyz' && ! echo "$fixture_missing" | "$GREP" -q 'gsd-next'; then
+    ok "T14b (DISCRIMINANT) : gsd-next exempté (canal 4, non signalé) ; gsd-inconnu-xyz non exempté et non routé → signalé manquant"
+  else
+    ko "T14b (DISCRIMINANT) : exemption non bornée aux 3 noms exacts — missing=[$fixture_missing]"
+  fi
 fi
 
 # ---------------------------------------------------------------------------

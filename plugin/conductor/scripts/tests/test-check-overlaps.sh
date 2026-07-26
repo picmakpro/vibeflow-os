@@ -16,6 +16,8 @@
 #   T12 — compagnons d'un même module (skill-creator + skill-creator-workflow) → PAS un recouvrement
 #   T13 — wrappers vf-* exclus de l'heuristique (vf-debug + gsd-debug → pas de ⚠)
 #   T14 — paires intra-famille (gsd-code-review + gsd-review) → PAS un recouvrement tierce
+#   T15 — les 3 frontières mempalace/gsd-next (ADR-057) : les deux côtés présents → affichées
+#   T16 — un seul côté présent pour chaque paire mempalace/gsd-next → aucune frontière affichée
 
 set -uo pipefail
 
@@ -36,6 +38,13 @@ SK="$WORK/skills"; AG="$WORK/agents"; USK="$WORK/user-skills"; PLUG="$WORK/plugi
 skill() { # $1 = dossier du skill (sandbox projet)
   mkdir -p "$SK/$1"
   printf -- '---\nname: %s\ndescription: sandbox\n---\ncorps\n' "$1" > "$SK/$1/SKILL.md"
+}
+user_skill() { # $1 = dossier du skill (sandbox user — côté GSD, gsd-* installés globalement)
+  mkdir -p "$USK/$1"
+  printf -- '---\nname: %s\ndescription: sandbox\n---\ncorps\n' "$1" > "$USK/$1/SKILL.md"
+}
+agent() { # $1 = nom de l'agent (sandbox projet)
+  printf -- '---\nname: %s\ndescription: sandbox\n---\ncorps\n' "$1" > "$AG/$1.md"
 }
 plugin_skill() { # $1 = plugin · $2 = skill
   mkdir -p "$PLUG/mkt/$1/1.0.0/skills/$2"
@@ -169,6 +178,36 @@ if [ $RC -eq 0 ] && ! echo "$OUT" | grep -q "recouvrement NON documenté"; then
   ok "T14 gsd-code-review + gsd-ui-review → intra-famille, pas un recouvrement tierce"
 else
   ko "T14 (rc=$RC) : $OUT"
+fi
+
+# T15 — les 3 frontières mempalace/gsd-next (ADR-057) : les deux côtés présents → affichées
+reset_all
+skill "consolidator"
+agent "vibeflow-dev"
+user_skill "gsd-mempalace-capture"
+user_skill "gsd-mempalace-recall"
+user_skill "gsd-next"
+OUT="$(run_check 2>&1)"; RC=$?
+c1=$(echo "$OUT" | grep -c "gsd-mempalace-capture")
+c2=$(echo "$OUT" | grep -c "gsd-mempalace-recall")
+c3=$(echo "$OUT" | grep -c "gsd-next")
+if [ $RC -eq 0 ] && [ "$c1" -ge 1 ] && [ "$c2" -ge 1 ] && [ "$c3" -ge 1 ]; then
+  ok "T15 consolidator/vibeflow-dev ↔ mempalace/gsd-next (deux côtés présents) → 3 frontières affichées"
+else
+  ko "T15 (rc=$RC, capture=$c1, recall=$c2, next=$c3) : $OUT"
+fi
+
+# T16 — un seul côté présent pour chaque paire mempalace/gsd-next → aucune frontière affichée
+reset_all
+skill "consolidator"
+agent "vibeflow-dev"
+OUT="$(run_check 2>&1)"; RC=$?
+if [ $RC -eq 0 ] && ! echo "$OUT" | grep -q "gsd-mempalace-capture" \
+   && ! echo "$OUT" | grep -q "gsd-mempalace-recall" \
+   && ! echo "$OUT" | grep -q "gsd-next"; then
+  ok "T16 un seul côté présent (VibeFlow seul, GSD absent) → aucune des 3 frontières affichée"
+else
+  ko "T16 (rc=$RC) : $OUT"
 fi
 
 echo ""
