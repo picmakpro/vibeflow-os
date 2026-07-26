@@ -1,96 +1,140 @@
-# skill-creator — Pattern Agent Minimal + 2 Skills Composables
+# skill-creator — Fabrique de capacités du lab
 
-> **Module multi-composants** : 1 agent natif + 2 skills externes.
-> Pattern issu de VideoFlow-Lab, généralisé Session 045 (LRN-101) puis packagé pour distribution cross-labs Session 047.
+> Transforme « il nous faudrait un skill pour X » en un SKILL.md chirurgical, ancré dans le réel
+> (recherche par facettes → draft → eval-loop), au lieu d'un skill générique écrit de mémoire.
 
-**Version** : v1.0.2
-**Source originale** : `output/skill-creator-universal/` du VibeFlow Lab (LRN-101, Session 045)
+> **Type** : agent + 2 skills · **Version** : v1.0.3 · **Dépend de** : aucun (module autonome)
 
 ---
 
 ## Quoi
 
-Ce module installe le **pattern de référence pour créer/améliorer des skills** dans n'importe quel lab Claude Code :
+Le canal de fabrication des capacités d'un lab : un agent natif `skill-creator` qui pilote un
+workflow 5 phases (cadrage → décomposition en facettes → recherche parallèle adaptative → draft →
+escalade), appuyé sur le moteur officiel Anthropic (drafting + éval + benchmark).
 
-```
-.claude/
-├── agents/
-│   └── skill-creator.md              ← Agent minimal (85 lignes)
-└── skills/
-    ├── skill-creator/                 ← Skill officiel Anthropic (~248 KB) — NE PAS MODIFIER
-    └── skill-creator-workflow/        ← Procédure 5 phases personnalisable
-```
+**Pour qui** : tout lab qui crée ou améliore ses propres skills — dev, contenu, growth, dossier.
+**Quand** : dès qu'un besoin récurrent mérite d'être codifié en skill, ou qu'un skill existant
+doit être amélioré/mesuré.
 
----
-
-## Philosophie : 3 couches stables / mobiles
+Pattern « 3 couches stables / mobiles » (LRN-101, issu de VideoFlow-Lab) :
 
 | Couche | Rôle | Qui peut modifier |
 |--------|------|-------------------|
-| **Agent** (85L) | Rôle + règles ABSOLUES + références vers les 2 skills | User (personnaliser nom Lab + orchestrating agent) |
-| **Skill Anthropic** | Moteur officiel de drafting + grader + analyzer + 9 scripts Python | Anthropic uniquement |
-| **Skill workflow** | Procédure 5 phases personnalisable (clarifier → planifier → drafter → tester → livrer) | User selon contexte Lab |
+| **Agent** (`skill-creator.md`) | Rôle + règles absolues + référence les 2 skills | Toi (personnalisation lab) |
+| **Skill Anthropic** (`skill-creator`) | Moteur officiel de drafting + grader + analyzer + scripts d'éval Python | Anthropic uniquement — ne pas modifier |
+| **Skill workflow** (`skill-creator-workflow`) | Procédure 5 phases personnalisable | Toi, selon le contexte du lab |
+
+**Frontière (ADR-057)** : ce module = **fabrication de capacités de lab avec eval-loop**
+(recherche par facettes → draft → éval) ; `superpowers:writing-skills` = **doctrine d'écriture**
+de skills. Les deux coexistent, aucune revendication d'exclusivité (détection outillée :
+`conductor/scripts/check-overlaps.sh`).
 
 ---
 
-## Installation via vibeflow-update.sh
+## Installation
 
 ```bash
-.claude/scripts/vibeflow-update.sh install skill-creator
+bash .claude/scripts/vibeflow-update.sh install skill-creator
 ```
 
-L'installation copie :
-- `AGENT.md` → `.claude/agents/skill-creator.md`
-- `skills/skill-creator/` → `.claude/skills/skill-creator/`
-- `skills/skill-creator-workflow/` → `.claude/skills/skill-creator-workflow/`
+Aucune dépendance de module (`requires: []`). L'install pose :
 
-**Pré-requis** : `vibeflow-update.sh` v1.3.0+ (support multi-skills par module).
+- `.claude/agents/skill-creator.md` (agent natif, `model: opus`, `memory: project`)
+- `.claude/commands/skill-creator.md` (commande d'incarnation `/skill-creator`, générée — ADR-042)
+- `.claude/skills/skill-creator/` (moteur Anthropic complet)
+- `.claude/skills/skill-creator-workflow/` (procédure 5 phases)
+
+**Prérequis réels** :
+
+- `python3` pour les scripts d'éval/benchmark du moteur Anthropic (optionnels au premier usage).
+- Au moins un **agent orchestrateur** dans le lab (destinataire de l'escalade Phase 5).
+- **Personnalisation post-install obligatoire** (voir Démarrer, étape 1) — le module est livré
+  avec des placeholders.
 
 ---
 
-## Personnalisation post-install
+## Démarrer (5 min)
 
-Après installation, ouvrir `.claude/agents/skill-creator.md` et remplacer les marqueurs :
+**1. Personnalise les placeholders** dans `.claude/agents/skill-creator.md` **et**
+`.claude/skills/skill-creator-workflow/SKILL.md` :
 
-- `[NOM_LAB]` → nom du Lab (ex: `BusinessFlow`, `MarketingFlow`)
-- `[ORCHESTRATING_AGENT]` → agent qui reçoit l'escalation Phase 5 (ex: `editor-architect`, `lead`, `architect`)
+| Placeholder | Remplacer par |
+|-------------|---------------|
+| `[NOM_LAB]` | Nom du lab (ex : `BusinessFlow`) |
+| `[ORCHESTRATING_AGENT]` | Agent qui reçoit l'escalade Phase 5 (ex : `lead`, `architect`) |
+| `[REFERENCER_DECISION]` | Décision de stack figée, ou supprimer la règle 5 |
 
-Optionnel : ajouter 1 skill de recherche spécifique au domaine dans le frontmatter `skills:` (ex: `marketing-research`, `urbanisme-research`).
+Vérifie qu'il n'en reste plus :
+
+```bash
+grep -rn "\[NOM_LAB\]\|\[ORCHESTRATING_AGENT\]\|\[A PERSONNALISER\]" .claude/agents/skill-creator.md
+```
+
+**2. Lance une première fabrication** :
+
+```
+Invoque l'agent skill-creator pour créer un skill <nom> qui <verbe + objectif>.
+Couvre <3-4 angles concrets>.
+```
+
+**3. Ce qui se passe** : l'agent cadre le besoin (doublon ? META ou LIVRABLE ?), décompose en
+3-10 facettes, lance 1 sous-agent de recherche par facette (pattern Isolate Context), synthétise,
+puis drafte le SKILL.md via le moteur Anthropic.
+
+**4. Ce que tu obtiens** : un `SKILL.md` < 500 lignes dans `.claude/skills/<nom>/`, le workspace
+de recherche conservé (`<nom>-workspace/`), et une **escalade bloquante** à ton agent
+orchestrateur qui décide seul de l'attribution (l'agent ne s'auto-attribue jamais).
 
 ---
 
 ## Usage
 
-```
-Invoque l'agent skill-creator pour créer un nouveau skill <nom-du-skill>.
-```
+- **Créer un skill** — « Crée un skill `<nom>` qui `<objectif>` » (workflow 5 phases complet).
+- **Améliorer un skill existant** — même canal ; l'ancien est archivé dans `.archive/`, jamais
+  écrasé sans décision.
+- **Évaluer / benchmarker** — le moteur Anthropic embarque l'eval-loop : cas de test générés,
+  double grading, boucle d'amélioration (`run_eval.py`, `run_loop.py`, `aggregate_benchmark.py`),
+  optimisation de la `description:` pour le triggering (`improve_description.py`).
+- **Règle absolue** : **1 skill par invocation**, non négociable. Un brief à 2+ skills →
+  N invocations parallèles décidées par l'orchestrateur.
 
-L'agent suit le workflow 5 phases : clarifier le besoin → planifier les facettes → recherche parallèle adaptive → draft via skill-creator Anthropic → escalation orchestrating agent pour attribution.
+---
 
-**Règle ABSOLUE** : 1 skill par invocation, non-négociable.
+## Référence
+
+Contenu du module et cibles d'installation :
+
+| Composant | Installé vers | Rôle |
+|-----------|---------------|------|
+| `AGENT.md` | `.claude/agents/skill-creator.md` | Agent natif : règles absolues, priorité pertinence > folklore lab, capitalisation mémoire |
+| *(généré à l'install)* | `.claude/commands/skill-creator.md` | Commande d'incarnation `/skill-creator` (ADR-042) |
+| `skills/skill-creator/SKILL.md` | `.claude/skills/skill-creator/` | Moteur officiel Anthropic de drafting — **ne pas modifier** |
+| `skills/skill-creator/agents/` (`grader`, `comparator`, `analyzer`) | idem | 3 sous-agents d'évaluation du moteur |
+| `skills/skill-creator/scripts/` (9 fichiers Python) | idem | Eval-loop : `quick_validate`, `run_eval`, `run_loop`, `aggregate_benchmark`, `improve_description`, `generate_report`, `package_skill` + `utils`/`__init__` |
+| `skills/skill-creator/eval-viewer/` + `assets/` | idem | Visionneuse HTML des résultats d'éval (`viewer.html`, `generate_review.py`) |
+| `skills/skill-creator/references/schemas.md` | idem | Schémas des artefacts d'éval |
+| `skills/skill-creator/LICENSE.txt` | idem | Licence MIT (Anthropic) |
+| `skills/skill-creator-workflow/SKILL.md` | `.claude/skills/skill-creator-workflow/` | Procédure 5 phases : cadrage, facettes, recherche adaptative, drafting, escalade |
+| `INSTALL.md` | *(non installé)* | Guide d'install/personnalisation manuel du package original (hors vibeflow-update) |
 
 ---
 
-## Frontière avec les briques tierces (ADR-057)
+## Limites
 
-Trois objets peuvent s'appeler `skill-creator` en session : ce module, le skill officiel Anthropic
-qu'il embarque, et `superpowers:writing-skills`. La frontière : **ce module = fabrication de
-capacités de LAB avec eval-loop** (recherche par facettes → draft → éval) ;
-`superpowers:writing-skills` = doctrine d'écriture de skills. Les deux coexistent — aucune
-revendication d'exclusivité (détection outillée : `conductor/scripts/check-overlaps.sh`).
-
----
+- **Personnalisation manuelle requise** après install (placeholders `[NOM_LAB]`,
+  `[ORCHESTRATING_AGENT]`) — pas encore automatisée.
+- **Le moteur Anthropic est figé** : toute évolution upstream doit être re-packagée manuellement
+  (remplacer intégralement `.claude/skills/skill-creator/`).
+- `skill-creator-workflow` contient des références VibeFlow (META vs LIVRABLE, registres
+  mémoire) — à adapter pour un lab non-VibeFlow (voir `INSTALL.md`, § « adapter au minimum »).
+- **Pas de gate machine sur la qualité du skill produit** : la checklist Phase 5 est un jugement
+  de l'agent orchestrateur, pas un script bloquant.
+- L'eval-loop Python suppose `python3` disponible ; sans lui, le drafting fonctionne mais pas la
+  mesure.
 
 ## Voir aussi
 
-- `INSTALL.md` — Guide d'install original du package universel (manuel, pas via vibeflow-update)
-- LRN-101 du Lab VibeFlow — pattern "agent minimal + 2 skills composables" issu de VideoFlow-Lab
+- LRN-101 (Lab VibeFlow) — pattern « agent minimal + 2 skills composables »
+- ADR-057 — frontière avec `superpowers:writing-skills`
 - Skill Anthropic officiel : https://github.com/anthropics/skills (skill-creator)
-
----
-
-## Limites v1.0.0
-
-- Pattern issu d'un Lab spécifique (VibeFlow), personnalisation manuelle requise au moment de l'install
-- skill-creator (Anthropic) est figé — toute évolution Anthropic doit être re-packagée manuellement
-- skill-creator-workflow contient des références à VibeFlow → à adapter pour Labs non-VibeFlow

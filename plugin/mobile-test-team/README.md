@@ -1,108 +1,137 @@
-# mobile-test-team — Équipe de test mobile autonome
+# mobile-test-team — La boucle autonome test → corrige → re-test
 
-> Module VibeFlow qui ajoute **la boucle test → corrige → re-test** manquante : celle qui fait
-> qu'un mode autonome (`vf-auto`) ne s'arrête plus aux tests unitaires, mais va jusqu'à **« l'app
-> marche vraiment »** sur simulateur/émulateur. Trois agents cloisonnés + une **rule path-scopée**
-> qui invoque la doctrine de vérification réelle **automatiquement** dès qu'on développe du mobile.
+> Un mode autonome qui s'arrête aux tests unitaires ne prouve pas que **« l'app marche
+> vraiment »**. Ce module ajoute la boucle manquante : trois agents cloisonnés qui testent
+> l'app réelle sur cible mobile, corrigent, et re-testent jusqu'au vert — sans jamais tricher.
 
-**Version** : v1.4.0
-**Type** : agents + rules
-**Requires** : `mobile-test` (le pipeline mécanique qu'elle pilote)
-**Statut** : ⚠️ **expérimental** — l'orchestration de sous-agents imbriqués doit être prouvée par un
-run réel de bout en bout (voir § Statut).
+**Type** : agents + rules · **Version** : v1.4.1 · **Dépend de** : `mobile-test`
 
 ---
 
-## Le problème qu'il résout
+## Quoi
 
-`vf-auto` enchaîne déjà les phases (cadrage → plan → exécution → *done* → suivante) et vérifie les
-**gates techniques** (lint, tsc, tests unitaires). Mais sur mobile, ça ne suffit pas : **un écran
-peut compiler, passer ses tests unitaires, et crasher au runtime.** Il manquait l'étape « teste
-l'app réelle et corrige en boucle jusqu'au vert ». C'est ce module.
+`vf-auto` enchaîne les phases et vérifie les gates **techniques** (lint, tsc, tests unitaires).
+Sur mobile ça ne suffit pas : un écran peut compiler, passer ses tests, et crasher au runtime.
+Ce module apporte :
 
-## Ce qu'il apporte
-
-### 1. Trois agents cloisonnés (Pattern 12)
-
-| Agent | Rôle | Écrit | Escalade (`Task`) |
-|-------|------|-------|:---:|
-| `vf-test-orchestrator` | Tient la boucle, dispatche les workers, applique les garde-fous et halt conditions | rapport | ✅ |
-| `vf-test-runner` | Possède les tests : écrit la couverture manquante, joue le pipeline | **tests seuls** | ❌ |
-| `vf-app-fixer` | Corrige **uniquement** le code app, commit atomique | **code seul** | ❌ |
-
-Le cloisonnement au niveau `tools:` **rend la triche impossible** : le correcteur de code ne peut
-pas toucher aux tests, l'auteur des tests ne peut pas toucher au code. Aucun assert n'est jamais
-affaibli pour « faire passer ».
-
-### 2. Une rule qui invoque la doctrine **naturellement**
-
-`rules/mobile-verify-gate.md` est **path-scopée** : elle se charge toute seule dès qu'on édite du
-code d'écran mobile ou un flow de test — sans invocation manuelle. Elle rappelle, au bon moment,
-que **un critère observable à l'écran exige une vérif réelle (Maestro)**, pas seulement un test
-unitaire (extension mobile du Gate Nyquist, ADR-037), et pointe vers la boucle test+fix.
-
-C'est le mécanisme qui transforme la doctrine de documentation passive en **règle active pendant
-le dev** — le même patron que les gates de `software-architecture` (rule path-scopée).
-
-## La boucle (résumé)
+1. **La boucle** — `vf-test-orchestrator` tient le cycle
+   `[ vf-test-runner joue Maestro → rouge ? → vf-app-fixer corrige → re-test ]` avec baseline
+   verte, anti-régression (revert), anti-thrash (abandon après N tentatives) et halt conditions.
+2. **Le cloisonnement anti-triche (Pattern 12)** — celui qui corrige le code ne peut pas toucher
+   aux tests, celui qui écrit les tests ne peut pas toucher au code. La séparation est portée par
+   les `tools:` des agents, pas par de la prose : **aucun assert n'est jamais affaibli** pour
+   « faire passer ».
+3. **Une rule path-scopée** — `mobile-verify-gate.md` se charge toute seule dès qu'on édite du
+   code d'écran mobile ou un flow Maestro, et rend active la doctrine « un critère observable à
+   l'écran exige une vérif réelle » (extension mobile du Gate Nyquist, ADR-037).
 
 ```
 execute (code + gates techniques verts)
   → vf-test-orchestrator :
-      [ vf-test-runner joue Maestro sur la cible → rouge ? → vf-app-fixer corrige → re-test ]
-      baseline verte · anti-régression (revert) · anti-thrash (abandon après 3) · halt conditions
+      [ vf-test-runner → rouge ? → vf-app-fixer → re-test ]
+      baseline verte · anti-régression · anti-thrash · halt conditions
   → phase done seulement si les critères observables sont vérifiés réellement
 ```
 
-## Structure
+## Installation
 
-```
-mobile-test-team/
-├── module.json                       # requires: [mobile-test]
-├── agents/
-│   ├── vf-test-orchestrator.md       # la boucle
-│   ├── vf-test-runner.md             # tests (cloisonné)
-│   └── vf-app-fixer.md               # code (cloisonné)
-├── rules/
-│   └── mobile-verify-gate.md         # rule path-scopée = invocation naturelle de la doctrine
-└── references/
-    └── test-loop-protocol.md         # protocole + mapping halt conditions (on-demand)
+Pré-requis modules (`module.json` → `requires`) : **`mobile-test`** — le pipeline mécanique que
+la boucle pilote. L'install nue ne résout **pas** les dépendances : installe-les explicitement
+dans l'ordre, ou passe `--with-deps`.
+
+```bash
+.claude/scripts/vibeflow-update.sh install mobile-test
+.claude/scripts/vibeflow-update.sh install mobile-test-team
+# ou en un coup :
+.claude/scripts/vibeflow-update.sh install --with-deps mobile-test-team
 ```
 
-## Modèle d'installation : global une fois, actif dans les bons projets
+Pré-requis **système** : ceux de `mobile-test` (Node, Maestro + JDK, Xcode/`simctl` ou `adb` +
+émulateur, projet Expo/RN, config `.vibeflow/mobile-test.json` posée). Le MCP du lab (ex.
+`mobile-mcp`) est injecté dans l'allowlist des 3 agents à l'install via `vf-mcp-consumer: true`
+(ADR-051) — aucun serveur en dur.
 
-Ce module (comme `mobile-test`) est conçu pour être **installé une seule fois en scope `user`**
-(`~/.claude/`) et **ne s'activer que dans les projets mobiles** — dormant partout ailleurs. Le
-mécanisme repose sur des comportements **natifs** de Claude Code :
+⚠️ **Redémarre Claude Code après (ré)install** : le `tools:` des agents est lu au démarrage de
+session.
 
-| Artefact | Où (scope user) | Activation |
-|----------|-----------------|------------|
-| `rules/mobile-verify-gate.md` | `~/.claude/rules/` | **Path-scopée** : le `paths:` est évalué relativement au **projet courant**. Se charge seulement si le projet touche `app/**/*.tsx`, `.maestro/**`, etc. Dormante sur un projet non-mobile. |
-| Script `mobile-test-run.mjs` | `~/.claude/scripts/` | Lit sa config **par projet** (`./.vibeflow/mobile-test.json`). Sans config projet → n'agit pas. |
-| Agents `vf-test-*`, `vf-app-fixer` | `~/.claude/agents/` | Pas de path-scoping natif ; l'orchestrateur **décline si le projet n'est pas mobile** (garde `app.json`/Expo). Les workers ne sont dispatchés que par l'orchestrateur. |
+**Modèle d'activation** : conçu pour un install global (scope `user`), dormant hors mobile —
+la rule est path-scopée sur des marqueurs discriminants, le script lit sa config par projet, et
+l'orchestrateur **décline** si le projet n'est pas mobile (garde `app.json`/Expo).
 
-**En clair** : l'utilisateur installe VibeFlow + le module dev en global, et l'outillage mobile
-s'invoque **tout seul** dès qu'il code une app mobile (via la rule path-scopée), sans jamais
-apparaître comme du bruit sur ses projets web ou backend. Pour activer le pipeline sur un projet
-donné, il suffit d'y poser un `.vibeflow/mobile-test.json` (copié du template de `mobile-test`).
+## Démarrer
 
-## Config
+Sur un projet Expo/RN avec la config `mobile-test` posée et une phase dont les critères sont
+observables à l'écran, dis :
 
-Réutilise la config du module `mobile-test` (`.vibeflow/mobile-test.json`) et, optionnellement, un
-`night-run.json` à la racine du projet : `maxWallClockMinutes`, `maxTokens`, `maxAttemptsPerFlow`
-(défaut 3), `revertOnRegression` (défaut true).
+> « Fais passer cette phase au vert sur le simulateur »
 
-## Statut
+(ou laisse `vf-auto` dispatcher l'orchestrateur en fin d'exécution d'une phase mobile). Ce qui
+se passe :
 
-**Expérimental.** Le point le plus risqué — un sous-agent (`vf-test-orchestrator`) qui **spawne
-d'autres sous-agents** (`vf-test-runner`, `vf-app-fixer`) via `Task` **et** invoque le pipeline —
-doit être prouvé par un **run réel de bout en bout** dans l'environnement VibeFlow (une phase mobile
-pilotée sans intervention, avec au moins un cycle de fix et un arrêt propre). Tant que ce run
-n'existe pas, considère le module comme une base solide mais à confirmer.
+1. **Garde** — l'orchestrateur vérifie les marqueurs mobile ; projet non mobile → il décline.
+2. **Couverture + premier run** — `vf-test-runner` mappe les critères aux flows Maestro, écrit
+   les flows manquants, joue le pipeline `mobile-test` (détection cible, build-if-missing,
+   régression).
+3. **Baseline** — l'ensemble des flows verts + le SHA git sont mémorisés (anti-régression).
+4. **Boucle de fix** — pour chaque flow rouge, `vf-app-fixer` reçoit l'échec + son diagnostic
+   et corrige le code app (un fix = un commit atomique), puis re-test complet.
+5. **Rapport** — verdict global (vert / partiel / bloqué), diff, commits, abandons, terminé par
+   le **bloc typé** ADR-053 (`{statut, findings[], noeuds_debloques}`) pour le contrôle de flux
+   de `vf-dev-manager`.
 
-## Références
+## Usage
 
-- Pipeline mécanique : module `mobile-test` (skill `vf-mobile-test`).
-- Doctrine des garde-fous : `dev-orchestrator/references/autonomous-guardrails.md`.
-- Patterns 09 (god-execution), 11 (halt), 12 (cloisonnement) : module `reference`.
-- Cadrage : `.planning/research/brique5-orchestration-CADRAGE.md`.
+- **Nuit / autonomie** : la boucle est faite pour tourner sans supervision (dispatchée par
+  `vf-auto` sur un projet mobile). Budgets optionnels dans un `night-run.json` à la racine :
+  `maxWallClockMinutes`, `maxTokens`, `maxAttemptsPerFlow` (défaut 3), `maxResearchRoundsPerFlow`
+  (défaut 2), `revertOnRegression` (défaut true).
+- **Recherche documentaire avant fix intensif (ADR-045)** : sur un flow déjà tenté, un échec
+  lib/framework/natif/version, ou un `doc-research-required` remonté par le fixer (cloisonné sans
+  web), l'orchestrateur **porte lui-même** la recherche (context7 + WebSearch : issues GitHub,
+  release notes) puis redispatche avec des pistes sourcées — pas de fix aveugle, 1 seul saut.
+- **Options de projet lues, jamais présumées** : politique de push (repo client → local
+  seulement) et attribution des commits (pas de mention d'IA si le projet l'exige) viennent du
+  `CLAUDE.md`/rules du projet cible.
+- **Arrêt** : tout vert, plafond temps/tokens, ou tous les flows restants abandonnés — plus les
+  halt conditions dures (HALT-2 sans progrès, HALT-3 action destructive, HALT-4 ressource ou
+  info manquante, HALT-5 drift de scope).
+
+## Référence
+
+### Agents (cloisonnement par `tools:`, Pattern 12)
+
+| Agent | Rôle | `tools:` (le couloir) | Interne |
+|-------|------|----------------------|:---:|
+| `vf-test-orchestrator` | tient la boucle, applique garde-fous et halts, porte la recherche doc (ADR-045), rapport typé ADR-053 | Read, Write, Bash, Glob, Grep, **WebSearch, WebFetch**, `Agent(vf-test-runner, vf-app-fixer)` — ne peut spawner **que** ses 2 workers | non |
+| `vf-test-runner` | possède les tests : écrit les flows manquants (**jamais affaiblir un assert**), joue le pipeline, diagnostic structuré | Read, Edit, Write, Bash, Glob, Grep — écrit **uniquement** dans `maestroFlowsDir` ; pas de `Task`, pas de web | `vf-internal: true` |
+| `vf-app-fixer` | corrige **uniquement** le code app, un fix = un commit atomique ; remonte `doc-research-required` plutôt que bricoler | Read, Edit, Write, Bash, Glob, Grep — interdit d'écrire dans les tests ; pas de `Task`, pas de web | `vf-internal: true` |
+
+Les 3 agents : `model: sonnet`, `memory: project`, `vf-mcp-consumer: true` (allowlist MCP dérivée
+du lab). Les workers `vf-internal` n'ont pas de commande d'incarnation (Pattern 12 / ADR-044) —
+seuls l'orchestrateur les dispatche.
+
+### Rules et références
+
+| Fichier | Rôle |
+|---------|------|
+| `rules/mobile-verify-gate.md` | rule **path-scopée** sur des marqueurs discriminants mobile (`app/**/_layout.tsx`, `src/screens/**`, `.maestro/**`) — dormante sur un projet web ; rend la doctrine de vérification réelle active pendant le dev |
+| `references/test-loop-protocol.md` | protocole de la boucle (invariants, budgets) + mapping halt conditions Pattern 11, insertion dans le flux `god-execution`/`vf-auto` — chargé on-demand |
+
+## Limites
+
+- ⚠️ **Statut expérimental.** Le point le plus risqué — un sous-agent
+  (`vf-test-orchestrator`) qui spawne d'autres sous-agents via `Task` **et** invoque le pipeline —
+  n'a **pas encore été prouvé par un run réel vert de bout en bout** dans un contexte VibeFlow.
+  La condition de sortie du statut est ce run : une phase mobile pilotée sans intervention, avec
+  au moins un cycle de fix et un arrêt propre. Tant qu'il n'existe pas, considère le module comme
+  une base solide **à confirmer**.
+- **Allowlist ≠ barrière dure** : Claude Code n'a pas de champ « agent interne seulement » — les
+  workers restent techniquement auto-délégables. La parade est l'allowlist `Agent(...)` côté
+  orchestrateur + `vf-internal` + descriptions dissuasives : heuristique robuste, pas un mur.
+- **Mobile uniquement** (Expo/React Native) : l'orchestrateur décline ailleurs ; la rule reste
+  dormante hors marqueurs mobile.
+- **Redémarrage requis** après (ré)install pour que les `tools:` (dont l'injection MCP) soient
+  pris en compte.
+- Doctrine des garde-fous : `dev-orchestrator/references/autonomous-guardrails.md` ·
+  Patterns 09 (god-execution), 11 (halt), 12 (cloisonnement) : module `reference` ·
+  Pipeline mécanique : module `mobile-test` (skill `vf-mobile-test`).

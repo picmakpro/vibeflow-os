@@ -1,5 +1,12 @@
 # Changelog — mobile-test
 
+## v1.0.2 — 2026-07-26
+
+### Modifié
+- README monté au standard de doc : tagline problème-résolu, prérequis système réels (cascades
+  Maestro/JAVA_HOME, émulateur Android manuel, mobile-mcp côté agent), premier run guidé,
+  tableau de référence exhaustif, limites avec condition de sortie du statut expérimental.
+
 ## v1.0.1 — 2026-07-25
 
 ### Modifié

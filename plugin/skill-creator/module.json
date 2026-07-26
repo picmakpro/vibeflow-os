@@ -1,6 +1,6 @@
 {
   "name": "skill-creator",
-  "version": "v1.0.2",
+  "version": "v1.0.3",
   "type": "agent+skills",
   "description": "Pattern agent minimal + 2 skills composables pour créer des skills.",
   "requires": []

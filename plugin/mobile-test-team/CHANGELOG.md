@@ -1,5 +1,13 @@
 # Changelog — mobile-test-team
 
+## v1.4.1 — 2026-07-26
+
+### Modifié
+- README monté au standard de doc : installation avec dépendance explicite (`mobile-test`
+  installé d'abord, ou `--with-deps` — pas de résolution auto en install nu), premier run guidé,
+  tableau des agents avec leur cloisonnement par `tools:` (Pattern 12), config `night-run.json`,
+  limites avec condition de sortie du statut expérimental (run réel vert de bout en bout).
+
 ## v1.4.0 — 2026-07-25
 
 ### Ajouté

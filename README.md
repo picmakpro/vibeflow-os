@@ -15,7 +15,7 @@ not promises.
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
-[The dev cycle](#-the-dev-cycle--spec-driven) · [Missions](#-long-missions--the-team) · [Memory](#-memory-that-holds) · [Install](#-install) · [Modules](#-modules)
+[The dev cycle](#-the-dev-cycle--spec-driven) · [Missions](#-long-missions--the-team) · [Labs & design](#-beyond-dev--a-lab-for-any-domain) · [Memory](#-memory-that-holds) · [Install](#-install) · [Modules](#-modules)
 
 </div>
 
@@ -81,6 +81,39 @@ conditions, anti-thrash (3 attempts), anti-regression (automatic revert), and an
 challenges intent or security **freezes the node** and escalates to the human — even at 3 AM.
 The same kernel powers **6 teams**: dev, design, mobile, content, growth, business.
 
+---
+
+## 🧪 Beyond dev — a lab for any domain
+
+VibeFlow is not a dev-only tool: it **manufactures labs** — governed workspaces for any
+domain — on the same kernel and the same gates.
+
+```mermaid
+flowchart LR
+    A["🗣 <i>“a lab for my<br/>content agency”</i>"] --> B["📋 /vf-new-lab<br/>clarification-first<br/>machine gates A·B·C"]
+    B --> C["🧬 Capability manifest<br/>derived for the domain"]
+    C --> D["🛠 skill-creator<br/>manufactures the skills<br/><i>with evals</i>"]
+    D --> E["✅ Governed lab<br/>planning · memory<br/>auditors wired"]
+```
+
+- **Lab creation** (`/vf-new-lab`, conductor) — clarification-first scoping under machine
+  gates, a capability manifest derived for the domain, skills built by `skill-creator` (eval
+  loop), auditors wired at the end. **Express mode: operational lab in ≤ 15 minutes**
+  (3 questions, assumed-and-flagged derivations) — validated through real-world UAT.
+- **Design** (`design-orchestrator`, installed with dev) — say *"make it beautiful"*, *"this
+  screen is bland"* or *"audit this page"*: the `vibeflow-design` agent routes the intent to
+  the right gesture (art direction, targeted craft, scored critique). Full design missions run
+  a team — manager + crafter + **fresh judge** scoring /100 against your art direction.
+  **Stack-agnostic**: it ships specs and tokens, never framework-locked code.
+- **Domain bundles** (`content` · `growth` · `business-pilot`) — complete teams on the
+  team-kernel, read-only judges with eliminatory criteria, offered in the `/vf-new-lab`
+  catalog. The multi-domain promise is shipped, not roadmapped.
+- **KPIs** (`kpi-analyst`) — the lab's numbers for any domain: metric trees, review cadences,
+  drift alerts.
+
+Each module ships **framework-grade documentation in its README** — installation, get
+started, usage, full reference — linked from [the modules table](#-modules).
+
 ### Efficiency, quantified
 
 | Lever | Effect |
@@ -131,10 +164,8 @@ flowchart TD
     CI["CI: 38 suites + “fresh lab” job<br/>the baseline passes its own gates<br/>from a blank install"] -.-> socle
 ```
 
-Other domains are **manufactured**: `/vf-new-lab` clarifies, derives a capability manifest,
-has `skill-creator` build the skills (with evals), and wires the auditors. **Express mode:
-operational lab in ≤ 15 minutes** (3 questions, assumed and flagged derivations, gates
-intact) — validated through real-world UAT.
+Other domains are **manufactured** on this base — see
+[Beyond dev — a lab for any domain](#-beyond-dev--a-lab-for-any-domain).
 
 ---
 
@@ -160,6 +191,10 @@ module picker, dependencies resolved and recapped before anything is written. Up
 infrastructure-audit / audit-architecture), then one choice — *dev lab* or *tailor-made
 domain lab*. The **3 domain bundles are offered** in the catalog; mobile-test and
 mobile-test-team stay as advanced à-la-carte add-ons.
+
+**Each module's README is its full documentation** — same structure everywhere: what it does,
+installation, get started, usage, complete reference, limits. Click a module below to open its
+docs.
 
 <details>
 <summary><strong>The 17 modules in detail</strong></summary>

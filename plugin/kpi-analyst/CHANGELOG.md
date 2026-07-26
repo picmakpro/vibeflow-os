@@ -1,5 +1,10 @@
 # CHANGELOG — kpi-analyst
 
+## [v1.0.3] — 2026-07-26
+
+### Modifié
+- README monté au standard de doc (installation, démarrer, usage, référence).
+
 ## [v1.0.2] — 2026-07-25
 
 ### Modifié

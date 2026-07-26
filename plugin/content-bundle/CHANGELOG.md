@@ -1,5 +1,12 @@
 # CHANGELOG — content-bundle
 
+## [v2.0.2] — 2026-07-26
+
+### Modifié
+- `README.md` monté au standard de doc framework : tagline, en-tête `Type · Version · Dépend de`
+  (l'en-tête **Version** est désormais déclaré — couvert par le gate `check-version-sync.sh`),
+  sections Quoi / Installation / Démarrer / Usage / Référence / Limites.
+
 ## [v2.0.1] — 2026-07-26
 
 ### Corrigé

@@ -1,5 +1,13 @@
 # CHANGELOG — infrastructure-audit
 
+## [v1.2.2] — 2026-07-26
+
+### Modifié
+- README monté au standard de doc du repo (tagline, Quoi, Installation avec prérequis réels,
+  Démarrer en 5 min, Usage — dont `--strict` et exit codes 0/1/3, Référence exhaustive vérifiée
+  sur disque, Limites). Découverte documentée : `known-versions.txt` n'est pas posé par l'engine
+  d'install (qui ne copie que `.sh`/`.mjs`/`.js`) → pose manuelle signalée, fail-open côté axe 1.
+
 ## [v1.2.1] — 2026-07-25
 
 ### Modifié

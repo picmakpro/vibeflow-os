@@ -15,7 +15,7 @@ machine** vérifient — pas des promesses.
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
-[Le cycle dev](#-le-cycle-dev--spec-driven) · [Missions](#-missions-longues--léquipe) · [Mémoire](#-la-mémoire-qui-tient) · [Installation](#-installation) · [Modules](#-modules)
+[Le cycle dev](#-le-cycle-dev--spec-driven) · [Missions](#-missions-longues--léquipe) · [Labs & design](#-au-delà-du-dev--un-lab-pour-chaque-métier) · [Mémoire](#-la-mémoire-qui-tient) · [Installation](#-installation) · [Modules](#-modules)
 
 </div>
 
@@ -82,6 +82,42 @@ qui défie l'intention ou la sécurité **gèle le nœud** et remonte à l'humai
 matin. Le même kernel fait tourner **6 équipes** : dev, design, mobile, content, growth,
 business.
 
+---
+
+## 🧪 Au-delà du dev — un lab pour chaque métier
+
+VibeFlow n'est pas un outil dev-only : il **fabrique des labs** — des espaces de travail
+gouvernés pour n'importe quel métier — sur le même kernel et les mêmes gates.
+
+```mermaid
+flowchart LR
+    A["🗣 <i>« un lab pour mon<br/>agence de contenu »</i>"] --> B["📋 /vf-new-lab<br/>clarification-first<br/>gates machine A·B·C"]
+    B --> C["🧬 Manifeste de capacités<br/>dérivé pour le métier"]
+    C --> D["🛠 skill-creator<br/>fabrique les skills<br/><i>avec évals</i>"]
+    D --> E["✅ Lab gouverné<br/>planning · mémoire<br/>auditeurs ficelés"]
+```
+
+- **Création de lab** (`/vf-new-lab`, conductor) — cadrage clarification-first sous gates
+  machine, manifeste de capacités dérivé pour le métier, skills fabriqués par `skill-creator`
+  (boucle d'évals), auditeurs ficelés en sortie. **Mode express : lab opérationnel en
+  ≤ 15 minutes** (3 questions, dérivations assumées et marquées) — recetté en conditions
+  réelles.
+- **Design** (`design-orchestrator`, installé avec le dev) — dis *« rends ça plus beau »*,
+  *« cet écran est fade »* ou *« audite cette page »* : l'agent `vibeflow-design` route
+  l'intention vers le bon geste (direction artistique, craft ciblé, critique scorée). Les
+  missions design complètes tournent en équipe — manager + crafter + **juge frais** qui score
+  /100 contre ta direction artistique. **Multi-stack** : il livre des specs et des tokens,
+  jamais du code verrouillé sur un framework.
+- **Bundles métier** (`content` · `growth` · `business-pilot`) — équipes complètes sur le
+  team-kernel, juges read-only à critères éliminatoires, proposés au catalogue de
+  `/vf-new-lab`. La promesse multi-métier est livrée, pas en roadmap.
+- **KPIs** (`kpi-analyst`) — les chiffres du lab pour tout métier : arbres de métriques,
+  cadences de revue, alertes de dérive.
+
+Chaque module embarque une **documentation niveau framework dans son README** —
+installation, démarrer, usage, référence complète — liée depuis
+[le tableau des modules](#-modules).
+
 ### L'efficience, chiffrée
 
 | Levier | Effet |
@@ -133,10 +169,8 @@ flowchart TD
     CI["CI : 38 suites + job « lab frais »<br/>la baseline passe ses propres gates<br/>depuis un lab vierge"] -.-> socle
 ```
 
-Les autres métiers se **fabriquent** : `/vf-new-lab` clarifie, dérive un manifeste de
-capacités, fait fabriquer les skills par `skill-creator` (avec évals), et ficelle les
-auditeurs. **Mode express : lab opérationnel en ≤ 15 minutes** (3 questions, dérivations
-assumées et marquées, gates intacts) — recetté en conditions réelles.
+Les autres métiers se **fabriquent** sur ce socle — voir
+[Au-delà du dev — un lab pour chaque métier](#-au-delà-du-dev--un-lab-pour-chaque-métier).
 
 ---
 
@@ -162,6 +196,10 @@ choix des modules, dépendances résolues et récapitulées avant toute pose. Mi
 infrastructure-audit / audit-architecture), puis un choix — *lab de dev* ou *lab métier sur
 mesure*. Les **3 bundles métier sont proposés** au catalogue ; mobile-test et
 mobile-test-team restent en à-la-carte avancé.
+
+**Le README de chaque module est sa documentation complète** — même structure partout : ce
+qu'il fait, installation, démarrer, usage, référence exhaustive, limites. Clique un module
+ci-dessous pour ouvrir sa doc.
 
 <details>
 <summary><strong>Les 17 modules en détail</strong></summary>

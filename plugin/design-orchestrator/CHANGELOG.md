@@ -1,5 +1,10 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.2.2] — 2026-07-26
+
+### Modifié
+- README monté au standard de doc (installation, démarrer, usage, référence).
+
 ## [v1.2.1] — 2026-07-26
 
 ### Corrigé

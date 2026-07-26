@@ -1,6 +1,6 @@
 {
   "name": "audit-architecture",
-  "version": "v1.0.1",
+  "version": "v1.0.2",
   "type": "single-skill+references",
   "description": "Méta-skill concepteur d'architectures d'audit multi-couches (universel, tout process brief→output). Dérive et force la structure d'audit adaptée (ADR-036).",
   "requires": []

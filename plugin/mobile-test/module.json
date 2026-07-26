@@ -1,6 +1,6 @@
 {
   "name": "mobile-test",
-  "version": "v1.0.1",
+  "version": "v1.0.2",
   "type": "skill + script + config",
   "description": "Pipeline de test mobile réel (iOS simulateur / Android émulateur) : détection de cible, build-if-absent, régression Maestro, rapport horodaté + artefacts, diagnostic visuel mobile-mcp sur échec. Script mécanique + skill jugement. Statut expérimental jusqu'au premier run réel vert. Toute valeur projet en config, aucune constante machine.",
   "requires": []

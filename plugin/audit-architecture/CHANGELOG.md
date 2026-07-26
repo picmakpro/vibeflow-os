@@ -1,5 +1,12 @@
 # Changelog — audit-architecture
 
+## [v1.0.2] — 2026-07-26
+
+### Modifié
+- README monté au standard de doc du repo (tagline, Quoi, Installation avec prérequis réels,
+  Démarrer en 5 min — méthode 4 temps, Usage, Référence exhaustive des 5 references, Limites).
+  Rôle explicité : porte la Phase 4 (architecture d'audit des process) de l'audit du validator.
+
 ## [v1.0.1] — 2026-07-07 (consolidation)
 
 ### Modifié

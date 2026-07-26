@@ -1,5 +1,13 @@
 # CHANGELOG — skill-creator
 
+## [v1.0.3] — 2026-07-26
+
+### Modifié
+- README monté au standard de doc du repo (tagline, Quoi, Installation avec prérequis réels,
+  Démarrer en 5 min, Usage, Référence exhaustive vérifiée sur disque, Limites). Contenu vérifié :
+  cibles d'install réelles (agent + commande d'incarnation ADR-042 + 2 skills), frontière ADR-057
+  descriptive (aucune revendication d'exclusivité).
+
 ## [v1.0.2] — 2026-07-25
 
 ### Modifié
