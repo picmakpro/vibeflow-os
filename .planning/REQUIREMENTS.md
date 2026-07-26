@@ -112,13 +112,13 @@
 
 ### Phase 10 — Étude & faisabilité
 
-- [ ] **GSDM-01**: La surface d'usage GSD dans VibeFlow est inventoriée exhaustivement — chaque point de
+- [x] **GSDM-01** *(2026-07-26 — `10-ETUDE.md` §1)*: La surface d'usage GSD dans VibeFlow est inventoriée exhaustivement — chaque point de
   contact (`ensure-deps.sh`, `build-gsd-index.sh`, binaire `gsd-sdk`, chemins `~/.claude/get-shit-done/`,
   pins `PROJECT.md`, hooks, références docs) listé avec le changement attendu.
-- [ ] **GSDM-02**: Le package cible `@opengsd/gsd-core` est caractérisé — existence/stabilité npm, commande
+- [x] **GSDM-02** *(2026-07-26 — `10-ETUDE.md` §2, sourcé npm/GitHub/tarball)*: Le package cible `@opengsd/gsd-core` est caractérisé — existence/stabilité npm, commande
   d'install non-interactive équivalente, nom du binaire, structure de dossier, parité fonctionnelle des
   skills/SDK consommés ; écarts documentés.
-- [ ] **GSDM-03**: Une note go/no-go écrite tranche — (a) migrer maintenant (stratégie + fenêtre de compat),
+- [~] **GSDM-03** *(note écrite `10-ETUDE.md` §5 — recommandation GO, validation humaine du GO en attente pour ouvrir la Phase 11)*: Une note go/no-go écrite tranche — (a) migrer maintenant (stratégie + fenêtre de compat),
   (b) attendre (déclencheur de resurgence explicite), ou (c) archiver.
 
 ### Phase 11 — Intégration (conditionnée au GO de la Phase 10)
@@ -272,9 +272,9 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | CONS-04 | Phase 8 | Complete |
 | RND-01 | Phase 9 | Spike done — GO (round-trip + archivage vérifiés) |
 | RND-02 | Phase 9 | Done — note go/no-go + demi-vies recalibrées + cadrage swarm |
-| GSDM-01 | Phase 10 | Not started |
-| GSDM-02 | Phase 10 | Not started |
-| GSDM-03 | Phase 10 | Not started |
+| GSDM-01 | Phase 10 | Done — inventaire 5 familles de points de contact (10-ETUDE.md §1) |
+| GSDM-02 | Phase 10 | Done — cible caractérisée : successeur communautaire dominant, parité totale, chemins/bins changés (10-ETUDE.md §2) |
+| GSDM-03 | Phase 10 | Note écrite — GO recommandé avec fenêtre de compat ; décision humaine en attente |
 | GSDM-04 | Phase 11 | Not started (GATE Phase 10) |
 | GSDM-05 | Phase 11 | Not started (GATE Phase 10) |
 | GSDM-06 | Phase 11 | Not started (GATE Phase 10) |

@@ -324,7 +324,7 @@ Plans:
 | 7. Philosophies de dev | dev-doctrine | 2/2 | Complete | 2026-07-07 |
 | 8. Consolidation des doublons | dev-doctrine | 4/4 | Complete | 2026-07-07 |
 | 9. Spike transposition jcode | memory-swarm-rnd | 2/2 | Complete — shippée `v2.28.0` (ADR-052/053) | 2026-07-22 |
-| 10. Étude & faisabilité migration GSD | gsd-migration | 0/? | Not planned yet | — |
+| 10. Étude & faisabilité migration GSD | gsd-migration | étude livrée | 10-ETUDE.md — GO recommandé, décision humaine en attente | — |
 | 11. Intégration migration GSD | gsd-migration | 0/? | Not planned yet (GATE Phase 10) | — |
 | 12. Routage fin & verbes /vf-* | vf-routing | 6/6 | Complete — release `v2.31.0` | 2026-07-25 |
 | 13. Pont spec → feuille de route | vf-routing | 2/2 | Complete — release `v2.37.0` — module v2.2.0, vérif PASS | 2026-07-26 |
