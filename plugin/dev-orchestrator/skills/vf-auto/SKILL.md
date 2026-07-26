@@ -15,7 +15,7 @@ description: >
 
 ## Étape 0 — Aiguillage : moteur direct ou équipe
 
-Détermine N = étapes restantes ciblées (`gsd-sdk query roadmap.analyze` — étapes non complètes
+Détermine N = étapes restantes ciblées (`gsd-tools roadmap analyze` — étapes non complètes
 dans le périmètre demandé). Applique le seuil canonique `SEUIL_EQUIPE` (défini dans
 `references/mission-contracts.md`, installé sous
 `.claude/agents/dev-orchestrator-references/mission-contracts.md`) :

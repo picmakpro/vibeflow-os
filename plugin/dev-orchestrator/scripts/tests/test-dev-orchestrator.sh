@@ -10,6 +10,10 @@
 #         à un verbe supprimé (la façade des 29 verbes est morte — elle ne ressuscite pas).
 #   T4  — Chaque skill du module mappe vers une cible existante (aucun orphelin) :
 #         gsd-X vérifié contre gsd-skills-index.md (fixture de secours si index vide).
+#   T4b — Non-régression : aucune occurrence vivante de gsd-sdk dans skills/ ou references/
+#         (Phase 11, 11-02 — migré vers gsd-tools).
+#   T4c — Renommage de la whitelist T4 effectif : gsd-tools référencé par vf-auto/SKILL.md
+#         et accepté sans orphelin (pas un simple ajout à côté de l'ancien nom).
 #   T5  — Densité (VERIF-02) MESURÉE PAR wc -l UNIQUEMENT : AGENT.md ≤250L, skills ≤500L.
 #         (NE PAS appeler le contrôleur de taille générique qui ignore les .md.)
 #   T6  — Install end-to-end via vibeflow-update.sh (best-effort, SKIP si non réalisable).
@@ -375,6 +379,8 @@ target_known() {
 
 orphans=0
 checked=0
+auto_whitelist_hit=0   # T4c (ci-dessous) : preuve que le run réel de CETTE boucle a bien
+                       # emprunté la branche whitelist pour gsd-tools — pas une réimplémentation.
 for skill_md in "$MOD"/skills/vf-*/SKILL.md; do
   [ -f "$skill_md" ] || continue
   vfname="$(basename "$(dirname "$skill_md")")"
@@ -394,7 +400,7 @@ for skill_md in "$MOD"/skills/vf-*/SKILL.md; do
   fi
   for t in $targets; do
     case "$t" in
-      gsd-sdk) : ;;                  # CLI d'état GSD — pas un skill
+      gsd-tools) auto_whitelist_hit=1 ;;  # CLI d'état GSD (gsd-core) — pas un skill (ex-gsd-sdk, Phase 11)
       gsd-*)
         if ! target_known "$t"; then
           ko "T4 mapping : $vfname → cible orpheline « $t » (absente de l'index/fixture)"
@@ -411,6 +417,36 @@ if [ "$orphans" -eq 0 ] && [ "$checked" -ge 2 ]; then
   ok "T4 mapping : $checked skill(s) du module — aucun orphelin (source: $src)"
 elif [ "$orphans" -eq 0 ]; then
   ko "T4 mapping : $checked skill(s) audités (<2 — vf-auto ou vf-dev manquant ?)"
+fi
+
+# ---------------------------------------------------------------------------
+# T4b — Non-régression : aucune occurrence vivante de gsd-sdk (Phase 11, 11-02)
+# ---------------------------------------------------------------------------
+leftover=$("$GREP" -rln 'gsd-sdk' "$MOD/skills" "$MOD/references" 2>/dev/null || true)
+if [ -z "$leftover" ]; then
+  ok "T4b gsd-sdk : aucune occurrence vivante dans skills/ ou references/ (migré vers gsd-tools)"
+else
+  ko "T4b gsd-sdk : occurrence(s) résiduelle(s) — $leftover"
+fi
+
+# ---------------------------------------------------------------------------
+# T4c — Renommage de la whitelist T4 effectif (dérivé du run RÉEL de la boucle T4
+# ci-dessus, pas d'une réimplémentation indépendante qui accepterait gsd-tools par
+# construction). Deux conditions cumulatives, chacune fait échouer si absente :
+#   1. la boucle T4 a bien emprunté la branche whitelist pour gsd-tools
+#      (auto_whitelist_hit, posé DANS le case réel, pas ici) ;
+#   2. sans cette branche, gsd-tools ne serait PAS accepté par target_known() —
+#      il n'est ni dans l'index disque ni dans la fixture. Sans ce 2e test, T4c
+#      passerait même whitelist retirée, tant que l'index le connaîtrait par ailleurs.
+# ---------------------------------------------------------------------------
+if [ "$auto_whitelist_hit" -eq 1 ]; then
+  if target_known "gsd-tools"; then
+    ko "T4c whitelist : gsd-tools est connu via target_known (index/fixture) — le test ne peut plus discriminer la whitelist du renommage"
+  else
+    ok "T4c whitelist : gsd-tools vu dans le run T4 réel via la branche whitelist, et target_known() l'aurait rejeté sans elle (renommage effectif, pas tautologique)"
+  fi
+else
+  ko "T4c whitelist : vf-auto/SKILL.md n'a pas déclenché la branche whitelist gsd-tools dans le run T4 (régression du plan 11-02)"
 fi
 
 # ---------------------------------------------------------------------------

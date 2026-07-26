@@ -69,10 +69,42 @@ Tâche simple sans signal → routage direct **sans question** (zéro friction s
 
 ## Seuil de bascule (vf-auto)
 
-`SEUIL_EQUIPE = 3` — N = étapes restantes ciblées, comptées via `gsd-sdk query roadmap.analyze`
-(**prérequis non garanti** : si `gsd-sdk` est absent de la machine, fallback documenté —
-compter les cases non cochées du périmètre dans `.planning/ROADMAP.md` : `grep -c '^- \[ \]'`
-ou équivalent ; jamais de blocage silencieux sur l'outil manquant) :
+`SEUIL_EQUIPE = 3` — N = étapes restantes ciblées, comptées via `gsd-tools roadmap analyze`.
+
+Résolution — cascade de résolution, jamais un chemin en dur (D1 ; forme reprise, variante
+Claude-only, de `gsd-core/workflows/_runtime-launcher.snippet.sh`, gsd-core 1.8.0) :
+```sh
+_GSD_ROOT="${RUNTIME_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+GSD_TOOLS=""
+for _c in "$_GSD_ROOT/gsd-core/bin/gsd-tools.cjs" \
+          "$_GSD_ROOT/.claude/gsd-core/bin/gsd-tools.cjs" \
+          "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/gsd-core/bin/gsd-tools.cjs"; do
+  [ -f "$_c" ] && { GSD_TOOLS="$_c"; break; }
+done
+if   [ -n "$GSD_TOOLS" ];                  then gsd_run() { node "$GSD_TOOLS" "$@"; }
+elif command -v gsd-tools >/dev/null 2>&1; then GSD_TOOLS="$(command -v gsd-tools)"; gsd_run() { "$GSD_TOOLS" "$@"; }
+else echo "ERROR: gsd-tools.cjs introuvable. Installer : npx -y @opengsd/gsd-core@latest --claude --global" >&2; exit 1; fi
+```
+`gsd_run roadmap analyze` remplace l'ancien appel direct. **Prérequis non garanti** : si
+`gsd_run` ne peut pas se résoudre (bloc `else` ci-dessus), fallback documenté — compter les cases
+non cochées du périmètre dans `.planning/ROADMAP.md` : `grep -c '^- \[ \]'` ou équivalent ; jamais
+de blocage silencieux sur l'outil manquant.
+
+**Test du succès sur le JSON, jamais sur `$?` (D2)** : `gsd-tools` sort exit 0 même en erreur
+métier. Le fallback grep ci-dessus se déclenche donc aussi si la sortie JSON de `gsd_run roadmap
+analyze` contient un champ `.error` — pas seulement si le binaire est introuvable. Ne jamais tester
+uniquement le code de sortie du processus.
+
+**Rester sur le dist-tag stable, jamais le canal de pré-version amont (D4)** : le canal de
+pré-version est périmé (1.7.0-rc.6, antérieur au tag stable = 1.8.0) — n'utiliser que `@latest`
+dans le message d'erreur ci-dessus et partout ailleurs dans ce document.
+
+Écarts assumés vs le snippet officiel amont (D5) : (a) les runtimes non-Claude du snippet sont
+retirés (VibeFlow est un plugin Claude Code) ; (b) `command -v gsd-tools` est placé après les
+chemins fichiers (le payload installé prime sur un bin npm global potentiellement d'une autre
+version) ; (c) ce document n'écrit jamais dans `CLAUDE_ENV_FILE`.
+
+Application du seuil :
 
 - **N < SEUIL_EQUIPE ET aucun signal de durée** → moteur direct (boucle autonome inline, moins chère).
 - **N ≥ SEUIL_EQUIPE OU signal de durée** → équipe (`Task(vf-dev-manager)` avec le brief ci-dessus).
