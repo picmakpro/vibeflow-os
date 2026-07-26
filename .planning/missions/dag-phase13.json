@@ -59,7 +59,7 @@
         "audit-13",
         "verify-13"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "review-13-01",
@@ -96,7 +96,7 @@
       "deps": [
         "hygiene-13"
       ],
-      "status": "blocked"
+      "status": "ready"
     }
   ]
 }
