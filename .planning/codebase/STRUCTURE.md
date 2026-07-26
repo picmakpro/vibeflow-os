@@ -1,326 +1,217 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-06-06 (restructuration plugin/ — voir note ci-dessous)
+**Analysis Date:** 2026-07-26
 
 ## Directory Layout
 
-> **Restructuration (2026-06-06)** : tout le distribuable a été isolé sous `plugin/` et
-> `marketplace.json` pointe `source: "./plugin"`. `.planning/` et `docs/` restent à la racine du
-> repo et **ne sont plus distribués** dans le bundle plugin. Les modules détaillés plus bas vivent
-> désormais sous `plugin/<module>/` (affichés à l'indentation racine pour la lisibilité).
+```
+vibeflow-os/                          # racine = marketplace (v2.36.1)
+├── VERSION                           # canon de version racine (vX.Y.Z)
+├── CHANGELOG.md                      # historique des releases racine
+├── CLAUDE.md                         # règles repo (discipline release, densité, agents natifs)
+├── README.md / README.fr.md          # vitrines EN/FR (badges version + compteur modules, gatés)
+├── INSTALL.md · LICENSE · .gitattributes · .gitignore
+├── .claude-plugin/
+│   └── marketplace.json              # fiche marketplace → plugins[0].source: "./plugin"
+├── .github/workflows/
+│   └── ci.yml                        # 3 jobs : suites de tests · gates stricts · lab frais Gate C
+├── scripts/                          # outillage RELEASE du repo (non distribué)
+│   ├── bump.sh                       # bump synchronisé de toutes les sources de version
+│   ├── check-version-sync.sh         # gate cohérence VERSION ↔ manifests ↔ badges ↔ triades
+│   ├── check-release-tag.sh          # gate « toute version = un tag » (--remote)
+│   └── hooks/pre-push                # câblage opt-in : git config core.hooksPath scripts/hooks
+├── docs/                             # docs internes de dev — NON distribuées
+│   ├── ADR.md                        # décisions d'architecture (fichier courant : ADR-046 → ADR-057)
+│   ├── reference/                    # exigences/roadmaps historiques (install-ux, vfdo) + note spike
+│   └── superpowers/
+│       ├── specs/                    # designs datés YYYY-MM-DD-*.md (brainstorm → design)
+│       └── plans/                    # plans d'implémentation datés
+├── .planning/                        # état GSD du repo — NON distribué
+│   ├── PROJECT.md · REQUIREMENTS.md · ROADMAP.md · STATE.md · MILESTONES.md · BACKLOG.md
+│   ├── config.json
+│   ├── codebase/                     # les 7 documents de cartographie (ce fichier)
+│   ├── phases/                       # 01-dev-orchestrator … 14-frontiere-altitude-planning-gsd
+│   ├── milestones/ · missions/ · research/
+├── reports/                          # sorties d'audits horodatées (audit/, uat/, validator/)
+└── plugin/                           # ★ LE BUNDLE DISTRIBUÉ (tout ce qui part chez l'utilisateur)
+    ├── .claude-plugin/plugin.json    # manifest plugin (version, skills: ./installer)
+    ├── installer/                    # skill /vibeflow-install (UX à toggles)
+    │   ├── SKILL.md
+    │   ├── scripts/{preflight.sh, build-module-catalog.sh, test-build-module-catalog.sh}
+    │   └── tests/
+    ├── _internal/                    # infrastructure d'install (pas un module)
+    │   ├── vibeflow-update.sh        # engine scope-aware (install/update/uninstall/rollback/status)
+    │   ├── resolve-deps.sh           # fermeture transitive des requires
+    │   ├── merge-hooks.sh            # câbleur des hooks.json de modules (ADR-043)
+    │   ├── retired-modules.txt       # manifeste des artefacts à nettoyer (convergence)
+    │   └── tests/
+    ├── commands/                     # slash-commands de gouvernance (pas de verbes dev)
+    │   ├── vibeflow.md · vf-update.md · vf-audit.md
+    │   └── vf-planning.md · vf-calibrate.md · vf-new-lab.md
+    └── <module>/  × 17               # voir « Triade module » ci-dessous
+```
+
+## Les 17 modules sous `plugin/`
 
 ```
-vibeflow-os/                  # repo root = marketplace
-├── README.md                 # Overview, module table, installation guide
-├── INSTALL.md                # Detailed installation walkthrough
-├── VERSION                   # Global repo version (semver)
-├── LICENSE
-├── .gitignore                # includes .vibeflow-cache
-├── .planning/                # GSD internal state — NOT distributed (hors bundle)
-├── docs/                     # Dev specs — NOT distributed (hors bundle)
-├── .claude-plugin/
-│   └── marketplace.json      # Marketplace manifest → plugin source: "./plugin"
-│
-└── plugin/                   # ★ THE DISTRIBUTED BUNDLE — everything below lives here
-    ├── .claude-plugin/
-    │   └── plugin.json       # Plugin manifest (skills: ./installer)
-    ├── installer/            # [ENTRY] /vibeflow-install skill + build-module-catalog.sh
-    └── _internal/
-        ├── vibeflow-update.sh    # [CORE] Universal installer/updater for all module types
-        └── resolve-deps.sh       # Dependency transitive-closure resolver
-
-# --- modules ci-dessous : tous sous plugin/<module>/ ---
-
-├── consolidator/             # v1.0.0 — Memory consolidation 4-pillar system
-│   ├── VERSION
-│   ├── CHANGELOG.md
-│   ├── README.md
-│   ├── SKILL.md              # [ENTRY] Consolidation memory (indexing/archiving/fusion/promotion)
-│   ├── references/           # Bundled docs
-│   │   ├── indexation.md     # Index header convention, colonne #Ligne
-│   │   ├── archiving.md      # Archive criteria (status/age/refs)
-│   │   ├── fusion.md         # Deduplication LLM-based
-│   │   └── promotion.md      # learning -> rule semi-auto
-│   └── scripts/              # Executable scripts (invoked by skill or hook)
-│       ├── archive.sh        # Archive entries by 3 criteria
-│       ├── reindex.sh        # Regenerate index header
-│       ├── detect-duplicates.sh
-│       ├── detect-promotions.sh
-│       └── tests/            # Test fixtures + test runs
-│           ├── fixtures/
-│           └── test-*.sh
-│
-├── infrastructure-audit/     # v1.0.0 — Lab runtime audit (Claude, hooks, scripts, drift)
-│   ├── VERSION
-│   ├── CHANGELOG.md
-│   ├── README.md
-│   ├── SKILL.md              # [ENTRY] Infrastructure audit in 4 axes
-│   ├── references/           # Bundled docs
-│   │   ├── claude-code-runtime.md
-│   │   ├── hooks-contract.md
-│   │   ├── scripts-integrity.md
-│   │   └── drift-detection.md
-│   └── scripts/
-│       ├── audit-infra.sh    # Main auditor (4 axes)
-│       ├── known-versions.txt # Claude Code version whitelist
-│       └── tests/
-│
-├── validator/                # v1.1.0 — Master audit agent (orchestrates 5 phases)
-│   ├── VERSION
-│   ├── CHANGELOG.md
-│   ├── README.md
-│   └── AGENT.md              # [ENTRY] vibeflow-validator agent (Opus, delegates to skills)
-│
-├── skill-creator/            # v1.0.0 — Sole authorized skill creation channel
-│   ├── VERSION
-│   ├── CHANGELOG.md
-│   ├── README.md
-│   ├── AGENT.md              # [ENTRY] skill-creator agent (Opus, decomposes + research)
-│   ├── skills/               # Multi-skill module (type composability example)
-│   │   ├── skill-creator/    # Anthropic official skill-creator
-│   │   │   ├── SKILL.md      # [ENTRY] Create/iterate skills + evals
-│   │   │   ├── references/
-│   │   │   │   └── *.md      # Guides for each phase
-│   │   │   ├── scripts/
-│   │   │   │   └── *.py      # Eval runner, viewer, benchmarker
-│   │   │   ├── agents/       # Sub-agents (parallel research facets)
-│   │   │   ├── assets/       # Templates
-│   │   │   └── eval-viewer/  # evaluate_results.py, generate_review.py
-│   │   └── skill-creator-workflow/  # Internal workflow
-│   │       ├── SKILL.md      # [ENTRY] 5-phase workflow (decompose → research → synthesis → draft → escalate)
-│   │       └── references/
-│
-├── software-architecture/    # v1.0.0 — AI-safe code architecture (P9: Modularize for cognition)
-│   ├── VERSION
-│   ├── CHANGELOG.md
-│   ├── README.md
-│   ├── SKILL.md              # [ENTRY] AI-safe architecture (SOLID/SoC, ≤300L, machine gates)
-│   ├── references/           # Bundled docs
-│   │   ├── solid-soc.md      # SOLID principles + SoC + structure
-│   │   ├── anti-patterns.md  # God file, feature envy, couplage circulaire
-│   │   ├── restructuration-playbook.md  # Brownfield 6-wave playbook
-│   │   └── universal-vs-dev.md  # P9 for non-code projects
-│   ├── rules/                # Path-scoped rules auto-loaded by Claude Code
-│   │   └── production-code-architecture.md  # `production-code/` subdirs only
-│   └── scripts/
-│       ├── check-file-size.sh       # Gate: warn 250L, block 300L
-│       ├── detect-cycles.sh         # Circular dependency detection
-│       ├── verify-boundaries.sh     # eslint-plugin-boundaries enforcement
-│       └── tests/
-│
-├── audit-architecture/       # v1.0.0 — Design multi-layer audit structures (P8)
-│   ├── VERSION
-│   ├── CHANGELOG.md
-│   ├── README.md
-│   ├── SKILL.md              # [ENTRY] Audit architect (derives structure → forces it)
-│   └── references/           # Bundled docs
-│       ├── decomposition-method.md  # 4-time method (identify → derive dimensions → order → choose enforcement)
-│       ├── enforcement-spectrum.md  # Script ← Test/Lint ← Checklist ← Rubric/LLM
-│       └── anti-boucle.md          # Escalation limits + verdict flow
-│
-├── reference/                # v2.1.1 — Complete methodology documentation (doc-only module)
-│   ├── VERSION
-│   ├── CHANGELOG.md
-│   ├── README.md
-│   └── content/              # [INSTALLED TO] docs/reference/ in target Lab
-│       ├── README-CLIENT.md        # Onboarding guide for end users
-│       ├── VERSION.md              # Release notes v2.0 → v2.1.1
-│       ├── LICENSE.md              # Usage license
-│       ├── methodology/
-│       │   ├── VIBEFLOW_CORE.md    # [CORE DOC] Bible v4.2 (9 principles P1-P9)
-│       │   ├── VIBEFLOW_PHILOSOPHY.md
-│       │   ├── VIBEFLOW_EXPLAINED.md
-│       │   ├── patterns/            # 11 architectural patterns
-│       │   │   ├── 01-constitution.md
-│       │   │   ├── 02-registres.md
-│       │   │   ├── 03-agents.md
-│       │   │   ├── 04-skills.md
-│       │   │   ├── 05-regles.md
-│       │   │   ├── 06-capitalisation.md
-│       │   │   ├── 07-transposition.md
-│       │   │   ├── 08-evaluer.md
-│       │   │   ├── 09-meta-procedures.md
-│       │   │   ├── 10-plan-review-adversarial.md
-│       │   │   └── 11-halt-conditions.md
-│       │   ├── vocabulary/          # Lexique + forks mapping + dos/don'ts
-│       │   │   └── *.md
-│       │   └── templates/           # 33 reusable templates
-│       │       ├── memory/          # 5 registry templates
-│       │       ├── agents/          # 8 agent templates + contracts
-│       │       ├── triggers/        # 5 trigger patterns
-│       │       ├── rules/           # 1 rule template
-│       │       ├── docs/            # 5 doc templates
-│       │       └── skills/          # 4 skill templates
-│       │           ├── agent-density-auditor/
-│       │           ├── skill-creator/
-│       │           ├── safe-execute/
-│       │           └── debugger/
-│       └── examples/
-│           └── PetitsCoursFlow/     # Fictitious end-to-end example (Sophie K., music teacher)
-│               ├── .claude/         # Example Lab structure
-│               │   ├── agents/
-│               │   ├── memory/
-│               │   └── rules/
-│               └── *.md             # Example decisions, conventions
-│
-├── .planning/
-│   └── codebase/             # Generated codebase maps (this repo's own documentation)
-│       ├── ARCHITECTURE.md   # System design, layers, data flow
-│       └── STRUCTURE.md      # Directory layout, file locations
-│
-└── .git/                     # Git repository (main branch, private)
+plugin/
+├── conductor/                # MANDATORY — AGENT.md + skills/{vf-new-lab,vf-update,vf-calibrate}
+│   ├── scripts/              # team-kernel (dag.sh, driver-lock.sh) + gates (check-agents.sh,
+│   │                         #   guard-agent-write.sh, check-debug-research.sh, check-legacy.sh,
+│   │                         #   check-overlaps.sh, check-plugin-update.sh, update-banner.sh,
+│   │                         #   framework-version.sh, generate-agent-commands.sh, scaffold-docs.sh,
+│   │                         #   vf-update-run.sh)
+│   ├── references/           # team-kernel.md, bootstrap-method.md, conductor-pipeline.md,
+│   │                         #   contracts.md, migration-playbook.md
+│   ├── hooks/hooks.json · tests/
+├── planning-core/            # SKILL.md + scripts/ (check-planning-state, planning-context,
+│   │                         #   detect-planning-debt, guard-planning-updated, detect-gsd-engine…)
+│   ├── references/           # GUIDE.md, PROFILES.md, compartments.md, gsd-handoff.md,
+│   │                         #   bridge-memory.md, domain-detection.md, templates/
+│   └── hooks/hooks.json
+├── consolidator/             # SKILL.md + scripts/ (guards registres, reindex, archive, decay-pass…)
+│   ├── references/           # indexation.md, archivage.md, fusion.md, promotion.md,
+│   │                         #   memoire-vivante.md, templates-memoire/
+│   └── hooks/hooks.json
+├── validator/                # agent-only : AGENT.md (5 audits), incarné par /vf-audit
+├── skill-creator/            # skills/{skill-creator, skill-creator-workflow}
+├── audit-architecture/       # SKILL.md + references/
+├── infrastructure-audit/     # SKILL.md + scripts/{audit-infra.sh, known-versions.txt} + hooks/
+├── software-architecture/    # SKILL.md + rules/ + scripts/{check,guard}-file-size.sh + hooks/
+├── reference/                # doc-only : content/methodology/ (VIBEFLOW_CORE.md v4.2,
+│   │                         #   VIBEFLOW_EXPLAINED.md, VIBEFLOW_PHILOSOPHY.md,
+│   │                         #   AXIOMES-ENFORCEMENT.md, patterns/01..12-*.md,
+│   │                         #   templates/{agents,…}, vocabulary/)
+│   └── content/examples/PetitsCoursFlow/
+├── dev-orchestrator/         # AGENT.md (vibeflow-dev) + agents/{vf-dev-manager, vf-coder,
+│   │                         #   vf-reviewer, vf-auditer} + skills/{vf-auto, vf-dev}
+│   ├── references/           # intent-routing.md (carte d'intention UNIQUE), mission-flow.md,
+│   │                         #   mission-contracts.md, gsd-skills-index.md, GSD-PIPELINE.md,
+│   │                         #   autonomous-guardrails.md
+│   └── scripts/              # ensure-deps.sh, build-gsd-index.sh, inject-mcp-tools.sh + tests
+├── design-orchestrator/      # AGENT.md (vibeflow-design) + agents/{vf-design-manager, vf-crafter,
+│   │                         #   vf-design-judge} + skills/{vf-design, vf-sketch} + references/
+├── kpi-analyst/              # AGENT.md + scripts/{kpis-writer.sh, extractor-template.sh} + references/
+├── mobile-test/              # SKILL.md + scripts/mobile-test-run.mjs + config/ + references/
+├── mobile-test-team/         # agents/ (vf-test-orchestrator, vf-test-runner, vf-app-fixer) + rules/
+├── content-bundle/           # agents/ + skills/vf-content + scripts/ + content/{agents,domain}
+├── growth-bundle/            # même topologie que content-bundle
+└── business-pilot-bundle/    # même topologie que content-bundle
 ```
 
 ## Directory Purposes
 
-**Module Directories** (`consolidator/`, `infrastructure-audit/`, `validator/`, etc.):
-- Purpose: Self-contained, versionable units of methodology
-- Contains: `VERSION`, `CHANGELOG.md`, `README.md`, type-specific content (`SKILL.md`, `AGENT.md`, `content/`, `rules/`)
-- Installation target: Determined by module type
-  - **Single-skill**: `SKILL.md` → `.claude/skills/<mod>/`
-  - **Multi-skill**: `skills/<name>/SKILL.md` → `.claude/skills/<name>/`
-  - **Agent**: `AGENT.md` → `.claude/agents/<mod>.md`
-  - **Doc**: `content/` → `docs/<mod>/`
-  - **Rules**: `rules/*.md` → `.claude/rules/`
+**`plugin/` (le distribuable):**
+- Purpose: tout ce qui est copié dans le cache plugin puis installé dans les labs
+- Contains: 17 modules + installer + _internal + commands + manifest
+- Key files: `plugin/.claude-plugin/plugin.json`, `plugin/_internal/vibeflow-update.sh`
 
-**`_internal/`**:
-- Purpose: Central installer/updater machinery
-- Contains: `vibeflow-update.sh` (sole entry point for Lab installations)
-- Not installed to Labs; used by Labs to install other modules
+**`plugin/<module>/` — Triade module (invariant):**
+- `VERSION` — version du module (vX.Y.Z, indépendante de la racine)
+- `module.json` — contrat : name, version, type, description, `requires[]`, flags `mandatory`/`proposable`
+- `CHANGELOG.md` — historique du module
+- `README.md` — vitrine du module
+- Puis selon le `type` : `AGENT.md` (agent principal), `agents/` (équipe), `SKILL.md` ou `skills/<nom>/SKILL.md`, `scripts/` (+ `scripts/tests/` ou `tests/`), `references/`, `rules/`, `hooks/hooks.json`, `config/`, `content/` (blueprints des bundles)
 
-**`reference/content/`**:
-- Purpose: Complete, distributable methodology reference
-- Installed to: `docs/reference/` in target Labs (doc-only module)
-- Consumed by: Lab designers (self-service), skill-creator (methodology alignment), validator (consistency checks)
+**`scripts/` (racine):**
+- Purpose: outillage de release du REPO uniquement — jamais distribué
+- Key files: `scripts/bump.sh`, `scripts/check-version-sync.sh`, `scripts/check-release-tag.sh`, `scripts/hooks/pre-push`
 
-**`.planning/codebase/`**:
-- Purpose: Auto-generated codebase documentation for vibeflow-os itself
-- Contents: ARCHITECTURE.md, STRUCTURE.md (maps for CLI operators on this repo)
-- Not installed to Labs; internal reference only
+**`docs/`:**
+- Purpose: mémoire de conception non distribuée
+- Key files: `docs/ADR.md` (décisions numérotées), `docs/superpowers/specs/` (designs datés), `docs/superpowers/plans/` (plans datés), `docs/reference/` (requirements/roadmaps historiques)
+
+**`.planning/`:**
+- Purpose: état GSD du repo (PROJECT/ROADMAP/STATE/phases 01→14) + `codebase/` (cette cartographie)
+- Generated: partiellement (par les skills gsd-*)
+- Committed: oui
+
+**`reports/`:**
+- Purpose: sorties d'audits horodatées `YYYY-MM-DD-*.md`
+- Contains: `reports/audit/`, `reports/uat/`, `reports/validator/`
+- Committed: oui
+
+**`.claude/` (racine repo):**
+- Purpose: état local Claude Code du repo lui-même (agent-memory, logs, memory) — ne pas confondre avec le `.claude/` d'un lab cible
+- Committed: non (majoritairement ignoré)
 
 ## Key File Locations
 
 **Entry Points:**
-
-- `_internal/vibeflow-update.sh` — Installer/updater (run from Lab)
-- `consolidator/SKILL.md` — Memory consolidation skill (most frequently used)
-- `validator/AGENT.md` — Master audit agent (invoked at `/checkpoint`)
-- `skill-creator/AGENT.md` — Sole skill creation channel
-- `software-architecture/SKILL.md` — Code architecture guardrails
-- `audit-architecture/SKILL.md` — Audit structure designer
-- `reference/content/methodology/VIBEFLOW_CORE.md` — Methodology bible (source of truth for all principles)
+- `plugin/installer/SKILL.md`: skill `/vibeflow-install` (première install, toggles, scope)
+- `plugin/commands/vibeflow.md`: `/vibeflow` → agent `vibeflow-conductor`
+- `plugin/dev-orchestrator/AGENT.md`: agent `vibeflow-dev` (routage NL dev)
 
 **Configuration:**
-
-- `VERSION` (repo root and each module) — Semantic version (MAJOR.MINOR.PATCH)
-- `CHANGELOG.md` (each module) — Detailed changes per version
-- `README.md` (each module) — Module-specific overview
-- `INSTALL.md` (repo root) — Multi-method installation guide
+- `VERSION` + `plugin/.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json`: les 3 sources de version (synchro gatée)
+- `plugin/<module>/module.json`: contrat de chaque module
 
 **Core Logic:**
-
-- `consolidator/scripts/archive.sh` — Executes archiving pillar (hook SessionEnd)
-- `consolidator/scripts/reindex.sh` — Executes indexing pillar
-- `infrastructure-audit/scripts/audit-infra.sh` — Executes 4-axis audit
-- `software-architecture/scripts/check-file-size.sh` — Gate: file size enforcement
-- `software-architecture/scripts/detect-cycles.sh` — Circular dependency detection
+- `plugin/_internal/vibeflow-update.sh`: engine d'install scope-aware
+- `plugin/conductor/scripts/dag.sh` + `driver-lock.sh`: team-kernel
+- `plugin/conductor/scripts/check-agents.sh`: lint agents natifs (ADR-044)
+- `plugin/dev-orchestrator/references/intent-routing.md`: carte d'intention unique
 
 **Testing:**
-
-- `consolidator/scripts/tests/test-*.sh` — Test suite (consolidator module)
-- `software-architecture/scripts/tests/test-*.sh` — Test suite (software-architecture)
-- `skill-creator/skills/skill-creator/eval-viewer/` — Eval runner/viewer Python scripts
-- `skill-creator/skills/skill-creator/scripts/` — Eval benchmarking utilities
-
-**Documentation:**
-
-- `consolidator/references/` — Indexation, archiving, fusion, promotion guides
-- `infrastructure-audit/references/` — Runtime, hooks, scripts, drift audit docs
-- `software-architecture/references/` — SOLID/SoC, anti-patterns, brownfield playbook
-- `audit-architecture/references/` — Decomposition method, enforcement spectrum
-- `skill-creator/skills/skill-creator/references/` — Skill creation workflow guides
-- `reference/content/methodology/` — Complete methodology (11 patterns, 33 templates)
+- `plugin/<module>/scripts/tests/` ou `plugin/<module>/tests/`: suites bash découvertes par la CI (`.github/workflows/ci.yml`, découverte non vide)
+- Gros harness : `plugin/dev-orchestrator/scripts/test-dev-orchestrator.sh`
 
 ## Naming Conventions
 
 **Files:**
-
-- **Skill definitions**: `SKILL.md` (mandatory YAML frontmatter + markdown body)
-- **Agent definitions**: `AGENT.md` (mandatory YAML frontmatter + markdown body)
-- **Version tracking**: `VERSION` (plain text: `vX.Y.Z`)
-- **Changelogs**: `CHANGELOG.md` (markdown, reverse chronological)
-- **Executable scripts**: `*.sh` (bash), `*.py` (Python) — lowercase, hyphenated
-- **Reference docs**: `*.md` (markdown) — descriptive names in bundled `references/`, `rules/`
-- **Tests**: `test-*.sh` (bash test files in `scripts/tests/`)
+- Scripts : `kebab-case.sh`, préfixes sémantiques — `check-*` (lint/gate), `guard-*` (hook bloquant), `detect-*`, `build-*`, `test-*` (suites)
+- Agents d'équipe : `vf-<rôle>.md` dans `agents/` ; agent principal du module : `AGENT.md`
+- Skills : `SKILL.md` (unique) ou `skills/<vf-nom>/SKILL.md`
+- Specs/plans/rapports : datés `YYYY-MM-DD-<sujet>.md`
+- Docs de référence module : `references/<sujet>.md` (minuscules), docs canoniques doctrine en `SCREAMING_SNAKE.md` (`VIBEFLOW_CORE.md`)
 
 **Directories:**
-
-- **Module root**: Lowercase, hyphenated (`consolidator/`, `skill-creator/`, `software-architecture/`)
-- **Type-specific subdirs**: Fixed names (`scripts/`, `references/`, `assets/`, `skills/`, `rules/`, `content/`)
-- **Nested skills**: `skills/<skill-name>/` (multi-skill modules only)
-- **Lab installation targets**: Fixed by installer (`.claude/skills/`, `.claude/agents/`, `.claude/rules/`, `docs/`)
+- Modules : `kebab-case` (`dev-orchestrator`, `business-pilot-bundle`)
+- Phases planning : `NN-sujet-kebab` (`.planning/phases/12-routage-fin-verbes/`)
+- Préfixe `_` = interne non-module (`plugin/_internal/`)
 
 ## Where to Add New Code
 
-**New Skill (within existing module):**
-- **Implementation**: `<module>/SKILL.md` (single skill) or `<module>/skills/<name>/SKILL.md` (if multi-skill)
-- **References**: `<module>/references/<name>.md` (bundled docs loaded on-demand)
-- **Scripts**: `<module>/scripts/<name>.sh` (executable; no .md files here)
-- **Tests**: `<module>/scripts/tests/test-<name>.sh`
+**Nouveau module:**
+- Créer `plugin/<nom>/` avec la triade `VERSION` + `module.json` (avec `requires[]`) + `CHANGELOG.md` + `README.md`
+- Le compteur de modules des 2 README est gaté par `scripts/check-version-sync.sh` → mettre à jour badges + texte
+- Release = **minor** de la racine (`scripts/bump.sh`)
 
-**New Standalone Module:**
-- Create directory `<new-module>/` at repo root (same level as `consolidator/`, `validator/`)
-- Add `VERSION` (semver: `v1.0.0`), `CHANGELOG.md`, `README.md`
-- Add type-specific content:
-  - If skill: `SKILL.md` + `references/`, `scripts/`
-  - If agent: `AGENT.md`
-  - If doc: `content/` subdirectory
-  - If rules: `rules/` subdirectory
-- Register in `README.md` module table (add row with name, version, type, description)
-- Test with `vibeflow-update.sh install <new-module>` from target Lab
+**Nouvel agent (dans un module existant):**
+- `plugin/<module>/agents/vf-<rôle>.md` — frontmatter natif complet (name, description, model, memory) sinon `check-agents.sh --strict` échoue en CI
+- Worker interne dispatché par un manager : ajouter `vf-internal: true` (pas de commande d'incarnation)
+- Respecter la densité ADR-029 (≤ 250 lignes)
 
-**New Agent (specialized orchestrator):**
-- Path: `<new-module>/AGENT.md`
-- Frontmatter: `name`, `description`, `model: opus`, `memory: project`, `skills: [list]`
-- Document delegation rules (each audit phase delegates to one skill, never re-implements)
-- Follow vibeflow-validator pattern: 5 phases, each delegates, Phase 5 synthesizes
+**Nouveau script de module:**
+- `plugin/<module>/scripts/<verbe-sujet>.sh` + suite `plugin/<module>/scripts/tests/` (la CI découvre les suites — une suite vide fait échouer la découverte)
+- S'il doit tourner en hook dans le lab : le déclarer dans `plugin/<module>/hooks/hooks.json` avec le placeholder `{{VF_SCRIPTS}}`
 
-**New Rule (path-scoped constraint):**
-- Path: `<module>/rules/<constraint-name>.md`
-- Format: Markdown with YAML frontmatter declaring path scope
-- Example: `software-architecture/rules/production-code-architecture.md` scopes to `production-code/`
-- Auto-loaded by Claude Code (no explicit reference needed)
+**Nouvelle intention dev:**
+- Éditer `plugin/dev-orchestrator/references/intent-routing.md` — JAMAIS créer une commande façade `/vf-*`
 
-**New Reference/Template (supporting doc):**
-- Path: `<module>/references/<topic>.md` (single-skill bundle) or `reference/content/methodology/templates/<type>/<name>/` (methodology-wide)
-- Format: Markdown, unlimited length, clear table of contents if >300 lines
-- Link from SKILL.md/AGENT.md with guidance on when to read
+**Doctrine / pattern:**
+- `plugin/reference/content/methodology/patterns/NN-<sujet>.md` ; décision structurante → nouvelle entrée `docs/ADR.md`
 
-**Adding to vibeflow-update.sh installer:**
-- Script already handles 5 module types (single-skill, multi-skill, agent, doc, rules)
-- New type requires edit to `_internal/vibeflow-update.sh`: add type detection + copy logic (similar to existing handlers, lines 106-150)
-- Test with `vibeflow-update.sh install|update|rollback` from dummy Lab before releasing
+**Design avant implémentation:**
+- Spec datée dans `docs/superpowers/specs/`, plan dans `docs/superpowers/plans/`
+
+**Retrait d'un module:**
+- Ajouter ses artefacts à `plugin/_internal/retired-modules.txt` (format `module:artefact`) pour la convergence à l'update
 
 ## Special Directories
 
-**`.vibeflow-cache/`** (in target Labs, not in this repo):
-- Purpose: Local git clone of vibeflow-os used as installer source
-- Generated: By `vibeflow-update.sh` on first run (`git clone --depth 1`)
-- Committed: No (added to Lab's `.gitignore`)
-- Lifetime: Persistent (reused for all subsequent updates)
+**`plugin/<bundle>/content/`:**
+- Purpose: blueprints d'origine des équipes bundle, trace de conception lisible par `vf-new-lab`
+- Generated: non — Committed: oui
 
-**`.claude/.backups/`** (in target Labs, not in this repo):
-- Purpose: Pre-update snapshots of installed modules
-- Generated: By `vibeflow-update.sh` before each install/update
-- Format: Timestamped directories: `.claude/.backups/<module>-YYYY-MM-DD-HHmmss/`
-- Cleanup: User-managed (no auto-cleanup)
+**`.planning/codebase/`:**
+- Purpose: les 7 documents de cartographie (STACK, INTEGRATIONS, ARCHITECTURE, STRUCTURE, CONVENTIONS, TESTING, CONCERNS)
+- Generated: oui (mappers GSD) — Committed: oui
 
-**`.claude/scripts/.vibeflow-installed`** (in target Labs, not in this repo):
-- Purpose: Version registry of installed modules
-- Format: Plain text, one entry per line: `module=vX.Y.Z`
-- Generated: By `vibeflow-update.sh` after successful install/update
-- Used by: `vibeflow-update.sh status` (compare installed vs available)
+**`.vibeflow-cache/`:**
+- Purpose: cache d'install legacy/debug (défaut `VIBEFLOW_CACHE` de l'engine hors plugin)
+- Generated: oui — Committed: non (`.gitignore`)
 
 ---
 
-*Structure analysis: 2026-06-04*
+*Structure analysis: 2026-07-26*

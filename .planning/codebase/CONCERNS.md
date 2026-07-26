@@ -1,203 +1,229 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-06-04
+**Analysis Date:** 2026-07-26
+
+> Réécriture complète — la version du 2026-06-04 est périmée. Sa dette majeure a été traitée par
+> l'enforcement CI v2.32.0+ : **37 suites de tests** découvertes dynamiquement par
+> `.github/workflows/ci.yml:32`, `check-agents.sh --strict` sur chaque `plugin/*/agents`
+> (`ci.yml:66-76`), gate `scripts/check-version-sync.sh` (9 points de contrôle, ADR-054).
+> `infrastructure-audit` a désormais sa suite (`plugin/infrastructure-audit/scripts/tests/test-audit-infra.sh`),
+> le résolveur de dépendances existe et est testé (`plugin/_internal/resolve-deps.sh` +
+> `plugin/_internal/tests/test-resolve-deps.sh`). Ne pas reporter l'ancienne liste.
 
 ## Tech Debt
 
-**Shell script portability — macOS/Linux stat differences**
-- Issue: Archive lock age detection uses platform-specific `stat` syntax
-- Files: `consolidator/scripts/archive.sh` (line 54)
-- Impact: Scripts fail silently on platforms where `stat -f` or `stat -c` is unavailable; lock mechanism unreliable
-- Fix approach: Implement fallback chain with error handling validation; test cross-platform or use Perl/Python for timestamp calculation
+**`update` ne converge pas le contenu — pas de manifeste des chemins posés** — Sévérité : **HIGH**
+- Issue: `vibeflow-update.sh update` re-matérialise le contenu du module mais **ne supprime jamais**
+  les fichiers que la nouvelle version ne livre plus. Vécu terrain (update machine 2.23.0 → 2.36.0) :
+  les 12 verbes-façades de dev-orchestrator v1.x ont survécu dans `~/.claude/skills/` et ressuscité
+  le double catalogue tué par la bascule agentique v2.33.0 — nettoyage manuel.
+- Files: `plugin/_internal/vibeflow-update.sh` (fonction `install_module`, aucune écriture de
+  manifeste) ; capturé dans `.planning/BACKLOG.md:3-12`
+- Impact: chaque lab mis à jour peut garder des skills/scripts fantômes qui contredisent la version
+  courante (régression de doctrine silencieuse).
+- Fix approach: manifeste des chemins posés par module à l'install
+  (`.claude/scripts/.vibeflow-manifest-<module>`) ; `update` supprime les chemins de l'ancien
+  manifeste absents du nouveau (avec backup). Test : update d'un module dont une skill a disparu.
 
-**Python 3 dependency without explicit version pinning**
-- Issue: Multiple scripts invoke `python3` without version specification; no way to verify minimum version available
-- Files: `consolidator/scripts/reindex.sh`, `consolidator/scripts/detect-duplicates.sh`, `consolidator/scripts/detect-promotions.sh`, `infrastructure-audit/scripts/audit-infra.sh`
-- Impact: Scripts may fail on systems with Python 2 as default `python3`; no graceful degradation if Python unavailable
-- Fix approach: Add explicit version check in `vibeflow-update.sh` installer; document Python 3.8+ requirement in INSTALL.md; provide error message if missing
+**Divergence de doctrine distribuée — lexique vs VIBEFLOW_CORE** — Sévérité : **HIGH**
+- Issue: les intitulés des principes P3–P8 divergent entre les deux documents canoniques livrés aux
+  labs. `lexique.md` : P3 Specialiser, P4 Orchestrer, P5 Verifier, P6 Iterer, P7 Transposer,
+  P8 Evaluer. `VIBEFLOW_CORE.md` v4.2 : P3 Orchestrer et executer, P4 Clarifier avant d'executer,
+  P5 Verifier en boucle, P6 Iterer par cycles courts, P7 Transposer pas copier, P8 Evaluer la
+  qualite cognitive. Toute référence « P4 » pointe donc sur deux principes différents selon la source.
+- Files: `plugin/reference/content/methodology/vocabulary/lexique.md:18-26` vs
+  `plugin/reference/content/methodology/VIBEFLOW_CORE.md:90-144`
+- Impact: agents et blueprints citent P-numéros (ex. `business-pilot-bundle` trace « EVAL-XXX (P8) ») —
+  le sens dépend du document lu. Signalée le 2026-07-26, **non arbitrée**.
+- Fix approach: arbitrer la numérotation canonique (CORE v4.2 probable), aligner `lexique.md`,
+  puis greper tous les `P[1-9]` du repo pour vérifier la cohérence.
 
-**Missing dependency verification in installer**
-- Issue: `vibeflow-update.sh` doesn't verify required CLI tools (bash, awk, grep, sed, python3, jq, git, date) before module installation
-- Files: `_internal/vibeflow-update.sh`
-- Impact: Modules install successfully but fail at runtime with cryptic errors; silent failures in unattended installations
-- Fix approach: Add `verify_dependencies()` function to installer; list required deps per module in module README
+**`docs/reference/` doublon divergent de `plugin/reference/content/`** — Sévérité : **MEDIUM**
+- Issue: 4 fichiers diffèrent entre les deux arborescences : `README-CLIENT.md`, `VERSION.md`,
+  `methodology/patterns/README.md`, `methodology/vocabulary/lexique.md` (vérifié `diff -rq` le
+  2026-07-26).
+- Files: `docs/reference/` vs `plugin/reference/content/` ; flagué « poids mort » dans
+  `reports/audit/2026-07-25-audit-complet.md:73` et `:143` (item 7) — toujours non traité.
+- Impact: deux vérités pour la même doc méthodologique ; le module `reference` installe
+  `plugin/reference/content/`, `docs/` est la copie qui dérive.
+- Fix approach: supprimer `docs/reference/` ou le réduire à un pointeur vers le module ; sinon gate
+  d'identité dans la CI.
 
-**Script test suite coverage gaps**
-- Issue: Only 2 modules have test files; 5 modules without automated tests
-- Files: `consolidator/scripts/tests/test-consolidator.sh` (exists), `software-architecture/scripts/tests/test-check-file-size.sh` (exists); `infrastructure-audit/scripts/audit-infra.sh` (no test), others
-- Impact: Regressions in infrastructure-audit, reference-content modules undetected; no validation pipeline for docstring/schema changes
-- Fix approach: Create test suite for `infrastructure-audit/scripts/audit-infra.sh` (JSON schema, hooks validation, version detection); add basic schema validation tests for `reference/` module
+**`check-agents.sh --strict` sans périmètre tiers** — Sévérité : **MEDIUM**
+- Issue: exécuté sur `~/.claude/agents` (scope user), le gate remonte 66 non-conformités — toutes
+  sur des agents `gsd-*` (chaîne tierce hors charte ADR-044). Faux positifs massifs qui rendent le
+  verdict inutilisable hors baseline repo.
+- Files: `plugin/conductor/scripts/check-agents.sh` ; capturé dans `.planning/BACKLOG.md:14-21`
+- Impact: le gate ne peut pas servir de sanity check post-install sur une machine réelle.
+- Fix approach: exclusion de préfixes tiers (`--exclude-prefix=gsd-`) ou lecture d'un
+  `.vibeflow-charter-scope` — cohérent avec la leçon UAT « baseline vs lab ».
+
+**`validator/AGENT.md` à 249/250 lignes (plafond ADR-029)** — Sévérité : **MEDIUM**
+- Issue: l'agent est à 1 ligne du plafond densité. Tout ajout (nouveau contrôle Phase 4, nouvelle
+  escalade) exige d'abord un délestage vers `references/` ou une skill.
+- Files: `plugin/validator/AGENT.md` (249 lignes, `wc -l` du 2026-07-26)
+- Impact: chaque évolution du validator devient une opération de refactoring, pas un simple ajout.
+- Fix approach: délester préventivement les sections les plus verbeuses vers
+  `plugin/validator/references/` avant la prochaine évolution. Même famille :
+  `plugin/skill-creator/skills/skill-creator/SKILL.md` à 485/500 lignes.
+
+**Résolution des `requires[]` opt-in seulement** — Sévérité : **MEDIUM**
+- Issue: la fermeture transitive existe (`plugin/_internal/resolve-deps.sh`, câblée et testée) mais
+  uniquement via `install --with-deps <module>` (`vibeflow-update.sh:759-768`). Un
+  `install <module>` nu n'installe **ni ne signale** les `requires[]` manquants (0 occurrence de
+  `requires` dans l'engine). `uninstall` ne vérifie pas non plus les dépendances inverses : on peut
+  désinstaller `consolidator` alors que `validator` installé le requiert.
+- Files: `plugin/_internal/vibeflow-update.sh:755-771` (dispatch install), `:611` (`uninstall_module`) ;
+  `requires[]` déclarés dans `plugin/*/module.json` (ex. `plugin/validator/module.json`)
+- Impact: install partiel silencieux → module qui échoue au runtime ; désinstallation qui casse un
+  module resté en place.
+- Fix approach: au minimum un warning listant les `requires[]` non installés sur `install` nu ;
+  refus (ou `--force`) sur `uninstall` d'un module requis par un module installé.
+
+**Backlog avec déclencheur consommé, non ré-arbitré** — Sévérité : **LOW**
+- Issue: l'item « Skill-installer global » avait pour déclencheur la clôture du milestone Install UX —
+  atteinte le 2026-06-05 ; l'item a dormi 7 semaines déclencheur consommé.
+- Files: `.planning/BACKLOG.md:36-38`
+- Impact: le backlog perd sa valeur de radar si les déclencheurs ne sont pas honorés.
+- Fix approach: ré-arbitrage explicite (reprendre / re-différer avec nouveau déclencheur / abandonner).
 
 ## Known Bugs
 
-**Orphaned registries not completed**
-- Symptoms: BLK-005 debt inherited from VibeFlow Lab; 32 LRN entries have index rows but no body content
-- Files: Installed labs' `.claude/memory/LEARNINGS.md`
-- Trigger: When `reindex.sh --apply` preserves index entries without corresponding body section
-- Workaround: Manual completion required; `reindex.sh --audit` detects orphans but does not guide completion
-- Recommendation: Create `/consolidate --pillar=recovery` skill to guide orphan completion
-
-**ITERATION_LOG format not fully supported by consolidator**
-- Symptoms: `reindex.sh`, `archive.sh`, `detect-duplicates.sh` skip ITERATION_LOG because format differs (Session headers, no standard ID pattern)
-- Files: `consolidator/CHANGELOG.md` (line 54), scripts use hardcoded `^## [A-Z]+-[0-9]+` pattern
-- Impact: ITERATION_LOG never archived, never checked for recent refs — archive.sh's C3 criterion ("0 recent refs in ITERATION_LOG") unreliable
-- Fix approach: Add optional `--register-format=session-log` mode to reindex/archive; or create separate `consolidate-iteration-log.sh` script
-
-**Archive script uses append-only, source cleanup manual**
-- Symptoms: `archive.sh` appends entries to archive but doesn't remove from source file
-- Files: `consolidator/scripts/archive.sh` (lines 227-228, explicit note)
-- Impact: Source LEARNINGS/BLOCKERS/ADR files grow unbounded; audit accumulates duplicates (archived + source); confusing state
-- Fix approach: Add `--cleanup` flag to `archive.sh` to remove archived entries from source after successful append; include safety check for backup integrity
+Aucun bug ouvert confirmé sur disque au 2026-07-26. Les comportements gênants connus (survie de
+fichiers à l'update, faux positifs check-agents hors baseline) sont des limites de conception
+capturées au backlog — voir Tech Debt.
 
 ## Security Considerations
 
-**No secret/credential validation in installation pipeline**
-- Risk: `.env` files, API keys, secrets may be accidentally copied into `.claude/` structure during module installation
-- Files: `_internal/vibeflow-update.sh` (no filtering on what gets copied)
-- Current mitigation: Relies on developer discipline; `.planning/codebase/` directory post-installation likely safe because Anthropic doesn't scan user secrets
-- Recommendations: (1) Add `.gitignore` check before installation; (2) Warn if target lab contains `.env*` files; (3) Explicitly filter out credential patterns in copy operations (e.g., `cp` with `--exclude="*.env*"`)
+**Nom de module non assaini dans l'engine** — Sévérité : **LOW**
+- Risk: `install_module` valide seulement `[ -d "$CACHE_DIR/$mod" ]` — un nom contenant `../`
+  résoudrait hors cache. Exposition faible : l'appelant prod est le skill `/vibeflow-install` qui
+  passe des noms issus du catalogue, et le cache est local.
+- Files: `plugin/_internal/vibeflow-update.sh` (`install_module`, garde `-d` uniquement)
+- Current mitigation: `err` si le dossier n'existe pas ; noms fournis par le catalogue en prod.
+- Recommendations: rejeter tout nom contenant `/`, `..` ou espace au parsing des positionnels.
 
-**Shell injection risk in dynamic path construction**
-- Risk: `vibeflow-update.sh` uses user-provided `--register=` argument in path expansion without validation
-- Files: `_internal/vibeflow-update.sh` (lines 29-40 arg parsing), used in `register_file()` function
-- Current mitigation: Argument passed through case statement (limited exposure); module names hardcoded
-- Recommendations: Explicitly whitelist module names in arg parser; reject any `--register=` value containing `/`, `..`, or special chars
-
-**Allowlist file permissions not enforced**
-- Risk: `archive.sh` reads `archive.allowlist` without permission checks; writable by regular users
-- Files: `consolidator/scripts/archive.sh` (line 20)
-- Current mitigation: Only read, never write
-- Recommendations: Document expected permissions (0644 or 0444); add warning if allowlist is world-writable
+**Pas de filtrage de secrets dans la copie d'install** — Sévérité : **LOW**
+- Risk: l'engine copie des arborescences de modules vers `.claude/` sans filtre de motifs
+  (`.env*`, clés). Exposition faible car la source est le cache du plugin packagé, pas le lab.
+- Files: `plugin/_internal/vibeflow-update.sh` (copies `cp` dans `install_module`)
+- Current mitigation: source contrôlée (cache = contenu du repo publié).
+- Recommendations: garde ceinture-bretelles excluant `*.env*` / `*secret*` des copies.
 
 ## Performance Bottlenecks
 
-**Duplicate detection uses full Cartesian product comparison**
-- Problem: `detect-duplicates.sh` compares all entry pairs (O(n²) title similarity checks)
-- Files: `consolidator/scripts/detect-duplicates.sh` (lines 110-125 Python loop)
-- Cause: No bucketing by category; compares LRN-001 vs LRN-500 even if unrelated
-- Improvement path: (1) Bucket entries by category/tag before comparison; (2) Skip pairs beyond Jaccard threshold early; (3) Limit to last N entries (only recent learnings vs older)
-
-**reindex.sh Python section extraction loads entire file into memory**
-- Problem: For large registers (100+ entries), Python regex operations on full file content may be slow
-- Files: `consolidator/scripts/reindex.sh` (lines 92-180)
-- Cause: No streaming; re-reads file for each section extraction
-- Improvement path: Single-pass Python parser; cache results in temp file
-
-**Archive lock check on every SessionEnd**
-- Problem: Every async archive check recalculates lock age and touches filesystem
-- Files: `consolidator/scripts/archive.sh` (lines 52-61)
-- Cause: No memoization; runs even if last archive was seconds ago
-- Improvement path: Store last archive timestamp in registry; skip if < 1h since last run
+Rien de bloquant identifié à l'échelle actuelle (registres de labs de quelques centaines
+d'entrées ; scripts bash + python3 stdlib). Les anciens points (O(n²) de
+`plugin/consolidator/scripts/detect-duplicates.sh`, chargement mémoire de `reindex.sh`) restent
+vrais dans le code mais sans impact observé — sévérité **LOW**, ne pas prioriser.
 
 ## Fragile Areas
 
-**validator agent orchestration via frontmatter `skills:`**
-- Files: `validator/AGENT.md` (depends on native Claude Code frontmatter support)
-- Why fragile: Depends on Claude Code version recognizing `skills:` in AGENT.md frontmatter (ADR-030 revised); if Anthropic changes syntax or parser, agent silently fails to delegate
-- Safe modification: (1) Add fallback text instructions if frontmatter parsing fails; (2) Document minimum Claude Code version required; (3) Test frontmatter parsing during `infrastructure-audit` scan
-- Test coverage: `validator` has no automated tests; no validation that frontmatter parses correctly; manual testing only
+**Modules `mobile-test` / `mobile-test-team` expérimentaux — « run réel vert » jamais tracé** — Sévérité : **HIGH**
+- Files: `plugin/mobile-test/module.json:5` et `plugin/mobile-test-team/module.json:5` (« Statut
+  expérimental jusqu'au premier run réel vert ») ; `plugin/mobile-test/README.md:10`,
+  `plugin/mobile-test-team/README.md:11` (bandeaux ⚠️)
+- Why fragile: le pipeline (`plugin/mobile-test/scripts/mobile-test-run.mjs`, 409 lignes, Node) et
+  l'orchestration de sous-agents imbriqués (Pattern 12, `plugin/mobile-test-team/agents/`) n'ont
+  jamais été prouvés par un run réel documenté depuis leur import. Aucun rapport horodaté dans
+  `reports/`.
+- Safe modification: ne pas étendre ces modules avant un run réel vert tracé (rapport commis) ;
+  toute release qui les touche doit le mentionner comme non-validé.
+- Test coverage: **zéro** — voir Test Coverage Gaps.
 
-**skill-creator module has hardcoded VibeFlow Lab references**
-- Files: `skill-creator/skills/skill-creator-workflow/SKILL.md` (contains `[NOM_LAB]` placeholders and VibeFlow-specific process)
-- Why fragile: Module installed as-is without variable substitution; Lab teams must manually edit after install; high chance of copy-paste errors
-- Safe modification: Create post-install hook that prompts for lab name and auto-replaces placeholders; validate that `[NOM_LAB]` is removed before marking install complete
-- Test coverage: CHANGELOG lists "Personalization manual required after install" as known limitation; no automated validation that personalization happened
+**Chiffres en prose non gatés — la famille de dérive n'est pas éteinte** — Sévérité : **MEDIUM**
+- Files: `README.md:169-182` et `README.fr.md:171-187` (tableau des modules, colonne version) —
+  actuellement alignés (vérifié 2026-07-26) mais **hors périmètre** de
+  `scripts/check-version-sync.sh` (ses 9 points couvrent badges, phrase « N modules », triade
+  VERSION↔module.json, en-têtes Version des README de modules, historique en tête, compte de
+  suites — pas la colonne version du tableau racine).
+- Why fragile: c'est exactement la dérive F1 (13 modules mensongers) qui a motivé le gate ; l'audit
+  du 2026-07-26 a encore trouvé 14/14 en-têtes Version faux avant que le point 8 du gate ne les
+  couvre. Tout compteur en prose hors gate finit par mentir.
+- Safe modification: à chaque nouveau chiffre en prose dans un README, soit le gater dans
+  `check-version-sync.sh`, soit le remplacer par un renvoi vers la source machine.
+- Test coverage: le gate lui-même n'a pas de suite (voir Test Coverage Gaps).
 
-**reindex.sh preserves orphaned index entries by design, but no guidance for completion**
-- Files: `consolidator/scripts/reindex.sh` (lines 261-280), tests verify orphans preserved
-- Why fragile: Orphans accumulate; no automatic cleanup; no skill to guide completion; manual completion required but not enforced
-- Safe modification: (1) Add `--orphan-report` flag to generate markdown list of incomplete entries with templates; (2) Create `/consolidate --pillar=recovery` skill; (3) Document that orphans block promotion
-- Test coverage: `test-consolidator.sh` T3 specifically tests orphan preservation but does not test completion workflow
-
-**detect-promotions.sh Python import dependencies**
-- Files: `consolidator/scripts/detect-promotions.sh` (lines 27-78 uses `re`, `defaultdict` modules)
-- Why fragile: Script assumes Python standard library is available; no error handling if modules missing
-- Safe modification: Add try/except for imports; fallback to bash-only Jaccard calculation or skip that phase
-- Test coverage: No test for Python unavailability scenario
+**Greps du gate sensibles aux reformulations README** — Sévérité : **LOW**
+- Files: `scripts/check-version-sync.sh:60-71` (phrases « N modules, each versioned » /
+  « N modules, chacun versionné » cherchées littéralement)
+- Why fragile: une refonte éditoriale des README casse le grep ; le gate signale désormais la cible
+  introuvable (ko explicite, leçon du contrôle sauté en silence) mais chaque refonte impose de
+  réaligner les motifs.
+- Safe modification: après toute refonte README, lancer `bash scripts/check-version-sync.sh` en local.
 
 ## Scaling Limits
 
-**Lock file TTL fixed at 5 minutes**
-- Current capacity: Supports concurrent SessionEnd hooks on same lab
-- Limit: If process takes > 5 minutes, lock expires; next session's archive runs in parallel → race condition possible
-- Scaling path: (1) Make TTL configurable via env var; (2) Implement file-lock with process PID; (3) Log lock collisions; (4) Add `--force` flag to override stale locks
-
-**Consolidator scripts load entire registers into memory**
-- Current capacity: Tested on VibeFlow Lab (5 registers, ~200 entries each)
-- Limit: Registers > 10k lines may cause Python regex timeout; no progress indication for large files
-- Scaling path: (1) Stream processing for large files; (2) Add `--chunk-size=1000` option; (3) Implement resumable mode for interrupted operations
-
-**infrastructure-audit hardcoded list of known tools and hooks**
-- Current capacity: 8 hook events, ~20 native tools documented
-- Limit: New Claude Code features (new hook events, new tools) require manual code update; drift undetected until audit runs
-- Scaling path: (1) Move tool/event list to external JSON file pulled from Anthropic docs; (2) Add `--fetch-latest` mode; (3) Alert when docs out of date
+**Découverte de suites CI limitée au motif `*/tests/test-*.sh`** — Sévérité : **MEDIUM**
+- Current capacity: 37 suites bash découvertes (`.github/workflows/ci.yml:32`).
+- Limit: tout test non-bash est invisible — `plugin/mobile-test/scripts/mobile-test-run.mjs` (Node)
+  ne peut structurellement pas être couvert par ce pipeline.
+- Scaling path: soit un wrapper bash `tests/test-mobile-test-run.sh` qui invoque le `.mjs` en mode
+  dry-run, soit élargir la découverte CI.
 
 ## Dependencies at Risk
 
-**Anthropic skill-creator module is frozen**
-- Risk: Anthropic may release new version; no auto-update path
-- Impact: Lab teams stuck on 248KB old version; new Anthropic skill features unavailable
-- Migration plan: (1) Monitor Anthropic releases; (2) Create `skill-creator-next` branch; (3) Manual repackaging quarterly; (4) Version bump with release notes in CHANGELOG
-
-**Python regex engine for learning/blocker parsing**
-- Risk: Complex regex patterns in `reindex.sh` may behave differently on different Python versions
-- Impact: Field extraction failures; orphans created incorrectly
-- Migration plan: Add Python version requirement (3.8+); test regex on target Python versions
-
-**`jq` dependency in infrastructure-audit**
-- Risk: Not all systems have `jq` installed by default
-- Impact: `audit-infra.sh` fails silently if `jq` missing
-- Migration plan: Add to dependency check; provide alternative using Python JSON parsing
+**`python3` et `jq` supposés présents, non vérifiés à l'install** — Sévérité : **LOW**
+- Risk: plusieurs scripts consomment `python3` (consolidator, check-agents) et `jq`
+  (resolve-deps a un fallback sed, mais pas tous les consommateurs) sans check de présence à
+  l'install d'un module.
+- Impact: échec runtime tardif sur machine minimale. Atténué : la CI « fresh lab » (`ci.yml:116+`)
+  valide le parcours complet sur runner standard, et `check-version-sync.sh` évite volontairement jq.
+- Migration plan: `verify_dependencies()` dans l'engine ou dans `plugin/installer/scripts/preflight.sh`
+  (qui existe déjà — vérifier son périmètre et le câbler systématiquement).
 
 ## Missing Critical Features
 
-**No auto-completion guide for orphaned index entries**
-- Problem: 32 LRN orphans exist in Lab but have no workflow to complete them
-- Blocks: Cannot promote incomplete learnings; debt accumulates; completion requires manual guidance
-- Recommendation: Create `/consolidate --pillar=recovery` skill with templates and guided form
+**Phase 13 en suspens — plan écrit, rien d'exécuté** — Sévérité : **MEDIUM** (dette de process, pas de code)
+- Problem: le plan 13-01 (`discover-unintegrated-docs.sh`, BRDG-02) est écrit et committé mais
+  **non exécuté** (0 SUMMARY) ; le plan 13-02 (câblage de l'ingestion dans l'agent `vibeflow-dev`)
+  reste à planifier.
+- Files: `.planning/phases/13-pont-spec-feuille-de-route/13-01-PLAN.md` ; `.planning/STATE.md:6-8`
+  et `:30-36` (stopped_at + Current Position)
+- Blocks: la promesse « pont spec → feuille de route » du milestone vf-routing (dernière phase du
+  milestone, 2/3 complétées). Prochaine action documentée : `/gsd:execute-phase 13`.
 
-**Drift detection between installed module version and available version**
-- Problem: `vibeflow-update.sh status` shows versions but doesn't alert to security patches or critical updates
-- Blocks: Security-critical fixes may be missed until next manual check
-- Recommendation: Add `--check-updates` hook to SessionStart; email/alert if critical updates available
-
-**No rollback validation after module downgrade**
-- Problem: `vibeflow-update.sh rollback` restores files but doesn't verify integrity
-- Blocks: Rollback may leave system in partially-migrated state if network fails
-- Recommendation: Add checksum validation post-rollback; document recovery if interrupted
+**Milestone `gsd-migration` ouvert et en attente** — Sévérité : **LOW**
+- Problem: Phases 10-11 (étude + intégration migration GSD) créées le 2026-07-25, chantier
+  indépendant jamais démarré.
+- Files: `.planning/MILESTONES.md:41` ; `.planning/phases/10-etude-migration-gsd/`,
+  `.planning/phases/11-integration-migration-gsd/`
+- Blocks: rien de bloquant (explicitement non bloquant dans STATE.md) — mais à arbitrer pour que le
+  milestone ne devienne pas un item de backlog fantôme.
 
 ## Test Coverage Gaps
 
-**infrastructure-audit has no unit tests**
-- What's not tested: JSON schema validation, hook contract parsing, version detection regex, cross-platform stat usage
-- Files: `infrastructure-audit/scripts/audit-infra.sh`
-- Risk: Regressions in version detection (critical for Claude Code drift detection) undetected
-- Priority: **HIGH** — validates runtime environment; should have >= 80% coverage
+**Les gates de release eux-mêmes n'ont aucune suite** — Priority: **HIGH**
+- What's not tested: `scripts/check-version-sync.sh` (9 points, parsing grep/sed volontairement
+  sans jq), `scripts/check-release-tag.sh`, `scripts/bump.sh`. Le dossier `scripts/` n'a pas de
+  `tests/` — la découverte CI (`find plugin scripts -path '*/tests/test-*.sh'`) n'y trouve donc rien.
+- Files: `scripts/bump.sh`, `scripts/check-version-sync.sh`, `scripts/check-release-tag.sh`
+- Risk: une régression dans un gate (grep qui ne matche plus, faux vert) neutralise silencieusement
+  la protection anti-dérive — la classe de bug la plus coûteuse de l'historique du repo (divergence
+  main juillet 2026). Ironique : tout le reste est gaté par eux.
+- Priority: **HIGH** — suite `scripts/tests/test-check-version-sync.sh` sur fixtures (README/VERSION
+  synthétiques désalignés → le gate doit ko).
 
-**validator agent orchestration not tested**
-- What's not tested: Frontmatter skill parsing, Phase 4 process scanning, escalation to audit-architecture skill
-- Files: `validator/AGENT.md`, `validator/` (no test directory)
-- Risk: Agent silently fails to invoke skills if Anthropic changes syntax
-- Priority: **HIGH** — orchestration layer critical; need manual regression test per release
+**`mobile-test-run.mjs` — 409 lignes Node, zéro test** — Priority: **HIGH**
+- What's not tested: détection de cible, build-if-absent, rapport horodaté, diagnostic sur échec.
+- Files: `plugin/mobile-test/scripts/mobile-test-run.mjs` (aucun `tests/` dans le module)
+- Risk: module déjà expérimental + script central non testé = régression invisible garantie ; hors
+  motif de découverte CI (voir Scaling Limits).
+- Priority: **HIGH** — préalable au « premier run réel vert » qui lèverait le statut expérimental.
 
-**skill-creator installation not validated**
-- What's not tested: Post-install personalization (placeholder replacement), skill availability after install
-- Files: `skill-creator/`
-- Risk: Installed module missing required fields; teams find out weeks later
-- Priority: **MEDIUM** — installation should validate placeholders removed
+**`plugin/installer/scripts/preflight.sh` non couvert** — Priority: **MEDIUM**
+- What's not tested: le preflight d'install (la suite du module, `test-build-module-catalog.sh`, ne
+  le référence pas ; aucune mention dans `plugin/_internal/tests/`).
+- Files: `plugin/installer/scripts/preflight.sh`
+- Risk: un preflight cassé laisse passer des installs sur environnement non conforme.
 
-**consolidator edge cases not covered**
-- What's not tested: Very large files (1000+ entries), files with unusual encoding, dates outside 1970-2100 range, register names with special chars
-- Files: `consolidator/scripts/reindex.sh`, `detect-duplicates.sh`
-- Risk: Silent failures on edge-case inputs; register corruption possible
-- Priority: **MEDIUM** — add fuzzing tests with generated data
-
-**No integration tests across module dependencies**
-- What's not tested: validator → consolidator → infrastructure-audit → software-architecture interaction
-- Files: No integration test suite
-- Risk: Module A works alone but breaks when combined with Module B after update
-- Priority: **MEDIUM** — Add cross-module integration test in test-consolidator.sh or new suite
+**`mobile-test-team` — orchestration Pattern 12 jamais éprouvée** — Priority: **MEDIUM**
+- What's not tested: la boucle test → corrige → re-test (vf-test-orchestrator + workers
+  vf-test-runner / vf-app-fixer). Les agents passent `check-agents.sh --strict` (conformité de
+  forme) mais aucun run d'orchestration n'est tracé.
+- Files: `plugin/mobile-test-team/agents/`, `plugin/mobile-test-team/README.md:11`
+- Risk: le module vend une capacité autonome non démontrée.
 
 ---
 
-*Concerns audit: 2026-06-04*
+*Concerns audit: 2026-07-26 — v2.36.1, 17 modules, 37 suites CI*

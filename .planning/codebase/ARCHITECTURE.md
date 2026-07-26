@@ -1,242 +1,255 @@
-<!-- refreshed: 2026-06-04 -->
+<!-- refreshed: 2026-07-26 -->
 # Architecture
 
-**Analysis Date:** 2026-06-04
+**Analysis Date:** 2026-07-26
 
 ## System Overview
 
-VibeFlow-OS is a **modular distribution system** for reusable VibeFlow methodology components. It centralizes methodology artifacts (agents, skills, rules, references, scripts) and distributes them to labs via a version-controlled installer. The architecture is built on **semantic versioning**, **type-composable modules**, and **machine-enforced distribution**.
+vibeflow-os est le **repo de distribution** du plugin Claude Code « VibeFlow » (v2.36.1) :
+un marketplace (`.claude-plugin/marketplace.json`) qui expose un plugin unique (`plugin/`)
+composé de **17 modules toggables** + une infrastructure d'install (installer, engine
+scope-aware, résolveur de deps, câbleur de hooks). Le repo lui-même n'exécute rien en
+production : il est packagé par Claude Code dans un **cache** (`${CLAUDE_PLUGIN_ROOT}`),
+puis l'engine copie les artefacts des modules choisis dans le `.claude/` d'un **lab**
+(scope user / project / local).
 
 ```text
-┌────────────────────────────────────────────────────────────────┐
-│              vibeflow-os Repository (Central)                  │
-│              Versioned Module Library + Installer              │
-├────────────────┬──────────────────┬───────────────┬───────────┤
-│  Consolidator  │  Validator Agent │  Skill Creator│ Software  │
-│  (v1.0.0)      │  (v1.1.0)        │  (v1.0.0)    │Architecture│
-│  skill+scripts │  agent+skills    │  agent+2     │  (v1.0.0)  │
-│                │                  │  skills      │ skill+rules│
-└────────────────┴──────────────────┴───────────────┴───────────┘
-                                      │
-                    ┌─────────────────┴──────────────────┐
-                    │                                    │
-         ┌──────────▼─────────────┐      ┌──────────────▼──────────┐
-         │  vibeflow-update.sh    │      │  Module Type Registry   │
-         │  (Installer/Updater)   │      │  (Single-skill/Agent/   │
-         │  `.vibeflow-cache/`    │      │   Doc-only/Rules/Multi) │
-         └────────────┬───────────┘      └─────────────────────────┘
-                      │
-        ┌─────────────┴──────────────┬───────────────────┐
-        │                            │                   │
-        ▼                            ▼                   ▼
-   ┌─────────────┐    ┌──────────────────┐   ┌──────────────────┐
-   │   Lab A     │    │   Lab B          │   │   Lab N          │
-   │ .claude/    │    │ .claude/         │   │ .claude/         │
-   │  skills/    │    │  skills/         │   │  skills/         │
-   │  agents/    │    │  agents/         │   │  agents/         │
-   │  rules/     │    │  rules/          │   │  rules/          │
-   │  scripts/   │    │  scripts/        │   │  scripts/        │
-   └─────────────┘    └──────────────────┘   └──────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│  Repo vibeflow-os (marketplace)                                      │
+│  `.claude-plugin/marketplace.json` → source: ./plugin                │
+├──────────────────────────────────────────────────────────────────────┤
+│  plugin/  (le bundle distribué, manifest `plugin/.claude-plugin/     │
+│  plugin.json`, skills: ./installer)                                  │
+│  ┌──────────────┬──────────────────┬───────────────────────────────┐ │
+│  │ 17 modules   │ installer/       │ _internal/                    │ │
+│  │ <module>/    │ SKILL.md         │ vibeflow-update.sh (engine)   │ │
+│  │ VERSION +    │ preflight.sh     │ resolve-deps.sh               │ │
+│  │ module.json +│ build-module-    │ merge-hooks.sh (ADR-043)      │ │
+│  │ CHANGELOG.md │ catalog.sh       │ retired-modules.txt           │ │
+│  └──────────────┴──────────────────┴───────────────────────────────┘ │
+└───────────────────────────┬──────────────────────────────────────────┘
+                            │  install du plugin par Claude Code
+                            ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  Cache local = ${CLAUDE_PLUGIN_ROOT} (modules + module.json à plat)  │
+└───────────────────────────┬──────────────────────────────────────────┘
+                            │  /vibeflow-install → engine scope-aware
+                            │  VF_SCOPE ∈ user|project|local
+                            ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  Lab installé — TARGET_ROOT/.claude/                                 │
+│  agents/  skills/  rules/  scripts/ (à plat)                         │
+│  agents/<module>-references/  settings hooks mergés                  │
+│  registre des modules installés + versions                           │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Component Responsibilities
 
 | Component | Responsibility | File |
 |-----------|----------------|------|
-| `consolidator` | 4-pillar memory consolidation (indexing, archiving, fusion, promotion) | `consolidator/SKILL.md` |
-| `infrastructure-audit` | Automated audit of Lab runtime, hooks, scripts, drift detection | `infrastructure-audit/SKILL.md` |
-| `validator` | Master audit agent orchestrating 5 phases (infrastructure, density, debt, process audit, synthesis) | `validator/AGENT.md` |
-| `skill-creator` | Sole authorized channel for skill creation; decomposes topic into facets + parallel research | `skill-creator/AGENT.md` + `skill-creator/skills/` |
-| `software-architecture` | AI-safe code architecture doctrine (SOLID/SoC, ≤300L files, machine-enforced gates) | `software-architecture/SKILL.md` |
-| `audit-architecture` | Designs multi-layer audit structures for any process (brief→output) | `audit-architecture/SKILL.md` |
-| `reference` | Complete methodology documentation (Core v4.2, 9 principles, 11 patterns, 33 templates) | `reference/content/` |
-| `vibeflow-update.sh` | Universal installer/updater for all module types; manages versions, backups, rollbacks | `_internal/vibeflow-update.sh` |
+| Marketplace | Fiche d'install vue par l'utilisateur (version, description) | `.claude-plugin/marketplace.json` |
+| Plugin manifest | Identité du plugin, pointe le skill d'entrée sur `./installer` | `plugin/.claude-plugin/plugin.json` |
+| Skill d'install | UX à toggles, orchestrateur thin qui DÉLÈGUE aux briques | `plugin/installer/SKILL.md` |
+| Préflight (ADR-054) | Prérequis durs (git, jq, python3 exécutable — piège stub Windows) | `plugin/installer/scripts/preflight.sh` |
+| Catalogue | Construit la liste des modules installables depuis le cache | `plugin/installer/scripts/build-module-catalog.sh` |
+| Engine scope-aware | install / update / uninstall / rollback / status par module, source = cache (plus de git clone) | `plugin/_internal/vibeflow-update.sh` (838 L) |
+| Résolveur de deps | Fermeture transitive des `requires` des module.json | `plugin/_internal/resolve-deps.sh` |
+| Câbleur de hooks (ADR-043) | Merge les `hooks/hooks.json` des modules dans les settings du lab (placeholder `{{VF_SCRIPTS}}`) | `plugin/_internal/merge-hooks.sh` |
+| Convergence des retraits | Nettoie les artefacts des modules retirés du parc | `plugin/_internal/retired-modules.txt` |
+| Commandes plugin | Slash-commands de gouvernance (`/vibeflow`, `/vf-update`, `/vf-audit`, `/vf-planning`, `/vf-calibrate`, `/vf-new-lab`) | `plugin/commands/*.md` |
+| Gates release repo | Discipline version/tag machine-enforced | `scripts/check-version-sync.sh`, `scripts/check-release-tag.sh`, `scripts/bump.sh`, `scripts/hooks/pre-push` |
+| CI | 3 jobs : suites de tests, gates stricts, lab frais Gate C | `.github/workflows/ci.yml` |
 
-## Pattern Overview
+## Les 17 modules (rôles et dépendances)
 
-**Overall:** Distributed Methodology Library with Type-Composable Modules
+Chaque module = un dossier `plugin/<module>/` avec la triade `VERSION` + `module.json`
+(name, version, type, description, `requires[]`) + `CHANGELOG.md` (+ `README.md`).
 
-**Key Characteristics:**
-- **Modular distribution** — Each skill/agent/doc is independently versioned and installable
-- **Type polymorphism** — Modules declared by their content type (single-skill, multi-skill, agent-only, doc-only, rules)
-- **Version isolation** — Each module has its own `VERSION` file; repo global version tags represent last major change
-- **Idempotent installation** — `vibeflow-update.sh` is re-runnable; backups created before overwrites
-- **Central-to-Lab pull model** — Labs pull from `.vibeflow-cache/` (git clone); never push back to central
-- **Iron Law enforcement** — Each skill/agent encodes its own operational constraints (max density, consolidation cycles, audit scope)
+| Module | Version | Type | Rôle | requires |
+|---|---|---|---|---|
+| **conductor** | v1.14.1 | agent + skills + scripts + references | **Mandatory.** Orchestrateur méta / gardien du lab (`AGENT.md`), skills `vf-new-lab` (Lab Factory), `vf-update`, `vf-calibrate`. **Hôte du team-kernel** et des gates agents | planning-core, validator, skill-creator |
+| **planning-core** | v2.5.1 | skill + references + scripts | Socle `.planning/` universel + altitude lab (compartiments, index, dette). **Frontière ADR-055** : ses hooks se retirent (`--defer-to-gsd`) quand un moteur GSD tient déjà le projet | — |
+| **validator** | v1.3.1 | agent-only | Agent garant de l'alignement lab ↔ méthodologie (5 audits), incarné par `/vf-audit` | consolidator, infrastructure-audit, audit-architecture |
+| **consolidator** | v1.8.0 | single-skill + scripts | Mémoire projet sur **5 piliers** (indexation, archivage, fusion, promotion, mémoire vivante ADR-052) + fork-config registres. Hooks de gouvernance mémoire ADR-032/043 | — |
+| **skill-creator** | v1.0.2 | agent + skills | Pattern agent minimal + 2 skills composables pour créer des skills (canal parmi d'autres depuis ADR-057, plus « sole authorized channel ») | — |
+| **audit-architecture** | v1.0.1 | single-skill + references | Méta-skill concepteur d'architectures d'audit multi-couches (ADR-036) | — |
+| **infrastructure-audit** | v1.2.1 | single-skill + scripts | Garde-fou technique des labs : drift Anthropic, intégrité scripts (`scripts/audit-infra.sh`) | — |
+| **software-architecture** | v1.5.2 | single-skill + rules + scripts | Doctrine AI-safe (SOLID, Clean Arch, gates Nyquist + Decision Coverage) + garde machine seuil 300 L (`scripts/guard-file-size.sh`) | — |
+| **reference** | v2.5.1 | doc-only | Doctrine distribuée : Core v4.2 (`content/methodology/VIBEFLOW_CORE.md`), **12 patterns** (`content/methodology/patterns/01..12-*.md`), templates d'agents, vocabulaire | — |
+| **dev-orchestrator** | v2.1.1 | agent + skills | **Modèle agentique (v2)** : agent `vibeflow-dev` (opus) route le langage naturel via la **carte d'intention unique** (`references/intent-routing.md`) vers les briques gsd-*/superpowers — la façade de verbes `/vf-*` est SUPPRIMÉE. Équipe de mission dev + skills `vf-auto`, `vf-dev` | conductor, design-orchestrator |
+| **design-orchestrator** | v1.2.1 | agent + skills | Agent routeur `vibeflow-design`, skills `vf-design` / `vf-sketch`, équipe design sur le team-kernel. Compagnon de dev-orchestrator | conductor |
+| **kpi-analyst** | v1.0.2 | agent + skill + scripts | KPIs métier déterministes → registre `KPIS.md` (jamais de chiffre inventé) | planning-core, consolidator |
+| **mobile-test** | v1.0.1 | skill + script + config | Pipeline test mobile réel (Maestro, `scripts/mobile-test-run.mjs`). Expérimental | — |
+| **mobile-test-team** | v1.4.0 | agents + rules | Boucle autonome test → corrige → re-test (`vf-test-orchestrator` + `vf-test-runner` / `vf-app-fixer`, Pattern 12) | mobile-test |
+| **content-bundle** | v2.0.1 | agents + skill + scripts | Équipe content sur le team-kernel (`vf-content-manager` + strategist/writer/repurposer + juge `content-clarity-judge`), skill `vf-content`. `proposable: true` | conductor, planning-core, consolidator, audit-architecture, validator |
+| **growth-bundle** | v2.0.1 | agents + skill + scripts | Équipe growth (`vf-growth-manager` + channel-strategist/copywriter/analyst + `growth-quality-judge`), Iron Law : envoi réel human-gated. `proposable: true` | idem content-bundle |
+| **business-pilot-bundle** | v2.0.1 | agents + skill + scripts | Équipe business (`vf-business-manager`, nœuds par dossier client + workers commercial/delivery/finance + `quality-gate-client`). `proposable: true` | idem content-bundle |
 
-## Layers
+**Graphe de dépendances (baseline)** : `conductor` (mandatory) tire `planning-core` +
+`validator` + `skill-creator` ; `validator` tire `consolidator` + `infrastructure-audit` +
+`audit-architecture`. Les 3 bundles métier et `dev-orchestrator` se posent par-dessus cette
+baseline. Résolution : `plugin/_internal/resolve-deps.sh` (`install --with-deps`).
 
-**Module Definition Layer:**
-- Purpose: Declare what a module is (skill, agent, rules, doc) and what it contains
-- Location: Each module root (`consolidator/`, `validator/`, etc.)
-- Contains: `VERSION`, `CHANGELOG.md`, `README.md`, `SKILL.md` or `AGENT.md` or `content/`
-- Depends on: None (self-contained)
-- Used by: `vibeflow-update.sh` (type detection), Lab developers (reference)
+## Le team-kernel (hébergé par conductor, ADR-053)
 
-**Distribution Layer:**
-- Purpose: Detect module type and copy to correct location in target Lab
-- Location: `_internal/vibeflow-update.sh`
-- Contains: Install logic (5 type handlers), version registry logic, backup/rollback
-- Depends on: Bash 4+, git, standard Unix tools (awk, grep, sed)
-- Used by: Labs during `vibeflow-update.sh install|update|rollback`
+Socle d'orchestration d'équipe transverse à tous les métiers, extrait du dev-orchestrator et
+hébergé par le module mandatory. Doc : `plugin/conductor/references/team-kernel.md`.
 
-**Methodology Layer:**
-- Purpose: Define VibeFlow principles, patterns, and decision rules
-- Location: `reference/content/methodology/` (VIBEFLOW_CORE.md, patterns/, templates/)
-- Contains: 9 Core principles (P1-P9), 11 architectural patterns, 33 templates, vocabulary
-- Depends on: None (documentation only)
-- Used by: Lab designers, skill-creator, validator (for consistency checks)
+| Brique | Implémentation | Garantie |
+|---|---|---|
+| Verrou de driver | `plugin/conductor/scripts/driver-lock.sh` (acquire / heartbeat / release, TTL + recovery, `mkdir` atomique) | une seule mission pilote à la fois |
+| Plan de bataille (DAG) | `plugin/conductor/scripts/dag.sh` (init / add --deps / ready / mark / reopen) | dispatch de la frontière `ready` en parallèle ; `reopen` re-bloque les dépendants |
+| Rapports typés (Pattern C) | `{ statut: passed\|gaps_found\|human_needed\|blocked, findings[], noeuds_debloques[] }` | fin du pilotage à la prose |
+| Halt conditions (P11) | 5 codes — doctrine `plugin/reference/content/methodology/patterns/11-halt-conditions.md` | arbitrage humain en 30 s |
+| Digest de mission | ≤ 30 lignes injectées dans chaque mandat | le disque fait foi |
+| Cloisonnement par tools (P12) | juges sans Write/Edit, workers sans Task, `vf-internal: true` — linté par `check-agents.sh` | anti-triche machine-enforced |
 
-**Skills Ecosystem Layer:**
-- Purpose: Executable skills tied to specific VibeFlow principles (mostly P9, P8)
-- Location: Each skill module root (`consolidator/SKILL.md`, `software-architecture/SKILL.md`, etc.)
-- Contains: SKILL.md + bundled references/scripts/assets
-- Depends on: Methodology (reference to ADRs/principles) + each other (validator delegates to skills)
-- Used by: Agents (via skill tool), hooks (async invocation), CLI (manual execution)
+**Qui s'y branche** :
 
-**Agent Orchestration Layer:**
-- Purpose: Coordinate multi-skill audits and repair recommendations
-- Location: `validator/AGENT.md` (master) + `skill-creator/AGENT.md` (specialized)
-- Contains: Frontmatter (model, memory, skills list) + procedures (5 phases, delegation rules)
-- Depends on: Skills (listed in frontmatter), methodology (Iron Laws from reference)
-- Used by: Labs at `/checkpoint`, periodically, or post-Claude-update
+| Équipe | Module | Manager | Workers | Juges |
+|---|---|---|---|---|
+| Dev (référence) | dev-orchestrator | `agents/vf-dev-manager.md` | `vf-coder.md` | `vf-reviewer.md`, `vf-auditer.md` |
+| Design | design-orchestrator | `agents/vf-design-manager.md` | `vf-crafter.md` | `vf-design-judge.md` |
+| Mobile | mobile-test-team | `vf-test-orchestrator` | `vf-app-fixer`, `vf-test-runner` | (le test EST le juge) |
+| Content / Growth / Business | 3 bundles | `vf-content-manager` / `vf-growth-manager` / `vf-business-manager` | workers cloisonnés par bundle | juges frais read-only (rubric /100) |
+
+Doctrine d'usage complète côté dev : `plugin/dev-orchestrator/references/mission-flow.md`
++ `mission-contracts.md` (seuil d'équipe `SEUIL_EQUIPE` : sous le seuil, pas de manager).
+
+## Le modèle agentique (v2.33.0+, spec `docs/superpowers/specs/2026-07-25-suppression-facade-vf-design.md`)
+
+- L'agent `vibeflow-dev` (`plugin/dev-orchestrator/AGENT.md`, opus, memory: project) détecte
+  l'intention en langage naturel et invoque **directement** la brique outillée — **aucune
+  couche de synonymes / façade de verbes** (leçon mémorisée : ne jamais la recréer).
+- **Source unique de routage** : `plugin/dev-orchestrator/references/intent-routing.md`
+  (carte intention → brique gsd-*/skill VibeFlow/agent d'équipe).
+- Next steps déduits de la feuille de route (pont spec ↔ roadmap, phase `.planning/phases/13-pont-spec-feuille-de-route/`).
+- Garde-fou first-use avant tout routage structurant ; hygiène documentaire déclenchée aux bons moments.
+- `plugin/dev-orchestrator/scripts/ensure-deps.sh` installe les briques gsd-* manquantes ;
+  `build-gsd-index.sh` génère l'index des skills ; `inject-mcp-tools.sh` dérive l'allowlist MCP
+  des exécutants (ADR-51).
+
+**Agents natifs machine-enforced (ADR-044)** : tout agent posé passe
+`plugin/conductor/scripts/check-agents.sh` — frontmatter natif Claude Code requis
+(name, **description**, **model**, **memory**), skills déclarés existants, champs inconnus
+rejetés. Un worker interne (Pattern 12) déclare `vf-internal: true` → pas de commande
+d'incarnation générée (`plugin/conductor/scripts/generate-agent-commands.sh`).
 
 ## Data Flow
 
-### Primary Distribution Path (Install/Update)
+### Install (chemin principal)
 
-1. **User invokes installer** (`./vibeflow-update.sh install <module>` or `update --all`) — `_internal/vibeflow-update.sh:1`
-2. **Ensure cache exists** (git clone if needed) — `_internal/vibeflow-update.sh:28-33`
-3. **Type detection** — Read `<module>/VERSION`, scan for `SKILL.md` / `AGENT.md` / `content/` / `rules/` — `_internal/vibeflow-update.sh:86-150`
-4. **Backup existing** (if installed) → `.claude/.backups/` — `_internal/vibeflow-update.sh:99-103`
-5. **Copy by type**:
-   - **Single-skill**: `SKILL.md` → `.claude/skills/<mod>/` + `references/` — `_internal/vibeflow-update.sh:106-110`
-   - **Multi-skill**: `skills/<name>/SKILL.md` → `.claude/skills/<name>/` — `_internal/vibeflow-update.sh:113-121`
-   - **Agent**: `AGENT.md` → `.claude/agents/<mod>.md` — `_internal/vibeflow-update.sh:124-128`
-   - **Doc**: `content/` → `docs/<mod>/` — `_internal/vibeflow-update.sh:131-136`
-   - **Rules**: `rules/*.md` → `.claude/rules/` — `_internal/vibeflow-update.sh:139-143`
-6. **Mark installed** in `.vibeflow-installed` registry — `_internal/vibeflow-update.sh:66-75`
+1. L'utilisateur ajoute le marketplace → Claude Code copie `plugin/` dans le cache `${CLAUDE_PLUGIN_ROOT}` (`.claude-plugin/marketplace.json`)
+2. `/vibeflow-install` (`plugin/installer/SKILL.md`) — UX à toggles, choix du scope
+3. `preflight.sh` (prérequis durs) → `build-module-catalog.sh` (catalogue) → `resolve-deps.sh` (fermeture transitive)
+4. `plugin/_internal/vibeflow-update.sh --scope <s> install --with-deps <module>` — copie les artefacts vers `TARGET_ROOT/.claude/` (user → `$HOME/.claude`, project/local → `./.claude`, local ajoute au `.gitignore`)
+5. `merge-hooks.sh` câble les `hooks/hooks.json` des modules dans les settings du lab (`{{VF_SCRIPTS}}` → chemin réel des scripts)
 
-### Primary Audit Path (Lab Health Check)
+### Update
 
-1. **User triggers `/checkpoint` or agent detects drift** — User prompt or scheduled hook
-2. **vibeflow-validator agent loads** — `.claude/agents/vibeflow-validator.md` (Opus model, project memory)
-3. **Phase 1 — Infrastructure audit** → delegates to `infrastructure-audit` skill
-4. **Phase 2 — Agent density audit** → delegates to `agent-density-auditor` skill
-5. **Phase 3 — Memory + debt audit** → delegates to `consolidator` + `dette-detector`
-6. **Phase 4 — Process audit** → delegates to `audit-architecture` skill (scans lab processes)
-7. **Phase 5 — Synthesis** → generates `reports/validator/YYYY-MM-DD-validator.md` (score 0-100, recommendations)
+1. `update-banner.sh` (SessionStart, conductor) signale une nouvelle version → `/vf-update` (`plugin/commands/vf-update.md` → skill `plugin/conductor/skills/vf-update/`)
+2. `vibeflow-update.sh update --all` depuis le cache + `cleanup_retired_modules` via `plugin/_internal/retired-modules.txt`
+3. Rollback possible : `vibeflow-update.sh rollback <module>` (backups)
+
+### Release du repo
+
+1. `scripts/bump.sh` — même numéro dans `VERSION`, `plugin/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, badges des 2 README + squelette CHANGELOG
+2. `scripts/check-version-sync.sh` — gate de cohérence (5 sources + compteur de modules)
+3. Merge sur main → tag annoté `vX.Y.Z` → `scripts/check-release-tag.sh --remote` (aussi câblé en `scripts/hooks/pre-push`, opt-in, et en CI)
 
 **State Management:**
-- **Module state**: `.vibeflow-installed` registry (name=version pairs)
-- **Infrastructure state**: INFRASTRUCTURE_SNAPSHOT.md (before/after diffs)
-- **Memory state**: `.claude/memory/*.md` (ADR/LEARNINGS/BLOCKERS/ITERATION_LOG/EVALS registries)
-- **Backup state**: `.claude/.backups/<mod>-<timestamp>/` (pre-update snapshots)
+- Repo : `.planning/` (GSD : PROJECT/ROADMAP/STATE/phases) — non distribué.
+- Lab : registre des modules installés + versions, tenu par l'engine (`vibeflow-update.sh status`).
+- Mission : DAG persistant sur fichier (`dag.sh --file=F`) + lock de driver (dossier atomique).
 
 ## Key Abstractions
 
-**Module:**
-- Purpose: Represents a reusable, versionable unit of methodology (skill, agent, docs, or rules)
-- Examples: `consolidator/SKILL.md`, `validator/AGENT.md`, `reference/content/`, `software-architecture/rules/`
-- Pattern: Self-contained directory with `VERSION`, `CHANGELOG.md`, `README.md` + type-specific content
+**Module** : unité toggable auto-décrite. Triade `VERSION` + `module.json` (`requires[]`,
+`type`, `mandatory`/`proposable`) + `CHANGELOG.md`. Types observés : agent+skills,
+single-skill+scripts, doc-only, agents+rules, skill+script+config.
 
-**Type Composability:**
-- Purpose: Allow modules to mix types (e.g., skill-creator = agent + 2 nested skills)
-- Examples: `skill-creator/AGENT.md` + `skill-creator/skills/skill-creator/SKILL.md` + `skill-creator/skills/skill-creator-workflow/SKILL.md`
-- Pattern: Installer scans module for all type markers; if found, installs them independently
+**Scope** : cible d'install (`VF_SCOPE` ∈ user|project|local) résolue en `TARGET_ROOT` par
+l'engine — un seul scope partagé par toutes les briques d'une install (cohérence ID4).
 
-**Iron Law:**
-- Purpose: Encode non-negotiable operational constraint as part of skill/agent definition
-- Examples: "Consolidation memory index = read header only (≤50 entries per read)" (consolidator), "No file > 300L without decomposition plan" (software-architecture), "One skill per invocation" (skill-creator)
-- Pattern: Named in SKILL.md/AGENT.md frontmatter + definition, enforced by machine gates (scripts) or architectural refusal
+**Hooks de gouvernance par module** : chaque module qui gouverne livre un `hooks/hooks.json`
+(événements PreToolUse/PostToolUse/SessionStart/UserPromptSubmit/Stop/SessionEnd) mergé par
+`merge-hooks.sh` — voir `plugin/conductor/hooks/hooks.json`, `plugin/planning-core/hooks/hooks.json`,
+`plugin/consolidator/hooks/hooks.json`, `plugin/software-architecture/hooks/hooks.json`,
+`plugin/infrastructure-audit/hooks/hooks.json`.
 
-**Skill Bundling:**
-- Purpose: Encapsulate executable logic, reference docs, and test scripts together
-- Examples: `consolidator/` contains `SKILL.md` + `scripts/{archive,reindex,detect-*}.sh` + `references/{indexation,archiving}.md`
-- Pattern: Resources in `scripts/`, `references/`, `assets/` subdirectories; SKILL.md loads as needed
+**Blueprint de bundle** : les bundles gardent leurs blueprints d'origine dans
+`plugin/<bundle>/content/` comme trace de conception lisible par `vf-new-lab` (Lab Factory).
 
 ## Entry Points
 
-**Lab Onboarding (Installation):**
-- Location: `.vibeflow-cache/` → `.claude/scripts/vibeflow-update.sh`
-- Triggers: First setup, new module deployment, periodic updates
-- Responsibilities: Detect module type, copy to correct Lab path, manage version registry, create backups
+**`/vibeflow-install`** — `plugin/installer/SKILL.md` : premier lancement, ajout/retrait de modules, changement de scope.
 
-**Lab Audit (Validation):**
-- Location: `.claude/agents/vibeflow-validator.md`
-- Triggers: `/checkpoint` command, post-Claude-update, scheduled hook (e.g., monthly)
-- Responsibilities: Orchestrate 5 audit phases, synthesize findings, propose remediations (never auto-fix per ADR-031)
+**`/vibeflow`** — `plugin/commands/vibeflow.md` : délègue à l'agent `vibeflow-conductor` (créer un lab, vérifier, migrer, escalades).
 
-**Skill Creation (Methodology Extension):**
-- Location: `.claude/agents/skill-creator.md` + `skill-creator/skills/skill-creator*/SKILL.md`
-- Triggers: New skill needed (never created outside this agent per rule 3)
-- Responsibilities: Decompose topic → parallel research → dense synthesis → draft SKILL.md → escalate to orchestrator
+**`/vf-update` · `/vf-audit` · `/vf-planning` · `/vf-calibrate` · `/vf-new-lab`** — `plugin/commands/*.md` : commandes de gouvernance (PAS des verbes dev — la façade dev `/vf-*` est supprimée).
 
-**Lab-Native Skills Invocation:**
-- Location: Each skill is invoked via Claude Code skill tool (loaded via agent frontmatter or user `/skill` command)
-- Triggers: When agent determines skill is appropriate; or user manually invokes `/consolidate`, `/audit-infra`, etc.
-- Responsibilities: Execute skill logic, read bundled references as needed, return verdict or recommendations
+**Langage naturel dev/design** — agents `vibeflow-dev` (`plugin/dev-orchestrator/AGENT.md`) et `vibeflow-design` (`plugin/design-orchestrator/AGENT.md`) auto-routés par leur `description`.
+
+## Les gates machine
+
+| Gate | Script | Déclencheur | Effet |
+|---|---|---|---|
+| Version sync (ADR-054) | `scripts/check-version-sync.sh` | pre-push (via check-release-tag), CI | exit 1 si VERSION ≠ plugin.json / marketplace / badges / compteur modules / triades |
+| Release tag | `scripts/check-release-tag.sh [--remote]` | `scripts/hooks/pre-push` (main uniquement, opt-in), CI | exit 1 si VERSION racine sans tag `vX.Y.Z` |
+| Agents natifs (ADR-044) | `plugin/conductor/scripts/check-agents.sh` (`--strict` en gate, `--hook` en SessionStart) | CI sur chaque `plugin/*/agents`, SessionStart lab, gate init | frontmatter natif + description + model + memory + skills existants |
+| Écriture d'agent | `plugin/conductor/scripts/guard-agent-write.sh` | PreToolUse Write (lab) | bloque l'écriture d'un agent non conforme |
+| Recherche avant debug (ADR-045) | `plugin/conductor/scripts/check-debug-research.sh` | SessionStart (advisory) | rappel doctrine |
+| Planning à jour (ADR-050/055) | `plugin/planning-core/scripts/guard-planning-updated.sh` | Stop hook (bloquant) | session ne se ferme pas planning en dette |
+| Mémoire index-first (ADR-032) | `plugin/consolidator/scripts/guard-read-registres.sh`, `guard-bash-registres.sh` | PreToolUse Read/Bash | lecture registre sans index bloquée |
+| Taille de fichier | `plugin/software-architecture/scripts/guard-file-size.sh` | hook | seuil 300 L |
+| Intégrité infra | `plugin/infrastructure-audit/scripts/audit-infra.sh` | `/vf-audit`, validator | drift Anthropic, scripts |
+| CI lab frais (Gate C) | `.github/workflows/ci.yml` job 3 | push/PR | install baseline dans un lab vierge avec le vrai engine → ses propres gates doivent passer sans intervention |
 
 ## Architectural Constraints
 
-- **Modular immutability** — Once a module is installed, it is not modified by the Lab; updates come via `vibeflow-update.sh update`, never manual edits to installed files
-- **Central-only source of truth** — All module updates flow from `picmakpro/vibeflow-os`; Labs never fork or contribute back (PR model on central repo only)
-- **Type-safe distribution** — Module type is detected once, then all type handlers run (no hybrid installation; if a module declares both `SKILL.md` and `AGENT.md`, both are installed)
-- **Backup before overwrite** — Every update creates a timestamped backup in `.claude/.backups/`; rollback is always possible
-- **No circular skill dependencies** — Validators, architects, consolidators all delegate *down* to specialized skills; never upward or sideways
-- **Iron Law enforcement by machine** — Constraints encoded in SKILL.md are not suggestions; they are enforced by `scripts/` hooks, gates, or architectural refusal (e.g., consolidator refuses to open a full register; software-architecture gates at 300L)
+- **Pas de runtime applicatif** : tout est bash + python3 inline (heredoc) + markdown. Portabilité Windows durcie par ADR-054 (préflight, sonde d'exécution python3, CRLF via `.gitattributes`).
+- **Source d'install = cache uniquement** : `vibeflow-update.sh sync` est un no-op — plus aucun `git clone/pull` dans le chemin d'install.
+- **Scripts installés à plat** dans `.claude/scripts/` du lab ; references sous `.claude/agents/<module>-references/`.
+- **Densité (ADR-029)** : agents ≤ 250 lignes, skills ≤ 500, bootstrap ≤ 2000 tokens.
+- **Jamais de fix sans validation humaine (ADR-031)** ; escalades humaines court-circuitent toute autonomie.
+- **Un manager ne produit jamais (P3)** ; production dans les workers ; juges read-only.
 
 ## Anti-Patterns
 
-### Distributed Fixing Without Validation
+### Recréer une couche de synonymes / façade de verbes
 
-**What happens:** A drift is detected (e.g., agent density violation), validator fixes it, then notifies user afterward
-**Why it's wrong:** Violates ADR-031 (never correct without validation); drifts may be intentional; automated fixes breed silent dependency on audits
-**Do this instead:** Validator (per `validator/AGENT.md:Phase 5`) detects, proposes, but never corrects. User approves remediations. If automation is needed, create a new skill via skill-creator and assign escalation rules.
+**What happens:** ajouter des commandes `/vf-code`, `/vf-test`… qui wrappent les briques gsd-*.
+**Why it's wrong:** double routage, drift entre façade et briques — c'est exactement ce que la v2.33.0 a supprimé (spec `docs/superpowers/specs/2026-07-25-suppression-facade-vf-design.md`).
+**Do this instead:** enrichir la carte d'intention unique `plugin/dev-orchestrator/references/intent-routing.md`.
 
-### Module Type Ambiguity
+### Release sans tag
 
-**What happens:** A module contains both `SKILL.md` at root AND `content/` directory; installer doesn't know which to prioritize
-**Why it's wrong:** Type is the only signal for where to install; ambiguity breaks Lab structure assumptions
-**Do this instead:** One primary type per module. If a skill needs bundled docs, put them in `references/` (sub-bundle of skill), not at `content/` (module-level doc marker). See `skill-creator/` (agent + multi-skill) as example of intentional composition: type composability is declared, not accidental.
+**What happens:** bump de `VERSION` mergé sur main sans tag `vX.Y.Z` (vécu : v2.10→v2.16, juillet 2026).
+**Why it's wrong:** version ni traçable ni installable par référence.
+**Do this instead:** `scripts/bump.sh` puis tag annoté + `bash scripts/check-release-tag.sh --remote` (voir `CLAUDE.md`).
 
-### Manual Installation Over Installer
+### Agent non natif ou non cloisonné
 
-**What happens:** Developer copies `consolidator/SKILL.md` manually to `.claude/skills/` instead of running `vibeflow-update.sh install consolidator`
-**Why it's wrong:** Breaks version tracking (`.vibeflow-installed` registry not updated); prevents rollback; masks when updates are available
-**Do this instead:** Always use `vibeflow-update.sh install|update|rollback`. Manual copy is only for debugging (and temporary).
-
-### Skill Scope Creep (Multi-Skill Invocation)
-
-**What happens:** skill-creator agent receives a request like "create skills for X and Y" in one invocation
-**Why it's wrong:** Per skill-creator rule 2: one skill per invocation. Multiple skills would deploy multiple sub-agents in parallel, degrading each skill's quality
-**Do this instead:** skill-creator refuses immediately and escalates to orchestrator (named [ORCHESTRATING_AGENT]) for N parallel invocations.
-
-### Iron Law as Guidance, Not Gate
-
-**What happens:** Software-architecture skill says "≤300L per file" but developer adds a 450-line file with a comment "we'll refactor later"
-**Why it's wrong:** Iron Laws without machine gates are not enforced; drift accumulates silently (LRN-115: "described policy ≠ enforced policy")
-**Do this instead:** Gate is in `software-architecture/scripts/check-file-size.sh` (warn at 250L, block at 300L unless marked `[DEBT]`). Hook gates into pre-commit or CI.
+**What happens:** poser un agent sans description/model/memory, ou un juge avec Write.
+**Why it's wrong:** jamais auto-routé, triche possible — c'est ce que `check-agents.sh` lint (ADR-044, Pattern 12).
+**Do this instead:** frontmatter natif complet ; workers internes `vf-internal: true` ; templates dans `plugin/reference/content/methodology/templates/agents/`.
 
 ## Error Handling
 
-**Strategy:** Fail-fast with clear diagnostics; no silent degradation
+**Strategy:** scripts bash `set -euo pipefail`, helpers `log()`/`err()` (exit 1), sorties préfixées `[nom-du-script]`.
 
 **Patterns:**
-- **Installer errors** (missing cache, invalid module): `vibeflow-update.sh` exits with code 1; logs reason to stderr
-- **Type detection**: If neither `SKILL.md` nor `AGENT.md` nor `content/` nor `rules/` found, module is skipped with warning (not an error; allows future additions)
-- **Skill invocation errors**: Skill returns structured verdict (PASS/FAIL/WARN + details); calling agent (validator, etc.) stops execution if FAIL and recommends manual intervention
-- **Circular dependencies**: Not possible by design (agents delegate only to skills, never other agents)
-- **Backup/rollback**: If backup fails, entire install/update aborts before making changes (atomicity)
+- Hooks non bloquants suffixés `|| true` dans les `hooks.json` ; les guards bloquants (Stop, PreToolUse) sortent en exit ≠ 0.
+- Rapports typés d'agents : `statut` + `findings[{severity, action}]` — l'escalade `ask-user` est impérative.
+- Engine : backups par module + commande `rollback`.
 
 ## Cross-Cutting Concerns
 
-**Versioning:** Each module has independent `VERSION` (semver). Repo `VERSION` file tracks last major change. Installer reads both. Update checks compare module versions only (no global version lock).
-
-**Auditability:** Every install/update logs to stderr with `[vibeflow-update]` prefix. Skill audits generate dated reports (`YYYY-MM-DD-validator.md`, `INFRASTRUCTURE_SNAPSHOT.md`). Version registry `.vibeflow-installed` is human-readable (name=version lines).
-
-**Backward Compatibility:** Installer v1.3.0+ supports all 5 module types. If older Lab runs installer v1.2.1, it skips doc-only modules (no error). New major installer version (v2.0) would be released as breaking change; Labs explicitly update `vibeflow-update.sh` to adopt.
+**Logging:** stderr préfixé par script (`[vibeflow-update]`, `[preflight]`…).
+**Validation:** module.json comme contrat (deps, type) ; check-agents en lint ; check-version-sync en cohérence.
+**Doctrine:** `plugin/reference/content/methodology/` (Core v4.2, 12 patterns, vocabulaire) — chargée on-demand, jamais en bloc. Les ADR vivent dans `docs/ADR.md` (ADR-046 → ADR-057 dans le fichier courant).
 
 ---
 
-*Architecture analysis: 2026-06-04*
+*Architecture analysis: 2026-07-26*

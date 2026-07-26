@@ -18,7 +18,7 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-04 — refresh planifié, cf. Pending Todos)
+See: .planning/PROJECT.md (updated 2026-07-26 — charte rouverte : 17 modules, D2/D6 renversées)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
 **Current focus:** Phase 13 (Pont spec → feuille de route) — **redéfinie le 2026-07-26 sans verbe-façade** :
@@ -141,8 +141,9 @@ Recent decisions affecting current work:
 
 - Exécuter le plan 13-01 (`/gsd:execute-phase 13`) — découverte outillée des documents non intégrés.
 - Planifier 13-02 (câblage de l'ingestion dans `vibeflow-dev`) — `/gsd:plan-phase 13`.
-- Rafraîchir `.planning/PROJECT.md` (D2/D6 renversées par la bascule agentique, requirements à cocher,
-  charte mono-module → 17 modules) et re-cartographier `.planning/codebase/` (`gsd-map-codebase`).
+- Arbitrer la divergence doctrine distribuée : intitulés P3-P8 de
+  `plugin/reference/content/methodology/vocabulary/lexique.md` ≠ `VIBEFLOW_CORE.md` v4.2
+  (« Specialiser » n'existe plus comme principe) — signalée le 2026-07-26, décision humaine requise.
 - *(milestone `gsd-migration`, en attente)* Cadrer la Phase 10 (`/gsd:discuss-phase 10`) : inventaire
   surface d'impact GSD + caractérisation `@opengsd/gsd-core`.
 
