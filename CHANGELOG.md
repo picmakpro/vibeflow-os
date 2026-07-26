@@ -5,6 +5,16 @@ dernières entrées et pointent ici). Chaque module a par ailleurs son propre `C
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [Non versionné] — 2026-07-26
+
+**Correctif `_internal/merge-hooks.sh`** (vague 11-04, Phase 11 — intégration migration GSD).
+Le matching des scripts référencés dans un hook merge est désormais ancré aux frontières de
+chemin réelles (fin du bug de sous-chaîne : un hook référençant `archive.sh` aurait pu, à tort,
+matcher et donc détruire une entrée tierce `gsd-archive.sh`). Fin également de la réutilisation
+de groupes mixtes lors du merge de hooks — un groupe qui mélange des scripts de provenances
+différentes n'est plus recyclé, un nouveau groupe est créé à la place. Entrée non taggée : ne
+déclenche pas de release, sera absorbée par le prochain bump de `VERSION` racine.
+
 ## [v2.38.0] — 2026-07-26
 
 **Documentation niveau framework, module par module.** Le README de chaque module devient sa
