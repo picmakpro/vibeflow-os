@@ -62,6 +62,9 @@ gsd-code-review|superpowers:requesting-code-review|gsd-code-review = canon dans 
 skill-creator|superpowers:writing-skills|module skill-creator = fabrication de capacités de LAB avec eval-loop (recherche par facettes → draft → éval) ; writing-skills = doctrine d'écriture de skills — coexistence, aucune exclusivité
 mobile-test|gsd-verify-work|mobile-test = preuve sur cible mobile réelle (simulateur/émulateur, Maestro) ; gsd-verify-work = recette conversationnelle d'une feature ; boucle autonome test+fix = équipe mobile-test-team
 gsd-explore|superpowers:brainstorming|brainstorming = concevoir une idée avant d'implémenter ; gsd-explore = exploration socratique et routage d'idée
+consolidator|gsd-mempalace-capture|consolidator = canon mémoire de lab (in-repo, machine-enforced, ADR-052) ; mempalace = opt-in, exige MemPalace, mémorise des artefacts de phase GSD via le loop-bus interne — non activé, non répliqué
+consolidator|gsd-mempalace-recall|consolidator = canon mémoire de lab (in-repo, machine-enforced, ADR-052) ; mempalace = opt-in, exige MemPalace, mémorise des artefacts de phase GSD via le loop-bus interne — non activé, non répliqué
+vibeflow-dev|gsd-next|vibeflow-dev = front door unique du lab (agent routeur) ; gsd-next = front door de GSD pour qui n'a pas d'agent routeur — ne jamais router gsd-next (empilerait deux routeurs, ADR-057)
 EOF
 )
 
