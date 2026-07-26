@@ -21,12 +21,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26 — charte rouverte : 17 modules, D2/D6 renversées)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Étude de migration GSD **livrée et approfondie** (`10-ETUDE.md` +
-`10-SOLUTIONS.md`, 2026-07-26) : spike sur install réelle sandbox → **parité SDK prouvée**
-(gsd-sdk conservé, 3 requêtes query vertes, 71 skills, index transparent), casse réduite à
-4 correctifs de chemins ; carte d'adoption tranchée (règle « plus complet et compatible ») :
-onboard routé, gsd-next non routé, mempalace éteint/documenté, model-profiles à adopter.
-**GO confirmé et dérisqué** — la décision humaine ouvre la Phase 11 (plan en 5 vagues prêt).
+**Current focus:** **Phase 11 (migration GSD) EN MISSION** — dossier d'étude complet
+(`10-ETUDE.md` + `10-SOLUTIONS.md` + `10-APPROFONDISSEMENT.md`) : parité prouvée, arbitrage SDK
+tranché (`gsd-tools` — le paquet `@opengsd/gsd-sdk` est déprécié), cohabitation hooks prouvée
+saine au dry-run (+ correctif préventif spécifié), runbook labs legacy (piège `command -v
+gsd-sdk` neutralisé), 6 vagues spécifiées au diff près. GO validé par Samuel le 2026-07-26.
 
 ## Current Position
 
@@ -171,8 +170,8 @@ Recent decisions affecting current work:
   positif — donc pas de ré-ingestion silencieuse, priorité basse.
 - ~~Divergence lexique P3-P8~~ **tranchée le 2026-07-26** (commit b835ffd) : le Core v4.2 est
   canonique, lexique réaligné, module reference v2.5.2 — part avec la prochaine release.
-- *(milestone `gsd-migration`)* Décision humaine sur le GO de migration (`10-SOLUTIONS.md` §5 —
-  spike de parité déjà fait et vert) ; si GO → `/gsd:plan-phase 11` (5 vagues proposées §4).
+- *(milestone `gsd-migration`)* Mission Phase 11 dispatchée (vf-dev-manager) sur les 6 vagues de
+  `10-APPROFONDISSEMENT.md` §5 — release finale réservée à validation humaine.
 
 ### Blockers/Concerns
 
