@@ -11,7 +11,7 @@
 | **Core** | Le tronc commun methodologique applicable a tout fork |
 | **Niveau d'usage IA** | Echelle 1 a 5 du degre d'integration de l'IA dans le systeme (1 = chat ; 4 = agent qui agit dans le systeme local ; 5 = orchestration multi-agents) |
 
-## Les 8 principes
+## Les 9 principes
 
 | # | Principe | Verbe |
 |---|----------|-------|
@@ -23,6 +23,7 @@
 | P6 | Iterer | "Toute decision est revisable" |
 | P7 | Transposer | "Forker, pas dupliquer" |
 | P8 | Evaluer | "Mesurer la qualite cognitive des outputs IA" |
+| P9 | Modulariser pour la cognition | "Une responsabilite par unite, frontieres enforced par la machine" |
 
 ## Les 5 registres
 

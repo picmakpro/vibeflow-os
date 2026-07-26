@@ -1,8 +1,8 @@
-# VibeFlow-Reference v2.0
+# VibeFlow-Reference v2.5.1
 
 > Le gardien methodologique de VibeFlow.
 > Bibliotheque de reference, pas template a copier.
-> **v2.0 (Mai 2026)** — Alignement Core v4.1 (saut majeur depuis v1.1 Core v4.0).
+> **v2.5.1 (Juillet 2026)** — Alignement Core v4.2 (9 principes P1-P9, 12 patterns, 5 skills).
 
 ---
 
@@ -29,9 +29,9 @@ Quand tu construis ton systeme propre (ex: `~/MonFlow/`), tu y restes. **Tu ne c
 
 | Dossier | Contenu |
 |---------|---------|
-| `methodology/` | Les 8 principes + 5 registres + philosophie + sections v4.1 (densité agents, skills natif, méta-procédures, halt conditions) |
-| `methodology/templates/` | Squelettes vides a recopier dans ton systeme (8 agents refondus ≤ 250L, 5 docs, 5 memory, 5 triggers, 1 rule, 4 skills) |
-| `methodology/patterns/` | **11 patterns architecturaux universels** avec exemples fictifs (vs 8 en v1.1) — nouveaux : 09 meta-procedures, 10 plan-review adversarial, 11 halt-conditions |
+| `methodology/` | Les 9 principes + 5 registres + philosophie + sections v4.1/v4.2 (densité agents, skills natif, méta-procédures, halt conditions, P9 modularisation) |
+| `methodology/templates/` | Squelettes vides a recopier dans ton systeme (9 agents ≤ 250L, 5 docs, 7 memory, 5 triggers, 1 rule, 5 skills) |
+| `methodology/patterns/` | **12 patterns architecturaux universels** avec exemples fictifs (vs 8 en v1.1) — nouveaux : 09 meta-procedures, 10 plan-review adversarial, 11 halt-conditions, 12 cloisonnement par outils |
 | `methodology/vocabulary/` | Lexique VibeFlow enrichi v4.1 (+16 termes) + dire/ne pas dire (+12 entrees) + mapping forks |
 | `examples/` | 1 exemple fictif de mini-systeme complet (PetitsCoursFlow — Sophie K., professeure de musique) |
 
@@ -106,13 +106,15 @@ Saut majeur depuis v1.1 (alignement Core v4.0 → **v4.1**). 7 zones d'enrichiss
 6. **Méta-procédures structurées** — `safe-execute` (5 phases mono-tâche) + `god-execution` (8 phases multi-sprints autonome, humain hors boucle)
 7. **Halt conditions (5 codes) + Anti-drift mechanisms (7)** — pour les exécutions autonomes multi-cycles
 
+**Depuis v2.0** (voir `VERSION.md` pour le détail) : Core v4.2 avec le principe **P9 — Modulariser pour la cognition** (9 principes), le **pattern 12 — Cloisonnement par outils**, et le 5e skill **`metier-orchestration`** (boucle de mission de l'orchestrateur métier).
+
 Voir `VERSION.md` pour le changelog détaillé et `methodology/VIBEFLOW_EXPLAINED.md` section "Nouveautés v4.1" pour les analogies pédagogiques.
 
 ---
 
 ## Mises a jour
 
-Cette archive est une version figee (v2.0). Les nouvelles versions seront livrees periodiquement.
+Cette archive est une version figee (v2.5.1). Les nouvelles versions seront livrees periodiquement.
 
 Tu peux verifier la version en ouvrant `VERSION.md`.
 

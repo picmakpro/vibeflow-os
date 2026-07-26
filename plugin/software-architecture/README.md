@@ -19,7 +19,9 @@ Spécialise le principe Core **P9 — Modulariser pour la cognition**.
 | `SKILL.md` | `.claude/skills/software-architecture/SKILL.md` | Doctrine : Iron Law, Red Flags, validation 3 tiers |
 | `references/*.md` | `.claude/skills/software-architecture/references/` | SOLID + Clean Architecture + Clean Code (`solid-soc.md`), DRY/KISS/YAGNI + carte TDD (`principles.md`), anti-patterns, playbook restructuration, universel vs dev |
 | `rules/production-code-architecture.md` | `.claude/rules/` | Rule **path-scopée** (`src/**`, `app/**`, `lib/**`, `features/**`) |
-| `scripts/check-file-size.sh` | `.claude/scripts/` | Gate de taille de fichier (250L warn / 300L block) |
+| `rules/doc-research-before-debug.md` | `.claude/rules/` | Rule ADR-045 : recherche documentaire AVANT tout debug intensif |
+| `scripts/check-file-size.sh` | `.claude/scripts/` | Gate de taille de fichier (250L warn / 300L block) — usage CI/pre-commit |
+| `scripts/guard-file-size.sh` | `.claude/scripts/` | Hook `PreToolUse(Edit\|Write)` câblé à l'install (deny ≥ 300L sans marqueur) |
 
 ## Activation dev vs non-dev
 

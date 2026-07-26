@@ -186,9 +186,10 @@ mobile-test-team stay as advanced à-la-carte add-ons.
 
 </details>
 
-**Shipped commands**: `/vibeflow` (conductor) · `/vf-new-lab` · `/vf-planning` ·
-`/vf-calibrate` · `/vf-audit` · `/vibeflow-install` · `/vf-update` (update banner at session
-start). Agents are never invoked directly — these commands are their explicit entry points.
+**Shipped entry points**: commands `/vibeflow` (conductor) · `/vf-new-lab` · `/vf-planning` ·
+`/vf-calibrate` · `/vf-audit` · `/vf-update` (update banner at session start), plus the
+`/vibeflow-install` skill (first-launch toggles UX). Agents are never invoked directly — these
+are their explicit entry points.
 
 ---
 

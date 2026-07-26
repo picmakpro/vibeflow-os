@@ -1,6 +1,6 @@
 ---
 name: consolidator
-description: Consolide la memoire structuree d'un lab VibeFlow (registres DECISIONS/LEARNINGS/BLOCKERS/JOURNAL/EVALS) sur 5 piliers — Indexation (header strict + colonne #Ligne), Archivage (3 criteres statut/age/refs, hook SessionEnd async), Fusion (deduplication LLM-based des doublons), Promotion (learning -> rule semi-auto avec validation humaine), Memoire vivante (decroissance de confiance par categorie + supersession non destructive de la couche fichier-par-entree .claude/memory/knowledge/, ADR-052). Utiliser ce skill quand un registre depasse 800 lignes, quand des doublons d'IDs apparaissent, en entretien a la release / au jalon (labs solo) ou mensuel (labs d'equipe actifs), lors d'un /vf-audit, ou via /consolidate. Reference ADR-032 + ADR-009 + ADR-029 + ADR-052. Iron Law : "La lecture d'un registre = lecture de l'index uniquement par defaut".
+description: Consolide la memoire structuree d'un lab VibeFlow (registres DECISIONS/LEARNINGS/BLOCKERS/JOURNAL/EVALS) sur 5 piliers — Indexation (header strict + colonne #Ligne), Archivage (3 criteres statut/age/refs, hook SessionEnd async), Fusion (deduplication LLM-based des doublons), Promotion (learning -> rule semi-auto avec validation humaine), Memoire vivante (decroissance de confiance par categorie + supersession non destructive de la couche fichier-par-entree .claude/memory/knowledge/, ADR-052). Utiliser ce skill quand un registre depasse 800 lignes, quand des doublons d'IDs apparaissent, en entretien a la release / au jalon (labs solo) ou mensuel (labs d'equipe actifs), lors d'un /vf-audit, ou via /consolidator. Reference ADR-032 + ADR-009 + ADR-029 + ADR-052. Iron Law : "La lecture d'un registre = lecture de l'index uniquement par defaut".
 ---
 
 # Skill : Consolidator — Consolidation Memoire 5 Piliers
@@ -28,10 +28,10 @@ Ce skill orchestre 4 mecanismes complementaires qui maintiennent la memoire scal
 ## Quand l'invoquer
 
 - **Auto (hook)** : SessionEnd async declenche `scripts/archive.sh` (pilier 2 uniquement, non destructif)
-- **Manuel recurrent** : `/consolidate` lance les 4 piliers en mode `--dry-run` puis applique apres validation — cadence proportionnee : a la release / au jalon (labs solo) ; mensuel (labs d'equipe actifs)
+- **Manuel recurrent** : `/consolidator` lance les 4 piliers en mode `--dry-run` puis applique apres validation — cadence proportionnee : a la release / au jalon (labs solo) ; mensuel (labs d'equipe actifs)
 - **Trigger immediat** :
-  - Un registre depasse 800 lignes -> `/consolidate --register=LEARNINGS`
-  - Doublons d'IDs detectes -> `/consolidate --pillar=fusion`
+  - Un registre depasse 800 lignes -> `/consolidator --register=LEARNINGS`
+  - Doublons d'IDs detectes -> `/consolidator --pillar=fusion`
   - Pendant `/vf-audit` -> pilier 1 (reindexation) + pilier 4 (proposition promotions)
 - **Surtout pas** : pendant une session active de coding feature (le hook async suffit)
 
@@ -42,14 +42,14 @@ Ce skill orchestre 4 mecanismes complementaires qui maintiennent la memoire scal
 Le skill opere en 4 modes selon le pilier cible. Tous acceptent `--dry-run` (defaut) et `--apply`.
 
 ```
-/consolidate                    # 4 piliers en dry-run
-/consolidate --apply            # 4 piliers applique apres validation
-/consolidate --pillar=index     # reindexation uniquement
-/consolidate --pillar=archive   # archivage uniquement
-/consolidate --pillar=fusion    # detection + propositions fusion
-/consolidate --pillar=promote   # detection candidats promotion
-/consolidate --pillar=decay     # memoire vivante : decroissance + supersession (couche knowledge/)
-/consolidate --register=DECISIONS # cible un seul registre
+/consolidator                    # 4 piliers en dry-run
+/consolidator --apply            # 4 piliers applique apres validation
+/consolidator --pillar=index     # reindexation uniquement
+/consolidator --pillar=archive   # archivage uniquement
+/consolidator --pillar=fusion    # detection + propositions fusion
+/consolidator --pillar=promote   # detection candidats promotion
+/consolidator --pillar=decay     # memoire vivante : decroissance + supersession (couche knowledge/)
+/consolidator --register=DECISIONS # cible un seul registre
 ```
 
 ---
@@ -89,7 +89,7 @@ Regenere l'index header de tous les registres en scannant les sections `## XXX-Y
 ### Quand declencher
 
 - `PostToolUse(Edit, path: .claude/memory/*.md)` -> reindex auto async
-- Manuel : `/consolidate --pillar=index`
+- Manuel : `/consolidator --pillar=index`
 
 ### Detail
 
@@ -150,7 +150,7 @@ Voir `references/archivage.md` + `scripts/archive.sh`.
 
 ### Quand declencher
 
-- Manuel uniquement : `/consolidate --pillar=fusion`
+- Manuel uniquement : `/consolidator --pillar=fusion`
 - Recommande : a la release / au jalon (labs solo) ; mensuel (labs d'equipe actifs) ; ou au /vf-audit
 
 ### Detail
@@ -175,7 +175,7 @@ Voir `references/fusion.md`.
 
 ### Quand declencher
 
-- Manuel uniquement : `/consolidate --pillar=promote`
+- Manuel uniquement : `/consolidator --pillar=promote`
 - Recommande : au gros jalon (labs solo) ; trimestriel (labs d'equipe actifs) ; ou au /vf-audit majeur
 
 ### Iron Law promotion
@@ -210,12 +210,12 @@ Voir `references/promotion.md`.
 
 - **Idempotent** : 2e passe a date egale = base preservee, effective identique, 0 archivage parasite.
 - **Batch, pas par-tour** : Claude Code n'expose pas de hook par-tour fiable ; la passe tourne au
-  `/consolidate`, comme les autres piliers (pipeline par-tour de jcode explicitement differe).
+  `/consolidator`, comme les autres piliers (pipeline par-tour de jcode explicitement differe).
 - **Backups isoles ADR-049** avant `--apply` (`.backups/` + rotation, defaut 3).
 
 ### Quand declencher
 
-- Manuel : `/consolidate --pillar=decay`
+- Manuel : `/consolidator --pillar=decay`
 - Recommande : a la release / au jalon (labs solo) ; mensuel (labs d'equipe actifs) ; ou au `/vf-audit`, avec les autres piliers.
 
 ### Detail
@@ -227,7 +227,7 @@ Voir `references/memoire-vivante.md` + `scripts/decay-pass.sh`. Format d'entree 
 
 ## Orchestration des 5 piliers
 
-Le skill orchestre les 5 piliers dans cet ordre quand `/consolidate` est invoque sans flag :
+Le skill orchestre les 5 piliers dans cet ordre quand `/consolidator` est invoque sans flag :
 
 ```
 Phase 1 — Audit (read-only, < 30s)
@@ -305,7 +305,7 @@ Pour qu'un lab puisse utiliser ce skill :
 2. `.claude/scripts/{reindex,archive,detect-duplicates,detect-promotions,guard-read-registres,guard-bash-registres,post-edit-reindex,check-registres}.sh` executables (poses par l'install)
 3. Hooks de gouvernance dans `.claude/settings.json` — POSES AUTOMATIQUEMENT par l'install
    du module (hooks/hooks.json + merge-hooks.sh, ADR-043) ; verifier : `grep guard-read-registres .claude/settings.json`
-4. Trigger `/consolidate` cree dans `.claude/commands/` (optionnel mais recommande)
+4. Trigger `/consolidator` cree dans `.claude/commands/` (optionnel mais recommande)
 5. CLAUDE.md du projet mentionne l'Iron Law `Lecture index uniquement par defaut`
    (desormais machine-enforced par le guard PreToolUse — la prose seule ne suffisait pas)
 
@@ -326,7 +326,7 @@ Voir `references/installation.md` (a creer si besoin).
 - ADR-009 — architecture memoire tiered (parent historique)
 - ADR-019 — /session-close + lifecycle hooks
 - ADR-029 — charte densite (Skill ≤500L)
-- ADR-031 — vigilance support runtime des conventions
+- ADR-056 — vigilance support runtime des conventions (scission du second emploi d'ADR-031)
 - LRN-019 — append-only ne scale pas
 - LRN-060 — la capitalisation structuree est le moat VibeFlow
 - Anthropic doc memory : https://code.claude.com/docs/en/memory (MEMORY.md 200L pattern officiel)

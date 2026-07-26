@@ -15,7 +15,7 @@ Chaque pattern repond a 4 questions :
 
 Les exemples fictifs s'appuient sur des personas inventes : *Sophie K., professeure de musique freelance*, *Atelier Demo, micro-studio creatif*, *Maxime R., consultant solo en strategie*. Aucun chiffre, aucun client, aucun secret reel.
 
-## Les 11 patterns
+## Les 12 patterns
 
 | # | Pattern | Fichier | Resume | Version |
 |---|---------|---------|--------|---------|

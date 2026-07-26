@@ -139,7 +139,7 @@ Idéalement : vérifier la doc officielle Anthropic via WebFetch lors du snapsho
 - `consolidator` maintient la mémoire propre
 - `infrastructure-audit` maintient la mécanique propre
 
-Bonne pratique : lancer `audit-infra --snapshot` avant tout `/consolidate` majeur, pour avoir un état initial à comparer.
+Bonne pratique : lancer `audit-infra --snapshot` avant toute passe `/consolidator` majeure, pour avoir un état initial à comparer.
 
 ---
 

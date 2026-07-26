@@ -188,10 +188,10 @@ mobile-test-team restent en à-la-carte avancé.
 
 </details>
 
-**Commandes livrées** : `/vibeflow` (conductor) · `/vf-new-lab` · `/vf-planning` ·
-`/vf-calibrate` · `/vf-audit` · `/vibeflow-install` · `/vf-update` (bandeau de mise à jour au
-démarrage). Les agents ne se tapent pas directement — ces commandes sont leurs points
-d'entrée.
+**Points d'entrée livrés** : les commandes `/vibeflow` (conductor) · `/vf-new-lab` ·
+`/vf-planning` · `/vf-calibrate` · `/vf-audit` · `/vf-update` (bandeau de mise à jour au
+démarrage), plus le skill `/vibeflow-install` (UX à toggles du premier lancement). Les agents
+ne se tapent pas directement — ce sont leurs points d'entrée explicites.
 
 ---
 

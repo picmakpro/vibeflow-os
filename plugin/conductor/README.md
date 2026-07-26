@@ -1,64 +1,128 @@
 # conductor
 
-> **L'orchestrateur méta et gardien du lab.** La porte d'entrée pour tout ce qui touche la
-> *configuration* du lab — créer, installer, vérifier, mettre à jour, migrer — dans **n'importe quel
-> métier**. Pas appelé en continu : il intervient aux moments de config, d'audit et de migration.
+> **Le socle de gouvernance du lab — et l'hôte du team-kernel.** Porte d'entrée pour tout ce qui
+> touche la *configuration* du lab — créer, installer, vérifier, mettre à jour, migrer — dans
+> **n'importe quel métier**. Pas appelé en continu : il intervient aux moments de config, d'audit
+> et de migration. Module **mandatory** : posé d'office à chaque install, c'est lui qui porte les
+> gates machine (hooks) et le noyau d'orchestration d'équipe réutilisé par tous les autres modules.
 
-**Type** : `agent + skills + scripts + references` · **Version** : v1.14.1 · **Dépend de** : `planning-core`, `validator`.
+**Type** : `agent + skills + scripts + references` · **Version** : v1.14.1 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
+
+> `skill-creator` est une dépendance **dure** depuis ADR-047 : c'est le canal unique de création de
+> skills, invoqué par `vf-new-lab` en fan-out (Phase 5) et exigé par le Gate C. Le conductor étant
+> mandatory, `skill-creator` est tiré d'office à chaque install (fermeture transitive `--with-deps`).
 
 ---
 
-## Pourquoi ce module
-
-Audit du plugin (juin 2026) : il savait **installer des briques** de façon agnostique, mais pas
-**construire un lab à partir d'un métier**, ni se comporter en **framework vivant**. `conductor` comble
-4 trous :
-
-| # | Trou comblé | Brique |
-|---|---|---|
-| **C1** | Pas d'agent méta central | Agent `vibeflow-conductor` |
-| **C2** | Pas de bootstrap de lab universel (`vf-init` était dev-couplé) | Skill `vf-new-lab` |
-| **C3** | Pas de propagation/migration d'update façon GSD | Skill `vf-calibrate` + `framework-version.sh` |
-| **C4** | Pas d'escalade sous-agents → gardien | `references/contracts.md` |
-
 ## L'agent `vibeflow-conductor` — 4 rôles
 
-1. **Configurateur** — crée un lab depuis ton métier (`vf-new-lab`), pose les modules, le planning.
-2. **Vérificateur** — déclenche l'audit complet (`vibeflow-validator`, 5 phases).
-3. **Calibreur** — détecte qu'une évolution du framework impacte le lab et pilote la migration.
-4. **Gardien** — reçoit les escalades de cohérence des sous-agents, arbitre, route.
+1. **Configurateur** — crée un lab depuis ton métier (`vf-new-lab`), pose les modules
+   (`/vibeflow-install`), le socle planning (`vf-planning`).
+2. **Vérificateur** — déclenche l'audit complet en déléguant à `vibeflow-validator` (5 phases).
+3. **Calibreur** — détecte qu'une évolution du framework impacte le lab et pilote la migration
+   (`vf-calibrate`), sous validation humaine (ADR-031).
+4. **Gardien** — reçoit les escalades de cohérence des sous-agents (`references/contracts.md`),
+   arbitre, route.
 
 Il **route et délègue** — ne réimplémente jamais, ne fait jamais le travail métier.
 
-## Créer un lab dans n'importe quel métier (install chirurgicale)
+## Le team-kernel — le noyau d'équipe transverse, hébergé ici
 
-Parle au conductor : *« crée un lab d'acquisition »*. Il pose **5 questions que tu sais déjà**
-(métier, process/livrables, objectif, contraintes, vocabulaire), puis **dérive** le lab : `CLAUDE.md`
-métier + `.planning/` adapté + registres mémoire + 2-3 agents métier + auditeurs câblés. **Zéro
-hypothèse dev** — un lab d'acquisition obtient une extension `acquisition/`, pas un `codebase/`.
+Extrait du dev-orchestrator (ADR-053, éprouvé en mission) et hébergé par le conductor **parce
+qu'il est mandatory** : le pattern **manager → workers → juges** est ainsi disponible dans tout
+lab, quel que soit le métier. Contrat complet : `references/team-kernel.md`.
 
-## Voir et absorber les mises à jour (façon GSD)
+Ce que le kernel fournit (invariant) :
 
-`framework-version.sh` enregistre la version du framework dans le lab et détecte quand il « prend du
-retard ». Un hook SessionStart **opt-in** (jamais imposé) surface *« le framework a bougé, lance
-/vf-calibrate »*. La migration se fait **sous validation humaine** (ADR-031) : détecter → proposer →
-valider → appliquer → re-auditer. C'est aussi l'outil par lequel l'équipe VibeFlow recalibre un lab
-branché selon la dernière version.
+| Brique | Support | Garantie |
+|---|---|---|
+| **Lock de driver** | `scripts/driver-lock.sh` (acquire / heartbeat / release, TTL + recovery) | une seule mission pilote à la fois ; reprise propre d'un lock périmé |
+| **Plan de bataille en DAG** | `scripts/dag.sh` (init / add --deps / ready / mark / reopen) | contrôle de flux déterministe ; la frontière `ready` se dispatche **en parallèle** sur périmètres disjoints |
+| **Rapports typés** (Pattern C) | `{ statut: passed\|gaps_found\|human_needed\|blocked, findings[], noeuds_debloques[] }` | fin du pilotage à la prose ; escalade humaine impérative sur `ask-user` |
+| **Halt conditions** | 5 codes (boucle sans progrès, action destructive, ressource manquante, budget épuisé, drift de scope) | l'humain arbitre sur un message structuré |
+| **Digest de mission** | ≤ 30 lignes par mandat, le disque fait foi | amortit les relectures de contexte |
+| **Cloisonnement par tools** (P12) | juges sans Write/Edit, workers sans Task, `vf-internal: true` | anti-triche, linté par `check-agents.sh` |
+
+Chaque métier ne paramètre que ses spécialistes, sa définition de « vert » et ses gates. S'y
+branchent aujourd'hui : **dev-orchestrator** (implémentation de référence, `vf-dev-manager`),
+**mobile-test-team** (`vf-test-orchestrator`), **design-orchestrator** (`vf-design-manager`,
+première instanciation non-dev) et les **bundles métier** (business-pilot, content, growth).
+
+## Les 3 skills
+
+- **`vf-new-lab`** — Lab Factory clarification-first : cadrage à gates machine (Gate A brief,
+  Gate B capacités, Gate C conformité), manifeste de capacités, fan-out `skill-creator`, ficelage
+  des auditeurs, assemblage. Mode **express** ≤ 15 min (3 questions, `[DÉRIVÉ]` assumé). Zéro
+  hypothèse dev. Embarque ses propres références (7) + `proportion-capabilities.sh`.
+- **`vf-calibrate`** — propagation d'update façon GSD : détecte l'écart framework ↔ lab
+  (`framework-version.sh`), lit les changements de structure/doctrine, propose et pilote la
+  migration **sous validation humaine**.
+- **`vf-update`** — met à jour VibeFlow en deux couches sous confirmation : le plugin
+  (`claude plugin update vibeflow@vibeflow-os`) puis les modules installés (engine `update --all`
+  via `vf-update-run.sh`). Frontière : `vf-update` **installe** la nouvelle version,
+  `vf-calibrate` **réaligne la structure** une fois celle-ci posée.
+
+## Hooks (posés automatiquement à l'install)
+
+`hooks/hooks.json` câble les gates dans la session :
+
+- **PreToolUse(Write)** → `guard-agent-write.sh` : un agent non conforme ADR-044 ne peut pas être
+  **écrit** dans `.claude/agents/` (deny avec erreurs précises + squelette canonique).
+- **SessionStart** → `check-agents.sh --hook` (lint des agents posés), `check-debug-research.sh
+  --hook` (advisory ADR-045 : recherche documentaire avant debug), `update-banner.sh` (bandeau
+  « mise à jour disponible X → Y, lance /vf-update » + nudge de méthode legacy).
+
+## Scripts (13) — par famille
+
+**Gates machine (`check-*`)** :
+- `check-agents.sh` — lint de conformité native des agents (ADR-044) : frontmatter, champs requis,
+  skills déclarés existants, budget de préchargement, `vf-internal`.
+- `guard-agent-write.sh` — enforcement du gate ci-dessus à l'écriture (hook Write).
+- `check-debug-research.sh` — phase de recherche documentaire avant debug dans les briques de
+  dépannage (ADR-045).
+- `check-legacy.sh` — détecte un lab resté sur l'ancienne méthode (pré ADR-052/053), scope-aware
+  (racines user ET projet), verdicts `legacy` / `drift`.
+- `check-overlaps.sh` — inventaire des recouvrements de déclenchement avec les briques tierces
+  (ADR-057, advisory).
+
+**Team-kernel** : `dag.sh` (plan de bataille persistant, frontière `ready`) et `driver-lock.sh`
+(verrou de mission atomique par `mkdir`, heartbeat + TTL).
+
+**Update** : `framework-version.sh` (current / recorded / stamp / drift, sémver portable),
+`check-plugin-update.sh` (compare au dernier tag GitHub, cache local), `update-banner.sh` (hook
+SessionStart), `vf-update-run.sh` (re-matérialise les modules depuis le cache plugin le plus récent).
+
+**Scaffolding & incarnation** : `scaffold-docs.sh` (externalise la doc du lab sous `docs/`,
+ADR-042) et `generate-agent-commands.sh` (une commande slash d'incarnation par agent posé — saute
+les workers `vf-internal: true`, Pattern 12).
+
+**Tests** : 10 suites sous `scripts/tests/` (une par script critique + `test-conductor.sh`,
+`test-vf-new-lab.sh`, `test-vf-update.sh`, `test-doc-and-commands.sh`).
 
 ## Contenu du module
 
 ```
 conductor/
-  AGENT.md                       # vibeflow-conductor (méta orchestrateur + gardien)
+  AGENT.md                         # vibeflow-conductor (méta orchestrateur + gardien)
+  hooks/hooks.json                 # guard Write + lints SessionStart + bandeau update
   skills/
-    vf-new-lab/SKILL.md          # C2 — bootstrap de lab universel
-    vf-calibrate/SKILL.md        # C3 — propagation update + migration
-  scripts/
-    framework-version.sh         # current / recorded / stamp / drift (sémver portable)
-    tests/test-conductor.sh
+    vf-new-lab/                    # Lab Factory (SKILL.md + 7 references + script + test)
+    vf-calibrate/SKILL.md          # propagation update + migration
+    vf-update/SKILL.md             # mise à jour plugin + modules
+  scripts/                         # 13 scripts (familles ci-dessus) + tests/ (10 suites)
   references/
-    contracts.md                 # C4 — escalade sous-agents → conductor
-    conductor-pipeline.md        # ordre canonique de configuration
-    migration-playbook.md        # recettes de migration + wiring hook opt-in
-    bootstrap-method.md          # méthode de cadrage + dérivation (5 questions)
+    team-kernel.md                 # contrat du noyau d'équipe (manager/workers/juges)
+    contracts.md                   # escalade sous-agents → conductor
+    conductor-pipeline.md          # ordre canonique de configuration
+    migration-playbook.md          # recettes de migration + wiring hook opt-in
+    bootstrap-method.md            # méthode de cadrage + dérivation
 ```
+
+## Limites
+
+- **Jamais le travail métier** : le conductor configure et garde le lab, il ne produit pas ses
+  livrables (l'orchestration métier vit dans les orchestrateurs métier, pas ici).
+- **Jamais de correction/migration silencieuse** : détecter → proposer → validation humaine
+  (ADR-031).
+- Le kernel est fait pour les **missions**, pas le quotidien : sous le seuil d'équipe du métier,
+  la brique outillée directe suffit.

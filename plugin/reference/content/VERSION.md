@@ -1,17 +1,26 @@
 # VERSION
 
-**VibeFlow-Reference** : v2.1
-**Date de release** : 2026-05-28
-**Type** : Enrichissement additif (Core v4.1 → v4.2 — ajout principe P9 « Modulariser pour la cognition »)
+**VibeFlow-Reference** : v2.5.1
+**Date de release** : 2026-07-25
+**Type** : Correctifs (deduplication skill-creator, scission ADR-031/ADR-056) sur la lignee v2.x (Core v4.2 — 9 principes dont P9 « Modulariser pour la cognition »)
 
 ## Contenu
 
-- 3 documents methodologiques fondateurs (CORE v4.1, PHILOSOPHY, EXPLAINED)
-- **11 patterns architecturaux universels** (vs 8 en v1.1) avec exemples fictifs : ajout des patterns 09 (meta-procedures), 10 (plan-review adversarial), 11 (halt-conditions)
+- 3 documents methodologiques fondateurs (CORE v4.2 — 9 principes P1-P9, PHILOSOPHY, EXPLAINED)
+- **12 patterns architecturaux universels** (vs 8 en v1.1) avec exemples fictifs : ajout des patterns 09 (meta-procedures), 10 (plan-review adversarial), 11 (halt-conditions), 12 (cloisonnement par outils)
 - 1 lexique VibeFlow enrichi (+16 termes v4.1) + 1 guide dire/ne pas dire (+12 entrees v4.1) + 1 mapping forks
-- **33 templates generiques** (8 agents refondus ≤ 250L, 5 docs, 5 memory, 5 triggers, 1 rule) + **4 skills** (vs 1 en v1.1) : debugger, agent-density-auditor, safe-execute, skill-creator
+- **42 fichiers de templates generiques** (9 agents ≤ 250L + 1 reference, 5 docs, 7 memory, 5 triggers, 1 rule) + **5 skills** (vs 1 en v1.1) : debugger, agent-density-auditor, safe-execute, metier-orchestration, skill-creator (pointeur vers le module canonique)
 - 1 exemple fictif complet : PetitsCoursFlow (Sophie K., professeure de musique)
 - README client + licence d'usage personnel
+
+## Changelog v2.0 → v2.5.1 (resume)
+
+- **v2.1.x** — Core v4.1 → **v4.2** : ajout du principe **P9 — Modulariser pour la cognition** (P1-P8 intacts) + pointeur P8 vers l'outillage par-process.
+- **v2.2.x** — Canon DECISIONS.md/DEC-XXX (`adr-template` → `decisions-template`) ; `memory: project` sur les templates agents.
+- **v2.3.x** — **Pattern 12 — Cloisonnement par outils** + convention `vf-internal: true`.
+- **v2.4.0** — Template `debugger` : Phase 0 — Recherche Documentaire.
+- **v2.5.0** — 5e skill **`metier-orchestration`** + `orchestrator-template.md` (orchestrateur metier generique).
+- **v2.5.1** — Deduplication du template skill-creator (pointeur vers le module canonique), sauvetage `adr-template.md` (legacy), scission ADR-031/ADR-056 repercutee.
 
 ## Changelog v1.1 → v2.0 (2026-05-19)
 
@@ -76,4 +85,4 @@ Voir le changelog interne (`README-INTERNAL.md`, non distribue).
 
 ---
 
-> Cette archive est figee. Si une mise a jour majeure intervient, une v2.1 (mineure) ou v3.0 (majeure) te sera livree separement.
+> Cette archive est figee. Si une mise a jour intervient, une version ulterieure (mineure ou majeure) te sera livree separement.

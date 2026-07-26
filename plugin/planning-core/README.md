@@ -71,14 +71,24 @@ manque, le skill pose un socle adapté au métier.
 ```
 planning-core/
   SKILL.md                     # /vf-planning — scaffoldeur/maintaineur adaptatif
+  hooks/
+    hooks.json                 # câblage garde-fous (SessionStart / PreToolUse)
   references/
     GUIDE.md                   # doctrine : tronc, anti-biais, adaptation métier
     PROFILES.md                # 3 profils + mapping métier → profil
     bridge-memory.md           # pont planning ↔ registres mémoire
+    compartments.md            # compartiments à l'altitude lab
     domain-detection.md        # heuristiques métier → profil + auto-infusion (hook opt-in)
     example-lab-contenu.md     # exemple complet d'un socle adapté à un lab NON-dev
-    templates/                 # 8 gabarits universels neutres-métier
+    gsd-handoff.md             # frontière d'altitude planning-core / moteur GSD (ADR-055)
+    templates/                 # 10 gabarits universels neutres-métier
   scripts/
     check-planning-state.sh    # garde-fou fraîcheur de STATE.md (advisory)
-    tests/test-planning-core.sh
+    detect-gsd-engine.sh       # fait « un moteur GSD est-il en place ? » (4 exits)
+    detect-planning-debt.sh    # 8e signal de dette : dette de planning (ADR-040)
+    guard-planning-updated.sh  # gate bloquant : planning à jour avant clôture (exception motivée)
+    planning-context.sh        # contexte planning injecté en session
+    planning-session-snapshot.sh  # snapshot de fin de session
+    planning-task-context.sh   # contexte par tâche
+    tests/                     # 5 suites (planning-core, hooks, hardening, detect-*)
 ```

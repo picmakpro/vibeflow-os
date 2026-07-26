@@ -62,7 +62,6 @@
   mise à jour du plugin ET le nudge de méthode legacy (via `check-legacy.sh`). Un lab déjà à la bonne
   version de plugin mais aux modules non migrés est désormais détecté au démarrage. Boucle fermée : un
   `drift` détecté est réparé par `/vf-update` (`sync_module_governance` re-copie les artefacts).
->>>>>>> origin/main
 
 ## [v1.11.3] — 2026-07-20 (audit robustesse hooks — 2e vague, gate agents fiabilisé)
 

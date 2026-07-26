@@ -36,6 +36,7 @@
 | ADR-030 | Architecture skills (révisée) : déléguer aux skills outillés, ne jamais réimplémenter |
 | ADR-031 | Jamais de fix / suppression / matérialisation sans validation humaine |
 | ADR-032 | Consolidation mémoire : registres indexés, 4 piliers (indexation / archivage / fusion / promotion) |
+| ADR-035 | Doctrine architecture logicielle AI-Safe : principes SOLID/SoC portés par `software-architecture`, gates de taille/structure machine-enforced |
 | ADR-036 | Doctrine d'architecture d'audit : tout process générateur a une structure d'audit multi-couches |
 | ADR-037 | Gate Nyquist de vérification réelle ; fusion feature-dev-gates → software-architecture |
 | ADR-040 | Dette de planning = 8e signal de dette, porté par planning-core à l'altitude lab |
@@ -502,7 +503,9 @@ La mémoire fichier de VibeFlow (`memory/*.md` : `name` / `description` / `metad
 ### Code Impacté
 
 - **Nouveau** `plugin/consolidator/scripts/decay-pass.sh` (+ suite `scripts/tests/test-decay.sh`) — passe de décroissance + supersession sur `.claude/memory/knowledge/`, modes `--dry-run`/`--apply`, idempotente. S'inspire de l'algo `spike/decay-pass.py` (référence, pas réutilisé tel quel).
-- **Nouveau** template + doc de format de la mémoire vivante : `docs/reference/methodology/templates/memory/knowledge-entry-template.md` (+ miroir `plugin/reference/`).
+- **Nouveau** template + doc de format de la mémoire vivante :
+  `plugin/reference/content/methodology/templates/memory/knowledge-entry-template.md` (fichier
+  versionné — son miroir installé `docs/reference/…` est gitignoré et n'existe que dans un lab).
 - `plugin/consolidator/SKILL.md` + `references/indexation.md` — documente le geste décroissance (pilier Indexation) et la couche mémoire vivante.
 - `reindex.sh` / `archive.sh` — **inchangés** (registres tabulaires d'audit, hors périmètre).
 - Bump `plugin/consolidator/VERSION` + `module.json` + `CHANGELOG.md` (nouvelle capacité → minor).
@@ -547,7 +550,9 @@ Protocole détaillé (source de vérité) : `plugin/dev-orchestrator/references/
 
 ### Code Impacté
 
-- **Nouveau** `plugin/dev-orchestrator/scripts/driver-lock.sh` + `dag.sh` (+ tests `test-driver-lock.sh`, `test-dag.sh`).
+- **Nouveau** `driver-lock.sh` + `dag.sh` (+ tests `test-driver-lock.sh`, `test-dag.sh`) — livrés à
+  l'époque dans `plugin/dev-orchestrator/scripts/`, **déménagés en v2.34.0 vers
+  `plugin/conductor/scripts/`** (team-kernel transverse, cf. `conductor-references/team-kernel.md`).
 - **Nouveau** `plugin/dev-orchestrator/references/mission-flow.md` (protocole A/B/C, contrat de rapport).
 - `agents/vf-dev-manager.md` — acquisition/heartbeat/release + pilotage par DAG + consommation des rapports typés.
 - `agents/vf-coder.md` / `vf-reviewer.md` / `vf-auditer.md` — section « Retour » typée. `mobile-test-team/agents/vf-test-orchestrator.md` — idem.

@@ -47,8 +47,10 @@ S'y ajoutent :
     (fallback manuel si Node/npm ou CLI `claude` manquent — jamais d'échec silencieux).
   - `build-gsd-index.sh` : génère un **index factuel** des skills GSD installés
     (100 % auto-généré depuis le frontmatter sur disque — D4, anti-hallucination).
-  - `dag.sh` / `driver-lock.sh` : DAG de mission et lock de driver unique (ADR-053).
   - `inject-mcp-tools.sh` : injection des serveurs MCP du lab dans les agents flaggés.
+  - Le kernel d'orchestration de mission (`dag.sh` / `driver-lock.sh`, ADR-053) est **consommé
+    depuis le team-kernel hébergé par `conductor`** depuis la v2.34.0 (d'où `requires` →
+    `conductor`) — il ne vit plus dans ce module.
 
 ---
 
@@ -68,7 +70,6 @@ dev-orchestrator/
 ├── scripts/
 │   ├── ensure-deps.sh             # bootstrap deps (idempotent, dry-run testable)
 │   ├── build-gsd-index.sh         # index factuel (VF_INDEX_OUT surchargeable)
-│   ├── dag.sh · driver-lock.sh    # kernel d'orchestration de mission (ADR-053)
 │   ├── inject-mcp-tools.sh        # injection MCP dans les agents flaggés
 │   └── tests/                     # suites de vérification
 └── references/                    # doctrine + index chargés on-demand par les agents
@@ -138,7 +139,7 @@ La carte exhaustive (~65 gestes, familles amont/construction/qualité/cycle de
 vie/contexte/design/mission) : `references/intent-routing.md`.
 
 Le module `design-orchestrator`, installé d'office avec celui-ci, porte l'intention design
-(`/vf-design`, `gsd-sketch`). Deux intentions voisines appartiennent à d'autres modules et ne
+(`/vf-design`, `vf-sketch`). Deux intentions voisines appartiennent à d'autres modules et ne
 sont **jamais** captées ici : `/vf-audit` (conformité du lab, module `validator`) et
 `/vf-planning` (socle de planning du lab, module `planning-core`, ADR-055).
 
@@ -219,6 +220,10 @@ Exit 0 si tout passe (les SKIP, ex. GSD absent, ne font pas échouer la suite).
 
 ## Historique
 
+- **v2.1.1** — recette dev en lab sandbox : cascade `$S` (le lab courant prime sur le scope
+  user), doctrine `human_needed` en autonome, `requires` += `conductor` (team-kernel).
+- **v2.1.0** — pipelining N/N+1 : cadrage+plan de l'étape suivante pendant l'exécution de la
+  courante ; `dag.sh`/`driver-lock.sh` consommés depuis le team-kernel du `conductor`.
 - **v2.0.0** — bascule agentique : suppression des 29 verbes-façades, fin du reframe et de la
   préséance, carte d'intention unique, manager upgradé (intention / next steps / hygiène doc /
   digest de mission).

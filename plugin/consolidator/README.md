@@ -1,23 +1,29 @@
-# consolidator — Consolidation Mémoire 4 Piliers
+# consolidator — Consolidation Mémoire 5 Piliers
 
-> Skill VibeFlow qui maintient les registres mémoire structurés (DECISIONS / LEARNINGS / BLOCKERS / EVALS / JOURNAL) scalables et propres au fil des sessions.
+> Skill VibeFlow qui maintient les registres mémoire structurés (DECISIONS / LEARNINGS / BLOCKERS / EVALS / JOURNAL) scalables et propres au fil des sessions, plus la couche « mémoire vivante » fichier-par-entrée.
 
 **Version** : v1.8.0
-**Référence** : ADR-032 du Lab VibeFlow
+**Référence** : ADR-032 (piliers 1-4) + ADR-052 (pilier 5) du Lab VibeFlow
 **Iron Law** : *"La lecture d'un registre = lecture de l'index uniquement par défaut."*
 
 ---
 
 ## Quoi
 
-Les registres mémoire VibeFlow grossissent en mode append-only (`/session-close` ADR-019). Sans consolidation, ils deviennent illisibles. Ce skill orchestre 4 mécanismes :
+Les registres mémoire VibeFlow grossissent en mode append-only. Sans consolidation, ils deviennent illisibles. Ce skill orchestre 5 mécanismes :
 
 | Pilier | Problème adressé | Mécanisme |
 |--------|------------------|-----------|
 | 1. Indexation | Lecture index sans `#Ligne` = parcours body inutile | Convention header strict + script `reindex.sh` |
 | 2. Archivage | Entrées obsolètes s'accumulent | Script `archive.sh` (3 critères AND) + hook SessionEnd async |
-| 3. Fusion | Collisions IDs + doublons sémantiques | Skill `/consolidate --pillar=fusion` (LLM-based) |
-| 4. Promotion | Learnings restent passifs (pas de comportement) | Skill `/consolidate --pillar=promote` (semi-auto + validation humaine) |
+| 3. Fusion | Collisions IDs + doublons sémantiques | Skill `/consolidator --pillar=fusion` (LLM-based) |
+| 4. Promotion | Learnings restent passifs (pas de comportement) | Skill `/consolidator --pillar=promote` (semi-auto + validation humaine) |
+| 5. Mémoire vivante | Une mémoire figée ment avec le temps | Couche fichier-par-entrée `.claude/memory/knowledge/` : décroissance de confiance par catégorie + supersession **non destructive** (`decay-pass.sh`, ADR-052) |
+
+La gouvernance est **machine-enforced** par hooks (`hooks/hooks.json`) : lecture index-first
+bloquante (`guard-read-registres.sh`, `guard-bash-registres.sh`), index auto-maintenu après
+édition (`post-edit-reindex.sh`), lint format au démarrage (`check-registres.sh`), archivage en
+fin de session.
 
 ---
 
@@ -28,6 +34,9 @@ Voir [INSTALL.md du repo racine](../INSTALL.md).
 ```bash
 .claude/scripts/vibeflow-update.sh install consolidator
 ```
+
+Le module embarque aussi les **5 gabarits de registres** (`references/templates-memoire/`)
+posés dans un lab neuf.
 
 ---
 
@@ -54,18 +63,18 @@ Voir [INSTALL.md du repo racine](../INSTALL.md).
 .claude/scripts/archive.sh --apply
 ```
 
-### Détecter doublons
+### Détecter doublons / promotions
 
 ```bash
-.claude/scripts/detect-duplicates.sh
-# → candidats fusion (collisions + titres similaires)
+.claude/scripts/detect-duplicates.sh    # → candidats fusion (collisions + titres similaires)
+.claude/scripts/detect-promotions.sh    # → candidats learning → rule
 ```
 
-### Détecter promotions
+### Passe de mémoire vivante (pilier 5)
 
 ```bash
-.claude/scripts/detect-promotions.sh
-# → candidats learning → rule
+.claude/scripts/decay-pass.sh --dry-run   # décroissance de confiance + supersession, idempotent
+.claude/scripts/decay-pass.sh --apply
 ```
 
 ### Skill complet via Claude Code
@@ -74,15 +83,19 @@ Voir [INSTALL.md du repo racine](../INSTALL.md).
 /consolidator
 ```
 
-Le skill `consolidator` (chargé via le système de skills Claude Code) orchestre les 4 piliers de manière interactive.
+Le skill `consolidator` (chargé via le système de skills Claude Code) orchestre les 5 piliers de
+manière interactive.
 
 ---
 
 ## Tests
 
+6 suites dans `scripts/tests/` (toutes branchées en CI) :
+
 ```bash
-.claude/scripts/tests/test-consolidator.sh
-# → 14 tests, doit passer 100%
+for t in .claude/scripts/tests/test-*.sh; do bash "$t"; done
+# test-consolidator · test-check-registres · test-decay · test-guard-bash-registres
+# test-guard-read-registres · test-windows-guards
 ```
 
 ---
@@ -91,25 +104,32 @@ Le skill `consolidator` (chargé via le système de skills Claude Code) orchestr
 
 ```
 consolidator/
-├── SKILL.md                          # Skill principal (449 lignes)
-├── VERSION                            # v1.0.0
+├── SKILL.md                          # Skill principal (359 lignes)
+├── VERSION                           # version courante (gate check-version-sync)
 ├── CHANGELOG.md                      # Historique
 ├── README.md                         # Ce fichier
+├── module.json                       # Manifeste (name, version, requires)
+├── hooks/
+│   └── hooks.json                    # gouvernance machine-enforced (guards + reindex + lint)
 ├── references/
 │   ├── indexation.md                 # Pilier 1
 │   ├── archivage.md                  # Pilier 2
 │   ├── fusion.md                     # Pilier 3
-│   └── promotion.md                  # Pilier 4
+│   ├── promotion.md                  # Pilier 4
+│   ├── memoire-vivante.md            # Pilier 5 (ADR-052)
+│   └── templates-memoire/            # 5 gabarits de registres (DECISIONS, LEARNINGS, …)
 └── scripts/
     ├── reindex.sh                    # Pilier 1
     ├── archive.sh                    # Pilier 2
     ├── detect-duplicates.sh          # Pilier 3
     ├── detect-promotions.sh          # Pilier 4
-    └── tests/
-        ├── test-consolidator.sh      # Suite 14 tests
-        └── fixtures/
-            ├── LEARNINGS-mini.md
-            └── BLOCKERS-mini.md
+    ├── decay-pass.sh                 # Pilier 5
+    ├── check-registres.sh            # lint format des registres (hook SessionStart)
+    ├── guard-read-registres.sh       # garde lecture index-first (hook PreToolUse)
+    ├── guard-bash-registres.sh       # garde cat/sed/awk sur registres (hook PreToolUse)
+    ├── post-edit-reindex.sh          # ré-indexation auto (hook PostToolUse)
+    ├── probe-memory-guards.sh        # sonde d'auto-diagnostic des guards
+    └── tests/                        # 6 suites + fixtures
 ```
 
 ---
@@ -118,12 +138,12 @@ consolidator/
 
 - macOS (testé Darwin 25.4.0)
 - Linux (compatible — utilise BSD/GNU utilities communes)
-- bash 4+, python3 3.8+
-- Claude Code v2+ (utilise hooks lifecycle + skills natifs)
+- Windows : guards portés (suite `test-windows-guards.sh`, ADR-054)
+- bash 4+ ; Claude Code v2+ (hooks lifecycle + skills natifs)
 
 ---
 
-## Limites v1.0.0
+## Limites
 
 Voir `CHANGELOG.md` section "Limites connues".
 

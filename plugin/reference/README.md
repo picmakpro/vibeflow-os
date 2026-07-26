@@ -1,10 +1,10 @@
 # reference — Documentation Méthodologique VibeFlow
 
 > **Module doc-only** : référence canonique de la méthodologie VibeFlow.
-> 70 fichiers (608 KB) — méthodologie + 11 patterns + 4 skills + 33 templates + 1 exemple complet.
+> 77 fichiers (612 KB) — méthodologie + 12 patterns + 5 skills + 42 fichiers de templates + 1 exemple complet.
 
-**Version** : v2.5.1 (release majeure mai 2026 — alignement VibeFlow Core v4.1)
-**Source** : `distributions/VibeFlow-Reference-v2/VibeFlow-Reference-v2.0.zip`
+**Version** : v2.5.1 (alignement VibeFlow Core v4.2 — 9 principes P1-P9)
+**Source** : le contenu canonique vit dans `plugin/reference/content/` ; l'installation le copie en `docs/reference/` dans le lab cible.
 
 ---
 
@@ -15,14 +15,14 @@ Documentation complète de la méthodologie VibeFlow, distribuable et utilisable
 ```
 content/
 ├── README-CLIENT.md                       # Présentation pour utilisateur final
-├── VERSION.md                              # Détail v2.0
+├── VERSION.md                              # Détail de la version distribuée
 ├── LICENSE.md                              # Licence d'usage personnel
 ├── methodology/
-│   ├── VIBEFLOW_CORE.md                    # Bible méthodologique v4.1 (8 principes P1-P8)
+│   ├── VIBEFLOW_CORE.md                    # Bible méthodologique v4.2 (9 principes P1-P9)
 │   ├── VIBEFLOW_PHILOSOPHY.md              # Philosophie
 │   ├── VIBEFLOW_EXPLAINED.md               # Vulgarisation avec analogies
 │   ├── AXIOMES-ENFORCEMENT.md              # 3 axiomes transverses (enforcement>prose, filet fonctionnel, preuve avant done)
-│   ├── patterns/                           # 11 patterns architecturaux universels
+│   ├── patterns/                           # 12 patterns architecturaux universels
 │   │   ├── 01-constitution.md
 │   │   ├── 02-registres.md
 │   │   ├── 03-agents.md
@@ -33,15 +33,16 @@ content/
 │   │   ├── 08-evaluer.md
 │   │   ├── 09-meta-procedures.md
 │   │   ├── 10-plan-review-adversarial.md
-│   │   └── 11-halt-conditions.md
+│   │   ├── 11-halt-conditions.md
+│   │   └── 12-cloisonnement-outils.md
 │   ├── vocabulary/                         # Lexique + forks-mapping + dire/ne-pas-dire
-│   └── templates/                          # 33 templates génériques
-│       ├── memory/ (5)
-│       ├── agents/ (8 + contracts)
+│   └── templates/                          # 42 fichiers de templates génériques
+│       ├── memory/ (7)
+│       ├── agents/ (9 + _reference)
 │       ├── triggers/ (5)
 │       ├── rules/ (1)
 │       ├── docs/ (5)
-│       └── skills/ (4 : agent-density-auditor, skill-creator, safe-execute, debugger)
+│       └── skills/ (5 : agent-density-auditor, debugger, metier-orchestration, safe-execute, skill-creator)
 └── examples/
     └── PetitsCoursFlow/                    # Exemple fictif complet (Sophie K., professeure de musique)
 ```
@@ -89,18 +90,19 @@ Lab fictif complet (Sophie K., professeure de musique) qui démontre tous les pa
 
 ---
 
-## Changelog v1.1 → v2.0
+## Historique des versions
 
-Saut majeur : alignement VibeFlow Core v4.0 → **v4.1**.
+Résumé du `CHANGELOG.md` du module :
 
-**Ajouts** (Session 044+ amendée du Lab) :
-- 7 zones additives dans `VIBEFLOW_CORE.md` (charte densité agents, architecture skills natif, garde-fou runtime, Adversarial Plan-Review, Iron Law fresh-evidence, méta-procédures, halt conditions)
-- 3 nouveaux patterns (09, 10, 11)
-- Lexique enrichi (+16 termes v4.1)
-- 4 skills (vs 1 en v1.1) : debugger, agent-density-auditor, safe-execute, skill-creator
-- 8 agents refondus ≤ 250L (charte ADR-029)
+- **v2.0.0** (2026-05-24) — Release initiale dans vibeflow-os : Core v4.1 (8 principes), 11 patterns, 4 skills, exemple PetitsCoursFlow.
+- **v2.1.x** (2026-05/06) — Core v4.1 → **v4.2** : ajout du principe **P9 — Modulariser pour la cognition** (9 principes) + pointeur P8 vers `audit-architecture` (ADR-036).
+- **v2.2.x** (2026-07) — Canon DECISIONS.md/DEC-XXX (`adr-template` → `decisions-template`, ADR-043) + `memory: project` sur les 7 templates agents (ADR-044).
+- **v2.3.x** (2026-07) — **Pattern 12 — Cloisonnement par outils** (« un juge n'écrit jamais / un worker n'escalade jamais », garanties au niveau `tools:`) + convention `vf-internal: true`.
+- **v2.4.0** (2026-07-08) — Template `debugger` : Phase 0 — Recherche Documentaire (ADR-045).
+- **v2.5.0** (2026-07-16) — 5e skill **`metier-orchestration`** (boucle de mission de l'orchestrateur métier) + `orchestrator-template.md` (ADR-048).
+- **v2.5.1** (2026-07-25) — Déduplication du template skill-creator (pointeur vers le module canonique), sauvetage `adr-template.md`, scission ADR-031/ADR-056 répercutée.
 
-Détail complet : voir `content/VERSION.md`.
+Détail complet : voir `CHANGELOG.md` (module) et `content/VERSION.md` (version distribuée).
 
 ---
 
@@ -112,20 +114,22 @@ Les modules `consolidator`, `infrastructure-audit`, `validator` du repo vibeflow
 - `infrastructure-audit` complémente le pattern 11-halt-conditions
 - `validator` orchestre tous les patterns via les skills outillés
 
+Le pattern 12-cloisonnement-outils est le support doctrinal des équipes d'agents (team-kernel, mobile-test-team) et de la convention `vf-internal: true`.
+
 Cette doc est donc la **source de vérité conceptuelle**, les autres modules sont les **outils opérationnels**.
 
 ---
 
-## Limites v2.0.0
+## Limites
 
 - 32 LRN orphelins dans certains templates registres (BLK-005 du Lab) — héritage à compléter
-- VIBEFLOW_PHILOSOPHY.md et VIBEFLOW_EXPLAINED.md à actualiser pour pleinement refléter v4.1
-- Pattern 11-halt-conditions doit être intégré avec `infrastructure-audit` Session future
+- VIBEFLOW_PHILOSOPHY.md et VIBEFLOW_EXPLAINED.md à actualiser pour pleinement refléter v4.1/v4.2
+- Skills templates (debugger, agent-density-auditor, safe-execute, metier-orchestration) sont des copies — toute évolution dans les modules vibeflow-os respectifs doit être resync'ée ici (skill-creator est déjà un pointeur vers le module canonique depuis v2.5.1)
 
 ---
 
 ## Liens
 
-- `content/methodology/VIBEFLOW_CORE.md` — Bible v4.1
+- `content/methodology/VIBEFLOW_CORE.md` — Bible v4.2
 - ADR-032 (Lab) — Pattern 02-registres opérationnalisé dans consolidator
 - ADR-033 (Lab) — Distribution via vibeflow-os
