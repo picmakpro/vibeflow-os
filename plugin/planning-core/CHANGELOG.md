@@ -1,5 +1,12 @@
 # Changelog — planning-core
 
+## [v2.5.2] — 2026-07-26
+
+### Corrigé
+- `detect-gsd-engine.sh` résout désormais `GSD_HOME` en dual-layout (`gsd-core` prioritaire,
+  `get-shit-done` legacy en repli) — Phase 11, intégration migration GSD. Aucun changement de
+  contrat de sortie : les codes d'exit `0`/`1`/`2`/`3`/`64` restent inchangés.
+
 ## [v2.5.1] — 2026-07-26
 
 ### Corrigé
