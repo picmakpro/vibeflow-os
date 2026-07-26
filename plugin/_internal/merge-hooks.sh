@@ -115,7 +115,12 @@ def frag_basenames():
     return names
 
 def references(entry, basenames):
-    return any(b in entry.get("command", "") for b in basenames)
+    cmd = entry.get("command", "")
+    for b in basenames:
+        pattern = r"(?:^|[\s'\"/])" + re.escape(b) + r"(?:$|[\s'\"])"
+        if re.search(pattern, cmd):
+            return True
+    return False
 
 hooks = settings.setdefault("hooks", {})
 
@@ -129,6 +134,18 @@ if mode == "merge":
             target = None
             for eg in ev:
                 if isinstance(eg, dict) and eg.get("matcher") == matcher:
+                    # Ne réutiliser un groupe existant que s'il est déjà ENTIÈREMENT possédé par
+                    # VF (tous ses hooks référencent un script connu du fragment courant) — sinon
+                    # créer un nouveau groupe plutôt que de mélanger avec des hooks tiers/gsd-core
+                    # (neutralise : migration de scope qui déplace tout le groupe,
+                    # cleanupOrphanedHooks qui supprime le groupe entier — Phase 10, dry-run).
+                    existing_hooks = eg.get("hooks", []) or []
+                    frag_names = set()
+                    for gg in groups or []:
+                        for hh in gg.get("hooks", []) or []:
+                            frag_names.update(SCRIPT_RE.findall(hh.get("command", "")))
+                    if existing_hooks and not all(references(h, frag_names) for h in existing_hooks):
+                        continue  # groupe mixte — ne pas réutiliser, en chercher un autre / en créer un nouveau
                     target = eg
                     break
             if target is None:

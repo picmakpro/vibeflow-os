@@ -2,7 +2,12 @@
 # test-merge-hooks.sh — Suite du câblage hooks ADR-043 (merge-hooks.sh + intégration engine).
 #
 # T1 — merge dans settings absent → créé, placeholder {{VF_SCRIPTS}} résolu
-# T2 — merge avec settings préexistant → hooks tiers ET clés étrangères préservés
+# T2 — merge avec settings préexistant → hooks tiers isolés dans un groupe propre distinct,
+#      jamais co-localisés avec les hooks VF (contrat arbitré en Phase 11-04 : VF ne fusionne
+#      plus jamais dans un groupe qu'il ne possède pas intégralement — protection contre les
+#      outils tiers qui réécrivent/suppriment des GROUPES entiers, cas prouvé : le
+#      cleanupOrphanedHooks de gsd-core et sa migration de scope). Anti-prolifération vérifiée :
+#      un second merge n'ajoute pas de 3e groupe Read.
 # T3 — idempotence : double merge → aucun doublon
 # T4 — remove → entrées du module retirées, tiers conservés, groupes vides nettoyés
 # T5 — intégration engine : install consolidator → hooks présents ; uninstall → retirés
@@ -51,7 +56,7 @@ else
   ko "T1 merge dans settings absent"
 fi
 
-# ---------- T2 : settings préexistant préservé ----------
+# ---------- T2 : settings préexistant préservé, hooks tiers isolés en groupe propre ----------
 S2="$WORK/t2/settings.json"
 mkdir -p "$WORK/t2"
 cat > "$S2" <<'EOF'
@@ -66,6 +71,13 @@ cat > "$S2" <<'EOF'
 }
 EOF
 bash "$MERGER" merge "$FRAG" --settings "$S2" --scripts-prefix "$PREFIX" 2>/dev/null
+READ_GROUPS_AFTER_1="$(python3 -c "
+import json
+d = json.load(open('$S2'))
+print(len([g for g in d['hooks']['PreToolUse'] if g.get('matcher') == 'Read']))
+")"
+# Second merge — vérifie l'anti-prolifération : aucun 3e groupe Read ne doit apparaître.
+bash "$MERGER" merge "$FRAG" --settings "$S2" --scripts-prefix "$PREFIX" 2>/dev/null
 if python3 -c "
 import json, sys
 d = json.load(open('$S2'))
@@ -75,11 +87,18 @@ assert any('tiers-read' in c for c in all_cmds), 'hook tiers Read perdu'
 assert any('tiers-bash' in c for c in all_cmds), 'hook tiers Bash perdu'
 assert any('guard-read-registres.sh' in c for c in all_cmds), 'hook module absent'
 read_groups = [g for g in d['hooks']['PreToolUse'] if g.get('matcher') == 'Read']
-assert len(read_groups) == 1, 'groupe Read dupliqué au lieu de fusionné'
+tiers_group = next((g for g in read_groups if any('tiers-read' in h['command'] for h in g['hooks'])), None)
+own_group = next((g for g in read_groups if any('guard-read-registres.sh' in h['command'] for h in g['hooks'])), None)
+assert tiers_group is not None, 'groupe tiers Read introuvable'
+assert own_group is not None, 'groupe VF Read introuvable'
+assert tiers_group is not own_group, 'VF a fusionné dans le groupe tiers au lieu de créer le sien'
+assert all('guard-read-registres.sh' not in h['command'] for h in tiers_group['hooks']), 'groupe tiers pollué par un hook VF'
+assert all('tiers-read' not in h['command'] for h in own_group['hooks']), 'groupe VF pollué par le hook tiers'
+assert len(read_groups) == $READ_GROUPS_AFTER_1, f'prolifération de groupes Read au 2e merge : {len(read_groups)} vs $READ_GROUPS_AFTER_1'
 " 2>/dev/null; then
-  ok "T2 hooks tiers + clés étrangères préservés, groupe Read fusionné"
+  ok "T2 hooks tiers isolés en groupe propre distinct, aucune prolifération au 2e merge"
 else
-  ko "T2 préservation du settings préexistant"
+  ko "T2 isolation groupe tiers / anti-prolifération"
 fi
 
 # ---------- T3 : idempotence ----------

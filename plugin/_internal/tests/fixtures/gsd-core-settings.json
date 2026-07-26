@@ -1,0 +1,91 @@
+{
+  "statusLine": {
+    "type": "command",
+    "command": "node \"/Users/dev/.claude/gsd-core/hooks/gsd-statusline.js\"",
+    "padding": 0
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(npm test:*)"
+    ],
+    "deny": []
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash /Users/dev/.claude/gsd-core/hooks/gsd-check-update.sh", "timeout": 5 },
+          { "type": "command", "command": "bash /Users/dev/.claude/gsd-core/hooks/gsd-session-state.sh" },
+          { "type": "command", "command": "bash /Users/dev/.claude/gsd-core/hooks/gsd-config-reload.sh" }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          { "type": "command", "command": "bash /Users/dev/.claude/gsd-core/hooks/gsd-read-guard.sh", "timeout": 5 }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          { "type": "command", "command": "bash /Users/dev/.claude/gsd-core/hooks/gsd-prompt-guard.sh", "timeout": 5 },
+          { "type": "command", "command": "bash /Users/dev/.claude/gsd-core/hooks/gsd-worktree-path-guard.sh", "timeout": 5 }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "bash /Users/dev/.claude/gsd-core/hooks/gsd-workflow-guard.sh" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "bash /Users/dev/.claude/gsd-core/hooks/gsd-context-monitor.sh", "timeout": 10 }
+        ]
+      },
+      {
+        "matcher": "Read|WebFetch|WebSearch",
+        "hooks": [
+          { "type": "command", "command": "bash /Users/dev/.claude/gsd-core/hooks/gsd-read-injection-scanner.sh", "timeout": 5 }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash /Users/dev/.claude/gsd-core/hooks/gsd-archive.sh --async --apply || true" },
+          { "type": "command", "command": "bash /Users/dev/.claude/gsd-core/hooks/gsd-context-monitor.sh", "timeout": 10 },
+          { "type": "command", "command": "bash /Users/dev/.claude/gsd-core/hooks/gsd-graphify-update.sh" }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash /Users/dev/.claude/gsd-core/hooks/gsd-context-monitor.sh", "timeout": 10 }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash /Users/dev/.claude/gsd-core/hooks/gsd-context-monitor.sh", "timeout": 10 }
+        ]
+      }
+    ],
+    "FileChanged": [
+      {
+        "matcher": "config.json",
+        "hooks": [
+          { "type": "command", "command": "bash /Users/dev/.claude/gsd-core/hooks/gsd-config-reload.sh", "timeout": 8 }
+        ]
+      }
+    ]
+  }
+}
