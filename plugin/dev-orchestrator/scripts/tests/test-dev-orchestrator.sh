@@ -34,6 +34,11 @@
 #   T15 — Pipelining N/N+1 (audit 2026-07-25) : mission-flow.md modélise le DAG fin
 #         (discuss/plan/execute par étape, règle de provisoire) et vf-dev-manager.md
 #         y renvoie avec la consigne compacte.
+#   T16 — Doctrine d'ingestion (phase 13, BRDG-01/BRDG-03) : ingestion-flow.md existe et
+#         porte le script, les 3 exits, le schéma manifest et les 4 garde-fous ; AGENT.md
+#         y renvoie en Références.
+#   T17 — Câblage du routage d'ingestion : AGENT.md porte une ligne d'intention explicite
+#         (table Amont & cadrage) et intent-routing.md conserve sa ligne enrichie.
 #
 # Historique de numérotation : T3/T12/T13/T14 ont changé de sémantique à la v2.0.0 (les
 # anciens tests de collision de descriptions, de préséance et de synchro de la table vf-dev
@@ -590,6 +595,48 @@ if [ -f "$MFLOW" ]; then
 else
   ko "T15 pipelining : $MFLOW introuvable"
 fi
+
+# ---------------------------------------------------------------------------
+# T16 — Doctrine d'ingestion (phase 13, BRDG-01/BRDG-03)
+# ---------------------------------------------------------------------------
+# ingestion-flow.md doit porter le script, ses 3 exits, le schéma manifest et les 4 garde-fous
+# textuellement ; AGENT.md doit y renvoyer en Références (gabarit exact de T15/T9).
+IFLOW="$REFS_DIR/ingestion-flow.md"
+if [ ! -f "$IFLOW" ]; then
+  ko "T16 ingestion : $IFLOW introuvable"
+else
+  t16_ok=1
+  "$GREP" -q "discover-unintegrated-docs.sh" "$IFLOW" || { ko "T16 ingestion : script non nommé dans ingestion-flow.md"; t16_ok=0; }
+  "$GREP" -q "exit 0" "$IFLOW" || { ko "T16 ingestion : exit 0 non documenté"; t16_ok=0; }
+  "$GREP" -q "exit 3" "$IFLOW" || { ko "T16 ingestion : exit 3 non documenté"; t16_ok=0; }
+  "$GREP" -q "exit 64" "$IFLOW" || { ko "T16 ingestion : exit 64 non documenté"; t16_ok=0; }
+  "$GREP" -q "type: SPEC" "$IFLOW" || { ko "T16 ingestion : schéma manifest (type: SPEC) absent"; t16_ok=0; }
+  "$GREP" -q "BLOCKER" "$IFLOW" || { ko "T16 ingestion : garde-fou BLOCKER absent"; t16_ok=0; }
+  "$GREP" -q "ADR-031" "$IFLOW" || { ko "T16 ingestion : garde-fou ADR-031 absent"; t16_ok=0; }
+  "$GREP" -q -e "--mode merge" "$IFLOW" || { ko "T16 ingestion : garde-fou --mode merge absent"; t16_ok=0; }
+  "$GREP" -qE "cap 50|50 doc" "$IFLOW" || { ko "T16 ingestion : garde-fou cap 50 absent"; t16_ok=0; }
+  "$GREP" -q "ingestion-flow" "$AGENT_FILE" || { ko "T16 ingestion : AGENT.md ne renvoie pas vers ingestion-flow.md"; t16_ok=0; }
+  [ "$t16_ok" -eq 1 ] && ok "T16 ingestion : ingestion-flow.md complet (script, 3 exits, manifest, 4 garde-fous), AGENT.md y renvoie"
+fi
+
+# ---------------------------------------------------------------------------
+# T17 — Câblage du routage d'ingestion (AGENT.md + intent-routing.md)
+# ---------------------------------------------------------------------------
+t17_ok=1
+if "$GREP" -q "ingestion-flow" "$AGENT_FILE" \
+   && ("$GREP" -q "gsd-ingest-docs" "$AGENT_FILE" || "$GREP" -q "gsd-import" "$AGENT_FILE"); then
+  :
+else
+  ko "T17 routage : AGENT.md sans ligne d'intention d'ingestion explicite"; t17_ok=0
+fi
+if [ -f "$ROUTING" ]; then
+  routing_gsd=$("$GREP" -c "gsd-ingest-docs" "$ROUTING")
+  routing_iflow=$("$GREP" -c "ingestion-flow" "$ROUTING")
+  { [ "${routing_gsd:-0}" -ge 1 ] && [ "${routing_iflow:-0}" -ge 1 ]; } || { ko "T17 routage : intent-routing.md sans ligne enrichie (gsd-ingest-docs + ingestion-flow)"; t17_ok=0; }
+else
+  ko "T17 routage : $ROUTING introuvable"; t17_ok=0
+fi
+[ "$t17_ok" -eq 1 ] && ok "T17 routage : AGENT.md + intent-routing.md câblent l'intention d'ingestion"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="

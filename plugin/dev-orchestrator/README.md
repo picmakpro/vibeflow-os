@@ -7,7 +7,7 @@
 > façade de verbes : GSD est l'interface directe du quotidien, l'agent est l'entrée
 > conversationnelle optionnelle.
 
-**Version** : v2.1.1
+**Version** : v2.2.0
 **Type** : agent + équipe d'agents + 2 skills + scripts
 
 ---
@@ -78,6 +78,7 @@ dev-orchestrator/
     ├── gsd-skills-index.md         # auto-généré (NE PAS ÉDITER)
     ├── mission-contracts.md        # Brief / Digest / Rapport de mission + SEUIL_EQUIPE
     ├── mission-flow.md             # lock + DAG + rapports typés (ADR-053)
+    ├── ingestion-flow.md           # ingestion BRDG-01/03, chargée on-demand
     └── autonomous-guardrails.md    # garde-fous des boucles autonomes
 ```
 
@@ -201,6 +202,12 @@ Couvre les axes de la bascule agentique (spec 2026-07-25) plus les acquis :
   aucun verbe supprimé référencé dans les fichiers du module.
 - **T14** — exhaustivité : chaque skill de l'index factuel est routé par `intent-routing.md`
   (SKIP si l'index est vide, c'est-à-dire sans chaîne installée).
+- **T15** — pipelining N/N+1 : `mission-flow.md` modélise le DAG fin (discuss/plan/execute par
+  étape, règle de provisoire), `vf-dev-manager.md` y renvoie avec la consigne compacte.
+- **T16** — doctrine d'ingestion (BRDG-01/BRDG-03) : `ingestion-flow.md` porte le script, ses
+  3 exits, le schéma manifest et les 4 garde-fous ; `AGENT.md` y renvoie en Références.
+- **T17** — câblage du routage d'ingestion : `AGENT.md` porte une ligne d'intention explicite,
+  `intent-routing.md` conserve sa ligne enrichie du renvoi vers `ingestion-flow.md`.
 
 Exit 0 si tout passe (les SKIP, ex. GSD absent, ne font pas échouer la suite).
 
@@ -208,6 +215,7 @@ Exit 0 si tout passe (les SKIP, ex. GSD absent, ne font pas échouer la suite).
 
 ## Références
 
+- Doctrine d'ingestion (découverte, manifest, garde-fous BRDG-03) : `references/ingestion-flow.md`
 - Spec de la bascule agentique : `docs/superpowers/specs/2026-07-25-suppression-facade-vf-design.md`
 - Spec d'origine du module : `docs/superpowers/specs/2026-06-04-dev-orchestrator-design.md`
 - Équipe de mission : `docs/superpowers/specs/2026-07-09-dev-manager-team-design.md` (DM1-DM6)
@@ -220,6 +228,10 @@ Exit 0 si tout passe (les SKIP, ex. GSD absent, ne font pas échouer la suite).
 
 ## Historique
 
+- **v2.2.0** — câblage de l'ingestion (BRDG-01/BRDG-03) dans `vibeflow-dev` : doctrine
+  `references/ingestion-flow.md` (découverte, manifest, délégation `gsd-ingest-docs`/
+  `gsd-import`, garde-fous BLOCKER/ADR-031/mode merge/cap 50), proposée comme next step en fin
+  de cadrage.
 - **v2.1.1** — recette dev en lab sandbox : cascade `$S` (le lab courant prime sur le scope
   user), doctrine `human_needed` en autonome, `requires` += `conductor` (team-kernel).
 - **v2.1.0** — pipelining N/N+1 : cadrage+plan de l'étape suivante pendant l'exécution de la

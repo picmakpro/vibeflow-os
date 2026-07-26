@@ -1,5 +1,14 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.2.0] — 2026-07-26
+
+### Ajouté
+- Câblage de l'ingestion (BRDG-01/BRDG-03) dans `vibeflow-dev` — doctrine
+  `references/ingestion-flow.md` (découverte via `discover-unintegrated-docs.sh` livré par la
+  phase 13/plan 13-01, construction du manifest, délégation `gsd-ingest-docs --mode merge` /
+  `gsd-import --from`, garde-fous BLOCKER/ADR-031/mode merge/cap 50), next step proposé en fin de
+  cadrage (spec/plan écrit(e) non encore dans la feuille de route), axes de test T16/T17.
+
 ## [v2.1.1] — 2026-07-26
 
 ### Corrigé
