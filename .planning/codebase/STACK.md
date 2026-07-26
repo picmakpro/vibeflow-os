@@ -106,9 +106,17 @@ Outil de bump : `scripts/bump.sh`.
 ## Key Dependencies
 
 **Dépendances externes réelles (auto-installées par `plugin/dev-orchestrator/scripts/ensure-deps.sh`) :**
-- **GSD** (`get-shit-done-cc`) — moteur de planning dev. Install non-interactive :
-  `npx -y get-shit-done-cc@latest --claude --global|--local` (scope user → `--global`,
-  project/local → `--local`). Détection : binaire `gsd-sdk` ou `~/.claude/get-shit-done/VERSION`.
+- **GSD** (`@opengsd/gsd-core`, depuis Phase 11 — remplace l'ancien `get-shit-done-cc`
+  désormais déprécié) — moteur de planning dev. Install non-interactive :
+  `npx -y @opengsd/gsd-core@latest --claude --global|--local` (pin `@latest`, jamais `@next` —
+  le dist-tag `next` amont est périmé ; scope user → `--global`, project/local → `--local`).
+  Payload sous `~/.claude/gsd-core/` (scope user) ou `<projet>/.claude/gsd-core/` (scope
+  projet/local), fichier `VERSION` faisant autorité. Détection : cascade fichier `VERSION`
+  uniquement, jamais de test PATH (nouveau layout prioritaire, legacy en repli). **Fenêtre de
+  compatibilité** : l'ancien layout `~/.claude/get-shit-done/` reste DÉTECTÉ pour les labs pas
+  encore migrés (jamais réinstallé ni supprimé automatiquement — nettoyage manuel affiché,
+  ADR-031). L'ancien binaire `gsd-sdk` a disparu au profit de `gsd-tools`, résolu **par cascade**
+  (jamais un chemin en dur) — voir `plugin/dev-orchestrator/references/mission-contracts.md`.
   Post-install : patch MCP de `gsd-executor.md` via
   `plugin/dev-orchestrator/scripts/inject-mcp-tools.sh` (ADR-051) et index via
   `plugin/dev-orchestrator/scripts/build-gsd-index.sh`. Détection moteur côté lab :

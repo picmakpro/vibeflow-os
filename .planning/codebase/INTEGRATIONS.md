@@ -24,7 +24,10 @@
 
 **npm registry :**
 - `plugin/dev-orchestrator/scripts/ensure-deps.sh` installe GSD via
-  `npx -y get-shit-done-cc@latest --claude --global|--local` (non-interactif, scope-aware).
+  `npx -y @opengsd/gsd-core@latest --claude --global|--local` (non-interactif, scope-aware ; pin
+  `@latest`, jamais `@next` — dist-tag amont périmé). Depuis Phase 11, remplace l'ancien
+  `get-shit-done-cc` (déprécié) ; fenêtre de compatibilité : l'ancien layout
+  `~/.claude/get-shit-done/` reste détecté (jamais réinstallé) pour les labs pas encore migrés.
 
 **Marketplace officiel Anthropic :**
 - `ensure-deps.sh` installe Superpowers via
