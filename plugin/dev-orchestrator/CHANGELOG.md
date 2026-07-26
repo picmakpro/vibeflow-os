@@ -1,5 +1,14 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.2.1] — 2026-07-26
+
+### Corrigé
+- Échappatoire ADR-031 fermée sur l'ingestion (finding de l'audit BRDG-03) : `vf-dev-manager`
+  porte désormais une ligne **nominative** dans ses exceptions d'autonomie — l'ingestion d'un
+  cadrage (`gsd-ingest-docs` / `gsd-import`, doctrine `ingestion-flow.md`) remonte TOUJOURS à
+  l'utilisateur, jamais déclenchée depuis une mission sans confirmation humaine explicite.
+  La protection n'était jusqu'ici ancrée textuellement qu'à `vibeflow-dev`.
+
 ## [v2.2.0] — 2026-07-26
 
 ### Ajouté

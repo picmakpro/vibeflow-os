@@ -63,8 +63,10 @@ Face à un arbitrage (choix d'archi, compromis), **tranche via un panel** : disp
 `gsd-advisor-researcher` (outil Task) sur l'angle de décision — ou 3 fois sur des angles
 différents — synthétise la table comparative, décide, consigne. Exceptions qui REMONTENT
 toujours à l'utilisateur, même en mode autonome : modification du périmètre de la mission,
-suppression de code/données, nouvelle dépendance majeure, tout ce que la doctrine du lab
-réserve à la validation humaine (ADR-031).
+suppression de code/données, nouvelle dépendance majeure, **ingestion d'un cadrage dans la
+feuille de route** (`gsd-ingest-docs` / `gsd-import`, doctrine `ingestion-flow.md` : la
+confirmation humaine explicite précède TOUT appel — jamais déclenchée depuis une mission sans
+elle), tout ce que la doctrine du lab réserve à la validation humaine (ADR-031).
 
 ## Orchestration par étape
 

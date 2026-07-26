@@ -7,7 +7,7 @@
 > façade de verbes : GSD est l'interface directe du quotidien, l'agent est l'entrée
 > conversationnelle optionnelle.
 
-**Version** : v2.2.0
+**Version** : v2.2.1
 **Type** : agent + équipe d'agents + 2 skills + scripts
 
 ---
@@ -228,6 +228,8 @@ Exit 0 si tout passe (les SKIP, ex. GSD absent, ne font pas échouer la suite).
 
 ## Historique
 
+- **v2.2.1** — échappatoire ADR-031 fermée : l'ingestion remonte nominativement à l'humain
+  depuis `vf-dev-manager` aussi (jamais déclenchée en mission sans confirmation).
 - **v2.2.0** — câblage de l'ingestion (BRDG-01/BRDG-03) dans `vibeflow-dev` : doctrine
   `references/ingestion-flow.md` (découverte, manifest, délégation `gsd-ingest-docs`/
   `gsd-import`, garde-fous BLOCKER/ADR-031/mode merge/cap 50), proposée comme next step en fin
