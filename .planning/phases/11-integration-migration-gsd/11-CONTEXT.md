@@ -93,21 +93,42 @@ interdit de toute façon de réordonner/fusionner/scinder les 6 vagues : chaque 
 — la chaîne est linéaire par construction, ce qui évacue le risque de conflit sans qu'il soit
 besoin de le documenter en garde-fou d'exécution.
 
-### D-01 — Détection dual-layout : réimplémentation locale, pas de fonction partagée
+### D-01 — Détection dual-layout : réimplémentation locale, pas de fonction partagée, cascade à 4
+niveaux (amendé — recherche documentaire, décision D1)
 
 `detect-gsd-engine.sh` (planning-core, `requires: []`) et `ensure-deps.sh`/`build-gsd-index.sh`
 (dev-orchestrator) ne peuvent pas partager de code (modules indépendants, aucune dépendance
 déclarée entre eux — cf. le commentaire existant dans `detect-gsd-engine.sh:51` : *« Réimplémenté
 localement et non sourcé »*). Chaque script porte donc **sa propre** fonction de résolution
-dual-path (nouveau `gsd-core` prioritaire, `get-shit-done` legacy en repli), sur le même schéma :
+dual-path (nouveau `gsd-core` prioritaire, `get-shit-done` legacy en repli).
+
+**Amendement D1** (panel de recherche documentaire, preuve : `bin/install.js` de gsd-core 1.8.0
+gère un scope `--local` qui dépose le payload sous `<projet>/.claude/gsd-core/`, pas sous
+`~/.claude/` — or `ensure-deps.sh` dérive déjà un `GSD_SCOPE_FLAG` `--global`/`--local` : un chemin
+figé sur `$HOME` seul rate donc une population que notre propre engine sait créer). La cascade
+passe de 3 à **4 niveaux**, jamais de chemin en dur :
 1. env var explicite (si fournie par l'appelant/les tests) → gagne toujours, aucune détection ;
-2. sinon, `~/.claude/gsd-core/...` si présent ;
-3. sinon, `~/.claude/get-shit-done/...` (legacy) si présent ;
-4. sinon, défaut = le chemin `gsd-core` (nomme le futur, pas le passé, dans les messages d'erreur).
+2. sinon, racine **projet-local** + `.claude/gsd-core/...` si présent (scope `--local`) — racine
+   résolue via la variable de chemin cible déjà utilisée par le script (probablement liée à
+   `--path`) si elle existe, sinon `git rev-parse --show-toplevel 2>/dev/null || pwd` ;
+3. sinon, `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/gsd-core/...` si présent (scope `--global`, cas
+   courant — le `CLAUDE_CONFIG_DIR` n'était pas honoré avant cet amendement) ;
+4. sinon, `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/get-shit-done/...` (legacy) si présent — **pas de
+   variante projet-local pour le legacy** : `get-shit-done-cc` est antérieur au scope `--local`
+   (introduit en 1.8.0), aucune preuve qu'il ait jamais pu être posé à l'échelle projet ;
+5. sinon, défaut = le chemin `gsd-core` sous `${CLAUDE_CONFIG_DIR:-$HOME/.claude}` (nomme le futur,
+   pas le passé, dans les messages d'erreur).
 
 Cette règle s'applique à **3 sites** : `GSD_HOME` (detect-gsd-engine.sh), `GSD_VERSION_FILE`
-(ensure-deps.sh, détection de présence), `WORKFLOWS_DIR` (build-gsd-index.sh, source secondaire
+(ensure-deps.sh, détection de présence — D3, dérivée du chemin résolu par la cascade plutôt que
+deux constantes indépendantes), `WORKFLOWS_DIR` (build-gsd-index.sh, source secondaire
 optionnelle).
+
+**Frontière avec D-02/piège n°1 (important, ne pas confondre)** : cette cascade reste
+**strictement fichier** (jamais de `command -v`) — le fallback `command -v gsd-tools` du snippet
+amont (D-05) n'a de sens que pour *localiser un binaire à exécuter* (mission-contracts.md, 11-02),
+pas pour *détecter une installation afin de décider si on la (ré)installe* (ensure-deps.sh, 11-01).
+Réintroduire `command -v` dans `detect_gsd()` recréerait exactement le piège n°1.
 
 ### D-02 — Piège n°1 : suppression pure, pas remplacement par un autre `command -v`
 
@@ -151,12 +172,44 @@ fragiles sur le format `vX.Y.Z` qui varie selon la commande).
 | `gsd-sdk query roadmap.analyze` | `gsd-tools roadmap analyze` | `vf-auto/SKILL.md:18`, `mission-contracts.md:72` |
 | `gsd-sdk query state-snapshot` | `gsd-tools state json` (court) / `state load` (complet) | (aucun site vivant trouvé) |
 
-Invocation canonique complète (à utiliser dans les fichiers de doctrine, pas un alias supposé) :
-`node "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/gsd-core/bin/gsd-tools.cjs" <cmd>`. Le fallback
-documenté dans `mission-contracts.md` (« si l'outil est absent, compter les cases non cochées
-via `grep -c '^- \[ \]'` ») est **conservé**, seule sa condition de déclenchement change : au lieu
-de tester `command -v gsd-sdk`, la doctrine teste l'existence du fichier
-`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/gsd-core/bin/gsd-tools.cjs`.
+**Forme d'invocation (amendée — recherche documentaire, décision D1) : cascade de résolution, pas
+un chemin en dur.** Le panel de recherche a infirmé le chemin figé initial (preuve : scope
+`--local` de gsd-core 1.8.0, cf. D-01) — l'arbitrage de fond (« `gsd-tools` gagne, pas `gsd-sdk` »)
+est inchangé, seule la forme d'invocation se durcit. Variante Claude-only du snippet officiel amont
+(`gsd-core/workflows/_runtime-launcher.snippet.sh`, généré par `npm run sync:launcher` côté
+gsd-core) à documenter dans `mission-contracts.md` comme l'invocation canonique complète :
+```sh
+_GSD_ROOT="${RUNTIME_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+GSD_TOOLS=""
+for _c in "$_GSD_ROOT/gsd-core/bin/gsd-tools.cjs" \
+          "$_GSD_ROOT/.claude/gsd-core/bin/gsd-tools.cjs" \
+          "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/gsd-core/bin/gsd-tools.cjs"; do
+  [ -f "$_c" ] && { GSD_TOOLS="$_c"; break; }
+done
+if   [ -n "$GSD_TOOLS" ];                  then gsd_run() { node "$GSD_TOOLS" "$@"; }
+elif command -v gsd-tools >/dev/null 2>&1; then GSD_TOOLS="$(command -v gsd-tools)"; gsd_run() { "$GSD_TOOLS" "$@"; }
+else echo "ERROR: gsd-tools.cjs introuvable. Installer : npx -y @opengsd/gsd-core@latest --claude --global" >&2; exit 1; fi
+
+GSD_HOME="${GSD_TOOLS%/bin/*}"                        # ex. ~/.claude/gsd-core
+GSD_VERSION="$(cat "$GSD_HOME/VERSION" 2>/dev/null || echo unknown)"   # D3 : dérivé, pas figé, jamais bloquant si absent
+```
+Le fallback documenté dans `mission-contracts.md` (« si l'outil est absent, compter les cases non
+cochées via `grep -c '^- \[ \]'` ») est **conservé**, mais sa condition de déclenchement **s'élargit
+(décision D2)** : `gsd-tools` sort exit 0 même en erreur métier — le succès se teste sur le
+**JSON** (absence de champ `.error`), jamais sur `$?`. Le fallback se déclenche donc si `gsd_run`
+échoue à se résoudre (bloc `else` ci-dessus) **OU** si la sortie JSON de `gsd-tools roadmap
+analyze` contient un champ `.error` — pas seulement sur binaire absent.
+
+**Écarts assumés vs le snippet amont (décision D5, à documenter dans le module, une ligne
+suffit)** : (a) les ~15 runtimes non-Claude du snippet officiel sont retirés (VibeFlow est un
+plugin Claude Code) ; (b) `command -v gsd-tools` est placé **après** les chemins fichiers (on
+privilégie le payload installé sur un éventuel bin npm global de version différente) ; (c) on
+n'écrit pas dans `CLAUDE_ENV_FILE`. Note de veille à ajouter en 11-06 : re-differ l'ordre de la
+cascade contre `_runtime-launcher.snippet.sh` à chaque bump de `gsd-core`.
+
+**Rester `@latest`, jamais `@next` (décision D4)** : le dist-tag `next` est périmé (1.7.0-rc.6,
+antérieur à `latest` = 1.8.0). `latest` est confirmé 1.8.0 au 2026-07-26, `[Unreleased]` amont vide
+— aucune occurrence de `@next` ne doit apparaître dans les fichiers touchés par cette phase.
 
 ### D-06 — Whitelist T4/T14 : renommage, pas ajout
 
@@ -190,12 +243,17 @@ router / §Couverture) exige que toute exception soit écrite dans CE fichier �
    une brique comme routée-ailleurs) : une liste `INTENTIONALLY_UNROUTED` — ces skills sont
    **exemptés** de l'obligation T14, pas déclarés routés. Sémantique différente, ne pas fusionner
    les deux listes.
-**Vérification des noms exacts** : le nom exact des skills mempalace posés par gsd-core
-(`gsd-mempalace-capture`/`gsd-mempalace-recall`, confirmé par la lecture du tarball en Phase 10 —
-`10-ETUDE.md` §4 : *« mempalace-capture/mempalace-recall + agent gsd-mempalace-curator »*) doit
-être **re-confirmé contre l'index régénéré en fin de 11-03** (D-09bis) avant de committer — si le
-nom diffère de ce qui est écrit ici, corriger le nom dans `intent-routing.md` ET la whitelist du
-test, jamais l'un sans l'autre (contrainte explicite de Phase 10).
+**Noms exacts des skills mempalace — FAIT PROUVÉ (amendé, décision F1, plus une hypothèse à
+reconfirmer)** : le manager de mission a fait inspecter directement le tarball `@opengsd/gsd-core@1.8.0`
+et confirme **exactement** `skills/gsd-mempalace-capture`, `skills/gsd-mempalace-recall`,
+`skills/gsd-next`, `skills/gsd-onboard`, et l'agent `agents/gsd-mempalace-curator.md`. Ces noms
+sont donc les noms **corrects**, source : inspection directe du tarball 1.8.0 (et non plus
+seulement `10-ETUDE.md` §4, qui reste cohérent). Le garde-fou « corriger partout si divergence à la
+régénération » **reste en place, mais en filet de sécurité, plus en incertitude ouverte à
+trancher** : la vague 11-03 régénère `gsd-skills-index.md` en toute fin (R-01) et doit toujours
+vérifier que l'index régénéré correspond à ces noms avant de committer — si un jour une divergence
+apparaissait (version future de gsd-core), corriger le nom dans `intent-routing.md` ET la
+whitelist du test, jamais l'un sans l'autre.
 
 ### D-09 — `check-overlaps.sh` : 3 paires exactes, pas de glob
 
