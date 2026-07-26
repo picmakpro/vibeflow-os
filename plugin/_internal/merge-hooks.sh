@@ -117,7 +117,15 @@ def frag_basenames():
 def references(entry, basenames):
     cmd = entry.get("command", "")
     for b in basenames:
-        pattern = r"(?:^|[\s'\"/])" + re.escape(b) + r"(?:$|[\s'\"])"
+        # Frontière fermée par construction plutôt qu'énumération de métacaractères shell :
+        # un basename ne peut être suivi/précédé d'un caractère qui ferait partie d'un nom de
+        # script ([A-Za-z0-9._-]) sans être un faux positif de sous-chaîne (ex. "archive.sh"
+        # NE DOIT PAS matcher "gsd-archive.sh"). Tout le reste (espace, guillemet, `/`, `;`,
+        # `)`, `|`, `&`, backtick, `<`, `>`, fin de chaîne...) est une frontière valide — un
+        # lookaround négatif capture cet ensemble ouvert sans qu'on ait à l'énumérer, donc sans
+        # risque d'oubli d'un futur métacaractère. `(?<!...)`/`(?!...)` réussissent naturellement
+        # en début/fin de chaîne (rien à faire correspondre), ce qui couvre aussi `^`/`$`.
+        pattern = r"(?<![A-Za-z0-9._-])" + re.escape(b) + r"(?![A-Za-z0-9._-])"
         if re.search(pattern, cmd):
             return True
     return False
