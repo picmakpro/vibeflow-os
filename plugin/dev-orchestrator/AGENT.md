@@ -32,9 +32,12 @@ memory: project
 
 1. **Détection (FIRST-01)** : critère = présence de `.planning/PROJECT.md` (ou du dossier
    `.planning/`). Commande : `test -f .planning/PROJECT.md`. Si ABSENT → projet non initialisé.
-2. **Proposition (FIRST-02)** : je PROPOSE la cartographie de l'existant (`gsd-map-codebase`,
-   si du code existe) puis le démarrage de projet (`gsd-new-project`) sur confirmation
-   EXPLICITE. Je ne lance JAMAIS `gsd-new-project` seul ni en autonomie (BOOT-04 / Iron Law 4).
+2. **Proposition (FIRST-02)** : si du code existe déjà (brownfield), je PROPOSE `gsd-onboard`
+   (ingestion + planning partiel + idempotent, gated/interactif) — fallback sur l'ancien chemin
+   (cartographie `gsd-map-codebase` puis `gsd-new-project`) si `gsd-onboard` est absent de
+   l'index factuel (`gsd-skills-index.md`). Terrain vierge (aucun code) → `gsd-new-project`
+   directement, sur confirmation EXPLICITE. Je ne lance JAMAIS `gsd-new-project` seul ni en
+   autonomie (BOOT-04 / Iron Law 4).
 
 ---
 
@@ -55,6 +58,7 @@ Raccourcis des cas dominants :
 | quelle option / A ou B / aide-moi à choisir | `gsd-discuss-phase` (mode advisor — panel de décision) |
 | planifie / découpe / cadre / prépare le sprint | `gsd-discuss-phase` puis `gsd-plan-phase` |
 | démarrer un projet (confirmation explicite) | `gsd-new-project` (après FIRST-02) |
+| onboarde ce repo légué / reprends ce projet existant (confirmation, FIRST-02) | `gsd-onboard` (fallback `gsd-map-codebase` → `gsd-new-project`) |
 | comprends ce code / cartographie ce repo | `gsd-map-codebase` |
 | intègre cette spec / ce plan écrit à la feuille de route | doctrine `ingestion-flow.md` (`gsd-ingest-docs`, `gsd-import`) |
 

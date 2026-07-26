@@ -50,6 +50,7 @@ l'inverse : on n'édite pas l'index pour faire tomber une couverture juste.
 | planifie / découpe / cadre / prépare le sprint / structure le boulot | `gsd-discuss-phase` puis `gsd-plan-phase` |
 | la plus petite version qui marche / une tranche verticale / le MVP de cette étape | `gsd-mvp-phase` |
 | démarrer un projet / repartir de zéro / nouveau repo (confirmation explicite, FIRST-02) | `gsd-new-project` |
+| onboarde ce codebase / reprends ce repo légué / c'est un projet existant, pas from scratch (FIRST-02) | `gsd-onboard` (fallback : `gsd-map-codebase` puis `gsd-new-project` si le skill est absent de l'index) |
 | intègre cette spec à la feuille de route / importe ce plan (doctrine : `ingestion-flow.md`) | `gsd-ingest-docs`, `gsd-import` |
 
 ## Construction
@@ -148,6 +149,14 @@ l'index ; ajouter un skill interne sans le router fait échouer la suite) :
    routé PAR le skill `vf-auto` (aiguillage seuil), seule entrée légitime.
 3. **Délégué au module design** : `gsd-ui-phase` / `gsd-ui-review` sont routés par la chaîne
    design (`vf-design` → agent `vibeflow-design`), pas par cette carte.
+4. **Non routé — une seule voix (ADR-057)** : `gsd-next` et `gsd-mempalace-capture` /
+   `gsd-mempalace-recall` sont **délibérément absents** de toute table de routage.
+   - `gsd-next` est la front door de GSD pour qui n'a pas d'agent routeur ; `vibeflow-dev` EST
+     déjà la front door de ce lab — router `gsd-next` empilerait deux routeurs (la couche que la
+     bascule agentique v2.33.0 a supprimée). Voir `check-overlaps.sh`.
+   - `gsd-mempalace-capture`/`gsd-mempalace-recall` mémorisent des artefacts de phase GSD
+     (opt-in, produit tiers MemPalace requis) ; le `consolidator` reste le canon de la mémoire de
+     lab (in-repo, machine-enforced, ADR-052). Ne pas activer, ne pas répliquer.
 
 Toute nouvelle exception doit être écrite ICI (et couverte par le test) — pas seulement dans
 la whitelist du test.
