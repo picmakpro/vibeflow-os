@@ -262,7 +262,21 @@ sans contourner leurs garde-fous.
      aucune spec orpheline, sans ressusciter le cycle de verbes supprimé en v2.33.0.
   5. Release livrée : CHANGELOG/README des modules à jour, bump racine + **tag annoté poussé**
      (`scripts/check-release-tag.sh --remote` → ✓).
-**Plans**: 13-01 (découverte outillée — plan écrit, à exécuter) · 13-02 (câblage dans l'agent — à planifier)
+**Plans**: 2 plans (2 vagues) — ✅ complétés, vérif goal-backward **PASS** (`13-VERIFICATION.md` : 4/4
+critères dans le mandat, 3/3 BRDG, 22/22 must-haves, 0 blocker). Livré : `discover-unintegrated-docs.sh`
+(16 cas, 3 mutants sur 4 tués) et la doctrine `references/ingestion-flow.md` câblée dans `AGENT.md`
+(158 L) + `intent-routing.md`, axes T16/T17. Module `dev-orchestrator` **v2.2.0**. Suites : 16 ok · 30 OK
+· 10 OK · `check-agents` ✓ · `check-version-sync` ✓.
+Plans:
+- [x] 13-01-PLAN.md — `discover-unintegrated-docs.sh` : le fait « quels cadrages ne sont pas dans la
+  feuille de route », 6 registres, grain spec/plan, exits 0/3/64 (BRDG-02)
+- [x] 13-02-PLAN.md — doctrine `ingestion-flow.md` + câblage agent (manifest, délégation
+  `gsd-ingest-docs --mode merge` / `gsd-import --from`, 4 garde-fous) + T16/T17 (BRDG-01, BRDG-03)
+
+**Reste-à-faire assumé** : le **critère 5 (release + tag)** est hors du mandat de la mission — réservé à
+validation humaine. Deux points ouverts tracés : l'arbitrage doctrinal sur la portée de `vf-dev-manager`
+face à l'ingestion (audit BRDG-03), et le filtre glob du script non couvert par la suite (mutant
+survivant — effet possible faux négatif, jamais faux positif).
 
 #### Phase 14: Frontière d'altitude planning-core / moteur GSD (rescope de `vf-planning`)
 **Goal**: Faire cesser la concurrence entre `vf-planning` et le moteur de planning GSD — deux moteurs
@@ -297,7 +311,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 ✅ (R&D, shippée v2.28.0)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 🚧** ; **14 ✅ (indépendante)**
+1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 ✅ (R&D, shippée v2.28.0)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 ✅ (code complet, release en attente de validation humaine)** ; **14 ✅ (indépendante)**
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -313,5 +327,5 @@ Plans:
 | 10. Étude & faisabilité migration GSD | gsd-migration | 0/? | Not planned yet | — |
 | 11. Intégration migration GSD | gsd-migration | 0/? | Not planned yet (GATE Phase 10) | — |
 | 12. Routage fin & verbes /vf-* | vf-routing | 6/6 | Complete — release `v2.31.0` | 2026-07-25 |
-| 13. Pont spec → feuille de route | vf-routing | 0/2 | In progress — 13-01 écrit, 13-02 à planifier (redéfinie sans verbe 2026-07-26) | — |
+| 13. Pont spec → feuille de route | vf-routing | 2/2 | Complete (hors release) — module v2.2.0, vérif PASS | 2026-07-26 |
 | 14. Frontière d'altitude planning-core / GSD | vf-routing | 7/7 | Complete — release `v2.30.0` (ADR-055) | 2026-07-25 |

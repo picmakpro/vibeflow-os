@@ -165,16 +165,21 @@ Spec : `docs/superpowers/specs/2026-07-25-routage-fin-verbes-vf-design.md`.
 > Redéfinie le 2026-07-26 : la façade `/vf-*` ayant été supprimée (v2.33.0, bascule agentique), la
 > capacité d'ingestion est portée par l'agent `vibeflow-dev` — pas de verbe `/vf-ingest`.
 
-- [ ] **BRDG-01**: L'agent `vibeflow-dev` intègre une spec `docs/superpowers/specs/*.md` à la feuille de
+- [x] **BRDG-01**: L'agent `vibeflow-dev` intègre une spec `docs/superpowers/specs/*.md` à la feuille de
   route via `gsd-ingest-docs --mode merge` (étapes + exigences), et un plan `docs/superpowers/plans/*.md`
   via `gsd-import --from` — sans réimplémenter ni contourner les moteurs.
-- [ ] **BRDG-02**: La découverte des specs/plans **non encore intégrés** est outillée
+- [x] **BRDG-02**: La découverte des specs/plans **non encore intégrés** est outillée
   (`discover-unintegrated-docs.sh` : chemin non cité dans les 6 registres — ROADMAP, REQUIREMENTS,
   MILESTONES, PROJECT, `milestones/*.md`, `docs/ADR.md` —, détection du grain spec vs plan) ; l'agent
   construit le manifest YAML attendu par le moteur — l'utilisateur n'écrit aucun manifest à la main.
-- [ ] **BRDG-03**: Les garde-fous sont préservés et vérifiés : gate BLOCKER jamais contourné, confirmation
+- [x] **BRDG-03**: Les garde-fous sont préservés et vérifiés : gate BLOCKER jamais contourné, confirmation
   humaine avant toute écriture dans `.planning/` (ADR-031), `--mode merge` par défaut sur projet existant,
   cap 50 documents signalé ; en fin de cadrage, l'agent propose l'ingestion comme next step.
+  *Réserve (2026-07-26)* : les 4 garde-fous sont **doctrinaux** — leur présence textuelle est prouvée
+  (axe T16), leur respect à l'exécution ne l'est pas et ne peut pas l'être par grep. L'audit a relevé
+  que la confirmation humaine est ancrée à `vibeflow-dev` seul : `vf-dev-manager` (chemin équipe) n'a
+  pas de ligne nominative sur l'ingestion, contrairement au patron appliqué aux skills de clôture de
+  milestone. **Arbitrage doctrinal remonté à l'humain**, non tranché en mission.
 
 ### Phase 14 — Frontière d'altitude `planning-core` / moteur GSD
 
@@ -278,9 +283,9 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | VERB-03 | Phase 12 | Done — 33 descriptions, 11 groupes à réciprocité stricte |
 | VERB-04 | Phase 12 | Livré v2.31.0 (rule 40 L) — **artefact supprimé en v2.33.0** |
 | VERB-05 | Phase 12 | Done — 65/65 skills routés (suite refondue v2.33.0 : 26 OK) |
-| BRDG-01 | Phase 13 | Not started (redéfini sans verbe 2026-07-26 — porté par l'agent) |
-| BRDG-02 | Phase 13 | In progress — plan 13-01 écrit (découverte outillée), non exécuté |
-| BRDG-03 | Phase 13 | Not started (redéfini sans verbe 2026-07-26) |
+| BRDG-01 | Phase 13 | Done — doctrine `ingestion-flow.md` + câblage `AGENT.md` (module v2.2.0) |
+| BRDG-02 | Phase 13 | Done — `discover-unintegrated-docs.sh`, 16 cas (bornage bilatéral + ERE durcis après revue) |
+| BRDG-03 | Phase 13 | Done (doctrinal) — 4 garde-fous écrits, T16 les vérifie ; portée `vf-dev-manager` en arbitrage |
 | ALTI-01 | Phase 14 | Complete |
 | ALTI-02 | Phase 14 | Complete |
 | ALTI-03 | Phase 14 | Complete |

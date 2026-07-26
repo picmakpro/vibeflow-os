@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: vf-routing
 milestone_name: Routage fin & verbes VibeFlow
 status: in_progress
-stopped_at: "Phases 12 et 14 COMPLÈTES et publiées (tags v2.31.0 et v2.30.0). Phase 13 redéfinie le 2026-07-26 sans verbe-façade (bascule agentique v2.33.0) : plan 13-01 écrit et committé, à exécuter ; 13-02 (câblage agent) à planifier. Repo en v2.36.1."
+stopped_at: "Phase 13 EXÉCUTÉE de bout en bout le 2026-07-26 (mission d'équipe) : 13-01 (découverte outillée) + 13-02 (câblage agent) livrés, vérif goal-backward PASS, module dev-orchestrator v2.2.0. Les 3 phases du milestone vf-routing sont désormais complètes côté code. RESTE : la release de clôture (bump racine + tag annoté), réservée à validation humaine — elle N'A PAS été faite. Repo en v2.36.2."
 last_updated: "2026-07-26"
 last_activity: 2026-07-26
 progress:
   total_phases: 3
-  completed_phases: 2
-  total_plans: 14
-  completed_plans: 13
-  percent: 67
+  completed_phases: 3
+  total_plans: 15
+  completed_plans: 15
+  percent: 100
 ---
 
 # Project State
@@ -21,17 +21,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26 — charte rouverte : 17 modules, D2/D6 renversées)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Phase 13 (Pont spec → feuille de route) — **redéfinie le 2026-07-26 sans verbe-façade** :
-la capacité d'ingestion est portée par l'agent `vibeflow-dev` (bascule agentique v2.33.0). Le fait est
-outillé par `discover-unintegrated-docs.sh` (plan 13-01, écrit, à exécuter) ; le câblage agent est le
-plan 13-02 (à planifier).
+**Current focus:** **Release de clôture du milestone `vf-routing`** — les 3 phases (12, 13, 14) sont
+complètes côté code. La Phase 13 a été livrée le 2026-07-26 : le fait est outillé par
+`discover-unintegrated-docs.sh` (13-01) et la doctrine `references/ingestion-flow.md` est câblée dans
+l'agent `vibeflow-dev` (13-02), sans aucun verbe-façade.
 
 ## Current Position
 
-Phase: 13 (Pont spec → feuille de route, ingestion portée par l'agent) — milestone vf-routing
-Plan: 13-01 écrit et committé (découverte outillée, BRDG-02) — **non exécuté** (0 SUMMARY).
-Status: In progress — prochaine action `/gsd:execute-phase 13`, puis `plan-phase` pour 13-02.
-Last activity: 2026-07-26 (remise à l'heure du planning + redéfinition Phase 13)
+Phase: 13 **complète (hors release)** — milestone vf-routing
+Plans: 13-01 ✅ (découverte outillée, BRDG-02) · 13-02 ✅ (câblage agent, BRDG-01/BRDG-03).
+Vérification goal-backward **PASS** (`13-VERIFICATION.md`) : 4/4 critères dans le mandat, 3/3 BRDG,
+22/22 must-haves, 0 blocker. Suites : 16 ok · 30 OK/0 KO · 10 OK · check-agents ✓ · check-version-sync ✓.
+Module `dev-orchestrator` bumpé **v2.2.0** ; `VERSION` racine volontairement **intouchée** (v2.36.2).
+Status: **Prochaine action = release de clôture** (bump racine + tag annoté poussé) — décision humaine.
+Last activity: 2026-07-26 (mission d'équipe : exécution complète de la Phase 13)
 
 **Phases 12 et 14 livrées et publiées sur `main`** :
 - Phase 12 (Routage fin & verbes `/vf-*`) — 6/6 plans · release **`v2.31.0`**. Livrait 31 verbes et la
@@ -50,7 +53,7 @@ conductor v1.14.1 · planning-core v2.5.1 · consolidator v1.8.0.
 Milestone `gsd-migration` (Phases 10-11) reste ouvert et **en attente** — chantier indépendant, non bloquant.
 Milestone précédent memory-swarm-rnd **SHIPPÉ v2.28.0** (ADR-052 mémoire vivante + ADR-053 swarm).
 
-Progress: [███████░░░] 2/3 phases (13 : 1 plan posé sur 2, 0 exécuté)
+Progress: [██████████] 3/3 phases — code complet, release de clôture en attente
 
 ## Performance Metrics
 
@@ -105,6 +108,18 @@ Progress: [███████░░░] 2/3 phases (13 : 1 plan posé sur 2, 
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
 
+- **2026-07-26 — Citation canonique restaurée pour le jalon `vfdo-v1.0`** : la spec
+  `2026-06-04-dev-orchestrator-design.md` n'était citée que dans `.planning/phases/01-*/**` (des sorties
+  du moteur, pas un registre) — sa citation n'avait jamais été reportée dans le snapshot du jalon à
+  l'archivage. C'est `discover-unintegrated-docs.sh` qui l'a mise au jour dès sa première passe sur le
+  corpus réel. Confirme le motif déjà connu : **la citation migre puis disparaît à l'archivage**, ce qui
+  justifie a posteriori les 6 registres de BRDG-02 plutôt que le seul `ROADMAP.md`.
+- **2026-07-26 — Revue de code non négociable sur un fait outillé** : le script de découverte avait été
+  livré sans revue (jugée disproportionnée par le worker) avec 12 tests verts. La revue commandée ensuite
+  a trouvé **2 bloquants reproduits** (motif de citation non borné à gauche → faux négatif silencieux ;
+  échappement ERE partiel → motif absorbant) que la suite ne pouvait pas voir, son cas de bornage étant
+  tautologique. Enseignement : sur un artefact à **coût d'erreur asymétrique**, une suite verte ne vaut
+  pas une revue — et un test de mutation dit la vérité qu'un décompte de cas cache.
 - **2026-07-26 — Phase 13 sans verbe** (arbitrage Samuel) : pas de résurrection de la façade — le pont
   spec → feuille de route est un geste de l'agent `vibeflow-dev`, la découverte seule est outillée
   (ligne de coupe ADR-055 §3).
@@ -139,8 +154,19 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Exécuter le plan 13-01 (`/gsd:execute-phase 13`) — découverte outillée des documents non intégrés.
-- Planifier 13-02 (câblage de l'ingestion dans `vibeflow-dev`) — `/gsd:plan-phase 13`.
+- **Release de clôture du milestone `vf-routing`** (bump `VERSION` racine + `plugin.json` +
+  `marketplace.json` + historique des 2 README, puis tag annoté poussé, `check-release-tag.sh --remote`
+  → ✓). Le module `dev-orchestrator` est déjà en v2.2.0 ; la racine est restée en v2.36.2.
+  **Réservée à validation humaine — non faite en mission.**
+- **Arbitrage doctrinal (audit BRDG-03)** : la confirmation humaine ADR-031 avant ingestion est ancrée
+  à `vibeflow-dev` seul. `vf-dev-manager` (chemin équipe, qui consulte `intent-routing.md` pour mapper
+  un brief brut) n'a **aucune ligne nominative** sur l'ingestion, contrairement au patron déjà appliqué
+  aux skills de clôture de milestone (« en respectant leurs confirmations internes »). Deux filets
+  génériques couvrent probablement le cas, mais rien ne l'interdit noir sur blanc. Options : (a) no-op
+  assumé, (b) ligne miroir dans `agents/vf-dev-manager.md` renvoyant à `ingestion-flow.md`.
+- Combler le trou de couverture du **filtre glob** de `discover-unintegrated-docs.sh` : le mutant
+  « filtre retiré » survit à la suite (16 ok quand même). Effet possible = faux négatif, jamais faux
+  positif — donc pas de ré-ingestion silencieuse, priorité basse.
 - Arbitrer la divergence doctrine distribuée : intitulés P3-P8 de
   `plugin/reference/content/methodology/vocabulary/lexique.md` ≠ `VIBEFLOW_CORE.md` v4.2
   (« Specialiser » n'existe plus comme principe) — signalée le 2026-07-26, décision humaine requise.
@@ -162,5 +188,7 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-07-26
-Stopped at: Remise à l'heure du planning (audit périmé) + redéfinition Phase 13 sans verbe
-Resume file: none — reprendre par `/gsd:execute-phase 13`
+Stopped at: Phase 13 exécutée de bout en bout (mission d'équipe, 6 commits) — vérif PASS, hygiène faite.
+Resume file: `.planning/missions/2026-07-26-phase-13-pont-spec-feuille-de-route.md`
+Reprendre par : **la release de clôture du milestone `vf-routing`** (décision humaine), ou l'arbitrage
+doctrinal sur la portée de `vf-dev-manager` face à l'ingestion.

@@ -1,0 +1,102 @@
+{
+  "nodes": [
+    {
+      "id": "exec-13-01",
+      "step": "Exécution plan 13-01 — discover-unintegrated-docs.sh + 12 tests (TDD)",
+      "stage": "execute",
+      "deps": [],
+      "status": "done"
+    },
+    {
+      "id": "plan-13-02",
+      "step": "Cadrage + plan 13-02 — câblage ingestion dans vibeflow-dev",
+      "stage": "plan",
+      "deps": [],
+      "status": "done"
+    },
+    {
+      "id": "revalid-13-02",
+      "step": "Re-validation du plan 13-02 contre le script réellement livré",
+      "stage": "plan",
+      "deps": [
+        "exec-13-01",
+        "plan-13-02"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-13-02",
+      "step": "Exécution plan 13-02 — AGENT.md + references + axes de test + CHANGELOG",
+      "stage": "execute",
+      "deps": [
+        "revalid-13-02"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "audit-13",
+      "step": "Audit garde-fous BRDG-03 (ADR-031, gate BLOCKER, mode merge, cap 50)",
+      "stage": "audit",
+      "deps": [
+        "exec-13-02"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "verify-13",
+      "step": "Vérification goal-backward + 3 suites + check-version-sync + check-agents",
+      "stage": "test",
+      "deps": [
+        "exec-13-02"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "hygiene-13",
+      "step": "Hygiène doc — STATE/ROADMAP/REQUIREMENTS + CHANGELOG modules (sans bump racine)",
+      "stage": "doc",
+      "deps": [
+        "audit-13",
+        "verify-13"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "review-13-01",
+      "step": "Revue de code du script de découverte (coût d'erreur asymétrique, non revu par vf-coder)",
+      "stage": "review",
+      "deps": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-citation",
+      "step": "Hygiène corpus — poser la citation canonique manquante de la spec Phase 1 (perdue à l'archivage du jalon)",
+      "stage": "doc",
+      "deps": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-13-01",
+      "step": "Comblement des 2 bloquants + 3 majeurs de la revue du script de découverte",
+      "stage": "execute",
+      "deps": [],
+      "status": "done"
+    },
+    {
+      "id": "sync-readme",
+      "step": "Synchro compte de suites CI 37 → 38 dans les README racine",
+      "stage": "doc",
+      "deps": [],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-vf-dev-manager",
+      "step": "ESCALADE — étendre ou non le domaine documenté de vf-dev-manager à l'ingestion (arbitrage doctrinal, ADR-031)",
+      "stage": "decision",
+      "deps": [
+        "hygiene-13"
+      ],
+      "status": "blocked"
+    }
+  ]
+}

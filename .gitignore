@@ -36,3 +36,8 @@ logs/
 # Python cache
 __pycache__/
 *.pyc
+
+# Verrou de driver d'une mission d'équipe (conductor/scripts/driver-lock.sh) :
+# état runtime local, jamais versionné — un lock committé bloquerait toute
+# mission ultérieure sur les autres clones.
+.planning/DRIVER.lock/
