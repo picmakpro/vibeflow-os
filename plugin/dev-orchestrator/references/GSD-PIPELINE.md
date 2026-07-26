@@ -124,3 +124,17 @@ pilotage) ; les workers d'équipe (`vf-coder`, `vf-reviewer`, `vf-auditer`) en `
 > Pour la liste exhaustive et à jour des briques disponibles, consulter
 > `.claude/agents/dev-orchestrator-references/gsd-skills-index.md` ; pour le routage
 > intention → brique, `intent-routing.md` (seule source de routage).
+
+---
+
+## 8. Frontière : `model:` (agents vf-*) vs `model_profile` (sous-agents gsd-*)
+
+Deux couches indépendantes, ne pas les confondre :
+- Le frontmatter `model:` des agents `vf-*` (processus Claude Code — `vibeflow-dev`, `vf-coder`,
+  `vf-dev-manager`…) fixe le modèle du **processus orchestrateur/worker**.
+- `model_profile` (`.planning/config.json`, défaut `balanced`) fixe le modèle des **sous-agents
+  gsd-*** invoqués par ce processus (`gsd-planner`, `gsd-executor`, `gsd-verifier`…).
+
+La chaîne `vf-coder (sonnet) → gsd-plan-phase → gsd-planner (opus)` est le comportement **voulu**
+— un worker sonnet peu coûteux qui délègue la planification à un sous-agent opus plus capable,
+pas une incohérence à corriger.

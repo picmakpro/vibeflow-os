@@ -52,6 +52,30 @@ topologie), donc snapshot + validation humaine obligatoires.
 > Garantie zéro perte : tout fichier existant est soit **promu** dans la nouvelle structure, soit
 > **archivé** sous `_archive/`. Aucune suppression. Snapshot global avant (étape 1 de la recette §2).
 
+## 2ter. Recette : poser model_profile: balanced (lab GSD existant)
+
+Classée *capacité* (nouvelle option, un défaut déjà implicite côté gsd-core rendu explicite) —
+pas une restructuration : protocole allégé, ni snapshot global ni re-audit 5 phases requis, juste
+la confirmation ADR-031 avant écriture (recette ci-dessous).
+
+**Déclencheur** : `vf-calibrate` détecte un lab avec un moteur GSD actif
+(`detect-gsd-engine.sh` → exit 0) dont `.planning/config.json` n'a PAS de clé `model_profile`
+(ou une valeur `inherit` explicite, le piège à corriger).
+
+**Ce qui se passe si on laisse faire** : le profil par défaut de gsd-core (`balanced`, planner
+opus / executor+verifier sonnet) reste implicite — un futur changement de défaut amont, ou un
+worker sonnet qui invoque `gsd-plan-phase` en `inherit`, tirerait silencieusement `gsd-planner`
+vers sonnet (dégradation de la qualité de plan sans signal).
+
+**Recette (PROPOSER, jamais imposer — ADR-031)** :
+1. Lire `.planning/config.json` (créer l'objet s'il n'existe pas encore, sans autre champ).
+2. PROPOSER l'ajout de `"model_profile": "balanced"` — annoncer explicitement pourquoi (protège
+   d'un changement de défaut amont + du piège `inherit`).
+3. Sur confirmation explicite uniquement : écrire la clé, snapshot avant/après (comme toute
+   écriture `vf-calibrate`).
+4. Refus → ne rien écrire, journaliser la proposition déclinée (pas de re-proposition en boucle
+   à chaque `vf-calibrate` — une fois par session suffit).
+
 ## 3. Surfaçage opt-in à l'ouverture de session (façon GSD)
 
 Pour que l'utilisateur **voie** qu'une mise à jour le concerne (comme GSD le montrait dans le repo),

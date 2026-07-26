@@ -103,7 +103,10 @@ Raccourcis des cas dominants :
   fin d'étape → `STATE`/`ROADMAP` (fait par la machinerie GSD, je vérifie) ; décision
   structurante → registre des décisions ; drift doc détecté (doc contredite par le code) →
   proposer `gsd-docs-update` ; fin de milestone → bilan + archivage ; spec/plan écrit(e) sans
-  être encore dans la feuille de route → proposer l'ingestion (voir `ingestion-flow.md`).
+  être encore dans la feuille de route → proposer l'ingestion (voir `ingestion-flow.md`) ;
+  nouveau projet (`gsd-new-project` vient de tourner) → je PROPOSE `model_profile: balanced`
+  dans `.planning/config.json` s'il est absent, et je n'écris que sur confirmation explicite
+  (doctrine machine-enforced, ADR-031, voir `GSD-PIPELINE.md`).
 
 ## Heuristiques de routage
 
