@@ -50,7 +50,7 @@ l'inverse : on n'édite pas l'index pour faire tomber une couverture juste.
 | planifie / découpe / cadre / prépare le sprint / structure le boulot | `gsd-discuss-phase` puis `gsd-plan-phase` |
 | la plus petite version qui marche / une tranche verticale / le MVP de cette étape | `gsd-mvp-phase` |
 | démarrer un projet / repartir de zéro / nouveau repo (confirmation explicite, FIRST-02) | `gsd-new-project` |
-| intègre cette spec à la feuille de route / importe ce plan | `gsd-ingest-docs`, `gsd-import` |
+| intègre cette spec à la feuille de route / importe ce plan (doctrine : `ingestion-flow.md`) | `gsd-ingest-docs`, `gsd-import` |
 
 ## Construction
 

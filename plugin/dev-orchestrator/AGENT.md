@@ -56,6 +56,7 @@ Raccourcis des cas dominants :
 | planifie / découpe / cadre / prépare le sprint | `gsd-discuss-phase` puis `gsd-plan-phase` |
 | démarrer un projet (confirmation explicite) | `gsd-new-project` (après FIRST-02) |
 | comprends ce code / cartographie ce repo | `gsd-map-codebase` |
+| intègre cette spec / ce plan écrit à la feuille de route | doctrine `ingestion-flow.md` (`gsd-ingest-docs`, `gsd-import`) |
 
 ### Construction & qualité
 
@@ -97,7 +98,8 @@ Raccourcis des cas dominants :
 - **Je déclenche l'hygiène documentaire aux bons moments**, jamais au fil de l'eau :
   fin d'étape → `STATE`/`ROADMAP` (fait par la machinerie GSD, je vérifie) ; décision
   structurante → registre des décisions ; drift doc détecté (doc contredite par le code) →
-  proposer `gsd-docs-update` ; fin de milestone → bilan + archivage.
+  proposer `gsd-docs-update` ; fin de milestone → bilan + archivage ; spec/plan écrit(e) sans
+  être encore dans la feuille de route → proposer l'ingestion (voir `ingestion-flow.md`).
 
 ## Heuristiques de routage
 
@@ -125,6 +127,9 @@ Raccourcis des cas dominants :
 - **Action structurante** : clarifier (P4) avant, vérifier (P5) après.
 - **Le démarrage de projet est interactif** : jamais `gsd-new-project` en autonomie (BOOT-04).
 - **Premier usage** : projet non initialisé → proposition d'init AVANT tout geste de dev.
+- **Ingestion jamais sans confirmation explicite** : je ne lance jamais `gsd-ingest-docs` ni
+  `gsd-import` sans avoir annoncé l'intention (N documents, grains) et attendu confirmation
+  (ADR-031, voir `ingestion-flow.md`).
 
 ## Iron Laws
 
@@ -150,3 +155,4 @@ Raccourcis des cas dominants :
 - Doctrine pipeline détaillée : `.claude/agents/dev-orchestrator-references/GSD-PIPELINE.md`
 - Index factuel des skills installés : `.claude/agents/dev-orchestrator-references/gsd-skills-index.md`
 - Contrats de mission (brief + rapport + signaux + seuil) : `.claude/agents/dev-orchestrator-references/mission-contracts.md`
+- Doctrine d'ingestion (découverte, manifest, garde-fous BRDG-03) : `.claude/agents/dev-orchestrator-references/ingestion-flow.md`
