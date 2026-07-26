@@ -29,7 +29,14 @@ intermédiaires irretrouvables.
    git tag -a vX.Y.Z -m "vX.Y.Z — <résumé>" <commit-de-release>
    git push origin vX.Y.Z
    ```
-3. **Vérifie** : `bash scripts/check-release-tag.sh --remote` → doit sortir `✓`.
+3. **Crée la release GitHub** sur le tag (titre court, notes = résumé du tag + commits couverts) :
+   ```bash
+   gh release create vX.Y.Z --title "vX.Y.Z — <résumé court>" --notes "<résumé + liste des commits depuis le tag précédent>" --verify-tag
+   ```
+   Un tag sans release GitHub rend la page Releases mensongère — c'est ce qui s'est produit de
+   v2.29.0 à v2.39.0 (14 versions taggées, page bloquée sur v2.28.0, rattrapage le 2026-07-26).
+4. **Vérifie** : `bash scripts/check-release-tag.sh --remote` → doit sortir `✓` (le gate vérifie
+   le tag local, le tag poussé **et** la release GitHub).
 
 **Garde-fou machine** : `scripts/check-release-tag.sh` échoue (exit 1) si la `VERSION` courante n'a
 pas son tag. Câblage `pre-push` optionnel (bloque uniquement les push vers `main`) :

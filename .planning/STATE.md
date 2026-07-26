@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
 status: awaiting-release
-stopped_at: "Milestone gsd-migration CLOS et SHIPPÉ v2.39.0 (2026-07-26) : bascule @opengsd/gsd-core@^1 livrée (mission 6 vagues, 26 commits) + plafond semver post-audit. Tous les milestones ouverts sont clos. Reste : migration réelle des machines legacy (geste utilisateur accompagné) et sortie d'expérimental de mobile-test. Post-ship : sections Auteurs des 2 README réécrites d'après l'historique git réel (picmakpro = méthodologie + socle gouvernance, mai–juil ; Samuel ≈ 90 % des commits, releases v2.17→v2.39) — non commité."
+stopped_at: "Milestone gsd-migration CLOS et SHIPPÉ v2.39.0 (2026-07-26) : bascule @opengsd/gsd-core@^1 livrée (mission 6 vagues, 26 commits) + plafond semver post-audit. Tous les milestones ouverts sont clos. Reste : migration réelle des machines legacy (geste utilisateur accompagné) et sortie d'expérimental de mobile-test. Post-ship : sections Auteurs des 2 README réécrites d'après l'historique git réel (commité + poussé) ; 14 releases GitHub manquantes créées (v2.29.0→v2.39.0, notes tirées des tags + commits) ; discipline durcie — check-release-tag.sh --remote vérifie désormais AUSSI la release GitHub (gh, repli curl API) et le CLAUDE.md ajoute l'étape gh release create."
 last_updated: "2026-07-26"
 last_activity: 2026-07-26
 progress:

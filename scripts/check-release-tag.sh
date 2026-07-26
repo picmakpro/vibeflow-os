@@ -8,6 +8,7 @@
 # Usage :
 #   check-release-tag.sh            # la VERSION courante est-elle taggée localement ? · exit 1 sinon
 #   check-release-tag.sh --remote   # vérifie AUSSI que le tag est poussé sur origin
+#                                   # ET qu'une release GitHub existe pour ce tag
 #   check-release-tag.sh --help
 #
 # Codes de sortie : 0 = conforme · 1 = tag manquant · 2 = usage/erreur
@@ -41,6 +42,36 @@ if $REMOTE && [ -z "$(git ls-remote --tags origin "refs/tags/$tag" 2>/dev/null)"
   echo "[check-release-tag] ✗ tag $tag présent en local mais PAS poussé sur origin." >&2
   echo "  → git push origin $tag" >&2
   exit 1
+fi
+
+# Release GitHub (2026-07-26) : les tags v2.29.0→v2.39.0 existaient tous mais la page Releases
+# s'était arrêtée à v2.28.0 — le gate ne vérifiait que le tag. Sous --remote, une release GitHub
+# DOIT exister pour le tag. gh en voie principale, repli API publique via curl ; aucun des deux
+# disponible = erreur d'intégrité (pas de skip silencieux, même doctrine que F23).
+if $REMOTE; then
+  if command -v gh >/dev/null 2>&1; then
+    if ! gh release view "$tag" >/dev/null 2>&1; then
+      echo "[check-release-tag] ✗ tag $tag poussé mais AUCUNE release GitHub associée." >&2
+      echo "  → gh release create $tag --title \"$tag — <résumé>\" --notes \"<résumé + commits couverts>\"" >&2
+      exit 1
+    fi
+  elif command -v curl >/dev/null 2>&1; then
+    origin_url="$(git remote get-url origin 2>/dev/null)"
+    slug="$(printf '%s' "$origin_url" | sed -E 's#^(https://github\.com/|git@github\.com:)##; s#\.git$##')"
+    case "$slug" in
+      */*) : ;;
+      *) echo "[check-release-tag] ✗ origin non-GitHub ($origin_url) — release invérifiable" >&2; exit 2 ;;
+    esac
+    http_code="$(curl -s -o /dev/null -w '%{http_code}' "https://api.github.com/repos/$slug/releases/tags/$tag")"
+    if [ "$http_code" != "200" ]; then
+      echo "[check-release-tag] ✗ tag $tag poussé mais AUCUNE release GitHub associée (API HTTP $http_code)." >&2
+      echo "  → gh release create $tag --title \"$tag — <résumé>\" --notes \"<résumé + commits couverts>\"" >&2
+      exit 1
+    fi
+  else
+    echo "[check-release-tag] ✗ ni gh ni curl disponibles — release GitHub invérifiable (intégrité du gate)" >&2
+    exit 2
+  fi
 fi
 
 # Cohérence inter-fichiers (ADR-054) : la fiche marketplace et les badges README avaient dérivé
