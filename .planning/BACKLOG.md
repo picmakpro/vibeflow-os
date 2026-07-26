@@ -32,7 +32,9 @@ l'ensemble des agents, via la même UX à toggles + scope.
 modules VibeFlow). À reprendre une fois l'engine scope-aware + le skill `/vibeflow-install` livrés
 (ils en seront la fondation réutilisable).
 
-**Déclencheur de resurgence :** clôture du milestone « Install UX ».
+**Déclencheur de resurgence :** clôture du milestone « Install UX » — **atteint le 2026-06-05**
+(constaté le 2026-07-26 : l'item a dormi 7 semaines avec son déclencheur consommé). À ré-arbitrer
+explicitement : reprendre, re-différer avec un nouveau déclencheur, ou abandonner.
 
 ## Template d'agent installable s'appuyant sur dev-orchestrator
 **Capturé :** 2026-06-06 · **À explorer :** quand un besoin réel d'agent de domaine apparaît
@@ -40,7 +42,9 @@ modules VibeFlow). À reprendre une fois l'engine scope-aware + le skill `/vibef
 Fournir un **module « agent starter »** (type `agent-only`, ex. `dev-agent-starter`) qu'un
 utilisateur coche dans `/vibeflow-install` pour poser un agent dev prêt à l'emploi qui pilote le
 pipeline VibeFlow. Install « facile » assurée par `requires: ["dev-orchestrator"]` (fermeture
-transitive → dev-orchestrator + ses verbes `/vf-*` tirés automatiquement).
+transitive). ⚠️ *Note 2026-07-26 : les « verbes `/vf-*` » cités dans cet item ont été supprimés en
+v2.33.0 (bascule agentique) — la prémisse est à retraduire en « l'agent invoque directement les
+skills gsd-* » avant toute reprise.*
 
 **Contraintes techniques déjà établies (cette session) :**
 - **Pas d'imbrication de sous-agents** en Claude Code : l'agent ne peut PAS déléguer à l'agent
@@ -85,7 +89,7 @@ suit ne concerne que les gaps réels, distillés depuis leur taxonomie.
 | Project Management | `planning-core`, `conductor`, `kpi-analyst`, `consolidator` | ✅ Couvert |
 | Marketing / Content | `content-bundle`, `growth-bundle` | ✅ Couvert |
 | Testing | `mobile-test`(-team) | 🟡 Mobile only, expérimental |
-| Security | `vf-auditer`, `infrastructure-audit`, `audit-architecture` | 🟡 Audit oui ; pas incident/compliance |
+| Security | `infrastructure-audit`, `audit-architecture` (+ agent `vf-auditer` du dev-orchestrator) | 🟡 Audit oui ; pas incident/compliance |
 | Sales | `business-pilot-bundle` (blueprint commercial) | 🟡 Granularité fine à dériver |
 | Product | `planning-core` + `business-pilot-bundle` | 🟡 Pas de module product first-class |
 | Paid Media | `growth-bundle` (crochet par canal) | 🟡 Crochet oui, blueprints non |

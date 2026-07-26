@@ -5,9 +5,9 @@
 - ✅ **vfdo-v1.0** — Module dev-orchestrator (Phase 1) — clôturé 2026-06-04
 - ✅ **install-ux-v1.0** — Phases 2-6 — clôturé 2026-06-05 (plugin + skill à toggles + scope) — release `v2.4.0`
 - ✅ **dev-doctrine** — Phases 7-8 — doctrine dev (SOLID/DRY/KISS/YAGNI/Clean Archi/Clean Code/TDD) + consolidation des doublons qualité — clôturé 2026-07-07 — release `v2.20.0`
-- 🔬 **memory-swarm-rnd** — Phase 9 — R&D : transposition du modèle mémoire + patterns swarm de jcode (spike, pas release)
+- ✅ **memory-swarm-rnd** — Phase 9 — R&D : transposition du modèle mémoire + patterns swarm de jcode — spike GO, shippé `v2.28.0` (ADR-052 mémoire vivante + ADR-053 swarm)
 - 🚧 **gsd-migration** — Phases 10-11 — migration du package GSD `get-shit-done-cc` → `@opengsd/gsd-core` (VOC-02) : étude de faisabilité + go/no-go, puis intégration outillée
-- 🚧 **vf-routing** — Phases 12-14 — routage fin des intentions vers les verbes `/vf-*`, couverture complète des skills GSD, pont spec → feuille de route, et frontière d'altitude avec le moteur de planning GSD
+- 🚧 **vf-routing** — Phases 12-14 — routage fin des intentions (verbes `/vf-*` à l'origine ; carte d'intention agentique depuis la bascule v2.33.0), couverture complète des skills GSD, pont spec → feuille de route, et frontière d'altitude avec le moteur de planning GSD
 
 ## Phases
 
@@ -184,7 +184,7 @@ sans toucher le code.
   3. Non-régression prouvée en **isolé** (dry-run 3 scopes + idempotence, vrai `~/.claude` jamais touché) ; CHANGELOG/README à jour ; release bumpée + **tag annoté poussé** (`scripts/check-release-tag.sh --remote` → ✓).
 **Plans**: à cadrer (`/gsd:discuss-phase 11` puis `plan-phase`)
 
-### 🚧 Routage fin & verbes VibeFlow (Phases 12-13)
+### 🚧 Routage fin & verbes VibeFlow (Phases 12-14)
 
 **Milestone Goal:** Faire qu'une intention formulée en langage naturel atterrisse **toujours** sur le bon
 verbe `/vf-*` — et qu'il existe un verbe pour chaque geste réellement formulable, les ~35 gestes d'outillage
@@ -215,6 +215,10 @@ qu'aucun skill `gsd-*` ne gagne l'arbitrage en entrée de chaîne.
 dans `design-orchestrator`, `AGENT.md` 218 L, rule 40 L, `intent-routing.md` 65/65 skills routés,
 suite de tests 25 OK / 0 KO / 1 SKIP (le SKIP est `vf-ingest`, attendu en Phase 13).
 Release `v2.31.0` — dev-orchestrator v1.8.1, design-orchestrator v1.1.0, conductor v1.12.2.
+⚠️ *Post-scriptum 2026-07-26* : la **façade `/vf-*` et la rule de préséance ont été supprimées en
+v2.33.0** (bascule agentique, spec `2026-07-25-suppression-facade-vf-design.md`). Les critères 2 et 4
+ci-dessus décrivent l'état livré en v2.31.0, plus l'état courant — subsistent la carte d'intention
+unique de `vibeflow-dev`, `vf-auto` et `vf-dev` ; la suite de tests a été refondue (26 OK en v2.33.0).
 Plans:
 - [x] 12-01 — fondations : gabarit de description + doctrine `intent-routing.md` + rule de préséance (VERB-01, VERB-04, VERB-05)
 - [x] 12-02 — 17 verbes `/vf-*` neufs dans `dev-orchestrator` (VERB-02)
@@ -287,12 +291,13 @@ Plans:
 - [x] 14-03-PLAN.md — `--defer-to-gsd` sur 2 hooks : fin de la double injection SessionStart, défaut inchangé (ALTI-03)
 - [x] 14-04-PLAN.md — `SKILL.md` : description désarmée + étape 0 + séquences A/B (ALTI-02)
 - [x] 14-05-PLAN.md — commande, `domain-detection.md`, ADR-055 au registre (ALTI-04)
-- [x] 14-06-PLAN.md — release : module v2.4.0, racine v2.29.0, tag annoté poussé (ALTI-05)
+- [x] 14-06-PLAN.md — release : module v2.4.0, racine v2.30.0, tag annoté poussé (ALTI-05)
+- [x] 14-07-PLAN.md — route `vf-new-lab` → moteur GSD documentée + 3 formulations alignées ADR-055 (ALTI-04 ; né du rapport d'exécution)
 
 ## Progress
 
 **Execution Order:**
-1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 🔬 (R&D, hors release)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 🚧** ; **14 ✅ (indépendante)**
+1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 ✅ (R&D, shippée v2.28.0)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 🚧** ; **14 ✅ (indépendante)**
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -304,9 +309,9 @@ Plans:
 | 6. dev-orchestrator first-use | Install UX | 1/1 | Complete | 2026-06-05 |
 | 7. Philosophies de dev | dev-doctrine | 2/2 | Complete | 2026-07-07 |
 | 8. Consolidation des doublons | dev-doctrine | 4/4 | Complete | 2026-07-07 |
-| 9. Spike transposition jcode | memory-swarm-rnd | 0/2 | Not started (R&D) | — |
+| 9. Spike transposition jcode | memory-swarm-rnd | 2/2 | Complete — shippée `v2.28.0` (ADR-052/053) | 2026-07-22 |
 | 10. Étude & faisabilité migration GSD | gsd-migration | 0/? | Not planned yet | — |
 | 11. Intégration migration GSD | gsd-migration | 0/? | Not planned yet (GATE Phase 10) | — |
 | 12. Routage fin & verbes /vf-* | vf-routing | 6/6 | Complete — release `v2.31.0` | 2026-07-25 |
-| 13. Pont spec → feuille de route | vf-routing | 0/? | Not planned yet (dépend Phase 12) | — |
+| 13. Pont spec → feuille de route | vf-routing | 0/2 | In progress — 13-01 écrit, 13-02 à planifier (redéfinie sans verbe 2026-07-26) | — |
 | 14. Frontière d'altitude planning-core / GSD | vf-routing | 7/7 | Complete — release `v2.30.0` (ADR-055) | 2026-07-25 |

@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: vf-routing
 milestone_name: Routage fin & verbes VibeFlow
 status: in_progress
-stopped_at: "Phases 12 et 14 COMPLÈTES et publiées sur main — tags v2.31.0 (routage fin) et v2.30.0 (frontière d'altitude, ADR-055) poussés. Reste : Phase 13 (pont /vf-ingest) non cadrée."
-last_updated: "2026-07-25"
-last_activity: 2026-07-25
+stopped_at: "Phases 12 et 14 COMPLÈTES et publiées (tags v2.31.0 et v2.30.0). Phase 13 redéfinie le 2026-07-26 sans verbe-façade (bascule agentique v2.33.0) : plan 13-01 écrit et committé, à exécuter ; 13-02 (câblage agent) à planifier. Repo en v2.36.1."
+last_updated: "2026-07-26"
+last_activity: 2026-07-26
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 13
+  total_plans: 14
   completed_plans: 13
   percent: 67
 ---
@@ -18,44 +18,53 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-04)
+See: .planning/PROJECT.md (updated 2026-06-04 — refresh planifié, cf. Pending Todos)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Phase 9 (memory-swarm-rnd) — spike GO → **ADR-052 VALIDÉ + IMPLÉMENTÉ**. Le `consolidator` gagne un **pilier 5 « Mémoire vivante »** (v1.6.0) : couche fichier-par-entrée `.claude/memory/knowledge/` à décroissance de confiance + supersession non destructive (`scripts/decay-pass.sh`, 27 tests, revue de code passée). **SHIPPÉ v2.28.0** (ADR-052 mémoire vivante + ADR-053 swarm : lock + DAG + rapports typés). Volet swarm implémenté et dogfoodé. Milestone Doctrine dev & consolidation **SHIPPED v2.20.0**.
+**Current focus:** Phase 13 (Pont spec → feuille de route) — **redéfinie le 2026-07-26 sans verbe-façade** :
+la capacité d'ingestion est portée par l'agent `vibeflow-dev` (bascule agentique v2.33.0). Le fait est
+outillé par `discover-unintegrated-docs.sh` (plan 13-01, écrit, à exécuter) ; le câblage agent est le
+plan 13-02 (à planifier).
 
 ## Current Position
 
-Phase: 13 (Pont spec → feuille de route, `/vf-ingest`) — milestone vf-routing
-Plan: aucun — phase non cadrée. Prochaine action `/gsd:discuss-phase 13` puis `plan-phase`.
-Status: Not planned yet
-Last activity: 2026-07-25
+Phase: 13 (Pont spec → feuille de route, ingestion portée par l'agent) — milestone vf-routing
+Plan: 13-01 écrit et committé (découverte outillée, BRDG-02) — **non exécuté** (0 SUMMARY).
+Status: In progress — prochaine action `/gsd:execute-phase 13`, puis `plan-phase` pour 13-02.
+Last activity: 2026-07-26 (remise à l'heure du planning + redéfinition Phase 13)
 
 **Phases 12 et 14 livrées et publiées sur `main`** :
-- Phase 12 (Routage fin & verbes `/vf-*`) — 6/6 plans · release **`v2.31.0`** · dev-orchestrator v1.8.1,
-  design-orchestrator v1.1.0, conductor v1.12.2. 31 verbes dans `dev-orchestrator` (14 → 31), 2 dans
-  `design-orchestrator`. Tests 25 OK / 0 KO / 1 SKIP (le SKIP est `vf-ingest`, attendu en Phase 13).
+- Phase 12 (Routage fin & verbes `/vf-*`) — 6/6 plans · release **`v2.31.0`**. Livrait 31 verbes et la
+  rule de préséance ; **la façade `/vf-*` a été supprimée depuis en v2.33.0** (bascule agentique, spec
+  `2026-07-25-suppression-facade-vf-design.md`) — subsistent la carte d'intention unique de
+  `vibeflow-dev` et les skills `vf-auto` / `vf-dev`.
 - Phase 14 (Frontière d'altitude `planning-core` / moteur GSD) — 7/7 plans · release **`v2.30.0`** ·
   **ADR-055** (renuméroté au merge : `ADR-054` était déjà pris par la portabilité Windows publiée en
-  v2.29.0). planning-core v2.4.0. 92 assertions vertes.
+  v2.29.0). 92 assertions vertes.
+
+**Depuis la clôture des phases 12/14, 5 releases hors milestone** (v2.32.0 → v2.36.1) : enforcement CI,
+bascule agentique, team-kernel transverse, 3 bundles métier matérialisés, recettes UAT, refonte README.
+Versions modules au 2026-07-26 : dev-orchestrator v2.1.1 · design-orchestrator v1.2.1 ·
+conductor v1.14.1 · planning-core v2.5.1 · consolidator v1.8.0.
 
 Milestone `gsd-migration` (Phases 10-11) reste ouvert et **en attente** — chantier indépendant, non bloquant.
 Milestone précédent memory-swarm-rnd **SHIPPÉ v2.28.0** (ADR-052 mémoire vivante + ADR-053 swarm).
 
-Progress: [██████░░░░] 2/3 phases (13 non cadrée)
+Progress: [███████░░░] 2/3 phases (13 : 1 plan posé sur 2, 0 exécuté)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0
-- Average duration: — min
-- Total execution time: 0 hours
+- Total plans completed: 26+ (13 mesurés phases 1-6 ci-dessous + 6 en Phase 12 + 7 en Phase 14 ;
+  le compteur automatique n'a jamais été alimenté — reconstruit le 2026-07-26)
+- Average duration: ~6 min/plan (sur les 13 plans mesurés)
+- Total execution time: non mesuré au-delà de la Phase 6
 
-**By Phase:**
+**By Phase:** *(mesures disponibles uniquement — phases 7, 8, 9, 12 et 14 non instrumentées)*
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1. dev-orchestrator | 0/5 | - | - |
 | Phase 01-dev-orchestrator P01 | 10min | 2 tasks | 6 files |
 | Phase 01 P02 | 10 | 2 tasks | 1 files |
 | Phase 01-dev-orchestrator P03 | 12 min | 2 tasks | 2 files |
@@ -74,10 +83,14 @@ Progress: [██████░░░░] 2/3 phases (13 non cadrée)
 
 ### Roadmap Evolution
 
+- 2026-07-26 : **Phase 13 redéfinie sans verbe-façade** — la phase était écrite autour de `/vf-ingest`
+  et du cycle `vf-brainstorm → vf-ingest → vf-plan → vf-execute`, supprimés en v2.33.0. BRDG-01..03 et
+  les critères de succès réécrits : ingestion portée par l'agent `vibeflow-dev`, découverte outillée
+  (13-01). Plan 13-01 committé et réparé (corpus 8 → 9 documents, markup parasite purgé).
 - 2026-07-25 : Milestone **gsd-migration** créé (VOC-02 promu). Phase 10 (Étude & faisabilité migration GSD)
   + Phase 11 (Intégration, GATE Phase 10) ajoutées à la feuille de route. Requirements GSDM-01..06.
 - 2026-07-25 : Milestone **vf-routing** créé. Phase 12 (Routage fin & couverture complète des verbes `/vf-*`)
-  + Phase 13 (Pont spec → feuille de route, `/vf-ingest`) ajoutées. Requirements VERB-01..05, BRDG-01..03.
+  + Phase 13 (Pont spec → feuille de route) ajoutées. Requirements VERB-01..05, BRDG-01..03.
   Devient le milestone actif ; `gsd-migration` reste ouvert en attente (chantiers indépendants).
 - 2026-07-25 : **Phase 14** (Frontière d'altitude planning-core / moteur GSD) ajoutée au milestone vf-routing.
   Constat déclencheur : `vf-planning` et la chaîne GSD produisaient les mêmes fichiers dans le même dossier
@@ -92,6 +105,9 @@ Progress: [██████░░░░] 2/3 phases (13 non cadrée)
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
 
+- **2026-07-26 — Phase 13 sans verbe** (arbitrage Samuel) : pas de résurrection de la façade — le pont
+  spec → feuille de route est un geste de l'agent `vibeflow-dev`, la découverte seule est outillée
+  (ligne de coupe ADR-055 §3).
 - **2026-07-25 — Programme d'audit croisé livré en 3 releases** (v2.32.0 → v2.34.0, rapports
   dans `reports/`) : (1) enforcement branché — CI, gates exit 3, scission ADR-031/ADR-056 ;
   (2) **bascule agentique** (arbitrage Samuel, spec
@@ -123,11 +139,18 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Cadrer la Phase 10 (`/gsd:discuss-phase 10`) : inventaire surface d'impact GSD + caractérisation `@opengsd/gsd-core`.
+- Exécuter le plan 13-01 (`/gsd:execute-phase 13`) — découverte outillée des documents non intégrés.
+- Planifier 13-02 (câblage de l'ingestion dans `vibeflow-dev`) — `/gsd:plan-phase 13`.
+- Rafraîchir `.planning/PROJECT.md` (D2/D6 renversées par la bascule agentique, requirements à cocher,
+  charte mono-module → 17 modules) et re-cartographier `.planning/codebase/` (`gsd-map-codebase`).
+- *(milestone `gsd-migration`, en attente)* Cadrer la Phase 10 (`/gsd:discuss-phase 10`) : inventaire
+  surface d'impact GSD + caractérisation `@opengsd/gsd-core`.
 
 ### Blockers/Concerns
 
-- Migration package GSD `get-shit-done-cc` → `@opengsd/gsd-core` : désormais **milestone actif `gsd-migration`** (VOC-02). Le go/no-go de la Phase 10 dépend de la maturité/parité du package cible sur npm — à vérifier en premier.
+- Migration package GSD `get-shit-done-cc` → `@opengsd/gsd-core` : milestone `gsd-migration` (VOC-02),
+  ouvert et **en attente** — non bloquant pour vf-routing. Le go/no-go de la Phase 10 dépend de la
+  maturité/parité du package cible sur npm — à vérifier en premier.
 
 ## Deferred Items
 
@@ -137,6 +160,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-07-20T15:23:36.856Z
-Stopped at: Phase 9 context gathered
-Resume file: .planning/phases/VFDO-09-spike-transposition-jcode-m-moire-swarm/09-CONTEXT.md
+Last session: 2026-07-26
+Stopped at: Remise à l'heure du planning (audit périmé) + redéfinition Phase 13 sans verbe
+Resume file: none — reprendre par `/gsd:execute-phase 13`

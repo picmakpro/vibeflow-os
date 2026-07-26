@@ -34,7 +34,7 @@
 - [x] **VERIF-01**: `tests/test-dev-orchestrator.sh` couvre génération d'index, idempotence de `ensure-deps`, couverture du routage, mapping `/vf-*` non orphelin.
 - [x] **VERIF-02**: Gates de densité respectés (agent ≤250L, skills ≤500L), vérifiés par `wc -l` dans le test du module (`check-file-size.sh` n'audite pas les `.md` : regex code sans `.md`).
 
-## Milestone 2 — Install UX (active)
+## Milestone 2 — Install UX (shipped `v2.4.0`, 2026-06-05)
 
 > Spec : `docs/superpowers/specs/2026-06-04-install-ux-design.md`
 
@@ -70,7 +70,7 @@
 - [x] **FIRST-01**: L'agent détecte l'absence de `.planning/` (projet non GSD-initialisé) au 1er usage.
 - [x] **FIRST-02**: Il propose map-codebase puis new-project sur confirmation (jamais `gsd-new-project` seul).
 
-## Milestone 3 — Doctrine dev & consolidation (active)
+## Milestone 3 — Doctrine dev & consolidation (shipped `v2.20.0`, 2026-07-07)
 
 > Spec : `docs/superpowers/specs/2026-07-07-dev-doctrine-consolidation-design.md`
 > Origine : audit du parc de modules vs `dev-orchestrator`.
@@ -136,6 +136,13 @@ Spec : `docs/superpowers/specs/2026-07-25-routage-fin-verbes-vf-design.md`.
 
 ### Phase 12 — Routage fin & couverture complète des verbes `/vf-*`
 
+> ⚠️ *Post-scriptum 2026-07-26* : ces exigences décrivent l'état **livré en v2.31.0**. La façade `/vf-*`
+> (verbes + rule de préséance + table de routage vers les verbes) a été **supprimée en v2.33.0**
+> (bascule agentique, spec `2026-07-25-suppression-facade-vf-design.md`) : VERB-01 est inversé (carte
+> d'intention unique, l'agent invoque les briques directement), les verbes de VERB-02 et l'artefact de
+> VERB-04 n'existent plus sur disque, la suite de tests a été refondue (26 OK). Les cases restent
+> cochées au titre de l'historique de livraison.
+
 - [x] **VERB-01**: La table de routage de `AGENT.md` mappe chaque intention vers un **verbe `/vf-*`**
   (plus aucune cible `gsd-*` en entrée de chaîne) ; `AGENT.md` reste ≤ 250 L.
 - [~] **VERB-02** *(partiel — 17/18, `vf-ingest` soldé en Phase 13)*: 18 nouveaux verbes `/vf-*` sont livrés dans `dev-orchestrator` (`vf-secure`, `vf-testgen`,
@@ -150,7 +157,8 @@ Spec : `docs/superpowers/specs/2026-07-25-routage-fin-verbes-vf-design.md`.
   chaîne ni nommé à l'utilisateur.
 - [x] **VERB-05**: `references/intent-routing.md` couvre **100 %** des skills listés dans
   `gsd-skills-index.md` (chargé on-demand) ; les tests du module passent, fixture T4 étendue aux nouvelles
-  cibles + T11 (anti-collision), T12 (préséance), T13 (exhaustivité).
+  cibles + T12 (anti-collision), T13 (préséance), T14 (exhaustivité) — numérotation tranchée en
+  12-CONTEXT D-03 (`T11` déjà pris par l'axe de généricité).
 
 ### Phase 13 — Pont spec → feuille de route
 
@@ -191,7 +199,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   **bloquant** (exception motivée) et aucun `.planning/` existant n'est jamais réécrit (ADR-031).
 - [x] **ALTI-05**: Non-régression prouvée : les 4 bundles non-dev (`content`, `business-pilot`, `growth`,
   `kpi-analyst`) passent par la séquence A sans changement, la suite de tests du module est verte,
-  `check-agents.sh` OK, JSON valides ; release bumpée (module v2.4.0, racine v2.29.0) + **tag annoté poussé**
+  `check-agents.sh` OK, JSON valides ; release bumpée (module v2.4.0, racine v2.30.0) + **tag annoté poussé**
   (`scripts/check-release-tag.sh --remote` → ✓).
 
 ## v2 Requirements
@@ -266,13 +274,13 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | GSDM-05 | Phase 11 | Not started (GATE Phase 10) |
 | GSDM-06 | Phase 11 | Not started (GATE Phase 10) |
 | VERB-01 | Phase 12 | Done |
-| VERB-02 | Phase 12 | Partiel — 17/18 verbes (`vf-audit` → **`vf-gaps`**, collision avec la commande d'audit de lab) ; `vf-ingest` en Phase 13 |
+| VERB-02 | Phase 12 | Livré v2.31.0 (17/18 verbes) — **caduc depuis v2.33.0** (façade supprimée) |
 | VERB-03 | Phase 12 | Done — 33 descriptions, 11 groupes à réciprocité stricte |
-| VERB-04 | Phase 12 | Done — rule globale 40 L |
-| VERB-05 | Phase 12 | Done — 65/65 skills routés, 25 OK / 0 KO / 1 SKIP |
-| BRDG-01 | Phase 13 | Not started |
-| BRDG-02 | Phase 13 | Not started |
-| BRDG-03 | Phase 13 | Not started |
+| VERB-04 | Phase 12 | Livré v2.31.0 (rule 40 L) — **artefact supprimé en v2.33.0** |
+| VERB-05 | Phase 12 | Done — 65/65 skills routés (suite refondue v2.33.0 : 26 OK) |
+| BRDG-01 | Phase 13 | Not started (redéfini sans verbe 2026-07-26 — porté par l'agent) |
+| BRDG-02 | Phase 13 | In progress — plan 13-01 écrit (découverte outillée), non exécuté |
+| BRDG-03 | Phase 13 | Not started (redéfini sans verbe 2026-07-26) |
 | ALTI-01 | Phase 14 | Complete |
 | ALTI-02 | Phase 14 | Complete |
 | ALTI-03 | Phase 14 | Complete |
@@ -286,7 +294,10 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - Milestone 4 (memory-swarm-rnd / R&D) : 2 requirements — mappés à la phase 9, 0 non-mappé ✓
 - Milestone 5 (gsd-migration) : 6 requirements — mappés aux phases 10-11, 0 non-mappé ✓
 - Milestone 6 (vf-routing) : 13 requirements — mappés aux phases 12-14, 0 non-mappé ✓
+- Hors-milestone : les releases `v2.32.0 → v2.36.1` (audit croisé, bascule agentique, bundles métier,
+  recettes UAT, refonte README) ont été livrées **sans requirements GSD** — tracées dans
+  `MILESTONES.md` (entrée « hors-milestone ») et `docs/ADR.md` (ADR-056/057).
 
 ---
 *Requirements defined: 2026-06-04*
-*Last updated: 2026-07-25 — ajout Phase 14 au Milestone 6 (ALTI-01→05 : frontière d'altitude planning-core / moteur GSD, ADR-055)*
+*Last updated: 2026-07-26 — remise à l'heure post-audit (Phase 12 annotée post-bascule v2.33.0, Phase 13 redéfinie sans verbe, Phase 14 = v2.30.0, milestones 2-3 shipped) ; précédent : 2026-07-25 — ajout Phase 14 au Milestone 6 (ALTI-01→05 : frontière d'altitude planning-core / moteur GSD, ADR-055)*

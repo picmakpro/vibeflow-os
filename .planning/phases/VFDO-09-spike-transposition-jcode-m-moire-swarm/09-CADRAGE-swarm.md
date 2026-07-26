@@ -1,9 +1,9 @@
 # Phase 9 — Mini-cadrage du volet swarm (ÉCRIT, NON IMPLÉMENTÉ)
 
 **Date :** 2026-07-22
-**Statut :** cadrage seul. **Aucune implémentation.** L'invariant tient : le swarm reste non implémenté tant que
-des collisions ne sont **pas observées** sur les backups isolés (ADR-048/049). Ce document est prêt à décider
-plus tard — il n'engage rien.
+**Statut :** cadrage seul à l'écriture. **Dépassé depuis** : le swarm a été implémenté et dogfoodé via
+**ADR-053** (lock driver + DAG + rapports typés, shippé `v2.28.0`), puis généralisé en team-kernel transverse
+(`conductor`, `v2.34.0`). Ce document reste une archive du raisonnement de cadrage.
 **Source :** note §2 (swarm jcode), §3.2 (transposition sans bus), §6.6 (custody no-mistakes qui converge).
 
 ---

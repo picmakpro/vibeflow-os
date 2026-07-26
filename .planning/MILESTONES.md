@@ -6,14 +6,16 @@
 
 **Périmètre :** 3 phases · requirements VERB-01..05, BRDG-01..03, ALTI-01..05.
 
-**But :** Deux trous constatés sur le module `dev-orchestrator` v1.7.0. **(1)** La table de routage de
-l'agent mappe l'intention directement sur la cible GSD au lieu du verbe `/vf-*` correspondant — deux
+**But :** Deux trous constatés sur le module `dev-orchestrator` (alors v1.7.0). **(1)** La table de routage
+de l'agent mappe l'intention directement sur la cible GSD au lieu du verbe `/vf-*` correspondant — deux
 sources de vérité par intention, et rien ne garantit qu'un verbe VibeFlow gagne l'arbitrage face aux 70
 skills `gsd-*` chargés en parallèle. **(2)** 14 verbes couvrent 12 cibles : ~50 skills GSD n'ont aucune
 porte d'entrée. La Phase 12 pose trois niveaux de routage (descriptions déclencheuses, rule de préséance
 globale, doctrine exhaustive on-demand) et 19 verbes. La Phase 13 ferme le seul maillon non outillé du
-cycle : `/vf-ingest`, qui transforme une spec en étapes de la feuille de route via les moteurs GSD
-existants. La **Phase 14**, ajoutée en cours de milestone, traite un troisième trou découvert au passage :
+cycle : le pont spec → feuille de route — initialement pensé comme verbe `/vf-ingest`, **redéfini le
+2026-07-26 sans verbe** (la façade `/vf-*` a été supprimée en v2.33.0 ; la capacité est portée par
+l'agent `vibeflow-dev`, la découverte est outillée). La **Phase 14**, ajoutée en cours de milestone,
+traite un troisième trou découvert au passage :
 `vf-planning` et la chaîne de développement produisaient les mêmes fichiers dans le même dossier avec des
 frontmatters incompatibles — deux moteurs de planning concurrents (ADR-055, frontière d'altitude).
 
@@ -24,15 +26,21 @@ frontmatters incompatibles — deux moteurs de planning concurrents (ADR-055, fr
   rule globale de préséance (40 L), doctrine `intent-routing.md` couvrant 65/65 skills. `AGENT.md` ne cite
   plus aucune cible interne. Tests 25 OK / 0 KO / 1 SKIP.
   *Écart tracé* : le verbe prévu `vf-audit` s'appelle **`vf-gaps`** (collision avec la commande d'audit de
-  conformité du lab). `VERB-02` reste **partiel** : 17/18 verbes, `vf-ingest` soldé en Phase 13.
+  conformité du lab).
+  ⚠️ *Post-scriptum 2026-07-26* : la **façade `/vf-*` a été supprimée en v2.33.0** (bascule agentique) —
+  les livrables « verbes » et « rule de préséance » de cette phase n'existent plus ; subsistent la carte
+  d'intention unique de `vibeflow-dev`, `vf-auto` et `vf-dev`. `VERB-02` (« reste vf-ingest ») est
+  **caduc** : le lot de verbes a été retiré du produit.
 - **Phase 14** — release `v2.30.0`, **ADR-055**. Un projet de code a un seul moteur de planning ;
-  `planning-core` garde l'altitude lab, la mémoire et le socle des labs non-dev. planning-core v2.4.0.
+  `planning-core` garde l'altitude lab, la mémoire et le socle des labs non-dev. planning-core v2.4.0
+  (v2.5.1 au 2026-07-26).
 
-**Prochaine action :** `/gsd:discuss-phase 13` puis `plan-phase` (pont `/vf-ingest`).
+**Prochaine action :** `/gsd:execute-phase 13` (plan 13-01, découverte outillée), puis `plan-phase` pour
+13-02 (câblage de l'ingestion dans l'agent).
 
 ## 🚧 gsd-migration — Migration package GSD (créé 2026-07-25)
 
-**Statut :** EN COURS — non planifié · **Requirement source :** VOC-02
+**Statut :** EN ATTENTE — non planifié, chantier indépendant non bloquant · **Requirement source :** VOC-02
 
 **Périmètre :** 2 phases · requirements GSDM-01..06.
 
@@ -43,6 +51,38 @@ taggée). **Phase 11 conditionnée au GO de la Phase 10** — un no-go document�
 toucher le code.
 
 **Prochaine action :** `/gsd:discuss-phase 10` puis `plan-phase`.
+
+## ✅ hors-milestone — Audit croisé, bascule agentique & universalisation (v2.32.0 → v2.36.1, 2026-07-25/26)
+
+**Tags git :** `v2.32.0` … `v2.36.1` · **Statut :** SHIPPED (5 releases hors milestone GSD)
+**Spec :** `docs/superpowers/specs/2026-07-25-suppression-facade-vf-design.md` (bascule agentique) ·
+rapports d'audit dans `reports/`
+
+**Livré :**
+
+- **v2.32.0 — Enforcement branché** : CI (31 suites de tests + `check-agents --strict`), gates exit 3,
+  scission ADR-031 (validation humaine) / ADR-056 (vigilance support runtime), `/checkpoint` → `/vf-audit`.
+- **v2.33.0 — Bascule agentique** (arbitrage Samuel) : suppression des 29 verbes-façades `/vf-*`, de la
+  table ×4 et de la rule de préséance ; `dev-orchestrator` v2.x — carte d'intention unique, l'agent
+  invoque les briques directement ; manager avec digest de mission, next steps et hygiène doc.
+- **v2.34.0 — Universalisation** : team-kernel transverse hébergé par `conductor` (`dag.sh`,
+  `driver-lock.sh`, `references/team-kernel.md`), équipe design (vf-design-manager / vf-crafter /
+  vf-design-judge), content-bundle matérialisé `proposable: true`, pipelining N/N+1, lab express, ADR-057.
+- **v2.35.0** : growth-bundle et business-pilot-bundle matérialisés (quality-gate-client livré) — les
+  3 bundles métier sont réels, promesse multi-métier tenue.
+- **v2.36.0** : recettes UAT réelles sur labs vierges (express ~11 min 30 ✓ ; protocole de mission
+  exécutable par un agent tiers ✓) — 16 frictions corrigées, job CI « lab frais ».
+- **v2.36.1** : refonte vitrine des deux README racine (mermaid, dev-first, efficience/mémoire).
+
+## ✅ memory-swarm-rnd — Spike transposition jcode (mémoire & swarm) (2026-07-22)
+
+**Tag git :** `v2.28.0` · **Statut :** SHIPPED · **Phase :** 9 (R&D)
+
+**Livré :** spike GO → **ADR-052** (mémoire vivante) : le `consolidator` gagne le **pilier 5
+« Mémoire vivante »** — couche fichier-par-entrée `.claude/memory/knowledge/` à décroissance de
+confiance + supersession non destructive (`scripts/decay-pass.sh`, 27 tests). **ADR-053** (swarm) :
+lock driver + DAG + rapports typés, implémenté et dogfoodé (devenu le team-kernel en v2.34.0).
+Dossier de phase : `.planning/phases/VFDO-09-spike-transposition-jcode-m-moire-swarm/`.
 
 ## ✅ dev-doctrine — Doctrine dev & consolidation (2026-07-07)
 

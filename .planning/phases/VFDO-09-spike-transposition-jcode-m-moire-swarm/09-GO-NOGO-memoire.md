@@ -128,3 +128,7 @@ last_decay_pass: YYYY-MM-DD       # DÉRIVÉ — traçabilité de la dernière p
 Écrire l'ADR « frontmatter mémoire enrichi (trust/confidence/décroissance/supersession) » sous validation humaine
 (ADR-031), reprenant : mapping §2, demi-vies recalibrées §3, frontmatter §4, seuil de rétrogradation §5. **Rien ne
 touche `plugin/consolidator/` ni le format officiel avant cet ADR.**
+
+> ✅ **FAIT (clos le 2026-07-26)** : l'ADR est **ADR-052** (registre `docs/ADR.md`), le `consolidator`
+> porte le pilier 5 « Mémoire vivante » (`scripts/decay-pass.sh`), le tout shippé `v2.28.0`.
+> Le volet swarm (ADR-053) est lui aussi implémenté — team-kernel depuis `v2.34.0`.

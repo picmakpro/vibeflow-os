@@ -4,6 +4,10 @@
 > Date : 2026-07-07. Statut : **IMPLÉMENTÉ (2026-07-07)** — les 4 briques sont posées et vérifiées
 > (voir § État de réalisation en fin de document). Le module `mobile-test` reste **expérimental**
 > jusqu'à un run réel vert dans un contexte VibeFlow.
+> *Note 2026-07-26 : document d'époque — le manager agentique a été entièrement refondu en v2.33.0
+> (bascule agentique) puis généralisé en team-kernel (v2.34.0) ; les mentions de verbes `/vf-*`
+> ci-dessous (dont `vf-plan`) désignent une façade supprimée. `mobile-test`(-team) est en v1.x et
+> reste marqué expérimental faute de run réel vert tracé.*
 > Périmètre validé par Samuel : les 4 briques ci-dessous. Rejeté : hiérarchie 7-agents, parité `.agent/`, contraintes de livraison du client.
 
 ## ⚠️ Révision 2026-07-07 — une 5e brique manquait

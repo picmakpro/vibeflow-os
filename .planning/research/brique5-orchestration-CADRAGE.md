@@ -5,6 +5,9 @@
 > + rule path-scopée) + câblage `vf-auto`, install/uninstall e2e validés. 5a « cerveau » n'était
 > pas nécessaire (déjà couvert par `gsd-autonomous`, voir §1bis). **Preuve finale = un run réel**
 > (nesting de sous-agents) encore à faire. Statut module : expérimental.
+> *Note 2026-07-26 : archive d'époque — le sommet d'orchestration a été refondu en v2.33.0/v2.34.0
+> (bascule agentique + team-kernel). L'action pendante « run réel » n'a jamais été soldée : elle est
+> désormais tracée comme condition de sortie du statut expérimental de `mobile-test`(-team).*
 > Déclencheur : la question « je dis "fais la phase 3 en auto" et il va jusqu'au bout ? » → **non**,
 > il manque le cerveau d'orchestration. Ce document cadre ce qui manque.
 > Décisions déjà prises par Samuel : (a) cadrer avant de coder ; (b) **sommet fusionné dans

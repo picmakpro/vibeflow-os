@@ -85,7 +85,11 @@ isolés (ADR-048/049).
 - **Aucun blocage technique.** Le spike est concluant.
 - **Décision humaine requise avant tout pas suivant** (ADR-031) : écrire l'ADR « frontmatter mémoire enrichi »
   et, seulement ensuite, modifier `plugin/consolidator/` + le format officiel. Rien n'a été touché de ce côté.
+  → **RÉSOLU (2026-07-26)** : ADR-052 écrit et validé, `plugin/consolidator/` modifié en conséquence
+  (pilier 5 « Mémoire vivante », `scripts/decay-pass.sh`, 27 tests) — shippé `v2.28.0`.
 - Volet swarm : rester en veille (non implémenté) jusqu'à observation de collisions réelles.
+  → **RÉSOLU** : ADR-053 écrit, swarm implémenté et dogfoodé (`v2.28.0`), devenu le team-kernel
+  transverse hébergé par `conductor` en `v2.34.0`.
 
 ## Livrables (chemins absolus)
 

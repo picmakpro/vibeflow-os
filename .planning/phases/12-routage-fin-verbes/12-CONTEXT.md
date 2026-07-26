@@ -31,7 +31,8 @@ Livre les **trois niveaux de routage** de la spec §2 et **18 verbes** neufs :
   n'est pas écrit ici.
 - Aucune release : **pas de bump de la `VERSION` racine, pas de tag git**, pas de modification de
   `plugin/.claude-plugin/plugin.json` ni de `.claude-plugin/marketplace.json`. La release est
-  portée par la Phase 13 qui clôt le milestone.
+  portée par la Phase 13 qui clôt le milestone. *(Démenti par les faits : la Phase 12 a finalement
+  shippé en `v2.31.0` — ne pas relire cette contrainte telle quelle en planifiant la Phase 13.)*
 - Aucun hook `UserPromptSubmit` de routage (YAGNI, spec §8).
 - Aucune refonte de `build-gsd-index.sh` — l'index reste auto-généré et **non éditable**.
 </domain>
