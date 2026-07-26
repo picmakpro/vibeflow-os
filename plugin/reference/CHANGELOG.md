@@ -1,5 +1,15 @@
 # CHANGELOG — reference
 
+## [v2.5.2] — 2026-07-26
+
+### Corrigé
+- Lexique (`vocabulary/lexique.md`) : intitulés P3-P8 réalignés sur le Core v4.2 canonique
+  (P3 « Orchestrer et executer », P4 « Clarifier avant d'executer », P5 « Verifier en boucle »,
+  P6 « Iterer par cycles courts », P7 « Transposer, pas copier », P8 « Evaluer la qualite
+  cognitive ») — le lexique portait encore la numérotation pré-v4 ; « Specialiser » n'existe
+  plus comme principe (absorbé par P3). Note de canonicité ajoutée (arbitrage 2026-07-26).
+
+
 ## [v2.5.1] — 2026-07-25
 
 ### Corrigé

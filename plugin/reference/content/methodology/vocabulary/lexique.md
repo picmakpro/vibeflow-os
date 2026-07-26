@@ -17,13 +17,17 @@
 |---|----------|-------|
 | P1 | Capitaliser | "Le projet n'oublie jamais" |
 | P2 | Structurer le contexte | "Donner la carte avant d'agir" |
-| P3 | Specialiser | "Un acteur, une mission" |
-| P4 | Orchestrer | "Le lead delegue, ne produit pas" |
-| P5 | Verifier | "Confiance plus contre-verification" |
-| P6 | Iterer | "Toute decision est revisable" |
-| P7 | Transposer | "Forker, pas dupliquer" |
-| P8 | Evaluer | "Mesurer la qualite cognitive des outputs IA" |
+| P3 | Orchestrer et executer | "Le lead delegue, ne produit pas ; des specialistes executent" |
+| P4 | Clarifier avant d'executer | "Pas de spec floue, pas de 'on verra en faisant'" |
+| P5 | Verifier en boucle | "No claim without fresh evidence" |
+| P6 | Iterer par cycles courts | "Cycle court, livrable, capitalisation a chaque fin" |
+| P7 | Transposer, pas copier | "Forker, pas dupliquer" |
+| P8 | Evaluer la qualite cognitive | "Mesurer la qualite cognitive des outputs IA" |
 | P9 | Modulariser pour la cognition | "Une responsabilite par unite, frontieres enforced par la machine" |
+
+> Intitules canoniques du Core v4.2 (`VIBEFLOW_CORE.md` est la source de verite). L'ancien
+> principe "Specialiser" (pre-v4) est absorbe par P3 : les specialistes executent sous
+> l'orchestrateur.
 
 ## Les 5 registres
 

@@ -1,6 +1,6 @@
 {
   "name": "reference",
-  "version": "v2.5.1",
+  "version": "v2.5.2",
   "type": "doc-only",
   "description": "Documentation méthodologique VibeFlow (module doc-only). 12 patterns architecturaux.",
   "requires": []
