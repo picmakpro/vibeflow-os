@@ -1,5 +1,5 @@
 # GSD Skills Index (auto-généré — NE PAS ÉDITER)
-> Généré le 2026-06-04T16:37:39+02:00 par build-gsd-index.sh depuis /Users/samuel/.claude/skills/gsd-*
+> Généré le 2026-07-26T22:14:33+02:00 par build-gsd-index.sh depuis /private/tmp/claude-501/-Users-samuel-Documents-dev-vibeflow-os/759d7268-3650-4846-8d1d-ab9f46221e21/scratchpad/ex/package/skills/gsd-*
 
 | Skill | Description |
 |-------|-------------|
@@ -31,19 +31,24 @@
 | gsd-ingest-docs | Bootstrap or merge a .planning/ setup from existing ADRs, PRDs, SPECs, and docs in a repo. |
 | gsd-manager | Interactive command center for managing multiple phases from one terminal |
 | gsd-map-codebase | Analyze codebase with parallel mapper agents to produce .planning/codebase/ documents |
+| gsd-mempalace-capture | File a phase artifact into MemPalace; mirror decision facts into its temporal KG |
+| gsd-mempalace-recall | Recall decisions, patterns, and surprises from MemPalace before planning |
 | gsd-milestone-summary | Generate a comprehensive project summary from milestone artifacts for team onboarding and review |
+| gsd-mvp-phase | Plan a phase as a vertical MVP slice — user story, SPIDR splitting, then plan-phase |
 | gsd-new-milestone | Start a new milestone cycle — update PROJECT.md and route to requirements |
 | gsd-new-project | Initialize a new project with deep context gathering and PROJECT.md |
-| gsd-ns-context | codebase intelligence \| map graphify docs learnings |
+| gsd-next | Smart entry — detect project state and route to the right next GSD action. |
+| gsd-ns-context | codebase intel \| map graphify docs learnings mempalace |
 | gsd-ns-ideate | exploration capture \| explore sketch spike spec capture |
 | gsd-ns-manage | config workspace \| workstreams thread update ship inbox |
 | gsd-ns-project | project lifecycle \| milestones audits summary |
 | gsd-ns-review | quality gates \| code review debug audit security eval ui |
 | gsd-ns-workflow | workflow \| discuss plan execute verify phase progress |
+| gsd-onboard | Guide existing codebase onboarding through mapping, doc ingest, and planning setup |
 | gsd-pause-work | Create context handoff when pausing work mid-phase |
 | gsd-phase | CRUD for phases in ROADMAP.md — add, insert, remove, or edit phases |
 | gsd-plan-phase | Create detailed phase plan (PLAN.md) with verification loop |
-| gsd-plan-review-convergence | Cross-AI plan convergence loop — replan with review feedback until no HIGH concerns remain. |
+| gsd-plan-review-convergence | Cross-AI plan convergence - replan until review concerns are resolved. |
 | gsd-pr-branch | Create a clean PR branch by filtering out .planning/ commits — ready for code review |
 | gsd-profile-user | Generate developer behavioral profile and create Claude-discoverable artifacts |
 | gsd-progress | Check progress, advance workflow, or dispatch freeform intent — the unified GSD situational command |
@@ -58,6 +63,7 @@
 | gsd-spec-phase | Clarify WHAT a phase delivers with ambiguity scoring; produces a SPEC.md before discuss-phase. |
 | gsd-spike | Spike an idea through experiential exploration, or propose what to spike next (frontier mode) |
 | gsd-stats | Display project statistics — phases, plans, requirements, git metrics, and timeline |
+| gsd-surface | Toggle which skills are surfaced — apply a profile, list, or disable a cluster without reinstall |
 | gsd-thread | Manage persistent context threads for cross-session work |
 | gsd-ui-phase | Generate UI design contract (UI-SPEC.md) for frontend phases |
 | gsd-ui-review | Retroactive 6-pillar visual audit of implemented frontend code |
@@ -71,6 +77,7 @@
 
 ## Workflows GSD (source secondaire)
 
+- add-backlog
 - add-phase
 - add-tests
 - add-todo
@@ -85,6 +92,7 @@
 - code-review
 - code-review-fix
 - complete-milestone
+- debug
 - diagnose-issues
 - discovery-phase
 - discuss-phase
@@ -97,7 +105,7 @@
 - execute-phase
 - execute-plan
 - explore
-- extract_learnings
+- extract-learnings
 - fast
 - forensics
 - graduation
@@ -112,6 +120,7 @@
 - manager
 - map-codebase
 - milestone-summary
+- mvp-phase
 - new-milestone
 - new-project
 - new-workspace
@@ -146,6 +155,7 @@
 - spike-wrap-up
 - stats
 - sync-skills
+- thread
 - transition
 - ui-phase
 - ui-review
