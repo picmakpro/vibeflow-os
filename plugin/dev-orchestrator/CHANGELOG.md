@@ -1,5 +1,31 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.3.0] — 2026-07-26
+
+### Ajouté
+- **Bascule `@opengsd/gsd-core`** (Phase 11, intégration migration GSD) : `ensure-deps.sh`
+  installe désormais le paquet npm `@opengsd/gsd-core` (dual-layout — `gsd-core` prioritaire,
+  `get-shit-done` legacy en repli, jamais de test PATH pour la détection — piège n°1
+  neutralisé), garde Node ≥ 22 (`@opengsd/gsd-core` cible Node 22+, message d'erreur explicite
+  sinon), nettoyage des artefacts legacy **affiché mais jamais exécuté** (ADR-031) quand
+  `~/.claude/get-shit-done/` est détecté au prochain run.
+- Migration des références internes `gsd-sdk` → `gsd-tools` (cascade de résolution documentée
+  dans `references/mission-contracts.md`, jamais un chemin en dur).
+- Routage `gsd-onboard` sur brownfield (FIRST-02) avec fallback si l'engine n'est pas encore
+  posé.
+- Canal 4 de la carte d'intention : `gsd-next`, `gsd-mempalace-*` explicitement **non routés**
+  (documentés pour mémoire, pas d'invocation directe depuis l'agent).
+- Index factuel `gsd-skills` régénéré (gsd-core 1.8.0).
+
+**Note de transition (labs existants)** : un lab encore sur l'ancien layout `get-shit-done`
+verra `ensure-deps.sh` **afficher** (jamais exécuter) 3 commandes de nettoyage manuel au
+prochain run — aucune action automatique sur les artefacts legacy, confirmation humaine requise.
+
+**Note de veille (décision D5, amendement recherche documentaire vague 11-02)** : à chaque bump
+de `gsd-core`, re-différer l'ordre de la cascade de résolution `gsd-tools` documentée dans
+`mission-contracts.md` contre `gsd-core/workflows/_runtime-launcher.snippet.sh` amont — le
+mapping peut évoluer entre versions du paquet.
+
 ## [v2.2.1] — 2026-07-26
 
 ### Corrigé
