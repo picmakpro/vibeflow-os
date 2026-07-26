@@ -5,6 +5,27 @@ dernières entrées et pointent ici). Chaque module a par ailleurs son propre `C
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.36.2] — 2026-07-26
+
+**Remédiation de l'audit « périmé »** (planning + docs, 5 commits). Côté distribution :
+README de modules réalignés sur l'état réel — `validator` (5 audits, dépendance
+`audit-architecture` rétablie, chemin d'install corrigé, skills fantômes purgés, densité vraie
+249/250 L), `conductor` (team-kernel enfin documenté : `dag.sh`, `driver-lock.sh`, rapports
+typés ; skill `vf-update`, hooks, 13 scripts, dépendance `skill-creator`/ADR-047), `reference`
+(12 patterns / 5 skills / 42 templates / Core v4.2 à 9 principes, contenu distribué inclus :
+`VERSION.md`, `README-CLIENT.md`, `lexique.md` gagne P9), `consolidator` (5 piliers, arbre
+complet, `/consolidate` → `/consolidator`, ADR-031 → ADR-056), `planning-core`,
+`software-architecture`, `dev-orchestrator` (`gsd-sketch` → `vf-sketch`, kernel consommé depuis
+`conductor`). Registre ADR : ADR-053 relocalisé (kernel → conductor, v2.34.0), ADR-052 remet
+`plugin/reference/` en source, ADR-035 gagne sa définition canonique. Les 14 en-têtes
+`**Version**` des README de modules réalignés et **gatés** : `check-version-sync.sh` gagne les
+contrôles 8 (en-tête Version ↔ VERSION du module) et 9 (compte de suites ↔ découverte CI), et
+son grep « N modules » mort depuis la v2.36.1 échoue désormais bruyamment au lieu d'être sauté
+en silence. Divers : marqueur de conflit git purgé de `conductor/CHANGELOG.md`,
+`/vibeflow-install` présenté comme skill dans les 2 README. Côté planning (non distribué) :
+Phase 13 redéfinie **sans verbe** (ingestion portée par l'agent), socle `.planning/` remis à
+l'heure, cartographie codebase régénérée, PROJECT.md rouvert.
+
 ## [v2.36.1] — 2026-07-26
 
 **Refonte vitrine des README** (FR+EN), inspirée d'ECC (spécificité, tables) et GSD (accroche
