@@ -137,8 +137,11 @@ Elles ne sont **jamais désinstallées automatiquement** (l'engine ne touche qu'
 VibeFlow). Si tu veux aussi les retirer :
 
 - **Superpowers** : `claude plugin uninstall superpowers`
-- **GSD** : installé hors VibeFlow via `npx get-shit-done-cc` — le retirer selon sa propre
-  procédure (typiquement en supprimant `~/.claude/get-shit-done/` et les skills `gsd-*` déposés).
+- **GSD** : installé hors VibeFlow via le paquet `@opengsd/gsd-core` — le retirer selon sa propre
+  procédure (typiquement en supprimant `~/.claude/gsd-core/`, ou `<projet>/.claude/gsd-core/` en
+  scope projet, et les skills `gsd-*` déposés). Les labs installés avant la migration vers
+  `gsd-core` peuvent encore porter l'ancien paquet legacy sous `~/.claude/get-shit-done/` — dans
+  ce cas, supprime ce dossier à la place.
 
 ---
 

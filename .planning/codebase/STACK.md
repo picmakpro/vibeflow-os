@@ -141,7 +141,9 @@ Outil de bump : `scripts/bump.sh`.
 - `VIBEFLOW_CACHE` (défaut `.vibeflow-cache`) — source des modules ; en prod = cache du plugin.
 - `VF_ENSURE_DRY_RUN`, `VF_ENSURE_FORCE`, `VF_ENSURE_AUTO_MAP` — modes de `ensure-deps.sh`.
 - `BASH_BIN` — surcharge d'interpréteur pour les tests de compat (bash 3.2).
-- `GSD_HOME` (défaut `~/.claude/get-shit-done`) — surchargeable pour les tests.
+- `GSD_HOME` — surchargeable pour les tests. Non fourni, résolu par cascade (D-01) : projet-local
+  `.claude/gsd-core` > global `~/.claude/gsd-core` > legacy `~/.claude/get-shit-done` > défaut
+  `gsd-core`.
 
 **Build:**
 - Aucun build. "Packaging" = le repo lui-même : Claude Code copie `plugin/` dans son cache à

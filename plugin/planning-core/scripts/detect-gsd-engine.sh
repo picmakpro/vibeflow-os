@@ -10,7 +10,9 @@
 # Usage:
 #   detect-gsd-engine.sh [--path <dir>] [--quiet]
 # Defaults: --path .planning
-# Env: GSD_HOME (défaut $HOME/.claude/get-shit-done) — surchargeable pour les tests.
+# Env: GSD_HOME — surchargeable pour les tests. Non fourni, résolu par cascade (gsd-core
+#   projet-local > gsd-core global > legacy get-shit-done > défaut gsd-core) ; voir détail
+#   dans default_gsd_home() plus bas.
 #
 # Exit codes, évalués dans CET ordre (le premier qui matche gagne) :
 #   1 = chaîne GSD absente de la machine — aucun moteur disponible

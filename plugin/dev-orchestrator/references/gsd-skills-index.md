@@ -1,5 +1,5 @@
 # GSD Skills Index (auto-généré — NE PAS ÉDITER)
-> Généré le 2026-07-26T22:14:33+02:00 par build-gsd-index.sh depuis @opengsd/gsd-core@1.8.0 (skills/gsd-*)
+> Généré le 2026-07-26T23:06:22+02:00 par build-gsd-index.sh depuis @opengsd/gsd-core@1.8.0
 
 | Skill | Description |
 |-------|-------------|

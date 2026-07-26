@@ -24,6 +24,10 @@ set -euo pipefail
 SKILLS_DIR="${VF_GSD_SKILLS_DIR:-$HOME/.claude/skills}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUT="${VF_INDEX_OUT:-$SCRIPT_DIR/../references/gsd-skills-index.md}"
+# Provenance affichée dans l'en-tête de sortie : nomme le paquet source (stable, reproductible)
+# plutôt que $SKILLS_DIR (chemin de système de fichiers — varie selon la machine/sandbox qui
+# régénère l'index, ex. un tarball extrait en /tmp).
+GSD_CORE_PACKAGE="${VF_GSD_CORE_PACKAGE:-@opengsd/gsd-core@1.8.0}"
 
 # Fenêtre de compat dual-layout (D-01, 11-CONTEXT.md), même cascade que detect-gsd-engine.sh :
 # projet-local gsd-core > $CLAUDE_CONFIG_DIR|$HOME gsd-core > legacy get-shit-done > défaut.
@@ -107,7 +111,7 @@ shopt -u nullglob
 # ---------- Écriture de la sortie ----------
 {
   echo "# GSD Skills Index (auto-généré — NE PAS ÉDITER)"
-  echo "> Généré le $generated_at par build-gsd-index.sh depuis $SKILLS_DIR/gsd-*"
+  echo "> Généré le $generated_at par build-gsd-index.sh depuis $GSD_CORE_PACKAGE"
   echo ""
   if [ "$skill_count" -eq 0 ]; then
     echo "_Aucun skill \`gsd-*\` trouvé sur disque. L'index sera régénéré après installation des skills GSD._"

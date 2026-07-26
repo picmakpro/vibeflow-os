@@ -183,13 +183,15 @@ vrais dans le code mais sans impact observé — sévérité **LOW**, ne pas pri
 - Blocks: la promesse « pont spec → feuille de route » du milestone vf-routing (dernière phase du
   milestone, 2/3 complétées). Prochaine action documentée : `/gsd:execute-phase 13`.
 
-**Milestone `gsd-migration` ouvert et en attente** — Sévérité : **LOW**
-- Problem: Phases 10-11 (étude + intégration migration GSD) créées le 2026-07-25, chantier
-  indépendant jamais démarré.
-- Files: `.planning/MILESTONES.md:41` ; `.planning/phases/10-etude-migration-gsd/`,
+**Milestone `gsd-migration` — Phase 11 livrée et vérifiée** — Sévérité : **LOW**
+- Problem: Phase 11 (intégration migration GSD, `get-shit-done-cc` → `@opengsd/gsd-core`) a été
+  exécutée et vérifiée (6 vagues, PASS sur les 3 critères, suites vertes) le 2026-07-26. Le
+  milestone `MILESTONES.md:42` porte encore le statut « EN ATTENTE — non planifié » hérité de sa
+  création — désynchronisé de l'avancement réel.
+- Files: `.planning/MILESTONES.md:42` ; `.planning/phases/10-etude-migration-gsd/`,
   `.planning/phases/11-integration-migration-gsd/`
-- Blocks: rien de bloquant (explicitement non bloquant dans STATE.md) — mais à arbitrer pour que le
-  milestone ne devienne pas un item de backlog fantôme.
+- Blocks: rien de bloquant — mais le statut du milestone (`MILESTONES.md`) mérite une mise à jour
+  pour ne pas laisser croire à un chantier non démarré alors qu'il est en grande partie livré.
 
 ## Test Coverage Gaps
 
