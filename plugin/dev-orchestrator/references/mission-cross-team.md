@@ -7,8 +7,9 @@
 > (T3 : DAG mixte `craft:écran → exec → (critique:écran ∥ revue-code)` ; T4 : reopen cross-métier).
 > Option A retenue : étages croisés **sous un seul manager** — un seul verrou de driver, un seul
 > DAG, un seul rapport de mission. L'imbrication manager→manager reste **interdite** (Pattern A,
-> T1 : `acquire` refusé), machine-enforced par les allowlists `Agent(...)` des deux managers
-> (Pattern 12, `check-agents.sh`).
+> T1 : `acquire` refusé) ; cette interdiction devient machine-enforced (allowlists `Agent(...)`
+> des deux managers, Pattern 12, `check-agents.sh`) sur le nœud D-07 dédié de cette phase — pas
+> encore livré à cette étape.
 
 ---
 
@@ -80,8 +81,8 @@
 - **Un seul rapport de mission** — le manager qui pilote synthétise, quel que soit le nombre de
   métiers touchés dans la mission.
 - **Jamais de manager qui en dispatche un autre** — l'imbrication manager→manager est bloquée
-  par construction (Pattern A, T1) ET machine-enforced par les allowlists `Agent(...)` des deux
-  managers (Pattern 12, `check-agents.sh`).
+  par construction (Pattern A, T1) ; à durcir en machine-enforced (allowlists `Agent(...)` des
+  deux managers, Pattern 12, `check-agents.sh`) par le nœud D-07 dédié de cette phase.
 
 ---
 
