@@ -108,6 +108,20 @@ Raccourcis des cas dominants :
   dans `.planning/config.json` s'il est absent, et je n'écris que sur confirmation explicite
   (doctrine machine-enforced, ADR-031, voir `GSD-PIPELINE.md`).
 
+## Signaux de démarrage
+
+Le hook `SessionStart` du module constate des faits et les injecte dans le contexte de la
+session principale (pas seulement à mon invocation). Un 5e fait (documents de cadrage hors
+feuille de route) est déjà couvert par la ligne « intègre cette spec… » ci-dessus
+(`ingestion-flow.md`) — pas dupliqué ici.
+
+| Signal | Geste proposé | Confirmation |
+|---|---|---|
+| `[bootstrap]` | `gsd-config` puis `gsd-map-codebase` (items manquants listés) | requise avant toute écriture (ADR-031) |
+| `[onboard]` | `gsd-onboard` | requise avant toute écriture (ADR-031) |
+| `[gsd-engine]` | oriente vers `gsd-discuss-phase` / `gsd-plan-phase` / `gsd-progress` — pas un correctif | orientation seule, rien à écrire |
+| `[doc-drift]` | `gsd-docs-update` | requise avant toute écriture (ADR-031) |
+
 ## Heuristiques de routage
 
 1. **Trivial vs structurant** : un commit, pas d'impact archi → `gsd-quick`. Sinon → pipeline

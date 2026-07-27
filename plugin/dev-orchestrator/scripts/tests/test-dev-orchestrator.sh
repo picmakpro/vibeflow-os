@@ -46,6 +46,12 @@
 #         y renvoie en Références.
 #   T17 — Câblage du routage d'ingestion : AGENT.md porte une ligne d'intention explicite
 #         (table Amont & cadrage) et intent-routing.md conserve sa ligne enrichie.
+#   T20 — Gate ADR-044 réellement falsifiable (VFDO-17-03, D-12) : check-agents.sh --file sur
+#         AGENT.md, triple assertion (exit 0, compte de warnings == baseline 3, présence des 3
+#         types connus) — jamais un simple exit 0 (invocation à nu = vert vide sur ce dépôt).
+#   T21 — Invariants SC5 par grep structurel (VFDO-17-03, D-15) : check-dev-bootstrap.sh et
+#         check-doc-drift.sh n'ont aucun exit 1, aucune écriture hors /dev/null|&N|*TMP*, aucune
+#         commande d'écriture directe, et tout mktemp est apparié à un trap ... EXIT.
 #
 # Historique de numérotation : T3/T12/T13/T14 ont changé de sémantique à la v2.0.0 (les
 # anciens tests de collision de descriptions, de préséance et de synchro de la table vf-dev
@@ -1072,6 +1078,97 @@ assert_no_homonym "tools: Read, Agent(gsd-code-fixer)"     "gsd-code-fixer"    "
 assert_no_homonym "tools: Read, Agent(gsd-planner)"        "gsd-planner"       "gsd-plan-checker"
 assert_no_homonym "tools: Read, Agent(gsd-planner)"        "gsd-planner"       "gsd-plan"
 [ "$t19f_ok" -eq 1 ] && ok "T19f anti-homonyme : aucun nom validé par un préfixe/homonyme partiel d'un autre (token exact, extraction bornée)"
+
+# ---------------------------------------------------------------------------
+# T20 — Gate ADR-044 réellement falsifiable sur AGENT.md (D-12, VFDO-17-03)
+# ---------------------------------------------------------------------------
+# check-agents.sh SANS argument sort exit 0 trivialement sur ce dépôt (.claude/agents absent —
+# vert vide). AGENT.md est à la racine du module, hors de la boucle CI plugin/*/agents
+# (ci.yml:76) : --file est donc la SEULE invocation qui vérifie réellement quelque chose ici.
+# Triple assertion (jamais un simple exit 0) : exit code, COMPTE de warnings égal à la baseline
+# (3), ET présence des 3 types connus — un 4e type de warning (dégradation) ou la disparition
+# d'un type font échouer ce cas, ce qu'une simple assertion d'exit 0 ne verrait jamais (preuve
+# de falsifiabilité par mutation : ajouter un champ frontmatter inconnu à une COPIE d'AGENT.md
+# fait passer le compte à 4 — documenté dans le SUMMARY du plan VFDO-17-03).
+# CHECK_AGENTS est résolu une seule fois par T8c ci-dessus — réutilisé ici (DRY).
+if [ -z "$CHECK_AGENTS" ]; then
+  skip "T20 gate ADR-044 : contrôleur check-agents.sh introuvable (conductor non présent dans cette disposition)"
+else
+  T20_OUT="$(bash "$CHECK_AGENTS" --file "$AGENT_FILE" 2>&1)"; T20_RC=$?
+  T20_WARN_COUNT=$(echo "$T20_OUT" | "$GREP" -c '⚠')
+  t20_ok=1
+  [ "$T20_RC" -eq 0 ] || { ko "T20 gate ADR-044 : check-agents.sh --file sort en $T20_RC (attendu 0)"; t20_ok=0; }
+  [ "${T20_WARN_COUNT:-0}" -eq 3 ] || { ko "T20 gate ADR-044 : $T20_WARN_COUNT warning(s) sur $(basename "$AGENT_FILE") (attendu exactement 3 — baseline VFDO-17-03)"; t20_ok=0; }
+  echo "$T20_OUT" | "$GREP" -q 'different du nom de fichier' || { ko "T20 gate ADR-044 : warning « name différent du nom de fichier » absent"; t20_ok=0; }
+  echo "$T20_OUT" | "$GREP" -q 'aucun skill cable' || { ko "T20 gate ADR-044 : warning « aucun skill câblé » absent"; t20_ok=0; }
+  echo "$T20_OUT" | "$GREP" -q 'tools absent' || { ko "T20 gate ADR-044 : warning « tools absent » absent"; t20_ok=0; }
+  [ "$t20_ok" -eq 1 ] && ok "T20 gate ADR-044 : check-agents.sh --file $(basename "$AGENT_FILE") — exit 0, exactement 3 warnings (les 3 types connus), --file obligatoire (invocation à nu = vert vide, D-12)"
+fi
+
+# ---------------------------------------------------------------------------
+# T21 — Invariants SC5 par grep structurel sur les 2 nouveaux scripts (D-15, VFDO-17-03)
+# ---------------------------------------------------------------------------
+# Vérifie, sur le corps ANALYSABLE de check-dev-bootstrap.sh et check-doc-drift.sh (lignes de
+# commentaire entières retirées, bloc awk embarqué neutralisé — langage étranger avec sa propre
+# sémantique d'exit/comparaison, jamais celle du script bash — et commentaires de fin de ligne
+# retirés) : (a) aucun exit 1 littéral, (b) toute redirection d'écriture cible /dev/null, un
+# descripteur (&N), ou une variable dont le nom contient TMP, (c) aucune commande d'écriture
+# directe (mkdir/touch/tee/cp/mv/sed -i), (d) tout mktemp est apparié à un trap ... EXIT dans le
+# même fichier. Chaque sous-vérification produit son propre ok/ko (l'invariant rompu et le
+# fichier fautif sont désignés, jamais un booléen global).
+t21_strip_awk_block() {
+  awk '
+    /awk[[:space:]]*'"'"'[[:space:]]*$/ { skip=1; next }
+    skip && /^[[:space:]]*'"'"'/ { skip=0; next }
+    skip { next }
+    { print }
+  '
+}
+t21_analyzable_body() { # <file>
+  "$GREP" -vE '^[[:space:]]*#' "$1" | t21_strip_awk_block | sed -E 's/[[:space:]]+#.*$//'
+}
+
+for T21_FILE in "$MOD/scripts/check-dev-bootstrap.sh" "$MOD/scripts/check-doc-drift.sh"; do
+  T21_NAME="$(basename "$T21_FILE")"
+  if [ ! -f "$T21_FILE" ]; then
+    ko "T21 invariants SC5 : $T21_FILE introuvable"
+    continue
+  fi
+  T21_BODY="$(t21_analyzable_body "$T21_FILE")"
+
+  # (a) aucun exit 1 littéral (seuls 0/3/64 admis dans le contrat de sortie du script).
+  t21a_hits="$(echo "$T21_BODY" | "$GREP" -nE 'exit[[:space:]]+1([^0-9]|$)')"
+  if [ -z "$t21a_hits" ]; then
+    ok "T21a invariants SC5 : $T21_NAME — aucun exit 1 (contrat 0/3/64 tenu)"
+  else
+    ko "T21a invariants SC5 : $T21_NAME — exit 1 littéral trouvé : $t21a_hits"
+  fi
+
+  # (b) toute redirection d'écriture cible /dev/null, un descripteur (&N), ou une variable *TMP*.
+  t21b_hits="$(echo "$T21_BODY" | "$GREP" -nE '>' | "$GREP" -vE '>[[:space:]]*(&[0-9]|/dev/null|\"?\$\{?[A-Za-z_]*TMP[A-Za-z_]*\}?)')"
+  if [ -z "$t21b_hits" ]; then
+    ok "T21b invariants SC5 : $T21_NAME — toute redirection d'écriture cible /dev/null, &N ou une variable *TMP*"
+  else
+    ko "T21b invariants SC5 : $T21_NAME — redirection hors /dev/null|&N|*TMP* : $t21b_hits"
+  fi
+
+  # (c) aucune commande d'écriture directe.
+  t21c_hits="$(echo "$T21_BODY" | "$GREP" -nE '\b(mkdir|touch|tee|cp|mv)\b|sed[[:space:]]+-i')"
+  if [ -z "$t21c_hits" ]; then
+    ok "T21c invariants SC5 : $T21_NAME — aucun mkdir/touch/tee/cp/mv/sed -i"
+  else
+    ko "T21c invariants SC5 : $T21_NAME — commande d'écriture trouvée : $t21c_hits"
+  fi
+
+  # (d) chaque mktemp est apparié à au moins un trap ... EXIT dans le même fichier.
+  t21d_mktemp_count=$(echo "$T21_BODY" | "$GREP" -c 'mktemp')
+  t21d_trap_count=$(echo "$T21_BODY" | "$GREP" -cE 'trap.*EXIT')
+  if [ "${t21d_mktemp_count:-0}" -gt 0 ] && [ "${t21d_trap_count:-0}" -eq 0 ]; then
+    ko "T21d invariants SC5 : $T21_NAME — $t21d_mktemp_count mktemp sans trap ... EXIT"
+  else
+    ok "T21d invariants SC5 : $T21_NAME — mktemp ($t21d_mktemp_count) apparié à trap ... EXIT, ou aucun mktemp"
+  fi
+done
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
