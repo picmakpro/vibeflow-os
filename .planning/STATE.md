@@ -108,6 +108,13 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
 
 ### Roadmap Evolution
 
+- 2026-07-27 : **Phase 18** (Capability living-specs, conventions OpenSpec) ajoutée. Issue de
+  l'étude « successeurs de GSD » du jour (mémoire `gsd-succession-landscape-2026-07`) : gap réel
+  confirmé — GSD n'a aucun ledger de specs accumulées « ce que le système EST » ; verdict des audits
+  code : ne PAS co-installer OpenSpec (collision de routage des skills, double état), voler la
+  convention (grammaire delta + merge par bloc Requirement/Scenario) via une capability overlay
+  `.gsd/capabilities/` sur `ship:post`, specs sous `.planning/specs/`. Piste amont : RFC/PR vers
+  open-gsd/gsd-core une fois la capability éprouvée dans VibeFlow.
 - 2026-07-27 : **Phase 17** (Signaux de démarrage du moteur de dev) ajoutée. Spec :
   `docs/superpowers/specs/2026-07-27-signaux-demarrage-dev-design.md`. Constat déclencheur :
   `dev-orchestrator` est le seul module structurant **sans hooks**, donc `discover-unintegrated-docs.sh`

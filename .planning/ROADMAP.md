@@ -484,8 +484,10 @@ courts et **auto-portants** (chaque ligne porte son propre geste, comme `[planni
 **Depends on**: — (indépendante de la Phase 16 ; s'appuie sur l'acquis des Phases 13 et 14)
 **Requirements**: TBD (à dériver au cadrage)
 **Success Criteria** (what must be TRUE):
+
   1. Sur un repo sain et complètement cadré, les trois scripts sortent en 3 et **aucune ligne**
      n'est injectée au démarrage — le coût contexte d'un projet sain est nul.
+
   2. `check-dev-bootstrap.sh` couvre le continuum de démarrage en un seul script : silence si ni
      code ni `.planning/`, signal `onboard` si code sans `.planning/`, signal `bootstrap` listant
      les items manquants (`config.json`, `codebase/`, ROADMAP sans phase) sinon, signal
@@ -498,14 +500,18 @@ courts et **auto-portants** (chaque ligne porte son propre geste, comme `[planni
      prend le relais ; le routage de `vibeflow-dev` n'existe que si son `AGENT.md` est lu, donc
      seulement une fois l'agent invoqué. Le signal lit le frontmatter réel de `STATE.md`
      (milestone, phase, statut) et retombe en silence s'il est illisible — jamais d'état inventé.
+
   3. `discover-unintegrated-docs.sh --hook` agrège le compte en une ligne **sans toucher** au
      contrat historique (`grain<TAB>chemin`, exits 0/3/64) consommé par `ingestion-flow.md` ;
      `--hook` avec `--quiet` sort en 64.
+
   4. `check-doc-drift.sh` signale au-delà d'un seuil de commits de code sans mise à jour de doc
      (défaut 20, réglable), et reste silencieux hors dépôt git ou sans commit de doc.
+
   5. Les trois scripts sont en **lecture seule** et **advisory** : aucune écriture, aucun exit 1,
      aucun blocage de tour — la confirmation humaine reste devant chaque geste proposé (ADR-031,
      garde-fous BRDG-03 pour l'ingestion).
+
   6. Les hooks sont câblés par l'engine sans le modifier (`merge_module_hooks` gère déjà le
      fragment), `check-agents.sh` passe après modification d'`AGENT.md`, et les tests des trois
      scripts passent sous `bash` macOS **et** Linux (portabilité CI — régression du 2026-07-27).
@@ -514,3 +520,14 @@ courts et **auto-portants** (chaque ligne porte son propre geste, comme `[planni
 Plans:
 
 - [ ] TBD (run /gsd-plan-phase 17 to break down)
+
+### Phase 18: Capability living-specs (conventions OpenSpec)
+
+**Goal:** Doter les labs d'un ledger de specs vivantes accumulées par capability — « ce que le système EST », tenu à jour à la clôture de phase — en volant les conventions d'OpenSpec sans en installer l'outil : grammaire delta (ADDED/MODIFIED/REMOVED/RENAMED Requirements), merge par bloc `### Requirement:` + `#### Scenario:` (Given/When/Then), cycle delta → merge → archive. Ancrage : capability overlay `.gsd/capabilities/` accrochée à `ship:post` (ADR-1244 D2 côté gsd-core), specs sous `.planning/specs/<capability>/`, skill de spec-sync agent-driven. Contraintes : zéro dépendance externe, zéro double état, gouvernance conductor applicable (densité ADR-029). Étude source : mémoire `gsd-succession-landscape-2026-07` (audits code OpenSpec × gsd-core du 2026-07-27). Piste amont : proposer la capability upstream à open-gsd/gsd-core une fois éprouvée ici (RFC/PR avec l'overlay comme implémentation de référence).
+**Requirements**: TBD
+**Depends on:** Phase 17
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 18 to break down)
