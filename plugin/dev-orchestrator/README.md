@@ -7,7 +7,7 @@
 > façade de verbes : GSD est l'interface directe du quotidien, l'agent est l'entrée
 > conversationnelle optionnelle.
 
-**Version** : v2.3.2
+**Version** : v2.4.0
 **Type** : agent + équipe d'agents + 2 skills + scripts
 
 ---
@@ -228,6 +228,11 @@ Exit 0 si tout passe (les SKIP, ex. GSD absent, ne font pas échouer la suite).
 
 ## Historique
 
+- **v2.4.0** — étages croisés dev ↔ design (Phase 15) : `vf-dev-manager` dispatche `vf-crafter`
+  (`craft:<écran>`) avant une étape UI et `vf-design-judge` (`critique:<écran>`) en parallèle de
+  la revue code, sans jamais dispatcher `vf-design-manager` ; brief enrichi
+  (`design: auto|force|off`, `livrable: specs|specs+implementation`) ; allowlist `Agent(...)`
+  portée à 18 noms.
 - **v2.2.1** — échappatoire ADR-031 fermée : l'ingestion remonte nominativement à l'humain
   depuis `vf-dev-manager` aussi (jamais déclenchée en mission sans confirmation).
 - **v2.2.0** — câblage de l'ingestion (BRDG-01/BRDG-03) dans `vibeflow-dev` : doctrine

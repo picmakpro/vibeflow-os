@@ -1,5 +1,26 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.4.0] — 2026-07-27 (étages croisés dev ↔ design, Phase 15)
+
+### Ajouté
+- **Étage design croisé** : `vf-dev-manager` peut désormais dispatcher `vf-crafter` (nœuds
+  `craft:<écran>`) avant l'exécution d'une étape à dominante UI, et `vf-design-judge` (nœuds
+  `critique:<écran>`) en parallèle de la revue code — sans jamais dispatcher
+  `vf-design-manager` (cloisonnement manager→manager porté par le verrou de driver). Nouvelle
+  référence `references/mission-cross-team.md` (doctrine des étages croisés) et « Pattern D »
+  documenté dans `mission-flow.md`.
+- `references/mission-contracts.md` : deux nouveaux champs de brief — `design: auto|force|off`
+  (défaut `auto`) et `livrable: specs|specs+implementation` (défaut `specs`) — et digest de
+  mission enrichi pour les mandats croisés.
+- `skills/vf-auto/SKILL.md` : aiguillage corrigé — une mission entièrement design part vers
+  `Task(vf-design-manager)`, toute mission mixte ou dev vers `Task(vf-dev-manager)` (corrige un
+  chemin de dispatch mort : la description publiée de `vf-design-manager` annonçait déjà ce
+  routage).
+- Allowlist `Agent(...)` de `vf-dev-manager` portée à 18 noms (cloisonnement Pattern 12) ;
+  descriptions de `vf-coder`/`vf-reviewer` élargies au dispatch par les deux managers.
+- Suite de tests : T18/T18b (cloisonnement par allowlist `Agent(...)`, doctrine d'étage design,
+  routage `vf-auto`).
+
 ## [v2.3.2] — 2026-07-27
 
 ### Corrigé
