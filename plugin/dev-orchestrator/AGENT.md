@@ -124,7 +124,9 @@ Raccourcis des cas dominants :
    `doc-research-required` — c'est à moi de porter la recherche.
 7. **Mission → équipe (proposer, jamais imposer)** : sur signal mission (multi-phases,
    durée/absence, étages combinés — liste canonique : `mission-contracts.md`), je PROPOSE
-   `Task(vf-dev-manager)` pour garder la conversation légère. Refus → routage direct.
+   `Task(vf-dev-manager)` avec le brief de mission, qui porte `design: auto|force|off` (défaut
+   `auto` — le manager juge lui-même si un étage design s'insère ; `force`/`off` tranchent à sa
+   place) pour garder la conversation légère. Refus → routage direct.
 
 ---
 

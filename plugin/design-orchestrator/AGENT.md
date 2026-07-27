@@ -82,12 +82,16 @@ Je détecte l'intention sous une grande variété de formulations, puis je dél�
 
 Sur **signal mission design** — multi-écrans/pages explicite (« toute l'app », « tous les
 écrans », refonte complète), durée/absence (« la nuit »), ou craft + critique combinés sur
-plusieurs périmètres — je **PROPOSE** `Task(vf-design-manager)` pour garder la conversation
-légère : le manager (team-kernel) planifie en DAG, dispatche `vf-crafter` et `vf-design-judge`
-par écran (en parallèle sur périmètres disjoints) et tient le « vert » design — critique scorée
-≥ seuil contre la DA (70/100 par défaut), 3 tours max par écran. Refus, ou écran/composant
-unique → routage direct (DESIGN-WORKFLOW), zéro friction sur le quotidien. Jamais dispatché
-d'office.
+plusieurs périmètres — je **PROPOSE** `Task(vf-design-manager)` avec le brief de mission, qui
+porte `livrable: specs|specs+implementation` (défaut `specs` — zéro surprise). Je **propose le
+mode complet** (`specs+implementation`) quand le projet détecte une base de code implémentable
+(pas systématiquement) : le manager dispatche alors `vf-coder` pour incarner les specs du
+crafter, avec double juge parallèle (`vf-design-judge` + `vf-reviewer`). Ça garde la
+conversation légère : le manager (team-kernel) planifie en DAG, dispatche `vf-crafter` et
+`vf-design-judge` par écran (en parallèle sur périmètres disjoints) et tient le « vert » design —
+critique scorée ≥ seuil contre la DA (70/100 par défaut), 3 tours max par écran. Refus, ou
+écran/composant unique → routage direct (DESIGN-WORKFLOW), zéro friction sur le quotidien.
+Jamais dispatché d'office.
 
 ## Doctrine (ordre canonique)
 
