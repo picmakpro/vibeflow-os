@@ -374,7 +374,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 ✅ (R&D, shippée v2.28.0)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 ✅ (code complet, release en attente de validation humaine)** ; **14 ✅ (indépendante)**
+1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 ✅ (R&D, shippée v2.28.0)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 ✅ (code complet, release en attente de validation humaine)** ; **14 ✅ (indépendante)** ; **15 ✅ (shippée v2.40.0) → 16 (escalades de 15)**
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -392,6 +392,8 @@ Plans:
 | 12. Routage fin & verbes /vf-* | vf-routing | 6/6 | Complete — release `v2.31.0` | 2026-07-25 |
 | 13. Pont spec → feuille de route | vf-routing | 2/2 | Complete — release `v2.37.0` — module v2.2.0, vérif PASS | 2026-07-26 |
 | 14. Frontière d'altitude planning-core / GSD | vf-routing | 7/7 | Complete — release `v2.30.0` (ADR-055) | 2026-07-25 |
+| 15. Collaboration inter-équipes dev ↔ design | — | 7/7 | Complete — release `v2.40.0` (5/5 critères), 2 points escaladés → Phase 16 | 2026-07-27 |
+| 16. Cloisonnement complet des dispatches | — | 0/? | Not started — lint réel `check-agents.sh` + scoping `Agent` des 3 workers | — |
 
 ### Phase 15: Collaboration inter-équipes dev ↔ design
 
@@ -430,4 +432,30 @@ Plans:
 - [x] Tests croisés — T18/T18b (dev), T8/T8b + T4 durci (design), T12 (DAG hétérogène cross-métier), chacun prouvé discriminant par mutation
 - [x] Portée réelle du cloisonnement — garantie attribuée au verrou de driver, dette `Agent` non scopé des workers consignée dans CONCERNS.md
 - [x] Bumps par module — conductor v1.14.6, design-orchestrator v1.3.0, dev-orchestrator v2.4.0
-- [ ] **Release racine + tag annoté + release GitHub** — réservé à la validation humaine (Success Criterion 5, seul reliquat)
+- [x] **Release racine + tag annoté + release GitHub** — `v2.40.0` validée humainement et publiée le 2026-07-27 (`check-release-tag.sh --remote` → ✓)
+
+### Phase 16: Cloisonnement complet des dispatches d'agents
+
+**Goal**: Fermer les deux trous escaladés par la mission de la Phase 15, tous deux sur le même
+sujet : le cloisonnement des dispatches est aujourd'hui **documenté et testé par module**, mais pas
+**garanti par le gate partagé**, et il ne couvre que le chemin direct manager→manager. (1) Écrire le
+lint réel des allowlists `Agent(...)` dans `check-agents.sh` — le script ne lit actuellement jamais
+le contenu du champ `tools:`, si bien que des noms d'agents inventés, une parenthèse non fermée ou
+des outils inexistants passent `--strict` en vert. (2) Scoper l'accès `Agent` de `vf-coder`,
+`vf-reviewer` et `vf-auditer`, qui laissent ouvert le chemin indirect manager→worker→manager.
+**Requirements**: TBD (à dériver au cadrage)
+**Depends on:** Phase 15
+**Success Criteria** (what must be TRUE):
+  1. `check-agents.sh` valide le **contenu** des allowlists `Agent(...)` : syntaxe (parenthèse
+     fermée, séparateurs) et existence de chaque nom — sans rendre rouges des allowlists correctes
+     qui référencent des types natifs sans fichier `.md` (`general-purpose`) ou des agents externes
+     fournis par `@opengsd/gsd-core` (`gsd-*`). Ce piège est la raison pour laquelle le lint n'a pas
+     été écrit en Phase 15.
+  2. Les allowlists de `vf-coder`, `vf-reviewer` et `vf-auditer` sont posées après le **même
+     recensement exhaustif** que celui de la Phase 15 — dispatches directs **et** agents dispatchés
+     par les skills que ces workers invoquent (l'angle mort qui avait produit 4 omissions).
+  3. Le chemin indirect manager→worker→manager est structurellement fermé ; la dette correspondante
+     sort de `CONCERNS.md`.
+  4. Les tests de suite existants (T18/T18b, T8/T8b) restent verts et le nouveau lint est prouvé
+     discriminant par mutation ; les 39 suites du repo passent.
+**Plans:** TBD

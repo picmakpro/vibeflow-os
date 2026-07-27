@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
 current_phase: 15
-current_phase_name: Collaboration inter-équipes dev ↔ design — livrée, release racine en attente
-status: awaiting-release
-stopped_at: Phase 15 delivered — root VERSION bump + tag pending human approval
-last_updated: "2026-07-27T18:30:00.000Z"
-last_activity: "2026-07-27 (mission d'équipe : exécution complète de la Phase 15)"
+current_phase_name: Collaboration inter-équipes dev ↔ design — shippée `v2.40.0`
+status: shipped
+stopped_at: Phase 15 shipped (v2.40.0 taggée + release GitHub) — Phase 16 inscrite, non démarrée
+last_updated: "2026-07-27T19:15:00.000Z"
+last_activity: "2026-07-27 (release v2.40.0 publiée + Phase 16 inscrite à la roadmap)"
 progress:
-  total_phases: 14
-  completed_phases: 7
-  total_plans: 36
-  completed_plans: 16
+  total_phases: 16
+  completed_phases: 8
+  total_plans: 43
+  completed_plans: 23
 ---
 
 # Project State
@@ -22,25 +22,28 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26 — charte rouverte : 17 modules, D2/D6 renversées)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Milestone `gsd-migration` **SHIPPÉ `v2.39.0`** (2026-07-26) — VibeFlow tourne
-sur `@opengsd/gsd-core@^1`. Plus aucun milestone ouvert. Chantiers candidats : sortie
-d'expérimental de `mobile-test`(-team), dette backlog (known-versions.txt, brick_routed).
+**Current focus:** Phase 15 **SHIPPÉE `v2.40.0`** (2026-07-27) — les équipes dev et design
+collaborent par étages croisés sous un seul manager. Plus aucun milestone ouvert. Prochain chantier
+inscrit : **Phase 16** (cloisonnement complet des dispatches, escalades de la 15). Autres chantiers
+candidats : sortie d'expérimental de `mobile-test`(-team), dette backlog (known-versions.txt,
+brick_routed).
 
 ## Current Position
 
-Phase: 15 **complète — livrée sur `main`, EN ATTENTE DE RELEASE RACINE**
+Phase: 15 **complète — shippée `v2.40.0`** (tag annoté + release GitHub, `check-release-tag --remote` ✓)
 Collaboration inter-équipes dev ↔ design (option A : étages croisés sous un seul manager). Livrée en
-mission d'équipe le 2026-07-27 : 16 commits, 18 fichiers, +406/−38. Success Criteria 1 à 4 tenus ;
-**SC5 partiellement** — les suites couvrent le scénario croisé et sont vertes (43 dev · 12 design ·
-36 dag · 26 driver-lock, 0 KO), mais la release racine + tag annoté reste à faire sous validation
-humaine. Modules bumpés : `conductor` v1.14.6 · `design-orchestrator` v1.3.0 · `dev-orchestrator` v2.4.0.
-`VERSION` racine volontairement **intouchée** (v2.39.0, taggée).
-Status: Phase livrée et vérifiée — release racine en attente de feu vert.
-Last activity: 2026-07-27 (mission d'équipe : exécution complète de la Phase 15)
+mission d'équipe le 2026-07-27 : 17 commits, 18 fichiers, +406/−38. **5/5 Success Criteria tenus.**
+Suites vertes (43 dev · 12 design · 36 dag · 26 driver-lock, 0 KO), rejouées à la main avant release.
+Modules : `conductor` v1.14.6 · `design-orchestrator` v1.3.0 · `dev-orchestrator` v2.4.0.
+Status: Shippée.
+Last activity: 2026-07-27 (release v2.40.0 publiée + Phase 16 inscrite)
 
-**Reliquat à arbitrer (remonté en mission, non exécuté)** : écrire le lint `Agent(...)` manquant dans
-`check-agents.sh`, et scoper l'accès `Agent` de `vf-coder`/`vf-reviewer`/`vf-auditer`. Voir §Decisions
-du 2026-07-27 et `.planning/codebase/CONCERNS.md`.
+**Deux escalades de la mission, arbitrées en Phase 16** (choix humain du 2026-07-27 : phase courte
+dédiée plutôt que traitement dans la foulée ou simple backlog) : écrire le lint `Agent(...)` manquant
+dans `check-agents.sh` (le script ne lit jamais le contenu du champ `tools:`), et scoper l'accès
+`Agent` de `vf-coder`/`vf-reviewer`/`vf-auditer` (chemin indirect manager→worker→manager encore
+ouvert, invariant tenu par le seul verrou de driver). Voir §Decisions du 2026-07-27,
+`.planning/codebase/CONCERNS.md` et ROADMAP §Phase 16.
 
 ---
 
