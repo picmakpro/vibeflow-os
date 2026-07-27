@@ -122,6 +122,41 @@ assert "T11.2 — racine ROOT rendue"          "$tree_out" 'ROOT'
 assert "T11.3 — orphelin C1 rendu"           "$tree_out" 'C1'
 assert "T11.4 — orphelin C2 rendu"           "$tree_out" 'C2'
 
+echo "=== T12 — DAG hétérogène cross-métier (dev + design, Phase 15) ==="
+# Le kernel est métier-agnostique : un nœud design (id à « : », convention craft:<écran>) doit
+# coexister dans un DAG dev sans traitement spécial, et sans être confondu avec le mécanisme de
+# remap déterministe sur collision (« id::stage », double « : »). Deux juges read-only cross-
+# métier (critique design + revue code) doivent pouvoir sortir dans la MÊME frontière `ready`.
+M="$WORK_DIR/mixte.dag.json"; "$SCRIPT" init --file="$M" >/dev/null
+"$SCRIPT" add --file="$M" --id=discuss-5 --step="cadrage étape 5" >/dev/null
+"$SCRIPT" add --file="$M" --id=plan-5    --step="plan étape 5" --deps=discuss-5 >/dev/null
+
+craft_out=$("$SCRIPT" add --file="$M" --id=craft:ecran-home --step="craft design écran" --deps=plan-5)
+assert "T12.1 — id craft:ecran-home NON remappé (un « : » simple ≠ la syntaxe de remap « :: »)" "$craft_out" '"added": "craft:ecran-home"'
+assert "T12.2 — remapped:false sur ce premier add (pas de collision)"                            "$craft_out" '"remapped": false'
+
+"$SCRIPT" add --file="$M" --id=exec-5              --step="implémentation"  --deps=craft:ecran-home,plan-5 >/dev/null
+"$SCRIPT" add --file="$M" --id=critique:ecran-home --step="critique design" --deps=exec-5 >/dev/null
+"$SCRIPT" add --file="$M" --id=revue-5             --step="revue code"     --deps=exec-5 >/dev/null
+
+"$SCRIPT" mark --file="$M" --id=discuss-5 --status=done >/dev/null
+"$SCRIPT" mark --file="$M" --id=plan-5    --status=done >/dev/null
+r1=$("$SCRIPT" ready --file="$M")
+assert "T12.3 — le nœud design craft:ecran-home entre dans la frontière d'un DAG dev (kernel métier-agnostique)" "$r1" 'craft:ecran-home'
+
+"$SCRIPT" mark --file="$M" --id=craft:ecran-home --status=done >/dev/null
+"$SCRIPT" mark --file="$M" --id=exec-5           --status=done >/dev/null
+r2=$("$SCRIPT" ready --file="$M")
+assert "T12.4 — juge design (critique:ecran-home) présent dans la frontière" "$r2" 'critique:ecran-home'
+assert "T12.5 — revue code (revue-5) présente DANS LA MÊME frontière"        "$r2" 'revue-5'
+
+# Contraste : une VRAIE collision (même id réajouté) déclenche bien le remap déterministe
+# id::stage — preuve que T12.1/T12.2 (fresh id à « : » simple, non remappé) discriminent
+# effectivement l'absence de collision de la présence d'une collision réelle.
+collide_out=$("$SCRIPT" add --file="$M" --id=craft:ecran-home --stage=v2 --step="craft v2")
+assert "T12.6 — collision réelle (même id relancé) → remapped:true" "$collide_out" '"remapped": true'
+assert "T12.7 — collision réelle → suffixe :: déterministe"         "$collide_out" '"added": "craft:ecran-home::v2"'
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
