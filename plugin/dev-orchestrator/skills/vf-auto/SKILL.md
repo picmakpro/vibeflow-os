@@ -13,7 +13,24 @@ description: >
 
 # vf-auto — Mode autonome
 
-## Étape 0 — Aiguillage : moteur direct ou équipe
+## Étape 0 — Aiguillage : quel pilote, puis moteur direct ou équipe
+
+### Pilote unique (D-11) — AVANT tout calcul de taille
+
+Un seul manager pilote une mission — jamais deux, jamais un calcul de dominante :
+
+- Mission **entièrement** design (refonte multi-écrans, harmonisation visuelle, **zéro feature**)
+  → `Task(vf-design-manager)` directement avec le brief de mission (champ `livrable:` s'il est
+  fourni), puis NE poursuis PAS ce skill : c'est lui qui pilote sa propre équipe (`vf-crafter`,
+  `vf-design-judge`).
+- **Toute** mission mixte ou dev (même avec un volet UI dedans) → continue ci-dessous vers le
+  moteur direct ou `vf-dev-manager` — c'est **lui** qui insère les étages design où il faut, en
+  jugeant au plan de bataille (jamais un comptage de lignes/écrans côté design vs dev ici).
+
+Ni score, ni pourcentage, ni heuristique pondérée : une seule question, binaire — « est-ce que
+cette mission contient ne serait-ce qu'une feature/un fix dev ? » Oui → dev. Non → design.
+
+### Taille (mission dev/mixte) — moteur direct ou équipe
 
 Détermine N = étapes restantes ciblées (`gsd-tools roadmap analyze` — étapes non complètes
 dans le périmètre demandé). Applique le seuil canonique `SEUIL_EQUIPE` (défini dans
