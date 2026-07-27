@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
 status: awaiting-release
-stopped_at: "Milestone gsd-migration CLOS et SHIPPÉ v2.39.0 (2026-07-26) : bascule @opengsd/gsd-core@^1 livrée (mission 6 vagues, 26 commits) + plafond semver post-audit. Tous les milestones ouverts sont clos. Reste : migration réelle des machines legacy (geste utilisateur accompagné) et sortie d'expérimental de mobile-test. Post-ship : sections Auteurs des 2 README réécrites d'après l'historique git réel (commité + poussé) ; 14 releases GitHub manquantes créées (v2.29.0→v2.39.0, notes tirées des tags + commits) ; discipline durcie — check-release-tag.sh --remote vérifie désormais AUSSI la release GitHub (gh, repli curl API) et le CLAUDE.md ajoute l'étape gh release create."
-last_updated: "2026-07-26"
-last_activity: 2026-07-26
+stopped_at: "CI RÉPARÉE (2026-07-27) : rouge sur 100 % des runs depuis sa pose, verte en 6 commits (7388905→f928c7b) — GH_TOKEN manquant sur le gate release, check-registres --allow-empty implémenté (consolidator v1.8.1), 3 bugs de portabilité macOS→Linux (conductor v1.14.3-v1.14.5 : $TMPDIR non échappé guard-agent-write, ordre stat GNU/BSD driver-lock, course ABA de la récupération de lock) et T2b hermétisé par stubs (dev-orchestrator v2.3.2). 39/39 suites vertes macOS ET ubuntu:24.04, run 30257419335 success sur les 3 jobs. Bumps de modules NON distribués : VERSION racine restée 2.39.0 → release patch v2.39.1 à décider (le fix vol-de-lock touche les missions réelles sous Linux). Écart engine découvert : templates-memoire jamais posés par vibeflow-update.sh malgré le CHANGELOG consolidator v1.8.0 (même famille que known-versions.txt) — contourné côté gate, décision produit en attente."
+last_updated: "2026-07-27"
+last_activity: 2026-07-27
 progress:
   total_phases: 2
   completed_phases: 2
@@ -205,8 +205,10 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-07-26
-Stopped at: Phase 13 exécutée de bout en bout (mission d'équipe, 6 commits) — vérif PASS, hygiène faite.
-Resume file: `.planning/missions/2026-07-26-phase-13-pont-spec-feuille-de-route.md`
-Reprendre par : **la release de clôture du milestone `vf-routing`** (décision humaine), ou l'arbitrage
-doctrinal sur la portée de `vf-dev-manager` face à l'ingestion.
+Last session: 2026-07-27
+Stopped at: CI réparée de bout en bout (6 commits atomiques, diagnostic reproduit sous Docker
+ubuntu:24.04) — 3 jobs verts au run 30257419335. Modules bumpés : conductor v1.14.5,
+consolidator v1.8.1, dev-orchestrator v2.3.2. Leçon durable : tout bash développé sur macOS/BSD
+doit être reproduit sous `docker run ubuntu:24.04` avant push (stat/-f, TMPDIR, outillage hôte).
+Reprendre par : **release patch v2.39.1** (décision humaine — distribue les fixes aux labs, dont
+le vol de lock ABA), et l'arbitrage engine sur les templates-memoire jamais posés à l'install.
