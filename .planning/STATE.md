@@ -2,16 +2,17 @@
 gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
+current_phase: 13
+current_phase_name: shippée `v2.37.0`** — milestone vf-routing CLOS
 status: awaiting-release
-stopped_at: "CI RÉPARÉE (2026-07-27) : rouge sur 100 % des runs depuis sa pose, verte en 6 commits (7388905→f928c7b) — GH_TOKEN manquant sur le gate release, check-registres --allow-empty implémenté (consolidator v1.8.1), 3 bugs de portabilité macOS→Linux (conductor v1.14.3-v1.14.5 : $TMPDIR non échappé guard-agent-write, ordre stat GNU/BSD driver-lock, course ABA de la récupération de lock) et T2b hermétisé par stubs (dev-orchestrator v2.3.2). 39/39 suites vertes macOS ET ubuntu:24.04, run 30257419335 success sur les 3 jobs. Bumps de modules NON distribués : VERSION racine restée 2.39.0 → release patch v2.39.1 à décider (le fix vol-de-lock touche les missions réelles sous Linux). Écart engine découvert : templates-memoire jamais posés par vibeflow-update.sh malgré le CHANGELOG consolidator v1.8.0 (même famille que known-versions.txt) — contourné côté gate, décision produit en attente."
-last_updated: "2026-07-27"
-last_activity: 2026-07-27
+stopped_at: Phase 15 context gathered
+last_updated: "2026-07-27T14:40:53.529Z"
+last_activity: "2026-07-26 (mission d'équipe : exécution complète de la Phase 13)"
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_phases: 14
+  completed_phases: 7
+  total_plans: 36
+  completed_plans: 16
 ---
 
 # Project State
@@ -36,10 +37,12 @@ Status: Milestone clos — release `v2.37.0` publiée et taggée le 2026-07-26.
 Last activity: 2026-07-26 (mission d'équipe : exécution complète de la Phase 13)
 
 **Phases 12 et 14 livrées et publiées sur `main`** :
+
 - Phase 12 (Routage fin & verbes `/vf-*`) — 6/6 plans · release **`v2.31.0`**. Livrait 31 verbes et la
   rule de préséance ; **la façade `/vf-*` a été supprimée depuis en v2.33.0** (bascule agentique, spec
   `2026-07-25-suppression-facade-vf-design.md`) — subsistent la carte d'intention unique de
   `vibeflow-dev` et les skills `vf-auto` / `vf-dev`.
+
 - Phase 14 (Frontière d'altitude `planning-core` / moteur GSD) — 7/7 plans · release **`v2.30.0`** ·
   **ADR-055** (renuméroté au merge : `ADR-054` était déjà pris par la portabilité Windows publiée en
   v2.29.0). 92 assertions vertes.
@@ -60,6 +63,7 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
 
 - Total plans completed: 26+ (13 mesurés phases 1-6 ci-dessous + 6 en Phase 12 + 7 en Phase 14 ;
   le compteur automatique n'a jamais été alimenté — reconstruit le 2026-07-26)
+
 - Average duration: ~6 min/plan (sur les 13 plans mesurés)
 - Total execution time: non mesuré au-delà de la Phase 6
 
@@ -91,20 +95,24 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
   description de `vf-design-manager` revendique un dispatch par `vf-auto` qui n'existe pas. Étude +
   7 tests empiriques (2026-07-27) : option A retenue — étages croisés sous UN manager, imbrication
   manager→manager interdite (Pattern A prouvé bloquant), DAG hétérogène déjà supporté par le kernel.
+
 - 2026-07-26 : **Phase 13 redéfinie sans verbe-façade** — la phase était écrite autour de `/vf-ingest`
   et du cycle `vf-brainstorm → vf-ingest → vf-plan → vf-execute`, supprimés en v2.33.0. BRDG-01..03 et
   les critères de succès réécrits : ingestion portée par l'agent `vibeflow-dev`, découverte outillée
   (13-01). Plan 13-01 committé et réparé (corpus 8 → 9 documents, markup parasite purgé).
+
 - 2026-07-25 : Milestone **gsd-migration** créé (VOC-02 promu). Phase 10 (Étude & faisabilité migration GSD)
   + Phase 11 (Intégration, GATE Phase 10) ajoutées à la feuille de route. Requirements GSDM-01..06.
 - 2026-07-25 : Milestone **vf-routing** créé. Phase 12 (Routage fin & couverture complète des verbes `/vf-*`)
   + Phase 13 (Pont spec → feuille de route) ajoutées. Requirements VERB-01..05, BRDG-01..03.
   Devient le milestone actif ; `gsd-migration` reste ouvert en attente (chantiers indépendants).
+
 - 2026-07-25 : **Phase 14** (Frontière d'altitude planning-core / moteur GSD) ajoutée au milestone vf-routing.
   Constat déclencheur : `vf-planning` et la chaîne GSD produisaient les mêmes fichiers dans le même dossier
   avec des frontmatters **incompatibles** (`planning_version` vs `gsd_state_version`) — deux moteurs de
   planning concurrents. Décision : ADR-055, frontière d'altitude (un projet = un seul moteur ; VibeFlow tient
   le lab et l'enforcement). Requirements ALTI-01..05, 6 plans sur 4 vagues, indépendante des Phases 12 et 13.
+
 - 2026-07-25 : compteurs de `progress` corrigés — ils affichaient `total_plans: 0` alors que la Phase 12
   comptait déjà 6 plans dont 1 livré (12-01). Réel : 12 plans posés (6 en Phase 12, 6 en Phase 14), 1 livré.
 
@@ -123,6 +131,7 @@ Recent decisions affecting current work:
   (`_runtime-launcher.snippet.sh`), en variante Claude-only. Corollaires : `gsd-tools` sort exit 0
   même en erreur métier → tester le JSON (`.error`), jamais `$?` ; `VERSION` dérivé du chemin
   résolu ; ne jamais installer `@next` (dist-tag amont périmé : 1.7.0-rc.6 < latest 1.8.0).
+
 - **2026-07-26 — Non-mixité GÉNÉRALE des groupes de hooks** (mission Phase 11, arbitrage manager).
   `merge-hooks.sh` ne fusionne plus jamais les hooks VibeFlow dans un groupe qu'il ne possède pas
   intégralement — y compris un groupe tiers, pas seulement gsd. L'option étroite (restreindre aux
@@ -139,15 +148,18 @@ Recent decisions affecting current work:
   l'archivage. C'est `discover-unintegrated-docs.sh` qui l'a mise au jour dès sa première passe sur le
   corpus réel. Confirme le motif déjà connu : **la citation migre puis disparaît à l'archivage**, ce qui
   justifie a posteriori les 6 registres de BRDG-02 plutôt que le seul `ROADMAP.md`.
+
 - **2026-07-26 — Revue de code non négociable sur un fait outillé** : le script de découverte avait été
   livré sans revue (jugée disproportionnée par le worker) avec 12 tests verts. La revue commandée ensuite
   a trouvé **2 bloquants reproduits** (motif de citation non borné à gauche → faux négatif silencieux ;
   échappement ERE partiel → motif absorbant) que la suite ne pouvait pas voir, son cas de bornage étant
   tautologique. Enseignement : sur un artefact à **coût d'erreur asymétrique**, une suite verte ne vaut
   pas une revue — et un test de mutation dit la vérité qu'un décompte de cas cache.
+
 - **2026-07-26 — Phase 13 sans verbe** (arbitrage Samuel) : pas de résurrection de la façade — le pont
   spec → feuille de route est un geste de l'agent `vibeflow-dev`, la découverte seule est outillée
   (ligne de coupe ADR-055 §3).
+
 - **2026-07-25 — Programme d'audit croisé livré en 3 releases** (v2.32.0 → v2.34.0, rapports
   dans `reports/`) : (1) enforcement branché — CI, gates exit 3, scission ADR-031/ADR-056 ;
   (2) **bascule agentique** (arbitrage Samuel, spec
@@ -183,17 +195,21 @@ Recent decisions affecting current work:
   `marketplace.json` + historique des 2 README, puis tag annoté poussé, `check-release-tag.sh --remote`
   → ✓). Le module `dev-orchestrator` est déjà en v2.2.0 ; la racine est restée en v2.36.2.
   **Réservée à validation humaine — non faite en mission.**
+
 - **Arbitrage doctrinal (audit BRDG-03)** : la confirmation humaine ADR-031 avant ingestion est ancrée
   à `vibeflow-dev` seul. `vf-dev-manager` (chemin équipe, qui consulte `intent-routing.md` pour mapper
   un brief brut) n'a **aucune ligne nominative** sur l'ingestion, contrairement au patron déjà appliqué
   aux skills de clôture de milestone (« en respectant leurs confirmations internes »). Deux filets
   génériques couvrent probablement le cas, mais rien ne l'interdit noir sur blanc. Options : (a) no-op
   assumé, (b) ligne miroir dans `agents/vf-dev-manager.md` renvoyant à `ingestion-flow.md`.
+
 - Combler le trou de couverture du **filtre glob** de `discover-unintegrated-docs.sh` : le mutant
   « filtre retiré » survit à la suite (16 ok quand même). Effet possible = faux négatif, jamais faux
   positif — donc pas de ré-ingestion silencieuse, priorité basse.
+
 - ~~Divergence lexique P3-P8~~ **tranchée le 2026-07-26** (commit b835ffd) : le Core v4.2 est
   canonique, lexique réaligné, module reference v2.5.2 — part avec la prochaine release.
+
 - *(milestone `gsd-migration`)* Mission Phase 11 dispatchée (vf-dev-manager) sur les 6 vagues de
   `10-APPROFONDISSEMENT.md` §5 — release finale réservée à validation humaine.
 
@@ -211,8 +227,10 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-07-27
-Stopped at: CI réparée de bout en bout (6 commits atomiques, diagnostic reproduit sous Docker
+**Resume file:** .planning/phases/VFDO-15-collaboration-inter-quipes-dev-design/15-CONTEXT.md
+
+Last session: 2026-07-27T14:40:53.506Z
+Stopped at: Phase 15 context gathered
 ubuntu:24.04) — 3 jobs verts au run 30257419335. Modules bumpés : conductor v1.14.5,
 consolidator v1.8.1, dev-orchestrator v2.3.2. Leçon durable : tout bash développé sur macOS/BSD
 doit être reproduit sous `docker run ubuntu:24.04` avant push (stat/-f, TMPDIR, outillage hôte).
