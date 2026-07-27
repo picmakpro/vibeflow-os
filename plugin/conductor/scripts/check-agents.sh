@@ -1,7 +1,21 @@
 #!/usr/bin/env bash
 # check-agents.sh — Lint machine de la conformité NATIVE des agents Claude Code (ADR-044).
 # Ce qui passait silencieusement : agents sans description (jamais auto-routés), sans model,
-# sans memory, skills déclarés jamais créés (hallucination), champs inconnus (typos).
+# sans memory, skills déclarés jamais créés (hallucination), champs inconnus (typos), et —
+# depuis la Phase 16 — des allowlists Agent(...) opaques : noms d'agents inventés, parenthèse
+# non fermée, outils hors du set connu passaient tous --strict en vert.
+#
+# Portée réelle du lint Agent(...) (doc sub-agents, vérifiée 2026-07-27, citation verbatim) :
+#   « The Agent(agent_type) allowlist syntax applies only to an agent running as the main
+#   thread with `claude --agent`. In a subagent definition, listing Agent in tools lets that
+#   subagent spawn subagents of its own [...], but any type list inside the parentheses is
+#   ignored. » — https://code.claude.com/docs/en/sub-agents
+# Concrètement : sur un agent posé sous .claude/agents/ (donc dispatché en SOUS-agent, jamais
+# incarné en thread principal), le runtime IGNORE la liste de noms entre parenthèses — seul le
+# fait que `Agent`/`Task` soit présent dans `tools:` compte pour le runtime. L'allowlist
+# `Agent(x, y)` n'est donc PAS un bac à sable runtime pour ces agents : c'est un CONTRAT
+# documenté, désormais enforcé PAR CE LINT (et seulement par lui). Elle redevient une vraie
+# restriction runtime uniquement pour un agent incarné en thread principal (`claude --agent`).
 #
 # Référentiel : frontmatter officiel Claude Code (docs sub-agents, vérifié 2026-07-05) +
 # charte VibeFlow (souveraineté : model explicite + memory explicite + skills câblés).
@@ -13,12 +27,37 @@
 #   check-agents.sh --file <agent.md>   # un seul fichier (utilisé par guard-agent-write)
 #   check-agents.sh --agents-dir=PATH   # défaut .claude/agents
 #   check-agents.sh --allow-empty       # avec --strict : tolère une cible vide (sinon exit 3)
+#   check-agents.sh --third-party-prefix=PFX     # répétable, défaut gsd- (accumulation)
+#   check-agents.sh --no-third-party-prefix      # vide la liste des préfixes tiers
+#   check-agents.sh --resolve-agents=lenient|strict  # défaut lenient (monde ouvert)
+#   check-agents.sh --agent-registry-dir=PATH    # répétable, dirs de résolution supplémentaires
 #
 # BLOQUANT : frontmatter absent · name absent/invalide · description absente ·
 #   model absent ou hors {sonnet,opus,haiku,fable,inherit,claude-*} · memory absente ou hors
-#   {user,project,local} · effort/permissionMode/isolation/background/maxTurns invalides.
+#   {user,project,local} · effort/permissionMode/isolation/background/maxTurns invalides ·
+#   allowlist Agent(...)/Task(...)/Bash(...)/etc malformée (parenthèse non fermée, allowlist
+#   vide, entrée vide, espace avant la parenthèse, token hors charset).
 # WARNING : skills absent · skill déclaré introuvable (ERROR en --strict) · description < 30c ·
-#   tools absent (hérite tout) · champ inconnu · name ≠ nom de fichier.
+#   tools absent (hérite tout) · champ inconnu · name ≠ nom de fichier · outil hors du set
+#   fermé documenté (ERROR en --strict) · nom d'agent non résolu dans une allowlist Agent(...)
+#   (reste WARNING même en --strict — voir plus bas ; ERROR seulement sous
+#   --resolve-agents=strict) · `Agent` nu sans allowlist (« dispatch non cloisonné »).
+#
+# --strict NE DURCIT PAS la résolution de noms d'agents (contrairement au reste) : un lint par
+# module (un `--agents-dir` à la fois) ne connaît jamais l'univers complet des agents — durcir
+# ce point ferait passer en rouge des dizaines d'entrées parfaitement saines (cross-module,
+# types natifs futurs, agents tiers). Le monde fermé est strictement OPT-IN via
+# --resolve-agents=strict (+ --agent-registry-dir répétés pour élargir l'univers connu) — c'est
+# la CI seule (union de tous les plugin/*/agents) qui a la légitimité de l'activer.
+#
+# --third-party-prefix (défaut "gsd-") a deux effets : (a) un FICHIER agent dont le name matche
+# le préfixe n'est plus linté du tout pour la charte VibeFlow (ce n'est pas notre agent) ; (b)
+# une ENTRÉE d'allowlist qui matche est réputée résolvable (silencieuse). Dans les deux cas,
+# c'est compté et imprimé dans le résumé — jamais un skip muet.
+#
+# --hook n'imprime QUE les erreurs (jamais les warnings) : les nouvelles classes en warning
+# (outil hors set, agent non résolu, Agent nu) restent invisibles au SessionStart. C'est VOULU
+# (bruit minimal à l'ouverture de session) — le signal complet est sur l'appel explicite/CI.
 #
 # Résolution d'un skill déclaré (UAT F2) : d'abord par NOM DE DOSSIER (.claude/skills/<s>/SKILL.md),
 # sinon par le frontmatter `name:` des SKILL.md installés — un skill peut porter un name différent
@@ -35,6 +74,10 @@ STRICT=false
 HOOK_MODE=false
 ALLOW_EMPTY=false
 SINGLE_FILE=""
+THIRD_PARTY_PREFIXES="gsd-"
+TP_CUSTOMIZED=false
+RESOLVE_AGENTS="lenient"
+REGISTRY_DIRS=""
 
 for arg in "$@"; do
   case "$arg" in
@@ -44,6 +87,17 @@ for arg in "$@"; do
     --file)           : ;; # valeur au prochain arg — géré ci-dessous
     --agents-dir=*)   AGENTS_DIR="${arg#*=}" ;;
     --skills-dir=*)   SKILLS_DIR="${arg#*=}" ;;
+    --third-party-prefix=*)
+      if [ "$TP_CUSTOMIZED" = false ]; then THIRD_PARTY_PREFIXES=""; TP_CUSTOMIZED=true; fi
+      v="${arg#*=}"
+      if [ -z "$THIRD_PARTY_PREFIXES" ]; then THIRD_PARTY_PREFIXES="$v"; else THIRD_PARTY_PREFIXES="$THIRD_PARTY_PREFIXES:$v"; fi
+      ;;
+    --no-third-party-prefix) THIRD_PARTY_PREFIXES=""; TP_CUSTOMIZED=true ;;
+    --resolve-agents=*) RESOLVE_AGENTS="${arg#*=}" ;;
+    --agent-registry-dir=*)
+      v="${arg#*=}"
+      if [ -z "$REGISTRY_DIRS" ]; then REGISTRY_DIRS="$v"; else REGISTRY_DIRS="$REGISTRY_DIRS:$v"; fi
+      ;;
     -h|--help)        grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
   esac
 done
@@ -62,7 +116,9 @@ case "$(command -v python3 2>/dev/null)" in
 esac
 
 VF_AGENTS_DIR="$AGENTS_DIR" VF_SKILLS_DIR="$SKILLS_DIR" VF_STRICT="$STRICT" \
-VF_HOOK="$HOOK_MODE" VF_SINGLE="$SINGLE_FILE" VF_ALLOW_EMPTY="$ALLOW_EMPTY" "$PYBIN" -c "
+VF_HOOK="$HOOK_MODE" VF_SINGLE="$SINGLE_FILE" VF_ALLOW_EMPTY="$ALLOW_EMPTY" \
+VF_THIRD_PARTY_PREFIXES="$THIRD_PARTY_PREFIXES" VF_RESOLVE_AGENTS="$RESOLVE_AGENTS" \
+VF_REGISTRY_DIRS="$REGISTRY_DIRS" "$PYBIN" -c "
 import glob, os, re, sys
 
 agents_dir = os.environ[\"VF_AGENTS_DIR\"]
@@ -71,6 +127,9 @@ strict = os.environ[\"VF_STRICT\"] == \"true\"
 hook = os.environ[\"VF_HOOK\"] == \"true\"
 allow_empty = os.environ[\"VF_ALLOW_EMPTY\"] == \"true\"
 single = os.environ[\"VF_SINGLE\"]
+third_party_prefixes = [p for p in os.environ.get(\"VF_THIRD_PARTY_PREFIXES\", \"\").split(\":\") if p]
+resolve_agents_strict = os.environ.get(\"VF_RESOLVE_AGENTS\", \"lenient\") == \"strict\"
+registry_dirs = [p for p in os.environ.get(\"VF_REGISTRY_DIRS\", \"\").split(\":\") if p]
 
 # Champs officiels Claude Code (docs sub-agents, 2026-07-05) — base du lint.
 # + conventions VibeFlow : vf-internal (worker interne — pas de commande d'incarnation, cf. Pattern 12) ;
@@ -84,7 +143,30 @@ EFFORT = {\"low\", \"medium\", \"high\", \"xhigh\", \"max\"}
 PERM = {\"default\", \"acceptEdits\", \"auto\", \"dontAsk\", \"bypassPermissions\", \"plan\", \"manual\"}
 NOT_AGENTS = {\"contracts.md\", \"README.md\", \"AGENTS.md\"}
 
+# Types natifs Claude Code (doc code.claude.com/docs/en/sub-agents, verifiee 2026-07-27).
+# ATTENTION rouille : Explore/Plan requierent min-version 2.1.198 ; fork requiert
+# CLAUDE_CODE_FORK_SUBAGENT=1 (pas actif par defaut) ; CLAUDE_CODE_DISABLE_EXPLORE_PLAN_AGENTS=1
+# et CLAUDE_AGENT_SDK_DISABLE_BUILTIN_AGENTS=1 peuvent desactiver tout ou partie de cette liste ;
+# un agent utilisateur peut surcharger un nom natif. C'est PRECISEMENT pourquoi \"nom non resolu\"
+# reste un WARNING (jamais une ERREUR par defaut) : la rouille de cette liste degrade en jaune.
+NATIVE_TYPES = {\"explore\", \"plan\", \"general-purpose\", \"statusline-setup\", \"claude-code-guide\", \"fork\"}
+
+# Set ferme des identifiants d'outils (doc code.claude.com/docs/en/tools-reference, verifiee
+# 2026-07-27 — 43 identifiants + alias Task confirmes mot pour mot, aucun ecart).
+TOOL_NAMES = {
+    \"Agent\", \"Artifact\", \"AskUserQuestion\", \"Bash\", \"CronCreate\", \"CronDelete\", \"CronList\",
+    \"Edit\", \"EndConversation\", \"EnterPlanMode\", \"EnterWorktree\", \"ExitPlanMode\", \"ExitWorktree\",
+    \"Glob\", \"Grep\", \"ListMcpResourcesTool\", \"LSP\", \"Monitor\", \"NotebookEdit\", \"PowerShell\",
+    \"PushNotification\", \"Read\", \"ReadMcpResourceTool\", \"RemoteTrigger\", \"ReportFindings\",
+    \"ScheduleWakeup\", \"SendMessage\", \"SendUserFile\", \"ShareOnboardingGuide\", \"Skill\", \"TaskCreate\",
+    \"TaskGet\", \"TaskList\", \"TaskOutput\", \"TaskStop\", \"TaskUpdate\", \"TodoWrite\", \"ToolSearch\",
+    \"WaitForMcpServers\", \"WebFetch\", \"WebSearch\", \"Workflow\", \"Write\",
+}
+# Task = alias legacy d'Agent depuis Claude Code v2.1.63 — traite a l'identique partout.
+AGENT_TOOL_NAMES = {\"Agent\", \"Task\"}
+
 errors, warnings = [], []
+thirdparty_total = 0
 
 def parse_frontmatter(text):
     lines = text.split(\"\n\")
@@ -124,9 +206,175 @@ def parse_frontmatter(text):
         i += 1
     return None  # frontmatter jamais ferme
 
+def frontmatter_lines(text):
+    \"\"\"Retourne les lignes BRUTES entre les deux '---' (pour la re-tokenisation des
+    allowlists Agent(...), qui doit repartir de la ligne source, jamais de fm[] deja mangle).\"\"\"
+    lines = text.split(\"\n\")
+    if not lines or lines[0].strip() != \"---\":
+        return None
+    for idx in range(1, len(lines)):
+        if lines[idx].strip() == \"---\":
+            return lines[1:idx]
+    return None
+
+_KEY_RE = re.compile(r\"^([A-Za-z_-]+):\s*(.*)$\")
+
+def extract_raw_field(fmlines, key):
+    \"\"\"Extrait la valeur BRUTE (non tokenisee) d'un champ tools:/disallowedTools:.
+    Retourne (mode, raw) : mode='block' -> raw est deja une liste de tokens (puces YAML) ;
+    mode in ('flow','scalar') -> raw est une chaine brute a re-tokeniser a profondeur de
+    parentheses. (None, None) si la cle est absente. Mirrore le comportement de continuation
+    de parse_frontmatter (ligne indentee >= 2 espaces) — une continuation NON indentee est
+    perdue ici EXACTEMENT comme dans parse_frontmatter (la perte se traduit en parenthese
+    non fermee au niveau du tokenizer, ce qui est le comportement voulu).
+    \"\"\"
+    if fmlines is None:
+        return None, None
+    n = len(fmlines)
+    for idx in range(n):
+        m = _KEY_RE.match(fmlines[idx])
+        if not (m and m.group(1) == key):
+            continue
+        val = m.group(2).strip()
+        k = idx + 1
+        if val == \"\":
+            bullets = []
+            while k < n:
+                item = re.match(r\"^\s+-\s+(.+?)(\s+#.*)?$\", fmlines[k])
+                if not item:
+                    break
+                bullets.append(item.group(1).strip())
+                k += 1
+            if bullets:
+                return \"block\", bullets
+            parts = []
+            while k < n and fmlines[k].startswith(\"  \") and fmlines[k].strip() and not _KEY_RE.match(fmlines[k]):
+                parts.append(fmlines[k].strip())
+                k += 1
+            return \"scalar\", \" \".join(parts)
+        else:
+            parts = [val]
+            while k < n and fmlines[k].startswith(\"  \") and fmlines[k].strip() and not _KEY_RE.match(fmlines[k]):
+                parts.append(fmlines[k].strip())
+                k += 1
+            raw = \" \".join(parts).strip()
+            if raw.startswith(\"[\"):
+                return \"flow\", raw
+            return \"scalar\", raw
+    return None, None
+
+def split_depth(raw):
+    \"\"\"Split a profondeur de parentheses (jamais un split(',') naif) — c'est ce qui
+    laisse 'Agent(vf-coder, vf-reviewer)' intact comme UN token. Retourne (tokens, unclosed).\"\"\"
+    tokens, depth, cur = [], 0, []
+    for ch in raw:
+        if ch == \"(\":
+            depth += 1
+            cur.append(ch)
+        elif ch == \")\":
+            depth -= 1
+            cur.append(ch)
+        elif ch == \",\" and depth == 0:
+            tokens.append(\"\".join(cur))
+            cur = []
+        else:
+            cur.append(ch)
+    tokens.append(\"\".join(cur))
+    return tokens, depth != 0
+
+def tokenize_field(mode, raw):
+    \"\"\"mode='block' : raw deja une liste de tokens individuels (puces YAML).
+    mode in ('flow','scalar') : raw est une chaine — on retire les crochets [ ] de la
+    flow list puis on decoupe a profondeur de parentheses. Retourne (tokens, unclosed).\"\"\"
+    if mode == \"block\":
+        return list(raw), False
+    s = raw.strip()
+    if s.startswith(\"[\") and s.endswith(\"]\"):
+        s = s[1:-1]
+    return split_depth(s)
+
+def analyze_token(raw_tok, field, base):
+    \"\"\"Analyse structurelle d'UN token d'allowlist deja isole par tokenize_field.
+    Retourne (tool_name, agent_names) : agent_names est None si pas de parametres,
+    [] si allowlist vide 'Agent()', une liste sinon. Ajoute les erreurs de SYNTAXE
+    (classe non affectee par --strict, toujours bloquante) a la liste errors.\"\"\"
+    tok = raw_tok.strip()
+    if tok == \"\":
+        errors.append(f\"{base} : {field} — entree d'allowlist vide (virgule orpheline, ex. 'a,,b')\")
+        return None, None
+    m_space = re.match(r\"^(\S+)\s+\(\", tok)
+    if m_space:
+        errors.append(f\"{base} : {field} — espace avant la parenthese dans '{tok}' (attendu Nom(args))\")
+        return None, None
+    m = re.match(r\"^([A-Za-z0-9_-]+)\((.*)$\", tok, re.S)
+    if not m:
+        # pas de parenthese : nom d'outil seul (Read, Bash, ...)
+        if not re.fullmatch(r\"[A-Za-z0-9_-]+\", tok):
+            errors.append(f\"{base} : {field} — token hors charset attendu '{tok}'\")
+            return None, None
+        return tok, None
+    name, rest = m.group(1), m.group(2)
+    if not rest.endswith(\")\"):
+        errors.append(f\"{base} : {field} — parenthese non fermee dans '{tok}'\")
+        return name, None
+    inner = rest[:-1]
+    if inner.strip() == \"\":
+        errors.append(f\"{base} : {field} — allowlist vide '{name}()'\")
+        return name, []
+    agent_names = [a.strip() for a in inner.split(\",\") if a.strip() != \"\"]
+    if len(agent_names) != len([a for a in inner.split(\",\")]):
+        errors.append(f\"{base} : {field} — entree vide dans l'allowlist de '{name}(...)'\")
+    return name, agent_names
+
+def resolve_agent_name(name, agents_dir_local, registry_dirs_local, prefixes):
+    low = name.lower()
+    if low in NATIVE_TYPES:
+        return \"native\"
+    for pfx in prefixes:
+        if pfx and name.startswith(pfx):
+            return \"thirdparty\"
+    if os.path.isfile(os.path.join(agents_dir_local, name + \".md\")):
+        return \"resolved\"
+    for rd in registry_dirs_local:
+        if rd and os.path.isfile(os.path.join(rd, name + \".md\")):
+            return \"resolved\"
+    return \"unresolved\"
+
+def lint_tool_field(base, field, mode, raw, do_agent_resolution):
+    \"\"\"Applique le tokenizer + la classification a un champ tools:/disallowedTools:.\"\"\"
+    global thirdparty_total
+    tokens, unclosed = tokenize_field(mode, raw)
+    if unclosed:
+        errors.append(f\"{base} : {field} — parenthese non fermee (allowlist tronquee ou mal formee, verifier l'indentation de la continuation)\")
+        return
+    bare_agent = False
+    for raw_tok in tokens:
+        name, agent_names = analyze_token(raw_tok, field, base)
+        if name is None:
+            continue
+        is_agent_tool = name in AGENT_TOOL_NAMES
+        if name not in TOOL_NAMES and not is_agent_tool and not name.startswith(\"mcp__\"):
+            msg = f\"{base} : {field} — outil hors du set connu '{name}' (typo ? nouvel outil non encore reference ?)\"
+            (errors if strict else warnings).append(msg)
+        if is_agent_tool:
+            if agent_names is None:
+                if field == \"tools\":
+                    bare_agent = True
+            elif do_agent_resolution:
+                for a in agent_names:
+                    verdict = resolve_agent_name(a, agents_dir, registry_dirs, third_party_prefixes)
+                    if verdict == \"thirdparty\":
+                        thirdparty_total += 1
+                    elif verdict == \"unresolved\":
+                        msg = f\"{base} : {field} — nom d'agent non resolu '{a}' (ni type natif, ni fichier {agents_dir}/{a}.md, ni registre)\"
+                        if resolve_agents_strict:
+                            errors.append(msg + \" [--resolve-agents=strict]\")
+                        else:
+                            warnings.append(msg)
+    if bare_agent:
+        warnings.append(f\"{base} : tools — 'Agent' sans allowlist parenthesee = dispatch non cloisonne\")
+
 # UAT F2 : carte frontmatter name: → chemin SKILL.md, construite paresseusement UNE fois.
-# Un skill declare se resout par NOM DE DOSSIER d abord, puis par ce name: (un module peut
-# installer son skill sous un dossier != name, ex. planning-core → vf-planning).
 _skill_name_map = None
 def skill_name_map():
     global _skill_name_map
@@ -149,6 +397,12 @@ def resolve_skill(s):
     if os.path.isfile(sk):
         return sk
     return skill_name_map().get(s, \"\")
+
+def agent_display_name(path, text):
+    fm = parse_frontmatter(text)
+    if fm and isinstance(fm.get(\"name\"), str) and fm.get(\"name\"):
+        return fm[\"name\"]
+    return os.path.basename(path)[:-3]
 
 def check_file(path):
     base = os.path.basename(path)
@@ -243,6 +497,13 @@ def check_file(path):
     if \"tools\" not in fm:
         warnings.append(f\"{base} : tools absent — herite de TOUS les outils (restreindre si agent en lecture/analyse)\")
 
+    fmlines = frontmatter_lines(text)
+    for field, do_resolution in ((\"tools\", True), (\"disallowedTools\", False)):
+        mode, raw = extract_raw_field(fmlines, field)
+        if mode is None:
+            continue
+        lint_tool_field(base, field, mode, raw, do_resolution)
+
     for k in fm:
         if k not in KNOWN:
             warnings.append(f\"{base} : champ inconnu du runtime — {k} (typo ? champ invente ? verifier la doc)\")
@@ -265,6 +526,18 @@ else:
             print(f\"[check-agents] aucun agent dans {agents_dir} — rien a verifier\")
         sys.exit(0)
     for f in files:
+        try:
+            ftext = open(f, encoding=\"utf-8-sig\").read()
+        except OSError as e:
+            errors.append(f\"{os.path.basename(f)} : illisible ({e})\")
+            continue
+        # --third-party-prefix : un FICHIER dont le name matche n'est plus linte pour la
+        # charte VibeFlow (ce n'est pas notre agent) — compte dans le resume, jamais un skip muet.
+        dname = agent_display_name(f, ftext)
+        matched_prefix = next((p for p in third_party_prefixes if p and dname.startswith(p)), None)
+        if matched_prefix:
+            thirdparty_total += 1
+            continue
         check_file(f)
 
 n_err, n_warn = len(errors), len(warnings)
@@ -278,6 +551,8 @@ if hook:
 
 for w in warnings:
     print(f\"  ⚠ {w}\")
+if thirdparty_total:
+    print(f\"[check-agents] {thirdparty_total} agent(s) tiers ignore(s) (prefixe(s) : {','.join(third_party_prefixes) if third_party_prefixes else '—'})\")
 if n_err:
     print(f\"[check-agents] ✗ {n_err} non-conformite(s) bloquante(s) :\")
     for e in errors:

@@ -18,6 +18,18 @@
 #   T12 — Write d'un agent conforme → allow
 #   T13 — Write hors .claude/agents/ ou contracts.md → allow
 #   T14 — stdin invalide → allow silencieux (fail-open)
+#
+# Lint des allowlists Agent(...)/Task(...) (Phase 16, ADR-044) :
+#   T25 — allowlist reelle mixte (natif+tiers+cross-module) --strict → exit 0 (anti-faux-positif)
+#   T26 — parenthese non fermee → exit 1 (classe syntaxe, non affectee par --strict)
+#   T27 — Agent() vide → exit 1
+#   T28 — outil hors set connu (Reed) : warning en defaut, ERREUR en --strict ; Read reste vert
+#   T29 — Agent(vf-codeur) (typo) reste VERT meme en --strict (non-regression faux positif)
+#   T30 — meme mutant sous --resolve-agents=strict + registre → exit 1 (preuve discriminance)
+#   T31 — flow list [Read, Agent(x, y), Bash(git:*)] : 0 finding fantome
+#   T32 — prefixe tiers (gsd-planner sans model/memory) → ignore ; --no-third-party-prefix → exit 1
+#   T33 — Task(...) alias legacy → reste vert
+#   T34 — Agent nu (sans allowlist) → warning "dispatch non cloisonne", non bloquant
 
 set -uo pipefail
 
@@ -333,6 +345,211 @@ EOF
 RC=0; run_check --strict >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 1 ] && ok "T24b skill inexistant (ni dossier ni name:) → toujours ERREUR en --strict" || ko "T24b gate affaibli (rc=$RC)"
 rm -f "$AG"/*.md; rm -rf "$SK/planning-core"
+
+# ---------- Phase 16 : lint des allowlists Agent(...)/Task(...) ----------
+
+good_agent "vf-coder"
+good_agent "vf-reviewer"
+
+# T25 — allowlist reelle mixte (natif + tiers + cross-module) reste VERTE en --strict
+cat > "$AG/vf-mixte.md" <<'EOF'
+---
+name: vf-mixte
+description: Agent de test avec allowlist mixte native, tierce et cross-module, mission 16.
+model: sonnet
+memory: project
+tools: Read, Write, Agent(vf-coder, vf-reviewer, general-purpose, gsd-planner)
+---
+corps
+EOF
+RC=0; run_check --strict >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] && ok "T25 allowlist reelle mixte --strict → exit 0" || ko "T25 (rc=$RC) : $(run_check --strict 2>&1 | tail -5)"
+rm -f "$AG/vf-mixte.md"
+
+# T26 — parenthese non fermee → exit 1 (classe syntaxe, jamais affectee par --strict)
+cat > "$AG/nonferme.md" <<'EOF'
+---
+name: nonferme
+description: Agent de test avec une allowlist Agent a parenthese non fermee.
+model: sonnet
+memory: project
+tools: Read, Agent(vf-coder
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "parenthese non fermee"; then
+  ok "T26 parenthese non fermee → exit 1 (citee dans le message)"
+else
+  ko "T26 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/nonferme.md"
+
+# T27 — Agent() vide → exit 1
+cat > "$AG/vide.md" <<'EOF'
+---
+name: vide
+description: Agent de test declarant une allowlist Agent totalement vide.
+model: sonnet
+memory: project
+tools: Read, Agent()
+---
+corps
+EOF
+RC=0; run_check >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 1 ] && ok "T27 Agent() vide → exit 1" || ko "T27 (rc=$RC)"
+rm -f "$AG/vide.md"
+
+# T28 — outil hors set connu (Reed) : warning en defaut, ERREUR en --strict ; Read reste vert
+cat > "$AG/reed.md" <<'EOF'
+---
+name: reed
+description: Agent de test declarant l'outil Reed (typo) au lieu de Read.
+model: sonnet
+memory: project
+tools: Reed, Agent(vf-coder)
+---
+corps
+EOF
+OUT_DEF="$(run_check 2>&1)"; RC_DEF=$?
+RC_STRICT=0; run_check --strict >/dev/null 2>&1 || RC_STRICT=$?
+if [ "$RC_DEF" -eq 0 ] && echo "$OUT_DEF" | grep -qi "outil hors" && [ "$RC_STRICT" -eq 1 ]; then
+  ok "T28 Reed : warning en defaut, ERREUR en --strict"
+else
+  ko "T28 (def=$RC_DEF strict=$RC_STRICT) : $OUT_DEF"
+fi
+rm -f "$AG/reed.md"
+cat > "$AG/lu.md" <<'EOF'
+---
+name: lu
+description: Agent de test avec l'outil Read correctement orthographie, non-regression.
+model: sonnet
+memory: project
+tools: Read, Agent(vf-coder)
+---
+corps
+EOF
+RC_DEF=0; run_check >/dev/null 2>&1 || RC_DEF=$?
+RC_STRICT=0; run_check --strict >/dev/null 2>&1 || RC_STRICT=$?
+[ "$RC_DEF" -eq 0 ] && [ "$RC_STRICT" -eq 0 ] && ok "T28b Read (bien orthographie) reste vert (defaut+strict)" || ko "T28b (def=$RC_DEF strict=$RC_STRICT)"
+rm -f "$AG/lu.md"
+
+# T29 — Agent(vf-codeur) (typo de nom d'agent) reste VERT meme en --strict — non-regression
+# faux positif : c'est le test le plus important de la serie (cf. digest de mission).
+cat > "$AG/typo-nom.md" <<'EOF'
+---
+name: typo-nom
+description: Agent de test declarant un nom d'agent mal orthographie dans son allowlist.
+model: sonnet
+memory: project
+tools: Read, Agent(vf-codeur)
+---
+corps
+EOF
+OUT="$(run_check --strict 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -qi "nom d'agent non resolu"; then
+  ok "T29 Agent(vf-codeur) (typo) reste VERT en --strict, avec warning"
+else
+  ko "T29 (rc=$RC) : $OUT"
+fi
+
+# T30 — le MEME mutant (vf-codeur) sous --resolve-agents=strict + registre → exit 1 ;
+# vf-coder (nom correct, fichier present) reste vert sous la meme resolution stricte.
+REG="$WORK/registry"; mkdir -p "$REG"
+cp "$AG/vf-coder.md" "$REG/vf-coder.md"
+RC=0; run_check --resolve-agents=strict --agent-registry-dir="$REG" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 1 ] && ok "T30 vf-codeur (typo) sous --resolve-agents=strict → exit 1 (discriminance prouvee)" || ko "T30 (rc=$RC)"
+rm -f "$AG/typo-nom.md"
+cat > "$AG/nom-ok.md" <<'EOF'
+---
+name: nom-ok
+description: Agent de test avec un nom d'agent correctement resolu via le registre.
+model: sonnet
+memory: project
+tools: Read, Agent(vf-coder)
+---
+corps
+EOF
+RC=0; run_check --resolve-agents=strict --agent-registry-dir="$REG" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] && ok "T30b vf-coder (resolu) reste vert sous --resolve-agents=strict" || ko "T30b (rc=$RC)"
+rm -f "$AG/nom-ok.md"
+
+# T31 — flow list YAML non dechiquetee : [Read, Agent(x, y), Bash(git:*)] → 0 finding fantome
+cat > "$AG/flow.md" <<'EOF'
+---
+name: flow
+description: Agent de test declarant son allowlist en flow list YAML entre crochets.
+model: sonnet
+memory: project
+tools: [Read, Agent(x, y), Bash(git:*)]
+---
+corps
+EOF
+OUT="$(run_check --strict 2>&1)"; RC=$?
+# Assertion forte (pas seulement l'absence d'un message precis) : avec un split naif (mutant
+# teste manuellement), "Agent(x" et " y)" deviennent des tokens invalides (parenthese non
+# fermee / token hors charset) -> exit 1 meme en mode defaut. Avec le tokenizer a profondeur
+# de parentheses, exactement 3 tokens valides (Read, Agent(x,y), Bash(git:*)) -> --strict reste
+# vert (x/y non resolus restent des WARNINGS, jamais des ERREURS sous --strict seul).
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -qE "hors charset|parenthese non fermee|hors du set connu 'Agent'"; then
+  ok "T31 flow list [Read, Agent(x, y), Bash(git:*)] → --strict reste vert, aucun finding fantome"
+else
+  ko "T31 flow list dechiquetee (rc=$RC) : $OUT"
+fi
+rm -f "$AG/flow.md"
+
+# T32 — prefixe tiers : un agent gsd-planner.md sans model/memory est ignore par defaut,
+# et redevient linte (donc en erreur) des --no-third-party-prefix (solde CONCERNS.md:52-59).
+cat > "$AG/gsd-planner.md" <<'EOF'
+---
+name: gsd-planner
+description: Agent tiers GSD sans model ni memory, pour tester le skip par prefixe.
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "agent(s) tiers ignore"; then
+  ok "T32 gsd-planner (tiers, prefixe gsd- par defaut) → ignore, exit 0"
+else
+  ko "T32 (rc=$RC) : $OUT"
+fi
+RC=0; run_check --no-third-party-prefix >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 1 ] && ok "T32b --no-third-party-prefix → gsd-planner linte normalement → exit 1" || ko "T32b (rc=$RC)"
+rm -f "$AG/gsd-planner.md"
+
+# T33 — Task(...) alias legacy (Claude Code v2.1.63) reste vert, traite comme Agent(...)
+cat > "$AG/taskalias.md" <<'EOF'
+---
+name: taskalias
+description: Agent de test utilisant l'alias legacy Task au lieu d'Agent dans tools.
+model: sonnet
+memory: project
+tools: Read, Task(vf-coder)
+---
+corps
+EOF
+RC=0; run_check --strict >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] && ok "T33 Task(vf-coder) (alias legacy) reste vert" || ko "T33 (rc=$RC) : $(run_check --strict 2>&1 | tail -5)"
+rm -f "$AG/taskalias.md"
+
+# T34 — Agent nu (sans allowlist parenthesee) → warning non bloquant "dispatch non cloisonne"
+cat > "$AG/nu-agent.md" <<'EOF'
+---
+name: nu-agent
+description: Agent de test declarant Agent sans aucune allowlist parenthesee.
+model: sonnet
+memory: project
+tools: Read, Agent
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "dispatch non cloisonne"; then
+  ok "T34 Agent nu → warning non bloquant"
+else
+  ko "T34 (rc=$RC) : $OUT"
+fi
+rm -f "$AG"/*.md
 
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
