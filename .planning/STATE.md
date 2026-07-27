@@ -108,6 +108,16 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
 
 ### Roadmap Evolution
 
+- 2026-07-27 : **Phase 17** (Signaux de démarrage du moteur de dev) ajoutée. Spec :
+  `docs/superpowers/specs/2026-07-27-signaux-demarrage-dev-design.md`. Constat déclencheur :
+  `dev-orchestrator` est le seul module structurant **sans hooks**, donc `discover-unintegrated-docs.sh`
+  (livré Phase 13) n'est jamais appelé automatiquement et rien ne guide l'utilisateur après l'init.
+  Incident du jour qui a élargi le périmètre : une demande de conception adressée au Claude principal
+  est partie sur `superpowers:brainstorming` alors que ce repo tourne sous GSD avec une Phase 16
+  inscrite — `planning-core` se retire quand GSD tient le projet (`--defer-to-gsd`), aucun module ne
+  prend le relais, et le routage de `vibeflow-dev` n'existe que si son `AGENT.md` est lu (donc jamais
+  avant invocation). D'où un 5e signal `[gsd-engine]` d'orientation. Indépendante de la Phase 16.
+
 - 2026-07-27 : **Phase 15** (Collaboration inter-équipes dev ↔ design) ajoutée. Constat déclencheur :
   les deux équipes de mission s'ignorent totalement (seul pont = routage conversationnel
   `vibeflow-dev` → skill `vf-design`) ; les specs de `vf-crafter` ne sont jamais implémentées ; la

@@ -410,15 +410,20 @@ déjà publiée de `vf-design-manager`.
 **Requirements**: TBD (à dériver au cadrage)
 **Depends on:** Phase 14
 **Success Criteria** (what must be TRUE):
+
   1. `vf-dev-manager` sait insérer les étages design (craft avant exec, critique en parallèle de la
      revue) sur une étape à dominante UI, avec workers `vf-crafter`/`vf-design-judge` — sans jamais
      dispatcher `vf-design-manager` (pas d'imbrication de managers, Pattern A intact).
+
   2. `vf-design-manager` sait dispatcher `vf-coder` pour implémenter les specs du crafter, avec le
      même contrat typé — le « vert » design reste la critique scorée ≥ seuil.
+
   3. `vf-auto` route une mission longue à dominante design vers `Task(vf-design-manager)` (aiguillage
      documenté, cohérent avec la description publiée de l'agent).
+
   4. Le cloisonnement machine-enforced tient : `check-agents.sh` passe, les juges restent sans
      Write/Edit effectif, les workers internes restent `vf-internal: true`.
+
   5. Tests : les suites des deux modules couvrent le scénario croisé (DAG mixte, reopen cross-métier,
      interdiction d'imbrication) et restent vertes ; release bumpée + tag annoté poussé
      (`check-release-tag.sh --remote` → ✓).
@@ -446,16 +451,66 @@ des outils inexistants passent `--strict` en vert. (2) Scoper l'accès `Agent` d
 **Requirements**: TBD (à dériver au cadrage)
 **Depends on:** Phase 15
 **Success Criteria** (what must be TRUE):
+
   1. `check-agents.sh` valide le **contenu** des allowlists `Agent(...)` : syntaxe (parenthèse
      fermée, séparateurs) et existence de chaque nom — sans rendre rouges des allowlists correctes
      qui référencent des types natifs sans fichier `.md` (`general-purpose`) ou des agents externes
      fournis par `@opengsd/gsd-core` (`gsd-*`). Ce piège est la raison pour laquelle le lint n'a pas
      été écrit en Phase 15.
+
   2. Les allowlists de `vf-coder`, `vf-reviewer` et `vf-auditer` sont posées après le **même
      recensement exhaustif** que celui de la Phase 15 — dispatches directs **et** agents dispatchés
      par les skills que ces workers invoquent (l'angle mort qui avait produit 4 omissions).
+
   3. Le chemin indirect manager→worker→manager est structurellement fermé ; la dette correspondante
      sort de `CONCERNS.md`.
+
   4. Les tests de suite existants (T18/T18b, T8/T8b) restent verts et le nouveau lint est prouvé
      discriminant par mutation ; les 39 suites du repo passent.
 **Plans:** TBD
+
+### Phase 17: Signaux de démarrage du moteur de dev
+
+Spec : `docs/superpowers/specs/2026-07-27-signaux-demarrage-dev-design.md`.
+
+**Goal**: Rendre implicites les gestes de démarrage et d'hygiène documentaire (`gsd-onboard`,
+`gsd-config`, `gsd-map-codebase`, `gsd-ingest-docs`, `gsd-docs-update`), qui ne se déclenchent
+aujourd'hui que si le modèle y pense. `dev-orchestrator` est le seul module structurant **sans
+aucun hook** — conséquence directe : `discover-unintegrated-docs.sh`, livré en Phase 13 avec un
+contrat propre et testé, n'est jamais appelé automatiquement, et rien ne guide l'utilisateur
+au-delà de l'init d'un projet. Poser au module un fragment `hooks/hooks.json` sur le modèle de
+`planning-core` : trois scripts constatent des FAITS au `SessionStart` et injectent des signaux
+courts et **auto-portants** (chaque ligne porte son propre geste, comme `[planning-debt]`).
+**Depends on**: — (indépendante de la Phase 16 ; s'appuie sur l'acquis des Phases 13 et 14)
+**Requirements**: TBD (à dériver au cadrage)
+**Success Criteria** (what must be TRUE):
+  1. Sur un repo sain et complètement cadré, les trois scripts sortent en 3 et **aucune ligne**
+     n'est injectée au démarrage — le coût contexte d'un projet sain est nul.
+  2. `check-dev-bootstrap.sh` couvre le continuum de démarrage en un seul script : silence si ni
+     code ni `.planning/`, signal `onboard` si code sans `.planning/`, signal `bootstrap` listant
+     les items manquants (`config.json`, `codebase/`, ROADMAP sans phase) sinon, signal
+     d'orientation `gsd-engine` si complet. Les trois signaux sont prouvés mutuellement exclusifs
+     par test.
+  2bis. Le signal `gsd-engine` ferme le trou de routage constaté le 2026-07-27 sur ce repo : une
+     demande de conception adressée au Claude principal est partie sur `superpowers:brainstorming`
+     alors que le projet tournait sous GSD avec une Phase 16 inscrite. Cause structurelle —
+     `planning-core` se retire quand GSD tient le projet (`--defer-to-gsd`) et aucun module ne
+     prend le relais ; le routage de `vibeflow-dev` n'existe que si son `AGENT.md` est lu, donc
+     seulement une fois l'agent invoqué. Le signal lit le frontmatter réel de `STATE.md`
+     (milestone, phase, statut) et retombe en silence s'il est illisible — jamais d'état inventé.
+  3. `discover-unintegrated-docs.sh --hook` agrège le compte en une ligne **sans toucher** au
+     contrat historique (`grain<TAB>chemin`, exits 0/3/64) consommé par `ingestion-flow.md` ;
+     `--hook` avec `--quiet` sort en 64.
+  4. `check-doc-drift.sh` signale au-delà d'un seuil de commits de code sans mise à jour de doc
+     (défaut 20, réglable), et reste silencieux hors dépôt git ou sans commit de doc.
+  5. Les trois scripts sont en **lecture seule** et **advisory** : aucune écriture, aucun exit 1,
+     aucun blocage de tour — la confirmation humaine reste devant chaque geste proposé (ADR-031,
+     garde-fous BRDG-03 pour l'ingestion).
+  6. Les hooks sont câblés par l'engine sans le modifier (`merge_module_hooks` gère déjà le
+     fragment), `check-agents.sh` passe après modification d'`AGENT.md`, et les tests des trois
+     scripts passent sous `bash` macOS **et** Linux (portabilité CI — régression du 2026-07-27).
+**Plans:** TBD
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 17 to break down)

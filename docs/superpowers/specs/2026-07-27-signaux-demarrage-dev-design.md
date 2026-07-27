@@ -47,20 +47,20 @@ Poser à `dev-orchestrator` un fragment `hooks/hooks.json` sur le modèle exact 
 au `SessionStart:startup`, des scripts constatent des **faits** et injectent un signal court et
 **auto-portant**. L'agent réagit au signal au lieu de devoir y penser.
 
-Quatre faits, **trois scripts** :
+Cinq faits, **trois scripts** :
 
 | Script | Faits couverts | État |
 |---|---|---|
-| `check-dev-bootstrap.sh` | repo brownfield non initialisé **+** bootstrap incomplet | à créer |
+| `check-dev-bootstrap.sh` | brownfield non initialisé **+** bootstrap incomplet **+** orientation moteur GSD | à créer |
 | `discover-unintegrated-docs.sh` | documents orphelins de la feuille de route | existe — ajouter `--hook` |
 | `check-doc-drift.sh` | documentation potentiellement périmée | à créer |
 
 ### 2.1 Pourquoi deux faits dans un seul script
 
-« Code présent, `.planning/` absent » et « `.planning/` présent mais incomplet » sont deux états
-d'un même continuum — *où en est le démarrage de ce projet ?* — et sont **mutuellement
-exclusifs**. Deux scripts séparés devraient chacun tester l'état de l'autre pour savoir s'ils ont
-le droit de parler.
+« Code présent, `.planning/` absent », « `.planning/` présent mais incomplet » et « projet
+complètement cadré sous GSD » sont trois états d'un même continuum — *où en est le démarrage de ce
+projet ?* — et sont **mutuellement exclusifs**. Des scripts séparés devraient chacun tester les
+conditions des autres pour savoir s'ils ont le droit de parler.
 
 ---
 
@@ -83,7 +83,7 @@ Continuum d'états, évalués dans cet ordre, le premier qui matche gagne :
 | 0 | ni code source ni `.planning/` | silence | 3 |
 | 1 | code source présent, `.planning/` absent | signal `onboard` | 0 |
 | 2 | `.planning/PROJECT.md` présent, ≥ 1 item de démarrage manquant | signal `bootstrap` + liste des items | 0 |
-| 3 | `.planning/PROJECT.md` présent, tous items posés | silence | 3 |
+| 3 | `.planning/PROJECT.md` présent, tous items posés | signal `engine` (1 ligne d'orientation) | 3 |
 | — | argument inconnu | message sur stderr | 64 |
 
 **Détection « code source présent »** : au moins un fichier existe hors des dossiers
@@ -104,6 +104,26 @@ brownfield au même titre qu'un dépôt.
 
 L'item `codebase` est conditionné à la présence de code : sur un greenfield fraîchement initialisé,
 il n'y a rien à cartographier et le signaler serait du bruit.
+
+**État 3 — le signal d'orientation `engine`.** Un projet complètement cadré n'a aucune dette à
+signaler, mais il a une information décisive à donner : *ce projet est piloté par GSD, le cadrage
+et la planification passent par la chaîne `gsd-*`*. Sans elle, une demande de conception adressée
+au Claude principal part sur une chaîne générique — c'est arrivé le 2026-07-27 sur ce repo même,
+où une spec a été rédigée via `superpowers:brainstorming` alors que le projet tournait sous GSD
+avec une Phase 16 inscrite. Cause structurelle : `planning-core` **se retire volontairement**
+quand GSD tient le projet (`--defer-to-gsd`, `detect-gsd-engine.sh`), et aucun module ne prend le
+relais.
+
+L'état 3 émet donc **une ligne**, lue depuis le frontmatter de `.planning/STATE.md`
+(`milestone`, `current_phase`, `status`) :
+
+```
+[gsd-engine] Projet piloté par GSD — milestone gsd-migration, phase 16 non démarrée.
+             → cadrage : gsd-discuss-phase · plan : gsd-plan-phase · état : gsd-progress.
+```
+
+L'exit reste **3** : ce n'est pas une dette, c'est une orientation. Si le frontmatter est illisible
+ou absent, le script retombe en silence — jamais d'invention d'état.
 
 **Env de surcharge** (testabilité, modèle `VF_INGEST_*` de `discover-unintegrated-docs.sh`) :
 `VF_BOOTSTRAP_PLANNING_DIR` (défaut `<path>/.planning`).
@@ -182,6 +202,8 @@ Chaque ligne porte donc **son propre geste**, sur le modèle de `[planning-debt]
             → propose gsd-config puis gsd-map-codebase (confirmation requise).
 [onboard]   Code présent, aucun .planning/ — projet non cadré.
             → propose gsd-onboard (confirmation requise).
+[gsd-engine] Projet piloté par GSD — milestone gsd-migration, phase 16 non démarrée.
+            → cadrage : gsd-discuss-phase · plan : gsd-plan-phase · état : gsd-progress.
 [docs-ingest] 3 documents de cadrage hors feuille de route (2 spec, 1 plan).
             → propose l'ingestion (gsd-ingest-docs --mode merge / gsd-import), jamais sans confirmation.
 [doc-drift] 24 commits de code depuis la dernière mise à jour de la doc.
@@ -190,15 +212,17 @@ Chaque ligne porte donc **son propre geste**, sur le modèle de `[planning-debt]
 
 ### 4.2 Invariants tenus par les trois scripts
 
-- **Silence par défaut** : rien à dire → aucune sortie, exit 3. Le coût contexte d'un projet sain
-  est nul.
+- **Silence par défaut** : rien à dire → aucune sortie, exit 3. Seule exception assumée, le signal
+  d'orientation `[gsd-engine]` de l'état 3 : **une** ligne sur un projet sain, contre le risque
+  qu'une demande parte sur une chaîne générique (§3.1). Un projet sain coûte donc 1 ligne, pas 0.
 - **Advisory, jamais bloquant** : aucun script ne sort en 1 ; le hook est suffixé `|| true`.
   Aucun `Stop` hook, aucun blocage de tour.
 - **Aucune écriture** : les trois scripts sont en lecture seule. La confirmation humaine reste
   devant chaque geste proposé (ADR-031, et pour l'ingestion les garde-fous BRDG-03 déjà écrits
   dans `ingestion-flow.md`).
-- **Densité** : ≤ 2 lignes par signal. `[bootstrap]` et `[onboard]` étant exclusifs, une session
-  ne peut porter que **3 signaux au maximum**.
+- **Densité** : ≤ 2 lignes par signal. `[bootstrap]`, `[onboard]` et `[gsd-engine]` étant les
+  trois états exclusifs d'un même continuum, une session ne peut porter que **3 signaux au
+  maximum**.
 - **Le fait, jamais le métier** (ADR-055 §3) : les scripts constatent, l'agent juge.
 
 ---
@@ -251,10 +275,11 @@ La contrainte de densité ADR-029 (agent ≤ 250 lignes) est respectée : `AGENT
 
 **Critères d'acceptation**
 
-1. Sur un repo sain et complètement cadré : les trois scripts sortent en 3, **aucune ligne**
-   injectée au démarrage.
-2. Sur un repo de code sans `.planning/` : signal `[onboard]` unique — aucun signal `[bootstrap]`
-   (exclusion mutuelle vérifiée par test).
+1. Sur un repo sain et complètement cadré : les trois scripts sortent en 3, et la **seule** ligne
+   injectée est le `[gsd-engine]` d'orientation, dont le milestone et la phase correspondent au
+   frontmatter réel de `.planning/STATE.md`. Frontmatter absent ou illisible → silence total.
+2. Sur un repo de code sans `.planning/` : signal `[onboard]` unique — ni `[bootstrap]` ni
+   `[gsd-engine]` (exclusion mutuelle des trois états vérifiée par test).
 3. Sur un projet fraîchement initialisé sans `config.json` : signal `[bootstrap]` listant les items
    manquants, et lui seul.
 4. Sur un repo avec 3 specs non citées : signal `[docs-ingest]` annonçant 3 documents, et
