@@ -482,11 +482,21 @@ au-delà de l'init d'un projet. Poser au module un fragment `hooks/hooks.json` s
 `planning-core` : trois scripts constatent des FAITS au `SessionStart` et injectent des signaux
 courts et **auto-portants** (chaque ligne porte son propre geste, comme `[planning-debt]`).
 **Depends on**: — (indépendante de la Phase 16 ; s'appuie sur l'acquis des Phases 13 et 14)
-**Requirements**: TBD (à dériver au cadrage)
+**Requirements**: SIG-01 (continuum `check-dev-bootstrap.sh` — 4 états mutuellement exclusifs, un
+seul script) · SIG-02 (`discover-unintegrated-docs.sh --hook`, non-régression du contrat historique
+`grain<TAB>chemin` + exits 0/3/64) · SIG-03 (`check-doc-drift.sh` — heuristique commits, seuil
+réglable, silence hors dépôt git) · SIG-04 (contrat advisory/lecture seule des 3 scripts — aucune
+écriture, aucun exit 1, aucun blocage de tour) · SIG-05 (gate ADR-044 réellement falsifiable sur
+`AGENT.md` racine de module via `check-agents.sh --file`, fermé par test embarqué plutôt que
+documenté) · SIG-06 (portabilité macOS/Linux prouvée par conteneur avant push, non cochée sur un
+run macOS seul)
 **Success Criteria** (what must be TRUE):
 
-  1. Sur un repo sain et complètement cadré, les trois scripts sortent en 3 et **aucune ligne**
-     n'est injectée au démarrage — le coût contexte d'un projet sain est nul.
+  1. Sur un repo sain et complètement cadré, les trois scripts sortent en 3 et la **seule** ligne
+     injectée est le `[gsd-engine]` d'orientation. *(Amendé le 2026-07-27 — arbitrage humain de
+     Samuel, cf. `.planning/STATE.md` §Decisions : le libellé original « aucune ligne n'est
+     injectée » contredisait la spec §4.2/§7 et se contredisait lui-même avec SC2/SC2bis
+     ci-dessous, qui exigent le signal `[gsd-engine]`. La spec fait foi.)*
 
   2. `check-dev-bootstrap.sh` couvre le continuum de démarrage en un seul script : silence si ni
      code ni `.planning/`, signal `onboard` si code sans `.planning/`, signal `bootstrap` listant
@@ -515,11 +525,13 @@ courts et **auto-portants** (chaque ligne porte son propre geste, comme `[planni
   6. Les hooks sont câblés par l'engine sans le modifier (`merge_module_hooks` gère déjà le
      fragment), `check-agents.sh` passe après modification d'`AGENT.md`, et les tests des trois
      scripts passent sous `bash` macOS **et** Linux (portabilité CI — régression du 2026-07-27).
-**Plans:** TBD
+**Plans:** 3 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 17 to break down)
+- [ ] 17-01-PLAN.md — Tranche traçante : `check-dev-bootstrap.sh` (continuum à 4 états) + fragment `hooks/hooks.json`, prouvé de bout en bout sur ce dépôt (vague 1)
+- [ ] 17-02-PLAN.md — Expansion : `check-doc-drift.sh` (seuil réglable, silence hors git) + `discover-unintegrated-docs.sh --hook` strictement additif (vague 2)
+- [ ] 17-03-PLAN.md — Doctrine `AGENT.md`, gates T20/T21 falsifiables (ADR-044, SC5), preuve de portabilité Linux en conteneur, module `v2.5.0` (vague 3)
 
 ### Phase 18: Capability living-specs (conventions OpenSpec)
 
