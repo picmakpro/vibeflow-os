@@ -15,6 +15,7 @@
 <summary>✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04</summary>
 
 ### Phase 1: dev-orchestrator
+
 **Goal**: Module `dev-orchestrator/` distribuable (agent routeur, index auto, verbes `/vf-*`, bootstrap auto-install).
 **Plans**: 5 plans (4 waves) — tous complétés.
 Snapshots : `.planning/milestones/vfdo-v1.0-*`. Détails : `MILESTONES.md`.
@@ -28,65 +29,85 @@ qui se lance automatiquement, avec choix de scope (user/project/local) appliqué
 Spec : `docs/superpowers/specs/2026-06-04-install-ux-design.md`.
 
 #### Phase 2: Manifeste & résolveur
+
 **Goal**: Doter chaque module d'un `module.json` machine-lisible + un résolveur de dépendances transitives.
 **Depends on**: Phase 1
 **Requirements**: MANIF-01, MANIF-02
 **Success Criteria** (what must be TRUE):
+
   1. Les 8 modules ont un `module.json` valide (name, version, type, description, `requires[]`).
   2. Le résolveur, donné une sélection, retourne la fermeture transitive correcte (validator → +consolidator +infrastructure-audit).
+
 **Plans**: 2 plans (2 waves)
 Plans:
+
 - [x] 02-01-PLAN.md — 8 module.json (name, version, type, description, requires) pour les 8 modules (MANIF-01)
 - [x] 02-02-PLAN.md — résolveur de fermeture transitive `_internal/resolve-deps.sh` + test (MANIF-02)
 
 #### Phase 3: Engine scope-aware
+
 **Goal**: `vibeflow-update.sh` + `ensure-deps.sh` installent au scope choisi, depuis le cache du plugin.
 **Depends on**: Phase 2
 **Requirements**: SCOPE-01, SCOPE-02, SCOPE-03, SCOPE-04
 **Success Criteria** (what must be TRUE):
+
   1. `--scope user` cible `~/.claude/` ; `project`/`local` cible `./.claude/` ; `local` ajoute au `.gitignore`.
   2. Les modules sont installés depuis le cache du plugin (plus de `git clone`).
   3. `ensure-deps.sh` installe GSD + Superpowers au scope demandé.
+
 **Plans**: 2 plans (1 wave — parallèles, fichiers disjoints)
 Plans:
+
 - [x] 03-01-PLAN.md — vibeflow-update.sh scope-aware : TARGET_ROOT + suppression clone + gitignore local + résolveur câblé + test isolé (SCOPE-01, SCOPE-02, SCOPE-04)
 - [x] 03-02-PLAN.md — ensure-deps.sh scopé (GSD --global/--local, Superpowers --scope) + test 3 scopes en dry-run (SCOPE-03)
 
 #### Phase 4: Skill /vibeflow-install + auto-lancement
+
 **Goal**: Le skill interactif (toggles scope + modules, récap déps, orchestration) + auto-lancement au 1er démarrage.
 **Depends on**: Phase 2, Phase 3
 **Requirements**: INST-01, INST-02, INST-03, INST-04, INST-05
 **Success Criteria** (what must be TRUE):
+
   1. L'UX propose un toggle scope puis un toggle modules (depuis les `module.json`).
   2. Les dépendances sont auto-résolues et récapitulées avant install.
   3. L'install s'effectue au scope choisi (modules + GSD + Superpowers).
   4. Un hook `SessionStart` ouvre l'UX automatiquement au 1er lancement (marqueur).
+
 **Plans**: 2 plans (1 wave — parallèles, fichiers disjoints)
 Plans:
+
 - [x] 04-01-PLAN.md — catalogue modules `build-module-catalog.sh` + skill `/vibeflow-install` (toggles scope+modules, récap déps, orchestration scope-aware) + test (INST-01..04)
 - [x] 04-02-PLAN.md — hook `SessionStart` + marqueur de 1er lancement (modèle Superpowers) + test isolé (INST-05)
 
 #### Phase 5: Packaging plugin
+
 **Goal**: VibeFlow installable comme plugin Claude Code (marketplace), repo public.
 **Depends on**: Phase 4
 **Requirements**: PLUG-01, PLUG-02, PLUG-03, PLUG-04
 **Success Criteria** (what must be TRUE):
+
   1. `plugin.json` + `marketplace.json` valides ; le plugin bundle modules + skill + engine + manifeste.
   2. `claude plugin marketplace add picmakpro/vibeflow-os` + `install vibeflow` fonctionnent en zéro-auth (repo public).
+
 **Plans**: 2 plans (2 waves — Plan 02 CONFIRMATION-GATED / non-autonome)
 Plans:
+
 - [x] 05-01-PLAN.md — `.claude-plugin/plugin.json` + `marketplace.json` (calque Superpowers) + câblage VIBEFLOW_CACHE=${CLAUDE_PLUGIN_ROOT} dans le skill + doc d'install 2-commandes (PLUG-01, PLUG-02)
 - [ ] 05-02-PLAN.md — checklist pré-public + flip repo public + validation marketplace add/install zéro-auth — CONFIRMÉ HORS-AGENT (PLUG-03, PLUG-04)
 
 #### Phase 6: dev-orchestrator first-use
+
 **Goal**: Au 1er usage, l'agent détecte un projet non GSD-initialisé et propose l'init.
 **Depends on**: Phase 1 (indépendant des phases 2-5)
 **Requirements**: FIRST-01, FIRST-02
 **Success Criteria** (what must be TRUE):
+
   1. L'agent détecte l'absence de `.planning/` au premier usage.
   2. Il propose map-codebase puis new-project sur confirmation (jamais `gsd-new-project` seul).
+
 **Plans**: 1 plan (1 wave)
 Plans:
+
 - [x] 06-01-PLAN.md — garde-fou first-use dans AGENT.md (détection `.planning/PROJECT.md` absent → délégation vf-init, new-project jamais seul) + axe de test T7 (FIRST-01, FIRST-02)
 
 ### 🚧 Doctrine dev & consolidation (Phases 7-8)
@@ -98,30 +119,38 @@ doublons du cluster qualité (`software-architecture` / `feature-dev-gates` / `a
 Spec : `docs/superpowers/specs/2026-07-07-dev-doctrine-consolidation-design.md`.
 
 #### Phase 7: Philosophies de dev
+
 **Goal**: Enrichir `software-architecture` — DRY/KISS/YAGNI écrits, Clean Architecture + Clean Code nommés, carte TDD renvoyant au skill canonique, câblage Tier 2 honnête. Sans dupliquer l'existant.
 **Depends on**: — (module déjà en place)
 **Requirements**: PHIL-01..08
 **Success Criteria** (what must be TRUE):
+
   1. `principles.md` porte DRY + KISS + YAGNI (contrats vérifiables) + une carte TDD renvoyant au skill canonique.
   2. Clean Architecture (Dependency Rule) et Clean Code sont **nommés** dans `solid-soc.md`.
   3. `SKILL.md` câble DRY/KISS-YAGNI/Clean Code en Tier 2, référence `principles.md`, étend le frontmatter — **aucun faux gate machine**.
   4. `module.json` bumpé v1.2.0 + CHANGELOG/README ; densité `.md` sous seuils ADR-029.
+
 **Plans**: 2 plans (2 waves) — ✅ complétés, vérif goal-backward PASS (`07-VERIFICATION.md`)
 Plans:
+
 - [x] 07-01-PLAN.md — nommage Clean Archi/Clean Code + `principles.md` (DRY/KISS/YAGNI + carte TDD) + table universelle (PHIL-01..05, 07)
 - [x] 07-02-PLAN.md — câblage Tier 2 `SKILL.md` + release-meta module v1.2.0 (PHIL-06, 08)
 
 #### Phase 8: Consolidation des doublons
+
 **Goal**: Assainir le cluster qualité — fusionner/déprécier `feature-dev-gates` dans un foyer de gates unique, dé-dupliquer `audit-architecture` (renvois au lieu de re-description), factoriser les 3 axiomes, corriger les descriptions legacy.
 **Depends on**: Phase 7
 **Requirements**: CONS-01..04
 **Success Criteria** (what must be TRUE):
+
   1. Un seul foyer de rule de gates de code (plus de doublon de globs `src/** app/** lib/** features/**`).
   2. `audit-architecture` renvoie au lieu de dupliquer ; sa `module.json` legacy corrigée.
   3. Les 3 axiomes (enforcement>prose, filet fonctionnel, preuve avant done) ont une source unique.
   4. Invariant vérifié : `dev-orchestrator` inchangé (pur routeur).
+
 **Plans**: 4 plans — ✅ complétés, vérif goal-backward PASS (`08-VERIFICATION.md`)
 Plans:
+
 - [x] 08-01-PLAN.md — fusion gates Nyquist+Decision Coverage → software-architecture v1.3.0 (CONS-01)
 - [x] 08-02-PLAN.md — suppression feature-dev-gates + `cleanup_retired_modules` engine + test T7 + doc refs (CONS-01)
 - [x] 08-03-PLAN.md — reference/AXIOMES-ENFORCEMENT.md source unique + renvois (CONS-03)
@@ -136,23 +165,30 @@ Plans:
 Source : `.planning/research/jcode-memory-swarm-transposition-NOTE.md`.
 
 #### Phase 9: Spike transposition jcode (mémoire + swarm)
+
 **Goal**: Prototyper les 3 gestes mémoire les moins chers (frontmatter `trust`/`confidence`/`superseded_by`
+
 + règle de décroissance par catégorie dans `consolidator`) sur un lab témoin, mesurer le coût de maintenance
+
 réel, et statuer go/no-go. Volet swarm (lock de driver + DAG) = second spike indépendant, conditionné à des
 collisions observées sur les backups isolés (ADR-048/049).
 **Depends on**: — (R&D exploratoire, hors chaîne de release)
 **Requirements**: RND-01, RND-02
 **Success Criteria** (what must be TRUE):
+
   1. Le format mémoire enrichi (3 gestes : `trust`/`confidence`/`superseded_by`) est prototypé sur ≥1 lab
      témoin et le `consolidator` sait le tenir à jour **automatiquement** — round-trip lit→recalcule→réécrit
      sans édition humaine, entrée `superseded_by` archivée sans suppression (sinon → no-go documenté).
+
   2. Les demi-vies de décroissance sont re-calibrées pour l'usage VibeFlow multi-métiers (pas les valeurs
      jcode brutes).
+
   3. Une décision go/no-go écrite tranche : (a) écrire un ADR + toucher le format officiel, ou (b) archiver.
   4. Le volet swarm est cadré (lock de driver + DAG) mais **non implémenté** tant que les collisions ne sont
      pas observées en pratique.
 **Plans**: à cadrer (`/gsd:discuss-phase 9` puis `plan-phase`)
 Plans:
+
 - [x] 09-01 — spike frontmatter mémoire enrichi (3 gestes) + règle décroissance `consolidator` sur lab témoin (RND-01) → **GO** (round-trip idempotent + archivage non destructif vérifiés, `spike/`)
 - [x] 09-02 — note go/no-go mémoire (verdict + demi-vies recalibrées, `09-GO-NOGO-memoire.md`) + mini-cadrage écrit du volet swarm non implémenté (`09-CADRAGE-swarm.md`) (RND-02)
 
@@ -165,23 +201,29 @@ taggée). L'intégration est **conditionnée au GO** de l'étude — un no-go do
 sans toucher le code.
 
 #### Phase 10: Étude & faisabilité migration GSD
+
 **Goal**: Cartographier toute la surface d'usage de GSD dans VibeFlow, évaluer la maturité et la parité du package cible `@opengsd/gsd-core`, et trancher par une note go/no-go écrite (bascule maintenant / attendre / stratégie de migration + fenêtre de compat).
 **Depends on**: — (chantier indépendant, hors chaîne des milestones précédents)
 **Requirements**: GSDM-01, GSDM-02, GSDM-03
 **Success Criteria** (what must be TRUE):
+
   1. La **surface d'impact** est inventoriée exhaustivement : tous les points de contact GSD (`ensure-deps.sh`, `build-gsd-index.sh`, binaire `gsd-sdk`, chemins `~/.claude/get-shit-done/`, pins `PROJECT.md`, hooks, références docs) sont listés avec le changement attendu pour chacun.
   2. Le package cible `@opengsd/gsd-core` est **caractérisé** : existence/stabilité npm, commande d'install non-interactive équivalente, nom du binaire, structure de dossier, parité fonctionnelle des skills/SDK consommés — écarts documentés.
   3. Une **note go/no-go écrite** tranche : (a) migrer maintenant (avec stratégie + fenêtre de compat), (b) attendre (déclencheur de resurgence explicite), ou (c) archiver. Un no-go clôt le milestone sans Phase 11.
+
 **Plans**: à cadrer (`/gsd:discuss-phase 10` puis `plan-phase`)
 
 #### Phase 11: Intégration migration GSD
+
 **Goal**: Exécuter la bascule décidée en Phase 10 — basculer les points d'install et l'index vers `@opengsd/gsd-core`, mettre à jour les références, prouver la non-régression en isolé, documenter et livrer une release taggée.
 **Depends on**: Phase 10 (**GATE** : n'exécuter que si go/no-go = GO)
 **Requirements**: GSDM-04, GSDM-05, GSDM-06
 **Success Criteria** (what must be TRUE):
+
   1. `ensure-deps.sh` et les pins (`PROJECT.md`) installent `@opengsd/gsd-core` en non-interactif, idempotent, avec fallback manuel — GSD `get-shit-done-cc` n'est plus référencé.
   2. L'index factuel (`build-gsd-index.sh`) est régénéré depuis le nouveau package/binaire, zéro hallucination, et les références docs pointent la nouvelle source.
   3. Non-régression prouvée en **isolé** (dry-run 3 scopes + idempotence, vrai `~/.claude` jamais touché) ; CHANGELOG/README à jour ; release bumpée + **tag annoté poussé** (`scripts/check-release-tag.sh --remote` → ✓).
+
 **Plans**: à cadrer (`/gsd:discuss-phase 11` puis `plan-phase`)
 
 ### 🚧 Routage fin & verbes VibeFlow (Phases 12-14)
@@ -193,21 +235,27 @@ cadrage écrit (spec) aux étapes de la feuille de route.
 Spec : `docs/superpowers/specs/2026-07-25-routage-fin-verbes-vf-design.md`.
 
 #### Phase 12: Routage fin & couverture complète des verbes `/vf-*`
+
 **Goal**: Trois niveaux de routage (descriptions déclencheuses, rule de préséance globale, agent + doctrine
 exhaustive on-demand) et 19 nouveaux verbes, pour qu'aucune intention de dev ne tombe dans le vide et
 qu'aucun skill `gsd-*` ne gagne l'arbitrage en entrée de chaîne.
 **Depends on**: — (chantier indépendant des milestones 10-11)
 **Requirements**: VERB-01, VERB-02, VERB-03, VERB-04, VERB-05
 **Success Criteria** (what must be TRUE):
+
   1. La table de routage de `AGENT.md` ne cite plus aucune cible `gsd-*` : chaque intention pointe un verbe
      `/vf-*`. `AGENT.md` reste ≤ 250 L (déport de la doctrine exhaustive dans `references/intent-routing.md`).
+
   2. 19 verbes sont livrés (18 dans `dev-orchestrator`, `vf-sketch` dans `design-orchestrator`), chacun
      déléguant à une cible GSD existante — aucune logique d'outil réimplémentée.
+
   3. Les 33 descriptions suivent le gabarit déclencheur (formulations FR réelles + contre-exemples nommant
      les voisins), et les groupes de collision identifiés (`vf-test`/`vf-testgen`, `vf-review`/`vf-gaps`,
      le quatuor amont, `vf-map`/`vf-learn`, `vf-progress`/`vf-resume`, `vf-gaps`/`/vf-audit`) sont démarqués.
+
   4. `rules/vf-verb-precedence.md` (≤ 40 L, globale) est installée en `.claude/rules/` et interdit
      l'invocation directe d'un `gsd-*`/`superpowers:*` en entrée de chaîne.
+
   5. `intent-routing.md` couvre 100 % des skills de `gsd-skills-index.md` ; les tests du module passent —
      **fixture T4 étendue aux nouvelles cibles** (sinon orphelins hors poste de dev), + T12 (anti-collision),
      T13 (préséance), T14 (exhaustivité).
@@ -220,6 +268,7 @@ v2.33.0** (bascule agentique, spec `2026-07-25-suppression-facade-vf-design.md`)
 ci-dessus décrivent l'état livré en v2.31.0, plus l'état courant — subsistent la carte d'intention
 unique de `vibeflow-dev`, `vf-auto` et `vf-dev` ; la suite de tests a été refondue (26 OK en v2.33.0).
 Plans:
+
 - [x] 12-01 — fondations : gabarit de description + doctrine `intent-routing.md` + rule de préséance (VERB-01, VERB-04, VERB-05)
 - [x] 12-02 — 17 verbes `/vf-*` neufs dans `dev-orchestrator` (VERB-02)
 - [x] 12-03 — verbe `/vf-sketch` dans `design-orchestrator` (VERB-02)
@@ -251,15 +300,20 @@ sans contourner leurs garde-fous.
 **Depends on**: Phase 12 (carte d'intention unique de `vibeflow-dev` en place)
 **Requirements**: BRDG-01, BRDG-02, BRDG-03
 **Success Criteria** (what must be TRUE):
+
   1. L'agent `vibeflow-dev` traite les deux grains : spec → `gsd-ingest-docs --mode merge` (étapes +
      exigences), plan → `gsd-import --from` (PLAN.md d'une étape) — sans réimplémenter de parseur maison.
+
   2. La découverte des specs/plans non encore intégrés est **outillée** (`discover-unintegrated-docs.sh` :
      chemin non cité dans les 6 registres, détection du grain) ; l'agent construit le manifest YAML —
      l'utilisateur n'écrit jamais de manifest à la main.
+
   3. Gate BLOCKER jamais contourné, confirmation humaine avant toute écriture dans `.planning/` (ADR-031),
      `--mode merge` par défaut sur projet existant, cap 50 documents signalé.
+
   4. En fin de cadrage (brainstorm → spec écrite), l'agent propose l'ingestion comme next step — plus
      aucune spec orpheline, sans ressusciter le cycle de verbes supprimé en v2.33.0.
+
   5. Release livrée : CHANGELOG/README des modules à jour, bump racine + **tag annoté poussé**
      (`scripts/check-release-tag.sh --remote` → ✓).
 **Plans**: 2 plans (2 vagues) — ✅ complétés, vérif goal-backward **PASS** (`13-VERIFICATION.md` : 4/4
@@ -268,8 +322,10 @@ critères dans le mandat, 3/3 BRDG, 22/22 must-haves, 0 blocker). Livré : `disc
 (158 L) + `intent-routing.md`, axes T16/T17. Module `dev-orchestrator` **v2.2.0**. Suites : 16 ok · 30 OK
 · 10 OK · `check-agents` ✓ · `check-version-sync` ✓.
 Plans:
+
 - [x] 13-01-PLAN.md — `discover-unintegrated-docs.sh` : le fait « quels cadrages ne sont pas dans la
   feuille de route », 6 registres, grain spec/plan, exits 0/3/64 (BRDG-02)
+
 - [x] 13-02-PLAN.md — doctrine `ingestion-flow.md` + câblage agent (manifest, délégation
   `gsd-ingest-docs --mode merge` / `gsd-import --from`, 4 garde-fous) + T16/T17 (BRDG-01, BRDG-03)
 
@@ -279,6 +335,7 @@ face à l'ingestion (audit BRDG-03), et le filtre glob du script non couvert par
 survivant — effet possible faux négatif, jamais faux positif).
 
 #### Phase 14: Frontière d'altitude planning-core / moteur GSD (rescope de `vf-planning`)
+
 **Goal**: Faire cesser la concurrence entre `vf-planning` et le moteur de planning GSD — deux moteurs
 produisaient les mêmes fichiers dans le même dossier avec des frontmatters incompatibles. Un projet de code
 a désormais un seul moteur (GSD) ; `planning-core` tient l'altitude lab et la couche mémoire/enforcement.
@@ -286,20 +343,26 @@ a désormais un seul moteur (GSD) ; `planning-core` tient l'altitude lab et la c
 `/vf-map` existent déjà parmi les 14 verbes actuels)
 **Requirements**: ALTI-01, ALTI-02, ALTI-03, ALTI-04, ALTI-05
 **Success Criteria** (what must be TRUE):
+
   1. `scripts/detect-gsd-engine.sh` répond au fait « un moteur de planning est-il en place ? » par 4 exits
      ordonnés par priorité, **sans jamais inférer de métier** ; 10 cas de test passent, dont la primauté du
      marqueur GSD sur les signaux de code.
+
   2. La description de `vf-planning` ne revendique plus aucune intention de projet dev et nomme ses voisins
      en contre-exemples ; le SKILL branche sur deux séquences (A : socle universel non-dev, B : couche lab).
      Sur un lab dev, **aucun** artefact de projet n'est généré.
+
   3. La double injection `SessionStart` est terminée (`--defer-to-gsd`, opt-in, câblé dans `hooks.json`) — le
      comportement par défaut des scripts est **inchangé** et l'`INDEX.md` du lab reste injecté (altitude lab).
+
   4. `guard-planning-updated.sh` reste **bloquant** (exception motivée : il vérifie un résultat, ne génère
      rien) et aucun `.planning/` existant n'est jamais réécrit (ADR-031, protocole de migration exit 2).
+
   5. Non-régression prouvée : les 4 bundles non-dev passent par la séquence A, la suite de tests du module est
      verte, `check-agents.sh` OK ; release bumpée + **tag annoté poussé** (`check-release-tag.sh --remote` → ✓).
 **Plans**: 7 plans (4 waves ; 14-07 né du rapport d'exécution) — portés depuis `docs/superpowers/plans/2026-07-25-rescope-vf-planning-gsd.md`
 Plans:
+
 - [x] 14-01-PLAN.md — `detect-gsd-engine.sh` : fait vérifiable « un moteur est-il en place », 4 exits + 10 tests (ALTI-01)
 - [x] 14-02-PLAN.md — `references/gsd-handoff.md` : doctrine d'altitude + table intention → verbe + protocole de migration (ALTI-04)
 - [x] 14-03-PLAN.md — `--defer-to-gsd` sur 2 hooks : fin de la double injection SessionStart, défaut inchangé (ALTI-03)
@@ -329,3 +392,36 @@ Plans:
 | 12. Routage fin & verbes /vf-* | vf-routing | 6/6 | Complete — release `v2.31.0` | 2026-07-25 |
 | 13. Pont spec → feuille de route | vf-routing | 2/2 | Complete — release `v2.37.0` — module v2.2.0, vérif PASS | 2026-07-26 |
 | 14. Frontière d'altitude planning-core / GSD | vf-routing | 7/7 | Complete — release `v2.30.0` (ADR-055) | 2026-07-25 |
+
+### Phase 15: Collaboration inter-équipes dev ↔ design
+
+**Goal**: Faire collaborer les deux équipes de mission (dev-orchestrator, design-orchestrator) **par
+étages croisés sous un seul manager** — option A de l'étude du 2026-07-27 : un seul verrou de driver,
+un seul DAG, un seul rapport. `vf-dev-manager` gagne un étage design (nœuds `craft:<écran>` via
+`vf-crafter` avant l'exécution d'une étape à dominante UI, `critique:<écran>` via `vf-design-judge`
+en parallèle de la revue code) ; `vf-design-manager` gagne un étage implémentation (`vf-coder` pour
+incarner les specs+tokens du crafter — comble le trou « specs jamais implémentées »). L'imbrication
+manager→manager reste INTERDITE (Pattern A, prouvée bloquante par test) ; le kernel `dag.sh` accepte
+déjà les DAG hétérogènes et le reopen cross-métier (7/7 tests empiriques verts). Inclut le fix de
+l'aiguillage `vf-auto` (dominante design → `Task(vf-design-manager)`) pour honorer la description
+déjà publiée de `vf-design-manager`.
+**Requirements**: TBD (à dériver au cadrage)
+**Depends on:** Phase 14
+**Success Criteria** (what must be TRUE):
+  1. `vf-dev-manager` sait insérer les étages design (craft avant exec, critique en parallèle de la
+     revue) sur une étape à dominante UI, avec workers `vf-crafter`/`vf-design-judge` — sans jamais
+     dispatcher `vf-design-manager` (pas d'imbrication de managers, Pattern A intact).
+  2. `vf-design-manager` sait dispatcher `vf-coder` pour implémenter les specs du crafter, avec le
+     même contrat typé — le « vert » design reste la critique scorée ≥ seuil.
+  3. `vf-auto` route une mission longue à dominante design vers `Task(vf-design-manager)` (aiguillage
+     documenté, cohérent avec la description publiée de l'agent).
+  4. Le cloisonnement machine-enforced tient : `check-agents.sh` passe, les juges restent sans
+     Write/Edit effectif, les workers internes restent `vf-internal: true`.
+  5. Tests : les suites des deux modules couvrent le scénario croisé (DAG mixte, reopen cross-métier,
+     interdiction d'imbrication) et restent vertes ; release bumpée + tag annoté poussé
+     (`check-release-tag.sh --remote` → ✓).
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 15 to break down)

@@ -85,6 +85,12 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
 
 ### Roadmap Evolution
 
+- 2026-07-27 : **Phase 15** (Collaboration inter-équipes dev ↔ design) ajoutée. Constat déclencheur :
+  les deux équipes de mission s'ignorent totalement (seul pont = routage conversationnel
+  `vibeflow-dev` → skill `vf-design`) ; les specs de `vf-crafter` ne sont jamais implémentées ; la
+  description de `vf-design-manager` revendique un dispatch par `vf-auto` qui n'existe pas. Étude +
+  7 tests empiriques (2026-07-27) : option A retenue — étages croisés sous UN manager, imbrication
+  manager→manager interdite (Pattern A prouvé bloquant), DAG hétérogène déjà supporté par le kernel.
 - 2026-07-26 : **Phase 13 redéfinie sans verbe-façade** — la phase était écrite autour de `/vf-ingest`
   et du cycle `vf-brainstorm → vf-ingest → vf-plan → vf-execute`, supprimés en v2.33.0. BRDG-01..03 et
   les critères de succès réécrits : ingestion portée par l'agent `vibeflow-dev`, découverte outillée
