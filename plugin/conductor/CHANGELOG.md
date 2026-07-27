@@ -1,5 +1,10 @@
 # Changelog — conductor
 
+## [v1.14.3] — 2026-07-27
+
+### Corrigé
+- `guard-agent-write.sh` : sous Linux (TMPDIR non défini + `set -u`), un `$TMPDIR` non échappé dans un commentaire du bloc python — chaîne bash double-quotée — avortait TOUTE la commande : le guard devenait muet (fail-open) et ne déniait plus jamais un agent non conforme. Reproduit sous ubuntu:24.04 (T11 de test-check-agents), commentaire reformulé sans dollar nu.
+
 ## [v1.14.2] — 2026-07-26
 
 ### Ajouté

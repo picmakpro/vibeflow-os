@@ -63,7 +63,9 @@ if (not (parent == \".claude/agents\" or parent.endswith(\"/.claude/agents\"))
 # En install user-scope le hook s applique partout — un agent personnel (~/.claude/agents)
 # ou un autre projet ne doit pas etre denie par la doctrine de ce lab.
 # realpath des DEUX cotes : getcwd() resout les symlinks mais pas abspath(fp) — sur macOS
-# /var → /private/var, un lab sous $TMPDIR serait sinon vu hors de lui-meme (fail-open a tort).
+# /var → /private/var, un lab sous le tmpdir systeme serait sinon vu hors de lui-meme
+# (fail-open a tort). NB : ce bloc python est une chaine bash DOUBLE-QUOTEE — aucun dollar
+# nu ici (TMPDIR non defini + set -u sur Linux avortait toute la commande, guard muet).
 try:
     if not (os.path.realpath(fp) + \"/\").startswith(os.path.realpath(os.getcwd()) + \"/\"):
         sys.exit(0)
