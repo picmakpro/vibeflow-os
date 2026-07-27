@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
-current_phase: 13
-current_phase_name: shippée `v2.37.0`** — milestone vf-routing CLOS
+current_phase: 15
+current_phase_name: Collaboration inter-équipes dev ↔ design — livrée, release racine en attente
 status: awaiting-release
-stopped_at: Phase 15 context gathered
-last_updated: "2026-07-27T14:40:53.529Z"
-last_activity: "2026-07-26 (mission d'équipe : exécution complète de la Phase 13)"
+stopped_at: Phase 15 delivered — root VERSION bump + tag pending human approval
+last_updated: "2026-07-27T18:30:00.000Z"
+last_activity: "2026-07-27 (mission d'équipe : exécution complète de la Phase 15)"
 progress:
   total_phases: 14
   completed_phases: 7
@@ -27,6 +27,22 @@ sur `@opengsd/gsd-core@^1`. Plus aucun milestone ouvert. Chantiers candidats : s
 d'expérimental de `mobile-test`(-team), dette backlog (known-versions.txt, brick_routed).
 
 ## Current Position
+
+Phase: 15 **complète — livrée sur `main`, EN ATTENTE DE RELEASE RACINE**
+Collaboration inter-équipes dev ↔ design (option A : étages croisés sous un seul manager). Livrée en
+mission d'équipe le 2026-07-27 : 16 commits, 18 fichiers, +406/−38. Success Criteria 1 à 4 tenus ;
+**SC5 partiellement** — les suites couvrent le scénario croisé et sont vertes (43 dev · 12 design ·
+36 dag · 26 driver-lock, 0 KO), mais la release racine + tag annoté reste à faire sous validation
+humaine. Modules bumpés : `conductor` v1.14.6 · `design-orchestrator` v1.3.0 · `dev-orchestrator` v2.4.0.
+`VERSION` racine volontairement **intouchée** (v2.39.0, taggée).
+Status: Phase livrée et vérifiée — release racine en attente de feu vert.
+Last activity: 2026-07-27 (mission d'équipe : exécution complète de la Phase 15)
+
+**Reliquat à arbitrer (remonté en mission, non exécuté)** : écrire le lint `Agent(...)` manquant dans
+`check-agents.sh`, et scoper l'accès `Agent` de `vf-coder`/`vf-reviewer`/`vf-auditer`. Voir §Decisions
+du 2026-07-27 et `.planning/codebase/CONCERNS.md`.
+
+---
 
 Phase: 13 **complète — shippée `v2.37.0`** — milestone vf-routing CLOS
 Plans: 13-01 ✅ (découverte outillée, BRDG-02) · 13-02 ✅ (câblage agent, BRDG-01/BRDG-03).
@@ -120,6 +136,38 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
 
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
+
+- **2026-07-27 — Le cloisonnement `Agent(...)` n'est PAS linté par `check-agents.sh`** (mission Phase 15,
+  établi empiriquement, pas déduit). Le cadrage de la phase et `team-kernel.md` affirmaient
+  « anti-triche machine-enforced, linté par `check-agents.sh` ». Faux : ce script ne teste que la
+  *présence* du champ `tools:` (`check-agents.sh:235-236`), jamais son contenu — le frontmatter est
+  stocké comme chaîne opaque. Quatre agents fabriqués avec une allowlist de noms inventés, une
+  parenthèse non fermée et des outils inexistants passent tous `--strict` en vert, exit 0. Décision :
+  l'affirmation a été corrigée partout (`team-kernel.md`, `conductor/README.md`, `mission-cross-team.md`),
+  et l'enforcement réel de D-07 passe par les suites de module (T18 dev, T8 design), seule vérification
+  machine du contenu de `tools:` dans tout le repo. **Écrire le lint manquant dans `check-agents.sh`
+  reste à arbitrer** — extension de périmètre sur un script de gate partagé, non exécutée en mission.
+  Piège à connaître si on l'écrit un jour : `general-purpose` est un type natif sans fichier `.md`, et
+  les agents `gsd-*` viennent de `@opengsd/gsd-core` — absents d'un lab sans GSD. Un lint exigeant
+  `<agents-dir>/<nom>.md` rendrait rouges des allowlists correctes.
+
+- **2026-07-27 — Un recensement de dispatches doit inclure les skills non forkées** (mission Phase 15,
+  après deux omissions successives). Aucune skill de `~/.claude/skills/` ne déclare `context:` : aucune
+  n'est donc forkée, et chacune exécute ses `Agent()` **dans le contexte de l'agent qui l'invoque**. Un
+  manager qui appelle `gsd-ingest-docs`, `gsd-plan-phase`, `gsd-docs-update` ou `gsd-audit-milestone`
+  dispatche donc lui-même `gsd-doc-classifier`, `gsd-doc-synthesizer`, `gsd-pattern-mapper`,
+  `gsd-integration-checker`… qui doivent figurer dans SON allowlist. Le premier recensement de la
+  mission a livré 7 noms, le second 14, un audit indépendant 18. Conséquence de méthode : sur ce type
+  d'inventaire, la seconde dérivation doit être **indépendante** (interdiction de lire la première),
+  sinon elle recopie l'angle mort au lieu de le corriger.
+
+- **2026-07-27 — Portée réelle de l'interdiction d'imbrication manager→manager** (mission Phase 15).
+  Les allowlists des deux managers ferment le chemin de dispatch **direct**. Le chemin **indirect**
+  (`manager → worker → manager`) reste ouvert au niveau du dispatch : `vf-coder`, `vf-reviewer` et
+  `vf-auditer` portent `Agent` nu. La garantie qu'un seul manager pilote une mission est portée par le
+  **verrou de driver**, qui refuse la seconde acquisition quel que soit le chemin (T1 de l'étude,
+  `test-driver-lock.sh` T2) — pas par les allowlists. Dette consignée dans `.planning/codebase/CONCERNS.md` ;
+  scoper l'accès `Agent` de ces trois workers est une extension de périmètre non exécutée (ADR-031).
 
 - **2026-07-26 — Résolution de `gsd-tools` par CASCADE, jamais par chemin en dur** (mission Phase 11,
   tranchée sur panel de recherche documentaire). Le dossier d'étude prescrivait

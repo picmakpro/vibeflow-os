@@ -420,8 +420,14 @@ déjà publiée de `vf-design-manager`.
   5. Tests : les suites des deux modules couvrent le scénario croisé (DAG mixte, reopen cross-métier,
      interdiction d'imbrication) et restent vertes ; release bumpée + tag annoté poussé
      (`check-release-tag.sh --remote` → ✓).
-**Plans:** 0 plans
+**Plans:** livrée en mission d'équipe (DAG de mission, 2026-07-27) — pas de PLAN.md par plan
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 15 to break down)
+- [x] Contrats et doctrine croisée — `mission-contracts.md` (champs de brief `design:`/`livrable:`, digest croisé), nouvelle référence `mission-cross-team.md`, « Pattern D » de renvoi, table `team-kernel.md`
+- [x] Étages croisés sur les deux managers — étage design dans `vf-dev-manager`, étage implémentation dans `vf-design-manager`, allowlists `Agent(...)` (18 et 6 noms)
+- [x] Aiguillage et descriptions — `vf-auto` D-11, dispatch élargi des 4 workers, signaux de mission des deux `AGENT.md`
+- [x] Tests croisés — T18/T18b (dev), T8/T8b + T4 durci (design), T12 (DAG hétérogène cross-métier), chacun prouvé discriminant par mutation
+- [x] Portée réelle du cloisonnement — garantie attribuée au verrou de driver, dette `Agent` non scopé des workers consignée dans CONCERNS.md
+- [x] Bumps par module — conductor v1.14.6, design-orchestrator v1.3.0, dev-orchestrator v2.4.0
+- [ ] **Release racine + tag annoté + release GitHub** — réservé à la validation humaine (Success Criterion 5, seul reliquat)
