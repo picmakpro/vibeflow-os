@@ -1,5 +1,18 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.3.0] — 2026-07-27 (étage implémentation croisée, Phase 15)
+
+### Ajouté
+- **Étage implémentation** : `vf-design-manager` peut désormais dispatcher `vf-coder` en aval
+  du craft, en opt-in par brief (`livrable: specs+implementation`) — la spec produite par
+  `vf-crafter` sert de cadrage à l'implémentation, avec double juge parallèle
+  (`vf-design-judge` re-score le rendu ∥ `vf-reviewer` relit le diff) et budgets séparés 3+3
+  tours par écran. Comble le trou « specs jamais implémentées ». Porte aussi la recherche
+  documentaire ADR-045 pour `vf-coder`, qui n'a pas d'accès web.
+- Allowlist `Agent(...)` de `vf-design-manager` portée à 6 noms ; descriptions de
+  `vf-crafter`/`vf-design-judge` élargies au dispatch par les deux managers.
+- Suite de tests : T8/T8b (allowlist, doctrine d'étage implémentation croisée) + T4 durci.
+
 ## [v1.2.2] — 2026-07-26
 
 ### Modifié
