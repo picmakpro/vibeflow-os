@@ -133,8 +133,10 @@ else
   echo "$ct" | "$GREP" -qE 'Write' || { ko "T4 cloisonnement : le crafter sans Write (il doit produire)"; t4_ok=0; }
 fi
 mt="$(tools_line "$MANAGER")"
-echo "$mt" | "$GREP" -qE 'Agent' || { ko "T4 cloisonnement : le manager sans Agent (il doit dispatcher la frontière)"; t4_ok=0; }
-[ "$t4_ok" -eq 1 ] && ok "T4 cloisonnement : juge sans Write/Edit/Task, crafter sans Task, manager avec Agent"
+# Durci Phase 15 (D-07) : un simple "Agent" nu passait ce test avant l'allowlist — désormais on
+# exige l'allowlist Agent( ) elle-même (le contenu est vérifié en détail par T8 ci-dessous).
+echo "$mt" | "$GREP" -qF 'Agent(' || { ko "T4 cloisonnement : le manager sans allowlist Agent( ) (il doit dispatcher la frontière, scopée)"; t4_ok=0; }
+[ "$t4_ok" -eq 1 ] && ok "T4 cloisonnement : juge sans Write/Edit/Task, crafter sans Task, manager avec allowlist Agent( )"
 
 # ---------------------------------------------------------------------------
 # T5 — Câblage team-kernel dans le manager (lock + DAG + digest + vert design)
@@ -200,6 +202,42 @@ if [ "$skills_over" -eq 0 ] && [ "$skills_total" -ge 1 ]; then
 elif [ "$skills_total" -eq 0 ]; then
   skip "T7 densité skills : aucun skill du module trouvé dans cette disposition"
 fi
+
+# ---------------------------------------------------------------------------
+# T8 — Cloisonnement par tools (Pattern 12) : allowlist Agent(...) du manager (Phase 15, D-07)
+# ---------------------------------------------------------------------------
+# check-agents.sh NE LINTE PAS le contenu du champ tools: (vérifié empiriquement — une allowlist
+# avec des noms inventés ou une parenthèse non fermée passe --strict en vert). Ces asserts sont
+# donc la SEULE vérification machine du cloisonnement D-07 (Pattern A : imbrication
+# manager→manager interdite) pour ce module.
+T8_ALLOWED="vf-crafter vf-design-judge vf-coder vf-reviewer general-purpose gsd-phase-researcher"
+t8_ok=1
+dmt="$(tools_line "$MANAGER")"
+if [ -z "$dmt" ]; then
+  ko "T8 cloisonnement : vf-design-manager sans ligne tools: (hériterait de TOUT)"; t8_ok=0
+else
+  # Allowlist Agent(...) et non Agent nu.
+  bare="$(echo "$dmt" | "$GREP" -oE 'Agent([^(]|$)')"
+  [ -z "$bare" ] || { ko "T8 cloisonnement : vf-design-manager a un Agent nu (pas d'allowlist)"; t8_ok=0; }
+  echo "$dmt" | "$GREP" -qF 'Agent(' || { ko "T8 cloisonnement : aucune allowlist Agent( ) trouvée"; t8_ok=0; }
+  # Chacun des 6 noms attendus, testé UN PAR UN (jamais un grep global satisfait par le premier).
+  for name in $T8_ALLOWED; do
+    echo "$dmt" | "$GREP" -qF -- "$name" || { ko "T8 cloisonnement : « $name » absent de l'allowlist du manager design"; t8_ok=0; }
+  done
+  # Interdit structurel : vf-dev-manager JAMAIS dans l'allowlist (imbrication manager→manager).
+  echo "$dmt" | "$GREP" -qF -- "vf-dev-manager" && { ko "T8 cloisonnement : vf-dev-manager présent dans l'allowlist (imbrication manager→manager)"; t8_ok=0; }
+  # Parenthèse d'allowlist fermée en fin de ligne.
+  echo "$dmt" | "$GREP" -qE '\)[[:space:]]*$' || { ko "T8 cloisonnement : allowlist non fermée (parenthèse manquante en fin de ligne)"; t8_ok=0; }
+fi
+[ "$t8_ok" -eq 1 ] && ok "T8 cloisonnement : allowlist Agent(...) complète (6 noms), vf-dev-manager absent, parenthèse fermée"
+
+# T8b — Success Criterion 2 : doctrine étage implémentation croisée (opt-in, double juge, 3+3)
+t8b_ok=1
+"$GREP" -qi 'Étage implémentation croisée' "$MANAGER" || { ko "T8b SC2 : doctrine étage implémentation absente de vf-design-manager.md"; t8b_ok=0; }
+"$GREP" -q 'specs+implementation' "$MANAGER" || { ko "T8b SC2 : opt-in livrable specs+implementation absent"; t8b_ok=0; }
+"$GREP" -qi 'double juge' "$MANAGER" || { ko "T8b SC2 : double juge parallèle absent"; t8b_ok=0; }
+"$GREP" -q '3+3' "$MANAGER" || { ko "T8b SC2 : budgets 3+3 absents"; t8b_ok=0; }
+[ "$t8b_ok" -eq 1 ] && ok "T8b doctrine : étage implémentation croisée (SC2 — opt-in, double juge, budgets 3+3) présente"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
