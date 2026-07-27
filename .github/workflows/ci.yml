@@ -82,6 +82,34 @@ jobs:
           echo "== $found dossier(s) d'agents vérifié(s), $fail échec(s) =="
           [ "$fail" -eq 0 ]
 
+      - name: check-agents --resolve-agents=strict (monde fermé — union de tous les plugin/*/agents)
+        # Le monde fermé n'est légitime qu'ici : la CI est le seul endroit où l'univers complet des
+        # agents du repo est connu (cf. en-tête check-agents.sh). Chaque run par module ci-dessus
+        # reste en lenient par défaut (ne pas durcir : c'est ce qui évite de rejouer les 66 faux
+        # positifs tracés dans .planning/codebase/CONCERNS.md:52-59) — cette étape est un run
+        # SUPPLÉMENTAIRE, indépendant du run lenient au-dessus.
+        run: |
+          set -u
+          registry_args=()
+          for d in plugin/*/agents; do
+            [ -d "$d" ] || continue
+            registry_args+=("--agent-registry-dir=$d")
+          done
+          found=0
+          fail=0
+          for d in plugin/*/agents; do
+            [ -d "$d" ] || continue
+            found=$((found + 1))
+            echo "== monde fermé : $d =="
+            bash plugin/conductor/scripts/check-agents.sh --strict --resolve-agents=strict --agents-dir="$d" "${registry_args[@]}" || fail=$((fail + 1))
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "::error::aucun dossier plugin/*/agents découvert — la CI refuse de rendre un verdict vide"
+            exit 1
+          fi
+          echo "== $found dossier(s) vérifiés en monde fermé, $fail échec(s) =="
+          [ "$fail" -eq 0 ]
+
       - name: check-version-sync (canon VERSION ↔ plugin.json ↔ marketplace ↔ badges ↔ triade par module)
         run: bash scripts/check-version-sync.sh
 
