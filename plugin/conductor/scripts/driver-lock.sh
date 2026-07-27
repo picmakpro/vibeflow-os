@@ -48,7 +48,10 @@ meta_get() { [ -f "$META" ] && grep "^$1=" "$META" 2>/dev/null | head -1 | cut -
 lock_age() {
   local hb; hb="$(meta_get heartbeat_epoch)"
   case "$hb" in ''|*[!0-9]*) hb="" ;; esac
-  [ -z "$hb" ] && hb="$(stat -f %m "$LOCK_DIR" 2>/dev/null || stat -c %Y "$LOCK_DIR" 2>/dev/null || now)"
+  # GNU (-c) AVANT BSD (-f) : sur GNU, `stat -f` = mode filesystem — il imprime un bloc
+  # multi-lignes sur stdout PUIS échoue, et la substitution capturait bloc + fallback
+  # (hb non numérique → staleness jamais détectée). BSD échoue proprement sur -c.
+  [ -z "$hb" ] && hb="$(stat -c %Y "$LOCK_DIR" 2>/dev/null || stat -f %m "$LOCK_DIR" 2>/dev/null || now)"
   echo "$(( $(now) - hb ))"
 }
 

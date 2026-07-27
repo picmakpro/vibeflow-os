@@ -1,5 +1,10 @@
 # Changelog — conductor
 
+## [v1.14.4] — 2026-07-27
+
+### Corrigé
+- `driver-lock.sh` : le fallback mtime testait `stat -f %m` (BSD) avant `stat -c %Y` (GNU). Sur Linux, `stat -f` = mode *filesystem* : il imprime un bloc multi-lignes puis échoue, la substitution capturait bloc + fallback → heartbeat non numérique → un lock au meta vide restait « frais éternel » (T12.1/T12.2/T13.1 rouges en CI). Ordre inversé : GNU d'abord, BSD échoue proprement sur `-c`. Reproduit sous ubuntu:24.04.
+
 ## [v1.14.3] — 2026-07-27
 
 ### Corrigé
