@@ -7,9 +7,10 @@
 > (T3 : DAG mixte `craft:écran → exec → (critique:écran ∥ revue-code)` ; T4 : reopen cross-métier).
 > Option A retenue : étages croisés **sous un seul manager** — un seul verrou de driver, un seul
 > DAG, un seul rapport de mission. L'imbrication manager→manager reste **interdite** (Pattern A,
-> T1 : `acquire` refusé) ; cette interdiction devient machine-enforced (allowlists `Agent(...)`
-> des deux managers, Pattern 12, `check-agents.sh`) sur le nœud D-07 dédié de cette phase — pas
-> encore livré à cette étape.
+> T1 : `acquire` refusé) ; cette interdiction est machine-enforced (allowlists `Agent(...)` des
+> deux managers, Pattern 12) depuis le nœud D-07 de cette phase — vérifiée par les suites de test
+> des modules (`test-dev-orchestrator.sh` T18, `test-design-orchestrator.sh` T8), pas par
+> `check-agents.sh` qui ne valide que la présence et la forme du champ `tools:`, jamais son contenu.
 
 ---
 
@@ -81,8 +82,10 @@
 - **Un seul rapport de mission** — le manager qui pilote synthétise, quel que soit le nombre de
   métiers touchés dans la mission.
 - **Jamais de manager qui en dispatche un autre** — l'imbrication manager→manager est bloquée
-  par construction (Pattern A, T1) ; à durcir en machine-enforced (allowlists `Agent(...)` des
-  deux managers, Pattern 12, `check-agents.sh`) par le nœud D-07 dédié de cette phase.
+  par construction (Pattern A, T1) et machine-enforced depuis le nœud D-07 (allowlists
+  `Agent(...)` des deux managers, Pattern 12), vérifiée par les suites de test des modules
+  (`test-dev-orchestrator.sh` T18, `test-design-orchestrator.sh` T8) — pas par `check-agents.sh`,
+  qui ne valide que le frontmatter, jamais le contenu du champ `tools:`.
 
 ---
 
