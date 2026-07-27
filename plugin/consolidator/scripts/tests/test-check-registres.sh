@@ -10,6 +10,8 @@
 # T7 — --hook : exit 0 même non conforme, sortie compacte signalant le problème
 # T8 (CSL-16) — registre conforme à gros préambule (150 lignes) → exit 0 (head -40/-60 le rejetait)
 # T9 (CSL-01) — '## Index' sans ligne '---' de fermeture → exit 1 (reindex refuserait la réécriture)
+# T11 — --strict --allow-empty (Gate C lab frais) : lab vierge → exit 3 (INDÉTERMINÉ) ;
+#       présence partielle → exit 1 inchangé ; sans le flag, lab vierge → exit 1 (historique)
 
 set -uo pipefail
 
@@ -230,6 +232,29 @@ if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "sans ligne '---' de fermeture"; the
   ok "T9 (CSL-01) index sans terminateur '---' → exit 1 + signalement"
 else
   ko "T9 (CSL-01) attendu exit 1 + message terminateur (rc=$RC, out=${OUT:-<vide>})"
+fi
+
+# T11 — --strict --allow-empty : verdict INDÉTERMINÉ (exit 3) réservé au lab VIERGE
+M11="$WORK/t11"; mkdir -p "$M11"
+OUT="$(bash "$CHECK" --strict --allow-empty --memory-dir="$M11" 2>/dev/null)"; RC=$?
+if [ "$RC" -eq 3 ] && echo "$OUT" | grep -q "lab vierge"; then
+  ok "T11a --strict --allow-empty + aucun registre → exit 3 (INDÉTERMINÉ)"
+else
+  ko "T11a attendu exit 3 + message lab vierge (rc=$RC, out=${OUT:-<vide>})"
+fi
+conforming_register "$M11/DECISIONS.md" "DEC"
+bash "$CHECK" --strict --allow-empty --memory-dir="$M11" >/dev/null 2>&1; RC=$?
+if [ "$RC" -eq 1 ]; then
+  ok "T11b --strict --allow-empty + présence partielle → exit 1 (vrai lab incomplet)"
+else
+  ko "T11b attendu exit 1 (rc=$RC)"
+fi
+M11c="$WORK/t11c"; mkdir -p "$M11c"
+bash "$CHECK" --strict --memory-dir="$M11c" >/dev/null 2>&1; RC=$?
+if [ "$RC" -eq 1 ]; then
+  ok "T11c --strict sans --allow-empty + lab vierge → exit 1 (historique inchangé)"
+else
+  ko "T11c attendu exit 1 (rc=$RC)"
 fi
 
 echo ""

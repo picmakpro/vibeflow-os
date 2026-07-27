@@ -6,6 +6,7 @@
 # Usage:
 #   check-registres.sh                       # lint les registres présents · exit 1 si non conforme
 #   check-registres.sh --strict              # GATE init : exige AUSSI l'existence des 5 registres canon
+#   check-registres.sh --strict --allow-empty  # Gate C lab frais : AUCUN registre → exit 3 (INDÉTERMINÉ)
 #   check-registres.sh --hook                # SessionStart : informatif, sortie compacte, exit 0 toujours
 #   check-registres.sh --memory-dir=PATH     # défaut .claude/memory
 #
@@ -27,16 +28,19 @@
 # registres canon restent exigés ; profil absent/illisible → comportement historique (EVALS requis).
 #
 # Codes de sortie : 0 = conforme · 1 = non conforme (ou registre canon manquant en --strict)
+#                 · 3 = lab vierge sous --strict --allow-empty (verdict INDÉTERMINÉ ≠ vert, doctrine F13)
 
 set -uo pipefail
 
 MEMORY_DIR="${MEMORY_DIR:-.claude/memory}"
 STRICT=false
 HOOK_MODE=false
+ALLOW_EMPTY=false
 
 for arg in "$@"; do
   case "$arg" in
     --strict)        STRICT=true ;;
+    --allow-empty)   ALLOW_EMPTY=true ;;
     --hook)          HOOK_MODE=true ;;
     --memory-dir=*)  MEMORY_DIR="${arg#*=}" ;;
     -h|--help)       grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
@@ -121,6 +125,12 @@ for name in $ALL_KNOWN; do
 done
 
 # ---------- Strict : les 5 registres canon doivent exister ----------
+# --allow-empty (Gate C lab frais) : AUCUN registre = lab jamais initialisé → verdict
+# INDÉTERMINÉ (exit 3), pas une non-conformité. Présence PARTIELLE = vrai lab incomplet → 1.
+if [ "$STRICT" = true ] && [ "$ALLOW_EMPTY" = true ] && [ "$found_any" = false ]; then
+  echo "[check-registres] ∅ aucun registre dans $MEMORY_DIR — lab vierge, verdict indéterminé (--allow-empty)"
+  exit 3
+fi
 if [ "$STRICT" = true ]; then
   declare_missing() { PROBLEMS+=("registre canon manquant : $MEMORY_DIR/$1.md"); }
   [ -f "$MEMORY_DIR/DECISIONS.md" ] || { { [ -f "$MEMORY_DIR/ADR.md" ] || [ -f "$MEMORY_DIR/BDR.md" ]; } && WARNINGS+=("DECISIONS.md absent — legacy ADR/BDR présent (migration conseillée : /vf-calibrate)") || declare_missing "DECISIONS"; }

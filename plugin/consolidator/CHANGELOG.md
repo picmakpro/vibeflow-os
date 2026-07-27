@@ -1,5 +1,10 @@
 # CHANGELOG — consolidator
 
+## [v1.8.1] — 2026-07-27
+
+### Corrigé
+- `check-registres.sh` : flag `--allow-empty` implémenté (il était appelé par le job CI « Lab frais » mais rejeté en « arg inconnu » → rc=1). En `--strict --allow-empty`, un lab VIERGE (aucun registre) rend exit 3 (verdict INDÉTERMINÉ ≠ vert, doctrine F13) au lieu de 1 ; présence partielle → exit 1 inchangé. Tests T11a/b/c ajoutés.
+
 ## [v1.8.0] — 2026-07-26
 
 ### Ajouté
