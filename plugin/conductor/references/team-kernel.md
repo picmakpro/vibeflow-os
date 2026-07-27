@@ -20,7 +20,7 @@
 | **Rapports typés** (Pattern C) | `{ statut: passed\|gaps_found\|human_needed\|blocked, findings[{severity, action: auto-fix\|no-op\|ask-user, ref}], noeuds_debloques[] }` | fin de l'interprétation de prose ; escalade humaine impérative sur `ask-user` |
 | **Halt conditions** | 5 codes (P11) : boucle sans progrès · action destructive · ressource manquante · budget épuisé · drift de scope | l'humain arbitre en 30 s sur un message structuré |
 | **Digest de mission** | ≤ 30 lignes injectées dans chaque mandat (le disque fait foi) | amortit les relectures de contexte par étage |
-| **Cloisonnement par tools** (P12) | juges sans Write/Edit ; workers sans Task ; allowlist `Agent(...)` ; `vf-internal: true` | anti-triche vérifié par les suites de test de chaque module (contenu de l'allowlist) — `check-agents.sh` linte le frontmatter (présence du champ `tools:`), jamais son contenu |
+| **Cloisonnement par tools** (P12) | juges sans Write/Edit ; la plupart des workers sans Task ; allowlist `Agent(...)` sur les managers ; `vf-internal: true` | anti-triche vérifié par les suites de test de chaque module (contenu de l'allowlist) — `check-agents.sh` linte le frontmatter (présence du champ `tools:`), jamais son contenu. Exception connue : `vf-coder`/`vf-reviewer`/`vf-auditer` gardent un `Agent` non scopé (dette suivie, cf. « Étages croisés » ci-dessous) |
 
 ## Ce que chaque métier paramètre (et RIEN d'autre)
 
@@ -59,12 +59,17 @@
 | Design | design-orchestrator | `vf-design-manager` | `vf-crafter` (+ `vf-coder` en étage implémentation croisé) | `vf-design-judge` (+ `vf-reviewer` en étage implémentation croisé) | critique scorée ≥ seuil contre la DA (+ revue PASS si implémentation) |
 
 Étages croisés (Phase 15) : chaque manager peut dispatcher des workers/juges de l'autre métier —
-JAMAIS l'autre manager (Pattern A, prouvé bloquant par test T1). Cette interdiction est
-machine-enforced par les allowlists `Agent(...)` des deux managers (`vf-dev-manager` exclut
-`vf-design-manager`, et réciproquement), vérifiées par les suites de test des modules (T18 côté
-dev-orchestrator, T8 côté design-orchestrator) — `check-agents.sh` ne linte que le frontmatter
-(présence du champ `tools:`), jamais son contenu. Le lock, le DAG et le rapport restent uniques,
-portés par le seul manager de la mission.
+JAMAIS l'autre manager (Pattern A, prouvé bloquant par test T1). Deux lignes de défense, de portées
+différentes : (1) les allowlists `Agent(...)` des deux managers (`vf-dev-manager` exclut
+`vf-design-manager`, et réciproquement — T18 côté dev-orchestrator, T8 côté design-orchestrator)
+ferment le chemin **direct** manager→manager ; (2) le **verrou de driver** garantit l'invariant en
+toutes circonstances, y compris par chemin **indirect** (`manager → worker → manager`) : un second
+manager tentant `acquire` se le voit refusé tant que le premier pilote (T1 ; couvert en continu par
+`test-driver-lock.sh` T2). Cette seconde ligne comble une limite connue de la première — `vf-coder`,
+`vf-reviewer` et `vf-auditer` gardent un `Agent` non scopé, donc le niveau 1 ne couvre pas encore le
+chemin indirect (dette suivie, cf. `.planning/codebase/CONCERNS.md`). Dans tous les cas,
+`check-agents.sh` ne linte que le frontmatter (présence du champ `tools:`), jamais son contenu. Le
+lock, le DAG et le rapport restent uniques, portés par le seul manager de la mission.
 
 Doctrine détaillée côté dev (le protocole complet de mission) :
 `dev-orchestrator-references/mission-flow.md` — c'est la référence d'usage du kernel. Doctrine

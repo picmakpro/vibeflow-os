@@ -7,10 +7,13 @@
 > (T3 : DAG mixte `craft:écran → exec → (critique:écran ∥ revue-code)` ; T4 : reopen cross-métier).
 > Option A retenue : étages croisés **sous un seul manager** — un seul verrou de driver, un seul
 > DAG, un seul rapport de mission. L'imbrication manager→manager reste **interdite** (Pattern A,
-> T1 : `acquire` refusé) ; cette interdiction est machine-enforced (allowlists `Agent(...)` des
-> deux managers, Pattern 12) depuis le nœud D-07 de cette phase — vérifiée par les suites de test
-> des modules (`test-dev-orchestrator.sh` T18, `test-design-orchestrator.sh` T8), pas par
-> `check-agents.sh` qui ne valide que la présence et la forme du champ `tools:`, jamais son contenu.
+> T1 : `acquire` refusé). Deux lignes de défense depuis le nœud D-07 : les allowlists `Agent(...)`
+> des deux managers (Pattern 12, `test-dev-orchestrator.sh` T18, `test-design-orchestrator.sh` T8)
+> ferment le chemin direct manager→manager ; le **verrou de driver** (T1, couvert en continu par
+> `test-driver-lock.sh` T2) garantit l'invariant même par chemin indirect
+> (`manager → worker → manager`), ce qui compte puisque `vf-coder`/`vf-reviewer`/`vf-auditer`
+> gardent un `Agent` non scopé (dette suivie, `.planning/codebase/CONCERNS.md`). Dans tous les cas,
+> `check-agents.sh` ne valide que la présence et la forme du champ `tools:`, jamais son contenu.
 
 ---
 
@@ -82,10 +85,14 @@
 - **Un seul rapport de mission** — le manager qui pilote synthétise, quel que soit le nombre de
   métiers touchés dans la mission.
 - **Jamais de manager qui en dispatche un autre** — l'imbrication manager→manager est bloquée
-  par construction (Pattern A, T1) et machine-enforced depuis le nœud D-07 (allowlists
-  `Agent(...)` des deux managers, Pattern 12), vérifiée par les suites de test des modules
-  (`test-dev-orchestrator.sh` T18, `test-design-orchestrator.sh` T8) — pas par `check-agents.sh`,
-  qui ne valide que le frontmatter, jamais le contenu du champ `tools:`.
+  par construction (Pattern A, T1). Depuis le nœud D-07, les allowlists `Agent(...)` des deux
+  managers (Pattern 12, `test-dev-orchestrator.sh` T18, `test-design-orchestrator.sh` T8) ferment
+  le chemin **direct**. La garantie qui tient en toutes circonstances, y compris par chemin
+  **indirect** (`manager → worker → manager` — `vf-coder`/`vf-reviewer`/`vf-auditer` gardent un
+  `Agent` non scopé, dette suivie), c'est le **verrou de driver** : un second `acquire` est refusé
+  tant que le premier manager pilote (T1, couvert en continu par `test-driver-lock.sh` T2). Ni l'un
+  ni l'autre n'est vérifié par `check-agents.sh`, qui ne valide que le frontmatter, jamais le
+  contenu du champ `tools:`.
 
 ---
 

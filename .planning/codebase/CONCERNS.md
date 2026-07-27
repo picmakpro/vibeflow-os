@@ -87,6 +87,24 @@
 - Impact: le backlog perd sa valeur de radar si les déclencheurs ne sont pas honorés.
 - Fix approach: ré-arbitrage explicite (reprendre / re-différer avec nouveau déclencheur / abandonner).
 
+**Accès `Agent` non scopé sur trois workers de l'équipe dev** — Sévérité : **MEDIUM**
+- Issue: `vf-coder`, `vf-reviewer` et `vf-auditer` déclarent `tools: …, Agent` sans allowlist
+  (Phase 15 a posé des allowlists sur les deux managers, pas sur ces workers). Le chemin de dispatch
+  **direct** manager→manager est fermé, mais rien n'empêche ces workers d'appeler
+  `Task(vf-dev-manager)` / `Task(vf-design-manager)` au niveau du dispatch — le chemin **indirect**
+  reste ouvert à ce niveau. L'invariant « un seul manager actif » tient quand même, mais par un
+  autre mécanisme : le verrou de driver refuse l'`acquire` du second manager (T1,
+  `test-driver-lock.sh` T2).
+- Files: `plugin/dev-orchestrator/agents/vf-coder.md:4`, `vf-reviewer.md:4`, `vf-auditer.md:4`
+- Impact: aucun aujourd'hui (le lock couvre), mais c'est une extension de périmètre à traiter sous
+  validation humaine — chacun de ces workers invoque des skills dont il faudrait recenser
+  exhaustivement les agents avant d'écrire une allowlist correcte (deux recensements successifs ont
+  déjà produit 4 omissions sur ce type d'exercice ; une allowlist incomplète casse des dispatches en
+  production silencieusement).
+- Fix approach: recenser exhaustivement les agents atteignables par chaque worker via ses skills
+  internes, puis poser une allowlist `Agent(...)` complète — geste réservé, pas à automatiser sans
+  revue humaine du recensement.
+
 ## Known Bugs
 
 Aucun bug ouvert confirmé sur disque au 2026-07-26. Les comportements gênants connus (survie de
