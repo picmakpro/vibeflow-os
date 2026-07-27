@@ -87,6 +87,10 @@ jobs:
 
       - name: check-release-tag (main uniquement — VERSION doit être taggée et poussée)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        # GH_TOKEN requis : sans lui le gh du runner échoue en auth et le gate lisait cet
+        # échec comme « aucune release » (faux négatif, vécu v2.39.0 le 2026-07-26).
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: bash scripts/check-release-tag.sh --remote
 
   lab-frais:
