@@ -528,9 +528,16 @@ run macOS seul)
 **Plans:** 3 plans
 
 Plans:
+**Wave 1**
 
 - [ ] 17-01-PLAN.md — Tranche traçante : `check-dev-bootstrap.sh` (continuum à 4 états) + fragment `hooks/hooks.json`, prouvé de bout en bout sur ce dépôt (vague 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 17-02-PLAN.md — Expansion : `check-doc-drift.sh` (seuil réglable, silence hors git) + `discover-unintegrated-docs.sh --hook` strictement additif (vague 2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 17-03-PLAN.md — Doctrine `AGENT.md`, gates T20/T21 falsifiables (ADR-044, SC5), preuve de portabilité Linux en conteneur, module `v2.5.0` (vague 3)
 
 ### Phase 18: Capability living-specs (conventions OpenSpec)

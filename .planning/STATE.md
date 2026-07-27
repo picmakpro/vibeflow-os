@@ -6,12 +6,12 @@ current_phase: 15
 current_phase_name: Collaboration inter-équipes dev ↔ design — shippée `v2.40.0`
 status: shipped
 stopped_at: Phase 15 shipped (v2.40.0 taggée + release GitHub) — Phase 16 inscrite, non démarrée
-last_updated: "2026-07-27T19:15:00.000Z"
-last_activity: "2026-07-27 (release v2.40.0 publiée + Phase 16 inscrite à la roadmap)"
+last_updated: "2026-07-27T20:44:28.399Z"
+last_activity: 2026-07-27 (release v2.40.0 publiée + Phase 16 inscrite)
 progress:
-  total_phases: 16
+  total_phases: 17
   completed_phases: 8
-  total_plans: 43
+  total_plans: 39
   completed_plans: 23
 ---
 
@@ -115,6 +115,7 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
   convention (grammaire delta + merge par bloc Requirement/Scenario) via une capability overlay
   `.gsd/capabilities/` sur `ship:post`, specs sous `.planning/specs/`. Piste amont : RFC/PR vers
   open-gsd/gsd-core une fois la capability éprouvée dans VibeFlow.
+
 - 2026-07-27 : **Phase 17** (Signaux de démarrage du moteur de dev) ajoutée. Spec :
   `docs/superpowers/specs/2026-07-27-signaux-demarrage-dev-design.md`. Constat déclencheur :
   `dev-orchestrator` est le seul module structurant **sans hooks**, donc `discover-unintegrated-docs.sh`
@@ -156,6 +157,19 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
 
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
+
+- **2026-07-27 — Arbitrage humain (Samuel) : SC1 de la Phase 17 amendé, la spec fait foi.**
+  `.planning/ROADMAP.md` §Phase 17 SC1 disait « les trois scripts sortent en 3 et **aucune ligne**
+  n'est injectée […] le coût contexte d'un projet sain est nul ». La spec de référence
+  (`docs/superpowers/specs/2026-07-27-signaux-demarrage-dev-design.md` §4.2 et §7) dit l'inverse :
+  sur un projet sain, **une** ligne `[gsd-engine]` d'orientation est injectée (« 1 ligne, pas 0 »).
+  SC1 tel qu'écrit contredisait aussi SC2 et SC2bis de la **même** entrée ROADMAP, qui exigent ce
+  signal (le trou de routage du 2026-07-27 où une demande de conception est partie sur
+  `superpowers:brainstorming` alors que le projet tournait sous GSD). Arbitrage retenu par Samuel :
+  SC1 devient « les trois scripts sortent en 3 et la **seule** ligne injectée est le `[gsd-engine]`
+  d'orientation ». SC2 et SC2bis restent inchangés. **Ceci est un arbitrage humain daté, pas une
+  initiative d'agent** — appliqué par `vf-coder` (n1 du DAG de mission Phase 17) sur mandat exprès
+  de `vf-dev-manager`, jamais tranché en autonomie.
 
 - **2026-07-27 — Le cloisonnement `Agent(...)` n'est PAS linté par `check-agents.sh`** (mission Phase 15,
   établi empiriquement, pas déduit). Le cadrage de la phase et `team-kernel.md` affirmaient
