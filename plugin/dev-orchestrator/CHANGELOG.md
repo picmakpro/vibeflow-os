@@ -1,5 +1,41 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.6.0] — 2026-07-27 (signaux de démarrage du moteur de dev, Phase 17)
+
+### Ajouté
+- **Premier fragment `hooks/hooks.json` du module** : `SessionStart:startup`, 3 commandes
+  tolérantes à l'échec (`|| true`) — `dev-orchestrator` était le seul module structurant sans
+  hooks, `discover-unintegrated-docs.sh` (livré Phase 13) n'était donc jamais appelé
+  automatiquement.
+- **`scripts/check-dev-bootstrap.sh`** (nouveau) : continuum à 4 états mutuellement exclusifs
+  (silence / `[onboard]` / `[bootstrap]` / `[gsd-engine]`), premier qui matche gagne — brownfield
+  non initialisé, bootstrap incomplet (items `config`/`codebase`/`roadmap` restitués en ordre
+  figé), et orientation moteur GSD lue depuis le frontmatter assaini de `.planning/STATE.md`
+  (liste blanche stricte, soupape de sûreté D-04). Contrat de sortie 0/3/64, lecture seule.
+- **`scripts/check-doc-drift.sh`** (nouveau) : dérive documentaire — commits de code depuis le
+  dernier commit ayant touché `docs/**` ou un `README*` racine, seuil réglable `--threshold`
+  (défaut 20). Premier script du module à shell-out vers git, durci systématiquement
+  (`core.fsmonitor=`, `core.hooksPath=/dev/null`, `--no-optional-locks`, variables
+  `GIT_CONFIG_NOSYSTEM`/`GIT_TERMINAL_PROMPT`/`GIT_OPTIONAL_LOCKS`).
+- **`scripts/discover-unintegrated-docs.sh --hook`** (extension additive) : ligne agrégée
+  `[docs-ingest] N documents…` au lieu de la liste — le contrat historique (`grain<TAB>chemin`,
+  exits 0/3/64, sans `--hook`) reste strictement inchangé, prouvé non-régressif octet pour octet.
+- **3 nouvelles suites de test** : `test-check-dev-bootstrap.sh` (23 assertions),
+  `test-check-doc-drift.sh` (21 assertions, fixtures git réelles), extension de
+  `test-discover-unintegrated-docs.sh` (16 cas historiques + 6 cas `--hook`, 22 au total).
+- **`AGENT.md`** : section « Signaux de démarrage » (4 lignes : `[bootstrap]`, `[onboard]`,
+  `[gsd-engine]`, `[doc-drift]` → geste proposé, confirmation ADR-031) — `[docs-ingest]` reste
+  couvert par la table « Amont & cadrage » existante, pas de doctrine parallèle.
+- **`test-dev-orchestrator.sh` : axes T20/T21**, fermant le gate ADR-044 (T20, `check-agents.sh
+  --file` sur `AGENT.md`, triple assertion exit/compte-warnings/types) et les invariants SC5
+  (T21, grep structurel sur les 2 nouveaux scripts — aucun `exit 1`, aucune écriture hors
+  `/dev/null`/descripteur/variable `*TMP*`, tout `mktemp` apparié à un `trap ... EXIT`). Suite
+  portée à **60 axes** (0 KO), ramassés par la découverte générique de `ci.yml:32` sans édition.
+- Portabilité prouvée en conteneur `ubuntu:24.04` (bash 5.2, git 2.43, python3 3.12) avant push,
+  en plus de macOS.
+
+Référence : `docs/superpowers/specs/2026-07-27-signaux-demarrage-dev-design.md`.
+
 ## [v2.5.0] — 2026-07-27 (allowlists `Agent(...)` sur les 3 workers internes, Phase 16)
 
 ### Ajouté

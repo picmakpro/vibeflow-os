@@ -7,7 +7,7 @@
 > façade de verbes : GSD est l'interface directe du quotidien, l'agent est l'entrée
 > conversationnelle optionnelle.
 
-**Version** : v2.5.0
+**Version** : v2.6.0
 **Type** : agent + équipe d'agents + 2 skills + scripts
 
 ---
@@ -48,9 +48,16 @@ S'y ajoutent :
   - `build-gsd-index.sh` : génère un **index factuel** des skills GSD installés
     (100 % auto-généré depuis le frontmatter sur disque — D4, anti-hallucination).
   - `inject-mcp-tools.sh` : injection des serveurs MCP du lab dans les agents flaggés.
+  - `check-dev-bootstrap.sh` / `check-doc-drift.sh` (**nouveau**, Phase 17) : signaux de
+    démarrage `SessionStart` — continuum bootstrap/onboard/orientation GSD et dérive
+    documentaire, en lecture seule (voir `hooks/hooks.json` ci-dessous).
   - Le kernel d'orchestration de mission (`dag.sh` / `driver-lock.sh`, ADR-053) est **consommé
     depuis le team-kernel hébergé par `conductor`** depuis la v2.34.0 (d'où `requires` →
     `conductor`) — il ne vit plus dans ce module.
+- **`hooks/hooks.json`** (**nouveau**, Phase 17) : premier fragment de hooks du module —
+  `SessionStart:startup` déclenche `check-dev-bootstrap.sh`, `discover-unintegrated-docs.sh` et
+  `check-doc-drift.sh` en mode `--hook`, chacun suffixé `|| true` (advisory, ADR-031, jamais
+  bloquant).
 
 ---
 
@@ -64,6 +71,8 @@ dev-orchestrator/
 │   ├── vf-coder.md                # worker interne (vf-internal: true, sonnet)
 │   ├── vf-reviewer.md             # worker interne (vf-internal: true, sonnet)
 │   └── vf-auditer.md              # worker interne (vf-internal: true, sonnet)
+├── hooks/
+│   └── hooks.json                 # SessionStart : signaux de démarrage (Phase 17)
 ├── skills/
 │   ├── vf-auto/SKILL.md           # porte d'autonomie (seuil équipe)
 │   └── vf-dev/SKILL.md            # point d'entrée générique (incarne l'agent)
@@ -71,7 +80,12 @@ dev-orchestrator/
 │   ├── ensure-deps.sh             # bootstrap deps (idempotent, dry-run testable)
 │   ├── build-gsd-index.sh         # index factuel (VF_INDEX_OUT surchargeable)
 │   ├── inject-mcp-tools.sh        # injection MCP dans les agents flaggés
+│   ├── discover-unintegrated-docs.sh # découverte doctrine ingestion (+ mode --hook)
+│   ├── check-dev-bootstrap.sh     # signal bootstrap/onboard/orientation GSD (Phase 17)
+│   ├── check-doc-drift.sh         # signal dérive documentaire (Phase 17)
 │   └── tests/                     # suites de vérification
+│       ├── test-check-dev-bootstrap.sh
+│       └── test-check-doc-drift.sh
 └── references/                    # doctrine + index chargés on-demand par les agents
     ├── intent-routing.md           # carte intention → brique (SEULE source de routage)
     ├── GSD-PIPELINE.md             # ordre canonique du cycle + model profiles
@@ -219,6 +233,12 @@ Couvre les axes de la bascule agentique (spec 2026-07-25) plus les acquis :
   listes, aucun `Agent` nu, parenthèses correctement refermées, `general-purpose` nommément
   présent chez `vf-coder` (cadrage non-interactif de `discuss-phase`), garde anti-homonyme (un nom
   préfixe littéral d'un autre — ex. `gsd-planner`/`gsd-plan-checker` — ne le valide jamais).
+- **T20** — gate ADR-044 réellement falsifiable sur `AGENT.md` (Phase 17) : `check-agents.sh
+  --file` (jamais à nu — `AGENT.md` est hors de la boucle CI `plugin/*/agents`), triple
+  assertion (exit 0, compte de warnings == baseline 3, présence des 3 types connus).
+- **T21** — invariants SC5 par grep structurel (Phase 17) sur `check-dev-bootstrap.sh` et
+  `check-doc-drift.sh` : aucun `exit 1`, aucune écriture hors `/dev/null`/descripteur/variable
+  `*TMP*`, aucune commande d'écriture directe, tout `mktemp` apparié à un `trap ... EXIT`.
 
 Exit 0 si tout passe (les SKIP, ex. GSD absent, ne font pas échouer la suite).
 
@@ -239,6 +259,12 @@ Exit 0 si tout passe (les SKIP, ex. GSD absent, ne font pas échouer la suite).
 
 ## Historique
 
+- **v2.6.0** — signaux de démarrage du moteur de dev (Phase 17) : premier fragment
+  `hooks/hooks.json` du module (`SessionStart:startup`), `check-dev-bootstrap.sh` (continuum à
+  4 états bootstrap/onboard/orientation GSD) et `check-doc-drift.sh` (dérive documentaire,
+  seuil réglable) nouveaux, `discover-unintegrated-docs.sh --hook` (extension additive, contrat
+  historique inchangé), section `AGENT.md` « Signaux de démarrage », gates T20/T21 (suite portée
+  à 60 axes). Portabilité prouvée en conteneur Linux avant push.
 - **v2.5.0** — allowlists `Agent(...)` posées sur les 3 workers internes (Phase 16) :
   `vf-coder` (22 noms), `vf-reviewer` (1), `vf-auditer` (1), fermant le chemin indirect
   manager→worker→manager ; aucun manager dans aucune des trois listes.
