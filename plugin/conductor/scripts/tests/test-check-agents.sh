@@ -30,6 +30,24 @@
 #   T32 — prefixe tiers (gsd-planner sans model/memory) → ignore ; --no-third-party-prefix → exit 1
 #   T33 — Task(...) alias legacy → reste vert
 #   T34 — Agent nu (sans allowlist) → warning "dispatch non cloisonne", non bloquant
+#
+# Correctifs post-revue (2 juges independants, re-entree mission Phase 16) :
+#   T35 — champ tools: ENTIEREMENT quote ('tools: "Read, Agent(x)"') → conforme (defaut 1)
+#   T36 — ligne vide dans une liste bloc tools: ne perd plus les puces suivantes (defaut 2)
+#   T37 — parenthese EN TROP 'Agent(a))' → exit 1 (pinne split_depth seul, defaut 3)
+#   T38 — entree vide au niveau token (virgule orpheline 'Read,,Agent(x)') → exit 1
+#   T39 — entree vide DANS une allowlist 'Agent(a,,b)' → exit 1
+#   T40 — espace avant la parenthese 'Agent (x)' → exit 1
+#   T41 — token hors charset au niveau bare (sans parenthese) → exit 1
+#   T42 — name invalide (majuscules/espaces) → exit 1
+#   T43 — permissionMode invalide → exit 1
+#   T44 — isolation invalide → exit 1
+#   T45 — background invalide → exit 1
+#   T46 — maxTurns invalide → exit 1
+#   T47 — skills absent → warning non bloquant
+#   T48 — description < 30c → warning non bloquant
+#   T49 — tools absent → warning non bloquant (herite tout)
+#   T50 — name different du nom de fichier → warning non bloquant
 
 set -uo pipefail
 
@@ -550,6 +568,316 @@ else
   ko "T34 (rc=$RC) : $OUT"
 fi
 rm -f "$AG"/*.md
+
+# ---------- Correctifs post-revue (re-entree Phase 16, 2 juges independants) ----------
+
+good_agent "vf-coder"
+
+# T35 — defaut 1 : champ tools: ENTIEREMENT quote (YAML valide) ne doit plus produire de
+# faux BLOQUANT (charset / parenthese non fermee sur les guillemets eux-memes).
+cat > "$AG/quote-tools.md" <<'EOF'
+---
+name: quote-tools
+description: Agent de test avec un champ tools entierement quote entre guillemets.
+model: sonnet
+memory: project
+tools: "Read, Write, Agent(vf-coder)"
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -qE "hors charset|parenthese non fermee"; then
+  ok "T35 tools: entierement quote → conforme, aucun faux BLOQUANT (defaut 1)"
+else
+  ko "T35 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/quote-tools.md"
+
+# T36 — defaut 2 : ligne vide au milieu d'une liste bloc tools: ne doit plus faire perdre
+# silencieusement les puces suivantes. Verifie via --resolve-agents=strict (discriminance
+# forte : avant le correctif, exit 0 total silence ; apres, exit 1 sur l'entree recuperee).
+cat > "$AG/blank-block.md" <<'EOF'
+---
+name: blank-block
+description: Agent de test avec une ligne vide au milieu d'une liste bloc tools.
+model: sonnet
+memory: project
+tools:
+  - Read
+
+  - Agent(vf-inexistant-improvise)
+---
+corps
+EOF
+OUT_DEF="$(run_check 2>&1)"; RC_DEF=$?
+RC_STRICTRES=0; run_check --resolve-agents=strict >/dev/null 2>&1 || RC_STRICTRES=$?
+if [ "$RC_DEF" -eq 0 ] && echo "$OUT_DEF" | grep -q "vf-inexistant-improvise" && [ "$RC_STRICTRES" -eq 1 ]; then
+  ok "T36 ligne vide dans liste bloc → puce suivante recuperee (warning + erreur sous strict) (defaut 2)"
+else
+  ko "T36 (def=$RC_DEF strictres=$RC_STRICTRES) : $OUT_DEF"
+fi
+rm -f "$AG/blank-block.md"
+
+# T37 — defaut 3 : parenthese EN TROP 'Agent(a))' → exit 1. Pinne SPECIFIQUEMENT split_depth
+# (seul detecteur du depth < 0) : analyze_token ne catche pas ce cas (rest se termine bien
+# par ')'), donc ce test tombe si on mute 'depth != 0' en 'depth > 0' dans split_depth.
+cat > "$AG/extra-paren.md" <<'EOF'
+---
+name: extra-paren
+description: Agent de test avec une parenthese fermante en trop dans une allowlist.
+model: sonnet
+memory: project
+tools: Read, Agent(a))
+---
+corps
+EOF
+RC=0; run_check >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 1 ] && ok "T37 parenthese en trop 'Agent(a))' → exit 1 (pinne split_depth, defaut 3)" || ko "T37 (rc=$RC)"
+rm -f "$AG/extra-paren.md"
+
+# T38 — entree vide au niveau token (virgule orpheline) → exit 1
+cat > "$AG/orpheline.md" <<'EOF'
+---
+name: orpheline
+description: Agent de test avec une virgule orpheline produisant une entree vide.
+model: sonnet
+memory: project
+tools: Read,,Agent(x)
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "entree d'allowlist vide"; then
+  ok "T38 virgule orpheline 'Read,,Agent(x)' → exit 1"
+else
+  ko "T38 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/orpheline.md"
+
+# T39 — entree vide A L'INTERIEUR d'une allowlist → exit 1
+cat > "$AG/interne-vide.md" <<'EOF'
+---
+name: interne-vide
+description: Agent de test avec une entree vide a l'interieur d'une allowlist Agent.
+model: sonnet
+memory: project
+tools: Agent(a,,b)
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "entree vide dans l'allowlist"; then
+  ok "T39 'Agent(a,,b)' (entree vide interne) → exit 1"
+else
+  ko "T39 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/interne-vide.md"
+
+# T40 — espace avant la parenthese → exit 1
+cat > "$AG/espace-paren.md" <<'EOF'
+---
+name: espace-paren
+description: Agent de test avec un espace entre le nom de l'outil et la parenthese.
+model: sonnet
+memory: project
+tools: Read, Agent (vf-coder)
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "espace avant la parenthese"; then
+  ok "T40 'Agent (vf-coder)' (espace avant parenthese) → exit 1"
+else
+  ko "T40 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/espace-paren.md"
+
+# T41 — token hors charset au niveau bare (sans parenthese, ex. symbole non autorise)
+cat > "$AG/bare-charset.md" <<'EOF'
+---
+name: bare-charset
+description: Agent de test avec un token bare contenant un caractere hors charset.
+model: sonnet
+memory: project
+tools: Read, Bash@2
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "token hors charset"; then
+  ok "T41 token bare hors charset ('Bash@2') → exit 1"
+else
+  ko "T41 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/bare-charset.md"
+
+# T42 — name invalide (majuscules/espaces, hors [a-z0-9-])
+cat > "$AG/nom-invalide.md" <<'EOF'
+---
+name: "Nom Invalide"
+description: Agent de test dont le name contient des majuscules et un espace.
+model: sonnet
+memory: project
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "name invalide"; then
+  ok "T42 name invalide (majuscules/espaces) → exit 1"
+else
+  ko "T42 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/nom-invalide.md"
+
+# T43 — permissionMode invalide
+cat > "$AG/permmode.md" <<'EOF'
+---
+name: permmode
+description: Agent de test avec un permissionMode qui n'existe pas dans l'enum attendu.
+model: sonnet
+memory: project
+permissionMode: yolo
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "permissionMode invalide"; then
+  ok "T43 permissionMode invalide → exit 1"
+else
+  ko "T43 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/permmode.md"
+
+# T44 — isolation invalide (seul 'worktree' est admis)
+cat > "$AG/isol.md" <<'EOF'
+---
+name: isol
+description: Agent de test avec une valeur isolation qui n'est pas worktree.
+model: sonnet
+memory: project
+isolation: sandbox
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "isolation invalide"; then
+  ok "T44 isolation invalide → exit 1"
+else
+  ko "T44 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/isol.md"
+
+# T45 — background invalide (attendu true|false)
+cat > "$AG/bg.md" <<'EOF'
+---
+name: bg
+description: Agent de test avec un champ background qui n'est ni true ni false.
+model: sonnet
+memory: project
+background: maybe
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "background invalide"; then
+  ok "T45 background invalide → exit 1"
+else
+  ko "T45 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/bg.md"
+
+# T46 — maxTurns invalide (attendu un entier)
+cat > "$AG/maxt.md" <<'EOF'
+---
+name: maxt
+description: Agent de test avec un champ maxTurns qui n'est pas un entier valide.
+model: sonnet
+memory: project
+maxTurns: beaucoup
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "maxTurns invalide"; then
+  ok "T46 maxTurns invalide → exit 1"
+else
+  ko "T46 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/maxt.md"
+
+# T47 — skills absent → warning non bloquant (pas d'ERREUR meme en --strict, hors resolution)
+cat > "$AG/sans-skill.md" <<'EOF'
+---
+name: sans-skill
+description: Agent de test sans aucun champ skills declare, pour verifier le warning.
+model: sonnet
+memory: project
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "aucun skill cable"; then
+  ok "T47 skills absent → warning non bloquant"
+else
+  ko "T47 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/sans-skill.md"
+
+# T48 — description < 30 caracteres → warning non bloquant
+cat > "$AG/desc-courte.md" <<'EOF'
+---
+name: desc-courte
+description: trop court
+model: sonnet
+memory: project
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "description trop courte"; then
+  ok "T48 description < 30c → warning non bloquant"
+else
+  ko "T48 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/desc-courte.md"
+
+# T49 — tools absent → warning non bloquant (herite tout)
+cat > "$AG/sans-tools.md" <<'EOF'
+---
+name: sans-tools
+description: Agent de test sans champ tools declare, pour verifier le warning d'heritage.
+model: sonnet
+memory: project
+skills:
+  - petit-skill
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "tools absent"; then
+  ok "T49 tools absent → warning non bloquant (herite tout)"
+else
+  ko "T49 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/sans-tools.md"
+
+# T50 — name different du nom de fichier → warning non bloquant
+cat > "$AG/autre-fichier.md" <<'EOF'
+---
+name: nom-different
+description: Agent de test dont le name ne correspond pas au nom du fichier sur disque.
+model: sonnet
+memory: project
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "different du nom de fichier"; then
+  ok "T50 name ≠ nom de fichier → warning non bloquant"
+else
+  ko "T50 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/autre-fichier.md" "$AG/vf-coder.md"
 
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="

@@ -240,10 +240,17 @@ def extract_raw_field(fmlines, key):
         if val == \"\":
             bullets = []
             while k < n:
-                item = re.match(r\"^\s+-\s+(.+?)(\s+#.*)?$\", fmlines[k])
-                if not item:
+                # Une ligne vide (ou toute ligne non-puce qui n'ouvre pas une nouvelle
+                # cle) est TOLEREE au milieu du bloc — a l'image de parse_frontmatter,
+                # qui ne casse jamais sur une ligne vide. Seule une nouvelle cle:
+                # (_KEY_RE) marque la fin LEGITIME du bloc. Avant ce correctif, un
+                # simple 'break' ici faisait perdre SILENCIEUSEMENT toute puce suivant
+                # une ligne vide (defaut 2, F13-like : zero warning sur l'entree perdue).
+                if _KEY_RE.match(fmlines[k]):
                     break
-                bullets.append(item.group(1).strip())
+                item = re.match(r\"^\s+-\s+(.+?)(\s+#.*)?$\", fmlines[k])
+                if item:
+                    bullets.append(item.group(1).strip())
                 k += 1
             if bullets:
                 return \"block\", bullets
@@ -282,13 +289,23 @@ def split_depth(raw):
     tokens.append(\"\".join(cur))
     return tokens, depth != 0
 
+def dequote_scalar(s):
+    \"\"\"Retire UNE seule paire de guillemets englobante (\" ou ') — calque exact du
+    dequotage deja applique aux scalaires par parse_frontmatter (l.195-196). Sans ca,
+    'tools: \"Read, Write, Agent(vf-coder)\"' (YAML valide) etait tokenise caracteres-
+    litteraux-compris et produisait de faux BLOQUANTS (charset, parenthese non fermee).\"\"\"
+    if len(s) >= 2 and s[0] == s[-1] and s[0] in (chr(34), chr(39)):
+        return s[1:-1]
+    return s
+
 def tokenize_field(mode, raw):
     \"\"\"mode='block' : raw deja une liste de tokens individuels (puces YAML).
-    mode in ('flow','scalar') : raw est une chaine — on retire les crochets [ ] de la
-    flow list puis on decoupe a profondeur de parentheses. Retourne (tokens, unclosed).\"\"\"
+    mode in ('flow','scalar') : raw est une chaine — on la dequote d'abord (voir
+    dequote_scalar), on retire les crochets [ ] de la flow list puis on decoupe a
+    profondeur de parentheses. Retourne (tokens, unclosed).\"\"\"
     if mode == \"block\":
-        return list(raw), False
-    s = raw.strip()
+        return [dequote_scalar(t) for t in raw], False
+    s = dequote_scalar(raw.strip())
     if s.startswith(\"[\") and s.endswith(\"]\"):
         s = s[1:-1]
     return split_depth(s)
