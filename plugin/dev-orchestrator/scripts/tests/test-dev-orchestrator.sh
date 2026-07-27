@@ -855,5 +855,55 @@ fi
 [ "$t17_ok" -eq 1 ] && ok "T17 routage : AGENT.md + intent-routing.md câblent l'intention d'ingestion"
 
 # ---------------------------------------------------------------------------
+# T18 — Cloisonnement par tools (Pattern 12) : allowlist Agent(...) du manager (Phase 15, D-07)
+# ---------------------------------------------------------------------------
+# check-agents.sh NE LINTE PAS le contenu du champ tools: (vérifié empiriquement — une allowlist
+# avec des noms inventés ou une parenthèse non fermée passe --strict en vert). Ces asserts sont
+# donc la SEULE vérification machine du cloisonnement D-07 (Pattern A : imbrication
+# manager→manager interdite) pour ce module.
+DEVMGR="$MOD/agents/vf-dev-manager.md"
+dev_tools_line() { "$GREP" -m1 '^tools:' "$1" 2>/dev/null; }
+T18_ALLOWED="vf-coder vf-reviewer vf-auditer vf-test-orchestrator gsd-advisor-researcher \
+general-purpose gsd-phase-researcher gsd-plan-checker gsd-planner gsd-pattern-mapper \
+gsd-doc-verifier gsd-doc-writer gsd-doc-classifier gsd-doc-synthesizer gsd-roadmapper \
+gsd-integration-checker vf-crafter vf-design-judge"
+
+t18_ok=1
+dmt="$(dev_tools_line "$DEVMGR")"
+if [ -z "$dmt" ]; then
+  ko "T18 cloisonnement : vf-dev-manager sans ligne tools: (hériterait de TOUT)"; t18_ok=0
+else
+  # Allowlist Agent(...) et non Agent nu : aucune occurrence de « Agent » qui ne soit pas
+  # immédiatement suivie d'une parenthèse ouvrante (bare Agent = pas de cloisonnement).
+  bare="$(echo "$dmt" | "$GREP" -oE 'Agent([^(]|$)')"
+  [ -z "$bare" ] || { ko "T18 cloisonnement : vf-dev-manager a un Agent nu (pas d'allowlist)"; t18_ok=0; }
+  echo "$dmt" | "$GREP" -qF 'Agent(' || { ko "T18 cloisonnement : aucune allowlist Agent( ) trouvée"; t18_ok=0; }
+  # Chacun des 18 noms attendus, testé UN PAR UN (jamais un grep global satisfait par le premier).
+  for name in $T18_ALLOWED; do
+    echo "$dmt" | "$GREP" -qF -- "$name" || { ko "T18 cloisonnement : « $name » absent de l'allowlist du manager"; t18_ok=0; }
+  done
+  # Interdit structurel : vf-design-manager JAMAIS dans l'allowlist (imbrication manager→manager).
+  # Piège : vf-design-judge contient la sous-chaîne « vf-design » — on teste le nom EXACT complet
+  # « vf-design-manager », qui ne peut pas matcher « vf-design-judge » (suffixe différent).
+  echo "$dmt" | "$GREP" -qF -- "vf-design-manager" && { ko "T18 cloisonnement : vf-design-manager présent dans l'allowlist (imbrication manager→manager)"; t18_ok=0; }
+  # Parenthèse d'allowlist fermée en fin de ligne.
+  echo "$dmt" | "$GREP" -qE '\)[[:space:]]*$' || { ko "T18 cloisonnement : allowlist non fermée (parenthèse manquante en fin de ligne)"; t18_ok=0; }
+fi
+[ "$t18_ok" -eq 1 ] && ok "T18 cloisonnement : allowlist Agent(...) complète (18 noms), vf-design-manager absent, parenthèse fermée"
+
+# T18b — Success Criteria 1 et 3 : doctrine étage design présente, routage vf-auto → design pur
+t18b_ok=1
+"$GREP" -qi 'Étage design croisé' "$DEVMGR" || { ko "T18b SC1 : doctrine étage design absente de vf-dev-manager.md"; t18b_ok=0; }
+"$GREP" -q 'mission-cross-team' "$DEVMGR" || { ko "T18b SC1 : renvoi vers mission-cross-team.md absent de vf-dev-manager.md"; t18b_ok=0; }
+AUTO_SKILL="$MOD/skills/vf-auto/SKILL.md"
+if [ -f "$AUTO_SKILL" ]; then
+  "$GREP" -q 'vf-design-manager' "$AUTO_SKILL" || { ko "T18b SC3 : vf-auto/SKILL.md ne route pas vers vf-design-manager"; t18b_ok=0; }
+  "$GREP" -qi 'zéro feature' "$AUTO_SKILL" || { ko "T18b SC3 : signal « mission entièrement design (zéro feature) » absent de vf-auto"; t18b_ok=0; }
+else
+  ko "T18b SC3 : $AUTO_SKILL introuvable"; t18b_ok=0
+fi
+[ "$t18b_ok" -eq 1 ] && ok "T18b doctrine : étage design (SC1, renvoi mission-cross-team) + routage vf-auto→design pur (SC3) présents"
+
+# ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
 [ "$fail" -eq 0 ]
