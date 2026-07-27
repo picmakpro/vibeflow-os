@@ -10,7 +10,7 @@
 intent, runs the pipeline (scoping → plan → execution → proof), and **machine gates** verify —
 not promises.
 
-[![Version](https://img.shields.io/badge/version-2.39.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.40.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -251,9 +251,9 @@ Full history: **[CHANGELOG.md](./CHANGELOG.md)** — the README keeps the last 3
 
 | Version | Date | Change |
 |---------|------|--------|
+| `v2.40.0` | 2026-07-27 | Cross-team dev ↔ design collaboration under a single manager: `vf-dev-manager` inserts `craft:`/`critique:` nodes into a dev mission (design stage skipped and reported when no art direction exists), `vf-design-manager` gains an opt-in implementation stage with dual judge (art-direction re-score ∥ code review) and separate 3 + 3 anti-thrash budgets, `vf-auto` finally routes design-only missions to the design manager, and both managers carry `Agent(...)` allowlists (18 / 6 names) making manager→manager nesting structurally impossible. Kernel untouched. |
 | `v2.39.0` | 2026-07-26 | GSD engine migrated: deprecated `get-shit-done-cc` → community successor `@opengsd/gsd-core@^1` (semver cap, proven parity), SDK calls → `gsd-tools`, `gsd-onboard` routed for brownfield, single-voice boundaries (gsd-next/mempalace unrouted), hardened hook merging + real-installer cohabitation suite, `model_profile: balanced` enforced. |
 | `v2.38.0` | 2026-07-26 | Framework-grade docs, module by module: every module README becomes its canonical documentation (install, get started, usage, full reference, limits — 10 modules brought to standard, version headers gated 17/17), plus a storefront section on lab creation & design. |
-| `v2.36.2` | 2026-07-26 | Doc-truth remediation: module READMEs realigned with reality (validator 5 audits, conductor finally documents the team-kernel, reference at Core v4.2 / 12 patterns / 5 skills), ADR registry fixes, and `check-version-sync` now gates module README version headers + CI suite counts (dead grep fails loudly). |
 
 <details>
 <summary><strong>Methodology references (ADR / LRN)</strong></summary>

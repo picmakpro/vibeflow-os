@@ -10,7 +10,7 @@ Orchestration agentique **spec-driven** pour Claude Code : tu parles normalement
 détecte l'intention, déroule le pipeline (cadrage → plan → exécution → preuve), et des **gates
 machine** vérifient — pas des promesses.
 
-[![Version](https://img.shields.io/badge/version-2.39.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.40.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -256,9 +256,9 @@ Historique complet : **[CHANGELOG.md](./CHANGELOG.md)** — le README garde les 
 
 | Version | Date | Changement |
 |---------|------|------------|
+| `v2.40.0` | 2026-07-27 | Collaboration croisée dev ↔ design sous un seul manager : `vf-dev-manager` insère des nœuds `craft:`/`critique:` dans une mission dev (étage sauté et signalé quand la direction artistique manque), `vf-design-manager` gagne un étage d'implémentation opt-in avec double juge (re-critique DA ∥ revue de code) et budgets anti-thrash séparés 3 + 3, `vf-auto` aiguille enfin les missions purement design vers le manager design, et les deux managers portent une allowlist `Agent(...)` (18 / 6 noms) qui rend l'imbrication manager→manager structurellement impossible. Kernel intact. |
 | `v2.39.0` | 2026-07-26 | Moteur GSD migré : `get-shit-done-cc` déprécié → successeur communautaire `@opengsd/gsd-core@^1` (plafond semver, parité prouvée), appels SDK → `gsd-tools`, `gsd-onboard` routé pour le brownfield, frontières « une seule voix » (gsd-next/mempalace non routés), merge de hooks durci + suite de cohabitation sur l'installeur réel, `model_profile: balanced` enforced. |
 | `v2.38.0` | 2026-07-26 | Doc niveau framework, module par module : le README de chaque module devient sa documentation canonique (installation, démarrer, usage, référence, limites — 10 modules montés au standard, en-têtes Version gatés 17/17), plus une section vitrine création de lab & design. |
-| `v2.36.2` | 2026-07-26 | Remédiation vérité-doc : README de modules réalignés sur le réel (validator 5 audits, conductor documente enfin le team-kernel, reference en Core v4.2 / 12 patterns / 5 skills), correctifs du registre ADR, et `check-version-sync` gate désormais les en-têtes Version des modules + le compte de suites CI (grep mort → échec bruyant). |
 
 <details>
 <summary><strong>Références méthodologiques (ADR / LRN)</strong></summary>

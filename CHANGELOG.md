@@ -15,6 +15,34 @@ de groupes mixtes lors du merge de hooks — un groupe qui mélange des scripts 
 différentes n'est plus recyclé, un nouveau groupe est créé à la place. Entrée non taggée : ne
 déclenche pas de release, sera absorbée par le prochain bump de `VERSION` racine.
 
+## [v2.40.0] — 2026-07-27
+
+**Collaboration inter-équipes dev ↔ design : étages croisés sous un seul manager** (Phase 15,
+option A validée par 7 tests empiriques). Les deux équipes de mission cessent d'être étanches sans
+jamais s'imbriquer : un seul verrou de driver, un seul DAG, un seul rapport de mission. En mission
+dev, `vf-dev-manager` insère des nœuds `craft:<écran>` (`vf-crafter`) avant l'exécution et
+`critique:<écran>` (`vf-design-judge`) en parallèle de la revue code — décision de jugement au plan
+de bataille, seuil design bloquant au même régime que l'équipe design, étage sauté et signalé si la
+DA manque (next step DA-INIT, jamais de DA inventée). En mission design, `vf-design-manager` gagne
+un étage d'implémentation opt-in (`livrable: specs|specs+implementation`) où `vf-coder` incarne les
+specs du crafter, avec double juge en parallèle (re-critique DA **et** revue de diff) et budgets
+anti-thrash séparés 3 + 3 par écran. Le brief de mission gagne les champs `design: auto|force|off`
+et `livrable:` ; le digest croisé embarque la DA vers les workers design et les conventions code
+vers les workers dev (≤ 30 lignes, le disque fait foi). `vf-auto` aiguille enfin les missions
+entièrement design vers `vf-design-manager` (règle simple : design pur → design, tout le reste →
+dev). Cloisonnement **structurel** : allowlists `Agent(...)` sur les deux managers (18 noms côté
+dev, 6 côté design) — un manager ne peut pas dispatcher l'autre. Deux corrections de vérité en
+cours de route : `check-agents.sh` ne lint **pas** le contenu du champ `tools:` (l'enforcement réel
+passe par les tests de suite, prouvés rouges par mutation), et le recensement initial de l'allowlist
+dev omettait 4 agents dispatchés via les skills du manager (fin de milestone, ingestion de cadrage,
+re-validation de plan) — trouvés par audit indépendant. Nouvelle référence
+`conductor/references/mission-cross-team.md` (Pattern D). Kernel intact : aucune modification de
+`dag.sh` ni `driver-lock.sh`. Suites : 43 dev-orchestrator, 12 design-orchestrator, 36 dag,
+26 driver-lock — 0 KO. Modules : dev-orchestrator v2.4.0, design-orchestrator v1.3.0,
+conductor v1.14.6. Escaladé et non livré volontairement : le lint réel dans `check-agents.sh` et le
+scoping `Agent` des workers (`vf-coder`/`vf-reviewer`/`vf-auditer`) — le chemin indirect
+manager→worker→manager reste ouvert au dispatch, l'invariant tenant par le verrou de driver.
+
 ## [v2.39.0] — 2026-07-26
 
 **Migration du moteur GSD : `get-shit-done-cc` → `@opengsd/gsd-core@^1`** (clôture du milestone
