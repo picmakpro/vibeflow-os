@@ -1,5 +1,10 @@
 # Changelog — conductor
 
+## [v1.14.5] — 2026-07-27
+
+### Corrigé
+- `driver-lock.sh` : course ABA dans la récupération de lock périmé (violation de l'invariant H1, T13.1 rouge en CI avec 2 « recovered »). Entre le verdict « périmé » d'un concurrent et son `mv`, un autre pouvait récupérer PUIS recréer un lock frais — le `mv` réussissait alors sur ce lock vivant et le volait. Le récupérateur re-vérifie désormais le heartbeat du méta DÉPLACÉ : frais → remise en place + `race-during-recovery`. Fenêtre résiduelle théorique documentée (détectée par le heartbeat du propriétaire déposédé).
+
 ## [v1.14.4] — 2026-07-27
 
 ### Corrigé

@@ -97,6 +97,17 @@ case "$ACTION" in
       # la source deja deplacee) → pas de double-acquisition pendant la recuperation.
       stale="${LOCK_DIR}.stale.$$"
       if mv "$LOCK_DIR" "$stale" 2>/dev/null; then
+        # H1-ABA : entre NOTRE verdict "perime" et ce mv, un concurrent a pu recuperer PUIS
+        # recreer un lock FRAIS — le mv reussit alors sur ce lock vivant (double "recovered"
+        # observe en CI, T13.1). Re-verifier le heartbeat du meta DEPLACE : frais → on le remet
+        # en place et on rend la main. (Fenetre residuelle theorique si un 3e mkdir s'intercale
+        # pendant ces quelques instructions — le heartbeat du proprietaire depossede la detecte.)
+        mhb="$(grep '^heartbeat_epoch=' "$stale/meta" 2>/dev/null | head -1 | cut -d= -f2-)"
+        case "$mhb" in ''|*[!0-9]*) mhb="" ;; esac
+        if [ -n "$mhb" ] && [ "$(( $(now) - mhb ))" -le "$TTL" ]; then
+          mv "$stale" "$LOCK_DIR" 2>/dev/null || rm -rf "$stale"
+          printf '{"acquired": false, "reason": "race-during-recovery"}\n'; exit 1
+        fi
         rm -rf "$stale"
         if mkdir "$LOCK_DIR" 2>/dev/null; then
           write_meta "$(now)" "$(iso)" "$(now)"
