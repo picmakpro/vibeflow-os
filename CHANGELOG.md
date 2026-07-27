@@ -15,6 +15,53 @@ de groupes mixtes lors du merge de hooks — un groupe qui mélange des scripts 
 différentes n'est plus recyclé, un nouveau groupe est créé à la place. Entrée non taggée : ne
 déclenche pas de release, sera absorbée par le prochain bump de `VERSION` racine.
 
+## [v2.41.0] — 2026-07-27
+
+**Cloisonnement complet des dispatches d'agents** (Phase 16, livrée en autonomie complète). Ferme
+les deux trous escaladés par la mission de la Phase 15. `check-agents.sh` **lint désormais le
+contenu** du champ `tools:` — syntaxe des allowlists (parenthèse fermée, séparateurs, charset) et
+existence de chaque nom, sur `tools:` comme `disallowedTools:` : jusqu'ici, des noms d'agents
+inventés, une parenthèse non fermée ou des outils inexistants passaient tous `--strict` en vert. La
+suite `test-check-agents` passe de 38 à **58 axes**.
+
+**Résolution graduée du piège natifs/externes.** La sévérité est indexée sur ce qui est vérifiable
+indépendamment du périmètre installé : syntaxe → erreur dure (ne dépend d'aucun scope) ; nom d'outil
+hors du set fermé documenté → warning, erreur en `--strict` ; **nom d'agent non résolu → warning même
+en `--strict`**, erreur seulement sous le mode opt-in `--resolve-agents=strict`, réservé à la CI —
+seul endroit où l'univers complet des agents du repo est connu. Mesure à l'appui : 22 entrées non
+résolvables sur la baseline, dont **aucune n'est un bug** (types natifs comme `general-purpose`,
+agents `gsd-*` de `@opengsd/gsd-core`, agents d'autres modules non installés). La doc officielle ne
+fige pas la liste des types natifs : en faire une erreur serait parier sur une liste mouvante, pari
+que le dépôt a déjà payé au prix de 66 faux positifs. L'option « manifeste externe » a été écartée
+sur preuve de code (`copy_module_scripts()` ne globbe que `*.sh|*.mjs|*.js` — un fichier de données
+ne serait jamais posé chez l'utilisateur) : tout est inline. Bonus, `--third-party-prefix` **ferme la
+dette connexe** des 66 faux positifs du scope user.
+
+**Allowlists posées sur les 3 workers dev** — `vf-coder` (22 noms), `vf-reviewer`
+(`gsd-code-reviewer`), `vf-auditer` (`gsd-security-auditor`) — après **double recensement
+indépendant en parallèle**, la seconde dérivation interdite de lire les rapports de mission, les
+allowlists existantes et `CONCERNS.md`. Accord total sur deux workers ; écart de 5 noms sur
+`vf-coder` (21 vs 18), union retenue au titre du coût d'erreur asymétrique. Fait discriminant :
+`vf-coder` a le tool `Skill`, donc une expansion transitive que les deux autres n'ont pas.
+
+**Correction de portée doctrinale — une allowlist n'est pas un sandbox runtime.** La doc officielle,
+désormais citée verbatim dans l'en-tête du script, est explicite : dans la définition d'un
+sous-agent, le runtime **ignore** la liste de noms entre parenthèses ; seule la présence de
+`Agent`/`Task` dans `tools:` compte. Une allowlist `Agent(x, y)` est donc un **contrat documenté,
+enforcé par ce lint et par lui seul** — elle ne redevient une restriction runtime que pour un agent
+incarné en thread principal (`claude --agent`). Vaut rétroactivement pour les allowlists des deux
+managers posées en v2.40.0.
+
+**Ce que les juges ont rattrapé**, sur des classes disjointes : T19/T19e étaient **tautologiques**
+(grep sur toute la ligne `tools:` — un nom retiré de l'allowlist mais replacé en `Bash(...)` laissait
+la suite verte à 50/0 alors que le dispatch était perdu), deux faux-bloquants du lint neuf (champ
+quoté ; ligne vide en liste bloc faisant perdre silencieusement les entrées suivantes), et
+`--resolve-agents=<valeur inconnue>` qui **dégradait le gate en silence** — une typo YAML aurait
+désactivé le monde fermé sans un mot.
+
+40 suites vertes, 6/6 modules `--strict` exit 0, 6/6 en monde fermé. Deux entrées retirées de
+`CONCERNS.md`. Modules : conductor v1.15.0, dev-orchestrator v2.5.0.
+
 ## [v2.40.0] — 2026-07-27
 
 **Collaboration inter-équipes dev ↔ design : étages croisés sous un seul manager** (Phase 15,

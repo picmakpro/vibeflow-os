@@ -374,7 +374,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 ✅ (R&D, shippée v2.28.0)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 ✅ (code complet, release en attente de validation humaine)** ; **14 ✅ (indépendante)** ; **15 ✅ (shippée v2.40.0) → 16 (escalades de 15)**
+1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 ✅ (R&D, shippée v2.28.0)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 ✅ (code complet, release en attente de validation humaine)** ; **14 ✅ (indépendante)** ; **15 ✅ (shippée v2.40.0) → 16 ✅ (shippée v2.41.0)** ; **17, 18 inscrites (indépendantes de 16)**
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -393,7 +393,7 @@ Plans:
 | 13. Pont spec → feuille de route | vf-routing | 2/2 | Complete — release `v2.37.0` — module v2.2.0, vérif PASS | 2026-07-26 |
 | 14. Frontière d'altitude planning-core / GSD | vf-routing | 7/7 | Complete — release `v2.30.0` (ADR-055) | 2026-07-25 |
 | 15. Collaboration inter-équipes dev ↔ design | — | 7/7 | Complete — release `v2.40.0` (5/5 critères), 2 points escaladés → Phase 16 | 2026-07-27 |
-| 16. Cloisonnement complet des dispatches | — | 0/? | Not started — lint réel `check-agents.sh` + scoping `Agent` des 3 workers | — |
+| 16. Cloisonnement complet des dispatches | — | 8/8 | Complete — release `v2.41.0` (4/4 critères, SC3 amendé : contrat + lint, pas sandbox runtime) | 2026-07-27 |
 
 ### Phase 15: Collaboration inter-équipes dev ↔ design
 
@@ -467,7 +467,27 @@ des outils inexistants passent `--strict` en vert. (2) Scoper l'accès `Agent` d
 
   4. Les tests de suite existants (T18/T18b, T8/T8b) restent verts et le nouveau lint est prouvé
      discriminant par mutation ; les 39 suites du repo passent.
-**Plans:** TBD
+**Plans:** livrée en mission d'équipe (2026-07-27) — cadrage rétroactif, pas de PLAN.md par plan
+
+**Amendement au SC3 (découverte de la mission, actée)** : le runtime Claude Code **ignore** la liste
+de noms entre parenthèses dans la définition d'un sous-agent — la doc officielle est explicite, et
+elle est désormais citée verbatim dans l'en-tête de `check-agents.sh`. Une allowlist `Agent(x, y)`
+n'est donc **pas** un bac à sable runtime pour un agent posé sous `.claude/agents/` : c'est un
+**contrat documenté, enforcé par le lint et par lui seul**. Elle ne redevient une vraie restriction
+runtime que pour un agent incarné en thread principal (`claude --agent`). Le SC3 est tenu au sens
+« contrat + gate machine », pas au sens « sandbox runtime ». Cette honnêteté doctrinale vaut
+rétroactivement pour les allowlists des deux managers posées en Phase 15.
+
+Plans:
+
+- [x] Lint des allowlists dans `check-agents.sh` — syntaxe et existence des noms, sur `tools:` comme `disallowedTools:` ; suite `test-check-agents` portée de 38 à 58 axes
+- [x] Résolution graduée du piège natifs/externes — sévérité indexée sur ce qui est vérifiable indépendamment du périmètre installé : syntaxe → erreur dure, outils → erreur en `--strict`, **nom d'agent non résolu → warning même en `--strict`**, erreur seulement sous `--resolve-agents=strict` (mode opt-in réservé à la CI, seul endroit où l'univers des agents est connu)
+- [x] Fermeture de la dette connexe `CONCERNS.md:52-59` — `--third-party-prefix` règle les 66 faux positifs du scope user
+- [x] Allowlists des 3 workers après double recensement indépendant — `vf-coder` (22 noms), `vf-reviewer` (1), `vf-auditer` (1) ; écart de 5 noms entre les deux dérivations sur `vf-coder`, union retenue (coût d'erreur asymétrique)
+- [x] Correctifs remontés par les juges — T19/T19e étaient **tautologiques** (grep sur toute la ligne `tools:` : un nom retiré de l'allowlist mais replacé en `Bash(...)` laissait la suite verte), 2 faux-bloquants du lint neuf, et `--resolve-agents=<valeur inconnue>` qui dégradait le gate en silence
+- [x] Sortie de dette — entrées « accès `Agent` non scopé » et « `check-agents --strict` sans périmètre tiers » retirées de `CONCERNS.md` (la seconde vérifiée empiriquement sur `~/.claude/agents`)
+- [x] Bumps par module — `conductor` v1.15.0, `dev-orchestrator` v2.5.0
+- [x] Release racine `v2.41.0` — taggée et publiée le 2026-07-27
 
 ### Phase 17: Signaux de démarrage du moteur de dev
 

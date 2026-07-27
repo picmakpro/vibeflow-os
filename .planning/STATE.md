@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
-current_phase: 15
-current_phase_name: Collaboration inter-équipes dev ↔ design — shippée `v2.40.0`
+current_phase: 16
+current_phase_name: Cloisonnement complet des dispatches d'agents — shippée `v2.41.0`
 status: shipped
-stopped_at: Phase 15 shipped (v2.40.0 taggée + release GitHub) — Phase 16 inscrite, non démarrée
-last_updated: "2026-07-27T20:44:28.399Z"
-last_activity: 2026-07-27 (release v2.40.0 publiée + Phase 16 inscrite)
+stopped_at: Phase 16 shipped (v2.41.0 taggée + release GitHub) — Phases 17 et 18 inscrites, non démarrées
+last_updated: "2026-07-27T22:30:00.000Z"
+last_activity: 2026-07-27 (mission d'équipe Phase 16 + release v2.41.0)
 progress:
-  total_phases: 17
-  completed_phases: 8
-  total_plans: 39
-  completed_plans: 23
+  total_phases: 18
+  completed_phases: 9
+  total_plans: 47
+  completed_plans: 31
 ---
 
 # Project State
@@ -22,28 +22,43 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26 — charte rouverte : 17 modules, D2/D6 renversées)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Phase 15 **SHIPPÉE `v2.40.0`** (2026-07-27) — les équipes dev et design
-collaborent par étages croisés sous un seul manager. Plus aucun milestone ouvert. Prochain chantier
-inscrit : **Phase 16** (cloisonnement complet des dispatches, escalades de la 15). Autres chantiers
-candidats : sortie d'expérimental de `mobile-test`(-team), dette backlog (known-versions.txt,
+**Current focus:** Phase 16 **SHIPPÉE `v2.41.0`** (2026-07-27) — les allowlists `Agent(...)` sont
+enfin lintées, les 3 workers dev scopés, deux dettes fermées. Plus aucun milestone ouvert. Chantiers
+inscrits : **Phases 17 et 18** (signaux de démarrage du moteur de dev ; capability living-specs).
+Autres candidats : sortie d'expérimental de `mobile-test`(-team), dette backlog (known-versions.txt,
 brick_routed).
 
 ## Current Position
 
-Phase: 15 **complète — shippée `v2.40.0`** (tag annoté + release GitHub, `check-release-tag --remote` ✓)
-Collaboration inter-équipes dev ↔ design (option A : étages croisés sous un seul manager). Livrée en
-mission d'équipe le 2026-07-27 : 17 commits, 18 fichiers, +406/−38. **5/5 Success Criteria tenus.**
-Suites vertes (43 dev · 12 design · 36 dag · 26 driver-lock, 0 KO), rejouées à la main avant release.
-Modules : `conductor` v1.14.6 · `design-orchestrator` v1.3.0 · `dev-orchestrator` v2.4.0.
+Phase: 16 **complète — shippée `v2.41.0`** (tag annoté + release GitHub, `check-release-tag --remote` ✓)
+Cloisonnement complet des dispatches. Livrée en mission d'équipe le 2026-07-27, en autonomie complète
+(cadrage rétroactif, aucun checkpoint humain). **4/4 Success Criteria tenus**, SC3 amendé (voir plus
+bas). Suites rejouées à la main avant release : 58 check-agents · 51 dev · 12 design ·
+`check-version-sync` ✓ · 6/6 modules `--strict` exit 0 · 6/6 en monde fermé (`--resolve-agents=strict`,
+le job CI). Modules : `conductor` v1.15.0 · `dev-orchestrator` v2.5.0.
 Status: Shippée.
-Last activity: 2026-07-27 (release v2.40.0 publiée + Phase 16 inscrite)
+Last activity: 2026-07-27 (mission d'équipe Phase 16 + release v2.41.0)
 
-**Deux escalades de la mission, arbitrées en Phase 16** (choix humain du 2026-07-27 : phase courte
-dédiée plutôt que traitement dans la foulée ou simple backlog) : écrire le lint `Agent(...)` manquant
-dans `check-agents.sh` (le script ne lit jamais le contenu du champ `tools:`), et scoper l'accès
-`Agent` de `vf-coder`/`vf-reviewer`/`vf-auditer` (chemin indirect manager→worker→manager encore
-ouvert, invariant tenu par le seul verrou de driver). Voir §Decisions du 2026-07-27,
-`.planning/codebase/CONCERNS.md` et ROADMAP §Phase 16.
+**Amendement SC3 — une allowlist `Agent(...)` n'est pas un sandbox runtime.** Découverte de la
+mission, doc officielle citée verbatim dans l'en-tête de `check-agents.sh` : le runtime **ignore** la
+liste de noms entre parenthèses dans la définition d'un sous-agent ; seule la présence de
+`Agent`/`Task` dans `tools:` compte pour lui. L'allowlist n'est une vraie restriction runtime que
+pour un agent incarné en thread principal (`claude --agent`). Elle reste donc un **contrat documenté,
+enforcé par le lint et par lui seul** — ce qui vaut rétroactivement pour les allowlists des deux
+managers posées en Phase 15. Le cloisonnement est réel, mais c'est un gate machine, pas un bac à sable.
+
+**Deux dettes fermées** (retirées de `CONCERNS.md`) : accès `Agent` non scopé des 3 workers, et
+`check-agents --strict` sans périmètre tiers (les 66 faux positifs du scope user, réglés par
+`--third-party-prefix` et vérifiés empiriquement sur `~/.claude/agents`).
+
+**Incident de concurrence à traiter — verrou de driver expiré en cours de mission.** Le TTL est de
+30 min ; plusieurs workers ont tourné 10 à 22 min et les heartbeats du manager étaient placés *entre*
+les frontières de dispatch, jamais pendant. Le lock a expiré, la session concurrente (Phase 17) l'a
+récupéré, et le `release` final du manager Phase 16 a rendu `not-owner`. **Deux managers ont donc
+tourné en parallèle** — sans dégât ici parce que les périmètres étaient disjoints, mais par chance,
+pas par construction. L'invariant « un seul driver » n'est pas tenu face à des workers plus longs que
+le TTL. À instruire (candidat phase ou correctif kernel : heartbeat pendant l'attente d'un worker,
+ou TTL indexé sur la durée réelle des dispatches).
 
 ---
 
