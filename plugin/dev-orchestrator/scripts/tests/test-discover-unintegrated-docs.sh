@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # test-discover-unintegrated-docs.sh — Suite de vérification de discover-unintegrated-docs.sh
-#                                       (BRDG-02, plan 13-01 + fix-13-01).
+#                                       (BRDG-02, plan 13-01 + fix-13-01 ; --hook, plan 17-02).
 #
-# Un cas par piège (16 assertions). Fixtures isolées via mktemp -d + --path, jamais sur le repo réel.
+# Un cas par piège (22 assertions : 16 du contrat historique grain<TAB>chemin, 6 du mode --hook
+# additif SIG-02). Fixtures isolées via mktemp -d + --path, jamais sur le repo réel.
 # Modèle de structure : plugin/planning-core/scripts/tests/test-detect-gsd-engine.sh.
+# Les cas 1 à 16 ne sont JAMAIS modifiés — leur passage inchangé EST la preuve de non-régression
+# du contrat historique (D-06). Les cas 17+ continuent la numérotation, forme identique.
 
 set -uo pipefail
 
@@ -144,6 +147,58 @@ errfile="$TMP/c16.err"
 out="$(bash "$SCRIPT" --path "$D" --quiet 2>"$errfile")"; rc=$?
 err="$(cat "$errfile")"
 if [ "$rc" -eq 3 ] && [ -z "$out" ] && [ -z "$err" ]; then ok "16 --quiet silencieux sur stdout et stderr (exit 3)"; else ko "16 --quiet silencieux sur stdout et stderr (exit 3)" "rc=$rc out=[$out] err=[$err]"; fi
+
+# === Cas 17 — --hook sur 3 documents non cités (2 spec, 1 plan) → ligne agrégée, exit 0 ==========
+D="$(mk_root c17)"
+echo '# spec' > "$D/docs/superpowers/specs/2026-01-17-un-design.md"
+echo '# spec' > "$D/docs/superpowers/specs/2026-01-17-deux-design.md"
+echo '# plan' > "$D/docs/superpowers/plans/2026-01-17-un.md"
+out="$(bash "$SCRIPT" --hook --path "$D")"; rc=$?
+has_signal=0; case "$out" in *"[docs-ingest] 3 documents"*"2 spec"*"1 plan"*) has_signal=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has_signal" -eq 1 ]; then ok "17 --hook sur 3 documents non cités (2 spec, 1 plan) → ligne agrégée, exit 0"; else ko "17 --hook sur 3 documents non cités (2 spec, 1 plan) → ligne agrégée, exit 0" "rc=$rc out=[$out]"; fi
+
+# === Cas 18 — --hook sur un corpus entièrement cité → stdout vide, exit 3 (mêmes conditions) ======
+D="$(mk_root c18)"
+echo '# spec' > "$D/docs/superpowers/specs/2026-01-18-trois-design.md"
+printf 'Spec : docs/superpowers/specs/2026-01-18-trois-design.md\n' > "$D/.planning/ROADMAP.md"
+out="$(bash "$SCRIPT" --hook --path "$D")"; rc=$?
+if [ "$rc" -eq 3 ] && [ -z "$out" ]; then ok "18 --hook sur corpus entièrement cité → stdout vide, exit 3"; else ko "18 --hook sur corpus entièrement cité → stdout vide, exit 3" "rc=$rc out=[$out]"; fi
+
+# === Cas 19 — --hook avec .planning/ absent → stdout vide, exit 3 =================================
+D="$TMP/c19"; mkdir -p "$D/docs/superpowers/specs"
+echo '# spec' > "$D/docs/superpowers/specs/2026-01-19-quatre-design.md"
+out="$(bash "$SCRIPT" --hook --path "$D")"; rc=$?
+if [ "$rc" -eq 3 ] && [ -z "$out" ]; then ok "19 --hook avec .planning/ absent → stdout vide, exit 3"; else ko "19 --hook avec .planning/ absent → stdout vide, exit 3" "rc=$rc out=[$out]"; fi
+
+# === Cas 20 — --hook + --quiet → exit 64, stdout vide, message non vide sur stderr ================
+errfile="$TMP/c20.err"
+out="$(bash "$SCRIPT" --hook --quiet 2>"$errfile")"; rc=$?
+err="$(cat "$errfile")"
+if [ "$rc" -eq 64 ] && [ -z "$out" ] && [ -n "$err" ]; then ok "20 --hook + --quiet ensemble → exit 64, stdout vide, stderr non vide"; else ko "20 --hook + --quiet ensemble → exit 64, stdout vide, stderr non vide" "rc=$rc out=[$out] err=[$err]"; fi
+
+# === Cas 21 — Non-régression : sur la MÊME fixture, sans --hook la sortie reste grain<TAB>chemin ==
+D="$(mk_root c21)"
+echo '# spec' > "$D/docs/superpowers/specs/2026-01-21-cinq-design.md"
+echo '# spec' > "$D/docs/superpowers/specs/2026-01-21-six-design.md"
+echo '# plan' > "$D/docs/superpowers/plans/2026-01-21-cinq.md"
+hook_out="$(bash "$SCRIPT" --hook --path "$D")"; hook_rc=$?
+plain_out="$(bash "$SCRIPT" --path "$D")"; plain_rc=$?
+plain_lines="$(printf '%s\n' "$plain_out" | grep -c '.' || true)"
+plain_has_tab=0; case "$plain_out" in *"$(printf '\t')"*) plain_has_tab=1 ;; esac
+plain_has_marker=0; case "$plain_out" in *"[docs-ingest]"*) plain_has_marker=1 ;; esac
+hook_count="$(printf '%s' "$hook_out" | head -n 1 | awk '{print $2}')"
+if [ "$plain_rc" -eq 0 ] && [ "$hook_rc" -eq 0 ] && [ "$plain_has_tab" -eq 1 ] && [ "$plain_has_marker" -eq 0 ] && [ "$plain_lines" = "$hook_count" ]; then
+  ok "21 non-régression — sans --hook, grain<TAB>chemin trié, aucun marqueur, lignes == compte --hook"
+else
+  ko "21 non-régression — sans --hook, grain<TAB>chemin trié, aucun marqueur, lignes == compte --hook" "plain_rc=$plain_rc hook_rc=$hook_rc plain_lines=[$plain_lines] hook_count=[$hook_count] plain_out=[$plain_out] hook_out=[$hook_out]"
+fi
+
+# === Cas 22 — --hook n'émet jamais de ligne tabulée (aucune fuite du contrat historique) ==========
+D="$(mk_root c22)"
+echo '# spec' > "$D/docs/superpowers/specs/2026-01-22-sept-design.md"
+out="$(bash "$SCRIPT" --hook --path "$D")"
+tabcount=0; case "$out" in *"$(printf '\t')"*) tabcount=1 ;; esac
+if [ "$tabcount" -eq 0 ]; then ok "22 --hook n'émet jamais de ligne tabulée"; else ko "22 --hook n'émet jamais de ligne tabulée" "out=[$out]"; fi
 
 echo ""
 echo "== résultat : $PASS ok, $FAIL ko =="

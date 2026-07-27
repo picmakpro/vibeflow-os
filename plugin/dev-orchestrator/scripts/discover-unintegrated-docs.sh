@@ -8,8 +8,14 @@
 # registre ne le cite » — et à quel GRAIN il appartient (spec | plan).
 #
 # Usage:
-#   discover-unintegrated-docs.sh [--path <dir>] [--quiet]
+#   discover-unintegrated-docs.sh [--path <dir>] [--hook] [--quiet]
 # Defaults: --path .
+#
+# --hook (plan 17-02, additif) : change UNIQUEMENT le format d'affichage — au lieu de la liste
+# grain<TAB>chemin, émet une ligne agrégée [docs-ingest] (compte total + ventilation spec/plan)
+# suivie de sa ligne de geste, dans les MÊMES conditions d'exit (0/3/64) que le mode par défaut.
+# Le contrat historique grain<TAB>chemin, consommé par ingestion-flow.md, reste le seul mode actif
+# sans --hook — il ne bouge pas d'un octet. --hook et --quiet sont mutuellement exclusifs (exit 64).
 #
 # Sources scannées (grain) :
 #   <sources>/specs/*.md  → grain spec
@@ -44,6 +50,7 @@ shopt -s nullglob
 
 ROOT="."
 QUIET=0
+HOOK=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -54,10 +61,17 @@ while [ "$#" -gt 0 ]; do
       fi
       ROOT="$2"; shift 2 ;;
     --quiet) QUIET=1; shift ;;
+    --hook) HOOK=1; shift ;;
     -h|--help) grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *) echo "[discover-unintegrated-docs] argument inconnu : $1" >&2; exit 64 ;;
   esac
 done
+
+# Gate de mutuelle exclusion, avant toute autre logique (même position que le gate --path).
+if [ "$HOOK" -eq 1 ] && [ "$QUIET" -eq 1 ]; then
+  echo "[discover-unintegrated-docs] --hook et --quiet sont mutuellement exclusifs" >&2
+  exit 64
+fi
 
 SOURCES_ROOT="${VF_INGEST_SOURCES_DIR:-$ROOT/docs/superpowers}"
 PLANNING_DIR="${VF_INGEST_PLANNING_DIR:-$ROOT/.planning}"
@@ -134,6 +148,18 @@ done < "$DOCS_TMP"
 if [ ! -s "$OUT_TMP" ]; then
   say "Corpus entièrement cité — rien à intégrer."
   exit 3
+fi
+
+# --- Mode --hook (additif) : une ligne agrégée au lieu de la liste, mêmes exits (D-06) -----------
+# Compte total + ventilation par grain en une seule passe awk POSIX. Le calcul amont ($OUT_TMP) et
+# les trois exits ne sont pas modifiés — cette branche ne fait que remplacer le rendu.
+if [ "$HOOK" -eq 1 ]; then
+  IFS="$(printf '\t')" read -r TOTAL NSPEC NPLAN <<HOOKEOF
+$(awk -F'\t' '{c[$1]++; n++} END{printf "%d\t%d\t%d\n", n, c["spec"]+0, c["plan"]+0}' "$OUT_TMP")
+HOOKEOF
+  printf '%s\n' "[docs-ingest] ${TOTAL} documents de cadrage hors feuille de route (${NSPEC} spec, ${NPLAN} plan)."
+  printf '%s\n' "            → propose l'ingestion (gsd-ingest-docs --mode merge / gsd-import), jamais sans confirmation."
+  exit 0
 fi
 
 [ "$QUIET" -eq 1 ] && exit 0
