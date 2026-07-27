@@ -11,14 +11,20 @@ chemins posés** par module à l'install (`.claude/scripts/.vibeflow-manifest-<m
 `update` supprime les chemins de l'ancien manifeste absents du nouveau (avec backup). Tests :
 update d'un module dont une skill a disparu → skill retirée du lab.
 
-## check-agents : périmètre des agents tiers (gsd-*, autres chaînes)
-**Capturé :** 2026-07-26 · **Origine :** sanity check machine post-update
+## check-agents : périmètre des agents tiers (gsd-*, autres chaînes) — CLOS
+**Capturé :** 2026-07-26 · **Clos :** 2026-07-27 (Phase 16) · **Origine :** sanity check machine
+post-update
 
-`check-agents.sh --strict` sur `~/.claude/agents` remonte 66 non-conformités — toutes sur les
-agents `gsd-*` (chaîne tierce qui ne suit pas la charte ADR-044). Les agents VibeFlow sont
-conformes. Remède proposé : liste d'exclusion de préfixes tiers (`--exclude-prefix=gsd-` par
-défaut documenté, ou lecture d'un `.vibeflow-charter-scope`) pour que le gate juge la charte
-VibeFlow sur les agents VibeFlow — cohérent avec la leçon UAT « baseline vs lab ».
+`check-agents.sh --strict` sur `~/.claude/agents` remontait 66 non-conformités — toutes sur les
+agents `gsd-*` (chaîne tierce qui ne suit pas la charte ADR-044). Fermé par le flag
+`--third-party-prefix` (défaut `gsd-`, répétable ; `--no-third-party-prefix` pour le vider) posé
+en Phase 16 dans `plugin/conductor/scripts/check-agents.sh` : un agent `gsd-*` n'est plus linté
+pour la charte VibeFlow, et une entrée d'allowlist qui matche le préfixe est réputée résolvable.
+**Vérifié empiriquement le 2026-07-27** : `check-agents.sh --strict --agents-dir="$HOME/.claude/agents"`
+sort désormais en exit 0 (34 agents `gsd-*` exclus, 0 erreur, 26 warnings résiduels sur des agents
+réels non-`gsd-*`, hors périmètre de cet item). Sans le flag (`--no-third-party-prefix`), les
+erreurs `gsd-*` réapparaissent (169 lignes ✗/⚠) — confirme que c'est bien le flag qui ferme le
+faux positif, pas une coïncidence de version.
 
 ## Skill-installer global (multi-agents)
 **Capturé :** 2026-06-04 · **À explorer :** après le milestone « Install UX »

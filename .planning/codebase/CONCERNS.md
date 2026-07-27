@@ -49,15 +49,6 @@
 - Fix approach: supprimer `docs/reference/` ou le réduire à un pointeur vers le module ; sinon gate
   d'identité dans la CI.
 
-**`check-agents.sh --strict` sans périmètre tiers** — Sévérité : **MEDIUM**
-- Issue: exécuté sur `~/.claude/agents` (scope user), le gate remonte 66 non-conformités — toutes
-  sur des agents `gsd-*` (chaîne tierce hors charte ADR-044). Faux positifs massifs qui rendent le
-  verdict inutilisable hors baseline repo.
-- Files: `plugin/conductor/scripts/check-agents.sh` ; capturé dans `.planning/BACKLOG.md:14-21`
-- Impact: le gate ne peut pas servir de sanity check post-install sur une machine réelle.
-- Fix approach: exclusion de préfixes tiers (`--exclude-prefix=gsd-`) ou lecture d'un
-  `.vibeflow-charter-scope` — cohérent avec la leçon UAT « baseline vs lab ».
-
 **`validator/AGENT.md` à 249/250 lignes (plafond ADR-029)** — Sévérité : **MEDIUM**
 - Issue: l'agent est à 1 ligne du plafond densité. Tout ajout (nouveau contrôle Phase 4, nouvelle
   escalade) exige d'abord un délestage vers `references/` ou une skill.
@@ -86,24 +77,6 @@
 - Files: `.planning/BACKLOG.md:36-38`
 - Impact: le backlog perd sa valeur de radar si les déclencheurs ne sont pas honorés.
 - Fix approach: ré-arbitrage explicite (reprendre / re-différer avec nouveau déclencheur / abandonner).
-
-**Accès `Agent` non scopé sur trois workers de l'équipe dev** — Sévérité : **MEDIUM**
-- Issue: `vf-coder`, `vf-reviewer` et `vf-auditer` déclarent `tools: …, Agent` sans allowlist
-  (Phase 15 a posé des allowlists sur les deux managers, pas sur ces workers). Le chemin de dispatch
-  **direct** manager→manager est fermé, mais rien n'empêche ces workers d'appeler
-  `Task(vf-dev-manager)` / `Task(vf-design-manager)` au niveau du dispatch — le chemin **indirect**
-  reste ouvert à ce niveau. L'invariant « un seul manager actif » tient quand même, mais par un
-  autre mécanisme : le verrou de driver refuse l'`acquire` du second manager (T1,
-  `test-driver-lock.sh` T2).
-- Files: `plugin/dev-orchestrator/agents/vf-coder.md:4`, `vf-reviewer.md:4`, `vf-auditer.md:4`
-- Impact: aucun aujourd'hui (le lock couvre), mais c'est une extension de périmètre à traiter sous
-  validation humaine — chacun de ces workers invoque des skills dont il faudrait recenser
-  exhaustivement les agents avant d'écrire une allowlist correcte (deux recensements successifs ont
-  déjà produit 4 omissions sur ce type d'exercice ; une allowlist incomplète casse des dispatches en
-  production silencieusement).
-- Fix approach: recenser exhaustivement les agents atteignables par chaque worker via ses skills
-  internes, puis poser une allowlist `Agent(...)` complète — geste réservé, pas à automatiser sans
-  revue humaine du recensement.
 
 ## Known Bugs
 
