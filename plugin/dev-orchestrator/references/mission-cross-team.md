@@ -7,13 +7,17 @@
 > (T3 : DAG mixte `craft:écran → exec → (critique:écran ∥ revue-code)` ; T4 : reopen cross-métier).
 > Option A retenue : étages croisés **sous un seul manager** — un seul verrou de driver, un seul
 > DAG, un seul rapport de mission. L'imbrication manager→manager reste **interdite** (Pattern A,
-> T1 : `acquire` refusé). Deux lignes de défense depuis le nœud D-07 : les allowlists `Agent(...)`
-> des deux managers (Pattern 12, `test-dev-orchestrator.sh` T18, `test-design-orchestrator.sh` T8)
-> ferment le chemin direct manager→manager ; le **verrou de driver** (T1, couvert en continu par
-> `test-driver-lock.sh` T2) garantit l'invariant même par chemin indirect
-> (`manager → worker → manager`), ce qui compte puisque `vf-coder`/`vf-reviewer`/`vf-auditer`
-> gardent un `Agent` non scopé (dette suivie, `.planning/codebase/CONCERNS.md`). Dans tous les cas,
-> `check-agents.sh` ne valide que la présence et la forme du champ `tools:`, jamais son contenu.
+> T1 : `acquire` refusé). Depuis le nœud D-07, les cinq agents du module (2 managers + les 3
+> workers `vf-coder`/`vf-reviewer`/`vf-auditer`) portent tous une allowlist `Agent(...)` recensée
+> (Pattern 12, `test-dev-orchestrator.sh` T18/T19, `test-design-orchestrator.sh` T8) : elle ferme
+> le chemin **direct** manager→manager **et** le chemin **indirect** manager→worker→manager, par
+> déclaration et par lint — l'allowlist est un contrat documenté, désormais enforcé par le lint de
+> `check-agents.sh` (recensement porté par ce nœud, lint écrit en parallèle par le nœud voisin), et
+> non un bac à sable runtime dans le cas sous-agent : le runtime Claude Code n'applique la liste
+> entre parenthèses que pour un agent incarné en fenêtre principale (`claude --agent`) — il
+> l'ignore quand l'agent est dispatché en sous-agent. Le **verrou de driver** (T1, couvert en
+> continu par `test-driver-lock.sh` T2) reste donc, dans tous les cas, la garantie machine de
+> dernier ressort de l'invariant « un seul manager actif ».
 
 ---
 
@@ -87,12 +91,15 @@
 - **Jamais de manager qui en dispatche un autre** — l'imbrication manager→manager est bloquée
   par construction (Pattern A, T1). Depuis le nœud D-07, les allowlists `Agent(...)` des deux
   managers (Pattern 12, `test-dev-orchestrator.sh` T18, `test-design-orchestrator.sh` T8) ferment
-  le chemin **direct**. La garantie qui tient en toutes circonstances, y compris par chemin
-  **indirect** (`manager → worker → manager` — `vf-coder`/`vf-reviewer`/`vf-auditer` gardent un
-  `Agent` non scopé, dette suivie), c'est le **verrou de driver** : un second `acquire` est refusé
-  tant que le premier manager pilote (T1, couvert en continu par `test-driver-lock.sh` T2). Ni l'un
-  ni l'autre n'est vérifié par `check-agents.sh`, qui ne valide que le frontmatter, jamais le
-  contenu du champ `tools:`.
+  le chemin **direct** ; les allowlists des trois workers `vf-coder`/`vf-reviewer`/`vf-auditer`
+  (`test-dev-orchestrator.sh` T19) ferment de la même façon le chemin **indirect**
+  (`manager → worker → manager`) — par déclaration et par lint (`check-agents.sh`), pas par bac à
+  sable runtime : le runtime Claude Code n'applique la liste entre parenthèses que pour un agent
+  incarné en fenêtre principale (`claude --agent`), jamais pour un agent dispatché en sous-agent.
+  C'est pourquoi le **verrou de driver** reste, dans tous les cas, la garantie machine de dernier
+  ressort de l'invariant « un seul manager actif » : un second `acquire` est refusé tant que le
+  premier manager pilote (T1, couvert en continu par `test-driver-lock.sh` T2), y compris si une
+  allowlist était mal posée ou absente.
 
 ---
 

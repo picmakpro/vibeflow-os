@@ -905,5 +905,85 @@ fi
 [ "$t18b_ok" -eq 1 ] && ok "T18b doctrine : étage design (SC1, renvoi mission-cross-team) + routage vf-auto→design pur (SC3) présents"
 
 # ---------------------------------------------------------------------------
+# T19 — Cloisonnement des 3 workers (Pattern 12) : allowlist Agent(...) nom par nom (Phase 16)
+# ---------------------------------------------------------------------------
+# Miroir de T18 (manager) côté workers : ferme le chemin INDIRECT manager→worker→manager
+# (mission-cross-team.md, Invariants). Chaque nom testé un par un — jamais un grep global qui
+# passerait avec une liste tronquée.
+CODER_FILE="$MOD/agents/vf-coder.md"
+REVIEWER_FILE="$MOD/agents/vf-reviewer.md"
+AUDITER_FILE="$MOD/agents/vf-auditer.md"
+
+CODER_ALLOWED="vf-reviewer general-purpose gsd-assumptions-analyzer gsd-phase-researcher \
+gsd-pattern-mapper gsd-planner gsd-plan-checker gsd-executor gsd-codebase-mapper gsd-verifier \
+gsd-code-reviewer gsd-code-fixer gsd-debugger gsd-integration-checker gsd-nyquist-auditor \
+gsd-ui-researcher gsd-ui-checker gsd-ui-auditor gsd-framework-selector gsd-ai-researcher \
+gsd-domain-researcher gsd-eval-planner"
+REVIEWER_ALLOWED="gsd-code-reviewer"
+AUDITER_ALLOWED="gsd-security-auditor"
+
+# Vérifie l'allowlist d'un worker nom par nom. Retourne l'échec via ko() (pas de return code
+# consommé par l'appelant — cohérent avec le style pass/fail global du fichier).
+check_worker_allowlist() {
+  local file="$1" label="$2" names="$3" ok_all=1 line bare name
+  line="$(dev_tools_line "$file")"
+  if [ -z "$line" ]; then
+    ko "T19 cloisonnement : $label sans ligne tools: (hériterait de TOUT)"; return
+  fi
+  bare="$(echo "$line" | "$GREP" -oE 'Agent([^(]|$)')"
+  [ -z "$bare" ] || { ko "T19 cloisonnement : $label a un Agent nu (pas d'allowlist)"; ok_all=0; }
+  echo "$line" | "$GREP" -qF 'Agent(' || { ko "T19 cloisonnement : $label — aucune allowlist Agent( ) trouvée"; ok_all=0; }
+  for name in $names; do
+    echo "$line" | "$GREP" -qF -- "$name" || { ko "T19 cloisonnement : « $name » absent de l'allowlist de $label"; ok_all=0; }
+  done
+  [ "$ok_all" -eq 1 ] && ok "T19 cloisonnement : $label — allowlist Agent(...) complète, nom par nom"
+}
+
+check_worker_allowlist "$CODER_FILE" "vf-coder" "$CODER_ALLOWED"
+check_worker_allowlist "$REVIEWER_FILE" "vf-reviewer" "$REVIEWER_ALLOWED"
+check_worker_allowlist "$AUDITER_FILE" "vf-auditer" "$AUDITER_ALLOWED"
+
+# T19b — aucun des 3 workers ne référence un manager (imbrication manager→manager interdite,
+# même par chemin indirect worker→manager).
+t19b_ok=1
+for f in "$CODER_FILE" "$REVIEWER_FILE" "$AUDITER_FILE"; do
+  line="$(dev_tools_line "$f")"
+  echo "$line" | "$GREP" -qF -- "vf-dev-manager" && { ko "T19b cloisonnement : $(basename "$f") référence vf-dev-manager (imbrication interdite)"; t19b_ok=0; }
+  echo "$line" | "$GREP" -qF -- "vf-design-manager" && { ko "T19b cloisonnement : $(basename "$f") référence vf-design-manager (imbrication interdite)"; t19b_ok=0; }
+done
+[ "$t19b_ok" -eq 1 ] && ok "T19b cloisonnement : aucun des 3 workers ne référence vf-dev-manager ni vf-design-manager"
+
+# T19c — plus aucun agent du module ne déclare Agent NU (motif borné : Agent non suivi de « ( »,
+# pas de faux positif sur Agent( ). Couvre les 2 managers + 3 workers (TEAM_AGENTS, défini en T8).
+t19c_ok=1
+for a in $TEAM_AGENTS; do
+  f="$MOD/agents/$a.md"
+  [ -f "$f" ] || continue
+  line="$(dev_tools_line "$f")"
+  [ -n "$line" ] || continue
+  bare="$(echo "$line" | "$GREP" -oE 'Agent([^(]|$)')"
+  [ -z "$bare" ] || { ko "T19c cloisonnement : $a.md déclare Agent nu dans tools:"; t19c_ok=0; }
+done
+[ "$t19c_ok" -eq 1 ] && ok "T19c cloisonnement : aucun agent du module ne déclare Agent nu"
+
+# T19d — parenthèse d'allowlist fermée en fin de ligne sur les 3 workers.
+t19d_ok=1
+for f in "$CODER_FILE" "$REVIEWER_FILE" "$AUDITER_FILE"; do
+  line="$(dev_tools_line "$f")"
+  echo "$line" | "$GREP" -qE '\)[[:space:]]*$' || { ko "T19d cloisonnement : $(basename "$f") — allowlist non fermée en fin de ligne"; t19d_ok=0; }
+done
+[ "$t19d_ok" -eq 1 ] && ok "T19d cloisonnement : parenthèse d'allowlist fermée en fin de ligne sur les 3 workers"
+
+# T19e — « general-purpose » testé NOMMÉMENT dans vf-coder : c'est le nom le plus facile à perdre
+# lors d'une future édition (introuvable par un inventaire des seuls fichiers d'agents — il n'est
+# dispatché que par discuss-phase en mode advisor/assumptions).
+coder_line="$(dev_tools_line "$CODER_FILE")"
+if echo "$coder_line" | "$GREP" -qF -- "general-purpose"; then
+  ok "T19e cloisonnement : « general-purpose » présent dans l'allowlist de vf-coder (cadrage non-interactif)"
+else
+  ko "T19e cloisonnement : « general-purpose » absent de l'allowlist de vf-coder — casserait discuss-phase --auto en silence"
+fi
+
+# ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
 [ "$fail" -eq 0 ]
