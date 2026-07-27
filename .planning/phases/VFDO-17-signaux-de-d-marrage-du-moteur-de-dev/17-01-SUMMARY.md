@@ -210,3 +210,14 @@ None - aucune configuration de service externe requise.
 ---
 *Phase: VFDO-17-signaux-de-d-marrage-du-moteur-de-dev*
 *Completed: 2026-07-27*
+
+## Self-Check: PASSED
+
+- FOUND: plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh
+- FOUND: plugin/dev-orchestrator/hooks/hooks.json
+- FOUND: plugin/dev-orchestrator/scripts/tests/test-check-dev-bootstrap.sh
+- FOUND: .planning/phases/VFDO-17-signaux-de-d-marrage-du-moteur-de-dev/17-01-SUMMARY.md
+- FOUND commit c5995ec, FOUND commit 5adae40, FOUND commit ac9d9da
+- `git status --short` ne montre que les 2 chemins hors périmètre déjà non trackés avant
+  exécution (`.planning/missions/dag-phase17.json`,
+  `.planning/phases/VFDO-18-capability-living-specs-conventions-openspec/`), laissés intacts.
