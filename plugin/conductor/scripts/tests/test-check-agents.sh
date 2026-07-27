@@ -48,6 +48,12 @@
 #   T48 — description < 30c → warning non bloquant
 #   T49 — tools absent → warning non bloquant (herite tout)
 #   T50 — name different du nom de fichier → warning non bloquant
+#
+# Gate final (3 ecarts en-tete <-> comportement, re-entree Phase 16 exec-lint) :
+#   T51 — --resolve-agents=<valeur invalide> → exit 1 explicite (plus un skip muet)
+#   T52 — --third-party-prefix ACCUMULE au-dessus du defaut gsd- (ne l'ecrase plus)
+#   T53 — compteurs distincts : fichiers agent tiers non lintes != entrees d'allowlist resolues
+#   T54 — nit : 'Agent(a))' (parenthese en trop) → libelle distinct de 'non fermee'
 
 set -uo pipefail
 
@@ -526,7 +532,7 @@ description: Agent tiers GSD sans model ni memory, pour tester le skip par prefi
 corps
 EOF
 OUT="$(run_check 2>&1)"; RC=$?
-if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "agent(s) tiers ignore"; then
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "fichier(s) agent tiers non linte"; then
   ok "T32 gsd-planner (tiers, prefixe gsd- par defaut) → ignore, exit 0"
 else
   ko "T32 (rc=$RC) : $OUT"
@@ -878,6 +884,98 @@ else
   ko "T50 (rc=$RC) : $OUT"
 fi
 rm -f "$AG/autre-fichier.md" "$AG/vf-coder.md"
+
+# ---------- Gate final (3 ecarts en-tete <-> comportement, re-entree Phase 16 exec-lint) ----------
+
+# T51 — --resolve-agents=<valeur invalide> (typo type 'stricts') → exit 1 explicite. Avant le
+# correctif, le code ne testait que '== "strict"' : toute autre valeur (y compris une typo CI)
+# degradait SILENCIEUSEMENT en lenient, exit 0, aucun message — exactement le faux vert F13
+# que ce script interdit deja pour la cible vide. Discriminance : ce test tombe (exit 0, pas
+# de message) si on mute la validation en retirant le case lenient|strict.
+RC=0; OUT="$(run_check --resolve-agents=stricts 2>&1)" || RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "resolve-agents invalide"; then
+  ok "T51 --resolve-agents=stricts (typo) → exit 1 explicite (plus un skip muet)"
+else
+  ko "T51 (rc=$RC) : $OUT"
+fi
+
+# T52 — --third-party-prefix ACCUMULE au-dessus du defaut gsd- (ne l'ecrase plus). Avant le
+# correctif, la premiere occurrence videait THIRD_PARTY_PREFIXES avant d'ajouter la valeur
+# custom : gsd-planner.md redevenait linte (donc en erreur) des qu'un seul --third-party-prefix
+# etait fourni, meme sans --no-third-party-prefix. Discriminance : ce test tombe (rc=1, ou
+# 'prefixe(s) : acme-' sans 'gsd-') si on remet l'ecrasement au premier flag custom.
+cat > "$AG/gsd-planner.md" <<'EOF'
+---
+name: gsd-planner
+description: Agent tiers GSD sans model ni memory, pour tester l'accumulation de prefixe.
+---
+corps
+EOF
+RC=0; OUT="$(run_check --third-party-prefix=acme- 2>&1)" || RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "prefixe(s) : gsd-,acme-"; then
+  ok "T52 --third-party-prefix=acme- ACCUMULE sur le defaut gsd- (gsd-planner toujours ignore)"
+else
+  ko "T52 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/gsd-planner.md"
+
+# T53 — compteurs DISTINCTS : fichiers agent tiers non lintes != entrees d'allowlist tierces
+# resolues. Avant le correctif, un seul compteur amalgamait les deux populations sous le
+# libelle trompeur 'N agent(s) tiers ignore(s)' (33 sur dev-orchestrator alors que 0 fichier
+# gsd-*.md n'existait sur disque). Ici : 2 fichiers tiers + 1 entree d'allowlist tierce (jamais
+# materialisee en fichier) doivent produire deux chiffres differents et correctement libelles.
+cat > "$AG/gsd-other.md" <<'EOF'
+---
+name: gsd-other
+description: Premier agent tiers GSD, pour peupler le compteur de fichiers non lintes.
+---
+corps
+EOF
+cat > "$AG/gsd-other2.md" <<'EOF'
+---
+name: gsd-other2
+description: Second agent tiers GSD, pour peupler le compteur de fichiers non lintes.
+---
+corps
+EOF
+cat > "$AG/vf-mixte2.md" <<'EOF'
+---
+name: vf-mixte2
+description: Agent de test dont l'allowlist reference un agent tiers jamais materialise sur disque.
+model: sonnet
+memory: project
+tools: Read, Agent(gsd-jamais-cree)
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "2 fichier(s) agent tiers non linte(s) · 1 entree(s) d'allowlist tierce(s) resolue(s)"; then
+  ok "T53 compteurs distincts : 2 fichier(s) agent tiers != 1 entree(s) d'allowlist tierce(s)"
+else
+  ko "T53 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/gsd-other.md" "$AG/gsd-other2.md" "$AG/vf-mixte2.md"
+
+# T54 (nit) — 'Agent(a))' (parenthese fermante EN TROP, pas manquante) ne doit plus etre
+# libelle 'non fermee' (message pointant vers l'oppose du vrai probleme). Discriminance :
+# ce test tombe si on refusionne les deux branches de signe en un seul message 'non fermee'.
+cat > "$AG/extra-mot.md" <<'EOF'
+---
+name: extra-mot
+description: Agent de test pour verifier le libelle exact de la parenthese en trop.
+model: sonnet
+memory: project
+tools: Read, Agent(a))
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "fermante en trop" && ! echo "$OUT" | grep -q "parenthese non fermee"; then
+  ok "T54 'Agent(a))' → libelle 'fermante en trop' distinct de 'non fermee' (nit)"
+else
+  ko "T54 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/extra-mot.md"
 
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="

@@ -27,9 +27,11 @@
 #   check-agents.sh --file <agent.md>   # un seul fichier (utilisé par guard-agent-write)
 #   check-agents.sh --agents-dir=PATH   # défaut .claude/agents
 #   check-agents.sh --allow-empty       # avec --strict : tolère une cible vide (sinon exit 3)
-#   check-agents.sh --third-party-prefix=PFX     # répétable, défaut gsd- (accumulation)
+#   check-agents.sh --third-party-prefix=PFX     # répétable, défaut gsd- (accumule AU-DESSUS
+#                                                 # du défaut ; --no-third-party-prefix avant pour repartir de zéro)
 #   check-agents.sh --no-third-party-prefix      # vide la liste des préfixes tiers
-#   check-agents.sh --resolve-agents=lenient|strict  # défaut lenient (monde ouvert)
+#   check-agents.sh --resolve-agents=lenient|strict  # défaut lenient (monde ouvert) — toute
+#                                                 # autre valeur est REJETÉE (exit 1, jamais un skip muet)
 #   check-agents.sh --agent-registry-dir=PATH    # répétable, dirs de résolution supplémentaires
 #
 # BLOQUANT : frontmatter absent · name absent/invalide · description absente ·
@@ -50,10 +52,14 @@
 # --resolve-agents=strict (+ --agent-registry-dir répétés pour élargir l'univers connu) — c'est
 # la CI seule (union de tous les plugin/*/agents) qui a la légitimité de l'activer.
 #
-# --third-party-prefix (défaut "gsd-") a deux effets : (a) un FICHIER agent dont le name matche
-# le préfixe n'est plus linté du tout pour la charte VibeFlow (ce n'est pas notre agent) ; (b)
-# une ENTRÉE d'allowlist qui matche est réputée résolvable (silencieuse). Dans les deux cas,
-# c'est compté et imprimé dans le résumé — jamais un skip muet.
+# --third-party-prefix (défaut "gsd-") ACCUMULE au-dessus du défaut à chaque répétition (le
+# premier --no-third-party-prefix rencontré vide la liste avant d'accumuler à nouveau — ordre
+# des arguments respecté, comme tout flag CLI répétable). Il a deux effets : (a) un FICHIER
+# agent dont le name matche un préfixe n'est plus linté du tout pour la charte VibeFlow (ce
+# n'est pas notre agent) ; (b) une ENTRÉE d'allowlist qui matche est réputée résolvable
+# (silencieuse). Les deux sont comptés et imprimés SÉPARÉMENT dans le résumé (fichiers non
+# lintés ≠ entrées d'allowlist résolues — deux choses différentes, jamais un skip muet ni un
+# skip mal décrit).
 #
 # --hook n'imprime QUE les erreurs (jamais les warnings) : les nouvelles classes en warning
 # (outil hors set, agent non résolu, Agent nu) restent invisibles au SessionStart. C'est VOULU
@@ -63,7 +69,8 @@
 # sinon par le frontmatter `name:` des SKILL.md installés — un skill peut porter un name différent
 # de son dossier (ex. module planning-core → skill `vf-planning`).
 #
-# Codes de sortie : 0 = conforme · 1 = non conforme · 3 = INDÉTERMINÉ (--strict sur cible
+# Codes de sortie : 0 = conforme · 1 = non conforme (agents non conformes, OU invocation
+#   invalide — ex. --resolve-agents=<valeur inconnue>) · 3 = INDÉTERMINÉ (--strict sur cible
 #   absente/vide : aucun verdict rendu — un vert sans rien vérifier serait un faux vert, F13).
 
 set -uo pipefail
@@ -75,7 +82,6 @@ HOOK_MODE=false
 ALLOW_EMPTY=false
 SINGLE_FILE=""
 THIRD_PARTY_PREFIXES="gsd-"
-TP_CUSTOMIZED=false
 RESOLVE_AGENTS="lenient"
 REGISTRY_DIRS=""
 
@@ -88,11 +94,10 @@ for arg in "$@"; do
     --agents-dir=*)   AGENTS_DIR="${arg#*=}" ;;
     --skills-dir=*)   SKILLS_DIR="${arg#*=}" ;;
     --third-party-prefix=*)
-      if [ "$TP_CUSTOMIZED" = false ]; then THIRD_PARTY_PREFIXES=""; TP_CUSTOMIZED=true; fi
       v="${arg#*=}"
       if [ -z "$THIRD_PARTY_PREFIXES" ]; then THIRD_PARTY_PREFIXES="$v"; else THIRD_PARTY_PREFIXES="$THIRD_PARTY_PREFIXES:$v"; fi
       ;;
-    --no-third-party-prefix) THIRD_PARTY_PREFIXES=""; TP_CUSTOMIZED=true ;;
+    --no-third-party-prefix) THIRD_PARTY_PREFIXES="" ;;
     --resolve-agents=*) RESOLVE_AGENTS="${arg#*=}" ;;
     --agent-registry-dir=*)
       v="${arg#*=}"
@@ -107,6 +112,18 @@ for arg in "$@"; do
   [ "$prev" = "--file" ] && SINGLE_FILE="$arg"
   prev="$arg"
 done
+
+# --resolve-agents ne connaît QUE lenient|strict — toute autre valeur (typo type "stricts")
+# dégraderait silencieusement le gate monde fermé en vert si on la laissait passer (le code
+# n'aurait alors testé que == "strict" et serait tombé en lenient sans un mot). Rejet explicite,
+# exit 1 : jamais un skip muet, à l'image du contrat F13 déjà appliqué plus bas (cible vide).
+case "$RESOLVE_AGENTS" in
+  lenient|strict) ;;
+  *)
+    echo "[check-agents] ✗ --resolve-agents invalide '$RESOLVE_AGENTS' — attendu lenient|strict" >&2
+    exit 1
+    ;;
+esac
 
 # ADR-054 : stub Microsoft Store — `python3` présent dans le PATH mais inerte. Détection par
 # CHEMIN (zéro spawn), repli `python` ; sinon message + exit 0 (advisory, comme avant).
@@ -166,7 +183,13 @@ TOOL_NAMES = {
 AGENT_TOOL_NAMES = {\"Agent\", \"Task\"}
 
 errors, warnings = [], []
-thirdparty_total = 0
+# Deux compteurs DISTINCTS (jamais un skip mal decrit) : thirdparty_files_total = fichiers
+# .md entiers exclus du lint (name matche un prefixe tiers) ; thirdparty_entries_total =
+# entrees d'allowlist Agent(...)/Task(...) reputees resolvables via un prefixe tiers. Ce
+# sont deux populations differentes — un agent peut avoir 0 fichier tiers et 30 entrees
+# tierces dans ses allowlists, ou l'inverse.
+thirdparty_files_total = 0
+thirdparty_entries_total = 0
 
 def parse_frontmatter(text):
     lines = text.split(\"\n\")
@@ -272,7 +295,10 @@ def extract_raw_field(fmlines, key):
 
 def split_depth(raw):
     \"\"\"Split a profondeur de parentheses (jamais un split(',') naif) — c'est ce qui
-    laisse 'Agent(vf-coder, vf-reviewer)' intact comme UN token. Retourne (tokens, unclosed).\"\"\"
+    laisse 'Agent(vf-coder, vf-reviewer)' intact comme UN token. Retourne (tokens, depth) ou
+    depth est le solde ouvertures-fermetures EN SIGNE (0 = equilibre ; > 0 = il manque des
+    fermetures ; < 0 = il y a des fermetures EN TROP, ex. 'Agent(a))') — la distinction de
+    signe permet a l'appelant de ne pas dire \"non fermee\" quand le vrai probleme est l'inverse.\"\"\"
     tokens, depth, cur = [], 0, []
     for ch in raw:
         if ch == \"(\":
@@ -287,7 +313,7 @@ def split_depth(raw):
         else:
             cur.append(ch)
     tokens.append(\"\".join(cur))
-    return tokens, depth != 0
+    return tokens, depth
 
 def dequote_scalar(s):
     \"\"\"Retire UNE seule paire de guillemets englobante (\" ou ') — calque exact du
@@ -302,9 +328,9 @@ def tokenize_field(mode, raw):
     \"\"\"mode='block' : raw deja une liste de tokens individuels (puces YAML).
     mode in ('flow','scalar') : raw est une chaine — on la dequote d'abord (voir
     dequote_scalar), on retire les crochets [ ] de la flow list puis on decoupe a
-    profondeur de parentheses. Retourne (tokens, unclosed).\"\"\"
+    profondeur de parentheses. Retourne (tokens, depth) — voir split_depth pour le signe.\"\"\"
     if mode == \"block\":
-        return [dequote_scalar(t) for t in raw], False
+        return [dequote_scalar(t) for t in raw], 0
     s = dequote_scalar(raw.strip())
     if s.startswith(\"[\") and s.endswith(\"]\"):
         s = s[1:-1]
@@ -359,10 +385,13 @@ def resolve_agent_name(name, agents_dir_local, registry_dirs_local, prefixes):
 
 def lint_tool_field(base, field, mode, raw, do_agent_resolution):
     \"\"\"Applique le tokenizer + la classification a un champ tools:/disallowedTools:.\"\"\"
-    global thirdparty_total
-    tokens, unclosed = tokenize_field(mode, raw)
-    if unclosed:
-        errors.append(f\"{base} : {field} — parenthese non fermee (allowlist tronquee ou mal formee, verifier l'indentation de la continuation)\")
+    global thirdparty_entries_total
+    tokens, depth = tokenize_field(mode, raw)
+    if depth > 0:
+        errors.append(f\"{base} : {field} — parenthese non fermee (il manque {depth} fermeture(s), allowlist tronquee ou mal formee, verifier l'indentation de la continuation)\")
+        return
+    if depth < 0:
+        errors.append(f\"{base} : {field} — parenthese fermante en trop ({-depth} de trop, verifier '{raw}')\")
         return
     bare_agent = False
     for raw_tok in tokens:
@@ -381,7 +410,7 @@ def lint_tool_field(base, field, mode, raw, do_agent_resolution):
                 for a in agent_names:
                     verdict = resolve_agent_name(a, agents_dir, registry_dirs, third_party_prefixes)
                     if verdict == \"thirdparty\":
-                        thirdparty_total += 1
+                        thirdparty_entries_total += 1
                     elif verdict == \"unresolved\":
                         msg = f\"{base} : {field} — nom d'agent non resolu '{a}' (ni type natif, ni fichier {agents_dir}/{a}.md, ni registre)\"
                         if resolve_agents_strict:
@@ -553,7 +582,7 @@ else:
         dname = agent_display_name(f, ftext)
         matched_prefix = next((p for p in third_party_prefixes if p and dname.startswith(p)), None)
         if matched_prefix:
-            thirdparty_total += 1
+            thirdparty_files_total += 1
             continue
         check_file(f)
 
@@ -568,8 +597,9 @@ if hook:
 
 for w in warnings:
     print(f\"  ⚠ {w}\")
-if thirdparty_total:
-    print(f\"[check-agents] {thirdparty_total} agent(s) tiers ignore(s) (prefixe(s) : {','.join(third_party_prefixes) if third_party_prefixes else '—'})\")
+if thirdparty_files_total or thirdparty_entries_total:
+    pfx_str = ','.join(third_party_prefixes) if third_party_prefixes else '—'
+    print(f\"[check-agents] {thirdparty_files_total} fichier(s) agent tiers non linte(s) · {thirdparty_entries_total} entree(s) d'allowlist tierce(s) resolue(s) (prefixe(s) : {pfx_str})\")
 if n_err:
     print(f\"[check-agents] ✗ {n_err} non-conformite(s) bloquante(s) :\")
     for e in errors:
