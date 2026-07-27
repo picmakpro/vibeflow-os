@@ -910,6 +910,58 @@ fi
 # Miroir de T18 (manager) côté workers : ferme le chemin INDIRECT manager→worker→manager
 # (mission-cross-team.md, Invariants). Chaque nom testé un par un — jamais un grep global qui
 # passerait avec une liste tronquée.
+#
+# Correctif (ré-entrée après finding BLOQUANT d'un juge de mutation) : un `grep -qF` sur la
+# ligne `tools:` ENTIÈRE est tautologique — il valide un nom présent N'IMPORTE OÙ sur la ligne
+# (y compris hors des parenthèses, ex. déplacé en `Bash(nom)`), et `grep -qE ')[[:space:]]*$'`
+# ne prouve que « la ligne finit par ) », pas que l'allowlist Agent( ) est refermée. Les deux
+# helpers ci-dessous corrigent ça : extraction par COMPTAGE DE PROFONDEUR de parenthèses
+# (jamais un grep sur la ligne entière), puis appartenance par ÉGALITÉ DE TOKEN exacte après
+# split sur virgule (jamais une recherche de sous-chaîne — immunise contre un nom validé par un
+# homonyme partiel, ex. « gsd-plan » ne doit jamais être « trouvé » parce que « gsd-planner »
+# est dans la liste).
+
+# extract_agent_allowlist LINE — imprime le contenu entre "Agent(" et sa ")" correspondante.
+# Codes retour : 0 = trouvée et refermée (contenu sur stdout) ; 1 = "Agent(" trouvée mais la
+# profondeur ne revient jamais à 0 avant la fin de la ligne (allowlist non refermée) ;
+# 2 = aucune "Agent(" dans la ligne.
+extract_agent_allowlist() {
+  local line="$1"
+  local after="${line#*Agent(}"
+  [ "$after" = "$line" ] && return 2
+  local depth=1 i ch content=""
+  local len=${#after}
+  for (( i=0; i<len; i++ )); do
+    ch="${after:$i:1}"
+    if [ "$ch" = "(" ]; then
+      depth=$((depth+1))
+    elif [ "$ch" = ")" ]; then
+      depth=$((depth-1))
+      if [ "$depth" -eq 0 ]; then
+        printf '%s' "$content"
+        return 0
+      fi
+    fi
+    content+="$ch"
+  done
+  return 1
+}
+
+# allowlist_has_name CONTENT NAME — vrai si NAME est un token EXACT de CONTENT (liste séparée
+# par virgules, espaces autour tolérés). Jamais une sous-chaîne : « gsd-plan » ne matche pas
+# dans une liste qui ne contient que « gsd-planner » ou « gsd-plan-checker ».
+allowlist_has_name() {
+  local content="$1" name="$2" tok
+  local prev_ifs="$IFS"
+  IFS=','
+  for tok in $content; do
+    tok="$(printf '%s' "$tok" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    if [ "$tok" = "$name" ]; then IFS="$prev_ifs"; return 0; fi
+  done
+  IFS="$prev_ifs"
+  return 1
+}
+
 CODER_FILE="$MOD/agents/vf-coder.md"
 REVIEWER_FILE="$MOD/agents/vf-reviewer.md"
 AUDITER_FILE="$MOD/agents/vf-auditer.md"
@@ -925,18 +977,24 @@ AUDITER_ALLOWED="gsd-security-auditor"
 # Vérifie l'allowlist d'un worker nom par nom. Retourne l'échec via ko() (pas de return code
 # consommé par l'appelant — cohérent avec le style pass/fail global du fichier).
 check_worker_allowlist() {
-  local file="$1" label="$2" names="$3" ok_all=1 line bare name
+  local file="$1" label="$2" names="$3" ok_all=1 line bare name content rc
   line="$(dev_tools_line "$file")"
   if [ -z "$line" ]; then
     ko "T19 cloisonnement : $label sans ligne tools: (hériterait de TOUT)"; return
   fi
   bare="$(echo "$line" | "$GREP" -oE 'Agent([^(]|$)')"
   [ -z "$bare" ] || { ko "T19 cloisonnement : $label a un Agent nu (pas d'allowlist)"; ok_all=0; }
-  echo "$line" | "$GREP" -qF 'Agent(' || { ko "T19 cloisonnement : $label — aucune allowlist Agent( ) trouvée"; ok_all=0; }
-  for name in $names; do
-    echo "$line" | "$GREP" -qF -- "$name" || { ko "T19 cloisonnement : « $name » absent de l'allowlist de $label"; ok_all=0; }
-  done
-  [ "$ok_all" -eq 1 ] && ok "T19 cloisonnement : $label — allowlist Agent(...) complète, nom par nom"
+  content="$(extract_agent_allowlist "$line")"; rc=$?
+  if [ "$rc" -eq 2 ]; then
+    ko "T19 cloisonnement : $label — aucune allowlist Agent( ) trouvée"; ok_all=0
+  elif [ "$rc" -eq 1 ]; then
+    ko "T19 cloisonnement : $label — allowlist Agent(...) non refermée (parenthèses déséquilibrées)"; ok_all=0
+  else
+    for name in $names; do
+      allowlist_has_name "$content" "$name" || { ko "T19 cloisonnement : « $name » absent de l'allowlist de $label (extraction bornée aux parenthèses Agent(...))"; ok_all=0; }
+    done
+  fi
+  [ "$ok_all" -eq 1 ] && ok "T19 cloisonnement : $label — allowlist Agent(...) complète, nom par nom (extraction bornée, jamais la ligne entière)"
 }
 
 check_worker_allowlist "$CODER_FILE" "vf-coder" "$CODER_ALLOWED"
@@ -966,23 +1024,54 @@ for a in $TEAM_AGENTS; do
 done
 [ "$t19c_ok" -eq 1 ] && ok "T19c cloisonnement : aucun agent du module ne déclare Agent nu"
 
-# T19d — parenthèse d'allowlist fermée en fin de ligne sur les 3 workers.
+# T19d — parenthèses de l'allowlist Agent(...) ÉQUILIBRÉES (comptage de profondeur), pas
+# seulement « la ligne se termine par ) » (cette dernière passerait à tort sur une allowlist
+# ouverte mais jamais refermée si un autre tool parenthésé — Bash(git:*) — clôt la ligne).
 t19d_ok=1
 for f in "$CODER_FILE" "$REVIEWER_FILE" "$AUDITER_FILE"; do
   line="$(dev_tools_line "$f")"
-  echo "$line" | "$GREP" -qE '\)[[:space:]]*$' || { ko "T19d cloisonnement : $(basename "$f") — allowlist non fermée en fin de ligne"; t19d_ok=0; }
+  extract_agent_allowlist "$line" >/dev/null; rc=$?
+  [ "$rc" -eq 0 ] || { ko "T19d cloisonnement : $(basename "$f") — allowlist Agent(...) non refermée (parenthèses déséquilibrées, code=$rc)"; t19d_ok=0; }
 done
-[ "$t19d_ok" -eq 1 ] && ok "T19d cloisonnement : parenthèse d'allowlist fermée en fin de ligne sur les 3 workers"
+[ "$t19d_ok" -eq 1 ] && ok "T19d cloisonnement : allowlist Agent(...) correctement refermée (comptage de profondeur) sur les 3 workers"
 
 # T19e — « general-purpose » testé NOMMÉMENT dans vf-coder : c'est le nom le plus facile à perdre
 # lors d'une future édition (introuvable par un inventaire des seuls fichiers d'agents — il n'est
-# dispatché que par discuss-phase en mode advisor/assumptions).
+# dispatché que par discuss-phase en mode advisor/assumptions). Vérifié par extraction bornée aux
+# parenthèses (pas un grep sur la ligne entière) : « general-purpose » sorti des parenthèses par
+# erreur doit faire échouer ce test, pas seulement T19.
 coder_line="$(dev_tools_line "$CODER_FILE")"
-if echo "$coder_line" | "$GREP" -qF -- "general-purpose"; then
-  ok "T19e cloisonnement : « general-purpose » présent dans l'allowlist de vf-coder (cadrage non-interactif)"
+coder_content="$(extract_agent_allowlist "$coder_line")"
+if allowlist_has_name "$coder_content" "general-purpose"; then
+  ok "T19e cloisonnement : « general-purpose » présent dans l'allowlist Agent(...) de vf-coder (cadrage non-interactif)"
 else
-  ko "T19e cloisonnement : « general-purpose » absent de l'allowlist de vf-coder — casserait discuss-phase --auto en silence"
+  ko "T19e cloisonnement : « general-purpose » absent de l'allowlist Agent(...) de vf-coder — casserait discuss-phase --auto en silence"
 fi
+
+# ---------------------------------------------------------------------------
+# T19f (anti-homonyme) — un nom ne peut jamais être validé par un préfixe/homonyme partiel d'un
+# autre nom de la même liste. Fixtures synthétiques (pas les fichiers réels — on isole la
+# fonction de matching) : une allowlist ne contenant QUE « gsd-ui-checker » ne doit jamais
+# « valider » gsd-ui-researcher (et réciproquement) ; une allowlist ne contenant QUE
+# « gsd-planner » ne doit jamais valider « gsd-plan » ni « gsd-plan-checker » — deux cas où l'un
+# est un préfixe littéral de l'autre. Chaque fixture est aussi vérifiée positivement (elle doit
+# valider son propre nom) pour prouver que le test n'est pas satisfait par construction.
+t19f_ok=1
+assert_no_homonym() {
+  local fixture_line="$1" self_name="$2" foreign_name="$3" content
+  content="$(extract_agent_allowlist "$fixture_line")"
+  allowlist_has_name "$content" "$self_name" \
+    || { ko "T19f anti-homonyme : fixture cassée — « $self_name » non trouvé dans sa propre liste (« $fixture_line »)"; t19f_ok=0; }
+  allowlist_has_name "$content" "$foreign_name" \
+    && { ko "T19f anti-homonyme : « $foreign_name » validé à tort par la liste ne contenant que « $self_name »"; t19f_ok=0; }
+}
+assert_no_homonym "tools: Read, Agent(gsd-ui-checker)"     "gsd-ui-checker"    "gsd-ui-researcher"
+assert_no_homonym "tools: Read, Agent(gsd-ui-researcher)"  "gsd-ui-researcher" "gsd-ui-checker"
+assert_no_homonym "tools: Read, Agent(gsd-code-reviewer)"  "gsd-code-reviewer" "gsd-code-fixer"
+assert_no_homonym "tools: Read, Agent(gsd-code-fixer)"     "gsd-code-fixer"    "gsd-code-reviewer"
+assert_no_homonym "tools: Read, Agent(gsd-planner)"        "gsd-planner"       "gsd-plan-checker"
+assert_no_homonym "tools: Read, Agent(gsd-planner)"        "gsd-planner"       "gsd-plan"
+[ "$t19f_ok" -eq 1 ] && ok "T19f anti-homonyme : aucun nom validé par un préfixe/homonyme partiel d'un autre (token exact, extraction bornée)"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
