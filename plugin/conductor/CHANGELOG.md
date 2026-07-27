@@ -1,5 +1,20 @@
 # Changelog — conductor
 
+## [v1.14.6] — 2026-07-27
+
+### Corrigé
+- `references/team-kernel.md` et `README.md` : formulation du cloisonnement manager→manager
+  rendue exacte — la garantie qu'un seul manager pilote une mission est portée par le **verrou
+  de driver** (refus de seconde acquisition), pas par une lecture du contenu du champ `tools:`
+  des agents que `check-agents.sh` ne valide pas (il ne linte que le frontmatter). Table
+  « Implémentations » du team-kernel mise à jour pour refléter les étages croisés dev ↔ design
+  livrés en Phase 15 (dev-orchestrator v2.4.0, design-orchestrator v1.3.0).
+
+### Ajouté
+- `scripts/tests/test-dag.sh` : T12 — DAG hétérogène cross-métier (nœud design dans une
+  frontière dev, ids namespacés, deux juges en parallèle dans la même frontière). Aucun script
+  du kernel (`dag.sh`, `driver-lock.sh`) modifié.
+
 ## [v1.14.5] — 2026-07-27
 
 ### Corrigé
