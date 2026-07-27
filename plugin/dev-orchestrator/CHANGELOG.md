@@ -1,5 +1,10 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.3.2] — 2026-07-27
+
+### Corrigé
+- `tests/test-dev-orchestrator.sh` T2b : stub CLI `claude` posé en tête de PATH pour les invocations dry-run — le test observait les commandes loguées mais dépendait de l'outillage réel de l'hôte : sur une machine sans `claude` (runner CI), `ensure_superpowers` basculait en « étape manuelle » sans loguer `--scope <scope>` et les 4 assertions échouaient à tort. Reproduit sous ubuntu:24.04.
+
 ## [v2.3.1] — 2026-07-26
 
 ### Sécurité

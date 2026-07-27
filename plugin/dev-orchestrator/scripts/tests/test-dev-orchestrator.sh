@@ -217,11 +217,22 @@ fi
 # FORCE ne fait que loguer via run_cmd : AUCUN appel réseau ni install (dry-run uniquement).
 ENS="$MOD/scripts/ensure-deps.sh"
 
+# Stubs claude + npm + node en tête de PATH : T2b observe les commandes LOGUÉES en dry-run —
+# il ne doit dépendre d'AUCUN outillage réel de l'hôte. Sans stub, sur une machine sans claude
+# (runner CI) ou sans node/npm, ensure-deps bascule en « étape manuelle » sans jamais loguer
+# les flags scopés → les 4 assertions échouaient à tort. Le stub node répond « 22 » à la sonde
+# de version majeure (garde Node ≥ 22 de ensure_gsd) ; npx n'est jamais exécuté en dry-run.
+T2B_STUB="$(mktemp -d)"
+printf '#!/bin/sh\nexit 0\n' > "$T2B_STUB/claude"
+printf '#!/bin/sh\nexit 0\n' > "$T2B_STUB/npm"
+printf '#!/bin/sh\necho 22\n' > "$T2B_STUB/node"
+chmod +x "$T2B_STUB/claude" "$T2B_STUB/npm" "$T2B_STUB/node"
+
 # (user|project|local) → flags GSD + Superpowers attendus.
 # user → --global / --scope user ; project → --local / --scope project ; local → --local / --scope local.
 assert_scope() {
   local scope="$1" gsd_flag="$2" sp_flag="$3" out
-  out=$(VF_ENSURE_DRY_RUN=1 VF_ENSURE_FORCE=1 VF_SCOPE="$scope" bash "$ENS" 2>&1)
+  out=$(PATH="$T2B_STUB:$PATH" VF_ENSURE_DRY_RUN=1 VF_ENSURE_FORCE=1 VF_SCOPE="$scope" bash "$ENS" 2>&1)
   if echo "$out" | "$GREP" -q -- "$gsd_flag" && echo "$out" | "$GREP" -q -- "$sp_flag"; then
     ok "T2b scope=$scope : GSD $gsd_flag + Superpowers $sp_flag logués (dry-run forcé)"
   else
@@ -234,7 +245,7 @@ assert_scope project "--local"  "--scope project"
 assert_scope local   "--local"  "--scope local"
 
 # Rétro-compat : sans VF_SCOPE (dry-run forcé) → défaut LEGACY user (--global / --scope user).
-out_default=$(VF_ENSURE_DRY_RUN=1 VF_ENSURE_FORCE=1 bash "$ENS" 2>&1)
+out_default=$(PATH="$T2B_STUB:$PATH" VF_ENSURE_DRY_RUN=1 VF_ENSURE_FORCE=1 bash "$ENS" 2>&1)
 if echo "$out_default" | "$GREP" -q -- "--global" && echo "$out_default" | "$GREP" -q -- "--scope user"; then
   ok "T2b rétro-compat : sans VF_SCOPE → --global + --scope user (défaut LEGACY)"
 else
