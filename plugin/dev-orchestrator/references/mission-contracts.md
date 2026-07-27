@@ -1,9 +1,11 @@
 # Référence — Contrats de mission (équipe manager)
 
-> Source unique des contrats qui relient la conversation principale, le manager (`vf-dev-manager`)
-> et le mode autonome (`vf-auto`). Consommée par : `AGENT.md` (router), `skills/vf-auto/SKILL.md`,
-> `agents/vf-dev-manager.md`. **DRY : ne dupliquer ces contrats nulle part — y renvoyer.**
-> Spec d'origine : docs/superpowers/specs/2026-07-09-dev-manager-team-design.md (DM1-DM6).
+> Source unique des contrats qui relient la conversation principale et les managers d'équipe
+> (`vf-dev-manager`, `vf-design-manager`) au mode autonome (`vf-auto`). Consommée par :
+> `AGENT.md` (router), `skills/vf-auto/SKILL.md`, `agents/vf-dev-manager.md`,
+> `design-orchestrator/agents/vf-design-manager.md`. **DRY : ne dupliquer ces contrats nulle
+> part — y renvoyer.** Spec d'origine : docs/superpowers/specs/2026-07-09-dev-manager-team-design.md
+> (DM1-DM6) ; champs et digest croisés dev ↔ design : Phase 15 (`15-CONTEXT.md` D-01..D-11).
 
 ## Brief de mission (main → manager)
 
@@ -14,9 +16,29 @@ Le dispatcheur (router ou vf-auto) passe au manager un brief **minimal**. Le dis
 MISSION
 - Périmètre : <phases ciblées (numéros) OU objectif libre>
 - Mode : superviser (checkpoints humains) | autonome (les panels tranchent)
+- Design : auto (défaut) | force | off
+- Livrable : specs (défaut) | specs+implementation
 - Contraintes session : <décisions déjà prises en conversation qui engagent la mission — 2-3 lignes max>
 - Budget : <optionnel : temps / tentatives ; sinon défauts du manager>
 ```
+
+### Champs croisés dev ↔ design (D-02, D-05)
+
+- **`design: auto|force|off`** (défaut `auto`) — gouverne l'étage design croisé d'une **mission
+  dev** (`vf-dev-manager`). `auto` = jugement du manager au plan de bataille (objectif de
+  l'étape dans la ROADMAP, présence d'un `DESIGN.md`/UI-SPEC, nature des livrables) ; `force`
+  impose les nœuds `craft:<écran>`/`critique:<écran>` même sur un cas limite ; `off` les
+  interdit explicitement, quel que soit le jugement du manager. Produit par : le dispatcheur
+  (routeur `vibeflow-dev`, `vf-auto`, ou mapping langage naturel). Consommé par : `vibeflow-dev`,
+  `vf-auto`, `vf-dev-manager`. **Absent → `auto`** (comportement actuel, zéro surprise).
+- **`livrable: specs|specs+implementation`** (défaut `specs`) — porté par le brief d'une
+  **mission design** (`vf-design-manager`). `specs` = comportement actuel du module (aucun
+  changement) ; `specs+implementation` = opt-in, le manager dispatche `vf-coder` pour incarner
+  les specs du crafter, avec double juge parallèle (doctrine détaillée :
+  `mission-cross-team.md` §Étage implémentation (mission design)). Produit par : le dispatcheur
+  d'une mission design (`vibeflow-design` — le propose quand le projet a du code — ou
+  l'utilisateur). Consommé par : `vf-design-manager` uniquement. **Absent → `specs`** (zéro
+  surprise).
 
 Le brief peut aussi être du **langage naturel brut** (« finis la milestone, la nuit ») : le
 manager le mappe lui-même vers périmètre/mode/contraintes via la carte d'intention
@@ -39,6 +61,17 @@ DIGEST (cache — le disque fait foi)
 - Verdicts amont utiles : <revue/audit/test pertinents pour ce mandat>
 - Conventions cibles : <2-3 lignes du CLAUDE.md projet qui engagent ce mandat>
 ```
+
+**Variantes croisées (D-10)** — le format ne change pas, seul le contenu des bullets
+`Conventions cibles` / `Verdicts amont utiles` s'adapte à la direction du mandat :
+- mandat dev → `vf-crafter`/`vf-design-judge` (étage design en mission dev) : `Conventions
+  cibles` embarque la DA en 3-5 lignes (tokens clés, personnalité — même format que le digest
+  design existant, cf. `vf-design-manager.md` §Orchestration par écran), en plus du CLAUDE.md.
+- mandat design → `vf-coder`/`vf-reviewer` (étage implémentation en mission design) :
+  `Conventions cibles` embarque les conventions code cibles (CLAUDE.md du projet, conventions de
+  commit, périmètre de fichiers du nœud) ET pointe la spec du crafter (chemin sur disque) comme
+  **source du cadrage** — l'entrée de `vf-coder` devient cette spec, pas la ROADMAP (sa chaîne
+  `gsd-discuss-phase` s'y ancre).
 
 Le worker lit le digest D'ABORD, et ne relit du disque que ce que son mandat exige
 (index-first). Un digest contredit par le disque → le disque gagne, et le worker le signale.

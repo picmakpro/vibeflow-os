@@ -54,9 +54,16 @@
 
 | Équipe | Module | Manager | Workers | Juges | « Vert » |
 |---|---|---|---|---|---|
-| Dev (référence) | dev-orchestrator | `vf-dev-manager` | `vf-coder` | `vf-reviewer`, `vf-auditer` | tests + revue PASS |
+| Dev (référence) | dev-orchestrator | `vf-dev-manager` | `vf-coder` (+ `vf-crafter` en étage design croisé) | `vf-reviewer`, `vf-auditer` (+ `vf-design-judge` en étage design croisé) | tests + revue PASS (+ critique ≥ seuil si étage design) |
 | Mobile (boucle test) | mobile-test-team | `vf-test-orchestrator` | `vf-app-fixer`, `vf-test-runner` | (le test EST le juge) | flows Maestro verts |
-| Design | design-orchestrator | `vf-design-manager` | `vf-crafter` | `vf-design-judge` | critique scorée ≥ seuil contre la DA |
+| Design | design-orchestrator | `vf-design-manager` | `vf-crafter` (+ `vf-coder` en étage implémentation croisé) | `vf-design-judge` (+ `vf-reviewer` en étage implémentation croisé) | critique scorée ≥ seuil contre la DA (+ revue PASS si implémentation) |
+
+Étages croisés (Phase 15) : chaque manager peut dispatcher des workers/juges de l'autre métier —
+JAMAIS l'autre manager (Pattern A/D-07, machine-enforced par allowlists `Agent(...)` +
+`check-agents.sh`). Le lock, le DAG et le rapport restent uniques, portés par le seul manager de
+la mission.
 
 Doctrine détaillée côté dev (le protocole complet de mission) :
-`dev-orchestrator-references/mission-flow.md` — c'est la référence d'usage du kernel.
+`dev-orchestrator-references/mission-flow.md` — c'est la référence d'usage du kernel. Doctrine
+des étages croisés (quand les insérer, forme DAG, budgets, invariants) :
+`dev-orchestrator-references/mission-cross-team.md`.

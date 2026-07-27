@@ -165,6 +165,15 @@ a consigne de ne piloter que sur le bloc typé, la prose libre est du volume mor
 
 ---
 
+## Pattern D — Étages croisés dev ↔ design (renvoi)
+
+Doctrine complète (quand insérer l'étage de l'autre métier, forme DAG, budgets, invariants) :
+`dev-orchestrator-references/mission-cross-team.md` (§Étage design (mission dev) / §Étage
+implémentation (mission design) / §Invariants non négociables). Les Patterns A/B/C ci-dessus
+s'appliquent tels quels aux nœuds croisés (`craft:<écran>`, `critique:<écran>`, étage
+implémentation) — le DAG reste métier-agnostique (prouvé T3/T4, `15-ETUDE-collaboration-dev-design.md`) ;
+le lock reste au seul manager de la mission, jamais imbriqué (Pattern A).
+
 ## Lignes rouges (rappel ADR-053)
 
 Pas de bus UDS / channels / `dm` temps réel (modèle `Task` = dispatch-and-join). Pas de RAII machine : le
