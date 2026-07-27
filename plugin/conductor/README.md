@@ -41,7 +41,7 @@ Ce que le kernel fournit (invariant) :
 | **Rapports typés** (Pattern C) | `{ statut: passed\|gaps_found\|human_needed\|blocked, findings[], noeuds_debloques[] }` | fin du pilotage à la prose ; escalade humaine impérative sur `ask-user` |
 | **Halt conditions** | 5 codes (boucle sans progrès, action destructive, ressource manquante, budget épuisé, drift de scope) | l'humain arbitre sur un message structuré |
 | **Digest de mission** | ≤ 30 lignes par mandat, le disque fait foi | amortit les relectures de contexte |
-| **Cloisonnement par tools** (P12) | juges sans Write/Edit, workers sans Task, `vf-internal: true` | anti-triche, linté par `check-agents.sh` |
+| **Cloisonnement par tools** (P12) | juges sans Write/Edit, workers sans Task, `vf-internal: true` | anti-triche vérifié par les suites de test des modules (contenu de l'allowlist) — `check-agents.sh` linte le frontmatter, pas le contenu de `tools:` |
 
 Chaque métier ne paramètre que ses spécialistes, sa définition de « vert » et ses gates. S'y
 branchent aujourd'hui : **dev-orchestrator** (implémentation de référence, `vf-dev-manager`),
