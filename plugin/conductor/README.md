@@ -6,7 +6,7 @@
 > et de migration. Module **mandatory** : posé d'office à chaque install, c'est lui qui porte les
 > gates machine (hooks) et le noyau d'orchestration d'équipe réutilisé par tous les autres modules.
 
-**Type** : `agent + skills + scripts + references` · **Version** : v1.14.6 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
+**Type** : `agent + skills + scripts + references` · **Version** : v1.15.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
 
 > `skill-creator` est une dépendance **dure** depuis ADR-047 : c'est le canal unique de création de
 > skills, invoqué par `vf-new-lab` en fan-out (Phase 5) et exigé par le Gate C. Le conductor étant
@@ -76,7 +76,9 @@ première instanciation non-dev) et les **bundles métier** (business-pilot, con
 
 **Gates machine (`check-*`)** :
 - `check-agents.sh` — lint de conformité native des agents (ADR-044) : frontmatter, champs requis,
-  skills déclarés existants, budget de préchargement, `vf-internal`.
+  skills déclarés existants, budget de préchargement, `vf-internal`, et depuis la Phase 16 le
+  contenu du champ `tools:`/`disallowedTools:` (syntaxe des allowlists `Agent(...)`/`Task(...)`,
+  noms d'outils, résolution graduée des noms d'agents avec préfixes tiers).
 - `guard-agent-write.sh` — enforcement du gate ci-dessus à l'écriture (hook Write).
 - `check-debug-research.sh` — phase de recherche documentaire avant debug dans les briques de
   dépannage (ADR-045).

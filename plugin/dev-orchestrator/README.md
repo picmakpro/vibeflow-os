@@ -7,7 +7,7 @@
 > façade de verbes : GSD est l'interface directe du quotidien, l'agent est l'entrée
 > conversationnelle optionnelle.
 
-**Version** : v2.4.0
+**Version** : v2.5.0
 **Type** : agent + équipe d'agents + 2 skills + scripts
 
 ---
@@ -208,6 +208,17 @@ Couvre les axes de la bascule agentique (spec 2026-07-25) plus les acquis :
   3 exits, le schéma manifest et les 4 garde-fous ; `AGENT.md` y renvoie en Références.
 - **T17** — câblage du routage d'ingestion : `AGENT.md` porte une ligne d'intention explicite,
   `intent-routing.md` conserve sa ligne enrichie du renvoi vers `ingestion-flow.md`.
+- **T18/T18b** — cloisonnement par tools (Pattern 12) du **manager** : allowlist `Agent(...)`
+  complète (18 noms testés un par un), `vf-design-manager` absent (imbrication manager→manager
+  interdite), parenthèse fermée ; doctrine d'étage design présente et routage `vf-auto` vers un
+  mandat entièrement design.
+- **T19 → T19f** — miroir de T18 côté **workers** (ferme le chemin indirect
+  manager→worker→manager, Phase 16) : allowlist `Agent(...)` de `vf-coder`/`vf-reviewer`/
+  `vf-auditer` vérifiée **nom par nom** par extraction bornée à la profondeur de parenthèses
+  (jamais un grep sur la ligne entière — non tautologique), aucun manager dans aucune des trois
+  listes, aucun `Agent` nu, parenthèses correctement refermées, `general-purpose` nommément
+  présent chez `vf-coder` (cadrage non-interactif de `discuss-phase`), garde anti-homonyme (un nom
+  préfixe littéral d'un autre — ex. `gsd-planner`/`gsd-plan-checker` — ne le valide jamais).
 
 Exit 0 si tout passe (les SKIP, ex. GSD absent, ne font pas échouer la suite).
 
@@ -228,6 +239,9 @@ Exit 0 si tout passe (les SKIP, ex. GSD absent, ne font pas échouer la suite).
 
 ## Historique
 
+- **v2.5.0** — allowlists `Agent(...)` posées sur les 3 workers internes (Phase 16) :
+  `vf-coder` (22 noms), `vf-reviewer` (1), `vf-auditer` (1), fermant le chemin indirect
+  manager→worker→manager ; aucun manager dans aucune des trois listes.
 - **v2.4.0** — étages croisés dev ↔ design (Phase 15) : `vf-dev-manager` dispatche `vf-crafter`
   (`craft:<écran>`) avant une étape UI et `vf-design-judge` (`critique:<écran>`) en parallèle de
   la revue code, sans jamais dispatcher `vf-design-manager` ; brief enrichi

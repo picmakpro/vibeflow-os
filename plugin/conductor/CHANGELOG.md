@@ -1,5 +1,37 @@
 # Changelog — conductor
 
+## [v1.15.0] — 2026-07-27 (lint du contenu de `tools:`, Phase 16)
+
+### Ajouté
+- **`check-agents.sh` lint désormais le contenu du champ `tools:`** (et `disallowedTools:`),
+  jusqu'ici jamais lu au-delà du frontmatter :
+  - **syntaxe** des spécificateurs `Outil(...)` — parenthèses équilibrées (non fermée **et**
+    fermante en trop, libellés distincts), allowlist vide `Agent()`, entrée vide (`a,,b` et
+    `Agent(a,,b)`), charset, espace avant la parenthèse — pour `Agent(` comme pour l'alias legacy
+    `Task(` et pour `Bash(` ;
+  - **noms d'outils** validés contre le set fermé documenté : warning par défaut, **erreur en
+    `--strict`** ;
+  - **existence des noms d'agents** en allowlist, par **résolution graduée** anti-faux-positif :
+    types natifs et préfixes tiers reconnus (défaut `gsd-`), noms non résolus en **warning même
+    sous `--strict`**, erreur **seulement** sous le mode opt-in `--resolve-agents=strict` ;
+  - nouveaux flags : `--third-party-prefix=PFX` (accumulatif), `--no-third-party-prefix`,
+    `--resolve-agents=lenient|strict` (valeur invalide rejetée, pas de dégradation silencieuse),
+    `--agent-registry-dir=PATH` (répétable) ;
+  - **ferme la dette** « `--strict` sans périmètre tiers » (66 faux positifs constatés sur un
+    scope user) : un fichier agent dont le `name` matche un préfixe tiers n'est plus linté pour la
+    charte VibeFlow.
+- Tokenizer robuste : split à **profondeur de parenthèses** (plus de coupure naïve sur `,`), 
+  dé-quotage des scalaires, tolérance des lignes vides dans une liste bloc YAML (deux
+  faux-bloquants corrigés en cours de phase).
+- **Limite de portée documentée** : la liste de noms entre parenthèses est **ignorée par le
+  runtime** pour un agent dispatché en sous-agent — elle n'est appliquée qu'en incarnation
+  fenêtre principale (`claude --agent`). Ce lint fait donc de l'allowlist un **contrat
+  documenté désormais enforcé**, pas un bac à sable runtime ; le garant machine de « un seul
+  manager actif » reste le verrou de driver (`references/team-kernel.md`).
+
+### Tests
+- `test-check-agents.sh` **38 → 58 axes**.
+
 ## [v1.14.6] — 2026-07-27
 
 ### Corrigé

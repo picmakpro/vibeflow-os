@@ -1,5 +1,28 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.5.0] — 2026-07-27 (allowlists `Agent(...)` sur les 3 workers internes, Phase 16)
+
+### Ajouté
+- **Allowlists `Agent(...)` posées sur les 3 workers internes**, fermant le chemin indirect
+  manager → worker → manager : `vf-coder` (**22 noms**), `vf-reviewer` (**1** — `gsd-code-reviewer`),
+  `vf-auditer` (**1** — `gsd-security-auditor`). Aucun manager (`vf-dev-manager`,
+  `vf-design-manager`) ne figure dans aucune des trois listes. Recensement obtenu par **deux
+  dérivations indépendantes** réconciliées : la couche décisive est celle des agents dispatchés
+  par les **skills** que ces workers invoquent — aucune skill ne déclarant `context:`, ses
+  `Task(...)` internes s'exécutent sous l'allowlist de l'agent appelant.
+- `references/mission-cross-team.md` : les passages qui décrivaient ces workers comme gardant un
+  `Agent` non scopé sont corrigés pour refléter le cloisonnement désormais posé.
+- `agents/vf-coder.md` : l'échappatoire « dispatche l'agent équivalent via Task » devient
+  « parmi les agents listés dans ton champ `tools:` ; sinon remonte `blocked` » — sans cette
+  précision, une allowlist fermée transformait silencieusement une permission documentée en refus
+  muet.
+
+### Tests
+- Axes **T19 → T19f** : allowlist nom par nom (extraction bornée à l'intérieur d'`Agent(...)`),
+  absence de manager, aucun `Agent` nu, parenthèses correctement refermées (comptage de
+  profondeur), `general-purpose` nommément testé (cadrage non-interactif de `vf-coder`), garde
+  anti-homonyme (un nom préfixe littéral d'un autre ne le valide jamais). Suite **50 → 51 axes**.
+
 ## [v2.4.0] — 2026-07-27 (étages croisés dev ↔ design, Phase 15)
 
 ### Ajouté
