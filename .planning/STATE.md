@@ -28,7 +28,9 @@ hooks `SessionStart`), module `dev-orchestrator` v2.6.0. SC5 (advisory/lecture s
 (portabilité macOS+Linux) prouvés par exécution, pas par lecture. Plus aucun milestone ouvert.
 **Release `v2.42.0` publiée** le 2026-07-28 (tag annoté + release GitHub, `check-release-tag --remote`
 ✓, `check-version-sync` ✓ après synchro 39 → 41 suites dans les deux README).
-Phase 18 inscrite, non démarrée.
+Phase 18 **requalifiée en variante réduite** le 2026-07-28 (étude `STUDY.md`, verdict GO-RÉDUIT) —
+non démarrée. Pré-requis bloquant : la RFC upstream `open-gsd/gsd-core` part **avant** toute
+implémentation du gate.
 
 **Dette backlog héritée — CLOSE le 2026-07-28** (commits `607844c`, `213ea1a`, hors release) :
 
@@ -185,6 +187,20 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
 ## Accumulated Context
 
 ### Roadmap Evolution
+
+- 2026-07-28 : **Phase 18 requalifiée en variante réduite** — « Survie du ledger d'exigences à la
+  clôture de jalon ». Étude d'implémentation
+  `.planning/phases/VFDO-18-capability-living-specs-conventions-openspec/STUDY.md` (branche
+  `phase-18-living-specs-study`, commit `0c2ecf7`) : verdict **GO-RÉDUIT**. Les 4 briques de
+  l'inscription du 2026-07-27 (grammaire delta, ledger par capability, overlay `ship:post`, skill de
+  spec-sync agent-driven) sont **écartées** — quatrième registre sans en retirer aucun (`ROUT-01` en
+  3 copies) ; chemin agent-driven d'OpenSpec volé sans les 16 garde-fous du chemin `archive` ;
+  ancrage `ship:post` réel en gsd-core 1.8.0 mais inopérant ici (`/gsd-ship` jamais emprunté,
+  `onError: skip`, gate `bundleContentHash`). Le trou prouvé restant : `complete-milestone.md`
+  supprime `.planning/REQUIREMENTS.md` **inconditionnellement** à chaque clôture. La RFC upstream
+  `open-gsd/gsd-core` passe de bonus à **dépendance bloquante** (condition D3, échéance
+  **2026-10-26**). Le dossier de phase garde son ancien slug — renommage non fait, à trancher au
+  cadrage.
 
 - 2026-07-27 : **Phase 18** (Capability living-specs, conventions OpenSpec) ajoutée. Issue de
   l'étude « successeurs de GSD » du jour (mémoire `gsd-succession-landscape-2026-07`) : gap réel

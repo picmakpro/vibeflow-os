@@ -588,11 +588,79 @@ Plans:
 
 - [x] 17-03-PLAN.md — Doctrine `AGENT.md`, gates T20/T21 falsifiables (ADR-044, SC5), preuve de portabilité Linux en conteneur, module `v2.6.0` (vague 3)
 
-### Phase 18: Capability living-specs (conventions OpenSpec)
+### Phase 18: Survie du ledger d'exigences à la clôture de jalon
 
-**Goal:** Doter les labs d'un ledger de specs vivantes accumulées par capability — « ce que le système EST », tenu à jour à la clôture de phase — en volant les conventions d'OpenSpec sans en installer l'outil : grammaire delta (ADDED/MODIFIED/REMOVED/RENAMED Requirements), merge par bloc `### Requirement:` + `#### Scenario:` (Given/When/Then), cycle delta → merge → archive. Ancrage : capability overlay `.gsd/capabilities/` accrochée à `ship:post` (ADR-1244 D2 côté gsd-core), specs sous `.planning/specs/<capability>/`, skill de spec-sync agent-driven. Contraintes : zéro dépendance externe, zéro double état, gouvernance conductor applicable (densité ADR-029). Étude source : mémoire `gsd-succession-landscape-2026-07` (audits code OpenSpec × gsd-core du 2026-07-27). Piste amont : proposer la capability upstream à open-gsd/gsd-core une fois éprouvée ici (RFC/PR avec l'overlay comme implémentation de référence).
-**Requirements**: TBD
+> **Périmètre réduit le 2026-07-28** par l'étude d'implémentation
+> `.planning/phases/VFDO-18-capability-living-specs-conventions-openspec/STUDY.md` (verdict
+> **GO-RÉDUIT**). L'intitulé précédent — *Capability living-specs (conventions OpenSpec)* — et ses
+> quatre briques (grammaire delta ADDED/MODIFIED/REMOVED/RENAMED, ledger indexé par capability,
+> ancrage overlay `.gsd/capabilities/` @ `ship:post`, skill de spec-sync agent-driven) sont
+> **écartés**, pour trois raisons prouvées : le plan créait un quatrième registre sans en retirer
+> aucun (`ROUT-01` existe déjà en 3 copies) ; il volait à OpenSpec le chemin agent-driven
+> (`/opsx:sync`) sans les ~2 253 lignes et 16 garde-fous du chemin `archive` déterministe qui le
+> rattrapent ; et l'ancrage `ship:post`, bien que réel en gsd-core 1.8.0, ne fire que dans
+> `/gsd-ship` — chemin que ce repo n'emprunte jamais — avec `onError: skip` masquant les échecs et
+> le gate `bundleContentHash` désarmant la capability à la première édition du bundle.
+
+**Goal**: Faire **survivre les exigences à la clôture de jalon** — un fichier qui existe déjà, aucun
+nouveau registre, aucune nouvelle grammaire, aucun overlay. Fait porteur (STUDY §7.1) :
+`gsd-complete-milestone` exécute `git rm .planning/REQUIREMENTS.md` **inconditionnellement** (aucun
+flag, aucune gate, aucun `--keep-requirements` — `complete-milestone.md:474, 527, 530, 786`) et
+`new-milestone.md:475` le régénère de zéro au jalon suivant. Conséquence : **aucun lab GSD conforme
+n'a de réponse durable à « qu'est-ce que ce système garantit aujourd'hui ? »** — seulement une pile
+d'archives par jalon jamais fusionnées ; le `REQUIREMENTS.md` à 5 blocs de ce repo est une déviation
+manuelle non reproductible ailleurs. La phase livre trois choses (STUDY §7.2) : (1) un **gate
+machine** `check-requirements-survival.sh` dans `plugin/dev-orchestrator/scripts/`, sur le modèle de
+`check-doc-drift.sh`, en **détection d'absence uniquement** — jamais « n'a pas bougé », heuristique
+que `check-doc-drift.sh` se refuse explicitement en en-tête ; (2) une **ligne de doctrine** dans
+`plugin/dev-orchestrator/AGENT.md` (« à la clôture de jalon, le ledger d'exigences survit ; l'archive
+est un instantané, pas un déménagement ») ; (3) une **RFC upstream** vers `open-gsd/gsd-core` rendant
+la suppression optionnelle. La variante réduit le double état existant au lieu d'en ajouter : les
+archives `.planning/milestones/*-REQUIREMENTS.md` deviennent explicitement des instantanés, donc
+`.planning/REQUIREMENTS.md` redevient la seule source vivante.
+
+**⚠ Dépendance bloquante — la RFC conditionne le GO, pas le code** (STUDY §7.2 encadré, condition
+**D3**) : le levier qui rend le geste durable est **chez un tiers**. Sans elle, le moteur supprime le
+fichier à chaque clôture et le gate échoue — VibeFlow planterait un piquet **contre sa propre chaîne
+d'outils**, cas interdit par l'Iron Law 2 (`plugin/conductor/AGENT.md:114`, « Router, jamais
+réimplémenter »). **La RFC part avant toute implémentation du gate.** Si elle est refusée ou reste
+sans réponse au **2026-10-26**, la phase est intégralement ré-arbitrée : doctrine seule sans machine,
+ou conflit récurrent assumé.
+
+**Requirements**: TBD (à dériver au cadrage)
 **Depends on:** Phase 17
+**Success Criteria** (what must be TRUE):
+
+  1. La RFC est **déposée** sur `open-gsd/gsd-core` (suppression de `REQUIREMENTS.md` rendue
+     optionnelle) **avant** que le gate ne soit posé, et son issue/PR est traçable depuis le repo.
+
+  2. `check-requirements-survival.sh` échoue si `.planning/MILESTONES.md` déclare un jalon clos alors
+     que `.planning/REQUIREMENTS.md` est **absent** — et **ne prétend jamais** qu'un fichier présent
+     mais figé serait périmé (pas de récidive de l'heuristique neutralisée en Phase 17).
+
+  3. Le gate est **falsifiable, prouvé par mutation** : sa suite de tests échoue si on le neutralise
+     (convention du module : ~1,5× la taille du script testé, cf. `test-check-doc-drift.sh`).
+
+  4. La doctrine est écrite dans `plugin/dev-orchestrator/AGENT.md` et le rôle d'**instantané** des
+     archives `milestones/*-REQUIREMENTS.md` est explicite — `.planning/REQUIREMENTS.md` désigné
+     comme seule source vivante.
+
+  5. **Aucun objet nouveau dans le socle** : zéro fichier de registre créé, zéro grammaire de merge
+     introduite, zéro overlay `.gsd/capabilities/`. Gouvernance conductor tenue (`check-agents.sh`
+     vert, densité ADR-029), portabilité macOS + Linux prouvée par exécution.
+
+  6. Module `dev-orchestrator` bumpé, release racine + tag annoté poussé (discipline `CLAUDE.md`),
+     `check-release-tag.sh --remote` ✓.
+
+**Chiffrage** (STUDY §7.3) : ≈ **370-470 lignes**, 1 module bumpé — contre ≈ 1 300-2 000 lignes et
+5 objets à maintenir pour la version complète écartée. Soit **25-30 % du coût**.
+
+**Bénéfice explicitement NON capté** — à ne pas revendiquer : l'**indexation par capability**. Un
+`REQUIREMENTS.md` qui survit reste indexé **par jalon** ; répondre à « que garantit le routage
+aujourd'hui ? » exigera toujours de réconcilier `ROUT-01..04`, `VERB-02` (« caduc depuis v2.33.0 »)
+et `PROJECT.md:84`. Cette part du besoin reste ouverte et peut être rouverte plus tard sous les
+conditions **E1/E2** du STUDY §8 — pas déclarée sans objet.
+
 **Plans:** 0 plans
 
 Plans:
