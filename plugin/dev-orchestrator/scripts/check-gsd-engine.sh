@@ -131,11 +131,22 @@ case "$STATE" in
     printf '%s\n' "              → propose la migration (confirmation requise via /vf-update)."
     exit 0
     ;;
+  gsd-core)
+    if has_legacy_leftover; then
+      # Cas dual (D-04) — rupture assumée de « exit 3 == silence » : la migration a déjà eu lieu
+      # (état gsd-core), donc AUCUNE proposition d'install n'est émise — mais un reliquat legacy
+      # subsiste à côté, et le taire serait un vrai silence sur un fait réel. Ce sous-cas imprime
+      # donc UNE ligne [gsd-leftover] sur stdout tout en sortant en 3 quand même : reproposer une
+      # install serait un no-op bruyant, mais ne rien dire du reliquat serait un silence trompeur.
+      say "moteur à jour (@opengsd/gsd-core), reliquat legacy détecté — signalé sans proposer d'install."
+      printf '%s\n' "[gsd-leftover] moteur @opengsd/gsd-core à jour ; reliquat legacy détecté — nettoyage manuel recommandé."
+      exit 3
+    fi
+    say "moteur @opengsd/gsd-core détecté, rien à signaler."
+    exit 3
+    ;;
   *)
-    # Provisoire pour cette tâche (tranche traçante, Task 1) : les états `absent` et `gsd-core`
-    # (y compris le cas dual D-04) tombent tous les deux dans exit 3 sans distinction. Task 2
-    # complète ce catch-all avec les deux branches définitives et le signal [gsd-leftover].
-    say "état ${STATE} — rien à signaler (branche complétée en Task 2)."
+    say "aucun moteur GSD détecté — rien à signaler."
     exit 3
     ;;
 esac
