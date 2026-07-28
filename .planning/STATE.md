@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
-current_phase: 17
-current_phase_name: Migration du moteur GSD pilotée par /vf-update — planifiée (3 plans), 19-01 exécuté
+current_phase: 19
+current_phase_name: Migration du moteur GSD pilotée par /vf-update — planifiée (3 plans), 19-01 et 19-02 exécutés
 status: in_progress
-stopped_at: Completed VFDO-19-02-PLAN.md
+stopped_at: "Plan 19-02 exécuté le 2026-07-28 — ensure-deps.sh : detect_gsd_state() à 3 valeurs, fin du skip legacy, chemin --migrate-engine chaîné sur patch_gsd_executor_mcp, message de nettoyage exact et atteignable (D-08) ; inject-mcp-tools.sh --verify qui dit fort et ne répare jamais (D-09). Suites étendues vertes macOS + Linux (test-dev-orchestrator.sh 72/0, test-inject-mcp-tools.sh 12/0). Prochain geste : 19-03 (vf-update/SKILL.md, ADR-058, release-meta dev-orchestrator v2.7.0 + conductor v1.16.0)."
 last_updated: "2026-07-28T12:21:36.658Z"
-last_activity: 2026-07-28 (clôture Phase 17)
+last_activity: 2026-07-28 (exécution Phase 19 Plan 02 — ensure-deps.sh --migrate-engine, inject-mcp-tools.sh --verify)
 progress:
-  total_phases: 18
-  completed_phases: 8
-  total_plans: 42
-  completed_plans: 21
+  total_phases: 19
+  completed_phases: 10
+  total_plans: 53
+  completed_plans: 36
 ---
 
 # Project State
@@ -157,7 +157,7 @@ conductor v1.14.1 · planning-core v2.5.1 · consolidator v1.8.0.
 Milestone `gsd-migration` (Phases 10-11) reste ouvert et **en attente** — chantier indépendant, non bloquant.
 Milestone précédent memory-swarm-rnd **SHIPPÉ v2.28.0** (ADR-052 mémoire vivante + ADR-053 swarm).
 
-Progress: [█████░░░░░] 50%
+Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
 
 ## Performance Metrics
 
