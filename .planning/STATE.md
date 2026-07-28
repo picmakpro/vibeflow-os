@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
-current_phase: 17
-current_phase_name: Signaux de démarrage du moteur de dev — terminée, vérifiée et shippée (v2.42.0)
+current_phase: 19
+current_phase_name: Migration du moteur GSD pilotée par /vf-update — cadrée (19-CONTEXT.md), non planifiée
 status: planning
-stopped_at: Phase 19 context gathered
+stopped_at: "Phase 19 cadrée le 2026-07-28 — 19-CONTEXT.md écrit (6 arbitrages tranchés par Samuel : gate dédié check-gsd-engine.sh + sonde best-effort, ensure-deps.sh --migrate-engine, inject-mcp-tools.sh --verify, nettoyage proposé jamais exécuté, détection moteur AVANT le stop de l'étape 1, suite de tests dédiée). Prochain geste : gsd-plan-phase 19. Phase 17 shippée v2.42.0 ; Phase 18 requalifiée en variante réduite, non démarrée, bloquée par la RFC upstream open-gsd/gsd-core."
 last_updated: "2026-07-28T10:13:53.157Z"
-last_activity: 2026-07-28 (clôture Phase 17)
+last_activity: 2026-07-28 (cadrage de la Phase 19 — migration du moteur GSD pilotée par /vf-update)
 progress:
-  total_phases: 18
-  completed_phases: 8
-  total_plans: 39
-  completed_plans: 19
+  total_phases: 19
+  completed_phases: 10
+  total_plans: 50
+  completed_plans: 34
 ---
 
 # Project State
