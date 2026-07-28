@@ -6,6 +6,10 @@
 #         (SKIP explicite si aucun skill gsd-* présent sur la machine).
 #   T2  — ensure-deps.sh idempotent (2 runs en dry-run = no-op, exit 0 aux deux).
 #   T2b — ensure-deps scopé (dry-run forcé, sans réseau) — SCOPE-03.
+#   T2g — --migrate-engine (VFDO-19-02, D-06) atteint le bloc d'install npx sur un état legacy ;
+#         sans le flag, aucun appel npx et le skip historique n'apparaît plus (3 sous-cas).
+#   T2h — Chaînage MCP de bout en bout (D-06/D-09) : --migrate-engine enchaîne install PUIS
+#         patch_gsd_executor_mcp() dans le même run (SKIP si python3 absent).
 #   T3  — AGENT.md : ≤250L, table d'intentions fournie (≥11 lignes NL) et AUCUNE référence
 #         à un verbe supprimé (la façade des 29 verbes est morte — elle ne ressuscite pas).
 #   T4  — Chaque skill du module mappe vers une cible existante (aucun orphelin) :
@@ -346,6 +350,127 @@ else
   ko "T2f (DISCRIMINANT) : détection projet-local KO — implémentation \$HOME-only ?"
 fi
 rm -rf "$T2F_HOME" "$T2F_PROJ"
+
+# ---------------------------------------------------------------------------
+# T2g — --migrate-engine atteint le bloc d'install (D-06, SC3) ; sans lui, aucun appel npx et le
+# skip historique n'apparaît plus sur legacy — c'est le silence fautif identifié par le rapport
+# d'audit. Fixture : HOME ne portant QUE le VERSION legacy (aucun nouveau layout), exécutée
+# depuis un répertoire de projet temporaire — jamais la racine du dépôt (patch_gsd_executor_mcp
+# écrirait dans un ./.claude/agents/ réel sinon).
+# ---------------------------------------------------------------------------
+T2G_HOME="$(mktemp -d)"
+mkdir -p "$T2G_HOME/.claude/get-shit-done"
+echo "1.42.3" > "$T2G_HOME/.claude/get-shit-done/VERSION"
+T2G_PROJ="$(mktemp -d)"
+T2G_BIN="$(mktemp -d)"
+cat > "$T2G_BIN/npm" <<'SH'
+#!/usr/bin/env bash
+exit 1
+SH
+cat > "$T2G_BIN/node" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = "-e" ]; then echo "22"; elif [ "$1" = "--version" ]; then echo "v22.0.0"; fi
+exit 0
+SH
+cat > "$T2G_BIN/claude" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+cat > "$T2G_BIN/npx" <<'SH'
+#!/usr/bin/env bash
+echo "npx $*" >> "$T2G_TRACE_FILE"
+exit 0
+SH
+chmod +x "$T2G_BIN/npm" "$T2G_BIN/node" "$T2G_BIN/claude" "$T2G_BIN/npx"
+
+# Sous-cas A : --migrate-engine → trace npx non vide, paquet plafonné + --global.
+T2GA_TRACE="$(mktemp)"; rm -f "$T2GA_TRACE"
+T2GA_OUT=$(cd "$T2G_PROJ" && env -u VF_ENSURE_DRY_RUN -u VF_ENSURE_FORCE -u VF_ENSURE_MIGRATE_ENGINE -u CLAUDE_CONFIG_DIR \
+  HOME="$T2G_HOME" PATH="$T2G_BIN:/usr/bin:/bin" T2G_TRACE_FILE="$T2GA_TRACE" bash "$ENS" --migrate-engine 2>&1)
+if [ -s "$T2GA_TRACE" ] && "$GREP" -qF -- '@opengsd/gsd-core@^1' "$T2GA_TRACE" && "$GREP" -q -- '--global' "$T2GA_TRACE"; then
+  ok "T2g sous-cas A : --migrate-engine atteint le bloc npx (paquet plafonné + --global)"
+else
+  ko "T2g sous-cas A : --migrate-engine n'a pas atteint le bloc npx attendu (trace=[$(cat "$T2GA_TRACE" 2>/dev/null)])"
+fi
+rm -f "$T2GA_TRACE"
+
+# Sous-cas B : sans le flag → trace npx vide, pas de skip historique, message de migration explicite.
+T2GB_TRACE="$(mktemp)"; rm -f "$T2GB_TRACE"
+T2GB_OUT=$(cd "$T2G_PROJ" && env -u VF_ENSURE_DRY_RUN -u VF_ENSURE_FORCE -u VF_ENSURE_MIGRATE_ENGINE -u CLAUDE_CONFIG_DIR \
+  HOME="$T2G_HOME" PATH="$T2G_BIN:/usr/bin:/bin" T2G_TRACE_FILE="$T2GB_TRACE" bash "$ENS" 2>&1)
+if [ ! -s "$T2GB_TRACE" ] && ! echo "$T2GB_OUT" | "$GREP" -q "GSD déjà présent" \
+   && echo "$T2GB_OUT" | "$GREP" -qi "migration disponible"; then
+  ok "T2g sous-cas B : sans --migrate-engine, aucun appel npx, skip historique absent, migration annoncée"
+else
+  ko "T2g sous-cas B : le legacy sans flag a soit appelé npx, soit skippé silencieusement"
+fi
+rm -f "$T2GB_TRACE"
+
+# Sous-cas C : VF_ENSURE_MIGRATE_ENGINE=1 (sans le flag) → même trace non vide que le sous-cas A.
+T2GC_TRACE="$(mktemp)"; rm -f "$T2GC_TRACE"
+T2GC_OUT=$(cd "$T2G_PROJ" && env -u VF_ENSURE_DRY_RUN -u VF_ENSURE_FORCE HOME="$T2G_HOME" \
+  PATH="$T2G_BIN:/usr/bin:/bin" T2G_TRACE_FILE="$T2GC_TRACE" VF_ENSURE_MIGRATE_ENGINE=1 bash "$ENS" 2>&1)
+if [ -s "$T2GC_TRACE" ] && "$GREP" -qF -- '@opengsd/gsd-core@^1' "$T2GC_TRACE"; then
+  ok "T2g sous-cas C : VF_ENSURE_MIGRATE_ENGINE=1 équivalent au flag (trace npx non vide)"
+else
+  ko "T2g sous-cas C : VF_ENSURE_MIGRATE_ENGINE=1 n'a pas déclenché l'install"
+fi
+rm -f "$T2GC_TRACE"
+rm -rf "$T2G_HOME" "$T2G_PROJ" "$T2G_BIN"
+
+# ---------------------------------------------------------------------------
+# T2h — Chaînage MCP de bout en bout (D-06/D-09, SC3) : --migrate-engine enchaîne install PUIS
+# patch_gsd_executor_mcp() dans le MÊME run. SKIP explicite (jamais KO) si python3 absent —
+# l'injecteur est best-effort par conception.
+# ---------------------------------------------------------------------------
+if ! command -v python3 >/dev/null 2>&1; then
+  skip "T2h chaînage MCP : python3 absent — injecteur best-effort, cas non applicable"
+else
+  T2H_HOME="$(mktemp -d)"
+  mkdir -p "$T2H_HOME/.claude/get-shit-done" "$T2H_HOME/.claude/agents"
+  echo "1.42.3" > "$T2H_HOME/.claude/get-shit-done/VERSION"
+  cat > "$T2H_HOME/.claude/agents/gsd-executor.md" <<'EOF'
+---
+name: gsd-executor
+description: exécute les plans GSD avec commits atomiques
+tools: Read, Write, Edit, Bash, Grep, Glob, mcp__context7__*
+model: opus
+memory: project
+---
+corps
+EOF
+  T2H_PROJ="$(mktemp -d)"
+  printf '%s\n' '{ "mcpServers": { "test-lab-mcp": {} } }' > "$T2H_PROJ/.mcp.json"
+  T2H_BIN="$(mktemp -d)"
+  cat > "$T2H_BIN/npm" <<'SH'
+#!/usr/bin/env bash
+exit 1
+SH
+  cat > "$T2H_BIN/node" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = "-e" ]; then echo "22"; elif [ "$1" = "--version" ]; then echo "v22.0.0"; fi
+exit 0
+SH
+  cat > "$T2H_BIN/claude" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  cat > "$T2H_BIN/npx" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  chmod +x "$T2H_BIN/npm" "$T2H_BIN/node" "$T2H_BIN/claude" "$T2H_BIN/npx"
+
+  (cd "$T2H_PROJ" && env -u VF_ENSURE_DRY_RUN -u VF_ENSURE_FORCE -u CLAUDE_CONFIG_DIR \
+      HOME="$T2H_HOME" PATH="$T2H_BIN:/usr/bin:/bin" bash "$ENS" --migrate-engine >/dev/null 2>&1)
+
+  if "$GREP" -m1 '^tools:' "$T2H_HOME/.claude/agents/gsd-executor.md" | "$GREP" -qF 'mcp__test-lab-mcp__*'; then
+    ok "T2h chaînage MCP : --migrate-engine enchaîne install puis patch_gsd_executor_mcp dans le même run"
+  else
+    ko "T2h chaînage MCP : gsd-executor.md n'a pas reçu le serveur du lab après --migrate-engine"
+  fi
+  rm -rf "$T2H_HOME" "$T2H_PROJ" "$T2H_BIN"
+fi
 
 # ---------------------------------------------------------------------------
 # T3 — AGENT.md : ≤250L, table d'intentions fournie, zéro verbe supprimé

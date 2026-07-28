@@ -33,6 +33,17 @@
 #                      détection (skip) pour loguer la commande scopée QUI SERAIT émise, sans rien
 #                      installer. Sans effet hors dry-run (jamais d'install forcée). Rend le dry-run
 #                      observable sur une machine où GSD/Superpowers sont déjà présents (CI/dev).
+#   VF_ENSURE_MIGRATE_ENGINE (défaut vide) — 1 → équivaut au flag --migrate-engine (voir Usage) :
+#                      autorise l'install npx sur un état `legacy` détecté (D-06). SANS cette
+#                      variable ni le flag, un état `legacy` est SIGNALÉ (message explicite) mais
+#                      JAMAIS migré (P-07) — la confirmation humaine appartient à l'appelant
+#                      (/vf-update, ADR-031), jamais à ce script.
+#
+# Flags CLI (rétro-compat : historiquement "$@" n'était jamais lu, les arguments inconnus sont
+# donc IGNORÉS avec une ligne log plutôt que rejetés — un rejet strict casserait un appelant
+# non recensé) :
+#   --migrate-engine   Équivalent à VF_ENSURE_MIGRATE_ENGINE=1 (voir ci-dessus).
+#   -h | --help        Affiche cet en-tête (grep '^# ') et exit 0.
 #
 # Comportement : idempotent (2e run consécutif = no-op, mode normal non forcé). Jamais d'échec silencieux :
 # si un prérequis (Node/npm ou CLI claude) manque, les étapes manuelles sont affichées et exit 0.
@@ -52,6 +63,11 @@ SCOPE="${VF_SCOPE:-user}"
 # 1 → en DRY-RUN, court-circuite l'early-return de détection pour loguer la cmd scopée (sans installer).
 # Sans effet hors dry-run (jamais d'install forcée).
 FORCE="${VF_ENSURE_FORCE:-}"
+# 1 → autorise l'install npx sur un état `legacy` détecté (D-06). Sans elle (ni le flag
+# --migrate-engine, réglé plus bas au parsing des arguments), un état `legacy` est SIGNALÉ mais
+# JAMAIS migré (P-07, ADR-031) — la confirmation humaine vit dans l'appelant (/vf-update), jamais
+# dans ce script.
+MIGRATE_ENGINE="${VF_ENSURE_MIGRATE_ENGINE:-}"
 # Fenêtre de compat dual-layout (D-01/D3, 11-CONTEXT.md) : le VERSION file du nouveau layout est
 # DÉRIVÉ de la même cascade que GSD_HOME (detect-gsd-engine.sh/build-gsd-index.sh), jamais une
 # constante $HOME figée — un chemin $HOME-only raterait le scope --local de gsd-core 1.8.0, qui
@@ -113,11 +129,25 @@ run_cmd() {
 
 # ---------- GSD (BOOT-01 / BOOT-03) ----------
 
-# Détecte GSD : cascade fichier VERSION UNIQUEMENT (jamais de test PATH — piège n°1). Un shim
+# Détecte l'état à 3 valeurs du moteur GSD (D-03) : source UNIQUE, réutilisée par detect_gsd()
+# ci-dessous — cascade fichier VERSION UNIQUEMENT (jamais de test PATH — piège n°1). Un shim
 # legacy (ex. gsd-sdk) peut rester sur le PATH après migration : un `command -v` ferait toujours
 # renvoyer vrai et gsd-core ne serait jamais installé (panne silencieuse et durable).
+detect_gsd_state() {
+  if [ -f "$GSD_VERSION_FILE_NEW" ]; then
+    echo "gsd-core"
+  elif [ -f "$GSD_VERSION_FILE_LEGACY" ]; then
+    echo "legacy"
+  else
+    echo "absent"
+  fi
+}
+
+# Détecte GSD : booléen DÉRIVÉ de detect_gsd_state() — les états gsd-core ET legacy comptent
+# tous deux comme « présent » (tolérance dual-layout, D-01/D3 Phase 10). Ne refait plus le test
+# elle-même : l'ancien `||` a disparu de son corps.
 detect_gsd() {
-  [ -f "$GSD_VERSION_FILE_NEW" ] || [ -f "$GSD_VERSION_FILE_LEGACY" ]
+  [ "$(detect_gsd_state)" != "absent" ]
 }
 
 # Legacy détecté = le VERSION file de l'ancien layout existe (le nouveau peut coexister ou non —
@@ -128,13 +158,31 @@ detect_gsd_legacy() {
 }
 
 ensure_gsd() {
-  # Early-return skip si GSD détecté — SAUF en dry-run forcé (on tombe alors dans le chemin run_cmd
-  # qui ne fait que loguer la cmd scopée, sans installer). Mode normal : comportement inchangé.
-  if detect_gsd && ! { [ -n "$DRY_RUN" ] && [ -n "$FORCE" ]; }; then
+  local state dry_run_forced
+  state="$(detect_gsd_state)"
+  dry_run_forced=0
+  { [ -n "$DRY_RUN" ] && [ -n "$FORCE" ]; } && dry_run_forced=1
+
+  # État gsd-core : skip historique mot pour mot, y compris son exception dry-run forcé —
+  # comportement strictement inchangé (D-03).
+  if [ "$state" = "gsd-core" ] && [ "$dry_run_forced" -eq 0 ]; then
     log "GSD déjà présent (skip)."
     log_legacy_cleanup_if_needed
     return 0
   fi
+
+  # État legacy SANS autorisation de migration (ni --migrate-engine, ni VF_ENSURE_MIGRATE_ENGINE,
+  # ni le court-circuit dry-run forcé) : SIGNALÉ, jamais migré (P-07, D-06). Le skip silencieux
+  # historique ne s'applique plus à cet état — c'est le trou identifié par le rapport d'audit.
+  if [ "$state" = "legacy" ] && [ -z "$MIGRATE_ENGINE" ] && [ "$dry_run_forced" -eq 0 ]; then
+    log "Moteur GSD legacy détecté — migration disponible vers @opengsd/gsd-core, ce run ne migre pas."
+    log "  Pour migrer : ./ensure-deps.sh --migrate-engine (ou VF_ENSURE_MIGRATE_ENGINE=1)."
+    log_legacy_cleanup_if_needed
+    return 0
+  fi
+
+  # Ici : état absent, OU legacy autorisé (--migrate-engine / VF_ENSURE_MIGRATE_ENGINE=1), OU
+  # dry-run forcé (observabilité T2b/T2g) — suite inchangée de la fonction.
 
   # Prérequis : Node/npm sur le PATH. Absent → étapes manuelles, jamais d'échec silencieux.
   if ! command -v npm >/dev/null 2>&1; then
@@ -320,5 +368,20 @@ main() {
   log "Résumé : GSD=$gsd_state ; Superpowers=$sp_state"
   return 0
 }
+
+# ---------- Parsing minimal des arguments ----------
+# Historique : ce script recevait "$@" sans jamais le lire — un rejet strict casserait un
+# appelant non recensé (choix délibéré de rétro-compat, cf. en-tête). Seuls --migrate-engine et
+# -h/--help sont reconnus ; tout le reste est IGNORÉ avec une ligne log, jamais un exit non-zéro.
+for arg in "$@"; do
+  case "$arg" in
+    --migrate-engine) MIGRATE_ENGINE=1 ;;
+    -h | --help)
+      grep '^# ' "$0" | sed 's/^# //'
+      exit 0
+      ;;
+    *) log "argument ignoré (rétro-compat, non reconnu) : $arg" ;;
+  esac
+done
 
 main "$@"
