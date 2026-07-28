@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
 current_phase: 19
-current_phase_name: Migration du moteur GSD pilotée par /vf-update — cadrée (19-CONTEXT.md), non planifiée
-status: planning
-stopped_at: "Phase 19 cadrée le 2026-07-28 — 19-CONTEXT.md écrit (6 arbitrages tranchés par Samuel : gate dédié check-gsd-engine.sh + sonde best-effort, ensure-deps.sh --migrate-engine, inject-mcp-tools.sh --verify, nettoyage proposé jamais exécuté, détection moteur AVANT le stop de l'étape 1, suite de tests dédiée). Prochain geste : gsd-plan-phase 19. Phase 17 shippée v2.42.0 ; Phase 18 requalifiée en variante réduite, non démarrée, bloquée par la RFC upstream open-gsd/gsd-core."
-last_updated: "2026-07-28T10:13:53.157Z"
-last_activity: 2026-07-28 (cadrage de la Phase 19 — migration du moteur GSD pilotée par /vf-update)
+current_phase_name: Migration du moteur GSD pilotée par /vf-update — planifiée (3 plans), 19-01 exécuté
+status: in_progress
+stopped_at: "Plan 19-01 exécuté le 2026-07-28 — check-gsd-engine.sh créé (gate à 3 états absent/legacy/gsd-core, D-02..D-05) + test-check-gsd-engine.sh (15 cas, 0 ko) ; portabilité prouvée par exécution réelle sous ubuntu:24.04 (compteur identique macOS/Linux). Prochain geste : 19-02/19-03 (ensure-deps.sh --migrate-engine, inject-mcp-tools.sh --verify, vf-update/SKILL.md, release-meta, ADR)."
+last_updated: "2026-07-28T12:08:33.000Z"
+last_activity: 2026-07-28 (exécution Phase 19 Plan 01 — check-gsd-engine.sh)
 progress:
   total_phases: 19
   completed_phases: 10
   total_plans: 53
-  completed_plans: 34
+  completed_plans: 35
 ---
 
 # Project State
@@ -186,6 +186,7 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
 | Phase 04 P02 | 5min | 2 tasks | 3 files |
 | Phase 05 P01 | 2 | 3 tasks | 5 files |
 | Phase 06 P01 | 1min | 2 tasks | 2 files |
+| Phase VFDO-19 P01 | 15min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -429,10 +430,10 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-**Resume file:** .planning/phases/VFDO-19-migration-du-moteur-gsd-pilot-e-par-vf-update/19-CONTEXT.md
+**Resume file:** None — Plan 19-01 terminé ; enchaîner sur 19-02/19-03-PLAN.md.
 
-Last session: 2026-07-28T10:13:53.142Z
-Stopped at: Phase 19 context gathered
+Last session: 2026-07-28T12:08:33.000Z
+Stopped at: Phase 19 Plan 01 exécuté (check-gsd-engine.sh + test-check-gsd-engine.sh, 15/15 cas verts macOS+Linux)
 ubuntu:24.04) — 3 jobs verts au run 30257419335. Modules bumpés : conductor v1.14.5,
 consolidator v1.8.1, dev-orchestrator v2.3.2. Leçon durable : tout bash développé sur macOS/BSD
 doit être reproduit sous `docker run ubuntu:24.04` avant push (stat/-f, TMPDIR, outillage hôte).
