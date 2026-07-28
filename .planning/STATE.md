@@ -7,9 +7,9 @@ current_phase_name: Migration du moteur GSD pilotée par /vf-update — terminé
 status: complete
 stopped_at: "Phase 19 terminée et vérifiée le 2026-07-28 (mission d'équipe, DAG 5 nœuds + 1 reopen après vérification). Verdict 19-VERIFICATION.md : PASS, 6/7 — SC2 reste PRESENT_BEHAVIOR_UNVERIFIED (comportement d'agent, recette humaine du parcours /vf-update sur poste legacy : acceptation PUIS refus). Livré : check-gsd-engine.sh (3 états, exits 0/2/3), ensure-deps.sh --migrate-engine chaîné sur la ré-injection MCP, inject-mcp-tools.sh --verify, vf-update/SKILL.md à deux volets, ADR-058, modules dev-orchestrator v2.7.0 + conductor v1.16.0. Réservé à validation humaine : release racine (bump VERSION/plugin.json/marketplace.json + historique des 2 README + rattrapage du compteur 41→42 suites, tag annoté, release GitHub)."
 last_updated: "2026-07-28T15:40:00.000Z"
-last_activity: 2026-07-28 (clôture Phase 19 — migration du moteur GSD pilotée par /vf-update)
+last_activity: 2026-07-28 (Phase 20 ouverte — fluidité du flux de dev, 4 constats vérifiés sur pièce dont 1 daté)
 progress:
-  total_phases: 19
+  total_phases: 20
   completed_phases: 11
   total_plans: 53
   completed_plans: 37
@@ -247,6 +247,36 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
 ## Accumulated Context
 
 ### Roadmap Evolution
+
+- 2026-07-28 : **Phase 20 ajoutée** — « Fluidité du flux de dev sans perte de qualité ». Origine :
+  **second rapport de l'audit externe du 2026-07-28** (même lab `ExploreSomfy`, tranche iOS en 5
+  lots dont 2 parallélisés par worktrees, ~90 commits, suite 177 → 331 tests), archivé en
+  `.planning/missions/2026-07-28-audit-externe-fluidite.md`. **Les 4 constats ont été vérifiés sur
+  pièce avant ouverture** — verdict : 3 confirmés dont 2 **plus solidement que le rapport ne
+  l'affirme**, 1 **partiellement daté**.
+  - **Changement 1 (ADR-051)** confirmé et aggravé : les `tools:` déclarés de `vf-reviewer`,
+    `vf-auditer` et `vf-design-judge` gagnent tous **`Write, Edit` au runtime** (`memory: project`),
+    et la description de `vf-design-judge` affirme une barrière « sans Write ni Edit » que le
+    runtime ne pose pas. Le moindre privilège invoqué par ADR-051 n'existait déjà plus.
+  - **Changement 2 (revue graduée par risque)** confirmé et verrouillé par un fait que le rapport ne
+    citait pas : `vf-dev-manager.md:108` **interdit explicitement** au manager d'ajouter une revue
+    (« Pas de double revue »). La revue est donc le seul étage à la fois obligatoire
+    (`vf-coder.md:34`, en dur) **et hors de portée du manager**. Gradation existante indexée sur le
+    volume (`SEUIL_EQUIPE = 3`), jamais sur le risque.
+  - **Changement 3 (`MISSION-INVARIANTS.md`)** confirmé sur sa partie vérifiable (le gabarit
+    `mission-contracts.md` existe et a été court-circuité ; `vf-dev-manager.md:29` lit déjà le
+    `CLAUDE.md` du projet). L'absence des 3 invariants sur disque porte sur `ExploreSomfy` et n'est
+    **pas vérifiable depuis ce repo** — statut plus faible que les autres constats.
+  - **Changement 4 (`check-agents.sh`) — DATÉ à moitié** : l'option d'exclusion demandée **existe
+    déjà** (`--third-party-prefix`, défaut `gsd-`, `check-agents.sh:84`), livrée en Phase 16 /
+    v2.41.0 le 2026-07-27, **la veille du rapport**. Mesure du jour : **23 lignes, pas 68** — 21
+    warnings tous sur des agents `vf-*`, 34 tiers `gsd-*` écartés, zéro finding `gsd-`. Reste vrai
+    et non corrigé : `AGENTS_DIR=".claude/agents"` relatif au cwd (`:78`) + hook appelé sans
+    `--agents-dir` ⇒ **le hook sort 0 ligne, le garde-fou ne regarde rien**. La correction, jugée
+    impraticable le 28/07, est devenue praticable — et ferait remonter l'écart du changement 1.
+  Découpage **arbitré par Samuel : une phase unique pour les 4 changements**, contre la
+  recommandation de scinder en {1,4} conformité observable et {2,3} pilotage de mission. Réserve
+  inscrite au ROADMAP : si l'exécution déborde, c'est par le changement 2 qu'il faudra scinder.
 
 - 2026-07-28 : **Phase 19 ajoutée** — « Migration du moteur GSD pilotée par `/vf-update` ». Origine :
   **audit externe sur un second poste** (lab `ExploreSomfy`, scope user, rapport archivé en

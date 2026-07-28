@@ -755,3 +755,176 @@ Plans:
 - [x] 19-01-PLAN.md — Gate `check-gsd-engine.sh` : détection à 3 états (layout/nom de paquet, jamais les numéros), contrat de sortie 0/2/3, suite dédiée + preuve Linux (vague 1)
 - [x] 19-02-PLAN.md — `ensure-deps.sh` : détecteur à 3 valeurs, fin du skip sur legacy, chemin `--migrate-engine` chaîné sur la ré-injection MCP, message de nettoyage exact ; `inject-mcp-tools.sh --verify` (vague 1)
 - [x] 19-03-PLAN.md — `vf-update/SKILL.md` : diagnostic à deux volets et ligne de confirmation moteur ; ADR-058 ; release-meta `dev-orchestrator` v2.7.0 + `conductor` v1.16.0 (vague 2, dépend de 19-01 et 19-02)
+
+### Phase 20: Fluidité du flux de dev sans perte de qualité
+
+> **Origine — second rapport de l'audit externe du 2026-07-28** (même lab `ExploreSomfy`, tranche de
+> dev iOS en 5 lots dont 2 parallélisés par worktrees, ~90 commits, suite passée de 177 à 331
+> tests) : `.planning/missions/2026-07-28-audit-externe-fluidite.md`. **Les 4 constats ont été
+> vérifiés sur pièce le 2026-07-28** avant ouverture — 3 confirmés (dont 2 plus solidement que le
+> rapport ne l'affirme), 1 **partiellement daté**. Découpage arbitré par Samuel : **une phase
+> unique** pour les 4 changements, contre la recommandation de scinder le changement 2.
+
+**Goal**: Rendre le flux de dev **plus rapide et plus fluide sans perdre en qualité**, par quatre
+changements indépendants dont deux touchent la doctrine. Deux garde-fous non négociables encadrent
+toute la phase, tirés des chiffres de l'audit :
+
+- **Ne jamais réduire le nombre de tests.** Mesuré : sur 90 s de `test_sim`, les tests pèsent ~1 s,
+  tout le reste est compilation et installation. Levier nul.
+- **Ne jamais alléger la revue sur le chemin critique produit** — 5 bloquants y ont été trouvés en
+  une journée, dont un qui cassait le geste le plus fréquent de la démo.
+- **Aucun allègement ne s'applique jamais à un diff de comblement.** Sur cette tranche, **9 fois,
+  puis 5, puis 4 défauts sont nés des correctifs de revue eux-mêmes**. Une re-revue reste pleine,
+  quelle que soit la nature du lot d'origine.
+
+**Changement 1 — `mcp__XcodeBuildMCP__*` à `vf-reviewer`, et révision d'ADR-051.**
+`docs/ADR.md` §ADR-051 porte la prémisse contestée mot pour mot : « les agents de planif/revue/audit
+(`vf-dev-manager`, `vf-reviewer`, `vf-auditer`) restent inchangés (moindre privilège — **ils ne
+compilent jamais**) ». Elle confond **produire** un verdict de compilation et **en vérifier** un :
+un relecteur n'a pas besoin de compiler pour livrer, il en a besoin pour ne pas *croire* un message
+de commit (constaté : « la revue de phase a dû croire un message de commit »). `vf-reviewer` a déjà
+`Bash`, l'outil le plus large — il ne lui manque pas l'outil dangereux, il lui manque l'outil
+sanctionné, alors que le `CLAUDE.md` du lab interdit `xcodebuild` en shell.
+**Fait vérifié dans ce repo, plus grave que le rapport ne le dit** — le moindre privilège invoqué
+n'existe déjà plus, `memory: project` rouvrant `Write`/`Edit` au runtime :
+
+| Agent | `tools:` déclaré sur disque | `tools:` au runtime |
+|---|---|---|
+| `vf-reviewer` | `Read, Bash, Glob, Grep, Agent(gsd-code-reviewer)` | + **`Write, Edit`** |
+| `vf-auditer` | `Read, Bash, Glob, Grep, Agent(gsd-security-auditor)` | + **`Write, Edit`** |
+| `vf-design-judge` | `Read, Bash, Glob, Grep` | + **`Write, Edit`** |
+
+Le cas de `vf-design-judge` dépasse le constat d'origine : sa **description** affirme « Ne corrige
+JAMAIS rien — **sans Write ni Edit** » — une barrière que le runtime ne pose pas, et cette phrase
+est lue par les agents qui le dispatchent. Le « je juge, je ne corrige pas » est une consigne de
+prompt, pas une barrière.
+**À instruire AVANT de livrer, par le test et non par la supposition** : ADR-051 établit que
+`mcp__*` est refusé en allowlist et que seule la forme par-serveur `mcp__<serveur>__*` est admise —
+il ne dit **rien** du nom d'outil exact. Si une allowlist fine (`test_sim` / `build_sim` seulement)
+passe dans le `tools:` d'un subagent, elle est préférable au wildcard. **Coût à assumer et à
+écrire** : un relecteur qui peut lancer les tests va les lancer — +90 s par revue et un slot de
+simulateur consommé.
+
+**Changement 2 — sortir la revue de `vf-coder` et la graduer par RISQUE.**
+Défaut de **placement**, pas de doctrine. `vf-dev-manager.md:93-94` sait déjà graduer (« une étape UI
+saute l'audit sécurité ; une étape sécurité le garde ») et l'audit est conditionnel (`:103`). La
+revue, elle, est **en dur à l'étape 4 du cycle interne de `vf-coder`** (`vf-coder.md:34`, sans
+condition). **Fait vérifié qui verrouille le diagnostic** : `vf-dev-manager.md:108` interdit
+explicitement au manager d'en ajouter une — « **Pas de double revue** : si le rapport typé de
+`vf-coder` est `passed` avec verdict revue PASS, ne re-dispatche pas de revue de code ». La revue est
+donc le seul étage à la fois **obligatoire et hors de portée du manager**.
+La seule gradation existante est indexée sur le **volume** : `SEUIL_EQUIPE = 3`
+(`mission-contracts.md:105`) compte des étapes restantes. Mauvais axe — trois lignes sur un chemin
+BLE partagé sont minuscules et à très haut risque ; 400 lignes de Domain pur prouvées par mutation
+sont grosses et à bas risque.
+**Rendement observé par nature de lot** (aucun rattrapable par les tests, sauf la dernière ligne) :
+
+| Nature du lot | Bloquants trouvés |
+|---|---|
+| Adaptateur matériel (non injectable, non testable) | 3 |
+| Contrôleur partagé entre features | 3 |
+| **Jointures entre lots parallèles** | **4 bloquants + 9 majeurs** — « aucun relecteur cadré sur un seul lot ne les aurait vus » |
+| Geste utilisateur / géométrie de vue | 3 (trouvés par géométrie et capture d'écran) |
+| **Domain pur avec tests de mutation** | **0** — terrain le mieux couvert |
+| Documentation / catalogue de chaînes | 0 bug, mais 2 faits faux bloquants pour la mission suivante |
+
+**Changement 3 — `.planning/MISSION-INVARIANTS.md`.**
+Le constat incrimine son auteur, et les deux faits qui le fondent sont vérifiés :
+`mission-contracts.md` dit bien « le brief ne porte QUE ce qui n'est pas sur disque, il ne paraphrase
+jamais `ROADMAP.md`/`STATE.md`/`PROJECT.md` », et `vf-dev-manager.md:29` lit déjà le `CLAUDE.md` du
+projet avec préséance. Recopier les conventions à la main dans chaque brief duplique donc ce que la
+machine lira de toute façon — et c'est cette recopie qui a produit une contradiction interne à
+corriger en cours de mission. **Le gabarit n'a pas manqué : il a été court-circuité.**
+Mais **trois invariants ne vivent nulle part sur disque** et aucun agent ne peut les deviner : le
+**seuil de tests courant** (mouvant : 177 → 331 en une journée) ; la **table des fichiers gelés** par
+mission en vol ; les **motifs de risque récurrents** du projet (« la neuvième occurrence du motif de
+la phase » — donc connu, mais écrit nulle part). Le fichier reste court, relu par le manager au même
+titre que `STATE.md` ; le brief garde ses champs minimaux.
+**Coût à écrire noir sur blanc : s'il ment, il est pire que rien** — précédent réel d'un `CLAUDE.md`
+affirmant encore « deux trous interdisent toute installation device » alors que la mission suivante
+devait recetter sur device. **Prévoir comment il est tenu à jour, ou ne pas le créer.** Sa table des
+fichiers gelés alimente directement le critère (b) du changement 2.
+
+**Changement 4 — scope des hooks de conformité. ⚠ CONSTAT PARTIELLEMENT DATÉ.**
+**La moitié demandée est déjà livrée** : l'option d'exclusion existe et `gsd-` est son **défaut** —
+`check-agents.sh` §Usage (`--third-party-prefix=PFX`, répétable) et `:84`
+(`THIRD_PARTY_PREFIXES="gsd-"`), livrés en **Phase 16 / v2.41.0 le 2026-07-27**, soit la veille du
+rapport. **Mesuré le 2026-07-28** sur `~/.claude/agents` avec la version du repo (identique à celle
+installée) : **23 lignes, pas 68** — 21 warnings **tous sur des agents `vf-*`**, 34 agents tiers
+`gsd-*` écartés proprement, **zéro finding `gsd-`**. Le motif du refus du 28/07 (« 68 lignes dont 66
+de bruit ») ne tient plus. La phase ne doit donc **pas** créer un `--exclude=GLOB` redondant.
+**Ce qui reste vrai et non corrigé** : `check-agents.sh:78` fixe `AGENTS_DIR=".claude/agents"`
+**relatif au cwd**, le hook `SessionStart` de `conductor/hooks/hooks.json` appelle
+`check-agents.sh --hook` **sans `--agents-dir`**, et un lab en scope user n'a aucun agent dans son
+projet. **Vérifié : le hook tel qu'il tourne sort 0 ligne** — le garde-fou de conformité ne regarde
+rien. Même diagnostic pour `check-debug-research.sh --hook`. Les deux sont en plus masqués par
+`|| true`.
+**La conséquence s'inverse** : corriger le scope produirait aujourd'hui **21 warnings de signal
+réel** sur les agents que VibeFlow gouverne — dont, précisément, l'écart `tools:` déclaré/runtime du
+changement 1. Impraticable le 28/07, praticable maintenant.
+
+**Requirements**: TBD (à dériver au cadrage)
+**Depends on:** aucune — indépendante des Phases 18 (bloquée par RFC upstream) et 19 (livrée).
+**Success Criteria** (what must be TRUE):
+
+  1. **ADR-051 est révisé** sur ce seul point, avec l'argument explicite « un relecteur ne PRODUIT
+     pas de verdict de compilation, il en VÉRIFIE un », et `vf-reviewer` obtient l'accès MCP — **à
+     lui seul**, ni `vf-auditer` ni `vf-dev-manager`. La granularité (allowlist fine vs wildcard
+     par serveur) est tranchée **par un test réel**, pas par lecture de doc.
+
+  2. **L'écart `tools:` déclaré / runtime est traité, pas seulement constaté** : la description de
+     `vf-design-judge` cesse d'affirmer une barrière `Write`/`Edit` que le runtime ne pose pas, et
+     le repo dit quelque part que `memory:` rouvre ces outils.
+
+  3. **La revue est un étage de premier rang piloté par le manager**, au même titre que l'audit et
+     le test — sans quoi la gradation n'a nulle part où s'appliquer. La règle « pas de double
+     revue » (`vf-dev-manager.md:108`) est réécrite en conséquence, pas contournée.
+
+  4. **Les critères de déclenchement sont objectifs, jamais des seuils au jugé** : revue renforcée
+     non négociable si le diff touche (a) un adaptateur d'infra non couvert par les tests, (b) un
+     fichier partagé avec une mission parallèle en vol, (c) du code que la mutation ne couvre pas,
+     (d) un geste utilisateur ou une géométrie de vue. **Revue de jointure obligatoire, en nœud
+     séparé**, dès que deux lots parallèles fusionnent — meilleur rendement de toute la tranche,
+     étage qui n'existe aujourd'hui que parce qu'il a été créé à la main. Revue allégée réservée au
+     Domain pur à mutation verte, à la documentation et aux catalogues sans ajout de clé.
+     **En cas de doute, revue pleine** — le classement du lot est un point de décision, donc un
+     point d'erreur : le défaut par défaut doit être le sûr.
+
+  5. **`MISSION-INVARIANTS.md` porte les 3 invariants + la contrainte d'outillage du moment**, le
+     brief reste à ses champs minimaux, et **son mécanisme de mise à jour est spécifié** — faute de
+     quoi le fichier n'est pas créé (critère falsifiable : un invariant périmé doit être détectable).
+
+  6. **Le scope des deux hooks est corrigé** (`check-agents.sh --hook`,
+     `check-debug-research.sh --hook`) et le garde-fou devient **silencieux en régime nominal et
+     utile sur les dérives** — **sans** créer d'option d'exclusion redondante avec
+     `--third-party-prefix`, déjà livrée et déjà réglée sur `gsd-`.
+
+  7. Gouvernance tenue : `check-agents.sh` vert, densité ADR-029, portabilité macOS + Linux prouvée
+     par exécution, modules bumpés, release racine + tag annoté, `check-release-tag.sh --remote` ✓.
+
+**Livrable attendu du cadrage** : pour chaque changement — ce qui bouge fichier par fichier, le
+gain, **le coût et le risque**, sa réversibilité, et l'ADR à créer ou réviser. **Distinguer
+nettement une correction de configuration (changement 4) d'un changement de doctrine (1, 2, 3).**
+
+**Déjà appliqué le 2026-07-28 côté lab, à ne pas refaire** : profils de session XcodeBuildMCP
+désactivés (`XCODEBUILDMCP_DISABLE_SESSION_DEFAULTS=true`) — le serveur n'a qu'**un seul
+`SessionStore` global** partagé par la fenêtre principale et tous les sous-agents, et `build_sim` /
+`test_sim` n'exposaient **aucun paramètre de projet** dans ce mode ; constaté : une exécution
+complète partie sur le code d'un autre worktree. **Conséquence à propager : chaque appel de build
+doit porter son `projectPath`, son `scheme` et son `simulatorId`/`deviceId`.** Purge du cache
+`test-products` (12 Go → 1,3 Go) également faite.
+
+**Piège d'outillage à inscrire dans la doctrine de gate** : un `build_sim` **en cache** (zéro tâche
+`SwiftCompile`) annonce « 0 warning » **sans rien compiler**. Un verdict de warnings non précédé
+d'un `clean` est structurellement invérifiable.
+
+**Réserve de cadrage, inscrite pour mémoire** : le découpage recommandé était {1,4} (conformité des
+agents observable — le 4 est ce qui rend le 1 visible) et {2,3} (pilotage de mission) en deux
+phases. Samuel a tranché pour une phase unique. Le changement 2 vaut à lui seul plus que les trois
+autres réunis — si l'exécution déborde, c'est par là qu'il faudra scinder.
+
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 20 to break down)
