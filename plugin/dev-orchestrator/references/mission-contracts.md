@@ -76,6 +76,46 @@ DIGEST (cache — le disque fait foi)
 Le worker lit le digest D'ABORD, et ne relit du disque que ce que son mandat exige
 (index-first). Un digest contredit par le disque → le disque gagne, et le worker le signale.
 
+## Isolation de branche (ADR-059) — toute mission d'équipe
+
+**Une mission d'équipe ne commite jamais sur la branche par défaut.** Dès qu'un manager est
+dispatché (`vf-dev-manager`, `vf-design-manager`), il crée **d'abord** une branche dédiée, y tient
+tous ses commits, et termine par une **PR laissée ouverte** — le merge appartient à l'utilisateur
+(ADR-031). Le travail conversationnel direct (un correctif, une doc, un cadrage mené dans le fil)
+**reste hors de cette règle** : sans elle, chaque échange créerait une branche.
+
+**Pourquoi** : une mission autonome produit des dizaines de commits sans supervision. Sur la
+branche par défaut, le seul recours après coup est un `revert` en masse d'un historique déjà
+poussé et potentiellement déjà consommé par d'autres. Sur une branche, le recours est de ne pas
+merger. La PR donne en prime le point de relecture groupée qu'un rapport de fin de mission ne
+remplace pas.
+
+**Protocole, dans l'ordre :**
+
+1. **Avant le premier commit** — vérifier que l'arbre est propre, puis créer la branche depuis la
+   branche par défaut à jour. Convention de nom : `feat/<périmètre-en-kebab>` (précédents du dépôt
+   VibeFlow : `feat/phase-13-pont-vf-ingest`, `feat/v3-team-kernel`). Une mission = une branche,
+   même quand elle couvre plusieurs étapes.
+2. **Pendant** — tous les commits de la mission et de ses workers y vont. Le manager ne bascule
+   jamais de branche en cours de route et ne merge jamais lui-même.
+3. **À la fin** — pousser la branche et ouvrir la PR (`gh pr create`), titre et corps dérivés du
+   rapport de mission. **Ne jamais merger, ne jamais fermer.** Le rapport rendu à la conversation
+   principale cite l'URL de la PR.
+
+**Replis, dans cet ordre — une mission n'échoue JAMAIS pour cette règle :**
+
+| Situation | Comportement |
+|---|---|
+| Pas un dépôt git | Aucune branche. Le manager le **dit** dans son rapport et travaille en place. |
+| Dépôt git, aucun remote | Branche créée quand même, **pas de PR**. Le rapport donne le nom de la branche et la commande de merge. |
+| Remote présent, `gh` absent ou non authentifié | Branche créée et **poussée**, PR impossible. Le rapport donne l'URL de création de PR. |
+| Arbre sale au démarrage | **Ne rien stasher.** Le manager remonte à l'utilisateur avant de créer la branche — c'est une halt condition, pas une décision d'autonomie. |
+| `CLAUDE.md` du projet cible impose un autre flux | Le projet cible **prime** (contrat de brief : ses conventions de livraison font foi). |
+
+**Ce que cette règle ne couvre pas** : l'isolation des **vagues parallèles à l'intérieur** d'une
+mission, qui partagent le même arbre de travail. Une branche par mission ne les sépare pas entre
+elles — seul `isolation: worktree` le ferait, et c'est une décision distincte, non tranchée ici.
+
 ## Rapport de mission (manager → main)
 
 Retour **compact**. Le détail vit sur disque, pas dans la conversation.

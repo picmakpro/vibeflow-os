@@ -1,5 +1,29 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.7.1] — 2026-07-28 (isolation de branche des missions d'équipe, ADR-059)
+
+**Une mission d'équipe ne commite plus jamais sur la branche par défaut.** Dès qu'un manager est
+dispatché, il crée sa branche **avant son premier commit**, y tient tous ses commits, et termine par
+une **PR laissée ouverte** — le merge appartient à l'utilisateur (ADR-031). Le travail
+conversationnel direct (correctif, doc, cadrage mené dans le fil) reste hors de la règle.
+
+**Origine** : constaté sur le dépôt VibeFlow le 2026-07-28 — la mission Phase 19 a produit **32
+commits directement sur `main`**, poussés puis taggés. Aucun dégât, mais le recours en cas de mission
+ratée était un `revert` en masse d'un historique déjà public. Sur une branche, le recours est de ne
+pas merger. La PR fournit en prime le point de relecture groupée qu'un rapport de fin de mission — 
+rédigé **par** l'agent qui a fait le travail, et lu trop tard — ne remplace pas.
+
+**Cinq replis, pour qu'une mission n'échoue jamais faute d'appliquer la règle** : pas de dépôt git →
+aucune branche, signalé ; pas de remote → branche sans PR ; `gh` absent → branche poussée et URL de
+création de PR donnée ; **arbre sale au démarrage → halt condition**, jamais un `stash` décidé seul ;
+`CLAUDE.md` du projet cible imposant un autre flux → le projet cible **prime**.
+
+**Ne couvre pas** : l'isolation des vagues parallèles **à l'intérieur** d'une mission, qui partagent
+le même arbre de travail — seul `isolation: worktree` le ferait. Décision distincte, laissée ouverte.
+
+Fichiers : `references/mission-contracts.md` (§Isolation de branche — protocole, conventions de nom,
+table des replis) · `agents/vf-dev-manager.md` §Garanties.
+
 ## [v2.7.0] — 2026-07-28 (migration du moteur GSD pilotée par /vf-update, Phase 19)
 
 ### Ajouté

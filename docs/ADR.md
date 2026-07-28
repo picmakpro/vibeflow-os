@@ -28,6 +28,7 @@
 | ADR-056 | 2026-07-25 | Vigilance support runtime (scission du double emploi d'ADR-031) | Validée |
 | ADR-057 | 2026-07-25 | Frontières avec les briques tierces — détection outillée des recouvrements | Validée |
 | ADR-058 | 2026-07-28 | Le moteur GSD entre dans le périmètre de `/vf-update` | Validée |
+| ADR-059 | 2026-07-28 | Une mission d'équipe travaille sur sa propre branche, jamais sur la branche par défaut | Validée |
 
 ### ADR héritées les plus citées (définitions canoniques)
 
@@ -925,3 +926,83 @@ code futur qui y touche, faute de quoi le piège semver documenté en D-05 se ro
   migration à une confirmation explicite, jamais automatique. Applique la méthode d'ADR-055 §3 (le
   script constate le fait, l'agent juge et propose) au périmètre du moteur GSD. Aucune rule
   nouvelle.
+
+## ADR-059 : Une mission d'équipe travaille sur sa propre branche, jamais sur la branche par défaut
+
+**Date** : 2026-07-28
+**Statut** : Validée
+**Décideur** : Samuel (constat du 2026-07-28 — 32 commits de mission autonome atterris sur `main`)
+**Contexte** : release v2.43.0 — dev-orchestrator, design-orchestrator
+
+### Problème
+
+Une mission d'équipe (`vf-dev-manager`, `vf-design-manager`) produit **des dizaines de commits sans
+supervision**. Rien, dans le contrat de brief ni dans les garanties des managers, ne disait sur
+quelle branche. Le comportement de fait était donc « celle où la session se trouve » — en pratique
+la branche par défaut.
+
+Constaté le 2026-07-28 sur ce dépôt : la mission Phase 19 a produit **32 commits directement sur
+`main`**, poussés, puis taggés. Aucun dégât — la mission était bonne — mais le recours en cas de
+mission ratée était un `revert` en masse d'un historique déjà public, potentiellement déjà consommé
+par d'autres clones. Le rapport de fin de mission ne remplace pas un point de relecture groupée : il
+est rédigé **par** l'agent qui a fait le travail, et il est déjà trop tard quand on le lit.
+
+Le même dépôt impose pourtant une discipline stricte en aval (« toute VERSION = un tag », gates de
+synchro, release GitHub). L'amont — comment le travail arrive sur la branche par défaut — n'était pas
+gouverné du tout.
+
+### Options Considérées
+
+| Option | Pour | Contre |
+|---|---|---|
+| Statu quo (mission sur la branche courante) | zéro friction | pas de point d'annulation, pas de relecture groupée, historique public d'office |
+| **Branche + PR pour toute mission d'équipe (retenue)** | annulation = ne pas merger ; relecture groupée ; le merge reste humain (ADR-031) | une branche à gérer par mission ; inopérant sans remote → exige des replis |
+| Branche pour tout travail de phase | plus uniforme | un `docs(NN)` d'ouverture de phase deviendrait une PR |
+| Branche pour toute modification de code | flux GitHub classique | alourdit chaque correctif d'une ligne et chaque mise à jour de `STATE.md` |
+
+### Décision
+
+**Toute mission d'équipe crée sa branche AVANT son premier commit, y tient tous ses commits, et
+termine par une PR laissée ouverte. Le manager ne merge jamais.** Le merge appartient à l'utilisateur
+(ADR-031 : jamais d'action irréversible sans validation humaine).
+
+Le déclencheur est le **dispatch d'un manager**, pas la nature du travail : le travail conversationnel
+direct (correctif, doc, cadrage mené dans le fil) reste hors de la règle — sinon chaque échange
+créerait une branche.
+
+**Une mission n'échoue jamais faute de pouvoir appliquer cette règle.** Quatre replis dégradés, du
+plus complet au plus pauvre : pas de dépôt git → aucune branche, signalé ; pas de remote → branche
+sans PR ; pas de `gh` → branche poussée, URL de création de PR donnée ; arbre sale au démarrage →
+**halt condition**, remontée à l'utilisateur, jamais un `stash` décidé seul. Et le `CLAUDE.md` du
+projet cible **prime** s'il impose un autre flux — cohérent avec le contrat de brief, où les
+conventions de livraison du projet font déjà foi.
+
+### Conséquences
+
+**Positives** : le recours après une mission ratée devient « ne pas merger » au lieu d'un revert en
+masse. La PR fournit le point de relecture groupée que le rapport de mission ne remplace pas. La
+branche par défaut cesse de recevoir du travail non supervisé.
+
+**Négatives / risque** : une branche de plus à gérer par mission, et un merge qui peut traîner —
+une mission livrée mais non mergée est un travail invisible pour la suivante, qui repartira de la
+branche par défaut sans le voir. Le manager doit donc citer l'URL de la PR dans son rapport, et
+l'utilisateur reste seul responsable du merge. Sur un lab sans remote, la règle se dégrade en simple
+isolation locale — utile, mais sans relecture.
+
+**Ne couvre pas** : l'isolation des vagues parallèles **à l'intérieur** d'une mission, qui partagent
+le même arbre de travail. Une branche par mission ne les sépare pas entre elles ; seul
+`isolation: worktree` le ferait. Décision distincte, non tranchée ici — signalée par
+`vf-dev-manager` lors de la mission Phase 19 et volontairement laissée ouverte.
+
+### Code Impacté
+
+- `plugin/dev-orchestrator/references/mission-contracts.md` — nouvelle section §Isolation de branche
+  (protocole en 3 temps, conventions de nom, table des 5 replis).
+- `plugin/dev-orchestrator/agents/vf-dev-manager.md` §Garanties — règle câblée, renvoi au contrat.
+- `plugin/design-orchestrator/agents/vf-design-manager.md` §Garanties — idem.
+
+### Rules Associées
+
+Applique ADR-031 (jamais d'action irréversible sans validation humaine) au **merge** : le manager
+peut tout produire, il ne peut rien intégrer. Complète la discipline de release du `CLAUDE.md`
+racine, qui gouvernait l'aval (tag, release) sans rien dire de l'amont. Aucune rule nouvelle.

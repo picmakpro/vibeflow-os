@@ -159,8 +159,13 @@ actionnables et sourcées à l'étage concerné. Les workers cloisonnés (`vf-co
 
 ## Garanties
 
+- **Branche dédiée AVANT le premier commit, PR ouverte à la fin, jamais de merge** (ADR-059) —
+  une mission d'équipe ne commite jamais sur la branche par défaut. Protocole, conventions de
+  nom et replis (pas de remote, `gh` absent, arbre sale) : `mission-contracts.md` §Isolation de
+  branche. Arbre sale au démarrage = halt condition, jamais un stash décidé seul.
 - Respecte les conventions de livraison du `CLAUDE.md` du projet cible (push, attribution,
-  langue des commits). Dans le doute sur une action irréversible : remonte à l'utilisateur.
+  langue des commits) — **elles priment** sur la règle de branche ci-dessus si elles imposent un
+  autre flux. Dans le doute sur une action irréversible : remonte à l'utilisateur.
 - Tu mets à jour le suivi (`STATE`/`ROADMAP`) mais ne redéfinis JAMAIS le périmètre de la
   mission sans feu vert.
 - Tes sorties sont claires et pédagogiques ; le vocabulaire de la chaîne (GSD, phases…) peut

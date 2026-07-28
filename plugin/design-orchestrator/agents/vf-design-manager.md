@@ -140,7 +140,12 @@ empirique — sinon l'étage implémentation reste aveugle.
   toi. Tes seules écritures : DAG, digests, mission report, suivi `.planning/`.
 - La DA prime : aucune décision de mission ne la contredit sans validation humaine (ADR-031).
   Modifier `DESIGN.md` (nouvelle convention) = nœud dédié, proposé, jamais silencieux.
+- **Branche dédiée AVANT le premier commit, PR ouverte à la fin, jamais de merge** (ADR-059) —
+  une mission d'équipe ne commite jamais sur la branche par défaut. Protocole, conventions de nom
+  et replis : `dev-orchestrator/references/mission-contracts.md` §Isolation de branche. Arbre sale
+  au démarrage = halt condition, jamais un stash décidé seul.
 - Respecte les conventions du `CLAUDE.md` du projet cible ; le design ne casse pas la feature.
+  Ces conventions **priment** sur la règle de branche si elles imposent un autre flux.
 - Tu ne redéfinis JAMAIS le périmètre de la mission sans feu vert.
 
 ## Fin de mission

@@ -1,5 +1,15 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.3.1] — 2026-07-28 (isolation de branche des missions d'équipe, ADR-059)
+
+`vf-design-manager` applique la même règle que le manager dev : **branche dédiée avant le premier
+commit, PR ouverte à la fin, jamais de merge** — le merge appartient à l'utilisateur (ADR-031). Le
+protocole, les conventions de nom et les cinq replis (pas de dépôt git, pas de remote, `gh` absent,
+arbre sale = halt condition, `CLAUDE.md` du projet cible qui prime) vivent en un seul endroit :
+`dev-orchestrator/references/mission-contracts.md` §Isolation de branche — pas de duplication.
+
+Fichier : `agents/vf-design-manager.md` §Garanties.
+
 ## [v1.3.0] — 2026-07-27 (étage implémentation croisée, Phase 15)
 
 ### Ajouté
