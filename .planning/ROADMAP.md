@@ -748,10 +748,10 @@ signal passe par `/vf-update`, pas par une ligne de plus au démarrage de chaque
 d'outils interne a sa propre mise à jour — hors périmètre ») devient fausse et doit être réécrite —
 ADR à créer, c'est un **changement de doctrine**, pas un correctif de configuration.
 
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans executed
 
 Plans:
 
 - [x] 19-01-PLAN.md — Gate `check-gsd-engine.sh` : détection à 3 états (layout/nom de paquet, jamais les numéros), contrat de sortie 0/2/3, suite dédiée + preuve Linux (vague 1)
 - [x] 19-02-PLAN.md — `ensure-deps.sh` : détecteur à 3 valeurs, fin du skip sur legacy, chemin `--migrate-engine` chaîné sur la ré-injection MCP, message de nettoyage exact ; `inject-mcp-tools.sh --verify` (vague 1)
-- [ ] 19-03-PLAN.md — `vf-update/SKILL.md` : diagnostic à deux volets et ligne de confirmation moteur ; ADR-058 ; release-meta `dev-orchestrator` v2.7.0 + `conductor` v1.16.0 (vague 2, dépend de 19-01 et 19-02)
+- [x] 19-03-PLAN.md — `vf-update/SKILL.md` : diagnostic à deux volets et ligne de confirmation moteur ; ADR-058 ; release-meta `dev-orchestrator` v2.7.0 + `conductor` v1.16.0 (vague 2, dépend de 19-01 et 19-02)

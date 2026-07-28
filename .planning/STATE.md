@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
 current_phase: 19
-current_phase_name: Migration du moteur GSD pilotée par /vf-update — planifiée (3 plans), 19-01 et 19-02 exécutés
+current_phase_name: Migration du moteur GSD pilotée par /vf-update — planifiée (3 plans), 19-01, 19-02 et 19-03 exécutés
 status: in_progress
-stopped_at: "Plan 19-02 exécuté le 2026-07-28 — ensure-deps.sh : detect_gsd_state() à 3 valeurs, fin du skip legacy, chemin --migrate-engine chaîné sur patch_gsd_executor_mcp, message de nettoyage exact et atteignable (D-08) ; inject-mcp-tools.sh --verify qui dit fort et ne répare jamais (D-09). Suites étendues vertes macOS + Linux (test-dev-orchestrator.sh 72/0, test-inject-mcp-tools.sh 12/0). Prochain geste : 19-03 (vf-update/SKILL.md, ADR-058, release-meta dev-orchestrator v2.7.0 + conductor v1.16.0)."
-last_updated: "2026-07-28T12:21:36.658Z"
-last_activity: 2026-07-28 (exécution Phase 19 Plan 02 — ensure-deps.sh --migrate-engine, inject-mcp-tools.sh --verify)
+stopped_at: "Plan 19-03 exécuté le 2026-07-28 — vf-update/SKILL.md : diagnostic à deux volets (sonde check-gsd-engine.sh consultée AVANT le stop sur plugin à jour), ligne de confirmation moteur indépendante, §Garde-fous réécrit ; ADR-058 posé ; release-meta dev-orchestrator v2.7.0 + conductor v1.16.0. check-version-sync.sh rouge uniquement sur le compteur de suites des 2 README racine (41 vs 42 réel), reste-à-faire nommé pour le commit de release humain. Phase 19 (3/3 plans) prête pour clôture."
+last_updated: "2026-07-28T13:00:00.000Z"
+last_activity: 2026-07-28 (exécution Phase 19 Plan 03 — vf-update/SKILL.md, ADR-058, release-meta)
 progress:
   total_phases: 19
   completed_phases: 10
   total_plans: 53
-  completed_plans: 36
+  completed_plans: 37
 ---
 
 # Project State
@@ -439,8 +439,8 @@ Recent decisions affecting current work:
 
 **Resume file:** None
 
-Last session: 2026-07-28T12:21:05.399Z
-Stopped at: Completed VFDO-19-02-PLAN.md
+Last session: 2026-07-28T13:00:00.000Z
+Stopped at: Completed VFDO-19-03-PLAN.md
 ubuntu:24.04) — 3 jobs verts au run 30257419335. Modules bumpés : conductor v1.14.5,
 consolidator v1.8.1, dev-orchestrator v2.3.2. Leçon durable : tout bash développé sur macOS/BSD
 doit être reproduit sous `docker run ubuntu:24.04` avant push (stat/-f, TMPDIR, outillage hôte).
