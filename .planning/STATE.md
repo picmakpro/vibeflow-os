@@ -5,14 +5,14 @@ milestone_name: Migration package GSD
 current_phase: 17
 current_phase_name: Signaux de démarrage du moteur de dev — terminée, vérifiée et shippée (v2.42.0)
 status: planning
-stopped_at: "Phase 19 OUVERTE le 2026-07-28 (migration du moteur GSD pilotée par /vf-update, indépendante de la Phase 18) — inscrite au ROADMAP avec 7 critères de succès, non cadrée : prochain geste gsd-discuss-phase 19. Phase 17 terminée (n1-n4 du DAG de mission : cadrage+plan, exécution, gate portabilité, audit advisory/read-only) et clôturée (n5) — SC5 et SC6 CONFORMES/PROUVÉS par exécution, module dev-orchestrator v2.6.0. Release racine v2.42.0 PUBLIÉE le 2026-07-28 (VERSION = v2.42.0, tag annoté + release GitHub, check-release-tag --remote ✓). Phase 18 requalifiée en variante réduite le 2026-07-28 (étude STUDY.md, verdict GO-RÉDUIT) — non démarrée ; pré-requis bloquant : la RFC upstream open-gsd/gsd-core part avant toute implémentation du gate."
-last_updated: "2026-07-28T00:00:00.000Z"
-last_activity: 2026-07-28 (Phase 19 ouverte — migration du moteur GSD pilotée par /vf-update, issue de l'audit externe recoupé sur pièce)
+stopped_at: Phase 19 context gathered
+last_updated: "2026-07-28T10:13:53.157Z"
+last_activity: 2026-07-28 (clôture Phase 17)
 progress:
-  total_phases: 19
-  completed_phases: 10
-  total_plans: 50
-  completed_plans: 34
+  total_phases: 18
+  completed_phases: 8
+  total_plans: 39
+  completed_plans: 19
 ---
 
 # Project State
@@ -37,6 +37,7 @@ implémentation du gate.
 - `known-versions.txt` jamais posé → cause racine corrigée côté engine. `copy_module_scripts()`
   pose désormais les fichiers de données `*.txt` (sans `chmod +x`) ; T9 borne le glob par le bas
   et par le haut, discriminance prouvée par mutation.
+
 - `brick_routed()` grep naïf → fonction rendue **stricte** (la carte est la seule source, comme la
   spec du 2026-07-25 l'affirmait déjà). Mesure : sur 71 briques, **0** n'était couverte par un
   repli seul — les deux gardes étaient mortes ET rendaient T14 insensible. T14c les remplace par
@@ -88,7 +89,9 @@ faux vert dans son invocation nue prescrite par la spec (`check-agents.sh` sans 
 sans rien vérifier, `.claude/agents` étant absent de ce repo).
 
 **Réservé à validation humaine** : release de clôture (bump `VERSION`/`plugin.json`/`marketplace.json`
+
 + historique des 2 README, tag annoté poussé, release GitHub, `check-release-tag.sh --remote` → ✓).
+
 Pré-requis identifié : `scripts/check-version-sync.sh` est actuellement **rouge** — `README.md` et
 `README.fr.md` annoncent « 39 suites » contre 41 réelles (les 2 suites ajoutées par cette phase), à
 corriger avant tout bump.
@@ -426,10 +429,10 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-**Resume file:** .planning/phases/VFDO-15-collaboration-inter-quipes-dev-design/15-CONTEXT.md
+**Resume file:** .planning/phases/VFDO-19-migration-du-moteur-gsd-pilot-e-par-vf-update/19-CONTEXT.md
 
-Last session: 2026-07-27T14:40:53.506Z
-Stopped at: Phase 15 context gathered
+Last session: 2026-07-28T10:13:53.142Z
+Stopped at: Phase 19 context gathered
 ubuntu:24.04) — 3 jobs verts au run 30257419335. Modules bumpés : conductor v1.14.5,
 consolidator v1.8.1, dev-orchestrator v2.3.2. Leçon durable : tout bash développé sur macOS/BSD
 doit être reproduit sous `docker run ubuntu:24.04` avant push (stat/-f, TMPDIR, outillage hôte).
