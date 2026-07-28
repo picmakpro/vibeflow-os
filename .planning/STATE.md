@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
 current_phase: 19
-current_phase_name: Migration du moteur GSD pilotée par /vf-update — terminée et vérifiée (PASS 6/7), NON shippée
-status: complete
-stopped_at: "Phase 19 terminée et vérifiée le 2026-07-28 (mission d'équipe, DAG 5 nœuds + 1 reopen après vérification). Verdict 19-VERIFICATION.md : PASS, 6/7 — SC2 reste PRESENT_BEHAVIOR_UNVERIFIED (comportement d'agent, recette humaine du parcours /vf-update sur poste legacy : acceptation PUIS refus). Livré : check-gsd-engine.sh (3 états, exits 0/2/3), ensure-deps.sh --migrate-engine chaîné sur la ré-injection MCP, inject-mcp-tools.sh --verify, vf-update/SKILL.md à deux volets, ADR-058, modules dev-orchestrator v2.7.0 + conductor v1.16.0. Réservé à validation humaine : release racine (bump VERSION/plugin.json/marketplace.json + historique des 2 README + rattrapage du compteur 41→42 suites, tag annoté, release GitHub)."
-last_updated: "2026-07-28T15:40:00.000Z"
-last_activity: 2026-07-28 (Phase 20 ouverte — fluidité du flux de dev, 4 constats vérifiés sur pièce dont 1 daté)
+current_phase_name: Migration du moteur GSD pilotée par /vf-update — vérifiée (PASS 6/7) et SHIPPÉE v2.43.0
+status: shipped
+stopped_at: "Phase 19 vérifiée et SHIPPÉE le 2026-07-28 — release racine v2.43.0 publiée (commit 70c5720, tag annoté poussé, release GitHub, check-release-tag --remote ✓). Gates avant tag : check-version-sync ✓ après rattrapage du compteur 41→42 suites, 42 suites vertes, check-agents --strict ✓ sur les 6 dossiers d'agents. Verdict 19-VERIFICATION.md : PASS, 6/7 — SC2 reste PRESENT_BEHAVIOR_UNVERIFIED (comportement d'agent). SEUL RESTE-À-FAIRE : recette humaine du parcours /vf-update sur poste legacy, acceptation PUIS refus de la ligne moteur. Phase 17 également shippée, en v2.42.0 (une section datée de ce fichier affirmait le contraire — corrigée). Phase 20 ouverte et cadrée au ROADMAP, non planifiée : prochain geste gsd-plan-phase 20 (ou gsd-discuss-phase 20 d'abord pour le changement 2, le plus lourd des quatre)."
+last_updated: "2026-07-28T16:30:00.000Z"
+last_activity: 2026-07-28 (release v2.43.0 publiée — Phase 19 shippée ; Phase 20 ouverte et cadrée)
 progress:
   total_phases: 20
   completed_phases: 11
@@ -22,11 +22,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26 — charte rouverte : 17 modules, D2/D6 renversées)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Phase 19 **terminée et vérifiée, NON shippée** (2026-07-28) — la migration
+**Current focus:** Phase 19 **terminée, vérifiée et SHIPPÉE `v2.43.0`** (2026-07-28) — la migration
 `get-shit-done-cc` → `@opengsd/gsd-core` livrée en v2.39.0 atteint enfin les **postes déjà équipés** :
 `/vf-update` dit l'état du moteur avant tout stop et propose la bascule sous confirmation ADR-031.
 Modules `dev-orchestrator` v2.7.0 + `conductor` v1.16.0. Verdict `19-VERIFICATION.md` : **PASS 6/7**.
-Phase 17 **terminée et vérifiée, NON shippée** (2026-07-28) — signaux de démarrage
+Phase 17 **terminée, vérifiée et SHIPPÉE `v2.42.0`** (2026-07-28) — signaux de démarrage
 du moteur de dev (`check-dev-bootstrap.sh`, `check-doc-drift.sh`, `discover-unintegrated-docs.sh --hook`,
 hooks `SessionStart`), module `dev-orchestrator` v2.6.0. SC5 (advisory/lecture seule) et SC6
 (portabilité macOS+Linux) prouvés par exécution, pas par lecture. Plus aucun milestone ouvert.
@@ -54,7 +54,7 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 ## Current Position
 
-Phase: 19 **complète — vérifiée, release racine en attente** (VERSION racine intouchée : 2.42.0)
+Phase: 19 **complète — vérifiée et shippée `v2.43.0`** (tag annoté + release GitHub, `check-release-tag --remote` ✓)
 Migration du moteur GSD pilotée par `/vf-update`. Livrée en mission d'équipe le 2026-07-28, en
 autonomie complète (DAG à 5 nœuds, `.planning/missions/dag-phase19.json` : n1 plan · n2 exécution ·
 n3 gate portabilité · n4 audit sécurité/infra · n5 clôture, avec **un `reopen` unique** de n2 après
@@ -65,8 +65,8 @@ chemin `--migrate-engine` chaîné sur la ré-injection MCP, message de nettoyag
 `inject-mcp-tools.sh --verify`, `vf-update/SKILL.md` (diagnostic à deux volets, ligne de confirmation
 moteur indépendante, §Garde-fous réécrit), **ADR-058**. Modules `dev-orchestrator` **v2.7.0** et
 `conductor` **v1.16.0** (premier cas à deux modules bumpés dans la même phase).
-Status: Terminée et vérifiée, non shippée.
-Last activity: 2026-07-28 (clôture Phase 19)
+Status: Shippée (v2.43.0).
+Last activity: 2026-07-28 (clôture Phase 19 + release v2.43.0)
 
 **Verdict `19-VERIFICATION.md` : PASS, 6/7 critères.** SC2 reste `PRESENT_BEHAVIOR_UNVERIFIED` — le
 volet moteur du skill est présent et son contrat d'exit prouvé, mais c'est du **comportement d'agent**
@@ -92,16 +92,25 @@ de tous les modules à plat dans le même `.claude/scripts/`. Le silence sur scr
 (un lab content/growth ne doit rien voir), mais il rend le mode dégradé indiscernable du nominal —
 même famille que le trou que cette phase vient de fermer. Risque auto-documenté en ADR-058.
 
-**Réservé à validation humaine** : release racine (bump `VERSION`/`plugin.json`/`marketplace.json`
-+ historique des 2 README, tag annoté poussé, release GitHub, `check-release-tag.sh --remote` → ✓).
-Pré-requis connu et **volontairement déféré** : `scripts/check-version-sync.sh` est rouge sur son
-seul contrôle du compteur « N suites » des 2 README racine (41 annoncé vs 42 réel) — le rattrapage
-voyage avec le commit de release, patron déjà appliqué aux Phases 13 et 17. Les 17 triades par
-module sont ✓.
+**Release `v2.43.0` PUBLIÉE** le 2026-07-28 (commit `70c5720`, tag annoté poussé, release GitHub,
+`check-release-tag.sh --remote` → ✓). Le compteur « N suites » des 2 README racine a été rattrapé
+dans le même commit (41 → **42**), comme prévu : `check-version-sync.sh` est repassé ✓ avant le tag.
+Gates rejoués avant release : **42 suites vertes**, `check-agents --strict` ✓ sur les 6 dossiers
+d'agents, 17 triades par module ✓.
+
+**Reste en attente — recette humaine de SC2** : le volet moteur du skill est présent et son contrat
+d'exit prouvé, mais c'est du **comportement d'agent** non éprouvable par test. À recetter : parcours
+`/vf-update` sur un poste legacy, **acceptation PUIS refus** de la ligne moteur.
 
 ---
 
-Phase: 17 **complète — vérifiée, release racine en attente** (VERSION racine intouchée : 2.41.0)
+Phase: 17 **complète — vérifiée et shippée `v2.42.0`** (tag annoté + release GitHub)
+<!-- Corrigé le 2026-07-28 : cette section affirmait encore « release racine en attente (VERSION
+     intouchée : 2.41.0) » alors que v2.42.0 était publiée depuis le matin. Contradiction interne
+     avec le §Current focus du même fichier, qui a fait conclure à tort à vf-dev-manager qu'il
+     restait DEUX phases non shippées (17 et 19). Vérifié sur pièce avant la release v2.43.0 :
+     `git show v2.42.0:plugin/dev-orchestrator/scripts/check-doc-drift.sh` répond — la Phase 17
+     est bien dans le tag. Une section de phase datée ne doit jamais contredire le focus courant. -->
 Signaux de démarrage du moteur de dev. Livrée en mission d'équipe (DAG à 5 nœuds : n1 cadrage+plan ·
 n2 exécution · n3 gate portabilité · n4 audit advisory/read-only · un `reopen` unique après fusion des
 deux juges · n5 clôture, `.planning/missions/dag-phase17.json`). Livré : `check-dev-bootstrap.sh`
@@ -109,7 +118,7 @@ deux juges · n5 clôture, `.planning/missions/dag-phase17.json`). Livré : `che
 `hooks/hooks.json`, section *Signaux de démarrage* dans `AGENT.md`, 2 nouvelles suites de tests.
 Module `dev-orchestrator` **v2.6.0** (collision de version résolue : la Phase 16 concurrente avait
 déjà pris v2.5.0, cible ajustée à v2.6.0 — commit `5a8b6a8`).
-Status: Terminée et vérifiée, non shippée.
+Status: Shippée (v2.42.0).
 Last activity: 2026-07-28 (clôture Phase 17)
 
 **SC5 (advisory / lecture seule) — CONFORME.** Prouvé par exécution, pas par lecture : lecture seule
