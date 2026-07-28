@@ -138,7 +138,20 @@ docker run --rm -v "$(pwd)":/repo -w /repo ubuntu:24.04 bash -c '
   (`open(tmp, "w", ...)`) n'apparaissent qu'aux lignes 297/299, dans la branche d'injection —
   aucune occurrence dans la branche `--verify` (qui `sys.exit()` avant de les atteindre).
 - `bash "$SCRIPT" --argument-inconnu` → `rc=1` avec message d'erreur (non-régression du parsing).
-- `grep -c 'verify' ensure-deps.sh` → `7` (≥ 1).
+- ~~`grep -c 'verify' ensure-deps.sh` → `7` (≥ 1).~~ **Correction post-hoc (2026-07-28, mandat
+  n2-bis, gap goal-backward SC3) :** cette preuve ne mesurait que la *présence* du mot dans le
+  fichier (commentaires inclus), jamais le *comportement* de l'appel `--verify` réellement câblé.
+  Or l'appel `--verify` de `patch_gsd_executor_mcp()` (ligne ~409) n'avait **pas** `--force`, alors
+  que l'injection (ligne ~394) si — `gsd-executor.md` ne porte pas le flag `vf-mcp-consumer`, donc
+  `inject-mcp-tools.sh` écartait systématiquement la cible en mode fichier unique et rendait `3`
+  (INDÉTERMINÉ), jamais `0` ni `1` : le garde-fou ne pouvait jamais rendre de verdict en
+  production. Les cas T10/T11 de `test-inject-mcp-tools.sh` ne l'ont pas détecté car ils exercent
+  `inject-mcp-tools.sh --force --verify` directement — une forme que `ensure-deps.sh` n'émettait
+  jamais. Preuve de l'angle mort : la mutation « suppression complète du bloc `--verify` de
+  `patch_gsd_executor_mcp()` » laissait la suite à 73 OK / 0 KO (inchangée). Corrigé et couvert par
+  `test-dev-orchestrator.sh` T2m (exerce le chaînage réel de `patch_gsd_executor_mcp()`, prouve que
+  la même mutation devient létale — 1 KO nouveau). Voir CHANGELOG `dev-orchestrator` v2.7.0 section
+  « Corrigé ».
 - `bash -n` → 0 sur les 4 fichiers modifiés.
 - `git diff --name-only` (depuis avant ce plan) : exactement les 4 fichiers de `files_modified` du
   frontmatter, aucun autre.

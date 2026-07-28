@@ -28,10 +28,33 @@
   vert si python3 est absent) ; dit fort un serveur manquant, ne répare jamais. Branché en
   best-effort dans `patch_gsd_executor_mcp()`, après l'injection, hors dry-run uniquement.
 
+### Corrigé
+- **`patch_gsd_executor_mcp()` : `--verify` portait sur une cible différente de l'injection.**
+  L'appel d'injection (ligne ~394) passait `--force` (requis : `gsd-executor.md` ne porte pas le
+  flag `vf-mcp-consumer`, fichier hors plugin) mais l'appel `--verify` (ligne ~409) en était
+  dépourvu — `inject-mcp-tools.sh` écartait alors systématiquement la cible en mode fichier unique
+  (`single and not force and not has_flag(text)`), rendant le verdict **toujours** `3`
+  (INDÉTERMINÉ), jamais `0` (conforme) ni `1` (écart réel) : un garde-fou qui ne pouvait jamais
+  rendre de verdict. `--force` ajouté sur l'appel `--verify`, même cible que l'injection.
+- **Contrat de relais F13** : seul `rc=1` (écart réel, serveur manquant) est désormais relayé en
+  `ERROR` sur stderr. `rc=3` (INDÉTERMINÉ — `.mcp.json` absent, aucun serveur déclaré, rien à
+  comparer) n'est **plus** une alarme bruyante à chaque bootstrap ; il passe en `log` informatif.
+  `rc=0` (conforme) ne logue plus rien. Preuve de létalité : suppression du bloc `--verify` →
+  1 KO nouveau (`test-dev-orchestrator.sh` T2m) contre 0 KO avant, sur une mutation qui survivait
+  jusqu'ici silencieusement (les cas T10/T11 de `test-inject-mcp-tools.sh` exerçaient
+  `--force --verify` directement, une forme que la production n'émettait jamais).
+- **`test-dev-orchestrator.sh` T2m (nouveau)** : exerce le chaînage réel de
+  `patch_gsd_executor_mcp()` (jamais un appel manuel à `inject-mcp-tools.sh --force --verify`) —
+  stub d'injection silencieusement no-op + vrai injecteur en `--verify`, pour produire un écart
+  réel (`rc=1`) déterministe et portable (root Docker Linux contourne les permissions fichier,
+  écarté comme moyen de test).
+
 ### Fait mesuré
 - Audit externe du 2026-07-28 : sur un poste où le plugin VibeFlow était déjà à jour, le moteur GSD
   était resté sur `get-shit-done-cc` (paquet déprécié, figé à `1.42.3`) sans qu'aucun signal ne le
   dise — le chemin de mise à jour nominal (`/vf-update`) ne consultait jamais l'état du moteur.
+- Vérification goal-backward Phase 19 (mandat n2-bis, 2026-07-28) : gap sur la 2e clause du
+  critère de succès SC3 — voir « Corrigé » ci-dessus.
 
 Référence : `docs/ADR.md` ADR-058, `.planning/phases/VFDO-19-migration-du-moteur-gsd-pilot-e-par-vf-update/`.
 

@@ -18,6 +18,9 @@
 #   T2l — robustesse VERSION legacy hostile post-revue (T-19-01-01) : sanitize_version() borne la
 #         lecture et neutralise substitution de commande / octet de contrôle / longueur excessive
 #         avant tout affichage (miroir du Cas 13 de test-check-gsd-engine.sh).
+#   T2m — mandat n2-bis : --verify (ligne ~409 de patch_gsd_executor_mcp()) porte --force comme
+#         l'injection (ligne ~394) — un écart réel (rc=1) est détecté et relayé fort dans le
+#         chaînage RÉEL du bootstrap (jamais un appel manuel à inject-mcp-tools.sh --force --verify).
 #   T3  — AGENT.md : ≤250L, table d'intentions fournie (≥11 lignes NL) et AUCUNE référence
 #         à un verbe supprimé (la façade des 29 verbes est morte — elle ne ressuscite pas).
 #   T4  — Chaque skill du module mappe vers une cible existante (aucun orphelin) :
@@ -610,6 +613,76 @@ SH
     ko "T2h chaînage MCP : gsd-executor.md n'a pas reçu le serveur du lab après --migrate-engine"
   fi
   rm -rf "$T2H_HOME" "$T2H_PROJ" "$T2H_BIN"
+fi
+
+# ---------------------------------------------------------------------------
+# T2m (mandat n2-bis, gap goal-backward Phase 19) — la vérification MCP (--verify, ligne ~409 de
+# patch_gsd_executor_mcp()) doit porter --force comme l'injection (ligne ~394), sous peine de
+# toujours écarter gsd-executor.md (pas de flag vf-mcp-consumer) et de rendre le garde-fou
+# structurellement aveugle (rc=3 systématique, jamais 0 ni 1). Exercé dans le CHAÎNAGE RÉEL de
+# patch_gsd_executor_mcp() — jamais par un appel manuel à inject-mcp-tools.sh --force --verify,
+# qui ne prouverait rien sur le câblage de ensure-deps.sh.
+#
+# Pour produire un écart RÉEL (rc=1) de façon déterministe et portable (pas de dépendance à des
+# bits de permission, contournés par root dans le conteneur Docker Linux du gate), le script
+# d'injection est stubé : l'appel d'INJECTION (sans --verify) devient un no-op silencieux (simule
+# une injection qui échoue sans lever d'alarme — le fichier agent reste inchangé), tandis que
+# l'appel --verify exec le VRAI inject-mcp-tools.sh. Le seul code exercé côté ensure-deps.sh est
+# donc bien le sien (patch_gsd_executor_mcp() réel), avec un verdict de vérification réel.
+# ---------------------------------------------------------------------------
+if ! command -v python3 >/dev/null 2>&1; then
+  skip "T2m vérification réelle (--force sur --verify) : python3 absent — cas non applicable"
+else
+  T2M_HOME="$(mktemp -d)"
+  mkdir -p "$T2M_HOME/.claude/agents"
+  cat > "$T2M_HOME/.claude/agents/gsd-executor.md" <<'EOF'
+---
+name: gsd-executor
+description: exécute les plans GSD avec commits atomiques
+tools: Read, Write, Edit, Bash, Grep, Glob, mcp__context7__*
+model: opus
+memory: project
+---
+corps
+EOF
+
+  T2M_PROJ="$(mktemp -d)"
+  mkdir -p "$T2M_PROJ/.claude/gsd-core"
+  echo "1.8.0" > "$T2M_PROJ/.claude/gsd-core/VERSION"
+  printf '%s\n' '{ "mcpServers": { "test-lab-mcp": {} } }' > "$T2M_PROJ/.mcp.json"
+
+  T2M_BIN="$(mktemp -d)"
+  cat > "$T2M_BIN/claude" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = "plugin" ] && [ "$2" = "list" ]; then echo superpowers; fi
+exit 0
+SH
+  chmod +x "$T2M_BIN/claude"
+
+  # Copie de ensure-deps.sh à côté d'un stub inject-mcp-tools.sh (résolution par dirname "$0") :
+  # no-op silencieux hors --verify, VRAI injecteur en --verify.
+  T2M_SCRIPTS="$(mktemp -d)"
+  cp "$ENS" "$T2M_SCRIPTS/ensure-deps.sh"
+  T2M_REAL_INJECTOR="$MOD/scripts/inject-mcp-tools.sh"
+  cat > "$T2M_SCRIPTS/inject-mcp-tools.sh" <<EOF2
+#!/usr/bin/env bash
+for a in "\$@"; do
+  if [ "\$a" = "--verify" ]; then exec bash "$T2M_REAL_INJECTOR" "\$@"; fi
+done
+exit 0
+EOF2
+  chmod +x "$T2M_SCRIPTS/inject-mcp-tools.sh"
+
+  T2M_OUT=$(cd "$T2M_PROJ" && env -u VF_ENSURE_DRY_RUN -u VF_ENSURE_FORCE -u CLAUDE_CONFIG_DIR \
+    HOME="$T2M_HOME" PATH="$T2M_BIN:/usr/bin:/bin" bash "$T2M_SCRIPTS/ensure-deps.sh" 2>&1)
+
+  if echo "$T2M_OUT" | "$GREP" -qF "vérification MCP (--verify) signale un écart réel" \
+     && echo "$T2M_OUT" | "$GREP" -qF "mcp__test-lab-mcp__*"; then
+    ok "T2m vérification réelle : écart réel (injection silencieusement en échec) détecté et relayé fort dans le chaînage réel de patch_gsd_executor_mcp()"
+  else
+    ko "T2m vérification réelle : écart non détecté/relayé (verify pas atteint avec --force sur la même cible que l'injection ?) [out=$T2M_OUT]"
+  fi
+  rm -rf "$T2M_HOME" "$T2M_PROJ" "$T2M_BIN" "$T2M_SCRIPTS"
 fi
 
 # ---------------------------------------------------------------------------

@@ -401,16 +401,24 @@ patch_gsd_executor_mcp() {
   fi
 
   # SC3/D-09 : vérification après coup, hors dry-run UNIQUEMENT (en dry-run rien n'a été écrit,
-  # une vérification y serait une fausse alarme). Best-effort : un verdict non nul est relayé
-  # bruyamment sur le canal d'erreur, jamais bloquant pour le bootstrap (P-02 — --verify ne
-  # répare jamais, il ne fait que dire fort ce qui manque).
+  # une vérification y serait une fausse alarme). --force est REQUIS ici aussi (même motif que
+  # l'injection ci-dessus) : sans lui, --verify en mode fichier unique écarte gsd-executor.md
+  # (pas de flag vf-mcp-consumer) et sort systématiquement en 3 ("aucune cible determinee"),
+  # jamais 0 ni 1 — un garde-fou qui ne peut jamais rendre de verdict n'en est pas un.
+  # Contrat de relais (F13) : seul rc=1 (écart réel, serveur manquant — inject-mcp-tools.sh
+  # l'a déjà comparé à l'attendu) est un signal fort sur stderr. rc=3 (INDÉTERMINÉ : pas de
+  # .mcp.json, aucun serveur déclaré, rien à comparer) n'est PAS un écart — jamais d'ERROR pour
+  # une absence de cible, best-effort informatif seulement. rc=0 = conforme, aucun log requis.
   if [ -z "$DRY_RUN" ]; then
     local verify_out verify_rc
-    verify_out="$(bash "$injector" --target "$found" --mcp-json "./.mcp.json" --verify 2>&1 >/dev/null)"
+    verify_out="$(bash "$injector" --target "$found" --mcp-json "./.mcp.json" --force --verify 2>&1 >/dev/null)"
     verify_rc=$?
-    if [ "$verify_rc" -ne 0 ]; then
-      err "gsd-executor : vérification MCP (--verify) signale un écart (rc=$verify_rc) :"
+    if [ "$verify_rc" -eq 1 ]; then
+      err "gsd-executor : vérification MCP (--verify) signale un écart réel (serveur manquant) :"
       err "$verify_out"
+    elif [ "$verify_rc" -eq 3 ]; then
+      log "gsd-executor : vérification MCP indéterminée (rien à comparer — voir détail) :"
+      log "$verify_out"
     fi
   fi
 }
