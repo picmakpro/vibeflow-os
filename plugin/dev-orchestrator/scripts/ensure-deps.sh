@@ -103,6 +103,34 @@ err() {
   echo "[ensure-deps] ERROR: $*" >&2
 }
 
+# --- Assainissement d'une valeur VERSION lue (duplication DÉLIBÉRÉE de
+# check-gsd-engine.sh:99-121, motivée par le même précédent que default_gsd_home_new() ci-dessus
+# (D-01) : ce script doit rester testable en boîte noire sans sourcer un script à effets de bord.
+# La RÉFÉRENCE de contenu de cette fonction reste check-gsd-engine.sh — ne pas la faire diverger
+# d'un côté sans reporter le changement de l'autre (T-19-01-01).
+# La lecture est bornée EN AMONT (200 octets max au point d'appel — jamais un `cat` intégral d'un
+# fichier de taille arbitraire, T-19-01-04), puis la valeur est validée contre une classe de
+# caractères restreinte. Toute valeur non conforme (substitution de commande, octet de contrôle,
+# longueur excessive) est remplacée par une mention neutre et n'est JAMAIS réinjectée dans une
+# expansion ni imprimée telle quelle.
+sanitize_version() { # <raw>
+  local v="$1"
+  if [ "${#v}" -gt 80 ]; then
+    printf '%s' "(version illisible)"
+    return 1
+  fi
+  case "$v" in
+    \"*) [ "${v%\"}" != "$v" ] && { v="${v#\"}"; v="${v%\"}"; } ;;
+    \'*) [ "${v%\'}" != "$v" ] && { v="${v#\'}"; v="${v%\'}"; } ;;
+  esac
+  if printf '%s' "$v" | grep -Eq '^[0-9A-Za-z._-]{1,80}$'; then
+    printf '%s' "$v"
+    return 0
+  fi
+  printf '%s' "(version illisible)"
+  return 1
+}
+
 # ---------- Validation du scope (T-03-04) ----------
 # Valider VF_SCOPE EN TÊTE, AVANT toute définition de main et tout effet de bord / run_cmd :
 # un scope invalide injecté dans les flags d'install est rejeté tôt (err + exit 1).
@@ -170,7 +198,13 @@ ensure_gsd() {
   # signal d'erreur (le piège de séquencement, preuve directe en T2k).
   if detect_gsd_legacy; then
     GSD_LEGACY_DETECTED=1
-    GSD_LEGACY_VERSION="$(cat "$GSD_VERSION_FILE_LEGACY" 2>/dev/null || echo '?')"
+    # T-19-01-01/T-19-01-04 : lecture bornée (200 octets max, jamais un `cat` intégral d'un
+    # fichier de taille arbitraire) PUIS assainissement (sanitize_version) avant assignation —
+    # la valeur assainie est ensuite réutilisée telle quelle par les deux sites d'affichage
+    # (${GSD_LEGACY_VERSION:-?}), sans nouveau traitement à chaque usage.
+    local raw_legacy_version
+    raw_legacy_version="$(head -c 200 "$GSD_VERSION_FILE_LEGACY" 2>/dev/null)"
+    GSD_LEGACY_VERSION="$(sanitize_version "$raw_legacy_version")"
   fi
 
   local state dry_run_forced

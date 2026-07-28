@@ -15,6 +15,9 @@
 #         vide + rm -rf restent (D-08.1/D-08.2).
 #   T2k — piège de séquencement (D-08.3) : le VERSION legacy capturé AVANT l'install survit à sa
 #         propre suppression par l'installeur amont — le message de nettoyage sort quand même.
+#   T2l — robustesse VERSION legacy hostile post-revue (T-19-01-01) : sanitize_version() borne la
+#         lecture et neutralise substitution de commande / octet de contrôle / longueur excessive
+#         avant tout affichage (miroir du Cas 13 de test-check-gsd-engine.sh).
 #   T3  — AGENT.md : ≤250L, table d'intentions fournie (≥11 lignes NL) et AUCUNE référence
 #         à un verbe supprimé (la façade des 29 verbes est morte — elle ne ressuscite pas).
 #   T4  — Chaque skill du module mappe vers une cible existante (aucun orphelin) :
@@ -410,6 +413,41 @@ else
   ko "T2k (piège de séquencement) : re-détection post-install a rendu le message inatteignable, ou VERSION legacy encore présent (rc=$T2K_RC)"
 fi
 rm -rf "$T2K_HOME" "$T2K_PROJ" "$T2K_BIN"
+
+# ---------------------------------------------------------------------------
+# T2l — robustesse VERSION legacy hostile (substitution de commande, octet de contrôle, >80 car.),
+# post-revue T-19-01-01 : miroir exact du Cas 13 de test-check-gsd-engine.sh, appliqué cette fois
+# à ensure-deps.sh (capture GSD_LEGACY_VERSION en tête de ensure_gsd(), lignes ~193/266). Un
+# VERSION legacy contenant `$(whoami)` + un octet de contrôle + une longueur excessive ne doit
+# JAMAIS apparaître tel quel dans le message loggé (ni expansion observable de l'utilisateur
+# courant, ni octet de contrôle brut, ni ligne de signal non bornée).
+# ---------------------------------------------------------------------------
+T2L_HOME="$(mktemp -d)"
+mkdir -p "$T2L_HOME/.claude/get-shit-done"
+HOSTILE_T2L="$(printf '$(whoami)\x01'; i=0; while [ "$i" -lt 90 ]; do printf 'A'; i=$((i+1)); done)"
+printf '%s' "$HOSTILE_T2L" > "$T2L_HOME/.claude/get-shit-done/VERSION"
+T2L_PROJ="$(mktemp -d)"
+# Stub claude : état legacy sans --migrate-engine ne touche jamais npm/node (retour précoce dans
+# ensure_gsd()), mais ensure_superpowers() enchaîne quand même juste après dans main() — sans
+# stub, une tentative RÉELLE d'install réseau (claude plugin install) polluerait $T2L_OUT avec
+# des lignes non bornées, faussant l'assertion de longueur (hors-sujet de ce cas).
+T2L_BIN="$(mktemp -d)"
+printf '#!/bin/sh\nexit 0\n' > "$T2L_BIN/claude"
+chmod +x "$T2L_BIN/claude"
+T2L_OUT=$(cd "$T2L_PROJ" && env -u VF_ENSURE_DRY_RUN -u VF_ENSURE_FORCE -u CLAUDE_CONFIG_DIR \
+  HOME="$T2L_HOME" PATH="$T2L_BIN:/usr/bin:/bin" bash "$ENS" 2>&1)
+T2L_RC=$?
+CURRENT_USER_T2L="$(whoami)"
+t2l_has_ctrl=0
+case "$T2L_OUT" in *$'\x01'*) t2l_has_ctrl=1 ;; esac
+t2l_long_line=$(printf '%s\n' "$T2L_OUT" | awk '{ print length }' | sort -rn | head -n1)
+if [ "$T2L_RC" -eq 0 ] && ! printf '%s' "$T2L_OUT" | "$GREP" -qF "$CURRENT_USER_T2L" \
+   && [ "$t2l_has_ctrl" -eq 0 ] && [ "${t2l_long_line:-0}" -le 200 ]; then
+  ok "T2l robustesse VERSION legacy hostile : rc=0, aucune expansion, aucun octet de contrôle, ligne bornée"
+else
+  ko "T2l robustesse VERSION legacy hostile : rc=$T2L_RC, long_line=$t2l_long_line, has_ctrl=$t2l_has_ctrl"
+fi
+rm -rf "$T2L_HOME" "$T2L_PROJ" "$T2L_BIN"
 
 # T2e — Garde Node ≥ 22 : Node 18 détecté → npx jamais tenté, message Node ≥ 22 logué.
 T2E_HOME="$(mktemp -d)"
