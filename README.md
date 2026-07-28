@@ -10,7 +10,7 @@
 intent, runs the pipeline (scoping → plan → execution → proof), and **machine gates** verify —
 not promises.
 
-[![Version](https://img.shields.io/badge/version-2.42.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.43.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -162,7 +162,7 @@ flowchart TD
     end
     socle --> orch
     socle --> gouv
-    CI["CI: 41 suites + “fresh lab” job<br/>the baseline passes its own gates<br/>from a blank install"] -.-> socle
+    CI["CI: 42 suites + “fresh lab” job<br/>the baseline passes its own gates<br/>from a blank install"] -.-> socle
 ```
 
 Other domains are **manufactured** on this base — see
@@ -232,7 +232,7 @@ are their explicit entry points.
 ## 🔒 Trust
 
 - **Source-available**: public code and history — see [LICENSE](./LICENSE).
-- **Auditable**: bash + `jq`, every script covered by its suite (41 suites in CI),
+- **Auditable**: bash + `jq`, every script covered by its suite (42 suites in CI),
   **idempotent** install with backup before overwrite.
 - **The repo applies its own doctrine**: CI on push/PR (tests + strict gates) + a
   "**fresh lab**" job — the baseline is installed into a blank lab and must pass its own
@@ -251,6 +251,7 @@ Full history: **[CHANGELOG.md](./CHANGELOG.md)** — the README keeps the last 3
 
 | Version | Date | Change |
 |---------|------|--------|
+| `v2.43.0` | 2026-07-28 | The GSD engine enters `/vf-update`'s scope (**ADR-058**): the `get-shit-done-cc` → `@opengsd/gsd-core` migration shipped in v2.39.0 reached **no already-equipped machine** — only fresh installs. Observed on a third-party machine: plugin current at 2.42.0, engine still at 1.42.3 laid down **12 days** earlier, with nothing in the interface saying so. Three chained causes, all closed. `detect_gsd()` returned true on the legacy layout through an `||` written for dual-layout tolerance, and turned that into a `skip`: it becomes a **three-valued** state (`absent`/`legacy`/`gsd-core`) where "legacy" is **actionable**. No update path ever called the install script: `check-gsd-engine.sh` (new gate, F13 contract) is now probed by `/vf-update` — and **before** its "VibeFlow is up to date" stop, without which a machine with a current plugin never saw the offer. The legacy cleanup message, previously reachable through `/vf-init` alone, becomes reachable and **accurate**: `npm uninstall -g` is offered only when the package is genuinely global, the empty tree left behind by the installer is included, and the state is captured **before** the install — since the upstream installer deletes the legacy `VERSION` itself, the message could otherwise never fire again. Trap recorded in plain words: the fork **restarts from zero**, so **1.8.0 < 1.42.3 in semver** — migration is decided on the **package name and the directory layout**, never on comparing numbers, and a test pins that exact pair. ADR-031 upheld throughout: detect and **offer**, never install or clean without consent. `ensure-deps.sh --migrate-engine` chains into MCP re-injection (the upstream installer files the ADR-051 injection as a "local patch" and erases `mcp__XcodeBuildMCP__*` from `gsd-executor`'s `tools:`), and `inject-mcp-tools.sh --verify` compares the final `tools:` against the servers in `.mcp.json`. That last one first shipped **inert** — called without `--force`, it excluded its own target and always exited 3 — a defect cleared by code review, the portability gate **and** the security audit, caught only by mutating the shipped block. |
 | `v2.42.0` | 2026-07-28 | Startup signals for the dev engine: `dev-orchestrator` — the only structuring module with **no hook at all** — gains its first `hooks/hooks.json` fragment. Three read-only, advisory `SessionStart` scripts state FACTS and inject short self-carrying lines. `check-dev-bootstrap.sh` covers the whole start continuum in one script (silence · `onboard` when code has no `.planning/` · `bootstrap` listing what is missing · `gsd-engine` orientation when complete), the signals proven mutually exclusive by test. `discover-unintegrated-docs.sh --hook` aggregates the count **additively**, leaving its historical `grain<TAB>path` contract untouched; `check-doc-drift.sh` flags code commits outstripping doc updates past a tunable threshold (default 20). The `gsd-engine` signal closes the routing hole observed on 2026-07-27 — `planning-core` steps aside when GSD holds a project and nothing took over. Portability **proven by execution**: identical counters on macOS bash 3.2.57, Debian 12 and Ubuntu 24.04, which rules out the silently skipped test. Two tautological test cases found and killed by mutation. |
 | `v2.41.0` | 2026-07-27 | Agent dispatch fully fenced: `check-agents.sh` now lints the **contents** of `tools:` — allowlist syntax and name existence, on `tools:` and `disallowedTools:` alike (invented agent names, unclosed parens and non-existent tools all passed `--strict` green until now; suite 38 → 58 axes). Severity is graded by what is verifiable regardless of the installed scope, so native types (`general-purpose`) and external `gsd-*` agents never turn a correct allowlist red — closed-world checking is an opt-in CI mode. Allowlists posted on the 3 dev workers after a double independent census. Doctrinal correction: in a subagent definition the runtime **ignores** the names in parentheses — an allowlist is a documented contract enforced by this lint alone, not a runtime sandbox. |
 | `v2.40.0` | 2026-07-27 | Cross-team dev ↔ design collaboration under a single manager: `vf-dev-manager` inserts `craft:`/`critique:` nodes into a dev mission (design stage skipped and reported when no art direction exists), `vf-design-manager` gains an opt-in implementation stage with dual judge (art-direction re-score ∥ code review) and separate 3 + 3 anti-thrash budgets, `vf-auto` finally routes design-only missions to the design manager, and both managers carry `Agent(...)` allowlists (18 / 6 names) forbidding manager→manager nesting (a documented contract — see the v2.41.0 correction on what an allowlist actually enforces). Kernel untouched. |

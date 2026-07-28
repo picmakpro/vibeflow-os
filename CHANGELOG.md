@@ -5,6 +5,74 @@ dernières entrées et pointent ici). Chaque module a par ailleurs son propre `C
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.43.0] — 2026-07-28
+
+**Le moteur GSD entre dans le périmètre de `/vf-update`** (Phase 19, livrée en mission d'équipe —
+**ADR-058**). Modules `dev-orchestrator` **v2.7.0** et `conductor` **v1.16.0** (premier cas de deux
+modules bumpés dans la même phase).
+
+**Le trou fermé.** La migration `get-shit-done-cc` → `@opengsd/gsd-core` livrée en v2.39.0
+n'atteignait **aucun poste déjà équipé** — seulement les installations neuves. Constaté sur un poste
+tiers le 2026-07-28 : plugin à jour en **2.42.0**, cache rafraîchi le matin même, et moteur toujours
+à **1.42.3** posé **12 jours** plus tôt, soit 2 jours après la livraison de la migration. Le poste
+portait le *code* de la migration sans en porter l'*effet*, et rien dans l'interface ne le disait.
+Le message final « Modules à jour sur disque » était **exact et trompeur à la fois**.
+
+**Trois causes enchaînées, toutes fermées.** `detect_gsd()` renvoyait vrai sur le layout legacy via
+un `||` écrit pour la tolérance dual-layout (Phase 10) et en faisait un `skip` : il devient un état
+à **trois valeurs** — `absent` / `legacy` / `gsd-core` — où « legacy » est **actionnable**, pas
+sauté. Aucun chemin de mise à jour n'appelait `ensure_gsd()` : le nouveau gate
+`check-gsd-engine.sh` (contrat F13, exits 0/2/3, 15 cas de test) est sondé par `/vf-update`. Et
+`log_legacy_cleanup_if_needed()` n'était joignable que par `/vf-init` et `/vf-calibrate` — un
+garde-fou correct sur un chemin que le régime nominal n'emprunte jamais.
+
+**La détection passe AVANT le stop « VibeFlow est à jour ».** Sans ce point, la correction n'aurait
+rien corrigé : sur le poste constaté, le plugin était déjà à jour, donc `/vf-update` s'arrêtait à
+l'étape 1 avant toute détection du moteur. L'étape 1 devient un **diagnostic à deux volets** —
+version du plugin **et** état du moteur — et le message ne peut plus sortir seul quand le moteur est
+legacy.
+
+**Le piège de version, écrit noir sur blanc.** Le fork **repart de zéro** : `get-shit-done-cc` est
+figé à 1.42.3 (déprécié sur npm) pendant que `@opengsd/gsd-core` vit à 1.8.0. Donc
+**1.8.0 < 1.42.3 en semver**, et la doctrine « ne jamais downgrader » interdirait précisément le
+geste à faire. La migration se décide sur le **nom du paquet et le layout du dossier**, jamais sur
+la comparaison des numéros — un test fixe ce couple exact. Le plafond `@^1` reste inchangé, et le
+repli legacy de la cascade à 4 niveaux est préservé pour les postes non migrés : c'est le **skip**
+qui est corrigé, pas le repli.
+
+**ADR-031 tenu de bout en bout.** Détecter et **proposer**, jamais installer sans accord : la
+migration est une ligne de plus dans la confirmation existante, refusable sans effet de bord. Le
+nettoyage legacy reste **affiché, jamais exécuté** — mais devient atteignable et **exact** :
+`npm uninstall -g` n'est plus proposé que si le paquet est réellement installé en global (constaté
+faux sur le poste audité — install `npx`, jamais globale, donc deux lignes sur trois étaient des
+no-op), l'arborescence vide laissée debout par l'installeur est incluse, et l'état legacy est
+**capturé avant l'install** — l'installeur amont supprimant lui-même le `VERSION` legacy, le message
+ne pouvait sinon plus jamais sortir après coup.
+
+**La ré-injection MCP devient une étape, pas une conséquence heureuse.** L'installeur `gsd-core`
+réécrit `agents/gsd-executor.md`, classe l'injection ADR-051 en « local patch » et efface
+`mcp__XcodeBuildMCP__*` du `tools:`. Sur un lab dont le `CLAUDE.md` interdit `xcodebuild` en shell,
+l'exécutant ne peut alors plus builder du tout — ou le fait par le chemin interdit.
+`ensure-deps.sh --migrate-engine` enchaîne donc sur `inject-mcp-tools.sh --force`, et le nouveau
+mode `--verify` compare le `tools:` final aux serveurs déclarés dans le `.mcp.json` du lab.
+
+**Le défaut que trois étages ont laissé passer — à retenir.** `--verify` a d'abord été livré
+**inerte** : appelé sans `--force`, il écartait sa propre cible (`gsd-executor.md` ne porte pas le
+flag `vf-mcp-consumer`) et sortait **toujours en 3** — jamais « conforme », jamais « serveur
+manquant » — tout en crachant un `ERROR` à chaque bootstrap sur les labs sans `.mcp.json`. Revue de
+code PASS, portabilité verte sur trois OS, audit sécurité 6/6 : aucun ne l'a vu. Seule la **mutation
+du bloc livré** l'a révélé — sa suppression complète laissait la suite à 73 OK / 0 KO. Deux causes
+nommables et réutilisables comme sondes : un compte rendu qui prouve une **présence**
+(`grep -c 'verify' → 7`) au lieu d'un comportement, et des tests qui exercent une forme de commande
+que la production n'émet jamais. Corrigé avec un contrat de relais explicite (seul `rc=1` alarme,
+`rc=3` reste INDÉTERMINÉ informatif) et un cas de test qui exerce le chaînage réel.
+
+**Reste ouvert, inscrit à `CONCERNS.md`** : la sonde cross-module `conductor` → `dev-orchestrator`
+s'éteindrait **sans aucun signal** si l'engine cessait de matérialiser les scripts de tous les
+modules à plat dans le même `.claude/scripts/`. Le silence sur script absent est voulu — un lab
+content ou growth ne doit rien voir du moteur GSD — mais il rend le mode dégradé indiscernable du
+nominal, même famille que le trou que cette version ferme.
+
 ## [Non versionné] — 2026-07-26
 
 **Correctif `_internal/merge-hooks.sh`** (vague 11-04, Phase 11 — intégration migration GSD).
