@@ -10,6 +10,11 @@
 #         sans le flag, aucun appel npx et le skip historique n'apparaît plus (3 sous-cas).
 #   T2h — Chaînage MCP de bout en bout (D-06/D-09) : --migrate-engine enchaîne install PUIS
 #         patch_gsd_executor_mcp() dans le même run (SKIP si python3 absent).
+#   T2i — npm_pkg_installed_globally() confirme installé → les 2 lignes uninstall apparaissent.
+#   T2j — npm_pkg_installed_globally() confirme absent → aucune ligne uninstall, arborescence
+#         vide + rm -rf restent (D-08.1/D-08.2).
+#   T2k — piège de séquencement (D-08.3) : le VERSION legacy capturé AVANT l'install survit à sa
+#         propre suppression par l'installeur amont — le message de nettoyage sort quand même.
 #   T3  — AGENT.md : ≤250L, table d'intentions fournie (≥11 lignes NL) et AUCUNE référence
 #         à un verbe supprimé (la façade des 29 verbes est morte — elle ne ressuscite pas).
 #   T4  — Chaque skill du module mappe vers une cible existante (aucun orphelin) :
@@ -281,7 +286,16 @@ else
   ko "T2c piège n°1 : 'command -v gsd' encore présent dans ensure-deps.sh"
 fi
 
-# T2d — detect_gsd_legacy() : les 3 commandes de nettoyage sont LOGUÉES, jamais exécutées (ADR-031).
+# T2d — detect_gsd_legacy() : le nettoyage est LOGUÉ, jamais exécuté (ADR-031).
+# Sémantique CHANGÉE par le plan VFDO-19-02 (D-08.1) : les 2 lignes `npm uninstall -g` ne sont
+# désormais proposées QUE si npm_pkg_installed_globally() confirme le paquet réellement présent
+# en global. Le stub npm de ce cas répond ÉCHEC à TOUTE invocation (y compris la requête en
+# lecture seule `npm ls -g --depth=0 <pkg>`) : sous la nouvelle logique, les 2 lignes uninstall
+# NE DOIVENT PLUS apparaître — avant ce plan, ce même stub produisait les 3 lignes (aucun
+# conditionnement). La ligne `rm -rf` et la nouvelle ligne d'arborescence vide restent affichées
+# inconditionnellement. L'assertion de non-exécution (trace sans « uninstall ») est conservée à
+# l'identique : seule la REQUÊTE en lecture seule `npm ls -g` est désormais réellement exécutée
+# (P-01) — le node stub, lui, n'est jamais atteint (retour avant la garde Node/npm).
 T2D_HOME="$(mktemp -d)"
 mkdir -p "$T2D_HOME/.claude/get-shit-done"
 echo "1.42.3" > "$T2D_HOME/.claude/get-shit-done/VERSION"
@@ -299,15 +313,103 @@ exit 1
 SH
 chmod +x "$T2D_BIN/npm" "$T2D_BIN/node"
 T2D_OUT=$(env -u VF_ENSURE_DRY_RUN -u VF_ENSURE_FORCE HOME="$T2D_HOME" PATH="$T2D_BIN:/usr/bin:/bin" T2D_TRACE_FILE="$T2D_TRACE_FILE" bash "$ENS" 2>&1)
-if echo "$T2D_OUT" | "$GREP" -q "npm uninstall -g get-shit-done-cc" \
-   && echo "$T2D_OUT" | "$GREP" -q "npm uninstall -g @gsd-build/sdk" \
+if ! echo "$T2D_OUT" | "$GREP" -q "npm uninstall -g get-shit-done-cc" \
+   && ! echo "$T2D_OUT" | "$GREP" -q "npm uninstall -g @gsd-build/sdk" \
    && echo "$T2D_OUT" | "$GREP" -q "rm -rf ~/.claude/get-shit-done" \
+   && echo "$T2D_OUT" | "$GREP" -q -- "-type d -empty" \
    && { [ ! -s "$T2D_TRACE_FILE" ] || ! "$GREP" -q "uninstall" "$T2D_TRACE_FILE"; }; then
-  ok "T2d legacy cleanup : 3 commandes affichées (log), jamais exécutées (trace sans 'uninstall')"
+  ok "T2d legacy cleanup (sémantique changée, D-08.1) : npm ls -g répond échec → aucune ligne uninstall, rm -rf + arborescence vide présents, trace sans 'uninstall'"
 else
-  ko "T2d legacy cleanup : affichage ou non-exécution non prouvés"
+  ko "T2d legacy cleanup : conditionnement des lignes uninstall ou non-exécution non prouvés"
 fi
 rm -rf "$T2D_HOME" "$T2D_BIN"; rm -f "$T2D_TRACE_FILE"
+
+# ---------------------------------------------------------------------------
+# T2i — npm_pkg_installed_globally() confirme les 2 paquets installés → les 2 lignes uninstall
+# apparaissent (D-08.1).
+# ---------------------------------------------------------------------------
+T2I_HOME="$(mktemp -d)"
+mkdir -p "$T2I_HOME/.claude/get-shit-done"
+echo "1.42.3" > "$T2I_HOME/.claude/get-shit-done/VERSION"
+T2I_BIN="$(mktemp -d)"
+cat > "$T2I_BIN/npm" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = "ls" ] && [ "$2" = "-g" ]; then
+  exit 0
+fi
+exit 1
+SH
+chmod +x "$T2I_BIN/npm"
+T2I_OUT=$(env -u VF_ENSURE_DRY_RUN -u VF_ENSURE_FORCE HOME="$T2I_HOME" PATH="$T2I_BIN:/usr/bin:/bin" bash "$ENS" 2>&1)
+if echo "$T2I_OUT" | "$GREP" -q "npm uninstall -g get-shit-done-cc" \
+   && echo "$T2I_OUT" | "$GREP" -q "npm uninstall -g @gsd-build/sdk"; then
+  ok "T2i legacy cleanup : npm ls -g confirme les 2 paquets installés → les 2 lignes uninstall apparaissent"
+else
+  ko "T2i legacy cleanup : npm ls -g confirme installé mais les lignes uninstall n'apparaissent pas"
+fi
+rm -rf "$T2I_HOME" "$T2I_BIN"
+
+# ---------------------------------------------------------------------------
+# T2j — npm_pkg_installed_globally() confirme absent → les 2 lignes uninstall n'apparaissent
+# pas, mais l'en-tête et la ligne d'arborescence vide restent (D-08.1/D-08.2).
+# ---------------------------------------------------------------------------
+T2J_HOME="$(mktemp -d)"
+mkdir -p "$T2J_HOME/.claude/get-shit-done"
+echo "1.42.3" > "$T2J_HOME/.claude/get-shit-done/VERSION"
+T2J_BIN="$(mktemp -d)"
+cat > "$T2J_BIN/npm" <<'SH'
+#!/usr/bin/env bash
+exit 1
+SH
+chmod +x "$T2J_BIN/npm"
+T2J_OUT=$(env -u VF_ENSURE_DRY_RUN -u VF_ENSURE_FORCE HOME="$T2J_HOME" PATH="$T2J_BIN:/usr/bin:/bin" bash "$ENS" 2>&1)
+if ! echo "$T2J_OUT" | "$GREP" -q "npm uninstall -g get-shit-done-cc" \
+   && ! echo "$T2J_OUT" | "$GREP" -q "npm uninstall -g @gsd-build/sdk" \
+   && echo "$T2J_OUT" | "$GREP" -q "rm -rf ~/.claude/get-shit-done" \
+   && echo "$T2J_OUT" | "$GREP" -q -- "-type d -empty"; then
+  ok "T2j legacy cleanup : npm ls -g confirme absent → aucune ligne uninstall, rm -rf + arborescence vide présents"
+else
+  ko "T2j legacy cleanup : lignes uninstall présentes à tort, ou rm -rf/arborescence vide absent"
+fi
+rm -rf "$T2J_HOME" "$T2J_BIN"
+
+# ---------------------------------------------------------------------------
+# T2k (piège de séquencement, D-08.3) — un stub npx qui supprime lui-même le VERSION legacy
+# pendant son exécution — reproduisant l'effet de bord réel de l'installeur amont — ne doit pas
+# empêcher le message de nettoyage de sortir après coup. Assertion complémentaire : le fichier a
+# bien disparu (sinon le cas serait tautologique, passant même avec une re-détection post-install).
+# ---------------------------------------------------------------------------
+T2K_HOME="$(mktemp -d)"
+mkdir -p "$T2K_HOME/.claude/get-shit-done"
+echo "1.42.3" > "$T2K_HOME/.claude/get-shit-done/VERSION"
+T2K_PROJ="$(mktemp -d)"
+T2K_BIN="$(mktemp -d)"
+cat > "$T2K_BIN/npm" <<'SH'
+#!/usr/bin/env bash
+exit 1
+SH
+cat > "$T2K_BIN/node" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = "-e" ]; then echo "22"; elif [ "$1" = "--version" ]; then echo "v22.0.0"; fi
+exit 0
+SH
+cat > "$T2K_BIN/npx" <<SH2
+#!/usr/bin/env bash
+rm -f "$T2K_HOME/.claude/get-shit-done/VERSION"
+exit 0
+SH2
+chmod +x "$T2K_BIN/npm" "$T2K_BIN/node" "$T2K_BIN/npx"
+T2K_OUT=$(cd "$T2K_PROJ" && env -u VF_ENSURE_DRY_RUN -u VF_ENSURE_FORCE -u CLAUDE_CONFIG_DIR \
+  HOME="$T2K_HOME" PATH="$T2K_BIN:/usr/bin:/bin" bash "$ENS" --migrate-engine 2>&1)
+T2K_RC=$?
+if [ ! -f "$T2K_HOME/.claude/get-shit-done/VERSION" ] \
+   && echo "$T2K_OUT" | "$GREP" -q "Artefacts legacy détectés" \
+   && [ "$T2K_RC" -eq 0 ]; then
+  ok "T2k (piège de séquencement) : le VERSION legacy a disparu pendant l'install, le message de nettoyage sort quand même, exit 0"
+else
+  ko "T2k (piège de séquencement) : re-détection post-install a rendu le message inatteignable, ou VERSION legacy encore présent (rc=$T2K_RC)"
+fi
+rm -rf "$T2K_HOME" "$T2K_PROJ" "$T2K_BIN"
 
 # T2e — Garde Node ≥ 22 : Node 18 détecté → npx jamais tenté, message Node ≥ 22 logué.
 T2E_HOME="$(mktemp -d)"

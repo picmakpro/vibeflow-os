@@ -86,6 +86,12 @@ default_gsd_home_new() {
 GSD_HOME_NEW="$(default_gsd_home_new)"
 GSD_VERSION_FILE_NEW="$GSD_HOME_NEW/VERSION"                                    # D3 : dérivé, pas figé
 GSD_VERSION_FILE_LEGACY="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/get-shit-done/VERSION"
+# État legacy capturé UNE SEULE FOIS en tête de ensure_gsd() (D-08.3) — source unique du
+# message de nettoyage : l'installeur amont supprime lui-même ce VERSION file à l'install
+# réussie, donc une re-détection après coup le rendrait définitivement inatteignable, sans
+# aucune erreur visible.
+GSD_LEGACY_DETECTED=""
+GSD_LEGACY_VERSION=""
 PLUGINS_CACHE_DIR="$HOME/.claude/plugins/cache"
 
 # ---------- Helpers ----------
@@ -158,6 +164,15 @@ detect_gsd_legacy() {
 }
 
 ensure_gsd() {
+  # D-08.3 : capturer l'état legacy UNE SEULE FOIS, tout en haut, avant toute garde et tout
+  # run_cmd — l'installeur amont supprime lui-même le VERSION legacy à l'install réussie ; une
+  # capture après coup rendrait log_legacy_cleanup_if_needed() définitivement muette, sans aucun
+  # signal d'erreur (le piège de séquencement, preuve directe en T2k).
+  if detect_gsd_legacy; then
+    GSD_LEGACY_DETECTED=1
+    GSD_LEGACY_VERSION="$(cat "$GSD_VERSION_FILE_LEGACY" 2>/dev/null || echo '?')"
+  fi
+
   local state dry_run_forced
   state="$(detect_gsd_state)"
   dry_run_forced=0
@@ -175,7 +190,7 @@ ensure_gsd() {
   # ni le court-circuit dry-run forcé) : SIGNALÉ, jamais migré (P-07, D-06). Le skip silencieux
   # historique ne s'applique plus à cet état — c'est le trou identifié par le rapport d'audit.
   if [ "$state" = "legacy" ] && [ -z "$MIGRATE_ENGINE" ] && [ "$dry_run_forced" -eq 0 ]; then
-    log "Moteur GSD legacy détecté — migration disponible vers @opengsd/gsd-core, ce run ne migre pas."
+    log "Moteur GSD legacy détecté (version ${GSD_LEGACY_VERSION:-?}) — migration disponible vers @opengsd/gsd-core, ce run ne migre pas."
     log "  Pour migrer : ./ensure-deps.sh --migrate-engine (ou VF_ENSURE_MIGRATE_ENGINE=1)."
     log_legacy_cleanup_if_needed
     return 0
@@ -225,17 +240,38 @@ if run_cmd npx -y "@opengsd/gsd-core@^1" --claude "$GSD_SCOPE_FLAG"; then
   return 0
 }
 
-# Affiche (jamais n'exécute — ADR-031) les 3 étapes de nettoyage manuel de l'ancien layout quand
-# des artefacts legacy sont détectés (le VERSION file legacy existe). L'installeur amont de
-# gsd-core nettoie hooks/commands/skills legacy à l'install, mais PAS les paquets npm globaux ni
-# l'arbre ~/.claude/get-shit-done/ — cette responsabilité reste manuelle.
+# Vérifie, en LECTURE SEULE, si <pkg> est installé en global via npm (npm ls -g --depth=0). Seul
+# appel npm réellement EXÉCUTÉ dans tout ce chemin (P-01) — jamais un uninstall. Retourne faux
+# (1) si npm est absent du PATH ou si le paquet n'est pas listé en global.
+npm_pkg_installed_globally() {
+  local pkg="$1"
+  command -v npm >/dev/null 2>&1 || return 1
+  npm ls -g --depth=0 "$pkg" >/dev/null 2>&1
+}
+
+# Affiche (jamais n'exécute — ADR-031) le nettoyage manuel de l'ancien layout quand des artefacts
+# legacy ont été CAPTURÉS en tête de ensure_gsd() (D-08.3 — jamais une re-détection ici, l'install
+# amont peut avoir déjà supprimé le témoin). L'installeur amont de gsd-core nettoie
+# hooks/commands/skills legacy à l'install, mais PAS les paquets npm globaux ni l'arbre
+# ~/.claude/get-shit-done/ — cette responsabilité reste manuelle.
+#
+# D-08.1 : les deux lignes `npm uninstall -g` ne sont proposées QUE si npm_pkg_installed_globally()
+# confirme le paquet réellement présent en global (sur le poste audité, aucun des deux ne l'était —
+# install faite en npx — donc deux lignes sur trois étaient des no-op trompeurs).
+# D-08.2 : le retrait de l'arborescence vide laissée debout par l'installeur amont est proposé,
+# jamais exécuté — même forme "afficher, jamais lancer" que le reste de cette fonction.
 log_legacy_cleanup_if_needed() {
-  if detect_gsd_legacy; then
-    log "Artefacts legacy détectés (~/.claude/get-shit-done/) — nettoyage manuel recommandé :"
+  [ -n "$GSD_LEGACY_DETECTED" ] || return 0
+
+  log "Artefacts legacy détectés (~/.claude/get-shit-done/, version ${GSD_LEGACY_VERSION:-?}) — nettoyage manuel recommandé :"
+  if npm_pkg_installed_globally "get-shit-done-cc"; then
     log "  npm uninstall -g get-shit-done-cc"
-    log "  npm uninstall -g @gsd-build/sdk"
-    log "  rm -rf ~/.claude/get-shit-done"
   fi
+  if npm_pkg_installed_globally "@gsd-build/sdk"; then
+    log "  npm uninstall -g @gsd-build/sdk"
+  fi
+  log "  rm -rf ~/.claude/get-shit-done"
+  log "  find ~/.claude/get-shit-done -type d -empty -delete"
 }
 
 # ---------- Superpowers (BOOT-02 / BOOT-03) ----------
