@@ -167,6 +167,23 @@ vrais dans le code mais sans impact observé — sévérité **LOW**, ne pas pri
   `check-version-sync.sh`, soit le remplacer par un renvoi vers la source machine.
 - Test coverage: le gate lui-même n'a pas de suite (voir Test Coverage Gaps).
 
+**Sonde cross-module `conductor` → `dev-orchestrator` aveugle en silence si le layout d'install change** — Sévérité : **MEDIUM**
+- Files: `plugin/conductor/skills/vf-update/SKILL.md` (étape 1, sonde de `check-gsd-engine.sh` en
+  cascade `$HOME/.claude/scripts/` → `./.claude/scripts/` → `${CLAUDE_PLUGIN_ROOT}/conductor/scripts/`) ;
+  `docs/ADR.md` §ADR-058 (Conséquences négatives, où le risque est auto-documenté).
+- Why fragile: `vf-update` (module `conductor`, mandatory) appelle un script de `dev-orchestrator`
+  (non mandatory) par **sonde de présence de fichier**, jamais par un `requires` — inverser la
+  dépendance casserait la baseline d'un lab non-dev. Le silence sur script absent est **voulu** (un
+  lab content/growth ne doit rien voir), mais il rend le mode dégradé indiscernable du mode nominal :
+  si l'engine cessait un jour de matérialiser les scripts de tous les modules à plat dans le même
+  `.claude/scripts/`, la détection du moteur GSD s'éteindrait **sans aucun signal**, exactement le
+  trou que la Phase 19 vient de fermer.
+- Safe modification: toute évolution de `copy_module_scripts()` / du layout d'install
+  (`plugin/_internal/vibeflow-update.sh`) doit être accompagnée d'une vérification que la sonde
+  résout toujours ; ne jamais convertir ce silence en dépendance déclarée.
+- Test coverage: les 3 états du gate sont couverts (`test-check-gsd-engine.sh`, 15 cas) ; la
+  **résolution de la sonde depuis le skill** ne l'est pas — c'est du markdown, non exécutable.
+
 **Greps du gate sensibles aux reformulations README** — Sévérité : **LOW**
 - Files: `scripts/check-version-sync.sh:60-71` (phrases « N modules, each versioned » /
   « N modules, chacun versionné » cherchées littéralement)
