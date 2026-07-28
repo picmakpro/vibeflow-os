@@ -666,3 +666,90 @@ conditions **E1/E2** du STUDY §8 — pas déclarée sans objet.
 Plans:
 
 - [ ] TBD (run /gsd-plan-phase 18 to break down)
+
+### Phase 19: Migration du moteur GSD pilotée par /vf-update
+
+> **Origine — audit externe vérifié sur pièce le 2026-07-28**, mené sur un second poste (lab
+> `ExploreSomfy`, scope user) : `.planning/missions/2026-07-28-audit-externe-migration-opengsd.md`.
+> Les cinq constats ont été **recoupés ligne à ligne** dans ce repo avant ouverture de la phase.
+
+**Goal**: Faire que la migration `get-shit-done-cc` → `@opengsd/gsd-core` livrée en **v2.39.0**
+atteigne les **postes déjà équipés**, et pas seulement les installations neuves. Fait porteur : sur
+un poste à jour côté plugin (**2.42.0**, cache rafraîchi), le moteur était toujours
+`~/.claude/get-shit-done/VERSION` = **1.42.3** posé le 16/07 — **12 jours après l'install initiale et
+2 jours après la livraison de la migration**. Le poste portait le *code* de la migration sans en
+porter l'*effet*, et rien dans l'interface ne le disait. Trois causes enchaînées, toutes vérifiées
+dans ce repo : (a) `ensure-deps.sh:119-120` — `detect_gsd()` renvoie vrai sur le VERSION file legacy
+via un `||` écrit pour la tolérance dual-layout (D-01/D3, Phase 10), et `:133` en fait un `skip`,
+donc **même appelé, le script sauterait la migration** ; (b) aucun chemin de mise à jour n'appelle
+`ensure_gsd()` — `vf-update/SKILL.md` §Garde-fous place explicitement le moteur **hors périmètre**
+(« la chaîne d'outils interne a sa propre mise à jour »), frontière que cette phase révise puisque
+la version du moteur est décidée par VibeFlow (`@^1`, `ensure-deps.sh:166`) ; (c)
+`log_legacy_cleanup_if_needed()` (`:184`) n'est appelé que depuis `ensure_gsd()`, donc joignable
+uniquement par `/vf-init` et `/vf-calibrate` — **un garde-fou correct sur un chemin que le régime
+nominal n'emprunte jamais**, exactement le motif déjà rencontré ailleurs.
+
+**Piège de version à écrire noir sur blanc** : le fork **repart de zéro** —
+`get-shit-done-cc 1.42.3` (déprécié, figé) contre `@opengsd/gsd-core 1.8.0` (vivant). **1.8.0 <
+1.42.3 en semver.** La doctrine « ne jamais downgrader » du skill `vf-update`, saine partout
+ailleurs, interdirait précisément le geste à faire. La migration se décide donc sur le **nom du
+paquet et le layout du dossier**, jamais sur la comparaison des numéros. Nuance portée au rapport
+d'origine : `check-plugin-update.sh` ne compare que les **tags GitHub du plugin VibeFlow**, jamais un
+numéro de moteur — il n'y a donc **aucun comparateur en défaut aujourd'hui**, le piège concerne le
+détecteur qui reste à écrire.
+
+**Effet de bord à couvrir dans le même geste** : l'installeur amont `gsd-core` réécrit
+`agents/gsd-executor.md` et classe l'injection ADR-051 en « local patch » — `mcp__XcodeBuildMCP__*`
+**disparaît du `tools:`**. `ensure-deps.sh:248` (`patch_gsd_executor_mcp`, `--force`, idempotent) sait
+la restaurer, mais `_internal/vibeflow-update.sh:268` n'injecte que dans les agents flaggés
+`vf-mcp-consumer` — flag que `gsd-executor` **ne porte pas** (fichier hors plugin, `:268` de
+`ensure-deps.sh`). Deux chemins, une seule couverture : toute migration automatique du moteur doit
+**enchaîner** sur la ré-injection, sinon l'exécutant perd silencieusement son accès MCP.
+
+**Requirements**: TBD (à dériver au cadrage)
+**Depends on:** aucune — **indépendante de la Phase 18**, dont le GO est suspendu à une RFC upstream
+`open-gsd/gsd-core`. La Phase 19 ne touche ni au ledger d'exigences ni à `gsd-complete-milestone`.
+**Success Criteria** (what must be TRUE):
+
+  1. `detect_gsd()` renvoie un **état à trois valeurs** — `absent` / `legacy` / `gsd-core` — et
+     « legacy » est **actionnable**, plus jamais un `skip`. La décision se prend sur le layout et le
+     nom du paquet ; **aucune comparaison de numéros** n'entre dans le classement.
+
+  2. `/vf-update` **dit l'état du moteur** dans le même récapitulatif que le plugin et les modules,
+     et propose la migration comme **une ligne de plus dans la confirmation `AskUserQuestion`
+     existante** (ADR-031). Refus accepté sans effet de bord ; **aucune migration silencieuse**.
+
+  3. Toute installation ou réinstallation du moteur **enchaîne** sur `inject-mcp-tools.sh --force`
+     pour `gsd-executor`, avec **vérification après coup** : si le `tools:` final ne contient pas les
+     serveurs déclarés dans le `.mcp.json` du lab, c'est dit fort.
+
+  4. Le message de nettoyage legacy est **atteignable** en régime nominal et **exact** : `npm
+     uninstall -g` n'est proposé que si le paquet est réellement installé en global (constaté faux
+     sur le poste audité : install `npx`, jamais globale), et le retrait de l'arborescence vide
+     laissée debout par l'installeur est inclus.
+
+  5. **Tests de non-régression** : le couple exact `1.42.3 → 1.8.0` est classé « à migrer » ; et un
+     test de cohabitation couvre le **scénario réel** — poste legacy déjà installé + plugin à jour →
+     migration **détectée**. La suite `test-gsd-cohabitation.sh` livrée en v2.39.0 ne teste que le
+     merger `settings.json`, sinon le trou aurait été vu.
+
+  6. **Repli legacy préservé** : la cascade à 4 niveaux de `detect-gsd-engine.sh` /
+     `build-gsd-index.sh` continue de fonctionner pour les postes non encore migrés — c'est le
+     **skip** qu'on corrige, pas le repli. Plafond `@^1` **inchangé**.
+
+  7. Gouvernance tenue : `check-agents.sh` vert, densité ADR-029, portabilité macOS + Linux prouvée
+     par exécution, module bumpé, release racine + tag annoté poussé, `check-release-tag.sh
+     --remote` ✓.
+
+**Hors périmètre, décidé** : aucun **hook `SessionStart` supplémentaire** sur l'état du moteur. Le
+signal passe par `/vf-update`, pas par une ligne de plus au démarrage de chaque session.
+
+**Doctrine à réviser** : la frontière de périmètre de `vf-update/SKILL.md` §Garde-fous (« la chaîne
+d'outils interne a sa propre mise à jour — hors périmètre ») devient fausse et doit être réécrite —
+ADR à créer, c'est un **changement de doctrine**, pas un correctif de configuration.
+
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 19 to break down)

@@ -5,11 +5,11 @@ milestone_name: Migration package GSD
 current_phase: 17
 current_phase_name: Signaux de démarrage du moteur de dev — terminée, vérifiée et shippée (v2.42.0)
 status: planning
-stopped_at: "Phase 17 terminée (n1-n4 du DAG de mission : cadrage+plan, exécution, gate portabilité, audit advisory/read-only) et clôturée (n5) — SC5 et SC6 CONFORMES/PROUVÉS par exécution, module dev-orchestrator v2.6.0. Release racine v2.42.0 PUBLIÉE le 2026-07-28 (VERSION = v2.42.0, tag annoté + release GitHub, check-release-tag --remote ✓). Phase 18 requalifiée en variante réduite le 2026-07-28 (étude STUDY.md, verdict GO-RÉDUIT) — non démarrée ; pré-requis bloquant : la RFC upstream open-gsd/gsd-core part avant toute implémentation du gate."
+stopped_at: "Phase 19 OUVERTE le 2026-07-28 (migration du moteur GSD pilotée par /vf-update, indépendante de la Phase 18) — inscrite au ROADMAP avec 7 critères de succès, non cadrée : prochain geste gsd-discuss-phase 19. Phase 17 terminée (n1-n4 du DAG de mission : cadrage+plan, exécution, gate portabilité, audit advisory/read-only) et clôturée (n5) — SC5 et SC6 CONFORMES/PROUVÉS par exécution, module dev-orchestrator v2.6.0. Release racine v2.42.0 PUBLIÉE le 2026-07-28 (VERSION = v2.42.0, tag annoté + release GitHub, check-release-tag --remote ✓). Phase 18 requalifiée en variante réduite le 2026-07-28 (étude STUDY.md, verdict GO-RÉDUIT) — non démarrée ; pré-requis bloquant : la RFC upstream open-gsd/gsd-core part avant toute implémentation du gate."
 last_updated: "2026-07-28T00:00:00.000Z"
-last_activity: 2026-07-28 (requalification de la Phase 18 en variante réduite — ROADMAP réécrit, dossier de phase renommé)
+last_activity: 2026-07-28 (Phase 19 ouverte — migration du moteur GSD pilotée par /vf-update, issue de l'audit externe recoupé sur pièce)
 progress:
-  total_phases: 18
+  total_phases: 19
   completed_phases: 10
   total_plans: 50
   completed_plans: 34
@@ -187,6 +187,26 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
 ## Accumulated Context
 
 ### Roadmap Evolution
+
+- 2026-07-28 : **Phase 19 ajoutée** — « Migration du moteur GSD pilotée par `/vf-update` ». Origine :
+  **audit externe sur un second poste** (lab `ExploreSomfy`, scope user, rapport archivé en
+  `.planning/missions/2026-07-28-audit-externe-migration-opengsd.md`), dont les 5 constats ont été
+  **recoupés ligne à ligne dans ce repo** avant ouverture. Fait porteur : la migration
+  `get-shit-done-cc` → `@opengsd/gsd-core` livrée en **v2.39.0** n'atteint **aucun poste déjà
+  équipé** — plugin à 2.42.0, moteur toujours à 1.42.3 posé le 16/07, 12 jours après l'install et 2
+  jours après la livraison de la migration. Trois causes vérifiées : `detect_gsd()` fait un `skip`
+  sur le layout legacy (`ensure-deps.sh:119-120` + `:133`) ; aucun chemin d'update n'appelle
+  `ensure_gsd()` (`vf-update/SKILL.md` §Garde-fous place le moteur hors périmètre) ;
+  `log_legacy_cleanup_if_needed()` (`:184`) n'est joignable que par `/vf-init` et `/vf-calibrate`.
+  Périmètre arbitré avec le mainteneur : **détecter + proposer sous confirmation ADR-031** (pas
+  seulement dire), les 5 trous dans la même phase, **sans** hook `SessionStart` supplémentaire.
+  Piège acté : **1.8.0 < 1.42.3 en semver** — le classement se fait sur le nom du paquet et le
+  layout, jamais sur les numéros. Nuance portée au rapport : `check-plugin-update.sh` ne compare que
+  les tags du plugin, aucun comparateur n'est en défaut aujourd'hui. **Indépendante de la Phase 18**
+  (elle, bloquée par la RFC upstream) — donc exécutable immédiatement.
+  Second rapport du même audit (fluidité du framework, 4 changements dont la révision d'ADR-051 et
+  la gradation de la revue par risque) archivé en
+  `.planning/missions/2026-07-28-audit-externe-fluidite.md` — **non instruit**, à arbitrer après.
 
 - 2026-07-28 : **Phase 18 requalifiée en variante réduite** — « Survie du ledger d'exigences à la
   clôture de jalon ». Étude d'implémentation
