@@ -5,9 +5,9 @@ milestone_name: Migration package GSD
 current_phase: 19
 current_phase_name: Migration du moteur GSD pilotée par /vf-update — vérifiée (PASS 6/7) et SHIPPÉE v2.43.0
 status: shipped
-stopped_at: "Phase 19 vérifiée et SHIPPÉE le 2026-07-28 — release racine v2.43.0 publiée (commit 70c5720, tag annoté poussé, release GitHub, check-release-tag --remote ✓). Gates avant tag : check-version-sync ✓ après rattrapage du compteur 41→42 suites, 42 suites vertes, check-agents --strict ✓ sur les 6 dossiers d'agents. Verdict 19-VERIFICATION.md : PASS, 6/7 — SC2 reste PRESENT_BEHAVIOR_UNVERIFIED (comportement d'agent). SEUL RESTE-À-FAIRE : recette humaine du parcours /vf-update sur poste legacy, acceptation PUIS refus de la ligne moteur. Phase 17 également shippée, en v2.42.0 (une section datée de ce fichier affirmait le contraire — corrigée). Phase 20 ouverte et cadrée au ROADMAP, non planifiée : prochain geste gsd-plan-phase 20 (ou gsd-discuss-phase 20 d'abord pour le changement 2, le plus lourd des quatre)."
-last_updated: "2026-07-28T16:30:00.000Z"
-last_activity: 2026-07-28 (release v2.43.0 publiée — Phase 19 shippée ; Phase 20 ouverte et cadrée)
+stopped_at: "Phase 19 vérifiée et SHIPPÉE le 2026-07-28 — release racine v2.43.0 publiée (commit 70c5720, tag annoté poussé, release GitHub, check-release-tag --remote ✓). Gates avant tag : check-version-sync ✓ après rattrapage du compteur 41→42 suites, 42 suites vertes, check-agents --strict ✓ sur les 6 dossiers d'agents. Verdict 19-VERIFICATION.md : PASS, 6/7 — SC2 reste PRESENT_BEHAVIOR_UNVERIFIED (comportement d'agent). SEUL RESTE-À-FAIRE : recette humaine du parcours /vf-update sur poste legacy, acceptation PUIS refus de la ligne moteur. Phase 17 également shippée, en v2.42.0. Phase 20 : cadrage produit (assumptions mode) — 20-CONTEXT.md, 26 décisions D-00..D-26, 2 points signalés au manager (D-05 mécanisme d'injection MCP nommé pour vf-reviewer, D-16 tension avec le texte littéral du critère 5). Prochain geste : gsd-plan-phase 20 (mandaté à vf-coder par vf-dev-manager, cadrage+plans seulement — pas d'exécution avant checkpoint humain)."
+last_updated: "2026-07-28T16:03:39.135Z"
+last_activity: 2026-07-28 (release v2.43.0 publiée — Phase 19 shippée ; Phase 20 cadrée — 20-CONTEXT.md)
 progress:
   total_phases: 20
   completed_phases: 11
@@ -263,19 +263,23 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
   `.planning/missions/2026-07-28-audit-externe-fluidite.md`. **Les 4 constats ont été vérifiés sur
   pièce avant ouverture** — verdict : 3 confirmés dont 2 **plus solidement que le rapport ne
   l'affirme**, 1 **partiellement daté**.
+
   - **Changement 1 (ADR-051)** confirmé et aggravé : les `tools:` déclarés de `vf-reviewer`,
     `vf-auditer` et `vf-design-judge` gagnent tous **`Write, Edit` au runtime** (`memory: project`),
     et la description de `vf-design-judge` affirme une barrière « sans Write ni Edit » que le
     runtime ne pose pas. Le moindre privilège invoqué par ADR-051 n'existait déjà plus.
+
   - **Changement 2 (revue graduée par risque)** confirmé et verrouillé par un fait que le rapport ne
     citait pas : `vf-dev-manager.md:108` **interdit explicitement** au manager d'ajouter une revue
     (« Pas de double revue »). La revue est donc le seul étage à la fois obligatoire
     (`vf-coder.md:34`, en dur) **et hors de portée du manager**. Gradation existante indexée sur le
     volume (`SEUIL_EQUIPE = 3`), jamais sur le risque.
+
   - **Changement 3 (`MISSION-INVARIANTS.md`)** confirmé sur sa partie vérifiable (le gabarit
     `mission-contracts.md` existe et a été court-circuité ; `vf-dev-manager.md:29` lit déjà le
     `CLAUDE.md` du projet). L'absence des 3 invariants sur disque porte sur `ExploreSomfy` et n'est
     **pas vérifiable depuis ce repo** — statut plus faible que les autres constats.
+
   - **Changement 4 (`check-agents.sh`) — DATÉ à moitié** : l'option d'exclusion demandée **existe
     déjà** (`--third-party-prefix`, défaut `gsd-`, `check-agents.sh:84`), livrée en Phase 16 /
     v2.41.0 le 2026-07-27, **la veille du rapport**. Mesure du jour : **23 lignes, pas 68** — 21
@@ -561,10 +565,10 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-**Resume file:** None
+**Resume file:** .planning/phases/VFDO-20-fluidit-du-flux-de-dev-sans-perte-de-qualit/20-CONTEXT.md
 
-Last session: 2026-07-28T13:00:00.000Z
-Stopped at: Completed VFDO-19-03-PLAN.md
+Last session: 2026-07-28T16:03:39.114Z
+Stopped at: Phase 20 context gathered (assumptions mode) — 5 changements (ROADMAP en compte 4 + le sous-critere 2 traite a part), 26 decisions D-00..D-26, 2 points signales au manager (D-05 mecanisme injection MCP, D-16 tension critere 5). Prochain geste : gsd-plan-phase 20 (deja mandate a vf-coder par vf-dev-manager, sans auto-avancer vers l'execution).
 ubuntu:24.04) — 3 jobs verts au run 30257419335. Modules bumpés : conductor v1.14.5,
 consolidator v1.8.1, dev-orchestrator v2.3.2. Leçon durable : tout bash développé sur macOS/BSD
 doit être reproduit sous `docker run ubuntu:24.04` avant push (stat/-f, TMPDIR, outillage hôte).
