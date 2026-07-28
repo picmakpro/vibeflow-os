@@ -25,11 +25,25 @@ See: .planning/PROJECT.md (updated 2026-07-26 — charte rouverte : 17 modules, 
 **Current focus:** Phase 17 **terminée et vérifiée, NON shippée** (2026-07-28) — signaux de démarrage
 du moteur de dev (`check-dev-bootstrap.sh`, `check-doc-drift.sh`, `discover-unintegrated-docs.sh --hook`,
 hooks `SessionStart`), module `dev-orchestrator` v2.6.0. SC5 (advisory/lecture seule) et SC6
-(portabilité macOS+Linux) prouvés par exécution, pas par lecture. Plus aucun milestone ouvert. Release
-de clôture réservée à validation humaine (`README`/`README.fr.md` annoncent 39 suites contre 41 réelles
-— `check-version-sync.sh` rouge, à régler en préparation de release). Phase 18 inscrite, non démarrée.
-Autres candidats : sortie d'expérimental de `mobile-test`(-team), dette backlog (known-versions.txt,
-brick_routed).
+(portabilité macOS+Linux) prouvés par exécution, pas par lecture. Plus aucun milestone ouvert.
+**Release `v2.42.0` publiée** le 2026-07-28 (tag annoté + release GitHub, `check-release-tag --remote`
+✓, `check-version-sync` ✓ après synchro 39 → 41 suites dans les deux README).
+Phase 18 inscrite, non démarrée.
+
+**Dette backlog héritée — CLOSE le 2026-07-28** (commits `607844c`, `213ea1a`, hors release) :
+
+- `known-versions.txt` jamais posé → cause racine corrigée côté engine. `copy_module_scripts()`
+  pose désormais les fichiers de données `*.txt` (sans `chmod +x`) ; T9 borne le glob par le bas
+  et par le haut, discriminance prouvée par mutation.
+- `brick_routed()` grep naïf → fonction rendue **stricte** (la carte est la seule source, comme la
+  spec du 2026-07-25 l'affirmait déjà). Mesure : sur 71 briques, **0** n'était couverte par un
+  repli seul — les deux gardes étaient mortes ET rendaient T14 insensible. T14c les remplace par
+  un filet qui échoue si une brique est citée par un SKILL.md sans l'être par la carte.
+  Discriminance prouvée par mutation sur `gsd-quick`, le cas partagé qui produisait le faux vert.
+
+Autre candidat restant : sortie d'expérimental de `mobile-test`(-team). Reliquat non traité :
+templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions) — la correction
+`*.txt` ci-dessus ne les couvre pas (ce sont des `.md` dans un sous-dossier).
 
 ## Current Position
 
