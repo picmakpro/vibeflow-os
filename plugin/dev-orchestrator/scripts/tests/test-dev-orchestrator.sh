@@ -21,6 +21,10 @@
 #   T2m — mandat n2-bis : --verify (ligne ~409 de patch_gsd_executor_mcp()) porte --force comme
 #         l'injection (ligne ~394) — un écart réel (rc=1) est détecté et relayé fort dans le
 #         chaînage RÉEL du bootstrap (jamais un appel manuel à inject-mcp-tools.sh --force --verify).
+#   T2n — mandat n3 (mutation survivante Phase 19, autre moitié du contrat F13) : rc=3 (INDÉTERMINÉ,
+#         rien à comparer — pas de .mcp.json) ne lève JAMAIS d'alarme ensure-deps, seulement un log
+#         informatif — vérifié dans le même chaînage RÉEL que T2m, en discriminant le canal
+#         ("[ensure-deps] ERROR:") du texte enfant cité (qui porte légitimement son propre "ERROR:").
 #   T3  — AGENT.md : ≤250L, table d'intentions fournie (≥11 lignes NL) et AUCUNE référence
 #         à un verbe supprimé (la façade des 29 verbes est morte — elle ne ressuscite pas).
 #   T4  — Chaque skill du module mappe vers une cible existante (aucun orphelin) :
@@ -683,6 +687,72 @@ EOF2
     ko "T2m vérification réelle : écart non détecté/relayé (verify pas atteint avec --force sur la même cible que l'injection ?) [out=$T2M_OUT]"
   fi
   rm -rf "$T2M_HOME" "$T2M_PROJ" "$T2M_BIN" "$T2M_SCRIPTS"
+fi
+
+# ---------------------------------------------------------------------------
+# T2n (mandat n3, mutation survivante Phase 19) — l'AUTRE moitié du contrat F13 (ligne ~419 de
+# patch_gsd_executor_mcp()) : rc=3 (INDÉTERMINÉ, rien à comparer) n'est PAS un écart — jamais
+# d'ERROR pour une absence de cible, best-effort informatif seulement (log, jamais err). C'est le
+# cas le plus courant en pratique (tout lab sans .mcp.json au bootstrap) : le défaut d'origine
+# émettait un ERROR bruyant à chaque run sur exactement ce cas. Exercé dans le même CHAÎNAGE RÉEL
+# que T2m (copie de ensure-deps.sh à côté du VRAI inject-mcp-tools.sh — aucun stub nécessaire ici,
+# l'absence de .mcp.json produit nativement le rc=3 côté injecteur).
+#
+# Piège (identifié en revue, cf. mandat) : la ligne de détail relayée par ensure-deps cite verbatim
+# la sortie enfant d'inject-mcp-tools.sh, laquelle porte légitimement SON PROPRE préfixe
+# "[inject-mcp-tools] ERROR: ..." (l'injecteur qualifie son propre verdict INDÉTERMINÉ d'erreur
+# lisible ; ce n'est pas la même chose qu'ensure-deps qui alarme). L'assertion doit donc discriminer
+# la sévérité du CANAL ensure-deps ("[ensure-deps] ERROR:", jamais émis en rc=3) du texte enfant
+# cité (présent, attendu, sans conséquence) — un simple grep sur le jeton nu "ERROR:" serait
+# faux-rouge ici.
+# ---------------------------------------------------------------------------
+if ! command -v python3 >/dev/null 2>&1; then
+  skip "T2n rc=3 non alarmant (contrat F13) : python3 absent — cas non applicable"
+else
+  T2N_HOME="$(mktemp -d)"
+  mkdir -p "$T2N_HOME/.claude/agents"
+  cat > "$T2N_HOME/.claude/agents/gsd-executor.md" <<'EOF'
+---
+name: gsd-executor
+description: exécute les plans GSD avec commits atomiques
+tools: Read, Write, Edit, Bash, Grep, Glob, mcp__context7__*
+model: opus
+memory: project
+---
+corps
+EOF
+
+  T2N_PROJ="$(mktemp -d)"
+  mkdir -p "$T2N_PROJ/.claude/gsd-core"
+  echo "1.8.0" > "$T2N_PROJ/.claude/gsd-core/VERSION"
+  # PAS de .mcp.json dans ce lab : exactement le cas « rien à comparer » (rc=3 côté injecteur).
+
+  T2N_BIN="$(mktemp -d)"
+  cat > "$T2N_BIN/claude" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = "plugin" ] && [ "$2" = "list" ]; then echo superpowers; fi
+exit 0
+SH
+  chmod +x "$T2N_BIN/claude"
+
+  # Copie de ensure-deps.sh à côté du VRAI inject-mcp-tools.sh (résolution par dirname "$0") —
+  # même protocole de chaînage réel que T2m, mais sans stub : le comportement natif de l'injecteur
+  # sans .mcp.json produit déjà le rc=3 recherché.
+  T2N_SCRIPTS="$(mktemp -d)"
+  cp "$ENS" "$T2N_SCRIPTS/ensure-deps.sh"
+  cp "$MOD/scripts/inject-mcp-tools.sh" "$T2N_SCRIPTS/inject-mcp-tools.sh"
+  chmod +x "$T2N_SCRIPTS/inject-mcp-tools.sh"
+
+  T2N_OUT=$(cd "$T2N_PROJ" && env -u VF_ENSURE_DRY_RUN -u VF_ENSURE_FORCE -u CLAUDE_CONFIG_DIR \
+    HOME="$T2N_HOME" PATH="$T2N_BIN:/usr/bin:/bin" bash "$T2N_SCRIPTS/ensure-deps.sh" 2>&1)
+
+  if echo "$T2N_OUT" | "$GREP" -qF "vérification MCP indéterminée" \
+     && ! echo "$T2N_OUT" | "$GREP" -qF "[ensure-deps] ERROR:"; then
+    ok "T2n rc=3 non alarmant : indéterminé (rien à comparer) relayé en log, jamais en alarme ensure-deps, dans le chaînage réel de patch_gsd_executor_mcp()"
+  else
+    ko "T2n rc=3 non alarmant : soit l'indéterminé n'a pas été atteint, soit une alarme ensure-deps a été émise à tort [out=$T2N_OUT]"
+  fi
+  rm -rf "$T2N_HOME" "$T2N_PROJ" "$T2N_BIN" "$T2N_SCRIPTS"
 fi
 
 # ---------------------------------------------------------------------------

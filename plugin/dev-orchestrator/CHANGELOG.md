@@ -48,6 +48,10 @@
   stub d'injection silencieusement no-op + vrai injecteur en `--verify`, pour produire un écart
   réel (`rc=1`) déterministe et portable (root Docker Linux contourne les permissions fichier,
   écarté comme moyen de test).
+- **`test-dev-orchestrator.sh` T2n (nouveau)** : couvre l'autre moitié du contrat F13 — `rc=3`
+  (rien à comparer) ne lève jamais d'alarme `[ensure-deps] ERROR:`, dans le même chaînage réel que
+  T2m. Comblait une mutation survivante (`rc=3` re-alarmé, `log` → `err`) qui passait sur les trois
+  suites du gate.
 
 ### Fait mesuré
 - Audit externe du 2026-07-28 : sur un poste où le plugin VibeFlow était déjà à jour, le moteur GSD
