@@ -12,6 +12,9 @@
 #   T7 — --servers explicite l'emporte sur --mcp-json.
 #   T8 — mcpServers vide : no-op.
 #   T9 — Ordre déterministe des serveurs (tri) → sortie stable.
+#   T10 — --verify détecte un serveur manquant : sortie bruyante (stderr), exit 1, empreinte
+#         md5 du fichier cible INCHANGÉE (le mode ne répare jamais — D-09, P-02).
+#   T11 — --verify confirme quand tout est déjà injecté : exit 0, empreinte inchangée.
 #
 # Convention : asserts numérotés, helpers ok()/ko(), exit 0 si tout passe, 1 si ≥1 KO.
 # Calqué sur test-dev-orchestrator.sh.
@@ -180,6 +183,31 @@ if echo "$line" | grep -q 'mcp__alpha__\*, mcp__mike__\*, mcp__zebra__\*'; then
   ok "T9 serveurs injectés triés (déterministe)"
 else
   ko "T9 ordre non déterministe : $line"
+fi
+
+# === T10 — --verify détecte un serveur manquant (D-09) =======================================
+# Réutilise mk_gsd_executor (agent hors plugin, sans flag vf-mcp-consumer) : exactement le
+# scénario D-09 (gsd-executor patché puis vérifié après une réinstall amont du moteur).
+G10="$WORK/gsd-executor-verify-missing.md"; mk_gsd_executor "$G10"
+g10_before="$(md5of "$G10")"
+t10_out="$(bash "$SCRIPT" --target "$G10" --servers "XcodeBuildMCP" --force --verify 2>&1)"; t10_rc=$?
+g10_after="$(md5of "$G10")"
+if [ "$t10_rc" -eq 1 ] && echo "$t10_out" | grep -qF 'mcp__XcodeBuildMCP__*' && [ "$g10_after" = "$g10_before" ]; then
+  ok "T10 --verify serveur manquant : rc=1, jeton manquant nommé, empreinte inchangée (ne répare jamais)"
+else
+  ko "T10 échec (rc=$t10_rc, empreinte avant=$g10_before après=$g10_after, sortie=[$t10_out])"
+fi
+
+# === T11 — --verify confirme quand tout est déjà injecté ======================================
+G11="$WORK/gsd-executor-verify-ok.md"; mk_gsd_executor "$G11"
+bash "$SCRIPT" --target "$G11" --servers "XcodeBuildMCP" --force >/dev/null 2>&1
+g11_before="$(md5of "$G11")"
+t11_out="$(bash "$SCRIPT" --target "$G11" --servers "XcodeBuildMCP" --force --verify 2>&1)"; t11_rc=$?
+g11_after="$(md5of "$G11")"
+if [ "$t11_rc" -eq 0 ] && [ "$g11_after" = "$g11_before" ]; then
+  ok "T11 --verify conforme : rc=0, empreinte inchangée"
+else
+  ko "T11 échec (rc=$t11_rc, empreinte avant=$g11_before après=$g11_after)"
 fi
 
 # === Bilan ===================================================================================

@@ -23,17 +23,28 @@
 #   --force             Traiter un fichier même SANS le flag vf-mcp-consumer (ex. gsd-executor, hors
 #                       plugin). Ignoré en mode dossier (le balayage reste filtré par le flag).
 #   --dry-run           Loguer les changements prévus SANS écrire.
+#   --verify            Mode LECTURE SEULE (D-09) : relit le `tools:` final et le COMPARE aux
+#                       serveurs attendus. Il RELIT, il COMPARE, il RAPPORTE — il ne réécrit JAMAIS
+#                       rien, et ne rejoue JAMAIS --force à la place de l'appelant (réparer
+#                       silencieusement détruirait exactement le signal que ce mode existe pour
+#                       produire). Exits dédiés : 0 = conforme · 1 = serveur manquant (bruyant, sur
+#                       stderr) · 3 = INDÉTERMINÉ (pas de ligne tools:, aucun serveur déclaré,
+#                       aucune cible retenue, ou python3 absent — ce dernier cas sort en succès
+#                       best-effort dans les AUTRES modes, mais JAMAIS en --verify : un faux vert
+#                       serait pire que l'absence de vérification).
 #   -h | --help
 #
 # Comportement :
 #   - Idempotent : un token déjà présent n'est jamais dupliqué ; sans changement, le fichier n'est
 #     pas réécrit (mtime préservé). Re-jouable à volonté.
 #   - Best-effort : python3 absent, .mcp.json absent ou sans serveurs, agent sans ligne `tools:`
-#     (hérite déjà tout) → no-op + log, JAMAIS d'échec (exit 0). Args invalides → exit 1.
+#     (hérite déjà tout) → no-op + log, JAMAIS d'échec (exit 0) — SAUF en --verify (voir ci-dessus,
+#     exit 3 systématique quand aucun verdict n'est possible). Args invalides → exit 1.
 #   - Ne modifie QUE la ligne `tools:` du frontmatter ; le reste du fichier est préservé.
 #
 # Appelé par : vibeflow-update.sh (hook post-install, agents flaggés) · ensure-deps.sh (gsd-executor,
-#              --force post-install GSD) · /vf-calibrate (re-injection sur évolution du .mcp.json).
+#              --force post-install GSD, puis --verify pour dire fort un écart, D-09) ·
+#              /vf-calibrate (re-injection sur évolution du .mcp.json).
 #
 # Référence : ADR-051 (allowlist MCP dérivée du lab), Pattern 12 (cloisonnement inchangé : on
 #             n'injecte que des serveurs de build/test, pas d'accès web/doc).
@@ -48,6 +59,7 @@ MCP_JSON="./.mcp.json"
 SERVERS=""
 FORCE="false"
 DRY_RUN="false"
+VERIFY="false"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -59,6 +71,7 @@ while [ "$#" -gt 0 ]; do
     --servers=*) SERVERS="${1#--servers=}"; shift ;;
     --force)     FORCE="true"; shift ;;
     --dry-run)   DRY_RUN="true"; shift ;;
+    --verify)    VERIFY="true"; shift ;;
     -h|--help)   grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *)           err "argument inconnu : $1"; exit 1 ;;
   esac
@@ -67,15 +80,21 @@ done
 [ -n "$TARGET" ] || { err "--target requis (fichier agent .md ou dossier d'agents)"; exit 1; }
 [ -e "$TARGET" ] || { err "cible introuvable : $TARGET"; exit 1; }
 
-# python3 est le cœur (parsing JSON + réécriture précise). Absent → best-effort no-op (exit 0),
-# comme check-agents.sh : jamais faire échouer une install sur une machine sans python3.
+# python3 est le cœur (parsing JSON + réécriture précise). Absent → best-effort no-op (exit 0)
+# dans les modes normaux, comme check-agents.sh : jamais faire échouer une install sur une
+# machine sans python3. En --verify UNIQUEMENT : ce repli deviendrait un faux vert (D-09) — le
+# verdict doit rester INDÉTERMINÉ (exit 3), jamais un succès muet.
 if ! command -v python3 >/dev/null 2>&1; then
+  if [ "$VERIFY" = "true" ]; then
+    err "python3 requis pour --verify — verdict INDÉTERMINÉ (jamais un faux vert)."
+    exit 3
+  fi
   log "python3 requis pour l'injection MCP — étape sautée (best-effort). Agents inchangés."
   exit 0
 fi
 
 VF_TARGET="$TARGET" VF_MCP_JSON="$MCP_JSON" VF_SERVERS="$SERVERS" \
-VF_FORCE="$FORCE" VF_DRY_RUN="$DRY_RUN" python3 -c '
+VF_FORCE="$FORCE" VF_DRY_RUN="$DRY_RUN" VF_VERIFY="$VERIFY" python3 -c '
 import json, os, re, sys, glob
 
 target   = os.environ["VF_TARGET"]
@@ -83,9 +102,13 @@ mcp_json = os.environ["VF_MCP_JSON"]
 servers_arg = os.environ["VF_SERVERS"].strip()
 force    = os.environ["VF_FORCE"] == "true"
 dry_run  = os.environ["VF_DRY_RUN"] == "true"
+verify   = os.environ["VF_VERIFY"] == "true"
 
 def logline(msg):
     print("[inject-mcp-tools] " + msg, file=sys.stderr)
+
+def errline(msg):
+    print("[inject-mcp-tools] ERROR: " + msg, file=sys.stderr)
 
 # --- 1. Résoudre la liste des serveurs -----------------------------------------------------------
 servers = []
@@ -93,12 +116,18 @@ if servers_arg:
     servers = [s.strip() for s in servers_arg.split(",") if s.strip()]
 else:
     if not os.path.isfile(mcp_json):
+        if verify:
+            errline("--verify : %s introuvable — verdict INDETERMINE (rien a comparer)." % mcp_json)
+            sys.exit(3)
         logline("pas de %s dans le lab — aucun serveur MCP a injecter (no-op)." % mcp_json)
         sys.exit(0)
     try:
         with open(mcp_json, encoding="utf-8") as f:
             data = json.load(f)
     except (OSError, ValueError) as e:
+        if verify:
+            errline("--verify : %s illisible/invalide (%s) — verdict INDETERMINE." % (mcp_json, e))
+            sys.exit(3)
         logline("%s illisible/invalide (%s) — no-op." % (mcp_json, e))
         sys.exit(0)
     block = data.get("mcpServers") or data.get("mcp_servers") or {}
@@ -108,6 +137,9 @@ else:
 # Serveurs valides pour un préfixe d outil MCP : [A-Za-z0-9_-].
 servers = sorted({s for s in servers if re.fullmatch(r"[A-Za-z0-9_-]+", s)})
 if not servers:
+    if verify:
+        errline("--verify : aucun serveur MCP declare — verdict INDETERMINE.")
+        sys.exit(3)
     logline("aucun serveur MCP declare — no-op.")
     sys.exit(0)
 
@@ -148,7 +180,64 @@ else:
             files.append(f)
 
 if not files:
+    if verify:
+        errline("--verify : aucune cible retenue — verdict INDETERMINE.")
+        sys.exit(3)
     logline("aucun agent cible (mode dossier : aucun fichier vf-mcp-consumer: true) — no-op.")
+    sys.exit(0)
+
+# --- 3bis. Mode --verify : LECTURE SEULE, aucune écriture (D-09, P-02) ---------------------------
+# Relit le tools: final, réutilise TELS QUELS les calculs de want_tokens/existing/missing du mode
+# injection ci-dessous (mêmes expressions, pas réinventées). Ne rejoue JAMAIS --force a la place
+# de l appelant : constater et rapporter, jamais réparer.
+if verify:
+    determined = False
+    all_missing = []
+    for path in files:
+        try:
+            text = open(path, encoding="utf-8").read()
+        except OSError:
+            continue
+        base = os.path.basename(path)
+
+        if single and not force and not has_flag(text):
+            continue
+
+        span, lines = frontmatter_block(text)
+        if span is None:
+            continue
+
+        fm_start, fm_end = span
+        tools_idx = None
+        for i in range(fm_start, fm_end):
+            if re.match(r"^tools:\s*", lines[i]):
+                tools_idx = i
+                break
+
+        if tools_idx is None:
+            # Pas de ligne tools: (herite tout) : aucun verdict possible sur ce fichier.
+            continue
+
+        line = lines[tools_idx]
+        prefix = re.match(r"^tools:\s*", line).group(0)
+        value = line[len(prefix):]
+        existing = [tok.strip() for tok in value.split(",") if tok.strip()]
+        missing = [tok for tok in want_tokens if tok not in existing]
+
+        determined = True
+        if missing:
+            all_missing.append((base, missing))
+
+    if not determined:
+        errline("--verify : aucune cible determinee (pas de ligne tools: exploitable) — verdict INDETERMINE.")
+        sys.exit(3)
+
+    if all_missing:
+        for base, missing in all_missing:
+            errline("--verify : %s — serveur(s) MCP manquant(s) : %s" % (base, ", ".join(missing)))
+        sys.exit(1)
+
+    logline("--verify : conforme, tous les serveurs attendus sont presents (%s)." % ", ".join(want_tokens))
     sys.exit(0)
 
 # --- 3. Injection idempotente sur la ligne tools: ------------------------------------------------

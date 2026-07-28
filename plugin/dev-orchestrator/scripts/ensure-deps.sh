@@ -365,6 +365,20 @@ patch_gsd_executor_mcp() {
   else
     log "gsd-executor : injection MCP best-effort (voir inject-mcp-tools.sh)."
   fi
+
+  # SC3/D-09 : vérification après coup, hors dry-run UNIQUEMENT (en dry-run rien n'a été écrit,
+  # une vérification y serait une fausse alarme). Best-effort : un verdict non nul est relayé
+  # bruyamment sur le canal d'erreur, jamais bloquant pour le bootstrap (P-02 — --verify ne
+  # répare jamais, il ne fait que dire fort ce qui manque).
+  if [ -z "$DRY_RUN" ]; then
+    local verify_out verify_rc
+    verify_out="$(bash "$injector" --target "$found" --mcp-json "./.mcp.json" --verify 2>&1 >/dev/null)"
+    verify_rc=$?
+    if [ "$verify_rc" -ne 0 ]; then
+      err "gsd-executor : vérification MCP (--verify) signale un écart (rc=$verify_rc) :"
+      err "$verify_out"
+    fi
+  fi
 }
 
 # ---------- Garde-fou init (BOOT-04) ----------
