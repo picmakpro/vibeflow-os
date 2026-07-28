@@ -15,6 +15,65 @@ de groupes mixtes lors du merge de hooks — un groupe qui mélange des scripts 
 différentes n'est plus recyclé, un nouveau groupe est créé à la place. Entrée non taggée : ne
 déclenche pas de release, sera absorbée par le prochain bump de `VERSION` racine.
 
+## [v2.42.0] — 2026-07-28
+
+**Signaux de démarrage du moteur de dev** (Phase 17, livrée en mission d'équipe). `dev-orchestrator`
+était le seul module structurant **sans aucun hook** — conséquence directe :
+`discover-unintegrated-docs.sh`, livré en Phase 13 avec un contrat propre et testé, n'était jamais
+appelé automatiquement. Le module reçoit son premier fragment `hooks/hooks.json`, câblé par l'engine
+sans le modifier (`merge_module_hooks` gérait déjà le cas). Trois scripts constatent des **FAITS** au
+`SessionStart` et injectent des lignes courtes et **auto-portantes** — chacune porte son propre geste,
+sur le modèle de `[planning-debt]`. Module `dev-orchestrator` **v2.6.0**.
+
+**`check-dev-bootstrap.sh` — le continuum de démarrage en un seul script.** Silence si ni code ni
+`.planning/` ; signal `onboard` si du code sans `.planning/` ; signal `bootstrap` listant les items
+manquants (`config.json`, `codebase/`, ROADMAP sans phase) ; signal d'orientation `gsd-engine` si
+complet. Les signaux sont **prouvés mutuellement exclusifs par test**, pas par construction.
+
+**Le signal `gsd-engine` ferme un trou de routage constaté sur ce dépôt le 2026-07-27** : une demande
+de conception adressée au Claude principal est partie sur du brainstorming générique alors que le
+projet tournait sous GSD avec une phase inscrite. Cause structurelle — `planning-core` se retire
+quand GSD tient le projet (`--defer-to-gsd`) et aucun module ne prenait le relais ; le routage de
+`vibeflow-dev` n'existe que si son `AGENT.md` est lu, donc seulement une fois l'agent invoqué. Le
+signal lit le frontmatter réel de `STATE.md` (milestone, phase, statut) et **retombe en silence s'il
+est illisible** — jamais d'état inventé. Arbitrage humain assumé : un projet sain coûte **1 ligne,
+pas 0**, le critère d'acceptation initial ayant été amendé en ce sens (il contredisait la spec et les
+deux critères voisins de la même feuille de route).
+
+**Les deux autres signaux.** `discover-unintegrated-docs.sh --hook` agrège le compte en une ligne de
+façon **additive**, sans toucher au contrat historique (`grain<TAB>chemin`, exits 0/3/64) consommé
+par `ingestion-flow.md` ; `--hook` avec `--quiet` sort en 64. `check-doc-drift.sh` signale au-delà
+d'un seuil de commits de code sans mise à jour de doc (défaut 20, réglable) et reste silencieux hors
+dépôt git ou sans commit de doc.
+
+**Contrat advisory vérifié par exécution.** Les trois scripts sont en lecture seule : aucune
+écriture, aucun `exit 1`, aucun blocage de tour — la confirmation humaine reste devant chaque geste
+proposé (ADR-031). Vérifié sur 5 frontmatter hostiles (injection shell, octet `0x01`, délimiteur
+tronqué) qui rendent tous stdout vide et exit 3, et sur un `node_modules` de 20 000 fichiers traversé
+en 0,007 s.
+
+**Portabilité prouvée par exécution, pas déclarée.** Compteurs **identiques** sur macOS bash 3.2.57,
+Debian 12 bash 5.2.15 et Ubuntu 24.04 — l'OS exact du runner. L'égalité des compteurs est le vrai
+résultat : elle exclut le **test sauté silencieusement**, qui était le mode de panne dangereux (la
+régression CI du 2026-07-27 avait coûté 6 fixes de portabilité). Aucun edit de `ci.yml` nécessaire,
+les suites tombent dans son `find`. Suites du dépôt : 39 → **41**.
+
+**Deux faux verts débusqués dans les tests** — aucun dans le code livré. Le cas 7 de
+`test-discover-unintegrated-docs.sh` était **tautologique** : sa fixture ne citait que le glob, jamais
+le basename, donc il passait avec ou sans le filtre qu'il prétendait verrouiller — prouvé par
+mutation, et re-prouvé discriminant après correctif. Et la boucle T21, filet censé garantir les
+invariants du contrat advisory, **omettait `discover-unintegrated-docs.sh`**, le seul des trois à
+utiliser `mktemp` ; le comblement a lui-même révélé un défaut latent du helper
+`t21_strip_awk_block`, aveugle à `awk -v x=… '`.
+
+**Deux dettes inscrites au `CONCERNS.md`, non corrigées (hors périmètre).** Le **verrou de driver est
+déclaratif, pas contraignant** (HIGH) : aucune garde en écriture ne refuse un commit à une session
+sans verrou — constaté le 2026-07-27, deux missions ont commité en parallèle avec des horodatages
+entrelacés, ce qui a produit une collision de numérotation de version. Le **gate ADR-044 est un faux
+vert dans son invocation nue** (MEDIUM) : `check-agents.sh` sans argument sort `exit 0` sans rien
+linter (`.claude/agents` absent du dépôt), et `AGENT.md` étant à la racine du module, il échappe
+aussi à la boucle CI sur `plugin/*/agents` — seul `--file` prouve quelque chose.
+
 ## [v2.41.0] — 2026-07-27
 
 **Cloisonnement complet des dispatches d'agents** (Phase 16, livrée en autonomie complète). Ferme

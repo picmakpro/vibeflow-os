@@ -10,7 +10,7 @@
 intent, runs the pipeline (scoping → plan → execution → proof), and **machine gates** verify —
 not promises.
 
-[![Version](https://img.shields.io/badge/version-2.41.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.42.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -162,7 +162,7 @@ flowchart TD
     end
     socle --> orch
     socle --> gouv
-    CI["CI: 39 suites + “fresh lab” job<br/>the baseline passes its own gates<br/>from a blank install"] -.-> socle
+    CI["CI: 41 suites + “fresh lab” job<br/>the baseline passes its own gates<br/>from a blank install"] -.-> socle
 ```
 
 Other domains are **manufactured** on this base — see
@@ -232,7 +232,7 @@ are their explicit entry points.
 ## 🔒 Trust
 
 - **Source-available**: public code and history — see [LICENSE](./LICENSE).
-- **Auditable**: bash + `jq`, every script covered by its suite (39 suites in CI),
+- **Auditable**: bash + `jq`, every script covered by its suite (41 suites in CI),
   **idempotent** install with backup before overwrite.
 - **The repo applies its own doctrine**: CI on push/PR (tests + strict gates) + a
   "**fresh lab**" job — the baseline is installed into a blank lab and must pass its own
@@ -251,9 +251,9 @@ Full history: **[CHANGELOG.md](./CHANGELOG.md)** — the README keeps the last 3
 
 | Version | Date | Change |
 |---------|------|--------|
+| `v2.42.0` | 2026-07-28 | Startup signals for the dev engine: `dev-orchestrator` — the only structuring module with **no hook at all** — gains its first `hooks/hooks.json` fragment. Three read-only, advisory `SessionStart` scripts state FACTS and inject short self-carrying lines. `check-dev-bootstrap.sh` covers the whole start continuum in one script (silence · `onboard` when code has no `.planning/` · `bootstrap` listing what is missing · `gsd-engine` orientation when complete), the signals proven mutually exclusive by test. `discover-unintegrated-docs.sh --hook` aggregates the count **additively**, leaving its historical `grain<TAB>path` contract untouched; `check-doc-drift.sh` flags code commits outstripping doc updates past a tunable threshold (default 20). The `gsd-engine` signal closes the routing hole observed on 2026-07-27 — `planning-core` steps aside when GSD holds a project and nothing took over. Portability **proven by execution**: identical counters on macOS bash 3.2.57, Debian 12 and Ubuntu 24.04, which rules out the silently skipped test. Two tautological test cases found and killed by mutation. |
 | `v2.41.0` | 2026-07-27 | Agent dispatch fully fenced: `check-agents.sh` now lints the **contents** of `tools:` — allowlist syntax and name existence, on `tools:` and `disallowedTools:` alike (invented agent names, unclosed parens and non-existent tools all passed `--strict` green until now; suite 38 → 58 axes). Severity is graded by what is verifiable regardless of the installed scope, so native types (`general-purpose`) and external `gsd-*` agents never turn a correct allowlist red — closed-world checking is an opt-in CI mode. Allowlists posted on the 3 dev workers after a double independent census. Doctrinal correction: in a subagent definition the runtime **ignores** the names in parentheses — an allowlist is a documented contract enforced by this lint alone, not a runtime sandbox. |
 | `v2.40.0` | 2026-07-27 | Cross-team dev ↔ design collaboration under a single manager: `vf-dev-manager` inserts `craft:`/`critique:` nodes into a dev mission (design stage skipped and reported when no art direction exists), `vf-design-manager` gains an opt-in implementation stage with dual judge (art-direction re-score ∥ code review) and separate 3 + 3 anti-thrash budgets, `vf-auto` finally routes design-only missions to the design manager, and both managers carry `Agent(...)` allowlists (18 / 6 names) forbidding manager→manager nesting (a documented contract — see the v2.41.0 correction on what an allowlist actually enforces). Kernel untouched. |
-| `v2.39.0` | 2026-07-26 | GSD engine migrated: deprecated `get-shit-done-cc` → community successor `@opengsd/gsd-core@^1` (semver cap, proven parity), SDK calls → `gsd-tools`, `gsd-onboard` routed for brownfield, single-voice boundaries (gsd-next/mempalace unrouted), hardened hook merging + real-installer cohabitation suite, `model_profile: balanced` enforced. |
 
 <details>
 <summary><strong>Methodology references (ADR / LRN)</strong></summary>

@@ -10,7 +10,7 @@ Orchestration agentique **spec-driven** pour Claude Code : tu parles normalement
 détecte l'intention, déroule le pipeline (cadrage → plan → exécution → preuve), et des **gates
 machine** vérifient — pas des promesses.
 
-[![Version](https://img.shields.io/badge/version-2.41.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.42.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -167,7 +167,7 @@ flowchart TD
     end
     socle --> orch
     socle --> gouv
-    CI["CI : 39 suites + job « lab frais »<br/>la baseline passe ses propres gates<br/>depuis un lab vierge"] -.-> socle
+    CI["CI : 41 suites + job « lab frais »<br/>la baseline passe ses propres gates<br/>depuis un lab vierge"] -.-> socle
 ```
 
 Les autres métiers se **fabriquent** sur ce socle — voir
@@ -237,7 +237,7 @@ ne se tapent pas directement — ce sont leurs points d'entrée explicites.
 ## 🔒 Confiance
 
 - **Source-available** : code et historique publics — voir [LICENSE](./LICENSE).
-- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`39 suites` en CI), install
+- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`41 suites` en CI), install
   **idempotente** avec backup avant écrasement.
 - **Le repo s'applique sa propre doctrine** : CI sur push/PR (tests + gates stricts) + job
   « **lab frais** » — la baseline est installée dans un lab vierge et doit passer ses propres
@@ -256,9 +256,9 @@ Historique complet : **[CHANGELOG.md](./CHANGELOG.md)** — le README garde les 
 
 | Version | Date | Changement |
 |---------|------|------------|
+| `v2.42.0` | 2026-07-28 | Signaux de démarrage du moteur de dev : `dev-orchestrator` — seul module structurant **sans aucun hook** — reçoit son premier fragment `hooks/hooks.json`. Trois scripts en lecture seule et **advisory** constatent des FAITS au `SessionStart` et injectent des lignes courtes et auto-portantes. `check-dev-bootstrap.sh` couvre tout le continuum de démarrage en un seul script (silence · `onboard` si du code sans `.planning/` · `bootstrap` listant les items manquants · orientation `gsd-engine` si complet), signaux prouvés mutuellement exclusifs par test. `discover-unintegrated-docs.sh --hook` agrège le compte de façon **additive**, sans toucher à son contrat historique `grain<TAB>chemin` ; `check-doc-drift.sh` signale les commits de code qui distancent la mise à jour de doc au-delà d'un seuil réglable (défaut 20). Le signal `gsd-engine` ferme le trou de routage constaté le 2026-07-27 — `planning-core` se retire quand GSD tient le projet et aucun module ne prenait le relais. Portabilité **prouvée par exécution** : compteurs identiques sur macOS bash 3.2.57, Debian 12 et Ubuntu 24.04, ce qui exclut le test sauté silencieusement. Deux cas de test tautologiques débusqués et tués par mutation. |
 | `v2.41.0` | 2026-07-27 | Cloisonnement complet des dispatches : `check-agents.sh` lint désormais le **contenu** du champ `tools:` — syntaxe des allowlists et existence des noms, sur `tools:` comme `disallowedTools:` (jusqu'ici, noms d'agents inventés, parenthèse non fermée et outils inexistants passaient tous `--strict` en vert ; suite 38 → 58 axes). La sévérité est indexée sur ce qui est vérifiable indépendamment du périmètre installé, de sorte que les types natifs (`general-purpose`) et les agents externes `gsd-*` ne rendent jamais rouge une allowlist correcte — le monde fermé est un mode opt-in réservé à la CI. Allowlists posées sur les 3 workers dev après double recensement indépendant. Correction doctrinale : dans la définition d'un sous-agent, le runtime **ignore** les noms entre parenthèses — une allowlist est un contrat documenté enforcé par ce lint seul, pas un bac à sable runtime. |
 | `v2.40.0` | 2026-07-27 | Collaboration croisée dev ↔ design sous un seul manager : `vf-dev-manager` insère des nœuds `craft:`/`critique:` dans une mission dev (étage sauté et signalé quand la direction artistique manque), `vf-design-manager` gagne un étage d'implémentation opt-in avec double juge (re-critique DA ∥ revue de code) et budgets anti-thrash séparés 3 + 3, `vf-auto` aiguille enfin les missions purement design vers le manager design, et les deux managers portent une allowlist `Agent(...)` (18 / 6 noms) qui interdit l'imbrication manager→manager (contrat documenté — voir la correction v2.41.0 sur ce qu'une allowlist enforce réellement). Kernel intact. |
-| `v2.39.0` | 2026-07-26 | Moteur GSD migré : `get-shit-done-cc` déprécié → successeur communautaire `@opengsd/gsd-core@^1` (plafond semver, parité prouvée), appels SDK → `gsd-tools`, `gsd-onboard` routé pour le brownfield, frontières « une seule voix » (gsd-next/mempalace non routés), merge de hooks durci + suite de cohabitation sur l'installeur réel, `model_profile: balanced` enforced. |
 
 <details>
 <summary><strong>Références méthodologiques (ADR / LRN)</strong></summary>
