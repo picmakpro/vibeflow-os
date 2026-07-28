@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
 current_phase: 19
-current_phase_name: Migration du moteur GSD pilotée par /vf-update — planifiée (3 plans), 19-01, 19-02 et 19-03 exécutés
-status: in_progress
-stopped_at: "Plan 19-03 exécuté le 2026-07-28 — vf-update/SKILL.md : diagnostic à deux volets (sonde check-gsd-engine.sh consultée AVANT le stop sur plugin à jour), ligne de confirmation moteur indépendante, §Garde-fous réécrit ; ADR-058 posé ; release-meta dev-orchestrator v2.7.0 + conductor v1.16.0. check-version-sync.sh rouge uniquement sur le compteur de suites des 2 README racine (41 vs 42 réel), reste-à-faire nommé pour le commit de release humain. Phase 19 (3/3 plans) prête pour clôture."
-last_updated: "2026-07-28T13:00:00.000Z"
-last_activity: 2026-07-28 (exécution Phase 19 Plan 03 — vf-update/SKILL.md, ADR-058, release-meta)
+current_phase_name: Migration du moteur GSD pilotée par /vf-update — terminée et vérifiée (PASS 6/7), NON shippée
+status: complete
+stopped_at: "Phase 19 terminée et vérifiée le 2026-07-28 (mission d'équipe, DAG 5 nœuds + 1 reopen après vérification). Verdict 19-VERIFICATION.md : PASS, 6/7 — SC2 reste PRESENT_BEHAVIOR_UNVERIFIED (comportement d'agent, recette humaine du parcours /vf-update sur poste legacy : acceptation PUIS refus). Livré : check-gsd-engine.sh (3 états, exits 0/2/3), ensure-deps.sh --migrate-engine chaîné sur la ré-injection MCP, inject-mcp-tools.sh --verify, vf-update/SKILL.md à deux volets, ADR-058, modules dev-orchestrator v2.7.0 + conductor v1.16.0. Réservé à validation humaine : release racine (bump VERSION/plugin.json/marketplace.json + historique des 2 README + rattrapage du compteur 41→42 suites, tag annoté, release GitHub)."
+last_updated: "2026-07-28T15:40:00.000Z"
+last_activity: 2026-07-28 (clôture Phase 19 — migration du moteur GSD pilotée par /vf-update)
 progress:
   total_phases: 19
-  completed_phases: 10
+  completed_phases: 11
   total_plans: 53
   completed_plans: 37
 ---
@@ -22,7 +22,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26 — charte rouverte : 17 modules, D2/D6 renversées)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Phase 17 **terminée et vérifiée, NON shippée** (2026-07-28) — signaux de démarrage
+**Current focus:** Phase 19 **terminée et vérifiée, NON shippée** (2026-07-28) — la migration
+`get-shit-done-cc` → `@opengsd/gsd-core` livrée en v2.39.0 atteint enfin les **postes déjà équipés** :
+`/vf-update` dit l'état du moteur avant tout stop et propose la bascule sous confirmation ADR-031.
+Modules `dev-orchestrator` v2.7.0 + `conductor` v1.16.0. Verdict `19-VERIFICATION.md` : **PASS 6/7**.
+Phase 17 **terminée et vérifiée, NON shippée** (2026-07-28) — signaux de démarrage
 du moteur de dev (`check-dev-bootstrap.sh`, `check-doc-drift.sh`, `discover-unintegrated-docs.sh --hook`,
 hooks `SessionStart`), module `dev-orchestrator` v2.6.0. SC5 (advisory/lecture seule) et SC6
 (portabilité macOS+Linux) prouvés par exécution, pas par lecture. Plus aucun milestone ouvert.
@@ -49,6 +53,53 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 `*.txt` ci-dessus ne les couvre pas (ce sont des `.md` dans un sous-dossier).
 
 ## Current Position
+
+Phase: 19 **complète — vérifiée, release racine en attente** (VERSION racine intouchée : 2.42.0)
+Migration du moteur GSD pilotée par `/vf-update`. Livrée en mission d'équipe le 2026-07-28, en
+autonomie complète (DAG à 5 nœuds, `.planning/missions/dag-phase19.json` : n1 plan · n2 exécution ·
+n3 gate portabilité · n4 audit sécurité/infra · n5 clôture, avec **un `reopen` unique** de n2 après
+la vérification goal-backward). Cadrage préalable non refait (`19-CONTEXT.md`, 6 arbitrages tranchés
+par Samuel en conversation). Livré : `check-gsd-engine.sh` (3 états `absent`/`legacy`/`gsd-core`,
+exits 0/2/3, suite dédiée 15 cas), `ensure-deps.sh` (détecteur à 3 valeurs, fin du `skip` sur legacy,
+chemin `--migrate-engine` chaîné sur la ré-injection MCP, message de nettoyage exact et atteignable),
+`inject-mcp-tools.sh --verify`, `vf-update/SKILL.md` (diagnostic à deux volets, ligne de confirmation
+moteur indépendante, §Garde-fous réécrit), **ADR-058**. Modules `dev-orchestrator` **v2.7.0** et
+`conductor` **v1.16.0** (premier cas à deux modules bumpés dans la même phase).
+Status: Terminée et vérifiée, non shippée.
+Last activity: 2026-07-28 (clôture Phase 19)
+
+**Verdict `19-VERIFICATION.md` : PASS, 6/7 critères.** SC2 reste `PRESENT_BEHAVIOR_UNVERIFIED` — le
+volet moteur du skill est présent et son contrat d'exit prouvé, mais c'est du **comportement d'agent**
+non éprouvable par test. **Recette humaine en attente** : parcours `/vf-update` sur un poste legacy,
+acceptation **puis** refus de la ligne moteur.
+
+**Le défaut que trois étages ont laissé passer — à retenir.** Revue de code (PASS), gate de
+portabilité (macOS + Ubuntu 24.04 + Debian 12, tout vert) et audit sécurité (6/6 angles PASS) ont
+tous validé un garde-fou **inerte** : `patch_gsd_executor_mcp()` appelait `inject-mcp-tools.sh
+--verify` **sans `--force`**, alors que l'injection juste au-dessus le passait (obligatoire —
+`gsd-executor.md` ne porte pas `vf-mcp-consumer`). La cible était donc systématiquement écartée : le
+verdict sortait **toujours en 3**, jamais 0 « conforme » ni 1 « serveur manquant », et un `ERROR`
+bruyant tombait à chaque bootstrap sur tout lab sans `.mcp.json`. Seul le vérificateur goal-backward
+l'a vu, **en mutant le bloc livré** : sa suppression complète laissait la suite à 73 OK / 0 KO.
+Deux causes nommables : le compte rendu prouvait une **présence** (`grep -c 'verify' → 7`) et non un
+comportement ; les tests exerçaient `--force --verify`, **une forme que la production n'émettait
+jamais**. Corrigé (`94587c5`) avec contrat de relais F13 explicite (seul `rc=1` alarme, `rc=3` =
+INDÉTERMINÉ informatif) et cas **T2m** qui exerce le chaînage réel — létal sur 3 mutations.
+
+**Dette inscrite à `CONCERNS.md`** (commit `164ff35`) : la sonde cross-module `conductor` →
+`dev-orchestrator` s'éteindrait **sans aucun signal** si l'engine cessait de matérialiser les scripts
+de tous les modules à plat dans le même `.claude/scripts/`. Le silence sur script absent est voulu
+(un lab content/growth ne doit rien voir), mais il rend le mode dégradé indiscernable du nominal —
+même famille que le trou que cette phase vient de fermer. Risque auto-documenté en ADR-058.
+
+**Réservé à validation humaine** : release racine (bump `VERSION`/`plugin.json`/`marketplace.json`
++ historique des 2 README, tag annoté poussé, release GitHub, `check-release-tag.sh --remote` → ✓).
+Pré-requis connu et **volontairement déféré** : `scripts/check-version-sync.sh` est rouge sur son
+seul contrôle du compteur « N suites » des 2 README racine (41 annoncé vs 42 réel) — le rattrapage
+voyage avec le commit de release, patron déjà appliqué aux Phases 13 et 17. Les 17 triades par
+module sont ✓.
+
+---
 
 Phase: 17 **complète — vérifiée, release racine en attente** (VERSION racine intouchée : 2.41.0)
 Signaux de démarrage du moteur de dev. Livrée en mission d'équipe (DAG à 5 nœuds : n1 cadrage+plan ·
@@ -284,6 +335,28 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
 
+- **2026-07-28 — Un test qui n'exerce pas la commande réellement émise ne teste rien** (mission
+  Phase 19, établi par mutation, pas par lecture). Le gap SC3 (`--verify` sans `--force`, garde-fou
+  incapable de rendre un verdict en production) a franchi **trois étages de vérification** : revue de
+  code PASS, gate de portabilité vert sur 3 OS, audit sécurité 6/6. Il n'a été vu qu'en **mutant le
+  bloc livré** — sa suppression complète laissait la suite à 73 OK / 0 KO. Les deux signaux qui
+  auraient dû alerter plus tôt sont désormais des sondes explicites : (a) un compte rendu qui prouve
+  une **présence** (`grep -c 'verify' → 7`) au lieu d'un comportement ; (b) des cas de test qui
+  invoquent une **forme de commande que le chaînage réel n'émet jamais** (`--force --verify` à la
+  main, quand la production émettait `--verify` seul). C'est la troisième occurrence du motif
+  « test tautologique derrière un décompte vert » sur ce repo (Phase 13 `discover-unintegrated-docs.sh`,
+  Phase 17 cas 7, Phase 19 ici) — le contre-poison qui a marché à chaque fois est la **mutation du
+  bloc livré**, jamais la relecture.
+
+- **2026-07-28 — Arbitrage de mission (manager, autonomie) : le compteur « N suites » des README
+  racine reste rouge à la clôture de phase.** Le gate de portabilité l'avait classé `auto-fix`
+  majeur. Refusé : `check-version-sync.sh` est rouge sur ce seul contrôle (41 annoncé vs 42 réel) et
+  le rattrapage **voyage avec le commit de release racine**, réservé à validation humaine — patron
+  déjà appliqué aux Phases 13 et 17. Le corriger en mission aurait été s'accorder un morceau de la
+  release explicitement sortie du périmètre. Les 17 triades par module sont ✓, dont les deux bumps
+  de la phase. Corollaire de méthode : un juge frais ignore les déférés qu'on ne lui nomme pas — le
+  mandat doit les lui dire, sinon il les remonte en faux positif.
+
 - **2026-07-27 — Arbitrage humain (Samuel) : SC1 de la Phase 17 amendé, la spec fait foi.**
   `.planning/ROADMAP.md` §Phase 17 SC1 disait « les trois scripts sortent en 3 et **aucune ligne**
   n'est injectée […] le coût contexte d'un projet sain est nul ». La spec de référence
@@ -405,6 +478,18 @@ Recent decisions affecting current work:
   `marketplace.json` + historique des 2 README, puis tag annoté poussé, `check-release-tag.sh --remote`
   → ✓). Le module `dev-orchestrator` est déjà en v2.2.0 ; la racine est restée en v2.36.2.
   **Réservée à validation humaine — non faite en mission.**
+
+- **Recette humaine de la Phase 19 (SC2)** : parcours `/vf-update` sur un poste réellement legacy —
+  vérifier que la ligne « moteur GSD legacy 1.42.3 → `@opengsd/gsd-core` » apparaît **avant** tout
+  stop sur « plugin à jour », puis l'**accepter** (migration + ré-injection MCP enchaînées) et, sur
+  un second passage, la **refuser** (aucun effet de bord, aucune insistance). Seul critère de la
+  phase non éprouvable par test — c'est du comportement d'agent.
+
+- **Arbitrage à trancher (remonté par la mission Phase 19, non tranché seul)** : les vagues
+  parallèles d'exécution partagent le même arbre de travail (pas d'`isolation: worktree`). Aucune
+  collision constatée — les périmètres de fichiers étaient disjoints et déclarés — mais la garantie
+  vient de la déclaration, pas de la construction. Même famille que l'incident de verrou de la
+  Phase 16.
 
 - **Arbitrage doctrinal (audit BRDG-03)** : la confirmation humaine ADR-031 avant ingestion est ancrée
   à `vibeflow-dev` seul. `vf-dev-manager` (chemin équipe, qui consulte `intent-routing.md` pour mapper

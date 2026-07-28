@@ -1,0 +1,48 @@
+{
+  "nodes": [
+    {
+      "id": "n1",
+      "step": "plan: gsd-plan-phase 19 + plan-checker (perimetre .planning/phases/VFDO-19-*)",
+      "stage": "build",
+      "deps": [],
+      "status": "done"
+    },
+    {
+      "id": "n2",
+      "step": "execute: gate check-gsd-engine.sh, ensure-deps --migrate-engine, inject-mcp-tools --verify, SKILL vf-update, ADR, release-meta 2 modules, tests",
+      "stage": "build",
+      "deps": [
+        "n1"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "n3",
+      "step": "gate portabilite Linux (docker ubuntu 24.04) + rejeu suites macOS",
+      "stage": "verify",
+      "deps": [
+        "n2"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "n4",
+      "step": "audit read-only (securite/infra: npx, rm -rf propose, injection MCP, ADR-031)",
+      "stage": "verify",
+      "deps": [
+        "n2"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "n5",
+      "step": "cloture: VERIFICATION, STATE/ROADMAP, rapport de mission",
+      "stage": "close",
+      "deps": [
+        "n3",
+        "n4"
+      ],
+      "status": "done"
+    }
+  ]
+}
