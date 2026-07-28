@@ -60,7 +60,10 @@ par des skills qui existent déjà, sans introduire de nouvel objet dans le socl
 > dépendance externe, zéro double état, gouvernance conductor applicable (densité ADR-029). »
 >
 > `**Requirements**: TBD` · `**Plans:** 0 plans`. Dossier de phase :
-> `/Users/samuel/Documents/dev/vibeflow-os/.planning/phases/VFDO-18-capability-living-specs-conventions-openspec/`
+> `.planning/phases/VFDO-18-capability-living-specs-conventions-openspec/` (chemin au moment de
+> l'étude ; **renommé après coup** en `VFDO-18-survie-du-ledger-d-exigences-la-cl-ture-de-jalon`
+> quand le ROADMAP a été requalifié — slug régénéré par
+> `gsd-tools query generate-slug`, donc conforme à ce que le moteur recalculerait)
 > → contient `.gitkeep` **et le présent `STUDY.md`**, tous deux non trackés. **Aucun plan, aucune
 > exigence, aucune exécution** : la phase n'a jamais tourné.
 

@@ -591,7 +591,7 @@ Plans:
 ### Phase 18: Survie du ledger d'exigences à la clôture de jalon
 
 > **Périmètre réduit le 2026-07-28** par l'étude d'implémentation
-> `.planning/phases/VFDO-18-capability-living-specs-conventions-openspec/STUDY.md` (verdict
+> `.planning/phases/VFDO-18-survie-du-ledger-d-exigences-la-cl-ture-de-jalon/STUDY.md` (verdict
 > **GO-RÉDUIT**). L'intitulé précédent — *Capability living-specs (conventions OpenSpec)* — et ses
 > quatre briques (grammaire delta ADDED/MODIFIED/REMOVED/RENAMED, ledger indexé par capability,
 > ancrage overlay `.gsd/capabilities/` @ `ship:post`, skill de spec-sync agent-driven) sont

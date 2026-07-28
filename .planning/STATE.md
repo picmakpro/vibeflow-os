@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
 current_phase: 17
-current_phase_name: Signaux de démarrage du moteur de dev — terminée et vérifiée, release racine en attente
-status: awaiting-release
-stopped_at: Phase 17 terminée (n1-n4 du DAG de mission : cadrage+plan, exécution, gate portabilité, audit advisory/read-only) et clôturée (n5) — SC5 et SC6 CONFORMES/PROUVÉS par exécution, module dev-orchestrator v2.6.0. Aucune release racine faite (VERSION reste 2.41.0) — réservée à validation humaine. Phase 18 inscrite, non démarrée.
+current_phase_name: Signaux de démarrage du moteur de dev — terminée, vérifiée et shippée (v2.42.0)
+status: planning
+stopped_at: "Phase 17 terminée (n1-n4 du DAG de mission : cadrage+plan, exécution, gate portabilité, audit advisory/read-only) et clôturée (n5) — SC5 et SC6 CONFORMES/PROUVÉS par exécution, module dev-orchestrator v2.6.0. Release racine v2.42.0 PUBLIÉE le 2026-07-28 (VERSION = v2.42.0, tag annoté + release GitHub, check-release-tag --remote ✓). Phase 18 requalifiée en variante réduite le 2026-07-28 (étude STUDY.md, verdict GO-RÉDUIT) — non démarrée ; pré-requis bloquant : la RFC upstream open-gsd/gsd-core part avant toute implémentation du gate."
 last_updated: "2026-07-28T00:00:00.000Z"
-last_activity: 2026-07-28 (clôture Phase 17 — hygiène documentaire, nœud n5 du DAG de mission)
+last_activity: 2026-07-28 (requalification de la Phase 18 en variante réduite — ROADMAP réécrit, dossier de phase renommé)
 progress:
   total_phases: 18
   completed_phases: 10
@@ -190,7 +190,7 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
 
 - 2026-07-28 : **Phase 18 requalifiée en variante réduite** — « Survie du ledger d'exigences à la
   clôture de jalon ». Étude d'implémentation
-  `.planning/phases/VFDO-18-capability-living-specs-conventions-openspec/STUDY.md` (branche
+  `.planning/phases/VFDO-18-survie-du-ledger-d-exigences-la-cl-ture-de-jalon/STUDY.md` (branche
   `phase-18-living-specs-study`, commit `0c2ecf7`) : verdict **GO-RÉDUIT**. Les 4 briques de
   l'inscription du 2026-07-27 (grammaire delta, ledger par capability, overlay `ship:post`, skill de
   spec-sync agent-driven) sont **écartées** — quatrième registre sans en retirer aucun (`ROUT-01` en
@@ -199,8 +199,11 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
   `onError: skip`, gate `bundleContentHash`). Le trou prouvé restant : `complete-milestone.md`
   supprime `.planning/REQUIREMENTS.md` **inconditionnellement** à chaque clôture. La RFC upstream
   `open-gsd/gsd-core` passe de bonus à **dépendance bloquante** (condition D3, échéance
-  **2026-10-26**). Le dossier de phase garde son ancien slug — renommage non fait, à trancher au
-  cadrage.
+  **2026-10-26**). Dossier de phase renommé en conséquence
+  (`VFDO-18-capability-living-specs-conventions-openspec` →
+  `VFDO-18-survie-du-ledger-d-exigences-la-cl-ture-de-jalon`, slug régénéré par
+  `gsd-tools query generate-slug`). Les `*-SUMMARY.md` de la Phase 17 citent l'ancien chemin :
+  laissés intacts, ce sont des constats datés.
 
 - 2026-07-27 : **Phase 18** (Capability living-specs, conventions OpenSpec) ajoutée. Issue de
   l'étude « successeurs de GSD » du jour (mémoire `gsd-succession-landscape-2026-07`) : gap réel
