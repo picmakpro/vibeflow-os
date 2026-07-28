@@ -27,6 +27,7 @@
 | ADR-055 | 2026-07-25 | Frontière d'altitude entre planning-core et le moteur de planning GSD — un projet = un seul moteur | Validée |
 | ADR-056 | 2026-07-25 | Vigilance support runtime (scission du double emploi d'ADR-031) | Validée |
 | ADR-057 | 2026-07-25 | Frontières avec les briques tierces — détection outillée des recouvrements | Validée |
+| ADR-058 | 2026-07-28 | Le moteur GSD entre dans le périmètre de `/vf-update` | Validée |
 
 ### ADR héritées les plus citées (définitions canoniques)
 
@@ -851,3 +852,76 @@ cause d'une brique qu'il ne contrôle pas). Mitigation : enrichir la table au fi
 - Applique la méthode ADR-055 (frontière détectée par script + doctrine courte, pas de prose de
   préséance) au périmètre des briques tierces. Respecte F13 (vacuous green) : `--strict` sur
   cible vide sort 3, jamais un vert. Aucune rule nouvelle.
+
+---
+
+## ADR-058 : Le moteur GSD entre dans le périmètre de `/vf-update`
+
+**Date** : 2026-07-28
+**Statut** : Validée
+**Décideur** : Samuel (audit externe migration OpenGSD, 2026-07-28)
+**Contexte** : Phase 19 — migration du moteur GSD pilotée par `/vf-update`
+
+### Problème
+
+La version du moteur GSD n'est pas une donnée subie, c'est une décision de VibeFlow — le plafond
+de version est posé dans `ensure-deps.sh:166` (`@opengsd/gsd-core@^1`) et a été arbitré après
+l'audit de la Phase 11. Or le §Garde-fous du skill de mise à jour plaçait explicitement la chaîne
+d'outils interne hors périmètre, au motif qu'elle avait sa propre mise à jour. Conséquence mesurée
+sur un poste audité le 2026-07-28 : plugin à jour, moteur resté sur le paquet déprécié
+`get-shit-done-cc` posé douze jours plus tôt, et rien dans l'interface ne le disait. Une frontière
+de périmètre exacte dans sa formulation et trompeuse dans son effet.
+
+### Options Considérées
+
+| Option | Verdict |
+|---|---|
+| Laisser le moteur hors périmètre, compter sur `/vf-init` ou `/vf-calibrate` | Rejetée — ce sont des chemins que le régime nominal n'emprunte jamais, c'est précisément le motif du trou |
+| Ajouter un hook `SessionStart` sur l'état du moteur | Rejetée — décision de l'utilisateur, une ligne de plus à chaque session pour un fait qui change une fois |
+| Migrer automatiquement dès détection | Rejetée — ADR-031 : une install tierce sur le poste de l'utilisateur ne se fait jamais sans accord explicite |
+| **Détecter et proposer dans le récapitulatif de `/vf-update`, sous confirmation** | **Retenue** — le régime nominal voit enfin l'état du moteur, sans jamais l'imposer |
+
+### Décision
+
+1. **L'état du moteur GSD est une donnée du diagnostic de `/vf-update`**, au même titre que la
+   version du plugin et celle des modules — il n'est plus une chose qu'on découvre par hasard via
+   `/vf-init` ou `/vf-calibrate`.
+2. **Il est détecté par un gate dédié en lecture seule** (`check-gsd-engine.sh`), dont le
+   classement se fait sur le layout et le nom du paquet installé, et **jamais** sur la comparaison
+   des numéros de version — un poste legacy figé à `1.42.3` reste actionnable même face à un
+   `@opengsd/gsd-core` à `1.8.0`, malgré `1.8.0 < 1.42.3` en semver.
+3. **La migration est proposée comme une ligne indépendante** de la confirmation existante de
+   `/vf-update` et **n'est jamais exécutée sans accord explicite** de l'utilisateur (ADR-031) — un
+   refus n'a aucun effet de bord et n'est jamais relancé.
+4. **La détection traverse la frontière de modules par une sonde de présence de fichier**, jamais
+   par une dépendance déclarée dans `module.json`, parce que le module qui porte le skill
+   (`conductor`) est mandatory et que celui qui porte le moteur (`dev-orchestrator`) ne l'est pas.
+5. **Le nettoyage des artefacts legacy est proposé, jamais exécuté** — même doctrine que la
+   migration elle-même.
+6. **Superpowers reste hors périmètre** : cette décision ne couvre que le moteur GSD.
+
+### Conséquences
+
+**Positives** : le chemin de mise à jour nominal voit enfin l'état du moteur et un poste équipé
+cesse de porter le code d'une migration sans en porter l'effet ; le nettoyage devient atteignable
+(via `/vf-update`, plus seulement via `/vf-init`/`/vf-calibrate`) et exact.
+
+**Négatives / risque** : `/vf-update` acquiert une dépendance de fait envers un script d'un module
+non mandatory, tenue par une sonde best-effort — si la matérialisation à plat des scripts changeait
+un jour (nouveau layout d'install), la sonde deviendrait silencieusement aveugle sans qu'aucun gate
+ne le signale. Le classement par layout doit rester insensible aux numéros de version dans tout
+code futur qui y touche, faute de quoi le piège semver documenté en D-05 se rouvre sans signal.
+
+### Code Impacté
+
+- `plugin/dev-orchestrator/scripts/check-gsd-engine.sh` (gate de détection à 3 états, 19-01)
+- `plugin/dev-orchestrator/scripts/ensure-deps.sh` (chemin `--migrate-engine`, 19-02)
+- `plugin/dev-orchestrator/scripts/inject-mcp-tools.sh` (mode `--verify`, 19-02)
+- `plugin/conductor/skills/vf-update/SKILL.md` (diagnostic à deux volets, §Garde-fous, 19-03)
+
+### Rules Associées
+
+- S'appuie sur ADR-031 (jamais d'action sans validation humaine) pour borner la proposition de
+  migration à une confirmation explicite, jamais automatique. Applique la méthode d'ADR-055 §3 (le
+  script constate le fait, l'agent juge et propose) au périmètre du moteur GSD. Aucune rule
+  nouvelle.
