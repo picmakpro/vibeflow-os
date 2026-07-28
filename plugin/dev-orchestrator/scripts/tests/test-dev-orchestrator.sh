@@ -731,12 +731,14 @@ else
   else
     indexed=""
   fi
-  # Une brique est « routée » si la carte la cite — OU si un skill survivant du module la
-  # porte lui-même (vf-auto → gsd-autonomous : la carte route « fais tout » vers le skill,
-  # qui invoque la brique) — OU si elle est déléguée au module design (la carte route
-  # l'intention design vers vf-design/vibeflow-design, qui pilote gsd-ui-phase/gsd-ui-review
-  # en interne ; les auditer ici ferait rougir la suite pour un routage qui existe ailleurs).
-  DESIGN_DELEGATED="gsd-ui-phase gsd-ui-review"
+  # Une brique est « routée » SI ET SEULEMENT SI la carte la cite. Les deux replis historiques
+  # (skill porteur du module, délégation design) ont été RETIRÉS le 2026-07-28 : mesurés sur les
+  # 68 briques auditées, ils ne couvraient à eux deux AUCUNE brique que la carte ne couvrait déjà
+  # (61 par la carte seule, 7 par la carte ET un SKILL.md, 0 par un repli seul). C'étaient des
+  # gardes MORTES, et elles rendaient T14 insensible au retrait de l'une d'elles : un routage
+  # supprimé de la carte restait vert tant qu'un SKILL.md citait le nom quelque part (dette
+  # backlog ouverte en Phase 11). Leur suppression aligne le code sur la doctrine déjà écrite
+  # ci-dessus — la carte est la SEULE source de routage. T14c verrouille le constat qui l'autorise.
   # Briques volontairement NON routées (canal 4, intent-routing.md) — sémantique différente de
   # DESIGN_DELEGATED : ces skills ne sont PAS considérés « routés », ils sont EXEMPTÉS de
   # l'obligation de routage. Toute nouvelle exception doit être écrite dans intent-routing.md
@@ -748,12 +750,7 @@ else
   }
   brick_routed() {
     local s="$1"
-    "$GREP" -qE -- "${s}([^a-z0-9-]|$)" "$ROUTING" && return 0
-    for sk in $OWNED_SKILLS; do
-      [ -f "$MOD/skills/$sk/SKILL.md" ] && "$GREP" -qE -- "${s}([^a-z0-9-]|$)" "$MOD/skills/$sk/SKILL.md" && return 0
-    done
-    case " $DESIGN_DELEGATED " in *" $s "*) return 0 ;; esac
-    return 1
+    "$GREP" -qE -- "${s}([^a-z0-9-]|$)" "$ROUTING"
   }
   if [ -z "$indexed" ]; then
     skip "T14 exhaustivité : index factuel vide — GSD non installé (pas un échec)"
@@ -792,6 +789,31 @@ else
     ok "T14b (DISCRIMINANT) : gsd-next exempté (canal 4, non signalé) ; gsd-inconnu-xyz non exempté et non routé → signalé manquant"
   else
     ko "T14b (DISCRIMINANT) : exemption non bornée aux 3 noms exacts — missing=[$fixture_missing]"
+  fi
+
+  # -------------------------------------------------------------------------
+  # T14c — Aucune brique ne dépend d'un repli disparu. Verrouille le constat qui a autorisé la
+  # suppression des deux gardes mortes de brick_routed() : si une brique de l'index est citée
+  # par un SKILL.md du module SANS l'être par la carte, la carte n'est plus la seule source de
+  # routage et T14 vient de perdre un cas qu'il couvrait. Cet axe le dit AVANT que le trou ne
+  # devienne un faux vert — c'est le filet qui remplace les replis, pas leur réintroduction.
+  # -------------------------------------------------------------------------
+  if [ -n "$indexed" ]; then
+    orphan_fallback=""
+    for s in $indexed; do
+      is_intentionally_unrouted "$s" && continue
+      brick_routed "$s" && continue
+      for sk in $OWNED_SKILLS; do
+        [ -f "$MOD/skills/$sk/SKILL.md" ] \
+          && "$GREP" -qE -- "${s}([^a-z0-9-]|$)" "$MOD/skills/$sk/SKILL.md" \
+          && { orphan_fallback="$orphan_fallback $s($sk)"; break; }
+      done
+    done
+    if [ -n "$orphan_fallback" ]; then
+      ko "T14c : brique(s) routée(s) par un SKILL.md mais ABSENTE(s) de la carte —$orphan_fallback (la carte doit rester la seule source)"
+    else
+      ok "T14c : aucune brique ne dépend d'un repli SKILL.md — la carte couvre tout ce qu'elle doit couvrir"
+    fi
   fi
 fi
 
