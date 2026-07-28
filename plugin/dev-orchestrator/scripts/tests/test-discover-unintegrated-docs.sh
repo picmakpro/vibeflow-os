@@ -7,6 +7,8 @@
 # Modèle de structure : plugin/planning-core/scripts/tests/test-detect-gsd-engine.sh.
 # Les cas 1 à 16 ne sont JAMAIS modifiés — leur passage inchangé EST la preuve de non-régression
 # du contrat historique (D-06). Les cas 17+ continuent la numérotation, forme identique.
+# Exception : le cas 7 a été durci (fixture rendue discriminante, forme et verdict inchangés —
+# voir son commentaire) en réponse à un finding de revue portabilité, VFDO-17 comblement n2.
 
 set -uo pipefail
 
@@ -73,11 +75,18 @@ expected="$(printf 'plan\tdocs/superpowers/plans/2026-01-06-zeta.md')"
 if [ "$rc" -eq 0 ] && [ "$out" = "$expected" ]; then ok "6 collision de préfixe — le plan reste non intégré"; else ko "6 collision de préfixe — le plan reste non intégré" "rc=$rc out=[$out] attendu=[$expected]"; fi
 
 # === Cas 7 — Auto-sabotage : un registre contient littéralement le glob → rien n'est cité =====
+# Discriminant (D-15, VFDO-17 comblement n2) : la ligne de registre porte À LA FOIS le glob et le
+# basename littéral du fichier. Filtre actif (script du dépôt) → la ligne entière est ignorée dès
+# `index($0, "/*") > 0` avant même d'examiner le basename littéral qu'elle contient : le fichier
+# reste non cité (spec\t..., rc=0). Filtre retiré (mutation) → la ligne est examinée normalement
+# et son basename littéral matche : le fichier devient cité (silence, rc=3). Sans le basename
+# littéral sur cette même ligne, le cas est vert par construction quel que soit le filtre —
+# c'est le défaut que ce correctif élimine.
 D="$(mk_root c7)"
-echo '# spec' > "$D/docs/superpowers/specs/2026-01-07-eta-design.md"
-printf 'Critère de succès : docs/superpowers/specs/*.md\n' > "$D/.planning/ROADMAP.md"
+echo '# spec' > "$D/docs/superpowers/specs/eta-design.md"
+printf 'Critère de succès : docs/superpowers/specs/*.md — dont eta-design.md\n' > "$D/.planning/ROADMAP.md"
 out="$(bash "$SCRIPT" --path "$D")"; rc=$?
-expected="$(printf 'spec\tdocs/superpowers/specs/2026-01-07-eta-design.md')"
+expected="$(printf 'spec\tdocs/superpowers/specs/eta-design.md')"
 if [ "$rc" -eq 0 ] && [ "$out" = "$expected" ]; then ok "7 auto-sabotage par glob — aucun fichier marqué cité"; else ko "7 auto-sabotage par glob — aucun fichier marqué cité" "rc=$rc out=[$out] attendu=[$expected]"; fi
 
 # === Cas 8 — Fichier sous specs/ → grain spec ==================================================

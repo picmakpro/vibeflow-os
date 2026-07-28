@@ -1108,17 +1108,28 @@ fi
 # ---------------------------------------------------------------------------
 # T21 — Invariants SC5 par grep structurel sur les 2 nouveaux scripts (D-15, VFDO-17-03)
 # ---------------------------------------------------------------------------
-# Vérifie, sur le corps ANALYSABLE de check-dev-bootstrap.sh et check-doc-drift.sh (lignes de
-# commentaire entières retirées, bloc awk embarqué neutralisé — langage étranger avec sa propre
-# sémantique d'exit/comparaison, jamais celle du script bash — et commentaires de fin de ligne
-# retirés) : (a) aucun exit 1 littéral, (b) toute redirection d'écriture cible /dev/null, un
-# descripteur (&N), ou une variable dont le nom contient TMP, (c) aucune commande d'écriture
-# directe (mkdir/touch/tee/cp/mv/sed -i), (d) tout mktemp est apparié à un trap ... EXIT dans le
-# même fichier. Chaque sous-vérification produit son propre ok/ko (l'invariant rompu et le
-# fichier fautif sont désignés, jamais un booléen global).
+# Vérifie, sur le corps ANALYSABLE de check-dev-bootstrap.sh, check-doc-drift.sh et
+# discover-unintegrated-docs.sh (lignes de commentaire entières retirées, bloc awk embarqué
+# neutralisé — langage étranger avec sa propre sémantique d'exit/comparaison, jamais celle du
+# script bash — et commentaires de fin de ligne retirés) : (a) aucun exit 1 littéral, (b) toute
+# redirection d'écriture cible /dev/null, un descripteur (&N), ou une variable dont le nom
+# contient TMP, (c) aucune commande d'écriture directe (mkdir/touch/tee/cp/mv/sed -i), (d) tout
+# mktemp est apparié à un trap ... EXIT dans le même fichier. Chaque sous-vérification produit
+# son propre ok/ko (l'invariant rompu et le fichier fautif sont désignés, jamais un booléen
+# global).
+# Déclencheur du neutraliseur de bloc awk élargi (D-15, VFDO-17 comblement n2) : la forme
+# `awk[[:space:]]*'` ne reconnaît que `awk '` nu en fin de ligne. discover-unintegrated-docs.sh
+# ouvre son bloc awk avec un paramètre (`awk -v base="$1" '`), forme légitime que l'ancien
+# déclencheur laissait échapper — le corps de l'awk (comparateurs `>` de sa propre sémantique,
+# ex. `index($0, "/*") > 0`) fuitait alors dans l'analyse bash et faisait échouer T21b par faux
+# positif (aucune redirection bash réelle n'est en cause). `[^'"'"']*` accepte tout préfixe avant
+# la citation ouvrante tant qu'il ne contient pas lui-même de guillemet simple, sans changer ce
+# qui compte comme fin de bloc (`^[[:space:]]*'"'"'`) : l'invariant n'est pas affaibli, seule sa
+# détection du périmètre awk est complétée pour couvrir une forme d'ouverture jusqu'ici absente
+# des scripts testés.
 t21_strip_awk_block() {
   awk '
-    /awk[[:space:]]*'"'"'[[:space:]]*$/ { skip=1; next }
+    /awk[^'"'"']*'"'"'[[:space:]]*$/ { skip=1; next }
     skip && /^[[:space:]]*'"'"'/ { skip=0; next }
     skip { next }
     { print }
@@ -1128,7 +1139,7 @@ t21_analyzable_body() { # <file>
   "$GREP" -vE '^[[:space:]]*#' "$1" | t21_strip_awk_block | sed -E 's/[[:space:]]+#.*$//'
 }
 
-for T21_FILE in "$MOD/scripts/check-dev-bootstrap.sh" "$MOD/scripts/check-doc-drift.sh"; do
+for T21_FILE in "$MOD/scripts/check-dev-bootstrap.sh" "$MOD/scripts/check-doc-drift.sh" "$MOD/scripts/discover-unintegrated-docs.sh"; do
   T21_NAME="$(basename "$T21_FILE")"
   if [ ! -f "$T21_FILE" ]; then
     ko "T21 invariants SC5 : $T21_FILE introuvable"
