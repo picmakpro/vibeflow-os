@@ -5,6 +5,47 @@ dernières entrées et pointent ici). Chaque module a par ailleurs son propre `C
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.43.1] — 2026-07-28
+
+**Une mission d'équipe travaille sur sa propre branche, jamais sur la branche par défaut**
+(**ADR-059**). Modules `dev-orchestrator` **v2.7.1** et `design-orchestrator` **v1.3.1**.
+
+Dès qu'un manager est dispatché (`vf-dev-manager`, `vf-design-manager`), il crée sa branche **avant
+son premier commit**, y tient tous ses commits, et termine par une **PR laissée ouverte**. Le
+manager ne merge jamais : le merge appartient à l'utilisateur — ADR-031 appliqué à l'intégration.
+
+**Origine.** Constaté sur ce dépôt le 2026-07-28 : la mission Phase 19 a produit **32 commits
+directement sur `main`**, poussés puis taggés. Aucun dégât — la mission était bonne — mais le recours
+en cas de mission ratée était un `revert` en masse d'un historique déjà public et potentiellement
+déjà cloné. Sur une branche, le recours est de **ne pas merger**. La PR fournit en prime le point de
+relecture groupée qu'un rapport de fin de mission ne remplace pas : il est rédigé **par** l'agent qui
+a fait le travail, et il est déjà trop tard quand on le lit. Le dépôt imposait une discipline stricte
+en aval (« toute VERSION = un tag », gates de synchro, release GitHub) ; l'amont — comment le travail
+arrive sur la branche par défaut — n'était pas gouverné du tout.
+
+**Le déclencheur est le dispatch d'un manager**, pas la nature du travail : le travail
+conversationnel direct (correctif, doc, cadrage mené dans le fil) reste hors de la règle — sinon
+chaque échange créerait une branche.
+
+**Cinq replis, pour qu'une mission n'échoue jamais faute d'appliquer la règle** : pas de dépôt git →
+aucune branche, signalé dans le rapport ; dépôt sans remote → branche créée, pas de PR ; `gh` absent
+ou non authentifié → branche poussée et URL de création de PR donnée ; **arbre sale au démarrage →
+halt condition**, remontée à l'utilisateur, jamais un `stash` décidé seul ; `CLAUDE.md` du projet
+cible imposant un autre flux → **le projet cible prime**, cohérent avec le contrat de brief où ses
+conventions de livraison font déjà foi.
+
+**Ne couvre pas** : l'isolation des vagues parallèles **à l'intérieur** d'une mission, qui partagent
+le même arbre de travail. Une branche par mission ne les sépare pas entre elles — seul
+`isolation: worktree` le ferait. Décision distincte, signalée par `vf-dev-manager` lors de la mission
+Phase 19 et volontairement laissée ouverte.
+
+**Risque assumé et écrit** : une mission livrée mais **non mergée** est un travail invisible pour la
+suivante, qui repartira de la branche par défaut sans le voir. Le manager cite donc l'URL de la PR
+dans son rapport, et le merge reste la responsabilité de l'utilisateur.
+
+Le protocole vit en **un seul endroit** (`mission-contracts.md` §Isolation de branche) ; les deux
+managers y renvoient sans le dupliquer.
+
 ## [v2.43.0] — 2026-07-28
 
 **Le moteur GSD entre dans le périmètre de `/vf-update`** (Phase 19, livrée en mission d'équipe —
