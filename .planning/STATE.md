@@ -11,7 +11,7 @@ last_activity: 2026-07-28 (cadrage de la Phase 19 — migration du moteur GSD pi
 progress:
   total_phases: 19
   completed_phases: 10
-  total_plans: 50
+  total_plans: 53
   completed_plans: 34
 ---
 
