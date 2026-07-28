@@ -1,5 +1,32 @@
 # Changelog — conductor
 
+## [v1.16.0] — 2026-07-28 (moteur GSD dans le récapitulatif de /vf-update, Phase 19)
+
+### Ajouté
+- **`skills/vf-update/SKILL.md` : diagnostic à deux volets.** L'étape 1 consultait uniquement le
+  plugin et s'arrêtait net sur « VibeFlow est à jour » — un poste dont le plugin est à jour mais
+  dont le moteur GSD est resté legacy ne voyait donc jamais la proposition de migration (trou
+  audité le 2026-07-28). La sonde best-effort `check-gsd-engine.sh` (module `dev-orchestrator`) est
+  désormais consultée **avant** ce stop ; script introuvable → silence total, aucune dégradation
+  pour un lab non-dev qui n'installe pas `dev-orchestrator`.
+- **Ligne de confirmation indépendante** : quand un moteur legacy est détecté, l'étape 3
+  (`AskUserQuestion`) gagne une ligne dédiée à la migration, acceptable ou refusable
+  **indépendamment** de la ligne plugin et de la ligne modules — refus sans effet de bord ni
+  relance (ADR-031).
+- **Bornes des deux flags existants explicitées, aucun flag nouveau créé** (densité ADR-029) :
+  `--check` affiche l'état du moteur comme le reste du diagnostic sans jamais demander ;
+  `--modules-only` ne propose pas la migration du moteur.
+- **Étape 4 : sous-étape « couche moteur »** — invoque `ensure-deps.sh --migrate-engine` et relaie
+  sa sortie ; le skill n'invoque jamais l'installeur amont directement (Iron Law 2).
+- **§Garde-fous réécrit** : la phrase plaçant la chaîne d'outils interne hors périmètre était
+  devenue fausse pour le moteur GSD (sa version est un plafond décidé par VibeFlow dans
+  `ensure-deps.sh:166`) — remplacée par une frontière qui couvre le plugin, ses modules et l'état
+  du moteur GSD (détecté et proposé, jamais installé sans accord), Superpowers restant
+  explicitement hors périmètre. Renvoi vers `docs/ADR.md` ADR-058, qui acte ce changement de
+  doctrine.
+
+Référence : `docs/ADR.md` ADR-058, `.planning/phases/VFDO-19-migration-du-moteur-gsd-pilot-e-par-vf-update/`.
+
 ## [v1.15.0] — 2026-07-27 (lint du contenu de `tools:`, Phase 16)
 
 ### Ajouté

@@ -1,5 +1,40 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.7.0] — 2026-07-28 (migration du moteur GSD pilotée par /vf-update, Phase 19)
+
+### Ajouté
+- **`scripts/check-gsd-engine.sh`** (nouveau) : gate de constat à 3 états
+  (absent/legacy/gsd-core), lecture seule, exits `0`/`2`/`3` — classement décidé exclusivement sur
+  la présence des fichiers `VERSION` du poste, jamais sur leur numéro (le legacy `get-shit-done-cc`
+  figé à `1.42.3` reste actionnable même face à un `@opengsd/gsd-core` `1.8.0`, malgré
+  `1.8.0 < 1.42.3` en semver). Signal `[gsd-migrate]` pour l'état actionnable, `[gsd-leftover]`
+  pour le cas dual gsd-core + reliquat legacy (rupture assumée de « exit 3 == silence »).
+- **`scripts/tests/test-check-gsd-engine.sh`** (nouveau) : suite dédiée, 15 cas en boîte noire,
+  verte macOS et Linux (`ubuntu:24.04`).
+- **`ensure-deps.sh` : `detect_gsd()` cesse de skipper le legacy**. `detect_gsd_state()` rend un
+  état à 3 valeurs ; un moteur legacy est désormais **signalé** (jamais migré sans autorisation) au
+  lieu d'être silencieusement sauté. Nouveau chemin **`--migrate-engine`**
+  (+ `VF_ENSURE_MIGRATE_ENGINE=1`) qui enchaîne, dans le même run, l'install `npx` existante
+  (plafond `@opengsd/gsd-core@^1` intouché) puis `patch_gsd_executor_mcp()` — la ré-injection MCP
+  ne peut donc plus être oubliée après une migration.
+- **Message de nettoyage legacy corrigé** : l'état legacy est capturé **avant** toute install
+  (l'installeur amont supprime lui-même son propre témoin `VERSION` à l'install réussie — le
+  message survit désormais à cette suppression) ; les deux lignes `npm uninstall -g` ne sont
+  proposées que si `npm ls -g` confirme réellement le paquet installé en global ; le retrait de
+  l'arborescence vide laissée debout est ajouté à la proposition (toujours affiché, jamais exécuté
+  — ADR-031).
+- **`scripts/inject-mcp-tools.sh` : mode `--verify`** (nouveau) — relit le `tools:` final de la
+  cible et le compare aux serveurs dérivés du `.mcp.json` du lab, exits `0`/`1`/`3` (jamais un faux
+  vert si python3 est absent) ; dit fort un serveur manquant, ne répare jamais. Branché en
+  best-effort dans `patch_gsd_executor_mcp()`, après l'injection, hors dry-run uniquement.
+
+### Fait mesuré
+- Audit externe du 2026-07-28 : sur un poste où le plugin VibeFlow était déjà à jour, le moteur GSD
+  était resté sur `get-shit-done-cc` (paquet déprécié, figé à `1.42.3`) sans qu'aucun signal ne le
+  dise — le chemin de mise à jour nominal (`/vf-update`) ne consultait jamais l'état du moteur.
+
+Référence : `docs/ADR.md` ADR-058, `.planning/phases/VFDO-19-migration-du-moteur-gsd-pilot-e-par-vf-update/`.
+
 ## [v2.6.0] — 2026-07-27 (signaux de démarrage du moteur de dev, Phase 17)
 
 ### Ajouté
