@@ -342,6 +342,15 @@ copy_module_scripts() {
   for f in "$module_dir/scripts/"*.sh "$module_dir/scripts/"*.mjs "$module_dir/scripts/"*.js; do
     [ -f "$f" ] && cp "$f" "$TARGET_ROOT/scripts/" && chmod +x "$TARGET_ROOT/scripts/$(basename "$f")"
   done
+  # Fichiers de DONNEES accompagnant les scripts (*.txt). Sans cette boucle, un module pouvait
+  # referencer un fichier que l'engine ne posait JAMAIS chez l'utilisateur : c'est exactement ce
+  # qui est arrive a `known-versions.txt` (infrastructure-audit), lu par audit-infra.sh en
+  # $SCRIPTS_DIR/known-versions.txt et absent de toute install. Glob volontairement borne a *.txt
+  # — assez large pour la whitelist, assez etroit pour ne pas ramasser les residus (*.bak) ni les
+  # manifestes de config. Pas de chmod +x : ce sont des donnees, pas des executables.
+  for f in "$module_dir/scripts/"*.txt; do
+    [ -f "$f" ] && cp "$f" "$TARGET_ROOT/scripts/"
+  done
   if [ -d "$module_dir/scripts/tests" ]; then
     mkdir -p "$TARGET_ROOT/scripts/tests/fixtures"
     cp -r "$module_dir/scripts/tests/"*.sh "$TARGET_ROOT/scripts/tests/" 2>/dev/null || true

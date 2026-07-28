@@ -301,6 +301,35 @@ fi
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
+# T9 (DISCRIMINANT) — les fichiers de DONNÉES *.txt d'un module sont posés chez l'utilisateur.
+# Dette constatée le 2026-07-26 : copy_module_scripts() ne globbait que *.sh|*.mjs|*.js, donc
+# `known-versions.txt` (lu par audit-infra.sh en $SCRIPTS_DIR/known-versions.txt) n'arrivait
+# JAMAIS à l'install. Trois assertions, dont deux bornent le glob par le bas et par le haut :
+# le .txt est posé (sinon la dette est intacte), le résidu .bak ne l'est PAS (sinon le glob
+# ratisse trop large), et le .txt n'est pas exécutable (données ≠ exécutable).
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+mkdir -p "$CACHE/dataful/scripts"
+echo v1.0.0 > "$CACHE/dataful/VERSION"
+printf '{"name":"dataful","version":"v1.0.0"}\n' > "$CACHE/dataful/module.json"
+printf '#!/usr/bin/env bash\necho x\n' > "$CACHE/dataful/scripts/dataful.sh"
+printf '2.0.14\n2.0.15\n' > "$CACHE/dataful/scripts/known-versions.txt"
+printf '#!/usr/bin/env bash\necho residu\n' > "$CACHE/dataful/scripts/dataful.sh.bak"
+(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+   bash "$INSTALLER" install dataful >/dev/null 2>&1) || true
+miss=0
+[ -f "$LAB/.claude/scripts/known-versions.txt" ] \
+  || { ko "T9 : known-versions.txt non posé — dette 'fichier de données jamais installé' intacte"; miss=1; }
+[ ! -f "$LAB/.claude/scripts/dataful.sh.bak" ] \
+  || { ko "T9 : résidu .bak posé — le glob de données ratisse trop large"; miss=1; }
+[ ! -x "$LAB/.claude/scripts/known-versions.txt" ] \
+  || { ko "T9 : known-versions.txt marqué exécutable — c'est une donnée, pas un script"; miss=1; }
+[ "$miss" -eq 0 ] \
+  && ok "T9 (DISCRIMINANT) : *.txt posé non exécutable, résidu .bak écarté"
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
 # Garde-fou final : le vrai ~/.claude est inchangé (snapshot récursif avant=après).
 # ---------------------------------------------------------------------------
 HOME_AFTER=$(snapshot_home_claude)
