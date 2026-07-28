@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
-current_phase: 19
+current_phase: 17
 current_phase_name: Migration du moteur GSD pilotée par /vf-update — planifiée (3 plans), 19-01 exécuté
 status: in_progress
-stopped_at: "Plan 19-01 exécuté le 2026-07-28 — check-gsd-engine.sh créé (gate à 3 états absent/legacy/gsd-core, D-02..D-05) + test-check-gsd-engine.sh (15 cas, 0 ko) ; portabilité prouvée par exécution réelle sous ubuntu:24.04 (compteur identique macOS/Linux). Prochain geste : 19-02/19-03 (ensure-deps.sh --migrate-engine, inject-mcp-tools.sh --verify, vf-update/SKILL.md, release-meta, ADR)."
-last_updated: "2026-07-28T12:08:33.000Z"
-last_activity: 2026-07-28 (exécution Phase 19 Plan 01 — check-gsd-engine.sh)
+stopped_at: Completed VFDO-19-02-PLAN.md
+last_updated: "2026-07-28T12:21:36.658Z"
+last_activity: 2026-07-28 (clôture Phase 17)
 progress:
-  total_phases: 19
-  completed_phases: 10
-  total_plans: 53
-  completed_plans: 35
+  total_phases: 18
+  completed_phases: 8
+  total_plans: 42
+  completed_plans: 21
 ---
 
 # Project State
@@ -157,7 +157,7 @@ conductor v1.14.1 · planning-core v2.5.1 · consolidator v1.8.0.
 Milestone `gsd-migration` (Phases 10-11) reste ouvert et **en attente** — chantier indépendant, non bloquant.
 Milestone précédent memory-swarm-rnd **SHIPPÉ v2.28.0** (ADR-052 mémoire vivante + ADR-053 swarm).
 
-Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -187,6 +187,11 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
 | Phase 05 P01 | 2 | 3 tasks | 5 files |
 | Phase 06 P01 | 1min | 2 tasks | 2 files |
 | Phase VFDO-19 P01 | 15min | 3 tasks | 2 files |
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase VFDO-19 P02 | 90min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -391,6 +396,8 @@ Recent decisions affecting current work:
 - [Phase ?]: Hook VibeFlow pointe directement le script bash; marqueur 1er lancement aligné sur registre engine scripts/.vibeflow-installed
 - [Phase 06]: Garde-fou first-use placé avant la table de routage (point de décision router-vs-proposer)
 - [Phase 06]: Séquence d'init non dupliquée : délégation au skill vf-init existant
+- [Phase ?]: 19-02: capture de l'état legacy avant toute garde de ensure_gsd() (D-08.3), preuve directe par T2k
+- [Phase ?]: 19-02: npm_pkg_installed_globally() est le seul appel npm réellement exécuté (lecture seule), --verify d'inject-mcp-tools.sh ne rejoue jamais --force
 
 ### Pending Todos
 
@@ -430,10 +437,10 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-**Resume file:** None — Plan 19-01 terminé ; enchaîner sur 19-02/19-03-PLAN.md.
+**Resume file:** None
 
-Last session: 2026-07-28T12:08:33.000Z
-Stopped at: Phase 19 Plan 01 exécuté (check-gsd-engine.sh + test-check-gsd-engine.sh, 15/15 cas verts macOS+Linux)
+Last session: 2026-07-28T12:21:05.399Z
+Stopped at: Completed VFDO-19-02-PLAN.md
 ubuntu:24.04) — 3 jobs verts au run 30257419335. Modules bumpés : conductor v1.14.5,
 consolidator v1.8.1, dev-orchestrator v2.3.2. Leçon durable : tout bash développé sur macOS/BSD
 doit être reproduit sous `docker run ubuntu:24.04` avant push (stat/-f, TMPDIR, outillage hôte).
