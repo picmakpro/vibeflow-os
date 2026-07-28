@@ -374,7 +374,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 ✅ (R&D, shippée v2.28.0)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 ✅ (code complet, release en attente de validation humaine)** ; **14 ✅ (indépendante)** ; **15 ✅ (shippée v2.40.0) → 16 ✅ (shippée v2.41.0)** ; **17, 18 inscrites (indépendantes de 16)**
+1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 ✅ (R&D, shippée v2.28.0)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 ✅ (code complet, release en attente de validation humaine)** ; **14 ✅ (indépendante)** ; **15 ✅ (shippée v2.40.0) → 16 ✅ (shippée v2.41.0)** ; **17 ✅ (indépendante de 16, terminée et vérifiée — release en attente de validation humaine) → 18 inscrite (dépend de 17)**
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -394,6 +394,7 @@ Plans:
 | 14. Frontière d'altitude planning-core / GSD | vf-routing | 7/7 | Complete — release `v2.30.0` (ADR-055) | 2026-07-25 |
 | 15. Collaboration inter-équipes dev ↔ design | — | 7/7 | Complete — release `v2.40.0` (5/5 critères), 2 points escaladés → Phase 16 | 2026-07-27 |
 | 16. Cloisonnement complet des dispatches | — | 8/8 | Complete — release `v2.41.0` (4/4 critères, SC3 amendé : contrat + lint, pas sandbox runtime) | 2026-07-27 |
+| 17. Signaux de démarrage du moteur de dev | — | 3/3 | Complete — module v2.6.0, SC5/SC6 vérifiés par exécution, release racine en attente de validation humaine | 2026-07-28 |
 
 ### Phase 15: Collaboration inter-équipes dev ↔ design
 
@@ -545,20 +546,47 @@ run macOS seul)
   6. Les hooks sont câblés par l'engine sans le modifier (`merge_module_hooks` gère déjà le
      fragment), `check-agents.sh` passe après modification d'`AGENT.md`, et les tests des trois
      scripts passent sous `bash` macOS **et** Linux (portabilité CI — régression du 2026-07-27).
-**Plans:** 3 plans
+**Plans:** 3 plans (3 vagues) — ✅ complétés. Livré : `check-dev-bootstrap.sh`, `check-doc-drift.sh`,
+`discover-unintegrated-docs.sh --hook`, `hooks/hooks.json`, section *Signaux de démarrage* dans
+`AGENT.md`, 2 nouvelles suites de tests. Module `dev-orchestrator` **v2.6.0** (collision de version
+avec la Phase 16 concurrente, qui avait déjà pris v2.5.0 — cible ajustée v2.5.0 → v2.6.0, commit
+`5a8b6a8`).
+
+**SC5 (advisory / lecture seule) — CONFORME**, prouvé par exécution : seul `mktemp` du module
+(`discover-unintegrated-docs.sh:91-93`) apparié à un `trap ... EXIT`, borné à `$TMPDIR` ; aucun
+`exit 1` (seuls 0/3/64, `set -uo pipefail` sans `set -e`) ; aucun blocage de tour (`hooks.json` =
+un seul groupe `SessionStart`, chaque commande suffixée `|| true`) ; 5 fixtures de frontmatter
+hostiles (injection shell, octet de contrôle 0x01, délimiteur tronqué, `$(whoami)`) → stdout vide et
+exit 3 dans les 5 cas ; `node_modules` 20 000 fichiers → 0.007s (élagage `-prune` confirmé).
+
+**SC6 (portabilité macOS ET Linux) — PROUVÉ** : compteurs identiques sur macOS bash 3.2.57, Debian 12
+bash 5.2.15, Ubuntu 24.04 bash 5.2.21 (OS exact de `runs-on: ubuntu-latest`) — `test-check-dev-bootstrap.sh`
+23 ok/0 ko · `test-check-doc-drift.sh` 21 ok/0 ko · `test-discover-unintegrated-docs.sh` 22 ok/0 ko.
+Aucun test sauté silencieusement, aucun edit de `ci.yml` nécessaire.
+
+**Comblement post-exécution** (commit `6e33b14`, après fusion des verdicts gate portabilité + audit
+advisory) : cas 7 de `test-discover-unintegrated-docs.sh` rendu discriminant (tautologique — vert
+avec ou sans le filtre glob, prouvé par mutation) ; boucle T21 de `test-dev-orchestrator.sh` élargie
+à `discover-unintegrated-docs.sh`, seul des 3 scripts à utiliser `mktemp`.
+
+**Reste-à-faire assumé** : la **release racine + tag** est hors du mandat de la mission — réservée à
+validation humaine. Pré-requis identifié : `scripts/check-version-sync.sh` est rouge (README/README.fr
+annoncent « 39 suites » contre 41 réelles). Deux dettes constatées et inscrites à `CONCERNS.md` (non
+corrigées, hors mandat de clôture) : le verrou de driver est déclaratif et non contraignant ; le gate
+ADR-044 est un faux vert dans son invocation nue prescrite par la spec.
 
 Plans:
 **Wave 1**
 
-- [ ] 17-01-PLAN.md — Tranche traçante : `check-dev-bootstrap.sh` (continuum à 4 états) + fragment `hooks/hooks.json`, prouvé de bout en bout sur ce dépôt (vague 1)
+- [x] 17-01-PLAN.md — Tranche traçante : `check-dev-bootstrap.sh` (continuum à 4 états) + fragment `hooks/hooks.json`, prouvé de bout en bout sur ce dépôt (vague 1)
 
-**Wave 2** *(blocked on Wave 1 completion)*
+**Wave 2**
 
-- [ ] 17-02-PLAN.md — Expansion : `check-doc-drift.sh` (seuil réglable, silence hors git) + `discover-unintegrated-docs.sh --hook` strictement additif (vague 2)
+- [x] 17-02-PLAN.md — Expansion : `check-doc-drift.sh` (seuil réglable, silence hors git) + `discover-unintegrated-docs.sh --hook` strictement additif (vague 2)
 
-**Wave 3** *(blocked on Wave 2 completion)*
+**Wave 3**
 
-- [ ] 17-03-PLAN.md — Doctrine `AGENT.md`, gates T20/T21 falsifiables (ADR-044, SC5), preuve de portabilité Linux en conteneur, module `v2.5.0` (vague 3)
+- [x] 17-03-PLAN.md — Doctrine `AGENT.md`, gates T20/T21 falsifiables (ADR-044, SC5), preuve de portabilité Linux en conteneur, module `v2.6.0` (vague 3)
 
 ### Phase 18: Capability living-specs (conventions OpenSpec)
 

@@ -1,0 +1,48 @@
+{
+  "nodes": [
+    {
+      "id": "n1",
+      "step": "Cadrage + PLAN (fait: 3 plans, SC1 amendé)",
+      "stage": "plan",
+      "deps": [],
+      "status": "done"
+    },
+    {
+      "id": "n2",
+      "step": "Exécution: 3 scripts + hooks.json + AGENT.md + triade version v2.6.0",
+      "stage": "execute",
+      "deps": [
+        "n1"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "n3",
+      "step": "Gate portabilité Linux empirique (Docker + CI) + suites",
+      "stage": "test",
+      "deps": [
+        "n2"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "n4",
+      "step": "Audit contrat advisory/read-only (SC5, ADR-031)",
+      "stage": "audit",
+      "deps": [
+        "n2"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "n5",
+      "step": "Hygiène doc + clôture étape",
+      "stage": "close",
+      "deps": [
+        "n3",
+        "n4"
+      ],
+      "status": "running"
+    }
+  ]
+}

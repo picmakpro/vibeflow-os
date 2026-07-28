@@ -101,6 +101,38 @@ capturées au backlog — voir Tech Debt.
 - Current mitigation: source contrôlée (cache = contenu du repo publié).
 - Recommendations: garde ceinture-bretelles excluant `*.env*` / `*secret*` des copies.
 
+**Le verrou de driver est déclaratif, pas contraignant** — Sévérité : **HIGH**
+- Risk: `driver-lock.sh` n'empêche techniquement rien : aucun hook ni garde en écriture ne refuse un
+  commit à une session sans verrou. Constaté le 2026-07-27 : le lock de `mission-phase16` a été élagué
+  par TTL, `mission-phase17` l'a acquis, et la Phase 16 a **continué à commiter** pendant que la
+  Phase 17 tenait le verrou — horodatages entrelacés 22:37 P16 · 22:38 P17 · 22:42 P16 · 22:46 P16 ·
+  22:48 P17 · 22:50 P16. Conséquence concrète : collision de version, la Phase 17 ayant planifié le
+  `v2.5.0` que la Phase 16 venait de prendre (résolu en `v2.6.0`, commit `5a8b6a8`). Deux drivers
+  concurrents sur le même `.planning/` peuvent écraser silencieusement les arbitrages l'un de l'autre.
+- Files: `plugin/conductor/scripts/driver-lock.sh`
+- Current mitigation: aucune — le lock est un fichier de coordination consulté par convention, pas un
+  garde-fou machine ; le TTL réduit la fenêtre d'expiration mais ne l'élimine pas.
+- Recommendations: instrumenter un hook d'écriture (`PreToolUse` sur `Write`/`Edit` de `.planning/`)
+  qui refuse si le lock actif n'appartient pas à la session courante ; ou heartbeat pendant l'attente
+  d'un worker pour empêcher l'expiration TTL en cours de mission (déjà tracé dans `STATE.md` §Phase 16).
+
+**Le gate ADR-044 est un faux vert dans son invocation nue** — Sévérité : **MEDIUM**
+- Risk: `bash plugin/conductor/scripts/check-agents.sh` **sans argument** sort **exit 0** avec
+  « aucun agent dans .claude/agents — rien a verifier », car `.claude/agents` est absent de ce repo.
+  Or c'est cette invocation que prescrivent les critères d'acceptation (spec Phase 17 §7.6) — elle ne
+  prouve RIEN. De plus, `plugin/dev-orchestrator/AGENT.md` (`name: vibeflow-dev`) est à la racine du
+  module, donc hors de la boucle CI sur `plugin/*/agents` : il n'est atteint que par
+  `check-agents.sh --file`. Invocation réelle qui prouve quelque chose :
+  `bash plugin/conductor/scripts/check-agents.sh --file plugin/dev-orchestrator/AGENT.md` (exit 0,
+  3 warnings préexistants : name ≠ nom de fichier, aucun skill câblé, `tools:` absent). Tout critère
+  d'acceptation futur rédigé sur l'invocation nue est satisfait à la lettre et vide sur le fond.
+- Files: `plugin/conductor/scripts/check-agents.sh`, `.github/workflows/ci.yml`
+- Current mitigation: aucune — constaté le 2026-07-27, non corrigé (hors mandat de clôture Phase 17).
+- Recommendations: toute future spec/critère d'acceptation qui cite `check-agents.sh` sans argument
+  sur ce repo doit être remplacée par l'invocation `--file` explicite du (des) `AGENT.md` racine de
+  module ; ou faire pointer l'invocation nue sur les emplacements réels des `AGENT.md` du repo plutôt
+  que sur `.claude/agents` (répertoire d'un lab qui a *installé* le plugin, pas de ce repo lui-même).
+
 ## Performance Bottlenecks
 
 Rien de bloquant identifié à l'échelle actuelle (registres de labs de quelques centaines

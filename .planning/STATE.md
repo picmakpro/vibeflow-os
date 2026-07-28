@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
-current_phase: 16
-current_phase_name: Cloisonnement complet des dispatches d'agents — shippée `v2.41.0`
-status: shipped
-stopped_at: Phase 16 shipped (v2.41.0 taggée + release GitHub) — Phases 17 et 18 inscrites, non démarrées
-last_updated: "2026-07-27T22:30:00.000Z"
-last_activity: 2026-07-27 (mission d'équipe Phase 16 + release v2.41.0)
+current_phase: 17
+current_phase_name: Signaux de démarrage du moteur de dev — terminée et vérifiée, release racine en attente
+status: awaiting-release
+stopped_at: Phase 17 terminée (n1-n4 du DAG de mission : cadrage+plan, exécution, gate portabilité, audit advisory/read-only) et clôturée (n5) — SC5 et SC6 CONFORMES/PROUVÉS par exécution, module dev-orchestrator v2.6.0. Aucune release racine faite (VERSION reste 2.41.0) — réservée à validation humaine. Phase 18 inscrite, non démarrée.
+last_updated: "2026-07-28T00:00:00.000Z"
+last_activity: 2026-07-28 (clôture Phase 17 — hygiène documentaire, nœud n5 du DAG de mission)
 progress:
   total_phases: 18
-  completed_phases: 9
-  total_plans: 47
-  completed_plans: 31
+  completed_phases: 10
+  total_plans: 50
+  completed_plans: 34
 ---
 
 # Project State
@@ -22,13 +22,62 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26 — charte rouverte : 17 modules, D2/D6 renversées)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Phase 16 **SHIPPÉE `v2.41.0`** (2026-07-27) — les allowlists `Agent(...)` sont
-enfin lintées, les 3 workers dev scopés, deux dettes fermées. Plus aucun milestone ouvert. Chantiers
-inscrits : **Phases 17 et 18** (signaux de démarrage du moteur de dev ; capability living-specs).
+**Current focus:** Phase 17 **terminée et vérifiée, NON shippée** (2026-07-28) — signaux de démarrage
+du moteur de dev (`check-dev-bootstrap.sh`, `check-doc-drift.sh`, `discover-unintegrated-docs.sh --hook`,
+hooks `SessionStart`), module `dev-orchestrator` v2.6.0. SC5 (advisory/lecture seule) et SC6
+(portabilité macOS+Linux) prouvés par exécution, pas par lecture. Plus aucun milestone ouvert. Release
+de clôture réservée à validation humaine (`README`/`README.fr.md` annoncent 39 suites contre 41 réelles
+— `check-version-sync.sh` rouge, à régler en préparation de release). Phase 18 inscrite, non démarrée.
 Autres candidats : sortie d'expérimental de `mobile-test`(-team), dette backlog (known-versions.txt,
 brick_routed).
 
 ## Current Position
+
+Phase: 17 **complète — vérifiée, release racine en attente** (VERSION racine intouchée : 2.41.0)
+Signaux de démarrage du moteur de dev. Livrée en mission d'équipe (DAG à 5 nœuds : n1 cadrage+plan ·
+n2 exécution · n3 gate portabilité · n4 audit advisory/read-only · un `reopen` unique après fusion des
+deux juges · n5 clôture, `.planning/missions/dag-phase17.json`). Livré : `check-dev-bootstrap.sh`
+(continuum à 4 états), `check-doc-drift.sh`, `discover-unintegrated-docs.sh --hook`,
+`hooks/hooks.json`, section *Signaux de démarrage* dans `AGENT.md`, 2 nouvelles suites de tests.
+Module `dev-orchestrator` **v2.6.0** (collision de version résolue : la Phase 16 concurrente avait
+déjà pris v2.5.0, cible ajustée à v2.6.0 — commit `5a8b6a8`).
+Status: Terminée et vérifiée, non shippée.
+Last activity: 2026-07-28 (clôture Phase 17)
+
+**SC5 (advisory / lecture seule) — CONFORME.** Prouvé par exécution, pas par lecture : lecture seule
+OUI (seul `mktemp` de `discover-unintegrated-docs.sh:91-93`, apparié au `trap ... EXIT` ligne 94, borné
+à `$TMPDIR`) · aucun `exit 1` OUI (seuls 0/3/64 ; `set -uo pipefail`, pas de `set -e`) · aucun blocage
+de tour OUI (`hooks.json` = un seul groupe `SessionStart`, 3 commandes chacune suffixée `|| true`,
+aucun `Stop`/`PreToolUse`). Robustesse : 5 fixtures de frontmatter hostiles (injection shell, octet de
+contrôle 0x01, délimiteur tronqué, `$(whoami)`) → stdout VIDE et exit 3 dans les 5 cas ; `node_modules`
+de 20 000 fichiers → 0.007s (élagage `-prune` confirmé) ; hors dépôt git sur chemin à espace/UTF-8 →
+silence propre. Toutes les menaces `high` du threat model closes.
+
+**SC6 (portabilité macOS ET Linux) — PROUVÉ.** Compteurs **identiques** sur trois environnements :
+macOS bash 3.2.57, Debian 12 bash 5.2.15, Ubuntu 24.04 bash 5.2.21 (OS exact de
+`runs-on: ubuntu-latest`) → `test-check-dev-bootstrap.sh` 23 ok/0 ko · `test-check-doc-drift.sh` 21
+ok/0 ko · `test-discover-unintegrated-docs.sh` 22 ok/0 ko. Aucun test sauté silencieusement. Zéro
+piège BSD/GNU trouvé. Aucun edit de `ci.yml` nécessaire.
+
+**Comblement post-exécution** (commit `6e33b14`, après fusion des verdicts n3/n4) : cas 7 de
+`test-discover-unintegrated-docs.sh` rendu discriminant (il était tautologique : vert avec ou sans le
+filtre glob — prouvé par mutation, 21 ok/1 ko après retrait du filtre) ; boucle T21 de
+`test-dev-orchestrator.sh` élargie à `discover-unintegrated-docs.sh`, seul des 3 scripts à utiliser
+`mktemp`.
+
+**Deux dettes inscrites à `CONCERNS.md`** (constatées pendant la mission, pas corrigées — hors
+mandat de clôture) : le verrou de driver n'empêche techniquement rien (déclaratif, pas contraignant —
+la Phase 16 a continué à commiter pendant que la Phase 17 tenait le verrou) ; le gate ADR-044 est un
+faux vert dans son invocation nue prescrite par la spec (`check-agents.sh` sans argument sort exit 0
+sans rien vérifier, `.claude/agents` étant absent de ce repo).
+
+**Réservé à validation humaine** : release de clôture (bump `VERSION`/`plugin.json`/`marketplace.json`
++ historique des 2 README, tag annoté poussé, release GitHub, `check-release-tag.sh --remote` → ✓).
+Pré-requis identifié : `scripts/check-version-sync.sh` est actuellement **rouge** — `README.md` et
+`README.fr.md` annoncent « 39 suites » contre 41 réelles (les 2 suites ajoutées par cette phase), à
+corriger avant tout bump.
+
+---
 
 Phase: 16 **complète — shippée `v2.41.0`** (tag annoté + release GitHub, `check-release-tag --remote` ✓)
 Cloisonnement complet des dispatches. Livrée en mission d'équipe le 2026-07-27, en autonomie complète
