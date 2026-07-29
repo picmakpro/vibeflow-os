@@ -15,7 +15,7 @@ affects: [VFDO-20-plan-06, VFDO-20-plan-07]
 tech-stack:
   added: []
   patterns:
-    - "Gate advisory répliqué en STRUCTURE (pas en heuristique) depuis check-doc-drift.sh : lecture seule, git_safe() unique, exits 0/3/64, distinction FAIT vs JUGEMENT"
+    - "Gate advisory répliqué en STRUCTURE (pas en heuristique) depuis check-doc-drift.sh : lecture seule, git_safe() unique, exits 0/3/4/64 (3=SAIN vérifié conforme, 4=INDÉTERMINÉ rien vérifié — correctif de revue post-exécution), distinction FAIT vs JUGEMENT"
     - "Section '## ' comme frontière de parsing : le script s'arrête à la 2e entête, les sections suivantes du fichier d'invariants ne sont jamais lues"
 
 key-files:
@@ -72,8 +72,8 @@ status: complete
 - **Files created:** 3
 
 ## Accomplishments
-- Gate advisory en lecture seule qui confronte chaque glob de la 1re section de `MISSION-INVARIANTS.md` à l'index git (`git ls-files --`) et signale, sans jamais juger ni écrire, tout glob qui ne matche plus aucun fichier suivi — contrat 0 (signal)/3 (rien à signaler)/64 (usage invalide).
-- Suite dédiée à 15 cas (les 3 codes de sortie, absence de jugement, durcissement git, lecture seule par empreinte, 2e section jamais lue, `--help`/`--hook`).
+- Gate advisory en lecture seule qui confronte chaque glob de la 1re section de `MISSION-INVARIANTS.md` à l'index git (`git ls-files --`) et signale, sans jamais juger ni écrire, tout glob qui ne matche plus aucun fichier suivi — contrat à quatre codes : 0 (signal émis) / 3 (SAIN — vérifié, conforme) / 4 (INDÉTERMINÉ — rien n'a été vérifié : fichier absent, hors dépôt git, ou §1 sans glob) / 64 (usage invalide). Correctif de revue post-exécution : avant ce correctif, les quatre situations fichier-absent / hors-git / §1-sans-glob / tous-globs-vivants tombaient dans le même code 3, rendant indistinguable « vérifié, conforme » de « rien à vérifier ».
+- Suite dédiée à 15 cas (les 4 codes de sortie, absence de jugement, durcissement git, lecture seule par empreinte, 2e section jamais lue, `--help`/`--hook`).
 - `.planning/MISSION-INVARIANTS.md` créé : zones de risque réelles de ce dépôt (gates partagés, fragments de hooks, kernel de mission, agents managers), table des fichiers gelés dérivée à la demande via `dag.sh status --file=...` (jamais recopiée), et la 3e section (contrainte XcodeBuildMCP) explicitement étiquetée non gatée.
 - Discriminance du gate prouvée par mutation manuelle du test de compte nul (2 puis 3 échecs induits, restauration à 0).
 - Revue `vf-reviewer` : **PASS**, aucun correctif bloquant.
