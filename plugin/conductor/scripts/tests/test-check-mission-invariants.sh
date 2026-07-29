@@ -69,20 +69,20 @@ else
   ko "1 glob mort détecté (parmi un glob vivant) → signal nommant CE glob et lui seul, exit 0" "rc=$rc out=[$out]"
 fi
 
-# === Cas 2 — tous les globs vivants → stdout vide, exit 3 ==========================================
+# === Cas 2 — tous les globs vivants (SAIN, regardé et conforme) → stdout vide, exit 3 ===============
 D="$(mk_git_root c2)"
 commit_file "$D" "plugin/foo/bar.sh" "x"
 commit_file "$D" "plugin/baz/qux.sh" "x"
 write_invariants "$D" "- \`plugin/foo/*.sh\`     # vivant
 - \`plugin/baz/*.sh\`     # vivant aussi"
 out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
-if [ "$rc" -eq 3 ] && [ -z "$out" ]; then ok "2 tous les globs vivants → stdout vide, exit 3"; else ko "2 tous les globs vivants → stdout vide, exit 3" "rc=$rc out=[$out]"; fi
+if [ "$rc" -eq 3 ] && [ -z "$out" ]; then ok "2 tous les globs vivants (SAIN) → stdout vide, exit 3"; else ko "2 tous les globs vivants (SAIN) → stdout vide, exit 3" "rc=$rc out=[$out]"; fi
 
-# === Cas 3 — fichier absent au chemin par défaut → stdout vide, exit 3, aucun message stdout ========
+# === Cas 3 — fichier absent au chemin par défaut (INDÉTERMINÉ, rien à vérifier) → stdout vide, exit 4
 D="$(mk_git_root c3)"
 commit_file "$D" "plugin/foo/bar.sh" "x"
 out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
-if [ "$rc" -eq 3 ] && [ -z "$out" ]; then ok "3 fichier absent au chemin par défaut → stdout vide, exit 3"; else ko "3 fichier absent au chemin par défaut → stdout vide, exit 3" "rc=$rc out=[$out]"; fi
+if [ "$rc" -eq 4 ] && [ -z "$out" ]; then ok "3 fichier absent au chemin par défaut (INDÉTERMINÉ) → stdout vide, exit 4"; else ko "3 fichier absent au chemin par défaut (INDÉTERMINÉ) → stdout vide, exit 4" "rc=$rc out=[$out]"; fi
 
 # === Cas 4 — fichier explicitement désigné et inexistant → stderr non vide, exit 64 =================
 D="$(mk_git_root c4)"
@@ -91,19 +91,39 @@ out="$(bash "$SCRIPT" --path "$D" --file nope.md 2>"$errfile")"; rc=$?
 err="$(cat "$errfile")"
 if [ "$rc" -eq 64 ] && [ -z "$out" ] && [ -n "$err" ]; then ok "4 --file explicite inexistant → exit 64, stdout vide, stderr non vide"; else ko "4 --file explicite inexistant → exit 64, stdout vide, stderr non vide" "rc=$rc out=[$out] err=[$err]"; fi
 
-# === Cas 5 — première section sans aucun glob → stdout vide, exit 3, diagnostic stderr ==============
+# === Cas 5 — première section sans aucun glob (INDÉTERMINÉ, rien à vérifier) → stdout vide, exit 4,
+# diagnostic stderr. C'est LE cas discriminant de ce correctif (finding : indistinguable du cas SAIN
+# tant que les deux rendaient 3) — cf. cas 5b pour la preuve de discrimination directe.
 D="$(mk_git_root c5)"
 write_invariants "$D" "Rien que de la prose ici, aucune entrée de liste."
 errfile="$TMP/c5.err"
 out="$(bash "$SCRIPT" --path "$D" 2>"$errfile")"; rc=$?
 err="$(cat "$errfile")"
-if [ "$rc" -eq 3 ] && [ -z "$out" ] && [ -n "$err" ]; then ok "5 aucun glob trouvé → stdout vide, exit 3, diagnostic stderr"; else ko "5 aucun glob trouvé → stdout vide, exit 3, diagnostic stderr" "rc=$rc out=[$out] err=[$err]"; fi
+if [ "$rc" -eq 4 ] && [ -z "$out" ] && [ -n "$err" ]; then ok "5 aucun glob trouvé (INDÉTERMINÉ) → stdout vide, exit 4, diagnostic stderr"; else ko "5 aucun glob trouvé (INDÉTERMINÉ) → stdout vide, exit 4, diagnostic stderr" "rc=$rc out=[$out] err=[$err]"; fi
 
-# === Cas 6 — hors d'un arbre de travail git → stdout vide, exit 3, aucun message stdout ==============
+# === Cas 5b — DISCRIMINATION MACHINE (SC5, finding du plan 20-05) : le même fichier d'invariants,
+# une fois §1 vidée de ses globs, doit rendre un code de sortie DIFFÉRENT du cas sain (cas 2/case
+# "tous vivants") — jamais le même 3 pour "rien à regarder" et pour "regardé, conforme". C'est le
+# cas RED→GREEN de ce correctif : rc_sain == rc_sans_glob avant le fix (les deux valaient 3),
+# rc_sain != rc_sans_glob après.
+D="$(mk_git_root c5b)"
+commit_file "$D" "plugin/foo/bar.sh" "x"
+write_invariants "$D" "- \`plugin/foo/*.sh\`     # vivant"
+rc_sain=$(bash "$SCRIPT" --path "$D" >/dev/null 2>&1; echo $?)
+D2="$(mk_git_root c5b-vide)"
+write_invariants "$D2" "Rien que de la prose ici, aucune entrée de liste."
+rc_sans_glob=$(bash "$SCRIPT" --path "$D2" >/dev/null 2>&1; echo $?)
+if [ "$rc_sain" -ne "$rc_sans_glob" ]; then
+  ok "5b discrimination machine — rc(sain)=$rc_sain != rc(§1 vidée)=$rc_sans_glob"
+else
+  ko "5b discrimination machine — rc(sain)=$rc_sain != rc(§1 vidée)=$rc_sans_glob" "les deux codes sont identiques : indistinguable par machine"
+fi
+
+# === Cas 6 — hors d'un arbre de travail git (INDÉTERMINÉ, rien à vérifier) → stdout vide, exit 4 =====
 D="$TMP/not-a-repo"; mkdir -p "$D/.planning"
 printf '# x\n\n## Zones de risque\n\n- `plugin/foo/*.sh`\n' > "$D/.planning/MISSION-INVARIANTS.md"
 out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
-if [ "$rc" -eq 3 ] && [ -z "$out" ]; then ok "6 hors d'un arbre de travail git → stdout vide, exit 3"; else ko "6 hors d'un arbre de travail git → stdout vide, exit 3" "rc=$rc out=[$out]"; fi
+if [ "$rc" -eq 4 ] && [ -z "$out" ]; then ok "6 hors d'un arbre de travail git (INDÉTERMINÉ) → stdout vide, exit 4"; else ko "6 hors d'un arbre de travail git (INDÉTERMINÉ) → stdout vide, exit 4" "rc=$rc out=[$out]"; fi
 
 # === Cas 7 — argument inconnu → exit 64 ==============================================================
 bash "$SCRIPT" --nope >/dev/null 2>&1; rc=$?

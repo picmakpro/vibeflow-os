@@ -19,11 +19,26 @@
 # parcours du système de fichiers — pour ne jamais compter un fichier ignoré ou un artefact de
 # build comme preuve de vie d'une zone de risque. Un compte nul est une zone morte.
 #
-# Contrat de sortie :
+# Contrat de sortie (révisé — correctif de revue, plan 20-05, D-15 §condition falsifiable) :
+#
+#   AVANT ce correctif, quatre situations distinctes tombaient dans le même code 3 : fichier absent,
+#   hors dépôt git, aucun glob trouvé dans la §1, et tous les globs vivants — un consommateur
+#   automatique ne pouvait pas distinguer « le gate a regardé et tout va bien » de « le gate n'avait
+#   rien à regarder ». Le cas le plus grave (§1 vidée de ses globs, l'invariant périmé le plus
+#   silencieux) était indistinguable du cas le plus sain (tous les globs vivants). Corrigé en
+#   séparant le code en un état SAIN et un état INDÉTERMINÉ distincts — précédent suivi :
+#   check-gsd-engine.sh (Phase 19), où exit 3 ≠ silence et où un état « rien de garanti » ne se
+#   confond jamais avec un état « vérifié, conforme ».
+#
 #   0  = au moins une zone morte détectée — signal [mission-invariants] émis, une ligne par zone,
 #        citant le glob VERBATIM (pour que le lecteur le retrouve dans le fichier).
-#   3  = rien à signaler : fichier absent au chemin par défaut, hors dépôt git, aucun glob trouvé
-#        dans la première section, ou tous les globs matchent encore au moins un fichier suivi.
+#   3  = SAIN — le fichier a été LU et la première section contenait au moins un glob : tous les
+#        globs matchent encore au moins un fichier suivi. C'est le SEUL code qui signifie
+#        « vérifié, conforme ».
+#   4  = INDÉTERMINÉ — rien n'a été vérifié, pour l'une de ces trois raisons (diagnostic sur stderr,
+#        sauf --quiet, précisant laquelle) : fichier absent au chemin par défaut ; racine hors d'un
+#        dépôt git ; ou première section du fichier sans aucun glob. Un exit 4 n'autorise JAMAIS à
+#        conclure que les zones de risque sont à jour — seul un exit 3 le dit.
 #   64 = argument inconnu, --path/--file sans valeur, --hook + --quiet ensemble, ou fichier
 #        EXPLICITEMENT désigné par --file et illisible.
 #
@@ -98,14 +113,14 @@ if [ ! -r "$FILE_PATH" ]; then
     echo "[check-mission-invariants] fichier introuvable ou illisible : $FILE_PATH" >&2
     exit 64
   fi
-  say "$FILE_PATH absent (chemin par défaut) — rien à constater."
-  exit 3
+  say "$FILE_PATH absent (chemin par défaut) — INDÉTERMINÉ, rien n'a été vérifié."
+  exit 4
 fi
 
 # --- Silence hors dépôt git ------------------------------------------------------------------------
 if ! git_safe rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  say "$ROOT hors d'un arbre de travail git — rien à constater."
-  exit 3
+  say "$ROOT hors d'un arbre de travail git — INDÉTERMINÉ, rien n'a été vérifié."
+  exit 4
 fi
 
 # --- Extraction de la PREMIÈRE section « ## » du fichier, et elle seule ---------------------------
@@ -125,8 +140,8 @@ extract_globs() { # écrit un glob par ligne sur stdout, jamais de tableau bash 
 GLOBS="$(extract_globs)"
 
 if [ -z "$GLOBS" ]; then
-  say "aucun glob trouvé dans la première section de $FILE_PATH — rien à constater."
-  exit 3
+  say "aucun glob trouvé dans la première section de $FILE_PATH — INDÉTERMINÉ, rien n'a été vérifié."
+  exit 4
 fi
 
 # --- Détection : pour chaque glob, l'index git le connaît-il encore ? ------------------------------
@@ -143,7 +158,7 @@ $GLOBS
 EOF
 
 if [ -z "$DEAD" ]; then
-  say "tous les globs de $FILE_PATH matchent encore au moins un fichier suivi — rien à constater."
+  say "SAIN — tous les globs de $FILE_PATH matchent encore au moins un fichier suivi."
   exit 3
 fi
 
