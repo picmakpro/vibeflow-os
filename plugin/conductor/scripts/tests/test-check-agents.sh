@@ -1027,6 +1027,137 @@ rm -rf "$DEFAULT_PRESENT"
 # T58 — le cwd de la suite est inchange : les 3 deplacements ci-dessus sont confines a des sous-shells
 [ "$(pwd)" = "$PWD_BEFORE" ] && ok "T58 cwd de la suite inchange apres les cas chemin par defaut" || ko "T58 cwd altere : $(pwd) != $PWD_BEFORE"
 
+# ---------- D-18/D-19 (perimetre hooks.json, hors perimetre de CE script) + D-21/D-22/D-05 ----------
+
+# T59 — hook, 0 erreur 0 avertissement → silence total (regime nominal inchange)
+cat > "$AG/silencieux.md" <<'EOF'
+---
+name: silencieux
+description: Agent de test entierement conforme, aucun avertissement attendu ici.
+model: sonnet
+memory: project
+tools: Read
+skills:
+  - petit-skill
+---
+corps
+EOF
+OUT="$(run_check --hook 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && [ -z "$OUT" ]; then
+  ok "T59 hook, 0 erreur 0 avertissement → silence total (D-21)"
+else
+  ko "T59 (rc=$RC) : '$OUT'"
+fi
+rm -f "$AG/silencieux.md"
+
+# T60 — hook, 0 erreur >= 1 avertissement → ligne compacte avec compte + invocation explicite
+cat > "$AG/avec-warning.md" <<'EOF'
+---
+name: avec-warning
+description: Agent de test avec un champ inconnu, pour verifier le resume hook (D-21).
+modle: sonnet
+model: sonnet
+memory: project
+tools: Read
+---
+corps
+EOF
+OUT="$(run_check --hook 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -qE "avertissement" && echo "$OUT" | grep -q "bash .claude/scripts/check-agents.sh"; then
+  ok "T60 hook, 0 erreur >=1 avertissement → ligne compacte compte + renvoi vers l'invocation explicite (D-21)"
+else
+  ko "T60 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/avec-warning.md"
+
+# T61 — hook, >=1 erreur → sortie inchangee (les erreurs priment, aucun resume d'avertissements mele)
+printf 'sans frontmatter\n' > "$AG/casse2.md"
+OUT="$(run_check --hook 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "non conforme" && ! echo "$OUT" | grep -q "avertissement"; then
+  ok "T61 hook, >=1 erreur → sortie inchangee, pas de resume avertissements mele (D-21)"
+else
+  ko "T61 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/casse2.md"
+
+# T62-T66 — charset d'un token MCP a joker TERMINAL (D-22)
+mk_mcp_agent() { # $1 nom fichier, $2 valeur additionnelle de tools
+  cat > "$AG/$1.md" <<EOF
+---
+name: $1
+description: Agent de test MCP pour verifier le charset du joker terminal (D-22).
+model: sonnet
+memory: project
+tools: Read, $2
+---
+corps
+EOF
+}
+
+mk_mcp_agent "mcp-ok1" "mcp__XcodeBuildMCP__*"
+RC=0; run_check --strict >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] && ok "T62 tools: mcp__XcodeBuildMCP__* (joker terminal) → accepte (D-22)" || ko "T62 (rc=$RC)"
+rm -f "$AG/mcp-ok1.md"
+
+mk_mcp_agent "mcp-ok2" "mcp__XcodeBuildMCP__test_sim"
+RC=0; run_check --strict >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] && ok "T63 tools: mcp__XcodeBuildMCP__test_sim (deja accepte avant D-22) → non-regression" || ko "T63 (rc=$RC)"
+rm -f "$AG/mcp-ok2.md"
+
+mk_mcp_agent "mcp-bad1" "mcp__*"
+RC=0; run_check >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 1 ] && ok "T64 tools: mcp__* (joker seul, sans serveur) → rejete (D-22)" || ko "T64 (rc=$RC)"
+rm -f "$AG/mcp-bad1.md"
+
+mk_mcp_agent "mcp-bad2" "mcp__XcodeBuildMCP__*_sim"
+RC=0; run_check >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 1 ] && ok "T65 tools: mcp__XcodeBuildMCP__*_sim (joker NON terminal) → rejete (D-22)" || ko "T65 (rc=$RC)"
+rm -f "$AG/mcp-bad2.md"
+
+mk_mcp_agent "mcp-bad3" "mcp__Xcode*MCP__*"
+RC=0; run_check >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 1 ] && ok "T66 tools: mcp__Xcode*MCP__* (joker dans le nom de serveur) → rejete (D-22)" || ko "T66 (rc=$RC)"
+rm -f "$AG/mcp-bad3.md"
+
+# T67-T68 — la clef de frontmatter vf-mcp-tools devient connue du gate (D-05)
+cat > "$AG/mcp-tools-ok.md" <<'EOF'
+---
+name: mcp-tools-ok
+description: Agent de test declarant vf-mcp-tools, pour verifier que la clef est connue (D-05).
+model: sonnet
+memory: project
+tools: Read
+vf-mcp-tools: XcodeBuildMCP:test_sim,build_sim,clean
+---
+corps
+EOF
+OUT="$(run_check --strict 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "champ inconnu du runtime — vf-mcp-tools"; then
+  ok "T67 vf-mcp-tools (clef exacte) → aucun avertissement de champ inconnu, --strict exit 0 (D-05)"
+else
+  ko "T67 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/mcp-tools-ok.md"
+
+cat > "$AG/mcp-tools-typo.md" <<'EOF'
+---
+name: mcp-tools-typo
+description: Agent de test avec une typo de vf-mcp-tools, pour verifier que le gate reste actif.
+model: sonnet
+memory: project
+tools: Read
+vf-mcp-tool: XcodeBuildMCP:test_sim
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "champ inconnu du runtime — vf-mcp-tool"; then
+  ok "T68 typo de vf-mcp-tools ('vf-mcp-tool') → avertissement de champ inconnu toujours declenche"
+else
+  ko "T68 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/mcp-tools-typo.md"
+
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
 [ "$fail" -eq 0 ]
