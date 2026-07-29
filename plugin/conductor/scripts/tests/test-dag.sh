@@ -157,6 +157,46 @@ collide_out=$("$SCRIPT" add --file="$M" --id=craft:ecran-home --stage=v2 --step=
 assert "T12.6 — collision réelle (même id relancé) → remapped:true" "$collide_out" '"remapped": true'
 assert "T12.7 — collision réelle → suffixe :: déterministe"         "$collide_out" '"added": "craft:ecran-home::v2"'
 
+echo "=== T13 — --scope declare et persiste le perimetre du noeud (D-13) ==="
+SF="$WORK_DIR/scope.dag.json"; "$SCRIPT" init --file="$SF" >/dev/null
+out=$("$SCRIPT" add --file="$SF" --id=A --step=x --scope="src/a/**,src/b.ts")
+assert "T13.1 — add avec --scope reste ready (sortie inchangee)" "$out" '"status": "ready"'
+scope_a=$(python3 -c "import json; print(json.load(open('$SF'))['nodes'][0]['scope'])")
+assert "T13.2 — scope A = 2 entrees exactes"                     "$scope_a" "['src/a/**', 'src/b.ts']"
+
+out=$("$SCRIPT" add --file="$SF" --id=B --step=y)
+assert "T13.3 — add sans --scope reste ready (sortie inchangee)" "$out" '"status": "ready"'
+scope_b=$(python3 -c "import json; print(json.load(open('$SF'))['nodes'][1]['scope'])")
+assert "T13.4 — B sans flag → scope = []"                        "$scope_b" '[]'
+
+"$SCRIPT" add --file="$SF" --id=C --step=z --scope="  src/a/**  ,  , src/b.ts " >/dev/null
+scope_c=$(python3 -c "import json; print(json.load(open('$SF'))['nodes'][2]['scope'])")
+assert "T13.5 — espaces rognes + entree vide ignoree (meme regle que --deps)" "$scope_c" "['src/a/**', 'src/b.ts']"
+
+echo "=== T14 — retro-compatibilite : DAG sans cle scope (ecrit par la version precedente, P-02) ==="
+RC="$WORK_DIR/retro.dag.json"
+cat > "$RC" <<'JSONEOF'
+{
+  "nodes": [
+    {"id": "A", "step": "a", "stage": "", "deps": [], "status": "done"},
+    {"id": "B", "step": "b", "stage": "", "deps": ["A"], "status": "ready"},
+    {"id": "revue-1", "step": "revue", "stage": "", "deps": ["B"], "status": "blocked"}
+  ]
+}
+JSONEOF
+ready_out=$("$SCRIPT" ready --file="$RC"); rc1=$?
+assert_exit "T14.1 — ready sur DAG sans scope (exit 0)"   "$rc1" 0
+assert      "T14.2 — ready rend B"                         "$ready_out" '"B"'
+status_out=$("$SCRIPT" status --file="$RC"); rc2=$?
+assert_exit "T14.3 — status sur DAG sans scope (exit 0)"  "$rc2" 0
+mark_out=$("$SCRIPT" mark --file="$RC" --id=B --status=done); rc3=$?
+assert_exit "T14.4 — mark sur DAG sans scope (exit 0)"    "$rc3" 0
+reopen_out=$("$SCRIPT" reopen --file="$RC" --id=A); rc4=$?
+assert_exit "T14.5 — reopen sur DAG sans scope (exit 0)"  "$rc4" 0
+tree_out=$(run_bounded "$SCRIPT" tree --file="$RC"); rc5=$?
+assert_exit "T14.6 — tree sur DAG sans scope (exit 0)"    "$rc5" 0
+assert      "T14.7 — tree rend quand meme A"               "$tree_out" 'A'
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
