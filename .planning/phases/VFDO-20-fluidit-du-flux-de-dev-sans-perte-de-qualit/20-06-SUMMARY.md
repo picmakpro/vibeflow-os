@@ -132,6 +132,7 @@ Task 1 (checkpoint:decision D-11) n'a produit aucun commit — décision déjà 
 
 1. **Task 2: protocole de l'étage revue + réécriture du manager** — `c342cac` (feat) — `mission-flow.md` + `vf-dev-manager.md` dans le même commit (les deux textes se répondent : le détail vit en référence, le corps du manager n'en garde que ce qu'il doit savoir).
 2. **Task 3: cycle à 3 étapes + alignement des 2 workers** — `7881134` (feat) — `vf-coder.md` + `vf-reviewer.md` dans le même commit (les deux fichiers décrivent les deux faces du même circuit).
+3. **Correctif de revue (1 tour sur 3)** — `5e06358` (fix) — `vf-coder.md` : lève une négation elliptique cassée signalée `majeur` par `vf-reviewer` (« piloté en direct par le manager, plus une sous-phase de ton cycle » se lisait comme un AJOUT, l'inverse de l'intention). Re-revue : **PASS**, `{"statut":"passed","findings":[],"noeuds_debloques":[]}`.
 
 ## Files Modified
 - `plugin/dev-orchestrator/references/mission-flow.md` — +Pattern E (89 lignes nettes), renvoi de Pattern D mis à jour
