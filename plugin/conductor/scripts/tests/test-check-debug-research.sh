@@ -198,6 +198,53 @@ rm -rf "$DEFAULT_PRESENT"
 # T18 — le cwd de la suite est inchange : les 3 deplacements ci-dessus sont confines a des sous-shells
 [ "$(pwd)" = "$PWD_BEFORE" ] && ok "T18 cwd de la suite inchange apres les cas chemin par defaut" || ko "T18 cwd altere : $(pwd) != $PWD_BEFORE"
 
+# ---------- --third-party-prefix (D-20) — le MEME mecanisme que check-agents.sh, jamais un second ----------
+
+# T19 — brique gsd-* qui serait sinon en erreur (signature debug, aucun marqueur) → ecartee, exit 0
+reset_sk
+skill "gsd-serait-en-erreur" "Débugge un crash, stack trace" "Reproduis, corrige — aucun marqueur ici."
+RC=0; run_check >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] && ok "T19 brique gsd-* sans marqueur → ecartee par le prefixe tiers par defaut, exit 0" || ko "T19 (rc=$RC) : $(run_check 2>&1)"
+
+# T20 — la MEME brique sous --no-third-party-prefix redevient une erreur
+RC=0; run_check --no-third-party-prefix >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 1 ] && ok "T20 --no-third-party-prefix → gsd-* redevient lintee normalement → exit 1" || ko "T20 (rc=$RC)"
+
+# T21 — une brique gsd-* ecartee ET une brique vf-* en erreur dans le MEME run → exit 1 (seule la
+# seconde compte), et la sortie porte le nombre de briques tierces ecartees.
+reset_sk
+skill "gsd-serait-en-erreur" "Débugge un crash, stack trace" "Reproduis, corrige — aucun marqueur ici."
+skill "vf-vraie-erreur" "Débugge un bug, erreur, crash" "Reproduis, corrige — toujours aucun marqueur."
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "vf-vraie-erreur/SKILL.md" && ! echo "$OUT" | grep -q "gsd-serait-en-erreur/SKILL.md" && echo "$OUT" | grep -q "brique(s) tierce(s) non auditee"; then
+  ok "T21 gsd-* ecartee + vf-* en erreur dans le meme run → exit 1 (seule vf-* compte), compteur affiche"
+else
+  ko "T21 (rc=$RC) : $OUT"
+fi
+
+# T22 — --third-party-prefix=acme- AJOUTE au defaut (accumulation, pas remplacement) : gsd-* ET
+# acme-* sont ecartees toutes les deux.
+reset_sk
+skill "gsd-serait-en-erreur" "Débugge un crash, stack trace" "Reproduis, corrige — aucun marqueur ici."
+skill "acme-serait-en-erreur" "Débugge un crash, stack trace" "Reproduis, corrige — aucun marqueur ici."
+OUT="$(run_check --third-party-prefix=acme- 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "prefixe(s) : gsd-,acme-"; then
+  ok "T22 --third-party-prefix=acme- ACCUMULE sur le defaut gsd- (gsd-* ET acme-* ecartees)"
+else
+  ko "T22 (rc=$RC) : $OUT"
+fi
+
+# T23 — non-regression : une brique dont le nom ne matche aucun prefixe reste lintee exactement
+# comme avant (rejoue le scenario de T3, verdict inchange).
+reset_sk
+skill "raw-debug" "Débugge un bug, erreur, crash" "Reproduis, hypothèse, teste, corrige."
+OUT="$(run_check 2>&1)"; RC=$?
+if [ $RC -eq 1 ] && echo "$OUT" | grep -q "SANS phase recherche documentaire"; then
+  ok "T23 brique sans prefixe tiers reste lintee normalement (non-regression, meme verdict que T3)"
+else
+  ko "T23 (rc=$RC) : $OUT"
+fi
+
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
 [ "$fail" -eq 0 ]
