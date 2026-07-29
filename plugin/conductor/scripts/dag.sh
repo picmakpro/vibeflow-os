@@ -24,7 +24,8 @@
 #   dag.sh ready  --file=F                                                # frontiere ready (JSON)
 #   dag.sh mark   --file=F --id=N --status=running|done|failed            # + recalcule la frontiere
 #   dag.sh reopen --file=F --id=N                # re-entree : noeud + dependants, force review_regime=full sur revue/join
-#   dag.sh status --file=F                                                # compteurs + frontiere (JSON)
+#   dag.sh status --file=F     # compteurs + frontiere + perimetres GELES (JSON) — source vivante
+#                               # de la table des fichiers geles, jamais une copie figee (D-15 §2)
 #   dag.sh tree   --file=F                                                # rendu ARBRE lisible (glyphes + connecteurs)
 #
 # Glyphes de statut (rendu `tree`) : ● done · ◐ running · ○ ready · · blocked · ✗ failed.
@@ -183,8 +184,23 @@ if action == "status":
     counts = {}
     for n in nodes:
         counts[n["status"]] = counts.get(n["status"], 0) + 1
+    # Perimetres GELES (D-15 §2) : tout noeud NON TERMINE (statut != "done" — un noeud en echec
+    # compte aussi comme gele, son perimetre est justement celui sur lequel une reprise va
+    # revenir) dont le scope declare est non vide. Lecture tolerante a l'absence (P-02) :
+    # node.get("scope", []) jamais un acces direct. Tri deterministe par id : deux appels
+    # consecutifs sur le meme DAG produisent une sortie identique et diffable. Cle TOUJOURS
+    # presente, meme vide — un consommateur (manager, lecteur humain) ne doit jamais avoir a
+    # distinguer l'absence de la vacuite. C'est la source unique et vivante de la table des
+    # fichiers geles : jamais recopiee dans un fichier de documentation (dag.sh status
+    # --file=<dag-de-mission-actif> EST la commande).
+    frozen = sorted(
+        ({"id": n["id"], "status": n["status"], "scope": n.get("scope", [])}
+         for n in nodes if n["status"] != "done" and n.get("scope", [])),
+        key=lambda f: f["id"],
+    )
     emit({"file": file, "total": len(nodes), "counts": counts,
-          "ready": [n["id"] for n in nodes if n["status"] == "ready"]})
+          "ready": [n["id"] for n in nodes if n["status"] == "ready"],
+          "frozen": frozen})
     sys.exit(0)
 
 if action == "tree":
