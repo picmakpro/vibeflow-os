@@ -450,6 +450,7 @@ description: Agent de test avec l'outil Read correctement orthographie, non-regr
 model: sonnet
 memory: project
 tools: Read, Agent(vf-coder)
+disallowedTools: Write, Edit
 ---
 corps
 EOF
@@ -467,6 +468,7 @@ description: Agent de test declarant un nom d'agent mal orthographie dans son al
 model: sonnet
 memory: project
 tools: Read, Agent(vf-codeur)
+disallowedTools: Write, Edit
 ---
 corps
 EOF
@@ -506,6 +508,7 @@ description: Agent de test declarant son allowlist en flow list YAML entre croch
 model: sonnet
 memory: project
 tools: [Read, Agent(x, y), Bash(git:*)]
+disallowedTools: Write, Edit
 ---
 corps
 EOF
@@ -549,6 +552,7 @@ description: Agent de test utilisant l'alias legacy Task au lieu d'Agent dans to
 model: sonnet
 memory: project
 tools: Read, Task(vf-coder)
+disallowedTools: Write, Edit
 ---
 corps
 EOF
@@ -1037,6 +1041,7 @@ description: Agent de test entierement conforme, aucun avertissement attendu ici
 model: sonnet
 memory: project
 tools: Read
+disallowedTools: Write, Edit
 skills:
   - petit-skill
 ---
@@ -1089,6 +1094,7 @@ description: Agent de test MCP pour verifier le charset du joker terminal (D-22)
 model: sonnet
 memory: project
 tools: Read, $2
+disallowedTools: Write, Edit
 ---
 corps
 EOF
@@ -1127,6 +1133,7 @@ description: Agent de test declarant vf-mcp-tools, pour verifier que la clef est
 model: sonnet
 memory: project
 tools: Read
+disallowedTools: Write, Edit
 vf-mcp-tools: XcodeBuildMCP:test_sim,build_sim,clean
 ---
 corps
@@ -1157,6 +1164,67 @@ else
   ko "T68 (rc=$RC) : $OUT"
 fi
 rm -f "$AG/mcp-tools-typo.md"
+
+# ---------- Extension : memory: + tools: sans Write/Edit exige disallowedTools (anti-regression) ----------
+
+# T69 — agent memory: + tools: sans Write/Edit, SANS disallowedTools → warning en defaut, ERREUR en --strict
+cat > "$AG/juge-sans-barriere.md" <<'EOF'
+---
+name: juge-sans-barriere
+description: Agent de test qui omet Write/Edit de tools sans les fermer via disallowedTools.
+model: sonnet
+memory: project
+tools: Read, Bash
+---
+corps
+EOF
+OUT_DEF="$(run_check 2>&1)"; RC_DEF=$?
+RC_STRICT=0; run_check --strict >/dev/null 2>&1 || RC_STRICT=$?
+if [ "$RC_DEF" -eq 0 ] && echo "$OUT_DEF" | grep -q "exige disallowedTools: Write, Edit" && [ "$RC_STRICT" -eq 1 ]; then
+  ok "T69 memory:+tools: sans Write/Edit, sans disallowedTools → warning en defaut, ERREUR en --strict (anti-regression)"
+else
+  ko "T69 (def=$RC_DEF strict=$RC_STRICT) : $OUT_DEF"
+fi
+rm -f "$AG/juge-sans-barriere.md"
+
+# T70 — la MEME situation, disallowedTools: Write, Edit pose → silence total, --strict exit 0
+cat > "$AG/juge-avec-barriere.md" <<'EOF'
+---
+name: juge-avec-barriere
+description: Agent de test qui ferme explicitement Write/Edit via disallowedTools.
+model: sonnet
+memory: project
+tools: Read, Bash
+disallowedTools: Write, Edit
+---
+corps
+EOF
+OUT="$(run_check --strict 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "exige disallowedTools"; then
+  ok "T70 memory:+tools: sans Write/Edit MAIS disallowedTools: Write, Edit pose → conforme, --strict exit 0"
+else
+  ko "T70 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/juge-avec-barriere.md"
+
+# T71 — non-regression : un agent dont tools: INCLUT deja Write/Edit reste silencieux (pas de fausse alerte)
+cat > "$AG/producteur.md" <<'EOF'
+---
+name: producteur
+description: Agent de test dont tools inclut deja Write, pour verifier l'absence de faux positif.
+model: sonnet
+memory: project
+tools: Read, Write, Edit, Bash
+---
+corps
+EOF
+OUT="$(run_check --strict 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "exige disallowedTools"; then
+  ok "T71 tools: inclut deja Write/Edit → aucune fausse alerte de la regle anti-regression"
+else
+  ko "T71 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/producteur.md"
 
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="

@@ -458,6 +458,20 @@ def agent_display_name(path, text):
         return fm[\"name\"]
     return os.path.basename(path)[:-3]
 
+def bare_tokens(fmlines, field):
+    \"\"\"Ensemble des tokens SANS parenthese d'un champ tools:/disallowedTools: — reutilise le
+    MEME tokenizer a profondeur de parentheses que le lint principal (extract_raw_field +
+    tokenize_field), jamais un second parseur. Un champ absent ou une allowlist mal formee
+    (depth != 0) rend un ensemble vide plutot que de lever : ce garde-fou structurel ne doit
+    jamais masquer les erreurs de syntaxe deja levees ailleurs par lint_tool_field.\"\"\"
+    mode, raw = extract_raw_field(fmlines, field)
+    if mode is None:
+        return set()
+    tokens, depth = tokenize_field(mode, raw)
+    if depth != 0:
+        return set()
+    return {t.strip() for t in tokens if t.strip() and \"(\" not in t}
+
 def check_file(path):
     base = os.path.basename(path)
     try:
@@ -557,6 +571,22 @@ def check_file(path):
         if mode is None:
             continue
         lint_tool_field(base, field, mode, raw, do_resolution)
+
+    # Regle anti-regression (Phase 20) : memory: reinjecte SILENCIEUSEMENT Write+Edit au
+    # runtime par-dessus l'allowlist tools: (contrat Claude Code confirme par sonde). Un agent
+    # qui porte memory: et dont le tools: (declare) omet Write ET Edit DOIT fermer ce canal
+    # explicitement via disallowedTools — sinon rien n'empeche un futur juge/reviewer de naitre
+    # sans sa barriere. Purement structurel : reutilise bare_tokens() (meme tokenizer), aucune
+    # analyse de texte. Warning en defaut, ERREUR en --strict — meme regime que les autres
+    # classes structurelles de ce script (outil hors set connu, skill introuvable) : visible au
+    # SessionStart des qu'il y en a un (D-21), bloquant sur l'appel explicite/CI --strict.
+    if memory and \"tools\" in fm:
+        tools_tokens = bare_tokens(fmlines, \"tools\")
+        if \"Write\" not in tools_tokens and \"Edit\" not in tools_tokens:
+            disallowed_tokens = bare_tokens(fmlines, \"disallowedTools\")
+            if not (\"Write\" in disallowed_tokens and \"Edit\" in disallowed_tokens):
+                msg = f\"{base} : memory: + tools: sans Write/Edit exige disallowedTools: Write, Edit (memory: reinjecte silencieusement ces outils au runtime — barriere structurelle requise)\"
+                (errors if strict else warnings).append(msg)
 
     for k in fm:
         if k not in KNOWN:
