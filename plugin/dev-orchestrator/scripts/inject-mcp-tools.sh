@@ -23,6 +23,12 @@
 # l'emporte, moindre privilège), avec une ligne de log qui le signale. Ce mode est déclenché par le
 # CONTENU du fichier cible, jamais par un flag — aucun appelant n'a besoin d'être modifié.
 #
+# HONNÊTETÉ (D-03) : les noms d'outils déclarés par un agent via `vf-mcp-tools` ne sont JAMAIS
+# confrontés à un serveur MCP vivant par ce script — ce repo n'a pas de `.mcp.json`. Une absence de
+# correspondance (serveur non résolu) produit un no-op silencieux, jamais une erreur : c'est un
+# contrat best-effort, pas une garantie que les noms d'outils existent réellement côté serveur. La
+# validation des noms réels relève d'une recette humaine sur un lab équipé, hors périmètre de ce repo.
+#
 # Usage:
 #   inject-mcp-tools.sh --target <fichier|dossier> [options]
 #
@@ -254,11 +260,13 @@ if not files:
 
 # --- 3bis. Mode --verify : LECTURE SEULE, aucune écriture (D-09, P-02) ---------------------------
 # Relit le tools: final, réutilise TELS QUELS les calculs de want_tokens/existing/missing du mode
-# injection ci-dessous (mêmes expressions, pas réinventées). Ne rejoue JAMAIS --force a la place
-# de l appelant : constater et rapporter, jamais réparer.
+# injection ci-dessous (mêmes expressions, pas réinventées — named_tokens_for est appelee ici
+# EXACTEMENT comme dans le bloc d injection, jamais recalculee autrement, D-05/lecon Phase 19). Ne
+# rejoue JAMAIS --force a la place de l appelant : constater et rapporter, jamais reparer.
 if verify:
     determined = False
     all_missing = []
+    indeterminate = []
     for path in files:
         try:
             text = open(path, encoding="utf-8").read()
@@ -284,15 +292,39 @@ if verify:
             # Pas de ligne tools: (herite tout) : aucun verdict possible sur ce fichier.
             continue
 
+        # Meme calcul par fichier que le bloc d injection : mode NOMME si vf-mcp-tools est
+        # present, sinon le mode JOKER existant (want_tokens).
+        if has_named(text):
+            req = named_request(text)
+            if req is None:
+                logline("%s : vf-mcp-tools malformee — aucune comparaison possible sur ce fichier." % base)
+                continue
+            file_want_tokens = named_tokens_for(text, servers)
+            if not file_want_tokens:
+                # Sous-etat INDETERMINE (pas malformee, pas manquante) : le serveur declare par
+                # vf-mcp-tools n est pas resolu dans le lab. Ni conforme ni manquant : aucune
+                # comparaison possible. Jamais un 0 conforme (D-05).
+                errline("--verify : %s — serveur %s (vf-mcp-tools) absent du lab — verdict INDETERMINE (rien a comparer, distinct d un token manquant dans tools:)." % (base, req[0]))
+                indeterminate.append(base)
+                continue
+        else:
+            file_want_tokens = want_tokens
+
         line = lines[tools_idx]
         prefix = re.match(r"^tools:\s*", line).group(0)
         value = line[len(prefix):]
         existing = [tok.strip() for tok in value.split(",") if tok.strip()]
-        missing = [tok for tok in want_tokens if tok not in existing]
+        missing = [tok for tok in file_want_tokens if tok not in existing]
 
         determined = True
         if missing:
             all_missing.append((base, missing))
+
+    if indeterminate:
+        # Priorite absolue : un sous-etat INDETERMINE ne peut jamais etre efface par un autre
+        # fichier conforme de la meme invocation — un 0 rendu sans avoir tout compare serait le
+        # faux vert que ce mode existe pour empecher.
+        sys.exit(3)
 
     if not determined:
         errline("--verify : aucune cible determinee (pas de ligne tools: exploitable) — verdict INDETERMINE.")
@@ -300,10 +332,10 @@ if verify:
 
     if all_missing:
         for base, missing in all_missing:
-            errline("--verify : %s — serveur(s) MCP manquant(s) : %s" % (base, ", ".join(missing)))
+            errline("--verify : %s — serveur(s)/outil(s) MCP manquant(s) : %s" % (base, ", ".join(missing)))
         sys.exit(1)
 
-    logline("--verify : conforme, tous les serveurs attendus sont presents (%s)." % ", ".join(want_tokens))
+    logline("--verify : conforme, tous les serveurs/outils attendus sont presents.")
     sys.exit(0)
 
 # --- 3. Injection idempotente sur la ligne tools: ------------------------------------------------

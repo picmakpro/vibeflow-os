@@ -27,9 +27,11 @@
 #   T16 — Serveur nommé absent de la liste résolue : no-op silencieux, exit 0, inchangé.
 #   T17 — Idempotence du mode nommé (2e run, md5 stable).
 #   T18 — Token déjà présent non dupliqué ; seuls les manquants sont ajoutés.
+#   T19 — --verify mode nommé, token manquant : exit 1, empreinte inchangée.
+#   T20 — --verify mode nommé complet : exit 0, empreinte inchangée.
+#   T21 — --verify mode nommé, serveur absent : exit 3 (INDÉTERMINÉ, jamais 0), empreinte inchangée.
 #   T22 — Valeur `vf-mcp-tools` malformée (sans séparateur (a), liste d'outils vide (b)) : no-op
 #         silencieux, exit 0.
-#   (T19-T21 : cohérence du mode --verify sur le mode nommé — tâche 2 de 20-03-PLAN.md.)
 #
 # Convention : asserts numérotés, helpers ok()/ko(), exit 0 si tout passe, 1 si ≥1 KO.
 # Calqué sur test-dev-orchestrator.sh.
@@ -357,6 +359,40 @@ if echo "$line18" | grep -q 'mcp__XcodeBuildMCP__test_sim' && \
   ok "T18 token déjà présent non dupliqué, seuls les manquants ajoutés"
 else
   ko "T18 échec (clean_count=$clean_count18 ligne=$line18)"
+fi
+
+# === T19 — --verify mode nommé, token manquant : rc=1, empreinte inchangée ====================
+N19="$WORK/t19.md"; mk_named "$N19"
+n19_before="$(md5of "$N19")"
+t19_out="$(bash "$SCRIPT" --target "$N19" --servers "XcodeBuildMCP" --verify 2>&1)"; rc19=$?
+n19_after="$(md5of "$N19")"
+if [ "$rc19" -eq 1 ] && echo "$t19_out" | grep -qF 'mcp__XcodeBuildMCP__test_sim' && [ "$n19_after" = "$n19_before" ]; then
+  ok "T19 --verify mode nommé, token manquant : rc=1, nommé, empreinte inchangée"
+else
+  ko "T19 échec (rc=$rc19, avant=$n19_before après=$n19_after, sortie=[$t19_out])"
+fi
+
+# === T20 — --verify mode nommé complet : rc=0, empreinte inchangée ============================
+N20="$WORK/t20.md"; mk_named "$N20"
+bash "$SCRIPT" --target "$N20" --servers "XcodeBuildMCP" >/dev/null 2>&1
+n20_before="$(md5of "$N20")"
+bash "$SCRIPT" --target "$N20" --servers "XcodeBuildMCP" --verify >/dev/null 2>&1; rc20=$?
+n20_after="$(md5of "$N20")"
+if [ "$rc20" -eq 0 ] && [ "$n20_after" = "$n20_before" ]; then
+  ok "T20 --verify mode nommé complet : rc=0, empreinte inchangée"
+else
+  ko "T20 échec (rc=$rc20)"
+fi
+
+# === T21 — --verify mode nommé, serveur absent : rc=3 (INDÉTERMINÉ, jamais 0) ==================
+N21="$WORK/t21.md"; mk_named "$N21"
+n21_before="$(md5of "$N21")"
+t21_out="$(bash "$SCRIPT" --target "$N21" --servers "mobile-mcp" --verify 2>&1)"; rc21=$?
+n21_after="$(md5of "$N21")"
+if [ "$rc21" -eq 3 ] && [ "$n21_after" = "$n21_before" ]; then
+  ok "T21 --verify mode nommé, serveur absent : rc=3 (INDÉTERMINÉ, jamais 0), empreinte inchangée"
+else
+  ko "T21 échec (rc=$rc21, sortie=[$t21_out])"
 fi
 
 # === T22 — Valeur vf-mcp-tools malformée : no-op silencieux, exit 0 ============================
