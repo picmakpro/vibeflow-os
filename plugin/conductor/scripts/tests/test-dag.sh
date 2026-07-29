@@ -261,6 +261,56 @@ echo "=== T19 — sortie de reopen etendue : liste des ids passes en regime plei
 out19=$("$SCRIPT" reopen --file="$RD" --id="join")
 assert "T19.1 — cles existantes preservees (reopened)" "$out19" '"reopened": "join"'
 
+echo "=== T20 — status expose les perimetres GELES : noeuds non termines a scope non vide (D-15 §2) ==="
+FZ="$WORK_DIR/frozen.dag.json"; "$SCRIPT" init --file="$FZ" >/dev/null
+"$SCRIPT" add --file="$FZ" --id=exec-1 --step=x --scope="src/a/**" >/dev/null
+"$SCRIPT" add --file="$FZ" --id=exec-2 --step=y --scope="src/b/**" --deps=exec-1 >/dev/null
+"$SCRIPT" add --file="$FZ" --id=exec-3 --step=z --deps=exec-2 >/dev/null
+"$SCRIPT" mark --file="$FZ" --id=exec-1 --status=done >/dev/null
+"$SCRIPT" mark --file="$FZ" --id=exec-2 --status=running >/dev/null
+SO="$WORK_DIR/status_out.json"
+"$SCRIPT" status --file="$FZ" > "$SO"
+frozen_ids=$(python3 -c "import json; print([f['id'] for f in json.load(open('$SO'))['frozen']])")
+assert "T20.1 — exactement 1 entree gelee : exec-2 (exec-1 done exclu, exec-3 scope vide exclu)" "$frozen_ids" "['exec-2']"
+frozen_entry=$(python3 -c "import json; f=json.load(open('$SO'))['frozen'][0]; print(f['status'], f['scope'])")
+assert "T20.2 — l'entree porte son statut (running) et son scope"                                "$frozen_entry" "running ['src/b/**']"
+
+echo "=== T21 — aucun perimetre declare : la cle frozen est presente et vide, jamais absente ==="
+EMPTY="$WORK_DIR/empty-scope.dag.json"; "$SCRIPT" init --file="$EMPTY" >/dev/null
+"$SCRIPT" add --file="$EMPTY" --id=x --step=x >/dev/null
+SE="$WORK_DIR/status_empty.json"
+"$SCRIPT" status --file="$EMPTY" > "$SE"
+frozen_empty=$(python3 -c "import json; print(json.load(open('$SE'))['frozen'])")
+assert "T21.1 — cle frozen presente et vide (consommateur ne distingue jamais absent de vide)" "$frozen_empty" "[]"
+
+echo "=== T22 — retro-compatibilite status : DAG sans cle scope du tout (version precedente, P-02) ==="
+RC2="$WORK_DIR/retro-status.dag.json"
+cat > "$RC2" <<'JSONEOF'
+{
+  "nodes": [
+    {"id": "A", "step": "a", "stage": "", "deps": [], "status": "running"},
+    {"id": "B", "step": "b", "stage": "", "deps": ["A"], "status": "blocked"}
+  ]
+}
+JSONEOF
+status_rc=$("$SCRIPT" status --file="$RC2"); rc=$?
+assert_exit "T22.1 — status sur DAG sans cle scope (exit 0)" "$rc" 0
+SR2="$WORK_DIR/status_retro.json"; echo "$status_rc" > "$SR2"
+frozen_retro=$(python3 -c "import json; print(json.load(open('$SR2'))['frozen'])")
+assert "T22.2 — frozen = [] sans cle scope sur les noeuds (P-02)" "$frozen_retro" "[]"
+
+echo "=== T23 — aucune regression de cle existante sur status (total/counts/ready) ==="
+assert "T23.1 — total preserve"  "$(cat "$SO")" '"total": 3'
+assert "T23.2 — counts preserve" "$(cat "$SO")" '"counts"'
+assert "T23.3 — ready preserve"  "$(cat "$SO")" '"ready"'
+
+echo "=== T24 — determinisme : deux appels consecutifs -> sortie octet pour octet identique ==="
+S1="$WORK_DIR/s1.json"; S2="$WORK_DIR/s2.json"
+"$SCRIPT" status --file="$FZ" > "$S1"
+"$SCRIPT" status --file="$FZ" > "$S2"
+if diff -q "$S1" "$S2" >/dev/null; then diffres="identical"; else diffres="differ"; fi
+assert "T24.1 — deux invocations successives produisent une sortie identique" "$diffres" "identical"
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
