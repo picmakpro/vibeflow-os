@@ -197,6 +197,70 @@ tree_out=$(run_bounded "$SCRIPT" tree --file="$RC"); rc5=$?
 assert_exit "T14.6 — tree sur DAG sans scope (exit 0)"    "$rc5" 0
 assert      "T14.7 — tree rend quand meme A"               "$tree_out" 'A'
 
+echo "=== T15 — reopen force review_regime=full transitivement sur revue/join, jamais sur exec (D-14) ==="
+RG="$WORK_DIR/regime.dag.json"; "$SCRIPT" init --file="$RG" >/dev/null
+"$SCRIPT" add --file="$RG" --id=exec-1  --step=x >/dev/null
+"$SCRIPT" add --file="$RG" --id=revue-1 --step=r --deps=exec-1  >/dev/null
+"$SCRIPT" add --file="$RG" --id=join-1  --step=j --deps=revue-1 >/dev/null
+"$SCRIPT" mark --file="$RG" --id=exec-1  --status=done >/dev/null
+"$SCRIPT" mark --file="$RG" --id=revue-1 --status=done >/dev/null
+"$SCRIPT" mark --file="$RG" --id=join-1  --status=done >/dev/null
+"$SCRIPT" reopen --file="$RG" --id=exec-1 >/dev/null
+regime_field() { python3 -c "import json; n=[x for x in json.load(open('$1'))['nodes'] if x['id']=='$2'][0]; print(n.get('review_regime'))"; }
+assert "T15.1 — revue-1 rouvert transitivement -> review_regime=full" "$(regime_field "$RG" revue-1)" "full"
+assert "T15.2 — join-1 rouvert transitivement -> review_regime=full"  "$(regime_field "$RG" join-1)"  "full"
+assert "T15.3 — exec-1 (cible, pas un noeud de revue) -> pas de champ" "$(regime_field "$RG" exec-1)" "None"
+
+echo "=== T16 — reopen direct : les 4 formes d'identifiant reconnues (D-14) ==="
+RD="$WORK_DIR/regime-direct.dag.json"; "$SCRIPT" init --file="$RD" >/dev/null
+"$SCRIPT" add --file="$RD" --id="revue:ecran-home" --step=r >/dev/null
+"$SCRIPT" add --file="$RD" --id="join-x"            --step=j >/dev/null
+"$SCRIPT" add --file="$RD" --id="join:y"            --step=j >/dev/null
+"$SCRIPT" add --file="$RD" --id="join"              --step=j >/dev/null
+"$SCRIPT" mark --file="$RD" --id="revue:ecran-home" --status=done >/dev/null
+"$SCRIPT" mark --file="$RD" --id="join-x"            --status=done >/dev/null
+"$SCRIPT" mark --file="$RD" --id="join:y"            --status=done >/dev/null
+"$SCRIPT" mark --file="$RD" --id="join"              --status=done >/dev/null
+"$SCRIPT" reopen --file="$RD" --id="revue:ecran-home" >/dev/null
+"$SCRIPT" reopen --file="$RD" --id="join-x"            >/dev/null
+"$SCRIPT" reopen --file="$RD" --id="join:y"            >/dev/null
+"$SCRIPT" reopen --file="$RD" --id="join"              >/dev/null
+assert "T16.1 — revue:ecran-home (prefixe deux-points) -> full" "$(regime_field "$RD" "revue:ecran-home")" "full"
+assert "T16.2 — join-x (prefixe tiret) -> full"                 "$(regime_field "$RD" "join-x")"            "full"
+assert "T16.3 — join:y (prefixe deux-points) -> full"           "$(regime_field "$RD" "join:y")"            "full"
+assert "T16.4 — join (identifiant exact) -> full"                "$(regime_field "$RD" "join")"              "full"
+
+echo "=== T17 — selecteur ferme : rejette les faux positifs, jamais un test de sous-chaine (D-14) ==="
+FP="$WORK_DIR/regime-faux-positif.dag.json"; "$SCRIPT" init --file="$FP" >/dev/null
+"$SCRIPT" add --file="$FP" --id="refonte-joint-bas" --step=x >/dev/null
+"$SCRIPT" add --file="$FP" --id="exec-2"            --step=x >/dev/null
+"$SCRIPT" add --file="$FP" --id="plan-2"            --step=x >/dev/null
+"$SCRIPT" mark --file="$FP" --id="refonte-joint-bas" --status=done >/dev/null
+"$SCRIPT" mark --file="$FP" --id="exec-2"            --status=done >/dev/null
+"$SCRIPT" mark --file="$FP" --id="plan-2"            --status=done >/dev/null
+"$SCRIPT" reopen --file="$FP" --id="refonte-joint-bas" >/dev/null
+"$SCRIPT" reopen --file="$FP" --id="exec-2" >/dev/null
+"$SCRIPT" reopen --file="$FP" --id="exec-2" >/dev/null   # deuxieme reopen : toujours aucun champ
+"$SCRIPT" reopen --file="$FP" --id="plan-2" >/dev/null
+assert "T17.1 — refonte-joint-bas (« join » en milieu de chaine) -> pas de champ" "$(regime_field "$FP" "refonte-joint-bas")" "None"
+assert "T17.2 — exec-2 rouvert 2x -> jamais de champ"                             "$(regime_field "$FP" "exec-2")"            "None"
+assert "T17.3 — plan-2 rouvert -> jamais de champ"                                "$(regime_field "$FP" "plan-2")"            "None"
+
+echo "=== T18 — idempotence : un second reopen ne duplique pas la cle (D-14) ==="
+ID_F="$WORK_DIR/regime-idempotence.dag.json"; "$SCRIPT" init --file="$ID_F" >/dev/null
+"$SCRIPT" add --file="$ID_F" --id="revue-9" --step=r >/dev/null
+"$SCRIPT" mark --file="$ID_F" --id="revue-9" --status=done >/dev/null
+"$SCRIPT" reopen --file="$ID_F" --id="revue-9" >/dev/null
+"$SCRIPT" mark --file="$ID_F" --id="revue-9" --status=done >/dev/null
+"$SCRIPT" reopen --file="$ID_F" --id="revue-9" >/dev/null
+key_count=$(grep -c '"review_regime"' "$ID_F")
+assert "T18.1 — une seule occurrence de la cle apres 2 reopens" "$key_count" "1"
+assert "T18.2 — valeur toujours full apres 2 reopens"           "$(regime_field "$ID_F" "revue-9")" "full"
+
+echo "=== T19 — sortie de reopen etendue : liste des ids passes en regime plein (D-14) ==="
+out19=$("$SCRIPT" reopen --file="$RD" --id="join")
+assert "T19.1 — cles existantes preservees (reopened)" "$out19" '"reopened": "join"'
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
