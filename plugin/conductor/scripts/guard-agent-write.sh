@@ -8,8 +8,9 @@
 #
 # Règle : Write vers .claude/agents/<nom>.md (hors contracts.md/README.md/AGENTS.md — les
 # sous-dossiers *-references/ ne matchent pas) → le CONTENU proposé est validé par
-# check-agents.sh --file AVANT écriture. Socle bloquant : frontmatter présent, name,
-# description, model, memory + enums valides. Le deny renvoie les erreurs précises + le
+# check-agents.sh --file --strict AVANT écriture. Socle bloquant : frontmatter présent, name,
+# description, model, memory + enums valides, + tout ce que --strict promeut en erreur (voir
+# plus bas). Le deny renvoie les erreurs précises + le
 # squelette canonique. Portée : LAB COURANT uniquement (un agent hors cwd — perso user-level
 # ou autre projet — n'est jamais dénié par la doctrine de ce lab).
 #
@@ -20,6 +21,13 @@
 #
 # Fail-open : toute erreur interne → allow (exit 0 silencieux). Un rc≠0 du checker SANS
 # diagnostic lisible (✗) = crash interne → allow aussi (jamais de deny aveugle).
+#
+# --strict (durcissement Phase 20, T20) : le checker est invoqué avec --strict — les
+# warnings qu'il promeut en erreurs (ex. memory: + tools: sans Write/Edit sans
+# disallowedTools : check-agents.sh:588 ; skill declare introuvable : idem le bloc skills ;
+# outil hors du set ferme documente) DEVIENNENT bloquants ici aussi. Avant ce durcissement,
+# --file seul laissait ces cas passer (0 obstacle a l'ecriture, seulement signales au
+# SessionStart suivant et en CI) — la difference entre une garantie et un avertissement.
 
 set -uo pipefail
 
@@ -92,7 +100,7 @@ with tempfile.TemporaryDirectory() as tmpd:
     with open(target, \"w\", encoding=\"utf-8\") as f:
         f.write(content)
     try:
-        r = subprocess.run([\"bash\", checker, \"--file\", target] + skills_arg,
+        r = subprocess.run([\"bash\", checker, \"--file\", target, \"--strict\"] + skills_arg,
                            capture_output=True, text=True, timeout=20)
     except Exception:
         sys.exit(0)
