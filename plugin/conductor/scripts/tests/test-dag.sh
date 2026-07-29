@@ -260,6 +260,7 @@ assert "T18.2 — valeur toujours full apres 2 reopens"           "$(regime_fiel
 echo "=== T19 — sortie de reopen etendue : liste des ids passes en regime plein (D-14) ==="
 out19=$("$SCRIPT" reopen --file="$RD" --id="join")
 assert "T19.1 — cles existantes preservees (reopened)" "$out19" '"reopened": "join"'
+assert "T19.2 — review_regime_full liste bien l'id passe en regime plein" "$out19" '"review_regime_full": ['$'\n''    "join"'
 
 echo "=== T20 — status expose les perimetres GELES : noeuds non termines a scope non vide (D-15 §2) ==="
 FZ="$WORK_DIR/frozen.dag.json"; "$SCRIPT" init --file="$FZ" >/dev/null
