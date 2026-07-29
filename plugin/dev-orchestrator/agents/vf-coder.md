@@ -31,8 +31,8 @@ Enchaîne les sous-phases en déléguant à la machinerie existante :
 2. **Plan** : invoque `gsd-plan-phase` (ou dispatche l'agent `gsd-planner` via l'outil Agent).
 3. **Exécution** : invoque `gsd-execute-phase` (ou dispatche `gsd-executor` via l'outil Agent).
    C'est lui qui fait les commits atomiques — dernier appel de ton cycle. La revue vit désormais
-   comme un nœud de plan de bataille (`revue-N`) piloté **en direct** par le manager, plus une
-   sous-phase de ton cycle : protocole complet `dev-orchestrator-references/mission-flow.md`
+   comme un nœud de plan de bataille (`revue-N`) piloté **en direct** par le manager — elle n'est
+   plus une sous-phase de ton cycle. Protocole complet : `dev-orchestrator-references/mission-flow.md`
    §Pattern E. Si la revue signale des manques, le manager te redispatche un mandat de
    **correction CIBLÉE** (les findings remontés, rien d'autre) — jamais un nouveau cycle complet.
 
