@@ -11,13 +11,19 @@
 # parallele (critere b de la gradation par risque) et a la table des fichiers geles (dag.sh
 # status). Absent sur les DAG ecrits avant ce champ : toute lecture tolere l'absence, jamais
 # d'acces direct a la cle (P-02).
+# review_regime : ecrit UNIQUEMENT par `reopen`, valeur "full" — jamais une autre valeur (P-03).
+# Force le regime plein sur tout noeud de revue/jointure (id prefixe revue-/revue:/join-/join:
+# ou egal a "join") rouvert, la cible ET ses dependants transitifs — enforcement machine du
+# garde-fou « aucun allegement ne s'applique jamais a un diff de comblement » (D-14). Absent =
+# non contraint ; il n'existe aucun flag pour poser un regime allege, l'allegement reste un
+# choix du manager au moment de composer le mandat (P-04 : jamais pose sur un noeud exec-*).
 #
 # Usage:
 #   dag.sh init   --file=F
 #   dag.sh add    --file=F --id=N --step="..." [--stage=S] [--deps=a,b] [--scope=g1,g2]   # remap id::stage si collision
 #   dag.sh ready  --file=F                                                # frontiere ready (JSON)
 #   dag.sh mark   --file=F --id=N --status=running|done|failed            # + recalcule la frontiere
-#   dag.sh reopen --file=F --id=N                                         # re-entree : noeud + dependants
+#   dag.sh reopen --file=F --id=N                # re-entree : noeud + dependants, force review_regime=full sur revue/join
 #   dag.sh status --file=F                                                # compteurs + frontiere (JSON)
 #   dag.sh tree   --file=F                                                # rendu ARBRE lisible (glyphes + connecteurs)
 #
@@ -80,6 +86,15 @@ def recompute(nodes):
 
 def emit(obj):
     print(json.dumps(obj, indent=2, ensure_ascii=False))
+
+def is_review_node(node_id):
+    """Selecteur ferme (D-14, P-04) : prefixes explicites uniquement, jamais un test de
+    sous-chaine — un id contenant le mot en milieu de chaine (ex. refonte-joint-bas) ne matche
+    pas. Les deux ponctuations (`revue-`/`revue:`, `join-`/`join:`) existent deja dans la
+    doctrine de mission croisee : ne pas en oublier une."""
+    return (node_id.startswith("revue-") or node_id.startswith("revue:")
+            or node_id.startswith("join-") or node_id.startswith("join:")
+            or node_id == "join")
 
 if action == "init":
     save({"nodes": []})
@@ -150,9 +165,17 @@ if action == "reopen":
     idx[nid]["status"] = "blocked"
     for d in affected:
         idx[d]["status"] = "blocked"
+    # D-14 / garde-fou ROADMAP « aucun allegement ne s'applique jamais a un diff de comblement » :
+    # le regime plein est ECRIT ICI par le script lui-meme, jamais laisse a une consigne de
+    # prompt — un regime decide par prompt est un point de decision, donc un point d'erreur.
+    # Cible ET dependants, sans exception ; idempotent (reecrire "full" ne duplique pas la cle).
+    regime_full = sorted(n for n in ({nid} | affected) if is_review_node(n))
+    for n in regime_full:
+        idx[n]["review_regime"] = "full"
     recompute(nodes)  # remet ready ce qui redevient dispatchable (deps done)
     save(dag)
     emit({"reopened": nid, "dependents_reset": sorted(affected),
+          "review_regime_full": regime_full,
           "ready": [n["id"] for n in nodes if n["status"] == "ready"]})
     sys.exit(0)
 
