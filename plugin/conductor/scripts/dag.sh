@@ -6,11 +6,15 @@
 # Un correctif qui ROUVRE une etape (`reopen`) repasse le noeud + ses dependants a blocked/ready →
 # le manager RE-ENTRE dans le dispatch au lieu de derouler lineairement.
 #
-# Noeud : { id, step, stage, deps[], status ∈ blocked|ready|running|done|failed }.
+# Noeud : { id, step, stage, deps[], scope[], status ∈ blocked|ready|running|done|failed }.
+# scope[] : perimetre declare (chemins/globs, D-13) — [] par defaut. Necessaire au dispatch
+# parallele (critere b de la gradation par risque) et a la table des fichiers geles (dag.sh
+# status). Absent sur les DAG ecrits avant ce champ : toute lecture tolere l'absence, jamais
+# d'acces direct a la cle (P-02).
 #
 # Usage:
 #   dag.sh init   --file=F
-#   dag.sh add    --file=F --id=N --step="..." [--stage=S] [--deps=a,b]   # remap id::stage si collision
+#   dag.sh add    --file=F --id=N --step="..." [--stage=S] [--deps=a,b] [--scope=g1,g2]   # remap id::stage si collision
 #   dag.sh ready  --file=F                                                # frontiere ready (JSON)
 #   dag.sh mark   --file=F --id=N --status=running|done|failed            # + recalcule la frontiere
 #   dag.sh reopen --file=F --id=N                                         # re-entree : noeud + dependants
@@ -23,7 +27,7 @@
 
 set -uo pipefail
 
-ACTION=""; FILE=""; ID=""; STEP=""; STAGE=""; DEPS=""; STATUS=""
+ACTION=""; FILE=""; ID=""; STEP=""; STAGE=""; DEPS=""; STATUS=""; SCOPE=""
 for arg in "$@"; do
   case "$arg" in
     init|add|ready|mark|reopen|status|tree) ACTION="$arg" ;;
@@ -32,6 +36,7 @@ for arg in "$@"; do
     --step=*)   STEP="${arg#*=}" ;;
     --stage=*)  STAGE="${arg#*=}" ;;
     --deps=*)   DEPS="${arg#*=}" ;;
+    --scope=*)  SCOPE="${arg#*=}" ;;
     --status=*) STATUS="${arg#*=}" ;;
     -h|--help)  grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *) echo "Unknown arg: $arg" >&2; exit 1 ;;
@@ -41,10 +46,10 @@ done
 [ -n "$FILE" ] || { echo '{"error": "file-required"}' >&2; exit 1; }
 [ -n "$ACTION" ] || { echo "Usage: $0 {init|add|ready|mark|reopen|status|tree} --file=F [...]" >&2; exit 1; }
 
-python3 - "$ACTION" "$FILE" "$ID" "$STEP" "$STAGE" "$DEPS" "$STATUS" <<'PYEOF'
+python3 - "$ACTION" "$FILE" "$ID" "$STEP" "$STAGE" "$DEPS" "$STATUS" "$SCOPE" <<'PYEOF'
 import sys, os, json
 
-action, file, nid, step, stage, deps_raw, status = sys.argv[1:8]
+action, file, nid, step, stage, deps_raw, status, scope_raw = sys.argv[1:9]
 VALID = {"blocked", "ready", "running", "done", "failed"}
 
 def load():
@@ -100,7 +105,10 @@ if action == "add":
     missing = [d for d in deps if d not in idx]  # M1 : une dep inexistante bloquerait le noeud a vie
     if missing:
         emit({"error": "unknown-dep", "missing": missing}); sys.exit(1)
-    node = {"id": final, "step": step, "stage": stage, "deps": deps, "status": "blocked"}
+    scope = [s.strip() for s in scope_raw.split(",") if s.strip()]  # meme regle que deps (D-13)
+    node = {"id": final, "step": step, "stage": stage, "deps": deps}
+    node["scope"] = scope  # affectation directe unique : CONSTRUCTION du noeud, jamais une lecture (P-02)
+    node["status"] = "blocked"
     nodes.append(node)
     recompute(nodes)
     save(dag)
