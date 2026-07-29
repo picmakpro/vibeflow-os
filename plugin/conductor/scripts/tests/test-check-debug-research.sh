@@ -152,6 +152,52 @@ RC=0; run_check --strict >/dev/null 2>&1 || RC=$?
 RC=0; run_check --strict --allow-empty >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 0 ] && ok "T14 --strict --allow-empty + aucune brique → exit 0 (opt-in)" || ko "T14 --allow-empty devrait sortir 0, obtenu rc=$RC"
 
+# ---------- Chemin par DEFAUT du gate (D-24) — jamais exerce jusqu'ici ----------
+# Aucun des 14 cas precedents n'invoque check-debug-research.sh SANS --agents-dir/--skills-dir : le
+# helper d'invocation partage par tous les cas ci-dessus les injecte systematiquement en dur. Les 3
+# cas suivants invoquent bash "$CHECK" DIRECTEMENT, dans un sous-shell deplace vers un repertoire
+# factice mktemp -d, sans jamais toucher au cwd de la suite. Mutation tuee : alterer la valeur par
+# defaut AGENTS_DIR/SKILLS_DIR dans check-debug-research.sh fait echouer T17 (T15/T16 passeraient
+# encore avec un defaut casse).
+
+PWD_BEFORE="$(pwd)"
+
+# T15 — cible absente, mode strict : exit 3 INDETERMINE, jamais un vert (contrat F13 / D-24)
+DEFAULT_EMPTY="$(mktemp -d)"
+OUT="$(cd "$DEFAULT_EMPTY" && bash "$CHECK" --strict 2>&1)"; RC=$?
+if [ "$RC" -eq 3 ] && echo "$OUT" | grep -q "INDETERMINE"; then
+  ok "T15 chemin par defaut, cible absente, --strict → exit 3 INDÉTERMINÉ, jamais un vert (D-24)"
+else
+  ko "T15 (rc=$RC) : $OUT"
+fi
+rm -rf "$DEFAULT_EMPTY"
+
+# T16 — cible absente, mode hook : exit 0, silence TOTAL (pin de l'exemption volontaire)
+DEFAULT_EMPTY2="$(mktemp -d)"
+OUT="$(cd "$DEFAULT_EMPTY2" && bash "$CHECK" --hook 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && [ -z "$OUT" ]; then
+  ok "T16 chemin par defaut, cible absente, --hook → exit 0, silence total (exemption pinnee)"
+else
+  ko "T16 (rc=$RC) : '$OUT'"
+fi
+rm -rf "$DEFAULT_EMPTY2"
+
+# T17 — cible PRESENTE au chemin par defaut, cas DISCRIMINANT : seul ce cas prouve que la valeur
+# par defaut resout une cible reelle — un SKILL.md de depannage sans marqueur de recherche doc.
+DEFAULT_PRESENT="$(mktemp -d)"
+mkdir -p "$DEFAULT_PRESENT/.claude/skills/raw-debug-defaut"
+printf -- '---\nname: raw-debug-defaut\ndescription: Débugge un crash, stack trace\n---\nReproduis, corrige.\n' > "$DEFAULT_PRESENT/.claude/skills/raw-debug-defaut/SKILL.md"
+RC=0; (cd "$DEFAULT_PRESENT" && bash "$CHECK") >/dev/null 2>&1 || RC=$?
+if [ "$RC" -eq 1 ]; then
+  ok "T17 chemin par defaut, cible presente non conforme, SANS flag → exit 1 (le defaut resout une cible reelle)"
+else
+  ko "T17 (rc=$RC) — le defaut AGENTS_DIR/SKILLS_DIR ne resout pas la cible reelle"
+fi
+rm -rf "$DEFAULT_PRESENT"
+
+# T18 — le cwd de la suite est inchange : les 3 deplacements ci-dessus sont confines a des sous-shells
+[ "$(pwd)" = "$PWD_BEFORE" ] && ok "T18 cwd de la suite inchange apres les cas chemin par defaut" || ko "T18 cwd altere : $(pwd) != $PWD_BEFORE"
+
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
 [ "$fail" -eq 0 ]

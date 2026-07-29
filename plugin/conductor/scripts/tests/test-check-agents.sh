@@ -977,6 +977,56 @@ else
 fi
 rm -f "$AG/extra-mot.md"
 
+# ---------- Chemin par DEFAUT des gates (D-24) — jamais exerce jusqu'ici ----------
+# Aucun des 54 cas precedents n'invoque check-agents.sh SANS --agents-dir/--skills-dir : le helper
+# d'invocation partage par tous les cas ci-dessus les injecte systematiquement en dur. C'est ce
+# point aveugle qui a laisse un defaut de perimetre (AGENTS_DIR/SKILLS_DIR resolus depuis le cwd du
+# hook, jamais celui du plugin) survivre a toute la Phase 16. Les 3 cas suivants invoquent
+# bash "$CHECK" DIRECTEMENT, dans un sous-shell deplace vers un repertoire factice mktemp -d, sans
+# jamais toucher au cwd de la suite elle-meme. Mutation tuee : alterer la valeur par defaut
+# AGENTS_DIR (ou SKILLS_DIR) dans check-agents.sh fait echouer T57 — la sonde qui manquait
+# (T55/T56 passeraient encore avec un defaut casse, T57 seul le prouve).
+
+PWD_BEFORE="$(pwd)"
+
+# T55 — cible absente, mode strict : exit 3 INDETERMINE, jamais un vert (contrat F13 / D-24)
+DEFAULT_EMPTY="$(mktemp -d)"
+OUT="$(cd "$DEFAULT_EMPTY" && bash "$CHECK" --strict 2>&1)"; RC=$?
+if [ "$RC" -eq 3 ] && echo "$OUT" | grep -q "INDETERMINE"; then
+  ok "T55 chemin par defaut, cible absente, --strict → exit 3 INDÉTERMINÉ, jamais un vert (D-24)"
+else
+  ko "T55 (rc=$RC) : $OUT"
+fi
+rm -rf "$DEFAULT_EMPTY"
+
+# T56 — cible absente, mode hook : exit 0, silence TOTAL (pin de l'exemption volontaire sur
+# cible vide — une suppression inconditionnelle future de cette exemption ferait echouer ce cas)
+DEFAULT_EMPTY2="$(mktemp -d)"
+OUT="$(cd "$DEFAULT_EMPTY2" && bash "$CHECK" --hook 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && [ -z "$OUT" ]; then
+  ok "T56 chemin par defaut, cible absente, --hook → exit 0, silence total (exemption pinnee)"
+else
+  ko "T56 (rc=$RC) : '$OUT'"
+fi
+rm -rf "$DEFAULT_EMPTY2"
+
+# T57 — cible PRESENTE au chemin par defaut, cas DISCRIMINANT : seul ce cas prouve que la valeur
+# par defaut resout une cible reelle — T55/T56 passeraient encore avec un defaut casse (pointant
+# vers un repertoire qui n'existera jamais).
+DEFAULT_PRESENT="$(mktemp -d)"
+mkdir -p "$DEFAULT_PRESENT/.claude/agents"
+printf 'Aucun frontmatter ici -- non conforme.\n' > "$DEFAULT_PRESENT/.claude/agents/casse.md"
+RC=0; (cd "$DEFAULT_PRESENT" && bash "$CHECK") >/dev/null 2>&1 || RC=$?
+if [ "$RC" -eq 1 ]; then
+  ok "T57 chemin par defaut, cible presente non conforme, SANS flag → exit 1 (le defaut resout une cible reelle)"
+else
+  ko "T57 (rc=$RC) — le defaut AGENTS_DIR ne resout pas la cible reelle"
+fi
+rm -rf "$DEFAULT_PRESENT"
+
+# T58 — le cwd de la suite est inchange : les 3 deplacements ci-dessus sont confines a des sous-shells
+[ "$(pwd)" = "$PWD_BEFORE" ] && ok "T58 cwd de la suite inchange apres les cas chemin par defaut" || ko "T58 cwd altere : $(pwd) != $PWD_BEFORE"
+
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
 [ "$fail" -eq 0 ]
