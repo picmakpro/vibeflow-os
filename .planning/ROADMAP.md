@@ -863,7 +863,10 @@ rien. Même diagnostic pour `check-debug-research.sh --hook`. Les deux sont en p
 réel** sur les agents que VibeFlow gouverne — dont, précisément, l'écart `tools:` déclaré/runtime du
 changement 1. Impraticable le 28/07, praticable maintenant.
 
-**Requirements**: TBD (à dériver au cadrage)
+**Requirements**: SC1, SC2, SC3, SC4, SC5, SC6, SC7 (les 7 critères de succès ci-dessous servent
+d'IDs de traçabilité — aucun ID formel `REQ-` n'existe pour cette phase dans `REQUIREMENTS.md`,
+même convention que les Phases 15 à 19 ; numérotation reprise telle quelle par `20-RESEARCH.md`,
+`20-VALIDATION.md` et le champ `requirements` de chaque `20-NN-PLAN.md`).
 **Depends on:** aucune — indépendante des Phases 18 (bloquée par RFC upstream) et 19 (livrée).
 **Success Criteria** (what must be TRUE):
 
@@ -923,8 +926,14 @@ agents observable — le 4 est ce qui rend le 1 visible) et {2,3} (pilotage de m
 phases. Samuel a tranché pour une phase unique. Le changement 2 vaut à lui seul plus que les trois
 autres réunis — si l'exécution déborde, c'est par là qu'il faudra scinder.
 
-**Plans:** 0 plans
+**Plans:** 7 plans (4 vagues)
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 20 to break down)
+- [ ] 20-01-PLAN.md — Changement 5 : périmètre explicite des 2 hooks de conformité, avertissements conditionnels en mode hook, charset de token MCP, clé `vf-mcp-tools` connue du gate ; chemin par défaut enfin testé (vague 1)
+- [ ] 20-02-PLAN.md — `dag.sh` : `--scope` sur `add`, `review_regime` forcé à `full` par `reopen`, périmètres gelés exposés par `status` (vague 1)
+- [ ] 20-03-PLAN.md — Changement 1 : mode d'injection MCP nommé dans `inject-mcp-tools.sh`, `vf-reviewer` déclare son allowlist et son protocole d'appel (vague 2, dépend de 20-01)
+- [ ] 20-04-PLAN.md — Critère 2, sens ouverture : `disallowedTools: Write, Edit` sur les 4 juges, `vf-design-judge` cesse d'affirmer une barrière que le runtime ne pose pas (vague 1)
+- [ ] 20-05-PLAN.md — Changement 3 : `.planning/MISSION-INVARIANTS.md` réduit aux éléments falsifiables + `check-mission-invariants.sh` et sa suite (vague 2, dépend de 20-02, checkpoint humain D-16)
+- [ ] 20-06-PLAN.md — Changement 2 : la revue devient un étage de premier rang piloté par le manager, graduée par risque, revue de jointure sur topologie (vague 3, dépend de 20-02/20-03/20-05, checkpoint humain D-11)
+- [ ] 20-07-PLAN.md — Gouvernance : ADR-051 révisée + ADR-060, doctrine `team-kernel`/README alignée, 6 modules bumpés, gates de sortie (vague 4, dépend de tous)
