@@ -141,7 +141,7 @@ deps[], scope[], status ... }`, doc du champ `review_regime`, ligne d'usage de `
 `[--scope=g1,g2]`, ligne d'usage de `reopen` mentionnant le regime force, ligne d'usage de `status`
 mentionnant les perimetres geles (voir transcription complete dans le rapport a l'orchestrateur).
 
-**Boucle complete des suites du repo (commande CI exacte)** : aucune ligne `ECHEC` — 37 suites
+**Boucle complete des suites du repo (commande CI exacte)** : aucune ligne `ECHEC` — 42 suites
 toutes vertes, aucune regression introduite par ce plan.
 
 ## Deviations from Plan
