@@ -19,6 +19,13 @@ docs/reference/
 .vibeflow-installed
 *.tmp
 
+# Pointeur de workstream actif : état LOCAL à une session, jamais partagé.
+# C'est le repli du moteur GSD quand aucune identité de session ne résout. S'il était
+# committé, deux personnes travaillant sur des workstreams différents s'écraseraient
+# mutuellement la sélection au prochain pull — soit exactement le conflit que la
+# partition en workstreams vise à supprimer. Vérifié en bac à sable le 2026-07-30.
+.planning/active-workstream
+
 # Dépendances / environnements (au cas où un module ajoute de l'outillage)
 node_modules/
 .venv/
