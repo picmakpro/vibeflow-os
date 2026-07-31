@@ -167,7 +167,7 @@ flowchart TD
     end
     socle --> orch
     socle --> gouv
-    CI["CI : 44 suites + job « lab frais »<br/>la baseline passe ses propres gates<br/>depuis un lab vierge"] -.-> socle
+    CI["CI : 45 suites + job « lab frais »<br/>la baseline passe ses propres gates<br/>depuis un lab vierge"] -.-> socle
 ```
 
 Les autres métiers se **fabriquent** sur ce socle — voir
@@ -237,7 +237,7 @@ ne se tapent pas directement — ce sont leurs points d'entrée explicites.
 ## 🔒 Confiance
 
 - **Source-available** : code et historique publics — voir [LICENSE](./LICENSE).
-- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`44 suites` en CI), install
+- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`45 suites` en CI), install
   **idempotente** avec backup avant écrasement.
 - **Le repo s'applique sa propre doctrine** : CI sur push/PR (tests + gates stricts) + job
   « **lab frais** » — la baseline est installée dans un lab vierge et doit passer ses propres

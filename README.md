@@ -162,7 +162,7 @@ flowchart TD
     end
     socle --> orch
     socle --> gouv
-    CI["CI: 44 suites + “fresh lab” job<br/>the baseline passes its own gates<br/>from a blank install"] -.-> socle
+    CI["CI: 45 suites + “fresh lab” job<br/>the baseline passes its own gates<br/>from a blank install"] -.-> socle
 ```
 
 Other domains are **manufactured** on this base — see
@@ -232,7 +232,7 @@ are their explicit entry points.
 ## 🔒 Trust
 
 - **Source-available**: public code and history — see [LICENSE](./LICENSE).
-- **Auditable**: bash + `jq`, every script covered by its suite (44 suites in CI),
+- **Auditable**: bash + `jq`, every script covered by its suite (45 suites in CI),
   **idempotent** install with backup before overwrite.
 - **The repo applies its own doctrine**: CI on push/PR (tests + strict gates) + a
   "**fresh lab**" job — the baseline is installed into a blank lab and must pass its own
