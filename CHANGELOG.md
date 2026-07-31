@@ -5,6 +5,69 @@ dernières entrées et pointent ici). Chaque module a par ailleurs son propre `C
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.46.0] — 2026-08-01
+
+**Le suivi cesse de mentir, et deux sessions cessent de pouvoir se marcher dessus sans le savoir.**
+Modules `conductor` **v1.19.0**, `dev-orchestrator` **v2.10.0**, `design-orchestrator` **v1.4.0**.
+
+### Hygiène documentaire — la doctrine de sortie (Phase 22)
+
+La doctrine documentaire avait une **entrée** (`ingestion-flow.md`) mais pas de **sortie**. Elle en
+a désormais une, symétrique, et les deux managers de mission savent quand la déclencher.
+`docs-flow.md` distingue les quatre familles que GSD maintient séparément et que nous avions fondues
+en une seule ligne : doc **produit** (`gsd-docs-update`), doc **d'entrée** (`gsd-ingest-docs`), doc
+**du code** (`gsd-map-codebase`), doc **de savoir** (`gsd-extract-learnings`). Les flags porteurs de
+sens sont enfin exposés — `--verify-only` (auditer sans écrire) et `--force` (régénérer, écrase le
+manuscrit) répondent à deux intentions que rien ne distinguait. `vf-design-manager` reçoit le même
+nœud `docs` que son homologue dev, **par renvoi et jamais par copie** (ADR-057).
+
+### Le ROADMAP reçoit la checklist que le moteur lit
+
+Le chantier était annoncé comme « les ~20 SUMMARY manquants ». Le diagnostic a montré autre chose :
+**le ROADMAP n'avait jamais porté la checklist de phases**, seule forme que `@opengsd/gsd-core` lit
+pour établir qu'une phase est terminée. Le moteur voyait **zéro** phase finie sur 24 et rendait des
+compteurs faux (`completed_phases: 10`, `current_phase: 19` alors que la Phase 22 était livrée). La
+table `## Progress`, riche et tenue à jour, n'est lue par **aucun** outil : elle est écrite pour les
+humains, et les deux s'étaient éloignées sans que rien ne le signale.
+
+Checklist posée pour les 25 phases. Elle rattrape du même geste les **20 plans sans SUMMARY** des
+Phases 11 à 14 : `roadmap.cjs` fait explicitement primer la case cochée sur le disque, « pour les
+phases terminées avant le tracking GSD, qui n'ont pas les paires PLAN/SUMMARY ». Ces 4 phases sont
+shippées, chacune avec sa release — **rien n'est inventé, aucun SUMMARY n'est fabriqué**. Les Phases
+23 à 25, inscrites hors périmètre par une session concurrente, sont **régularisées** sous un jalon
+`gsd-alignement` avec une note d'origine qui dit franchement d'où elles viennent.
+
+**Deux signalements déposés en amont** : [#2956](https://github.com/open-gsd/gsd-core/issues/2956)
+(`Phase` toujours non scopé — troisième génération de #2444/#2567, dont `Last Activity` avait reçu
+un garde-fou que `Phase` n'a jamais eu) et
+[#2957](https://github.com/open-gsd/gsd-core/issues/2957) (`buildStateFrontmatter` ignore la
+checkbox que `roadmap.analyze` honore délibérément — la même fonction lit le ROADMAP pour le
+dénominateur et refuse de le lire pour le numérateur).
+
+### Un écrivain = un worktree (ADR-064)
+
+Le 2026-07-31, **deux sessions ont écrit sur la même branche sans le savoir** : trois commits hors
+périmètre dans la PR d'une mission qui ne les avait pas produits. Le constat de départ — « le verrou
+protège l'étape, pas la branche » — était juste mais incomplet, et l'incomplétude changeait la
+solution : **`driver-lock.sh` n'est consulté que par les managers**, et la session fautive n'en était
+pas un. Durcir le verrou n'aurait rien changé ; un verrou que seule une catégorie d'acteurs
+interroge documente une intention, il ne la fait pas respecter.
+
+ADR-064 tranche ce qu'ADR-059 avait explicitement laissé ouvert : l'isolation devient **physique**
+(`isolation: worktree`) au lieu de reposer sur la bonne volonté de celui qui écrit. `driver-lock.sh`
+enregistre `branch=` et `worktree=` et les **préserve** au heartbeat. `check-branch-claim.sh`
+(contrat à 4 codes, **advisory**, câblé au `SessionStart`) porte enfin le claim jusqu'aux sessions
+ordinaires — le discriminant est l'**arbre**, pas l'owner. Emprunts assumés à
+`shanraisshan/claude-code-best-practice` (le worktree de premier rang) et à `jcode`/ADR-053 (le
+verrou, dont on élargit le claim au lieu de le remplacer).
+
+Un faux positif réel a été trouvé dans le gate en le construisant : la comparaison **littérale** des
+chemins d'arbre le faisait crier sur son **propre** arbre (`/tmp` → `/private/tmp` sur macOS).
+Corrigé par comparaison normalisée, tenu par un cas de régression **et** un cas de discriminance,
+mutant tué.
+
+**46 suites** vertes, `check-agents --strict` vert sur les 6 dossiers d'agents.
+
 ## [v2.45.0] — 2026-07-31
 
 **VibeFlow aligné sur `@opengsd/gsd-core` 1.9.0.** Modules `dev-orchestrator` **v2.9.0**,
