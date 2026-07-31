@@ -29,6 +29,9 @@
 | ADR-057 | 2026-07-25 | Frontières avec les briques tierces — détection outillée des recouvrements | Validée |
 | ADR-058 | 2026-07-28 | Le moteur GSD entre dans le périmètre de `/vf-update` | Validée |
 | ADR-059 | 2026-07-28 | Une mission d'équipe travaille sur sa propre branche, jamais sur la branche par défaut | Validée |
+| ADR-060 | 2026-07-29 | La revue devient un étage de premier rang, piloté par le manager | Validée |
+| ADR-061 | 2026-07-31 | Les lanes de revue cross-AI de plans (amont) et l'étage de revue de code (ADR-060) sont des objets disjoints | Validée |
+| ADR-062 | 2026-07-31 | Les deux hooks 1.9.0 non câblés restent hors périmètre de `merge-hooks.sh` | Validée |
 
 ### ADR héritées les plus citées (définitions canoniques)
 
@@ -1158,3 +1161,84 @@ de mission.
 
 Ne modifie ni ADR-060 ni ADR-053 (Pattern E) — clarifie une frontière déjà vraie en pratique,
 jamais écrite. Aucune rule nouvelle.
+
+## ADR-062 : Les deux hooks 1.9.0 non câblés (`gsd-ensure-canonical-path.js`, `gsd-update-banner.js`) restent hors périmètre de `merge-hooks.sh`
+
+**Date** : 2026-07-31
+**Statut** : Validée
+**Décideur** : Samuel (arbitrage de cadrage, mission delta `@opengsd/gsd-core` 1.8.0 → 1.9.0, Phase
+VFDO-21 plan 21-03)
+**Contexte** : `gsd-core` 1.9.0 pose deux hooks `SessionStart` absents du `settings.json` du poste
+courant, qui câble déjà 13 autres hooks `gsd-*` : `gsd-ensure-canonical-path.js` (#997) et
+`gsd-update-banner.js` (#2795). Le diagnostic de mission (`.planning/missions/2026-07-31-delta-gsd-core-1.9.0.md`
+§Observation annexe) constate le fait sans trancher : « rien n'est cassé, mais une fonctionnalité
+amont est peut-être inactive faute de câblage » — à instruire explicitement plutôt que par
+omission, sujet que `merge-hooks.sh` (`plugin/_internal/merge-hooks.sh:145-150`) documente déjà
+vouloir laisser aux « hooks tiers/gsd-core » sans jamais les avoir confrontés au cas réel.
+
+### Problème
+
+Sans arbitrage écrit, l'absence de ces deux hooks resterait ambiguë à chaque lecture future du
+delta : gap VibeFlow à combler, ou comportement gsd-core correct qu'il ne faut surtout pas casser
+en le câblant à la main ? Les deux hooks n'ont pas la même nature et ne peuvent pas être tranchés
+par une règle unique — chacun est confronté séparément à l'état réel du poste.
+
+### Options Considérées
+
+| Option | Avantages | Inconvénients |
+|---|---|---|
+| Statu quo silencieux (ne rien écrire) | coût nul | la question du diagnostic reste ouverte — refera surface à chaque delta gsd-core |
+| Étendre `merge-hooks.sh` pour câbler les deux hooks dans tout `settings.json` cible | « complet » en apparence | câblerait `gsd-update-banner.js` alors que son propre en-tête dit qu'il doit rester **éteint** quand la statusline GSD est installée (notre cas) — régression, pas un gain ; et `gsd-ensure-canonical-path.js` répare un problème d'install que VibeFlow ne produit pas (voir Décision) |
+| **Vérifier séparément chaque hook contre son propre contrat d'activation puis documenter (retenue)** | ferme la question avec preuves, ne câble rien qui casserait un comportement déjà correct | aucun — rend explicite un état déjà correct en pratique |
+
+### Décision
+
+**Aucun câblage n'est ajouté à `merge-hooks.sh`.** Les deux hooks sont restés hors `settings.json`
+pour des raisons distinctes, vérifiées séparément sur pièce :
+
+1. **`gsd-update-banner.js` — absence correcte, pas un gap.** Son propre en-tête (`~/.claude/hooks/gsd-update-banner.js:6-9`)
+   documente que ce hook n'est enregistré par l'installeur amont QUE si l'utilisateur a décliné (ou
+   remplacé) la statusline GSD — « the presence of the SessionStart entry IS the opt-in ». Le
+   `settings.json` du poste courant câble déjà `gsd-statusline.js` (bloc `statusLine`) : la
+   statusline EST installée, donc la non-registration du banner est exactement le comportement
+   voulu par gsd-core lui-même. Le câbler à la main romprait ce contrat amont (double signal de
+   mise à jour disponible : statusline + banner).
+2. **`gsd-ensure-canonical-path.js` — hors cas d'usage de VibeFlow.** Son propre en-tête
+   (`~/.claude/hooks/gsd-ensure-canonical-path.js:4-14`) documente qu'il répare un problème
+   d'installation précis : quand `gsd-core` lui-même est posé comme **plugin marketplace Claude
+   Code** (`CLAUDE_PLUGIN_ROOT` présent), l'installeur classique ne s'exécute jamais et
+   `~/.claude/gsd-core/` n'est jamais matérialisé, cassant les `@`-includes des agents/workflows.
+   Ce n'est PAS le chemin d'install de VibeFlow : `ensure-deps.sh:263` bootstrappe `gsd-core` via
+   `npx -y "@opengsd/gsd-core@^1" --claude <scope>` — l'installeur npm classique que le hook lui-même
+   cite comme cas qui N'A PAS besoin de sa correction (« In a classic `bin/install.js` install the
+   canonical path is a real directory holding the bundled tree, so the includes resolve »). Vérifié
+   sur le poste courant : `~/.claude/gsd-core/` existe bien comme répertoire réel, pas un lien
+   symbolique de secours posé par ce hook.
+3. **`merge-hooks.sh` reste inchangé** : son commentaire existant (`:145-150`, « hooks
+   tiers/gsd-core ») documentait déjà l'intention de ne pas s'en mêler — cette ADR confirme cette
+   intention avec preuves plutôt que de la modifier. Aucune ligne de code n'est ajoutée ou retirée
+   du script.
+
+### Conséquences
+
+**Positives** : la question du diagnostic de mission est fermée avec preuves, sans risquer de
+casser un comportement amont déjà correct (le banner en double aurait été un vrai régression
+utilisateur). Aucun changement de comportement.
+**Négatives** : aucune — décision purement documentaire, aucun code touché.
+**Explicitement écarté** : étendre `merge-hooks.sh` pour ces deux hooks ; forcer leur câblage dans
+`settings.json`.
+**Limite assumée** : cette décision est vérifiée sur **ce poste** (statusline installée, install
+npm classique). Si un lab VibeFlow installait un jour `gsd-core` via un plugin Claude Code
+marketplace, ou déclinait la statusline GSD, la conclusion du point 1/2 changerait — l'ADR ne
+prétend pas couvrir ce cas hypothétique, seulement l'état vérifié aujourd'hui.
+
+### Code Impacté
+
+- `docs/ADR.md` (cette entrée)
+- `plugin/dev-orchestrator/README.md` — pointeur bref dans la section hooks/scripts du module
+  (§Structure du module)
+
+### Rules Associées
+
+Ne modifie ni `merge-hooks.sh` ni son commentaire existant — confirme avec preuves une intention
+déjà écrite (`plugin/_internal/merge-hooks.sh:145-150`). Aucune rule nouvelle.
