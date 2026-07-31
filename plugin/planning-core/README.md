@@ -7,7 +7,7 @@
 > Sur un lab de code, le planning du **projet** appartient au moteur de développement : ce module
 > redirige vers le verbe adéquat au lieu de produire un format concurrent (ADR-055).
 
-**Type** : `skill + references + scripts` · **Version** : v2.5.2 · **Dépend de** : rien.
+**Type** : `skill + references + scripts` · **Version** : v2.5.3 · **Dépend de** : rien.
 
 ---
 
