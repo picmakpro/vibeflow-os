@@ -116,6 +116,52 @@ remplace pas.
 mission, qui partagent le même arbre de travail. Une branche par mission ne les sépare pas entre
 elles — seul `isolation: worktree` le ferait, et c'est une décision distincte, non tranchée ici.
 
+## Contrat `estimate:`/`actuals:` (calibration amont, gsd-core 1.9.0)
+
+`gsd-planner` (1.9.0) écrit un bloc `estimate:` dans le frontmatter du `PLAN.md` qu'il produit
+(`tokens`, `raw_tokens`, `tasks`, `confidence`) ; `gsd-executor`, **quand le plan portait un
+`estimate:`**, écrit en retour un bloc `actuals:` dans le frontmatter du `SUMMARY.md` (`tokens`,
+`tasks`, `commits`). Trois règles amont, non négociables, à ne jamais affaiblir en les
+retranscrivant :
+
+- **`confidence` est DÉRIVÉE du nombre d'échantillons, jamais auto-évaluée** — un agent ne « se
+  sent » pas confiant, il compte ses échantillons.
+- **Même échelle des deux côtés** : `actuals.tokens` se mesure en `chars/4` sur les fichiers
+  réellement changés, **jamais** un compteur du harness — sinon on mesure les méthodes de mesure,
+  pas l'écart.
+- **Aucun arrondi flatteur** — un nombre flatté corrompt toute projection ultérieure.
+
+Ces deux blocs sont produits **directement sur disque** par `gsd-planner`/`gsd-executor` — rien à
+faire côté VibeFlow pour qu'ils existent. Le risque n'est pas leur absence, c'est leur **perte
+silencieuse** au passage `vf-coder` → `vf-dev-manager` → conversation principale : ni le bloc typé
+de `vf-coder` (Pattern C, `mission-flow.md`) ni le gabarit « Rapport de mission » ci-dessous ne les
+mentionnaient avant cette entrée.
+
+**Propagation retenue** — le disque reste la source de vérité, mais le bloc typé de `vf-coder`
+gagne deux champs **optionnels**, frères de `statut`/`findings`/`noeuds_debloques` :
+
+```
+"estimate": { "tokens": …, "raw_tokens": …, "tasks": …, "confidence": "low|med|high" },
+"actuals":  { "tokens": …, "tasks": …, "commits": … }
+```
+
+Présents **uniquement** quand le `PLAN.md`/`SUMMARY.md` du mandat les portait — absents sinon
+(aucune valeur inventée, même conditionnalité que l'amont). `vf-coder` les **recopie verbatim**
+depuis le frontmatter qu'il a produit ou lu : il ne recalcule, n'arrondit ni ne réinterprète jamais
+ces nombres — ce serait précisément l'arrondi flatteur que l'amont proscrit. `vf-dev-manager` fait
+de même en les relayant dans son « Rapport de mission » : simple concaténation par sprint, aucune
+statistique agrégée de son cru — la boucle de calibration reste amont, notre seul devoir est de ne
+pas couper le fil.
+
+## Étage revue — deux objets disjoints (ADR-060 / ADR-061)
+
+La revue de **diff de code** (`vf-reviewer` → `gsd-code-reviewer`, nœud `revue-N` posé
+systématiquement par le manager, ADR-060) et la revue **cross-AI de plans** amont (`gsd-review`,
+lanes déclarées par `review-lane-descriptor.cjs`, ADR-2782 Phase 1, opt-in utilisateur via
+`--reviews`) sont deux étages **disjoints** — objet revu, moment du cycle et déclencheur diffèrent
+sur les trois axes. Arbitrage complet, avec le critère écrit : `docs/ADR.md` ADR-061. Aucun
+câblage automatique de `gsd-review` dans le DAG de mission — décision distincte, non prise ici.
+
 ## Rapport de mission (manager → main)
 
 Retour **compact**. Le détail vit sur disque, pas dans la conversation.
@@ -124,6 +170,7 @@ Retour **compact**. Le détail vit sur disque, pas dans la conversation.
 RAPPORT DE MISSION
 - Verdict global : ✅ | partiel | bloqué
 - Par sprint : fait / verdicts (recette, revue, audit) / commits (SHA)
+- Calibration (si portée) : estimate vs actuals par sprint — recopiés verbatim, jamais recalculés
 - Décisions prises en autonomie (et par quel panel)
 - Blocages & points nécessitant l'utilisateur
 - Rapport détaillé : <chemin du fichier écrit sur disque>
