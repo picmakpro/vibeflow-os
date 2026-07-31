@@ -330,6 +330,14 @@ Progress: [██████░░░░] 59%
 
 ### Roadmap Evolution
 
+- 2026-08-01 : **Phase 26 ajoutée** — « Manuel utilisateur VibeFlow (manual/) ». Origine : demande
+  de Samuel (réorganiser les specs et offrir une doc lisible aux arrivants sans les plonger dans
+  les docs de gestion de projet). Un manuel « vitrine » sous `manual/` à la racine : arborescence
+  thématique numérotée qui descend progressivement sous le capot, pages courtes chaînées
+  prev/sommaire/next, index avec graphiques mermaid, bilingue FR + EN. `README`/`INSTALL`
+  maigrissent et pointent dessus au lieu de dupliquer. Cible : lecteurs humains — ce dossier sera
+  généralement ignoré par les agents de maintenance du repo.
+
 - 2026-07-31 : **Phase 22 ajoutée** — « Hygiène documentaire — doctrine de sortie et captation
   d'intention ». Origine : demande de Samuel (« le dev-orchestrator n'a pas de workflow de mise à
   jour de doc avec les commandes GSD qui maintiennent la doc et les specs »). Gap établi **sur

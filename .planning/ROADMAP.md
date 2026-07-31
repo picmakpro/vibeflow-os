@@ -1554,10 +1554,12 @@ pile.
   d'invocation et la doctrine de flags soient arrêtées. Cette phase **dépend** de 23 et ne la
   préempte pas ; si l'artefact prend la forme d'une capability `plan:pre`, la table
   capabilities/hooks de la Phase 23 fait foi.
+
 - **vs Phase 24 (activation et mesure).** M3 (`effort:` par rôle) et A2 (`agent_skills`)
   éditent tous deux `plugin/*/agents/*.md` — les fichiers mêmes sur lesquels G1 pose un gate.
   Ordonnancement **après 24** pour ne pas calibrer un seuil sur un état qui bouge, et pour éviter
   les éditions concurrentes.
+
 - **G1 n'est pas une capability GSD.** C'est une règle de densité propre à VibeFlow (ADR-029)
   outillée par notre propre gate. Aucun recouvrement avec le lot ACTIVATION de la Phase 24.
 
@@ -1568,3 +1570,22 @@ pile.
 Plans:
 
 - [ ] TBD (run /gsd-plan-phase 25 to break down)
+
+### Phase 26: Manuel utilisateur VibeFlow (manual/)
+
+**Goal:** Créer un manuel utilisateur « vitrine » sous `manual/` à la racine — destiné aux humains
+qui arrivent sur le repo, distinct des docs de gestion de projet (`docs/`, `.planning/`) et
+volontairement hors du contexte des agents qui maintiennent VibeFlow. Arborescence thématique à
+préfixes numériques (get started/install, philosophie, cycle de dev, équipe d'agents, sous le
+capot…) qui descend progressivement dans la profondeur : pages courtes (un sujet = un fichier, on
+divise plutôt qu'allonger), chaînées par navigation `← Précédent · ↑ Sommaire · Suivant →`, index
+`manual/README.md` avec carte du manuel (graphiques mermaid) et tutos. Bilingue FR + EN (comme les
+deux README). `README.md`/`README.fr.md` et `INSTALL.md` maigrissent et pointent vers le manuel au
+lieu de dupliquer — le manuel devient la version guidée et pédagogique.
+**Requirements**: TBD
+**Depends on:** Phase 25
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 26 to break down)
