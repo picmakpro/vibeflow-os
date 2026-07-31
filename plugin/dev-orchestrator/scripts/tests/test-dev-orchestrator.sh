@@ -1650,7 +1650,22 @@ else
   else
     ko "T22 docs-flow : frontière vibeflow-os absente (une seule ligne doit porter gsd-docs-update + vibeflow-os + check-version-sync.sh)"; t22_ok=0
   fi
-  [ "$t22_ok" -eq 1 ] && ok "T22 docs-flow : doctrine complète (4 familles, --verify-only, ADR-031, ligne rouge --force, frontière vibeflow-os, ## Interdits), AGENT.md et intent-routing.md y renvoient"
+  # Tâche 3 — captation d'intention : les deux régimes distincts sont ROUTÉS, pas seulement
+  # documentés. C'est le (b) du but de la phase — sans ces lignes, la doctrine existe et reste
+  # inatteignable en langage naturel.
+  "$GREP" -q -- "--verify-only" "$ROUTING" || { ko "T22 captation : intent-routing.md ne route pas le régime d'audit (--verify-only)"; t22_ok=0; }
+  "$GREP" -q -- "--force" "$ROUTING" || { ko "T22 captation : intent-routing.md ne route pas le régime de régénération (--force)"; t22_ok=0; }
+  "$GREP" -q "dit encore vrai" "$ROUTING" || { ko "T22 captation : la formulation d'audit « dit encore vrai » n'est pas captée"; t22_ok=0; }
+  "$GREP" -q "refais toute la doc" "$ROUTING" || { ko "T22 captation : la formulation de régénération « refais toute la doc » n'est pas captée"; t22_ok=0; }
+  # Le protocole de désambiguïsation (D-10) : les quatre familles nommées au même endroit.
+  "$GREP" -q "Désambiguïsation" "$ROUTING" || { ko "T22 captation : protocole de désambiguïsation absent d'intent-routing.md"; t22_ok=0; }
+  # §Contexte & session doit porter ≥ 8 lignes de table (5 doc/contexte + les 3 existantes).
+  ctx_rows=$(awk '/^## Contexte & session/,/^## Design/' "$ROUTING" | "$GREP" -c '^| ' || true)
+  [ "${ctx_rows:-0}" -ge 8 ] || { ko "T22 captation : §Contexte & session porte $ctx_rows lignes de table, plancher 8"; t22_ok=0; }
+  # Non-régression de densité (ADR-029) sur l'agent conversationnel.
+  agent_lines=$(wc -l < "$AGENT_FILE" | tr -d ' ')
+  [ "$agent_lines" -le 250 ] || { ko "T22 captation : AGENT.md à $agent_lines lignes, plafond ADR-029 = 250"; t22_ok=0; }
+  [ "$t22_ok" -eq 1 ] && ok "T22 docs-flow : doctrine complète (4 familles, --verify-only, ADR-031, ligne rouge --force, frontière vibeflow-os, ## Interdits), captation des 2 régimes + désambiguïsation routées, AGENT.md ($agent_lines l.) et intent-routing.md ($ctx_rows lignes de table) y renvoient"
 fi
 
 # ---------------------------------------------------------------------------

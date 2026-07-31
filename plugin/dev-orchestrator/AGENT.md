@@ -85,7 +85,8 @@ Raccourcis des cas dominants :
 | ajoute/retire une étape de la feuille de route | `gsd-phase` |
 | on est où / next / la suite | `gsd-progress` + ma proposition de next step |
 | reprends / je m'arrête là | `gsd-resume-work` / `gsd-pause-work` |
-| mets à jour la doc | `gsd-docs-update` |
+| vérifie que la doc dit encore vrai (audit) | `gsd-docs-update --verify-only` (read-only, libre) |
+| mets à jour la doc / la doc est fausse / documente ce module | `gsd-docs-update` (confirmation) — doctrine `docs-flow.md` |
 | design / UI / c'est moche / la DA | skill `vf-design` (module design-orchestrator) |
 | mission multi-étapes / « étapes 3 à 5 » / build+test+revue combinés | **proposer l'équipe** → `Task(vf-dev-manager)` (heuristique 7) |
 
@@ -102,11 +103,16 @@ Raccourcis des cas dominants :
 - **Je déclenche l'hygiène documentaire aux bons moments**, jamais au fil de l'eau :
   fin d'étape → `STATE`/`ROADMAP` (fait par la machinerie GSD, je vérifie) ; décision
   structurante → registre des décisions ; drift doc détecté (doc contredite par le code) →
-  proposer `gsd-docs-update` ; fin de milestone → bilan + archivage ; spec/plan écrit(e) sans
+  **d'abord l'audit read-only** (`gsd-docs-update --verify-only`, libre : il n'écrit rien), la
+  génération seulement ensuite et sous confirmation ; fin de milestone → bilan + archivage ; spec/plan écrit(e) sans
   être encore dans la feuille de route → proposer l'ingestion (voir `ingestion-flow.md`) ;
   nouveau projet (`gsd-new-project` vient de tourner) → je PROPOSE `model_profile: balanced`
   dans `.planning/config.json` s'il est absent, et je n'écris que sur confirmation explicite
   (doctrine machine-enforced, ADR-031, voir `GSD-PIPELINE.md`).
+- **« La doc » désigne quatre familles distinctes** — produit (`gsd-docs-update`), code
+  (`gsd-map-codebase`), savoir (`gsd-extract-learnings`), entrée (`ingestion-flow.md`). Je tranche
+  sur le contexte du geste qui vient de se fermer, et je pose une question courte quand la
+  formulation est creuse. Régimes de confirmation et déclencheurs : `docs-flow.md` (on-demand).
 
 ## Signaux de démarrage
 
@@ -120,7 +126,7 @@ feuille de route) est déjà couvert par la ligne « intègre cette spec… » c
 | `[bootstrap]` | `gsd-config` puis `gsd-map-codebase` (items manquants listés) | requise avant toute écriture (ADR-031) |
 | `[onboard]` | `gsd-onboard` | requise avant toute écriture (ADR-031) |
 | `[gsd-engine]` | oriente vers `gsd-discuss-phase` / `gsd-plan-phase` / `gsd-progress` — pas un correctif | orientation seule, rien à écrire |
-| `[doc-drift]` | `gsd-docs-update` | requise avant toute écriture (ADR-031) |
+| `[doc-drift]` | `gsd-docs-update --verify-only` d'abord (read-only), génération ensuite — doctrine `docs-flow.md` | requise avant toute écriture (ADR-031) |
 
 ## Heuristiques de routage
 
