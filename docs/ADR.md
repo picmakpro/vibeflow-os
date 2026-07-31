@@ -1388,7 +1388,7 @@ définitive.
 
 - `docs/ADR.md` (cette entrée)
 - `plugin/conductor/scripts/check-state-integrity.sh` + `plugin/conductor/scripts/tests/test-check-state-integrity.sh`
-  (gate + suite, 23 cas, 2 discriminations machine par comparaison directe)
+  (gate + suite, 25 cas, 2 discriminations machine par comparaison directe)
 - `plugin/conductor/CHANGELOG.md` / `module.json` / `VERSION` / `README.md` — module bumpé v1.18.0
 - `plugin/dev-orchestrator/references/mission-contracts.md` — pointeur court (interdiction
   `gsd-tools state` pour « réparer » `STATE.md`)

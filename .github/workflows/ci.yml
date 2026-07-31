@@ -113,6 +113,9 @@ jobs:
       - name: check-version-sync (canon VERSION ↔ plugin.json ↔ marketplace ↔ badges ↔ triade par module)
         run: bash scripts/check-version-sync.sh
 
+      - name: check-state-integrity (anti-régression du frontmatter .planning/STATE.md, ADR-063)
+        run: bash plugin/conductor/scripts/check-state-integrity.sh
+
       - name: check-release-tag (main uniquement — VERSION doit être taggée et poussée)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         # GH_TOKEN requis : sans lui le gh du runner échoue en auth et le gate lisait cet

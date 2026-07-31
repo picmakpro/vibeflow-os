@@ -441,6 +441,7 @@ if verify:
 
     if not determined:
         errline("--verify : aucune cible determinee (pas de ligne tools: exploitable) — verdict INDETERMINE.")
+        errline("piste frequente en mode fichier unique : agent reecrit par installeur amont (marqueur vf-mcp-consumer: true efface) — relancer avec --force.")
         sys.exit(3)
 
     if all_missing:
