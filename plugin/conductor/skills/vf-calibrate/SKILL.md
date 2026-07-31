@@ -71,12 +71,16 @@ Pour les changements **structure/doctrine**, produire un plan explicite :
 1. **Snapshot avant** (le lab est sauvegardé).
 2. Rafraîchir les modules : `VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT}" bash "${CLAUDE_PLUGIN_ROOT}/_internal/vibeflow-update.sh" update <module>` (manuel, par module).
 3. **Ré-affirmer l'allowlist MCP des agents exécutants** (ADR-051) : si le lab a gagné (ou perdu)
-   un serveur MCP dans son `./.mcp.json` **sans** bump de module (l'`update` ne re-copie pas les
-   agents à version inchangée), re-jouer l'injection idempotente sur les agents flaggés
-   `vf-mcp-consumer` :
+   un serveur MCP — dans son `./.mcp.json` (scope projet) **ou** en scope global `~/.claude.json`
+   (union des deux sources depuis Phase 21, ADR-051-B — un serveur déclaré seulement en scope
+   global, cas courant sur ce parc, déclenche désormais aussi la ré-affirmation) — **sans** bump de
+   module (l'`update` ne re-copie pas les agents à version inchangée), re-jouer l'injection
+   idempotente sur les agents flaggés `vf-mcp-consumer` :
    ```sh
    .claude/scripts/inject-mcp-tools.sh --target .claude/agents --mcp-json ./.mcp.json
    ```
+   Le scope global (`--claude-json`, défaut `$HOME/.claude.json`) est lu automatiquement en plus —
+   aucun flag supplémentaire requis dans l'appel ci-dessus, sauf pour cibler un fichier de test.
    Et, si GSD est présent, ré-affirmer aussi `gsd-executor` (relancer `.claude/scripts/ensure-deps.sh` suffit — il
    appelle le patch, ou directement `.claude/scripts/inject-mcp-tools.sh --target ~/.claude/agents/gsd-executor.md
    --mcp-json ./.mcp.json --force`). **Redémarrage de Claude Code requis** ensuite : le `tools:` des
