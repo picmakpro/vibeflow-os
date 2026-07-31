@@ -33,6 +33,29 @@
 #   T22 — Valeur `vf-mcp-tools` malformée (sans séparateur (a), liste d'outils vide (b)) : no-op
 #         silencieux, exit 0.
 #
+# Découverte scope GLOBAL (Phase 21, ADR-051-B — union ./.mcp.json ∪ ~/.claude.json) :
+#   T23 — Scope global SEUL (via variable d'environnement VF_CLAUDE_JSON), pas de .mcp.json :
+#         le serveur déclaré en scope global est bien injecté.
+#   T24 — Union scope global (--claude-json, flag) + scope projet (.mcp.json) : les DEUX serveurs
+#         sont injectés (jamais un remplacement).
+#   T25 — Précédence d'orthographe sur collision insensible à la casse : le scope PROJET l'emporte
+#         sur le scope global.
+#   T26 — Dégradation propre : --claude-json JSON invalide → cette source contribue vide, le
+#         scope projet reste opérant (jamais de crash).
+#   T27 — --verify avec SEULEMENT le scope global renseigné (pas de .mcp.json) : un écart réel
+#         (serveur manquant) rend rc=1, JAMAIS 3 — c'est le défaut structurel corrigé par cette
+#         phase (mission 2026-07-31-delta-gsd-core-1.9.0.md).
+#   T28 — --verify avec LES DEUX sources vides : rc=3 INDÉTERMINÉ légitime, distinct de T27 (une
+#         découverte vide ne doit jamais être confondue avec un écart réel ni un succès).
+#
+# --strict / WINDOWS #4 (un nom de serveur cité mais inconnu de toutes les sources découvertes) :
+#   T29 — Token `mcp__<serveur>__*` déjà présent dans `tools:` citant un serveur inconnu : WARNING
+#         + exit 0 sans --strict (a), ERROR + exit 1 avec --strict (b).
+#   T30 — `vf-mcp-tools` citant un serveur inconnu (même scénario que T16, sans --strict → exit 0) :
+#         avec --strict → exit 1.
+#   T31 — --verify + --strict : conforme sur les tokens MCP attendus mais un serveur inconnu est
+#         cité ailleurs dans `tools:` → rc bascule 0 (sans --strict) → 1 (avec --strict).
+#
 # Convention : asserts numérotés, helpers ok()/ko(), exit 0 si tout passe, 1 si ≥1 KO.
 # Calqué sur test-dev-orchestrator.sh.
 
@@ -51,6 +74,15 @@ toolsline() { grep -m1 '^tools:' "$1"; }
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
+
+# Isolation hermétique du scope GLOBAL (Phase 21, Geste B) : le script lit VF_CLAUDE_JSON comme
+# override de ~/.claude.json (défaut réel sinon). On le fixe UNE FOIS pour tout le fichier, sur
+# un chemin qui n'existe jamais, pour que TOUTE invocation de $SCRIPT dans cette suite reste
+# indifférente à la vraie config personnelle de la machine (Samuel ou CI ubuntu-latest) — sans
+# ça, T1..T22 seraient verts ou rouges selon qui les lance (le piège que la mission interdit
+# explicitement). T23+ (découverte scope global) redéfinit VF_CLAUDE_JSON en préfixe de SA propre
+# commande, sans toucher à cet export par défaut pour les tests suivants.
+export VF_CLAUDE_JSON="$WORK/absent-claude.json"
 
 # --- Fixtures ---------------------------------------------------------------------------------
 mk_flagged() {
@@ -434,6 +466,146 @@ if [ "$rc22b" -eq 0 ] && [ "$(md5of "$N22B")" = "$n22b_before" ]; then
   ok "T22b valeur malformée (liste d'outils vide) : no-op silencieux, exit 0"
 else
   ko "T22b échec (rc=$rc22b)"
+fi
+
+# === T23 — Scope global SEUL (VF_CLAUDE_JSON), pas de .mcp.json ===============================
+D23="$WORK/t23"; mkdir -p "$D23"
+mk_flagged "$D23/a.md"
+CJ23="$WORK/t23-claude.json"
+printf '%s\n' '{ "mcpServers": { "XcodeBuildMCP": {} } }' > "$CJ23"
+VF_CLAUDE_JSON="$CJ23" bash "$SCRIPT" --target "$D23" --mcp-json "$WORK/t23-absent-project.json" >/dev/null 2>&1
+if toolsline "$D23/a.md" | grep -q 'mcp__XcodeBuildMCP__\*'; then
+  ok "T23 scope global seul (VF_CLAUDE_JSON, pas de .mcp.json) : serveur injecté"
+else
+  ko "T23 scope global (variable d'environnement) non découvert"
+fi
+
+# === T24 — Union scope global (--claude-json) + scope projet (.mcp.json) ======================
+D24="$WORK/t24"; mkdir -p "$D24"
+mk_flagged "$D24/a.md"
+CJ24="$WORK/t24-claude.json"
+printf '%s\n' '{ "mcpServers": { "XcodeBuildMCP": {} } }' > "$CJ24"
+mk_mcp '{ "mcpServers": { "mobile-mcp": {} } }'
+bash "$SCRIPT" --target "$D24" --mcp-json "$WORK/.mcp.json" --claude-json "$CJ24" >/dev/null 2>&1
+line24="$(toolsline "$D24/a.md")"
+if echo "$line24" | grep -q 'mcp__XcodeBuildMCP__\*' && echo "$line24" | grep -q 'mcp__mobile-mcp__\*'; then
+  ok "T24 union scope global + scope projet : les deux serveurs injectés (jamais un remplacement)"
+else
+  ko "T24 échec union (ligne=$line24)"
+fi
+
+# === T25 — Précédence d'orthographe : scope PROJET l'emporte sur scope global (collision casse) ===
+D25="$WORK/t25"; mkdir -p "$D25"
+mk_flagged "$D25/a.md"
+CJ25="$WORK/t25-claude.json"
+printf '%s\n' '{ "mcpServers": { "xcodebuildmcp": {} } }' > "$CJ25"
+printf '%s\n' '{ "mcpServers": { "XcodeBuildMCP": {} } }' > "$WORK/t25-mcp.json"
+bash "$SCRIPT" --target "$D25" --mcp-json "$WORK/t25-mcp.json" --claude-json "$CJ25" >/dev/null 2>&1
+line25="$(toolsline "$D25/a.md")"
+if echo "$line25" | grep -q 'mcp__XcodeBuildMCP__\*' && ! echo "$line25" | grep -q 'mcp__xcodebuildmcp__\*'; then
+  ok "T25 précédence orthographe : scope PROJET l'emporte sur scope global en cas de collision"
+else
+  ko "T25 échec précédence (ligne=$line25)"
+fi
+
+# === T26 — Dégradation propre : --claude-json JSON invalide, scope projet reste opérant =========
+D26="$WORK/t26"; mkdir -p "$D26"
+mk_flagged "$D26/a.md"
+CJ26="$WORK/t26-claude.json"
+printf '%s' '{ not valid json' > "$CJ26"
+mk_mcp '{ "mcpServers": { "XcodeBuildMCP": {} } }'
+bash "$SCRIPT" --target "$D26" --mcp-json "$WORK/.mcp.json" --claude-json "$CJ26" >/dev/null 2>&1; rc26=$?
+if [ "$rc26" -eq 0 ] && toolsline "$D26/a.md" | grep -q 'mcp__XcodeBuildMCP__\*'; then
+  ok "T26 dégradation : --claude-json JSON invalide → source vide, scope projet reste opérant"
+else
+  ko "T26 échec dégradation (rc=$rc26)"
+fi
+
+# === T27 — --verify, scope global SEUL : écart réel → rc=1, JAMAIS 3 (cœur du défaut corrigé) ===
+G27="$WORK/t27.md"; mk_gsd_executor "$G27"
+CJ27="$WORK/t27-claude.json"
+printf '%s\n' '{ "mcpServers": { "XcodeBuildMCP": {} } }' > "$CJ27"
+g27_before="$(md5of "$G27")"
+t27_out="$(bash "$SCRIPT" --target "$G27" --mcp-json "$WORK/t27-absent-project.json" --claude-json "$CJ27" --force --verify 2>&1)"; rc27=$?
+g27_after="$(md5of "$G27")"
+if [ "$rc27" -eq 1 ] && echo "$t27_out" | grep -qF 'mcp__XcodeBuildMCP__*' && [ "$g27_after" = "$g27_before" ]; then
+  ok "T27 --verify scope global seul (pas de .mcp.json) : écart réel détecté, rc=1 jamais 3 (Geste C)"
+else
+  ko "T27 échec (rc=$rc27, sortie=[$t27_out])"
+fi
+
+# === T28 — --verify, LES DEUX sources vides : rc=3 INDÉTERMINÉ légitime (distinct de T27) =======
+G28="$WORK/t28.md"; mk_gsd_executor "$G28"
+CJ28="$WORK/t28-absent-claude.json"
+t28_out="$(bash "$SCRIPT" --target "$G28" --mcp-json "$WORK/t28-absent-project.json" --claude-json "$CJ28" --force --verify 2>&1)"; rc28=$?
+if [ "$rc28" -eq 3 ]; then
+  ok "T28 --verify deux sources vides : rc=3 INDÉTERMINÉ légitime (jamais confondu avec T27)"
+else
+  ko "T28 échec (rc=$rc28, sortie=[$t28_out])"
+fi
+
+# === T29 — --strict, token mcp__ déjà présent citant un serveur inconnu (WINDOWS #4) ============
+mk_ghost() {
+  cat > "$1" <<'EOF'
+---
+name: vf-coder
+description: exécute une étape de dev, build et test inclus
+tools: Read, Write, Edit, Bash, Glob, Grep, Skill, Agent, mcp__ghost-server__*
+model: opus
+memory: project
+vf-internal: true
+vf-mcp-consumer: true
+---
+corps
+EOF
+}
+G29A="$WORK/t29a.md"; mk_ghost "$G29A"
+out29a="$(bash "$SCRIPT" --target "$G29A" --servers "XcodeBuildMCP" 2>&1)"; rc29a=$?
+if [ "$rc29a" -eq 0 ] && echo "$out29a" | grep -qF "ghost-server"; then
+  ok "T29a serveur inconnu déjà présent (mcp__) : WARNING loggé, exit 0 sans --strict"
+else
+  ko "T29a échec (rc=$rc29a out=[$out29a])"
+fi
+
+G29B="$WORK/t29b.md"; mk_ghost "$G29B"
+bash "$SCRIPT" --target "$G29B" --servers "XcodeBuildMCP" --strict >/dev/null 2>&1; rc29b=$?
+if [ "$rc29b" -eq 1 ]; then
+  ok "T29b --strict : même serveur inconnu déjà présent → ERROR bloquante, exit 1"
+else
+  ko "T29b échec (rc=$rc29b)"
+fi
+
+# === T30 — --strict, vf-mcp-tools citant un serveur inconnu (même entrée que T16, --strict) =====
+N30="$WORK/t30.md"; mk_named "$N30"
+bash "$SCRIPT" --target "$N30" --servers "mobile-mcp" --strict >/dev/null 2>&1; rc30=$?
+if [ "$rc30" -eq 1 ]; then
+  ok "T30 --strict : vf-mcp-tools cite un serveur inconnu (non résolu) → exit 1 (T16 sans --strict = exit 0)"
+else
+  ko "T30 échec (rc=$rc30)"
+fi
+
+# === T31 — --verify + --strict : conforme sur l'attendu mais serveur inconnu cité ailleurs =======
+mk_ghost_conforme() {
+  cat > "$1" <<'EOF'
+---
+name: vf-coder
+description: exécute une étape de dev, build et test inclus
+tools: Read, Write, Edit, Bash, Glob, Grep, Skill, Agent, mcp__XcodeBuildMCP__*, mcp__ghost-server__*
+model: opus
+memory: project
+vf-internal: true
+vf-mcp-consumer: true
+---
+corps
+EOF
+}
+G31="$WORK/t31.md"; mk_ghost_conforme "$G31"
+bash "$SCRIPT" --target "$G31" --servers "XcodeBuildMCP" --verify >/dev/null 2>&1; rc31a=$?
+bash "$SCRIPT" --target "$G31" --servers "XcodeBuildMCP" --verify --strict >/dev/null 2>&1; rc31b=$?
+if [ "$rc31a" -eq 0 ] && [ "$rc31b" -eq 1 ]; then
+  ok "T31 --verify + --strict : conforme sur l'attendu, serveur inconnu cité → rc bascule 0 → 1"
+else
+  ko "T31 échec (rc31a=$rc31a rc31b=$rc31b)"
 fi
 
 # === Bilan ===================================================================================
