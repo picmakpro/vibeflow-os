@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
 current_phase: 21
-current_phase_name: Alignement du moteur GSD sur gsd-core 1.9.0 — 4/4 plans exécutés, gates de sortie à rejouer
-status: in_progress
-stopped_at: "Phase 21 plan 21-04 : check-state-integrity.sh (gate anti-régression du frontmatter de ce fichier, module conductor v1.18.0) + ADR-063 (arbitrage de l'anomalie d'agrégation ci-dessous). Les 4 plans de la Phase 21 sont exécutés (21-01 défaut MCP actif, 21-02 trois contrats amont, 21-03 purge de version + ADR-062, 21-04 gate + ADR-063). Reste : rejouer les gates de sortie de phase et la clôture (release racine réservée à Samuel, même patron que les Phases 13/17/19/20)."
-last_updated: "2026-07-31T18:00:00.000Z"
-last_activity: 2026-07-31 (Phase 21 plan 21-04 — check-state-integrity.sh + ADR-063)
+current_phase_name: Alignement du moteur GSD sur gsd-core 1.9.0 — 5/5 plans exécutés, gouvernance close, release v2.45.0 préparée (non taguée)
+status: complete
+stopped_at: "Phase 21 close par sa gouvernance (plan 21-05), même patron que 20-07/c01f813 : 5/5 plans livrés, vérification PASS PARTIEL 7/8 comblée (CI remise au vert — compteur de suites 44→45 —, dev-orchestrator bumpé v2.9.0, planning-core v2.5.3, ROADMAP §Phase 21 recalé, 4 warnings W1-W4 traités : check-state-integrity.sh câblé au job gates de la CI, ADR-063 23→25 cas, team-kernel.md porte le recoupement #1995/#2608, inject-mcp-tools.sh nomme --force sur le rc=3 mode fichier unique). Release racine v2.45.0 préparée en commits locaux (triade + 2 historiques README + CHANGELOG racine) — AUCUN tag, AUCUN merge, AUCUN push : réservés à Samuel. Prochain geste humain : merger la PR, puis `git tag -a v2.45.0` et `gh release create`."
+last_updated: "2026-07-31T19:30:00.000Z"
+last_activity: 2026-07-31 (Phase 21 plan 21-05 — clôture de gouvernance, release v2.45.0 préparée)
 progress:
   total_phases: 22
-  completed_phases: 12
-  total_plans: 55
-  completed_plans: 40
+  completed_phases: 13
+  total_plans: 56
+  completed_plans: 41
 # ⚠ Compteurs curés À LA MAIN — PAS régénérés par `gsd-tools state` (ADR-063, cf.
 # plugin/dev-orchestrator/references/mission-contracts.md §STATE.md : toute invocation force
 # resync:true non désactivable et reproduirait la régression corrigée ici). Toute future mise à
@@ -21,11 +21,12 @@ progress:
 #
 # Baseline héritée telle quelle (12/54/39), recalée le 2026-07-31 lors de la clôture 20-07 après une
 # régression constatée (completed_phases 11→10, total_plans 53→49, completed_plans 37→29,
-# current_phase resté à 19). Ce plan (21-04) n'a PAS ré-audité l'exacte composition de ces 12
-# phases — seul le delta depuis cette baseline est vérifié ici : total_plans et completed_plans
-# +1/+1 (le plan 21-04 lui-même, PLAN+SUMMARY livrés) ; completed_phases INCHANGÉ, la Phase 21
-# reste EN COURS (gates de sortie non rejouées, release non publiée) — l'incrémenter clôturerait
-# la phase par écriture d'état plutôt que par vérification goal-backward.
+# current_phase resté à 19). Le plan 21-04 n'a PAS ré-audité l'exacte composition de ces 12
+# phases — seul le delta depuis cette baseline était vérifié : total_plans et completed_plans
+# +1/+1 (21-04 lui-même). Ce plan (21-05) ferme la Phase 21 par vérification goal-backward
+# (21-VERIFICATION.md, PASS PARTIEL 7/8, comblé) : completed_phases +1 (12→13), total_plans et
+# completed_plans +1/+1 (21-05 lui-même, PLAN+SUMMARY) — jamais un delta supposé, chaque
+# incrément correspond à un artefact livré et vérifiable sur disque.
 #
 # Point ouvert, NON tranché par ce plan (remonté à Samuel, ADR-063 §Décision) : une lecture
 # ROADMAP-trust stricte (« une phase shippée compte, qu'elle ait ou non un SUMMARY.md par plan » —
@@ -76,9 +77,9 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 ## Current Position
 
-Phase: 21 **en cours** — Alignement du moteur GSD sur `@opengsd/gsd-core` 1.9.0. Rituel allégé
+Phase: 21 **complète** — Alignement du moteur GSD sur `@opengsd/gsd-core` 1.9.0. Rituel allégé
 (arbitrage Samuel, `.planning/missions/2026-07-31-delta-gsd-core-1.9.0.md`) : pas de
-`gsd-discuss-phase` séparé, périmètre exhaustif directement dérivé du digest de mission. 4 plans :
+`gsd-discuss-phase` séparé, périmètre exhaustif directement dérivé du digest de mission. 5 plans :
 21-01 — défaut MCP actif corrigé (`inject-mcp-tools.sh` découvre le scope global MCP,
 `~/.claude.json`, plus seulement `./.mcp.json`), WINDOWS #4 clos ; 21-02 — les trois contrats amont
 (`estimate:`/`actuals:` relayés verbatim par `vf-coder`/`vf-dev-manager`, ADR-061 tranchant la
@@ -90,9 +91,15 @@ d'activation — absence correcte dans les deux cas, `merge-hooks.sh` non modifi
 `check-state-integrity.sh` (gate anti-régression du frontmatter de ce fichier, module `conductor`
 v1.18.0) et ADR-063 (arbitrage de l'anomalie d'agrégation ci-dessous : dette d'artefact locale
 doublée d'un vrai bug amont non scopé sur l'extraction `Phase`, cause de ce même correctif de
-mise en forme du corps de ce fichier).
-Status: En cours (4/4 plans exécutés, gates de sortie à rejouer avant clôture de phase).
-Last activity: 2026-07-31 (plan 21-04, ce commit).
+mise en forme du corps de ce fichier) ; 21-05 — clôture de gouvernance : CI remise au vert
+(compteur de suites 44→45, `.planning/WINDOWS.md` recalé), `dev-orchestrator` bumpé v2.9.0,
+`planning-core` v2.5.3, `.planning/ROADMAP.md` §Phase 21 recalé (5/5 plans, Requirements
+tranchés), les 4 warnings de `21-VERIFICATION.md` traités (`check-state-integrity.sh` câblé au
+job `gates` de la CI, ADR-063 25 cas, `team-kernel.md` porte le recoupement #1995/#2608,
+`inject-mcp-tools.sh` nomme `--force` sur le rc=3 mode fichier unique), release racine v2.45.0
+préparée en commits locaux (jamais taguée).
+Status: Complète (5/5 plans exécutés, gates de sortie verts, release préparée non taguée).
+Last activity: 2026-07-31 (plan 21-05, clôture de gouvernance).
 
 **Anomalie d'agrégation instruite (ADR-063).** Le commentaire YAML du frontmatter ci-dessus daté du
 2026-07-31 signalait une régression silencieuse de `completed_phases`/`total_plans`/
