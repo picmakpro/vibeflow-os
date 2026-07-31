@@ -5,6 +5,59 @@ dernières entrées et pointent ici). Chaque module a par ailleurs son propre `C
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.44.0] — 2026-07-31
+
+**La revue devient un étage de premier rang, piloté par le manager** (**ADR-060**). Modules
+`conductor` **v1.17.0**, `dev-orchestrator` **v2.8.0**, `design-orchestrator` **v1.3.2**, les
+3 bundles **v2.0.3**.
+
+La revue sort du cycle interne de `vf-coder`, qui cesse d'être juge de son propre travail : le
+manager dispatche `vf-reviewer` sur un nœud `revue-N` du plan de bataille et tient lui-même la
+boucle correction → re-revue. La règle « pas de double revue » est **réécrite**, pas contournée.
+
+**Origine.** Le **second rapport d'audit externe** du 2026-07-28 (lab tiers, tranche iOS en 5 lots
+dont 2 parallélisés par worktrees, ~90 commits, suite passée de 177 à 331 tests). Ses 4 constats ont
+été **vérifiés sur pièce avant l'ouverture de la phase** : 3 confirmés — dont 2 **plus solidement
+que le rapport ne l'affirmait** — et 1 partiellement daté.
+
+**ADR-051 révisée sur son seul point contesté.** La prémisse « les agents de revue ne compilent
+jamais » confondait **produire** un verdict de compilation et **en vérifier** un. `vf-reviewer`
+reçoit une allowlist MCP **nommée** (`vf-mcp-tools`, grammaire `<serveur>:<outil…>`) — jamais le
+joker de serveur, moindre privilège préservé — et la révision porte **son prix écrit noir sur
+blanc** : ~90 s de plus par revue, un slot de simulateur. `vf-reviewer` est le seul agent du dépôt à
+porter cette clé ; `vf-auditer` et `vf-dev-manager` : zéro occurrence de `mcp`.
+
+**La barrière d'écriture des 4 juges cesse d'être une fiction.** L'absence de `Write`/`Edit` dans
+`tools:` était rouverte **silencieusement au runtime** par `memory: project` — prouvé par sonde. Les
+juges portent désormais `disallowedTools: Write, Edit`, une contrainte réelle, sans qu'une ligne du
+gate n'ait bougé. Le dépôt ne se contente pas de le *dire*, il l'**impose** à deux étages :
+`check-agents.sh` avertit sur le couple `memory:` + `tools:` sans barrière, et `guard-agent-write.sh`
+**dénie** l'écriture d'un juge non conforme — ce dernier appelait le checker sans `--strict`, donc
+livré inerte, exactement le défaut de Phase 19 ; le correctif mord, vérifié par sonde discriminante.
+`vf-design-judge`, seul à conserver `Bash`, **cesse d'affirmer une barrière qu'il n'a pas** et nomme
+son angle mort : canal shell ouvert, retenue qui reste un engagement de prompt.
+
+**Trois garde-fous non négociables** encadrent tout allègement, tirés des chiffres de l'audit :
+jamais réduire le nombre de tests (mesuré : sur 90 s de build, les tests pèsent ~1 s — levier nul) ;
+jamais alléger la revue sur le chemin critique produit (5 bloquants trouvés en une journée) ; aucun
+allègement ne s'applique à un **diff de comblement** (9 puis 5 puis 4 défauts nés des correctifs de
+revue eux-mêmes). Le troisième n'est pas une consigne de prompt : `dag.sh reopen` écrit
+`review_regime_full` sur les descendants de revue et de jointure, et **rien** sur un dépendant
+non-revue.
+
+**Livrés aussi** : `--scope` et `review_regime` (périmètres gelés, rétro-compatibles sur les 4 DAG
+suivis) ; `check-mission-invariants.sh` + `.planning/MISSION-INVARIANTS.md` (gate de zone morte,
+contrat à 4 codes 0/3/4/64 où SAIN et INDÉTERMINÉ ne se confondent jamais) ; le périmètre explicite
+des hooks tiers (`--third-party-prefix`), qui fait passer le hook d'agents de **0 ligne** à
+**30 avertissements réels** sur un `~/.claude/agents` de 49 agents.
+
+**Vérification — PASS partiel 5/7** (`20-VERIFICATION.md`), l'essentiel prouvé **par exécution** et
+non par lecture. Les 2 réserves de SC5 ont été comblées avant la release : le gate d'invariants
+n'avait **aucun appelant** — il devient le 4ᵉ geste non négociable de `vf-dev-manager`, après le
+verrou de driver et avant le premier dispatch ; l'exclusion du seuil de tests (3ᵉ invariant)
+passe d'une décision de planification à un **override humain daté**. **44 suites** vertes,
+`check-agents --strict` vert sur les 6 dossiers d'agents.
+
 ## [v2.43.1] — 2026-07-28
 
 **Une mission d'équipe travaille sur sa propre branche, jamais sur la branche par défaut**
