@@ -70,7 +70,7 @@ FORCE="${VF_ENSURE_FORCE:-}"
 MIGRATE_ENGINE="${VF_ENSURE_MIGRATE_ENGINE:-}"
 # Fenêtre de compat dual-layout (D-01/D3, 11-CONTEXT.md) : le VERSION file du nouveau layout est
 # DÉRIVÉ de la même cascade que GSD_HOME (detect-gsd-engine.sh/build-gsd-index.sh), jamais une
-# constante $HOME figée — un chemin $HOME-only raterait le scope --local de gsd-core 1.8.0, qui
+# constante $HOME figée — un chemin $HOME-only raterait le scope --local de gsd-core 1.9.0, qui
 # dépose le payload sous <projet>/.claude/gsd-core/. Pas de variante projet-local pour le legacy
 # (D-01 : antérieur au scope --local).
 default_gsd_home_new() {

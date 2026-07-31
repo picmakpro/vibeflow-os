@@ -192,7 +192,7 @@ Tâche simple sans signal → routage direct **sans question** (zéro friction s
 `SEUIL_EQUIPE = 3` — N = étapes restantes ciblées, comptées via `gsd-tools roadmap analyze`.
 
 Résolution — cascade de résolution, jamais un chemin en dur (D1 ; forme reprise, variante
-Claude-only, de `gsd-core/workflows/_runtime-launcher.snippet.sh`, gsd-core 1.8.0) :
+Claude-only, de `gsd-core/workflows/_runtime-launcher.snippet.sh`, gsd-core 1.9.0) :
 ```sh
 _GSD_ROOT="${RUNTIME_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 GSD_TOOLS=""
@@ -216,7 +216,7 @@ analyze` contient un champ `.error` — pas seulement si le binaire est introuva
 uniquement le code de sortie du processus.
 
 **Rester sur le dist-tag stable, jamais le canal de pré-version amont (D4)** : le canal de
-pré-version est périmé (1.7.0-rc.6, antérieur au tag stable = 1.8.0) — n'utiliser que `@latest`
+pré-version est périmé (1.7.0-rc.6, antérieur au tag stable = 1.9.0) — n'utiliser que `@latest`
 dans le message d'erreur ci-dessus et partout ailleurs dans ce document.
 
 Écarts assumés vs le snippet officiel amont (D5) : (a) les runtimes non-Claude du snippet sont

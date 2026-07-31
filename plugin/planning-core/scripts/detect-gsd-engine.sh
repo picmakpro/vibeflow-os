@@ -27,7 +27,7 @@ PLANNING_DIR=".planning"
 # Fenêtre de compat dual-layout (D-01, 11-CONTEXT.md) : gsd-core (nouveau) prioritaire, legacy
 # get-shit-done en repli. Cascade à 4 niveaux, résolue uniquement si GSD_HOME n'est pas déjà
 # fourni par l'environnement (préserve les appels qui fixent GSD_HOME explicitement) :
-#   1. <projet>/.claude/gsd-core     — scope --local de gsd-core 1.8.0 (payload projet)
+#   1. <projet>/.claude/gsd-core     — scope --local de gsd-core 1.9.0 (payload projet)
 #   2. $CLAUDE_CONFIG_DIR|$HOME/.claude/gsd-core — scope --global de gsd-core
 #   3. $CLAUDE_CONFIG_DIR|$HOME/.claude/get-shit-done — legacy (pas de variante projet-local :
 #      antérieur au scope --local, aucune preuve qu'il ait pu être posé à l'échelle projet)
