@@ -1,5 +1,30 @@
 # Changelog — conductor
 
+## [v1.19.0] — 2026-08-01 (isolation multi-session, ADR-064, quick 260801-17w)
+
+### Ajouté
+- **`check-branch-claim.sh`** — constate qu'un lock de driver **actif** revendique la branche git
+  courante **depuis un autre arbre de travail**, et le dit au `SessionStart` (fragment de hooks,
+  advisory, lecture seule, silencieux en nominal). Ferme le trou constaté le 2026-07-31 : deux
+  sessions ont écrit sur `feat/phase-22-hygiene-doc` sans le savoir, parce que `driver-lock.sh`
+  revendiquait une **étape** et n'était consulté **que par les managers** — la session qui est
+  passée par-dessus n'en était pas un. Contrat à 4 codes (`0` signal · `3` SAIN · `4` INDÉTERMINÉ
+  · `64` usage), où SAIN et INDÉTERMINÉ ne se confondent jamais. Le discriminant est l'**arbre**,
+  pas l'owner : deux sessions du même arbre se voient déjà. Comparaison de chemins **normalisée**
+  (`pwd -P`) — un faux positif de symlink (`/tmp` → `/private/tmp`) faisait crier le gate sur son
+  propre arbre ; débusqué par sa suite, tenu par un cas de régression, discriminance prouvée par
+  mutation. Suite dédiée : 18 cas.
+
+### Modifié
+- **`driver-lock.sh`** enregistre `branch=` et `worktree=` dans son `meta` à l'acquisition, et les
+  **préserve** au heartbeat (même patron que `acquired_epoch`) : un heartbeat émis après un
+  `git checkout` ne doit pas revendiquer silencieusement une branche que personne n'a décidé de
+  piloter. Champs **additifs** — le contrat JSON de sortie et les consommateurs existants ne
+  bougent pas. Un lock posé par une version antérieure (sans ces champs) rend `4` INDÉTERMINÉ
+  côté gate, jamais un SAIN de complaisance.
+
+Référence : `docs/ADR.md` ADR-064 (un écrivain = un worktree), `.planning/quick/260801-17w-isolation-multi-session/`.
+
 ## [v1.18.0] — 2026-07-31 (alignement gsd-core 1.9.0, Phase 21 plan 21-04)
 
 ### Ajouté

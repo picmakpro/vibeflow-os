@@ -55,10 +55,21 @@ lock_age() {
   echo "$(( $(now) - hb ))"
 }
 
+# Branche et arbre de travail du poseur du lock (ADR-064). Le claim ne disait QUE l'etape :
+# il ne permettait pas de repondre a « qui tient CETTE branche ? », la question posee par la
+# collision du 2026-07-31. Champs ADDITIFS — le JSON de sortie et les consommateurs existants
+# ne bougent pas. Capture faite a l'ACQUISITION et PRESERVEE au heartbeat (meme patron que
+# acquired_epoch) : un heartbeat emis apres un `git checkout` ne doit pas reecrire le claim,
+# sinon le lock revendiquerait silencieusement une branche que personne n'a decide de piloter.
+git_branch() { git rev-parse --abbrev-ref HEAD 2>/dev/null | tr -d '\n' || true; }
+git_worktree() { git rev-parse --show-toplevel 2>/dev/null | tr -d '\n' || true; }
+
 write_meta() {
   {
     printf 'owner=%s\n'           "$(printf '%s' "$OWNER" | tr -d '\n')"
     printf 'step=%s\n'            "$(printf '%s' "$STEP"  | tr -d '\n')"
+    printf 'branch=%s\n'          "$(printf '%s' "${LOCK_BRANCH:-}"   | tr -d '\n')"
+    printf 'worktree=%s\n'        "$(printf '%s' "${LOCK_WORKTREE:-}" | tr -d '\n')"
     printf 'acquired_epoch=%s\n'  "$1"
     printf 'acquired_iso=%s\n'    "$2"
     printf 'heartbeat_epoch=%s\n' "$3"
@@ -81,11 +92,17 @@ require_owner() {
 }
 ensure_parent() { mkdir -p "$(dirname "$LOCK_DIR")" 2>/dev/null || true; }
 
+# Defaut : on PRESERVE ce que le meta porte deja (heartbeat, re-acquisition du meme owner).
+# Seule une acquisition qui cree reellement le lock capture la branche/l'arbre courants.
+LOCK_BRANCH="$(meta_get branch)"
+LOCK_WORKTREE="$(meta_get worktree)"
+
 case "$ACTION" in
   acquire)
     require_owner
     ensure_parent
     if mkdir "$LOCK_DIR" 2>/dev/null; then
+      LOCK_BRANCH="$(git_branch)"; LOCK_WORKTREE="$(git_worktree)"
       write_meta "$(now)" "$(iso)" "$(now)"
       printf '{"acquired": true, "owner": "%s", "step": "%s", "recovered": false}\n' "$OWNER" "$STEP"
       exit 0
@@ -110,6 +127,7 @@ case "$ACTION" in
         fi
         rm -rf "$stale"
         if mkdir "$LOCK_DIR" 2>/dev/null; then
+          LOCK_BRANCH="$(git_branch)"; LOCK_WORKTREE="$(git_worktree)"
           write_meta "$(now)" "$(iso)" "$(now)"
           printf '{"acquired": true, "owner": "%s", "step": "%s", "recovered": true, "previous_owner": "%s"}\n' \
             "$OWNER" "$STEP" "$held"
