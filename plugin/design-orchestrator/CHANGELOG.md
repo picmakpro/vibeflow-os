@@ -1,5 +1,32 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.4.0] — 2026-07-31 (geste documentaire en mission design, Phase 22)
+
+**`vf-design-manager` n'avait aucun geste documentaire. Il pose désormais le même nœud `docs`
+agrégé que son homologue dev, en fin de mission — par renvoi, jamais par copie.**
+
+### Ajouté
+- **§Hygiène documentaire** dans `vf-design-manager` (161 → 187 lignes) : le nœud `docs` agrégé,
+  posé une seule fois en fin de mission (`deps` = tous les nœuds de craft et de critique), sur les
+  **mêmes quatre déclencheurs** que côté dev — surface publique touchée, signal `[doc-drift]`
+  actif, nouveau module ou nouvelle capacité — sous le même régime superviser/autonome.
+- **Renvoi cross-module vers la doctrine hébergée dans `dev-orchestrator`**
+  (`dev-orchestrator-references/docs-flow.md` §Déclencheurs et §Garde-fous) : **aucune copie
+  locale**. La table des quatre déclencheurs et la doctrine des trois régimes de confirmation
+  n'existent qu'à un seul endroit ; `vf-design-manager` porte les noms, pas la table (ADR-057,
+  même patron que le renvoi déjà en place vers `mission-cross-team.md`).
+- **Bloc T23** de `test-dev-orchestrator.sh` (`dev-orchestrator`) : le câblage des deux managers
+  est désormais non-régressable, avec `SKIP` explicite si ce module design est hors du périmètre
+  scanné.
+
+### Non modifié (volontaire)
+- **Le gate `DESIGN.md` reste distinct et inchangé** : la bible visuelle (tokens, palette, typo,
+  perso) n'est pas de la doc produit, et le nouveau nœud `docs` ne s'y confond jamais.
+- **Le frontmatter de l'agent n'a pas bougé** : `Skill` y était déjà présent, aucune capacité
+  d'outillage nouvelle n'était nécessaire pour poser ce geste documentaire.
+
+Référence : `.planning/phases/VFDO-22-hygi-ne-documentaire-doctrine-de-sortie-et-captation-d-inten/`.
+
 ## [v1.3.2] — 2026-07-31 (barrière d'écriture réelle de `vf-design-judge`, Phase 20)
 
 ### Corrigé
