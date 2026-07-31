@@ -15,6 +15,18 @@
 #   check-debug-research.sh --agents-dir=PATH # défaut .claude/agents
 #   check-debug-research.sh --skills-dir=PATH # défaut .claude/skills
 #   check-debug-research.sh --allow-empty     # avec --strict : tolère une cible vide (sinon exit 3)
+#   check-debug-research.sh --third-party-prefix=PFX    # répétable, défaut gsd- (accumule AU-DESSUS
+#                                                        # du défaut ; --no-third-party-prefix avant pour repartir de zéro)
+#   check-debug-research.sh --no-third-party-prefix     # vide la liste des préfixes tiers
+#
+# --third-party-prefix (défaut "gsd-", MÊME mécanisme que check-agents.sh — aucun second inventé,
+# critère 6 du ROADMAP) : une brique (skill ou agent) dont le nom d'affichage (frontmatter `name`,
+# sinon le nom de dossier pour un SKILL.md / le nom de fichier pour un agent) matche un préfixe
+# n'est plus auditée du tout pour ADR-045 (ce n'est pas notre brique). Le nombre de briques ainsi
+# écartées est compté et imprimé — un écartement qui ne se voit pas est un skip muet, interdit ici.
+# Limite honnête : seule une brique tierce EFFECTIVEMENT préfixée ainsi est écartée ; une brique
+# tierce d'un autre écosystème (nom sans préfixe partagé) reste auditée — le levier est une
+# répétition du flag, jamais un second mécanisme d'exclusion.
 #
 # Une brique est « de dépannage » si son name/description matche : debug|diagnos|dépannage|
 #   depannage|crash|stack trace|ça plante|ca plante. Elle est CONFORME si son corps mentionne la
@@ -38,6 +50,7 @@ STRICT=false
 HOOK_MODE=false
 ALLOW_EMPTY=false
 SINGLE_FILE=""
+THIRD_PARTY_PREFIXES="gsd-"
 
 for arg in "$@"; do
   case "$arg" in
@@ -47,6 +60,11 @@ for arg in "$@"; do
     --file)           : ;; # valeur au prochain arg — géré ci-dessous
     --agents-dir=*)   AGENTS_DIR="${arg#*=}" ;;
     --skills-dir=*)   SKILLS_DIR="${arg#*=}" ;;
+    --third-party-prefix=*)
+      v="${arg#*=}"
+      if [ -z "$THIRD_PARTY_PREFIXES" ]; then THIRD_PARTY_PREFIXES="$v"; else THIRD_PARTY_PREFIXES="$THIRD_PARTY_PREFIXES:$v"; fi
+      ;;
+    --no-third-party-prefix) THIRD_PARTY_PREFIXES="" ;;
     -h|--help)        grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
   esac
 done
@@ -64,7 +82,8 @@ case "$(command -v python3 2>/dev/null)" in
 esac
 
 VF_AGENTS_DIR="$AGENTS_DIR" VF_SKILLS_DIR="$SKILLS_DIR" VF_STRICT="$STRICT" \
-VF_HOOK="$HOOK_MODE" VF_SINGLE="$SINGLE_FILE" VF_ALLOW_EMPTY="$ALLOW_EMPTY" "$PYBIN" -c "
+VF_HOOK="$HOOK_MODE" VF_SINGLE="$SINGLE_FILE" VF_ALLOW_EMPTY="$ALLOW_EMPTY" \
+VF_THIRD_PARTY_PREFIXES="$THIRD_PARTY_PREFIXES" "$PYBIN" -c "
 import glob, os, re, sys
 
 agents_dir = os.environ[\"VF_AGENTS_DIR\"]
@@ -73,8 +92,10 @@ strict = os.environ[\"VF_STRICT\"] == \"true\"
 hook = os.environ[\"VF_HOOK\"] == \"true\"
 allow_empty = os.environ[\"VF_ALLOW_EMPTY\"] == \"true\"
 single = os.environ[\"VF_SINGLE\"]
+third_party_prefixes = [p for p in os.environ.get(\"VF_THIRD_PARTY_PREFIXES\", \"\").split(\":\") if p]
 
 NOT_AGENTS = {\"contracts.md\", \"README.md\", \"AGENTS.md\"}
+thirdparty_files_total = 0
 
 # Une brique est 'de dépannage' si name/description matche ce motif. Resserré (audit S061) :
 # 'crash-free' (KPI mobile) et 'diagnos' isolé ('Diagnostique la santé du funnel', 'pass/fail +
@@ -106,6 +127,18 @@ def frontmatter_block(text):
 def field(fm, key):
     m = re.search(r\"^\s*\" + key + r\":\s*(.*)$\", fm, re.M)
     return m.group(1).strip() if m else \"\"
+
+def display_name(path, text):
+    \"\"\"Miroir de agent_display_name() (check-agents.sh) : la valeur du frontmatter name: si
+    presente et non vide, sinon un repli lisible — le dossier parent pour un SKILL.md (regle de
+    label_for()), le nom de fichier sans extension pour un agent.\"\"\"
+    fm, _ = frontmatter_block(text)
+    name = field(fm, \"name\")
+    if name:
+        return name
+    if os.path.basename(path) == \"SKILL.md\":
+        return os.path.basename(os.path.dirname(path))
+    return os.path.basename(path)[:-3]
 
 def check_file(path):
     global checked
@@ -150,6 +183,17 @@ else:
             print(f\"[check-debug-research] aucune brique dans {skills_dir}/{agents_dir} — rien a verifier\")
         sys.exit(0)
     for f in files:
+        try:
+            ftext = open(f, encoding=\"utf-8\").read()
+        except OSError:
+            continue
+        # --third-party-prefix : une brique dont le nom d'affichage matche n'est plus auditee du
+        # tout pour ADR-045 (ce n'est pas notre brique) — comptee dans le resume, jamais un skip muet.
+        dname = display_name(f, ftext)
+        matched_prefix = next((p for p in third_party_prefixes if p and dname.startswith(p)), None)
+        if matched_prefix:
+            thirdparty_files_total += 1
+            continue
         check_file(f)
 
 if strict:
@@ -167,6 +211,9 @@ if hook:
 
 for w in warnings:
     print(f\"  ⚠ {w}\")
+if thirdparty_files_total:
+    pfx_str = ','.join(third_party_prefixes) if third_party_prefixes else '—'
+    print(f\"[check-debug-research] {thirdparty_files_total} brique(s) tierce(s) non auditee(s) (prefixe(s) : {pfx_str})\")
 if n_err:
     print(f\"[check-debug-research] ✗ {n_err} non-conformite(s) bloquante(s) (ADR-045) :\")
     for e in errors:

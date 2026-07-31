@@ -13,6 +13,22 @@
 # lab n'obtient que les serveurs qu'il déclare). Data-driven côté agents : ne touche QUE les fichiers
 # marqués `vf-mcp-consumer: true` (sélecteur analogue à `mandatory:` / `vf-internal:`).
 #
+# SECOND MODE — allowlist NOMMÉE (D-05) : un agent qui porte la clé de frontmatter `vf-mcp-tools`
+# (grammaire `<serveur>:<outil1>,<outil2>,…`) reçoit UNIQUEMENT les tokens `mcp__<serveur>__<outil>`
+# qu'il déclare — JAMAIS le joker `mcp__<serveur>__*`. La correspondance de nom de serveur est
+# INSENSIBLE À LA CASSE, en égalité stricte (jamais un motif ni une sous-chaîne) ; le token injecté
+# reprend l'orthographe du `.mcp.json` du lab (liste `servers` résolue), PAS celle du frontmatter,
+# car c'est cette orthographe-là qui forme le préfixe réel côté runtime. Les deux modes coexistent
+# par fichier : un fichier qui porte les DEUX clés est traité en mode NOMMÉ (le plus restrictif
+# l'emporte, moindre privilège), avec une ligne de log qui le signale. Ce mode est déclenché par le
+# CONTENU du fichier cible, jamais par un flag — aucun appelant n'a besoin d'être modifié.
+#
+# HONNÊTETÉ (D-03) : les noms d'outils déclarés par un agent via `vf-mcp-tools` ne sont JAMAIS
+# confrontés à un serveur MCP vivant par ce script — ce repo n'a pas de `.mcp.json`. Une absence de
+# correspondance (serveur non résolu) produit un no-op silencieux, jamais une erreur : c'est un
+# contrat best-effort, pas une garantie que les noms d'outils existent réellement côté serveur. La
+# validation des noms réels relève d'une recette humaine sur un lab équipé, hors périmètre de ce repo.
+#
 # Usage:
 #   inject-mcp-tools.sh --target <fichier|dossier> [options]
 #
@@ -165,6 +181,62 @@ def has_flag(text):
     fm = "\n".join(lines[span[0]:span[1]])
     return bool(FLAG_RE.search(fm))
 
+# --- Mode NOMMÉ (D-05) : clé dédiée `vf-mcp-tools`, grammaire <serveur>:<outil1>,<outil2>,… -------
+TOKEN_SEGMENT_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+NAMED_FLAG_RE = re.compile(r"^vf-mcp-tools:\s*(.*)$", re.M)
+
+def has_named(text):
+    """Présence de la clé `vf-mcp-tools` dans le frontmatter, valide ou non (pour découverte,
+    garde de mode fichier unique, et détection de coexistence avec vf-mcp-consumer)."""
+    span, lines = frontmatter_block(text)
+    if span is None:
+        return False
+    fm = "\n".join(lines[span[0]:span[1]])
+    return bool(NAMED_FLAG_RE.search(fm))
+
+def named_request(text):
+    """Renvoie (serveur_declare, [outils]) depuis la cle vf-mcp-tools, ou None si la cle est
+    absente OU la valeur malformee (pas de deux-points, serveur vide, aucun outil declare, ou
+    caractere hors du charset autorise pour un segment de token MCP). Une valeur malformee est un
+    no-op journalise, jamais une erreur (best-effort, D-05)."""
+    span, lines = frontmatter_block(text)
+    if span is None:
+        return None
+    fm = "\n".join(lines[span[0]:span[1]])
+    m = NAMED_FLAG_RE.search(fm)
+    if not m:
+        return None
+    raw = m.group(1).strip()
+    if ":" not in raw:
+        return None
+    server_part, _, tools_part = raw.partition(":")
+    server = server_part.strip()
+    tools = [t.strip() for t in tools_part.split(",") if t.strip()]
+    if not server or not tools:
+        return None
+    if not TOKEN_SEGMENT_RE.match(server):
+        return None
+    if any(not TOKEN_SEGMENT_RE.match(t) for t in tools):
+        return None
+    return (server, tools)
+
+def named_tokens_for(text, servers):
+    """Renvoie la liste mcp__<serveur, orthographe du lab>__<outil> pour chaque outil declare par
+    vf-mcp-tools, ou la liste vide si la cle est absente, malformee, ou si le serveur declare
+    n est pas resolu dans servers (comparaison insensible a la casse, egalite stricte)."""
+    req = named_request(text)
+    if req is None:
+        return []
+    server, tools = req
+    resolved = None
+    for s in servers:
+        if s.lower() == server.lower():
+            resolved = s
+            break
+    if resolved is None:
+        return []
+    return ["mcp__%s__%s" % (resolved, t) for t in tools]
+
 files = []
 if os.path.isfile(target):
     files = [target]
@@ -176,23 +248,25 @@ else:
             t = open(f, encoding="utf-8").read()
         except OSError:
             continue
-        if has_flag(t):
+        if has_flag(t) or has_named(t):
             files.append(f)
 
 if not files:
     if verify:
         errline("--verify : aucune cible retenue — verdict INDETERMINE.")
         sys.exit(3)
-    logline("aucun agent cible (mode dossier : aucun fichier vf-mcp-consumer: true) — no-op.")
+    logline("aucun agent cible (mode dossier : aucun fichier vf-mcp-consumer: true ni vf-mcp-tools) — no-op.")
     sys.exit(0)
 
 # --- 3bis. Mode --verify : LECTURE SEULE, aucune écriture (D-09, P-02) ---------------------------
 # Relit le tools: final, réutilise TELS QUELS les calculs de want_tokens/existing/missing du mode
-# injection ci-dessous (mêmes expressions, pas réinventées). Ne rejoue JAMAIS --force a la place
-# de l appelant : constater et rapporter, jamais réparer.
+# injection ci-dessous (mêmes expressions, pas réinventées — named_tokens_for est appelee ici
+# EXACTEMENT comme dans le bloc d injection, jamais recalculee autrement, D-05/lecon Phase 19). Ne
+# rejoue JAMAIS --force a la place de l appelant : constater et rapporter, jamais reparer.
 if verify:
     determined = False
     all_missing = []
+    indeterminate = []
     for path in files:
         try:
             text = open(path, encoding="utf-8").read()
@@ -200,7 +274,7 @@ if verify:
             continue
         base = os.path.basename(path)
 
-        if single and not force and not has_flag(text):
+        if single and not force and not (has_flag(text) or has_named(text)):
             continue
 
         span, lines = frontmatter_block(text)
@@ -218,15 +292,39 @@ if verify:
             # Pas de ligne tools: (herite tout) : aucun verdict possible sur ce fichier.
             continue
 
+        # Meme calcul par fichier que le bloc d injection : mode NOMME si vf-mcp-tools est
+        # present, sinon le mode JOKER existant (want_tokens).
+        if has_named(text):
+            req = named_request(text)
+            if req is None:
+                logline("%s : vf-mcp-tools malformee — aucune comparaison possible sur ce fichier." % base)
+                continue
+            file_want_tokens = named_tokens_for(text, servers)
+            if not file_want_tokens:
+                # Sous-etat INDETERMINE (pas malformee, pas manquante) : le serveur declare par
+                # vf-mcp-tools n est pas resolu dans le lab. Ni conforme ni manquant : aucune
+                # comparaison possible. Jamais un 0 conforme (D-05).
+                errline("--verify : %s — serveur %s (vf-mcp-tools) absent du lab — verdict INDETERMINE (rien a comparer, distinct d un token manquant dans tools:)." % (base, req[0]))
+                indeterminate.append(base)
+                continue
+        else:
+            file_want_tokens = want_tokens
+
         line = lines[tools_idx]
         prefix = re.match(r"^tools:\s*", line).group(0)
         value = line[len(prefix):]
         existing = [tok.strip() for tok in value.split(",") if tok.strip()]
-        missing = [tok for tok in want_tokens if tok not in existing]
+        missing = [tok for tok in file_want_tokens if tok not in existing]
 
         determined = True
         if missing:
             all_missing.append((base, missing))
+
+    if indeterminate:
+        # Priorite absolue : un sous-etat INDETERMINE ne peut jamais etre efface par un autre
+        # fichier conforme de la meme invocation — un 0 rendu sans avoir tout compare serait le
+        # faux vert que ce mode existe pour empecher.
+        sys.exit(3)
 
     if not determined:
         errline("--verify : aucune cible determinee (pas de ligne tools: exploitable) — verdict INDETERMINE.")
@@ -234,10 +332,10 @@ if verify:
 
     if all_missing:
         for base, missing in all_missing:
-            errline("--verify : %s — serveur(s) MCP manquant(s) : %s" % (base, ", ".join(missing)))
+            errline("--verify : %s — serveur(s)/outil(s) MCP manquant(s) : %s" % (base, ", ".join(missing)))
         sys.exit(1)
 
-    logline("--verify : conforme, tous les serveurs attendus sont presents (%s)." % ", ".join(want_tokens))
+    logline("--verify : conforme, tous les serveurs/outils attendus sont presents.")
     sys.exit(0)
 
 # --- 3. Injection idempotente sur la ligne tools: ------------------------------------------------
@@ -251,10 +349,10 @@ for path in files:
 
     base = os.path.basename(path)
 
-    # En mode fichier unique sans --force, exiger le flag (securite : ne pas ouvrir un agent
-    # planif/revue/audit par erreur). En mode dossier, le filtrage par flag est deja fait.
-    if single and not force and not has_flag(text):
-        logline("%s : pas de flag vf-mcp-consumer et pas de --force — ignore." % base)
+    # En mode fichier unique sans --force, exiger un des deux flags (securite : ne pas ouvrir un
+    # agent planif/revue/audit par erreur). En mode dossier, le filtrage est deja fait.
+    if single and not force and not (has_flag(text) or has_named(text)):
+        logline("%s : ni vf-mcp-consumer ni vf-mcp-tools, pas de --force — ignore." % base)
         continue
 
     span, lines = frontmatter_block(text)
@@ -274,14 +372,31 @@ for path in files:
         logline("%s : pas de ligne tools: (herite tout) — rien a injecter." % base)
         continue
 
+    # Calcul des tokens souhaites POUR CE FICHIER : mode NOMME (D-05) si vf-mcp-tools est
+    # present — le plus restrictif l emporte si les deux cles coexistent — sinon le mode JOKER
+    # existant (want_tokens, tous les serveurs du lab).
+    if has_named(text):
+        if has_flag(text):
+            logline("%s : vf-mcp-consumer ET vf-mcp-tools presents — mode NOMME retenu (moindre privilege)." % base)
+        req = named_request(text)
+        if req is None:
+            logline("%s : vf-mcp-tools malformee (attendu grammaire <serveur>:<outil1>,<outil2>,...) — no-op." % base)
+            continue
+        file_want_tokens = named_tokens_for(text, servers)
+        if not file_want_tokens:
+            logline("%s : serveur %s (vf-mcp-tools) absent du lab — no-op silencieux." % (base, req[0]))
+            continue
+    else:
+        file_want_tokens = want_tokens
+
     line = lines[tools_idx]
     prefix = re.match(r"^tools:\s*", line).group(0)
     value = line[len(prefix):]
     existing = [tok.strip() for tok in value.split(",") if tok.strip()]
 
-    missing = [tok for tok in want_tokens if tok not in existing]
+    missing = [tok for tok in file_want_tokens if tok not in existing]
     if not missing:
-        logline("%s : deja a jour (%s)." % (base, ", ".join(want_tokens)))
+        logline("%s : deja a jour (%s)." % (base, ", ".join(file_want_tokens)))
         continue
 
     new_tokens = existing + missing

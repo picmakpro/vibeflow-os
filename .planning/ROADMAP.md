@@ -771,8 +771,10 @@ toute la phase, tirés des chiffres de l'audit :
 
 - **Ne jamais réduire le nombre de tests.** Mesuré : sur 90 s de `test_sim`, les tests pèsent ~1 s,
   tout le reste est compilation et installation. Levier nul.
+
 - **Ne jamais alléger la revue sur le chemin critique produit** — 5 bloquants y ont été trouvés en
   une journée, dont un qui cassait le geste le plus fréquent de la démo.
+
 - **Aucun allègement ne s'applique jamais à un diff de comblement.** Sur cette tranche, **9 fois,
   puis 5, puis 4 défauts sont nés des correctifs de revue eux-mêmes**. Une re-revue reste pleine,
   quelle que soit la nature du lot d'origine.
@@ -863,7 +865,10 @@ rien. Même diagnostic pour `check-debug-research.sh --hook`. Les deux sont en p
 réel** sur les agents que VibeFlow gouverne — dont, précisément, l'écart `tools:` déclaré/runtime du
 changement 1. Impraticable le 28/07, praticable maintenant.
 
-**Requirements**: TBD (à dériver au cadrage)
+**Requirements**: SC1, SC2, SC3, SC4, SC5, SC6, SC7 (les 7 critères de succès ci-dessous servent
+d'IDs de traçabilité — aucun ID formel `REQ-` n'existe pour cette phase dans `REQUIREMENTS.md`,
+même convention que les Phases 15 à 19 ; numérotation reprise telle quelle par `20-RESEARCH.md`,
+`20-VALIDATION.md` et le champ `requirements` de chaque `20-NN-PLAN.md`).
 **Depends on:** aucune — indépendante des Phases 18 (bloquée par RFC upstream) et 19 (livrée).
 **Success Criteria** (what must be TRUE):
 
@@ -923,8 +928,165 @@ agents observable — le 4 est ce qui rend le 1 visible) et {2,3} (pilotage de m
 phases. Samuel a tranché pour une phase unique. Le changement 2 vaut à lui seul plus que les trois
 autres réunis — si l'exécution déborde, c'est par là qu'il faudra scinder.
 
+**Plans:** 7/7 plans executed
+
+Plans:
+
+- [x] 20-01-PLAN.md — Changement 5 : périmètre explicite des 2 hooks de conformité, avertissements conditionnels en mode hook, charset de token MCP, clé `vf-mcp-tools` connue du gate ; chemin par défaut enfin testé (vague 1)
+- [x] 20-02-PLAN.md — `dag.sh` : `--scope` sur `add`, `review_regime` forcé à `full` par `reopen`, périmètres gelés exposés par `status` (vague 1)
+- [x] 20-03-PLAN.md — Changement 1 : mode d'injection MCP nommé dans `inject-mcp-tools.sh`, `vf-reviewer` déclare son allowlist et son protocole d'appel (vague 2, dépend de 20-01)
+- [x] 20-04-PLAN.md — Critère 2, sens ouverture : `disallowedTools: Write, Edit` sur les 4 juges, `vf-design-judge` cesse d'affirmer une barrière que le runtime ne pose pas (vague 1)
+- [x] 20-05-PLAN.md — Changement 3 : `.planning/MISSION-INVARIANTS.md` réduit aux éléments falsifiables + `check-mission-invariants.sh` et sa suite (vague 2, dépend de 20-02, checkpoint humain D-16)
+- [x] 20-06-PLAN.md — Changement 2 : la revue devient un étage de premier rang piloté par le manager, graduée par risque, revue de jointure sur topologie (vague 3, dépend de 20-02/20-03/20-05, checkpoint humain D-11)
+- [x] 20-07-PLAN.md — Gouvernance : ADR-051 révisée + ADR-060, doctrine `team-kernel`/README alignée, 6 modules bumpés, gates de sortie (vague 4, dépend de tous)
+
+### Phase 21: Alignement du moteur GSD sur gsd-core 1.9.0
+
+> **Origine** — mise à jour du moteur de 1.8.0 vers 1.9.0 sur le poste de Samuel le 2026-07-31
+> (11:35). Delta établi **sur pièce** par `npm pack` des deux versions et diff intégral des
+> tarballs, plus vérification de l'installation vivante :
+> `.planning/missions/2026-07-31-delta-gsd-core-1.9.0.md`. Découpage arbitré par Samuel le
+> 2026-07-31 : **une phase unique**, périmètre exhaustif, **rituel allégé**.
+
+**Goal**: Faire coller VibeFlow à `@opengsd/gsd-core` 1.9.0 — réparer le seul défaut actif,
+adopter les contrats amont qui créent une perte silencieuse, instruire les recouvrements
+d'architecture, et purger la dette de version — puis **publier une release racine** (tag annoté +
+release GitHub, discipline `CLAUDE.md`).
+
+**Le point de départ n'est pas une panne.** Vérifié avant ouverture : aucun frontmatter d'agent ne
+change entre 1.8.0 et 1.9.0 (les 10 agents modifiés ne bougent que dans le corps — `description:`,
+`tools:` et `model:` identiques), 71 skills des deux côtés sans ajout ni suppression,
+`_runtime-launcher.snippet.sh` identique, les 43 suites vertes, aucun hook déclaré manquant, gates
+`check-gsd-engine.sh` et `detect-gsd-engine.sh` au vert. **Le dispatch tient.** Cette phase est de
+l'alignement, pas du sauvetage — à l'exception du changement 1.
+
+**Changement 1 — l'injection MCP (ADR-051) est structurellement inopérante sur ce poste.**
+Seul défaut qui dégrade réellement le fonctionnement. L'update a réécrit
+`~/.claude/agents/gsd-executor.md` (mtime identique à celui de `gsd-core/VERSION`) et effacé
+`mcp__XcodeBuildMCP__*` de son `tools:` — comportement connu, documenté au README v2.43.0
+(l'installeur amont classe l'injection en « local patch »). Mais la remédiation prévue **ne peut
+pas s'appliquer** : `inject-mcp-tools.sh` dérive les serveurs de `./.mcp.json` (défaut de
+`--mcp-json`), or **aucun lab de `~/Documents/dev` n'a de `.mcp.json`** — `XcodeBuildMCP` est
+déclaré en **scope global** dans `~/.claude.json`. `--verify` sort donc en `3 / INDÉTERMINÉ` au lieu
+de signaler le manque, et `ensure-deps.sh --migrate-engine` ne rattrape rien. Conséquence : sur un
+projet iOS, `gsd-executor` dispatché par `vf-coder` est **aveugle à XcodeBuildMCP** (un sous-agent
+n'hérite pas des serveurs MCP de la session), alors que le `CLAUDE.md` de RoastMyRoom interdit
+`xcodebuild` brut. La cause n'est pas la 1.9.0 — c'est une **lacune de scope dans notre propre
+script**, que chaque update du moteur révèle à nouveau.
+
+**Changement 2 — câbler le contrat `estimate:` / `actuals:` (ADR-2629 amont, #2632).**
+`gsd-planner` émet désormais un bloc `estimate:` (`tokens`, `raw_tokens`, `tasks`, `confidence`
+— cette dernière **dérivée du nombre d'échantillons, jamais auto-évaluée**) dans le frontmatter du
+`PLAN.md` ; `gsd-executor` doit écrire `actuals:` (`tokens`, `tasks`, `commits`) dans le `SUMMARY`
+quand le plan portait un `estimate`. Deux exigences amont à respecter : **même échelle** des deux
+côtés (`chars/4` sur le diff réalisé, **pas** un compteur du harness — sinon on mesure les méthodes
+de mesure), et **aucun arrondi flatteur**. `dev-orchestrator/references/mission-contracts.md`
+définit les contrats de sortie typés de `vf-coder` et des workers et **ignore ces deux champs** :
+les missions pilotées par `vf-dev-manager` traversent la chaîne sans jamais alimenter la boucle de
+calibration. Rien n'échoue — la donnée n'existe simplement pas. **Perte silencieuse**, d'où sa
+place dans le périmètre.
+
+**Changement 3 — instruire le recouvrement avec les lanes de revue amont (ADR-2782 Phase 1,
+#2794, clôt #2690).** `review-lane-descriptor.cjs` déclare **en données** le contrat des reviewers
+cross-AI, jusqu'ici éclaté sur trois surfaces (roster, ~640 lignes de bash par CLI dans
+`workflows/review.md`, en-têtes codés en dur dans `write_reviews`). Le module **déclare, il
+n'exécute pas** — `invoke_reviewers` garde ses jambes manuelles jusqu'à la Phase 5b amont (#2799) ;
+l'apport est `checkReviewerLaneParity`. À trancher **explicitement plutôt que par omission** : le
+recouvrement avec l'**étage de revue de premier rang** livré en 20-06 (`vf-reviewer` →
+`gsd-code-reviewer`). Ce sont a priori deux objets distincts — revue **cross-AI de plans** en amont,
+revue de **diff de code** chez nous — mais l'arbitrage doit être écrit.
+
+**Changement 4 — instruire `runtime-aware-dispatch` (#2505 Phase 4 / #2508) et
+`executor-isolation-dispatch`.** L'amont distingue les runtimes à **dispatch nommé**
+(`hostIntegration.dispatch.namedDispatch: true` — Claude Code, OpenCode, Cursor, Cline) des
+runtimes **built-in-only** (kimi-code : `coder`, `explore`, `plan`), où un nom de rôle GSD est
+inconnu et doit tomber sur le built-in le plus proche. Nos managers dispatchent des agents nommés
+**en dur** ; `.gsd-runtime` vaut `claude` ici, donc aucun effet immédiat — mais l'hypothèse « le
+dispatch nommé marche toujours » est désormais fausse en général et **n'est écrite nulle part chez
+nous**. À recouper aussi : `gsd-executor` accepte maintenant `agent-<id>` **ou**
+`worktree-agent-<id>` (#1995), et remonte un nouveau cas d'échec `staging_failed` /
+`staging_timeout` à ne pas retenter (#2608) — à confronter à `gsd-worktree-path-guard`.
+
+**Changement 5 — purger la dette de version figée sur 1.8.0.** `gsd-skills-index.md` est
+**auto-généré** et porte « depuis @opengsd/gsd-core@1.8.0 », daté 2026-07-26 → regénérer via
+`build-gsd-index.sh` ; `mission-contracts.md` cite « gsd-core 1.8.0 » (:148) et « tag stable =
+1.8.0 » (:172) ; `check-gsd-engine.sh` (:25) et `detect-gsd-engine.sh` (:30) citent 1.8.0.
+⚠️ **Piège à préserver, pas à corriger** : `test-check-gsd-engine.sh` **cas 8 asserte la présence
+littérale de la chaîne `1.8.0`** dans l'en-tête — le test doit bouger avec le texte. Et la leçon
+elle-même reste vraie : le fork repart de zéro, donc **1.9.0 < 1.42.3 en semver** — la migration se
+décide sur le **nom du paquet et le layout**, jamais sur la comparaison des numéros.
+
+**Changement 6 — statuer sur les hooks 1.9.0 non câblés.** `gsd-ensure-canonical-path.js` et
+`gsd-update-banner.js` sont posés par 1.9.0 et absents de `settings.json` (les `gsd-cursor-*` /
+`gsd-windsurf-*` sont normalement dormants hors de leur runtime, `gsd-check-update-worker.js` est
+un interne appelé par son parent). Rien n'est cassé, mais une fonctionnalité amont est peut-être
+inactive faute de câblage. Décider si `merge-hooks.sh` doit en tenir compte — ou acter que c'est un
+sujet `gsd-core`, hors périmètre VibeFlow.
+
+**Requirements**: TBD (à mapper au ledger pendant le plan)
+**Depends on:** Phase 20 — **merge requis avant exécution**. Même règle que le diagnostic du
+2026-07-29 : les phases qui touchent le couplage au moteur attendent que la 20 soit mergée pour
+éviter les conflits sur les fichiers partagés.
 **Plans:** 0 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 20 to break down)
+- [ ] TBD (run /gsd-plan-phase 21 to break down)
+
+### Phase 22: Hygiène documentaire — doctrine de sortie et captation d'intention
+
+> **Origine** — demande de Samuel le 2026-07-31 : « le dev-orchestrator n'a pas de workflow de
+> mise à jour de doc avec les commandes GSD qui maintiennent la doc et les specs ». Gap établi
+> **sur pièce** par lecture des workflows amont (`gsd-core/workflows/docs-update.md` 1177 lignes,
+> `ingest-docs.md`, `map-codebase.md`, `extract-learnings.md`) confrontés à l'état du module.
+
+**Goal**: Donner au moteur de dev une **doctrine documentaire de sortie** — symétrique de la
+doctrine d'entrée déjà écrite (`ingestion-flow.md`) — et la **captation d'intention en langage
+naturel** qui la déclenche, de sorte que (a) `vf-dev-manager` et `vf-design-manager` sachent
+QUAND poser un nœud de doc et LEQUEL, et (b) l'utilisateur obtienne le bon geste sans jamais
+nommer une commande, exactement comme « on en est où ? » tombe aujourd'hui sur `gsd-progress`.
+
+**Le point de départ n'est pas un manque d'outils — c'est un manque de discernement.**
+Les quatre familles documentaires que GSD maintient sont **outillées séparément amont** et
+**fondues en une seule ligne** chez nous (`intent-routing.md` : « mets à jour la doc / génère le
+README / la doc est périmée » → `gsd-docs-update`) :
+
+| Famille | Brique | Ce qui est réellement maintenu |
+|---|---|---|
+| doc **produit** | `gsd-docs-update` | 6 docs toujours-on (README, ARCHITECTURE, GETTING-STARTED, DEVELOPMENT, TESTING, CONFIGURATION) + 3 conditionnelles (API si routes, CONTRIBUTING si OSS, DEPLOYMENT si config de déploiement), **plus** une *review queue* des docs écrites à la main vérifiées contre le code, **plus** une détection de trous. CHANGELOG **jamais** régénéré. |
+| doc **d'entrée** | `gsd-ingest-docs`, `gsd-import` | specs/ADR/PRD → `.planning/`. Doctrine déjà écrite (`ingestion-flow.md`). |
+| doc **du code** | `gsd-map-codebase` | `.planning/codebase/` (STACK, ARCHITECTURE, CONVENTIONS, CONCERNS…), modes `--fast` / `--query refresh`. |
+| doc **de savoir** | `gsd-extract-learnings`, `gsd-graphify` | LEARNINGS.md de phase, graphe de connaissance. |
+
+**Lacune 1 — aucune doctrine de sortie.** L'entrée a ses 94 lignes de garde-fous ; la sortie n'a
+qu'une ligne de table. Un agent à qui l'on dit « mets à jour la doc » ne sait pas s'il s'agit du
+README, de `.planning/codebase/`, ou de `STATE`. Les **flags porteurs de sens** de
+`gsd-docs-update` ne sont exposés nulle part : `--verify-only` (auditer sans écrire — la doc
+est-elle encore juste ?) et `--force` (régénérer, écrase le manuscrit) répondent à **deux
+intentions distinctes** aujourd'hui indiscernables.
+
+**Lacune 2 — captation d'intention famélique.** Une seule ligne de formulations pour un geste que
+l'utilisateur exprime de vingt façons : « la doc est fausse », « ça correspond plus au code »,
+« documente ce module », « il manque la doc d'API », « vérifie que la doc dit encore vrai »,
+« on a changé l'archi », « qu'est-ce qu'on a appris ». Aucune ne tombe de façon fiable.
+
+**Lacune 3 — managers sans moments déclencheurs.** `vf-dev-manager` porte 3 puces d'hygiène et
+une seule mention outillée (« drift doc détecté → ajoute un nœud `gsd-docs-update` ») ; il
+n'existe aucune table « à ce moment du cycle → cette brique, à cette condition ».
+`vf-design-manager` n'a **aucun** geste documentaire : son gate `DESIGN.md` ne parle jamais à la
+doc produit, alors qu'une refonte d'écran périme ARCHITECTURE/README aussi sûrement qu'un refactor.
+
+**Lacune 4 — le signal existe, le destinataire n'est pas outillé.** Le hook `[doc-drift]`
+(`check-doc-drift.sh`, Phase 17) constate déjà le FAIT — N commits de code sans commit de doc —
+et propose `gsd-docs-update`. Personne n'est équipé pour transformer ce constat en geste gradué
+(vérifier ? régénérer une doc ? toutes ?).
+
+**Requirements**: TBD (à mapper au ledger pendant le plan)
+**Depends on:** Phase 20 — **merge requis avant exécution**. Périmètre à fichiers partagés avec
+la 20 (`intent-routing.md`, `mission-contracts.md`, `vf-dev-manager.md`). **Indépendante de la
+Phase 21** (alignement gsd-core 1.9.0) : aucun fichier commun, l'ordre d'exécution est libre.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 22 to break down)

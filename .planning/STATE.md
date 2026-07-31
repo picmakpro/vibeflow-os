@@ -2,17 +2,22 @@
 gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
-current_phase: 19
-current_phase_name: Migration du moteur GSD pilotée par /vf-update — vérifiée (PASS 6/7) et SHIPPÉE v2.43.0
-status: shipped
-stopped_at: "Phase 19 vérifiée et SHIPPÉE le 2026-07-28 — release racine v2.43.0 publiée (commit 70c5720, tag annoté poussé, release GitHub, check-release-tag --remote ✓). Gates avant tag : check-version-sync ✓ après rattrapage du compteur 41→42 suites, 42 suites vertes, check-agents --strict ✓ sur les 6 dossiers d'agents. Verdict 19-VERIFICATION.md : PASS, 6/7 — SC2 reste PRESENT_BEHAVIOR_UNVERIFIED (comportement d'agent). SEUL RESTE-À-FAIRE : recette humaine du parcours /vf-update sur poste legacy, acceptation PUIS refus de la ligne moteur. Phase 17 également shippée, en v2.42.0 (une section datée de ce fichier affirmait le contraire — corrigée). Phase 20 ouverte et cadrée au ROADMAP, non planifiée : prochain geste gsd-plan-phase 20 (ou gsd-discuss-phase 20 d'abord pour le changement 2, le plus lourd des quatre)."
-last_updated: "2026-07-28T16:30:00.000Z"
-last_activity: 2026-07-28 (release v2.43.0 publiée — Phase 19 shippée ; Phase 20 ouverte et cadrée)
+current_phase: 20
+current_phase_name: Fluidité du flux de dev sans perte de qualité — 7/7 plans livrés, release racine en attente
+status: complete
+stopped_at: "Phase 20 close, reliquats compris. Les 7/7 plans livrés + la vérification (PASS partiel 5/7) + la release racine v2.44.0 COMMITÉE (jamais taggée — merge et tag réservés à Samuel). Registre WINDOWS ramené à 2 ouverts : #1 résolu le 2026-07-31 (l'affirmation anti-triche de team-kernel.md nommait un mécanisme inexistant — phrase corrigée ET assertion sur l'arbre réel posée, T72), #2 résolu (compteur de suites à 44). Restent #3 (recette XcodeBuildMCP, infaisable dans ce dépôt) et #4 (validation des noms de serveurs MCP, repris au périmètre de la Phase 21). Prochain geste humain : merger la PR #21, puis taguer v2.44.0."
+last_updated: "2026-07-31T10:26:41.602Z"
+last_activity: 2026-07-28 (clôture Phase 19 + release v2.43.0)
 progress:
-  total_phases: 20
-  completed_phases: 11
-  total_plans: 53
-  completed_plans: 37
+  total_phases: 22
+  completed_phases: 12
+  total_plans: 54
+  completed_plans: 39
+# ⚠ Compteurs recalés à la main le 2026-07-31. L'écriture d'état de la clôture 20-07 les a fait
+# RÉGRESSER (completed_phases 11→10, total_plans 53→49, completed_plans 37→29) alors que la phase
+# venait de se terminer, et a laissé current_phase à 19. Anomalie d'agrégation à instruire en
+# Phase 21 (candidat : régression d'écriture d'état côté gsd-core 1.9.0). Valeurs reposées ici
+# depuis le disque : 21 phases déclarées, 54 PLAN.md, Phase 20 à 7/7.
 ---
 
 # Project State
@@ -217,7 +222,7 @@ conductor v1.14.1 · planning-core v2.5.1 · consolidator v1.8.0.
 Milestone `gsd-migration` (Phases 10-11) reste ouvert et **en attente** — chantier indépendant, non bloquant.
 Milestone précédent memory-swarm-rnd **SHIPPÉ v2.28.0** (ADR-052 mémoire vivante + ADR-053 swarm).
 
-Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
+Progress: [██████░░░░] 59%
 
 ## Performance Metrics
 
@@ -252,10 +257,47 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase VFDO-19 P02 | 90min | 3 tasks | 4 files |
+| Phase 20 P07 | ~1h10 | 3 tasks | 26 files |
 
 ## Accumulated Context
 
 ### Roadmap Evolution
+
+- 2026-07-31 : **Phase 22 ajoutée** — « Hygiène documentaire — doctrine de sortie et captation
+  d'intention ». Origine : demande de Samuel (« le dev-orchestrator n'a pas de workflow de mise à
+  jour de doc avec les commandes GSD qui maintiennent la doc et les specs »). Gap établi **sur
+  pièce** par lecture des workflows amont (`gsd-core/workflows/docs-update.md`, 1177 lignes, 17
+  steps ; `ingest-docs.md` ; `map-codebase.md` ; `extract-learnings.md`) confrontés à l'état du
+  module. **Le manque n'est pas d'outils mais de discernement** : les quatre familles
+  documentaires que GSD outille séparément (doc **produit** → `gsd-docs-update` ; doc **d'entrée**
+  → `gsd-ingest-docs`/`gsd-import` ; doc **du code** → `gsd-map-codebase` ; doc **de savoir** →
+  `gsd-extract-learnings`/`gsd-graphify`) sont fondues en une ligne unique d'`intent-routing.md`.
+  Quatre lacunes nommées : (1) aucune doctrine de sortie symétrique d'`ingestion-flow.md`, et les
+  flags porteurs de sens de `gsd-docs-update` (`--verify-only` = auditer sans écrire, `--force` =
+  régénérer) exposés nulle part ; (2) captation d'intention famélique — une seule ligne de
+  formulations ; (3) `vf-dev-manager` sans table de moments déclencheurs et `vf-design-manager`
+  sans aucun geste documentaire ; (4) le signal `[doc-drift]` (Phase 17) constate le fait mais
+  personne n'est outillé pour le graduer. **Dépend du merge de la Phase 20** (fichiers partagés :
+  `intent-routing.md`, `mission-contracts.md`, `vf-dev-manager.md`) ; **indépendante de la Phase
+  21**, ordre libre.
+
+- 2026-07-31 : **Phase 21 ajoutée** — « Alignement du moteur GSD sur gsd-core 1.9.0 ». Origine : la
+  mise à jour du moteur de 1.8.0 vers 1.9.0 sur le poste de Samuel le 2026-07-31 (11:35). Delta
+  établi **sur pièce** (`npm pack` des deux versions + diff intégral des tarballs + vérification de
+  l'installation vivante), archivé en `.planning/missions/2026-07-31-delta-gsd-core-1.9.0.md`.
+  **Vérifié avant ouverture : le dispatch tient** — aucun frontmatter d'agent modifié, 71 skills des
+  deux côtés sans ajout ni suppression, `_runtime-launcher.snippet.sh` identique, 43 suites vertes,
+  gates `check-gsd-engine.sh` / `detect-gsd-engine.sh` au vert. La phase est de l'**alignement**, pas
+  du sauvetage, sauf sur un point : l'injection MCP ADR-051 est **structurellement inopérante** sur
+  ce poste (`inject-mcp-tools.sh` dérive ses serveurs de `./.mcp.json`, or les serveurs sont en
+  **scope global** dans `~/.claude.json` — `--verify` sort en `3 / INDÉTERMINÉ` au lieu de signaler
+  le manque, et `gsd-executor` est aveugle à XcodeBuildMCP sur les labs iOS). Périmètre arbitré par
+  Samuel : **une phase unique, exhaustive, rituel allégé** — injection MCP, contrat
+  `estimate:`/`actuals:` (ADR-2629 amont), recouvrement avec les lanes de revue amont (ADR-2782) vs
+  l'étage de revue livré en 20-06, `runtime-aware-dispatch` (#2508) et `executor-isolation-dispatch`,
+  purge de la dette de version 1.8.0 (dont le **cas 8 de `test-check-gsd-engine.sh` qui asserte la
+  chaîne littérale `1.8.0`**), et statut des hooks 1.9.0 non câblés. **Dépend du merge de la Phase
+  20** — même règle que le diagnostic du 2026-07-29.
 
 - 2026-07-28 : **Phase 20 ajoutée** — « Fluidité du flux de dev sans perte de qualité ». Origine :
   **second rapport de l'audit externe du 2026-07-28** (même lab `ExploreSomfy`, tranche iOS en 5
@@ -263,19 +305,23 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
   `.planning/missions/2026-07-28-audit-externe-fluidite.md`. **Les 4 constats ont été vérifiés sur
   pièce avant ouverture** — verdict : 3 confirmés dont 2 **plus solidement que le rapport ne
   l'affirme**, 1 **partiellement daté**.
+
   - **Changement 1 (ADR-051)** confirmé et aggravé : les `tools:` déclarés de `vf-reviewer`,
     `vf-auditer` et `vf-design-judge` gagnent tous **`Write, Edit` au runtime** (`memory: project`),
     et la description de `vf-design-judge` affirme une barrière « sans Write ni Edit » que le
     runtime ne pose pas. Le moindre privilège invoqué par ADR-051 n'existait déjà plus.
+
   - **Changement 2 (revue graduée par risque)** confirmé et verrouillé par un fait que le rapport ne
     citait pas : `vf-dev-manager.md:108` **interdit explicitement** au manager d'ajouter une revue
     (« Pas de double revue »). La revue est donc le seul étage à la fois obligatoire
     (`vf-coder.md:34`, en dur) **et hors de portée du manager**. Gradation existante indexée sur le
     volume (`SEUIL_EQUIPE = 3`), jamais sur le risque.
+
   - **Changement 3 (`MISSION-INVARIANTS.md`)** confirmé sur sa partie vérifiable (le gabarit
     `mission-contracts.md` existe et a été court-circuité ; `vf-dev-manager.md:29` lit déjà le
     `CLAUDE.md` du projet). L'absence des 3 invariants sur disque porte sur `ExploreSomfy` et n'est
     **pas vérifiable depuis ce repo** — statut plus faible que les autres constats.
+
   - **Changement 4 (`check-agents.sh`) — DATÉ à moitié** : l'option d'exclusion demandée **existe
     déjà** (`--third-party-prefix`, défaut `gsd-`, `check-agents.sh:84`), livrée en Phase 16 /
     v2.41.0 le 2026-07-27, **la veille du rapport**. Mesure du jour : **23 lignes, pas 68** — 21
@@ -373,6 +419,33 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
 
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
+
+- **2026-07-31 — L'anti-triche P12 est garanti par un gate transverse, pas par les suites de
+  module** (mission de clôture des reliquats Phase 20, WINDOWS #1). `team-kernel.md:23` affirmait
+  que le cloisonnement `disallowedTools` était « vérifié par les suites de test de chaque module » :
+  **faux sur pièce** — 0 occurrence de `disallowedTools` dans les suites propres de
+  `design-orchestrator`, `business-pilot-bundle`, `content-bundle` et `growth-bundle`, et la seule
+  du `dev-orchestrator` est une fixture de `test-inject-mcp-tools.sh`. Arbitrage : **corriger la
+  phrase plutôt que dupliquer l'assertion dans 4 suites** — la garantie est transverse par
+  construction (un seul gate `check-agents.sh --strict`, passé par la CI sur les 6 dossiers
+  `plugin/*/agents` en découverte non vide + monde clos, doublé du hook `guard-agent-write.sh` à
+  l'écriture, les deux testés par la suite conductor T69/T70). Quatre copies auraient divergé. La
+  faute était de **nommer le mauvais mécanisme**, pas d'avoir un mécanisme manquant.
+  **Corollaire non négociable** : la correction de doc seule aurait été un garde-fou inerte (motif
+  exact du précédent Phase 19), donc elle est indissociable d'une **assertion sur l'arbre réel** —
+  `test-check-agents.sh` T72 balaie `plugin/*/agents/*.md` (découverte dynamique, échec si vide) et
+  exige `disallowedTools: Write, Edit` sur tout agent `memory:` + `tools:` sans Write/Edit. Jusque-là
+  **aucune** suite du repo n'assertait quoi que ce soit sur les agents réellement posés — tout était
+  fixture. Validé par mutation. Commit `8c5f0a5`.
+
+- **2026-07-31 — Deux sessions ont écrit dans `.planning/` en parallèle ; le verrou de driver ne
+  l'a pas empêché.** Pendant la mission de clôture des reliquats Phase 20 (verrou tenu par
+  `mission-phase21` depuis 15:2xZ), une session tierce a rédigé la **Phase 22** dans `ROADMAP.md` et
+  `STATE.md` à 15:37–15:38Z et créé `.planning/phases/VFDO-22-*/`. Confirmation opérationnelle que
+  `driver-lock.sh` est **déclaratif, pas contraignant** : il coordonne des missions qui le
+  consultent, il n'a aucun moyen d'arrêter un écrivain qui l'ignore. Traitement retenu : le brouillon
+  Phase 22 est **préservé verbatim**, jamais réécrit ni annulé, et committé tel quel en signalant son
+  origine hors mission. Ne jamais résoudre ce cas par un `stash` ou un `checkout --` décidé seul.
 
 - **2026-07-28 — Un test qui n'exerce pas la commande réellement émise ne teste rien** (mission
   Phase 19, établi par mutation, pas par lecture). Le gap SC3 (`--verify` sans `--force`, garde-fou
@@ -510,6 +583,8 @@ Recent decisions affecting current work:
 - [Phase 06]: Séquence d'init non dupliquée : délégation au skill vf-init existant
 - [Phase ?]: 19-02: capture de l'état legacy avant toute garde de ensure_gsd() (D-08.3), preuve directe par T2k
 - [Phase ?]: 19-02: npm_pkg_installed_globally() est le seul appel npm réellement exécuté (lecture seule), --verify d'inject-mcp-tools.sh ne rejoue jamais --force
+- [Phase ?]: 2026-07-31 — Phase 20 (20-07, clôture) : anti-triche « vérifié par les suites de test de chaque module » constaté FAUX pour design-orchestrator/business-pilot-bundle/content-bundle/growth-bundle (0 test de disallowedTools dans leur suite propre) — inscrit en différé nommé (WINDOWS.md), non corrigé (P-07).
+- [Phase ?]: 2026-07-31 — Phase 20 (20-07) : compteurs du module obligatoire écrits à leur valeur réelle (14 scripts, 12 suites, pas 11) — un correctif de revue hors plan (test-guard-agent-write.sh, commit 447e75a) a créé une 2e suite entre le cadrage et l'exécution. Compteur repo-entier de suites réel = 44, pas 43 : consigné en reste-à-faire de release racine.
 
 ### Pending Todos
 
@@ -557,14 +632,15 @@ Recent decisions affecting current work:
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| *(none)* | | | |
+| Recette humaine | **WINDOWS #3** — valider `test_sim` / `build_sim` / `clean` (clé `vf-mcp-tools`) contre un serveur **XcodeBuildMCP vivant** sur un lab iOS équipé. Reste `open` : **infaisable dans ce dépôt** (aucun `.mcp.json`, serveur non connecté) — toute preuve produite ici serait fabriquée. Se recette sur `RoastMyRoom` ou `FreelanceMoneyCalc`, pas sur `vibeflow-os`. | open | 2026-07-31 |
+| Dette outillage | **WINDOWS #4** — `inject-mcp-tools.sh` ne valide pas qu'un nom de serveur cité dans un token `vf-mcp-tools`/`mcp__` **existe réellement**. **Repris au périmètre de la Phase 21, changement 1** : la phase rouvre déjà ce script pour lui donner la découverte des serveurs en scope global (`~/.claude.json`) — une fois la source des noms de serveurs connue du script, valider un nom cité devient possible, alors que c'était structurellement hors de portée tant que la seule source était `./.mcp.json`. | repris en Phase 21 | 2026-07-31 |
 
 ## Session Continuity
 
 **Resume file:** None
 
-Last session: 2026-07-28T13:00:00.000Z
-Stopped at: Completed VFDO-19-03-PLAN.md
+Last session: 2026-07-31T10:26:41.586Z
+Stopped at: Phase 20 complète (7/7 plans) — clôture de gouvernance (20-07) : ADR-051 révisée + ADR-060 posée, doctrine transverse alignée, 6 modules bumpés (conductor v1.17.0, dev-orchestrator v2.8.0, design-orchestrator v1.3.2, 3 bundles v2.0.3). Gates verts sauf le seul rouge attendu (compteur de suites racine, 44 réel pas 43). Release racine réservée à validation humaine post-fusion (4 éléments consignés + WINDOWS.md).
 ubuntu:24.04) — 3 jobs verts au run 30257419335. Modules bumpés : conductor v1.14.5,
 consolidator v1.8.1, dev-orchestrator v2.3.2. Leçon durable : tout bash développé sur macOS/BSD
 doit être reproduit sous `docker run ubuntu:24.04` avant push (stat/-f, TMPDIR, outillage hôte).

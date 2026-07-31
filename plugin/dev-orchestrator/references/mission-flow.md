@@ -165,14 +165,97 @@ a consigne de ne piloter que sur le bloc typé, la prose libre est du volume mor
 
 ---
 
+## Pattern E — Étage revue de premier rang (D-10 → D-14)
+
+> Généralise le patron déjà écrit pour l'étage design croisé (`mission-cross-team.md` §Étage design,
+> nœud `revue-N` deps=`exec-N`) : la revue cesse d'être un cas particulier de la collaboration
+> dev↔design pour devenir LE patron de l'étage revue de toute mission dev. `mission-cross-team.md`
+> continue de le SPÉCIALISER (formule de « vert » complet du double juge) — il n'est ni dupliqué ni
+> modifié ici.
+
+### 1. Pose du nœud
+
+Pour chaque étape, le manager pose un nœud `revue-N` dépendant du nœud d'exécution de la même
+étape, **systématiquement** — au même titre que test/audit sont posés quand ils s'appliquent, mais
+sans condition : la revue n'est jamais sautée.
+
+```bash
+"$S"/dag.sh add --file="$DAG" --id=revue-N --step="revue code étape N" --deps=exec-N --scope=<globs>
+```
+
+Le périmètre (`--scope`) est déclaré à la pose : c'est ce qui rend calculable le critère (b) de la
+§3 ci-dessous (fichier partagé avec une mission parallèle en vol) — sans déclaration, ce critère
+reste aveugle. `dag.sh status` dérive la table des fichiers gelés depuis ces périmètres déclarés,
+jamais depuis une copie figée (cf. `.planning/MISSION-INVARIANTS.md` §2).
+
+### 2. Dispatch et boucle de correction
+
+`vf-reviewer` est dispatché **EN DIRECT** par le manager, jamais via `vf-coder` — un seul pilote de
+la revue, cohérent avec les allowlists `Agent(...)` des deux agents (ni dispatch direct ni indirect
+manager↔worker↔worker de revue). Sur un rapport typé `gaps_found` :
+
+1. `dag.sh reopen --id=revue-N` — force `review_regime=full` sur le nœud et ses dépendants transitifs
+   (mécanisme machine, cf. §5).
+2. Dispatch `vf-coder` en mandat de **correction CIBLÉE** : les findings remontés, rien d'autre —
+   jamais un cycle cadrage → plan → exécution complet.
+3. Re-dispatch `vf-reviewer` sur le diff corrigé.
+
+Budget **3 tours** ; au-delà, escalade humaine (jamais de raffinage infini) — cette boucle s'articule
+sur la MÊME table de pilotage déterministe que le reste du contrôle de flux (Pattern C), une seule
+règle : `passed` → `mark done` + frontière suivante · `gaps_found` → la boucle ci-dessus ·
+`human_needed`/finding `ask-user` → escalade.
+
+### 3. Gradation par risque, jamais par volume
+
+Déclencheurs de revue **renforcée**, non négociables — chacun un FAIT constatable sur le diff ou le
+plan de bataille, jamais un jugement au feeling :
+
+(a) un adaptateur d'infrastructure non couvert par les tests ;
+(b) un fichier partagé avec une mission parallèle en vol (table dérivée par `dag.sh status`) ;
+(c) du code que la mutation ne couvre pas ;
+(d) un geste utilisateur ou une géométrie de vue.
+
+Allègement réservé — et seulement — au Domain pur à mutation verte, à la documentation, aux
+catalogues sans ajout de clé. **Défaut sûr : dans le doute, revue pleine** — le classement du lot
+est un point de décision, donc un point d'erreur, et le défaut doit être le sûr. Axe abandonné
+explicitement : la seule gradation d'avant indexait sur le VOLUME (`SEUIL_EQUIPE`, nombre d'étapes
+restantes) — mauvais axe, trois lignes sur un chemin partagé sont minuscules et à très haut risque,
+quatre cents lignes de Domain pur prouvées par mutation sont grosses et à bas risque.
+
+### 4. Revue de jointure
+
+Dès que deux nœuds `exec-*` **incomparables** (aucun lien de dépendance entre eux) partagent un
+descendant, un nœud `join-<N>` séparé est posé, et il lit **l'union** des deux diffs :
+
+```bash
+"$S"/dag.sh add --file="$DAG" --id=join-N --step="revue de jointure" --deps=exec-A,exec-B
+```
+
+Déclencheur = la **TOPOLOGIE** du DAG, jamais l'intersection des périmètres de fichiers : cette
+intersection est vide par construction en parallélisation nominale — on parallélise précisément
+quand les périmètres sont disjoints, un déclencheur fondé dessus ne se déclencherait donc jamais.
+C'est l'étage au meilleur rendement mesuré sur la tranche source de la Phase 20 : 4 bloquants + 9
+majeurs, qu'aucun relecteur cadré sur un seul lot n'aurait vus.
+
+### 5. Garde-fou de comblement
+
+**Aucun allègement ne s'applique jamais à un diff de comblement. Une re-revue reste pleine, quelle
+que soit la nature du lot d'origine.** Garant MACHINE, pas une consigne : `dag.sh reopen` écrit
+lui-même `review_regime=full` sur tout nœud `revue-*`/`join-*` rouvert (et ses dépendants
+transitifs) — une consigne se contourne par interprétation, un champ écrit par l'outil ne se
+contourne pas.
+
+---
+
 ## Pattern D — Étages croisés dev ↔ design (renvoi)
 
 Doctrine complète (quand insérer l'étage de l'autre métier, forme DAG, budgets, invariants) :
 `dev-orchestrator-references/mission-cross-team.md` (§Étage design (mission dev) / §Étage
-implémentation (mission design) / §Invariants non négociables). Les Patterns A/B/C ci-dessus
-s'appliquent tels quels aux nœuds croisés (`craft:<écran>`, `critique:<écran>`, étage
+implémentation (mission design) / §Invariants non négociables). Les Patterns A/B/C/E ci-dessus
+s'appliquent tels quels aux nœuds croisés (`craft:<écran>`, `critique:<écran>`, `revue-N`, étage
 implémentation) — le DAG reste métier-agnostique (prouvé T3/T4, `15-ETUDE-collaboration-dev-design.md`) ;
-le lock reste au seul manager de la mission, jamais imbriqué (Pattern A).
+le nœud `revue-N` du cross-team EST une instance de Pattern E, pas un cas séparé ; le lock reste au
+seul manager de la mission, jamais imbriqué (Pattern A).
 
 ## Lignes rouges (rappel ADR-053)
 

@@ -61,9 +61,11 @@
 # lintés ≠ entrées d'allowlist résolues — deux choses différentes, jamais un skip muet ni un
 # skip mal décrit).
 #
-# --hook n'imprime QUE les erreurs (jamais les warnings) : les nouvelles classes en warning
-# (outil hors set, agent non résolu, Agent nu) restent invisibles au SessionStart. C'est VOULU
-# (bruit minimal à l'ouverture de session) — le signal complet est sur l'appel explicite/CI.
+# --hook n'imprime les avertissements QUE lorsqu'il y en a (une ligne compacte avec le compte,
+# renvoyant vers l'invocation explicite pour le détail) ; silence total en régime nominal (0 erreur,
+# 0 avertissement). Les erreurs, quand il y en a, priment et remplacent ce résumé — le mode reste
+# minimal, jamais une énumération ligne par ligne au SessionStart (le signal complet est sur
+# l'appel explicite/CI).
 #
 # Résolution d'un skill déclaré (UAT F2) : d'abord par NOM DE DOSSIER (.claude/skills/<s>/SKILL.md),
 # sinon par le frontmatter `name:` des SKILL.md installés — un skill peut porter un name différent
@@ -150,10 +152,12 @@ registry_dirs = [p for p in os.environ.get(\"VF_REGISTRY_DIRS\", \"\").split(\":
 
 # Champs officiels Claude Code (docs sub-agents, 2026-07-05) — base du lint.
 # + conventions VibeFlow : vf-internal (worker interne — pas de commande d'incarnation, cf. Pattern 12) ;
-#   vf-mcp-consumer (agent exécutant recevant l'allowlist MCP dérivée du lab à l'install, ADR-051).
+#   vf-mcp-consumer (agent exécutant recevant l'allowlist MCP dérivée du lab à l'install, ADR-051) ;
+#   vf-mcp-tools (allowlist MCP NOMMÉE — un serveur, une liste d'outils explicites — consommée par
+#   le script d'injection du module dev-orchestrator ; coexiste avec vf-mcp-consumer sans le remplacer).
 KNOWN = {\"name\", \"description\", \"tools\", \"disallowedTools\", \"model\", \"permissionMode\",
          \"maxTurns\", \"skills\", \"mcpServers\", \"hooks\", \"memory\", \"background\", \"effort\",
-         \"isolation\", \"color\", \"initialPrompt\", \"vf-internal\", \"vf-mcp-consumer\"}
+         \"isolation\", \"color\", \"initialPrompt\", \"vf-internal\", \"vf-mcp-consumer\", \"vf-mcp-tools\"}
 MODELS = {\"sonnet\", \"opus\", \"haiku\", \"fable\", \"inherit\"}
 MEMORY = {\"user\", \"project\", \"local\"}
 EFFORT = {\"low\", \"medium\", \"high\", \"xhigh\", \"max\"}
@@ -351,8 +355,12 @@ def analyze_token(raw_tok, field, base):
         return None, None
     m = re.match(r\"^([A-Za-z0-9_-]+)\((.*)$\", tok, re.S)
     if not m:
-        # pas de parenthese : nom d'outil seul (Read, Bash, ...)
-        if not re.fullmatch(r\"[A-Za-z0-9_-]+\", tok):
+        # pas de parenthese : nom d'outil seul (Read, Bash, ...) OU forme MCP a joker TERMINAL
+        # 'mcp__<serveur>__*' — la forme sure documentee en tete d'inject-mcp-tools.sh ADR-051
+        # (\"on injecte donc, par serveur, la forme sure mcp__<serveur>__*\"). Aucun joker ailleurs :
+        # ni en tete, ni en milieu de chaine, ni dans le nom du serveur, ni suivi d'un suffixe
+        # (mcp__*, mcp__Xcode*MCP__*, mcp__XcodeBuildMCP__*_sim restent hors charset).
+        if not (re.fullmatch(r\"[A-Za-z0-9_-]+\", tok) or re.fullmatch(r\"mcp__[A-Za-z0-9_-]+__[*]\", tok)):
             errors.append(f\"{base} : {field} — token hors charset attendu '{tok}'\")
             return None, None
         return tok, None
@@ -449,6 +457,20 @@ def agent_display_name(path, text):
     if fm and isinstance(fm.get(\"name\"), str) and fm.get(\"name\"):
         return fm[\"name\"]
     return os.path.basename(path)[:-3]
+
+def bare_tokens(fmlines, field):
+    \"\"\"Ensemble des tokens SANS parenthese d'un champ tools:/disallowedTools: — reutilise le
+    MEME tokenizer a profondeur de parentheses que le lint principal (extract_raw_field +
+    tokenize_field), jamais un second parseur. Un champ absent ou une allowlist mal formee
+    (depth != 0) rend un ensemble vide plutot que de lever : ce garde-fou structurel ne doit
+    jamais masquer les erreurs de syntaxe deja levees ailleurs par lint_tool_field.\"\"\"
+    mode, raw = extract_raw_field(fmlines, field)
+    if mode is None:
+        return set()
+    tokens, depth = tokenize_field(mode, raw)
+    if depth != 0:
+        return set()
+    return {t.strip() for t in tokens if t.strip() and \"(\" not in t}
 
 def check_file(path):
     base = os.path.basename(path)
@@ -550,6 +572,22 @@ def check_file(path):
             continue
         lint_tool_field(base, field, mode, raw, do_resolution)
 
+    # Regle anti-regression (Phase 20) : memory: reinjecte SILENCIEUSEMENT Write+Edit au
+    # runtime par-dessus l'allowlist tools: (contrat Claude Code confirme par sonde). Un agent
+    # qui porte memory: et dont le tools: (declare) omet Write ET Edit DOIT fermer ce canal
+    # explicitement via disallowedTools — sinon rien n'empeche un futur juge/reviewer de naitre
+    # sans sa barriere. Purement structurel : reutilise bare_tokens() (meme tokenizer), aucune
+    # analyse de texte. Warning en defaut, ERREUR en --strict — meme regime que les autres
+    # classes structurelles de ce script (outil hors set connu, skill introuvable) : visible au
+    # SessionStart des qu'il y en a un (D-21), bloquant sur l'appel explicite/CI --strict.
+    if memory and \"tools\" in fm:
+        tools_tokens = bare_tokens(fmlines, \"tools\")
+        if \"Write\" not in tools_tokens and \"Edit\" not in tools_tokens:
+            disallowed_tokens = bare_tokens(fmlines, \"disallowedTools\")
+            if not (\"Write\" in disallowed_tokens and \"Edit\" in disallowed_tokens):
+                msg = f\"{base} : memory: + tools: sans Write/Edit exige disallowedTools: Write, Edit (memory: reinjecte silencieusement ces outils au runtime — barriere structurelle requise)\"
+                (errors if strict else warnings).append(msg)
+
     for k in fm:
         if k not in KNOWN:
             warnings.append(f\"{base} : champ inconnu du runtime — {k} (typo ? champ invente ? verifier la doc)\")
@@ -593,6 +631,11 @@ if hook:
         for e in errors:
             print(f\"  - {e}\")
         print(\"  Corriger le frontmatter puis relancer : bash .claude/scripts/check-agents.sh\")
+    elif n_warn:
+        # D-21 : le hook trouvait desormais un perimetre reel (D-18/D-19) sans jamais le dire —
+        # faux vert silencieux. Une ligne compacte, jamais une enumeration (le mode reste minimal) ;
+        # silence total inchange quand n_err == 0 ET n_warn == 0 (regime nominal, cf. T56/T16).
+        print(f\"[check-agents] ⚠ {n_warn} avertissement(s) — detail : bash .claude/scripts/check-agents.sh\")
     sys.exit(0)
 
 for w in warnings:

@@ -13,8 +13,8 @@
       {
         "matcher": "startup",
         "hooks": [
-          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-agents.sh --hook || true" },
-          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-debug-research.sh --hook || true" },
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-agents.sh --hook --agents-dir={{VF_SCRIPTS}}/../agents --skills-dir={{VF_SCRIPTS}}/../skills || true" },
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-debug-research.sh --hook --agents-dir={{VF_SCRIPTS}}/../agents --skills-dir={{VF_SCRIPTS}}/../skills || true" },
           { "type": "command", "command": "bash {{VF_SCRIPTS}}/update-banner.sh || true" }
         ]
       }

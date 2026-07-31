@@ -6,7 +6,7 @@
 > et de migration. Module **mandatory** : posé d'office à chaque install, c'est lui qui porte les
 > gates machine (hooks) et le noyau d'orchestration d'équipe réutilisé par tous les autres modules.
 
-**Type** : `agent + skills + scripts + references` · **Version** : v1.16.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
+**Type** : `agent + skills + scripts + references` · **Version** : v1.17.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
 
 > `skill-creator` est une dépendance **dure** depuis ADR-047 : c'est le canal unique de création de
 > skills, invoqué par `vf-new-lab` en fan-out (Phase 5) et exigé par le Gate C. Le conductor étant
@@ -37,11 +37,11 @@ Ce que le kernel fournit (invariant) :
 | Brique | Support | Garantie |
 |---|---|---|
 | **Lock de driver** | `scripts/driver-lock.sh` (acquire / heartbeat / release, TTL + recovery) | une seule mission pilote à la fois ; reprise propre d'un lock périmé |
-| **Plan de bataille en DAG** | `scripts/dag.sh` (init / add --deps / ready / mark / reopen) | contrôle de flux déterministe ; la frontière `ready` se dispatche **en parallèle** sur périmètres disjoints |
+| **Plan de bataille en DAG** | `scripts/dag.sh` (init / add --deps **--scope** / ready / mark / reopen / status) | contrôle de flux déterministe ; la frontière `ready` se dispatche **en parallèle** sur périmètres disjoints ; `reopen` force `review_regime=full` sur tout nœud de revue/jointure rouvert (D-14, Phase 20) |
 | **Rapports typés** (Pattern C) | `{ statut: passed\|gaps_found\|human_needed\|blocked, findings[], noeuds_debloques[] }` | fin du pilotage à la prose ; escalade humaine impérative sur `ask-user` |
 | **Halt conditions** | 5 codes (boucle sans progrès, action destructive, ressource manquante, budget épuisé, drift de scope) | l'humain arbitre sur un message structuré |
 | **Digest de mission** | ≤ 30 lignes par mandat, le disque fait foi | amortit les relectures de contexte |
-| **Cloisonnement par tools** (P12) | juges sans Write/Edit, la plupart des workers sans Task, allowlist `Agent(...)` sur les managers, `vf-internal: true` | anti-triche vérifié par les suites de test des modules ET par `check-agents.sh`, qui linte désormais le contenu de `tools:` (syntaxe des allowlists `Agent(...)`/`Task(...)`, noms résolus) en plus du frontmatter (ADR-044, Phase 16) — un CONTRAT documenté, pas un cloisonnement runtime : le runtime ignore la liste de noms entre parenthèses pour tout agent dispatché en sous-agent, il ne l'applique qu'en incarnation fenêtre principale (`claude --agent`, doc officielle sub-agents). Le garant machine réel de « un seul manager actif », quel que soit le chemin de dispatch, est le verrou de driver — détail : `references/team-kernel.md` |
+| **Cloisonnement par tools** (P12) | juges via `disallowedTools: Write, Edit` (contrainte runtime, Phase 20), la plupart des workers sans Task, allowlist `Agent(...)` sur les managers, `vf-internal: true` | anti-triche vérifié par les suites de test des modules ET par `check-agents.sh`, qui linte désormais le contenu de `tools:` (syntaxe des allowlists `Agent(...)`/`Task(...)`, noms résolus) en plus du frontmatter (ADR-044, Phase 16) — un CONTRAT documenté, pas un cloisonnement runtime : le runtime ignore la liste de noms entre parenthèses pour tout agent dispatché en sous-agent, il ne l'applique qu'en incarnation fenêtre principale (`claude --agent`, doc officielle sub-agents). Le garant machine réel de « un seul manager actif », quel que soit le chemin de dispatch, est le verrou de driver — détail : `references/team-kernel.md` |
 
 Chaque métier ne paramètre que ses spécialistes, sa définition de « vert » et ses gates. S'y
 branchent aujourd'hui : **dev-orchestrator** (implémentation de référence, `vf-dev-manager`),
@@ -72,7 +72,7 @@ première instanciation non-dev) et les **bundles métier** (business-pilot, con
   --hook` (advisory ADR-045 : recherche documentaire avant debug), `update-banner.sh` (bandeau
   « mise à jour disponible X → Y, lance /vf-update » + nudge de méthode legacy).
 
-## Scripts (13) — par famille
+## Scripts (14) — par famille
 
 **Gates machine (`check-*`)** :
 - `check-agents.sh` — lint de conformité native des agents (ADR-044) : frontmatter, champs requis,
@@ -86,6 +86,9 @@ première instanciation non-dev) et les **bundles métier** (business-pilot, con
   (racines user ET projet), verdicts `legacy` / `drift`.
 - `check-overlaps.sh` — inventaire des recouvrements de déclenchement avec les briques tierces
   (ADR-057, advisory).
+- `check-mission-invariants.sh` — gate advisory (Phase 20, D-15) : constate qu'un glob de zone de
+  risque de `.planning/MISSION-INVARIANTS.md` ne matche plus aucun fichier suivi ; il ne juge
+  jamais, il signale.
 
 **Team-kernel** : `dag.sh` (plan de bataille persistant, frontière `ready`) et `driver-lock.sh`
 (verrou de mission atomique par `mkdir`, heartbeat + TTL).
@@ -98,7 +101,7 @@ SessionStart), `vf-update-run.sh` (re-matérialise les modules depuis le cache p
 ADR-042) et `generate-agent-commands.sh` (une commande slash d'incarnation par agent posé — saute
 les workers `vf-internal: true`, Pattern 12).
 
-**Tests** : 10 suites sous `scripts/tests/` (une par script critique + `test-conductor.sh`,
+**Tests** : 12 suites sous `scripts/tests/` (une par script critique + `test-conductor.sh`,
 `test-vf-new-lab.sh`, `test-vf-update.sh`, `test-doc-and-commands.sh`).
 
 ## Contenu du module
@@ -111,7 +114,7 @@ conductor/
     vf-new-lab/                    # Lab Factory (SKILL.md + 7 references + script + test)
     vf-calibrate/SKILL.md          # propagation update + migration
     vf-update/SKILL.md             # mise à jour plugin + modules
-  scripts/                         # 13 scripts (familles ci-dessus) + tests/ (10 suites)
+  scripts/                         # 14 scripts (familles ci-dessus) + tests/ (12 suites)
   references/
     team-kernel.md                 # contrat du noyau d'équipe (manager/workers/juges)
     contracts.md                   # escalade sous-agents → conductor

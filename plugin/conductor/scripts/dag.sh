@@ -6,15 +6,26 @@
 # Un correctif qui ROUVRE une etape (`reopen`) repasse le noeud + ses dependants a blocked/ready →
 # le manager RE-ENTRE dans le dispatch au lieu de derouler lineairement.
 #
-# Noeud : { id, step, stage, deps[], status ∈ blocked|ready|running|done|failed }.
+# Noeud : { id, step, stage, deps[], scope[], status ∈ blocked|ready|running|done|failed }.
+# scope[] : perimetre declare (chemins/globs, D-13) — [] par defaut. Necessaire au dispatch
+# parallele (critere b de la gradation par risque) et a la table des fichiers geles (dag.sh
+# status). Absent sur les DAG ecrits avant ce champ : toute lecture tolere l'absence, jamais
+# d'acces direct a la cle (P-02).
+# review_regime : ecrit UNIQUEMENT par `reopen`, valeur "full" — jamais une autre valeur (P-03).
+# Force le regime plein sur tout noeud de revue/jointure (id prefixe revue-/revue:/join-/join:
+# ou egal a "join") rouvert, la cible ET ses dependants transitifs — enforcement machine du
+# garde-fou « aucun allegement ne s'applique jamais a un diff de comblement » (D-14). Absent =
+# non contraint ; il n'existe aucun flag pour poser un regime allege, l'allegement reste un
+# choix du manager au moment de composer le mandat (P-04 : jamais pose sur un noeud exec-*).
 #
 # Usage:
 #   dag.sh init   --file=F
-#   dag.sh add    --file=F --id=N --step="..." [--stage=S] [--deps=a,b]   # remap id::stage si collision
+#   dag.sh add    --file=F --id=N --step="..." [--stage=S] [--deps=a,b] [--scope=g1,g2]   # remap id::stage si collision
 #   dag.sh ready  --file=F                                                # frontiere ready (JSON)
 #   dag.sh mark   --file=F --id=N --status=running|done|failed            # + recalcule la frontiere
-#   dag.sh reopen --file=F --id=N                                         # re-entree : noeud + dependants
-#   dag.sh status --file=F                                                # compteurs + frontiere (JSON)
+#   dag.sh reopen --file=F --id=N                # re-entree : noeud + dependants, force review_regime=full sur revue/join
+#   dag.sh status --file=F     # compteurs + frontiere + perimetres GELES (JSON) — source vivante
+#                               # de la table des fichiers geles, jamais une copie figee (D-15 §2)
 #   dag.sh tree   --file=F                                                # rendu ARBRE lisible (glyphes + connecteurs)
 #
 # Glyphes de statut (rendu `tree`) : ● done · ◐ running · ○ ready · · blocked · ✗ failed.
@@ -23,7 +34,7 @@
 
 set -uo pipefail
 
-ACTION=""; FILE=""; ID=""; STEP=""; STAGE=""; DEPS=""; STATUS=""
+ACTION=""; FILE=""; ID=""; STEP=""; STAGE=""; DEPS=""; STATUS=""; SCOPE=""
 for arg in "$@"; do
   case "$arg" in
     init|add|ready|mark|reopen|status|tree) ACTION="$arg" ;;
@@ -32,6 +43,7 @@ for arg in "$@"; do
     --step=*)   STEP="${arg#*=}" ;;
     --stage=*)  STAGE="${arg#*=}" ;;
     --deps=*)   DEPS="${arg#*=}" ;;
+    --scope=*)  SCOPE="${arg#*=}" ;;
     --status=*) STATUS="${arg#*=}" ;;
     -h|--help)  grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *) echo "Unknown arg: $arg" >&2; exit 1 ;;
@@ -41,10 +53,10 @@ done
 [ -n "$FILE" ] || { echo '{"error": "file-required"}' >&2; exit 1; }
 [ -n "$ACTION" ] || { echo "Usage: $0 {init|add|ready|mark|reopen|status|tree} --file=F [...]" >&2; exit 1; }
 
-python3 - "$ACTION" "$FILE" "$ID" "$STEP" "$STAGE" "$DEPS" "$STATUS" <<'PYEOF'
+python3 - "$ACTION" "$FILE" "$ID" "$STEP" "$STAGE" "$DEPS" "$STATUS" "$SCOPE" <<'PYEOF'
 import sys, os, json
 
-action, file, nid, step, stage, deps_raw, status = sys.argv[1:8]
+action, file, nid, step, stage, deps_raw, status, scope_raw = sys.argv[1:9]
 VALID = {"blocked", "ready", "running", "done", "failed"}
 
 def load():
@@ -76,6 +88,15 @@ def recompute(nodes):
 def emit(obj):
     print(json.dumps(obj, indent=2, ensure_ascii=False))
 
+def is_review_node(node_id):
+    """Selecteur ferme (D-14, P-04) : prefixes explicites uniquement, jamais un test de
+    sous-chaine — un id contenant le mot en milieu de chaine (ex. refonte-joint-bas) ne matche
+    pas. Les deux ponctuations (`revue-`/`revue:`, `join-`/`join:`) existent deja dans la
+    doctrine de mission croisee : ne pas en oublier une."""
+    return (node_id.startswith("revue-") or node_id.startswith("revue:")
+            or node_id.startswith("join-") or node_id.startswith("join:")
+            or node_id == "join")
+
 if action == "init":
     save({"nodes": []})
     emit({"file": file, "initialized": True, "nodes": 0})
@@ -100,7 +121,10 @@ if action == "add":
     missing = [d for d in deps if d not in idx]  # M1 : une dep inexistante bloquerait le noeud a vie
     if missing:
         emit({"error": "unknown-dep", "missing": missing}); sys.exit(1)
-    node = {"id": final, "step": step, "stage": stage, "deps": deps, "status": "blocked"}
+    scope = [s.strip() for s in scope_raw.split(",") if s.strip()]  # meme regle que deps (D-13)
+    node = {"id": final, "step": step, "stage": stage, "deps": deps}
+    node["scope"] = scope  # affectation directe unique : CONSTRUCTION du noeud, jamais une lecture (P-02)
+    node["status"] = "blocked"
     nodes.append(node)
     recompute(nodes)
     save(dag)
@@ -142,9 +166,17 @@ if action == "reopen":
     idx[nid]["status"] = "blocked"
     for d in affected:
         idx[d]["status"] = "blocked"
+    # D-14 / garde-fou ROADMAP « aucun allegement ne s'applique jamais a un diff de comblement » :
+    # le regime plein est ECRIT ICI par le script lui-meme, jamais laisse a une consigne de
+    # prompt — un regime decide par prompt est un point de decision, donc un point d'erreur.
+    # Cible ET dependants, sans exception ; idempotent (reecrire "full" ne duplique pas la cle).
+    regime_full = sorted(n for n in ({nid} | affected) if is_review_node(n))
+    for n in regime_full:
+        idx[n]["review_regime"] = "full"
     recompute(nodes)  # remet ready ce qui redevient dispatchable (deps done)
     save(dag)
     emit({"reopened": nid, "dependents_reset": sorted(affected),
+          "review_regime_full": regime_full,
           "ready": [n["id"] for n in nodes if n["status"] == "ready"]})
     sys.exit(0)
 
@@ -152,8 +184,23 @@ if action == "status":
     counts = {}
     for n in nodes:
         counts[n["status"]] = counts.get(n["status"], 0) + 1
+    # Perimetres GELES (D-15 §2) : tout noeud NON TERMINE (statut != "done" — un noeud en echec
+    # compte aussi comme gele, son perimetre est justement celui sur lequel une reprise va
+    # revenir) dont le scope declare est non vide. Lecture tolerante a l'absence (P-02) :
+    # node.get("scope", []) jamais un acces direct. Tri deterministe par id : deux appels
+    # consecutifs sur le meme DAG produisent une sortie identique et diffable. Cle TOUJOURS
+    # presente, meme vide — un consommateur (manager, lecteur humain) ne doit jamais avoir a
+    # distinguer l'absence de la vacuite. C'est la source unique et vivante de la table des
+    # fichiers geles : jamais recopiee dans un fichier de documentation (dag.sh status
+    # --file=<dag-de-mission-actif> EST la commande).
+    frozen = sorted(
+        ({"id": n["id"], "status": n["status"], "scope": n.get("scope", [])}
+         for n in nodes if n["status"] != "done" and n.get("scope", [])),
+        key=lambda f: f["id"],
+    )
     emit({"file": file, "total": len(nodes), "counts": counts,
-          "ready": [n["id"] for n in nodes if n["status"] == "ready"]})
+          "ready": [n["id"] for n in nodes if n["status"] == "ready"],
+          "frozen": frozen})
     sys.exit(0)
 
 if action == "tree":

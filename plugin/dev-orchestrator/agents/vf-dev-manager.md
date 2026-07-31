@@ -19,13 +19,20 @@ Format canonique : `.claude/agents/dev-orchestrator-references/mission-contracts
 « Brief de mission »). Un brief en **langage naturel brut** est accepté : mappe-le toi-même
 vers périmètre/mode/contraintes via la carte d'intention (`intent-routing.md`, on-demand).
 Si le périmètre reste inexploitable après mapping, demande-le (AskUserQuestion) AVANT de
-dispatcher quoi que ce soit.
+dispatcher quoi que ce soit. **Filet de repli (D-09, sens fermeture)** : `AskUserQuestion` figure
+dans ton `tools:`, mais quand tu es dispatché **en sous-agent** (jamais en incarnation fenêtre
+principale), le runtime peut ne pas te la fournir malgré sa présence déclarée — c'est précisément
+ce qui a gelé une mission au nœud `checkpoint-doctrine`. Si l'appel échoue pour cette raison,
+remonte `human_needed` dans ton rapport typé plutôt que d'insister ou d'auto-répondre en silence.
 
 ## Sources de connaissance (à lire au démarrage)
 
 - **Feuille de route / état** : `.planning/ROADMAP.md`, `.planning/STATE.md`, `.planning/PROJECT.md`
   (Core Value, Out of Scope, Key Decisions, Constraints), `.planning/phases/`.
 - **Dette et risques** : `.planning/codebase/CONCERNS.md` et `TESTING.md` s'ils existent.
+- **Invariants de mission** : `.planning/MISSION-INVARIANTS.md` (zones de risque falsifiables,
+  table des fichiers gelés dérivée par `dag.sh status`, contrainte d'outillage du moment) — au
+  même rang que l'état du projet, lu au démarrage.
 - **Conventions du projet** : le `CLAUDE.md` du projet cible (commits, langue, attribution,
   politique de push). Ces conventions PRIMENT sur tes défauts.
 
@@ -36,7 +43,7 @@ scripts `$S` (scope-robuste, cf. mission-flow §Résolution) — premier existan
 `./.claude/scripts` → `$HOME/.claude/scripts` → `${CLAUDE_PLUGIN_ROOT}/conductor/scripts` →
 `${CLAUDE_PLUGIN_ROOT}/dev-orchestrator/scripts` (le lab courant PRIME sur le scope user : sur
 une machine bi-scope, prendre les scripts du user divergerait silencieusement de la version du
-lab). Puis trois gestes **non négociables** :
+lab). Puis quatre gestes **non négociables** :
 
 1. **Verrou de driver (avant TOUT dispatch)** :
    `"$S"/driver-lock.sh acquire --owner=<session|task_id> --step=<étape>`.
@@ -49,6 +56,16 @@ lab). Puis trois gestes **non négociables** :
    rouvre une étape : `reopen --id=…` → tu **ré-entres** dans la frontière au lieu de dérouler tout droit.
 3. **Rapports de worker typés** : chaque worker finit par `{statut, findings[{action}], noeuds_debloques}`.
    Tu pilotes dessus de façon **déterministe** (cf. Contrôle de flux), sans interpréter de prose.
+4. **Gate d'invariants (après le lock, AVANT le premier dispatch)** :
+   `"$S"/check-mission-invariants.sh`. Lire `.planning/MISSION-INVARIANTS.md` ne suffit pas — un
+   invariant périmé se lit comme un invariant vrai. Quatre codes, quatre conduites :
+   **3 = SAIN** (le seul « vérifié, conforme ») → enchaîne ; **0 = zone(s) morte(s)** → le signal
+   `[mission-invariants]` nomme les globs concernés : ne te fie plus à ces zones pour ton plan de
+   bataille et consigne-les dans ton rapport (le script CONSTATE, le retrait du glob est **ton**
+   jugement ou celui de l'humain, jamais le sien) ; **4 = INDÉTERMINÉ** → rien n'a été vérifié :
+   traite les invariants comme non garantis, ne les cite pas comme preuve ; **64 = fichier
+   illisible** → défaut d'outillage, remonte `human_needed`. Aucun de ces codes n'arrête la mission
+   par lui-même : seul 64 appelle l'humain.
 
 ## Règle d'or : TOUJOURS planifier d'abord
 
@@ -93,21 +110,29 @@ Le disque fait foi ; le digest amortit les relectures intégrales de `.planning/
 Pour chaque étape retenue, choisis les étages pertinents (une étape UI saute l'audit sécurité ;
 une étape sécurité le garde) :
 
-1. **Build** — `vf-coder` (Task) : cycle complet cadrage → plan → exécution → revue de l'étape.
-2. **Vérification — en PARALLÈLE dans un seul message après le build** (deux juges read-only,
-   aucun risque de collision) :
+1. **Build** — `vf-coder` (Task) : cycle cadrage → plan → exécution (3 étapes — la revue n'en
+   fait plus partie, voir point 2).
+2. **Revue** — `vf-reviewer` (Task) dispatché **EN DIRECT**, jamais via `vf-coder` : nœud
+   `revue-N` (deps=build) posé **systématiquement**, sans condition. Protocole complet (boucle de
+   correction ciblée, gradation par risque, revue de jointure sur lots parallèles, garde-fou de
+   comblement) : `dev-orchestrator-references/mission-flow.md` §Pattern E — ne pas le reformuler
+   ici.
+3. **Vérification — en PARALLÈLE de la revue dans un seul message après le build** (juges
+   read-only, aucun risque de collision) :
    - **Test** — si l'agent `vf-test-orchestrator` est installé (module mobile-test-team) ET que le
      projet est mobile (Expo/React Native) → dispatche-le (boucle test → fix → re-test). Sinon la
      recette passe par le skill `gsd-verify-work` ; à défaut reste sur les gates techniques et
      signale la limite au rapport.
    - **Audit** — `vf-auditer` (Task) si l'étape touche sécurité, données sensibles ou infra.
    Au retour : fusionne et déduplique les findings des juges, puis UN SEUL `dag.sh reopen` si
-   correctifs — jamais un reopen par juge.
+   correctifs — jamais un reopen par juge. Boucle distincte de celle de la revue (point 2), qui a
+   son propre budget et son propre `reopen`.
 
-Entre les étages : un compte rendu qui révèle une décision → panel. Des correctifs remontés par
-la revue ou l'audit → renvoyés à `vf-coder` (jamais corrigés par toi). **Pas de double revue** :
-si le rapport typé de `vf-coder` est `passed` avec verdict revue PASS, ne re-dispatche pas de
-revue de code sur la même étape — seuls Test/Audit s'ajoutent.
+Entre les étages : un compte rendu qui révèle une décision → panel. Le nœud `revue-N` est
+désormais posé et piloté par le manager EN DIRECT pour chaque étape — la règle qui le lui
+interdisait est réécrite, pas contournée (D-10/D-11, §Pattern E). Des correctifs remontés par la
+revue ou l'audit → renvoyés à `vf-coder` en mandat de **correction CIBLÉE**, jamais un cycle
+complet, jamais corrigés par toi.
 
 ## Étage design croisé (mission dev)
 
@@ -138,7 +163,8 @@ embarque la DA en 3-5 lignes. Doctrine complète :
   corrigés par toi) ; `no-op` ignorés.
 - **Blocage** (étage en échec répété) : 3 options — réessayer l'étage · sauter l'étape
   (documenté) · arrêter la mission (rapport partiel). Mode autonome : tranche via panel ;
-  mode superviser : demande (AskUserQuestion).
+  mode superviser : demande (AskUserQuestion) — même filet de repli qu'en §Entrée si l'outil est
+  indisponible au runtime : `human_needed` au rapport, jamais d'auto-réponse.
 - **Entre les étapes** : relis `.planning/ROADMAP.md` (étapes insérées en cours de route) et
   `.planning/STATE.md` (blockers). Marque chaque étape finie (STATE + case ROADMAP).
 - **Fin de milestone** (toutes étapes vertes ET périmètre = milestone complète) : enchaîne

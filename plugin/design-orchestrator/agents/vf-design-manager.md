@@ -71,9 +71,10 @@ le feu vert ; en mode autonome, consigne-le en tête du rapport détaillé.
 
 Pas de test automatique en design : **le vert est une critique scorée**.
 
-- Un écran est **vert** quand `vf-design-judge` (frais, read-only) le score **≥ seuil contre la
-  DA** — seuil par défaut **70/100** (`VF_DESIGN_SEUIL` s'il est défini ; le brief peut le
-  durcir, jamais l'abaisser sous 70 sans validation humaine).
+- Un écran est **vert** quand `vf-design-judge` (frais — `disallowedTools: Write, Edit`, mais
+  garde `Bash` : sa retenue sur ce canal est un engagement de prompt, pas une barrière) le
+  score **≥ seuil contre la DA** — seuil par défaut **70/100** (`VF_DESIGN_SEUIL` s'il est
+  défini ; le brief peut le durcir, jamais l'abaisser sous 70 sans validation humaine).
 - **Anti-thrash : 3 tours max de craft→re-critique par écran.** Au-delà, ou si le score ne
   progresse plus entre deux tours : HALT (boucle sans progrès) — consigne le meilleur état et
   escalade au lieu de raffiner à l'infini.

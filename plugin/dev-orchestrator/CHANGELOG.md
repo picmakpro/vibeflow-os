@@ -1,5 +1,38 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.8.0] — 2026-07-31 (fluidité du flux de dev sans perte de qualité, Phase 20)
+
+**Changement de contrat pour quiconque dispatche `vf-coder` : son cycle passe de 4 à 3 étapes,
+il ne dispatche plus `vf-reviewer`.**
+
+### Ajouté
+- **Mode d'injection MCP nommé** dans `inject-mcp-tools.sh`, déclenché par la clé de frontmatter
+  `vf-mcp-tools` (grammaire `<serveur>:<outil1>,<outil2>,…`) : injecte UNIQUEMENT les tokens
+  nommés d'un serveur, jamais le joker `mcp__<serveur>__*` du mode existant — les deux modes
+  coexistent par fichier (le nommé l'emporte, moindre privilège). `--verify` réutilise le même
+  calcul et rend un 3e verdict INDÉTERMINÉ quand le serveur nommé n'est pas résolu.
+- **`vf-reviewer` porte l'accès MCP nommé** (`XcodeBuildMCP:test_sim,build_sim,clean`) et son
+  protocole de vérification outillée : nettoyage avant toute compilation de vérification,
+  paramètres de projet explicites à chaque appel (le serveur maintient un état de session global
+  partagé), honnêteté quand le serveur est absent. Coût assumé : ~90s et un slot de simulateur.
+  Voir `docs/ADR.md` ADR-051 (révisée), qui documente ce mécanisme.
+- **L'étage revue devient un nœud de plan de bataille de premier rang, posé systématiquement par
+  le manager et dispatché en direct** (`mission-flow.md` §Pattern E, `docs/ADR.md` ADR-060) : la
+  boucle de correction migre vers le manager (mandat ciblé) ; gradation sur 4 déclencheurs
+  objectifs (jamais le volume) avec défaut sûr ; revue de jointure obligatoire déclenchée par la
+  topologie du DAG ; garde-fou de comblement adossé au champ machine `review_regime` (`dag.sh
+  reopen`). La règle `vf-dev-manager.md:108` (« Pas de double revue ») est réécrite en place, pas
+  contournée par une exception.
+- **`vf-coder` : cycle réduit à 3 étapes** (cadrage → plan → exécution), ne dispatche plus
+  `vf-reviewer` et ne reçoit plus de verdict de revue en retour ; allowlist `tools:` inchangée
+  caractère pour caractère.
+- **`vf-dev-manager` lit `.planning/MISSION-INVARIANTS.md`** au même rang que l'état du projet, et
+  porte le filet de repli sur `AskUserQuestion` absent au runtime en dispatch sous-agent (le
+  besoin humain remonte dans le rapport typé, jamais auto-répondu en silence).
+
+Référence : `docs/ADR.md` ADR-051 (révisée), ADR-060 (nouvelle),
+`.planning/phases/VFDO-20-fluidit-du-flux-de-dev-sans-perte-de-qualit/`.
+
 ## [v2.7.1] — 2026-07-28 (isolation de branche des missions d'équipe, ADR-059)
 
 **Une mission d'équipe ne commite plus jamais sur la branche par défaut.** Dès qu'un manager est

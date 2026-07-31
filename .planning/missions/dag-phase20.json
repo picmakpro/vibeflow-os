@@ -1,0 +1,197 @@
+{
+  "nodes": [
+    {
+      "id": "probe-mcp",
+      "step": "Test reel granularite allowlist MCP subagent",
+      "stage": "probe",
+      "deps": [],
+      "status": "done"
+    },
+    {
+      "id": "research-runtime",
+      "step": "Source documentee: memory rouvre Write/Edit",
+      "stage": "research",
+      "deps": [],
+      "status": "done"
+    },
+    {
+      "id": "panel-c2",
+      "step": "Panel: gradation de la revue par risque",
+      "stage": "panel",
+      "deps": [],
+      "status": "done"
+    },
+    {
+      "id": "probe-hooks",
+      "step": "Constat outille: scope des hooks de conformite",
+      "stage": "probe",
+      "deps": [],
+      "status": "done"
+    },
+    {
+      "id": "checkpoint-doctrine",
+      "step": "Checkpoint Samuel: doctrine 1/2/3",
+      "stage": "checkpoint",
+      "deps": [
+        "probe-mcp",
+        "research-runtime",
+        "panel-c2",
+        "probe-hooks"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "discuss-20",
+      "step": "gsd-discuss-phase 20 (cadrage)",
+      "stage": "discuss",
+      "deps": [
+        "checkpoint-doctrine"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plan-20",
+      "step": "gsd-plan-phase 20 + plan-checker",
+      "stage": "plan",
+      "deps": [
+        "discuss-20"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "checkpoint-plan",
+      "step": "Checkpoint Samuel: validation du plan",
+      "stage": "checkpoint",
+      "deps": [
+        "plan-20"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "execute-20",
+      "step": "gsd-execute-phase 20",
+      "stage": "execute",
+      "deps": [
+        "checkpoint-plan"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "review-20",
+      "step": "Revue de code independante",
+      "stage": "review",
+      "deps": [
+        "exec-20-07"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "audit-20",
+      "step": "Audit privileges/hooks",
+      "stage": "audit",
+      "deps": [
+        "exec-20-07"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "gates-release",
+      "step": "Gates + bumps + PR + gouvernance release",
+      "stage": "release",
+      "deps": [
+        "review-20",
+        "audit-20"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "scope-dag",
+      "step": "dag.sh --scope + reopen force plein + tests",
+      "stage": "execute",
+      "deps": [
+        "checkpoint-plan"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-20-01",
+      "step": "plan 20-01",
+      "stage": "execute",
+      "deps": [
+        "exec-20-04"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-20-02",
+      "step": "plan 20-02",
+      "stage": "execute",
+      "deps": [
+        "checkpoint-plan"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-20-03",
+      "step": "plan 20-03",
+      "stage": "execute",
+      "deps": [
+        "exec-20-01"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-20-04",
+      "step": "plan 20-04",
+      "stage": "execute",
+      "deps": [
+        "checkpoint-plan"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-20-05",
+      "step": "plan 20-05",
+      "stage": "execute",
+      "deps": [
+        "exec-20-02"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-20-06",
+      "step": "plan 20-06",
+      "stage": "execute",
+      "deps": [
+        "exec-20-02",
+        "exec-20-03",
+        "exec-20-05"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "exec-20-07",
+      "step": "plan 20-07",
+      "stage": "execute",
+      "deps": [
+        "exec-20-01",
+        "exec-20-02",
+        "exec-20-03",
+        "exec-20-04",
+        "exec-20-05",
+        "exec-20-06"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "docs-contrat-20-05",
+      "step": "aligner 20-05-PLAN/SUMMARY sur le contrat 0/3/4/64",
+      "stage": "docs",
+      "deps": [
+        "exec-20-06"
+      ],
+      "scope": [],
+      "status": "blocked"
+    }
+  ]
+}
