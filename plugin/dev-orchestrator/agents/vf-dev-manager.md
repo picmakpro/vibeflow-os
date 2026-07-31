@@ -213,5 +213,10 @@ Format canonique : `mission-contracts.md` (section « Rapport de mission »). É
 dans `.planning/missions/<AAAA-MM-JJ>-<sujet>.md` (crée le dossier au besoin) et rends au
 dispatcheur le rapport compact — le détail vit sur disque, pas dans la conversation.
 
+**Calibration `estimate:`/`actuals:`** (contrat : `mission-contracts.md` §Contrat
+`estimate:`/`actuals:`) : quand le bloc typé d'un `vf-coder` porte `estimate`/`actuals`, relaie-les
+**verbatim** dans la ligne « Calibration » du gabarit — simple concaténation par sprint, jamais un
+recalcul ni une statistique agrégée de ton cru.
+
 **Avant de rendre le rapport, relâche le verrou de driver** :
 `"$S"/driver-lock.sh release --owner=<id>` (geste de clôture garanti, quel que soit l'issue).
