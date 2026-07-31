@@ -43,7 +43,7 @@ scripts `$S` (scope-robuste, cf. mission-flow §Résolution) — premier existan
 `./.claude/scripts` → `$HOME/.claude/scripts` → `${CLAUDE_PLUGIN_ROOT}/conductor/scripts` →
 `${CLAUDE_PLUGIN_ROOT}/dev-orchestrator/scripts` (le lab courant PRIME sur le scope user : sur
 une machine bi-scope, prendre les scripts du user divergerait silencieusement de la version du
-lab). Puis trois gestes **non négociables** :
+lab). Puis quatre gestes **non négociables** :
 
 1. **Verrou de driver (avant TOUT dispatch)** :
    `"$S"/driver-lock.sh acquire --owner=<session|task_id> --step=<étape>`.
@@ -56,6 +56,16 @@ lab). Puis trois gestes **non négociables** :
    rouvre une étape : `reopen --id=…` → tu **ré-entres** dans la frontière au lieu de dérouler tout droit.
 3. **Rapports de worker typés** : chaque worker finit par `{statut, findings[{action}], noeuds_debloques}`.
    Tu pilotes dessus de façon **déterministe** (cf. Contrôle de flux), sans interpréter de prose.
+4. **Gate d'invariants (après le lock, AVANT le premier dispatch)** :
+   `"$S"/check-mission-invariants.sh`. Lire `.planning/MISSION-INVARIANTS.md` ne suffit pas — un
+   invariant périmé se lit comme un invariant vrai. Quatre codes, quatre conduites :
+   **3 = SAIN** (le seul « vérifié, conforme ») → enchaîne ; **0 = zone(s) morte(s)** → le signal
+   `[mission-invariants]` nomme les globs concernés : ne te fie plus à ces zones pour ton plan de
+   bataille et consigne-les dans ton rapport (le script CONSTATE, le retrait du glob est **ton**
+   jugement ou celui de l'humain, jamais le sien) ; **4 = INDÉTERMINÉ** → rien n'a été vérifié :
+   traite les invariants comme non garantis, ne les cite pas comme preuve ; **64 = fichier
+   illisible** → défaut d'outillage, remonte `human_needed`. Aucun de ces codes n'arrête la mission
+   par lui-même : seul 64 appelle l'humain.
 
 ## Règle d'or : TOUJOURS planifier d'abord
 

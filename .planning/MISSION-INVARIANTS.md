@@ -9,6 +9,13 @@ device » alors que la mission suivante devait recetter sur device, ce qui a fai
 sans exécution et mouvant à l'échelle de la journée, exactement comme la contrainte d'outillage
 ci-dessous aurait pu l'être si elle n'avait pas reçu sa propre étiquette (§3).
 
+> **Override — 2026-07-31, Samuel Neveu.** Le ROADMAP de la Phase 20 nommait trois invariants ;
+> celui-ci n'en porte que deux. L'exclusion du seuil de tests, décidée en planification (plan
+> 20-05, P-02) puis relevée comme non arbitrée par `20-VERIFICATION.md` (SC5), est ici **actée
+> par l'humain** : un seuil recopié à la main serait faux dès la suite suivante, donc pire que
+> son absence. Il reste hors de ce fichier tant qu'aucun mécanisme ne le rend falsifiable sans
+> exécuter la suite complète.
+
 ## Zones de risque (globs, falsifiables par machine)
 
 > Un glob qui ne matche plus aucun fichier suivi du dépôt est une "zone morte" — détecté par
@@ -63,7 +70,9 @@ défaut de session.
 ---
 
 Provenance : fichier amorcé par la Phase 20 (plan 20-05, SC5, D-15/D-16). Mécanisme de mise à
-jour propre à chaque section : §1 est gatée par `check-mission-invariants.sh` (zone morte
-détectable par commande) ; §2 n'a jamais besoin d'être tenue à jour puisqu'elle n'est jamais une
+jour propre à chaque section : §1 est gatée par `check-mission-invariants.sh`, **invoqué par
+`vf-dev-manager` au démarrage de mission** (4ᵉ geste non négociable, après le verrou de driver et
+avant le premier dispatch) — jusqu'au 2026-07-31 le gate existait sans aucun appelant, et la
+présente phrase décrivait une capacité, pas un câblage ; §2 n'a jamais besoin d'être tenue à jour puisqu'elle n'est jamais une
 copie, seulement une convention de lecture dynamique ; §3, si elle survit à une future revue,
 dépend d'une revérification humaine explicite à chaque mission — elle n'a pas d'autre garantie.
