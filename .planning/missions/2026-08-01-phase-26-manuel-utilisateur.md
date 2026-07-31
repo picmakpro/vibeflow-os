@@ -198,3 +198,58 @@ rediriger sèchement.
 
 Aucune suppression de fichier n'est donc au programme de cette mission.
 
+### D-9 — Doctrine de référence : **9 principes**, sourcés de `VIBEFLOW_CORE.md`
+
+L'inventaire remontait une « contradiction active » entre `VIBEFLOW_CORE.md` (9 principes),
+`VIBEFLOW_EXPLAINED.md` (7) et `PHILOSOPHY.md` (7). **Vérification sur pièce : ce n'en est pas une.**
+`plugin/reference/content/methodology/VIBEFLOW_CORE.md:308` qualifie lui-même les 7 de
+**« principes historiques »** et explique que le 9ᵉ (P-Evaluer) répond à une question distincte ; sa
+table de versions (ligne 765) date les 7 principes de la v3 pré-Core (2026-02). `VIBEFLOW_CORE.md`
+est le canon (module `plugin/reference` en v2.5.2), `VIBEFLOW_EXPLAINED.md` a simplement décroché.
+
+Le manuel documente donc **9 principes**, sourcés du canon. Aucune arbitration doctrinale n'est
+demandée à l'humain : le canon tranche déjà.
+
+**Doc-drift nommé, NON traité dans cette mission** : `VIBEFLOW_EXPLAINED.md` (5 occurrences de « 7
+principes ») est périmé. Le corriger implique d'éditer `plugin/reference/content/`, hors du périmètre
+déclaré de la Phase 26, sur un corpus qui porte sa propre triade de version. Consigné comme next step
+plutôt qu'absorbé au fil de l'eau.
+
+### D-10 — Hors périmètre, escaladé : la duplication `docs/reference/` ↔ `plugin/reference/content/`
+
+Constat de l'inventaire, **confirmé sur pièce** : 77 fichiers / ~9 800 lignes dupliqués, dont
+**74 identiques octet pour octet** (`diff -rq` ne sort que 3 fichiers différents : `README-CLIENT.md`,
+`VERSION.md`, `methodology/patterns/README.md` — les deux premiers périmés en v2.0/v2.1 face à
+v2.5.2).
+
+**Non traité ici**, pour deux raisons cumulées : c'est hors du périmètre de la Phase 26, et la
+résolution passe par une **suppression de contenu** — que la doctrine réserve à la validation humaine
+sans exception, même en mode autonome. Escaladé au rapport avec une proposition de phase dédiée.
+
+### D-11 — Aucun contenu de référence n'est recopié : il est **dérivé du disque**
+
+L'inventaire établit que le README ment déjà sur son propre produit : **13 versions de modules sur 17
+sont périmées** (conductor 1.14.1 affiché contre 1.19.0 réel, dev-orchestrator 2.1.1 contre 2.10.0),
+`/vf-design` et `/vf-sketch` y sont classés en commandes alors que ce sont des skills, et **1 skill
+sur 18 seulement est listée**.
+
+Règle imposée à l'exécution : les pages de référence du manuel (`06-reference`) **dérivent leurs
+listes du disque** (`module.json`, frontmatter des skills, commandes réellement exposées) et
+**ne portent aucun numéro de version en dur**. Une table de versions dans un manuel est une promesse
+de mensonge — le manuel pointe vers `module.json` et le CHANGELOG. Le dégraissage des README (D-7)
+retire de fait la table de versions périmée plutôt que de la corriger.
+
+### D-12 — Le manuel EN se **produit**, il ne se traduit pas
+
+Constat de parité de l'inventaire : les deux README racine sont en parité **structurelle intégrale**
+(17 unités de chaque côté, même ordre, mêmes ancres, mêmes 4 mermaid, aucune divergence de fond). En
+revanche la parité **s'arrête au README** : `INSTALL.md`, `CHANGELOG.md`, `docs/ADR.md`, les 17
+READMEs de modules et les ~9 800 lignes de `plugin/reference/content/` sont **FR-only**. Un
+anglophone qui suit un lien tombe aujourd'hui sur du français.
+
+Conséquence sur la charge : aux profondeurs 2 et 3, le manuel EN n'a **aucune matière source à
+traduire** — il doit être écrit. C'est le principal risque de budget de la phase, et la raison pour
+laquelle un épuisement de budget doit sortir en `gaps_found` explicite plutôt qu'en manuel EN
+partiel : la sonde de parité (D-1, conséquence 2) échouerait de toute façon, et c'est le
+comportement voulu.
+
