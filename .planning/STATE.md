@@ -9,7 +9,7 @@ stopped_at: "Phase 21 close par sa gouvernance (plan 21-05), même patron que 20
 last_updated: "2026-07-31T19:30:00.000Z"
 last_activity: 2026-07-31 (Phase 21 plan 21-05 — clôture de gouvernance, release v2.45.0 préparée)
 progress:
-  total_phases: 25
+  total_phases: 26
   completed_phases: 21
   total_plans: 62
   completed_plans: 62

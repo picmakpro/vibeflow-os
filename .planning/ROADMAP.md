@@ -59,6 +59,7 @@
 - [ ] Phase 23: Couplage explicite au moteur GSD — capabilities, flags et voie unique
 - [ ] Phase 24: Activation et mesure du moteur GSD — capacités dormantes et faits de runtime
 - [ ] Phase 25: Budget d'instructions et étage d'alignement court
+- [ ] Phase 26: Manuel utilisateur VibeFlow (manual/)
 
 <details>
 <summary>✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04</summary>
