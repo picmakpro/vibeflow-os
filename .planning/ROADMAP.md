@@ -1032,3 +1032,61 @@ sujet `gsd-core`, hors périmètre VibeFlow.
 Plans:
 
 - [ ] TBD (run /gsd-plan-phase 21 to break down)
+
+### Phase 22: Hygiène documentaire — doctrine de sortie et captation d'intention
+
+> **Origine** — demande de Samuel le 2026-07-31 : « le dev-orchestrator n'a pas de workflow de
+> mise à jour de doc avec les commandes GSD qui maintiennent la doc et les specs ». Gap établi
+> **sur pièce** par lecture des workflows amont (`gsd-core/workflows/docs-update.md` 1177 lignes,
+> `ingest-docs.md`, `map-codebase.md`, `extract-learnings.md`) confrontés à l'état du module.
+
+**Goal**: Donner au moteur de dev une **doctrine documentaire de sortie** — symétrique de la
+doctrine d'entrée déjà écrite (`ingestion-flow.md`) — et la **captation d'intention en langage
+naturel** qui la déclenche, de sorte que (a) `vf-dev-manager` et `vf-design-manager` sachent
+QUAND poser un nœud de doc et LEQUEL, et (b) l'utilisateur obtienne le bon geste sans jamais
+nommer une commande, exactement comme « on en est où ? » tombe aujourd'hui sur `gsd-progress`.
+
+**Le point de départ n'est pas un manque d'outils — c'est un manque de discernement.**
+Les quatre familles documentaires que GSD maintient sont **outillées séparément amont** et
+**fondues en une seule ligne** chez nous (`intent-routing.md` : « mets à jour la doc / génère le
+README / la doc est périmée » → `gsd-docs-update`) :
+
+| Famille | Brique | Ce qui est réellement maintenu |
+|---|---|---|
+| doc **produit** | `gsd-docs-update` | 6 docs toujours-on (README, ARCHITECTURE, GETTING-STARTED, DEVELOPMENT, TESTING, CONFIGURATION) + 3 conditionnelles (API si routes, CONTRIBUTING si OSS, DEPLOYMENT si config de déploiement), **plus** une *review queue* des docs écrites à la main vérifiées contre le code, **plus** une détection de trous. CHANGELOG **jamais** régénéré. |
+| doc **d'entrée** | `gsd-ingest-docs`, `gsd-import` | specs/ADR/PRD → `.planning/`. Doctrine déjà écrite (`ingestion-flow.md`). |
+| doc **du code** | `gsd-map-codebase` | `.planning/codebase/` (STACK, ARCHITECTURE, CONVENTIONS, CONCERNS…), modes `--fast` / `--query refresh`. |
+| doc **de savoir** | `gsd-extract-learnings`, `gsd-graphify` | LEARNINGS.md de phase, graphe de connaissance. |
+
+**Lacune 1 — aucune doctrine de sortie.** L'entrée a ses 94 lignes de garde-fous ; la sortie n'a
+qu'une ligne de table. Un agent à qui l'on dit « mets à jour la doc » ne sait pas s'il s'agit du
+README, de `.planning/codebase/`, ou de `STATE`. Les **flags porteurs de sens** de
+`gsd-docs-update` ne sont exposés nulle part : `--verify-only` (auditer sans écrire — la doc
+est-elle encore juste ?) et `--force` (régénérer, écrase le manuscrit) répondent à **deux
+intentions distinctes** aujourd'hui indiscernables.
+
+**Lacune 2 — captation d'intention famélique.** Une seule ligne de formulations pour un geste que
+l'utilisateur exprime de vingt façons : « la doc est fausse », « ça correspond plus au code »,
+« documente ce module », « il manque la doc d'API », « vérifie que la doc dit encore vrai »,
+« on a changé l'archi », « qu'est-ce qu'on a appris ». Aucune ne tombe de façon fiable.
+
+**Lacune 3 — managers sans moments déclencheurs.** `vf-dev-manager` porte 3 puces d'hygiène et
+une seule mention outillée (« drift doc détecté → ajoute un nœud `gsd-docs-update` ») ; il
+n'existe aucune table « à ce moment du cycle → cette brique, à cette condition ».
+`vf-design-manager` n'a **aucun** geste documentaire : son gate `DESIGN.md` ne parle jamais à la
+doc produit, alors qu'une refonte d'écran périme ARCHITECTURE/README aussi sûrement qu'un refactor.
+
+**Lacune 4 — le signal existe, le destinataire n'est pas outillé.** Le hook `[doc-drift]`
+(`check-doc-drift.sh`, Phase 17) constate déjà le FAIT — N commits de code sans commit de doc —
+et propose `gsd-docs-update`. Personne n'est équipé pour transformer ce constat en geste gradué
+(vérifier ? régénérer une doc ? toutes ?).
+
+**Requirements**: TBD (à mapper au ledger pendant le plan)
+**Depends on:** Phase 20 — **merge requis avant exécution**. Périmètre à fichiers partagés avec
+la 20 (`intent-routing.md`, `mission-contracts.md`, `vf-dev-manager.md`). **Indépendante de la
+Phase 21** (alignement gsd-core 1.9.0) : aucun fichier commun, l'ordre d'exécution est libre.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 22 to break down)
