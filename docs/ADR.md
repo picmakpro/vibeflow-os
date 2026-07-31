@@ -33,6 +33,7 @@
 | ADR-061 | 2026-07-31 | Les lanes de revue cross-AI de plans (amont) et l'étage de revue de code (ADR-060) sont des objets disjoints | Validée |
 | ADR-062 | 2026-07-31 | Les deux hooks 1.9.0 non câblés restent hors périmètre de `merge-hooks.sh` | Validée |
 | ADR-063 | 2026-07-31 | Anomalie d'agrégation `.planning/STATE.md` : dette d'artefact locale + bug amont non scopé — gate local, jamais de correction par `gsd-tools state` | Validée |
+| ADR-064 | 2026-08-01 | Un écrivain = un worktree : l'isolation des sessions concurrentes devient physique, et le claim de branche se dit à tout le monde (advisory) | Validée |
 
 ### ADR héritées les plus citées (définitions canoniques)
 
@@ -1401,3 +1402,99 @@ Nouvelle convention d'écriture de `.planning/STATE.md` (portée par cette ADR, 
 `check-state-integrity.sh`) : au plus une ligne `^Phase:` dans le corps, toute section archivée en
 `**Phase archivée :**`. Aucune modification de `plugin/_internal/**` ni du moteur GSD — décision
 purement locale au repo de distribution.
+
+---
+
+## ADR-064 : Un écrivain = un worktree — l'isolation devient physique, et le claim se dit à tout le monde
+
+**Date** : 2026-08-01 · **Statut** : Validée · **Complète** : ADR-053 (verrou de driver), ADR-059
+(une mission = une branche) · **Quick** : `260801-17w`
+
+### Contexte
+
+Le 2026-07-31, entre 18h52 et 19h06, **deux sessions ont écrit sur la même branche**
+(`feat/phase-22-hygiene-doc`) sans le savoir. L'une était une mission pilotée par
+`vf-dev-manager`, l'autre une session conversationnelle. Trois commits hors périmètre se sont
+retrouvés dans la PR d'une mission qui ne les avait pas produits ; le manager a gelé sa lane le
+temps de comprendre ce qui bougeait sous ses pieds, puis l'a reprise en trouvant une passation
+écrite dans un SUMMARY. Aucun dégât — mais par chance, pas par construction.
+
+Le constat de cause racine, formulé par le manager lui-même :
+
+> le verrou de driver protège la même **étape** contre deux pilotes, rien ne protège la même
+> **branche** contre deux écrivains.
+
+Il faut y ajouter le point qui fait vraiment mal, et qu'aucun durcissement du verrou n'aurait
+couvert : **`driver-lock.sh` n'est consulté que par les managers**. La session qui est passée
+par-dessus n'en était pas un. Un verrou que seule une catégorie d'acteurs interroge ne protège
+pas contre les autres — il documente une intention, il ne la fait pas respecter.
+
+ADR-059 avait déjà vu le trou et l'avait **explicitement laissé ouvert** : « ne couvre pas
+l'isolation des vagues parallèles à l'intérieur d'une mission […] seul `isolation: worktree` le
+ferait. Décision distincte, volontairement laissée ouverte. » Elle est tranchée ici.
+
+### Ce qu'on emprunte, et à qui
+
+- **`shanraisshan/claude-code-best-practice`** (lu le 2026-08-01) — prescrit le **git worktree**
+  comme mécanisme d'isolation de premier rang pour le travail parallèle (`--worktree`/`-w`,
+  `isolation: "worktree"`, `.worktreeinclude`, hooks `WorktreeCreate`/`WorktreeRemove`). L'idée
+  qu'on retient tient en un mot : l'isolation y est **physique**. Deux arbres de travail distincts
+  ne peuvent pas se marcher dessus, quelles que soient les intentions de leurs occupants.
+- **`1jehuang/jcode`** (étude Phase 9, ADR-053) — d'où vient notre verrou de driver. On ne le
+  remplace pas : on **élargit son claim**. Il revendiquait une étape ; il revendique désormais
+  aussi une branche et un arbre.
+
+### Décision
+
+**1. Un écrivain = un worktree.** Dès que deux acteurs travaillent en parallèle sur le même dépôt
+— deux missions, une mission et une session conversationnelle, deux vagues d'une même mission —
+chacun tient **son propre arbre de travail**. C'est la seule barrière qui ne repose pas sur la
+bonne volonté de celui qui écrit. La branche (ADR-059) reste nécessaire, elle n'est pas
+suffisante : deux sessions peuvent partager une branche depuis un même arbre.
+
+**2. Le claim dit sur quoi il porte.** `driver-lock.sh` enregistre `branch=` et `worktree=` dans
+son `meta` à l'acquisition, et les **préserve** au heartbeat — un heartbeat émis après un
+`git checkout` ne doit pas revendiquer silencieusement une branche que personne n'a décidé de
+piloter. Champs additifs : le contrat JSON de sortie ne bouge pas.
+
+**3. Le signal atteint enfin les sessions ordinaires.** `check-branch-claim.sh` (module
+`conductor`) constate qu'un lock **actif** revendique la branche courante **depuis un autre
+arbre**, et le dit au `SessionStart`. C'est le geste qui ferme réellement le trou : la session
+qui nous est passée dessus aurait vu une ligne au démarrage. Contrat à 4 codes, sur le patron
+maintenant établi (`0` signal · `3` SAIN · `4` INDÉTERMINÉ · `64` usage), où SAIN et INDÉTERMINÉ
+ne se confondent jamais.
+
+**Le discriminant est l'arbre, pas l'owner.** Deux sessions dans le même arbre se voient déjà :
+rien à signaler. C'est l'écriture depuis un arbre **tiers** sur une branche déjà pilotée qui
+surprend, et c'est le seul cas signalé.
+
+### Ce que la décision n'est pas
+
+**Aucun blocage dur.** Le gate est **advisory**, comme `check-doc-drift.sh` et
+`check-mission-invariants.sh` : il CONSTATE un fait, il ne prononce pas de verdict. Deux sessions
+volontairement sur la même branche est un cas **légitime et fréquent** — un hook qui refuserait
+d'écrire le casserait. ADR-031 tenu : détecter et prévenir, jamais arbitrer à la place de l'humain.
+
+**On ne réimplémente pas le harness.** `.worktreeinclude` et les hooks `WorktreeCreate`/
+`WorktreeRemove` appartiennent à Claude Code. On prescrit l'usage d'`isolation: worktree`, on ne
+le refabrique pas.
+
+**Pas de verrou par fichier.** Le grain juste est la branche : c'est là que la collision s'est
+produite. Un verrou par fichier serait une usine à faux positifs pour un gain nul.
+
+### Conséquences
+
+Un lock posé par une version antérieure de `driver-lock.sh` ne porte pas de champ `branch` : le
+gate rend alors **INDÉTERMINÉ** (4), jamais un SAIN de complaisance. La transition se fait d'
+elle-même au premier `acquire` de la nouvelle version.
+
+Le gate compare les chemins **normalisés** (`pwd -P`) et non littéralement : le même arbre se
+présente sous deux écritures selon qui l'interroge (`/tmp` est un lien vers `/private/tmp` sur
+macOS), et une comparaison brute criait à la collision sur son propre arbre. Ce faux positif a été
+débusqué par le cas 2 de la suite, et un cas de régression le tient — discriminance prouvée par
+mutation.
+
+Reste non couvert, et assumé : deux sessions dans le **même** arbre sur la **même** branche. Elles
+partagent un arbre, elles se voient — mais rien ne les empêche de committer l'une par-dessus
+l'autre. C'est le cas que l'utilisateur crée délibérément ; le fermer demanderait un verrou
+d'écriture dur, écarté ci-dessus.

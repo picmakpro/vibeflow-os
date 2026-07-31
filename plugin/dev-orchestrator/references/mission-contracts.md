@@ -76,7 +76,21 @@ DIGEST (cache — le disque fait foi)
 Le worker lit le digest D'ABORD, et ne relit du disque que ce que son mandat exige
 (index-first). Un digest contredit par le disque → le disque gagne, et le worker le signale.
 
-## Isolation de branche (ADR-059) — toute mission d'équipe
+## Isolation de branche (ADR-059) et d'arbre de travail (ADR-064) — toute mission d'équipe
+
+> **Un écrivain = un worktree (ADR-064).** La branche seule ne suffit pas : deux acteurs peuvent la
+> partager depuis un même arbre, et c'est exactement ce qui s'est produit le 2026-07-31 — une
+> mission et une session conversationnelle écrivant sur `feat/phase-22-hygiene-doc` sans le savoir,
+> 3 commits hors périmètre dans la PR d'une mission qui ne les avait pas produits. Dès que tu
+> travailles **en parallèle** d'un autre acteur sur ce dépôt, prends **ton propre arbre**
+> (`isolation: worktree` au dispatch, ou `git worktree add`). L'isolation devient physique au lieu
+> de reposer sur la bonne volonté de celui qui écrit.
+>
+> **Avant de committer sur une branche que tu n'as pas créée**, tu peux constater qui la pilote :
+> `"$S"/check-branch-claim.sh` (exit **3** = personne d'autre · **0** = revendiquée depuis un autre
+> arbre, le signal nomme l'owner et l'étape · **4** = rien n'a pu être vérifié). C'est **advisory** :
+> deux sessions volontairement sur la même branche est un cas légitime, le gate ne bloque rien et
+> ne décide rien.
 
 **Une mission d'équipe ne commite jamais sur la branche par défaut.** Dès qu'un manager est
 dispatché (`vf-dev-manager`, `vf-design-manager`), il crée **d'abord** une branche dédiée, y tient
