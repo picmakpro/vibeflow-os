@@ -207,6 +207,56 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   `check-agents.sh` OK, JSON valides ; release bumpée (module v2.4.0, racine v2.30.0) + **tag annoté poussé**
   (`scripts/check-release-tag.sh --remote` → ✓).
 
+## Hors-milestone — Phase 22 : hygiène documentaire (doctrine de sortie et captation d'intention)
+
+> **IDs proposés au plan du 2026-07-31**, préfixe `DOCF` (doctrine documentaire de sortie) — aucun
+> préfixe existant du ledger ne couvrait ce périmètre. La ROADMAP portait `TBD (à mapper au ledger
+> pendant le plan)`.
+>
+> *Note de continuité* : les Phases 15 à 21 ont été livrées **sans requirements GSD**, comme les
+> releases `v2.32.0 → v2.36.1` — tracées dans `MILESTONES.md` et `docs/ADR.md`. La Phase 22 rouvre
+> le ledger sans rétro-documenter ces phases.
+>
+> Source : `.planning/phases/VFDO-22-hygi-ne-documentaire-doctrine-de-sortie-et-captation-d-inten/22-CONTEXT.md`
+> (D-01 → D-14, tranchés par Samuel en conversation).
+
+- [ ] **DOCF-01**: `plugin/dev-orchestrator/references/docs-flow.md` existe, symétrique
+  d'`ingestion-flow.md` (même module, même chargement on-demand, même chemin d'install D7). Il
+  traite **en propre** les familles produit / code / savoir et **RENVOIE** vers `ingestion-flow.md`
+  pour l'entrée — jamais de duplication (ADR-057). Il écrit noir sur blanc la frontière
+  `vibeflow-os` : ce dépôt maintient une triade par module sous gates machine, `gsd-docs-update` ne
+  doit jamais y être lancé. *(D-01, D-02)*
+- [ ] **DOCF-02**: Le régime de confirmation est **gradué par le risque réel, pas par le volume** :
+  `--verify-only` est libre (read-only, n'écrit rien, ne commite rien) ; la génération standard
+  exige une confirmation humaine explicite avant l'appel (ADR-031) ; en mission autonome, l'agent
+  **constate et consigne, jamais n'écrit**. *(D-03, D-04)*
+- [ ] **DOCF-03**: `--force` est **autorisé sur intention explicite de l'utilisateur** (arbitrage de
+  Samuel contre la recommandation) et borné par un garde-fou en trois temps : reformulation du
+  nombre **et** de la liste des docs manuscrites qui seront écrasées (dérivée d'`existing_docs`,
+  `has_gsd_marker` faux = travail humain à risque), attente d'un oui explicite, et interdiction en
+  mission d'équipe **et** en mode autonome. *(D-05, D-06)*
+- [ ] **DOCF-04**: La captation d'intention couvre les quatre familles avec les formulations réelles
+  de l'utilisateur ; `--verify-only` et `--force` ont **chacun** leur formulation déclencheuse dans
+  `intent-routing.md` — auditer et régénérer ne sont plus indiscernables. La désambiguïsation se
+  fait par ancrage contextuel, et par une **question courte** quand aucun ancrage ne tombe, jamais
+  par une devinette. *(D-10, D-12)*
+- [ ] **DOCF-05**: `vf-dev-manager` et `vf-design-manager` posent **UN** nœud `docs` agrégé en fin
+  de mission (`deps` = tous les nœuds d'exécution), dès qu'au moins un des quatre déclencheurs
+  constatables tombe — surface publique touchée · `[doc-drift]` actif · fin de milestone · nouveau
+  module ou capacité. Aucun déclencheur ne tombe → pas de nœud, état normal. Aucun format de
+  rapport nouveau n'est introduit. Le gate `DESIGN.md` du manager design reste distinct. *(D-07,
+  D-08, D-09, D-11)*
+- [ ] **DOCF-06**: La doctrine est non-régressable : `test-dev-orchestrator.sh` est **étendu** (blocs
+  T22 et T23, plus `docs-flow.md` dans la boucle d'install T6), jamais dupliqué en suite séparée ;
+  le test d'exhaustivité de routage T14 reste vert ; `check-doc-drift.sh` reste **bit-à-bit
+  inchangé** — il constate le seul fait qu'il sait produire, c'est la doctrine qui gradue la
+  réponse (ADR-055 §3). *(D-13, D-14)*
+- [ ] **DOCF-07**: Les deux modules touchés sont bumpés en **minor** (nouvelle capacité) avec leur
+  triade complète (`VERSION` ↔ `module.json` ↔ en-tête README) et leur CHANGELOG ;
+  `check-version-sync.sh` sort ✓. La **release racine** (`VERSION`, `plugin.json`,
+  `marketplace.json`, les deux README, tag annoté, release GitHub) reste **hors périmètre**,
+  réservée à validation humaine — patron des Phases 13, 17 et 19.
+
 ## v2 Requirements
 
 ### Vocabulaire & UX
@@ -291,6 +341,13 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | ALTI-03 | Phase 14 | Complete |
 | ALTI-04 | Phase 14 | Complete |
 | ALTI-05 | Phase 14 | Complete |
+| DOCF-01 | Phase 22 | Planned — plan 22-01 |
+| DOCF-02 | Phase 22 | Planned — plan 22-01 |
+| DOCF-03 | Phase 22 | Planned — plan 22-01 |
+| DOCF-04 | Phase 22 | Planned — plan 22-01 |
+| DOCF-05 | Phase 22 | Planned — plan 22-02 |
+| DOCF-06 | Phase 22 | Planned — plans 22-01 et 22-02 |
+| DOCF-07 | Phase 22 | Planned — plan 22-03 |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -302,6 +359,9 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - Hors-milestone : les releases `v2.32.0 → v2.36.1` (audit croisé, bascule agentique, bundles métier,
   recettes UAT, refonte README) ont été livrées **sans requirements GSD** — tracées dans
   `MILESTONES.md` (entrée « hors-milestone ») et `docs/ADR.md` (ADR-056/057).
+- Phase 22 (hygiène documentaire) : 7 requirements `DOCF-01..07` **créés au plan du 2026-07-31** —
+  mappés aux 3 plans de la phase, 0 non-mappé. Les Phases 15 à 21 restent sans requirements au
+  ledger (livrées hors registre, comme les releases hors-milestone ci-dessus).
 
 ---
 *Requirements defined: 2026-06-04*
