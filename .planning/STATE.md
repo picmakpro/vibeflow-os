@@ -5,14 +5,14 @@ milestone_name: Migration package GSD
 current_phase: 19
 current_phase_name: Migration du moteur GSD pilotée par /vf-update — vérifiée (PASS 6/7) et SHIPPÉE v2.43.0
 status: shipped
-stopped_at: "Phase 19 vérifiée et SHIPPÉE le 2026-07-28 — release racine v2.43.0 publiée (commit 70c5720, tag annoté poussé, release GitHub, check-release-tag --remote ✓). Gates avant tag : check-version-sync ✓ après rattrapage du compteur 41→42 suites, 42 suites vertes, check-agents --strict ✓ sur les 6 dossiers d'agents. Verdict 19-VERIFICATION.md : PASS, 6/7 — SC2 reste PRESENT_BEHAVIOR_UNVERIFIED (comportement d'agent). SEUL RESTE-À-FAIRE : recette humaine du parcours /vf-update sur poste legacy, acceptation PUIS refus de la ligne moteur. Phase 17 également shippée, en v2.42.0. Phase 20 : cadrage produit (assumptions mode) — 20-CONTEXT.md, 26 décisions D-00..D-26, 2 points signalés au manager (D-05 mécanisme d'injection MCP nommé pour vf-reviewer, D-16 tension avec le texte littéral du critère 5). Prochain geste : gsd-plan-phase 20 (mandaté à vf-coder par vf-dev-manager, cadrage+plans seulement — pas d'exécution avant checkpoint humain)."
-last_updated: "2026-07-28T16:03:39.135Z"
-last_activity: 2026-07-28 (release v2.43.0 publiée — Phase 19 shippée ; Phase 20 cadrée — 20-CONTEXT.md)
+stopped_at: "Phase 20 complète (7/7 plans) — clôture de gouvernance (20-07) : ADR-051 révisée + ADR-060 posée, doctrine transverse alignée, 6 modules bumpés (conductor v1.17.0, dev-orchestrator v2.8.0, design-orchestrator v1.3.2, 3 bundles v2.0.3). Gates verts sauf le seul rouge attendu (compteur de suites racine, 44 réel pas 43). Release racine réservée à validation humaine post-fusion (4 éléments consignés + WINDOWS.md)."
+last_updated: "2026-07-31T10:26:41.602Z"
+last_activity: 2026-07-28 (clôture Phase 19 + release v2.43.0)
 progress:
   total_phases: 20
-  completed_phases: 11
-  total_plans: 53
-  completed_plans: 37
+  completed_phases: 10
+  total_plans: 49
+  completed_plans: 29
 ---
 
 # Project State
@@ -217,7 +217,7 @@ conductor v1.14.1 · planning-core v2.5.1 · consolidator v1.8.0.
 Milestone `gsd-migration` (Phases 10-11) reste ouvert et **en attente** — chantier indépendant, non bloquant.
 Milestone précédent memory-swarm-rnd **SHIPPÉ v2.28.0** (ADR-052 mémoire vivante + ADR-053 swarm).
 
-Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
+Progress: [██████░░░░] 59%
 
 ## Performance Metrics
 
@@ -252,6 +252,7 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase VFDO-19 P02 | 90min | 3 tasks | 4 files |
+| Phase 20 P07 | ~1h10 | 3 tasks | 26 files |
 
 ## Accumulated Context
 
@@ -532,6 +533,8 @@ Recent decisions affecting current work:
 - [Phase 06]: Séquence d'init non dupliquée : délégation au skill vf-init existant
 - [Phase ?]: 19-02: capture de l'état legacy avant toute garde de ensure_gsd() (D-08.3), preuve directe par T2k
 - [Phase ?]: 19-02: npm_pkg_installed_globally() est le seul appel npm réellement exécuté (lecture seule), --verify d'inject-mcp-tools.sh ne rejoue jamais --force
+- [Phase ?]: 2026-07-31 — Phase 20 (20-07, clôture) : anti-triche « vérifié par les suites de test de chaque module » constaté FAUX pour design-orchestrator/business-pilot-bundle/content-bundle/growth-bundle (0 test de disallowedTools dans leur suite propre) — inscrit en différé nommé (WINDOWS.md), non corrigé (P-07).
+- [Phase ?]: 2026-07-31 — Phase 20 (20-07) : compteurs du module obligatoire écrits à leur valeur réelle (14 scripts, 12 suites, pas 11) — un correctif de revue hors plan (test-guard-agent-write.sh, commit 447e75a) a créé une 2e suite entre le cadrage et l'exécution. Compteur repo-entier de suites réel = 44, pas 43 : consigné en reste-à-faire de release racine.
 
 ### Pending Todos
 
@@ -583,10 +586,10 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-**Resume file:** .planning/phases/VFDO-20-fluidit-du-flux-de-dev-sans-perte-de-qualit/20-CONTEXT.md
+**Resume file:** None
 
-Last session: 2026-07-28T16:03:39.114Z
-Stopped at: Phase 20 context gathered (assumptions mode) — 5 changements (ROADMAP en compte 4 + le sous-critere 2 traite a part), 26 decisions D-00..D-26, 2 points signales au manager (D-05 mecanisme injection MCP, D-16 tension critere 5). Prochain geste : gsd-plan-phase 20 (deja mandate a vf-coder par vf-dev-manager, sans auto-avancer vers l'execution).
+Last session: 2026-07-31T10:26:41.586Z
+Stopped at: Phase 20 complète (7/7 plans) — clôture de gouvernance (20-07) : ADR-051 révisée + ADR-060 posée, doctrine transverse alignée, 6 modules bumpés (conductor v1.17.0, dev-orchestrator v2.8.0, design-orchestrator v1.3.2, 3 bundles v2.0.3). Gates verts sauf le seul rouge attendu (compteur de suites racine, 44 réel pas 43). Release racine réservée à validation humaine post-fusion (4 éléments consignés + WINDOWS.md).
 ubuntu:24.04) — 3 jobs verts au run 30257419335. Modules bumpés : conductor v1.14.5,
 consolidator v1.8.1, dev-orchestrator v2.3.2. Leçon durable : tout bash développé sur macOS/BSD
 doit être reproduit sous `docker run ubuntu:24.04` avant push (stat/-f, TMPDIR, outillage hôte).

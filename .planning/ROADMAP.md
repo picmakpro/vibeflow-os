@@ -928,17 +928,17 @@ agents observable — le 4 est ce qui rend le 1 visible) et {2,3} (pilotage de m
 phases. Samuel a tranché pour une phase unique. Le changement 2 vaut à lui seul plus que les trois
 autres réunis — si l'exécution déborde, c'est par là qu'il faudra scinder.
 
-**Plans:** 7 plans (4 vagues)
+**Plans:** 7/7 plans executed
 
 Plans:
 
-- [ ] 20-01-PLAN.md — Changement 5 : périmètre explicite des 2 hooks de conformité, avertissements conditionnels en mode hook, charset de token MCP, clé `vf-mcp-tools` connue du gate ; chemin par défaut enfin testé (vague 1)
-- [ ] 20-02-PLAN.md — `dag.sh` : `--scope` sur `add`, `review_regime` forcé à `full` par `reopen`, périmètres gelés exposés par `status` (vague 1)
-- [ ] 20-03-PLAN.md — Changement 1 : mode d'injection MCP nommé dans `inject-mcp-tools.sh`, `vf-reviewer` déclare son allowlist et son protocole d'appel (vague 2, dépend de 20-01)
-- [ ] 20-04-PLAN.md — Critère 2, sens ouverture : `disallowedTools: Write, Edit` sur les 4 juges, `vf-design-judge` cesse d'affirmer une barrière que le runtime ne pose pas (vague 1)
-- [ ] 20-05-PLAN.md — Changement 3 : `.planning/MISSION-INVARIANTS.md` réduit aux éléments falsifiables + `check-mission-invariants.sh` et sa suite (vague 2, dépend de 20-02, checkpoint humain D-16)
-- [ ] 20-06-PLAN.md — Changement 2 : la revue devient un étage de premier rang piloté par le manager, graduée par risque, revue de jointure sur topologie (vague 3, dépend de 20-02/20-03/20-05, checkpoint humain D-11)
-- [ ] 20-07-PLAN.md — Gouvernance : ADR-051 révisée + ADR-060, doctrine `team-kernel`/README alignée, 6 modules bumpés, gates de sortie (vague 4, dépend de tous)
+- [x] 20-01-PLAN.md — Changement 5 : périmètre explicite des 2 hooks de conformité, avertissements conditionnels en mode hook, charset de token MCP, clé `vf-mcp-tools` connue du gate ; chemin par défaut enfin testé (vague 1)
+- [x] 20-02-PLAN.md — `dag.sh` : `--scope` sur `add`, `review_regime` forcé à `full` par `reopen`, périmètres gelés exposés par `status` (vague 1)
+- [x] 20-03-PLAN.md — Changement 1 : mode d'injection MCP nommé dans `inject-mcp-tools.sh`, `vf-reviewer` déclare son allowlist et son protocole d'appel (vague 2, dépend de 20-01)
+- [x] 20-04-PLAN.md — Critère 2, sens ouverture : `disallowedTools: Write, Edit` sur les 4 juges, `vf-design-judge` cesse d'affirmer une barrière que le runtime ne pose pas (vague 1)
+- [x] 20-05-PLAN.md — Changement 3 : `.planning/MISSION-INVARIANTS.md` réduit aux éléments falsifiables + `check-mission-invariants.sh` et sa suite (vague 2, dépend de 20-02, checkpoint humain D-16)
+- [x] 20-06-PLAN.md — Changement 2 : la revue devient un étage de premier rang piloté par le manager, graduée par risque, revue de jointure sur topologie (vague 3, dépend de 20-02/20-03/20-05, checkpoint humain D-11)
+- [x] 20-07-PLAN.md — Gouvernance : ADR-051 révisée + ADR-060, doctrine `team-kernel`/README alignée, 6 modules bumpés, gates de sortie (vague 4, dépend de tous)
 
 ### Phase 21: Alignement du moteur GSD sur gsd-core 1.9.0
 
