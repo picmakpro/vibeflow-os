@@ -1669,5 +1669,58 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# T23 — Câblage du geste documentaire dans les DEUX managers de mission
+# ---------------------------------------------------------------------------
+# Ce que T23 garantit : une PRÉSENCE TEXTUELLE de câblage — les deux managers nomment le nœud, les
+# quatre déclencheurs, et renvoient à la doctrine plutôt que d'en héberger une copie.
+# Ce que T23 NE garantit PAS : le COMPORTEMENT de l'agent à l'exécution — qu'il pose réellement le
+# nœud au bon moment. Même réserve que celle inscrite pour BRDG-03 dans REQUIREMENTS.md.
+# Précédent Phase 19 : un compte rendu qui prouve une présence n'est pas un comportement prouvé.
+t23_ok=1
+
+# Résolution de la cible design — seule zone du fichier qui sort de dev-orchestrator.
+# Ordre imposé : en dépôt source, $MOD/agents/ est le dossier du manager DEV et ne contient pas
+# le manager design ; la branche $REPO doit donc être testée en premier.
+DESIGNMGR=""
+DESIGN_SRC_LAYOUT=0
+if [ -f "$REPO/design-orchestrator/agents/vf-design-manager.md" ]; then
+  DESIGNMGR="$REPO/design-orchestrator/agents/vf-design-manager.md"; DESIGN_SRC_LAYOUT=1
+elif [ -f "$MOD/agents/vf-design-manager.md" ]; then
+  DESIGNMGR="$MOD/agents/vf-design-manager.md"
+fi
+
+# Côté dev — $DEVMGR est déjà résolu par T18 plus haut.
+"$GREP" -q "docs-flow" "$DEVMGR" || { ko "T23 managers : vf-dev-manager.md ne renvoie pas vers docs-flow.md"; t23_ok=0; }
+"$GREP" -q -- "--id=docs" "$DEVMGR" || { ko "T23 managers : vf-dev-manager.md ne pose pas le nœud --id=docs"; t23_ok=0; }
+for motif in "doc-drift" "milestone" "surface publique" "capacité"; do
+  "$GREP" -q -- "$motif" "$DEVMGR" || { ko "T23 managers : vf-dev-manager.md ne nomme pas le déclencheur « $motif »"; t23_ok=0; }
+done
+
+# Côté design — skip explicite si le module n'est pas dans le périmètre scanné (cf. T6/installeur).
+if [ -n "$DESIGNMGR" ]; then
+  "$GREP" -q "dev-orchestrator-references/docs-flow.md" "$DESIGNMGR" || { ko "T23 managers : vf-design-manager.md ne renvoie pas vers dev-orchestrator-references/docs-flow.md"; t23_ok=0; }
+  "$GREP" -q -- "--id=docs" "$DESIGNMGR" || { ko "T23 managers : vf-design-manager.md ne pose pas le nœud --id=docs"; t23_ok=0; }
+  for motif in "doc-drift" "milestone" "surface publique" "capacité"; do
+    "$GREP" -q -- "$motif" "$DESIGNMGR" || { ko "T23 managers : vf-design-manager.md ne nomme pas le déclencheur « $motif »"; t23_ok=0; }
+  done
+  # ADR-057 / D-01 : la doctrine vit dans UN SEUL module. En lab installé l'arborescence est
+  # aplatie, donc l'assertion d'absence n'a de sens qu'en disposition dépôt source.
+  if [ "$DESIGN_SRC_LAYOUT" -eq 1 ] && [ -f "$REPO/design-orchestrator/references/docs-flow.md" ]; then
+    ko "T23 managers : copie locale de la doctrine dans design-orchestrator/references — ADR-057, une seule voix"; t23_ok=0
+  fi
+else
+  skip "T23 managers : module design hors du périmètre scanné — volet design non vérifié"
+fi
+
+# D-13 : check-doc-drift.sh est CONSOMMÉ par la doctrine, jamais réimplémenté.
+[ -f "$MOD/scripts/check-doc-drift.sh" ] || { ko "T23 managers : check-doc-drift.sh absent — la doctrine s'appuie sur un fait qui n'existe plus"; t23_ok=0; }
+if [ -f "$REFS_DIR/docs-flow.md" ]; then
+  "$GREP" -q "check-doc-drift.sh" "$REFS_DIR/docs-flow.md" || { ko "T23 managers : docs-flow.md n'interprète pas le fait check-doc-drift.sh"; t23_ok=0; }
+fi
+"$GREP" -q "check_doc_drift\s*()" "$DEVMGR" && { ko "T23 managers : vf-dev-manager.md réimplémente check-doc-drift au lieu de le consommer"; t23_ok=0; }
+
+[ "$t23_ok" -eq 1 ] && ok "T23 managers : le geste documentaire est câblé des deux côtés (nœud docs, 4 déclencheurs, renvoi à la doctrine, aucune copie locale) — présence textuelle, pas comportement"
+
+# ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
 [ "$fail" -eq 0 ]
