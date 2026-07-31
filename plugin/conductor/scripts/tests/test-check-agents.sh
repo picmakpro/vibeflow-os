@@ -54,6 +54,12 @@
 #   T52 — --third-party-prefix ACCUMULE au-dessus du defaut gsd- (ne l'ecrase plus)
 #   T53 — compteurs distincts : fichiers agent tiers non lintes != entrees d'allowlist resolues
 #   T54 — nit : 'Agent(a))' (parenthese en trop) → libelle distinct de 'non fermee'
+#
+# Assertion sur l'ARBRE REEL (WINDOWS #1, Phase 20 reliquat) — T72 seul cas de la suite qui ne
+# pointe PAS vers une fixture $AG jetable : balaie les agents reellement poses sous
+# plugin/*/agents (perimetre exact des 6 dossiers audites par la CI), pas une liste codee en dur.
+#   T72 — chaque agent memory: + tools: sans Write/Edit porte disallowedTools: Write, Edit ;
+#         echoue si la decouverte est vide (anti "vert a vide", precedent Phase 19)
 
 set -uo pipefail
 
@@ -1225,6 +1231,48 @@ else
   ko "T71 (rc=$RC) : $OUT"
 fi
 rm -f "$AG/producteur.md"
+
+# ---------- T72 : assertion sur l'arbre REEL (pas une fixture) — WINDOWS #1 ----------
+# team-kernel.md affirmait l'anti-triche P12 "verifie par les suites de test de chaque module" —
+# faux (aucune suite de module n'y touche, cf. team-kernel.md ligne 23 corrigee). Le seul
+# mecanisme reel est check-agents.sh --strict passe par la CI sur plugin/*/agents, jamais teste
+# en local sur l'arbre reel jusqu'ici (test-check-agents.sh ne teste que $AG, une fixture
+# temporaire — cf. commentaire "Chemin par DEFAUT des gates" plus haut). Ce cas comble ce trou.
+REPO_ROOT="$(cd "$SCRIPTS_DIR/../../.." && pwd)"
+T72_CANDIDATES=""
+T72_N=0
+for f in "$REPO_ROOT"/plugin/*/agents/*.md; do
+  [ -f "$f" ] || continue
+  mem_line="$(grep -E '^memory:[[:space:]]*[a-zA-Z]' "$f" || true)"
+  tools_line="$(grep -E '^tools:' "$f" || true)"
+  [ -n "$mem_line" ] || continue
+  [ -n "$tools_line" ] || continue
+  # deja conforme si tools: contient Write et/ou Edit — regle non applicable (cf. check-agents.sh)
+  if echo "$tools_line" | grep -Eq '(^tools:|,)[[:space:]]*(Write|Edit)[[:space:]]*(,|$)'; then
+    continue
+  fi
+  T72_N=$((T72_N+1))
+  T72_CANDIDATES="$T72_CANDIDATES
+$f"
+done
+
+if [ "$T72_N" -eq 0 ]; then
+  ko "T72 (decouverte vide sur $REPO_ROOT/plugin/*/agents — anti 'vert a vide', precedent Phase 19)"
+else
+  T72_BAD=""
+  for f in $T72_CANDIDATES; do
+    [ -n "$f" ] || continue
+    dis_line="$(grep -E '^disallowedTools:' "$f" || true)"
+    if ! echo "$dis_line" | grep -q "Write" || ! echo "$dis_line" | grep -q "Edit"; then
+      T72_BAD="$T72_BAD $f"
+    fi
+  done
+  if [ -z "$T72_BAD" ]; then
+    ok "T72 arbre reel : $T72_N agent(s) memory:+tools: sans Write/Edit, tous barres par disallowedTools: Write, Edit"
+  else
+    ko "T72 arbre reel : disallowedTools: Write, Edit manquant sur :$T72_BAD"
+  fi
+fi
 
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
