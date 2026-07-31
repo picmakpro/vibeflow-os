@@ -316,7 +316,18 @@ Progress: [██████░░░░] 59%
   `backgroundDispatch: false`** donc `shouldFlattenDispatch()` renvoie `true` pour Claude : le
   moteur **aplatit** ses dispatches, et la capability `claude-orchestration` (BETA, default-off)
   existe pour restaurer ce parallélisme via le Workflow tool — or le **dispatch parallèle de la
-  frontière `ready`** et `max_concurrent_agents: 3` en dépendent, **à mesurer et non à déduire** ;
+  frontière `ready`** et la **recherche doc en tâche de fond** (ADR-045) en dépendent.
+  **→ M2 MESURÉ le 2026-07-31, hypothèse démentie** (protocole et chiffres :
+  `.planning/missions/2026-07-31-mesure-m2-dispatch-parallele.md`) : sondes horodatées de 20 s,
+  PID distincts. Fan-out depuis un **sous-agent** = **92 %** de recouvrement contre **91 %** pour le
+  contrôle en fenêtre principale ; et un sous-agent qui dispatche en tâche de fond continue de
+  travailler (parent démarré 1018 ms **avant** son enfant, terminé 18 s avant lui). **Les deux
+  acquis VibeFlow tiennent** — `backgroundDispatch: false` est *fail-closed par conception*, pas
+  descriptif du runtime. **Le gap se déplace sans disparaître** : `gsd-execute-phase` sérialise ses
+  vagues **par décision du moteur** alors que le runtime sait les paralléliser → le parallélisme
+  **intra-étape** est perdu, seul subsiste l'**inter-nœuds** porté par `vf-dev-manager`, qui est donc
+  **la seule couche qui parallélise réellement sur ce runtime** (à écrire en doctrine ; trois voies
+  au plan : signalement amont · `claude_orchestration` en opt-in explicite · acter et documenter) ;
   M3 — `effort:` est exposé par le harness, **validé par notre propre gate** (`check-agents.sh:514`)
   et déclaré par **aucun** agent `vf-*`. **Lot ACTIVATION** (8 items) : A1 broken-windows — le
   ledger `.planning/WINDOWS.md` porte déjà `open_count: 2`, exactement le predicate du gate
@@ -489,6 +500,25 @@ Progress: [██████░░░░] 59%
 
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
+
+- **2026-07-31 — La Phase 23 attend la clôture de 21+22 ; le bridage de parallélisme s'acte et se
+  signale, il ne se contourne pas** (arbitrage de Samuel, session d'audit VibeFlow ↔ GSD). Quatre
+  points tranchés : **(1)** la Phase 23 **ne se planifie pas** tant que la mission `reprise-p21-p22`
+  est en vol — son fichier central (`vf-dev-manager.md`) est modifié par la 22 en ce moment (2
+  commits + diff en cours), et on ne planifie pas contre une base qui bouge ; l'arbitrage des étages
+  de revue écrit par la 21 (changement 3) **fera autorité** pour la lacune 1 de la 23. **(2)** Les
+  écritures de planning de cette session (ROADMAP 23+24, STATE, note de mesure M2) sont commitées à
+  part, sur leurs seuls fichiers, pour ne pas être emportées par l'hygiène de fin d'étape de la
+  mission. **(3)** La dette de suivi est **comblée immédiatement** — table Progress et Execution
+  Order couvrent désormais les phases 18 à 24, au lieu de s'arrêter à 17. **(4)** Suite de la mesure
+  M2 : on retient **acter+documenter** et **signaler le descripteur en amont** (mesure horodatée à
+  l'appui) ; on **écarte** l'activation de `claude_orchestration` — un backend **BETA** sur le chemin
+  critique d'exécution n'est pas justifié quand notre parallélisme fonctionne (mesuré à 92 % de
+  recouvrement). À reconsidérer si le parallélisme intra-étape devient un besoin démontré, ou si le
+  signalement amont échoue.
+  **Fait de contexte à retenir** : le merge de la **Phase 20** (`d549b2d`, PR #21, release `v2.44.0`,
+  2026-07-31) **satisfait** la dépendance « Phase 20 requise » de 21, 22 **et** 23 — le `main` local
+  était simplement en retard sur `origin/main` au moment de l'audit.
 
 - **2026-07-31 — L'anti-triche P12 est garanti par un gate transverse, pas par les suites de
   module** (mission de clôture des reliquats Phase 20, WINDOWS #1). `team-kernel.md:23` affirmait

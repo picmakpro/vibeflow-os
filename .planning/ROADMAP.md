@@ -374,7 +374,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 ✅ (R&D, shippée v2.28.0)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 ✅ (code complet, release en attente de validation humaine)** ; **14 ✅ (indépendante)** ; **15 ✅ (shippée v2.40.0) → 16 ✅ (shippée v2.41.0)** ; **17 ✅ (indépendante de 16, terminée et vérifiée — release en attente de validation humaine) → 18 inscrite (dépend de 17)**
+1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 ✅ (R&D, shippée v2.28.0)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 ✅ (code complet, release en attente de validation humaine)** ; **14 ✅ (indépendante)** ; **15 ✅ (shippée v2.40.0) → 16 ✅ (shippée v2.41.0)** ; **17 ✅ (indépendante de 16, terminée et vérifiée — release en attente de validation humaine) → 18 inscrite (dépend de 17)** ; **19 ✅ (2026-07-28, ADR-058) → 20 ✅ (mergée dans `main` le 2026-07-31, PR #21, release `v2.44.0`)** — ce merge **satisfait** la dépendance « Phase 20 requise » de 21, 22 et 23 ; **21 🚧 + 22 🚧 en vol (mission `reprise-p21-p22`, ordre libre entre elles — aucun fichier commun)** → **23 inscrite : attend la clôture de 21+22**, périmètre partagé sur `vf-dev-manager.md` / `intent-routing.md` (arbitré le 2026-07-31 : on ne planifie pas contre une base qui bouge ; l'arbitrage des étages de revue écrit par la 21 fait autorité) → **24 inscrite (dépendance doctrinale de 23, aucun fichier commun ; son lot MESURE est déjà rendu)**
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -395,6 +395,13 @@ Plans:
 | 15. Collaboration inter-équipes dev ↔ design | — | 7/7 | Complete — release `v2.40.0` (5/5 critères), 2 points escaladés → Phase 16 | 2026-07-27 |
 | 16. Cloisonnement complet des dispatches | — | 8/8 | Complete — release `v2.41.0` (4/4 critères, SC3 amendé : contrat + lint, pas sandbox runtime) | 2026-07-27 |
 | 17. Signaux de démarrage du moteur de dev | — | 3/3 | Complete — module v2.6.0, SC5/SC6 vérifiés par exécution, release racine en attente de validation humaine | 2026-07-28 |
+| 18. Survie du ledger d'exigences | — | 0/0 | Inscrite — périmètre réduit le 2026-07-28 par `18-STUDY.md`, non planifiée | — |
+| 19. Migration du moteur GSD par /vf-update | — | 3/3 | Complete — 3 plans exécutés, VERIFICATION produite, module `dev-orchestrator` v2.7.0 + `conductor` v1.16.0, ADR-058 | 2026-07-28 |
+| 20. Fluidité du flux de dev sans perte de qualité | — | 7/7 | Complete — **mergée dans `main`** (PR #21, `d549b2d`), release `v2.44.0`, VERIFICATION produite | 2026-07-31 |
+| 21. Alignement du moteur GSD sur gsd-core 1.9.0 | — | 0/0 | En planification — pilotée par la mission `reprise-p21-p22` (verrou de driver actif) | — |
+| 22. Hygiène documentaire — doctrine de sortie | — | 1/3 | En cours — 22-01 livré (3/3 tâches, SUMMARY), 22-02 en exécution, DOCF-01..07 mappés au ledger | — |
+| 23. Couplage explicite au moteur GSD | — | 0/0 | Inscrite — 7 lacunes, sûreté en premier ; **attend la clôture de 21+22** (périmètre partagé sur `vf-dev-manager.md`) | — |
+| 24. Activation et mesure du moteur GSD | — | 0/0 | Inscrite — lot MESURE : M2 **rendu** le 2026-07-31, M1/M3 à instruire ; lot ACTIVATION : 8 items | — |
 
 ### Phase 15: Collaboration inter-équipes dev ↔ design
 
@@ -1087,13 +1094,13 @@ définis dans `.planning/REQUIREMENTS.md` §Hors-milestone — Phase 22.)*
 **Depends on:** Phase 20 — **merge requis avant exécution**. Périmètre à fichiers partagés avec
 la 20 (`intent-routing.md`, `mission-contracts.md`, `vf-dev-manager.md`). **Indépendante de la
 Phase 21** (alignement gsd-core 1.9.0) : aucun fichier commun, l'ordre d'exécution est libre.
-**Plans:** 3 plans, 3 vagues séquentielles (le fichier de suite `test-dev-orchestrator.sh` est
+**Plans:** 1/3 plans executed
 partagé par les plans 01 et 02 — pas de parallélisme possible). Découpage tracer-first : le plan
 01 prouve la chaîne complète sur UNE intention avant d'écrire les trois autres familles.
 
 Plans:
 
-- [ ] 22-01-PLAN.md — doctrine de sortie `docs-flow.md` (4 familles, 3 régimes, garde-fous) +
+- [x] 22-01-PLAN.md — doctrine de sortie `docs-flow.md` (4 familles, 3 régimes, garde-fous) +
   captation d'intention dans `intent-routing.md` + câblage `AGENT.md` au chemin d'install D7 +
   bloc de garde T22. *Tracer : la doctrine existe, est référencée, s'installe réellement et est
   gardée — prouvé sur une seule intention avant toute expansion.* (DOCF-01→04, DOCF-06)
@@ -1276,12 +1283,13 @@ table.** Chaque item ci-dessous est une brique du moteur **présente sur le disq
 toggle est à `false` ou dont le canal est vide, et que VibeFlow soit ignore, soit ré-implémente à
 la main.
 
-**Ordre imposé — le lot MESURE d'abord.** Le constat M2 porte sur le cœur du gain de la Phase 20 :
-si le parallélisme de frontière est illusoire sur ce runtime, il déplace la valeur de plusieurs
-acquis et doit être connu **avant** d'activer quoi que ce soit d'autre. Aucun lot d'activation ne
-démarre avant que les trois mesures soient rendues.
+**Ordre imposé — le lot MESURE d'abord.** Le constat M2 portait sur le cœur du gain de la Phase 20 :
+il devait être connu **avant** d'activer quoi que ce soit d'autre. **M2 est mesuré et rendu**
+(2026-07-31, verdict ci-dessous : les acquis tiennent, le gap se déplace) ; M1 et M3 restent des
+constats de lecture à instruire au plan. Aucun lot d'activation ne démarre avant que les trois
+soient traités.
 
-#### Lot MESURE — trois faits présumés, jamais vérifiés
+#### Lot MESURE — trois faits présumés (M2 mesuré le 2026-07-31, M1 et M3 à instruire)
 
 Le descripteur officiel du runtime `claude` dans GSD 1.9 (capability `claude`, clé
 `hostIntegration.dispatch`) dit :
@@ -1298,21 +1306,46 @@ tient, avec **deux niveaux de marge**. Ce fait **clôt** la question du nesting 
 de l'audit et n'est écrit nulle part dans le module — ni la limite, ni la marge, ni ce qu'elle
 autorise (un worker pourrait légitimement dispatcher un sous-worker).
 
-**M2 — `backgroundDispatch: false` : le moteur juge le dispatch parallèle indisponible ici.**
+**M2 — ✅ MESURÉ le 2026-07-31 : le moteur s'auto-bride, le runtime sait paralléliser.**
+Preuve complète et protocole : `.planning/missions/2026-07-31-mesure-m2-dispatch-parallele.md`.
 `shouldFlattenDispatch()` (`bin/lib/host-integration.cjs:464`) renvoie `true` dès que
 `background && backgroundDispatch` n'est pas vrai — donc **true pour Claude Code** : GSD
-**aplatit** ses dispatches. La capability `claude-orchestration` (1.9.0, **default-off**, BETA)
-existe précisément pour « *restoring the wave parallelism the #853 backgrounded-agent nesting
-limitation forces inline on Claude Code* », en passant par le **Workflow tool** (« *works precisely
-because a single tool-call orchestrates internally, sidestepping the `backgroundDispatch:false`
-limitation* »). Deux acquis VibeFlow reposent sur la capacité inverse : le **dispatch en parallèle
-de la frontière `ready`** (`vf-dev-manager.md:90-96`, « plusieurs Task dans un seul message ») et
-`parallelization.max_concurrent_agents: 3` du `config.json`. **À mesurer, pas à déduire** :
-émettre depuis un sous-agent deux Task dans un même message et constater le recouvrement
-temporel réel. Trois issues possibles, toutes acceptables si elles sont écrites : le parallélisme
-tient (le descripteur est conservateur) · il ne tient pas et le gain de la Phase 20 vient du
-pipelining seul · il ne tient pas et `claude_orchestration.enabled` devient une piste (BETA,
-donc opt-in explicite et jamais par défaut).
+**aplatit** ses dispatches, et la capability `claude-orchestration` (1.9.0, **default-off**, BETA)
+existe pour « *restoring the wave parallelism the #853 backgrounded-agent nesting limitation forces
+inline on Claude Code* ». Deux acquis VibeFlow reposaient sur la capacité inverse — le **fan-out de
+la frontière `ready`** (`vf-dev-manager.md:90-96`) et la **recherche doc en tâche de fond**
+(`vf-dev-manager.md:180-184`, ADR-045). **Mesure par sondes horodatées (busy-loop 20 s, PID
+distincts, 12 cœurs)** :
+
+| Configuration | Recouvrement | Verdict |
+|---|---|---|
+| Contrôle — fenêtre principale → 2 agents en un message | 18 259 / 20 000 ms (**91 %**) | parallèle |
+| **Sous-agent** → 2 agents en un message (le cas `vf-dev-manager`) | 18 460 / 20 000 ms (**92 %**) | **parallèle** |
+| **Sous-agent** → 1 enfant en tâche de fond, puis travail propre | parent démarré 1018 ms **avant** l'enfant, fini 18 s avant lui | **non bloquant** |
+
+**Les deux acquis tiennent** — statistiquement indiscernables du contrôle. `backgroundDispatch:
+false` est **fail-closed par conception, pas descriptif** de la capacité réelle du runtime. **Le gap
+se déplace donc, il ne disparaît pas** : `gsd-execute-phase` sérialise ses vagues **par décision du
+moteur** alors que le runtime sait les paralléliser → le parallélisme **intra-étape** (vagues de
+plans d'une même phase) est perdu, et seul subsiste le parallélisme **inter-nœuds** porté par
+`vf-dev-manager`. Conséquence doctrinale à écrire : sur ce runtime, notre couche d'orchestration ne
+duplique pas celle de GSD, **elle est la seule qui parallélise réellement**.
+
+**Voies retenues (arbitrées par Samuel le 2026-07-31), deux sur trois :**
+1. **Acter et documenter** — écrire en doctrine que sur ce runtime le parallélisme **inter-nœuds**
+   porté par `vf-dev-manager` est le seul effectif, et que le parallélisme **intra-étape** des vagues
+   GSD est perdu par décision du moteur. Gratuit, immédiat, et consolide l'architecture existante au
+   lieu de la remettre en cause.
+2. **Signaler le descripteur en amont** — remonter à `@opengsd/gsd-core`, **mesure horodatée à
+   l'appui**, que `backgroundDispatch: false` est *fail-closed* mais non descriptif du runtime
+   Claude Code. Bénéfice collectif : débloquerait le parallélisme intra-étape pour tous les labs.
+3. ~~Activer `claude_orchestration.enabled`~~ — **ÉCARTÉ pour l'instant** : placer un backend
+   **BETA** sur le chemin critique d'exécution n'est pas justifié quand notre propre parallélisme
+   fonctionne (mesuré). À reconsidérer seulement si le parallélisme intra-étape devient un besoin
+   démontré, ou si la voie 2 échoue.
+
+Reste non mesuré : la profondeur 2 → 3 (`vf-coder → gsd-executor`), couverte en **déclaration** par
+M1 (`maxDepth: 5`), pas par l'expérience.
 
 **M3 — `effort:` est supporté, validé, et déclaré par aucun agent.** Le harness l'expose
 (`agentFrontmatterExtensions: ["effort"]`), notre propre gate le **valide déjà**
