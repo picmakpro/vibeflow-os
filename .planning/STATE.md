@@ -2,17 +2,22 @@
 gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
-current_phase: 19
-current_phase_name: Migration du moteur GSD pilotée par /vf-update — vérifiée (PASS 6/7) et SHIPPÉE v2.43.0
-status: shipped
+current_phase: 20
+current_phase_name: Fluidité du flux de dev sans perte de qualité — 7/7 plans livrés, release racine en attente
+status: complete
 stopped_at: "Phase 20 complète (7/7 plans) — clôture de gouvernance (20-07) : ADR-051 révisée + ADR-060 posée, doctrine transverse alignée, 6 modules bumpés (conductor v1.17.0, dev-orchestrator v2.8.0, design-orchestrator v1.3.2, 3 bundles v2.0.3). Gates verts sauf le seul rouge attendu (compteur de suites racine, 44 réel pas 43). Release racine réservée à validation humaine post-fusion (4 éléments consignés + WINDOWS.md)."
 last_updated: "2026-07-31T10:26:41.602Z"
 last_activity: 2026-07-28 (clôture Phase 19 + release v2.43.0)
 progress:
-  total_phases: 20
-  completed_phases: 10
-  total_plans: 49
-  completed_plans: 29
+  total_phases: 21
+  completed_phases: 12
+  total_plans: 54
+  completed_plans: 39
+# ⚠ Compteurs recalés à la main le 2026-07-31. L'écriture d'état de la clôture 20-07 les a fait
+# RÉGRESSER (completed_phases 11→10, total_plans 53→49, completed_plans 37→29) alors que la phase
+# venait de se terminer, et a laissé current_phase à 19. Anomalie d'agrégation à instruire en
+# Phase 21 (candidat : régression d'écriture d'état côté gsd-core 1.9.0). Valeurs reposées ici
+# depuis le disque : 21 phases déclarées, 54 PLAN.md, Phase 20 à 7/7.
 ---
 
 # Project State
