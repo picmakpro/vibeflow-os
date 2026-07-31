@@ -691,6 +691,12 @@ Recent decisions affecting current work:
   ouvert et **en attente** — non bloquant pour vf-routing. Le go/no-go de la Phase 10 dépend de la
   maturité/parité du package cible sur npm — à vérifier en premier.
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260801-17w | Isolation multi-session : un écrivain = un worktree (ADR-064) + gate advisory de revendication de branche | 2026-08-01 | `efa20c5` | [260801-17w-isolation-multi-session](./quick/260801-17w-isolation-multi-session/) |
+
 ## Deferred Items
 
 | Category | Item | Status | Deferred At |
