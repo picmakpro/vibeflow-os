@@ -394,9 +394,15 @@ multi-stack) dans un agent générique.
 ### Décision
 
 1. **Sélecteur data-driven** : les agents exécutants portent `vf-mcp-consumer: true` (analogue à
-   `mandatory:` / `vf-internal:`). Les agents de planif/revue/audit (`vf-dev-manager`, `vf-reviewer`,
-   `vf-auditer`) **restent inchangés** (moindre privilège — ils ne compilent jamais). Champ ajouté au
-   `KNOWN` de `check-agents.sh`.
+   `mandatory:` / `vf-internal:`). Les agents de planification et d'audit (`vf-dev-manager`,
+   `vf-auditer`) **restent inchangés** (moindre privilège — ils ne compilent jamais). Le relecteur
+   (`vf-reviewer`) reçoit une allowlist **NOMMÉE**, portée par la clé de frontmatter `vf-mcp-tools`
+   (grammaire `<serveur>:<outil1>,<outil2>,…`, injectée par le même script en mode dédié — Phase 20) :
+   un relecteur ne PRODUIT pas un verdict de compilation, il en VÉRIFIE un — le moindre
+   privilège reste tenu par une liste explicite d'outils de vérification, pas par l'absence totale
+   d'accès MCP. Coût assumé, écrit noir sur blanc : de l'ordre de **+90 secondes** par revue et un
+   **slot de simulateur** consommé, uniquement quand la vérification outillée est déclenchée. Champ
+   ajouté au `KNOWN` de `check-agents.sh`.
 2. **Injecteur idempotent** `dev-orchestrator/scripts/inject-mcp-tools.sh` : lit les serveurs du
    `./.mcp.json` du lab et injecte `mcp__<serveur>__*` dans le `tools:` des fichiers flaggés (ou d'un
    fichier `--force` pour `gsd-executor`). Aucun nom de serveur ni d'agent en dur. Best-effort.
@@ -412,7 +418,13 @@ imposée ; enforcement machine cohérent avec la philosophie « scope-aware ».
 **Négatives** : le `tools:` est lu au **démarrage de session** → un **redémarrage de Claude Code** est
 requis après (ré)install pour que l'allowlist prenne (documenté dans les CHANGELOGs) ; la source est
 le `./.mcp.json` **projet** — un serveur configuré uniquement au niveau user n'est pas injecté (par
-conception : moindre privilège, alignement sur le brief).
+conception : moindre privilège, alignement sur le brief) ; l'accès nommé du relecteur (Phase 20) porte
+deux contraintes de protocole que le mécanisme rend nécessaires : **l'ordre d'appel imposé** (le
+nettoyage `clean` précède toute compilation ou exécution de tests de vérification, faute de quoi un
+résultat servi par le cache annoncerait zéro avertissement sans avoir rien compilé) et **des
+paramètres de projet explicites à chaque appel de build** (le serveur MCP maintient un état de
+session global partagé par la fenêtre principale et tous les sous-agents — un appel sans paramètres
+peut s'exécuter sur un autre arbre de travail).
 
 ### Cloisonnement anti-triche (Pattern 12) — inchangé
 
@@ -430,6 +442,11 @@ d'accès web/doc : `vf-app-fixer` conserve son interdiction ADR-045 (pas de cont
 - `plugin/_internal/vibeflow-update.sh` — `find_mcp_injector` + `inject_lab_mcp_into_agents` (hook post-install)
 - `plugin/dev-orchestrator/scripts/ensure-deps.sh` — `patch_gsd_executor_mcp` (post-install GSD)
 - `plugin/conductor/skills/vf-calibrate/SKILL.md` — étape de ré-affirmation MCP
+- `plugin/dev-orchestrator/agents/vf-reviewer.md` (Phase 20) — clé `vf-mcp-tools:
+  XcodeBuildMCP:test_sim,build_sim,clean` + protocole de vérification outillée
+- `plugin/dev-orchestrator/scripts/inject-mcp-tools.sh` (Phase 20) — second mode d'injection en
+  **mode nommé**, déclenché par la clé `vf-mcp-tools`, coexistant avec le mode joker existant
+  (le nommé l'emporte si les deux clés sont présentes sur un même fichier)
 
 ### Rules Associées
 
@@ -1006,3 +1023,69 @@ le même arbre de travail. Une branche par mission ne les sépare pas entre elle
 Applique ADR-031 (jamais d'action irréversible sans validation humaine) au **merge** : le manager
 peut tout produire, il ne peut rien intégrer. Complète la discipline de release du `CLAUDE.md`
 racine, qui gouvernait l'aval (tag, release) sans rien dire de l'amont. Aucune rule nouvelle.
+
+## ADR-060 : La revue devient un étage de premier rang, piloté par le manager
+
+**Date** : 2026-07-29
+**Statut** : Validée
+**Décideur** : Samuel (arbitrage de cadrage D-26, `20-CONTEXT.md`), acté par l'exécution du plan 20-06
+**Contexte** : Phase VFDO-20 (fluidité du flux de dev) — `dev-orchestrator` v2.8.0 ; release racine
+hors périmètre de cette phase, réservée à une validation humaine post-fusion
+
+### Problème
+
+La revue était le **seul** étage à la fois obligatoire — en dur dans le cycle interne du worker
+d'exécution (`vf-coder.md:34`) — et **hors de portée du manager**, une règle lui interdisant
+explicitement d'en ajouter une (`vf-dev-manager.md:108`, « Pas de double revue »). La seule gradation
+existante était indexée sur le **volume** d'étapes restantes (`SEUIL_EQUIPE`), ce qui est le mauvais
+axe : trois lignes sur un chemin partagé sont minuscules et à très haut risque, quatre cents lignes de
+domaine pur prouvées par mutation sont grosses et à bas risque. Et le meilleur rendement de toute la
+tranche auditée venait des jointures entre lots parallèles — un étage qui n'existait que parce qu'il
+avait été créé à la main.
+
+### Options Considérées
+
+| Option | Avantages | Inconvénients |
+|---|---|---|
+| Statu quo (revue en dur dans `vf-coder`, gradation sur le volume `SEUIL_EQUIPE`) | zéro changement | le manager n'a explicitement pas le droit d'en ajouter une ; le volume ne corrèle pas avec le risque réel ; aucune revue de jointure entre lots parallèles hors geste manuel |
+| Gradation indexée sur le volume de lignes changées | simple à calculer | mauvais axe — écartée explicitement, cf. Problème |
+| Allègement d'un différentiel de comblement | réduirait le coût d'un `reopen` | affaiblirait le seul garde-fou qui empêche un comblement de passer en revue allégée |
+| **Nœud de plan de bataille posé systématiquement par le manager, dispatché en direct, gradué par 4 déclencheurs objectifs, jointure sur topologie (retenue)** | la revue devient pilotable, graduée sur le bon axe, jointure garantie machine | un nœud de dispatch de plus par étape — coût réel |
+
+### Décision
+
+La revue devient un nœud `revue-N` de plan de bataille posé **systématiquement** par le manager et
+**dispatché en direct** — `vf-coder` ne la dispatche plus. La boucle de correction migre vers le
+manager sous forme de mandat de correction ciblée. La gradation s'appuie sur **quatre déclencheurs
+objectifs** (jamais le volume) avec défaut sûr (« dans le doute, revue pleine »). Une **revue de
+jointure** (`join-N`) est déclenchée par la **topologie du graphe**, jamais par l'intersection des
+périmètres. Le garde-fou de comblement est adossé au champ machine `review_regime` que `dag.sh
+reopen` écrit lui-même (D-14, plan 20-02) — jamais une consigne de prompt. Protocole complet :
+`dev-orchestrator-references/mission-flow.md` §Pattern E, non dupliqué ici.
+
+### Conséquences
+
+**Positives** : un nœud pilotable au lieu d'une sous-phase interne invisible au manager ; la
+gradation a enfin un axe où s'appliquer (risque, pas volume) ; la jointure cesse d'être un geste
+manuel — elle est garantie par construction du DAG.
+**Négatives** : un nœud de dispatch de plus par étape, donc un coût de dispatch réel.
+**Explicitement écarté** : l'indexation de la gradation sur le volume d'étapes restantes, et tout
+allègement d'un différentiel de comblement.
+
+### Code Impacté
+
+- `plugin/dev-orchestrator/references/mission-flow.md` — §Pattern E (protocole complet de l'étage
+  revue de premier rang)
+- `plugin/dev-orchestrator/agents/vf-dev-manager.md` — règle `vf-dev-manager.md:108` réécrite en
+  place, pilotage direct de `revue-N`/`join-N`
+- `plugin/dev-orchestrator/agents/vf-coder.md` — cycle réduit à 3 étapes, ne dispatche plus
+  `vf-reviewer`
+- `plugin/dev-orchestrator/agents/vf-reviewer.md` — dispatché uniquement en direct par un manager
+- `plugin/conductor/scripts/dag.sh` — `review_regime` écrit par `reopen` (D-14) : le mécanisme
+  machine du garde-fou de comblement
+
+### Rules Associées
+
+Remplace en place la règle `vf-dev-manager.md:108` (« Pas de double revue »), pas de contournement
+par exception. Le rapport typé (Pattern C, ADR-053) reste le socle inchangé du retour de `revue-N`.
+Aucune rule nouvelle.
