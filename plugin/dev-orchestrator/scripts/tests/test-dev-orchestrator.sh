@@ -71,6 +71,10 @@
 #   T21 — Invariants SC5 par grep structurel (VFDO-17-03, D-15) : check-dev-bootstrap.sh et
 #         check-doc-drift.sh n'ont aucun exit 1, aucune écriture hors /dev/null|&N|*TMP*, aucune
 #         commande d'écriture directe, et tout mktemp est apparié à un trap ... EXIT.
+#   T22 — Doctrine de sortie documentaire (phase 22, DOCF-01 → DOCF-04) : docs-flow.md existe,
+#         traite les quatre familles, porte la ligne rouge --force (jamais mission, jamais
+#         autonome) et la frontière vibeflow-os, câble --verify-only/--force dans la carte
+#         d'intention ; AGENT.md et intent-routing.md y renvoient.
 #
 # Historique de numérotation : T3/T12/T13/T14 ont changé de sémantique à la v2.0.0 (les
 # anciens tests de collision de descriptions, de préséance et de synchro de la table vf-dev
@@ -920,7 +924,7 @@ else
   if (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install dev-orchestrator >/dev/null 2>&1); then
     miss=0
     [ -f "$LAB/.claude/agents/dev-orchestrator.md" ] || { ko "T6 install : .claude/agents/dev-orchestrator.md manquant"; miss=1; }
-    for ref in GSD-PIPELINE.md gsd-skills-index.md intent-routing.md mission-contracts.md; do
+    for ref in GSD-PIPELINE.md gsd-skills-index.md intent-routing.md mission-contracts.md docs-flow.md; do
       [ -f "$LAB/.claude/agents/dev-orchestrator-references/$ref" ] || { ko "T6 install : references/$ref manquant"; miss=1; }
     done
     for sk in vf-auto vf-dev; do
@@ -1610,6 +1614,25 @@ for T21_FILE in "$MOD/scripts/check-dev-bootstrap.sh" "$MOD/scripts/check-doc-dr
     ok "T21d invariants SC5 : $T21_NAME — mktemp ($t21d_mktemp_count) apparié à trap ... EXIT, ou aucun mktemp"
   fi
 done
+
+# ---------------------------------------------------------------------------
+# T22 — Doctrine de sortie documentaire (phase 22, DOCF-01 → DOCF-04)
+# ---------------------------------------------------------------------------
+# docs-flow.md doit exister, traiter la famille produit et le régime --verify-only, porter le
+# garde-fou ADR-031 et fermer sur ## Interdits ; AGENT.md et intent-routing.md doivent y renvoyer.
+DOCSFLOW="$REFS_DIR/docs-flow.md"
+if [ ! -f "$DOCSFLOW" ]; then
+  ko "T22 docs-flow : $DOCSFLOW introuvable"
+else
+  t22_ok=1
+  "$GREP" -q "gsd-docs-update" "$DOCSFLOW" || { ko "T22 docs-flow : famille produit (gsd-docs-update) absente"; t22_ok=0; }
+  "$GREP" -q -- "--verify-only" "$DOCSFLOW" || { ko "T22 docs-flow : régime --verify-only absent"; t22_ok=0; }
+  "$GREP" -q "ADR-031" "$DOCSFLOW" || { ko "T22 docs-flow : garde-fou ADR-031 absent"; t22_ok=0; }
+  "$GREP" -q "^## Interdits" "$DOCSFLOW" || { ko "T22 docs-flow : section ## Interdits absente"; t22_ok=0; }
+  "$GREP" -q "docs-flow" "$AGENT_FILE" || { ko "T22 docs-flow : AGENT.md ne renvoie pas vers docs-flow.md"; t22_ok=0; }
+  "$GREP" -q "docs-flow" "$ROUTING" || { ko "T22 docs-flow : intent-routing.md ne renvoie pas vers docs-flow.md"; t22_ok=0; }
+  [ "$t22_ok" -eq 1 ] && ok "T22 docs-flow : doctrine complète (famille produit, --verify-only, ADR-031, ## Interdits), AGENT.md et intent-routing.md y renvoient"
+fi
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="

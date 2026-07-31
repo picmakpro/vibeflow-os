@@ -179,3 +179,4 @@ feuille de route) est déjà couvert par la ligne « intègre cette spec… » c
 - Index factuel des skills installés : `.claude/agents/dev-orchestrator-references/gsd-skills-index.md`
 - Contrats de mission (brief + rapport + signaux + seuil) : `.claude/agents/dev-orchestrator-references/mission-contracts.md`
 - Doctrine d'ingestion (découverte, manifest, garde-fous BRDG-03) : `.claude/agents/dev-orchestrator-references/ingestion-flow.md`
+- Doctrine de sortie documentaire (familles, régime de confirmation, déclencheurs) : `.claude/agents/dev-orchestrator-references/docs-flow.md`

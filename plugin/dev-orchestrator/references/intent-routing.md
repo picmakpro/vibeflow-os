@@ -170,5 +170,6 @@ une entrée manquante casse le routage : on préfère la première.
 
 - `GSD-PIPELINE.md` — l'ordre canonique du cycle (quoi après quoi), et non quelle intention mène où.
 - `mission-contracts.md` — brief et rapport de mission quand le travail part à l'équipe.
+- `docs-flow.md` — doctrine des quatre familles documentaires (quoi maintenir, quand, quel régime de confirmation).
 - Spec de la bascule : `docs/superpowers/specs/2026-07-25-suppression-facade-vf-design.md`
   *(provenance — chemin du repo source vibeflow-os, non résolu dans un lab installé)*.
