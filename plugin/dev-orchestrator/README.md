@@ -7,7 +7,7 @@
 > façade de verbes : GSD est l'interface directe du quotidien, l'agent est l'entrée
 > conversationnelle optionnelle.
 
-**Version** : v2.9.0
+**Version** : v2.10.0
 **Type** : agent + équipe d'agents + 2 skills + scripts
 
 ---
@@ -57,7 +57,9 @@ S'y ajoutent :
 - **`hooks/hooks.json`** (**nouveau**, Phase 17) : premier fragment de hooks du module —
   `SessionStart:startup` déclenche `check-dev-bootstrap.sh`, `discover-unintegrated-docs.sh` et
   `check-doc-drift.sh` en mode `--hook`, chacun suffixé `|| true` (advisory, ADR-031, jamais
-  bloquant).
+  bloquant). Ce fragment ne couvre que les hooks VibeFlow : les hooks `gsd-*` posés par
+  `gsd-core` lui-même (ex. `gsd-ensure-canonical-path.js`, `gsd-update-banner.js`) restent hors
+  de son périmètre — arbitrage écrit, pas un oubli (ADR-062).
 
 ---
 

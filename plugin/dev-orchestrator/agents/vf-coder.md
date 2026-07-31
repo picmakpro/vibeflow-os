@@ -65,3 +65,10 @@ il vient désormais de `vf-reviewer`, dispatché en direct par le manager.
 **Termine par le bloc typé** (contrat ADR-053, cf. `dev-orchestrator-references/mission-flow.md`) :
 `{ "statut": "passed|gaps_found|human_needed|blocked", "findings": [{ "severity": "…", "action": "auto-fix|no-op|ask-user", "ref": "fichier:ligne" }], "noeuds_debloques": ["<id DAG>"] }`.
 Un point qui défie l'intention/la logique/la sécurité → `action: ask-user` (escalade, jamais tranché seul).
+
+**Calibration `estimate:`/`actuals:`** (contrat détaillé : `mission-contracts.md` §Contrat
+`estimate:`/`actuals:`) : si le `PLAN.md` que tu as exécuté portait un `estimate:` en frontmatter,
+`gsd-executor` t'a rendu un `actuals:` dans le `SUMMARY.md` — ajoute-les **verbatim**, en champs
+optionnels frères du bloc typé (`"estimate": {…}`, `"actuals": {…}`). Ne les recalcule, n'arrondis
+ni ne réinterprète jamais : tu relaies des nombres déjà mesurés en amont, tu n'en calcules aucun.
+Absents des deux fichiers → absents de ton retour, jamais une valeur inventée.

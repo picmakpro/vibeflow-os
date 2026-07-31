@@ -6,7 +6,7 @@
 > et de migration. Module **mandatory** : posé d'office à chaque install, c'est lui qui porte les
 > gates machine (hooks) et le noyau d'orchestration d'équipe réutilisé par tous les autres modules.
 
-**Type** : `agent + skills + scripts + references` · **Version** : v1.17.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
+**Type** : `agent + skills + scripts + references` · **Version** : v1.18.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
 
 > `skill-creator` est une dépendance **dure** depuis ADR-047 : c'est le canal unique de création de
 > skills, invoqué par `vf-new-lab` en fan-out (Phase 5) et exigé par le Gate C. Le conductor étant
@@ -72,7 +72,7 @@ première instanciation non-dev) et les **bundles métier** (business-pilot, con
   --hook` (advisory ADR-045 : recherche documentaire avant debug), `update-banner.sh` (bandeau
   « mise à jour disponible X → Y, lance /vf-update » + nudge de méthode legacy).
 
-## Scripts (14) — par famille
+## Scripts (15) — par famille
 
 **Gates machine (`check-*`)** :
 - `check-agents.sh` — lint de conformité native des agents (ADR-044) : frontmatter, champs requis,
@@ -89,6 +89,9 @@ première instanciation non-dev) et les **bundles métier** (business-pilot, con
 - `check-mission-invariants.sh` — gate advisory (Phase 20, D-15) : constate qu'un glob de zone de
   risque de `.planning/MISSION-INVARIANTS.md` ne matche plus aucun fichier suivi ; il ne juge
   jamais, il signale.
+- `check-state-integrity.sh` — gate anti-régression (Phase 21) : `completed_phases`,
+  `completed_plans`, `total_plans` et `current_phase` de `.planning/STATE.md` ne décroissent jamais
+  au sein d'un même jalon, et le corps ne porte jamais plus d'une ligne `^Phase:` (ADR-063).
 
 **Team-kernel** : `dag.sh` (plan de bataille persistant, frontière `ready`) et `driver-lock.sh`
 (verrou de mission atomique par `mkdir`, heartbeat + TTL).

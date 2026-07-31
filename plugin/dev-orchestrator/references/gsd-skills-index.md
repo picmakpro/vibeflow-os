@@ -1,5 +1,5 @@
 # GSD Skills Index (auto-généré — NE PAS ÉDITER)
-> Généré le 2026-07-26T23:06:22+02:00 par build-gsd-index.sh depuis @opengsd/gsd-core@1.8.0
+> Généré le 2026-07-31T19:09:15+02:00 par build-gsd-index.sh depuis @opengsd/gsd-core@1.9.0
 
 | Skill | Description |
 |-------|-------------|
@@ -116,6 +116,7 @@
 - ingest-docs
 - insert-phase
 - list-phase-assumptions
+- list-seeds
 - list-workspaces
 - manager
 - map-codebase
@@ -127,6 +128,7 @@
 - next
 - node-repair
 - note
+- onboard
 - pause-work
 - plan-milestone-gaps
 - plan-phase
@@ -150,6 +152,7 @@
 - ship
 - sketch
 - sketch-wrap-up
+- smart-entry
 - spec-phase
 - spike
 - spike-wrap-up

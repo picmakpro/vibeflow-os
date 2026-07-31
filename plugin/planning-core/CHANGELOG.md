@@ -1,5 +1,12 @@
 # Changelog — planning-core
 
+## [v2.5.3] — 2026-07-31
+
+### Corrigé
+- `detect-gsd-engine.sh` cite désormais `@opengsd/gsd-core@1.9.0` au lieu de `1.8.0` (purge de
+  dette de version, Phase 21, alignement gsd-core 1.9.0). Aucun changement de contrat de sortie :
+  les codes d'exit restent inchangés.
+
 ## [v2.5.2] — 2026-07-26
 
 ### Corrigé

@@ -1,5 +1,27 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.10.0] — 2026-07-31 (alignement gsd-core 1.9.0, Phase 21)
+
+### Ajouté
+- **`inject-mcp-tools.sh` découvre les serveurs MCP en UNION de deux scopes** : `./.mcp.json`
+  (projet) **et** `~/.claude.json` clé top-level `mcpServers` (utilisateur/global, `--claude-json`
+  ou `VF_CLAUDE_JSON`). Corrige le défaut actif ADR-051 sur tout poste sans `.mcp.json` — un
+  serveur déclaré uniquement en scope global (ex. XcodeBuildMCP) était jusqu'ici invisible,
+  `--verify` sortait en `3` INDÉTERMINÉ au lieu de signaler l'écart. Dégradation indépendante par
+  source, précédence projet > global sur collision, `--strict` signale un nom de serveur cité mais
+  inconnu de toutes les sources découvertes (WINDOWS #4 clos).
+- **`vf-coder` et `vf-dev-manager` relaient verbatim le contrat `estimate:`/`actuals:` amont**
+  (ADR-2629, #2632) : deux champs optionnels frères du bloc typé ADR-053, jamais une statistique
+  agrégée du cru de l'agent, absents du rapport si absents en amont.
+- **Purge de la dette de version 1.8.0 → 1.9.0** : `gsd-skills-index.md` régénéré,
+  `mission-contracts.md`, `check-gsd-engine.sh`, `build-gsd-index.sh` citent désormais 1.9.0. Le
+  piège de préservation (cas 8 de `test-check-gsd-engine.sh`, qui asserte la chaîne littérale de
+  version dans l'en-tête) a été déplacé avec le texte qu'il vérifie, jamais neutralisé.
+- **`team-kernel.md`** documente l'hypothèse datée du dispatch nommé (`hostIntegration.dispatch.namedDispatch`,
+  amont 1.9.0) et le recoupement vérifié conforme avec `gsd-worktree-path-guard.js` (#1995, #2608).
+
+Référence : `docs/ADR.md` ADR-061 (recouvrement lanes de revue amont vs étage 20-06), ADR-062
+(hooks 1.9.0 non câblés), `.planning/phases/VFDO-21-alignement-du-moteur-gsd-sur-gsd-core-1-9-0/`.
 ## [v2.9.0] — 2026-07-31 (hygiène documentaire — doctrine de sortie et captation d'intention, Phase 22)
 
 **La doctrine documentaire avait une entrée (`ingestion-flow.md`) mais pas de sortie. Elle en a

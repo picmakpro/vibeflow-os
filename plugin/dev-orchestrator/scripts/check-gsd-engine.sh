@@ -22,7 +22,7 @@
 #
 # Piège semver (D-05) — ÉCRIT NOIR SUR BLANC, à ne jamais réintroduire : le paquet legacy
 # get-shit-done-cc est FIGÉ à 1.42.3 (déprécié sur npm, plus jamais republié) tandis que le
-# paquet vivant @opengsd/gsd-core est à 1.8.0 aujourd'hui. Donc 1.8.0 < 1.42.3 en semver : toute
+# paquet vivant @opengsd/gsd-core est à 1.9.0 aujourd'hui. Donc 1.9.0 < 1.42.3 en semver : toute
 # comparaison de numéros de version (sort -V, test d'infériorité/supériorité, réutilisation d'un
 # comparateur existant comme celui de check-plugin-update.sh) classerait à tort le poste legacy
 # comme « à jour » — pour toujours, puisque 1.42.3 ne redescendra jamais. C'est exactement le

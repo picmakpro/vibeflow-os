@@ -29,6 +29,10 @@
 | ADR-057 | 2026-07-25 | Frontières avec les briques tierces — détection outillée des recouvrements | Validée |
 | ADR-058 | 2026-07-28 | Le moteur GSD entre dans le périmètre de `/vf-update` | Validée |
 | ADR-059 | 2026-07-28 | Une mission d'équipe travaille sur sa propre branche, jamais sur la branche par défaut | Validée |
+| ADR-060 | 2026-07-29 | La revue devient un étage de premier rang, piloté par le manager | Validée |
+| ADR-061 | 2026-07-31 | Les lanes de revue cross-AI de plans (amont) et l'étage de revue de code (ADR-060) sont des objets disjoints | Validée |
+| ADR-062 | 2026-07-31 | Les deux hooks 1.9.0 non câblés restent hors périmètre de `merge-hooks.sh` | Validée |
+| ADR-063 | 2026-07-31 | Anomalie d'agrégation `.planning/STATE.md` : dette d'artefact locale + bug amont non scopé — gate local, jamais de correction par `gsd-tools state` | Validée |
 
 ### ADR héritées les plus citées (définitions canoniques)
 
@@ -1089,3 +1093,311 @@ allègement d'un différentiel de comblement.
 Remplace en place la règle `vf-dev-manager.md:108` (« Pas de double revue »), pas de contournement
 par exception. Le rapport typé (Pattern C, ADR-053) reste le socle inchangé du retour de `revue-N`.
 Aucune rule nouvelle.
+
+## ADR-061 : Les lanes de revue cross-AI de plans (amont) et l'étage de revue de code (ADR-060) sont des objets disjoints
+
+**Date** : 2026-07-31
+**Statut** : Validée
+**Décideur** : Samuel (arbitrage de cadrage, mission delta `@opengsd/gsd-core` 1.8.0 → 1.9.0, Phase
+VFDO-21 plan 21-02)
+**Contexte** : `gsd-core` 1.9.0 déclare `review-lane-descriptor.cjs` (ADR-2782 Phase 1 amont,
+#2794, clôt #2690) — le contrat des reviewers cross-AI (`gemini`, `codex`, `coderabbit`, etc.) qui
+relisent un **plan** avant exécution, invoqués par le skill `gsd-review`. VibeFlow venait, une
+mission plus tôt (Phase 20, `dev-orchestrator` v2.8.0), de poser ADR-060 : la revue de **code**
+devient un nœud `revue-N` de premier rang, posé systématiquement par `vf-dev-manager` et relu par
+`vf-reviewer` → `gsd-code-reviewer`. Les deux mécanismes partagent le mot « revue » — rien
+n'établissait noir sur blanc s'ils se recouvraient.
+
+### Problème
+
+Sans arbitrage écrit, la question « est-ce qu'on double la revue » resterait ouverte à chaque
+lecture du delta 1.9.0, avec le risque qu'une phase future la tranche par supposition plutôt que
+par constat — ou pire, fusionne deux objets qui ne se comparent pas terme à terme.
+
+### Options Considérées
+
+| Option | Avantages | Inconvénients |
+|---|---|---|
+| Statu quo silencieux (ne rien écrire) | coût nul dans l'immédiat | la question est précisément ce que la mission demande de fermer — la laisser ouverte la fait ressurgir |
+| Fusionner les deux étages en un seul nœud de revue | un seul concept apparent | confond un TEXTE DE PLAN pré-exécution et un DIFF DE CODE post-exécution ; l'amont n'a livré que la couche déclarative (Phase 1/6 de son propre plan) — `invoke_reviewers` reste écrit à la main jusqu'à sa Phase 5b (#2799), rien de stable à intégrer |
+| **Documenter la disjonction sur un critère explicite à 3 axes, sans câbler `gsd-review` dans le cycle automatique de l'équipe (retenue)** | ferme la question durablement, coût nul, aucune sur-ingénierie sur une brique amont encore mouvante | aucun — rend explicite un état déjà vrai en pratique |
+
+### Décision
+
+Les deux mécanismes restent des étages **disjoints**, distingués sur trois axes factuels :
+
+1. **Objet revu** — ADR-060/`vf-reviewer` relit un **diff de code déjà exécuté et commité** ;
+   `gsd-review`/les lanes cross-AI relisent le **texte d'un `PLAN.md`**, avant toute exécution.
+2. **Moment du cycle** — ADR-060 intervient APRÈS `execute-N` (nœud `revue-N`, `deps=exec-N`,
+   `mission-flow.md` §Pattern E) ; `gsd-review` intervient AVANT `execute-N`, en option de
+   `gsd-plan-phase` (flag `--reviews` consommé par `gsd-planner`).
+3. **Qui déclenche et qui relit** — ADR-060 est posé **systématiquement** par `vf-dev-manager`,
+   sans condition, et relu par `vf-reviewer` → `gsd-code-reviewer` (Claude, la stack interne) ;
+   `gsd-review` est un geste **opt-in** déclenché par un utilisateur/opérateur, relu par des CLIs
+   IA tierces (gemini, codex, coderabbit…) — **jamais** déclenché automatiquement par
+   `vf-coder`/`vf-dev-manager` aujourd'hui (vérifié : ni `gsd-plan-phase` tel qu'invoqué par
+   `vf-coder`, ni aucun nœud du DAG de mission, ne passent `--reviews`).
+
+**Aucune fusion.** `gsd-review` reste hors du cycle automatique de l'équipe VibeFlow : cette
+décision ne pose aucun nœud DAG `plan-review-N` — sur-ingénierie évitée tant que l'exécution des
+lanes amont (`invoke_reviewers`) reste écrite à la main. Si VibeFlow veut un jour orchestrer ce
+review cross-AI automatiquement, c'est une décision distincte, non tranchée ici.
+
+### Conséquences
+
+**Positives** : la question ne peut plus être redécouverte — le critère est écrit et vérifiable sur
+ses 3 axes. Aucun changement de comportement : ADR-060 continue tel quel, `gsd-review` reste
+invocable manuellement par qui veut un second avis cross-AI sur un plan.
+**Négatives** : aucune — décision purement documentaire.
+**Explicitement écarté** : fusion des deux étages ; câblage automatique de `gsd-review` dans le DAG
+de mission.
+
+### Code Impacté
+
+- `docs/ADR.md` (cette entrée)
+- `plugin/dev-orchestrator/references/mission-contracts.md` — pointeur bref vers cette ADR
+  (§Étage revue — deux objets disjoints)
+
+### Rules Associées
+
+Ne modifie ni ADR-060 ni ADR-053 (Pattern E) — clarifie une frontière déjà vraie en pratique,
+jamais écrite. Aucune rule nouvelle.
+
+## ADR-062 : Les deux hooks 1.9.0 non câblés (`gsd-ensure-canonical-path.js`, `gsd-update-banner.js`) restent hors périmètre de `merge-hooks.sh`
+
+**Date** : 2026-07-31
+**Statut** : Validée
+**Décideur** : Samuel (arbitrage de cadrage, mission delta `@opengsd/gsd-core` 1.8.0 → 1.9.0, Phase
+VFDO-21 plan 21-03)
+**Contexte** : `gsd-core` 1.9.0 pose deux hooks `SessionStart` absents du `settings.json` du poste
+courant, qui câble déjà 13 autres hooks `gsd-*` : `gsd-ensure-canonical-path.js` (#997) et
+`gsd-update-banner.js` (#2795). Le diagnostic de mission (`.planning/missions/2026-07-31-delta-gsd-core-1.9.0.md`
+§Observation annexe) constate le fait sans trancher : « rien n'est cassé, mais une fonctionnalité
+amont est peut-être inactive faute de câblage » — à instruire explicitement plutôt que par
+omission, sujet que `merge-hooks.sh` (`plugin/_internal/merge-hooks.sh:145-150`) documente déjà
+vouloir laisser aux « hooks tiers/gsd-core » sans jamais les avoir confrontés au cas réel.
+
+### Problème
+
+Sans arbitrage écrit, l'absence de ces deux hooks resterait ambiguë à chaque lecture future du
+delta : gap VibeFlow à combler, ou comportement gsd-core correct qu'il ne faut surtout pas casser
+en le câblant à la main ? Les deux hooks n'ont pas la même nature et ne peuvent pas être tranchés
+par une règle unique — chacun est confronté séparément à l'état réel du poste.
+
+### Options Considérées
+
+| Option | Avantages | Inconvénients |
+|---|---|---|
+| Statu quo silencieux (ne rien écrire) | coût nul | la question du diagnostic reste ouverte — refera surface à chaque delta gsd-core |
+| Étendre `merge-hooks.sh` pour câbler les deux hooks dans tout `settings.json` cible | « complet » en apparence | câblerait `gsd-update-banner.js` alors que son propre en-tête dit qu'il doit rester **éteint** quand la statusline GSD est installée (notre cas) — régression, pas un gain ; et `gsd-ensure-canonical-path.js` répare un problème d'install que VibeFlow ne produit pas (voir Décision) |
+| **Vérifier séparément chaque hook contre son propre contrat d'activation puis documenter (retenue)** | ferme la question avec preuves, ne câble rien qui casserait un comportement déjà correct | aucun — rend explicite un état déjà correct en pratique |
+
+### Décision
+
+**Aucun câblage n'est ajouté à `merge-hooks.sh`.** Les deux hooks sont restés hors `settings.json`
+pour des raisons distinctes, vérifiées séparément sur pièce :
+
+1. **`gsd-update-banner.js` — absence correcte, pas un gap.** Son propre en-tête (`~/.claude/hooks/gsd-update-banner.js:6-9`)
+   documente que ce hook n'est enregistré par l'installeur amont QUE si l'utilisateur a décliné (ou
+   remplacé) la statusline GSD — « the presence of the SessionStart entry IS the opt-in ». Le
+   `settings.json` du poste courant câble déjà `gsd-statusline.js` (bloc `statusLine`) : la
+   statusline EST installée, donc la non-registration du banner est exactement le comportement
+   voulu par gsd-core lui-même. Le câbler à la main romprait ce contrat amont (double signal de
+   mise à jour disponible : statusline + banner).
+2. **`gsd-ensure-canonical-path.js` — hors cas d'usage de VibeFlow.** Son propre en-tête
+   (`~/.claude/hooks/gsd-ensure-canonical-path.js:4-14`) documente qu'il répare un problème
+   d'installation précis : quand `gsd-core` lui-même est posé comme **plugin marketplace Claude
+   Code** (`CLAUDE_PLUGIN_ROOT` présent), l'installeur classique ne s'exécute jamais et
+   `~/.claude/gsd-core/` n'est jamais matérialisé, cassant les `@`-includes des agents/workflows.
+   Ce n'est PAS le chemin d'install de VibeFlow : `ensure-deps.sh:263` bootstrappe `gsd-core` via
+   `npx -y "@opengsd/gsd-core@^1" --claude <scope>` — l'installeur npm classique que le hook lui-même
+   cite comme cas qui N'A PAS besoin de sa correction (« In a classic `bin/install.js` install the
+   canonical path is a real directory holding the bundled tree, so the includes resolve »). Vérifié
+   sur le poste courant : `~/.claude/gsd-core/` existe bien comme répertoire réel, pas un lien
+   symbolique de secours posé par ce hook.
+3. **`merge-hooks.sh` reste inchangé** : son commentaire existant (`:145-150`, « hooks
+   tiers/gsd-core ») documentait déjà l'intention de ne pas s'en mêler — cette ADR confirme cette
+   intention avec preuves plutôt que de la modifier. Aucune ligne de code n'est ajoutée ou retirée
+   du script.
+
+### Conséquences
+
+**Positives** : la question du diagnostic de mission est fermée avec preuves, sans risquer de
+casser un comportement amont déjà correct (le banner en double aurait été un vrai régression
+utilisateur). Aucun changement de comportement.
+**Négatives** : aucune — décision purement documentaire, aucun code touché.
+**Explicitement écarté** : étendre `merge-hooks.sh` pour ces deux hooks ; forcer leur câblage dans
+`settings.json`.
+**Limite assumée** : cette décision est vérifiée sur **ce poste** (statusline installée, install
+npm classique). Si un lab VibeFlow installait un jour `gsd-core` via un plugin Claude Code
+marketplace, ou déclinait la statusline GSD, la conclusion du point 1/2 changerait — l'ADR ne
+prétend pas couvrir ce cas hypothétique, seulement l'état vérifié aujourd'hui.
+
+### Code Impacté
+
+- `docs/ADR.md` (cette entrée)
+- `plugin/dev-orchestrator/README.md` — pointeur bref dans la section hooks/scripts du module
+  (§Structure du module)
+
+### Rules Associées
+
+Ne modifie ni `merge-hooks.sh` ni son commentaire existant — confirme avec preuves une intention
+déjà écrite (`plugin/_internal/merge-hooks.sh:145-150`). Aucune rule nouvelle.
+
+## ADR-063 : Anomalie d'agrégation `.planning/STATE.md` — dette d'artefact locale + bug amont non scopé, gate local, jamais de correction par `gsd-tools state`
+
+**Date** : 2026-07-31
+**Statut** : Validée
+**Décideur** : Samuel (arbitrage de cadrage, mission delta `@opengsd/gsd-core` 1.8.0 → 1.9.0, Phase
+VFDO-21 plan 21-04)
+**Contexte** : la clôture de la Phase 20 (20-07) a constaté que `.planning/STATE.md` avait vu son
+frontmatter **régresser** silencieusement — `completed_phases` 11→10, `total_plans` 53→49,
+`completed_plans` 37→29, `current_phase` resté à 19 — alors que la Phase 20 venait précisément de
+se terminer. `.planning/STATE.md:16-20` a recalé les compteurs à la main et inscrit un commentaire
+renvoyant l'instruction à la Phase 21. Diagnostic établi sur pièce sur `@opengsd/gsd-core` 1.9.0
+(`~/.claude/gsd-core/bin/lib/state.cjs`, `bin/lib/plan-scan.cjs`, `bin/lib/state-document.cjs`) —
+aucune supposition, chaque affirmation ci-dessous cite une ligne réelle.
+
+### Problème
+
+Sans arbitrage écrit, chaque nouvelle régression de compteur redéclencherait le même cycle : un
+recalage manuel, un commentaire d'intention, et l'anomalie ressurgirait à la prochaine écriture
+d'état — exactement le motif « garde-fou documenté mais jamais machine-enforced » déjà rencontré
+trois fois sur ce repo (Phase 13, 17, 19). Sans distinguer les deux causes, la remédiation risquait
+soit de sur-corriger un défaut d'artefact local en le traitant comme un bug à contourner par du
+code, soit de sous-réagir à un vrai bug amont en l'absorbant silencieusement dans un recalage
+manuel répété à chaque phase.
+
+### Diagnostic — deux causes distinctes, jamais confondues
+
+**Cause A — dette d'artefact locale, pas un bug.** `state.cjs:1494-1501` + `plan-scan.cjs:158` :
+une phase n'est « complète » que si **chaque** `NN-MM-PLAN.md` a son `NN-MM-SUMMARY.md` partenaire
+sur le disque — sans repli sur le ROADMAP, alors que `roadmap analyze` (`roadmap.cjs:353-355`)
+**a** ce repli (« trust roadmap over disk »). Deux définitions de « complète » coexistent dans le
+même moteur. Sur ce repo, les Phases 11, 12, 13, 14 sont shippées et publiées mais n'ont jamais eu
+de `SUMMARY.md` (missions d'équipe ou artefacts nommés différemment — Phase 10 : `10-ETUDE.md` /
+`10-SOLUTIONS.md` / `10-APPROFONDISSEMENT.md`, Phase 15/16 : listes de checkboxes dans
+`ROADMAP.md` sans fichier `PLAN.md` par plan) ; la Phase 1 est en plus filtrée hors du calcul car
+enfermée dans un bloc `<details>` de jalon archivé. **Le comportement de `buildStateFrontmatter`
+est cohérent avec sa propre règle** — c'est nos artefacts qui ne la satisfont pas.
+
+**Cause B — vrai bug amont, notre fichier est conforme.** `state.cjs:1390-1391` appelle
+`stateExtractField(bodyContent, 'Phase')`, qui (`state-document.cjs:214`) prend le **premier**
+`^Phase:` du **corps entier**, sans aucun scope. Le corps de `STATE.md` empile un historique de
+sections archivées, chacune commençant par `Phase: N …` — la même ancre `^Phase:` pour l'archive
+et pour l'actif. Asymétrie décisive : la **même fonction** scope explicitement `Stopped At` et
+`Paused At` à la section `## Session` (`state.cjs:1402-1413`), mais **jamais** `Phase`. Notre
+fichier respectait le format documenté ; c'est l'extracteur qui n'a pas de scope.
+
+**Déclencheur, commun aux deux causes.** `gsd-tools state record-session` — appelé par
+`workflows/discuss-phase.md:480`, `execute-plan.md:443`, `milestone-summary.md:221`,
+`ui-phase.md:462`, et d'autres workflows du cycle normal — écrit le frontmatter via
+`cmdStateRecordSession` (`state.cjs:915`), qui appelle `readModifyWriteStateMd` **sans `options`** ;
+`state.cjs:2024` calcule `resync = !options || options.resync !== false` → **`resync: true` figé,
+non désactivable** depuis cette voie d'appel. Ce n'est pas un hook isolé : c'est le chemin
+d'écriture normal de chaque cadrage/exécution/clôture de phase. Motif déjà rencontré : 3
+régressions sur ce repo, 2 déjà réparées à la main (`63aca55`, `ef8826c`) avant celle-ci.
+
+### Options Considérées
+
+| Option | Avantages | Inconvénients |
+|---|---|---|
+| Patcher `@opengsd/gsd-core` en local (`~/.claude/gsd-core/**`) | corrigerait les deux causes à la source | interdit par la doctrine du repo (paquet tiers en lecture seule, `~/.claude/gsd-core` régénéré à chaque update — la Phase 21 elle-même documente cette règle en 21-01/21-03) ; corrigerait un fichier qui n'appartient pas à ce repo |
+| Backfiller les ~20 `SUMMARY.md` manquants des Phases 11/12/13/14 | rendrait la Cause A auto-cohérente avec le moteur amont, sans aucun gate à écrire | lourd (reconstruction rétroactive de 4 phases shippées il y a des semaines), déborde le périmètre confié à cette mission — **remonté en décision à trancher par Samuel, non tranché ici** (cf. Conséquences) |
+| Absorber silencieusement chaque régression par un recalage manuel répété | coût immédiat nul | c'est précisément le motif qui a produit l'incident du 2026-07-31 — un recalage sans gate ne survit pas à la prochaine écriture d'état, et personne ne le détecte avant la prochaine relecture humaine |
+| **Gate machine local + interdiction documentée de "réparer" `STATE.md` via `gsd-tools state` + signalement amont à déposer (retenue)** | ferme la classe d'incident sans toucher au paquet tiers ; rend visible la prochaine régression au lieu de la laisser dormir jusqu'à la prochaine lecture humaine | ne corrige pas la cause amont — nécessite un geste humain (dépôt de l'issue/RFC) hors du contrôle de VibeFlow, délai indéterminé |
+
+### Décision
+
+**Aucun patch du paquet tiers.** `~/.claude/gsd-core/**` reste lecture seule, sans exception —
+cohérent avec la doctrine déjà posée en Phase 21 (21-01/21-03, purge de la dette de version) et
+avec le principe déjà appliqué en ADR-062 (« confirmer avec preuves plutôt que modifier un
+comportement amont »).
+
+**Le gate `check-state-integrity.sh`** (`plugin/conductor/scripts/`, module `conductor` v1.18.0)
+rend la classe d'incident bruyante des deux côtés : régression de compteur au sein d'un même jalon
+(Cause A, tant que le backfill n'est pas tranché) et plus d'une ligne `^Phase:` dans le corps
+(Cause B, tant que l'amont n'a pas scopé son extracteur). Deux invariants dans le même script parce
+qu'ils protègent le même fichier contre le même défaut de fond — voir son en-tête pour le détail du
+contrat.
+
+**Convention d'écriture posée pour ce repo (couvre Cause B en attendant l'amont)** : le corps de
+`.planning/STATE.md` ne contient **jamais** plus d'une ligne commençant par `Phase:`. Toute section
+narrant une phase **archivée** (non courante) doit utiliser une forme qui ne matche pas l'ancre
+`^Phase:` — retenue : **`**Phase archivée :** N …`** (gras, deux-points après le mot « archivée »,
+jamais en toute première position de ligne sous la forme `Phase:`). Appliquée rétroactivement aux 4
+sections archivées de `.planning/STATE.md` dans ce même plan (21-04) et gardée par le gate
+ci-dessus.
+
+**Interdiction documentée : ne jamais invoquer `gsd-tools state <verbe>` pour « réparer »
+`.planning/STATE.md`.** Toute invocation de `gsd-tools state record-session` (directe, ou via un
+workflow qui l'appelle) force `resync: true` de façon non désactivable (`state.cjs:2024`) — un
+agent qui tenterait de corriger un frontmatter erroné en relançant cette commande **régénérerait
+la régression qu'il essaie de corriger**, en appliquant à nouveau la Cause A sur l'état courant.
+La seule correction sûre d'un frontmatter erroné est l'édition manuelle directe du fichier (comme
+ce plan le fait), jamais un appel outillé qui repasse par l'agrégateur défaillant. Cette règle est
+propagée dans `plugin/dev-orchestrator/references/mission-contracts.md` (pointeur court, section
+dédiée) — c'est la référence que `vf-coder`/`vf-dev-manager` consultent pour les conventions de
+mission, l'endroit où un agent la lira avant d'être tenté de « juste relancer la commande ».
+
+**Signalement amont — deux points, à déposer sur `open-gsd/gsd-core` (action humaine, hors
+contrôle de VibeFlow, même patron que la RFC de la Phase 18)** :
+
+1. **`stateExtractField(bodyContent, 'Phase')` n'est pas scopée** (`state-document.cjs:214`) —
+   prend le premier `^Phase:` du corps entier, alors que la même fonction scope explicitement
+   `Stopped At`/`Paused At` à la section `## Session` (`state.cjs:1402-1413`). Un `STATE.md` qui
+   accumule un historique de phases archivées (motif courant sur un projet long) casse
+   silencieusement `current_phase` dérivé du corps.
+2. **`buildStateFrontmatter()` n'a pas le repli ROADMAP que `roadmap analyze` a** (`state.cjs:1494-
+   1501` vs `roadmap.cjs:353-355`) — deux définitions de « phase complète » dans le même paquet,
+   l'une tolérante aux artefacts manquants, l'autre non. Un projet qui a shippé des phases sans
+   `SUMMARY.md` (missions d'équipe, cadrage allégé) voit ses compteurs régresser à chaque écriture
+   d'état, sans qu'aucun signal ne le prévienne.
+
+Le texte des deux signalements est rédigé dans `.planning/missions/2026-07-31-delta-gsd-core-1.9.0.md`
+(section à compléter par le dépôt effectif) — **le dépôt lui-même (issue ou PR sur
+`github.com/open-gsd/gsd-core`) reste une action humaine**, cette ADR ne prétend pas l'avoir fait.
+
+**Sur le backfill des `SUMMARY.md` manquants (Phases 11/12/13/14)** : **non tranché ici,
+explicitement remonté à Samuel.** Deux options restent ouvertes — (a) backfiller rétroactivement
+les ~20 fichiers manquants pour que la Cause A cesse de produire un écart entre le compteur amont
+et le compteur curé à la main ; (b) accepter durablement que le compteur amont sous-évalue et
+continuer à curer `.planning/STATE.md` à la main, protégé par le gate. Le coût de (a) est élevé
+(reconstruction rétroactive de contenu déjà exécuté et publié) ; le coût de (b) est un entretien
+manuel permanent, désormais gardé plutôt qu'invisible.
+
+### Conséquences
+
+**Positives** : la classe d'incident ne peut plus dormir jusqu'à la prochaine relecture humaine —
+`check-state-integrity.sh` échoue bruyamment. Le corps de `STATE.md` respecte une convention
+vérifiable au lieu de tenir par chance (l'asymétrie de `state.cjs:1402-1413` — qui scope `Stopped
+At`/`Paused At` à `## Session` mais ne mentionne jamais `Phase` — établit que le défaut de scope de
+`Phase` était déjà vrai avant cette mission ; seul le hasard du contenu du fichier avait empêché la
+casse jusqu'ici, pas un choix délibéré du code amont). La distinction Cause A / Cause B empêche de
+sur-corriger un défaut d'artefact local avec du code, ou de sous-réagir à un vrai bug amont en
+l'absorbant en silence.
+**Négatives** : le gate ne corrige rien à la source — une régression continuera de se produire à
+chaque écriture d'état tant que Cause A/B ne sont pas résolues en amont ou par backfill ; il la
+rend seulement visible. Le signalement amont a un délai et une issue indéterminés (même risque que
+documenté pour la RFC de la Phase 18) — VibeFlow reste dépendant d'un tiers pour la correction
+définitive.
+**Explicitement écarté** : patcher `~/.claude/gsd-core/**` ; trancher seul le backfill des
+`SUMMARY.md` manquants ; absorber silencieusement une future régression sans gate.
+
+### Code Impacté
+
+- `docs/ADR.md` (cette entrée)
+- `plugin/conductor/scripts/check-state-integrity.sh` + `plugin/conductor/scripts/tests/test-check-state-integrity.sh`
+  (gate + suite, 25 cas, 2 discriminations machine par comparaison directe)
+- `plugin/conductor/CHANGELOG.md` / `module.json` / `VERSION` / `README.md` — module bumpé v1.18.0
+- `plugin/dev-orchestrator/references/mission-contracts.md` — pointeur court (interdiction
+  `gsd-tools state` pour « réparer » `STATE.md`)
+- `.planning/STATE.md` — 4 sections archivées reformées (`Phase: N` → `**Phase archivée :** N`),
+  frontmatter recalé avec commentaire YAML expliquant la curation
+
+### Rules Associées
+
+Nouvelle convention d'écriture de `.planning/STATE.md` (portée par cette ADR, gardée par
+`check-state-integrity.sh`) : au plus une ligne `^Phase:` dans le corps, toute section archivée en
+`**Phase archivée :**`. Aucune modification de `plugin/_internal/**` ni du moteur GSD — décision
+purement locale au repo de distribution.

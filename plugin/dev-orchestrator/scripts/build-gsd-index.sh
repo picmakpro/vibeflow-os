@@ -27,7 +27,7 @@ OUT="${VF_INDEX_OUT:-$SCRIPT_DIR/../references/gsd-skills-index.md}"
 # Provenance affichée dans l'en-tête de sortie : nomme le paquet source (stable, reproductible)
 # plutôt que $SKILLS_DIR (chemin de système de fichiers — varie selon la machine/sandbox qui
 # régénère l'index, ex. un tarball extrait en /tmp).
-GSD_CORE_PACKAGE="${VF_GSD_CORE_PACKAGE:-@opengsd/gsd-core@1.8.0}"
+GSD_CORE_PACKAGE="${VF_GSD_CORE_PACKAGE:-@opengsd/gsd-core@1.9.0}"
 
 # Fenêtre de compat dual-layout (D-01, 11-CONTEXT.md), même cascade que detect-gsd-engine.sh :
 # projet-local gsd-core > $CLAUDE_CONFIG_DIR|$HOME gsd-core > legacy get-shit-done > défaut.

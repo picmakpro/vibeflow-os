@@ -33,6 +33,29 @@
 #   T22 — Valeur `vf-mcp-tools` malformée (sans séparateur (a), liste d'outils vide (b)) : no-op
 #         silencieux, exit 0.
 #
+# Découverte scope GLOBAL (Phase 21, ADR-051-B — union ./.mcp.json ∪ ~/.claude.json) :
+#   T23 — Scope global SEUL (via variable d'environnement VF_CLAUDE_JSON), pas de .mcp.json :
+#         le serveur déclaré en scope global est bien injecté.
+#   T24 — Union scope global (--claude-json, flag) + scope projet (.mcp.json) : les DEUX serveurs
+#         sont injectés (jamais un remplacement).
+#   T25 — Précédence d'orthographe sur collision insensible à la casse : le scope PROJET l'emporte
+#         sur le scope global.
+#   T26 — Dégradation propre : --claude-json JSON invalide → cette source contribue vide, le
+#         scope projet reste opérant (jamais de crash).
+#   T27 — --verify avec SEULEMENT le scope global renseigné (pas de .mcp.json) : un écart réel
+#         (serveur manquant) rend rc=1, JAMAIS 3 — c'est le défaut structurel corrigé par cette
+#         phase (mission 2026-07-31-delta-gsd-core-1.9.0.md).
+#   T28 — --verify avec LES DEUX sources vides : rc=3 INDÉTERMINÉ légitime, distinct de T27 (une
+#         découverte vide ne doit jamais être confondue avec un écart réel ni un succès).
+#
+# --strict / WINDOWS #4 (un nom de serveur cité mais inconnu de toutes les sources découvertes) :
+#   T29 — Token `mcp__<serveur>__*` déjà présent dans `tools:` citant un serveur inconnu : WARNING
+#         + exit 0 sans --strict (a), ERROR + exit 1 avec --strict (b).
+#   T30 — `vf-mcp-tools` citant un serveur inconnu (même scénario que T16, sans --strict → exit 0) :
+#         avec --strict → exit 1.
+#   T31 — --verify + --strict : conforme sur les tokens MCP attendus mais un serveur inconnu est
+#         cité ailleurs dans `tools:` → rc bascule 0 (sans --strict) → 1 (avec --strict).
+#
 # Convention : asserts numérotés, helpers ok()/ko(), exit 0 si tout passe, 1 si ≥1 KO.
 # Calqué sur test-dev-orchestrator.sh.
 
@@ -51,6 +74,15 @@ toolsline() { grep -m1 '^tools:' "$1"; }
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
+
+# Isolation hermétique du scope GLOBAL (Phase 21, Geste B) : le script lit VF_CLAUDE_JSON comme
+# override de ~/.claude.json (défaut réel sinon). On le fixe UNE FOIS pour tout le fichier, sur
+# un chemin qui n'existe jamais, pour que TOUTE invocation de $SCRIPT dans cette suite reste
+# indifférente à la vraie config personnelle de la machine (Samuel ou CI ubuntu-latest) — sans
+# ça, T1..T22 seraient verts ou rouges selon qui les lance (le piège que la mission interdit
+# explicitement). T23+ (découverte scope global) redéfinit VF_CLAUDE_JSON en préfixe de SA propre
+# commande, sans toucher à cet export par défaut pour les tests suivants.
+export VF_CLAUDE_JSON="$WORK/absent-claude.json"
 
 # --- Fixtures ---------------------------------------------------------------------------------
 mk_flagged() {
@@ -436,7 +468,7 @@ else
   ko "T22b échec (rc=$rc22b)"
 fi
 
-# === Bilan ===================================================================================
+# === T23 — Scope global SEUL (VF_CLAUDE_JSON), pas de .mcp.json ========================# === Bilan ===================================================================================
 echo ""
 echo "  Bilan : $pass OK, $fail KO"
 [ "$fail" -eq 0 ] || exit 1
