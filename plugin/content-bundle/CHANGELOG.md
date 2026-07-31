@@ -1,5 +1,18 @@
 # CHANGELOG — content-bundle
 
+## [v2.0.3] — 2026-07-31 (barrière d'écriture réelle de `content-clarity-judge`, Phase 20)
+
+### Corrigé
+- **`content-clarity-judge` porte `disallowedTools: Write, Edit`** : la barrière d'écriture était
+  une simple absence dans `tools:`, rouverte silencieusement au runtime par `memory: project`.
+  Elle devient une contrainte posée par le frontmatter — le juge ne peut plus écrire son fichier
+  de mémoire (il continue de le lire), cohérent avec l'exigence de regard frais.
+- **`vf-content-manager` cite le mécanisme réel** (au lieu du seul adjectif « read-only ») pour
+  justifier le dispatch parallèle de son juge.
+
+Référence : `plugin/conductor/references/team-kernel.md` §Cloisonnement par tools,
+`.planning/phases/VFDO-20-fluidit-du-flux-de-dev-sans-perte-de-qualit/`.
+
 ## [v2.0.2] — 2026-07-26
 
 ### Modifié

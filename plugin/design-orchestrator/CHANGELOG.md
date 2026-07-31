@@ -1,5 +1,22 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.3.2] — 2026-07-31 (barrière d'écriture réelle de `vf-design-judge`, Phase 20)
+
+### Corrigé
+- **`vf-design-judge` porte `disallowedTools: Write, Edit`** : la barrière d'écriture était une
+  simple absence dans `tools:`, rouverte silencieusement au runtime par `memory: project`. Elle
+  devient une contrainte posée par le frontmatter.
+- **La description et le corps de l'agent cessent d'affirmer une barrière complète qu'il n'a pas** :
+  `vf-design-judge` est le seul des 4 juges du team-kernel à conserver `Bash` (inspection du
+  rendu) ; le fait exact est désormais écrit — canal shell conservé, retenue sur ce canal comme
+  engagement de prompt, pas une barrière.
+- **`vf-design-manager` cite le mécanisme réel** (au lieu du seul adjectif « read-only ») pour
+  justifier le dispatch parallèle de son juge — sans prétendre à une barrière complète que
+  `vf-design-judge` n'a pas.
+
+Référence : `plugin/conductor/references/team-kernel.md` §Cloisonnement par tools,
+`.planning/phases/VFDO-20-fluidit-du-flux-de-dev-sans-perte-de-qualit/`.
+
 ## [v1.3.1] — 2026-07-28 (isolation de branche des missions d'équipe, ADR-059)
 
 `vf-design-manager` applique la même règle que le manager dev : **branche dédiée avant le premier

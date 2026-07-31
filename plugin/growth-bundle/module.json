@@ -1,6 +1,6 @@
 {
   "name": "growth-bundle",
-  "version": "v2.0.2",
+  "version": "v2.0.3",
   "type": "agents + skill + scripts",
   "description": "Équipe growth installable sur le team-kernel (GrowthFlow) : manager de mission vf-growth-manager (DAG + verrou de driver, dispatch parallèle des campagnes indépendantes, digest par mandat, rapports typés, Iron Law growth — tout envoi réel human-gated) + workers cloisonnés channel-strategist / copywriter-sequences / campaign-analyst (aucun chiffre inventé — métrique sourcée ou « inconnue ») + juge frais read-only growth-quality-judge (rubric qualité /100, claim non sourcé et non-conformité consentement/RGPD éliminatoires), et le skill d'entrée vf-growth (geste simple vs mission). Les blueprints d'origine restent dans content/ comme trace de conception lisible par vf-new-lab.",
   "proposable": true,

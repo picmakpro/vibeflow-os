@@ -1,5 +1,43 @@
 # Changelog — conductor
 
+## [v1.17.0] — 2026-07-31 (fluidité du flux de dev sans perte de qualité, Phase 20)
+
+### Ajouté
+- **`check-agents.sh` / `check-debug-research.sh` — le chemin PAR DÉFAUT (sans `--agents-dir`/
+  `--skills-dir`) est enfin exercé par un test.** Fin du faux vert qui en découlait : sur cible
+  absente, le défaut sort désormais en 3 INDÉTERMINÉ (jamais un vert silencieux) ; sur cible
+  présente non conforme sans flag, il détecte réellement l'anomalie.
+- **`hooks.json` : périmètre explicite** — les 2 commandes `SessionStart` de conformité reçoivent
+  `--agents-dir`/`--skills-dir`, condition de possibilité du point précédent.
+- **`check-agents.sh --hook` : avertissements affichés dès qu'il y en a un**, silence total
+  inchangé en régime 0 erreur / 0 avertissement — jusqu'ici le mode hook cachait les warnings.
+- **Charset d'un token MCP élargi à `mcp__<serveur>__*`** (joker terminal uniquement), ce que
+  produit l'injecteur ADR-051 depuis sa livraison — le gate contredisait son propre injecteur.
+- **`check-debug-research.sh --third-party-prefix`** : mécanisme d'exclusion des briques tierces
+  porté à l'identique de `check-agents.sh` (même flag, même défaut `gsd-`), pas réinventé.
+- **Règle anti-régression** : un agent `memory:` dont le `tools:` omet Write ET Edit doit fermer
+  le canal via `disallowedTools` — sinon `memory: project` le rouvre silencieusement au runtime.
+  Warning par défaut, erreur en `--strict`.
+- **`dag.sh` : `--scope` sur `add`** (périmètre déclaré d'un nœud, rétro-compatible) et `reopen` qui
+  force `review_regime=full` sur tout nœud de revue/jointure rouvert — enforcement machine du
+  garde-fou « aucun allègement ne s'applique jamais à un diff de comblement ». `status` expose la
+  table des fichiers gelés dérivée à la demande (jamais une copie figée).
+- **`check-mission-invariants.sh`** (nouveau, gate advisory patronné sur `check-doc-drift.sh`) :
+  constate qu'un glob de zone de risque de `.planning/MISSION-INVARIANTS.md` ne matche plus aucun
+  fichier suivi. Lecture seule, ne juge jamais.
+- **Doctrine du noyau d'équipe mise en conformité** (`references/team-kernel.md` + `README.md`) :
+  la ligne de cloisonnement par outils cite désormais le mécanisme réel (`disallowedTools:
+  Write, Edit`) qui rend la barrière des 4 juges effective ; nouvelle ligne documentant la classe
+  symétrique « un outil déclaré peut être absent au runtime » (filet de repli : le besoin humain
+  remonte dans le rapport typé) ; la ligne du plan de bataille cite `--scope` et `review_regime`.
+
+### Corrigé
+- **Le changement de périmètre des hooks ci-dessus est une correction de configuration, pas un
+  changement de doctrine** — aucune ADR dédiée, cf. `docs/ADR.md`.
+
+Référence : `docs/ADR.md` ADR-051 (révisée), ADR-060 (nouvelle),
+`.planning/phases/VFDO-20-fluidit-du-flux-de-dev-sans-perte-de-qualit/`.
+
 ## [v1.16.0] — 2026-07-28 (moteur GSD dans le récapitulatif de /vf-update, Phase 19)
 
 ### Ajouté
