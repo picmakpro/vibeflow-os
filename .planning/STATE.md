@@ -2,22 +2,39 @@
 gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
-current_phase: 20
-current_phase_name: Fluidité du flux de dev sans perte de qualité — 7/7 plans livrés, release racine en attente
-status: complete
-stopped_at: "Phase 20 close, reliquats compris. Les 7/7 plans livrés + la vérification (PASS partiel 5/7) + la release racine v2.44.0 COMMITÉE (jamais taggée — merge et tag réservés à Samuel). Registre WINDOWS ramené à 2 ouverts : #1 résolu le 2026-07-31 (l'affirmation anti-triche de team-kernel.md nommait un mécanisme inexistant — phrase corrigée ET assertion sur l'arbre réel posée, T72), #2 résolu (compteur de suites à 44). Restent #3 (recette XcodeBuildMCP, infaisable dans ce dépôt) et #4 (validation des noms de serveurs MCP, repris au périmètre de la Phase 21). Prochain geste humain : merger la PR #21, puis taguer v2.44.0."
-last_updated: "2026-07-31T10:26:41.602Z"
-last_activity: 2026-07-28 (clôture Phase 19 + release v2.43.0)
+current_phase: 21
+current_phase_name: Alignement du moteur GSD sur gsd-core 1.9.0 — 4/4 plans exécutés, gates de sortie à rejouer
+status: in_progress
+stopped_at: "Phase 21 plan 21-04 : check-state-integrity.sh (gate anti-régression du frontmatter de ce fichier, module conductor v1.18.0) + ADR-063 (arbitrage de l'anomalie d'agrégation ci-dessous). Les 4 plans de la Phase 21 sont exécutés (21-01 défaut MCP actif, 21-02 trois contrats amont, 21-03 purge de version + ADR-062, 21-04 gate + ADR-063). Reste : rejouer les gates de sortie de phase et la clôture (release racine réservée à Samuel, même patron que les Phases 13/17/19/20)."
+last_updated: "2026-07-31T18:00:00.000Z"
+last_activity: 2026-07-31 (Phase 21 plan 21-04 — check-state-integrity.sh + ADR-063)
 progress:
   total_phases: 22
   completed_phases: 12
-  total_plans: 54
-  completed_plans: 39
-# ⚠ Compteurs recalés à la main le 2026-07-31. L'écriture d'état de la clôture 20-07 les a fait
-# RÉGRESSER (completed_phases 11→10, total_plans 53→49, completed_plans 37→29) alors que la phase
-# venait de se terminer, et a laissé current_phase à 19. Anomalie d'agrégation à instruire en
-# Phase 21 (candidat : régression d'écriture d'état côté gsd-core 1.9.0). Valeurs reposées ici
-# depuis le disque : 21 phases déclarées, 54 PLAN.md, Phase 20 à 7/7.
+  total_plans: 55
+  completed_plans: 40
+# ⚠ Compteurs curés À LA MAIN — PAS régénérés par `gsd-tools state` (ADR-063, cf.
+# plugin/dev-orchestrator/references/mission-contracts.md §STATE.md : toute invocation force
+# resync:true non désactivable et reproduirait la régression corrigée ici). Toute future mise à
+# jour de ce bloc = édition manuelle, gardée par plugin/conductor/scripts/check-state-integrity.sh
+# (compteurs non régressés au sein du même jalon `gsd-migration`).
+#
+# Baseline héritée telle quelle (12/54/39), recalée le 2026-07-31 lors de la clôture 20-07 après une
+# régression constatée (completed_phases 11→10, total_plans 53→49, completed_plans 37→29,
+# current_phase resté à 19). Ce plan (21-04) n'a PAS ré-audité l'exacte composition de ces 12
+# phases — seul le delta depuis cette baseline est vérifié ici : total_plans et completed_plans
+# +1/+1 (le plan 21-04 lui-même, PLAN+SUMMARY livrés) ; completed_phases INCHANGÉ, la Phase 21
+# reste EN COURS (gates de sortie non rejouées, release non publiée) — l'incrémenter clôturerait
+# la phase par écriture d'état plutôt que par vérification goal-backward.
+#
+# Point ouvert, NON tranché par ce plan (remonté à Samuel, ADR-063 §Décision) : une lecture
+# ROADMAP-trust stricte (« une phase shippée compte, qu'elle ait ou non un SUMMARY.md par plan » —
+# le repli que `roadmap analyze` amont applique et que `buildStateFrontmatter` n'applique pas,
+# Cause A) classerait significativement PLUS de phases complètes que 12 (`.planning/ROADMAP.md`
+# marque les Phases 1-17, 19 et 20 « Complete »/shippées). Trancher entre backfiller les
+# `SUMMARY.md` manquants (11/12/13/14) ou adopter durablement une lecture ROADMAP-trust locale
+# reste une décision produit, pas une extraction mécanique — non faite ici par choix, pas par
+# oubli.
 ---
 
 # Project State
@@ -59,7 +76,42 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 ## Current Position
 
-Phase: 19 **complète — vérifiée et shippée `v2.43.0`** (tag annoté + release GitHub, `check-release-tag --remote` ✓)
+Phase: 21 **en cours** — Alignement du moteur GSD sur `@opengsd/gsd-core` 1.9.0. Rituel allégé
+(arbitrage Samuel, `.planning/missions/2026-07-31-delta-gsd-core-1.9.0.md`) : pas de
+`gsd-discuss-phase` séparé, périmètre exhaustif directement dérivé du digest de mission. 4 plans :
+21-01 — défaut MCP actif corrigé (`inject-mcp-tools.sh` découvre le scope global MCP,
+`~/.claude.json`, plus seulement `./.mcp.json`), WINDOWS #4 clos ; 21-02 — les trois contrats amont
+(`estimate:`/`actuals:` relayés verbatim par `vf-coder`/`vf-dev-manager`, ADR-061 tranchant la
+disjonction lanes de revue cross-AI amont / étage de revue de code ADR-060, hypothèse datée sur le
+dispatch nommé dans `team-kernel.md`) ; 21-03 — purge de la dette de version figée 1.8.0 → 1.9.0
+(6 fichiers, cas 8 de `test-check-gsd-engine.sh` déplacé avec le texte qu'il vérifie, preuve par
+mutation) et ADR-062 (les 2 hooks 1.9.0 non câblés confrontés séparément à leur contrat
+d'activation — absence correcte dans les deux cas, `merge-hooks.sh` non modifié) ; 21-04 —
+`check-state-integrity.sh` (gate anti-régression du frontmatter de ce fichier, module `conductor`
+v1.18.0) et ADR-063 (arbitrage de l'anomalie d'agrégation ci-dessous : dette d'artefact locale
+doublée d'un vrai bug amont non scopé sur l'extraction `Phase`, cause de ce même correctif de
+mise en forme du corps de ce fichier).
+Status: En cours (4/4 plans exécutés, gates de sortie à rejouer avant clôture de phase).
+Last activity: 2026-07-31 (plan 21-04, ce commit).
+
+**Anomalie d'agrégation instruite (ADR-063).** Le commentaire YAML du frontmatter ci-dessus daté du
+2026-07-31 signalait une régression silencieuse de `completed_phases`/`total_plans`/
+`completed_plans` et un `current_phase` resté figé après la clôture de la Phase 20. Diagnostic établi
+sur pièce dans `@opengsd/gsd-core` 1.9.0 : Cause A (dette d'artefact locale — `buildStateFrontmatter`
+n'a pas le repli ROADMAP que `roadmap analyze` a, les Phases 11/12/13/14 shippées sans `SUMMARY.md`
+le révèlent) et Cause B (vrai bug amont — `stateExtractField(body, 'Phase')` prend le premier
+`^Phase:` du corps entier sans scope, alors que la même fonction scope `Stopped At`/`Paused At` à
+`## Session`). Remédiation : aucun patch du paquet tiers ; `check-state-integrity.sh` garde les deux
+invariants (compteurs non régressés au sein d'un même jalon, une seule ligne `^Phase:` dans ce
+fichier) ; convention d'archivage posée ici même (`**Phase archivée :**` au lieu de `Phase:` pour
+toute section non courante) ; interdiction documentée d'invoquer `gsd-tools state` pour « réparer »
+ce fichier (force `resync: true`, régénérerait la régression) ; signalement amont rédigé pour les
+deux points de la Cause B, dépôt réservé à validation humaine. Le backfill des ~20 `SUMMARY.md`
+manquants (Cause A) n'est **pas tranché** — remonté à Samuel avec son coût (ADR-063 §Décision).
+
+---
+
+**Phase archivée :** 19 **complète — vérifiée et shippée `v2.43.0`** (tag annoté + release GitHub, `check-release-tag --remote` ✓)
 Migration du moteur GSD pilotée par `/vf-update`. Livrée en mission d'équipe le 2026-07-28, en
 autonomie complète (DAG à 5 nœuds, `.planning/missions/dag-phase19.json` : n1 plan · n2 exécution ·
 n3 gate portabilité · n4 audit sécurité/infra · n5 clôture, avec **un `reopen` unique** de n2 après
@@ -109,7 +161,7 @@ d'exit prouvé, mais c'est du **comportement d'agent** non éprouvable par test.
 
 ---
 
-Phase: 17 **complète — vérifiée et shippée `v2.42.0`** (tag annoté + release GitHub)
+**Phase archivée :** 17 **complète — vérifiée et shippée `v2.42.0`** (tag annoté + release GitHub)
 <!-- Corrigé le 2026-07-28 : cette section affirmait encore « release racine en attente (VERSION
      intouchée : 2.41.0) » alors que v2.42.0 était publiée depuis le matin. Contradiction interne
      avec le §Current focus du même fichier, qui a fait conclure à tort à vf-dev-manager qu'il
@@ -163,7 +215,7 @@ corriger avant tout bump.
 
 ---
 
-Phase: 16 **complète — shippée `v2.41.0`** (tag annoté + release GitHub, `check-release-tag --remote` ✓)
+**Phase archivée :** 16 **complète — shippée `v2.41.0`** (tag annoté + release GitHub, `check-release-tag --remote` ✓)
 Cloisonnement complet des dispatches. Livrée en mission d'équipe le 2026-07-27, en autonomie complète
 (cadrage rétroactif, aucun checkpoint humain). **4/4 Success Criteria tenus**, SC3 amendé (voir plus
 bas). Suites rejouées à la main avant release : 58 check-agents · 51 dev · 12 design ·
@@ -195,7 +247,7 @@ ou TTL indexé sur la durée réelle des dispatches).
 
 ---
 
-Phase: 13 **complète — shippée `v2.37.0`** — milestone vf-routing CLOS
+**Phase archivée :** 13 **complète — shippée `v2.37.0`** — milestone vf-routing CLOS
 Plans: 13-01 ✅ (découverte outillée, BRDG-02) · 13-02 ✅ (câblage agent, BRDG-01/BRDG-03).
 Vérification goal-backward **PASS** (`13-VERIFICATION.md`) : 4/4 critères dans le mandat, 3/3 BRDG,
 22/22 must-haves, 0 blocker. Suites : 16 ok · 30 OK/0 KO · 10 OK · check-agents ✓ · check-version-sync ✓.
