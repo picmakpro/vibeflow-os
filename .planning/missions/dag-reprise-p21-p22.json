@@ -48,7 +48,7 @@
         "p21:VERSION",
         "p21:README"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "p21-pr",
@@ -58,7 +58,7 @@
         "p21-verif"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "p22-exec-02",
@@ -83,7 +83,7 @@
         "main:plugin/dev-orchestrator/",
         "main:plugin/conductor/"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "p22-verif",
@@ -95,7 +95,7 @@
       "scope": [
         "main:.planning/"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "p22-pr",
@@ -105,7 +105,7 @@
         "p22-verif"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     }
   ]
 }
