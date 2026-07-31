@@ -1089,3 +1089,72 @@ allègement d'un différentiel de comblement.
 Remplace en place la règle `vf-dev-manager.md:108` (« Pas de double revue »), pas de contournement
 par exception. Le rapport typé (Pattern C, ADR-053) reste le socle inchangé du retour de `revue-N`.
 Aucune rule nouvelle.
+
+## ADR-061 : Les lanes de revue cross-AI de plans (amont) et l'étage de revue de code (ADR-060) sont des objets disjoints
+
+**Date** : 2026-07-31
+**Statut** : Validée
+**Décideur** : Samuel (arbitrage de cadrage, mission delta `@opengsd/gsd-core` 1.8.0 → 1.9.0, Phase
+VFDO-21 plan 21-02)
+**Contexte** : `gsd-core` 1.9.0 déclare `review-lane-descriptor.cjs` (ADR-2782 Phase 1 amont,
+#2794, clôt #2690) — le contrat des reviewers cross-AI (`gemini`, `codex`, `coderabbit`, etc.) qui
+relisent un **plan** avant exécution, invoqués par le skill `gsd-review`. VibeFlow venait, une
+mission plus tôt (Phase 20, `dev-orchestrator` v2.8.0), de poser ADR-060 : la revue de **code**
+devient un nœud `revue-N` de premier rang, posé systématiquement par `vf-dev-manager` et relu par
+`vf-reviewer` → `gsd-code-reviewer`. Les deux mécanismes partagent le mot « revue » — rien
+n'établissait noir sur blanc s'ils se recouvraient.
+
+### Problème
+
+Sans arbitrage écrit, la question « est-ce qu'on double la revue » resterait ouverte à chaque
+lecture du delta 1.9.0, avec le risque qu'une phase future la tranche par supposition plutôt que
+par constat — ou pire, fusionne deux objets qui ne se comparent pas terme à terme.
+
+### Options Considérées
+
+| Option | Avantages | Inconvénients |
+|---|---|---|
+| Statu quo silencieux (ne rien écrire) | coût nul dans l'immédiat | la question est précisément ce que la mission demande de fermer — la laisser ouverte la fait ressurgir |
+| Fusionner les deux étages en un seul nœud de revue | un seul concept apparent | confond un TEXTE DE PLAN pré-exécution et un DIFF DE CODE post-exécution ; l'amont n'a livré que la couche déclarative (Phase 1/6 de son propre plan) — `invoke_reviewers` reste écrit à la main jusqu'à sa Phase 5b (#2799), rien de stable à intégrer |
+| **Documenter la disjonction sur un critère explicite à 3 axes, sans câbler `gsd-review` dans le cycle automatique de l'équipe (retenue)** | ferme la question durablement, coût nul, aucune sur-ingénierie sur une brique amont encore mouvante | aucun — rend explicite un état déjà vrai en pratique |
+
+### Décision
+
+Les deux mécanismes restent des étages **disjoints**, distingués sur trois axes factuels :
+
+1. **Objet revu** — ADR-060/`vf-reviewer` relit un **diff de code déjà exécuté et commité** ;
+   `gsd-review`/les lanes cross-AI relisent le **texte d'un `PLAN.md`**, avant toute exécution.
+2. **Moment du cycle** — ADR-060 intervient APRÈS `execute-N` (nœud `revue-N`, `deps=exec-N`,
+   `mission-flow.md` §Pattern E) ; `gsd-review` intervient AVANT `execute-N`, en option de
+   `gsd-plan-phase` (flag `--reviews` consommé par `gsd-planner`).
+3. **Qui déclenche et qui relit** — ADR-060 est posé **systématiquement** par `vf-dev-manager`,
+   sans condition, et relu par `vf-reviewer` → `gsd-code-reviewer` (Claude, la stack interne) ;
+   `gsd-review` est un geste **opt-in** déclenché par un utilisateur/opérateur, relu par des CLIs
+   IA tierces (gemini, codex, coderabbit…) — **jamais** déclenché automatiquement par
+   `vf-coder`/`vf-dev-manager` aujourd'hui (vérifié : ni `gsd-plan-phase` tel qu'invoqué par
+   `vf-coder`, ni aucun nœud du DAG de mission, ne passent `--reviews`).
+
+**Aucune fusion.** `gsd-review` reste hors du cycle automatique de l'équipe VibeFlow : cette
+décision ne pose aucun nœud DAG `plan-review-N` — sur-ingénierie évitée tant que l'exécution des
+lanes amont (`invoke_reviewers`) reste écrite à la main. Si VibeFlow veut un jour orchestrer ce
+review cross-AI automatiquement, c'est une décision distincte, non tranchée ici.
+
+### Conséquences
+
+**Positives** : la question ne peut plus être redécouverte — le critère est écrit et vérifiable sur
+ses 3 axes. Aucun changement de comportement : ADR-060 continue tel quel, `gsd-review` reste
+invocable manuellement par qui veut un second avis cross-AI sur un plan.
+**Négatives** : aucune — décision purement documentaire.
+**Explicitement écarté** : fusion des deux étages ; câblage automatique de `gsd-review` dans le DAG
+de mission.
+
+### Code Impacté
+
+- `docs/ADR.md` (cette entrée)
+- `plugin/dev-orchestrator/references/mission-contracts.md` — pointeur bref vers cette ADR
+  (§Étage revue — deux objets disjoints)
+
+### Rules Associées
+
+Ne modifie ni ADR-060 ni ADR-053 (Pattern E) — clarifie une frontière déjà vraie en pratique,
+jamais écrite. Aucune rule nouvelle.
