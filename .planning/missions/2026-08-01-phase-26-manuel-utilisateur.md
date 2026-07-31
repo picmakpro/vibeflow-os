@@ -61,6 +61,34 @@ porté à 26 par **édition manuelle** du frontmatter (ADR-063 — jamais `gsd-t
 **Baseline des compteurs à ne pas faire régresser** : `total_phases: 26`, `completed_phases: 21`,
 `total_plans: 62`, `completed_plans: 62`.
 
+## 3 bis. AMENDEMENT DU BRIEF (2026-08-01, en cours de mission) — `manual/` reste local
+
+Contrainte posée par Samuel après le tranchage des zones grises et avant tout dispatch d'exécution :
+
+1. **Rien sous `manual/` n'arrive sur git.** Le contenu peut avoir de la valeur et reste local.
+   Exclusion locale déjà en place et **vérifiée sur pièce** : `.git/info/exclude:7` contient
+   `manual/`, `git check-ignore` confirme (rc=0). Ne pas la retirer.
+2. **Pas d'entrée `.gitignore`** — ce fichier est versionné, une entrée y laisserait une trace
+   publique de l'existence du manuel. Vérifié : `.gitignore` ne mentionne pas `manual`.
+3. **`README.md`, `README.fr.md` et `INSTALL.md` ne sont pas touchés.** Le volet « les README
+   maigrissent et pointent vers le manuel » est **SUSPENDU** : pointer vers un dossier absent du
+   dépôt casserait les liens pour les visiteurs. Repris quand Samuel décidera de publier.
+4. Les docs de planning restent committables, sans y coller le contenu du manuel.
+
+**Impact sur les décisions déjà prises** : D-7 et D-8 sont **conservées telles quelles mais gelées**
+— elles restent le plan d'exécution du jour où le manuel sera publié, et rien ne les applique
+aujourd'hui. D-1 à D-6 et D-9 à D-12 sont inchangées : elles portent sur le manuel lui-même.
+
+**Impact sur le périmètre de `build-26`** : `README.md`, `README.fr.md` et `INSTALL.md` **sortent**
+du périmètre déclaré. `scripts/**` en sort aussi (cf. D-13). Le périmètre écrivable devient
+`manual/**` (non commité) + `.planning/phases/VFDO-26-*/**` + suivi.
+
+**Observation remontée à l'humain, non bloquante** : la confidentialité obtenue est partielle. La
+section `### Phase 26` du ROADMAP décrit déjà publiquement le manuel (commit `6ba2f34`, antérieur à
+cette contrainte), et le point 4 de l'amendement maintient les docs de planning committables. La
+trace publique porte donc sur *l'intention* et *l'avancement*, pas sur le contenu — ce qui semble
+être exactement l'intention, mais mérite d'être dit plutôt que supposé.
+
 ## 4. Décisions prises en autonomie
 
 ### D-1 — Disposition bilingue : miroir `manual/fr/` + `manual/en/` (option A)
@@ -252,4 +280,27 @@ traduire** — il doit être écrit. C'est le principal risque de budget de la p
 laquelle un épuisement de budget doit sortir en `gaps_found` explicite plutôt qu'en manuel EN
 partiel : la sonde de parité (D-1, conséquence 2) échouerait de toute façon, et c'est le
 comportement voulu.
+
+### D-13 — L'outillage du manuel vit **sous `manual/`**, pas dans `scripts/`, et n'entre pas en CI
+
+Conséquence directe de l'amendement du brief, qui invalide le placement que D-3 supposait
+(`scripts/build-manual-nav.sh`) et celui qu'appelait la culture de gates du repo (`scripts/` +
+job `gates` de `ci.yml`).
+
+Deux raisons cumulées, chacune suffisante :
+
+1. **Trace publique** — `scripts/` et `.github/workflows/ci.yml` sont versionnés. Un
+   `check-manual.sh` commité annoncerait l'existence du manuel aussi sûrement qu'une entrée
+   `.gitignore`, ce que l'amendement proscrit explicitement.
+2. **CI structurellement rouge** — un gate commité qui vérifie `manual/` s'exécuterait sur un dépôt
+   où `manual/` n'existe pas. Il sortirait soit en échec permanent, soit en **vert à vide** —
+   c'est-à-dire le pire des deux mondes, un gate qui rassure sans rien vérifier.
+
+Placement retenu : `manual/.tools/build-nav.sh` et `manual/.tools/check-manual.sh`, couverts par
+l'exclusion `manual/` déjà en place — une seule règle protège l'ensemble. Ils s'exécutent à la main
+en local. **Aucune ligne ajoutée à `ci.yml`.**
+
+Exigence maintenue sur le gate malgré son statut local : il doit **refuser de rendre un verdict
+vide** (échouer s'il ne découvre aucune page), sur le modèle du job `tests` de la CI qui refuse une
+découverte de suites vide. Un gate de parité qui passe au vert sur zéro fichier ne vaut rien.
 
