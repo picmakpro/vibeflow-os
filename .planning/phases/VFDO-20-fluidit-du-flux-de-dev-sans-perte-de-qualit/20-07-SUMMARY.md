@@ -376,6 +376,15 @@ issue #1950) pour rester visibles au moment du `/gsd-ship`.
   **entièrement réservée** à une validation humaine post-fusion — les 4 éléments du §Reste-à-faire
   ci-dessus lui donnent tout ce qu'il faut pour l'exécuter sans relire la phase.
 
+## Self-Check: PASSED
+
+- `docs/ADR.md`, `plugin/conductor/references/team-kernel.md`, `plugin/conductor/README.md` : FOUND
+- Les 6 `CHANGELOG.md` de module : FOUND
+- Commit `c694d18` (Task 1) : FOUND dans `git log`
+- Commit `2e1e7dd` (Task 2) : FOUND dans `git log`
+- Commit `06534f1` (Task 3) : FOUND dans `git log`
+- Commit `cd9508e` (SUMMARY) : FOUND dans `git log`
+
 ---
 *Phase: VFDO-20-fluidit-du-flux-de-dev-sans-perte-de-qualit*
 *Completed: 2026-07-31*
