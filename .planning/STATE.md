@@ -2,22 +2,18 @@
 gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
-current_phase: 20
-current_phase_name: Fluidité du flux de dev sans perte de qualité — 7/7 plans livrés, release racine en attente
-status: complete
-stopped_at: "Phase 20 close, reliquats compris. Les 7/7 plans livrés + la vérification (PASS partiel 5/7) + la release racine v2.44.0 COMMITÉE (jamais taggée — merge et tag réservés à Samuel). Registre WINDOWS ramené à 2 ouverts : #1 résolu le 2026-07-31 (l'affirmation anti-triche de team-kernel.md nommait un mécanisme inexistant — phrase corrigée ET assertion sur l'arbre réel posée, T72), #2 résolu (compteur de suites à 44). Restent #3 (recette XcodeBuildMCP, infaisable dans ce dépôt) et #4 (validation des noms de serveurs MCP, repris au périmètre de la Phase 21). Prochain geste humain : merger la PR #21, puis taguer v2.44.0."
-last_updated: "2026-07-31T10:26:41.602Z"
-last_activity: 2026-07-28 (clôture Phase 19 + release v2.43.0)
+current_phase: 22
+current_phase_name: Hygiène documentaire — doctrine de sortie et captation d'intention
+status: executing
+stopped_at: Phase 22 context gathered
+last_updated: "2026-07-31T16:25:27.886Z"
+last_activity: 2026-07-31
+last_activity_desc: Phase 22 execution started
 progress:
-  total_phases: 22
-  completed_phases: 12
-  total_plans: 54
-  completed_plans: 39
-# ⚠ Compteurs recalés à la main le 2026-07-31. L'écriture d'état de la clôture 20-07 les a fait
-# RÉGRESSER (completed_phases 11→10, total_plans 53→49, completed_plans 37→29) alors que la phase
-# venait de se terminer, et a laissé current_phase à 19. Anomalie d'agrégation à instruire en
-# Phase 21 (candidat : régression d'écriture d'état côté gsd-core 1.9.0). Valeurs reposées ici
-# depuis le disque : 21 phases déclarées, 54 PLAN.md, Phase 20 à 7/7.
+  total_phases: 25
+  completed_phases: 10
+  total_plans: 52
+  completed_plans: 29
 ---
 
 # Project State
@@ -27,7 +23,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26 — charte rouverte : 17 modules, D2/D6 renversées)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Phase 19 **terminée, vérifiée et SHIPPÉE `v2.43.0`** (2026-07-28) — la migration
+**Current focus:** Phase 22 — Hygiène documentaire — doctrine de sortie et captation d'intention
 `get-shit-done-cc` → `@opengsd/gsd-core` livrée en v2.39.0 atteint enfin les **postes déjà équipés** :
 `/vf-update` dit l'état du moteur avant tout stop et propose la bascule sous confirmation ADR-031.
 Modules `dev-orchestrator` v2.7.0 + `conductor` v1.16.0. Verdict `19-VERIFICATION.md` : **PASS 6/7**.
@@ -59,7 +55,7 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 ## Current Position
 
-Phase: 19 **complète — vérifiée et shippée `v2.43.0`** (tag annoté + release GitHub, `check-release-tag --remote` ✓)
+Phase: 22 (Hygiène documentaire — doctrine de sortie et captation d'intention) — EXECUTING
 Migration du moteur GSD pilotée par `/vf-update`. Livrée en mission d'équipe le 2026-07-28, en
 autonomie complète (DAG à 5 nœuds, `.planning/missions/dag-phase19.json` : n1 plan · n2 exécution ·
 n3 gate portabilité · n4 audit sécurité/infra · n5 clôture, avec **un `reopen` unique** de n2 après
@@ -70,8 +66,8 @@ chemin `--migrate-engine` chaîné sur la ré-injection MCP, message de nettoyag
 `inject-mcp-tools.sh --verify`, `vf-update/SKILL.md` (diagnostic à deux volets, ligne de confirmation
 moteur indépendante, §Garde-fous réécrit), **ADR-058**. Modules `dev-orchestrator` **v2.7.0** et
 `conductor` **v1.16.0** (premier cas à deux modules bumpés dans la même phase).
-Status: Shippée (v2.43.0).
-Last activity: 2026-07-28 (clôture Phase 19 + release v2.43.0)
+Status: Executing Phase 22
+Last activity: 2026-07-31 — Phase 22 execution started
 
 **Verdict `19-VERIFICATION.md` : PASS, 6/7 critères.** SC2 reste `PRESENT_BEHAVIOR_UNVERIFIED` — le
 volet moteur du skill est présent et son contrat d'exit prouvé, mais c'est du **comportement d'agent**
@@ -263,6 +259,108 @@ Progress: [██████░░░░] 59%
 
 ### Roadmap Evolution
 
+- 2026-07-31 : **Phase 25 ajoutée** — « Budget d'instructions et étage d'alignement court ».
+  Origine : audit de `shanraisshan/claude-code-best-practice` (65k ★), demandé par Samuel pour
+  vérifier si le pari GSD tenait. **Il tient** — GSD y est cité rang 7/12 (`README.md:122`), la
+  ligne pointait seulement le repo archivé `gsd-build/get-shit-done` (archivé 2026-06-26) au lieu
+  de `open-gsd/gsd-core` ; corrigé en amont par **PR #169** (lien + ★ 65k→7.5k + agents 33→34 +
+  commandes 67→71 + skills 0→71, plus la commande de veille hebdomadaire qui aurait reverté). Le
+  critère d'inclusion de cette table est **étoiles + choix du curateur**, aucun jugement
+  méthodologique : rien dans ce repo n'infirme le choix de moteur. Deux constats **de notre propre
+  couche** en sortent, hors périmètre 23 et 24 : **G1** — ADR-029 borne les **lignes** alors que le
+  prédicteur d'adhérence est le **nombre d'instructions normatives** (~150-200 max ; HumanLayer
+  sautait 50 % de ses étapes à 85 instructions) → compteur à ajouter à `check-agents.sh` ; **G2** —
+  l'étage « design » existe (`22-CONTEXT.md`, 361 lignes) mais l'étage **outline court** manque, si
+  bien que le seul document relu avant l'écriture du code reste PLAN.md (**1291 lignes sur 3 plans**
+  pour la Phase 22). Ordonnée **après 24** (G1 édite les mêmes fichiers d'agents que M3/A2) et
+  **dépendante de 23** (G2 insère un étage dans `discuss → plan`, dont la voie unique est arbitrée
+  en 23).
+
+- 2026-07-31 : **Phase 23 ajoutée** — « Couplage explicite au moteur GSD — capabilities, flags et
+  voie unique ». Origine : Samuel observe un `gsd-pattern-mapper` spawné en session **inline** (hors
+  `vf-dev-manager`) et demande si le manager y a accès et s'il sait employer GSD au bon moment. Gap
+  établi **sur pièce** contre `@opengsd/gsd-core@1.9.0` **installé** (`~/.claude/gsd-core/VERSION`,
+  pas le 1.8.0 de l'index versionné) : `workflows/plan-phase.md`, `workflows/execute-phase.md`,
+  `bin/lib/config.cjs`, `bin/lib/capability-registry.cjs`, et **sortie réelle** de
+  `gsd-tools.cjs loop render-hooks` sur 6 points de hook. **L'accès n'était pas le sujet** :
+  `gsd-pattern-mapper` figure dans les deux allowlists, et son activation appartient de toute façon
+  au **hook `plan:pre` de la capability `pattern-mapper`** (`plan-phase.md:651`), pas au jugement
+  d'un agent. Le vrai défaut est un **couplage implicite** : `grep -r "capabilit\|render-hooks\|
+  plan:pre\|verify:post"` sur `plugin/dev-orchestrator/` → **zéro occurrence**, alors que GSD 1.9
+  insère lui-même research/pattern-mapper/gap-analysis (`plan:pre`/`plan:post`), `code-review`
+  (`execute:post`) et validate-phase/secure-phase/ui-review (`verify:post`), tous à `true` par
+  défaut (`config.cjs:243-273`), `execute-phase.md` rendant à lui seul `execute:post` **et**
+  `verify:post`. **Sept** lacunes nommées : (1) doublons d'étage non arbitrés — `revue-N` systématique
+  et `vf-auditer` par-dessus les hooks `code-review`/`secure-phase` ; (2) **voie dégradée sans
+  garde-fou** — `vf-coder.md:31-32` offre « ou dispatche `gsd-planner`/`gsd-executor` » à égalité
+  avec le skill, ce qui fait sauter dix étages sans rien signaler au rapport typé ; (3) aucune
+  doctrine de flags — `plan-phase.md:333` prompte sans `--research`/`--skip-research` alors que
+  `vf-coder` n'a pas `AskUserQuestion`, et `--auto` persiste `_auto_chain_active` puis enchaîne seul
+  `execute-phase` (`plan-phase.md:1557-1577`), donc **hors frontière DAG** ; (4) briques routées
+  jamais mobilisées en mission (`gsd-spec-phase`, `gsd-add-tests`, `gsd-extract-learnings`,
+  `gsd-debug` — `gsd-debugger` même absent de l'allowlist du manager —, `gsd-undo`,
+  `gsd-forensics`, `gsd-ship`/`gsd-pr-branch` vs ADR-059) ; (5) `config.json` du lab non aligné —
+  blocs `gates` et `safety` **inertes** (avertissement à chaque appel), `pattern_mapper` /
+  `code_review` / `ui_review` absentes donc au défaut `true` sans décision ; **(6) SÛRETÉ — la
+  taxonomie de checkpoint GSD est ignorée** (`grep "checkpoint"` sur le module → 4 occurrences,
+  toutes au sens du mode superviser VibeFlow, aucune au sens GSD) : `gate="blocking-human"` que
+  `gsd-executor.md:330-332` **refuse** d'auto-approuver n'est mappé sur aucun `statut` du bloc typé,
+  donc le manager autonome peut trancher ce que le moteur a refusé de trancher (`checkpoints.md`
+  décrit ce scénario comme LE mode de défaillance à éviter) · l'auto-mode **auto-sélectionne la
+  première option** d'un `checkpoint:decision` dès que `_auto_chain_active`/`auto_advance` est vrai,
+  flag que personne dans le module ne lit ni ne remet à zéro · un worker interrompu par checkpoint
+  **n'est jamais repris** (`execute-plan.md:321`) et exige une continuation en 4 blocs que le
+  contrat ADR-053 ne porte pas, `dag.sh reopen` ne modélisant pas un plan partiellement exécuté ;
+  **(7) les budgets de boucle se superposent** — `workflow.node_repair` ON par défaut (budget 2,
+  RETRY/DECOMPOSE/PRUNE) sous les « 3 tours max » de Pattern E, soit ≈ 3 × (1+2) tentatives réelles
+  jamais consignées. **Ordre imposé dans la phase : la lacune 6 d'abord** (seule dont la conséquence
+  est un mauvais comportement silencieux, et prérequis de la doctrine de flags). **Dépend du merge de la
+  Phase 20** (fichiers partagés : `vf-coder.md`, `vf-dev-manager.md`, `mission-contracts.md`,
+  `intent-routing.md`). **Recoupements à instruire, pas des dépendances d'ordre** : Phase 21
+  (changement 3 — arbitrage des étages de revue) et Phase 22 (flags documentaires) ; l'arbitrage
+  écrit par la première exécutée fait autorité.
+
+- 2026-07-31 : **Phase 24 ajoutée** — « Activation et mesure du moteur GSD — capacités dormantes et
+  faits de runtime ». Origine : second temps du même audit, sur demande de Samuel d'aller au bout des
+  gaps VibeFlow ↔ GSD. Établi **sur pièce** par inventaire des **44 capabilities** et **12 points de
+  hook** (`capability-registry.cjs`), du **descripteur d'hôte `claude`**, de `init.cjs`
+  (`buildAgentSkillsBlock`), de `host-integration.cjs` (`shouldFlattenDispatch`) et des hooks posés
+  dans `~/.claude/settings.json`. **Nature différente de la 23** : là où la 23 rend le couplage
+  explicite, celle-ci constate de la **valeur laissée sur la table** — des briques présentes sur le
+  disque dont le toggle est à `false` ou dont le canal est vide. **Lot MESURE imposé en premier**
+  (trois faits présumés) : M1 — la profondeur de dispatch disponible est **`maxDepth: 5`** et
+  VibeFlow en consomme 3 (fait qui **clôt** la question du nesting, écrit nulle part) ; **M2 —
+  `backgroundDispatch: false`** donc `shouldFlattenDispatch()` renvoie `true` pour Claude : le
+  moteur **aplatit** ses dispatches, et la capability `claude-orchestration` (BETA, default-off)
+  existe pour restaurer ce parallélisme via le Workflow tool — or le **dispatch parallèle de la
+  frontière `ready`** et la **recherche doc en tâche de fond** (ADR-045) en dépendent.
+  **→ M2 MESURÉ le 2026-07-31, hypothèse démentie** (protocole et chiffres :
+  `.planning/missions/2026-07-31-mesure-m2-dispatch-parallele.md`) : sondes horodatées de 20 s,
+  PID distincts. Fan-out depuis un **sous-agent** = **92 %** de recouvrement contre **91 %** pour le
+  contrôle en fenêtre principale ; et un sous-agent qui dispatche en tâche de fond continue de
+  travailler (parent démarré 1018 ms **avant** son enfant, terminé 18 s avant lui). **Les deux
+  acquis VibeFlow tiennent** — `backgroundDispatch: false` est *fail-closed par conception*, pas
+  descriptif du runtime. **Le gap se déplace sans disparaître** : `gsd-execute-phase` sérialise ses
+  vagues **par décision du moteur** alors que le runtime sait les paralléliser → le parallélisme
+  **intra-étape** est perdu, seul subsiste l'**inter-nœuds** porté par `vf-dev-manager`, qui est donc
+  **la seule couche qui parallélise réellement sur ce runtime** (à écrire en doctrine ; trois voies
+  au plan : signalement amont · `claude_orchestration` en opt-in explicite · acter et documenter) ;
+  M3 — `effort:` est exposé par le harness, **validé par notre propre gate** (`check-agents.sh:514`)
+  et déclaré par **aucun** agent `vf-*`. **Lot ACTIVATION** (8 items) : A1 broken-windows — le
+  ledger `.planning/WINDOWS.md` porte déjà `open_count: 2`, exactement le predicate du gate
+  `ship:pre`, mais `workflow.windows_enforce` est absent → défaut `false`, ledger tenu à la main et
+  gate jamais exécuté (le plus actionnable) ; **A2 `agent_skills` vide — 17 slots d'injection
+  consommés par 19 workflows, donc la doctrine de dev du lab n'atteint JAMAIS `gsd-planner` ni
+  `gsd-executor`** (plus fort levier qualité de l'audit) ; A3 `tdd_mode: false` malgré la doctrine
+  TDD écrite ; A4 profils `contexts/dev|review|research.md` non employés alors que Pattern C
+  légifère sur la même chose ; A5 hooks opt-in inertes (`workflow_guard`, `community` =
+  Conventional Commits) ; A6 `inline_plan_threshold` (défaut 2) levier de coût inconnu ; A7 `intel`
+  jamais instruit face à `.planning/codebase/` ; A8 `intent-routing.md` route vers `gsd-graphify` et
+  `gsd-profile-user` dont les capabilities sont **off** — le test d'exhaustivité vérifie le routage,
+  jamais l'activation, donc une couverture verte masque un geste mort. **Dépend de la Phase 23**
+  (dépendance **doctrinale**, aucun fichier commun) ; le **lot MESURE est exécutable sans attendre**
+  et M2 gagne à être connu tôt : il porte sur le cœur du gain de la Phase 20.
+
 - 2026-07-31 : **Phase 22 ajoutée** — « Hygiène documentaire — doctrine de sortie et captation
   d'intention ». Origine : demande de Samuel (« le dev-orchestrator n'a pas de workflow de mise à
   jour de doc avec les commandes GSD qui maintiennent la doc et les specs »). Gap établi **sur
@@ -419,6 +517,25 @@ Progress: [██████░░░░] 59%
 
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
+
+- **2026-07-31 — La Phase 23 attend la clôture de 21+22 ; le bridage de parallélisme s'acte et se
+  signale, il ne se contourne pas** (arbitrage de Samuel, session d'audit VibeFlow ↔ GSD). Quatre
+  points tranchés : **(1)** la Phase 23 **ne se planifie pas** tant que la mission `reprise-p21-p22`
+  est en vol — son fichier central (`vf-dev-manager.md`) est modifié par la 22 en ce moment (2
+  commits + diff en cours), et on ne planifie pas contre une base qui bouge ; l'arbitrage des étages
+  de revue écrit par la 21 (changement 3) **fera autorité** pour la lacune 1 de la 23. **(2)** Les
+  écritures de planning de cette session (ROADMAP 23+24, STATE, note de mesure M2) sont commitées à
+  part, sur leurs seuls fichiers, pour ne pas être emportées par l'hygiène de fin d'étape de la
+  mission. **(3)** La dette de suivi est **comblée immédiatement** — table Progress et Execution
+  Order couvrent désormais les phases 18 à 24, au lieu de s'arrêter à 17. **(4)** Suite de la mesure
+  M2 : on retient **acter+documenter** et **signaler le descripteur en amont** (mesure horodatée à
+  l'appui) ; on **écarte** l'activation de `claude_orchestration` — un backend **BETA** sur le chemin
+  critique d'exécution n'est pas justifié quand notre parallélisme fonctionne (mesuré à 92 % de
+  recouvrement). À reconsidérer si le parallélisme intra-étape devient un besoin démontré, ou si le
+  signalement amont échoue.
+  **Fait de contexte à retenir** : le merge de la **Phase 20** (`d549b2d`, PR #21, release `v2.44.0`,
+  2026-07-31) **satisfait** la dépendance « Phase 20 requise » de 21, 22 **et** 23 — le `main` local
+  était simplement en retard sur `origin/main` au moment de l'audit.
 
 - **2026-07-31 — L'anti-triche P12 est garanti par un gate transverse, pas par les suites de
   module** (mission de clôture des reliquats Phase 20, WINDOWS #1). `team-kernel.md:23` affirmait
@@ -637,10 +754,10 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-**Resume file:** None
+**Resume file:** .planning/phases/VFDO-22-hygi-ne-documentaire-doctrine-de-sortie-et-captation-d-inten/22-CONTEXT.md
 
-Last session: 2026-07-31T10:26:41.586Z
-Stopped at: Phase 20 complète (7/7 plans) — clôture de gouvernance (20-07) : ADR-051 révisée + ADR-060 posée, doctrine transverse alignée, 6 modules bumpés (conductor v1.17.0, dev-orchestrator v2.8.0, design-orchestrator v1.3.2, 3 bundles v2.0.3). Gates verts sauf le seul rouge attendu (compteur de suites racine, 44 réel pas 43). Release racine réservée à validation humaine post-fusion (4 éléments consignés + WINDOWS.md).
+Last session: 2026-07-31T15:52:14.541Z
+Stopped at: Phase 22 context gathered
 ubuntu:24.04) — 3 jobs verts au run 30257419335. Modules bumpés : conductor v1.14.5,
 consolidator v1.8.1, dev-orchestrator v2.3.2. Leçon durable : tout bash développé sur macOS/BSD
 doit être reproduit sous `docker run ubuntu:24.04` avant push (stat/-f, TMPDIR, outillage hôte).

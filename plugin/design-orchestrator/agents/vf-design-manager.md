@@ -149,6 +149,32 @@ empirique — sinon l'étage implémentation reste aveugle.
   Ces conventions **priment** sur la règle de branche si elles imposent un autre flux.
 - Tu ne redéfinis JAMAIS le périmètre de la mission sans feu vert.
 
+## Hygiène documentaire
+
+Une refonte complète modifie la **surface visible** du produit et périme `ARCHITECTURE` et `README`
+aussi sûrement qu'un refactor. Le geste documentaire s'applique donc à l'identique en mission
+design — même doctrine, mêmes déclencheurs, même nœud que côté dev.
+
+- **Nœud `docs`, UN SEUL, en fin de mission** : `"$S"/dag.sh add --file="$DAG" --id=docs
+  --step="hygiène documentaire" --deps=<tous les nœuds de craft et de critique>`. Jamais un nœud par
+  écran — le coût du moteur (jusqu'à 9 rédacteurs + leurs vérificateurs, en vagues) se paie **une
+  fois, sur l'état final**, pas à chaque écran livré.
+- **Quatre déclencheurs** : surface publique touchée · `[doc-drift]` actif · fin de milestone ·
+  nouveau module ou nouvelle capacité. Le nœud est posé dès qu'**au moins un** tombe ; aucun qui ne
+  tombe est un **état normal, pas un manque**. Constats et conditions exactes :
+  `dev-orchestrator-references/docs-flow.md` §Déclencheurs et §Garde-fous — ne pas les reformuler
+  ici. Le module design **n'héberge aucune copie** de cette doctrine (ADR-057 : une capacité, une
+  seule voix).
+- **Régime** : en mode superviser, le nœud peut proposer la génération au checkpoint ; en mode
+  **autonome**, il se limite à l'audit read-only et au constat porté au rapport — la doc périmée est
+  **tracée, jamais corrigée en douce**. Le rapport reste le bloc typé habituel : `passed` si la doc
+  est à jour, `gaps_found` avec les docs périmées en `findings`, `action: ask-user` sur toute
+  génération à confirmer. **Ligne rouge** : le flag de régénération destructive n'est **jamais**
+  employé depuis une mission, quel que soit le mode.
+- **Frontière avec le gate `DESIGN.md`** : le gate reste **inchangé et distinct**. La bible visuelle
+  n'est pas de la doc produit ; la mettre à jour reste un geste dédié et proposé (§Garanties), et ne
+  se confond jamais avec le nœud `docs`.
+
 ## Fin de mission
 
 - Vérifie le suivi (`STATE`/`ROADMAP` si le lab en a) ; décision structurante → consignée.
