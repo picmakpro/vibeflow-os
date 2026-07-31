@@ -71,6 +71,10 @@
 #   T21 — Invariants SC5 par grep structurel (VFDO-17-03, D-15) : check-dev-bootstrap.sh et
 #         check-doc-drift.sh n'ont aucun exit 1, aucune écriture hors /dev/null|&N|*TMP*, aucune
 #         commande d'écriture directe, et tout mktemp est apparié à un trap ... EXIT.
+#   T22 — Doctrine de sortie documentaire (phase 22, DOCF-01 → DOCF-04) : docs-flow.md existe,
+#         traite les quatre familles, porte la ligne rouge --force (jamais mission, jamais
+#         autonome) et la frontière vibeflow-os, câble --verify-only/--force dans la carte
+#         d'intention ; AGENT.md et intent-routing.md y renvoient.
 #
 # Historique de numérotation : T3/T12/T13/T14 ont changé de sémantique à la v2.0.0 (les
 # anciens tests de collision de descriptions, de préséance et de synchro de la table vf-dev
@@ -920,7 +924,7 @@ else
   if (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install dev-orchestrator >/dev/null 2>&1); then
     miss=0
     [ -f "$LAB/.claude/agents/dev-orchestrator.md" ] || { ko "T6 install : .claude/agents/dev-orchestrator.md manquant"; miss=1; }
-    for ref in GSD-PIPELINE.md gsd-skills-index.md intent-routing.md mission-contracts.md; do
+    for ref in GSD-PIPELINE.md gsd-skills-index.md intent-routing.md mission-contracts.md docs-flow.md; do
       [ -f "$LAB/.claude/agents/dev-orchestrator-references/$ref" ] || { ko "T6 install : references/$ref manquant"; miss=1; }
     done
     for sk in vf-auto vf-dev; do
@@ -1610,6 +1614,112 @@ for T21_FILE in "$MOD/scripts/check-dev-bootstrap.sh" "$MOD/scripts/check-doc-dr
     ok "T21d invariants SC5 : $T21_NAME — mktemp ($t21d_mktemp_count) apparié à trap ... EXIT, ou aucun mktemp"
   fi
 done
+
+# ---------------------------------------------------------------------------
+# T22 — Doctrine de sortie documentaire (phase 22, DOCF-01 → DOCF-04)
+# ---------------------------------------------------------------------------
+# docs-flow.md doit exister, traiter la famille produit et le régime --verify-only, porter le
+# garde-fou ADR-031 et fermer sur ## Interdits ; AGENT.md et intent-routing.md doivent y renvoyer.
+DOCSFLOW="$REFS_DIR/docs-flow.md"
+if [ ! -f "$DOCSFLOW" ]; then
+  ko "T22 docs-flow : $DOCSFLOW introuvable"
+else
+  t22_ok=1
+  "$GREP" -q "gsd-docs-update" "$DOCSFLOW" || { ko "T22 docs-flow : famille produit (gsd-docs-update) absente"; t22_ok=0; }
+  "$GREP" -q -- "--verify-only" "$DOCSFLOW" || { ko "T22 docs-flow : régime --verify-only absent"; t22_ok=0; }
+  "$GREP" -q "ADR-031" "$DOCSFLOW" || { ko "T22 docs-flow : garde-fou ADR-031 absent"; t22_ok=0; }
+  "$GREP" -q "^## Interdits" "$DOCSFLOW" || { ko "T22 docs-flow : section ## Interdits absente"; t22_ok=0; }
+  "$GREP" -q "docs-flow" "$AGENT_FILE" || { ko "T22 docs-flow : AGENT.md ne renvoie pas vers docs-flow.md"; t22_ok=0; }
+  "$GREP" -q "docs-flow" "$ROUTING" || { ko "T22 docs-flow : intent-routing.md ne renvoie pas vers docs-flow.md"; t22_ok=0; }
+  # Tâche 2 — familles code/savoir/entrée et fait outillé sous-jacent.
+  "$GREP" -q "gsd-map-codebase" "$DOCSFLOW" || { ko "T22 docs-flow : famille code (gsd-map-codebase) absente"; t22_ok=0; }
+  "$GREP" -q "gsd-extract-learnings" "$DOCSFLOW" || { ko "T22 docs-flow : famille savoir (gsd-extract-learnings) absente"; t22_ok=0; }
+  "$GREP" -q "ingestion-flow" "$DOCSFLOW" || { ko "T22 docs-flow : renvoi vers ingestion-flow.md (famille entrée) absent"; t22_ok=0; }
+  "$GREP" -q "check-doc-drift.sh" "$DOCSFLOW" || { ko "T22 docs-flow : fait outillé check-doc-drift.sh non cité"; t22_ok=0; }
+  # Ligne rouge --force (D-06) : une SEULE ligne physique porte le flag ET la mission ET
+  # l'autonome — chaînage de trois greps sur le même flux, jamais trois greps indépendants.
+  if "$GREP" -F -- "--force" "$DOCSFLOW" | "$GREP" -F "mission" | "$GREP" -q "autonome"; then
+    :
+  else
+    ko "T22 docs-flow : ligne rouge --force absente (une seule ligne doit porter --force + mission + autonome)"; t22_ok=0
+  fi
+  # Frontière vibeflow-os : une SEULE ligne physique porte gsd-docs-update ET vibeflow-os ET
+  # check-version-sync.sh — même idiome de chaînage.
+  if "$GREP" -F "gsd-docs-update" "$DOCSFLOW" | "$GREP" -F "vibeflow-os" | "$GREP" -q "check-version-sync.sh"; then
+    :
+  else
+    ko "T22 docs-flow : frontière vibeflow-os absente (une seule ligne doit porter gsd-docs-update + vibeflow-os + check-version-sync.sh)"; t22_ok=0
+  fi
+  # Tâche 3 — captation d'intention : les deux régimes distincts sont ROUTÉS, pas seulement
+  # documentés. C'est le (b) du but de la phase — sans ces lignes, la doctrine existe et reste
+  # inatteignable en langage naturel.
+  "$GREP" -q -- "--verify-only" "$ROUTING" || { ko "T22 captation : intent-routing.md ne route pas le régime d'audit (--verify-only)"; t22_ok=0; }
+  "$GREP" -q -- "--force" "$ROUTING" || { ko "T22 captation : intent-routing.md ne route pas le régime de régénération (--force)"; t22_ok=0; }
+  "$GREP" -q "dit encore vrai" "$ROUTING" || { ko "T22 captation : la formulation d'audit « dit encore vrai » n'est pas captée"; t22_ok=0; }
+  "$GREP" -q "refais toute la doc" "$ROUTING" || { ko "T22 captation : la formulation de régénération « refais toute la doc » n'est pas captée"; t22_ok=0; }
+  # Le protocole de désambiguïsation (D-10) : les quatre familles nommées au même endroit.
+  "$GREP" -q "Désambiguïsation" "$ROUTING" || { ko "T22 captation : protocole de désambiguïsation absent d'intent-routing.md"; t22_ok=0; }
+  # §Contexte & session doit porter ≥ 8 lignes de table (5 doc/contexte + les 3 existantes).
+  ctx_rows=$(awk '/^## Contexte & session/,/^## Design/' "$ROUTING" | "$GREP" -c '^| ' || true)
+  [ "${ctx_rows:-0}" -ge 8 ] || { ko "T22 captation : §Contexte & session porte $ctx_rows lignes de table, plancher 8"; t22_ok=0; }
+  # Non-régression de densité (ADR-029) sur l'agent conversationnel.
+  agent_lines=$(wc -l < "$AGENT_FILE" | tr -d ' ')
+  [ "$agent_lines" -le 250 ] || { ko "T22 captation : AGENT.md à $agent_lines lignes, plafond ADR-029 = 250"; t22_ok=0; }
+  [ "$t22_ok" -eq 1 ] && ok "T22 docs-flow : doctrine complète (4 familles, --verify-only, ADR-031, ligne rouge --force, frontière vibeflow-os, ## Interdits), captation des 2 régimes + désambiguïsation routées, AGENT.md ($agent_lines l.) et intent-routing.md ($ctx_rows lignes de table) y renvoient"
+fi
+
+# ---------------------------------------------------------------------------
+# T23 — Câblage du geste documentaire dans les DEUX managers de mission
+# ---------------------------------------------------------------------------
+# Ce que T23 garantit : une PRÉSENCE TEXTUELLE de câblage — les deux managers nomment le nœud, les
+# quatre déclencheurs, et renvoient à la doctrine plutôt que d'en héberger une copie.
+# Ce que T23 NE garantit PAS : le COMPORTEMENT de l'agent à l'exécution — qu'il pose réellement le
+# nœud au bon moment. Même réserve que celle inscrite pour BRDG-03 dans REQUIREMENTS.md.
+# Précédent Phase 19 : un compte rendu qui prouve une présence n'est pas un comportement prouvé.
+t23_ok=1
+
+# Résolution de la cible design — seule zone du fichier qui sort de dev-orchestrator.
+# Ordre imposé : en dépôt source, $MOD/agents/ est le dossier du manager DEV et ne contient pas
+# le manager design ; la branche $REPO doit donc être testée en premier.
+DESIGNMGR=""
+DESIGN_SRC_LAYOUT=0
+if [ -f "$REPO/design-orchestrator/agents/vf-design-manager.md" ]; then
+  DESIGNMGR="$REPO/design-orchestrator/agents/vf-design-manager.md"; DESIGN_SRC_LAYOUT=1
+elif [ -f "$MOD/agents/vf-design-manager.md" ]; then
+  DESIGNMGR="$MOD/agents/vf-design-manager.md"
+fi
+
+# Côté dev — $DEVMGR est déjà résolu par T18 plus haut.
+"$GREP" -q "docs-flow" "$DEVMGR" || { ko "T23 managers : vf-dev-manager.md ne renvoie pas vers docs-flow.md"; t23_ok=0; }
+"$GREP" -q -- "--id=docs" "$DEVMGR" || { ko "T23 managers : vf-dev-manager.md ne pose pas le nœud --id=docs"; t23_ok=0; }
+for motif in "doc-drift" "milestone" "surface publique" "capacité"; do
+  "$GREP" -q -- "$motif" "$DEVMGR" || { ko "T23 managers : vf-dev-manager.md ne nomme pas le déclencheur « $motif »"; t23_ok=0; }
+done
+
+# Côté design — skip explicite si le module n'est pas dans le périmètre scanné (cf. T6/installeur).
+if [ -n "$DESIGNMGR" ]; then
+  "$GREP" -q "dev-orchestrator-references/docs-flow.md" "$DESIGNMGR" || { ko "T23 managers : vf-design-manager.md ne renvoie pas vers dev-orchestrator-references/docs-flow.md"; t23_ok=0; }
+  "$GREP" -q -- "--id=docs" "$DESIGNMGR" || { ko "T23 managers : vf-design-manager.md ne pose pas le nœud --id=docs"; t23_ok=0; }
+  for motif in "doc-drift" "milestone" "surface publique" "capacité"; do
+    "$GREP" -q -- "$motif" "$DESIGNMGR" || { ko "T23 managers : vf-design-manager.md ne nomme pas le déclencheur « $motif »"; t23_ok=0; }
+  done
+  # ADR-057 / D-01 : la doctrine vit dans UN SEUL module. En lab installé l'arborescence est
+  # aplatie, donc l'assertion d'absence n'a de sens qu'en disposition dépôt source.
+  if [ "$DESIGN_SRC_LAYOUT" -eq 1 ] && [ -f "$REPO/design-orchestrator/references/docs-flow.md" ]; then
+    ko "T23 managers : copie locale de la doctrine dans design-orchestrator/references — ADR-057, une seule voix"; t23_ok=0
+  fi
+else
+  skip "T23 managers : module design hors du périmètre scanné — volet design non vérifié"
+fi
+
+# D-13 : check-doc-drift.sh est CONSOMMÉ par la doctrine, jamais réimplémenté.
+[ -f "$MOD/scripts/check-doc-drift.sh" ] || { ko "T23 managers : check-doc-drift.sh absent — la doctrine s'appuie sur un fait qui n'existe plus"; t23_ok=0; }
+if [ -f "$REFS_DIR/docs-flow.md" ]; then
+  "$GREP" -q "check-doc-drift.sh" "$REFS_DIR/docs-flow.md" || { ko "T23 managers : docs-flow.md n'interprète pas le fait check-doc-drift.sh"; t23_ok=0; }
+fi
+"$GREP" -q "check_doc_drift\s*()" "$DEVMGR" && { ko "T23 managers : vf-dev-manager.md réimplémente check-doc-drift au lieu de le consommer"; t23_ok=0; }
+
+[ "$t23_ok" -eq 1 ] && ok "T23 managers : le geste documentaire est câblé des deux côtés (nœud docs, 4 déclencheurs, renvoi à la doctrine, aucune copie locale) — présence textuelle, pas comportement"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="

@@ -2,22 +2,26 @@
 gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
-current_phase: 21
-current_phase_name: Alignement du moteur GSD sur gsd-core 1.9.0 — 5/5 plans exécutés, gouvernance close, release v2.45.0 préparée (non taguée)
+current_phase: 22
+current_phase_name: Hygiène documentaire — doctrine de sortie et captation d'intention (Phase 22 mergée) ; Phase 21 close, release v2.45.0 préparée (non taguée)
 status: complete
 stopped_at: "Phase 21 close par sa gouvernance (plan 21-05), même patron que 20-07/c01f813 : 5/5 plans livrés, vérification PASS PARTIEL 7/8 comblée (CI remise au vert — compteur de suites 44→45 —, dev-orchestrator bumpé v2.9.0, planning-core v2.5.3, ROADMAP §Phase 21 recalé, 4 warnings W1-W4 traités : check-state-integrity.sh câblé au job gates de la CI, ADR-063 23→25 cas, team-kernel.md porte le recoupement #1995/#2608, inject-mcp-tools.sh nomme --force sur le rc=3 mode fichier unique). Release racine v2.45.0 préparée en commits locaux (triade + 2 historiques README + CHANGELOG racine) — AUCUN tag, AUCUN merge, AUCUN push : réservés à Samuel. Prochain geste humain : merger la PR, puis `git tag -a v2.45.0` et `gh release create`."
 last_updated: "2026-07-31T19:30:00.000Z"
 last_activity: 2026-07-31 (Phase 21 plan 21-05 — clôture de gouvernance, release v2.45.0 préparée)
 progress:
-  total_phases: 22
-  completed_phases: 13
-  total_plans: 56
-  completed_plans: 41
+  total_phases: 25
+  completed_phases: 14
+  total_plans: 59
+  completed_plans: 44
 # ⚠ Compteurs curés À LA MAIN — PAS régénérés par `gsd-tools state` (ADR-063, cf.
 # plugin/dev-orchestrator/references/mission-contracts.md §STATE.md : toute invocation force
 # resync:true non désactivable et reproduirait la régression corrigée ici). Toute future mise à
 # jour de ce bloc = édition manuelle, gardée par plugin/conductor/scripts/check-state-integrity.sh
 # (compteurs non régressés au sein du même jalon `gsd-migration`).
+# ⚠ Recalé le 2026-07-31 à la fusion de `main` dans la branche Phase 21 : la PR #23 (Phase 22)
+# ayant été mergée AVANT la #22, ces compteurs cumulent les deux phases — +1 phase complète
+# (22) et +3 plans livrés (22-01..03), et total_phases passe à 25 (phases 23/24/25 inscrites au
+# ROADMAP par la Phase 22, hors périmètre, en attente d'arbitrage).
 #
 # Baseline héritée telle quelle (12/54/39), recalée le 2026-07-31 lors de la clôture 20-07 après une
 # régression constatée (completed_phases 11→10, total_plans 53→49, completed_plans 37→29,

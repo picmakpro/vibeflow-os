@@ -1,0 +1,111 @@
+{
+  "nodes": [
+    {
+      "id": "p22-preserve",
+      "step": "commit de préservation hors-périmètre (worktree principal)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/ROADMAP.md",
+        ".planning/STATE.md",
+        ".planning/missions/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "p21-exec-03",
+      "step": "Phase 21 — Changements 5+6 : purge dette 1.8.0, arbitrage hooks",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "p21:plugin/dev-orchestrator/",
+        "p21:plugin/planning-core/scripts/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "p21-exec-04",
+      "step": "Phase 21 — anomalie agrégation STATE : gate + cause B",
+      "stage": "",
+      "deps": [
+        "p21-exec-03"
+      ],
+      "scope": [
+        "p21:plugin/conductor/scripts/",
+        "p21:.planning/STATE.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "p21-verif",
+      "step": "Phase 21 — VERIFICATION + clôture + prep release racine",
+      "stage": "",
+      "deps": [
+        "p21-exec-04"
+      ],
+      "scope": [
+        "p21:.planning/",
+        "p21:VERSION",
+        "p21:README"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "p21-pr",
+      "step": "Phase 21 — push + PR ouverte",
+      "stage": "",
+      "deps": [
+        "p21-verif"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "p22-exec-02",
+      "step": "Phase 22 — exécution du plan 22-02",
+      "stage": "",
+      "deps": [
+        "p22-preserve"
+      ],
+      "scope": [
+        "main:plugin/dev-orchestrator/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "p22-exec-03",
+      "step": "Phase 22 — exécution du plan 22-03",
+      "stage": "",
+      "deps": [
+        "p22-exec-02"
+      ],
+      "scope": [
+        "main:plugin/dev-orchestrator/",
+        "main:plugin/conductor/"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "p22-verif",
+      "step": "Phase 22 — VERIFICATION + clôture",
+      "stage": "",
+      "deps": [
+        "p22-exec-03"
+      ],
+      "scope": [
+        "main:.planning/"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "p22-pr",
+      "step": "Phase 22 — push + PR ouverte",
+      "stage": "",
+      "deps": [
+        "p22-verif"
+      ],
+      "scope": [],
+      "status": "blocked"
+    }
+  ]
+}

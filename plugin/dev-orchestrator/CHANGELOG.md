@@ -1,6 +1,6 @@
 # CHANGELOG — dev-orchestrator
 
-## [v2.9.0] — 2026-07-31 (alignement gsd-core 1.9.0, Phase 21)
+## [v2.10.0] — 2026-07-31 (alignement gsd-core 1.9.0, Phase 21)
 
 ### Ajouté
 - **`inject-mcp-tools.sh` découvre les serveurs MCP en UNION de deux scopes** : `./.mcp.json`
@@ -22,6 +22,41 @@
 
 Référence : `docs/ADR.md` ADR-061 (recouvrement lanes de revue amont vs étage 20-06), ADR-062
 (hooks 1.9.0 non câblés), `.planning/phases/VFDO-21-alignement-du-moteur-gsd-sur-gsd-core-1-9-0/`.
+## [v2.9.0] — 2026-07-31 (hygiène documentaire — doctrine de sortie et captation d'intention, Phase 22)
+
+**La doctrine documentaire avait une entrée (`ingestion-flow.md`) mais pas de sortie. Elle en a
+désormais une, symétrique, et les deux managers de mission savent quand la déclencher.**
+
+### Ajouté
+- **`references/docs-flow.md`** (111 lignes) — la doctrine de sortie documentaire, strictement
+  symétrique d'`ingestion-flow.md` : table de discernement des **quatre familles** documentaires
+  que GSD outille séparément (produit / code / savoir / entrée par renvoi), une section par
+  famille traitée en propre, et un **renvoi** — jamais une copie — vers `ingestion-flow.md` pour
+  la famille entrée (ADR-057).
+- **Trois régimes de confirmation gradés par le risque réel** : `--verify-only` libre (read-only,
+  ne rien écrire ne demande rien), génération sous confirmation (elle commite), et `--force`
+  autorisé sur intention explicite mais borné par l'annonce en trois temps de ce qui sera écrasé
+  — les trois notions tiennent sur une seule ligne rouge, jamais dispersées.
+- **La captation d'intention distingue désormais auditer / générer / régénérer** en langage
+  naturel, avec un protocole de désambiguïsation à quatre ancrages contextuels quand la
+  formulation est creuse (`AGENT.md` + `references/intent-routing.md`), et le flag
+  `--verify-only` — qui répondait déjà à une intention distincte — est exposé pour la première
+  fois comme geste par défaut sur signal `[doc-drift]`.
+- **Le nœud `docs` agrégé** posé en fin de mission par `vf-dev-manager` (et son homologue
+  `vf-design-manager` côté `design-orchestrator`, par renvoi cross-module) sur quatre
+  déclencheurs factuels nommés : surface publique touchée, signal `[doc-drift]` actif, nouveau
+  module ou nouvelle capacité — jamais un nœud par commit.
+- **Bloc T22/T23** de `test-dev-orchestrator.sh` — la doctrine et son routage machine sont
+  gardés (T22), le câblage des deux managers est non-régressable, discriminant par mutation, avec
+  `SKIP` si le module design est hors du périmètre scanné (T23). Aucune suite nouvelle : le
+  compteur « N suites » des deux README racine reste à 44.
+
+### Non modifié (volontaire)
+- **`scripts/check-doc-drift.sh` n'a pas bougé** (D-13) : le script constate le **fait** (N
+  commits de code sans commit de doc), la nouvelle doctrine porte le **jugement** sur ce qu'on en
+  fait. Les deux responsabilités restent séparées (ADR-055 §3).
+
+Référence : `.planning/phases/VFDO-22-hygi-ne-documentaire-doctrine-de-sortie-et-captation-d-inten/`.
 
 ## [v2.8.0] — 2026-07-31 (fluidité du flux de dev sans perte de qualité, Phase 20)
 

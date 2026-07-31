@@ -374,7 +374,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 ✅ (R&D, shippée v2.28.0)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 ✅ (code complet, release en attente de validation humaine)** ; **14 ✅ (indépendante)** ; **15 ✅ (shippée v2.40.0) → 16 ✅ (shippée v2.41.0)** ; **17 ✅ (indépendante de 16, terminée et vérifiée — release en attente de validation humaine) → 18 inscrite (dépend de 17)**
+1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 ✅ (R&D, shippée v2.28.0)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 ✅ (code complet, release en attente de validation humaine)** ; **14 ✅ (indépendante)** ; **15 ✅ (shippée v2.40.0) → 16 ✅ (shippée v2.41.0)** ; **17 ✅ (indépendante de 16, terminée et vérifiée — release en attente de validation humaine) → 18 inscrite (dépend de 17)** ; **19 ✅ (2026-07-28, ADR-058) → 20 ✅ (mergée dans `main` le 2026-07-31, PR #21, release `v2.44.0`)** — ce merge **satisfait** la dépendance « Phase 20 requise » de 21, 22 et 23 ; **21 🚧 + 22 🚧 en vol (mission `reprise-p21-p22`, ordre libre entre elles — aucun fichier commun)** → **23 inscrite : attend la clôture de 21+22**, périmètre partagé sur `vf-dev-manager.md` / `intent-routing.md` (arbitré le 2026-07-31 : on ne planifie pas contre une base qui bouge ; l'arbitrage des étages de revue écrit par la 21 fait autorité) → **24 inscrite (dépendance doctrinale de 23, aucun fichier commun ; son lot MESURE est déjà rendu)** → **25 inscrite : après 24** (son volet G1 pose un gate sur `plugin/*/agents/*.md`, les fichiers mêmes que M3/`effort:` et A2/`agent_skills` éditent) **et dépendante de 23** (son volet G2 insère un étage dans `discuss → plan`, dont la voie unique d'invocation est arbitrée en 23)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -395,6 +395,14 @@ Plans:
 | 15. Collaboration inter-équipes dev ↔ design | — | 7/7 | Complete — release `v2.40.0` (5/5 critères), 2 points escaladés → Phase 16 | 2026-07-27 |
 | 16. Cloisonnement complet des dispatches | — | 8/8 | Complete — release `v2.41.0` (4/4 critères, SC3 amendé : contrat + lint, pas sandbox runtime) | 2026-07-27 |
 | 17. Signaux de démarrage du moteur de dev | — | 3/3 | Complete — module v2.6.0, SC5/SC6 vérifiés par exécution, release racine en attente de validation humaine | 2026-07-28 |
+| 18. Survie du ledger d'exigences | — | 0/0 | Inscrite — périmètre réduit le 2026-07-28 par `18-STUDY.md`, non planifiée | — |
+| 19. Migration du moteur GSD par /vf-update | — | 3/3 | Complete — 3 plans exécutés, VERIFICATION produite, module `dev-orchestrator` v2.7.0 + `conductor` v1.16.0, ADR-058 | 2026-07-28 |
+| 20. Fluidité du flux de dev sans perte de qualité | — | 7/7 | Complete — **mergée dans `main`** (PR #21, `d549b2d`), release `v2.44.0`, VERIFICATION produite | 2026-07-31 |
+| 21. Alignement du moteur GSD sur gsd-core 1.9.0 | — | 0/0 | En planification — pilotée par la mission `reprise-p21-p22` (verrou de driver actif) | — |
+| 22. Hygiène documentaire — doctrine de sortie | — | 1/3 | En cours — 22-01 livré (3/3 tâches, SUMMARY), 22-02 en exécution, DOCF-01..07 mappés au ledger | — |
+| 23. Couplage explicite au moteur GSD | — | 0/0 | Inscrite — 7 lacunes, sûreté en premier ; **attend la clôture de 21+22** (périmètre partagé sur `vf-dev-manager.md`) | — |
+| 24. Activation et mesure du moteur GSD | — | 0/0 | Inscrite — lot MESURE : M2 **rendu** le 2026-07-31, M1/M3 à instruire ; lot ACTIVATION : 8 items | — |
+| 25. Budget d'instructions et étage d'alignement court | — | 0/0 | Inscrite — G1 (compteur d'instructions dans `check-agents.sh`) après 24 ; G2 (outline court `discuss`→`plan`) dépend de 23 | — |
 
 ### Phase 15: Collaboration inter-équipes dev ↔ design
 
@@ -1039,7 +1047,7 @@ Plans:
 - [x] 21-02-PLAN.md — Changements 2, 3, 4 : contrat `estimate:`/`actuals:` relayé verbatim, ADR-061 (recouvrement lanes de revue amont vs étage 20-06), hypothèse datée du dispatch nommé + recoupement #1995/#2608 (vague 1)
 - [x] 21-03-PLAN.md — Changements 5, 6 : purge de la dette de version 1.8.0 → 1.9.0, ADR-062 (hooks 1.9.0 non câblés, absence correcte dans les deux cas) (vague 2)
 - [x] 21-04-PLAN.md — Point hérité : `check-state-integrity.sh` (gate anti-régression du frontmatter de `STATE.md`, module `conductor` v1.18.0) et ADR-063 (arbitrage de l'anomalie d'agrégation) (vague 2)
-- [x] 21-05-PLAN.md — Gouvernance : CI remise au vert (compteur de suites), 2 modules bumpés (`dev-orchestrator` v2.9.0, `planning-core` v2.5.3), ROADMAP recalé, 4 warnings traités, `STATE.md` recalé, release racine v2.45.0 préparée (vague 3, dépend de tous)
+- [x] 21-05-PLAN.md — Gouvernance : CI remise au vert (compteur de suites), 2 modules bumpés (`dev-orchestrator` v2.10.0 — v2.9.0 prise par la Phase 22, `planning-core` v2.5.3), ROADMAP recalé, 4 warnings traités, `STATE.md` recalé, release racine v2.45.0 préparée (vague 3, dépend de tous)
 
 ### Phase 22: Hygiène documentaire — doctrine de sortie et captation d'intention
 
@@ -1089,12 +1097,425 @@ doc produit, alors qu'une refonte d'écran périme ARCHITECTURE/README aussi sû
 et propose `gsd-docs-update`. Personne n'est équipé pour transformer ce constat en geste gradué
 (vérifier ? régénérer une doc ? toutes ?).
 
-**Requirements**: TBD (à mapper au ledger pendant le plan)
+**Requirements**: DOCF-01, DOCF-02, DOCF-03, DOCF-04, DOCF-05, DOCF-06, DOCF-07
+*(IDs créés au plan du 2026-07-31 — aucun préfixe existant du ledger ne couvrait ce périmètre ;
+définis dans `.planning/REQUIREMENTS.md` §Hors-milestone — Phase 22.)*
 **Depends on:** Phase 20 — **merge requis avant exécution**. Périmètre à fichiers partagés avec
 la 20 (`intent-routing.md`, `mission-contracts.md`, `vf-dev-manager.md`). **Indépendante de la
 Phase 21** (alignement gsd-core 1.9.0) : aucun fichier commun, l'ordre d'exécution est libre.
+**Plans:** 1/3 plans executed
+partagé par les plans 01 et 02 — pas de parallélisme possible). Découpage tracer-first : le plan
+01 prouve la chaîne complète sur UNE intention avant d'écrire les trois autres familles.
+
+Plans:
+
+- [x] 22-01-PLAN.md — doctrine de sortie `docs-flow.md` (4 familles, 3 régimes, garde-fous) +
+  captation d'intention dans `intent-routing.md` + câblage `AGENT.md` au chemin d'install D7 +
+  bloc de garde T22. *Tracer : la doctrine existe, est référencée, s'installe réellement et est
+  gardée — prouvé sur une seule intention avant toute expansion.* (DOCF-01→04, DOCF-06)
+
+- [ ] 22-02-PLAN.md — les deux managers dotés du nœud `docs` agrégé et des 4 déclencheurs, par
+  renvoi vers la doctrine (aucune copie) + bloc de garde T23 + checkpoint humain sur la
+  formulation de `--force` (D-05/D-06). (DOCF-05, DOCF-06)
+
+- [ ] 22-03-PLAN.md — bump **minor** des 2 modules touchés (`dev-orchestrator` v2.9.0,
+  `design-orchestrator` v1.4.0), triades + CHANGELOG, `check-version-sync.sh` ✓. Release racine
+  **hors périmètre**, réservée à validation humaine. (DOCF-07)
+
+### Phase 23: Couplage explicite au moteur GSD — capabilities, flags et voie unique
+
+> **Origine** — analyse du 2026-07-31, déclenchée par l'observation d'un `gsd-pattern-mapper`
+> spawné en session **inline** (hors `vf-dev-manager`) et la question de Samuel : « dev-manager a-t-il
+> accès à cet outil, et sait-il utiliser GSD avec le bon workflow, au bon moment, quand c'est
+> réellement utile ? ». Gap établi **sur pièce** contre `@opengsd/gsd-core@1.9.0` **installé**
+> (`~/.claude/gsd-core/VERSION` = 1.9.0, pas le 1.8.0 de l'index versionné) : lecture de
+> `workflows/plan-phase.md`, `workflows/execute-phase.md`, `bin/lib/config.cjs`,
+> `bin/lib/capability-registry.cjs`, et **sortie réelle** de
+> `gsd-tools.cjs loop render-hooks` sur 6 points de hook.
+
+**Goal**: Rendre le couplage du moteur de dev à GSD **explicite et arbitré** — (a) une **voie
+unique** d'invocation des briques de cycle, (b) une **doctrine de flags** par sous-phase, (c) une
+**table des capabilities/hooks** qui dit qui couvre quoi, (d) un **contrat de checkpoint aligné**
+sur celui du moteur (type × `gate`, continuation) et (e) des **budgets de boucle additionnés** —
+de sorte que la chaîne d'équipe cesse de superposer des étages que GSD lance déjà, de laisser
+accessible sans garde-fou une voie qui en désactive la moitié, et de pouvoir trancher seule un
+checkpoint que le moteur a refusé de trancher.
+
+**Ordre de traitement imposé** : la **Lacune 6 (sûreté) passe en premier** — c'est la seule dont la
+conséquence est un mauvais comportement silencieux, les autres coûtant du volume ou de la
+cohérence. Elle est aussi le prérequis de la Lacune 3 : la doctrine de flags ne peut pas être
+écrite sans savoir ce qu'un `--auto` auto-approuve.
+
+**Le point de départ n'est pas une panne.** La chaîne tourne, les agents ont les accès, aucune
+suite n'échoue. Le défaut est un **couplage implicite** : le module raisonne comme si GSD était une
+liste de skills à appeler, alors que GSD 1.9 est un **moteur à capabilities** qui insère ses étages
+lui-même.
+
+**Constat 0 — l'accès n'est pas le sujet.** `gsd-pattern-mapper` est déclaré dans les allowlists
+`Agent(...)` de `vf-dev-manager.md:4` **et** `vf-coder.md:4` ; et `team-kernel.md:23` acte que cette
+allowlist est **un contrat documenté, pas un cloisonnement runtime** pour un agent dispatché en
+sous-agent. Le pattern-mapper de la capture n'a d'ailleurs été choisi par **aucun** agent :
+`plan-phase.md:651` — « Pattern mapper activation is owned by the `pattern-mapper` capability's
+`plan:pre` step hook ». La bonne question n'est donc pas « y a-t-il accès », c'est « qui décide,
+et le module le sait-il ».
+
+**Constat 1 — le mécanisme de capabilities est invisible pour le module.**
+`grep -r "capabilit\|render-hooks\|plan:pre\|verify:post"` sur `plugin/dev-orchestrator/` →
+**zéro occurrence**. `gsd-pattern-mapper`, `gsd-verifier` et `gsd-nyquist-auditor` n'apparaissent
+**que** dans les lignes `tools:`, jamais dans une doctrine d'usage. Hooks réellement actifs
+(mesurés, pas déduits) :
+
+| Point | Capability → brique | Toggle (défaut **true**, `config.cjs:243-273`) |
+|---|---|---|
+| `plan:pre` | `gsd-phase-researcher`, **`gsd-pattern-mapper`**, `ui-phase`, `ai-integration-phase` | `research`, `pattern_mapper`, `ui_phase` |
+| `plan:post` | gap-analysis | `post_planning_gaps` |
+| `execute:post` | skill **`code-review`** | `code_review` |
+| `verify:post` | **`validate-phase`** (nyquist), **`secure-phase`**, **`ui-review`** | `nyquist_validation`, `security_enforcement`, `ui_review` |
+
+`execute-phase.md` rend **à lui seul** `execute:post` (:1210) **et** `verify:post` (:1152) — un
+seul appel de skill déclenche donc revue de code, validation nyquist et audit sécurité.
+
+**Lacune 1 — doublons d'étage non arbitrés.** `vf-dev-manager.md:114-129` pose `revue-N`
+**systématiquement** (Pattern E, `mission-flow.md:176-206`) et `vf-auditer` conditionnellement,
+par-dessus les hooks `code-review` et `secure-phase` que GSD a déjà lancés. Deux revues du même
+diff, deux budgets, deux `reopen` possibles. Ce n'est pas nécessairement faux — la **revue de
+jointure** a un rendement prouvé (`mission-flow.md:238` : 4 bloquants + 9 majeurs sur la tranche
+Phase 20) — mais l'arbitrage n'est écrit nulle part. À trancher **explicitement plutôt que par
+omission**, et **une seule fois** : recouper avec le changement 3 de la Phase 21 (recouvrement avec
+les lanes de revue cross-AI amont), qui instruit le même genre de frontière.
+
+**Lacune 2 — une voie dégradée accessible sans garde-fou.** `vf-coder.md:31-32` offre
+« ou dispatche l'agent `gsd-planner` » / « ou dispatche `gsd-executor` » **à égalité** avec
+l'invocation du skill. Or l'agent nu fait sauter research, pattern-mapper, plan-checker,
+gap-analysis, drift gate, waves, verifier, code-review, nyquist et secure-phase — **sans que rien
+ne le signale** au rapport typé. C'est le trou le plus grave : un worker peut rendre `passed` en
+ayant désactivé la moitié du moteur.
+
+**Lacune 3 — aucune doctrine de flags.** Un seul flag GSD dans tout le module (`--auto` sur
+`gsd-discuss-phase`, `vf-coder.md:27`). Deux faits mesurés qui rendent le silence coûteux :
+
+- `plan-phase.md:333` **prompte** sur la recherche si ni `--research` ni `--skip-research` ni
+  `--auto` — et `vf-coder` **n'a pas `AskUserQuestion`** (blocage ou auto-réponse silencieuse) ;
+
+- `plan-phase.md:1557-1577` : `--auto` **persiste** `workflow._auto_chain_active` puis enchaîne
+  seul `gsd-execute-phase --auto` et la phase suivante. Un `--auto` par réflexe **exécuterait hors
+  frontière DAG**, contre le pipelining N/N+1 (`mission-flow.md:98-132`).
+
+Le réglage juste est donc **étroit** (`--research`/`--skip-research` explicite, `--text` si besoin,
+**jamais** `--auto` sur plan/execute) et il n'est écrit nulle part.
+**Frontière avec la Phase 22** : la 22 porte les flags de la famille **documentaire**
+(`--verify-only` / `--force` de `gsd-docs-update`) ; celle-ci porte ceux du **cycle**
+discuss/plan/execute. Une seule surface de doctrine, pas deux — la première exécutée fixe la forme.
+
+**Lacune 4 — briques routées mais jamais mobilisées en mission.** Présentes dans
+`intent-routing.md` (couverture 100 % vérifiée machine) et absentes du cycle d'équipe :
+`gsd-spec-phase`, `gsd-add-tests`, `gsd-extract-learnings` (l'hygiène du manager ne cite que
+`gsd-docs-update`), `gsd-debug` — `vf-dev-manager` n'a même pas `gsd-debugger` en allowlist, donc
+après la recherche doc d'ADR-045 il n'a **rien** —, `gsd-undo` sur échec, `gsd-forensics` après
+blocage, et `gsd-ship`/`gsd-pr-branch` : le manager ouvre la PR à la main (ADR-059) alors que
+`GSD-PIPELINE.md:19` place `gsd-ship` dans le cycle canonique — **tension non tranchée**.
+
+**Lacune 5 — le `config.json` du lab n'est pas aligné sur le moteur.** `gsd-tools` avertit à chaque
+appel : « unknown config key(s) in .planning/config.json: `gates`, `safety` — these will be
+ignored » (deux blocs entiers **inertes**, dont `confirm_plan`) ; et `pattern_mapper`,
+`code_review`, `ui_review` sont **absentes** → au défaut `true` sans que personne ne l'ait décidé.
+Le lab pilote donc ses étages par omission.
+
+**Lacune 6 — la taxonomie de checkpoint GSD est ignorée (SÛRETÉ, priorité de la phase).**
+GSD 1.9 porte un contrat de checkpoint **à deux couches** (type × `gate`) que le module ne
+connaît pas : `grep -rn "checkpoint"` sur `plugin/dev-orchestrator/` → 4 occurrences, **toutes** au
+sens du mode superviser VibeFlow, **aucune** au sens GSD. `references/checkpoints.md` décrit
+pourtant exactement notre configuration comme le mode de défaillance à éviter : « *An orchestrator
+that dispatches on checkpoint **type** alone would auto-approve the very checkpoint the executor
+just refused to auto-approve, nullifying that refusal one layer up.* » Trois faits :
+
+- **(a) `gate="blocking-human"` n'est jamais honoré.** `gsd-executor.md:330-332` : en auto-mode
+  l'exécuteur auto-approuve `human-verify` et auto-sélectionne `decision` — **sauf**
+  `gate="blocking-human"` (et sauf les checkpoints de légitimité de paquet), qu'il **refuse** de
+  trancher et escalade exprès via `checkpoint_return_format`. `vf-dev-manager.md:157` pilote sur son
+  `statut` maison (`passed|gaps_found|human_needed|blocked`) : **aucun mapping** n'existe entre le
+  gate amont et `human_needed`, donc un manager en mode autonome peut « continuer » sur le seul
+  checkpoint que le moteur a explicitement refusé d'auto-approuver. Même chose pour les
+  **préconditions non satisfaites** (`gsd-executor.md:150`), « NEVER auto-approved, even under
+  `AUTO_CFG=true` ».
+
+- **(b) l'auto-mode auto-tranche les décisions.** Règle 5 de `checkpoints.md` : dès que
+  `workflow._auto_chain_active` **ou** `workflow.auto_advance` est vrai, `human-verify`
+  auto-approuve et `decision` **auto-sélectionne la première option**. Aucun agent du module ne lit
+  ni ne remet ce flag à zéro — alors que `plan-phase.md:1560` sait l'écrire (cf. Lacune 3). Le
+  couplage des deux lacunes est le vrai danger : un `--auto` mal placé ne fait pas que dérouler,
+  il **tranche des décisions à notre place**.
+
+- **(c) un worker interrompu par checkpoint ne reprend pas.** `execute-plan.md:321` :
+  « *You will NOT be resumed* » — l'orchestrateur doit spawner une **continuation** portant l'état
+  des tâches déjà faites, sur un contrat en 4 blocs (Completed Tasks / Current Task / Checkpoint
+  Details / Awaiting). Le bloc typé ADR-053 ne porte **aucun** de ces champs, et `dag.sh reopen` ne
+  modélise pas un plan **partiellement** exécuté : au reopen, `vf-coder` repart de l'étape, pas de
+  la tâche. Risque : travail refait, ou commits orphelins d'un premier passage.
+
+**Lacune 7 — les budgets de boucle se superposent en silence.** `workflow.node_repair` est **ON par
+défaut** (budget 2) : sur échec de vérification, GSD tente seul RETRY / DECOMPOSE / PRUNE avant
+d'escalader (`execute-plan.md:330-345`). Les « 3 tours max » de la boucle de revue
+(`mission-flow.md` §Pattern E) et celle de comblement s'empilent donc **par-dessus** deux
+réparations déjà consommées à l'intérieur de chaque tour — budget réel ≈ 3 × (1+2), jamais écrit,
+jamais consigné au rapport. Un blocage « après 3 tours » a en réalité coûté jusqu'à neuf tentatives.
+
+**Requirements**: TBD (à mapper au ledger pendant le plan)
+**Depends on:** Phase 20 — **merge requis avant exécution** (périmètre à fichiers partagés :
+`vf-coder.md`, `vf-dev-manager.md`, `mission-contracts.md`, `intent-routing.md`).
+**Recoupements à instruire, pas des dépendances d'ordre** : Phase 21 (changement 3 — arbitrage des
+étages de revue) et Phase 22 (doctrine de flags documentaires). L'ordre est libre ; l'arbitrage
+écrit par la première exécutée **fait autorité**, la suivante s'y réfère sans le dupliquer.
 **Plans:** 0 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 22 to break down)
+- [ ] TBD (run /gsd-plan-phase 23 to break down)
+
+### Phase 24: Activation et mesure du moteur GSD — capacités dormantes et faits de runtime
+
+> **Origine** — second temps de l'audit du 2026-07-31 (le premier a produit la Phase 23), sur
+> demande de Samuel d'aller au bout des gaps VibeFlow ↔ GSD. Établi **sur pièce** contre
+> `@opengsd/gsd-core@1.9.0` installé : inventaire des **44 capabilities** et des **12 points de
+> hook** (`bin/lib/capability-registry.cjs`, exports `capabilities` / `byLoopPoint` /
+> `capabilityClusters`), du **descripteur d'hôte `claude`**, de `bin/lib/init.cjs`
+> (`buildAgentSkillsBlock`), de `bin/lib/host-integration.cjs` (`shouldFlattenDispatch`) et des
+> hooks réellement posés dans `~/.claude/settings.json`.
+
+**Goal**: Cesser de payer l'installation d'un moteur sans en prendre les bénéfices — **activer**
+les capacités GSD déjà installées mais dormantes, **mesurer** les faits de runtime que VibeFlow
+présume, et **fermer** les routes qui mènent à un geste inerte. La Phase 23 rend le couplage
+explicite ; celle-ci rend le moteur **effectivement employé**.
+
+**Le point de départ n'est ni une panne ni un couplage flou — c'est de la valeur laissée sur la
+table.** Chaque item ci-dessous est une brique du moteur **présente sur le disque**, dont le
+toggle est à `false` ou dont le canal est vide, et que VibeFlow soit ignore, soit ré-implémente à
+la main.
+
+**Ordre imposé — le lot MESURE d'abord.** Le constat M2 portait sur le cœur du gain de la Phase 20 :
+il devait être connu **avant** d'activer quoi que ce soit d'autre. **M2 est mesuré et rendu**
+(2026-07-31, verdict ci-dessous : les acquis tiennent, le gap se déplace) ; M1 et M3 restent des
+constats de lecture à instruire au plan. Aucun lot d'activation ne démarre avant que les trois
+soient traités.
+
+#### Lot MESURE — trois faits présumés (M2 mesuré le 2026-07-31, M1 et M3 à instruire)
+
+Le descripteur officiel du runtime `claude` dans GSD 1.9 (capability `claude`, clé
+`hostIntegration.dispatch`) dit :
+
+```
+{ namedDispatch: true, nested: true, maxDepth: 5,
+  background: true, backgroundDispatch: false,
+  subagentToolkit: "full", isolation: "harness-worktree" }
+```
+
+**M1 — la profondeur de dispatch disponible est 5, VibeFlow en consomme 3.** `nested: true`,
+`maxDepth: 5`, `subagentToolkit: "full"` : la chaîne `vf-dev-manager → vf-coder → agent gsd-*`
+tient, avec **deux niveaux de marge**. Ce fait **clôt** la question du nesting posée à l'ouverture
+de l'audit et n'est écrit nulle part dans le module — ni la limite, ni la marge, ni ce qu'elle
+autorise (un worker pourrait légitimement dispatcher un sous-worker).
+
+**M2 — ✅ MESURÉ le 2026-07-31 : le moteur s'auto-bride, le runtime sait paralléliser.**
+Preuve complète et protocole : `.planning/missions/2026-07-31-mesure-m2-dispatch-parallele.md`.
+`shouldFlattenDispatch()` (`bin/lib/host-integration.cjs:464`) renvoie `true` dès que
+`background && backgroundDispatch` n'est pas vrai — donc **true pour Claude Code** : GSD
+**aplatit** ses dispatches, et la capability `claude-orchestration` (1.9.0, **default-off**, BETA)
+existe pour « *restoring the wave parallelism the #853 backgrounded-agent nesting limitation forces
+inline on Claude Code* ». Deux acquis VibeFlow reposaient sur la capacité inverse — le **fan-out de
+la frontière `ready`** (`vf-dev-manager.md:90-96`) et la **recherche doc en tâche de fond**
+(`vf-dev-manager.md:180-184`, ADR-045). **Mesure par sondes horodatées (busy-loop 20 s, PID
+distincts, 12 cœurs)** :
+
+| Configuration | Recouvrement | Verdict |
+|---|---|---|
+| Contrôle — fenêtre principale → 2 agents en un message | 18 259 / 20 000 ms (**91 %**) | parallèle |
+| **Sous-agent** → 2 agents en un message (le cas `vf-dev-manager`) | 18 460 / 20 000 ms (**92 %**) | **parallèle** |
+| **Sous-agent** → 1 enfant en tâche de fond, puis travail propre | parent démarré 1018 ms **avant** l'enfant, fini 18 s avant lui | **non bloquant** |
+
+**Les deux acquis tiennent** — statistiquement indiscernables du contrôle. `backgroundDispatch:
+false` est **fail-closed par conception, pas descriptif** de la capacité réelle du runtime. **Le gap
+se déplace donc, il ne disparaît pas** : `gsd-execute-phase` sérialise ses vagues **par décision du
+moteur** alors que le runtime sait les paralléliser → le parallélisme **intra-étape** (vagues de
+plans d'une même phase) est perdu, et seul subsiste le parallélisme **inter-nœuds** porté par
+`vf-dev-manager`. Conséquence doctrinale à écrire : sur ce runtime, notre couche d'orchestration ne
+duplique pas celle de GSD, **elle est la seule qui parallélise réellement**.
+
+**Voies retenues (arbitrées par Samuel le 2026-07-31), deux sur trois :**
+
+1. **Acter et documenter** — écrire en doctrine que sur ce runtime le parallélisme **inter-nœuds**
+   porté par `vf-dev-manager` est le seul effectif, et que le parallélisme **intra-étape** des vagues
+   GSD est perdu par décision du moteur. Gratuit, immédiat, et consolide l'architecture existante au
+   lieu de la remettre en cause.
+
+2. **Signaler le descripteur en amont** — remonter à `@opengsd/gsd-core`, **mesure horodatée à
+   l'appui**, que `backgroundDispatch: false` est *fail-closed* mais non descriptif du runtime
+   Claude Code. Bénéfice collectif : débloquerait le parallélisme intra-étape pour tous les labs.
+
+3. ~~Activer `claude_orchestration.enabled`~~ — **ÉCARTÉ pour l'instant** : placer un backend
+   **BETA** sur le chemin critique d'exécution n'est pas justifié quand notre propre parallélisme
+   fonctionne (mesuré). À reconsidérer seulement si le parallélisme intra-étape devient un besoin
+   démontré, ou si la voie 2 échoue.
+
+Reste non mesuré : la profondeur 2 → 3 (`vf-coder → gsd-executor`), couverte en **déclaration** par
+M1 (`maxDepth: 5`), pas par l'expérience.
+
+**M3 — `effort:` est supporté, validé, et déclaré par aucun agent.** Le harness l'expose
+(`agentFrontmatterExtensions: ["effort"]`), notre propre gate le **valide déjà**
+(`check-agents.sh:514`, `low|medium|high|xhigh|max`), les skills GSD l'emploient (`effort: max` sur
+`gsd-plan-phase`) — et `grep -rln "^effort:" plugin/*/agents/*.md` → **aucun résultat**. Managers,
+juges et workers tournent tous à l'effort par défaut. À trancher par rôle (pilotage et jugement
+haut, exécution mécanique bas), pas uniformément.
+
+#### Lot ACTIVATION — capacités installées, dormantes
+
+**A1 — broken-windows : le ledger est au bon format, le gate est éteint.** `.planning/WINDOWS.md`
+porte `open_count: 2` — **exactement** le frontmatter que le gate `ship:pre` évalue
+(`predicate: artifact-frontmatter-equals`, `artifact: WINDOWS.md`, `field: open_count`,
+`equals: 0`). Mais `workflow.windows_enforce` est **absent** du `config.json` → défaut **`false`**,
+et la description amont est sans ambiguïté : « *When false (default), windows are still tracked
+(the executor and verifier still populate WINDOWS.md) but ship does not block — teams can adopt
+tracking before enforcement* » (#1950). Nous sommes exactement dans cet état intermédiaire : le
+tracking tourne, l'enforcement non — sauf que nous tenons le ledger **à la main** (commits
+`chore(20): WINDOWS #2 résolu`) sans savoir que le moteur l'alimente et saurait bloquer le ship.
+**Le plus actionnable de la phase** : une clé de config et une décision.
+
+**A2 — `agent_skills` : le canal officiel de transmission de doctrine est vide.**
+`buildAgentSkillsBlock` (`bin/lib/init.cjs:1731`) injecte des skills dans le prompt des agents
+GSD via **17 slots** (`AGENT_SKILLS_PLANNER`, `EXECUTOR`, `REVIEWER`, `VERIFIER`, `AUDITOR`,
+`DEBUGGER`, `MAPPER`, `CHECKER`, `ANALYZER`, `ADVISOR`, `ROADMAPPER`, `SYNTHESIZER`, `FIXER`,
+`RESEARCHER`, `UI*`), consommés par **19 workflows**, et accepte les skills de **plugin
+namespacés** (`global:<plugin>:<skill>`). Le `config.json` du lab : `agent_skills: {}`. Conséquence
+structurante : la doctrine de dev du lab (Phases 7-8 — SOLID/DRY/KISS/YAGNI/Clean Archi/TDD)
+**n'atteint jamais** `gsd-planner` ni `gsd-executor`, c'est-à-dire les agents qui écrivent
+réellement le plan et le code. Le « digest de mission » (`mission-contracts.md`) ne va qu'aux
+workers `vf-*` et s'arrête à la frontière du moteur. C'est le gap avec le plus fort levier
+qualité de tout l'audit.
+
+**A3 — `workflow.tdd_mode = false` alors que la doctrine TDD est écrite.** `plan-phase.md:80` :
+quand la capability `tdd` est active, le planner applique `type: tdd` aux tâches éligibles via
+`references/tdd.md`, et un hook `execute:post` porte un review-checkpoint TDD. Le lab a une
+doctrine TDD (Phase 7) et un skill `tdd` — et le toggle qui la câblerait au moteur est à `false`.
+
+**A4 — les profils de contexte (`contexts/dev|review|research.md`) ne sont pas employés.** Chargés
+par la clé `context:` du `config.json` (**absente**), ils fixent style de sortie, focus et
+**verbosité** par mode. Or `mission-flow.md` §Pattern C légifère précisément là-dessus (« la prose
+libre est du volume mort ») : nous ré-implémentons en doctrine ce que le moteur porte en config.
+À arbitrer : adopter, ou acter que notre contrat typé est plus strict et pourquoi.
+
+**A5 — deux hooks machine opt-in, non branchés.** `hooks.workflow_guard` (garde d'enchaînement de
+workflow, `gsd-workflow-guard.js:70-79`) et `hooks.community` (Conventional Commits bloquants,
+`gsd-validate-commit.sh`) sont **installés et inertes**. Le lab impose déjà des commits
+conventionnels en français **par consigne** — un gate existe.
+
+**A6 — `workflow.inline_plan_threshold` (défaut 2) est un levier de coût inconnu.** Un plan de
+≤ 2 tâches s'exécute **inline** au lieu de spawner un sous-agent : « *avoids ~14K token subagent
+spawn overhead and preserves prompt cache* » (`execute-plan.md:100`). À confronter à la doctrine
+de délégation systématique du module.
+
+**A7 — `intel` (`intel.enabled: false`, agent `gsd-intel-updater`, cible `.planning/intel/`).**
+Jamais instruit, alors que `.planning/codebase/` (via `gsd-map-codebase`) est pleinement employé et
+lu par `vf-dev-manager` au démarrage. Frontière à écrire : que ferait `intel` que `codebase/` ne
+fait pas — ou acter le refus.
+
+**A8 — la carte de routage envoie sur des gestes inertes.** `intent-routing.md` route « le graphe
+de connaissance » → `gsd-graphify` et « profile ma façon de bosser » → `gsd-profile-user`, or
+`graphify.enabled` et `profile-pipeline.enabled` valent **`false`**. Le test d'exhaustivité du
+module (`test-dev-orchestrator.sh`) vérifie que **le skill est routé**, jamais que **la capability
+est active** : une couverture verte peut donc masquer un geste mort. Deux issues : activer, ou
+marquer l'entrée comme conditionnelle — et dans les deux cas, **étendre le test à l'activation**
+(sinon le même trou se rouvre au prochain skill ajouté).
+
+**Requirements**: TBD (à mapper au ledger pendant le plan)
+**Depends on:** Phase 23 — dépendance **doctrinale**, pas de fichiers : la 23 écrit la table des
+capabilities et la voie unique ; la 24 décide quoi activer dedans. Activer avant de savoir qui
+couvre quoi reviendrait à empiler des étages sur un couplage encore implicite. Le **lot MESURE**
+est en revanche exécutable **sans attendre** la 23 (lecture et instrumentation seules, aucun
+fichier de doctrine touché) — et M2 gagne à être connu tôt.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 24 to break down)
+
+### Phase 25: Budget d'instructions et étage d'alignement court
+
+> **Origine** — audit du 2026-07-31 de `shanraisshan/claude-code-best-practice` (65k ★, veille
+> communautaire Claude Code), demandé par Samuel pour vérifier si le pari GSD tenait. Verdict sur
+> ce point : **GSD y est cité** (rang 7/12 des workflows, `README.md:122`) — la ligne pointait
+> simplement le repo archivé, corrigé en amont par PR #169. Deux constats **méthodologiques**
+> survivent à l'audit et n'appartiennent ni à la Phase 23 ni à la Phase 24 : ils sont ci-dessous.
+> Source primaire commune : Dex Horthy (HumanLayer), *« Everything We Got Wrong About
+> Research-Plan-Implement »*, MLOps Community, 2026-03-24.
+
+**Goal**: Corriger deux défauts de **notre propre couche**, indépendants du moteur — (a) la densité
+d'agents et de skills est bornée par une métrique qui ne prédit pas l'adhérence, (b) le seul
+document que l'humain relit avant l'écriture du code est trop long pour être relu. Les deux
+attaquent la même chose : **ce que le modèle suit réellement, et ce que l'humain peut réellement
+corriger avant qu'il soit trop tard.**
+
+**Le point de départ n'est ni une panne ni un couplage — c'est un mauvais instrument de mesure
+dans un cas, un artefact manquant dans l'autre.**
+
+#### G1 — Le budget d'instructions n'est pas mesuré
+
+Fait amont : les LLM frontier suivent **~150-200 instructions** avec constance ; au-delà,
+l'adhérence devient stochastique. HumanLayer l'a payé cash — leur méga-prompt `create_plan`
+portait **85 instructions** et **sautait ses étapes à plus haute valeur ~50 % du temps** (poser les
+questions, aligner avant d'écrire). Le correctif qui a marché n'a pas été une meilleure rédaction
+mais le **découpage** : `research → plan → implement` est devenu sept prompts de moins de 40
+instructions chacun.
+
+État du lab : **ADR-029 borne les lignes** (agents ≤ 250, skills ≤ 500) et `check-agents.sh`
+l'applique. Les lignes sont un proxy défaillant — une skill de 200 lignes portant 90 impératifs
+est plus dangereuse qu'une de 400 lignes en portant 30. Nous mesurons le volume, pas la charge
+d'instruction, et rien ne dit aujourd'hui laquelle de nos briques est en zone rouge.
+
+À trancher au plan : la métrique exacte (quelles formes comptent comme instruction normative), le
+seuil, la portée (agents seuls ou agents + skills), et si le dépassement **bloque** ou **signale** —
+recouper avec l'Axiome 1 et la doctrine ADR-031.
+
+#### G2 — L'étage d'alignement court manque entre `discuss` et `plan`
+
+Fait amont : *« Don't read the plans. Please read the code. »* Un plan de 1000 lignes produit
+~1000 lignes de code à 10 % près — le relire n'est pas du levier, c'est le même travail deux fois,
+et le code livré diffère du plan. Leur substitution : un **design doc ~200 lignes** puis un
+**structure outline de 2 pages** (« si le plan est l'implémentation, l'outline c'est le fichier
+`.h` ») revus **avant** l'écriture, où une correction coûte une phrase au lieu d'un refactor.
+
+État du lab, **vérifié sur pièce** (Phase 22) : l'étage « design » **existe déjà** —
+`22-CONTEXT.md` fait **361 lignes** et porte frontière, décisions et références. C'est l'étage
+**outline** qui manque : le document réellement soumis au jugement humain reste PLAN.md, soit
+**1291 lignes sur 3 plans** pour cette seule phase. Le dernier point de correction bon marché
+n'existe pas.
+
+Corollaire à instruire : le même travail établit que les modèles écrivent **systématiquement des
+plans horizontaux** (toute la DB, puis toute l'API, puis tout le front) et qu'**aucun prompt ne
+l'empêche** — l'outline est le seul correctif structurel connu. Le lab **pratique** déjà le
+tracer-first (3 plans Phase 22) **sans l'avoir doctriné** : à acter comme règle ou à écarter
+explicitement.
+
+À trancher au plan : forme de l'artefact (document propre, section de CONTEXT.md, ou capability
+accrochée à `plan:pre`), et si CONTEXT.md doit maigrir en conséquence plutôt que s'ajouter à la
+pile.
+
+#### Frontières — ce que cette phase ne fait pas
+
+- **vs Phase 23 (couplage explicite au moteur).** G2 insère un étage dans la chaîne
+  `discuss → plan`. Le point d'insertion **ne peut pas être décidé** avant que la voie unique
+  d'invocation et la doctrine de flags soient arrêtées. Cette phase **dépend** de 23 et ne la
+  préempte pas ; si l'artefact prend la forme d'une capability `plan:pre`, la table
+  capabilities/hooks de la Phase 23 fait foi.
+- **vs Phase 24 (activation et mesure).** M3 (`effort:` par rôle) et A2 (`agent_skills`)
+  éditent tous deux `plugin/*/agents/*.md` — les fichiers mêmes sur lesquels G1 pose un gate.
+  Ordonnancement **après 24** pour ne pas calibrer un seuil sur un état qui bouge, et pour éviter
+  les éditions concurrentes.
+- **G1 n'est pas une capability GSD.** C'est une règle de densité propre à VibeFlow (ADR-029)
+  outillée par notre propre gate. Aucun recouvrement avec le lot ACTIVATION de la Phase 24.
+
+**Requirements**: TBD (à mapper au ledger pendant le plan)
+**Depends on:** Phase 24 (et Phase 23 pour le volet G2)
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 25 to break down)

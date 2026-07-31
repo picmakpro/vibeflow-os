@@ -95,6 +95,7 @@ dev-orchestrator/
     ├── mission-contracts.md        # Brief / Digest / Rapport de mission + SEUIL_EQUIPE
     ├── mission-flow.md             # lock + DAG + rapports typés (ADR-053)
     ├── ingestion-flow.md           # ingestion BRDG-01/03, chargée on-demand
+    ├── docs-flow.md                # sortie doc DOCF-01/04, chargée on-demand (Phase 22)
     └── autonomous-guardrails.md    # garde-fous des boucles autonomes
 ```
 
@@ -241,6 +242,15 @@ Couvre les axes de la bascule agentique (spec 2026-07-25) plus les acquis :
 - **T21** — invariants SC5 par grep structurel (Phase 17) sur `check-dev-bootstrap.sh` et
   `check-doc-drift.sh` : aucun `exit 1`, aucune écriture hors `/dev/null`/descripteur/variable
   `*TMP*`, aucune commande d'écriture directe, tout `mktemp` apparié à un `trap ... EXIT`.
+- **T22** — doctrine `docs-flow.md` (Phase 22) : les quatre familles documentaires, les trois
+  régimes de confirmation (`--verify-only` libre, génération sous confirmation, `--force` sous
+  garde-fou en trois temps sur une même ligne rouge), le renvoi vers `ingestion-flow.md` pour la
+  famille entrée (jamais une copie), et la captation d'intention (`AGENT.md` +
+  `intent-routing.md`) qui route les trois régimes séparément.
+- **T23** — câblage du geste documentaire dans les deux managers de mission (`vf-dev-manager` et
+  `vf-design-manager`, `dev-orchestrator` + `design-orchestrator`) : nœud `docs` agrégé posé en
+  fin de mission par chacun, quatre déclencheurs testés un par un, `SKIP` si le module design est
+  hors du périmètre scanné.
 
 Exit 0 si tout passe (les SKIP, ex. GSD absent, ne font pas échouer la suite).
 
@@ -249,6 +259,7 @@ Exit 0 si tout passe (les SKIP, ex. GSD absent, ne font pas échouer la suite).
 ## Références
 
 - Doctrine d'ingestion (découverte, manifest, garde-fous BRDG-03) : `references/ingestion-flow.md`
+- Doctrine de sortie documentaire (4 familles, 3 régimes, ligne rouge `--force`) : `references/docs-flow.md`
 - Spec de la bascule agentique : `docs/superpowers/specs/2026-07-25-suppression-facade-vf-design.md`
 - Spec d'origine du module : `docs/superpowers/specs/2026-06-04-dev-orchestrator-design.md`
 - Équipe de mission : `docs/superpowers/specs/2026-07-09-dev-manager-team-design.md` (DM1-DM6)

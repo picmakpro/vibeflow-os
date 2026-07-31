@@ -97,9 +97,22 @@ l'inverse : on n'édite pas l'index pour faire tomber une couverture juste.
 | on est où / et après / next / la suite / statut / avancement | `gsd-progress` (+ next step proposé par l'agent) |
 | reprends où on en était / on reprend / recharge le contexte | `gsd-resume-work` |
 | je m'arrête là / note où on en est / handoff | `gsd-pause-work` |
-| comprends ce code / cartographie / c'est quoi ce repo / explique l'archi | `gsd-map-codebase` |
-| mets à jour la doc / génère le README / la doc est périmée | `gsd-docs-update` |
-| qu'est-ce qu'on a appris / extrais les décisions / le graphe de connaissance | `gsd-extract-learnings`, `gsd-graphify` |
+| comprends ce code / cartographie / c'est quoi ce repo / explique l'archi / la carto est datée (famille **code**, doctrine : `docs-flow.md`) | `gsd-map-codebase` |
+| vérifie que la doc dit encore vrai / la doc est-elle à jour / la doc correspond plus au code / audite la doc sans rien changer (doctrine : `docs-flow.md`) | `gsd-docs-update --verify-only` — **read-only, libre** |
+| mets à jour la doc / génère le README / la doc est périmée / la doc est fausse / il manque la doc d'API / documente ce module (doctrine : `docs-flow.md`) | `gsd-docs-update` — **confirmation humaine requise** |
+| refais toute la doc / repars de zéro sur la doc / on a changé l'archi, reprends tout (doctrine : `docs-flow.md`) | `gsd-docs-update --force` — annoncer ce qui sera écrasé, **jamais en mission ni en autonome** |
+| qu'est-ce qu'on a appris / extrais les décisions / le bilan de l'étape / le graphe de connaissance (famille **savoir**, doctrine : `docs-flow.md`) | `gsd-extract-learnings`, `gsd-graphify` |
+
+> **Désambiguïsation — « mets à jour la doc » vise quatre familles.** Router **au jugement du
+> contexte** (heuristique 5 d'`AGENT.md`, pas une règle nouvelle) : une étape vient d'être exécutée
+> et du code a bougé → **produit** ; le repo est inconnu, `.planning/codebase/` absent ou daté →
+> **code** ; une étape vient d'être vérifiée ou clôturée → **savoir** ; un document de cadrage
+> traîne hors de la feuille de route → **entrée** (`ingestion-flow.md`). Rien de tout cela —
+> formulation creuse en début de session → **une question courte, jamais une devinette**.
+>
+> Les trois lignes `gsd-docs-update` ci-dessus ne sont pas trois briques mais **trois régimes** de
+> la même : auditer sans écrire, générer sous confirmation, régénérer en écrasant. La différence
+> porte tout le discernement — `docs-flow.md` §Garde-fous en donne les conditions exactes.
 
 ## Design
 
@@ -170,5 +183,6 @@ une entrée manquante casse le routage : on préfère la première.
 
 - `GSD-PIPELINE.md` — l'ordre canonique du cycle (quoi après quoi), et non quelle intention mène où.
 - `mission-contracts.md` — brief et rapport de mission quand le travail part à l'équipe.
+- `docs-flow.md` — doctrine des quatre familles documentaires (quoi maintenir, quand, quel régime de confirmation).
 - Spec de la bascule : `docs/superpowers/specs/2026-07-25-suppression-facade-vf-design.md`
   *(provenance — chemin du repo source vibeflow-os, non résolu dans un lab installé)*.

@@ -202,8 +202,22 @@ actionnables et sourcées à l'étage concerné. Les workers cloisonnés (`vf-co
 - **Fin d'étape** : vérifie que la machinerie a mis à jour `STATE`/`ROADMAP` (fait-le sinon) ;
   une **décision structurante** prise en mission → consignée (STATE `### Decisions` ou registre
   du lab).
-- **Drift doc détecté** (doc contredite par le code touché) : ajoute un nœud `gsd-docs-update`
-  au DAG plutôt que de laisser filer — jamais de réécriture de doc au fil de l'eau.
+- **Nœud `docs`, UN SEUL, en fin de mission** : `"$S"/dag.sh add --file="$DAG" --id=docs
+  --step="hygiène documentaire" --deps=<tous les nœuds exec-*>`. Jamais un nœud par étape — il
+  documenterait des états intermédiaires déjà périmés à l'étape suivante et re-traiterait les mêmes
+  fichiers à chaque tour. Le coût réel du moteur (jusqu'à 9 rédacteurs + leurs vérificateurs, en
+  vagues) se paie **une fois, sur l'état final**.
+- **Quatre déclencheurs** : surface publique touchée · `[doc-drift]` actif · fin de milestone ·
+  nouveau module ou nouvelle capacité. Le nœud est posé dès qu'**au moins un** tombe ; aucun qui ne
+  tombe est un **état normal, pas un manque**. Constats et conditions exactes :
+  `dev-orchestrator-references/docs-flow.md` §Déclencheurs et §Garde-fous — ne pas les reformuler ici.
+- **Régime** : en mode superviser, le nœud peut proposer la génération au checkpoint ; en mode
+  **autonome**, il se limite à l'audit read-only et au constat porté au rapport — la doc périmée est
+  **tracée, jamais corrigée en douce**. Aucun format de rapport nouveau : `passed` si la doc est à
+  jour, `gaps_found` avec les docs périmées en `findings`, `action: ask-user` sur toute génération à
+  confirmer — le contrat typé de §Contrôle de flux couvre le cas. **Ligne rouge** : le flag de
+  régénération destructive n'est **jamais** employé depuis une mission, quel que soit le mode — son
+  déclencheur vient de l'utilisateur, en direct.
 - **Fin de mission** : propose LE next step depuis la feuille de route (étape suivante, recette
   en attente, milestone à clore) — une proposition ferme, pas un menu.
 
