@@ -1023,15 +1023,23 @@ un interne appelé par son parent). Rien n'est cassé, mais une fonctionnalité 
 inactive faute de câblage. Décider si `merge-hooks.sh` doit en tenir compte — ou acter que c'est un
 sujet `gsd-core`, hors périmètre VibeFlow.
 
-**Requirements**: TBD (à mapper au ledger pendant le plan)
+**Requirements**: Changements 1 à 6 + le point hérité (anomalie d'agrégation `STATE.md`) servent
+d'IDs de traçabilité — aucun ID formel `REQ-` n'existe pour cette phase dans `REQUIREMENTS.md`
+(le ledger s'arrête à ALTI-05 / Phase 14, vérifié sur pièce), même convention que les Phases 15 à
+20 ; numérotation reprise telle quelle par le champ `requirements-completed` de chaque
+`21-0N-PLAN.md`/`SUMMARY.md`.
 **Depends on:** Phase 20 — **merge requis avant exécution**. Même règle que le diagnostic du
 2026-07-29 : les phases qui touchent le couplage au moteur attendent que la 20 soit mergée pour
 éviter les conflits sur les fichiers partagés.
-**Plans:** 0 plans
+**Plans:** 5/5 plans executed
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 21 to break down)
+- [x] 21-01-PLAN.md — Changement 1 : `inject-mcp-tools.sh` découvre les serveurs MCP en union de deux scopes (`./.mcp.json` projet ∪ `~/.claude.json` global), corrige le défaut actif ADR-051 (vague 1)
+- [x] 21-02-PLAN.md — Changements 2, 3, 4 : contrat `estimate:`/`actuals:` relayé verbatim, ADR-061 (recouvrement lanes de revue amont vs étage 20-06), hypothèse datée du dispatch nommé + recoupement #1995/#2608 (vague 1)
+- [x] 21-03-PLAN.md — Changements 5, 6 : purge de la dette de version 1.8.0 → 1.9.0, ADR-062 (hooks 1.9.0 non câblés, absence correcte dans les deux cas) (vague 2)
+- [x] 21-04-PLAN.md — Point hérité : `check-state-integrity.sh` (gate anti-régression du frontmatter de `STATE.md`, module `conductor` v1.18.0) et ADR-063 (arbitrage de l'anomalie d'agrégation) (vague 2)
+- [x] 21-05-PLAN.md — Gouvernance : CI remise au vert (compteur de suites), 2 modules bumpés (`dev-orchestrator` v2.9.0, `planning-core` v2.5.3), ROADMAP recalé, 4 warnings traités, `STATE.md` recalé, release racine v2.45.0 préparée (vague 3, dépend de tous)
 
 ### Phase 22: Hygiène documentaire — doctrine de sortie et captation d'intention
 
