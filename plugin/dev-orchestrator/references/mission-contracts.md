@@ -162,6 +162,17 @@ lanes déclarées par `review-lane-descriptor.cjs`, ADR-2782 Phase 1, opt-in uti
 sur les trois axes. Arbitrage complet, avec le critère écrit : `docs/ADR.md` ADR-061. Aucun
 câblage automatique de `gsd-review` dans le DAG de mission — décision distincte, non prise ici.
 
+## `.planning/STATE.md` — ne jamais « réparer » via `gsd-tools state` (ADR-063)
+
+Un frontmatter `.planning/STATE.md` erroné (compteurs régressés, `current_phase` faux) se corrige
+**uniquement par édition manuelle directe du fichier**. N'invoque **jamais** `gsd-tools state
+<verbe>` (ni aucun appel qui le déclenche) dans l'intention de corriger un état déjà écrit : cette
+commande force `resync: true` de façon non désactivable depuis cette voie d'appel, ce qui
+**régénère** la régression que tu essaies de corriger au lieu de la réparer — cause détaillée en
+`docs/ADR.md` ADR-063. Le corps du fichier ne porte par ailleurs jamais plus d'une ligne `^Phase:`
+(sections archivées en `**Phase archivée :** N …`), invariant gardé par
+`plugin/conductor/scripts/check-state-integrity.sh`.
+
 ## Rapport de mission (manager → main)
 
 Retour **compact**. Le détail vit sur disque, pas dans la conversation.

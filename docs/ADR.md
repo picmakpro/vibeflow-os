@@ -32,6 +32,7 @@
 | ADR-060 | 2026-07-29 | La revue devient un étage de premier rang, piloté par le manager | Validée |
 | ADR-061 | 2026-07-31 | Les lanes de revue cross-AI de plans (amont) et l'étage de revue de code (ADR-060) sont des objets disjoints | Validée |
 | ADR-062 | 2026-07-31 | Les deux hooks 1.9.0 non câblés restent hors périmètre de `merge-hooks.sh` | Validée |
+| ADR-063 | 2026-07-31 | Anomalie d'agrégation `.planning/STATE.md` : dette d'artefact locale + bug amont non scopé — gate local, jamais de correction par `gsd-tools state` | Validée |
 
 ### ADR héritées les plus citées (définitions canoniques)
 
@@ -1242,3 +1243,160 @@ prétend pas couvrir ce cas hypothétique, seulement l'état vérifié aujourd'h
 
 Ne modifie ni `merge-hooks.sh` ni son commentaire existant — confirme avec preuves une intention
 déjà écrite (`plugin/_internal/merge-hooks.sh:145-150`). Aucune rule nouvelle.
+
+## ADR-063 : Anomalie d'agrégation `.planning/STATE.md` — dette d'artefact locale + bug amont non scopé, gate local, jamais de correction par `gsd-tools state`
+
+**Date** : 2026-07-31
+**Statut** : Validée
+**Décideur** : Samuel (arbitrage de cadrage, mission delta `@opengsd/gsd-core` 1.8.0 → 1.9.0, Phase
+VFDO-21 plan 21-04)
+**Contexte** : la clôture de la Phase 20 (20-07) a constaté que `.planning/STATE.md` avait vu son
+frontmatter **régresser** silencieusement — `completed_phases` 11→10, `total_plans` 53→49,
+`completed_plans` 37→29, `current_phase` resté à 19 — alors que la Phase 20 venait précisément de
+se terminer. `.planning/STATE.md:16-20` a recalé les compteurs à la main et inscrit un commentaire
+renvoyant l'instruction à la Phase 21. Diagnostic établi sur pièce sur `@opengsd/gsd-core` 1.9.0
+(`~/.claude/gsd-core/bin/lib/state.cjs`, `bin/lib/plan-scan.cjs`, `bin/lib/state-document.cjs`) —
+aucune supposition, chaque affirmation ci-dessous cite une ligne réelle.
+
+### Problème
+
+Sans arbitrage écrit, chaque nouvelle régression de compteur redéclencherait le même cycle : un
+recalage manuel, un commentaire d'intention, et l'anomalie ressurgirait à la prochaine écriture
+d'état — exactement le motif « garde-fou documenté mais jamais machine-enforced » déjà rencontré
+trois fois sur ce repo (Phase 13, 17, 19). Sans distinguer les deux causes, la remédiation risquait
+soit de sur-corriger un défaut d'artefact local en le traitant comme un bug à contourner par du
+code, soit de sous-réagir à un vrai bug amont en l'absorbant silencieusement dans un recalage
+manuel répété à chaque phase.
+
+### Diagnostic — deux causes distinctes, jamais confondues
+
+**Cause A — dette d'artefact locale, pas un bug.** `state.cjs:1494-1501` + `plan-scan.cjs:158` :
+une phase n'est « complète » que si **chaque** `NN-MM-PLAN.md` a son `NN-MM-SUMMARY.md` partenaire
+sur le disque — sans repli sur le ROADMAP, alors que `roadmap analyze` (`roadmap.cjs:353-355`)
+**a** ce repli (« trust roadmap over disk »). Deux définitions de « complète » coexistent dans le
+même moteur. Sur ce repo, les Phases 11, 12, 13, 14 sont shippées et publiées mais n'ont jamais eu
+de `SUMMARY.md` (missions d'équipe ou artefacts nommés différemment — Phase 10 : `10-ETUDE.md` /
+`10-SOLUTIONS.md` / `10-APPROFONDISSEMENT.md`, Phase 15/16 : listes de checkboxes dans
+`ROADMAP.md` sans fichier `PLAN.md` par plan) ; la Phase 1 est en plus filtrée hors du calcul car
+enfermée dans un bloc `<details>` de jalon archivé. **Le comportement de `buildStateFrontmatter`
+est cohérent avec sa propre règle** — c'est nos artefacts qui ne la satisfont pas.
+
+**Cause B — vrai bug amont, notre fichier est conforme.** `state.cjs:1390-1391` appelle
+`stateExtractField(bodyContent, 'Phase')`, qui (`state-document.cjs:214`) prend le **premier**
+`^Phase:` du **corps entier**, sans aucun scope. Le corps de `STATE.md` empile un historique de
+sections archivées, chacune commençant par `Phase: N …` — la même ancre `^Phase:` pour l'archive
+et pour l'actif. Asymétrie décisive : la **même fonction** scope explicitement `Stopped At` et
+`Paused At` à la section `## Session` (`state.cjs:1402-1413`), mais **jamais** `Phase`. Notre
+fichier respectait le format documenté ; c'est l'extracteur qui n'a pas de scope.
+
+**Déclencheur, commun aux deux causes.** `gsd-tools state record-session` — appelé par
+`workflows/discuss-phase.md:480`, `execute-plan.md:443`, `milestone-summary.md:221`,
+`ui-phase.md:462`, et d'autres workflows du cycle normal — écrit le frontmatter via
+`cmdStateRecordSession` (`state.cjs:915`), qui appelle `readModifyWriteStateMd` **sans `options`** ;
+`state.cjs:2024` calcule `resync = !options || options.resync !== false` → **`resync: true` figé,
+non désactivable** depuis cette voie d'appel. Ce n'est pas un hook isolé : c'est le chemin
+d'écriture normal de chaque cadrage/exécution/clôture de phase. Motif déjà rencontré : 3
+régressions sur ce repo, 2 déjà réparées à la main (`63aca55`, `ef8826c`) avant celle-ci.
+
+### Options Considérées
+
+| Option | Avantages | Inconvénients |
+|---|---|---|
+| Patcher `@opengsd/gsd-core` en local (`~/.claude/gsd-core/**`) | corrigerait les deux causes à la source | interdit par la doctrine du repo (paquet tiers en lecture seule, `~/.claude/gsd-core` régénéré à chaque update — la Phase 21 elle-même documente cette règle en 21-01/21-03) ; corrigerait un fichier qui n'appartient pas à ce repo |
+| Backfiller les ~20 `SUMMARY.md` manquants des Phases 11/12/13/14 | rendrait la Cause A auto-cohérente avec le moteur amont, sans aucun gate à écrire | lourd (reconstruction rétroactive de 4 phases shippées il y a des semaines), déborde le périmètre confié à cette mission — **remonté en décision à trancher par Samuel, non tranché ici** (cf. Conséquences) |
+| Absorber silencieusement chaque régression par un recalage manuel répété | coût immédiat nul | c'est précisément le motif qui a produit l'incident du 2026-07-31 — un recalage sans gate ne survit pas à la prochaine écriture d'état, et personne ne le détecte avant la prochaine relecture humaine |
+| **Gate machine local + interdiction documentée de "réparer" `STATE.md` via `gsd-tools state` + signalement amont à déposer (retenue)** | ferme la classe d'incident sans toucher au paquet tiers ; rend visible la prochaine régression au lieu de la laisser dormir jusqu'à la prochaine lecture humaine | ne corrige pas la cause amont — nécessite un geste humain (dépôt de l'issue/RFC) hors du contrôle de VibeFlow, délai indéterminé |
+
+### Décision
+
+**Aucun patch du paquet tiers.** `~/.claude/gsd-core/**` reste lecture seule, sans exception —
+cohérent avec la doctrine déjà posée en Phase 21 (21-01/21-03, purge de la dette de version) et
+avec le principe déjà appliqué en ADR-062 (« confirmer avec preuves plutôt que modifier un
+comportement amont »).
+
+**Le gate `check-state-integrity.sh`** (`plugin/conductor/scripts/`, module `conductor` v1.18.0)
+rend la classe d'incident bruyante des deux côtés : régression de compteur au sein d'un même jalon
+(Cause A, tant que le backfill n'est pas tranché) et plus d'une ligne `^Phase:` dans le corps
+(Cause B, tant que l'amont n'a pas scopé son extracteur). Deux invariants dans le même script parce
+qu'ils protègent le même fichier contre le même défaut de fond — voir son en-tête pour le détail du
+contrat.
+
+**Convention d'écriture posée pour ce repo (couvre Cause B en attendant l'amont)** : le corps de
+`.planning/STATE.md` ne contient **jamais** plus d'une ligne commençant par `Phase:`. Toute section
+narrant une phase **archivée** (non courante) doit utiliser une forme qui ne matche pas l'ancre
+`^Phase:` — retenue : **`**Phase archivée :** N …`** (gras, deux-points après le mot « archivée »,
+jamais en toute première position de ligne sous la forme `Phase:`). Appliquée rétroactivement aux 4
+sections archivées de `.planning/STATE.md` dans ce même plan (21-04) et gardée par le gate
+ci-dessus.
+
+**Interdiction documentée : ne jamais invoquer `gsd-tools state <verbe>` pour « réparer »
+`.planning/STATE.md`.** Toute invocation de `gsd-tools state record-session` (directe, ou via un
+workflow qui l'appelle) force `resync: true` de façon non désactivable (`state.cjs:2024`) — un
+agent qui tenterait de corriger un frontmatter erroné en relançant cette commande **régénérerait
+la régression qu'il essaie de corriger**, en appliquant à nouveau la Cause A sur l'état courant.
+La seule correction sûre d'un frontmatter erroné est l'édition manuelle directe du fichier (comme
+ce plan le fait), jamais un appel outillé qui repasse par l'agrégateur défaillant. Cette règle est
+propagée dans `plugin/dev-orchestrator/references/mission-contracts.md` (pointeur court, section
+dédiée) — c'est la référence que `vf-coder`/`vf-dev-manager` consultent pour les conventions de
+mission, l'endroit où un agent la lira avant d'être tenté de « juste relancer la commande ».
+
+**Signalement amont — deux points, à déposer sur `open-gsd/gsd-core` (action humaine, hors
+contrôle de VibeFlow, même patron que la RFC de la Phase 18)** :
+
+1. **`stateExtractField(bodyContent, 'Phase')` n'est pas scopée** (`state-document.cjs:214`) —
+   prend le premier `^Phase:` du corps entier, alors que la même fonction scope explicitement
+   `Stopped At`/`Paused At` à la section `## Session` (`state.cjs:1402-1413`). Un `STATE.md` qui
+   accumule un historique de phases archivées (motif courant sur un projet long) casse
+   silencieusement `current_phase` dérivé du corps.
+2. **`buildStateFrontmatter()` n'a pas le repli ROADMAP que `roadmap analyze` a** (`state.cjs:1494-
+   1501` vs `roadmap.cjs:353-355`) — deux définitions de « phase complète » dans le même paquet,
+   l'une tolérante aux artefacts manquants, l'autre non. Un projet qui a shippé des phases sans
+   `SUMMARY.md` (missions d'équipe, cadrage allégé) voit ses compteurs régresser à chaque écriture
+   d'état, sans qu'aucun signal ne le prévienne.
+
+Le texte des deux signalements est rédigé dans `.planning/missions/2026-07-31-delta-gsd-core-1.9.0.md`
+(section à compléter par le dépôt effectif) — **le dépôt lui-même (issue ou PR sur
+`github.com/open-gsd/gsd-core`) reste une action humaine**, cette ADR ne prétend pas l'avoir fait.
+
+**Sur le backfill des `SUMMARY.md` manquants (Phases 11/12/13/14)** : **non tranché ici,
+explicitement remonté à Samuel.** Deux options restent ouvertes — (a) backfiller rétroactivement
+les ~20 fichiers manquants pour que la Cause A cesse de produire un écart entre le compteur amont
+et le compteur curé à la main ; (b) accepter durablement que le compteur amont sous-évalue et
+continuer à curer `.planning/STATE.md` à la main, protégé par le gate. Le coût de (a) est élevé
+(reconstruction rétroactive de contenu déjà exécuté et publié) ; le coût de (b) est un entretien
+manuel permanent, désormais gardé plutôt qu'invisible.
+
+### Conséquences
+
+**Positives** : la classe d'incident ne peut plus dormir jusqu'à la prochaine relecture humaine —
+`check-state-integrity.sh` échoue bruyamment. Le corps de `STATE.md` respecte une convention
+vérifiable au lieu de tenir par chance (le commentaire de `state.cjs:1402-1413` documentant le
+défaut de scope de `Phase` était déjà vrai avant cette mission — seul le hasard du contenu du
+fichier avait empêché la casse jusqu'ici). La distinction Cause A / Cause B empêche de sur-corriger
+un défaut d'artefact local avec du code, ou de sous-réagir à un vrai bug amont en l'absorbant en
+silence.
+**Négatives** : le gate ne corrige rien à la source — une régression continuera de se produire à
+chaque écriture d'état tant que Cause A/B ne sont pas résolues en amont ou par backfill ; il la
+rend seulement visible. Le signalement amont a un délai et une issue indéterminés (même risque que
+documenté pour la RFC de la Phase 18) — VibeFlow reste dépendant d'un tiers pour la correction
+définitive.
+**Explicitement écarté** : patcher `~/.claude/gsd-core/**` ; trancher seul le backfill des
+`SUMMARY.md` manquants ; absorber silencieusement une future régression sans gate.
+
+### Code Impacté
+
+- `docs/ADR.md` (cette entrée)
+- `plugin/conductor/scripts/check-state-integrity.sh` + `plugin/conductor/scripts/tests/test-check-state-integrity.sh`
+  (gate + suite, 23 cas, 2 discriminations machine par comparaison directe)
+- `plugin/conductor/CHANGELOG.md` / `module.json` / `VERSION` / `README.md` — module bumpé v1.18.0
+- `plugin/dev-orchestrator/references/mission-contracts.md` — pointeur court (interdiction
+  `gsd-tools state` pour « réparer » `STATE.md`)
+- `.planning/STATE.md` — 4 sections archivées reformées (`Phase: N` → `**Phase archivée :** N`),
+  frontmatter recalé avec commentaire YAML expliquant la curation
+
+### Rules Associées
+
+Nouvelle convention d'écriture de `.planning/STATE.md` (portée par cette ADR, gardée par
+`check-state-integrity.sh`) : au plus une ligne `^Phase:` dans le corps, toute section archivée en
+`**Phase archivée :**`. Aucune modification de `plugin/_internal/**` ni du moteur GSD — décision
+purement locale au repo de distribution.
