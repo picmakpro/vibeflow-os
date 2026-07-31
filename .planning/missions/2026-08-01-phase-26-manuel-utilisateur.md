@@ -1,0 +1,200 @@
+# Mission — Phase 26 : Manuel utilisateur VibeFlow (`manual/`)
+
+- **Date d'ouverture** : 2026-08-01
+- **Manager** : `vf-dev-manager` · owner du verrou : `mission-phase26-manual`
+- **Mode** : autonome (escalade sur modification de périmètre, suppression, dépendance majeure)
+- **Branche** : `feat/phase-26-manuel-utilisateur` (créée depuis `main` local à `6ba2f34`)
+- **DAG** : `.planning/missions/dag-phase26.json`
+
+## 1. Périmètre
+
+Livrer la Phase 26 du ROADMAP (`### Phase 26`, ligne ~1574) de bout en bout : planification,
+tranchage des zones grises, exécution, vérification, hygiène documentaire.
+
+Hors périmètre, explicitement : aucune release, aucun bump de version, aucun tag. Le chantier est
+purement documentaire.
+
+**Note d'état au démarrage** : `main` local portait un commit non poussé (`6ba2f34`, ajout de la
+section Phase 26 au ROADMAP). La branche de mission en hérite ; la PR le contiendra donc en
+premier commit.
+
+## 2. Plan de bataille (DAG)
+
+| Nœud | Étage | Deps | Périmètre déclaré |
+|---|---|---|---|
+| `panel-bilingue` | research | — | ∅ (read-only) |
+| `panel-ia` | research | — | ∅ (read-only) |
+| `inventaire` | research | — | `.planning/phases/VFDO-26-*/26-INVENTAIRE-MATIERE.md` seul |
+| `build-26` | build | les 3 ci-dessus | `manual/**`, `README.md`, `README.fr.md`, `INSTALL.md`, `.planning/phases/VFDO-26-*/**`, `scripts/**`, `.planning/ROADMAP.md`, `.planning/STATE.md` |
+| `verify-manual` | verify | `build-26` | ∅ (read-only) |
+
+Les trois nœuds de recherche ont été dispatchés **en parallèle** (périmètres disjoints, deux d'entre
+eux strictement read-only). `build-26` est le seul nœud écrivain — pas d'isolation par worktree
+nécessaire, un seul écrivain à la fois.
+
+**Étages écartés, avec la raison** :
+
+- **Audit (`vf-auditer`)** — écarté : la phase ne touche ni sécurité, ni données sensibles, ni
+  infrastructure. Elle produit du markdown.
+- **Recette mobile (`vf-test-orchestrator`)** — sans objet : ce repo n'est pas un projet Expo/RN.
+- **Étage design** — écarté : pas de `DESIGN.md` dans ce repo et pas de livrable UI. Signalé au
+  rapport conformément à la doctrine (« étage design sauté, pas de DA »).
+- **Double revue** — `vf-coder` porte sa propre revue interne (`vf-reviewer`) ; aucune revue de code
+  supplémentaire ne sera commandée si son rapport typé sort `passed` avec verdict PASS.
+
+En revanche `verify-manual` est **maintenu et non négociable** malgré l'absence d'audit : le coût
+d'erreur est asymétrique sur ce livrable (un lien de navigation mort ou une page EN manquante ne se
+voit pas à la relecture du diff, mais se voit immédiatement par le lecteur à qui le manuel
+s'adresse).
+
+## 3. Hygiène documentaire faite en préalable
+
+Le commit `6ba2f34` avait ajouté la section `### Phase 26` **sans** la ligne correspondante dans la
+checklist des phases du ROADMAP — or c'est la checklist que le moteur lit pour compter l'avancement
+(même classe de régression que celle corrigée le 2026-08-01). `STATE.md` restait à
+`total_phases: 25` pour un ROADMAP qui en décrit 26.
+
+Corrigé en préalable de la mission (commit `2f7b143`) : ligne de checklist ajoutée, `total_phases`
+porté à 26 par **édition manuelle** du frontmatter (ADR-063 — jamais `gsd-tools state`).
+`check-state-integrity.sh` au vert.
+
+**Baseline des compteurs à ne pas faire régresser** : `total_phases: 26`, `completed_phases: 21`,
+`total_plans: 62`, `completed_plans: 62`.
+
+## 4. Décisions prises en autonomie
+
+### D-1 — Disposition bilingue : miroir `manual/fr/` + `manual/en/` (option A)
+
+*Panel : `gsd-advisor-researcher`, angle « stratégie bilingue d'un manuel multi-pages lu sur
+GitHub », 7 critères instruits avec sources.*
+
+Retenu contre l'option « suffixes `.fr.md` » qui prolongeait pourtant la convention
+`README.md`/`README.fr.md` du repo. **Raison décisive** : le couplage langue ↔ chemin. En miroir de
+dossiers, un lien de navigation est toujours intra-dossier et ne peut structurellement pas traverser
+la frontière de langue ; avec des suffixes, un `.fr` oublié produit une **fuite silencieuse vers
+l'anglais**, indétectable à la relecture sur des dizaines de liens écrits à la main.
+
+Arguments d'appui : la sonde de parité se réduit à un `diff` de deux `find` (le repo a une culture
+forte de gates `check-*.sh`) ; le listing de `manual/` ne double pas en nombre de fichiers ; c'est
+la seule disposition qu'aucun générateur statique ne demanderait de réécrire (Docusaurus, VitePress,
+Starlight conventionnent tous le dossier par locale). Précédents multi-pages : `kubernetes/website`,
+`microsoft/generative-ai-for-beginners`, `tldr-pages/tldr`, `withastro/starlight` — le suffixe de
+langue n'existe en nature que pour des documents **mono-fichier**, ce qui est exactement le cas des
+deux README racine et n'a donc pas valeur de précédent ici.
+
+Conséquences opérationnelles retenues :
+
+1. Lien de navigation toujours relatif intra-langue :
+   `[← Précédent](./01-installation.md) · [↑ Sommaire](../README.md) · [Suivant →](./03-config.md)`.
+2. Le sélecteur de langue est le **seul** lien qui traverse, en tête de page — donc mécanique et
+   vérifiable par script (miroir du chemin, `fr` ↔ `en` au 2ᵉ segment).
+3. `manual/README.md` est le seul fichier bilingue : titre, une phrase, deux liens vers
+   `fr/README.md` et `en/README.md`. Chaque README racine pointe vers **sa** langue de manuel, ce qui
+   préserve la continuité de langue pour le lecteur.
+
+**Convergence indépendante** : le second panel (angle architecture d'information), instruit
+séparément et sans connaissance du premier, a écarté les suffixes pour la même famille de raisons
+plus une autre — les suffixes doublent le nombre de fichiers par dossier (14 au lieu de 7) et font
+sauter le seuil de lisibilité qu'il venait d'établir. Deux panels indépendants, même verdict : la
+décision est prise avec une confiance élevée.
+
+### D-2 — Profondeur : 2 niveaux, numérotation sur les **dossiers seulement**
+
+*Panel : `gsd-advisor-researcher`, angle « architecture d'information d'un manuel numéroté lu sur
+GitHub ».*
+
+Structure : `manual/<lang>/NN-theme/page.md`. Les fichiers gardent un **slug descriptif stable**
+(`installation.md`, `premier-lab.md`) — **jamais** de préfixe numérique.
+
+**Raison décisive** : sur GitHub il n'y a aucun build step, donc un numéro dans le nom de fichier
+entre dans l'URL. Renuméroter casserait tous les liens entrants et tous les liens croisés. Le
+contre-exemple apparent (Svelte, `documentation/docs/01-introduction/03-svelte-files.md`) ne
+s'applique pas : son site strippe les numéros à la génération, nous n'avons pas ce filet. Insérer un
+sujet coûte alors un fichier + une ligne de sommaire, **zéro renommage**. Les 7 dossiers de tête,
+eux, bougent au plus une fois par an — le renommage est assumé à ce niveau seulement.
+
+Le *gap numbering* (10/20/30) a été examiné puis écarté : il repousse le problème sans le résoudre
+et paraît arbitraire au lecteur humain.
+
+Cette décision reste fidèle au Goal du ROADMAP, qui demande une « arborescence thématique à préfixes
+numériques » : les préfixes portent l'arborescence, c'est-à-dire les dossiers.
+
+### D-3 — L'ordre vit dans un fichier unique, et la navigation est **générée**
+
+Un `manual/toc.yml` porte la séquence complète (modèle mdBook `SUMMARY.md` — « sans SUMMARY.md, il
+n'y a pas de livre » — et Deno `toc.json`). Le bandeau `← Précédent · ↑ Sommaire · Suivant →` est
+**généré** depuis ce fichier par `scripts/build-manual-nav.sh`, qui réécrit un bloc délimité par des
+marqueurs HTML.
+
+**Pourquoi ne pas l'écrire à la main** : 7 thèmes × ~6 pages × 2 langues ≈ 80 bandeaux, chacun avec
+deux liens relatifs. Tenir ça à la main sans filet ne marche pas — c'est la même classe de dette que
+ce repo a déjà payée sur les tags de release (v2.10.0 → v2.16.0 publiées sans tag, états
+intermédiaires irretrouvables). Le générateur transforme une discipline en propriété machine.
+
+### D-4 — Longueur de page : 100-200 lignes, bascule ferme à 300
+
+Cible ≈ 400-800 mots. **Point de bascule** : au-delà de 300 lignes **ou** de 3 titres H2 de même
+rang, la page se scinde. Seuil de re-division d'un dossier : **au-delà de 7 pages on scinde le
+thème** (plafond dur 9) — 5 à 9 items par palier étant le compromis établi entre hiérarchie plate et
+hiérarchie profonde. La « règle des 3 clics » est explicitement écartée comme critère.
+
+### D-5 — Séquence des 7 thèmes (trajectoire Diátaxis)
+
+Tutoriel → explication → how-to → référence → explication avancée :
+
+1. `01-demarrer` — installer, premier lancement, premier lab en 10 min. Le seul chemin qu'un inconnu
+   suit sans contexte ; il doit produire un succès visible avant toute théorie.
+2. `02-concepts` — lab, module, agent, skill, orchestrateur, gate. Sans ce vocabulaire les pages
+   suivantes sont illisibles ; le poser tôt évite de le redéfinir six fois.
+3. `03-modules` — catalogue, choisir son scope, activer/désactiver. C'est la promesse produit
+   (modules toggables) : elle mérite son thème, pas une annexe.
+4. `04-cycle-de-dev` — cadrer → planifier → exécuter → livrer au quotidien. Le how-to central, celui
+   qu'on relit ; après les concepts, avant l'exotisme.
+5. `05-equipe-agents` — orchestrateurs, workers internes, design, mobile-test. Différenciateur fort,
+   mais inutile tant que le cycle n'est pas acquis.
+6. `06-reference` — commandes, arborescence, config, options. Consulté, jamais lu : en fin de
+   parcours par construction.
+7. `07-sous-le-capot` — engine d'install, gates, ADR, contribuer. Public restreint (contributeurs) ;
+   dernier, et sert de pont vers `docs/`.
+
+### D-6 — La carte mermaid est **décorative**, la navigation réelle est une liste de liens
+
+Contrainte technique établie sur pièce : sur GitHub, **les liens relatifs et internes ne fonctionnent
+pas dans un diagramme mermaid** (seules les URL absolues passent) ; ni tooltips, ni callbacks, ni
+icônes ; emoji et ASCII étendu cassent le rendu ; aucun contrôle de layout.
+
+Conséquence retenue : la carte est un `flowchart LR` unique de **≤ 20 nœuds** (les 7 thèmes et leurs
+entrées, pas les ~40 pages), et une **liste markdown de liens relatifs la suit immédiatement**.
+C'est cette liste qui porte la navigation réelle, l'accessibilité (lecteurs d'écran) et le rendu
+mobile. Le Goal du ROADMAP demandait des graphiques mermaid : ils sont livrés, mais ils ne peuvent
+pas porter seuls la navigation.
+
+### D-7 — Ce qui reste dans `README.md` / `README.fr.md` (cible 120-160 lignes, plafond 200)
+
+Fonction irréductible du README, qu'aucune page de manuel ne reprend : **carte d'identité et porte
+d'entrée** — dire ce que c'est, prouver que c'est vivant, router. Un README qui « raconte »
+concurrence le manuel et dérive.
+
+**Restent** : titre + phrase de positionnement · badges (version, licence, CI) · démo/capture ·
+« pour qui / pourquoi » en 5 lignes · **quickstart copiable en 2 commandes** · un lien proéminent et
+unique vers `manual/` juste après le quickstart · statut du projet + lien CHANGELOG · licence ·
+contribution · sécurité · lien vers l'autre langue.
+
+**Migrent vers le manuel** : catalogue détaillé des modules, workflows, tutoriels, FAQ, dépannage,
+glossaire, architecture, comparaisons, exemples longs.
+
+**Ne migrent jamais** : badges, licence, statut/maintenance, quickstart, contribution, sécurité — ce
+sont des signaux de confiance attendus *sur la page d'atterrissage*, pas à un clic.
+
+### D-8 — `INSTALL.md` réduit à un stub de redirection (5-10 lignes), **pas supprimé**
+
+Le contenu canonique part dans `manual/<lang>/01-demarrer/installation.md`.
+
+**Pourquoi ne pas le supprimer** : `INSTALL` est une convention d'entrée héritée de GNU et il existe
+des liens entrants ; le supprimer les casse pour un gain nul. **Pourquoi ne pas le garder plein** :
+192 lignes maintenues en double du manuel divergeront — coût non borné et silencieux — là où
+l'indirection d'un clic est une frustration bornée. Le stub doit dire *où* et *pourquoi*, pas
+rediriger sèchement.
+
+Aucune suppression de fichier n'est donc au programme de cette mission.
+
