@@ -374,7 +374,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 ✅ (R&D, shippée v2.28.0)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 ✅ (code complet, release en attente de validation humaine)** ; **14 ✅ (indépendante)** ; **15 ✅ (shippée v2.40.0) → 16 ✅ (shippée v2.41.0)** ; **17 ✅ (indépendante de 16, terminée et vérifiée — release en attente de validation humaine) → 18 inscrite (dépend de 17)** ; **19 ✅ (2026-07-28, ADR-058) → 20 ✅ (mergée dans `main` le 2026-07-31, PR #21, release `v2.44.0`)** — ce merge **satisfait** la dépendance « Phase 20 requise » de 21, 22 et 23 ; **21 🚧 + 22 🚧 en vol (mission `reprise-p21-p22`, ordre libre entre elles — aucun fichier commun)** → **23 inscrite : attend la clôture de 21+22**, périmètre partagé sur `vf-dev-manager.md` / `intent-routing.md` (arbitré le 2026-07-31 : on ne planifie pas contre une base qui bouge ; l'arbitrage des étages de revue écrit par la 21 fait autorité) → **24 inscrite (dépendance doctrinale de 23, aucun fichier commun ; son lot MESURE est déjà rendu)**
+1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 ✅ (R&D, shippée v2.28.0)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 ✅ (code complet, release en attente de validation humaine)** ; **14 ✅ (indépendante)** ; **15 ✅ (shippée v2.40.0) → 16 ✅ (shippée v2.41.0)** ; **17 ✅ (indépendante de 16, terminée et vérifiée — release en attente de validation humaine) → 18 inscrite (dépend de 17)** ; **19 ✅ (2026-07-28, ADR-058) → 20 ✅ (mergée dans `main` le 2026-07-31, PR #21, release `v2.44.0`)** — ce merge **satisfait** la dépendance « Phase 20 requise » de 21, 22 et 23 ; **21 🚧 + 22 🚧 en vol (mission `reprise-p21-p22`, ordre libre entre elles — aucun fichier commun)** → **23 inscrite : attend la clôture de 21+22**, périmètre partagé sur `vf-dev-manager.md` / `intent-routing.md` (arbitré le 2026-07-31 : on ne planifie pas contre une base qui bouge ; l'arbitrage des étages de revue écrit par la 21 fait autorité) → **24 inscrite (dépendance doctrinale de 23, aucun fichier commun ; son lot MESURE est déjà rendu)** → **25 inscrite : après 24** (son volet G1 pose un gate sur `plugin/*/agents/*.md`, les fichiers mêmes que M3/`effort:` et A2/`agent_skills` éditent) **et dépendante de 23** (son volet G2 insère un étage dans `discuss → plan`, dont la voie unique d'invocation est arbitrée en 23)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -402,6 +402,7 @@ Plans:
 | 22. Hygiène documentaire — doctrine de sortie | — | 1/3 | En cours — 22-01 livré (3/3 tâches, SUMMARY), 22-02 en exécution, DOCF-01..07 mappés au ledger | — |
 | 23. Couplage explicite au moteur GSD | — | 0/0 | Inscrite — 7 lacunes, sûreté en premier ; **attend la clôture de 21+22** (périmètre partagé sur `vf-dev-manager.md`) | — |
 | 24. Activation et mesure du moteur GSD | — | 0/0 | Inscrite — lot MESURE : M2 **rendu** le 2026-07-31, M1/M3 à instruire ; lot ACTIVATION : 8 items | — |
+| 25. Budget d'instructions et étage d'alignement court | — | 0/0 | Inscrite — G1 (compteur d'instructions dans `check-agents.sh`) après 24 ; G2 (outline court `discuss`→`plan`) dépend de 23 | — |
 
 ### Phase 15: Collaboration inter-équipes dev ↔ design
 
@@ -1332,13 +1333,16 @@ plans d'une même phase) est perdu, et seul subsiste le parallélisme **inter-n�
 duplique pas celle de GSD, **elle est la seule qui parallélise réellement**.
 
 **Voies retenues (arbitrées par Samuel le 2026-07-31), deux sur trois :**
+
 1. **Acter et documenter** — écrire en doctrine que sur ce runtime le parallélisme **inter-nœuds**
    porté par `vf-dev-manager` est le seul effectif, et que le parallélisme **intra-étape** des vagues
    GSD est perdu par décision du moteur. Gratuit, immédiat, et consolide l'architecture existante au
    lieu de la remettre en cause.
+
 2. **Signaler le descripteur en amont** — remonter à `@opengsd/gsd-core`, **mesure horodatée à
    l'appui**, que `backgroundDispatch: false` est *fail-closed* mais non descriptif du runtime
    Claude Code. Bénéfice collectif : débloquerait le parallélisme intra-étape pour tous les labs.
+
 3. ~~Activer `claude_orchestration.enabled`~~ — **ÉCARTÉ pour l'instant** : placer un backend
    **BETA** sur le chemin critique d'exécution n'est pas justifié quand notre propre parallélisme
    fonctionne (mesuré). À reconsidérer seulement si le parallélisme intra-étape devient un besoin
@@ -1424,3 +1428,86 @@ fichier de doctrine touché) — et M2 gagne à être connu tôt.
 Plans:
 
 - [ ] TBD (run /gsd-plan-phase 24 to break down)
+
+### Phase 25: Budget d'instructions et étage d'alignement court
+
+> **Origine** — audit du 2026-07-31 de `shanraisshan/claude-code-best-practice` (65k ★, veille
+> communautaire Claude Code), demandé par Samuel pour vérifier si le pari GSD tenait. Verdict sur
+> ce point : **GSD y est cité** (rang 7/12 des workflows, `README.md:122`) — la ligne pointait
+> simplement le repo archivé, corrigé en amont par PR #169. Deux constats **méthodologiques**
+> survivent à l'audit et n'appartiennent ni à la Phase 23 ni à la Phase 24 : ils sont ci-dessous.
+> Source primaire commune : Dex Horthy (HumanLayer), *« Everything We Got Wrong About
+> Research-Plan-Implement »*, MLOps Community, 2026-03-24.
+
+**Goal**: Corriger deux défauts de **notre propre couche**, indépendants du moteur — (a) la densité
+d'agents et de skills est bornée par une métrique qui ne prédit pas l'adhérence, (b) le seul
+document que l'humain relit avant l'écriture du code est trop long pour être relu. Les deux
+attaquent la même chose : **ce que le modèle suit réellement, et ce que l'humain peut réellement
+corriger avant qu'il soit trop tard.**
+
+**Le point de départ n'est ni une panne ni un couplage — c'est un mauvais instrument de mesure
+dans un cas, un artefact manquant dans l'autre.**
+
+#### G1 — Le budget d'instructions n'est pas mesuré
+
+Fait amont : les LLM frontier suivent **~150-200 instructions** avec constance ; au-delà,
+l'adhérence devient stochastique. HumanLayer l'a payé cash — leur méga-prompt `create_plan`
+portait **85 instructions** et **sautait ses étapes à plus haute valeur ~50 % du temps** (poser les
+questions, aligner avant d'écrire). Le correctif qui a marché n'a pas été une meilleure rédaction
+mais le **découpage** : `research → plan → implement` est devenu sept prompts de moins de 40
+instructions chacun.
+
+État du lab : **ADR-029 borne les lignes** (agents ≤ 250, skills ≤ 500) et `check-agents.sh`
+l'applique. Les lignes sont un proxy défaillant — une skill de 200 lignes portant 90 impératifs
+est plus dangereuse qu'une de 400 lignes en portant 30. Nous mesurons le volume, pas la charge
+d'instruction, et rien ne dit aujourd'hui laquelle de nos briques est en zone rouge.
+
+À trancher au plan : la métrique exacte (quelles formes comptent comme instruction normative), le
+seuil, la portée (agents seuls ou agents + skills), et si le dépassement **bloque** ou **signale** —
+recouper avec l'Axiome 1 et la doctrine ADR-031.
+
+#### G2 — L'étage d'alignement court manque entre `discuss` et `plan`
+
+Fait amont : *« Don't read the plans. Please read the code. »* Un plan de 1000 lignes produit
+~1000 lignes de code à 10 % près — le relire n'est pas du levier, c'est le même travail deux fois,
+et le code livré diffère du plan. Leur substitution : un **design doc ~200 lignes** puis un
+**structure outline de 2 pages** (« si le plan est l'implémentation, l'outline c'est le fichier
+`.h` ») revus **avant** l'écriture, où une correction coûte une phrase au lieu d'un refactor.
+
+État du lab, **vérifié sur pièce** (Phase 22) : l'étage « design » **existe déjà** —
+`22-CONTEXT.md` fait **361 lignes** et porte frontière, décisions et références. C'est l'étage
+**outline** qui manque : le document réellement soumis au jugement humain reste PLAN.md, soit
+**1291 lignes sur 3 plans** pour cette seule phase. Le dernier point de correction bon marché
+n'existe pas.
+
+Corollaire à instruire : le même travail établit que les modèles écrivent **systématiquement des
+plans horizontaux** (toute la DB, puis toute l'API, puis tout le front) et qu'**aucun prompt ne
+l'empêche** — l'outline est le seul correctif structurel connu. Le lab **pratique** déjà le
+tracer-first (3 plans Phase 22) **sans l'avoir doctriné** : à acter comme règle ou à écarter
+explicitement.
+
+À trancher au plan : forme de l'artefact (document propre, section de CONTEXT.md, ou capability
+accrochée à `plan:pre`), et si CONTEXT.md doit maigrir en conséquence plutôt que s'ajouter à la
+pile.
+
+#### Frontières — ce que cette phase ne fait pas
+
+- **vs Phase 23 (couplage explicite au moteur).** G2 insère un étage dans la chaîne
+  `discuss → plan`. Le point d'insertion **ne peut pas être décidé** avant que la voie unique
+  d'invocation et la doctrine de flags soient arrêtées. Cette phase **dépend** de 23 et ne la
+  préempte pas ; si l'artefact prend la forme d'une capability `plan:pre`, la table
+  capabilities/hooks de la Phase 23 fait foi.
+- **vs Phase 24 (activation et mesure).** M3 (`effort:` par rôle) et A2 (`agent_skills`)
+  éditent tous deux `plugin/*/agents/*.md` — les fichiers mêmes sur lesquels G1 pose un gate.
+  Ordonnancement **après 24** pour ne pas calibrer un seuil sur un état qui bouge, et pour éviter
+  les éditions concurrentes.
+- **G1 n'est pas une capability GSD.** C'est une règle de densité propre à VibeFlow (ADR-029)
+  outillée par notre propre gate. Aucun recouvrement avec le lot ACTIVATION de la Phase 24.
+
+**Requirements**: TBD (à mapper au ledger pendant le plan)
+**Depends on:** Phase 24 (et Phase 23 pour le volet G2)
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 25 to break down)

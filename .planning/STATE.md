@@ -10,7 +10,7 @@ last_updated: "2026-07-31T16:25:27.886Z"
 last_activity: 2026-07-31
 last_activity_desc: Phase 22 execution started
 progress:
-  total_phases: 22
+  total_phases: 25
   completed_phases: 10
   total_plans: 52
   completed_plans: 29
@@ -258,6 +258,23 @@ Progress: [██████░░░░] 59%
 ## Accumulated Context
 
 ### Roadmap Evolution
+
+- 2026-07-31 : **Phase 25 ajoutée** — « Budget d'instructions et étage d'alignement court ».
+  Origine : audit de `shanraisshan/claude-code-best-practice` (65k ★), demandé par Samuel pour
+  vérifier si le pari GSD tenait. **Il tient** — GSD y est cité rang 7/12 (`README.md:122`), la
+  ligne pointait seulement le repo archivé `gsd-build/get-shit-done` (archivé 2026-06-26) au lieu
+  de `open-gsd/gsd-core` ; corrigé en amont par **PR #169** (lien + ★ 65k→7.5k + agents 33→34 +
+  commandes 67→71 + skills 0→71, plus la commande de veille hebdomadaire qui aurait reverté). Le
+  critère d'inclusion de cette table est **étoiles + choix du curateur**, aucun jugement
+  méthodologique : rien dans ce repo n'infirme le choix de moteur. Deux constats **de notre propre
+  couche** en sortent, hors périmètre 23 et 24 : **G1** — ADR-029 borne les **lignes** alors que le
+  prédicteur d'adhérence est le **nombre d'instructions normatives** (~150-200 max ; HumanLayer
+  sautait 50 % de ses étapes à 85 instructions) → compteur à ajouter à `check-agents.sh` ; **G2** —
+  l'étage « design » existe (`22-CONTEXT.md`, 361 lignes) mais l'étage **outline court** manque, si
+  bien que le seul document relu avant l'écriture du code reste PLAN.md (**1291 lignes sur 3 plans**
+  pour la Phase 22). Ordonnée **après 24** (G1 édite les mêmes fichiers d'agents que M3/A2) et
+  **dépendante de 23** (G2 insère un étage dans `discuss → plan`, dont la voie unique est arbitrée
+  en 23).
 
 - 2026-07-31 : **Phase 23 ajoutée** — « Couplage explicite au moteur GSD — capabilities, flags et
   voie unique ». Origine : Samuel observe un `gsd-pattern-mapper` spawné en session **inline** (hors
