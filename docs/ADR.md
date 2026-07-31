@@ -1354,9 +1354,20 @@ contrôle de VibeFlow, même patron que la RFC de la Phase 18)** :
    `SUMMARY.md` (missions d'équipe, cadrage allégé) voit ses compteurs régresser à chaque écriture
    d'état, sans qu'aucun signal ne le prévienne.
 
-Le texte des deux signalements est rédigé dans `.planning/missions/2026-07-31-delta-gsd-core-1.9.0.md`
-(section à compléter par le dépôt effectif) — **le dépôt lui-même (issue ou PR sur
-`github.com/open-gsd/gsd-core`) reste une action humaine**, cette ADR ne prétend pas l'avoir fait.
+**Déposés le 2026-08-01**, sur accord de Samuel : point 1 → [open-gsd/gsd-core#2956](https://github.com/open-gsd/gsd-core/issues/2956),
+point 2 → [#2957](https://github.com/open-gsd/gsd-core/issues/2957), croisées l'une vers l'autre.
+
+La recherche préalable a affiné le point 1 : le défaut a une **lignée établie** en amont —
+[#2444](https://github.com/open-gsd/gsd-core/issues/2444) a scopé `Stopped At`,
+[#2567](https://github.com/open-gsd/gsd-core/issues/2567) a signalé que les champs frères restaient
+exposés. `Last Activity` a alors reçu un garde-fou propre (`preferNewerLastActivity`, sur la
+direction de date plutôt que sur la section — son commentaire dit pourquoi : il n'a pas de section
+canonique). **`Phase` n'a rien reçu**, alors qu'il vit, lui, dans une section canonique : le
+correctif de #2444 s'y applique tel quel. C'est l'argument porté par #2956.
+
+Le point 2 a été porté plus haut que « il manque un repli » : `buildStateFrontmatter` lit le
+ROADMAP pour le **dénominateur** (`Math.max(phaseDirs.length, roadmapPhaseCount)`) et refuse de le
+lire pour le **numérateur** — ce qui désigne un oubli, pas un choix de conception.
 
 **Sur le backfill des `SUMMARY.md` manquants (Phases 11/12/13/14)** : **non tranché ici,
 explicitement remonté à Samuel.** Deux options restent ouvertes — (a) backfiller rétroactivement

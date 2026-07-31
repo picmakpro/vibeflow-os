@@ -8,8 +8,57 @@
 - ✅ **memory-swarm-rnd** — Phase 9 — R&D : transposition du modèle mémoire + patterns swarm de jcode — spike GO, shippé `v2.28.0` (ADR-052 mémoire vivante + ADR-053 swarm)
 - ✅ **gsd-migration** — Phases 10-11 — clos 2026-07-26, release `v2.39.0` — migration du package GSD `get-shit-done-cc` → `@opengsd/gsd-core@^1` (VOC-02)
 - ✅ **vf-routing** — Phases 12-14 — clos 2026-07-26, release `v2.37.0` — routage fin des intentions (verbes `/vf-*` à l'origine ; carte d'intention agentique depuis la bascule v2.33.0), couverture complète des skills GSD, pont spec → feuille de route, et frontière d'altitude avec le moteur de planning GSD
+- 🚧 **gsd-alignement** — Phases 23-25 — **ouvert le 2026-08-01**, aucune phase démarrée — couplage explicite au moteur GSD, activation des capacités dormantes, budget d'instructions
+
+> **Origine des Phases 23 à 25, dite franchement.** Elles ont été inscrites au ROADMAP le
+> 2026-07-31 par une session concurrente, **hors du périmètre confié** à la mission qui tournait
+> alors (« fin de Phase 20 + toute la Phase 21 »), et poussées dans la PR #23 sans avoir été
+> commandées. Le contenu a été jugé sérieux et **conservé** sur arbitrage de Samuel le
+> 2026-08-01 ; ce jalon existe pour qu'elles cessent d'être des clandestines rattachées à
+> aucun milestone. Leur ouverture reste soumise au cadrage normal (`gsd-discuss-phase`) —
+> être inscrite au ROADMAP ne vaut pas feu vert d'exécution.
 
 ## Phases
+
+### État des phases — checklist lue par le moteur
+
+> **Ne pas retirer.** C'est la SEULE forme que `@opengsd/gsd-core` lit pour établir qu'une phase
+> est terminée (`roadmap.cjs` → `checkboxPattern`) ; il la coche lui-même à la clôture d'une phase
+> vérifiée. La table `## Progress` plus bas, elle, n'est lue par aucun outil : elle est rédigée
+> pour les humains et les deux doivent rester d'accord.
+>
+> Cette checklist a été posée le 2026-08-01, après coup : le ROADMAP n'en avait jamais eu, si bien
+> que le moteur voyait **zéro** phase terminée et rendait des compteurs faux
+> (`completed_phases: 10`, `current_phase: 19` alors que la 22 était livrée). C'est aussi ce qui
+> rattrape les **20 plans sans SUMMARY** des Phases 11 à 14 : `roadmap.cjs` fait explicitement
+> primer la case cochée sur le disque, « pour les phases terminées avant le tracking GSD, qui
+> n'ont pas les paires PLAN/SUMMARY ». Ces 4 phases sont shippées, chacune avec sa release.
+
+- [x] Phase 1: dev-orchestrator (completed 2026-06-04)
+- [x] Phase 2: Manifeste & résolveur (completed 2026-06-04)
+- [x] Phase 3: Engine scope-aware (completed 2026-06-05)
+- [x] Phase 4: Skill /vibeflow-install + auto-lancement (completed 2026-06-05)
+- [x] Phase 5: Packaging plugin (completed 2026-06-05)
+- [x] Phase 6: dev-orchestrator first-use (completed 2026-06-05)
+- [x] Phase 7: Philosophies de dev (completed 2026-07-07)
+- [x] Phase 8: Consolidation des doublons (completed 2026-07-07)
+- [x] Phase 9: Spike transposition jcode (mémoire + swarm) (completed 2026-07-22)
+- [x] Phase 10: Étude & faisabilité migration GSD (completed 2026-07-26)
+- [x] Phase 11: Intégration migration GSD (completed 2026-07-26)
+- [x] Phase 12: Routage fin & couverture complète des verbes (completed 2026-07-25)
+- [x] Phase 13: Pont spec → feuille de route (completed 2026-07-26)
+- [x] Phase 14: Frontière d'altitude planning-core / moteur GSD (completed 2026-07-25)
+- [x] Phase 15: Collaboration inter-équipes dev ↔ design (completed 2026-07-27)
+- [x] Phase 16: Cloisonnement complet des dispatches d'agents (completed 2026-07-27)
+- [x] Phase 17: Signaux de démarrage du moteur de dev (completed 2026-07-28)
+- [ ] Phase 18: Survie du ledger d'exigences à la clôture de jalon
+- [x] Phase 19: Migration du moteur GSD pilotée par /vf-update (completed 2026-07-28)
+- [x] Phase 20: Fluidité du flux de dev sans perte de qualité (completed 2026-07-31)
+- [x] Phase 21: Alignement du moteur GSD sur gsd-core 1.9.0 (completed 2026-07-31)
+- [x] Phase 22: Hygiène documentaire — doctrine de sortie et captation d'intention (completed 2026-07-31)
+- [ ] Phase 23: Couplage explicite au moteur GSD — capabilities, flags et voie unique
+- [ ] Phase 24: Activation et mesure du moteur GSD — capacités dormantes et faits de runtime
+- [ ] Phase 25: Budget d'instructions et étage d'alignement court
 
 <details>
 <summary>✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04</summary>
@@ -374,7 +423,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 ✅ (R&D, shippée v2.28.0)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 ✅ (code complet, release en attente de validation humaine)** ; **14 ✅ (indépendante)** ; **15 ✅ (shippée v2.40.0) → 16 ✅ (shippée v2.41.0)** ; **17 ✅ (indépendante de 16, terminée et vérifiée — release en attente de validation humaine) → 18 inscrite (dépend de 17)** ; **19 ✅ (2026-07-28, ADR-058) → 20 ✅ (mergée dans `main` le 2026-07-31, PR #21, release `v2.44.0`)** — ce merge **satisfait** la dépendance « Phase 20 requise » de 21, 22 et 23 ; **21 🚧 + 22 🚧 en vol (mission `reprise-p21-p22`, ordre libre entre elles — aucun fichier commun)** → **23 inscrite : attend la clôture de 21+22**, périmètre partagé sur `vf-dev-manager.md` / `intent-routing.md` (arbitré le 2026-07-31 : on ne planifie pas contre une base qui bouge ; l'arbitrage des étages de revue écrit par la 21 fait autorité) → **24 inscrite (dépendance doctrinale de 23, aucun fichier commun ; son lot MESURE est déjà rendu)** → **25 inscrite : après 24** (son volet G1 pose un gate sur `plugin/*/agents/*.md`, les fichiers mêmes que M3/`effort:` et A2/`agent_skills` éditent) **et dépendante de 23** (son volet G2 insère un étage dans `discuss → plan`, dont la voie unique d'invocation est arbitrée en 23)
+1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 ✅ (R&D, shippée v2.28.0)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 ✅ (code complet, release en attente de validation humaine)** ; **14 ✅ (indépendante)** ; **15 ✅ (shippée v2.40.0) → 16 ✅ (shippée v2.41.0)** ; **17 ✅ (indépendante de 16, terminée et vérifiée — release en attente de validation humaine) → 18 inscrite (dépend de 17)** ; **19 ✅ (2026-07-28, ADR-058) → 20 ✅ (mergée dans `main` le 2026-07-31, PR #21, release `v2.44.0`)** — ce merge **satisfait** la dépendance « Phase 20 requise » de 21, 22 et 23 ; **21 ✅ (mergée le 2026-07-31, PR #22, release `v2.45.0`) + 22 ✅ (mergée le 2026-07-31, PR #23)** — les deux livrées par la mission `reprise-p21-p22`, sans fichier commun ; leur clôture **lève la dépendance** de 23 → **23 inscrite**, périmètre partagé sur `vf-dev-manager.md` / `intent-routing.md` (arbitré le 2026-07-31 : on ne planifie pas contre une base qui bouge ; l'arbitrage des étages de revue écrit par la 21 fait autorité) → **24 inscrite (dépendance doctrinale de 23, aucun fichier commun ; son lot MESURE est déjà rendu)** → **25 inscrite : après 24** (son volet G1 pose un gate sur `plugin/*/agents/*.md`, les fichiers mêmes que M3/`effort:` et A2/`agent_skills` éditent) **et dépendante de 23** (son volet G2 insère un étage dans `discuss → plan`, dont la voie unique d'invocation est arbitrée en 23)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -398,11 +447,11 @@ Plans:
 | 18. Survie du ledger d'exigences | — | 0/0 | Inscrite — périmètre réduit le 2026-07-28 par `18-STUDY.md`, non planifiée | — |
 | 19. Migration du moteur GSD par /vf-update | — | 3/3 | Complete — 3 plans exécutés, VERIFICATION produite, module `dev-orchestrator` v2.7.0 + `conductor` v1.16.0, ADR-058 | 2026-07-28 |
 | 20. Fluidité du flux de dev sans perte de qualité | — | 7/7 | Complete — **mergée dans `main`** (PR #21, `d549b2d`), release `v2.44.0`, VERIFICATION produite | 2026-07-31 |
-| 21. Alignement du moteur GSD sur gsd-core 1.9.0 | — | 0/0 | En planification — pilotée par la mission `reprise-p21-p22` (verrou de driver actif) | — |
-| 22. Hygiène documentaire — doctrine de sortie | — | 1/3 | En cours — 22-01 livré (3/3 tâches, SUMMARY), 22-02 en exécution, DOCF-01..07 mappés au ledger | — |
-| 23. Couplage explicite au moteur GSD | — | 0/0 | Inscrite — 7 lacunes, sûreté en premier ; **attend la clôture de 21+22** (périmètre partagé sur `vf-dev-manager.md`) | — |
-| 24. Activation et mesure du moteur GSD | — | 0/0 | Inscrite — lot MESURE : M2 **rendu** le 2026-07-31, M1/M3 à instruire ; lot ACTIVATION : 8 items | — |
-| 25. Budget d'instructions et étage d'alignement court | — | 0/0 | Inscrite — G1 (compteur d'instructions dans `check-agents.sh`) après 24 ; G2 (outline court `discuss`→`plan`) dépend de 23 | — |
+| 21. Alignement du moteur GSD sur gsd-core 1.9.0 | — | 5/5 | Complete — **mergée dans `main`** (PR #22, `d89a60e`), release `v2.45.0`, VERIFICATION produite, ADR-061/062/063 | 2026-07-31 |
+| 22. Hygiène documentaire — doctrine de sortie | — | 3/3 | Complete — **mergée dans `main`** (PR #23, `474c3eb`), `dev-orchestrator` v2.9.0 + `design-orchestrator` v1.4.0 | 2026-07-31 |
+| 23. Couplage explicite au moteur GSD | gsd-alignement | 0/0 | Inscrite — 7 lacunes, sûreté en premier ; dépendance 21+22 **levée** (les deux mergées le 2026-07-31) | — |
+| 24. Activation et mesure du moteur GSD | gsd-alignement | 0/0 | Inscrite — lot MESURE : M2 **rendu** le 2026-07-31, M1/M3 à instruire ; lot ACTIVATION : 8 items | — |
+| 25. Budget d'instructions et étage d'alignement court | gsd-alignement | 0/0 | Inscrite — G1 (compteur d'instructions dans `check-agents.sh`) après 24 ; G2 (outline court `discuss`→`plan`) dépend de 23 | — |
 
 ### Phase 15: Collaboration inter-équipes dev ↔ design
 
@@ -1047,7 +1096,7 @@ Plans:
 - [x] 21-02-PLAN.md — Changements 2, 3, 4 : contrat `estimate:`/`actuals:` relayé verbatim, ADR-061 (recouvrement lanes de revue amont vs étage 20-06), hypothèse datée du dispatch nommé + recoupement #1995/#2608 (vague 1)
 - [x] 21-03-PLAN.md — Changements 5, 6 : purge de la dette de version 1.8.0 → 1.9.0, ADR-062 (hooks 1.9.0 non câblés, absence correcte dans les deux cas) (vague 2)
 - [x] 21-04-PLAN.md — Point hérité : `check-state-integrity.sh` (gate anti-régression du frontmatter de `STATE.md`, module `conductor` v1.18.0) et ADR-063 (arbitrage de l'anomalie d'agrégation) (vague 2)
-- [x] 21-05-PLAN.md — Gouvernance : CI remise au vert (compteur de suites), 2 modules bumpés (`dev-orchestrator` v2.10.0 — v2.9.0 prise par la Phase 22, `planning-core` v2.5.3), ROADMAP recalé, 4 warnings traités, `STATE.md` recalé, release racine v2.45.0 préparée (vague 3, dépend de tous)
+- [x] 21-05-PLAN.md — Gouvernance : CI remise au vert (compteur de suites), 2 modules bumpés (`dev-orchestrator` v2.10.0 — v2.9.0 étant déjà prise en amont, `planning-core` v2.5.3), ROADMAP recalé, 4 warnings traités, `STATE.md` recalé, release racine v2.45.0 préparée (vague 3, dépend de tous)
 
 ### Phase 22: Hygiène documentaire — doctrine de sortie et captation d'intention
 
