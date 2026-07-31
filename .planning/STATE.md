@@ -257,6 +257,24 @@ Progress: [██████████] 3/3 phases — SHIPPED `v2.37.0`
 
 ### Roadmap Evolution
 
+- 2026-07-31 : **Phase 21 ajoutée** — « Alignement du moteur GSD sur gsd-core 1.9.0 ». Origine : la
+  mise à jour du moteur de 1.8.0 vers 1.9.0 sur le poste de Samuel le 2026-07-31 (11:35). Delta
+  établi **sur pièce** (`npm pack` des deux versions + diff intégral des tarballs + vérification de
+  l'installation vivante), archivé en `.planning/missions/2026-07-31-delta-gsd-core-1.9.0.md`.
+  **Vérifié avant ouverture : le dispatch tient** — aucun frontmatter d'agent modifié, 71 skills des
+  deux côtés sans ajout ni suppression, `_runtime-launcher.snippet.sh` identique, 43 suites vertes,
+  gates `check-gsd-engine.sh` / `detect-gsd-engine.sh` au vert. La phase est de l'**alignement**, pas
+  du sauvetage, sauf sur un point : l'injection MCP ADR-051 est **structurellement inopérante** sur
+  ce poste (`inject-mcp-tools.sh` dérive ses serveurs de `./.mcp.json`, or les serveurs sont en
+  **scope global** dans `~/.claude.json` — `--verify` sort en `3 / INDÉTERMINÉ` au lieu de signaler
+  le manque, et `gsd-executor` est aveugle à XcodeBuildMCP sur les labs iOS). Périmètre arbitré par
+  Samuel : **une phase unique, exhaustive, rituel allégé** — injection MCP, contrat
+  `estimate:`/`actuals:` (ADR-2629 amont), recouvrement avec les lanes de revue amont (ADR-2782) vs
+  l'étage de revue livré en 20-06, `runtime-aware-dispatch` (#2508) et `executor-isolation-dispatch`,
+  purge de la dette de version 1.8.0 (dont le **cas 8 de `test-check-gsd-engine.sh` qui asserte la
+  chaîne littérale `1.8.0`**), et statut des hooks 1.9.0 non câblés. **Dépend du merge de la Phase
+  20** — même règle que le diagnostic du 2026-07-29.
+
 - 2026-07-28 : **Phase 20 ajoutée** — « Fluidité du flux de dev sans perte de qualité ». Origine :
   **second rapport de l'audit externe du 2026-07-28** (même lab `ExploreSomfy`, tranche iOS en 5
   lots dont 2 parallélisés par worktrees, ~90 commits, suite 177 → 331 tests), archivé en
