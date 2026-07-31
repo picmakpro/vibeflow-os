@@ -111,14 +111,17 @@ else
   ko "7 structurel D-05 : aucun sort -V / newer / comparaison numérique de version hors commentaires" "sort-V=$c_sortv newer=$c_newer numver=$c_numver"
 fi
 
-# === Cas 8 — assertions documentaires D-05 : en-tête cite 1.42.3, 1.8.0, semver ===================
+# === Cas 8 — assertions documentaires D-05 : en-tête cite 1.42.3, 1.9.0, semver ===================
+# Bouge avec le texte de check-gsd-engine.sh:25 à chaque migration du poste courant (Phase
+# 21-03/Changement 5) — jamais affaibli ni neutralisé, la leçon D-05 reste vraie quel que soit le
+# numéro « aujourd'hui » : la migration se décide sur le nom du paquet/layout, jamais un semver.
 c_142=$(grep '^# ' "$SCRIPT" | grep -c '1\.42\.3')
-c_180=$(grep '^# ' "$SCRIPT" | grep -c '1\.8\.0')
+c_190=$(grep '^# ' "$SCRIPT" | grep -c '1\.9\.0')
 c_semver=$(grep '^# ' "$SCRIPT" | grep -ci 'semver')
-if [ "$c_142" -ge 1 ] && [ "$c_180" -ge 1 ] && [ "$c_semver" -ge 1 ]; then
-  ok "8 documentaire D-05 : en-tête cite 1.42.3, 1.8.0 et semver"
+if [ "$c_142" -ge 1 ] && [ "$c_190" -ge 1 ] && [ "$c_semver" -ge 1 ]; then
+  ok "8 documentaire D-05 : en-tête cite 1.42.3, 1.9.0 et semver"
 else
-  ko "8 documentaire D-05 : en-tête cite 1.42.3, 1.8.0 et semver" "142=$c_142 180=$c_180 semver=$c_semver"
+  ko "8 documentaire D-05 : en-tête cite 1.42.3, 1.9.0 et semver" "142=$c_142 190=$c_190 semver=$c_semver"
 fi
 
 # === Cas 9 — scénario réel du rapport (D-11) : legacy + cache plugin planté « à jour » → toujours legacy
