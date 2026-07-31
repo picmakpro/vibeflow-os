@@ -5,16 +5,20 @@
 ### Ajouté
 - **`check-state-integrity.sh`** — gate anti-régression du frontmatter de `.planning/STATE.md`.
   Compare l'état courant (fichier de travail ou `--current-ref`) à une référence git (`--against`,
-  défaut `HEAD`) et échoue si `completed_phases`, `completed_plans` ou `current_phase` ont
-  décru **au sein d'un même jalon** (`milestone:` inchangé — un changement de jalon réinitialise
-  légitimement ces compteurs). Vérifie en même temps que le corps du fichier ne porte
-  **qu'une seule** ligne `^Phase:` (ADR-063) — la même fonction amont qui régresse les compteurs
-  (`buildStateFrontmatter`, `gsd-core` 1.9.0) prend aussi le premier `^Phase:` du corps sans scope
-  si plusieurs sections en portent une. Transforme en échec bruyant l'anomalie d'agrégation
-  constatée le 2026-07-31 (clôture 20-07 : `completed_phases` 11→10, `total_plans` 53→49,
-  `completed_plans` 37→29 après une écriture d'état, silencieusement). Suite dédiée, 23 cas, dont 2
-  discriminations machine par comparaison directe (garde de jalon, 1 vs 2 lignes `^Phase:`) —
-  4 mutants tués (garde de régression, garde `^Phase:`, garde de jalon, garde de ref `--against`).
+  défaut `HEAD`) et échoue si `completed_phases`, `completed_plans`, `total_plans` ou
+  `current_phase` ont décru **au sein d'un même jalon** (`milestone:` inchangé — un changement de
+  jalon réinitialise légitimement ces compteurs ; un `milestone:` absent/illisible d'un seul côté
+  est traité comme une intégrité compromise, jamais comme un skip silencieux). Vérifie en même
+  temps que le corps du fichier ne porte **qu'une seule** ligne `^Phase:` (ADR-063) — la même
+  fonction amont qui régresse les compteurs (`buildStateFrontmatter`, `gsd-core` 1.9.0) prend aussi
+  le premier `^Phase:` du corps sans scope si plusieurs sections en portent une. Transforme en
+  échec bruyant l'anomalie d'agrégation constatée le 2026-07-31 (clôture 20-07 :
+  `completed_phases` 11→10, `total_plans` 53→49, `completed_plans` 37→29 après une écriture
+  d'état, silencieusement). Suite dédiée, 25 cas, dont 3 discriminations machine par comparaison
+  directe (garde de jalon, garde de jalon illisible, 1 vs 2 lignes `^Phase:`) — 6 mutants tués
+  (garde de régression, garde `^Phase:`, garde de jalon, garde de ref `--against`, champ
+  `total_plans` protégé, garde de jalon illisible — ces deux derniers ajoutés par revue
+  `vf-reviewer`, PASS après correctif).
 
 ## [v1.17.0] — 2026-07-31 (fluidité du flux de dev sans perte de qualité, Phase 20)
 

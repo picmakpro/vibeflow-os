@@ -1370,11 +1370,12 @@ manuel permanent, désormais gardé plutôt qu'invisible.
 
 **Positives** : la classe d'incident ne peut plus dormir jusqu'à la prochaine relecture humaine —
 `check-state-integrity.sh` échoue bruyamment. Le corps de `STATE.md` respecte une convention
-vérifiable au lieu de tenir par chance (le commentaire de `state.cjs:1402-1413` documentant le
-défaut de scope de `Phase` était déjà vrai avant cette mission — seul le hasard du contenu du
-fichier avait empêché la casse jusqu'ici). La distinction Cause A / Cause B empêche de sur-corriger
-un défaut d'artefact local avec du code, ou de sous-réagir à un vrai bug amont en l'absorbant en
-silence.
+vérifiable au lieu de tenir par chance (l'asymétrie de `state.cjs:1402-1413` — qui scope `Stopped
+At`/`Paused At` à `## Session` mais ne mentionne jamais `Phase` — établit que le défaut de scope de
+`Phase` était déjà vrai avant cette mission ; seul le hasard du contenu du fichier avait empêché la
+casse jusqu'ici, pas un choix délibéré du code amont). La distinction Cause A / Cause B empêche de
+sur-corriger un défaut d'artefact local avec du code, ou de sous-réagir à un vrai bug amont en
+l'absorbant en silence.
 **Négatives** : le gate ne corrige rien à la source — une régression continuera de se produire à
 chaque écriture d'état tant que Cause A/B ne sont pas résolues en amont ou par backfill ; il la
 rend seulement visible. Le signalement amont a un délai et une issue indéterminés (même risque que

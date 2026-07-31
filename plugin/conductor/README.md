@@ -90,8 +90,8 @@ première instanciation non-dev) et les **bundles métier** (business-pilot, con
   risque de `.planning/MISSION-INVARIANTS.md` ne matche plus aucun fichier suivi ; il ne juge
   jamais, il signale.
 - `check-state-integrity.sh` — gate anti-régression (Phase 21) : `completed_phases`,
-  `completed_plans` et `current_phase` de `.planning/STATE.md` ne décroissent jamais au sein d'un
-  même jalon, et le corps ne porte jamais plus d'une ligne `^Phase:` (ADR-063).
+  `completed_plans`, `total_plans` et `current_phase` de `.planning/STATE.md` ne décroissent jamais
+  au sein d'un même jalon, et le corps ne porte jamais plus d'une ligne `^Phase:` (ADR-063).
 
 **Team-kernel** : `dag.sh` (plan de bataille persistant, frontière `ready`) et `driver-lock.sh`
 (verrou de mission atomique par `mkdir`, heartbeat + TTL).

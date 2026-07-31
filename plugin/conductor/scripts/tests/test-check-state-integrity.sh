@@ -88,6 +88,15 @@ err="$(bash "$SCRIPT" --path "$D" 2>&1 >/dev/null)"; rc=$?
 named=0; case "$err" in *"RÉGRESSION completed_plans"*) named=1 ;; esac
 if [ "$rc" -eq 1 ] && [ "$named" -eq 1 ]; then ok "4b completed_plans régresse → exit 1"; else ko "4b completed_plans régresse → exit 1" "rc=$rc err=[$err]"; fi
 
+# === Cas 4d — total_plans régresse SEUL (motif exact de l'incident réel : 53→49, correctif de revue
+# 21-04 — ce champ était absent de l'invariant initial malgré sa citation dans l'en-tête du gate) ===
+D="$(mk_git_root c4d)"
+write_state "$D" "m1" 20 22 12 54 39 "Phase: 20 complète"
+sed -i.bak 's/total_plans: 54/total_plans: 49/' "$D/.planning/STATE.md"
+err="$(bash "$SCRIPT" --path "$D" 2>&1 >/dev/null)"; rc=$?
+named=0; case "$err" in *"RÉGRESSION total_plans"*"54"*"49"*) named=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$named" -eq 1 ]; then ok "4d total_plans régresse seul → exit 1"; else ko "4d total_plans régresse seul → exit 1" "rc=$rc err=[$err]"; fi
+
 # === Cas 4c — trois champs régressent ensemble → les trois sont nommés (pas juste le premier) ======
 D="$(mk_git_root c4c)"
 write_state "$D" "m1" 20 22 12 54 39 "Phase: 20 complète"
@@ -119,6 +128,20 @@ if [ "$rc_same" -eq 1 ] && [ "$rc_diff" -eq 0 ] && [ "$rc_same" -ne "$rc_diff" ]
   ok "5 discrimination machine — garde de jalon : rc(même jalon)=$rc_same != rc(jalon changé)=$rc_diff"
 else
   ko "5 discrimination machine — garde de jalon" "rc_same=$rc_same rc_diff=$rc_diff (devrait être 1 et 0)"
+fi
+
+# === Cas 5c — `milestone:` illisible d'UN SEUL côté (courant) alors que le fichier régresse par
+# ailleurs → exit 2 (intégrité compromise), JAMAIS un skip silencieux façon "jalon différent".
+# Correctif de revue (plan 21-04) : avant ce correctif, ce cas rendait exit 0 (skip), exactement le
+# trou qu'une corruption qui casse à la fois les compteurs ET la ligne milestone aurait exploité. ===
+D="$(mk_git_root c5c)"
+write_state "$D" "gsd-migration" 20 22 12 54 39 "Phase: 20 complète"
+sed -i.bak -E '/^milestone: gsd-migration$/d; s/completed_phases: 12/completed_phases: 2/' "$D/.planning/STATE.md"
+err="$(bash "$SCRIPT" --path "$D" 2>&1 >/dev/null)"; rc=$?
+if [ "$rc" -eq 2 ]; then
+  ok "5c milestone illisible d'un seul côté + régression réelle → exit 2 (jamais un skip)"
+else
+  ko "5c milestone illisible d'un seul côté → exit 2" "rc=$rc err=[$err]"
 fi
 
 # === Cas 6 — aucune baseline à --against (fichier tout juste créé) → exit 0, pas une erreur =========

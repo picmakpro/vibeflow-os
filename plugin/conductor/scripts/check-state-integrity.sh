@@ -14,10 +14,14 @@
 # contre le même défaut de fond (une réécriture qui régresse ou duplique un état déjà correct) :
 #
 #   1. RÉGRESSION DE COMPTEUR — au sein d'un même jalon (`milestone:` identique des deux côtés),
-#      `completed_phases`, `completed_plans` et `current_phase` ne décroissent JAMAIS entre l'état
-#      `--against` (défaut HEAD) et l'état courant (`--current-ref`, défaut : fichier de travail).
-#      Un changement de jalon (clôture + `gsd-new-milestone`) réinitialise légitimement ces
-#      compteurs — l'invariant ne s'applique donc QUE si `milestone:` est identique des deux côtés.
+#      `completed_phases`, `completed_plans`, `total_plans` et `current_phase` ne décroissent JAMAIS
+#      entre l'état `--against` (défaut HEAD) et l'état courant (`--current-ref`, défaut : fichier de
+#      travail) — couvre exactement les 4 champs de l'incident du 2026-07-31 cité ci-dessus. Un
+#      changement de jalon (clôture + `gsd-new-milestone`) réinitialise légitimement ces compteurs —
+#      l'invariant ne s'applique donc QUE si `milestone:` est identique des deux côtés ; un `milestone:`
+#      absent/illisible d'UN SEUL côté n'est PAS traité comme un changement de jalon (ce serait un
+#      skip silencieux) mais comme une intégrité de frontmatter compromise (exit 2), même posture que
+#      pour un compteur illisible.
 #
 #   2. LIGNE `^Phase:` UNIQUE — cause B du diagnostic de mission : `stateExtractField(body, 'Phase')`
 #      (amont) prend le PREMIER `^Phase:` du corps entier, sans scope, alors que le corps de ce
@@ -37,6 +41,8 @@
 # par défaut, "courant" désigne le fichier de travail tel qu'il est sur disque — le point d'usage
 # principal est un gate PRE-COMMIT : intercepter une régression AVANT qu'elle ne soit commitée par
 # `gsd-tools state record-session` ou tout écrivain équivalent.
+# Note : `--file` attend un chemin RELATIF (au `--path`, résolu en objet git via `<ref>:<relpath>`) —
+# un `--file` absolu combiné à `--current-ref` n'est pas un usage supporté.
 #
 # Codes de sortie : 0 = conforme · 1 = régression ou invariant rompu (message stderr précise lequel)
 #                   2 = erreur d'intégrité (hors dépôt git, fichier/ref illisible, champ imparsable)
@@ -133,12 +139,24 @@ FAIL=0
 say_fail() { printf '[check-state-integrity] ✗ %s\n' "$1" >&2; FAIL=1; }
 
 # === Invariant 1 — régression de compteur, au sein d'un même jalon =================================
+# Revue (plan 21-04) : deux correctifs. (1) total_plans rejoint les champs protégés — l'incident qui
+# motive ce gate (cf. en-tête) régressait AUSSI total_plans (53→49), le laisser hors invariant aurait
+# contredit la promesse documentée du script. (2) un champ `milestone:` absent/illisible D'UN SEUL
+# côté n'est PLUS traité comme "jalon différent" (skip silencieux) : c'est une intégrité de
+# frontmatter compromise, même posture fail-closed que pour un compteur illisible ci-dessous — sinon
+# une corruption qui casse à la fois les compteurs ET la ligne milestone désarmerait le gate qu'elle
+# devrait justement déclencher.
 if [ "$HAVE_BASELINE" -eq 1 ]; then
   cur_milestone="$(extract_str "$TMPD/current.fm" '^milestone:')"
   base_milestone="$(extract_str "$TMPD/against.fm" '^milestone:')"
 
-  if [ -n "$cur_milestone" ] && [ -n "$base_milestone" ] && [ "$cur_milestone" = "$base_milestone" ]; then
-    for field in current_phase completed_phases completed_plans; do
+  if [ -z "$cur_milestone" ] || [ -z "$base_milestone" ]; then
+    echo "[check-state-integrity] milestone introuvable ou illisible ($AGAINST_REF=\"$base_milestone\" ↔ courant=\"$cur_milestone\") — intégrité du frontmatter compromise" >&2
+    exit 2
+  fi
+
+  if [ "$cur_milestone" = "$base_milestone" ]; then
+    for field in current_phase completed_phases completed_plans total_plans; do
       case "$field" in
         current_phase) regex='^current_phase:[[:space:]]*[0-9]+' ;;
         *)             regex="^[[:space:]]+${field}:[[:space:]]*[0-9]+" ;;
@@ -154,7 +172,7 @@ if [ "$HAVE_BASELINE" -eq 1 ]; then
       fi
     done
   else
-    echo "[check-state-integrity] jalon différent ou illisible ($AGAINST_REF=\"$base_milestone\" ↔ courant=\"$cur_milestone\") — invariant de compteur non applicable, ignoré" >&2
+    echo "[check-state-integrity] jalon différent ($AGAINST_REF=\"$base_milestone\" ↔ courant=\"$cur_milestone\") — invariant de compteur non applicable, ignoré" >&2
   fi
 else
   echo "[check-state-integrity] aucune référence à $AGAINST_REF pour $FILE_REL — rien à régresser, invariant de compteur ignoré" >&2
