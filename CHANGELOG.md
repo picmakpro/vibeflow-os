@@ -5,6 +5,60 @@ dernières entrées et pointent ici). Chaque module a par ailleurs son propre `C
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.45.0] — 2026-07-31
+
+**VibeFlow aligné sur `@opengsd/gsd-core` 1.9.0.** Modules `dev-orchestrator` **v2.9.0**,
+`planning-core` **v2.5.3**, `conductor` **v1.18.0** (inchangé, vérifié cohérent).
+
+**Origine.** La mise à jour du moteur GSD de 1.8.0 vers 1.9.0 sur un poste équipé le 2026-07-31.
+Delta établi **sur pièce** (`npm pack` des deux versions, diff intégral des tarballs, vérification
+de l'installation vivante — `.planning/missions/2026-07-31-delta-gsd-core-1.9.0.md`). Vérifié avant
+ouverture de la phase : le dispatch tient (aucun frontmatter d'agent modifié entre les deux
+versions, 71 skills des deux côtés, 43 suites vertes) — cette release est de l'**alignement**, pas
+du sauvetage, à l'exception du défaut actif ci-dessous.
+
+**Le seul défaut actif : l'injection MCP était structurellement inopérante hors `.mcp.json`.**
+`inject-mcp-tools.sh` ne dérivait la liste des serveurs MCP que de `./.mcp.json` (scope projet).
+Sur tout poste où un serveur est déclaré uniquement en **scope global** (`~/.claude.json`, ex.
+XcodeBuildMCP — le cas réel de ce dépôt), le serveur restait invisible et `--verify` sortait en
+`3` INDÉTERMINÉ au lieu de signaler l'écart, alors qu'un `gsd-executor` dispatché en sous-agent
+est structurellement aveugle au MCP de la session. Corrigé par une **union de deux sources**
+(`./.mcp.json` ∪ `~/.claude.json` clé `mcpServers`, `--claude-json`/`VF_CLAUDE_JSON`),
+dégradation indépendante par source, précédence projet > global sur collision de nom.
+
+**Les 5 autres changements, tous instruits et écrits.**
+- Le contrat amont `estimate:`/`actuals:` (ADR-2629, #2632) est relayé **verbatim** par
+  `vf-coder`/`vf-dev-manager` — jamais une statistique auto-évaluée du cru de l'agent.
+- **ADR-061** arbitre par écrit le recouvrement entre les lanes de revue cross-AI de plans amont
+  (`review-lane-descriptor.cjs`) et l'étage de revue de code livré en Phase 20 (20-06) : deux
+  objets distincts, gardés séparés, aucun câblage automatique construit par anticipation.
+- L'hypothèse datée du **dispatch nommé** (`hostIntegration.dispatch.namedDispatch`, amont 1.9.0)
+  est consignée dans `team-kernel.md`, recoupée avec `gsd-worktree-path-guard.js` (#1995 — namespace
+  de branche élargi `agent-*`/`worktree-agent-*` — et #2608 — cas `staging_failed`/`staging_timeout`
+  interne à `gsd-executor` — vérifiés conformes sur pièce).
+- **Purge de la dette de version** 1.8.0 → 1.9.0 sur 6 fichiers (index régénéré, 3 scripts,
+  `mission-contracts.md`). Piège de préservation tenu : le cas de test qui asserte la chaîne
+  littérale de version (`test-check-gsd-engine.sh` cas 8) s'est déplacé avec le texte qu'il
+  vérifie, jamais neutralisé — la leçon semver (le fork repart de zéro, 1.9.0 < 1.42.3) reste vraie.
+- **ADR-062** arbitre les 2 hooks 1.9.0 non câblés (`gsd-ensure-canonical-path.js`,
+  `gsd-update-banner.js`) : chaque hook confronté séparément à son propre contrat d'activation,
+  absence correcte dans les deux cas — le câbler serait une régression, pas un correctif.
+
+**Le point hérité : `check-state-integrity.sh` (ADR-063).** Une anomalie d'agrégation constatée
+après la clôture de la Phase 20 — `completed_phases`/`total_plans`/`completed_plans` avaient
+régressé silencieusement dans `.planning/STATE.md`, sans qu'aucun gate ne le détecte. Cause
+identifiée sur pièce dans `@opengsd/gsd-core` 1.9.0 (dette d'artefact locale doublée d'un vrai bug
+amont sur l'extraction du champ `Phase`, signalé à l'amont). Nouveau gate `check-state-integrity.sh`
+(module `conductor`) : deux invariants — compteurs jamais régressés au sein du même jalon, une
+seule ligne `^Phase:` dans le fichier — **câblé au job `gates` de la CI** dans cette même release
+(il n'était auparavant dégainé que par sa propre suite, sur des dépôts synthétiques).
+
+**Clôture de gouvernance.** Compteur de suites des 2 README recalé (44 → 45, une suite ajoutée par
+cette phase), `.planning/ROADMAP.md` §Phase 21 recalé (5/5 plans, Requirements tranchés sans ID
+`REQ-` inventé), ADR-063 §Code Impacté corrigée (23 → 25 cas), `team-kernel.md` porte désormais le
+recoupement #1995/#2608, et `inject-mcp-tools.sh` nomme la cause fréquente (`--force` requis) sur
+son rc=3 en mode fichier unique.
+
 ## [v2.44.0] — 2026-07-31
 
 **La revue devient un étage de premier rang, piloté par le manager** (**ADR-060**). Modules
