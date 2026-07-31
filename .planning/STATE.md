@@ -2,22 +2,17 @@
 gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
-current_phase: 20
+current_phase: 19
 current_phase_name: Fluidité du flux de dev sans perte de qualité — 7/7 plans livrés, release racine en attente
 status: complete
-stopped_at: "Phase 20 close, reliquats compris. Les 7/7 plans livrés + la vérification (PASS partiel 5/7) + la release racine v2.44.0 COMMITÉE (jamais taggée — merge et tag réservés à Samuel). Registre WINDOWS ramené à 2 ouverts : #1 résolu le 2026-07-31 (l'affirmation anti-triche de team-kernel.md nommait un mécanisme inexistant — phrase corrigée ET assertion sur l'arbre réel posée, T72), #2 résolu (compteur de suites à 44). Restent #3 (recette XcodeBuildMCP, infaisable dans ce dépôt) et #4 (validation des noms de serveurs MCP, repris au périmètre de la Phase 21). Prochain geste humain : merger la PR #21, puis taguer v2.44.0."
-last_updated: "2026-07-31T10:26:41.602Z"
+stopped_at: Phase 22 context gathered
+last_updated: "2026-07-31T15:52:14.576Z"
 last_activity: 2026-07-28 (clôture Phase 19 + release v2.43.0)
 progress:
-  total_phases: 22
-  completed_phases: 12
-  total_plans: 54
-  completed_plans: 39
-# ⚠ Compteurs recalés à la main le 2026-07-31. L'écriture d'état de la clôture 20-07 les a fait
-# RÉGRESSER (completed_phases 11→10, total_plans 53→49, completed_plans 37→29) alors que la phase
-# venait de se terminer, et a laissé current_phase à 19. Anomalie d'agrégation à instruire en
-# Phase 21 (candidat : régression d'écriture d'état côté gsd-core 1.9.0). Valeurs reposées ici
-# depuis le disque : 21 phases déclarées, 54 PLAN.md, Phase 20 à 7/7.
+  total_phases: 21
+  completed_phases: 10
+  total_plans: 49
+  completed_plans: 29
 ---
 
 # Project State
@@ -637,10 +632,10 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-**Resume file:** None
+**Resume file:** .planning/phases/VFDO-22-hygi-ne-documentaire-doctrine-de-sortie-et-captation-d-inten/22-CONTEXT.md
 
-Last session: 2026-07-31T10:26:41.586Z
-Stopped at: Phase 20 complète (7/7 plans) — clôture de gouvernance (20-07) : ADR-051 révisée + ADR-060 posée, doctrine transverse alignée, 6 modules bumpés (conductor v1.17.0, dev-orchestrator v2.8.0, design-orchestrator v1.3.2, 3 bundles v2.0.3). Gates verts sauf le seul rouge attendu (compteur de suites racine, 44 réel pas 43). Release racine réservée à validation humaine post-fusion (4 éléments consignés + WINDOWS.md).
+Last session: 2026-07-31T15:52:14.541Z
+Stopped at: Phase 22 context gathered
 ubuntu:24.04) — 3 jobs verts au run 30257419335. Modules bumpés : conductor v1.14.5,
 consolidator v1.8.1, dev-orchestrator v2.3.2. Leçon durable : tout bash développé sur macOS/BSD
 doit être reproduit sous `docker run ubuntu:24.04` avant push (stat/-f, TMPDIR, outillage hôte).
