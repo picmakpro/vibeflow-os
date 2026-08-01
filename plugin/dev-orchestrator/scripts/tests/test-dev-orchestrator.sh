@@ -1847,24 +1847,68 @@ t24_assert "A (mission-contracts.md, §Règle unique de mapping)" "$CONTRACTS_FI
 t24_assert "B (vf-coder.md, bloc du champ gate)"                "$CODER_FILE"     '[*][*][`]gate[`][*][*]'
 t24_assert "C (vf-dev-manager.md, bloc Verdict d'étape)"        "$DEVMGR"         '[*][*]Verdict d'
 
-# D (DISCRIMINANT, par mutation de VALEUR) : on ne retire PAS la chaîne qu'on cherche ensuite —
-# ce serait une tautologie, la branche serait vraie quel que soit l'état du dépôt. On altère la
-# sémantique du contrat sur une copie (le statut cible, puis la valeur du gate) et on exige que
-# l'assertion rougisse dans les deux cas, tout en restant verte sur le fichier réel.
+# D (DISCRIMINANT) — trois mutants + une fixture LICITE. Ce que chaque cas prouve, sans le
+# surdéclarer :
+#
+#   D1/D2 (mutations de VALEUR, `s///g` GLOBAUX) : elles effacent le token que l'assertion cherche
+#   ensuite. Elles prouvent donc que la sonde lit le BON token (un renommage du statut cible ou de
+#   la valeur du gate ne passe pas inaperçu) — elles ne prouvent RIEN sur la relation entre les
+#   deux. Ne pas leur prêter plus : le commentaire précédent affirmait « on ne retire PAS la chaîne
+#   qu'on cherche ensuite », c'était faux.
+#
+#   D3 (mutation de RELATION — c'est elle qui mesure D-01) : on ÉCHANGE les deux étiquettes de
+#   statut `human_needed` ↔ `gaps_found`. Aucun mot n'est retiré : une fois les deux étiquettes
+#   ramenées à un jeton canonique unique, le multiset de tokens du fichier est rigoureusement
+#   IDENTIQUE avant et après — c'est ce que l'assertion vérifie avant de mesurer quoi que ce soit.
+#   Seule la RELATION change : les deux motifs se retrouvent rattachés à `gaps_found`. Une doctrine
+#   disant l'inverse exact de D-01 laissait la suite à 87 OK/0 KO ; c'est ce trou que D3 ferme.
+#   Robuste à toute reformulation : la mutation ne s'ancre sur aucune phrase, seulement sur les
+#   deux étiquettes que le contrat ADR-053 impose de toute façon.
+#
+#   D4 (fixture LICITE) : une rédaction correcte mais REFORMULÉE de la règle (autre marqueur de
+#   mapping, autre ordre, autres mots de liaison) doit rester VERTE. Une sonde qui punit une
+#   réécriture légitime nuit autant qu'une sonde aveugle.
 T24_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T24_TMPDIR"
 T24_MUT_STATUT="$T24_TMPDIR/mutant-statut.md"
 T24_MUT_GATE="$T24_TMPDIR/mutant-gate.md"
+T24_MUT_RELATION="$T24_TMPDIR/mutant-relation.md"
+T24_LICIT="$T24_TMPDIR/licite-reformulee.md"
 sed 's/human_needed/gaps_found/g'      "$DEVMGR" > "$T24_MUT_STATUT"
 sed 's/blocking-human/blocking-auto/g' "$DEVMGR" > "$T24_MUT_GATE"
+sed -e 's/`human_needed`/`@@VFSWAP@@`/g' -e 's/`gaps_found`/`human_needed`/g' \
+    -e 's/`@@VFSWAP@@`/`gaps_found`/g' "$DEVMGR" > "$T24_MUT_RELATION"
+
+cat > "$T24_LICIT" <<'T24LICIT'
+## Contrôle de flux
+
+- **Verdict d'étape (rapport typé, ADR-053)** : `passed` → nœud marqué fait, frontière suivante ·
+  `human_needed` : tout refus d'auto-approbation venu de l'amont — un checkpoint
+  `gate="blocking-human"` aussi bien qu'une précondition amont non satisfaite — remonte en
+  escalade, jamais tranché seul · `gaps_found` → relance de comblement, puis arbitrage ·
+  `blocked` → laisser le nœud en l'état et traiter la dépendance.
+T24LICIT
 
 t24_mut_ko=""
-t24_maps_to_human_needed "$T24_MUT_STATUT" '[*][*]Verdict d' && t24_mut_ko="$t24_mut_ko [statut human_needed→gaps_found non détecté]"
-t24_maps_to_human_needed "$T24_MUT_GATE"   '[*][*]Verdict d' && t24_mut_ko="$t24_mut_ko [gate blocking-human→blocking-auto non détecté]"
-t24_maps_to_human_needed "$DEVMGR"         '[*][*]Verdict d' || t24_mut_ko="$t24_mut_ko [le fichier réel ne tient plus l'assertion]"
+# Preuve que D3 est bien une mutation de RELATION et pas un effacement : une fois les deux
+# étiquettes ramenées au même jeton canonique, le multiset de tokens doit être IDENTIQUE de part et
+# d'autre. Et le mutant doit DIFFÉRER de l'original — sinon la doctrine ne porte plus les deux
+# étiquettes, la mutation n'a rien mordu et il faut le dire, jamais laisser passer pour vert.
+t24_canon() { sed -e 's/human_needed/@VFST@/g' -e 's/gaps_found/@VFST@/g' "$1" | tr -cs '[:alnum:]_@' '\n' | LC_ALL=C sort; }
+if [ "$(t24_canon "$DEVMGR")" != "$(t24_canon "$T24_MUT_RELATION")" ]; then
+  t24_mut_ko="$t24_mut_ko [mutant de relation : le multiset canonique de tokens a changé — ce n'est plus une mutation de relation pure]"
+elif cmp -s "$DEVMGR" "$T24_MUT_RELATION"; then
+  t24_mut_ko="$t24_mut_ko [mutant de relation IDENTIQUE à l'original — les deux étiquettes de statut ne sont plus toutes deux présentes, la mutation n'a rien mordu]"
+fi
+
+t24_maps_to_human_needed "$T24_MUT_STATUT"   '[*][*]Verdict d' && t24_mut_ko="$t24_mut_ko [D1 statut human_needed→gaps_found non détecté]"
+t24_maps_to_human_needed "$T24_MUT_GATE"     '[*][*]Verdict d' && t24_mut_ko="$t24_mut_ko [D2 gate blocking-human→blocking-auto non détecté]"
+t24_maps_to_human_needed "$T24_MUT_RELATION" '[*][*]Verdict d' && t24_mut_ko="$t24_mut_ko [D3 RELATION : les deux motifs rattachés à gaps_found, aucun token retiré — non détecté]"
+t24_maps_to_human_needed "$T24_LICIT"        '[*][*]Verdict d' || t24_mut_ko="$t24_mut_ko [D4 FAUX ROUGE : une reformulation LICITE de la règle est rejetée (rc=$?)]"
+t24_maps_to_human_needed "$DEVMGR"           '[*][*]Verdict d' || t24_mut_ko="$t24_mut_ko [le fichier réel ne tient plus l'assertion]"
 if [ -n "$t24_mut_ko" ]; then
-  ko "T24 D (DISCRIMINANT) : l'assertion de mapping ne rougit pas sous mutation sémantique —$t24_mut_ko"; t24_ok=0
+  ko "T24 D (DISCRIMINANT) : l'assertion de mapping ne discrimine pas —$t24_mut_ko"; t24_ok=0
 else
-  ok "T24 D (DISCRIMINANT) : deux mutations de VALEUR (statut cible, valeur du gate) font rougir l'assertion, le fichier réel la tient"
+  ok "T24 D (DISCRIMINANT) : 2 mutations de VALEUR + 1 mutation de RELATION (échange d'étiquettes, multiset de tokens inchangé) font rougir l'assertion ; une reformulation LICITE reste verte ; le fichier réel la tient"
 fi
 
 [ "$t24_ok" -eq 1 ] && ok "T24 : le mapping D-01 (deux motifs ⇒ human_needed) est porté dans le même bloc par référence, vf-coder et vf-dev-manager"
