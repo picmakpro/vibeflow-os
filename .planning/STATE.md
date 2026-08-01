@@ -2,12 +2,21 @@
 gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
-current_phase: 22
-current_phase_name: Phases 21 et 22 mergées et shippées ; ROADMAP et compteurs remis d'équerre le 2026-08-01
-status: complete
-stopped_at: "Phase 21 close par sa gouvernance (plan 21-05), même patron que 20-07/c01f813 : 5/5 plans livrés, vérification PASS PARTIEL 7/8 comblée (CI remise au vert — compteur de suites 44→45 —, dev-orchestrator bumpé v2.9.0, planning-core v2.5.3, ROADMAP §Phase 21 recalé, 4 warnings W1-W4 traités : check-state-integrity.sh câblé au job gates de la CI, ADR-063 23→25 cas, team-kernel.md porte le recoupement #1995/#2608, inject-mcp-tools.sh nomme --force sur le rc=3 mode fichier unique). Release racine v2.45.0 préparée en commits locaux (triade + 2 historiques README + CHANGELOG racine) — AUCUN tag, AUCUN merge, AUCUN push : réservés à Samuel. Prochain geste humain : merger la PR, puis `git tag -a v2.45.0` et `gh release create`."
-last_updated: "2026-07-31T19:30:00.000Z"
-last_activity: 2026-07-31 (Phase 21 plan 21-05 — clôture de gouvernance, release v2.45.0 préparée)
+current_phase: 26
+current_phase_name: Manuel utilisateur VibeFlow (manual/) — cadrage capturé, mission d'équipe en cours (branche feat/phase-26-manuel-utilisateur)
+status: in_progress
+stopped_at: "Phase 26 — contexte capturé (26-CONTEXT.md, commit b9001b1), planification en cours. manual/ (bilingue FR+EN, hors git par amendement de mission — .git/info/exclude) reste le livrable réel, non versionné ; seuls les artefacts de suivi sous .planning/phases/VFDO-26-*/ sont committés. Reprendre par /gsd-plan-phase 26."
+last_updated: "2026-08-01T00:00:00.000Z"
+last_activity: 2026-08-01 (Phase 26 — cadrage capturé, plan en cours)
+
+# ⚠ Phase 21 close par sa gouvernance (plan 21-05), même patron que 20-07/c01f813 : 5/5 plans
+# livrés, vérification PASS PARTIEL 7/8 comblée (CI remise au vert — compteur de suites 44→45 —,
+# dev-orchestrator bumpé v2.9.0, planning-core v2.5.3, ROADMAP §Phase 21 recalé, 4 warnings W1-W4
+# traités : check-state-integrity.sh câblé au job gates de la CI, ADR-063 23→25 cas, team-kernel.md
+# porte le recoupement #1995/#2608, inject-mcp-tools.sh nomme --force sur le rc=3 mode fichier
+# unique). Release racine v2.45.0 préparée en commits locaux (triade + 2 historiques README +
+# CHANGELOG racine) — AUCUN tag, AUCUN merge, AUCUN push : réservés à Samuel. Prochain geste
+# humain : merger la PR, puis `git tag -a v2.45.0` et `gh release create`.
 progress:
   total_phases: 26
   completed_phases: 21
