@@ -154,7 +154,12 @@ INDEX_TMP="$(mktemp)"
 # Nettoyage UNIQUE et CUMULATIF : un seul `trap ... EXIT` pour toute la suite. Deux traps EXIT
 # successifs ne se cumulent pas — le second REMPLACE le premier —, ce qui fuiterait les
 # temporaires des tests précédents et violerait l'invariant que T21d impose aux autres scripts.
-# Tout mktemp ultérieur s'enregistre via vf_tmp_track au lieu de reposer un trap.
+#
+# Portée RÉELLE de ce trap (ne pas surdéclarer) : la grande majorité des ~40 `mktemp` de cette
+# suite sont nettoyés INLINE par leur propre test (`rm -rf` en fin de bloc) et ne s'enregistrent
+# pas ici. `vf_tmp_track` sert aux temporaires dont la durée de vie va jusqu'à la fin du script —
+# les fixtures T24/T25/T26, relues après leur bloc — et au stub PATH de T2b, partagé par plusieurs
+# assertions. Une phrase du type « tout mktemp s'enregistre via vf_tmp_track » serait fausse.
 VF_TMPS=("$INDEX_TMP")
 vf_tmp_track() { VF_TMPS+=("$1"); }
 trap 'rm -rf "${VF_TMPS[@]}" 2>/dev/null' EXIT
@@ -257,7 +262,7 @@ ENS="$MOD/scripts/ensure-deps.sh"
 # (runner CI) ou sans node/npm, ensure-deps bascule en « étape manuelle » sans jamais loguer
 # les flags scopés → les 4 assertions échouaient à tort. Le stub node répond « 22 » à la sonde
 # de version majeure (garde Node ≥ 22 de ensure_gsd) ; npx n'est jamais exécuté en dry-run.
-T2B_STUB="$(mktemp -d)"
+T2B_STUB="$(mktemp -d)"; vf_tmp_track "$T2B_STUB"   # partagé par toutes les assertions T2b
 printf '#!/bin/sh\nexit 0\n' > "$T2B_STUB/claude"
 printf '#!/bin/sh\nexit 0\n' > "$T2B_STUB/npm"
 printf '#!/bin/sh\necho 22\n' > "$T2B_STUB/node"
