@@ -1822,19 +1822,21 @@ fi
 
 # ---------------------------------------------------------------------------
 # T25 (D-02) — le flag d'enchaînement autonome (workflow._auto_chain_active) est désarmé au
-# démarrage de mission ET fermé par gate : aucun fichier du module ne peut le represcrire sur
-# les briques de Plan ou d'Exécution. EXCLUSION VOLONTAIRE de scripts/tests/ (motif) : ce
-# fichier de test embarque par construction la forme interdite dans ses fixtures de mutation —
-# sans l'exclure, le balayage se détecterait lui-même à chaque run (faux rouge permanent). Le
-# balayage porte donc UNIQUEMENT sur les *.md de agents/ et references/, jamais sur les *.sh de
-# scripts/tests/.
+# démarrage de mission ET fermé par gate : aucun fichier de doctrine du module ne peut le
+# represcrire sur les briques de Plan ou d'Exécution. Périmètre du balayage : les .md de doctrine
+# (agents de l'équipe + références résolues, cf. module_md_targets) — ce fichier de test, qui
+# embarque la forme interdite dans ses fixtures, n'en fait pas partie puisqu'il n'est ni un agent
+# de $TEAM_AGENTS ni une référence de $REFS_DIR.
 # ---------------------------------------------------------------------------
 t25_ok=1
 
-# forme interdite : mention du mode d'enchaînement (non-interactif / --auto / --chain)
-# co-occurrant, sur la MÊME ligne, avec le marqueur de brique Plan ou Exécution.
+# Forme interdite : un bloc de brique **Plan** / **Exécution** qui prescrit le mode
+# d'enchaînement (non-interactif / --auto / --chain). Co-occurrence exigée DANS LE BLOC et non
+# sur la même ligne physique : le module wrap à 100 colonnes, donc un simple retour à la ligne
+# suffisait à passer au travers — tout comme « **Plan (planification)** » (gras non fermé
+# immédiatement après le mot), d'où l'ancre ouvrante seule.
 t25_forbidden_chain_hits() { # <file>
-  "$GREP" -inE '(non-interactif|--auto\b|--chain\b)' "$1" 2>/dev/null | "$GREP" -E '\*\*(Plan|Exécution)\*\*'
+  md_blocks_matching "$1" '[*][*](Plan|Exécution)' | "$GREP" -E '(non-interactif|--auto\b|--chain\b)'
 }
 
 # volet présence : vf-dev-manager.md nomme la clé et l'appel qui la remet à faux.
@@ -1843,38 +1845,46 @@ t25_forbidden_chain_hits() { # <file>
 "$GREP" -q 'gsd_run' "$DEVMGR" || { ko "T25 présence : vf-dev-manager.md ne résout pas gsd_run"; t25_ok=0; }
 "$GREP" -q 'RUNTIME_DIR' "$DEVMGR" && { ko "T25 présence : vf-dev-manager.md recopie la cascade de résolution (RUNTIME_DIR) au lieu d'y renvoyer — DRY rompu"; t25_ok=0; }
 
-# volet fermeture (le cœur) : balayage réel des .md de agents/ et references/ — jamais
-# scripts/tests/, cf. exclusion documentée ci-dessus.
-t25_real_hits=""
-for f in "$MOD"/agents/*.md "$MOD"/references/*.md; do
-  [ -f "$f" ] || continue
+# volet fermeture (le cœur) : balayage réel des .md de doctrine, via les cibles RÉSOLUES. Le
+# compteur de fichiers vus est non négociable : sans lui, un glob qui n'expanse pas produit un
+# vert qui prétend avoir balayé ce qu'il n'a jamais ouvert.
+t25_real_hits=""; t25_scanned=0
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  t25_scanned=$((t25_scanned + 1))
   h="$(t25_forbidden_chain_hits "$f")"
   [ -n "$h" ] && t25_real_hits="$t25_real_hits
 $f: $h"
-done
-if [ -n "$t25_real_hits" ]; then
+done < <(module_md_targets)
+if [ "$t25_scanned" -eq 0 ]; then
+  ko "T25 fermeture : ZÉRO fichier balayé (agents d'équipe + $REFS_DIR introuvables) — un vert à vide n'est pas une garantie"
+  t25_ok=0
+elif [ -n "$t25_real_hits" ]; then
   ko "T25 fermeture : forme interdite (mode d'enchaînement sur brique Plan/Exécution) trouvée —$t25_real_hits"
   t25_ok=0
 else
-  ok "T25 fermeture : aucun fichier de agents/ ni references/ ne prescrit le mode d'enchaînement sur les briques Plan/Exécution"
+  ok "T25 fermeture : $t25_scanned fichier(s) de doctrine balayé(s), aucun ne prescrit le mode d'enchaînement sur une brique Plan/Exécution"
 fi
 
-# volet discriminance (DISCRIMINANT, par mutation) : deux fixtures dans un mktemp -d — une forme
-# interdite (Plan), une forme licite (Cadrage, patron ligne 27 réelle de vf-coder.md) — la
-# fonction de détection doit remonter EXACTEMENT la première et PAS la seconde.
-T25_TMPDIR="$(mktemp -d)"
-trap 'rm -rf "${T24_TMPDIR:-}" "${T25_TMPDIR:-}" "${T26_TMPDIR:-}" 2>/dev/null' EXIT
+# volet discriminance (DISCRIMINANT, par mutation) : trois fixtures dans un mktemp -d — une forme
+# interdite (Plan), la même reformulée/wrappée (gras non fermé + retour à la ligne, la faille que
+# la co-occurrence sur ligne physique laissait passer), et une forme licite (Cadrage, patron de la
+# ligne 27 réelle de vf-coder.md). La détection doit remonter les deux premières et PAS la dernière.
+T25_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T25_TMPDIR"
 T25_FORBIDDEN="$T25_TMPDIR/forbidden-plan.md"
+T25_WRAPPED="$T25_TMPDIR/forbidden-plan-wrappe.md"
 T25_LICIT="$T25_TMPDIR/licit-cadrage.md"
 printf '2. **Plan** : invoque `gsd-plan-phase` en mode **non-interactif**.\n' > "$T25_FORBIDDEN"
+printf '2. **Plan (planification)** : invoque `gsd-plan-phase`\n   en mode **non-interactif**.\n' > "$T25_WRAPPED"
 printf '1. **Cadrage** : invoque le skill `gsd-discuss-phase` en mode **non-interactif**.\n' > "$T25_LICIT"
 
 t25_forbidden_hit="$(t25_forbidden_chain_hits "$T25_FORBIDDEN")"
+t25_wrapped_hit="$(t25_forbidden_chain_hits "$T25_WRAPPED")"
 t25_licit_hit="$(t25_forbidden_chain_hits "$T25_LICIT")"
-if [ -n "$t25_forbidden_hit" ] && [ -z "$t25_licit_hit" ]; then
-  ok "T25 (DISCRIMINANT) : fixture Plan (interdite) détectée, fixture Cadrage (licite, ligne 27 réelle de vf-coder.md) épargnée"
+if [ -n "$t25_forbidden_hit" ] && [ -n "$t25_wrapped_hit" ] && [ -z "$t25_licit_hit" ]; then
+  ok "T25 (DISCRIMINANT) : fixture Plan détectée, variante reformulée/wrappée détectée aussi, fixture Cadrage (licite, ligne 27 réelle de vf-coder.md) épargnée"
 else
-  ko "T25 (DISCRIMINANT) : ne distingue pas Plan (interdite, attendu détecté) de Cadrage (licite, attendu épargnée) — forbidden=[$t25_forbidden_hit] licit=[$t25_licit_hit]"
+  ko "T25 (DISCRIMINANT) : ne distingue pas les formes interdites (Plan, Plan wrappé — attendues détectées) de la licite (Cadrage — attendue épargnée) — forbidden=[$t25_forbidden_hit] wrapped=[$t25_wrapped_hit] licit=[$t25_licit_hit]"
   t25_ok=0
 fi
 
@@ -1882,19 +1892,74 @@ fi
 
 # ---------------------------------------------------------------------------
 # T26 (D-03, D-04, D-04bis) — minimum de reprise, halte de nœud, réponse par le manager. Garde
-# anti-duplication ADR-030 (assertion D, NÉGATIVE) : aucun fichier de agents/ ni references/ ne
-# reproduit les intitulés du contrat interne de l'exécuteur amont (Completed Tasks / Current
-# Task / Checkpoint Details / Awaiting / CHECKPOINT REACHED — checkpoint_return_format,
-# execute-plan.md). EXCLUSION VOLONTAIRE de scripts/tests/ (motif) : ce fichier de test cite ces
-# intitulés dans sa fixture de mutation E — sans l'exclure, le balayage se détecterait lui-même.
+# anti-duplication ADR-030 (assertion D, NÉGATIVE) : aucun .md de doctrine du module ne reproduit
+# les intitulés du contrat interne de l'exécuteur amont (Completed Tasks / Current Task /
+# Checkpoint Details / Awaiting / CHECKPOINT REACHED — checkpoint_return_format, execute-plan.md).
+# Périmètre = module_md_targets (agents de l'équipe + références résolues) : ni ce fichier de test
+# (qui cite ces intitulés dans sa fixture E), ni les agents VOISINS d'un lab installé — en
+# disposition lab, agents/ est plat et partagé, et gsd-executor.md y porte légitimement les quatre
+# intitulés : les capter serait un faux rouge chez tout utilisateur ayant gsd-core au même scope.
 # ---------------------------------------------------------------------------
 t26_ok=1
 
-# A — mission-contracts.md nomme les quatre sous-champs du minimum de reprise + le motif ADR-030.
-for champ in 'plan_id' 'checkpoint' 'gate' 'attendu'; do
-  "$GREP" -q -- "$champ" "$CONTRACTS_FILE" || { ko "T26 A : mission-contracts.md ne nomme pas le sous-champ '$champ' du minimum de reprise"; t26_ok=0; }
-done
-"$GREP" -q 'ADR-030' "$CONTRACTS_FILE" || { ko "T26 A : mission-contracts.md ne cite pas ADR-030 (motif de la borne)"; t26_ok=0; }
+# A — Minimum de reprise (D-03) : l'ensemble des sous-champs est MESURÉ sur l'énumération fermée
+# du contrat, jamais comparé à une liste de noms figée dans le test (le nombre de sous-champs peut
+# évoluer ; la propriété à verrouiller est la fermeture de l'ensemble). Les sous-champs sont
+# repérés comme TOKENS BACKTICKÉS : un grep de mot nu sur tout le fichier ne verrouillait rien —
+# « checkpoint » et « gate » avaient déjà un hit AVANT l'ajout du paragraphe (sondes mortes), et
+# un renommage en `type_checkpoint` / `gate_amont` les satisfaisait tout autant.
+
+# Identifiants backtickés d'un texte lu sur stdin, triés et dédupliqués.
+t26_ids() { "$GREP" -oE '`[a-z][a-z0-9_]*`' | tr -d '`' | sort -u; }
+
+# Intitulés du contrat INTERNE amont, en version « texte » (sans ancre de ligne) : sert à
+# interdire qu'un sous-champ du minimum de reprise en reproduise un (ADR-030).
+T26_INTERNAL_RE='Completed Tasks|Current Task|Checkpoint Details|Awaiting|CHECKPOINT REACHED'
+
+# 0 = contrat clos et sain (T26_FIELDS/T26_N renseignés) · 1 = fermeture rompue ($T26_WHY) ·
+# 2 = bloc introuvable.
+T26_FIELDS=""; T26_N=0; T26_WHY=""
+t26_reprise_closed() { # <fichier de contrat>
+  local blk enum fields parent all
+  blk="$(md_blocks_matching "$1" '[*][*]Minimum de reprise')"
+  [ -n "$blk" ] || return 2
+  printf '%s\n' "$blk" | "$GREP" -q 'sous-champs sont exactement' || { T26_WHY="énumération fermée (« sous-champs sont exactement ») absente"; return 1; }
+  printf '%s\n' "$blk" | "$GREP" -q "rien d'autre"                || { T26_WHY="borne « rien d'autre » absente"; return 1; }
+  printf '%s\n' "$blk" | "$GREP" -q 'ADR-030'                     || { T26_WHY="motif ADR-030 non cité"; return 1; }
+  enum="$(printf '%s\n' "$blk" | sed -e 's/.*sous-champs sont exactement//' -e "s/[*][*]rien d'autre[*][*].*//")"
+  printf '%s\n' "$enum" | "$GREP" -qE "$T26_INTERNAL_RE" && { T26_WHY="un sous-champ reproduit un intitulé du contrat interne amont (ADR-030)"; return 1; }
+  fields="$(printf '%s\n' "$enum" | t26_ids)"
+  [ -n "$fields" ] || { T26_WHY="aucun sous-champ backtické dans l'énumération"; return 1; }
+  parent="$(printf '%s\n' "$blk" | sed -n 's/.*champ optionnel `\([a-z][a-z0-9_]*\)`.*/\1/p')"
+  [ -n "$parent" ] || { T26_WHY="champ porteur (« un champ optionnel \`…\` ») non déclaré"; return 1; }
+  all="$(printf '%s\n' "$blk" | t26_ids)"
+  # égalité d'ensemble : ce que le bloc déclare == énumération ∪ champ porteur, ni plus ni moins.
+  [ "$(printf '%s\n%s\n' "$fields" "$parent" | sort -u)" = "$all" ] || {
+    T26_WHY="le bloc déclare des identifiants hors de l'énumération fermée [$(echo $all)]"; return 1; }
+  T26_FIELDS="$fields"; T26_N="$(printf '%s\n' "$fields" | "$GREP" -c .)"
+  return 0
+}
+
+t26_reprise_closed "$CONTRACTS_FILE"
+case $? in
+  0) ok "T26 A : minimum de reprise — ensemble MESURÉ de $T26_N sous-champs backtickés ($(printf "%s" "$T26_FIELDS" | tr "\n" " ")), énumération close (« exactement » / « rien d'autre » / ADR-030), aucun intitulé du contrat interne amont" ;;
+  2) ko "T26 A : bloc « Minimum de reprise » introuvable dans mission-contracts.md"; t26_ok=0 ;;
+  *) ko "T26 A : minimum de reprise — $T26_WHY"; t26_ok=0 ;;
+esac
+
+# A' — ce que l'AGENT déclare ne peut pas sortir de l'ensemble du contrat : tout identifiant
+# backtické des blocs `gate`/`reprise` de vf-coder.md doit appartenir à l'ensemble déclaré par
+# mission-contracts.md (aucun champ inventé côté worker, ADR-030 : une seule voix).
+t26_coder_ids="$(md_blocks_matching "$CODER_FILE" '[*][*][`](gate|reprise)[`][*][*]' | t26_ids)"
+t26_contract_ids="$(md_blocks_matching "$CONTRACTS_FILE" '[*][*]Minimum de reprise' | t26_ids)"
+t26_invented="$(comm -23 <(printf '%s\n' "$t26_coder_ids" | "$GREP" -v '^$') <(printf '%s\n' "$t26_contract_ids" | "$GREP" -v '^$') 2>/dev/null)"
+if [ -z "$t26_coder_ids" ]; then
+  ko "T26 A' : vf-coder.md ne déclare aucun champ backtické de checkpoint (blocs gate/reprise introuvables)"; t26_ok=0
+elif [ -n "$t26_invented" ]; then
+  ko "T26 A' : vf-coder.md déclare un champ absent du contrat — $(echo $t26_invented)"; t26_ok=0
+else
+  ok "T26 A' : les champs déclarés par vf-coder.md ($(echo $t26_coder_ids)) sont tous dans l'ensemble du contrat — aucun champ inventé côté worker"
+fi
 
 # B — vf-coder.md porte la règle « attente humaine ⇒ escalade, jamais auto-répondue ».
 "$GREP" -q 'reprise' "$CODER_FILE" || { ko "T26 B : vf-coder.md ne nomme pas le champ reprise"; t26_ok=0; }
@@ -1904,38 +1969,50 @@ done
 "$GREP" -q 'halte de nœud' "$DEVMGR" || { ko "T26 C : vf-dev-manager.md ne nomme pas le halt de nœud"; t26_ok=0; }
 "$GREP" -q 'réponds aux attentes humaines' "$DEVMGR" || { ko "T26 C : vf-dev-manager.md ne nomme pas le manager comme répondant aux attentes humaines"; t26_ok=0; }
 
-# D (NÉGATIVE) — aucun fichier .md de agents/ ni references/ (jamais scripts/tests/, cf.
-# exclusion ci-dessus) ne reproduit les intitulés du contrat interne de l'exécuteur amont.
+# D (NÉGATIVE) — aucun .md de doctrine du module (module_md_targets : agents de l'équipe +
+# références résolues) ne reproduit les intitulés du contrat interne de l'exécuteur amont. Le
+# compteur de fichiers vus est non négociable : sans lui, un glob qui n'expanse pas rendrait un
+# vert prétendant avoir balayé ce qu'il n'a jamais ouvert.
 t26_internal_titles() { # <file>
   "$GREP" -lE 'Completed Tasks|Current Task|Checkpoint Details|^Awaiting$|CHECKPOINT REACHED' "$1" 2>/dev/null
 }
-t26_dup_hits=""
-for f in "$MOD"/agents/*.md "$MOD"/references/*.md; do
-  [ -f "$f" ] || continue
+t26_dup_hits=""; t26_scanned=0
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  t26_scanned=$((t26_scanned + 1))
   h="$(t26_internal_titles "$f")"
   [ -n "$h" ] && t26_dup_hits="$t26_dup_hits $f"
-done
-if [ -n "$t26_dup_hits" ]; then
+done < <(module_md_targets)
+if [ "$t26_scanned" -eq 0 ]; then
+  ko "T26 D (NÉGATIVE) : ZÉRO fichier balayé (agents d'équipe + $REFS_DIR introuvables) — un vert à vide n'est pas une garantie"
+  t26_ok=0
+elif [ -n "$t26_dup_hits" ]; then
   ko "T26 D (NÉGATIVE) : intitulé du contrat interne de l'exécuteur reproduit dans —$t26_dup_hits"
   t26_ok=0
 else
-  ok "T26 D (NÉGATIVE) : aucun fichier de agents/ ni references/ ne reproduit les intitulés du contrat interne de l'exécuteur amont"
+  ok "T26 D (NÉGATIVE) : $t26_scanned fichier(s) de doctrine balayé(s), aucun ne reproduit les intitulés du contrat interne de l'exécuteur amont"
 fi
 
-# E (DISCRIMINANT, par mutation) — une fixture temporaire portant l'un de ces intitulés doit
-# faire échouer l'assertion D.
-T26_TMPDIR="$(mktemp -d)"
-trap 'rm -rf "${T24_TMPDIR:-}" "${T25_TMPDIR:-}" "${T26_TMPDIR:-}" 2>/dev/null' EXIT
+# E (DISCRIMINANT, par mutation) — deux fixtures temporaires : l'une portant un intitulé du
+# contrat interne doit faire échouer l'assertion D ; l'autre, un contrat de reprise dont
+# l'énumération n'est plus close (sous-champ supplémentaire hors liste), doit faire échouer A.
+T26_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T26_TMPDIR"
 T26_FIXTURE="$T26_TMPDIR/duplicated-contract.md"
+T26_MUT_CONTRACT="$T26_TMPDIR/contrat-non-clos.md"
 printf '## Rapport de reprise\n\n**Completed Tasks** table (hashes + files)\n' > "$T26_FIXTURE"
-if [ -n "$(t26_internal_titles "$T26_FIXTURE")" ]; then
-  ok "T26 E (DISCRIMINANT) : fixture portant un intitulé du contrat interne détectée par l'assertion D"
+sed 's/et en particulier \*\*pas\*\* la table/plus `taches_executees`, et en particulier **pas** la table/' \
+  "$CONTRACTS_FILE" > "$T26_MUT_CONTRACT"
+t26_e_ko=""
+[ -n "$(t26_internal_titles "$T26_FIXTURE")" ] || t26_e_ko="$t26_e_ko [fixture d'intitulé interne non détectée par D]"
+t26_reprise_closed "$T26_MUT_CONTRACT" && t26_e_ko="$t26_e_ko [sous-champ hors énumération non détecté par A]"
+t26_reprise_closed "$CONTRACTS_FILE"   || t26_e_ko="$t26_e_ko [le contrat réel ne tient plus l'assertion A]"
+if [ -n "$t26_e_ko" ]; then
+  ko "T26 E (DISCRIMINANT) : une assertion ne rougit pas sur mutation —$t26_e_ko"; t26_ok=0
 else
-  ko "T26 E (DISCRIMINANT) : la fixture portant un intitulé du contrat interne n'est PAS détectée — assertion D morte"
-  t26_ok=0
+  ok "T26 E (DISCRIMINANT) : intitulé du contrat interne détecté par D, sous-champ hors énumération détecté par A, contrat réel tenu"
 fi
 
-[ "$t26_ok" -eq 1 ] && ok "T26 : minimum de reprise (4 sous-champs), halte de nœud, réponse par le manager, garde anti-duplication ADR-030 discriminante par mutation"
+[ "$t26_ok" -eq 1 ] && ok "T26 : minimum de reprise ($T26_N sous-champs mesurés), halte de nœud, réponse par le manager, garde anti-duplication ADR-030 discriminante par mutation"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
