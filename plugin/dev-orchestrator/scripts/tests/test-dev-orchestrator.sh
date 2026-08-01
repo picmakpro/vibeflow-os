@@ -1923,13 +1923,52 @@ fi
 # ---------------------------------------------------------------------------
 t25_ok=1
 
-# Forme interdite : un bloc de brique **Plan** / **Exécution** qui prescrit le mode
-# d'enchaînement (non-interactif / --auto / --chain). Co-occurrence exigée DANS LE BLOC et non
-# sur la même ligne physique : le module wrap à 100 colonnes, donc un simple retour à la ligne
-# suffisait à passer au travers — tout comme « **Plan (planification)** » (gras non fermé
-# immédiatement après le mot), d'où l'ancre ouvrante seule.
+# Forme interdite : un bloc de brique **Plan** / **Exécution** qui PRESCRIT le mode d'enchaînement
+# (non-interactif / --auto / --chain). Co-occurrence exigée DANS LE BLOC et non sur la même ligne
+# physique : le module wrap à 100 colonnes, donc un simple retour à la ligne suffisait à passer au
+# travers — tout comme « **Plan (planification)** » (gras non fermé immédiatement après le mot),
+# d'où l'ancre ouvrante seule.
+#
+# Deux corrections de FAUX ROUGES (le test punissait des rédactions légitimes) :
+#
+#  1. ANCRAGE EN DÉBUT DE BLOC + frontière de mot. L'ancre `[*][*](Plan|Exécution)` était matchée
+#     n'importe où dans le bloc et sans fermeture : un bloc « **Planification amont** … `--auto` »
+#     — prose parfaitement licite — était compté comme une brique Plan. On exige désormais que le
+#     bloc DÉBUTE par l'intitulé (marqueur de liste optionnel) et que le mot soit suivi d'un
+#     non-caractère de mot (`**`, espace, `(` ou `:`) : « **Plan** », « **Plan (planification)** »
+#     et « **Exécution** » matchent, « **Planification** » non.
+T25_BRICK_RE='^[[:space:]]*([0-9]+[.)][[:space:]]+|[-*+][[:space:]]+)?[*][*](Plan|Exécution)([*]|[ ]|[(]|:)'
+T25_MODE_RE='(non-interactif|--auto([^a-z-]|$)|--chain([^a-z-]|$))'
+T25_NEG_RE='(JAMAIS|[Jj]amais|[Nn]e pas|[Nn]i |[Ss]ans |[Aa]ucun|[Ii]nterdit|[Pp]as de |opt-in)'
+
+#  2. EXCLUSION DES NÉGATIONS. « JAMAIS en mode **non-interactif** » est un DURCISSEMENT du texte,
+#     pas la forme fautive : le test rougissait sur l'interdiction qu'il est censé faire respecter.
+#     La négation est bornée à la CLAUSE qui porte le motif (depuis le dernier séparateur ASCII
+#     . ; : ! ?), JAMAIS au bloc entier — sinon un « jamais » n'importe où désarmerait la sonde
+#     (fixture T25 c ci-dessous). Limite assumée et documentée : une prescription réelle rédigée
+#     avec une négation dans la MÊME clause échappe à la sonde. L'écart est volontairement orienté
+#     vers le faux vert : un gate qui punit une rédaction correcte coûte plus qu'un gate poreux.
+t25_prescriptive_clauses() { # bloc(s) sur stdin
+  awk -v mode="$T25_MODE_RE" -v neg="$T25_NEG_RE" '
+    {
+      line = $0
+      while (match(line, mode)) {
+        head = substr(line, 1, RSTART + RLENGTH - 1)
+        n = 0
+        for (i = length(head); i > 0; i--) {
+          c = substr(head, i, 1)
+          if (c == "." || c == ";" || c == ":" || c == "!" || c == "?") { n = i; break }
+        }
+        clause = substr(head, n + 1)
+        if (clause !~ neg) print clause
+        line = substr(line, RSTART + RLENGTH)
+      }
+    }
+  '
+}
+
 t25_forbidden_chain_hits() { # <file>
-  md_blocks_matching "$1" '[*][*](Plan|Exécution)' | "$GREP" -E '(non-interactif|--auto\b|--chain\b)'
+  md_blocks_matching "$1" "$T25_BRICK_RE" | t25_prescriptive_clauses
 }
 
 # volet présence : vf-dev-manager.md nomme la clé et l'appel qui la remet à faux.
@@ -1941,13 +1980,16 @@ t25_forbidden_chain_hits() { # <file>
 # volet fermeture (le cœur) : balayage réel des .md de doctrine, via les cibles RÉSOLUES. Le
 # compteur de fichiers vus est non négociable : sans lui, un glob qui n'expanse pas produit un
 # vert qui prétend avoir balayé ce qu'il n'a jamais ouvert.
+# Variables de boucle PRÉFIXÉES : les deux balayages (T25 fermeture, T26 D) sont au niveau du
+# script — `local` y est illégal — et partageaient `f`/`h`, donc la valeur du premier survivait
+# dans le second.
 t25_real_hits=""; t25_scanned=0
-while IFS= read -r f; do
-  [ -n "$f" ] || continue
+while IFS= read -r t25_f; do
+  [ -n "$t25_f" ] || continue
   t25_scanned=$((t25_scanned + 1))
-  h="$(t25_forbidden_chain_hits "$f")"
-  [ -n "$h" ] && t25_real_hits="$t25_real_hits
-$f: $h"
+  t25_h="$(t25_forbidden_chain_hits "$t25_f")"
+  [ -n "$t25_h" ] && t25_real_hits="$t25_real_hits
+$t25_f: $t25_h"
 done < <(module_md_targets)
 if [ "$t25_scanned" -eq 0 ]; then
   ko "T25 fermeture : ZÉRO fichier balayé (agents d'équipe + $REFS_DIR introuvables) — un vert à vide n'est pas une garantie"
@@ -1959,25 +2001,48 @@ else
   ok "T25 fermeture : $t25_scanned fichier(s) de doctrine balayé(s), aucun ne prescrit le mode d'enchaînement sur une brique Plan/Exécution"
 fi
 
-# volet discriminance (DISCRIMINANT, par mutation) : trois fixtures dans un mktemp -d — une forme
-# interdite (Plan), la même reformulée/wrappée (gras non fermé + retour à la ligne, la faille que
-# la co-occurrence sur ligne physique laissait passer), et une forme licite (Cadrage, patron de la
-# ligne 27 réelle de vf-coder.md). La détection doit remonter les deux premières et PAS la dernière.
+# volet discriminance (DISCRIMINANT, par mutation) — six fixtures dans un mktemp -d, trois qui
+# DOIVENT être détectées et trois qui DOIVENT rester vertes. Les secondes ne sont pas décoratives :
+# chacune correspond à une rédaction légitime sur laquelle le test rougissait.
+#   a  interdite  — brique Plan qui prescrit le mode.
+#   b  interdite  — la même wrappée + gras non fermé (« **Plan (planification)** »), la faille que
+#                   la co-occurrence sur ligne physique laissait passer.
+#   c  interdite  — prescription SUIVIE d'une négation dans une AUTRE clause : prouve que
+#                   l'exclusion des négations est bornée à la clause et non au bloc (sinon un seul
+#                   « jamais » n'importe où suffirait à désarmer le gate).
+#   d  LICITE     — brique Cadrage (patron de la ligne 27 réelle de vf-coder.md).
+#   e  LICITE     — INTERDICTION rédigée sur une brique Plan (« JAMAIS en mode non-interactif ») :
+#                   un durcissement du texte, que le test punissait.
+#   f  LICITE     — bloc « **Planification amont** » citant `--auto`/`--chain` : ce n'est pas une
+#                   brique Plan, seulement un mot qui commence pareil.
 T25_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T25_TMPDIR"
-T25_FORBIDDEN="$T25_TMPDIR/forbidden-plan.md"
-T25_WRAPPED="$T25_TMPDIR/forbidden-plan-wrappe.md"
-T25_LICIT="$T25_TMPDIR/licit-cadrage.md"
+T25_FORBIDDEN="$T25_TMPDIR/a-forbidden-plan.md"
+T25_WRAPPED="$T25_TMPDIR/b-forbidden-plan-wrappe.md"
+T25_NEGOTHER="$T25_TMPDIR/c-forbidden-plan-negation-autre-clause.md"
+T25_LICIT="$T25_TMPDIR/d-licit-cadrage.md"
+T25_LICIT_NEG="$T25_TMPDIR/e-licit-interdiction.md"
+T25_LICIT_PLANIF="$T25_TMPDIR/f-licit-planification-amont.md"
 printf '2. **Plan** : invoque `gsd-plan-phase` en mode **non-interactif**.\n' > "$T25_FORBIDDEN"
 printf '2. **Plan (planification)** : invoque `gsd-plan-phase`\n   en mode **non-interactif**.\n' > "$T25_WRAPPED"
+printf '2. **Plan** : invoque `gsd-plan-phase` en mode **non-interactif**. JAMAIS de rendu au manager.\n' > "$T25_NEGOTHER"
 printf '1. **Cadrage** : invoque le skill `gsd-discuss-phase` en mode **non-interactif**.\n' > "$T25_LICIT"
+printf '2. **Plan** : invoque `gsd-plan-phase` (ou dispatche `gsd-planner`).\n   JAMAIS en mode **non-interactif** : le plan se rend au manager.\n' > "$T25_LICIT_NEG"
+printf '**Planification amont** — la revue cross-AI de plans reste opt-in : jamais de `--auto`\nimplicite, jamais de `--chain` posé par le DAG.\n' > "$T25_LICIT_PLANIF"
 
-t25_forbidden_hit="$(t25_forbidden_chain_hits "$T25_FORBIDDEN")"
-t25_wrapped_hit="$(t25_forbidden_chain_hits "$T25_WRAPPED")"
-t25_licit_hit="$(t25_forbidden_chain_hits "$T25_LICIT")"
-if [ -n "$t25_forbidden_hit" ] && [ -n "$t25_wrapped_hit" ] && [ -z "$t25_licit_hit" ]; then
-  ok "T25 (DISCRIMINANT) : fixture Plan détectée, variante reformulée/wrappée détectée aussi, fixture Cadrage (licite, ligne 27 réelle de vf-coder.md) épargnée"
+t25_disc_ko=""
+for t25_fx in FORBIDDEN:1 WRAPPED:1 NEGOTHER:1 LICIT:0 LICIT_NEG:0 LICIT_PLANIF:0; do
+  eval "t25_fxfile=\$T25_${t25_fx%%:*}"
+  t25_fxhit="$(t25_forbidden_chain_hits "$t25_fxfile")"
+  if [ "${t25_fx##*:}" = 1 ] && [ -z "$t25_fxhit" ]; then
+    t25_disc_ko="$t25_disc_ko [$(basename "$t25_fxfile") : forme interdite NON détectée]"
+  elif [ "${t25_fx##*:}" = 0 ] && [ -n "$t25_fxhit" ]; then
+    t25_disc_ko="$t25_disc_ko [$(basename "$t25_fxfile") : FAUX ROUGE sur une rédaction licite — hit=[$t25_fxhit]]"
+  fi
+done
+if [ -z "$t25_disc_ko" ]; then
+  ok "T25 (DISCRIMINANT) : 3 formes interdites détectées (Plan, Plan wrappé, prescription + négation en autre clause), 3 rédactions LICITES épargnées (Cadrage, interdiction rédigée, « Planification amont »)"
 else
-  ko "T25 (DISCRIMINANT) : ne distingue pas les formes interdites (Plan, Plan wrappé — attendues détectées) de la licite (Cadrage — attendue épargnée) — forbidden=[$t25_forbidden_hit] wrapped=[$t25_wrapped_hit] licit=[$t25_licit_hit]"
+  ko "T25 (DISCRIMINANT) : la sonde ne sépare pas prescription et rédaction licite —$t25_disc_ko"
   t25_ok=0
 fi
 
