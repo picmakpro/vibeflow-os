@@ -153,7 +153,8 @@ embarque la DA en 3-5 lignes. Doctrine complète :
 
 - **Verdict d'étape (rapport typé, ADR-053)** : le `statut` du rapport de worker — recoupé au
   `*-VERIFICATION.md` — pilote le flux de façon déterministe : `passed` → `dag.sh mark done` + frontière
-  suivante · `human_needed` (ou tout finding `action: ask-user`) → **escalade** (mode superviser :
+  suivante · `human_needed` — déclenché par `gate="blocking-human"` amont (`mission-contracts.md`
+  §Contrat de checkpoint amont) ou par tout finding `action: ask-user` — → **escalade** (mode superviser :
   checkpoint ; mode autonome : **GELER le nœud porteur** — le laisser `blocked`/`failed`, consigner
   l'escalade au rapport, et ne poursuivre QUE les nœuds indépendants ; jamais « continuer » sur un
   finding qui défie l'intention/la sécurité — cohérent Pattern C « jamais tranché seul ») ·

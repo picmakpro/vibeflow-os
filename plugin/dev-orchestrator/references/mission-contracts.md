@@ -167,6 +167,22 @@ de même en les relayant dans son « Rapport de mission » : simple concaténati
 statistique agrégée de son cru — la boucle de calibration reste amont, notre seul devoir est de ne
 pas couper le fil.
 
+## Contrat de checkpoint amont (gsd-core 1.9.0)
+
+`gsd-executor` (1.9.0) peut refuser d'auto-approuver un checkpoint : soit `gate="blocking-human"`
+porté par le `PLAN.md`, soit une **précondition** amont non satisfaite (cf.
+`gsd-core/references/checkpoints.md` règles 5/6 ; `$HOME/.claude/agents/gsd-executor.md`
+§Préconditions/checkpoints — sources amont, non recopiées ici). Le bloc typé de `vf-coder` gagne
+un champ **optionnel** `gate`, frère de `statut`/`findings`/`noeuds_debloques` : présent
+**uniquement** quand un checkpoint est survenu pendant le mandat, portant la valeur amont
+**recopiée verbatim** — jamais calculée, jamais déduite du **type** de checkpoint côté VibeFlow
+(un pilotage sur le type seul annulerait le refus que l'amont vient d'exprimer, un étage plus
+haut).
+
+**Règle unique de mapping** (une règle, deux motifs, ADR-030) : `gate="blocking-human"` **OU**
+précondition amont non satisfaite ⇒ `statut: "human_needed"`. Un refus d'auto-approbation amont
+est un refus, quel qu'en soit le motif.
+
 ## Étage revue — deux objets disjoints (ADR-060 / ADR-061)
 
 La revue de **diff de code** (`vf-reviewer` → `gsd-code-reviewer`, nœud `revue-N` posé

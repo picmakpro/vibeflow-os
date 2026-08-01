@@ -72,3 +72,9 @@ Un point qui défie l'intention/la logique/la sécurité → `action: ask-user` 
 optionnels frères du bloc typé (`"estimate": {…}`, `"actuals": {…}`). Ne les recalcule, n'arrondis
 ni ne réinterprète jamais : tu relaies des nombres déjà mesurés en amont, tu n'en calcules aucun.
 Absents des deux fichiers → absents de ton retour, jamais une valeur inventée.
+
+**`gate`** (contrat détaillé : `mission-contracts.md` §Contrat de checkpoint amont) : quand
+`gsd-executor` rend un checkpoint `gate="blocking-human"` ou refuse sur précondition non
+satisfaite, ajoute `"gate": "…"` — champ optionnel frère du bloc typé, **recopié verbatim**,
+absent si aucun checkpoint n'est survenu — et rends `statut: "human_needed"`. Jamais une réponse
+de ta part : c'est le patron déjà appliqué au §Cadrage (escalade, jamais auto-répondue).

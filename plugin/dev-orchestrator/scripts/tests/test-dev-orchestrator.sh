@@ -1722,5 +1722,45 @@ fi
 [ "$t23_ok" -eq 1 ] && ok "T23 managers : le geste documentaire est câblé des deux côtés (nœud docs, 4 déclencheurs, renvoi à la doctrine, aucune copie locale) — présence textuelle, pas comportement"
 
 # ---------------------------------------------------------------------------
+# T24 (tracer, D-01) — le champ `gate` traverse référence → vf-coder → vf-dev-manager, avec la
+# règle unique de mapping vers `human_needed`. Assertion D est DISCRIMINANTE par mutation
+# (patron T14c/T21) : une copie de vf-dev-manager.md où la mention est retirée doit faire
+# échouer la détection, jamais un vert qui ne peut structurellement pas s'en distinguer.
+# ---------------------------------------------------------------------------
+t24_ok=1
+CONTRACTS_FILE="$REFS_DIR/mission-contracts.md"
+CODER_FILE="$MOD/agents/vf-coder.md"
+
+t24_gate_hit() { "$GREP" -q 'gate="blocking-human"' "$1" 2>/dev/null; } # <file>
+
+if [ -f "$CONTRACTS_FILE" ]; then
+  "$GREP" -q '^## Contrat de checkpoint amont' "$CONTRACTS_FILE" || { ko "T24 A : section « Contrat de checkpoint amont » absente de mission-contracts.md"; t24_ok=0; }
+  t24_gate_hit "$CONTRACTS_FILE" || { ko "T24 A : mission-contracts.md ne nomme pas gate=\"blocking-human\""; t24_ok=0; }
+  "$GREP" -q 'human_needed' "$CONTRACTS_FILE" || { ko "T24 A : mission-contracts.md ne porte pas la règle de mapping vers human_needed"; t24_ok=0; }
+else
+  ko "T24 A : $CONTRACTS_FILE introuvable"; t24_ok=0
+fi
+
+t24_gate_hit "$CODER_FILE" || { ko "T24 B : vf-coder.md ne nomme pas gate=\"blocking-human\" dans son §Retour"; t24_ok=0; }
+t24_gate_hit "$DEVMGR" || { ko "T24 C : vf-dev-manager.md ne nomme pas gate=\"blocking-human\" dans son contrôle de flux"; t24_ok=0; }
+
+# D (DISCRIMINANT, par mutation) : retirer la mention dans une copie temporaire de
+# vf-dev-manager.md et exiger que la détection échoue dessus, tout en restant verte sur le
+# fichier réel.
+T24_TMPDIR="$(mktemp -d)"
+trap 'rm -rf "$T24_TMPDIR"' EXIT
+T24_MUTANT="$T24_TMPDIR/vf-dev-manager.md"
+"$GREP" -v 'gate="blocking-human"' "$DEVMGR" > "$T24_MUTANT"
+if t24_gate_hit "$T24_MUTANT"; then
+  ko "T24 D (DISCRIMINANT) : la mutation n'a pas retiré la mention — assertion morte"; t24_ok=0
+elif ! t24_gate_hit "$DEVMGR"; then
+  ko "T24 D (DISCRIMINANT) : le fichier réel ne porte plus la mention — contradiction avec C"; t24_ok=0
+else
+  : # discriminance tenue, verdict global ci-dessous
+fi
+
+[ "$t24_ok" -eq 1 ] && ok "T24 : le champ gate traverse référence → vf-coder → vf-dev-manager, mapping unique vers human_needed, discriminance prouvée par mutation"
+
+# ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
 [ "$fail" -eq 0 ]
