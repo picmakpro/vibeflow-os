@@ -1583,10 +1583,36 @@ divise plutôt qu'allonger), chaînées par navigation `← Précédent · ↑ S
 `manual/README.md` avec carte du manuel (graphiques mermaid) et tutos. Bilingue FR + EN (comme les
 deux README). `README.md`/`README.fr.md` et `INSTALL.md` maigrissent et pointent vers le manuel au
 lieu de dupliquer — le manuel devient la version guidée et pédagogique.
-**Requirements**: TBD
+
+> **Amendement de mission (2026-08-01)** — `manual/` **reste local, hors git** (`.git/info/exclude`,
+> aucune entrée `.gitignore`). Aucun fichier du manuel n'entre dans un commit. Le volet « les README
+> maigrissent et pointent vers le manuel » est **SUSPENDU, pas abandonné** : pointer vers un dossier
+> absent du dépôt casserait les liens des visiteurs. `README.md`, `README.fr.md`, `INSTALL.md`,
+> `scripts/` et `.github/` sortent du périmètre d'écriture ; l'outillage vit sous `manual/.tools/`
+> et n'entre pas en CI. Seuls `.planning/**` sont committés.
+> Cadrage complet : `.planning/missions/2026-08-01-phase-26-manuel-utilisateur.md` (D-1 à D-13) et
+> `.planning/phases/VFDO-26-manuel-utilisateur-vibeflow-manual/26-CONTEXT.md` (D-01 à D-14).
+
+**Requirements**: aucun ID formel — `REQUIREMENTS.md` ne porte aucun `REQ-` pour cette phase (le
+ledger s'arrête à ALTI-05 / Phase 14), même convention que les Phases 15 à 21. La traçabilité est
+assurée par les **décisions D-01 à D-14** de `26-CONTEXT.md` et les **manques M-1 à M-12** de
+`26-INVENTAIRE-MATIERE.md`, repris par le champ `must_haves` de chaque `26-0N-PLAN.md`.
 **Depends on:** Phase 25
-**Plans:** 0 plans
+**Plans:** 0/9 plans executed
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 26 to break down)
+- [ ] 26-01-PLAN.md — Infrastructure : `toc.yml` (D-03), `manual/.tools/build-nav.sh` (nav générée), `manual/.tools/check-manual.sh` (gate à 7 contrôles, refus du verdict vide, D-13), `manual/README.md` bilingue (vague 1)
+- [ ] 26-02-PLAN.md — Priorité du mandat 1/2 : les deux README de langue (carte mermaid décorative + navigation réelle, D-06) et le thème `01-demarrer` complet FR+EN, 7 pages — comble M-1, M-6 (scope), M-12 (vague 2)
+- [ ] 26-03-PLAN.md — Priorité du mandat 2/2 : thème `02-concepts` complet FR+EN, 7 pages — comble M-2 (glossaire produit), M-3 (« lab » enfin défini), M-5 (VibeFlow ↔ GSD ↔ Superpowers) ; documente 9 principes sourcés du canon (D-09) (vague 3)
+- [ ] 26-04-PLAN.md — Thème `03-modules` FR+EN, 6 pages : catalogue et choix de modules **dérivés du disque**, zéro version en dur (D-11) — comble M-6 (modules) (vague 4)
+- [ ] 26-05-PLAN.md — Thème `04-cycle-de-dev` FR+EN, 6 pages : cadrer → planifier → exécuter → livrer, écrit du point de vue de l'humain (vague 5)
+- [ ] 26-06-PLAN.md — Thème `05-equipe-agents` FR+EN, 6 pages : missions longues, ce qu'on vous demande (M-8), branches et worktrees (ADR-059, ADR-064) (vague 6)
+- [ ] 26-07-PLAN.md — Thème `06-reference` FR+EN, 6 pages : commandes/skills/agents énumérés depuis le disque (D-11) — comble M-7 (dépannage après install) et M-11 (coût et modèles) (vague 7)
+- [ ] 26-08-PLAN.md — Thème `07-sous-le-capot` FR+EN, 6 pages : anatomie d'un lab installé (M-4), engine d'install, gates, 15 ADR à valeur utilisateur, pont vers `docs/` (vague 8)
+- [ ] 26-09-PLAN.md — Clôture : ROADMAP et STATE recalés sur le réel livré, **checkpoint humain bloquant** puis unique commit de la phase, par chemins explicites (D-14, one-way) (vague 9)
+
+**Découpe différable.** Les vagues 4 à 8 (un thème chacune, bilingue) peuvent être différées sans
+casser le manuel ni son gate : `toc.yml` ne référence à tout instant que des pages réellement
+écrites dans les deux langues, donc un arrêt entre deux vagues laisse un manuel plus court et
+cohérent, `check-manual.sh` au vert. La priorité du mandat est tenue dès la vague 3.
