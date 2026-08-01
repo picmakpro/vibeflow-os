@@ -1748,7 +1748,7 @@ t24_gate_hit "$DEVMGR" || { ko "T24 C : vf-dev-manager.md ne nomme pas gate=\"bl
 # vf-dev-manager.md et exiger que la détection échoue dessus, tout en restant verte sur le
 # fichier réel.
 T24_TMPDIR="$(mktemp -d)"
-trap 'rm -rf "$T24_TMPDIR"' EXIT
+trap 'rm -rf "${T24_TMPDIR:-}" "${T25_TMPDIR:-}" "${T26_TMPDIR:-}" 2>/dev/null' EXIT
 T24_MUTANT="$T24_TMPDIR/vf-dev-manager.md"
 "$GREP" -v 'gate="blocking-human"' "$DEVMGR" > "$T24_MUTANT"
 if t24_gate_hit "$T24_MUTANT"; then
@@ -1760,6 +1760,66 @@ else
 fi
 
 [ "$t24_ok" -eq 1 ] && ok "T24 : le champ gate traverse référence → vf-coder → vf-dev-manager, mapping unique vers human_needed, discriminance prouvée par mutation"
+
+# ---------------------------------------------------------------------------
+# T25 (D-02) — le flag d'enchaînement autonome (workflow._auto_chain_active) est désarmé au
+# démarrage de mission ET fermé par gate : aucun fichier du module ne peut le represcrire sur
+# les briques de Plan ou d'Exécution. EXCLUSION VOLONTAIRE de scripts/tests/ (motif) : ce
+# fichier de test embarque par construction la forme interdite dans ses fixtures de mutation —
+# sans l'exclure, le balayage se détecterait lui-même à chaque run (faux rouge permanent). Le
+# balayage porte donc UNIQUEMENT sur les *.md de agents/ et references/, jamais sur les *.sh de
+# scripts/tests/.
+# ---------------------------------------------------------------------------
+t25_ok=1
+
+# forme interdite : mention du mode d'enchaînement (non-interactif / --auto / --chain)
+# co-occurrant, sur la MÊME ligne, avec le marqueur de brique Plan ou Exécution.
+t25_forbidden_chain_hits() { # <file>
+  "$GREP" -inE '(non-interactif|--auto\b|--chain\b)' "$1" 2>/dev/null | "$GREP" -E '\*\*(Plan|Exécution)\*\*'
+}
+
+# volet présence : vf-dev-manager.md nomme la clé et l'appel qui la remet à faux.
+"$GREP" -q '_auto_chain_active' "$DEVMGR" || { ko "T25 présence : vf-dev-manager.md ne nomme pas workflow._auto_chain_active"; t25_ok=0; }
+"$GREP" -q 'config-set' "$DEVMGR" || { ko "T25 présence : vf-dev-manager.md n'invoque pas config-set"; t25_ok=0; }
+"$GREP" -q 'gsd_run' "$DEVMGR" || { ko "T25 présence : vf-dev-manager.md ne résout pas gsd_run"; t25_ok=0; }
+"$GREP" -q 'RUNTIME_DIR' "$DEVMGR" && { ko "T25 présence : vf-dev-manager.md recopie la cascade de résolution (RUNTIME_DIR) au lieu d'y renvoyer — DRY rompu"; t25_ok=0; }
+
+# volet fermeture (le cœur) : balayage réel des .md de agents/ et references/ — jamais
+# scripts/tests/, cf. exclusion documentée ci-dessus.
+t25_real_hits=""
+for f in "$MOD"/agents/*.md "$MOD"/references/*.md; do
+  [ -f "$f" ] || continue
+  h="$(t25_forbidden_chain_hits "$f")"
+  [ -n "$h" ] && t25_real_hits="$t25_real_hits
+$f: $h"
+done
+if [ -n "$t25_real_hits" ]; then
+  ko "T25 fermeture : forme interdite (mode d'enchaînement sur brique Plan/Exécution) trouvée —$t25_real_hits"
+  t25_ok=0
+else
+  ok "T25 fermeture : aucun fichier de agents/ ni references/ ne prescrit le mode d'enchaînement sur les briques Plan/Exécution"
+fi
+
+# volet discriminance (DISCRIMINANT, par mutation) : deux fixtures dans un mktemp -d — une forme
+# interdite (Plan), une forme licite (Cadrage, patron ligne 27 réelle de vf-coder.md) — la
+# fonction de détection doit remonter EXACTEMENT la première et PAS la seconde.
+T25_TMPDIR="$(mktemp -d)"
+trap 'rm -rf "${T24_TMPDIR:-}" "${T25_TMPDIR:-}" "${T26_TMPDIR:-}" 2>/dev/null' EXIT
+T25_FORBIDDEN="$T25_TMPDIR/forbidden-plan.md"
+T25_LICIT="$T25_TMPDIR/licit-cadrage.md"
+printf '2. **Plan** : invoque `gsd-plan-phase` en mode **non-interactif**.\n' > "$T25_FORBIDDEN"
+printf '1. **Cadrage** : invoque le skill `gsd-discuss-phase` en mode **non-interactif**.\n' > "$T25_LICIT"
+
+t25_forbidden_hit="$(t25_forbidden_chain_hits "$T25_FORBIDDEN")"
+t25_licit_hit="$(t25_forbidden_chain_hits "$T25_LICIT")"
+if [ -n "$t25_forbidden_hit" ] && [ -z "$t25_licit_hit" ]; then
+  ok "T25 (DISCRIMINANT) : fixture Plan (interdite) détectée, fixture Cadrage (licite, ligne 27 réelle de vf-coder.md) épargnée"
+else
+  ko "T25 (DISCRIMINANT) : ne distingue pas Plan (interdite, attendu détecté) de Cadrage (licite, attendu épargnée) — forbidden=[$t25_forbidden_hit] licit=[$t25_licit_hit]"
+  t25_ok=0
+fi
+
+[ "$t25_ok" -eq 1 ] && ok "T25 : flag d'enchaînement désarmé au démarrage + fermé par gate (Plan/Exécution interdits, Cadrage licite), discriminance prouvée par mutation"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="

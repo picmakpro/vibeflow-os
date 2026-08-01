@@ -43,7 +43,7 @@ scripts `$S` (scope-robuste, cf. mission-flow §Résolution) — premier existan
 `./.claude/scripts` → `$HOME/.claude/scripts` → `${CLAUDE_PLUGIN_ROOT}/conductor/scripts` →
 `${CLAUDE_PLUGIN_ROOT}/dev-orchestrator/scripts` (le lab courant PRIME sur le scope user : sur
 une machine bi-scope, prendre les scripts du user divergerait silencieusement de la version du
-lab). Puis quatre gestes **non négociables** :
+lab). Puis cinq gestes **non négociables** :
 
 1. **Verrou de driver (avant TOUT dispatch)** :
    `"$S"/driver-lock.sh acquire --owner=<session|task_id> --step=<étape>`.
@@ -66,6 +66,10 @@ lab). Puis quatre gestes **non négociables** :
    traite les invariants comme non garantis, ne les cite pas comme preuve ; **64 = fichier
    illisible** → défaut d'outillage, remonte `human_needed`. Aucun de ces codes n'arrête la mission
    par lui-même : seul 64 appelle l'humain.
+5. **Reset du flag d'enchaînement (avant le premier dispatch)** : `gsd_run config-set
+   workflow._auto_chain_active false` (résolution : `mission-contracts.md` §Seuil de bascule,
+   DRY). Persisté dans `.planning/config.json`, il survit aux sessions et auto-tranche les
+   checkpoints tant qu'il vaut vrai ; `gsd_run` introuvable → consigne au rapport, best-effort.
 
 ## Règle d'or : TOUJOURS planifier d'abord
 
