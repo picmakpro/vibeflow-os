@@ -1,0 +1,251 @@
+{
+  "nodes": [
+    {
+      "id": "exec-01",
+      "step": "23-01 Lacune 6 — taxonomie checkpoint GSD, gate blocking-human",
+      "stage": "exec",
+      "deps": [],
+      "scope": [
+        "plugin/dev-orchestrator/references/mission-contracts.md",
+        "plugin/dev-orchestrator/agents/vf-coder.md",
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-01",
+      "step": "revue code 23-01",
+      "stage": "revue",
+      "deps": [
+        "exec-01"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/references/mission-contracts.md",
+        "plugin/dev-orchestrator/agents/vf-coder.md",
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "exec-02",
+      "step": "23-02 check-gsd-config.sh + hooks + config.json",
+      "stage": "exec",
+      "deps": [
+        "revue-01"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/check-gsd-config.sh",
+        "plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh",
+        "plugin/dev-orchestrator/hooks/hooks.json",
+        ".planning/config.json"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-02",
+      "step": "revue code 23-02",
+      "stage": "revue",
+      "deps": [
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/check-gsd-config.sh",
+        "plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh",
+        "plugin/dev-orchestrator/hooks/hooks.json"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-03",
+      "step": "23-03 Lacune 3 — doctrine de flags de cycle (GSD-PIPELINE §9)",
+      "stage": "exec",
+      "deps": [
+        "revue-02"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/references/GSD-PIPELINE.md",
+        "plugin/dev-orchestrator/agents/vf-coder.md",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-03",
+      "step": "revue code 23-03",
+      "stage": "revue",
+      "deps": [
+        "exec-03"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/references/GSD-PIPELINE.md",
+        "plugin/dev-orchestrator/agents/vf-coder.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-04",
+      "step": "23-04 table capabilities/hooks generee",
+      "stage": "exec",
+      "deps": [
+        "revue-03"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh",
+        "plugin/dev-orchestrator/references/gsd-capabilities-index.md",
+        "plugin/dev-orchestrator/references/GSD-PIPELINE.md",
+        "plugin/_internal/vibeflow-update.sh",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-04",
+      "step": "revue code 23-04",
+      "stage": "revue",
+      "deps": [
+        "exec-04"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh",
+        "plugin/_internal/vibeflow-update.sh"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "audit-infra",
+      "step": "audit infra — engine install + hooks + scripts gates (23-02 + 23-04)",
+      "stage": "audit",
+      "deps": [
+        "revue-04"
+      ],
+      "scope": [
+        "plugin/_internal/vibeflow-update.sh",
+        "plugin/dev-orchestrator/hooks/hooks.json",
+        "plugin/dev-orchestrator/scripts/check-gsd-config.sh",
+        "plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-05",
+      "step": "23-05 voie unique d'invocation (Lacune 5)",
+      "stage": "exec",
+      "deps": [
+        "audit-infra"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/agents/vf-coder.md",
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md",
+        "plugin/dev-orchestrator/references/GSD-PIPELINE.md",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-05",
+      "step": "revue code 23-05",
+      "stage": "revue",
+      "deps": [
+        "exec-05"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/agents/vf-coder.md",
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md",
+        "plugin/dev-orchestrator/references/GSD-PIPELINE.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-06",
+      "step": "23-06 disjonction hooks moteur vs etages VibeFlow (Lacune 1, ADR)",
+      "stage": "exec",
+      "deps": [
+        "revue-05"
+      ],
+      "scope": [
+        "docs/ADR.md",
+        "plugin/dev-orchestrator/references/mission-contracts.md",
+        "plugin/dev-orchestrator/agents/vf-coder.md",
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-06",
+      "step": "revue code 23-06",
+      "stage": "revue",
+      "deps": [
+        "exec-06"
+      ],
+      "scope": [
+        "docs/ADR.md",
+        "plugin/dev-orchestrator/references/mission-contracts.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-07",
+      "step": "23-07 budgets de boucle additionnes + briques dormantes",
+      "stage": "exec",
+      "deps": [
+        "revue-06"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/references/mission-flow.md",
+        "plugin/dev-orchestrator/references/mission-contracts.md",
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md",
+        "plugin/dev-orchestrator/references/GSD-PIPELINE.md",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-07",
+      "step": "revue code 23-07",
+      "stage": "revue",
+      "deps": [
+        "exec-07"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/references/mission-flow.md",
+        "plugin/dev-orchestrator/references/mission-contracts.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-08",
+      "step": "23-08 gouvernance — bump module, README, CHANGELOG, gates verts",
+      "stage": "exec",
+      "deps": [
+        "revue-07"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/VERSION",
+        "plugin/dev-orchestrator/module.json",
+        "plugin/dev-orchestrator/README.md",
+        "plugin/dev-orchestrator/CHANGELOG.md",
+        "README.md",
+        "README.fr.md",
+        ".planning/REQUIREMENTS.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-08",
+      "step": "revue finale 23-08 + coherence de phase",
+      "stage": "revue",
+      "deps": [
+        "exec-08"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/**",
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "blocked"
+    }
+  ]
+}
