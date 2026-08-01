@@ -281,6 +281,96 @@ laquelle un épuisement de budget doit sortir en `gaps_found` explicite plutôt 
 partiel : la sonde de parité (D-1, conséquence 2) échouerait de toute façon, et c'est le
 comportement voulu.
 
+## 5. Livré (au 2026-08-02)
+
+**44 pages × 2 langues = 88 fichiers de contenu**, 7 thèmes complets et isomorphes, plus
+`manual/README.md`, `manual/{fr,en}/README.md`, `manual/toc.yml` et l'outillage `manual/.tools/`.
+94 fichiers sous `manual/`, **zéro commité** — conformément à l'amendement §3 bis.
+
+| Thème | Pages (par langue) |
+|---|---|
+| `01-demarrer` | 7 |
+| `02-concepts` | 7 |
+| `03-modules` | 6 |
+| `04-cycle-de-dev` | 6 |
+| `05-equipe-agents` | 6 |
+| `06-reference` | 6 |
+| `07-sous-le-capot` | 6 |
+
+Gate `manual/.tools/check-manual.sh` : **exit 0**, C0-C6 verts, zéro avertissement.
+
+**Trois coupures d'infrastructure** ont interrompu la mission (panne réseau ×2, limite de session
+×1). Aucune n'a produit de perte : le disque a été re-constaté à chaque reprise avant de relancer,
+et la vague 6 a été retrouvée à moitié écrite **avec le gate rouge** — C2 et C3 l'ont attrapée. La
+propriété « un arrêt entre deux vagues laisse un état cohérent » a donc été éprouvée pour de vrai.
+
+## 5 bis. Verdict de la revue (juge frais `vf-reviewer`, read-only)
+
+`gaps_found`. Le juge a lu ~20 pages, recoupé les faits contre le disque et testé le gate par
+mutation en copie temporaire.
+
+**PASS sans réserve sur 4 axes** :
+- **Anglais** — idiomatique de bout en bout sur 7 pages échantillonnées, aucun calque du français.
+- **Véracité (D-11)** — recomptage manuel : 31 agents (25 + 6 `AGENT.md`), 20 skills, 6 commandes,
+  17 modules, chaîne de dépendances du socle, TTL du verrou (1800 s) — **tout correspond au disque**.
+  Zéro version en dur. La discipline « rien du README, tout du disque » a tenu.
+- **Pédagogie** — le jargon est explicitement différé puis défini ; le glossaire couvre les 16
+  termes réellement employés ailleurs.
+- **Honnêteté** — `mobile-test` marqué expérimental, verrou de driver déclaré non contraignant,
+  charte des 250 lignes déclarée non gatée. Aucune garantie survendue.
+
+**Le gate n'est pas tautologique** — prouvé par mutation réelle : C0 échoue bien sur un manuel vide,
+C4 détecte bien un bandeau corrompu.
+
+**4 findings `auto-fix` — COMBLÉS**, chacun avec preuve avant/après (le point important : les 4
+étaient **dormants**, donc un correctif non prouvé aurait été indistinguable d'un no-op) :
+1. `build-nav.sh:parse_themes` sans bloc `END` — perte silencieuse du dernier thème. Reproduit sur
+   le vrai `toc.yml` réordonné (6 thèmes au lieu de 7), corrigé, re-prouvé.
+2. `check-manual.sh` C3 — blocs de code non sautés et liens titrés tronqués à la première `)`.
+3. `check-manual.sh` C5 — toggle ``` ancré colonne 0, aveugle à un bloc indenté sous une puce.
+4. `build-nav.sh` — valeurs `fr:`/`en:`/`path:` ni trimées ni dé-quotées.
+
+Non-régression vérifiée indépendamment par moi : gate exit 0, `build-nav.sh` toujours idempotent
+(checksum des 90 fichiers identique après deux passes), **0 page de contenu modifiée**.
+
+**1 finding `no-op` conservé comme dette documentée** : C4 régénère avec le même `build-nav.sh` puis
+diffe — un bug systémique partagé entre l'état sur disque et la logique de régénération resterait
+invisible. Ce n'est pas une tautologie (il échoue sur une vraie dérive) mais un angle mort réel.
+
+## 6. ESCALADES — deux décisions qui reviennent à Samuel
+
+### E-1 — Parité de contenu FR↔EN (finding `ask-user` de la revue)
+
+**21 pages EN sur 44 portent un ou deux paragraphes sans équivalent FR.** Jamais une inexactitude :
+ce sont des justifications méta ou des rappels de limite. Le lecteur EN reçoit systématiquement
+un peu plus que le lecteur FR.
+
+Concentration : `07-sous-le-capot` 6/6 · `05-equipe-agents` 5/6 · `04-cycle-de-dev` 3/6 ·
+`02-concepts` 3/7 · `01-demarrer` 2/7 · `06-reference` 2/6 · `03-modules` 0/6.
+
+Cas vérifiés ligne à ligne : `manual/en/07-sous-le-capot/les-gates-machine.md:99-105` ·
+`manual/en/02-concepts/glossaire.md:97-99` · `manual/en/05-equipe-agents/les-agents-livres.md:91-95`.
+
+**Aucun gate ne peut voir ça** : C1/C2 prouvent l'isomorphisme des *chemins*, jamais que la page EN
+*dit la même chose* que sa jumelle FR.
+
+Trois sorties possibles : **porter vers le FR** (le contenu est jugé utile par la revue — le FR y
+gagne, ~21 pages à retoucher) · **couper côté EN** (parité stricte immédiate, moins de matière à
+maintenir, mais on perd des rappels utiles) · **laisser en dette** (le manuel n'est pas publié,
+l'arbitrage peut attendre la décision de publication). **Non tranché — c'est une décision de
+direction éditoriale, pas un défaut à corriger d'office.**
+
+### E-2 — Clôture de la phase (plan 26-09, `autonomous: false`)
+
+Le plan de clôture porte un **checkpoint humain bloquant** avant le commit de clôture. Je m'y suis
+tenu : je n'ai ni marqué la Phase 26 terminée, ni bumpé `completed_phases`, ni poussé, ni ouvert de
+PR. Restent à ta main : marquer la phase complète, pousser la branche, ouvrir la PR (ADR-059 — sans
+merger).
+
+**Note de contexte pour cette décision** : la branche ne contient que des docs de planning —
+`manual/` est hors git dans tous les cas. Pousser ne publie donc pas le manuel, seulement la trace
+de son plan (déjà publique via la section `### Phase 26` du ROADMAP, commit `6ba2f34`).
+
 ## 4 bis. Points ouverts — à trancher à la revue, PAS décidés
 
 ### O-1 — Le miroir `en/` réutilise les slugs français

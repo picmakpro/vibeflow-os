@@ -1,0 +1,122 @@
+{
+  "nodes": [
+    {
+      "id": "panel-bilingue",
+      "step": "Panel: stratégie bilingue FR/EN d'un manuel lu sur GitHub (miroir fr/ + en/ vs suffixes .fr.md)",
+      "stage": "research",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "panel-ia",
+      "step": "Panel: architecture d'information d'un manuel numéroté + frontière README/INSTALL vs manuel",
+      "stage": "research",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "inventaire",
+      "step": "Inventaire de la matière source: sections README/INSTALL/plugin-reference/docs mappées aux thèmes candidats",
+      "stage": "research",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "build-26",
+      "step": "vf-coder: cycle complet Phase 26 (cadrage, plan, exécution, revue) — manuel bilingue + dégraissage README/INSTALL",
+      "stage": "build",
+      "deps": [
+        "panel-bilingue",
+        "panel-ia",
+        "inventaire"
+      ],
+      "scope": [
+        "manual/**",
+        "README.md",
+        "README.fr.md",
+        "INSTALL.md",
+        ".planning/phases/VFDO-26-manuel-utilisateur-vibeflow-manual/**",
+        "scripts/**",
+        ".planning/ROADMAP.md",
+        ".planning/STATE.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "verify-manual",
+      "step": "Vérification read-only: parité FR/EN, chaînes de navigation, liens relatifs, mermaid, pointeurs README/INSTALL",
+      "stage": "verify",
+      "deps": [
+        "build-26"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-w1-3",
+      "step": "Exécution vagues 1-3 : outillage + toc.yml + index de langue + 01-demarrer + 02-concepts (FR+EN)",
+      "stage": "build",
+      "deps": [
+        "build-26"
+      ],
+      "scope": [
+        "manual/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-w4-8",
+      "step": "Exécution vagues 4-8 : thèmes 03-modules à 07-sous-le-capot (FR+EN)",
+      "stage": "build",
+      "deps": [
+        "exec-w1-3"
+      ],
+      "scope": [
+        "manual/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "cloture-w9",
+      "step": "Vague 9 : recalage ROADMAP/STATE + checkpoint humain bloquant avant commit de clôture",
+      "stage": "build",
+      "deps": [
+        "exec-w4-8"
+      ],
+      "scope": [
+        ".planning/ROADMAP.md",
+        ".planning/STATE.md",
+        ".planning/phases/VFDO-26-manuel-utilisateur-vibeflow-manual/**"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "fix-outillage",
+      "step": "Comblement: 4 findings auto-fix sur build-nav.sh et check-manual.sh (revue vf-reviewer)",
+      "stage": "build",
+      "deps": [
+        "verify-manual"
+      ],
+      "scope": [
+        "manual/.tools/**"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "parite-fr-en",
+      "step": "GELÉ (ask-user): 21 pages EN portent des paragraphes absents du FR — arbitrage Samuel requis",
+      "stage": "build",
+      "deps": [
+        "verify-manual"
+      ],
+      "scope": [
+        "manual/fr/**",
+        "manual/en/**"
+      ],
+      "status": "failed"
+    }
+  ]
+}
