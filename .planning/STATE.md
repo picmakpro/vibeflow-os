@@ -504,6 +504,23 @@ Progress: [██████░░░░] 59%
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
 
+- **2026-08-02 — Le manuel utilisateur (Phase 26) vit sur disque, hors git, et sa disposition
+  bilingue est un miroir de dossiers** (mission `.planning/missions/2026-08-01-phase-26-manuel-utilisateur.md`,
+  13 décisions D-1..D-13 + point ouvert O-1). Contrainte de Samuel posée en cours de mission :
+  **rien sous `manual/` n'est commité**, et **aucune entrée `.gitignore`** — ce fichier étant
+  versionné, une entrée y laisserait une trace publique de l'existence du manuel ; l'exclusion
+  passe par `.git/info/exclude`. Conséquences : le dégraissage de `README.md`/`README.fr.md`/
+  `INSTALL.md` (D-7, D-8) est **gelé** — pointer vers un dossier absent du dépôt casserait les
+  liens des visiteurs —, et l'outillage du manuel vit sous `manual/.tools/` plutôt que dans
+  `scripts/` + `ci.yml` (D-13), où il aurait à la fois trahi l'existence du manuel et tourné **à
+  vide** en CI. Disposition retenue : miroir `manual/fr/` + `manual/en/` (D-1), contre les suffixes
+  `.fr.md` de la convention des deux README — **deux panels indépendants ont convergé** : le
+  couplage langue↔chemin rend impossible la fuite silencieuse vers l'anglais qu'un `.fr` oublié
+  produirait, et réduit la sonde de parité à un `diff` de deux `find`. **Livré : 8 vagues sur 9**
+  (44 pages × 2 langues, gate `check-manual` exit 0). La vague 9 porte `autonomous: false` : la
+  phase n'est **pas** marquée terminée, deux décisions attendent l'humain (parité de contenu FR/EN
+  sur 21 pages, clôture + PR).
+
 - **2026-07-31 — L'anti-triche P12 est garanti par un gate transverse, pas par les suites de
   module** (mission de clôture des reliquats Phase 20, WINDOWS #1). `team-kernel.md:23` affirmait
   que le cloisonnement `disallowedTools` était « vérifié par les suites de test de chaque module » :
