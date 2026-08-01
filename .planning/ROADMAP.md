@@ -1310,17 +1310,52 @@ d'escalader (`execute-plan.md:330-345`). Les « 3 tours max » de la boucle de r
 réparations déjà consommées à l'intérieur de chaque tour — budget réel ≈ 3 × (1+2), jamais écrit,
 jamais consigné au rapport. Un blocage « après 3 tours » a en réalité coûté jusqu'à neuf tentatives.
 
-**Requirements**: TBD (à mapper au ledger pendant le plan)
+**Requirements**: GSDC-01, GSDC-02, GSDC-03, GSDC-04, GSDC-05, GSDC-06, GSDC-07, GSDC-08, GSDC-09,
+GSDC-10 *(créés au plan du 2026-08-01, préfixe `GSDC` — cf. `.planning/REQUIREMENTS.md`)*
 **Depends on:** Phase 20 — **merge requis avant exécution** (périmètre à fichiers partagés :
 `vf-coder.md`, `vf-dev-manager.md`, `mission-contracts.md`, `intent-routing.md`).
 **Recoupements à instruire, pas des dépendances d'ordre** : Phase 21 (changement 3 — arbitrage des
 étages de revue) et Phase 22 (doctrine de flags documentaires). L'ordre est libre ; l'arbitrage
 écrit par la première exécutée **fait autorité**, la suivante s'y réfère sans le dupliquer.
-**Plans:** 0 plans
+**Plans:** 8 plans (7 vagues — le périmètre à fichiers partagés impose une exécution
+quasi-séquentielle ; seuls 23-01 et 23-02 sont parallélisables en vague 1)
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 23 to break down)
+- [ ] 23-01-PLAN.md — **Zone 1, SÛRETÉ, priorité imposée** : champ `gate` et mapping unique vers
+  `human_needed` de bout en bout, reset de `workflow._auto_chain_active` au démarrage de mission,
+  minimum de reprise, halt de nœud, réponse humaine portée par le manager. Blocs T24/T25/T26,
+  discriminance prouvée par mutation. (GSDC-01, GSDC-02)
+
+- [ ] 23-02-PLAN.md — **Zone 5, parallèle de 23-01** : `check-gsd-config.sh` (advisory, exit 0/3/64,
+  clés connues lues depuis `gsd-core`) + suite dédiée + câblage `SessionStart` ; blocs `gates` et
+  `safety` supprimés du `config.json` du lab et 5 toggles écrits à une valeur décidée. (GSDC-07)
+
+- [ ] 23-03-PLAN.md — **Zone 2** : `GSD-PIPELINE.md` §9 doctrine de flags de cycle en **allowlist
+  stricte** (clause de fermeture par défaut, gradation `--research` factuelle, renvoi croisé vers
+  `docs-flow.md`), ligne `gsd-ship` du cycle canonique corrigée. Bloc T27. (GSDC-03)
+
+- [ ] 23-04-PLAN.md — **Zone 2** : générateur `build-gsd-capabilities-index.sh` →
+  `references/gsd-capabilities-index.md` sur les **12** points de hook (liste découverte depuis le
+  registre amont), renvoi depuis la doctrine, régénération à l'install. Bloc T28. (GSDC-04)
+
+- [ ] 23-05-PLAN.md — **Zone 3, le trou le plus grave** : voie dégradée supprimée du corps de
+  prompt de `vf-coder`, `gsd-planner`/`gsd-executor` retirés des lignes `tools:` des **deux**
+  agents (arbitrage du Finding 1), doctrine de voie unique et continuation par voie skill. Bloc
+  T29. (GSDC-05)
+
+- [ ] 23-06-PLAN.md — **Zone 4** : verdicts de hooks au bloc typé (`pass|fail|absent`), ADR-061
+  étendue d'un **troisième objet revu** sur les mêmes 3 axes (hook vs `revue-N`, hook vs
+  `vf-auditer` avec le delta `CONCERNS.md`). Bloc T30. (GSDC-06)
+
+- [ ] 23-07-PLAN.md — **Zones 6 et 7** : budget de tours **partagé par étape**, halt `blocked` +
+  décompte complet avec l'invisibilité `node_repair` nommée, table des moments déclencheurs des 4
+  briques dormantes, mandat de debug par le skill. Blocs T31/T32. (GSDC-08, GSDC-09)
+
+- [ ] 23-08-PLAN.md — **Clôture** : bump **minor** du module (v2.10.0 → v2.11.0), triade +
+  CHANGELOG, compteur de suites des 2 README racine 46 → 47, `check-version-sync.sh` ✓, ledger
+  d'exigences, rejeu des 11 gates de sortie. Release racine **hors périmètre**, réservée à
+  validation humaine. (GSDC-10)
 
 ### Phase 24: Activation et mesure du moteur GSD — capacités dormantes et faits de runtime
 

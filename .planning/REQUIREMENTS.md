@@ -257,6 +257,88 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   `marketplace.json`, les deux README, tag annoté, release GitHub) reste **hors périmètre**,
   réservée à validation humaine — patron des Phases 13, 17 et 19.
 
+## Hors-milestone — Phase 23 : couplage explicite au moteur GSD (capabilities, flags, voie unique)
+
+> **IDs proposés au plan du 2026-08-01**, préfixe `GSDC` (« GSD Coupling ») — aucun préfixe existant
+> du ledger ne couvrait ce périmètre. La ROADMAP portait `TBD (à mapper au ledger pendant le plan)`,
+> comme la Phase 22 avant elle.
+>
+> Source : `.planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-CONTEXT.md`
+> (D-00 → D-31, tranchés par Samuel en conversation, `23-DISCUSSION-LOG.md`), recoupés sur pièce par
+> `23-RESEARCH.md` contre `@opengsd/gsd-core@1.9.0` **installé**.
+>
+> **Ordre imposé** (ROADMAP + D-31) : la Lacune 6 (sûreté du contrat de checkpoint) passe avant la
+> Lacune 3 (doctrine de flags), qui passe avant la Lacune 2 (voie unique). Le découpage se fait en
+> **plans**, pas en phases.
+
+- [ ] **GSDC-01**: Le contrat de checkpoint amont est relayé, jamais recalculé : le bloc typé porte
+  un champ `gate` optionnel (présent dès qu'un checkpoint est survenu, recopié verbatim) et **une
+  seule règle** de mapping — `gate="blocking-human"` **OU** précondition amont non satisfaite ⇒
+  statut `human_needed`. Le bloc porte aussi le **minimum de reprise** (`plan_id`, type de
+  checkpoint, `gate`, attendu) et **rien de plus** : le contrat de retour interne de l'exécuteur
+  n'est jamais dupliqué côté VibeFlow (ADR-030). En mission autonome le gate bloquant fige le
+  **nœud**, pas la mission ; c'est `vf-dev-manager` (porteur d'`AskUserQuestion`) qui répond aux
+  attentes humaines, jamais `vf-coder`. *(D-01, D-03, D-04, D-04bis, D-10, D-29)*
+- [ ] **GSDC-02**: `workflow._auto_chain_active` est remis à `false` en geste de démarrage de
+  mission, et `test-dev-orchestrator.sh` échoue si un fichier d'agent ou de référence du module
+  prescrit le mode d'enchaînement autonome sur la brique de plan ou d'exécution — il reste licite
+  sur la brique de cadrage. Discriminance prouvée par mutation, balayage excluant `scripts/tests/`.
+  *(D-02)*
+- [ ] **GSDC-03**: `GSD-PIPELINE.md` porte une **doctrine de flags de cycle en allowlist stricte** :
+  seuls les flags nommés sont utilisables, tout le reste est fermé par défaut **y compris les flags
+  futurs de `gsd-core`** ; la recherche est graduée sur un critère **factuel** (ADR-055 §3) ; la
+  distinction toggle de capability / flag de ligne de commande est écrite ; un renvoi croisé pointe
+  `docs-flow.md` pour la famille documentaire, sans jamais la dupliquer (ADR-057). Le cycle
+  canonique dit **pourquoi** `gsd-ship` n'est pas emprunté ici (ADR-059/ADR-064). *(D-05, D-06,
+  D-08, D-21)*
+- [ ] **GSDC-04**: La table capabilities/hooks est **GÉNÉRÉE** depuis le moteur installé
+  (`build-gsd-capabilities-index.sh` → `references/gsd-capabilities-index.md`, patron
+  `build-gsd-index.sh`), couvre les **12** points de hook — liste **découverte** depuis le registre
+  amont, jamais écrite en dur —, ne recopie aucun champ de prose destiné au modèle, ne fige aucune
+  version, et se régénère à l'install/update (patron IDX-02). *(D-07)*
+- [ ] **GSDC-05**: **Voie unique** d'invocation des briques de cycle : les mentions de dispatch
+  direct d'agent nu disparaissent du corps de prompt de `vf-coder`, et `gsd-planner`/`gsd-executor`
+  sortent de sa ligne `tools:` **ainsi que** de celle de `vf-dev-manager` (arbitrage du planner sur
+  le Finding 1 du RESEARCH, lecture littérale de D-09 ; l'audit complet des 20+ entrées reste
+  différé). Aucune trace textuelle des noms retirés ne subsiste dans les fichiers d'agents. Gate
+  machine à discriminance prouvée par mutation, `check-agents.sh --strict` vert (ADR-044).
+  *(D-09, D-11, D-12, Finding 1)*
+- [ ] **GSDC-06**: L'arbitrage des doublons d'étage est écrit **en extension d'ADR-061** (troisième
+  objet revu, mêmes 3 axes) : hook de revue de code *vs* nœud `revue-N`, et hook `secure-phase` *vs*
+  `vf-auditer` dont le delta factuel est le recoupement avec `CONCERNS.md` — que le hook **ne peut
+  pas** produire. Le bloc typé porte les **verdicts déjà rendus** par les hooks
+  (`pass|fail|absent`), et le fait dimensionnant est écrit : un seul appel du skill d'exécution
+  déclenche revue + nyquist + sécurité. Le critère ne vit qu'à un endroit (assertion négative).
+  *(D-13, D-14, D-15, D-16)*
+- [ ] **GSDC-07**: `check-gsd-config.sh` (module `dev-orchestrator`) signale, sur **n'importe quel
+  lab**, les clés inconnues du moteur installé et les toggles de cycle laissés au défaut implicite ;
+  il lit ses clés connues **depuis `gsd-core`** (union `VALID_CONFIG_KEYS` ∪ `configKeys`) donc ne
+  périme pas ; contrat **advisory** exit 0/3/64, patron `check-doc-drift.sh`, câblé `SessionStart`
+  avec `|| true`, jamais bloquant en CI. Les blocs `gates`/`safety` sont **supprimés** du
+  `.planning/config.json` de ce lab et les 5 toggles arbitrés y sont écrits à une valeur décidée,
+  `ui_review` traité comme **absent en amont** et jamais comme faux. *(D-17, D-18, D-19, D-20,
+  Finding 2)*
+- [ ] **GSDC-08**: Quatre briques dormantes reçoivent un **moment déclencheur** écrit dans
+  `mission-flow.md`, au gabarit `Déclencheur | Constat` de la Phase 22, chaque ligne un FAIT
+  constatable (`gsd-extract-learnings`, `gsd-add-tests`, `gsd-spec-phase`,
+  `gsd-undo`/`gsd-forensics`). Le manager **ne debug pas** : il redispatche `vf-coder` en mandat de
+  debug, qui invoque le **skill** `gsd-debug` — aucun agent nu de debug en allowlist, aucune
+  exception à la voie unique. *(D-22, D-23, D-24)*
+- [ ] **GSDC-09**: Le budget de tours devient **UN** budget par **ÉTAPE**, partagé entre la boucle de
+  revue et la boucle de comblement (fermeture du contournement par renommage du problème) ; sa
+  **valeur ne change pas** (D-25). Budget épuisé ⇒ statut `blocked` **+ décompte complet** (tours
+  par boucle, findings non résolus), sans proposition de next step jointe. L'invisibilité du coût
+  `node_repair` consommé à l'intérieur d'un plan est **écrite comme un fait sourcé**, jamais
+  compensée par un total agrégé inventé (D-26, verdict du RESEARCH : le journal amont est de la
+  prose libre, aucun champ structuré). *(D-25, D-26, D-27, D-28)*
+- [ ] **GSDC-10**: Le module `dev-orchestrator` est bumpé en **minor** (nouvelle capacité) avec sa
+  triade complète (`VERSION` ↔ `module.json` ↔ en-tête README) et son CHANGELOG écrit depuis les
+  SUMMARY ; le compteur « N suites » des deux README racine est remis d'équerre (46 → 47, précédent
+  21-05) et `check-version-sync.sh` sort ✓ ; les gates de sortie sont **rejoués** et consignés. La
+  **release racine** (`VERSION`, `plugin.json`, `marketplace.json`, badges, historiques, tag annoté,
+  release GitHub) reste **hors périmètre**, réservée à validation humaine — patron des Phases 13,
+  17, 19 et 22.
+
 ## v2 Requirements
 
 ### Vocabulaire & UX
@@ -348,6 +430,16 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | DOCF-05 | Phase 22 | Planned — plan 22-02 |
 | DOCF-06 | Phase 22 | Planned — plans 22-01 et 22-02 |
 | DOCF-07 | Phase 22 | Planned — plan 22-03 |
+| GSDC-01 | Phase 23 | Planned — plan 23-01 |
+| GSDC-02 | Phase 23 | Planned — plan 23-01 |
+| GSDC-03 | Phase 23 | Planned — plan 23-03 |
+| GSDC-04 | Phase 23 | Planned — plan 23-04 |
+| GSDC-05 | Phase 23 | Planned — plan 23-05 |
+| GSDC-06 | Phase 23 | Planned — plan 23-06 |
+| GSDC-07 | Phase 23 | Planned — plan 23-02 |
+| GSDC-08 | Phase 23 | Planned — plan 23-07 |
+| GSDC-09 | Phase 23 | Planned — plan 23-07 |
+| GSDC-10 | Phase 23 | Planned — plan 23-08 |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -362,6 +454,15 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - Phase 22 (hygiène documentaire) : 7 requirements `DOCF-01..07` **créés au plan du 2026-07-31** —
   mappés aux 3 plans de la phase, 0 non-mappé. Les Phases 15 à 21 restent sans requirements au
   ledger (livrées hors registre, comme les releases hors-milestone ci-dessus).
+- Phase 23 (couplage explicite au moteur GSD) : 10 requirements `GSDC-01..10` **créés au plan du
+  2026-08-01** — mappés aux 8 plans de la phase, 0 non-mappé. Couverture des 7 zones de décision de
+  `23-CONTEXT.md` : zone 1 → GSDC-01/02 · zone 2 → GSDC-03/04 · zone 3 → GSDC-05 · zone 4 →
+  GSDC-06 · zone 5 → GSDC-07 · zone 6 → GSDC-03 (tension `gsd-ship`) et GSDC-08 · zone 7 →
+  GSDC-09 · gouvernance → GSDC-10. Les décisions factuelles D-00, D-29, D-30 et D-31 sont
+  **informatives** (vérifications de cadrage et périmètre) : elles fondent les exigences ci-dessus
+  sans en constituer une — D-30 (`dag.sh` non touché) et le périmètre différé de D-31 sont des
+  **non-livrables explicites**, vérifiables par l'absence de `plugin/conductor/scripts/dag.sh` du
+  périmètre de fichiers des 8 plans.
 
 ---
 *Requirements defined: 2026-06-04*
