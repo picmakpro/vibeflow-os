@@ -1,0 +1,52 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-08-01T10:13:15.330Z",
+  "phase": "26",
+  "phase_name": "Manuel utilisateur VibeFlow (manual/)",
+  "phase_dir": ".planning/phases/VFDO-26-manuel-utilisateur-vibeflow-manual",
+  "plan": 5,
+  "task": 5,
+  "total_tasks": 9,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "Socle : manual/toc.yml, .tools/build-nav.sh, .tools/check-manual.sh, README racine + fr/ + en/", "status": "done", "commit": "non committé (D-14)"},
+    {"id": 2, "name": "Vague 2 — thème 01-demarrer (7 pages × 2 langues)", "status": "done", "commit": "non committé (D-14)"},
+    {"id": 3, "name": "Vague 3 — thème 02-concepts (7 pages × 2 langues)", "status": "done", "commit": "non committé (D-14)"},
+    {"id": 4, "name": "Vague 4 — thème 03-modules (6 pages × 2 langues)", "status": "done", "commit": "non committé (D-14)"},
+    {"id": 5, "name": "Vague 5 — thème 04-cycle-de-dev (6 pages × 2 langues)", "status": "in_progress", "progress": "les 12 fichiers de pages sont écrits sur disque (FR=6, EN=6) ; le 26-05-SUMMARY.md n'a PAS été écrit — le worker a été arrêté par HALT avant de le produire"}
+  ],
+  "remaining_tasks": [
+    {"id": 6, "name": "Vague 6 — thème 05-equipe-d-agents", "status": "not_started"},
+    {"id": 7, "name": "Vague 7 — thème 06-reference", "status": "not_started"},
+    {"id": 8, "name": "Vague 8 — thème 07-sous-le-capot", "status": "not_started"},
+    {"id": 9, "name": "Clôture de phase — checkpoint humain bloquant avant tout commit (autonomous: false)", "status": "not_started"}
+  ],
+  "blockers": [
+    {"description": "Aucun blocage technique. La pause est une décision de Samuel (halt propre), pas un incident.", "type": "external", "workaround": "n/a"}
+  ],
+  "async_jobs": [],
+  "human_actions_pending": [
+    {"action": "Trancher le point ouvert O-1 : les slugs du miroir en/ sont en français (en/01-demarrer/prerequis.md). Renommer en slugs anglais (en/01-get-started/prerequisites.md) ou assumer les slugs FR partout ?", "context": "Consigné en commit 00c11ef. Le coût de renommage croît à chaque thème ajouté — 4 thèmes sur 7 sont déjà écrits.", "blocking": false},
+    {"action": "Décider si et quand manual/ entre dans git", "context": "Samuel garde le manuel hors du dépôt pour l'instant (valeur potentielle). Exclusion locale posée dans .git/info/exclude — délibérément PAS dans .gitignore, qui est versionné et trahirait l'existence du manuel.", "blocking": false},
+    {"action": "Checkpoint humain de clôture (plan 26-09, autonomous: false)", "context": "Aucun commit de clôture de phase ne doit partir sans validation explicite de Samuel.", "blocking": true}
+  ],
+  "decisions": [
+    {"decision": "D-01 — miroir de dossiers manual/fr/ + manual/en/, jamais de suffixes .fr.md", "rationale": "Lisibilité des URLs et symétrie stricte des deux arbres", "phase": "26"},
+    {"decision": "D-03 — manual/toc.yml porte la séquence canonique du manuel", "rationale": "Source unique pour build-nav.sh : la nav prev/sommaire/next est générée, jamais maintenue à la main", "phase": "26"},
+    {"decision": "D-04 — page de 100-200 lignes, bascule ferme au-delà de 300 lignes ou 3 H2", "rationale": "Contrainte de densité : on divise plutôt qu'on allonge", "phase": "26"},
+    {"decision": "D-05 — 7 thèmes en ordre fixe, trajectoire Diátaxis tutoriel → référence", "rationale": "Le lecteur descend progressivement en profondeur", "phase": "26"},
+    {"decision": "D-11 — aucun contenu de référence recopié, tout se dérive du disque", "rationale": "Évite la divergence entre le manuel et l'état réel du plugin", "phase": "26"},
+    {"decision": "D-12 — le manuel EN se produit, il ne se traduit pas", "rationale": "Qualité d'écriture native aux profondeurs 2-3 plutôt que calque du FR", "phase": "26"},
+    {"decision": "D-14 — aucun git add sous manual/", "rationale": "Consigne de Samuel : le manuel reste hors du dépôt pour l'instant", "phase": "26"},
+    {"decision": "D-07/D-08 gelées — dégraissage README.md / README.fr.md / INSTALL.md suspendu", "rationale": "Pointer vers un dossier absent du dépôt casserait les liens pour les visiteurs ; reprendre ce volet le jour où manual/ est publié", "phase": "26"}
+  ],
+  "uncommitted_files": [
+    ".planning/phases/VFDO-26-manuel-utilisateur-vibeflow-manual/26-01-SUMMARY.md",
+    ".planning/phases/VFDO-26-manuel-utilisateur-vibeflow-manual/26-02-SUMMARY.md",
+    ".planning/phases/VFDO-26-manuel-utilisateur-vibeflow-manual/26-03-SUMMARY.md",
+    ".planning/phases/VFDO-26-manuel-utilisateur-vibeflow-manual/26-04-SUMMARY.md",
+    "manual/** (55 fichiers — hors git par exclusion locale volontaire, ne pas committer)"
+  ],
+  "next_action": "Vérifier l'état du thème 04-cycle-de-dev sur disque (12 pages attendues), écrire le 26-05-SUMMARY.md manquant, puis reprendre au plan 26-06 (thème 05-equipe-d-agents).",
+  "context_notes": "Mission menée par vf-dev-manager en mode autonome, découpée en 9 plans = 1 socle + 7 vagues thématiques + 1 clôture. 4 thèmes sur 7 écrits (55 fichiers, miroir FR/EN synchrone à chaque vague). La pause est propre : halt demandé à une frontière de fichier, rien d'à moitié écrit. Le seul reliquat est le SUMMARY du plan 05."
+}
