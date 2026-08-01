@@ -151,7 +151,13 @@ if "$GREP" -q . <(ls -d "$GSD_SKILLS_DIR"/gsd-*/SKILL.md 2>/dev/null); then
 fi
 
 INDEX_TMP="$(mktemp)"
-trap 'rm -f "$INDEX_TMP"' EXIT
+# Nettoyage UNIQUE et CUMULATIF : un seul `trap ... EXIT` pour toute la suite. Deux traps EXIT
+# successifs ne se cumulent pas — le second REMPLACE le premier —, ce qui fuiterait les
+# temporaires des tests précédents et violerait l'invariant que T21d impose aux autres scripts.
+# Tout mktemp ultérieur s'enregistre via vf_tmp_track au lieu de reposer un trap.
+VF_TMPS=("$INDEX_TMP")
+vf_tmp_track() { VF_TMPS+=("$1"); }
+trap 'rm -rf "${VF_TMPS[@]}" 2>/dev/null' EXIT
 
 if VF_INDEX_OUT="$INDEX_TMP" bash "$MOD/scripts/build-gsd-index.sh" >/dev/null 2>&1; then
   if [ "$gsd_installed" -eq 1 ]; then
@@ -1722,44 +1728,97 @@ fi
 [ "$t23_ok" -eq 1 ] && ok "T23 managers : le geste documentaire est câblé des deux côtés (nœud docs, 4 déclencheurs, renvoi à la doctrine, aucune copie locale) — présence textuelle, pas comportement"
 
 # ---------------------------------------------------------------------------
-# T24 (tracer, D-01) — le champ `gate` traverse référence → vf-coder → vf-dev-manager, avec la
-# règle unique de mapping vers `human_needed`. Assertion D est DISCRIMINANTE par mutation
-# (patron T14c/T21) : une copie de vf-dev-manager.md où la mention est retirée doit faire
-# échouer la détection, jamais un vert qui ne peut structurellement pas s'en distinguer.
+# Outillage commun T24/T25/T26 — assertions BORNÉES AU BLOC, jamais « la chaîne existe quelque
+# part dans le fichier ». Un grep global ne relie rien à rien : il reste vert quand la sémantique
+# du contrat est inversée (mapping D-01 retourné vers gaps_found, sous-champ renommé…).
+# ---------------------------------------------------------------------------
+
+# Imprime les blocs de <file> qui matchent <ancre ERE>, un bloc par ligne de sortie (les sauts de
+# ligne internes sont aplatis en espaces) : la co-occurrence « dans le même bloc » devient une
+# co-occurrence sur la ligne de sortie, insensible au wrap à 100 colonnes du module. Un bloc =
+# paragraphe, item de liste, item numéroté ou titre. L'ancre est une ERE awk SANS backslash
+# (écrire [*] et pas \*) : awk -v interprète les échappements de la valeur avant la regex.
+md_blocks_matching() { # <file> <ancre ERE>
+  [ -f "$1" ] || return 0
+  awk -v anchor="$2" '
+    function flush() { if (buf != "" && buf ~ anchor) print buf; buf = "" }
+    /^[[:space:]]*$/ { flush(); next }
+    /^([[:space:]]*[-*+][[:space:]]|[[:space:]]*[0-9]+\.[[:space:]]|#)/ { flush() }
+    { buf = (buf == "" ? $0 : buf " " $0) }
+    END { flush() }
+  ' "$1"
+}
+
+# Cibles de balayage du module : les agents de l'ÉQUIPE (liste fermée $TEAM_AGENTS) + les
+# références RÉSOLUES ($REFS_DIR). Jamais "$MOD"/agents/*.md ni "$MOD"/references/*.md en dur :
+# en lab installé agents/ est plat et PARTAGÉ (on capterait ~/.claude/agents/gsd-executor.md, qui
+# porte légitimement les intitulés internes → faux rouge) et references/ n'existe pas sous ce nom
+# (glob non expansé, avalé par [ -f ] || continue → zéro fichier scanné, vert à vide).
+module_md_targets() {
+  local a f
+  for a in $TEAM_AGENTS; do [ -f "$MOD/agents/$a.md" ] && echo "$MOD/agents/$a.md"; done
+  for f in "$REFS_DIR"/*.md; do [ -f "$f" ] && echo "$f"; done
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# T24 (tracer, D-01) — le mapping du checkpoint amont traverse référence → vf-coder →
+# vf-dev-manager. La règle est UNE règle à DEUX motifs : gate="blocking-human" OU précondition
+# amont non satisfaite ⇒ statut `human_needed`. L'assertion exige donc la CO-OCCURRENCE des trois
+# éléments DANS LE BLOC qui porte la règle — la seule présence de la chaîne gate=… ailleurs dans
+# le fichier ne dit rien du statut vers lequel elle mappe (et laissait passer un mapping inversé).
 # ---------------------------------------------------------------------------
 t24_ok=1
-CONTRACTS_FILE="$REFS_DIR/mission-contracts.md"
-CODER_FILE="$MOD/agents/vf-coder.md"
+CONTRACTS_FILE="$REFS_DIR/mission-contracts.md"   # $CODER_FILE et $DEVMGR : déjà résolus plus haut
 
-t24_gate_hit() { "$GREP" -q 'gate="blocking-human"' "$1" 2>/dev/null; } # <file>
+# 0 = mapping tenu · 1 = bloc trouvé mais mapping rompu · 2 = ancre introuvable.
+t24_maps_to_human_needed() { # <file> <ancre ERE>
+  local blk
+  blk="$(md_blocks_matching "$1" "$2")"
+  [ -n "$blk" ] || return 2
+  printf '%s\n' "$blk" | "$GREP" -q 'gate="blocking-human"' || return 1
+  printf '%s\n' "$blk" | "$GREP" -qi 'précondition'         || return 1
+  printf '%s\n' "$blk" | "$GREP" -q 'human_needed'          || return 1
+  return 0
+}
 
-if [ -f "$CONTRACTS_FILE" ]; then
-  "$GREP" -q '^## Contrat de checkpoint amont' "$CONTRACTS_FILE" || { ko "T24 A : section « Contrat de checkpoint amont » absente de mission-contracts.md"; t24_ok=0; }
-  t24_gate_hit "$CONTRACTS_FILE" || { ko "T24 A : mission-contracts.md ne nomme pas gate=\"blocking-human\""; t24_ok=0; }
-  "$GREP" -q 'human_needed' "$CONTRACTS_FILE" || { ko "T24 A : mission-contracts.md ne porte pas la règle de mapping vers human_needed"; t24_ok=0; }
+t24_assert() { # <libellé> <fichier> <ancre ERE>
+  if [ ! -f "$2" ]; then ko "T24 $1 : fichier introuvable ($2)"; t24_ok=0; return; fi
+  t24_maps_to_human_needed "$2" "$3"
+  case $? in
+    0) : ;;
+    2) ko "T24 $1 : bloc porteur de la règle de mapping introuvable dans $(basename "$2") (ancre /$3/)"; t24_ok=0 ;;
+    *) ko "T24 $1 : dans $(basename "$2"), le bloc de la règle ne relie pas les DEUX motifs (gate=\"blocking-human\" ET précondition non satisfaite) au statut human_needed"; t24_ok=0 ;;
+  esac
+}
+
+"$GREP" -q '^## Contrat de checkpoint amont' "$CONTRACTS_FILE" 2>/dev/null \
+  || { ko "T24 A : section « Contrat de checkpoint amont » absente de mission-contracts.md"; t24_ok=0; }
+t24_assert "A (mission-contracts.md, §Règle unique de mapping)" "$CONTRACTS_FILE" '[*][*]Règle unique de mapping[*][*]'
+t24_assert "B (vf-coder.md, bloc du champ gate)"                "$CODER_FILE"     '[*][*][`]gate[`][*][*]'
+t24_assert "C (vf-dev-manager.md, bloc Verdict d'étape)"        "$DEVMGR"         '[*][*]Verdict d'
+
+# D (DISCRIMINANT, par mutation de VALEUR) : on ne retire PAS la chaîne qu'on cherche ensuite —
+# ce serait une tautologie, la branche serait vraie quel que soit l'état du dépôt. On altère la
+# sémantique du contrat sur une copie (le statut cible, puis la valeur du gate) et on exige que
+# l'assertion rougisse dans les deux cas, tout en restant verte sur le fichier réel.
+T24_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T24_TMPDIR"
+T24_MUT_STATUT="$T24_TMPDIR/mutant-statut.md"
+T24_MUT_GATE="$T24_TMPDIR/mutant-gate.md"
+sed 's/human_needed/gaps_found/g'      "$DEVMGR" > "$T24_MUT_STATUT"
+sed 's/blocking-human/blocking-auto/g' "$DEVMGR" > "$T24_MUT_GATE"
+
+t24_mut_ko=""
+t24_maps_to_human_needed "$T24_MUT_STATUT" '[*][*]Verdict d' && t24_mut_ko="$t24_mut_ko [statut human_needed→gaps_found non détecté]"
+t24_maps_to_human_needed "$T24_MUT_GATE"   '[*][*]Verdict d' && t24_mut_ko="$t24_mut_ko [gate blocking-human→blocking-auto non détecté]"
+t24_maps_to_human_needed "$DEVMGR"         '[*][*]Verdict d' || t24_mut_ko="$t24_mut_ko [le fichier réel ne tient plus l'assertion]"
+if [ -n "$t24_mut_ko" ]; then
+  ko "T24 D (DISCRIMINANT) : l'assertion de mapping ne rougit pas sous mutation sémantique —$t24_mut_ko"; t24_ok=0
 else
-  ko "T24 A : $CONTRACTS_FILE introuvable"; t24_ok=0
+  ok "T24 D (DISCRIMINANT) : deux mutations de VALEUR (statut cible, valeur du gate) font rougir l'assertion, le fichier réel la tient"
 fi
 
-t24_gate_hit "$CODER_FILE" || { ko "T24 B : vf-coder.md ne nomme pas gate=\"blocking-human\" dans son §Retour"; t24_ok=0; }
-t24_gate_hit "$DEVMGR" || { ko "T24 C : vf-dev-manager.md ne nomme pas gate=\"blocking-human\" dans son contrôle de flux"; t24_ok=0; }
-
-# D (DISCRIMINANT, par mutation) : retirer la mention dans une copie temporaire de
-# vf-dev-manager.md et exiger que la détection échoue dessus, tout en restant verte sur le
-# fichier réel.
-T24_TMPDIR="$(mktemp -d)"
-trap 'rm -rf "${T24_TMPDIR:-}" "${T25_TMPDIR:-}" "${T26_TMPDIR:-}" 2>/dev/null' EXIT
-T24_MUTANT="$T24_TMPDIR/vf-dev-manager.md"
-"$GREP" -v 'gate="blocking-human"' "$DEVMGR" > "$T24_MUTANT"
-if t24_gate_hit "$T24_MUTANT"; then
-  ko "T24 D (DISCRIMINANT) : la mutation n'a pas retiré la mention — assertion morte"; t24_ok=0
-elif ! t24_gate_hit "$DEVMGR"; then
-  ko "T24 D (DISCRIMINANT) : le fichier réel ne porte plus la mention — contradiction avec C"; t24_ok=0
-else
-  : # discriminance tenue, verdict global ci-dessous
-fi
-
-[ "$t24_ok" -eq 1 ] && ok "T24 : le champ gate traverse référence → vf-coder → vf-dev-manager, mapping unique vers human_needed, discriminance prouvée par mutation"
+[ "$t24_ok" -eq 1 ] && ok "T24 : le mapping D-01 (deux motifs ⇒ human_needed) est porté dans le même bloc par référence, vf-coder et vf-dev-manager"
 
 # ---------------------------------------------------------------------------
 # T25 (D-02) — le flag d'enchaînement autonome (workflow._auto_chain_active) est désarmé au
