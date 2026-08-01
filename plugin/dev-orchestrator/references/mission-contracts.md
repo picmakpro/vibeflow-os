@@ -183,6 +183,21 @@ haut).
 précondition amont non satisfaite ⇒ `statut: "human_needed"`. Un refus d'auto-approbation amont
 est un refus, quel qu'en soit le motif.
 
+**Minimum de reprise (D-03)** : quand le statut est celui d'escalade humaine, le bloc typé porte
+un champ optionnel `reprise` dont les sous-champs sont exactement `plan_id`, `checkpoint` (le
+**type** de checkpoint amont), `gate`, et `attendu` (ce que le moteur déclare attendre, recopié
+verbatim) — **rien d'autre**, et en particulier **pas** la table des tâches déjà exécutées. Motif
+factuel (ADR-030) : le contrat de retour détaillé de l'exécuteur est **interne** au moteur, que le
+skill d'exécution orchestre déjà lui-même (il présente le checkpoint puis relance une
+continuation) — le recopier côté VibeFlow dupliquerait un contrat amont. On désigne ce contrat
+amont **par son rôle**, sans en reproduire les intitulés de bloc.
+
+**Continuation (D-10, forme minimale ici)** : la reprise se fait en redispatchant un **nouveau**
+`vf-coder` avec le champ `reprise` ; le skill d'exécution reprend de lui-même au premier plan sans
+rapport de plan, et son garde-fou de reprise sûre refuse de relancer un exécuteur sur des commits
+de production orphelins en offrant trois recours. Doctrine de voie unique qui encadre ce constat :
+plan 23-05 (y renvoyer une fois qu'elle existe).
+
 ## Étage revue — deux objets disjoints (ADR-060 / ADR-061)
 
 La revue de **diff de code** (`vf-reviewer` → `gsd-code-reviewer`, nœud `revue-N` posé

@@ -1822,5 +1822,62 @@ fi
 [ "$t25_ok" -eq 1 ] && ok "T25 : flag d'enchaînement désarmé au démarrage + fermé par gate (Plan/Exécution interdits, Cadrage licite), discriminance prouvée par mutation"
 
 # ---------------------------------------------------------------------------
+# T26 (D-03, D-04, D-04bis) — minimum de reprise, halte de nœud, réponse par le manager. Garde
+# anti-duplication ADR-030 (assertion D, NÉGATIVE) : aucun fichier de agents/ ni references/ ne
+# reproduit les intitulés du contrat interne de l'exécuteur amont (Completed Tasks / Current
+# Task / Checkpoint Details / Awaiting / CHECKPOINT REACHED — checkpoint_return_format,
+# execute-plan.md). EXCLUSION VOLONTAIRE de scripts/tests/ (motif) : ce fichier de test cite ces
+# intitulés dans sa fixture de mutation E — sans l'exclure, le balayage se détecterait lui-même.
+# ---------------------------------------------------------------------------
+t26_ok=1
+
+# A — mission-contracts.md nomme les quatre sous-champs du minimum de reprise + le motif ADR-030.
+for champ in 'plan_id' 'checkpoint' 'gate' 'attendu'; do
+  "$GREP" -q -- "$champ" "$CONTRACTS_FILE" || { ko "T26 A : mission-contracts.md ne nomme pas le sous-champ '$champ' du minimum de reprise"; t26_ok=0; }
+done
+"$GREP" -q 'ADR-030' "$CONTRACTS_FILE" || { ko "T26 A : mission-contracts.md ne cite pas ADR-030 (motif de la borne)"; t26_ok=0; }
+
+# B — vf-coder.md porte la règle « attente humaine ⇒ escalade, jamais auto-répondue ».
+"$GREP" -q 'reprise' "$CODER_FILE" || { ko "T26 B : vf-coder.md ne nomme pas le champ reprise"; t26_ok=0; }
+"$GREP" -qi 'jamais une réponse' "$CODER_FILE" || { ko "T26 B : vf-coder.md ne porte pas la règle « jamais une réponse de ta part »"; t26_ok=0; }
+
+# C — vf-dev-manager.md porte le halt DE NŒUD et la réponse par le manager.
+"$GREP" -q 'halte de nœud' "$DEVMGR" || { ko "T26 C : vf-dev-manager.md ne nomme pas le halt de nœud"; t26_ok=0; }
+"$GREP" -q 'réponds aux attentes humaines' "$DEVMGR" || { ko "T26 C : vf-dev-manager.md ne nomme pas le manager comme répondant aux attentes humaines"; t26_ok=0; }
+
+# D (NÉGATIVE) — aucun fichier .md de agents/ ni references/ (jamais scripts/tests/, cf.
+# exclusion ci-dessus) ne reproduit les intitulés du contrat interne de l'exécuteur amont.
+t26_internal_titles() { # <file>
+  "$GREP" -lE 'Completed Tasks|Current Task|Checkpoint Details|^Awaiting$|CHECKPOINT REACHED' "$1" 2>/dev/null
+}
+t26_dup_hits=""
+for f in "$MOD"/agents/*.md "$MOD"/references/*.md; do
+  [ -f "$f" ] || continue
+  h="$(t26_internal_titles "$f")"
+  [ -n "$h" ] && t26_dup_hits="$t26_dup_hits $f"
+done
+if [ -n "$t26_dup_hits" ]; then
+  ko "T26 D (NÉGATIVE) : intitulé du contrat interne de l'exécuteur reproduit dans —$t26_dup_hits"
+  t26_ok=0
+else
+  ok "T26 D (NÉGATIVE) : aucun fichier de agents/ ni references/ ne reproduit les intitulés du contrat interne de l'exécuteur amont"
+fi
+
+# E (DISCRIMINANT, par mutation) — une fixture temporaire portant l'un de ces intitulés doit
+# faire échouer l'assertion D.
+T26_TMPDIR="$(mktemp -d)"
+trap 'rm -rf "${T24_TMPDIR:-}" "${T25_TMPDIR:-}" "${T26_TMPDIR:-}" 2>/dev/null' EXIT
+T26_FIXTURE="$T26_TMPDIR/duplicated-contract.md"
+printf '## Rapport de reprise\n\n**Completed Tasks** table (hashes + files)\n' > "$T26_FIXTURE"
+if [ -n "$(t26_internal_titles "$T26_FIXTURE")" ]; then
+  ok "T26 E (DISCRIMINANT) : fixture portant un intitulé du contrat interne détectée par l'assertion D"
+else
+  ko "T26 E (DISCRIMINANT) : la fixture portant un intitulé du contrat interne n'est PAS détectée — assertion D morte"
+  t26_ok=0
+fi
+
+[ "$t26_ok" -eq 1 ] && ok "T26 : minimum de reprise (4 sous-champs), halte de nœud, réponse par le manager, garde anti-duplication ADR-030 discriminante par mutation"
+
+# ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
 [ "$fail" -eq 0 ]

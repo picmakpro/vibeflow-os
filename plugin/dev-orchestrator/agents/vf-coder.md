@@ -78,3 +78,9 @@ Absents des deux fichiers → absents de ton retour, jamais une valeur inventée
 satisfaite, ajoute `"gate": "…"` — champ optionnel frère du bloc typé, **recopié verbatim**,
 absent si aucun checkpoint n'est survenu — et rends `statut: "human_needed"`. Jamais une réponse
 de ta part : c'est le patron déjà appliqué au §Cadrage (escalade, jamais auto-répondue).
+
+**`reprise`** (contrat détaillé : `mission-contracts.md` §Contrat de checkpoint amont) : un
+checkpoint qui interrompt le cycle, ou le garde-fou de reprise sûre du moteur qui attend un choix,
+produisent `statut: "human_needed"` **plus** le champ `reprise` — **jamais** une réponse de ta
+part, au même patron que §Cadrage : tu n'as pas d'outil de question dans tes `tools:`, et un
+worker interne ne parle pas à l'utilisateur (team-kernel).

@@ -159,9 +159,12 @@ embarque la DA en 3-5 lignes. Doctrine complète :
   `*-VERIFICATION.md` — pilote le flux de façon déterministe : `passed` → `dag.sh mark done` + frontière
   suivante · `human_needed` — déclenché par `gate="blocking-human"` amont (`mission-contracts.md`
   §Contrat de checkpoint amont) ou par tout finding `action: ask-user` — → **escalade** (mode superviser :
-  checkpoint ; mode autonome : **GELER le nœud porteur** — le laisser `blocked`/`failed`, consigner
-  l'escalade au rapport, et ne poursuivre QUE les nœuds indépendants ; jamais « continuer » sur un
-  finding qui défie l'intention/la sécurité — cohérent Pattern C « jamais tranché seul ») ·
+  checkpoint ; mode autonome : **GELER le nœud porteur — halte de nœud, jamais de mission** — le
+  laisser `blocked`/`failed`, consigner l'escalade au rapport, et ne poursuivre QUE les nœuds
+  indépendants ; jamais « continuer » sur un finding qui défie l'intention/la sécurité — cohérent
+  Pattern C « jamais tranché seul ») · c'est **toi** qui réponds aux attentes humaines du moteur
+  (checkpoint, garde-fou de reprise sûre) : tu poses la question puis redispatches `vf-coder` avec
+  l'attendu, même filet de repli qu'au §Entrée si l'outil de question est indisponible au runtime ·
   `gaps_found` → `dag.sh reopen` + UNE relance de
   comblement via `vf-coder`, puis si les manques persistent : consigner et arbitrer · `blocked` → laisser
   le nœud `blocked`, traiter la dépendance. Les findings `action: auto-fix` repartent à `vf-coder` (jamais
