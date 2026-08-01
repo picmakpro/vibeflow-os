@@ -1738,13 +1738,23 @@ fi
 # co-occurrence sur la ligne de sortie, insensible au wrap à 100 colonnes du module. Un bloc =
 # paragraphe, item de liste, item numéroté ou titre. L'ancre est une ERE awk SANS backslash
 # (écrire [*] et pas \*) : awk -v interprète les échappements de la valeur avant la regex.
+#
+# Un item de liste ne clôt le bloc que si son INDENTATION est ≤ celle de la ligne qui a ouvert le
+# bloc. Flusher sur toute ligne commençant par un marqueur de puce coupait le bloc à la première
+# sous-puce imbriquée : « 2. **Plan** : … » suivi de «    - en mode **non-interactif** » donnait
+# deux blocs, et la forme interdite passait au travers de toute co-occurrence exigée DANS le bloc.
+# Une sous-puce est une continuation de son item parent : elle appartient au même bloc.
 md_blocks_matching() { # <file> <ancre ERE>
   [ -f "$1" ] || return 0
   awk -v anchor="$2" '
+    function indent(s,   t) { t = s; sub(/[^ \t].*$/, "", t); gsub(/\t/, "    ", t); return length(t) }
     function flush() { if (buf != "" && buf ~ anchor) print buf; buf = "" }
     /^[[:space:]]*$/ { flush(); next }
-    /^([[:space:]]*[-*+][[:space:]]|[[:space:]]*[0-9]+\.[[:space:]]|#)/ { flush() }
-    { buf = (buf == "" ? $0 : buf " " $0) }
+    /^#/ { flush() }
+    /^[[:space:]]*([-*+][[:space:]]|[0-9]+\.[[:space:]])/ {
+      if (buf == "" || indent($0) <= openind) flush()
+    }
+    { if (buf == "") openind = indent($0); buf = (buf == "" ? $0 : buf " " $0) }
     END { flush() }
   ' "$1"
 }
@@ -1764,21 +1774,59 @@ module_md_targets() {
 # ---------------------------------------------------------------------------
 # T24 (tracer, D-01) — le mapping du checkpoint amont traverse référence → vf-coder →
 # vf-dev-manager. La règle est UNE règle à DEUX motifs : gate="blocking-human" OU précondition
-# amont non satisfaite ⇒ statut `human_needed`. L'assertion exige donc la CO-OCCURRENCE des trois
-# éléments DANS LE BLOC qui porte la règle — la seule présence de la chaîne gate=… ailleurs dans
-# le fichier ne dit rien du statut vers lequel elle mappe (et laissait passer un mapping inversé).
+# amont non satisfaite ⇒ statut `human_needed`.
+#
+# L'assertion mesure une RELATION, pas une co-présence. Exiger trois chaînes indépendantes dans un
+# bloc ne verrouille rien dès que le bloc énumère PLUSIEURS statuts : celui de vf-dev-manager fait
+# 14 lignes et couvre 4 verdicts — une doctrine disant l'INVERSE de D-01 (gate ⇒ gaps_found) y
+# satisfait les trois sondes par des phrases sans rapport entre elles. On isole donc le SEGMENT du
+# bloc qui appartient à `human_needed` et on exige les deux motifs DANS CE SEGMENT.
 # ---------------------------------------------------------------------------
 t24_ok=1
 CONTRACTS_FILE="$REFS_DIR/mission-contracts.md"   # $CODER_FILE et $DEVMGR : déjà résolus plus haut
 
-# 0 = mapping tenu · 1 = bloc trouvé mais mapping rompu · 2 = ancre introuvable.
+# Statuts du contrat ADR-053. Dans une énumération de verdicts, une entrée s'OUVRE par le statut
+# backtické suivi d'un marqueur de mapping (→ ⇒ — – :) ; une mention incidente en cours de phrase
+# (« le laisser `blocked`/`failed` ») n'en porte pas et ne coupe donc pas le segment.
+T24_STATUTS='passed|gaps_found|human_needed|blocked'
+
+# Segment d'un bloc appartenant à un statut : de son entrée jusqu'à l'entrée du statut suivant.
+# Vide si le statut n'ouvre aucune entrée.
+t24_segment_of() { # <statut> ; bloc(s) sur stdin
+  awk -v want="$1" -v st="$T24_STATUTS" '
+    {
+      entry = "`(" st ")`[ ]*(→|⇒|—|–|:)"
+      line = $0; owner = ""; res = ""
+      while (length(line) > 0 && match(line, entry)) {
+        if (owner == want) res = res substr(line, 1, RSTART - 1)
+        m = substr(line, RSTART, RLENGTH)
+        split(m, a, "`"); owner = a[2]
+        line = substr(line, RSTART + RLENGTH)
+        if (owner == want) res = res m
+      }
+      if (owner == want) res = res line
+      if (res != "") print res
+    }
+  '
+}
+
+# 0 = mapping tenu · 1 = segment trouvé mais mapping rompu · 2 = bloc introuvable ·
+# 3 = bloc multi-statuts dont `human_needed` n'ouvre aucune entrée (rien de mesurable — jamais un
+# repli silencieux sur le bloc entier, qui rouvrirait exactement la faille de co-présence).
 t24_maps_to_human_needed() { # <file> <ancre ERE>
-  local blk
+  local blk seg mentions
   blk="$(md_blocks_matching "$1" "$2")"
   [ -n "$blk" ] || return 2
-  printf '%s\n' "$blk" | "$GREP" -q 'gate="blocking-human"' || return 1
-  printf '%s\n' "$blk" | "$GREP" -qi 'précondition'         || return 1
-  printf '%s\n' "$blk" | "$GREP" -q 'human_needed'          || return 1
+  mentions="$(printf '%s\n' "$blk" | "$GREP" -oE "\`($T24_STATUTS)\`" | LC_ALL=C sort -u | "$GREP" -c . || true)"
+  if [ "${mentions:-0}" -le 1 ]; then
+    seg="$blk"          # bloc mono-statut : pas d'énumération, le bloc EST le segment
+  else
+    seg="$(printf '%s\n' "$blk" | t24_segment_of 'human_needed')"
+    [ -n "$seg" ] || return 3
+  fi
+  printf '%s\n' "$seg" | "$GREP" -q 'gate="blocking-human"' || return 1
+  printf '%s\n' "$seg" | "$GREP" -qi 'précondition'         || return 1
+  printf '%s\n' "$seg" | "$GREP" -q 'human_needed'          || return 1
   return 0
 }
 
@@ -1788,7 +1836,8 @@ t24_assert() { # <libellé> <fichier> <ancre ERE>
   case $? in
     0) : ;;
     2) ko "T24 $1 : bloc porteur de la règle de mapping introuvable dans $(basename "$2") (ancre /$3/)"; t24_ok=0 ;;
-    *) ko "T24 $1 : dans $(basename "$2"), le bloc de la règle ne relie pas les DEUX motifs (gate=\"blocking-human\" ET précondition non satisfaite) au statut human_needed"; t24_ok=0 ;;
+    3) ko "T24 $1 : dans $(basename "$2"), le bloc énumère plusieurs statuts mais human_needed n'y ouvre aucune entrée de mapping (« \`human_needed\` — … ») — segment non isolable, donc mapping non vérifiable"; t24_ok=0 ;;
+    *) ko "T24 $1 : dans $(basename "$2"), le segment du statut human_needed ne porte pas les DEUX motifs (gate=\"blocking-human\" ET précondition non satisfaite) — ils sont rattachés à un autre verdict"; t24_ok=0 ;;
   esac
 }
 
