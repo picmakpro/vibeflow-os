@@ -103,7 +103,7 @@
       "scope": [
         "manual/.tools/**"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "parite-fr-en",
@@ -117,6 +117,20 @@
         "manual/en/**"
       ],
       "status": "failed"
+    },
+    {
+      "id": "slugs-en",
+      "step": "O-1 tranché: slugs anglais sous manual/en/ — toc.yml apparié par langue, build-nav et check-manual réoutillés, 44 pages + 7 dossiers renommés",
+      "stage": "build",
+      "deps": [
+        "fix-outillage"
+      ],
+      "scope": [
+        "manual/en/**",
+        "manual/toc.yml",
+        "manual/.tools/**"
+      ],
+      "status": "running"
     }
   ]
 }

@@ -371,9 +371,38 @@ merger).
 `manual/` est hors git dans tous les cas. Pousser ne publie donc pas le manuel, seulement la trace
 de son plan (déjà publique via la section `### Phase 26` du ROADMAP, commit `6ba2f34`).
 
-## 4 bis. Points ouverts — à trancher à la revue, PAS décidés
+## 4 bis. Points ouverts
 
-### O-1 — Le miroir `en/` réutilise les slugs français
+### O-1 — TRANCHÉ le 2026-08-02 par Samuel : slugs **anglais** sous `manual/en/`
+
+**Décision** : sous `manual/en/`, les noms de **dossiers ET de fichiers** sont en anglais —
+`en/01-demarrer/prerequis.md` devient `en/01-get-started/prerequisites.md`. L'arbre `manual/fr/`
+ne bouge pas. Slugs anglais **idiomatiques**, pas du calque mot à mot.
+
+**Ce que ça coûte, et pourquoi ce n'est pas un `git mv` en masse** : la décision **invalide
+l'hypothèse H-1**, documentée dans `manual/toc.yml` comme un choix assumé — « les slugs de fichiers
+sont identiques en FR et EN […] c'est ce qui rend la disposition D-01 mécanique : un lien miroir
+fr↔en se déduit du chemin seul ».
+
+H-1 était l'hypothèse porteuse de tout l'outillage. En la levant :
+
+- **`toc.yml`** doit porter un slug **par langue** pour chaque thème et chaque page. L'appariement
+  FR↔EN cesse d'être *déduit* pour devenir une **donnée explicite**.
+- **`build-nav.sh`** ne peut plus calculer le chemin miroir par substitution du 2ᵉ segment : le
+  bloc de langue (`**Français** · [English](…)`) doit **lire l'appariement dans `toc.yml`**.
+- **`check-manual.sh`** C1/C2 comparaient des **chemins**. Ils doivent désormais comparer des
+  **identifiants logiques de page** appariés via `toc.yml` — et c'est le piège : après le
+  changement, un contrôle mal écrit passerait **par construction** sans plus rien prouver. D'où
+  l'exigence de **preuve par mutation** (casser volontairement un appariement, le gate doit rougir)
+  avant de déclarer C1/C2 bons.
+
+**Trace de l'arbitrage** : H-1 n'était pas une erreur — c'était le bon compromis tant que la
+question du lecteur anglophone n'était pas tranchée, et c'est précisément pour ça qu'elle avait été
+consignée comme point ouvert plutôt qu'enterrée comme un détail. Samuel a arbitré en faveur du
+lecteur EN (des URL françaises dans un manuel anglais contredisent l'intention du volet EN) contre
+la commodité de vérification. La commodité perdue est rachetée en rendant l'appariement explicite.
+
+### O-1 (formulation d'origine, conservée pour la trace) — Le miroir `en/` réutilise les slugs français
 
 Constat : `manual/en/01-demarrer/prerequis.md` plutôt que `manual/en/01-getting-started/prerequisites.md`.
 Les slugs de dossiers **et** de fichiers sont identiques des deux côtés du miroir.
