@@ -281,6 +281,29 @@ laquelle un épuisement de budget doit sortir en `gaps_found` explicite plutôt 
 partiel : la sonde de parité (D-1, conséquence 2) échouerait de toute façon, et c'est le
 comportement voulu.
 
+## 4 bis. Points ouverts — à trancher à la revue, PAS décidés
+
+### O-1 — Le miroir `en/` réutilise les slugs français
+
+Constat : `manual/en/01-demarrer/prerequis.md` plutôt que `manual/en/01-getting-started/prerequisites.md`.
+Les slugs de dossiers **et** de fichiers sont identiques des deux côtés du miroir.
+
+**Ce n'est ni validé ni condamné — Samuel n'a pas tranché.** Consigné ici pour être arbitré à la
+revue, délibérément **sans renommage maintenant**.
+
+Ce qui plaide pour le statu quo : c'est exactement ce qui rend le miroir *mécanique*, donc
+vérifiable — le contrôle C1 du gate se réduit à une comparaison d'arbres, et le sélecteur de langue
+(D-1) se calcule en substituant un seul segment de chemin. Traduire les slugs casse cette propriété
+et demande une table de correspondance.
+
+Ce qui plaide contre : un lecteur anglophone lit des URL françaises, ce qui contredit l'intention du
+volet EN.
+
+Chemin de sortie s'il faut trancher vers des slugs traduits : c'est `toc.yml` qui porte déjà la
+séquence, donc le renommage est mécanisable — mais il touche les ~30 pages EN existantes et le
+sélecteur de langue. **À faire en une fois, avant d'écrire les thèmes restants ou après tous**,
+jamais au milieu.
+
 ### D-13 — L'outillage du manuel vit **sous `manual/`**, pas dans `scripts/`, et n'entre pas en CI
 
 Conséquence directe de l'amendement du brief, qui invalide le placement que D-3 supposait
