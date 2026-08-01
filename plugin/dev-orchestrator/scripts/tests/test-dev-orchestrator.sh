@@ -2060,63 +2060,116 @@ fi
 # ---------------------------------------------------------------------------
 t26_ok=1
 
-# A — Minimum de reprise (D-03) : l'ensemble des sous-champs est MESURÉ sur l'énumération fermée
-# du contrat, jamais comparé à une liste de noms figée dans le test (le nombre de sous-champs peut
-# évoluer ; la propriété à verrouiller est la fermeture de l'ensemble). Les sous-champs sont
-# repérés comme TOKENS BACKTICKÉS : un grep de mot nu sur tout le fichier ne verrouillait rien —
-# « checkpoint » et « gate » avaient déjà un hit AVANT l'ajout du paragraphe (sondes mortes), et
-# un renommage en `type_checkpoint` / `gate_amont` les satisfaisait tout autant.
+# A — Minimum de reprise (D-03). Trois propriétés CUMULÉES, pas alternatives (le faux dilemme
+# « liste figée OU fermeture mesurée » a coûté une régression de couverture : l'ancrage nominal
+# retiré, un renommage `plan_id`→`plan_ref` passait à 0 KO — l'ensemble reste clos, seulement il ne
+# désigne plus la même chose) :
+#   (a) FERMETURE MESURÉE : l'énumération est bornée des deux côtés, et la borne de fin est
+#       réellement coupée — une coupe no-op est un défaut de sonde, jamais un succès ;
+#   (b) ANCRAGE NOMINAL : les sous-champs fixés par D-03 sont présents, nommément ;
+#   (c) INTERDITS ADR-030 : aucun nom du contrat INTERNE de l'exécuteur amont (la table des tâches
+#       déjà exécutées) dans l'ensemble mesuré NI ailleurs dans le bloc.
+# Sans (c), l'assertion certifiait « énumération close » sur un contrat énumérant
+# `taches_executees` et `hashes` — littéralement ce que le motif ADR-030 interdit de recopier.
 
-# Identifiants backtickés d'un texte lu sur stdin, triés et dédupliqués.
-t26_ids() { "$GREP" -oE '`[a-z][a-z0-9_]*`' | tr -d '`' | sort -u; }
+# Identifiants backtickés d'un texte lu sur stdin, triés et dédupliqués. Collationnement BYTE
+# imposé : toute comparaison d'ensemble en aval (égalité de chaînes, comm) le suppose.
+t26_ids() { "$GREP" -oE '`[a-z][a-z0-9_]*`' | tr -d '`' | LC_ALL=C sort -u; }
 
 # Intitulés du contrat INTERNE amont, en version « texte » (sans ancre de ligne) : sert à
 # interdire qu'un sous-champ du minimum de reprise en reproduise un (ADR-030).
 T26_INTERNAL_RE='Completed Tasks|Current Task|Checkpoint Details|Awaiting|CHECKPOINT REACHED'
 
+# Sous-champs FIXÉS par D-03. Un renommage exige un amendement de D-03, pas un test qui suit.
+T26_D03_FIELDS="plan_id checkpoint gate attendu"
+
+# Noms de sous-champs INTERDITS (ADR-030) : la table des tâches déjà exécutées du contrat interne
+# de l'exécuteur, sous ses graphies plausibles FR/EN. La fermeture seule ne protège de rien — une
+# énumération peut être close ET recopier exactement ce qu'elle prétend interdire.
+T26_FORBIDDEN_FIELDS='^(taches_executees|taches_realisees|taches|completed_tasks|current_task|checkpoint_details|awaiting|hashes|hash|shas|commits|fichiers|files)$'
+
 # 0 = contrat clos et sain (T26_FIELDS/T26_N renseignés) · 1 = fermeture rompue ($T26_WHY) ·
 # 2 = bloc introuvable.
 T26_FIELDS=""; T26_N=0; T26_WHY=""
 t26_reprise_closed() { # <fichier de contrat>
-  local blk enum fields parent all
+  local blk head enum fields parent bad miss n
+  # Réinitialisation à l'ENTRÉE : sans elle, un $T26_WHY périmé survivait à un retour 2 et
+  # l'appelant affichait le motif de l'appel précédent.
+  T26_FIELDS=""; T26_N=0; T26_WHY=""
   blk="$(md_blocks_matching "$1" '[*][*]Minimum de reprise')"
   [ -n "$blk" ] || return 2
   printf '%s\n' "$blk" | "$GREP" -q 'sous-champs sont exactement' || { T26_WHY="énumération fermée (« sous-champs sont exactement ») absente"; return 1; }
-  printf '%s\n' "$blk" | "$GREP" -q "rien d'autre"                || { T26_WHY="borne « rien d'autre » absente"; return 1; }
+  # Le garde porte le motif EXACT de la coupe. Un garde plus laxiste (« rien d'autre » sans gras)
+  # restait vert quand le gras disparaissait, tandis que la coupe devenait un no-op SILENCIEUX :
+  # l'énumération s'étendait jusqu'à la fin du bloc et la fermeture devenait trivialement vraie.
+  printf '%s\n' "$blk" | "$GREP" -qF "**rien d'autre**"           || { T26_WHY="borne fermante « **rien d'autre** » (en gras — motif EXACT de la coupe) absente"; return 1; }
   printf '%s\n' "$blk" | "$GREP" -q 'ADR-030'                     || { T26_WHY="motif ADR-030 non cité"; return 1; }
-  enum="$(printf '%s\n' "$blk" | sed -e 's/.*sous-champs sont exactement//' -e "s/[*][*]rien d'autre[*][*].*//")"
+
+  # (a) fermeture MESURÉE : les deux coupes doivent avoir mordu.
+  head="$(printf '%s\n' "$blk" | sed -e 's/.*sous-champs sont exactement//')"
+  [ "$head" != "$blk" ] || { T26_WHY="ouverture d'énumération non coupée — coupe no-op, sonde en défaut"; return 1; }
+  enum="$(printf '%s\n' "$head" | sed -e "s/[*][*]rien d'autre[*][*].*//")"
+  [ "$enum" != "$head" ] || { T26_WHY="borne fermante non coupée — une coupe no-op est un défaut de sonde, jamais un succès"; return 1; }
+
   printf '%s\n' "$enum" | "$GREP" -qE "$T26_INTERNAL_RE" && { T26_WHY="un sous-champ reproduit un intitulé du contrat interne amont (ADR-030)"; return 1; }
   fields="$(printf '%s\n' "$enum" | t26_ids)"
   [ -n "$fields" ] || { T26_WHY="aucun sous-champ backtické dans l'énumération"; return 1; }
+
+  # (b) ancrage nominal D-03 — cumulé à (a), jamais à sa place.
+  miss=""
+  for n in $T26_D03_FIELDS; do
+    printf '%s\n' "$fields" | "$GREP" -qx "$n" || miss="$miss $n"
+  done
+  [ -z "$miss" ] || { T26_WHY="sous-champ(s) fixé(s) par D-03 absent(s) de l'énumération —$miss (un renommage exige un amendement de D-03, pas un test qui suit)"; return 1; }
+
+  # (c) interdits ADR-030, sur l'ensemble MESURÉ puis sur tout le bloc (un champ « ajouté » après
+  # la borne fermante serait la même violation, contournée d'un pas).
+  bad="$(printf '%s\n' "$fields" | "$GREP" -E "$T26_FORBIDDEN_FIELDS" | tr '\n' ' ')"
+  [ -z "$bad" ] || { T26_WHY="l'énumération recopie la table du contrat interne amont (ADR-030) — $bad"; return 1; }
+  bad="$(printf '%s\n' "$blk" | t26_ids | "$GREP" -E "$T26_FORBIDDEN_FIELDS" | tr '\n' ' ')"
+  [ -z "$bad" ] || { T26_WHY="le bloc déclare, hors énumération, un champ du contrat interne amont (ADR-030) — $bad"; return 1; }
+
   parent="$(printf '%s\n' "$blk" | sed -n 's/.*champ optionnel `\([a-z][a-z0-9_]*\)`.*/\1/p')"
   [ -n "$parent" ] || { T26_WHY="champ porteur (« un champ optionnel \`…\` ») non déclaré"; return 1; }
-  all="$(printf '%s\n' "$blk" | t26_ids)"
-  # égalité d'ensemble : ce que le bloc déclare == énumération ∪ champ porteur, ni plus ni moins.
-  [ "$(printf '%s\n%s\n' "$fields" "$parent" | sort -u)" = "$all" ] || {
-    T26_WHY="le bloc déclare des identifiants hors de l'énumération fermée [$(echo $all)]"; return 1; }
   T26_FIELDS="$fields"; T26_N="$(printf '%s\n' "$fields" | "$GREP" -c .)"
   return 0
 }
 
 t26_reprise_closed "$CONTRACTS_FILE"
 case $? in
-  0) ok "T26 A : minimum de reprise — ensemble MESURÉ de $T26_N sous-champs backtickés ($(printf "%s" "$T26_FIELDS" | tr "\n" " ")), énumération close (« exactement » / « rien d'autre » / ADR-030), aucun intitulé du contrat interne amont" ;;
+  0) ok "T26 A : minimum de reprise — $T26_N sous-champs MESURÉS ($(printf "%s" "$T26_FIELDS" | tr "\n" " ")), énumération bornée et coupée pour de bon, les 4 noms de D-03 présents, aucun champ du contrat interne amont (ADR-030)" ;;
   2) ko "T26 A : bloc « Minimum de reprise » introuvable dans mission-contracts.md"; t26_ok=0 ;;
   *) ko "T26 A : minimum de reprise — $T26_WHY"; t26_ok=0 ;;
 esac
 
-# A' — ce que l'AGENT déclare ne peut pas sortir de l'ensemble du contrat : tout identifiant
-# backtické des blocs `gate`/`reprise` de vf-coder.md doit appartenir à l'ensemble déclaré par
-# mission-contracts.md (aucun champ inventé côté worker, ADR-030 : une seule voix).
-t26_coder_ids="$(md_blocks_matching "$CODER_FILE" '[*][*][`](gate|reprise)[`][*][*]' | t26_ids)"
-t26_contract_ids="$(md_blocks_matching "$CONTRACTS_FILE" '[*][*]Minimum de reprise' | t26_ids)"
-t26_invented="$(comm -23 <(printf '%s\n' "$t26_coder_ids" | "$GREP" -v '^$') <(printf '%s\n' "$t26_contract_ids" | "$GREP" -v '^$') 2>/dev/null)"
-if [ -z "$t26_coder_ids" ]; then
-  ko "T26 A' : vf-coder.md ne déclare aucun champ backtické de checkpoint (blocs gate/reprise introuvables)"; t26_ok=0
-elif [ -n "$t26_invented" ]; then
-  ko "T26 A' : vf-coder.md déclare un champ absent du contrat — $(echo $t26_invented)"; t26_ok=0
+# A' — une seule voix (ADR-030) : ce que l'AGENT écrit sur le checkpoint ne REDÉFINIT pas le
+# contrat, il y RENVOIE.
+#
+# CE QUI A ÉTÉ DÉCLASSÉ ICI, ET POURQUOI. La forme précédente — « tout identifiant backtické des
+# blocs gate/reprise de vf-coder.md appartient à l'ensemble du contrat » — n'est pas gateable :
+# t26_ids capte TOUT token backtické minuscule, pas des noms de champ. Écrire `statut` dans le
+# bloc `gate`, ou `human_needed` dans le bloc du contrat — deux rédactions PLUS précises que
+# l'actuelle — faisaient rougir la suite avec un message accusant la doctrine. Une sonde qui punit
+# une édition correcte nuit plus qu'elle ne protège, a fortiori sur des fichiers qu'on s'apprête à
+# réécrire. On la remplace par deux propriétés étroites mais vraies : le RENVOI (DRY) et les noms
+# INTERDITS (ADR-030) — la partie « champ inventé » reste un contrôle documenté, non gaté.
+t26_ap_ko=""
+for n in gate reprise; do
+  t26_blk="$(md_blocks_matching "$CODER_FILE" "[*][*][\`]$n[\`][*][*]")"
+  if [ -z "$t26_blk" ]; then
+    t26_ap_ko="$t26_ap_ko [bloc \`$n\` introuvable dans vf-coder.md]"; continue
+  fi
+  printf '%s\n' "$t26_blk" | "$GREP" -q 'mission-contracts.md' \
+    || t26_ap_ko="$t26_ap_ko [bloc \`$n\` : aucun renvoi à mission-contracts.md — le worker porterait une seconde définition du contrat]"
+  t26_bad="$(printf '%s\n' "$t26_blk" | t26_ids | "$GREP" -E "$T26_FORBIDDEN_FIELDS" | tr '\n' ' ')"
+  [ -z "$t26_bad" ] \
+    && printf '%s\n' "$t26_blk" | "$GREP" -qE "$T26_INTERNAL_RE" && t26_bad="(intitulé littéral du contrat interne)"
+  [ -z "$t26_bad" ] || t26_ap_ko="$t26_ap_ko [bloc \`$n\` : nomme un champ du contrat INTERNE amont (ADR-030) — $t26_bad]"
+done
+if [ -z "$t26_ap_ko" ]; then
+  ok "T26 A' : les blocs \`gate\` et \`reprise\` de vf-coder.md renvoient tous deux à mission-contracts.md et ne nomment aucun champ du contrat interne amont (une seule voix, ADR-030)"
 else
-  ok "T26 A' : les champs déclarés par vf-coder.md ($(echo $t26_coder_ids)) sont tous dans l'ensemble du contrat — aucun champ inventé côté worker"
+  ko "T26 A' : vf-coder.md ne tient pas la voix unique —$t26_ap_ko"; t26_ok=0
 fi
 
 # B — vf-coder.md porte la règle « attente humaine ⇒ escalade, jamais auto-répondue ».
@@ -2135,11 +2188,11 @@ t26_internal_titles() { # <file>
   "$GREP" -lE 'Completed Tasks|Current Task|Checkpoint Details|^Awaiting$|CHECKPOINT REACHED' "$1" 2>/dev/null
 }
 t26_dup_hits=""; t26_scanned=0
-while IFS= read -r f; do
-  [ -n "$f" ] || continue
+while IFS= read -r t26_f; do            # variables préfixées : cf. note du balayage T25
+  [ -n "$t26_f" ] || continue
   t26_scanned=$((t26_scanned + 1))
-  h="$(t26_internal_titles "$f")"
-  [ -n "$h" ] && t26_dup_hits="$t26_dup_hits $f"
+  t26_h="$(t26_internal_titles "$t26_f")"
+  [ -n "$t26_h" ] && t26_dup_hits="$t26_dup_hits $t26_f"
 done < <(module_md_targets)
 if [ "$t26_scanned" -eq 0 ]; then
   ko "T26 D (NÉGATIVE) : ZÉRO fichier balayé (agents d'équipe + $REFS_DIR introuvables) — un vert à vide n'est pas une garantie"
@@ -2151,26 +2204,58 @@ else
   ok "T26 D (NÉGATIVE) : $t26_scanned fichier(s) de doctrine balayé(s), aucun ne reproduit les intitulés du contrat interne de l'exécuteur amont"
 fi
 
-# E (DISCRIMINANT, par mutation) — deux fixtures temporaires : l'une portant un intitulé du
-# contrat interne doit faire échouer l'assertion D ; l'autre, un contrat de reprise dont
-# l'énumération n'est plus close (sous-champ supplémentaire hors liste), doit faire échouer A.
+# E (DISCRIMINANT, par mutation) — une fixture pour D et TROIS mutants du contrat pour A, chacun
+# ancré sur un motif que les gardes de A exigent déjà (donc jamais un no-op invisible), chacun
+# VÉRIFIÉ différent de l'original avant d'être mesuré, chacun jugé sur TROIS branches :
+#   rc=1 → détecté (seul succès) · rc=0 → mutation non détectée · rc=2 → l'ancre du bloc a été
+#   détruite : la mutation n'a RIEN mesuré, ce n'est pas une détection. L'ancienne forme
+#   (`t26_reprise_closed "$MUT" && …`) confondait rc=2 avec un succès, et son sed visait une phrase
+#   littérale du contrat — une reformulation anodine le rendait no-op, et E rougissait alors avec
+#   un message accusant A alors que la mutation n'avait pas mordu.
 T26_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T26_TMPDIR"
 T26_FIXTURE="$T26_TMPDIR/duplicated-contract.md"
-T26_MUT_CONTRACT="$T26_TMPDIR/contrat-non-clos.md"
+T26_MUT_INTERDIT="$T26_TMPDIR/mutant-champ-interdit.md"
+T26_MUT_RENAME="$T26_TMPDIR/mutant-rename-plan-id.md"
+T26_MUT_BORNE="$T26_TMPDIR/mutant-borne-sans-gras.md"
 printf '## Rapport de reprise\n\n**Completed Tasks** table (hashes + files)\n' > "$T26_FIXTURE"
-sed 's/et en particulier \*\*pas\*\* la table/plus `taches_executees`, et en particulier **pas** la table/' \
-  "$CONTRACTS_FILE" > "$T26_MUT_CONTRACT"
+# 1. un champ INTERDIT ajouté DANS l'énumération close (la table que ADR-030 interdit de recopier).
+sed "s/\*\*rien d'autre\*\*/, \`taches_executees\` — **rien d'autre**/" "$CONTRACTS_FILE" > "$T26_MUT_INTERDIT"
+# 2. un sous-champ fixé par D-03 RENOMMÉ : l'ensemble reste clos, il ne désigne plus la même chose.
+sed 's/`plan_id`/`plan_ref`/g' "$CONTRACTS_FILE" > "$T26_MUT_RENAME"
+# 3. la borne fermante dégrassée : garde et coupe doivent parler du MÊME motif.
+sed "s/\*\*rien d'autre\*\*/rien d'autre/" "$CONTRACTS_FILE" > "$T26_MUT_BORNE"
+
 t26_e_ko=""
+t26_assert_mutant_red() { # <libellé> <fichier mutant>
+  if cmp -s "$CONTRACTS_FILE" "$2"; then
+    t26_e_ko="$t26_e_ko [$1 : mutant IDENTIQUE à l'original — le motif visé n'existe plus dans le contrat, la mutation n'a rien mordu (sonde à réancrer, ce n'est PAS un défaut de A)]"
+    return
+  fi
+  t26_reprise_closed "$2"
+  case $? in
+    1) : ;;
+    0) t26_e_ko="$t26_e_ko [$1 : NON détecté par A]" ;;
+    *) t26_e_ko="$t26_e_ko [$1 : rc=2, ancre du bloc détruite — rien n'a été mesuré, ce n'est pas une détection]" ;;
+  esac
+}
 [ -n "$(t26_internal_titles "$T26_FIXTURE")" ] || t26_e_ko="$t26_e_ko [fixture d'intitulé interne non détectée par D]"
-t26_reprise_closed "$T26_MUT_CONTRACT" && t26_e_ko="$t26_e_ko [sous-champ hors énumération non détecté par A]"
-t26_reprise_closed "$CONTRACTS_FILE"   || t26_e_ko="$t26_e_ko [le contrat réel ne tient plus l'assertion A]"
+t26_assert_mutant_red "champ interdit dans l'énumération (taches_executees)" "$T26_MUT_INTERDIT"
+t26_assert_mutant_red "renommage d'un sous-champ de D-03 (plan_id→plan_ref)" "$T26_MUT_RENAME"
+t26_assert_mutant_red "borne fermante dégrassée (garde vs coupe désalignés)" "$T26_MUT_BORNE"
+# Dernier appel sur le contrat RÉEL : il revalide A et restaure $T26_FIELDS/$T26_N pour le bilan.
+t26_reprise_closed "$CONTRACTS_FILE"
+case $? in
+  0) : ;;
+  2) t26_e_ko="$t26_e_ko [le contrat réel : bloc « Minimum de reprise » introuvable (rc=2)]" ;;
+  *) t26_e_ko="$t26_e_ko [le contrat réel ne tient plus l'assertion A — $T26_WHY]" ;;
+esac
 if [ -n "$t26_e_ko" ]; then
   ko "T26 E (DISCRIMINANT) : une assertion ne rougit pas sur mutation —$t26_e_ko"; t26_ok=0
 else
-  ok "T26 E (DISCRIMINANT) : intitulé du contrat interne détecté par D, sous-champ hors énumération détecté par A, contrat réel tenu"
+  ok "T26 E (DISCRIMINANT) : intitulé interne détecté par D ; 3 mutants du contrat (champ interdit, renommage D-03, borne dégrassée) détectés par A, chacun prouvé différent de l'original ; contrat réel tenu"
 fi
 
-[ "$t26_ok" -eq 1 ] && ok "T26 : minimum de reprise ($T26_N sous-champs mesurés), halte de nœud, réponse par le manager, garde anti-duplication ADR-030 discriminante par mutation"
+[ "$t26_ok" -eq 1 ] && ok "T26 : minimum de reprise ($T26_N sous-champs mesurés, noms de D-03 ancrés, interdits ADR-030 exclus), halte de nœud, réponse par le manager, garde anti-duplication discriminante par mutation"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
