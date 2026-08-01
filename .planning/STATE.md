@@ -339,6 +339,16 @@ Progress: [██████░░░░] 59%
 
 ### Roadmap Evolution
 
+- 2026-08-01 : **Phase 23 plan 01 exécuté hors-bande** — mandat étroit (un seul plan sur 8) confié
+  dans le worktree `vibeflow-os-p23` (branche `feat/phase-23-couplage-gsd`), sans passer par
+  `gsd-execute-phase` pour la phase entière. Livré : le contrat de checkpoint amont (`gate`,
+  `reprise`) et le désarmement du flag `workflow._auto_chain_active` — détail complet :
+  `.planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-01-SUMMARY.md`.
+  Compteurs `total_plans`/`completed_plans` incrémentés en conséquence (+1 chacun) ;
+  `current_phase`/narratif Phase 21 volontairement laissés intacts (ADR-063 : ne jamais
+  réparer ce fichier par `gsd-tools state`, et la Phase 23 n'est pas encore la phase courante
+  suivie ici). Les 7 autres plans de la Phase 23 restent à exécuter.
+
 - 2026-08-01 : **Phase 26 ajoutée** — « Manuel utilisateur VibeFlow (manual/) ». Origine : demande
   de Samuel (réorganiser les specs et offrir une doc lisible aux arrivants sans les plonger dans
   les docs de gestion de projet). Un manuel « vitrine » sous `manual/` à la racine : arborescence
