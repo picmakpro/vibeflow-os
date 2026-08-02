@@ -1349,73 +1349,12 @@ fi
 [ "$t17_ok" -eq 1 ] && ok "T17 routage : AGENT.md + intent-routing.md câblent l'intention d'ingestion"
 
 # ---------------------------------------------------------------------------
-# T18 — Cloisonnement par tools (Pattern 12) : allowlist Agent(...) du manager (Phase 15, D-07)
+# Outillage commun T18/T19 — appartenance à une allowlist Agent(...), mesurée en RELATION
 # ---------------------------------------------------------------------------
-# check-agents.sh NE LINTE PAS le contenu du champ tools: (vérifié empiriquement — une allowlist
-# avec des noms inventés ou une parenthèse non fermée passe --strict en vert). Ces asserts sont
-# donc la SEULE vérification machine du cloisonnement D-07 (Pattern A : imbrication
-# manager→manager interdite) pour ce module.
-DEVMGR="$MOD/agents/vf-dev-manager.md"
-dev_tools_line() { "$GREP" -m1 '^tools:' "$1" 2>/dev/null; }
-T18_ALLOWED="vf-coder vf-reviewer vf-auditer vf-test-orchestrator gsd-advisor-researcher \
-general-purpose gsd-phase-researcher gsd-plan-checker gsd-planner gsd-pattern-mapper \
-gsd-doc-verifier gsd-doc-writer gsd-doc-classifier gsd-doc-synthesizer gsd-roadmapper \
-gsd-integration-checker vf-crafter vf-design-judge"
-
-t18_ok=1
-dmt="$(dev_tools_line "$DEVMGR")"
-if [ -z "$dmt" ]; then
-  ko "T18 cloisonnement : vf-dev-manager sans ligne tools: (hériterait de TOUT)"; t18_ok=0
-else
-  # Allowlist Agent(...) et non Agent nu : aucune occurrence de « Agent » qui ne soit pas
-  # immédiatement suivie d'une parenthèse ouvrante (bare Agent = pas de cloisonnement).
-  bare="$(echo "$dmt" | "$GREP" -oE 'Agent([^(]|$)')"
-  [ -z "$bare" ] || { ko "T18 cloisonnement : vf-dev-manager a un Agent nu (pas d'allowlist)"; t18_ok=0; }
-  echo "$dmt" | "$GREP" -qF 'Agent(' || { ko "T18 cloisonnement : aucune allowlist Agent( ) trouvée"; t18_ok=0; }
-  # Chacun des 18 noms attendus, testé UN PAR UN (jamais un grep global satisfait par le premier).
-  for name in $T18_ALLOWED; do
-    echo "$dmt" | "$GREP" -qF -- "$name" || { ko "T18 cloisonnement : « $name » absent de l'allowlist du manager"; t18_ok=0; }
-  done
-  # Interdit structurel : vf-design-manager JAMAIS dans l'allowlist (imbrication manager→manager).
-  # Piège : vf-design-judge contient la sous-chaîne « vf-design » — on teste le nom EXACT complet
-  # « vf-design-manager », qui ne peut pas matcher « vf-design-judge » (suffixe différent).
-  echo "$dmt" | "$GREP" -qF -- "vf-design-manager" && { ko "T18 cloisonnement : vf-design-manager présent dans l'allowlist (imbrication manager→manager)"; t18_ok=0; }
-  # Parenthèse d'allowlist fermée en fin de ligne.
-  echo "$dmt" | "$GREP" -qE '\)[[:space:]]*$' || { ko "T18 cloisonnement : allowlist non fermée (parenthèse manquante en fin de ligne)"; t18_ok=0; }
-fi
-[ "$t18_ok" -eq 1 ] && ok "T18 cloisonnement : allowlist Agent(...) complète (18 noms), vf-design-manager absent, parenthèse fermée"
-
-# T18b — Success Criteria 1 et 3 : doctrine étage design présente, routage vf-auto → design pur
-t18b_ok=1
-# Formules MULTI-MOTS sur des .md wrappés à 100 colonnes : mesure sur le fichier REPLIÉ + blancs
-# élastiques (B6) — sinon un re-wrap légitime les ferait rougir à tort.
-md_folded "$DEVMGR" | "$GREP" -qiE 'Étage[[:space:]]+design[[:space:]]+croisé' || { ko "T18b SC1 : doctrine étage design absente de vf-dev-manager.md"; t18b_ok=0; }
-"$GREP" -q 'mission-cross-team' "$DEVMGR" || { ko "T18b SC1 : renvoi vers mission-cross-team.md absent de vf-dev-manager.md"; t18b_ok=0; }
-AUTO_SKILL="$MOD/skills/vf-auto/SKILL.md"
-if [ -f "$AUTO_SKILL" ]; then
-  "$GREP" -q 'vf-design-manager' "$AUTO_SKILL" || { ko "T18b SC3 : vf-auto/SKILL.md ne route pas vers vf-design-manager"; t18b_ok=0; }
-  md_folded "$AUTO_SKILL" | "$GREP" -qiE 'zéro[[:space:]]+feature' || { ko "T18b SC3 : signal « mission entièrement design (zéro feature) » absent de vf-auto"; t18b_ok=0; }
-else
-  ko "T18b SC3 : $AUTO_SKILL introuvable"; t18b_ok=0
-fi
-[ "$t18b_ok" -eq 1 ] && ok "T18b doctrine : étage design (SC1, renvoi mission-cross-team) + routage vf-auto→design pur (SC3) présents"
-
-# ---------------------------------------------------------------------------
-# T19 — Cloisonnement des 3 workers (Pattern 12) : allowlist Agent(...) nom par nom (Phase 16)
-# ---------------------------------------------------------------------------
-# Miroir de T18 (manager) côté workers : ferme le chemin INDIRECT manager→worker→manager
-# (mission-cross-team.md, Invariants). Chaque nom testé un par un — jamais un grep global qui
-# passerait avec une liste tronquée.
-#
-# Correctif (ré-entrée après finding BLOQUANT d'un juge de mutation) : un `grep -qF` sur la
-# ligne `tools:` ENTIÈRE est tautologique — il valide un nom présent N'IMPORTE OÙ sur la ligne
-# (y compris hors des parenthèses, ex. déplacé en `Bash(nom)`), et `grep -qE ')[[:space:]]*$'`
-# ne prouve que « la ligne finit par ) », pas que l'allowlist Agent( ) est refermée. Les deux
-# helpers ci-dessous corrigent ça : extraction par COMPTAGE DE PROFONDEUR de parenthèses
-# (jamais un grep sur la ligne entière), puis appartenance par ÉGALITÉ DE TOKEN exacte après
-# split sur virgule (jamais une recherche de sous-chaîne — immunise contre un nom validé par un
-# homonyme partiel, ex. « gsd-plan » ne doit jamais être « trouvé » parce que « gsd-planner »
-# est dans la liste).
+# Ces deux helpers étaient définis dans la section T19 et n'étaient donc utilisables que par elle.
+# T18, qui s'exécute AVANT, en était réduit au `grep -qF` sur la ligne `tools:` entière — la forme
+# que le commentaire de T19 qualifie lui-même de tautologique. Ils sont REMONTÉS ici, à l'identique,
+# pour que les deux sections mesurent la même chose ; T19 les consomme toujours, inchangés.
 
 # extract_agent_allowlist LINE — imprime le contenu entre "Agent(" et sa ")" correspondante.
 # Codes retour : 0 = trouvée et refermée (contenu sur stdout) ; 1 = "Agent(" trouvée mais la
@@ -1457,6 +1396,156 @@ allowlist_has_name() {
   IFS="$prev_ifs"
   return 1
 }
+
+# ---------------------------------------------------------------------------
+# T18 — Cloisonnement par tools (Pattern 12) : allowlist Agent(...) du manager (Phase 15, D-07)
+# ---------------------------------------------------------------------------
+# check-agents.sh NE LINTE PAS le contenu du champ tools: (vérifié empiriquement — une allowlist
+# avec des noms inventés ou une parenthèse non fermée passe --strict en vert). Ces asserts sont
+# donc la SEULE vérification machine du cloisonnement D-07 (Pattern A : imbrication
+# manager→manager interdite) pour ce module.
+DEVMGR="$MOD/agents/vf-dev-manager.md"
+dev_tools_line() { "$GREP" -m1 '^tools:' "$1" 2>/dev/null; }
+T18_ALLOWED="vf-coder vf-reviewer vf-auditer vf-test-orchestrator gsd-advisor-researcher \
+general-purpose gsd-phase-researcher gsd-plan-checker gsd-planner gsd-pattern-mapper \
+gsd-doc-verifier gsd-doc-writer gsd-doc-classifier gsd-doc-synthesizer gsd-roadmapper \
+gsd-integration-checker vf-crafter vf-design-judge"
+
+t18_ok=1
+dmt="$(dev_tools_line "$DEVMGR")"
+if [ -z "$dmt" ]; then
+  ko "T18 cloisonnement : vf-dev-manager sans ligne tools: (hériterait de TOUT)"; t18_ok=0
+else
+  # Allowlist Agent(...) et non Agent nu : aucune occurrence de « Agent » qui ne soit pas
+  # immédiatement suivie d'une parenthèse ouvrante (bare Agent = pas de cloisonnement).
+  bare="$(echo "$dmt" | "$GREP" -oE 'Agent([^(]|$)')"
+  [ -z "$bare" ] || { ko "T18 cloisonnement : vf-dev-manager a un Agent nu (pas d'allowlist)"; t18_ok=0; }
+  echo "$dmt" | "$GREP" -qF 'Agent(' || { ko "T18 cloisonnement : aucune allowlist Agent( ) trouvée"; t18_ok=0; }
+  # TAUTOLOGIE FERMÉE (revue du 2026-08-02, famille « existence au lieu de relation »). La forme
+  # précédente testait chaque nom par `grep -qF` sur la ligne `tools:` ENTIÈRE — le commentaire de
+  # T19 qualifie lui-même cette forme de tautologique depuis Phase 16, et T19 s'en est débarrassé
+  # côté workers ; T18, qui s'exécute avant, l'avait gardée. Ce qu'elle mesurait : « le nom apparaît
+  # QUELQUE PART sur la ligne ». Ce que le libellé promet : « le nom est DANS l'allowlist Agent(...) ».
+  # Un nom sorti des parenthèses et replacé ailleurs sur la même ligne (`Bash(<nom>)`) conserve tous
+  # les tokens et restait vert — le cloisonnement était donc annoncé et non mesuré. On passe à
+  # l'extraction BORNÉE aux parenthèses + égalité de token, comme T19 (T18c le prouve par mutation).
+  #
+  # La borne `)[[:space:]]*$` de la forme précédente est REMPLACÉE, pas retirée : elle ne prouvait
+  # que « la ligne finit par ) » (un autre tool parenthésé — `Bash(git:*)` — la satisfaisait avec
+  # une allowlist jamais refermée). Le comptage de profondeur ci-dessous prouve strictement plus,
+  # donc le « parenthèse fermée » du libellé d'ok reste vrai.
+  dmt_content="$(extract_agent_allowlist "$dmt")"; dmt_rc=$?
+  if [ "$dmt_rc" -eq 2 ]; then
+    ko "T18 cloisonnement : aucune allowlist Agent( ) extractible de la ligne tools: du manager"; t18_ok=0
+  elif [ "$dmt_rc" -eq 1 ]; then
+    ko "T18 cloisonnement : allowlist Agent(...) non refermée (parenthèses déséquilibrées, comptage de profondeur)"; t18_ok=0
+  else
+    # Chacun des 18 noms attendus, testé UN PAR UN (jamais un grep global satisfait par le premier),
+    # et par ÉGALITÉ DE TOKEN dans le contenu des parenthèses (jamais une sous-chaîne de la ligne).
+    for name in $T18_ALLOWED; do
+      allowlist_has_name "$dmt_content" "$name" || { ko "T18 cloisonnement : « $name » absent de l'allowlist Agent(...) du manager (extraction bornée aux parenthèses)"; t18_ok=0; }
+    done
+    # Interdit structurel, versant TOKEN EXACT dans les parenthèses.
+    allowlist_has_name "$dmt_content" "vf-design-manager" && { ko "T18 cloisonnement : vf-design-manager est un token de l'allowlist Agent(...) (imbrication manager→manager)"; t18_ok=0; }
+  fi
+  # Interdit structurel, versant LIGNE ENTIÈRE — CONSERVÉ en plus du test de token ci-dessus, et
+  # jamais à sa place : un `vf-design-manager` glissé HORS des parenthèses (dans un `Bash(...)`, en
+  # commentaire de fin de ligne) échapperait à l'extraction bornée. Fail-closed sur la ligne entière.
+  # Piège : vf-design-judge contient la sous-chaîne « vf-design » — on teste le nom EXACT complet
+  # « vf-design-manager », qui ne peut pas matcher « vf-design-judge » (suffixe différent).
+  echo "$dmt" | "$GREP" -qF -- "vf-design-manager" && { ko "T18 cloisonnement : vf-design-manager présent dans l'allowlist (imbrication manager→manager)"; t18_ok=0; }
+fi
+[ "$t18_ok" -eq 1 ] && ok "T18 cloisonnement : allowlist Agent(...) complète (18 noms), vf-design-manager absent, parenthèse fermée"
+
+# ---------------------------------------------------------------------------
+# T18c (DISCRIMINANT) — la vérification de T18 mesure l'APPARTENANCE À L'ALLOWLIST, pas la présence
+# d'un nom sur la ligne. Sans ce cas, rien ne distinguerait la forme bornée de la forme
+# tautologique qu'elle remplace : les deux sont vertes sur le fichier réel.
+#
+# Deux contrôles positifs construits depuis la ligne `tools:` RÉELLE, ancrés sur des éléments
+# STRUCTURELS (un token de la liste, les parenthèses) et non sur une tournure :
+#   µ1 — un nom SORTI des parenthèses et replacé sur la même ligne dans `Bash(<nom>)`. AUCUN token
+#        n'est retiré : le `grep -qF` historique reste vert (vérifié ici, c'est la moitié qui
+#        prouve que la mutation est une RELOCALISATION et pas une suppression), l'extraction bornée
+#        doit rougir.
+#   µ2 — la parenthèse fermante de `Agent(` retirée, la ligne se terminant malgré tout par « ) »
+#        grâce à un autre tool parenthésé (`Bash(git:*)`). L'ancienne borne `)[[:space:]]*$` reste
+#        verte (vérifié), le comptage de profondeur doit rendre rc=1.
+# Chaque mutant est prouvé DIFFÉRENT de l'original avant d'être mesuré — un mutant no-op ne prouve
+# rien, et le dire vaut mieux que le laisser passer pour vert.
+# ---------------------------------------------------------------------------
+t18c_ko=""
+T18C_VICTIM="gsd-roadmapper"
+if [ -z "$dmt" ]; then
+  t18c_ko="$t18c_ko [ligne tools: du manager introuvable — rien à muter]"
+else
+  # µ1 — relocalisation d'un nom hors des parenthèses Agent(...).
+  t18c_mu1="$(printf '%s' "$dmt" | sed -e "s/,[[:space:]]*${T18C_VICTIM}\([,)]\)/\1/")"
+  t18c_mu1="$t18c_mu1, Bash($T18C_VICTIM)"
+  if [ "$t18c_mu1" = "$dmt" ]; then
+    t18c_ko="$t18c_ko [µ1 : mutant IDENTIQUE à l'original — « $T18C_VICTIM » n'est plus dans la liste sous cette graphie, la mutation n'a rien mordu (sonde à réancrer, ce n'est PAS un défaut de T18)]"
+  else
+    printf '%s' "$t18c_mu1" | "$GREP" -qF -- "$T18C_VICTIM" \
+      || t18c_ko="$t18c_ko [µ1 : le nom a disparu de la ligne — ce n'est plus une relocalisation, le cas ne prouve plus que la forme tautologique restait verte]"
+    if allowlist_has_name "$(extract_agent_allowlist "$t18c_mu1")" "$T18C_VICTIM"; then
+      t18c_ko="$t18c_ko [µ1 : NON détecté — un nom sorti des parenthèses Agent(...) est encore compté comme cloisonné]"
+    fi
+  fi
+  # µ2 — allowlist jamais refermée, mais ligne se terminant par « ) ».
+  t18c_mu2="$(printf '%s' "$dmt" | sed -e 's/)[[:space:]]*$//'), Bash(git:*)"
+  if [ "$t18c_mu2" = "$dmt" ]; then
+    t18c_ko="$t18c_ko [µ2 : mutant IDENTIQUE à l'original — la parenthèse fermante n'a pas été retirée, la mutation n'a rien mordu]"
+  else
+    printf '%s' "$t18c_mu2" | "$GREP" -qE '\)[[:space:]]*$' \
+      || t18c_ko="$t18c_ko [µ2 : la ligne mutée ne finit plus par « ) » — le cas ne prouve plus que l'ancienne borne restait verte]"
+    extract_agent_allowlist "$t18c_mu2" >/dev/null
+    [ $? -eq 1 ] || t18c_ko="$t18c_ko [µ2 : NON détecté — une allowlist Agent(...) jamais refermée passe encore, dès qu'un autre tool parenthésé clôt la ligne]"
+  fi
+  # Contrôle NÉGATIF : la ligne RÉELLE, elle, doit rester verte sur les deux propriétés.
+  allowlist_has_name "$(extract_agent_allowlist "$dmt")" "$T18C_VICTIM" \
+    || t18c_ko="$t18c_ko [FAUX ROUGE : « $T18C_VICTIM » n'est pas reconnu dans l'allowlist RÉELLE du manager]"
+fi
+if [ -z "$t18c_ko" ]; then
+  ok "T18c (DISCRIMINANT) : l'allowlist du manager est mesurée en APPARTENANCE (extraction bornée aux parenthèses + égalité de token) — un nom relocalisé hors des parenthèses sans perdre un seul token de la ligne, et une allowlist jamais refermée dont la ligne finit pourtant par « ) », font tous deux rougir T18 ; la ligne réelle reste verte"
+else
+  ko "T18c (DISCRIMINANT) : la vérification d'allowlist du manager ne discrimine pas —$t18c_ko"
+fi
+
+# T18b — Success Criteria 1 et 3 : doctrine étage design présente, routage vf-auto → design pur
+t18b_ok=1
+# Formules MULTI-MOTS sur des .md wrappés à 100 colonnes : mesure sur le fichier REPLIÉ + blancs
+# élastiques (B6) — sinon un re-wrap légitime les ferait rougir à tort.
+md_folded "$DEVMGR" | "$GREP" -qiE 'Étage[[:space:]]+design[[:space:]]+croisé' || { ko "T18b SC1 : doctrine étage design absente de vf-dev-manager.md"; t18b_ok=0; }
+"$GREP" -q 'mission-cross-team' "$DEVMGR" || { ko "T18b SC1 : renvoi vers mission-cross-team.md absent de vf-dev-manager.md"; t18b_ok=0; }
+AUTO_SKILL="$MOD/skills/vf-auto/SKILL.md"
+if [ -f "$AUTO_SKILL" ]; then
+  "$GREP" -q 'vf-design-manager' "$AUTO_SKILL" || { ko "T18b SC3 : vf-auto/SKILL.md ne route pas vers vf-design-manager"; t18b_ok=0; }
+  md_folded "$AUTO_SKILL" | "$GREP" -qiE 'zéro[[:space:]]+feature' || { ko "T18b SC3 : signal « mission entièrement design (zéro feature) » absent de vf-auto"; t18b_ok=0; }
+else
+  ko "T18b SC3 : $AUTO_SKILL introuvable"; t18b_ok=0
+fi
+[ "$t18b_ok" -eq 1 ] && ok "T18b doctrine : étage design (SC1, renvoi mission-cross-team) + routage vf-auto→design pur (SC3) présents"
+
+# ---------------------------------------------------------------------------
+# T19 — Cloisonnement des 3 workers (Pattern 12) : allowlist Agent(...) nom par nom (Phase 16)
+# ---------------------------------------------------------------------------
+# Miroir de T18 (manager) côté workers : ferme le chemin INDIRECT manager→worker→manager
+# (mission-cross-team.md, Invariants). Chaque nom testé un par un — jamais un grep global qui
+# passerait avec une liste tronquée.
+#
+# Correctif (ré-entrée après finding BLOQUANT d'un juge de mutation) : un `grep -qF` sur la
+# ligne `tools:` ENTIÈRE est tautologique — il valide un nom présent N'IMPORTE OÙ sur la ligne
+# (y compris hors des parenthèses, ex. déplacé en `Bash(nom)`), et `grep -qE ')[[:space:]]*$'`
+# ne prouve que « la ligne finit par ) », pas que l'allowlist Agent( ) est refermée. Les deux
+# helpers ci-dessous corrigent ça : extraction par COMPTAGE DE PROFONDEUR de parenthèses
+# (jamais un grep sur la ligne entière), puis appartenance par ÉGALITÉ DE TOKEN exacte après
+# split sur virgule (jamais une recherche de sous-chaîne — immunise contre un nom validé par un
+# homonyme partiel, ex. « gsd-plan » ne doit jamais être « trouvé » parce que « gsd-planner »
+# est dans la liste).
+
+# `extract_agent_allowlist` et `allowlist_has_name` sont définis PLUS HAUT (outillage commun
+# T18/T19) : T18 s'exécute avant cette section et doit mesurer la même relation. Ils sont utilisés
+# ici tels quels.
 
 CODER_FILE="$MOD/agents/vf-coder.md"
 REVIEWER_FILE="$MOD/agents/vf-reviewer.md"
