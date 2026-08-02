@@ -66,10 +66,12 @@ lab). Puis cinq gestes **non négociables** :
    traite les invariants comme non garantis, ne les cite pas comme preuve ; **64 = fichier
    illisible** → défaut d'outillage, remonte `human_needed`. Aucun de ces codes n'arrête la mission
    par lui-même : seul 64 appelle l'humain.
-5. **Reset du flag d'enchaînement (avant le premier dispatch)** : `gsd_run config-set
-   workflow._auto_chain_active false` (résolution : `mission-contracts.md` §Seuil de bascule,
-   DRY). Persisté dans `.planning/config.json`, il survit aux sessions et auto-tranche les
-   checkpoints tant qu'il vaut vrai ; `gsd_run` introuvable → consigne au rapport, best-effort.
+5. **Reset des flags d'enchaînement (avant le premier dispatch)** : `gsd_run config-set
+   workflow._auto_chain_active false` **puis** `gsd_run config-set workflow.auto_advance false` —
+   les DEUX déclencheurs amont d'auto-approbation de checkpoint, désarmer le premier seul laisse
+   le second armé (résolution : `mission-contracts.md` §Seuil de bascule, DRY). Persistés dans
+   `.planning/config.json`, ils survivent aux sessions et auto-tranchent les checkpoints tant
+   qu'ils valent vrai ; `gsd_run` introuvable → consigne au rapport, best-effort.
 
 ## Règle d'or : TOUJOURS planifier d'abord
 

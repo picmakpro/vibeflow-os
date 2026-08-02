@@ -2226,6 +2226,64 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# T25c (A-2) — les DEUX déclencheurs amont d'auto-approbation sont désarmés dans le MÊME geste.
+# `workflow._auto_chain_active` seul ne suffit pas : `workflow.auto_advance` est le second
+# déclencheur de la règle 5 amont (gsd-core/references/checkpoints.md) et n'apparaissait nulle part
+# dans plugin/ — un flag qu'on ne nomme pas est un flag qu'on ne désarme pas. Assertion BORNÉE AU
+# BLOC : deux désarmements dans deux sections sans rapport ne sont pas « le même geste ».
+# ---------------------------------------------------------------------------
+t25c_ok=1
+T25C_WHY=""
+t25c_both_disarmed() { # <file>
+  local blk
+  T25C_WHY=""
+  blk="$(md_blocks_matching "$1" 'workflow[.]_auto_chain_active')"
+  [ -n "$blk" ] || { T25C_WHY="aucun bloc ne nomme workflow._auto_chain_active"; return 2; }
+  printf '%s\n' "$blk" | "$GREP" -qE 'workflow[.]_auto_chain_active[`]?[[:space:]]+false' \
+    || { T25C_WHY="workflow._auto_chain_active n'est pas mis à false dans ce bloc"; return 1; }
+  printf '%s\n' "$blk" | "$GREP" -qE 'workflow[.]auto_advance[`]?[[:space:]]+false' \
+    || { T25C_WHY="workflow.auto_advance — second déclencheur de la règle 5 amont — n'est pas désarmé dans le même geste"; return 1; }
+  return 0
+}
+
+t25c_both_disarmed "$DEVMGR"
+case $? in
+  0) : ;;
+  2) ko "T25c (A-2) : vf-dev-manager.md — $T25C_WHY"; t25c_ok=0 ;;
+  *) ko "T25c (A-2) : vf-dev-manager.md — $T25C_WHY"; t25c_ok=0 ;;
+esac
+
+# Discriminance par mutation : (1) le second flag remplacé par le premier — le geste désarme deux
+# fois la même chose, exactement la régression que A-2 corrige, et AUCUN token de forme n'est
+# retiré ; (2) le second flag armé à `true`.
+T25C_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T25C_TMPDIR"
+T25C_MUT_MEME="$T25C_TMPDIR/mutant-deux-fois-le-meme-flag.md"
+T25C_MUT_TRUE="$T25C_TMPDIR/mutant-auto-advance-arme.md"
+sed 's/workflow[.]auto_advance/workflow._auto_chain_active/g' "$DEVMGR" > "$T25C_MUT_MEME"
+sed 's/workflow[.]auto_advance false/workflow.auto_advance true/' "$DEVMGR" > "$T25C_MUT_TRUE"
+t25c_mut_ko=""
+t25c_assert_mutant_red() { # <libellé> <mutant>
+  if cmp -s "$DEVMGR" "$2"; then
+    t25c_mut_ko="$t25c_mut_ko [$1 : mutant IDENTIQUE à l'original — le motif visé n'existe plus, la mutation n'a rien mordu (sonde à réancrer, ce n'est PAS un défaut de l'assertion)]"
+    return
+  fi
+  t25c_both_disarmed "$2"
+  case $? in
+    1) : ;;
+    0) t25c_mut_ko="$t25c_mut_ko [$1 : NON détecté]" ;;
+    *) t25c_mut_ko="$t25c_mut_ko [$1 : rc=2, bloc introuvable — rien n'a été mesuré, ce n'est pas une détection]" ;;
+  esac
+}
+t25c_assert_mutant_red "second flag remplacé par le premier (désarmement en double)" "$T25C_MUT_MEME"
+t25c_assert_mutant_red "workflow.auto_advance armé à true"                           "$T25C_MUT_TRUE"
+t25c_both_disarmed "$DEVMGR" || t25c_mut_ko="$t25c_mut_ko [le fichier réel ne tient plus l'assertion — $T25C_WHY]"
+if [ -n "$t25c_mut_ko" ]; then
+  ko "T25c (A-2, DISCRIMINANT) : le désarmement des deux flags n'est pas mesuré —$t25c_mut_ko"; t25c_ok=0
+else
+  ok "T25c (A-2, DISCRIMINANT) : le geste de démarrage désarme les DEUX déclencheurs amont (_auto_chain_active ET auto_advance) dans le même bloc — 2 mutants (désarmement en double, second flag armé) font rougir l'assertion"
+fi
+
+# ---------------------------------------------------------------------------
 # T26 (D-03, D-04, D-04bis) — minimum de reprise, halte de nœud, réponse par le manager. Garde
 # anti-duplication ADR-030 (assertion D, NÉGATIVE) : aucun .md de doctrine du module ne reproduit
 # les intitulés du contrat interne de l'exécuteur amont (Completed Tasks / Current Task /
