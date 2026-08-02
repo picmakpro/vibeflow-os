@@ -14,7 +14,7 @@
         "plugin/dev-orchestrator/agents/vf-dev-manager.md",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "done"
+      "status": "ready"
     },
     {
       "id": "revue-01",
@@ -29,7 +29,7 @@
         "plugin/dev-orchestrator/agents/vf-dev-manager.md",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "running",
+      "status": "blocked",
       "review_regime": "full"
     },
     {
