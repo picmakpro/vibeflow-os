@@ -2170,11 +2170,15 @@ t26_ok=1
 # désigne plus la même chose) :
 #   (a) FERMETURE MESURÉE : l'énumération est bornée des deux côtés, et la borne de fin est
 #       réellement coupée — une coupe no-op est un défaut de sonde, jamais un succès ;
-#   (b) ANCRAGE NOMINAL : les sous-champs fixés par D-03 sont présents, nommément ;
-#   (c) INTERDITS ADR-030 : aucun nom du contrat INTERNE de l'exécuteur amont (la table des tâches
-#       déjà exécutées) dans l'ensemble mesuré NI ailleurs dans le bloc.
+#   (b) ANCRAGE NOMINAL EN ÉGALITÉ D'ENSEMBLE : l'ensemble mesuré vaut EXACTEMENT celui de D-03 ;
+#   (c) INTERDITS ADR-030 hors énumération : aucune graphie connue du contrat INTERNE de
+#       l'exécuteur amont (la table des tâches déjà exécutées) ailleurs dans le bloc.
 # Sans (c), l'assertion certifiait « énumération close » sur un contrat énumérant
 # `taches_executees` et `hashes` — littéralement ce que le motif ADR-030 interdit de recopier.
+# Et tant que (b) se contentait d'une présence doublée d'une liste NOIRE, l'ensemble n'était pas
+# clos pour autant : ajouter `journal_des_taches_executees` — la table même que ADR-030 interdit de
+# recopier, sous une graphie absente de la liste — laissait la suite à 87 OK / 0 KO. L'égalité
+# d'ensemble ferme la question par la lecture littérale de D-03 (« exactement … rien d'autre »).
 
 # Identifiants backtickés d'un texte lu sur stdin, triés et dédupliqués. Collationnement BYTE
 # imposé : toute comparaison d'ensemble en aval (égalité de chaînes, comm) le suppose.
@@ -2184,19 +2188,24 @@ t26_ids() { "$GREP" -oE '`[a-z][a-z0-9_]*`' | tr -d '`' | LC_ALL=C sort -u; }
 # interdire qu'un sous-champ du minimum de reprise en reproduise un (ADR-030).
 T26_INTERNAL_RE='Completed Tasks|Current Task|Checkpoint Details|Awaiting|CHECKPOINT REACHED'
 
-# Sous-champs FIXÉS par D-03. Un renommage exige un amendement de D-03, pas un test qui suit.
+# Sous-champs FIXÉS par D-03, tenus comme un ENSEMBLE CLOS : D-03 dit « sont exactement … — rien
+# d'autre », donc l'ensemble MESURÉ doit être ÉGAL à celui-ci, jamais seulement le contenir. Un
+# renommage OU un ajout exige un amendement de D-03, pas un test qui suit.
 T26_D03_FIELDS="plan_id checkpoint gate attendu"
 
 # Noms de sous-champs INTERDITS (ADR-030) : la table des tâches déjà exécutées du contrat interne
-# de l'exécuteur, sous ses graphies plausibles FR/EN. La fermeture seule ne protège de rien — une
-# énumération peut être close ET recopier exactement ce qu'elle prétend interdire.
+# de l'exécuteur, sous ses graphies plausibles FR/EN. C'est une LISTE NOIRE, donc un filet à
+# mailles finies : elle ne ferme rien à elle seule (`journal_des_taches_executees` n'y figure pas
+# et passait à 0 KO). La fermeture de l'énumération est assurée par l'ÉGALITÉ D'ENSEMBLE avec
+# $T26_D03_FIELDS ; cette liste ne sert plus qu'aux zones où aucun ensemble clos n'est définissable
+# — le reste du bloc, hors énumération, et les blocs de vf-coder.md (T26 A').
 T26_FORBIDDEN_FIELDS='^(taches_executees|taches_realisees|taches|completed_tasks|current_task|checkpoint_details|awaiting|hashes|hash|shas|commits|fichiers|files)$'
 
 # 0 = contrat clos et sain (T26_FIELDS/T26_N renseignés) · 1 = fermeture rompue ($T26_WHY) ·
 # 2 = bloc introuvable.
 T26_FIELDS=""; T26_N=0; T26_WHY=""
 t26_reprise_closed() { # <fichier de contrat>
-  local blk head enum fields parent bad miss n
+  local blk head enum fields parent bad miss extra expected
   # Réinitialisation à l'ENTRÉE : sans elle, un $T26_WHY périmé survivait à un retour 2 et
   # l'appelant affichait le motif de l'appel précédent.
   T26_FIELDS=""; T26_N=0; T26_WHY=""
@@ -2219,19 +2228,25 @@ t26_reprise_closed() { # <fichier de contrat>
   fields="$(printf '%s\n' "$enum" | t26_ids)"
   [ -n "$fields" ] || { T26_WHY="aucun sous-champ backtické dans l'énumération"; return 1; }
 
-  # (b) ancrage nominal D-03 — cumulé à (a), jamais à sa place.
-  miss=""
-  for n in $T26_D03_FIELDS; do
-    printf '%s\n' "$fields" | "$GREP" -qx "$n" || miss="$miss $n"
-  done
-  [ -z "$miss" ] || { T26_WHY="sous-champ(s) fixé(s) par D-03 absent(s) de l'énumération —$miss (un renommage exige un amendement de D-03, pas un test qui suit)"; return 1; }
+  # (b) ancrage nominal D-03, en ÉGALITÉ D'ENSEMBLE — cumulé à (a), jamais à sa place. L'égalité
+  # couvre d'un seul geste le nom MANQUANT (renommage : l'ensemble reste clos mais ne désigne plus
+  # la même chose) et le nom EN TROP, y compris une graphie qu'aucune liste noire n'aurait
+  # anticipée : c'est la lecture littérale de « sont exactement … — rien d'autre ».
+  expected="$(printf '%s\n' $T26_D03_FIELDS | LC_ALL=C sort -u)"   # non quoté : découpage voulu
+  if [ "$fields" != "$expected" ]; then
+    miss="$(LC_ALL=C comm -13 <(printf '%s\n' "$fields") <(printf '%s\n' "$expected") | tr '\n' ' ')"
+    extra="$(LC_ALL=C comm -23 <(printf '%s\n' "$fields") <(printf '%s\n' "$expected") | tr '\n' ' ')"
+    T26_WHY="l'ensemble mesuré des sous-champs n'est pas EXACTEMENT celui de D-03 — en trop : ${extra:-(rien)} · manquant(s) : ${miss:-(rien)} (un renommage comme un ajout exige un amendement de D-03, pas un test qui suit)"
+    return 1
+  fi
 
-  # (c) interdits ADR-030, sur l'ensemble MESURÉ puis sur tout le bloc (un champ « ajouté » après
-  # la borne fermante serait la même violation, contournée d'un pas).
-  bad="$(printf '%s\n' "$fields" | "$GREP" -E "$T26_FORBIDDEN_FIELDS" | tr '\n' ' ')"
-  [ -z "$bad" ] || { T26_WHY="l'énumération recopie la table du contrat interne amont (ADR-030) — $bad"; return 1; }
+  # (c) interdits ADR-030 hors énumération : DANS l'énumération, (b) les exclut déjà par
+  # construction — tout nom absent de D-03 y est refusé, interdit connu ou non. Ailleurs dans le
+  # bloc, aucun ensemble clos n'est définissable (la prose y nomme légitimement d'autres champs) :
+  # on retombe sur la liste noire, en le disant. Un champ « ajouté » après la borne fermante serait
+  # la même violation, contournée d'un pas.
   bad="$(printf '%s\n' "$blk" | t26_ids | "$GREP" -E "$T26_FORBIDDEN_FIELDS" | tr '\n' ' ')"
-  [ -z "$bad" ] || { T26_WHY="le bloc déclare, hors énumération, un champ du contrat interne amont (ADR-030) — $bad"; return 1; }
+  [ -z "$bad" ] || { T26_WHY="le bloc déclare, hors énumération, une graphie connue de la table du contrat interne amont (ADR-030) — $bad"; return 1; }
 
   parent="$(printf '%s\n' "$blk" | sed -n 's/.*champ optionnel `\([a-z][a-z0-9_]*\)`.*/\1/p')"
   [ -n "$parent" ] || { T26_WHY="champ porteur (« un champ optionnel \`…\` ») non déclaré"; return 1; }
@@ -2241,7 +2256,7 @@ t26_reprise_closed() { # <fichier de contrat>
 
 t26_reprise_closed "$CONTRACTS_FILE"
 case $? in
-  0) ok "T26 A : minimum de reprise — $T26_N sous-champs MESURÉS ($(printf "%s" "$T26_FIELDS" | tr "\n" " ")), énumération bornée et coupée pour de bon, les 4 noms de D-03 présents, aucun champ du contrat interne amont (ADR-030)" ;;
+  0) ok "T26 A : minimum de reprise — énumération bornée et coupée pour de bon, dont l'ensemble MESURÉ des $T26_N sous-champs ($(printf "%s" "$T26_FIELDS" | tr "\n" " ")) vaut EXACTEMENT celui de D-03 (égalité d'ensemble : rien de manquant, rien en trop) ; hors énumération, aucune des graphies connues de la table du contrat interne amont (ADR-030)" ;;
   2) ko "T26 A : bloc « Minimum de reprise » introuvable dans mission-contracts.md"; t26_ok=0 ;;
   *) ko "T26 A : minimum de reprise — $T26_WHY"; t26_ok=0 ;;
 esac
@@ -2359,7 +2374,7 @@ else
   ok "T26 E (DISCRIMINANT) : intitulé interne détecté par D ; 3 mutants du contrat (champ interdit, renommage D-03, borne dégrassée) détectés par A, chacun prouvé différent de l'original ; contrat réel tenu"
 fi
 
-[ "$t26_ok" -eq 1 ] && ok "T26 : minimum de reprise ($T26_N sous-champs mesurés, noms de D-03 ancrés, interdits ADR-030 exclus), halte de nœud, réponse par le manager, garde anti-duplication discriminante par mutation"
+[ "$t26_ok" -eq 1 ] && ok "T26 : minimum de reprise (ensemble mesuré = exactement les $T26_N noms de D-03), halte de nœud, réponse par le manager, garde anti-duplication discriminante par mutation"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
