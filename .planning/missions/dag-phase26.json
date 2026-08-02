@@ -166,6 +166,30 @@
         "manual/en/**"
       ],
       "status": "done"
+    },
+    {
+      "id": "degraissage",
+      "step": "D-7/D-8 dégel total: dégraissage README.md, README.fr.md, INSTALL.md vers le manuel",
+      "stage": "build",
+      "deps": [
+        "cloture-w9"
+      ],
+      "scope": [
+        "README.md",
+        "README.fr.md",
+        "INSTALL.md"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "juge-degraissage",
+      "step": "Juge frais: aucune information perdue, aucun lien mort dans le dépôt",
+      "stage": "verify",
+      "deps": [
+        "degraissage"
+      ],
+      "scope": [],
+      "status": "blocked"
     }
   ]
 }
