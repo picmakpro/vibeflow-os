@@ -771,6 +771,17 @@ Recent decisions affecting current work:
 
 ### Blockers/Concerns
 
+- **Phase 23 — 7 arbitrages humains en attente, la phase est GELÉE derrière eux** (mission du
+  2026-08-02). Le nœud `exec-01` est livré et gaté ; `revue-01` est `ready` mais non re-dispatché
+  (budget de boucle atteint). Les plans 23-02 à 23-08 restent `blocked`. Quatre décisions portent
+  sur la **doctrine** (fichiers gelés `mission-contracts.md`, `mission-flow.md`, `vf-coder.md`,
+  `vf-dev-manager.md`) : D-02 inerte (le désarmement du flag d'enchaînement crée la condition de son
+  propre ré-armement) · `workflow.auto_advance` jamais désarmé · le minimum de reprise ne transporte
+  pas la **réponse** humaine (boucle sur un gate `blocking-human`) · geler le nœud **ou** poser la
+  question, en mode autonome. Trois portent sur la **couverture de test** : rc=3 contraint la forme
+  rédactionnelle · porosité assumée de T25 · déclassement de T26 A′. Détail et options :
+  `.planning/missions/2026-08-02-phase-23-couplage-gsd.md`.
+
 - Migration package GSD `get-shit-done-cc` → `@opengsd/gsd-core` : milestone `gsd-migration` (VOC-02),
   ouvert et **en attente** — non bloquant pour vf-routing. Le go/no-go de la Phase 10 dépend de la
   maturité/parité du package cible sur npm — à vérifier en premier.

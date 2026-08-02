@@ -26,7 +26,8 @@
         "plugin/dev-orchestrator/agents/vf-dev-manager.md",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "ready"
+      "status": "ready",
+      "review_regime": "full"
     },
     {
       "id": "exec-02",
@@ -55,7 +56,8 @@
         "plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh",
         "plugin/dev-orchestrator/hooks/hooks.json"
       ],
-      "status": "blocked"
+      "status": "blocked",
+      "review_regime": "full"
     },
     {
       "id": "exec-03",
@@ -82,7 +84,8 @@
         "plugin/dev-orchestrator/references/GSD-PIPELINE.md",
         "plugin/dev-orchestrator/agents/vf-coder.md"
       ],
-      "status": "blocked"
+      "status": "blocked",
+      "review_regime": "full"
     },
     {
       "id": "exec-04",
@@ -111,7 +114,8 @@
         "plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh",
         "plugin/_internal/vibeflow-update.sh"
       ],
-      "status": "blocked"
+      "status": "blocked",
+      "review_regime": "full"
     },
     {
       "id": "audit-infra",
@@ -155,7 +159,8 @@
         "plugin/dev-orchestrator/agents/vf-dev-manager.md",
         "plugin/dev-orchestrator/references/GSD-PIPELINE.md"
       ],
-      "status": "blocked"
+      "status": "blocked",
+      "review_regime": "full"
     },
     {
       "id": "exec-06",
@@ -184,7 +189,8 @@
         "docs/ADR.md",
         "plugin/dev-orchestrator/references/mission-contracts.md"
       ],
-      "status": "blocked"
+      "status": "blocked",
+      "review_regime": "full"
     },
     {
       "id": "exec-07",
@@ -213,7 +219,8 @@
         "plugin/dev-orchestrator/references/mission-flow.md",
         "plugin/dev-orchestrator/references/mission-contracts.md"
       ],
-      "status": "blocked"
+      "status": "blocked",
+      "review_regime": "full"
     },
     {
       "id": "exec-08",
@@ -245,7 +252,8 @@
         "README.md",
         "README.fr.md"
       ],
-      "status": "blocked"
+      "status": "blocked",
+      "review_regime": "full"
     }
   ]
 }
