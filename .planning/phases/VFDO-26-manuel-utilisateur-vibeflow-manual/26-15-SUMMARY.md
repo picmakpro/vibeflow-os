@@ -76,12 +76,48 @@ Badges, triade de release (`VERSION`, `plugin/.claude-plugin/plugin.json`,
 `git diff --stat` confirme 3 fichiers modifiés seulement (`README.md`, `README.fr.md`,
 `plugin/consolidator/README.md`).
 
-## Commit
+## Commits
 
-`4b450bd` — "Comblement — dégraissage réel des README vers le manuel (Phase 26)", sur
-`feat/phase-26-manuel-utilisateur`. Un seul commit atomique (3 fichiers, portée unique).
+- `4b450bd` — "Comblement — dégraissage réel des README vers le manuel (Phase 26)" (3 fichiers :
+  `README.md`, `README.fr.md`, `plugin/consolidator/README.md`).
+- `b0a281b` — "Comblement — retire un artefact `</content>` en fin des deux README" (correctif de
+  revue, 2 fichiers).
 
-## Revue
+Les deux sur `feat/phase-26-manuel-utilisateur`.
 
-Dispatchée à `vf-reviewer` sur ce diff (3 fichiers). Verdict à intégrer par le manager /
-consigné en fin de rapport typé.
+## Revue (`vf-reviewer`, tour 1)
+
+Verdict : `gaps_found`.
+
+- **Bloquant, auto-fixé** — les deux README se terminaient par une ligne littérale `</content>`
+  (artefact d'outillage, aucun sens Markdown), visible sur la page GitHub publique du repo juste
+  après la licence. Confirmé par lecture directe des fichiers (`README.md:180`,
+  `README.fr.md:185`), corrigé au commit `b0a281b`. Après correctif : `README.md` = 179 lignes,
+  `README.fr.md` = 184 lignes (toujours dans la fourchette de gate 120-200).
+- **Majeur, hors périmètre — remonté au manager, PAS corrigé** : le diff de dégraissage a supprimé
+  deux blocs que **6 pages du manuel citent nommément comme source vivante et datée**, publiées au
+  commit `28ccf34` (avant ce comblement) :
+  - Le tableau « Efficiency, quantified » / « L'efficience, chiffrée » (ex-section 🤖 Missions
+    longues) est reproduit et daté du « 2026-08-01 » dans
+    `manual/en/06-reference/cost-and-models.md:80-96` et
+    `manual/fr/06-reference/couts-et-modeles.md:83-99`, avec la phrase : *« Si tu veux vérifier ce
+    chiffrage toi-même, `README.md` (racine du dépôt), section "Efficiency, quantified," est la
+    source »* — section qui n'existe plus après compression.
+  - Le tableau « Les 17 modules en détail » (ex-section 📦 Modules) est cité comme preuve d'une
+    confusion présente « au README racine » entre skills et commandes (`/vf-design`,
+    `/vf-sketch`) dans `manual/en/06-reference/commands.md:90-91`,
+    `manual/fr/06-reference/commandes.md:91-92`, `manual/en/06-reference/skills.md:107-109` et
+    `manual/fr/06-reference/skills.md:110-112` — le tableau qui portait cette confusion a été
+    entièrement retiré, l'affirmation ne pointe plus vers rien.
+
+  **Non corrigé** : la correction demanderait soit de rouvrir `manual/**` (explicitement
+  **INTERDIT en écriture** dans le périmètre de ce mandat), soit de réintroduire dans le README le
+  contenu que le même mandat demande de retirer — deux options qui se contredisent et qui
+  dépassent ma délégation. Remonté au manager comme point d'arbitrage (`ask-user`) : quelle page
+  gagne (README compressé vs exactitude datée du manuel), et qui porte l'édition de `manual/**`.
+
+Tous les autres axes de revue sont en **PASS** : les 17 liens du diff résolvent, parité stricte
+(12 sections `##`, même ordre), blocs figés (Installation, Confiance, Versioning à 8 entrées,
+Auteurs, Licence, badges) sans aucun diff, correctif du lien mort isolé et correct, cohérence
+linguistique FR/EN des passages ajoutés, contenu compressé substituable par les 6 pages du manuel
+liées pour les sections elles-mêmes (le vrai trou est la citation datée, pas le pointeur direct).
