@@ -1332,21 +1332,81 @@ fi
 # ---------------------------------------------------------------------------
 # T17 — Câblage du routage d'ingestion (AGENT.md + intent-routing.md)
 # ---------------------------------------------------------------------------
+# EXISTENCE → RELATION (revue du 2026-08-02). La forme précédente comptait séparément
+# `gsd-ingest-docs` et `ingestion-flow` sur le fichier ENTIER, puis concluait « ligne enrichie ».
+# Une « ligne enrichie » est pourtant une RELATION : la brique et sa doctrine sur la MÊME ligne
+# physique — c'est ce qui fait qu'un lecteur de la carte trouve l'une par l'autre. Séparer les deux
+# moitiés dans deux sections sans rapport laissait la sonde verte. Idiome de chaînage déjà employé
+# par T22 (ligne rouge --force, frontière vibeflow-os) : trois greps sur le MÊME flux.
+#
+# Contrepartie assumée, identique à celle de T22 : la mesure porte sur la ligne PHYSIQUE, donc elle
+# est sensible à un repli. C'est délibéré — replier le fichier (md_folded) rendrait « même ligne »
+# trivialement vrai et détruirait la propriété mesurée. Les deux cibles sont aujourd'hui des lignes
+# de tableau markdown, atomiques par construction.
+t17_enriched_line() { # <file> <motif ERE A> <motif ERE B> — vrai si UNE ligne porte les deux
+  "$GREP" -E -- "$2" "$1" 2>/dev/null | "$GREP" -qE -- "$3"
+}
+
 t17_ok=1
-if "$GREP" -q "ingestion-flow" "$AGENT_FILE" \
-   && ("$GREP" -q "gsd-ingest-docs" "$AGENT_FILE" || "$GREP" -q "gsd-import" "$AGENT_FILE"); then
+if t17_enriched_line "$AGENT_FILE" 'ingestion-flow' 'gsd-ingest-docs|gsd-import'; then
   :
 else
-  ko "T17 routage : AGENT.md sans ligne d'intention d'ingestion explicite"; t17_ok=0
+  ko "T17 routage : AGENT.md sans ligne d'intention d'ingestion explicite (doctrine et brique doivent tenir sur la MÊME ligne de la table)"; t17_ok=0
 fi
 if [ -f "$ROUTING" ]; then
-  routing_gsd=$("$GREP" -c "gsd-ingest-docs" "$ROUTING")
-  routing_iflow=$("$GREP" -c "ingestion-flow" "$ROUTING")
-  { [ "${routing_gsd:-0}" -ge 1 ] && [ "${routing_iflow:-0}" -ge 1 ]; } || { ko "T17 routage : intent-routing.md sans ligne enrichie (gsd-ingest-docs + ingestion-flow)"; t17_ok=0; }
+  t17_enriched_line "$ROUTING" 'gsd-ingest-docs' 'ingestion-flow' \
+    || { ko "T17 routage : intent-routing.md sans ligne enrichie (gsd-ingest-docs + ingestion-flow sur la MÊME ligne)"; t17_ok=0; }
 else
   ko "T17 routage : $ROUTING introuvable"; t17_ok=0
 fi
 [ "$t17_ok" -eq 1 ] && ok "T17 routage : AGENT.md + intent-routing.md câblent l'intention d'ingestion"
+
+# ---------------------------------------------------------------------------
+# T17b (DISCRIMINANT) — la « ligne enrichie » de T17 est mesurée en RELATION, pas en co-présence.
+# ---------------------------------------------------------------------------
+# Contrôle positif par SCISSION : sur chaque ligne portant les deux motifs, un retour à la ligne est
+# inséré JUSTE AVANT le second. Aucun token n'est retiré — les deux moitiés restent dans le fichier,
+# et c'est vérifié ici : c'est la partie qui prouve que la forme précédente (deux greps indépendants
+# sur le fichier entier) serait restée VERTE sur ce mutant. L'ancre de la scission est le TOKEN
+# mesuré lui-même, pas une tournure : une reformulation de la ligne de table ne la rend pas no-op,
+# et si elle le devenait le garde `cmp -s` le dit.
+T17B_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T17B_TMPDIR"
+t17b_ko=""
+t17b_split() { # <file src> <motif A> <motif B> <file dst> — coupe la ligne juste avant B
+  # La coupe tombe devant le motif le PLUS À DROITE des deux, quel que soit leur ordre de
+  # rédaction : couper devant le premier laisserait les deux moitiés du côté droit, et le mutant ne
+  # séparerait rien. Coupe > 1 exigée pour la même raison ; sinon on ne coupe pas et le garde
+  # `cmp -s` signale le no-op au lieu de le laisser passer pour vert.
+  awk -v a="$2" -v b="$3" '
+    {
+      pa = match($0, a); pb = match($0, b)
+      if (pa > 0 && pb > 0) {
+        cut = (pa > pb) ? pa : pb
+        if (cut > 1) { print substr($0, 1, cut - 1); print substr($0, cut); next }
+      }
+      print
+    }
+  ' "$1" > "$4"
+}
+t17b_case() { # <libellé> <file> <motif A> <motif B>
+  local mut="$T17B_TMPDIR/$(basename "$2").split"
+  t17b_split "$2" "$3" "$4" "$mut"
+  if cmp -s "$2" "$mut"; then
+    t17b_ko="$t17b_ko [$1 : mutant IDENTIQUE à l'original — aucune ligne ne portait les deux motifs, la scission n'a rien mordu (sonde à réancrer, ce n'est PAS un défaut de T17)]"
+    return
+  fi
+  { "$GREP" -qE -- "$3" "$mut" && "$GREP" -qE -- "$4" "$mut"; } \
+    || t17b_ko="$t17b_ko [$1 : un motif a disparu du mutant — ce n'est plus une scission, le cas ne prouve plus que la co-présence restait verte]"
+  t17_enriched_line "$mut" "$3" "$4" \
+    && t17b_ko="$t17b_ko [$1 : NON détecté — les deux moitiés séparées sur deux lignes passent encore pour une ligne enrichie]"
+}
+t17b_case "AGENT.md"         "$AGENT_FILE" 'ingestion-flow' 'gsd-ingest-docs'
+[ -f "$ROUTING" ] && t17b_case "intent-routing.md" "$ROUTING" 'gsd-ingest-docs' 'ingestion-flow'
+if [ -z "$t17b_ko" ]; then
+  ok "T17b (DISCRIMINANT) : la ligne d'intention d'ingestion est mesurée en RELATION (doctrine et brique sur la MÊME ligne) — sur les 2 cibles, la scission de la ligne en deux, sans retirer un seul token, fait rougir T17"
+else
+  ko "T17b (DISCRIMINANT) : la « ligne enrichie » n'est qu'une co-présence —$t17b_ko"
+fi
 
 # ---------------------------------------------------------------------------
 # Outillage commun T18/T19 — appartenance à une allowlist Agent(...), mesurée en RELATION
