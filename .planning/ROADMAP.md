@@ -1475,6 +1475,61 @@ est active** : une couverture verte peut donc masquer un geste mort. Deux issues
 marquer l'entrée comme conditionnelle — et dans les deux cas, **étendre le test à l'activation**
 (sinon le même trou se rouvre au prochain skill ajouté).
 
+**A9 — les workstreams : chantiers parallèles en `.planning/`, capacité native à 18 % de
+couverture.** Entré au lot le **2026-08-02**, à la suite de la **PR #27** (partition de `.planning`
+en workstreams dev/gouvernance, proposée par Willy, **revue en `CHANGES_REQUESTED`**). Le besoin est
+réel et démontré : `ROADMAP.md` et `STATE.md` sont **mono-position** et ne savent pas décrire deux
+chantiers simultanés — chaque avancée de l'un réécrit la position de l'autre.
+
+GSD porte la réponse nativement (`.planning/workstreams/<nom>/`, flag `--ws`, `bin/lib/workstream.cjs`,
+`gsd-tools workstream list` → `"mode": "workstream"`). **Mais la capacité est à moitié câblée en
+amont** : sur les **91 workflows** de gsd-core 1.9.0, **16 la connaissent, 37 codent en dur
+`.planning/ROADMAP.md` / `STATE.md` / `phases/`** (`add-phase`, `verify-phase`, `next`, `pr-branch`,
+`execute-plan`, `extract-learnings`, `complete-milestone`…). Couverture réelle : **18 %**. Adopter en
+l'état, c'est faire tourner le lab contre sa propre chaîne d'outils — le cas que l'**Iron Law 2**
+interdit (`conductor/AGENT.md:114`).
+
+Faits établis en bac à sable sur la PR #27 (worktree `c0908fd`, gsd-core 1.9.0), qui bornent
+l'arbitrage :
+
+- **Notre propre outillage est aveugle.** `check-dev-bootstrap.sh:28` cherche `.planning/ROADMAP.md`
+  à la racine → le `SessionStart` repasse de `[gsd-engine] phase 26 en cours` à `[bootstrap] feuille
+  de route absente`. `check-state-integrity.sh` (câblé `ci.yml:117` en Phase 21) sort **exit 2**.
+  `vf-dev-manager.md` lit les chemins racine en dur (7 occurrences) ; sur tout `plugin/`, **3
+  fichiers** mentionnent « workstream », tous des tables de routage.
+- **`/gsd-pr-branch` s'inverse.** Ses regex sont ancrées (`pr-branch.md:232-234`) :
+  `.planning/workstreams/dev/STATE.md` ne matche plus `STRUCTURAL` → reclassé **transient →
+  EXCLUDED**. Les commits de feuille de route disparaissent silencieusement des branches de PR.
+- **Le pointeur de workstream ne vit pas où on croit.** Dès qu'une clé de session résout, ce n'est
+  pas `.planning/active-workstream` mais
+  `os.tmpdir()/gsd-workstream-sessions/<sha1(chemin absolu du .planning)>/<clé>`
+  (`active-workstream-store.cjs:95-111`) : effacé au reboot, **et indexé sur le chemin absolu, donc
+  distinct par worktree, jamais hérité**. Sur cette machine `CLAUDE_SESSION_ID` n'est pas défini —
+  la clé effective est `CLAUDE_CODE_SSE_PORT`, un port recyclable par l'OS.
+- **Migration à conflit nul, donc à divergence invisible.** `git merge-tree` d'une branche de travail
+  post-partition → **exit 0** avec le dossier de phase en cours **orphelin à la racine** pendant que
+  le `STATE.md` du workstream le déclare courant. Git ne signale rien.
+
+**Le recouvrement à instruire est avec ADR-064, pas avec le moteur.** Le quick `260801-17w`
+(2026-08-01) a déjà tranché la concurrence multi-session par l'**isolation physique** — « un
+écrivain = un worktree », `check-branch-claim.sh` au `SessionStart`, claim de branche élargi —
+d'après `shanraisshan/claude-code-best-practice`. Les workstreams sont une **seconde réponse au même
+problème, conventionnelle** celle-là, et les deux se composent mal : le pointeur étant indexé sur le
+chemin du `.planning`, **chaque worktree ouvre sans workstream résolu**, et aucun agent `vf-*` ne
+sait passer `--ws`. Or M2 (lot MESURE) a établi que le parallélisme **inter-nœuds** de
+`vf-dev-manager` est le **seul effectif** sur ce runtime : le seul étage de parallélisme qui
+fonctionne est aussi celui que la partition fragilise le plus.
+
+**À trancher au plan — la question est ouverte, l'adoption n'est pas acquise :** (a) **adopter** les
+workstreams et payer la mise à niveau de notre couche (`check-dev-bootstrap.sh`,
+`check-state-integrity.sh`, `planning-context.sh` workstream-aware, `--ws` câblé dans les agents
+`vf-*`, gate sur le pointeur, CI étendue) ; (b) **refuser** et traiter les chantiers parallèles par
+jalons distincts dans une ROADMAP partagée, l'isolation restant physique par ADR-064 ; (c) **borner**
+— workstreams réservés à un usage où les 37 workflows aveugles ne sont jamais sollicités, ce qui
+demande de dire lesquels. Dans les cas (a) et (c), la **remontée upstream** des 37 workflows est le
+préalable, au même titre que la RFC de la Phase 18 et la voie 2 de M2. Condition commune aux trois :
+**aucune partition tant qu'une phase est en vol** (cf. divergence invisible ci-dessus).
+
 **Requirements**: TBD (à mapper au ledger pendant le plan)
 **Depends on:** Phase 23 — dépendance **doctrinale**, pas de fichiers : la 23 écrit la table des
 capabilities et la voie unique ; la 24 décide quoi activer dedans. Activer avant de savoir qui
