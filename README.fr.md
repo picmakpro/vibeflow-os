@@ -21,6 +21,11 @@ machine** vérifient — pas des promesses.
 
 ---
 
+📖 **Nouveau ici ?** Le [manuel utilisateur](./manual/README.md) t'accompagne pour installer,
+comprendre et faire tourner VibeFlow — sans jamais ouvrir `.planning/` ni `docs/`.
+
+---
+
 ## Le problème
 
 Les setups IA échouent à l'échelle pour trois raisons : le **context rot** (la qualité se

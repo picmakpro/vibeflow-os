@@ -21,6 +21,11 @@ not promises.
 
 ---
 
+📖 **New here?** The [User Manual](./manual/README.md) walks a human through installing,
+understanding and running VibeFlow — no `.planning/` or `docs/` required.
+
+---
+
 ## The problem
 
 AI coding setups fail at scale for three reasons: **context rot** (quality degrades as the
