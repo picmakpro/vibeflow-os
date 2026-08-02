@@ -131,6 +131,41 @@
         "manual/.tools/**"
       ],
       "status": "done"
+    },
+    {
+      "id": "portage-fr",
+      "step": "Parité tranchée: porter en FR les paragraphes présents côté EN uniquement (alignement par le haut)",
+      "stage": "build",
+      "deps": [
+        "slugs-en"
+      ],
+      "scope": [
+        "manual/fr/**",
+        "manual/toc.yml"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "juge-parite",
+      "step": "Juge frais: verdict de parité sémantique page à page FR vs EN",
+      "stage": "verify",
+      "deps": [
+        "portage-fr"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "libelles-en",
+      "step": "Reliquat du renommage: 34 pages EN affichent encore des noms de fichiers FR en libellé de lien",
+      "stage": "build",
+      "deps": [
+        "juge-parite"
+      ],
+      "scope": [
+        "manual/en/**"
+      ],
+      "status": "done"
     }
   ]
 }

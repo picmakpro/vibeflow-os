@@ -339,7 +339,54 @@ invisible. Ce n'est pas une tautologie (il échoue sur une vraie dérive) mais u
 
 ## 6. ESCALADES — deux décisions qui reviennent à Samuel
 
-### E-1 — Parité de contenu FR↔EN (finding `ask-user` de la revue)
+### E-1 — TRANCHÉ le 2026-08-02 : alignement **par le haut**, portage vers le FR
+
+**Décision de Samuel** : porter en FR les paragraphes présents côté EN uniquement. **Rien n'est coupé
+côté anglais.**
+
+**Résultat — l'estimation de la revue était basse.** Le portage a re-dérivé la liste depuis le
+contenu réel plutôt que de faire confiance au relevé antérieur : **31 pages sur 44** portaient un
+écart, contre 21 estimées. L'écart de +10 se concentre sur `03-modules`, que la revue déclarait à
+**0/6** et qui en comptait **3/6**. Consigne de re-dérivation justifiée après coup : les chemins EN
+cités par la revue étaient de surcroît **périmés** (renommage O-1 entre-temps).
+
+| Thème | Estimé | Réel |
+|---|---|---|
+| `01-get-started` | 2/7 | 4/7 |
+| `02-concepts` | 3/7 | 5/7 |
+| `03-modules` | 0/6 | **3/6** |
+| `04-development-cycle` | 3/6 | 4/6 |
+| `05-agent-team` | 5/6 | 6/6 |
+| `06-reference` | 2/6 | 3/6 |
+| `07-under-the-hood` | 6/6 | 6/6 |
+
+Aucun écart volontairement conservé : chaque paragraphe trouvé avait un sens transposable. Aucune
+page n'a franchi la bascule D-4 (max 136 lignes), donc aucune division et `manual/en/` + `toc.yml`
+non touchés par ce mandat.
+
+**Vérifié par un juge frais** en **couverture intégrale 44/44** (pas un échantillon), appariement lu
+dans `toc.yml` et jamais par ressemblance de chemin : **44/44 OK**, dans les deux sens (aucune
+addition FR unilatérale non plus). Verdict sur la langue : français natif, aucun calque relevé
+(sonde sur les faux amis classiques), ton tutoyant tenu, paragraphes insérés à leur place logique et
+non en bloc final.
+
+### E-1 bis — Reliquat du renommage O-1, détecté par le juge et corrigé
+
+Le juge a signalé, **hors de son périmètre**, un défaut que le gate ne pouvait pas voir : des pages
+EN affichaient encore des **noms de fichiers français en libellé de lien**. Recompté par moi :
+**34 pages**, pas « plusieurs ».
+
+Diagnostic : le manuel emploie dans les deux langues un **style maison** où le libellé visible d'un
+lien est le nom de fichier de la cible. Le renommage O-1 avait mis à jour les `href` mais **pas les
+libellés**. Aucun lien mort (C3 vert) — mais un lecteur anglophone lisait `[bundles-metier.md]`,
+ce qui **vidait de son sens le renommage lui-même**, dont c'était précisément l'objet.
+
+Traité comme **achèvement du mandat O-1**, pas comme un élargissement de périmètre : **73 libellés
+sur 26 pages**, chacun dérivé du basename de sa propre cible (jamais traduit à la main). Preuve de
+non-régression : **357 liens avant et après, `href` rigoureusement identiques** — seule la colonne
+libellé bouge. Vérifié indépendamment par moi : **0 mismatch** résiduel dans `manual/en/`.
+
+### E-1 (formulation d'origine, conservée pour la trace) — finding `ask-user` de la revue
 
 **21 pages EN sur 44 portent un ou deux paragraphes sans équivalent FR.** Jamais une inexactitude :
 ce sont des justifications méta ou des rappels de limite. Le lecteur EN reçoit systématiquement
