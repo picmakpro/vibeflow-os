@@ -2898,11 +2898,19 @@ T26_INTERNAL_RE="$T26_INTERNAL_MULTI_RE|Awaiting"
 # référence laissait la suite à 99 OK / 0 KO — la famille B6, restée ouverte sur ce motif.
 #
 # Ce qui est mesuré ici n'est donc PAS l'existence du token — c'est la POSITION DE RUBRIQUE : le
-# mot suivi du séparateur qui introduit son contenu (`:` ou `(`, la graphie de l'amont), ou porté
-# par un marqueur d'intitulé markdown (titre `#`, gras). De la prose anglaise qui contient le mot
-# reste verte (contrôle positif ET contrôle anti-faux-rouge en T26 D+). Aucun backtick dans le
-# motif : il est déréférencé entre guillemets doubles au point d'appel.
-T26_AWAITING_RE='Awaiting[*_]*[[:space:]]*[:(]|#[[:space:]]*[*_]*Awaiting([^[:alnum:]]|$)|[*][*][[:space:]]*Awaiting[[:space:]]*[*][*]'
+# mot suivi du séparateur qui introduit son contenu, ou porté par un marqueur d'intitulé markdown
+# (titre `#`, gras). De la prose anglaise qui contient le mot reste verte (contrôle positif ET
+# contrôle anti-faux-rouge en T26 D+). Aucun backtick dans le motif : il est déréférencé entre
+# guillemets doubles au point d'appel.
+#
+# SÉPARATEURS (N3) : la classe ne tenait que `:` et `(` — les deux graphies de l'AMONT anglophone —
+# et manquait le séparateur DOMINANT de ce dépôt, le tiret cadratin. « - Awaiting — ce que le
+# moteur attend… » échappait donc à la garde, c'est-à-dire exactement la graphie sous laquelle une
+# recopie s'écrirait ICI. Cadratin et demi-cadratin sont ajoutés en ALTERNATION, pas dans la classe
+# entre crochets : ce sont des caractères multi-octets, et une classe de crochets les découperait en
+# octets isolés. Le tiret ASCII est délibérément EXCLU : sans blanc obligatoire, il ferait rougir
+# un composé anglais (« Awaiting-user »), donc un faux rouge sur le flanc que D+ protège.
+T26_AWAITING_RE='Awaiting[*_]*[[:space:]]*([:(]|—|–)|#[[:space:]]*[*_]*Awaiting([^[:alnum:]]|$)|[*][*][[:space:]]*Awaiting[[:space:]]*[*][*]'
 
 # Sous-champs FIXÉS par D-03, tenus comme un ENSEMBLE CLOS : D-03 dit « sont exactement … — rien
 # d'autre », donc l'ensemble MESURÉ doit être ÉGAL à celui-ci, jamais seulement le contenir. Un
