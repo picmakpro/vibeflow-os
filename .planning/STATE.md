@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
 current_phase: 26
-current_phase_name: Manuel utilisateur VibeFlow (manual/) — cadrage capturé, mission d'équipe en cours (branche feat/phase-26-manuel-utilisateur)
-status: in_progress
-stopped_at: "Phase 26 — contexte capturé (26-CONTEXT.md, commit b9001b1), planification en cours. manual/ (bilingue FR+EN, hors git par amendement de mission — .git/info/exclude) reste le livrable réel, non versionné ; seuls les artefacts de suivi sous .planning/phases/VFDO-26-*/ sont committés. Reprendre par /gsd-plan-phase 26."
-last_updated: "2026-08-01T00:00:00.000Z"
-last_activity: 2026-08-01 (Phase 26 — cadrage capturé, plan en cours)
+current_phase_name: Manuel utilisateur VibeFlow (manual/) — livrée, PR ouverte (branche feat/phase-26-manuel-utilisateur)
+status: complete
+stopped_at: "Phase 26 CLOSE — 9/9 plans livrés. Le manuel existe sur disque (44 pages x 2 langues, 7 thèmes, gate manual/.tools/check-manual.sh exit 0) et reste VOLONTAIREMENT HORS GIT : exclusion par .git/info/exclude, JAMAIS par .gitignore (fichier versionné = trace publique). Seuls les artefacts de suivi sous .planning/ sont committés. Deux points ouverts tranchés par Samuel en cours de mission : O-1 (slugs anglais sous manual/en/, hypothèse H-1 du toc.yml levée, appariement FR/EN devenu explicite) et la parité de contenu FR/EN (alignement par le haut, 31 pages portées sur 44, vérifiées 44/44 par juge frais). Volet GELÉ, non livré : le dégraissage de README.md/README.fr.md/INSTALL.md (D-7, D-8) — pointer vers un dossier absent du dépôt casserait les liens des visiteurs ; à reprendre le jour où le manuel sera publié. Prochain geste humain : merger la PR (aucun merge fait, ADR-059)."
+last_updated: "2026-08-02T00:00:00.000Z"
+last_activity: 2026-08-02 (Phase 26 — clôture, manuel livré hors git, PR ouverte)
 
 # ⚠ Phase 21 close par sa gouvernance (plan 21-05), même patron que 20-07/c01f813 : 5/5 plans
 # livrés, vérification PASS PARTIEL 7/8 comblée (CI remise au vert — compteur de suites 44→45 —,
@@ -19,9 +19,9 @@ last_activity: 2026-08-01 (Phase 26 — cadrage capturé, plan en cours)
 # humain : merger la PR, puis `git tag -a v2.45.0` et `gh release create`.
 progress:
   total_phases: 26
-  completed_phases: 21
-  total_plans: 62
-  completed_plans: 62
+  completed_phases: 22
+  total_plans: 71
+  completed_plans: 71
 # ⚠ Compteurs curés À LA MAIN — PAS régénérés par `gsd-tools state` (ADR-063, cf.
 # plugin/dev-orchestrator/references/mission-contracts.md §STATE.md : toute invocation force
 # resync:true non désactivable et reproduirait la régression corrigée ici). Toute future mise à
@@ -516,10 +516,31 @@ Recent decisions affecting current work:
   vide** en CI. Disposition retenue : miroir `manual/fr/` + `manual/en/` (D-1), contre les suffixes
   `.fr.md` de la convention des deux README — **deux panels indépendants ont convergé** : le
   couplage langue↔chemin rend impossible la fuite silencieuse vers l'anglais qu'un `.fr` oublié
-  produirait, et réduit la sonde de parité à un `diff` de deux `find`. **Livré : 8 vagues sur 9**
-  (44 pages × 2 langues, gate `check-manual` exit 0). La vague 9 porte `autonomous: false` : la
-  phase n'est **pas** marquée terminée, deux décisions attendent l'humain (parité de contenu FR/EN
-  sur 21 pages, clôture + PR).
+  produirait, et réduit la sonde de parité à un `diff` de deux `find`. **Livré : 9 vagues sur 9**
+  (44 pages × 2 langues, gate `check-manual` exit 0).
+
+  **Deux points ouverts tranchés par Samuel avant clôture :**
+
+  - **O-1 — slugs anglais sous `manual/en/`** (dossiers ET fichiers : `01-get-started`,
+    `07-under-the-hood`, `your-first-lab.md`). La décision **lève l'hypothèse H-1** du `toc.yml`
+    (slugs identiques FR/EN), qui rendait le lien miroir déductible du seul chemin. L'appariement
+    FR↔EN devient une **donnée explicite** (`id` + `path_fr` + `path_en`) au lieu d'être déduit :
+    `build-nav.sh` le lit au lieu de le calculer, `check-manual.sh` C1 compare des identifiants
+    logiques et C2 vérifie une bijection par langue. Discrimination re-prouvée par mutation (page EN
+    supprimée → C1+C2 rouges ; page EN orpheline → C2 seul rouge, les deux contrôles sont bien
+    indépendants). Reliquat soldé dans la foulée : 73 libellés de liens sur 26 pages EN affichaient
+    encore des noms de fichiers **français** — les `href` avaient suivi le renommage, pas les
+    libellés, ce qui vidait de son sens le renommage lui-même.
+  - **Parité de contenu FR/EN — alignement PAR LE HAUT** : les paragraphes présents côté EN
+    uniquement sont portés en FR, rien n'est coupé côté anglais. Relevé **re-dérivé du contenu réel**
+    (les chemins de la revue étaient périmés depuis O-1) : **31 pages sur 44**, contre 21 estimées —
+    l'écart se concentre sur `03-modules`, annoncé à 0/6 et qui en comptait 3/6. Vérifié par un juge
+    frais en **couverture intégrale 44/44**, appariement lu dans `toc.yml` : 44/44 OK dans les deux
+    sens, français natif sans calque.
+
+  **Volet GELÉ, non livré et assumé** : le dégraissage de `README.md`/`README.fr.md`/`INSTALL.md`
+  (D-7, D-8). Pointer vers un dossier absent du dépôt casserait les liens des visiteurs — à reprendre
+  le jour où le manuel sera publié.
 
 - **2026-07-31 — L'anti-triche P12 est garanti par un gate transverse, pas par les suites de
   module** (mission de clôture des reliquats Phase 20, WINDOWS #1). `team-kernel.md:23` affirmait
