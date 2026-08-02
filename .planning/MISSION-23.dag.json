@@ -14,7 +14,7 @@
         "plugin/dev-orchestrator/agents/vf-dev-manager.md",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "revue-01",
@@ -29,7 +29,7 @@
         "plugin/dev-orchestrator/agents/vf-dev-manager.md",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "blocked",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -45,7 +45,7 @@
         "plugin/dev-orchestrator/hooks/hooks.json",
         ".planning/config.json"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "revue-02",
@@ -67,7 +67,8 @@
       "step": "23-03 Lacune 3 — doctrine de flags de cycle (GSD-PIPELINE §9)",
       "stage": "exec",
       "deps": [
-        "revue-02"
+        "revue-02",
+        "arbitrage-O8"
       ],
       "scope": [
         "plugin/dev-orchestrator/references/GSD-PIPELINE.md",
@@ -320,6 +321,16 @@
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
       "status": "done"
+    },
+    {
+      "id": "arbitrage-O8",
+      "step": "ARBITRAGE HUMAIN — O-8 : A-1bis démentie sur ses faits (--auto lance discuss→plan→execute). Bloque 23-03 par construction (la Lacune 3 ne peut être écrite sans savoir ce qu'un --auto auto-approuve). O-9 et O-10 à trancher au même passage.",
+      "stage": "human",
+      "deps": [
+        "revue-01"
+      ],
+      "scope": [],
+      "status": "ready"
     }
   ]
 }

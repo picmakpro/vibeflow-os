@@ -174,6 +174,34 @@ aujourd'hui** (`` `tools:` `` est un champ de frontmatter YAML cité en prose, p
 `statut` est un champ de **premier niveau** ADR-053, pas un sous-champ de `reprise` — l'accepter
 rouvrirait la liste à mailles finies que le déclassement avait justement fermée.
 
+## O-9 — `T25_UNAVAIL_RE` impose de recopier une conduite qui a déjà un foyer (ADR-030)
+
+**Même famille qu'O-1, à verser au même arbitrage.** `mission-contracts.md:275-278` porte déjà le
+foyer : « **Prérequis non garanti** : si `gsd_run` ne peut pas se résoudre … jamais de blocage
+silencieux ». Or le correctif F3 a étendu `T25_UNAVAIL_RE` de sorte qu'il exige le token
+`introuvable` **dans chaque agent** — donc **deux voix pour une conduite qui en a déjà une**, à
+deux clauses d'un texte qui écrit « ne la recopie jamais ici (ADR-030) ».
+
+**La question** : le gate doit-il exiger la **conduite** dans chaque agent, ou seulement le
+**renvoi** vers son foyer ? C'est la même tension pointeur nu / paraphrase que O-1 — les deux
+devraient être tranchées ensemble, et d'une seule façon.
+
+## O-10 — `T26_ANSWER_RE` refuse l'infinitif dans les DEUX sens (borne fail-closed assumée)
+
+La correction de N1 (régression introduite puis fermée au 3ᵉ tour) retire l'infinitif du motif :
+une **prohibition** ne peut plus se faire passer pour l'affirmation qu'elle nie. Corollaire assumé
+et écrit dans le motif : une **affirmation** à l'infinitif (« c'est au manager **de répondre aux**
+attentes humaines ») **rougit elle aussi**.
+
+**Choix fail-closed délibéré** : une forme dont la garde ne sait pas lire la polarité se refuse,
+elle ne s'accepte pas au bénéfice du doute. L'accepter demanderait une **sonde de polarité**, pas
+un élargissement de motif — c'est précisément l'élargissement qui avait créé la régression N1
+(une prohibition passait verte, rouge à `d4f7ba3`, verte à `cf3223a`).
+
+**À trancher** : garder la borne, ou financer une sonde de polarité.
+
+---
+
 ## Rappel — écarté pour ce plan, reversable au débat
 
 La **3ᵉ voie d'A-1bis** (le manager porte le cadrage lui-même, il a `AskUserQuestion`) supprime le

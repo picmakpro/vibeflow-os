@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-02T19:17:00+02:00",
+  "timestamp": "2026-08-02T23:05:00+02:00",
   "phase": "23",
   "phase_name": "Couplage explicite au moteur GSD — capabilities, flags et voie unique",
   "phase_dir": ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-",
@@ -9,46 +9,63 @@
   "plan": 1,
   "task": 1,
   "total_tasks": 8,
-  "status": "paused",
-  "paused_reason": "Limite de session atteinte (reset 19h40 CEST le 2026-08-02) — le manager ET son reviewer ont été coupés par le quota, pas par un défaut de leur travail.",
+  "status": "blocked_on_human",
+  "paused_reason": "23-01 est CLOS sur toute sa part mécanique (revue en régime plein + 2 tours de comblement, tout prouvé par mutation). Il reste UN point bloquant qui appartient à Samuel : O-8 — la décision humaine A-1bis est démentie sur ses faits. Aucun agent n'a le droit de la retrancher (ADR-031). C'est la 2e fois que D-02 repose sur une prémisse fausse.",
   "mission_mode": "vf-dev-manager (équipe) — DAG dans .planning/MISSION-23.dag.json",
   "completed_tasks": [
-    {"id": 1, "name": "exec-01 — 23-01 Lacune 6, taxonomie de checkpoint GSD (clos après 4 revues et 5 tours de comblement)", "status": "done", "commit": "4b34cac"},
-    {"id": 2, "name": "exec-01a — déport du bloc contrôle de flux (A-4) vers references/ : densité 249 → 235 lignes", "status": "done"},
-    {"id": 3, "name": "exec-01b — A-1bis : vf-coder garde --auto et désarme adjacent", "status": "done"},
-    {"id": 4, "name": "exec-01c — B6 garde ADR-030 insensible au wrap + B4 sonde A-4 sur les trois cibles", "status": "done"},
-    {"id": 5, "name": "exec-01c2 — couverture du 3e foyer : la paraphrase A-4 de vf-dev-manager", "status": "done"},
-    {"id": 6, "name": "exec-01d — re-dérivation et fermeture de B2, B3, B7, M1", "status": "done"}
+    {"id": 1, "name": "exec-01 — 23-01 Lacune 6, taxonomie de checkpoint GSD", "status": "done", "commit": "4b34cac"},
+    {"id": 2, "name": "revue-01 — revue en régime plein sur le diff consolidé (36 mutations : 31 de violation, 5 contrôles licites). B4/B5/B6/O-1 prouvés fermés, 8 findings neufs", "status": "done", "commit": "183486f"},
+    {"id": 3, "name": "exec-01 tour 2 — comblement F2, F3, F4, F5, F6, F8 (F7 no-op, F1 gelé)", "status": "done", "commit": "6bccc88"},
+    {"id": 4, "name": "revue-01 tour 2 — re-revue ciblée, mutations RE-JOUÉES par le reviewer (23 exécutions, 4 contre-épreuves sur d4f7ba3 matérialisé). A trouvé N1 : le correctif F5 avait OUVERT un trou en en fermant un autre", "status": "done"},
+    {"id": 5, "name": "exec-01 tour 3 — N1, N2, N3 fermés, chacun prouvé DANS LES DEUX SENS (accepte le licite, refuse le fautif)", "status": "done", "commit": "5baf647"}
   ],
   "remaining_tasks": [
-    {"id": 7, "name": "revue-01 — revue en régime plein sur le diff consolidé de 23-01 (COUPÉE EN COURS par le quota, à relancer)", "status": "in_progress"},
-    {"id": 8, "name": "23-02 — check-gsd-config.sh + hooks + config.json", "status": "not_started"},
-    {"id": 9, "name": "23-03 — Lacune 3 : doctrine de flags de cycle", "status": "not_started"},
-    {"id": 10, "name": "23-04 — table capabilities/hooks générée", "status": "not_started"},
-    {"id": 11, "name": "audit-infra — engine install + hooks + scripts gates", "status": "not_started"},
-    {"id": 12, "name": "23-05 — voie unique d'invocation (Lacune 5)", "status": "not_started"},
-    {"id": 13, "name": "23-06 — disjonction hooks moteur vs étages VibeFlow (Lacune 1, ADR)", "status": "not_started"},
-    {"id": 14, "name": "23-07 — budgets de boucle additionnés + briques dormantes", "status": "not_started"},
-    {"id": 15, "name": "23-08 — gouvernance : bump MODULE, README, CHANGELOG, gates verts (PAS la release racine)", "status": "not_started"},
-    {"id": 16, "name": "revue-08 — revue finale + cohérence de phase, puis PR", "status": "not_started"}
+    {"id": 6, "name": "arbitrage-O8 — ARBITRAGE HUMAIN, seul Samuel. Bloque 23-03 par construction", "status": "awaiting_human"},
+    {"id": 7, "name": "23-02 — check-gsd-config.sh + hooks + config.json (LANÇABLE sans attendre Samuel, périmètre disjoint)", "status": "ready"},
+    {"id": 8, "name": "23-03 — Lacune 3 : doctrine de flags de cycle (BLOQUÉ par arbitrage-O8)", "status": "blocked"},
+    {"id": 9, "name": "23-04 — table capabilities/hooks générée", "status": "blocked"},
+    {"id": 10, "name": "audit-infra — engine install + hooks + scripts gates", "status": "blocked"},
+    {"id": 11, "name": "23-05 — voie unique d'invocation (Lacune 5) — c'est ICI que la voie 1 d'O-8 doit être instruite si Samuel la retient", "status": "blocked"},
+    {"id": 12, "name": "23-06 — disjonction hooks moteur vs étages VibeFlow (Lacune 1, ADR)", "status": "blocked"},
+    {"id": 13, "name": "23-07 — budgets de boucle additionnés + briques dormantes", "status": "blocked"},
+    {"id": 14, "name": "23-08 — gouvernance : bump MODULE, README, CHANGELOG (JAMAIS la release racine)", "status": "blocked"},
+    {"id": 15, "name": "revue-08 — revue finale + cohérence de phase, puis PR (autorisée d'avance)", "status": "blocked"}
   ],
-  "blockers": [],
+  "blockers": [
+    {
+      "id": "O-8",
+      "severity": "bloquant",
+      "summary": "A-1bis est démentie sur ses faits : `--auto` sur gsd-discuss-phase ne pose pas seulement le chain flag, il enchaîne discuss → plan → execute (chain.md étape 5, l. 45-61 → Skill(gsd-plan-phase --auto)). Le désarmement « adjacent » exigé par A-1bis s'exécute donc APRÈS tout le pipeline, et T25b certifie une adjacence TEXTUELLE qui ne borne aucune fenêtre RUNTIME.",
+      "portee_reelle": "Bornée : checkpoints.md règle 6 protège les gates blocking-human, jamais auto-approuvés. C'est la règle 5 qui s'applique — pendant plan et execute, human-verify AUTO-APPROUVE et decision AUTO-SÉLECTIONNE la première option. Ce n'est donc PAS une violation ADR-031 sur le gate que 23-01 construit ; c'est une mission qui déroule plan et execute en autonome sans l'avoir voulu.",
+      "verifie_par": "reviewer, puis re-vérifié directement par le manager sur ~/.claude/gsd-core/workflows/discuss-phase/modes/chain.md et references/checkpoints.md",
+      "consigne_dans": "23-ARBITRAGES-OUVERTS.md §O-8 (avec les 3 voies chiffrées)"
+    }
+  ],
   "async_jobs": [],
   "human_actions_pending": [
     {
-      "action": "Trancher les arbitrages ouverts O-1 à O-7 et les points 5-7 réinstruits",
-      "context": "Consignés et chiffrés dans 23-ARBITRAGES-OUVERTS.md (commits e16cc72 et 277a0a4). Aucun n'est bloquant pour la suite du DAG — ils portent sur le périmètre des gates, pas sur la doctrine.",
+      "action": "O-8 — trancher : A-1bis tombe-t-elle à son tour ? Voie 1 (le manager porte le cadrage, il a AskUserQuestion — à instruire en 23-05) · voie 2 (workflow.discuss_mode : impasse déjà constatée) · voie 3 (statu quo assumé, en retirant à T25b une promesse qu'il ne tient pas).",
+      "blocking": true
+    },
+    {
+      "action": "O-9 — T25_UNAVAIL_RE impose de recopier dans chaque agent une conduite dont mission-contracts.md:275-278 est le foyer (tension ADR-030). Même famille qu'O-1 : à trancher AVEC lui, et d'une seule façon.",
+      "blocking": false
+    },
+    {
+      "action": "O-10 — borne fail-closed assumée : l'infinitif est refusé dans les deux sens. L'accepter demanderait une sonde de polarité, pas un élargissement de motif (c'est l'élargissement qui avait créé la régression N1).",
+      "blocking": false
+    },
+    {
+      "action": "O-1..O-7 et points 5-7 réinstruits — inchangés depuis la session précédente, non bloquants.",
       "blocking": false
     }
   ],
   "decisions": [
-    {"decision": "A-1bis (révise A-1, prémisse fausse) — vf-coder garde --auto et désarme le flag adjacent à l'armement", "rationale": "Sur gsd-core 1.9.0 aucun drapeau n'est à la fois non interactif, producteur de CONTEXT.md et sans chain flag ; --assumptions n'écrit rien et bloque. Coût en lignes sur vf-coder (marge large) et non sur le manager.", "phase": "23"},
-    {"decision": "A-2 — workflow.auto_advance désarmé dans la forme de A-1bis", "rationale": "Second déclencheur de la règle 5 amont, absent de tout plugin/", "phase": "23"},
-    {"decision": "A-3 — le minimum de reprise transporte la réponse humaine ET la table des tâches faites", "rationale": "Casse le ping-pong sur gate blocking-human ; l'interdiction ADR-030 est levée pour ce cas, le distinguo est écrit", "phase": "23"},
-    {"decision": "A-4 — le mode départage gel et question : autonome ⇒ gel du nœud, supervisé ⇒ poser la question", "rationale": "Sans qualificatif de mode, un agent autonome pouvait répondre lui-même à une attente humaine (violation ADR-031)", "phase": "23"},
-    {"decision": "PR autorisée d'avance à la clôture ; release racine réservée à l'humain", "rationale": "Autorisation de Samuel du 2026-08-02, mais T-23-08-01 gate machine : aucun fichier de version racine dans le diff de branche, aucun tag créé par un agent", "phase": "23"}
+    {"decision": "A-1bis, A-2, A-3, A-4 restent les décisions écrites — A-1bis est CONTESTÉE PAR LES FAITS (O-8) mais n'a PAS été retranchée par un agent", "rationale": "ADR-031. A-1 avait déjà été tranchée sur une prémisse fausse ; c'est parce qu'un agent a refusé de passer outre qu'on l'a rattrapée", "phase": "23"},
+    {"decision": "Mission ARRÊTÉE sur O-8 plutôt que poursuivie sur 23-02", "rationale": "23-02 est de périmètre disjoint et techniquement lançable, mais la réponse à O-8 peut déplacer la sémantique des clés de config que check-gsd-config.sh gate. Surfacer la question vaut mieux qu'un demi-23-02 à refaire", "phase": "23"},
+    {"decision": "PR autorisée d'avance à la clôture ; release racine réservée à l'humain", "rationale": "T-23-08-01 vérifié machine à ce jour : aucun des 3 fichiers de version racine dans le diff de branche, aucun tag créé (v2.46.0 pointe sur le merge-base 69ca0ec, il préexiste)", "phase": "23"}
   ],
   "uncommitted_files": [],
-  "next_action": "Relancer un vf-dev-manager après 19h40 CEST : reprendre le nœud revue-01 (revue en régime plein sur le diff consolidé de 23-01), puis ouvrir exec-02 et dérouler le DAG.",
-  "context_notes": "exec-01 est CLOS après 4 revues et 5 tours de comblement. Suite à 99 OK / 0 KO / 0 SKIP. Densité vf-dev-manager.md redescendue de 249 à 235 lignes grâce au déport du bloc A-4 vers references/ — le bloquant structurel est levé. 6 nœuds done, revue-01 running (coupée), 15 blocked. Le worktree est propre, le driver-lock libéré. Attention : le compteur de tests a menti quatre fois sur cette phase — ne jamais conclure au vert sur le seul nombre, exiger la discriminance par mutation."
+  "next_action": "Poser O-8 à Samuel. Sa réponse débloque 23-03 → 23-04 → 23-05. En attendant, 23-02 est lançable seul (nœud `exec-02`, déjà `ready`) si l'on accepte le risque de reprise décrit ci-dessus.",
+  "context_notes": "23-01 : 3 tours d'exécution, 2 tours de revue, TOUT prouvé par mutation. Suite à 102 OK / 0 KO / 0 SKIP — mais le compteur a menti CINQ fois sur cette phase, il ne vaut RIEN comme verdict. Le 5e mensonge est instructif : le correctif F5 fermait un faux rouge en élargissant une regex à l'infinitif, ce qui laissait une PROHIBITION satisfaire une assertion exigeant une AFFIRMATION (rouge à d4f7ba3, vert à cf3223a) — un correctif peut fermer un trou en en ouvrant un autre, d'où l'exigence de prouver toute regex touchée DANS LES DEUX SENS. Densité : vf-dev-manager.md 235/250 (marge préservée, les 7 plans restants touchent tous cet agent), vf-coder.md 94/250. OUTILLAGE : `grep` est proxifié et TRONQUE silencieusement (31 lignes rendues sur 102) ; `diff` a déjà rendu « files are identical » sur des fichiers différents — extraction en awk, comparaison en comm sur listes matérialisées, `rtk proxy` pour le brut. ATTENTION AVANT 23-08 : origin/main a avancé (Phase 26 : manual/, README.md, README.fr.md, INSTALL.md). Les compteurs README de 23-08 doivent être recalés APRÈS synchronisation avec main, sinon ils seront faux au merge."
 }
