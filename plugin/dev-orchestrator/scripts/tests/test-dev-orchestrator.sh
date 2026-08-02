@@ -3102,5 +3102,116 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# T27b (B4, DISCRIMINANT) — l'exigence d'A-4 tient sur les TROIS cibles de doctrine, pas sur le
+# seul foyer.
+#
+# CE QUE CE GATE FERME. T27 mesure (a) (b) (c) DANS le segment `human_needed` du bloc « Verdict
+# d'étape » de mission-flow.md. Une clause contredisant A-4 DE FACE — « en mode **autonome**,
+# c'est le manager qui **répond aux attentes humaines** », ou une branche de gel qualifiée
+# « superviser » — écrite dans mission-contracts.md laissait la suite à 92 OK / 0 KO. La sonde
+# stricte existait ; elle n'était simplement pas ATTEINTE sur 2 cibles sur 3. Même défaut et même
+# remède que T24 a fini par recevoir pour D-01.
+#
+# RÉPARTITION, et pourquoi elle n'est pas arbitraire. (a-présence) et (b) sont des exigences de
+# PRÉSENCE : la règle doit être écrite quelque part, et une seule fois (ADR-030, une seule voix) —
+# les exiger de chaque fichier ferait rougir toute la doctrine pour n'avoir pas répété le foyer.
+# Elles restent donc ancrées sur mission-flow.md §Pattern C, dans T27. L'EXCLUSION, elle, ne se
+# satisfait d'aucun foyer : une clause qui contredit A-4 ne devient pas licite parce qu'elle est
+# écrite ailleurs. C'est elle — plus l'interdiction de la clause MUETTE sur le mode, qui est le
+# défaut d'origine littéral d'A-4 — qui balaie toute la doctrine du module ici.
+#
+# CIBLES : module_md_targets (agents d'équipe + références résolues), jamais un glob en dur. Les
+# trois cibles nommées par A-4 sont en outre vérifiées PRÉSENTES dans l'ensemble balayé : sans
+# cela, un déport futur — il y en a déjà eu un sur cette phase — sortirait une cible du balayage
+# sans qu'un seul KO ne le dise.
+# ---------------------------------------------------------------------------
+t27b_ok=1
+T27B_WHY=""
+t27_no_crossed_clause() { # <file> — 0 = rien à redire · 1 = clause fautive ($T27B_WHY)
+  local clauses hits
+  T27B_WHY=""
+  # Clause = segment borné par « ; » et « · » DANS UN BLOC markdown (ancre « . » = tous les
+  # blocs) — jamais le fichier d'un bout à l'autre, qui rattacherait le mode d'une section à la
+  # disposition d'une autre.
+  clauses="$(md_blocks_matching "$1" '.' | t27_clauses)"
+  hits="$(printf '%s\n' "$clauses" | "$GREP" -E "$T27_ASK_RE" | "$GREP" -E 'mode[[:space:]]+[*]*autonome' \
+          | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | tr '\n' '|')"
+  [ -z "$hits" ] || { T27B_WHY="une clause rattache la RÉPONSE à l'attente humaine au mode AUTONOME — l'utilisateur y est absent par définition, y répondre viole ADR-031 : « $hits »"; return 1; }
+  hits="$(printf '%s\n' "$clauses" | "$GREP" -E "$T27_FREEZE_RE" | "$GREP" -E 'mode[[:space:]]+[*]*superviser' \
+          | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | tr '\n' '|')"
+  [ -z "$hits" ] || { T27B_WHY="une clause rattache le GEL du nœud au mode SUPERVISER — le checkpoint humain y est disponible, geler priverait la session de sa réponse : « $hits »"; return 1; }
+  hits="$(printf '%s\n' "$clauses" | "$GREP" -E "$T27_ASK_RE|$T27_FREEZE_RE" | "$GREP" -vE "$T27_MODE_RE" \
+          | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | tr '\n' '|')"
+  [ -z "$hits" ] || { T27B_WHY="une clause dispose d'une attente humaine SANS qualificatif de mode — le défaut d'origine d'A-4, littéralement : « $hits »"; return 1; }
+  return 0
+}
+
+t27b_ko=""
+t27b_scanned=0; t27b_seen_flow=0; t27b_seen_contracts=0; t27b_seen_devmgr=0
+while IFS= read -r t27b_f; do
+  [ -n "$t27b_f" ] || continue
+  t27b_scanned=$((t27b_scanned + 1))
+  case "$t27b_f" in
+    "$MFLOW")          t27b_seen_flow=1 ;;
+    "$CONTRACTS_FILE") t27b_seen_contracts=1 ;;
+    "$DEVMGR")         t27b_seen_devmgr=1 ;;
+  esac
+  t27_no_crossed_clause "$t27b_f" || t27b_ko="$t27b_ko [$(basename "$t27b_f") : $T27B_WHY]"
+done < <(module_md_targets)
+[ "$t27b_scanned" -gt 0 ] \
+  || t27b_ko="$t27b_ko [balayage : ZÉRO fichier de doctrine ouvert — un vert à vide n'est pas une garantie]"
+[ "$t27b_seen_flow" -eq 1 ] \
+  || t27b_ko="$t27b_ko [mission-flow.md HORS du balayage — la cible FOYER d'A-4 n'est pas mesurée]"
+[ "$t27b_seen_contracts" -eq 1 ] \
+  || t27b_ko="$t27b_ko [mission-contracts.md HORS du balayage — c'est LA cible sur laquelle une clause contredisant A-4 passait verte (B4)]"
+[ "$t27b_seen_devmgr" -eq 1 ] \
+  || t27b_ko="$t27b_ko [vf-dev-manager.md HORS du balayage — la cible qui porte le renvoi vers le foyer]"
+
+# CONTRÔLE POSITIF, CIBLE PAR CIBLE. La clause est AJOUTÉE en fin de fichier — aucun token n'est
+# retiré, aucune ancre existante n'est touchée, donc le mutant ne peut pas « détruire ce qu'il
+# prétend mesurer ». Une cible qui resterait verte est un échec du nœud, pas un détail : c'est le
+# mode d'échec exact que B4 décrit.
+T27B_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T27B_TMPDIR"
+T27B_ASK_AUTO="- **Contrôle de flux (clause injectée)** : en mode **autonome**, c'est le manager qui **répond aux attentes humaines** du moteur et il pose la question."
+T27B_GEL_SUP="- **Contrôle de flux (clause injectée)** : en mode **superviser**, GELER le nœud porteur (halte de nœud, jamais de mission)."
+T27B_MUETTE="- **Contrôle de flux (clause injectée)** : le manager **répond aux attentes humaines** du moteur et il pose la question."
+# Rédaction CORRECTE de la même disposition : elle doit rester VERTE. Un gate qui punit une
+# clause bien qualifiée ferait taire la doctrine au lieu de la tenir.
+T27B_LICITE="- **Contrôle de flux (clause injectée)** : en mode **superviser**, le manager **répond aux attentes humaines** du moteur et il pose la question ; en mode **autonome**, GELER le nœud porteur (halte de nœud, jamais de mission)."
+
+t27b_mut_n=0
+t27b_assert_mutant_red() { # <libellé> <fichier cible> <clause injectée>
+  local mut
+  t27b_mut_n=$((t27b_mut_n + 1))
+  mut="$T27B_TMPDIR/mutant-$t27b_mut_n.md"
+  { cat "$2"; printf '\n%s\n' "$3"; } > "$mut"
+  if cmp -s "$2" "$mut"; then
+    t27b_ko="$t27b_ko [$1 : mutant IDENTIQUE à l'original — la clause n'a pas été injectée, rien n'a été mesuré]"
+    return
+  fi
+  t27_no_crossed_clause "$mut" \
+    && t27b_ko="$t27b_ko [$1 : NON détecté — une clause qui contredit A-4 DE FACE reste verte sur cette cible]"
+}
+for t27b_pair in "mission-flow.md:$MFLOW" "mission-contracts.md:$CONTRACTS_FILE" "vf-dev-manager.md:$DEVMGR"; do
+  t27b_name="${t27b_pair%%:*}"; t27b_path="${t27b_pair#*:}"
+  if [ ! -f "$t27b_path" ]; then
+    t27b_ko="$t27b_ko [$t27b_name introuvable — cible d'A-4 non mesurable]"; continue
+  fi
+  t27b_assert_mutant_red "$t27b_name : QUESTION rattachée au mode autonome"  "$t27b_path" "$T27B_ASK_AUTO"
+  t27b_assert_mutant_red "$t27b_name : GEL rattaché au mode superviser"      "$t27b_path" "$T27B_GEL_SUP"
+  t27b_assert_mutant_red "$t27b_name : clause MUETTE sur le mode"            "$t27b_path" "$T27B_MUETTE"
+done
+T27B_LICIT_FILE="$T27B_TMPDIR/licite-clause-bien-qualifiee.md"
+{ cat "$MFLOW"; printf '\n%s\n' "$T27B_LICITE"; } > "$T27B_LICIT_FILE"
+t27_no_crossed_clause "$T27B_LICIT_FILE" \
+  || t27b_ko="$t27b_ko [FAUX ROUGE : une clause CORRECTEMENT qualifiée (question ⇒ superviser, gel ⇒ autonome) est rejetée — $T27B_WHY]"
+
+if [ -n "$t27b_ko" ]; then
+  ko "T27b (B4, DISCRIMINANT) : l'exigence d'A-4 n'est pas tenue sur les trois cibles —$t27b_ko"; t27b_ok=0
+else
+  ok "T27b (B4, DISCRIMINANT) : l'EXCLUSIVITÉ A-4 est mesurée sur les $t27b_scanned .md de doctrine du module — les TROIS cibles nommées (mission-flow.md, mission-contracts.md, vf-dev-manager.md) vérifiées PRÉSENTES dans le balayage —, 9 mutants font rougir l'assertion (question⇒autonome, gel⇒superviser, clause muette, injectés dans CHACUNE des trois), 1 clause correctement qualifiée reste verte"
+fi
+
+# ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
 [ "$fail" -eq 0 ]
