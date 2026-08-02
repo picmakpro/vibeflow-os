@@ -41,142 +41,56 @@ le contexte), **rien n'est « fait » sans preuve machine** (tests, gates, juges
 
 ## 🔁 Le cycle dev — spec-driven
 
-Dis _« ajoute l'auth Google »_ : l'agent `vibeflow-dev` détecte l'intention et invoque la
-brique outillée (chaîne GSD). Chaque étape **laisse un artefact sur disque** — le contexte
-peut mourir, le projet continue.
+Dis _« ajoute l'auth Google »_ : l'agent `vibeflow-dev` détecte l'intention et déroule le
+pipeline GSD — cadrage, plan vérifié, exécution atomique, juges read-only — en laissant un
+artefact sur disque à chaque étape, pour que le contexte puisse mourir sans que le projet
+en pâtisse.
 
-```mermaid
-flowchart LR
-    A["🗣 Intention<br/><i>« ajoute l'auth Google »</i>"] --> B["📋 Cadrage<br/>spec + décisions<br/><code>CONTEXT.md</code>"]
-    B --> C["🗺 Plan vérifié<br/>plan-checker en boucle<br/><code>PLAN.md</code>"]
-    C --> D["⚙️ Exécution<br/>commits atomiques<br/>contextes frais"]
-    D --> E["✅ Recette ∥ Revue<br/>juges read-only<br/>en parallèle"]
-    E -->|gaps| D
-    E -->|preuve verte| F["🚀 Ship<br/>PR + état à jour<br/><code>STATE.md</code>"]
-```
-
-- **Cadrage avant plan, preuve avant done** : un critère d'UI mobile n'est pas « fait » tant
-  qu'un flow Maestro n'est pas passé sur simulateur — pas juste un test unitaire vert.
-- **Recherche doc avant debug** (ADR-045) : un bug de lib se cherche dans les issues et
-  release notes avant de tâtonner.
-- **Le juge n'est jamais l'auteur** : revue et audit tournent dans des agents **sans droit
-  d'écriture** — cloisonnement par les tools, pas par la prose.
+→ [Le cycle, étape par étape](./manual/fr/04-cycle-de-dev/le-cycle-en-bref.md)
 
 ---
 
 ## 🤖 Missions longues — l'équipe
 
 « Fais les étapes 3 à 5, je reviens demain matin. » Au-delà du seuil, un **manager de
-mission** prend le relais sur le **team-kernel** — la conversation principale reste légère.
+mission** prend le relais sur le **team-kernel** : des workers sonnet tournent en parallèle,
+des rapports typés remplacent la prose, et tout ce qui défie l'intention ou la sécurité
+**gèle le nœud** et remonte à l'humain — même à 3 h du matin.
 
-```mermaid
-flowchart TD
-    U["🗣 Brief<br/><i>« finis la milestone, la nuit »</i>"] --> M["🧠 vf-dev-manager <b>(opus)</b><br/>lock driver · DAG · digests ≤30 lignes"]
-    M -->|"frontière ready<br/>en PARALLÈLE"| C["⚙️ vf-coder <b>(sonnet)</b><br/>cadrage→plan→exec"]
-    M -->|"pendant exec(N)"| P["🗺 plan(N+1)<br/><i>provisoire, re-validé</i>"]
-    C --> J1["🔍 vf-reviewer <b>(sonnet)</b><br/>read-only"]
-    C --> J2["🛡 vf-auditer <b>(sonnet)</b><br/>read-only"]
-    J1 & J2 -->|"rapports typés<br/>{statut, findings, nœuds}"| M
-    M -->|"gaps_found → reopen"| C
-    M -->|"ask-user → nœud GELÉ"| H["🙋 Humain"]
-```
-
-Le contrôle de flux est **déterministe** : rapports typés (jamais d'interprétation de prose),
-5 halt conditions, anti-thrash (3 essais), anti-régression (revert automatique), et tout ce
-qui défie l'intention ou la sécurité **gèle le nœud** et remonte à l'humain — même à 3 h du
-matin. Le même kernel fait tourner **6 équipes** : dev, design, mobile, content, growth,
-business.
-
-### L'efficience, chiffrée
-
-| Levier | Effet |
-|---|---|
-| **Workers & juges en sonnet**, opus réservé au manager | le gros du volume au juste prix |
-| **Digest de mission ≤ 30 lignes** par mandat | ~100-200k tokens de relecture évités par étape |
-| **Dispatch parallèle** : juges ∥, nœuds DAG disjoints ∥ | le mur d'attente séquentiel tombe |
-| **Pipelining N/N+1** : cadrage+plan de l'étape suivante pendant l'exécution | zéro temps mort entre étapes |
-| **Chargement on-demand** (règle du 1 %) | doctrine hors contexte tant qu'elle ne sert pas |
+→ [Comment tient une mission longue](./manual/fr/05-equipe-agents/une-mission-longue.md)
 
 ---
 
 ## 🧪 Au-delà du dev — un lab pour chaque métier
 
 VibeFlow n'est pas un outil dev-only : il **fabrique des labs** — des espaces de travail
-gouvernés pour n'importe quel métier — sur le même kernel et les mêmes gates.
+gouvernés pour le contenu, la croissance, le business ou tout autre métier — sur le même
+kernel, les mêmes gates, et des skills fabriqués par `skill-creator` avec une boucle d'évals.
 
-```mermaid
-flowchart LR
-    A["🗣 <i>« un lab pour mon<br/>agence de contenu »</i>"] --> B["📋 /vf-new-lab<br/>clarification-first<br/>gates machine A·B·C"]
-    B --> C["🧬 Manifeste de capacités<br/>dérivé pour le métier"]
-    C --> D["🛠 skill-creator<br/>fabrique les skills<br/><i>avec évals</i>"]
-    D --> E["✅ Lab gouverné<br/>planning · mémoire<br/>auditeurs ficelés"]
-```
-
-- **Création de lab** (`/vf-new-lab`, conductor) — cadrage clarification-first sous gates
-  machine, manifeste de capacités dérivé pour le métier, skills fabriqués par `skill-creator`
-  (boucle d'évals), auditeurs ficelés en sortie. **Mode express : lab opérationnel en
-  ≤ 15 minutes** (3 questions, dérivations assumées et marquées) — recetté en conditions
-  réelles.
-- **Design** (`design-orchestrator`, installé avec le dev) — dis *« rends ça plus beau »*,
-  *« cet écran est fade »* ou *« audite cette page »* : l'agent `vibeflow-design` route
-  l'intention vers le bon geste (direction artistique, craft ciblé, critique scorée). Les
-  missions design complètes tournent en équipe — manager + crafter + **juge frais** qui score
-  /100 contre ta direction artistique. **Multi-stack** : il livre des specs et des tokens,
-  jamais du code verrouillé sur un framework.
-- **Bundles métier** (`content` · `growth` · `business-pilot`) — équipes complètes sur le
-  team-kernel, juges read-only à critères éliminatoires, proposés au catalogue de
-  `/vf-new-lab`. La promesse multi-métier est livrée, pas en roadmap.
-- **KPIs** (`kpi-analyst`) — les chiffres du lab pour tout métier : arbres de métriques,
-  cadences de revue, alertes de dérive.
-
-Chaque module embarque une **documentation niveau framework dans son README** —
-installation, démarrer, usage, référence complète — liée depuis
-[le tableau des modules](#-modules).
-
+→ [Qu'est-ce qu'un lab ?](./manual/fr/02-concepts/qu-est-ce-qu-un-lab.md)
 
 ---
 
 ## 🧠 La mémoire qui tient
 
-Un lab VibeFlow n'oublie pas entre deux sessions — et sa mémoire ne pourrit pas :
+Un lab VibeFlow n'oublie pas entre deux sessions : registres indexés, mémoire d'agents qui
+capitalise cross-session, et artefacts disque en premier (`PROJECT.md`, `ROADMAP.md`,
+`STATE.md`) — n'importe quelle session repart d'un disque à jour, jamais d'un contexte
+compacté.
 
-- **Registres indexés** (`DECISIONS` / `LEARNINGS` / `BLOCKERS` / `JOURNAL` / `EVALS`) :
-  lecture **index-first imposée par hook** — on ne recharge jamais un registre entier.
-- **Mémoire d'agents** (`memory: project`) : le manager et les workers capitalisent
-  cross-session.
-- **Consolidator** : archivage par statut/âge, fusion des doublons, **promotion**
-  learning → règle (validation humaine), décroissance de confiance par demi-vie.
-- **Les artefacts comme API** : `PROJECT.md`, `ROADMAP.md`, `STATE.md`, plans et specs —
-  n'importe quelle session repart d'un disque à jour, pas d'un contexte compacté.
+→ [Anatomie d'un lab installé](./manual/fr/07-sous-le-capot/anatomie-d-un-lab-installe.md)
 
 ---
 
 ## 🏗 Architecture
 
-```mermaid
-flowchart TD
-    subgraph socle["🧭 conductor — socle obligatoire"]
-        K["team-kernel<br/><code>dag.sh</code> · <code>driver-lock.sh</code><br/>rapports typés · halt"]
-        G["gates machine<br/><code>check-agents</code> · <code>check-overlaps</code><br/>versions · registres"]
-    end
-    subgraph orch["Orchestrateurs métier — équipes sur le kernel"]
-        DEV["⭐ dev<br/>vibeflow-dev + équipe"]
-        DES["🎨 design<br/>manager + crafter + juge"]
-        MOB["📱 mobile<br/>boucle test→fix"]
-        BIZ["📦 content · growth · business<br/>3 bundles complets"]
-    end
-    subgraph gouv["Gouvernance"]
-        V["validator<br/>audit 5 phases"]
-        CO["consolidator<br/>mémoire"]
-        IA["infrastructure-audit<br/>drift Claude Code"]
-    end
-    socle --> orch
-    socle --> gouv
-    CI["CI : 46 suites + job « lab frais »<br/>la baseline passe ses propres gates<br/>depuis un lab vierge"] -.-> socle
-```
+Un socle `conductor` obligatoire (team-kernel + gates machine) porte les orchestrateurs
+métier — dev, design, mobile, trois bundles métier — plus les modules de gouvernance
+(`validator`, `consolidator`, `infrastructure-audit`). La CI fait tourner un job
+« **lab frais** » : la baseline s'installe dans un lab vierge et doit passer ses propres
+gates sans intervention.
 
-Les autres métiers se **fabriquent** sur ce socle — voir
-[Au-delà du dev — un lab pour chaque métier](#-au-delà-du-dev--un-lab-pour-chaque-métier).
+→ [Les gates machine](./manual/fr/07-sous-le-capot/les-gates-machine.md)
 
 ---
 
@@ -198,46 +112,13 @@ choix des modules, dépendances résolues et récapitulées avant toute pose. Mi
 ## 📦 Modules
 
 17 modules, chacun versionné avec son `CHANGELOG.md`. À l'install : `conductor` est le
-**socle obligatoire** (avec son filet planning-core / validator / consolidator /
-infrastructure-audit / audit-architecture), puis un choix — *lab de dev* ou *lab métier sur
-mesure*. Les **3 bundles métier sont proposés** au catalogue ; mobile-test et
-mobile-test-team restent en à-la-carte avancé.
+**socle obligatoire**, puis un choix — *lab de dev* ou *lab métier sur mesure*. Le README de
+chaque module est sa documentation complète — même structure partout.
 
-**Le README de chaque module est sa documentation complète** — même structure partout : ce
-qu'il fait, installation, démarrer, usage, référence exhaustive, limites. Clique un module
-ci-dessous pour ouvrir sa doc, ou va directement au [catalogue des modules](./manual/fr/03-modules/catalogue.md)
-et à la référence [commandes](./manual/fr/06-reference/commandes.md) ·
-[skills](./manual/fr/06-reference/skills.md) · [agents](./manual/fr/06-reference/agents.md) du manuel.
-
-<details>
-<summary><strong>Les 17 modules en détail</strong></summary>
-
-| Module | Ver. | Type | Ce qu'il fait |
-|--------|:----:|------|---------------|
-| **[conductor](./plugin/conductor/)** | `1.14.1` | agent + skills + scripts + references | 🧭 La porte d'entrée — crée/configure un lab dans n'importe quel métier, installe/vérifie/met à jour, migre sur évolution de doctrine, et reçoit les escalades de cohérence. Héberge le **team-kernel** et les gates. |
-| **[dev-orchestrator](./plugin/dev-orchestrator/)** | `2.1.1` | agent + skills + scripts | ⭐ Le cœur dev, **modèle agentique** (v2, breaking) — détecte l'intention et invoque directement les briques GSD, propose les next steps, garde le first-use. Embarque une équipe de mission pour les missions longues (dispatch parallèle revue ∥ audit, garde-fous de boucle autonome). Installe `design-orchestrator` d'office. |
-| **[design-orchestrator](./plugin/design-orchestrator/)** | `1.2.1` | agent + skills | 🎨 Le compagnon design — route l'intention vers le bon geste (direction artistique, craft ciblé, critique scorée) via `/vf-design` et `/vf-sketch`. Les missions complètes tournent en équipe, avec un juge frais qui score /100 contre ta direction artistique. **Générique multi-stack** : specs et tokens, jamais de code framework-locké. Installé d'office avec `dev-orchestrator`. |
-| **[mobile-test](./plugin/mobile-test/)** | `1.0.1` | skill + script + config | 📱 Test réel d'app mobile (simulateur iOS / émulateur Android) : build-si-absent, régression Maestro, rapport avec diagnostic visuel des échecs. **Expérimental** jusqu'au premier vrai run vert. |
-| **[mobile-test-team](./plugin/mobile-test-team/)** | `1.4.0` | agents + rules | 🤖 Boucle autonome test→fix mobile par-dessus `mobile-test` : teste, corrige, re-teste jusqu'au vert ou jusqu'à épuisement du budget. **Expérimental**. |
-| **[software-architecture](./plugin/software-architecture/)** | `1.5.2` | skill + rules + scripts | Doctrine d'architecture logicielle AI-Safe + **foyer des philosophies de dev** : SOLID, DRY, KISS, YAGNI, Clean Architecture, Clean Code, carte TDD ; anti-god-files (≤300 L), gates *machine-enforced* (**Nyquist + Decision Coverage**), playbook brownfield. |
-| **[audit-architecture](./plugin/audit-architecture/)** | `1.0.1` | skill + references | Concepteur d'**architecture d'audit** — dérive depuis un brief la structure d'audit multi-couches d'un process (contenu / dossier / code / vente). |
-| **[infrastructure-audit](./plugin/infrastructure-audit/)** | `1.2.1` | skill + scripts | Audit automatique de l'infra Claude Code (hooks, scripts, drift Anthropic) — détecte les régressions après une mise à jour. |
-| **[validator](./plugin/validator/)** | `1.3.1` | agent-only | Garant de l'alignement méthodo ↔ projets, en 5 phases — **proportionné au profil du lab** (Phase 4 opt-in en profil léger). |
-| **[consolidator](./plugin/consolidator/)** | `1.8.0` | skill + scripts | Consolidation de la mémoire structurée : indexation / archivage / fusion / promotion + mémoire vivante (décroissance par demi-vie, supersession non destructive) + **templates de registres embarqués**. |
-| **[skill-creator](./plugin/skill-creator/)** | `1.0.2` | agent + skills | Fabrique de capacités de lab avec **eval-loop** (recherche par facettes → draft → évals) — le moteur de la Lab Factory. |
-| **[reference](./plugin/reference/)** | `2.5.1` | doc-only | Documentation méthodologique complète : VibeFlow Core (9 principes) + 12 patterns (dont le cloisonnement par outils) + templates + 1 exemple de bout en bout. |
-| **[planning-core](./plugin/planning-core/)** | `2.5.1` | skill + references + scripts | Socle de planning & documentation du lab non-dev + **altitude lab** partout (index des projets, compartiments, dette, pont mémoire). Sur un projet de code, le planning appartient au moteur de dev : redirection, jamais de format concurrent (ADR-055). |
-| **[kpi-analyst](./plugin/kpi-analyst/)** | `1.0.2` | agent + skill + scripts + references | 📈 Déduit les **vrais KPIs métier** d'un lab : schéma stable validé une fois + valeurs extraites de façon déterministe (registre `KPIS.md`, standalone ou Hub externe optionnel). Jamais de chiffre inventé. |
-| 📦 **[business-pilot-bundle](./plugin/business-pilot-bundle/)** | `2.0.1` | agents + skill + scripts | Bundle métier, **équipe complète sur le team-kernel** pour le commercial/delivery/finance, avec un juge éliminatoire de qualité client (seuil 80). Double Iron Law : aucun envoi client sans validation humaine, aucun chiffre financier inventé. |
-| 📦 **[content-bundle](./plugin/content-bundle/)** | `2.0.1` | agents + skill + scripts | Bundle métier, **équipe complète sur le team-kernel** pour le contenu — cadrage, rédaction, déclinaison — avec un juge de clarté éliminatoire (seuil 80). Publication toujours human-gated. |
-| 📦 **[growth-bundle](./plugin/growth-bundle/)** | `2.0.1` | agents + skill + scripts | Bundle métier, **équipe complète sur le team-kernel** pour l'acquisition — stratégie de canal, créatives, mesure — avec un juge qualité éliminatoire (claims sourcés, consentement/anti-spam). Tout envoi réel est human-gated ; métriques sourcées ou `low`. |
-
-</details>
-
-**Points d'entrée livrés** : les commandes `/vibeflow` (conductor) · `/vf-new-lab` ·
-`/vf-planning` · `/vf-calibrate` · `/vf-audit` · `/vf-update` (bandeau de mise à jour au
-démarrage), plus le skill `/vibeflow-install` (UX à toggles du premier lancement). Les agents
-ne se tapent pas directement — ce sont leurs points d'entrée explicites.
+→ [Catalogue des modules](./manual/fr/03-modules/catalogue.md) ·
+[commandes](./manual/fr/06-reference/commandes.md) ·
+[skills](./manual/fr/06-reference/skills.md) ·
+[agents](./manual/fr/06-reference/agents.md)
 
 ---
 
@@ -301,3 +182,4 @@ Source-available sous licence propriétaire — voir [LICENSE](./LICENSE). Code 
 publics ; les élèves de la formation disposent d'un droit de réutilisation privée ;
 redistribution et revente interdites. Le module `skill-creator` réutilise du contenu Anthropic
 original sous licence MIT.
+</content>

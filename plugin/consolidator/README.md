@@ -29,7 +29,7 @@ fin de session.
 
 ## Installation
 
-Voir [INSTALL.md du repo racine](../INSTALL.md).
+Voir [INSTALL.md du repo racine](../../INSTALL.md).
 
 ```bash
 .claude/scripts/vibeflow-update.sh install consolidator

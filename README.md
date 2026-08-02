@@ -41,137 +41,52 @@ and **every token has a job** (sonnet workers, digests, on-demand loading, paral
 
 ## 🔁 The dev cycle — spec-driven
 
-Say _"add Google auth"_: the `vibeflow-dev` agent detects the intent and invokes the tooled
-brick (GSD toolchain). Every step **leaves an artifact on disk** — the context can die, the
-project carries on.
+Say _"add Google auth"_: the `vibeflow-dev` agent detects the intent and runs the GSD pipeline —
+scoping, verified plan, atomic execution, read-only judges — leaving an artifact on disk at
+every step, so the context can die without the project losing ground.
 
-```mermaid
-flowchart LR
-    A["🗣 Intent<br/><i>“add Google auth”</i>"] --> B["📋 Scoping<br/>spec + decisions<br/><code>CONTEXT.md</code>"]
-    B --> C["🗺 Verified plan<br/>plan-checker loop<br/><code>PLAN.md</code>"]
-    C --> D["⚙️ Execution<br/>atomic commits<br/>fresh contexts"]
-    D --> E["✅ UAT ∥ Review<br/>read-only judges<br/>in parallel"]
-    E -->|gaps| D
-    E -->|green proof| F["🚀 Ship<br/>PR + fresh state<br/><code>STATE.md</code>"]
-```
-
-- **Scope before plan, proof before done**: a mobile UI criterion isn't "done" until a
-  Maestro flow passes on a simulator — not just a green unit test.
-- **Doc research before debugging** (ADR-045): a library bug gets looked up in issues and
-  release notes before trial-and-error.
-- **The judge is never the author**: review and audit run in agents **without write access**
-  — enforcement by tools, not by prose.
+→ [The cycle, step by step](./manual/en/04-development-cycle/the-cycle-at-a-glance.md)
 
 ---
 
 ## 🤖 Long missions — the team
 
-"Do steps 3 to 5, I'm back tomorrow morning." Past the threshold, a **mission manager**
-takes over on the **team-kernel** — the main conversation stays light.
+"Do steps 3 to 5, I'm back tomorrow morning." Past a threshold, a **mission manager** takes
+over on the **team-kernel**: sonnet workers run in parallel, typed reports replace prose, and
+anything that challenges intent or security **freezes the node** for a human — even at 3 AM.
 
-```mermaid
-flowchart TD
-    U["🗣 Brief<br/><i>“finish the milestone, overnight”</i>"] --> M["🧠 vf-dev-manager <b>(opus)</b><br/>driver lock · DAG · ≤30-line digests"]
-    M -->|"ready frontier<br/>in PARALLEL"| C["⚙️ vf-coder <b>(sonnet)</b><br/>scope→plan→exec"]
-    M -->|"while exec(N) runs"| P["🗺 plan(N+1)<br/><i>provisional, re-validated</i>"]
-    C --> J1["🔍 vf-reviewer <b>(sonnet)</b><br/>read-only"]
-    C --> J2["🛡 vf-auditer <b>(sonnet)</b><br/>read-only"]
-    J1 & J2 -->|"typed reports<br/>{status, findings, nodes}"| M
-    M -->|"gaps_found → reopen"| C
-    M -->|"ask-user → node FROZEN"| H["🙋 Human"]
-```
-
-Flow control is **deterministic**: typed reports (never prose interpretation), 5 halt
-conditions, anti-thrash (3 attempts), anti-regression (automatic revert), and anything that
-challenges intent or security **freezes the node** and escalates to the human — even at 3 AM.
-The same kernel powers **6 teams**: dev, design, mobile, content, growth, business.
-
-### Efficiency, quantified
-
-| Lever | Effect |
-|---|---|
-| **Sonnet workers & judges**, opus reserved for the manager | bulk volume at the right price |
-| **Mission digest ≤ 30 lines** per mandate | ~100-200k re-reading tokens saved per step |
-| **Parallel dispatch**: judges ∥, disjoint DAG nodes ∥ | the sequential wait-wall falls |
-| **N/N+1 pipelining**: next step scoped+planned during current execution | zero dead time between steps |
-| **On-demand loading** (1% rule) | doctrine stays out of context until it's needed |
+→ [How a long mission holds together](./manual/en/05-agent-team/a-long-mission.md)
 
 ---
 
 ## 🧪 Beyond dev — a lab for any domain
 
-VibeFlow is not a dev-only tool: it **manufactures labs** — governed workspaces for any
-domain — on the same kernel and the same gates.
+VibeFlow is not a dev-only tool: it **manufactures labs** — governed workspaces for content,
+growth, business or any other domain — on the same kernel, the same gates, and skills built
+by `skill-creator` with an eval loop.
 
-```mermaid
-flowchart LR
-    A["🗣 <i>“a lab for my<br/>content agency”</i>"] --> B["📋 /vf-new-lab<br/>clarification-first<br/>machine gates A·B·C"]
-    B --> C["🧬 Capability manifest<br/>derived for the domain"]
-    C --> D["🛠 skill-creator<br/>manufactures the skills<br/><i>with evals</i>"]
-    D --> E["✅ Governed lab<br/>planning · memory<br/>auditors wired"]
-```
-
-- **Lab creation** (`/vf-new-lab`, conductor) — clarification-first scoping under machine
-  gates, a capability manifest derived for the domain, skills built by `skill-creator` (eval
-  loop), auditors wired at the end. **Express mode: operational lab in ≤ 15 minutes**
-  (3 questions, assumed-and-flagged derivations) — validated through real-world UAT.
-- **Design** (`design-orchestrator`, installed with dev) — say *"make it beautiful"*, *"this
-  screen is bland"* or *"audit this page"*: the `vibeflow-design` agent routes the intent to
-  the right gesture (art direction, targeted craft, scored critique). Full design missions run
-  a team — manager + crafter + **fresh judge** scoring /100 against your art direction.
-  **Stack-agnostic**: it ships specs and tokens, never framework-locked code.
-- **Domain bundles** (`content` · `growth` · `business-pilot`) — complete teams on the
-  team-kernel, read-only judges with eliminatory criteria, offered in the `/vf-new-lab`
-  catalog. The multi-domain promise is shipped, not roadmapped.
-- **KPIs** (`kpi-analyst`) — the lab's numbers for any domain: metric trees, review cadences,
-  drift alerts.
-
-Each module ships **framework-grade documentation in its README** — installation, get
-started, usage, full reference — linked from [the modules table](#-modules).
-
+→ [What is a lab?](./manual/en/02-concepts/what-is-a-lab.md)
 
 ---
 
 ## 🧠 Memory that holds
 
-A VibeFlow lab doesn't forget between sessions — and its memory doesn't rot:
+A VibeFlow lab doesn't forget between sessions: indexed registries, agent memory that
+capitalizes across sessions, and disk-first artifacts (`PROJECT.md`, `ROADMAP.md`,
+`STATE.md`) mean any session restarts from a fresh disk, never a compacted context.
 
-- **Indexed registries** (`DECISIONS` / `LEARNINGS` / `BLOCKERS` / `JOURNAL` / `EVALS`):
-  **index-first reads enforced by hook** — a full registry is never reloaded.
-- **Agent memory** (`memory: project`): the manager and workers capitalize across sessions.
-- **Consolidator**: archiving by status/age, duplicate merging, learning → rule **promotion**
-  (human-validated), confidence decay by category half-life.
-- **Artifacts as API**: `PROJECT.md`, `ROADMAP.md`, `STATE.md`, plans and specs — any session
-  restarts from a fresh disk, not a compacted context.
+→ [Anatomy of an installed lab](./manual/en/07-under-the-hood/anatomy-of-an-installed-lab.md)
 
 ---
 
 ## 🏗 Architecture
 
-```mermaid
-flowchart TD
-    subgraph socle["🧭 conductor — mandatory baseline"]
-        K["team-kernel<br/><code>dag.sh</code> · <code>driver-lock.sh</code><br/>typed reports · halts"]
-        G["machine gates<br/><code>check-agents</code> · <code>check-overlaps</code><br/>versions · registries"]
-    end
-    subgraph orch["Domain orchestrators — teams on the kernel"]
-        DEV["⭐ dev<br/>vibeflow-dev + team"]
-        DES["🎨 design<br/>manager + crafter + judge"]
-        MOB["📱 mobile<br/>test→fix loop"]
-        BIZ["📦 content · growth · business<br/>3 complete bundles"]
-    end
-    subgraph gouv["Governance"]
-        V["validator<br/>5-phase audit"]
-        CO["consolidator<br/>memory"]
-        IA["infrastructure-audit<br/>Claude Code drift"]
-    end
-    socle --> orch
-    socle --> gouv
-    CI["CI: 46 suites + “fresh lab” job<br/>the baseline passes its own gates<br/>from a blank install"] -.-> socle
-```
+A mandatory `conductor` baseline (team-kernel + machine gates) carries the domain
+orchestrators — dev, design, mobile, three business bundles — plus governance modules
+(`validator`, `consolidator`, `infrastructure-audit`). CI runs a "**fresh lab**" job: the
+baseline installs into a blank lab and must pass its own gates with zero intervention.
 
-Other domains are **manufactured** on this base — see
-[Beyond dev — a lab for any domain](#-beyond-dev--a-lab-for-any-domain).
+→ [The machine gates](./manual/en/07-under-the-hood/the-machine-gates.md)
 
 ---
 
@@ -193,46 +108,13 @@ module picker, dependencies resolved and recapped before anything is written. Up
 ## 📦 Modules
 
 17 modules, each versioned with its own `CHANGELOG.md`. At install: `conductor` is the
-**mandatory baseline** (with its safety net planning-core / validator / consolidator /
-infrastructure-audit / audit-architecture), then one choice — *dev lab* or *tailor-made
-domain lab*. The **3 domain bundles are offered** in the catalog; mobile-test and
-mobile-test-team stay as advanced à-la-carte add-ons.
+**mandatory baseline**, then one choice — *dev lab* or *tailor-made domain lab*. Each
+module's README is its full documentation — same structure everywhere.
 
-**Each module's README is its full documentation** — same structure everywhere: what it does,
-installation, get started, usage, complete reference, limits. Click a module below to open its
-docs, or jump to the manual's [module catalog](./manual/en/03-modules/catalog.md) and its
-[commands](./manual/en/06-reference/commands.md) · [skills](./manual/en/06-reference/skills.md) ·
-[agents](./manual/en/06-reference/agents.md) reference for the full picture.
-
-<details>
-<summary><strong>The 17 modules in detail</strong></summary>
-
-| Module | Ver. | Type | What it does |
-|--------|:----:|------|--------------|
-| **[conductor](./plugin/conductor/)** | `1.14.1` | agent + skills + scripts + references | 🧭 The front door — creates/configures a lab in any domain, installs/verifies/updates, migrates on doctrine change, and receives coherence escalations. Hosts the **team-kernel** and the gates. |
-| **[dev-orchestrator](./plugin/dev-orchestrator/)** | `2.1.1` | agent + skills + scripts | ⭐ The dev core, **agentic model** (v2, breaking) — detects intent and invokes GSD bricks directly, proposes next steps, guards first-use. Ships a mission team for long missions (parallel review ∥ audit dispatch, autonomous-loop guardrails). Installs `design-orchestrator` by default. |
-| **[design-orchestrator](./plugin/design-orchestrator/)** | `1.2.1` | agent + skills | 🎨 The design companion — routes intent to the right gesture (art direction, targeted craft, scored critique) via `/vf-design` and `/vf-sketch`. Full missions run a team with a fresh judge scoring /100 against your art direction. **Stack-agnostic**: specs and tokens, never framework-locked code. Installed by default with `dev-orchestrator`. |
-| **[mobile-test](./plugin/mobile-test/)** | `1.0.1` | skill + script + config | 📱 Real mobile app testing (iOS simulator / Android emulator): build-if-missing, Maestro regression, report with visual failure diagnosis. **Experimental** until the first real green run. |
-| **[mobile-test-team](./plugin/mobile-test-team/)** | `1.4.0` | agents + rules | 🤖 Autonomous mobile test→fix loop on top of `mobile-test`: tests, fixes, re-tests until green or budget exhausted. **Experimental**. |
-| **[software-architecture](./plugin/software-architecture/)** | `1.5.2` | skill + rules + scripts | AI-Safe software architecture doctrine + **home of dev philosophies**: SOLID, DRY, KISS, YAGNI, Clean Architecture, Clean Code, TDD map; anti-god-files (≤300 L), *machine-enforced* gates (**Nyquist + Decision Coverage**), brownfield playbook. |
-| **[audit-architecture](./plugin/audit-architecture/)** | `1.0.1` | skill + references | **Audit-architecture** designer — derives from a brief the multi-layer audit structure of a process (content / dossier / code / sales). |
-| **[infrastructure-audit](./plugin/infrastructure-audit/)** | `1.2.1` | skill + scripts | Automatic Claude Code infra audit (hooks, scripts, Anthropic drift) — catches regressions after an update. |
-| **[validator](./plugin/validator/)** | `1.3.1` | agent-only | Guards methodology ↔ project alignment in 5 phases — **proportioned to the lab profile** (Phase 4 opt-in on light profile). |
-| **[consolidator](./plugin/consolidator/)** | `1.8.0` | skill + scripts | Structured memory consolidation: indexing / archiving / merging / promotion + living memory (half-life confidence decay, non-destructive supersession) + **bundled registry templates**. |
-| **[skill-creator](./plugin/skill-creator/)** | `1.0.2` | agent + skills | Lab capability factory with an **eval loop** (facet research → draft → evals) — the engine of the Lab Factory. |
-| **[reference](./plugin/reference/)** | `2.5.1` | doc-only | Complete methodology documentation: VibeFlow Core (9 principles) + 12 patterns (incl. tool partitioning) + templates + 1 end-to-end example. |
-| **[planning-core](./plugin/planning-core/)** | `2.5.1` | skill + references + scripts | Non-dev lab planning & documentation backbone + **lab altitude** everywhere (project index, typed compartments, debt, memory bridge). On a code project, planning belongs to the dev engine: it redirects, never competes (ADR-055). |
-| **[kpi-analyst](./plugin/kpi-analyst/)** | `1.0.2` | agent + skill + scripts + references | 📈 Derives a lab's **real business KPIs**: stable schema validated once + deterministically extracted values (`KPIS.md` registry, standalone or optional external Hub). Never an invented figure. |
-| 📦 **[business-pilot-bundle](./plugin/business-pilot-bundle/)** | `2.0.1` | agents + skill + scripts | Métier bundle, **full team on the team-kernel** for commercial/delivery/finance work, with an eliminatory client-quality judge (threshold 80). Twin Iron Laws: no client send without human validation, no invented financial figure. |
-| 📦 **[content-bundle](./plugin/content-bundle/)** | `2.0.1` | agents + skill + scripts | Métier bundle, **full team on the team-kernel** for content — strategy, writing, repurposing — with an eliminatory clarity judge (threshold 80). Publication always human-gated. |
-| 📦 **[growth-bundle](./plugin/growth-bundle/)** | `2.0.1` | agents + skill + scripts | Métier bundle, **full team on the team-kernel** for growth — channel strategy, copy, analysis — with an eliminatory quality judge (sourced claims, consent/anti-spam). Every real send is human-gated; metrics sourced or `low`. |
-
-</details>
-
-**Shipped entry points**: commands `/vibeflow` (conductor) · `/vf-new-lab` · `/vf-planning` ·
-`/vf-calibrate` · `/vf-audit` · `/vf-update` (update banner at session start), plus the
-`/vibeflow-install` skill (first-launch toggles UX). Agents are never invoked directly — these
-are their explicit entry points.
+→ [Module catalog](./manual/en/03-modules/catalog.md) ·
+[commands](./manual/en/06-reference/commands.md) ·
+[skills](./manual/en/06-reference/skills.md) ·
+[agents](./manual/en/06-reference/agents.md)
 
 ---
 
@@ -295,3 +177,4 @@ Main lab (private): [vibeflow-lab](https://github.com/picmakpro/vibeflow-lab) �
 Source-available under a proprietary license — see [LICENSE](./LICENSE). Public code and
 history; training students get a private-reuse right; redistribution and resale prohibited.
 The `skill-creator` module reuses original Anthropic content under the MIT license.
+</content>
