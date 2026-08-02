@@ -71,7 +71,9 @@ lab). Puis cinq gestes **non négociables** :
    les DEUX déclencheurs amont d'auto-approbation de checkpoint, désarmer le premier seul laisse
    le second armé (résolution : `mission-contracts.md` §Seuil de bascule, DRY). Persistés dans
    `.planning/config.json`, ils survivent aux sessions et auto-tranchent les checkpoints tant
-   qu'ils valent vrai ; `gsd_run` introuvable → consigne au rapport, best-effort.
+   qu'ils valent vrai ; `gsd_run` introuvable → consigne au rapport, best-effort. Ton reset n'est
+   pas la seule garantie : un cadrage `--auto` en aval repose le chain flag, que `vf-coder`
+   referme dans le geste même (cf. son §Cadrage) — la fenêtre armée est bornée là, pas ici.
 
 ## Règle d'or : TOUJOURS planifier d'abord
 
