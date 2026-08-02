@@ -3397,6 +3397,38 @@ else
     || { ko "T27 (A-4, renvoi) : le bloc de renvoi de vf-dev-manager.md ne nomme pas mission-flow.md"; t27_ok=0; }
   printf '%s\n' "$t27_renvoi_blk" | "$GREP" -qE 'Pattern[[:space:]]+C' \
     || { ko "T27 (A-4, renvoi) : le bloc de renvoi de vf-dev-manager.md ne nomme pas la section (§Pattern C) — un renvoi au fichier entier n'est pas un renvoi"; t27_ok=0; }
+
+  # CITATION NON PENDANTE. Le renvoi cite en outre un SOUS-TITRE entre guillemets français
+  # (« Contrôle de flux du manager »). Rien ne vérifiait que ce titre existe côté foyer : le
+  # renommer laissait la suite à 99 OK / 0 KO — le renvoi pointait vers un titre disparu et aucune
+  # sonde ne bronchait. Famille connue de ce dépôt (renommage de section → citation pendante).
+  #
+  # CE QUI EST MESURÉ : une RELATION — « la chaîne citée par l'agent existe comme TITRE dans le
+  # foyer » —, jamais la présence du mot « Contrôle » quelque part dans le fichier. La citation est
+  # EXTRAITE du bloc de renvoi, jamais réencodée en dur ici : une sonde en dur resterait verte le
+  # jour où l'agent citerait autre chose, c'est-à-dire exactement quand la citation devient
+  # pendante. Elle est ensuite convertie en ERE à blancs ÉLASTIQUES — une citation coupée par le
+  # repli à 100 colonnes arrive du bloc recollé avec l'indentation de la ligne suivante.
+  #
+  # COMPTEUR D'ATTEINTE : zéro citation extraite ⇒ KO. Un renvoi qui perdrait ses guillemets
+  # éteindrait sinon la sonde en silence, sur exactement le risque qu'elle ferme.
+  t27_cit_n=0; t27_cit_ko=""
+  while IFS= read -r t27_cit; do
+    [ -n "$t27_cit" ] || continue
+    t27_cit_n=$((t27_cit_n + 1))
+    t27_cit_re="$(printf '%s' "$t27_cit" \
+                  | sed -e 's/[][\.*^$(){}?+|]/\\&/g' -e 's/[[:space:]][[:space:]]*/[[:space:]]+/g')"
+    "$GREP" -E '^#{1,6}[[:space:]]' "$MFLOW" | "$GREP" -qE "$t27_cit_re" \
+      || t27_cit_ko="$t27_cit_ko [« $t27_cit » : citée par le renvoi, absente des TITRES de mission-flow.md]"
+  done < <(printf '%s\n' "$t27_renvoi_blk" | "$GREP" -oE '«[^»]*»' \
+           | sed -e 's/^«[[:space:]]*//' -e 's/[[:space:]]*»$//')
+  if [ "$t27_cit_n" -eq 0 ]; then
+    ko "T27 (A-4, renvoi) : le bloc de renvoi de vf-dev-manager.md ne cite AUCUN titre entre guillemets — la sonde de citation pendante n'a rien à mesurer, elle serait verte à vide"; t27_ok=0
+  elif [ -n "$t27_cit_ko" ]; then
+    ko "T27 (A-4, renvoi) : citation PENDANTE — le renvoi cite un titre qui n'existe pas dans le foyer :$t27_cit_ko"; t27_ok=0
+  else
+    ok "T27 (A-4, renvoi, citation non pendante) : le ou les $t27_cit_n titre(s) cités entre guillemets par le renvoi de vf-dev-manager.md existent comme TITRE dans mission-flow.md — un renommage du sous-titre du foyer fait rougir"
+  fi
 fi
 
 # Cinq mutants + une fixture LICITE. (Le libellé d'ok ci-dessous n'en annonce que trois : il est
