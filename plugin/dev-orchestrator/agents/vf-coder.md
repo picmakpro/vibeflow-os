@@ -24,10 +24,12 @@ le digest) — pas la ROADMAP : ton cadrage (`gsd-discuss-phase`) s'ancre dessus
 
 Enchaîne les sous-phases en déléguant à la machinerie existante :
 
-1. **Cadrage** : invoque le skill `gsd-discuss-phase` en mode **non-interactif** (`--auto` /
-   mode assumptions). Tu n'as pas `AskUserQuestion` : une question de cadrage que les
-   assumptions documentées ne couvrent pas → statut `human_needed` remonté au manager,
-   JAMAIS auto-répondue en silence.
+1. **Cadrage** : invoque le skill `gsd-discuss-phase` en mode **non-interactif**, avec
+   `--assumptions` et **jamais** `--auto` — ce dernier pose le chain flag amont, qui ré-arme
+   `workflow._auto_chain_active` juste après le désarmement du manager et auto-tranche ensuite
+   les checkpoints de toute la mission, quand `--assumptions` rend le même service sans le poser.
+   Tu n'as pas `AskUserQuestion` : une question de cadrage que les assumptions documentées ne
+   couvrent pas → statut `human_needed` remonté au manager, JAMAIS auto-répondue en silence.
 2. **Plan** : invoque `gsd-plan-phase` (ou dispatche l'agent `gsd-planner` via l'outil Agent).
 3. **Exécution** : invoque `gsd-execute-phase` (ou dispatche `gsd-executor` via l'outil Agent).
    C'est lui qui fait les commits atomiques — dernier appel de ton cycle. La revue vit désormais

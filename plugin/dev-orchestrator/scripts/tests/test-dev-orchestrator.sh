@@ -2045,6 +2045,22 @@ T25_BRICK_RE='^[[:space:]]*([0-9]+[.)][[:space:]]+|[-*+][[:space:]]+)?[*][*](Pla
 T25_MODE_RE='(non-interactif|--auto([^a-z-]|$)|--chain([^a-z-]|$))'
 T25_NEG_RE='(JAMAIS|[Jj]amais|[Nn]e pas|[Nn]i |[Ss]ans |[Aa]ucun|[Ii]nterdit|[Pp]as de |opt-in)'
 
+# INVERSION DE FIXTURE (A-1, arbitrage humain du 2026-08-02). La brique **Cadrage** était tenue
+# pour licite EN BLOC — et sa forme réelle, `gsd-discuss-phase … --auto`, immortalisée comme
+# rédaction correcte. C'était l'anti-corrélation exacte du risque annoncé : `--auto` pose le chain
+# flag amont, qui RÉ-ARME `workflow._auto_chain_active` juste après le désarmement du geste 5 du
+# manager — rendant D-02 inerte pour toute la mission. `--auto` (et `--chain`) sur une brique
+# Cadrage est donc désormais une forme INTERDITE, au même titre que le mode d'enchaînement sur une
+# brique Plan/Exécution.
+#
+# Ce qui reste licite sur Cadrage, et pourquoi la fixture d ne change pas : `--assumptions` rend le
+# même service (`vf-coder` n'a pas `AskUserQuestion`, il ne peut pas bloquer sur un prompt) SANS
+# poser de chain flag. Le mot « non-interactif » décrit un mode, pas un flag : il ne pose rien. La
+# sonde du Cadrage porte donc sur les FLAGS D'ENCHAÎNEMENT seuls, jamais sur $T25_MODE_RE — sinon
+# elle punirait la rédaction que l'arbitrage vient précisément de retenir.
+T25_CADRAGE_RE='^[[:space:]]*([0-9]+[.)][[:space:]]+|[-*+][[:space:]]+)?[*][*]Cadrage([*]|[ ]|[(]|:)'
+T25_CHAINFLAG_RE='(--auto([^a-z-]|$)|--chain([^a-z-]|$))'
+
 #  2. EXCLUSION DES NÉGATIONS. « JAMAIS en mode **non-interactif** » est un DURCISSEMENT du texte,
 #     pas la forme fautive : le test rougissait sur l'interdiction qu'il est censé faire respecter.
 #     La négation est bornée à la CLAUSE qui porte le motif (depuis le dernier séparateur ASCII
@@ -2052,8 +2068,8 @@ T25_NEG_RE='(JAMAIS|[Jj]amais|[Nn]e pas|[Nn]i |[Ss]ans |[Aa]ucun|[Ii]nterdit|[Pp
 #     (fixture T25 c ci-dessous). Limite assumée et documentée : une prescription réelle rédigée
 #     avec une négation dans la MÊME clause échappe à la sonde. L'écart est volontairement orienté
 #     vers le faux vert : un gate qui punit une rédaction correcte coûte plus qu'un gate poreux.
-t25_prescriptive_clauses() { # bloc(s) sur stdin
-  awk -v mode="$T25_MODE_RE" -v neg="$T25_NEG_RE" '
+t25_prescriptive_clauses() { # <motif ERE de la forme interdite> ; bloc(s) sur stdin
+  awk -v mode="$1" -v neg="$T25_NEG_RE" '
     {
       line = $0
       while (match(line, mode)) {
@@ -2072,7 +2088,8 @@ t25_prescriptive_clauses() { # bloc(s) sur stdin
 }
 
 t25_forbidden_chain_hits() { # <file>
-  md_blocks_matching "$1" "$T25_BRICK_RE" | t25_prescriptive_clauses
+  md_blocks_matching "$1" "$T25_BRICK_RE"   | t25_prescriptive_clauses "$T25_MODE_RE"
+  md_blocks_matching "$1" "$T25_CADRAGE_RE" | t25_prescriptive_clauses "$T25_CHAINFLAG_RE"
 }
 
 # volet présence : vf-dev-manager.md nomme la clé et l'appel qui la remet à faux.
@@ -2099,9 +2116,13 @@ if [ "$t25_scanned" -eq 0 ]; then
   ko "T25 fermeture : ZÉRO fichier balayé (agents d'équipe + $REFS_DIR introuvables) — un vert à vide n'est pas une garantie"
   t25_ok=0
 elif [ -n "$t25_real_hits" ]; then
-  ko "T25 fermeture : forme interdite (mode d'enchaînement sur brique Plan/Exécution) trouvée —$t25_real_hits"
+  ko "T25 fermeture : forme interdite trouvée (mode d'enchaînement sur brique Plan/Exécution, OU flag --auto/--chain sur brique Cadrage depuis A-1) —$t25_real_hits"
   t25_ok=0
 else
+  # Le libellé ci-dessous SOUS-DÉCLARE volontairement depuis A-1 : le balayage couvre aussi les
+  # briques Cadrage (flags d'enchaînement). Un libellé qui sous-déclare ne ment jamais sur ce qui
+  # est garanti ; c'est T25b qui porte la revendication précise. On ne le réécrit pas : il est,
+  # mot pour mot, l'un des 87 acquis dont la stabilité sert de base de comparaison.
   ok "T25 fermeture : $t25_scanned fichier(s) de doctrine balayé(s), aucun ne prescrit le mode d'enchaînement sur une brique Plan/Exécution"
 fi
 
@@ -2151,6 +2172,58 @@ else
 fi
 
 [ "$t25_ok" -eq 1 ] && ok "T25 : flag d'enchaînement désarmé au démarrage + fermé par gate (Plan/Exécution interdits, Cadrage licite), discriminance prouvée par mutation"
+
+# ---------------------------------------------------------------------------
+# T25b (A-1, DISCRIMINANT) — la brique **Cadrage** ne prescrit plus de FLAG D'ENCHAÎNEMENT.
+# Assertion CUMULATIVE : elle s'ajoute à T25, dont les six fixtures gardent leur verdict (la
+# fixture « d » reste licite — elle ne cite aucun flag, seulement le mode « non-interactif »).
+# Quatre fixtures + un mutant tiré du fichier RÉEL, parce qu'une fixture synthétique prouve la
+# sonde et pas la doctrine : c'est vf-coder.md qui portait la forme fautive.
+#   g  interdite — la forme réelle d'AVANT l'arbitrage (`--auto` / mode assumptions).
+#   h  LICITE    — la forme retenue par A-1 (`--assumptions`) : le service rendu sans chain flag.
+#   i  LICITE    — l'INTERDICTION rédigée (« JAMAIS `--auto` ») : un durcissement du texte, que la
+#                  sonde ne doit pas confondre avec la prescription qu'elle poursuit.
+#   j  interdite — `--chain` sur une SOUS-PUCE imbriquée du Cadrage : la faille de bloc que le
+#                  splitter sensible à l'indentation ferme (acquis à ne pas reperdre).
+# ---------------------------------------------------------------------------
+t25b_ok=1
+T25B_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T25B_TMPDIR"
+T25B_FORBIDDEN="$T25B_TMPDIR/g-forbidden-cadrage-auto.md"
+T25B_LICIT="$T25B_TMPDIR/h-licit-cadrage-assumptions.md"
+T25B_LICIT_NEG="$T25B_TMPDIR/i-licit-cadrage-interdiction.md"
+T25B_SUBBULLET="$T25B_TMPDIR/j-forbidden-cadrage-souspuce.md"
+T25B_MUT_CODER="$T25B_TMPDIR/mutant-cadrage-reintroduit-auto.md"
+printf '1. **Cadrage** : invoque le skill `gsd-discuss-phase` en mode **non-interactif** (`--auto` /\n   mode assumptions).\n' > "$T25B_FORBIDDEN"
+printf '1. **Cadrage** : invoque le skill `gsd-discuss-phase` en mode **non-interactif**, avec\n   `--assumptions`.\n' > "$T25B_LICIT"
+printf '1. **Cadrage** : `gsd-discuss-phase` avec `--assumptions`, JAMAIS `--auto` — il poserait le\n   chain flag amont.\n' > "$T25B_LICIT_NEG"
+printf '1. **Cadrage** : invoque le skill `gsd-discuss-phase`\n   - en enchaînement automatique (`--chain`).\n' > "$T25B_SUBBULLET"
+# Mutation de la DOCTRINE réelle : on réintroduit le flag que A-1 vient de bannir, à la place de
+# celui qu'il retient. Anchrée sur la formule du fichier — d'où le garde d'identité ci-dessous,
+# qui distingue « mutation non détectée » de « mutation qui n'a rien mordu ».
+sed 's/`--assumptions` et \*\*jamais\*\* `--auto`/`--auto`/' "$CODER_FILE" > "$T25B_MUT_CODER"
+
+t25b_ko=""
+for t25b_fx in FORBIDDEN:1 LICIT:0 LICIT_NEG:0 SUBBULLET:1; do
+  eval "t25b_fxfile=\$T25B_${t25b_fx%%:*}"
+  t25b_hit="$(t25_forbidden_chain_hits "$t25b_fxfile")"
+  if [ "${t25b_fx##*:}" = 1 ] && [ -z "$t25b_hit" ]; then
+    t25b_ko="$t25b_ko [$(basename "$t25b_fxfile") : flag d'enchaînement sur brique Cadrage NON détecté]"
+  elif [ "${t25b_fx##*:}" = 0 ] && [ -n "$t25b_hit" ]; then
+    t25b_ko="$t25b_ko [$(basename "$t25b_fxfile") : FAUX ROUGE sur une rédaction licite — hit=[$t25b_hit]]"
+  fi
+done
+if cmp -s "$CODER_FILE" "$T25B_MUT_CODER"; then
+  t25b_ko="$t25b_ko [mutant de vf-coder.md IDENTIQUE à l'original — la formule visée n'existe plus, la mutation n'a rien mordu (sonde à réancrer, ce n'est PAS un défaut de l'assertion)]"
+elif [ -z "$(t25_forbidden_chain_hits "$T25B_MUT_CODER")" ]; then
+  t25b_ko="$t25b_ko [mutant de vf-coder.md : la réintroduction de \`--auto\` sur le cadrage n'est PAS détectée — le gate resterait anti-corrélé au risque annoncé]"
+fi
+[ -z "$(t25_forbidden_chain_hits "$CODER_FILE")" ] \
+  || t25b_ko="$t25b_ko [vf-coder.md RÉEL : sa brique Cadrage prescrit un flag d'enchaînement]"
+if [ -z "$t25b_ko" ]; then
+  ok "T25b (A-1, DISCRIMINANT) : \`--auto\`/\`--chain\` sur la brique Cadrage est une forme INTERDITE — 2 formes détectées (forme d'avant l'arbitrage, sous-puce imbriquée), 2 rédactions LICITES épargnées (\`--assumptions\`, interdiction rédigée), et la réintroduction de \`--auto\` dans vf-coder.md réel fait rougir la sonde"
+else
+  ko "T25b (A-1, DISCRIMINANT) : la fixture du cadrage n'est pas réellement inversée —$t25b_ko"; t25b_ok=0
+fi
 
 # ---------------------------------------------------------------------------
 # T26 (D-03, D-04, D-04bis) — minimum de reprise, halte de nœud, réponse par le manager. Garde
