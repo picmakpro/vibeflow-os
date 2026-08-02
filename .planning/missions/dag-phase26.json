@@ -130,7 +130,7 @@
         "manual/toc.yml",
         "manual/.tools/**"
       ],
-      "status": "running"
+      "status": "done"
     }
   ]
 }
