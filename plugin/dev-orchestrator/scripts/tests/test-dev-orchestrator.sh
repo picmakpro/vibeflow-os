@@ -3030,8 +3030,16 @@ md_folded "$CODER_FILE" | "$GREP" -qiE 'jamais[[:space:]]+une[[:space:]]+répons
 #     formule à cheval sur deux lignes se retrouve avec trois espaces au pli.
 #  2. la personne du verbe est tolérée (« répond » à la 3e dans la référence, « réponds » à la 2e
 #     dans une rédaction adressée au manager) : c'est la FORMULE qui est gatée, pas sa voix.
+#  3. le NOMBRE de l'attente est toléré, comme en T27. Ce motif n'acceptait que le pluriel alors
+#     que $T27_ASK_RE, ajouté par le MÊME lot, reconnaît explicitement les deux nombres (« attente
+#     au singulier introduite par « à l' » ») — un désalignement mécanique entre deux sondes de la
+#     même doctrine. Coût mesuré : une réécriture licite d'A-4 au singulier produisait ici un KO
+#     disant « le bloc ne nomme pas le manager comme répondant aux attentes humaines », c'est-à-dire
+#     accusant une doctrine qui dit exactement cela. Le motif n'est PAS remplacé par $T27_ASK_RE :
+#     celui-ci accepte en plus « pose la question », qui satisferait C sans que le bloc ne nomme
+#     jamais la réponse aux attentes — ce serait un relâchement, pas un alignement.
 T26_HALT_RE='halte[[:space:]]+de[[:space:]]+nœud'
-T26_ANSWER_RE='répond(s)?[[:space:]]+aux[[:space:]]+attentes[[:space:]]+humaines'
+T26_ANSWER_RE="répond(s|re)?[[:space:]]+(aux[[:space:]]+|à[[:space:]]+l['’][[:space:]]*)attentes?[[:space:]]+humaines?"
 t26_c_blk="$(md_blocks_matching "$MFLOW" "$T24_ANCHOR_C")"
 if [ -z "$t26_c_blk" ]; then
   ko "T26 C : bloc « Verdict d'étape » introuvable dans mission-flow.md — rien n'a été mesuré"; t26_ok=0
@@ -3456,7 +3464,43 @@ T27_MUT_QUESTION="$T27_TMPDIR/mutant-question-sans-mode.md"
 T27_MUT_ADD_ASK="$T27_TMPDIR/mutant-ajout-question-en-autonome.md"
 T27_MUT_ADD_GEL="$T27_TMPDIR/mutant-ajout-gel-en-superviser.md"
 T27_LICIT="$T27_TMPDIR/licite-modes-en-clair.md"
-md_sed_folded "s/mode${MDSP}[*][*]superviser[*][*]/mode **@@VFMODE@@**/g;s/mode${MDSP}[*][*]autonome[*][*]/mode **superviser**/g;s/mode${MDSP}[*][*]@@VFMODE@@[*][*]/mode **autonome**/g" "$MFLOW" > "$T27_MUT_SWAP"
+# M1 est fabriqué DANS le segment mesuré, sur les MÊMES ancres structurelles que celles qui le
+# bornent — jamais sur une graphie de prose. La forme précédente (`s/mode **superviser**/…/g` sur
+# tout le fichier) était ancrée sur la graphie EN INCISE du foyer : dès qu'une réécriture licite
+# déplace le qualificatif en TÊTE DE BRANCHE (« superviser : … », la graphie du renvoi, que T27c
+# déclare pourtant reconnaître), le `sed` ne mord plus rien dans le segment mais mord encore
+# AILLEURS (le bullet « Blocage », plus bas). Le fichier diffère donc le garde `cmp -s` passe, le
+# garde de multiset canonique passe, et l'assertion rend « M1 NON détecté » — un faux rouge chiffré
+# qui accuse l'assertion là où la mutation n'a rien mordu DANS le périmètre mesuré.
+#
+# COROLLAIRE À NE PAS REPERDRE : `cmp -s` est un garde au niveau du FICHIER. Il ne distingue pas
+# « mutation hors du périmètre mesuré » de « mutation non détectée ». Il ne redevient exact que
+# parce que la mutation est désormais CONFINÉE au segment : « fichier identique » y équivaut à
+# « rien à muter dans le segment », et le message de KO dit alors la bonne chose.
+#
+# Bornes STRUCTURELLES, imposées par le contrat ADR-053 et déjà gatées ailleurs : le bloc
+# « **Verdict d'…** » ($T24_ANCHOR_C, l'ancre de T24), puis les entrées de statut `human_needed`
+# (ouverture) et `gaps_found` (fermeture) — celles-là mêmes que t24_segment_of découpe. La mutation
+# échange les deux qualificatifs de mode QUELLE QUE SOIT leur graphie : elle suit la rédaction au
+# lieu de la figer.
+t27_swap_modes_in_segment() { # <file> — échange superviser ↔ autonome DANS le segment mesuré
+  awk -v anchor="$T24_ANCHOR_C" '
+    function swap(s) {
+      gsub(/superviser/, "@VFSWAP@", s); gsub(/autonome/, "superviser", s)
+      gsub(/@VFSWAP@/, "autonome", s); return s
+    }
+    state == 0 { if ($0 ~ anchor) state = 1 }
+    state == 1 && match($0, /`human_needed`/) {
+      print substr($0, 1, RSTART + RLENGTH - 1) swap(substr($0, RSTART + RLENGTH)); state = 2; next
+    }
+    state == 2 && match($0, /`gaps_found`/) {
+      print swap(substr($0, 1, RSTART - 1)) substr($0, RSTART); state = 3; next
+    }
+    state == 2 { print swap($0); next }
+    { print }
+  ' "$1"
+}
+t27_swap_modes_in_segment "$MFLOW" > "$T27_MUT_SWAP"
 md_sed_folded "s/en${MDSP}mode${MDSP}[*][*]autonome[*][*],${MDSP}il${MDSP}n/il n/" "$MFLOW" > "$T27_MUT_GEL"
 md_sed_folded "s/en${MDSP}mode${MDSP}[*][*]superviser[*][*],${MDSP}c/c/"           "$MFLOW" > "$T27_MUT_QUESTION"
 # Guillemets SIMPLES : les motifs portent des backticks (substitution de commande entre guillemets
