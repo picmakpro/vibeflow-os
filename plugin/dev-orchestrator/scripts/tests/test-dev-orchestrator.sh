@@ -2391,11 +2391,56 @@ t25_forbidden_chain_hits() { # <file>
   md_blocks_matching "$1" "$T25_BRICK_RE" | t25_prescriptive_clauses "$T25_MODE_RE"
 }
 
-# volet présence : vf-dev-manager.md nomme la clé et l'appel qui la remet à faux.
-"$GREP" -q '_auto_chain_active' "$DEVMGR" || { ko "T25 présence : vf-dev-manager.md ne nomme pas workflow._auto_chain_active"; t25_ok=0; }
-"$GREP" -q 'config-set' "$DEVMGR" || { ko "T25 présence : vf-dev-manager.md n'invoque pas config-set"; t25_ok=0; }
-"$GREP" -q 'gsd_run' "$DEVMGR" || { ko "T25 présence : vf-dev-manager.md ne résout pas gsd_run"; t25_ok=0; }
-"$GREP" -q 'RUNTIME_DIR' "$DEVMGR" && { ko "T25 présence : vf-dev-manager.md recopie la cascade de résolution (RUNTIME_DIR) au lieu d'y renvoyer — DRY rompu"; t25_ok=0; }
+# volet présence : les DEUX agents qui prescrivent `gsd_run` nomment la clé, l'appel qui la remet
+# à faux, ET la conduite si l'outil ne se résout pas.
+#
+# POURQUOI LES DEUX (F3). Cette sonde ne gatait que $DEVMGR. A-1bis a depuis fait reposer la
+# fermeture de la fenêtre armée sur un `gsd_run config-set` porté par vf-coder.md — introduit sans
+# renvoi de résolution ni conduite d'indisponibilité, là où le manager portait les deux. Un
+# désarmement qui échoue parce que l'outil n'est pas résoluble depuis le worker échoue EN SILENCE,
+# et c'est exactement la garantie qu'A-1bis fait reposer sur lui. Gater un seul des deux agents
+# laissait la moitié de la chaîne hors mesure.
+#
+# CE QUI EST MESURÉ : une RELATION, pas la présence de trois tokens dans un fichier. Le renvoi et
+# la conduite doivent vivre DANS le bloc qui prescrit `gsd_run` — un « §Seuil de bascule » cité
+# trois sections plus loin ne se suit pas depuis l'appel. Et la conduite doit vivre dans le bloc
+# QUI PORTE LE RENVOI : les deux moitiés séparées ne composent aucune conduite.
+#
+# COMPTEUR D'ATTEINTE : le nombre d'agents où un bloc `gsd_run` a réellement été VU. Sans lui, un
+# agent qui cesserait de prescrire `gsd_run` sortirait de la mesure sans qu'un seul KO ne le dise.
+T25_RESOLUTION_RE='Seuil[[:space:]]+de[[:space:]]+bascule'
+T25_UNAVAIL_RE='introuvable'
+t25_presence_seen=0
+for t25_pf in "$DEVMGR" "$CODER_FILE"; do
+  t25_pn="$(basename "$t25_pf")"
+  if [ ! -f "$t25_pf" ]; then
+    ko "T25 présence : $t25_pn introuvable — rien n'a été mesuré sur cet agent"; t25_ok=0; continue
+  fi
+  "$GREP" -q '_auto_chain_active' "$t25_pf" || { ko "T25 présence : $t25_pn ne nomme pas workflow._auto_chain_active"; t25_ok=0; }
+  "$GREP" -q 'config-set' "$t25_pf" || { ko "T25 présence : $t25_pn n'invoque pas config-set"; t25_ok=0; }
+  if "$GREP" -q 'RUNTIME_DIR' "$t25_pf"; then
+    ko "T25 présence : $t25_pn recopie la cascade de résolution (RUNTIME_DIR) au lieu d'y renvoyer — DRY rompu"; t25_ok=0
+  fi
+  t25_gblk="$(md_blocks_matching "$t25_pf" 'gsd_run')"
+  if [ -z "$t25_gblk" ]; then
+    ko "T25 présence : $t25_pn ne résout pas gsd_run — aucun bloc ne le prescrit"; t25_ok=0; continue
+  fi
+  t25_presence_seen=$((t25_presence_seen + 1))
+  t25_rblk="$(printf '%s\n' "$t25_gblk" | "$GREP" -E "$T25_RESOLUTION_RE")"
+  if [ -z "$t25_rblk" ]; then
+    ko "T25 présence : $t25_pn prescrit gsd_run sans renvoyer, DANS le bloc qui le prescrit, à son foyer de résolution (mission-contracts.md §Seuil de bascule) — l'appel peut échouer sans que rien ne dise où l'outil se résout"; t25_ok=0
+  else
+    printf '%s\n' "$t25_rblk" | "$GREP" -q 'mission-contracts.md' \
+      || { ko "T25 présence : $t25_pn nomme la section de résolution sans nommer son fichier (mission-contracts.md) — un renvoi sans fichier ne se suit pas"; t25_ok=0; }
+    printf '%s\n' "$t25_rblk" | "$GREP" -qE "$T25_UNAVAIL_RE" \
+      || { ko "T25 présence : $t25_pn renvoie à la résolution de gsd_run mais ne dit pas la conduite quand l'outil est INTROUVABLE — le désarmement échouerait en silence"; t25_ok=0; }
+  fi
+done
+if [ "$t25_presence_seen" -eq 2 ]; then
+  ok "T25 présence (2 agents) : vf-dev-manager.md et vf-coder.md prescrivent tous deux gsd_run, et chacun porte DANS le bloc qui le prescrit le renvoi de résolution (mission-contracts.md §Seuil de bascule) et la conduite si l'outil est introuvable — cascade jamais recopiée (DRY)"
+else
+  ko "T25 présence : $t25_presence_seen agent(s) sur 2 prescrivent réellement gsd_run — la sonde de renvoi et de conduite est verte à vide sur le ou les autres"; t25_ok=0
+fi
 
 # volet fermeture (le cœur) : balayage réel des .md de doctrine, via les cibles RÉSOLUES. Le
 # compteur de fichiers vus est non négociable : sans lui, un glob qui n'expanse pas produit un

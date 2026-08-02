@@ -28,9 +28,12 @@ Enchaîne les sous-phases en déléguant à la machinerie existante :
    **immédiatement, dans le même geste**, `gsd_run config-set workflow._auto_chain_active false`
    — le chain flag posé par le cadrage ré-arme sinon ce que le manager avait désarmé à son geste
    de démarrage, pour toute la suite de la mission ; le refermer ICI, dans le geste même qui
-   l'ouvre, borne la fenêtre armée au seul cadrage de cette étape. Aucun autre mode ne convient
-   sur `gsd-core@1.9.0` : le mode assumptions n'écrit aucun `CONTEXT.md` et attend une réponse
-   humaine. Tu n'as pas `AskUserQuestion` : une question de cadrage que les assumptions
+   l'ouvre, borne la fenêtre armée au seul cadrage de cette étape. Résolution de `gsd_run` :
+   `mission-contracts.md` §Seuil de bascule — la cascade y vit, ne la recopie jamais ici (ADR-030) ;
+   introuvable → consigne-le au rapport, best-effort comme au geste 5 du manager, JAMAIS un
+   désarmement en échec muet : la garantie ci-dessus ne tient que par cet appel. Aucun autre mode
+   ne convient sur `gsd-core@1.9.0` : le mode assumptions n'écrit aucun `CONTEXT.md` et attend une
+   réponse humaine. Tu n'as pas `AskUserQuestion` : une question de cadrage que les assumptions
    documentées ne couvrent pas → statut `human_needed` remonté au manager, JAMAIS auto-répondue
    en silence.
 2. **Plan** : invoque `gsd-plan-phase` (ou dispatche l'agent `gsd-planner` via l'outil Agent).
