@@ -2961,15 +2961,44 @@ fi
 # 2e (« tu poses », « tu réponds »). Punir l'une des deux serait un faux rouge sur une rédaction
 # licite — la fixture L, qui est écrite à la 2e personne, le prouve à chaque exécution.
 #
+# ÉLASTICITÉ DE GRAPHIE (B5, 2026-08-02). Un motif qui ne reconnaît QUE la graphie du foyer est
+# aveugle partout ailleurs, et son aveuglement est silencieux : la doctrine peut dire l'inverse
+# d'ADR-031 sans qu'un seul KO ne sorte. C'est ce qui s'est produit une TROISIÈME fois — après les
+# deux foyers fermés par B4 — sur le renvoi de vf-dev-manager.md, qui paraphrase A-4 dans ses
+# propres graphies : « superviser : tu réponds à l'attente humaine ; autonome : gel du nœud ».
+# Trois écarts, trois angles morts cumulés :
+#   · l'attente au SINGULIER, introduite par « à l' » et non par « aux » ;
+#   · le gel au NOMINAL (« gel du nœud ») et non au verbal (« GELER », « geler le nœud ») ;
+#   · le mode annoncé en TÊTE DE BRANCHE (« superviser : … ») et non en incise (« en mode
+#     **superviser**, … ») — la forme même que le §clause décrit plus haut, où « : » sépare
+#     l'annonce de sa disposition À L'INTÉRIEUR d'une branche.
+# Échanger les deux modes dans cette paraphrase — l'inversion exacte qui rouvre ADR-031 — laissait
+# la suite à 93 OK / 0 KO. Les trois motifs couvrent donc désormais les deux nombres, les deux
+# formes (nominale et verbale) et les deux positions du qualificatif de mode. Le balayage des 13
+# cibles a été refait motif par motif : l'élargissement ne capture que les 2 clauses de cette
+# paraphrase, toutes deux correctement qualifiées — aucun faux rouge (T27c le rejoue).
+#
 # Tous les blancs INTERNES des motifs sont élastiques ([[:space:]]+) : md_blocks_matching recolle
 # les lignes du bloc en conservant leur indentation, donc une formule coupée par le repli à 100
 # colonnes se retrouve avec plusieurs espaces au pli. Un motif à espace littéral ne rougirait pas
 # — il deviendrait AVEUGLE, ce qui est pire : la clause pourrait disparaître sans un seul KO.
 # ---------------------------------------------------------------------------
 t27_ok=1
-T27_MODE_RE='mode[[:space:]]+[*]*(superviser|autonome)'
-T27_ASK_RE='répond(s)?[[:space:]]+aux[[:space:]]+attentes[[:space:]]+humaines|pose(s|r)?[[:space:]]+la[[:space:]]+question'
-T27_FREEZE_RE='GELER|halte[[:space:]]+de[[:space:]]+nœud|g(è|e)le[[:space:]]+le[[:space:]]+nœud|geler[[:space:]]+le[[:space:]]+nœud'
+# QUALIFICATIF DE MODE — deux positions licites, une par mode. En INCISE (« en mode
+# **superviser**, … ») : la graphie du foyer. En TÊTE DE BRANCHE (« superviser : … ») : la graphie
+# du renvoi. Ces deux motifs sont nommés séparément parce que (b) et (c) mesurent une RELATION —
+# quel mode qualifie quelle disposition — et non la présence d'un mot : les confondre dans une
+# alternance unique rendrait l'inversion des deux modes indétectable.
+T27_MODE_SUP_RE='mode[[:space:]]+[*]*superviser|[*]*superviser[*]*[[:space:]]*:'
+T27_MODE_AUTO_RE='mode[[:space:]]+[*]*autonome|[*]*autonome[*]*[[:space:]]*:'
+T27_MODE_RE="$T27_MODE_SUP_RE|$T27_MODE_AUTO_RE"
+# Disposition de QUESTION : « répond / réponds / répondre », « aux attentes humaines » comme « à
+# l'attente humaine » (les deux nombres, les deux apostrophes — droite et typographique).
+T27_ASK_RE="répond(s|re)?[[:space:]]+(aux[[:space:]]+|à[[:space:]]+l['’][[:space:]]*)attentes?[[:space:]]+humaines?|pose(s|r)?[[:space:]]+la[[:space:]]+question"
+# Disposition de GEL : forme verbale (« GELER », « gèle/geler/gelez le nœud ») ET forme nominale
+# (« gel du nœud », « halte de nœud »). Le participe seul (« a gelé une mission », « fichiers
+# gelés ») reste HORS motif : il raconte un fait passé, il ne dispose de rien.
+T27_FREEZE_RE='GELER|halte[[:space:]]+de[[:space:]]+nœud|gel[[:space:]]+d(u|e)[[:space:]]+nœud|g(è|e)l(e|es|er|ez)[[:space:]]+le[[:space:]]+nœud'
 T27_WHY=""
 
 t27_clauses() { awk '{ gsub(/;|·/, "\n"); print }'; }
@@ -2987,18 +3016,18 @@ t27_flow_modes() { # <file>
   [ -z "$unqual" ] || { T27_WHY="clause de contrôle de flux SANS qualificatif de mode — « $unqual »"; return 1; }
 
   # (b) — le rattachement, pas seulement la co-présence des deux mots « superviser » et « autonome ».
-  printf '%s\n' "$seg" | t27_clauses | "$GREP" -E "$T27_ASK_RE" | "$GREP" -qE 'mode[[:space:]]+[*]*superviser' \
+  printf '%s\n' "$seg" | t27_clauses | "$GREP" -E "$T27_ASK_RE" | "$GREP" -qE "$T27_MODE_SUP_RE" \
     || { T27_WHY="répondre à l'attente humaine (poser la question) n'est pas rattaché au mode SUPERVISER — en mode autonome, y répondre viole ADR-031"; return 1; }
-  printf '%s\n' "$seg" | t27_clauses | "$GREP" -E "$T27_FREEZE_RE" | "$GREP" -qE 'mode[[:space:]]+[*]*autonome' \
+  printf '%s\n' "$seg" | t27_clauses | "$GREP" -E "$T27_FREEZE_RE" | "$GREP" -qE "$T27_MODE_AUTO_RE" \
     || { T27_WHY="le GEL du nœud n'est pas rattaché au mode AUTONOME — « toujours geler » interromprait aussi les sessions supervisées"; return 1; }
 
   # (c) — EXCLUSIVITÉ : aucune clause de QUESTION sous le mode autonome, aucune clause de GEL sous
   # le mode superviser. Sans elle, (a) et (b) restent satisfaites par la BONNE clause pendant
   # qu'une clause contradictoire vit juste à côté.
-  crossed="$(printf '%s\n' "$seg" | t27_clauses | "$GREP" -E "$T27_ASK_RE" | "$GREP" -E 'mode[[:space:]]+[*]*autonome' \
+  crossed="$(printf '%s\n' "$seg" | t27_clauses | "$GREP" -E "$T27_ASK_RE" | "$GREP" -E "$T27_MODE_AUTO_RE" \
              | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | tr '\n' '|')"
   [ -z "$crossed" ] || { T27_WHY="une clause rattache la RÉPONSE à l'attente humaine au mode AUTONOME — l'utilisateur y est absent par définition, y répondre viole ADR-031 : « $crossed »"; return 1; }
-  crossed="$(printf '%s\n' "$seg" | t27_clauses | "$GREP" -E "$T27_FREEZE_RE" | "$GREP" -E 'mode[[:space:]]+[*]*superviser' \
+  crossed="$(printf '%s\n' "$seg" | t27_clauses | "$GREP" -E "$T27_FREEZE_RE" | "$GREP" -E "$T27_MODE_SUP_RE" \
              | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | tr '\n' '|')"
   [ -z "$crossed" ] || { T27_WHY="une clause rattache le GEL du nœud au mode SUPERVISER — le checkpoint humain y est disponible, geler priverait la session de sa réponse : « $crossed »"; return 1; }
   return 0
@@ -3134,10 +3163,10 @@ t27_no_crossed_clause() { # <file> — 0 = rien à redire · 1 = clause fautive 
   # blocs) — jamais le fichier d'un bout à l'autre, qui rattacherait le mode d'une section à la
   # disposition d'une autre.
   clauses="$(md_blocks_matching "$1" '.' | t27_clauses)"
-  hits="$(printf '%s\n' "$clauses" | "$GREP" -E "$T27_ASK_RE" | "$GREP" -E 'mode[[:space:]]+[*]*autonome' \
+  hits="$(printf '%s\n' "$clauses" | "$GREP" -E "$T27_ASK_RE" | "$GREP" -E "$T27_MODE_AUTO_RE" \
           | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | tr '\n' '|')"
   [ -z "$hits" ] || { T27B_WHY="une clause rattache la RÉPONSE à l'attente humaine au mode AUTONOME — l'utilisateur y est absent par définition, y répondre viole ADR-031 : « $hits »"; return 1; }
-  hits="$(printf '%s\n' "$clauses" | "$GREP" -E "$T27_FREEZE_RE" | "$GREP" -E 'mode[[:space:]]+[*]*superviser' \
+  hits="$(printf '%s\n' "$clauses" | "$GREP" -E "$T27_FREEZE_RE" | "$GREP" -E "$T27_MODE_SUP_RE" \
           | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | tr '\n' '|')"
   [ -z "$hits" ] || { T27B_WHY="une clause rattache le GEL du nœud au mode SUPERVISER — le checkpoint humain y est disponible, geler priverait la session de sa réponse : « $hits »"; return 1; }
   hits="$(printf '%s\n' "$clauses" | "$GREP" -E "$T27_ASK_RE|$T27_FREEZE_RE" | "$GREP" -vE "$T27_MODE_RE" \
@@ -3210,6 +3239,90 @@ if [ -n "$t27b_ko" ]; then
   ko "T27b (B4, DISCRIMINANT) : l'exigence d'A-4 n'est pas tenue sur les trois cibles —$t27b_ko"; t27b_ok=0
 else
   ok "T27b (B4, DISCRIMINANT) : l'EXCLUSIVITÉ A-4 est mesurée sur les $t27b_scanned .md de doctrine du module — les TROIS cibles nommées (mission-flow.md, mission-contracts.md, vf-dev-manager.md) vérifiées PRÉSENTES dans le balayage —, 9 mutants font rougir l'assertion (question⇒autonome, gel⇒superviser, clause muette, injectés dans CHACUNE des trois), 1 clause correctement qualifiée reste verte"
+fi
+
+# ---------------------------------------------------------------------------
+# T27c (B5, DISCRIMINANT) — l'exigence d'A-4 mord sur les GRAPHIES de la doctrine, pas sur la seule
+# graphie du foyer.
+#
+# CE QUE CE GATE FERME. B4 a étendu la PORTÉE (3 cibles au lieu d'1). Restait l'autre moitié : la
+# RECONNAISSANCE. Les motifs ne connaissaient que la rédaction du foyer — attente au pluriel
+# introduite par « aux », gel au verbal (« GELER »), mode en incise (« en mode **autonome**, … »).
+# Le renvoi de vf-dev-manager.md, lui, paraphrase A-4 dans ses propres graphies : « superviser : tu
+# réponds à l'attente humaine ; autonome : gel du nœud ». AUCUN des trois motifs ne la voyait.
+# Échanger ses deux modes — l'inversion exacte qui fait dire à l'agent, en autonomie, l'inverse
+# d'ADR-031 — laissait la suite à 93 OK / 0 KO. Troisième foyer, même mode d'échec que B4.
+#
+# CE QUI EST MESURÉ, et pourquoi par FIXTURES et non sur le fichier réel. La paraphrase elle-même
+# est balayée par T27b (elle vit dans une cible du sweep) : si elle s'inverse, T27b rougit. Ici on
+# mesure la propriété de l'OUTIL — que les motifs SACHENT lire ces graphies —, et cela doit rester
+# vrai quelle que soit l'issue de l'arbitrage ouvert sur ce renvoi (O-1 : paraphrase conservée ou
+# réduite à un pointeur nu). Une sonde ancrée sur la paraphrase réelle deviendrait no-op le jour où
+# le pointeur nu l'emporte ; une sonde par fixtures reste fondée dans les deux issues, et interdit
+# la réintroduction d'une paraphrase inversée.
+#
+# GARDE « VERT À VIDE ». t27_no_crossed_clause est une garde NÉGATIVE : elle est verte quand la
+# doctrine est saine ET quand les motifs ne voient rien. Le compteur ci-dessous distingue les deux —
+# sans lui, un motif cassé par une refonte future rendrait TOUT le paragraphe A-4 muet en silence.
+# ---------------------------------------------------------------------------
+t27c_ok=1
+t27c_ko=""
+
+# Compteur d'ATTEINTE : combien de clauses de doctrine les motifs voient-ils réellement ?
+t27c_ask_seen=0; t27c_freeze_seen=0
+while IFS= read -r t27c_f; do
+  [ -n "$t27c_f" ] || continue
+  t27c_cl="$(md_blocks_matching "$t27c_f" '.' | t27_clauses)"
+  t27c_ask_seen=$((t27c_ask_seen + $(printf '%s\n' "$t27c_cl" | "$GREP" -cE "$T27_ASK_RE")))
+  t27c_freeze_seen=$((t27c_freeze_seen + $(printf '%s\n' "$t27c_cl" | "$GREP" -cE "$T27_FREEZE_RE")))
+done < <(module_md_targets)
+[ "$t27c_ask_seen" -gt 0 ] \
+  || t27c_ko="$t27c_ko [ATTEINTE : le motif de QUESTION ne voit AUCUNE clause dans toute la doctrine du module — la garde d'exclusion est verte à vide, elle ne garantit rien]"
+[ "$t27c_freeze_seen" -gt 0 ] \
+  || t27c_ko="$t27c_ko [ATTEINTE : le motif de GEL ne voit AUCUNE clause dans toute la doctrine du module — la garde d'exclusion est verte à vide, elle ne garantit rien]"
+
+# Fixtures écrites dans la graphie du RENVOI (mode en tête de branche, attente au singulier, gel au
+# nominal) — celle qui échappait aux motifs. Injection en FIN de fichier : aucun token retiré,
+# aucune ancre existante touchée.
+T27C_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T27C_TMPDIR"
+T27C_ASK_AUTO="- **Renvoi (clause injectée)** : escalade human_needed départagée par le mode (autonome : tu réponds à l'attente humaine)."
+T27C_GEL_SUP="- **Renvoi (clause injectée)** : escalade human_needed départagée par le mode (superviser : gel du nœud, ADR-031)."
+T27C_MUETTE="- **Renvoi (clause injectée)** : escalade human_needed — tu réponds à l'attente humaine, puis gel du nœud."
+# La paraphrase CORRECTE, dans sa graphie native : elle doit rester VERTE. C'est la contrepartie du
+# fil rouge — élargir les motifs sans punir une rédaction licite.
+T27C_LICITE="- **Renvoi (clause injectée)** : escalade human_needed départagée par le mode (superviser : tu réponds à l'attente humaine ; autonome : gel du nœud, ADR-031)."
+
+t27c_mut_n=0
+t27c_assert_mutant_red() { # <libellé> <fichier cible> <clause injectée>
+  local mut
+  t27c_mut_n=$((t27c_mut_n + 1))
+  mut="$T27C_TMPDIR/mutant-$t27c_mut_n.md"
+  { cat "$2"; printf '\n%s\n' "$3"; } > "$mut"
+  if cmp -s "$2" "$mut"; then
+    t27c_ko="$t27c_ko [$1 : mutant IDENTIQUE à l'original — la clause n'a pas été injectée, rien n'a été mesuré]"
+    return
+  fi
+  t27_no_crossed_clause "$mut" \
+    && t27c_ko="$t27c_ko [$1 : NON détecté — la graphie du renvoi échappe encore aux motifs sur cette cible]"
+}
+for t27c_pair in "mission-flow.md:$MFLOW" "mission-contracts.md:$CONTRACTS_FILE" "vf-dev-manager.md:$DEVMGR"; do
+  t27c_name="${t27c_pair%%:*}"; t27c_path="${t27c_pair#*:}"
+  if [ ! -f "$t27c_path" ]; then
+    t27c_ko="$t27c_ko [$t27c_name introuvable — cible d'A-4 non mesurable]"; continue
+  fi
+  t27c_assert_mutant_red "$t27c_name : QUESTION en tête de branche « autonome : … »"   "$t27c_path" "$T27C_ASK_AUTO"
+  t27c_assert_mutant_red "$t27c_name : GEL NOMINAL en tête de branche « superviser : … »" "$t27c_path" "$T27C_GEL_SUP"
+  t27c_assert_mutant_red "$t27c_name : paraphrase MUETTE sur le mode"                   "$t27c_path" "$T27C_MUETTE"
+done
+T27C_LICIT_FILE="$T27C_TMPDIR/licite-graphie-du-renvoi.md"
+{ cat "$MFLOW"; printf '\n%s\n' "$T27C_LICITE"; } > "$T27C_LICIT_FILE"
+t27_no_crossed_clause "$T27C_LICIT_FILE" \
+  || t27c_ko="$t27c_ko [FAUX ROUGE : la paraphrase CORRECTEMENT qualifiée dans la graphie du renvoi (superviser : question ; autonome : gel) est rejetée — $T27B_WHY]"
+
+if [ -n "$t27c_ko" ]; then
+  ko "T27c (B5, DISCRIMINANT) : les motifs d'A-4 restent aveugles aux graphies de la doctrine —$t27c_ko"; t27c_ok=0
+else
+  ok "T27c (B5, DISCRIMINANT) : les motifs d'A-4 lisent les GRAPHIES du renvoi autant que celles du foyer (attente au singulier introduite par « à l' », gel NOMINAL « gel du nœud », mode annoncé en TÊTE DE BRANCHE « superviser : … ») — $t27c_ask_seen clause(s) de question et $t27c_freeze_seen clause(s) de gel effectivement ATTEINTES dans la doctrine (pas de vert à vide), 9 mutants dans cette graphie font rougir l'assertion sur CHACUNE des trois cibles, 1 paraphrase correctement qualifiée reste verte"
 fi
 
 # ---------------------------------------------------------------------------
