@@ -177,4 +177,3 @@ Main lab (private): [vibeflow-lab](https://github.com/picmakpro/vibeflow-lab) â€
 Source-available under a proprietary license â€” see [LICENSE](./LICENSE). Public code and
 history; training students get a private-reuse right; redistribution and resale prohibited.
 The `skill-creator` module reuses original Anthropic content under the MIT license.
-</content>

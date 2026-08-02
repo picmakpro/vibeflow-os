@@ -182,4 +182,3 @@ Source-available sous licence propriétaire — voir [LICENSE](./LICENSE). Code 
 publics ; les élèves de la formation disposent d'un droit de réutilisation privée ;
 redistribution et revente interdites. Le module `skill-creator` réutilise du contenu Anthropic
 original sous licence MIT.
-</content>
