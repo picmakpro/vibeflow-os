@@ -183,13 +183,24 @@ haut).
 précondition amont non satisfaite ⇒ `statut: "human_needed"`. Un refus d'auto-approbation amont
 est un refus, quel qu'en soit le motif.
 
-**Minimum de reprise (D-03)** : quand le statut est celui d'escalade humaine, le bloc typé porte
-un champ optionnel `reprise` dont les sous-champs sont exactement `plan_id`, `checkpoint` (le
-**type** de checkpoint amont), `gate`, et `attendu` (ce que le moteur déclare attendre, recopié
-verbatim) — **rien d'autre**, et en particulier **pas** la table des tâches déjà exécutées. Motif
-factuel (ADR-030) : le contrat de retour détaillé de l'exécuteur est **interne** au moteur, que le
-skill d'exécution orchestre déjà lui-même (il présente le checkpoint puis relance une
-continuation) — le recopier côté VibeFlow dupliquerait un contrat amont. On désigne ce contrat
+**Minimum de reprise (D-03, élargi par A-3)** : quand le statut est celui d'escalade humaine, le
+bloc typé porte un champ optionnel `reprise` dont les sous-champs sont exactement `plan_id`,
+`checkpoint` (le **type** de checkpoint amont), `gate`, `attendu` (ce que le moteur déclare
+attendre, recopié verbatim), `reponse_humaine` (la réponse donnée par l'humain, recopiée verbatim ;
+absent tant qu'il n'a pas répondu) et `taches_faites` (l'état d'avancement du mandat interrompu,
+tel que mesuré) — **rien d'autre**. Les deux derniers sont un ajout gouverné, pas un relâchement de
+la garde ADR-030 : le distinguo qui les autorise est écrit juste en dessous.
+
+**Pourquoi les deux derniers, et pourquoi ce n'est PAS la duplication que ADR-030 interdit.** Les
+quatre premiers décrivent tous *la question*. Un manager qui redispatche « avec l'attendu »
+redispatche donc la question qu'il vient de reposer : le worker neuf retombe sur le même
+checkpoint et rend `human_needed` — ping-pong sur un gate bloquant. L'amont exige d'ailleurs la
+réponse de l'utilisateur pour reprendre. **Distinguo à ne jamais réduire** : la garde
+anti-duplication ADR-030 vise la recopie de **doctrine amont** — les intitulés du contrat de
+retour **interne** de l'exécuteur, que le skill d'exécution orchestre déjà lui-même (il présente le
+checkpoint puis relance une continuation) — et **pas** le transport d'un **état de reprise** d'un
+mandat vers son successeur. Une doctrine recopiée se relit à sa source ; un état mesuré, lui, n'est
+nulle part ailleurs et se perd si personne ne le transporte. On continue de désigner le contrat
 amont **par son rôle**, sans en reproduire les intitulés de bloc.
 
 **Continuation (D-10, forme minimale ici)** : la reprise se fait en redispatchant un **nouveau**

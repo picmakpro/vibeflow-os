@@ -2322,7 +2322,14 @@ T26_INTERNAL_RE='Completed Tasks|Current Task|Checkpoint Details|Awaiting|CHECKP
 # Sous-champs FIXÉS par D-03, tenus comme un ENSEMBLE CLOS : D-03 dit « sont exactement … — rien
 # d'autre », donc l'ensemble MESURÉ doit être ÉGAL à celui-ci, jamais seulement le contenir. Un
 # renommage OU un ajout exige un amendement de D-03, pas un test qui suit.
-T26_D03_FIELDS="plan_id checkpoint gate attendu"
+#
+# ÉLARGISSEMENT A-3 (arbitrage humain du 2026-08-02) : les quatre premiers décrivent tous *la
+# question*. Un manager qui redispatche « avec l'attendu » redispatche la question qu'il vient de
+# reposer — le worker neuf retombe sur le même checkpoint et rend `human_needed` : ping-pong sur un
+# gate bloquant. Le contrat transporte donc en plus l'ÉTAT DE REPRISE (`reponse_humaine`,
+# `taches_faites`). L'ensemble reste CLOS et l'assertion reste une ÉGALITÉ : seule la cible bouge,
+# jamais la propriété.
+T26_D03_FIELDS="plan_id checkpoint gate attendu reponse_humaine taches_faites"
 
 # Noms de sous-champs INTERDITS (ADR-030) : la table des tâches déjà exécutées du contrat interne
 # de l'exécuteur, sous ses graphies plausibles FR/EN. C'est une LISTE NOIRE, donc un filet à
@@ -2336,7 +2343,7 @@ T26_FORBIDDEN_FIELDS='^(taches_executees|taches_realisees|taches|completed_tasks
 # 2 = bloc introuvable.
 T26_FIELDS=""; T26_N=0; T26_WHY=""
 t26_reprise_closed() { # <fichier de contrat>
-  local blk head enum fields parent bad miss extra expected
+  local blk head enum fields parent bad id miss extra expected
   # Réinitialisation à l'ENTRÉE : sans elle, un $T26_WHY périmé survivait à un retour 2 et
   # l'appelant affichait le motif de l'appel précédent.
   T26_FIELDS=""; T26_N=0; T26_WHY=""
@@ -2376,8 +2383,18 @@ t26_reprise_closed() { # <fichier de contrat>
   # bloc, aucun ensemble clos n'est définissable (la prose y nomme légitimement d'autres champs) :
   # on retombe sur la liste noire, en le disant. Un champ « ajouté » après la borne fermante serait
   # la même violation, contournée d'un pas.
-  bad="$(printf '%s\n' "$blk" | t26_ids | "$GREP" -E "$T26_FORBIDDEN_FIELDS" | tr '\n' ' ')"
-  [ -z "$bad" ] || { T26_WHY="le bloc déclare, hors énumération, une graphie connue de la table du contrat interne amont (ADR-030) — $bad"; return 1; }
+  #
+  # A-3 : un nom que l'ensemble clos SANCTIONNE ne peut pas être, dans le même souffle, une
+  # violation ADR-030 — depuis A-3 le contrat transporte légitimement l'état de reprise. La liste
+  # noire ne s'applique donc qu'à ce que $T26_D03_FIELDS ne couvre pas. Ce n'est PAS un repli : la
+  # fermeture réelle reste (b), qui refuse tout nom absent de D-03, interdit connu ou non — élargir
+  # $T26_D03_FIELDS exige d'amender D-03, un acte explicite, jamais un test qui suit.
+  bad=""
+  for id in $(printf '%s\n' "$blk" | t26_ids | "$GREP" -E "$T26_FORBIDDEN_FIELDS"); do
+    case " $T26_D03_FIELDS " in *" $id "*) continue ;; esac
+    bad="$bad $id"
+  done
+  [ -z "$bad" ] || { T26_WHY="le bloc déclare, hors énumération, une graphie connue de la table du contrat interne amont (ADR-030) —$bad"; return 1; }
 
   parent="$(printf '%s\n' "$blk" | sed -n 's/.*champ optionnel `\([a-z][a-z0-9_]*\)`.*/\1/p')"
   [ -n "$parent" ] || { T26_WHY="champ porteur (« un champ optionnel \`…\` ») non déclaré"; return 1; }
@@ -2506,6 +2523,108 @@ else
 fi
 
 [ "$t26_ok" -eq 1 ] && ok "T26 : minimum de reprise (ensemble mesuré = exactement les $T26_N noms de D-03), halte de nœud, réponse par le manager, garde anti-duplication discriminante par mutation"
+
+# ---------------------------------------------------------------------------
+# T26 F (A-3) — le DISTINGUO ADR-030 est ÉCRIT, pas sous-entendu. Le contrat interdisait
+# explicitement la table des tâches faites ; A-3 lève cette interdiction pour ce seul cas. Sans la
+# phrase qui sépare les deux objets, la garde repart en faux rouge à la première relecture : rien
+# ne distinguerait plus « recopier de la DOCTRINE amont » (interdit — elle se relit à sa source) de
+# « transporter un ÉTAT de reprise » (nécessaire — un état mesuré n'est nulle part ailleurs et se
+# perd si personne ne le transporte). L'assertion mesure la présence des DEUX termes du distinguo
+# dans le MÊME bloc, avec son motif ADR-030 : une moitié de distinguo ne distingue rien.
+# ---------------------------------------------------------------------------
+t26f_ok=1
+T26F_WHY=""
+t26_distinguo_written() { # <file>
+  local blk
+  T26F_WHY=""
+  blk="$(md_blocks_matching "$1" '[*][*]Distinguo à ne jamais réduire[*][*]')"
+  [ -n "$blk" ] || { T26F_WHY="aucun bloc ne porte le distinguo (« **Distinguo à ne jamais réduire**  »)"; return 2; }
+  printf '%s\n' "$blk" | "$GREP" -q 'ADR-030' \
+    || { T26F_WHY="le distinguo ne cite pas ADR-030 — il ne se rattache à aucune garde"; return 1; }
+  printf '%s\n' "$blk" | "$GREP" -qi 'doctrine amont' \
+    || { T26F_WHY="le distinguo ne nomme pas ce qui reste INTERDIT (la recopie de doctrine amont)"; return 1; }
+  printf '%s\n' "$blk" | "$GREP" -qi 'état de reprise' \
+    || { T26F_WHY="le distinguo ne nomme pas ce qui devient LICITE (le transport d'un état de reprise)"; return 1; }
+  return 0
+}
+
+T26F_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T26F_TMPDIR"
+T26F_MUT_MOITIE="$T26F_TMPDIR/mutant-distinguo-a-moitie.md"
+T26F_MUT_INTERDIT="$T26F_TMPDIR/mutant-distinguo-sans-l-interdit.md"
+T26F_MUT_ORPHELIN="$T26F_TMPDIR/mutant-distinguo-sans-garde.md"
+# Les trois mutants gardent l'ANCRE du bloc : chacun est donc mesuré là où on prétend mesurer, et
+# jugé sur rc=1 (fermeture rompue) — jamais sur rc=2, qui signerait une ancre détruite, c'est-à-dire
+# rien de mesuré du tout.
+# 1. la moitié LICITE du distinguo effacée : il ne reste que l'interdit, donc plus de distinction.
+sed 's/état de reprise/objet/g' "$CONTRACTS_FILE" > "$T26F_MUT_MOITIE"
+# 2. la moitié INTERDITE effacée : symétrique — un distinguo sans son interdit n'interdit plus rien.
+sed 's/doctrine amont/matière amont/g' "$CONTRACTS_FILE" > "$T26F_MUT_INTERDIT"
+# 3. le distinguo détaché de sa garde : il ne cite plus ADR-030, donc il n'amende plus rien.
+sed 's/ADR-030/la garde/g' "$CONTRACTS_FILE" > "$T26F_MUT_ORPHELIN"
+
+t26f_ko=""
+t26f_assert_mutant_red() { # <libellé> <mutant>
+  if cmp -s "$CONTRACTS_FILE" "$2"; then
+    t26f_ko="$t26f_ko [$1 : mutant IDENTIQUE à l'original — le motif visé n'existe plus, la mutation n'a rien mordu (sonde à réancrer, ce n'est PAS un défaut de l'assertion)]"
+    return
+  fi
+  t26_distinguo_written "$2"
+  case $? in
+    1) : ;;
+    0) t26f_ko="$t26f_ko [$1 : NON détecté]" ;;
+    *) t26f_ko="$t26f_ko [$1 : rc=2, ancre du bloc détruite — rien n'a été mesuré, ce n'est pas une détection]" ;;
+  esac
+}
+t26f_assert_mutant_red "moitié LICITE du distinguo effacée (état de reprise)"    "$T26F_MUT_MOITIE"
+t26f_assert_mutant_red "moitié INTERDITE du distinguo effacée (doctrine amont)"  "$T26F_MUT_INTERDIT"
+t26f_assert_mutant_red "distinguo détaché de sa garde (ADR-030 non cité)"        "$T26F_MUT_ORPHELIN"
+t26_distinguo_written "$CONTRACTS_FILE" || t26f_ko="$t26f_ko [le contrat réel : $T26F_WHY]"
+if [ -z "$t26f_ko" ]; then
+  ok "T26 F (A-3, DISCRIMINANT) : le distinguo ADR-030 est écrit dans mission-contracts.md — recopie de DOCTRINE amont (interdite) vs transport d'un ÉTAT de reprise (licite) — et 3 mutants (chaque moitié effacée, garde décitée) font rougir l'assertion, tous mesurés sur l'ancre intacte"
+else
+  ko "T26 F (A-3) : le distinguo ADR-030 n'est pas gardé —$t26f_ko"; t26f_ok=0
+fi
+
+# ---------------------------------------------------------------------------
+# T26 E' (A-3, DISCRIMINANT) — l'égalité d'ensemble recalibrée reste DISCRIMINANTE sur les DEUX
+# noms ajoutés. Élargir une cible sans réarmer la sonde, c'est livrer un gate qui suit la doctrine
+# au lieu de la tenir : un renommage silencieux de `reponse_humaine` casserait la reprise
+# exactement comme un renommage de `plan_id`. E' s'AJOUTE à E, qui garde ses 3 mutants.
+# ---------------------------------------------------------------------------
+T26EP_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T26EP_TMPDIR"
+T26EP_MUT_REPONSE="$T26EP_TMPDIR/mutant-rename-reponse-humaine.md"
+T26EP_MUT_TACHES="$T26EP_TMPDIR/mutant-rename-taches-faites.md"
+T26EP_MUT_HORS="$T26EP_TMPDIR/mutant-champ-hors-ensemble.md"
+sed 's/`reponse_humaine`/`reponse_user`/g' "$CONTRACTS_FILE" > "$T26EP_MUT_REPONSE"
+sed 's/`taches_faites`/`taches_executees`/g' "$CONTRACTS_FILE" > "$T26EP_MUT_TACHES"
+# Champ ajouté dont AUCUNE liste noire ne contient la graphie : c'est l'égalité d'ensemble, et elle
+# seule, qui doit le refuser. Sans elle, un `journal_de_bord` passait à 87 OK / 0 KO.
+sed "s/\*\*rien d'autre\*\*/, \`journal_de_bord\` — **rien d'autre**/" "$CONTRACTS_FILE" > "$T26EP_MUT_HORS"
+
+t26ep_ko=""
+t26ep_assert_mutant_red() { # <libellé> <mutant>
+  if cmp -s "$CONTRACTS_FILE" "$2"; then
+    t26ep_ko="$t26ep_ko [$1 : mutant IDENTIQUE à l'original — le motif visé n'existe plus dans le contrat, la mutation n'a rien mordu (sonde à réancrer, ce n'est PAS un défaut de A)]"
+    return
+  fi
+  t26_reprise_closed "$2"
+  case $? in
+    1) : ;;
+    0) t26ep_ko="$t26ep_ko [$1 : NON détecté par A]" ;;
+    *) t26ep_ko="$t26ep_ko [$1 : rc=2, ancre du bloc détruite — rien n'a été mesuré, ce n'est pas une détection]" ;;
+  esac
+}
+t26ep_assert_mutant_red "renommage de reponse_humaine (→ reponse_user)"          "$T26EP_MUT_REPONSE"
+t26ep_assert_mutant_red "renommage de taches_faites (→ taches_executees)"        "$T26EP_MUT_TACHES"
+t26ep_assert_mutant_red "champ hors ensemble clos, absent de toute liste noire"  "$T26EP_MUT_HORS"
+# Dernier appel sur le contrat RÉEL : revalide A et restaure $T26_FIELDS/$T26_N.
+t26_reprise_closed "$CONTRACTS_FILE" || t26ep_ko="$t26ep_ko [le contrat réel ne tient plus l'assertion A — $T26_WHY]"
+if [ -z "$t26ep_ko" ]; then
+  ok "T26 E' (A-3, DISCRIMINANT) : l'ensemble clos ÉLARGI reste mesuré en égalité — renommage de l'un ou l'autre des 2 noms ajoutés (reponse_humaine, taches_faites) et champ hors ensemble absent de toute liste noire font tous trois rougir A"
+else
+  ko "T26 E' (A-3, DISCRIMINANT) : l'ensemble élargi n'est plus discriminant —$t26ep_ko"; t26_ok=0
+fi
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
