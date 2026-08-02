@@ -2,17 +2,26 @@
 gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
-current_phase: 22
-current_phase_name: Phases 21 et 22 mergées et shippées ; ROADMAP et compteurs remis d'équerre le 2026-08-01
+current_phase: 26
+current_phase_name: Manuel utilisateur VibeFlow (manual/) — livrée, PR ouverte (branche feat/phase-26-manuel-utilisateur)
 status: complete
-stopped_at: "Phase 21 close par sa gouvernance (plan 21-05), même patron que 20-07/c01f813 : 5/5 plans livrés, vérification PASS PARTIEL 7/8 comblée (CI remise au vert — compteur de suites 44→45 —, dev-orchestrator bumpé v2.9.0, planning-core v2.5.3, ROADMAP §Phase 21 recalé, 4 warnings W1-W4 traités : check-state-integrity.sh câblé au job gates de la CI, ADR-063 23→25 cas, team-kernel.md porte le recoupement #1995/#2608, inject-mcp-tools.sh nomme --force sur le rc=3 mode fichier unique). Release racine v2.45.0 préparée en commits locaux (triade + 2 historiques README + CHANGELOG racine) — AUCUN tag, AUCUN merge, AUCUN push : réservés à Samuel. Prochain geste humain : merger la PR, puis `git tag -a v2.45.0` et `gh release create`."
-last_updated: "2026-07-31T19:30:00.000Z"
-last_activity: 2026-07-31 (Phase 21 plan 21-05 — clôture de gouvernance, release v2.45.0 préparée)
+stopped_at: "Phase 26 CLOSE — 9/9 plans livrés. Le manuel est PUBLIC et commité depuis le 2026-08-02 (94 fichiers : 88 pages 44x2 langues, 3 index, toc.yml, .tools/ ; gate manual/.tools/check-manual.sh exit 0). Renversement de la contrainte fondatrice par Samuel : D-14 (aucun git add sous manual/) RÉVOQUÉE, exclusion .git/info/exclude levée, rien dans .gitignore. D-7/D-8 DÉGELÉES TOTALEMENT le 2026-08-02 : dégraissage livré — README.md 295->180 lignes, README.fr.md 301->185, INSTALL.md 192->22 (stub de redirection). Le README raconte le projet, le manuel raconte l'usage (frontiere ecrite dans manual/fr/README.md:12). Parite 12/12 sections. Tous les liens visiteur resolvent ; lien mort pre-existant plugin/consolidator/README.md:32 (../INSTALL.md -> ../../INSTALL.md) corrige au passage. Deux points ouverts tranchés par Samuel en cours de mission : O-1 (slugs anglais sous manual/en/, hypothèse H-1 du toc.yml levée, appariement FR/EN devenu explicite) et la parité de contenu FR/EN (alignement par le haut, 31 pages portées sur 44, vérifiées 44/44 par juge frais). Volet GELÉ, non livré : le dégraissage de README.md/README.fr.md/INSTALL.md (D-7, D-8) — pointer vers un dossier absent du dépôt casserait les liens des visiteurs ; à reprendre le jour où le manuel sera publié. Prochain geste humain : merger la PR (aucun merge fait, ADR-059)."
+last_updated: "2026-08-02T00:00:00.000Z"
+last_activity: 2026-08-02 (Phase 26 — clôture, manuel livré hors git, PR ouverte)
+
+# ⚠ Phase 21 close par sa gouvernance (plan 21-05), même patron que 20-07/c01f813 : 5/5 plans
+# livrés, vérification PASS PARTIEL 7/8 comblée (CI remise au vert — compteur de suites 44→45 —,
+# dev-orchestrator bumpé v2.9.0, planning-core v2.5.3, ROADMAP §Phase 21 recalé, 4 warnings W1-W4
+# traités : check-state-integrity.sh câblé au job gates de la CI, ADR-063 23→25 cas, team-kernel.md
+# porte le recoupement #1995/#2608, inject-mcp-tools.sh nomme --force sur le rc=3 mode fichier
+# unique). Release racine v2.45.0 préparée en commits locaux (triade + 2 historiques README +
+# CHANGELOG racine) — AUCUN tag, AUCUN merge, AUCUN push : réservés à Samuel. Prochain geste
+# humain : merger la PR, puis `git tag -a v2.45.0` et `gh release create`.
 progress:
-  total_phases: 25
-  completed_phases: 21
-  total_plans: 62
-  completed_plans: 62
+  total_phases: 26
+  completed_phases: 22
+  total_plans: 71
+  completed_plans: 71
 # ⚠ Compteurs curés À LA MAIN — PAS régénérés par `gsd-tools state` (ADR-063, cf.
 # plugin/dev-orchestrator/references/mission-contracts.md §STATE.md : toute invocation force
 # resync:true non désactivable et reproduirait la régression corrigée ici). Toute future mise à
@@ -330,6 +339,14 @@ Progress: [██████░░░░] 59%
 
 ### Roadmap Evolution
 
+- 2026-08-01 : **Phase 26 ajoutée** — « Manuel utilisateur VibeFlow (manual/) ». Origine : demande
+  de Samuel (réorganiser les specs et offrir une doc lisible aux arrivants sans les plonger dans
+  les docs de gestion de projet). Un manuel « vitrine » sous `manual/` à la racine : arborescence
+  thématique numérotée qui descend progressivement sous le capot, pages courtes chaînées
+  prev/sommaire/next, index avec graphiques mermaid, bilingue FR + EN. `README`/`INSTALL`
+  maigrissent et pointent dessus au lieu de dupliquer. Cible : lecteurs humains — ce dossier sera
+  généralement ignoré par les agents de maintenance du repo.
+
 - 2026-07-31 : **Phase 22 ajoutée** — « Hygiène documentaire — doctrine de sortie et captation
   d'intention ». Origine : demande de Samuel (« le dev-orchestrator n'a pas de workflow de mise à
   jour de doc avec les commandes GSD qui maintiennent la doc et les specs »). Gap établi **sur
@@ -486,6 +503,59 @@ Progress: [██████░░░░] 59%
 
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
+
+- **2026-08-02 — Le manuel utilisateur (Phase 26) vit sur disque, hors git, et sa disposition
+  bilingue est un miroir de dossiers** (mission `.planning/missions/2026-08-01-phase-26-manuel-utilisateur.md`,
+  13 décisions D-1..D-13 + point ouvert O-1). Contrainte de Samuel posée en cours de mission :
+  **rien sous `manual/` n'est commité**, et **aucune entrée `.gitignore`** — ce fichier étant
+  versionné, une entrée y laisserait une trace publique de l'existence du manuel ; l'exclusion
+  passe par `.git/info/exclude`. Conséquences : le dégraissage de `README.md`/`README.fr.md`/
+  `INSTALL.md` (D-7, D-8) est **gelé** — pointer vers un dossier absent du dépôt casserait les
+  liens des visiteurs —, et l'outillage du manuel vit sous `manual/.tools/` plutôt que dans
+  `scripts/` + `ci.yml` (D-13), où il aurait à la fois trahi l'existence du manuel et tourné **à
+  vide** en CI. Disposition retenue : miroir `manual/fr/` + `manual/en/` (D-1), contre les suffixes
+  `.fr.md` de la convention des deux README — **deux panels indépendants ont convergé** : le
+  couplage langue↔chemin rend impossible la fuite silencieuse vers l'anglais qu'un `.fr` oublié
+  produirait, et réduit la sonde de parité à un `diff` de deux `find`. **Livré : 9 vagues sur 9**
+  (44 pages × 2 langues, gate `check-manual` exit 0).
+
+  **Deux points ouverts tranchés par Samuel avant clôture :**
+
+  - **O-1 — slugs anglais sous `manual/en/`** (dossiers ET fichiers : `01-get-started`,
+    `07-under-the-hood`, `your-first-lab.md`). La décision **lève l'hypothèse H-1** du `toc.yml`
+    (slugs identiques FR/EN), qui rendait le lien miroir déductible du seul chemin. L'appariement
+    FR↔EN devient une **donnée explicite** (`id` + `path_fr` + `path_en`) au lieu d'être déduit :
+    `build-nav.sh` le lit au lieu de le calculer, `check-manual.sh` C1 compare des identifiants
+    logiques et C2 vérifie une bijection par langue. Discrimination re-prouvée par mutation (page EN
+    supprimée → C1+C2 rouges ; page EN orpheline → C2 seul rouge, les deux contrôles sont bien
+    indépendants). Reliquat soldé dans la foulée : 73 libellés de liens sur 26 pages EN affichaient
+    encore des noms de fichiers **français** — les `href` avaient suivi le renommage, pas les
+    libellés, ce qui vidait de son sens le renommage lui-même.
+  - **Parité de contenu FR/EN — alignement PAR LE HAUT** : les paragraphes présents côté EN
+    uniquement sont portés en FR, rien n'est coupé côté anglais. Relevé **re-dérivé du contenu réel**
+    (les chemins de la revue étaient périmés depuis O-1) : **31 pages sur 44**, contre 21 estimées —
+    l'écart se concentre sur `03-modules`, annoncé à 0/6 et qui en comptait 3/6. Vérifié par un juge
+    frais en **couverture intégrale 44/44**, appariement lu dans `toc.yml` : 44/44 OK dans les deux
+    sens, français natif sans calque.
+
+  **Volet D-7/D-8 — statut au 2026-08-02** : le blocage a sauté. Samuel a **publié le manuel** (voir
+  entrée suivante), donc pointer vers `manual/` ne casse plus rien. Une **mention** est posée en tête
+  des deux README. Le **dégraissage complet** des README et d'`INSTALL.md` — le projet d'origine de
+  D-7/D-8 — reste **non fait et non demandé** : plus aucun obstacle technique, mais c'est un
+  arbitrage éditorial à proposer, pas à décider seul.
+
+- **2026-08-02 — `manual/` devient public : D-14 révoquée** (mission
+  `.planning/missions/2026-08-01-phase-26-manuel-utilisateur.md` §3 ter). Renversement, par Samuel,
+  de la contrainte qui avait structuré toute la mission. Le manuel entre au dépôt : **94 fichiers**
+  (88 pages, 3 index, `toc.yml`, 2 scripts `.tools/`). Ligne `manual/` retirée de
+  `.git/info/exclude` ; **rien ajouté à `.gitignore`** — il n'y a plus rien à exclure. Le manuel
+  **n'a pas changé d'une ligne** : ce qui le rendait invisible au dépôt était une précaution de
+  confidentialité, pas une limite technique, et la mission avait été conduite pour que sa levée soit
+  un `git add` et non une reprise. Vérification que la publication rendait enfin possible : les
+  **2 liens sortants** du manuel (`../../../docs/ADR.md` depuis les deux pages
+  `07-*/…architecture…`) **résolvent** désormais, et **aucun chemin absolu** de la machine de Samuel
+  ne traîne dans les 91 fichiers — c'est exactement la classe de défaut qui serait restée invisible
+  jusqu'à la publication et cassée pour tout le monde.
 
 - **2026-07-31 — L'anti-triche P12 est garanti par un gate transverse, pas par les suites de
   module** (mission de clôture des reliquats Phase 20, WINDOWS #1). `team-kernel.md:23` affirmait

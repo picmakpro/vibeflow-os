@@ -1,0 +1,195 @@
+{
+  "nodes": [
+    {
+      "id": "panel-bilingue",
+      "step": "Panel: stratégie bilingue FR/EN d'un manuel lu sur GitHub (miroir fr/ + en/ vs suffixes .fr.md)",
+      "stage": "research",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "panel-ia",
+      "step": "Panel: architecture d'information d'un manuel numéroté + frontière README/INSTALL vs manuel",
+      "stage": "research",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "inventaire",
+      "step": "Inventaire de la matière source: sections README/INSTALL/plugin-reference/docs mappées aux thèmes candidats",
+      "stage": "research",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "build-26",
+      "step": "vf-coder: cycle complet Phase 26 (cadrage, plan, exécution, revue) — manuel bilingue + dégraissage README/INSTALL",
+      "stage": "build",
+      "deps": [
+        "panel-bilingue",
+        "panel-ia",
+        "inventaire"
+      ],
+      "scope": [
+        "manual/**",
+        "README.md",
+        "README.fr.md",
+        "INSTALL.md",
+        ".planning/phases/VFDO-26-manuel-utilisateur-vibeflow-manual/**",
+        "scripts/**",
+        ".planning/ROADMAP.md",
+        ".planning/STATE.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "verify-manual",
+      "step": "Vérification read-only: parité FR/EN, chaînes de navigation, liens relatifs, mermaid, pointeurs README/INSTALL",
+      "stage": "verify",
+      "deps": [
+        "build-26"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-w1-3",
+      "step": "Exécution vagues 1-3 : outillage + toc.yml + index de langue + 01-demarrer + 02-concepts (FR+EN)",
+      "stage": "build",
+      "deps": [
+        "build-26"
+      ],
+      "scope": [
+        "manual/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-w4-8",
+      "step": "Exécution vagues 4-8 : thèmes 03-modules à 07-sous-le-capot (FR+EN)",
+      "stage": "build",
+      "deps": [
+        "exec-w1-3"
+      ],
+      "scope": [
+        "manual/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "cloture-w9",
+      "step": "Vague 9 : recalage ROADMAP/STATE + checkpoint humain bloquant avant commit de clôture",
+      "stage": "build",
+      "deps": [
+        "exec-w4-8"
+      ],
+      "scope": [
+        ".planning/ROADMAP.md",
+        ".planning/STATE.md",
+        ".planning/phases/VFDO-26-manuel-utilisateur-vibeflow-manual/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-outillage",
+      "step": "Comblement: 4 findings auto-fix sur build-nav.sh et check-manual.sh (revue vf-reviewer)",
+      "stage": "build",
+      "deps": [
+        "verify-manual"
+      ],
+      "scope": [
+        "manual/.tools/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "parite-fr-en",
+      "step": "GELÉ (ask-user): 21 pages EN portent des paragraphes absents du FR — arbitrage Samuel requis",
+      "stage": "build",
+      "deps": [
+        "verify-manual"
+      ],
+      "scope": [
+        "manual/fr/**",
+        "manual/en/**"
+      ],
+      "status": "failed"
+    },
+    {
+      "id": "slugs-en",
+      "step": "O-1 tranché: slugs anglais sous manual/en/ — toc.yml apparié par langue, build-nav et check-manual réoutillés, 44 pages + 7 dossiers renommés",
+      "stage": "build",
+      "deps": [
+        "fix-outillage"
+      ],
+      "scope": [
+        "manual/en/**",
+        "manual/toc.yml",
+        "manual/.tools/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "portage-fr",
+      "step": "Parité tranchée: porter en FR les paragraphes présents côté EN uniquement (alignement par le haut)",
+      "stage": "build",
+      "deps": [
+        "slugs-en"
+      ],
+      "scope": [
+        "manual/fr/**",
+        "manual/toc.yml"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "juge-parite",
+      "step": "Juge frais: verdict de parité sémantique page à page FR vs EN",
+      "stage": "verify",
+      "deps": [
+        "portage-fr"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "libelles-en",
+      "step": "Reliquat du renommage: 34 pages EN affichent encore des noms de fichiers FR en libellé de lien",
+      "stage": "build",
+      "deps": [
+        "juge-parite"
+      ],
+      "scope": [
+        "manual/en/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "degraissage",
+      "step": "D-7/D-8 dégel total: dégraissage README.md, README.fr.md, INSTALL.md vers le manuel",
+      "stage": "build",
+      "deps": [
+        "cloture-w9"
+      ],
+      "scope": [
+        "README.md",
+        "README.fr.md",
+        "INSTALL.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "juge-degraissage",
+      "step": "Juge frais: aucune information perdue, aucun lien mort dans le dépôt",
+      "stage": "verify",
+      "deps": [
+        "degraissage"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

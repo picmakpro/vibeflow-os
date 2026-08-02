@@ -59,6 +59,7 @@
 - [ ] Phase 23: Couplage explicite au moteur GSD — capabilities, flags et voie unique
 - [ ] Phase 24: Activation et mesure du moteur GSD — capacités dormantes et faits de runtime
 - [ ] Phase 25: Budget d'instructions et étage d'alignement court
+- [x] Phase 26: Manuel utilisateur VibeFlow (manual/) (completed 2026-08-02)
 
 <details>
 <summary>✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04</summary>
@@ -1474,6 +1475,61 @@ est active** : une couverture verte peut donc masquer un geste mort. Deux issues
 marquer l'entrée comme conditionnelle — et dans les deux cas, **étendre le test à l'activation**
 (sinon le même trou se rouvre au prochain skill ajouté).
 
+**A9 — les workstreams : chantiers parallèles en `.planning/`, capacité native à 18 % de
+couverture.** Entré au lot le **2026-08-02**, à la suite de la **PR #27** (partition de `.planning`
+en workstreams dev/gouvernance, proposée par Willy, **revue en `CHANGES_REQUESTED`**). Le besoin est
+réel et démontré : `ROADMAP.md` et `STATE.md` sont **mono-position** et ne savent pas décrire deux
+chantiers simultanés — chaque avancée de l'un réécrit la position de l'autre.
+
+GSD porte la réponse nativement (`.planning/workstreams/<nom>/`, flag `--ws`, `bin/lib/workstream.cjs`,
+`gsd-tools workstream list` → `"mode": "workstream"`). **Mais la capacité est à moitié câblée en
+amont** : sur les **91 workflows** de gsd-core 1.9.0, **16 la connaissent, 37 codent en dur
+`.planning/ROADMAP.md` / `STATE.md` / `phases/`** (`add-phase`, `verify-phase`, `next`, `pr-branch`,
+`execute-plan`, `extract-learnings`, `complete-milestone`…). Couverture réelle : **18 %**. Adopter en
+l'état, c'est faire tourner le lab contre sa propre chaîne d'outils — le cas que l'**Iron Law 2**
+interdit (`conductor/AGENT.md:114`).
+
+Faits établis en bac à sable sur la PR #27 (worktree `c0908fd`, gsd-core 1.9.0), qui bornent
+l'arbitrage :
+
+- **Notre propre outillage est aveugle.** `check-dev-bootstrap.sh:28` cherche `.planning/ROADMAP.md`
+  à la racine → le `SessionStart` repasse de `[gsd-engine] phase 26 en cours` à `[bootstrap] feuille
+  de route absente`. `check-state-integrity.sh` (câblé `ci.yml:117` en Phase 21) sort **exit 2**.
+  `vf-dev-manager.md` lit les chemins racine en dur (7 occurrences) ; sur tout `plugin/`, **3
+  fichiers** mentionnent « workstream », tous des tables de routage.
+- **`/gsd-pr-branch` s'inverse.** Ses regex sont ancrées (`pr-branch.md:232-234`) :
+  `.planning/workstreams/dev/STATE.md` ne matche plus `STRUCTURAL` → reclassé **transient →
+  EXCLUDED**. Les commits de feuille de route disparaissent silencieusement des branches de PR.
+- **Le pointeur de workstream ne vit pas où on croit.** Dès qu'une clé de session résout, ce n'est
+  pas `.planning/active-workstream` mais
+  `os.tmpdir()/gsd-workstream-sessions/<sha1(chemin absolu du .planning)>/<clé>`
+  (`active-workstream-store.cjs:95-111`) : effacé au reboot, **et indexé sur le chemin absolu, donc
+  distinct par worktree, jamais hérité**. Sur cette machine `CLAUDE_SESSION_ID` n'est pas défini —
+  la clé effective est `CLAUDE_CODE_SSE_PORT`, un port recyclable par l'OS.
+- **Migration à conflit nul, donc à divergence invisible.** `git merge-tree` d'une branche de travail
+  post-partition → **exit 0** avec le dossier de phase en cours **orphelin à la racine** pendant que
+  le `STATE.md` du workstream le déclare courant. Git ne signale rien.
+
+**Le recouvrement à instruire est avec ADR-064, pas avec le moteur.** Le quick `260801-17w`
+(2026-08-01) a déjà tranché la concurrence multi-session par l'**isolation physique** — « un
+écrivain = un worktree », `check-branch-claim.sh` au `SessionStart`, claim de branche élargi —
+d'après `shanraisshan/claude-code-best-practice`. Les workstreams sont une **seconde réponse au même
+problème, conventionnelle** celle-là, et les deux se composent mal : le pointeur étant indexé sur le
+chemin du `.planning`, **chaque worktree ouvre sans workstream résolu**, et aucun agent `vf-*` ne
+sait passer `--ws`. Or M2 (lot MESURE) a établi que le parallélisme **inter-nœuds** de
+`vf-dev-manager` est le **seul effectif** sur ce runtime : le seul étage de parallélisme qui
+fonctionne est aussi celui que la partition fragilise le plus.
+
+**À trancher au plan — la question est ouverte, l'adoption n'est pas acquise :** (a) **adopter** les
+workstreams et payer la mise à niveau de notre couche (`check-dev-bootstrap.sh`,
+`check-state-integrity.sh`, `planning-context.sh` workstream-aware, `--ws` câblé dans les agents
+`vf-*`, gate sur le pointeur, CI étendue) ; (b) **refuser** et traiter les chantiers parallèles par
+jalons distincts dans une ROADMAP partagée, l'isolation restant physique par ADR-064 ; (c) **borner**
+— workstreams réservés à un usage où les 37 workflows aveugles ne sont jamais sollicités, ce qui
+demande de dire lesquels. Dans les cas (a) et (c), la **remontée upstream** des 37 workflows est le
+préalable, au même titre que la RFC de la Phase 18 et la voie 2 de M2. Condition commune aux trois :
+**aucune partition tant qu'une phase est en vol** (cf. divergence invisible ci-dessus).
+
 **Requirements**: TBD (à mapper au ledger pendant le plan)
 **Depends on:** Phase 23 — dépendance **doctrinale**, pas de fichiers : la 23 écrit la table des
 capabilities et la voie unique ; la 24 décide quoi activer dedans. Activer avant de savoir qui
@@ -1554,10 +1610,12 @@ pile.
   d'invocation et la doctrine de flags soient arrêtées. Cette phase **dépend** de 23 et ne la
   préempte pas ; si l'artefact prend la forme d'une capability `plan:pre`, la table
   capabilities/hooks de la Phase 23 fait foi.
+
 - **vs Phase 24 (activation et mesure).** M3 (`effort:` par rôle) et A2 (`agent_skills`)
   éditent tous deux `plugin/*/agents/*.md` — les fichiers mêmes sur lesquels G1 pose un gate.
   Ordonnancement **après 24** pour ne pas calibrer un seuil sur un état qui bouge, et pour éviter
   les éditions concurrentes.
+
 - **G1 n'est pas une capability GSD.** C'est une règle de densité propre à VibeFlow (ADR-029)
   outillée par notre propre gate. Aucun recouvrement avec le lot ACTIVATION de la Phase 24.
 
@@ -1568,3 +1626,48 @@ pile.
 Plans:
 
 - [ ] TBD (run /gsd-plan-phase 25 to break down)
+
+### Phase 26: Manuel utilisateur VibeFlow (manual/)
+
+**Goal:** Créer un manuel utilisateur « vitrine » sous `manual/` à la racine — destiné aux humains
+qui arrivent sur le repo, distinct des docs de gestion de projet (`docs/`, `.planning/`) et
+volontairement hors du contexte des agents qui maintiennent VibeFlow. Arborescence thématique à
+préfixes numériques (get started/install, philosophie, cycle de dev, équipe d'agents, sous le
+capot…) qui descend progressivement dans la profondeur : pages courtes (un sujet = un fichier, on
+divise plutôt qu'allonger), chaînées par navigation `← Précédent · ↑ Sommaire · Suivant →`, index
+`manual/README.md` avec carte du manuel (graphiques mermaid) et tutos. Bilingue FR + EN (comme les
+deux README). `README.md`/`README.fr.md` et `INSTALL.md` maigrissent et pointent vers le manuel au
+lieu de dupliquer — le manuel devient la version guidée et pédagogique.
+
+> **Amendement de mission (2026-08-01)** — `manual/` **reste local, hors git** (`.git/info/exclude`,
+> aucune entrée `.gitignore`). Aucun fichier du manuel n'entre dans un commit. Le volet « les README
+> maigrissent et pointent vers le manuel » est **SUSPENDU, pas abandonné** : pointer vers un dossier
+> absent du dépôt casserait les liens des visiteurs. `README.md`, `README.fr.md`, `INSTALL.md`,
+> `scripts/` et `.github/` sortent du périmètre d'écriture ; l'outillage vit sous `manual/.tools/`
+> et n'entre pas en CI. Seuls `.planning/**` sont committés.
+> Cadrage complet : `.planning/missions/2026-08-01-phase-26-manuel-utilisateur.md` (D-1 à D-13) et
+> `.planning/phases/VFDO-26-manuel-utilisateur-vibeflow-manual/26-CONTEXT.md` (D-01 à D-14).
+
+**Requirements**: aucun ID formel — `REQUIREMENTS.md` ne porte aucun `REQ-` pour cette phase (le
+ledger s'arrête à ALTI-05 / Phase 14), même convention que les Phases 15 à 21. La traçabilité est
+assurée par les **décisions D-01 à D-14** de `26-CONTEXT.md` et les **manques M-1 à M-12** de
+`26-INVENTAIRE-MATIERE.md`, repris par le champ `must_haves` de chaque `26-0N-PLAN.md`.
+**Depends on:** Phase 25
+**Plans:** 9/9 plans executed
+
+Plans:
+
+- [x] 26-01-PLAN.md — Infrastructure : `toc.yml` (D-03), `manual/.tools/build-nav.sh` (nav générée), `manual/.tools/check-manual.sh` (gate à 7 contrôles, refus du verdict vide, D-13), `manual/README.md` bilingue (vague 1)
+- [x] 26-02-PLAN.md — Priorité du mandat 1/2 : les deux README de langue (carte mermaid décorative + navigation réelle, D-06) et le thème `01-demarrer` complet FR+EN, 7 pages — comble M-1, M-6 (scope), M-12 (vague 2)
+- [x] 26-03-PLAN.md — Priorité du mandat 2/2 : thème `02-concepts` complet FR+EN, 7 pages — comble M-2 (glossaire produit), M-3 (« lab » enfin défini), M-5 (VibeFlow ↔ GSD ↔ Superpowers) ; documente 9 principes sourcés du canon (D-09) (vague 3)
+- [x] 26-04-PLAN.md — Thème `03-modules` FR+EN, 6 pages : catalogue et choix de modules **dérivés du disque**, zéro version en dur (D-11) — comble M-6 (modules) (vague 4)
+- [x] 26-05-PLAN.md — Thème `04-cycle-de-dev` FR+EN, 6 pages : cadrer → planifier → exécuter → livrer, écrit du point de vue de l'humain (vague 5)
+- [x] 26-06-PLAN.md — Thème `05-equipe-agents` FR+EN, 6 pages : missions longues, ce qu'on vous demande (M-8), branches et worktrees (ADR-059, ADR-064) (vague 6)
+- [x] 26-07-PLAN.md — Thème `06-reference` FR+EN, 6 pages : commandes/skills/agents énumérés depuis le disque (D-11) — comble M-7 (dépannage après install) et M-11 (coût et modèles) (vague 7)
+- [x] 26-08-PLAN.md — Thème `07-sous-le-capot` FR+EN, 6 pages : anatomie d'un lab installé (M-4), engine d'install, gates, 15 ADR à valeur utilisateur, pont vers `docs/` (vague 8)
+- [x] 26-09-PLAN.md — Clôture : ROADMAP et STATE recalés sur le réel livré, **checkpoint humain bloquant** puis unique commit de la phase, par chemins explicites (D-14, one-way) (vague 9)
+
+**Découpe différable.** Les vagues 4 à 8 (un thème chacune, bilingue) peuvent être différées sans
+casser le manuel ni son gate : `toc.yml` ne référence à tout instant que des pages réellement
+écrites dans les deux langues, donc un arrêt entre deux vagues laisse un manuel plus court et
+cohérent, `check-manual.sh` au vert. La priorité du mandat est tenue dès la vague 3.

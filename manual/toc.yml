@@ -1,0 +1,289 @@
+# manual/toc.yml — séquence canonique du manuel utilisateur VibeFlow (D-03).
+#
+# INVARIANT NON NEGOCIABLE : n'inscrire une entrée `pages:` qu'APRES avoir écrit la page
+# dans LES DEUX langues (manual/fr/<path_fr> ET manual/en/<path_en>). Une entrée inscrite
+# sans les deux fichiers fait échouer manual/.tools/check-manual.sh (contrôle C2). De même,
+# `themes:` ne liste que les thèmes ayant déjà au moins une page inscrite.
+#
+# Ordre fixe des 7 thèmes (D-05, trajectoire Diátaxis — jamais réordonné) :
+#   get-started -> concepts -> modules -> development-cycle -> agent-team
+#   -> reference -> under-the-hood
+#
+# Disposition (D-02) : profondeur DEUX niveaux, manual/<lang>/NN-theme/slug.md. Le préfixe
+# numérique porte sur le DOSSIER seulement — jamais sur un fichier (GitHub n'a pas de build
+# step : un numéro dans un nom de fichier entrerait dans l'URL, et renuméroter casserait tous
+# les liens entrants et croisés).
+#
+# H-1 LEVÉE (26-CONTEXT.md posait : "les slugs de fichiers sont identiques en FR et EN").
+# Décision du 2026-08-02 (wave 26-10) : sous manual/en/, dossiers ET fichiers portent des
+# slugs anglais idiomatiques (traduction, pas translittération) — ex. 01-demarrer/prerequis.md
+# devient 01-get-started/prerequisites.md. L'appariement FR<->EN ne se déduit donc plus du
+# chemin seul : chaque entrée porte désormais un `id` logique stable PLUS un chemin par
+# langue (`dir_fr`/`dir_en` pour les thèmes, `path_fr`/`path_en` pour les pages). C'est cette
+# paire explicite — pas la ressemblance des chemins — que lisent build-nav.sh (bandeaux, y
+# compris le sélecteur de langue) et check-manual.sh (contrôles C1/C2). Un chemin FR et un
+# chemin EN qui se ressembleraient encore par coïncidence (ex. `installation.md` des deux
+# côtés) ne sont PAS un cas particulier : ils passent par la même paire `path_fr`/`path_en`
+# que n'importe quelle autre entrée.
+#
+# Forme : YAML restreint volontairement parsable en bash pur (awk/sed, aucune dépendance) —
+# indentation à 2 espaces, une clé par ligne, aucune ancre, aucune valeur multi-ligne.
+# L'ordre des entrées `pages:` EST l'ordre de lecture (prev/next du bandeau de navigation).
+
+themes:
+  - id: get-started
+    dir_fr: 01-demarrer
+    dir_en: 01-get-started
+    fr: Démarrer
+    en: Getting Started
+  - id: concepts
+    dir_fr: 02-concepts
+    dir_en: 02-concepts
+    fr: Concepts
+    en: Concepts
+  - id: modules
+    dir_fr: 03-modules
+    dir_en: 03-modules
+    fr: Modules
+    en: Modules
+  - id: development-cycle
+    dir_fr: 04-cycle-de-dev
+    dir_en: 04-development-cycle
+    fr: Cycle de développement
+    en: Development cycle
+  - id: agent-team
+    dir_fr: 05-equipe-agents
+    dir_en: 05-agent-team
+    fr: Équipe d'agents
+    en: Agent team
+  - id: reference
+    dir_fr: 06-reference
+    dir_en: 06-reference
+    fr: Référence
+    en: Reference
+  - id: under-the-hood
+    dir_fr: 07-sous-le-capot
+    dir_en: 07-under-the-hood
+    fr: Sous le capot
+    en: Under the hood
+pages:
+  - id: prerequisites
+    path_fr: 01-demarrer/prerequis.md
+    path_en: 01-get-started/prerequisites.md
+    fr: Prérequis
+    en: Prerequisites
+  - id: installation
+    path_fr: 01-demarrer/installation.md
+    path_en: 01-get-started/installation.md
+    fr: Installation
+    en: Installation
+  - id: choosing-your-scope
+    path_fr: 01-demarrer/choisir-son-scope.md
+    path_en: 01-get-started/choosing-your-scope.md
+    fr: Choisir son scope
+    en: Choosing your scope
+  - id: your-first-session
+    path_fr: 01-demarrer/premiere-session.md
+    path_en: 01-get-started/your-first-session.md
+    fr: Première session
+    en: Your first session
+  - id: your-first-lab
+    path_fr: 01-demarrer/premier-lab.md
+    path_en: 01-get-started/your-first-lab.md
+    fr: Premier lab
+    en: Your first lab
+  - id: updating-and-uninstalling
+    path_fr: 01-demarrer/mettre-a-jour-et-desinstaller.md
+    path_en: 01-get-started/updating-and-uninstalling.md
+    fr: Mettre à jour et désinstaller
+    en: Updating and uninstalling
+  - id: installation-troubleshooting
+    path_fr: 01-demarrer/depannage-installation.md
+    path_en: 01-get-started/installation-troubleshooting.md
+    fr: Dépannage — installation
+    en: Troubleshooting — installation
+  - id: what-is-a-lab
+    path_fr: 02-concepts/qu-est-ce-qu-un-lab.md
+    path_en: 02-concepts/what-is-a-lab.md
+    fr: Qu'est-ce qu'un lab ?
+    en: What is a lab?
+  - id: modules-and-bundles
+    path_fr: 02-concepts/modules-et-bundles.md
+    path_en: 02-concepts/modules-and-bundles.md
+    fr: Modules et bundles
+    en: Modules and bundles
+  - id: agents-skills-and-commands
+    path_fr: 02-concepts/agents-skills-commandes.md
+    path_en: 02-concepts/agents-skills-and-commands.md
+    fr: Agents, skills et commandes
+    en: Agents, skills, and commands
+  - id: vibeflow-gsd-and-superpowers
+    path_fr: 02-concepts/vibeflow-gsd-superpowers.md
+    path_en: 02-concepts/vibeflow-gsd-and-superpowers.md
+    fr: VibeFlow, GSD et Superpowers
+    en: VibeFlow, GSD, and Superpowers
+  - id: the-nine-principles
+    path_fr: 02-concepts/les-9-principes.md
+    path_en: 02-concepts/the-nine-principles.md
+    fr: Les neuf principes
+    en: The nine principles
+  - id: gates-and-human-validation
+    path_fr: 02-concepts/gates-et-validation-humaine.md
+    path_en: 02-concepts/gates-and-human-validation.md
+    fr: Gates et validation humaine
+    en: Gates and human validation
+  - id: glossary
+    path_fr: 02-concepts/glossaire.md
+    path_en: 02-concepts/glossary.md
+    fr: Glossaire
+    en: Glossary
+  - id: catalog
+    path_fr: 03-modules/catalogue.md
+    path_en: 03-modules/catalog.md
+    fr: Catalogue des modules
+    en: Module catalog
+  - id: baseline-and-dependencies
+    path_fr: 03-modules/socle-et-dependances.md
+    path_en: 03-modules/baseline-and-dependencies.md
+    fr: Le socle et les dépendances
+    en: The baseline and its dependencies
+  - id: choosing-your-modules
+    path_fr: 03-modules/choisir-ses-modules.md
+    path_en: 03-modules/choosing-your-modules.md
+    fr: Choisir ses modules
+    en: Choosing your modules
+  - id: business-bundles
+    path_fr: 03-modules/bundles-metier.md
+    path_en: 03-modules/business-bundles.md
+    fr: Les bundles métier
+    en: Business bundles
+  - id: enabling-and-disabling
+    path_fr: 03-modules/activer-desactiver.md
+    path_en: 03-modules/enabling-and-disabling.md
+    fr: Activer, désactiver, changer d'avis
+    en: Enabling, disabling, changing your mind
+  - id: where-a-module-lives
+    path_fr: 03-modules/ou-vit-un-module.md
+    path_en: 03-modules/where-a-module-lives.md
+    fr: Où vit un module
+    en: Where a module lives
+  - id: the-cycle-at-a-glance
+    path_fr: 04-cycle-de-dev/le-cycle-en-bref.md
+    path_en: 04-development-cycle/the-cycle-at-a-glance.md
+    fr: Le cycle en bref
+    en: The cycle at a glance
+  - id: framing-an-idea
+    path_fr: 04-cycle-de-dev/cadrer-une-idee.md
+    path_en: 04-development-cycle/framing-an-idea.md
+    fr: Cadrer une idée
+    en: Framing an idea
+  - id: planning
+    path_fr: 04-cycle-de-dev/planifier.md
+    path_en: 04-development-cycle/planning.md
+    fr: Planifier
+    en: Planning
+  - id: executing
+    path_fr: 04-cycle-de-dev/executer.md
+    path_en: 04-development-cycle/executing.md
+    fr: Exécuter
+    en: Executing
+  - id: shipping-and-reviewing
+    path_fr: 04-cycle-de-dev/livrer-et-relire.md
+    path_en: 04-development-cycle/shipping-and-reviewing.md
+    fr: Livrer et relire
+    en: Shipping and reviewing
+  - id: autonomous-mode
+    path_fr: 04-cycle-de-dev/mode-autonome.md
+    path_en: 04-development-cycle/autonomous-mode.md
+    fr: Le mode autonome
+    en: Autonomous mode
+  - id: why-a-team
+    path_fr: 05-equipe-agents/pourquoi-une-equipe.md
+    path_en: 05-agent-team/why-a-team.md
+    fr: Pourquoi une équipe
+    en: Why a team
+  - id: the-agents-that-ship
+    path_fr: 05-equipe-agents/les-agents-livres.md
+    path_en: 05-agent-team/the-agents-that-ship.md
+    fr: Les agents livrés
+    en: The agents that ship
+  - id: a-long-mission
+    path_fr: 05-equipe-agents/une-mission-longue.md
+    path_en: 05-agent-team/a-long-mission.md
+    fr: Une mission longue, la mécanique
+    en: A long mission, the mechanics
+  - id: what-is-asked-of-you
+    path_fr: 05-equipe-agents/ce-qu-on-vous-demande.md
+    path_en: 05-agent-team/what-is-asked-of-you.md
+    fr: Ce qu'on vous demande
+    en: What's asked of you
+  - id: branches-and-worktrees
+    path_fr: 05-equipe-agents/branches-et-worktrees.md
+    path_en: 05-agent-team/branches-and-worktrees.md
+    fr: Branches et worktrees
+    en: Branches and worktrees
+  - id: specialized-teams
+    path_fr: 05-equipe-agents/equipes-specialisees.md
+    path_en: 05-agent-team/specialized-teams.md
+    fr: Équipes spécialisées
+    en: Specialized teams
+  - id: commands
+    path_fr: 06-reference/commandes.md
+    path_en: 06-reference/commands.md
+    fr: Commandes
+    en: Commands
+  - id: skills
+    path_fr: 06-reference/skills.md
+    path_en: 06-reference/skills.md
+    fr: Skills
+    en: Skills
+  - id: agents
+    path_fr: 06-reference/agents.md
+    path_en: 06-reference/agents.md
+    fr: Agents
+    en: Agents
+  - id: cost-and-models
+    path_fr: 06-reference/couts-et-modeles.md
+    path_en: 06-reference/cost-and-models.md
+    fr: Coûts et modèles
+    en: Cost and models
+  - id: troubleshooting
+    path_fr: 06-reference/depannage.md
+    path_en: 06-reference/troubleshooting.md
+    fr: Dépannage
+    en: Troubleshooting
+  - id: where-to-find-what
+    path_fr: 06-reference/ou-trouver-quoi.md
+    path_en: 06-reference/where-to-find-what.md
+    fr: Où trouver quoi
+    en: Where to find what
+  - id: anatomy-of-an-installed-lab
+    path_fr: 07-sous-le-capot/anatomie-d-un-lab-installe.md
+    path_en: 07-under-the-hood/anatomy-of-an-installed-lab.md
+    fr: Anatomie d'un lab installé
+    en: Anatomy of an installed lab
+  - id: the-install-engine
+    path_fr: 07-sous-le-capot/l-engine-d-install.md
+    path_en: 07-under-the-hood/the-install-engine.md
+    fr: L'engine d'installation
+    en: The install engine
+  - id: the-machine-gates
+    path_fr: 07-sous-le-capot/les-gates-machine.md
+    path_en: 07-under-the-hood/the-machine-gates.md
+    fr: Les gates machine
+    en: The machine gates
+  - id: the-doctrine-and-its-patterns
+    path_fr: 07-sous-le-capot/la-doctrine-et-ses-patterns.md
+    path_en: 07-under-the-hood/the-doctrine-and-its-patterns.md
+    fr: La doctrine et ses patterns
+    en: The doctrine and its patterns
+  - id: architecture-decisions
+    path_fr: 07-sous-le-capot/decisions-d-architecture.md
+    path_en: 07-under-the-hood/architecture-decisions.md
+    fr: Décisions d'architecture
+    en: Architecture decisions
+  - id: contributing-and-going-further
+    path_fr: 07-sous-le-capot/contribuer-et-aller-plus-loin.md
+    path_en: 07-under-the-hood/contributing-and-going-further.md
+    fr: Contribuer et aller plus loin
+    en: Contributing and going further
