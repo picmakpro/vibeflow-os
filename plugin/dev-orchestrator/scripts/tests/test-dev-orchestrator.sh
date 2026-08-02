@@ -3046,8 +3046,21 @@ md_folded "$CODER_FILE" | "$GREP" -qiE 'jamais[[:space:]]+une[[:space:]]+répons
 #     accusant une doctrine qui dit exactement cela. Le motif n'est PAS remplacé par $T27_ASK_RE :
 #     celui-ci accepte en plus « pose la question », qui satisferait C sans que le bloc ne nomme
 #     jamais la réponse aux attentes — ce serait un relâchement, pas un alignement.
+#
+# L'INFINITIF EST EXCLU, et c'est la borne de la tolérance de personne (N1). Une passe précédente
+# avait écrit `répond(s|re)?` en croyant élargir la même tolérance : elle a retourné l'assertion.
+# L'infinitif est la forme dans laquelle s'écrivent les INTERDICTIONS en français — « le manager
+# n'a jamais à répondre aux attentes humaines » satisfaisait alors une garde qui exige que le bloc
+# nomme le manager comme y RÉPONDANT. Une prohibition passait pour l'affirmation qu'elle nie, et
+# c'était le dernier motif de la suite qui refusait encore cette silhouette. Les personnes
+# conjuguées (« répond », « réponds ») portent l'affirmation ; l'infinitif nu ne la porte pas. Le
+# faux rouge que la passe précédente fermait tenait au NOMBRE et à « à l' » — jamais à l'infinitif :
+# retirer `|re` ne le rouvre pas (contre-épreuve : la réécriture licite au singulier reste verte).
+# L'infinitif est donc refusé DANS LES DEUX SENS, y compris une tournure affirmative (« c'est au
+# manager de répondre aux… ») : une forme dont la garde ne peut pas lire la polarité se refuse,
+# elle ne s'accepte pas au bénéfice du doute — un gate qui ne sait pas conclure rougit.
 T26_HALT_RE='halte[[:space:]]+de[[:space:]]+nœud'
-T26_ANSWER_RE="répond(s|re)?[[:space:]]+(aux[[:space:]]+|à[[:space:]]+l['’][[:space:]]*)attentes?[[:space:]]+humaines?"
+T26_ANSWER_RE="répond(s)?[[:space:]]+(aux[[:space:]]+|à[[:space:]]+l['’][[:space:]]*)attentes?[[:space:]]+humaines?"
 t26_c_blk="$(md_blocks_matching "$MFLOW" "$T24_ANCHOR_C")"
 if [ -z "$t26_c_blk" ]; then
   ko "T26 C : bloc « Verdict d'étape » introuvable dans mission-flow.md — rien n'a été mesuré"; t26_ok=0
