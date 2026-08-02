@@ -5,6 +5,60 @@ accidentellement et seul le disque a survécu. Aucun de ces points n'a été tra
 
 ---
 
+## O-8 — ⚠️ BLOQUANT — A-1bis est démentie sur ses faits : `--auto` lance TOUTE la chaîne
+
+**Statut : gelé, en attente d'arbitrage humain. Aucun agent n'y a touché.** C'est la **deuxième
+fois** que la décision sur D-02 repose sur une prémisse fausse (A-1 avait déjà été retranchée pour
+ce motif) — d'où le gel plutôt qu'une correction d'office.
+
+**Le fait, vérifié deux fois contre `gsd-core@1.9.0` installé** (par le reviewer, puis re-vérifié
+directement par le manager sur le fichier amont) :
+
+`~/.claude/gsd-core/workflows/discuss-phase/modes/chain.md` **étape 5** (l. 45-61) :
+
+> **If `--auto` flag present OR `--chain` flag present OR `AUTO_MODE` is true:** display banner and
+> launch plan-phase. → `Skill(skill="gsd-plan-phase", args="${PHASE} --auto ${GSD_WS}")`
+
+`--auto` sur le cadrage ne se contente donc **pas** de poser le chain flag : il **enchaîne
+discuss → plan → execute** dans le même appel. `vf-coder` ne reprend la main **qu'à la fin du
+pipeline entier**. Son désarmement « immédiatement, dans le même geste », exigé par A-1bis et gaté
+par `T25b`, s'exécute **après** que plan et execute ont déjà tourné.
+
+**`T25b` certifie donc une adjacence *textuelle*, verte, qui ne borne aucune fenêtre *runtime*.**
+C'est la famille d'erreur exacte que cette phase combat : l'assertion mesure une relation dans le
+texte, pas la relation dans le monde.
+
+**Ce que la fenêtre expose réellement — à ne pas surestimer.** `references/checkpoints.md` règle 6
+protège les gates `blocking-human` : ils ne sont **jamais** auto-approuvés, même en auto-mode.
+Ce que la fenêtre ouvre, c'est la **règle 5** sur tout le reste : pendant plan et execute,
+`human-verify` **auto-approuve** et `decision` **auto-sélectionne la première option**.
+Ce n'est donc **pas** une violation d'ADR-031 sur le gate que 23-01 construit — c'est une mission
+qui déroule plan et execute en mode autonome **sans l'avoir voulu**, et dont les décisions se
+choisissent toutes seules.
+
+**Les voies, chiffrées :**
+
+| Voie | Ce qu'elle coûte | Ce qu'elle règle |
+|---|---|---|
+| **1. Le manager porte le cadrage** (3ᵉ voie d'A-1bis, explicitement « reversable au débat si la Lacune 5 rouvre la voie unique ») | lignes sur `vf-dev-manager.md` — **235/250**, et les 7 plans restants touchent tous cet agent | supprime le problème à la racine : le manager a `AskUserQuestion`, plus besoin de `--auto` |
+| **2. `workflow.discuss_mode="assumptions"`** (`config.cjs:259`) | produit bien un `CONTEXT.md` mais **appelle `AskUserQuestion`** — `vf-coder` ne l'a pas, il bloque | rien : c'est l'impasse déjà constatée en A-1bis |
+| **3. Statu quo assumé** | zéro ligne | rien, mais l'expose **par écrit** au lieu de laisser `T25b` prétendre le contraire ; exige alors de retirer la promesse du libellé de `T25b` |
+
+**La question pour Samuel :**
+
+> A-1bis tombe-t-elle à son tour ? Si oui, bascule-t-on sur la **voie 1** (le manager porte le
+> cadrage — changement structurel du cycle, à instruire dans le plan **23-05**, voie unique
+> d'invocation), ou assume-t-on le **statu quo** en retirant à `T25b` une promesse qu'il ne tient
+> pas ?
+
+**Ce qui est bloqué en attendant.** Le plan **23-03** (Lacune 3, doctrine de flags de cycle) est
+explicitement conditionné à cette réponse : `23-ARBITRAGES.md` §intro écrit que « la Lacune 3 ne
+peut pas être écrite sans savoir ce qu'un `--auto` auto-approuve ». Par effet de chaîne (fichier
+`GSD-PIPELINE.md` partagé), **23-04** puis **23-05** suivent. Le plan **23-02**, lui, est
+indépendant : son périmètre est disjoint.
+
+---
+
 ## O-1 — La paraphrase d'A-4 par `vf-dev-manager.md` : index légitime ou infraction ADR-030 ?
 
 **Le fait, vérifié par mutation.** Le renvoi de `vf-dev-manager.md` §Contrôle de flux dit d'un
