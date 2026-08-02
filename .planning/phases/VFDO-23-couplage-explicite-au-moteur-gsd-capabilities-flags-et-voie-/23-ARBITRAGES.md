@@ -10,7 +10,12 @@ seront instruits une fois les fichiers de doctrine réécrits.
 
 ---
 
-## A-1 — D-02 inerte : retirer `--auto`, passer à `--assumptions`
+## A-1 — RETRANCHÉ le 2026-08-02 : voir A-1bis
+
+> ⚠️ **La décision ci-dessous est ANNULÉE.** Sa prémisse était fausse. Elle est conservée telle
+> quelle pour la traçabilité ; la décision qui fait autorité est **A-1bis**, plus bas.
+
+## A-1 (ANNULÉE) — D-02 inerte : retirer `--auto`, passer à `--assumptions`
 
 **Décision.** `vf-coder` n'invoque plus le cadrage en mode `--auto`. Il utilise `--assumptions`.
 
@@ -30,7 +35,45 @@ prompt ; `--assumptions` rend le même service sans poser de chain flag.
 fixture — il était anti-corrélé au risque qu'il annonce couvrir. La fixture doit être inversée :
 `--auto` sur le cadrage devient une forme **interdite**, prouvée par mutation.
 
-## A-2 — `workflow.auto_advance` : désarmé, dans la forme retenue en A-1
+## A-1bis — D-02 : garder `--auto`, et `vf-coder` désarme juste après son cadrage
+
+**Décision (2026-08-02, révision de A-1).** `vf-coder` **garde** `--auto` sur le cadrage, et
+**désarme le flag d'enchaînement immédiatement après** l'appel qui l'arme.
+
+**Pourquoi A-1 était infondée — trois faits vérifiés contre `gsd-core@1.9.0` installé.**
+
+1. `--assumptions` route, via `skills/gsd-discuss-phase/SKILL.md:54-55`, vers
+   `workflows/list-phase-assumptions.md`, qui se déclare lui-même en tête :
+   « *This is ANALYSIS of what Claude thinks, not INTAKE of what user knows. **No file output** —
+   purely conversational* », et porte une attente bloquante (`Wait for user response.` l. 126).
+2. **Aucun `CONTEXT.md` n'est écrit** ⇒ `gsd-planner` planifierait à vide.
+3. `vf-coder` n'ayant pas `AskUserQuestion`, il retombe **exactement** dans le mode d'échec que la
+   présence de `--auto` servait à éviter — la justification de A-1 se retournait contre elle-même.
+
+**La voie par la config ne sauve rien non plus.** Le vrai mode assumptions non interactif serait
+`workflow.discuss_mode="assumptions"` (`config.cjs:259`, absent de tout `plugin/` — 0 hit), qui
+route vers `workflows/discuss-phase-assumptions.md`. Ce workflow **produit** bien un `CONTEXT.md`
+(« *Output is identical to discuss mode — same CONTEXT.md* ») mais il est **interactif** : il
+appelle `AskUserQuestion`. Même blocage.
+
+**Conclusion.** Sur 1.9.0 il n'existe **aucun drapeau** qui soit à la fois non interactif,
+producteur de `CONTEXT.md`, et sans chain flag. A-1 exigeait les trois : la cause qu'elle
+prétendait traiter est **inatteignable en l'état**.
+
+**Pourquoi A-1bis plutôt que les deux autres voies.** Le coût en lignes tombe sur `vf-coder`
+(88/250, large marge) au lieu de `vf-dev-manager` (**249/250**, une ligne de marge). Le désarmement
+est **adjacent** à l'armement, donc local et vérifiable par un gate de proximité — là où un
+re-désarmement par le manager à chaque retour laisse une fenêtre armée pendant toute la durée du
+worker. La troisième voie (le manager porte le cadrage lui-même, il a `AskUserQuestion`) supprime
+le problème à la racine mais constitue un **changement structurel du cycle**, hors périmètre du
+plan 23-01 — à reverser au débat si la Lacune 5 (voie unique d'invocation, plan 23-05) le rouvre.
+
+**Conséquence sur le gate.** Le commit `e2b1bfe` avait figé `--assumptions` comme la forme licite
+et faisait rougir le retour à `--auto` — **même anti-corrélation que celle qu'A-1 diagnostiquait,
+étiquette retournée**. À défaire : `--auto` sur le cadrage redevient licite, et c'est **l'absence
+du désarmement adjacent** qui doit rougir.
+
+## A-2 — `workflow.auto_advance` : désarmé, dans la forme retenue en A-1bis
 
 **Décision.** Le second déclencheur de la règle 5 amont (`checkpoints.md:11`), absent de tout
 `plugin/`, est désarmé lui aussi. La forme suit celle retenue en A-1.
