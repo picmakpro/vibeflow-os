@@ -2051,19 +2051,22 @@ T25_BRICK_RE='^[[:space:]]*([0-9]+[.)][[:space:]]+|[-*+][[:space:]]+)?[*][*](Pla
 T25_MODE_RE='(non-interactif|--auto([^a-z-]|$)|--chain([^a-z-]|$))'
 T25_NEG_RE='(JAMAIS|[Jj]amais|[Nn]e pas|[Nn]i |[Ss]ans |[Aa]ucun|[Ii]nterdit|[Pp]as de |opt-in)'
 
-# INVERSION DE FIXTURE (A-1, arbitrage humain du 2026-08-02). La brique **Cadrage** était tenue
-# pour licite EN BLOC — et sa forme réelle, `gsd-discuss-phase … --auto`, immortalisée comme
-# rédaction correcte. C'était l'anti-corrélation exacte du risque annoncé : `--auto` pose le chain
-# flag amont, qui RÉ-ARME `workflow._auto_chain_active` juste après le désarmement du geste 5 du
-# manager — rendant D-02 inerte pour toute la mission. `--auto` (et `--chain`) sur une brique
-# Cadrage est donc désormais une forme INTERDITE, au même titre que le mode d'enchaînement sur une
-# brique Plan/Exécution.
+# PÉRIMÈTRE DE T25, ET POURQUOI LA BRIQUE **Cadrage** N'Y EST PAS (A-1bis, arbitrage humain du
+# 2026-08-02, qui RETRANCHE A-1). Le commit e2b1bfe avait ajouté ici une seconde branche faisant de
+# `--auto`/`--chain` sur une brique Cadrage une forme INTERDITE. Sa prémisse était fausse, vérifié
+# contre `gsd-core@1.9.0` : `--assumptions` route vers `workflows/list-phase-assumptions.md`, qui
+# n'écrit AUCUN `CONTEXT.md` (« No file output — purely conversational ») et porte une attente
+# bloquante ; `vf-coder` n'ayant pas `AskUserQuestion`, la forme prétendue licite le faisait
+# retomber dans le mode d'échec exact que `--auto` évitait, et `gsd-planner` planifiait à vide. Sur
+# 1.9.0 il n'existe AUCUN drapeau à la fois non interactif, producteur de `CONTEXT.md`, et sans
+# chain flag : le gate était donc anti-corrélé au risque, étiquette simplement retournée.
 #
-# Ce qui reste licite sur Cadrage, et pourquoi la fixture d ne change pas : `--assumptions` rend le
-# même service (`vf-coder` n'a pas `AskUserQuestion`, il ne peut pas bloquer sur un prompt) SANS
-# poser de chain flag. Le mot « non-interactif » décrit un mode, pas un flag : il ne pose rien. La
-# sonde du Cadrage porte donc sur les FLAGS D'ENCHAÎNEMENT seuls, jamais sur $T25_MODE_RE — sinon
-# elle punirait la rédaction que l'arbitrage vient précisément de retenir.
+# La branche est RETIRÉE d'ici. Ce qui la remplace n'est pas une interdiction mais une exigence de
+# RELATION, portée par T25b : `--auto` sur le Cadrage est licite, et c'est l'ABSENCE d'un
+# désarmement ADJACENT de `workflow._auto_chain_active` juste après lui qui doit rougir. T25 garde
+# donc son périmètre d'origine — les briques Plan/Exécution — et la fixture d (brique Cadrage,
+# patron de la ligne réelle de vf-coder.md, `--auto` inclus) redevient ce qu'elle était : la preuve
+# que ce balayage-ci laisse le Cadrage à T25b au lieu de le punir.
 T25_CADRAGE_RE='^[[:space:]]*([0-9]+[.)][[:space:]]+|[-*+][[:space:]]+)?[*][*]Cadrage([*]|[ ]|[(]|:)'
 T25_CHAINFLAG_RE='(--auto([^a-z-]|$)|--chain([^a-z-]|$))'
 
@@ -2094,8 +2097,7 @@ t25_prescriptive_clauses() { # <motif ERE de la forme interdite> ; bloc(s) sur s
 }
 
 t25_forbidden_chain_hits() { # <file>
-  md_blocks_matching "$1" "$T25_BRICK_RE"   | t25_prescriptive_clauses "$T25_MODE_RE"
-  md_blocks_matching "$1" "$T25_CADRAGE_RE" | t25_prescriptive_clauses "$T25_CHAINFLAG_RE"
+  md_blocks_matching "$1" "$T25_BRICK_RE" | t25_prescriptive_clauses "$T25_MODE_RE"
 }
 
 # volet présence : vf-dev-manager.md nomme la clé et l'appel qui la remet à faux.
@@ -2122,13 +2124,13 @@ if [ "$t25_scanned" -eq 0 ]; then
   ko "T25 fermeture : ZÉRO fichier balayé (agents d'équipe + $REFS_DIR introuvables) — un vert à vide n'est pas une garantie"
   t25_ok=0
 elif [ -n "$t25_real_hits" ]; then
-  ko "T25 fermeture : forme interdite trouvée (mode d'enchaînement sur brique Plan/Exécution, OU flag --auto/--chain sur brique Cadrage depuis A-1) —$t25_real_hits"
+  ko "T25 fermeture : forme interdite trouvée (mode d'enchaînement prescrit sur une brique Plan/Exécution) —$t25_real_hits"
   t25_ok=0
 else
-  # Le libellé ci-dessous SOUS-DÉCLARE volontairement depuis A-1 : le balayage couvre aussi les
-  # briques Cadrage (flags d'enchaînement). Un libellé qui sous-déclare ne ment jamais sur ce qui
-  # est garanti ; c'est T25b qui porte la revendication précise. On ne le réécrit pas : il est,
-  # mot pour mot, l'un des 87 acquis dont la stabilité sert de base de comparaison.
+  # Le libellé ci-dessous décrit EXACTEMENT ce qui est balayé depuis A-1bis (les briques
+  # Plan/Exécution, et elles seules — le Cadrage relève de T25b, qui y mesure une relation et non
+  # une interdiction). Il n'est pas réécrit : mot pour mot, il est l'un des acquis dont la
+  # stabilité sert de base de comparaison d'une exécution à l'autre.
   ok "T25 fermeture : $t25_scanned fichier(s) de doctrine balayé(s), aucun ne prescrit le mode d'enchaînement sur une brique Plan/Exécution"
 fi
 
@@ -2141,7 +2143,10 @@ fi
 #   c  interdite  — prescription SUIVIE d'une négation dans une AUTRE clause : prouve que
 #                   l'exclusion des négations est bornée à la clause et non au bloc (sinon un seul
 #                   « jamais » n'importe où suffirait à désarmer le gate).
-#   d  LICITE     — brique Cadrage (patron de la ligne 27 réelle de vf-coder.md).
+#   d  LICITE     — brique Cadrage portant la forme RÉELLE retenue par A-1bis (`--auto` + son
+#                   désarmement adjacent) : ce balayage-ci ne la voit pas, et c'est voulu — le
+#                   Cadrage est mesuré par T25b, en RELATION. La fixture réimmortalise ainsi
+#                   comme licite la rédaction que le gate d'A-1 faisait rougir.
 #   e  LICITE     — INTERDICTION rédigée sur une brique Plan (« JAMAIS en mode non-interactif ») :
 #                   un durcissement du texte, que le test punissait.
 #   f  LICITE     — bloc « **Planification amont** » citant `--auto`/`--chain` : ce n'est pas une
@@ -2156,7 +2161,7 @@ T25_LICIT_PLANIF="$T25_TMPDIR/f-licit-planification-amont.md"
 printf '2. **Plan** : invoque `gsd-plan-phase` en mode **non-interactif**.\n' > "$T25_FORBIDDEN"
 printf '2. **Plan (planification)** : invoque `gsd-plan-phase`\n   en mode **non-interactif**.\n' > "$T25_WRAPPED"
 printf '2. **Plan** : invoque `gsd-plan-phase` en mode **non-interactif**. JAMAIS de rendu au manager.\n' > "$T25_NEGOTHER"
-printf '1. **Cadrage** : invoque le skill `gsd-discuss-phase` en mode **non-interactif**.\n' > "$T25_LICIT"
+printf '1. **Cadrage** : invoque le skill `gsd-discuss-phase` en mode **non-interactif** (`--auto`), puis\n   **immédiatement, dans le même geste**, `gsd_run config-set workflow._auto_chain_active false`.\n' > "$T25_LICIT"
 printf '2. **Plan** : invoque `gsd-plan-phase` (ou dispatche `gsd-planner`).\n   JAMAIS en mode **non-interactif** : le plan se rend au manager.\n' > "$T25_LICIT_NEG"
 printf '**Planification amont** — la revue cross-AI de plans reste opt-in : jamais de `--auto`\nimplicite, jamais de `--chain` posé par le DAG.\n' > "$T25_LICIT_PLANIF"
 
@@ -2180,55 +2185,240 @@ fi
 [ "$t25_ok" -eq 1 ] && ok "T25 : flag d'enchaînement désarmé au démarrage + fermé par gate (Plan/Exécution interdits, Cadrage licite), discriminance prouvée par mutation"
 
 # ---------------------------------------------------------------------------
-# T25b (A-1, DISCRIMINANT) — la brique **Cadrage** ne prescrit plus de FLAG D'ENCHAÎNEMENT.
-# Assertion CUMULATIVE : elle s'ajoute à T25, dont les six fixtures gardent leur verdict (la
-# fixture « d » reste licite — elle ne cite aucun flag, seulement le mode « non-interactif »).
-# Quatre fixtures + un mutant tiré du fichier RÉEL, parce qu'une fixture synthétique prouve la
-# sonde et pas la doctrine : c'est vf-coder.md qui portait la forme fautive.
-#   g  interdite — la forme réelle d'AVANT l'arbitrage (`--auto` / mode assumptions).
-#   h  LICITE    — la forme retenue par A-1 (`--assumptions`) : le service rendu sans chain flag.
-#   i  LICITE    — l'INTERDICTION rédigée (« JAMAIS `--auto` ») : un durcissement du texte, que la
-#                  sonde ne doit pas confondre avec la prescription qu'elle poursuit.
-#   j  interdite — `--chain` sur une SOUS-PUCE imbriquée du Cadrage : la faille de bloc que le
-#                  splitter sensible à l'indentation ferme (acquis à ne pas reperdre).
+# T25b (A-1bis, DISCRIMINANT) — sur la brique **Cadrage**, `--auto` est LICITE et c'est l'ABSENCE
+# d'un désarmement ADJACENT qui doit rougir. Assertion CUMULATIVE : elle s'ajoute à T25, dont les
+# six fixtures gardent leur verdict.
+#
+# CE QUI EST MESURÉ : une RELATION, jamais l'existence d'un token. C'est le défaut qui s'est
+# reproduit quatre fois sur cette phase — et dans sa forme la plus coûteuse au commit e2b1bfe, où
+# la sonde cherchait `--auto` et le déclarait fautif par sa seule présence. Chercher le mot
+# « désarme » quelque part dans le fichier serait la même faute, symétrique : la garantie n'est pas
+# que le désarmement EXISTE, c'est qu'il SUIVE IMMÉDIATEMENT l'appel qui arme. Un désarmement
+# renvoyé à l'autre bout du fichier — ou à l'autre bout du même bloc — laisse exactement la fenêtre
+# armée que A-1bis prétend fermer, sans qu'un seul token manque.
+#
+# La sonde apparie donc, DANS le bloc Cadrage aplati : chaque occurrence PRESCRIPTIVE d'un flag
+# d'armement (`--auto`/`--chain`, hors clause négative — cf. $T25_NEG_RE, acquis anti-faux-rouge de
+# T25) doit être suivie, dans une fenêtre bornée, du désarmement NOMMÉ. « Suivie » est
+# load-bearing : un désarmement placé AVANT l'armement est précisément le geste 5 du manager, dont
+# A-1bis établit qu'il ne suffit pas. Écart assumé et symétrique du choix de T25 : une rédaction
+# qui poserait le désarmement avant l'armement rougit — sur cette relation-là, l'ordre EST la
+# garantie.
+#
+# ≥1 appariement suffit (jamais « toutes les occurrences ») : une prose qui recite `--auto` plus
+# loin pour l'expliquer serait sinon un faux rouge — la famille de faux rouges que cette phase a
+# déjà payée trois fois.
+#
+# Fixtures et mutants — les quatre contrôles exigés par le mandat, plus deux :
+#   g  ROUGE      — la forme d'AVANT A-1bis (`--auto` seul, aucun désarmement) : le cas nominal.
+#   h  SANS OBJET — `--assumptions` seul. La fixture est CONSERVÉE mais sa portée a changé, et on
+#                   le DIT plutôt que de la retirer en silence : A-1bis établit que cette forme
+#                   n'écrit aucun `CONTEXT.md` et bloque sur une attente — elle n'est plus la
+#                   rédaction retenue. Elle n'arme rien pour autant : la sonde n'a rien à apparier
+#                   (rc=3), ce qui n'est ni un vert ni un rouge, et la fixture le fige.
+#   i  SANS OBJET — l'INTERDICTION rédigée (« JAMAIS `--auto` »). Sa doctrine est périmée depuis
+#                   A-1bis ; la PROPRIÉTÉ qu'elle garde ne l'est pas : une négation n'est pas une
+#                   prescription, donc elle n'arme rien. Acquis anti-faux-rouge à ne pas reperdre.
+#   j  ROUGE      — `--chain` sur une SOUS-PUCE imbriquée du Cadrage, sans désarmement : la faille
+#                   de bloc que le splitter sensible à l'indentation ferme (acquis à ne pas
+#                   reperdre — la sonde doit voir la sous-puce comme partie du bloc parent).
+#   k  VERT       — reformulation LÉGITIME du couple (autres mots, même adjacence) : une sonde qui
+#                   punit une réécriture licite nuit autant qu'une sonde aveugle.
+#   M1 ROUGE      — vf-coder.md RÉEL, ligne de désarmement RETIRÉE.
+#   M2 ROUGE      — le désarmement DÉPLACÉ hors du bloc, ailleurs dans le fichier : tous les tokens
+#                   conservés, seule la relation rompue.
+#   M3 ROUGE      — le désarmement DÉPLACÉ à la fin du même bloc Cadrage : c'est LUI qui sépare
+#                   « adjacence » de « co-présence dans le bloc », et il est gardé contre le
+#                   no-op (un M3 identique à M1 ne prouverait que le retrait).
+#   M4 ROUGE      — armement et désarmement PERMUTÉS (désarmement AVANT) : permutation pure, le
+#                   multiset canonique de tokens du fichier est vérifié identique, seul l'ordre
+#                   change.
+#   + le fichier RÉEL doit tenir l'assertion (rc=0), et AUCUN .md de doctrine du module ne doit
+#     porter un Cadrage armé sans désarmement adjacent (balayage, mêmes cibles résolues que T25).
 # ---------------------------------------------------------------------------
 t25b_ok=1
+
+# Désarmement NOMMÉ : la clé ET sa remise à faux, même graphie qu'au geste 5 du manager (T25c). Un
+# « désarme le flag » sans la clé ne désarme rien de vérifiable — un flag qu'on ne nomme pas est un
+# flag qu'on ne désarme pas.
+T25B_DISARM_RE='workflow[.]_auto_chain_active[`]?[[:space:]]+false'
+
+# Fenêtre d'ADJACENCE, en caractères du bloc APLATI, comptés depuis la fin du flag d'armement. 150
+# ≈ une ligne et demie du repli à 100 colonnes du module : de quoi écrire « puis, dans le même
+# geste, <appel> » dans plusieurs tournures, pas de quoi renvoyer le désarmement à l'autre bout du
+# bloc (celui de vf-coder.md fait ~800 caractères, son appariement réel en fait ~75).
+T25B_WINDOW=150
+
+# rc=0 appariement armement→désarmement ADJACENT trouvé ($T25B_WHY porte la distance mesurée) ·
+# rc=1 armement prescriptif SANS désarmement adjacent · rc=2 aucune brique Cadrage · rc=3 aucun
+# armement prescriptif : la sonde est SANS OBJET sur ce fichier — ni un vert ni un rouge, et
+# jamais un repli silencieux sur « le mot désarmement apparaît quelque part ».
+T25B_WHY=""
+t25b_cadrage_adjacent_disarm() { # <file>
+  local blk res armed paired mind
+  T25B_WHY=""
+  blk="$(md_blocks_matching "$1" "$T25_CADRAGE_RE")"
+  [ -n "$blk" ] || { T25B_WHY="aucune brique **Cadrage** dans ce fichier"; return 2; }
+  # Sortie : "<armements prescriptifs> <appariements adjacents> <distance minimale, -1 si aucun
+  # désarmement ne SUIT un armement>".
+  res="$(printf '%s\n' "$blk" | awk -v arm="$T25_CHAINFLAG_RE" -v dis="$T25B_DISARM_RE" \
+                                    -v neg="$T25_NEG_RE" -v win="$T25B_WINDOW" '
+    BEGIN { armed = 0; paired = 0; mind = -1 }
+    {
+      block = $0; base = 0; line = block
+      while (match(line, arm)) {
+        rs = RSTART; rl = RLENGTH
+        e = base + rs + rl - 1                  # index absolu de fin du flag dans le bloc
+        head = substr(block, 1, e)
+        # Negation bornee a la CLAUSE (depuis le dernier separateur ASCII), jamais au bloc : acquis
+        # de T25 — un « jamais » place ailleurs ne doit pas desarmer la sonde.
+        n = 0
+        for (i = length(head); i > 0; i--) {
+          c = substr(head, i, 1)
+          if (c == "." || c == ";" || c == ":" || c == "!" || c == "?") { n = i; break }
+        }
+        if (substr(head, n + 1) !~ neg) {
+          armed++
+          tail = substr(block, e + 1)           # ce qui SUIT l armement, et lui seul
+          if (match(tail, dis)) {
+            d = RSTART - 1
+            if (mind < 0 || d < mind) mind = d
+            if (d <= win) paired++
+          }
+        }
+        base = e
+        line = substr(line, rs + rl)
+      }
+    }
+    END { print armed, paired, mind }
+  ')"
+  armed="${res%% *}"; mind="${res##* }"; paired="$(printf '%s' "$res" | cut -d' ' -f2)"
+  [ "${armed:-0}" -gt 0 ] || { T25B_WHY="aucun armement prescriptif (\`--auto\`/\`--chain\`) dans la brique Cadrage — rien à apparier"; return 3; }
+  if [ "${paired:-0}" -gt 0 ]; then
+    T25B_WHY="$armed armement(s) prescriptif(s), $paired apparié(s) à ≤ $T25B_WINDOW caractères (distance minimale mesurée : $mind)"
+    return 0
+  fi
+  if [ "${mind:--1}" -lt 0 ]; then
+    T25B_WHY="la brique Cadrage arme le chain flag ($armed occurrence(s) prescriptive(s)) et AUCUN désarmement nommé (\`workflow._auto_chain_active … false\`) ne le SUIT dans le bloc — la fenêtre reste ouverte pour toute la mission"
+  else
+    T25B_WHY="le désarmement suit bien l'armement, mais à $mind caractères (> $T25B_WINDOW) : il n'est PAS adjacent — la fenêtre armée court jusque-là, et une co-présence dans le bloc ne la referme pas"
+  fi
+  return 1
+}
+
 T25B_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T25B_TMPDIR"
-T25B_FORBIDDEN="$T25B_TMPDIR/g-forbidden-cadrage-auto.md"
-T25B_LICIT="$T25B_TMPDIR/h-licit-cadrage-assumptions.md"
-T25B_LICIT_NEG="$T25B_TMPDIR/i-licit-cadrage-interdiction.md"
-T25B_SUBBULLET="$T25B_TMPDIR/j-forbidden-cadrage-souspuce.md"
-T25B_MUT_CODER="$T25B_TMPDIR/mutant-cadrage-reintroduit-auto.md"
-printf '1. **Cadrage** : invoque le skill `gsd-discuss-phase` en mode **non-interactif** (`--auto` /\n   mode assumptions).\n' > "$T25B_FORBIDDEN"
-printf '1. **Cadrage** : invoque le skill `gsd-discuss-phase` en mode **non-interactif**, avec\n   `--assumptions`.\n' > "$T25B_LICIT"
-printf '1. **Cadrage** : `gsd-discuss-phase` avec `--assumptions`, JAMAIS `--auto` — il poserait le\n   chain flag amont.\n' > "$T25B_LICIT_NEG"
+T25B_ARMED="$T25B_TMPDIR/g-cadrage-arme-sans-desarmement.md"
+T25B_ASSUMPTIONS="$T25B_TMPDIR/h-cadrage-assumptions-sans-objet.md"
+T25B_NEG="$T25B_TMPDIR/i-cadrage-interdiction-sans-objet.md"
+T25B_SUBBULLET="$T25B_TMPDIR/j-cadrage-souspuce-armee.md"
+T25B_REFORM="$T25B_TMPDIR/k-cadrage-reformulation-legitime.md"
+printf '1. **Cadrage** : invoque le skill `gsd-discuss-phase` en mode **non-interactif** (`--auto` /\n   mode assumptions).\n' > "$T25B_ARMED"
+printf '1. **Cadrage** : invoque le skill `gsd-discuss-phase` en mode **non-interactif**, avec\n   `--assumptions`.\n' > "$T25B_ASSUMPTIONS"
+printf '1. **Cadrage** : `gsd-discuss-phase` avec `--assumptions`, JAMAIS `--auto` — il poserait le\n   chain flag amont.\n' > "$T25B_NEG"
 printf '1. **Cadrage** : invoque le skill `gsd-discuss-phase`\n   - en enchaînement automatique (`--chain`).\n' > "$T25B_SUBBULLET"
-# Mutation de la DOCTRINE réelle : on réintroduit le flag que A-1 vient de bannir, à la place de
-# celui qu'il retient. Anchrée sur la formule du fichier — d'où le garde d'identité ci-dessous,
-# qui distingue « mutation non détectée » de « mutation qui n'a rien mordu ».
-sed 's/`--assumptions` et \*\*jamais\*\* `--auto`/`--auto`/' "$CODER_FILE" > "$T25B_MUT_CODER"
+printf '1. **Cadrage** : lance `gsd-discuss-phase --auto`, et enchaîne aussitôt, dans le même geste,\n   sur `gsd_run config-set workflow._auto_chain_active false` — la fenêtre reste bornée là.\n' > "$T25B_REFORM"
 
 t25b_ko=""
-for t25b_fx in FORBIDDEN:1 LICIT:0 LICIT_NEG:0 SUBBULLET:1; do
-  eval "t25b_fxfile=\$T25B_${t25b_fx%%:*}"
-  t25b_hit="$(t25_forbidden_chain_hits "$t25b_fxfile")"
-  if [ "${t25b_fx##*:}" = 1 ] && [ -z "$t25b_hit" ]; then
-    t25b_ko="$t25b_ko [$(basename "$t25b_fxfile") : flag d'enchaînement sur brique Cadrage NON détecté]"
-  elif [ "${t25b_fx##*:}" = 0 ] && [ -n "$t25b_hit" ]; then
-    t25b_ko="$t25b_ko [$(basename "$t25b_fxfile") : FAUX ROUGE sur une rédaction licite — hit=[$t25b_hit]]"
+t25b_rc=0
+t25b_assert_rc() { # <libellé> <fichier> <rc attendu>
+  t25b_cadrage_adjacent_disarm "$2"
+  t25b_rc=$?
+  [ "$t25b_rc" = "$3" ] \
+    || t25b_ko="$t25b_ko [$1 : rc=$t25b_rc, attendu $3 — $T25B_WHY]"
+}
+t25b_assert_rc "g Cadrage armé sans désarmement"                  "$T25B_ARMED"       1
+t25b_assert_rc "h --assumptions seul (SANS OBJET depuis A-1bis)"  "$T25B_ASSUMPTIONS" 3
+t25b_assert_rc "i interdiction rédigée (négation ≠ prescription)" "$T25B_NEG"         3
+t25b_assert_rc "j --chain sur sous-puce imbriquée du Cadrage"     "$T25B_SUBBULLET"   1
+t25b_assert_rc "k reformulation LÉGITIME du couple adjacent"      "$T25B_REFORM"      0
+
+# --- Mutants tirés du fichier RÉEL : une fixture synthétique prouve la sonde, jamais la doctrine.
+T25B_M1="$T25B_TMPDIR/M1-desarmement-retire.md"
+T25B_M2="$T25B_TMPDIR/M2-desarmement-hors-bloc.md"
+T25B_M3="$T25B_TMPDIR/M3-desarmement-fin-de-bloc.md"
+T25B_M4="$T25B_TMPDIR/M4-armement-desarmement-permutes.md"
+T25B_CALL='gsd_run config-set workflow._auto_chain_active false'
+# Les quatre mutants s ancrent sur les TOKENS du couple (l appel de désarmement, le flag), jamais
+# sur la prose qui les entoure ni sur leurs backticks : une reformulation légitime de la brique —
+# le contrôle « k » du mandat, rejoué ci-dessous sur le fichier réel — ne doit pas transformer un
+# mutant en no-op, ce qui ferait rougir la suite sur une réécriture correcte. M3 en particulier
+# repère la fin du bloc STRUCTURELLEMENT (même règle de coupe que md_blocks_matching), pas par une
+# phrase.
+# M1 — l appel de désarmement retiré, purement et simplement.
+sed 's/gsd_run config-set workflow[.]_auto_chain_active false//' "$CODER_FILE" > "$T25B_M1"
+# M2 — le MÊME appel, replacé ailleurs dans le fichier : aucun token perdu, seule la relation.
+{ cat "$T25B_M1"; printf '\nAprès le cadrage, `%s` reste requis.\n' "$T25B_CALL"; } > "$T25B_M2"
+# M3 — replacé à la FIN du même bloc Cadrage : toujours dans le bloc, mais loin de l armement.
+awk -v anchor="$T25_CADRAGE_RE" -v call="$T25B_CALL" '
+  function indent(s,   t) { t = s; sub(/[^ \t].*$/, "", t); gsub(/\t/, "    ", t); return length(t) }
+  function flush(  i) { buf[n] = buf[n] " — puis `" call "` —"; for (i = 1; i <= n; i++) print buf[i]; n = 0; ina = 0 }
+  {
+    if (!ina && $0 ~ anchor) { ina = 1; openind = indent($0); buf[++n] = $0; next }
+    if (ina) {
+      if (/^[[:space:]]*$/ || /^#/ || (/^[[:space:]]*([-*+][[:space:]]|[0-9]+\.[[:space:]])/ && indent($0) <= openind)) {
+        flush(); print; next
+      }
+      buf[++n] = $0; next
+    }
+    print
+  }
+  END { if (ina) flush() }
+' "$T25B_M1" > "$T25B_M3"
+# M4 — permutation PURE des deux membres du couple : le désarmement passe AVANT l armement.
+sed -e 's/--auto/@@VFARM@@/' \
+    -e 's/gsd_run config-set workflow[.]_auto_chain_active false/--auto/' \
+    -e "s/@@VFARM@@/$T25B_CALL/" "$CODER_FILE" > "$T25B_M4"
+
+# Gardes de MORSURE, avant toute mesure : un mutant qui n a rien changé (ou qui a changé autre
+# chose que ce qu il prétend) ne prouve rien. M3 en particulier serait, s il n avait pas mordu, un
+# simple doublon de M1 — il ne dirait plus rien de l adjacence, qui est tout son objet.
+cmp -s "$T25B_M1" "$T25B_M3" \
+  && t25b_ko="$t25b_ko [M3 : la réinsertion en fin de bloc n'a pas mordu (M3 identique à M1) — il ne prouverait que le retrait, pas la non-adjacence]"
+cmp -s "$T25B_M1" "$T25B_M2" \
+  && t25b_ko="$t25b_ko [M2 : le report hors bloc n'a pas mordu (M2 identique à M1) — il ne prouverait que le retrait]"
+t25b_canon() { LC_ALL=C tr -cs '[:alnum:]_' '\n' < "$1" | LC_ALL=C sort; }
+[ "$(t25b_canon "$CODER_FILE")" = "$(t25b_canon "$T25B_M4")" ] \
+  || t25b_ko="$t25b_ko [M4 : le multiset canonique de tokens a changé — ce n'est plus une permutation pure, donc plus une mutation de RELATION]"
+
+t25b_assert_mutant_red() { # <libellé> <mutant>
+  if cmp -s "$CODER_FILE" "$2"; then
+    t25b_ko="$t25b_ko [$1 : mutant IDENTIQUE à l'original — le motif visé n'existe plus dans vf-coder.md, la mutation n'a rien mordu (sonde à réancrer, ce n'est PAS un défaut de l'assertion)]"
+    return
   fi
-done
-if cmp -s "$CODER_FILE" "$T25B_MUT_CODER"; then
-  t25b_ko="$t25b_ko [mutant de vf-coder.md IDENTIQUE à l'original — la formule visée n'existe plus, la mutation n'a rien mordu (sonde à réancrer, ce n'est PAS un défaut de l'assertion)]"
-elif [ -z "$(t25_forbidden_chain_hits "$T25B_MUT_CODER")" ]; then
-  t25b_ko="$t25b_ko [mutant de vf-coder.md : la réintroduction de \`--auto\` sur le cadrage n'est PAS détectée — le gate resterait anti-corrélé au risque annoncé]"
-fi
-[ -z "$(t25_forbidden_chain_hits "$CODER_FILE")" ] \
-  || t25b_ko="$t25b_ko [vf-coder.md RÉEL : sa brique Cadrage prescrit un flag d'enchaînement]"
+  t25b_cadrage_adjacent_disarm "$2"
+  case $? in
+    1) : ;;
+    0) t25b_ko="$t25b_ko [$1 : NON détecté — $T25B_WHY]" ;;
+    2) t25b_ko="$t25b_ko [$1 : rc=2, brique Cadrage détruite — rien n'a été mesuré, ce n'est pas une détection]" ;;
+    *) t25b_ko="$t25b_ko [$1 : rc=3, plus aucun armement prescriptif — rien n'a été mesuré là où on prétend mesurer]" ;;
+  esac
+}
+t25b_assert_mutant_red "M1 désarmement RETIRÉ"                                "$T25B_M1"
+t25b_assert_mutant_red "M2 désarmement déplacé HORS du bloc (tokens gardés)"  "$T25B_M2"
+t25b_assert_mutant_red "M3 désarmement déplacé en FIN de bloc (non adjacent)" "$T25B_M3"
+t25b_assert_mutant_red "M4 armement/désarmement PERMUTÉS (multiset inchangé)" "$T25B_M4"
+
+# Le fichier RÉEL doit tenir l'assertion : `--auto` armé ET refermé dans le geste même.
+t25b_cadrage_adjacent_disarm "$CODER_FILE" \
+  || t25b_ko="$t25b_ko [vf-coder.md RÉEL ne tient pas l'assertion (rc=$?) — $T25B_WHY]"
+
+# Balayage : AUCUN .md de doctrine du module ne peut porter un Cadrage armé sans désarmement
+# adjacent. Mêmes cibles RÉSOLUES que T25 — jamais un glob en dur (en lab installé agents/ est plat
+# et partagé, et references/ n'existe pas sous ce nom : un glob non expansé = vert à vide).
+t25b_scanned=0
+while IFS= read -r t25b_f; do
+  [ -n "$t25b_f" ] || continue
+  t25b_scanned=$((t25b_scanned + 1))
+  t25b_cadrage_adjacent_disarm "$t25b_f"
+  [ $? -eq 1 ] && t25b_ko="$t25b_ko [$t25b_f : $T25B_WHY]"
+done < <(module_md_targets)
+[ "$t25b_scanned" -gt 0 ] \
+  || t25b_ko="$t25b_ko [balayage : ZÉRO fichier de doctrine ouvert — un vert à vide n'est pas une garantie]"
+
 if [ -z "$t25b_ko" ]; then
-  ok "T25b (A-1, DISCRIMINANT) : \`--auto\`/\`--chain\` sur la brique Cadrage est une forme INTERDITE — 2 formes détectées (forme d'avant l'arbitrage, sous-puce imbriquée), 2 rédactions LICITES épargnées (\`--assumptions\`, interdiction rédigée), et la réintroduction de \`--auto\` dans vf-coder.md réel fait rougir la sonde"
+  ok "T25b (A-1bis, DISCRIMINANT) : sur la brique Cadrage, \`--auto\` est LICITE et c'est l'ABSENCE de désarmement ADJACENT qui rougit — relation mesurée (armement → désarmement nommé, à ≤ $T25B_WINDOW caractères et APRÈS lui), 4 mutants du fichier RÉEL détectés (retrait, report hors bloc, report en fin de bloc, permutation à multiset inchangé), 2 fixtures SANS OBJET assumées (\`--assumptions\`, interdiction rédigée), 1 reformulation légitime verte, $t25b_scanned fichier(s) de doctrine balayé(s), et vf-coder.md tient l'appariement"
 else
-  ko "T25b (A-1, DISCRIMINANT) : la fixture du cadrage n'est pas réellement inversée —$t25b_ko"; t25b_ok=0
+  ko "T25b (A-1bis, DISCRIMINANT) : l'adjacence armement↔désarmement n'est pas mesurée —$t25b_ko"; t25b_ok=0
 fi
 
 # ---------------------------------------------------------------------------
