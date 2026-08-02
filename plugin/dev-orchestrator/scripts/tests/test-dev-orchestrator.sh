@@ -2627,5 +2627,116 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# T27 (A-4, DISCRIMINANT) — le contrôle de flux DÉPARTAGE gel et question par le MODE.
+#
+# Ce que ce gate ferme. Deux clauses CONSÉCUTIVES se contredisaient : la première qualifiait ses
+# branches (« mode superviser : checkpoint ; mode autonome : GELER le nœud »), la seconde — « c'est
+# toi qui réponds aux attentes humaines … tu poses la question puis redispatches » — n'en portait
+# AUCUNE. En mode autonome l'utilisateur est absent par définition : un agent pouvait résoudre la
+# tension dans le mauvais sens, en répondant lui-même à une attente humaine (violation directe
+# d'ADR-031). L'absence de qualificatif était le défaut, pas une imprécision de style.
+#
+# Ce qui est mesuré, DANS le segment du statut `human_needed` (même isolation que T24 F1 — un
+# qualificatif de mode posé sur un AUTRE verdict ne qualifie pas celui-ci) :
+#   (a) aucune clause disposant d'une attente humaine n'est MUETTE sur le mode ;
+#   (b) chaque disposition est rattachée au BON mode — poser la question ⇒ superviser, geler le
+#       nœud ⇒ autonome. Sans (b), échanger les deux modes passerait inaperçu alors que c'est
+#       exactement l'inversion qui rouvre ADR-031.
+# La clause est bornée par « ; » et « · », les séparateurs de branche du bloc — jamais par « : »,
+# qui sépare l'annonce de sa disposition à l'INTÉRIEUR d'une même branche.
+# ---------------------------------------------------------------------------
+t27_ok=1
+T27_MODE_RE='mode[[:space:]]+[*]*(superviser|autonome)'
+T27_ASK_RE='réponds aux attentes humaines|poses? la question|poser la question'
+T27_FREEZE_RE='GELER|halte de nœud|gèle le nœud|geler le nœud'
+T27_WHY=""
+
+t27_clauses() { awk '{ gsub(/;|·/, "\n"); print }'; }
+
+t27_flow_modes() { # <file>
+  local seg unqual
+  T27_WHY=""
+  seg="$(md_blocks_matching "$1" "$T24_ANCHOR_C" | t24_segment_of 'human_needed')"
+  [ -n "$seg" ] || { T27_WHY="segment du statut human_needed introuvable dans le bloc « Verdict d'étape » — rien n'a été mesuré"; return 2; }
+
+  # (a) — une clause qui dispose d'une attente humaine SANS nommer le mode est le défaut d'origine.
+  unqual="$(printf '%s\n' "$seg" | t27_clauses \
+            | "$GREP" -E "$T27_ASK_RE|$T27_FREEZE_RE" | "$GREP" -vE "$T27_MODE_RE" \
+            | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | tr '\n' '|')"
+  [ -z "$unqual" ] || { T27_WHY="clause de contrôle de flux SANS qualificatif de mode — « $unqual »"; return 1; }
+
+  # (b) — le rattachement, pas seulement la co-présence des deux mots « superviser » et « autonome ».
+  printf '%s\n' "$seg" | t27_clauses | "$GREP" -E "$T27_ASK_RE" | "$GREP" -qE 'mode[[:space:]]+[*]*superviser' \
+    || { T27_WHY="répondre à l'attente humaine (poser la question) n'est pas rattaché au mode SUPERVISER — en mode autonome, y répondre viole ADR-031"; return 1; }
+  printf '%s\n' "$seg" | t27_clauses | "$GREP" -E "$T27_FREEZE_RE" | "$GREP" -qE 'mode[[:space:]]+[*]*autonome' \
+    || { T27_WHY="le GEL du nœud n'est pas rattaché au mode AUTONOME — « toujours geler » interromprait aussi les sessions supervisées"; return 1; }
+  return 0
+}
+
+t27_flow_modes "$DEVMGR"
+case $? in
+  0) : ;;
+  2) ko "T27 (A-4) : vf-dev-manager.md — $T27_WHY"; t27_ok=0 ;;
+  *) ko "T27 (A-4) : vf-dev-manager.md — $T27_WHY"; t27_ok=0 ;;
+esac
+
+# Trois mutants + une fixture LICITE.
+#   M1 (RELATION, aucun token retiré) : les deux qualificatifs de mode sont ÉCHANGÉS. (a) reste
+#      satisfaite — les deux branches restent qualifiées —, seule (b) mord : c'est précisément
+#      l'inversion qui autorise un agent à répondre en autonomie.
+#   M2 : le qualificatif retiré de la branche de GEL — la forme littérale du défaut d'origine.
+#   M3 : le qualificatif retiré de la branche de QUESTION — le défaut d'origine, exactement.
+#   L  : une reformulation LICITE (modes en clair, sans gras, branches en ordre inverse) reste
+#      VERTE — un gate qui punit une rédaction correcte nuit autant qu'un gate aveugle.
+T27_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T27_TMPDIR"
+T27_MUT_SWAP="$T27_TMPDIR/mutant-modes-echanges.md"
+T27_MUT_GEL="$T27_TMPDIR/mutant-gel-sans-mode.md"
+T27_MUT_QUESTION="$T27_TMPDIR/mutant-question-sans-mode.md"
+T27_LICIT="$T27_TMPDIR/licite-modes-en-clair.md"
+sed -e 's/mode \*\*superviser\*\*/mode **@@VFMODE@@**/g' \
+    -e 's/mode \*\*autonome\*\*/mode **superviser**/g' \
+    -e 's/mode \*\*@@VFMODE@@\*\*/mode **autonome**/g' "$DEVMGR" > "$T27_MUT_SWAP"
+sed 's/en mode \*\*autonome\*\*, tu n/tu n/' "$DEVMGR" > "$T27_MUT_GEL"
+sed 's/en mode \*\*superviser\*\*, c/c/'     "$DEVMGR" > "$T27_MUT_QUESTION"
+cat > "$T27_LICIT" <<'T27L'
+- **Verdict d'étape (rapport typé, ADR-053)** : `passed` → frontière suivante ·
+  `human_needed` — déclenché par `gate="blocking-human"` amont OU par une précondition amont non
+  satisfaite — → escalade : en mode autonome, GELER le nœud porteur (halte de nœud, jamais de
+  mission), poursuivre les branches indépendantes et consigner la question au rapport ; en mode
+  superviser, c'est toi qui réponds aux attentes humaines du moteur et tu poses la question ·
+  `gaps_found` → relance de comblement.
+T27L
+
+t27_mut_ko=""
+# Preuve que M1 est une mutation de RELATION et non un effacement : une fois les deux qualificatifs
+# ramenés à un jeton canonique, le multiset de tokens doit être IDENTIQUE de part et d'autre.
+t27_canon() { sed -e 's/superviser/@VFMD@/g' -e 's/autonome/@VFMD@/g' "$1" | tr -cs '[:alnum:]_@' '\n' | LC_ALL=C sort; }
+[ "$(t27_canon "$DEVMGR")" = "$(t27_canon "$T27_MUT_SWAP")" ] \
+  || t27_mut_ko="$t27_mut_ko [M1 : le multiset canonique de tokens a changé — ce n'est plus une mutation de relation pure]"
+
+t27_assert_mutant_red() { # <libellé> <mutant>
+  if cmp -s "$DEVMGR" "$2"; then
+    t27_mut_ko="$t27_mut_ko [$1 : mutant IDENTIQUE à l'original — le motif visé n'existe plus, la mutation n'a rien mordu (sonde à réancrer, ce n'est PAS un défaut de l'assertion)]"
+    return
+  fi
+  t27_flow_modes "$2"
+  case $? in
+    1) : ;;
+    0) t27_mut_ko="$t27_mut_ko [$1 : NON détecté]" ;;
+    *) t27_mut_ko="$t27_mut_ko [$1 : rc=2, segment du statut détruit — rien n'a été mesuré, ce n'est pas une détection]" ;;
+  esac
+}
+t27_assert_mutant_red "M1 RELATION : qualificatifs de mode ÉCHANGÉS, aucun token retiré" "$T27_MUT_SWAP"
+t27_assert_mutant_red "M2 : branche de GEL sans qualificatif de mode"                     "$T27_MUT_GEL"
+t27_assert_mutant_red "M3 : branche de QUESTION sans qualificatif de mode"                "$T27_MUT_QUESTION"
+t27_flow_modes "$T27_LICIT" || t27_mut_ko="$t27_mut_ko [FAUX ROUGE : une reformulation LICITE (modes en clair, ordre inverse) est rejetée (rc=$?, $T27_WHY)]"
+t27_flow_modes "$DEVMGR"    || t27_mut_ko="$t27_mut_ko [le fichier réel ne tient plus l'assertion — $T27_WHY]"
+if [ -n "$t27_mut_ko" ]; then
+  ko "T27 (A-4, DISCRIMINANT) : le départage gel/question par le mode n'est pas mesuré —$t27_mut_ko"; t27_ok=0
+else
+  ok "T27 (A-4, DISCRIMINANT) : les deux branches de l'escalade human_needed portent un qualificatif de mode EXPLICITE et le bon (question ⇒ superviser, gel du nœud ⇒ autonome) — 3 mutants font rougir l'assertion (modes échangés sans retirer un token, puis chaque branche démuselée de son mode), 1 reformulation LICITE reste verte"
+fi
+
+# ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
 [ "$fail" -eq 0 ]
