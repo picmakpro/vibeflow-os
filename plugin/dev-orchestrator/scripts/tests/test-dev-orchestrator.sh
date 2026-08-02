@@ -1784,8 +1784,25 @@ module_md_targets() {
 # L'assertion mesure une RELATION, pas une co-présence. Exiger trois chaînes indépendantes dans un
 # bloc ne verrouille rien dès que le bloc énumère PLUSIEURS statuts : celui de vf-dev-manager fait
 # 14 lignes et couvre 4 verdicts — une doctrine disant l'INVERSE de D-01 (gate ⇒ gaps_found) y
-# satisfait les trois sondes par des phrases sans rapport entre elles. On isole donc le SEGMENT du
-# bloc qui appartient à `human_needed` et on exige les deux motifs DANS CE SEGMENT.
+# satisfait les trois sondes par des phrases sans rapport entre elles.
+#
+# Les trois cibles n'écrivent PAS la règle sous la même forme rhétorique. Une sonde unique ne
+# mordait donc que sur UNE d'entre elles, les deux autres retombant en silence sur la co-présence —
+# dont le fichier de RÉFÉRENCE, l'énoncé faisant autorité de D-01 : l'y inverser laissait la suite
+# à 87 OK / 0 KO. Deux formes sont reconnues, et une cible doit être couverte par l'une OU l'autre :
+#
+#   F1 — ÉNUMÉRATION « étiquette → mapping » (vf-dev-manager.md) : le statut OUVRE une entrée. On
+#        isole le SEGMENT du bloc qui lui appartient et on exige les deux motifs DANS CE SEGMENT.
+#   F2 — IMPLICATION « prémisse ⇒ conséquent » (mission-contracts.md, vf-coder.md) : le statut est
+#        le CONSÉQUENT, les motifs sont AVANT lui — aucune entrée à isoler. On prend, pour CHAQUE
+#        occurrence de motif, le PREMIER statut qui la suit : il doit être `human_needed`.
+#        Élargir le compteur d'entrées de F1 à la graphie JSON (`statut: "…"`) ne suffit pas — ça
+#        rougit sur la forme à contraste explicite (⇒ `statut: "human_needed"` — jamais
+#        `statut: "gaps_found"`), rédaction licite et plus précise que l'actuelle.
+#
+# Une cible couvrable par NI F1 NI F2 est un KO explicite (« mapping non vérifiable »). Jamais de
+# repli sur la co-présence : c'est lui qui rendait le vert de deux assertions sur trois indépendant
+# de ce que la doctrine dit réellement.
 # ---------------------------------------------------------------------------
 t24_ok=1
 CONTRACTS_FILE="$REFS_DIR/mission-contracts.md"   # $CODER_FILE et $DEVMGR : déjà résolus plus haut
@@ -1815,44 +1832,85 @@ t24_segment_of() { # <statut> ; bloc(s) sur stdin
   '
 }
 
-# 0 = mapping tenu · 1 = segment trouvé mais mapping rompu · 2 = bloc introuvable ·
-# 3 = bloc multi-statuts dont `human_needed` n'ouvre aucune entrée (rien de mesurable — jamais un
-# repli silencieux sur le bloc entier, qui rouvrirait exactement la faille de co-présence).
-t24_maps_to_human_needed() { # <file> <ancre ERE>
-  local blk seg mentions
-  blk="$(md_blocks_matching "$1" "$2")"
-  [ -n "$blk" ] || return 2
-  mentions="$(printf '%s\n' "$blk" | "$GREP" -oE "\`($T24_STATUTS)\`" | LC_ALL=C sort -u | "$GREP" -c . || true)"
-  if [ "${mentions:-0}" -le 1 ]; then
-    seg="$blk"          # bloc mono-statut : pas d'énumération, le bloc EST le segment
-  else
-    seg="$(printf '%s\n' "$blk" | t24_segment_of 'human_needed')"
-    [ -n "$seg" ] || return 3
-  fi
-  printf '%s\n' "$seg" | "$GREP" -q 'gate="blocking-human"' || return 1
-  printf '%s\n' "$seg" | "$GREP" -qi 'précondition'         || return 1
-  printf '%s\n' "$seg" | "$GREP" -q 'human_needed'          || return 1
-  return 0
+# F2 — conséquents d'implication : pour CHAQUE occurrence d'un motif de la prémisse, le PREMIER
+# statut qui la suit dans le bloc (un par ligne de sortie). Sortie vide = aucun motif n'est suivi
+# d'un statut : le bloc n'exprime pas d'implication, F2 ne s'applique pas (et rien n'est conclu).
+t24_implication_consequents() { # bloc(s) sur stdin
+  awk -v st="$T24_STATUTS" -v m1='gate="blocking-human"' -v m2='[Pp]récondition' '
+    function consequents(line, motif,   rest) {
+      while (match(line, motif)) {
+        rest = substr(line, RSTART + RLENGTH)
+        if (match(rest, "(" st ")")) print substr(rest, RSTART, RLENGTH)
+        line = rest
+      }
+    }
+    { consequents($0, m1); consequents($0, m2) }
+  '
 }
 
+# 0 = mapping tenu ($T24_FORME renseignée) · 1 = forme reconnue mais mapping rompu ($T24_WHY) ·
+# 2 = bloc introuvable · 3 = ni F1 ni F2 reconnaissable — mapping NON VÉRIFIABLE, jamais un repli
+# silencieux sur le bloc entier, qui rouvrirait exactement la faille de co-présence.
+T24_WHY=""; T24_FORME=""
+t24_maps_to_human_needed() { # <file> <ancre ERE>
+  local blk seg cons bad
+  T24_WHY=""; T24_FORME=""        # réinitialisation à l'ENTRÉE : pas de motif périmé d'un appel précédent
+  blk="$(md_blocks_matching "$1" "$2")"
+  [ -n "$blk" ] || return 2
+
+  # F1 — le statut ouvre une entrée d'énumération : on mesure DANS son segment.
+  seg="$(printf '%s\n' "$blk" | t24_segment_of 'human_needed')"
+  if [ -n "$seg" ]; then
+    T24_FORME="F1"
+    printf '%s\n' "$seg" | "$GREP" -q 'gate="blocking-human"' \
+      || { T24_WHY="segment (F1) du statut human_needed sans le motif gate=\"blocking-human\" — il est rattaché à un autre verdict"; return 1; }
+    printf '%s\n' "$seg" | "$GREP" -qi 'précondition' \
+      || { T24_WHY="segment (F1) du statut human_needed sans le motif de précondition amont — il est rattaché à un autre verdict"; return 1; }
+    return 0
+  fi
+
+  # F2 — le statut est le conséquent : chaque motif doit impliquer human_needed, et lui seul.
+  cons="$(printf '%s\n' "$blk" | t24_implication_consequents)"
+  if [ -n "$cons" ]; then
+    T24_FORME="F2"
+    printf '%s\n' "$blk" | "$GREP" -q 'gate="blocking-human"' \
+      || { T24_WHY="prémisse (F2) sans le motif gate=\"blocking-human\" — la règle n'a plus ses DEUX motifs"; return 1; }
+    printf '%s\n' "$blk" | "$GREP" -qi 'précondition' \
+      || { T24_WHY="prémisse (F2) sans le motif de précondition amont — la règle n'a plus ses DEUX motifs"; return 1; }
+    bad="$(printf '%s\n' "$cons" | "$GREP" -vx 'human_needed' | LC_ALL=C sort -u | tr '\n' ' ')"
+    [ -z "$bad" ] || { T24_WHY="un motif de la prémisse implique un AUTRE statut que human_needed — conséquent(s) mesuré(s) : $bad"; return 1; }
+    return 0
+  fi
+
+  T24_WHY="ni entrée d'énumération (« \`human_needed\` — … », F1) ni implication (motif ⇒ statut, F2) — mapping non vérifiable"
+  return 3
+}
+
+t24_formes=""
 t24_assert() { # <libellé> <fichier> <ancre ERE>
   if [ ! -f "$2" ]; then ko "T24 $1 : fichier introuvable ($2)"; t24_ok=0; return; fi
   t24_maps_to_human_needed "$2" "$3"
   case $? in
-    0) : ;;
+    0) t24_formes="$t24_formes ${1%% *}=$T24_FORME" ;;
     2) ko "T24 $1 : bloc porteur de la règle de mapping introuvable dans $(basename "$2") (ancre /$3/)"; t24_ok=0 ;;
-    3) ko "T24 $1 : dans $(basename "$2"), le bloc énumère plusieurs statuts mais human_needed n'y ouvre aucune entrée de mapping (« \`human_needed\` — … ») — segment non isolable, donc mapping non vérifiable"; t24_ok=0 ;;
-    *) ko "T24 $1 : dans $(basename "$2"), le segment du statut human_needed ne porte pas les DEUX motifs (gate=\"blocking-human\" ET précondition non satisfaite) — ils sont rattachés à un autre verdict"; t24_ok=0 ;;
+    3) ko "T24 $1 : dans $(basename "$2"), $T24_WHY — un KO explicite vaut mieux qu'un vert obtenu par co-présence"; t24_ok=0 ;;
+    *) ko "T24 $1 : dans $(basename "$2"), $T24_WHY"; t24_ok=0 ;;
   esac
 }
 
 "$GREP" -q '^## Contrat de checkpoint amont' "$CONTRACTS_FILE" 2>/dev/null \
   || { ko "T24 A : section « Contrat de checkpoint amont » absente de mission-contracts.md"; t24_ok=0; }
-t24_assert "A (mission-contracts.md, §Règle unique de mapping)" "$CONTRACTS_FILE" '[*][*]Règle unique de mapping[*][*]'
-t24_assert "B (vf-coder.md, bloc du champ gate)"                "$CODER_FILE"     '[*][*][`]gate[`][*][*]'
-t24_assert "C (vf-dev-manager.md, bloc Verdict d'étape)"        "$DEVMGR"         '[*][*]Verdict d'
+# Ancres NOMMÉES : les mêmes servent aux assertions et aux mutants de D — un mutant mesuré sur une
+# autre ancre que sa cible ne prouverait rien de cette cible.
+T24_ANCHOR_A='[*][*]Règle unique de mapping[*][*]'
+T24_ANCHOR_B='[*][*][`]gate[`][*][*]'
+T24_ANCHOR_C='[*][*]Verdict d'
+t24_assert "A (mission-contracts.md, §Règle unique de mapping)" "$CONTRACTS_FILE" "$T24_ANCHOR_A"
+t24_assert "B (vf-coder.md, bloc du champ gate)"                "$CODER_FILE"     "$T24_ANCHOR_B"
+t24_assert "C (vf-dev-manager.md, bloc Verdict d'étape)"        "$DEVMGR"         "$T24_ANCHOR_C"
 
-# D (DISCRIMINANT) — trois mutants + une fixture LICITE. Ce que chaque cas prouve, sans le
+# D (DISCRIMINANT) — cinq mutants + deux fixtures LICITES, couvrant les DEUX formes (F1 sur
+# vf-dev-manager.md, F2 sur mission-contracts.md et vf-coder.md). Ce que chaque cas prouve, sans le
 # surdéclarer :
 #
 #   D1/D2 (mutations de VALEUR, `s///g` GLOBAUX) : elles effacent le token que l'assertion cherche
@@ -1870,18 +1928,34 @@ t24_assert "C (vf-dev-manager.md, bloc Verdict d'étape)"        "$DEVMGR"      
 #   Robuste à toute reformulation : la mutation ne s'ancre sur aucune phrase, seulement sur les
 #   deux étiquettes que le contrat ADR-053 impose de toute façon.
 #
-#   D4 (fixture LICITE) : une rédaction correcte mais REFORMULÉE de la règle (autre marqueur de
-#   mapping, autre ordre, autres mots de liaison) doit rester VERTE. Une sonde qui punit une
+#   D5/D5' (mutation d'IMPLICATION — c'est elle qui mesure D-01 sous la forme F2, sur les deux
+#   cibles où le statut est le CONSÉQUENT) : le conséquent devient `gaps_found` et l'ancien statut
+#   est REMIS dans la phrase en contraste (« — jamais `statut: "human_needed"` »). Aucun token
+#   n'est retiré du bloc : la co-présence reste satisfaite, seule la relation s'inverse. C'est
+#   exactement l'état qui laissait la suite à 87 OK / 0 KO sur le fichier de RÉFÉRENCE.
+#
+#   D4/D6 (fixtures LICITES) : une rédaction correcte mais REFORMULÉE de la règle doit rester
+#   VERTE. D4 la reformule en énumération (autre marqueur de mapping, autre ordre, autres mots de
+#   liaison) ; D6 est le miroir exact de D5 — même contraste, ordre inverse (⇒ `human_needed` —
+#   jamais `gaps_found`), donc rédaction PLUS précise que l'actuelle. Une sonde qui punit une
 #   réécriture légitime nuit autant qu'une sonde aveugle.
 T24_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T24_TMPDIR"
 T24_MUT_STATUT="$T24_TMPDIR/mutant-statut.md"
 T24_MUT_GATE="$T24_TMPDIR/mutant-gate.md"
 T24_MUT_RELATION="$T24_TMPDIR/mutant-relation.md"
+T24_MUT_IMPL_REF="$T24_TMPDIR/mutant-implication-reference.md"
+T24_MUT_IMPL_CODER="$T24_TMPDIR/mutant-implication-coder.md"
 T24_LICIT="$T24_TMPDIR/licite-reformulee.md"
+T24_LICIT_CONTRASTE="$T24_TMPDIR/licite-contraste.md"
 sed 's/human_needed/gaps_found/g'      "$DEVMGR" > "$T24_MUT_STATUT"
 sed 's/blocking-human/blocking-auto/g' "$DEVMGR" > "$T24_MUT_GATE"
 sed -e 's/`human_needed`/`@@VFSWAP@@`/g' -e 's/`gaps_found`/`human_needed`/g' \
     -e 's/`@@VFSWAP@@`/`gaps_found`/g' "$DEVMGR" > "$T24_MUT_RELATION"
+# Guillemets SIMPLES obligatoires : l'expression porte des backticks, qui seraient une substitution
+# de commande entre guillemets doubles. L'expansion de "$T24_INVERT_SED" n'est, elle, pas réévaluée.
+T24_INVERT_SED='s/`statut: "human_needed"`/`statut: "gaps_found"` — jamais `statut: "human_needed"`/'
+sed "$T24_INVERT_SED" "$CONTRACTS_FILE" > "$T24_MUT_IMPL_REF"
+sed "$T24_INVERT_SED" "$CODER_FILE"     > "$T24_MUT_IMPL_CODER"
 
 cat > "$T24_LICIT" <<'T24LICIT'
 ## Contrôle de flux
@@ -1893,30 +1967,55 @@ cat > "$T24_LICIT" <<'T24LICIT'
   `blocked` → laisser le nœud en l'état et traiter la dépendance.
 T24LICIT
 
+cat > "$T24_LICIT_CONTRASTE" <<'T24L6'
+## Contrat de checkpoint amont
+
+**Règle unique de mapping** (une règle, deux motifs, ADR-030) : `gate="blocking-human"` **OU** une
+précondition amont non satisfaite ⇒ `statut: "human_needed"` — jamais `statut: "gaps_found"`, qui
+ne couvre que les manques constatés en revue.
+T24L6
+
 t24_mut_ko=""
 # Preuve que D3 est bien une mutation de RELATION et pas un effacement : une fois les deux
 # étiquettes ramenées au même jeton canonique, le multiset de tokens doit être IDENTIQUE de part et
-# d'autre. Et le mutant doit DIFFÉRER de l'original — sinon la doctrine ne porte plus les deux
-# étiquettes, la mutation n'a rien mordu et il faut le dire, jamais laisser passer pour vert.
+# d'autre. (Le cas « mutant identique à l'original » est traité par le garde commun ci-dessous.)
 t24_canon() { sed -e 's/human_needed/@VFST@/g' -e 's/gaps_found/@VFST@/g' "$1" | tr -cs '[:alnum:]_@' '\n' | LC_ALL=C sort; }
 if [ "$(t24_canon "$DEVMGR")" != "$(t24_canon "$T24_MUT_RELATION")" ]; then
   t24_mut_ko="$t24_mut_ko [mutant de relation : le multiset canonique de tokens a changé — ce n'est plus une mutation de relation pure]"
-elif cmp -s "$DEVMGR" "$T24_MUT_RELATION"; then
-  t24_mut_ko="$t24_mut_ko [mutant de relation IDENTIQUE à l'original — les deux étiquettes de statut ne sont plus toutes deux présentes, la mutation n'a rien mordu]"
 fi
 
-t24_maps_to_human_needed "$T24_MUT_STATUT"   '[*][*]Verdict d' && t24_mut_ko="$t24_mut_ko [D1 statut human_needed→gaps_found non détecté]"
-t24_maps_to_human_needed "$T24_MUT_GATE"     '[*][*]Verdict d' && t24_mut_ko="$t24_mut_ko [D2 gate blocking-human→blocking-auto non détecté]"
-t24_maps_to_human_needed "$T24_MUT_RELATION" '[*][*]Verdict d' && t24_mut_ko="$t24_mut_ko [D3 RELATION : les deux motifs rattachés à gaps_found, aucun token retiré — non détecté]"
-t24_maps_to_human_needed "$T24_LICIT"        '[*][*]Verdict d' || t24_mut_ko="$t24_mut_ko [D4 FAUX ROUGE : une reformulation LICITE de la règle est rejetée (rc=$?)]"
-t24_maps_to_human_needed "$DEVMGR"           '[*][*]Verdict d' || t24_mut_ko="$t24_mut_ko [le fichier réel ne tient plus l'assertion]"
+# Garde commun à TOUS les mutants (symétrie avec T26 E) : un mutant identique à son original est une
+# mutation qui n'a rien mordu — le motif visé n'existe plus dans la doctrine. Le dire explicitement,
+# jamais le laisser passer pour vert, et ne jamais accuser la doctrine à la place de la sonde.
+t24_assert_mutant_red() { # <libellé> <original> <mutant> <ancre ERE>
+  if cmp -s "$2" "$3"; then
+    t24_mut_ko="$t24_mut_ko [$1 : mutant IDENTIQUE à l'original — le motif visé n'existe plus, la mutation n'a rien mordu (sonde à réancrer, ce n'est PAS un défaut de l'assertion)]"
+    return
+  fi
+  t24_maps_to_human_needed "$3" "$4"
+  case $? in
+    1) : ;;
+    0) t24_mut_ko="$t24_mut_ko [$1 : NON détecté]" ;;
+    2) t24_mut_ko="$t24_mut_ko [$1 : rc=2, ancre du bloc détruite — rien n'a été mesuré, ce n'est pas une détection]" ;;
+    *) t24_mut_ko="$t24_mut_ko [$1 : rc=3, forme du mapping non reconnaissable — rien n'a été mesuré là où on prétend mesurer]" ;;
+  esac
+}
+
+t24_assert_mutant_red "D1 VALEUR statut human_needed→gaps_found (F1)"          "$DEVMGR"         "$T24_MUT_STATUT"     "$T24_ANCHOR_C"
+t24_assert_mutant_red "D2 VALEUR gate blocking-human→blocking-auto (F1)"       "$DEVMGR"         "$T24_MUT_GATE"       "$T24_ANCHOR_C"
+t24_assert_mutant_red "D3 RELATION, aucun token retiré (F1)"                   "$DEVMGR"         "$T24_MUT_RELATION"   "$T24_ANCHOR_C"
+t24_assert_mutant_red "D5 IMPLICATION inversée dans la RÉFÉRENCE (F2)"         "$CONTRACTS_FILE" "$T24_MUT_IMPL_REF"   "$T24_ANCHOR_A"
+t24_assert_mutant_red "D5' IMPLICATION inversée dans vf-coder.md (F2)"         "$CODER_FILE"     "$T24_MUT_IMPL_CODER" "$T24_ANCHOR_B"
+t24_maps_to_human_needed "$T24_LICIT"           "$T24_ANCHOR_C" || t24_mut_ko="$t24_mut_ko [D4 FAUX ROUGE : une reformulation LICITE en énumération est rejetée (rc=$?, $T24_WHY)]"
+t24_maps_to_human_needed "$T24_LICIT_CONTRASTE" "$T24_ANCHOR_A" || t24_mut_ko="$t24_mut_ko [D6 FAUX ROUGE : la forme à contraste explicite (⇒ human_needed — jamais gaps_found) est rejetée (rc=$?, $T24_WHY)]"
+t24_maps_to_human_needed "$DEVMGR"              "$T24_ANCHOR_C" || t24_mut_ko="$t24_mut_ko [le fichier réel ne tient plus l'assertion]"
 if [ -n "$t24_mut_ko" ]; then
   ko "T24 D (DISCRIMINANT) : l'assertion de mapping ne discrimine pas —$t24_mut_ko"; t24_ok=0
 else
-  ok "T24 D (DISCRIMINANT) : 2 mutations de VALEUR + 1 mutation de RELATION (échange d'étiquettes, multiset de tokens inchangé) font rougir l'assertion ; une reformulation LICITE reste verte ; le fichier réel la tient"
+  ok "T24 D (DISCRIMINANT) : 5 mutants font rougir l'assertion — 2 de VALEUR et 1 de RELATION sur la forme F1, 2 d'IMPLICATION (conséquent inversé, tous les tokens conservés) sur la forme F2, chacun prouvé différent de son original ; 2 reformulations LICITES (énumération, contraste explicite) restent vertes ; les fichiers réels la tiennent"
 fi
 
-[ "$t24_ok" -eq 1 ] && ok "T24 : le mapping D-01 (deux motifs ⇒ human_needed) est porté dans le même bloc par référence, vf-coder et vf-dev-manager"
+[ "$t24_ok" -eq 1 ] && ok "T24 : le mapping D-01 (deux motifs ⇒ human_needed) est mesuré par sonde STRICTE sur les 3 cibles —$t24_formes (F1 = segment d'énumération, F2 = conséquent d'implication), aucune ne retombe sur la co-présence"
 
 # ---------------------------------------------------------------------------
 # T25 (D-02) — le flag d'enchaînement autonome (workflow._auto_chain_active) est désarmé au
