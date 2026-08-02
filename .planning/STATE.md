@@ -5,7 +5,7 @@ milestone_name: Migration package GSD
 current_phase: 26
 current_phase_name: Manuel utilisateur VibeFlow (manual/) — livrée, PR ouverte (branche feat/phase-26-manuel-utilisateur)
 status: complete
-stopped_at: "Phase 26 CLOSE — 9/9 plans livrés. Le manuel existe sur disque (44 pages x 2 langues, 7 thèmes, gate manual/.tools/check-manual.sh exit 0) et reste VOLONTAIREMENT HORS GIT : exclusion par .git/info/exclude, JAMAIS par .gitignore (fichier versionné = trace publique). Seuls les artefacts de suivi sous .planning/ sont committés. Deux points ouverts tranchés par Samuel en cours de mission : O-1 (slugs anglais sous manual/en/, hypothèse H-1 du toc.yml levée, appariement FR/EN devenu explicite) et la parité de contenu FR/EN (alignement par le haut, 31 pages portées sur 44, vérifiées 44/44 par juge frais). Volet GELÉ, non livré : le dégraissage de README.md/README.fr.md/INSTALL.md (D-7, D-8) — pointer vers un dossier absent du dépôt casserait les liens des visiteurs ; à reprendre le jour où le manuel sera publié. Prochain geste humain : merger la PR (aucun merge fait, ADR-059)."
+stopped_at: "Phase 26 CLOSE — 9/9 plans livrés. Le manuel est PUBLIC et commité depuis le 2026-08-02 (94 fichiers : 88 pages 44x2 langues, 3 index, toc.yml, .tools/ ; gate manual/.tools/check-manual.sh exit 0). Renversement de la contrainte fondatrice par Samuel : D-14 (aucun git add sous manual/) RÉVOQUÉE, exclusion .git/info/exclude levée, rien dans .gitignore. D-7/D-8 dégelées PARTIELLEMENT : une mention du manuel est posée en tête des deux README (ligne 24), le dégraissage complet des README/INSTALL reste NON FAIT et non demandé. Deux points ouverts tranchés par Samuel en cours de mission : O-1 (slugs anglais sous manual/en/, hypothèse H-1 du toc.yml levée, appariement FR/EN devenu explicite) et la parité de contenu FR/EN (alignement par le haut, 31 pages portées sur 44, vérifiées 44/44 par juge frais). Volet GELÉ, non livré : le dégraissage de README.md/README.fr.md/INSTALL.md (D-7, D-8) — pointer vers un dossier absent du dépôt casserait les liens des visiteurs ; à reprendre le jour où le manuel sera publié. Prochain geste humain : merger la PR (aucun merge fait, ADR-059)."
 last_updated: "2026-08-02T00:00:00.000Z"
 last_activity: 2026-08-02 (Phase 26 — clôture, manuel livré hors git, PR ouverte)
 
@@ -538,9 +538,24 @@ Recent decisions affecting current work:
     frais en **couverture intégrale 44/44**, appariement lu dans `toc.yml` : 44/44 OK dans les deux
     sens, français natif sans calque.
 
-  **Volet GELÉ, non livré et assumé** : le dégraissage de `README.md`/`README.fr.md`/`INSTALL.md`
-  (D-7, D-8). Pointer vers un dossier absent du dépôt casserait les liens des visiteurs — à reprendre
-  le jour où le manuel sera publié.
+  **Volet D-7/D-8 — statut au 2026-08-02** : le blocage a sauté. Samuel a **publié le manuel** (voir
+  entrée suivante), donc pointer vers `manual/` ne casse plus rien. Une **mention** est posée en tête
+  des deux README. Le **dégraissage complet** des README et d'`INSTALL.md` — le projet d'origine de
+  D-7/D-8 — reste **non fait et non demandé** : plus aucun obstacle technique, mais c'est un
+  arbitrage éditorial à proposer, pas à décider seul.
+
+- **2026-08-02 — `manual/` devient public : D-14 révoquée** (mission
+  `.planning/missions/2026-08-01-phase-26-manuel-utilisateur.md` §3 ter). Renversement, par Samuel,
+  de la contrainte qui avait structuré toute la mission. Le manuel entre au dépôt : **94 fichiers**
+  (88 pages, 3 index, `toc.yml`, 2 scripts `.tools/`). Ligne `manual/` retirée de
+  `.git/info/exclude` ; **rien ajouté à `.gitignore`** — il n'y a plus rien à exclure. Le manuel
+  **n'a pas changé d'une ligne** : ce qui le rendait invisible au dépôt était une précaution de
+  confidentialité, pas une limite technique, et la mission avait été conduite pour que sa levée soit
+  un `git add` et non une reprise. Vérification que la publication rendait enfin possible : les
+  **2 liens sortants** du manuel (`../../../docs/ADR.md` depuis les deux pages
+  `07-*/…architecture…`) **résolvent** désormais, et **aucun chemin absolu** de la machine de Samuel
+  ne traîne dans les 91 fichiers — c'est exactement la classe de défaut qui serait restée invisible
+  jusqu'à la publication et cassée pour tout le monde.
 
 - **2026-07-31 — L'anti-triche P12 est garanti par un gate transverse, pas par les suites de
   module** (mission de clôture des reliquats Phase 20, WINDOWS #1). `team-kernel.md:23` affirmait

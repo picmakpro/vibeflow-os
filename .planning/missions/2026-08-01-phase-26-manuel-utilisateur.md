@@ -61,7 +61,46 @@ porté à 26 par **édition manuelle** du frontmatter (ADR-063 — jamais `gsd-t
 **Baseline des compteurs à ne pas faire régresser** : `total_phases: 26`, `completed_phases: 21`,
 `total_plans: 62`, `completed_plans: 62`.
 
+## 3 ter. RÉVOCATION (2026-08-02, après clôture et ouverture de la PR) — `manual/` devient public
+
+**Samuel renverse la contrainte fondatrice de la mission.** Le manuel entre dans le dépôt et dans la
+PR #28.
+
+**Ce qui est révoqué :**
+
+- **D-14 RÉVOQUÉE** (« aucun `git add` sous `manual/` », posée one-way par le plan 26-09).
+  `manual/` est commité en intégralité : **94 fichiers** — 88 pages de contenu (44 × 2 langues),
+  3 index (racine bilingue + un par langue), `toc.yml`, et les 2 scripts de `.tools/`.
+- **Exclusion levée** : la ligne `manual/` est retirée de `.git/info/exclude`. **Rien n'est ajouté à
+  `.gitignore`** — il n'y a plus rien à exclure, et l'y inscrire n'aurait de toute façon jamais eu de
+  sens (c'était précisément le piège que l'amendement du 2026-08-01 évitait).
+- **D-7 / D-8 DÉGELÉES PARTIELLEMENT — et il faut être précis sur la portée.** Samuel demande **une
+  mention** du manuel dans les README, **pas** le dégraissage complet qui était le projet initial de
+  la phase. Livré : un renvoi vers `manual/README.md` en tête des deux README (ligne 24, juste après
+  le pitch, avant la première section), dans la langue de chaque fichier. **Aucune section n'a été
+  allégée, déplacée ou supprimée.** La parité structurelle des deux README est préservée (12
+  sections de chaque côté, mention au même endroit).
+
+**Ce qui reste ouvert** : le dégraissage complet des README et d'`INSTALL.md` (le projet d'origine
+de D-7/D-8) reste **non fait**. Il n'est plus bloqué par un obstacle technique — le manuel est là et
+les liens résolvent — mais il n'a pas été demandé. À proposer, pas à décider seul.
+
+**Ce que la publication change, vérifié sur pièce.** La revue avait relevé que le manuel n'était pas
+autoportant : il contient des liens qui **sortent** de `manual/` vers le dépôt. Recensement complet
+des 91 fichiers `.md` : **2 liens sortants**, tous deux `../../../docs/ADR.md` (depuis
+`fr/07-sous-le-capot/decisions-d-architecture.md:14` et
+`en/07-under-the-hood/architecture-decisions.md:14`). **Les deux résolvent** maintenant que le
+manuel est dans le dépôt. Aucun lien mort ailleurs, et **aucun chemin absolu** de la machine de
+Samuel nulle part — c'est le défaut qui serait resté invisible jusqu'à la publication et cassé pour
+tout le monde.
+
+**Ce que cette révocation ne remet pas en cause** : le manuel n'a pas changé d'une ligne. Il était
+complet, vérifié en couverture intégrale et gaté depuis sa livraison. Ce qui le rendait invisible au
+dépôt était une **précaution de confidentialité, pas une limite technique** — et la mission a été
+conduite pour que la levée de cette précaution soit un `git add`, pas une reprise.
+
 ## 3 bis. AMENDEMENT DU BRIEF (2026-08-01, en cours de mission) — `manual/` reste local
+### ⚠ CADUC depuis le 2026-08-02 — conservé pour la trace, voir §3 ter ci-dessus
 
 Contrainte posée par Samuel après le tranchage des zones grises et avant tout dispatch d'exécution :
 
