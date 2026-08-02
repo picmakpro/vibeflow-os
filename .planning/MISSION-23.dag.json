@@ -2,16 +2,19 @@
   "nodes": [
     {
       "id": "exec-01",
-      "step": "23-01 Lacune 6 — taxonomie checkpoint GSD, gate blocking-human",
+      "step": "23-01 Lacune 6 — taxonomie checkpoint GSD, gate blocking-human (jointure des sous-noeuds 01a..01d)",
       "stage": "exec",
-      "deps": [],
+      "deps": [
+        "exec-01d",
+        "exec-01c2"
+      ],
       "scope": [
         "plugin/dev-orchestrator/references/mission-contracts.md",
         "plugin/dev-orchestrator/agents/vf-coder.md",
         "plugin/dev-orchestrator/agents/vf-dev-manager.md",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "revue-01",
@@ -26,7 +29,7 @@
         "plugin/dev-orchestrator/agents/vf-dev-manager.md",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "blocked",
+      "status": "running",
       "review_regime": "full"
     },
     {
@@ -254,6 +257,69 @@
       ],
       "status": "blocked",
       "review_regime": "full"
+    },
+    {
+      "id": "exec-01a",
+      "step": "23-01a deport du bloc controle de flux (A-4) vers references/ — retablir la marge ADR-029 sur vf-dev-manager",
+      "stage": "exec",
+      "deps": [],
+      "scope": [
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md",
+        "plugin/dev-orchestrator/references/mission-flow.md",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-01b",
+      "step": "23-01b A-1bis — vf-coder garde --auto et desarme adjacent ; gate inverse ; A-2 coherente",
+      "stage": "exec",
+      "deps": [
+        "exec-01a"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/agents/vf-coder.md",
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-01c",
+      "step": "23-01c B6 garde ADR-030 insensible au wrap + B4 sonde A-4 sur les trois cibles (B5 ferme par 01a)",
+      "stage": "exec",
+      "deps": [
+        "exec-01b"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh",
+        "plugin/dev-orchestrator/references/mission-contracts.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-01d",
+      "step": "23-01d re-derivation et fermeture de B2, B3, B7, M1 (famille : existence au lieu de relation, tautologie assumee)",
+      "stage": "exec",
+      "deps": [
+        "exec-01c"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-01c2",
+      "step": "23-01c2 couverture du 3e foyer — la paraphrase A-4 de vf-dev-manager echappe au gate (O-1, doctrine NON tranchee)",
+      "stage": "exec",
+      "deps": [
+        "exec-01c"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "done"
     }
   ]
 }
