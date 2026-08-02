@@ -1581,9 +1581,17 @@ else
     fi
   fi
   # µ2 — allowlist jamais refermée, mais ligne se terminant par « ) ».
-  t18c_mu2="$(printf '%s' "$dmt" | sed -e 's/)[[:space:]]*$//'), Bash(git:*)"
-  if [ "$t18c_mu2" = "$dmt" ]; then
-    t18c_ko="$t18c_ko [µ2 : mutant IDENTIQUE à l'original — la parenthèse fermante n'a pas été retirée, la mutation n'a rien mordu]"
+  #
+  # Le garde no-op porte sur le RÉSULTAT DU `sed` SEUL, jamais sur le mutant final. Comparer
+  # « $dmt privé de sa parenthèse + `, Bash(git:*)` » à `$dmt` ne pouvait JAMAIS être vrai : la
+  # concaténation garantit la différence. Le garde était donc mort, et un `sed` qui ne mord pas —
+  # une ligne `tools:` qui ne se termine pas par « ) » — produisait un mutant ÉQUILIBRÉ, donc un
+  # KO « µ2 : NON détecté … » qui accuse T18 alors que la mutation n'avait pas eu lieu. Même
+  # défaut, même remède que le garde de µ1 juste au-dessus, dont c'est la forme exacte.
+  t18c_mu2_stripped="$(printf '%s' "$dmt" | sed -e 's/)[[:space:]]*$//')"
+  t18c_mu2="$t18c_mu2_stripped, Bash(git:*)"
+  if [ "$t18c_mu2_stripped" = "$dmt" ]; then
+    t18c_ko="$t18c_ko [µ2 : mutant IDENTIQUE à l'original — la ligne tools: ne se termine pas par « ) », la parenthèse fermante n'a donc pas été retirée et la mutation n'a rien mordu (sonde à réancrer, ce n'est PAS un défaut de T18)]"
   else
     printf '%s' "$t18c_mu2" | "$GREP" -qE '\)[[:space:]]*$' \
       || t18c_ko="$t18c_ko [µ2 : la ligne mutée ne finit plus par « ) » — le cas ne prouve plus que l'ancienne borne restait verte]"
