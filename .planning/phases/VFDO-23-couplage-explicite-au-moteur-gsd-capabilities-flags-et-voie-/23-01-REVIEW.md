@@ -334,3 +334,158 @@ amont dans le même geste** (A-2), la **relation armement → désarmement adjac
 la recopie de l'intitulé `Awaiting` sous graphie markdown (F2), l'existence du titre de section
 cité par le renvoi (F4), et — surtout — le fait que l'adjacence textuelle certifiée par `T25b` ne
 correspond à **aucune** fenêtre runtime bornée (F1).
+
+---
+
+## Second tour — vérification du comblement (2026-08-02)
+
+Le premier tour ci-dessus est **conservé tel quel** : il est commité et fait référence. Cette
+section enregistre le second tour, qui a vérifié le comblement de F2..F8 entre `d4f7ba3` et
+`cf3223a`.
+
+**Ce qui est relayé et ce qui est re-mesuré.** Le tableau des mutations du second tour — **23
+exécutions, dont 4 contre-épreuves rejouées sur le script `d4f7ba3` matérialisé** — est relayé du
+rapport de revue ; il n'est pas re-joué ici, et aucune ligne de détail n'en est reconstituée de
+mémoire. En revanche, **les trois mesures d'ensemble ci-dessous ont été re-jouées à l'identique**
+au troisième tour, et leurs chiffres sont ceux réellement observés.
+
+### Ensembles de libellés `ok` (méthode : `awk` → `sort -u` → `comm`, jamais `diff`)
+
+L'arbre est tenu **constant** (celui de `cf3223a`) et seul le script change : c'est la seule façon
+d'isoler l'effet du lot de correctifs de celui de la doctrine.
+
+| Mesure | `d4f7ba3` | `cf3223a` | Verdict |
+|---|---|---|---|
+| Libellés `ok` **exécutés** (uniques) | 99 | 102 | **+3** |
+| `d4f7ba3 − cf3223a` (`comm -23`) | — | — | **∅ — aucune assertion retirée ni réécrite** |
+| Sites d'appel **statiques** `ok "` | **87** | **90** | **+3** |
+
+Les trois libellés gagnés sont exactement les trois correctifs annoncés : `T25 présence
+(2 agents)` (F3), `T26 D+ (CONTRÔLE POSITIF, branche Awaiting)` (F2), `T27 (A-4, renvoi, citation
+non pendante)` (F4).
+
+> **Correction d'un chiffre du rapport de second tour.** Ce rapport annonçait des sites d'appel
+> statiques à **86 → 89**, en écartant le « 87 → 90 » du tour précédent comme ne correspondant « ni
+> à l'un ni à l'autre ». Re-mesure : **87 → 90** est le bon compte, et « 86 → 89 » n'est
+> reproductible sous aucune décomposition. Méthode, sur le fichier seul (aucun arbre requis) —
+> trois formes **disjointes** dont la somme partitionne exactement le total :
+> `^[[:space:]]*ok "` = 65 → 68 · `&&[[:space:]]+ok "` = 21 → 21 · `\)[[:space:]]+ok "` = 1 → 1,
+> soit 87 → 90. Le « 87 → 90 » du tour précédent était donc **exact** pour le compte statique ; ce
+> qui manquait n'était pas le chiffre mais la **distinction** entre sites statiques et exécutions
+> (les boucles font diverger les deux : 90 sites pour 102 exécutions).
+
+### Zone gelée F1 / O-8
+
+Vérifiée **byte-identique** (`cmp -s` contre `cf3223a`, jamais `diff`) sur les quatre fichiers qui
+portent la clause `--auto`, son désarmement adjacent et le contenu doctrinal d'A-1bis/A-2/A-3/A-4 :
+`vf-coder.md`, `vf-dev-manager.md`, `mission-flow.md`, `mission-contracts.md`. L'assertion `T25b`
+est de surcroît absente de l'ensemble des lignes modifiées du script (§ Troisième tour). **Rien de
+gelé n'a bougé.**
+
+### Findings du second tour
+
+| # | Sévérité | Ref | Objet | Statut |
+|---|---|---|---|---|
+| **N1** | **majeur** | `test-dev-orchestrator.sh:3050` | **Régression introduite par F5** : `répond(s)?` élargi à `répond(s\|re)?`. L'infinitif étant la forme des interdictions en français, une **prohibition** satisfaisait une assertion qui exige une **affirmation**. Dernier motif de la suite qui refusait cette silhouette ⇒ l'ensemble cessait d'être fail-closed | **fermé** (troisième tour, `9e26660`) |
+| **N2** | mineur | `test-dev-orchestrator.sh:2432` | `T25 présence` sélectionnait la **réunion** des blocs contenant `gsd_run` alors que son libellé promet « DANS le bloc qui le prescrit » — renvoi et conduite déportables arbitrairement loin | **fermé** (troisième tour, `271935e`) |
+| **N3** | mineur | `test-dev-orchestrator.sh:2896` | `$T26_AWAITING_RE` couvrait `:` et `(` mais pas le tiret cadratin, séparateur dominant du dépôt | **fermé** (troisième tour, `a7f1a37`) |
+| **N4** | — | — | — | **`no-op`** — non traité, par mandat |
+| **N5** | — | `mission-contracts.md:275-278` | La conduite d'indisponibilité a déjà un foyer, et `T25_UNAVAIL_RE` impose de la recopier dans chaque agent — tension ADR-030 de la même famille qu'O-1 | **versé à l'arbitrage humain** (ADR-031), non tranché par un agent |
+
+---
+
+## Troisième tour — fermeture de N1, N2, N3 (2026-08-02)
+
+Protocole inchangé : mutation du fichier **réel** → `bash test-dev-orchestrator.sh` → relevé des
+lignes `✗` → `git checkout -- <fichier>` → `git status --porcelain` **vide** avant la mutation
+suivante. Chaque mutant est prouvé **différent de son original** par `cmp -s` avant d'être mesuré
+(un mutant identique ne mesure rien). Chaque regex touchée est prouvée **dans les deux sens** :
+elle refuse toujours la forme fautive **et** accepte toujours la forme licite.
+
+### 3.1 N1 — l'infinitif retiré de `$T26_ANSWER_RE`
+
+Motif retenu, sans `|re` :
+`répond(s)?[[:space:]]+(aux[[:space:]]+|à[[:space:]]+l['’][[:space:]]*)attentes?[[:space:]]+humaines?`
+
+| # | Sens | Mutation exacte, sur `mission-flow.md` | Script | Verdict observé | Conclusion |
+|---|---|---|---|---|---|
+| **T01** | violation | « c'est le manager qui **n'a jamais à répondre aux attentes humaines** du moteur » | `cf3223a` | **`102 OK / 0 KO`** | **régression reproduite** — une prohibition passe |
+| **T02** | violation | *(la même)* | corrigé | `rc=1` · `✗ T26 C : … ne nomme pas le manager comme répondant aux attentes humaines` | **discriminante** |
+| **T03** | licite | singulier coupé au pli : `**répond à l'` / `attente humaine**` | corrigé | `102 OK / 0 KO` | **pas de faux rouge** — le faux rouge L04/F5 reste fermé |
+| **T04** | licite | 2ᵉ personne : « c'est le manager qui **réponds aux attentes humaines** » | corrigé | `102 OK / 0 KO` | **pas de faux rouge** — la tolérance de personne est intacte |
+
+T03 est la contre-épreuve décisive : elle rejoue **exactement** le faux rouge que F5 fermait
+(nombre + « à l' »), et prouve que retirer `|re` ne le rouvre pas — la correction de F5 portait sur
+le nombre, jamais sur l'infinitif.
+
+**Borne assumée, fail-closed** : une tournure affirmative à l'infinitif (« c'est au manager de
+répondre aux… ») est désormais **refusée elle aussi**. C'est délibéré et écrit dans le commentaire
+du motif : une forme dont la garde ne peut pas lire la polarité se refuse, elle ne s'accepte pas au
+bénéfice du doute. Un gate qui ne sait pas conclure rougit — il ne se replie pas.
+
+### 3.2 N2 — `T25 présence` ancrée sur le geste, pas sur le token
+
+Ancre : `T25_GESTE_RE='config-set[[:space:]]+workflow[.]_auto_chain_active'` — l'appel **réel** qui
+ferme la fenêtre armée. Blancs élastiques (le wrap à 100 colonnes coupe `config-set` de sa clé dans
+`vf-dev-manager.md`) ; point **entre crochets** et non échappé, l'ancre transitant par `awk -v` où
+`\.` est un échappement indéfini.
+
+| # | Sens | Mutation exacte, sur `vf-dev-manager.md` | Script | Verdict observé | Conclusion |
+|---|---|---|---|---|---|
+| **T05** | violation | renvoi (`§Seuil de bascule`) **et** conduite (`introuvable → …`) retirés du geste 5 et **déportés** dans une section `## Note d'outillage` en fin de fichier, qui mentionne `gsd_run` | `cf3223a` | **`102 OK / 0 KO`** | **trou reproduit** — la réunion des blocs suffisait |
+| **T06** | violation | *(le même déport)* | corrigé | `rc=1` · `✗ T25 présence : vf-dev-manager.md prescrit gsd_run sans renvoyer, DANS le bloc qui le prescrit, à son foyer de résolution` | **discriminante** |
+| **T07** | licite | geste replié sur **une seule ligne** — `gsd_run config-set workflow._auto_chain_active false` suivi du parenthétique de résolution —, renvoi et conduite restés dans le bloc | corrigé | `102 OK / 0 KO` | **pas de faux rouge** — les deux graphies (repliée et non repliée) sont tenues |
+| **T08** | vert à vide | le geste **retiré** de l'agent (clé remplacée par `workflow.auto_advance`) | corrigé | `rc=1` ×5, dont `✗ T25 présence : 1 agent(s) sur 2 portent réellement le geste de désarmement` | **le compteur d'atteinte mord** — pas de vert à vide |
+
+Le libellé d'`ok` de `T25 présence` est resté **byte-identique** : il ne sur-promet plus, parce que
+c'est la **mesure** qui a été relevée à hauteur du libellé, jamais l'inverse. Seuls les deux
+messages de **KO** ont été réalignés sur ce qui est désormais mesuré.
+
+### 3.3 N3 — `$T26_AWAITING_RE` reconnaît le tiret
+
+| # | Sens | Mutation exacte, sur `mission-contracts.md` | Script | Verdict observé | Conclusion |
+|---|---|---|---|---|---|
+| **T09** | violation | `- Awaiting — ce que le moteur attend de l'utilisateur avant de reprendre.` (cadratin) | `cf3223a` | **`102 OK / 0 KO`** | **échappement reproduit** |
+| **T10** | violation | *(la même)* | corrigé | `rc=1` · `✗ T26 D (NÉGATIVE) : intitulé du contrat interne … reproduit dans — mission-contracts.md` | **discriminante** |
+| **T11** | violation | variante au **demi-cadratin** (`- Awaiting – ce que …`) | corrigé | `rc=1` · `✗ T26 D (NÉGATIVE)` | **discriminante** |
+| **T12** | licite | prose anglaise **et** composé ASCII : « Awaiting the human answer, et Awaiting-user reste un composé licite. » | corrigé | `102 OK / 0 KO` | **flanc tenu** — la fixture anti-faux-rouge de `T26 D+` reste verte |
+
+Le tiret **ASCII** est délibérément **exclu** de la classe : sans blanc obligatoire il ferait rougir
+`Awaiting-user`, c'est-à-dire un faux rouge sur le flanc même que `T26 D+` protège (T12 le mesure).
+Cadratin et demi-cadratin sont ajoutés en **alternation**, jamais dans la classe entre crochets :
+caractères multi-octets, qu'une classe découperait en octets isolés.
+
+### 3.4 Non-régression du troisième tour
+
+| Mesure | `cf3223a` | `a7f1a37` (HEAD) | Verdict |
+|---|---|---|---|
+| Libellés `ok` **exécutés** (uniques) | 102 | 102 | **égalité d'ensemble** |
+| `cf3223a − HEAD` (`comm -23`) | — | — | **∅** |
+| `HEAD − cf3223a` (`comm -13`) | — | — | **∅** — aucun libellé ajouté non plus |
+| Sites d'appel statiques `ok "` | 90 | 90 | inchangé |
+| Sites d'appel statiques `ko "` | 203 | 203 | inchangé |
+
+**Écart exact du script**, par ensembles de lignes (`sort -u` + `comm`, jamais `diff`) : **3 lignes
+de code** modifiées (l'ancre de `t25_gblk`, `$T26_ANSWER_RE`, `$T26_AWAITING_RE`), **2 messages de
+KO** réalignés, le reste étant du commentaire ajouté. **Aucune ligne `ok "` ne figure dans
+l'ensemble retiré** — c'est la preuve, indépendante de l'exécution, qu'aucune assertion n'a été
+retirée ni réécrite en douce.
+
+**Zone gelée F1 / O-8** : `vf-coder.md`, `vf-dev-manager.md`, `mission-flow.md` et
+`mission-contracts.md` sont **byte-identiques** à `cf3223a` (`cmp -s`) — aucun fichier de doctrine
+n'a été touché de tout le tour, seule la suite de test a changé. `T25b` n'apparaît pas dans
+l'ensemble des lignes modifiées.
+
+**ADR-029** : `vf-coder.md` **94**/250 et `vf-dev-manager.md` **235**/250, inchangés — la marge des
+7 plans restants est intacte.
+
+**Suite finale : `102 OK / 0 KO / 0 SKIP`.** Le compteur n'est pas le verdict — il a menti cinq
+fois sur cette phase, dont trois fois documentées ici (T01, T05, T09, toutes à `102 OK` sur une
+violation). Le verdict est le tableau de mutations ci-dessus.
+
+### 3.5 Reste ouvert
+
+- **F1 / O-8** (A-1bis démentie sur ses faits) : gelé, **en attente d'arbitrage de Samuel**.
+- **N5** : tension ADR-030 entre le foyer de `mission-contracts.md:275-278` et l'exigence de
+  `T25_UNAVAIL_RE` de recopier la conduite dans chaque agent. **Versé à l'arbitrage humain**, même
+  famille qu'O-1 — aucun agent ne la tranche.
