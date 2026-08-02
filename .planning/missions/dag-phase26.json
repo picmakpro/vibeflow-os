@@ -179,7 +179,7 @@
         "README.fr.md",
         "INSTALL.md"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "juge-degraissage",
@@ -189,7 +189,7 @@
         "degraissage"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     }
   ]
 }
