@@ -148,6 +148,35 @@ md_sed_folded() { # <expression sed -E, blancs écrits $MDSP> <fichier>
   tr '\n' "$MD_FOLD_SEP" < "$2" | sed -E "$1" | tr "$MD_FOLD_SEP" '\n'
 }
 
+# Imprime les blocs de <file> qui matchent <ancre ERE>, un bloc par ligne de sortie (les sauts de
+# ligne internes sont aplatis en espaces) : la co-occurrence « dans le même bloc » devient une
+# co-occurrence sur la ligne de sortie, insensible au wrap à 100 colonnes du module. Un bloc =
+# paragraphe, item de liste, item numéroté ou titre. L'ancre est une ERE awk SANS backslash
+# (écrire [*] et pas \*) : awk -v interprète les échappements de la valeur avant la regex.
+#
+# Un item de liste ne clôt le bloc que si son INDENTATION est ≤ celle de la ligne qui a ouvert le
+# bloc. Flusher sur toute ligne commençant par un marqueur de puce coupait le bloc à la première
+# sous-puce imbriquée : « 2. **Plan** : … » suivi de «    - en mode **non-interactif** » donnait
+# deux blocs, et la forme interdite passait au travers de toute co-occurrence exigée DANS le bloc.
+# Une sous-puce est une continuation de son item parent : elle appartient au même bloc.
+#
+# Défini ICI, avec md_folded/md_sed_folded, parce que ses appelants s'échelonnent désormais de T23
+# à T27 — il vivait dans l'outillage T24/T25/T26, donc hors de portée de T23 qui s'exécute avant.
+md_blocks_matching() { # <file> <ancre ERE>
+  [ -f "$1" ] || return 0
+  awk -v anchor="$2" '
+    function indent(s,   t) { t = s; sub(/[^ \t].*$/, "", t); gsub(/\t/, "    ", t); return length(t) }
+    function flush() { if (buf != "" && buf ~ anchor) print buf; buf = "" }
+    /^[[:space:]]*$/ { flush(); next }
+    /^#/ { flush() }
+    /^[[:space:]]*([-*+][[:space:]]|[0-9]+\.[[:space:]])/ {
+      if (buf == "" || indent($0) <= openind) flush()
+    }
+    { if (buf == "") openind = indent($0); buf = (buf == "" ? $0 : buf " " $0) }
+    END { flush() }
+  ' "$1"
+}
+
 # ---------------------------------------------------------------------------
 # Périmètre : ce que le module POSSÈDE depuis la v2.0.0
 # ---------------------------------------------------------------------------
@@ -1896,12 +1925,32 @@ elif [ -f "$MOD/agents/vf-design-manager.md" ]; then
   DESIGNMGR="$MOD/agents/vf-design-manager.md"
 fi
 
+# Les QUATRE déclencheurs sont un ENSEMBLE : ils déclenchent le MÊME nœud, et c'est cet « au moins
+# un des quatre » qui est la doctrine. Mesurés un par un sur le fichier ENTIER, ils ne mesuraient
+# que quatre présences sans lien — « milestone » et « capacité » sont des mots courants de ces
+# agents, et une énumération démantelée aux quatre coins du fichier restait verte (famille
+# « existence au lieu de relation », revue du 2026-08-02). L'exigence de CO-LOCALISATION ci-dessous
+# s'AJOUTE aux quatre présences, elle ne les remplace pas.
+#
+# Elle ne s'ancre sur AUCUNE tournure : ancre « . » (tous les blocs), et on demande qu'il en existe
+# UN qui porte les quatre. Une réécriture de l'énumération — autres mots de liaison, autre ordre,
+# autre intitulé — reste donc verte tant que les quatre déclencheurs restent énumérés ensemble.
+t23_triggers_colocated() { # <file> — 0 si UN MÊME bloc porte les quatre déclencheurs
+  md_blocks_matching "$1" '.' \
+    | "$GREP" -F -- "doc-drift" \
+    | "$GREP" -F -- "milestone" \
+    | "$GREP" -F -- "surface publique" \
+    | "$GREP" -qF -- "capacité"
+}
+
 # Côté dev — $DEVMGR est déjà résolu par T18 plus haut.
 "$GREP" -q "docs-flow" "$DEVMGR" || { ko "T23 managers : vf-dev-manager.md ne renvoie pas vers docs-flow.md"; t23_ok=0; }
 "$GREP" -q -- "--id=docs" "$DEVMGR" || { ko "T23 managers : vf-dev-manager.md ne pose pas le nœud --id=docs"; t23_ok=0; }
 for motif in "doc-drift" "milestone" "surface publique" "capacité"; do
   "$GREP" -q -- "$motif" "$DEVMGR" || { ko "T23 managers : vf-dev-manager.md ne nomme pas le déclencheur « $motif »"; t23_ok=0; }
 done
+t23_triggers_colocated "$DEVMGR" \
+  || { ko "T23 managers : les quatre déclencheurs de vf-dev-manager.md ne tiennent pas dans un MÊME bloc — dispersés, ils ne déclenchent plus rien de commun"; t23_ok=0; }
 
 # Côté design — skip explicite si le module n'est pas dans le périmètre scanné (cf. T6/installeur).
 if [ -n "$DESIGNMGR" ]; then
@@ -1910,6 +1959,8 @@ if [ -n "$DESIGNMGR" ]; then
   for motif in "doc-drift" "milestone" "surface publique" "capacité"; do
     "$GREP" -q -- "$motif" "$DESIGNMGR" || { ko "T23 managers : vf-design-manager.md ne nomme pas le déclencheur « $motif »"; t23_ok=0; }
   done
+  t23_triggers_colocated "$DESIGNMGR" \
+    || { ko "T23 managers : les quatre déclencheurs de vf-design-manager.md ne tiennent pas dans un MÊME bloc — dispersés, ils ne déclenchent plus rien de commun"; t23_ok=0; }
   # ADR-057 / D-01 : la doctrine vit dans UN SEUL module. En lab installé l'arborescence est
   # aplatie, donc l'assertion d'absence n'a de sens qu'en disposition dépôt source.
   if [ "$DESIGN_SRC_LAYOUT" -eq 1 ] && [ -f "$REPO/design-orchestrator/references/docs-flow.md" ]; then
@@ -1929,36 +1980,52 @@ fi
 [ "$t23_ok" -eq 1 ] && ok "T23 managers : le geste documentaire est câblé des deux côtés (nœud docs, 4 déclencheurs, renvoi à la doctrine, aucune copie locale) — présence textuelle, pas comportement"
 
 # ---------------------------------------------------------------------------
+# T23b (DISCRIMINANT) — les quatre déclencheurs sont mesurés ENSEMBLE, pas un par un.
+# ---------------------------------------------------------------------------
+# Contrôle positif par DISPERSION : un déclencheur est retiré de son énumération et réécrit dans un
+# bloc à part, en fin de fichier. AUCUN token ne quitte le fichier — les quatre `grep -q` sur le
+# fichier entier restent donc VERTS, ce qui est vérifié ici : c'est la moitié du cas qui prouve que
+# la forme précédente ne mordait pas. Seule la co-localisation rompt.
+#
+# L'ancre de la mutation est le TOKEN mesuré (`capacité`), pas une tournure : une reformulation de
+# l'énumération ne la rend pas no-op, et si elle le devenait le garde `cmp -s` le dit.
+T23B_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T23B_TMPDIR"
+t23b_ko=""
+t23b_case() { # <libellé> <fichier>
+  local mut="$T23B_TMPDIR/$(basename "$2").disperse"
+  sed 's/capacité//g' "$2" > "$mut"
+  printf '\n- **Note (bloc injecté)** : ce module expose une nouvelle capacité.\n' >> "$mut"
+  if cmp -s "$2" "$mut"; then
+    t23b_ko="$t23b_ko [$1 : mutant IDENTIQUE à l'original — la dispersion n'a rien mordu (sonde à réancrer, ce n'est PAS un défaut de T23)]"
+    return
+  fi
+  "$GREP" -qF -- "capacité" "$mut" \
+    || t23b_ko="$t23b_ko [$1 : le déclencheur a quitté le fichier — ce n'est plus une dispersion, le cas ne prouve plus que les quatre présences restaient vertes]"
+  for t23b_m in "doc-drift" "milestone" "surface publique" "capacité"; do
+    "$GREP" -q -- "$t23b_m" "$mut" \
+      || t23b_ko="$t23b_ko [$1 : « $t23b_m » absent du mutant — la forme « quatre présences » aurait rougi, le cas ne discrimine plus rien]"
+  done
+  t23_triggers_colocated "$mut" \
+    && t23b_ko="$t23b_ko [$1 : NON détecté — un déclencheur sorti de l'énumération et réécrit ailleurs passe encore]"
+}
+t23b_case "vf-dev-manager.md" "$DEVMGR"
+[ -n "$DESIGNMGR" ] && t23b_case "vf-design-manager.md" "$DESIGNMGR"
+# Contrôle NÉGATIF : les fichiers RÉELS, eux, doivent rester verts.
+t23_triggers_colocated "$DEVMGR" || t23b_ko="$t23b_ko [FAUX ROUGE : vf-dev-manager.md RÉEL ne porte plus les quatre déclencheurs dans un même bloc]"
+if [ -z "$t23b_ko" ]; then
+  ok "T23b (DISCRIMINANT) : les quatre déclencheurs du nœud docs sont mesurés en CO-LOCALISATION (un même bloc), pas en quatre présences indépendantes — la dispersion de l'un d'eux hors de l'énumération, sans qu'un seul token quitte le fichier et avec les quatre présences restées vertes, fait rougir T23"
+else
+  ko "T23b (DISCRIMINANT) : les quatre déclencheurs ne sont que quatre présences —$t23b_ko"
+fi
+
+# ---------------------------------------------------------------------------
 # Outillage commun T24/T25/T26 — assertions BORNÉES AU BLOC, jamais « la chaîne existe quelque
 # part dans le fichier ». Un grep global ne relie rien à rien : il reste vert quand la sémantique
 # du contrat est inversée (mapping D-01 retourné vers gaps_found, sous-champ renommé…).
 # ---------------------------------------------------------------------------
 
-# Imprime les blocs de <file> qui matchent <ancre ERE>, un bloc par ligne de sortie (les sauts de
-# ligne internes sont aplatis en espaces) : la co-occurrence « dans le même bloc » devient une
-# co-occurrence sur la ligne de sortie, insensible au wrap à 100 colonnes du module. Un bloc =
-# paragraphe, item de liste, item numéroté ou titre. L'ancre est une ERE awk SANS backslash
-# (écrire [*] et pas \*) : awk -v interprète les échappements de la valeur avant la regex.
-#
-# Un item de liste ne clôt le bloc que si son INDENTATION est ≤ celle de la ligne qui a ouvert le
-# bloc. Flusher sur toute ligne commençant par un marqueur de puce coupait le bloc à la première
-# sous-puce imbriquée : « 2. **Plan** : … » suivi de «    - en mode **non-interactif** » donnait
-# deux blocs, et la forme interdite passait au travers de toute co-occurrence exigée DANS le bloc.
-# Une sous-puce est une continuation de son item parent : elle appartient au même bloc.
-md_blocks_matching() { # <file> <ancre ERE>
-  [ -f "$1" ] || return 0
-  awk -v anchor="$2" '
-    function indent(s,   t) { t = s; sub(/[^ \t].*$/, "", t); gsub(/\t/, "    ", t); return length(t) }
-    function flush() { if (buf != "" && buf ~ anchor) print buf; buf = "" }
-    /^[[:space:]]*$/ { flush(); next }
-    /^#/ { flush() }
-    /^[[:space:]]*([-*+][[:space:]]|[0-9]+\.[[:space:]])/ {
-      if (buf == "" || indent($0) <= openind) flush()
-    }
-    { if (buf == "") openind = indent($0); buf = (buf == "" ? $0 : buf " " $0) }
-    END { flush() }
-  ' "$1"
-}
+# `md_blocks_matching` est défini TOUT EN HAUT, avec md_folded/md_sed_folded : ses appelants
+# commencent désormais à T23, qui s'exécute avant cette section.
 
 # Cibles de balayage du module : les agents de l'ÉQUIPE (liste fermée $TEAM_AGENTS) + les
 # références RÉSOLUES ($REFS_DIR). Jamais "$MOD"/agents/*.md ni "$MOD"/references/*.md en dur :
