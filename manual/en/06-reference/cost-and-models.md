@@ -77,11 +77,11 @@ of rerunning everything.
 time, force ten separate explorations where a single well-phrased request covering the same need
 would have made just one.
 
-## What the README says, dated
+## Five efficiency levers, quantified on this repo
 
-The repo's root README quantifies five efficiency levers in its "Efficiency, quantified" section,
-as read on 2026-08-01 — reproduced here with its source, as a measurement observed on this repo at
-that date, not a guarantee that holds forever:
+This repo quantifies five efficiency levers of its own construction, as measured on this repo on
+2026-08-01 — reproduced here as a measurement observed at that date, not a guarantee that holds
+forever:
 
 | Lever | Measured effect |
 |---|---|
@@ -91,9 +91,11 @@ that date, not a guarantee that holds forever:
 | Next step framed while the current one is still executing | zero dead time between steps |
 | On-demand loading of the doctrine | it stays out of context until it's actually needed |
 
-If you want to check this figure yourself, `README.md` (repo root), section "Efficiency,
-quantified," is the source — it may have changed since the date above, which is exactly why this
-page never copies it as a settled fact, and never turns it into a promise about your own lab.
+This figure stays a measurement dated to this phase of the repo, not a promise about your own
+lab — which is exactly why this page never copies it as a settled fact. The five levers
+themselves stay documented throughout this manual, theme by theme, and that's where they remain
+true independent of this precise figure; for what has changed on this repo since that date,
+`CHANGELOG.md` (repo root) is the source that keeps growing.
 
 <!-- vf-manual:nav -->
 [← Previous](../06-reference/agents.md) · [↑ Contents](../README.md) · [Next →](../06-reference/troubleshooting.md)

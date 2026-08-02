@@ -89,9 +89,9 @@ façon dont on les déclenche : une commande se tape explicitement avec un `/`, 
 tout seul quand ta phrase en langage naturel correspond à sa description — tu n'as jamais besoin de
 connaître son nom. La page [skills.md](./skills.md) couvre cette seconde famille, bien plus
 nombreuse, et c'est délibérément qu'aucune des entrées listées ici n'y réapparaît comme une
-commande : le README racine du dépôt fait cette confusion pour deux d'entre elles (`/vf-design` et
-`/vf-sketch`, qui sont des skills et n'ont jamais de fichier sous `plugin/commands/`), cette page
-ne la reproduit pas.
+commande — `/vf-design` et `/vf-sketch`, en particulier, sont des skills et n'ont jamais de fichier
+sous `plugin/commands/`, une distinction qui mérite d'être faite explicitement tant les deux se
+ressemblent en surface.
 
 ## D'où vient cette liste
 

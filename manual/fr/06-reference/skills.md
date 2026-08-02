@@ -108,10 +108,9 @@ Tu ne le nommeras jamais dans une phrase.
 
 ## Deux précisions qui évitent une confusion
 
-D'abord, deux des skills ci-dessus (`vf-design` et `vf-sketch`) apparaissent au tableau des modules
-du README racine du dépôt comme s'il s'agissait de commandes — ce ne sont pas des commandes, elles
-n'ont aucun fichier sous `plugin/commands/`. Vois [commandes.md](./commandes.md) pour la vraie
-liste. Ensuite, un skill n'est jamais un agent : le skill décrit **quand** intervenir, l'agent (ou
+D'abord, deux des skills ci-dessus (`vf-design` et `vf-sketch`) se ressemblent à des commandes en
+surface — ce ne sont pas des commandes, elles n'ont aucun fichier sous `plugin/commands/`. Vois
+[commandes.md](./commandes.md) pour la vraie liste. Ensuite, un skill n'est jamais un agent : le skill décrit **quand** intervenir, l'agent (ou
 l'équipe d'agents) fait ensuite le travail une fois invoqué — la référence des agents vit sur une
 page séparée de ce même thème, consacrée uniquement à ça.
 

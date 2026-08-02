@@ -80,11 +80,11 @@ que de tout relancer.
 posées une par une, forcent dix explorations séparées là où une seule demande bien formulée,
 couvrant le même besoin, en aurait fait une.
 
-## Ce que dit le README, daté
+## Cinq leviers d'efficience, chiffrés sur ce dépôt
 
-Le README racine du dépôt chiffre cinq leviers d'efficience dans sa section « L'efficience,
-chiffrée », telle que consultée le 2026-08-01 — reproduite ici avec sa source, comme une mesure
-observée sur ce dépôt à cette date, pas comme une garantie valable pour toujours :
+Ce dépôt chiffre cinq leviers d'efficience de sa propre construction, tels que mesurés sur ce
+dépôt au 2026-08-01 — reproduits ici comme une mesure observée à cette date, pas comme une
+garantie valable pour toujours :
 
 | Levier | Effet mesuré |
 |---|---|
@@ -94,10 +94,11 @@ observée sur ce dépôt à cette date, pas comme une garantie valable pour touj
 | Cadrage de l'étape suivante pendant l'exécution de la précédente | zéro temps mort entre étapes |
 | Chargement à la demande de la doctrine | elle reste hors contexte tant qu'elle ne sert pas |
 
-Si tu veux vérifier ce chiffrage toi-même, `README.md` (racine du dépôt), section « Efficiency,
-quantified », est la source — elle peut avoir changé depuis la date ci-dessus, c'est pour ça que
-cette page ne la recopie jamais comme un fait acquis, ni comme une promesse valable pour ton propre
-lab.
+Ce chiffrage reste une mesure datée de cette phase du dépôt, pas une promesse valable pour ton
+propre lab — c'est pour ça que cette page ne le recopie jamais comme un fait acquis. Les cinq
+leviers eux-mêmes restent documentés au fil de ce manuel, thème par thème, et c'est là qu'ils
+restent vrais indépendamment de ce chiffrage précis ; pour ce qui a changé sur ce dépôt depuis
+cette date, `CHANGELOG.md` (racine du dépôt) est la source qui, elle, continue de s'enrichir.
 
 <!-- vf-manual:nav -->
 [← Précédent](../06-reference/agents.md) · [↑ Sommaire](../README.md) · [Suivant →](../06-reference/depannage.md)

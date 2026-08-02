@@ -106,9 +106,9 @@ never name it in a sentence.
 
 ## Two clarifications that avoid a mix-up
 
-First, two of the skills above (`vf-design` and `vf-sketch`) show up in the repo root README's
-module table as if they were commands — they aren't: neither has a file under
-`plugin/commands/`. See [commands.md](./commands.md) for the real list. Second, a skill is never
+First, two of the skills above (`vf-design` and `vf-sketch`) can look like commands at a
+glance — they aren't: neither has a file under `plugin/commands/`. See [commands.md](./commands.md)
+for the real list. Second, a skill is never
 an agent: the skill describes **when** to step in, and the agent (or team of agents) then does the
 work once invoked — the agent reference lives on a separate page in this same theme, dedicated
 entirely to that.

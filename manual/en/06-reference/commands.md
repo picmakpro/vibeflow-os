@@ -87,8 +87,8 @@ delegate to a same-named skill once invoked. The difference is in how you trigge
 is typed explicitly with a `/`, a skill fires on its own when your plain-language sentence matches
 its description — you never need to know its name. [skills.md](./skills.md) covers that second,
 much larger family, and it's deliberate that none of the entries listed here reappear there as a
-command: the repo's root README makes that mistake for two of them (`/vf-design` and `/vf-sketch`,
-which are skills and have no file under `plugin/commands/`), and this page doesn't repeat it.
+command — `/vf-design` and `/vf-sketch`, in particular, are skills and have no file under
+`plugin/commands/`, a distinction worth making explicit since the two look alike on the surface.
 
 ## Where this list comes from
 
