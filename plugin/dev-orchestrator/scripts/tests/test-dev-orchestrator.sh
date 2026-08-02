@@ -113,6 +113,41 @@ skip() { echo "  ⊘ SKIP $1"; skipped=$((skipped+1)); }
 # grep insensible à l'alias zsh (ugrep) : on force le binaire système.
 GREP="$(command -v grep)"
 
+# Le fichier REPLIÉ : tout saut de ligne devient un blanc, le reste est intact. À coupler
+# SYSTÉMATIQUEMENT à des blancs élastiques ([[:space:]]+) dans le motif. Défini ICI, avant toute
+# assertion, parce que ses appelants s'échelonnent de T7 à T27.
+#
+# POURQUOI (B6, revue du 2026-08-02). grep travaille LIGNE À LIGNE. Sur des fichiers de doctrine
+# wrappés à 100 colonnes, un motif MULTI-MOTS à espace littéral n'est jamais vu dès qu'il tombe à
+# cheval sur deux lignes — et rendre ses blancs élastiques n'y change RIEN tant que le fichier
+# n'est pas replié, puisque le saut de ligne est le séparateur d'enregistrement, pas un blanc.
+# Sur une garde NÉGATIVE (« aucun fichier ne reproduit … »), l'évasion est silencieuse : la garde
+# reste VERTE sur exactement ce qu'elle interdit. Sur une assertion POSITIVE, elle produit un faux
+# ROUGE sur un simple re-wrap. Les deux sont des défauts de sonde.
+#
+# md_blocks_matching règle le même problème DANS un bloc ; md_folded le règle à l'échelle du
+# FICHIER, là où la propriété mesurée n'est bornée à aucun bloc. Contrepartie assumée : deux
+# paragraphes voisins se retrouvent adjacents — un motif pourrait donc enjamber une frontière de
+# paragraphe. C'est le sens fail-closed (faux rouge bruyant), jamais le faux vert silencieux ;
+# quand la propriété EST bornée à un bloc, utiliser md_blocks_matching, pas ceci.
+md_folded() { [ -f "$1" ] || return 0; tr '\n' ' ' < "$1"; }
+
+# MUTATION tolérante au pli — même défaut B6, versant fabrication de mutants. `sed` est ligne à
+# ligne : un motif de mutation MULTI-MOTS ne mord pas quand le wrap à 100 colonnes le coupe en
+# deux, et le mutant redevient identique à l'original. Les gardes `cmp -s` le disent (fail-closed,
+# jamais un faux vert) — mais c'est un faux ROUGE sur un re-wrap parfaitement légitime, et une
+# suite qui rougit sur une réécriture correcte nuit autant qu'une suite aveugle.
+#
+# On replie donc le fichier sur un octet qui ne peut pas apparaître dans un .md (\001), on mute
+# avec des blancs élastiques INCLUANT cet octet, puis on rétablit les sauts de ligne. Les blancs
+# du motif s'écrivent $MDSP (« un ou plusieurs blancs, pli compris »). Seuls les blancs consommés
+# PAR le motif disparaissent : le reste du wrap est intact, comme après toute mutation.
+MD_FOLD_SEP=$'\001'
+MDSP="[[:space:]${MD_FOLD_SEP}]+"
+md_sed_folded() { # <expression sed -E, blancs écrits $MDSP> <fichier>
+  tr '\n' "$MD_FOLD_SEP" < "$2" | sed -E "$1" | tr "$MD_FOLD_SEP" '\n'
+}
+
 # ---------------------------------------------------------------------------
 # Périmètre : ce que le module POSSÈDE depuis la v2.0.0
 # ---------------------------------------------------------------------------
@@ -958,7 +993,9 @@ fi
 # ---------------------------------------------------------------------------
 # Présence du garde-fou sur fichier FILTRÉ des commentaires (hygiène grep-gate : un simple
 # commentaire ne doit pas suffire). Pas de check densité ici (T3/T5 le font via wc -l).
-has_marker=$("$GREP" -v '^#' "$AGENT_FILE" | "$GREP" -ci 'first-use\|premier usage')
+# « premier usage » est multi-mots : mesure sur le corps REPLIÉ, blancs élastiques (B6). Le
+# comptage reste comparé à « ≥ 1 » — replier ramène le compte à 0 ou 1, jamais à une autre décision.
+has_marker=$("$GREP" -v '^#' "$AGENT_FILE" | tr '\n' ' ' | "$GREP" -ciE 'first-use|premier[[:space:]]+usage')
 has_detect=0; "$GREP" -q -- '.planning' "$AGENT_FILE" && has_detect=1
 has_mapcb=0;  "$GREP" -q -- 'gsd-map-codebase' "$AGENT_FILE" && has_mapcb=1
 has_noauto=$("$GREP" -v '^#' "$AGENT_FILE" | "$GREP" -ci 'new-project')
@@ -1020,7 +1057,10 @@ fi
 # ---------------------------------------------------------------------------
 CONTRACTS="$REFS_DIR/mission-contracts.md"
 if [ -f "$CONTRACTS" ]; then
-  if "$GREP" -qi "Brief de mission" "$CONTRACTS" && "$GREP" -qi "Rapport de mission" "$CONTRACTS" \
+  # Motifs multi-mots → fichier REPLIÉ + blancs élastiques (B6). Aujourd'hui ils sont portés par des
+  # titres ATX, atomiques par construction ; demain la seule occurrence peut vivre en prose wrappée.
+  if md_folded "$CONTRACTS" | "$GREP" -qiE "Brief[[:space:]]+de[[:space:]]+mission" \
+     && md_folded "$CONTRACTS" | "$GREP" -qiE "Rapport[[:space:]]+de[[:space:]]+mission" \
      && "$GREP" -q "SEUIL_EQUIPE" "$CONTRACTS"; then
     ok "T9 contrats : mission-contracts.md présent (Brief + Rapport + SEUIL_EQUIPE)"
   else
@@ -1028,7 +1068,8 @@ if [ -f "$CONTRACTS" ]; then
   fi
   # Digest de mission (manager → workers) : le contrat DIGEST doit être défini ici et
   # seulement ici (audit 2026-07-25 : sans lui, 100-200k tokens de relecture par étape).
-  if "$GREP" -q "DIGEST" "$CONTRACTS" && "$GREP" -qi "Digest de mission" "$CONTRACTS"; then
+  if "$GREP" -q "DIGEST" "$CONTRACTS" \
+     && md_folded "$CONTRACTS" | "$GREP" -qiE "Digest[[:space:]]+de[[:space:]]+mission"; then
     ok "T9 digest : contrat DIGEST défini dans mission-contracts.md"
   else
     ko "T9 digest : contrat DIGEST absent de mission-contracts.md"
@@ -1098,7 +1139,9 @@ for sk in $OWNED_SKILLS; do
   desc=$(awk '/^description:/{f=1;print;next} f&&/^[A-Za-z_-]+:/{exit} f&&/^---[[:space:]]*$/{exit} f{print}' "$f" | tr '\n' ' ')
   dlen=$(echo "$desc" | wc -c | tr -d ' ')
   [ "${dlen:-0}" -ge 120 ] || { ko "T12 skills : description de $sk trop courte (${dlen} car. — pas de formulations réelles ?)"; t12_ok=0; }
-  echo "$desc" | "$GREP" -qi "Utiliser quand" || { ko "T12 skills : description de $sk sans déclencheur « Utiliser quand »"; t12_ok=0; }
+  # $desc est déjà REPLIÉE (tr ci-dessus) mais garde l'indentation YAML des lignes de continuation :
+  # blancs élastiques obligatoires (B6), sinon un simple repli de la description ferait rougir.
+  echo "$desc" | "$GREP" -qiE "Utiliser[[:space:]]+quand" || { ko "T12 skills : description de $sk sans déclencheur « Utiliser quand »"; t12_ok=0; }
   echo "$desc" | "$GREP" -qi "Invocable" || { ko "T12 skills : description de $sk sans portée d'invocation"; t12_ok=0; }
 done
 [ "$t12_ok" -eq 1 ] && ok "T12 skills : vf-auto et vf-dev — descriptions valides (déclencheur + portée)"
@@ -1344,12 +1387,14 @@ fi
 
 # T18b — Success Criteria 1 et 3 : doctrine étage design présente, routage vf-auto → design pur
 t18b_ok=1
-"$GREP" -qi 'Étage design croisé' "$DEVMGR" || { ko "T18b SC1 : doctrine étage design absente de vf-dev-manager.md"; t18b_ok=0; }
+# Formules MULTI-MOTS sur des .md wrappés à 100 colonnes : mesure sur le fichier REPLIÉ + blancs
+# élastiques (B6) — sinon un re-wrap légitime les ferait rougir à tort.
+md_folded "$DEVMGR" | "$GREP" -qiE 'Étage[[:space:]]+design[[:space:]]+croisé' || { ko "T18b SC1 : doctrine étage design absente de vf-dev-manager.md"; t18b_ok=0; }
 "$GREP" -q 'mission-cross-team' "$DEVMGR" || { ko "T18b SC1 : renvoi vers mission-cross-team.md absent de vf-dev-manager.md"; t18b_ok=0; }
 AUTO_SKILL="$MOD/skills/vf-auto/SKILL.md"
 if [ -f "$AUTO_SKILL" ]; then
   "$GREP" -q 'vf-design-manager' "$AUTO_SKILL" || { ko "T18b SC3 : vf-auto/SKILL.md ne route pas vers vf-design-manager"; t18b_ok=0; }
-  "$GREP" -qi 'zéro feature' "$AUTO_SKILL" || { ko "T18b SC3 : signal « mission entièrement design (zéro feature) » absent de vf-auto"; t18b_ok=0; }
+  md_folded "$AUTO_SKILL" | "$GREP" -qiE 'zéro[[:space:]]+feature' || { ko "T18b SC3 : signal « mission entièrement design (zéro feature) » absent de vf-auto"; t18b_ok=0; }
 else
   ko "T18b SC3 : $AUTO_SKILL introuvable"; t18b_ok=0
 fi
@@ -1666,8 +1711,10 @@ else
   # inatteignable en langage naturel.
   "$GREP" -q -- "--verify-only" "$ROUTING" || { ko "T22 captation : intent-routing.md ne route pas le régime d'audit (--verify-only)"; t22_ok=0; }
   "$GREP" -q -- "--force" "$ROUTING" || { ko "T22 captation : intent-routing.md ne route pas le régime de régénération (--force)"; t22_ok=0; }
-  "$GREP" -q "dit encore vrai" "$ROUTING" || { ko "T22 captation : la formulation d'audit « dit encore vrai » n'est pas captée"; t22_ok=0; }
-  "$GREP" -q "refais toute la doc" "$ROUTING" || { ko "T22 captation : la formulation de régénération « refais toute la doc » n'est pas captée"; t22_ok=0; }
+  # Formulations MULTI-MOTS → fichier REPLIÉ + blancs élastiques (B6). Elles vivent aujourd'hui dans
+  # des lignes de tableau, atomiques par construction ; rien ne garantit qu'elles y restent.
+  md_folded "$ROUTING" | "$GREP" -qE "dit[[:space:]]+encore[[:space:]]+vrai" || { ko "T22 captation : la formulation d'audit « dit encore vrai » n'est pas captée"; t22_ok=0; }
+  md_folded "$ROUTING" | "$GREP" -qE "refais[[:space:]]+toute[[:space:]]+la[[:space:]]+doc" || { ko "T22 captation : la formulation de régénération « refais toute la doc » n'est pas captée"; t22_ok=0; }
   # Le protocole de désambiguïsation (D-10) : les quatre familles nommées au même endroit.
   "$GREP" -q "Désambiguïsation" "$ROUTING" || { ko "T22 captation : protocole de désambiguïsation absent d'intent-routing.md"; t22_ok=0; }
   # §Contexte & session doit porter ≥ 8 lignes de table (5 doc/contexte + les 3 existantes).
@@ -1908,9 +1955,12 @@ t24_assert() { # <libellé> <fichier> <ancre ERE>
   || { ko "T24 A : section « Contrat de checkpoint amont » absente de mission-contracts.md"; t24_ok=0; }
 # Ancres NOMMÉES : les mêmes servent aux assertions et aux mutants de D — un mutant mesuré sur une
 # autre ancre que sa cible ne prouverait rien de cette cible.
-T24_ANCHOR_A='[*][*]Règle unique de mapping[*][*]'
+# Blancs ÉLASTIQUES (B6) : l'ancre est confrontée au buffer RECOLLÉ de md_blocks_matching, où le
+# pli du wrap à 100 colonnes laisse l'indentation de la ligne suivante. Une ancre à espace littéral
+# ne rougirait pas franchement : elle rendrait rc=2 (« bloc introuvable ») sur un simple re-wrap.
+T24_ANCHOR_A='[*][*]Règle[[:space:]]+unique[[:space:]]+de[[:space:]]+mapping[*][*]'
 T24_ANCHOR_B='[*][*][`]gate[`][*][*]'
-T24_ANCHOR_C='[*][*]Verdict d'
+T24_ANCHOR_C='[*][*]Verdict[[:space:]]+d'
 t24_assert "A (mission-contracts.md, §Règle unique de mapping)" "$CONTRACTS_FILE" "$T24_ANCHOR_A"
 t24_assert "B (vf-coder.md, bloc du champ gate)"                "$CODER_FILE"     "$T24_ANCHOR_B"
 t24_assert "C (mission-flow.md, bloc Verdict d'étape)"          "$MFLOW"          "$T24_ANCHOR_C"
@@ -1959,9 +2009,11 @@ sed -e 's/`human_needed`/`@@VFSWAP@@`/g' -e 's/`gaps_found`/`human_needed`/g' \
     -e 's/`@@VFSWAP@@`/`gaps_found`/g' "$MFLOW" > "$T24_MUT_RELATION"
 # Guillemets SIMPLES obligatoires : l'expression porte des backticks, qui seraient une substitution
 # de commande entre guillemets doubles. L'expansion de "$T24_INVERT_SED" n'est, elle, pas réévaluée.
-T24_INVERT_SED='s/`statut: "human_needed"`/`statut: "gaps_found"` — jamais `statut: "human_needed"`/'
-sed "$T24_INVERT_SED" "$CONTRACTS_FILE" > "$T24_MUT_IMPL_REF"
-sed "$T24_INVERT_SED" "$CODER_FILE"     > "$T24_MUT_IMPL_CODER"
+# `g` explicite : le fichier étant replié en UNE ligne, « la première occurrence de chaque ligne »
+# (comportement d'origine, 2 lignes porteuses dans vf-coder.md) devient « la première du fichier ».
+T24_INVERT_SED='s/`statut:'"$MDSP"'"human_needed"`/`statut: "gaps_found"` — jamais `statut: "human_needed"`/g'
+md_sed_folded "$T24_INVERT_SED" "$CONTRACTS_FILE" > "$T24_MUT_IMPL_REF"
+md_sed_folded "$T24_INVERT_SED" "$CODER_FILE"     > "$T24_MUT_IMPL_CODER"
 
 cat > "$T24_LICIT" <<'T24LICIT'
 ## Contrôle de flux
@@ -2049,7 +2101,12 @@ t25_ok=1
 #     et « **Exécution** » matchent, « **Planification** » non.
 T25_BRICK_RE='^[[:space:]]*([0-9]+[.)][[:space:]]+|[-*+][[:space:]]+)?[*][*](Plan|Exécution)([*]|[ ]|[(]|:)'
 T25_MODE_RE='(non-interactif|--auto([^a-z-]|$)|--chain([^a-z-]|$))'
-T25_NEG_RE='(JAMAIS|[Jj]amais|[Nn]e pas|[Nn]i |[Ss]ans |[Aa]ucun|[Ii]nterdit|[Pp]as de |opt-in)'
+# Blancs ÉLASTIQUES (B6) : cette liste est confrontée à des clauses RECOLLÉES depuis un bloc
+# wrappé à 100 colonnes. Un « ne / pas » coupé au pli échappait à un motif à espace littéral —
+# la négation devenait invisible, la clause repassait pour une prescription, et le gate rougissait
+# sur un durcissement du texte. Les espaces FINAUX (« ni », « sans », « pas de ») sont des
+# frontières de mot : élastiques aussi, mais toujours exigés — sans quoi « Sansonnet » désarmerait.
+T25_NEG_RE='(JAMAIS|[Jj]amais|[Nn]e[[:space:]]+pas|[Nn]i[[:space:]]+|[Ss]ans[[:space:]]+|[Aa]ucun|[Ii]nterdit|[Pp]as[[:space:]]+de[[:space:]]+|opt-in)'
 
 # PÉRIMÈTRE DE T25, ET POURQUOI LA BRIQUE **Cadrage** N'Y EST PAS (A-1bis, arbitrage humain du
 # 2026-08-02, qui RETRANCHE A-1). Le commit e2b1bfe avait ajouté ici une seconde branche faisant de
@@ -2345,7 +2402,7 @@ T25B_CALL='gsd_run config-set workflow._auto_chain_active false'
 # repère la fin du bloc STRUCTURELLEMENT (même règle de coupe que md_blocks_matching), pas par une
 # phrase.
 # M1 — l appel de désarmement retiré, purement et simplement.
-sed 's/gsd_run config-set workflow[.]_auto_chain_active false//' "$CODER_FILE" > "$T25B_M1"
+md_sed_folded "s/gsd_run${MDSP}config-set${MDSP}workflow[.]_auto_chain_active${MDSP}false//g" "$CODER_FILE" > "$T25B_M1"
 # M2 — le MÊME appel, replacé ailleurs dans le fichier : aucun token perdu, seule la relation.
 { cat "$T25B_M1"; printf '\nAprès le cadrage, `%s` reste requis.\n' "$T25B_CALL"; } > "$T25B_M2"
 # M3 — replacé à la FIN du même bloc Cadrage : toujours dans le bloc, mais loin de l armement.
@@ -2365,9 +2422,7 @@ awk -v anchor="$T25_CADRAGE_RE" -v call="$T25B_CALL" '
   END { if (ina) flush() }
 ' "$T25B_M1" > "$T25B_M3"
 # M4 — permutation PURE des deux membres du couple : le désarmement passe AVANT l armement.
-sed -e 's/--auto/@@VFARM@@/' \
-    -e 's/gsd_run config-set workflow[.]_auto_chain_active false/--auto/' \
-    -e "s/@@VFARM@@/$T25B_CALL/" "$CODER_FILE" > "$T25B_M4"
+md_sed_folded "s/--auto/@@VFARM@@/;s/gsd_run${MDSP}config-set${MDSP}workflow[.]_auto_chain_active${MDSP}false/--auto/;s/@@VFARM@@/$T25B_CALL/" "$CODER_FILE" > "$T25B_M4"
 
 # Gardes de MORSURE, avant toute mesure : un mutant qui n a rien changé (ou qui a changé autre
 # chose que ce qu il prétend) ne prouve rien. M3 en particulier serait, s il n avait pas mordu, un
@@ -2456,7 +2511,7 @@ T25C_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T25C_TMPDIR"
 T25C_MUT_MEME="$T25C_TMPDIR/mutant-deux-fois-le-meme-flag.md"
 T25C_MUT_TRUE="$T25C_TMPDIR/mutant-auto-advance-arme.md"
 sed 's/workflow[.]auto_advance/workflow._auto_chain_active/g' "$DEVMGR" > "$T25C_MUT_MEME"
-sed 's/workflow[.]auto_advance false/workflow.auto_advance true/' "$DEVMGR" > "$T25C_MUT_TRUE"
+md_sed_folded "s/workflow[.]auto_advance${MDSP}false/workflow.auto_advance true/g" "$DEVMGR" > "$T25C_MUT_TRUE"
 t25c_mut_ko=""
 t25c_assert_mutant_red() { # <libellé> <mutant>
   if cmp -s "$DEVMGR" "$2"; then
@@ -2513,7 +2568,12 @@ t26_ids() { "$GREP" -oE '`[a-z][a-z0-9_]*`' | tr -d '`' | LC_ALL=C sort -u; }
 
 # Intitulés du contrat INTERNE amont, en version « texte » (sans ancre de ligne) : sert à
 # interdire qu'un sous-champ du minimum de reprise en reproduise un (ADR-030).
-T26_INTERNAL_RE='Completed Tasks|Current Task|Checkpoint Details|Awaiting|CHECKPOINT REACHED'
+#
+# Blancs ÉLASTIQUES (B6) : ces motifs sont mesurés sur du contenu RECOLLÉ — blocs de
+# md_blocks_matching, fichier replié par md_folded —, où le pli du wrap à 100 colonnes laisse
+# l'indentation de la ligne suivante. Un espace littéral y rendrait la garde AVEUGLE, pas rouge.
+T26_INTERNAL_MULTI_RE='Completed[[:space:]]+Tasks|Current[[:space:]]+Task|Checkpoint[[:space:]]+Details|CHECKPOINT[[:space:]]+REACHED'
+T26_INTERNAL_RE="$T26_INTERNAL_MULTI_RE|Awaiting"
 
 # Sous-champs FIXÉS par D-03, tenus comme un ENSEMBLE CLOS : D-03 dit « sont exactement … — rien
 # d'autre », donc l'ensemble MESURÉ doit être ÉGAL à celui-ci, jamais seulement le contenir. Un
@@ -2543,19 +2603,22 @@ t26_reprise_closed() { # <fichier de contrat>
   # Réinitialisation à l'ENTRÉE : sans elle, un $T26_WHY périmé survivait à un retour 2 et
   # l'appelant affichait le motif de l'appel précédent.
   T26_FIELDS=""; T26_N=0; T26_WHY=""
-  blk="$(md_blocks_matching "$1" '[*][*]Minimum de reprise')"
+  blk="$(md_blocks_matching "$1" '[*][*]Minimum[[:space:]]+de[[:space:]]+reprise')"
   [ -n "$blk" ] || return 2
-  printf '%s\n' "$blk" | "$GREP" -q 'sous-champs sont exactement' || { T26_WHY="énumération fermée (« sous-champs sont exactement ») absente"; return 1; }
+  # Blancs ÉLASTIQUES partout (B6) : le bloc est RECOLLÉ, donc une formule coupée par le wrap à
+  # 100 colonnes s'y retrouve avec l'indentation de la ligne suivante au pli. Garde ET coupe
+  # portent le MÊME motif élastique — les désaligner rendrait la coupe no-op sous un garde vert.
+  printf '%s\n' "$blk" | "$GREP" -qE 'sous-champs[[:space:]]+sont[[:space:]]+exactement' || { T26_WHY="énumération fermée (« sous-champs sont exactement ») absente"; return 1; }
   # Le garde porte le motif EXACT de la coupe. Un garde plus laxiste (« rien d'autre » sans gras)
   # restait vert quand le gras disparaissait, tandis que la coupe devenait un no-op SILENCIEUX :
   # l'énumération s'étendait jusqu'à la fin du bloc et la fermeture devenait trivialement vraie.
-  printf '%s\n' "$blk" | "$GREP" -qF "**rien d'autre**"           || { T26_WHY="borne fermante « **rien d'autre** » (en gras — motif EXACT de la coupe) absente"; return 1; }
+  printf '%s\n' "$blk" | "$GREP" -qE "[*][*]rien[[:space:]]+d'autre[*][*]" || { T26_WHY="borne fermante « **rien d'autre** » (en gras — motif EXACT de la coupe) absente"; return 1; }
   printf '%s\n' "$blk" | "$GREP" -q 'ADR-030'                     || { T26_WHY="motif ADR-030 non cité"; return 1; }
 
   # (a) fermeture MESURÉE : les deux coupes doivent avoir mordu.
-  head="$(printf '%s\n' "$blk" | sed -e 's/.*sous-champs sont exactement//')"
+  head="$(printf '%s\n' "$blk" | sed -E 's/.*sous-champs[[:space:]]+sont[[:space:]]+exactement//')"
   [ "$head" != "$blk" ] || { T26_WHY="ouverture d'énumération non coupée — coupe no-op, sonde en défaut"; return 1; }
-  enum="$(printf '%s\n' "$head" | sed -e "s/[*][*]rien d'autre[*][*].*//")"
+  enum="$(printf '%s\n' "$head" | sed -E "s/[*][*]rien[[:space:]]+d'autre[*][*].*//")"
   [ "$enum" != "$head" ] || { T26_WHY="borne fermante non coupée — une coupe no-op est un défaut de sonde, jamais un succès"; return 1; }
 
   printf '%s\n' "$enum" | "$GREP" -qE "$T26_INTERNAL_RE" && { T26_WHY="un sous-champ reproduit un intitulé du contrat interne amont (ADR-030)"; return 1; }
@@ -2592,7 +2655,7 @@ t26_reprise_closed() { # <fichier de contrat>
   done
   [ -z "$bad" ] || { T26_WHY="le bloc déclare, hors énumération, une graphie connue de la table du contrat interne amont (ADR-030) —$bad"; return 1; }
 
-  parent="$(printf '%s\n' "$blk" | sed -n 's/.*champ optionnel `\([a-z][a-z0-9_]*\)`.*/\1/p')"
+  parent="$(printf '%s\n' "$blk" | sed -nE "s/.*champ[[:space:]]+optionnel[[:space:]]+\`([a-z][a-z0-9_]*)\`.*/\1/p")"
   [ -n "$parent" ] || { T26_WHY="champ porteur (« un champ optionnel \`…\` ») non déclaré"; return 1; }
   T26_FIELDS="$fields"; T26_N="$(printf '%s\n' "$fields" | "$GREP" -c .)"
   return 0
@@ -2636,8 +2699,10 @@ else
 fi
 
 # B — vf-coder.md porte la règle « attente humaine ⇒ escalade, jamais auto-répondue ».
+# La formule est multi-mots et la propriété n'est bornée à aucun bloc : mesure sur le fichier
+# REPLIÉ, blancs élastiques (B6) — sinon un simple re-wrap la ferait rougir à tort.
 "$GREP" -q 'reprise' "$CODER_FILE" || { ko "T26 B : vf-coder.md ne nomme pas le champ reprise"; t26_ok=0; }
-"$GREP" -qi 'jamais une réponse' "$CODER_FILE" || { ko "T26 B : vf-coder.md ne porte pas la règle « jamais une réponse de ta part »"; t26_ok=0; }
+md_folded "$CODER_FILE" | "$GREP" -qiE 'jamais[[:space:]]+une[[:space:]]+réponse' || { ko "T26 B : vf-coder.md ne porte pas la règle « jamais une réponse de ta part »"; t26_ok=0; }
 
 # C — la table de pilotage porte le halt DE NŒUD et la réponse par le manager. Cible SUIVIE :
 # depuis le déport A-4, les deux formules vivent dans mission-flow.md §Pattern C, plus dans
@@ -2669,8 +2734,20 @@ fi
 # références résolues) ne reproduit les intitulés du contrat interne de l'exécuteur amont. Le
 # compteur de fichiers vus est non négociable : sans lui, un glob qui n'expanse pas rendrait un
 # vert prétendant avoir balayé ce qu'il n'a jamais ouvert.
-t26_internal_titles() { # <file>
-  "$GREP" -lE 'Completed Tasks|Current Task|Checkpoint Details|^Awaiting$|CHECKPOINT REACHED' "$1" 2>/dev/null
+#
+# B6 — ÉVASION PAR RETOUR À LA LIGNE, fermée ici. Les intitulés visés sont MULTI-MOTS et les
+# fichiers balayés sont wrappés à 100 colonnes : un « Completed / Tasks » coupé au pli échappait à
+# un motif à espace littéral et la garde restait VERTE sur la duplication qu'elle interdit
+# (contrôle positif à l'appui). Deux passes COMPLÉMENTAIRES, jamais l'une à la place de l'autre :
+#   1. LIGNE À LIGNE pour l'intitulé ANCRÉ `^Awaiting$` — l'ancre de ligne n'a plus de sens sur un
+#      fichier replié, et la dégrader en `Awaiting` nu ferait rougir toute prose anglaise ;
+#   2. FICHIER REPLIÉ (md_folded) + blancs ÉLASTIQUES pour les intitulés multi-mots.
+# Urgence : A-3 vient d'élargir le minimum de reprise à la table des tâches faites — c'est-à-dire
+# de rouvrir la porte exacte que cette garde surveille.
+t26_internal_titles() { # <file> — imprime le fichier s'il reproduit un intitulé interne
+  "$GREP" -lE '^Awaiting$' "$1" 2>/dev/null && return 0
+  md_folded "$1" | "$GREP" -qE "$T26_INTERNAL_MULTI_RE" && printf '%s\n' "$1"
+  return 0
 }
 t26_dup_hits=""; t26_scanned=0
 while IFS= read -r t26_f; do            # variables préfixées : cf. note du balayage T25
@@ -2704,11 +2781,11 @@ T26_MUT_RENAME="$T26_TMPDIR/mutant-rename-plan-id.md"
 T26_MUT_BORNE="$T26_TMPDIR/mutant-borne-sans-gras.md"
 printf '## Rapport de reprise\n\n**Completed Tasks** table (hashes + files)\n' > "$T26_FIXTURE"
 # 1. un champ INTERDIT ajouté DANS l'énumération close (la table que ADR-030 interdit de recopier).
-sed "s/\*\*rien d'autre\*\*/, \`taches_executees\` — **rien d'autre**/" "$CONTRACTS_FILE" > "$T26_MUT_INTERDIT"
+md_sed_folded "s/[*][*]rien${MDSP}d'autre[*][*]/, \`taches_executees\` — **rien d'autre**/" "$CONTRACTS_FILE" > "$T26_MUT_INTERDIT"
 # 2. un sous-champ fixé par D-03 RENOMMÉ : l'ensemble reste clos, il ne désigne plus la même chose.
 sed 's/`plan_id`/`plan_ref`/g' "$CONTRACTS_FILE" > "$T26_MUT_RENAME"
 # 3. la borne fermante dégrassée : garde et coupe doivent parler du MÊME motif.
-sed "s/\*\*rien d'autre\*\*/rien d'autre/" "$CONTRACTS_FILE" > "$T26_MUT_BORNE"
+md_sed_folded "s/[*][*]rien${MDSP}d'autre[*][*]/rien d'autre/" "$CONTRACTS_FILE" > "$T26_MUT_BORNE"
 
 t26_e_ko=""
 t26_assert_mutant_red() { # <libellé> <fichier mutant>
@@ -2756,13 +2833,14 @@ T26F_WHY=""
 t26_distinguo_written() { # <file>
   local blk
   T26F_WHY=""
-  blk="$(md_blocks_matching "$1" '[*][*]Distinguo à ne jamais réduire[*][*]')"
+  # Blancs élastiques (B6) : ancre comme motifs sont mesurés sur le bloc RECOLLÉ.
+  blk="$(md_blocks_matching "$1" '[*][*]Distinguo[[:space:]]+à[[:space:]]+ne[[:space:]]+jamais[[:space:]]+réduire[*][*]')"
   [ -n "$blk" ] || { T26F_WHY="aucun bloc ne porte le distinguo (« **Distinguo à ne jamais réduire**  »)"; return 2; }
   printf '%s\n' "$blk" | "$GREP" -q 'ADR-030' \
     || { T26F_WHY="le distinguo ne cite pas ADR-030 — il ne se rattache à aucune garde"; return 1; }
-  printf '%s\n' "$blk" | "$GREP" -qi 'doctrine amont' \
+  printf '%s\n' "$blk" | "$GREP" -qiE 'doctrine[[:space:]]+amont' \
     || { T26F_WHY="le distinguo ne nomme pas ce qui reste INTERDIT (la recopie de doctrine amont)"; return 1; }
-  printf '%s\n' "$blk" | "$GREP" -qi 'état de reprise' \
+  printf '%s\n' "$blk" | "$GREP" -qiE 'état[[:space:]]+de[[:space:]]+reprise' \
     || { T26F_WHY="le distinguo ne nomme pas ce qui devient LICITE (le transport d'un état de reprise)"; return 1; }
   return 0
 }
@@ -2775,9 +2853,9 @@ T26F_MUT_ORPHELIN="$T26F_TMPDIR/mutant-distinguo-sans-garde.md"
 # jugé sur rc=1 (fermeture rompue) — jamais sur rc=2, qui signerait une ancre détruite, c'est-à-dire
 # rien de mesuré du tout.
 # 1. la moitié LICITE du distinguo effacée : il ne reste que l'interdit, donc plus de distinction.
-sed 's/état de reprise/objet/g' "$CONTRACTS_FILE" > "$T26F_MUT_MOITIE"
+md_sed_folded "s/état${MDSP}de${MDSP}reprise/objet/g" "$CONTRACTS_FILE" > "$T26F_MUT_MOITIE"
 # 2. la moitié INTERDITE effacée : symétrique — un distinguo sans son interdit n'interdit plus rien.
-sed 's/doctrine amont/matière amont/g' "$CONTRACTS_FILE" > "$T26F_MUT_INTERDIT"
+md_sed_folded "s/doctrine${MDSP}amont/matière amont/g" "$CONTRACTS_FILE" > "$T26F_MUT_INTERDIT"
 # 3. le distinguo détaché de sa garde : il ne cite plus ADR-030, donc il n'amende plus rien.
 sed 's/ADR-030/la garde/g' "$CONTRACTS_FILE" > "$T26F_MUT_ORPHELIN"
 
@@ -2818,7 +2896,7 @@ sed 's/`reponse_humaine`/`reponse_user`/g' "$CONTRACTS_FILE" > "$T26EP_MUT_REPON
 sed 's/`taches_faites`/`taches_executees`/g' "$CONTRACTS_FILE" > "$T26EP_MUT_TACHES"
 # Champ ajouté dont AUCUNE liste noire ne contient la graphie : c'est l'égalité d'ensemble, et elle
 # seule, qui doit le refuser. Sans elle, un `journal_de_bord` passait à 87 OK / 0 KO.
-sed "s/\*\*rien d'autre\*\*/, \`journal_de_bord\` — **rien d'autre**/" "$CONTRACTS_FILE" > "$T26EP_MUT_HORS"
+md_sed_folded "s/[*][*]rien${MDSP}d'autre[*][*]/, \`journal_de_bord\` — **rien d'autre**/" "$CONTRACTS_FILE" > "$T26EP_MUT_HORS"
 
 t26ep_ko=""
 t26ep_assert_mutant_red() { # <libellé> <mutant>
@@ -2938,13 +3016,13 @@ esac
 # bloc du §Contrôle de flux : le fichier foyer et la section. Sans ce volet, un futur plan pourrait
 # supprimer le renvoi sans qu'aucune sonde ne bronche : la clause serait introuvable depuis l'agent
 # alors même que T27 resterait vert sur la référence.
-t27_renvoi_blk="$(md_blocks_matching "$DEVMGR" '[*][*]Table de pilotage')"
+t27_renvoi_blk="$(md_blocks_matching "$DEVMGR" '[*][*]Table[[:space:]]+de[[:space:]]+pilotage')"
 if [ -z "$t27_renvoi_blk" ]; then
   ko "T27 (A-4, renvoi) : vf-dev-manager.md ne porte aucun bloc de renvoi vers la table de pilotage — la clause déportée est devenue injoignable depuis l'agent"; t27_ok=0
 else
   printf '%s\n' "$t27_renvoi_blk" | "$GREP" -q 'mission-flow.md' \
     || { ko "T27 (A-4, renvoi) : le bloc de renvoi de vf-dev-manager.md ne nomme pas mission-flow.md"; t27_ok=0; }
-  printf '%s\n' "$t27_renvoi_blk" | "$GREP" -q 'Pattern C' \
+  printf '%s\n' "$t27_renvoi_blk" | "$GREP" -qE 'Pattern[[:space:]]+C' \
     || { ko "T27 (A-4, renvoi) : le bloc de renvoi de vf-dev-manager.md ne nomme pas la section (§Pattern C) — un renvoi au fichier entier n'est pas un renvoi"; t27_ok=0; }
 fi
 
@@ -2973,16 +3051,15 @@ T27_MUT_QUESTION="$T27_TMPDIR/mutant-question-sans-mode.md"
 T27_MUT_ADD_ASK="$T27_TMPDIR/mutant-ajout-question-en-autonome.md"
 T27_MUT_ADD_GEL="$T27_TMPDIR/mutant-ajout-gel-en-superviser.md"
 T27_LICIT="$T27_TMPDIR/licite-modes-en-clair.md"
-sed -e 's/mode \*\*superviser\*\*/mode **@@VFMODE@@**/g' \
-    -e 's/mode \*\*autonome\*\*/mode **superviser**/g' \
-    -e 's/mode \*\*@@VFMODE@@\*\*/mode **autonome**/g' "$MFLOW" > "$T27_MUT_SWAP"
-sed 's/en mode \*\*autonome\*\*, il n/il n/' "$MFLOW" > "$T27_MUT_GEL"
-sed 's/en mode \*\*superviser\*\*, c/c/'     "$MFLOW" > "$T27_MUT_QUESTION"
+md_sed_folded "s/mode${MDSP}[*][*]superviser[*][*]/mode **@@VFMODE@@**/g;s/mode${MDSP}[*][*]autonome[*][*]/mode **superviser**/g;s/mode${MDSP}[*][*]@@VFMODE@@[*][*]/mode **autonome**/g" "$MFLOW" > "$T27_MUT_SWAP"
+md_sed_folded "s/en${MDSP}mode${MDSP}[*][*]autonome[*][*],${MDSP}il${MDSP}n/il n/" "$MFLOW" > "$T27_MUT_GEL"
+md_sed_folded "s/en${MDSP}mode${MDSP}[*][*]superviser[*][*],${MDSP}c/c/"           "$MFLOW" > "$T27_MUT_QUESTION"
 # Guillemets SIMPLES : les motifs portent des backticks (substitution de commande entre guillemets
 # doubles). L'ancre `· `gaps_found` → `dag.sh reopen`` borne la fin du segment human_needed :
 # insérer JUSTE avant, c'est insérer dans le segment mesuré, sans toucher au reste du bloc.
-sed 's/· `gaps_found` → `dag.sh reopen`/; en mode **autonome**, c’est le manager qui **répond aux attentes humaines** et il pose la question · `gaps_found` → `dag.sh reopen`/' "$MFLOW" > "$T27_MUT_ADD_ASK"
-sed 's/· `gaps_found` → `dag.sh reopen`/; en mode **superviser**, GELER le nœud porteur (halte de nœud) · `gaps_found` → `dag.sh reopen`/' "$MFLOW" > "$T27_MUT_ADD_GEL"
+T27_ADD_ANCHOR="·${MDSP}\`gaps_found\`${MDSP}→${MDSP}\`dag.sh${MDSP}reopen\`"
+md_sed_folded "s/$T27_ADD_ANCHOR/; en mode **autonome**, c’est le manager qui **répond aux attentes humaines** et il pose la question · \`gaps_found\` → \`dag.sh reopen\`/" "$MFLOW" > "$T27_MUT_ADD_ASK"
+md_sed_folded "s/$T27_ADD_ANCHOR/; en mode **superviser**, GELER le nœud porteur (halte de nœud) · \`gaps_found\` → \`dag.sh reopen\`/" "$MFLOW" > "$T27_MUT_ADD_GEL"
 cat > "$T27_LICIT" <<'T27L'
 - **Verdict d'étape (rapport typé, ADR-053)** : `passed` → frontière suivante ·
   `human_needed` — déclenché par `gate="blocking-human"` amont OU par une précondition amont non
