@@ -51,20 +51,74 @@ Il annonce 3 mutants alors que 5 tournent. **Gelé volontairement** : le réécr
 disparaître une entrée de l'ensemble des libellés `ok`, seul invariant permettant de prouver d'une
 version à l'autre qu'aucune assertion n'a été retirée en douce. Les messages de KO restent exacts.
 
+## O-5 — Les mutants M2/M3 de T27 sont ancrés sur une tournure de prose (nœud `exec-01d`)
+
+Ancrés sur `en mode **superviser**, c` — une simple majuscule les rend **no-op**. Le garde `cmp -s`
+le dit fort, donc pas de faux vert : mais c'est un **rouge bruyant** sur une réécriture pourtant
+licite. Faut-il les réancrer, et sur quoi ? (Les autres mutants de la phase ont été réancrés sur
+des éléments **structurels** — entrée de table, token mesuré, intitulé de brique.)
+
+## O-6 — Cinq défauts re-dérivés pour quatre étiquettes historiques (nœud `exec-01d`)
+
+Le détail de **B2, B3, B7, M1** a disparu avec la mission fermée accidentellement ; seul l'énoncé
+de famille a survécu. La re-dérivation a produit **cinq** défauts, dont **un seul** est attribuable
+avec certitude (`T18`, nommé dans l'énoncé survivant). Les quatre autres — `T17`, `T23`,
+« T25 fermeture » sans compteur d'atteinte, `T21d` vert à vide — sont **fermés**, mais sans
+garantie qu'ils recouvrent B2/B3/B7/M1.
+
+**Question** : considère-t-on B2/B3/B7/M1 comme **soldées** par cette liste, ou consigne-t-on
+l'écart d'attribution comme dette de traçabilité ? *(Choix par défaut appliqué en attendant :
+l'écart est consigné ici, aucune étiquette n'est déclarée soldée par assimilation.)*
+
+## O-7 — Assertions au libellé plus fort que la mesure, laissées ouvertes (nœud `exec-01d`)
+
+`T10`, `T15`, `T7` (« new-project **encadré** »), `T25 présence`, `T22 captation` promettent une
+**relation** dans leur libellé et mesurent une **présence**. Non gatées **délibérément** : la seule
+relation mesurable serait une proximité de prose, donc une contrainte de rédaction imposée à tout
+futur auteur pour un gain marginal — exactement le coût que le point 5 documente. Une assertion
+cosmétique aurait été pire. À trancher : durcir, reformuler les libellés pour qu'ils cessent de
+sur-promettre, ou laisser en l'état.
+
 ---
 
-## Rappel — points 5 à 7 hérités du rapport du 2026-08-02
+## Points 5 à 7 — RÉINSTRUITS le 2026-08-02, chiffrés, non tranchés
 
-À réinstruire **après** la réécriture commandée par A-1bis..A-4, puisque ce sont ces réécritures
-qui subissent la contrainte. Statut à la clôture : voir le rapport de mission.
+Ils devaient être réinstruits **après** la réécriture commandée par A-1bis..A-4. C'est fait. Les
+faits ci-dessous permettent de décider s'ils partent en **dette assumée** ou s'ils sont **soldés**.
 
-5. **`rc=3` contraint la forme rédactionnelle** — une réécriture en prose sémantiquement correcte
-   du bloc Verdict rougit.
-6. **Porosité de T25** — une prescription rédigée avec une négation dans la même clause échappe.
-   Coût chiffré : ajouter `,` aux séparateurs ferme le trou et préserve les 6 fixtures, au prix
-   d'un seul faux rouge (négation avec incise). Écart actuellement orienté vers le **faux vert**.
-7. **Déclassement de T26 A′** — piste retenue : gater sur les **positions de clé JSON**, couplé à
-   un garde « ≥1 clé mesurée ou renvoi explicite ».
+### 5. `rc=3` contraint la forme rédactionnelle — **toujours vrai, et le diagnostic d'époque était incomplet**
+
+Le mode d'échec observé n'est pas `rc=3` mais **`rc=1`** (faux rouge dont le message *accuse la
+doctrine*) et **`rc=2`** (« rien n'a été mesuré »). Trois réécritures en prose sémantiquement
+complètes du bloc Verdict : P1 → 4 KO · P2 → 2 KO · P3 → 1 KO, et ce dernier n'est qu'un garde de
+no-op de mutant (cf. O-5). **La prose reste donc possible**, sous deux contraintes cumulatives :
+(1) chaque étiquette de statut mesurée doit être **immédiatement suivie** d'un marqueur
+(`→ ⇒ — – :`) ; (2) dès que la forme F1 s'applique, les deux motifs doivent être **après**
+l'étiquette — F1 court-circuite F2 et n'est jamais retentée.
+
+### 6. Porosité de T25 — **l'estimation d'époque doit être corrigée**
+
+Ajouter `,` aux séparateurs ne « ferme pas le trou » : il en ferme **3 formes sur 4** (celles à
+virgule) ; une négation étrangère **sans** virgule continue de passer. Le coût reste **un seul**
+faux rouge (négation avec incise, « JAMAIS, sous aucun prétexte, en mode … »), mais les fixtures
+sont désormais **11** (6 T25 + 5 T25b), pas 6 — et l'ajout les laisse **toutes** au même verdict
+(suite à 99 OK / 0 KO avec `,`). **Occurrences réelles aujourd'hui : 0 de part et d'autre** — la
+sonde voit 3 briques Plan/Exécution et 0 motif de mode à l'intérieur. **Le débat est entièrement
+prospectif** : l'écart penche vers le faux vert, sans faux vert constaté.
+
+### 7. Déclassement de T26 A′ — **la piste des positions de clé JSON rapporte peu**
+
+| Graphie | bloc `gate` | bloc `reprise` | total |
+|---|---|---|---|
+| stricte `"clé":` | 1 (`"gate":`) | **0** | **1** |
+| élargie `` `clé`: `` | 1 | 2 | 3 |
+
+En graphie **stricte** : une seule position mesurable et **zéro** sur le bloc `reprise` — le garde
+« ≥1 clé mesurée **ou** renvoi explicite » retomberait sur la branche « renvoi », c'est-à-dire sur
+le contrôle que T26 A′ effectue **déjà**. En graphie **élargie** : **1 faux rouge garanti
+aujourd'hui** (`` `tools:` `` est un champ de frontmatter YAML cité en prose, pas une clé JSON), et
+`statut` est un champ de **premier niveau** ADR-053, pas un sous-champ de `reprise` — l'accepter
+rouvrirait la liste à mailles finies que le déclassement avait justement fermée.
 
 ## Rappel — écarté pour ce plan, reversable au débat
 
