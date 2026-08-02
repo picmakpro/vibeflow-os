@@ -1807,6 +1807,7 @@ t21_analyzable_body() { # <file>
   "$GREP" -vE '^[[:space:]]*#' "$1" | t21_strip_awk_block | sed -E 's/[[:space:]]+#.*$//'
 }
 
+t21d_total_mktemp=0
 for T21_FILE in "$MOD/scripts/check-dev-bootstrap.sh" "$MOD/scripts/check-doc-drift.sh" "$MOD/scripts/discover-unintegrated-docs.sh"; do
   T21_NAME="$(basename "$T21_FILE")"
   if [ ! -f "$T21_FILE" ]; then
@@ -1840,14 +1841,31 @@ for T21_FILE in "$MOD/scripts/check-dev-bootstrap.sh" "$MOD/scripts/check-doc-dr
   fi
 
   # (d) chaque mktemp est apparié à au moins un trap ... EXIT dans le même fichier.
+  # LIMITE ASSUMÉE, dite plutôt que masquée : ce que grep peut mesurer ici, c'est « il existe un
+  # mktemp ⇒ il existe un trap », pas l'appariement un-à-un — un seul trap couvre légitimement
+  # plusieurs mktemp, et rien dans le texte ne relie tel trap à tel mktemp. La branche « ou aucun
+  # mktemp » est, elle, un VERT À VIDE : deux des trois scripts n'utilisent aucun mktemp, leur ok
+  # ne verrouille donc rien. Il n'est pas retiré (l'invariant reste vrai pour eux, et le libellé le
+  # déclare), mais il ne peut pas tenir lieu de garantie : le compteur d'atteinte ci-dessous exige
+  # qu'AU MOINS UN des scripts balayés exerce réellement la règle.
   t21d_mktemp_count=$(echo "$T21_BODY" | "$GREP" -c 'mktemp')
   t21d_trap_count=$(echo "$T21_BODY" | "$GREP" -cE 'trap.*EXIT')
+  t21d_total_mktemp=$((t21d_total_mktemp + t21d_mktemp_count))
   if [ "${t21d_mktemp_count:-0}" -gt 0 ] && [ "${t21d_trap_count:-0}" -eq 0 ]; then
     ko "T21d invariants SC5 : $T21_NAME — $t21d_mktemp_count mktemp sans trap ... EXIT"
   else
     ok "T21d invariants SC5 : $T21_NAME — mktemp ($t21d_mktemp_count) apparié à trap ... EXIT, ou aucun mktemp"
   fi
 done
+
+# T21d ATTEINTE — sans ce cas, la règle « mktemp ⇒ trap » pourrait être verte trois fois sur trois
+# sans avoir jamais été exercée : les trois ok se contenteraient de leur branche « ou aucun mktemp ».
+# C'est le vert à vide, décliné sur un balayage de scripts au lieu d'un balayage de doctrine.
+if [ "$t21d_total_mktemp" -gt 0 ]; then
+  ok "T21d atteinte : $t21d_total_mktemp mktemp effectivement vu(s) dans les 3 scripts balayés — la règle « mktemp ⇒ trap ... EXIT » est exercée au moins une fois, pas seulement satisfaite à vide"
+else
+  ko "T21d atteinte : AUCUN mktemp dans les 3 scripts balayés — les trois ok de T21d ne tiennent que par leur branche « ou aucun mktemp », la règle n'est exercée nulle part"
+fi
 
 # ---------------------------------------------------------------------------
 # T22 — Doctrine de sortie documentaire (phase 22, DOCF-01 → DOCF-04)
@@ -2385,10 +2403,13 @@ t25_forbidden_chain_hits() { # <file>
 # Variables de boucle PRÉFIXÉES : les deux balayages (T25 fermeture, T26 D) sont au niveau du
 # script — `local` y est illégal — et partageaient `f`/`h`, donc la valeur du premier survivait
 # dans le second.
-t25_real_hits=""; t25_scanned=0
+t25_real_hits=""; t25_scanned=0; t25_bricks=0
 while IFS= read -r t25_f; do
   [ -n "$t25_f" ] || continue
   t25_scanned=$((t25_scanned + 1))
+  # Compteur d'ATTEINTE (cf. T25 atteinte ci-dessous) : combien de briques Plan/Exécution l'ancre
+  # voit-elle RÉELLEMENT ? Compter les fichiers ouverts ne dit rien de ce qui a été mesuré dedans.
+  t25_bricks=$((t25_bricks + $(md_blocks_matching "$t25_f" "$T25_BRICK_RE" | "$GREP" -c .)))
   t25_h="$(t25_forbidden_chain_hits "$t25_f")"
   [ -n "$t25_h" ] && t25_real_hits="$t25_real_hits
 $t25_f: $t25_h"
@@ -2405,6 +2426,22 @@ else
   # une interdiction). Il n'est pas réécrit : mot pour mot, il est l'un des acquis dont la
   # stabilité sert de base de comparaison d'une exécution à l'autre.
   ok "T25 fermeture : $t25_scanned fichier(s) de doctrine balayé(s), aucun ne prescrit le mode d'enchaînement sur une brique Plan/Exécution"
+fi
+
+# T25 ATTEINTE — le volet fermeture est une garde NÉGATIVE : elle est verte quand aucun fichier ne
+# prescrit le mode, ET quand l'ancre de brique ne voit RIEN. Le compteur de FICHIERS ne distingue
+# pas les deux — il dit ce qui a été ouvert, jamais ce qui a été mesuré dedans. Une refonte future
+# des intitulés de briques (« **Étape 2 — planification** » au lieu de « **Plan** ») rendrait la
+# garde muette en silence, sur exactement le risque qu'elle prétend fermer. Même garde que celle
+# posée pour les motifs d'A-4 en T27c, ici sur l'ancre de brique.
+#
+# Assertion SÉPARÉE, jamais fondue dans le libellé de fermeture : celui-ci est un acquis gelé, dont
+# la stabilité mot pour mot sert de base de comparaison d'une exécution à l'autre.
+if [ "$t25_bricks" -gt 0 ]; then
+  ok "T25 atteinte : $t25_bricks brique(s) Plan/Exécution effectivement VUE(S) par l'ancre dans les $t25_scanned fichier(s) balayés — la garde de fermeture porte sur des cibles réelles, elle n'est pas verte à vide"
+else
+  ko "T25 atteinte : l'ancre de brique Plan/Exécution ne voit AUCUN bloc dans toute la doctrine du module ($t25_scanned fichier(s) ouverts) — la garde de fermeture est verte à vide, elle ne garantit rien"
+  t25_ok=0
 fi
 
 # volet discriminance (DISCRIMINANT, par mutation) — six fixtures dans un mktemp -d, trois qui
