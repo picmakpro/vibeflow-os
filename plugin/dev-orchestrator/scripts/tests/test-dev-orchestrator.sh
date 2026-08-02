@@ -2828,6 +2828,20 @@ t26_ids() { "$GREP" -oE '`[a-z][a-z0-9_]*`' | tr -d '`' | LC_ALL=C sort -u; }
 T26_INTERNAL_MULTI_RE='Completed[[:space:]]+Tasks|Current[[:space:]]+Task|Checkpoint[[:space:]]+Details|CHECKPOINT[[:space:]]+REACHED'
 T26_INTERNAL_RE="$T26_INTERNAL_MULTI_RE|Awaiting"
 
+# CINQUIÈME intitulé, à parité avec les quatre autres. `Awaiting` est le seul du contrat interne
+# amont (`execute-plan.md`: « 4) Awaiting (what's needed from user) ») qui tienne en UN mot — donc
+# le seul que la garde ne pouvait pas mesurer comme les autres sans faire rougir toute prose
+# anglaise. Elle se rabattait sur la ligne strictement nue `^Awaiting$` : quatre intitulés couverts
+# sur cinq, pendant que le libellé d'ok en promet cinq. Recopier `**Awaiting** : …` dans une
+# référence laissait la suite à 99 OK / 0 KO — la famille B6, restée ouverte sur ce motif.
+#
+# Ce qui est mesuré ici n'est donc PAS l'existence du token — c'est la POSITION DE RUBRIQUE : le
+# mot suivi du séparateur qui introduit son contenu (`:` ou `(`, la graphie de l'amont), ou porté
+# par un marqueur d'intitulé markdown (titre `#`, gras). De la prose anglaise qui contient le mot
+# reste verte (contrôle positif ET contrôle anti-faux-rouge en T26 D+). Aucun backtick dans le
+# motif : il est déréférencé entre guillemets doubles au point d'appel.
+T26_AWAITING_RE='Awaiting[*_]*[[:space:]]*[:(]|#[[:space:]]*[*_]*Awaiting([^[:alnum:]]|$)|[*][*][[:space:]]*Awaiting[[:space:]]*[*][*]'
+
 # Sous-champs FIXÉS par D-03, tenus comme un ENSEMBLE CLOS : D-03 dit « sont exactement … — rien
 # d'autre », donc l'ensemble MESURÉ doit être ÉGAL à celui-ci, jamais seulement le contenir. Un
 # renommage OU un ajout exige un amendement de D-03, pas un test qui suit.
@@ -2994,12 +3008,16 @@ fi
 # (contrôle positif à l'appui). Deux passes COMPLÉMENTAIRES, jamais l'une à la place de l'autre :
 #   1. LIGNE À LIGNE pour l'intitulé ANCRÉ `^Awaiting$` — l'ancre de ligne n'a plus de sens sur un
 #      fichier replié, et la dégrader en `Awaiting` nu ferait rougir toute prose anglaise ;
-#   2. FICHIER REPLIÉ (md_folded) + blancs ÉLASTIQUES pour les intitulés multi-mots.
+#   2. FICHIER REPLIÉ (md_folded) + blancs ÉLASTIQUES pour les intitulés multi-mots, ET pour
+#      `Awaiting` en POSITION DE RUBRIQUE ($T26_AWAITING_RE) — la passe 1 seule ne couvrait que
+#      la ligne strictement nue, donc aucune des graphies markdown sous lesquelles une recopie
+#      s'écrit réellement. La passe 1 est CONSERVÉE (elle capte la ligne nue, que la 2 ne voit
+#      pas) : les deux sont complémentaires, jamais l'une à la place de l'autre.
 # Urgence : A-3 vient d'élargir le minimum de reprise à la table des tâches faites — c'est-à-dire
 # de rouvrir la porte exacte que cette garde surveille.
 t26_internal_titles() { # <file> — imprime le fichier s'il reproduit un intitulé interne
   "$GREP" -lE '^Awaiting$' "$1" 2>/dev/null && return 0
-  md_folded "$1" | "$GREP" -qE "$T26_INTERNAL_MULTI_RE" && printf '%s\n' "$1"
+  md_folded "$1" | "$GREP" -qE "$T26_INTERNAL_MULTI_RE|$T26_AWAITING_RE" && printf '%s\n' "$1"
   return 0
 }
 t26_dup_hits=""; t26_scanned=0
@@ -3068,6 +3086,34 @@ if [ -n "$t26_e_ko" ]; then
   ko "T26 E (DISCRIMINANT) : une assertion ne rougit pas sur mutation —$t26_e_ko"; t26_ok=0
 else
   ok "T26 E (DISCRIMINANT) : intitulé interne détecté par D ; 3 mutants du contrat (champ interdit, renommage D-03, borne dégrassée) détectés par A, chacun prouvé différent de l'original ; contrat réel tenu"
+fi
+
+# D+ (CONTRÔLE POSITIF de la branche `Awaiting`) — la garde D est NÉGATIVE : elle est verte quand
+# aucun fichier ne reproduit d'intitulé, ET quand une de ses branches ne peut rien voir. Les quatre
+# intitulés multi-mots ont leur contrôle positif ($T26_FIXTURE, exercé par E) ; la branche
+# `Awaiting` n'en avait AUCUN — elle a donc pu rester des mois à ne couvrir que la ligne nue sans
+# qu'une seule exécution ne le dise. Trois fixtures, dans les deux sens :
+#   · deux RECOPIES qui doivent être vues — la graphie réellement produite par une duplication
+#     (`**Awaiting** : …`, coupée au pli pour rejouer B6) et la graphie titre (`### Awaiting`) ;
+#   · une PROSE ANGLAISE licite qui doit rester verte — c'est la justification écrite en tête de D
+#     (ne pas dégrader en `Awaiting` nu), désormais VÉRIFIÉE au lieu d'être seulement affirmée.
+T26_FIXTURE_AWAITING="$T26_TMPDIR/awaiting-rubrique-gras.md"
+T26_FIXTURE_AWAITING_TITRE="$T26_TMPDIR/awaiting-rubrique-titre.md"
+T26_LICIT_AWAITING="$T26_TMPDIR/awaiting-prose-anglaise.md"
+printf '## Rapport de reprise\n\n**Awaiting** : la rubrique du contrat interne amont, recopiée\ntelle quelle ici.\n' > "$T26_FIXTURE_AWAITING"
+printf '### Awaiting\n\nCe que le moteur attend de l'"'"'utilisateur.\n' > "$T26_FIXTURE_AWAITING_TITRE"
+printf 'Le nœud reste en attente. Awaiting the human answer, le manager ne tranche jamais seul.\n' > "$T26_LICIT_AWAITING"
+t26_aw_ko=""
+[ -n "$(t26_internal_titles "$T26_FIXTURE_AWAITING")" ] \
+  || t26_aw_ko="$t26_aw_ko [recopie sous graphie gras (« **Awaiting** : … ») NON détectée — la branche ne couvre toujours que la ligne nue]"
+[ -n "$(t26_internal_titles "$T26_FIXTURE_AWAITING_TITRE")" ] \
+  || t26_aw_ko="$t26_aw_ko [recopie sous graphie titre (« ### Awaiting ») NON détectée]"
+[ -z "$(t26_internal_titles "$T26_LICIT_AWAITING")" ] \
+  || t26_aw_ko="$t26_aw_ko [FAUX ROUGE : de la prose anglaise contenant le mot « Awaiting » est comptée comme une recopie de rubrique]"
+if [ -z "$t26_aw_ko" ]; then
+  ok "T26 D+ (CONTRÔLE POSITIF, branche Awaiting) : le 5e intitulé du contrat interne est mesuré à parité avec les 4 multi-mots — recopie vue sous graphie gras et sous graphie titre, prose anglaise épargnée"
+else
+  ko "T26 D+ (CONTRÔLE POSITIF, branche Awaiting) : la branche « Awaiting » de la garde D ne mesure pas ce que D annonce —$t26_aw_ko"; t26_ok=0
 fi
 
 [ "$t26_ok" -eq 1 ] && ok "T26 : minimum de reprise (ensemble mesuré = exactement les $T26_N noms de D-03), halte de nœud, réponse par le manager, garde anti-duplication discriminante par mutation"
