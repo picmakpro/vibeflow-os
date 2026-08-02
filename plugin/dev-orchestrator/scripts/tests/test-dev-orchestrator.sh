@@ -2418,6 +2418,15 @@ t25_forbidden_chain_hits() { # <file>
 # agent qui cesserait de prescrire `gsd_run` sortirait de la mesure sans qu'un seul KO ne le dise.
 T25_RESOLUTION_RE='Seuil[[:space:]]+de[[:space:]]+bascule'
 T25_UNAVAIL_RE='introuvable'
+# L'ANCRE EST LE GESTE, PAS LE TOKEN (N2). La sélection portait sur `gsd_run` : md_blocks_matching
+# rend alors la RÉUNION des blocs qui contiennent le token, quand le libellé d'ok promet, lui, que
+# chacun porte le renvoi « DANS le bloc qui le prescrit ». Renvoi et conduite déportés dans une
+# « ## Note d'outillage » arbitrairement loin du geste de cadrage restaient VERTS — le libellé
+# sur-promettait une relation que la sonde ne mesurait pas. L'ancre est donc l'appel RÉEL qui
+# désarme la fenêtre. Blancs ÉLASTIQUES : le wrap à 100 colonnes coupe `config-set` de sa clé dans
+# les DEUX agents (md_blocks_matching recolle en gardant l'indentation du pli). Point entre
+# CROCHETS et non échappé : cette ancre transite par `awk -v`, où `\.` est un échappement indéfini.
+T25_GESTE_RE='config-set[[:space:]]+workflow[.]_auto_chain_active'
 t25_presence_seen=0
 for t25_pf in "$DEVMGR" "$CODER_FILE"; do
   t25_pn="$(basename "$t25_pf")"
@@ -2429,9 +2438,9 @@ for t25_pf in "$DEVMGR" "$CODER_FILE"; do
   if "$GREP" -q 'RUNTIME_DIR' "$t25_pf"; then
     ko "T25 présence : $t25_pn recopie la cascade de résolution (RUNTIME_DIR) au lieu d'y renvoyer — DRY rompu"; t25_ok=0
   fi
-  t25_gblk="$(md_blocks_matching "$t25_pf" 'gsd_run')"
+  t25_gblk="$(md_blocks_matching "$t25_pf" "$T25_GESTE_RE")"
   if [ -z "$t25_gblk" ]; then
-    ko "T25 présence : $t25_pn ne résout pas gsd_run — aucun bloc ne le prescrit"; t25_ok=0; continue
+    ko "T25 présence : $t25_pn ne porte aucun bloc où le désarmement (gsd_run config-set workflow._auto_chain_active) est réellement prescrit — le renvoi de résolution et la conduite d'indisponibilité n'ont aucun geste auquel se rattacher"; t25_ok=0; continue
   fi
   t25_presence_seen=$((t25_presence_seen + 1))
   t25_rblk="$(printf '%s\n' "$t25_gblk" | "$GREP" -E "$T25_RESOLUTION_RE")"
@@ -2447,7 +2456,7 @@ done
 if [ "$t25_presence_seen" -eq 2 ]; then
   ok "T25 présence (2 agents) : vf-dev-manager.md et vf-coder.md prescrivent tous deux gsd_run, et chacun porte DANS le bloc qui le prescrit le renvoi de résolution (mission-contracts.md §Seuil de bascule) et la conduite si l'outil est introuvable — cascade jamais recopiée (DRY)"
 else
-  ko "T25 présence : $t25_presence_seen agent(s) sur 2 prescrivent réellement gsd_run — la sonde de renvoi et de conduite est verte à vide sur le ou les autres"; t25_ok=0
+  ko "T25 présence : $t25_presence_seen agent(s) sur 2 portent réellement le geste de désarmement (gsd_run config-set workflow._auto_chain_active) — la sonde de renvoi et de conduite est verte à vide sur le ou les autres"; t25_ok=0
 fi
 
 # volet fermeture (le cœur) : balayage réel des .md de doctrine, via les cibles RÉSOLUES. Le
