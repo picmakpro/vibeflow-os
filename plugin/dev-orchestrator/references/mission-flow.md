@@ -159,9 +159,34 @@ a consigne de ne piloter que sur le bloc typé, la prose libre est du volume mor
 - **`noeuds_debloques`** : les nœuds DAG que ce retour permet de marquer `done` → le manager fait
   `dag.sh mark` puis re-dispatche la nouvelle frontière.
 
-**Contrôle de flux du manager** (déterministe, plus d'interprétation de prose) :
-`passed` → `mark done` + frontière suivante · `gaps_found` → `reopen`/relance de comblement ·
-`human_needed` ou finding `ask-user` → **escalade humaine** · `blocked` → laisser `blocked`, traiter la dep.
+### Contrôle de flux du manager — table de pilotage (foyer UNIQUE)
+
+Déterministe, plus d'interprétation de prose. Cette table est l'énoncé **faisant autorité** : le
+`vf-dev-manager` y RENVOIE et ne la reformule pas (ADR-030, une seule voix). Elle a été déportée
+ici depuis l'agent (arbitrage A-4) — l'agent tenait 249/250 lignes du plafond ADR-029, une marge
+d'une ligne que huit plans restants auraient crevée ; rien de son sens n'a bougé au passage.
+
+- **Verdict d'étape (rapport typé, ADR-053)** : le `statut` du rapport de worker — recoupé au
+  `*-VERIFICATION.md` — pilote le flux de façon déterministe : `passed` → `dag.sh mark done` +
+  frontière suivante · `human_needed` — déclenché par `gate="blocking-human"` amont OU par une
+  précondition amont non satisfaite (`mission-contracts.md` §Contrat de checkpoint amont : une
+  règle, deux motifs), ou par tout finding `action: ask-user` — → **escalade départagée par le
+  MODE**, jamais tranchée seule : en mode **superviser**, c'est le manager qui **répond aux
+  attentes humaines** du moteur (checkpoint, garde-fou de reprise sûre) : il pose la question, il
+  attend, puis il redispatche `vf-coder` avec le champ `reprise` — qui transporte la réponse ET
+  les tâches faites, sans quoi le worker neuf retombe sur le même checkpoint
+  (`mission-contracts.md` §Minimum de reprise) —, avec le même filet de repli qu'au §Entrée de
+  l'agent si l'outil de question est indisponible au runtime ; en mode **autonome**, il n'y répond
+  JAMAIS à la place de l'utilisateur, absent par définition (ADR-031) : **GELER le nœud porteur,
+  halte de nœud, jamais de mission**, le laisser `blocked`/`failed`, ne poursuivre QUE les nœuds
+  indépendants, consigner la question au rapport · `gaps_found` → `dag.sh reopen` + UNE relance de
+  comblement via `vf-coder`, puis si les manques persistent : consigner et arbitrer · `blocked` →
+  laisser le nœud `blocked`, traiter la dépendance. Findings `action: auto-fix` → repartent à
+  `vf-coder` (jamais corrigés par le manager) ; `no-op` ignorés.
+- **Blocage** (étage en échec répété) : 3 options — réessayer l'étage · sauter l'étape (documenté)
+  · arrêter la mission (rapport partiel). En mode **autonome** : trancher via panel ; en mode
+  **superviser** : demander (AskUserQuestion) — même filet de repli si l'outil est indisponible au
+  runtime : `human_needed` au rapport, jamais d'auto-réponse.
 
 ---
 

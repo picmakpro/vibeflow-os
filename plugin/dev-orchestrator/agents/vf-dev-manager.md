@@ -157,27 +157,11 @@ embarque la DA en 3-5 lignes. Doctrine complète :
 
 ## Contrôle de flux (acquis à ne jamais perdre)
 
-- **Verdict d'étape (rapport typé, ADR-053)** : le `statut` du rapport de worker — recoupé au
-  `*-VERIFICATION.md` — pilote le flux de façon déterministe : `passed` → `dag.sh mark done` + frontière
-  suivante · `human_needed` — déclenché par `gate="blocking-human"` amont OU par une précondition
-  amont non satisfaite (`mission-contracts.md` §Contrat de checkpoint amont : une règle, deux
-  motifs), ou par tout finding `action: ask-user` — → **escalade départagée par le MODE**, jamais
-  tranchée seule (Pattern C) : en mode **superviser**, c'est toi qui **réponds aux attentes humaines**
-  du moteur (checkpoint, garde-fou de reprise sûre) : tu poses la question, tu attends, puis tu
-  redispatches `vf-coder` avec le champ `reprise` — qui transporte la réponse ET les tâches faites,
-  sans quoi le worker neuf retombe sur le même checkpoint (`mission-contracts.md` §Minimum de
-  reprise) —, même filet de repli qu'au §Entrée si l'outil de question est indisponible au
-  runtime ; en mode **autonome**, tu n'y réponds JAMAIS à la place de
-  l'utilisateur, absent par définition (ADR-031) : **GELER le nœud porteur, halte de nœud, jamais
-  de mission**, le laisser `blocked`/`failed`, ne poursuivre QUE les nœuds indépendants, consigner
-  la question au rapport ·
-  `gaps_found` → `dag.sh reopen` + UNE relance de comblement via `vf-coder`, puis si les manques
-  persistent : consigner et arbitrer · `blocked` → laisser le nœud `blocked`, traiter la dépendance.
-  Findings `action: auto-fix` → repartent à `vf-coder` (jamais corrigés par toi) ; `no-op` ignorés.
-- **Blocage** (étage en échec répété) : 3 options — réessayer l'étage · sauter l'étape
-  (documenté) · arrêter la mission (rapport partiel). Mode autonome : tranche via panel ;
-  mode superviser : demande (AskUserQuestion) — même filet de repli qu'en §Entrée si l'outil est
-  indisponible au runtime : `human_needed` au rapport, jamais d'auto-réponse.
+- **Table de pilotage — foyer UNIQUE** : `dev-orchestrator-references/mission-flow.md` §Pattern C,
+  « Contrôle de flux du manager ». Elle porte les 4 verdicts du rapport typé, l'escalade
+  `human_needed` **départagée par le mode** (superviser : tu réponds à l'attente humaine ;
+  autonome : gel du nœud, ADR-031), le sort des findings `auto-fix`/`no-op`, et le blocage répété.
+  Applique-la telle quelle — ne la reformule JAMAIS ici (ADR-030, une seule voix).
 - **Entre les étapes** : relis `.planning/ROADMAP.md` (étapes insérées en cours de route) et
   `.planning/STATE.md` (blockers). Marque chaque étape finie (STATE + case ROADMAP).
 - **Fin de milestone** (toutes étapes vertes ET périmètre = milestone complète) : enchaîne

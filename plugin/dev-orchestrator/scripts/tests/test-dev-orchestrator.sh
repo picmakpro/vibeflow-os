@@ -1777,13 +1777,19 @@ module_md_targets() {
 }
 
 # ---------------------------------------------------------------------------
-# T24 (tracer, D-01) — le mapping du checkpoint amont traverse référence → vf-coder →
-# vf-dev-manager. La règle est UNE règle à DEUX motifs : gate="blocking-human" OU précondition
+# T24 (tracer, D-01) — le mapping du checkpoint amont traverse mission-contracts → vf-coder →
+# table de pilotage. La règle est UNE règle à DEUX motifs : gate="blocking-human" OU précondition
 # amont non satisfaite ⇒ statut `human_needed`.
 #
+# DÉPLACEMENT DE CIBLE (A-4, déport). La cible C était le bloc « Verdict d'étape » de
+# vf-dev-manager.md ; ce bloc vit désormais dans mission-flow.md §Pattern C (« Contrôle de flux du
+# manager »), l'agent n'en garde qu'un renvoi. La sonde SUIT le bloc : une sonde restée sur
+# l'ancienne cible mesurerait un fichier où la clause n'habite plus — verte et morte, le mode
+# d'échec que cette phase a déjà produit. Le renvoi de l'agent est gaté à part (T27, volet renvoi).
+#
 # L'assertion mesure une RELATION, pas une co-présence. Exiger trois chaînes indépendantes dans un
-# bloc ne verrouille rien dès que le bloc énumère PLUSIEURS statuts : celui de vf-dev-manager fait
-# 14 lignes et couvre 4 verdicts — une doctrine disant l'INVERSE de D-01 (gate ⇒ gaps_found) y
+# bloc ne verrouille rien dès que le bloc énumère PLUSIEURS statuts : celui de la table de pilotage
+# couvre 4 verdicts — une doctrine disant l'INVERSE de D-01 (gate ⇒ gaps_found) y
 # satisfait les trois sondes par des phrases sans rapport entre elles.
 #
 # Les trois cibles n'écrivent PAS la règle sous la même forme rhétorique. Une sonde unique ne
@@ -1791,7 +1797,7 @@ module_md_targets() {
 # dont le fichier de RÉFÉRENCE, l'énoncé faisant autorité de D-01 : l'y inverser laissait la suite
 # à 87 OK / 0 KO. Deux formes sont reconnues, et une cible doit être couverte par l'une OU l'autre :
 #
-#   F1 — ÉNUMÉRATION « étiquette → mapping » (vf-dev-manager.md) : le statut OUVRE une entrée. On
+#   F1 — ÉNUMÉRATION « étiquette → mapping » (mission-flow.md §Pattern C) : le statut OUVRE une entrée. On
 #        isole le SEGMENT du bloc qui lui appartient et on exige les deux motifs DANS CE SEGMENT.
 #   F2 — IMPLICATION « prémisse ⇒ conséquent » (mission-contracts.md, vf-coder.md) : le statut est
 #        le CONSÉQUENT, les motifs sont AVANT lui — aucune entrée à isoler. On prend, pour CHAQUE
@@ -1907,7 +1913,7 @@ T24_ANCHOR_B='[*][*][`]gate[`][*][*]'
 T24_ANCHOR_C='[*][*]Verdict d'
 t24_assert "A (mission-contracts.md, §Règle unique de mapping)" "$CONTRACTS_FILE" "$T24_ANCHOR_A"
 t24_assert "B (vf-coder.md, bloc du champ gate)"                "$CODER_FILE"     "$T24_ANCHOR_B"
-t24_assert "C (vf-dev-manager.md, bloc Verdict d'étape)"        "$DEVMGR"         "$T24_ANCHOR_C"
+t24_assert "C (mission-flow.md, bloc Verdict d'étape)"          "$MFLOW"          "$T24_ANCHOR_C"
 
 # D (DISCRIMINANT) — cinq mutants + deux fixtures LICITES, couvrant les DEUX formes (F1 sur
 # vf-dev-manager.md, F2 sur mission-contracts.md et vf-coder.md). Ce que chaque cas prouve, sans le
@@ -1947,10 +1953,10 @@ T24_MUT_IMPL_REF="$T24_TMPDIR/mutant-implication-reference.md"
 T24_MUT_IMPL_CODER="$T24_TMPDIR/mutant-implication-coder.md"
 T24_LICIT="$T24_TMPDIR/licite-reformulee.md"
 T24_LICIT_CONTRASTE="$T24_TMPDIR/licite-contraste.md"
-sed 's/human_needed/gaps_found/g'      "$DEVMGR" > "$T24_MUT_STATUT"
-sed 's/blocking-human/blocking-auto/g' "$DEVMGR" > "$T24_MUT_GATE"
+sed 's/human_needed/gaps_found/g'      "$MFLOW" > "$T24_MUT_STATUT"
+sed 's/blocking-human/blocking-auto/g' "$MFLOW" > "$T24_MUT_GATE"
 sed -e 's/`human_needed`/`@@VFSWAP@@`/g' -e 's/`gaps_found`/`human_needed`/g' \
-    -e 's/`@@VFSWAP@@`/`gaps_found`/g' "$DEVMGR" > "$T24_MUT_RELATION"
+    -e 's/`@@VFSWAP@@`/`gaps_found`/g' "$MFLOW" > "$T24_MUT_RELATION"
 # Guillemets SIMPLES obligatoires : l'expression porte des backticks, qui seraient une substitution
 # de commande entre guillemets doubles. L'expansion de "$T24_INVERT_SED" n'est, elle, pas réévaluée.
 T24_INVERT_SED='s/`statut: "human_needed"`/`statut: "gaps_found"` — jamais `statut: "human_needed"`/'
@@ -1980,7 +1986,7 @@ t24_mut_ko=""
 # étiquettes ramenées au même jeton canonique, le multiset de tokens doit être IDENTIQUE de part et
 # d'autre. (Le cas « mutant identique à l'original » est traité par le garde commun ci-dessous.)
 t24_canon() { sed -e 's/human_needed/@VFST@/g' -e 's/gaps_found/@VFST@/g' "$1" | tr -cs '[:alnum:]_@' '\n' | LC_ALL=C sort; }
-if [ "$(t24_canon "$DEVMGR")" != "$(t24_canon "$T24_MUT_RELATION")" ]; then
+if [ "$(t24_canon "$MFLOW")" != "$(t24_canon "$T24_MUT_RELATION")" ]; then
   t24_mut_ko="$t24_mut_ko [mutant de relation : le multiset canonique de tokens a changé — ce n'est plus une mutation de relation pure]"
 fi
 
@@ -2001,14 +2007,14 @@ t24_assert_mutant_red() { # <libellé> <original> <mutant> <ancre ERE>
   esac
 }
 
-t24_assert_mutant_red "D1 VALEUR statut human_needed→gaps_found (F1)"          "$DEVMGR"         "$T24_MUT_STATUT"     "$T24_ANCHOR_C"
-t24_assert_mutant_red "D2 VALEUR gate blocking-human→blocking-auto (F1)"       "$DEVMGR"         "$T24_MUT_GATE"       "$T24_ANCHOR_C"
-t24_assert_mutant_red "D3 RELATION, aucun token retiré (F1)"                   "$DEVMGR"         "$T24_MUT_RELATION"   "$T24_ANCHOR_C"
+t24_assert_mutant_red "D1 VALEUR statut human_needed→gaps_found (F1)"          "$MFLOW"          "$T24_MUT_STATUT"     "$T24_ANCHOR_C"
+t24_assert_mutant_red "D2 VALEUR gate blocking-human→blocking-auto (F1)"       "$MFLOW"          "$T24_MUT_GATE"       "$T24_ANCHOR_C"
+t24_assert_mutant_red "D3 RELATION, aucun token retiré (F1)"                   "$MFLOW"          "$T24_MUT_RELATION"   "$T24_ANCHOR_C"
 t24_assert_mutant_red "D5 IMPLICATION inversée dans la RÉFÉRENCE (F2)"         "$CONTRACTS_FILE" "$T24_MUT_IMPL_REF"   "$T24_ANCHOR_A"
 t24_assert_mutant_red "D5' IMPLICATION inversée dans vf-coder.md (F2)"         "$CODER_FILE"     "$T24_MUT_IMPL_CODER" "$T24_ANCHOR_B"
 t24_maps_to_human_needed "$T24_LICIT"           "$T24_ANCHOR_C" || t24_mut_ko="$t24_mut_ko [D4 FAUX ROUGE : une reformulation LICITE en énumération est rejetée (rc=$?, $T24_WHY)]"
 t24_maps_to_human_needed "$T24_LICIT_CONTRASTE" "$T24_ANCHOR_A" || t24_mut_ko="$t24_mut_ko [D6 FAUX ROUGE : la forme à contraste explicite (⇒ human_needed — jamais gaps_found) est rejetée (rc=$?, $T24_WHY)]"
-t24_maps_to_human_needed "$DEVMGR"              "$T24_ANCHOR_C" || t24_mut_ko="$t24_mut_ko [le fichier réel ne tient plus l'assertion]"
+t24_maps_to_human_needed "$MFLOW"               "$T24_ANCHOR_C" || t24_mut_ko="$t24_mut_ko [le fichier réel ne tient plus l'assertion]"
 if [ -n "$t24_mut_ko" ]; then
   ko "T24 D (DISCRIMINANT) : l'assertion de mapping ne discrimine pas —$t24_mut_ko"; t24_ok=0
 else
@@ -2443,9 +2449,31 @@ fi
 "$GREP" -q 'reprise' "$CODER_FILE" || { ko "T26 B : vf-coder.md ne nomme pas le champ reprise"; t26_ok=0; }
 "$GREP" -qi 'jamais une réponse' "$CODER_FILE" || { ko "T26 B : vf-coder.md ne porte pas la règle « jamais une réponse de ta part »"; t26_ok=0; }
 
-# C — vf-dev-manager.md porte le halt DE NŒUD et la réponse par le manager.
-"$GREP" -q 'halte de nœud' "$DEVMGR" || { ko "T26 C : vf-dev-manager.md ne nomme pas le halt de nœud"; t26_ok=0; }
-"$GREP" -q 'réponds aux attentes humaines' "$DEVMGR" || { ko "T26 C : vf-dev-manager.md ne nomme pas le manager comme répondant aux attentes humaines"; t26_ok=0; }
+# C — la table de pilotage porte le halt DE NŒUD et la réponse par le manager. Cible SUIVIE :
+# depuis le déport A-4, les deux formules vivent dans mission-flow.md §Pattern C, plus dans
+# l'agent qui n'en garde qu'un renvoi — grepper encore vf-dev-manager.md serait une sonde morte.
+#
+# Deux durcissements par rapport à la forme précédente, aucun relâchement :
+#  1. la mesure porte sur le BLOC « Verdict d'étape » (lignes rejointes par md_blocks_matching),
+#     plus sur le fichier entier — les deux formules doivent être là où la doctrine les emploie.
+#     Un grep ligne à ligne était de surcroît à la merci du repli à 100 colonnes : la référence
+#     coupe « répond aux / attentes humaines » en deux lignes, ce qu'aucune sonde de doctrine ne
+#     doit pouvoir sanctionner. Les blancs INTERNES des formules sont donc élastiques
+#     ([[:space:]]+) : md_blocks_matching recolle les lignes SANS retirer leur indentation, une
+#     formule à cheval sur deux lignes se retrouve avec trois espaces au pli.
+#  2. la personne du verbe est tolérée (« répond » à la 3e dans la référence, « réponds » à la 2e
+#     dans une rédaction adressée au manager) : c'est la FORMULE qui est gatée, pas sa voix.
+T26_HALT_RE='halte[[:space:]]+de[[:space:]]+nœud'
+T26_ANSWER_RE='répond(s)?[[:space:]]+aux[[:space:]]+attentes[[:space:]]+humaines'
+t26_c_blk="$(md_blocks_matching "$MFLOW" "$T24_ANCHOR_C")"
+if [ -z "$t26_c_blk" ]; then
+  ko "T26 C : bloc « Verdict d'étape » introuvable dans mission-flow.md — rien n'a été mesuré"; t26_ok=0
+else
+  printf '%s\n' "$t26_c_blk" | "$GREP" -qE "$T26_HALT_RE" \
+    || { ko "T26 C : le bloc « Verdict d'étape » de mission-flow.md ne nomme pas le halt de nœud"; t26_ok=0; }
+  printf '%s\n' "$t26_c_blk" | "$GREP" -qE "$T26_ANSWER_RE" \
+    || { ko "T26 C : le bloc « Verdict d'étape » de mission-flow.md ne nomme pas le manager comme répondant aux attentes humaines"; t26_ok=0; }
+fi
 
 # D (NÉGATIVE) — aucun .md de doctrine du module (module_md_targets : agents de l'équipe +
 # références résolues) ne reproduit les intitulés du contrat interne de l'exécuteur amont. Le
@@ -2636,6 +2664,12 @@ fi
 # tension dans le mauvais sens, en répondant lui-même à une attente humaine (violation directe
 # d'ADR-031). L'absence de qualificatif était le défaut, pas une imprécision de style.
 #
+# CIBLE SUIVIE (déport A-4). La clause vivait dans vf-dev-manager.md ; elle a été déportée dans
+# mission-flow.md §Pattern C (« Contrôle de flux du manager ») pour rendre au plafond ADR-029 la
+# marge que l'agent n'avait plus (249/250). La sonde SUIT le bloc — la laisser sur l'agent en
+# ferait une sonde verte qui ne mesure plus rien. Le volet « renvoi » ci-dessous ferme l'autre
+# moitié du risque : que l'agent perde le pointeur vers le foyer.
+#
 # Ce qui est mesuré, DANS le segment du statut `human_needed` (même isolation que T24 F1 — un
 # qualificatif de mode posé sur un AUTRE verdict ne qualifie pas celui-ci) :
 #   (a) aucune clause disposant d'une attente humaine n'est MUETTE sur le mode ;
@@ -2644,11 +2678,21 @@ fi
 #       exactement l'inversion qui rouvre ADR-031.
 # La clause est bornée par « ; » et « · », les séparateurs de branche du bloc — jamais par « : »,
 # qui sépare l'annonce de sa disposition à l'INTÉRIEUR d'une même branche.
+#
+# Les deux personnes du verbe sont reconnues : la référence rédige à la 3e (« il pose la
+# question », « le manager répond aux attentes humaines »), une rédaction adressée au manager à la
+# 2e (« tu poses », « tu réponds »). Punir l'une des deux serait un faux rouge sur une rédaction
+# licite — la fixture L, qui est écrite à la 2e personne, le prouve à chaque exécution.
+#
+# Tous les blancs INTERNES des motifs sont élastiques ([[:space:]]+) : md_blocks_matching recolle
+# les lignes du bloc en conservant leur indentation, donc une formule coupée par le repli à 100
+# colonnes se retrouve avec plusieurs espaces au pli. Un motif à espace littéral ne rougirait pas
+# — il deviendrait AVEUGLE, ce qui est pire : la clause pourrait disparaître sans un seul KO.
 # ---------------------------------------------------------------------------
 t27_ok=1
 T27_MODE_RE='mode[[:space:]]+[*]*(superviser|autonome)'
-T27_ASK_RE='réponds aux attentes humaines|poses? la question|poser la question'
-T27_FREEZE_RE='GELER|halte de nœud|gèle le nœud|geler le nœud'
+T27_ASK_RE='répond(s)?[[:space:]]+aux[[:space:]]+attentes[[:space:]]+humaines|pose(s|r)?[[:space:]]+la[[:space:]]+question'
+T27_FREEZE_RE='GELER|halte[[:space:]]+de[[:space:]]+nœud|g(è|e)le[[:space:]]+le[[:space:]]+nœud|geler[[:space:]]+le[[:space:]]+nœud'
 T27_WHY=""
 
 t27_clauses() { awk '{ gsub(/;|·/, "\n"); print }'; }
@@ -2670,15 +2714,31 @@ t27_flow_modes() { # <file>
     || { T27_WHY="répondre à l'attente humaine (poser la question) n'est pas rattaché au mode SUPERVISER — en mode autonome, y répondre viole ADR-031"; return 1; }
   printf '%s\n' "$seg" | t27_clauses | "$GREP" -E "$T27_FREEZE_RE" | "$GREP" -qE 'mode[[:space:]]+[*]*autonome' \
     || { T27_WHY="le GEL du nœud n'est pas rattaché au mode AUTONOME — « toujours geler » interromprait aussi les sessions supervisées"; return 1; }
+
   return 0
 }
 
-t27_flow_modes "$DEVMGR"
+t27_flow_modes "$MFLOW"
 case $? in
   0) : ;;
-  2) ko "T27 (A-4) : vf-dev-manager.md — $T27_WHY"; t27_ok=0 ;;
-  *) ko "T27 (A-4) : vf-dev-manager.md — $T27_WHY"; t27_ok=0 ;;
+  2) ko "T27 (A-4) : mission-flow.md — $T27_WHY"; t27_ok=0 ;;
+  *) ko "T27 (A-4) : mission-flow.md — $T27_WHY"; t27_ok=0 ;;
 esac
+
+# Volet RENVOI (corollaire du déport) — l'agent ne porte plus la clause, il doit donc porter le
+# POINTEUR, et un pointeur qui ne nomme pas son foyer ne se suit pas. Deux exigences dans le MÊME
+# bloc du §Contrôle de flux : le fichier foyer et la section. Sans ce volet, un futur plan pourrait
+# supprimer le renvoi sans qu'aucune sonde ne bronche : la clause serait introuvable depuis l'agent
+# alors même que T27 resterait vert sur la référence.
+t27_renvoi_blk="$(md_blocks_matching "$DEVMGR" '[*][*]Table de pilotage')"
+if [ -z "$t27_renvoi_blk" ]; then
+  ko "T27 (A-4, renvoi) : vf-dev-manager.md ne porte aucun bloc de renvoi vers la table de pilotage — la clause déportée est devenue injoignable depuis l'agent"; t27_ok=0
+else
+  printf '%s\n' "$t27_renvoi_blk" | "$GREP" -q 'mission-flow.md' \
+    || { ko "T27 (A-4, renvoi) : le bloc de renvoi de vf-dev-manager.md ne nomme pas mission-flow.md"; t27_ok=0; }
+  printf '%s\n' "$t27_renvoi_blk" | "$GREP" -q 'Pattern C' \
+    || { ko "T27 (A-4, renvoi) : le bloc de renvoi de vf-dev-manager.md ne nomme pas la section (§Pattern C) — un renvoi au fichier entier n'est pas un renvoi"; t27_ok=0; }
+fi
 
 # Trois mutants + une fixture LICITE.
 #   M1 (RELATION, aucun token retiré) : les deux qualificatifs de mode sont ÉCHANGÉS. (a) reste
@@ -2695,9 +2755,9 @@ T27_MUT_QUESTION="$T27_TMPDIR/mutant-question-sans-mode.md"
 T27_LICIT="$T27_TMPDIR/licite-modes-en-clair.md"
 sed -e 's/mode \*\*superviser\*\*/mode **@@VFMODE@@**/g' \
     -e 's/mode \*\*autonome\*\*/mode **superviser**/g' \
-    -e 's/mode \*\*@@VFMODE@@\*\*/mode **autonome**/g' "$DEVMGR" > "$T27_MUT_SWAP"
-sed 's/en mode \*\*autonome\*\*, tu n/tu n/' "$DEVMGR" > "$T27_MUT_GEL"
-sed 's/en mode \*\*superviser\*\*, c/c/'     "$DEVMGR" > "$T27_MUT_QUESTION"
+    -e 's/mode \*\*@@VFMODE@@\*\*/mode **autonome**/g' "$MFLOW" > "$T27_MUT_SWAP"
+sed 's/en mode \*\*autonome\*\*, il n/il n/' "$MFLOW" > "$T27_MUT_GEL"
+sed 's/en mode \*\*superviser\*\*, c/c/'     "$MFLOW" > "$T27_MUT_QUESTION"
 cat > "$T27_LICIT" <<'T27L'
 - **Verdict d'étape (rapport typé, ADR-053)** : `passed` → frontière suivante ·
   `human_needed` — déclenché par `gate="blocking-human"` amont OU par une précondition amont non
@@ -2711,11 +2771,11 @@ t27_mut_ko=""
 # Preuve que M1 est une mutation de RELATION et non un effacement : une fois les deux qualificatifs
 # ramenés à un jeton canonique, le multiset de tokens doit être IDENTIQUE de part et d'autre.
 t27_canon() { sed -e 's/superviser/@VFMD@/g' -e 's/autonome/@VFMD@/g' "$1" | tr -cs '[:alnum:]_@' '\n' | LC_ALL=C sort; }
-[ "$(t27_canon "$DEVMGR")" = "$(t27_canon "$T27_MUT_SWAP")" ] \
+[ "$(t27_canon "$MFLOW")" = "$(t27_canon "$T27_MUT_SWAP")" ] \
   || t27_mut_ko="$t27_mut_ko [M1 : le multiset canonique de tokens a changé — ce n'est plus une mutation de relation pure]"
 
 t27_assert_mutant_red() { # <libellé> <mutant>
-  if cmp -s "$DEVMGR" "$2"; then
+  if cmp -s "$MFLOW" "$2"; then
     t27_mut_ko="$t27_mut_ko [$1 : mutant IDENTIQUE à l'original — le motif visé n'existe plus, la mutation n'a rien mordu (sonde à réancrer, ce n'est PAS un défaut de l'assertion)]"
     return
   fi
@@ -2730,7 +2790,7 @@ t27_assert_mutant_red "M1 RELATION : qualificatifs de mode ÉCHANGÉS, aucun tok
 t27_assert_mutant_red "M2 : branche de GEL sans qualificatif de mode"                     "$T27_MUT_GEL"
 t27_assert_mutant_red "M3 : branche de QUESTION sans qualificatif de mode"                "$T27_MUT_QUESTION"
 t27_flow_modes "$T27_LICIT" || t27_mut_ko="$t27_mut_ko [FAUX ROUGE : une reformulation LICITE (modes en clair, ordre inverse) est rejetée (rc=$?, $T27_WHY)]"
-t27_flow_modes "$DEVMGR"    || t27_mut_ko="$t27_mut_ko [le fichier réel ne tient plus l'assertion — $T27_WHY]"
+t27_flow_modes "$MFLOW"     || t27_mut_ko="$t27_mut_ko [le fichier réel ne tient plus l'assertion — $T27_WHY]"
 if [ -n "$t27_mut_ko" ]; then
   ko "T27 (A-4, DISCRIMINANT) : le départage gel/question par le mode n'est pas mesuré —$t27_mut_ko"; t27_ok=0
 else
