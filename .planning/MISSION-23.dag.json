@@ -76,7 +76,7 @@
         "plugin/dev-orchestrator/agents/vf-coder.md",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "revue-03",
@@ -89,7 +89,7 @@
         "plugin/dev-orchestrator/references/GSD-PIPELINE.md",
         "plugin/dev-orchestrator/agents/vf-coder.md"
       ],
-      "status": "blocked",
+      "status": "running",
       "review_regime": "full"
     },
     {
@@ -553,6 +553,30 @@
         "plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh"
       ],
       "status": "blocked"
+    },
+    {
+      "id": "summary-03",
+      "step": "23-03-SUMMARY.md — livrable exige par le <output> du plan, absent de files_modified donc non ecrit par exec-03",
+      "stage": "exec",
+      "deps": [
+        "exec-03"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-03-SUMMARY.md"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "arbitrage-o16",
+      "step": "O-16 RATIFICATION — gradation de recherche portee par la ligne PLAN et non CADRAGE (ecart a plan doublement re-valide, fait verifie deux fois)",
+      "stage": "arbitrage",
+      "deps": [
+        "exec-03"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/references/GSD-PIPELINE.md"
+      ],
+      "status": "ready"
     }
   ]
 }
