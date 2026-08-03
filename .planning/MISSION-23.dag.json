@@ -45,7 +45,7 @@
         "plugin/dev-orchestrator/hooks/hooks.json",
         ".planning/config.json"
       ],
-      "status": "done"
+      "status": "ready"
     },
     {
       "id": "revue-02",
@@ -59,7 +59,7 @@
         "plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh",
         "plugin/dev-orchestrator/hooks/hooks.json"
       ],
-      "status": "running",
+      "status": "blocked",
       "review_regime": "full"
     },
     {
@@ -403,7 +403,7 @@
       "scope": [
         "plugin/dev-orchestrator/scripts/check-gsd-config.sh"
       ],
-      "status": "ready"
+      "status": "blocked"
     },
     {
       "id": "alloc-blocs-test",
@@ -413,7 +413,7 @@
         "replan-03"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "plancheck-04",
@@ -423,7 +423,81 @@
         "replan-03"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
+    },
+    {
+      "id": "replan-03b",
+      "step": "23-03 : renumerotation T27 -> T33 (seule collision de la phase), suppression de la section QUESTION OUVERTE, + boilerplate de plage T24 a T33 dans 23-05..23-08",
+      "stage": "plan",
+      "deps": [
+        "alloc-blocs-test"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-03-PLAN.md",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-05-PLAN.md",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-06-PLAN.md",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-07-PLAN.md",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-08-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "replan-04",
+      "step": "amendement du plan 23-04 sur les 3 bloquants du plancheck (garde de fraicheur absente sur la copie versionnee, T28-C vert a vide, critere non exprimable) + 7 warnings",
+      "stage": "plan",
+      "deps": [
+        "plancheck-04"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-04-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-sessionstart-rce",
+      "step": "ARBITRAGE HUMAIN SECURITE — check-gsd-config.sh, cable sur SessionStart, resout sa cascade lab-first et fait require() par node -e d'un config.cjs du depot audite : un depot piege s'execute a chaque demarrage de session, et le || true masque tout. La cascade lab-first est PRESCRITE par le plan (VF_SCOPE=project legitime). Durcir comment ?",
+      "stage": "human",
+      "deps": [
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/check-gsd-config.sh"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "arbitrage-known-top",
+      "step": "ARBITRAGE HUMAIN — 'faux positif possible, jamais faux negatif' est FAUX : le script inclut configKeys et CONFIG_DEFAULTS que le moteur n'inclut pas dans KNOWN_TOP_LEVEL, donc il TAIT des cles que loadConfig signale (prouve sur _comment). Parite stricte (rouvre des faux positifs federes) ou limite reecrite honnetement ?",
+      "stage": "human",
+      "deps": [
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/check-gsd-config.sh"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "fix-ci-gsd-core",
+      "step": "ci.yml n'installe pas gsd-core : la suite test-check-gsd-config.sh sort 24 ok / 2 ko / exit 1 sur runner vierge. Installer gsd-core dans le job, JAMAIS degrader le ko (ce serait rouvrir le vert a vide). Verifier aussi test-check-gsd-engine.sh (23-01), meme trait probable",
+      "stage": "exec",
+      "deps": [
+        "exec-02"
+      ],
+      "scope": [
+        ".github/workflows/ci.yml"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "plancheck-05",
+      "step": "re-validation du plan 23-05 (AMENDE apres coup par la contrainte d'entree A-1ter geste 2 — obligatoire avant exec-05) + les 4 familles de defauts trouvees sur 23-02/03/04",
+      "stage": "plan",
+      "deps": [
+        "replan-04"
+      ],
+      "scope": [],
+      "status": "ready"
     }
   ]
 }
