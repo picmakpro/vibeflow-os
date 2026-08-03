@@ -311,6 +311,16 @@ libellé touché, et l'écart est matérialisé plutôt qu'assumé de mémoire.
 devient **sans objet** : à retirer, ou à remplacer par une garantie **runtime** — jamais à conserver
 vert. La contrainte est écrite dans `23-05-PLAN.md` §« Contrainte d'entrée (A-1ter geste 2) ».
 
+**Débordement d'allocation d'identifiants de bloc — constaté après coup (2026-08-03).**
+`23-01-PLAN.md:113-115` allouait `T24`, `T25`, `T26` à ce plan et `T27` au plan 23-03. L'exécution
+a posé `T24, T25, T25b, T25c, T26, T27, T27b, T27c` : les satellites `T25b`/`T25c` et surtout
+`T27`/`T27b`/`T27c` (A-4, B4-B5) sont sortis de l'allocation, et `T27` a été pris au plan 23-03.
+Le plan 23-03 a été **réattribué à `T33`** le 2026-08-03 — `T28`→`T32` restant revendiqués par
+23-04 à 23-07, et le décalage en cascade coûtant plus que la réattribution d'un seul plan. Aucun
+geste n'est repris ici : `23-01-PLAN.md` n'est pas réécrit, son allocation d'origine reste
+l'archive de ce qui était prévu. Motif complet dans `23-03-PLAN.md` §« Numérotation du bloc de
+test ».
+
 ## Densité restante — budget pour les plans 23-06 et 23-07
 
 - `vf-dev-manager.md` : **244 lignes** / plafond ADR-029 = 250 → **6 lignes de marge**. Le plan
