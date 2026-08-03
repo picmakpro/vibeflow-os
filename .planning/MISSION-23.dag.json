@@ -45,7 +45,7 @@
         "plugin/dev-orchestrator/hooks/hooks.json",
         ".planning/config.json"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "revue-02",
@@ -59,7 +59,7 @@
         "plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh",
         "plugin/dev-orchestrator/hooks/hooks.json"
       ],
-      "status": "blocked",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -75,7 +75,7 @@
         "plugin/dev-orchestrator/agents/vf-coder.md",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "revue-03",
@@ -403,7 +403,7 @@
       "scope": [
         "plugin/dev-orchestrator/scripts/check-gsd-config.sh"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "alloc-blocs-test",
@@ -463,7 +463,7 @@
       "scope": [
         "plugin/dev-orchestrator/scripts/check-gsd-config.sh"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "arbitrage-known-top",
@@ -475,7 +475,7 @@
       "scope": [
         "plugin/dev-orchestrator/scripts/check-gsd-config.sh"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "fix-ci-gsd-core",
@@ -487,7 +487,7 @@
       "scope": [
         ".github/workflows/ci.yml"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "plancheck-05",
