@@ -329,14 +329,17 @@ else ko "19 --quiet muselle stderr ; --hook n'altère aucun rendu (stdout identi
 # Interdit le « vert à vide » : un jeu de clés connues vide signalerait TOUT (donc code_review
 # serait signalé), un jeu universel ne signalerait RIEN (donc le bloc bidon passerait). Exiger les
 # deux à la fois prouve que le vrai moteur a bien été lu et discrimine.
-# Le script sous test résout son moteur sur une cascade à TROIS branches ; n'en essayer qu'une
-# (`$HOME`) déclarait « moteur introuvable » un poste qui a son gsd-core en node_modules. Les trois
-# branches sont donc essayées, dans le MÊME ORDRE que la cascade du script (premier trouvé gagne).
+# MIRROIR DE LA CASCADE DU SCRIPT — elle a DEUX branches, pas trois. La branche
+# <repo>/node_modules/@opengsd/gsd-core/bin/lib a été retirée du script (arbitrage A-10) : le
+# tarball npm range son payload sous un DOUBLE SEGMENT (.../gsd-core/gsd-core/bin/lib), le bin/lib
+# du niveau au-dessus ne porte pas config.cjs, et cette branche n'a donc jamais résolu — défaut
+# identique sur 1.8.0 et 1.9.0. La garder ICI ferait diverger le miroir du script : ce cas
+# résoudrait un moteur que le script sous test, lui, ne peut pas atteindre.
+# Branches essayées dans le MÊME ORDRE que la cascade du script (premier trouvé gagne).
 # `${HOME:-}` et non `$HOME` : cette suite tourne sous set -u.
 REPO_ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
 REAL_LIB=""
 for c in "$REPO_ROOT/.claude/gsd-core/bin/lib" \
-         "$REPO_ROOT/node_modules/@opengsd/gsd-core/bin/lib" \
          "${HOME:-}/.claude/gsd-core/bin/lib"
 do
   [ -z "$REAL_LIB" ] && [ -f "$c/config.cjs" ] && REAL_LIB="$c"
@@ -346,7 +349,7 @@ done
 # fermer. C'est une lacune d'INFRASTRUCTURE (installer @opengsd/gsd-core dans le job), pas un
 # assouplissement à consentir ici.
 if [ -z "$REAL_LIB" ]; then
-  ko "20 ATTEINTE sur le moteur réel" "moteur gsd-core introuvable sur les 3 branches (repo/.claude, repo/node_modules/@opengsd, \$HOME/.claude) — la suite ne peut pas prouver l'intégration ; installer le moteur dans l'environnement d'exécution"
+  ko "20 ATTEINTE sur le moteur réel" "moteur gsd-core introuvable sur les 2 branches de la cascade (repo/.claude, \$HOME/.claude) — la suite ne peut pas prouver l'intégration ; installer le moteur dans l'environnement d'exécution"
 else
   CFG_R="$(mk_config c20 '{ "workflow": { "code_review": true, "pattern_mapper": true, "node_repair": true, "node_repair_budget": 2, "ui_review": false }, "bloc_totalement_bidon": { "x": 1 } }')"
   out="$(VF_GSD_CORE_LIB="$REAL_LIB" VF_CONFIG_PATH="$CFG_R" bash "$SCRIPT" 2>/dev/null)"; rc=$?
@@ -422,7 +425,7 @@ if [ "$rc25" -eq 0 ] && [ "$before" = "$after" ]; then ok "25 lecture seule — 
 # une comparaison de longueurs. Les lignes de spread (`...VALID_CONFIG_KEYS`, `...DYNAMIC_KEY…`)
 # sont écartées : elles portent des quotes ('.') qui ne sont pas des littéraux de clé.
 if [ -z "$REAL_LIB" ]; then
-  ko "26 mirroir engineExtra contre le moteur réel" "moteur gsd-core introuvable sur les 3 branches de la cascade — installer le moteur dans l'environnement d'exécution (ne PAS dégrader ce cas en vert)"
+  ko "26 mirroir engineExtra contre le moteur réel" "moteur gsd-core introuvable sur les 2 branches de la cascade — installer le moteur dans l'environnement d'exécution (ne PAS dégrader ce cas en vert)"
 else
   CFG_X="$(mk_config c26 '{ "depth": 3, "branching_strategy": "phase", "cle_hors_mirroir": 1 }')"
   out="$(VF_GSD_CORE_LIB="$REAL_LIB" VF_CONFIG_PATH="$CFG_X" bash "$SCRIPT" 2>/dev/null)"; rc=$?
@@ -840,9 +843,14 @@ CALLS_SEEN="$TMP/calls-seen.txt"; CALLS_ALLOW="$TMP/calls-allow.txt"
 RX_SEEN="$TMP/rx-seen.txt";       RX_ALLOW="$TMP/rx-allow.txt"
 sort -u "$CALLOUT" > "$CALLS_SEEN"
 sort -u "$RXOUT"   > "$RX_SEEN"
-printf '%s\n' J RegExp Set String accept add balancedRegions call catch concat exec filter \
-  flatten for from has if indexOf isArray join jsLiteralToJSON keys lookup map parse push \
-  readFileSync readJSON readLiteral replace slice slurp some split stringify test while write \
+# openSync / fstatSync / isFile / closeSync sont la GARDE DE TYPE ET DE TAILLE (arbitrage A-14) :
+# elles appartiennent toutes les quatre à `fs`, dont le chargement cœur est déjà érodé plus haut, et
+# aucune ne charge de code. Elles sont ajoutées NOMMÉMENT, jamais par élargissement du critère : une
+# cinquième forme d'accès au système de fichiers devra à son tour être ajoutée à la main.
+printf '%s\n' J RegExp Set String accept add balancedRegions call catch closeSync concat exec \
+  filter flatten for from fstatSync has if indexOf isArray isFile join jsLiteralToJSON keys \
+  lookup map openSync parse push readFileSync readJSON readLiteral replace slice slurp some \
+  split stringify test while write \
   | sort -u > "$CALLS_ALLOW"
 { printf '%s\n' '/\s+/' '/\s/' '/\\'"'"'/g' '/,(\s*[}\]])/g'
   printf '%s\n' '/([A-Za-z_$][A-Za-z0-9_$]*)(\s*):/y'; } | sort -u > "$RX_ALLOW"
@@ -870,6 +878,272 @@ if [ "$extracted35" -eq 1 ] && [ "$lexsain35" -eq 1 ] \
    && [ -z "$calls_intrus" ] && [ -z "$rx_intrus" ]; then
   ok "35 CRITÈRE MACHINE — le programme node adresse $n_libpath chemins du moteur sans en charger aucun : après érosion de ses $n_core chargements cœur et de ses $n_procok accès process licites, le RÉSIDU des porteurs de chargement est VIDE, ses $n_calls noms appelés et ses $lex_nrx littéraux de regex sont tous dans la liste blanche"
 else ko "35 CRITÈRE MACHINE — résidu de chargement nul et noms appelés dans la liste blanche" "corps=$n_np lignes (plancher 100) src1=$has_src1 libpath=$n_libpath lexeur(marqueur@=$n_at chaine_ouverte=$lex_unterm etat=$lex_state regex_cassee=$lex_rxbad interpolation=$lex_tn) coeur=$n_core residu=$n_res Function=$n_bigF appels=$n_calls intrus=[$calls_intrus] regex=$lex_nrx regex_intrus=[$rx_intrus]"; fi
+
+# === Cas 36 — GARDE DE TYPE ET DE TAILLE : plus rien ne peut faire ATTENDRE le SessionStart ======
+# Le cas 34 prouve que le moteur n'est pas EXÉCUTÉ ; celui-ci prouve qu'il n'est pas non plus lu
+# n'importe comment. Ne pas exécuter ferme l'exécution de code, PAS le déni de service : une FIFO,
+# ou un lien vers /dev/zero, déposé sur une cible lue BLOQUAIT indéfiniment (mesuré : 4 des 6 cibles
+# atteignables ne terminaient jamais, tuées au bout du budget). Le `|| true` du hook ne raccourcit
+# pas une attente, et le contrat de sortie ne s'applique pas à un processus qui n'a pas fini.
+#
+# LA LISTE DES CIBLES EST DÉRIVÉE ($CIBLES), jamais recopiée — même raison qu'au cas 34 : une
+# huitième cible lue par une version future serait automatiquement piégée ici, au lieu d'échapper
+# au filet. L'ÉGALITÉ D'ENSEMBLE entre les cibles parcourues et les cibles dérivées est asserté.
+#
+# DEUX SENS DANS UN SEUL LAB, par cible — c'est ce qui interdit le « vert à vide » :
+#   (1) TÉMOIN SAIN : la cible est un fichier ordinaire et elle est la SEULE à porter un marqueur.
+#       Le marqueur doit être ÉPARGNÉ dans la sortie — donc la cible a bien été OUVERTE ET LUE à ce
+#       rang de cascade. Sans cette moitié, on piégerait des fichiers que le script n'ouvre jamais.
+#   (2) CIBLE PIÉGÉE : le MÊME lab, dont seul le TYPE de la cible change. Le run doit TERMINER sous
+#       le plafond, rester dans le contrat, et le verdict doit BASCULER (marqueur redevenu signalé,
+#       ou signal « moteur périmé » quand la cible était le dernier porteur de la source 1).
+#
+# Les rangs de cascade sont couverts, pas seulement les rangs 1 : chaque lab est construit pour que
+# la cible soit le PREMIER porteur de sa source, ce qui force le script à descendre jusqu'à elle.
+PLAFOND_S=3
+BUDGET_S=5
+MARQ="marqueur_lu_par_la_cible"
+
+# --- Chronomètre borné, portable (ni `timeout` ni `gtimeout` sur macOS) --------------------------
+# Le processus tourne en arrière-plan sous un CHIEN DE GARDE qui le tue au bout du budget. Un rc
+# >= 128 signifie « tué », donc NON TERMINÉ : c'est l'attente non bornée elle-même, et elle échoue.
+# La durée est mesurée en secondes entières via SECONDS — largement assez fin pour séparer
+# « immédiat » d'« infini », qui est la seule distinction que ce cas a besoin de faire.
+RB_OUT="$TMP/borne.out"; RB_RC=0; RB_SEC=0
+run_borne() { # <budget-s> <commande…>  -> RB_RC, RB_SEC, contenu dans $RB_OUT
+  local budget="$1"; shift
+  local t0=$SECONDS pid wd r
+  : > "$RB_OUT"
+  { "$@" >"$RB_OUT" 2>/dev/null & pid=$!
+    { sleep "$budget"; kill -9 "$pid"; } >/dev/null 2>&1 &
+    wd=$!
+    wait "$pid"; r=$?
+    kill "$wd"; wait "$wd"
+  } 2>/dev/null
+  RB_RC=$r; RB_SEC=$((SECONDS - t0))
+}
+
+# Contenus élémentaires du moteur factice. $1 = suffixe optionnel qui ajoute le marqueur.
+mo_valid() { printf "module.exports = { VALID_CONFIG_KEYS: new Set([ 'mode'%s ]), DYNAMIC_KEY_PATTERNS: [{ topLevel: 'agent_skills' }] };\n" "$1"; }
+mo_defs()  { printf "module.exports = { CONFIG_DEFAULTS: { mode: 'interactive'%s } };\n" "$1"; }
+mo_caps()  { printf "module.exports = { configKeys: { 'workflow.code_review': 'code-review'%s } };\n" "$1"; }
+
+# mk_lab_lecture <lab> <cible> — la cible est le PREMIER porteur de sa source ; tous les porteurs
+# ANTÉRIEURS sont muets (sinon la cascade s'arrêterait avant elle et la cible ne serait jamais lue)
+# et un porteur POSTÉRIEUR prend le relais (sinon le piège ne pourrait pas être distingué d'une
+# panne totale). config.cjs existe TOUJOURS : c'est le fichier que la cascade teste pour résoudre.
+mk_lab_lecture() {
+  local d="$1" c="$2" L S
+  rm -rf "$d"
+  L="$d/.claude/gsd-core/bin/lib"; S="$d/.claude/gsd-core/bin/shared"
+  mkdir -p "$d/.planning" "$L" "$S"
+  : > "$L/config-schema.cjs"; : > "$L/config-loader.cjs"
+  mo_caps  "" > "$L/capability-registry.cjs"
+  mo_valid "" > "$L/config.cjs"
+  mo_defs  "" > "$L/configuration.cjs"
+  case "$c" in
+    config-schema.manifest.json)   # source 1, rang 1
+      printf '{ "validKeys": ["mode", "%s"], "dynamicKeyPatterns": [{ "topLevel": "agent_skills" }] }\n' "$MARQ" > "$S/$c" ;;
+    config.cjs)                    # source 1, rang 2 — configuration.cjs prend le relais
+      mo_valid ", '$MARQ'" > "$L/config.cjs"
+      { mo_valid ""; mo_defs ""; } > "$L/configuration.cjs" ;;
+    config-schema.cjs)             # source 1, rang 4 — DERNIER porteur : aucun relais possible
+      mo_defs  "" > "$L/config.cjs"
+      mo_defs  "" > "$L/configuration.cjs"
+      mo_valid ", '$MARQ'" > "$L/config-schema.cjs" ;;
+    capability-registry.cjs)       # source 2, porteur unique
+      mo_caps ", '$MARQ': 'x'" > "$L/$c" ;;
+    config-defaults.manifest.json) # source 3, rang 1
+      printf '{ "mode": "interactive", "%s": 1 }\n' "$MARQ" > "$S/$c" ;;
+    configuration.cjs)             # source 3, rang 2 — config-loader.cjs prend le relais
+      mo_defs ", $MARQ: 1" > "$L/configuration.cjs"
+      mo_defs "" > "$L/config-loader.cjs" ;;
+    config-loader.cjs)             # source 3, rang 3 — config.cjs prend le relais
+      mo_valid "" > "$L/configuration.cjs"
+      { mo_valid ""; mo_defs ""; } > "$L/config.cjs"
+      mo_defs ", $MARQ: 1" > "$L/config-loader.cjs" ;;
+    TOUTES) : ;;                   # pire cas : toutes les cibles piégées d'un coup
+  esac
+  printf '{ "%s": 1, "sonde_36": { "x": 1 } }\n' "$MARQ" > "$d/.planning/config.json"
+}
+
+# TROIS PIÈGES, parce que la garde porte TROIS propriétés distinctes et qu'un seul piège n'en
+# exercerait qu'une. Ce n'est pas une précaution de principe, c'est mesuré :
+#   - `fifo`    → sans O_NONBLOCK, l'attente a lieu DANS l'ouverture, avant que le moindre fstat ait
+#                 pu refuser quoi que ce soit. AVEC O_NONBLOCK, lire une FIFO sans écrivain rend 0
+#                 octet immédiatement — la garde de TYPE, elle, n'est même pas sollicitée ici ;
+#   - `devzero` → un lien vers /dev/zero s'ouvre sans broncher, MÊME en non bloquant, et sa lecture
+#                 ne finit JAMAIS (flux infini, taille annoncée 0 : le plafond ne le voit pas
+#                 passer). C'est le SEUL piège que la garde de TYPE arrête, et rien d'autre ne
+#                 l'arrête. Mesuré : sans elle, lecture jamais terminée ;
+#   - `taille`  → un fichier parfaitement ordinaire, mais au-dessus du plafond.
+# Chacune des trois propriétés est donc individuellement opposable, et le mode --mutants les mute
+# séparément (m8, m9, m10) pour le prouver.
+#
+# config.cjs ne reçoit QUE le piège `taille` : c'est le seul fichier filtré par le `[ -f ]` de la
+# cascade, et ce test refuse aussi bien une FIFO qu'un lien vers un périphérique. Y poser l'un des
+# deux ferait échouer la RÉSOLUTION du moteur, pas la lecture — le piège porterait alors sur autre
+# chose que ce qu'on veut mesurer.
+piege_cible() {
+  local d="$1" c="$2" mode="$3" p
+  case "$c" in
+    *.json) p="$d/.claude/gsd-core/bin/shared/$c" ;;
+    *)      p="$d/.claude/gsd-core/bin/lib/$c" ;;
+  esac
+  [ -e "$p" ] || : > "$p"
+  case "$mode" in
+    taille)  { cat "$p"; awk 'BEGIN{ pad = sprintf("%1000s", ""); for (i = 0; i < 2600; i++) printf "// %s\n", pad }'; } > "$p.gros"
+             mv "$p.gros" "$p" ;;
+    fifo)    rm -f "$p"; mkfifo "$p" ;;
+    devzero) rm -f "$p"; ln -s /dev/zero "$p" ;;
+  esac
+}
+
+# Le piège `devzero` est INVÉRIFIABLE sans /dev/zero : plutôt qu'un vert obtenu par une
+# vérification plus faible, le cas sort en `ko` « non vérifiable » (même doctrine que le cas 31).
+DEVZERO_OK=0; [ -c /dev/zero ] && DEVZERO_OK=1
+
+# Vérifie UNE cible sous UN piège, sur un lab neuf : témoin sain d'abord (preuve que la cible est
+# réellement lue à ce rang de cascade), piège ensuite (preuve que la lecture est refusée et bornée).
+n_c36=0; ec36=""; sec36_max=0; n_pieges36=0
+VUES36="$TMP/cibles-vues-36.txt"; : > "$VUES36"
+verifie_cible() { # <cible> <mode>
+  local c="$1" mode="$2" lab sain piege
+  lab="$TMP/lab-lecture-$c-$mode"
+  mk_lab_lecture "$lab" "$c"
+  run_borne "$BUDGET_S" env -u VF_CONFIG_PATH -u VF_GSD_CORE_LIB bash "$SCRIPT" --path "$lab"
+  sain="$(cat "$RB_OUT")"
+  [ "$RB_RC" -eq 0 ] || ec36="$ec36 [$c/$mode temoin-rc=$RB_RC]"
+  case "$sain" in *sonde_36*) : ;; *) ec36="$ec36 [$c/$mode temoin-sonde-absente]" ;; esac
+  case "$sain" in *"$MARQ"*) ec36="$ec36 [$c/$mode marqueur-signale-au-temoin-donc-cible-JAMAIS-lue]" ;; esac
+
+  piege_cible "$lab" "$c" "$mode"
+  run_borne "$BUDGET_S" env -u VF_CONFIG_PATH -u VF_GSD_CORE_LIB bash "$SCRIPT" --path "$lab"
+  piege="$(cat "$RB_OUT")"
+  n_pieges36=$((n_pieges36+1))
+  [ "$RB_SEC" -gt "$sec36_max" ] && sec36_max="$RB_SEC"
+  [ "$RB_RC" -lt 128 ] || ec36="$ec36 [$c/$mode NON-TERMINE-tue-apres-${BUDGET_S}s]"
+  case "$RB_RC" in 0|3|64) : ;; *) ec36="$ec36 [$c/$mode piege-hors-contrat-rc=$RB_RC]" ;; esac
+  [ "$RB_SEC" -le "$PLAFOND_S" ] || ec36="$ec36 [$c/$mode duree=${RB_SEC}s>plafond=${PLAFOND_S}s]"
+  # Bascule attendue. config-schema.cjs est le DERNIER porteur de la source 1 : son piégeage ne
+  # laisse aucune clé connue, donc aucune comparaison — c'est le signal « moteur périmé » qui doit
+  # parler, et exiger le marqueur là serait exiger un fait que le script ne peut plus constater.
+  case "$c" in
+    config-schema.cjs)
+      case "$piege" in *"une source de clés connues n'a rien rendu"*) : ;; *) ec36="$ec36 [$c/$mode pas-de-signal-moteur-perime]" ;; esac ;;
+    *)
+      case "$piege" in *"$MARQ"*) : ;; *) ec36="$ec36 [$c/$mode marqueur-toujours-epargne-donc-piege-NON-OUVERT]" ;; esac ;;
+  esac
+}
+
+while IFS= read -r c36; do
+  [ -n "$c36" ] || continue
+  printf '%s\n' "$c36" >> "$VUES36"
+  if [ "$c36" = "config.cjs" ]; then
+    verifie_cible "$c36" taille
+  else
+    verifie_cible "$c36" fifo
+    [ "$DEVZERO_OK" -eq 1 ] && verifie_cible "$c36" devzero
+  fi
+  n_c36=$((n_c36+1))
+done < "$CIBLES"
+
+# Pire cas : toutes les cibles piégées d'un coup (FIFO partout, TAILLE sur config.cjs).
+mk_lab_lecture "$TMP/lab-lecture-TOUTES" TOUTES
+while IFS= read -r c36; do
+  [ -n "$c36" ] || continue
+  if [ "$c36" = "config.cjs" ]; then piege_cible "$TMP/lab-lecture-TOUTES" "$c36" taille
+  else piege_cible "$TMP/lab-lecture-TOUTES" "$c36" fifo; fi
+done < "$CIBLES"
+run_borne "$BUDGET_S" env -u VF_CONFIG_PATH -u VF_GSD_CORE_LIB bash "$SCRIPT" --path "$TMP/lab-lecture-TOUTES"
+tout36="$(cat "$RB_OUT")"
+[ "$RB_SEC" -gt "$sec36_max" ] && sec36_max="$RB_SEC"
+[ "$RB_RC" -lt 128 ] || ec36="$ec36 [TOUTES NON-TERMINE-tue-apres-${BUDGET_S}s]"
+case "$RB_RC" in 0|3|64) : ;; *) ec36="$ec36 [TOUTES hors-contrat-rc=$RB_RC]" ;; esac
+[ "$RB_SEC" -le "$PLAFOND_S" ] || ec36="$ec36 [TOUTES duree=${RB_SEC}s>plafond=${PLAFOND_S}s]"
+case "$tout36" in *"une source de clés connues n'a rien rendu"*) : ;; *) ec36="$ec36 [TOUTES pas-de-signal-moteur-perime]" ;; esac
+
+# Égalité d'ensemble : les cibles parcourues sont EXACTEMENT les cibles dérivées du script. Un
+# plancher de comptage seul laisserait passer une cible dérivée mais sautée par la boucle.
+sort -u "$VUES36" > "$TMP/vues36.sorted"
+oubliees36="$(comm -13 "$TMP/vues36.sorted" "$CIBLES" | tr '\n' ' ')"
+en_trop36="$(comm -23 "$TMP/vues36.sorted" "$CIBLES" | tr '\n' ' ')"
+if [ "$DEVZERO_OK" -ne 1 ]; then
+  ko "36 GARDE DE LECTURE" "/dev/zero absent ou non caractère : le piège qui exerce la garde de TYPE est INVÉRIFIABLE — cas non vérifiable, pas un succès (ne PAS dégrader en vert)"
+elif [ "$N_CIBLES" -ge 7 ] && [ "$n_c36" -eq "$N_CIBLES" ] && [ "$n_pieges36" -ge 13 ] \
+   && [ -z "$oubliees36" ] && [ -z "$en_trop36" ] && [ -z "$ec36" ]; then
+  ok "36 GARDE DE LECTURE — les $N_CIBLES cibles dérivées du script sont chacune prouvée LUE (marqueur épargné au témoin) puis piégée sous $n_pieges36 pièges (FIFO + lien vers /dev/zero, TAILLE pour config.cjs) : tous les runs TERMINENT (pire durée observée ${sec36_max}s, plafond ${PLAFOND_S}s), restent dans {0,3,64} et font BASCULER le verdict ; pire cas toutes cibles piégées inclus"
+else ko "36 GARDE DE LECTURE — aucune cible non ordinaire ou hors plafond ne doit faire attendre le SessionStart" "cibles=$N_CIBLES (plancher 7) parcourues=$n_c36 pieges=$n_pieges36 (plancher 13) oubliees=[$oubliees36] en_trop=[$en_trop36] pire_duree=${sec36_max}s echecs=[$ec36]"; fi
+
+# === Cas 37 — MOTEUR LU MAIS ILLISIBLE : le gate le DIT, il ne se tait plus (arbitrage A-9) ======
+# Le mode d'échec fermé ici est le plus vicieux de la lecture de texte, parce qu'il ne ressemble pas
+# à une panne. Quand une source cesse d'être lisible (manifeste déplacé, `new Set(VARIABLE)`,
+# défauts calculés), le script sortait en 3 — le MÊME code que « moteur introuvable » et que « lab
+# aligné » —, et le `|| true` du hook achevait de tout masquer : un gate périmé était silencieux, et
+# son silence ressemblait à un succès.
+#
+# Trois moitiés, et les trois sont nécessaires :
+#   (a) TOUTES les sources illisibles → un signal explicite, rc 0 ; contre un témoin lisible et
+#       aligné qui, lui, reste MUET en 3. Sans le témoin, un script qui crierait toujours passerait.
+#   (b) SOURCE 3 SEULE illisible → les toggles disent « état INCONNU », et surtout PAS « sans défaut
+#       lisible » : c'est l'affirmation FAUSSE qui était rendue avant. Le sens inverse est mesuré sur
+#       le moteur de base, où ui_review n'a réellement aucun défaut et doit garder l'autre formule.
+#   (c) CONFIG_DEFAULTS RÉELLEMENT VIDE → AUCUN signal de périmé. « Lu, et vide » est une donnée ;
+#       « pas lu » est une panne. Les confondre ferait crier au périmé sur un moteur parfaitement
+#       lisible, et un gate qui crie tout le temps ne se lit plus.
+ENG_CALC="$(mk_engine tout-calcule)"
+cat > "$ENG_CALC/config.cjs" <<'JS'
+const KEYS = buildKeys();
+module.exports = { VALID_CONFIG_KEYS: new Set(KEYS) };
+JS
+cat > "$ENG_CALC/capability-registry.cjs" <<'JS'
+module.exports = { configKeys: Object.assign({}, BASE_KEYS) };
+JS
+cat > "$ENG_CALC/configuration.cjs" <<'JS'
+module.exports = { CONFIG_DEFAULTS: { mode: resolveMode(), workflow: Object.assign({}, WF) } };
+JS
+CFG_37="$(mk_config c37 '{ "mode": "interactive" }')"
+out37a="$(VF_GSD_CORE_LIB="$ENG_CALC" VF_CONFIG_PATH="$CFG_37" bash "$SCRIPT" 2>/dev/null)"; rc37a=$?
+stale_a=0; case "$out37a" in *"une source de clés connues n'a rien rendu"*) stale_a=1 ;; esac
+# Les trois sources sont nommées : un signal qui n'en nommerait qu'une masquerait les deux autres.
+nomme3=1
+for s in VALID_CONFIG_KEYS configKeys CONFIG_DEFAULTS; do
+  case "$out37a" in *"$s"*) : ;; *) nomme3=0 ;; esac
+done
+# Témoin : moteur parfaitement lisible + lab aligné → silence total, exit 3 (le cas 3, rejoué ici
+# sur la même mécanique pour que ce cas ne puisse pas devenir un « signale toujours »).
+out37t="$(VF_GSD_CORE_LIB="$ENG" VF_CONFIG_PATH="$CFG_OK" bash "$SCRIPT" 2>/dev/null)"; rc37t=$?
+muet_t=1; case "$out37t" in *"n'a rien rendu"*) muet_t=0 ;; esac
+
+# (b) source 3 seule illisible — source 1 et source 2 restent celles du moteur de base.
+ENG_DEFCALC="$(mk_engine defauts-calcules)"
+cat > "$ENG_DEFCALC/configuration.cjs" <<'JS'
+module.exports = { CONFIG_DEFAULTS: { mode: resolveMode(), workflow: Object.assign({}, WF) },
+  DYNAMIC_KEY_PATTERNS: [{ topLevel: 'agent_skills' }] };
+JS
+out37b="$(VF_GSD_CORE_LIB="$ENG_DEFCALC" VF_CONFIG_PATH="$CFG_T" bash "$SCRIPT" 2>/dev/null)"; rc37b=$?
+ui37b="$(printf '%s\n' "$out37b" | awk '/ui_review/{print}')"
+dit_inconnu=0;  case "$ui37b" in *INCONNU*) dit_inconnu=1 ;; esac
+pas_absence=1;  case "$ui37b" in *"sans défaut lisible"*) pas_absence=0 ;; esac
+stale_b=0;      case "$out37b" in *"n'a rien rendu"*) stale_b=1 ;; esac
+# Sens inverse : sur le moteur de base, ui_review n'a VRAIMENT aucun défaut — la formule d'absence
+# doit rester, sinon le nouvel état aurait simplement remplacé l'ancien au lieu de s'en distinguer.
+out37base="$(VF_GSD_CORE_LIB="$ENG" VF_CONFIG_PATH="$CFG_T" bash "$SCRIPT" 2>/dev/null)"
+ui37base="$(printf '%s\n' "$out37base" | awk '/ui_review/{print}')"
+garde_absence=0; case "$ui37base" in *"sans défaut lisible"*) garde_absence=1 ;; esac
+pas_inconnu=1;   case "$ui37base" in *INCONNU*) pas_inconnu=0 ;; esac
+
+# (c) CONFIG_DEFAULTS réellement vide (ENG4, cas 22) → aucun signal de périmé.
+out37c="$(VF_GSD_CORE_LIB="$ENG4" VF_CONFIG_PATH="$CFG_U" bash "$SCRIPT" 2>/dev/null)"; rc37c=$?
+vide_muet=1; case "$out37c" in *"n'a rien rendu"*) vide_muet=0 ;; esac
+
+if [ "$rc37a" -eq 0 ] && [ "$stale_a" -eq 1 ] && [ "$nomme3" -eq 1 ] \
+   && [ "$rc37t" -eq 3 ] && [ -z "$out37t" ] && [ "$muet_t" -eq 1 ] \
+   && [ "$rc37b" -eq 0 ] && [ "$stale_b" -eq 1 ] && [ "$dit_inconnu" -eq 1 ] && [ "$pas_absence" -eq 1 ] \
+   && [ "$garde_absence" -eq 1 ] && [ "$pas_inconnu" -eq 1 ] \
+   && [ "$rc37c" -eq 0 ] && [ "$vide_muet" -eq 1 ]; then
+  ok "37 MOTEUR PÉRIMÉ — sources illisibles : signal explicite nommant les TROIS sources (exit 0, jamais un 3 muet) ; source 3 seule : toggles à l'état INCONNU au lieu d'une absence AFFIRMÉE, l'absence réelle gardant sa formule sur le moteur de base ; CONFIG_DEFAULTS vide mais LU : aucun cri au périmé"
+else ko "37 MOTEUR PÉRIMÉ — signal explicite, état INCONNU distinct d'une absence, et « lu et vide » distinct de « pas lu »" "a(rc=$rc37a signal=$stale_a trois_sources=$nomme3) temoin(rc=$rc37t muet=$muet_t out=[$out37t]) b(rc=$rc37b signal=$stale_b inconnu=$dit_inconnu pas_absence=$pas_absence ui=[$ui37b]) base(absence=$garde_absence pas_inconnu=$pas_inconnu ui=[$ui37base]) c(rc=$rc37c muet=$vide_muet)"; fi
 
 # === Cas 33 — BALAYAGE FINAL : aucun chemin ne sort du contrat {0, 3, 64} ========================
 # Filet transverse. Les cas ci-dessus assertent chacun UN rc attendu ; celui-ci rejoue TOUTES les
@@ -1004,6 +1278,31 @@ AWK
 { print }
 AWK
 
+  # m8 / m9 / m10 découpent la garde de lecture en ses TROIS propriétés et les mutent SÉPARÉMENT.
+  # Muter la garde d'un bloc laisserait croire qu'elle est un tout indivisible, alors que chacune
+  # des trois est individuellement porteuse : sans O_NONBLOCK, l'attente a lieu DANS l'ouverture et
+  # aucun fstat n'a jamais l'occasion de refuser quoi que ce soit — c'est la propriété la plus
+  # facile à supprimer par « simplification », et la seule dont la suppression laisse le code
+  # parfaitement plausible à la relecture.
+  cat > "$MUTD/m8.awk" <<'AWK'
+{ sub(/if \(!st\.isFile\(\) \|\| st\.size > MAX_LU\) return null;/, "if (st.size > MAX_LU) return null;"); print }
+AWK
+  cat > "$MUTD/m9.awk" <<'AWK'
+{ sub(/if \(!st\.isFile\(\) \|\| st\.size > MAX_LU\) return null;/, "if (!st.isFile()) return null;"); print }
+AWK
+  cat > "$MUTD/m10.awk" <<'AWK'
+{ sub(/fs\.openSync\(p, fs\.constants\.O_RDONLY \| O_NB\)/, "fs.openSync(p, fs.constants.O_RDONLY)"); print }
+AWK
+  # m11 / m12 rétablissent les deux silences qu'A-9 a fermés : le gate périmé qui se tait dans le
+  # code de « rien à signaler », et l'absence AFFIRMÉE là où les défauts n'ont pas pu être lus.
+  cat > "$MUTD/m11.awk" <<'AWK'
+/process\.stdout\.write\('ENGINE_STALE/ { print "  process.exit(3);"; next }
+{ print }
+AWK
+  cat > "$MUTD/m12.awk" <<'AWK'
+{ sub(/out\.push\('TOGGLE_UNREADABLE/, "out.push('TOGGLE_ABSENT"); print }
+AWK
+
   mutant m1 "34 35" "$MUTD/m1.awk" "require() rétabli dans readLiteral — la RCE d'origine"
   mutant m2 "34"    "$MUTD/m2.awk" "readLiteral n'accepte plus rien — le gate devient muet"
   mutant m3 "35"    "$MUTD/m3.awk" "chargement SANS effet observable — invisible au lab piégé"
@@ -1011,6 +1310,11 @@ AWK
   mutant m5 ""      "$MUTD/m5.awk" "réécriture LICITE (commentaire de bloc, chaîne, gabarit) nommant les interdits"
   mutant m6 "34"    "$MUTD/m6.awk" "script totalement MUET — le cas 34 n'est pas satisfaisable par un silence"
   mutant m7 "34 35" "$MUTD/m7.awk" "require ALIASÉ (const _load = require) — la régression qui rouvrait la RCE"
+  mutant m8  "36" "$MUTD/m8.awk"  "garde de TYPE retirée — un lien vers /dev/zero se lit sans fin"
+  mutant m9  "36" "$MUTD/m9.awk"  "plafond de TAILLE retiré — un fichier hors plafond est relu en entier"
+  mutant m10 "36" "$MUTD/m10.awk" "O_NONBLOCK retiré — l'attente reprend DANS l'ouverture, avant tout fstat"
+  mutant m11 "36 37" "$MUTD/m11.awk" "gate périmé re-rendu MUET — retour au 3 indistinguable de « rien à signaler »"
+  mutant m12 "37"    "$MUTD/m12.awk" "absence AFFIRMÉE là où les défauts n'ont pas pu être lus"
 fi
 
 echo ""

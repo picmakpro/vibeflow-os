@@ -44,17 +44,22 @@ jobs:
           # conditionnel, ni être entourés d'un `|| true` : ce serait rouvrir le « vert à vide » qu'ils
           # existent pour fermer. La cause se traite ICI, dans l'environnement d'exécution.
           #
-          # OÙ (cascade de check-gsd-config.sh, NON modifiée — trois branches, premier trouvé gagne) :
+          # OÙ (cascade de check-gsd-config.sh — DEUX branches, premier trouvé gagne) :
           #   1. <repo>/.claude/gsd-core/bin/lib             — ÉCARTÉE : ce dépôt ignore .claude/
           #      délibérément (« le repo est la SOURCE des modules, PAS un lab », .gitignore) ;
           #      y déposer le distribuable contredirait cette règle et déplacerait le GSD_HOME dérivé
           #      par check-gsd-engine.sh / ensure-deps.sh.
-          #   2. <repo>/node_modules/@opengsd/gsd-core/bin/lib — INATTEIGNABLE par `npm install` : le
-          #      paquet publié dépose son payload sous .../@opengsd/gsd-core/gsd-core/bin/lib
-          #      (mesuré sur 1.9.1). Un bin/lib existe bien à ce niveau, mais il ne contient que
-          #      ui-safety-gate.cjs — pas config.cjs. Cette branche ne résout donc rien.
-          #   3. $HOME/.claude/gsd-core/bin/lib               — CELLE-CI : c'est ce que pose
+          #   2. $HOME/.claude/gsd-core/bin/lib               — CELLE-CI : c'est ce que pose
           #      l'installeur officiel en scope global, et c'est la topologie d'un poste de dev réel.
+          #
+          # Une TROISIÈME branche existait, <repo>/node_modules/@opengsd/gsd-core/bin/lib, et elle a
+          # été RETIRÉE du script (arbitrage A-10). C'est ce job qui l'avait mesurée morte : le
+          # paquet publié dépose son payload sous .../@opengsd/gsd-core/gsd-core/bin/lib — DOUBLE
+          # SEGMENT. Un bin/lib existe bien un cran plus haut, mais il ne contient que
+          # ui-safety-gate.cjs, pas config.cjs : le `[ -f "$candidate/config.cjs" ]` de la cascade
+          # n'y a jamais réussi, sur aucune version (défaut identique 1.8.0 / 1.9.0). Ne pas la
+          # rétablir « au cas où » : elle ouvrirait une voie de résolution neuve pour un moteur non
+          # maîtrisé, au moment précis où l'on ferme un vecteur d'exécution de code.
           #
           # COMMENT : la commande du dépôt lui-même (ensure-deps.sh), plafond "^1" — dernier 1.x, mais
           # un saut de MAJEURE reste une décision humaine (arbitrage 2026-07-26, audit Phase 11).
@@ -71,6 +76,89 @@ jobs:
             fi
           done
           echo "== moteur GSD $(cat "$HOME/.claude/gsd-core/VERSION" 2>/dev/null || echo '?') résolu par la branche 3 de la cascade : $LIB =="
+
+      # ------------------------------------------------------------------------------------------
+      # CANARI DE FORME DU MOTEUR GSD (arbitrage A-9, voie c d'O-13)
+      #
+      # POURQUOI ICI ET PAS DANS UNE SUITE. Les scripts qui couplent ce dépôt au moteur GSD ne
+      # l'exécutent plus, ils le LISENT (arbitrage A-6). Le prix de cette mesure est qu'une lecture
+      # de texte ne suit AUCUNE indirection : le jour où le moteur déplace un manifeste, écrit
+      # `new Set(VARIABLE)` ou calcule ses défauts, l'extraction rend zéro. Le script le DIT
+      # désormais (signal « moteur périmé »), mais il le dit sur le poste de l'utilisateur, au
+      # SessionStart, sous le `|| true` du hook — c'est-à-dire au pire endroit possible. Ce canari
+      # déplace la détection ICI : il rougit à la première montée de version qui casse la forme
+      # lisible, avant que quiconque ne le découvre en session.
+      #
+      # CE QU'IL MESURE, ET POURQUOI IL NE PEUT PAS ÊTRE VERT À VIDE. Trois discriminants dans UN
+      # SEUL fichier audité, un par source de clés connues — un jeu de clés vide échouerait sur le
+      # premier, un jeu universel sur le second :
+      #   1. `bloc_canari_inexistant` DOIT être signalé  → source 1 (VALID_CONFIG_KEYS) lue, et
+      #      discriminante : elle ne reconnaît pas n'importe quoi ;
+      #   2. `workflow.ui_review`, ÉCRIT dans le fichier, ne doit PAS être signalé inconnu →
+      #      source 2 (configKeys du registre) lue : c'est la SEULE source où cette clé existe ;
+      #   3. au moins 3 toggles rendus « au défaut amont (valeur) » → source 3 (CONFIG_DEFAULTS)
+      #      lue AVEC ses valeurs. C'est le mode d'échec le plus vicieux : des défauts calculés
+      #      laissent le gate parler tout en affirmant des absences fausses.
+      #   4. AUCUN signal « moteur périmé » — la garde générale, qui couvre les trois sources.
+      #
+      # POINT D'EXTENSION — NOMMÉ, PAS IMPLÉMENTÉ. Un SECOND script du module,
+      # plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh, doit basculer lui aussi en
+      # lecture de texte (nœud voisin de la Phase 23) et aura EXACTEMENT le même besoin de canari.
+      # Quand ce sera fait : ajouter sa sonde DANS CETTE ÉTAPE, sous le même `set -eu` et le même
+      # bilan — surtout pas un second job, ni un `|| true`. Un canari qu'on peut contourner ne
+      # canarie rien.
+      - name: Canari de forme du moteur GSD (lecture de texte — check-gsd-config.sh)
+        run: |
+          set -eu
+          LAB="$(mktemp -d)"
+          mkdir -p "$LAB/.planning"
+          cat > "$LAB/.planning/config.json" <<'JSON'
+          { "bloc_canari_inexistant": { "x": 1 },
+            "workflow": { "ui_review": false } }
+          JSON
+
+          # La cascade du script est laissée faire (branche $HOME, posée à l'étape précédente) : le
+          # canari doit mesurer le chemin RÉEL, pas une surcharge d'environnement.
+          out="$(env -u VF_CONFIG_PATH -u VF_GSD_CORE_LIB bash plugin/dev-orchestrator/scripts/check-gsd-config.sh --path "$LAB" 2>/dev/null)" || rc=$?
+          rc="${rc:-0}"
+          echo "== sortie du gate (rc=$rc) =="
+          printf '%s\n' "$out"
+
+          fail=0
+          note() { echo "::error::canari de forme du moteur GSD : $1"; fail=$((fail + 1)); }
+
+          case "$rc" in 0|3|64) : ;; *) note "rc=$rc HORS du contrat de sortie {0, 3, 64}" ;; esac
+
+          case "$out" in
+            *"une source de clés connues n'a rien rendu"*)
+              note "le gate se déclare PÉRIMÉ sur le moteur installé — la forme du moteur a changé et la lecture de texte ne la suit plus. Corriger l'extraction dans check-gsd-config.sh ; ne PAS neutraliser ce canari." ;;
+          esac
+
+          case "$out" in
+            *bloc_canari_inexistant*) : ;;
+            *) note "source 1 (VALID_CONFIG_KEYS) : un bloc de premier niveau qui n'existe dans AUCUNE version du moteur n'est pas signalé — les clés connues ne sont plus lues, ou l'ensemble lu est devenu universel" ;;
+          esac
+
+          # La clé est cherchée SUR la ligne des sous-clés inconnues, jamais dans tout le blob : une
+          # co-présence (« inconnues » ici, « ui_review » trois lignes plus bas) ferait rougir le
+          # canari pour la mauvaise raison.
+          sub_line="$(printf '%s\n' "$out" | awk '/sous-clés inconnues/ { print }')"
+          case "$sub_line" in
+            *ui_review*)
+              note "source 2 (configKeys du registre de capabilities) : workflow.ui_review est signalé inconnu alors qu'il est ÉCRIT et légitime — c'est la seule source où cette clé existe, elle n'est donc plus lue" ;;
+          esac
+
+          n_def="$(printf '%s\n' "$out" | awk '/au défaut amont \(/ { n++ } END { print n+0 }')"
+          echo "== toggles rendus avec leur défaut amont : $n_def =="
+          if [ "$n_def" -lt 3 ]; then
+            note "source 3 (CONFIG_DEFAULTS) : seulement $n_def toggle(s) rendu(s) avec une valeur de défaut lue (plancher 3). Des défauts devenus calculés font AFFIRMER au gate des absences fausses."
+          fi
+
+          if [ "$fail" -ne 0 ]; then
+            echo "== canari ROUGE : $fail écart(s) entre la forme attendue du moteur et la forme lisible =="
+            exit 1
+          fi
+          echo "== canari VERT : les trois sources du moteur installé restent lisibles par extraction de texte =="
 
       - name: Découvrir et lancer toutes les suites
         run: |
