@@ -3824,5 +3824,412 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# T33 — Doctrine de flags de cycle : §9 de GSD-PIPELINE.md en ALLOWLIST STRICTE (Lacune 3, plan
+#       23-03 — D-05/D-06/D-08 et A-1ter) + D-21 sur le §1 (brique de livraison non empruntée).
+#
+# Numérotation : ce plan prescrivait T27, déjà consommé par 23-01 (T27/T27b/T27c). Collision
+# tranchée le 2026-08-03 — ce bloc prend T33, aucun autre plan ne bouge.
+#
+# POURQUOI CHAQUE ASSERTION MESURE UNE RELATION, JAMAIS UNE PRÉSENCE. Un token cherché « quelque
+# part dans le fichier » est vert sans rien garantir : il peut vivre dans une phrase qui dit le
+# contraire, dans une section sans rapport, ou y être DÉJÀ avant qu'une ligne soit écrite. Chaque
+# assertion est donc bornée à sa SECTION MATÉRIALISÉE et ancrée sur l'affirmation attendue —
+# entrée de table, cellule d'une entrée, co-présence sur une même ligne physique, ordre relatif.
+#
+#   A — la §9 existe COMME SECTION (bloc matérialisé non vide, titre porteur du mot flags).
+#   B — la clause de fermeture par défaut GOUVERNE la table : DANS la §9 et AVANT sa première
+#       ligne de table. Une clause posée après la table ne gouverne rien.
+#   C — les deux formes de gradation de la recherche vivent dans la CELLULE « flags autorisés »
+#       de l'entrée de table de la brique de plan, jamais dans la prose. Piège de l'infinitif :
+#       en français l'infinitif est la forme de l'INTERDICTION — « ne jamais passer --research »
+#       CONTIENT le flag tout en prescrivant le contraire de ce qu'on prétend prouver.
+#   D — renvoi croisé mesuré en co-présence sur UNE MÊME LIGNE physique de la §9, et
+#       non-duplication prouvée PAR LISTE (intersection des deux familles de flags vide), avec
+#       garde de non-vacuité sur la liste source — sans elle, une extraction cassée rend
+#       l'intersection vide et la preuve mensongère.
+#   E — vf-coder.md renvoie vers la doctrine DEPUIS le bloc Cadrage et sur la question de la
+#       recherche. Le nom du fichier ailleurs dans l'agent ne prouve rien.
+#   F — DISCRIMINANT : mutant privé de la SEULE clause de fermeture, table INTACTE.
+#   I — la ligne de cadrage porte, dans sa PROPRE cellule de motif, la marque de transitoire ET
+#       l'échéance nommée (plan 23-05). Une échéance reléguée en note de bas de page devient
+#       permanente au premier lecteur pressé — l'objet même d'A-1ter est qu'aucune autorisation
+#       ne soit plus accordée en silence.
+#   G — D-21 : la ligne de table de gsd-ship porte ELLE-MÊME l'ADR qui dit pourquoi la brique
+#       n'est pas empruntée. Compter le nom de la brique sur le fichier serait vert avant toute
+#       écriture — il y était déjà deux fois.
+#   H — DISCRIMINANT de G, par mutation.
+#
+# PREUVE DANS LES DEUX SENS pour chaque regex introduite ici : une fixture LICITE (l'affirmation
+# attendue, dans une autre graphie) qu'elle doit ACCEPTER, et une fixture de PROHIBITION bâtie
+# avec le MÊME vocabulaire qu'elle doit REJETER. Précédent coûteux de cette phase : un correctif
+# avait élargi une regex à l'infinitif, si bien qu'une PROHIBITION satisfaisait une assertion qui
+# exigeait une AFFIRMATION.
+# ---------------------------------------------------------------------------
+t33_ok=1; t33_ko=""
+T33_PIPE="$REFS_DIR/GSD-PIPELINE.md"
+T33_DOCSFLOW="$REFS_DIR/docs-flow.md"
+T33_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T33_TMPDIR"
+# Valeurs de repli des compteurs cités par le libellé : sous `set -u`, une cible manquante ne doit
+# pas faire TOMBER le script — elle doit produire un KO qui le dit.
+t33_s9_n=0; t33_first_table=0; t33_d_src=0; t33_s1_rows=0
+T33_S9_AVANT="$T33_TMPDIR/s9-avant-table.txt"; : > "$T33_S9_AVANT"
+
+# Section matérialisée, TITRE COMPRIS : l'assertion A porte sur le titre, il ne peut donc pas être
+# consommé par le `next` de l'ancre. Ancre ERE awk SANS backslash ([.] et pas \.), convention du
+# fichier (awk -v interprète les échappements avant la regex).
+t33_section() { # <fichier> <numéro de section> <fichier de sortie>
+  awk -v n="^## $2[.]" '$0 ~ n {f=1; print; next} /^## /{f=0} f' "$1" > "$3"
+}
+t33_nlines() { awk 'END{print NR+0}' "$1"; }               # jamais `wc -l <`, jamais un grep -c sur pipe
+# Imprime LA ligne de table dont la cellule <index> matche <ERE>, ou rien. L'index est explicite
+# parce qu'il DIFFÈRE d'une table à l'autre : la brique est en 1re cellule dans la §9, en 2e dans
+# la table du cycle canonique (§1, colonne « Brique gsd »). Matcher la ligne entière ferait passer
+# une mention tombée dans une cellule voisine.
+t33_row() { # <fichier de section> <ERE> [index de cellule, défaut 2 = 1re cellule]
+  awk -F'|' -v pat="$2" -v i="${3:-2}" '/^\| / && $i ~ pat {print; exit}' "$1"
+}
+t33_cell() { # <ligne de table> <index de champ awk -F'|'>
+  printf '%s\n' "$1" | awk -F'|' -v i="$2" '{print $i}'
+}
+
+# --- Regexes de la clause de fermeture, et leur contrat ---------------------------------------
+# PORTÉE : ce que la clause referme (« tout le reste », « tout flag non nommé »…). Sans elle, on
+# mesure une phrase qui parle de flags interdits sans rien fermer du tout.
+T33_SCOPE_RE='[Tt]out[[:space:]]+(le[[:space:]]+reste|flag[[:space:]]+non[[:space:]]+nomm|autre[[:space:]]+flag|ce[[:space:]]+qui[[:space:]]+n)'
+# FERMETURE À L'AFFIRMATIF : la copule est collée au participe. « n'est pas fermé par défaut »
+# donne « est pas fermé », qui ne matche pas — l'inversion par négation est rejetée sans garde.
+T33_CLOSE_RE='(est|sont|reste|restent)[[:space:]]+(interdit|interdits|interdite|interdites|fermé|fermés|fermée|fermées|clos)[[:space:]]+par[[:space:]]+défaut'
+# MÉTA-PROHIBITION : « ne jamais écrire que tout le reste est interdit par défaut » porte le même
+# vocabulaire ET la même syntaxe affirmative en subordonnée. Seul ce garde le distingue.
+T33_PROHIB_RE='[Nn]e[[:space:]]+(jamais|pas|plus)[[:space:]]+(écrire|dire|motiver|prescrire|présenter|poser|laisser|accorder|croire)'
+
+# rc=0 une clause de fermeture GOUVERNANTE est détectée dans <fichier> · rc=1 aucune.
+# Mesure par BLOC aplati (md_blocks_matching) : la clause est wrappée à 100 colonnes, et grep
+# travaille ligne à ligne — « est fermé par\ndéfaut » serait invisible sur le fichier brut.
+t33_closure_in() { # <fichier>
+  local blk
+  while IFS= read -r blk; do
+    [ -n "$blk" ] || continue
+    printf '%s\n' "$blk" | "$GREP" -qE "$T33_SCOPE_RE"  || continue
+    printf '%s\n' "$blk" | "$GREP" -qE "$T33_CLOSE_RE"  || continue
+    printf '%s\n' "$blk" | "$GREP" -qE "$T33_PROHIB_RE" && continue
+    return 0
+  done < <(md_blocks_matching "$1" '.')
+  return 1
+}
+
+# --- Fixtures de la clause, dans les DEUX SENS ------------------------------------------------
+t33_fx_n=0; t33_fx_licites=0; t33_fx_fautives=0
+t33_fixture() { # <libellé> <ATTENDU: vert|rouge> <texte>
+  local f
+  t33_fx_n=$((t33_fx_n + 1))
+  f="$T33_TMPDIR/fixture-cloture-$t33_fx_n.md"
+  printf '%s\n' "$3" > "$f"
+  if [ "$2" = "vert" ]; then
+    t33_fx_licites=$((t33_fx_licites + 1))
+    t33_closure_in "$f" \
+      || t33_ko="$t33_ko [FAUX ROUGE ($1) : une AFFIRMATION licite de fermeture est rejetée par la sonde — une regex qui punit une rédaction correcte nuit autant qu'une sonde aveugle]"
+  else
+    t33_fx_fautives=$((t33_fx_fautives + 1))
+    t33_closure_in "$f" \
+      && t33_ko="$t33_ko [FAUX VERT ($1) : une formulation FAUTIVE de même vocabulaire satisfait la sonde de fermeture]"
+  fi
+}
+t33_fixture "licite, graphie « tout flag non nommé »" vert \
+  "Fermeture par défaut : seuls les flags nommés dans la table sont utilisables, tout flag non nommé est fermé par défaut."
+t33_fixture "licite, graphie « tout le reste »" vert \
+  "Tout le reste reste interdit par défaut, y compris les flags que gsd-core ajoutera en amont."
+t33_fixture "fautive, INVERSION par négation (même vocabulaire)" rouge \
+  "Tout flag non nommé n'est pas fermé par défaut, y compris ceux que gsd-core ajoutera."
+t33_fixture "fautive, MÉTA-PROHIBITION à l'infinitif (même vocabulaire)" rouge \
+  "Ne jamais écrire que tout le reste est interdit par défaut."
+t33_fixture "fautive, vocabulaire présent mais AUCUNE portée refermée" rouge \
+  "Chaque brique porte des flags interdits par défaut."
+
+if [ ! -f "$T33_PIPE" ]; then
+  t33_ko="$t33_ko [$T33_PIPE introuvable — la doctrine de flags de cycle n'est pas mesurable]"
+else
+T33_S9="$T33_TMPDIR/s9.txt"; t33_section "$T33_PIPE" 9 "$T33_S9"
+T33_S1="$T33_TMPDIR/s1.txt"; t33_section "$T33_PIPE" 1 "$T33_S1"
+T33_S6="$T33_TMPDIR/s6.txt"; t33_section "$T33_PIPE" 6 "$T33_S6"
+t33_s9_n="$(t33_nlines "$T33_S9")"
+
+# --- A : la §9 existe COMME SECTION -----------------------------------------------------------
+if [ "$t33_s9_n" -lt 20 ]; then
+  t33_ko="$t33_ko [A : la §9 matérialisée fait $t33_s9_n ligne(s) (< 20) — section absente ou croupion, aucune des autres mesures ne vaut]"
+else
+  awk 'NR==1' "$T33_S9" | "$GREP" -qE '^## 9[.].*[Ff]lags' \
+    || t33_ko="$t33_ko [A : la première ligne du bloc n'est pas un titre « ## 9. … flags … » — l'ancre de section ne désigne pas la doctrine de flags]"
+fi
+
+# --- B : la clause de fermeture GOUVERNE la table ----------------------------------------------
+t33_first_table="$(awk '/^\| /{print NR; exit}' "$T33_S9")"
+: "${t33_first_table:=0}"
+if [ "$t33_first_table" -le 1 ]; then
+  t33_ko="$t33_ko [B : aucune ligne de table dans la §9 (première ligne « | » = $t33_first_table) — il n'y a pas d'allowlist à gouverner]"
+else
+  awk -v k="$t33_first_table" 'NR < k' "$T33_S9" > "$T33_S9_AVANT"
+  t33_closure_in "$T33_S9_AVANT" \
+    || t33_ko="$t33_ko [B : aucune clause de fermeture par défaut dans les $((t33_first_table - 1)) ligne(s) qui PRÉCÈDENT la première ligne de table — une clause absente, ou écrite après la table, ne gouverne rien : la §9 est une liste, pas une allowlist]"
+fi
+
+# --- C : la gradation de la recherche est une ENTRÉE DE TABLE, pas de la prose -----------------
+t33_row_plan="$(t33_row "$T33_S9" 'gsd-plan-phase')"
+if [ -z "$t33_row_plan" ]; then
+  t33_ko="$t33_ko [C : aucune ligne de table de la §9 dont la première cellule nomme gsd-plan-phase]"
+else
+  t33_cell_plan="$(t33_cell "$t33_row_plan" 3)"
+  printf '%s\n' "$t33_cell_plan" | "$GREP" -qF -- '--research' \
+    || t33_ko="$t33_ko [C : --research absent de la cellule « flags autorisés » de la brique de plan (le trouver ailleurs ne prouve rien : une prohibition à l'infinitif contient le flag)]"
+  printf '%s\n' "$t33_cell_plan" | "$GREP" -qF -- '--skip-research' \
+    || t33_ko="$t33_ko [C : --skip-research absent de la cellule « flags autorisés » de la brique de plan]"
+fi
+# Contre-épreuve de C, le piège nommé : les DEUX flags présents dans le fichier, mais uniquement
+# dans une PROHIBITION à l'infinitif, la cellule « flags autorisés » étant vide. Une assertion qui
+# les cherche « quelque part » est verte ici — et prouve exactement le contraire de ce qu'elle dit.
+T33_FX_C_KO="$T33_TMPDIR/fixture-c-fautive.md"
+{
+  printf '%s\n' "## 9. Flags de cycle — allowlist stricte"
+  printf '%s\n' "Ne jamais passer --research ni --skip-research à une brique de cycle."
+  printf '%s\n' "| Brique de cycle | Flags autorisés | Flags fermés | Motif |"
+  printf '%s\n' "|---|---|---|---|"
+  printf '%s\n' "| Plan — \`gsd-plan-phase\` | *(aucun)* | tout | fermé |"
+} > "$T33_FX_C_KO"
+T33_FX_C_S9="$T33_TMPDIR/fixture-c-fautive-s9.txt"; t33_section "$T33_FX_C_KO" 9 "$T33_FX_C_S9"
+t33_fx_c_cell="$(t33_cell "$(t33_row "$T33_FX_C_S9" 'gsd-plan-phase')" 3)"
+t33_fx_fautives=$((t33_fx_fautives + 1))
+if printf '%s\n' "$t33_fx_c_cell" | "$GREP" -qF -- '--research'; then
+  t33_ko="$t33_ko [FAUX VERT (C, flags en PROHIBITION seule) : la mesure lit hors de la cellule « flags autorisés » — une interdiction satisferait l'assertion qui exige une autorisation]"
+fi
+
+# --- I : marque transitoire ET échéance, dans la CELLULE DE MOTIF de la ligne de cadrage -------
+# Contrat des deux regexes ci-dessous : la marque doit être AFFIRMÉE sur cette ligne. Une
+# méta-prohibition de même vocabulaire (« ne jamais présenter cette autorisation comme
+# transitoire… ») porte les deux tokens et doit être REJETÉE — d'où le garde partagé.
+T33_TRANSIT_RE='[Tt]ransitoire'
+T33_ECHEANCE_RE='23-05'
+t33_transit_ok() { # <cellule de motif>
+  printf '%s\n' "$1" | "$GREP" -qE "$T33_TRANSIT_RE"  || return 1
+  printf '%s\n' "$1" | "$GREP" -qE "$T33_ECHEANCE_RE" || return 1
+  printf '%s\n' "$1" | "$GREP" -qE "$T33_PROHIB_RE"   && return 1
+  return 0
+}
+t33_row_cadrage="$(t33_row "$T33_S9" 'gsd-discuss-phase')"
+if [ -z "$t33_row_cadrage" ]; then
+  t33_ko="$t33_ko [I : aucune ligne de table de la §9 dont la première cellule nomme gsd-discuss-phase]"
+else
+  t33_cell_cadrage="$(t33_cell "$t33_row_cadrage" 5)"
+  t33_transit_ok "$t33_cell_cadrage" \
+    || t33_ko="$t33_ko [I : la cellule de MOTIF de la ligne de cadrage ne porte pas, sur elle-même, la marque de transitoire ET l'échéance nommée (plan 23-05) — une autorisation dont l'échéance vit ailleurs devient permanente par oubli (A-1ter)]"
+fi
+# Fixtures de la marque transitoire, dans les deux sens.
+t33_fx_transit() { # <libellé> <ATTENDU: vert|rouge> <cellule>
+  if [ "$2" = "vert" ]; then
+    t33_fx_licites=$((t33_fx_licites + 1))
+    t33_transit_ok "$3" || t33_ko="$t33_ko [FAUX ROUGE ($1) : une marque de transitoire licite est rejetée]"
+  else
+    t33_fx_fautives=$((t33_fx_fautives + 1))
+    t33_transit_ok "$3" && t33_ko="$t33_ko [FAUX VERT ($1) : une cellule FAUTIVE satisfait la marque de transitoire]"
+  fi
+}
+t33_fx_transit "licite, autre graphie de la marque" vert \
+  " Autorisation transitoire, elle périme au plan 23-05 dès que le manager porte le cadrage. "
+t33_fx_transit "fautive, échéance SANS marque de transitoire" rouge \
+  " Autorisation ouverte, revue au plan 23-05 si le besoin se confirme. "
+t33_fx_transit "fautive, marque SANS échéance nommée" rouge \
+  " Autorisation transitoire, à refermer dès qu'un correctif structurel existe. "
+t33_fx_transit "fautive, MÉTA-PROHIBITION de même vocabulaire" rouge \
+  " Ne jamais présenter cette autorisation comme transitoire ni la dater du plan 23-05. "
+
+# --- D : renvoi croisé en CO-PRÉSENCE sur une même ligne, non-duplication PAR LISTE ------------
+T33_RENVOI="$T33_TMPDIR/renvoi.txt"
+"$GREP" -F 'docs-flow.md' "$T33_S9" > "$T33_TMPDIR/renvoi-brut.txt" 2>/dev/null
+"$GREP" -F 'ADR-057' "$T33_TMPDIR/renvoi-brut.txt" > "$T33_RENVOI" 2>/dev/null
+[ "$(t33_nlines "$T33_RENVOI")" -ge 1 ] \
+  || t33_ko="$t33_ko [D positif : aucune ligne PHYSIQUE de la §9 ne porte à la fois docs-flow.md et ADR-057 — deux comptes indépendants sur le fichier seraient satisfaits par des occurrences sans rapport, y compris hors §9]"
+
+t33_inter_count() { # <fichier de doctrine documentaire> <fichier de pipeline> — imprime "<inter> <source>"
+  local a b
+  a="$T33_TMPDIR/flags-docs-$3.txt"; b="$T33_TMPDIR/flags-pipe-$3.txt"
+  "$GREP" -oE -- '--[a-z][a-z0-9-]*' "$1" | sort -u > "$a"
+  "$GREP" -oE -- '--[a-z][a-z0-9-]*' "$2" | sort -u > "$b"
+  comm -12 "$a" "$b" > "$T33_TMPDIR/inter-$3.txt"
+  printf '%s %s\n' "$(t33_nlines "$T33_TMPDIR/inter-$3.txt")" "$(t33_nlines "$a")"
+}
+if [ ! -f "$T33_DOCSFLOW" ]; then
+  t33_ko="$t33_ko [D négatif : docs-flow.md introuvable — la non-duplication documentaire n'est pas mesurable, et une intersection vide ne prouverait rien]"
+else
+  t33_d_res="$(t33_inter_count "$T33_DOCSFLOW" "$T33_PIPE" reel)"
+  t33_d_inter="${t33_d_res%% *}"; t33_d_src="${t33_d_res##* }"
+  [ "$t33_d_src" -ge 3 ] \
+    || t33_ko="$t33_ko [D négatif, VERT À VIDE : seulement $t33_d_src flag(s) extrait(s) de docs-flow.md (< 3) — l'extraction est cassée, l'intersection vide ne prouve rien]"
+  [ "$t33_d_inter" -eq 0 ] \
+    || t33_ko="$t33_ko [D négatif : $t33_d_inter flag(s) de la famille documentaire recopié(s) dans GSD-PIPELINE.md — deux voix sur une même capacité (ADR-057)]"
+  # Contre-épreuve : une duplication RÉELLE doit faire rougir la mesure. Sans elle, « intersection
+  # vide » pourrait n'être qu'un comm mal appelé.
+  T33_MUT_DUP="$T33_TMPDIR/mutant-duplication.md"
+  t33_dup_flag="$(awk 'NR==1' "$T33_TMPDIR/flags-docs-reel.txt")"
+  { cat "$T33_PIPE"; printf '\nFlag documentaire recopie : %s\n' "$t33_dup_flag"; } > "$T33_MUT_DUP"
+  if cmp -s "$T33_PIPE" "$T33_MUT_DUP"; then
+    t33_ko="$t33_ko [D négatif : mutant de duplication IDENTIQUE à l'original — rien n'a été mesuré, sonde à réancrer]"
+  else
+    t33_fx_fautives=$((t33_fx_fautives + 1))
+    t33_d_mut="$(t33_inter_count "$T33_DOCSFLOW" "$T33_MUT_DUP" mutant)"
+    [ "${t33_d_mut%% *}" -ge 1 ] \
+      || t33_ko="$t33_ko [D négatif NON DISCRIMINANT : une recopie réelle de $t33_dup_flag laisse l'intersection vide — la mesure ne verrait aucune duplication]"
+  fi
+fi
+# Fixtures du volet POSITIF, dans les deux sens : la co-présence doit tenir sur UNE ligne.
+t33_co_presence_ok() { # <fichier>
+  "$GREP" -F 'docs-flow.md' "$1" 2>/dev/null | "$GREP" -qF 'ADR-057'
+}
+T33_FX_RENVOI_OK="$T33_TMPDIR/fixture-renvoi-licite.md"
+printf '%s\n' "Les flags documentaires sont doctrinés par docs-flow.md et ne sont pas redits ici (ADR-057)." > "$T33_FX_RENVOI_OK"
+t33_fx_licites=$((t33_fx_licites + 1))
+t33_co_presence_ok "$T33_FX_RENVOI_OK" \
+  || t33_ko="$t33_ko [FAUX ROUGE (renvoi croisé, autre graphie) : une co-présence licite sur une seule ligne est rejetée]"
+T33_FX_RENVOI_KO="$T33_TMPDIR/fixture-renvoi-fautive.md"
+printf '%s\n%s\n' "Les flags documentaires sont doctrinés par docs-flow.md." "Une capacité, une seule voix (ADR-057)." > "$T33_FX_RENVOI_KO"
+t33_fx_fautives=$((t33_fx_fautives + 1))
+t33_co_presence_ok "$T33_FX_RENVOI_KO" \
+  && t33_ko="$t33_ko [FAUX VERT (renvoi croisé éclaté sur DEUX lignes) : la mesure accepte deux mentions sans rapport l'une avec l'autre]"
+
+# --- F : DISCRIMINANT de B, par mutation — clause retirée, TABLE INTACTE -----------------------
+# Le mutant retire le PARAGRAPHE porteur de la clause (run de lignes non vides), rien d'autre :
+# muter la table ferait rougir B pour la mauvaise raison.
+T33_MUT_CLAUSE="$T33_TMPDIR/mutant-sans-clause.md"
+awk -v scope="$T33_SCOPE_RE" '
+  { l[NR] = $0 }
+  END {
+    s = 0; e = 0
+    for (i = 1; i <= NR; i++) {
+      if (l[i] ~ scope) {
+        s = i; while (s > 1 && l[s-1] !~ /^[[:space:]]*$/) s--
+        e = i; while (e < NR && l[e+1] !~ /^[[:space:]]*$/) e++
+        break
+      }
+    }
+    for (i = 1; i <= NR; i++) if (i < s || i > e) print l[i]
+  }' "$T33_PIPE" > "$T33_MUT_CLAUSE"
+if cmp -s "$T33_PIPE" "$T33_MUT_CLAUSE"; then
+  t33_ko="$t33_ko [F : mutant IDENTIQUE à l'original — le paragraphe de la clause n'a pas été mordu, la SONDE EST À RÉANCRER (ce n'est pas un défaut de la doctrine)]"
+else
+  T33_MUT_S9="$T33_TMPDIR/mutant-s9.txt"; t33_section "$T33_MUT_CLAUSE" 9 "$T33_MUT_S9"
+  t33_tbl_reel="$(awk '/^\| /{n++} END{print n+0}' "$T33_S9")"
+  t33_tbl_mut="$(awk '/^\| /{n++} END{print n+0}' "$T33_MUT_S9")"
+  if [ "$t33_tbl_reel" -ne "$t33_tbl_mut" ]; then
+    t33_ko="$t33_ko [F : la mutation a touché la TABLE ($t33_tbl_reel lignes « | » avant, $t33_tbl_mut après) — B rougirait pour la mauvaise raison]"
+  else
+    t33_mut_first="$(awk '/^\| /{print NR; exit}' "$T33_MUT_S9")"; : "${t33_mut_first:=0}"
+    T33_MUT_AVANT="$T33_TMPDIR/mutant-s9-avant-table.txt"
+    awk -v k="$t33_mut_first" 'NR < k' "$T33_MUT_S9" > "$T33_MUT_AVANT"
+    t33_closure_in "$T33_MUT_AVANT" \
+      && t33_ko="$t33_ko [F NON DISCRIMINANT : la §9 privée de sa SEULE clause de fermeture (table intacte, $t33_tbl_mut lignes) satisfait encore B — l'assertion ne mesure pas ce qu'elle prétend]"
+    # Contrôle négatif : sans lui, une fonction cassée « détecterait » l'absence partout.
+    t33_closure_in "$T33_S9_AVANT" \
+      || t33_ko="$t33_ko [F, contrôle négatif : le fichier RÉEL ne tient pas B — la fonction de détection est cassée, elle rougirait sur n'importe quoi]"
+  fi
+fi
+
+# --- G : D-21, le motif ADR est ATTACHÉ à la ligne de la brique de livraison -------------------
+T33_ADR_RE='ADR-059|ADR-064'
+t33_ship_motif_ok() { # <fichier de section §1> — la brique est en 2e cellule (colonne « Brique gsd »)
+  local r
+  r="$(t33_row "$1" 'gsd-ship' 3)"
+  [ -n "$r" ] || return 1
+  printf '%s\n' "$r" | "$GREP" -qE "$T33_ADR_RE"
+}
+t33_s1_rows="$(awk '/^\| /&&!/^\| Étape /{n++} END{print n+0}' "$T33_S1")"
+t33_s1_ship="$(awk '/^\| /&&/gsd-ship/{n++} END{print n+0}' "$T33_S1")"
+[ "$t33_s1_rows" -eq 9 ] \
+  || t33_ko="$t33_ko [G : la table du cycle canonique porte $t33_s1_rows ligne(s) de données au lieu de 9 — D-21 corrige la ligne de gsd-ship, il ne la supprime pas]"
+[ "$t33_s1_ship" -eq 1 ] \
+  || t33_ko="$t33_ko [G : $t33_s1_ship ligne(s) de table nomment gsd-ship dans la §1 (attendu : exactement 1)]"
+t33_ship_motif_ok "$T33_S1" \
+  || t33_ko="$t33_ko [G : la ligne de table de gsd-ship ne porte pas elle-même ADR-059 ou ADR-064 — un compte sur le fichier serait VERT AVANT TOUTE ÉCRITURE, le nom de la brique y était déjà]"
+# Les DEUX ADR doivent vivre dans les sections que ce plan amende — pas « ailleurs par accident ».
+for t33_adr in ADR-059 ADR-064; do
+  if ! "$GREP" -qF "$t33_adr" "$T33_S1" && ! "$GREP" -qF "$t33_adr" "$T33_S6"; then
+    t33_ko="$t33_ko [G : $t33_adr absent des deux sections amendées (§1 et §6) — le motif de D-21 n'est pas là où le lecteur du cycle passe]"
+  fi
+done
+"$GREP" -qF 'mission-contracts.md' "$T33_S1" \
+  || t33_ko="$t33_ko [G : le renvoi de protocole (mission-contracts.md) est absent de la §1 — le motif y est écrit sans dire où vit le protocole]"
+# Mesure NÉGATIVE : le protocole est renvoyé, jamais recopié (ADR-057/ADR-030).
+for t33_inv in 'gh pr create' 'git worktree add'; do
+  for t33_sec in "$T33_S1" "$T33_S6"; do
+    "$GREP" -qF "$t33_inv" "$t33_sec" \
+      && t33_ko="$t33_ko [G négatif : l'invocation « $t33_inv » est RECOPIÉE dans une section amendée — le protocole de branche a une seule voix, mission-contracts.md]"
+  done
+done
+# Fixture LICITE de G : une seule des deux ADR suffit à attacher le motif.
+T33_FX_G_OK="$T33_TMPDIR/fixture-g-licite.md"
+printf '%s\n' "| Livraison | \`gsd-ship\` | Crée la PR — non emprunté ici (ADR-064) | livraison |" > "$T33_FX_G_OK"
+t33_fx_licites=$((t33_fx_licites + 1))
+t33_ship_motif_ok "$T33_FX_G_OK" \
+  || t33_ko="$t33_ko [FAUX ROUGE (G, une seule ADR citée) : un motif licite attaché à la ligne est rejeté]"
+# Fixture FAUTIVE de G : l'ADR existe dans la section, mais DÉTACHÉE de la ligne de la brique.
+T33_FX_G_KO="$T33_TMPDIR/fixture-g-fautive.md"
+printf '%s\n%s\n' "| Livraison | \`gsd-ship\` | Crée la PR + revue + préparation merge | livraison |" "ADR-059 et ADR-064 priment sur l'adoption des briques amont." > "$T33_FX_G_KO"
+t33_fx_fautives=$((t33_fx_fautives + 1))
+t33_ship_motif_ok "$T33_FX_G_KO" \
+  && t33_ko="$t33_ko [FAUX VERT (G, ADR DÉTACHÉE de la ligne) : la mesure accepte un motif présent ailleurs dans la section]"
+
+# --- H : DISCRIMINANT de G, par mutation — ADR retirées de la seule ligne de gsd-ship ----------
+T33_MUT_ADR="$T33_TMPDIR/mutant-sans-adr.md"
+awk '/^\| /&&/gsd-ship/ { gsub(/ADR-059/, "ADR-XXX"); gsub(/ADR-064/, "ADR-XXX") } { print }' "$T33_PIPE" > "$T33_MUT_ADR"
+if cmp -s "$T33_PIPE" "$T33_MUT_ADR"; then
+  t33_ko="$t33_ko [H : mutant IDENTIQUE à l'original — aucune ADR n'était portée par la ligne de gsd-ship, la mutation n'a rien mordu]"
+else
+  T33_MUT_S1="$T33_TMPDIR/mutant-s1.txt"; t33_section "$T33_MUT_ADR" 1 "$T33_MUT_S1"
+  t33_mut_rows="$(awk '/^\| /&&!/^\| Étape /{n++} END{print n+0}' "$T33_MUT_S1")"
+  if [ "$t33_mut_rows" -ne 9 ]; then
+    t33_ko="$t33_ko [H : la mutation a touché la table de la §1 ($t33_mut_rows lignes de données au lieu de 9) — G rougirait pour la mauvaise raison]"
+  else
+    t33_ship_motif_ok "$T33_MUT_S1" \
+      && t33_ko="$t33_ko [H NON DISCRIMINANT : la ligne de gsd-ship privée de son ADR satisfait encore G — l'assertion ne prouve que la présence d'un nom de brique qui était là avant la Phase 23]"
+  fi
+fi
+fi
+
+# --- E : vf-coder.md renvoie vers la doctrine DEPUIS le bloc Cadrage ---------------------------
+T33_RECHERCHE_RE='[Rr]echerche'
+t33_cadrage_renvoi_ok() { # <fichier agent>
+  local blk
+  blk="$(md_blocks_matching "$1" "$T25_CADRAGE_RE")"
+  [ -n "$blk" ] || return 2
+  printf '%s\n' "$blk" | "$GREP" -qF 'GSD-PIPELINE.md' || return 1
+  printf '%s\n' "$blk" | "$GREP" -qE "$T33_RECHERCHE_RE" || return 1
+  return 0
+}
+if [ ! -f "$CODER_FILE" ]; then
+  t33_ko="$t33_ko [E : $CODER_FILE introuvable]"
+else
+  t33_cadrage_renvoi_ok "$CODER_FILE"
+  case $? in
+    0) : ;;
+    2) t33_ko="$t33_ko [E : aucune brique **Cadrage** dans vf-coder.md — le renvoi n'a pas de foyer]" ;;
+    *) t33_ko="$t33_ko [E : le bloc Cadrage de vf-coder.md ne porte pas à la fois le renvoi vers GSD-PIPELINE.md et la notion de recherche — le nom du fichier ailleurs dans l'agent ne prouve rien]" ;;
+  esac
+  # Contre-épreuve : renvoi DÉPLACÉ hors du bloc Cadrage (rien retiré du fichier, juste relocalisé).
+  T33_MUT_CODER="$T33_TMPDIR/mutant-coder-renvoi-deplace.md"
+  awk '{ if ($0 ~ /GSD-PIPELINE[.]md/) { gsub(/GSD-PIPELINE[.]md/, "la doctrine de flags") ; print ; next } print }' "$CODER_FILE" > "$T33_MUT_CODER"
+  printf '\n%s\n' "Voir aussi \`GSD-PIPELINE.md\` §9 pour la recherche." >> "$T33_MUT_CODER"
+  if cmp -s "$CODER_FILE" "$T33_MUT_CODER"; then
+    t33_ko="$t33_ko [E : mutant IDENTIQUE à l'original — le renvoi n'a pas été déplacé, rien n'a été mesuré]"
+  else
+    t33_fx_fautives=$((t33_fx_fautives + 1))
+    t33_cadrage_renvoi_ok "$T33_MUT_CODER" \
+      && t33_ko="$t33_ko [E NON DISCRIMINANT : le renvoi déplacé HORS du bloc Cadrage (et toujours présent dans le fichier) satisfait encore E — la mesure n'est pas bornée au bloc]"
+  fi
+fi
+
+if [ -n "$t33_ko" ]; then
+  ko "T33 (Lacune 3, §9 allowlist stricte + D-21, DISCRIMINANT) : la doctrine de flags de cycle ne tient pas —$t33_ko"; t33_ok=0
+else
+  ok "T33 (Lacune 3, §9 allowlist stricte + D-21, DISCRIMINANT) : la clause de fermeture par défaut GOUVERNE la table (détectée dans les $((t33_first_table - 1)) ligne(s) qui la précèdent, §9 de $t33_s9_n lignes), les deux formes de gradation de la recherche sont dans la CELLULE « flags autorisés » de la brique de plan, la ligne de cadrage porte dans sa PROPRE cellule de motif la marque de transitoire ET l'échéance (plan 23-05), le renvoi croisé tient sur UNE ligne physique (docs-flow.md + ADR-057) avec intersection de flags VIDE sur $t33_d_src flag(s) documentaires extraits, vf-coder.md renvoie depuis son bloc Cadrage, et la ligne de gsd-ship porte elle-même son ADR (table de §1 intacte : $t33_s1_rows lignes de données) — $t33_fx_fautives formulation(s)/mutant(s) FAUTIFS font rougir les sondes, $t33_fx_licites reformulation(s) LICITES restent vertes"
+fi
+
+# ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
 [ "$fail" -eq 0 ]

@@ -28,8 +28,14 @@ gsd-new-project → gsd-map-codebase → gsd-discuss-phase → gsd-plan-phase �
 | Implémentation | `gsd-execute-phase` | Exécute les plans (waves parallèles) | sprint d'implémentation |
 | Validation UAT | `gsd-verify-work` | Valide les features (UAT conversationnel) | recette |
 | Revue de code | `gsd-code-review` | Relit les fichiers modifiés (bugs/sécu) | revue de code |
-| Livraison | `gsd-ship` | Crée la PR + revue + préparation merge | livraison |
+| Livraison | `gsd-ship` | Crée la PR + revue + préparation merge — **non emprunté chez VibeFlow**, l'ouverture de PR reste un geste VibeFlow tenu à la main par le manager de mission (ADR-059, ADR-064) | livraison |
 | Clôture milestone | `gsd-new-milestone` / `gsd-complete-milestone` | Ouvre le cycle suivant / archive | jalons |
+
+> **Pourquoi `gsd-ship` reste dans la table sans être emprunté (D-21).** C'est un outil réel du
+> moteur, il garde sa place dans le cycle canonique — mais ADR-059 (une mission = une branche) et
+> ADR-064 (un écrivain = un worktree, claim de driver) priment, et la brique amont ne connaît ni
+> l'une ni l'autre. Le protocole d'isolation et d'ouverture de PR vit dans `mission-contracts.md`
+> §Isolation de branche : il n'est jamais recopié ici.
 
 **Règle d'or** : on ne saute pas `gsd-verify-work` ni `gsd-code-review` sur une feature
 structurante. Le cadrage (`gsd-discuss-phase`) précède toujours la planification
@@ -109,6 +115,9 @@ pilotage) ; les workers d'équipe (`vf-coder`, `vf-reviewer`, `vf-auditer`) en `
   `gsd-verify-work` / `gsd-code-review` pour une feature non triviale.
 - **Fermer la boucle** : après chaque geste, proposer LE next step depuis `ROADMAP`/`STATE`
   (rôle actif des agents — pas un menu, une proposition ferme).
+- **L'ouverture de PR est un geste VibeFlow** : jamais déléguée à `gsd-ship` tant qu'ADR-059 (une
+  mission = une branche) et ADR-064 (un écrivain = un worktree) tiennent. Protocole :
+  `mission-contracts.md` §Isolation de branche.
 
 ---
 
@@ -138,3 +147,37 @@ Deux couches indépendantes, ne pas les confondre :
 La chaîne `vf-coder (sonnet) → gsd-plan-phase → gsd-planner (opus)` est le comportement **voulu**
 — un worker sonnet peu coûteux qui délègue la planification à un sous-agent opus plus capable,
 pas une incohérence à corriger.
+
+---
+
+## 9. Flags de cycle — allowlist stricte
+
+**Fermeture par défaut (D-08).** Seuls les flags **nommés dans la table ci-dessous** sont
+utilisables par un agent du module sur une brique de cycle : **tout flag non nommé est fermé par
+défaut**, y compris ceux que `gsd-core` ajoutera dans une version ultérieure. Le corollaire est ce
+qui a de la valeur ici — un flag nouveau arrive **fermé**, et il s'ouvre par une décision datée
+inscrite dans cette table, jamais par omission. Une liste d'interdits seuls périmerait à la
+première montée de version : elle laisserait gagner l'omission, exactement le pilotage que cette
+doctrine referme.
+
+| Brique de cycle | Flags autorisés | Flags fermés | Motif (fait + source vérifiable) |
+|---|---|---|---|
+| Cadrage — `gsd-discuss-phase` | `--auto` | `--chain`, et tout autre | **Transitoire — périme au plan 23-05.** Sur cette brique, `--auto` ne pose pas seulement un état : il déclenche le pipeline entier — cadrage → plan → exécution dans le même appel (`chain.md:45-61`, étape 5). La **règle 5** de `checkpoints.md:11` joue donc sur tout le plan et toute l'exécution qui suivent : vérification humaine **auto-approuvée**, décision **auto-sélectionnée sur la première option**. Portée **bornée**, à ne pas surestimer : la **règle 6** (`checkpoints.md:12`) protège les gates `gate="blocking-human"`, jamais auto-approuvés, même en auto-mode. Reste ouvert aujourd'hui parce que `vf-coder` n'a pas `AskUserQuestion` : le fermer maintenant le mettrait en impasse, constatée et chiffrée en `23-ARBITRAGES-OUVERTS.md` §O-8 (voie 2). Autorisation **assumée par écrit**, coût nommé, plutôt qu'accordée en silence. Correctif structurel instruit au **plan 23-05** (le manager porte le cadrage, il a `AskUserQuestion`) : le jour où 23-05 passe, cette ligne devient fermée. `--chain` est fermé pour le même fait, aggravé — il ouvre le mode interactif, que `vf-coder` ne peut pas tenir. |
+| Plan — `gsd-plan-phase` | `--research`, `--skip-research` | `--auto`, `--chain`, et tout autre | La gradation de la recherche se décide **ici**, et nulle part ailleurs : `gsd-discuss-phase` ne consomme aucun flag de recherche — sa table `progressive_disclosure` (`discuss-phase.md`) n'en liste aucun. En l'absence des deux, le workflow **prompte** (`plan-phase.md` §5.1) et `vf-coder`, privé d'`AskUserQuestion`, y reste bloqué : le flag n'est donc jamais omis. `--auto` et `--chain` fermés en invocation directe, même fait qu'au cadrage (`chain.md:45-61` + règle 5 de `checkpoints.md:11`, bornée par la règle 6 de `checkpoints.md:12`). |
+| Exécution — `gsd-execute-phase` | *(aucun)* | `--auto`, `--chain`, et tout autre | Même fait qu'au cadrage (`chain.md:45-61` + règle 5 de `checkpoints.md:11`, bornée par la règle 6 de `checkpoints.md:12`). De surcroît, exécuter au-delà de la frontière du nœud contredirait le pipelining modélisé dans `mission-flow.md` : le manager tient le DAG, l'exécution ne le déborde pas. |
+
+**Gradation de la recherche (D-05) — sur un FAIT constatable, jamais sur un ressenti (ADR-055 §3)** :
+
+- `--research` quand l'étape touche une **lib, un framework, du natif ou une version**, ou un
+  domaine que `.planning/codebase/` ne cartographie pas.
+- `--skip-research` quand l'étape prolonge un périmètre **déjà couvert** par un `RESEARCH.md` ou un
+  `CONTEXT.md` récent du même dossier de phase.
+
+**Toggle ≠ flag** — la confusion la plus probable à la lecture, nommée ici plutôt que laissée au
+lecteur : le toggle `workflow.research` du `config.json` active la **capability** de recherche sur
+le point de hook de pré-plan (le moteur spawne lui-même son chercheur) ; le flag, lui, répond au
+**prompt**. Toggle à vrai ⇒ la recherche a lieu de toute façon, le flag décide seulement si le
+worker se fait interroger. Deux couches distinctes, pas interchangeables.
+
+**Flags documentaires** : leur doctrine est `docs-flow.md`, jamais recopiée ici (ADR-057).
+Elle fait autorité sur sa famille — une capacité, une seule voix.

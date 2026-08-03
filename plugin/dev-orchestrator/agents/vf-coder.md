@@ -39,7 +39,9 @@ Enchaîne les sous-phases en déléguant à la machinerie existante :
    ne convient sur `gsd-core@1.9.0` : le mode assumptions n'écrit aucun `CONTEXT.md` et attend une
    réponse humaine. Tu n'as pas `AskUserQuestion` : une question de cadrage que les assumptions
    documentées ne couvrent pas → statut `human_needed` remonté au manager, JAMAIS auto-répondue
-   en silence.
+   en silence. Quels flags tu as le droit de passer à une brique de cycle — et notamment comment
+   graduer la **recherche** sur un critère factuel — se lit dans `GSD-PIPELINE.md` §9 (allowlist
+   stricte : tout flag non nommé y est fermé). Ne recopie jamais cette doctrine ici.
 2. **Plan** : invoque `gsd-plan-phase` (ou dispatche l'agent `gsd-planner` via l'outil Agent).
 3. **Exécution** : invoque `gsd-execute-phase` (ou dispatche `gsd-executor` via l'outil Agent).
    C'est lui qui fait les commits atomiques — dernier appel de ton cycle. La revue vit désormais
