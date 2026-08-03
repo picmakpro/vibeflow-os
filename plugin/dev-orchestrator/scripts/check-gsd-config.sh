@@ -13,9 +13,9 @@
 #       laisse tomber au défaut amont au lieu de les écrire (piloter ses étages par omission).
 #
 # --- Source des clés connues : LUE DEPUIS LE MOTEUR, jamais en dur ------------------------------
-# Aucune liste de clés n'est écrite dans ce script : elles sont lues à l'exécution depuis le
-# gsd-core installé, donc ce gate NE PÉRIME PAS quand le moteur monte de version. L'union de TROIS
-# sources est nécessaire — chacune seule produit des faux positifs (fait vérifié, pas supposé) :
+# Les clés connues sont lues à l'exécution depuis le gsd-core installé, donc ce gate NE PÉRIME PAS
+# quand le moteur monte de version. L'union de TROIS sources est nécessaire — chacune seule produit
+# des faux positifs (fait vérifié, pas supposé) :
 #
 #   1. VALID_CONFIG_KEYS  (bin/lib/config.cjs)             — Set de clés pointées (104 aujourd'hui).
 #   2. configKeys         (bin/lib/capability-registry.cjs) — clés de config déclarées par les
@@ -30,6 +30,23 @@
 #
 # Inversement workflow.node_repair et workflow.node_repair_budget ne vivent que dans la source 1.
 # Les trois sources sont donc lues et unies ; aucune n'est suffisante seule.
+#
+# UNE EXCEPTION, ASSUMÉE ET NOMMÉE : la liste engineExtra (voir plus bas) recopie en dur une poignée
+# de littéraux de premier niveau que le moteur ajoute à son propre KNOWN_TOP_LEVEL sans les exporter
+# nulle part (config-loader.cjs) — aucun module de bin/lib ne les expose, ils ne sont donc pas
+# lisibles dynamiquement. C'est le SEUL endroit du script où des noms de clés sont écrits à la main,
+# et c'est le seul point par lequel le gate peut dériver à la montée de version du moteur. Le cas 26
+# de la suite dédiée exerce ce mirroir contre le moteur réel, précisément pour qu'une telle dérive
+# se voie en test rouge au lieu de passer en silence.
+#
+# --- LIMITE DE PORTÉE CONNUE (schéma fédéré) ---------------------------------------------------
+# Le moteur complète son KNOWN_TOP_LEVEL avec un overlay FÉDÉRÉ résolu pour le lab audité (clés de
+# config déclarées par des capabilities tierces installées dans ce lab). Ce gate ne lit PAS cet
+# overlay : sur un lab qui installerait de telles capabilities, il peut signaler comme inconnue une
+# clé que le moteur, lui, accepterait. Faux positif possible, jamais faux négatif — le gate reste
+# advisory et ne bloque rien. Arbitrage volontairement NON tranché ici (hors périmètre du plan
+# 23-02, dont la recherche amont ne mentionne pas cette source) : à instruire avant d'élargir la
+# portée du gate.
 #
 # --- Granularité de comparaison (choix explicite, pas un accident) ------------------------------
 # Le moteur ne valide QUE le premier niveau : son KNOWN_TOP_LEVEL est l'ensemble des premiers
@@ -208,6 +225,14 @@ const KNOWN = new Set([].concat(validArr, ck, flatten(DEFAULTS, '', [], true)));
 
 // Miroir exact du KNOWN_TOP_LEVEL du moteur (config-loader.cjs) : premiers segments des clés
 // connues + topLevel des motifs dynamiques + les littéraux que le moteur ajoute en dur.
+//
+// engineExtra est la SEULE liste écrite à la main de ce script (exception nommée en en-tête) : ces
+// littéraux ne sont exportés par aucun module de bin/lib, donc pas lisibles dynamiquement. Plusieurs
+// d'entre eux (depth, multiRepo, branching_strategy, research en premier niveau) n'existent dans
+// AUCUNE des trois sources dynamiques : les retirer parce qu'ils « semblent redondants » rouvrirait
+// un faux positif. La redondance apparente des autres est délibérément CONSERVÉE — la couverture par
+// les sources dynamiques dépend de la version du moteur, et un mirroir fidèle reste juste même si
+// une version future retire l'une de ces clés de ses listes exportées.
 const engineExtra = ['model_overrides', 'context_window', 'resolve_model_ids', 'claude_md_path',
   'effort', 'fast_mode', 'depth', 'multiRepo', 'branching_strategy', 'research'];
 const KNOWN_TOP = new Set([].concat(

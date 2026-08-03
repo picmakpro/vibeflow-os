@@ -321,6 +321,26 @@ VF_GSD_CORE_LIB="$ENG" VF_CONFIG_PATH="$CFG_RO" bash "$SCRIPT" >/dev/null 2>&1
 after="$(cat "$CFG_RO")"
 if [ "$before" = "$after" ]; then ok "25 lecture seule — le config.json audité est inchangé après exécution"; else ko "25 lecture seule — le config.json audité est inchangé" "avant=[$before] après=[$after]"; fi
 
+# === Cas 26 — Le mirroir engineExtra est exercé contre le MOTEUR RÉEL ============================
+# engineExtra est la seule liste de clés écrite à la main du script : le moteur ajoute ces littéraux
+# à son KNOWN_TOP_LEVEL sans les exporter, donc ils ne peuvent pas être lus dynamiquement. Sans ce
+# cas, une dérive du moteur (littéral ajouté ou retiré) passerait en silence. « depth » et
+# « branching_strategy » sont choisis parce qu'ils n'existent dans AUCUNE des trois sources
+# dynamiques : seul le mirroir peut les épargner. Le cas est écrit dans les DEUX SENS — les clés du
+# mirroir épargnées ET une clé voisine, non mirroirée, toujours signalée : sans cette seconde
+# moitié, un KNOWN_TOP devenu universel passerait au vert.
+if [ -z "$REAL_LIB" ]; then
+  ko "26 mirroir engineExtra contre le moteur réel" "moteur installé introuvable"
+else
+  CFG_X="$(mk_config c26 '{ "depth": 3, "branching_strategy": "phase", "cle_hors_mirroir": 1 }')"
+  out="$(VF_GSD_CORE_LIB="$REAL_LIB" VF_CONFIG_PATH="$CFG_X" bash "$SCRIPT" 2>/dev/null)"; rc=$?
+  spares_mirror=1; case "$out" in *depth*|*branching_strategy*) spares_mirror=0 ;; esac
+  flags_other=0;  case "$out" in *cle_hors_mirroir*) flags_other=1 ;; esac
+  if [ "$spares_mirror" -eq 1 ] && [ "$flags_other" -eq 1 ]; then
+    ok "26 mirroir engineExtra — depth/branching_strategy épargnés ET une clé hors mirroir signalée"
+  else ko "26 mirroir engineExtra — depth/branching_strategy épargnés ET clé hors mirroir signalée" "rc=$rc spares_mirror=$spares_mirror flags_other=$flags_other out=[$out]"; fi
+fi
+
 echo ""
 echo "== résultat : $PASS ok, $FAIL ko =="
 [ "$FAIL" -eq 0 ]
