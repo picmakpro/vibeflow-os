@@ -89,7 +89,7 @@
         "plugin/dev-orchestrator/references/GSD-PIPELINE.md",
         "plugin/dev-orchestrator/agents/vf-coder.md"
       ],
-      "status": "ready",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -106,7 +106,7 @@
         "plugin/_internal/vibeflow-update.sh",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "revue-04",
@@ -513,7 +513,7 @@
       "scope": [
         ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-05-PLAN.md"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "fix-a5",
@@ -539,7 +539,7 @@
         "plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh",
         ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-02-PLAN.md"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "revue-a6",
@@ -552,7 +552,7 @@
         "plugin/dev-orchestrator/scripts/check-gsd-config.sh",
         "plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh"
       ],
-      "status": "blocked",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -565,7 +565,7 @@
       "scope": [
         ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-03-SUMMARY.md"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "arbitrage-o16",
