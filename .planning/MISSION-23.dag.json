@@ -497,6 +497,18 @@
         "replan-04"
       ],
       "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "replan-05",
+      "step": "REECRITURE PARTIELLE du plan 23-05 — il documente A-1ter geste 2 sur 43 lignes et n'en execute rien ; son critere l.300 INTERDIT le geste attendu. Ajouter la tache de portage du cadrage, la tache de retrait de T25b avec ses 3 renvois, viser les DEUX sites du mensonge doctrinal",
+      "stage": "plan",
+      "deps": [
+        "plancheck-05"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-05-PLAN.md"
+      ],
       "status": "ready"
     }
   ]
