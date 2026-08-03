@@ -7,6 +7,7 @@ requirements: [GSDC-07]
 commits:
   - 3b68a02 feat(23) check-gsd-config.sh — gate advisory d'alignement config/moteur (tâches 1 et 2)
   - 9f235e0 feat(23) câblage SessionStart du gate et alignement du config.json de ce lab (tâche 3)
+  - 9c756aa fix(23) exactitude de l'en-tête et couverture du mirroir engineExtra (revue)
 files_modified:
   - plugin/dev-orchestrator/scripts/check-gsd-config.sh
   - plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh
@@ -28,7 +29,7 @@ Les deux mesures sont des **exécutions**, jamais des relectures.
 ## Ce qui a été livré
 
 `check-gsd-config.sh` (advisory, exits `0` signal / `3` silence / `64` argument invalide, patron
-`check-doc-drift.sh`), sa suite dédiée de 25 cas, son câblage `SessionStart` suffixé `|| true`, et
+`check-doc-drift.sh`), sa suite dédiée de 26 cas, son câblage `SessionStart` suffixé `|| true`, et
 le `.planning/config.json` de ce lab nettoyé puis décidé.
 
 Le gate constate **deux faits** et ne porte **aucun jugement** (ADR-055 §3) : des clés que le moteur
@@ -105,9 +106,9 @@ doctrine appliquée par des agents plutôt que drapeau inerte. Risque résiduel 
 
 ## Preuve dans les deux sens — ce qui vaut verdict ici
 
-Le compteur « 25 ok / 0 ko » **ne vaut rien** en soi. Ce qui vaut verdict : la suite a été rejouée
-contre **quatre mutations du script**, chacune tuée par le cas prévu, puis le script restauré est
-repassé au vert.
+Le compteur « 26 ok / 0 ko » **ne vaut rien** en soi. Ce qui vaut verdict : la suite a été rejouée
+contre **six mutations du script**, chacune tuée par le cas prévu, puis le script restauré est
+repassé au vert à chaque fois.
 
 | Mutation du script | Cas qui vire au rouge |
 |---|---|
@@ -115,6 +116,8 @@ repassé au vert.
 | Toggle sans défaut amont présenté comme `false` | **14** |
 | Borne des conteneurs opaques supprimée | 3, **11**, 16 |
 | `gates`/`safety` codés en dur au lieu de comparer | **2**, 18, **20** |
+| Mirroir `engineExtra` vidé | **26** (1re moitié) |
+| `KNOWN_TOP` rendu universel | 1, 17, 18, 20, **26** (2e moitié) |
 
 Anti-« vert à vide » : le cas 20 tourne contre le moteur **réellement installé** et exige les deux
 sens dans un même fichier — un bloc bidon **signalé** ET les cinq toggles légitimes **épargnés**. Un
@@ -148,6 +151,29 @@ Les tâches 1 et 2 sont livrées en **un seul commit** au lieu de deux. Elles to
 fichiers et le volet b réutilise l'extraction du volet a ; les découper *a posteriori* aurait
 fabriqué un état intermédiaire jamais exécuté ni testé. L'état final est celui prescrit ; seul le
 découpage des commits diffère. La tâche 3 est bien un commit distinct.
+
+## Revue — un tour, aucun bloquant, deux majeurs traités
+
+| Finding | Traitement |
+|---|---|
+| En-tête affirmant « aucune liste de clés en dur » alors qu'`engineExtra` en est une | **Corrigé** — exception nommée en en-tête et au site du code |
+| `engineExtra` exercé par aucun cas : dérive future silencieuse | **Corrigé** — cas 26, contre le moteur réel, dans les deux sens |
+| Overlay **fédéré** du moteur (capabilities tierces) non lu par le gate | **Documenté, NON tranché** — voir ci-dessous |
+| `--path --quiet` consommerait un flag comme valeur | **no-op** — hérité du patron imposé (`check-doc-drift.sh`), pas une régression de ce plan ; à traiter au niveau du patron commun |
+| Élaguer les redondances d'`engineExtra` | **Rejeté, motivé** — la couverture par les sources dynamiques dépend de la version du moteur ; un mirroir fidèle reste juste si une version future retire une clé de ses listes exportées. Élaguer rouvrirait un faux positif différé. |
+
+### Question ouverte remontée (ADR-031, non tranchée)
+
+Le moteur complète son `KNOWN_TOP_LEVEL` avec un **overlay fédéré** résolu pour le lab audité — les
+clés de config déclarées par des **capabilities tierces installées dans ce lab**. `check-gsd-config.sh`
+ne lit que les trois modules statiques. Sur un lab portant de telles capabilities, il peut donc
+signaler comme inconnue une clé que le moteur accepte : **faux positif possible, jamais faux
+négatif**, et le gate reste advisory (il ne bloque rien).
+
+Vérifié sur ce lab-ci : aucune dérive actuelle (le schéma fédéré y rend exactement les mêmes clés
+que le registre statique). La limite est **documentée en en-tête du script**. Élargir la portée à une
+quatrième source est **hors périmètre du plan 23-02**, dont le RESEARCH ne mentionne pas cette
+source — d'où l'escalade plutôt que l'implémentation silencieuse.
 
 ## Attendu, non corrigé ici
 
