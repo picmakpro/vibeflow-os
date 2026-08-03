@@ -15,18 +15,33 @@
 # --- Source des clés connues : LUE DEPUIS LE MOTEUR, jamais en dur ------------------------------
 # Les clés connues sont lues à l'exécution depuis le gsd-core installé, donc ce gate NE PÉRIME PAS
 # quand le moteur monte de version. L'union de TROIS sources est nécessaire — chacune seule produit
-# des faux positifs (fait vérifié, pas supposé) :
+# des faux positifs (fait vérifié, pas supposé).
 #
-#   1. VALID_CONFIG_KEYS  (bin/lib/config.cjs)             — Set de clés pointées (104 aujourd'hui).
-#   2. configKeys         (bin/lib/capability-registry.cjs) — clés de config déclarées par les
-#      capabilities (58 aujourd'hui). Indispensable : workflow.code_review, workflow.pattern_mapper
+# Chaque source est cherchée SOUS DEUX FORMES, dans cet ordre : d'abord le MANIFESTE JSON de
+# bin/shared/, ensuite le LITTÉRAL JS du module de bin/lib/ qui la porte. Les deux formes sont
+# nécessaires, et c'est mesuré : sur gsd-core 1.9, AUCUNE des trois sources n'est un littéral dans
+# le module qui l'exporte (elles viennent toutes des manifestes) ; à l'inverse, un moteur minimal
+# qui les écrit en clair dans ses .cjs n'a pas de bin/shared/ du tout.
+#
+#   1. VALID_CONFIG_KEYS — Set de clés pointées (104 aujourd'hui). Sur gsd-core 1.9, config.cjs la
+#      RÉ-EXPORTE depuis config-schema.cjs, qui la ré-exporte depuis configuration.cjs, où elle vaut
+#      `new Set(SCHEMA_MANIFEST.validKeys)` : la donnée réelle est dans
+#      bin/shared/config-schema.manifest.json, clé `validKeys`. Le repli littéral vise
+#      bin/lib/{config,configuration,config-schema}.cjs. Le même manifeste porte `dynamicKeyPatterns`,
+#      d'où sortent les topLevel des motifs dynamiques (calculés par `.map` dans configuration.cjs,
+#      donc illisibles là-bas).
+#   2. configKeys (bin/lib/capability-registry.cjs) — clés de config déclarées par les capabilities
+#      (58 aujourd'hui). C'est la SEULE des trois qui soit réellement un littéral dans un .cjs : un
+#      objet plat, compatible JSON. Indispensable : workflow.code_review, workflow.pattern_mapper
 #      et workflow.ui_review sont ABSENTS de VALID_CONFIG_KEYS et ne vivent QUE là — un gate qui ne
 #      lirait que la source 1 signalerait à tort trois clés parfaitement légitimes.
-#   3. CONFIG_DEFAULTS    (bin/lib/configuration.cjs)      — les défauts canoniques imbriqués. Même
-#      raison, symétrique : workflow._auto_chain_active (écrit par le moteur lui-même quand une
-#      chaîne --auto est active) n'est dans AUCUNE des deux premières sources. Sans cette troisième
-#      source, le gate signalerait comme « inconnue » une clé que le moteur écrit de sa propre main.
-#      C'est aussi la source qui donne la VALEUR du défaut amont d'un toggle (volet b).
+#   3. CONFIG_DEFAULTS — les défauts canoniques imbriqués. Même topologie que la source 1 : sur
+#      gsd-core 1.9, configuration.cjs les charge depuis bin/shared/config-defaults.manifest.json ;
+#      le repli littéral vise bin/lib/{configuration,config-loader,config}.cjs. Même raison d'être,
+#      symétrique de la source 2 : workflow._auto_chain_active (écrit par le moteur lui-même quand
+#      une chaîne --auto est active) n'est dans AUCUNE des deux premières sources. Sans cette
+#      troisième source, le gate signalerait comme « inconnue » une clé que le moteur écrit de sa
+#      propre main. C'est aussi la source qui donne la VALEUR du défaut amont d'un toggle (volet b).
 #
 # Inversement workflow.node_repair et workflow.node_repair_budget ne vivent que dans la source 1.
 # Les trois sources sont donc lues et unies ; aucune n'est suffisante seule.
@@ -74,6 +89,32 @@
 # 23-02, dont la recherche amont ne mentionne pas la source fédérée. Escaladée, à instruire avant
 # d'élargir la portée du gate.
 #
+# --- LIMITE DE LA LECTURE DE TEXTE — ELLE NE SUIT PAS LES INDIRECTIONS (O-13) -------------------
+# Ce script LIT le moteur au lieu de l'exécuter (A-6, voir « Sécurité » plus bas). Le prix est
+# nommé ici, et il n'est pas nul : `require()` suivait les indirections (ré-exports en chaîne,
+# chargement d'un manifeste, valeur calculée) ; la lecture de texte ne les suit PAS. Elle voit du
+# JSON pur et des littéraux JS simples, rien d'autre. Si une version future du moteur déplace ses
+# manifestes, écrit `new Set(VARIABLE)`, ou calcule ses défauts (spread, `.map`, `process.env`),
+# l'extraction rend zéro sur la source concernée. Les DEUX SENS de la conséquence sont atteignables,
+# et tous deux sont MESURÉS, pas supposés :
+#
+#   (iii) TROP MUET — plus aucune clé connue lisible ⇒ le script sort en 3. C'est le MÊME code que
+#       « moteur gsd-core introuvable » (`:203`) et que « fichier audité absent » (`:183`) : rien,
+#       dans le contrat de sortie ni dans la sortie de session, ne distingue alors « ce gate est
+#       périmé » de « rien à signaler ». Au SessionStart, le `|| true` du hook achève de tout
+#       masquer. Un gate périmé est silencieux, et son silence ressemble à un succès.
+#
+#   (iv) FAUSSEMENT AFFIRMATIF — pire que le silence, parce que le script parle. Si la source 1
+#       reste lisible mais que CONFIG_DEFAULTS ne l'est plus (valeurs calculées), les toggles
+#       arbitrés basculent de l'état 2 (« au défaut amont », avec sa valeur) à l'état 3 (« sans
+#       défaut lisible dans le moteur ») : le script AFFIRME une absence là où il y a une valeur.
+#       Symétriquement, les clés qui ne vivent QUE dans la source 3 (workflow._auto_chain_active)
+#       redeviennent « inconnues » et sont signalées à tort.
+#
+# Cette limite est ASSUMÉE, pas corrigée : c'est la voie (a) d'O-13 au registre
+# 23-ARBITRAGES-OUVERTS.md. Rendre l'échec distinguable (voie b) ou poser un canari de forme en CI
+# (voie c) sont des AJOUTS DE COMPORTEMENT hors de la lettre d'A-6 — escaladés, non tranchés ici.
+#
 # --- Granularité de comparaison (choix explicite, pas un accident) ------------------------------
 # Le moteur ne valide QUE le premier niveau : son KNOWN_TOP_LEVEL est l'ensemble des premiers
 # segments des clés connues, plus les topLevel de DYNAMIC_KEY_PATTERNS, plus une poignée de
@@ -101,7 +142,7 @@
 #      valeur qui n'existe nulle part N'EST PAS `false` — elle est ABSENTE. L'afficher comme faux
 #      serait fabriquer un fait, précisément ce qu'ADR-055 §3 interdit à un script.
 #
-# --- Sécurité (T-23-02-01, §Security Domain du RESEARCH) ---------------------------------------
+# --- Sécurité (T-23-02-01 et T-23-02-07, §Security Domain du RESEARCH) -------------------------
 # Le fichier audité est une entrée NON MAÎTRISÉE (ce gate est fait pour tourner sur n'importe quel
 # lab) : ses clés comme ses valeurs sont hostiles par hypothèse. Aucun contenu lu depuis ce fichier
 # n'est jamais interpolé dans une commande shell. L'aplatissement du JSON se fait entièrement côté
@@ -109,6 +150,21 @@
 # contenir ni tabulation, ni saut de ligne, ni guillemet nu, et un octet de contrôle ressort en
 # échappement \uXXXX plutôt qu'en octet brut dans la sortie de session. Les chemins sont passés à
 # node par l'ENVIRONNEMENT, jamais par concaténation dans le texte du programme.
+#
+# Le MOTEUR RÉSOLU est lui aussi une entrée non maîtrisée (T-23-02-07, arbitrage A-6). La cascade
+# ci-dessous fait PRIMER le lab courant : sa première branche est <path>/.claude/gsd-core/bin/lib,
+# c'est-à-dire un chemin situé DANS le dépôt audité. Cette priorité est délibérée et conservée — un
+# lab en VF_SCOPE=project a légitimement son moteur dans son dépôt. Elle a pour conséquence qu'un
+# dépôt cloné et non maîtrisé peut fournir le moteur : y déposer un config.cjs piégé suffisait à
+# faire exécuter du code arbitraire au SessionStart, sans trace — le script sortait en 0 comme si de
+# rien n'était, et le `|| true` du hook masquait jusqu'à un échec. Ouvrir une session dans un dépôt
+# cloné suffisait. La mesure appliquée : ce script N'EXÉCUTE JAMAIS le moteur résolu, il le LIT.
+# Aucun require() n'est fait sur un chemin construit depuis le dossier du moteur — les seuls
+# require() du programme node portent sur des modules cœur (fs, path) —, aucun eval, aucun vm,
+# aucun import() dynamique. Les listes sont extraites par lecture de JSON et de littéraux JS, dont
+# le pire cas est une extraction vide, jamais une exécution. Motif écrit une seule fois, valable
+# pour les trois sources et pour les deux formes de lecture. Le prix de cette mesure est nommé plus
+# haut, à « LIMITE DE LA LECTURE DE TEXTE ».
 #
 # Usage:
 #   check-gsd-config.sh [--path <dir>] [--hook] [--quiet]
@@ -129,8 +185,11 @@
 # sert qu'à la cohérence d'interface et au gate de mutuelle exclusion avec --quiet. Les 3 exits
 # (0/3/64) restent identiques avec ou sans --hook.
 #
-# Interdit dans ce script (critère machine du plan) : aucun appel à eval, aucun bash -c sur une
-# valeur lue depuis le fichier audité ou depuis la sortie node.
+# Interdit dans ce script (critères machine du plan) : aucun appel à eval, aucun bash -c sur une
+# valeur lue depuis le fichier audité ou depuis la sortie node (T-23-02-01) ; et, dans le programme
+# node, aucun chargement de module hors des modules cœur — tout appel de chargement y porte
+# exactement sur fs ou sur path, jamais sur un chemin construit depuis le dossier du moteur
+# (T-23-02-07). Les deux sont vérifiés par la suite dédiée.
 #
 # Exit codes:
 #   0  = au moins un signal [gsd-config] émis
@@ -229,27 +288,109 @@ const LIB = process.env.VF_LIB || '';
 const CFG = process.env.VF_CFG || '';
 const ARB = (process.env.VF_ARB || '').split(/\s+/).filter(Boolean);
 
-function tryReq(f) { try { return require(path.join(LIB, f)); } catch (e) { return null; } }
+// --- Acquisition par LECTURE, jamais par exécution (T-23-02-07, arbitrage A-6) -----------------
+// Le moteur résolu peut venir du dépôt audité (première branche de la cascade) : il est donc une
+// entrée non maîtrisée. Rien ici ne le charge comme un module — un fichier lu ne peut pas
+// s'exécuter, quelle que soit sa provenance. Deux formes sont lues, dans cet ordre : manifeste
+// JSON de bin/shared, puis littéral JS du module de bin/lib. Voir l'en-tête pour le pourquoi des
+// deux formes, et pour la limite que la lecture de texte introduit.
+const SHARED = path.join(LIB, '..', 'shared');
+function slurp(p) { try { return fs.readFileSync(p, 'utf8'); } catch (e) { return null; } }
+function readJSON(p) { const s = slurp(p); if (s === null) return null; try { return JSON.parse(s); } catch (e) { return null; } }
 
-const mConfig = tryReq('config.cjs');
-const mConfiguration = tryReq('configuration.cjs');
-const mRegistry = tryReq('capability-registry.cjs');
+// Régions à délimiteurs équilibrés ouvertes par une ancre. TOUTES les occurrences de l'ancre sont
+// rendues (bornées à 8), pas seulement la première : un module de 273 Ko peut porter une occurrence
+// décorative avant la vraie déclaration, et s'arrêter à la première rendrait une liste vide.
+// Les chaînes sont traversées sans compter leurs délimiteurs, sinon une accolade dans un libellé
+// fermerait la région trop tôt.
+function balancedRegions(src, anchorSrc, open, close) {
+  const out = [];
+  const re = new RegExp(anchorSrc, 'g');
+  let m;
+  while ((m = re.exec(src)) !== null) {
+    const start = m.index + m[0].length - 1;   // l'ancre se termine SUR le délimiteur ouvrant
+    let depth = 0, inStr = null, esc = false;
+    for (let j = start; j < src.length; j++) {
+      const c = src[j];
+      if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === inStr) inStr = null; continue; }
+      if (c === '"' || c === "'" || c === '`') { inStr = c; continue; }
+      if (c === open) depth++;
+      else if (c === close) { depth--; if (depth === 0) { out.push(src.slice(start, j + 1)); break; } }
+    }
+    if (out.length >= 8) break;
+    if (re.lastIndex <= m.index) re.lastIndex = m.index + 1;
+  }
+  return out;
+}
 
-// Source 1 — VALID_CONFIG_KEYS (repli sur configuration.cjs, qui l'exporte aussi).
-let VALID = (mConfig && mConfig.VALID_CONFIG_KEYS) || (mConfiguration && mConfiguration.VALID_CONFIG_KEYS) || null;
-let validArr = [];
-try { validArr = VALID ? Array.from(VALID) : []; } catch (e) { validArr = []; }
+// Littéral JS « simple » -> JSON. Couvre ce qu'un module de configuration écrit réellement :
+// identifiants nus en clé, quotes simples, virgules traînantes, commentaires. Tout le reste
+// (variable, appel, spread, opérateur) fait échouer JSON.parse et rend null — c'est VOULU : mieux
+// vaut ne rien lire que lire faux. Le prix est nommé en en-tête (LIMITE DE LA LECTURE DE TEXTE).
+function jsLiteralToJSON(txt) {
+  let out = '', i = 0; const n = txt.length;
+  while (i < n) {
+    const c = txt[i];
+    if (c === '"' || c === "'") {
+      const q = c; let j = i + 1, buf = '';
+      while (j < n) { if (txt[j] === '\\') { buf += txt[j] + txt[j + 1]; j += 2; continue; } if (txt[j] === q) break; buf += txt[j]; j++; }
+      out += JSON.stringify(buf.replace(/\\'/g, "'")); i = j + 1; continue;
+    }
+    if (c === '/' && txt[i + 1] === '/') { while (i < n && txt[i] !== '\n') i++; continue; }
+    if (c === '/' && txt[i + 1] === '*') { const e = txt.indexOf('*/', i); if (e < 0) return null; i = e + 2; continue; }
+    const idm = /^([A-Za-z_$][A-Za-z0-9_$]*)(\s*):/.exec(txt.slice(i));
+    if (idm && idm[1] !== 'true' && idm[1] !== 'false' && idm[1] !== 'null') {
+      const prev = out.replace(/\s+$/, '').slice(-1);
+      if (prev === '' || prev === '{' || prev === ',') { out += '"' + idm[1] + '":'; i += idm[0].length; continue; }
+    }
+    out += c; i++;
+  }
+  out = out.replace(/,(\s*[}\]])/g, '$1');
+  try { return JSON.parse(out); } catch (e) { return null; }
+}
+
+// Premier littéral, dans la liste de fichiers donnée, qui satisfait `accept`.
+function readLiteral(files, anchorSrc, open, close, accept) {
+  for (const f of files) {
+    const src = slurp(path.join(LIB, f));
+    if (src === null) continue;
+    for (const reg of balancedRegions(src, anchorSrc, open, close)) {
+      const v = jsLiteralToJSON(reg);
+      if (v !== null && accept(v)) return v;
+    }
+  }
+  return null;
+}
+
+// Source 1 — VALID_CONFIG_KEYS, et les topLevel des motifs dynamiques (même manifeste).
+const SCHEMA = readJSON(path.join(SHARED, 'config-schema.manifest.json'));
+let validArr = (SCHEMA && Array.isArray(SCHEMA.validKeys)) ? SCHEMA.validKeys.filter(x => typeof x === 'string') : [];
+if (validArr.length === 0) {
+  const a = readLiteral(['config.cjs', 'configuration.cjs', 'config-schema.cjs'],
+    'VALID_CONFIG_KEYS\\s*[:=]\\s*new Set\\(\\s*\\[', '[', ']',
+    v => Array.isArray(v) && v.some(x => typeof x === 'string'));
+  if (a) validArr = a.filter(x => typeof x === 'string');
+}
 // Aucune clé connue lisible => le gate ne peut rien constater, il ne prétend rien.
 if (validArr.length === 0) process.exit(3);
 
-// Source 2 — configKeys du registre de capabilities.
-const ck = (mRegistry && mRegistry.configKeys && typeof mRegistry.configKeys === 'object') ? Object.keys(mRegistry.configKeys) : [];
+let dynPat = (SCHEMA && Array.isArray(SCHEMA.dynamicKeyPatterns)) ? SCHEMA.dynamicKeyPatterns : null;
+if (!dynPat) dynPat = readLiteral(['configuration.cjs', 'config.cjs', 'config-schema.cjs'],
+  'DYNAMIC_KEY_PATTERNS\\s*[:=]\\s*\\[', '[', ']', v => Array.isArray(v));
+const dynTop = (dynPat || []).map(p => p && p.topLevel).filter(x => typeof x === 'string');
+
+// Source 2 — configKeys du registre de capabilities (objet plat, compatible JSON).
+const ckObj = readLiteral(['capability-registry.cjs'], '\\bconfigKeys\\s*[:=]\\s*\\{', '{', '}',
+  v => v && typeof v === 'object' && !Array.isArray(v));
+const ck = ckObj ? Object.keys(ckObj) : [];
 
 // Source 3 — CONFIG_DEFAULTS canoniques (donne aussi la VALEUR des défauts amont).
-const DEFAULTS = (mConfiguration && mConfiguration.CONFIG_DEFAULTS && typeof mConfiguration.CONFIG_DEFAULTS === 'object') ? mConfiguration.CONFIG_DEFAULTS : {};
-const dynTop = (mConfiguration && Array.isArray(mConfiguration.DYNAMIC_KEY_PATTERNS))
-  ? mConfiguration.DYNAMIC_KEY_PATTERNS.map(p => p && p.topLevel).filter(x => typeof x === 'string')
-  : [];
+let DEFAULTS = readJSON(path.join(SHARED, 'config-defaults.manifest.json'));
+if (!DEFAULTS || typeof DEFAULTS !== 'object' || Array.isArray(DEFAULTS)) {
+  DEFAULTS = readLiteral(['configuration.cjs', 'config-loader.cjs', 'config.cjs'],
+    'CONFIG_DEFAULTS\\s*[:=]\\s*\\{', '{', '}',
+    v => v && typeof v === 'object' && !Array.isArray(v)) || {};
+}
 
 function flatten(o, prefix, out, withContainers) {
   for (const k of Object.keys(o)) {
