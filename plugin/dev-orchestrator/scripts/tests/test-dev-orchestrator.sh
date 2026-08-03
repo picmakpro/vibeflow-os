@@ -2369,6 +2369,10 @@ T25_NEG_RE='(JAMAIS|[Jj]amais|[Nn]e[[:space:]]+pas|[Nn]i[[:space:]]+|[Ss]ans[[:s
 # donc son périmètre d'origine — les briques Plan/Exécution — et la fixture d (brique Cadrage,
 # patron de la ligne réelle de vf-coder.md, `--auto` inclus) redevient ce qu'elle était : la preuve
 # que ce balayage-ci laisse le Cadrage à T25b au lieu de le punir.
+# PROPRIÉTÉ PARTAGÉE : cette graphie de bloc « Cadrage » est MIROITÉE en `T33_CADRAGE_RE` (bloc
+# T33, assertion E), qui ne lit PAS cette variable-ci — T33 survit donc à sa disparition. Si tu la
+# fais évoluer ici, fais-la évoluer là aussi : le recoupement croisé de T33 le dira, mais il vaut
+# mieux le savoir avant.
 T25_CADRAGE_RE='^[[:space:]]*([0-9]+[.)][[:space:]]+|[-*+][[:space:]]+)?[*][*]Cadrage([*]|[ ]|[(]|:)'
 T25_CHAINFLAG_RE='(--auto([^a-z-]|$)|--chain([^a-z-]|$))'
 
@@ -3871,7 +3875,7 @@ T33_DOCSFLOW="$REFS_DIR/docs-flow.md"
 T33_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T33_TMPDIR"
 # Valeurs de repli des compteurs cités par le libellé : sous `set -u`, une cible manquante ne doit
 # pas faire TOMBER le script — elle doit produire un KO qui le dit.
-t33_s9_n=0; t33_first_table=0; t33_d_src=0; t33_s1_rows=0
+t33_s9_n=0; t33_first_table=0; t33_d_src=0; t33_s1_rows=0; t33_al_flags_n=0
 T33_S9_AVANT="$T33_TMPDIR/s9-avant-table.txt"; : > "$T33_S9_AVANT"
 
 # Section matérialisée, TITRE COMPRIS : l'assertion A porte sur le titre, il ne peut donc pas être
@@ -4407,20 +4411,63 @@ t33_ship_motif_ok() { # <fichier de section §1> — la brique est en 2e cellule
 }
 t33_s1_rows="$(awk '/^\| /&&!/^\| Étape /{n++} END{print n+0}' "$T33_S1")"
 t33_s1_ship="$(awk '/^\| /&&/gsd-ship/{n++} END{print n+0}' "$T33_S1")"
-[ "$t33_s1_rows" -eq 9 ] \
-  || t33_ko="$t33_ko [G : la table du cycle canonique porte $t33_s1_rows ligne(s) de données au lieu de 9 — D-21 corrige la ligne de gsd-ship, il ne la supprime pas]"
+# Le compte de lignes n'est PAS gaté sur une valeur absolue. Un cycle canonique qui gagne une
+# brique gsd-core légitime ferait rougir T33 avec le message « D-21 ne supprime pas la ligne » —
+# un KO pour la mauvaise raison, et un piège de maintenance. Le garde UTILE est juste en dessous
+# (« exactement 1 ligne gsd-ship ») ; ici on ne garde que la NON-VACUITÉ, sans laquelle une table
+# croupion rendrait les mesures suivantes vraies à vide.
+[ "$t33_s1_rows" -ge 3 ] \
+  || t33_ko="$t33_ko [G, VERT À VIDE : la table du cycle canonique porte $t33_s1_rows ligne(s) de données (< 3) — la section est croupion ou l'extraction est cassée, aucune mesure sur cette table ne prouve rien]"
 [ "$t33_s1_ship" -eq 1 ] \
   || t33_ko="$t33_ko [G : $t33_s1_ship ligne(s) de table nomment gsd-ship dans la §1 (attendu : exactement 1)]"
 t33_ship_motif_ok "$T33_S1" \
   || t33_ko="$t33_ko [G : la ligne de table de gsd-ship ne porte pas elle-même ADR-059 ou ADR-064 — un compte sur le fichier serait VERT AVANT TOUTE ÉCRITURE, le nom de la brique y était déjà]"
-# Les DEUX ADR doivent vivre dans les sections que ce plan amende — pas « ailleurs par accident ».
-for t33_adr in ADR-059 ADR-064; do
-  if ! "$GREP" -qF "$t33_adr" "$T33_S1" && ! "$GREP" -qF "$t33_adr" "$T33_S6"; then
-    t33_ko="$t33_ko [G : $t33_adr absent des deux sections amendées (§1 et §6) — le motif de D-21 n'est pas là où le lecteur du cycle passe]"
+# Les DEUX ADR doivent vivre dans CHACUNE des sections que ce plan amende. Le « §1 OU §6 » de la
+# rédaction précédente rendait la §6 gratuite : les deux ADR étant déjà dans la §1, la puce
+# « L'ouverture de PR est un geste VibeFlow » pouvait être SUPPRIMÉE sans qu'une assertion bouge
+# (mutant rejoué par la revue → vert). Les deux sections sont exigées SÉPARÉMENT.
+# Fonction PURE de sa section, pour être rejouable telle quelle sur un mutant.
+t33_motif_section_ko() { # <fichier de section> <numéro> — imprime les manquements, rien si OK
+  local f n ko a
+  f="$1"; n="$2"; ko=""
+  if [ ! -s "$f" ]; then
+    printf '%s' " [G : la §$n matérialisée est VIDE — rien n'a été mesuré, la SONDE EST À RÉANCRER]"
+    return 0
   fi
-done
-"$GREP" -qF 'mission-contracts.md' "$T33_S1" \
-  || t33_ko="$t33_ko [G : le renvoi de protocole (mission-contracts.md) est absent de la §1 — le motif y est écrit sans dire où vit le protocole]"
+  for a in ADR-059 ADR-064; do
+    "$GREP" -qF "$a" "$f" \
+      || ko="$ko [G : $a absent de la §$n — le motif de D-21 doit être lisible dans CHACUNE des sections amendées, sinon l'une des deux se vide sans que rien ne rougisse]"
+  done
+  "$GREP" -qF 'mission-contracts.md' "$f" \
+    || ko="$ko [G : le renvoi de protocole (mission-contracts.md) est absent de la §$n — le motif y est écrit sans dire où vit le protocole]"
+  printf '%s' "$ko"
+}
+t33_ko="$t33_ko$(t33_motif_section_ko "$T33_S1" 1)"
+t33_ko="$t33_ko$(t33_motif_section_ko "$T33_S6" 6)"
+# Contre-épreuve : la §6 privée de sa puce doit faire ROUGIR. Sans elle, on aurait remplacé un
+# « §1 OU §6 » silencieux par un « ET » jamais mis à l'épreuve — et la revue a rejoué ce mutant-là
+# en vert. La mutation retire la puce ENTIÈRE (run de lignes non vides portant le renvoi).
+T33_MUT_S6="$T33_TMPDIR/mutant-s6-sans-puce.txt"
+awk '
+  { l[NR] = $0 }
+  END {
+    s = 0; e = 0
+    for (i = 1; i <= NR; i++) {
+      if (l[i] ~ /mission-contracts[.]md/) {
+        s = i; while (s > 1 && l[s-1] !~ /^[[:space:]]*$/) s--
+        e = i; while (e < NR && l[e+1] !~ /^[[:space:]]*$/) e++
+        break
+      }
+    }
+    for (i = 1; i <= NR; i++) if (i < s || i > e) print l[i]
+  }' "$T33_S6" > "$T33_MUT_S6"
+if cmp -s "$T33_S6" "$T33_MUT_S6"; then
+  t33_ko="$t33_ko [G/§6 : mutant IDENTIQUE à l'original — la puce de la §6 n'a pas été mordue, SONDE À RÉANCRER (ce n'est pas un défaut de la doctrine)]"
+else
+  t33_fx_fautives=$((t33_fx_fautives + 1))
+  [ -n "$(t33_motif_section_ko "$T33_MUT_S6" 6)" ] \
+    || t33_ko="$t33_ko [G/§6 NON DISCRIMINANT : la §6 privée de sa puce « L'ouverture de PR est un geste VibeFlow » satisfait encore le garde — la §6 est décorative, elle peut se vider sans qu'une assertion bouge]"
+fi
 # Mesure NÉGATIVE : le protocole est renvoyé, jamais recopié (ADR-057/ADR-030).
 for t33_inv in 'gh pr create' 'git worktree add'; do
   for t33_sec in "$T33_S1" "$T33_S6"; do
@@ -4449,8 +4496,10 @@ if cmp -s "$T33_PIPE" "$T33_MUT_ADR"; then
 else
   T33_MUT_S1="$T33_TMPDIR/mutant-s1.txt"; t33_section "$T33_MUT_ADR" 1 "$T33_MUT_S1"
   t33_mut_rows="$(awk '/^\| /&&!/^\| Étape /{n++} END{print n+0}' "$T33_MUT_S1")"
-  if [ "$t33_mut_rows" -ne 9 ]; then
-    t33_ko="$t33_ko [H : la mutation a touché la table de la §1 ($t33_mut_rows lignes de données au lieu de 9) — G rougirait pour la mauvaise raison]"
+  # Comparaison RELATIVE au fichier réel, jamais à un 9 codé en dur : ce garde dit « la mutation
+  # n'a pas touché à la table », pas « la table fait telle taille ».
+  if [ "$t33_mut_rows" -ne "$t33_s1_rows" ]; then
+    t33_ko="$t33_ko [H : la mutation a touché la table de la §1 ($t33_mut_rows lignes de données contre $t33_s1_rows dans le fichier réel) — G rougirait pour la mauvaise raison]"
   else
     t33_ship_motif_ok "$T33_MUT_S1" \
       && t33_ko="$t33_ko [H NON DISCRIMINANT : la ligne de gsd-ship privée de son ADR satisfait encore G — l'assertion ne prouve que la présence d'un nom de brique qui était là avant la Phase 23]"
@@ -4460,9 +4509,24 @@ fi
 
 # --- E : vf-coder.md renvoie vers la doctrine DEPUIS le bloc Cadrage ---------------------------
 T33_RECHERCHE_RE='[Rr]echerche'
+# COPIE LOCALE, ET NON `$T25_CADRAGE_RE`. Ce motif est la PROPRIÉTÉ de T25 (défini dans son
+# en-tête) et le plan 23-05 est instruit pour retoucher T25/T25b. Sous `set -uo pipefail`, la
+# disparition de la variable ne dégraderait pas T33 : elle tuerait le maillon de pipeline qui la
+# lit, dont le trap EXIT hérité effacerait `$T33_TMPDIR` — toutes les assertions suivantes se
+# mettraient alors à mentir avec des compteurs vides. Ce n'est pas une hypothèse : c'est arrivé
+# pendant l'écriture de ce correctif, sur une variable retirée un peu trop tôt.
+T33_CADRAGE_RE='^[[:space:]]*([0-9]+[.)][[:space:]]+|[-*+][[:space:]]+)?[*][*]Cadrage([*]|[ ]|[(]|:)'
+# Recoupement CROISÉ, jamais une dépendance : `${T25_CADRAGE_RE-}` ne tombe pas si T25 retire la
+# variable — E reste entièrement porté par la copie locale ci-dessus. Le recoupement ne parle que
+# quand la variable EXISTE et DIFFÈRE : là, l'une des deux graphies a bougé sans l'autre, et E
+# risque de mesurer un autre bloc que celui qu'elle croit. Ce cas-là, il faut le voir.
+t33_t25_re="${T25_CADRAGE_RE-}"
+if [ -n "$t33_t25_re" ] && [ "$T33_CADRAGE_RE" != "$t33_t25_re" ]; then
+  t33_ko="$t33_ko [E : la copie locale du motif de bloc Cadrage a DIVERGÉ de celle de T25 — l'une des deux a bougé sans l'autre. Réaligner les deux, ou assumer la divergence en le disant ici]"
+fi
 t33_cadrage_renvoi_ok() { # <fichier agent>
   local blk
-  blk="$(md_blocks_matching "$1" "$T25_CADRAGE_RE")"
+  blk="$(md_blocks_matching "$1" "$T33_CADRAGE_RE")"
   [ -n "$blk" ] || return 2
   printf '%s\n' "$blk" | "$GREP" -qF 'GSD-PIPELINE.md' || return 1
   printf '%s\n' "$blk" | "$GREP" -qE "$T33_RECHERCHE_RE" || return 1
@@ -4493,7 +4557,7 @@ fi
 if [ -n "$t33_ko" ]; then
   ko "T33 (Lacune 3, §9 allowlist stricte + D-21, DISCRIMINANT) : la doctrine de flags de cycle ne tient pas —$t33_ko"; t33_ok=0
 else
-  ok "T33 (Lacune 3, §9 allowlist stricte + D-21, DISCRIMINANT) : la clause de fermeture par défaut GOUVERNE la table (détectée dans les $((t33_first_table - 1)) ligne(s) qui la précèdent, §9 de $t33_s9_n lignes), les deux formes de gradation de la recherche sont dans la CELLULE « flags autorisés » de la brique de plan, la ligne de cadrage porte dans sa PROPRE cellule de motif la marque de transitoire ET l'échéance (plan 23-05), le renvoi croisé tient sur UNE ligne physique (docs-flow.md + ADR-057) avec intersection de flags VIDE sur $t33_d_src flag(s) documentaires extraits, vf-coder.md renvoie depuis son bloc Cadrage, et la ligne de gsd-ship porte elle-même son ADR (table de §1 intacte : $t33_s1_rows lignes de données) — $t33_fx_fautives formulation(s)/mutant(s) FAUTIFS font rougir les sondes, $t33_fx_licites reformulation(s) LICITES restent vertes"
+  ok "T33 (Lacune 3, §9 allowlist stricte + D-21, DISCRIMINANT) : la clause de fermeture par défaut GOUVERNE la table (détectée dans les $((t33_first_table - 1)) ligne(s) qui la précèdent, §9 de $t33_s9_n lignes) et la co-présence portée/prédicat est bornée à la PROPOSITION, pas au bloc ; le CONTENU de l'allowlist est gaté par ÉGALITÉ D'ENSEMBLE cellule par cellule sur les 3 briques ($t33_al_flags_n flag(s) distinct(s) extraits, intersection autorisés∩fermés vide, --chain fermé partout) ; les deux formes de gradation de la recherche sont dans la CELLULE « flags autorisés » de la brique de plan ; la ligne de cadrage porte dans sa PROPRE cellule de motif la marque de transitoire ET l'échéance (plan 23-05) sans ressusciter les prémisses mortes (persistance config.json, T25b comme borne) ; le renvoi croisé tient sur UNE ligne physique (docs-flow.md + ADR-057) avec intersection de flags VIDE sur $t33_d_src flag(s) documentaires extraits ; vf-coder.md renvoie depuis son bloc Cadrage ; la ligne de gsd-ship porte elle-même son ADR et le motif de D-21 est lisible dans CHACUNE des sections amendées (§1 de $t33_s1_rows lignes de données, et §6) — $t33_fx_fautives formulation(s)/mutant(s) FAUTIFS font rougir les sondes, $t33_fx_licites reformulation(s) LICITES restent vertes"
 fi
 
 # ---------------------------------------------------------------------------
