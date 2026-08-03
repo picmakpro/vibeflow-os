@@ -45,7 +45,7 @@
         "plugin/dev-orchestrator/hooks/hooks.json",
         ".planning/config.json"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "revue-02",
@@ -59,7 +59,7 @@
         "plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh",
         "plugin/dev-orchestrator/hooks/hooks.json"
       ],
-      "status": "blocked",
+      "status": "running",
       "review_regime": "full"
     },
     {
@@ -377,6 +377,50 @@
       "stage": "plan",
       "deps": [
         "arbitrage-O8"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "replan-03",
+      "step": "amendement du plan 23-03 sur les 3 bloquants du plancheck (table d'allowlist contradictoire sous A-1ter, motif adosse a un gate degaze, tracabilite amont absente) + les 6 warnings de sondes a token",
+      "stage": "plan",
+      "deps": [
+        "plancheck-03"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-03-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-overlay-federe",
+      "step": "ARBITRAGE HUMAIN — check-gsd-config.sh ne lit pas l'overlay federe de capabilities tierces : faux positif possible, jamais faux negatif, gate advisory. Elargir la portee (hors perimetre 23-02) ou acter la limite documentee ?",
+      "stage": "human",
+      "deps": [
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/check-gsd-config.sh"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "alloc-blocs-test",
+      "step": "allocation des identifiants de bloc de test a travers 23-03..23-08 — T24,T25,T25b,T25c,T26,T27,T27b,T27c sont DEJA poses par 23-01, les plans restants les revendiquent encore (lecture seule)",
+      "stage": "plan",
+      "deps": [
+        "replan-03"
+      ],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "plancheck-04",
+      "step": "re-validation du plan 23-04 contre A-1ter et contre les 3 familles de defauts trouvees sur 23-03 et 23-02 (lecture seule)",
+      "stage": "plan",
+      "deps": [
+        "replan-03"
       ],
       "scope": [],
       "status": "running"

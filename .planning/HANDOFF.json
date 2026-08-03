@@ -23,10 +23,15 @@
     {"id": 8, "name": "revue-01e — revue ciblée : invariance de la sonde prouvée par ensembles matérialisés (comm sur verdicts triés, cmp sur multiset statut+identifiant, séquence de lignes de code identique) PUIS re-vérifiée par le manager sur le diff brut : exactement 4 lignes non-commentaire changées, toutes des chaînes de message (2 T25B_WHY, 1 ok, 1 ko). T25B_DISARM_RE, T25B_WINDOW, l'awk d'appariement, les fixtures g..k, les mutants M1..M4 et les codes de retour sont intacts", "status": "done"}
   ],
   "remaining_tasks": [
-    {"id": 9, "name": "exec-02 — 23-02 check-gsd-config.sh + hooks + config.json", "status": "running"},
-    {"id": 10, "name": "arbitrage-A1ter-vfcoder — ARBITRAGE HUMAIN, seul Samuel. NE BLOQUE AUCUN NŒUD du DAG", "status": "awaiting_human"},
-    {"id": 11, "name": "revue-02 — revue code 23-02", "status": "blocked"},
-    {"id": 12, "name": "exec-03 — 23-03 Lacune 3, doctrine de flags de cycle. DÉBLOQUÉ (arbitrage-O8 done : on sait ce qu'un --auto auto-approuve)", "status": "blocked"},
+    {"id": 9, "name": "exec-02 — 23-02 check-gsd-config.sh + suite dédiée + câblage SessionStart + config.json du lab aligné. Bascule du gate prouvée par exécution : exit 0 (signal) AVANT, exit 3 (silence) APRÈS ; l'avertissement `unknown config key(s)` passe de 1 occurrence à 0. 6 mutations du script rejouées, chacune tuée par le cas prévu. ÉCART AU PLAN : union à 3 sources et non 2 (CONFIG_DEFAULTS ajoutée — `workflow._auto_chain_active`, écrit par le moteur lui-même, n'est ni dans VALID_CONFIG_KEYS ni dans configKeys, donc le critère « stdout vide » était inatteignable à 2 sources)", "status": "done", "commits": ["3b68a02", "9f235e0", "9c756aa", "f72bcb3", "b04d88a"]},
+    {"id": 10, "name": "plancheck-03 — re-validation du plan 23-03 contre A-1ter : TROIS BLOQUANTS trouvés (table d'allowlist logiquement contradictoire, motif adossé à un gate dégazé, traçabilité amont absente : 0 occurrence de A-1ter/ARBITRAGES/23-05 dans le plan) + 6 sondes à token", "status": "done"},
+    {"id": 11, "name": "replan-03 — plan 23-03 amendé : allowlist requalifiée en AUTORISATION TRANSITOIRE DATÉE (table à 4 colonnes, échéance 23-05 écrite dans la cellule de motif), motif réécrit sur chain.md:45-61 + règle 5 borné par règle 6, T-23-03-02 requalifié mitigate→accept, ARBITRAGES ajoutés au context et au read_first, 6 sondes ancrées", "status": "done", "commit": "a4fdbe5"},
+    {"id": 12, "name": "revue-02 — revue code 23-02 en RÉGIME PLEIN, regard frais (le livrable câble un script sur SessionStart de tous les labs : coût d'erreur asymétrique)", "status": "running"},
+    {"id": 13, "name": "alloc-blocs-test — allocation des identifiants de bloc de test à travers 23-03..23-08 (lecture seule)", "status": "running"},
+    {"id": 14, "name": "plancheck-04 — re-validation du plan 23-04 (lecture seule)", "status": "running"},
+    {"id": 15, "name": "arbitrage-A1ter-vfcoder — ARBITRAGE HUMAIN. NE BLOQUE AUCUN NŒUD du DAG", "status": "awaiting_human"},
+    {"id": 16, "name": "arbitrage-overlay-federe — ARBITRAGE HUMAIN. NE BLOQUE AUCUN NŒUD du DAG", "status": "awaiting_human"},
+    {"id": 17, "name": "exec-03 — 23-03 Lacune 3, doctrine de flags de cycle. Plan AMENDÉ et re-validé. Reste la QUESTION OUVERTE de numérotation de bloc de test (23-03-PLAN.md:130-152), traitée par alloc-blocs-test", "status": "blocked"},
     {"id": 13, "name": "revue-03 / exec-04 / revue-04 / audit-infra", "status": "blocked"},
     {"id": 14, "name": "exec-05 — 23-05 voie unique d'invocation. PORTE la contrainte d'entrée A-1ter geste 2 (le manager porte le cadrage). Plan AMENDÉ après coup → re-validation plan-checker AVANT exécution", "status": "blocked"},
     {"id": 15, "name": "exec-06 / exec-07", "status": "blocked"},
@@ -40,6 +45,14 @@
   "human_actions_pending": [
     {
       "action": "A-1ter, portée du geste 1 — vf-coder.md:30-31 affirme encore « le refermer ICI, dans le geste même qui l'ouvre, borne la fenêtre armée au seul cadrage de cette étape ». C'est exactement le fait qu'A-1ter dément. Le gate ne ment plus ; la doctrine que le gate vérifie ment toujours, et c'est elle qui pilote un agent en production. Le geste 1 ne nommait que T25b, donc personne n'y a touché (ADR-031). Trois voies : (a) correctif TEXTE minimal maintenant, nœud séparé, ~1 commit, vf-coder.md à 94/250, périmètre disjoint des nœuds en cours ; (b) correctif + sonde de non-régression, mais cela rouvre 23-01 une 6e fois sur du gate ; (c) statu quo jusqu'à l'exécution de 23-05, en assumant qu'un agent en production affirme entre-temps un fait connu faux.",
+      "blocking": false
+    },
+    {
+      "action": "check-gsd-config.sh (23-02) ne lit pas l'OVERLAY FÉDÉRÉ de capabilities tierces avec lequel le moteur complète ses clés connues. Conséquence bornée : sur un lab qui en installe, faux positif possible, JAMAIS faux négatif, et le gate reste advisory (exit 0/3/64, jamais bloquant). Aucune dérive sur ce lab-ci (vérifié). La limite est DOCUMENTÉE en en-tête du script, pas implémentée : élargir la portée est hors périmètre du plan 23-02, dont le RESEARCH ignore cette source. Élargir en Phase 24, ou acter la limite documentée ?",
+      "blocking": false
+    },
+    {
+      "action": "Collision d'identifiants de bloc de test : T24, T25, T25b, T25c, T26, T27, T27b, T27c existent DÉJÀ (posés par 23-01) alors que les plans de la phase annonçaient « blocs neufs T24 à T32 ». Le plan 23-03 amendé porte une section ⚠ QUESTION OUVERTE (l. 130-152) avec instruction d'arrêt pour l'exécutant. Conséquence au-delà du nommage : un critère d'acceptation qui cherche un identifiant déjà présent est VERT AVANT TOUTE ÉCRITURE. Nœud alloc-blocs-test en cours pour établir les faits et proposer une allocation sans collision — arbitrage technique, tranché par le manager si les faits le permettent.",
       "blocking": false
     },
     {
