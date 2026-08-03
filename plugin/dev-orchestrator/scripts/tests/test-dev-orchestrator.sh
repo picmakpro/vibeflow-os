@@ -2360,9 +2360,12 @@ T25_NEG_RE='(JAMAIS|[Jj]amais|[Nn]e[[:space:]]+pas|[Nn]i[[:space:]]+|[Ss]ans[[:s
 # 1.9.0 il n'existe AUCUN drapeau à la fois non interactif, producteur de `CONTEXT.md`, et sans
 # chain flag : le gate était donc anti-corrélé au risque, étiquette simplement retournée.
 #
-# La branche est RETIRÉE d'ici. Ce qui la remplace n'est pas une interdiction mais une exigence de
-# RELATION, portée par T25b : `--auto` sur le Cadrage est licite, et c'est l'ABSENCE d'un
-# désarmement ADJACENT de `workflow._auto_chain_active` juste après lui qui doit rougir. T25 garde
+# La branche est RETIRÉE d'ici. Ce qui la remplace n'est pas une interdiction mais une exigence
+# d'ADJACENCE TEXTUELLE, portée par T25b : `--auto` sur le Cadrage est licite, et c'est l'ABSENCE,
+# DANS LE TEXTE, d'un désarmement de `workflow._auto_chain_active` proche de lui qui doit rougir.
+# T25b ne borne AUCUNE fenêtre d'armement runtime — le trou est documenté dans son en-tête et son
+# correctif structurel est instruit dans le plan 23-05 (A-1ter). Ne pas lire son vert autrement.
+# T25 garde
 # donc son périmètre d'origine — les briques Plan/Exécution — et la fixture d (brique Cadrage,
 # patron de la ligne réelle de vf-coder.md, `--auto` inclus) redevient ce qu'elle était : la preuve
 # que ce balayage-ci laisse le Cadrage à T25b au lieu de le punir.
@@ -2484,9 +2487,10 @@ elif [ -n "$t25_real_hits" ]; then
   t25_ok=0
 else
   # Le libellé ci-dessous décrit EXACTEMENT ce qui est balayé depuis A-1bis (les briques
-  # Plan/Exécution, et elles seules — le Cadrage relève de T25b, qui y mesure une relation et non
-  # une interdiction). Il n'est pas réécrit : mot pour mot, il est l'un des acquis dont la
-  # stabilité sert de base de comparaison d'une exécution à l'autre.
+  # Plan/Exécution, et elles seules — le Cadrage relève de T25b, qui y mesure une ADJACENCE
+  # TEXTUELLE et non une interdiction ; T25b ne borne aucune fenêtre runtime, cf. son en-tête).
+  # Il n'est pas réécrit : mot pour mot, il est l'un des acquis dont la stabilité sert de base de
+  # comparaison d'une exécution à l'autre.
   ok "T25 fermeture : $t25_scanned fichier(s) de doctrine balayé(s), aucun ne prescrit le mode d'enchaînement sur une brique Plan/Exécution"
 fi
 
@@ -2516,9 +2520,9 @@ fi
 #                   l'exclusion des négations est bornée à la clause et non au bloc (sinon un seul
 #                   « jamais » n'importe où suffirait à désarmer le gate).
 #   d  LICITE     — brique Cadrage portant la forme RÉELLE retenue par A-1bis (`--auto` + son
-#                   désarmement adjacent) : ce balayage-ci ne la voit pas, et c'est voulu — le
-#                   Cadrage est mesuré par T25b, en RELATION. La fixture réimmortalise ainsi
-#                   comme licite la rédaction que le gate d'A-1 faisait rougir.
+#                   désarmement TEXTUELLEMENT adjacent) : ce balayage-ci ne la voit pas, et c'est
+#                   voulu — le Cadrage est mesuré par T25b, en ADJACENCE TEXTUELLE. La fixture
+#                   réimmortalise ainsi comme licite la rédaction que le gate d'A-1 faisait rougir.
 #   e  LICITE     — INTERDICTION rédigée sur une brique Plan (« JAMAIS en mode non-interactif ») :
 #                   un durcissement du texte, que le test punissait.
 #   f  LICITE     — bloc « **Planification amont** » citant `--auto`/`--chain` : ce n'est pas une
@@ -2557,25 +2561,56 @@ fi
 [ "$t25_ok" -eq 1 ] && ok "T25 : flag d'enchaînement désarmé au démarrage + fermé par gate (Plan/Exécution interdits, Cadrage licite), discriminance prouvée par mutation"
 
 # ---------------------------------------------------------------------------
-# T25b (A-1bis, DISCRIMINANT) — sur la brique **Cadrage**, `--auto` est LICITE et c'est l'ABSENCE
-# d'un désarmement ADJACENT qui doit rougir. Assertion CUMULATIVE : elle s'ajoute à T25, dont les
-# six fixtures gardent leur verdict.
+# T25b (A-1bis, DÉGAZÉ PAR A-1ter le 2026-08-03 — DISCRIMINANT) — sur la brique **Cadrage**,
+# `--auto` est LICITE et c'est l'ABSENCE d'un désarmement TEXTUELLEMENT ADJACENT qui doit rougir.
+# Assertion CUMULATIVE : elle s'ajoute à T25, dont les six fixtures gardent leur verdict.
 #
-# CE QUI EST MESURÉ : une RELATION, jamais l'existence d'un token. C'est le défaut qui s'est
-# reproduit quatre fois sur cette phase — et dans sa forme la plus coûteuse au commit e2b1bfe, où
-# la sonde cherchait `--auto` et le déclarait fautif par sa seule présence. Chercher le mot
-# « désarme » quelque part dans le fichier serait la même faute, symétrique : la garantie n'est pas
-# que le désarmement EXISTE, c'est qu'il SUIVE IMMÉDIATEMENT l'appel qui arme. Un désarmement
-# renvoyé à l'autre bout du fichier — ou à l'autre bout du même bloc — laisse exactement la fenêtre
-# armée que A-1bis prétend fermer, sans qu'un seul token manque.
+# ============================ CE QUI EST MESURÉ, ET RIEN DE PLUS ============================
+# Une ADJACENCE TEXTUELLE, dans le bloc **Cadrage** APLATI d'un fichier de doctrine : chaque
+# occurrence PRESCRIPTIVE d'un flag d'armement (`--auto`/`--chain`, hors clause négative — cf.
+# $T25_NEG_RE, acquis anti-faux-rouge de T25) doit être SUIVIE, à ≤ $T25B_WINDOW caractères du
+# bloc aplati, d'un désarmement NOMMÉ (la clé ET sa remise à faux). C'est une propriété du TEXTE,
+# comptée en caractères, entre un armement PRESCRIT et un désarmement PRESCRIT. Rien d'autre.
 #
-# La sonde apparie donc, DANS le bloc Cadrage aplati : chaque occurrence PRESCRIPTIVE d'un flag
-# d'armement (`--auto`/`--chain`, hors clause négative — cf. $T25_NEG_RE, acquis anti-faux-rouge de
-# T25) doit être suivie, dans une fenêtre bornée, du désarmement NOMMÉ. « Suivie » est
-# load-bearing : un désarmement placé AVANT l'armement est précisément le geste 5 du manager, dont
-# A-1bis établit qu'il ne suffit pas. Écart assumé et symétrique du choix de T25 : une rédaction
-# qui poserait le désarmement avant l'armement rougit — sur cette relation-là, l'ordre EST la
-# garantie.
+# ===================== CE QUE CETTE SONDE NE GARANTIT **PAS** (A-1ter, O-8) ==================
+# Elle ne borne AUCUNE fenêtre d'armement RUNTIME. Le fait, vérifié trois fois contre
+# `gsd-core@1.9.0` installé, sur `~/.claude/gsd-core/workflows/discuss-phase/modes/chain.md`
+# étape 5 (l. 45-61) : « If `--auto` flag present OR `--chain` flag present OR `AUTO_MODE` is
+# true » → `Skill(skill="gsd-plan-phase", args="${PHASE} --auto ${GSD_WS}")`. `--auto` sur le
+# cadrage n'arme donc pas seulement le chain flag : il ENCHAÎNE discuss → plan → execute dans le
+# MÊME appel. L'agent ne reprend la main qu'à la FIN du pipeline entier — le désarmement
+# « adjacent » que cette sonde certifie s'exécute APRÈS que plan et execute ont déjà tourné.
+# Un vert de T25b ne dit donc RIEN de la durée pendant laquelle le flag est effectivement armé,
+# et surtout pas qu'elle serait bornée, fermée, ou antérieure à l'exécution de quoi que ce soit.
+#
+# PORTÉE RÉELLE DU TROU, BORNÉE — à ne pas surestimer non plus.
+# `gsd-core/references/checkpoints.md` RÈGLE 6 protège les gates `blocking-human` : ils ne sont
+# JAMAIS auto-approuvés, même en auto-mode. Ce n'est donc PAS une violation d'ADR-031 sur le gate
+# que 23-01 construit. C'est la RÈGLE 5 qui joue, sur tout le reste : pendant plan et execute,
+# `human-verify` AUTO-APPROUVE et `decision` AUTO-SÉLECTIONNE la première option — une mission
+# déroule plan et execute en autonome sans l'avoir voulu, et ses décisions se choisissent seules.
+#
+# CORRECTIF STRUCTUREL, ET DATE DE PÉREMPTION DE CETTE SONDE. A-1ter geste 2, voie 1 : le MANAGER
+# porte le cadrage (il a `AskUserQuestion`, donc `--auto` n'a plus lieu d'être et le problème
+# disparaît à la racine). Instruite dans le plan 23-05 (Lacune 5, voie unique d'invocation), NON
+# ENCORE EXÉCUTÉE. Le jour où elle le sera, T25b devient SANS OBJET : à RETIRER, ou à remplacer
+# par une garantie RUNTIME — jamais à conserver vert. En attendant, la sonde garde son utilité
+# (l'adjacence textuelle est tout ce qu'un fichier de doctrine peut porter) et son libellé ne
+# promet plus que ce qu'elle mesure : aucun gate ne ment en attendant le correctif.
+# ============================================================================================
+#
+# POURQUOI UNE RELATION ET JAMAIS UN TOKEN. Chercher `--auto` et le déclarer fautif par sa seule
+# présence (commit e2b1bfe) était la forme la plus coûteuse du défaut qui s'est reproduit quatre
+# fois sur cette phase. Chercher le mot « désarme » quelque part dans le fichier serait la même
+# faute, symétrique : ce que le texte doit porter, ce n'est pas que le désarmement EXISTE, c'est
+# qu'il SUIVE de près l'appel qui arme. Un désarmement renvoyé à l'autre bout du fichier — ou à
+# l'autre bout du même bloc — rompt cette adjacence sans qu'un seul token manque, et c'est
+# précisément ce que les mutants M2 et M3 prouvent.
+#
+# « Suivie » est load-bearing : un désarmement placé AVANT l'armement est précisément le geste 5
+# du manager, dont A-1bis établissait qu'il ne suffit pas. Écart assumé et symétrique du choix de
+# T25 : une rédaction qui poserait le désarmement avant l'armement rougit (cf. O-2) — sur cette
+# adjacence-là, l'ordre EST ce qui est mesuré.
 #
 # ≥1 appariement suffit (jamais « toutes les occurrences ») : une prose qui recite `--auto` plus
 # loin pour l'expliquer serait sinon un faux rouge — la famille de faux rouges que cette phase a
@@ -2606,7 +2641,8 @@ fi
 #                   multiset canonique de tokens du fichier est vérifié identique, seul l'ordre
 #                   change.
 #   + le fichier RÉEL doit tenir l'assertion (rc=0), et AUCUN .md de doctrine du module ne doit
-#     porter un Cadrage armé sans désarmement adjacent (balayage, mêmes cibles résolues que T25).
+#     porter un Cadrage armé sans désarmement TEXTUELLEMENT adjacent (balayage, mêmes cibles
+#     résolues que T25).
 # ---------------------------------------------------------------------------
 t25b_ok=1
 
@@ -2621,8 +2657,9 @@ T25B_DISARM_RE='workflow[.]_auto_chain_active[`]?[[:space:]]+false'
 # bloc (celui de vf-coder.md fait ~800 caractères, son appariement réel en fait ~75).
 T25B_WINDOW=150
 
-# rc=0 appariement armement→désarmement ADJACENT trouvé ($T25B_WHY porte la distance mesurée) ·
-# rc=1 armement prescriptif SANS désarmement adjacent · rc=2 aucune brique Cadrage · rc=3 aucun
+# rc=0 appariement TEXTUEL armement→désarmement adjacent trouvé ($T25B_WHY porte la distance
+# mesurée, en caractères) · rc=1 armement prescriptif SANS désarmement textuellement adjacent
+# (ce qui ne dit rien de la fenêtre runtime, cf. en-tête) · rc=2 aucune brique Cadrage · rc=3 aucun
 # armement prescriptif : la sonde est SANS OBJET sur ce fichier — ni un vert ni un rouge, et
 # jamais un repli silencieux sur « le mot désarmement apparaît quelque part ».
 T25B_WHY=""
@@ -2671,9 +2708,9 @@ t25b_cadrage_adjacent_disarm() { # <file>
     return 0
   fi
   if [ "${mind:--1}" -lt 0 ]; then
-    T25B_WHY="la brique Cadrage arme le chain flag ($armed occurrence(s) prescriptive(s)) et AUCUN désarmement nommé (\`workflow._auto_chain_active … false\`) ne le SUIT dans le bloc — la fenêtre reste ouverte pour toute la mission"
+    T25B_WHY="la brique Cadrage prescrit le chain flag ($armed occurrence(s) prescriptive(s)) et AUCUN désarmement nommé (\`workflow._auto_chain_active … false\`) ne le SUIT dans le bloc — l'adjacence TEXTUELLE exigée est absente du texte"
   else
-    T25B_WHY="le désarmement suit bien l'armement, mais à $mind caractères (> $T25B_WINDOW) : il n'est PAS adjacent — la fenêtre armée court jusque-là, et une co-présence dans le bloc ne la referme pas"
+    T25B_WHY="le désarmement suit bien l'armement dans le texte, mais à $mind caractères (> $T25B_WINDOW) : il n'est PAS adjacent au sens de cette sonde — une co-présence dans le bloc ne vaut pas adjacence"
   fi
   return 1
 }
@@ -2768,13 +2805,15 @@ t25b_assert_mutant_red "M2 désarmement déplacé HORS du bloc (tokens gardés)"
 t25b_assert_mutant_red "M3 désarmement déplacé en FIN de bloc (non adjacent)" "$T25B_M3"
 t25b_assert_mutant_red "M4 armement/désarmement PERMUTÉS (multiset inchangé)" "$T25B_M4"
 
-# Le fichier RÉEL doit tenir l'assertion : `--auto` armé ET refermé dans le geste même.
+# Le fichier RÉEL doit tenir l'assertion : `--auto` prescrit, et son désarmement écrit dans la
+# foulée — adjacence dans le TEXTE, qui ne présume rien de l'ordre d'exécution (cf. en-tête).
 t25b_cadrage_adjacent_disarm "$CODER_FILE" \
   || t25b_ko="$t25b_ko [vf-coder.md RÉEL ne tient pas l'assertion (rc=$?) — $T25B_WHY]"
 
 # Balayage : AUCUN .md de doctrine du module ne peut porter un Cadrage armé sans désarmement
-# adjacent. Mêmes cibles RÉSOLUES que T25 — jamais un glob en dur (en lab installé agents/ est plat
-# et partagé, et references/ n'existe pas sous ce nom : un glob non expansé = vert à vide).
+# TEXTUELLEMENT adjacent. Mêmes cibles RÉSOLUES que T25 — jamais un glob en dur (en lab installé
+# agents/ est plat et partagé, et references/ n'existe pas sous ce nom : un glob non expansé =
+# vert à vide).
 t25b_scanned=0
 while IFS= read -r t25b_f; do
   [ -n "$t25b_f" ] || continue
@@ -2786,9 +2825,9 @@ done < <(module_md_targets)
   || t25b_ko="$t25b_ko [balayage : ZÉRO fichier de doctrine ouvert — un vert à vide n'est pas une garantie]"
 
 if [ -z "$t25b_ko" ]; then
-  ok "T25b (A-1bis, DISCRIMINANT) : sur la brique Cadrage, \`--auto\` est LICITE et c'est l'ABSENCE de désarmement ADJACENT qui rougit — relation mesurée (armement → désarmement nommé, à ≤ $T25B_WINDOW caractères et APRÈS lui), 4 mutants du fichier RÉEL détectés (retrait, report hors bloc, report en fin de bloc, permutation à multiset inchangé), 2 fixtures SANS OBJET assumées (\`--assumptions\`, interdiction rédigée), 1 reformulation légitime verte, $t25b_scanned fichier(s) de doctrine balayé(s), et vf-coder.md tient l'appariement"
+  ok "T25b (A-1bis, dégazé A-1ter — DISCRIMINANT) : ADJACENCE TEXTUELLE mesurée dans le bloc Cadrage APLATI — chaque armement prescriptif (\`--auto\`/\`--chain\`) est suivi, à ≤ $T25B_WINDOW caractères et APRÈS lui, d'un désarmement NOMMÉ ; ne borne AUCUNE fenêtre d'armement runtime (\`--auto\` enchaîne discuss→plan→execute, le désarmement adjacent s'exécute APRÈS le pipeline — cf. en-tête du bloc, correctif structurel en 23-05). 4 mutants du fichier RÉEL détectés (retrait, report hors bloc, report en fin de bloc, permutation à multiset inchangé), 2 fixtures SANS OBJET assumées (\`--assumptions\`, interdiction rédigée), 1 reformulation légitime verte, $t25b_scanned fichier(s) de doctrine balayé(s), et vf-coder.md tient l'appariement TEXTUEL"
 else
-  ko "T25b (A-1bis, DISCRIMINANT) : l'adjacence armement↔désarmement n'est pas mesurée —$t25b_ko"; t25b_ok=0
+  ko "T25b (A-1bis, dégazé A-1ter — DISCRIMINANT) : l'adjacence TEXTUELLE armement↔désarmement dans le bloc Cadrage n'est pas mesurée —$t25b_ko"; t25b_ok=0
 fi
 
 # ---------------------------------------------------------------------------
