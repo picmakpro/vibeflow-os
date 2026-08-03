@@ -3893,27 +3893,68 @@ t33_cell() { # <ligne de table> <index de champ awk -F'|'>
 }
 
 # --- Regexes de la clause de fermeture, et leur contrat ---------------------------------------
+#
+# LEÇON N1 DE CETTE PHASE, PAYÉE DEUX FOIS. Une sonde ne se prouve pas sur un échantillon de
+# formes, elle se prouve sur l'ESPACE des formes. La rédaction précédente échouait deux fois :
+#   · la co-présence était mesurée au niveau du BLOC — deux propositions sans aucun rapport
+#     grammatical dans le même paragraphe aplati suffisaient à déclarer la clause présente ;
+#   · la méta-prohibition était détectée par une LISTE FERMÉE DE VERBES — « ne jamais écrire que »
+#     était attrapé, « ne jamais affirmer / soutenir / formuler que » passait.
+# Une liste plus longue serait le même défaut avec un tour d'avance. Les deux gardes sont donc
+# STRUCTURELS : co-présence bornée à la PROPOSITION, et négation détectée par sa PARTICULE
+# (`ne ` / `n'`), pas par le verbe qu'elle porte.
+#
 # PORTÉE : ce que la clause referme (« tout le reste », « tout flag non nommé »…). Sans elle, on
 # mesure une phrase qui parle de flags interdits sans rien fermer du tout.
 T33_SCOPE_RE='[Tt]out[[:space:]]+(le[[:space:]]+reste|flag[[:space:]]+non[[:space:]]+nomm|autre[[:space:]]+flag|ce[[:space:]]+qui[[:space:]]+n)'
 # FERMETURE À L'AFFIRMATIF : la copule est collée au participe. « n'est pas fermé par défaut »
-# donne « est pas fermé », qui ne matche pas — l'inversion par négation est rejetée sans garde.
-T33_CLOSE_RE='(est|sont|reste|restent)[[:space:]]+(interdit|interdits|interdite|interdites|fermé|fermés|fermée|fermées|clos)[[:space:]]+par[[:space:]]+défaut'
-# MÉTA-PROHIBITION : « ne jamais écrire que tout le reste est interdit par défaut » porte le même
-# vocabulaire ET la même syntaxe affirmative en subordonnée. Seul ce garde le distingue.
-T33_PROHIB_RE='[Nn]e[[:space:]]+(jamais|pas|plus)[[:space:]]+(écrire|dire|motiver|prescrire|présenter|poser|laisser|accorder|croire)'
+# donne « est pas fermé », qui ne matche pas — l'inversion par « ne … pas » est rejetée sans garde.
+T33_COP_RE='(est|sont|reste|restent)'
+T33_PART_RE='(interdit|interdits|interdite|interdites|fermé|fermés|fermée|fermées|clos)'
+T33_CLOSE_RE="${T33_COP_RE}[[:space:]]+${T33_PART_RE}[[:space:]]+par[[:space:]]+défaut"
+# PROPOSITION : segment sans terminateur de phrase ASCII. La portée et le prédicat doivent tenir
+# DANS LE MÊME segment — sinon « Tout le reste relève du manager. La cellule est fermée par
+# défaut. » vaudrait clause de fermeture. Le segment extrait commence après le terminateur qui
+# précède (les `*` sont gloutons vers la gauche jusqu'à la borne) et s'arrête sur « par défaut » :
+# c'est exactement le PRÉFIXE qui mène à l'affirmation, et donc le bon terrain pour les gardes.
+T33_SEG_RE='[^.!?;:]*'
+T33_PROP_RE="${T33_SEG_RE}${T33_SCOPE_RE}${T33_SEG_RE}${T33_CLOSE_RE}"
+# PARTICULE DE NÉGATION, élidée ou non, en début de mot (le `(^|[[:space:]])` évite que « lig-ne
+# reste fermée par défaut » se prenne pour une négation).
+T33_APOS_RE="('|’)"
+T33_NEGPART_RE="(^|[[:space:]])([Nn]e[[:space:]]+|[Nn]${T33_APOS_RE})"
+# INVERSION : la particule est collée à la copule du prédicat. Couvre d'un coup « aucun … n'est »,
+# « nul … n'est », « rien n'est », « ne reste … que », sans énumérer aucun sujet de négation.
+T33_NEG_RE="${T33_NEGPART_RE}${T33_CLOSE_RE}"
+# DÉMENTI : une matrice négative introduit l'affirmation par une complétive — « ne jamais écrire
+# QUE … », « ne jamais affirmer QUE … », « il n'est pas vrai QUE … ». Le verbe n'est pas nommé ;
+# seule la structure « particule de négation … que » l'est.
+T33_DENY_RE="${T33_NEGPART_RE}[^.!?;:]*[[:space:]]que[[:space:]]"
+#
+# CE QUE CES GARDES NE COUVRENT PAS — bornes ASSUMÉES, écrites plutôt que supposées :
+#   · un démenti sans particule de négation (« il est faux que … », « contrairement à … ») ;
+#   · une inversion où le prédicat précède la portée (« est fermé par défaut tout flag non
+#     nommé ») — non détectée comme clause du tout, donc ROUGE, jamais faux vert ;
+#   · une copule hors {est, sont, reste, restent} ou un participe hors T33_PART_RE : ces deux
+#     listes SONT fermées, assumé — elles décrivent le vocabulaire de la doctrine, pas l'espace
+#     des façons de la nier. Les élargir accepterait des phrases sans rapport ;
+#   · une portée hors des quatre graphies de T33_SCOPE_RE.
+# Toutes ces bornes échouent du côté SÛR : elles produisent un ROUGE, jamais un vert à tort.
 
 # rc=0 une clause de fermeture GOUVERNANTE est détectée dans <fichier> · rc=1 aucune.
 # Mesure par BLOC aplati (md_blocks_matching) : la clause est wrappée à 100 colonnes, et grep
-# travaille ligne à ligne — « est fermé par\ndéfaut » serait invisible sur le fichier brut.
+# travaille ligne à ligne — « est fermé par\ndéfaut » serait invisible sur le fichier brut. Puis
+# par PROPOSITION à l'intérieur du bloc : c'est le niveau où la portée gouverne le prédicat.
 t33_closure_in() { # <fichier>
-  local blk
+  local blk prop
   while IFS= read -r blk; do
     [ -n "$blk" ] || continue
-    printf '%s\n' "$blk" | "$GREP" -qE "$T33_SCOPE_RE"  || continue
-    printf '%s\n' "$blk" | "$GREP" -qE "$T33_CLOSE_RE"  || continue
-    printf '%s\n' "$blk" | "$GREP" -qE "$T33_PROHIB_RE" && continue
-    return 0
+    while IFS= read -r prop; do
+      [ -n "$prop" ] || continue
+      printf '%s\n' "$prop" | "$GREP" -qE "$T33_NEG_RE"  && continue
+      printf '%s\n' "$prop" | "$GREP" -qE "$T33_DENY_RE" && continue
+      return 0
+    done < <(printf '%s\n' "$blk" | "$GREP" -oE "$T33_PROP_RE")
   done < <(md_blocks_matching "$1" '.')
   return 1
 }
@@ -3935,16 +3976,68 @@ t33_fixture() { # <libellé> <ATTENDU: vert|rouge> <texte>
       && t33_ko="$t33_ko [FAUX VERT ($1) : une formulation FAUTIVE de même vocabulaire satisfait la sonde de fermeture]"
   fi
 }
+# BATTERIE LICITE — un ÉVENTAIL de rédactions correctes, pas un exemplaire : quatre graphies de
+# portée, les deux ordres, le wrap sur deux lignes physiques, une négation INTERNE à la portée
+# (« tout ce qui n'est pas nommé ») et une négation POSTÉRIEURE au prédicat (qui renforce la
+# clause au lieu de l'inverser). Toutes doivent rester VERTES : une regex qui punit une rédaction
+# correcte nuit autant qu'une sonde aveugle.
 t33_fixture "licite, graphie « tout flag non nommé »" vert \
   "Fermeture par défaut : seuls les flags nommés dans la table sont utilisables, tout flag non nommé est fermé par défaut."
-t33_fixture "licite, graphie « tout le reste »" vert \
+t33_fixture "licite, graphie « tout le reste » + copule « reste »" vert \
   "Tout le reste reste interdit par défaut, y compris les flags que gsd-core ajoutera en amont."
-t33_fixture "fautive, INVERSION par négation (même vocabulaire)" rouge \
+t33_fixture "licite, graphie « tout autre flag » + participe « clos »" vert \
+  "Les briques sont doctrinées ici : tout autre flag est clos par défaut sur une brique de cycle."
+t33_fixture "licite, NÉGATION INTERNE à la portée (« tout ce qui n'est pas nommé »)" vert \
+  "Tout ce qui n'est pas nommé dans la table est fermé par défaut."
+t33_fixture "licite, clause WRAPPÉE sur deux lignes physiques" vert \
+  "$(printf 'Seuls les flags nommés sont utilisables : tout flag non nommé est fermé par\ndéfaut, y compris les suivants.')"
+t33_fixture "licite, incise longue entre la portée et le prédicat" vert \
+  "Tout flag non nommé, y compris ceux que gsd-core ajoutera dans une version ultérieure, est fermé par défaut."
+t33_fixture "licite, NÉGATION POSTÉRIEURE au prédicat (renforcement, pas inversion)" vert \
+  "Tout flag non nommé est fermé par défaut, et aucune omission ne l'ouvre jamais."
+t33_fixture "licite, clause précédée d'une phrase sans rapport dans le MÊME bloc" vert \
+  "$(printf 'La table ci-dessous fait autorité.\nTout le reste est interdit par défaut.')"
+# BATTERIE FAUTIVE — l'ESPACE des façons de nier ou de simuler la clause. Toutes doivent ROUGIR.
+# Les six premières attaquent la NÉGATION (élidée, universelle, restrictive, non élidée,
+# intercalée), les six suivantes la MÉTA-PROHIBITION avec des verbes que l'ancienne liste fermée
+# laissait passer (affirmer, soutenir, formuler, prétendre, garantir) et les trois dernières la
+# CO-OCCURRENCE hors proposition.
+t33_fixture "fautive, INVERSION « ne … pas »" rouge \
   "Tout flag non nommé n'est pas fermé par défaut, y compris ceux que gsd-core ajoutera."
-t33_fixture "fautive, MÉTA-PROHIBITION à l'infinitif (même vocabulaire)" rouge \
+t33_fixture "fautive, NÉGATION UNIVERSELLE « aucun … ne »" rouge \
+  "Aucun flag non nommé n'est fermé par défaut : tout le reste est ouvert, y compris ce que gsd-core ajoutera."
+t33_fixture "fautive, NÉGATION par « nul … ne »" rouge \
+  "Nul flag autre que ceux-ci n'est fermé par défaut ; tout le reste demeure disponible."
+t33_fixture "fautive, RESTRICTIVE « ne … que » (portée refermée en apparence seulement)" rouge \
+  "Tout le reste n'est fermé par défaut qu'en apparence : le moteur accepte les autres flags."
+t33_fixture "fautive, NÉGATION NON ÉLIDÉE « ne reste »" rouge \
+  "Tout flag non nommé ne reste fermé par défaut que le temps d'un appel."
+t33_fixture "fautive, « en aucun cas » intercalé entre copule et participe" rouge \
+  "Tout flag non nommé n'est en aucun cas fermé par défaut."
+t33_fixture "fautive, « rien … ne »" rouge \
+  "Rien de ce que gsd-core ajoutera, ni tout autre flag, n'est fermé par défaut."
+t33_fixture "fautive, MÉTA-PROHIBITION, verbe HORS liste fermée : affirmer" rouge \
+  "Ne jamais affirmer que tout le reste est interdit par défaut."
+t33_fixture "fautive, MÉTA-PROHIBITION, verbe HORS liste fermée : soutenir" rouge \
+  "Ne jamais soutenir que tout flag non nommé est fermé par défaut."
+t33_fixture "fautive, MÉTA-PROHIBITION, verbe HORS liste fermée : formuler" rouge \
+  "Ne plus formuler que tout autre flag est clos par défaut."
+t33_fixture "fautive, MÉTA-PROHIBITION, verbe en -re : prétendre" rouge \
+  "Ne pas prétendre que tout le reste est fermé par défaut."
+t33_fixture "fautive, MÉTA-PROHIBITION, verbe en -ir : garantir" rouge \
+  "Ne jamais garantir que tout flag non nommé est fermé par défaut."
+t33_fixture "fautive, MÉTA-PROHIBITION historique (verbe de l'ancienne liste) : écrire" rouge \
   "Ne jamais écrire que tout le reste est interdit par défaut."
+t33_fixture "fautive, DÉMENTI impersonnel par complétive" rouge \
+  "Il n'est pas vrai que tout flag non nommé est fermé par défaut."
+t33_fixture "fautive, CO-OCCURRENCE DE BLOC : deux phrases sans rapport grammatical" rouge \
+  "$(printf 'Tout le reste relève du manager de mission.\nLa cellule de motif est fermée par défaut.')"
+t33_fixture "fautive, CO-OCCURRENCE dans une phrase mais DEUX propositions (« ; »)" rouge \
+  "Tout le reste relève du manager ; la cellule de motif est fermée par défaut."
 t33_fixture "fautive, vocabulaire présent mais AUCUNE portée refermée" rouge \
   "Chaque brique porte des flags interdits par défaut."
+t33_fixture "fautive, portée refermée sur autre chose que « par défaut »" rouge \
+  "Tout flag non nommé est fermé sur décision du manager."
 
 if [ ! -f "$T33_PIPE" ]; then
   t33_ko="$t33_ko [$T33_PIPE introuvable — la doctrine de flags de cycle n'est pas mesurable]"
@@ -4003,15 +4096,24 @@ if printf '%s\n' "$t33_fx_c_cell" | "$GREP" -qF -- '--research'; then
 fi
 
 # --- I : marque transitoire ET échéance, dans la CELLULE DE MOTIF de la ligne de cadrage -------
-# Contrat des deux regexes ci-dessous : la marque doit être AFFIRMÉE sur cette ligne. Une
+# Contrat des trois regexes ci-dessous : la marque doit être AFFIRMÉE sur cette ligne. Une
 # méta-prohibition de même vocabulaire (« ne jamais présenter cette autorisation comme
-# transitoire… ») porte les deux tokens et doit être REJETÉE — d'où le garde partagé.
+# transitoire… ») porte les deux tokens et doit être REJETÉE. Le garde est STRUCTUREL comme celui
+# de la clause de fermeture : une particule de négation qui PRÉCÈDE l'une des deux marques dans la
+# même proposition, quel que soit le verbe qu'elle porte.
 T33_TRANSIT_RE='[Tt]ransitoire'
 T33_ECHEANCE_RE='23-05'
+T33_TRANSIT_NEG_RE="${T33_NEGPART_RE}[^.!?;:]*([Tt]ransitoire|23-05)"
+# PRÉMISSES MORTES (plan 23-03, l. 234-243). Deux motifs sont interdits NOMMÉMENT parce qu'ils sont
+# FAUX : la persistance du mode dans `.planning/config.json` (démentie par A-1ter) et `T25`/`T25b`
+# présentés comme la mitigation (gate dégazé le 2026-08-03). Le texte livré les évite — mais rien
+# ne le MAINTENAIT : une réécriture pouvait les ressusciter sans qu'une seule assertion rougisse.
+T33_MORTE_RE='T25b?([^0-9]|$)|survi[tv][^.]*session|persist|config[.]json'
 t33_transit_ok() { # <cellule de motif>
-  printf '%s\n' "$1" | "$GREP" -qE "$T33_TRANSIT_RE"  || return 1
-  printf '%s\n' "$1" | "$GREP" -qE "$T33_ECHEANCE_RE" || return 1
-  printf '%s\n' "$1" | "$GREP" -qE "$T33_PROHIB_RE"   && return 1
+  printf '%s\n' "$1" | "$GREP" -qE "$T33_TRANSIT_RE"     || return 1
+  printf '%s\n' "$1" | "$GREP" -qE "$T33_ECHEANCE_RE"    || return 1
+  printf '%s\n' "$1" | "$GREP" -qE "$T33_TRANSIT_NEG_RE" && return 1
+  printf '%s\n' "$1" | "$GREP" -qE "$T33_MORTE_RE"       && return 1
   return 0
 }
 t33_row_cadrage="$(t33_row "$T33_S9" 'gsd-discuss-phase')"
@@ -4034,12 +4136,30 @@ t33_fx_transit() { # <libellé> <ATTENDU: vert|rouge> <cellule>
 }
 t33_fx_transit "licite, autre graphie de la marque" vert \
   " Autorisation transitoire, elle périme au plan 23-05 dès que le manager porte le cadrage. "
+t33_fx_transit "licite, ordre inversé (échéance avant la marque)" vert \
+  " Le plan 23-05 referme cette ligne : autorisation transitoire, assumée par écrit. "
+t33_fx_transit "licite, prose portant une négation APRÈS les deux marques" vert \
+  " Transitoire — périme au plan 23-05. Ouvert faute d'AskUserQuestion, ce que nul autre mode ne compense. "
 t33_fx_transit "fautive, échéance SANS marque de transitoire" rouge \
   " Autorisation ouverte, revue au plan 23-05 si le besoin se confirme. "
 t33_fx_transit "fautive, marque SANS échéance nommée" rouge \
   " Autorisation transitoire, à refermer dès qu'un correctif structurel existe. "
-t33_fx_transit "fautive, MÉTA-PROHIBITION de même vocabulaire" rouge \
+t33_fx_transit "fautive, MÉTA-PROHIBITION, verbe de l'ancienne liste : présenter" rouge \
   " Ne jamais présenter cette autorisation comme transitoire ni la dater du plan 23-05. "
+t33_fx_transit "fautive, MÉTA-PROHIBITION, verbe HORS ancienne liste : qualifier" rouge \
+  " Ne jamais qualifier cette autorisation de transitoire, ni l'adosser au plan 23-05. "
+t33_fx_transit "fautive, MÉTA-PROHIBITION, verbe HORS ancienne liste : suggérer" rouge \
+  " Ne plus suggérer que la marque transitoire du plan 23-05 vaut engagement. "
+t33_fx_transit "fautive, NÉGATION de la marque (« n'est plus »)" rouge \
+  " Cette autorisation n'est plus transitoire depuis le plan 23-05. "
+t33_fx_transit "fautive, NÉGATION universelle devant la marque" rouge \
+  " Aucune autorisation n'est transitoire ici, pas même jusqu'au plan 23-05. "
+t33_fx_transit "fautive, PRÉMISSE MORTE ressuscitée : persistance config.json" rouge \
+  " Transitoire — périme au plan 23-05. Le mode persiste dans .planning/config.json et survit à la session. "
+t33_fx_transit "fautive, PRÉMISSE MORTE ressuscitée : T25b présenté comme la borne" rouge \
+  " Transitoire — périme au plan 23-05. T25b borne la fenêtre d'armement du flag. "
+t33_fx_transit "fautive, PRÉMISSE MORTE ressuscitée : les DEUX à la fois" rouge \
+  " Transitoire — périme au plan 23-05. Le mode persiste dans le config.json et survit à la session ; T25b borne la fenêtre. "
 
 # --- D : renvoi croisé en CO-PRÉSENCE sur une même ligne, non-duplication PAR LISTE ------------
 T33_RENVOI="$T33_TMPDIR/renvoi.txt"
