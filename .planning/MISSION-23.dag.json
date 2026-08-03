@@ -97,6 +97,7 @@
       "step": "23-04 table capabilities/hooks generee",
       "stage": "exec",
       "deps": [
+        "arbitrage-f1-rce",
         "revue-03"
       ],
       "scope": [
@@ -106,7 +107,7 @@
         "plugin/_internal/vibeflow-update.sh",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "done"
+      "status": "blocked"
     },
     {
       "id": "revue-04",
@@ -119,7 +120,7 @@
         "plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh",
         "plugin/_internal/vibeflow-update.sh"
       ],
-      "status": "done",
+      "status": "blocked",
       "review_regime": "full"
     },
     {
@@ -135,7 +136,7 @@
         "plugin/dev-orchestrator/scripts/check-gsd-config.sh",
         "plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh"
       ],
-      "status": "running"
+      "status": "blocked"
     },
     {
       "id": "exec-05",
@@ -597,6 +598,16 @@
       "deps": [],
       "scope": [
         ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-ARBITRAGES.md"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "arbitrage-f1-rce",
+      "step": "ARBITRAGE HUMAIN BLOQUANT — RCE REINTRODUITE par build-gsd-capabilities-index.sh:117 (require du registre resolu depuis le DEPOT AUDITE, cascade :63-80). Chaine d install reelle bouclee par l auditeur : vibeflow-update.sh install dev-orchestrator depuis un depot piege -> code execute, rc=0. Le correctif impose de toucher la cascade qu A-6 prescrit de laisser INCHANGEE, et la voie evidente (porter le lecteur de litteraux de 23-02) rouvre O-13 sur un second script ET exige de reposer la garde de type que require() fournissait gratuitement (protection DoS mesuree). ADR-031 : arbitrage, pas geste de worker",
+      "stage": "human",
+      "deps": [],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh"
       ],
       "status": "ready"
     }
