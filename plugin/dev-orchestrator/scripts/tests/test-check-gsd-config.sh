@@ -20,6 +20,15 @@
 # interdit le « vert à vide ». Il exige les DEUX sens dans un seul fichier — un bloc bidon signalé
 # ET les cinq toggles légitimes épargnés : un jeu de clés connues vide échouerait sur le second,
 # un jeu universel sur le premier.
+#
+# --- Pourquoi un LAB PIÉGÉ, en plus des moteurs factices (cas 34) -------------------------------
+# Un moteur factice mesure ce que le script LIT ; il ne mesure pas ce qu'il ÉVITE d'exécuter. Le
+# cas 34 pose donc un lab dont les trois modules de moteur écrivent chacun un témoin sur disque à
+# leur chargement : le témoin est la seule preuve DIRECTE que l'exécution n'a pas eu lieu, et le
+# seul dispositif qui rougisse si une version future du script recommençait à charger le moteur.
+# Le cas 35 est son pendant STATIQUE — il mesure la propriété du texte du programme node, donc vaut
+# pour tout moteur, y compris ceux qu'aucune fixture ne représente. Les deux sont nécessaires : un
+# chargement de module sans effet observable échappe au cas 34 et n'est attrapé que par le 35.
 
 set -uo pipefail
 
@@ -552,6 +561,90 @@ if [ "$rc32" -eq 0 ] && [ -n "$blk_line" ] && [ "$rc32b" -eq 0 ] && [ -n "$blk_l
   ok "32 clé VIDE → le volet « clés inconnues » parle quand même (seule, et aux côtés d'une autre clé), la sous-clé vide aussi, et le témoin aligné reste muet, exit 0"
 else ko "32 clé VIDE → le volet « clés inconnues » ne doit pas être éteint" "rc32=$rc32 blk=[$blk_line] rc32b=$rc32b blk2=[$blk_line2] both_named=$both_named rc32c=$rc32c sub=[$sub_ek] mute_ok=$mute_ok"; fi
 
+# === Cas 34 — NON-EXÉCUTION : un moteur piégé, résolu depuis le dépôt audité, n'est PAS exécuté ==
+# Écrit AVANT le cas 33 parce que le balayage final rejoue le lab construit ici.
+#
+# Le vecteur (T-23-02-07, arbitrage A-6) : la première branche de la cascade résout le moteur DANS
+# le dépôt audité. Tant que le script faisait un require() dessus, ouvrir une session dans un dépôt
+# cloné suffisait à faire exécuter du code arbitraire au SessionStart — le gate sortait en 0 et le
+# `|| true` du hook masquait tout. La cascade n'a pas changé ; c'est l'exécution qui a disparu.
+#
+# LES TROIS modules sont piégés, chacun avec SON PROPRE témoin : n'en piéger qu'un laisserait passer
+# une implémentation qui n'exécuterait plus que les deux autres.
+#
+# L'invocation passe OBLIGATOIREMENT par la branche 1 de la cascade (`--path`, sans surcharge VF_) —
+# c'est le chemin du hook, et le seul qui exerce la résolution depuis le dépôt audité. `env -u`
+# retire les deux surcharges même si l'environnement appelant les exportait.
+#
+# Trois assertions, exigées ENSEMBLE :
+#   (a) aucun témoin n'existe, et le contrat de sortie tient ;
+#   (b) une sonde du fichier audité est bien SIGNALÉE — donc le fichier a été lu ;
+#   (c) une clé déclarée UNIQUEMENT par le config.cjs piégé est ÉPARGNÉE — donc le moteur du lab a
+#       bien été LU, et non ignoré.
+# (b) et (c) sont l'anti « vert à vide » : sans elles, un script qui sortirait toujours en 3 sans
+# rien lire satisferait (a) trivialement.
+LABX="$TMP/lab-piege"
+PWN="$TMP/pwn"
+mkdir -p "$LABX/.planning" "$LABX/.claude/gsd-core/bin/lib" "$PWN"
+cat > "$LABX/.claude/gsd-core/bin/lib/config.cjs" <<JS
+require('fs').writeFileSync('$PWN/pwned-config', 'x');
+module.exports = { VALID_CONFIG_KEYS: new Set([
+  'mode', 'workflow.research', 'cle_connue_du_moteur_piege'
+]) };
+JS
+cat > "$LABX/.claude/gsd-core/bin/lib/capability-registry.cjs" <<JS
+require('fs').writeFileSync('$PWN/pwned-capability-registry', 'x');
+module.exports = { configKeys: { 'workflow.code_review': 'code-review' } };
+JS
+cat > "$LABX/.claude/gsd-core/bin/lib/configuration.cjs" <<JS
+require('fs').writeFileSync('$PWN/pwned-configuration', 'x');
+module.exports = {
+  CONFIG_DEFAULTS: { mode: 'interactive', workflow: { research: true } },
+  DYNAMIC_KEY_PATTERNS: [{ topLevel: 'agent_skills' }]
+};
+JS
+printf '%s\n' '{ "cle_connue_du_moteur_piege": 1, "sonde_du_cas": { "x": 1 } }' > "$LABX/.planning/config.json"
+outX="$(env -u VF_CONFIG_PATH -u VF_GSD_CORE_LIB bash "$SCRIPT" --path "$LABX" 2>/dev/null)"; rcX=$?
+# Le compte est fait sur les ENTRÉES du dossier de témoins, jamais sur la vacuité d'une chaîne.
+n_pwned="$(ls "$PWN" 2>/dev/null | awk 'END{print NR+0}')"
+in_contractX=0; case "$rcX" in 0|3|64) in_contractX=1 ;; esac
+flags_probeX=0;  case "$outX" in *sonde_du_cas*) flags_probeX=1 ;; esac
+spares_trapX=1;  case "$outX" in *cle_connue_du_moteur_piege*) spares_trapX=0 ;; esac
+if [ "$in_contractX" -eq 1 ] && [ "$rcX" -eq 0 ] && [ "$n_pwned" -eq 0 ] \
+   && [ "$flags_probeX" -eq 1 ] && [ "$spares_trapX" -eq 1 ]; then
+  ok "34 NON-EXÉCUTION — moteur piégé résolu par la branche 1 de la cascade : AUCUN des 3 témoins n'est créé, la sonde du fichier audité est signalée ET la clé du moteur piégé est épargnée (il a bien été LU), exit 0"
+else ko "34 NON-EXÉCUTION — moteur piégé lu et jamais exécuté" "rcX=$rcX n_pwned=$n_pwned (0 attendu) flags_probeX=$flags_probeX spares_trapX=$spares_trapX outX=[$outX]"; fi
+
+# === Cas 35 — CRITÈRE MACHINE : le programme node ne charge QUE des modules cœur =================
+# Pendant du `grep -c 'eval'` de T-23-02-01, pour T-23-02-07. Le cas 34 mesure un COMPORTEMENT sur
+# un moteur donné ; celui-ci mesure la PROPRIÉTÉ du texte, donc vaut pour tout moteur, y compris
+# ceux qu'aucune fixture ne représente.
+#
+# Le corps de NODE_PROG est extrait entre son here-doc et son terminateur, puis DÉPOUILLÉ de ses
+# commentaires de ligne : sans ce dépouillement, une phrase de commentaire nommant l'appel interdit
+# ferait rougir le compteur alors que le code est sain (le compteur mesurerait la prose).
+# \047 = l'apostrophe, écrite en octal : le programme awk est lui-même en quotes simples.
+NP="$TMP/node-prog.js"
+awk '
+  /<<\047NODEJS\047/ { inb = 1; next }
+  inb && /^NODEJS$/  { inb = 0; next }
+  inb { sub(/\/\/.*$/, ""); print }
+' "$SCRIPT" > "$NP"
+n_np="$(awk 'END{print NR+0}' "$NP")"
+n_req="$(awk  '{ n += gsub(/require\(/, "") } END{ print n+0 }' "$NP")"
+n_core="$(awk '{ n += gsub(/require\(\047fs\047\)/, "") + gsub(/require\(\047path\047\)/, "") } END{ print n+0 }' "$NP")"
+n_dyn="$(awk  '{ n += gsub(/eval/, "") + gsub(/new Function/, "") + gsub(/import\(/, "") + gsub(/\047vm\047/, "") } END{ print n+0 }' "$NP")"
+# Anti « vert à vide », dans les deux directions :
+#   - le corps a bien été extrait (plancher de lignes + la source 1 y est nommée) ;
+#   - le corps ADRESSE bel et bien des fichiers du moteur (path.join(LIB…). Sans ce marqueur, un
+#     programme qui ne toucherait plus du tout au moteur satisferait le critère sans rien prouver.
+n_libpath="$(awk '{ n += gsub(/path\.join\(LIB/, "") } END{ print n+0 }' "$NP")"
+has_src1=0; case "$(cat "$NP")" in *VALID_CONFIG_KEYS*) has_src1=1 ;; esac
+extracted35=0; [ "$n_np" -ge 100 ] && [ "$has_src1" -eq 1 ] && [ "$n_libpath" -ge 1 ] && extracted35=1
+if [ "$extracted35" -eq 1 ] && [ "$n_req" -eq "$n_core" ] && [ "$n_core" -ge 2 ] && [ "$n_dyn" -eq 0 ]; then
+  ok "35 CRITÈRE MACHINE — le programme node adresse $n_libpath chemins du moteur mais n'en charge AUCUN : ses $n_req chargements portent tous sur fs ou path, et il ne contient ni eval, ni new Function, ni import dynamique, ni vm"
+else ko "35 CRITÈRE MACHINE — aucun chargement de module hors fs/path dans le programme node" "corps=$n_np lignes (plancher 100) src1=$has_src1 libpath=$n_libpath chargements=$n_req dont_coeur=$n_core dynamiques=$n_dyn"; fi
+
 # === Cas 33 — BALAYAGE FINAL : aucun chemin ne sort du contrat {0, 3, 64} ========================
 # Filet transverse. Les cas ci-dessus assertent chacun UN rc attendu ; celui-ci rejoue TOUTES les
 # fixtures (chacune contre un moteur présent PUIS absent) et toutes les formes d'invocation, et
@@ -570,7 +663,9 @@ sweep() { # <étiquette> <commande…>
   # balayage mourait au lieu de rougir, et la suite paraissait verte. Accolades + ASCII, donc.
   case "$r" in 0|3|64) : ;; *) hors_contrat="$hors_contrat [${label} rc=${r}]" ;; esac
 }
-for f in "$TMP"/cfg-*.json "$CFG_H" "$LABP/.planning/config.json"; do
+# Le glob "$TMP"/cfg-*.json absorbe toute fixture créée par mk_config ; les labs, eux, doivent être
+# listés EXPLICITEMENT — leur config vit sous <lab>/.planning/, hors du glob.
+for f in "$TMP"/cfg-*.json "$CFG_H" "$LABP/.planning/config.json" "$LABX/.planning/config.json"; do
   [ -f "$f" ] || continue
   sweep "moteur:$f"      env VF_GSD_CORE_LIB="$ENG"              VF_CONFIG_PATH="$f" bash "$SCRIPT"
   sweep "sans-moteur:$f" env VF_GSD_CORE_LIB="$TMP/pas-de-moteur" VF_CONFIG_PATH="$f" bash "$SCRIPT"
@@ -579,6 +674,7 @@ done
 sweep "path-nominal"   env -u VF_CONFIG_PATH -u VF_GSD_CORE_LIB bash "$SCRIPT" --path "$LABP"
 sweep "path-nohome"    env -u HOME -u VF_CONFIG_PATH -u VF_GSD_CORE_LIB bash "$SCRIPT" --path "$LABP"
 sweep "path-nonlab"    env -u VF_CONFIG_PATH -u VF_GSD_CORE_LIB bash "$SCRIPT" --path "$TMP"
+sweep "path-piege"     env -u VF_CONFIG_PATH -u VF_GSD_CORE_LIB bash "$SCRIPT" --path "$LABX"
 sweep "nohome-nonlab"  env -u HOME -u VF_CONFIG_PATH -u VF_GSD_CORE_LIB bash "$SCRIPT" --path "$TMP"
 sweep "nohome-quiet"   env -u HOME -u VF_CONFIG_PATH -u VF_GSD_CORE_LIB bash "$SCRIPT" --quiet
 sweep "nohook"         env -u HOME -u VF_CONFIG_PATH -u VF_GSD_CORE_LIB bash "$SCRIPT" --hook --path "$LABP"
