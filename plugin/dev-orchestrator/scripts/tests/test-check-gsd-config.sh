@@ -30,9 +30,23 @@
 # pour tout moteur, y compris ceux qu'aucune fixture ne représente. Les deux sont nécessaires : un
 # chargement de module sans effet observable échappe au cas 34 et n'est attrapé que par le 35.
 
+#
+# --- Pourquoi des MUTANTS MATÉRIALISÉS (mode --mutants) -----------------------------------------
+# Un filet anti-régression qui n'a jamais été vu rougir ne prouve rien. Les mutants de cette suite
+# ne vivent donc PAS dans un rapport : ils sont ÉCRITS ICI, sous `--mutants`, et rejouables par
+# quiconque (`bash test-check-gsd-config.sh --mutants`). Chaque mutant déclare les cas qu'il DOIT
+# faire rougir ; le mode échoue si l'un d'eux reste vert, et échoue aussi si la mutation n'a rien
+# changé au fichier (motif introuvable = mutant NON OPPOSABLE, pas mutant satisfait).
+# Le mode se relance lui-même en sous-processus via VF_TEST_TARGET, qui pointe la suite sur une
+# COPIE mutée du script ; la copie vit dans le mktemp -d de la session et disparaît avec elle.
 set -uo pipefail
 
-SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/check-gsd-config.sh"
+MUTANTS=0
+for a in "$@"; do case "$a" in --mutants) MUTANTS=1 ;; esac; done
+
+# VF_TEST_TARGET : cible sous test. Sert UNIQUEMENT au mode --mutants, qui se relance sur une copie
+# mutée. Non défini, la suite teste le script du dépôt — le chemin normal.
+SCRIPT="${VF_TEST_TARGET:-$(cd "$(dirname "$0")/.." && pwd)/check-gsd-config.sh}"
 
 PASS=0; FAIL=0
 ok() { echo "  ✓ $1"; PASS=$((PASS+1)); }
@@ -561,6 +575,28 @@ if [ "$rc32" -eq 0 ] && [ -n "$blk_line" ] && [ "$rc32b" -eq 0 ] && [ -n "$blk_l
   ok "32 clé VIDE → le volet « clés inconnues » parle quand même (seule, et aux côtés d'une autre clé), la sous-clé vide aussi, et le témoin aligné reste muet, exit 0"
 else ko "32 clé VIDE → le volet « clés inconnues » ne doit pas être éteint" "rc32=$rc32 blk=[$blk_line] rc32b=$rc32b blk2=[$blk_line2] both_named=$both_named rc32c=$rc32c sub=[$sub_ek] mute_ok=$mute_ok"; fi
 
+# === Extraction du corps du programme node (partagée par les cas 34 et 35) ======================
+# ANCRE : la ligne `IFS= read -r -d '' NODE_PROG <<'NODEJS'` ELLE-MÊME, et non le seul marqueur
+# `<<'NODEJS'`. Le marqueur seul matche DEUX lignes du script — la vraie, et le commentaire de
+# portabilité qui cite `NODE_PROG=$(cat <<'NODEJS' … )`. L'extraction ramassait donc 4 lignes de
+# commentaire SHELL en plus du programme (186 lignes là où le programme en fait 182), lignes que le
+# dépouillement JS ne nettoie pas. Mesuré, pas supposé.
+NP="$TMP/node-prog.js"
+awk '
+  /^IFS= read -r -d .. NODE_PROG <<.NODEJS./ { inb = 1; next }
+  inb && /^NODEJS$/                          { inb = 0; next }
+  inb                                        { print }
+' "$SCRIPT" > "$NP"
+
+# Cibles du moteur que le programme node OUVRE, DÉRIVÉES DU SCRIPT et jamais recopiées : tout nom de
+# fichier .cjs / .json cité dans le corps. Écrire cette liste en dur, c'est ce qui a laissé le cas 34
+# ne piéger que 3 des 5 modules réellement lus ; dérivée, elle suit le script quand il change.
+# \047 = l'apostrophe, écrite en octal : le programme awk est lui-même en quotes simples.
+CIBLES="$TMP/cibles-moteur.txt"
+awk '{ n = split($0, p, "\047"); for (i = 2; i <= n; i += 2) if (p[i] ~ /^[A-Za-z0-9_.-]+\.(cjs|json)$/) print p[i] }' "$NP" \
+  | sort -u > "$CIBLES"
+N_CIBLES="$(awk 'END{print NR+0}' "$CIBLES")"
+
 # === Cas 34 — NON-EXÉCUTION : un moteur piégé, résolu depuis le dépôt audité, n'est PAS exécuté ==
 # Écrit AVANT le cas 33 parce que le balayage final rejoue le lab construit ici.
 #
@@ -569,81 +605,271 @@ else ko "32 clé VIDE → le volet « clés inconnues » ne doit pas être étei
 # cloné suffisait à faire exécuter du code arbitraire au SessionStart — le gate sortait en 0 et le
 # `|| true` du hook masquait tout. La cascade n'a pas changé ; c'est l'exécution qui a disparu.
 #
-# LES TROIS modules sont piégés, chacun avec SON PROPRE témoin : n'en piéger qu'un laisserait passer
-# une implémentation qui n'exécuterait plus que les deux autres.
+# TOUTES les cibles sont piégées, chacune avec SON PROPRE témoin — pas trois sur cinq. Le commentaire
+# de la version précédente énonçait la règle (« n'en piéger qu'un laisserait passer une implémentation
+# qui n'exécuterait plus que les autres ») sans l'appliquer : config-schema.cjs et config-loader.cjs
+# étaient lus par le script et sans témoin. La liste est maintenant DÉRIVÉE (voir $CIBLES).
+# Les deux manifestes sont piégés avec du JS : `require()` d'un .json passe par le parseur JSON et
+# n'exécuterait rien, mais un retour à `eval(readFileSync(manifeste))`, lui, ferait feu.
+#
+# UN PIÈGE NON OUVERT NE PROUVE RIEN. `readLiteral` s'arrête au PREMIER fichier qui rend un littéral
+# acceptable : piéger cinq modules en laissant le premier porter la donnée n'exerce que le premier.
+# Le lab est donc rejoué en QUATRE variantes, qui déplacent le PORTEUR de la donnée le long des
+# cascades de `readLiteral` — chaque variante prouve, par la sortie, que ses porteurs ont été ouverts :
+#   V1 porteur config.cjs        (source 1 rang 1, source 3 rang 3)
+#   V2 porteur configuration.cjs (source 1 rang 2, source 3 rang 1)
+#   V3 porteurs config-schema.cjs (source 1 rang 3) et config-loader.cjs (source 3 rang 2)
+#   V4 porteurs les DEUX MANIFESTES (valides), tous les .cjs restant des pièges nus
+# capability-registry.cjs porte configKeys dans les quatre. Les cinq modules et les deux manifestes
+# sont donc chacun prouvés OUVERTS au moins une fois, et piégés dans toutes les autres variantes.
 #
 # L'invocation passe OBLIGATOIREMENT par la branche 1 de la cascade (`--path`, sans surcharge VF_) —
 # c'est le chemin du hook, et le seul qui exerce la résolution depuis le dépôt audité. `env -u`
 # retire les deux surcharges même si l'environnement appelant les exportait.
 #
-# Trois assertions, exigées ENSEMBLE :
+# Quatre assertions par variante, exigées ENSEMBLE :
 #   (a) aucun témoin n'existe, et le contrat de sortie tient ;
 #   (b) une sonde du fichier audité est bien SIGNALÉE — donc le fichier a été lu ;
-#   (c) une clé déclarée UNIQUEMENT par le config.cjs piégé est ÉPARGNÉE — donc le moteur du lab a
-#       bien été LU, et non ignoré.
-# (b) et (c) sont l'anti « vert à vide » : sans elles, un script qui sortirait toujours en 3 sans
-# rien lire satisferait (a) trivialement.
-LABX="$TMP/lab-piege"
-PWN="$TMP/pwn"
-mkdir -p "$LABX/.planning" "$LABX/.claude/gsd-core/bin/lib" "$PWN"
-cat > "$LABX/.claude/gsd-core/bin/lib/config.cjs" <<JS
-require('fs').writeFileSync('$PWN/pwned-config', 'x');
-module.exports = { VALID_CONFIG_KEYS: new Set([
-  'mode', 'workflow.research', 'cle_connue_du_moteur_piege'
-]) };
-JS
-cat > "$LABX/.claude/gsd-core/bin/lib/capability-registry.cjs" <<JS
-require('fs').writeFileSync('$PWN/pwned-capability-registry', 'x');
+#   (c) une clé déclarée UNIQUEMENT par le porteur piégé est ÉPARGNÉE — donc il a bien été LU ;
+#   (d) la VALEUR de défaut amont portée par le porteur de la source 3 ressort SUR SA PROPRE LIGNE —
+#       une relation, pas une co-présence, et une valeur (7 ou 9) qu'aucun défaut réel ne porte.
+# (b), (c) et (d) sont l'anti « vert à vide » : sans elles, un script qui sortirait toujours en 3
+# sans rien lire satisferait (a) trivialement.
+
+# mk_lab_piege <dir> <dossier-témoins> <porteur-source1> <porteur-source3>
+# Porteur « MANIFESTES » : les deux manifestes portent la donnée (en JSON valide) et aucun .cjs.
+mk_lab_piege() {
+  local d="$1" pwn="$2" src1="$3" src3="$4" base tgt
+  rm -rf "$d" "$pwn"
+  mkdir -p "$d/.planning" "$d/.claude/gsd-core/bin/lib" "$d/.claude/gsd-core/bin/shared" "$pwn"
+  while read -r base; do
+    case "$base" in
+      *.json) tgt="$d/.claude/gsd-core/bin/shared/$base" ;;
+      *)      tgt="$d/.claude/gsd-core/bin/lib/$base" ;;
+    esac
+    printf "require('fs').writeFileSync('%s/pwned-%s', 'x');\n" "$pwn" "$base" > "$tgt"
+  done < "$CIBLES"
+  cat >> "$d/.claude/gsd-core/bin/lib/capability-registry.cjs" <<'JS'
 module.exports = { configKeys: { 'workflow.code_review': 'code-review' } };
 JS
-cat > "$LABX/.claude/gsd-core/bin/lib/configuration.cjs" <<JS
-require('fs').writeFileSync('$PWN/pwned-configuration', 'x');
-module.exports = {
-  CONFIG_DEFAULTS: { mode: 'interactive', workflow: { research: true } },
-  DYNAMIC_KEY_PATTERNS: [{ topLevel: 'agent_skills' }]
-};
+  if [ "$src1" = "MANIFESTES" ]; then
+    cat > "$d/.claude/gsd-core/bin/shared/config-schema.manifest.json" <<'J'
+{ "validKeys": ["mode", "cle_connue_du_moteur_piege"], "dynamicKeyPatterns": [{ "topLevel": "agent_skills" }] }
+J
+    cat > "$d/.claude/gsd-core/bin/shared/config-defaults.manifest.json" <<'J'
+{ "mode": "interactive", "workflow": { "node_repair_budget": 9 } }
+J
+  else
+    cat >> "$d/.claude/gsd-core/bin/lib/$src1" <<'JS'
+module.exports = { VALID_CONFIG_KEYS: new Set([ 'mode', 'cle_connue_du_moteur_piege' ]),
+  DYNAMIC_KEY_PATTERNS: [{ topLevel: 'agent_skills' }] };
 JS
-printf '%s\n' '{ "cle_connue_du_moteur_piege": 1, "sonde_du_cas": { "x": 1 } }' > "$LABX/.planning/config.json"
-outX="$(env -u VF_CONFIG_PATH -u VF_GSD_CORE_LIB bash "$SCRIPT" --path "$LABX" 2>/dev/null)"; rcX=$?
-# Le compte est fait sur les ENTRÉES du dossier de témoins, jamais sur la vacuité d'une chaîne.
-n_pwned="$(ls "$PWN" 2>/dev/null | awk 'END{print NR+0}')"
-in_contractX=0; case "$rcX" in 0|3|64) in_contractX=1 ;; esac
-flags_probeX=0;  case "$outX" in *sonde_du_cas*) flags_probeX=1 ;; esac
-spares_trapX=1;  case "$outX" in *cle_connue_du_moteur_piege*) spares_trapX=0 ;; esac
-if [ "$in_contractX" -eq 1 ] && [ "$rcX" -eq 0 ] && [ "$n_pwned" -eq 0 ] \
-   && [ "$flags_probeX" -eq 1 ] && [ "$spares_trapX" -eq 1 ]; then
-  ok "34 NON-EXÉCUTION — moteur piégé résolu par la branche 1 de la cascade : AUCUN des 3 témoins n'est créé, la sonde du fichier audité est signalée ET la clé du moteur piégé est épargnée (il a bien été LU), exit 0"
-else ko "34 NON-EXÉCUTION — moteur piégé lu et jamais exécuté" "rcX=$rcX n_pwned=$n_pwned (0 attendu) flags_probeX=$flags_probeX spares_trapX=$spares_trapX outX=[$outX]"; fi
+    cat >> "$d/.claude/gsd-core/bin/lib/$src3" <<'JS'
+module.exports = { CONFIG_DEFAULTS: { mode: 'interactive', workflow: { node_repair_budget: 7 } } };
+JS
+  fi
+  printf '%s\n' '{ "cle_connue_du_moteur_piege": 1, "sonde_du_cas": { "x": 1 } }' > "$d/.planning/config.json"
+}
+
+n_var34=0; ec34=""
+essaie_lab_piege() { # <étiquette> <porteur1> <porteur3> <valeur-defaut-attendue>
+  local lab="$TMP/lab-piege-$1" pwn="$TMP/pwn-$1" out rc n_pwned budget_line
+  mk_lab_piege "$lab" "$pwn" "$2" "$3"
+  out="$(env -u VF_CONFIG_PATH -u VF_GSD_CORE_LIB bash "$SCRIPT" --path "$lab" 2>/dev/null)"; rc=$?
+  # Le compte est fait sur les ENTRÉES du dossier de témoins, jamais sur la vacuité d'une chaîne.
+  n_pwned="$(ls "$pwn" 2>/dev/null | awk 'END{print NR+0}')"
+  budget_line="$(printf '%s\n' "$out" | awk '/workflow\.node_repair_budget /{print}')"
+  n_var34=$((n_var34+1))
+  case "$rc" in 0) : ;; *) ec34="$ec34 [$1 rc=$rc]" ;; esac
+  [ "$n_pwned" -eq 0 ]                     || ec34="$ec34 [$1 temoins=$n_pwned]"
+  case "$out" in *sonde_du_cas*) : ;; *)      ec34="$ec34 [$1 sonde-non-signalee]" ;; esac
+  case "$out" in *cle_connue_du_moteur_piege*) ec34="$ec34 [$1 cle-du-porteur-signalee-donc-non-lu]" ;; esac
+  case "$budget_line" in *"($4)"*) : ;; *)    ec34="$ec34 [$1 defaut-amont-absent:[$budget_line]]" ;; esac
+  LABX="$lab"
+}
+essaie_lab_piege v1 config.cjs        config.cjs        7
+essaie_lab_piege v2 configuration.cjs configuration.cjs 7
+essaie_lab_piege v3 config-schema.cjs config-loader.cjs 7
+essaie_lab_piege v4 MANIFESTES        MANIFESTES        9
+# Plancher : la dérivation doit avoir trouvé les 5 modules + les 2 manifestes. Une dérivation qui
+# rendrait 0 cible poserait 0 piège et rendrait ce cas vert sans rien mesurer.
+if [ "$N_CIBLES" -ge 7 ] && [ "$n_var34" -eq 4 ] && [ -z "$ec34" ]; then
+  ok "34 NON-EXÉCUTION — $N_CIBLES cibles du moteur dérivées du script et TOUTES piégées, sur 4 variantes qui déplacent le porteur de la donnée le long des cascades : AUCUN témoin créé, la sonde du fichier audité signalée, la clé du porteur épargnée ET son défaut amont rendu sur sa propre ligne, exit 0"
+else ko "34 NON-EXÉCUTION — moteur piégé lu et jamais exécuté, sur toutes les cibles et tous les rangs de cascade" "cibles=$N_CIBLES (plancher 7) variantes=$n_var34 (4 attendues) echecs=[$ec34]"; fi
 
 # === Cas 35 — CRITÈRE MACHINE : le programme node ne charge QUE des modules cœur =================
 # Pendant du `grep -c 'eval'` de T-23-02-01, pour T-23-02-07. Le cas 34 mesure un COMPORTEMENT sur
 # un moteur donné ; celui-ci mesure la PROPRIÉTÉ du texte, donc vaut pour tout moteur, y compris
 # ceux qu'aucune fixture ne représente.
 #
-# Le corps de NODE_PROG est extrait entre son here-doc et son terminateur, puis DÉPOUILLÉ de ses
-# commentaires de ligne : sans ce dépouillement, une phrase de commentaire nommant l'appel interdit
-# ferait rougir le compteur alors que le code est sain (le compteur mesurerait la prose).
-# \047 = l'apostrophe, écrite en octal : le programme awk est lui-même en quotes simples.
-NP="$TMP/node-prog.js"
-awk '
-  /<<\047NODEJS\047/ { inb = 1; next }
-  inb && /^NODEJS$/  { inb = 0; next }
-  inb { sub(/\/\/.*$/, ""); print }
-' "$SCRIPT" > "$NP"
-n_np="$(awk 'END{print NR+0}' "$NP")"
-n_req="$(awk  '{ n += gsub(/require\(/, "") } END{ print n+0 }' "$NP")"
-n_core="$(awk '{ n += gsub(/require\(\047fs\047\)/, "") + gsub(/require\(\047path\047\)/, "") } END{ print n+0 }' "$NP")"
-n_dyn="$(awk  '{ n += gsub(/eval/, "") + gsub(/new Function/, "") + gsub(/import\(/, "") + gsub(/\047vm\047/, "") } END{ print n+0 }' "$NP")"
+# --- Pourquoi ce n'est plus un COMPTAGE DE LITTÉRAL ----------------------------------------------
+# La version précédente comptait le littéral `require\(`. Elle était fausse dans les DEUX SENS, et
+# c'est mesuré :
+#   - TROP PERMISSIVE — sur les 17 formes d'appel réelles, 7 échappaient, dont `require (` avec UNE
+#     SEULE ESPACE, `const _r = require`, `require['call']`, `Reflect.apply`,
+#     `module.constructor._load` et `process.binding`. Un mutant écrivant `const _load = require;`
+#     puis `_load(path.join(LIB, …))` ROUVRAIT la RCE avec la suite à 35 ok / 0 ko.
+#   - TROP STRICTE — elle ne dépouillait que les commentaires DE LIGNE : un commentaire DE BLOC ou
+#     une CHAÎNE nommant l'interdit faisaient rougir du code parfaitement sain. La pente naturelle
+#     aurait alors été de relâcher le critère plutôt que de corriger le commentaire — exactement le
+#     mouvement qui a produit la faille d'origine.
+#
+# --- La forme du critère : ÉRODER LE LICITE, EXIGER UN RÉSIDU NUL --------------------------------
+# On ne cherche plus des formes interdites (liste fermée, contournable par réécriture cosmétique) :
+# on NEUTRALISE d'abord ce qui ne peut pas s'exécuter (commentaires, contenu des chaînes, littéraux
+# de regex), on ÉRODE ensuite les seules formes licites — `require('fs')`, `require('path')`, et les
+# accès `process.env` / `process.exit` / `process.stdout` —, et on exige que le RÉSIDU soit VIDE.
+# Une forme d'appel n'a alors que trois façons d'exister, et les trois rougissent :
+#   1. elle nomme `require` ou `process` autrement que sous leur forme licite → résidu non nul ;
+#   2. elle passe par une échappée réflexive (`eval`, `Function`, `import`, `module`, `constructor`,
+#      `global`, `Reflect`, `_load`, `binding`, `dlopen`, `WebAssembly`, `vm`) → résidu non nul ;
+#   3. elle APPELLE un nom qui n'est pas dans la liste blanche des noms réellement appelés.
+# BORNE ÉCRITE, à remonter plutôt qu'à taire : une forme qui chargerait du code sans nommer AUCUN de
+# ces porteurs et sans appeler de nom neuf échapperait encore. Aucune n'est connue en Node ; si une
+# telle forme apparaît, c'est la liste des porteurs qu'il faut étendre, pas le critère qu'il faut
+# relâcher.
+#
+# --- Le lexeur, et pourquoi sa santé est ASSERTÉE -----------------------------------------------
+# Neutraliser suppose de savoir où commencent et finissent chaînes, commentaires et regex. Trois
+# invariants sont donc exigés, faute de quoi le cas sort en KO « non vérifiable » et JAMAIS en vert :
+#   - aucune chaîne '…' / "…" laissée ouverte en fin de ligne (un saut de ligne nu y est ILLÉGAL en
+#     JS : s'y trouver prouve que le lexeur a ouvert une chaîne fantôme, typiquement sur la quote
+#     d'un littéral de regex — le programme en porte une, `/\\'/g`) ;
+#   - état normal et interpolation fermée en fin de fichier ;
+#   - tout littéral de regex rencontré appartient à la liste blanche. C'est ce point qui ferme la
+#     seule ambiguïté que le lexeur ne peut pas trancher seul : une DIVISION serait lue comme une
+#     regex et pourrait masquer du code entre ses deux `/`. Une telle « regex » ne ressemble à
+#     aucune des vraies et rougit.
+# Les `${…}` d'un littéral de gabarit sont du CODE et repassent en état normal : sans cela, une
+# interpolation porteuse d'un chargement serait avalée comme du contenu de chaîne.
+#
+# @ est le marqueur de neutralisation. Sa présence dans le corps casserait la neutralisation : elle
+# est donc vérifiée absente, et le cas sort en KO si elle ne l'est pas.
+LEXOUT="$TMP/np-neutre.txt"; LEXERR="$TMP/np-lex.txt"
+RXOUT="$TMP/np-regex.txt";   CALLOUT="$TMP/np-calls.txt"
+: > "$RXOUT"; : > "$CALLOUT"
+n_at="$(awk '{ n += gsub(/@/, "") } END{ print n+0 }' "$NP")"
+awk -v REGEX_OUT="$RXOUT" '
+  BEGIN { st = "n"; unterm = 0; nregex = 0; tn = 0; bdepth = 0 }
+  {
+    line = $0; outl = (st == "t") ? "@" : ""; i = 1; L = length(line)
+    while (i <= L) {
+      c = substr(line, i, 1)
+      if (st == "n") {
+        d = substr(line, i, 2)
+        if (d == "//") { i = L + 1; continue }
+        if (d == "/*") { st = "b"; i += 2; continue }
+        if (c == "/") {
+          j = i + 1; inclass = 0; lit = "/"
+          while (j <= L) {
+            e = substr(line, j, 1)
+            if (e == "\\") { lit = lit substr(line, j, 2); j += 2; continue }
+            if (e == "[") inclass = 1
+            else if (e == "]") inclass = 0
+            else if (e == "/" && inclass == 0) break
+            lit = lit e; j++
+          }
+          if (j > L) { regex_bad++; outl = outl "@@"; i = L + 1; continue }
+          lit = lit "/"; j++
+          while (j <= L && substr(line, j, 1) ~ /[a-z]/) { lit = lit substr(line, j, 1); j++ }
+          print lit > REGEX_OUT
+          nregex++; outl = outl "@@"; i = j; continue
+        }
+        if (c == "\047") { st = "s"; outl = outl "@"; i++; continue }
+        if (c == "\"")   { st = "d"; outl = outl "@"; i++; continue }
+        if (c == "`")    { st = "t"; outl = outl "@"; i++; continue }
+        if (c == "{") { bdepth++; outl = outl c; i++; continue }
+        if (c == "}") {
+          if (bdepth > 0) { bdepth-- }
+          else if (tn > 0) { st = "t"; bdepth = tsave[tn]; tn--; outl = outl "@"; i++; continue }
+          outl = outl c; i++; continue
+        }
+        outl = outl c; i++; continue
+      }
+      if (st == "b") {
+        e = index(substr(line, i), "*/")
+        if (e == 0) { i = L + 1 } else { i = i + e + 1; st = "n" }
+        continue
+      }
+      if (c == "\\") { i += 2; continue }
+      if (st == "t" && substr(line, i, 2) == "${") {
+        tn++; tsave[tn] = bdepth; bdepth = 0; st = "n"; outl = outl "@"; i += 2; continue
+      }
+      if ((st == "s" && c == "\047") || (st == "d" && c == "\"") || (st == "t" && c == "`")) {
+        st = "n"; outl = outl "@"; i++; continue
+      }
+      outl = outl c; i++
+    }
+    if (st == "s" || st == "d") { unterm++; st = "n"; outl = outl "@" }
+    else if (st == "t") { outl = outl "@" }
+    print outl
+  }
+  END { printf "%d %s %d %d %d\n", unterm, st, nregex, regex_bad + 0, tn > REGEX_STAT }
+' REGEX_STAT="$LEXERR" "$NP" > "$LEXOUT"
+lex_unterm="$(awk '{print $1}' "$LEXERR")"
+lex_state="$(awk  '{print $2}' "$LEXERR")"
+lex_nrx="$(awk    '{print $3}' "$LEXERR")"
+lex_rxbad="$(awk  '{print $4}' "$LEXERR")"
+lex_tn="$(awk     '{print $5}' "$LEXERR")"
+
+# Érosion des formes licites, puis résidu. Les chaînes survivantes sont réduites à @@ APRÈS
+# l'érosion : une chaîne qui CONTIENDRAIT le texte `require('fs')` ne gonfle donc pas le résidu.
+eval "$(awk -v CALLS_OUT="$CALLOUT" '
+  {
+    l = $0
+    n_core   += gsub(/require\(@fs@\)/, "", l) + gsub(/require\(@path@\)/, "", l)
+    n_procok += gsub(/process\.(env|exit|stdout)/, "", l)
+    gsub(/@[^@]*@/, "@@", l)
+    n_bigF   += gsub(/Function/, "", l)
+    ll = tolower(l)
+    n_res += gsub(/require|eval|import|module|constructor|global|reflect|_load|binding|dlopen|webassembly|process/, "", ll)
+    n_res += gsub(/(^|[^a-z0-9_$])vm([^a-z0-9_$]|$)/, "", ll)
+    while (match(l, /[A-Za-z_$][A-Za-z0-9_$]*[ \t]*\(/)) {
+      tok = substr(l, RSTART, RLENGTH); sub(/[ \t]*\($/, "", tok)
+      print tok > CALLS_OUT
+      l = substr(l, RSTART + RLENGTH)
+    }
+  }
+  END { printf "n_core=%d; n_procok=%d; n_bigF=%d; n_res=%d\n", n_core, n_procok, n_bigF, n_res }
+' "$LEXOUT")"
+
+# Listes blanches. Comparées par `comm` en INCLUSION (aucun intrus), jamais par diff ni par
+# longueur : un nom appelé ou un littéral de regex qui n'y figure pas est un AJOUT CONSCIENT à
+# faire, pas un critère à relâcher.
+CALLS_SEEN="$TMP/calls-seen.txt"; CALLS_ALLOW="$TMP/calls-allow.txt"
+RX_SEEN="$TMP/rx-seen.txt";       RX_ALLOW="$TMP/rx-allow.txt"
+sort -u "$CALLOUT" > "$CALLS_SEEN"
+sort -u "$RXOUT"   > "$RX_SEEN"
+printf '%s\n' J RegExp Set String accept add balancedRegions call catch concat exec filter \
+  flatten for from has if indexOf isArray join jsLiteralToJSON keys lookup map parse push \
+  readFileSync readJSON readLiteral replace slice slurp some split stringify test while write \
+  | sort -u > "$CALLS_ALLOW"
+{ printf '%s\n' '/\s+/' '/\s/' '/\\'"'"'/g' '/,(\s*[}\]])/g'
+  printf '%s\n' '/([A-Za-z_$][A-Za-z0-9_$]*)(\s*):/y'; } | sort -u > "$RX_ALLOW"
+calls_intrus="$(comm -23 "$CALLS_SEEN" "$CALLS_ALLOW" | tr '\n' ' ')"
+rx_intrus="$(comm -23 "$RX_SEEN" "$RX_ALLOW" | tr '\n' ' ')"
+n_calls="$(awk 'END{print NR+0}' "$CALLS_SEEN")"
+
 # Anti « vert à vide », dans les deux directions :
 #   - le corps a bien été extrait (plancher de lignes + la source 1 y est nommée) ;
 #   - le corps ADRESSE bel et bien des fichiers du moteur (path.join(LIB…). Sans ce marqueur, un
-#     programme qui ne toucherait plus du tout au moteur satisferait le critère sans rien prouver.
+#     programme qui ne toucherait plus du tout au moteur satisferait le critère sans rien prouver ;
+#   - la neutralisation a bel et bien produit des noms appelés et des regex, sinon les deux
+#     inclusions seraient vraies sur du vide.
+n_np="$(awk 'END{print NR+0}' "$NP")"
 n_libpath="$(awk '{ n += gsub(/path\.join\(LIB/, "") } END{ print n+0 }' "$NP")"
 has_src1=0; case "$(cat "$NP")" in *VALID_CONFIG_KEYS*) has_src1=1 ;; esac
-extracted35=0; [ "$n_np" -ge 100 ] && [ "$has_src1" -eq 1 ] && [ "$n_libpath" -ge 1 ] && extracted35=1
-if [ "$extracted35" -eq 1 ] && [ "$n_req" -eq "$n_core" ] && [ "$n_core" -ge 2 ] && [ "$n_dyn" -eq 0 ]; then
-  ok "35 CRITÈRE MACHINE — le programme node adresse $n_libpath chemins du moteur mais n'en charge AUCUN : ses $n_req chargements portent tous sur fs ou path, et il ne contient ni eval, ni new Function, ni import dynamique, ni vm"
-else ko "35 CRITÈRE MACHINE — aucun chargement de module hors fs/path dans le programme node" "corps=$n_np lignes (plancher 100) src1=$has_src1 libpath=$n_libpath chargements=$n_req dont_coeur=$n_core dynamiques=$n_dyn"; fi
+extracted35=0
+[ "$n_np" -ge 100 ] && [ "$has_src1" -eq 1 ] && [ "$n_libpath" -ge 1 ] \
+  && [ "$n_calls" -ge 30 ] && [ "$lex_nrx" -ge 4 ] && extracted35=1
+lexsain35=0
+[ "$n_at" -eq 0 ] && [ "$lex_unterm" -eq 0 ] && [ "$lex_state" = "n" ] \
+  && [ "$lex_rxbad" -eq 0 ] && [ "$lex_tn" -eq 0 ] && lexsain35=1
+if [ "$extracted35" -eq 1 ] && [ "$lexsain35" -eq 1 ] \
+   && [ "$n_res" -eq 0 ] && [ "$n_bigF" -eq 0 ] && [ "$n_core" -ge 2 ] \
+   && [ -z "$calls_intrus" ] && [ -z "$rx_intrus" ]; then
+  ok "35 CRITÈRE MACHINE — le programme node adresse $n_libpath chemins du moteur sans en charger aucun : après érosion de ses $n_core chargements cœur et de ses $n_procok accès process licites, le RÉSIDU des porteurs de chargement est VIDE, ses $n_calls noms appelés et ses $lex_nrx littéraux de regex sont tous dans la liste blanche"
+else ko "35 CRITÈRE MACHINE — résidu de chargement nul et noms appelés dans la liste blanche" "corps=$n_np lignes (plancher 100) src1=$has_src1 libpath=$n_libpath lexeur(marqueur@=$n_at chaine_ouverte=$lex_unterm etat=$lex_state regex_cassee=$lex_rxbad interpolation=$lex_tn) coeur=$n_core residu=$n_res Function=$n_bigF appels=$n_calls intrus=[$calls_intrus] regex=$lex_nrx regex_intrus=[$rx_intrus]"; fi
 
 # === Cas 33 — BALAYAGE FINAL : aucun chemin ne sort du contrat {0, 3, 64} ========================
 # Filet transverse. Les cas ci-dessus assertent chacun UN rc attendu ; celui-ci rejoue TOUTES les
@@ -686,6 +912,89 @@ sweep "hook+quiet"     bash "$SCRIPT" --hook --quiet
 if [ "$n_swept" -ge 20 ] && [ -z "$hors_contrat" ]; then
   ok "33 BALAYAGE — $n_swept exécutions (toutes les fixtures × moteur présent/absent + toutes les formes d'invocation) : aucun rc hors de {0, 3, 64}"
 else ko "33 BALAYAGE — aucun rc hors du contrat {0, 3, 64}" "n_swept=$n_swept (plancher 20) hors_contrat=[$hors_contrat]"; fi
+
+# === Mutants (--mutants) — le filet est-il capable de rougir ? ==================================
+# Chaque mutant est une réécriture MÉCANIQUE du script, rejouable, qui déclare les cas qu'elle doit
+# faire rougir. Deux garde-fous avant tout verdict, parce qu'un mutant qui ne mute rien « passe » :
+#   - la mutation doit avoir CHANGÉ le fichier (comparaison par `cmp`, jamais par `diff`) ;
+#   - le mutant doit rester un script valide, sinon il rougirait pour la mauvaise raison.
+# Le mutant LICITE est le sens inverse, et il est aussi important que les autres : commentaire de
+# bloc, chaîne et littéral de gabarit nommant les formes interdites doivent laisser la suite VERTE.
+# Sans lui, on refermerait le trou en rendant le critère inutilisable sur du code sain.
+if [ "$MUTANTS" -eq 1 ]; then
+  echo ""
+  echo "== mutants =="
+  MUTD="$TMP/mutants"; mkdir -p "$MUTD"
+
+  mutant() { # <nom> <cas devant rougir, vides = aucun> <fichier awk de mutation> <intention>
+    local nom="$1" attendus="$2" prog="$3" intention="$4"
+    local m="$MUTD/$nom.sh" log="$MUTD/$nom.log"
+    awk -f "$prog" "$SCRIPT" > "$m"; chmod +x "$m"
+    if cmp -s "$m" "$SCRIPT"; then
+      ko "MUT $nom — $intention" "la mutation n'a RIEN changé (motif introuvable) — mutant NON OPPOSABLE, pas mutant satisfait"; return
+    fi
+    if ! bash -n "$m" 2>/dev/null; then
+      ko "MUT $nom — $intention" "le mutant n'est pas un script valide : il rougirait pour la mauvaise raison"; return
+    fi
+    VF_TEST_TARGET="$m" bash "$0" > "$log" 2>&1
+    awk '/^  ✗ /{ sub(/^  ✗ /, ""); split($0, p, " "); print p[1] }' "$log" | sort -u > "$MUTD/$nom.rouges"
+    printf '%s\n' $attendus | awk 'NF' | sort -u > "$MUTD/$nom.attendus"
+    local rouges manquants
+    rouges="$(tr '\n' ' ' < "$MUTD/$nom.rouges")"
+    manquants="$(comm -23 "$MUTD/$nom.attendus" "$MUTD/$nom.rouges" | tr '\n' ' ')"
+    if [ -z "$attendus" ]; then
+      if [ -z "$rouges" ]; then ok "MUT $nom — $intention : la suite reste VERTE, comme elle le doit"
+      else ko "MUT $nom — $intention : la suite doit rester VERTE" "cas rougis à tort : [$rouges] (log : $log)"; fi
+    else
+      if [ -z "$manquants" ]; then ok "MUT $nom — $intention : cas [$attendus] rougis comme annoncé (rouges : [$rouges])"
+      else ko "MUT $nom — $intention : les cas [$attendus] doivent rougir" "restés VERTS : [$manquants] — rouges observés : [$rouges] (log : $log)"; fi
+    fi
+  }
+
+  cat > "$MUTD/m1.awk" <<'AWK'
+/const src = slurp\(path\.join\(LIB, f\)\);/ { print "    try { require(path.join(LIB, f)); } catch (e) {}" }
+{ print }
+AWK
+  cat > "$MUTD/m2.awk" <<'AWK'
+{ sub(/if \(v !== null && accept\(v\)\) return v;/, "if (false && v !== null && accept(v)) return v;"); print }
+AWK
+  cat > "$MUTD/m3.awk" <<'AWK'
+/const src = slurp\(path\.join\(LIB, f\)\);/ { print "    try { require('os'); } catch (e) {}" }
+{ print }
+AWK
+  cat > "$MUTD/m4.awk" <<'AWK'
+{ sub(/<<'NODEJS' \|\| true/, "<<'NODEPROG' || true"); if ($0 == "NODEJS") $0 = "NODEPROG"; print }
+AWK
+  cat > "$MUTD/m5.awk" <<'AWK'
+{ print }
+/^const ARB = / {
+  print "/* interdits documentés : require(, eval, new Function, module.constructor._load */"
+  print "const NOTE_INTERDITS = ['require(', 'eval', 'new Function', 'process.binding'];"
+  print "const NOTE_T = `require(${LIB}) puis eval puis new Function`;"
+}
+AWK
+  cat > "$MUTD/m6.awk" <<'AWK'
+{ print }
+/^const ARB = / { print "process.exit(3);" }
+AWK
+  # m7 vise un basename FIXE, et c'est délibéré : c'est la forme DURE. Avec la variable de boucle,
+  # le chargement frappe config.cjs, que l'ancienne fixture piégeait déjà — le cas 34 rougissait donc
+  # tout seul. Avec 'config-schema.cjs', il ne frappait QUE l'un des deux modules laissés sans témoin :
+  # l'ancienne suite sortait à 35 ok / 0 ko pendant que le témoin « RCE confirmée » était écrit.
+  cat > "$MUTD/m7.awk" <<'AWK'
+/^const path = require/ { print; print "const _load = require;"; next }
+/const src = slurp\(path\.join\(LIB, f\)\);/ { print "    try { _load(path.join(LIB, 'config-schema.cjs')); } catch (e) {}" }
+{ print }
+AWK
+
+  mutant m1 "34 35" "$MUTD/m1.awk" "require() rétabli dans readLiteral — la RCE d'origine"
+  mutant m2 "34"    "$MUTD/m2.awk" "readLiteral n'accepte plus rien — le gate devient muet"
+  mutant m3 "35"    "$MUTD/m3.awk" "chargement SANS effet observable — invisible au lab piégé"
+  mutant m4 "35"    "$MUTD/m4.awk" "terminateur du here-doc renommé — l'extraction ne trouve plus le corps"
+  mutant m5 ""      "$MUTD/m5.awk" "réécriture LICITE (commentaire de bloc, chaîne, gabarit) nommant les interdits"
+  mutant m6 "34"    "$MUTD/m6.awk" "script totalement MUET — le cas 34 n'est pas satisfaisable par un silence"
+  mutant m7 "34 35" "$MUTD/m7.awk" "require ALIASÉ (const _load = require) — la régression qui rouvrait la RCE"
+fi
 
 echo ""
 echo "== résultat : $PASS ok, $FAIL ko =="
