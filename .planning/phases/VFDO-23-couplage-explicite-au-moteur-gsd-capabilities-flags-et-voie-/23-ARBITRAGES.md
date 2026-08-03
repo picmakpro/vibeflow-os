@@ -75,6 +75,11 @@ du désarmement adjacent** qui doit rougir.
 
 ## A-1ter — TRANCHÉ le 2026-08-03 : A-1bis tombe. Voie 1 instruite en 23-05, `T25b` dégazé maintenant
 
+> **MOTIF SUBSTITUÉ le 2026-08-04 (arbitrage A-13, sur O-21).** Le **geste** ci-dessous est
+> **maintenu tel quel** — le manager porte le cadrage. Seul le **motif** du geste 2 est remplacé :
+> l'ancienne justification est conservée en citation pour la traçabilité, elle ne fait plus
+> autorité. Décision de référence : **A-13**, plus bas.
+
 **Décision.** A-1bis est **démentie sur ses faits** (cf. `23-ARBITRAGES-OUVERTS.md` §O-8). Deux
 gestes, dans cet ordre :
 
@@ -83,9 +88,27 @@ gestes, dans cet ordre :
    dire ce qu'il mesure et rien de plus, et le trou est documenté par écrit. **Aucun gate ne ment
    en attendant le correctif structurel.**
 2. **Dans le plan 23-05 (voie unique d'invocation, Lacune 5)** — **le manager porte le cadrage**.
-   Il a `AskUserQuestion`, donc `--auto` n'a plus de raison d'être et le problème disparaît à la
-   racine. C'était la 3ᵉ voie d'A-1bis, explicitement « reversable au débat si la Lacune 5 rouvre
-   la voie unique » : la Lacune 5 la rouvre, la voie revient.
+   C'était la 3ᵉ voie d'A-1bis, explicitement « reversable au débat si la Lacune 5 rouvre la voie
+   unique » : la Lacune 5 la rouvre, la voie revient.
+
+   **Motif retiré le 2026-08-04 (A-13), conservé pour la traçabilité** :
+   > « Il a `AskUserQuestion`, donc `--auto` n'a plus de raison d'être et le problème disparaît à
+   > la racine. »
+
+   Ce motif est **faux**. `vf-dev-manager.md` documente lui-même, dans son repli **D-09**, que
+   **dispatché en sous-agent — sa configuration nominale — le runtime peut ne pas lui fournir
+   `AskUserQuestion`** malgré sa déclaration au frontmatter, et qu'« c'est précisément ce qui a
+   gelé une mission au nœud `checkpoint-doctrine` ». Faire reposer le geste sur la disponibilité
+   d'un outil de question, c'est le faire reposer sur une propriété que le runtime ne garantit pas.
+
+   **Motif de remplacement, en vigueur depuis le 2026-08-04 (A-13)** — vrai et suffisant : une fois
+   le cadrage porté par le manager, **plus aucun mode d'enchaînement n'est passé au cadrage**, donc
+   la **règle 5** de `checkpoints.md` — auto-approbation de `human-verify`, auto-sélection de la
+   **première option** sur `decision` — **cesse de s'appliquer** au plan et à l'exécution. C'est
+   exactement le dommage identifié plus bas sous « Portée réelle », et il est fermé à la racine.
+   Ce bénéfice est **indépendant** de la disponibilité d'un outil de question : il tient au mode
+   **non passé**, pas à l'outillage de l'agent qui cadre. Le repli D-09 s'applique alors au manager
+   comme à tout agent — il ne conditionne plus le geste, il le borne.
 
 **Pourquoi A-1bis tombe — le fait, vérifié trois fois** (reviewer, puis manager, puis directement
 sur `~/.claude/gsd-core/workflows/discuss-phase/modes/chain.md:45-61`) :
@@ -114,6 +137,13 @@ le rouvrirait une sixième fois, alors que 23-05 traite ce sujet de toute façon
 pratique), A-1bis (tranchée sur une adjacence qui n'existe qu'à l'écrit), et maintenant A-1ter. La
 leçon est écrite ici pour la suite : **sur cette lacune, vérifier le comportement du moteur amont
 avant de trancher, pas après.**
+
+**Mise à jour du 2026-08-04 (A-13) — c'est en réalité la QUATRIÈME.** Le motif initial du geste 2
+d'A-1ter était lui-même une prémisse fausse : A-1, A-1bis, A-1ter, et le motif d'A-1ter. La leçon
+ci-dessus **vient de jouer une fois de plus, contre l'arbitrage qui l'écrivait** — signe qu'elle
+n'était pas encore appliquée à sa propre justification. Elle vaut désormais pour **toute** décision
+de cette lacune, motifs compris : aucune décision D-02 ne se tranche sur une capacité supposée d'un
+agent ou d'un moteur amont sans que le comportement ait été **vérifié** au préalable.
 
 ## A-2 — `workflow.auto_advance` : désarmé, dans la forme retenue en A-1bis
 

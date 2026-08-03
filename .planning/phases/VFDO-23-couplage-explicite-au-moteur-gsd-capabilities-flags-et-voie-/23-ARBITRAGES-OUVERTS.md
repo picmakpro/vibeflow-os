@@ -224,7 +224,18 @@ la Lacune 5 / plan 23-05 rouvre la voie unique d'invocation.
 
 ---
 
-## O-11 — ⚠️ EN ATTENTE DE SAMUEL — `KNOWN_TOP` : parité stricte, ou limite assumée ?
+## O-11 — TRANCHÉ le 2026-08-04 : voir `23-ARBITRAGES.md` §A-8
+
+> ✅ **Ce point n'est plus ouvert.** Décision : **statu quo, limite assumée**. `KNOWN_TOP` du script
+> reste un **sur-ensemble** de celui du moteur ; les **6 clés** tues restent tues, mais **honnêtement
+> documentées** dans l'en-tête et le SUMMARY, qui nomment désormais les deux sens. La parité stricte
+> est écartée : elle échangerait un faux négatif **documenté** contre des faux positifs **non
+> documentés** sur les labs à capabilities fédérées. La voie (c) reste ouverte si l'overlay est
+> mesuré un jour. La décision qui fait autorité est `23-ARBITRAGES.md` **§A-8**.
+>
+> **L'énoncé ci-dessous est conservé mot pour mot**, à lire comme un instantané daté.
+
+## O-11 (TRANCHÉ) — ⚠️ EN ATTENTE DE SAMUEL — `KNOWN_TOP` : parité stricte, ou limite assumée ?
 
 **Le fait, démenti par exécution.** La limite que `check-gsd-config.sh` déclarait — « faux positif
 possible, jamais faux négatif » — était **fausse**. Le moteur bâtit son `KNOWN_TOP_LEVEL`
@@ -262,7 +273,41 @@ pas — c'est un mauvais échange tant que l'overlay n'a pas été instruit.
 
 ---
 
-## O-12 — ⚠️ EN ATTENTE DE SAMUEL — la branche 2 de la cascade est du code mort
+## O-12 — TRANCHÉ le 2026-08-04 : voir `23-ARBITRAGES.md` §A-10 — **application RESTREINTE à une moitié**
+
+> ✅ **Ce point n'est plus ouvert** — mais l'arbitrage n'est appliqué **qu'à moitié**, et l'autre
+> moitié **remonte à l'humain**. Décision de référence : `23-ARBITRAGES.md` **§A-10** (voie (b) :
+> retirer la branche 2, code mort).
+>
+> **Moitié APPLIQUÉE — `check-gsd-config.sh`.** La branche 2
+> (`<root>/node_modules/@opengsd/gsd-core/bin/lib`) est retirée de la cascade du script. Le motif
+> fautif — le **double segment** du tarball npm — n'existe que là : mesuré, il ne subsiste plus que
+> **des mentions en commentaire**, toutes dans la famille `check-gsd-config.sh` (le script et sa
+> suite de tests), qui documentent le retrait.
+>
+> **Moitié GELÉE, REMONTÉE À L'HUMAIN — `mission-flow.md` : prémisse démentie par mesure (ADR-031).**
+> A-10 prescrit de retirer la branche « des **deux** cascades, `mission-flow.md` portant le même
+> défaut ». **Cette prémisse est fausse**, et c'est une re-mesure indépendante qui le montre — la
+> même que celle déjà consignée plus bas dans cette section le 2026-08-03 :
+>
+> - `plugin/dev-orchestrator/references/mission-flow.md` compte **288 lignes** et **0 occurrence**
+>   de `gsd-core`. Il n'y a **rien à y retirer** qui ressemble à la branche visée.
+> - Sa cascade `$S` résout des dossiers de **scripts**, **sans aucun rapport** avec le layout du
+>   tarball npm qui fonde tout le défaut O-12.
+> - Sa « branche 2 » est **`$HOME/.claude/scripts`** — **vivante**, et documentée comme telle dans
+>   le fichier lui-même : c'est la **seule** voie de résolution d'un lab en scope **user**. La
+>   retirer ne supprimerait pas du code mort, elle **casserait** une résolution légitime.
+>
+> **Rien n'a donc été appliqué sur `mission-flow.md`**, et rien ne doit l'être sur la foi d'A-10 :
+> exécuter la lettre de l'arbitrage ici produirait une régression, pas un durcissement. Le point
+> repart à l'arbitre — **ADR-031, un agent ne tranche pas contre une prémisse qu'il a mesurée
+> fausse** (nœud `escalade-a10-missionflow`).
+>
+> **L'énoncé ci-dessous est conservé mot pour mot**, à lire comme un instantané daté. Noter qu'il
+> portait **déjà**, depuis le 2026-08-03, la correction du fait sur `$S` — la prémisse d'A-10 était
+> démentie par écrit dans ce registre **avant** d'être écrite dans l'arbitrage.
+
+## O-12 (TRANCHÉ, application restreinte) — ⚠️ EN ATTENTE DE SAMUEL — la branche 2 de la cascade est du code mort
 
 **Le fait, RE-MESURÉ indépendamment le 2026-08-03 (nœud `verif-o12`), et précisé sur trois points.**
 La branche fautive est **`check-gsd-config.sh:270`** — la ligne 195 citée au premier relevé est la
@@ -312,7 +357,20 @@ documentant qu'elle est inopérante. **Non bloquant.**
 
 ---
 
-## O-13 — ⚠️ EN ATTENTE DE SAMUEL — A-6 introduit une péremption silencieuse
+## O-13 — TRANCHÉ le 2026-08-04 : voir `23-ARBITRAGES.md` §A-9
+
+> ✅ **Ce point n'est plus ouvert.** Décision : **signal explicite ET canari en CI** — les deux, pas
+> l'un ou l'autre. Quand `LIB` est **bien résolu** mais que l'extraction rend **0 clé**, le script
+> **émet un signal explicite** au lieu de se taire, en restant dans le contrat de sortie `0/3/64`
+> (jamais d'`exit 1`, cf. `T-23-02-03`) ; **et** un **canari** en CI rougit si la forme du moteur
+> réel cesse d'être lisible. Le signal corrige l'**affirmation fausse** mesurée ; le canari déplace
+> la détection du **runtime vers la CI**. La décision qui fait autorité est `23-ARBITRAGES.md`
+> **§A-9** — même remède prescrit une seconde fois par **A-12**, pour la péremption que le portage
+> du lecteur de littéraux rouvre sur le générateur de 23-04.
+>
+> **L'énoncé ci-dessous est conservé mot pour mot**, à lire comme un instantané daté.
+
+## O-13 (TRANCHÉ) — ⚠️ EN ATTENTE DE SAMUEL — A-6 introduit une péremption silencieuse
 
 **Conséquence NEUVE, découverte après l'arbitrage** (reconnaissance lecture seule, 2026-08-03).
 
@@ -355,7 +413,22 @@ la CI et **masquerait** précisément ce que le cas 26 doit voir.
 
 ---
 
-## O-15 — ⚠️ EN ATTENTE DE SAMUEL — la fixture k de T25b porte encore le mensonge d'A-5
+## O-15 — TRANCHÉ le 2026-08-04 : voir `23-ARBITRAGES.md` §A-11
+
+> ✅ **Ce point n'est plus ouvert.** Décision : **ne rien faire, `23-05` règle le sujet**. La fixture
+> `k` de `T25b` **garde sa prose** : `T25b` devient **sans objet au plan 23-05** (retiré ou
+> remplacé), et y toucher maintenant rouvrirait `23-01` une **6ᵉ** fois sur du gate. C'est la voie
+> qui était déjà explicitement recommandée par l'énoncé, et que la section **« O-15 — MISE À JOUR :
+> soldé par péremption au plan 23-05 »**, plus bas dans ce registre, avait anticipée. La décision
+> qui fait autorité est `23-ARBITRAGES.md` **§A-11**.
+>
+> ⚠️ **Clos par péremption, pas sans contrepartie** : la MISE À JOUR plus bas chiffre le coût réel
+> du retrait de `T25b` (**18** renvois, **3** gardes cassées, et la brique **Cadrage** laissée sans
+> garde si `T25` n'est pas élargi). Ce coût est porté par le plan 23-05, **pas** par O-15.
+>
+> **L'énoncé ci-dessous est conservé mot pour mot**, à lire comme un instantané daté.
+
+## O-15 (TRANCHÉ) — ⚠️ EN ATTENTE DE SAMUEL — la fixture k de T25b porte encore le mensonge d'A-5
 
 `plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh:2729` — la prose de la fixture
 contient encore « la fenêtre reste bornée là », conservée comme **modèle de reformulation
@@ -423,7 +496,23 @@ point **plus grave** que « isolation de fixtures ». Trancher après son verdic
 
 ---
 
-## O-18 — ⚠️ EN ATTENTE DE SAMUEL — lectures non bornées (`check-gsd-config.sh:298`)
+## O-18 — TRANCHÉ le 2026-08-04 : voir `23-ARBITRAGES.md` §A-14
+
+> ✅ **Ce point n'est plus ouvert.** Décision : **poser la garde**. Le script **refuse les fichiers
+> non ordinaires avant de lire**. L'argument du « défaut préexistant, donc hors périmètre » ne tient
+> pas : l'imputation a changé et elle est **mesurée** — `check-gsd-config.sh` **n'existe pas sur
+> `main`** et `hooks.json` **ajoute** sa ligne au `SessionStart`, donc **la PR ouvre ce chemin, elle
+> n'en hérite pas**. Les 3 gates préexistants terminent en **1 s** sur FIFO ; celui-ci doit faire
+> pareil. La seule occurrence de `statSync` dans le fichier est le **commentaire `:181` qui décrit
+> la garde non posée** — poser la garde, c'est faire dire vrai à ce commentaire. La décision qui
+> fait autorité est `23-ARBITRAGES.md` **§A-14**. Voir aussi la section **« O-18 — MISE À JOUR »**
+> plus bas, qui porte la mesure d'imputation, et **§A-12**, qui exige la même garde de type sur le
+> générateur de 23-04 (les deux gardes ferment la même famille de DoS).
+>
+> **L'énoncé ci-dessous est conservé mot pour mot**, à lire comme un instantané daté — y compris son
+> imputation « préexistante », que la MISE À JOUR dément.
+
+## O-18 (TRANCHÉ) — ⚠️ EN ATTENTE DE SAMUEL — lectures non bornées (`check-gsd-config.sh:298`)
 
 **Rapatrié depuis `HANDOFF.json` le 2026-08-03** : ce point vivait dans le relais de mission et
 **pas** dans ce registre, alors qu'il est dû comme les autres avant la PR. Le registre est la
@@ -521,7 +610,35 @@ versions n'est pas cachée ici. **Honnête, pas trompeur** — à distinguer soi
 
 ---
 
-## O-21 — 🛑 EN ATTENTE DE SAMUEL — la prémisse d'A-1ter est démentie dans la configuration nominale
+## O-21 — TRANCHÉ le 2026-08-04 : voir `23-ARBITRAGES.md` §A-13
+
+> ✅ **Ce point n'est plus ouvert.** Décision : **le geste d'A-1ter est maintenu, son motif est
+> substitué**. Le manager porte le cadrage — ça ne change pas. Ce qui change, c'est la
+> justification :
+>
+> - **Motif retiré** (faux) : « il a `AskUserQuestion`, donc `--auto` n'a plus de raison d'être ».
+>   Démenti par `vf-dev-manager.md` lui-même : dispatché **en sous-agent — sa configuration
+>   nominale** — le runtime peut ne pas lui fournir `AskUserQuestion` malgré sa déclaration au
+>   frontmatter. C'est le repli **D-09**, et « c'est précisément ce qui a gelé une mission au nœud
+>   `checkpoint-doctrine` ».
+> - **Motif en vigueur** (vrai et suffisant) : une fois le cadrage porté par le manager, **plus
+>   aucun mode d'enchaînement n'est passé au cadrage**, donc la **règle 5** de `checkpoints.md` —
+>   auto-approbation de `human-verify`, auto-sélection de la **première option** sur `decision` —
+>   **cesse de s'appliquer** au plan et à l'exécution. Ce bénéfice est **indépendant** de la
+>   disponibilité d'un outil de question. Le repli D-09 s'applique alors au manager comme à tout
+>   agent : il **borne** le geste, il ne le **conditionne** plus.
+>
+> La substitution est portée dans `23-ARBITRAGES.md` **§A-1ter** (ancien motif conservé en
+> citation, traçabilité intacte). La décision qui fait autorité est **§A-13**.
+>
+> ⚠️ **Quatrième prémisse fausse d'affilée sur la lacune D-02** (A-1, A-1bis, A-1ter, et le motif
+> d'A-1ter). La leçon d'A-1ter — *vérifier le comportement du moteur amont avant de trancher, pas
+> après* — a été démentie **par l'arbitrage qui l'écrivait**. Elle vaut désormais pour **toute**
+> décision de cette lacune, **motifs compris**.
+>
+> **L'énoncé ci-dessous est conservé mot pour mot**, à lire comme un instantané daté.
+
+## O-21 (TRANCHÉ) — 🛑 EN ATTENTE DE SAMUEL — la prémisse d'A-1ter est démentie dans la configuration nominale
 
 **Le point le plus important du registre. Il remet en cause un arbitrage TRANCHÉ.**
 
@@ -598,7 +715,36 @@ compensatoire (motif de brique élargi, fixture retournée, mutant rouge + refor
 
 ---
 
-## O-23 — 🛑 BLOQUANT MAJEUR — la RCE d'A-6 est RÉINTRODUITE par le générateur de 23-04
+## O-23 — TRANCHÉ le 2026-08-04 : voir `23-ARBITRAGES.md` §A-12
+
+> ✅ **Ce point n'est plus ouvert.** Décision : **lecteur de littéraux ET garde de type reposée
+> explicitement** — les deux moitiés sont **indissociables**.
+>
+> - **Moitié 1** — porter au générateur `build-gsd-capabilities-index.sh` le **lecteur de littéraux**
+>   écrit en 23-02 : le registre est **lu**, jamais **chargé**. Plus de `require()` sur un chemin
+>   issu de la cascade.
+> - **Moitié 2** — **reposer explicitement la garde de type** que `require()` fournissait
+>   gratuitement. Mesure de l'auditeur : `[ -f "$REGISTRY" ]` protège *incidemment* de la FIFO
+>   (rc=1 en 1 s). **Fermer la RCE sans reposer cette garde rouvrirait un DoS** — un correctif de
+>   sécurité qui en ouvre un autre est le mode de défaillance N1 de cette phase.
+>
+> **Pourquoi cette voie** : elle est cohérente avec A-6 — ne jamais exécuter ce qu'on audite — là où
+> (b) sacrifiait la résolution légitime d'un lab en `VF_SCOPE=project` et (c) changeait la nature de
+> 23-04. La péremption silencieuse que le portage rouvre sur ce **second** script se traite par
+> **A-9**, déjà tranché : même remède, appliqué deux fois.
+>
+> **Geste documentaire fait** (nœud `propagation-a6`, 2026-08-04) : la menace est enregistrée au
+> threat model de `23-04-PLAN.md` sous **`T-23-04-07`** / Elevation of Privilege / **critical**, et
+> la **cause racine documentaire** est corrigée — la table des *Trust Boundaries* de `23-04-PLAN.md`
+> qualifiait de « frontière de version » la **même** frontière que `23-02-PLAN.md:378` avait
+> requalifiée sous A-6 en **code non maîtrisé**. Cette requalification n'avait **jamais** été
+> propagée jusqu'à 23-04 : **la RCE n'est pas une faute de codeur**, c'est un plan dont la prémisse
+> de sécurité était périmée. La décision qui fait autorité est `23-ARBITRAGES.md` **§A-12**.
+>
+> **L'énoncé ci-dessous est conservé mot pour mot**, à lire comme un instantané daté — y compris ses
+> corollaires F2, F3, F4 et F6, à traiter **avec** F1 : même racine.
+
+## O-23 (TRANCHÉ) — 🛑 BLOQUANT MAJEUR — la RCE d'A-6 est RÉINTRODUITE par le générateur de 23-04
 
 **Le finding le plus grave de la phase. Il est introduit par CETTE BRANCHE, il n'est pas hérité.**
 
