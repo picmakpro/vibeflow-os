@@ -92,6 +92,16 @@
       "name": "summary-03 — 23-03-SUMMARY.md ecrit (192 lignes). A RECOUPE et confirme sur disque : GSD-PIPELINE.md +44/-1 (140->183), vf-coder.md 98->100, test-dev-orchestrator.sh +407/-0 (3828->4235), clause de fermeture bien AVANT la table, aucune occurrence de T25 dans la §9 livree, extracteur de l'assertion G corrige par index de cellule explicite, 11 fixtures fautives / 5 licites confirmees par comptage des sites d'increment. A VERIFIE O-16 une TROISIEME fois, meme resultat. NUANCE NON GOMMEE : « §9 = 34 lignes » est le compte du BLOC AJOUTE (separateur inclus) ; la section proprement dite fait 31 lignes (l.153-183) — les deux sous le budget de 60. HONNETETE : les compteurs 102->103 et les 11 mutants externes n'ont PAS ete re-mesures (interdiction d'executer les suites, deux noeuds voisins mesuraient) ; corroboration STRUCTURELLE seulement — diff en addition pure +407/-0 et un seul couple ok/ko ajoute (l.4228/4230), donc « 0 libelle disparu, 1 ajoute » est mecaniquement vrai. Le SUMMARY le dit explicitement au lieu de le passer sous silence",
       "status": "done",
       "commit": "fdd5bee"
+    },
+    {
+      "id": 29,
+      "name": "fix-a6 — A-6 APPLIQUE. Le gate LIT le moteur au lieu de l'executer. 3 commits atomiques, un fichier chacun ; les 3 fichiers interdits verifies BYTE-IDENTIQUES par egalite de blob. PREUVES : (1) equivalence par ensembles, 8 ensembles x 7 moteurs = 56 comparaisons comm BIDIRECTIONNELLES, 0 ecart, tous ensembles NON VIDES (cardinaux rendus moteur par moteur) ; l'or de la reconnaissance re-derive independamment puis recoupe, 8/8 identiques. (2) equivalence bout en bout : 152 paires (19 fixtures x 8 moteurs) contre l'ancien script, stdout cmp identique 152/152 ET rc egal 152/152, 95536 octets compares ; seule exception assumee --help (l'en-tete a change), comparee en rc seul. (3) non-execution DANS LES DEUX SENS : ancien script 3 temoins crees, nouveau 0, avec dans les deux cas (b) sonde signalee et (c) cle du moteur piege epargnee — les deux assertions anti-vert-a-vide. (4) 5 MUTANTS, rouge constate : M1 retablit require() -> 34 et 35 rouges ; M2 readLiteral rend toujours null -> 34 rouge PAR (b) SEULEMENT, ce qui prouve que (b) n'est pas decoratif ; M3 chargement SANS EFFET OBSERVABLE (require('os') inutilise) -> 35 SEUL ROUGE, 34 VERT : preuve decisive que le critere STATIQUE attrape ce que la sonde DYNAMIQUE ne peut pas voir, les deux cas sont necessaires ; M4 terminateur de here-doc renomme -> corps extrait a 0 ligne, 35 rouge sur le plancher, le vert a vide est ferme ; M5 reecriture LICITE (renommage interne pur) -> reste vert, aucun sur-ajustement sur des noms. (5) suite 33 -> 35 ok / 0 ko, ensembles de libelles compares, un seul libelle modifie (cas 33, compteur 49 -> 52, consequence attendue de l'ajout). GELE ET VERIFIE : cascade :246-264 BYTE-IDENTIQUE (cmp), contrat de sortie 1x exit 0 / 5x exit 3 / 2x exit 64, AUCUN exit 1. FAIT NEUF NON DEMANDE : latence 59 ms -> 51 ms, lire du texte coute MOINS que charger 273 Ko de JS. HONNETETE : les « 18 rouges + 4 verts par accident » du lecteur mono-forme n'ont PAS ete re-derives (parti directement du bi-forme prescrit) ; moteur mesure en 1.9.0 et non 1.9.1",
+      "status": "done",
+      "commits": [
+        "6eb79a2",
+        "d2b2c3d",
+        "41eb709"
+      ]
     }
   ],
   "remaining_tasks": [
