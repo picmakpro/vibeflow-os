@@ -5,7 +5,21 @@ accidentellement et seul le disque a survécu. Aucun de ces points n'a été tra
 
 ---
 
-## O-8 — ⚠️ BLOQUANT — A-1bis est démentie sur ses faits : `--auto` lance TOUTE la chaîne
+## O-8 — TRANCHÉ le 2026-08-03 : voir `23-ARBITRAGES.md` §A-1ter
+
+> ✅ **Ce point n'est plus ouvert.** Samuel a tranché, en deux gestes : **A-1bis tombe** ; la
+> **voie 1** (le manager porte le cadrage — il a `AskUserQuestion`, `--auto` n'a plus lieu d'être)
+> est instruite comme **contrainte d'entrée du plan 23-05**, non exécutée à ce jour ; et `T25b` est
+> **dégazé immédiatement** dans 23-01 — son libellé ne certifie plus qu'une adjacence **textuelle**,
+> et le trou runtime est documenté par écrit dans l'en-tête de son bloc de test. La décision qui
+> fait autorité est `23-ARBITRAGES.md` **§A-1ter**.
+>
+> **L'énoncé ci-dessous est conservé mot pour mot**, y compris son statut « gelé » d'époque, ses
+> trois voies chiffrées et sa liste de ce qui était alors bloqué : la traçabilité des prémisses
+> fausses est un acquis de cette phase — **trois d'affilée sur D-02** (A-1, A-1bis, A-1ter). À lire
+> comme un instantané daté, jamais comme l'état courant.
+
+## O-8 (TRANCHÉ) — ⚠️ BLOQUANT — A-1bis est démentie sur ses faits : `--auto` lance TOUTE la chaîne
 
 **Statut : gelé, en attente d'arbitrage humain. Aucun agent n'y a touché.** C'est la **deuxième
 fois** que la décision sur D-02 repose sur une prémisse fausse (A-1 avait déjà été retranchée pour

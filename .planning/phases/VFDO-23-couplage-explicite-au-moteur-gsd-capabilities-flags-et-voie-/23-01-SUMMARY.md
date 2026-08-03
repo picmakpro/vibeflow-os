@@ -264,6 +264,53 @@ Aucun blocage. Le seul point de friction — la syntaxe `--agents-dir=` vs `--ag
 documenté ci-dessus comme déviation Rule 1 (commande de vérification, pas un fichier du
 périmètre).
 
+## Dernier geste de 23-01 — dégazage de `T25b` (A-1ter geste 1, 2026-08-03)
+
+**Ce que c'est.** 23-01 était clos sur toute sa part mécanique, sauf O-8. L'arbitrage humain
+**A-1ter** (`23-ARBITRAGES.md`) l'a tranché et a commandé, **immédiatement dans 23-01**, de retirer
+à `T25b` une promesse qu'il ne tient pas. C'est le dernier geste du plan.
+
+**Le fait.** `--auto` sur le cadrage n'arme pas seulement le chain flag : il **enchaîne
+discuss → plan → execute dans le même appel** (`gsd-core@1.9.0`,
+`workflows/discuss-phase/modes/chain.md` étape 5, l. 45-61). Le désarmement « adjacent » exigé par
+A-1bis s'exécute donc **après tout le pipeline**. `T25b` certifie une adjacence **TEXTUELLE** ; il
+**ne borne aucune fenêtre runtime** — son libellé prétendait le contraire.
+
+**Ce qui a changé — de la PROSE, exclusivement.**
+
+- Libellé `ok` et message `ko` de `T25b` réécrits : ils disent maintenant *adjacence textuelle dans
+  le bloc Cadrage aplati, à ≤ 150 caractères*, et énoncent explicitement qu'aucune fenêtre runtime
+  n'est bornée.
+- En-tête du bloc `T25b` : deux sections neuves — **« ce qui est mesuré, et rien de plus »** et
+  **« ce que cette sonde ne garantit PAS »** — plus la portée réelle **bornée** (règle 6 de
+  `checkpoints.md` protège les gates `blocking-human` : ce n'est **pas** une violation d'ADR-031 sur
+  le gate que 23-01 construit ; c'est la **règle 5** qui joue — `human-verify` auto-approuve et
+  `decision` auto-sélectionne la première option pendant plan et execute) et le renvoi au correctif
+  structurel (A-1ter geste 2, voie 1, instruite en **23-05**).
+- Les deux messages `T25B_WHY` de KO qui parlaient de « fenêtre ouverte pour toute la mission » et
+  de fenêtre « refermée » : corrigés — un message de KO doit rester exact.
+- Renvois à `T25b` ailleurs dans le fichier (périmètre de `T25`, commentaire de la fixture `d`,
+  commentaire du libellé gelé de `T25 fermeture`, balayage) : requalifiés en *adjacence textuelle*.
+
+**Ce qui n'a PAS changé — invariance prouvée, pas au compteur.** `T25B_DISARM_RE`, `T25B_WINDOW`
+(150), l'`awk` d'appariement, les fixtures `g`..`k`, les mutants `M1`..`M4`, les codes de retour et
+tous les autres blocs : intacts. Preuve : verdicts matérialisés par assertion **avant** et **après**
+(102 OK / 0 KO / 0 SKIP dans les deux cas), comparés en `comm` sur listes triées — **103 libellés
+sur 104 identiques mot pour mot**, l'unique écart étant le libellé de `T25b` volontairement
+réécrit ; multiset (statut + identifiant de test) **identique** (`cmp -s`) ; et séquence des lignes
+de **code** (commentaires exclus) **identique ligne à ligne** hors les 4 chaînes de message
+réécrites — 2160 lignes de code de part et d'autre.
+
+**Exception assumée au gel des libellés `ok`.** L'acquis « on ajoute, on ne réécrit jamais » (cf.
+O-4) protège les libellés qui **sous-déclarent** : ils ne mentent pas. Celui de `T25b`
+**sur-déclarait** — il annonçait une garantie que la sonde ne rend pas. Un libellé qui ment n'est
+pas un invariant à préserver, et A-1ter commande explicitement sa réécriture. C'est le **seul**
+libellé touché, et l'écart est matérialisé plutôt qu'assumé de mémoire.
+
+**Statut de `T25b` pour la suite.** Le jour où 23-05 fait porter le cadrage au manager, `T25b`
+devient **sans objet** : à retirer, ou à remplacer par une garantie **runtime** — jamais à conserver
+vert. La contrainte est écrite dans `23-05-PLAN.md` §« Contrainte d'entrée (A-1ter geste 2) ».
+
 ## Densité restante — budget pour les plans 23-06 et 23-07
 
 - `vf-dev-manager.md` : **244 lignes** / plafond ADR-029 = 250 → **6 lignes de marge**. Le plan
