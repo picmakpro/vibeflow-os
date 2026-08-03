@@ -26,6 +26,52 @@ jobs:
           jq --version
           python3 --version
 
+      # Node 22+ est un prérequis DUR de @opengsd/gsd-core (garde explicite dans
+      # plugin/dev-orchestrator/scripts/ensure-deps.sh). Épinglé ici plutôt que subi depuis l'image
+      # du runner : une image qui redescendrait sous 22 ferait échouer l'install, donc les cas 20/26.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Installer le moteur GSD (@opengsd/gsd-core@^1) — sans lui, deux cas ne peuvent rien prouver
+        run: |
+          set -eu
+          # POURQUOI (arbitrage A-7, Phase 23). Les cas 20 et 26 de
+          # plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh tournent contre le moteur
+          # RÉELLEMENT INSTALLÉ — c'est leur raison d'être : compteur d'ATTEINTE (20) et détection de
+          # dérive du mirroir engineExtra (26). Sur un runner sans moteur ils sortent en `ko`, et ils
+          # sortent en `ko` À BON DROIT. Ils ne doivent JAMAIS être dégradés en `skip`, en `ok`
+          # conditionnel, ni être entourés d'un `|| true` : ce serait rouvrir le « vert à vide » qu'ils
+          # existent pour fermer. La cause se traite ICI, dans l'environnement d'exécution.
+          #
+          # OÙ (cascade de check-gsd-config.sh, NON modifiée — trois branches, premier trouvé gagne) :
+          #   1. <repo>/.claude/gsd-core/bin/lib             — ÉCARTÉE : ce dépôt ignore .claude/
+          #      délibérément (« le repo est la SOURCE des modules, PAS un lab », .gitignore) ;
+          #      y déposer le distribuable contredirait cette règle et déplacerait le GSD_HOME dérivé
+          #      par check-gsd-engine.sh / ensure-deps.sh.
+          #   2. <repo>/node_modules/@opengsd/gsd-core/bin/lib — INATTEIGNABLE par `npm install` : le
+          #      paquet publié dépose son payload sous .../@opengsd/gsd-core/gsd-core/bin/lib
+          #      (mesuré sur 1.9.1). Un bin/lib existe bien à ce niveau, mais il ne contient que
+          #      ui-safety-gate.cjs — pas config.cjs. Cette branche ne résout donc rien.
+          #   3. $HOME/.claude/gsd-core/bin/lib               — CELLE-CI : c'est ce que pose
+          #      l'installeur officiel en scope global, et c'est la topologie d'un poste de dev réel.
+          #
+          # COMMENT : la commande du dépôt lui-même (ensure-deps.sh), plafond "^1" — dernier 1.x, mais
+          # un saut de MAJEURE reste une décision humaine (arbitrage 2026-07-26, audit Phase 11).
+          npx -y "@opengsd/gsd-core@^1" --claude --global
+
+          # Échec VISIBLE : l'installeur peut sortir 0 sans avoir posé le payload attendu (changement
+          # de layout amont, install partielle). Sans cette assertion, les cas 20/26 repartiraient en
+          # `ko` en accusant la suite alors que la panne est ici.
+          LIB="$HOME/.claude/gsd-core/bin/lib"
+          for f in config.cjs config-loader.cjs capability-registry.cjs configuration.cjs; do
+            if [ ! -f "$LIB/$f" ]; then
+              echo "::error::moteur GSD absent après install : $LIB/$f introuvable — les cas 20 et 26 de test-check-gsd-config.sh ne pourraient rien prouver"
+              exit 1
+            fi
+          done
+          echo "== moteur GSD $(cat "$HOME/.claude/gsd-core/VERSION" 2>/dev/null || echo '?') résolu par la branche 3 de la cascade : $LIB =="
+
       - name: Découvrir et lancer toutes les suites
         run: |
           set -u
