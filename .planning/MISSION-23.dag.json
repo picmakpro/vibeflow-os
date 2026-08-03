@@ -370,6 +370,16 @@
         "plugin/dev-orchestrator/agents/vf-coder.md"
       ],
       "status": "ready"
+    },
+    {
+      "id": "plancheck-03",
+      "step": "re-validation du plan 23-03 contre A-1ter — le plan a ete redige AVANT que la semantique d'un --auto soit connue (lecture seule, aucune ecriture)",
+      "stage": "plan",
+      "deps": [
+        "arbitrage-O8"
+      ],
+      "scope": [],
+      "status": "running"
     }
   ]
 }
