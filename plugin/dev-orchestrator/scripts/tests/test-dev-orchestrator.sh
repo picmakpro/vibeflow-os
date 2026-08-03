@@ -2583,7 +2583,8 @@ fi
 # Un vert de T25b ne dit donc RIEN de la durée pendant laquelle le flag est effectivement armé,
 # et surtout pas qu'elle serait bornée, fermée, ou antérieure à l'exécution de quoi que ce soit.
 #
-# PORTÉE RÉELLE DU TROU, BORNÉE — à ne pas surestimer non plus.
+# PORTÉE RÉELLE DU TROU, ELLE AUSSI BORNÉE — au sens de l'EXPOSITION, jamais d'une fenêtre runtime
+# (le paragraphe ci-dessus reste entier) : à ne pas surestimer non plus.
 # `gsd-core/references/checkpoints.md` RÈGLE 6 protège les gates `blocking-human` : ils ne sont
 # JAMAIS auto-approuvés, même en auto-mode. Ce n'est donc PAS une violation d'ADR-031 sur le gate
 # que 23-01 construit. C'est la RÈGLE 5 qui joue, sur tout le reste : pendant plan et execute,
