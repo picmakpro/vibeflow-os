@@ -4091,9 +4091,155 @@ T33_FX_C_KO="$T33_TMPDIR/fixture-c-fautive.md"
 T33_FX_C_S9="$T33_TMPDIR/fixture-c-fautive-s9.txt"; t33_section "$T33_FX_C_KO" 9 "$T33_FX_C_S9"
 t33_fx_c_cell="$(t33_cell "$(t33_row "$T33_FX_C_S9" 'gsd-plan-phase')" 3)"
 t33_fx_fautives=$((t33_fx_fautives + 1))
-if printf '%s\n' "$t33_fx_c_cell" | "$GREP" -qF -- '--research'; then
+# Garde de non-vacuité (sans elle la contre-épreuve passe À VIDE) : si `t33_row`/`t33_cell` se
+# cassaient, la cellule serait vide, le grep échouerait et la contre-épreuve se déclarerait
+# satisfaite sans avoir rien mesuré. L'assertion D a la sienne (t33_d_src ≥ 3) ; C doit l'avoir.
+if [ -z "$t33_fx_c_cell" ]; then
+  t33_ko="$t33_ko [C, contre-épreuve À VIDE : la cellule « flags autorisés » extraite de la fixture est VIDE — t33_row/t33_cell ne rendent plus rien, la contre-épreuve ne prouve rien, sonde à réancrer]"
+elif printf '%s\n' "$t33_fx_c_cell" | "$GREP" -qF -- '--research'; then
   t33_ko="$t33_ko [FAUX VERT (C, flags en PROHIBITION seule) : la mesure lit hors de la cellule « flags autorisés » — une interdiction satisferait l'assertion qui exige une autorisation]"
 fi
+
+# --- J : le CONTENU de l'allowlist, et pas seulement son emballage -----------------------------
+# A→I mesurent l'EMBALLAGE de la table — ordre clause/table, cellule d'appartenance, co-présence
+# sur une ligne physique, marque + échéance — et jamais QUELS flags sont ouverts. Quatre mutations
+# du contenu laissaient la suite verte : `--chain` déplacé vers les flags autorisés du cadrage,
+# `--auto`/`--chain` ouverts au plan, un flag listé à la FOIS autorisé et fermé (table logiquement
+# contradictoire), la ligne d'exécution purement supprimée. Les quatre sont rejouées ci-dessous.
+#
+# La mesure est une ÉGALITÉ D'ENSEMBLE par cellule, jamais une liste noire : une liste noire ne
+# voit pas le flag qu'elle n'a pas pensé à interdire, et c'est exactement la faute que la §9
+# reproche à une « liste d'interdits seuls ».
+T33_FLAG_RE='--[a-z][a-z0-9-]*'
+t33_flags_of() { # <ligne de table> <index de cellule> <fichier de sortie>
+  t33_cell "$1" "$2" | "$GREP" -oE -- "$T33_FLAG_RE" | sort -u > "$3"
+  return 0   # aucun flag dans la cellule est un résultat LÉGITIME (ligne d'exécution), pas un échec
+}
+t33_set_write() { # <liste espacée> <fichier de sortie> — liste vide ⇒ fichier vide, jamais 1 ligne vide
+  local x
+  : > "$2"
+  for x in $1; do printf '%s\n' "$x"; done | sort -u > "$2"
+}
+# Imprime les manquements de contenu portés par <fichier §9>, rien si tout tient. FONCTION PURE de
+# son argument : c'est ce qui la rend rejouable telle quelle sur les mutants, sans toucher au dépôt.
+t33_allowlist_ko() { # <fichier §9> <étiquette de run>
+  local s9 tag spec brique rest attendus fermes nrows row att fer exp ko sup man inter f
+  s9="$1"; tag="$2"; ko=""
+  # Sans ce garde, une §9 INTROUVABLE fait rougir toutes les briques d'un coup : le mutant serait
+  # « discriminant » pour la seule raison que son fichier n'existe pas. Précédent payé sur ce bloc.
+  if [ ! -s "$s9" ]; then
+    printf '%s' " [J/$tag : section §9 introuvable ou VIDE ($s9) — rien n'a été mesuré, la SONDE EST À RÉANCRER : ce rouge ne dit rien de la doctrine]"
+    return 0
+  fi
+  for spec in 'gsd-discuss-phase|--auto|--chain' \
+              'gsd-plan-phase|--research --skip-research|--auto --chain' \
+              'gsd-execute-phase||--auto --chain'; do
+    brique="${spec%%|*}"; rest="${spec#*|}"; attendus="${rest%%|*}"; fermes="${rest#*|}"
+    nrows="$(awk -F'|' -v p="$brique" '/^\| / && $2 ~ p {n++} END{print n+0}' "$s9")"
+    if [ "$nrows" -ne 1 ]; then
+      ko="$ko [J/$tag : $nrows ligne(s) de table pour $brique au lieu d'exactement 1 — une brique du cycle qui sort de l'allowlist n'y est plus fermée par rien, elle est simplement muette]"
+      continue
+    fi
+    row="$(t33_row "$s9" "$brique")"
+    att="$T33_TMPDIR/al-$tag-$brique-aut.txt"; fer="$T33_TMPDIR/al-$tag-$brique-fer.txt"
+    exp="$T33_TMPDIR/al-$tag-$brique-exp.txt"
+    t33_flags_of "$row" 3 "$att"
+    t33_flags_of "$row" 4 "$fer"
+    t33_set_write "$attendus" "$exp"
+    sup="$(comm -23 "$att" "$exp" | tr '\n' ' ')"
+    man="$(comm -13 "$att" "$exp" | tr '\n' ' ')"
+    if [ -n "$sup" ] || [ -n "$man" ]; then
+      ko="$ko [J/$tag : la cellule « flags autorisés » de $brique n'est pas EXACTEMENT « ${attendus:-aucun} » — ouvert(s) en trop : ${sup:-néant}· absent(s) : ${man:-néant}]"
+    fi
+    for f in $fermes; do
+      "$GREP" -qxF -- "$f" "$fer" \
+        || ko="$ko [J/$tag : $f absent de la cellule « flags fermés » de $brique — un flag de pipeline non nommé fermé s'ouvre par omission, exactement ce que D-08 referme]"
+    done
+    inter="$(comm -12 "$att" "$fer" | awk 'END{print NR+0}')"
+    [ "$inter" -eq 0 ] \
+      || ko="$ko [J/$tag : $inter flag(s) listé(s) à la FOIS autorisé(s) et fermé(s) sur $brique — table logiquement contradictoire, elle n'autorise ni ne ferme]"
+  done
+  printf '%s' "$ko"
+}
+# Garde de NON-VACUITÉ, avant toute conclusion : si l'extraction de flags se cassait, chaque
+# cellule serait vide, « exactement (aucun) » deviendrait vrai partout et J passerait à vide.
+t33_al_flags_n="$(awk '/^\| /' "$T33_S9" | "$GREP" -oE -- "$T33_FLAG_RE" | sort -u | awk 'END{print NR+0}')"
+if [ "$t33_al_flags_n" -lt 4 ]; then
+  t33_ko="$t33_ko [J, VERT À VIDE : seulement $t33_al_flags_n flag(s) distinct(s) extrait(s) des lignes de table de la §9 (< 4) — l'extraction est cassée, aucune égalité d'ensemble ne prouve quoi que ce soit]"
+else
+  t33_al_reel="$(t33_allowlist_ko "$T33_S9" reel)"
+  [ -z "$t33_al_reel" ] || t33_ko="$t33_ko$t33_al_reel"
+fi
+# --- Mutants du CONTENU, matérialisés et rejoués à chaque run ----------------------------------
+t33_mut_flag() { # <s9 in> <ERE brique> <flag> <cellule source, 0 = aucune> <cellule cible> <out>
+  awk -F'|' -v OFS='|' -v p="$2" -v f="$3" -v s="$4" -v d="$5" '
+    /^\| / && $2 ~ p { if (s > 0) sub(f, "", $s); $d = $d " " f }
+    { print }' "$1" > "$6"
+}
+# Le compte de lignes de table de la §9 réelle sert de témoin : un mutant qui ne les a plus toutes
+# (moins une, tolérée pour la mutation qui SUPPRIME une ligne) n'a pas été construit, il a échoué.
+t33_al_rows_reel="$(awk '/^\| /{n++} END{print n+0}' "$T33_S9")"
+t33_assert_al_red() { # <libellé> <fichier §9 muté> <étiquette>
+  local nrows
+  if [ ! -s "$2" ]; then
+    t33_ko="$t33_ko [J, mutant INEXISTANT ou VIDE ($1) — le rouge qui en sortirait ne dirait rien de la doctrine, il dirait que le fichier manque. SONDE À RÉANCRER]"
+    return 0
+  fi
+  nrows="$(awk '/^\| /{n++} END{print n+0}' "$2")"
+  if [ "$nrows" -lt $((t33_al_rows_reel - 1)) ]; then
+    t33_ko="$t33_ko [J, mutant MAL CONSTRUIT ($1) : $nrows ligne(s) de table au lieu de $t33_al_rows_reel — la mutation a détruit la table au lieu de la modifier, elle rougirait pour la mauvaise raison]"
+    return 0
+  fi
+  if cmp -s "$T33_S9" "$2"; then
+    t33_ko="$t33_ko [J, mutant IDENTIQUE à l'original ($1) — la mutation n'a rien mordu, la SONDE EST À RÉANCRER (ce n'est pas un défaut de la doctrine)]"
+  else
+    t33_fx_fautives=$((t33_fx_fautives + 1))
+    [ -n "$(t33_allowlist_ko "$2" "$3")" ] \
+      || t33_ko="$t33_ko [J NON DISCRIMINANT ($1) : une mutation du CONTENU de l'allowlist ne fait rougir aucune assertion — J mesure l'emballage, pas ce qui est ouvert]"
+  fi
+}
+t33_mut_flag "$T33_S9" 'gsd-discuss-phase' '--chain' 4 3 "$T33_TMPDIR/mut-al-1.txt"
+t33_assert_al_red "--chain ouvert au CADRAGE" "$T33_TMPDIR/mut-al-1.txt" m1
+t33_mut_flag "$T33_S9" 'gsd-plan-phase' '--auto' 0 3 "$T33_TMPDIR/mut-al-2.txt"
+t33_assert_al_red "--auto ouvert au PLAN" "$T33_TMPDIR/mut-al-2.txt" m2
+t33_mut_flag "$T33_S9" 'gsd-plan-phase' '--research' 0 4 "$T33_TMPDIR/mut-al-3.txt"
+t33_assert_al_red "--research à la fois AUTORISÉ et FERMÉ au plan" "$T33_TMPDIR/mut-al-3.txt" m3
+awk -F'|' '!(/^\| / && $2 ~ /gsd-execute-phase/)' "$T33_S9" > "$T33_TMPDIR/mut-al-4.txt"
+t33_assert_al_red "ligne d'EXÉCUTION entièrement supprimée" "$T33_TMPDIR/mut-al-4.txt" m4
+t33_mut_flag "$T33_S9" 'gsd-execute-phase' '--chain' 4 3 "$T33_TMPDIR/mut-al-5.txt"
+t33_assert_al_red "--chain ouvert à l'EXÉCUTION (cellule « aucun » percée)" "$T33_TMPDIR/mut-al-5.txt" m5
+awk -F'|' -v OFS='|' '/^\| / && $2 ~ /gsd-plan-phase/ { $3 = " `--research` " } { print }' \
+  "$T33_S9" > "$T33_TMPDIR/mut-al-6.txt"
+t33_assert_al_red "--skip-research RETIRÉ des autorisés du plan" "$T33_TMPDIR/mut-al-6.txt" m6
+awk -F'|' -v OFS='|' '/^\| / && $2 ~ /gsd-discuss-phase/ { $4 = " et tout autre " } { print }' \
+  "$T33_S9" > "$T33_TMPDIR/mut-al-7.txt"
+t33_assert_al_red "--chain retiré des FERMÉS du cadrage (fermeture par prose seule)" "$T33_TMPDIR/mut-al-7.txt" m7
+awk '/^\| / && /gsd-plan-phase/ { print } { print }' "$T33_S9" > "$T33_TMPDIR/mut-al-8.txt"
+t33_assert_al_red "ligne de PLAN dupliquée (deux allowlists concurrentes)" "$T33_TMPDIR/mut-al-8.txt" m8
+# Contre-épreuves LICITES : quatre réécritures qui ne changent AUCUN ensemble — J doit rester vert
+# sur les quatre. Sans elles, J pourrait n'être qu'une comparaison de chaînes déguisée, et punirait
+# la première reformulation venue.
+t33_assert_al_green() { # <libellé> <fichier §9 réécrit> <étiquette>
+  if [ ! -s "$2" ] || cmp -s "$T33_S9" "$2"; then
+    t33_ko="$t33_ko [J, réécriture licite VIDE ou IDENTIQUE à l'original ($1) — rien n'a été mesuré, la contre-épreuve ne prouve pas que J tolère une reformulation]"
+  else
+    t33_fx_licites=$((t33_fx_licites + 1))
+    [ -z "$(t33_allowlist_ko "$2" "$3")" ] \
+      || t33_ko="$t33_ko [FAUX ROUGE (J, $1) : J compare des chaînes et non des ENSEMBLES — une réécriture licite serait punie]"
+  fi
+}
+awk -F'|' -v OFS='|' '/^\| / && $2 ~ /gsd-plan-phase/ { $3 = " `--skip-research`, `--research` " } { print }' \
+  "$T33_S9" > "$T33_TMPDIR/lic-al-1.txt"
+t33_assert_al_green "flags réordonnés dans la cellule" "$T33_TMPDIR/lic-al-1.txt" lic1
+awk -F'|' -v OFS='|' '/^\| / && $2 ~ /gsd-execute-phase/ { $3 = " *(aucun flag)* " } { print }' \
+  "$T33_S9" > "$T33_TMPDIR/lic-al-2.txt"
+t33_assert_al_green "« (aucun) » reformulé en « (aucun flag) »" "$T33_TMPDIR/lic-al-2.txt" lic2
+awk -F'|' -v OFS='|' '/^\| / && $2 ~ /gsd-discuss-phase/ { $4 = " `--chain`, et tout flag non nommé " } { print }' \
+  "$T33_S9" > "$T33_TMPDIR/lic-al-3.txt"
+t33_assert_al_green "cellule « flags fermés » reformulée, --chain conservé" "$T33_TMPDIR/lic-al-3.txt" lic3
+awk -F'|' -v OFS='|' '/^\| / && $2 ~ /gsd-plan-phase/ { $5 = " Motif entièrement réécrit, sans aucun flag cité. " } { print }' \
+  "$T33_S9" > "$T33_TMPDIR/lic-al-4.txt"
+t33_assert_al_green "cellule de MOTIF réécrite (hors périmètre de J)" "$T33_TMPDIR/lic-al-4.txt" lic4
 
 # --- I : marque transitoire ET échéance, dans la CELLULE DE MOTIF de la ligne de cadrage -------
 # Contrat des trois regexes ci-dessous : la marque doit être AFFIRMÉE sur cette ligne. Une
