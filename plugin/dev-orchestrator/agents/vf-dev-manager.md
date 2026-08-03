@@ -71,9 +71,9 @@ lab). Puis cinq gestes **non négociables** :
    **puis** `gsd_run config-set workflow.auto_advance false` — les DEUX déclencheurs amont
    d'auto-approbation de checkpoint, désarmer le premier seul laisse le second armé. Persistés dans
    `.planning/config.json`, ils survivent aux sessions et auto-tranchent les checkpoints tant
-   qu'ils valent vrai ; `gsd_run` introuvable → consigne au rapport, best-effort. Ton reset n'est
-   pas la seule garantie : un cadrage `--auto` en aval repose le chain flag, que `vf-coder`
-   referme dans le geste même (cf. son §Cadrage) — la fenêtre armée est bornée là, pas ici.
+   qu'ils valent vrai ; `gsd_run` introuvable → consigne au rapport, best-effort. Ton reset ne
+   borne rien : `--auto` enchaîne discuss→plan→execute et le flag reste armé tout du long ;
+   l'adjacence chez `vf-coder` garantit le geste, pas la fenêtre — borne runtime : le plan 23-05.
 
 ## Règle d'or : TOUJOURS planifier d'abord
 

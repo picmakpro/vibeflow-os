@@ -27,8 +27,12 @@ Enchaîne les sous-phases en déléguant à la machinerie existante :
 1. **Cadrage** : invoque le skill `gsd-discuss-phase` en mode **non-interactif** (`--auto`), puis
    **immédiatement, dans le même geste**, `gsd_run config-set workflow._auto_chain_active false`
    — le chain flag posé par le cadrage ré-arme sinon ce que le manager avait désarmé à son geste
-   de démarrage, pour toute la suite de la mission ; le refermer ICI, dans le geste même qui
-   l'ouvre, borne la fenêtre armée au seul cadrage de cette étape. Résolution de `gsd_run` :
+   de démarrage, pour toute la suite de la mission. Cette adjacence est une garantie **de texte** :
+   elle prescrit le désarmement et empêche qu'on l'oublie, rien de plus. Elle ne borne aucune
+   fenêtre runtime — `--auto` enchaîne discuss → plan → execute dans le même appel, tu ne reprends
+   la main qu'à la fin du pipeline, et le flag reste donc **armé pendant tout l'enchaînement**. La
+   borne runtime réelle viendra du correctif **structurel du plan 23-05** (le manager porte le
+   cadrage : il a `AskUserQuestion`, `--auto` n'a plus lieu d'être). Résolution de `gsd_run` :
    `mission-contracts.md` §Seuil de bascule — la cascade y vit, ne la recopie jamais ici (ADR-030) ;
    introuvable → consigne-le au rapport, best-effort comme au geste 5 du manager, JAMAIS un
    désarmement en échec muet : la garantie ci-dessus ne tient que par cet appel. Aucun autre mode
