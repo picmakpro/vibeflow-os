@@ -68,14 +68,15 @@
       "stage": "exec",
       "deps": [
         "revue-02",
-        "arbitrage-O8"
+        "arbitrage-O8",
+        "fix-a5"
       ],
       "scope": [
         "plugin/dev-orchestrator/references/GSD-PIPELINE.md",
         "plugin/dev-orchestrator/agents/vf-coder.md",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "ready"
+      "status": "blocked"
     },
     {
       "id": "revue-03",
@@ -141,7 +142,9 @@
       "step": "23-05 voie unique d'invocation (Lacune 5)",
       "stage": "exec",
       "deps": [
-        "audit-infra"
+        "audit-infra",
+        "replan-05",
+        "fix-a5"
       ],
       "scope": [
         "plugin/dev-orchestrator/agents/vf-coder.md",
@@ -369,7 +372,7 @@
       "scope": [
         "plugin/dev-orchestrator/agents/vf-coder.md"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "plancheck-03",
@@ -403,7 +406,7 @@
       "scope": [
         "plugin/dev-orchestrator/scripts/check-gsd-config.sh"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "alloc-blocs-test",
@@ -463,7 +466,7 @@
       "scope": [
         "plugin/dev-orchestrator/scripts/check-gsd-config.sh"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "arbitrage-known-top",
@@ -487,7 +490,7 @@
       "scope": [
         ".github/workflows/ci.yml"
       ],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "plancheck-05",
@@ -504,12 +507,52 @@
       "step": "REECRITURE PARTIELLE du plan 23-05 — il documente A-1ter geste 2 sur 43 lignes et n'en execute rien ; son critere l.300 INTERDIT le geste attendu. Ajouter la tache de portage du cadrage, la tache de retrait de T25b avec ses 3 renvois, viser les DEUX sites du mensonge doctrinal",
       "stage": "plan",
       "deps": [
-        "plancheck-05"
+        "plancheck-05",
+        "revue-03"
       ],
       "scope": [
         ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-05-PLAN.md"
       ],
-      "status": "ready"
+      "status": "blocked"
+    },
+    {
+      "id": "fix-a5",
+      "step": "A-5 — correctif TEXTE du mensonge doctrinal sur les deux foyers (vf-coder.md §Cadrage, vf-dev-manager.md geste 5)",
+      "stage": "exec",
+      "deps": [],
+      "scope": [
+        "plugin/dev-orchestrator/agents/vf-coder.md",
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "fix-a6",
+      "step": "A-6 — check-gsd-config.sh n'execute plus le fichier resolu : extraction par LECTURE DE TEXTE. Cascade lab-first inchangee. + section Securite en-tete + threat model de phase",
+      "stage": "exec",
+      "deps": [
+        "exec-02",
+        "fix-ci-gsd-core"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/check-gsd-config.sh",
+        "plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-02-PLAN.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-a6",
+      "step": "revue de securite ciblee du correctif A-6 : non-execution prouvee, equivalence d'extraction, aucune regression de la cascade legitime",
+      "stage": "revue",
+      "deps": [
+        "fix-a6"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/check-gsd-config.sh",
+        "plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh"
+      ],
+      "status": "blocked"
     }
   ]
 }
