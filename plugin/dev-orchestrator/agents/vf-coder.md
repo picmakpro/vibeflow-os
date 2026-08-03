@@ -43,6 +43,8 @@ Enchaîne les sous-phases en déléguant à la machinerie existante :
    graduer la **recherche** sur un critère factuel — se lit dans `GSD-PIPELINE.md` §9 (allowlist
    stricte : tout flag non nommé y est fermé). Ne recopie jamais cette doctrine ici.
 2. **Plan** : invoque `gsd-plan-phase` (ou dispatche l'agent `gsd-planner` via l'outil Agent).
+   C'est **ici**, et nulle part avant, que la gradation de la recherche se joue : `--research` /
+   `--skip-research` se passent à cette brique-ci → `GSD-PIPELINE.md` §9, ligne « Plan ».
 3. **Exécution** : invoque `gsd-execute-phase` (ou dispatche `gsd-executor` via l'outil Agent).
    C'est lui qui fait les commits atomiques — dernier appel de ton cycle. La revue vit désormais
    comme un nœud de plan de bataille (`revue-N`) piloté **en direct** par le manager — elle n'est

@@ -162,9 +162,21 @@ doctrine referme.
 
 | Brique de cycle | Flags autorisés | Flags fermés | Motif (fait + source vérifiable) |
 |---|---|---|---|
-| Cadrage — `gsd-discuss-phase` | `--auto` | `--chain`, et tout autre | **Transitoire — périme au plan 23-05.** Sur cette brique, `--auto` ne pose pas seulement un état : il déclenche le pipeline entier — cadrage → plan → exécution dans le même appel (`chain.md:45-61`, étape 5). La **règle 5** de `checkpoints.md:11` joue donc sur tout le plan et toute l'exécution qui suivent : vérification humaine **auto-approuvée**, décision **auto-sélectionnée sur la première option**. Portée **bornée**, à ne pas surestimer : la **règle 6** (`checkpoints.md:12`) protège les gates `gate="blocking-human"`, jamais auto-approuvés, même en auto-mode. Reste ouvert aujourd'hui parce que `vf-coder` n'a pas `AskUserQuestion` : le fermer maintenant le mettrait en impasse, constatée et chiffrée en `23-ARBITRAGES-OUVERTS.md` §O-8 (voie 2). Autorisation **assumée par écrit**, coût nommé, plutôt qu'accordée en silence. Correctif structurel instruit au **plan 23-05** (le manager porte le cadrage, il a `AskUserQuestion`) : le jour où 23-05 passe, cette ligne devient fermée. `--chain` est fermé pour le même fait, aggravé — il ouvre le mode interactif, que `vf-coder` ne peut pas tenir. |
-| Plan — `gsd-plan-phase` | `--research`, `--skip-research` | `--auto`, `--chain`, et tout autre | La gradation de la recherche se décide **ici**, et nulle part ailleurs : `gsd-discuss-phase` ne consomme aucun flag de recherche — sa table `progressive_disclosure` (`discuss-phase.md`) n'en liste aucun. En l'absence des deux, le workflow **prompte** (`plan-phase.md` §5.1) et `vf-coder`, privé d'`AskUserQuestion`, y reste bloqué : le flag n'est donc jamais omis. `--auto` et `--chain` fermés en invocation directe, même fait qu'au cadrage (`chain.md:45-61` + règle 5 de `checkpoints.md:11`, bornée par la règle 6 de `checkpoints.md:12`). |
+| Cadrage — `gsd-discuss-phase` | `--auto` | `--chain`, et tout autre | **Transitoire — périme au plan 23-05.** `--auto` déclenche ici le pipeline entier (`chain.md:45-61`, étape 5), donc la règle 5 de `checkpoints.md:11` sur tout ce qui suit, bornée par la règle 6 (`checkpoints.md:12`). Ouvert faute d'`AskUserQuestion` chez `vf-coder` ; raisonnement complet et coût chiffré : note « `--auto` au cadrage » sous la table. `--chain` fermé pour le même fait, aggravé — il ouvre le mode interactif. |
+| Plan — `gsd-plan-phase` | `--research`, `--skip-research` | `--auto`, `--chain`, et tout autre | La gradation de la recherche se décide **ici**, et nulle part ailleurs : `gsd-discuss-phase` n'en consomme aucun flag (sa table `progressive_disclosure` de `discuss-phase.md` n'en liste aucun). Sur une phase neuve et en l'absence des deux, le workflow **prompte** (`plan-phase.md` §5.1) et `vf-coder`, privé d'`AskUserQuestion`, y reste bloqué : le flag n'est donc jamais omis — borne de ce « jamais » en note sous la table. `--auto` et `--chain` fermés en invocation directe, même fait qu'au cadrage (`chain.md:45-61` + règle 5 de `checkpoints.md:11`, bornée par la règle 6 de `checkpoints.md:12`). |
 | Exécution — `gsd-execute-phase` | *(aucun)* | `--auto`, `--chain`, et tout autre | Même fait qu'au cadrage (`chain.md:45-61` + règle 5 de `checkpoints.md:11`, bornée par la règle 6 de `checkpoints.md:12`). De surcroît, exécuter au-delà de la frontière du nœud contredirait le pipelining modélisé dans `mission-flow.md` : le manager tient le DAG, l'exécution ne le déborde pas. |
+
+**`--auto` au cadrage — pourquoi il reste ouvert, et jusqu'à quand (D-06)** : sur cette brique,
+`--auto` ne pose pas seulement un état, il déclenche le pipeline entier — cadrage → plan →
+exécution dans le même appel (`chain.md:45-61`, étape 5). La **règle 5** de `checkpoints.md:11` joue
+donc sur tout le plan et toute l'exécution qui suivent : vérification humaine **auto-approuvée**,
+décision **auto-sélectionnée sur la première option**. Portée **bornée**, à ne pas surestimer : la
+**règle 6** (`checkpoints.md:12`) protège les gates `gate="blocking-human"`, jamais auto-approuvés,
+même en auto-mode. Reste ouvert aujourd'hui parce que `vf-coder` n'a pas `AskUserQuestion` : le
+fermer maintenant le mettrait en impasse, constatée et chiffrée en `23-ARBITRAGES-OUVERTS.md` §O-8
+(voie 2). Autorisation **assumée par écrit**, coût nommé, plutôt qu'accordée en silence. Correctif
+structurel instruit au **plan 23-05** (le manager porte le cadrage, il a `AskUserQuestion`) : le
+jour où 23-05 passe, cette ligne devient fermée.
 
 **Gradation de la recherche (D-05) — sur un FAIT constatable, jamais sur un ressenti (ADR-055 §3)** :
 
@@ -172,6 +184,11 @@ doctrine referme.
   domaine que `.planning/codebase/` ne cartographie pas.
 - `--skip-research` quand l'étape prolonge un périmètre **déjà couvert** par un `RESEARCH.md` ou un
   `CONTEXT.md` récent du même dossier de phase.
+
+Borne du « le flag n'est jamais omis » de la ligne Plan : la branche de prompt de `plan-phase.md`
+§5.1 est gardée par « **RESEARCH.md missing** » (`plan-phase.md:329-331`). Un `RESEARCH.md` déjà
+présent est réutilisé **sans prompt**, flag ou pas — le garde-fou ne joue donc que sur une phase
+neuve, cas opératoire de `vf-coder`. Sur une phase reprise, c'est à toi de trancher explicitement.
 
 **Toggle ≠ flag** — la confusion la plus probable à la lecture, nommée ici plutôt que laissée au
 lecteur : le toggle `workflow.research` du `config.json` active la **capability** de recherche sur
