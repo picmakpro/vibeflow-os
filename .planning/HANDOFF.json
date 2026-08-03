@@ -1,71 +1,67 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-02T23:05:00+02:00",
+  "timestamp": "2026-08-03T00:00:00+02:00",
   "phase": "23",
   "phase_name": "Couplage explicite au moteur GSD — capabilities, flags et voie unique",
   "phase_dir": ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-",
   "worktree": "/Users/samuel/Documents/dev/vibeflow-os-p23",
   "branch": "feat/phase-23-couplage-gsd",
-  "plan": 1,
+  "plan": 2,
   "task": 1,
   "total_tasks": 8,
-  "status": "blocked_on_human",
-  "paused_reason": "23-01 est CLOS sur toute sa part mécanique (revue en régime plein + 2 tours de comblement, tout prouvé par mutation). Il reste UN point bloquant qui appartient à Samuel : O-8 — la décision humaine A-1bis est démentie sur ses faits. Aucun agent n'a le droit de la retrancher (ADR-031). C'est la 2e fois que D-02 repose sur une prémisse fausse.",
+  "status": "in_progress",
+  "paused_reason": "",
   "mission_mode": "vf-dev-manager (équipe) — DAG dans .planning/MISSION-23.dag.json",
   "completed_tasks": [
     {"id": 1, "name": "exec-01 — 23-01 Lacune 6, taxonomie de checkpoint GSD", "status": "done", "commit": "4b34cac"},
-    {"id": 2, "name": "revue-01 — revue en régime plein sur le diff consolidé (36 mutations : 31 de violation, 5 contrôles licites). B4/B5/B6/O-1 prouvés fermés, 8 findings neufs", "status": "done", "commit": "183486f"},
+    {"id": 2, "name": "revue-01 — revue en régime plein sur le diff consolidé (36 mutations). B4/B5/B6/O-1 prouvés fermés, 8 findings neufs", "status": "done", "commit": "183486f"},
     {"id": 3, "name": "exec-01 tour 2 — comblement F2, F3, F4, F5, F6, F8 (F7 no-op, F1 gelé)", "status": "done", "commit": "6bccc88"},
-    {"id": 4, "name": "revue-01 tour 2 — re-revue ciblée, mutations RE-JOUÉES par le reviewer (23 exécutions, 4 contre-épreuves sur d4f7ba3 matérialisé). A trouvé N1 : le correctif F5 avait OUVERT un trou en en fermant un autre", "status": "done"},
-    {"id": 5, "name": "exec-01 tour 3 — N1, N2, N3 fermés, chacun prouvé DANS LES DEUX SENS (accepte le licite, refuse le fautif)", "status": "done", "commit": "5baf647"}
+    {"id": 4, "name": "revue-01 tour 2 — re-revue ciblée, mutations RE-JOUÉES. A trouvé N1 : le correctif F5 avait OUVERT un trou en en fermant un autre", "status": "done"},
+    {"id": 5, "name": "exec-01 tour 3 — N1, N2, N3 fermés, chacun prouvé DANS LES DEUX SENS", "status": "done", "commit": "5baf647"},
+    {"id": 6, "name": "arbitrage-O8 — TRANCHÉ par Samuel le 2026-08-03 : A-1bis tombe (A-1ter). Voie 1 en 23-05, T25b dégazé maintenant", "status": "done", "commit": "42d4b0d"},
+    {"id": 7, "name": "exec-01e — A-1ter geste 1 : T25b dégazé (libellés ok/ko + T25B_WHY), trou runtime documenté dans l'en-tête, O-8 marqué TRANCHÉ, contrainte d'entrée A-1ter geste 2 inscrite dans 23-05-PLAN.md, dégazage consigné au 23-01-SUMMARY", "status": "done", "commits": ["9539220", "045e137", "42a82b6"]},
+    {"id": 8, "name": "revue-01e — revue ciblée : invariance de la sonde prouvée par ensembles matérialisés (comm sur verdicts triés, cmp sur multiset statut+identifiant, séquence de lignes de code identique) PUIS re-vérifiée par le manager sur le diff brut : exactement 4 lignes non-commentaire changées, toutes des chaînes de message (2 T25B_WHY, 1 ok, 1 ko). T25B_DISARM_RE, T25B_WINDOW, l'awk d'appariement, les fixtures g..k, les mutants M1..M4 et les codes de retour sont intacts", "status": "done"}
   ],
   "remaining_tasks": [
-    {"id": 6, "name": "arbitrage-O8 — ARBITRAGE HUMAIN, seul Samuel. Bloque 23-03 par construction", "status": "awaiting_human"},
-    {"id": 7, "name": "23-02 — check-gsd-config.sh + hooks + config.json (LANÇABLE sans attendre Samuel, périmètre disjoint)", "status": "ready"},
-    {"id": 8, "name": "23-03 — Lacune 3 : doctrine de flags de cycle (BLOQUÉ par arbitrage-O8)", "status": "blocked"},
-    {"id": 9, "name": "23-04 — table capabilities/hooks générée", "status": "blocked"},
-    {"id": 10, "name": "audit-infra — engine install + hooks + scripts gates", "status": "blocked"},
-    {"id": 11, "name": "23-05 — voie unique d'invocation (Lacune 5) — c'est ICI que la voie 1 d'O-8 doit être instruite si Samuel la retient", "status": "blocked"},
-    {"id": 12, "name": "23-06 — disjonction hooks moteur vs étages VibeFlow (Lacune 1, ADR)", "status": "blocked"},
-    {"id": 13, "name": "23-07 — budgets de boucle additionnés + briques dormantes", "status": "blocked"},
-    {"id": 14, "name": "23-08 — gouvernance : bump MODULE, README, CHANGELOG (JAMAIS la release racine)", "status": "blocked"},
-    {"id": 15, "name": "revue-08 — revue finale + cohérence de phase, puis PR (autorisée d'avance)", "status": "blocked"}
+    {"id": 9, "name": "exec-02 — 23-02 check-gsd-config.sh + hooks + config.json", "status": "running"},
+    {"id": 10, "name": "arbitrage-A1ter-vfcoder — ARBITRAGE HUMAIN, seul Samuel. NE BLOQUE AUCUN NŒUD du DAG", "status": "awaiting_human"},
+    {"id": 11, "name": "revue-02 — revue code 23-02", "status": "blocked"},
+    {"id": 12, "name": "exec-03 — 23-03 Lacune 3, doctrine de flags de cycle. DÉBLOQUÉ (arbitrage-O8 done : on sait ce qu'un --auto auto-approuve)", "status": "blocked"},
+    {"id": 13, "name": "revue-03 / exec-04 / revue-04 / audit-infra", "status": "blocked"},
+    {"id": 14, "name": "exec-05 — 23-05 voie unique d'invocation. PORTE la contrainte d'entrée A-1ter geste 2 (le manager porte le cadrage). Plan AMENDÉ après coup → re-validation plan-checker AVANT exécution", "status": "blocked"},
+    {"id": 15, "name": "exec-06 / exec-07", "status": "blocked"},
+    {"id": 16, "name": "exec-08 — gouvernance : bump MODULE, README, CHANGELOG (JAMAIS la release racine). Compteurs README à recaler APRÈS synchronisation avec origin/main (Phase 26 a avancé)", "status": "blocked"},
+    {"id": 17, "name": "revue-08 — revue finale + cohérence de phase, puis PR (autorisée d'avance)", "status": "blocked"}
   ],
-  "blockers": [
-    {
-      "id": "O-8",
-      "severity": "bloquant",
-      "summary": "A-1bis est démentie sur ses faits : `--auto` sur gsd-discuss-phase ne pose pas seulement le chain flag, il enchaîne discuss → plan → execute (chain.md étape 5, l. 45-61 → Skill(gsd-plan-phase --auto)). Le désarmement « adjacent » exigé par A-1bis s'exécute donc APRÈS tout le pipeline, et T25b certifie une adjacence TEXTUELLE qui ne borne aucune fenêtre RUNTIME.",
-      "portee_reelle": "Bornée : checkpoints.md règle 6 protège les gates blocking-human, jamais auto-approuvés. C'est la règle 5 qui s'applique — pendant plan et execute, human-verify AUTO-APPROUVE et decision AUTO-SÉLECTIONNE la première option. Ce n'est donc PAS une violation ADR-031 sur le gate que 23-01 construit ; c'est une mission qui déroule plan et execute en autonome sans l'avoir voulu.",
-      "verifie_par": "reviewer, puis re-vérifié directement par le manager sur ~/.claude/gsd-core/workflows/discuss-phase/modes/chain.md et references/checkpoints.md",
-      "consigne_dans": "23-ARBITRAGES-OUVERTS.md §O-8 (avec les 3 voies chiffrées)"
-    }
+  "blockers": [],
+  "async_jobs": [
+    {"id": "exec-02", "agent": "vf-coder", "lance": "2026-08-03", "perimetre": "check-gsd-config.sh, test-check-gsd-config.sh, hooks.json, .planning/config.json"}
   ],
-  "async_jobs": [],
   "human_actions_pending": [
     {
-      "action": "O-8 — trancher : A-1bis tombe-t-elle à son tour ? Voie 1 (le manager porte le cadrage, il a AskUserQuestion — à instruire en 23-05) · voie 2 (workflow.discuss_mode : impasse déjà constatée) · voie 3 (statu quo assumé, en retirant à T25b une promesse qu'il ne tient pas).",
-      "blocking": true
+      "action": "A-1ter, portée du geste 1 — vf-coder.md:30-31 affirme encore « le refermer ICI, dans le geste même qui l'ouvre, borne la fenêtre armée au seul cadrage de cette étape ». C'est exactement le fait qu'A-1ter dément. Le gate ne ment plus ; la doctrine que le gate vérifie ment toujours, et c'est elle qui pilote un agent en production. Le geste 1 ne nommait que T25b, donc personne n'y a touché (ADR-031). Trois voies : (a) correctif TEXTE minimal maintenant, nœud séparé, ~1 commit, vf-coder.md à 94/250, périmètre disjoint des nœuds en cours ; (b) correctif + sonde de non-régression, mais cela rouvre 23-01 une 6e fois sur du gate ; (c) statu quo jusqu'à l'exécution de 23-05, en assumant qu'un agent en production affirme entre-temps un fait connu faux.",
+      "blocking": false
     },
     {
       "action": "O-9 — T25_UNAVAIL_RE impose de recopier dans chaque agent une conduite dont mission-contracts.md:275-278 est le foyer (tension ADR-030). Même famille qu'O-1 : à trancher AVEC lui, et d'une seule façon.",
       "blocking": false
     },
     {
-      "action": "O-10 — borne fail-closed assumée : l'infinitif est refusé dans les deux sens. L'accepter demanderait une sonde de polarité, pas un élargissement de motif (c'est l'élargissement qui avait créé la régression N1).",
+      "action": "O-10 — borne fail-closed assumée : l'infinitif est refusé dans les deux sens. L'accepter demanderait une sonde de polarité, pas un élargissement de motif.",
       "blocking": false
     },
     {
-      "action": "O-1..O-7 et points 5-7 réinstruits — inchangés depuis la session précédente, non bloquants.",
+      "action": "O-1..O-7 et points 5-7 réinstruits — inchangés, non bloquants.",
       "blocking": false
     }
   ],
   "decisions": [
-    {"decision": "A-1bis, A-2, A-3, A-4 restent les décisions écrites — A-1bis est CONTESTÉE PAR LES FAITS (O-8) mais n'a PAS été retranchée par un agent", "rationale": "ADR-031. A-1 avait déjà été tranchée sur une prémisse fausse ; c'est parce qu'un agent a refusé de passer outre qu'on l'a rattrapée", "phase": "23"},
-    {"decision": "Mission ARRÊTÉE sur O-8 plutôt que poursuivie sur 23-02", "rationale": "23-02 est de périmètre disjoint et techniquement lançable, mais la réponse à O-8 peut déplacer la sémantique des clés de config que check-gsd-config.sh gate. Surfacer la question vaut mieux qu'un demi-23-02 à refaire", "phase": "23"},
-    {"decision": "PR autorisée d'avance à la clôture ; release racine réservée à l'humain", "rationale": "T-23-08-01 vérifié machine à ce jour : aucun des 3 fichiers de version racine dans le diff de branche, aucun tag créé (v2.46.0 pointe sur le merge-base 69ca0ec, il préexiste)", "phase": "23"}
+    {"decision": "A-1ter TRANCHÉE par Samuel : A-1bis tombe. Geste 1 (dégazage de T25b) appliqué dans 23-01 ; geste 2 (le manager porte le cadrage) inscrit comme CONTRAINTE D'ENTRÉE de 23-05, non implémenté", "rationale": "--auto sur le cadrage enchaîne discuss→plan→execute (chain.md:45-61), donc le désarmement adjacent s'exécute après tout le pipeline ; T25b certifiait une adjacence TEXTUELLE qui ne borne aucune fenêtre runtime. Aucun gate ne ment en attendant le correctif structurel", "phase": "23"},
+    {"decision": "23-05-PLAN.md est désormais un plan AMENDÉ (contrainte d'entrée ajoutée après sa rédaction) — re-validation par gsd-plan-checker OBLIGATOIRE avant exec-05", "rationale": "Doctrine de pipelining : jamais d'exécution sur un plan dont les hypothèses ont bougé après rédaction", "phase": "23"},
+    {"decision": "exec-01e et exec-02 dispatchés en SÉQUENCE et non en parallèle, malgré des périmètres de fichiers disjoints", "rationale": "Deux workers qui commitent dans le même worktree partagent l'index git : un `git add -A` de l'un avalerait les éditions en vol de l'autre. Le mandat de Samuel est lui-même ordonné (geste 1 d'abord). Chaque worker reçoit désormais l'interdiction explicite de `git add -A/./-u`", "phase": "23"},
+    {"decision": "PR autorisée d'avance à la clôture ; release racine réservée à l'humain", "rationale": "T-23-08-01 : aucun des 3 fichiers de version racine dans le diff de branche, aucun tag créé", "phase": "23"}
   ],
   "uncommitted_files": [],
-  "next_action": "Poser O-8 à Samuel. Sa réponse débloque 23-03 → 23-04 → 23-05. En attendant, 23-02 est lançable seul (nœud `exec-02`, déjà `ready`) si l'on accepte le risque de reprise décrit ci-dessus.",
-  "context_notes": "23-01 : 3 tours d'exécution, 2 tours de revue, TOUT prouvé par mutation. Suite à 102 OK / 0 KO / 0 SKIP — mais le compteur a menti CINQ fois sur cette phase, il ne vaut RIEN comme verdict. Le 5e mensonge est instructif : le correctif F5 fermait un faux rouge en élargissant une regex à l'infinitif, ce qui laissait une PROHIBITION satisfaire une assertion exigeant une AFFIRMATION (rouge à d4f7ba3, vert à cf3223a) — un correctif peut fermer un trou en en ouvrant un autre, d'où l'exigence de prouver toute regex touchée DANS LES DEUX SENS. Densité : vf-dev-manager.md 235/250 (marge préservée, les 7 plans restants touchent tous cet agent), vf-coder.md 94/250. OUTILLAGE : `grep` est proxifié et TRONQUE silencieusement (31 lignes rendues sur 102) ; `diff` a déjà rendu « files are identical » sur des fichiers différents — extraction en awk, comparaison en comm sur listes matérialisées, `rtk proxy` pour le brut. ATTENTION AVANT 23-08 : origin/main a avancé (Phase 26 : manual/, README.md, README.fr.md, INSTALL.md). Les compteurs README de 23-08 doivent être recalés APRÈS synchronisation avec main, sinon ils seront faux au merge."
+  "next_action": "Attendre exec-02, puis revue-02 → exec-03 (débloqué) → exec-04 → audit-infra → exec-05 (avec re-validation du plan amendé) → 23-06/07/08 → revue-08 → PR. L'arbitrage A-1ter/vf-coder.md ne bloque aucun nœud : il se tranche quand Samuel repasse.",
+  "context_notes": "OUTILLAGE — piège NEUF et coûteux, vérifié cette session : `git diff` SANS `rtk proxy` rend une sortie RÉSUMÉE, sans aucun en-tête de hunk `@@` et sans les lignes +/- — un awk qui compte les lignes modifiées y trouve ZÉRO et le croit. Le même `git diff` passé par `rtk proxy` rend 187 lignes et 9 hunks. Tout diff qui sert de PREUVE passe par `rtk proxy`. S'y ajoutent les pièges déjà connus : `grep` proxifié TRONQUE silencieusement (31 lignes rendues sur 102), `diff` a rendu « Files are identical » sur des fichiers différents. Extraction en awk, comparaison en comm/cmp sur listes matérialisées. LEÇON N1 : un correctif peut fermer un trou en en ouvrant un autre (le correctif F5 avait élargi une regex à l'infinitif — forme des interdictions en français — laissant une PROHIBITION satisfaire une assertion exigeant une AFFIRMATION). Toute regex touchée se prouve DANS LES DEUX SENS : accepte le licite ET refuse le fautif. Le compteur « X OK / 0 KO » a menti CINQ fois sur cette phase, il ne vaut RIEN comme verdict. Densité : vf-dev-manager.md 235/250 (marge à préserver, les 7 plans restants le touchent tous), vf-coder.md 94/250. AVANT 23-08 : origin/main a avancé (Phase 26 : manual/, README.md, README.fr.md, INSTALL.md) — recaler les compteurs README APRÈS synchronisation avec main."
 }

@@ -45,7 +45,7 @@
         "plugin/dev-orchestrator/hooks/hooks.json",
         ".planning/config.json"
       ],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "revue-02",
@@ -330,6 +330,45 @@
         "revue-01"
       ],
       "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-01e",
+      "step": "23-01e A-1ter geste 1 — retirer a T25b la promesse qu'il ne tient pas (adjacence TEXTUELLE, aucune fenetre runtime bornee) + documenter le trou + inscrire la contrainte d'entree de 23-05",
+      "stage": "exec",
+      "deps": [
+        "arbitrage-O8"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-05-PLAN.md",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-01-SUMMARY.md",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-ARBITRAGES-OUVERTS.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-01e",
+      "step": "revue ciblee exec-01e — le libelle ne promet plus que ce qu'il mesure ET le COMPORTEMENT de la sonde est inchange (memes rc sur reel, fixtures g..k, mutants M1..M4)",
+      "stage": "revue",
+      "deps": [
+        "exec-01e"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-A1ter-vfcoder",
+      "step": "ARBITRAGE HUMAIN — vf-coder.md:30-31 affirme encore 'borne la fenetre armee au seul cadrage de cette etape', fait demenmti par A-1ter. Le gate ne ment plus, la doctrine qu'il verifie ment toujours. Correctif texte minimal maintenant, ou statu quo jusqu'a 23-05 ?",
+      "stage": "human",
+      "deps": [
+        "exec-01e"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/agents/vf-coder.md"
+      ],
       "status": "ready"
     }
   ]
