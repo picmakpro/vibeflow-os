@@ -518,3 +518,80 @@ deux sous `conductor/scripts`). Mais **ce n'est pas un chemin malformé** : `git
 que le fichier a vécu là de v2.28.0 jusqu'à `60576e9` (extraction `team-kernel`). C'est un fallback
 de compatibilité **explicitement documenté** (`mission-flow.md` l. 26-28) dont la fenêtre de
 versions n'est pas cachée ici. **Honnête, pas trompeur** — à distinguer soigneusement d'O-12.
+
+---
+
+## O-21 — 🛑 EN ATTENTE DE SAMUEL — la prémisse d'A-1ter est démentie dans la configuration nominale
+
+**Le point le plus important du registre. Il remet en cause un arbitrage TRANCHÉ.**
+
+Découvert par `replan-05` (2026-08-03) en réécrivant le plan 23-05, et **validé par `gsd-plan-checker`**.
+
+**Le fait.** A-1ter voie 1 — « le **manager** porte le cadrage » — est motivée par une seule raison
+écrite : *« il a `AskUserQuestion`, donc `--auto` n'a plus de raison d'être »*. Or
+`vf-dev-manager.md` documente **lui-même**, dans son filet de repli D-09, que **dispatché en
+sous-agent — sa configuration NOMINALE — le runtime peut ne pas lui fournir `AskUserQuestion`
+malgré sa présence déclarée au frontmatter**, et que « c'est précisément ce qui a gelé une mission
+au nœud `checkpoint-doctrine` ».
+
+**La conséquence.** Le problème serait **déplacé d'un agent à l'autre**, pas fermé à la racine —
+alors que « fermer à la racine » est l'argument même qui a fait préférer la voie 1 au statu quo.
+
+**Ce qui tient malgré tout, et qui est décisif.** Le **gain ne dépend pas** de l'outil de question :
+une fois le cadrage porté par le manager, **plus aucun mode d'enchaînement n'est passé au cadrage**,
+donc la **règle 5** de `checkpoints.md` (auto-approbation de `human-verify`, auto-sélection de la
+première option sur `decision`) **cesse de s'appliquer** au plan et à l'exécution. C'est le vrai
+bénéfice, et il est indépendant du démenti ci-dessus.
+
+**Autrement dit : la décision reste probablement bonne, mais le MOTIF ÉCRIT est plus faible que le
+motif réel.** Et c'est la **quatrième prémisse fausse d'affilée** sur la lacune D-02 — A-1
+(`--assumptions` inexistant en pratique), A-1bis (adjacence qui n'existe qu'à l'écrit), A-1ter
+(motif affaibli). La leçon écrite en A-1ter — *« sur cette lacune, vérifier le comportement du
+moteur amont avant de trancher, pas après »* — vient de jouer une fois de plus.
+
+**Les voies.** (a) **recommandée** — maintenir la voie 1 et **corriger le motif d'A-1ter** dans
+`23-ARBITRAGES.md` : le bénéfice est la neutralisation de la règle 5, pas la disponibilité
+d'`AskUserQuestion` ; le repli D-09 s'applique alors au manager comme à tout agent · (b) rouvrir la
+voie et chercher un mécanisme qui ne dépende d'aucun outil de question · (c) statu quo, en assumant
+un motif dont on sait qu'il est faux dans le cas nominal.
+
+**🛑 BLOQUANT POUR `exec-05`.** Une dépendance machine a été posée dans le DAG
+(`arbitrage-a1ter-premisse` → `exec-05`) : l'exécution du plan 23-05 **ne peut pas démarrer** avant
+ce mot. Le plan lui-même est écrit, re-validé **PASS**, et porte la question en **tâche 0 de type
+`checkpoint`** avec les trois voies.
+
+---
+
+## O-22 — ⚠️ EN ATTENTE DE SAMUEL — la fermeture de la ligne de cadrage de §9 repose sur une note antérieure à A-1ter
+
+Corollaire d'O-21, remonté par le même nœud.
+
+La fermeture de la ligne de cadrage dans la **§9** de `GSD-PIPELINE.md` est prescrite par une note
+écrite au plan **23-03** — c'est-à-dire **AVANT** qu'A-1ter ne soit tranché. La note promet noir sur
+blanc, à `GSD-PIPELINE.md:179` : *« le jour où 23-05 passe, cette ligne devient fermée »*.
+
+**La question.** Si la ligne doit finalement **rester ouverte** comme filet, ce n'est pas la §9
+qu'il faut amender — c'est **la note qu'il faut réécrire**, et le motif du maintien doit être
+inscrit **dans la cellule elle-même**, jamais laissé par omission. Une cellule qui reste ouverte
+sans motif écrit est indistinguable d'un oubli.
+
+**Non bloquant** au-delà d'O-21, dont il dépend.
+
+---
+
+## O-15 — MISE À JOUR : soldé par péremption au plan 23-05
+
+O-15 (la fixture `k` de `T25b` porte encore le mensonge d'A-5) proposait trois voies, dont la
+troisième — *« attendre 23-05, qui rend `T25b` sans objet »* — était explicitement recommandée.
+Le plan 23-05 réécrit **retire `T25b`**. O-15 est donc **clos par péremption** dès l'exécution de
+23-05, sans geste propre. À consigner comme tel au SUMMARY, **et à ne pas rouvrir**.
+
+**Attention, contrainte découverte à la réécriture** : le retrait de `T25b` n'est **pas** un simple
+effacement. Le nombre réel de renvois est **18** (et non 3 comme annoncé au DAG, ni 17) : **5** dans
+le bloc, **7** renvois hors bloc qui documentent une décision de périmètre et **se réécrivent** au
+lieu de disparaître, **6** occurrences de données de test sur **2 fixtures intouchables** de `T33`.
+Et **trois gardes cassent au premier geste** — `T25 présence` (compteur d'atteinte codé en dur à 2
+agents), `T33` assertion **E**, `T33` assertion **I**. Surtout : `T25` s'était borné aux briques
+Plan/Exécution **parce que `T25b` prenait le relais** sur la brique Cadrage — retirer `T25b` sans
+élargir `T25` **supprimerait la seule garde du Cadrage**. Le plan réécrit porte le geste
+compensatoire (motif de brique élargi, fixture retournée, mutant rouge + reformulation licite verte).

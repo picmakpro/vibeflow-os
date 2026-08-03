@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-03T23:35:00+02:00",
+  "timestamp": "2026-08-04T00:15:00+02:00",
   "phase": "23",
   "phase_name": "Couplage explicite au moteur GSD — capabilities, flags et voie unique",
   "phase_dir": ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-",
@@ -10,7 +10,7 @@
   "task": 1,
   "total_tasks": 8,
   "status": "in_progress",
-  "relais": "FRONTIERE DISPATCHEE EN PARALLELE le 2026-08-03 : exec-04 et replan-05 (perimetres de FICHIERS disjoints — exec-04 ecrit dans plugin/dev-orchestrator/{scripts,references}/ + plugin/_internal/vibeflow-update.sh + tests/test-dev-orchestrator.sh ; replan-05 n ecrit QUE 23-05-PLAN.md), plus verif-o12 en LECTURE SEULE. Les trois mandats portent la consigne de COMMIT PAR PATHSPEC (git commit <chemins>, jamais add -A) parce qu ils partagent l index du worktree p23. PIEGE TRANSMIS A replan-05 : exec-04 fait bouger TOUS les numeros de ligne de test-dev-orchestrator.sh (ajout du bloc T28) — les read_first du plan 23-05 doivent etre reecrits en ANCRES DE CHAINE, jamais en numeros. DEFAUT D4 AFFINE PAR MESURE : le bloquant B4 de plancheck-05 n est PLUS vrai tel quel — fix-a5 (d5840d6) a deja corrige les deux foyers du mensonge doctrinal, et les deux textes PROMETTENT desormais 23-05 par ecrit (vf-coder.md:33-35 « la borne runtime reelle viendra du correctif structurel du plan 23-05 » ; vf-dev-manager.md:75-76 « borne runtime : le plan 23-05 »). Si 23-05 n execute pas le portage, ces DEUX phrases deviennent a leur tour des mensonges post-dates dans deux agents de production. RENVOIS T25b RE-DERIVES PAR LE MANAGER : le DAG en annoncait 3, la mesure en donne ~17 dans test-dev-orchestrator.sh (2364, 2366, 2371, 2494, 2495, 2528, 2568, 2587, 2601, 2833, 2835, 4258, 4261, 4309, 4310, 4312, 4513) — dont DEUX FIXTURES FAUTIVES VOLONTAIRES de T33 (4309-4312) qui doivent RESTER ROUGES, et la sonde T33_MORTE_RE qui ne doit pas etre affaiblie. ETATS MESURES : vf-dev-manager.md 235/250 (marge 15), vf-coder.md 102. NOEUDS HUMAINS GELES, NON DISPATCHES : arbitrage-known-top (= O-11, porte a Samuel) et arbitrage-o16 restent ready dans le DAG mais relevent d ADR-031 — ne jamais les dispatcher a un worker.",
+  "relais": "EXEC-04 ET REPLAN-05 SOLDES, VERIFIES SUR DISQUE PAR LE MANAGER (parents derives par git rev-parse <sha>^, jamais par l adjacence du log ; forme de diff a DEUX ARGUMENTS ; 0 fichier de version racine sur 7). revue-04 marquee done SANS double revue (la revue interne a vf-coder a tourne en regime plein et a mordu). AUDIT-INFRA EN VOL (vf-auditer, perimetre vibeflow-update.sh + hooks.json + check-gsd-config.sh + build-gsd-capabilities-index.sh, couvre 23-02 et 23-04). ETAT DU GEL : exec-05 est BLOQUE PAR CONSTRUCTION derriere le noeud humain arbitrage-a1ter-premisse (O-21) — ne jamais le marquer ready a la main. DOUZE ARBITRAGES ATTENDENT SAMUEL : O-11 a O-22 dans 23-ARBITRAGES-OUVERTS.md, qui porte desormais ses 24 sections et fait SEUL autorite (O-18 y a ete rapatrie depuis ce fichier — un arbitrage qui n est pas au registre se perd). UN SEUL est bloquant : O-21. SUITE APRES AUDIT-INFRA : si O-21 est tranche -> exec-05 ; sinon poursuivre sur les branches independantes (23-06 puis 23-07 dependent de revue-05, donc de exec-05 : la chaine est SEQUENTIELLE apres 23-05, il n y a pas de branche independante a part les noeuds humains. En clair, SANS LE MOT DE SAMUEL SUR O-21 LA MISSION S ARRETE APRES AUDIT-INFRA).",
   "paused_reason": "",
   "mission_mode": "vf-dev-manager (équipe) — DAG dans .planning/MISSION-23.dag.json",
   "completed_tasks": [
@@ -146,6 +146,30 @@
       "id": 30,
       "name": "verif-o12 — verification LECTURE SEULE de la famille « couverture apparente ». O-12 CONFIRME et precise sur 3 points (ligne 270 et non 195 ; segment minuscule ; defaut identique en 1.8.0 ET 1.9.0 donc jamais fonctionnel). Hypothese sur la cascade $S INFIRMEE par mesure. DEUX CONSTATS NEUFS a la place : O-19 (inversion de priorite sur 5 foyers sur 7, contredisant l affirmation de parite de check-gsd-config.sh:195-196) et O-20 ($S vide en silence si CLAUDE_PLUGIN_ROOT unset). Aucun fichier modifie par le worker, aucun commit",
       "status": "done"
+    },
+    {
+      "id": 31,
+      "name": "replan-05 — reecriture partielle de 23-05-PLAN.md (408 -> 1036 lignes, 3 -> 6 taches). plan-checker PASS en finale apres TROIS passes ; le premier passage a rapporte 4 bloquants DONT UN QUE LE WORKER AVAIT INTRODUIT LUI-MEME (retirer T25b supprimait la seule garde de la brique Cadrage, alors que le plan proclamait en SC7 qu aucune garde ne serait affaiblie). Critere l.300 mort, remplace par <= 250 + clause de deport EX ANTE vers mission-flow.md §Pattern F, marge nommee 15 lignes, avec bretelle : si meme la decision seule ne tient pas, remonter blocked. 18 renvois T25b re-derives par deux methodes croisees (comm vide dans les deux sens). RAPPORT human_needed sur O-21",
+      "status": "done",
+      "commits": [
+        "d4f641a",
+        "429c2bc",
+        "88ad4bc",
+        "6d1e38a"
+      ]
+    },
+    {
+      "id": 32,
+      "name": "exec-04 — 23-04 table capabilities/hooks generee. Suite 112 OK / 0 KO / 0 SKIP. QUATRE assertions prouvees discriminantes PAR MUTATION DANS LES DEUX SENS (C registre factice, F fraicheur, D point en dur, G2 repli d install). VERT A VIDE FERME PAR EXECUTION : moteur hors d atteinte -> 107 OK / 0 KO / 5 SKIP, rc=0 et ZERO ligne T28 atteinte — le critere « 0 KO » y est tenu sans qu une seule mesure ait eu lieu, c est precisement pourquoi il n est pas le critere. Revue vf-reviewer en regime plein, 7 mutants construits par le reviewer, aucun survivant, aucune reformulation licite rougie. §9 de GSD-PIPELINE.md (arbitrage O-16) intacte caractere pour caractere. 0 fichier de version racine sur 7 fichiers du diff (verifie forme a deux arguments)",
+      "status": "done",
+      "commits": [
+        "13ccc8e",
+        "cf8f103",
+        "2029686",
+        "fbf3d8a",
+        "f81e639",
+        "25bbd77"
+      ]
     }
   ],
   "remaining_tasks": [
@@ -271,7 +295,13 @@
       "status": "blocked"
     }
   ],
-  "blockers": [],
+  "blockers": [
+    {
+      "id": "O-21",
+      "description": "exec-05 GELE PAR DEPENDANCE MACHINE (noeud arbitrage-a1ter-premisse ajoute au DAG comme dep de exec-05). La premisse d A-1ter est dementie dans la configuration nominale du manager. Le plan 23-05 est ECRIT et re-valide PASS, il porte la question en tache 0 type checkpoint. Rien ne demarre sur 23-05 avant le mot de Samuel. ADR-031",
+      "blocking": true
+    }
+  ],
   "async_jobs": [
     {
       "id": "exec-02",
@@ -327,6 +357,14 @@
     },
     {
       "action": "O-20 NEUF — CLAUDE_PLUGIN_ROOT est UNSET sur ce poste (mesure). Les crans 3 et 4 de la cascade se reduisent alors a /conductor/scripts et /dev-orchestrator/scripts (RACINE DU FS). Si les crans 1-2 manquent aussi, $S sort VIDE et les commandes deviennent /dag.sh, /driver-lock.sh : ECHEC SILENCIEUX A UN CHEMIN MENSONGER. Un manager qui ne teste pas le code de retour croira que le verrou n existe pas. Meme famille : un mecanisme qui a l air de couvrir 4 cas et n en couvre que 2 sans le dire. Voies : (a) echouer explicitement quand $S est vide (b) ne construire les crans 3-4 que si CLAUDE_PLUGIN_ROOT est non vide (c) statu quo documente. NON BLOQUANT. ANNEXE SANS ARBITRAGE : le cran 4 est mort sur ce poste (dag.sh absent des 7 versions cachees et du depot) mais c est un fallback de compatibilite DOCUMENTE (mission-flow.md l.26-28) — le fichier y a vecu de v2.28.0 a 60576e9. HONNETE, PAS TROMPEUR : a distinguer d O-12",
+      "blocking": false
+    },
+    {
+      "action": "O-21 BLOQUANT — la premisse d A-1ter (« le manager A AskUserQuestion ») est DEMENTIE : dispatche en sous-agent, sa configuration NOMINALE, le runtime peut ne pas la lui fournir malgre sa presence declaree (filet D-09 de vf-dev-manager.md, a deja gele une mission au noeud checkpoint-doctrine). Le probleme serait DEPLACE d un agent a l autre, pas ferme a la racine — alors que « fermer a la racine » est l argument qui a fait preferer la voie 1. CE QUI TIENT MALGRE TOUT : le gain ne depend PAS de l outil de question — une fois le cadrage porte par le manager, plus aucun mode d enchainement n est passe au cadrage, donc la regle 5 de checkpoints.md cesse de s appliquer au plan et a l execution. La decision reste probablement bonne, le MOTIF ECRIT est plus faible que le motif reel. 4e premisse fausse d affilee sur D-02. Voies : (a) RECOMMANDEE maintenir la voie 1 et corriger le motif d A-1ter dans 23-ARBITRAGES.md (b) rouvrir et chercher un mecanisme independant de tout outil de question (c) statu quo avec un motif connu faux. BLOQUE exec-05",
+      "blocking": true
+    },
+    {
+      "action": "O-22 — la fermeture de la ligne de cadrage de la §9 de GSD-PIPELINE.md est prescrite par une note ecrite au plan 23-03, AVANT qu A-1ter ne soit tranche. GSD-PIPELINE.md:179 promet noir sur blanc « le jour ou 23-05 passe, cette ligne devient fermee ». Si la ligne doit RESTER ouverte comme filet, c est la NOTE qu il faut reecrire, et le motif du maintien inscrit DANS LA CELLULE, jamais laisse par omission — une cellule ouverte sans motif est indistinguable d un oubli. Depend d O-21",
       "blocking": false
     }
   ],
@@ -410,6 +448,21 @@
       "decision": "O-18 rapatrie de HANDOFF.json vers 23-ARBITRAGES-OUVERTS.md ; O-19 et O-20 ouverts. Le registre porte desormais les 21 sections O-, il est la SOURCE UNIQUE avant la PR",
       "rationale": "O-18 vivait dans le relais de mission et pas dans le registre, alors qu il est du comme les autres avant la PR — un arbitrage qui ne figure pas au registre se perd",
       "phase": "23"
+    },
+    {
+      "decision": "Dependance machine posee dans le DAG : arbitrage-a1ter-premisse (stage human) devient une dep de exec-05, en plus de audit-infra, replan-05 et fix-a5",
+      "rationale": "Sept interruptions externes sur cette phase. Un gel consigne en prose se perd au prochain relais ; une dependance dans le DAG ne se perd pas. exec-05 ne peut plus devenir ready par construction avant le mot de Samuel (ADR-031, A-4 mode autonome : geler le noeud et poursuivre les branches independantes)",
+      "phase": "23"
+    },
+    {
+      "decision": "revue-04 marquee done SANS re-dispatch d une revue de code — la revue vf-reviewer interne a vf-coder a tourne en REGIME PLEIN et a MORDU",
+      "rationale": "Doctrine anti-double-revue : rapport typé passed + verdict revue PASS => pas de seconde revue de code sur la meme etape, seuls Test/Audit s ajoutent. Ici la revue interne a construit 7 mutants a elle (dont un sur T33) et a rattrape une mesure de non-regression FAUSSE (baseline capturee APRES le premier artefact genere : vraie mesure 5 disparus / 14 apparus / 98 communs, et non 0/9/103). Une revue qui trouve un defaut reel n a pas besoin d etre doublee ; l audit infra, lui, est un AUTRE regard et reste dispatche",
+      "phase": "23"
+    },
+    {
+      "decision": "O-15 clos par peremption au plan 23-05 (retrait de T25b), sans geste propre — a consigner au SUMMARY, ne pas rouvrir",
+      "rationale": "La 3e voie d O-15 etait explicitement recommandee : attendre 23-05 qui rend T25b sans objet",
+      "phase": "23"
     }
   ],
   "uncommitted_files": [],
@@ -430,8 +483,12 @@
     "check-gsd-config.sh EN-TETE FACTUELLEMENT FAUX (mesure recon-a6) — :20 dit « VALID_CONFIG_KEYS (bin/lib/config.cjs) » alors que c'est une chaine de re-exports config.cjs:29 -> config-schema.cjs:71 -> configuration.cjs:45 ; :25 dit « CONFIG_DEFAULTS (bin/lib/configuration.cjs) » alors que configuration.cjs:42 charge un MANIFESTE. Les donnees vivent dans bin/shared/*.manifest.json. A corriger DANS le geste fix-a6 (meme fichier).",
     "23-02-PLAN.md:357 — la frontiere de confiance decrit « gsd-core/bin/lib/*.cjs installe -> script » comme une simple frontiere de VERSION et assume explicitement le « charge par node -e ». C'est CETTE LIGNE qui a autorise le vecteur. A requalifier en frontiere de CODE NON MAITRISE (le moteur peut venir du depot audite via la branche 1 de la cascade). Meme fichier que l'entree de threat model T-23-02-07.",
     "test-check-gsd-config.sh cas 23 (:358-370) — la doc ajoutee a l'en-tete entre dans la sortie --help : conserver « Exit codes: » et NE PAS reproduire les chaines « Liste arbitree des toggles » ni « Miroir exact du KNOWN_TOP_LEVEL » (marqueurs anti-debordement, :212 et :267). Cas 33 (:590) — plancher n_swept >= 20 : le glob cfg-*.json absorbe une fixture de plus automatiquement, mais un lab piege NEUF doit etre ajoute explicitement a la liste du for (:573) pour etre balaye.",
-    "ERREUR DU MANAGER, a ne pas repeter — j'ai ecrit la plage de diff `git diff a6c8329 2f830ab` dans DEUX mandats en lisant l'adjacence dans `git log --oneline`, qui liste du plus RECENT au plus ancien : a6c8329 est POSTERIEUR a 2f830ab. La plage etait donc INVERSEE et rendait des fichiers sans rapport. Le vrai parent, verifie par `git rev-parse 2f830ab^`, est aa43b1d. summary-03 l'a detecte et corrige seul ; revue-03 a recu la meme consigne fausse. AGGRAVANT : le manager n'a pas SendMessage — relancer l'outil Agent pour corriger CREE UN AGENT NEUF au mandat incoherent, qui peut de surcroit entrer en COLLISION D'ECRITURE avec celui qu'on voulait corriger (ici deux revues pouvant ecrire 23-03-REVIEW.md). UN WORKER DISPATCHE N'EST PAS RATTRAPABLE. Regle : deriver toute base de diff par `git rev-parse <sha>^` ou `git show --stat`, et relire chaque mandat comme irrevocable. A VERIFIER A LA RECONCILIATION : qui a ecrit 23-03-REVIEW.md et avec quelle plage."
+    "ERREUR DU MANAGER, a ne pas repeter — j'ai ecrit la plage de diff `git diff a6c8329 2f830ab` dans DEUX mandats en lisant l'adjacence dans `git log --oneline`, qui liste du plus RECENT au plus ancien : a6c8329 est POSTERIEUR a 2f830ab. La plage etait donc INVERSEE et rendait des fichiers sans rapport. Le vrai parent, verifie par `git rev-parse 2f830ab^`, est aa43b1d. summary-03 l'a detecte et corrige seul ; revue-03 a recu la meme consigne fausse. AGGRAVANT : le manager n'a pas SendMessage — relancer l'outil Agent pour corriger CREE UN AGENT NEUF au mandat incoherent, qui peut de surcroit entrer en COLLISION D'ECRITURE avec celui qu'on voulait corriger (ici deux revues pouvant ecrire 23-03-REVIEW.md). UN WORKER DISPATCHE N'EST PAS RATTRAPABLE. Regle : deriver toute base de diff par `git rev-parse <sha>^` ou `git show --stat`, et relire chaque mandat comme irrevocable. A VERIFIER A LA RECONCILIATION : qui a ecrit 23-03-REVIEW.md et avec quelle plage.",
+    "PIEGE D OUTILLAGE NEUF (decouvert par exec-04, il etait DANS UN MANDAT DU MANAGER) : check-gsd-config n est pas concerne, mais check-agents.sh n accepte QUE la forme COLLEE --agents-dir=CHEMIN. En DEUX ARGUMENTS l option est IGNOREE EN SILENCE, le script retombe sur .claude/agents et sort en rc=3 INDETERMINE. Le gate ne s est pas replie en vert, mais un lecteur presse y aurait instruit un faux bloquant. Forme correcte (celle de T8c) : rc=0, 4 agents balayes, 33 entrees d allowlist resolues, 7 warnings de baseline. A propager dans tous les mandats restants.",
+    "CORRECTION DE L ANALYSE DU MANAGER (defaut D4 du mandat replan-05) : j avais ecrit que DEUX sites promettaient le plan 23-05. IL Y EN A SIX — vf-coder.md, vf-dev-manager.md, TROIS dans GSD-PIPELINE.md (dont l.165 cellule --auto de la §9 et surtout l.179 « le jour ou 23-05 passe, cette ligne devient fermee ») et mission-contracts.md:210. Le portage sans la fermeture aurait transforme ces promesses en mensonges. Une tache 2 entiere a ete ajoutee au plan que le mandat n anticipait pas. LECON : compter les sites d une promesse par MESURE avant de les annoncer dans un mandat.",
+    "CITATION FAUSSE DU MANAGER : GSD-PIPELINE.md:138 — le CONTENU est confirme mais la POSITION est fausse, c est 147-148. Meme famille que les read_first perimes.",
+    "ANCRES PERIMEES relevees par exec-04 (dette pour les plans suivants) : T25 ATTEINTE « l.2497-2511 » -> 2501-2513 ; hook post-install « l.535-560 » -> ~540-550 ; digest « 102 OK » -> 103 avant travaux. EXACTES en revanche : T6 l.986/1002-1003, T21d l.1869-1876, md_folded/md_blocks_matching."
   ],
-  "next_action": "EN VOL (3 noeuds, dispatches 2026-08-03) : exec-04 (vf-coder, 23-04 table capabilities/hooks) + replan-05 (vf-coder, reecriture partielle 23-05-PLAN.md) + verif-o12 (general-purpose, LECTURE SEULE, cascade $S de mission-flow.md). AU RETOUR : 1) fusionner et dedupliquer les findings, UN SEUL dag.sh reopen si correctifs. 2) revue-04 (regime plein) puis audit-infra. 3) exec-05 (geste 2 d A-1ter : le manager porte le cadrage). 4) 23-06, 23-07 avec re-validation de plan AVANT chaque execution. 5) AVANT 23-08 : synchroniser avec origin/main (Phase 26) et RE-MESURER les compteurs README. 6) revue-08 puis PR (autorisee d avance par Samuel). RAPPEL T-23-08-01 : forme A DEUX ARGUMENTS git diff --name-only <base> HEAD, JAMAIS <base>..HEAD, et prouver la NON-VACUITE de la liste. Release racine : JAMAIS dans cette branche.",
+  "next_action": "1) Attendre audit-infra (en vol) et traiter ses findings — un seul dag.sh reopen si correctifs, jamais un par juge. 2) REMONTER O-21 A SAMUEL : c est le seul arbitrage BLOQUANT, il gele exec-05 et donc toute la chaine 23-05 -> 23-06 -> 23-07 -> 23-08. Recommandation (a) : maintenir la voie 1 et corriger le MOTIF d A-1ter (le benefice est la neutralisation de la regle 5 de checkpoints.md, pas la disponibilite d AskUserQuestion). 3) Une fois tranche : exec-05, revue-05, exec-06, revue-06, exec-07, revue-07. 4) AVANT 23-08 : synchroniser avec origin/main (Phase 26 : manual/, README.md, README.fr.md, INSTALL.md) et RE-MESURER les compteurs README — baseline 46 suites, 23-02 en ajoute une -> 47, a re-mesurer apres synchro. 5) revue-08 puis PR (autorisee d avance par Samuel), en rappelant O-11 a O-22 au rapport de cloture. RAPPEL T-23-08-01 : forme A DEUX ARGUMENTS git diff --name-only <base> HEAD, JAMAIS <base>..HEAD (0 ligne sous ce proxy = garde VERTE A VIDE), et prouver la NON-VACUITE de la liste. Release racine : JAMAIS dans cette branche.",
   "context_notes": "OUTILLAGE — piège NEUF et coûteux, vérifié cette session : `git diff` SANS `rtk proxy` rend une sortie RÉSUMÉE, sans aucun en-tête de hunk `@@` et sans les lignes +/- — un awk qui compte les lignes modifiées y trouve ZÉRO et le croit. Le même `git diff` passé par `rtk proxy` rend 187 lignes et 9 hunks. Tout diff qui sert de PREUVE passe par `rtk proxy`. S'y ajoutent les pièges déjà connus : `grep` proxifié TRONQUE silencieusement (31 lignes rendues sur 102), `diff` a rendu « Files are identical » sur des fichiers différents. Extraction en awk, comparaison en comm/cmp sur listes matérialisées. LEÇON N1 : un correctif peut fermer un trou en en ouvrant un autre (le correctif F5 avait élargi une regex à l'infinitif — forme des interdictions en français — laissant une PROHIBITION satisfaire une assertion exigeant une AFFIRMATION). Toute regex touchée se prouve DANS LES DEUX SENS : accepte le licite ET refuse le fautif. Le compteur « X OK / 0 KO » a menti CINQ fois sur cette phase, il ne vaut RIEN comme verdict. Densité : vf-dev-manager.md 235/250 (marge à préserver, les 7 plans restants le touchent tous), vf-coder.md 94/250. AVANT 23-08 : origin/main a avancé (Phase 26 : manual/, README.md, README.fr.md, INSTALL.md) — recaler les compteurs README APRÈS synchronisation avec main."
 }

@@ -106,7 +106,7 @@
         "plugin/_internal/vibeflow-update.sh",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "revue-04",
@@ -119,7 +119,7 @@
         "plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh",
         "plugin/_internal/vibeflow-update.sh"
       ],
-      "status": "blocked",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -135,16 +135,17 @@
         "plugin/dev-orchestrator/scripts/check-gsd-config.sh",
         "plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh"
       ],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "exec-05",
       "step": "23-05 voie unique d'invocation (Lacune 5)",
       "stage": "exec",
       "deps": [
+        "arbitrage-a1ter-premisse",
         "audit-infra",
-        "replan-05",
-        "fix-a5"
+        "fix-a5",
+        "replan-05"
       ],
       "scope": [
         "plugin/dev-orchestrator/agents/vf-coder.md",
@@ -513,7 +514,7 @@
       "scope": [
         ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-05-PLAN.md"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "fix-a5",
@@ -588,6 +589,16 @@
         "plugin/conductor/references/mission-flow.md"
       ],
       "status": "done"
+    },
+    {
+      "id": "arbitrage-a1ter-premisse",
+      "step": "ARBITRAGE HUMAIN — la premisse d A-1ter (le manager A AskUserQuestion) est DEMENTIE dans la configuration nominale : dispatche en sous-agent, le runtime peut ne pas la lui fournir malgre sa presence declaree (filet D-09 de vf-dev-manager.md, a deja gele une mission au noeud checkpoint-doctrine). Le GAIN du portage subsiste et n en depend pas, mais le MOTIF ecrit est plus faible que le motif reel. 4e premisse fausse de la serie D-02",
+      "stage": "human",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-ARBITRAGES.md"
+      ],
+      "status": "ready"
     }
   ]
 }
