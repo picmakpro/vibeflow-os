@@ -368,3 +368,27 @@ agents lisent comme une loi — le mode de défaillance exact qu'A-1ter document
 nommer laquelle, elle reste donc satisfaite. Refuser reviendrait à réintroduire sciemment une
 affirmation fausse dans le livrable de la phase qui existe pour les supprimer. Non bloquant, mais
 **à ratifier avant la PR** puisque le code est déjà commité.
+
+---
+
+## O-17 — Les manifestes sont cherchés dans le PARENT du `LIB` pointé (observation neuve)
+
+Découvert par l'exécutant d'A-6, **hors de son périmètre**, signalé et non corrigé.
+
+Le lecteur bi-forme cherche les manifestes en `path.join(LIB, '..', 'shared')`
+(`check-gsd-config.sh:297`). Un `VF_GSD_CORE_LIB` dont le **dossier parent** porterait un
+`shared/config-schema.manifest.json` **étranger** verrait ce manifeste **primer** sur les littéraux
+du moteur effectivement pointé.
+
+**Portée réelle, mesurée** : aucune fixture actuelle n'est dans ce cas (`$TMP/shared` n'existe
+jamais). Ce **n'est pas** un vecteur de sécurité — le fichier est **lu**, jamais exécuté, c'est tout
+l'objet d'A-6. C'est une question d'**isolation** : le gate pourrait décrire un moteur qui n'est pas
+celui qu'on lui a désigné.
+
+**Les voies.** (a) ancrer la recherche de manifeste sur une **racine de moteur** dérivée et vérifiée
+plutôt que sur `LIB/..` · (b) exiger une **co-résidence** (le manifeste n'est retenu que si le `LIB`
+frère porte bien les modules attendus) · (c) statu quo documenté — la variable est un opt-in
+explicite d'utilisateur averti.
+
+**Non bloquant.** La revue de sécurité `revue-a6` est explicitement invitée à dire si elle juge ce
+point **plus grave** que « isolation de fixtures ». Trancher après son verdict.
