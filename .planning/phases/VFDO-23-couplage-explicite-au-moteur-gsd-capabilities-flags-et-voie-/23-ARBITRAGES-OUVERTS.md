@@ -264,14 +264,42 @@ pas — c'est un mauvais échange tant que l'overlay n'a pas été instruit.
 
 ## O-12 — ⚠️ EN ATTENTE DE SAMUEL — la branche 2 de la cascade est du code mort
 
-**Le fait, mesuré sur `@opengsd/gsd-core@1.9.1`.** `check-gsd-config.sh:195` résout
-`<root>/node_modules/@opengsd/gsd-core/bin/lib`. Le tarball npm publié range son payload sous
-`<root>/node_modules/@opengsd/gsd-core/`**`gsd-core/`**`bin/lib` — **double segment**. Un `bin/lib`
-existe bien un cran plus haut, mais il ne contient que `ui-safety-gate.cjs`, **pas** `config.cjs`.
+**Le fait, RE-MESURÉ indépendamment le 2026-08-03 (nœud `verif-o12`), et précisé sur trois points.**
+La branche fautive est **`check-gsd-config.sh:270`** — la ligne 195 citée au premier relevé est la
+*promesse* de l'en-tête (l. 196-197), pas le code. Elle résout
+`<root>/node_modules/@opengsd/gsd-core/bin/lib` ; le tarball npm range son payload sous
+`<root>/node_modules/@opengsd/gsd-core/`**`gsd-core/`**`bin/lib` — **double segment, en minuscules**
+(nom de scope + dossier de payload), et non `GSD-CORE` comme écrit au premier relevé. Le `bin/lib`
+du cran supérieur contient **un seul** fichier, `ui-safety-gate.cjs`, contre **172** dans le vrai
+dossier : `[ -f "$candidat/config.cjs" ]` est faux.
+
+**Ce n'est pas une régression de version.** Mesuré sur les **deux** installs présents sur le poste —
+`@opengsd/gsd-core` **1.9.0** et **1.8.0** — le défaut est **identique**. C'est le layout du tarball,
+pas un accident de 1.9.1. Autrement dit : **cette branche n'a jamais fonctionné, pour personne, sur
+aucune version.**
+
+**Les deux autres crans, mesurés** : cran 1 (`$ROOT/.claude/gsd-core/bin/lib`) vide dans ce
+worktree ; cran 3 (`$HOME/.claude/gsd-core/bin/lib`) **résout** (moteur 1.9.0). Le layout posé sous
+`$HOME` **n'a pas** le double segment — seul le tarball npm l'a. C'est donc la branche 2 **et elle
+seule** qui est fautive.
 
 **La branche a l'air correcte à la lecture et ne résout rien à l'exécution.** C'est exactement la
 famille de défaillance que cette phase existe pour fermer : une couverture apparente qui n'en est
-pas une. La cascade `$S` de `mission-flow.md` reprend la même forme et porte donc le même défaut.
+pas une.
+
+> **⚠️ CORRECTION D'UN FAIT ÉCRIT ICI LE 2026-08-03.** Ce paragraphe affirmait : « *la cascade `$S`
+> de `mission-flow.md` reprend la même forme et porte donc le même défaut* ». **C'EST FAUX, et
+> démenti par mesure** (nœud `verif-o12`). La cascade `$S` **n'omet aucun segment** : `marketplace.json`
+> déclare `"source": "./plugin"`, donc le préfixe `plugin/` du dépôt n'est pas dans le chemin
+> installé, et `CLAUDE_PLUGIN_ROOT` pointe sur un dossier de version qui contient `conductor/`,
+> `dev-orchestrator/`, `_internal/` **à plat** (20 entrées mesurées sous `…/vibeflow/2.43.1/`).
+> Exécutée telle quelle, la cascade résout. La famille O-12 **ne s'étend pas** à `$S`. Laisser cette
+> phrase aurait reproduit, dans le registre d'arbitrages lui-même, le défaut que le registre
+> instruit. Deux constats **différents** ont en revanche été trouvés sur `$S` : voir **O-19** et
+> **O-20**.
+>
+> Note de chemin : la cascade vit dans **`plugin/dev-orchestrator/references/mission-flow.md`** —
+> il n'existe pas de `plugin/conductor/references/mission-flow.md`.
 
 **Pourquoi elle n'a pas été corrigée** : A-6 prescrit que la cascade reste **INCHANGÉE**, et
 réparer une branche de résolution est un changement de comportement hors des trois arbitrages
@@ -392,3 +420,101 @@ explicite d'utilisateur averti.
 
 **Non bloquant.** La revue de sécurité `revue-a6` est explicitement invitée à dire si elle juge ce
 point **plus grave** que « isolation de fixtures ». Trancher après son verdict.
+
+---
+
+## O-18 — ⚠️ EN ATTENTE DE SAMUEL — lectures non bornées (`check-gsd-config.sh:298`)
+
+**Rapatrié depuis `HANDOFF.json` le 2026-08-03** : ce point vivait dans le relais de mission et
+**pas** dans ce registre, alors qu'il est dû comme les autres avant la PR. Le registre est la
+source unique ; un arbitrage qui n'y figure pas se perd.
+
+`readFileSync` sans garde de type ni de taille. Une **FIFO**, ou un lien vers `/dev/zero`, sur
+l'une des **4 cibles NEUVES** = **attente infinie au `SessionStart`**. Préexistant sur les 3
+anciennes cibles, mais le correctif A-6 en **ajoute 4**.
+
+**Pourquoi non implémenté** : poser une garde (stat de type + plafond de taille) est un **ajout de
+comportement** hors de la lettre d'A-6, exactement comme les voies (b) et (c) d'O-13. ADR-031.
+
+**Ce qui a en revanche été corrigé** : la phrase de l'en-tête `:106` (« le pire cas est une
+extraction vide ») est **fausse en disponibilité**. Documenter honnêtement n'est pas ajouter du
+comportement.
+
+**Les voies.** (a) statu quo documenté · (b) garde de type (refuser tout ce qui n'est pas un
+fichier régulier) · (c) garde de type + plafond de taille. **Non bloquant.**
+
+---
+
+## O-19 — ⚠️ EN ATTENTE DE SAMUEL — la cascade `$S` est inversée dans 5 foyers sur 7
+
+**Découvert par mesure le 2026-08-03** (nœud `verif-o12`), en cherchant tout autre chose. Balayage
+complet re-dérivé : 632 fichiers `.md`/`.sh`/`.json`, extraction `awk` sur liste matérialisée
+(jamais `grep | wc -l` — le `grep` de ce poste tronque).
+
+**Le fait.** Un seul foyer porte la cascade complète à 4 crans. Six la reprennent en forme courte.
+Tous sont **conformes sur les segments** (aucun ne porte le défaut d'O-12). Mais **cinq inversent
+l'ordre de priorité** :
+
+| Fichier | L. | Ordre prescrit | Verdict |
+|---|---|---|---|
+| `plugin/dev-orchestrator/references/mission-flow.md` | 17 | `./` → `$HOME` → `CPR/conductor` → `CPR/dev-orch` | **canon** |
+| `plugin/dev-orchestrator/agents/vf-dev-manager.md` | 43-44 | idem, 4 crans | conforme |
+| `plugin/design-orchestrator/agents/vf-design-manager.md` | 43 | `$HOME` → `./` → `CPR/conductor` | **INVERSÉ** |
+| `plugin/growth-bundle/agents/vf-growth-manager.md` | 40 | `$HOME` → `./` → `CPR/conductor` | **INVERSÉ** |
+| `plugin/content-bundle/agents/vf-content-manager.md` | 37 | `$HOME` → `./` → `CPR/conductor` | **INVERSÉ** |
+| `plugin/business-pilot-bundle/agents/vf-business-manager.md` | 55 | `$HOME` → `./` → `CPR/conductor` | **INVERSÉ** |
+| `plugin/conductor/skills/vf-update/SKILL.md` | 27 | `$HOME/` → `./` → `CPR/conductor/` | **INVERSÉ** |
+
+**Pourquoi c'est de la famille de cette phase.** L'inversion contredit **frontalement** la
+justification écrite de `mission-flow.md` l. 21-24 — « *le lab courant PRIME … préférer le scope
+user ferait tourner la mission avec des scripts d'une autre version que celle du lab,
+silencieusement* » — et contredit aussi **`check-gsd-config.sh` l. 195-196**, qui affirme que sa
+propre cascade a « **même priorité que la cascade `$S` de `mission-flow.md`** ». **Cette affirmation
+de parité est fausse pour 5 foyers sur 7.** C'est un renvoi croisé qui certifie une équivalence
+inexistante : couverture apparente au niveau de la doctrine, pas du code.
+
+**Portée réelle, bornée — à ne pas surestimer.** Sur ce poste l'écart **n'est pas observable** :
+pas de `./.claude/scripts` dans le worktree, `$HOME/.claude/scripts` peuplé (48 entrées dont
+`dag.sh` et `driver-lock.sh`). L'écart ne change le résultat que sur un **lab bi-scope**. C'est
+précisément le cas que la justification du canon décrit comme dangereux.
+
+**Cause racine identifiée** : `plugin/conductor/references/team-kernel.md`, cité comme « contrat
+invariant » par les trois managers de bundle, **ne définit pas la cascade** (sa seule mention,
+l. 10, dit que les scripts vivent à plat dans `.claude/scripts/`). D'où six reformulations *inline*
+indépendantes, d'où la dérive.
+
+**Les voies.** (a) aligner les 5 foyers sur le canon (geste mécanique, mais **6 fichiers d'agents
+et 1 skill** hors périmètre des plans de la Phase 23) · (b) porter la cascade **dans
+`team-kernel.md`** et remplacer les 6 reformulations par un renvoi — traite la cause, cohérent
+ADR-030/ADR-057, mais c'est un refactor de doctrine transverse · (c) statu quo documenté, en
+inscrivant l'écart · (d) **au minimum**, retirer de `check-gsd-config.sh` l. 195-196 l'affirmation
+de parité, qui est fausse aujourd'hui. **Non bloquant.**
+
+---
+
+## O-20 — ⚠️ EN ATTENTE DE SAMUEL — `CLAUDE_PLUGIN_ROOT` non défini rend `$S` vide, en silence
+
+**Mesuré le 2026-08-03** : `CLAUDE_PLUGIN_ROOT` est **UNSET** dans l'environnement Bash de ce
+poste.
+
+**La conséquence.** Les crans 3 et 4 de la cascade, écrits `"${CLAUDE_PLUGIN_ROOT:-}/conductor/scripts"`,
+se réduisent alors à **`/conductor/scripts`** et **`/dev-orchestrator/scripts`** — la **racine du
+système de fichiers**. Pas de faux positif (ces chemins n'existent pas), mais si les crans 1 et 2
+manquent aussi, `$S` sort **vide** et toutes les commandes deviennent **`/dag.sh`**,
+**`/driver-lock.sh`**. **Échec silencieux, à un chemin mensonger** — et un manager qui ne teste pas
+le code de retour croira simplement que le verrou n'existe pas.
+
+**Rapport avec la Phase 23** : même famille que le reste — un mécanisme qui a l'air de couvrir
+quatre cas et qui, dans la configuration réelle, n'en couvre que deux, sans jamais le dire.
+
+**Les voies.** (a) faire échouer la résolution explicitement quand `$S` sort vide (garde de 2
+lignes dans le patron, à répercuter sur les 7 foyers) · (b) ne construire les crans 3 et 4 que si
+`CLAUDE_PLUGIN_ROOT` est non vide · (c) statu quo documenté. **Non bloquant.**
+
+**Observation annexe, sans arbitrage requis** : le cran 4
+(`${CLAUDE_PLUGIN_ROOT}/dev-orchestrator/scripts`) est **mort sur ce poste** — `dag.sh` est absent
+des **7 versions cachées** (2.23.0 → 2.43.1) et du dépôt (`find plugin -name dag.sh` → 2 hits, tous
+deux sous `conductor/scripts`). Mais **ce n'est pas un chemin malformé** : `git log --all` montre
+que le fichier a vécu là de v2.28.0 jusqu'à `60576e9` (extraction `team-kernel`). C'est un fallback
+de compatibilité **explicitement documenté** (`mission-flow.md` l. 26-28) dont la fenêtre de
+versions n'est pas cachée ici. **Honnête, pas trompeur** — à distinguer soigneusement d'O-12.

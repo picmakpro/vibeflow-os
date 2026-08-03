@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-03T23:20:00+02:00",
+  "timestamp": "2026-08-03T23:35:00+02:00",
   "phase": "23",
   "phase_name": "Couplage explicite au moteur GSD — capabilities, flags et voie unique",
   "phase_dir": ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-",
@@ -141,6 +141,11 @@
         "5462801",
         "76df6af"
       ]
+    },
+    {
+      "id": 30,
+      "name": "verif-o12 — verification LECTURE SEULE de la famille « couverture apparente ». O-12 CONFIRME et precise sur 3 points (ligne 270 et non 195 ; segment minuscule ; defaut identique en 1.8.0 ET 1.9.0 donc jamais fonctionnel). Hypothese sur la cascade $S INFIRMEE par mesure. DEUX CONSTATS NEUFS a la place : O-19 (inversion de priorite sur 5 foyers sur 7, contredisant l affirmation de parite de check-gsd-config.sh:195-196) et O-20 ($S vide en silence si CLAUDE_PLUGIN_ROOT unset). Aucun fichier modifie par le worker, aucun commit",
+      "status": "done"
     }
   ],
   "remaining_tasks": [
@@ -285,7 +290,7 @@
       "blocking": false
     },
     {
-      "action": "BRANCHE 2 DE LA CASCADE INOPERANTE — check-gsd-config.sh:195 resout <root>/node_modules/@opengsd/gsd-core/bin/lib, mais le tarball npm publie range le payload sous <root>/node_modules/@opengsd/gsd-core/GSD-CORE/bin/lib (double segment, mesure sur 1.9.1). Un bin/lib existe bien un cran plus haut mais ne contient que ui-safety-gate.cjs, pas config.cjs. La branche a l'air correcte a la lecture et NE RESOUT RIEN a l'execution — du code mort qui donne une fausse impression de couverture. La cascade $S de mission-flow.md reprend la meme forme et porte donc le meme defaut. NON TOUCHEE : A-6 prescrit explicitement que la cascade reste INCHANGEE, et corriger une branche de resolution est un changement de comportement hors des trois arbitrages. A instruire — c'est un chemin d'installation legitime (npm local) qui ne fonctionne pour personne aujourd'hui.",
+      "action": "O-12 RE-MESURE ET CORRIGE (noeud verif-o12, 2026-08-03) — la branche fautive est check-gsd-config.sh:270 (et non 195, qui est la promesse d en-tete). Segment omis en MINUSCULES (gsd-core/gsd-core), pas GSD-CORE. SURTOUT : le defaut est IDENTIQUE sur 1.8.0 ET 1.9.0 — c est le layout du tarball, pas une regression de version : cette branche n a JAMAIS fonctionne, pour personne, sur aucune version. bin/lib du cran superieur = 1 fichier (ui-safety-gate.cjs) contre 172 dans le vrai dossier. DEMENTI IMPORTANT : l affirmation « la cascade $S de mission-flow.md porte le meme defaut » est FAUSSE (mesuree). $S n omet aucun segment ; marketplace.json declare source: ./plugin, donc le prefixe plugin/ n est pas dans le chemin installe et CLAUDE_PLUGIN_ROOT pointe un dossier de version a plat. La famille O-12 ne s etend PAS a $S. Note de chemin : mission-flow.md vit dans plugin/dev-orchestrator/references/, il n existe pas de plugin/conductor/references/mission-flow.md",
       "blocking": false
     },
     {
@@ -314,6 +319,14 @@
     },
     {
       "action": "O-1..O-7 et points 5-7 réinstruits — inchangés, non bloquants.",
+      "blocking": false
+    },
+    {
+      "action": "O-19 NEUF — la cascade $S est INVERSEE dans 5 foyers sur 7 (vf-design-manager:43, vf-growth-manager:40, vf-content-manager:37, vf-business-manager:55, vf-update/SKILL.md:27 mettent $HOME AVANT ./). Contredit frontalement mission-flow.md l.21-24 (« le lab courant PRIME ... prendre le scope user divergerait silencieusement de la version du lab ») ET contredit check-gsd-config.sh l.195-196 qui AFFIRME avoir « meme priorite que la cascade $S de mission-flow.md » — affirmation de parite FAUSSE pour 5 foyers sur 7. Famille de la phase, au niveau doctrine : un renvoi croise qui certifie une equivalence inexistante. Cause racine : team-kernel.md, cite comme contrat invariant par les 3 managers de bundle, NE DEFINIT PAS la cascade — d ou 6 reformulations inline independantes. Ecart non observable sur ce poste, decisif sur un lab bi-scope. Voies : (a) aligner les 5 foyers (6 agents + 1 skill, hors perimetre des plans P23) (b) porter la cascade dans team-kernel.md et renvoyer (traite la cause, ADR-030/057, refactor transverse) (c) statu quo documente (d) AU MINIMUM retirer l affirmation de parite de check-gsd-config.sh:195-196. NON BLOQUANT",
+      "blocking": false
+    },
+    {
+      "action": "O-20 NEUF — CLAUDE_PLUGIN_ROOT est UNSET sur ce poste (mesure). Les crans 3 et 4 de la cascade se reduisent alors a /conductor/scripts et /dev-orchestrator/scripts (RACINE DU FS). Si les crans 1-2 manquent aussi, $S sort VIDE et les commandes deviennent /dag.sh, /driver-lock.sh : ECHEC SILENCIEUX A UN CHEMIN MENSONGER. Un manager qui ne teste pas le code de retour croira que le verrou n existe pas. Meme famille : un mecanisme qui a l air de couvrir 4 cas et n en couvre que 2 sans le dire. Voies : (a) echouer explicitement quand $S est vide (b) ne construire les crans 3-4 que si CLAUDE_PLUGIN_ROOT est non vide (c) statu quo documente. NON BLOQUANT. ANNEXE SANS ARBITRAGE : le cran 4 est mort sur ce poste (dag.sh absent des 7 versions cachees et du depot) mais c est un fallback de compatibilite DOCUMENTE (mission-flow.md l.26-28) — le fichier y a vecu de v2.28.0 a 60576e9. HONNETE, PAS TROMPEUR : a distinguer d O-12",
       "blocking": false
     }
   ],
@@ -386,6 +399,16 @@
     {
       "decision": "replan-05 : le critere l.300 de 23-05 (« aucune ligne ajoutee au manager ») est REMPLACE par un plafond <= 250 + clause de deport EX ANTE vers plugin/dev-orchestrator/references/",
       "rationale": "Le critere rendait le geste 2 d A-1ter (le manager porte le cadrage) litteralement inexecutable : porter le cadrage ajoute necessairement des lignes. Le critere etait de surcroit adosse a une base morte (fix-a5 a modifie le fichier depuis 23-01). Marge reelle mesuree : 15 lignes",
+      "phase": "23"
+    },
+    {
+      "decision": "O-12 : le registre 23-ARBITRAGES-OUVERTS.md est CORRIGE en place — la phrase « la cascade $S de mission-flow.md porte le meme defaut » etait fausse et est remplacee par un encadre de dementi mesure",
+      "rationale": "Laisser cette phrase aurait reproduit, DANS LE REGISTRE D ARBITRAGES LUI-MEME, le defaut exact que le registre instruit : une affirmation de couverture non verifiee. Le registre est lu comme une source de faits par les plans suivants",
+      "phase": "23"
+    },
+    {
+      "decision": "O-18 rapatrie de HANDOFF.json vers 23-ARBITRAGES-OUVERTS.md ; O-19 et O-20 ouverts. Le registre porte desormais les 21 sections O-, il est la SOURCE UNIQUE avant la PR",
+      "rationale": "O-18 vivait dans le relais de mission et pas dans le registre, alors qu il est du comme les autres avant la PR — un arbitrage qui ne figure pas au registre se perd",
       "phase": "23"
     }
   ],
