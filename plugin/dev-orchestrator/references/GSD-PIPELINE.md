@@ -134,6 +134,17 @@ pilotage) ; les workers d'équipe (`vf-coder`, `vf-reviewer`, `vf-auditer`) en `
 > `.claude/agents/dev-orchestrator-references/gsd-skills-index.md` ; pour le routage
 > intention → brique, `intent-routing.md` (seule source de routage).
 
+> **Qui décide de ce qui s'exécute — la question du Constat 0.** La bonne question n'était pas
+> « l'agent a-t-il accès aux étages du cycle », mais « qui les déclenche ». Réponse : aux points
+> de hook du cycle, le moteur **insère lui-même** ses étages selon les toggles du lab. Un agent
+> ne les « choisit » pas ; il ne peut qu'en activer la condition. La table point par point
+> (capability, nature, toggle gouvernant, bloquant, conduite sur erreur) vit dans
+> `.claude/agents/dev-orchestrator-references/gsd-capabilities-index.md`. Elle est
+> **auto-générée** depuis le registre du moteur installé — ne jamais l'éditer à la main ; la
+> régénérer avec `build-gsd-capabilities-index.sh`. Elle énumère ce que le moteur **déclare** à
+> la version depuis laquelle elle a été produite, et jamais l'état effectif d'un lab : cet
+> état-là se lit avec `gsd-tools loop render-hooks <point> --raw`, pas dans ce fichier.
+
 ---
 
 ## 8. Frontière : `model:` (agents vf-*) vs `model_profile` (sous-agents gsd-*)
