@@ -999,7 +999,7 @@ else
   if (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install dev-orchestrator >/dev/null 2>&1); then
     miss=0
     [ -f "$LAB/.claude/agents/dev-orchestrator.md" ] || { ko "T6 install : .claude/agents/dev-orchestrator.md manquant"; miss=1; }
-    for ref in GSD-PIPELINE.md gsd-skills-index.md intent-routing.md mission-contracts.md docs-flow.md; do
+    for ref in GSD-PIPELINE.md gsd-skills-index.md gsd-capabilities-index.md intent-routing.md mission-contracts.md docs-flow.md; do
       [ -f "$LAB/.claude/agents/dev-orchestrator-references/$ref" ] || { ko "T6 install : references/$ref manquant"; miss=1; }
     done
     for sk in vf-auto vf-dev; do
@@ -4559,6 +4559,251 @@ if [ -n "$t33_ko" ]; then
 else
   ok "T33 (Lacune 3, §9 allowlist stricte + D-21, DISCRIMINANT) : la clause de fermeture par défaut GOUVERNE la table (détectée dans les $((t33_first_table - 1)) ligne(s) qui la précèdent, §9 de $t33_s9_n lignes) et la co-présence portée/prédicat est bornée à la PROPOSITION, pas au bloc ; le CONTENU de l'allowlist est gaté par ÉGALITÉ D'ENSEMBLE cellule par cellule sur les 3 briques ($t33_al_flags_n flag(s) distinct(s) extraits, intersection autorisés∩fermés vide, --chain fermé partout) ; les deux formes de gradation de la recherche sont dans la CELLULE « flags autorisés » de la brique de plan ; la ligne de cadrage porte dans sa PROPRE cellule de motif la marque de transitoire ET l'échéance (plan 23-05) sans ressusciter les prémisses mortes (persistance config.json, T25b comme borne) ; le renvoi croisé tient sur UNE ligne physique (docs-flow.md + ADR-057) avec intersection de flags VIDE sur $t33_d_src flag(s) documentaires extraits ; vf-coder.md renvoie depuis son bloc Cadrage ; la ligne de gsd-ship porte elle-même son ADR et le motif de D-21 est lisible dans CHACUNE des sections amendées (§1 de $t33_s1_rows lignes de données, et §6) — $t33_fx_fautives formulation(s)/mutant(s) FAUTIFS font rougir les sondes, $t33_fx_licites reformulation(s) LICITES restent vertes"
 fi
+
+# ---------------------------------------------------------------------------
+# T28 — Table capabilities / points de hook GÉNÉRÉE depuis le moteur (Lacune 3, plan 23-04, D-07)
+#
+# CE QUE CE BLOC REFERME. Le module ignorait le mécanisme de capabilities du moteur : le geste de
+# ce plan est une table point de hook par point de hook, et le défaut à éviter est celui qui a
+# ouvert la Phase 23 — un index versionné qui affirme une version que la machine ne fait plus
+# tourner. Trois pièges, trois assertions distinctes :
+#   · une table ÉCRITE à la main périme en silence      → A/B/C + D (garde négative)
+#   · une table GÉNÉRÉE puis commitée dérive en silence  → F (fraîcheur)
+#   · un générateur best-effort qui casse une install    → G2 (comportementale)
+#
+# POURQUOI UN COMPTEUR D'ATTEINTE SÉPARÉ. C, F et E se sautent proprement (`skip`) quand le
+# moteur est absent de la machine de test. Un critère de résultat qui se contenterait de « 0 KO »
+# serait alors tenu sur une machine où RIEN n'a été mesuré. Le compteur `t28_derived` dit
+# combien de points ont été RÉELLEMENT dérivés du registre, et il distingue deux régimes qu'on ne
+# confond jamais : registre illisible ⇒ `skip` nommant la cause ; registre lu mais 0 point ⇒ `ko`.
+# Patron identique à `T21d atteinte` et `T25 atteinte`.
+#
+# LA LISTE DES POINTS N'EST ÉCRITE NULLE PART ICI. Ni dans le générateur, ni dans cette suite :
+# elle est dérivée du registre des deux côtés. Une liste réécrite dans le test figerait la
+# vérification au lieu du générateur — le même défaut, déplacé d'un cran.
+# ---------------------------------------------------------------------------
+# >>> T28 DEBUT
+T28_GEN="$MOD/scripts/build-gsd-capabilities-index.sh"
+T28_OUT="$REFS_DIR/gsd-capabilities-index.md"
+T28_INSTALLER="$REPO/_internal/vibeflow-update.sh"
+T28_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T28_TMPDIR"
+t28_derived=0
+t28_f_state="non atteinte"
+t28_g2_state="non atteinte"
+
+# Résolution du registre du moteur — cascade PROPRE à la suite, jamais empruntée au générateur :
+# une vérification qui appellerait le générateur pour savoir où lire la vérité ne vérifierait que
+# la cohérence du générateur avec lui-même.
+t28_core_lib() {
+  local root claude_home d
+  if [ -n "${VF_GSD_CORE_LIB:-}" ]; then printf '%s' "$VF_GSD_CORE_LIB"; return 0; fi
+  root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+  claude_home="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+  for d in "$root/.claude/gsd-core/bin/lib" "$claude_home/gsd-core/bin/lib" \
+           "$claude_home/get-shit-done/bin/lib"; do
+    if [ -f "$d/capability-registry.cjs" ]; then printf '%s' "$d"; return 0; fi
+  done
+  printf '%s' ""
+}
+T28_CORE_LIB="$(t28_core_lib)"
+T28_REG=""
+[ -n "$T28_CORE_LIB" ] && T28_REG="$T28_CORE_LIB/capability-registry.cjs"
+
+T28_POINTS="$T28_TMPDIR/points.txt"; : > "$T28_POINTS"
+if [ -n "$T28_REG" ] && [ -f "$T28_REG" ] && command -v node >/dev/null 2>&1; then
+  node -e 'var r = require(process.argv[1]); var b = (r && r.byLoopPoint) || {}; Object.keys(b).forEach(function (k) { process.stdout.write(k + "\n"); });' \
+    "$T28_REG" > "$T28_POINTS" 2>/dev/null || : > "$T28_POINTS"
+fi
+t28_points_n="$(awk 'END{print NR+0}' "$T28_POINTS")"
+[ "$t28_points_n" -gt 0 ] && t28_derived="$t28_points_n"
+
+# Imprime les points de <liste> ABSENTS de <index>, rien si la couverture est complète. FONCTION
+# PURE de ses arguments : c'est ce qui la rend rejouable telle quelle sur la sortie mutée (E),
+# sans dupliquer la logique de C — une seconde implémentation prouverait la seconde, pas C.
+t28_missing_points() { # <fichier index> <fichier liste de points>
+  local p miss=""
+  if [ ! -f "$1" ]; then printf '%s' " (index introuvable)"; return 0; fi
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    awk -v pt="$p" 'index($0,pt){n++} END{exit (n>0)?0:1}' "$1" || miss="$miss $p"
+  done < "$2"
+  printf '%s' "$miss"
+}
+
+# --- A : le générateur existe et est exécutable ------------------------------------------------
+if [ -f "$T28_GEN" ] && [ -x "$T28_GEN" ]; then
+  ok "T28-A : le générateur de la table de capabilities existe et est exécutable ($T28_GEN)"
+else
+  ko "T28-A : générateur absent ou non exécutable ($T28_GEN) — la table ne peut pas être régénérée"
+fi
+
+# --- B : la sortie versionnée porte l'en-tête « ne pas éditer » --------------------------------
+if [ ! -f "$T28_OUT" ]; then
+  ko "T28-B : la table versionnée est absente ($T28_OUT)"
+elif "$GREP" -qF 'NE PAS ÉDITER' "$T28_OUT"; then
+  ok "T28-B : la table versionnée porte l'en-tête « auto-généré — NE PAS ÉDITER » (une édition manuelle présentée comme générée est un défaut de répudiation)"
+else
+  ko "T28-B : la table versionnée ne porte pas « NE PAS ÉDITER » — rien n'y dit qu'elle est générée"
+fi
+
+# --- C : couverture des points, DÉRIVÉE du registre --------------------------------------------
+if [ "$t28_points_n" -eq 0 ]; then
+  skip "T28-C couverture : registre de capabilities illisible ou absent (${T28_REG:-aucun chemin résolu}) — la liste des points ne peut pas être dérivée, rien n'est mesuré"
+else
+  t28_c_miss="$(t28_missing_points "$T28_OUT" "$T28_POINTS")"
+  if [ -z "$t28_c_miss" ]; then
+    ok "T28-C : la table versionnée nomme les $t28_points_n point(s) de hook DÉRIVÉS du registre du moteur (la liste n'est réécrite ni dans le générateur, ni dans cette suite)"
+  else
+    ko "T28-C : point(s) de hook déclaré(s) par le registre et ABSENT(S) de la table versionnée :$t28_c_miss — régénérer : bash plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh"
+  fi
+fi
+
+# --- F : FRAÎCHEUR de la copie versionnée ------------------------------------------------------
+# Sans F, ce plan déplacerait le défaut au lieu de le fermer : la copie est générée depuis le
+# moteur d'UN poste puis commitée, le hook d'install ne régénère que chez l'installateur — jamais
+# dans le dépôt —, et entre les deux la copie versionnée dérive EN SILENCE sous un en-tête qui la
+# fait lire comme à jour. C'est exactement le scénario 1.8.0 / 1.9.0. Ni l'idempotence (deux runs
+# du MÊME moteur au MÊME instant) ni T6 (qui constate une PRÉSENCE, donc vert grâce à la copie
+# commitée) ne couvrent ça.
+if [ "$t28_points_n" -eq 0 ] || [ ! -x "$T28_GEN" ]; then
+  skip "T28-F fraîcheur : moteur GSD absent (${T28_REG:-aucun chemin résolu}) — la copie versionnée ne peut être confrontée à aucune régénération"
+else
+  T28_F_REGEN="$T28_TMPDIR/regen.md"
+  if VF_CAPS_INDEX_OUT="$T28_F_REGEN" bash "$T28_GEN" >/dev/null 2>&1 && [ -s "$T28_F_REGEN" ]; then
+    t28_f_state="atteinte"
+    # Comparaison hors ligne d'horodatage, par `cmp -s` sur deux fichiers matérialisés : `diff` a
+    # rendu « Files are identical » sur des fichiers différents sur ce poste.
+    awk '!/Généré le/' "$T28_OUT"     > "$T28_TMPDIR/f-versionnee.txt"
+    awk '!/Généré le/' "$T28_F_REGEN" > "$T28_TMPDIR/f-regen.txt"
+    if cmp -s "$T28_TMPDIR/f-versionnee.txt" "$T28_TMPDIR/f-regen.txt"; then
+      ok "T28-F fraîcheur (ATTEINTE) : la copie versionnée est identique, hors horodatage, à une régénération faite à l'instant depuis le moteur installé — elle ne peut pas affirmer un état que la machine ne déclare plus"
+    else
+      ko "T28-F fraîcheur (ATTEINTE) : la copie versionnée a DÉRIVÉ du registre du moteur installé — régénérer : bash plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh"
+    fi
+  else
+    skip "T28-F fraîcheur : la régénération de contrôle n'a produit aucune sortie — rien à comparer"
+  fi
+fi
+
+# --- D (NÉGATIVE) : aucun nom de point écrit en dur dans le code du générateur -----------------
+if [ ! -f "$T28_GEN" ]; then
+  ko "T28-D : générateur introuvable — la garde négative n'a rien à mesurer"
+elif [ "$t28_points_n" -eq 0 ]; then
+  skip "T28-D : registre absent — la liste des noms à traquer en dur ne peut pas être dérivée"
+else
+  T28_GEN_CODE="$T28_TMPDIR/gen-code.sh"
+  awk '!/^[[:space:]]*#/' "$T28_GEN" > "$T28_GEN_CODE"
+  t28_d_hard=""
+  while IFS= read -r t28_p; do
+    [ -n "$t28_p" ] || continue
+    awk -v pt="$t28_p" 'index($0,pt){n++} END{exit (n>0)?0:1}' "$T28_GEN_CODE" \
+      && t28_d_hard="$t28_d_hard $t28_p"
+  done < "$T28_POINTS"
+  if [ -z "$t28_d_hard" ]; then
+    ok "T28-D (NÉGATIVE) : aucun des $t28_points_n noms de point de hook n'est écrit en dur dans le code du générateur (commentaires pleine ligne retirés) — un point ajouté en amont apparaîtra seul à la régénération suivante"
+  else
+    ko "T28-D : nom(s) de point de hook écrit(s) en dur dans le code du générateur :$t28_d_hard — la liste figerait, exactement le défaut que D-07 corrige"
+  fi
+fi
+
+# --- G1 (structurelle) : le hook post-install nomme le générateur et sa variable de sortie -----
+if [ ! -f "$T28_INSTALLER" ]; then
+  ko "T28-G1 : installeur introuvable ($T28_INSTALLER)"
+else
+  t28_g1_gen="$(awk '/build-gsd-capabilities-index[.]sh/{n++} END{print n+0}' "$T28_INSTALLER")"
+  t28_g1_var="$(awk '/VF_CAPS_INDEX_OUT/{n++} END{print n+0}' "$T28_INSTALLER")"
+  t28_g1_hist="$(awk '/build-gsd-index[.]sh/{n++} END{print n+0}' "$T28_INSTALLER")"
+  if [ "$t28_g1_gen" -ge 2 ] && [ "$t28_g1_var" -ge 1 ] && [ "$t28_g1_hist" -ge 2 ]; then
+    ok "T28-G1 : le hook post-install porte la garde de présence ET l'appel du générateur ($t28_g1_gen occurrence(s)) avec sa variable de sortie VF_CAPS_INDEX_OUT ($t28_g1_var), l'appel historique de l'index de skills restant intact ($t28_g1_hist occurrence(s), non refactoré)"
+  else
+    ko "T28-G1 : câblage post-install incomplet — générateur=$t28_g1_gen (attendu ≥ 2), VF_CAPS_INDEX_OUT=$t28_g1_var (≥ 1), appel historique=$t28_g1_hist (≥ 2)"
+  fi
+fi
+
+# --- G2 (COMPORTEMENTALE) : un moteur absent à l'install DÉGRADE, il n'ampute pas --------------
+# C'est la seule assertion qui exerce le chemin de repli. `vibeflow-update.sh` est l'engine
+# d'install de TOUS les modules : une sonde de présence de chaîne n'y prouve rien du comportement,
+# et le risque qui compte (T-23-04-04) EST un comportement. T6 ne couvre que le chemin nominal.
+if [ ! -f "$T28_INSTALLER" ]; then
+  skip "T28-G2 : installeur introuvable ($T28_INSTALLER)"
+elif ! "$GREP" -q -- '-references' "$T28_INSTALLER"; then
+  skip "T28-G2 : l'installeur ne câble pas la copie des references agent (D7) — l'install n'est pas exerçable"
+else
+  T28_LAB="$(mktemp -d)"; vf_tmp_track "$T28_LAB"
+  T28_CACHE="$T28_LAB/.vibeflow-cache"
+  mkdir -p "$T28_CACHE/dev-orchestrator"
+  cp -r "$MOD/." "$T28_CACHE/dev-orchestrator/" 2>/dev/null || true
+  T28_JOURNAL="$T28_LAB/journal.txt"
+  # Moteur RÉELLEMENT hors d'atteinte : les deux ancres de résolution pointent dans le vide.
+  (cd "$T28_LAB" && VIBEFLOW_CACHE="$T28_CACHE" \
+      VF_GSD_TOOLS="/nonexistent-t28-$$/gsd-tools.cjs" \
+      VF_GSD_CORE_LIB="/nonexistent-t28-$$/lib" \
+      bash "$T28_INSTALLER" install dev-orchestrator) > "$T28_JOURNAL" 2>&1
+  t28_g2_rc=$?
+  t28_g2_agent=0; [ -f "$T28_LAB/.claude/agents/dev-orchestrator.md" ] && t28_g2_agent=1
+  t28_g2_refs=0
+  [ -f "$T28_LAB/.claude/agents/dev-orchestrator-references/GSD-PIPELINE.md" ] && t28_g2_refs=1
+  t28_g2_log="$(awk '/capabilities/ && /non régénéré/{n++} END{print n+0}' "$T28_JOURNAL")"
+  if [ "$t28_g2_rc" -eq 0 ] && [ "$t28_g2_agent" -eq 1 ] && [ "$t28_g2_refs" -eq 1 ] \
+     && [ "$t28_g2_log" -ge 1 ]; then
+    t28_g2_state="atteinte"
+    ok "T28-G2 (COMPORTEMENTALE, ATTEINTE) : moteur hors d'atteinte au moment de l'install ⇒ install en succès (exit 0), agent et références bien posés, et $t28_g2_log ligne(s) de repli journalisée(s) pour la table de capabilities — le nouveau générateur ne peut pas casser l'install d'un module"
+  else
+    ko "T28-G2 : le repli best-effort ne tient pas — exit=$t28_g2_rc (attendu 0), agent posé=$t28_g2_agent, références posées=$t28_g2_refs, ligne(s) de repli=$t28_g2_log (attendu ≥ 1) : un moteur absent doit dégrader, jamais amputer l'install"
+  fi
+fi
+
+# >>> T28 FIXTURE MUTATION DEBUT
+# --- E (DISCRIMINANTE, par mutation) : registre factice à 2 points ⇒ la couverture C doit ROUGIR.
+# Sans elle, C n'est qu'un constat de présence de quelques chaînes : elle serait verte sur une
+# table qui aurait perdu dix points. Ce dépôt a un précédent documenté de garde morte (les deux
+# gardes de brick_routed(), remplacées par T14c).
+if [ "$t28_points_n" -eq 0 ] || [ ! -x "$T28_GEN" ]; then
+  skip "T28-E discriminance : moteur absent — le registre factice ne peut être confronté à aucune liste réelle de points"
+else
+  T28_FX_LIB="$T28_TMPDIR/faux-registre"
+  mkdir -p "$T28_FX_LIB"
+  cat > "$T28_FX_LIB/capability-registry.cjs" <<'T28_FIXTURE_REGISTRE'
+module.exports = {
+  version: '1',
+  byLoopPoint: {
+    'fixture:alpha': {
+      steps: [{ capId: 'fx-alpha', when: 'fixture.alpha', onError: 'skip' }],
+      contributions: [],
+      gates: []
+    },
+    'fixture:omega': { steps: [], contributions: [], gates: [] }
+  }
+};
+T28_FIXTURE_REGISTRE
+  T28_FX_OUT="$T28_TMPDIR/index-mute.md"
+  if VF_GSD_CORE_LIB="$T28_FX_LIB" VF_CAPS_INDEX_OUT="$T28_FX_OUT" bash "$T28_GEN" >/dev/null 2>&1 \
+     && [ -s "$T28_FX_OUT" ]; then
+    t28_fx_sections="$(awk '/^## /{n++} END{print n+0}' "$T28_FX_OUT")"
+    t28_fx_miss="$(t28_missing_points "$T28_FX_OUT" "$T28_POINTS")"
+    t28_fx_miss_n="$(printf '%s\n' "$t28_fx_miss" | awk '{n+=NF} END{print n+0}')"
+    if [ "$t28_fx_sections" -ne 2 ]; then
+      ko "T28-E : le registre factice devait produire exactement 2 sections de point, il en produit $t28_fx_sections — la mutation n'a pas mordu, la SONDE EST À RÉANCRER (ce n'est pas un défaut du générateur)"
+    elif [ "$t28_fx_miss_n" -ge 1 ]; then
+      ok "T28-E (DISCRIMINANTE, par mutation) : sur une table générée depuis un registre factice à 2 points, l'assertion de couverture C rougit en nommant $t28_fx_miss_n point(s) manquant(s) sur $t28_points_n — elle compare bien à la liste amont, elle ne constate pas la présence de quelques chaînes"
+    else
+      ko "T28-E NON DISCRIMINANTE : une table générée depuis un registre à 2 points satisfait encore la couverture C — C ne mesure pas la liste du registre"
+    fi
+  else
+    ko "T28-E : le générateur n'a produit aucune sortie depuis le registre factice — la mutation n'a rien pu prouver, SONDE À RÉANCRER"
+  fi
+fi
+# >>> T28 FIXTURE MUTATION FIN
+
+# --- T28 ATTEINTE : ce qui a été RÉELLEMENT dérivé, jamais ce qui a été ouvert -----------------
+if [ "$t28_points_n" -eq 0 ]; then
+  skip "T28 atteinte : registre du moteur introuvable ou illisible (${T28_REG:-aucun chemin résolu}) — 0 point dérivé, les assertions C, F et E n'ont rien mesuré. La preuve reste à produire sur une machine qui fait tourner le moteur"
+elif [ "$t28_derived" -eq 0 ]; then
+  ko "T28 atteinte : le registre répond mais ne déclare AUCUN point de hook — les gardes de couverture seraient vertes à vide"
+else
+  ok "T28 atteinte : $t28_derived point(s) de hook dérivé(s) du registre du moteur (C, D et E mesurent sur cette liste) ; fraîcheur F : $t28_f_state ; repli d'install G2 : $t28_g2_state"
+fi
+# >>> T28 FIN
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
