@@ -76,7 +76,7 @@
         "plugin/dev-orchestrator/agents/vf-coder.md",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "revue-03",
@@ -524,7 +524,7 @@
         "plugin/dev-orchestrator/agents/vf-coder.md",
         "plugin/dev-orchestrator/agents/vf-dev-manager.md"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "fix-a6",

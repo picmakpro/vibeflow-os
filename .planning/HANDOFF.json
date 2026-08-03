@@ -63,6 +63,12 @@
       "id": 8,
       "name": "revue-01e — revue ciblée : invariance de la sonde prouvée par ensembles matérialisés (comm sur verdicts triés, cmp sur multiset statut+identifiant, séquence de lignes de code identique) PUIS re-vérifiée par le manager sur le diff brut : exactement 4 lignes non-commentaire changées, toutes des chaînes de message (2 T25B_WHY, 1 ok, 1 ko). T25B_DISARM_RE, T25B_WINDOW, l'awk d'appariement, les fixtures g..k, les mutants M1..M4 et les codes de retour sont intacts",
       "status": "done"
+    },
+    {
+      "id": 24,
+      "name": "fix-a5 — A-5 applique. Les deux foyers du mensonge doctrinal reecrits en TEXTE SEUL. vf-dev-manager.md 235 -> 235 lignes (0 ligne nette, marge ADR-029 preservee) ; vf-coder.md 94 -> 98. Suite test-dev-orchestrator.sh 102 OK / 0 KO avant ET apres, avec comparaison des ENSEMBLES de libelles en comm dans les deux sens (zero ligne d'ecart). Gate T25b re-prouve : ses 4 mutants derives du vf-coder.md REEL (retrait, report hors bloc, report en fin de bloc, permutation) rougissent tous — la fenetre de 150 caracteres n'a pas bouge et la sonde mord toujours. Aucune promesse reintroduite (recherche born|limit|clos|ferm|fenetre : seuls des hits NEGATIFS ou prospectifs)",
+      "status": "done",
+      "commit": "d5840d6"
     }
   ],
   "remaining_tasks": [
@@ -198,6 +204,10 @@
     }
   ],
   "human_actions_pending": [
+    {
+      "action": "A-5, RESIDU — la fixture k du gate T25b, plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh:2729, porte encore dans sa prose « la fenetre reste bornee la ». C'est EXACTEMENT le mensonge qu'A-5 vient de corriger sur les deux agents, conserve ici comme modele de « reformulation LEGITIME du couple ». Deux lectures opposees, toutes deux defendables : (a) LE CORRIGER — un redacteur qui s'inspire de la fixture reimporte la formulation fausse, et la phase existe precisement pour tuer les faux verts doctrinaux ; (b) LE LAISSER — la fixture est de la DONNEE DE TEST : sa prose est la paraphrase que la sonde doit ACCEPTER, la modifier change ce que le test prouve, et rouvrirait 23-01 une 6e fois sur du gate. Le mandat d'A-5 bornait le perimetre a « les deux foyers verifies sur disque » : etendre est un changement de perimetre, donc ADR-031. NON BLOQUANT. Note : T25b devient SANS OBJET au plan 23-05 (a retirer ou remplacer) — attendre 23-05 est une troisieme voie coherente.",
+      "blocking": false
+    },
     {
       "action": "A-1ter, portée du geste 1 — le mensonge doctrinal vit à DEUX endroits, tous deux vérifiés sur disque. (1) vf-coder.md:30-31 : « le refermer ICI, dans le geste même qui l'ouvre, borne la fenêtre armée au seul cadrage de cette étape ». (2) vf-dev-manager.md:75-76, découvert par plancheck-05 : « un cadrage --auto en aval repose le chain flag, que vf-coder referme dans le geste même — la fenêtre armée est bornée là, pas ici ». Le gate ne ment plus ; la doctrine que le gate vérifie ment toujours, aux deux endroits, et c'est elle qui pilote deux agents en production. Le geste 1 ne nommait que T25b, donc personne n'y a touché (ADR-031). Trois voies : (a) correctif TEXTE minimal maintenant sur les DEUX sites, nœud séparé, ~1 commit (vf-coder.md 94/250, vf-dev-manager.md 235/250 — un correctif texte ne coûte pas de ligne s'il remplace) ; (b) correctif + sonde de non-régression qui refuse la réapparition de la promesse, mais cela rouvre 23-01 une 6e fois sur du gate ; (c) statu quo jusqu'à l'exécution de 23-05, en assumant que deux agents en production affirment entre-temps un fait connu faux — et en sachant que le plan 23-05 tel qu'il est écrit NE VISE AUCUN des deux sites (plancheck-05, bloquant B4).",
       "blocking": false
