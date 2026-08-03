@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-03T21:00:00+02:00",
+  "timestamp": "2026-08-03T23:30:00+02:00",
   "phase": "23",
   "phase_name": "Couplage explicite au moteur GSD — capabilities, flags et voie unique",
   "phase_dir": ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-",
@@ -10,7 +10,7 @@
   "task": 1,
   "total_tasks": 8,
   "status": "in_progress",
-  "relais": "Reprise apres coupure reseau n.7. Driver-lock frais. A-5, A-6, A-7 SOLDES ET PROUVES. 23-03-REVIEW.md integre, commite et FUSIONNE avec la seconde revue (0141e97, 401 lignes) — la section FUSION DES DEUX REVUES porte la liste F-1..F-6 qui FAIT FOI. exec-03 ROUVERT UNE SEULE FOIS pour les deux revues (jamais un reopen par juge). EN VOL : exec-03 (correction ciblee des 6 majeurs + mineurs) et revue-a6 (revue de securite, RE-DISPATCHEE apres coupure — le premier reviewer en etait aux sondes d'evasion contre le critere statique du cas 35, il n'avait rien ecrit). Perimetres disjoints en fichiers ET en mesure. LES DIX-SEPT QUESTIONS OUVERTES SONT EN CLAIR SUR DISQUE : 23-ARBITRAGES-OUVERTS.md, O-11 l.227, O-12 l.265, O-13 l.287, O-14 l.314, O-15 l.330, O-16 l.347, O-17 l.374. C'est la source a porter a Samuel, PAS ce JSON.",
+  "relais": "Reprise apres coupure reseau n.8. A-5, A-6, A-7 SOLDES. Les revues de 23-03 ET d'A-6 sont rendues, commitees, et leurs correctifs sont EN VOL. VERIFICATION FAITE PAR LE MANAGER : contrairement a ce que rapportait le relais precedent, O-11 (=arbitrage-known-top), O-16 (=arbitrage-o16) et MJ-01 (=F-2) SONT sur disque et COMMITES. Emplacements exacts : 23-ARBITRAGES-OUVERTS.md l.227 (O-11), l.265 (O-12), l.287 (O-13), l.314 (O-14), l.330 (O-15), l.347 (O-16), l.374 (O-17) ; MJ-01 = ligne F-2 de la section FUSION DES DEUX REVUES du 23-03-REVIEW.md. La section FUSION avait ete ecrite DEUX FOIS (mon premier appel avait echoue sur le git commit, pas sur le cat) — dedoublonnee, le fichier passe de 401 a 354 lignes, les 6 findings F-1..F-6 presents une seule fois. EN VOL : exec-03 (cloture de PREUVE — rejouer les mutants que les revues trouvaient VERTS, ils doivent desormais ROUGIR) et fix-a6 (les deux majeurs de securite M-1 parseur quadratique et M-2 filet troue par M7).",
   "paused_reason": "",
   "mission_mode": "vf-dev-manager (équipe) — DAG dans .planning/MISSION-23.dag.json",
   "completed_tasks": [
@@ -113,6 +113,12 @@
       "name": "revue-03 (nominale, regime plein) — VERDICT correctifs requis, aucun bloquant. 10 findings, 3 majeurs NEUFS que la seconde revue n'avait pas vus : MAJEUR-1 FAUX VERT DE L'ASSERTION B (la negation par « aucun … ne » SATISFAIT la sonde de fermeture — l'assertion la plus structurante du bloc) ; MAJEUR-2 le CONTENU de l'allowlist n'est gate nulle part ; MAJEUR-3 le motif peut redevenir faux sans rougir (premisses mortes non gatees : persistance config.json et T25b comme borne). Methode : tout rejoue dans une copie sandbox (tar sans .git), mutations par ancrage de CONTENU (les read_first du plan sont perimes), restauration par cmp, aucun fichier du worktree modifie. Mineurs : puce §6 non gatee, contre-epreuve de C sans garde de non-vacuite, T33 consomme $T25_CADRAGE_RE propriete de T25 que 23-05 doit retoucher (sous set -u sa disparition fait tomber TOUT le script), t33_s1_rows -eq 9 code en dur, le motif « le workflow prompte » plus fort que sa source, ecart O-16 propage a moitie dans vf-coder.md:45, ADR-057 cite par analogie (no-op)",
       "status": "done",
       "commit": "0141e97"
+    },
+    {
+      "id": 32,
+      "name": "revue-a6 (securite ciblee, regard frais) — VERDICT correctifs requis. A-6 LUI-MEME EST BON : vecteur RCE reellement ferme, eprouve AU-DELA de la suite — 3 branches de cascade x les 5 basenames que le script ouvre (pas les 3 de la fixture) x 2 manifestes pieges dont un .json qui est en fait du JS et un symlink vers un .cjs piege = 0 TEMOIN SUR 15 PIEGES, cle du moteur piege epargnee (donc lu, pas ignore). Cascade byte-identique (meme sha256 sur 31 lignes). Les 5 mutants annonces se rejouent EXACTEMENT comme annonces. Ni 34 ni 35 ne passent a vide. Pollution de prototype non exploitable, hasOwnProperty tient. Doc conforme (patron T-17-06, STRIDE, SC en queue, O-13 dans les deux sens, cas 23). HONNETETE DU JUGE : sa premiere passe annoncait « 8/8 identiques » avec 0 sortie non vide — son chemin de moteur etait faux, il comparait DEUX SILENCES ; il l'a detecte et corrige. DEUX MAJEURS, tous deux ouverts PAR le correctif : M-1 le parseur est QUADRATIQUE (txt.slice par caractere, :341) — 973 Ko = 52,6 s contre 0,11 s pour l'ancien script (x480), 3,9 Mo toujours vivant a 75 s ; cela ROUVRE T-23-02-03 (high|mitigate) dont les deux mitigations (|| true, contrat sans exit 1) NE COUVRENT PAS UN BLOCAGE ; correction linéaire verifiee au banc (regex collante /y + lastIndex) 19720 ms -> 800 ms, memes cles, zero changement de comportement. M-2 LE FILET ANTI-REGRESSION LAISSE PASSER UNE REGRESSION QUI ROUVRE LA RCE : mutant M7 = const _load = require; + _load(path.join(LIB,'config-schema.cjs')) -> suite 35 ok / 0 ko PENDANT QUE LE TEMOIN RCE EST ECRIT. Deux causes : (a) le cas 35 compte le litteral require\\( alors que sur l'ESPACE des 17 formes d'appel reelles calcule mecaniquement, 7 ECHAPPENT (dont « require ( » avec UNE SEULE ESPACE, _r = require, require['call'], Reflect.apply, module.constructor._load, process.binding) ; (b) le cas 34 ne piege que 3 des 5 basenames ouverts — et le commentaire du cas ENONCE LUI-MEME LA REGLE QU'IL N'APPLIQUE PAS",
+      "status": "done",
+      "commit": "9edeeb3"
     }
   ],
   "remaining_tasks": [
@@ -248,6 +254,10 @@
     }
   ],
   "human_actions_pending": [
+    {
+      "action": "O-18 — LECTURES NON BORNEES (check-gsd-config.sh:298). readFileSync sans garde de type ni de taille : une FIFO, ou un lien vers /dev/zero, sur l'une des 4 cibles NEUVES = ATTENTE INFINIE au SessionStart. Preexistant sur les 3 anciennes cibles, mais le correctif A-6 en ajoute 4. Poser une garde (stat de type + plafond de taille) est un AJOUT DE COMPORTEMENT hors de la lettre d'A-6, exactement comme les voies (b) et (c) d'O-13 — donc NON IMPLEMENTE. En revanche la phrase de l'en-tete :106 (« le pire cas est une extraction vide ») est FAUSSE EN DISPONIBILITE et sera corrigee : documenter honnetement n'est pas ajouter du comportement. Voies : (a) statu quo documente ; (b) garde de type (refuser tout ce qui n'est pas un fichier regulier) ; (c) garde de type + plafond de taille. NON BLOQUANT.",
+      "blocking": false
+    },
     {
       "action": "A-7, ZONE GRISE NON TRANCHEE — plafond de version du moteur dans la CI. Le job installe @opengsd/gsd-core@^1, coherent avec ensure-deps.sh, ce qui resout 1.9.1 aujourd'hui alors que la version en usage sur le poste est 1.9.0. Le cas 26 (egalite d'ensemble du mirroir engineExtra contre les 10 litteraux reels du moteur) est VERT sur 1.9.1 — mesure, pas suppose. Mais ^1 est une cible MOUVANTE : le jour ou un 1.x amont ajoute ou retire un litteral de KNOWN_TOP_LEVEL, le cas 26 rougira en CI. C'est EXACTEMENT son travail — il existe pour detecter cette derive — mais cela signifie qu'un rouge de CI pourra desormais venir d'une publication npm et non d'un commit du depot. Epingler 1.9.0 figerait la CI et MASQUERAIT la derive que le cas 26 doit voir. A confirmer : garder ^1 (recommande) ou epingler.",
       "blocking": false

@@ -539,7 +539,7 @@
         "plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh",
         ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-02-PLAN.md"
       ],
-      "status": "done"
+      "status": "running"
     },
     {
       "id": "revue-a6",
@@ -552,7 +552,8 @@
         "plugin/dev-orchestrator/scripts/check-gsd-config.sh",
         "plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh"
       ],
-      "status": "running"
+      "status": "blocked",
+      "review_regime": "full"
     },
     {
       "id": "summary-03",
