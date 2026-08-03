@@ -39,21 +39,48 @@
 # de la suite dédiée exerce ce mirroir contre le moteur réel, précisément pour qu'une telle dérive
 # se voie en test rouge au lieu de passer en silence.
 #
-# --- LIMITE DE PORTÉE CONNUE (schéma fédéré) ---------------------------------------------------
-# Le moteur complète son KNOWN_TOP_LEVEL avec un overlay FÉDÉRÉ résolu pour le lab audité (clés de
-# config déclarées par des capabilities tierces installées dans ce lab). Ce gate ne lit PAS cet
-# overlay : sur un lab qui installerait de telles capabilities, il peut signaler comme inconnue une
-# clé que le moteur, lui, accepterait. Faux positif possible, jamais faux négatif — le gate reste
-# advisory et ne bloque rien. Arbitrage volontairement NON tranché ici (hors périmètre du plan
-# 23-02, dont la recherche amont ne mentionne pas cette source) : à instruire avant d'élargir la
-# portée du gate.
+# --- LIMITES DE PORTÉE CONNUES — LES DEUX SENS SONT ATTEIGNABLES -------------------------------
+# Ce gate n'est PAS en parité avec le moteur sur l'ensemble des clés de premier niveau. Il peut se
+# tromper dans les DEUX sens, et c'est mesuré, pas supposé :
+#
+#   (i) FAUX POSITIF possible (schéma fédéré) — le moteur complète son KNOWN_TOP_LEVEL avec un
+#       overlay FÉDÉRÉ résolu pour le lab audité (clés déclarées par des capabilities tierces
+#       installées dans ce lab). Ce gate ne lit PAS cet overlay : sur un lab qui en installerait,
+#       il peut signaler comme inconnue une clé que le moteur, lui, accepterait.
+#
+#   (ii) FAUX NÉGATIF possible (sur-ensemble statique) — et c'est le sens que la version initiale
+#       de cet en-tête déclarait à tort impossible. Le moteur bâtit son KNOWN_TOP_LEVEL
+#       (config-loader.cjs) à partir de VALID_CONFIG_KEYS + DYNAMIC_KEY_PATTERNS + les littéraux
+#       en dur — NI configKeys, NI CONFIG_DEFAULTS. Le KNOWN_TOP de ce script, lui, dérive de
+#       l'union des TROIS sources : il est donc un SUR-ENSEMBLE strict de celui du moteur. Toute
+#       clé de premier niveau présente dans les sources 2 ou 3 mais absente de la source 1 est
+#       épargnée ici et signalée là-bas.
+#       Mesuré contre le moteur installé le 2026-08-03 : le script connaît en plus _comment,
+#       claude_orchestration, external_job, intel, mempalace, profile-pipeline (6 clés) ; le
+#       moteur ne connaît rien que le script ignore. Cas reproduit de bout en bout : sur un lab
+#       par ailleurs aligné portant _comment (une CHAÎNE de documentation de CONFIG_DEFAULTS,
+#       jamais une clé de config), ce gate sort en 3 « rien à signaler » pendant que loadConfig
+#       avertit « unknown config key(s): _comment ».
+#       Conséquence de second ordre : un bloc de ce type est traité comme conteneur CONNU, donc
+#       ses sous-clés sont signalées à sa place — le conseil rendu porte alors sur la mauvaise
+#       cible.
+#
+# La ligne « reproduit ce comportement à l'identique » plus bas vaut pour la MÉCANIQUE (comparer
+# les clés de premier niveau à un ensemble connu), pas pour la COMPOSITION de cet ensemble.
+#
+# Le gate reste advisory et ne bloque rien. La DIRECTION du correctif (mettre KNOWN_TOP en parité
+# stricte avec le moteur — ce qui rouvre des faux positifs sur les labs fédérés — ou lire aussi
+# l'overlay fédéré en 4ᵉ source) est volontairement NON tranchée ici : hors périmètre du plan
+# 23-02, dont la recherche amont ne mentionne pas la source fédérée. Escaladée, à instruire avant
+# d'élargir la portée du gate.
 #
 # --- Granularité de comparaison (choix explicite, pas un accident) ------------------------------
 # Le moteur ne valide QUE le premier niveau : son KNOWN_TOP_LEVEL est l'ensemble des premiers
 # segments des clés connues, plus les topLevel de DYNAMIC_KEY_PATTERNS, plus une poignée de
 # littéraux ; il signale ensuite les clés de premier niveau du fichier qui n'y sont pas. C'est
-# pourquoi il nomme « gates, safety » et jamais leurs dix sous-clés. Ce script reproduit ce
-# comportement à l'identique pour le premier niveau, puis va UN CRAN PLUS LOIN, en le bornant :
+# pourquoi il nomme « gates, safety » et jamais leurs dix sous-clés. Ce script reproduit la même
+# MÉCANIQUE pour le premier niveau (son ensemble connu n'est PAS le même — voir « LIMITES DE
+# PORTÉE » ci-dessus), puis va UN CRAN PLUS LOIN, en le bornant :
 #
 #   - clé de PREMIER NIVEAU inconnue  → signalée EN TANT QUE BLOC (son nom seul, pas ses sous-clés) ;
 #   - sous-clé inconnue sous un conteneur connu → signalée par son chemin pointé complet, MAIS
@@ -65,8 +92,11 @@
 #   1. écrit dans le fichier audité                      → rien à signaler ;
 #   2. absent du fichier, présent dans les défauts amont → signalé « au défaut amont », avec la
 #      valeur effective LUE dans le moteur (jamais recopiée ici) ;
-#   3. absent du fichier ET absent des défauts amont     → signalé « absent des défauts amont »,
-#      SANS aucune valeur. Cas de workflow.ui_review : il est référencé comme condition
+#   3. absent du fichier ET absent des défauts amont     → signalé « sans défaut lisible dans le
+#      moteur », SANS aucune valeur ET SANS CAUSE. Le script observe une absence, jamais sa raison :
+#      énoncer « résolu par la capability elle-même » serait fabriquer un fait, et serait faux pour
+#      node_repair / node_repair_budget, qui ne sont pas des capabilities (voir plus haut). Cas de
+#      workflow.ui_review : il est référencé comme condition
 #      d'activation par le registre de capabilities mais n'a de valeur par défaut nulle part. Une
 #      valeur qui n'existe nulle part N'EST PAS `false` — elle est ABSENTE. L'afficher comme faux
 #      serait fabriquer un fait, précisément ce qu'ADR-055 §3 interdit à un script.
@@ -105,7 +135,12 @@
 # Exit codes:
 #   0  = au moins un signal [gsd-config] émis
 #   3  = rien à signaler (fichier absent, JSON illisible, moteur introuvable, ou lab aligné)
-#   64 = argument inconnu, --path sans valeur, ou --hook + --quiet ensemble
+#   64 = argument inconnu, --path sans valeur (ou valeur vide), ou --hook + --quiet ensemble
+#
+# CONTRAT FERMÉ : {0, 3, 64} et RIEN D'AUTRE. Aucun chemin d'échec ne doit en sortir — HOME non
+# défini inclus (référence guardée `${HOME:-}` dans la cascade : sous set -u une référence nue y
+# sortait en 1 avec un message sur stderr MALGRÉ --quiet). La suite dédiée porte un balayage final
+# qui rejoue toutes les fixtures et échoue sur tout rc hors de cet ensemble.
 set -uo pipefail
 
 ROOT="."
@@ -115,14 +150,20 @@ QUIET=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --path)
-      if [ "$#" -lt 2 ]; then
+      # La valeur VIDE est refusée au même titre que l'absence de valeur : `--path ""` passerait
+      # le seul test de comptage et déplacerait silencieusement la cible sur /.planning/config.json.
+      # (Le court-circuit de `||` garantit que "$2" n'est évalué que s'il existe, sous set -u.)
+      if [ "$#" -lt 2 ] || [ -z "$2" ]; then
         echo "[check-gsd-config] --path nécessite une valeur" >&2
         exit 64
       fi
       ROOT="$2"; shift 2 ;;
     --hook) HOOK=1; shift ;;
     --quiet) QUIET=1; shift ;;
-    -h|--help) grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
+    # --help rend le BLOC D'EN-TÊTE et lui seul : la lecture s'arrête à la première ligne non
+    # commentée du fichier. Un `grep '^# '` sur tout le fichier ramasserait aussi les commentaires
+    # d'implémentation et écraserait la mise en page de l'aide.
+    -h|--help) awk 'NR==1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"; exit 0 ;;
     *) echo "[check-gsd-config] argument inconnu : $1" >&2; exit 64 ;;
   esac
 done
@@ -152,7 +193,7 @@ else
   for candidate in \
     "$ROOT/.claude/gsd-core/bin/lib" \
     "$ROOT/node_modules/@opengsd/gsd-core/bin/lib" \
-    "$HOME/.claude/gsd-core/bin/lib"
+    "${HOME:-}/.claude/gsd-core/bin/lib"
   do
     if [ -f "$candidate/config.cjs" ]; then LIB="$candidate"; break; fi
   done
@@ -301,24 +342,42 @@ unq() { local s="$1"; s="${s#\"}"; s="${s%\"}"; printf '%s' "$s"; }
 BLOCKS=""
 SUBKEYS=""
 TOGGLE_LINES=""
+# ACCUMULATEUR ≠ VALEUR : le fichier audité est hostile par hypothèse et peut porter une clé VIDE
+# ("" ou une sous-clé vide). Tester la vacuité de la chaîne accumulée confondrait « rien accumulé »
+# et « une seule clé, vide » — une entrée de deux octets faisait alors taire TOUT le volet « clés
+# inconnues ». Le nombre d'entrées est donc compté, jamais déduit de la chaîne.
+N_BLOCKS=0
+N_SUBKEYS=0
+N_TOGGLES=0
+
+# Un nom de clé vide n'est rien à l'écran : il est rendu sous sa forme JSON ("") pour rester
+# lisible et actionnable, plutôt que d'imprimer un blanc entre deux virgules.
+vis() { [ -n "$1" ] && printf '%s' "$1" || printf '%s' '""'; }
 
 while IFS="$(printf '\t')" read -r kind f1 f2; do
   [ -n "$kind" ] || continue
   case "$kind" in
     UNKNOWN_BLOCK)
-      k="$(unq "$f1")"
-      if [ -z "$BLOCKS" ]; then BLOCKS="$k"; else BLOCKS="$BLOCKS, $k"; fi ;;
+      k="$(vis "$(unq "$f1")")"
+      if [ "$N_BLOCKS" -eq 0 ]; then BLOCKS="$k"; else BLOCKS="$BLOCKS, $k"; fi
+      N_BLOCKS=$((N_BLOCKS+1)) ;;
     UNKNOWN_KEY)
-      k="$(unq "$f1")"
-      if [ -z "$SUBKEYS" ]; then SUBKEYS="$k"; else SUBKEYS="$SUBKEYS, $k"; fi ;;
+      k="$(vis "$(unq "$f1")")"
+      if [ "$N_SUBKEYS" -eq 0 ]; then SUBKEYS="$k"; else SUBKEYS="$SUBKEYS, $k"; fi
+      N_SUBKEYS=$((N_SUBKEYS+1)) ;;
     TOGGLE_DEFAULT)
       t="$(unq "$f1")"; v="$(unq "$f2")"
       TOGGLE_LINES="${TOGGLE_LINES}             - ${t} : non écrit, au défaut amont (${v})
-" ;;
+"
+      N_TOGGLES=$((N_TOGGLES+1)) ;;
     TOGGLE_ABSENT)
+      # Le script n'observe QUE l'absence de défaut lisible. Il n'observe pas POURQUOI, et
+      # n'invoque donc aucune cause (« résolu par la capability elle-même » était une cause
+      # FABRIQUÉE : node_repair/node_repair_budget ne sont pas des capabilities).
       t="$(unq "$f1")"
-      TOGGLE_LINES="${TOGGLE_LINES}             - ${t} : non écrit, et absent des défauts amont — résolu par la capability elle-même, aucune valeur à afficher
-" ;;
+      TOGGLE_LINES="${TOGGLE_LINES}             - ${t} : non écrit, et sans défaut lisible dans le moteur — aucune valeur à afficher
+"
+      N_TOGGLES=$((N_TOGGLES+1)) ;;
   esac
 done <<EOF
 $RAW
@@ -326,19 +385,19 @@ EOF
 
 SIGNAL=0
 
-if [ -n "$BLOCKS" ]; then
+if [ "$N_BLOCKS" -gt 0 ]; then
   printf '%s\n' "[gsd-config] clés inconnues du moteur GSD installé dans ${CONFIG_PATH} : ${BLOCKS}"
   printf '%s\n' "             → le moteur les ignore ; les retirer ou écrire leur équivalent amont."
   SIGNAL=1
 fi
 
-if [ -n "$SUBKEYS" ]; then
+if [ "$N_SUBKEYS" -gt 0 ]; then
   printf '%s\n' "[gsd-config] sous-clés inconnues sous un conteneur connu : ${SUBKEYS}"
   printf '%s\n' "             → le moteur les ignore ; les retirer ou écrire leur équivalent amont."
   SIGNAL=1
 fi
 
-if [ -n "$TOGGLE_LINES" ]; then
+if [ "$N_TOGGLES" -gt 0 ]; then
   printf '%s\n' "[gsd-config] toggles de cycle non écrits dans ${CONFIG_PATH} — ce lab les pilote par omission :"
   printf '%s' "$TOGGLE_LINES"
   printf '%s\n' "             → les écrire à une valeur décidée rend le choix explicite."
