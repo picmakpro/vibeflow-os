@@ -549,6 +549,21 @@ install_module() {
     fi
   fi
 
+  # Hook post-install (IDX-02 / D7 / D-07) : second générateur, STRICTEMENT symétrique du premier
+  # — table des capabilities par point de hook du moteur. Volontairement NON fusionné avec l'appel
+  # ci-dessus en boucle générique : le premier est stabilisé depuis la Phase 1, et le refactorer
+  # élargirait le périmètre à un fichier d'engine partagé par tous les modules, sans bénéfice.
+  # Best-effort de la même façon : un moteur GSD absent au moment de l'install DÉGRADE (une ligne
+  # de journal), il n'ampute jamais l'install d'un module.
+  if [ -f "$module_dir/scripts/build-gsd-capabilities-index.sh" ] && [ -f "$TARGET_ROOT/scripts/build-gsd-capabilities-index.sh" ]; then
+    if VF_CAPS_INDEX_OUT="$TARGET_ROOT/agents/${mod}-references/gsd-capabilities-index.md" \
+       bash "$TARGET_ROOT/scripts/build-gsd-capabilities-index.sh" >/dev/null 2>&1; then
+      log "  index capabilities régénéré → $TARGET_ROOT/agents/${mod}-references/gsd-capabilities-index.md"
+    else
+      log "  (index capabilities non régénéré — moteur GSD absent, best-effort)"
+    fi
+  fi
+
   # Commande d'incarnation (ADR-042) : tout agent posé devient invocable nativement via `/<mod>`
   # dans la fenêtre principale. Après la copie des scripts ci-dessus, le générateur est dispo.
   if [ -f "$module_dir/AGENT.md" ]; then
