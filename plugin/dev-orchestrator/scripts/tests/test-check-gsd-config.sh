@@ -909,9 +909,26 @@ sweep "arg-inconnu"    bash "$SCRIPT" --nawak
 sweep "path-nu"        bash "$SCRIPT" --path
 sweep "path-vide"      bash "$SCRIPT" --path ""
 sweep "hook+quiet"     bash "$SCRIPT" --hook --quiet
-if [ "$n_swept" -ge 20 ] && [ -z "$hors_contrat" ]; then
-  ok "33 BALAYAGE — $n_swept exécutions (toutes les fixtures × moteur présent/absent + toutes les formes d'invocation) : aucun rc hors de {0, 3, 64}"
-else ko "33 BALAYAGE — aucun rc hors du contrat {0, 3, 64}" "n_swept=$n_swept (plancher 20) hors_contrat=[$hors_contrat]"; fi
+# Moitié STATIQUE du même contrat. Le balayage ci-dessus n'exerce que les chemins qu'il sait
+# atteindre ; un `exit` hors contrat sur un chemin qu'aucune fixture ne déclenche lui échapperait.
+# On mesure donc aussi le TEXTE : ÉGALITÉ D'ENSEMBLE entre les codes de sortie littéraux du script
+# et {0, 3, 64}, dans les deux directions par `comm`. L'égalité, et non une liste noire sur `exit 1` :
+# un `exit 2` neuf doit rougir tout autant. Le contrat a déjà été mal ÉNONCÉ (« 1× exit 0, 2× exit 64 »
+# là où le fichier en porte 2 et 3) ; il est désormais compté par la machine, jamais de mémoire.
+EXITS_SEEN="$TMP/exits-seen.txt"; EXITS_ALLOW="$TMP/exits-allow.txt"
+awk '{ l = $0
+  while (match(l, /(^|[^A-Za-z_])exit [0-9]+/)) { t = substr(l, RSTART, RLENGTH); sub(/.*exit /, "", t); print t; l = substr(l, RSTART + RLENGTH) }
+  l = $0
+  while (match(l, /process\.exit\([0-9]+\)/)) { t = substr(l, RSTART, RLENGTH); gsub(/[^0-9]/, "", t); print t; l = substr(l, RSTART + RLENGTH) } }' \
+  "$SCRIPT" | sort -u > "$EXITS_SEEN"
+printf '%s\n' 0 3 64 | sort -u > "$EXITS_ALLOW"
+n_exits="$(awk 'END{print NR+0}' "$EXITS_SEEN")"
+exits_seuls="$(comm -23 "$EXITS_SEEN" "$EXITS_ALLOW" | tr '\n' ' ')"
+contrat_seuls="$(comm -13 "$EXITS_SEEN" "$EXITS_ALLOW" | tr '\n' ' ')"
+if [ "$n_swept" -ge 20 ] && [ -z "$hors_contrat" ] \
+   && [ "$n_exits" -eq 3 ] && [ -z "$exits_seuls" ] && [ -z "$contrat_seuls" ]; then
+  ok "33 BALAYAGE — $n_swept exécutions (toutes les fixtures × moteur présent/absent + toutes les formes d'invocation) : aucun rc hors de {0, 3, 64}, ET les codes de sortie ÉCRITS dans le script forment exactement cet ensemble"
+else ko "33 BALAYAGE — aucun rc hors du contrat {0, 3, 64}, et codes écrits égaux à cet ensemble" "n_swept=$n_swept (plancher 20) hors_contrat=[$hors_contrat] codes_ecrits=$n_exits en_trop=[$exits_seuls] manquants=[$contrat_seuls]"; fi
 
 # === Mutants (--mutants) — le filet est-il capable de rougir ? ==================================
 # Chaque mutant est une réécriture MÉCANIQUE du script, rejouable, qui déclare les cas qu'elle doit
