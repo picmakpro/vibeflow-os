@@ -221,3 +221,150 @@ un élargissement de motif — c'est précisément l'élargissement qui avait cr
 La **3ᵉ voie d'A-1bis** (le manager porte le cadrage lui-même, il a `AskUserQuestion`) supprime le
 problème à la racine mais constitue un changement structurel du cycle. À reverser au débat **si**
 la Lacune 5 / plan 23-05 rouvre la voie unique d'invocation.
+
+---
+
+## O-11 — ⚠️ EN ATTENTE DE SAMUEL — `KNOWN_TOP` : parité stricte, ou limite assumée ?
+
+**Le fait, démenti par exécution.** La limite que `check-gsd-config.sh` déclarait — « faux positif
+possible, jamais faux négatif » — était **fausse**. Le moteur bâtit son `KNOWN_TOP_LEVEL`
+(`config-loader.cjs`) à partir de `VALID_CONFIG_KEYS` + `DYNAMIC_KEY_PATTERNS` + des littéraux en
+dur — **ni `configKeys`, ni `CONFIG_DEFAULTS`**. Le `KNOWN_TOP` du script, lui, dérive de l'union
+des **trois** sources : c'est un **sur-ensemble strict** de celui du moteur. Toute clé de premier
+niveau présente dans les sources 2 ou 3 mais absente de la source 1 est **épargnée ici et signalée
+là-bas**.
+
+**Mesuré deux fois, indépendamment** (2026-08-03) : script **59** clés / moteur **53**. Écart exact,
+dans un seul sens :
+
+    _comment · claude_orchestration · external_job · intel · mempalace · profile-pipeline
+
+Rien dans l'autre sens. Cas reproduit de bout en bout sur `_comment` : le gate sort **exit 3**
+(« rien à signaler ») pendant que `loadConfig` écrit `unknown config key(s): _comment`.
+Confirmé une troisième fois par la reconnaissance A-6 : `golden.KNOWN_TOP.txt` = **59**.
+
+**Le texte ne ment plus** : l'en-tête (`:46`) et le SUMMARY (`:170`) nomment désormais **les deux
+sens**. Ce qui reste à trancher n'est pas l'honnêteté du texte, c'est la **direction du correctif**.
+
+**Les voies, chiffrées.**
+
+| Voie | Effet | Coût | Risque |
+|---|---|---|---|
+| **(a) Statu quo** — limite assumée, honnêtement écrite | Le gate reste **muet sur 6 clés** que le moteur signalerait | **0** (déjà en place) | Un faux négatif documenté reste un faux négatif : quelqu'un peut lire le vert comme une validation |
+| **(b) Parité stricte** — n'unir que ce que le moteur unit | Le gate cesse de taire les 6 clés | Correctif **exécuté et mesuré par le juge** : la suite reste **verte** (elle n'enshrine pas le bug) et ce lab reste à **exit 3** | **Rouvre des faux positifs** sur les labs à capabilities fédérées : le moteur complète son `KNOWN_TOP_LEVEL` avec un **overlay fédéré** que ce script ne lit pas |
+| **(c) Lire aussi l'overlay fédéré** | Supprimerait les deux sens à la fois | **Non mesuré** — à instruire avant d'être proposé | Inconnu ; `arbitrage-overlay-federe` avait été ouvert puis **fermé comme reposant sur une prémisse fausse** |
+
+**Recommandation du manager** : **(a)**, jusqu'à ce que (c) soit mesuré. (b) échange un faux
+négatif documenté contre un faux positif non documenté sur une population de labs qu'on ne connaît
+pas — c'est un mauvais échange tant que l'overlay n'a pas été instruit.
+
+**Non bloquant** pour les plans restants. À trancher **avant la PR**.
+
+---
+
+## O-12 — ⚠️ EN ATTENTE DE SAMUEL — la branche 2 de la cascade est du code mort
+
+**Le fait, mesuré sur `@opengsd/gsd-core@1.9.1`.** `check-gsd-config.sh:195` résout
+`<root>/node_modules/@opengsd/gsd-core/bin/lib`. Le tarball npm publié range son payload sous
+`<root>/node_modules/@opengsd/gsd-core/`**`gsd-core/`**`bin/lib` — **double segment**. Un `bin/lib`
+existe bien un cran plus haut, mais il ne contient que `ui-safety-gate.cjs`, **pas** `config.cjs`.
+
+**La branche a l'air correcte à la lecture et ne résout rien à l'exécution.** C'est exactement la
+famille de défaillance que cette phase existe pour fermer : une couverture apparente qui n'en est
+pas une. La cascade `$S` de `mission-flow.md` reprend la même forme et porte donc le même défaut.
+
+**Pourquoi elle n'a pas été corrigée** : A-6 prescrit que la cascade reste **INCHANGÉE**, et
+réparer une branche de résolution est un changement de comportement hors des trois arbitrages
+tranchés. ADR-031.
+
+**Les voies.** (a) corriger le segment dans les deux cascades (geste de deux lignes, mais qui
+**ouvre une voie de résolution aujourd'hui morte** — donc une surface neuve, à instruire au regard
+du vecteur d'A-6) · (b) retirer la branche 2, puisqu'elle ne sert personne · (c) statu quo, en
+documentant qu'elle est inopérante. **Non bloquant.**
+
+---
+
+## O-13 — ⚠️ EN ATTENTE DE SAMUEL — A-6 introduit une péremption silencieuse
+
+**Conséquence NEUVE, découverte après l'arbitrage** (reconnaissance lecture seule, 2026-08-03).
+
+`require()` **suit les indirections** (ré-exports, chargement de manifeste, valeurs calculées). La
+lecture de texte **ne les suit pas**. Si un futur `gsd-core` déplace ses manifestes, construit
+`new Set(VARIABLE)`, ou calcule des valeurs dans `CONFIG_DEFAULTS` (spread, `.map`,
+`process.env`), l'extraction rend **zéro** et le script sort en **3** — code **strictement
+identique** à « moteur introuvable » (`:203`) et « fichier absent » (`:183`). Rien ne distingue
+« gate périmé » de « rien à signaler », et le `|| true` du hook masque le tout.
+
+**Pire, mesuré** (fixtures `eng-dyn`, `eng-computed`) : sur un `CONFIG_DEFAULTS` à valeurs
+calculées, les toggles basculent de l'état 2 (défaut amont connu) à l'état 3 (sans défaut lisible).
+Le gate **AFFIRME** alors « sans défaut lisible » là où il y en a un — ce n'est plus du silence,
+c'est une affirmation fausse.
+
+**Les voies.** **(a)** documenter honnêtement la limite dans l'en-tête — **plancher, déjà dans le
+mandat de `fix-a6`**, coût nul, mais le gate périra en silence le jour venu · **(b)** rendre
+l'échec **distinguable** : quand `LIB` est bien résolu mais que l'extraction rend 0 clé, émettre un
+signal explicite au lieu de se taire — doit rester dans le contrat `0/3/64` (jamais d'`exit 1`,
+T-23-02-03) · **(c)** poser un **canari** : un cas de test qui rougit si la forme du moteur réel
+cesse d'être lisible, ce qui déplace la détection du runtime vers la CI.
+
+**(b) et (c) ne sont pas engagés.** Ce sont des ajouts de comportement, hors de la lettre d'A-6.
+
+---
+
+## O-14 — ⚠️ EN ATTENTE DE SAMUEL — plafond `^1` du moteur dans la CI
+
+Le job installe `@opengsd/gsd-core@^1` (cohérence avec `ensure-deps.sh`), ce qui résout **1.9.1**
+alors que le poste tourne en **1.9.0**. Le **cas 26** (égalité d'ensemble du mirroir `engineExtra`
+contre les 10 littéraux réels du moteur) est **vert sur 1.9.1** — mesuré, pas supposé.
+
+Mais `^1` est une **cible mouvante** : le jour où un 1.x amont ajoute ou retire un littéral de
+`KNOWN_TOP_LEVEL`, le cas 26 rougira **en CI, depuis une publication npm, sans commit du dépôt**.
+
+C'est **exactement son travail** — il existe pour détecter cette dérive. Épingler `1.9.0` figerait
+la CI et **masquerait** précisément ce que le cas 26 doit voir.
+
+**Recommandation du manager** : garder `^1`. **À confirmer.** Non bloquant.
+
+---
+
+## O-15 — ⚠️ EN ATTENTE DE SAMUEL — la fixture k de T25b porte encore le mensonge d'A-5
+
+`plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh:2729` — la prose de la fixture
+contient encore « la fenêtre reste bornée là », conservée comme **modèle de reformulation
+LÉGITIME du couple**. C'est le mensonge exact qu'A-5 vient de corriger sur les deux agents.
+
+**Les deux lectures se défendent.** **(a) La corriger** — un rédacteur qui s'en inspire réimporte
+la formulation fausse, et cette phase existe pour tuer les faux verts doctrinaux · **(b) la
+laisser** — c'est de la **donnée de test** : sa prose est la paraphrase que la sonde doit
+**ACCEPTER**, la modifier change ce que le test prouve, et rouvre 23-01 une **6ᵉ** fois sur du gate.
+
+**Troisième voie, recommandée** : ne rien faire ici. `T25b` devient **SANS OBJET au plan 23-05**
+(à retirer ou remplacer, cf. son en-tête `:2597`) — attendre 23-05 règle le sujet **sans y toucher
+deux fois**. Non bloquant.
+
+---
+
+## O-16 — ⚠️ RATIFICATION DEMANDÉE — la gradation de recherche portée par la ligne PLAN, pas CADRAGE
+
+**Écart à un plan doublement re-validé**, assumé et motivé par l'exécutant de `exec-03`
+(`GSD-PIPELINE.md:151`, commit `2f830ab`).
+
+Le plan 23-03 prescrivait, pour la **ligne de cadrage** de la table d'allowlist, que « la gradation
+de la recherche est autorisée dans ses deux formes ». **C'est faux contre le moteur.**
+
+**Vérifié deux fois — par l'exécutant, puis indépendamment par le manager** sur
+`~/.claude/gsd-core/workflows/discuss-phase.md` :
+- la table `<progressive_disclosure>` de `gsd-discuss-phase` ne connaît que
+  `--power`, `--all`, `--auto`, `--chain`, `--text`, `--batch`, `--analyze` — **aucun flag de
+  recherche** ;
+- la seule occurrence de `--skip-research` du fichier (**l. 447**) est une **suggestion d'appel de
+  `/gsd-plan-phase`**, pas un flag de la brique de cadrage.
+
+L'exécutant a donc porté la gradation sur la **ligne plan** et inscrit le fait dans le motif de
+cette ligne. Écrire la version du plan aurait posé un **motif faux** dans une doctrine que deux
+agents lisent comme une loi — le mode de défaillance exact qu'A-1ter documente.
+
+**Recommandation du manager : RATIFIER.** L'assertion C du plan vise « la brique concernée » sans
+nommer laquelle, elle reste donc satisfaite. Refuser reviendrait à réintroduire sciemment une
+affirmation fausse dans le livrable de la phase qui existe pour les supprimer. Non bloquant, mais
+**à ratifier avant la PR** puisque le code est déjà commité.
