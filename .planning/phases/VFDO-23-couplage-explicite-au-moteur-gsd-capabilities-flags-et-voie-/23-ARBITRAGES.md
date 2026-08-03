@@ -172,3 +172,50 @@ rougir sur une clause de contrôle de flux sans qualificatif de mode.
 7. **Déclassement de T26 A′** — « aucun champ inventé côté worker » jugé non gateable par le worker,
    trop large par le reviewer. Piste retenue : gater sur les **positions de clé JSON**, couplé à un
    garde « ≥1 clé mesurée ou renvoi explicite ».
+
+---
+
+## A-5 — TRANCHÉ le 2026-08-03 : le mensonge doctrinal est corrigé MAINTENANT
+
+**Décision.** Correctif texte minimal **immédiat** sur les deux foyers vérifiés sur disque —
+`vf-coder.md:30-31` **et** `vf-dev-manager.md:75-76` (« la fenêtre armée est bornée là »).
+
+**Pourquoi ne pas attendre 23-05.** Le gate `T25b` a cessé de mentir (geste 1 d'A-1ter), mais **la
+doctrine qu'il vérifie ment toujours**, et elle **pilote deux agents en production** pendant les six
+plans restants. Le plan 23-05, tel qu'il est écrit, ne vise **ni l'un ni l'autre** de ces deux
+fichiers. Laisser une garantie runtime inexistante dans un texte que des agents lisent comme une
+loi est exactement le mode de défaillance de cette phase.
+
+**Périmètre.** Texte seulement : la phrase doit dire ce qui est vrai (adjacence **textuelle**, pas
+de borne **runtime**) et renvoyer au correctif structurel de 23-05. Aucun changement de
+comportement, aucune ligne de logique.
+
+## A-6 — TRANCHÉ le 2026-08-03 : ne plus `require()`, lire le texte
+
+**Décision.** `check-gsd-config.sh` **n'exécute plus** le fichier résolu : il extrait les listes par
+**lecture de texte**. La cascade lab-first reste **inchangée**.
+
+**Le vecteur, prouvé par le juge.** La cascade résout le moteur depuis le **dépôt audité** en
+priorité (`:152-158`), puis un `node -e` en fait un `require()` (`:287`). Un `config.cjs` piégé
+déposé dans un dépôt cloné **s'exécute au `SessionStart`**, rend `exit 0`, et le `|| true` masque
+tout. Ouvrir une session dans un dépôt non maîtrisé suffit.
+
+**Pourquoi cette forme plutôt que les deux autres.** Elle supprime le vecteur **à la racine** — un
+fichier lu ne peut pas s'exécuter, quelle que soit sa provenance — **sans rien casser** : un lab en
+`VF_SCOPE=project` a légitimement son moteur dans le dépôt (`23-02-PLAN.md:186-187`, « le lab
+courant PRIME ») et continue de fonctionner. Les deux autres formes (retirer `$ROOT` de la cascade,
+ou refuser les candidats sous `$ROOT`) sacrifiaient cette résolution légitime, l'une avec une porte
+de sortie explicite, l'autre sans.
+
+**Non négociable dans tous les cas** : documenter le vecteur dans la **section Sécurité de
+l'en-tête**, comme `T-17-06` le fait pour git, et l'**ajouter au threat model de la phase**.
+
+## A-7 — TRANCHÉ le 2026-08-03 : `gsd-core` installé dans le job CI, maintenant
+
+**Décision.** Le job CI installe `gsd-core` **tout de suite**, dans un commit d'infra dédié, sans
+attendre 23-08.
+
+**Pourquoi.** Deux cas échouent parce que le runner n'a pas le moteur — ils échouent **honnêtement**
+et **ne doivent surtout pas être dégradés** pour produire du vert. Traiter la cause maintenant coûte
+peu et évite de découvrir un problème de CI à la toute fin, au moment précis où tout le reste doit
+être vert et où la PR part.
