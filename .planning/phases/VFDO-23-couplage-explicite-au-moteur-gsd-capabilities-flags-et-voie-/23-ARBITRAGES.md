@@ -219,3 +219,99 @@ attendre 23-08.
 et **ne doivent surtout pas être dégradés** pour produire du vert. Traiter la cause maintenant coûte
 peu et évite de découvrir un problème de CI à la toute fin, au moment précis où tout le reste doit
 être vert et où la PR part.
+
+---
+
+# Arbitrages du 2026-08-04 — A-8 à A-14
+
+## A-8 — O-11 : statu quo, limite assumée
+
+`KNOWN_TOP` du script reste un **sur-ensemble** de celui du moteur. Les **6 clés** tues
+(`_comment`, `claude_orchestration`, `external_job`, `intel`, `mempalace`, `profile-pipeline`)
+restent tues, mais **honnêtement documentées** dans l'en-tête et le SUMMARY, qui nomment désormais
+les deux sens.
+
+**Pourquoi pas la parité stricte.** Elle échangerait un faux négatif **documenté** contre des faux
+positifs **non documentés** sur les labs à capabilities fédérées, dont le moteur lit un overlay que
+ce script ne lit pas. Mauvais échange tant que l'overlay n'est pas instruit. La voie (c) reste
+ouverte si quelqu'un mesure l'overlay un jour.
+
+## A-9 — O-13 : signal explicite **et** canari en CI
+
+Quand `LIB` est **bien résolu** mais que l'extraction rend **0 clé**, le script émet un **signal
+explicite** au lieu de se taire — en restant dans le contrat `0/3/64` (jamais d'`exit 1`,
+`T-23-02-03`). **Et** un **canari** en CI rougit si la forme du moteur réel cesse d'être lisible.
+
+**Pourquoi les deux.** Le signal corrige l'**affirmation fausse** mesurée (« sans défaut lisible »
+là où il y en a un) ; le canari déplace la détection du **runtime vers la CI**, donc on l'apprend
+avant de livrer plutôt qu'au moment où ça frappe un utilisateur.
+
+## A-10 — O-12 : retirer la branche 2 de la cascade
+
+La branche est du **code mort** (double segment dans le tarball npm publié) : elle a l'air correcte
+à la lecture et ne résout rien à l'exécution. **On la retire** — des deux cascades, `mission-flow.md`
+portant le même défaut.
+
+**Pourquoi pas corriger le chemin.** Ce serait deux lignes, mais ça **ouvre une voie de résolution
+aujourd'hui morte**, donc une surface neuve — au moment précis où l'on ferme un vecteur d'exécution
+de code via la résolution du moteur (A-6, puis A-12).
+
+## A-11 — O-15 : ne rien faire, `23-05` règle le sujet
+
+La fixture `k` de `T25b` garde sa prose. `T25b` devient **sans objet au plan 23-05** (retiré ou
+remplacé) : y toucher maintenant rouvrirait `23-01` une **6ᵉ** fois sur du gate, et modifierait une
+**donnée de test** dont la prose est précisément la paraphrase que la sonde doit **accepter**.
+
+## A-12 — O-23 🛑 : lecteur de littéraux **et** garde de type reposée explicitement
+
+**La RCE réintroduite par cette branche est fermée** en portant au générateur le lecteur de
+littéraux écrit en 23-02, **et** en **reposant explicitement la garde de type** que `require()`
+fournissait gratuitement.
+
+**Les deux moitiés sont indissociables.** L'auditeur a mesuré que `[ -f "$REGISTRY" ]` protège
+*incidemment* le générateur de la FIFO (rc=1 en 1 s) : **fermer F1 sans reposer cette garde
+rouvrirait un DoS**. Un correctif de sécurité qui en ouvre un autre est exactement le mode de
+défaillance N1 de cette phase.
+
+**Pourquoi cette voie.** Elle est **cohérente avec A-6** — ne jamais exécuter ce qu'on audite —
+là où la voie (b) sacrifiait la résolution légitime d'un lab en `VF_SCOPE=project`, ce que A-6 avait
+explicitement refusé, et où la voie (c) changeait la nature de 23-04 et périmerait à chaque
+évolution du moteur. La péremption silencieuse que ce portage rouvre sur un **second** script se
+traite par **A-9** (signal explicite + canari), déjà tranché : même remède, appliqué deux fois.
+
+**À enregistrer au threat model** : `T-23-04-07` / Elevation of Privilege / **critical**. Et
+**corriger la cause racine documentaire** : `23-04-PLAN.md:462` qualifie de « frontière de version »
+la **même** frontière que `23-02-PLAN.md:378` a requalifiée sous A-6. La requalification n'avait
+jamais été propagée — **F1 n'est pas une faute de codeur**, c'est un plan dont la prémisse de
+sécurité était périmée. Traiter F2, F3, F4 et F6 **avec** F1 : même racine.
+
+## A-13 — O-21 : maintenir la voie 1, corriger le motif d'A-1ter
+
+Le **geste** d'A-1ter est **maintenu** — le manager porte le cadrage. Son **motif écrit est
+remplacé** dans `23-ARBITRAGES.md` §A-1ter.
+
+**Le motif faux** : « il a `AskUserQuestion`, donc `--auto` n'a plus de raison d'être ».
+`vf-dev-manager.md` documente lui-même, dans son repli D-09, que **dispatché en sous-agent — sa
+configuration nominale — le runtime peut ne pas lui fournir `AskUserQuestion`** malgré sa
+déclaration au frontmatter, et qu'« c'est précisément ce qui a gelé une mission au nœud
+`checkpoint-doctrine` ».
+
+**Le motif vrai, et suffisant** : une fois le cadrage porté par le manager, **plus aucun mode
+d'enchaînement n'est passé au cadrage**, donc la **règle 5** de `checkpoints.md` — auto-approbation
+de `human-verify`, auto-sélection de la **première option** sur `decision` — **cesse de s'appliquer**
+au plan et à l'exécution. Ce bénéfice est **indépendant** de la disponibilité d'un outil de
+question. Le repli D-09 s'applique alors au manager comme à tout agent.
+
+**Quatrième prémisse fausse d'affilée sur D-02** (A-1, A-1bis, A-1ter, et ce motif). La leçon
+d'A-1ter — *vérifier le comportement du moteur amont avant de trancher, pas après* — vient de jouer
+une fois de plus. Elle vaut désormais pour **toute** décision de cette lacune.
+
+## A-14 — O-18 : poser la garde
+
+Le script **refuse les fichiers non ordinaires** avant de lire. L'imputation a changé et elle est
+mesurée : `check-gsd-config.sh` **n'existe pas sur `main`** et `hooks.json` **ajoute** sa ligne au
+`SessionStart` — **la PR ouvre ce chemin, elle n'en hérite pas**. Les 3 gates préexistants
+terminent en 1 s sur FIFO ; celui-ci doit faire pareil.
+
+La seule occurrence de `statSync` dans le fichier est le **commentaire `:181` qui décrit la garde
+non posée** — poser la garde, c'est faire dire vrai à ce commentaire.
