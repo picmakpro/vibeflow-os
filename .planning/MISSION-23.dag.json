@@ -76,7 +76,7 @@
         "plugin/dev-orchestrator/agents/vf-coder.md",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "done"
+      "status": "running"
     },
     {
       "id": "revue-03",
@@ -89,7 +89,7 @@
         "plugin/dev-orchestrator/references/GSD-PIPELINE.md",
         "plugin/dev-orchestrator/agents/vf-coder.md"
       ],
-      "status": "running",
+      "status": "blocked",
       "review_regime": "full"
     },
     {
@@ -564,7 +564,7 @@
       "scope": [
         ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-03-SUMMARY.md"
       ],
-      "status": "done"
+      "status": "blocked"
     },
     {
       "id": "arbitrage-o16",
@@ -576,7 +576,7 @@
       "scope": [
         "plugin/dev-orchestrator/references/GSD-PIPELINE.md"
       ],
-      "status": "ready"
+      "status": "blocked"
     }
   ]
 }
