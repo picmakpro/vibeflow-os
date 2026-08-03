@@ -76,7 +76,7 @@
         "plugin/dev-orchestrator/agents/vf-coder.md",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "revue-03",
@@ -490,7 +490,7 @@
       "scope": [
         ".github/workflows/ci.yml"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "plancheck-05",
@@ -539,7 +539,7 @@
         "plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh",
         ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-02-PLAN.md"
       ],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "revue-a6",
