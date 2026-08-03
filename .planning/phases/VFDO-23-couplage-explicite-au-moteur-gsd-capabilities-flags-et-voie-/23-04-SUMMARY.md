@@ -171,18 +171,47 @@ fixture matérialisée       = 39 lignes    (non vide : la clause d'exclusion se
 ## 6. Non-régression prouvée par ENSEMBLES
 
 Libellés `ok` **exécutés** (et non les sites `ok "` statiques), extraits en `awk`, triés,
-matérialisés, comparés par `comm` **dans les deux sens** :
+matérialisés, comparés par `comm` **dans les deux sens**.
+
+> **Correction post-revue — la première mesure de cette section était FAUSSE, et pour une raison
+> qui mérite d'être écrite.** La baseline avait été capturée après que le générateur eut déjà
+> déposé `gsd-capabilities-index.md` dans `references/`. Or `module_md_targets()`
+> (l. 2060-2066, **non touché par ce plan**) globe `"$REFS_DIR"/*.md` : le nouveau fichier
+> entrait donc **déjà** dans le périmètre des gates larges au moment de la « baseline ». Celle-ci
+> mesurait un état post-geste, pas l'état d'avant. Elle annonçait `0 disparu / 9 apparus / 103
+> communs` ; la vraie mesure est ci-dessous. Leçon : une baseline se capture **avant le premier
+> artefact produit**, ou se reconstitue — jamais après le premier `bash générateur`.
+
+Base reconstituée à l'état `d4f641a` (index retiré de `references/`, libellés `T28` écartés) :
 
 ```
-base = 103 libellés   final = 112 libellés
-comm -23 (disparus) : 0
-comm -13 (apparus)  : 9   ← T28-A, T28-B, T28-C, T28-D, T28-E, T28-F, T28-G1, T28-G2, T28 atteinte
-comm -12 (communs)  : 103
+vraie base = 103 libellés   final = 112 libellés
+comm -23 (disparus) : 5
+comm -13 (apparus)  : 14
+comm -12 (communs)  : 98
 ```
 
-**Zéro libellé réécrit.** Le libellé gelé de `T33` est intact **à l'octet près** — c'est la
-conséquence directe du choix d'emplacement de la jonction doctrinale (cf. §7 ci-dessous) : il cite
-`§9 de $t33_s9_n lignes`, donc toute écriture **dans** la §9 l'aurait fait bouger.
+Les **14 apparus** = les 9 de `T28` (A, B, C, D, E, F, G1, G2, atteinte) **plus** 5 libellés
+préexistants dont le seul **compte de fichiers balayés** passe de **13 à 14** : `T25 fermeture`,
+`T25 atteinte`, `T25b`, `T26 D`, `T27b`. Les 5 « disparus » sont exactement ces mêmes libellés
+dans leur version à 13. Prouvé par normalisation du seul nombre :
+
+```
+awk '{gsub(/ 13 /," N ");gsub(/ 14 /," N ");…}' disparus | sort > d-norm
+… apparus (hors T28) … | sort > a-norm
+cmp -s d-norm a-norm   →  IDENTIQUES
+```
+
+**Aucune substance perdue** : les compteurs de fond des mêmes libellés sont inchangés (`T25
+atteinte` voit toujours `3 brique(s)`, `T27b` fait toujours rougir ses trois cibles). C'est un
+effet **attendu et bénin** de l'ajout d'un `.md` dans `references/` — `gsd-skills-index.md`, lui
+aussi auto-généré, y est dans le même périmètre depuis la Phase 1 : ce n'est pas une classe de
+risque nouvelle. Le fichier produit ne porte que des identifiants de capability et des noms de
+toggle, aucune prose de doctrine susceptible de déclencher une garde négative.
+
+**Zéro libellé réécrit à la main.** Le libellé gelé de `T33` est intact **à l'octet près** — c'est
+la conséquence directe du choix d'emplacement de la jonction doctrinale (cf. §7 ci-dessous) : il
+cite `§9 de $t33_s9_n lignes`, donc toute écriture **dans** la §9 l'aurait fait bouger.
 
 Autres gates rejoués : `bash -n` propre sur les deux scripts touchés ·
 `test-check-gsd-config.sh` → **35 ok / 0 ko** (inchangé) ·
