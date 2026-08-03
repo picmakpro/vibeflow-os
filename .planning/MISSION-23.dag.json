@@ -106,7 +106,7 @@
         "plugin/_internal/vibeflow-update.sh",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "revue-04",
@@ -513,7 +513,7 @@
       "scope": [
         ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-05-PLAN.md"
       ],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "fix-a5",
@@ -578,6 +578,16 @@
         "plugin/dev-orchestrator/references/GSD-PIPELINE.md"
       ],
       "status": "ready"
+    },
+    {
+      "id": "verif-o12",
+      "step": "O-12 — verifier que la cascade $S de mission-flow.md porte le MEME defaut que la branche 2 de check-gsd-config.sh (double segment gsd-core/gsd-core dans le tarball npm) : couverture apparente qui n'en est pas une. LECTURE SEULE, consignation seule",
+      "stage": "verif",
+      "deps": [],
+      "scope": [
+        "plugin/conductor/references/mission-flow.md"
+      ],
+      "status": "running"
     }
   ]
 }
