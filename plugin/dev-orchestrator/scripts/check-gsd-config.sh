@@ -161,10 +161,26 @@
 # cloné suffisait. La mesure appliquée : ce script N'EXÉCUTE JAMAIS le moteur résolu, il le LIT.
 # Aucun require() n'est fait sur un chemin construit depuis le dossier du moteur — les seuls
 # require() du programme node portent sur des modules cœur (fs, path) —, aucun eval, aucun vm,
-# aucun import() dynamique. Les listes sont extraites par lecture de JSON et de littéraux JS, dont
-# le pire cas est une extraction vide, jamais une exécution. Motif écrit une seule fois, valable
-# pour les trois sources et pour les deux formes de lecture. Le prix de cette mesure est nommé plus
-# haut, à « LIMITE DE LA LECTURE DE TEXTE ».
+# aucun import() dynamique. Les listes sont extraites par lecture de JSON et de littéraux JS :
+# aucun CONTENU, si hostile soit-il, ne s'exécute. Motif écrit une seule fois, valable pour les
+# trois sources et pour les deux formes de lecture. Le prix de cette mesure est nommé plus haut, à
+# « LIMITE DE LA LECTURE DE TEXTE ».
+#
+# CE QUE CETTE MESURE NE COUVRE PAS — DISPONIBILITÉ (T-23-02-03). Ne pas exécuter ferme l'exécution
+# de code, PAS le déni de service, et le pire cas n'est donc PAS « une extraction vide » : c'est une
+# ATTENTE NON BORNÉE. Deux coûts distincts, l'un fermé et l'autre ouvert :
+#   - le COÛT DU PARSEUR est borné : la boucle de lecture des littéraux est linéaire en la taille de
+#     la région, propriété exigée et tenue (voir « COÛT LINÉAIRE, EXIGÉ » dans le programme node) ;
+#   - le COÛT DE LA LECTURE ELLE-MÊME ne l'est pas : les cibles sont ouvertes par un readFileSync
+#     sans garde de type ni de taille. Seul config.cjs est gardé par un `[ -f ]` dans la cascade ;
+#     sur les six autres (capability-registry.cjs, configuration.cjs, config-schema.cjs,
+#     config-loader.cjs et les deux manifestes de bin/shared), une FIFO ou un lien vers /dev/zero
+#     déposé dans le dépôt audité BLOQUE le SessionStart indéfiniment. Mesuré, jamais terminé.
+#     Le `|| true` du hook ne raccourcit pas une attente, et le contrat de sortie ne s'applique pas
+#     à un processus qui n'a pas fini.
+# Poser cette garde (statSync : fichier régulier + taille plafonnée) est un AJOUT DE COMPORTEMENT
+# hors de la lettre d'A-6, au même titre que les voies (b) et (c) d'O-13 : ESCALADÉ, non tranché
+# ici. Ce qui est tranché, c'est de ne plus le promettre.
 #
 # Usage:
 #   check-gsd-config.sh [--path <dir>] [--hook] [--quiet]
@@ -327,23 +343,35 @@ function balancedRegions(src, anchorSrc, open, close) {
 // identifiants nus en clé, quotes simples, virgules traînantes, commentaires. Tout le reste
 // (variable, appel, spread, opérateur) fait échouer JSON.parse et rend null — c'est VOULU : mieux
 // vaut ne rien lire que lire faux. Le prix est nommé en en-tête (LIMITE DE LA LECTURE DE TEXTE).
+//
+// COÛT LINÉAIRE, EXIGÉ (T-23-02-03) : la région parsée vient du dépôt audité, donc d'un attaquant.
+// Deux tournures ont été bannies ici parce qu'elles rendaient la boucle QUADRATIQUE, et qu'un
+// parseur quadratique sur une entrée hostile est un déni de service au SessionStart — que ni le
+// `|| true` du hook ni le contrat de sortie ne raccourcissent, un processus qui n'a pas fini ne
+// sortant pas :
+//   - `.exec(txt.slice(i))` à chaque caractère       -> regex COLLANTE (`/…/y`) + `lastIndex = i` ;
+//   - `out.replace(/\s+$/, '')` à chaque identifiant -> `lastNb`, suivi INCRÉMENTAL du dernier
+//     caractère non blanc déjà émis (même définition de « blanc » que `\s`, d'où le `/\s/.test`).
+// Les deux réécritures sont à comportement STRICTEMENT identique : mêmes clés produites.
+const IDRE = /([A-Za-z_$][A-Za-z0-9_$]*)(\s*):/y;
 function jsLiteralToJSON(txt) {
-  let out = '', i = 0; const n = txt.length;
+  let out = '', i = 0, lastNb = ''; const n = txt.length;
   while (i < n) {
     const c = txt[i];
     if (c === '"' || c === "'") {
       const q = c; let j = i + 1, buf = '';
       while (j < n) { if (txt[j] === '\\') { buf += txt[j] + txt[j + 1]; j += 2; continue; } if (txt[j] === q) break; buf += txt[j]; j++; }
-      out += JSON.stringify(buf.replace(/\\'/g, "'")); i = j + 1; continue;
+      out += JSON.stringify(buf.replace(/\\'/g, "'")); lastNb = '"'; i = j + 1; continue;
     }
     if (c === '/' && txt[i + 1] === '/') { while (i < n && txt[i] !== '\n') i++; continue; }
     if (c === '/' && txt[i + 1] === '*') { const e = txt.indexOf('*/', i); if (e < 0) return null; i = e + 2; continue; }
-    const idm = /^([A-Za-z_$][A-Za-z0-9_$]*)(\s*):/.exec(txt.slice(i));
-    if (idm && idm[1] !== 'true' && idm[1] !== 'false' && idm[1] !== 'null') {
-      const prev = out.replace(/\s+$/, '').slice(-1);
-      if (prev === '' || prev === '{' || prev === ',') { out += '"' + idm[1] + '":'; i += idm[0].length; continue; }
+    IDRE.lastIndex = i;
+    const idm = IDRE.exec(txt);
+    if (idm && idm[1] !== 'true' && idm[1] !== 'false' && idm[1] !== 'null'
+        && (lastNb === '' || lastNb === '{' || lastNb === ',')) {
+      out += '"' + idm[1] + '":'; lastNb = ':'; i += idm[0].length; continue;
     }
-    out += c; i++;
+    out += c; if (!/\s/.test(c)) lastNb = c; i++;
   }
   out = out.replace(/,(\s*[}\]])/g, '$1');
   try { return JSON.parse(out); } catch (e) { return null; }
