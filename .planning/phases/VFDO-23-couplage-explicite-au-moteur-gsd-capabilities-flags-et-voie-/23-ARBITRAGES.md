@@ -73,6 +73,48 @@ et faisait rougir le retour à `--auto` — **même anti-corrélation que celle 
 étiquette retournée**. À défaire : `--auto` sur le cadrage redevient licite, et c'est **l'absence
 du désarmement adjacent** qui doit rougir.
 
+## A-1ter — TRANCHÉ le 2026-08-03 : A-1bis tombe. Voie 1 instruite en 23-05, `T25b` dégazé maintenant
+
+**Décision.** A-1bis est **démentie sur ses faits** (cf. `23-ARBITRAGES-OUVERTS.md` §O-8). Deux
+gestes, dans cet ordre :
+
+1. **Immédiatement, dans 23-01** — retirer à `T25b` la promesse qu'il ne tient pas. Le gate
+   certifie une adjacence **textuelle** ; il ne borne **aucune** fenêtre runtime. Son libellé doit
+   dire ce qu'il mesure et rien de plus, et le trou est documenté par écrit. **Aucun gate ne ment
+   en attendant le correctif structurel.**
+2. **Dans le plan 23-05 (voie unique d'invocation, Lacune 5)** — **le manager porte le cadrage**.
+   Il a `AskUserQuestion`, donc `--auto` n'a plus de raison d'être et le problème disparaît à la
+   racine. C'était la 3ᵉ voie d'A-1bis, explicitement « reversable au débat si la Lacune 5 rouvre
+   la voie unique » : la Lacune 5 la rouvre, la voie revient.
+
+**Pourquoi A-1bis tombe — le fait, vérifié trois fois** (reviewer, puis manager, puis directement
+sur `~/.claude/gsd-core/workflows/discuss-phase/modes/chain.md:45-61`) :
+
+> **If `--auto` flag present OR `--chain` flag present OR `AUTO_MODE` is true:** display banner and
+> launch plan-phase. → `Skill(skill="gsd-plan-phase", args="${PHASE} --auto ${GSD_WS}")`
+
+`--auto` sur le cadrage **enchaîne discuss → plan → execute** dans le même appel. `vf-coder` ne
+reprend la main **qu'à la fin du pipeline entier** : son désarmement « immédiatement, dans le même
+geste » s'exécute **après** que plan et execute ont déjà tourné. C'est la famille d'erreur exacte
+que cette phase combat — l'assertion mesure une relation **dans le texte**, pas dans le monde.
+
+**Portée réelle, bornée (à ne pas surestimer).** `references/checkpoints.md` **règle 6** protège les
+gates `blocking-human` : jamais auto-approuvés, même en auto-mode. Ce n'est donc **pas** une
+violation d'ADR-031 sur le gate que 23-01 construit. C'est la **règle 5** qui joue : pendant plan et
+execute, `human-verify` **auto-approuve** et `decision` **auto-sélectionne la première option** —
+une mission déroule plan et execute en autonome **sans l'avoir voulu**, et ses décisions se
+choisissent toutes seules.
+
+**Pourquoi pas le statu quo.** Il coûtait zéro ligne, mais laissait vivre exactement ce que la
+Phase 23 existe pour fermer. **Pourquoi pas la voie 1 tout de suite dans 23-01.** Le plan a déjà
+coûté 3 tours d'exécution et 2 de revue ; élargir son périmètre à un changement structurel du cycle
+le rouvrirait une sixième fois, alors que 23-05 traite ce sujet de toute façon.
+
+**Troisième prémisse fausse d'affilée sur D-02.** A-1 (tranchée sur `--assumptions` inexistant en
+pratique), A-1bis (tranchée sur une adjacence qui n'existe qu'à l'écrit), et maintenant A-1ter. La
+leçon est écrite ici pour la suite : **sur cette lacune, vérifier le comportement du moteur amont
+avant de trancher, pas après.**
+
 ## A-2 — `workflow.auto_advance` : désarmé, dans la forme retenue en A-1bis
 
 **Décision.** Le second déclencheur de la règle 5 amont (`checkpoints.md:11`), absent de tout
