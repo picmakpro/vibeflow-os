@@ -260,7 +260,7 @@ capturées au backlog — voir Tech Debt.
   partagée de confinement) — et le **segment racine** reste hors couverture, voir l'entrée
   « `.planning` lui-même en lien symbolique » plus bas.
 
-**T-24-02-01 — mitigation falsifiée, en attente d'un arbitrage humain** — Sévérité : **HIGH**
+**T-24-02-01 — mitigation falsifiée, en attente d'un arbitrage humain** — Sévérité : **HIGH** — **TRANCHÉE le 2026-08-05**
 - Risk: le modèle de menaces du plan 24-02 mitigeait le risque `gsd-tools windows *` par
   **abstinence** (« aucune tâche ne les invoque ») plus une interdiction écrite. Les deux moitiés
   sont tombées : ADR-066 ne porte aucune formulation d'interdiction et **acte** l'exécution
@@ -274,10 +274,17 @@ capturées au backlog — voir Tech Debt.
   répétition préalable sur copie jetable via `--cwd` (`docs/ADR.md:1609-1611`), post-conditions
   vérifiées (`:1611-1615`), risque résiduel acté (`:1633-1639`), et **aucun script du dépôt
   n'invoque ces commandes** (balayage `.sh`/`.md`/`.json`/`.yml` : prose uniquement).
-- Recommendations: acte **humain** requis — soit re-disposer en `accept` avec entrée nominative
-  au journal (justification ADR-066 + les quatre contrôles), soit réécrire la mitigation autour
-  des contrôles réellement en place. Un agent ne peut pas s'inscrire lui-même dans la colonne
-  « Accepté par » sans la vider de son sens.
+- Recommendations: **soldé le 2026-08-05 — Samuel a tranché pour la RÉÉCRITURE de la mitigation ;
+  la re-disposition en `accept` avec entrée nominative est écartée.** La mitigation n'avait pas été
+  violée : elle a été **rendue caduque par ADR-066**, décision d'un niveau supérieur et postérieure
+  à sa rédaction. Elle décrit désormais les quatre contrôles qui ont réellement protégé l'opération
+  (répétition sur copie jetable via `--cwd` ; `WINDOWS.md` commité et propre à `d89a60e`, `waive`
+  borné à 1 fichier / 7+ / 7− en `7b96e34` ; intégrité constatée après — 87 lignes avant/après, 1
+  fence JSON, 4 entrées `fixed` intactes, `fixed_count` et `total_count` inchangés ; résiduel nommé
+  et opposable). Formulation d'origine **conservée en trace** dans `24-02-PLAN.md`, à la forme de la
+  trace de révision de l'Iron Law 2. **Le journal des risques acceptés n'a reçu aucune entrée** :
+  la menace est mitigée, pas acceptée, et aucune signature humaine n'est empruntée. `threats_open`
+  passe de 1 à **0** — recalculé par extracteur `awk`, contre-épreuve jouée.
 
 **`.planning` lui-même en lien symbolique — surface NON COUVERTE, pas exposition vivante** — Sévérité : **LOW**
 - Risk: le correctif `T-24-14-C1` contraint les **deux segments du compartiment**

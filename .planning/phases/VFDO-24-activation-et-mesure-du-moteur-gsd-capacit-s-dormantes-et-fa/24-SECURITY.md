@@ -4,11 +4,11 @@ slug: activation-et-mesure-du-moteur-gsd
 status: draft
 # threats_open = menaces OUVERTES de sévérité >= workflow.security_block_on (« high » sur ce lab).
 # Ce nombre est CALCULÉ à partir du registre ci-dessous, jamais posé pour satisfaire un gate.
-threats_open: 1
+threats_open: 0
 asvs_level: 1
 register_authored_at_plan_time: true
 created: 2026-08-04
-audited: 2026-08-04
+audited: 2026-08-05
 ---
 
 # Phase 24 — Sécurité
@@ -46,7 +46,17 @@ exécution réelle). **27 menaces ont été fermées sur preuve citée** ; **7 r
 **Puis, le soir du même jour**, un mandat de correction ciblée en a fermé **trois de plus** :
 `T-24-14-C1` par un correctif prouvé par mutation, `T-24-12-01` et `T-24-12-03` sur les commits
 du plan 24-12 une fois celui-ci livré. `threats_open` passe de **4** à **1**. La seule bloquante
-restante, `T-24-02-01`, n'attend pas du code — elle attend une **décision humaine**.
+restante, `T-24-02-01`, n'attendait pas du code — elle attendait une **décision humaine**.
+
+**Le 2026-08-05, cette décision a été prise.** Samuel a tranché entre les deux sorties que ce
+document posait : **ni** re-disposition en `accept` avec entrée nominative (voie écartée), **mais**
+**réécriture de la mitigation** autour des contrôles réellement en place. La mitigation d'origine
+n'avait pas été violée — elle avait été **rendue caduque par ADR-066**, décision d'un niveau
+supérieur et **postérieure** à sa rédaction. Elle décrit désormais les quatre contrôles qui ont
+protégé l'opération, tous re-vérifiés de première main ; la formulation d'origine est conservée en
+trace dans `24-02-PLAN.md`, à la forme exacte de la trace de révision de l'Iron Law 2. **La menace
+est mitigée, pas acceptée** : le journal des risques acceptés reste vide de toute entrée d'agent.
+`threats_open` passe de **1** à **0** — recalculé par l'extracteur, jamais posé.
 
 Trois principes ont gouverné les verdicts, et expliquent pourquoi le compteur ne tombe pas à 0 :
 
@@ -57,7 +67,9 @@ Trois principes ont gouverné les verdicts, et expliquent pourquoi le compteur n
    `numstat` d'un commit, qui prouve qu'aucune ligne antérieure n'a bougé).
 3. **Une mitigation falsifiée par les faits reste ouverte**, même si des contrôles
    compensatoires existent — les inscrire ne relève pas de l'audit mais d'une **décision
-   humaine** de re-disposition. C'est le cas de T-24-02-01.
+   humaine** de re-disposition. C'est le cas de T-24-02-01 — *jusqu'au 2026-08-05, où cette
+   décision a été prise et la mitigation réécrite ; le principe, lui, ne bouge pas : c'est la
+   décision humaine qui a débloqué la ligne, pas un verdict d'audit.*
 
 ---
 
@@ -88,7 +100,7 @@ règle unique, énoncée ici et appliquée sans exception :
 |---|---|---|---|---|---|
 | T-24-01-01 | Denial of Service | `check-agents.sh` au `SessionStart` | high | mitigate | closed — le skip `--third-party-prefix` (défaut `gsd-`, `:86`) agit dans la boucle **avant** `check_file` (`:626-632` vs `:633`) ; le bloc `effort` exigeant vit **dans** `check_file` (`:520-524`). Même chemin en hook (`hooks.json:16`). Cas T74 (`test-check-agents.sh:1330-1349`) **rejoué vert**, avec agent local conforme injecté (`:1342`) contre le vert à vide. |
 | T-24-01-02 | Tampering | `test-check-agents.sh` (cas de mutation) | medium | mitigate | closed — `cmp -s` compare mutant et original **avant tout verdict** (`test-check-agents.sh:1375-1376`) ; l'égalité déclenche `ko` « mutant NON OPPOSABLE ». Second plancher d'opposabilité `:1365-1366`. T75 **rejoué vert**. |
-| T-24-02-01 | Tampering | `.planning/WINDOWS.md` via `gsd-tools windows *` | high | mitigate | open — **mitigation FALSIFIÉE.** Elle promettait une interdiction écrite **et** l'abstinence. (1) ADR-066 (`docs/ADR.md:1565-1651`) ne porte **aucune** formulation d'interdiction (0 occurrence de `interdi\|jamais invoqu\|proscri\|banni`) et **acte** l'exécution (`:1597`) ; `CONCERNS.md:92-94` formule une précaution, pas une interdiction. (2) La commande **a été invoquée** : commit `7b96e34`, `.planning/WINDOWS.md:3-4` (`waived_count: 1`), entrée id 3 `"status": "waived"` (`:57`). L'abstinence a été **levée par décision humaine** (dégel, ADR-066) sans entrée au journal des risques acceptés. Re-disposition = acte humain, pas verdict d'audit. |
+| T-24-02-01 | Tampering | `.planning/WINDOWS.md` via `gsd-tools windows *` | high | mitigate | closed — **mitigation RÉÉCRITE le 2026-08-05 sur décision humaine, sous ADR-066** (trace de révision + formulation d'origine : `24-02-PLAN.md`, sous la table du modèle de menaces). La mitigation d'origine promettait interdiction écrite **et** abstinence ; elle n'a pas été *violée*, elle a été **rendue caduque par une décision d'un niveau supérieur** — ADR-066, postérieure à sa rédaction, acte l'exécution (`docs/ADR.md:1597`) au motif que le risque est **mesuré inexistant sur ce fichier**. La mitigation décrit désormais les quatre contrôles qui ont réellement protégé l'opération, **tous re-vérifiés de première main le 2026-08-05** : (1) `waive` **répété d'abord sur une copie jetable** via `--cwd`, constat identique dans les deux cas (`docs/ADR.md:1609-1611`) ; (2) fichier **commité et propre avant** (`d89a60e`, dernier commit antérieur à le toucher — dégât récupérable par git), et commit du `waive` **borné à 1 fichier / 7 insertions / 7 suppressions** (`git show --numstat 7b96e34`) ; (3) **intégrité constatée après** — `git show 7b96e34^:.planning/WINDOWS.md \| awk END` = **87** lignes, après = **87**, aujourd'hui = **87** ; **1** fence JSON ouverte-refermée avant comme après ; miroir reparsé, **4 entrées `fixed` intactes** ; `fixed_count` **4 → 4** et `total_count` **5 → 5** inchangés, seuls `open_count` 1 → 0 et `waived_count` 0 → 1 bougent — l'effet voulu, et rien d'autre ; (4) **résiduel nommé** : tant que gsd-core ≤ 1.9.1, `WINDOWS.md` reste un fichier **purement généré** (aucune prose sous le ledger), condition **opposable** — la première prose écrite dessous rouvrirait cette entrée. **Aucune entrée au journal des risques acceptés** : la menace est mitigée, pas acceptée, et aucune signature humaine n'est empruntée. |
 | T-24-02-02 | Repudiation | ADR-066 / ADR-067 | medium | mitigate | open — **promesse non tenue.** La mitigation exigeait que **chaque fait** porte sa source de première main (fichier + lignes, ou date npm ISO). Balayage `awk` du motif `:[0-9]+` sur ADR-066 (`:1565-1651`) et ADR-067 (`:1655-1715`) : **0 citation fichier+lignes**. L'horodatage npm ISO exigé est absent (seule la date courte `:1581`). Le fait le plus porteur (mécanisme de destruction #2893, `:1574-1576`) ne nomme que deux symboles, sans fichier ni ligne. Partiellement conforme : la contre-épreuve `:1617-1624` et le corpus nommé d'ADR-067 `:1671-1678` sont, eux, opposables. |
 | T-24-03-01 | Tampering | `.planning/config.json` | high | mitigate | closed — édition exactement bornée : commit `0aa88fa`, 1 fichier, 6 insertions / 1 suppression, uniquement le bloc `agent_skills` (`.planning/config.json:51-56`). Contrôles négatifs **rejoués** : `jq -e` échoue sur les 7 clés refusées. Les 2 clés zone 2 présentes (`:27`, `:45`) ont été posées par le plan **24-02** (`b3cb402`) sous ADR-066 ; le contrôle a été inversé en place et daté (`24-03-PLAN.md:88-93`, `:104`). |
 | T-24-03-02 | Elevation of Privilege | injection de skill dans un agent du moteur | medium | mitigate | closed — un seul slot (`config.json:51-56`, `jq -e '.agent_skills\|keys\|length==1'` vrai) ; deux skills **du dépôt lui-même**, byte-identiques (`cmp -s`) aux copies résolues ; aucune entrée tierce. Forme de résolution validée contre le moteur : `init.cjs:1765` (préfixe `global:`), `:1773` (regex de nom), `:1801` (`validatePath`, refus d'échappement par lien symbolique), `:1815`. |
@@ -262,12 +274,17 @@ audits suivants. Les 12 entrées `-SC` sont la même menace de chaîne d'approvi
 réinstruite plan par plan : aucun de ces plans n'installe quoi que ce soit, la seule
 installation de la phase est le `npx -y "@opengsd/gsd-core@^1"` du job `tests`.*
 
-> **Aucune entrée n'a été ajoutée à ce journal par l'audit du 2026-08-04.** Accepter un risque
-> est un acte d'autorité humaine — la colonne « Accepté par » n'a de sens que remplie par
-> quelqu'un qui engage sa responsabilité. Un agent qui s'y inscrirait lui-même viderait la
-> colonne de son contenu. C'est pourquoi T-24-02-01 reste **ouverte** plutôt que d'être
-> re-disposée en `accept` : la matière de la décision est réunie plus bas, la décision
-> appartient à l'humain.
+> **Aucune entrée n'a été ajoutée à ce journal, ni par l'audit du 2026-08-04, ni par la correction
+> du 2026-08-05.** Accepter un risque est un acte d'autorité humaine — la colonne « Accepté par »
+> n'a de sens que remplie par quelqu'un qui engage sa responsabilité. Un agent qui s'y inscrirait
+> lui-même viderait la colonne de son contenu.
+>
+> **C'est aussi ce qui distingue les deux sorties de T-24-02-01, et pourquoi celle retenue ne
+> touche pas ce journal.** La voie `accept` aurait exigé une entrée nominative ici. Elle a été
+> **écartée** : la menace n'est pas acceptée, elle est **mitigée** — par des contrôles réels,
+> antérieurs à l'opération, et re-vérifiables aujourd'hui. La réécriture de la mitigation dit ce
+> qui a protégé l'opération ; elle ne demande à personne d'endosser un risque résiduel qu'on
+> aurait renoncé à traiter. Ce journal reste donc à 12 entrées `-SC`, toutes attribuées aux plans.
 
 ---
 
@@ -278,6 +295,7 @@ installation de la phase est le `npx -y "@opengsd/gsd-core@^1"` du job `tests`.*
 | 2026-08-04 | 66 (56 plans + 10 nœud 24-13) | 16 | 34 dont **18 de sévérité >= high** | nœud de correction 24-13 (`vf-coder`), sur la matière de la revue de jointure et de l'audit des vagues 2-3 |
 | 2026-08-04 | 67 (56 plans + 10 nœud 24-13 + 1 découverte C1) | 43 | 8 dont **4 de sévérité >= high** | `/gsd-secure-phase 24` — 5 `gsd-security-auditor` en parallèle sur les 12 plans, ASVS L1 |
 | 2026-08-04 (soir) | 67 | 46 | 5 dont **1 de sévérité >= high** | mandat de correction ciblée (`vf-coder`) — T-24-14-C1 fermée **par correctif + mutation**, T-24-12-01 et T-24-12-03 fermées **sur les commits** du plan 24-12 livré. Aucune fermeture sur la foi d'un SUMMARY. |
+| 2026-08-05 | 67 | 47 | 4 dont **0 de sévérité >= high** | mandat de correction ciblée (`vf-coder`) sur **décision humaine de Samuel** — T-24-02-01 fermée par **réécriture de la mitigation** (voie `accept` écartée), les quatre contrôles re-vérifiés de première main. `threats_open` **1 → 0**. |
 
 ### Méthode de calcul de `threats_open`
 
@@ -303,6 +321,40 @@ le fichier tel qu'il est, jamais un décompte à la main : **51 lignes de menace
   réécriture de la mitigation autour des contrôles réellement en place).
 - 4 non bloquantes : `T-24-02-02`, `T-24-03-03`, `T-24-12-02`, `T-24-12-04`.
 
+Décompte du **2026-08-05**, après la décision humaine sur T-24-02-01 — extracteur rejoué sur le
+fichier tel qu'il est : **51 lignes de menace lues, 47 `closed`, 4 `open`, 0 statut non reconnu**
+→ `threats_open` = **0**.
+
+- **0 bloquante.**
+- 4 non bloquantes, inchangées : `T-24-02-02`, `T-24-03-03`, `T-24-12-02`, `T-24-12-04` — toutes
+  `medium`, donc sous le seuil `security_block_on: "high"`. Elles restent **ouvertes et écrites** :
+  un `threats_open: 0` ne veut pas dire « plus rien à faire », il veut dire « plus rien au-dessus du
+  seuil qui bloque ».
+
+**Ce zéro n'est pas un zéro posé — il est mesuré, et l'extracteur est prouvé discriminant.**
+Contre-épreuve jouée le 2026-08-05 : sur une **copie** du fichier où le seul statut de `T-24-02-01`
+est remis à `open —`, le même extracteur rend `threats_open = 1` et nomme la ligne
+(`OPEN-BLOQUANTE T-24-02-01 [high]`) ; rejoué sur l'original, il rend `0`. Le mutant a été constaté
+**différent par `cmp -s`** avant tout verdict — un motif de mutation introuvable aurait rendu la
+contre-épreuve non opposable, donc sans valeur.
+
+Programme de l'extracteur (rejouable tel quel, `FS="|"` — colonnes `$2` id, `$5` sévérité,
+`$7` statut, identiques aux **trois** registres) :
+
+```awk
+BEGIN { FS="|" }
+/^\| T-/ {
+  n++; id=$2; sev=$5; st=$7
+  gsub(/^[ \t]+/,"",sev); gsub(/[ \t]+$/,"",sev); gsub(/\*/,"",sev)
+  gsub(/^[ \t]+/,"",st)
+  blocking = (sev=="high" || sev=="critical")
+  if      (st ~ /^closed/) closed++
+  else if (st ~ /^open/)   { open++; if (blocking) block++ }
+  else                     { unknown++; block++ }   # fail-closed : jamais ignoré
+}
+END { printf "lues=%d closed=%d open=%d non_reconnu=%d threats_open=%d\n", n, closed, open, unknown, block+0 }
+```
+
 Les trois fermetures du soir sont rangées à leur ligne de registre avec leur preuve. Aucune n'est
 un verdict d'opportunité : `T-24-14-C1` est fermée par un **correctif prouvé par mutation** (la
 garde retirée, les quatre gates refuient), les deux autres par des **commandes rejouées sur les
@@ -318,16 +370,18 @@ aucune ligne n'a été fermée deux fois, aucune n'a été fermée sur la foi de
 
 ## Ce qu'il reste à faire pour que le gate de ship passe
 
-1. **T-24-02-01 — décision humaine requise.** La mitigation déclarée (« abstinence + interdiction
-   écrite ») est falsifiée : `gsd-tools windows waive 3` **a été exécutée**, sous dégel explicite
-   (ADR-066). Les contrôles compensatoires réellement en place sont sérieux et constatés :
-   répétition préalable sur copie jetable via `--cwd` (`docs/ADR.md:1609-1611`), post-conditions
-   vérifiées (87 lignes avant/après, fence JSON unique, miroir à 5 entrées dont 4 `fixed`
-   intactes, `:1611-1615`), risque résiduel acté (`:1633-1639`), précaution maintenue au ledger
-   (`CONCERNS.md:92-94`), et **aucun script du dépôt n'invoque ces commandes**. Deux sorties
-   possibles, toutes deux humaines : **(a)** re-disposer en `accept` avec entrée nominative au
-   journal ci-dessus (justification ADR-066 + les quatre contrôles) ; **(b)** réécrire la
-   mitigation autour des contrôles réellement en place. Puis rejouer `/gsd-secure-phase 24`.
+1. ~~**T-24-02-01 — décision humaine requise.**~~ **FAIT** (2026-08-05) — **voie (b) retenue par
+   Samuel : la mitigation est réécrite. La voie (a), re-disposition en `accept` avec entrée
+   nominative, est écartée.** La mitigation déclarée (« abstinence + interdiction écrite ») était
+   falsifiée : `gsd-tools windows waive 3` **a été exécutée**, sous dégel explicite (ADR-066). Mais
+   elle n'avait pas été *violée* — ADR-066 est **postérieure** à elle et lui retire son objet. Les
+   contrôles compensatoires, eux, existaient bien et sont désormais **la** mitigation : répétition
+   préalable sur copie jetable via `--cwd` (`docs/ADR.md:1609-1611`), point de retour garanti
+   (`WINDOWS.md` commité et propre à `d89a60e` ; commit du `waive` borné à 1 fichier / 7 insertions
+   / 7 suppressions, `7b96e34`), intégrité constatée après (87 lignes avant / 87 après / 87
+   aujourd'hui, 1 fence JSON, 4 entrées `fixed` intactes, `fixed_count` et `total_count`
+   inchangés), résiduel nommé et opposable (ledger purement généré tant que gsd-core ≤ 1.9.1). La
+   menace est **mitigée, pas acceptée** ; le journal des risques acceptés n'a reçu aucune entrée.
 2. ~~**T-24-14-C1 — corriger ou accepter.**~~ **FAIT** (2026-08-04 au soir) — corrigée, pas
    acceptée. Le correctif refuse de **traverser** au lieu de confiner un chemin résolu (écart
    assumé et motivé au registre C) ; la fermeture est prouvée par mutation sur les quatre gates.
@@ -336,9 +390,19 @@ aucune ligne n'a été fermée deux fois, aucune n'a été fermée sur la foi de
    **sur eux** : gate rejoué aux deux bornes, frontière de release mesurée à 0 ligne d'écart
    depuis `main`.
 
-**Il ne reste donc que le point 1**, et il n'appartient pas à un agent. Tant qu'il n'est pas
-tranché, `threats_open: 1` et le gate de ship reste bloquant — ce qui est le comportement voulu :
-une décision d'acceptation de risque engage une responsabilité humaine, elle ne se délègue pas.
+**Les trois points sont soldés** (2026-08-05). `threats_open: 0`, recalculé par l'extracteur et
+prouvé discriminant par contre-épreuve — **jamais un zéro posé pour satisfaire le gate**. Le
+prédicat que `/gsd-ship` évalue est exactement celui-ci : le workflow lit le frontmatter
+`threats_open` du `*-SECURITY.md` résolu et **ne passe que sur `0` strict** — toute autre valeur,
+un champ manquant, non numérique ou illisible **bloque** (`ship.md:105-114` de la version installée
+du moteur). Rien d'autre n'entre dans le prédicat : ni `status:`, ni la case de signature.
+
+**Ce que ce zéro ne dit pas.** Il ne dit pas « la phase est sans risque ». Il dit : **aucune menace
+ouverte au-dessus du seuil `security_block_on: "high"`**. Quatre `medium` restent ouvertes et
+écrites, et le point 1 n'a été soldé ni par un agent ni par un verdict d'audit — mais par une
+**décision humaine**, comme ce document l'exigeait. Le principe est intact : une acceptation de
+risque ne se délègue pas. Ici, il n'y a d'ailleurs **pas eu d'acceptation** — la voie retenue est
+la mitigation.
 
 ---
 
@@ -415,13 +479,19 @@ trier, rien de plus.
 - [x] Toute menace porte une disposition (mitigate / accept / transfer)
 - [x] Les risques acceptés sont au journal des risques acceptés
 - [x] Chaque menace `closed` porte une preuve citée dans le code livré, opposable et re-vérifiable
-- [ ] `threats_open: 0` confirmé — **NON** : **1** menace ouverte de sévérité >= high
-      (`T-24-02-01`). Les trois autres bloquantes du matin ont été fermées le soir même, sur
-      preuve : mutation pour `T-24-14-C1`, commandes rejouées sur les commits livrés pour
-      `T-24-12-01` et `T-24-12-03`.
-- [ ] `status: verified` en frontmatter — **NON** : `draft`. Il ne reste **aucun** travail
-      d'ingénierie à faire pour lever le gate ; il reste une **décision humaine** (T-24-02-01,
-      re-disposition en `accept` avec entrée nominative, ou réécriture de la mitigation). Aucun
-      agent ne peut la prendre, et ce document ne la prendra pas à sa place.
+- [x] `threats_open: 0` confirmé (2026-08-05) — **mesuré, pas posé** : extracteur `awk` rejoué sur
+      le fichier tel qu'il est (**51 lues, 47 `closed`, 4 `open`, 0 non reconnu**), et **prouvé
+      discriminant** par contre-épreuve (statut de `T-24-02-01` remis à `open` sur une copie →
+      l'extracteur rend **1** et nomme la ligne ; original → **0** ; mutant constaté différent par
+      `cmp -s` avant tout verdict). Les 4 bloquantes du matin sont fermées : mutation pour
+      `T-24-14-C1`, commandes rejouées sur les commits livrés pour `T-24-12-01` et `T-24-12-03`,
+      **décision humaine + réécriture de mitigation** pour `T-24-02-01`.
+- [ ] `status: verified` en frontmatter — **NON** : `draft`, **délibérément**. Il ne reste aucun
+      travail d'ingénierie, et la décision humaine que ce document attendait (T-24-02-01) **a été
+      prise**. Mais passer ce champ à `verified` est un acte d'**approbation du document**, pas un
+      constat : c'est la signature de celui qui engage sa responsabilité sur l'ensemble. Aucun
+      agent ne la donne à sa place. **Le gate de ship n'en dépend pas** — son prédicat est
+      `threats_open == 0` et rien d'autre (`ship.md:105-114`) ; laisser `draft` ne bloque donc rien
+      et ne maquille rien.
 
 **Approbation : en attente.** Ce document est un constat honnête, pas une validation.
