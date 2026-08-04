@@ -252,6 +252,12 @@
         "8b7272f",
         "b41e890"
       ]
+    },
+    {
+      "id": 45,
+      "name": "fix-06 — LE WORKER A REFUSE MON GESTE ET IL AVAIT RAISON. Il a applique les 2 mineurs (commit 8fdd29f : extraction awk bornee en T30-C2, prouvee par section factice injectee en sandbox ; mutation basculee sur md_sed_folded) et a ESCALADE human_needed sur le majeur au lieu de l'executer. MA PRESCRIPTION ETAIT DESTRUCTRICE. J'avais verifie D-16/17/18 << libres >> en ne balayant que docs/ADR.md et mission-contracts.md. Le worker a balaye 23-CONTEXT.md — le REGISTRE DE DECISIONS DE LA PHASE 23 — et y a trouve que D-16 (l.201, extension d'ADR-061), D-17 (l.208, gate check-gsd-config.sh) et D-18 (l.216, suppression des blocs gates/safety) sont DEJA des decisions de la Phase 23 elle-meme, deux d'entre elles referencees par des fichiers GELES. Le renommage aurait corrompu le registre de cadrage et cree des collisions PIRES que celle qu'il pretendait fermer. RE-MESURE DU MANAGER, CONCLUANTE : LES LABELS D-NN SONT PROPRES A UNE PHASE, PAS GLOBAUX. Trois preuves — (1) ADR.md:1068 ecrit << (D-14, plan 20-02) >>, la citation hors phase PORTE SON PLAN ; (2) 23-CONTEXT.md:164 ecrit << D-14 de la Phase 22 >>, meme convention en sens inverse ; (3) D-13 (l.177), D-14 (l.186) et D-15 (l.194) de la Phase 23 correspondent EXACTEMENT a ce que l'etape a transcrit. LES TRANSCRIPTIONS DE L'ETAPE SONT DONC CORRECTES. Le finding majeur de revue-06 reposait sur une PREMISSE FAUSSE (unicite globale des labels) — meme famille que la reutilisation de D-09, qu'une revue precedente avait su classer no-op. DEFAUT REEL RESIDUEL, bien plus etroit : dans docs/ADR.md, un D-14 NU designe desormais deux phases (l.1089 Phase 20, l.1169 Phase 23). Le geste correct est d'AJOUTER LE QUALIFICATIF DE PHASE sur les sites de l'etape, JAMAIS de renumeroter. Dispatche en fix-06b, perimetre reduit a 3 sites. ADR.md:1068 et :1089 restent HORS PERIMETRE (ADR-060, non touche par l'etape) : signales, pas corriges",
+      "status": "done",
+      "commit": "8fdd29f"
     }
   ],
   "remaining_tasks": [
