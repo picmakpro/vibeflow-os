@@ -7,7 +7,7 @@ current_phase_name: jalon gsd-migration — dernière livraison : Phase 23 (coup
 status: complete
 stopped_at: "Phase 23 CLOSE et PUBLIÉE — 8/8 plans exécutés et revus, PR #30 mergée, release racine v2.47.0 taggée et publiée (gate check-release-tag --remote vert). 9 exigences GSDC sur 10 soldées ; GSDC-08 en [~] sur l'écart D-22 (gsd-debugger présent dans vf-coder.md contre une décision « aucune exception » ET exigé par le gate T19 — les deux se tranchent ensemble, arbitrage humain). Deux RCE fermées. Suite du module 102 -> 161 cas, 47 suites vertes. Livré hors phase au passage : correctif de la course de récupération du lock de driver (PR #31, conductor v1.19.1) — jusqu'à 5 acquéreurs simultanés mesurés, lock devenu lien symbolique remplacé par rename(2). Reste ouvert et NON traité : la fuite d'info par symlink (slurp sans O_NOFOLLOW, sur les deux scripts, absente du threat model), la promotion d'A-15 en ADR, et nyquist_compliant=false sur 23-VALIDATION.md (rempli a posteriori, la continuité d'échantillonnage n'a pas pu être mesurée). Prochaine phase : 24."
 last_updated: "2026-08-04T00:00:00.000Z"
-last_activity: 2026-08-04 (Phase 23 — livrée, mergée, publiée en v2.47.0 ; worktrees p21/p23 élagués)
+last_activity: 2026-08-04 (quick 260804-ki4 — cache du bandeau update invalidé puis régénéré en queue de /vf-update, conductor v1.19.2)
 
 # ⚠ Phase 21 close par sa gouvernance (plan 21-05), même patron que 20-07/c01f813 : 5/5 plans
 # livrés, vérification PASS PARTIEL 7/8 comblée (CI remise au vert — compteur de suites 44→45 —,
@@ -806,6 +806,7 @@ Recent decisions affecting current work:
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260801-17w | Isolation multi-session : un écrivain = un worktree (ADR-064) + gate advisory de revendication de branche | 2026-08-01 | `efa20c5` | [260801-17w-isolation-multi-session](./quick/260801-17w-isolation-multi-session/) |
+| 260804-ki4 | Invalider et re-régénérer le cache du bandeau update après /vf-update (vf-update-run.sh) — conductor v1.19.2 | 2026-08-04 | `e4a6138` | [260804-ki4-invalider-et-re-r-g-n-rer-le-cache-du-ba](./quick/260804-ki4-invalider-et-re-r-g-n-rer-le-cache-du-ba/) |
 
 ## Deferred Items
 
