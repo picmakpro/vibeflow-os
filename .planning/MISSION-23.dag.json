@@ -120,7 +120,7 @@
         "plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh",
         "plugin/_internal/vibeflow-update.sh"
       ],
-      "status": "ready",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -136,7 +136,7 @@
         "plugin/dev-orchestrator/scripts/check-gsd-config.sh",
         "plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "exec-05",
@@ -146,6 +146,7 @@
         "arbitrage-a1ter-premisse",
         "audit-infra",
         "fix-a5",
+        "plancheck-05b",
         "replan-05"
       ],
       "scope": [
@@ -692,6 +693,26 @@
         ".planning/phases/VFDO-23-*/23-ARBITRAGES*.md"
       ],
       "status": "running"
+    },
+    {
+      "id": "arbitrage-fuite-info",
+      "step": "ARBITRAGE HUMAIN (ADR-031) — FUSION DES DEUX JUGES : T-23-04-01 Information Disclosure est mitigee sur le papier, mais NI la garde runtime NI le filet anti-regression ne couvrent la classe. Gele, ne bloque aucun noeud",
+      "stage": "human",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-23-*/23-ARBITRAGES-OUVERTS.md"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "plancheck-05b",
+      "step": "RE-VALIDATION LECTURE SEULE du plan 23-05 : ses read_first sont DEMENTIS par mesure et fix-a5 a modifie les deux agents cibles depuis la redaction. Re-deriver les ancres AVANT exec-05",
+      "stage": "verif",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-23-*/23-05-PLAN.md"
+      ],
+      "status": "ready"
     }
   ]
 }
