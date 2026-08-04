@@ -30,11 +30,11 @@
 # (INDEX.md présent) est INCHANGÉ, à l'octet près : l'INDEX est de l'altitude LAB, antérieur et
 # orthogonal aux workstreams du moteur ; la résolution se fait donc APRÈS sa branche. Le régime
 # « lab non amorcé » est inchangé lui aussi.
-# Ordre de résolution, court-circuitant : VF_CONTEXT_WORKSTREAM, puis GSD_WORKSTREAM, puis la 1re
-# ligne du pointeur PARTAGÉ in-repo `<planning>/active-workstream`. Nom validé contre la politique
-# du moteur (workstream-name-policy.cjs : 1er caractère alphanumérique, puis alphanumériques, point,
-# souligné, tiret ; ni séparateur de chemin, ni `.`/`..`, ni `..` en sous-chaîne) plus une borne
-# locale de 80 caractères ; un nom hors politique n'est JAMAIS concaténé (T-24-04-01).
+# Résolution et validation du nom : `workstream-policy.sh` (ce module), fichier SOURCÉ et partagé
+# par les quatre gates — voir son en-tête pour la politique UNIQUE, la parité amont exacte et la
+# gradation par rôle du cas « résolu mais dossier absent ». La surcharge historique
+# VF_CONTEXT_WORKSTREAM reste le premier canal ; un nom hors politique n'est JAMAIS concaténé, et
+# sa valeur brute jamais réimprimée (T-24-04-01).
 # FRONTIÈRE ASSUMÉE : le pointeur de SESSION en os.tmpdir() n'est PAS lu ici — indexé sur un
 # condensat de chemin absolu et une clé de session que bash ne reproduit pas fidèlement.
 # FAIL-OPEN INTACT : un workstream résolu SANS STATE.md ne bloque rien — repli sur la racine PLUS
@@ -50,17 +50,33 @@ PLANNING_DIR=".planning"
 MAX_LINES=45
 DEFER_TO_GSD=0
 
-# NB : ${2:?} obligatoire (convention des scripts frères) — un ${2:-défaut} + shift 2 sans
-# valeur ne consommait rien et bouclait à l'infini (gel du SessionStart jusqu'au timeout).
+# Une option sans valeur ne doit JAMAIS être avalée : un `${2:-défaut}` + `shift 2` ne consommait
+# rien et bouclait à l'infini (gel du SessionStart jusqu'au timeout). Les gardes explicites
+# ci-dessous rendent 64 comme les scripts frères, là où `${2:?}` rendait 1 (code d'erreur du shell,
+# pas un code d'usage) et où un flag inconnu était avalé en exit 0 — un `--max-lines` mal
+# orthographié se lisait alors comme un succès silencieux.
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --path) PLANNING_DIR="${2:?--path nécessite une valeur}"; shift 2 ;;
-    --max-lines) MAX_LINES="${2:?--max-lines nécessite une valeur}"; shift 2 ;;
+    --path)
+      [ "$#" -ge 2 ] || { echo "[planning-context] --path nécessite une valeur" >&2; exit 64; }
+      PLANNING_DIR="$2"; shift 2 ;;
+    --max-lines)
+      [ "$#" -ge 2 ] || { echo "[planning-context] --max-lines nécessite une valeur" >&2; exit 64; }
+      MAX_LINES="$2"; shift 2 ;;
     --defer-to-gsd) DEFER_TO_GSD=1; shift ;;
     -h|--help) grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
-    *) shift ;;
+    *) echo "[planning-context] argument inconnu : $1" >&2; exit 64 ;;
   esac
 done
+
+# --max-lines est un COMPTE DE LIGNES, et il est passé tel quel à `head -n`. Sans cette validation,
+# `--max-lines abc` faisait entrer « head: illegal line count -- abc » DANS le bloc présenté comme
+# l'état du lab, en exit 0 : un message d'erreur d'outil injecté dans le contexte de session et
+# offert à la lecture comme un fait du projet. Un entier strictement positif, ou rien.
+case "$MAX_LINES" in
+  ''|*[!0-9]*) echo "[planning-context] --max-lines attend un entier positif" >&2; exit 64 ;;
+esac
+[ "$MAX_LINES" -ge 1 ] || { echo "[planning-context] --max-lines attend un entier positif" >&2; exit 64; }
 
 # Pas de socle → rien à injecter (le rappel "non amorcé" vient de check-planning-state.sh).
 [ -d "$PLANNING_DIR" ] || exit 0
@@ -103,47 +119,35 @@ fi
 # Position volontaire : APRÈS le bloc de retrait ADR-055 (qui doit rester après $INDEX_FILE) ET
 # après la branche INDEX, qui sort en 0. C'est ce qui garantit que le régime « lab à compartiments »
 # reste identique à l'octet près, workstream posé ou non.
-# Politique de nom recopiée du moteur amont ; la borne de longueur est une addition LOCALE,
-# strictement plus sévère — elle ne peut donc accepter aucun nom qu'amont refuserait.
-ws_trim() { printf '%s' "$1" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'; }
+# La politique de nom n'est PLUS recopiée ici : elle est SOURCÉE (le fichier est possédé par CE
+# module — voir son en-tête pour la politique UNIQUE et sa gradation par rôle).
+WS_POLICY=""
+for _cand in "$(dirname "$0")/workstream-policy.sh" \
+             "$(dirname "$0")/../../planning-core/scripts/workstream-policy.sh"; do
+  [ -r "$_cand" ] && { WS_POLICY="$_cand"; break; }
+done
 
-ws_name_valid() { # <nom>
-  local n="$1"
-  [ -n "$n" ] || return 1
-  [ "${#n}" -le 80 ] || return 1
-  case "$n" in */*|*\\*|.|..|*..*) return 1 ;; esac
-  printf '%s' "$n" | grep -Eq '^[a-zA-Z0-9][a-zA-Z0-9._-]*$'
-}
-
-# Imprime le nom résolu ET valide, ou RIEN. Sort en 2 sans rien imprimer quand un nom résolu est
-# hors politique — la valeur brute n'est jamais ré-imprimée : elle traverserait vers le contexte de
-# session (frontière T-17-01), et elle est non maîtrisée par construction.
-ws_resolve() {
-  local n=""
-  if [ -n "${VF_CONTEXT_WORKSTREAM:-}" ]; then
-    n="$VF_CONTEXT_WORKSTREAM"
-  elif [ -n "${GSD_WORKSTREAM:-}" ]; then
-    n="$GSD_WORKSTREAM"
-  elif [ -r "$PLANNING_DIR/active-workstream" ]; then
-    n="$(head -n 1 "$PLANNING_DIR/active-workstream" 2>/dev/null)"
-  fi
-  n="$(ws_trim "$n")"
-  [ -n "$n" ] || return 0
-  ws_name_valid "$n" || return 2
-  printf '%s' "$n"
-}
-
-WS="$(ws_resolve)"; ws_rc=$?
 WS_LABEL=""
 WS_NOTE=""
-if [ "$ws_rc" -eq 2 ]; then
-  WS_NOTE="_(un nom de workstream invalide a été ignoré — extrait de la racine.)_"
-elif [ -n "$WS" ]; then
-  if [ -f "$PLANNING_DIR/workstreams/$WS/STATE.md" ]; then
-    STATE_FILE="$PLANNING_DIR/workstreams/$WS/STATE.md"
-    WS_LABEL="$WS"
-  else
-    WS_NOTE="_(workstream \`$WS\` actif, mais aucun \`$PLANNING_DIR/workstreams/$WS/STATE.md\` — extrait de la racine.)_"
+if [ -z "$WS_POLICY" ]; then
+  # RÔLE INJECTEUR : fail-open, jamais muet, jamais un exit non nul (hook SessionStart).
+  WS_NOTE="_(politique de workstream non chargeable — extrait de la racine.)_"
+else
+  # shellcheck source=/dev/null
+  . "$WS_POLICY"
+  vf_ws_resolve "$PLANNING_DIR" "${VF_CONTEXT_WORKSTREAM:-}"; ws_rc=$?
+  if [ "$ws_rc" -eq 2 ]; then
+    # La valeur brute n'est JAMAIS réimprimée : elle traverserait vers le contexte de session
+    # (frontière T-17-01) et elle est non maîtrisée par construction. Seule la raison, prise dans
+    # une énumération fermée, est imprimable.
+    WS_NOTE="_(workstream rejeté par la politique amont : $VF_WS_REASON — extrait de la racine.)_"
+  elif [ -n "$VF_WS_NAME" ]; then
+    if [ -f "$PLANNING_DIR/workstreams/$VF_WS_NAME/STATE.md" ]; then
+      STATE_FILE="$PLANNING_DIR/workstreams/$VF_WS_NAME/STATE.md"
+      WS_LABEL="$VF_WS_NAME"
+    else
+      WS_NOTE="_(workstream \`$VF_WS_NAME\` actif, mais aucun \`$PLANNING_DIR/workstreams/$VF_WS_NAME/STATE.md\` — extrait de la racine.)_"
+    fi
   fi
 fi
 # Émis AVANT la branche STATE : même sans STATE.md de racine, le signalement ne se perd pas.
