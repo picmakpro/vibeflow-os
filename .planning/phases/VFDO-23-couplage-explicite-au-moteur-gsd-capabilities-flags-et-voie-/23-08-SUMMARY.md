@@ -218,10 +218,27 @@ non-vacuité prouvée avant correspondance).
 
 ## Issues Encountered
 
-Aucun. La commande `cat`/`head` via bash a semblé tronquer certains fichiers courts sur ce poste
-(`module.json`, `CHANGELOG.md`) au premier essai — contournement immédiat par l'outil `Read`, qui a
-rendu le contenu intégral et correct pour toutes les lectures suivantes. N'a affecté aucune écriture
-ni aucun verdict.
+1. La commande `cat`/`head` via bash a semblé tronquer certains fichiers courts sur ce poste
+   (`module.json`, `CHANGELOG.md`) au premier essai — contournement immédiat par l'outil `Read`, qui
+   a rendu le contenu intégral et correct pour toutes les lectures suivantes. N'a affecté aucune
+   écriture ni aucun verdict.
+
+2. **Incident critique évité — `roadmap.update-plan-progress` (via `gsd-tools query`) a déclenché un
+   resync `gsd-tools state` non désactivable qui a régressé `STATE.md`** : `current_phase` 26 → 21,
+   `progress:` (26/22/71/71) → baseline pré-Phase-26 (25/13/74/53), et **tout le bloc de
+   commentaires curés à la main a été effacé** — le bloc porte pourtant explicitement l'avertissement
+   « ⚠ Compteurs curés À LA MAIN — PAS régénérés par `gsd-tools state` (ADR-063 : toute invocation
+   force `resync:true` non désactivable et reproduirait la régression corrigée ici) ». C'est
+   exactement cette régression documentée qui s'est reproduite en exécutant une commande `gsd-tools`
+   d'apparence sans rapport (`roadmap.update-plan-progress`, pas `state.*`). Détecté par lecture du
+   diff avant commit, **restauré immédiatement** par `git checkout -- .planning/STATE.md` (usage
+   sanctionné : restauration d'un fichier précis non intentionnellement modifié, jamais un reset
+   large). `check-state-integrity.sh` reconfirmé vert après restauration. La modification de
+   `ROADMAP.md` produite par la même commande a été conservée (légitime, ne touche que la ligne de
+   phase 23 et les cases à cocher des plans 23-07/23-08). **Conséquence pour la suite : aucune
+   commande `gsd-tools query state.*` ni `roadmap.update-plan-progress` ne doit être relancée sur ce
+   dépôt sans revérifier le diff de `STATE.md` avant tout commit — le risque de régression silencieuse
+   est confirmé, pas seulement documenté.**
 
 ## Next Phase Readiness
 
