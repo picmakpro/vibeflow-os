@@ -189,7 +189,7 @@
         "plugin/dev-orchestrator/agents/vf-dev-manager.md",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "revue-06",
@@ -751,7 +751,7 @@
       "scope": [
         ".planning/phases/VFDO-23-*/23-06-PLAN.md"
       ],
-      "status": "running"
+      "status": "done"
     }
   ]
 }
