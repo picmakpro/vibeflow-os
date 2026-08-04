@@ -92,7 +92,7 @@ patterns-established:
     de briques dormantes future — la forme est déjà lue par le manager (docs-flow.md), aucun
     format nouveau à apprendre"
 
-requirements-completed: [GSDC-08, GSDC-09]
+requirements-completed: [GSDC-09]
 
 coverage:
   - id: D1
@@ -318,6 +318,20 @@ Voir `key-decisions` en frontmatter — résumé :
   a été **mesuré et écarté** : cela rend la suite ROUGE (`T29-A : vf-coder.md contient encore
   [ gsd-debugger ]`), parce que `T29-A` balaie le fichier ENTIER de `vf-coder.md`, ligne `tools:`
   comprise — cela aurait couplé le gate de dispatch à l'écart D-22 encore ouvert.
+
+## Requalification de couverture — GSDC-08 retiré de `requirements-completed` (2026-08-04)
+
+**Correctif de revue, post-livraison de ce plan.** Le frontmatter de ce SUMMARY portait
+`requirements-completed: [GSDC-08, GSDC-09]` — une sur-certification : `GSDC-08` est livré **`[~]`
+(partiel)** dans `.planning/REQUIREMENTS.md` (lignes 321 et 440), pas `[x]` (complet), parce que
+son volet allowlist bute sur l'écart D-22 encore ouvert (voir section suivante) — `vf-coder.md`
+porte toujours `gsd-debugger` dans sa ligne `tools:`, contre la décision D-22. Un champ
+machine-lisible qui annonce une couverture pleine alors que le ledger la dit partielle contredit
+frontalement ce dernier ; corrigé en retirant `GSDC-08` du champ (désormais `[GSDC-09]` seul,
+`GSDC-09` restant complet et non affecté). Le modèle à suivre existait déjà dans ce même dossier :
+`23-08-SUMMARY.md` n'annonce que `[GSDC-10]`, jamais `GSDC-08`. **Cette requalification ne tranche
+pas l'écart D-22 lui-même** — volet dispatch couvert par ce plan (T32-D), volet allowlist toujours
+ouvert, arbitrage humain toujours attendu de Samuel (cf. section suivante, inchangée).
 
 ## 🛑 Écart D-22 — ÉCART OUVERT, remonté à l'arbitrage humain (jamais un constat clos)
 
