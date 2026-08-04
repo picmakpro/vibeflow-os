@@ -1576,10 +1576,58 @@ workstreams et payer la mise à niveau de notre couche (`check-dev-bootstrap.sh`
 `check-state-integrity.sh`, `planning-context.sh` workstream-aware, `--ws` câblé dans les agents
 `vf-*`, gate sur le pointeur, CI étendue) ; (b) **refuser** et traiter les chantiers parallèles par
 jalons distincts dans une ROADMAP partagée, l'isolation restant physique par ADR-064 ; (c) **borner**
-— workstreams réservés à un usage où les 37 workflows aveugles ne sont jamais sollicités, ce qui
-demande de dire lesquels. Dans les cas (a) et (c), la **remontée upstream** des 37 workflows est le
-préalable, au même titre que la RFC de la Phase 18 et la voie 2 de M2. Condition commune aux trois :
-**aucune partition tant qu'une phase est en vol** (cf. divergence invisible ci-dessus).
+— workstreams réservés à un usage où les 42 workflows aveugles (critère K2) ne sont jamais sollicités, ce qui
+demande de dire lesquels. Dans les cas (a) et (c), la **remontée upstream** des workflows aveugles
+est le préalable, au même titre que la RFC de la Phase 18 et la voie 2 de M2. Condition commune aux
+trois : **aucune partition tant qu'une phase est en vol** (cf. divergence invisible ci-dessus).
+
+> **Chiffre recalé le 2026-08-04.** Ce paragraphe et le précédent citaient « **37** workflows
+> aveugles ». Ce nombre n'a jamais été réconcilié avec une mesure : les aveugles sont **42** au
+> critère **K2** (43 au K1, 35 au K3), sur **45** qui codent des chemins en dur. Le critère fait
+> partie du chiffre — voir le tableau de clôture en fin de section, et ADR-069 pour la commande.
+
+---
+
+#### État à la clôture — ce que la phase a effectivement tranché (2026-08-04)
+
+> **Comment lire tout ce qui précède.** Les lots MESURE et ACTIVATION ci-dessus décrivent l'état
+> **au cadrage** (2026-07-31 / 2026-08-02). Ils sont conservés tels quels : ils portent le
+> raisonnement qui a produit les plans, et les réécrire effacerait la trace de ce qui était su
+> quand la phase a été ouverte. Le tableau ci-dessous dit ce qu'ils sont **devenus**, mesuré sur
+> l'arbre le 2026-08-04 au soir. **En cas de contradiction, c'est ce tableau qui fait foi.**
+
+| Constat du cadrage | État mesuré à la clôture | Où |
+|---|---|---|
+| **M1** — profondeur 5 disponible, 3 consommée, écrite nulle part | **écrite** dans les agents | 24-01 |
+| **M2** — ✅ mesuré le 2026-07-31 | inchangé — acté en doctrine (voie 1), remontée amont déposée (voie 2) | 24-01, 24-10 |
+| **M3** — « `effort:` déclaré par **aucun** agent » | **PÉRIMÉ** — **31 agents sur 31** le déclarent (25 en `agents/<nom>.md` **+ 6 en `AGENT.md`** de module : le second balayage est celui que le cadrage oubliait) | 24-01 |
+| **A1** — `workflow.windows_enforce` absent → défaut `false` | **PÉRIMÉ** — présent et à **`true`** (dégel, ADR-066) | 24-02 |
+| **A2** — `agent_skills: {}` | **PÉRIMÉ** — slot **PLANNER ouvert** (2 skills) ; `gsd-executor` délibérément non câblé | 24-03 |
+| **A3** — `tdd_mode` à `false` | **inchangé, par décision écrite** — clé non posée | 24-03 |
+| **A4** — profils de contexte non employés | **refusés**, par décision écrite | 24-07, ADR-068 |
+| **A5** — deux hooks opt-in inertes | `hooks.workflow_guard` **à `true`** ; `hooks.community` **refusé** | 24-02 |
+| **A6** — `inline_plan_threshold`, levier inconnu | **chiffré**, laissé au défaut | 24-07 |
+| **A7** — `intel` jamais instruit | **PÉRIMÉ** — `intel.enabled: true` | 24-06 |
+| **A8** — routes vers des gestes inertes, test aveugle à l'activation | `graphify` et `profile-pipeline` **refusés**, entrées de doc **marquées conditionnelles**, et le trou **fermé par un gate** (`check-capability-activation.sh`) câblé au job `gates` de la CI | 24-06, 24-11 |
+| **A9** — workstreams : « notre propre outillage est aveugle » | **PÉRIMÉ sur l'outillage** — les quatre gates sont workstream-aware et exercés en CI sur un arbre réellement partitionné. **L'adoption, elle, n'est PAS acquise** : voir la décision ci-dessous | 24-04, 24-05, 24-08, 24-09 |
+
+**La décision A9, écrite : voie (c) bornée, et aucune partition tant qu'une phase est en vol.**
+`ADR-069` acte la révision de l'**Iron Law 2** (« *Router, jamais forker — une capacité amont
+partiellement couverte se câble en écrivant ses limites, elle ne se réimplémente pas* ») et grave
+la couverture **avec son critère et sa commande rejouable**, parce qu'un nombre sans critère est
+précisément ce qui avait produit trois chiffres inconciliables. **Re-dérivé le 2026-08-04 au soir
+par la commande d'ADR-069 elle-même**, identique au fichier près :
+
+| Critère | Ce qu'il demande | Workflows | Couverture | En dur | Aveugles |
+|---|---|---|---|---|---|
+| K1 | le mot `workstream` seul | 5 | 5,5 % | 45 | 43 |
+| **K2** | **`workstream` ou `--ws` — *résout un scope*** | **7** | **7,7 %** | **45** | **42** |
+| K3 | K2 ou `GSD_WS` — toute forme de surface | 16 bruts / 15 réels | 17,6 % / 16,5 % | 45 | 35 |
+
+Univers : **91 workflows** de `@opengsd/gsd-core` **1.9.1**, compteur d'**atteinte** inclus dans la
+commande (`atteinte=91`) — une invocation antérieure avait rendu **4** en silence. Le **« 37 en
+dur »** qui figurait dans ce document n'a jamais été réconcilié : la mesure est **45**, et les
+**42** aveugles sont ceux du critère **K2**.
 
 **Requirements**: GSDA-01 → GSDA-22 (créés au plan du 2026-08-04 — préfixe `GSDA`, « GSD
 Activation », distinct du `GSDC` de la Phase 23 ; détail et mapping aux plans dans
@@ -1589,11 +1637,43 @@ capabilities et la voie unique ; la 24 décide quoi activer dedans. Activer avan
 couvre quoi reviendrait à empiler des étages sur un couplage encore implicite. Le **lot MESURE**
 est en revanche exécutable **sans attendre** la 23 (lecture et instrumentation seules, aucun
 fichier de doctrine touché) — et M2 gagne à être connu tôt.
-**Plans:** 0 plans
+**Plans:** 12/12 plans executed
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 24 to break down)
+- [x] 24-01-PLAN.md — **Lot MESURE, M1 + M3** : profondeur de dispatch et parallélisme gravés dans
+  les agents ; `effort:` propagé sur **31 agents sur 31** (barème par rôle) et exigé par
+  `check-agents.sh`. `GSDA-20/21/22`.
+- [x] 24-02-PLAN.md — **Zone 2** : `workflow.windows_enforce` et `hooks.workflow_guard` **activés**
+  (dégel, **ADR-066** — un prérequis de version insatisfiable ne gate pas) ; `hooks.community`
+  **refusé**. `GSDA-01/04/05/06`.
+- [x] 24-03-PLAN.md — **Zone 1** : slot `agent_skills` **PLANNER** ouvert (la doctrine du lab
+  atteint enfin `gsd-planner`) ; `tdd_mode` non posé, par décision écrite. `GSDA-02/03`.
+- [x] 24-04-PLAN.md — **Zone 4** : trois gates rendus **workstream-aware**, sur une politique de
+  nom **partagée** et conforme au moteur amont. `GSDA-13/14`.
+- [x] 24-05-PLAN.md — **Zone 4** : `check-workstream-pointer.sh` — l'auto-nettoyage silencieux du
+  moteur rendu **audible**, câblé au `SessionStart`. `GSDA-16`.
+- [x] 24-06-PLAN.md — **Zone 3** : `intel` **activé** (la promesse publiée par notre doc devient
+  tenue) ; `graphify` et `profile-pipeline` **refusés**, et les refus **indexés**. `GSDA-07/08`.
+- [x] 24-07-PLAN.md — **Zones A4/A6** : profils de contexte **refusés** (**ADR-068**), seuil inline
+  **chiffré** et laissé au défaut. `GSDA-10/11`.
+- [x] 24-08-PLAN.md — **Zone 4** : les agents `vf-*` savent enfin dire au moteur **sur quel scope**
+  ils travaillent. `GSDA-15`.
+- [x] 24-09-PLAN.md — **Zone 4, CI** : les gates workstream exercés sur un arbre **réellement
+  partitionné**, fixture prouvée **discriminante**, + non-régression sur la racine. `GSDA-17`.
+- [x] 24-10-PLAN.md — **Zone 5** : **ADR-069** — Iron Law 2 révisée (« router, jamais forker »),
+  couverture workstreams gravée **avec son critère et sa commande**, remontée amont déposée.
+  `GSDA-12/18/19`.
+- [x] 24-11-PLAN.md — **Zone 3, la cause** : `check-capability-activation.sh` — une entrée de doc
+  ne peut plus promettre un geste inerte ; câblé au job `gates` de la CI. `GSDA-09/08/15/02`.
+- [x] 24-12-PLAN.md — **Clôture** : **10 modules** bumpés (dont 2 mono-agents que le plan avait
+  sous-recensés), compteur de suites des deux README recalé, `check-version-sync.sh` vert, et la
+  **frontière de release non franchie** — 0 ligne d'écart depuis `main`.
+
+> **Ce que cette checklist ne dit pas.** Douze plans exécutés ne valent pas phase close : le gate
+> de sécurité reste **bloquant** (`24-SECURITY.md`, `threats_open: 1`) sur `T-24-02-01`, qui
+> demande une **décision humaine** de re-disposition et non du code. Aucun tag, aucune release :
+> la release racine est un geste humain gaté (`CLAUDE.md` § Discipline de release).
 
 ### Phase 25: Budget d'instructions et étage d'alignement court
 
