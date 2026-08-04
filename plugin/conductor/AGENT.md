@@ -9,6 +9,7 @@ description: >
   aux moments de configuration, d'audit et de migration. Ne code jamais le travail métier — il route et
   délègue aux briques outillées (installeur, validator, planning-core, consolidator, migrateur).
 model: opus
+effort: high
 memory: project
 skills:
   - vf-new-lab
