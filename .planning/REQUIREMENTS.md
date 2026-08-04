@@ -565,6 +565,28 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | GSDC-08 | Phase 23 | Partiel — plan 23-07 (volet dispatch couvert, volet allowlist ouvert sur `D-22`, non tranché) |
 | GSDC-09 | Phase 23 | Done — plan 23-07 (exécuté + revue en régime plein) |
 | GSDC-10 | Phase 23 | Done — plan 23-08 (exécuté) |
+| GSDA-01 | Phase 24 | Planned — plan 24-02 (différé écrit : aucune version npm > 1.9.1 au 2026-08-04) |
+| GSDA-02 | Phase 24 | Planned — plans 24-03 et 24-11 |
+| GSDA-03 | Phase 24 | Planned — plan 24-03 |
+| GSDA-04 | Phase 24 | Planned — plan 24-02 (**différé**, déclencheur objectif — non activé) |
+| GSDA-05 | Phase 24 | Planned — plan 24-02 (**différé**, déclencheur objectif — non activé) |
+| GSDA-06 | Phase 24 | Planned — plan 24-02 (ADR-067, non gaté) |
+| GSDA-07 | Phase 24 | Planned — plan 24-06 |
+| GSDA-08 | Phase 24 | Planned — plans 24-06 et 24-11 |
+| GSDA-09 | Phase 24 | Planned — plans 24-11 et 24-12 |
+| GSDA-10 | Phase 24 | Planned — plan 24-07 (ADR-068) |
+| GSDA-11 | Phase 24 | Planned — plan 24-07 |
+| GSDA-12 | Phase 24 | Planned — plan 24-10, tâche 1 (révision de l'Iron Law 2) |
+| GSDA-13 | Phase 24 | Planned — plans 24-04 et 24-12 |
+| GSDA-14 | Phase 24 | Planned — plans 24-04 et 24-12 (module `planning-core`, cf. 24-RESEARCH.md R-2d) |
+| GSDA-15 | Phase 24 | Planned — plans 24-08, 24-11 et 24-12 |
+| GSDA-16 | Phase 24 | Planned — plans 24-05 et 24-12 |
+| GSDA-17 | Phase 24 | Planned — plan 24-09 |
+| GSDA-18 | Phase 24 | Planned — plan 24-10 (ADR-069) |
+| GSDA-19 | Phase 24 | Planned — plan 24-10 |
+| GSDA-20 | Phase 24 | Planned — plans 24-01 et 24-12 |
+| GSDA-21 | Phase 24 | Planned — plans 24-01 et 24-12 |
+| GSDA-22 | Phase 24 | Planned — plans 24-01 et 24-12 |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -588,6 +610,16 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   sans en constituer une — D-30 (`dag.sh` non touché) et le périmètre différé de D-31 sont des
   **non-livrables explicites**, vérifiables par l'absence de `plugin/conductor/scripts/dag.sh` du
   périmètre de fichiers des 8 plans.
+- Phase 24 (activation et mesure du moteur GSD) : 22 requirements `GSDA-01..22` **créés au plan du
+  2026-08-04** — mappés aux **12 plans** de la phase (`24-01` → `24-12`, 4 vagues), **0 non-mappé**,
+  **0 inventé** (union des champs `requirements:` des 12 plans comparée au ledger par `comm`).
+  Couverture des 6 zones d'arbitrage de `24-ARBITRAGES.md` : zone 1 → GSDA-02/03 · zone 2 →
+  GSDA-01/04/05/06 · zone 3 → GSDA-07/08/09 · zone 4 → GSDA-10/11 · zone 5 → GSDA-12→19 · zone 6 →
+  GSDA-20/21/22. **`GSDA-04` et `GSDA-05` sont planifiés en DIFFÉRÉ ÉCRIT, pas en activation** : la
+  recherche du 2026-08-04 (`24-RESEARCH.md` R-1) établit qu'**aucune version de
+  `@opengsd/gsd-core` au-delà de `1.9.1` n'est publiée sur npm**, si bien que le prérequis dur du
+  verdict de la zone 2 ne peut pas être satisfait et que la clause de repli de `GSDA-01`
+  s'applique — déclencheur de reprise objectif gravé, jamais un abandon silencieux.
 
 ---
 *Requirements defined: 2026-06-04*
