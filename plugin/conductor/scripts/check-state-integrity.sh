@@ -43,12 +43,15 @@
 # sinon `.planning/STATE.md` (comportement historique, strictement inchangé).
 # `--file` EXPLICITE PRIME TOUJOURS : la résolution automatique ne le réécrase JAMAIS, quelle que
 # soit la valeur de GSD_WORKSTREAM ou du pointeur.
-# Ordre de résolution, court-circuitant : VF_STATE_WORKSTREAM, puis GSD_WORKSTREAM (canal de premier
-# rang du moteur), puis la 1re ligne du pointeur PARTAGÉ in-repo `<path>/.planning/active-workstream`.
-# Nom validé contre la politique du moteur (workstream-name-policy.cjs : 1er caractère
-# alphanumérique, puis alphanumériques, point, souligné, tiret ; ni séparateur de chemin, ni
-# `.`/`..`, ni `..` en sous-chaîne) plus une borne locale de 80 caractères ; un nom hors politique
-# est traité comme « aucun workstream » et n'est JAMAIS concaténé dans un chemin (T-24-04-01).
+# PRÉCONDITION DE PARTITIONNEMENT : la résolution ne s'arme QUE si `<path>/.planning/workstreams/`
+# existe. Sans elle, ce script était le seul des quatre à rendre un verdict sur un dépôt NON
+# partitionné : `GSD_WORKSTREAM=feature-x` le faisait sortir en 2 là où ses trois pairs
+# poursuivaient — et le déclencheur n'avait rien d'hypothétique, `check-workstream-pointer.sh`
+# PRESCRIT littéralement `export GSD_WORKSTREAM=<nom>` comme remède.
+# Politique de nom et ordre de résolution : `workstream-policy.sh` (planning-core), fichier SOURCÉ
+# et partagé par les quatre gates — voir son en-tête pour la politique UNIQUE, la parité amont et
+# la gradation par rôle du cas « résolu mais dossier absent ». La surcharge historique
+# VF_STATE_WORKSTREAM reste le premier canal.
 # FRONTIÈRE ASSUMÉE : le pointeur de SESSION en os.tmpdir() n'est PAS lu ici — indexé sur un
 # condensat de chemin absolu et une clé de session que bash ne reproduit pas fidèlement.
 #
@@ -61,10 +64,13 @@
 #
 # Codes de sortie : 0 = conforme · 1 = régression ou invariant rompu (message stderr précise lequel)
 #                   2 = erreur d'intégrité (hors dépôt git, fichier/ref illisible, champ imparsable,
-#                       OU workstream résolu dont le dossier `.planning/workstreams/<nom>/` est
-#                       introuvable — même posture fail-closed que ligne « hors dépôt git » : on ne
-#                       retombe JAMAIS en silence sur le STATE.md de la racine, ce serait rendre
-#                       « conforme » sur un fichier que l'on n'a pas vérifié)
+#                       workstream résolu dont le dossier `.planning/workstreams/<nom>/` est
+#                       introuvable, OU nom/pointeur REJETÉ par la politique amont — même posture
+#                       fail-closed que ligne « hors dépôt git » : on ne retombe JAMAIS en silence
+#                       sur le STATE.md de la racine, ce serait rendre « conforme » sur un fichier
+#                       que l'on n'a pas vérifié. Le rejet d'un nom retombait précisément sur la
+#                       racine en rendant « exit 0 conforme » — fail-OPEN, l'exact inverse de ce
+#                       que cette ligne jure.)
 #                   64 = usage
 set -uo pipefail
 
@@ -107,47 +113,40 @@ fi
 # Position volontaire : la précondition « on est dans un dépôt » reste le premier échec de premier
 # rang. Position volontaire aussi vis-à-vis de `--file` : la résolution ne s'applique QUE si
 # l'appelant n'a rien imposé (FILE_REL_EXPLICIT=0), jamais l'inverse.
-# Politique de nom recopiée du moteur amont ; la borne de longueur est une addition LOCALE,
-# strictement plus sévère — elle ne peut donc accepter aucun nom qu'amont refuserait.
-ws_trim() { printf '%s' "$1" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'; }
+# La politique de nom n'est PLUS recopiée ici : elle est SOURCÉE (voir en-tête). Une copie locale
+# avait divergé du moteur amont ET de ses trois pairs en un seul lot de travail parallèle.
+WS_POLICY=""
+for _cand in "$(dirname "$0")/workstream-policy.sh" \
+             "$(dirname "$0")/../../planning-core/scripts/workstream-policy.sh"; do
+  [ -r "$_cand" ] && { WS_POLICY="$_cand"; break; }
+done
+if [ -z "$WS_POLICY" ]; then
+  # Fail-closed, même posture que « hors dépôt git » : sans la politique, ce script ne peut pas
+  # savoir QUEL fichier il doit vérifier. Rendre « conforme » sur la racine serait un vert rendu
+  # par défaut d'outillage. Le cas est structurellement impossible dans un lab conforme (conductor
+  # requiert planning-core), donc jamais un coût en régime nominal.
+  echo "[check-state-integrity] workstream-policy.sh introuvable — politique de workstream non chargeable, intégrité non vérifiable" >&2
+  exit 2
+fi
+# shellcheck source=/dev/null
+. "$WS_POLICY"
 
-ws_name_valid() { # <nom>
-  local n="$1"
-  [ -n "$n" ] || return 1
-  [ "${#n}" -le 80 ] || return 1
-  case "$n" in */*|*\\*|.|..|*..*) return 1 ;; esac
-  printf '%s' "$n" | grep -Eq '^[a-zA-Z0-9][a-zA-Z0-9._-]*$'
-}
-
-# Imprime le nom résolu ET valide, ou RIEN. Sort en 2 sans rien imprimer quand un nom a bien été
-# résolu mais qu'il est hors politique — l'appelant distingue « aucun workstream » de « rejeté »
-# sans jamais voir la valeur brute (non maîtrisée par construction — T-24-04-01).
-ws_resolve() {
-  local n=""
-  if [ -n "${VF_STATE_WORKSTREAM:-}" ]; then
-    n="$VF_STATE_WORKSTREAM"
-  elif [ -n "${GSD_WORKSTREAM:-}" ]; then
-    n="$GSD_WORKSTREAM"
-  elif [ -r "$ROOT/.planning/active-workstream" ]; then
-    n="$(head -n 1 "$ROOT/.planning/active-workstream" 2>/dev/null)"
-  fi
-  n="$(ws_trim "$n")"
-  [ -n "$n" ] || return 0
-  ws_name_valid "$n" || return 2
-  printf '%s' "$n"
-}
-
-if [ "$FILE_REL_EXPLICIT" -eq 0 ]; then
-  WS="$(ws_resolve)"; ws_rc=$?
+if [ "$FILE_REL_EXPLICIT" -eq 0 ] && [ -d "$ROOT/.planning/workstreams" ]; then
+  vf_ws_resolve "$ROOT/.planning" "${VF_STATE_WORKSTREAM:-}"; ws_rc=$?
   if [ "$ws_rc" -eq 2 ]; then
-    echo "[check-state-integrity] nom de workstream hors politique — rejeté, aucun chemin construit ; vérification sur $FILE_REL" >&2
-  elif [ -n "$WS" ]; then
-    if [ -d "$ROOT/.planning/workstreams/$WS" ]; then
-      FILE_REL=".planning/workstreams/$WS/STATE.md"
+    # Le REJET est fail-closed, comme le dossier absent ci-dessous. Il retombait auparavant sur le
+    # STATE.md de la racine en rendant « exit 0 conforme » : un nom rejeté désarmait le gate.
+    # Seule la RAISON est imprimée — jamais la valeur, non maîtrisée par construction (T-24-04-01).
+    echo "[check-state-integrity] workstream rejeté par la politique amont ($VF_WS_REASON, canal $VF_WS_SOURCE) — aucun chemin construit, intégrité non vérifiable" >&2
+    exit 2
+  fi
+  if [ -n "$VF_WS_NAME" ]; then
+    if [ -d "$ROOT/.planning/workstreams/$VF_WS_NAME" ]; then
+      FILE_REL=".planning/workstreams/$VF_WS_NAME/STATE.md"
     else
       # Fail-closed : ne JAMAIS retomber sur le STATE.md de la racine — ce serait rendre un verdict
       # de conformité sur un fichier autre que celui que l'appelant croit vérifier.
-      echo "[check-state-integrity] workstream « $WS » actif mais .planning/workstreams/$WS introuvable sous $ROOT — intégrité non vérifiable" >&2
+      echo "[check-state-integrity] workstream « $VF_WS_NAME » actif mais .planning/workstreams/$VF_WS_NAME introuvable sous $ROOT — intégrité non vérifiable" >&2
       exit 2
     fi
   fi
