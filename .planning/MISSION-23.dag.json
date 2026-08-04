@@ -107,7 +107,7 @@
         "plugin/_internal/vibeflow-update.sh",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "revue-04",
@@ -480,7 +480,7 @@
       "scope": [
         "plugin/dev-orchestrator/scripts/check-gsd-config.sh"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "fix-ci-gsd-core",
@@ -599,7 +599,7 @@
       "scope": [
         ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-ARBITRAGES.md"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "arbitrage-f1-rce",
@@ -609,7 +609,89 @@
       "scope": [
         "plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh"
       ],
+      "status": "done"
+    },
+    {
+      "id": "propagation-a6",
+      "step": "A-12 cause racine documentaire : propager la requalification de frontiere A-6 a TOUS les plans, threat model T-23-04-07, motif A-1ter (A-13)",
+      "stage": "build",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-config-a9-a10-a14",
+      "step": "A-14 garde de type non-ordinaire + A-9 signal explicite 0 cle + canari CI + A-10 retrait branche 2 morte (check-gsd-config.sh uniquement)",
+      "stage": "build",
+      "deps": [],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/check-gsd-config.sh",
+        "plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh",
+        ".github/workflows/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "escalade-a10-missionflow",
+      "step": "HALT ADR-031 : moitie mission-flow.md d A-10 GELEE — premisse dementie par mesure (0 occurrence gsd-core sur 288 lignes ; branche 2 de $S = $HOME/.claude/scripts, VIVANTE)",
+      "stage": "arbitrage",
+      "deps": [],
+      "scope": [],
       "status": "ready"
+    },
+    {
+      "id": "balayage-frontiere",
+      "step": "A-12 balayage : chercher la redaction perimee de frontiere dans les 8 plans, corriger 23-05..23-08",
+      "stage": "build",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-05-PLAN.md",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-06-PLAN.md",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-07-PLAN.md",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-08-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "canari-generateur",
+      "step": "A-9 : etendre le canari CI au generateur une fois les deux scripts en lecture de texte",
+      "stage": "build",
+      "deps": [
+        "exec-04",
+        "fix-config-a9-a10-a14"
+      ],
+      "scope": [
+        ".github/workflows/"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-04b",
+      "step": "A-12 : lecteur de litteraux porte au generateur + garde de type reposee + F3 (non-execution assertee dans les deux sens) + F4 (retrait des 3 chemins d execution du piege) + F6 (borne de DUREE) + signal A-9 cote generateur + extension du canari CI",
+      "stage": "exec",
+      "deps": [
+        "arbitrage-f1-rce",
+        "propagation-a6",
+        "fix-config-a9-a10-a14"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh",
+        ".github/workflows/ci.yml"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "arbitrage-a10-re",
+      "step": "RE-ARBITRAGE PLEIN d A-10 sur son INTENTION (decision de Samuel 2026-08-04) : panel de recherche, verdict explicite sur la moitie mission-flow.md — geste de code ou caducite motivee. La moitie check-gsd-config.sh reste en place",
+      "stage": "human",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-23-*/23-ARBITRAGES*.md"
+      ],
+      "status": "running"
     }
   ]
 }
