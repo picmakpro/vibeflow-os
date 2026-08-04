@@ -8,47 +8,10 @@ status: complete
 stopped_at: "Phase 23 CLOSE et PUBLIÉE — 8/8 plans exécutés et revus, PR #30 mergée, release racine v2.47.0 taggée et publiée (gate check-release-tag --remote vert). 9 exigences GSDC sur 10 soldées ; GSDC-08 en [~] sur l'écart D-22 (gsd-debugger présent dans vf-coder.md contre une décision « aucune exception » ET exigé par le gate T19 — les deux se tranchent ensemble, arbitrage humain). Deux RCE fermées. Suite du module 102 -> 161 cas, 47 suites vertes. Livré hors phase au passage : correctif de la course de récupération du lock de driver (PR #31, conductor v1.19.1) — jusqu'à 5 acquéreurs simultanés mesurés, lock devenu lien symbolique remplacé par rename(2). Reste ouvert et NON traité : la fuite d'info par symlink (slurp sans O_NOFOLLOW, sur les deux scripts, absente du threat model), la promotion d'A-15 en ADR, et nyquist_compliant=false sur 23-VALIDATION.md (rempli a posteriori, la continuité d'échantillonnage n'a pas pu être mesurée). Prochaine phase : 24."
 last_updated: "2026-08-04T00:00:00.000Z"
 last_activity: 2026-08-04 (quick 260804-ki4 — cache du bandeau update invalidé puis régénéré en queue de /vf-update, conductor v1.19.2)
-# ▶ Mission Phase 24 EN COURS (2026-08-04, branche `feat/phase-24-activation-moteur-gsd`).
-# Arbitrages rendus (8), plan complet (12 plans / 4 vagues, plan-checker PASS, ledger GSDA-01..22),
-# VAGUE 1 LIVRÉE ET CORRIGÉE : plans 24-01/03/04/05, revue de jointure + audit, 6 bloquants fermés
-# par mutation (dont 2 CRITICAL : fuite symlink au SessionStart, gate CI ADR-063 désarmable).
-# 49 suites, 0 échec. VAGUE 2 : 24-02 (zone 2 DÉGELÉE et activée — waive #3 joué, ledger intact,
-# bug #2893 non manifesté ; ADR-066/067) et 24-08 (workstreams dans les agents) LIVRÉS.
-# VAGUES 2-3 LIVRÉES : 24-06 (intel), 24-07 (ADR-068), 24-08 (workstreams agents), 24-09 (CI
-# partitionnée), 24-10 (Iron Law 2 RÉVISÉE + ADR-069 adoption + remontée amont), 24-11 (gate
-# d'activation doc↔capability). Revue de jointure + audit passés : 1 bloquant + 8 majeurs + 2 HIGH
-# de sécurité, TOUS fermés par mutation (B1→B11). 50 suites vertes.
-# P1 et P2 SOLDÉES : P1 inversée chez ses porteurs réels ; P2 n'était PAS un écart de mesure mais
-# un CRITÈRE NON DÉCLARÉ — K1=5, K2=7, K3=16 sur 91, atteinte 91, gsd-core 1.9.1. ADR-069 grave
-# K2=7/91 avec sa commande. Re-vérifié indépendamment deux fois.
-# PHASE 24 CLOSE côté ingénierie — 12/12 plans livrés, revus, audités. 84 commits, 140 fichiers.
-# 24-12 : 10 modules bumpés (PAS 8 — kpi-analyst et validator sont des mono-agents invisibles au
-# balayage plugin/*/agents/), compteur des 2 README 47 → 51, check-version-sync VERT.
-# /gsd-secure-phase 24 : threats_open 18 → 4 → **1**. 46 menaces fermées SUR PREUVE CITÉE.
-# 51 suites, 0 échec. state-integrity ✓, invariants SAIN, version-sync ✓.
-# ⚠️ /gsd-ship RESTE BLOQUÉ sur UNE menace, et c'est exact : **T-24-02-01** n'attend plus aucun
-# travail d'ingénierie — elle attend un ACTE D'AUTORITÉ HUMAINE (re-disposition en `accept` avec
-# entrée nominative, ou réécriture de la mitigation). Sa mitigation promettait l'abstinence de
-# `gsd-tools windows`, or le waive a été exécuté sous dégel humain (ADR-066).
-# ⚠️ QUATRIÈME passage du motif symlink trouvé et fermé sur les 4 gates workstream-aware
-# (planning-context.sh injectait un STATE.md hors-lab dans le contexte de session, exit 0).
-# Dette d'architecture nommée dans CONCERNS.md : 6 implémentations du même besoin en 3 langages.
-# ⚠️ RESTE À ARBITRER (aucun n'est bloquant) : (a) les 4 scripts corrigés après le bump de 24-12
-# embarquent du code que leur CHANGELOG ne décrit pas ; (b) ~70 fichiers suivis portent un chemin
-# absolu contenant le nom d'utilisateur — dépôt PUBLIC, classe non couverte par le scrub ;
-# (c) `.planning` lui-même versionné en symlink = même vecteur au segment racine, non couvert.
-# La RELEASE RACINE (bump VERSION + tag + release GitHub) reste un geste humain gaté.
-# Détail complet :
-# .planning/missions/2026-08-04-phase-24-activation-moteur-gsd.md
-# ⚠ check-version-sync ROUGE assumé : README « 47 suites » vs 49 réelles — le plan 24-12 le referme.
-# (Historique) Mission mise en pause sur checkpoint humain plus tôt le 2026-08-04, branche
-# `feat/phase-24-activation-moteur-gsd`). Cadrage FAIT et commité : 24-CONTEXT.md, 24-ARBITRAGES.md
-# (6 zones, 4 options chacune), 24-DISCUSSION-LOG.md. Aucun plan, aucune exécution — la phase attend
-# 6 arbitrages de Samuel. Détail, faits re-vérifiés et recherche amont :
-# .planning/missions/2026-08-04-phase-24-activation-moteur-gsd.md ; DAG : missions/dag-phase24.json.
-# 8 faits du ROADMAP §Phase 24 sur 23 ont péri en 4 jours (3 inversent leur conclusion) — le recalage
-# du ROADMAP est différé au nœud `docs` de fin de mission, PAS encore fait.
-# ⚠ Compteurs `progress` ci-dessous INTACTS : aucune invocation `gsd-tools state` (ADR-063).
+# ▶ Phase 24 (activation du moteur GSD) : 12/12 plans livrés, revus, audités ; vérification
+# PASS PARTIEL (4 gaps) donc /gsd-ship reste bloqué. Récit complet, chiffres et arbitrages :
+# .planning/missions/2026-08-04-phase-24-activation-moteur-gsd.md — TENU COURT ICI À DESSEIN :
+# check-dev-bootstrap.sh ne lit que les 60 premières lignes (garde NR>60), un frontmatter plus
 
 # ⚠ Phase 21 close par sa gouvernance (plan 21-05), même patron que 20-07/c01f813 : 5/5 plans
 # livrés, vérification PASS PARTIEL 7/8 comblée (CI remise au vert — compteur de suites 44→45 —,
