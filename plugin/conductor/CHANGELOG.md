@@ -30,6 +30,29 @@
 - **`references/team-kernel.md`** — la marge de profondeur de dispatch est écrite (GSDA-22).
 - **`AGENT.md`** — Iron Law 2 révisée (ADR-069, adoption des workstreams GSD).
 
+### Corrigé
+
+- **Les deux gates de compartiment cessent de traverser un lien symbolique** (`T-24-14-C1`, 4ᵉ
+  passage du motif dans ce dépôt). `[ -d ]` **suit le lien** : un `.planning/workstreams/<nom>`
+  versionné en mode `120000` vers un répertoire hors du lab suffisait à leur faire quitter l'arbre du
+  lab. La résolution est déléguée aux primitives partagées de `planning-core`
+  (`vf_ws_dir_resolve` / `vf_ws_file_in_ws`) plutôt que réimplémentée une cinquième fois.
+
+  - **`check-state-integrity.sh`** rendait un verdict de conformité sur un `STATE.md` qui **n'est pas
+    celui que l'appelant croit vérifier** — exactement le fail-open qui avait motivé ce gate. **Rôle
+    de vérification → exit 2, « non vérifiable »** : le refus est audible, la cible n'est ni lue ni
+    nommée, seule la raison sort. Le `STATE.md` est contrôlé **au même titre** que le répertoire,
+    sinon la fuite se rejoue un cran plus bas.
+  - **`check-workstream-pointer.sh`** **bénissait la partition** (« dossier présent », exit 0) — le
+    vert sur lequel les trois autres gates s'appuient pour lire le compartiment. Il rend désormais
+    **exit 2** (il n'a **pas pu** regarder le compartiment) et non l'état 3 « signal », qui constate
+    une absence qu'il **a** pu voir. Trois raisons distinctes, énumération fermée, chacune expliquant
+    ce que la traversée aurait ouvert.
+
+  Cas licite **inchangé à l'octet près** : un vrai répertoire reste vert. Fermeture prouvée **par
+  mutation sur les quatre gates à la fois** (`planning-core/scripts/tests/test-workstream-symlink-escape.sh`) ;
+  `test-check-workstream-pointer.sh` reçoit son cas de non-régression.
+
 ## [v1.19.2] — 2026-08-04 (le bandeau cesse de mentir après /vf-update)
 
 ### Corrigé

@@ -20,6 +20,37 @@
 - **`planning-context.sh --max-lines`** cesse d'injecter une erreur d'outil dans le contexte produit :
   un message d'erreur passé pour du contenu est pire qu'une troncature annoncée.
 
+### Corrigé
+
+- **Échappement du répertoire de compartiment par lien symbolique** (`T-24-14-C1`, **4ᵉ passage du
+  motif dans ce dépôt**). La politique contraignait le **nom** du workstream et refusait un
+  pointeur-**fichier** en lien symbolique ; le **chemin** du compartiment, lui, n'était contraint par
+  rien. Les gates construisaient `<planning>/workstreams/<nom>` puis testaient `[ -d ]` — et `[ -d ]`
+  **suit le lien**. Un `.planning/workstreams/dev` versionné en mode `120000` vers un répertoire hors
+  du lab suffisait à faire **injecter le `STATE.md` de la cible dans le contexte de session**, en
+  exit 0 et **sans aucune action de la victime** au-delà de l'ouverture de session (hook
+  `SessionStart`). Reproduit sur dépôt piégé le 2026-08-04.
+
+  Deux primitives neuves dans **`workstream-policy.sh`** : `vf_ws_dir_resolve` (résout le
+  compartiment sans jamais traverser un lien — les **deux** segments sont contraints, `workstreams`
+  lui-même puis `workstreams/<nom>`, car détourner le premier détourne tous les compartiments d'un
+  coup) et `vf_ws_file_in_ws` (même contrôle sur les **fichiers** du compartiment : fermer le
+  répertoire en laissant le `STATE.md` ouvert verrouillerait la porte en laissant la fenêtre —
+  `[ -f ]` suit le lien exactement comme `[ -d ]`).
+
+  **Posture : on refuse de suivre**, on ne tente pas de décider si la cible est « dans le lab ». Un
+  tel test se réécrit avec `..`, dépend d'un `readlink -f` absent de macOS et ne survit pas à un
+  remontage. La cible n'est **jamais lue, jamais nommée** ; seule la raison sort, prise dans une
+  **énumération fermée** (`workstreams-lien-symbolique`, `compartiment-lien-symbolique`,
+  `fichier-compartiment-lien-symbolique`).
+
+  **`planning-context.sh`** consomme ces primitives selon la gradation par rôle déjà déclarée dans la
+  politique : **rôle injecteur** → repli sur la racine **plus une ligne qui nomme le refus**, jamais
+  un silence (un exit non nul dégraderait toutes les sessions). Le **cas licite est inchangé à
+  l'octet près** : un vrai répertoire reste vert. Nouvelle suite dédiée
+  `test-workstream-symlink-escape.sh` — la fermeture est prouvée **par mutation, sur les quatre
+  gates à la fois** (garde retirée → les quatre refuient).
+
 ## [v2.5.3] — 2026-07-31
 
 ### Corrigé

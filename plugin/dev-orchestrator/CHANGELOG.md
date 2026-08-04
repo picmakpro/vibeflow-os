@@ -38,6 +38,27 @@
 - **`test-dev-orchestrator.sh`** — le gate d'exhaustivité T14 interroge désormais l'**activation**,
   pas seulement le routage (+ T34, T35).
 
+### Corrigé
+
+- **`check-dev-bootstrap.sh` cesse de réimprimer le frontmatter d'une cible hors du lab**
+  (`T-24-14-C1`, 4ᵉ passage du motif dans ce dépôt). `[ -d ]` **suit le lien symbolique** : un
+  `.planning/workstreams/<nom>` versionné en mode `120000` vers un répertoire hors du lab faisait lire
+  le compartiment de la **cible** et réimprimer son frontmatter — « milestone *valeur de
+  l'attaquant* » — sur le **stdout d'un hook `SessionStart`**, donc sans aucune action de la victime.
+  La résolution passe par les primitives partagées de `planning-core` (`vf_ws_dir_resolve` /
+  `vf_ws_file_in_ws`), qui **refusent de traverser** au lieu de tenter de décider si la cible est
+  « dans le lab ».
+
+  **Rôle injecteur** (gradation déjà déclarée par la politique) : repli sur la racine, **jamais
+  muet** — un exit non nul dégraderait toutes les sessions, un silence masquerait le refus — et la
+  cible n'est ni lue ni nommée. Le garde `ws_readable` s'applique à `ROADMAP.md` **et** à `STATE.md`,
+  et c'est sur ce dernier qu'il compte le plus puisque c'est lui qui alimente la réimpression.
+
+  **Le chemin nominal reste inchangé à l'octet près** : `WS_SCOPED` n'est armé que lorsque la lecture
+  a quitté la racine pour un compartiment — hors compartiment, aucune indirection n'a été introduite,
+  donc rien à contrôler et aucun verdict qui bouge. Fermeture prouvée **par mutation sur les quatre
+  gates à la fois** (`plugin/planning-core/scripts/tests/test-workstream-symlink-escape.sh`).
+
 ## [v2.11.1] — 2026-08-04 (l'index des skills cesse de mentir sur sa propre provenance)
 
 ### Corrigé
