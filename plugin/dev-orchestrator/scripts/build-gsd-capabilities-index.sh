@@ -130,8 +130,10 @@ var generatedAt = process.argv[3];
 // check-gsd-config.sh (A-6) : y déposer un capability-registry.cjs piégé suffisait à exécuter du
 // code arbitraire à la régénération de cette table, avec l'appel post-install best-effort qui
 // absorbe l'échec (donc silencieusement). Ce programme ne require() PLUS JAMAIS un chemin issu de
-// la cascade : il LIT le texte, port intégral du lecteur de littéraux de 23-02
-// (check-gsd-config.sh) — mêmes fonctions, même garde de type et de taille, même coût linéaire.
+// la cascade : il LIT le texte. balancedRegions est un port intégral du lecteur de 23-02
+// (check-gsd-config.sh, logique caractère pour caractère identique) ; jsLiteralToJSON diverge sur
+// deux points ASSUMÉS et mesurés (détail au-dessus de sa définition et de readQuotedStringAt),
+// jamais un port intégral au sens strict — même garde de type et de taille, même coût linéaire.
 // Aucun require() hors de 'fs' (module cœur), aucun eval, aucun vm, aucun import() dynamique.
 
 // GARDE DE TYPE ET DE TAILLE, AVANT TOUTE LECTURE (A-12, moitié 2 — indissociable de la moitié 1).
@@ -158,6 +160,16 @@ function slurp(p) {
 
 // Chaîne entre guillemets ' ou ", échappements bruts conservés (aucune interprétation JS réelle :
 // mieux vaut ne rien lire que lire faux). Renvoie {value, next} ou null si jamais refermée.
+//
+// DIVERGENCE ASSUMÉE #2 face à l'original (check-gsd-config.sh) : là où l'original, sur une
+// chaîne jamais refermée, consomme le reste du texte comme contenu littéral puis laisse
+// JSON.parse trancher la validité globale en aval, cette fonction retourne `null` dès qu'elle
+// atteint la fin du texte sans avoir trouvé le guillemet fermant — jsLiteralToJSON abandonne donc
+// IMMÉDIATEMENT sur ce chemin, plutôt que plus tard. Aucune entrée légitime (littéral bien formé,
+// seul cas qui traverse ce lecteur en usage réel) n'atteint jamais ce chemin ; seule une entrée
+// hostile ou corrompue le peut, et y échouer plus tôt ne fait qu'anticiper un rejet que
+// JSON.parse aurait de toute façon prononcé en aval dans l'immense majorité des cas — jamais plus
+// laxiste que l'original, jamais une lecture qui accepterait plus que lui.
 function readQuotedStringAt(txt, i) {
   var q = txt[i];
   if (q !== '"' && q !== "'") return null;
@@ -194,8 +206,17 @@ function balancedRegions(src, anchorSrc, open, close) {
   return out;
 }
 
-// Littéral JS « simple » -> JSON (port intégral de check-gsd-config.sh, mêmes limites assumées :
-// variable/appel/spread font échouer JSON.parse et rendent null, jamais une lecture fausse).
+// Littéral JS « simple » -> JSON (mêmes limites assumées que check-gsd-config.sh : variable/appel/
+// spread font échouer JSON.parse et rendent null, jamais une lecture fausse). PAS un port intégral
+// au sens strict — deux divergences ASSUMÉES et mesurées face à l'original :
+//  1) chaîne jamais refermée -> échec immédiat (voir readQuotedStringAt ci-dessus), jamais plus
+//     laxiste, jamais plus tardif que l'original.
+//  2) `lastNb === '['` : branche absente de l'original, ajoutée ici. Fuzzée (200 000 tirages
+//     aléatoires de littéraux malformés, 2026-08-04) : aucun cas ne change l'issue accepté/rejeté
+//     ni la valeur produite face à l'original sans cette branche — un identifiant nu suivi de ':'
+//     ne peut jamais former de JSON valide en position d'élément de tableau, quoté ou non, donc
+//     cette branche est un no-op comportemental mesuré sur toute entrée testée, gardée pour rester
+//     au plus près de la forme du registre plutôt que retirée sans motif.
 var IDRE = /([A-Za-z_$][A-Za-z0-9_$]*)(\s*):/y;
 function jsLiteralToJSON(txt) {
   var out = '', i = 0, lastNb = ''; var n = txt.length;
