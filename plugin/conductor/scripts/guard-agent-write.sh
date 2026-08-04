@@ -118,7 +118,7 @@ reason = (
     + \" | Squelette canonique obligatoire : --- ; name: <kebab-case = nom du fichier> ; \"
     + \"description: <quand utiliser cet agent — declencheur du routage automatique> ; \"
     + \"model: sonnet|opus|haiku|fable|inherit ; memory: project ; \"
-    + \"skills: [<skills EXISTANTS, crees via skill-creator>] ; effort: <optionnel> ; --- \"
+    + \"skills: [<skills EXISTANTS, crees via skill-creator>] ; effort: low|medium|high|xhigh|max ; --- \"
     + \"| Verifier : bash .claude/scripts/check-agents.sh --file <fichier>\"
 )
 print(json.dumps({

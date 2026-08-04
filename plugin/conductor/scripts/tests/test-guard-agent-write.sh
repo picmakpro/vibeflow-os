@@ -52,6 +52,7 @@ CONFORME='---
 name: test-agent-conforme
 description: Agent de test conforme utilise par test-guard-agent-write pour prouver qu une ecriture licite passe le guard durci --strict.
 model: sonnet
+effort: medium
 memory: project
 tools: [Read, Write, Edit, Bash, Glob, Grep]
 ---
