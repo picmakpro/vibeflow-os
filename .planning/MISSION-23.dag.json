@@ -685,8 +685,8 @@
     },
     {
       "id": "arbitrage-a10-re",
-      "step": "RE-ARBITRAGE PLEIN d A-10 sur son INTENTION (decision de Samuel 2026-08-04) : panel de recherche, verdict explicite sur la moitie mission-flow.md — geste de code ou caducite motivee. La moitie check-gsd-config.sh reste en place",
-      "stage": "human",
+      "step": "INSTRUCTION LECTURE SEULE d'A-10 (initiative du MANAGER, PAS une decision de Samuel — erratum : le manager n2 avait ecrit a tort que le HALT etait tranche). Panel de 3 chercheurs pour preparer la decision humaine sur la moitie mission-flow.md. Ne tranche RIEN : escalade-a10-missionflow reste GELE (ADR-031)",
+      "stage": "verif",
       "deps": [],
       "scope": [
         ".planning/phases/VFDO-23-*/23-ARBITRAGES*.md"
