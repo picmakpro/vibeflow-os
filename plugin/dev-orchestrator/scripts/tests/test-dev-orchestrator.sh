@@ -5303,7 +5303,7 @@ if "$GREP" -q 'verdicts' "$CODER_FILE"; then
 else
   ko "T30-C1 : vf-coder.md ne nomme pas 'verdicts'"; t30_ok=0
 fi
-t30_dm_rapport="$(awk '/^## Rapport de mission/{f=1} f{print}' "$DEVMGR")"
+t30_dm_rapport="$(awk '/^## /{if (f) exit} /^## Rapport de mission/{f=1} f{print}' "$DEVMGR")"
 t30_dm_global="$("$GREP" -c 'verdicts' "$DEVMGR" 2>/dev/null || true)"
 if printf '%s\n' "$t30_dm_rapport" | "$GREP" -q 'verdicts' && [ "${t30_dm_global:-0}" -gt 2 ]; then
   ok "T30-C2 : vf-dev-manager.md nomme 'verdicts' dans §Rapport de mission (compte global $t30_dm_global > 2, ligne de base)"
@@ -5318,7 +5318,7 @@ fi
 # échouer.
 T30_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T30_TMPDIR"
 T30_MUT_ABSENT="$T30_TMPDIR/mutant-sans-absent.md"
-sed -E "s/ ou \`absent\`//g; s/vaut \`absent\`,? ?/vaut le succès, /g" "$T30_CONTRACTS" > "$T30_MUT_ABSENT"
+md_sed_folded "s/${MDSP}ou${MDSP}\`absent\`//g; s/vaut${MDSP}\`absent\`,?(${MDSP})?/vaut le succès, /g" "$T30_CONTRACTS" > "$T30_MUT_ABSENT"
 if cmp -s "$T30_CONTRACTS" "$T30_MUT_ABSENT"; then
   ko "T30-D : mutant IDENTIQUE à mission-contracts.md — l'ablation n'a rien mordu, la preuve ne vaut rien"; t30_ok=0
 else
