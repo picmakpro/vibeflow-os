@@ -637,11 +637,11 @@
     },
     {
       "id": "escalade-a10-missionflow",
-      "step": "HALT ADR-031 : moitie mission-flow.md d A-10 GELEE — premisse dementie par mesure (0 occurrence gsd-core sur 288 lignes ; branche 2 de $S = $HOME/.claude/scripts, VIVANTE)",
+      "step": "FERME le 2026-08-04 par le verdict A-15 (le HALT avait ete leve par Samuel lui-meme, pas par le manager)",
       "stage": "arbitrage",
       "deps": [],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "balayage-frontiere",
@@ -687,13 +687,13 @@
     },
     {
       "id": "arbitrage-a10-re",
-      "step": "INSTRUCTION LECTURE SEULE d'A-10 (initiative du MANAGER, PAS une decision de Samuel — erratum : le manager n2 avait ecrit a tort que le HALT etait tranche). Panel de 3 chercheurs pour preparer la decision humaine sur la moitie mission-flow.md. Ne tranche RIEN : escalade-a10-missionflow reste GELE (ADR-031)",
-      "stage": "verif",
+      "step": "ARBITRAGE PLEIN d'A-10 sur son INTENTION, mandate par Samuel le 2026-08-04 (option 2 sur 3 : re-arbitrer en entier). Instruit par un panel de 3 chercheurs. VERDICT RENDU : A-15 — moitie mission-flow.md CADUQUE, moitie check-gsd-config.sh maintenue, intention re-imputee a O-19(d) et O-20 qui restent ouverts",
+      "stage": "human",
       "deps": [],
       "scope": [
         ".planning/phases/VFDO-23-*/23-ARBITRAGES*.md"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "arbitrage-fuite-info",

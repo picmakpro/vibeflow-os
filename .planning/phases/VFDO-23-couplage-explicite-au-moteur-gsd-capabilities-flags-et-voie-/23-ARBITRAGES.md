@@ -345,3 +345,89 @@ terminent en 1 s sur FIFO ; celui-ci doit faire pareil.
 
 La seule occurrence de `statSync` dans le fichier est le **commentaire `:181` qui décrit la garde
 non posée** — poser la garde, c'est faire dire vrai à ce commentaire.
+
+---
+
+# Arbitrage du 2026-08-04 — A-15 (remplace la moitié non appliquée d'A-10)
+
+## A-15 — A-10 est **appliquée** sur `check-gsd-config.sh`, **périmée** sur `mission-flow.md`
+
+**Mandat.** Samuel a été consulté sur le HALT ADR-031 qui gelait la moitié `mission-flow.md`
+d'A-10, avec trois options (confirmer le gel · **ré-arbitrer A-10 en entier** · appliquer A-10 à la
+lettre). Il a choisi **ré-arbitrer A-10 en entier, sur son INTENTION et non sa lettre**. Instruction :
+panel de 3 chercheurs en lecture seule. Les trois angles convergent.
+
+**Décision. La moitié `mission-flow.md` d'A-10 est CADUQUE et se ferme par péremption motivée.
+Aucun retrait de la branche 2 de la cascade `$S`.** La moitié `check-gsd-config.sh`, mesurée morte,
+reste appliquée (`50edce3`) et n'est pas rouverte.
+
+### Pourquoi — trois preuves indépendantes
+
+**1. La phrase fondatrice est la reprise d'une phrase déjà rétractée.** « Des DEUX cascades,
+`mission-flow.md` portant le même défaut » reproduit mot pour mot le « porte donc le même défaut »
+écrit à la naissance d'O-12 (`69ac7b6`) et **démenti par mesure dès le lendemain** (`2a3f64e`). Le
+démenti vivait dans un encadré ; le paragraphe « Les voies » — celui qu'on lit pour choisir — a
+gardé le résidu fautif. **Le registre a produit lui-même la couverture apparente qu'il instruisait.**
+
+**2. La justification de sécurité ne transfère pas — elle se retourne.** Le seul raisonnement
+propre à l'arbitrage (« ouvre une voie de résolution aujourd'hui morte, donc une surface neuve, au
+moment précis où l'on ferme un vecteur d'exécution de code **via la résolution du moteur** ») est
+ancré nominativement sur A-6 et A-12. C'est un argument de **non-ajout**, pas de retrait. Appliqué à
+`$S`, il **contredit sa propre prescription** : retirer `$HOME/.claude/scripts` ne réduit aucune
+surface — c'est la **seule** voie de résolution d'un lab en scope **user**, justifiée trois fois dans
+la même section (`mission-flow.md:12-13, 21-24, 30-31`) — et fait retomber la résolution sur les
+crans `CLAUDE_PLUGIN_ROOT`, dont O-20 mesure qu'ils dégénèrent en racine du FS. **La lettre d'A-10
+appliquée ici ne durcit pas : elle fabrique un défaut de la famille que la phase ferme.**
+
+**3. Le registre porte déjà le critère qui départage, et il exclut ce cas.** O-20 tranche le cas du
+cran 4 — mort, mais **explicitement documenté** : « *fallback de compatibilité documenté… honnête,
+pas trompeur — à distinguer d'O-12* ». Le critère O-12 est **chemin malformé + n'a jamais résolu +
+non documenté**. La branche retirée de `check-gsd-config.sh` était morte **et tue**. La branche 2 de
+`$S` est **vivante et documentée**. Ce ne sont pas les mêmes objets.
+
+**Borne de périmètre.** `23-CONTEXT.md:9-15` fixe « neuf surfaces, et pas une de plus » ; la surface
+`mission-flow.md` y est bornée au budget, au halt et à la table de déclencheurs — **pas** à `$S`.
+
+### Ce que la fermeture ne doit PAS emporter avec elle
+
+La péremption porte sur **la lettre**, pas sur l'intuition. L'intention d'A-10 — fermer les
+couvertures apparentes — **a un objet réel sur `$S`**, mais ce n'est pas celui qu'A-10 nommait, et il
+est déjà instruit ailleurs. Il est **explicitement ré-imputé**, pour que cette clôture ne soit pas un
+abandon :
+
+- **O-19 (voie d)** — `check-gsd-config.sh:195-196` affirme avoir « la même priorité que la cascade
+  `$S` de `mission-flow.md` ». **Faux pour 5 foyers sur 7** (recompté au foyer près par deux méthodes
+  croisées). Un renvoi croisé qui certifie une équivalence inexistante, dans le script même que cette
+  phase durcit. Fait neuf du panel : les 5 foyers divergents ne sont **pas une dérive de doctrine**
+  mais la **propagation non faite du commit `54c5f41` (2026-07-25)**, resté dans le seul module
+  `dev-orchestrator` — et les 3 blocs de bundle sont **byte-identiques** (md5 trois fois le même),
+  donc du copier-coller, pas de la reformulation. Cela requalifie O-19 en **dette de propagation
+  datée**, nettement plus tractable qu'un refactor.
+- **O-20** — `$S` **n'a aucune branche d'échec**. Mesuré : les 4 crans absents donnent `S=""`, puis
+  `/driver-lock.sh` → **exit 127**, un état qui n'existe dans aucun des trois cas du protocole
+  (`acquired:true|false`, `recovered`). Asymétrie accablante : le même fichier sait poser cette garde
+  ailleurs, et `vf-update` aussi — mais le foyer qui prend le **verrou anti-collision** ne la pose
+  pas.
+
+**Ces deux points restent OUVERTS et ne sont pas tranchés ici** : les trancher depuis cet arbitrage
+serait exactement la dérive de périmètre que le panel chiffre comme la raison d'écarter la voie
+transverse (6 fichiers hors des 8 plans, édition concurrente sur le fichier le plus disputé de la
+phase, halt P11 du kernel).
+
+### Réserve sur la durée de vie de cette décision
+
+Mesuré (angle 3) : **0 `SECURITY.md`** dans le dépôt, les 2 jalons archivés ne conservent que
+REQUIREMENTS + ROADMAP, et **aucune phase antérieure n'a jamais produit d'`ARBITRAGES.md`**. Une
+caducité qui ne vit que dans un registre de phase a une **durée de vie nulle** — c'est un oubli
+différé, pas une décision. Le seul lieu de résidence durable démontré est `docs/ADR.md`, et
+**ADR-062 a déjà établi qu'un « on ne fait rien » vaut un ADR** (il rejette nommément l'option
+« statu quo silencieux »). **Promotion en ADR recommandée à Samuel, non exécutée ici** (créer un ADR
+est un acte de doctrine).
+
+### Ce qui reste vrai et n'est pas rejoué
+
+Faits acquis, mesurés avant cet arbitrage : `mission-flow.md` porte **0 occurrence** de `gsd-core`
+sur ses 288 lignes ; sa cascade `$S` résout des dossiers de **scripts**, sans rapport avec le layout
+du tarball npm ; sa branche 2 est `$HOME/.claude/scripts`, vivante et documentée.
+
+**Le nœud `escalade-a10-missionflow` se ferme sur ce verdict.**
