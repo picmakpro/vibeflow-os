@@ -46,8 +46,11 @@ refus repose, **en tout ou partie**, sur de la conformité interne plutôt que s
 
 ## C-1 — Iron Law 2 contre l'adoption des workstreams
 
-**Loi.** `plugin/conductor/AGENT.md:114` — « **Router, jamais réimplémenter.** »
-(Les 4 Iron Laws occupent les lignes 113-116 ; c'est la 2ᵉ.)
+**Loi.** `plugin/conductor/AGENT.md:115` — « **Router, jamais réimplémenter.** » (formulation
+antérieure ; la ligne porte aujourd'hui la formulation révisée, cf. Statut plus bas).
+(Les 4 Iron Laws occupent les lignes **114-117** ; c'est la 2ᵉ, donc la **115**. Ancres re-vérifiées
+le 2026-08-04 : les précédentes — `:114` pour la loi, `113-116` pour le bloc — étaient décalées d'une
+ligne et pointaient sur l'**Iron Law 1**.)
 
 **Usage GSD contrarié.** L'adoption des workstreams (verdict zone 5, option C) oblige le lab à
 **réimplémenter** la résolution du workstream actif dans sa propre couche : trois gates bash
@@ -71,8 +74,11 @@ révision doit préserver le premier interdit tout en autorisant le second. Form
 
 **Statut : ✅ RÉVISION APPLIQUÉE le 2026-08-04** par `24-10`, tâche 1 (autorisation : verdict zone 5,
 point 1 — « soit on la révise, soit on écrit pourquoi elle ne s'applique pas — ne pas la contourner
-en silence »). **Seule entrée de cet inventaire dont la révision effective a été validée, et la
-seule appliquée.**
+en silence »). **Première des DEUX entrées appliquées de cet inventaire** — l'autre est **C-6**
+(amendement d'ADR-064), appliquée le même jour. Toutes les autres restent des PROPOSITIONS.
+*(Correction du 2026-08-04, nœud 24-13 : ce paragraphe portait « seule entrée … et la seule
+appliquée », en contradiction directe avec l'encadré d'ouverture « sauf deux » et avec le statut de
+C-6 plus bas. C'était le compte de C-1 seul, écrit avant que C-6 ne soit appliquée.)*
 
 **Ce qui a été écrit.** L'item 2 du bloc `## Iron Laws` de `plugin/conductor/AGENT.md` devient
 « **Router, jamais forker — une capacité amont partiellement couverte se câble en écrivant ses
@@ -242,8 +248,8 @@ workstream actif. L'arbitrage l'a inventorié en **risque (c)** : le pointeur vi
 reboot, indexé sur le chemin absolu, donc distinct par worktree et jamais hérité** — et conclut à la
 **non-composabilité** avec ADR-064.
 
-**Fait nouveau mesuré le 2026-08-04 (`24-RESEARCH.md` R-2b/R-2c) — la collision est RÉELLE mais
-CONTOURNABLE.** L'inventaire de risques de l'arbitrage était **incomplet** :
+**Fait nouveau mesuré le 2026-08-04 (`24-RESEARCH.md` R-2b/R-2c) — la collision est RÉELLE, et elle
+se COMPOSE par le canal nominal.** L'inventaire de risques de l'arbitrage était **incomplet** :
 
 1. La résolution du workstream actif a **trois niveaux court-circuitants**
    (`resolveActiveWorkstream`, `active-workstream-store.cjs:252-277`) :
@@ -259,8 +265,15 @@ CONTOURNABLE.** L'inventaire de risques de l'arbitrage était **incomplet** :
 
 **Conséquence.** `GSD_WORKSTREAM` est un **canal de premier rang, indépendant du pointeur**. Un
 worktree qui l'exporte résout son workstream **sans jamais toucher au fichier de `os.tmpdir()`** —
-la non-composabilité tombe. C'est la voie de mitigation **la moins coûteuse**, et elle **n'existait
-pas** dans l'inventaire de risques de l'arbitrage.
+la non-composabilité tombe. C'est la voie **la moins coûteuse**, et elle **n'existait pas** dans
+l'inventaire de risques de l'arbitrage.
+
+*(Vocabulaire rectifié le 2026-08-04, nœud 24-13.* Ce paragraphe et le précédent qualifiaient
+`GSD_WORKSTREAM` de « **contournement** » et de « **voie de mitigation** » — contre leur propre
+conclusion, reprise telle quelle par ADR-069 : c'est le **canal NOMINAL**, niveau 2 de la résolution
+amont, et non un détour autour d'un défaut. La nuance n'est pas cosmétique : un contournement se
+tolère et se retire au premier refactoring, un canal nominal se **borne** et se **teste** — c'est
+d'ailleurs ce qui a fait découvrir qu'il n'avait, lui, aucune borne de longueur.*)
 
 **Proposition — AMENDER ADR-064**, sans le contredire : ajouter que, sur un arbre partitionné en
 workstreams, l'isolation « un écrivain = un worktree » se **compose** avec les workstreams via
@@ -406,6 +419,7 @@ l'étage qui marche, sans rien préjuger de l'arbitrage.
 
 `24-ARBITRAGES.md` (verdicts) · `24-RESEARCH.md` (R-1, R-2) · `24-CONTEXT.md` (F-01→F-38) ·
 `.planning/REQUIREMENTS.md` § Hors-milestone Phase 24 (GSDA-01→22) ·
-`plugin/conductor/AGENT.md:113-116` · `docs/ADR.md` (ADR-057, ADR-064, ADR-031) ·
+`plugin/conductor/AGENT.md:114-117` (les 4 Iron Laws ; ancre re-vérifiée le 2026-08-04) ·
+`docs/ADR.md` (ADR-057, ADR-064, ADR-069, ADR-031) ·
 `.planning/missions/2026-07-31-mesure-m2-dispatch-parallele.md` ·
 `.planning/missions/2026-08-04-phase-24-activation-moteur-gsd.md`

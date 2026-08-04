@@ -1518,11 +1518,24 @@ chantiers simultanés — chaque avancée de l'un réécrit la position de l'aut
 
 GSD porte la réponse nativement (`.planning/workstreams/<nom>/`, flag `--ws`, `bin/lib/workstream.cjs`,
 `gsd-tools workstream list` → `"mode": "workstream"`). **Mais la capacité est à moitié câblée en
-amont** : sur les **91 workflows** de gsd-core 1.9.0, **16 la connaissent, 37 codent en dur
-`.planning/ROADMAP.md` / `STATE.md` / `phases/`** (`add-phase`, `verify-phase`, `next`, `pr-branch`,
-`execute-plan`, `extract-learnings`, `complete-milestone`…). Couverture réelle : **18 %**. Adopter en
-l'état, c'est faire tourner le lab contre sa propre chaîne d'outils — le cas que l'**Iron Law 2**
-interdit (`conductor/AGENT.md:114`).
+amont** : sur les **91 workflows** de gsd-core **1.9.1**, **16 bruts / 15 réels** la connaissent au
+critère le plus large (`K3` : le mot `workstream`, l'option `--ws` ou la variable `GSD_WS` — un faux
+positif nommé, `reapply-patches.md:220`, qui ne cite `${GSD_WS}` que comme exemple de dérive), et
+**45 codent en dur** `.planning/ROADMAP.md` / `STATE.md` / `phases/` (`add-phase`, `verify-phase`,
+`next`, `pr-branch`, `execute-plan`, `extract-learnings`, `complete-milestone`…). Couverture :
+**17,6 % bruts / 16,5 % réels** au critère K3, **7,7 %** au critère K2 (« le workflow sait-il
+résoudre un scope »). Adopter en l'état, c'est faire tourner le lab contre sa propre chaîne
+d'outils — le cas que visait l'**Iron Law 2**.
+
+> **Faits corrigés le 2026-08-04 (nœud 24-13), les seuls de ce paragraphe.** Trois périmés y
+> figuraient et sont rectifiés ci-dessus : le **« 37 en dur »**, jamais réconcilié avec la mesure
+> finale (**45**) ; la version du moteur (**1.9.0 → 1.9.1**) ; et le **~18 %** laissé sans critère,
+> désormais nommé (K3) et daté. L'**Iron Law 2** figurait ici dans sa formulation **pré-révision**
+> avec une ancre périmée (`conductor/AGENT.md:114`, qui est aujourd'hui l'**Iron Law 1**) : elle a
+> été révisée par **ADR-069** en « *Router, jamais forker — une capacité amont partiellement
+> couverte se câble en écrivant ses limites, elle ne se réimplémente pas* », et se lit désormais en
+> `plugin/conductor/AGENT.md:115` avec sa trace de révision juste en dessous. Le reste de ce bloc
+> n'est PAS recalé : il appartient au nœud de documentation de fin de mission.
 
 Faits établis en bac à sable sur la PR #27 (worktree `c0908fd`, gsd-core 1.9.0), qui bornent
 l'arbitrage :

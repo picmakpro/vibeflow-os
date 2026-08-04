@@ -246,7 +246,7 @@ en zone 6 ci-dessous.
   depuis le **2026-08-03T06:56:32Z** (`state: CLOSED`, `isDraft: true`,
   `reviewDecision: CHANGES_REQUESTED`, `mergedAt: null`, auteur `picmakpro`). Elle n'a pas été
   mergée et n'est plus ouverte. **Le statu quo de fait est aujourd'hui le refus.**
-- **F-34 [PÉRIMÉ — la couverture est BIEN PIRE que 18 %] :** re-mesure sur les **91 workflows
+- **F-34 [MESURES EXACTES, CONCLUSION INVALIDÉE — voir ADR-069] :** re-mesure sur les **91 workflows
   racine** de la 1.9.1 (compte confirmé), en `awk` + `comm` (jamais en `grep` piped) :
   **7 workflows seulement** connaissent les workstreams (5 sur le motif `workstream` insensible à la
   casse — `new-milestone`, `settings`, `settings-advanced`, `settings-integrations`, `transition` —
@@ -254,8 +254,15 @@ en zone 6 ci-dessous.
   **42 sans aucune conscience des workstreams** (`add-phase`, `execute-phase`, `execute-plan`,
   `next`, `pr-branch`, `plan-phase`, `discuss-phase`, `ship`, `complete-milestone`,
   `extract-learnings`, `quick`, `progress`, `undo`…). **Couverture réelle : 7/91 = 7,7 %**, pas
-  18 %. La divergence avec le chiffre du ROADMAP tient à la méthode de comptage, non à une
-  régression amont — mais la conclusion s'en trouve durcie, pas adoucie.
+  18 %.
+  > **Renvoi (2026-08-04, nœud de correction 24-13).** Les trois nombres ci-dessus — 7/91, 45, 42 —
+  > sont EXACTS et re-vérifiés. La phrase de conclusion qui les suivait (« la couverture est BIEN
+  > PIRE que 18 % … la conclusion s'en trouve durcie ») est **INVALIDÉE** : `ADR-069` a établi que
+  > les trois mesures qui ont circulé mesuraient trois CRITÈRES différents (K1/K2/K3) et qu'aucune
+  > n'était fausse. 7/91 est K2 ; le ~18 % du ROADMAP est K3, réhabilité à **17,6 % bruts / 16,5 %
+  > réels** (un faux positif nommé). Il n'y avait donc pas de durcissement, mais un critère à
+  > écrire. La trace est conservée telle quelle ; c'est l'égarement qui s'arrête ici.
+  > Voir `docs/ADR.md` (ADR-069), `24-COLLISIONS.md` §critères, `plugin/dev-orchestrator/references/workstreams.md` §4.
 - **F-35 [CONFIRMÉ, mécanisme lu ; symptôme NON RE-MESURÉ] :** les trois constats d'outillage
   aveugle tiennent **par lecture du code** — `check-dev-bootstrap.sh:111` cherche
   `"$PLANNING_DIR/ROADMAP.md"` en dur ; `check-state-integrity.sh:53` fixe

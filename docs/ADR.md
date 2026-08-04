@@ -33,7 +33,7 @@
 | ADR-061 | 2026-07-31 | Les lanes de revue cross-AI de plans (amont) et l'étage de revue de code (ADR-060) sont des objets disjoints | Validée |
 | ADR-062 | 2026-07-31 | Les deux hooks 1.9.0 non câblés restent hors périmètre de `merge-hooks.sh` | Validée |
 | ADR-063 | 2026-07-31 | Anomalie d'agrégation `.planning/STATE.md` : dette d'artefact locale + bug amont non scopé — gate local, jamais de correction par `gsd-tools state` | Validée |
-| ADR-064 | 2026-08-01 | Un écrivain = un worktree : l'isolation des sessions concurrentes devient physique, et le claim de branche se dit à tout le monde (advisory) | Validée |
+| ADR-064 | 2026-08-01 | Un écrivain = un worktree : l'isolation des sessions concurrentes devient physique, et le claim de branche se dit à tout le monde (advisory) | Validée — amendée par ADR-069 (`GSD_WORKSTREAM` devient le canal nominal) |
 | ADR-066 | 2026-08-04 | La zone 2 est activée, pas différée : un prérequis de version insatisfiable ne gate pas, et le risque mesuré est inexistant | Validée |
 | ADR-067 | 2026-08-04 | `hooks.community` refusé : c'est une mesure de style, pas de conformité — 6 types maison hors liste amont, 68 % des sujets > 72 caractères | Validée |
 | ADR-068 | 2026-08-04 | Profils de contexte du moteur refusés (rien à activer, notre contrat typé est per-rôle et plus strict) — et `workflow.inline_plan_threshold` inchangé à 2, la mesure étant le livrable | Validée |
@@ -1979,7 +1979,14 @@ d'inclusion nommé et sa commande rejouable.**
 |---|---|---|---|---|---|
 | K1 | le mot `workstream` seul | 5 | 5,5 % | 45 | 43 |
 | **K2** | **le mot `workstream` ou l'option `--ws` — *résout le scope*** | **7** | **7,7 %** | **45** | **42** |
-| K3 | K2 ou la variable `GSD_WS` — toute forme de surface | 16 | 17,6 % | 45 | 35 |
+| K3 | K2 ou la variable `GSD_WS` — toute forme de surface | 16 bruts / **15 réels** | 17,6 % / **16,5 %** | 45 | 35 |
+
+> **La réserve de K3 est indissociable de son chiffre.** `reapply-patches.md:220` ne cite `${GSD_WS}`
+> que comme *exemple de dérive de variable* dans une doc de rapprochement de patchs : il n'est
+> workstream-aware en rien. K3 vaut donc **16 bruts / 15 réels**, soit **16,5 %** et non 17,6 %.
+> Toute la réhabilitation du « ~18 % » du ROADMAP repose sur ce taux — le citer sans sa réserve,
+> c'est refaire, un cran plus bas, l'erreur que cette ADR corrige : un nombre sans son critère.
+> (`24-COLLISIONS.md:324-326`.)
 
 ```bash
 W="$HOME/.claude/gsd-core/workflows"; T1=$(mktemp); H=$(mktemp); seen=0

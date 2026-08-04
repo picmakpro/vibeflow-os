@@ -75,8 +75,11 @@ par worktree et **jamais hérité** — non composable avec **ADR-064** (« un �
 **Ce n'est pas générique, c'est mesuré.** L'adaptateur `os.tmpdir()` n'est retenu que si une clé de
 session résout ; sinon le moteur retombe sur le pointeur **in-repo** `.planning/active-workstream`,
 lui composable. Sous Claude Code, mesuré ce 2026-08-04, la clé effective est
-`CLAUDE_CODE_SSE_PORT` — un numéro de port, donc **recyclable** : la clé observée valait
-`claude-code-sse-port-25130`. C'est donc bien l'adaptateur `os.tmpdir()` qui est retenu ici, et le
+`CLAUDE_CODE_SSE_PORT` — un numéro de port, donc **recyclable** : la clé observée avait la forme
+`claude-code-sse-port-<port>`. **La valeur résolue n'est pas publiée** : ce fichier est distribué à
+chaque installation depuis un dépôt public, et le threat model de ce lot n'accepte le risque qu'au
+motif exprès qu'on y décrit la **forme** d'un chemin, **jamais sa valeur** relevée sur un poste.
+C'est donc bien l'adaptateur `os.tmpdir()` qui est retenu ici, et le
 canal fichier in-repo **n'est jamais lu** : le moteur rend `null` pendant que
 `.planning/active-workstream` dit `dev` (table du §2). Un runtime sans clé de session, lui,
 tomberait sur le canal in-repo et n'aurait pas ce problème — ne généralise pas notre mesure.
@@ -103,11 +106,22 @@ partie.
 **Un taux de couverture ne veut rien dire sans son critère d'inclusion nommé.** Trois critères
 cohabitent sur ce corpus, et ils ne posent pas la même question :
 
-| Critère | Ce qu'il compte | Conscients | Taux | Aveugles |
-|---|---|---|---|---|
-| K1 | le mot `workstream` seul — *le mot apparaît-il ?* | 5 | 5,5 % | 43 |
-| **K2** | K1 **ou** l'option `--ws` — *le workflow sait-il résoudre un scope ?* | **7** | **7,7 %** | **42** |
-| K3 | K2 **ou** la variable `GSD_WS` — *toute forme de surface* | 16 | 17,6 % | 35 |
+| Critère | Ce qu'il compte | Conscients | Taux | En dur | Aveugles |
+|---|---|---|---|---|---|
+| K1 | le mot `workstream` seul — *le mot apparaît-il ?* | 5 | 5,5 % | 45 | 43 |
+| **K2** | K1 **ou** l'option `--ws` — *le workflow sait-il résoudre un scope ?* | **7** | **7,7 %** | **45** | **42** |
+| K3 | K2 **ou** la variable `GSD_WS` — *toute forme de surface* | 16 bruts / **15 réels** | 17,6 % / **16,5 %** | 45 | 35 |
+
+La colonne **En dur** vaut 45 aux trois critères, et ce n'est pas une redondance : elle montre que
+le dénominateur du problème ne bouge pas quand le critère bouge. Une table qui l'omettrait laisserait
+croire qu'un critère plus large réduit la dette — il ne fait que compter autrement ceux qui la
+portent.
+
+**K3 porte une réserve, et elle est indissociable de son chiffre.** `reapply-patches.md:220` ne cite
+`${GSD_WS}` que comme *exemple de dérive de variable* dans une doc de rapprochement de patchs : il
+n'est workstream-aware en rien. K3 vaut donc **16 bruts / 15 réels**, soit **16,5 %**. C'est ce taux,
+et non 17,6 %, qui réhabilite le « ~18 % » du ROADMAP — le citer sans sa réserve reproduirait un cran
+plus bas l'erreur que ce tableau corrige : un nombre sans son critère.
 
 **K2 est le critère de cette référence**, parce que c'est lui qui répond à la seule question qui
 nous engage : le workflow sait-il sur quel compartiment il travaille. Les trois mesures qui ont
