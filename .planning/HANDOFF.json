@@ -6,11 +6,11 @@
   "phase_dir": ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-",
   "worktree": "/Users/samuel/Documents/dev/vibeflow-os-p23",
   "branch": "feat/phase-23-couplage-gsd",
-  "plan": 3,
-  "task": 1,
+  "plan": 8,
+  "task": 8,
   "total_tasks": 8,
-  "status": "in_progress",
-  "relais": "RELAIS DE MANAGER n2 le 2026-08-04 (le manager precedent a ete interrompu en cours de vague 1). Verrou driver reacquis (mission-phase23-couplage-gsd, step reprise-vague1-solde) — il avait expire par TTL, il n'y avait AUCUNE session concurrente. Gate d'invariants : SAIN. Vague 1 SOLDEE : propagation-a6 done (2423868) et fix-config-a9-a10-a14 done (50edce3, les trois volets A-9 + A-10-moitie-script + A-14 verifies presents dans le diff avant commit, suite dediee 37 ok / 0 ko mesuree par le manager precedent). Vague 2 DISPATCHEE : exec-04b (vf-coder, perimetre build-gsd-capabilities-index.sh + test-dev-orchestrator.sh + ci.yml au point d'extension du canari) EN PARALLELE d'un PANEL DE 3 CHERCHEURS EN LECTURE SEULE sur A-10 — ⚠️ RECTIFIE : ce panel est une INITIATIVE DU MANAGER pour INSTRUIRE l'escalade gelee, PAS l'execution d'une decision de Samuel. J'avais ecrit ici qu'il avait tranche le HALT : c'etait faux, voir l'erratum en tete de human_actions_pending. escalade-a10-missionflow RESTE GELE. Perimetres disjoints : le panel est en LECTURE SEULE et lui est explicitement INTERDIT d'ouvrir les deux scripts qu'exec-04b modifie. Suite prevue : revue-04 + audit-infra EN REGIME PLEIN et en parallele, puis exec-05, 23-06, 23-07, synchro origin/main + re-mesure des compteurs README, 23-08, revue-08, PR. HISTORIQUE : mission reprise le 2026-08-04 apres les arbitrages A-8 a A-14. Les deux bloquants sont leves (O-23 -> A-12, O-21 -> A-13). Verrou driver acquis (mission-phase23-couplage-gsd). DAG : arbitrage-a1ter-premisse et arbitrage-known-top marques done ; arbitrage-f1-rce VOLONTAIREMENT LAISSE OUVERT comme garde machine — A-12 bundle le correctif code ET la correction de sa cause racine documentaire, donc exec-04 reste blocked tant que propagation-a6 n est pas done. Vague 1 dispatchee EN PARALLELE (perimetres disjoints, commits par pathspec) : propagation-a6 (.planning/phases/VFDO-23-*) et fix-config-a9-a10-a14 (check-gsd-config.sh + son test + canari CI). Vague 2 : exec-04b (generateur + test-dev-orchestrator.sh). Vague 3 : revue-04 et audit-infra EN REGIME PLEIN, en parallele. Puis exec-05 (debloque), 23-06, 23-07, synchro origin/main + re-mesure compteurs README, 23-08, revue-08, PR.",
+  "status": "awaiting_human",
+  "relais": "PHASE 23 — LES 8 PLANS SONT EXECUTES ET REVUS. Etat au 2026-08-04, apres revue-08 (revue finale + coherence de phase). Module dev-orchestrator bumpe en v2.11.0 ; VERSION racine INCHANGEE a v2.46.0 ; aucun tag cree ; branche synchronisee avec origin/main (merge d9e33be, 0 commit de retard). Ledger GSDC-01..10 coche, GSDC-08 en [~] (partiel) parce que son volet allowlist bute sur l'ecart D-22 non tranche. Les 8 cases de ROADMAP.md sont cochees. Suites : 161/37/21/23/15/22/26, toutes a 0 KO, REJOUEES UNE PAR UNE par le juge final et recoupees par ensembles de libelles. CE QUI RESTE : (1) les correctifs de revue-08 en cours (noeud fix-08) ; (2) LA PR, autorisee d'avance par Samuel ; (3) les arbitrages humains listes dans human_actions_pending, dont deux qui ne peuvent plus attendre : l'ecart D-22 et le push de la branche pour exercer une CI qui n'a JAMAIS tourne sur cette branche. LA RELEASE RACINE (bump de la triade, badges, historiques README, tag annote, release GitHub) EST HORS MISSION et reste le geste de Samuel — six gestes listes en tete du 23-08-SUMMARY.",
   "paused_reason": "",
   "mission_mode": "vf-dev-manager (équipe) — DAG dans .planning/MISSION-23.dag.json",
   "completed_tasks": [
@@ -356,136 +356,23 @@
   ],
   "remaining_tasks": [
     {
-      "id": 9,
-      "name": "exec-02 — 23-02 check-gsd-config.sh + suite dédiée + câblage SessionStart + config.json du lab aligné. Bascule du gate prouvée par exécution : exit 0 (signal) AVANT, exit 3 (silence) APRÈS ; l'avertissement `unknown config key(s)` passe de 1 occurrence à 0. 6 mutations du script rejouées, chacune tuée par le cas prévu. ÉCART AU PLAN : union à 3 sources et non 2 (CONFIG_DEFAULTS ajoutée — `workflow._auto_chain_active`, écrit par le moteur lui-même, n'est ni dans VALID_CONFIG_KEYS ni dans configKeys, donc le critère « stdout vide » était inatteignable à 2 sources)",
-      "status": "done",
-      "commits": [
-        "3b68a02",
-        "9f235e0",
-        "9c756aa",
-        "f72bcb3",
-        "b04d88a"
-      ]
+      "id": "fix-08",
+      "name": "Correctifs de revue-08 : sur-certification GSDC-08 dans le frontmatter de 23-07-SUMMARY (bloquant), commentaire de << port integral >> faux sur le lecteur de litteraux, mktemp non nettoye dans ci.yml",
+      "status": "running"
     },
     {
-      "id": 10,
-      "name": "plancheck-03 — re-validation du plan 23-03 contre A-1ter : TROIS BLOQUANTS trouvés (table d'allowlist logiquement contradictoire, motif adossé à un gate dégazé, traçabilité amont absente : 0 occurrence de A-1ter/ARBITRAGES/23-05 dans le plan) + 6 sondes à token",
-      "status": "done"
+      "id": "PR",
+      "name": "Ouvrir la PR — autorisee d'avance par Samuel. JAMAIS de merge, JAMAIS de tag, JAMAIS de bump racine. La description doit porter les arbitrages ouverts.",
+      "status": "blocked"
     },
     {
-      "id": 11,
-      "name": "replan-03 — plan 23-03 amendé : allowlist requalifiée en AUTORISATION TRANSITOIRE DATÉE (table à 4 colonnes, échéance 23-05 écrite dans la cellule de motif), motif réécrit sur chain.md:45-61 + règle 5 borné par règle 6, T-23-03-02 requalifié mitigate→accept, ARBITRAGES ajoutés au context et au read_first, 6 sondes ancrées",
-      "status": "done",
-      "commit": "a4fdbe5"
-    },
-    {
-      "id": 12,
-      "name": "revue-02 — revue code 23-02 en RÉGIME PLEIN, regard frais. VERDICT : correctifs requis. 2 BLOQUANTS + 7 majeurs. A confirmé solides : les 6 mutations mordent (mutants comparés par cmp), le `|| true` vérifié par exécution sur exits 3/64/127/2, l'union à 3 sources est un fait du moteur, le cas 26 est réellement bidirectionnel, ADR-054 propre sous bash 3.2.57",
-      "status": "done",
-      "commit": "f854f7c"
-    },
-    {
-      "id": 13,
-      "name": "alloc-blocs-test — reconnaissance lecture seule. A DÉMENTI deux prémisses : (a) la seule collision de toute la phase est le T27 de 23-03 — T28..T32 sont libres (0 occurrence sur 3828 lignes) ; (b) 23-08 ne crée AUCUN bloc. Cause racine : 23-01 a débordé son allocation (23-01-PLAN.md:113-115 lui donnait T24/T25/T26, il a posé jusqu'à T27c) et a mangé le T27 de 23-03",
-      "status": "done"
-    },
-    {
-      "id": 14,
-      "name": "plancheck-04 — re-validation du plan 23-04 : 3 bloquants + 7 warnings. A DÉMENTI la prémisse de collision (T28 libre) et confirmé que 23-04 ne s'adosse ni à A-1ter ni à T25/T25b (0 occurrence)",
-      "status": "done"
-    },
-    {
-      "id": 15,
-      "name": "replan-03b — collision T27 TRANCHÉE : le plan 23-03 prend T33. 8 gestes sur 23-03-PLAN.md, section ⚠ QUESTION OUVERTE supprimée (elle prescrivait l'ARRÊT à l'exécutant) et remplacée par une note de traçabilité datée. 2 faux verts neutralisés. Les 9 renvois historiques à T27/T27b/T27c préservés intacts. Plage T24→T33 corrigée dans 23-05/06/07/08",
-      "status": "done",
-      "commit": "42b2722"
-    },
-    {
-      "id": 16,
-      "name": "replan-04 — plan 23-04 amendé : garde de fraîcheur T28-F, compteur d'atteinte t28_derived, périmètres matérialisés par ancres, 7 warnings traités. DÉCISION STRUCTURANTE VALIDÉE PAR LE MANAGER (voir decisions) : source de contenu déplacée de `loop render-hooks` vers le registre `byLoopPoint`",
-      "status": "done",
-      "commit": "c5e1f61"
-    },
-    {
-      "id": 17,
-      "name": "exec-02 tour 2 — les 9 findings auto-fix COMBLÉS, chacun prouvé par exécution. Contrat de sortie fermé (12 chemins d'échec rejoués un par un, tous 0/3/64 ; HOME absent sortait 1 avec un message sur stderr MALGRÉ --quiet) · clé vide entendue · cause fabriquée retirée · cas 13 dé-tautologisé (preuve décisive : le mutant qui falsifie la valeur de code_review est VERT contre l'ancienne forme et ROUGE contre la nouvelle) · cas 26 rendu sensible aux AJOUTS par égalité d'ensemble en comm · rc asserté sur les 8 cas + cas 27 neuf couvrant le chemin --path nominal, celui du hook. Suite 26 → 33 cas. Les 6 mutations d'origine REJOUÉES, aucune devenue survivable ; 22 mutations exécutées au total. A ATTRAPÉ UN BUG DANS SON PROPRE COMBLEMENT : `[$label→$r]` — bash 3.2 avale l'octet de tête de la flèche DANS LE NOM de variable, fatal sous set -u, donc le balayage MOURAIT au lieu de rougir sur un rc hors contrat (2 mutants y survivaient). NUANCE ASSUMÉE contre l'attendu de la revue : le mutant « ordre inversé » reste vert, et c'est correct — l'ordre n'est pas un défaut tant que chaque valeur reste attachée à sa clé ; le rendre sensible à l'ordre aurait inventé une exigence",
-      "status": "done",
-      "commits": [
-        "b023b6b",
-        "f295c85",
-        "0a46883"
-      ]
-    },
-    {
-      "id": 18,
-      "name": "plancheck-05 — VERDICT : À RÉÉCRIRE, amendements majeurs et non ponctuels. Le plan DOCUMENTE A-1ter geste 2 sur 43 lignes de prose (l. 86-128) et N'EN EXÉCUTE RIEN : aucune des 3 tâches ne porte le cadrage vers le manager, ne retire T25b, ni ne corrige la phrase mensongère. Task 1 ne touche que les points 2-3 du §Le cycle et conserve le point 1 (Cadrage) « mot pour mot », --auto compris ; Task 2 s'interdit d'ajouter au corps du manager. 6 BLOQUANTS + 9 warnings",
-      "status": "done"
-    },
-    {
-      "id": 18.1,
-      "name": "replan-05 — réécriture partielle, PRÊTE À DISPATCHER. Les 6 bloquants : B1 la contrainte d'entrée n'est portée par aucune tâche · B2 le critère l.300 (« wc -l identique, AUCUNE ligne ajoutée au manager ») REND LE GESTE INEXÉCUTABLE — le remplacer par un plafond ≤250 PLUS une clause de déport ex ante vers references/ (marge réelle 15 lignes, le §Cadrage à porter en fait 12 et devra gagner la logique AskUserQuestion : plausible mais NON GARANTI) · B3 le retrait de T25b n'est prescrit nulle part et son périmètre réel n'est pas mesuré — 11 occurrences du token, et surtout TROIS RENVOIS depuis d'autres blocs (:2364-2371 en-tête de T25, :2490-2491, :2524) qui DÉLÈGUENT la brique Cadrage à T25b et l'excluent de leur propre balayage : le retirer sans réécrire ces exclusions crée un TROU DE COUVERTURE SILENCIEUX sur la brique Cadrage, exactement le faux vert que la phase existe pour fermer · B4 aucun des deux sites du mensonge doctrinal n'est visé · B5 les trois recettes en `| tail -5` (l. 235, 290, 348) sont STRUCTURELLEMENT INCAPABLES D'ÉCHOUER, et l. 290 le `&& bash check-agents.sh` s'enchaîne sur tail (toujours 0) donc check-agents tourne même sur suite rouge · B6 trois des sept critères de Task 3 sont VERTS AVANT ÉCRITURE (gsd-plan-phase/gsd-execute-phase déjà aux l. 19,27,28,36,54,69,92,93,138 de GSD-PIPELINE.md ; mission-contracts.md déjà l. 45 ; plan_id déjà à 0)",
-      "status": "ready"
-    },
-    {
-      "id": 19,
-      "name": "arbitrage-A1ter-vfcoder — ARBITRAGE HUMAIN. NE BLOQUE AUCUN NŒUD",
+      "id": "arbitrages",
+      "name": "Sept points remontes a Samuel, voir human_actions_pending. Les deux plus urgents : l'ecart D-22 (avec T19/CODER_ALLOWED qui l'exige) et le push de la branche pour exercer une CI jamais executee sur 178 commits.",
       "status": "awaiting_human"
-    },
-    {
-      "id": 20,
-      "name": "arbitrage-sessionstart-rce — ARBITRAGE HUMAIN SÉCURITÉ. NE BLOQUE AUCUN NŒUD, mais doit être tranché AVANT la PR",
-      "status": "awaiting_human"
-    },
-    {
-      "id": 21,
-      "name": "arbitrage-known-top — ARBITRAGE HUMAIN. Remplace arbitrage-overlay-federe, qui reposait sur une prémisse fausse",
-      "status": "awaiting_human"
-    },
-    {
-      "id": 22,
-      "name": "fix-ci-gsd-core — installer gsd-core dans le job CI. Simulation runner refaite après comblement (HOME vide, pas de moteur dans le dépôt) : 31 ok / 2 ko / exit 1 — les cas 20 et 26 échouent HONNÊTEMENT, en nommant les 3 branches de résolution et le geste attendu, ni ok ni skip complaisant. JAMAIS dégrader le ko : ce serait rouvrir le vert à vide que ces cas existent pour fermer. La suspicion sur test-check-gsd-engine.sh NE TIENT PAS : mesuré auto-porté, 15 ok avec HOME vide",
-      "status": "ready"
-    },
-    {
-      "id": 23,
-      "name": "exec-03 — 23-03 Lacune 3, doctrine de flags de cycle. Plan AMENDÉ et re-validé. Reste la QUESTION OUVERTE de numérotation de bloc de test (23-03-PLAN.md:130-152), traitée par alloc-blocs-test",
-      "status": "blocked"
-    },
-    {
-      "id": 13,
-      "name": "revue-03 / exec-04 / revue-04 / audit-infra",
-      "status": "blocked"
-    },
-    {
-      "id": 14,
-      "name": "exec-05 — 23-05 voie unique d'invocation. PORTE la contrainte d'entrée A-1ter geste 2 (le manager porte le cadrage). Plan AMENDÉ après coup → re-validation plan-checker AVANT exécution",
-      "status": "blocked"
-    },
-    {
-      "id": 15,
-      "name": "exec-06 / exec-07",
-      "status": "blocked"
-    },
-    {
-      "id": 16,
-      "name": "exec-08 — gouvernance : bump MODULE, README, CHANGELOG (JAMAIS la release racine). Compteurs README à recaler APRÈS synchronisation avec origin/main (Phase 26 a avancé)",
-      "status": "blocked"
-    },
-    {
-      "id": 17,
-      "name": "revue-08 — revue finale + cohérence de phase, puis PR (autorisée d'avance)",
-      "status": "blocked"
     }
   ],
   "blockers": [],
-  "async_jobs": [
-    {
-      "id": "exec-02",
-      "agent": "vf-coder",
-      "lance": "2026-08-03",
-      "perimetre": "check-gsd-config.sh, test-check-gsd-config.sh, hooks.json, .planning/config.json"
-    }
-  ],
+  "async_jobs": [],
   "human_actions_pending": [
     {
       "action": "HALT ADR-031 — ECART A D-22, GELE (noeud arbitrage-d22-debugger, ne bloque aucun autre noeud). 23-CONTEXT.md:248-250 porte D-22 TRANCHE PAR SAMUEL : le manager ne debug pas, vf-coder invoque le skill gsd-debug, << aucun gsd-debugger en allowlist, AUCUNE EXCEPTION >>. MESURE DU MANAGER : plugin/dev-orchestrator/agents/vf-coder.md:4 porte gsd-debugger dans son tools:. Le plan 23-07 proposait de le constater et de le consigner << sans modification : audit differe >> — un report SILENCIEUX d'une decision deja verrouillee. AGGRAVANT MESURE : la fonction brique_nue_dispatch_hits() de la suite (test-dev-orchestrator.sh:215) exclut la ligne tools: PAR CONSTRUCTION (awk '!/^tools:/'), donc l'assertion de conformite de 23-07 serait VERTE precisement au-dessus du seul site qui contredit D-22. C'est la famille exacte que la Phase 23 existe pour fermer — une couverture apparente — et elle serait livree DANS la phase qui la ferme. VOIES : (a) retirer gsd-debugger du tools: de vf-coder.md, conformement a la lettre de D-22 (les assertions T19/T29 d'egalite d'ensemble suivent, a re-mesurer) ; (b) maintenir l'entree et AMENDER D-22 par ecrit, avec le motif — une decision peut changer, mais elle change explicitement ; (c) differer, mais alors l'ecart doit etre INSCRIT comme dette datee et le critere d'acceptation retire, jamais laisse vert. Le manager a EXCLU ce point du mandat d'amendement : replan-07 a consigne pour seule instruction de remplacer << audit differe >> par un marqueur d'escalade et de retirer tout critere qui passerait au vert au-dessus de l'ecart. || AGGRAVATION MAJEURE TROUVEE PAR revue-07 (2026-08-04), VERIFIEE PAR LE MANAGER — LE QUATRIEME SITE EXISTE, ET C'EST UN GATE MACHINE. test-dev-orchestrator.sh:1679-1712 (bloc T19, pose en Phase 16, non touche par 23-07) definit CODER_ALLOWED, qui LISTE gsd-debugger, et son assertion est POSITIVE : elle EXIGE sa presence pour passer. PROUVE PAR MUTATION en sandbox : retirer gsd-debugger du tools: de vf-coder.md fait tomber la suite de 161 a 159 OK avec 1 KO (<< gsd-debugger absent de l'allowlist de vf-coder >>). CONSEQUENCE DECISIVE POUR L'ARBITRAGE : honorer D-22 en editant vf-coder.md SEUL CASSE LA CI. T19 traite l'etat que D-22 interdit comme la REFERENCE CORRECTE — un gate machine qui VERROUILLE la violation comme etat attendu. Les trois sites re-scopes par l'amendement parlaient tous en PROSE ; celui-ci ne prononce jamais << D-22 >> mais il est le seul qui contraigne une machine. Le commentaire de T19 (l.1677-1678) note explicitement que 23-05 a retire gsd-planner et gsd-executor de cette liste — gsd-debugger est reste. QUELLE QUE SOIT LA VOIE RETENUE, T19/CODER_ALLOWED DOIT BOUGER DANS LE MEME GESTE : voie (a) retirer l'entree -> retirer aussi gsd-debugger de CODER_ALLOWED, sinon la CI casse ; voie (b) amender D-22 -> T19 devient la trace machine de l'exception, et c'est coherent ; voie (c) differer -> l'ecart doit etre inscrit comme dette datee AVEC ce site nomme, sinon il survit a la cloture de gouvernance sans que personne ne l'ait vu.",
@@ -696,6 +583,6 @@
     "CITATION FAUSSE DU MANAGER : GSD-PIPELINE.md:138 — le CONTENU est confirme mais la POSITION est fausse, c est 147-148. Meme famille que les read_first perimes.",
     "ANCRES PERIMEES relevees par exec-04 (dette pour les plans suivants) : T25 ATTEINTE « l.2497-2511 » -> 2501-2513 ; hook post-install « l.535-560 » -> ~540-550 ; digest « 102 OK » -> 103 avant travaux. EXACTES en revanche : T6 l.986/1002-1003, T21d l.1869-1876, md_folded/md_blocks_matching."
   ],
-  "next_action": "Vague 2 EN VOL (dispatchee le 2026-08-04 par le manager n2) : exec-04b + panel de 3 sur le re-arbitrage d'A-10. AU RETOUR D'exec-04b : verifier le commit sur disque (git log, jamais la parole du worker), marquer exec-04 ET exec-04b done, marquer canari-generateur done SI et SEULEMENT SI la sonde du generateur est reellement posee dans l'etape canari du ci.yml (elle lui est mandatee — sinon redispatcher un comblement cible sur ce seul fichier), puis dispatcher revue-04 ET audit-infra EN REGIME PLEIN, EN PARALLELE dans un seul message (juges read-only, perimetres disjoints), fusionner et dedupliquer leurs findings, UN SEUL reopen si correctifs. AU RETOUR DU PANEL : synthetiser la table comparative et la remonter a Samuel comme DOSSIER D'INSTRUCTION avec une recommandation ferme — SANS rien trancher, SANS ecrire de verdict au registre, SANS fermer escalade-a10-missionflow, qui reste GELE tant que Samuel n'a pas parle (ADR-031, et erratum du manager n2 en tete de human_actions_pending). Tout geste de code sur mission-flow.md attend son mot, puis part en mandat CIBLE a un worker. RESTE ENSUITE : exec-05 (deblocable des qu'audit-infra est done), 23-06, 23-07, synchro origin/main + re-mesure des compteurs README, 23-08, revue-08, PR. arbitrage-o16 (ratification) est ready et attend un mot de Samuel — il ne bloque rien.",
+  "next_action": "AU RETOUR DE fix-08 : verifier sur disque les trois gestes (frontmatter de 23-07-SUMMARY debarrasse de sa sur-certification GSDC-08, commentaire de port du lecteur de litteraux rendu vrai, mktemp nettoye dans ci.yml), re-verifier la LIGNE ROUGE avec la construction en TROIS TEMPS (rtk proxy > fichier, PUIS non-vacuite awk NR>=10, PUIS awk correspondance exacte sur les trois chemins interdits — dans cet ordre, l'absence ne prouve rien sur une liste vide), puis marquer revue-08 done. ENSUITE : OUVRIR LA PR (autorisee d'avance, jamais de merge, jamais de tag) en portant dans sa description les arbitrages OUVERTS — l'ecart D-22, la fuite d'info par symlink, la promotion d'A-15 en ADR, le constat systemique sur les recettes de plan, la formulation D-09, O-16, et la dette DOCF de la Phase 22. NE PAS clore la phase comme si D-22 etait resolu : GSDC-08 reste [~] jusqu'au mot de Samuel.",
   "context_notes": "OUTILLAGE — piège NEUF et coûteux, vérifié cette session : `git diff` SANS `rtk proxy` rend une sortie RÉSUMÉE, sans aucun en-tête de hunk `@@` et sans les lignes +/- — un awk qui compte les lignes modifiées y trouve ZÉRO et le croit. Le même `git diff` passé par `rtk proxy` rend 187 lignes et 9 hunks. Tout diff qui sert de PREUVE passe par `rtk proxy`. S'y ajoutent les pièges déjà connus : `grep` proxifié TRONQUE silencieusement (31 lignes rendues sur 102), `diff` a rendu « Files are identical » sur des fichiers différents. Extraction en awk, comparaison en comm/cmp sur listes matérialisées. LEÇON N1 : un correctif peut fermer un trou en en ouvrant un autre (le correctif F5 avait élargi une regex à l'infinitif — forme des interdictions en français — laissant une PROHIBITION satisfaire une assertion exigeant une AFFIRMATION). Toute regex touchée se prouve DANS LES DEUX SENS : accepte le licite ET refuse le fautif. Le compteur « X OK / 0 KO » a menti CINQ fois sur cette phase, il ne vaut RIEN comme verdict. Densité : vf-dev-manager.md 235/250 (marge à préserver, les 7 plans restants le touchent tous), vf-coder.md 94/250. AVANT 23-08 : origin/main a avancé (Phase 26 : manual/, README.md, README.fr.md, INSTALL.md) — recaler les compteurs README APRÈS synchronisation avec main. || AJOUTS DU MANAGER n2 (2026-08-04) : (a) NE JAMAIS COMPTER LES LIGNES D'UNE SORTIE PROXIFIEE — le proxy y injecte sa ligne de statut, un `git stash list` VIDE rend << 1 entree >> a un awk END{NR} ; materialiser dans un fichier PUIS compter. Vaut aussi pour les sondes du MANAGER, pas seulement pour les mandats de workers. (b) CORRIGE LE 2026-08-04 — `wc -l < fichier` (REDIRECTION) rend faussement 0 : DEUX workers independants l'ont reproduit (replan-06 et exec-07), le manager NON, sur trois essais. Ce n'est donc PAS une fausse alerte a ecarter comme je l'avais d'abord conclu, mais un piege DEPENDANT DU CONTEXTE D'EXECUTION : un worker ne peut pas savoir d'avance dans quel shell il tourne. CONDUITE : utiliser `wc -l <fichier>` en ARGUMENT ou `awk 'END{print NR}'`, et CROISER les deux — jamais la redirection seule. Ancienne formulation, fausse, conservee pour tracabilite — `wc -l < f`, `wc -l f` et `/usr/bin/wc -l < f` rendent tous 3 sur un fichier de 3 lignes. Piege NON CONFIRME, probablement local a la session de ce worker : ne pas le propager comme un fait tant qu'il n'est pas re-mesure. (c) Le fichier .planning/MISSION-23.dag.json apparait regulierement modifie puis propre pendant qu'un worker travaille : c'est LE MANAGER qui le commite au fil de l'eau, il n'y a pas de processus tiers dans le worktree — ne pas ouvrir d'enquete la-dessus."
 }
