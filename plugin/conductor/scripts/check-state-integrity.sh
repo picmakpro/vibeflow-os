@@ -34,8 +34,23 @@
 #   check-state-integrity.sh [--path <dir>] [--file <relpath>] [--current-ref <ref>] [--against <ref>]
 #   check-state-integrity.sh --help
 #
-# Defaults: --path .  --file .planning/STATE.md  --current-ref <fichier de travail, non commité>
-#           --against HEAD
+# Defaults: --path .  --file <résolu : racine OU compartiment de workstream, cf. ci-dessous>
+#           --current-ref <fichier de travail, non commité>  --against HEAD
+#
+# WORKSTREAMS GSD (GSDA-13) — RÉSOLUTION DU DÉFAUT DE `--file` :
+# Le moteur amont peut partitionner le planning en `.planning/workstreams/<nom>/`. Quand `--file`
+# n'est PAS fourni, le défaut est résolu : workstream actif → `.planning/workstreams/<nom>/STATE.md`,
+# sinon `.planning/STATE.md` (comportement historique, strictement inchangé).
+# `--file` EXPLICITE PRIME TOUJOURS : la résolution automatique ne le réécrase JAMAIS, quelle que
+# soit la valeur de GSD_WORKSTREAM ou du pointeur.
+# Ordre de résolution, court-circuitant : VF_STATE_WORKSTREAM, puis GSD_WORKSTREAM (canal de premier
+# rang du moteur), puis la 1re ligne du pointeur PARTAGÉ in-repo `<path>/.planning/active-workstream`.
+# Nom validé contre la politique du moteur (workstream-name-policy.cjs : 1er caractère
+# alphanumérique, puis alphanumériques, point, souligné, tiret ; ni séparateur de chemin, ni
+# `.`/`..`, ni `..` en sous-chaîne) plus une borne locale de 80 caractères ; un nom hors politique
+# est traité comme « aucun workstream » et n'est JAMAIS concaténé dans un chemin (T-24-04-01).
+# FRONTIÈRE ASSUMÉE : le pointeur de SESSION en os.tmpdir() n'est PAS lu ici — indexé sur un
+# condensat de chemin absolu et une clé de session que bash ne reproduit pas fidèlement.
 #
 # --current-ref permet de comparer deux refs git entre elles (utile en CI post-commit ou en test) ;
 # par défaut, "courant" désigne le fichier de travail tel qu'il est sur disque — le point d'usage
@@ -45,12 +60,17 @@
 # un `--file` absolu combiné à `--current-ref` n'est pas un usage supporté.
 #
 # Codes de sortie : 0 = conforme · 1 = régression ou invariant rompu (message stderr précise lequel)
-#                   2 = erreur d'intégrité (hors dépôt git, fichier/ref illisible, champ imparsable)
+#                   2 = erreur d'intégrité (hors dépôt git, fichier/ref illisible, champ imparsable,
+#                       OU workstream résolu dont le dossier `.planning/workstreams/<nom>/` est
+#                       introuvable — même posture fail-closed que ligne « hors dépôt git » : on ne
+#                       retombe JAMAIS en silence sur le STATE.md de la racine, ce serait rendre
+#                       « conforme » sur un fichier que l'on n'a pas vérifié)
 #                   64 = usage
 set -uo pipefail
 
 ROOT="."
 FILE_REL=".planning/STATE.md"
+FILE_REL_EXPLICIT=0   # 1 dès que --file est fourni → la résolution de workstream se retire
 CURRENT_REF=""       # vide = fichier de travail
 AGAINST_REF="HEAD"
 
@@ -61,7 +81,7 @@ while [ "$#" -gt 0 ]; do
       ROOT="$2"; shift 2 ;;
     --file)
       [ "$#" -ge 2 ] || { echo "[check-state-integrity] --file nécessite une valeur" >&2; exit 64; }
-      FILE_REL="$2"; shift 2 ;;
+      FILE_REL="$2"; FILE_REL_EXPLICIT=1; shift 2 ;;
     --current-ref)
       [ "$#" -ge 2 ] || { echo "[check-state-integrity] --current-ref nécessite une valeur" >&2; exit 64; }
       CURRENT_REF="$2"; shift 2 ;;
@@ -81,6 +101,56 @@ git_safe() { git -C "$ROOT" -c core.fsmonitor= -c core.hooksPath=/dev/null --no-
 if ! git_safe rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "[check-state-integrity] $ROOT hors d'un dépôt git — intégrité non vérifiable" >&2
   exit 2
+fi
+
+# --- Résolution du workstream actif (GSDA-13) — APRÈS le gate « hors dépôt git » -------------------
+# Position volontaire : la précondition « on est dans un dépôt » reste le premier échec de premier
+# rang. Position volontaire aussi vis-à-vis de `--file` : la résolution ne s'applique QUE si
+# l'appelant n'a rien imposé (FILE_REL_EXPLICIT=0), jamais l'inverse.
+# Politique de nom recopiée du moteur amont ; la borne de longueur est une addition LOCALE,
+# strictement plus sévère — elle ne peut donc accepter aucun nom qu'amont refuserait.
+ws_trim() { printf '%s' "$1" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'; }
+
+ws_name_valid() { # <nom>
+  local n="$1"
+  [ -n "$n" ] || return 1
+  [ "${#n}" -le 80 ] || return 1
+  case "$n" in */*|*\\*|.|..|*..*) return 1 ;; esac
+  printf '%s' "$n" | grep -Eq '^[a-zA-Z0-9][a-zA-Z0-9._-]*$'
+}
+
+# Imprime le nom résolu ET valide, ou RIEN. Sort en 2 sans rien imprimer quand un nom a bien été
+# résolu mais qu'il est hors politique — l'appelant distingue « aucun workstream » de « rejeté »
+# sans jamais voir la valeur brute (non maîtrisée par construction — T-24-04-01).
+ws_resolve() {
+  local n=""
+  if [ -n "${VF_STATE_WORKSTREAM:-}" ]; then
+    n="$VF_STATE_WORKSTREAM"
+  elif [ -n "${GSD_WORKSTREAM:-}" ]; then
+    n="$GSD_WORKSTREAM"
+  elif [ -r "$ROOT/.planning/active-workstream" ]; then
+    n="$(head -n 1 "$ROOT/.planning/active-workstream" 2>/dev/null)"
+  fi
+  n="$(ws_trim "$n")"
+  [ -n "$n" ] || return 0
+  ws_name_valid "$n" || return 2
+  printf '%s' "$n"
+}
+
+if [ "$FILE_REL_EXPLICIT" -eq 0 ]; then
+  WS="$(ws_resolve)"; ws_rc=$?
+  if [ "$ws_rc" -eq 2 ]; then
+    echo "[check-state-integrity] nom de workstream hors politique — rejeté, aucun chemin construit ; vérification sur $FILE_REL" >&2
+  elif [ -n "$WS" ]; then
+    if [ -d "$ROOT/.planning/workstreams/$WS" ]; then
+      FILE_REL=".planning/workstreams/$WS/STATE.md"
+    else
+      # Fail-closed : ne JAMAIS retomber sur le STATE.md de la racine — ce serait rendre un verdict
+      # de conformité sur un fichier autre que celui que l'appelant croit vérifier.
+      echo "[check-state-integrity] workstream « $WS » actif mais .planning/workstreams/$WS introuvable sous $ROOT — intégrité non vérifiable" >&2
+      exit 2
+    fi
+  fi
 fi
 
 case "$FILE_REL" in
