@@ -1,5 +1,14 @@
 # Changelog — mobile-test-team
 
+## v1.4.2 — 2026-08-04
+
+### Modifié
+- **Les 3 agents de l'équipe déclarent `effort:`** — `vf-test-orchestrator` **high** (pilotage de la
+  boucle), `vf-app-fixer` **medium** (exécution), `vf-test-runner` **low** (exécution mécanique du
+  pipeline). Barème par rôle repris des agents-templates de `plugin/reference/`, lus et non modifiés.
+- Motif : `check-agents.sh` **exige** désormais le champ (conductor v1.20.0) au lieu de le valider
+  seulement quand il est présent. Le cloisonnement anti-triche code/tests est inchangé.
+
 ## v1.4.1 — 2026-07-26
 
 ### Modifié

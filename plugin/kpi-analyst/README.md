@@ -4,7 +4,7 @@
 > les **vrais indicateurs** (CA, leads, MRR, vues, engagement) et les tient à jour de façon
 > **déterministe** — jamais un chiffre inventé, chaque KPI porte sa source.
 
-**Type** : agent + skill + scripts + references · **Version** : v1.0.3 · **Dépend de** : `planning-core`, `consolidator`
+**Type** : agent + skill + scripts + references · **Version** : v1.0.4 · **Dépend de** : `planning-core`, `consolidator`
 
 ---
 

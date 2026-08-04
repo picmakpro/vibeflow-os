@@ -1,5 +1,16 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.4.1] — 2026-08-04 (`effort:` par rôle sur les 4 fichiers d'agents, Phase 24)
+
+### Modifié
+- **Les 4 fichiers d'agents du module déclarent `effort:`** — `AGENT.md` (`vibeflow-design`)
+  **high**, `vf-design-manager` **high** et `vf-design-judge` **high** (pilotage et jugement) ;
+  `vf-crafter` **medium** (exécution). Barème par rôle repris des agents-templates de
+  `plugin/reference/`, qui ont été **lus, jamais modifiés**.
+- Motif : `check-agents.sh` **exige** désormais le champ (conductor v1.20.0) au lieu de le valider
+  seulement quand il est présent. Le module est concerné par **les deux** familles d'agents que
+  l'installeur pose — `agents/<nom>.md` et l'`AGENT.md` de la racine — d'où 4 fichiers et non 3.
+
 ## [v1.4.0] — 2026-07-31 (geste documentaire en mission design, Phase 22)
 
 **`vf-design-manager` n'avait aucun geste documentaire. Il pose désormais le même nœud `docs`

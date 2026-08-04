@@ -1,5 +1,14 @@
 # CHANGELOG — validator
 
+## [v1.3.2] — 2026-08-04
+
+### Modifié
+- **`AGENT.md` (`vibeflow-validator`) déclare `effort: high`** — agent d'audit et de jugement, au
+  barème par rôle repris des agents-templates de `plugin/reference/`, lus et non modifiés. Motif :
+  `check-agents.sh` **exige** désormais le champ (conductor v1.20.0) au lieu de le valider seulement
+  quand il est présent. Ce module est **mono-agent** — son agent vit dans l'`AGENT.md` de la racine,
+  la famille que le balayage par `plugin/*/agents/` ne voyait pas et que la CI couvre désormais.
+
 ## [v1.3.1] — 2026-07-26
 
 ### Corrigé

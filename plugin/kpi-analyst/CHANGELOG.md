@@ -1,5 +1,15 @@
 # CHANGELOG — kpi-analyst
 
+## [v1.0.4] — 2026-08-04
+
+### Modifié
+- **`AGENT.md` (`vibeflow-kpi-analyst`) déclare `effort: medium`.** Motif : `check-agents.sh`
+  **exige** désormais le champ (conductor v1.20.0) au lieu de le valider seulement quand il est
+  présent. Ce module est **mono-agent** — son agent vit dans l'`AGENT.md` de la racine, pas sous
+  `agents/` : c'est exactement la famille que le balayage par `plugin/*/agents/` ne voyait pas, et
+  qui serait restée non conforme jusqu'au Gate C d'un lab frais. La CI balaye désormais aussi
+  `plugin/*/AGENT.md`.
+
 ## [v1.0.3] — 2026-07-26
 
 ### Modifié

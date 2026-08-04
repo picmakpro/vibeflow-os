@@ -4,7 +4,7 @@
 > jamais rien envoyer à un client tout seul, et sans jamais inventer un chiffre** : ce module
 > installe l'équipe complète qui tient cette promesse.
 
-**Type** : `agents + skill + scripts` · **Version** : v2.0.3 · **Dépend de** : `conductor`,
+**Type** : `agents + skill + scripts` · **Version** : v2.0.4 · **Dépend de** : `conductor`,
 `planning-core`, `consolidator`, `audit-architecture`, `validator`.
 
 ---

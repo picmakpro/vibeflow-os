@@ -1,5 +1,15 @@
 # CHANGELOG — business-pilot-bundle
 
+## [v2.0.4] — 2026-08-04 (`effort:` par rôle sur les 5 agents, Phase 24)
+
+### Modifié
+- **Les 5 agents du bundle déclarent `effort:`** — `vf-business-manager` **high** et
+  `quality-gate-client` **high** (pilotage et jugement) ; `vf-business-commercial`,
+  `vf-business-delivery` et `vf-business-finance` **medium** (exécution). Barème par rôle repris des
+  agents-templates de `plugin/reference/`, qui ont été **lus, jamais modifiés**.
+- Motif : `check-agents.sh` **exige** désormais le champ (conductor v1.20.0) au lieu de le valider
+  seulement quand il est présent — un agent sans `effort:` échoue le gate.
+
 ## [v2.0.3] — 2026-07-31 (barrière d'écriture réelle de `quality-gate-client`, Phase 20)
 
 ### Corrigé
