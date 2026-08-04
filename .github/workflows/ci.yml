@@ -328,6 +328,19 @@ jobs:
         # RACINE, celui dont ADR-063 garde les compteurs.
         run: bash plugin/conductor/scripts/check-state-integrity.sh --file .planning/STATE.md
 
+      - name: check-capability-activation (une entrée de doc ne promet pas un geste inerte, GSDA-09)
+        # POURQUOI CE CÂBLAGE EXISTE. Le gate était livré, testé, distribué dans chaque lab — et
+        # référencé par RIEN d'exécutable : ni ce job, ni un hook, ni un agent, ni un skill. Sa
+        # seule invocation vivait dans la suite du module. Une garde que la chaîne d'intégration ne
+        # lance jamais est une garde absente : c'est exactement le mode d'échec (« routé, donc
+        # réputé vivant ») que ce gate existe pour fermer, reproduit un étage plus haut sur
+        # lui-même.
+        #
+        # Aucune surcharge `VF_CAPACT_*` : la cascade de résolution du lab est exercée telle qu'elle
+        # tourne chez l'utilisateur. Un exit 2 (NON VÉRIFIABLE) échoue le job au même titre qu'un
+        # exit 1 — un gate qui ne peut pas se prononcer n'est pas un gate vert.
+        run: bash plugin/dev-orchestrator/scripts/check-capability-activation.sh
+
       - name: Gates workstream-aware sur un arbre RÉELLEMENT partitionné (fixture jetable) + non-régression racine
         # POURQUOI CETTE ÉTAPE EXISTE (plan 24-09, exigence GSDA-17). Les trois gates rendus
         # workstream-aware au plan 24-04 et le gate de pointeur créé au plan 24-05 sont tous VERTS
@@ -445,8 +458,15 @@ jobs:
 
           # --- 5/6 : PREUVE DE DISCRIMINANCE — MÊMES fichiers, workstream NON résolu. Sans ce
           # verdict contraire, les quatre précédents seraient satisfaits par un arbre non partitionné. ---
+          # TMPDIR ISOLÉ, en 5/6 comme en 6/6. Le message asserté en 6/6 nomme un canal RÉSIDUEL
+          # (« pointeur de session en os.tmpdir() ») : laisser les deux verdicts partager le TMPDIR
+          # de l'exécuteur, c'est laisser un pointeur de session déposé par n'importe quelle autre
+          # étape décider du résultat. 5/6 ne l'isolait pas, 6/6 non plus — l'asymétrie était
+          # d'autant plus trompeuse que la moitié des `env -u` y était déjà.
+          mkdir -p "$FIX/tmp-isole"
           rc=0
           out="$(env -u GSD_WORKSTREAM -u VF_WORKSTREAM -u VF_BOOTSTRAP_WORKSTREAM \
+            TMPDIR="$FIX/tmp-isole" \
             bash plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh --path "$FIX" 2>/dev/null)" || rc=$?
           echo "== 5/6 check-dev-bootstrap (sans workstream) rc=$rc =="; printf '%s\n' "$out"
           [ "$rc" -eq 0 ] || note "5/6 check-dev-bootstrap sans workstream : rc=$rc, attendu 0 (démarrage inachevé)"
@@ -460,7 +480,8 @@ jobs:
           # et « ADR-064 » nu apparaissent AUSSI dans le message de conformité (« composable avec
           # ADR-064 »), ils ne discrimineraient donc rien — mesuré au banc de mutation. ---
           rc=0
-          err="$(env -u GSD_WORKSTREAM -u VF_WORKSTREAM \
+          err="$(env -u GSD_WORKSTREAM -u VF_WORKSTREAM -u VF_BOOTSTRAP_WORKSTREAM \
+            TMPDIR="$FIX/tmp-isole" \
             bash plugin/conductor/scripts/check-workstream-pointer.sh --path "$FIX" 2>&1 >/dev/null)" || rc=$?
           echo "== 6/6 check-workstream-pointer (sans workstream) rc=$rc =="; printf '%s\n' "$err"
           [ "$rc" -eq 1 ] || note "6/6 check-workstream-pointer sans workstream : rc=$rc, attendu 1 (partitionné, aucun canal composable ne résout)"
@@ -503,16 +524,35 @@ jobs:
           echo "== non-régression sur le checkout racine (arbre NON partitionné) =="
 
           # R1 — gate de démarrage : exit 3, et sortie strictement INVARIANTE selon GSD_WORKSTREAM.
+          #
+          # POURQUOI LES DEUX CANAUX SONT FUSIONNÉS ICI, à rebours de la consigne d'isolation du
+          # bloc 1. Le bloc 1 isole stderr parce qu'il cherche une SOUS-CHAÎNE : y accepter les deux
+          # voies laisserait une assertion se satisfaire depuis la mauvaise. Ici l'assertion est une
+          # ÉGALITÉ entre deux exécutions, pas la recherche d'un motif — et c'est la sortie TOTALE
+          # du processus qui doit être invariante, pas la moitié qu'on aurait choisie.
+          #
+          # SANS CETTE FUSION, L'ASSERTION ÉTAIT VIDE, et mesuré comme tel le 2026-08-04 :
+          # `rc_sans=3 rc_avec=3 len_sans=0 len_avec=0`. Le stdout de ce gate est VIDE sur la racine
+          # (soupape D-04 : frontmatter de .planning/STATE.md hors garde anti-gel, exit 3 muet) —
+          # le commentaire ci-dessus identifiait d'ailleurs ce stdout vide, puis en tirait la
+          # conclusion inverse. Comparer deux chaînes vides, c'est écrire `"" != ""` : R1 serait
+          # resté VERT même si la résolution de workstream avait totalement fui hors de son domaine.
+          # stderr, lui, porte 97 octets de diagnostic : la comparaison redevient opposable.
           rc=0
           root_sans="$(env -u GSD_WORKSTREAM -u VF_WORKSTREAM -u VF_BOOTSTRAP_WORKSTREAM \
-            bash plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh --path . 2>/dev/null)" || rc=$?
+            bash plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh --path . 2>&1)" || rc=$?
           rc2=0
           root_avec="$(env -u VF_WORKSTREAM -u VF_BOOTSTRAP_WORKSTREAM GSD_WORKSTREAM=dev \
-            bash plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh --path . 2>/dev/null)" || rc2=$?
-          echo "== R1 check-dev-bootstrap racine : rc(sans)=$rc rc(avec)=$rc2 =="
+            bash plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh --path . 2>&1)" || rc2=$?
+          echo "== R1 check-dev-bootstrap racine : rc(sans)=$rc rc(avec)=$rc2, sorties de ${#root_sans} et ${#root_avec} octet(s) =="
           [ "$rc" -eq 3 ] || note "R1 check-dev-bootstrap racine sans workstream : rc=$rc, attendu 3"
           [ "$rc2" -eq 3 ] || note "R1 check-dev-bootstrap racine avec workstream : rc=$rc2, attendu 3 (un arbre non partitionné ne doit pas changer de verdict)"
-          if [ "$root_sans" != "$root_avec" ]; then
+          # PLANCHER D'OPPOSABILITÉ, avant le verdict : deux sorties vides ne peuvent RIEN opposer.
+          # Le dire est un échec, jamais un succès — patron `NON OPPOSABLE` de
+          # test-check-capability-activation.sh, qui refuse le même repli sur `cmp -s`.
+          if [ -z "$root_sans" ] && [ -z "$root_avec" ]; then
+            note "R1 check-dev-bootstrap racine : les DEUX sorties sont vides — l'assertion d'invariance est NON OPPOSABLE (elle comparerait deux chaînes vides et serait verte quoi qu'il arrive au sujet)"
+          elif [ "$root_sans" != "$root_avec" ]; then
             note "R1 check-dev-bootstrap racine : la sortie CHANGE selon GSD_WORKSTREAM sur un arbre NON partitionné — la résolution de workstream a fui hors de son domaine"
           fi
 
