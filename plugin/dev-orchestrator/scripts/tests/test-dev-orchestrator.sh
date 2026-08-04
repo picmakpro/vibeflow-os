@@ -1392,6 +1392,103 @@ else
       ok "T14c : aucune brique ne dépend d'un repli SKILL.md — la carte couvre tout ce qu'elle doit couvrir"
     fi
   fi
+
+  # -------------------------------------------------------------------------
+  # T14d — TROISIÈME catégorie de brique : « routée MAIS conditionnelle » (plan 24-11, GSDA-09).
+  # -------------------------------------------------------------------------
+  # Ce que T14 ne faisait PAS, et qui a coûté deux gestes morts. T14 vérifiait qu'une brique de
+  # l'index est ROUTÉE par la carte. Il n'a jamais interrogé l'ACTIVATION de la capability qui la
+  # porte : `gsd-graphify` et `gsd-profile-user` étaient routés alors que `graphify.enabled` et
+  # `profile-pipeline.enabled` étaient inactifs. T14 était VERT sur deux promesses inertes — le
+  # mode d'échec exact que la Phase 24 referme.
+  #
+  # La catégorie suit la MÊME forme que INTENTIONALLY_UNROUTED (liste blanche nommée + fonction
+  # `case`), jamais une variable booléenne éparse : la forme est ce qui rend l'exception
+  # énumérable et auditable. Sémantique DIFFÉRENTE de INTENTIONALLY_UNROUTED, en revanche : ces
+  # briques SONT routées et comptent pour l'exhaustivité — mais leur ligne doit PORTER le marqueur
+  # conditionnel posé par le plan 24-06. Toute nouvelle entrée conditionnelle s'écrit dans
+  # intent-routing.md ET ici.
+  ROUTED_CONDITIONAL="gsd-graphify gsd-profile-user"
+  is_routed_conditional() {
+    case " $ROUTED_CONDITIONAL " in *" $1 "*) return 0 ;; esac
+    return 1
+  }
+  # Rend les briques conditionnelles CITÉES par la carte sur au moins une ligne SANS marqueur.
+  # Granularité assumée : cette fonction travaille à la LIGNE de routage ; l'appariement fin
+  # « ce marqueur nomme bien le toggle de cette capability » est le travail de
+  # check-capability-activation.sh, invoqué plus bas. Les deux étages sont complémentaires, pas
+  # redondants — celui-ci garde la carte, celui-là garde la cohérence des trois artefacts.
+  conditional_unmarked() { # <fichier de routage> -> liste des briques citées hors marqueur
+    local f="$1" b
+    for b in $ROUTED_CONDITIONAL; do
+      awk -v brique="$b" '
+        index($0, brique) == 0 { next }
+        { cite++ }
+        index($0, "(conditionnelle : ") == 0 { nue++ }
+        END { if (cite > 0 && nue > 0) printf "%s", " " brique }
+      ' "$f"
+    done
+  }
+  t14d_ok=1
+
+  # (a) la liste blanche n'est pas morte : chaque nom qu'elle porte est réellement routé par la
+  # carte. Une liste blanche qui nomme des briques disparues exempte du vide et ne garde rien.
+  t14d_absentes=""
+  for s in $ROUTED_CONDITIONAL; do
+    brick_routed "$s" || t14d_absentes="$t14d_absentes $s"
+  done
+  if [ -z "$t14d_absentes" ]; then
+    ok "T14d (a) : les $(printf '%s' "$ROUTED_CONDITIONAL" | awk '{print NF}') brique(s) déclarée(s) conditionnelle(s) sont toutes réellement routées par la carte (liste blanche vivante)"
+  else
+    ko "T14d (a) : brique(s) déclarée(s) conditionnelle(s) mais ABSENTE(s) de la carte —$t14d_absentes (liste blanche périmée : elle exempte du vide)"; t14d_ok=0
+  fi
+
+  # (b) l'assertion neuve : toute ligne citant une brique conditionnelle porte son marqueur.
+  t14d_nues="$(conditional_unmarked "$ROUTING")"
+  if [ -z "$t14d_nues" ]; then
+    ok "T14d (b) : chaque brique conditionnelle est citée SOUS marqueur dans la carte — aucune promesse inerte non signalée"
+  else
+    ko "T14d (b) : brique(s) conditionnelle(s) citée(s) SANS marqueur dans $ROUTING —$t14d_nues (T14 les compterait routées, elles restent inertes)"; t14d_ok=0
+  fi
+
+  # (c) DISCRIMINANCE par mutation : sur une copie privée du marqueur de gsd-graphify, (b) doit
+  # rougir EN NOMMANT gsd-graphify — et le fichier réel doit rester vert. Sans ce couple, (b)
+  # pourrait être une assertion qui ne sait pas rougir.
+  T14D_TMPDIR="$(mktemp -d)"
+  T14D_MUT="$T14D_TMPDIR/carte-sans-marqueur-graphify.md"
+  awk '/gsd-graphify/ { sub(/\(conditionnelle : [A-Za-z0-9_.-]+\)/, "") } { print }' "$ROUTING" > "$T14D_MUT"
+  if cmp -s "$ROUTING" "$T14D_MUT"; then
+    ko "T14d (c) : mutant IDENTIQUE à la carte — le marqueur de gsd-graphify est introuvable, mutant NON OPPOSABLE (pas mutant satisfait)"; t14d_ok=0
+  else
+    t14d_mut_nues="$(conditional_unmarked "$T14D_MUT")"
+    if [ "$t14d_mut_nues" = " gsd-graphify" ]; then
+      ok "T14d (c) (DISCRIMINANT, par mutation) : marqueur retiré de gsd-graphify → (b) rougit en nommant précisément gsd-graphify ; la carte réelle reste verte"
+    else
+      ko "T14d (c) NON DISCRIMINANTE : le retrait du marqueur de gsd-graphify devrait produire exactement [ gsd-graphify] (obtenu : [$t14d_mut_nues])"; t14d_ok=0
+    fi
+  fi
+  rm -rf "$T14D_TMPDIR"
+
+  # (d) LE CÂBLAGE : le gate d'activation est invoqué ICI, sur le corpus réel du module. Sans cette
+  # invocation, check-capability-activation.sh existerait sans que personne ne le lance — une
+  # garde jamais exécutée est une garde absente. Ses chemins d'entrée sont passés explicitement
+  # depuis $REFS_DIR, seul endroit qui résout les DEUX dispositions (source et lab installé).
+  CAPACT="$MOD/scripts/check-capability-activation.sh"
+  if [ ! -f "$CAPACT" ]; then
+    ko "T14d (d) : $CAPACT introuvable — le gate d'activation doc ↔ capability n'est pas livré"; t14d_ok=0
+  else
+    capact_out="$(VF_CAPACT_INDEX="$REFS_DIR/gsd-capabilities-index.md" \
+                  VF_CAPACT_CORPUS="$ROUTING $REFS_DIR/docs-flow.md" \
+                  bash "$CAPACT" 2>&1 >/dev/null)"
+    capact_rc=$?
+    if [ "$capact_rc" -eq 0 ]; then
+      ok "T14d (d) : check-capability-activation.sh invoqué sur le corpus réel → 0 — $capact_out"
+    else
+      ko "T14d (d) : check-capability-activation.sh sort $capact_rc (attendu 0) — $capact_out"; t14d_ok=0
+    fi
+  fi
+
+  [ "$t14d_ok" -eq 1 ] && ok "T14d : T14 interroge enfin l'ACTIVATION et plus seulement le routage (liste blanche vivante, marqueurs présents, discriminance prouvée, gate câblé)"
 fi
 
 # ---------------------------------------------------------------------------
@@ -5834,6 +5931,163 @@ else
 fi
 
 [ "$t32_ok" -eq 1 ] && ok "T32 : table des briques dormantes gatée (gabarit + 4 noms anti-homonyme + clôture), mandat de debug via skill uniquement (fonction de détection unique BRIQUES_NUES_DISPATCH_RE, aucun agent nu dispatché en corps de prompt, discriminance prouvée dans les deux sens), non-duplication ADR-057"
+
+# ---------------------------------------------------------------------------
+# T34 (assertion DÉLÉGUÉE par le plan 24-03) — doctrine du canal `agent_skills`
+# ---------------------------------------------------------------------------
+# Motif du gardiennage : ce sont deux contraintes de RÉDACTION imposées par un arbitrage, et une
+# contrainte de rédaction qu'aucune machine ne garde finit par se relâcher. Les deux doivent
+# survivre ensemble dans GSD-PIPELINE.md :
+#   1. le constat — la doctrine du lab atteint le PLAN, pas l'EXÉCUTION ;
+#   2. l'interdiction qui en découle — ce canal ne doit plus jamais être présenté comme résolu du
+#      côté de l'exécuteur.
+# Garder la seule (1) laisserait réécrire l'interdiction ; garder la seule (2) laisserait effacer
+# le fait qui la fonde. Le bloc échoue dès que L'UNE des deux disparaît.
+#
+# Les deux motifs sont cherchés sur le fichier REPLIÉ (md_folded) avec des blancs ÉLASTIQUES : le
+# constat (1) est en gras et le wrap à 100 colonnes le coupe AUJOURD'HUI entre « n'atteint » et
+# « pas l'exécution ». Un littéral à espaces figés serait invisible sur le fichier intact — faux
+# rouge garanti au premier re-wrap, et pire : une garde qui rougit sur une réécriture licite.
+T34_PIPE="$REFS_DIR/GSD-PIPELINE.md"
+T34_PHRASE1="la doctrine de dev du lab atteint le plan, elle n'atteint pas l'exécution"
+T34_PHRASE2="Ce canal ne doit plus jamais être présenté comme résolu du côté de l'exécuteur"
+
+# Un littéral en prose -> une ERE dont CHAQUE blanc est élastique (variante md_folded).
+t34_elastic() { printf '%s' "$1" | awk '{ gsub(/ /, "[[:space:]]+"); print }'; }
+# Idem, variante md_sed_folded (les blancs doivent aussi absorber l'octet de pli).
+t34_elastic_fold() { printf '%s' "$1" | awk -v sp="$MDSP" '{ gsub(/ /, sp); print }'; }
+
+t34_has() { # <fichier> <phrase en clair>
+  md_folded "$1" | "$GREP" -qE "$(t34_elastic "$2")"
+}
+
+t34_ok=1
+if [ ! -f "$T34_PIPE" ]; then
+  ko "T34 doctrine agent_skills : $T34_PIPE introuvable"; t34_ok=0
+else
+  # (a) état nominal : les DEUX phrases sont là.
+  t34_manquantes=""
+  t34_has "$T34_PIPE" "$T34_PHRASE1" || t34_manquantes="$t34_manquantes [constat plan/exécution]"
+  t34_has "$T34_PIPE" "$T34_PHRASE2" || t34_manquantes="$t34_manquantes [interdiction côté exécuteur]"
+  if [ -z "$t34_manquantes" ]; then
+    ok "T34 (a) : GSD-PIPELINE.md porte le constat (doctrine → plan, pas exécution) ET l'interdiction de présenter le canal comme résolu côté exécuteur"
+  else
+    ko "T34 (a) : phrase(s) doctrinale(s) absente(s) de GSD-PIPELINE.md —$t34_manquantes (arbitrage 24-03 relâché)"; t34_ok=0
+  fi
+
+  # (b) et (c) DISCRIMINANCE par mutation, une phrase à la fois — c'est ce qui prouve que le bloc
+  # échoue sur la disparition de L'UNE, et pas seulement quand les deux tombent ensemble.
+  T34_TMPDIR="$(mktemp -d)"
+  t34_mutation() { # <étiquette> <phrase visée> <phrase à préserver> <nom de fichier mutant>
+    local etiquette="$1" phrase="$2" temoin="$3" mut="$T34_TMPDIR/$4"
+    md_sed_folded "s/$(t34_elastic_fold "$phrase")/PHRASE DOCTRINALE NEUTRALISEE/" "$T34_PIPE" > "$mut"
+    if cmp -s "$T34_PIPE" "$mut"; then
+      ko "T34 ($etiquette) : mutant IDENTIQUE à GSD-PIPELINE.md — le motif n'a rien mordu, mutant NON OPPOSABLE"; t34_ok=0
+      return
+    fi
+    if t34_has "$mut" "$phrase"; then
+      ko "T34 ($etiquette) NON DISCRIMINANTE : la phrase retirée est encore vue dans le mutant"; t34_ok=0
+      return
+    fi
+    # La mutation doit être CHIRURGICALE : la phrase TÉMOIN survit dans le mutant. Sans ce
+    # contrôle, une mutation trop large (qui emporterait les deux phrases) produirait le même
+    # rouge et prouverait seulement que le bloc échoue quand tout disparaît — jamais qu'il
+    # échoue sur la disparition de L'UNE, qui est exactement ce que l'arbitrage 24-03 exige.
+    if ! t34_has "$mut" "$temoin"; then
+      ko "T34 ($etiquette) : mutation TROP LARGE — la phrase témoin a disparu du mutant, le rouge ne prouve pas la détection isolée"; t34_ok=0
+      return
+    fi
+    # Le VERT RETROUVÉ : le fichier réel porte toujours la phrase visée.
+    if t34_has "$T34_PIPE" "$phrase"; then
+      ok "T34 ($etiquette) (DISCRIMINANT, par mutation) : phrase neutralisée SEULE (témoin intact) → l'assertion (a) rougit ; fichier réel restauré → elle redevient verte"
+    else
+      ko "T34 ($etiquette) : le fichier RÉEL ne porte plus la phrase — la restauration ne rend pas le vert"; t34_ok=0
+    fi
+  }
+  t34_mutation "b" "$T34_PHRASE1" "$T34_PHRASE2" "pipeline-sans-constat.md"
+  t34_mutation "c" "$T34_PHRASE2" "$T34_PHRASE1" "pipeline-sans-interdiction.md"
+  rm -rf "$T34_TMPDIR"
+fi
+[ "$t34_ok" -eq 1 ] && ok "T34 : les deux contraintes de rédaction de l'arbitrage 24-03 sont gardées par une machine, chacune prouvée détectable séparément"
+
+# ---------------------------------------------------------------------------
+# T35 (assertion DÉLÉGUÉE par le plan 24-08) — câblage --ws / GSD_WORKSTREAM + plafond ADR-029
+# ---------------------------------------------------------------------------
+# Les deux agents du chemin de dev doivent CHACUN porter la mention du compartiment de planning
+# (`--ws` ou `GSD_WORKSTREAM`) ET renvoyer à workstreams.md. « Chacun » est le mot qui compte :
+# une assertion qui balaierait les deux fichiers et se contenterait d'un seul succès resterait
+# VERTE quand l'un des deux perd sa mention — c'est le mode d'erreur « existence au lieu de
+# relation ». Les mutations (b) et (c) le prouvent en frappant les deux fichiers SÉPARÉMENT.
+T35_AGENTS="vf-coder vf-dev-manager"
+T35_PLAFOND=250
+t35_ok=1
+
+t35_agent_cable() { # <fichier agent> -> 0 si mention ET renvoi présents
+  "$GREP" -qE -- '--ws|GSD_WORKSTREAM' "$1" || return 1
+  "$GREP" -q -- 'workstreams\.md' "$1" || return 1
+  return 0
+}
+
+# (a) état nominal, fichier par fichier.
+t35_manquants=""
+for a in $T35_AGENTS; do
+  f="$MOD/agents/$a.md"
+  if [ ! -f "$f" ]; then
+    t35_manquants="$t35_manquants $a(absent)"
+  else
+    t35_agent_cable "$f" || t35_manquants="$t35_manquants $a"
+  fi
+done
+if [ -z "$t35_manquants" ]; then
+  ok "T35 (a) : vf-coder.md ET vf-dev-manager.md portent chacun la mention --ws/GSD_WORKSTREAM et renvoient à workstreams.md"
+else
+  ko "T35 (a) : agent(s) sans mention de compartiment ou sans renvoi workstreams.md —$t35_manquants (câblage 24-08 relâché)"; t35_ok=0
+fi
+
+# (b)(c) DISCRIMINANCE : chaque agent est muté SÉPARÉMENT. Un bloc qui ne muterait qu'un fichier
+# ne prouverait rien sur l'autre.
+T35_TMPDIR="$(mktemp -d)"
+for a in $T35_AGENTS; do
+  f="$MOD/agents/$a.md"
+  [ -f "$f" ] || continue
+  mut="$T35_TMPDIR/$a-sans-ws.md"
+  awk '{ gsub(/--ws/, "--XX"); gsub(/GSD_WORKSTREAM/, "GSD_XXXXXXXXXX"); print }' "$f" > "$mut"
+  if cmp -s "$f" "$mut"; then
+    ko "T35 (mutation $a) : mutant IDENTIQUE à l'original — aucune mention à retirer, mutant NON OPPOSABLE"; t35_ok=0
+  elif t35_agent_cable "$mut"; then
+    ko "T35 (mutation $a) NON DISCRIMINANTE : $a privé de --ws ET de GSD_WORKSTREAM passe encore le contrôle"; t35_ok=0
+  elif t35_agent_cable "$f"; then
+    ok "T35 (mutation $a) (DISCRIMINANT) : $a.md privé de sa mention → rouge ; fichier réel → vert. Le contrôle porte bien sur CE fichier, pas sur la paire."
+  else
+    ko "T35 (mutation $a) : le fichier RÉEL ne passe plus le contrôle — la restauration ne rend pas le vert"; t35_ok=0
+  fi
+done
+
+# (d) plafond ADR-029 sur vf-dev-manager.md, compté en awk (jamais déduit d'un autre compteur),
+# avec sa mutation : une copie allongée doit franchir le plafond.
+T35_MGR="$MOD/agents/vf-dev-manager.md"
+if [ ! -f "$T35_MGR" ]; then
+  ko "T35 (d) : $T35_MGR introuvable"; t35_ok=0
+else
+  t35_lignes="$(awk 'END{print NR}' "$T35_MGR")"
+  if [ "$t35_lignes" -le "$T35_PLAFOND" ]; then
+    ok "T35 (d) plafond ADR-029 : vf-dev-manager.md fait $t35_lignes ligne(s) (≤ $T35_PLAFOND) — marge de $((T35_PLAFOND - t35_lignes))"
+  else
+    ko "T35 (d) plafond ADR-029 : vf-dev-manager.md fait $t35_lignes ligne(s) (> $T35_PLAFOND)"; t35_ok=0
+  fi
+  t35_mut_long="$T35_TMPDIR/vf-dev-manager-trop-long.md"
+  { cat "$T35_MGR"; awk -v n=$((T35_PLAFOND + 5 - t35_lignes)) 'BEGIN{ for (i = 1; i <= n; i++) print "ligne de remplissage" }'; } > "$t35_mut_long"
+  t35_lignes_mut="$(awk 'END{print NR}' "$t35_mut_long")"
+  if cmp -s "$T35_MGR" "$t35_mut_long"; then
+    ko "T35 (e) : mutant IDENTIQUE à l'original — aucune ligne ajoutée, mutant NON OPPOSABLE"; t35_ok=0
+  elif [ "$t35_lignes_mut" -gt "$T35_PLAFOND" ] && [ "$t35_lignes" -le "$T35_PLAFOND" ]; then
+    ok "T35 (e) (DISCRIMINANT, par mutation) : copie allongée à $t35_lignes_mut ligne(s) → le plafond est franchi et vu ; fichier réel à $t35_lignes → vert"
+  else
+    ko "T35 (e) NON DISCRIMINANTE : la copie allongée ($t35_lignes_mut l.) ne franchit pas le plafond $T35_PLAFOND"; t35_ok=0
+  fi
+fi
+rm -rf "$T35_TMPDIR"
+[ "$t35_ok" -eq 1 ] && ok "T35 : câblage --ws/GSD_WORKSTREAM gardé PAR AGENT (jamais sur la paire) et plafond ADR-029 tenu, les deux prouvés détectables par mutation"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
