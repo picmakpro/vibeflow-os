@@ -20,6 +20,24 @@ PASS=0; FAIL=0
 assert()     { if [[ "$2" == *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: $3"; echo "     obtenu:  $2"; FAIL=$((FAIL+1)); fi; }
 assert_exit(){ if [ "$2" -eq "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1 (exit $2 ≠ $3)"; FAIL=$((FAIL+1)); fi; }
 
+# Antidate un lock existant AU-DELÀ du TTL, sans présumer de sa forme interne. Les tests exigent
+# un lock périmé ; ils n'ont pas à savoir COMMENT l'âge est stocké. Un test qui édite le meta à la
+# main est un test qui casse au premier changement de protocole — et qui, pire, peut se mettre à
+# mesurer autre chose sans rougir.
+age_stale() {
+  local lock="$1" old; old=$(( $(date +%s) - 999999 ))
+  if [ -L "$lock" ]; then                      # forme lien : l'âge vit dans la cible du lien
+    local gen; gen="$(readlink "$lock")"
+    [ -f "$lock/meta" ] && sed -i.bak "s/^heartbeat_epoch=.*/heartbeat_epoch=$old/" "$lock/meta" 2>/dev/null
+    rm -f "$lock/meta.bak" 2>/dev/null
+    touch -t 202001010000 "$(dirname "$lock")/$gen" 2>/dev/null || true
+  elif [ -f "$lock/meta" ]; then               # forme dossier+meta
+    sed -i.bak "s/^heartbeat_epoch=.*/heartbeat_epoch=$old/" "$lock/meta" && rm -f "$lock/meta.bak"
+  else
+    touch -t 202001010000 "$lock" 2>/dev/null || true
+  fi
+}
+
 echo "=== T1 — acquisition franche ==="
 out=$("$SCRIPT" acquire --owner=A --step=phase-9); rc=$?
 assert "T1.1 — acquired true" "$out" '"acquired": true'
@@ -53,8 +71,7 @@ assert "T6.2 — lock absent après release" "$("$SCRIPT" status)" '"present": f
 echo "=== T7 — récupération de claim périmé (heartbeat antidaté) ==="
 "$SCRIPT" acquire --owner=DEAD --step=x >/dev/null
 # antidate le heartbeat bien au-delà du TTL par défaut (1800 s)
-old=$(( $(date +%s) - 999999 ))
-sed -i.bak "s/^heartbeat_epoch=.*/heartbeat_epoch=$old/" "$VF_DRIVER_LOCK/meta" && rm -f "$VF_DRIVER_LOCK/meta.bak"
+age_stale "$VF_DRIVER_LOCK"
 out=$("$SCRIPT" acquire --owner=B --step=y); rc=$?
 assert "T7.1 — recovered true" "$out" '"recovered": true'
 assert "T7.2 — previous_owner DEAD" "$out" '"previous_owner": "DEAD"'
@@ -91,16 +108,28 @@ assert "T12.1 — lock sans meta → stale (mtime, pas 'frais éternel')" "$("$S
 assert "T12.2 — récupérable par un nouvel owner" "$("$SCRIPT" acquire --owner=NEW --step=z)" '"acquired": true'
 
 echo "=== T13 — récupération concurrente : un SEUL récupère (H1) ==="
-rm -rf "$VF_DRIVER_LOCK"
-"$SCRIPT" acquire --owner=DEAD --step=x >/dev/null
-old=$(( $(date +%s) - 999999 ))
-sed -i.bak "s/^heartbeat_epoch=.*/heartbeat_epoch=$old/" "$VF_DRIVER_LOCK/meta" && rm -f "$VF_DRIVER_LOCK/meta.bak"
-for i in 1 2 3 4 5 6; do ( "$SCRIPT" acquire --owner="R$i" --step=y >"$WORK_DIR/rec.$i" 2>/dev/null ) & done
-wait
-won=$(grep -l '"acquired": true' "$WORK_DIR"/rec.* 2>/dev/null | wc -l | tr -d ' ')
-num_eq "T13.1 — exactement 1 récupère le lock périmé" "$won" 1
-"$SCRIPT" release --owner=R1 >/dev/null 2>&1; "$SCRIPT" release --owner=R2 >/dev/null 2>&1
-rm -rf "$VF_DRIVER_LOCK"
+# CONCURRENCE ÉLEVÉE ET RÉPÉTÉE, à dessein. La forme précédente (6 concurrents, 1 round) ne
+# révélait le défaut qu'en loterie : verte sur macOS, rouge sur runner Linux — 24 concurrents la
+# rendaient rouge des deux côtés, avec jusqu'à 5 acquéreurs simultanés observés. Un contrat
+# d'exclusion mutuelle ne se mesure pas sur un tirage : on répète, et on exige l'égalité stricte
+# à CHAQUE round. Les deux bornes comptent — 0 gagnant est un échec au même titre que 2, sinon
+# un lock qui refuse tout le monde passerait pour correct.
+T13_N=24; T13_ROUNDS=5
+t13_bad=0; t13_worst=0; t13_zero=0
+for round in $(seq 1 "$T13_ROUNDS"); do
+  rm -rf "$VF_DRIVER_LOCK" "$WORK_DIR"/rec.*
+  "$SCRIPT" acquire --owner=DEAD --step=x >/dev/null 2>&1
+  age_stale "$VF_DRIVER_LOCK"
+  for i in $(seq 1 "$T13_N"); do ( "$SCRIPT" acquire --owner="R$i" --step=y >"$WORK_DIR/rec.$i" 2>/dev/null ) & done
+  wait
+  won=$(grep -l '"acquired": true' "$WORK_DIR"/rec.* 2>/dev/null | wc -l | tr -d ' ')
+  [ "$won" -gt "$t13_worst" ] && t13_worst="$won"
+  [ "$won" -eq 0 ] && t13_zero=$((t13_zero+1))
+  [ "$won" -ne 1 ] && t13_bad=$((t13_bad+1))
+done
+num_eq "T13.1 — $T13_ROUNDS rounds × $T13_N concurrents : aucun round hors contrat (pire=$t13_worst)" "$t13_bad" 0
+num_eq "T13.2 — jamais 0 gagnant (un lock périmé reste récupérable)" "$t13_zero" 0
+rm -rf "$VF_DRIVER_LOCK" "$WORK_DIR"/rec.*
 
 echo "=== T14 — TTL non numérique → défaut 1800 (L3, anti-injection) ==="
 rm -rf "$VF_DRIVER_LOCK"

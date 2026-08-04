@@ -2,9 +2,22 @@
 # driver-lock.sh — Lock de driver unique pour vf-dev-manager (ADR-053, Pattern A)
 #
 # Empeche deux missions/sessions de piloter la MEME etape en parallele (collision de pilotage
-# sur les backups isoles ADR-048/049). Acquisition ATOMIQUE par `mkdir` (le seul primitif atomique
-# portable). Recuperation de claim perime livree d'emblee (heartbeat + TTL) : un manager qui meurt
-# ne gele pas les missions.
+# sur les backups isoles ADR-048/049). Recuperation de claim perime livree d'emblee
+# (heartbeat + TTL) : un manager qui meurt ne gele pas les missions.
+#
+# FORME DU LOCK — le chemin public est un LIEN SYMBOLIQUE vers un dossier de generation qui
+# porte le `meta`. Les consommateurs ne changent pas : `[ -d "$LOCK" ]` et `"$LOCK/meta"`
+# traversent le lien (check-branch-claim.sh est inchange).
+#
+# POURQUOI PAS `mkdir` SEUL. La forme precedente prenait la PRESENCE DU DOSSIER pour le lock, et
+# recuperait un claim perime en le DEPLACANT (`mv`) avant de le recreer. Pendant ce deplacement le
+# chemin du lock n'existe pas — et le `mkdir` de la voie normale, qui ne peut pas distinguer
+# « libre » de « en cours de recuperation », y entre. Mesure : 24 acquisitions concurrentes sur un
+# lock perime rendaient jusqu'a 5 gagnants simultanes (macOS ET Linux). Ce n'est pas une fenetre a
+# retrecir : deux correctifs de fenetre ont ete mesures PIRES que l'original (8 et 6 gagnants).
+# Le lien, lui, est REMPLACE par rename(2) — il n'est jamais absent, donc il n'y a pas d'instant
+# ou le lock parait libre. La recuperation est en plus serialisee par un mutex nomme d'apres la
+# generation observee : un seul recuperateur par generation, les retardataires refusent.
 #
 # Usage:
 #   driver-lock.sh acquire   --owner=<id> --step=<etape>   # pose le lock (ou le recupere si perime)
@@ -39,12 +52,31 @@ done
 log() { echo "[driver-lock.sh] $*" >&2; }
 now() { date +%s; }
 iso() { date +%Y-%m-%dT%H:%M:%S; }
-# lit une cle du meta (vide si absent) — 1re ligne, pas de saut
 meta_get() { [ -f "$META" ] && grep "^$1=" "$META" 2>/dev/null | head -1 | cut -d= -f2- || true; }
 
-# age du lock en secondes. heartbeat_epoch s'il est numerique ; SINON mtime du dossier de lock
-# (fix H2 : un meta vide/partiel — process mort entre mkdir et write_meta — devient recuperable
-# apres TTL au lieu de rester eternellement "frais" et de geler toutes les missions).
+LOCK_PARENT="$(dirname "$LOCK_DIR")"
+LOCK_BASE="$(basename "$LOCK_DIR")"
+
+# Remplacement ATOMIQUE d'un lien : rename(2) par-dessus le lien existant. Sans option, `mv`
+# SUIT un lien vers un dossier et deplace la source DEDANS (verifie sur ce poste) — le lock
+# serait alors intact et le nouveau claim invisible. BSD/macOS : -h ; GNU/Linux : -T.
+mv_link() {
+  mv -h "$1" "$2" 2>/dev/null || mv -T "$1" "$2" 2>/dev/null
+}
+
+# Creation ATOMIQUE d'un lien, qui ECHOUE si le nom est deja pris — c'est le primitif qui
+# departage les acquisitions concurrentes. MEME PIEGE que `mv` : sans option, `ln -s A B` ou B
+# est un lien vers un dossier cree `B/A` et rend 0. Le lock paraissait alors libre a chaque
+# acquisition (mesure : 8 gagnants sur 8). BSD/macOS : -h ; GNU/Linux : -n. L'enchainement
+# couvre les deux — sur l'un l'option manquante echoue, sur l'autre elle fait le travail, et un
+# nom deja pris echoue des deux cotes (c'est le refus recherche).
+ln_atomic() {
+  ln -sh "$1" "$2" 2>/dev/null || ln -sn "$1" "$2" 2>/dev/null
+}
+
+# age du lock en secondes. heartbeat_epoch s'il est numerique ; SINON mtime de la CIBLE du lien
+# (fix H2 : un meta vide/partiel — process mort entre la creation et l'ecriture — devient
+# recuperable apres TTL au lieu de rester eternellement "frais" et de geler toutes les missions).
 lock_age() {
   local hb; hb="$(meta_get heartbeat_epoch)"
   case "$hb" in ''|*[!0-9]*) hb="" ;; esac
@@ -55,25 +87,69 @@ lock_age() {
   echo "$(( $(now) - hb ))"
 }
 
+# Presence du lock, quelle que soit sa forme : lien (nominal) ou dossier reel (lock legacy pose
+# par une version anterieure, ou dossier nu cree a la main). Les deux doivent rester gerables,
+# sinon une mise a jour du script gelerait les sessions en cours.
+lock_present() { [ -L "$LOCK_DIR" ] || [ -d "$LOCK_DIR" ]; }
+# Nom de la generation courante — sert d'identite au mutex de recuperation. Un lock legacy
+# (dossier reel) n'a pas de generation : on lui en donne une stable et distincte.
+lock_gen() { if [ -L "$LOCK_DIR" ]; then readlink "$LOCK_DIR"; else echo "legacy"; fi; }
+
 # Branche et arbre de travail du poseur du lock (ADR-064). Le claim ne disait QUE l'etape :
 # il ne permettait pas de repondre a « qui tient CETTE branche ? », la question posee par la
-# collision du 2026-07-31. Champs ADDITIFS — le JSON de sortie et les consommateurs existants
-# ne bougent pas. Capture faite a l'ACQUISITION et PRESERVEE au heartbeat (meme patron que
-# acquired_epoch) : un heartbeat emis apres un `git checkout` ne doit pas reecrire le claim,
-# sinon le lock revendiquerait silencieusement une branche que personne n'a decide de piloter.
+# collision du 2026-07-31. Champs ADDITIFS. Capture faite a l'ACQUISITION et PRESERVEE au
+# heartbeat (meme patron que acquired_epoch) : un heartbeat emis apres un `git checkout` ne doit
+# pas reecrire le claim, sinon le lock revendiquerait une branche que personne n'a decide de piloter.
 git_branch() { git rev-parse --abbrev-ref HEAD 2>/dev/null | tr -d '\n' || true; }
 git_worktree() { git rev-parse --show-toplevel 2>/dev/null | tr -d '\n' || true; }
 
-write_meta() {
+# Cree une generation NEUVE (dossier + meta complet) et rend son nom. Le meta est ecrit AVANT que
+# la generation ne soit publiee : un lock publie est toujours un lock complet — c'est cette
+# propriete qui supprime la fenetre « present mais vide » de la forme precedente.
+new_generation() {
+  local ts iso_ts gen
+  ts="$(now)"; iso_ts="$(iso)"
+  gen="${LOCK_BASE}.gen.${ts}.$$"
+  mkdir -p "$LOCK_PARENT" 2>/dev/null || true
+  mkdir "$LOCK_PARENT/$gen" 2>/dev/null || return 1
   {
     printf 'owner=%s\n'           "$(printf '%s' "$OWNER" | tr -d '\n')"
     printf 'step=%s\n'            "$(printf '%s' "$STEP"  | tr -d '\n')"
-    printf 'branch=%s\n'          "$(printf '%s' "${LOCK_BRANCH:-}"   | tr -d '\n')"
-    printf 'worktree=%s\n'        "$(printf '%s' "${LOCK_WORKTREE:-}" | tr -d '\n')"
-    printf 'acquired_epoch=%s\n'  "$1"
-    printf 'acquired_iso=%s\n'    "$2"
-    printf 'heartbeat_epoch=%s\n' "$3"
+    printf 'branch=%s\n'          "$(printf '%s' "$(git_branch)"   | tr -d '\n')"
+    printf 'worktree=%s\n'        "$(printf '%s' "$(git_worktree)" | tr -d '\n')"
+    printf 'acquired_epoch=%s\n'  "$ts"
+    printf 'acquired_iso=%s\n'    "$iso_ts"
+    printf 'heartbeat_epoch=%s\n' "$ts"
+  } > "$LOCK_PARENT/$gen/meta" || { rm -rf "$LOCK_PARENT/$gen"; return 1; }
+  echo "$gen"
+}
+
+# Reecrit le meta de la generation COURANTE en place (heartbeat, re-acquisition du meme owner).
+# Le lien ne bouge pas : rien a serialiser, l'owner est deja etabli.
+rewrite_meta() {
+  local ap ai br wt
+  ap="$(meta_get acquired_epoch)"; ai="$(meta_get acquired_iso)"
+  br="$(meta_get branch)"; wt="$(meta_get worktree)"
+  {
+    printf 'owner=%s\n'           "$(printf '%s' "$OWNER" | tr -d '\n')"
+    printf 'step=%s\n'            "$(printf '%s' "$STEP"  | tr -d '\n')"
+    printf 'branch=%s\n'          "$br"
+    printf 'worktree=%s\n'        "$wt"
+    printf 'acquired_epoch=%s\n'  "$ap"
+    printf 'acquired_iso=%s\n'    "$ai"
+    printf 'heartbeat_epoch=%s\n' "$1"
   } > "$META"
+}
+
+# Supprime lien + generation pointee (ou le dossier reel d'un lock legacy).
+drop_lock() {
+  if [ -L "$LOCK_DIR" ]; then
+    local gen; gen="$(readlink "$LOCK_DIR")"
+    rm -f "$LOCK_DIR"
+    case "$gen" in */*|'') ;; *) rm -rf "${LOCK_PARENT:?}/$gen" ;; esac
+  else
+    rm -rf "$LOCK_DIR"
+  fi
 }
 
 json_status() {
@@ -90,71 +166,77 @@ json_status() {
 require_owner() {
   [ -n "$OWNER" ] || { log "--owner requis pour '$ACTION'"; echo '{"error": "owner-required"}'; exit 1; }
 }
-ensure_parent() { mkdir -p "$(dirname "$LOCK_DIR")" 2>/dev/null || true; }
-
-# Defaut : on PRESERVE ce que le meta porte deja (heartbeat, re-acquisition du meme owner).
-# Seule une acquisition qui cree reellement le lock capture la branche/l'arbre courants.
-LOCK_BRANCH="$(meta_get branch)"
-LOCK_WORKTREE="$(meta_get worktree)"
 
 case "$ACTION" in
   acquire)
     require_owner
-    ensure_parent
-    if mkdir "$LOCK_DIR" 2>/dev/null; then
-      LOCK_BRANCH="$(git_branch)"; LOCK_WORKTREE="$(git_worktree)"
-      write_meta "$(now)" "$(iso)" "$(now)"
+    # 1. VOIE LIBRE — generation complete d'abord, publication par `ln -s` ensuite. `ln -s` echoue
+    #    si le nom existe : c'est le primitif atomique qui departage, et il ne publie qu'un lock
+    #    deja complet.
+    gen="$(new_generation)" || { echo '{"acquired": false, "reason": "generation-failed"}'; exit 1; }
+    if ln_atomic "$gen" "$LOCK_DIR"; then
       printf '{"acquired": true, "owner": "%s", "step": "%s", "recovered": false}\n' "$OWNER" "$STEP"
       exit 0
     fi
-    age="$(lock_age)"; held="$(meta_get owner)"
-    if [ "$age" -gt "$TTL" ]; then
-      log "lock perime (age ${age}s > ${TTL}s, owner=$held) — recuperation"
-      # H1 : elagage ATOMIQUE par rename. `mv` reussit pour UN SEUL concurrent (les autres voient
-      # la source deja deplacee) → pas de double-acquisition pendant la recuperation.
-      stale="${LOCK_DIR}.stale.$$"
-      if mv "$LOCK_DIR" "$stale" 2>/dev/null; then
-        # H1-ABA : entre NOTRE verdict "perime" et ce mv, un concurrent a pu recuperer PUIS
-        # recreer un lock FRAIS — le mv reussit alors sur ce lock vivant (double "recovered"
-        # observe en CI, T13.1). Re-verifier le heartbeat du meta DEPLACE : frais → on le remet
-        # en place et on rend la main. (Fenetre residuelle theorique si un 3e mkdir s'intercale
-        # pendant ces quelques instructions — le heartbeat du proprietaire depossede la detecte.)
-        mhb="$(grep '^heartbeat_epoch=' "$stale/meta" 2>/dev/null | head -1 | cut -d= -f2-)"
-        case "$mhb" in ''|*[!0-9]*) mhb="" ;; esac
-        if [ -n "$mhb" ] && [ "$(( $(now) - mhb ))" -le "$TTL" ]; then
-          mv "$stale" "$LOCK_DIR" 2>/dev/null || rm -rf "$stale"
-          printf '{"acquired": false, "reason": "race-during-recovery"}\n'; exit 1
-        fi
-        rm -rf "$stale"
-        if mkdir "$LOCK_DIR" 2>/dev/null; then
-          LOCK_BRANCH="$(git_branch)"; LOCK_WORKTREE="$(git_worktree)"
-          write_meta "$(now)" "$(iso)" "$(now)"
-          printf '{"acquired": true, "owner": "%s", "step": "%s", "recovered": true, "previous_owner": "%s"}\n' \
-            "$OWNER" "$STEP" "$held"
-          exit 0
-        fi
+    # 2. OCCUPE — notre generation ne sert pas encore ; on la garde pour une eventuelle
+    #    recuperation et on l'elague sur tous les chemins de sortie.
+    age="$(lock_age)"; held="$(meta_get owner)"; observed_gen="$(lock_gen)"
+    if [ "$age" -le "$TTL" ]; then
+      rm -rf "${LOCK_PARENT:?}/$gen"
+      if [ "$held" = "$OWNER" ]; then
+        # meme owner : ré-acquisition idempotente (rafraichit heartbeat, maj etape si fournie)
+        [ -z "$STEP" ] && STEP="$(meta_get step)"
+        rewrite_meta "$(now)"
+        printf '{"acquired": true, "owner": "%s", "step": "%s", "reentrant": true}\n' "$OWNER" "$STEP"
+        exit 0
       fi
+      printf '{"acquired": false, "reason": "held", "held_by": "%s", "age_seconds": %s}\n' "$held" "$age"
+      exit 1
+    fi
+    # 3. PERIME — un SEUL recuperateur par generation. Le mutex porte le nom de la generation
+    #    observee : `ln -s` echoue si un concurrent l'a deja pris, et une generation neuve
+    #    donnerait un autre nom (donc pas de mutex zombie qui bloquerait la suivante).
+    log "lock perime (age ${age}s > ${TTL}s, owner=$held) — recuperation"
+    mutex="${LOCK_DIR}.rec.$(printf '%s' "$observed_gen" | tr -c 'A-Za-z0-9._-' '_')"
+    if ! ln_atomic "$$" "$mutex"; then
+      rm -rf "${LOCK_PARENT:?}/$gen"
       printf '{"acquired": false, "reason": "race-during-recovery"}\n'; exit 1
     fi
-    if [ "$held" = "$OWNER" ]; then
-      # meme owner : ré-acquisition idempotente (rafraichit heartbeat, maj etape si fournie)
-      [ -z "$STEP" ] && STEP="$(meta_get step)"
-      write_meta "$(meta_get acquired_epoch)" "$(meta_get acquired_iso)" "$(now)"
-      printf '{"acquired": true, "owner": "%s", "step": "%s", "reentrant": true}\n' "$OWNER" "$STEP"
+    # Re-verifier APRES le mutex, SUR LES DEUX CRITERES. La generation ne suffit pas : un
+    # retardataire qui lit l'age AVANT le remplacement et la generation APRES obtient un mutex
+    # libre (celui de la generation NEUVE) et passe le test d'egalite — il recupere alors un lock
+    # frais sur la foi d'un verdict de peremption perime. C'est ce qui laissait 2 gagnants apres
+    # la bascule du protocole. L'age est donc RELU ici, et c'est lui qui tranche.
+    if [ "$(lock_gen)" != "$observed_gen" ] || [ "$(lock_age)" -le "$TTL" ]; then
+      rm -f "$mutex"; rm -rf "${LOCK_PARENT:?}/$gen"
+      printf '{"acquired": false, "reason": "race-during-recovery"}\n'; exit 1
+    fi
+    old_gen="$observed_gen"
+    if [ -L "$LOCK_DIR" ]; then
+      ln_atomic "$gen" "${LOCK_DIR}.new.$$" && mv_link "${LOCK_DIR}.new.$$" "$LOCK_DIR"
+    else
+      # lock legacy (dossier reel) : pas de lien a remplacer, on elague puis on publie.
+      rm -rf "$LOCK_DIR" && ln_atomic "$gen" "$LOCK_DIR"
+    fi
+    if [ "$(lock_gen)" = "$gen" ]; then
+      rm -f "$mutex" "${LOCK_DIR}.new.$$"
+      case "$old_gen" in */*|''|legacy) ;; *) rm -rf "${LOCK_PARENT:?}/$old_gen" ;; esac
+      printf '{"acquired": true, "owner": "%s", "step": "%s", "recovered": true, "previous_owner": "%s"}\n' \
+        "$OWNER" "$STEP" "$held"
       exit 0
     fi
-    printf '{"acquired": false, "reason": "held", "held_by": "%s", "age_seconds": %s}\n' "$held" "$age"
-    exit 1
+    rm -f "$mutex" "${LOCK_DIR}.new.$$"; rm -rf "${LOCK_PARENT:?}/$gen"
+    printf '{"acquired": false, "reason": "race-during-recovery"}\n'; exit 1
     ;;
 
   heartbeat)
     require_owner
-    [ -d "$LOCK_DIR" ] || { echo '{"ok": false, "reason": "no-lock"}'; exit 1; }
+    lock_present || { echo '{"ok": false, "reason": "no-lock"}'; exit 1; }
     if [ "$(meta_get owner)" = "$OWNER" ]; then
       # rafraichit l'horodatage (maj step si --step fourni) — un seul ts pour meta + rapport
       [ -z "$STEP" ] && STEP="$(meta_get step)"
       ts="$(now)"
-      write_meta "$(meta_get acquired_epoch)" "$(meta_get acquired_iso)" "$ts"
+      rewrite_meta "$ts"
       printf '{"ok": true, "owner": "%s", "heartbeat_epoch": %s}\n' "$OWNER" "$ts"
       exit 0
     fi
@@ -163,30 +245,35 @@ case "$ACTION" in
 
   release)
     require_owner
-    [ -d "$LOCK_DIR" ] || { echo '{"released": false, "reason": "no-lock"}'; exit 0; }
+    lock_present || { echo '{"released": false, "reason": "no-lock"}'; exit 0; }
     held="$(meta_get owner)"
     if [ "$held" = "$OWNER" ]; then
-      rm -rf "$LOCK_DIR"
+      drop_lock
       printf '{"released": true, "owner": "%s"}\n' "$OWNER"; exit 0
     fi
     printf '{"released": false, "reason": "not-owner", "held_by": "%s"}\n' "$held"; exit 1
     ;;
 
   status)
-    [ -d "$LOCK_DIR" ] && json_status true || json_status false
+    lock_present && json_status true || json_status false
     exit 0
     ;;
 
   recover)
-    [ -d "$LOCK_DIR" ] || { echo '{"recovered": false, "reason": "no-lock"}'; exit 0; }
+    lock_present || { echo '{"recovered": false, "reason": "no-lock"}'; exit 0; }
     age="$(lock_age)"; held="$(meta_get owner)"
     if [ "$age" -gt "$TTL" ]; then
-      stale="${LOCK_DIR}.stale.$$"
-      if mv "$LOCK_DIR" "$stale" 2>/dev/null; then
-        rm -rf "$stale"
-        printf '{"recovered": true, "previous_owner": "%s", "age_seconds": %s}\n' "$held" "$age"; exit 0
+      observed_gen="$(lock_gen)"
+      mutex="${LOCK_DIR}.rec.$(printf '%s' "$observed_gen" | tr -c 'A-Za-z0-9._-' '_')"
+      if ! ln_atomic "$$" "$mutex"; then
+        printf '{"recovered": false, "reason": "race-during-recovery"}\n'; exit 1
       fi
-      printf '{"recovered": false, "reason": "race-during-recovery"}\n'; exit 1
+      if [ "$(lock_gen)" != "$observed_gen" ] || [ "$(lock_age)" -le "$TTL" ]; then
+        rm -f "$mutex"
+        printf '{"recovered": false, "reason": "race-during-recovery"}\n'; exit 1
+      fi
+      drop_lock; rm -f "$mutex"
+      printf '{"recovered": true, "previous_owner": "%s", "age_seconds": %s}\n' "$held" "$age"; exit 0
     fi
     printf '{"recovered": false, "reason": "still-fresh", "age_seconds": %s, "ttl": %s}\n' "$age" "$TTL"
     exit 1
