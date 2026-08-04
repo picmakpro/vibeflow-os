@@ -27,8 +27,11 @@
 #      Exit 3, stdout strictement vide. C'est le cas nominal de tous les labs à ce jour.
 #   1. `GSD_WORKSTREAM` non vide, nom valide, `<root>/.planning/workstreams/<nom>/` existe →
 #      exit 0, canal `env`.
-#   2. Pas de `GSD_WORKSTREAM`, pointeur partagé `<root>/.planning/active-workstream` lisible, son
-#      contenu est un nom valide, le dossier correspondant existe → exit 0, canal `store-partagé`.
+#   2. Pas de `GSD_WORKSTREAM`, pointeur partagé `<root>/.planning/active-workstream` lisible SANS
+#      RISQUE (fichier régulier, PAS un lien symbolique, borné en octets), son contenu ENTIER rogné
+#      de ses bords est un nom valide, le dossier correspondant existe → exit 0, canal
+#      `store-partagé`. Le contenu entier, et non la 1re ligne : le moteur rogne le fichier entier,
+#      « dev\nautre » lui est donc INVALIDE — le lire ligne à ligne le rendait « dev ».
 #   3. Un nom est résolu par l'un des deux canaux mais `<root>/.planning/workstreams/<nom>/`
 #      n'existe pas → exit 1. C'est l'auto-nettoyage silencieux du moteur rendu audible.
 #   4. Dépôt partitionné, aucun des deux canaux composables ne résout → exit 1, avec le fait
@@ -53,7 +56,8 @@
 #   1  = échec constaté — dépôt partitionné sans workstream composable résolu (état 4), ou nom
 #        résolu dont le dossier n'existe pas (état 3).
 #   2  = NON VÉRIFIABLE — hors dépôt git, `.planning/` illisible, `workstreams/` illisible ou non
-#        répertoire, pointeur partagé illisible, ou nom hors de la classe de caractères du moteur.
+#        répertoire, pointeur partagé non lisible SANS RISQUE (lien symbolique refusé, non
+#        régulier, au-delà de la borne d'octets), ou nom hors de la politique du moteur.
 #        Jamais un 0 de complaisance : « je n'ai pas pu regarder » ne vaut pas « conforme ».
 #   3  = SILENCE — dépôt non partitionné, vérifié : il n'y a rien à dire.
 #   64 = erreur d'usage (argument inconnu, option sans valeur).
@@ -118,41 +122,42 @@ fi
 { [ -d "$WS_ROOT" ] && [ -r "$WS_ROOT" ] && [ -x "$WS_ROOT" ]; } \
   || non_verifiable "$WS_ROOT existe mais n'est pas un répertoire lisible"
 
-# Classe de caractères du moteur (`validateWorkstreamName` : alphanum, `-`, `_`, `.`). Validée AVANT
-# toute concaténation dans un chemin (T-24-05-01) : un nom hors classe ne traverse jamais vers un
-# chemin, et n'est jamais réimprimé tel quel dans la sortie.
-nom_valide() {
-  case "$1" in
-    ''|*[!A-Za-z0-9._-]*) return 1 ;;
-    *) return 0 ;;
+# Politique de nom : fichier SOURCÉ partagé par les quatre gates (planning-core). La copie locale
+# qui vivait ici n'avait repris QUE la classe de caractères du moteur, en abandonnant
+# `hasInvalidPathSegment` et l'ancre alphanumérique initiale : `.` et `..` sont entièrement dans la
+# classe, ce gate rendait donc « exit 0 conforme » sur `..` là où le moteur rend `false` — et
+# `WS_DIR="$WS_ROOT/.."` satisfait trivialement `[ -d ]`. L'en-tête ci-dessus revendiquait
+# T-24-05-01 (« un nom hors classe ne traverse jamais vers un chemin ») : mitigation annoncée, non
+# tenue. Elle l'est maintenant par la politique amont intégrale.
+WS_POLICY=""
+for _cand in "$(dirname "$0")/workstream-policy.sh" \
+             "$(dirname "$0")/../../planning-core/scripts/workstream-policy.sh"; do
+  [ -r "$_cand" ] && { WS_POLICY="$_cand"; break; }
+done
+[ -n "$WS_POLICY" ] \
+  || non_verifiable "workstream-policy.sh introuvable — politique de workstream non chargeable"
+# shellcheck source=/dev/null
+. "$WS_POLICY"
+
+# La résolution partagée couvre les deux canaux composables dans l'ordre du moteur
+# (GSD_WORKSTREAM, puis pointeur partagé) et refuse un pointeur qui ne peut pas être lu SANS
+# RISQUE — lien symbolique en tête. Motif (rejoué sur dépôt piégé) : un `.planning/active-workstream`
+# versionné en mode 120000 vers `../../victime/.env` faisait imprimer la 1re ligne du fichier cible
+# VERBATIM sur stdout de ce hook, donc dans le contexte de session, sans aucune action de la victime
+# au-delà de l'ouverture de session. Le motif de la Phase 23 (`slurp` sans `O_NOFOLLOW`), mais
+# auto-déclenché et sans borne de longueur.
+vf_ws_resolve "$PLANNING"; WS_RC=$?
+if [ "$WS_RC" -eq 2 ]; then
+  # Énumération FERMÉE de raisons — la valeur brute n'est jamais réimprimée.
+  case "$VF_WS_REASON" in
+    pointeur-lien-symbolique) non_verifiable "$POINTER est un lien symbolique — refus de le suivre (le contenu de la cible traverserait vers le contexte de session) ; valeur non lue, non réimprimée" ;;
+    pointeur-trop-long)       non_verifiable "$POINTER dépasse $VF_WS_POINTER_MAX_BYTES octets — refus de le lire ; valeur non lue, non réimprimée" ;;
+    pointeur-illisible)       non_verifiable "$POINTER existe mais n'est pas un fichier régulier lisible" ;;
+    *)                        non_verifiable "le canal $VF_WS_SOURCE porte un nom hors de la politique du moteur (1er caractère alphanumérique, puis [A-Za-z0-9._-], ni séparateur de chemin, ni '.'/'..', ni '..' en sous-chaîne) — valeur non réimprimée" ;;
   esac
-}
-
-WS_NAME=""
-WS_CANAL=""
-
-# --- Canal 1 : GSD_WORKSTREAM (premier rang de resolveActiveWorkstream) ---------------------------
-ENV_WS="${GSD_WORKSTREAM:-}"
-if [ -n "$ENV_WS" ]; then
-  nom_valide "$ENV_WS" \
-    || non_verifiable "GSD_WORKSTREAM porte un nom hors de la classe de caractères du moteur ([A-Za-z0-9._-]) — valeur non réimprimée"
-  WS_NAME="$ENV_WS"
-  WS_CANAL="env (GSD_WORKSTREAM)"
 fi
-
-# --- Canal 2 : pointeur partagé in-repo -----------------------------------------------------------
-if [ -z "$WS_NAME" ] && [ -e "$POINTER" ]; then
-  { [ -f "$POINTER" ] && [ -r "$POINTER" ]; } \
-    || non_verifiable "$POINTER existe mais n'est pas un fichier lisible"
-  RAW="$(awk 'NR==1{print; exit}' "$POINTER" 2>/dev/null)" || RAW=""
-  RAW="$(printf '%s' "$RAW" | tr -d ' \011\013\014\015')"
-  if [ -n "$RAW" ]; then
-    nom_valide "$RAW" \
-      || non_verifiable "le pointeur partagé porte un nom hors de la classe de caractères du moteur ([A-Za-z0-9._-]) — valeur non réimprimée"
-    WS_NAME="$RAW"
-    WS_CANAL="store-partagé (.planning/active-workstream)"
-  fi
-fi
+WS_NAME="$VF_WS_NAME"
+WS_CANAL="$VF_WS_SOURCE"
 
 # --- État 4 : partitionné, aucun canal composable ne résout ---------------------------------------
 if [ -z "$WS_NAME" ]; then
