@@ -7,17 +7,19 @@ l'efficience* ».
 
 > ## ⛔ STATUT DE CE DOCUMENT
 >
-> **Chaque entrée est une PROPOSITION.** La seule exception est la **collision C-1** (Iron Law 2),
-> dont Samuel a **explicitement autorisé la révision effective** dans le verdict de la zone 5 :
-> elle a été **APPLIQUÉE le 2026-08-04** par le plan `24-10` (tâche 1), et actée par **ADR-069**.
+> **Chaque entrée est une PROPOSITION, sauf deux.** Les **deux révisions doctrinales** que Samuel a
+> explicitement autorisées dans le verdict de la zone 5 ont été **APPLIQUÉES le 2026-08-04** et sont
+> actées par **ADR-069** :
 >
-> ⚠️ **Statut de C-6 à re-vérifier — hors périmètre de `24-10`.** ADR-069 porte l'**amendement
-> d'ADR-064** (`GSD_WORKSTREAM` écrit comme **canal nominal**), c'est-à-dire précisément la
-> proposition de C-6, que Samuel a autorisée comme 2ᵉ révision doctrinale de la phase. La ligne de
-> statut de C-6 ci-dessous (« PROPOSÉE — non appliquée ») n'a **pas** été mise à jour : le mandat de
-> `24-10` bornait ce document au **statut de C-1**. À reprendre par un mandat ciblé.
+> - **C-1** — Iron Law 2 révisée dans `plugin/conductor/AGENT.md` (item 2, formulation antérieure
+>   conservée en trace sous le bloc des lois), appliquée par le plan `24-10`, tâche 1 ;
+> - **C-6** — **amendement d'ADR-064** (`GSD_WORKSTREAM` écrit comme **canal nominal**), porté par
+>   **ADR-069 § « L'amendement d'ADR-064 — `GSD_WORKSTREAM` est le canal nominal »**. Statut mis à
+>   jour le **2026-08-04** par un mandat de correction ciblée : le mandat de `24-10` bornait ce
+>   document au statut de C-1, ce qui avait laissé C-6 en « PROPOSÉE » alors que l'amendement était
+>   déjà gravé.
 >
-> Les collisions C-2 à C-6 attendent un **arbitrage humain**. Elles n'ont **rien changé** aux
+> Les collisions C-2 à C-5 attendent un **arbitrage humain**. Elles n'ont **rien changé** aux
 > verdicts en vigueur : les 12 plans de la phase exécutent les verdicts **tels qu'arbitrés le
 > 2026-08-04**, pas les propositions ci-dessous.
 >
@@ -38,7 +40,7 @@ refus repose, **en tout ou partie**, sur de la conformité interne plutôt que s
 | **C-3** | `CLAUDE.md` — vocabulaire de commit | `hooks.community` (capability native) | conformité interne | **MAINTENIR**, motif requalifié |
 | **C-4** | ADR-057 « une capacité, une seule voix » | `graphify`, `profile-pipeline` (natives) | **fait mesuré** | **MAINTENIR** — hors doctrine, tracé pour relisibilité |
 | **C-5** | Pattern C — contrat typé par rôle | `context_profile` (natif) | **fait mesuré** | **MAINTENIR** — collision apparente seulement |
-| **C-6** | ADR-064 « un écrivain = un worktree » | Pointeur de session des workstreams | **fait mesuré** | **AMENDER** — voie de composition trouvée |
+| **C-6** | ADR-064 « un écrivain = un worktree » | Pointeur de session des workstreams | **fait mesuré** | **AMENDÉE — ✅ APPLIQUÉE le 2026-08-04** (ADR-069) |
 
 ---
 
@@ -273,7 +275,16 @@ workstream résolu — la défaillance visée est mesurée : `getActiveWorkstrea
 **auto-nettoie en silence** (nom invalide **ou** `.planning/workstreams/<nom>/` inexistant →
 `adapter.clear()` puis `null`).
 
-**Statut : PROPOSÉE (amendement d'ADR-064) — non appliquée. ADR-064 reste en vigueur tel quel.**
+**Statut : ✅ AMENDEMENT APPLIQUÉ le 2026-08-04** — 2ᵉ des deux révisions doctrinales autorisées par
+le verdict de la zone 5, et **seule autre entrée appliquée** avec C-1. ADR-064 **reste en vigueur,
+principe intact** : l'amendement ne le contredit pas, il en précise la mécanique de composition.
+
+**Ce qui a été écrit.** `docs/ADR.md` § **ADR-069 → « L'amendement d'ADR-064 — `GSD_WORKSTREAM` est
+le canal nominal »** grave la proposition ci-dessus : sur un arbre partitionné, l'isolation « un
+écrivain = un worktree » se compose avec les workstreams **via l'export de `GSD_WORKSTREAM` par
+worktree**, jamais via le pointeur de session. `GSD_WORKSTREAM` y est qualifié de **canal nominal**
+(niveau 2 de la résolution amont), et non de contournement. L'en-tête d'ADR-069 porte ADR-064 comme
+voisine « **amendée par cette entrée** », et ADR-064 porte le renvoi retour vers ADR-069.
 
 ---
 
@@ -383,7 +394,9 @@ l'étage qui marche, sans rien préjuger de l'arbitrage.
 
 ## Ce que cet inventaire ne contient pas
 
-- **Aucune application.** Une seule révision est autorisée (C-1) et elle est portée par `24-10`.
+- **Aucune application au-delà des deux révisions autorisées.** Seules **C-1** (Iron Law 2, portée
+  par `24-10`) et **C-6** (amendement d'ADR-064, portée par ADR-069) sont appliquées ; C-2 à C-5
+  restent des propositions sans effet.
 - **Aucune révision d'ADR-031** ni de la **release racine gatée** — la doctrine GSD-first ne les lève
   pas (contrainte explicite du mandat).
 - **Aucun verdict modifié.** Les 12 plans exécutent les 6 verdicts **tels qu'arbitrés le 2026-08-04**.
