@@ -107,6 +107,52 @@
 - Fix approach: rejouer la recette sur un **lab iOS équipé** (projet Xcode + `.mcp.json` + simulateur),
   puis reporter le constat ici. La dérogation se réexamine si `vibeflow-os` acquiert un projet iOS.
 
+**Aucune primitive partagée de confinement de chemin — le motif symlink en est à son 4ᵉ passage** — Sévérité : **HIGH**
+- Issue: le même défaut (un chemin dérivé d'une entrée non maîtrisée qui sort de son arbre par
+  lien symbolique) a été fermé **quatre fois, à quatre endroits, sans jamais l'être une fois pour
+  toutes** : deux scripts en Phase 23 ; `check-workstream-pointer.sh` (vague 1, refus `[ -L ]`) ;
+  `build-gsd-capabilities-index.sh` (vague 2, `vf_realpath` node + comparaison de préfixe) ; et
+  le répertoire de compartiment (découvert le 2026-08-04, **non fermé** — voir T-24-14-C1). Le
+  commentaire du 3ᵉ passage écrit lui-même « *C'est le troisième passage de ce motif dans ce
+  dépôt ; il se ferme ici* » (`build-gsd-capabilities-index.sh:166`) — il s'est fermé **là**, et
+  le motif est réapparu ailleurs. Trois causes mesurées :
+  **(1)** six implémentations du même besoin coexistent dans **trois langages** — `[ -L ]`
+  (`workstream-policy.sh:153`), `vf_realpath` node (`build-gsd-capabilities-index.sh:174-176`),
+  `os.path.realpath` python (`guard-agent-write.sh:78`), `pwd -P`
+  (`check-branch-claim.sh:128`), `os.path.normpath` (`guard-read-registres.sh:25`) ;
+  **(2)** la primitive existe déjà mais **déguisée en règle métier** — `vf_ws_read_pointer()`
+  (`workstream-policy.sh:149-171`) est une lecture sûre générique (ses 3 refus — lien
+  symbolique, fichier non régulier, taille — n'ont rien de spécifique au workstream) mais son
+  nommage (`VF_WS_RAW`, `VF_WS_REASON`) la rend invisible à qui résout un autre genre de chemin ;
+  **(3)** le contrôle anti-duplication existe déjà mais **sur un roster figé** —
+  `test-workstream-policy.sh` C1 (`:301-313`) / C2 (`:316-322`) / C3 (mutation, `:324+`) est
+  exactement la bonne forme, mais C1 itère sur **quatre chemins écrits en dur**. Un script neuf
+  n'appartient à aucun roster : il peut ré-inventer le confinement sans que rien ne s'en
+  aperçoive. **Le contrôle est aveugle aux nouveaux entrants, qui sont précisément la population
+  qui reproduit le motif.**
+- Files: `plugin/planning-core/scripts/workstream-policy.sh:149-171`,
+  `plugin/planning-core/scripts/tests/test-workstream-policy.sh:301-322`,
+  `plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh:160-192`,
+  `plugin/conductor/scripts/guard-agent-write.sh:78`,
+  `plugin/conductor/scripts/check-branch-claim.sh:128`,
+  `plugin/consolidator/scripts/guard-read-registres.sh:25`
+- Impact: sur les 52 scripts hors tests de `plugin/*/scripts/`, **37** lisent un fichier à un
+  chemin porté par une variable et **29** ne portent aucun marqueur de confinement. Ce chiffre
+  est un **majorant de candidats à trier, pas un décompte de vulnérabilités** (beaucoup de ces
+  chemins dérivent de la racine du dépôt et ne sont pas pilotables). Il donne l'ordre de
+  grandeur de la surface. Tant que le contrôle reste par-script, un 5ᵉ passage est attendu.
+- Fix approach: **(a)** primitive partagée dans `plugin/planning-core/scripts/` (le précédent est
+  là : la politique de workstream y vit et est sourcée par 4 scripts de 3 modules, et sa
+  fermeture de dépendances est réduite à elle-même) — **deux** fonctions, car le motif a deux
+  moitiés que les quatre passages confondent : `vf_path_refuse_link` (refuser de suivre — cas
+  pointeur) et `vf_path_confine <candidat> <ancre>` (chemin réel sous ancre réelle — cas registre
+  et cas compartiment) ; **(b)** généraliser C1/C2 du roster figé à l'**énumération** de
+  `plugin/*/scripts/*.sh`, chaque script lisant un chemin dérivé d'une entrée devant soit sourcer
+  la primitive, soit figurer dans une liste d'exemptions **nommée et motivée** ; **(c)** cas de
+  **mutation obligatoire** sur le modèle de C3 — un script neuf non confiné ajouté au corpus doit
+  faire rougir la suite, sans quoi la garde n'est qu'une assertion d'*existence* (« la primitive
+  existe quelque part ») qui reste verte pendant que la *relation* se rompt.
+
 ## Known Bugs
 
 Aucun bug ouvert confirmé sur disque au 2026-07-26. Les comportements gênants connus (survie de
@@ -161,6 +207,45 @@ capturées au backlog — voir Tech Debt.
   sur ce repo doit être remplacée par l'invocation `--file` explicite du (des) `AGENT.md` racine de
   module ; ou faire pointer l'invocation nue sur les emplacements réels des `AGENT.md` du repo plutôt
   que sur `.claude/agents` (répertoire d'un lab qui a *installé* le plugin, pas de ce repo lui-même).
+
+**Fuite hors-lab par répertoire de compartiment en lien symbolique (T-24-14-C1)** — Sévérité : **HIGH**
+- Risk: le nom de workstream est validé et le pointeur-*fichier* refuse les liens symboliques
+  (`plugin/planning-core/scripts/workstream-policy.sh:153-156`), mais **rien ne contraint le
+  répertoire de compartiment lui-même**. Avec `.planning/workstreams/<nom>` posé en lien
+  symbolique vers un répertoire hors du lab, `[ -d ]` le suit et
+  `plugin/planning-core/scripts/planning-context.sh:168` injecte le `STATE.md` de la cible
+  **verbatim dans le contexte de session**. **Reproduit** le 2026-08-04 sur fixture jetable : à
+  exit 0, une ligne sentinelle lue hors de l'arbre du lab apparaît dans la sortie du hook.
+  Préconditions identiques à celles du trou pointeur que la Phase 24 a jugé réel et fermé : une
+  entrée mode 120000 committée sous `.planning/`, puis n'importe quelle ouverture de session.
+- Files: `plugin/planning-core/scripts/planning-context.sh:168`,
+  `plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh:286` (portée réduite à 3 valeurs
+  ≤ 80 caractères par la liste blanche), `plugin/conductor/scripts/check-state-integrity.sh:145`
+- Current mitigation: aucune sur le répertoire. La liste blanche de frontmatter limite ce qui
+  ressort par `check-dev-bootstrap.sh`, mais pas par `planning-context.sh`.
+- Recommendations: confinement sur le chemin **résolu** du compartiment — le motif T28-M déjà
+  employé dans `plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh:160-192`. Tracé
+  comme menace ouverte bloquante au registre C de
+  `.planning/phases/VFDO-24-*/24-SECURITY.md` ; c'est l'une des 4 qui bloquent `/gsd-ship`.
+
+**T-24-02-01 — mitigation falsifiée, en attente d'un arbitrage humain** — Sévérité : **HIGH**
+- Risk: le modèle de menaces du plan 24-02 mitigeait le risque `gsd-tools windows *` par
+  **abstinence** (« aucune tâche ne les invoque ») plus une interdiction écrite. Les deux moitiés
+  sont tombées : ADR-066 ne porte aucune formulation d'interdiction et **acte** l'exécution
+  (`docs/ADR.md:1597`), et la commande **a été invoquée** (commit `7b96e34`,
+  `.planning/WINDOWS.md:3-4`, entrée id 3 `"status": "waived"`). Le dégel était une décision
+  humaine légitime — mais le registre de menaces n'a jamais été révisé en conséquence, et aucune
+  entrée n'existe au journal des risques acceptés.
+- Files: `docs/ADR.md:1565-1651` (ADR-066), `.planning/WINDOWS.md`,
+  `.planning/phases/VFDO-24-*/24-SECURITY.md` (registre A)
+- Current mitigation: contrôles compensatoires réels mais non déclarés comme la mitigation —
+  répétition préalable sur copie jetable via `--cwd` (`docs/ADR.md:1609-1611`), post-conditions
+  vérifiées (`:1611-1615`), risque résiduel acté (`:1633-1639`), et **aucun script du dépôt
+  n'invoque ces commandes** (balayage `.sh`/`.md`/`.json`/`.yml` : prose uniquement).
+- Recommendations: acte **humain** requis — soit re-disposer en `accept` avec entrée nominative
+  au journal (justification ADR-066 + les quatre contrôles), soit réécrire la mitigation autour
+  des contrôles réellement en place. Un agent ne peut pas s'inscrire lui-même dans la colonne
+  « Accepté par » sans la vider de son sens.
 
 ## Performance Bottlenecks
 
@@ -295,6 +380,48 @@ vrais dans le code mais sans impact observé — sévérité **LOW**, ne pas pri
 - Files: `plugin/mobile-test-team/agents/`, `plugin/mobile-test-team/README.md:11`
 - Risk: le module vend une capacité autonome non démontrée.
 
+**Gestes documentés de la Phase 24 sans aucune garde machine** — Priority: **HIGH**
+- What's not tested: trois mitigations **présentes aujourd'hui, gardées par rien demain**,
+  relevées par l'audit sécurité du 2026-08-04 (fermées au registre parce qu'elles livrent ce
+  qu'elles promettaient, mais sans non-régression) :
+  **(1)** `hooks.json` — le `|| true` sur les 5 commandes `SessionStart` de conductor (T-24-05-02).
+  Le filtre `jq` qui devait le vérifier ne vit que dans le bloc `<verify>` du plan, un one-shot
+  d'exécution. Aucune suite ni étape CI ne l'asserte. Le précédent existe pourtant :
+  `plugin/consolidator/scripts/tests/test-consolidator.sh:295-296` (T-CSL11) fait exactement cela
+  pour le `PostToolUse` de consolidator.
+  **(2)** `workstreams.md` — le geste de vérification avant PR (T-24-08-03) et l'ordonnancement
+  « résous le compartiment **AVANT** toute lecture » (T-24-08-01). Le seul exécutable qui
+  mentionne `workstreams.md` est `test-dev-orchestrator.sh:6139-6158` (T35), et il ne vérifie que
+  le **renvoi** depuis les deux agents, jamais le **contenu**. Concrètement : supprimer le geste
+  PR, les quatre gestes, ou le mot « AVANT » laisse **toute la CI verte**.
+  **(3)** plafond ADR-029 sur les deux modules injectés en `agent_skills` (T-24-03-03) :
+  `test-dev-orchestrator.sh:1052` borne T5 à `"$MOD"/skills/vf-*/SKILL.md`, or
+  `plugin/software-architecture/SKILL.md` et `plugin/audit-architecture/SKILL.md` sont à la racine
+  de modules autonomes, sans préfixe `vf-`. Le volume injecté dans le prompt de `gsd-planner`
+  (269 lignes aujourd'hui) peut croître au-delà de 500 sans qu'aucun gate ne rougisse.
+- Files: `plugin/conductor/hooks/hooks.json:16-20`,
+  `plugin/dev-orchestrator/references/workstreams.md:138-145`,
+  `plugin/dev-orchestrator/agents/vf-dev-manager.md:33-34`,
+  `plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh:1052`
+- Risk: une régression sur l'une de ces trois rouvre une menace **fermée** de la Phase 24 sans
+  qu'aucun signal ne se déclenche — le mode d'échec exact que le registre de menaces existe pour
+  empêcher.
+
+**`24-03-SUMMARY.md` affirme le contraire de l'arbre courant** — Priority: **MEDIUM**
+- What's not tested: rien ne vérifie qu'un SUMMARY reste vrai après coup. `24-03-SUMMARY.md:74-78`
+  affirme que « les **9** clés refusées ou différées sont **TOUTES absentes**, chacune vérifiée
+  individuellement ». Or `.planning/config.json:27` porte `"windows_enforce": true` et `:45`
+  porte `"workflow_guard": true` — posées par le plan **24-02** sous ADR-066. Le PLAN a été
+  corrigé et daté (`24-03-PLAN.md:88-93`, `:104`), le SUMMARY ne l'a pas été. Un relecteur du
+  SUMMARY conclurait que la zone 2 est désarmée alors qu'elle est **armée et bloquante** à
+  `ship:pre`.
+- Files: `.planning/phases/VFDO-24-*/24-03-SUMMARY.md:74-78`, `.planning/config.json:27,45`
+- Risk: c'est la classe de fait la plus dangereuse du dépôt — un artefact de traçabilité qui dit
+  le contraire du réel et que personne ne re-mesure. Non corrigé ici : le mandat d'audit
+  autorisait à *enregistrer un verdict* dans les SUMMARY, pas à les réécrire.
+
 ---
 
 *Concerns audit: 2026-07-26 — v2.36.1, 17 modules, 37 suites CI*
+*Complété 2026-08-04 par `/gsd-secure-phase 24` : 4 entrées (1 dette d'architecture HIGH,
+2 sécurité HIGH, 2 lacunes de couverture) issues de l'audit des 34 menaces ouvertes.*
