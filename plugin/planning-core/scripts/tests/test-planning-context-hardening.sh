@@ -60,6 +60,89 @@ printf '# INDEX\n| a | actif |\n' > "$SMALL/.planning/INDEX.md"
 out=$( cd "$SMALL" && "$BASH_BIN" "$PC" )
 hasnt "$out" "tronqué" "H2d INDEX court → pas de faux signal de troncature"
 
+echo "=== planning-context.sh — workstreams GSD (GSDA-14) ==="
+# Fixture lab MONO partitionné : STATE.md à la racine ET dans workstreams/dev/, contenus disjoints.
+WSM="$WORK/wsmono"; mkdir -p "$WSM/.planning/workstreams/dev"
+printf 'last_updated: 2026-08-04\n# racine\n- RACINE-SENTINELLE\n' > "$WSM/.planning/STATE.md"
+printf 'last_updated: 2026-08-04\n# dev\n- COMPARTIMENT-SENTINELLE\n' > "$WSM/.planning/workstreams/dev/STATE.md"
+
+# W1 — NON-RÉGRESSION : lab mono sans workstream → sortie identique OCTET POUR OCTET à l'existant.
+# Référence figée dans le test (pas capturée à chaud) : c'est ce que le script produisait avant
+# l'ajout des workstreams, en-tête compris.
+out_sans=$( cd "$WSM" && env -u GSD_WORKSTREAM -u VF_CONTEXT_WORKSTREAM "$BASH_BIN" "$PC" 2>/dev/null ); code=$?
+printf '## 📍 Contexte planning (injecté — STATE.md, extrait borné)\n\nÉtat courant du lab (45 premières lignes sur 3 — lis le reste à la demande) :\n\n```\nlast_updated: 2026-08-04\n# racine\n- RACINE-SENTINELLE\n```\n' > "$WORK/w1.expected"
+printf '%s\n' "$out_sans" > "$WORK/w1.actual"
+if [ "$code" -eq 0 ] && cmp -s "$WORK/w1.expected" "$WORK/w1.actual"; then
+  ok "W1 non-régression — lab mono sans workstream : sortie identique octet pour octet (exit 0)"
+else
+  ko "W1 non-régression lab mono (exit=$code) — sortie divergente de la référence figée"
+fi
+
+# W2 — GSD_WORKSTREAM posée → l'extrait vient du compartiment ET l'en-tête le NOMME.
+out=$( cd "$WSM" && GSD_WORKSTREAM=dev "$BASH_BIN" "$PC" 2>/dev/null ); code=$?
+has   "$out" "COMPARTIMENT-SENTINELLE" "W2 GSD_WORKSTREAM=dev → l'extrait vient du STATE.md du compartiment"
+hasnt "$out" "RACINE-SENTINELLE"       "W2b l'extrait de la racine n'est PAS injecté à sa place"
+has   "$out" "workstream .dev."        "W2c l'en-tête d'injection NOMME le workstream (pas d'injection muette)"
+[ "$code" -eq 0 ] && ok "W2d fail-open intact sous workstream (exit 0)" || ko "W2d exit=$code sous workstream"
+
+# W2e — DISCRIMINATION MACHINE : même fixture, seul l'environnement change.
+if [ "$out" != "$out_sans" ]; then
+  ok "W2e discrimination machine — même fixture, sortie(avec ws) != sortie(sans ws)"
+else
+  ko "W2e discrimination machine — la variable n'a rien changé"
+fi
+
+# W3 — Pointeur partagé in-repo → même résolution que la variable.
+printf 'dev\n' > "$WSM/.planning/active-workstream"
+out=$( cd "$WSM" && env -u GSD_WORKSTREAM -u VF_CONTEXT_WORKSTREAM "$BASH_BIN" "$PC" 2>/dev/null )
+has "$out" "COMPARTIMENT-SENTINELLE" "W3 pointeur .planning/active-workstream → même résolution"
+rm -f "$WSM/.planning/active-workstream"
+
+# W4 — Workstream résolu SANS STATE.md → repli racine + ligne qui le NOMME, exit 0.
+out=$( cd "$WSM" && GSD_WORKSTREAM=fantome "$BASH_BIN" "$PC" 2>/dev/null ); code=$?
+has "$out" "RACINE-SENTINELLE" "W4 workstream sans STATE.md → repli sur l'extrait de la racine"
+has "$out" "fantome"           "W4b la ligne de signalement NOMME le workstream non résolu"
+[ "$code" -eq 0 ] && ok "W4c fail-open intact — repli signalé, exit 0" || ko "W4c exit=$code (fail-open rompu)"
+
+# W5 — Nom hors politique : jamais concaténé. `../workstreams/dev` se résoudrait VRAIMENT vers le
+# compartiment existant si la validation sautait — c'est le cas discriminant de T-24-04-01.
+out=$( cd "$WSM" && GSD_WORKSTREAM='../workstreams/dev' "$BASH_BIN" "$PC" 2>/dev/null ); code=$?
+hasnt "$out" "COMPARTIMENT-SENTINELLE" "W5 traversée résolvable rejetée — le compartiment n'est PAS atteint"
+has   "$out" "RACINE-SENTINELLE"       "W5b repli sur la racine"
+[ "$code" -eq 0 ] && ok "W5c fail-open intact sur nom invalide (exit 0)" || ko "W5c exit=$code sur nom invalide"
+
+# W6 — Lab À COMPARTIMENTS : le régime INDEX est INCHANGÉ, workstream posé ou non (cmp -s).
+WSI="$WORK/wsindex"; mkdir -p "$WSI/.planning/workstreams/dev"
+printf '# INDEX\n| compartiment-a | actif |\n' > "$WSI/.planning/INDEX.md"
+printf 'last_updated: 2026-08-04\n# racine\n- RACINE-SENTINELLE\n' > "$WSI/.planning/STATE.md"
+printf 'last_updated: 2026-08-04\n# dev\n- COMPARTIMENT-SENTINELLE\n' > "$WSI/.planning/workstreams/dev/STATE.md"
+( cd "$WSI" && env -u GSD_WORKSTREAM -u VF_CONTEXT_WORKSTREAM "$BASH_BIN" "$PC" 2>/dev/null ) > "$WORK/w6.sans"
+( cd "$WSI" && GSD_WORKSTREAM=dev "$BASH_BIN" "$PC" 2>/dev/null ) > "$WORK/w6.avec"; code=$?
+if cmp -s "$WORK/w6.sans" "$WORK/w6.avec" && grep -q 'compartiment-a' "$WORK/w6.avec" && ! grep -q 'COMPARTIMENT-SENTINELLE' "$WORK/w6.avec"; then
+  ok "W6 lab à compartiments — régime INDEX identique avec et sans GSD_WORKSTREAM (cmp -s)"
+else
+  ko "W6 lab à compartiments — le régime INDEX a bougé sous GSD_WORKSTREAM"
+fi
+[ "$code" -eq 0 ] && ok "W6b régime INDEX sous workstream — exit 0" || ko "W6b exit=$code"
+
+# W6c — ORDRE DU BLOC : la seule sortie que le régime INDEX pourrait laisser fuir est la LIGNE DE
+# SIGNALEMENT (W6 ne l'exerce pas : son workstream se résout, donc rien n'est émis). Un workstream
+# NON résolu dans un lab à compartiments doit rester sans effet — si le bloc de résolution remontait
+# avant la branche INDEX, la note fuiterait dans l'injection d'INDEX. Cas discriminant de l'ordre.
+( cd "$WSI" && GSD_WORKSTREAM=fantome "$BASH_BIN" "$PC" 2>/dev/null ) > "$WORK/w6c.avec"; code=$?
+if cmp -s "$WORK/w6.sans" "$WORK/w6c.avec"; then
+  ok "W6c régime INDEX — workstream NON résolu : aucune ligne de signalement ne fuit (cmp -s)"
+else
+  ko "W6c régime INDEX pollué par un workstream non résolu (bloc remonté avant la branche INDEX ?)"
+fi
+( cd "$WSI" && GSD_WORKSTREAM='../workstreams/dev' "$BASH_BIN" "$PC" 2>/dev/null ) > "$WORK/w6d.avec"
+if cmp -s "$WORK/w6.sans" "$WORK/w6d.avec"; then
+  ok "W6d régime INDEX — nom hors politique : aucune note ne fuit non plus (cmp -s)"
+else
+  ko "W6d régime INDEX pollué par un nom de workstream invalide"
+fi
+[ "$code" -eq 0 ] && ok "W6e régime INDEX, workstream non résolu — exit 0" || ko "W6e exit=$code"
+
 echo "=== planning-task-context.sh — frontière de mot (PLN-03) ==="
 LAB="$WORK/lab"; mkdir -p "$LAB/.planning" "$LAB/projects/formation/.planning" "$LAB/projects/art/.planning"
 cd "$LAB"

@@ -18,6 +18,28 @@
 #   planning-context.sh [--path <dir>] [--max-lines <N>] [--defer-to-gsd]
 # Defaults: --path .planning  --max-lines 45
 #
+# Env (workstreams GSD, GSDA-14) :
+#   VF_CONTEXT_WORKSTREAM (workstream actif ; prime sur GSD_WORKSTREAM et sur le pointeur)
+#   GSD_WORKSTREAM        (canal de premier rang du moteur GSD amont)
+#
+# WORKSTREAMS — QUEL RÉGIME EST AFFECTÉ, LESQUELS NE LE SONT PAS :
+# Le moteur amont peut partitionner le planning en `.planning/workstreams/<nom>/`. SEUL le régime
+# « lab MONO » suit le compartiment actif : l'extrait injecté vient alors de
+# `<planning>/workstreams/<nom>/STATE.md` et l'en-tête d'injection NOMME le workstream — sans quoi
+# l'injection mentirait par omission sur la provenance de l'état. Le régime « lab À COMPARTIMENTS »
+# (INDEX.md présent) est INCHANGÉ, à l'octet près : l'INDEX est de l'altitude LAB, antérieur et
+# orthogonal aux workstreams du moteur ; la résolution se fait donc APRÈS sa branche. Le régime
+# « lab non amorcé » est inchangé lui aussi.
+# Ordre de résolution, court-circuitant : VF_CONTEXT_WORKSTREAM, puis GSD_WORKSTREAM, puis la 1re
+# ligne du pointeur PARTAGÉ in-repo `<planning>/active-workstream`. Nom validé contre la politique
+# du moteur (workstream-name-policy.cjs : 1er caractère alphanumérique, puis alphanumériques, point,
+# souligné, tiret ; ni séparateur de chemin, ni `.`/`..`, ni `..` en sous-chaîne) plus une borne
+# locale de 80 caractères ; un nom hors politique n'est JAMAIS concaténé (T-24-04-01).
+# FRONTIÈRE ASSUMÉE : le pointeur de SESSION en os.tmpdir() n'est PAS lu ici — indexé sur un
+# condensat de chemin absolu et une clé de session que bash ne reproduit pas fidèlement.
+# FAIL-OPEN INTACT : un workstream résolu SANS STATE.md ne bloque rien — repli sur la racine PLUS
+# une ligne qui le nomme. Fail-open ne veut pas dire muet, et aucun cas ne sort non nul.
+#
 # --defer-to-gsd (ADR-055) : opt-in, câblé dans hooks.json uniquement. Sur un lab MONO dont le
 # moteur GSD est actif, gsd-session-state.sh a déjà injecté l'état du projet → on se retire pour
 # ne pas payer le contexte deux fois. Un lab À COMPARTIMENTS garde son injection : l'INDEX.md est
@@ -77,10 +99,64 @@ if [ -f "$INDEX_FILE" ]; then
   exit 0
 fi
 
+# --- Résolution du workstream actif (GSDA-14) — régime « lab MONO » UNIQUEMENT ------------------
+# Position volontaire : APRÈS le bloc de retrait ADR-055 (qui doit rester après $INDEX_FILE) ET
+# après la branche INDEX, qui sort en 0. C'est ce qui garantit que le régime « lab à compartiments »
+# reste identique à l'octet près, workstream posé ou non.
+# Politique de nom recopiée du moteur amont ; la borne de longueur est une addition LOCALE,
+# strictement plus sévère — elle ne peut donc accepter aucun nom qu'amont refuserait.
+ws_trim() { printf '%s' "$1" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'; }
+
+ws_name_valid() { # <nom>
+  local n="$1"
+  [ -n "$n" ] || return 1
+  [ "${#n}" -le 80 ] || return 1
+  case "$n" in */*|*\\*|.|..|*..*) return 1 ;; esac
+  printf '%s' "$n" | grep -Eq '^[a-zA-Z0-9][a-zA-Z0-9._-]*$'
+}
+
+# Imprime le nom résolu ET valide, ou RIEN. Sort en 2 sans rien imprimer quand un nom résolu est
+# hors politique — la valeur brute n'est jamais ré-imprimée : elle traverserait vers le contexte de
+# session (frontière T-17-01), et elle est non maîtrisée par construction.
+ws_resolve() {
+  local n=""
+  if [ -n "${VF_CONTEXT_WORKSTREAM:-}" ]; then
+    n="$VF_CONTEXT_WORKSTREAM"
+  elif [ -n "${GSD_WORKSTREAM:-}" ]; then
+    n="$GSD_WORKSTREAM"
+  elif [ -r "$PLANNING_DIR/active-workstream" ]; then
+    n="$(head -n 1 "$PLANNING_DIR/active-workstream" 2>/dev/null)"
+  fi
+  n="$(ws_trim "$n")"
+  [ -n "$n" ] || return 0
+  ws_name_valid "$n" || return 2
+  printf '%s' "$n"
+}
+
+WS="$(ws_resolve)"; ws_rc=$?
+WS_LABEL=""
+WS_NOTE=""
+if [ "$ws_rc" -eq 2 ]; then
+  WS_NOTE="_(un nom de workstream invalide a été ignoré — extrait de la racine.)_"
+elif [ -n "$WS" ]; then
+  if [ -f "$PLANNING_DIR/workstreams/$WS/STATE.md" ]; then
+    STATE_FILE="$PLANNING_DIR/workstreams/$WS/STATE.md"
+    WS_LABEL="$WS"
+  else
+    WS_NOTE="_(workstream \`$WS\` actif, mais aucun \`$PLANNING_DIR/workstreams/$WS/STATE.md\` — extrait de la racine.)_"
+  fi
+fi
+# Émis AVANT la branche STATE : même sans STATE.md de racine, le signalement ne se perd pas.
+[ -n "$WS_NOTE" ] && { echo "$WS_NOTE"; echo ""; }
+
 if [ -f "$STATE_FILE" ]; then
   # --- Lab mono : injecter un extrait borné de STATE.md ---
   total=$(wc -l < "$STATE_FILE" | tr -d ' ')
-  echo "## 📍 Contexte planning (injecté — STATE.md, extrait borné)"
+  if [ -n "$WS_LABEL" ]; then
+    echo "## 📍 Contexte planning (injecté — STATE.md du workstream \`$WS_LABEL\`, extrait borné)"
+  else
+    echo "## 📍 Contexte planning (injecté — STATE.md, extrait borné)"
+  fi
   echo ""
   echo "État courant du lab (${MAX_LINES} premières lignes sur ${total} — lis le reste à la demande) :"
   echo ""
