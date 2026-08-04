@@ -202,7 +202,7 @@
         "docs/ADR.md",
         "plugin/dev-orchestrator/references/mission-contracts.md"
       ],
-      "status": "running",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -210,6 +210,7 @@
       "step": "23-07 budgets de boucle additionnes + briques dormantes",
       "stage": "exec",
       "deps": [
+        "plancheck-07",
         "revue-06"
       ],
       "scope": [
@@ -752,6 +753,18 @@
         ".planning/phases/VFDO-23-*/23-06-PLAN.md"
       ],
       "status": "done"
+    },
+    {
+      "id": "plancheck-07",
+      "step": "RE-VALIDATION LECTURE SEULE du plan 23-07 avant exec-07 — troisieme fois que ce noeud se paie tout seul",
+      "stage": "verif",
+      "deps": [
+        "revue-06"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-*/23-07-PLAN.md"
+      ],
+      "status": "ready"
     }
   ]
 }

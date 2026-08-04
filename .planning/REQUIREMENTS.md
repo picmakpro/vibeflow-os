@@ -435,7 +435,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | GSDC-03 | Phase 23 | Done — plan 23-03 (exécuté + revue en régime plein) |
 | GSDC-04 | Phase 23 | Done — plan 23-04 (exécuté + revue en régime plein) |
 | GSDC-05 | Phase 23 | Done — plan 23-05 (exécuté + revue en régime plein) |
-| GSDC-06 | Phase 23 | Planned — plan 23-06 |
+| GSDC-06 | Phase 23 | Done — plan 23-06 (exécuté + revue en régime plein + comblement re-revu) |
 | GSDC-07 | Phase 23 | Done — plan 23-02 (exécuté + revue en régime plein) |
 | GSDC-08 | Phase 23 | Planned — plan 23-07 |
 | GSDC-09 | Phase 23 | Planned — plan 23-07 |

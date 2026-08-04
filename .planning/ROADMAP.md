@@ -1344,7 +1344,7 @@ Plans:
   agents (arbitrage du Finding 1), doctrine de voie unique et continuation par voie skill. Bloc
   T29. (GSDC-05)
 
-- [ ] 23-06-PLAN.md — **Zone 4** : verdicts de hooks au bloc typé (`pass|fail|absent`), ADR-061
+- [x] 23-06-PLAN.md — **Zone 4** : verdicts de hooks au bloc typé (`pass|fail|absent`), ADR-061
   étendue d'un **troisième objet revu** sur les mêmes 3 axes (hook vs `revue-N`, hook vs
   `vf-auditer` avec le delta `CONCERNS.md`). Bloc T30. (GSDC-06)
 
