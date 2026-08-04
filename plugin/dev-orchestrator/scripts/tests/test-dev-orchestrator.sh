@@ -4713,10 +4713,19 @@ fi
 # ce contenu ressorte dans la table produite.
 T28H_LIB="$T28_TMPDIR/registre-piege-h"; mkdir -p "$T28H_LIB"
 T28H_WITNESS="$T28_TMPDIR/witness-h.txt"
+# Le fixture déclare AUSSI `capabilities` : depuis l'extension de la Phase 24, le générateur lit
+# les DEUX exports et refuse d'écrire quoi que ce soit s'il n'arrive pas à lire le second (une
+# section vide passerait pour « aucune capability hors point de hook »). Un registre réel porte
+# toujours cet export — un fixture qui l'omettrait ne modéliserait plus aucun moteur réel et ferait
+# rougir T28-H pour une raison étrangère à ce qu'il mesure (la NON-EXÉCUTION).
 cat > "$T28H_LIB/capability-registry.cjs" <<'T28_FIXTURE_H'
 require('fs').writeFileSync(process.env.T28H_WITNESS_PATH, 'PWNED');
 module.exports = {
   version: '9',
+  capabilities: {
+    'fx-alpha-h28': { id: 'fx-alpha-h28', role: 'feature', activationKey: 'fixture.alpha.h28' },
+    'fx-dormant-h28': { id: 'fx-dormant-h28', role: 'feature', activationKey: 'fixture.dormant.h28' }
+  },
   byLoopPoint: {
     'fixture:h-alpha': { steps: [{ capId: 'fx-alpha-h28', when: 'fixture.alpha.h28', onError: 'skip' }], contributions: [], gates: [] }
   }
@@ -4857,8 +4866,15 @@ t28i_verify() { # <script generateur> -> T28I_OK (0/1), T28I_MSG
   calls_seen="$T28_TMPDIR/cs-$(basename "$gen").txt"; calls_allow="$T28_TMPDIR/ca-$(basename "$gen").txt"
   rx_seen="$T28_TMPDIR/rs-$(basename "$gen").txt"; rx_allow="$T28_TMPDIR/ra-$(basename "$gen").txt"
   sort -u "$callout" > "$calls_seen"; sort -u "$rxout" > "$rx_seen"
+  # Liste blanche des noms APPELÉS dans le programme node du générateur. Elle se maintient à la
+  # main, volontairement : tout nouvel appelé doit être regardé avant d'être admis — c'est
+  # précisément ce qui rend cette garde capable de voir arriver un chargeur déguisé.
+  # Phase 24 : readCapabilities / readObjectExport (lecture du SECOND export du registre, même
+  # lecteur de texte, aucune indirection nouvelle) et governingKey (dérivation de la clé de
+  # configuration gouvernante, pure manipulation d'objet déjà parsé).
   printf '%s\n' RegExp String balancedRegions catch cell closeSync code exec fstatSync for \
-    if indexOf isArray isFile join jsLiteralToJSON keys openSync parse push readByLoopPoint \
+    governingKey if indexOf isArray isFile join jsLiteralToJSON keys openSync parse push \
+    readByLoopPoint readCapabilities readObjectExport \
     readFileSync readQuotedStringAt readVersion replace slice slurp stringify test trim while write \
     | sort -u > "$calls_allow"
   { printf '%s\n' '/([A-Za-z_$][A-Za-z0-9_$]*)(\s*):/y' '/,(\s*[}\]])/g' '/[\r\n]+/g' '/\\'"'"'/g' \
@@ -4974,12 +4990,20 @@ fi
 #     ne doit JAMAIS porter la mention « PERIMEE ». Les confondre ferait crier au périmé sur un
 #     moteur parfaitement lisible (a), ou masquerait un moteur devenu illisible derrière le message
 #     paisible d'un moteur simplement vide (b, c).
+#
+# Les trois fixtures déclarent un `capabilities` PARFAITEMENT LISIBLE. Ce n'est pas décoratif :
+# depuis la Phase 24 le générateur porte un SECOND signal de péremption, sur `capabilities`. Un
+# fixture qui omettrait cet export ferait déclencher ce second signal et RATTRAPERAIT ainsi un
+# mutant qui aurait muselé le premier — le mutant `muet` resterait vert en paraissant discriminant.
+# En rendant `capabilities` lisible, on isole ce que T28-K mesure : le signal de `byLoopPoint`,
+# et lui seul.
+T28K_CAPS='capabilities: { "fx-k": { id: "fx-k", role: "feature", activationKey: "fixture.k" } }'
 T28K_S="$T28_TMPDIR/registre-stale";  mkdir -p "$T28K_S"
-printf 'module.exports = { version: "1", autreChose: {} };\n' > "$T28K_S/capability-registry.cjs"
+printf 'module.exports = { version: "1", %s, autreChose: {} };\n' "$T28K_CAPS" > "$T28K_S/capability-registry.cjs"
 T28K_C="$T28_TMPDIR/registre-calcule"; mkdir -p "$T28K_C"
-printf 'const byLoopPoint = buildTable();\nmodule.exports = { version: "1", byLoopPoint: byLoopPoint };\n' > "$T28K_C/capability-registry.cjs"
+printf 'const byLoopPoint = buildTable();\nmodule.exports = { version: "1", %s, byLoopPoint: byLoopPoint };\n' "$T28K_CAPS" > "$T28K_C/capability-registry.cjs"
 T28K_V="$T28_TMPDIR/registre-vide"; mkdir -p "$T28K_V"
-printf 'module.exports = { version: "1", byLoopPoint: {} };\n' > "$T28K_V/capability-registry.cjs"
+printf 'module.exports = { version: "1", %s, byLoopPoint: {} };\n' "$T28K_CAPS" > "$T28K_V/capability-registry.cjs"
 
 t28k_verify() { # <script generateur> -> T28K_OK (0/1), T28K_MSG
   local gen="$1" out_s out_c out_v err_s err_c err_v rc_s rc_c rc_v
@@ -5014,6 +5038,70 @@ else
   T28K_OK=-1
 fi
 
+# === T28-L — SIGNAL A-9 sur le SECOND export (`capabilities`, Phase 24) =========================
+# Le générateur lit désormais DEUX exports. `byLoopPoint` ne peut, par construction, nommer que les
+# capabilities qui déclarent un étage : celles qui n'en déclarent aucune lui sont invisibles. C'est
+# `capabilities` qui les porte — donc un second point de rupture, qui mérite le même traitement A-9
+# que le premier. Deux constats, jamais confondus :
+#  (a) `capabilities` présent mais NON-LITTÉRAL (calculé) — le lecteur de texte ne suit aucune
+#      indirection : EXTRACTION PÉRIMÉE, rc=1, et AUCUN fichier écrit (une section absente vaudrait
+#      « aucune capability hors point de hook », mensonge par omission) ;
+#  (b) `capabilities` LU, mais toute capability déclarée apparaît à un point de hook — la liste est
+#      légitimement VIDE : rc=0, fichier écrit, et JAMAIS la mention périmée.
+# Sans (b), (a) ne prouverait rien : un générateur qui échouerait sur tout registre satisferait (a).
+T28L_I="$T28_TMPDIR/registre-caps-calcule"; mkdir -p "$T28L_I"
+cat > "$T28L_I/capability-registry.cjs" <<'T28_FIXTURE_L_I'
+const capabilities = buildCapabilities();
+module.exports = {
+  version: '1',
+  capabilities: capabilities,
+  byLoopPoint: { 'fixture:l': { steps: [{ capId: 'fx-l', when: 'fixture.l', onError: 'skip' }] } }
+};
+T28_FIXTURE_L_I
+T28L_V="$T28_TMPDIR/registre-caps-couvert"; mkdir -p "$T28L_V"
+cat > "$T28L_V/capability-registry.cjs" <<'T28_FIXTURE_L_V'
+module.exports = {
+  version: '1',
+  capabilities: { 'fx-l': { id: 'fx-l', role: 'feature', activationKey: 'fixture.l' } },
+  byLoopPoint: { 'fixture:l': { steps: [{ capId: 'fx-l', when: 'fixture.l', onError: 'skip' }] } }
+};
+T28_FIXTURE_L_V
+
+t28l_verify() { # <script generateur> -> T28L_OK (0/1), T28L_MSG
+  local gen="$1" out_i out_v err_i err_v rc_i rc_v
+  local perime_i=0 nomme_i=0 intact_i=0 perime_v=0 ecrit_v=0 vide_v=0
+  out_i="$T28_TMPDIR/out-l-i-$(basename "$gen").md"; out_v="$T28_TMPDIR/out-l-v-$(basename "$gen").md"
+  err_i="$T28_TMPDIR/err-l-i-$(basename "$gen").txt"; err_v="$T28_TMPDIR/err-l-v-$(basename "$gen").txt"
+  # Cible TÉMOIN au contenu connu : l'échec doit la laisser bit-à-bit intacte, jamais la tronquer.
+  rm -f "$out_i" "$out_v"; printf 'TEMOIN-L-INTACT\n' > "$out_i"
+  VF_GSD_CORE_LIB="$T28L_I" VF_CAPS_INDEX_OUT="$out_i" bash "$gen" >/dev/null 2>"$err_i"; rc_i=$?
+  "$GREP" -qF 'PERIMEE' "$err_i" && perime_i=1
+  "$GREP" -qF 'capabilities' "$err_i" && nomme_i=1
+  [ "$(cat "$out_i")" = "TEMOIN-L-INTACT" ] && intact_i=1
+  VF_GSD_CORE_LIB="$T28L_V" VF_CAPS_INDEX_OUT="$out_v" bash "$gen" >/dev/null 2>"$err_v"; rc_v=$?
+  "$GREP" -qF 'PERIMEE' "$err_v" && perime_v=1
+  [ -s "$out_v" ] && ecrit_v=1
+  [ -f "$out_v" ] && "$GREP" -qF 'Aucune : toute capability' "$out_v" && vide_v=1
+  if [ "$rc_i" -eq 1 ] && [ "$perime_i" -eq 1 ] && [ "$nomme_i" -eq 1 ] && [ "$intact_i" -eq 1 ] \
+     && [ "$rc_v" -eq 0 ] && [ "$perime_v" -eq 0 ] && [ "$ecrit_v" -eq 1 ] && [ "$vide_v" -eq 1 ]; then
+    T28L_OK=1; T28L_MSG="calcule(rc=$rc_i perime=$perime_i nomme=$nomme_i cible_intacte=$intact_i) couvert(rc=$rc_v perime=$perime_v ecrit=$ecrit_v liste_vide=$vide_v)"
+  else
+    T28L_OK=0; T28L_MSG="calcule(rc=$rc_i attendu 1, perime=$perime_i attendu 1, nomme_capabilities=$nomme_i attendu 1, cible_intacte=$intact_i attendu 1) couvert(rc=$rc_v attendu 0, perime=$perime_v attendu 0, ecrit=$ecrit_v attendu 1, liste_vide=$vide_v attendu 1) — « illisible » et « legitimement vide » doivent rester DISTINCTS"
+  fi
+}
+
+if [ -x "$T28_GEN" ] && command -v node >/dev/null 2>&1; then
+  t28l_verify "$T28_GEN"
+  if [ "$T28L_OK" -eq 1 ]; then
+    ok "T28-L SIGNAL A-9 sur l'export capabilities (Phase 24) : un export CALCULÉ sort en EXTRACTION PÉRIMÉE (rc=1, message nommant capabilities) en laissant la cible bit-à-bit INTACTE, tandis qu'un registre dont toute capability est couverte par un point de hook produit la table avec une liste explicitement VIDE (rc=0, aucune mention périmée) — l'illisible et le vide ne se confondent jamais ($T28L_MSG)"
+  else
+    ko "T28-L SIGNAL A-9 sur capabilities : $T28L_MSG"
+  fi
+else
+  skip "T28-L SIGNAL A-9 sur capabilities : générateur absent/non exécutable ou node introuvable — rien à mesurer"
+  T28L_OK=-1
+fi
+
 # === Mutants (matérialisés, rejouables) — le filet est-il capable de rougir ? ====================
 # Chaque mutant est une réécriture MÉCANIQUE d'une COPIE du générateur, via awk, rejouable par
 # quiconque relance cette suite. Deux garde-fous avant tout verdict : la mutation doit avoir CHANGÉ
@@ -5040,8 +5128,14 @@ t28_mutant() { # <nom> <awk> <fonctions-a-rejouer: "h" "i" "k" separees par espa
       h) t28h_verify "$m"; tag="H($T28H_OK)"; [ "$att" = "0" ] && [ "$T28H_OK" -eq 1 ] && { flipped_ok=0; detail="$detail T28-H attendu rouge, resté vert"; } ;;
       i) t28i_verify "$m"; tag="I($T28I_OK)"; [ "$att" = "0" ] && [ "$T28I_OK" -eq 1 ] && { flipped_ok=0; detail="$detail T28-I attendu rouge, resté vert"; } ;;
       k) t28k_verify "$m"; tag="K($T28K_OK)"; [ "$att" = "0" ] && [ "$T28K_OK" -eq 1 ] && { flipped_ok=0; detail="$detail T28-K attendu rouge, resté vert"; } ;;
+      l) t28l_verify "$m"; tag="L($T28L_OK)"; [ "$att" = "0" ] && [ "$T28L_OK" -eq 1 ] && { flipped_ok=0; detail="$detail T28-L attendu rouge, resté vert"; } ;;
     esac
-    [ "$att" = "1" ] && [ "$([ "$fn" = h ] && echo "$T28H_OK" || { [ "$fn" = i ] && echo "$T28I_OK" || echo "$T28K_OK"; })" -eq 0 ] \
+    # Sélection EXPLICITE du verdict de la fonction rejouée. L'ancienne cascade imbriquée traitait
+    # « tout ce qui n'est ni h ni i » comme K : une lettre ajoutée aurait été silencieusement
+    # évaluée contre le mauvais verdict — un mutant vert pour la mauvaise raison.
+    t28_verdict=""
+    case "$fn" in h) t28_verdict="$T28H_OK" ;; i) t28_verdict="$T28I_OK" ;; k) t28_verdict="$T28K_OK" ;; l) t28_verdict="$T28L_OK" ;; esac
+    [ "$att" = "1" ] && [ "$t28_verdict" -eq 0 ] \
       && { flipped_ok=0; detail="$detail $tag attendu vert, tourné rouge (mutant NON opposable ou sur-ajusté)"; }
   done
   # Restaure l'état de référence pour les appels normaux qui suivraient (aucun n'en fait usage plus
@@ -5088,10 +5182,22 @@ cat > "$T28_TMPDIR/mut-licite.awk" <<'AWK'
 }
 AWK
 
+cat > "$T28_TMPDIR/mut-muet-caps.awk" <<'AWK'
+BEGIN { skip = 0 }
+/^if \(capabilities === null\) \{$/ {
+  print "if (capabilities === null) { capabilities = { \x27mute:caps\x27: {} }; }"
+  skip = 1; next
+}
+skip && /^\}$/ { skip = 0; next }
+skip { next }
+{ print }
+AWK
+
 t28_mutant alias   "$T28_TMPDIR/mut-alias.awk"   "h i" "0 0" "require ALIASÉ (const _alias = require) réintroduit dans le lecteur — la RCE d'origine, sous un autre nom"
 t28_mutant silence "$T28_TMPDIR/mut-silence.awk" "k"   "0"   "silence de péremption rétabli — EXTRACTION PÉRIMÉE redevient indistincte d'un registre réellement vide"
 t28_mutant muet    "$T28_TMPDIR/mut-muet.awk"    "k"   "0"   "script totalement MUET sur l'extraction périmée — fabrique un succès vide au lieu d'échouer bruyamment (ferme le vert à vide)"
 t28_mutant licite  "$T28_TMPDIR/mut-licite.awk"  "i"   "1"   "réécriture LICITE (commentaire de bloc + gabarit) nommant les interdits sans les appeler — doit rester VERTE"
+t28_mutant muet-caps "$T28_TMPDIR/mut-muet-caps.awk" "l" "0" "script MUET sur l'illisibilité du SECOND export — fabrique un capabilities vide au lieu d'échouer, et publierait une section « aucune capability hors point de hook » MENSONGÈRE"
 
 # >>> T28 FIXTURE MUTATION DEBUT
 # --- E (DISCRIMINANTE, par mutation) : registre factice à 2 points ⇒ la couverture C doit ROUGIR.
@@ -5106,6 +5212,9 @@ else
   cat > "$T28_FX_LIB/capability-registry.cjs" <<'T28_FIXTURE_REGISTRE'
 module.exports = {
   version: '1',
+  capabilities: {
+    'fx-alpha': { id: 'fx-alpha', role: 'feature', activationKey: 'fixture.alpha' }
+  },
   byLoopPoint: {
     'fixture:alpha': {
       steps: [{ capId: 'fx-alpha', when: 'fixture.alpha', onError: 'skip' }],
@@ -5119,7 +5228,11 @@ T28_FIXTURE_REGISTRE
   T28_FX_OUT="$T28_TMPDIR/index-mute.md"
   if VF_GSD_CORE_LIB="$T28_FX_LIB" VF_CAPS_INDEX_OUT="$T28_FX_OUT" bash "$T28_GEN" >/dev/null 2>&1 \
      && [ -s "$T28_FX_OUT" ]; then
-    t28_fx_sections="$(awk '/^## /{n++} END{print n+0}' "$T28_FX_OUT")"
+    # Ne compter QUE les titres de point de hook : ils sont encadrés de back-quotes (`## ` + '`').
+    # Depuis la Phase 24 la table porte une section finale « hors point de hook » au titre nu ; un
+    # `^## ` large en compterait 3 là où le registre factice n'en déclare que 2, et ferait crier à
+    # une sonde à réancrer sur un générateur parfaitement correct.
+    t28_fx_sections="$(awk '/^## `/{n++} END{print n+0}' "$T28_FX_OUT")"
     t28_fx_miss="$(t28_missing_points "$T28_FX_OUT" "$T28_POINTS")"
     t28_fx_miss_n="$(printf '%s\n' "$t28_fx_miss" | awk '{n+=NF} END{print n+0}')"
     if [ "$t28_fx_sections" -ne 2 ]; then

@@ -1,5 +1,5 @@
 # GSD Capabilities Index (auto-généré — NE PAS ÉDITER)
-> Généré le 2026-08-03T23:11:24+02:00 par build-gsd-capabilities-index.sh
+> Généré le 2026-08-04T20:50:52+02:00 par build-gsd-capabilities-index.sh
 > Source : registre de capabilities du moteur GSD (`capability-registry.cjs`), schéma déclaré `1`
 
 **Ce que cette table dit.** Elle énumère ce que le moteur **déclare** à la version depuis
@@ -106,6 +106,47 @@ point existe et reste vide, pas qu'il est absent._
 |---|---|---|---|---|
 | `mempalace` | step | `mempalace.enabled` | — | `skip` |
 
+## Capabilities hors point de hook
+
+Ces capabilities sont **déclarées par le registre** mais n'apparaissent à aucun point de
+hook — le moteur ne les insère donc jamais dans le cycle. Lire la colonne `Rôle` avant de
+conclure : pour un `runtime` ou un `reviewer`, n'avoir aucun étage est l'état **normal** ;
+c'est seulement pour une `feature` que cela signale une capacité **dormante**.
+
+La clé gouvernante vient de `activationKey` quand le registre en déclare une, sinon de
+l'unique clé du bloc `config` de la capability. `—` signifie que le registre n'en déclare
+aucune — jamais qu'elle est introuvable.
+
+| Capability | Rôle | Clé de configuration gouvernante |
+|---|---|---|
+| `antigravity` | runtime | `review.models.agy` |
+| `audit` | feature | — |
+| `augment` | runtime | — |
+| `claude` | runtime | `review.models.claude` |
+| `cline` | runtime | — |
+| `codebuddy` | runtime | — |
+| `coderabbit` | reviewer | — |
+| `codex` | runtime | `review.models.codex` |
+| `copilot` | runtime | — |
+| `cursor` | runtime | — |
+| `gemini` | reviewer | `review.models.gemini` |
+| `graphify` | feature | `graphify.enabled` |
+| `hermes` | runtime | — |
+| `kilo` | runtime | — |
+| `kimi` | runtime | — |
+| `kimi-code` | runtime | `review.models.kimi-code` |
+| `llama-cpp` | reviewer | — |
+| `lm-studio` | reviewer | — |
+| `ollama` | reviewer | — |
+| `opencode` | runtime | `review.models.opencode` |
+| `pi` | runtime | — |
+| `profile-pipeline` | feature | `profile-pipeline.enabled` |
+| `qwen` | runtime | — |
+| `trae` | runtime | — |
+| `vscode` | runtime | — |
+| `windsurf` | runtime | — |
+| `zcode` | runtime | — |
+
 ---
 
-> 12 point(s) de hook parcouru(s), 35 étage(s) déclaré(s) par le registre.
+> 12 point(s) de hook parcouru(s), 35 étage(s) déclaré(s) par le registre, 27 capability(ies) hors point de hook sur 44 déclarée(s).

@@ -9,10 +9,31 @@
 #      reproduirait, une couche plus bas, exactement le défaut que D-07 corrige ;
 #   2. aucune version de moteur n'est figée dans la logique.
 #
-# SOURCE UNIQUE : le registre (`capability-registry.cjs`, export `byLoopPoint`). C'est une
-# DÉCLARATION : elle ne dépend que de la version du moteur, jamais des toggles du lab courant.
-# C'est cette propriété, et elle seule, qui rend la copie versionnée comparable d'un lab à
+# SOURCE UNIQUE : le registre (`capability-registry.cjs`, exports `byLoopPoint` ET `capabilities`).
+# C'est une DÉCLARATION : elle ne dépend que de la version du moteur, jamais des toggles du lab
+# courant. C'est cette propriété, et elle seule, qui rend la copie versionnée comparable d'un lab à
 # l'autre — donc vérifiable par la garde de fraîcheur de la suite de tests (T28-F).
+#
+# POURQUOI DEUX EXPORTS. `byLoopPoint` ne peut, par construction, nommer que les capabilities qui
+# déclarent au moins un étage : celles qui n'en déclarent aucun sont INVISIBLES pour lui. C'est ce
+# qui a fait que l'index de la Phase 23 ne portait ni `graphify` ni `profile-pipeline` — deux
+# capacités bien réelles du moteur, simplement dépourvues d'étage. Une table qui ne dit rien d'elles
+# laisse croire qu'elles n'existent pas ; un gate d'activation doc ↔ capability n'a alors rien à
+# lire. `capabilities` est donc lu en SECOND, par le MÊME lecteur de texte, aux MÊMES gardes.
+#
+# LA COLONNE `Rôle` N'EST PAS DÉCORATIVE — et le chiffre qui le montre porte sa méthode.
+# MESURE (gsd-core 1.9.1, schéma de registre `1`, 2026-08-04) : 27 des 44 capabilities déclarées
+# n'ont aucun étage ; parmi elles 19 sont des adaptateurs de runtime (`cursor`, `copilot`, …) et
+# 5 des relecteurs — n'avoir aucun étage est leur état NORMAL, pas une dormance. Seules 3 sont des
+# `feature` sans étage : `audit`, `graphify`, `profile-pipeline`. Sans ce champ — déclaré par le
+# registre, jamais inféré — la section se lirait comme « 27 capacités dormantes », fausse par
+# omission d'un facteur 9.
+# RE-DÉRIVATION (ne jamais recopier ces nombres, les reprendre à la source) : régénérer l'index et
+# lire son pied de page, qui les recompte à chaque exécution contre le moteur RÉELLEMENT installé —
+#   bash build-gsd-capabilities-index.sh && tail -1 ../references/gsd-capabilities-index.md
+# puis, pour la ventilation par rôle, la colonne `Rôle` de la section « hors point de hook » :
+#   awk -F'|' '/^\| `/ && NF==5 {gsub(/ /,"",$3); r[$3]++} END{for (k in r) print k, r[k]}' \
+#     ../references/gsd-capabilities-index.md
 #
 # LECTURE, JAMAIS EXÉCUTION (T-23-04-07, arbitrage A-12). `default_core_lib()` ci-dessous résout en
 # PREMIER $root/.claude/gsd-core/bin/lib — un chemin DANS le dépôt audité (un lab en VF_SCOPE=project
@@ -65,6 +86,11 @@ set -euo pipefail
 # ---------- Variables ----------
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUT="${VF_CAPS_INDEX_OUT:-$SCRIPT_DIR/../references/gsd-capabilities-index.md}"
+
+# Libellé UNIQUE de la section « hors point de hook » : passé au programme node qui l'écrit, et
+# réutilisé par les compteurs de contrôle en fin de script pour séparer les deux tables. Une seule
+# définition, donc aucune dérive possible entre le producteur et le vérificateur.
+SECTION_TITLE="Capabilities hors point de hook"
 
 # Cascade de résolution du dossier de modules du moteur : ancre explicite (VF_GSD_TOOLS) d'abord,
 # puis lab courant, puis scope utilisateur, puis disposition legacy — même priorité que la cascade
@@ -122,6 +148,11 @@ cat > "$prog_tmp" <<'NODE_PROGRAM'
 var fs = require('fs');
 var registryPath = process.argv[2];
 var generatedAt = process.argv[3];
+// Titre de la section « hors point de hook », reçu en ARGUMENT et non écrit ici : le shell en aval
+// s'en sert pour recompter indépendamment les deux tables. Le passer garantit que ce libellé
+// n'existe qu'à UN seul endroit du script — deux copies qui divergent silencieusement, c'est
+// exactement le compteur faux que ce fichier s'emploie à éviter.
+var sectionTitle = process.argv[4];
 
 // --- Acquisition par LECTURE, jamais par exécution (T-23-04-07, arbitrage A-12) ----------------
 // Le registre est résolu par une cascade qui fait PRIMER le lab courant (default_core_lib ci-dessus,
@@ -245,12 +276,39 @@ function jsLiteralToJSON(txt) {
 // JSON pur sur gsd-core 1.9 (mesuré), mais jsLiteralToJSON tolère aussi des identifiants nus en
 // clé si une version future du moteur change de forme sans devenir calculée.
 function readByLoopPoint(src) {
-  var regions = balancedRegions(src, '\\bbyLoopPoint\\s*[:=]\\s*\\{', '{', '}');
+  return readObjectExport(src, '\\bbyLoopPoint\\s*[:=]\\s*\\{');
+}
+// SECONDE SOURCE, même lecteur, mêmes gardes : l'export `capabilities`. Il est indispensable parce
+// que `byLoopPoint` ne peut nommer que ce qui déclare un étage — une capability sans étage y est
+// structurellement invisible. Aucune liste de capabilities n'est écrite en dur ici : elles sont
+// ÉNUMÉRÉES depuis cet export, exactement comme les points de hook le sont depuis `byLoopPoint`.
+function readCapabilities(src) {
+  return readObjectExport(src, '\\bcapabilities\\s*[:=]\\s*\\{');
+}
+function readObjectExport(src, anchorSrc) {
+  var regions = balancedRegions(src, anchorSrc, '{', '}');
   if (regions.length === 0) return null;
   for (var i = 0; i < regions.length; i++) {
     var v = jsLiteralToJSON(regions[i]);
     if (v && typeof v === 'object' && !Array.isArray(v)) return v;
   }
+  return null;
+}
+// Clé de configuration gouvernante, DÉRIVÉE du registre et jamais devinée, dans cet ordre :
+//   1. `activationKey` quand la capability en déclare une (seul `graphify` et `intel` le font sur
+//      gsd-core 1.9.1 — c'est la forme la plus explicite, elle prime) ;
+//   2. sinon, l'unique clé de son bloc `config` quand il n'en porte qu'une (cas de
+//      `profile-pipeline`, dont le seul réglage EST son activation) ;
+//   3. sinon, la clé `<id>.enabled` si le bloc `config` la contient parmi plusieurs ;
+//   4. sinon `—` : la capability ne déclare aucune clé gouvernante, et le dire est plus honnête
+//      que d'en fabriquer une par convention de nommage.
+function governingKey(id, cap) {
+  if (typeof cap.activationKey === 'string' && cap.activationKey !== '') return cap.activationKey;
+  var cfg = cap.config;
+  if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) return null;
+  var keys = Object.keys(cfg);
+  if (keys.length === 1) return keys[0];
+  if (keys.indexOf(id + '.enabled') >= 0) return id + '.enabled';
   return null;
 }
 // Champ d'AFFICHAGE seul (jamais utilisé en logique) : `version: '1'` dans module.exports. Ce bloc
@@ -284,6 +342,19 @@ if (points.length === 0) {
   process.stderr.write('le registre ne declare aucun point de hook\n');
   process.exit(1);
 }
+// Seconde lecture, même doctrine A-9 : « je n'arrive plus à lire » et « il n'y a rien à lire » sont
+// deux messages DISTINCTS. Une section vide qui passerait pour « aucune capability hors point de
+// hook » alors que le lecteur a décroché serait exactement le succès vide qu'on s'interdit.
+var capabilities = readCapabilities(src);
+if (capabilities === null) {
+  process.stderr.write('EXTRACTION PERIMEE : l\'ancre capabilities est introuvable ou illisible dans ' + registryPath + ' -- ce n\'est PAS "aucune capability hors point de hook", c\'est le lecteur de texte qui ne suit plus la forme du moteur installe.\n');
+  process.exit(1);
+}
+var capIds = Object.keys(capabilities);
+if (capIds.length === 0) {
+  process.stderr.write('le registre ne declare aucune capability\n');
+  process.exit(1);
+}
 var version = readVersion(src);
 
 function cell(v) {
@@ -314,6 +385,7 @@ out.push('fichier.');
 out.push('');
 
 var declared = 0;
+var seen = {};
 for (var i = 0; i < points.length; i++) {
   var point = points[i];
   var groups = byLoopPoint[point] || {};
@@ -329,6 +401,7 @@ for (var i = 0; i < points.length; i++) {
       var e = entries[k] || {};
       rows.push('| ' + code(e.capId) + ' | ' + cell(label) + ' | ' + code(e.when) + ' | '
         + cell(e.blocking) + ' | ' + code(e.onError) + ' |');
+      if (e.capId) seen[e.capId] = 1;
       declared++;
     }
   }
@@ -345,14 +418,51 @@ for (var i = 0; i < points.length; i++) {
   out.push('');
 }
 
+// ---- Capabilities déclarées par le registre mais présentes à AUCUN point de hook ----------------
+// L'ordre suit celui du registre (Object.keys) : déterministe d'une exécution à l'autre à version
+// de moteur égale, donc `cmp -s` reste un contrôle valable sur le fichier versionné.
+var orphans = [];
+for (var ci = 0; ci < capIds.length; ci++) {
+  if (!seen[capIds[ci]]) orphans.push(capIds[ci]);
+}
+out.push('## ' + cell(sectionTitle));
+out.push('');
+out.push('Ces capabilities sont **déclarées par le registre** mais n\'apparaissent à aucun point de');
+out.push('hook — le moteur ne les insère donc jamais dans le cycle. Lire la colonne `Rôle` avant de');
+out.push('conclure : pour un `runtime` ou un `reviewer`, n\'avoir aucun étage est l\'état **normal** ;');
+out.push('c\'est seulement pour une `feature` que cela signale une capacité **dormante**.');
+out.push('');
+out.push('La clé gouvernante vient de `activationKey` quand le registre en déclare une, sinon de');
+out.push('l\'unique clé du bloc `config` de la capability. `—` signifie que le registre n\'en déclare');
+out.push('aucune — jamais qu\'elle est introuvable.');
+out.push('');
+if (orphans.length === 0) {
+  // Le signal d'extraction périmée n'est PAS cité littéralement ici : ce document est une cible de
+  // `grep` naturelle pour un gate, et y écrire le jeton ferait compter la prose comme un incident
+  // (l'index versionné le porterait en permanence). Le jeton vit sur stderr, et seulement là.
+  out.push('_Aucune : toute capability déclarée par le registre apparaît à au moins un point de');
+  out.push('hook. C\'est un constat de LECTURE RÉUSSIE sur un registre lisible — un échec de lecture,');
+  out.push('lui, ne produit aucun fichier du tout et se signale explicitement sur la sortie d\'erreur._');
+} else {
+  out.push('| Capability | Rôle | Clé de configuration gouvernante |');
+  out.push('|---|---|---|');
+  for (var oi = 0; oi < orphans.length; oi++) {
+    var oid = orphans[oi];
+    var ocap = capabilities[oid] || {};
+    out.push('| ' + code(oid) + ' | ' + cell(ocap.role) + ' | ' + code(governingKey(oid, ocap)) + ' |');
+  }
+}
+out.push('');
+
 out.push('---');
 out.push('');
-out.push('> ' + points.length + ' point(s) de hook parcouru(s), ' + declared + ' étage(s) déclaré(s) par le registre.');
+out.push('> ' + points.length + ' point(s) de hook parcouru(s), ' + declared + ' étage(s) déclaré(s) par le registre, '
+  + orphans.length + ' capability(ies) hors point de hook sur ' + capIds.length + ' déclarée(s).');
 process.stdout.write(out.join('\n') + '\n');
 NODE_PROGRAM
 
 # ---------- Production intégrale dans le temporaire ----------
-if ! node "$prog_tmp" "$REGISTRY" "$generated_at" > "$body_tmp"; then
+if ! node "$prog_tmp" "$REGISTRY" "$generated_at" "$SECTION_TITLE" > "$body_tmp"; then
   die "lecture du registre en échec : $REGISTRY"
 fi
 [ -s "$body_tmp" ] || die "contenu produit vide — refus d'écrire un index tronqué"
@@ -360,6 +470,11 @@ fi
 # ---------- Dépôt atomique ----------
 mv "$body_tmp" "$OUT"
 
-points_n="$(awk '/^## /{n++} END{print n+0}' "$OUT")"
-rows_n="$(awk '/^\| `/{n++} END{print n+0}' "$OUT")"
-log "Index généré : $OUT ($points_n point(s) de hook, $rows_n étage(s) déclaré(s))"
+# Recompte INDÉPENDANT du pied de page produit par node — c'est un contrôle croisé, pas un écho :
+# les deux tables se distinguent ici par le fait que les titres de point de hook sont encadrés de
+# back-quotes (`## \`plan:pre\``) là où la section finale est un libellé nu. Compter tous les `## `,
+# comme le faisait la version précédente, aurait fait dire « 13 points de hook » pour 12.
+points_n="$(awk '/^## `/{n++} END{print n+0}' "$OUT")"
+rows_n="$(awk -v t="## $SECTION_TITLE" 'index($0,t)==1{off=1} !off && /^\| `/{n++} END{print n+0}' "$OUT")"
+orphans_n="$(awk -v t="## $SECTION_TITLE" 'index($0,t)==1{on=1} on && /^\| `/{n++} END{print n+0}' "$OUT")"
+log "Index généré : $OUT ($points_n point(s) de hook, $rows_n étage(s) déclaré(s), $orphans_n hors point de hook)"
