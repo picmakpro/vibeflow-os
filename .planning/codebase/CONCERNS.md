@@ -78,6 +78,35 @@
 - Impact: le backlog perd sa valeur de radar si les déclencheurs ne sont pas honorés.
 - Fix approach: ré-arbitrage explicite (reprendre / re-différer avec nouveau déclencheur / abandonner).
 
+**`.planning/WINDOWS.md` est un fichier purement généré tant que gsd-core ≤ 1.9.1** — Sévérité : **MEDIUM**
+- Issue: bug amont **#2893** — `gsd-tools windows append|waive|fixed` passent tous les trois par le
+  même `writeLedgerAtomic` → `renderLedger`, qui **réécrit le fichier intégralement** (frontmatter +
+  en-tête figé + table + miroir JSON, et rien d'autre) et rapporte `ok: true`. Toute prose libre
+  ajoutée sous le ledger serait détruite **sans avertissement**. La PR corrective **#2975** est
+  mergée mais **non publiée** : `dist-tags.latest` = `1.9.1` (2026-07-31), aucune version au-delà.
+- Files: `~/.claude/gsd-core/bin/lib/broken-windows.cjs` (version installée 1.9.1) ;
+  `.planning/WINDOWS.md` (87 lignes, aucune prose libre sous le ledger au 2026-08-04)
+- Impact: **nul en l'état** — c'est précisément ce qui a permis d'activer la zone 2 (ADR-066) : le
+  bug n'a rien à détruire sur ce fichier. Le risque n'apparaîtrait que si quelqu'un ajoutait de la
+  prose sous le ledger, ou éditait le fichier à la main.
+- Fix approach: **ne pas écrire à la main dans `.planning/WINDOWS.md`** et ne pas y ajouter de prose
+  sous le ledger ; **le committer avant toute commande `windows`** pour que tout dégât reste
+  récupérable (répéter d'abord sur une copie jetable via `--cwd` est bon marché et concluant).
+  Résolution définitive : monter `@opengsd/gsd-core` dès qu'une version strictement supérieure à
+  1.9.1 portant le correctif #2893 est publiée. **Cette montée ne gate aucun travail** — la zone 2
+  est activée, elle n'attend rien (ADR-066, § Note de veille).
+
+**Fenêtre #3 du ledger dérogée, pas résolue — la recette XcodeBuildMCP reste à faire ailleurs** — Sévérité : **LOW**
+- Issue: valider `test_sim`/`build_sim`/`clean` (tokens `vf-mcp-tools`) contre un serveur
+  XcodeBuildMCP **vivant** est impossible dans ce dépôt : aucun `.mcp.json`, aucun projet iOS, aucun
+  simulateur. La fenêtre a donc été **dérogée** (`waived`) le 2026-08-04, pas fermée.
+- Files: `.planning/WINDOWS.md` (entrée id 3, `status: waived`) ;
+  `plugin/dev-orchestrator/agents/vf-reviewer.md`
+- Impact: `open_count` = 0, donc `/gsd-ship` ne bloque plus — mais la recette humaine n'a **jamais
+  été jouée**. Ne pas lire cette dérogation comme une validation.
+- Fix approach: rejouer la recette sur un **lab iOS équipé** (projet Xcode + `.mcp.json` + simulateur),
+  puis reporter le constat ici. La dérogation se réexamine si `vibeflow-os` acquiert un projet iOS.
+
 ## Known Bugs
 
 Aucun bug ouvert confirmé sur disque au 2026-07-26. Les comportements gênants connus (survie de
