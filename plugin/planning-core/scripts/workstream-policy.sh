@@ -74,11 +74,21 @@
 # bash ne reproduit pas fidèlement. Ce trou est l'objet d'un gate dédié
 # (`check-workstream-pointer.sh`), jamais d'une approximation à cet endroit.
 
-# Bornes de LECTURE du pointeur. Ce ne sont PAS des bornes de politique de nom (amont n'en a
-# aucune) : ce sont des bornes de SÛRETÉ DE LECTURE. Un pointeur qui les dépasse n'est pas
-# « invalide », il est « non lisible sûrement » — et il est refusé bruyamment, jamais réimprimé.
+# Bornes de LECTURE. Ce ne sont PAS des bornes de politique de nom (amont n'en a aucune) : ce sont
+# des bornes de SÛRETÉ DE LECTURE. Une valeur qui les dépasse n'est pas « invalide », elle est
+# « non lisible sûrement » — et elle est refusée bruyamment, jamais réimprimée.
 # Motif : un pointeur versionné est du contenu de dépôt non maîtrisé, lu par un hook SessionStart.
 VF_WS_POINTER_MAX_BYTES=4096
+
+# LA MÊME BORNE, SUR LE CANAL NOMINAL — et l'absence de cette ligne était le trou. La borne
+# ci-dessus ne protège que le canal RÉTROGRADÉ (le pointeur partagé). Or l'amendement d'ADR-064 a
+# fait de `GSD_WORKSTREAM` le canal NOMINAL : c'est lui que la doctrine prescrit, lui que les hooks
+# lisent en premier, et il n'avait AUCUNE borne. `vf_ws_name_valid` ne pouvait pas y suppléer —
+# elle contraint l'ALPHABET des caractères, jamais leur nombre : 200 000 octets pris dans
+# `[A-Za-z0-9._-]` la traversent intacts. Mesuré : 200 000 octets en entrée → 400 Ko en sortie de
+# deux hooks SessionStart, c'est-à-dire directement dans le contexte de session. Borner le canal
+# rétrogradé en laissant le nominal libre revenait à verrouiller la porte de service.
+VF_WS_VALUE_MAX_BYTES=4096
 
 VF_WS_NAME=""
 VF_WS_SOURCE=""
@@ -187,6 +197,18 @@ vf_ws_resolve() { # <planning_dir> [surcharge]
   fi
 
   [ -n "$raw" ] || return 0
+
+  # BORNE DE SÛRETÉ AVANT TOUTE AUTRE CHOSE, et sur TOUS les canaux sans exception (surcharge,
+  # VF_WORKSTREAM, GSD_WORKSTREAM, pointeur partagé) : la valeur arrive ici quelle que soit sa
+  # provenance, c'est donc le seul endroit qui ne puisse pas en oublier un. Placée AVANT la
+  # validation de nom : celle-ci parcourt la chaîne entière, et une valeur hors borne ne doit pas
+  # même être parcourue. La raison est distincte de `hors-politique` — la valeur n'est pas rejetée
+  # pour sa FORME mais pour sa TAILLE, et confondre les deux rendrait le diagnostic faux.
+  if [ "${#raw}" -gt "$VF_WS_VALUE_MAX_BYTES" ]; then
+    VF_WS_SOURCE="$src"
+    VF_WS_REASON="valeur-trop-longue"
+    return 2
+  fi
 
   if ! vf_ws_name_valid "$raw"; then
     VF_WS_SOURCE="$src"

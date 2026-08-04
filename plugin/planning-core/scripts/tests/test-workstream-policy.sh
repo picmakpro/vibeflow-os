@@ -157,6 +157,33 @@ if [ "$r5c" -eq 2 ] && [ "$VF_WS_REASON" = "hors-politique" ]; then
   ok "A5c pointeur « dev\\nautre » → rejete : le fichier ENTIER est evalue (parite raw.trim())"
 else ko "A5c lecture du fichier entier" "rc=$r5c raison=$VF_WS_REASON nom=[$VF_WS_NAME]"; fi
 
+# --- A5d BORNE DU CANAL NOMINAL (ADR-064 amendée) ---------------------------------------------
+# La borne A5b ne couvre que le canal RÉTROGRADÉ. Le canal NOMINAL — `GSD_WORKSTREAM` — n'en avait
+# AUCUNE : `vf_ws_name_valid` contraint l'alphabet des caractères, jamais leur nombre, si bien
+# qu'une valeur de 200 000 octets prise dans `[A-Za-z0-9._-]` la traversait intacte et ressortait
+# dans le contexte de session par deux hooks SessionStart (400 Ko mesurés). Borner la porte de
+# service en laissant l'entrée principale ouverte, c'est ne rien border.
+#
+# Le cas est bâti dans les DEUX sens : la valeur démesurée doit être refusée POUR SA TAILLE (raison
+# distincte de `hors-politique`, sinon le diagnostic conseillerait de corriger une forme qui est
+# déjà correcte), et une valeur de forme identique mais COURTE doit rester acceptée — sans quoi le
+# refus prouverait seulement que l'alphabet est rejeté, pas que la borne existe.
+mkdir -p "$TMP/a5d/.planning"
+a5d_long="$(awk 'BEGIN{s="";for(i=0;i<200000;i++)s=s"a";printf "%s", s}')"
+a5d_n="${#a5d_long}"
+GSD_WORKSTREAM="$a5d_long" vf_ws_resolve "$TMP/a5d/.planning"; r5d=$?
+r5d_raison="$VF_WS_REASON"; r5d_nom="$VF_WS_NAME"
+GSD_WORKSTREAM="aaaa" vf_ws_resolve "$TMP/a5d/.planning"; r5d_ok=$?
+r5d_ok_nom="$VF_WS_NAME"
+if [ "$a5d_n" -ne 200000 ]; then
+  ko "A5d borne du canal nominal" "la valeur de test fait $a5d_n octets au lieu de 200000 — cas NON OPPOSABLE, sonde a reancrer"
+elif [ "$r5d" -eq 2 ] && [ "$r5d_raison" = "valeur-trop-longue" ] && [ -z "$r5d_nom" ] \
+     && [ "$r5d_ok" -eq 0 ] && [ "$r5d_ok_nom" = "aaaa" ]; then
+  ok "A5d GSD_WORKSTREAM de $a5d_n octets → refus POUR SA TAILLE (raison distincte de hors-politique), aucun nom rendu ; la MEME forme en 4 octets reste acceptee"
+else
+  ko "A5d borne du canal nominal" "long: rc=$r5d raison=$r5d_raison nom=[$r5d_nom] / court: rc=$r5d_ok nom=[$r5d_ok_nom]"
+fi
+
 # =============================================================================================
 # B. Les QUATRE gates classent le corpus a l'identique
 # =============================================================================================

@@ -153,6 +153,11 @@ if [ "$WS_RC" -eq 2 ]; then
     pointeur-lien-symbolique) non_verifiable "$POINTER est un lien symbolique — refus de le suivre (le contenu de la cible traverserait vers le contexte de session) ; valeur non lue, non réimprimée" ;;
     pointeur-trop-long)       non_verifiable "$POINTER dépasse $VF_WS_POINTER_MAX_BYTES octets — refus de le lire ; valeur non lue, non réimprimée" ;;
     pointeur-illisible)       non_verifiable "$POINTER existe mais n'est pas un fichier régulier lisible" ;;
+    # Distincte de « hors politique » : la valeur n'est pas rejetée pour sa FORME mais pour sa
+    # TAILLE. La laisser tomber dans le fourre-tout ci-dessous ferait dire « 1er caractère
+    # alphanumérique… » d'une valeur parfaitement bien formée mais démesurée — un diagnostic faux,
+    # et impossible à corriger en suivant son propre conseil.
+    valeur-trop-longue)       non_verifiable "le canal $VF_WS_SOURCE porte une valeur de plus de $VF_WS_VALUE_MAX_BYTES octets — refus de la lire ; valeur non réimprimée" ;;
     *)                        non_verifiable "le canal $VF_WS_SOURCE porte un nom hors de la politique du moteur (1er caractère alphanumérique, puis [A-Za-z0-9._-], ni séparateur de chemin, ni '.'/'..', ni '..' en sous-chaîne) — valeur non réimprimée" ;;
   esac
 fi
