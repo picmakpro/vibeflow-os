@@ -5475,7 +5475,8 @@ fi
 
 # assertion C : l'invisibilité amont est nommée avec le mécanisme qu'elle concerne (node_repair),
 # jamais en termes vagues. Bases mesurées sur l'arbre intact : 0 et 0.
-if [ "$("$GREP" -c 'node_repair' "$T31_MFLOW" 2>/dev/null || echo 0)" -ge 1 ] && "$GREP" -qi 'invisible' "$T31_MFLOW"; then
+t31_c_count="$("$GREP" -c 'node_repair' "$T31_MFLOW" 2>/dev/null)"
+if [ "${t31_c_count:-0}" -ge 1 ] && "$GREP" -qi 'invisible' "$T31_MFLOW"; then
   ok "T31-C : l'invisibilité amont du coût interne (node_repair) est écrite, pas seulement supposée"
 else
   ko "T31-C : node_repair et/ou « invisible » absents de mission-flow.md — l'invisibilité amont n'est pas nommée"; t31_ok=0
@@ -5593,7 +5594,8 @@ fi
 
 # Garde de fonction UNIQUE : brique_nue_dispatch_hits n'est définie qu'une fois dans le fichier —
 # pas de fonction sœur introduite pour T32.
-t32_fn_defs="$("$GREP" -cE '^brique_nue_dispatch_hits\(\)[[:space:]]*\{' "$0" 2>/dev/null || echo 0)"
+t32_fn_defs="$("$GREP" -cE '^brique_nue_dispatch_hits\(\)[[:space:]]*\{' "$0" 2>/dev/null)"
+t32_fn_defs="${t32_fn_defs:-0}"
 if [ "$t32_fn_defs" -eq 1 ]; then
   ok "T32 (garde) : brique_nue_dispatch_hits() n'est définie qu'UNE fois dans le fichier — aucune seconde fonction de détection"
 else
