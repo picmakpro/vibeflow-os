@@ -1949,7 +1949,7 @@ d'adopter ne les efface pas**.
 
 | Livrable | Emplacement | Plan |
 |---|---|---|
-| Gate de démarrage rendu workstream-aware | `plugin/conductor/scripts/check-dev-bootstrap.sh` | `24-04` |
+| Gate de démarrage rendu workstream-aware | `plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh` | `24-04` |
 | Gate d'intégrité d'état rendu workstream-aware | `plugin/conductor/scripts/check-state-integrity.sh` | `24-04` |
 | Injection de contexte rendue workstream-aware | `plugin/planning-core/scripts/planning-context.sh` | `24-04` |
 | Gate de pointeur créé (5 codes de sortie, 17 cas de test) | `plugin/conductor/scripts/check-workstream-pointer.sh` | `24-05` |

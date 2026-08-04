@@ -262,6 +262,24 @@ désormais chiffré, et tout retour dessus devra citer la mesure, pas la rouvrir
 
 **Item couvert :** A9
 
+> ### 🔤 Lettrage — **celui de cette zone est le seul normatif**
+>
+> Les lettres **A / B / C / D** employées ci-dessous sont **la** référence citable pour A9 : ce sont
+> elles que citent `ADR-069` et toute décision postérieure. Le `.planning/ROADMAP.md` (§ A9, cadrage)
+> a posé **un second jeu, à trois branches** `(a) (b) (c)` — **historique, non citable**. Les deux ne
+> se recouvrent pas terme à terme, et confondre les deux a effectivement produit un contresens
+> (corrigé le 2026-08-05, cf. l'encadré « Lettrage » du ROADMAP) :
+>
+> | Ici / ADR-069 (**normatif**) | ROADMAP § A9 (historique, non citable) |
+> |---|---|
+> | **A** — refuser sec | **(b)** refuser |
+> | **B** — borner sous liste d'exclusions | **(c)** borner |
+> | **C** — adopter *(retenue)* | **(a)** adopter |
+> | **D** — refuser + remontée amont | **(b)** refuser *(le ROADMAP ne scindait pas le refus)* |
+>
+> **Règle :** ne jamais désigner une voie A9 par une lettre nue. Nommer le jeu (« option C de
+> l'arbitrage ») **et** le geste (« adoption »).
+
 > ### ⚠️ VERDICT SAMUEL — **OPTION C : ADOPTION** — **CONTRE la recommandation D du cadrage**
 >
 > Verbatim : « *je veux coller au max à ce que fait GSD, je préfère jeter des IronLaw outdated que

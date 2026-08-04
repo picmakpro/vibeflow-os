@@ -1581,6 +1581,26 @@ demande de dire lesquels. Dans les cas (a) et (c), la **remontée upstream** des
 est le préalable, au même titre que la RFC de la Phase 18 et la voie 2 de M2. Condition commune aux
 trois : **aucune partition tant qu'une phase est en vol** (cf. divergence invisible ci-dessus).
 
+> ### ⚠️ Lettrage — deux jeux de lettres ont coexisté sur A9, un seul fait foi
+>
+> Les lettres `(a) (b) (c)` ci-dessus sont celles du **cadrage de ce ROADMAP**. L'arbitrage
+> `24-ARBITRAGES.md` § Zone 5 en a posé **d'autres**, à quatre branches, et c'est **le lettrage de
+> l'arbitrage qui est normatif** — c'est lui que citent `ADR-069` et toute décision postérieure.
+> Les lettres du ROADMAP sont conservées pour la trace, **elles ne sont plus une référence
+> citable**.
+>
+> | ROADMAP (historique, non citable) | Arbitrage § Zone 5 / ADR-069 (**normatif**) |
+> |---|---|
+> | **(a)** adopter | **C** — adopter et payer la mise à niveau de notre couche |
+> | **(b)** refuser | **A** — refuser sec · **D** — refuser + remontée amont (l'arbitrage a scindé le refus en deux) |
+> | **(c)** borner | **B** — borner à un usage restreint, sous liste de workflows interdits |
+>
+> **Pourquoi cet encadré existe.** La confusion a effectivement eu lieu : la ligne de décision du
+> tableau de clôture a été écrite « voie (c) bornée » en pensant à l'**option C de l'arbitrage**
+> (= adopter), glosée avec la lettre `(c)` du ROADMAP (= borner) — soit l'exact contraire de la
+> décision de Samuel. Corrigé le 2026-08-05. **Ne jamais désigner une voie A9 par une lettre nue :
+> nommer le jeu (« option C de l'arbitrage ») et le geste (« adoption »).**
+
 > **Chiffre recalé le 2026-08-04.** Ce paragraphe et le précédent citaient « **37** workflows
 > aveugles ». Ce nombre n'a jamais été réconcilié avec une mesure : les aveugles sont **42** au
 > critère **K2** (43 au K1, 35 au K3), sur **45** qui codent des chemins en dur. Le critère fait
@@ -1609,9 +1629,13 @@ trois : **aucune partition tant qu'une phase est en vol** (cf. divergence invisi
 | **A6** — `inline_plan_threshold`, levier inconnu | **chiffré**, laissé au défaut | 24-07 |
 | **A7** — `intel` jamais instruit | **PÉRIMÉ** — `intel.enabled: true` | 24-06 |
 | **A8** — routes vers des gestes inertes, test aveugle à l'activation | `graphify` et `profile-pipeline` **refusés**, entrées de doc **marquées conditionnelles**, et le trou **fermé par un gate** (`check-capability-activation.sh`) câblé au job `gates` de la CI | 24-06, 24-11 |
-| **A9** — workstreams : « notre propre outillage est aveugle » | **PÉRIMÉ sur l'outillage** — les quatre gates sont workstream-aware et exercés en CI sur un arbre réellement partitionné. **L'adoption, elle, n'est PAS acquise** : voir la décision ci-dessous | 24-04, 24-05, 24-08, 24-09 |
+| **A9** — workstreams : « notre propre outillage est aveugle » | **PÉRIMÉ sur les deux volets.** Outillage : les quatre gates sont workstream-aware et exercés en CI sur un arbre réellement partitionné. **Adoption : ACQUISE** depuis `ADR-069` (2026-08-04) — voir la décision ci-dessous | 24-04, 24-05, 24-08, 24-09 |
 
-**La décision A9, écrite : voie (c) bornée, et aucune partition tant qu'une phase est en vol.**
+**La décision A9, écrite : ADOPTION — *option C de l'arbitrage* (`24-ARBITRAGES.md` § Zone 5), soit
+la *voie (a) du lettrage historique de ce ROADMAP* — avec ses quatre limites datées et la condition
+dure « aucune partition tant qu'une phase est en vol ».** L'usage restreint sous liste d'exclusions
+(option **B** de l'arbitrage = voie `(c)` du ROADMAP) est **explicitement rejeté** par ADR-069, tout
+comme le refus (options **A** et **D**). Cf. l'encadré « Lettrage » plus haut dans cette section.
 `ADR-069` acte la révision de l'**Iron Law 2** (« *Router, jamais forker — une capacité amont
 partiellement couverte se câble en écrivant ses limites, elle ne se réimplémente pas* ») et grave
 la couverture **avec son critère et sa commande rejouable**, parce qu'un nombre sans critère est

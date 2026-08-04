@@ -354,52 +354,52 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 > `GSDA-04`/`GSDA-05` — le bug amont #2893 détruit la prose sous le ledger de `WINDOWS.md` et
 > rapporte `ok: true`. Le lot MESURE (zone 6) et le lot workstreams (zone 5) n'en dépendent pas.
 
-- [ ] **GSDA-01**: La version de `@opengsd/gsd-core` sous laquelle la zone 2 s'active est
+- [x] **GSDA-01**: La version de `@opengsd/gsd-core` sous laquelle la zone 2 s'active est
   **déterminée contre le registre npm** et porte le correctif de l'issue amont **#2893** (`windows
   append` détruit la prose sous le ledger JSON et rapporte `ok: true` ; PR #2975 mergée le
   2026-08-01, **après** la publication de 1.9.1 le 2026-07-31). Si aucune version publiée ne porte
   le correctif, la zone 2 est **explicitement différée** avec un **déclencheur de reprise objectif**
   (publication d'une version portant le correctif), **jamais** activée sur une version vulnérable —
   et jamais silencieusement abandonnée. *(prérequis dur, verdict zone 2)*
-- [ ] **GSDA-02**: Le slot `AGENT_SKILLS_PLANNER` est peuplé dans `.planning/config.json` : la
+- [x] **GSDA-02**: Le slot `AGENT_SKILLS_PLANNER` est peuplé dans `.planning/config.json` : la
   doctrine de dev du lab atteint `gsd-planner`. La portée réelle est **écrite telle quelle** — la
   doctrine atteint le **plan**, **pas l'exécution** ; A2 n'est **plus jamais** présenté comme résolu
   côté exécuteur (le slot `EXECUTOR` n'est pas atteignable : `gsd-executor` est hors de l'allowlist
   de `vf-coder` depuis la Phase 23, et le repli inline n'injecte rien). *(A2, verdict zone 1)*
-- [ ] **GSDA-03**: `workflow.tdd_mode` reste `false`, **refus écrit** avec son motif mesuré :
+- [x] **GSDA-03**: `workflow.tdd_mode` reste `false`, **refus écrit** avec son motif mesuré :
   `references/tdd.md` (330 l.) est **déjà injecté sans condition** (`execute-phase.md:693`) et le
   toggle n'ajoute qu'un tag `type: tdd` plus un gate `execute:post` **non bloquant**
   (`onError: skip`) ; l'heuristique amont, calibrée pour des dépôts applicatifs, classerait presque
   tout ce dépôt (bash + markdown) en `execute`. *(A3, verdict zone 1)*
-- [ ] **GSDA-04**: `workflow.windows_enforce` est activé **et** la fenêtre #3 (recette humaine
+- [x] **GSDA-04**: `workflow.windows_enforce` est activé **et** la fenêtre #3 (recette humaine
   XcodeBuildMCP, **structurellement infermable dans ce dépôt** — aucun `.mcp.json`, aucun projet
   iOS) est **dérogée par une trace auditable** `gsd-tools windows waive 3 "<raison>"`, l'entrée
   passant `open` → `waived` et restant visible dans `/gsd-progress`. **Gaté sur `GSDA-01`.**
   *(A1, verdict zone 2)*
-- [ ] **GSDA-05**: `hooks.workflow_guard` est activé (garde d'enchaînement de workflow) — une clé,
+- [x] **GSDA-05**: `hooks.workflow_guard` est activé (garde d'enchaînement de workflow) — une clé,
   **aucune édition de `~/.claude/settings.json`** : le hook est déjà posé en `PreToolUse` et
   s'auto-gate sur le config. **Gaté sur `GSDA-01`.** *(A5, verdict zone 2)*
-- [ ] **GSDA-06**: `hooks.community` (Conventional Commits bloquants) est **refusé par ADR**, avec
+- [x] **GSDA-06**: `hooks.community` (Conventional Commits bloquants) est **refusé par ADR**, avec
   sa mesure : sur **109 commits locaux**, **23 échouent sur le type** (six types maison — `release:`,
   `planning:`, `doctrine:`, `bump`, `spec`, `plan` — absents de la liste amont) et **76/109 = 69 %**
   des sujets dépassent 72 caractères. L'ADR acte aussi qu'il n'existe **aucun gate machine de message
   de commit** dans ce dépôt : c'est une **consigne** du `CLAUDE.md`, jamais une garantie machine.
   *(A5, verdict zone 2)*
-- [ ] **GSDA-07**: `intel.enabled` est activé — la promesse de notre propre `docs-flow.md:43-44`
+- [x] **GSDA-07**: `intel.enabled` est activé — la promesse de notre propre `docs-flow.md:43-44`
   (le mode `--query` publié comme l'un des **deux modes normaux** de `gsd-map-codebase`) **tient**
   au lieu de router vers un geste inerte. La frontière `codebase/` (jugement humain daté, lecteurs
   prescrits) ↔ `intel/` (fait dérivé rafraîchissable, « HINT ONLY … MAY BE INCOMPLETE ») est
   **écrite**. *(A7 + la troisième route, verdict zone 3)*
-- [ ] **GSDA-08**: `graphify` et `profile-pipeline` sont **refusés** (aucun consommateur prescrit
+- [x] **GSDA-08**: `graphify` et `profile-pipeline` sont **refusés** (aucun consommateur prescrit
   dans le module), leurs entrées de `intent-routing.md` (`:104`, `:147`) marquées **conditionnelles**,
   et **portées dans `gsd-capabilities-index.md` avec leur état** — sans quoi le gate d'activation
   n'a rien à lire. *(A8, verdict zone 3)*
-- [ ] **GSDA-09**: Un **gate d'activation doc ↔ capability** existe et le gate **T14** de
+- [x] **GSDA-09**: Un **gate d'activation doc ↔ capability** existe et le gate **T14** de
   `test-dev-orchestrator.sh` est étendu : une entrée de doc ou de routage qui pointe une capability
   **inactive** fait **échouer** la suite. C'est le **vrai livrable de la zone 3** — sans lui le trou
   se rouvre au prochain skill ajouté, exactement ce que le ROADMAP relevait en A8 (« une couverture
   verte peut masquer un geste mort »). Discriminance prouvée par mutation. *(A8, verdict zone 3)*
-- [ ] **GSDA-10**: Les profils de contexte sont **refusés par ADR**, et l'ADR est **factuellement
+- [x] **GSDA-10**: Les profils de contexte sont **refusés par ADR**, et l'ADR est **factuellement
   exact** : la clé porteuse de la sémantique est **`context_profile`** (et non `context:`, que les
   trois fichiers livrés nomment à tort en en-tête) ; son état est **documentée, livrée, jamais
   câblée, abandonnée de fait depuis avril 2026** — le mot « **dépréciée** » n'apparaît **nulle
@@ -408,34 +408,34 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   porte un **déclencheur de réexamen objectif, pas une date** : rouvrir **ssi** `context_profile`
   apparaît hors de `docs/` dans une release amont, **ou** qu'une issue amont le mentionne.
   *(A4, verdict zone 4)*
-- [ ] **GSDA-11**: `workflow.inline_plan_threshold` reste **inchangé à 2**, et **la mesure est le
+- [x] **GSDA-11**: `workflow.inline_plan_threshold` reste **inchangé à 2**, et **la mesure est le
   livrable** : sur les `*-PLAN.md` des phases 20-26, regex exacte du moteur, **4 plans sur 28
   (14 %)** passent sous le seuil et le **mode est à 3 tâches** — juste au-dessus. Le seuil ne
   contredit pas la délégation systématique (la doctrine vise l'**acteur**, le seuil est lu **dans**
   la brique). A6 n'est plus présentable comme un « levier de coût inconnu ». *(A6, verdict zone 4)*
-- [ ] **GSDA-12**: L'**Iron Law 2** (`plugin/conductor/AGENT.md:114`) est traitée **explicitement**
+- [x] **GSDA-12**: L'**Iron Law 2** (`plugin/conductor/AGENT.md:114`) est traitée **explicitement**
   — soit **révisée**, soit accompagnée de l'écrit qui dit **pourquoi elle ne s'applique pas** à
   l'adoption des workstreams. Le contournement silencieux est **interdit** : c'est une tâche du
   plan, pas un sous-entendu. *(A9, verdict zone 5, point 1)*
-- [ ] **GSDA-13**: `check-dev-bootstrap.sh` (`:111`) et `check-state-integrity.sh` (`:53`) sont
+- [x] **GSDA-13**: `check-dev-bootstrap.sh` (`:111`) et `check-state-integrity.sh` (`:53`) sont
   **workstream-aware** : les chemins `.planning/ROADMAP.md` / `.planning/STATE.md` codés en dur
   résolvent le workstream actif. Les deux gates restent **verts** dans l'arbre non partitionné
   (non-régression) **et** deviennent verts dans un arbre partitionné. *(A9, verdict zone 5, point 2)*
-- [ ] **GSDA-14**: `planning-context.sh` est **workstream-aware**, au même contrat de
+- [x] **GSDA-14**: `planning-context.sh` est **workstream-aware**, au même contrat de
   non-régression que `GSDA-13`. *(A9, verdict zone 5, point 2)*
-- [ ] **GSDA-15**: Le flag `--ws` est **câblé dans les agents `vf-*`** — aujourd'hui **aucun** ne
+- [x] **GSDA-15**: Le flag `--ws` est **câblé dans les agents `vf-*`** — aujourd'hui **aucun** ne
   sait le passer, et exactement **3 fichiers** de tout `plugin/` mentionnent « workstream », tous
   des tables de routage. *(A9, verdict zone 5, point 2)*
-- [ ] **GSDA-16**: Un **gate sur le pointeur de session de workstream** existe : il détecte que le
+- [x] **GSDA-16**: Un **gate sur le pointeur de session de workstream** existe : il détecte que le
   pointeur vit dans `os.tmpdir()/gsd-workstream-sessions/<sha1(realpath du .planning) tronqué
   16>/<clé>` — **effacé au reboot, indexé sur le chemin absolu, donc distinct par worktree et jamais
   hérité** — et **échoue bruyamment** plutôt que de laisser une session ouvrir sans workstream
   résolu. C'est la **non-composabilité avec ADR-064** (« un écrivain = un worktree ») rendue visible
   au lieu d'être subie. *(A9, verdict zone 5, points 2 et 3)*
-- [ ] **GSDA-17**: La **CI est étendue** aux chemins workstream (les gates de `GSDA-13`/`GSDA-14`
+- [x] **GSDA-17**: La **CI est étendue** aux chemins workstream (les gates de `GSDA-13`/`GSDA-14`
   sont exercés sur un arbre partitionné, pas seulement sur l'arbre racine). *(A9, verdict zone 5,
   point 2)*
-- [ ] **GSDA-18**: L'**ADR d'adoption** des workstreams est écrit — il dit « **adoption** », avec
+- [x] **GSDA-18**: L'**ADR d'adoption** des workstreams est écrit — il dit « **adoption** », avec
   ses **limites connues DATÉES**, et porte les **quatre risques mesurés** sans les dissoudre dans la
   décision : (a) couverture amont **7/91 = 7,7 %** (45 workflows à chemins en dur, dont **42 sans
   aucune conscience** des workstreams) ; (b) `pr-branch.md:235-236`, dont les regex ancrées
@@ -445,22 +445,22 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   `git merge-tree` sort **exit 0** sur une branche post-partition avec un dossier de phase orphelin,
   **Git ne signale rien**. L'ADR porte la **condition dure conservée : aucune partition tant qu'une
   phase est en vol**. *(A9, verdict zone 5, points 3 et 5)*
-- [ ] **GSDA-19**: La **remontée amont** des **42 workflows aveugles** est rédigée et prête à
+- [x] **GSDA-19**: La **remontée amont** des **42 workflows aveugles** est rédigée et prête à
   poster, au **gabarit de forme déjà accepté en amont** (issue **#2598** : « descripteur non
   descriptif du runtime », jamais « bug de comportement »), avec la méthode de mesure reproductible
   (`awk` + `comm` sur les 91 workflows racine, **jamais** `grep` piped qui tronque). Elle est
   **compatible avec l'adoption** — les deux ne s'excluent pas. *(A9, verdict zone 5, point 4)*
-- [ ] **GSDA-20**: La **marge de profondeur de dispatch** est écrite en doctrine : le descripteur
+- [x] **GSDA-20**: La **marge de profondeur de dispatch** est écrite en doctrine : le descripteur
   du runtime `claude` porte `maxDepth: 5`, la chaîne `vf-dev-manager → vf-coder → agent gsd-*` en
   consomme **3**, il reste **deux niveaux de marge** — et ce que cette marge **autorise** est dit
   (un worker peut légitimement dispatcher un sous-worker). Ce fait **clôt** la question du nesting
   ouverte à l'audit ; ne pas l'écrire garantit qu'elle se repose. *(M1, verdict zone 6)*
-- [ ] **GSDA-21**: `effort:` est **propagé par rôle** sur les **25 agents livrés**
+- [x] **GSDA-21**: `effort:` est **propagé par rôle** sur les **25 agents livrés**
   (`plugin/*/agents/*.md`, aujourd'hui **0 sur 25**) — **pilotage et jugement haut, exécution
   mécanique bas, jamais uniformément**. Le barème n'est **pas inventé** : il est **repris** des
   3 agents-templates qui en portent déjà un (`business-agent-template.md: medium`,
   `clarity-feature-template.md: high`, `orchestrator-template.md: high`). *(M3, verdict zone 6)*
-- [ ] **GSDA-22**: `check-agents.sh:514-516` est **durci** de « valide si présent » à « **exige** » :
+- [x] **GSDA-22**: `check-agents.sh:514-516` est **durci** de « valide si présent » à « **exige** » :
   un agent posé sans `effort:` fait **échouer** le gate. Les **25** agents passent, **aucun laissé de
   côté**. Discriminance prouvée par mutation. *(M3, verdict zone 6)*
 

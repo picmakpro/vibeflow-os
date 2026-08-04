@@ -52,6 +52,41 @@ allowlists** `Agent(...)` (P12, ci-dessus). Deux niveaux disponibles ne rendent 
 chemin que la doctrine interdit par ailleurs — en particulier `manager → worker → manager`, que le
 verrou de driver refuse quelle que soit la profondeur restante.
 
+### Étage de parallélisme réellement effectif (mesuré le 2026-07-31, sondes horodatées)
+
+Le runtime **sait** paralléliser un fan-out depuis un sous-agent — c'est mesuré, pas déduit d'un
+descripteur. Le moteur, lui, **choisit** de ne pas s'en servir : `shouldFlattenDispatch()`
+(`bin/lib/host-integration.cjs`) renvoie **`true` pour Claude Code** dès que
+`background && backgroundDispatch` n'est pas vrai, et `gsd-execute-phase` **sérialise ses vagues par
+décision**. `backgroundDispatch: false` est *fail-closed* par conception : conservateur, **pas
+descriptif** de la capacité réelle du poste.
+
+**La conséquence doctrinale, en une ligne :** sur ce runtime, le parallélisme **intra-étape** (les
+vagues de plans d'une même étape, côté moteur) est **perdu**, et le parallélisme **inter-nœuds**
+porté par la frontière `ready` de `vf-dev-manager` est le **seul effectif**. Notre couche
+d'orchestration ne duplique donc pas celle du moteur : **elle est la seule qui parallélise
+réellement**.
+
+**Ce qui en découle pour un manager**, et qui n'est pas facultatif :
+
+- Le fan-out de la frontière `ready` et la recherche doc non bloquante (ADR-045) **tiennent** —
+  mesurés à **92 %** de recouvrement depuis un sous-agent, indiscernables du contrôle en fenêtre
+  principale (91 %), et un parent qui dispatche puis continue à travailler n'est **pas** bloqué.
+  Ces deux acquis décrivent des gains réels, pas une intention.
+- **N'attendez aucun gain de parallélisme d'un découpage en plans multiples au sein d'une même
+  étape** : le moteur les aplatira. Le gain se prend en **découpant en nœuds de DAG à périmètres
+  disjoints**, dispatchés en un seul message par le manager.
+- **Sérialisation observée ≠ panne.** Voir une étape enchaîner ses plans un par un est le
+  comportement nominal du moteur ici ; ce n'est ni un symptôme, ni un motif de halt condition, ni
+  quelque chose à corriger côté lab.
+- Toute bascule sur la capability amont `claude_orchestration` (BETA, default-off) qui prétendrait
+  restaurer le parallélisme intra-étape est un **opt-in explicite**, jamais un défaut.
+
+Protocole complet, trois configurations, horodatages bruts et réserves de la mesure (la profondeur
+2 → 3 n'a pas été mesurée) : `.planning/missions/2026-07-31-mesure-m2-dispatch-parallele.md` du
+dépôt VibeFlow. **Renvoi, pas copie** — les chiffres ne se recopient pas d'ici, ils se relisent
+là-bas.
+
 ## Ce que chaque métier paramètre (et RIEN d'autre)
 
 1. **Les spécialistes** : un manager (opus, seul à voir large), des producteurs (sonnet), des
