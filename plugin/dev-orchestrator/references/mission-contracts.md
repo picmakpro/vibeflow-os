@@ -209,7 +209,7 @@ rapport de plan, et son garde-fou de reprise sûre refuse de relancer un exécut
 de production orphelins en offrant trois recours. Doctrine de voie unique qui encadre ce constat :
 `GSD-PIPELINE.md` §9.
 
-**Verdicts de hooks moteur (D-15, ce plan)** : le bloc typé de `vf-coder` gagne un **troisième**
+**Verdicts de hooks moteur (D-15, plan 23-06)** : le bloc typé de `vf-coder` gagne un **troisième**
 champ optionnel frère de `gate`/`reprise` : `verdicts`, avec exactement trois sous-champs —
 `code_review`, `nyquist`, `secure` — dont les valeurs sont `pass`, `fail` ou `absent`. Mêmes règles
 que les champs frères, à écrire explicitement parce que c'est là que la fidélité se perd : les

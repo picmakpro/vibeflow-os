@@ -1150,7 +1150,7 @@ workflow d'exécution du moteur rend à lui seul le point de hook de post-exécu
 post-vérification, donc un seul appel de `gsd-execute-phase` déclenche revue de code, nyquist et
 audit de sécurité — un fait qui aggrave le silence si l'arbitrage n'est écrit nulle part.
 
-**Couple 1 (D-13)** — hook de revue de code du moteur (`gsd-code-reviewer`, inséré par
+**Couple 1 (D-13, plan 23-06)** — hook de revue de code du moteur (`gsd-code-reviewer`, inséré par
 `gsd-execute-phase`) *versus* nœud `revue-N` du manager (`vf-reviewer`, ADR-060) :
 
 - **Objet revu** — le hook relit le diff **d'un plan**, au moment où ce plan se ferme ; le nœud
@@ -1166,7 +1166,7 @@ superposition subie. **Option écartée** : éteindre le toggle de revue du mote
 doublon » — ferait perdre sa revue à tout appel direct du skill d'exécution par l'utilisateur, hors
 mission.
 
-**Couple 2 (D-14)** — hook d'audit de sécurité du moteur *versus* auditeur VibeFlow
+**Couple 2 (D-14, plan 23-06)** — hook d'audit de sécurité du moteur *versus* auditeur VibeFlow
 (`vf-auditer`). Le delta est un **FAIT**, pas une préférence, sur les mêmes 3 axes :
 
 - **Objet revu** — le hook vérifie les mitigations du **threat model du plan** ; l'auditeur y
