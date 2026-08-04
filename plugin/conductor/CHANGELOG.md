@@ -1,5 +1,46 @@
 # Changelog — conductor
 
+## [v1.19.1] — 2026-08-04 (course de récupération du lock de driver)
+
+### Corrigé
+- **`driver-lock.sh`** — le lock ne s'ouvre plus pendant qu'il se récupère. Récupérer un claim
+  périmé **déplaçait** le dossier de lock avant de le recréer ; pendant ce déplacement le chemin
+  n'existe pas, et le `mkdir` de la voie normale — qui ne sait pas distinguer « libre » de « en
+  cours de récupération » — y entrait. Mesure sur 24 acquisitions concurrentes d'un lock périmé :
+  **jusqu'à 5 gagnants simultanés**, sur macOS comme sur Linux. Le `T13.1` rouge du runner CI n'en
+  voyait que la pointe (6 concurrents, un seul tirage).
+
+  Ce n'était pas une fenêtre à rétrécir : deux correctifs de fenêtre ont été écrits et **mesurés
+  pires que l'original** (14 et 16 rounds hors contrat sur 25, contre 10 ; pires cas 8 et 6 contre
+  5). Le protocole lui-même prenait la **présence d'un dossier** pour un lock, alors que le
+  récupérer impose de le faire disparaître.
+
+  Le chemin du lock devient un **lien symbolique** vers un dossier de génération : un lien se
+  remplace par `rename(2)`, il n'est donc **jamais absent** et il n'y a plus d'instant où le lock
+  paraît libre. La génération est écrite **complète avant d'être publiée** (plus de lock « présent
+  mais vide »), la récupération est **sérialisée par un mutex** nommé d'après la génération
+  observée, et le verdict de péremption est **relu après** l'obtention du mutex — sans quoi un
+  retardataire lisant l'âge avant le remplacement et la génération après récupérait un lock
+  redevenu frais.
+
+  Deux pièges de shell levés au passage, identiques dans leur forme : sans option, `ln -s A B` et
+  `mv A B` **suivent** un lien vers un dossier et opèrent **dedans en rendant 0**. Le lock
+  paraissait alors libre à chaque acquisition (8 gagnants sur 8). D'où `ln -sh`/`-sn` et
+  `mv -h`/`-T`, qui couvrent BSD et GNU.
+
+### Inchangé (vérifié)
+- **`check-branch-claim.sh`** — aucune modification : `[ -d ]` et `"$LOCK/meta"` traversent le
+  lien, `branch=` et `worktree=` (ADR-064) restent lus tels quels. Les locks au **format dossier**
+  posés par v1.19.0 restent lus et récupérables — une mise à jour ne gèle pas les sessions en
+  cours ; vérifié sur un lock réel périmé de 41 964 s.
+
+### Tests
+- `T13` passe de 6 concurrents en un tirage à **24 concurrents sur 5 rounds**, égalité stricte
+  exigée à chaque round et **les deux bornes gardées** : 0 gagnant est un échec au même titre que
+  2. L'antidatage passe par un helper qui ne présume pas de la forme interne du lock, pour qu'un
+  prochain changement de protocole ne puisse pas rendre le test vert à vide. Suite `27/27` sur
+  trois exécutions ; 20 rounds × 48 concurrents sans un seul écart.
+
 ## [v1.19.0] — 2026-08-01 (isolation multi-session, ADR-064, quick 260801-17w)
 
 ### Ajouté
