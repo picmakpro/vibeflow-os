@@ -189,7 +189,7 @@
         "plugin/dev-orchestrator/agents/vf-dev-manager.md",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "revue-06",
@@ -202,7 +202,7 @@
         "docs/ADR.md",
         "plugin/dev-orchestrator/references/mission-contracts.md"
       ],
-      "status": "blocked",
+      "status": "running",
       "review_regime": "full"
     },
     {
