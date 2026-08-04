@@ -15,11 +15,16 @@
 # Sans MUT2 et MUT3, les deux échappatoires seraient des verts à vide : elles laisseraient passer
 # parce que rien ne les regarde, et la suite ne saurait pas faire la différence.
 #
-# LES LITTÉRAUX FAUTIFS SONT CONSTRUITS À L'EXÉCUTION (`"$U/alice/…"`, jamais `/Users/alice/…`
+# LES LITTÉRAUX FAUTIFS SONT CONSTRUITS À L'EXÉCUTION (`"$U/alice/…"`, jamais `/Users/alice/…`  vf-allow-machine-path
 # écrit tel quel). Ce n'est pas une coquetterie : cette suite est elle-même un fichier VERSIONNÉ,
 # donc dans l'univers que le gate balaie. Y écrire un chemin de machine en clair ferait rougir le
-# gate sur sa propre suite — la contorsion serait alors d'ajouter une exception pour elle, c'est-à-dire
-# de commencer à trouer le gate par son test. La concaténation évite l'exception.
+# gate sur sa propre suite — la contorsion serait alors d'ajouter une exception pour ELLE, c'est-à-dire
+# de commencer à trouer le gate par son test. La concaténation évite cette exception.
+#
+# La ligne ci-dessus est le SEUL usage en production du marqueur `vf-allow-machine-path`, et il est
+# involontairement parfait : elle a fait rougir le gate en le posant, parce qu'elle CITE le motif
+# qu'elle décrit. C'est exactement le cas que l'échappatoire couvre — le littéral EST le sujet — et
+# c'est aussi la démonstration que le gate ne dépend pas de la bonne volonté de son auteur.
 #
 # Toutes les fixtures sont des dépôts git JETABLES sous `mktemp -d`, nettoyés par `trap`. Aucune
 # n'est ancrée sur l'arbre réel : celui-ci bougera. Le seul cas ancré dessus est un contrôle final,
