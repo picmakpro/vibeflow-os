@@ -60,6 +60,13 @@
 # plugin/*/agents (perimetre exact des 6 dossiers audites par la CI), pas une liste codee en dur.
 #   T72 — chaque agent memory: + tools: sans Write/Edit porte disallowedTools: Write, Edit ;
 #         echoue si la decouverte est vide (anti "vert a vide", precedent Phase 19)
+#
+# effort: EXIGE (zone 6, Phase 24 — GSDA-20/21) : le champ etait valide S'IL ETAIT PRESENT,
+# donc omissible en silence. Le durcissement transpose le patron du bloc model:.
+#   T73 — agent LOCAL complet mais sans effort: → ERREUR bloquante nommant effort + ses valeurs
+#   T74 — meme manque sur un agent TIERS (prefixe gsd- par defaut) → 0 erreur, 0 warning (T-24-01-01)
+#   T75 — DISCRIMINANCE PAR MUTATION sur l'arbre reel : ligne effort: retiree → rouge, restauree
+#         → vert ; mutation confirmee effective par `cmp` (jamais par `diff`, menteur ici)
 
 set -uo pipefail
 
@@ -1231,6 +1238,93 @@ else
   ko "T71 (rc=$RC) : $OUT"
 fi
 rm -f "$AG/producteur.md"
+
+# ---------- T73/T74/T75 : effort: EXIGE (zone 6, Phase 24 — GSDA-20/21) ----------
+# Le champ effort: etait valide S'IL ETAIT PRESENT (une seule branche : valeur hors enum).
+# Un agent qui l'omettait passait le gate en silence — donc 0 des 25 agents livres le portait.
+# Le durcissement transpose le patron du bloc model: (absence = ERREUR, puis validation de
+# valeur). Les trois cas ci-dessous bornent ce durcissement des deux cotes.
+
+# T73 — agent LOCAL complet (name/description/model/memory) mais SANS effort: → erreur nommant effort
+cat > "$AG/sans-effort.md" <<'EOF'
+---
+name: sans-effort
+description: Agent local complet sur le socle natif mais qui omet le champ effort, pour tester l'exigence.
+model: sonnet
+memory: project
+skills:
+  - petit-skill
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "effort absent" && echo "$OUT" | grep -q "low|medium|high|xhigh|max"; then
+  ok "T73 agent local sans effort: → ERREUR bloquante nommant effort et ses valeurs admises"
+else
+  ko "T73 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/sans-effort.md"
+
+# T74 — NON-DEBORDEMENT : le meme manque sur un agent TIERS (prefixe --third-party-prefix, defaut
+# gsd-) ne doit produire NI erreur NI warning citant effort. Sans cette borne, chaque SessionStart
+# d'un lab equipe d'agents gsd-* cracherait un flot d'erreurs (T-24-01-01).
+cat > "$AG/gsd-sans-effort.md" <<'EOF'
+---
+name: gsd-sans-effort
+description: Agent tiers GSD depourvu d'effort, pour prouver que le durcissement ne deborde pas sur les labs.
+model: sonnet
+memory: project
+---
+corps
+EOF
+printf -- '---\nname: agent-conforme-t74\ndescription: Agent local conforme portant effort, pour que le run T74 ait un perimetre reel.\nmodel: sonnet\neffort: medium\nmemory: project\nskills:\n  - petit-skill\n---\ncorps\n' > "$AG/agent-conforme-t74.md"
+OUT="$(run_check --strict 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "effort"; then
+  ok "T74 agent tiers (prefixe gsd- par defaut) sans effort: → 0 erreur, 0 warning citant effort"
+else
+  ko "T74 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/gsd-sans-effort.md" "$AG/agent-conforme-t74.md"
+
+# T75 — DISCRIMINANCE PAR MUTATION, sur l'ARBRE REEL (pas une fixture ecrite pour l'occasion).
+# Deux garde-fous avant tout verdict, au patron mutant() de test-check-gsd-config.sh:1220 :
+#   - la mutation doit avoir CHANGE le fichier (comparaison par `cmp`, JAMAIS par `diff`,
+#     proxifie et menteur sur ce runtime) — sinon mutant NON OPPOSABLE, pas mutant satisfait ;
+#   - la reecriture LICITE (ligne restauree) doit rejouer VERT, sinon le critere serait
+#     inutilisable sur du code sain.
+T75_ROOT="$(cd "$SCRIPTS_DIR/../../.." && pwd)"
+T75_SRC=""
+for f in "$T75_ROOT"/plugin/*/agents/*.md; do
+  [ -f "$f" ] || continue
+  if awk 'FNR==1{fm=1;next} fm && /^---[[:space:]]*$/{fm=0} fm && /^effort:/{found=1} END{exit !found}' "$f"; then
+    T75_SRC="$f"; break
+  fi
+done
+if [ -z "$T75_SRC" ]; then
+  ko "T75 (aucun agent porteur d'effort: trouve sous $T75_ROOT/plugin/*/agents — anti 'vert a vide')"
+else
+  MUT_AG="$WORK/mut-agents"; rm -rf "$MUT_AG"; mkdir -p "$MUT_AG"
+  T75_BASE="$(basename "$T75_SRC")"
+  T75_ORIG="$WORK/t75-original"          # hors de $MUT_AG : le gate ne doit voir qu'UN fichier
+  cat "$T75_SRC" > "$T75_ORIG"
+  # mutant : la ligne effort: du frontmatter est retiree
+  awk 'FNR==1{fm=1;print;next} fm && /^---[[:space:]]*$/{fm=0;print;next} fm && /^effort:/{next} {print}' \
+    "$T75_ORIG" > "$MUT_AG/$T75_BASE"
+  if cmp -s "$MUT_AG/$T75_BASE" "$T75_ORIG"; then
+    ko "T75 la mutation n'a RIEN change (ligne effort: introuvable dans $T75_BASE) — mutant NON OPPOSABLE, pas mutant satisfait"
+  else
+    OUT_MUT="$(bash "$CHECK" --agents-dir="$MUT_AG" --skills-dir="$SK" 2>&1)"; RC_MUT=$?
+    # reecriture LICITE : la ligne est restauree a l'identique
+    cat "$T75_ORIG" > "$MUT_AG/$T75_BASE"
+    OUT_LIC="$(bash "$CHECK" --agents-dir="$MUT_AG" --skills-dir="$SK" 2>&1)"; RC_LIC=$?
+    if [ "$RC_MUT" -eq 1 ] && echo "$OUT_MUT" | grep -q "effort absent" && [ "$RC_LIC" -eq 0 ]; then
+      ok "T75 mutation sur l'arbre reel ($T75_BASE) : effort: retire → gate ROUGE (rc=1, message effort) ; ligne restauree → gate VERT (rc=0)"
+    else
+      ko "T75 (mutant rc=$RC_MUT, licite rc=$RC_LIC) mutant:[$OUT_MUT] licite:[$OUT_LIC]"
+    fi
+  fi
+  rm -rf "$MUT_AG"; rm -f "$T75_ORIG"
+fi
 
 # ---------- T72 : assertion sur l'arbre REEL (pas une fixture) — WINDOWS #1 ----------
 # team-kernel.md affirmait l'anti-triche P12 "verifie par les suites de test de chaque module" —
