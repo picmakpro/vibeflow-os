@@ -42,9 +42,11 @@ ok "sélectionne 2.18.0 (max semver, pas 2.9.0)" "$(echo "$out" | grep -q 'cache
 
 echo "== vf-update-run.sh (invalidation + régénération du cache du bandeau) =="
 # Isolation HOME (même motif que run_banner ligne 18) : le repli du bloc de production et le
-# chemin par défaut du cache dérivent tous deux de $HOME.
-RB_HOME="$TMP/rb-home"; mkdir -p "$RB_HOME/.cache/vibeflow"
-RB_CACHE="$RB_HOME/.cache/vibeflow/update-check.json"
+# chemin par défaut du cache dérivent tous deux de $HOME. XDG_CACHE_HOME est déjà exporté
+# (ligne 10) vers $TMP/cache pour toute la suite — c'est donc LUI, pas HOME, qui fixe le chemin
+# du cache ici (même précédence que dans le script de production).
+RB_HOME="$TMP/rb-home"; mkdir -p "$RB_HOME"
+RB_CACHE="$XDG_CACHE_HOME/vibeflow/update-check.json"
 
 # Cas A — régénération depuis la copie la plus fraîche ($NEW/conductor/scripts/…).
 echo '{"update_available":true,"installed":"0.0.0","latest":"9.9.9","checked_at":"x"}' > "$RB_CACHE"
