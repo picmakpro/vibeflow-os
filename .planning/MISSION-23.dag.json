@@ -156,7 +156,7 @@
         "plugin/dev-orchestrator/references/GSD-PIPELINE.md",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "revue-05",
@@ -725,7 +725,7 @@
       "scope": [
         ".planning/phases/VFDO-23-*/23-05-PLAN.md"
       ],
-      "status": "running"
+      "status": "done"
     }
   ]
 }
