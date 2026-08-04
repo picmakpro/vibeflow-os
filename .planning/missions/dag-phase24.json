@@ -224,7 +224,7 @@
         "fix-vague-2"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "secure-phase",
@@ -234,7 +234,7 @@
         "fix-vague-2"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "docs",
@@ -244,7 +244,7 @@
         "exec-24-12"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     }
   ]
 }

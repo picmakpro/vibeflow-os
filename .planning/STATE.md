@@ -21,11 +21,23 @@ last_activity: 2026-08-04 (quick 260804-ki4 — cache du bandeau update invalid�
 # P1 et P2 SOLDÉES : P1 inversée chez ses porteurs réels ; P2 n'était PAS un écart de mesure mais
 # un CRITÈRE NON DÉCLARÉ — K1=5, K2=7, K3=16 sur 91, atteinte 91, gsd-core 1.9.1. ADR-069 grave
 # K2=7/91 avec sa commande. Re-vérifié indépendamment deux fois.
-# RESTE : 24-12 (clôture — triades des 8 modules + compteur des 2 README à porter de 47 à **50**,
-# à RE-MESURER au moment de l'écriture), /gsd-secure-phase 24, puis le nœud docs de fin de mission.
-# ⚠️ /gsd-ship est BLOQUÉ, et c'est exact : 24-SECURITY.md porte threats_open: 18 (calculé, pas
-# posé — les 12 plans portent 56 menaces et aucun des 11 SUMMARY n'enregistre de verdict).
-# Seul /gsd-secure-phase 24 peut faire descendre ce compteur.
+# PHASE 24 CLOSE côté ingénierie — 12/12 plans livrés, revus, audités. 84 commits, 140 fichiers.
+# 24-12 : 10 modules bumpés (PAS 8 — kpi-analyst et validator sont des mono-agents invisibles au
+# balayage plugin/*/agents/), compteur des 2 README 47 → 51, check-version-sync VERT.
+# /gsd-secure-phase 24 : threats_open 18 → 4 → **1**. 46 menaces fermées SUR PREUVE CITÉE.
+# 51 suites, 0 échec. state-integrity ✓, invariants SAIN, version-sync ✓.
+# ⚠️ /gsd-ship RESTE BLOQUÉ sur UNE menace, et c'est exact : **T-24-02-01** n'attend plus aucun
+# travail d'ingénierie — elle attend un ACTE D'AUTORITÉ HUMAINE (re-disposition en `accept` avec
+# entrée nominative, ou réécriture de la mitigation). Sa mitigation promettait l'abstinence de
+# `gsd-tools windows`, or le waive a été exécuté sous dégel humain (ADR-066).
+# ⚠️ QUATRIÈME passage du motif symlink trouvé et fermé sur les 4 gates workstream-aware
+# (planning-context.sh injectait un STATE.md hors-lab dans le contexte de session, exit 0).
+# Dette d'architecture nommée dans CONCERNS.md : 6 implémentations du même besoin en 3 langages.
+# ⚠️ RESTE À ARBITRER (aucun n'est bloquant) : (a) les 4 scripts corrigés après le bump de 24-12
+# embarquent du code que leur CHANGELOG ne décrit pas ; (b) ~70 fichiers suivis portent un chemin
+# absolu contenant le nom d'utilisateur — dépôt PUBLIC, classe non couverte par le scrub ;
+# (c) `.planning` lui-même versionné en symlink = même vecteur au segment racine, non couvert.
+# La RELEASE RACINE (bump VERSION + tag + release GitHub) reste un geste humain gaté.
 # Détail complet :
 # .planning/missions/2026-08-04-phase-24-activation-moteur-gsd.md
 # ⚠ check-version-sync ROUGE assumé : README « 47 suites » vs 49 réelles — le plan 24-12 le referme.
