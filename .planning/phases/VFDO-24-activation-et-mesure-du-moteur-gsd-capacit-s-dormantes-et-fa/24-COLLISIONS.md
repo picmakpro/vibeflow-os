@@ -261,6 +261,85 @@ workstream résolu — la défaillance visée est mesurée : `getActiveWorkstrea
 
 ---
 
+## M-1 — Mesure datée de la couverture amont des workstreams
+
+**Mesurée le 2026-08-04**, à inscrire telle quelle dans ADR-069 (plan 24-10). Elle remplace tout
+chiffre de couverture cité sans sa méthode.
+
+### Corpus (exact, vérifiable)
+
+`$HOME/.claude/gsd-core/workflows/*.md`, **profondeur 1 uniquement** — `@opengsd/gsd-core` **1.9.1**.
+**91 fichiers.** Le qualificatif « racine » porte : en récursif le même dossier en compte 115. Le
+compte 91 a été confirmé par **six** méthodes indépendantes (`find|awk`, `find -exec`, glob shell,
+`ls`, `find`>fichier, `find|sort`>fichier) après qu'une invocation a rendu **4** en silence — un
+compteur d'atteinte (`91 fichiers réellement ouverts`) est donc inclus dans la commande.
+
+### Le critère d'inclusion, nommé — c'est lui, et lui seul, qui explique l'écart 7 vs 5
+
+Un workflow est dit **conscient** selon l'une de ces trois définitions, qui ne sont pas
+interchangeables. Aucune des mesures antérieures ne nommait la sienne :
+
+| # | Critère d'inclusion | Conscients | Taux | En dur | Aveugles |
+|---|---|---|---|---|---|
+| **K1** | le mot `workstream` (insensible à la casse) **seul** | **5** | 5,5 % | 45 | **43** |
+| **K2** | le mot `workstream` **ou** l'option `--ws` — *« résout le scope »* | **7** | **7,7 %** | 45 | **42** |
+| **K3** | K2 **ou** la variable `GSD_WS` — *toute forme de surface* | **16** | 17,6 % | 45 | **35** |
+
+### Ce que la re-dérivation établit
+
+- **Les deux chiffres en litige sont reproductibles.** L'arbitrage citait 7/91 (45 en dur, 42
+  aveugles) : c'est **exactement K2**, retrouvé au fichier près. La re-mesure indépendante citait
+  5/91 (45 en dur, 43 aveugles) : c'est **exactement K1**. Aucune n'était fausse ; aucune ne nommait
+  son critère. Il n'y a donc **pas** de mesure à corriger, mais un critère à écrire.
+- **K1 sous-compte par faux négatifs.** Les 2 workflows que K2 ajoute — `verify-work.md` et
+  `plan-review-convergence.md` — traitent bien `--ws` (`verify-work.md:42-43` le parse dans `GSD_WS`)
+  **sans jamais écrire le mot** « workstream ». Un critère purement lexical les rate.
+- **K3 contient un faux positif isolé et nommé** : `reapply-patches.md:220` ne cite `${GSD_WS}` que
+  comme *exemple de dérive de variable* dans une doc de rapprochement de patchs. Il n'est
+  workstream-aware en rien. K3 vaut donc **16 bruts / 15 réels**.
+- **K3 sépare deux natures que K2 confond.** Sur ses 16, **7 résolvent** le scope et **9 ne font que
+  propager** `${GSD_WS}` dans une commande suggérée (`ship.md` : 1 seule ligne ; `progress.md` : 29).
+  Propager n'est pas résoudre — mais ce n'est pas non plus être aveugle.
+
+### La correction qui compte pour ADR-069
+
+La fiche **F-34 déclare « PÉRIMÉ — la couverture est BIEN PIRE que 18 % »**. **Cette conclusion ne
+survit pas à la re-dérivation.** Le taux ~18 % du ROADMAP est **retrouvé** par K3 (17,6 %). L'écart
+18 % → 7,7 % n'est donc **pas** une régression amont ni une découverte d'un état pire : c'est un
+**changement de critère non déclaré**. Écrire « bien pire que 18 % » dans une ADR serait graver un
+artefact de méthode comme un fait sur le produit.
+
+**À graver : 7/91 = 7,7 % (critère K2), 45 en dur dont 42 aveugles, mesuré le 2026-08-04 sur
+gsd-core 1.9.1.** K2 est retenu parce que c'est le critère qui répond à la question de l'ADR — *ce
+workflow sait-il résoudre un scope de workstream ?* — et non *le mot apparaît-il ?* (K1) ni *la
+variable transite-t-elle ?* (K3). Les trois chiffres restent publiés ci-dessus : c'est le tableau,
+pas le seul nombre retenu, qui rend la mesure rejouable.
+
+### Commande reproductible (à recopier dans ADR-069)
+
+`awk` et `comm` uniquement — **jamais** `grep` piped, qui tronque en silence sur ce poste.
+
+```bash
+W="$HOME/.claude/gsd-core/workflows"; T1=$(mktemp); H=$(mktemp); seen=0
+for f in "$W"/*.md; do
+  [ -f "$f" ] || continue; seen=$((seen+1))
+  awk -v F="$f" 'tolower($0) ~ /workstream/ || /--ws([^a-zA-Z0-9-]|$)/ { print F; exit }' "$f" >> "$T1"
+  awk -v F="$f" '/\.planning\/(ROADMAP\.md|STATE\.md|phases)/           { print F; exit }' "$f" >> "$H"
+done
+sort -u "$T1" -o "$T1"; sort -u "$H" -o "$H"
+echo "atteinte=$seen (doit valoir 91)"
+echo "K2 conscients=$(awk 'END{print NR+0}' "$T1")  en dur=$(awk 'END{print NR+0}' "$H")  aveugles=$(comm -13 "$T1" "$H" | awk 'END{print NR+0}')"
+```
+
+Attendu au 2026-08-04, gsd-core 1.9.1 : `atteinte=91`, `K2 conscients=7  en dur=45  aveugles=42`.
+
+**Règle générale, applicable au-delà de cette fiche** : tout chiffre gravé dans un ADR ou un README
+porte sa méthode et se re-dérive au moment de l'écriture. Un chiffre sans critère nommé n'est pas
+faux — il est **indécidable**, et deux lecteurs de bonne foi en tireront deux conclusions opposées,
+ce qui est exactement ce qui s'est produit ici.
+
+---
+
 ## Tension hors-collision — la parallélisation
 
 **Le mandat la signale comme pouvant diverger, et elle diverge.**
