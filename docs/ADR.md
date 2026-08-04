@@ -1469,6 +1469,7 @@ purement locale au repo de distribution.
 
 **Date** : 2026-08-01 · **Statut** : Validée · **Complète** : ADR-053 (verrou de driver), ADR-059
 (une mission = une branche) · **Quick** : `260801-17w`
+· **Amendée par** : **ADR-069** (2026-08-04) — composition avec les workstreams par `GSD_WORKSTREAM`.
 
 ### Contexte
 
