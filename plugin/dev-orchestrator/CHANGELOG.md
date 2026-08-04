@@ -1,5 +1,69 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.11.0] — 2026-08-04 (couplage explicite au moteur GSD — capabilities, flags, voie unique, Phase 23)
+
+Couplage explicite du module au moteur `@opengsd/gsd-core` : un gate qui vérifie que ce que le lab
+déclare correspond à ce que le moteur installé sait faire, une table de capabilities générée depuis
+le moteur plutôt que recopiée à la main, une doctrine de flags de cycle qui ferme par défaut plutôt
+que d'ouvrir par omission, et une voie unique d'invocation des briques Plan/Exécution.
+
+### Ajouté
+- **`check-gsd-config.sh`** — gate d'alignement de configuration entre `.planning/config.json` du
+  lab et les capabilities réellement exposées par le moteur `@opengsd/gsd-core` installé. Contrat
+  d'exit `0` (aligné) / `3` (INDÉTERMINÉ, silence attendu sur un lab conforme) / `64` (usage), avec
+  sa suite dédiée `test-check-gsd-config.sh`.
+- **`build-gsd-capabilities-index.sh`** et sa sortie auto-générée
+  `references/gsd-capabilities-index.md` — table de capabilities dérivée du moteur installé plutôt
+  que recopiée à la main, fermant la classe de dérive « le lab affirme une capacité que le moteur
+  n'a plus ».
+- **Doctrine de flags de cycle** — `GSD-PIPELINE.md` §9, allowlist stricte des flags de cycle avec
+  clause de fermeture par défaut (un flag absent des trois sources amont n'a aucune valeur, il n'est
+  jamais lu `false` par confort).
+- **Doctrine de voie unique (D-09/D-10)** — nouvelle sous-section « Voie unique d'invocation » dans
+  `GSD-PIPELINE.md` §9 : les briques Plan/Exécution ne sont atteintes que par le skill amont, jamais
+  par dispatch direct d'un agent nu ; la reprise après checkpoint reste un nouveau worker par la voie
+  skill, sans exception.
+- **Table des moments déclencheurs des briques dormantes** — les quatre briques D-22/D-23/D-24 et
+  leurs déclencheurs, câblée au contrat de checkpoint.
+- **Quatre champs optionnels du bloc typé** — `gate`, `reprise`, `verdicts`, `decompte`, relayés par
+  `vf-coder` et `vf-dev-manager` sans jamais devenir une statistique auto-évaluée.
+- **Blocs de test neufs de `test-dev-orchestrator.sh`** — **dix blocs principaux, `T24` à `T33`**,
+  étendus par **huit sous-blocs nommés** (`T25 ATTEINTE`, `T25c`, `T26 F`, `T26 E'`, `T27b`, `T27c`,
+  `T28-H/I/J/K`, `T28 ATTEINTE`). Numérotation volontairement non monotone dans le fichier (`T33`
+  vit entre `T27c` et `T28`, réservé par 23-03, choix consigné au SUMMARY de 23-07).
+
+### Modifié
+- **Contrat de checkpoint** — mapping unique vers l'escalade, une seule voix pour ce que fait un
+  checkpoint plutôt qu'une déclinaison par brique.
+- **Budget de tours** — devenu partagé **par étape** plutôt que par brique individuelle.
+- **`mission-flow.md`** — ligne du cycle canonique sur la brique de livraison, Pattern E budget
+  partagé, section briques dormantes.
+- **`docs/ADR.md` ADR-061** — étendue d'un troisième objet revu.
+- **`.planning/config.json` du lab** — `ui_review` explicitement écrit `false` (ce dépôt est un
+  plugin de distribution bash + markdown, sans aucune surface d'interface ; le toggle n'ayant de
+  valeur nulle part, l'étage `ui-review` était accidentellement inactif faute de valeur — pas
+  délibérément fermé ; l'écrire transforme l'omission en décision).
+
+### Retiré
+- **La voie dégradée de dispatch d'agent nu dans le worker** — deux entrées d'allowlist retirées :
+  - `gsd-planner`/`gsd-executor` de l'allowlist `tools:` de `vf-coder` : dispatch direct des agents
+    nus de cycle fermé (D-09/D-11/D-12) — la voie unique d'invocation des briques Plan/Exécution est
+    désormais le skill, seul, avec ses dix étages de contrôle.
+  - `gsd-planner` de l'allowlist `tools:` de `vf-dev-manager` : lecture littérale de D-09
+    (interdiction sans qualificatif d'agent) + Finding 1 du RESEARCH — le manager ne code, ne teste
+    ni n'audite jamais lui-même, et rien dans son prompt ne mobilisait cette entrée.
+
+  Arbitrage tranché en tête du plan 23-05 : D-09 est formulée sans qualificatif d'agent, la doctrine
+  du manager dit noir sur blanc qu'il ne code/teste/audite jamais lui-même. Retrait ponctuel et
+  nommé, l'audit complet des 20+ entrées restant explicitement différé.
+
+⚠️ **Écart ouvert, non couvert par ce retrait** : `gsd-debugger` reste dans l'allowlist `tools:` de
+`vf-coder.md` et reste exigé par le gate `CODER_ALLOWED` (`T19`) — `D-22` (« aucun `gsd-debugger` en
+allowlist, aucune exception ») n'est donc pas vraie en machine sur ce point. Arbitrage reporté à
+Samuel, voir le SUMMARY 23-08.
+
+Référence : `.planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/`.
+
 ## [v2.10.0] — 2026-07-31 (alignement gsd-core 1.9.0, Phase 21)
 
 ### Ajouté
