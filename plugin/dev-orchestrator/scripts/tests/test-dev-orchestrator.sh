@@ -5435,5 +5435,91 @@ fi
 [ "$t30_ok" -eq 1 ] && ok "T30 : le bloc typé porte les verdicts déjà rendus par les hooks (code_review/nyquist/secure), valeur d'absence distincte du succès, ADR-061 porte le troisième objet (CONCERNS.md), critère de disjonction vérifié absent partout ailleurs (assertion négative, discriminance prouvée par mutation dans les deux sens)"
 
 # ---------------------------------------------------------------------------
+# T31 (D-25, D-26, D-27, D-28, plan 23-07 tâche 1) — budget de tours partagé PAR ÉTAPE (pas par
+# boucle, pas par mission), décompte complet à l'épuisement, invisibilité amont du coût interne
+# nommée. Co-présence bornée AU BLOC (md_blocks_matching, patron t23_triggers_colocated) — un
+# grep global sur trois mots séparément resterait vert sans aucune relation entre eux.
+# ---------------------------------------------------------------------------
+t31_ok=1
+T31_MFLOW="$MFLOW"          # résolu à T24
+T31_CONTRACTS="$CONTRACTS_FILE"   # résolu à T30
+T31_DEVMGR="$DEVMGR"        # résolu à T18
+
+# assertion A (DISCRIMINANT — co-présence, PAS mot isolé) : un même bloc de mission-flow.md porte
+# à la fois « budget », « partagé » et « étape ». Base mesurée sur l'arbre intact : 0 bloc.
+t31_a_hit="$(md_blocks_matching "$T31_MFLOW" '.' | "$GREP" -F -- 'budget' | "$GREP" -F -- 'partagé' | "$GREP" -F -- 'étape')"
+if [ -n "$t31_a_hit" ]; then
+  ok "T31-A : mission-flow.md porte un bloc qui co-nomme budget, partagé ET étape — le grain est écrit, pas une liste fermée de boucles"
+else
+  ko "T31-A : aucun bloc de mission-flow.md ne co-nomme budget/partagé/étape"; t31_ok=0
+fi
+
+# assertion B : une sous-section dont le TITRE nomme à la fois « budget » et « épuis », qui nomme
+# aussi le décompte.
+t31_b_title="$("$GREP" -E '^#+' "$T31_MFLOW" | "$GREP" -i 'budget' | "$GREP" -i 'épuis')"
+if [ -n "$t31_b_title" ] && "$GREP" -q 'decompte' "$T31_MFLOW"; then
+  ok "T31-B : mission-flow.md porte une sous-section d'épuisement du budget (titre : « $t31_b_title ») qui nomme le décompte"
+else
+  ko "T31-B : sous-section d'épuisement introuvable (titre budget+épuis), ou le décompte n'y est pas nommé"; t31_ok=0
+fi
+
+# assertion C : l'invisibilité amont est nommée avec le mécanisme qu'elle concerne (node_repair),
+# jamais en termes vagues. Bases mesurées sur l'arbre intact : 0 et 0.
+if [ "$("$GREP" -c 'node_repair' "$T31_MFLOW" 2>/dev/null || echo 0)" -ge 1 ] && "$GREP" -qi 'invisible' "$T31_MFLOW"; then
+  ok "T31-C : l'invisibilité amont du coût interne (node_repair) est écrite, pas seulement supposée"
+else
+  ko "T31-C : node_repair et/ou « invisible » absents de mission-flow.md — l'invisibilité amont n'est pas nommée"; t31_ok=0
+fi
+
+# assertion D : mission-contracts.md nomme le champ decompte (avec le jeton littéral D-28
+# 'blocked', W4) ET vf-dev-manager.md ne déclare plus deux budgets séparés (NÉGATIVE). Base
+# mesurée sur l'arbre intact : « son propre budget » présent 1 fois dans vf-dev-manager.md.
+t31_d_ok=1
+"$GREP" -q 'decompte' "$T31_CONTRACTS" || { ko "T31-D : mission-contracts.md ne nomme pas le champ decompte"; t31_d_ok=0; }
+"$GREP" -q 'blocked' "$T31_CONTRACTS" || { ko "T31-D (W4) : mission-contracts.md ne porte pas le jeton littéral D-28 'blocked'"; t31_d_ok=0; }
+"$GREP" -q 'son propre budget' "$T31_DEVMGR" && { ko "T31-D : vf-dev-manager.md porte encore « son propre budget » — la formulation de deux budgets séparés a été doublée, pas remplacée"; t31_d_ok=0; }
+if [ "$t31_d_ok" -eq 1 ]; then
+  ok "T31-D : mission-contracts.md nomme decompte et le jeton blocked, vf-dev-manager.md ne déclare plus deux budgets séparés"
+else
+  t31_ok=0
+fi
+
+# assertion E (DISCRIMINANTE, par mutation) : sur une copie temporaire de vf-dev-manager.md où la
+# formulation de budget séparé est réinjectée, l'assertion D (volet vf-dev-manager.md) doit
+# échouer — sinon la garde négative T31-D ne discrimine rien.
+T31_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T31_TMPDIR"
+T31_MUT_DEVMGR="$T31_TMPDIR/mutant-devmgr-budget-separe.md"
+sed "s/pas doublé/pas doublé (chacune garde son propre budget et son propre \`reopen\`)/" "$T31_DEVMGR" > "$T31_MUT_DEVMGR"
+if cmp -s "$T31_DEVMGR" "$T31_MUT_DEVMGR"; then
+  ko "T31-E : mutant IDENTIQUE à vf-dev-manager.md — la réinjection n'a rien mordu, la preuve ne vaut rien"; t31_ok=0
+else
+  if "$GREP" -q 'son propre budget' "$T31_MUT_DEVMGR" && ! "$GREP" -q 'son propre budget' "$T31_DEVMGR"; then
+    ok "T31-E (DISCRIMINANTE, par mutation) : la formulation de budget séparé réinjectée dans une copie est détectée, le fichier RÉEL en reste exempt"
+  else
+    ko "T31-E NON DISCRIMINANTE : la réinjection dans la copie n'est pas détectée, ou le fichier réel la porte déjà"; t31_ok=0
+  fi
+fi
+
+# assertion F (GARDE DE NON-RÉGRESSION — vert d'avance, et c'est VOULU) : la VALEUR du budget de
+# tours n'a pas bougé (D-25). Base mesurée sur l'arbre intact : déjà 1 avant tout travail — ce
+# critère ne prouve aucune livraison, il interdit un plafonnement opportuniste.
+if "$GREP" -qE '\b3 tours\b' "$T31_MFLOW"; then
+  ok "T31-F (garde de non-régression, D-25) : la valeur du budget de tours (3 tours) est inchangée"
+else
+  ko "T31-F : la valeur du budget de tours a disparu de mission-flow.md — régression sur D-25 (plafonnement opportuniste)"; t31_ok=0
+fi
+
+# assertion G : densité ADR-029 — vf-dev-manager.md reste sous le plafond (wc -l < FICHIER est
+# cassé sur au moins un poste de dev de ce module : awk 'END{print NR}' est la mesure fiable).
+t31_wc="$(awk 'END{print NR}' "$T31_DEVMGR")"
+if [ "$t31_wc" -le 250 ]; then
+  ok "T31-G : vf-dev-manager.md reste sous le plafond ADR-029 ($t31_wc/250 lignes)"
+else
+  ko "T31-G : vf-dev-manager.md dépasse le plafond ADR-029 ($t31_wc/250 lignes)"; t31_ok=0
+fi
+
+[ "$t31_ok" -eq 1 ] && ok "T31 : budget de tours UNIQUE et partagé par ÉTAPE (le grain, pas une liste fermée de boucles), décompte complet à l'épuisement, invisibilité amont du coût interne du moteur nommée, valeur du budget inchangée (D-25), discriminance prouvée par mutation"
+
+# ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
 [ "$fail" -eq 0 ]

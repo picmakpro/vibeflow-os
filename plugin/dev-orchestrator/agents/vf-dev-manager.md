@@ -138,8 +138,8 @@ une étape sécurité le garde) :
      signale la limite au rapport.
    - **Audit** — `vf-auditer` (Task) si l'étape touche sécurité, données sensibles ou infra.
    Au retour : fusionne et déduplique les findings des juges, puis UN SEUL `dag.sh reopen` si
-   correctifs — jamais un reopen par juge. Boucle distincte de celle de la revue (point 2), qui a
-   son propre budget et son propre `reopen`.
+   correctifs — jamais un reopen par juge. Budget de tours **partagé par étape** avec la boucle de
+   revue (point 2), pas doublé — détail : `mission-flow.md` §Pattern E §6.
 
 Entre les étages : un compte rendu qui révèle une décision → panel. Le nœud `revue-N` est
 désormais posé et piloté par le manager EN DIRECT pour chaque étape — la règle qui le lui

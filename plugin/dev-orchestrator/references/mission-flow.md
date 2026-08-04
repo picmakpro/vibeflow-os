@@ -225,10 +225,14 @@ manager↔worker↔worker de revue). Sur un rapport typé `gaps_found` :
    jamais un cycle cadrage → plan → exécution complet.
 3. Re-dispatch `vf-reviewer` sur le diff corrigé.
 
-Budget **3 tours** ; au-delà, escalade humaine (jamais de raffinage infini) — cette boucle s'articule
-sur la MÊME table de pilotage déterministe que le reste du contrôle de flux (Pattern C), une seule
-règle : `passed` → `mark done` + frontière suivante · `gaps_found` → la boucle ci-dessus ·
-`human_needed`/finding `ask-user` → escalade.
+Budget **3 tours**, au grain **étape** et **partagé** avec les autres boucles de correction de la
+même étape (§6 ci-dessous) — un budget séparé par boucle se contournerait mécaniquement, par
+renommage du problème, ce que ce Pattern dit précisément vouloir empêcher. La valeur ne bouge pas
+(D-25) : elle reste celle mesurée à son rendement actuel, on ne plafonne pas avant d'avoir des
+chiffres réels. Au-delà, escalade humaine — cette boucle s'articule sur la MÊME table de pilotage
+déterministe que le reste du contrôle de flux (Pattern C), une seule règle : `passed` → `mark done`
++ frontière suivante · `gaps_found` → la boucle ci-dessus · `human_needed`/finding `ask-user` →
+escalade.
 
 ### 3. Gradation par risque, jamais par volume
 
@@ -269,6 +273,25 @@ que soit la nature du lot d'origine.** Garant MACHINE, pas une consigne : `dag.s
 lui-même `review_regime=full` sur tout nœud `revue-*`/`join-*` rouvert (et ses dépendants
 transitifs) — une consigne se contourne par interprétation, un champ écrit par l'outil ne se
 contourne pas.
+
+### 6. Épuisement du budget (D-26, D-27, D-28)
+
+Budget épuisé (§2) ⇒ statut de rapport typé `blocked`, assorti d'un **décompte complet** de ce qui
+a été tenté : tours de revue consommés, tours de comblement consommés, findings restés non
+résolus. **Le décompte EST la livraison** : sans lui, un budget partagé ne serait qu'un chiffre
+plus petit, pas une information. Champ porteur : `decompte` (`mission-contracts.md` §Décompte de
+budget épuisé).
+
+**L'invisibilité amont, nommée (D-26).** Le décompte porte les tours d'ÉQUIPE — ceux que VibeFlow
+pilote et compte lui-même. Le nombre de réparations `node_repair` consommées **à l'intérieur d'un
+plan** par le moteur est **invisible** sans parser la prose libre de chaque rapport de plan, format
+non contractuel — fait daté et sourcé : le journal amont est de la prose dans une section markdown,
+aucun gabarit de rapport amont ne porte de champ de comptage. Ne **jamais** fabriquer un total
+agrégé qui laisserait croire à une mesure exhaustive : un manque nommé vaut mieux qu'un chiffre
+inventé.
+
+Aucune proposition de next step n'accompagne le décompte : elle serait produite par l'agent qui
+vient d'échouer plusieurs fois sur le sujet, donc la partie la moins fiable du rapport.
 
 ---
 

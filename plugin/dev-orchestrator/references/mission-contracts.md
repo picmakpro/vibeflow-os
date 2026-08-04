@@ -220,6 +220,16 @@ point de hook de post-exécution **et** celui de post-vérification — donc **u
 `gsd-execute-phase` déclenche revue de code, validation nyquist et audit de sécurité. C'est ce fait,
 pas une préférence, qui justifie que le manager cesse de redemander ce qui est déjà fait.
 
+## Décompte de budget épuisé (D-26, D-27, D-28, plan 23-07)
+
+Le bloc typé de `vf-dev-manager` (Pattern C, `mission-flow.md`) gagne un **quatrième** champ
+optionnel frère de `gate`/`reprise`/`verdicts` : `decompte`, présent **uniquement** avec le statut
+`blocked` — tours de revue consommés, tours de comblement consommés, findings restés non résolus.
+Mêmes règles que les champs frères : recopié/compté par celui qui pilote la boucle, jamais estimé,
+absent quand le statut n'est pas `blocked`. Doctrine complète (grain étape, budget partagé, garde
+contre le contournement mécanique, invisibilité amont nommée) : `mission-flow.md` §Pattern E §6
+Épuisement du budget — ne pas la reformuler ici (ADR-030).
+
 ## Étage revue — deux objets disjoints (ADR-060 / ADR-061)
 
 La revue de **diff de code** (`vf-reviewer` → `gsd-code-reviewer`, nœud `revue-N` posé
@@ -253,6 +263,7 @@ RAPPORT DE MISSION
 - Calibration (si portée) : estimate vs actuals par sprint — recopiés verbatim, jamais recalculés
 - Décisions prises en autonomie (et par quel panel)
 - Blocages & points nécessitant l'utilisateur
+- Décompte (si bloqué) : tours consommés par boucle + findings non résolus — recopié verbatim, jamais recalculé
 - Rapport détaillé : <chemin du fichier écrit sur disque>
 ```
 
