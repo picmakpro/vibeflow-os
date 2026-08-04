@@ -341,6 +341,23 @@ jobs:
         # exit 1 — un gate qui ne peut pas se prononcer n'est pas un gate vert.
         run: bash plugin/dev-orchestrator/scripts/check-capability-activation.sh
 
+      - name: check-machine-paths (aucun chemin absolu de machine dans les fichiers versionnés)
+        # POURQUOI CE GATE EST BLOQUANT ET PAS ADVISORY. Le défaut qu'il ferme est une ACCUMULATION,
+        # pas un incident : mesurée le 2026-08-04, elle touchait 19 fichiers suivis dont 18 déjà
+        # publiés sur `main`, tous écrits sans intention par des artefacts de session qui recopient
+        # le chemin que l'outil leur a rendu. Un gate advisory sur une accumulation ne change pas la
+        # pente — il documente la dérive pendant qu'elle continue. La ligne de base est à ZÉRO
+        # depuis le nettoyage, donc le coût de le tenir vert est nul, et les trois échappatoires
+        # (segment placeholder, segment non identifiant `<user>`, marqueur `vf-allow-machine-path`)
+        # couvrent les besoins légitimes SANS qu'on ait à contourner le gate — c'est précisément le
+        # motif qui a fait refuser `hooks.community` (ADR-067 : une mesure qu'on désarme en la
+        # contournant tous les jours).
+        #
+        # `fetch-depth: 0` est déjà posé sur ce job (check-release-tag) : `git ls-files` a bien son
+        # index. Un exit 2 (cible vide, hors dépôt git) échoue le job au même titre qu'un exit 1 —
+        # un gate qui n'a pas pu regarder n'est pas un gate vert.
+        run: bash scripts/check-machine-paths.sh
+
       - name: Gates workstream-aware sur un arbre RÉELLEMENT partitionné (fixture jetable) + non-régression racine
         # POURQUOI CETTE ÉTAPE EXISTE (plan 24-09, exigence GSDA-17). Les trois gates rendus
         # workstream-aware au plan 24-04 et le gate de pointeur créé au plan 24-05 sont tous VERTS
