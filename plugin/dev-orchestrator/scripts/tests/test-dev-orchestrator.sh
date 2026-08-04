@@ -1477,14 +1477,41 @@ else
   if [ ! -f "$CAPACT" ]; then
     ko "T14d (d) : $CAPACT introuvable — le gate d'activation doc ↔ capability n'est pas livré"; t14d_ok=0
   else
+    # Corpus séparé par des SAUTS DE LIGNE, jamais par des espaces : le séparateur « espace »
+    # rendait tout chemin en contenant un inexprimable — et il développait les globs, si bien
+    # qu'un motif aspirait des fichiers que personne n'avait nommés.
     capact_out="$(VF_CAPACT_INDEX="$REFS_DIR/gsd-capabilities-index.md" \
-                  VF_CAPACT_CORPUS="$ROUTING $REFS_DIR/docs-flow.md" \
+                  VF_CAPACT_CORPUS="$ROUTING
+$REFS_DIR/docs-flow.md" \
                   bash "$CAPACT" 2>&1 >/dev/null)"
     capact_rc=$?
     if [ "$capact_rc" -eq 0 ]; then
       ok "T14d (d) : check-capability-activation.sh invoqué sur le corpus réel → 0 — $capact_out"
     else
       ko "T14d (d) : check-capability-activation.sh sort $capact_rc (attendu 0) — $capact_out"; t14d_ok=0
+    fi
+
+    # (e) LE GATE SANS AUCUNE SURCHARGE — c'est-à-dire tel qu'il tourne CHEZ L'UTILISATEUR.
+    # (d) ne surcharge que INDEX et CORPUS : la résolution de la RACINE du lab (donc du
+    # `.planning/config.json` lu) n'y était jamais exercée. Elle était pourtant fausse hors du
+    # dépôt de distribution — les scripts atterrissent à plat dans `.claude/scripts/`, et la
+    # racine déduite désignait alors le PARENT du lab. Le gate sortait 2 chez l'utilisateur, donc
+    # la suite du module y rougissait ; et quand un projet voisin existait, il lisait SA
+    # configuration. Ce cas exerce la cascade complète, sans rien lui souffler.
+    capact_nu_out="$(env -u VF_CAPACT_INDEX -u VF_CAPACT_CONFIG -u VF_CAPACT_CORPUS \
+                     bash "$CAPACT" 2>&1 >/dev/null)"
+    capact_nu_rc=$?
+    capact_nu_rel=0
+    case "$capact_nu_out" in
+      */Users/*|*/home/*) capact_nu_rel=0 ;;
+      *) capact_nu_rel=1 ;;
+    esac
+    if [ "$capact_nu_rc" -ne 0 ]; then
+      ko "T14d (e) : le gate SANS surcharge sort $capact_nu_rc (attendu 0) — sa cascade de résolution ne trouve pas le lab : $capact_nu_out"; t14d_ok=0
+    elif [ "$capact_nu_rel" -ne 1 ]; then
+      ko "T14d (e) : le gate imprime des chemins ABSOLUS dans son verdict — ces messages finissent en clair dans des rapports versionnés : $capact_nu_out"; t14d_ok=0
+    else
+      ok "T14d (e) : le gate sans AUCUNE surcharge résout seul le lab et sort 0, en chemins relatifs — $capact_nu_out"
     fi
   fi
 
@@ -4969,13 +4996,22 @@ t28i_verify() { # <script generateur> -> T28I_OK (0/1), T28I_MSG
   # Phase 24 : readCapabilities / readObjectExport (lecture du SECOND export du registre, même
   # lecteur de texte, aucune indirection nouvelle) et governingKey (dérivation de la clé de
   # configuration gouvernante, pure manipulation d'objet déjà parsé).
+  # Phase 24 / plan 24-13 : trois lecteurs de plus sur le MÊME lecteur de texte
+  # (readConfigSchema / readBySkill / readByAgent, tous passant par readObjectExportOptional, qui
+  # distingue « ancre absente » de « ancre illisible » et n'ajoute aucune indirection), et quatre
+  # fonctions de pure manipulation d'objet déjà parsé (schemaEntry / schemaType / schemaDefault,
+  # qui lisent le type et le défaut amont d'une clé ; noteToggle et pushBrick, qui accumulent deux
+  # listes ordonnées). Aucune ne prend de nom de module, aucune ne charge quoi que ce soit.
   printf '%s\n' RegExp String balancedRegions catch cell closeSync code exec fstatSync for \
     governingKey if indexOf isArray isFile join jsLiteralToJSON keys openSync parse push \
     readByLoopPoint readCapabilities readObjectExport \
+    readByAgent readBySkill readConfigSchema readObjectExportOptional \
+    noteToggle pushBrick schemaDefault schemaEntry schemaType \
     readFileSync readQuotedStringAt readVersion replace slice slurp stringify test trim while write \
     | sort -u > "$calls_allow"
   { printf '%s\n' '/([A-Za-z_$][A-Za-z0-9_$]*)(\s*):/y' '/,(\s*[}\]])/g' '/[\r\n]+/g' '/\\'"'"'/g' \
-      '/\bversion\s*:\s*/g' '/\s/' '/\|/g' '/s$/'; } | sort -u > "$rx_allow"
+      '/\bversion\s*:\s*/g' '/\s/' '/\|/g' '/s$/' \
+      '/^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)+$/'; } | sort -u > "$rx_allow"
   calls_intrus="$(comm -23 "$calls_seen" "$calls_allow" | tr '\n' ' ')"
   rx_intrus="$(comm -23 "$rx_seen" "$rx_allow" | tr '\n' ' ')"
   n_calls="$(awk 'END{print NR+0}' "$calls_seen")"
@@ -5344,6 +5380,84 @@ T28_FIXTURE_REGISTRE
   fi
 fi
 # >>> T28 FIXTURE MUTATION FIN
+
+# --- T28-M (DISCRIMINANTE, par mutation) : ÉCHAPPEMENT PAR LIEN SYMBOLIQUE ---------------------
+# Le durcissement existant du générateur (O_NONBLOCK + fstat sur le descripteur + plafond de
+# taille) ferme l'exécution de code et le déni de service. Il ne dit RIEN de l'ENDROIT d'où vient
+# l'octet lu : un `capability-registry.cjs` posé en LIEN SYMBOLIQUE vers l'extérieur du dépôt
+# audité reste un fichier ordinaire, de taille modeste, parfaitement lisible — et son contenu se
+# retrouvait reflété VERBATIM dans un index VERSIONNÉ, donc committé et publié. C'est le troisième
+# passage de ce motif dans ce dépôt.
+#
+# Ce test est bâti dans les DEUX sens, et le second est celui qui compte : la garde EN PLACE doit
+# refuser, et la garde RETIRÉE doit laisser l'échappement réapparaître. Sans le mutant, un refus
+# obtenu pour une tout autre raison (registre illisible, node absent…) passerait pour une preuve.
+if [ ! -x "$T28_GEN" ]; then
+  skip "T28-M confinement : générateur introuvable — l'échappement par lien symbolique ne peut pas être rejoué"
+else
+  T28M_ROOT="$T28_TMPDIR/confinement"
+  T28M_LAB="$T28M_ROOT/lab"
+  T28M_HORS="$T28M_ROOT/hors-depot"
+  mkdir -p "$T28M_LAB/.claude/gsd-core/bin/lib" "$T28M_HORS"
+  # Registre CIBLE, hors du lab. Le jeton `fx-EXFILTRE` n'existe nulle part ailleurs : le voir
+  # apparaître dans l'index produit EST la preuve que du contenu hors ancre a traversé.
+  cat > "$T28M_HORS/capability-registry.cjs" <<'T28M_FIXTURE'
+module.exports = {
+  version: '1',
+  capabilities: {
+    'fx-EXFILTRE': { id: 'fx-EXFILTRE', role: 'feature', activationKey: 'exfiltre.actif' }
+  },
+  byLoopPoint: {
+    'fixture:hors': {
+      steps: [{ capId: 'fx-EXFILTRE', when: 'exfiltre.actif', onError: 'skip' }],
+      contributions: [],
+      gates: []
+    }
+  }
+};
+T28M_FIXTURE
+  ln -s "$T28M_HORS/capability-registry.cjs" "$T28M_LAB/.claude/gsd-core/bin/lib/capability-registry.cjs"
+
+  # --- Sens 1 : garde EN PLACE. Le lab n'est pas un dépôt git, donc `default_core_lib` retombe sur
+  # `pwd` comme racine — c'est-à-dire le lab lui-même, exactement la branche NON MAÎTRISÉE visée.
+  T28M_OUT="$T28M_ROOT/index-confine.md"
+  t28m_rc=0
+  t28m_err="$( (cd "$T28M_LAB" && env -u VF_GSD_CORE_LIB -u VF_GSD_TOOLS \
+    VF_CAPS_INDEX_OUT="$T28M_OUT" bash "$T28_GEN" 2>&1 >/dev/null) )" || t28m_rc=$?
+  t28m_dit_hors=0; case "$t28m_err" in *"HORS de son ancre"*) t28m_dit_hors=1 ;; esac
+  t28m_ecrit=0; [ -e "$T28M_OUT" ] && t28m_ecrit=1
+
+  # --- Sens 2 : garde RETIRÉE (mutant). La branche de confinement est neutralisée — et RIEN
+  # d'autre. Si le motif n'est pas trouvé, le mutant est NON OPPOSABLE : la sonde est à réancrer,
+  # ce n'est jamais un succès.
+  T28M_MUT="$T28M_ROOT/generateur-sans-garde.sh"
+  awk '{ if (index($0, "\"$real_anchor\"/*) : ;;") > 0) { print "  *) : ;;" ; muted=1 } else print }
+       END { exit (muted ? 0 : 3) }' "$T28_GEN" > "$T28M_MUT"
+  t28m_mut_construit=$?
+  T28M_OUT_MUT="$T28M_ROOT/index-sans-garde.md"
+  t28m_mut_rc=1
+  t28m_exfiltre=0
+  if [ "$t28m_mut_construit" -eq 0 ] && ! cmp -s "$T28M_MUT" "$T28_GEN"; then
+    ( cd "$T28M_LAB" && env -u VF_GSD_CORE_LIB -u VF_GSD_TOOLS \
+      VF_CAPS_INDEX_OUT="$T28M_OUT_MUT" bash "$T28M_MUT" >/dev/null 2>&1 ) && t28m_mut_rc=0 || t28m_mut_rc=$?
+    if [ -s "$T28M_OUT_MUT" ]; then
+      awk 'index($0, "fx-EXFILTRE") > 0 { n++ } END { exit (n > 0 ? 0 : 1) }' "$T28M_OUT_MUT" \
+        && t28m_exfiltre=1
+    fi
+  fi
+
+  if [ "$t28m_mut_construit" -ne 0 ]; then
+    ko "T28-M confinement : le mutant n'a PAS pu être construit (motif de la garde introuvable) — mutant NON OPPOSABLE, SONDE À RÉANCRER"
+  elif [ "$t28m_exfiltre" -ne 1 ]; then
+    ko "T28-M confinement NON DISCRIMINANTE : garde retirée, l'échappement ne se reproduit PAS (rc=$t28m_mut_rc) — le test ne mesure pas ce qu'il prétend, SONDE À RÉANCRER"
+  elif [ "$t28m_rc" -eq 0 ] || [ "$t28m_ecrit" -eq 1 ]; then
+    ko "T28-M confinement : garde EN PLACE, le générateur a tout de même abouti (rc=$t28m_rc, fichier écrit=$t28m_ecrit) — l'échappement par lien symbolique reste OUVERT"
+  elif [ "$t28m_dit_hors" -ne 1 ]; then
+    ko "T28-M confinement : le refus a bien eu lieu (rc=$t28m_rc) mais il ne nomme pas le confinement — un refus pour une autre raison ne prouve rien : [$t28m_err]"
+  else
+    ok "T28-M (DISCRIMINANTE, par mutation) : un registre en lien symbolique HORS du lab est refusé (rc=$t28m_rc, cible laissée intacte, message nommant l'ancre) — et la MÊME fixture, garde retirée, fait réapparaître le jeton \`fx-EXFILTRE\` dans l'index produit"
+  fi
+fi
 
 # --- T28 ATTEINTE : ce qui a été RÉELLEMENT dérivé, jamais ce qui a été ouvert -----------------
 if [ "$t28_points_n" -eq 0 ]; then

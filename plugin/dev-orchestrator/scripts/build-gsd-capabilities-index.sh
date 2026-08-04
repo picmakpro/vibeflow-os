@@ -91,29 +91,56 @@ OUT="${VF_CAPS_INDEX_OUT:-$SCRIPT_DIR/../references/gsd-capabilities-index.md}"
 # réutilisé par les compteurs de contrôle en fin de script pour séparer les deux tables. Une seule
 # définition, donc aucune dérive possible entre le producteur et le vérificateur.
 SECTION_TITLE="Capabilities hors point de hook"
+# Libellés des deux sections ajoutées au plan 24-13. Ce sont des CONTRATS lus par
+# `check-capability-activation.sh` : ne jamais les modifier sans modifier le gate dans le même
+# commit — un libellé qui dérive rend la table introuvable, donc le gate silencieusement plus faible.
+SECTION_TITLE_TOGGLES="Toggles gouvernants déclarés par le registre"
+SECTION_TITLE_BRICKS="Briques routées et leur toggle gouvernant"
 
 # Cascade de résolution du dossier de modules du moteur : ancre explicite (VF_GSD_TOOLS) d'abord,
 # puis lab courant, puis scope utilisateur, puis disposition legacy — même priorité que la cascade
 # de `build-gsd-index.sh` et de `mission-flow.md`.
+#
+# CHAQUE BRANCHE POSE AUSSI SON ANCRE DE CONFINEMENT (`CORE_ANCHOR`) : le dossier dont le registre
+# ne doit PAS pouvoir sortir. Voir la garde de confinement plus bas — l'ancre est la moitié
+# indissociable de cette garde, elle ne peut donc pas être déduite après coup.
+CORE_ANCHOR=""
 default_core_lib() {
   local root claude_home
   if [ -n "${VF_GSD_TOOLS:-}" ]; then
-    echo "$(dirname "$VF_GSD_TOOLS")/lib"
+    CORE_ANCHOR="$(dirname "$VF_GSD_TOOLS")"
+    echo "$CORE_ANCHOR/lib"
     return 0
   fi
   root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
   claude_home="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
   if [ -d "$root/.claude/gsd-core/bin/lib" ]; then
+    # SEULE branche dont la source est un dépôt potentiellement NON MAÎTRISÉ : l'ancre est la racine
+    # du dépôt lui-même, pas le dossier du moteur — sinon un `.claude/gsd-core` qui EST un lien vers
+    # l'extérieur satisferait sa propre ancre.
+    CORE_ANCHOR="$root"
     echo "$root/.claude/gsd-core/bin/lib"
   elif [ -d "$claude_home/gsd-core/bin/lib" ]; then
+    CORE_ANCHOR="$claude_home"
     echo "$claude_home/gsd-core/bin/lib"
   elif [ -d "$claude_home/get-shit-done/bin/lib" ]; then
+    CORE_ANCHOR="$claude_home"
     echo "$claude_home/get-shit-done/bin/lib"
   else
+    CORE_ANCHOR="$claude_home"
     echo "$claude_home/gsd-core/bin/lib"
   fi
 }
 CORE_LIB="${VF_GSD_CORE_LIB:-$(default_core_lib)}"
+# `VF_GSD_CORE_LIB` est une surcharge d'OPÉRATEUR (testabilité) : elle est sa propre ancre. Le
+# `$(...)` de la ligne précédente est un sous-shell — CORE_ANCHOR positionné DEDANS serait perdu.
+# La cascade est donc rejouée hors sous-shell quand la surcharge est absente : c'est le prix de
+# `set -e` + `$(...)`, et le taire aurait donné une ancre vide, donc une garde inerte.
+if [ -n "${VF_GSD_CORE_LIB:-}" ]; then
+  CORE_ANCHOR="$VF_GSD_CORE_LIB"
+else
+  default_core_lib >/dev/null
+fi
 REGISTRY="$CORE_LIB/capability-registry.cjs"
 
 # ---------- Helpers ----------
@@ -129,6 +156,40 @@ die() {
 # ---------- Garde de disponibilité (avant toute écriture) ----------
 command -v node >/dev/null 2>&1 || die "node introuvable — le registre du moteur ne peut pas être lu"
 [ -f "$REGISTRY" ] || die "registre de capabilities introuvable : $REGISTRY (moteur GSD absent ? surcharger VF_GSD_CORE_LIB)"
+
+# ---------- Garde de CONFINEMENT DE CHEMIN (avant toute lecture du registre) ----------
+# CE QUE LE DURCISSEMENT EXISTANT NE FERME PAS. `slurp()` (O_NONBLOCK + fstat sur le descripteur +
+# plafond de taille) ferme l'exécution de code et le déni de service. Il ne dit RIEN de l'endroit
+# d'où vient l'octet lu : un `.claude/gsd-core` — ou le seul `capability-registry.cjs` — posé en
+# LIEN SYMBOLIQUE vers l'extérieur du dépôt audité reste un fichier ordinaire, de taille modeste,
+# parfaitement lisible. Le contenu visé est alors reflété VERBATIM dans un index VERSIONNÉ, donc
+# committé et publié. C'est le troisième passage de ce motif dans ce dépôt ; il se ferme ici.
+#
+# La règle, unique : le chemin RÉEL du registre doit rester sous le chemin RÉEL de l'ancre que la
+# cascade a choisie (`CORE_ANCHOR`). Elle ne présume rien de l'emplacement légitime du moteur —
+# `$HOME/.claude` est hors du dépôt et reste licite, parce que l'ancre suit la branche empruntée.
+#
+# `readlink -f` est INTERDIT (ADR-054 : absent de macOS avant coreutils). La résolution passe par
+# node, déjà dépendance dure de ce script, en LECTURE de chemin seulement — jamais un require().
+vf_realpath() { # <chemin> — imprime le chemin réel, ou rien
+  node -e 'try { process.stdout.write(require("fs").realpathSync(process.argv[1])); } catch (e) { process.exit(1); }' "$1" 2>/dev/null
+}
+real_registry="$(vf_realpath "$REGISTRY")" \
+  || die "chemin réel du registre non résolvable : $REGISTRY"
+real_anchor="$(vf_realpath "$CORE_ANCHOR")" \
+  || die "chemin réel de l'ancre de confinement non résolvable : $CORE_ANCHOR"
+[ -n "$real_registry" ] && [ -n "$real_anchor" ] \
+  || die "confinement NON VÉRIFIABLE (chemin réel vide) — refus de lire le registre"
+case "$real_registry" in
+  "$real_anchor"/*) : ;;
+  *)
+    die "registre HORS de son ancre de confinement — lecture refusée.
+    registre déclaré : $REGISTRY
+    registre réel    : $real_registry
+    ancre            : $real_anchor
+  Un lien symbolique fait sortir la source de l'index de l'arbre qui la déclare : le contenu visé
+  se retrouverait recopié dans un index versionné. Le contenu hors ancre n'est jamais lu." ;;
+esac
 
 generated_at="$(date -Iseconds 2>/dev/null || date "+%Y-%m-%dT%H:%M:%S%z")"
 
@@ -153,6 +214,13 @@ var generatedAt = process.argv[3];
 // n'existe qu'à UN seul endroit du script — deux copies qui divergent silencieusement, c'est
 // exactement le compteur faux que ce fichier s'emploie à éviter.
 var sectionTitle = process.argv[4];
+// Mêmes règles pour les deux sections ajoutées : leur libellé n'existe qu'à UN endroit (le shell),
+// et il est de surcroît un CONTRAT avec `check-capability-activation.sh`, qui repère ses tables par
+// section et non par arité de colonnes. Deux copies divergentes, ici, désarmeraient le gate en
+// silence — il ne trouverait plus la table et se croirait simplement en présence d'un index sans
+// briques.
+var togglesTitle = process.argv[5];
+var bricksTitle = process.argv[6];
 
 // --- Acquisition par LECTURE, jamais par exécution (T-23-04-07, arbitrage A-12) ----------------
 // Le registre est résolu par une cascade qui fait PRIMER le lab courant (default_core_lib ci-dessus,
@@ -285,6 +353,44 @@ function readByLoopPoint(src) {
 function readCapabilities(src) {
   return readObjectExport(src, '\\bcapabilities\\s*[:=]\\s*\\{');
 }
+// TROISIÈME SOURCE : `configSchema`. Le registre y déclare, pour CHAQUE clé de configuration, son
+// propriétaire (`owner`), son `type` et son `default` amont. Deux faits en découlent, et aucun des
+// deux n'était lisible sans elle :
+//   - le TYPE distingue un toggle d'activation (`boolean`) d'un réglage qui nomme autre chose
+//     (`review.models.*` porte une CHAÎNE : un modèle, jamais une activation) ;
+//   - le DÉFAUT rend lisible l'état d'une clé ABSENTE du config.json d'un lab. Sans lui, « absente »
+//     se lit « inactive », ce qui est FAUX pour les 12 clés dont le défaut amont vaut `true`
+//     (`workflow.ai_integration_phase`, `workflow.ui_phase`, … mesuré sur gsd-core 1.9.1).
+function readConfigSchema(src) {
+  return readObjectExportOptional(src, '\\bconfigSchema\\s*[:=]\\s*\\{');
+}
+// QUATRIÈME SOURCE : `bySkill`, la table qui dit QUELLE capability gouverne QUELLE brique. C'est
+// elle, et elle seule, qui relie un identifiant de brique écrit dans la documentation (`gsd-graphify`)
+// au toggle qui le rend inerte (`graphify.enabled`). Sans elle, un gate doc ↔ activation ne peut
+// chercher que des noms de TOGGLE — or le défaut mesuré en Phase 24 portait sur le nom de la BRIQUE.
+function readBySkill(src) {
+  return readObjectExportOptional(src, '\\bbySkill\\s*[:=]\\s*\\{');
+}
+// CINQUIÈME SOURCE : `byAgent`, même rôle pour les agents. Ses clés sont DÉJÀ des identifiants
+// complets (`gsd-code-reviewer`) là où celles de `bySkill` sont nues (`code-review`) — la seule
+// synthèse de ce fichier est donc le préfixe `gsd-` appliqué aux secondes, et elle est déclarée
+// comme telle dans le document produit plutôt que passée sous silence.
+function readByAgent(src) {
+  return readObjectExportOptional(src, '\\bbyAgent\\s*[:=]\\s*\\{');
+}
+// VARIANTE OPTIONNELLE, et la distinction qu'elle porte est celle de la doctrine A-9 elle-même :
+// « l'ancre n'existe pas » et « l'ancre existe mais je n'arrive plus à la lire » sont deux faits
+// DIFFÉRENTS, que `readObjectExport` confond en un unique `null`. Pour les trois exports ajoutés
+// (`configSchema`, `bySkill`, `byAgent`), un registre qui n'en déclare aucun est une possibilité
+// LICITE — une version du moteur peut ne pas router de brique. Faire mourir le générateur là-dessus
+// le rendrait plus fragile que le moteur qu'il lit. Ancre absente ⇒ ensemble VIDE, et le document
+// produit porte alors une table vide qui le DIT ; le gate en aval refuse de conclure sur une table
+// vide (son plancher règle 1), ce qui est le bon endroit pour ce refus. Ancre présente mais
+// illisible ⇒ `null`, donc EXTRACTION PÉRIMÉE, exactement comme les deux exports d'origine.
+function readObjectExportOptional(src, anchorSrc) {
+  if (balancedRegions(src, anchorSrc, '{', '}').length === 0) return {};
+  return readObjectExport(src, anchorSrc);
+}
 function readObjectExport(src, anchorSrc) {
   var regions = balancedRegions(src, anchorSrc, '{', '}');
   if (regions.length === 0) return null;
@@ -297,19 +403,51 @@ function readObjectExport(src, anchorSrc) {
 // Clé de configuration gouvernante, DÉRIVÉE du registre et jamais devinée, dans cet ordre :
 //   1. `activationKey` quand la capability en déclare une (seul `graphify` et `intel` le font sur
 //      gsd-core 1.9.1 — c'est la forme la plus explicite, elle prime) ;
-//   2. sinon, l'unique clé de son bloc `config` quand il n'en porte qu'une (cas de
-//      `profile-pipeline`, dont le seul réglage EST son activation) ;
+//   2. sinon, l'unique clé de son bloc `config` quand il n'en porte qu'une ET que le registre la
+//      déclare BOOLÉENNE (cas de `profile-pipeline`, dont le seul réglage EST son activation) ;
 //   3. sinon, la clé `<id>.enabled` si le bloc `config` la contient parmi plusieurs ;
 //   4. sinon `—` : la capability ne déclare aucune clé gouvernante, et le dire est plus honnête
 //      que d'en fabriquer une par convention de nommage.
+//
+// POURQUOI LE TYPE EST INTERROGÉ AU PALIER 2, et pourquoi son absence était un défaut. « Clé unique
+// du bloc config » n'est pas la même chose que « clé d'activation » : sans le type, la règle 2
+// promouvait 6 clés `review.models.*` (`review.models.claude`, `…codex`, `…gemini`, `…agy`,
+// `…kimi-code`, `…opencode`) au rang de toggles alors qu'elles portent une CHAÎNE nommant un modèle.
+// L'en-tête de ce fichier promet une clé « DÉRIVÉE du registre et jamais devinée » : promouvoir une
+// chaîne en toggle était une devinette par convention, exactement ce que cette phrase interdit. Le
+// registre déclare le type — il suffisait de le lire. Le palier 3 (`<id>.enabled`) n'est PAS soumis
+// au même filtre : cette clé est nommée explicitement, elle n'est pas inférée d'une cardinalité.
 function governingKey(id, cap) {
   if (typeof cap.activationKey === 'string' && cap.activationKey !== '') return cap.activationKey;
   var cfg = cap.config;
   if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) return null;
   var keys = Object.keys(cfg);
-  if (keys.length === 1) return keys[0];
+  if (keys.length === 1) return schemaType(keys[0]) === 'boolean' ? keys[0] : null;
   if (keys.indexOf(id + '.enabled') >= 0) return id + '.enabled';
   return null;
+}
+// Type et défaut déclarés par le registre pour une clé. `null` quand le registre ne la décrit pas :
+// une clé sans description n'est pas une clé « booléenne par défaut », et l'inventer reproduirait la
+// devinette que `governingKey` vient de fermer.
+var schema = {};
+function schemaEntry(key) {
+  if (!key) return null;
+  var e = schema[key];
+  if (!e || typeof e !== 'object' || Array.isArray(e)) return null;
+  return e;
+}
+function schemaType(key) {
+  var e = schemaEntry(key);
+  return e && typeof e.type === 'string' ? e.type : null;
+}
+// `'default' in e` et non `hasOwnProperty.call(...)` : l'objet vient de JSON.parse, son prototype
+// est celui d'un objet nu, et `in` evite un appel indirect de plus dans un programme dont la garde
+// statique de la suite (T28-I) enumere chaque nom appele.
+function schemaDefault(key) {
+  var e = schemaEntry(key);
+  if (!e) return undefined;
+  if (!('default' in e)) return undefined;
+  return e['default'];
 }
 // Champ d'AFFICHAGE seul (jamais utilisé en logique) : `version: '1'` dans module.exports. Ce bloc
 // référence des identifiants nus comme valeurs (capabilities, bySkill, …) et n'est donc PAS un
@@ -355,6 +493,25 @@ if (capIds.length === 0) {
   process.stderr.write('le registre ne declare aucune capability\n');
   process.exit(1);
 }
+// Troisième lecture, MÊME doctrine A-9 : « je n'arrive plus à lire » ≠ « il n'y a rien à lire ».
+// `configSchema` porte les types et les défauts amont ; un index qui les tairait ferait lire toute
+// clé absente d'un config.json comme INACTIVE, ce qui est faux pour les clés à défaut `true`.
+schema = readConfigSchema(src);
+if (schema === null) {
+  process.stderr.write('EXTRACTION PERIMEE : l\'ancre configSchema est introuvable ou illisible dans ' + registryPath + ' -- sans elle, ni le type ni le defaut amont d\'un toggle ne sont lisibles, et une cle absente passerait pour inactive.\n');
+  process.exit(1);
+}
+// Quatrième et cinquième lectures : les deux tables de routage brique → capability.
+var bySkill = readBySkill(src);
+if (bySkill === null) {
+  process.stderr.write('EXTRACTION PERIMEE : l\'ancre bySkill est introuvable ou illisible dans ' + registryPath + ' -- sans elle, aucun identifiant de brique ne peut etre relie au toggle qui le rend inerte.\n');
+  process.exit(1);
+}
+var byAgent = readByAgent(src);
+if (byAgent === null) {
+  process.stderr.write('EXTRACTION PERIMEE : l\'ancre byAgent est introuvable ou illisible dans ' + registryPath + '.\n');
+  process.exit(1);
+}
 var version = readVersion(src);
 
 function cell(v) {
@@ -386,6 +543,22 @@ out.push('');
 
 var declared = 0;
 var seen = {};
+// Univers des toggles NOMMÉS par ce document, dans l'ordre où il les nomme. Il réunit DEUX
+// provenances, et les réunir est le point : la condition `when` d'un étage (colonne « Toggle
+// gouvernant » des tables par point de hook) et la clé gouvernante d'une capability (table des
+// capabilities hors point de hook). Un lecteur du document — au premier chef le gate d'activation —
+// balaie les deux ; une table de types et de défauts qui n'en couvrirait qu'une le laisserait
+// résoudre l'autre moitié à l'aveugle, c'est-à-dire en lisant « absente du config.json » comme
+// « inactive ».
+var toggleUniverse = [];
+var toggleSeen = {};
+function noteToggle(k) {
+  if (typeof k !== 'string') return;
+  if (!/^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)+$/.test(k)) return;  // écarte —, vide, expression
+  if (toggleSeen[k]) return;
+  toggleSeen[k] = 1;
+  toggleUniverse.push(k);
+}
 for (var i = 0; i < points.length; i++) {
   var point = points[i];
   var groups = byLoopPoint[point] || {};
@@ -402,6 +575,7 @@ for (var i = 0; i < points.length; i++) {
       rows.push('| ' + code(e.capId) + ' | ' + cell(label) + ' | ' + code(e.when) + ' | '
         + cell(e.blocking) + ' | ' + code(e.onError) + ' |');
       if (e.capId) seen[e.capId] = 1;
+      noteToggle(e.when);
       declared++;
     }
   }
@@ -454,15 +628,84 @@ if (orphans.length === 0) {
 }
 out.push('');
 
+// ---- Toggles gouvernants : type et DÉFAUT AMONT ------------------------------------------------
+// Cette table existe pour une raison unique et mesurable : sans le défaut amont, une clé ABSENTE du
+// `config.json` d'un lab se lit « inactive ». C'est faux pour toute clé dont le registre déclare
+// `default: true`. Un gate qui bâtirait son verdict sur la seule présence dans le config.json
+// fabriquerait donc des inactivités — et, s'il les confrontait à la documentation, des écarts.
+for (var gi = 0; gi < capIds.length; gi++) {
+  noteToggle(governingKey(capIds[gi], capabilities[capIds[gi]] || {}));
+}
+var govKeys = toggleUniverse;
+out.push('## ' + cell(togglesTitle));
+out.push('');
+out.push('Type et **défaut amont** de **chaque toggle nommé ailleurs dans ce document** — condition');
+out.push('`when` d\'un étage comme clé gouvernante d\'une capability. Les deux colonnes sont lues dans');
+out.push('`configSchema`, jamais inférées. `Défaut` est la valeur qui s\'applique quand la clé est');
+out.push('**absente** du `.planning/config.json` d\'un lab : une clé absente n\'est PAS synonyme');
+out.push('d\'inactive, et `—` en colonne `Type` signale un toggle que le registre ne décrit pas.');
+out.push('');
+if (govKeys.length === 0) {
+  out.push('_Ce document ne nomme aucun toggle à cette version du moteur._');
+} else {
+  out.push('| Toggle gouvernant | Propriétaire | Type | Défaut amont |');
+  out.push('|---|---|---|---|');
+  for (var gj = 0; gj < govKeys.length; gj++) {
+    var gkey = govKeys[gj];
+    var gent = schemaEntry(gkey) || {};
+    var gdef = schemaDefault(gkey);
+    out.push('| ' + code(gkey) + ' | ' + code(gent.owner) + ' | ' + cell(gent.type) + ' | '
+      + (gdef === undefined ? '—' : cell(gdef)) + ' |');
+  }
+}
+out.push('');
+
+// ---- Briques routées : identifiant écrit dans la doc → toggle qui le rend inerte ----------------
+// SEULE SYNTHÈSE DE CE FICHIER, et elle est déclarée : les clés de `bySkill` sont NUES (`graphify`)
+// là où la documentation et la ligne de commande écrivent l'identifiant complet (`gsd-graphify`).
+// Le préfixe `gsd-` est l'espace de noms des commandes du moteur — il est ajouté ici, et nulle part
+// ailleurs. Les clés de `byAgent` sont déjà complètes : elles traversent SANS transformation.
+var bricks = [];
+var brickSeen = {};
+function pushBrick(idDoc, capId) {
+  if (!idDoc || !capId || brickSeen[idDoc]) return;
+  brickSeen[idDoc] = 1;
+  bricks.push({ id: idDoc, cap: capId, key: governingKey(capId, capabilities[capId] || {}) });
+}
+var skillKeys = Object.keys(bySkill);
+for (var si = 0; si < skillKeys.length; si++) pushBrick('gsd-' + skillKeys[si], bySkill[skillKeys[si]]);
+var agentKeys = Object.keys(byAgent);
+for (var ai = 0; ai < agentKeys.length; ai++) pushBrick(agentKeys[ai], byAgent[agentKeys[ai]]);
+out.push('## ' + cell(bricksTitle));
+out.push('');
+out.push('Chaque brique que le moteur rattache à une capability, et le toggle qui la rend inerte.');
+out.push('`bySkill` fournit les skills (clés nues, préfixées `gsd-` ici — **seule** transformation de');
+out.push('ce document), `byAgent` les agents (clés déjà complètes, reprises telles quelles). Une');
+out.push('entrée de documentation qui promet une de ces briques promet un geste que son toggle peut');
+out.push('rendre inerte : c\'est exactement ce que `check-capability-activation.sh` confronte.');
+out.push('');
+if (bricks.length === 0) {
+  out.push('_Le registre ne rattache aucune brique à une capability à cette version du moteur._');
+} else {
+  out.push('| Brique | Capability | Toggle gouvernant |');
+  out.push('|---|---|---|');
+  for (var bi = 0; bi < bricks.length; bi++) {
+    out.push('| ' + code(bricks[bi].id) + ' | ' + code(bricks[bi].cap) + ' | ' + code(bricks[bi].key) + ' |');
+  }
+}
+out.push('');
+
 out.push('---');
 out.push('');
 out.push('> ' + points.length + ' point(s) de hook parcouru(s), ' + declared + ' étage(s) déclaré(s) par le registre, '
-  + orphans.length + ' capability(ies) hors point de hook sur ' + capIds.length + ' déclarée(s).');
+  + orphans.length + ' capability(ies) hors point de hook sur ' + capIds.length + ' déclarée(s), '
+  + govKeys.length + ' toggle(s) gouvernant(s) distinct(s), ' + bricks.length + ' brique(s) routée(s).');
 process.stdout.write(out.join('\n') + '\n');
 NODE_PROGRAM
 
 # ---------- Production intégrale dans le temporaire ----------
-if ! node "$prog_tmp" "$REGISTRY" "$generated_at" "$SECTION_TITLE" > "$body_tmp"; then
+if ! node "$prog_tmp" "$REGISTRY" "$generated_at" "$SECTION_TITLE" \
+     "$SECTION_TITLE_TOGGLES" "$SECTION_TITLE_BRICKS" > "$body_tmp"; then
   die "lecture du registre en échec : $REGISTRY"
 fi
 [ -s "$body_tmp" ] || die "contenu produit vide — refus d'écrire un index tronqué"
@@ -471,10 +714,49 @@ fi
 mv "$body_tmp" "$OUT"
 
 # Recompte INDÉPENDANT du pied de page produit par node — c'est un contrôle croisé, pas un écho :
-# les deux tables se distinguent ici par le fait que les titres de point de hook sont encadrés de
-# back-quotes (`## \`plan:pre\``) là où la section finale est un libellé nu. Compter tous les `## `,
-# comme le faisait la version précédente, aurait fait dire « 13 points de hook » pour 12.
-points_n="$(awk '/^## `/{n++} END{print n+0}' "$OUT")"
-rows_n="$(awk -v t="## $SECTION_TITLE" 'index($0,t)==1{off=1} !off && /^\| `/{n++} END{print n+0}' "$OUT")"
-orphans_n="$(awk -v t="## $SECTION_TITLE" 'index($0,t)==1{on=1} on && /^\| `/{n++} END{print n+0}' "$OUT")"
-log "Index généré : $OUT ($points_n point(s) de hook, $rows_n étage(s) déclaré(s), $orphans_n hors point de hook)"
+# les titres de point de hook sont encadrés de back-quotes (`## \`plan:pre\``) là où les sections
+# finales sont des libellés nus. Compter tous les `## `, comme le faisait une version antérieure,
+# aurait fait dire « 13 points de hook » pour 12.
+#
+# LE RECOMPTE EST DÉSORMAIS CONFRONTÉ, et c'est le point. Un contrôle croisé qui n'est comparé à
+# rien n'est pas un contrôle : il imprime un second chiffre à côté du premier et laisse le lecteur
+# faire la soustraction — c'est-à-dire personne. Les quatre compteurs sont donc relus DEPUIS le pied
+# de page produit par node et opposés un à un ; un désaccord tue le script (la cible est déjà
+# déposée, mais un index dont les deux comptages divergent ne doit jamais passer pour valide).
+sections_awk='
+  index($0, "## " TT) == 1 { sec = "T"; next }
+  index($0, "## " TB) == 1 { sec = "B"; next }
+  index($0, "## " TO) == 1 { sec = "O"; next }
+  /^## `/                  { sec = "P"; points++; next }
+  /^\| `/                  { n[sec]++ }
+  END { printf "%d %d %d %d", points+0, n["P"]+0, n["O"]+0, n["T"]+0; printf " %d", n["B"]+0 }
+'
+set -- $(awk -v TT="$SECTION_TITLE_TOGGLES" -v TB="$SECTION_TITLE_BRICKS" -v TO="$SECTION_TITLE" \
+  "$sections_awk" "$OUT")
+points_n="$1"; rows_n="$2"; orphans_n="$3"; toggles_n="$4"; bricks_n="$5"
+
+# Pied de page : les cinq nombres, dans l'ordre où node les écrit. Extraits par position de champ
+# numérique et non par motif de phrase — la phrase peut être reformulée, la suite de nombres non.
+# La DERNIÈRE ligne de citation, jamais « toutes les lignes de citation » : l'en-tête du document en
+# porte deux autres (date de génération, schéma déclaré) dont un champ pourrait un jour être un
+# nombre nu, et les agréger ferait dériver silencieusement le nombre de champs attendu.
+set -- $(awk '/^> /{ last = $0 } END {
+    n = split(last, f, " ")
+    for (i = 1; i <= n; i++) if (f[i] ~ /^[0-9]+$/) printf "%s ", f[i]
+    printf "\n"
+  }' "$OUT")
+# SIX nombres, et le 4e n'est PAS opposable : c'est le total de capabilities DÉCLARÉES par le
+# registre, qui n'a aucune table dans le document — il n'a donc pas de recompte indépendant, et lui
+# en inventer un serait un écho, pas un contrôle. Il est compté pour que le nombre de champs reste
+# une assertion (un champ qui apparaît ou disparaît fait rougir), jamais confronté à lui-même.
+if [ "$#" -ne 6 ]; then
+  die "pied de page illisible ($# nombre(s) au lieu de 6) — le recompte croisé ne peut RIEN opposer"
+fi
+for pair in "points:$points_n:$1" "etages:$rows_n:$2" "hors-point:$orphans_n:$3" \
+            "toggles:$toggles_n:$5" "briques:$bricks_n:$6"; do
+  what="${pair%%:*}"; rest="${pair#*:}"
+  if [ "${rest%%:*}" != "${rest#*:}" ]; then
+    die "recompte croisé EN DÉSACCORD sur « $what » : la table en porte ${rest%%:*}, le pied de page en annonce ${rest#*:} — index incohérent"
+  fi
+done
+log "Index généré : $OUT ($points_n point(s) de hook, $rows_n étage(s) déclaré(s), $orphans_n hors point de hook, $toggles_n toggle(s) gouvernant(s), $bricks_n brique(s) routée(s) — recompte croisé CONCORDANT sur les 5 compteurs)"
