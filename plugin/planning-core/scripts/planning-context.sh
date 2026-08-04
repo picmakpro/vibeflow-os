@@ -142,9 +142,27 @@ else
     # une énumération fermée, est imprimable.
     WS_NOTE="_(workstream rejeté par la politique amont : $VF_WS_REASON — extrait de la racine.)_"
   elif [ -n "$VF_WS_NAME" ]; then
-    if [ -f "$PLANNING_DIR/workstreams/$VF_WS_NAME/STATE.md" ]; then
-      STATE_FILE="$PLANNING_DIR/workstreams/$VF_WS_NAME/STATE.md"
-      WS_LABEL="$VF_WS_NAME"
+    # Le CHEMIN est résolu par la politique partagée, jamais concaténé puis testé par `[ -f ]` ici :
+    # `[ -f ]` SUIT les liens symboliques, et un `workstreams/<nom>` en mode 120000 vers un
+    # répertoire hors du lab faisait injecter le STATE.md de la CIBLE dans le contexte de session,
+    # en exit 0 et sans aucune action de la victime (reproduit le 2026-08-04 ; voir l'en-tête de
+    # workstream-policy.sh). Le STATE.md lui-même est contrôlé au même titre : fermer le répertoire
+    # en laissant le fichier ouvert rejouerait la fuite un cran plus bas.
+    vf_ws_dir_resolve "$PLANNING_DIR" "$VF_WS_NAME"; dir_rc=$?
+    if [ "$dir_rc" -eq 2 ]; then
+      # RÔLE INJECTEUR : fail-open sur la racine, mais JAMAIS muet — et la cible n'est ni lue ni
+      # nommée. Seule la raison, prise dans l'énumération fermée de la politique, est imprimable.
+      WS_NOTE="_(compartiment \`$VF_WS_NAME\` refusé : $VF_WS_REASON — cible non lue, extrait de la racine.)_"
+    elif [ "$dir_rc" -eq 0 ]; then
+      vf_ws_file_in_ws "$VF_WS_DIR/STATE.md"; f_rc=$?
+      if [ "$f_rc" -eq 2 ]; then
+        WS_NOTE="_(état du compartiment \`$VF_WS_NAME\` refusé : $VF_WS_REASON — cible non lue, extrait de la racine.)_"
+      elif [ "$f_rc" -eq 0 ]; then
+        STATE_FILE="$VF_WS_DIR/STATE.md"
+        WS_LABEL="$VF_WS_NAME"
+      else
+        WS_NOTE="_(workstream \`$VF_WS_NAME\` actif, mais aucun \`$PLANNING_DIR/workstreams/$VF_WS_NAME/STATE.md\` — extrait de la racine.)_"
+      fi
     else
       WS_NOTE="_(workstream \`$VF_WS_NAME\` actif, mais aucun \`$PLANNING_DIR/workstreams/$VF_WS_NAME/STATE.md\` — extrait de la racine.)_"
     fi

@@ -170,10 +170,28 @@ if [ -z "$WS_NAME" ]; then
   exit 1
 fi
 
+# --- REFUS DE TRAVERSÉE, avant l'état 3 ------------------------------------------------------------
+# `[ -d ]` SUIT les liens symboliques. Ce gate bénissait donc « dossier présent, conforme, exit 0 »
+# un `.planning/workstreams/<nom>` versionné en mode 120000 vers un répertoire hors du lab — et ce
+# vert-là est précisément celui sur lequel les trois autres gates s'appuient pour lire le
+# compartiment. Même vecteur, même posture et même énumération que le refus du pointeur-FICHIER
+# ci-dessus : on ne suit pas, on ne lit pas la cible, on ne la nomme pas, et on le dit.
+# NON VÉRIFIABLE (exit 2) et non « signal » : ce gate n'a pas pu regarder le compartiment, ce qui
+# est la définition même de l'exit 2 dans son contrat — là où l'état 3 constate une absence qu'il A
+# pu voir.
+vf_ws_dir_resolve "$PLANNING" "$WS_NAME"; WS_DIR_RC=$?
+if [ "$WS_DIR_RC" -eq 2 ]; then
+  case "$VF_WS_REASON" in
+    workstreams-lien-symbolique)  non_verifiable "$WS_ROOT est un lien symbolique — refus de le suivre (il détournerait TOUS les compartiments d'un coup, et le contenu de la cible traverserait vers les gates qui lisent ce dossier) ; cible non lue, non nommée" ;;
+    compartiment-lien-symbolique) non_verifiable "le compartiment « $WS_NAME » est un lien symbolique — refus de le suivre (les gates qui lisent ce dossier injecteraient le contenu de la cible dans le contexte de session) ; cible non lue, non nommée" ;;
+    *)                            non_verifiable "le compartiment « $WS_NAME » est refusé par la politique amont ($VF_WS_REASON) — cible non lue, non nommée" ;;
+  esac
+fi
+
 WS_DIR="$WS_ROOT/$WS_NAME"
 
 # --- État 3 : nom résolu, dossier absent — l'auto-nettoyage du moteur rendu audible ----------------
-if [ ! -d "$WS_DIR" ]; then
+if [ "$WS_DIR_RC" -ne 0 ]; then
   signal "le workstream « $WS_NAME » est résolu par le canal $WS_CANAL, mais son dossier .planning/workstreams/$WS_NAME/ n'existe pas. Le moteur, lui, effacerait le pointeur en silence et rendrait « aucun workstream », sans un mot. Créer le dossier, ou corriger le canal (GSD_WORKSTREAM)."
   exit 1
 fi

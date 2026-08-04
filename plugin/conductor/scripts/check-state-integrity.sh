@@ -141,7 +141,24 @@ if [ "$FILE_REL_EXPLICIT" -eq 0 ] && [ -d "$ROOT/.planning/workstreams" ]; then
     exit 2
   fi
   if [ -n "$VF_WS_NAME" ]; then
-    if [ -d "$ROOT/.planning/workstreams/$VF_WS_NAME" ]; then
+    # `[ -d ]` SUIT les liens symboliques : un `workstreams/<nom>` versionné en mode 120000 vers un
+    # répertoire hors du lab faisait rendre à ce gate un verdict de conformité sur un STATE.md qui
+    # n'est PAS celui que l'appelant croit vérifier — exactement le fail-open qui a motivé la
+    # politique partagée. Elle refuse désormais de traverser ; le STATE.md est contrôlé au même
+    # titre, sans quoi la fuite se rejoue un cran plus bas.
+    vf_ws_dir_resolve "$ROOT/.planning" "$VF_WS_NAME"; dir_rc=$?
+    if [ "$dir_rc" -eq 2 ]; then
+      # GATE DE VÉRIFICATION → exit 2, « non vérifiable » (gradation par rôle de la politique).
+      # La cible n'est ni lue ni nommée : seule la raison, prise dans l'énumération fermée, sort.
+      echo "[check-state-integrity] compartiment « $VF_WS_NAME » refusé ($VF_WS_REASON) — aucune traversée, cible non lue, intégrité non vérifiable" >&2
+      exit 2
+    fi
+    if [ "$dir_rc" -eq 0 ]; then
+      vf_ws_file_in_ws "$VF_WS_DIR/STATE.md"; f_rc=$?
+      if [ "$f_rc" -eq 2 ]; then
+        echo "[check-state-integrity] état du compartiment « $VF_WS_NAME » refusé ($VF_WS_REASON) — aucune traversée, cible non lue, intégrité non vérifiable" >&2
+        exit 2
+      fi
       FILE_REL=".planning/workstreams/$VF_WS_NAME/STATE.md"
     else
       # Fail-closed : ne JAMAIS retomber sur le STATE.md de la racine — ce serait rendre un verdict

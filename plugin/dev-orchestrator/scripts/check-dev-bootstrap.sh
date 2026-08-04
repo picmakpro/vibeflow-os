@@ -118,6 +118,12 @@ for _cand in "$(dirname "$0")/workstream-policy.sh" \
   [ -r "$_cand" ] && { WS_POLICY="$_cand"; break; }
 done
 PLANNING_SCOPE="$PLANNING_DIR"
+# 1 uniquement quand PLANNING_SCOPE a quitté la racine pour un compartiment. C'est la condition
+# EXACTE sous laquelle les fichiers lus deviennent joignables par une indirection versionnée, donc
+# la seule sous laquelle il faille les contrôler (`ws_readable` plus bas). La racine garde son
+# comportement à l'octet près : ce correctif ferme le trou ouvert par les workstreams, il ne
+# requalifie pas le chemin nominal.
+WS_SCOPED=0
 if [ -z "$WS_POLICY" ]; then
   # RÔLE INJECTEUR (hook SessionStart) : fail-open, mais JAMAIS muet. Un exit non nul ici
   # dégraderait toutes les sessions ; un silence masquerait l'absence d'outillage.
@@ -130,8 +136,17 @@ else
     # Seule la RAISON est dite — la valeur brute est non maîtrisée par construction (T-24-04-01).
     say "workstream rejeté par la politique amont ($VF_WS_REASON, canal $VF_WS_SOURCE) — aucun chemin construit, lecture sur la racine."
   elif [ -n "$VF_WS_NAME" ]; then
-    if [ -d "$PLANNING_DIR/workstreams/$VF_WS_NAME" ]; then
-      PLANNING_SCOPE="$PLANNING_DIR/workstreams/$VF_WS_NAME"
+    # `[ -d ]` SUIT les liens symboliques : un `workstreams/<nom>` en mode 120000 vers un répertoire
+    # hors du lab faisait lire le compartiment de la CIBLE et réimprimer son frontmatter
+    # (« milestone <valeur de l'attaquant> ») sur le stdout de ce hook SessionStart. La résolution
+    # est donc déléguée à la politique partagée, qui refuse de traverser (voir son en-tête).
+    vf_ws_dir_resolve "$PLANNING_DIR" "$VF_WS_NAME"; dir_rc=$?
+    if [ "$dir_rc" -eq 2 ]; then
+      # RÔLE INJECTEUR : fail-open sur la racine, jamais muet, et la cible n'est ni lue ni nommée.
+      say "compartiment « $VF_WS_NAME » refusé par la politique amont ($VF_WS_REASON) — cible non lue, lecture sur la racine."
+    elif [ "$dir_rc" -eq 0 ]; then
+      PLANNING_SCOPE="$VF_WS_DIR"
+      WS_SCOPED=1
     else
       say "workstream « $VF_WS_NAME » résolu mais $PLANNING_DIR/workstreams/$VF_WS_NAME absent — lecture sur la racine."
     fi
@@ -163,8 +178,21 @@ codebase_missing() {
 
 # ROADMAP.md suit le compartiment actif (GSDA-13) — cf. docstring : config.json/codebase/PROJECT.md
 # restent à la racine, seuls ROADMAP.md et STATE.md bougent.
+# Un fichier DU COMPARTIMENT est-il lisible sans traverser un lien symbolique ? Fermer le répertoire
+# en laissant les fichiers ouverts verrouillerait la porte en laissant la fenêtre : `[ -f ]` suit le
+# lien exactement comme `[ -d ]`, et un `STATE.md` versionné en 120000 rejouerait la même fuite un
+# cran plus bas. Hors compartiment (WS_SCOPED=0), aucune indirection n'a été introduite : le chemin
+# racine reste inchangé, et la fonction rend « lisible » sans rien changer au verdict.
+ws_readable() { # <fichier>
+  [ "$WS_SCOPED" -eq 1 ] || return 0
+  vf_ws_file_in_ws "$1"
+  [ "$?" -ne 2 ] || { say "fichier de compartiment refusé ($VF_WS_REASON) — cible non lue."; return 1; }
+  return 0
+}
+
 roadmap_missing() {
   local f="$PLANNING_SCOPE/ROADMAP.md"
+  ws_readable "$f" || return 0
   [ -f "$f" ] || return 0
   if grep -qE '^#{1,6}[[:space:]]*Phase[[:space:]]+[0-9]+' "$f" 2>/dev/null; then
     return 1
@@ -283,7 +311,9 @@ if [ -f "$PLANNING_DIR/PROJECT.md" ]; then
   fi
 
   # --- État 3 — tous les items posés : orientation [gsd-engine], exit 3 (D-01, D-14) ---------
-  if OUT="$(state3_signal "$PLANNING_SCOPE/STATE.md")"; then
+  # Même garde que sur ROADMAP.md, et c'est ICI qu'elle compte le plus : state3_signal REIMPRIME
+  # des valeurs du frontmatter (« milestone <valeur> ») sur le stdout d'un hook SessionStart.
+  if ws_readable "$PLANNING_SCOPE/STATE.md" && OUT="$(state3_signal "$PLANNING_SCOPE/STATE.md")"; then
     say "projet complètement cadré — orientation gsd-engine."
     printf '%s\n' "$OUT"
     exit 3

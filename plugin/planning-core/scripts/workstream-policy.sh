@@ -94,6 +94,10 @@ VF_WS_NAME=""
 VF_WS_SOURCE=""
 VF_WS_REASON=""
 VF_WS_RAW=""
+# Chemin du compartiment résolu SANS traverser de lien symbolique (vf_ws_dir_resolve). Initialisée
+# ici, comme ses sœurs : les quatre gates tournent sous `set -u` ou le deviendront, et une variable
+# lue avant son premier positionnement y est fatale.
+VF_WS_DIR=""
 
 # Rogne les BORDS uniquement (espaces, tabulations, CR, LF, VT, FF) — parité avec le `.trim()` de
 # `normalizeWorkstreamNameInput`. NE TOUCHE JAMAIS À L'INTÉRIEUR : un `tr -d ' '` global faisait
@@ -167,6 +171,81 @@ vf_ws_read_pointer() { # <fichier> — positionne VF_WS_RAW ; 0 = lu, 1 = absent
     return 2
   fi
   VF_WS_RAW="$(vf_ws_trim "$(cat "$f" 2>/dev/null)")"
+  return 0
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# RÉSOLUTION DU COMPARTIMENT — le nom est validé, le CHEMIN ne l'était par rien
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# QUATRIÈME PASSAGE DU MÊME MOTIF, mesuré sur dépôt piégé le 2026-08-04. La politique ci-dessus
+# contraint le NOM (alphabet, `..`, séparateurs) et `vf_ws_read_pointer` refuse un pointeur-FICHIER
+# en lien symbolique. Le RÉPERTOIRE, lui, n'était contraint par rien : les quatre gates
+# construisaient `<planning>/workstreams/<nom>` puis testaient `[ -d ]` (ou `[ -f .../STATE.md ]`),
+# et `[ -d ]` SUIT le lien. Un `.planning/workstreams/dev` versionné en mode 120000 vers un
+# répertoire hors du lab suffisait donc à :
+#   - `planning-context.sh`  → INJECTER le STATE.md de la cible dans le contexte de session, exit 0
+#                              (reproduit : le contenu hors-lab sortait verbatim entre les ```) ;
+#   - `check-dev-bootstrap.sh` → lire le compartiment de la cible et réimprimer son frontmatter
+#                              (`milestone <valeur de l'attaquant>`) sur stdout d'un SessionStart ;
+#   - `check-state-integrity.sh` → rendre son VERDICT sur un STATE.md qui n'est pas celui que
+#                              l'appelant croit vérifier — le fail-open qui a motivé ce fichier ;
+#   - `check-workstream-pointer.sh` → bénir la partition (« dossier présent », exit 0), c'est-à-dire
+#                              fournir aux trois autres le vert sur lequel ils s'appuient.
+# Deux hooks SessionStart dans le lot : auto-déclenchés, sans aucune action de la victime au-delà de
+# l'ouverture de session. Même vecteur que le pointeur en 120000, une indirection plus loin.
+#
+# POSTURE, identique à celle de `vf_ws_read_pointer` : ON REFUSE DE SUIVRE, on ne tente pas de
+# décider si la cible est « dans le lab » — un tel test se réécrit avec `..`, dépend d'un
+# `readlink -f` absent de macOS, et ne survit pas à un remontage. Le refus est AUDIBLE, jamais
+# muet, et la valeur de la cible n'est JAMAIS lue ni réimprimée. Un compartiment légitime est un
+# vrai répertoire : le cas licite reste vert à l'octet près.
+#
+# CE QUI N'EST PAS REFUSÉ, ET POURQUOI : un `workstreams/<nom>` qui existe en fichier régulier reste
+# classé « absent » (rc 1), comme avant. Rien ne le lit — `[ -d ]` est faux et `[ -f <lui>/STATE.md ]`
+# aussi : il n'ouvre aucune voie de lecture, et le requalifier en refus déplacerait la gradation par
+# rôle d'un cas qui n'est pas une menace.
+
+# Primitive : <chemin> existe-t-il SANS être un lien symbolique ?
+#   0 = présent et non-lien · 1 = absent · 2 = lien symbolique (y compris pendant : `[ -L ]` est vrai
+#   là où `[ -e ]` est faux, l'ordre des tests ci-dessous est donc porteur).
+vf_ws_path_nolink() { # <chemin>
+  [ -L "$1" ] && return 2
+  [ -e "$1" ] || return 1
+  return 0
+}
+
+# Résout le répertoire du compartiment SANS jamais traverser un lien symbolique. Les DEUX segments
+# sont contraints : `workstreams` lui-même (le détourner détourne tous les compartiments d'un coup)
+# puis `workstreams/<nom>`. Il n'y en a que deux — la politique de nom interdit `/`, donc `<nom>`
+# est un segment unique par construction.
+# Positionne VF_WS_DIR (chemin du compartiment) ; rend :
+#   0 = répertoire réel et sûr · 1 = absent (cas « dossier absent » de la gradation par rôle)
+#   2 = REFUS motivé, VF_WS_REASON dans l'énumération fermée ci-dessous, AUCUNE lecture effectuée.
+vf_ws_dir_resolve() { # <planning_dir> <nom>
+  local root="$1/workstreams" dir="$1/workstreams/$2" rc=0
+  VF_WS_DIR=""
+  vf_ws_path_nolink "$root"; rc=$?
+  [ "$rc" -eq 2 ] && { VF_WS_REASON="workstreams-lien-symbolique"; return 2; }
+  [ "$rc" -eq 1 ] && return 1
+  vf_ws_path_nolink "$dir"; rc=$?
+  [ "$rc" -eq 2 ] && { VF_WS_REASON="compartiment-lien-symbolique"; return 2; }
+  [ "$rc" -eq 1 ] && return 1
+  [ -d "$dir" ] || return 1
+  VF_WS_DIR="$dir"
+  return 0
+}
+
+# MÊME MOTIF, UN CRAN PLUS BAS — fermer le répertoire en laissant le fichier ouvert, c'est verrouiller
+# la porte et laisser la fenêtre : un compartiment parfaitement légitime dont le `STATE.md` est
+# versionné en 120000 vers `../../victime/.env` rejoue la fuite à l'identique, `[ -f ]` suivant le
+# lien tout comme `[ -d ]`. À appeler sur tout fichier du compartiment AVANT de le lire.
+#   0 = fichier régulier sûr · 1 = absent · 2 = refus motivé (VF_WS_REASON).
+vf_ws_file_in_ws() { # <chemin>
+  local rc=0
+  vf_ws_path_nolink "$1"; rc=$?
+  [ "$rc" -eq 2 ] && { VF_WS_REASON="fichier-compartiment-lien-symbolique"; return 2; }
+  [ "$rc" -eq 1 ] && return 1
+  [ -f "$1" ] || return 1
   return 0
 }
 
