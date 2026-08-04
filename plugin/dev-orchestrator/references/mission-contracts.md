@@ -226,8 +226,10 @@ La revue de **diff de code** (`vf-reviewer` → `gsd-code-reviewer`, nœud `revu
 systématiquement par le manager, ADR-060) et la revue **cross-AI de plans** amont (`gsd-review`,
 lanes déclarées par `review-lane-descriptor.cjs`, ADR-2782 Phase 1, opt-in utilisateur via
 `--reviews`) sont deux étages **disjoints** — objet revu, moment du cycle et déclencheur diffèrent
-sur les trois axes. Arbitrage complet, avec le critère écrit : `docs/ADR.md` ADR-061. Aucun
-câblage automatique de `gsd-review` dans le DAG de mission — décision distincte, non prise ici.
+sur les trois axes. Arbitrage complet, avec le critère écrit : `docs/ADR.md` ADR-061 — qui couvre
+désormais aussi, sur les mêmes axes, le hook de revue de code du moteur face au nœud `revue-N`, et
+le hook d'audit de sécurité face à l'auditeur VibeFlow (Phase 23, plan 23-06). Aucun câblage
+automatique de `gsd-review` dans le DAG de mission — décision distincte, non prise ici.
 
 ## `.planning/STATE.md` — ne jamais « réparer » via `gsd-tools state` (ADR-063)
 
