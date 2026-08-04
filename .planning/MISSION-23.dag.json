@@ -812,7 +812,7 @@
         "README.md",
         "README.fr.md"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "replan-08",
@@ -824,7 +824,7 @@
       "scope": [
         ".planning/phases/VFDO-23-*/23-08-PLAN.md"
       ],
-      "status": "blocked"
+      "status": "running"
     }
   ]
 }
