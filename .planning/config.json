@@ -43,6 +43,11 @@
     "context_warnings": true
   },
   "project_code": "VFDO",
-  "agent_skills": {},
+  "agent_skills": {
+    "gsd-planner": [
+      "global:software-architecture",
+      "global:audit-architecture"
+    ]
+  },
   "claude_md_path": "./CLAUDE.md"
 }
