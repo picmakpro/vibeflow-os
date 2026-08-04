@@ -1568,7 +1568,9 @@ demande de dire lesquels. Dans les cas (a) et (c), la **remontée upstream** des
 préalable, au même titre que la RFC de la Phase 18 et la voie 2 de M2. Condition commune aux trois :
 **aucune partition tant qu'une phase est en vol** (cf. divergence invisible ci-dessus).
 
-**Requirements**: TBD (à mapper au ledger pendant le plan)
+**Requirements**: GSDA-01 → GSDA-22 (créés au plan du 2026-08-04 — préfixe `GSDA`, « GSD
+Activation », distinct du `GSDC` de la Phase 23 ; détail et mapping aux plans dans
+`.planning/REQUIREMENTS.md`)
 **Depends on:** Phase 23 — dépendance **doctrinale**, pas de fichiers : la 23 écrit la table des
 capabilities et la voie unique ; la 24 décide quoi activer dedans. Activer avant de savoir qui
 couvre quoi reviendrait à empiler des étages sur un couplage encore implicite. Le **lot MESURE**
