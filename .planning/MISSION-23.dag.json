@@ -221,7 +221,7 @@
         "plugin/dev-orchestrator/references/GSD-PIPELINE.md",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "revue-07",
@@ -234,7 +234,7 @@
         "plugin/dev-orchestrator/references/mission-flow.md",
         "plugin/dev-orchestrator/references/mission-contracts.md"
       ],
-      "status": "blocked",
+      "status": "running",
       "review_regime": "full"
     },
     {
