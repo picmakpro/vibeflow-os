@@ -94,12 +94,29 @@ nos labs à ce jour, pas un manque.
 Aucun des quatre n'est un avertissement décoratif : chacun se solde par un geste à faire.
 
 **(a) La couverture amont est marginale.** Re-mesuré en `awk` + `comm` sur les **91 workflows
-racine** de `gsd-core` 1.9.1, ce 2026-08-04 : **5 seulement connaissent les workstreams, soit
-5,5 %** ; **45 codent en dur** `.planning/ROADMAP.md`, `.planning/STATE.md` ou `.planning/phases`,
-dont **43 sans aucune conscience** du sujet — `execute-phase`, `execute-plan`, `plan-phase`,
+racine** de `gsd-core` 1.9.1, ce 2026-08-04 : **7 seulement savent résoudre un scope, soit 7,7 %** ;
+**45 codent en dur** `.planning/ROADMAP.md`, `.planning/STATE.md` ou `.planning/phases`, dont
+**42 sans aucune conscience** du sujet — `execute-phase`, `execute-plan`, `plan-phase`,
 `discuss-phase`, `next`, `ship`, `pr-branch`, `quick`, `progress` et `complete-milestone` en font
-partie. *(L'arbitrage de la phase 24 annonçait 7 sur 91, soit 7,7 %, et 42 aveugles ; ces deux
-valeurs ne se reproduisent pas sur 1.9.1, et l'écart va dans le sens du pire.)*
+partie.
+
+**Un taux de couverture ne veut rien dire sans son critère d'inclusion nommé.** Trois critères
+cohabitent sur ce corpus, et ils ne posent pas la même question :
+
+| Critère | Ce qu'il compte | Conscients | Taux | Aveugles |
+|---|---|---|---|---|
+| K1 | le mot `workstream` seul — *le mot apparaît-il ?* | 5 | 5,5 % | 43 |
+| **K2** | K1 **ou** l'option `--ws` — *le workflow sait-il résoudre un scope ?* | **7** | **7,7 %** | **42** |
+| K3 | K2 **ou** la variable `GSD_WS` — *toute forme de surface* | 16 | 17,6 % | 35 |
+
+**K2 est le critère de cette référence**, parce que c'est lui qui répond à la seule question qui
+nous engage : le workflow sait-il sur quel compartiment il travaille. Les trois mesures qui ont
+circulé se rangent alors sans contradiction — les **7 sur 91 / 42 aveugles** de l'arbitrage de la
+phase 24 se reproduisent **exactement**, c'est K2 ; les **5 sur 91 / 43 aveugles** d'une re-mesure
+ultérieure sont **exactement K1** ; et le **~18 %** du ROADMAP est **retrouvé** par K3 (17,6 %).
+Aucune n'est fausse, aucune n'est irreproductible, et l'écart ne va **pas** « dans le sens du
+pire » : il ne manquait qu'un critère déclaré. Corpus, définition des trois critères et **commande
+rejouable** : **ADR-069, § Méthode** — ne les recopie pas ici, re-dérive-les là-bas.
 → **Geste** : sur un dépôt partitionné, avant de faire confiance au verdict d'un de ces workflows,
 vérifie **quel chemin il a effectivement lu**. Lui passer `--ws` ne le sauve pas : il ne sait pas
 le lire, il écrira à la racine quoi qu'on lui ait passé.
