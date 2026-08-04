@@ -211,6 +211,7 @@
       "stage": "exec",
       "deps": [
         "plancheck-07",
+        "replan-07",
         "revue-06"
       ],
       "scope": [
@@ -764,7 +765,27 @@
       "scope": [
         ".planning/phases/VFDO-23-*/23-07-PLAN.md"
       ],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-d22-debugger",
+      "step": "HALT ADR-031 — D-22 dit 'aucune exception' mais vf-coder.md:4 porte gsd-debugger, et le gate de 23-07 est calibre pour ne pas le voir (la fonction exclut la ligne tools:). Reduction de perimetre sur une decision verrouillee",
+      "stage": "human",
+      "deps": [],
+      "scope": [],
       "status": "ready"
+    },
+    {
+      "id": "replan-07",
+      "step": "Amendement cible du plan 23-07 : B1 forme d option, B2 trois recettes incapables d echouer, B3 assertion D vacue par construction, W1-W5. B4 EXCLU du mandat, escalade",
+      "stage": "plan",
+      "deps": [
+        "plancheck-07"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-*/23-07-PLAN.md"
+      ],
+      "status": "running"
     }
   ]
 }
