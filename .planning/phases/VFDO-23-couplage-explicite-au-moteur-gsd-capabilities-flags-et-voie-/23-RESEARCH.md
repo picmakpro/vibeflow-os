@@ -6,7 +6,7 @@ package à installer — la « stack » de cette phase, ce sont les workflows GS
 du module `dev-orchestrator`).
 **Confidence:** HIGH — quasi toutes les affirmations ci-dessous sont `[VERIFIED]` par lecture directe
 des fichiers sources (installés à `$HOME/.claude/gsd-core/` et matérialisés à `$HOME/.claude/agents/`)
-et du dépôt cible (`/Users/samuel/Documents/dev/vibeflow-os-p23`), pas par mémoire d'entraînement.
+et du dépôt cible (`../vibeflow-os-p23`), pas par mémoire d'entraînement.
 
 <user_constraints>
 ## User Constraints (from CONTEXT.md)
@@ -280,7 +280,7 @@ en-tête « auto-généré — NE PAS ÉDITER », idempotent (overwrite complet)
 
 **Example (patron exact vérifié, `build-gsd-index.sh`) :**
 ```bash
-# Source: /Users/samuel/Documents/dev/vibeflow-os-p23/plugin/dev-orchestrator/scripts/build-gsd-index.sh
+# Source: ../vibeflow-os-p23/plugin/dev-orchestrator/scripts/build-gsd-index.sh
 # [VERIFIED: build-gsd-index.sh:1-30, :86-138]
 SKILLS_DIR="${VF_GSD_SKILLS_DIR:-$HOME/.claude/skills}"
 OUT="${VF_INDEX_OUT:-$SCRIPT_DIR/../references/gsd-skills-index.md}"
@@ -307,7 +307,7 @@ il a quelque chose à signaler, 3 quand il n'a rien à dire, 64 sur argument inv
 
 **Example (patron exact vérifié, `check-doc-drift.sh`) :**
 ```bash
-# Source: /Users/samuel/Documents/dev/vibeflow-os-p23/plugin/dev-orchestrator/scripts/check-doc-drift.sh
+# Source: ../vibeflow-os-p23/plugin/dev-orchestrator/scripts/check-doc-drift.sh
 # [VERIFIED: check-doc-drift.sh:56-60, :145-153]
 # Exit codes:
 #   0  = signal émis (quelque chose à signaler)
@@ -497,7 +497,7 @@ destination** amont.
 ### `.planning/config.json` de ce lab — état exact au 2026-08-01
 
 ```json
-// [VERIFIED: /Users/samuel/Documents/dev/vibeflow-os-p23/.planning/config.json — lu intégralement cette session]
+// [VERIFIED: ../vibeflow-os-p23/.planning/config.json — lu intégralement cette session]
 {
   "workflow": {
     "research": true, "plan_check": true, "verifier": true, "auto_advance": false,
@@ -730,7 +730,7 @@ lequel toute la vérification de cette recherche a été exécutée.
 - `$HOME/.claude/agents/gsd-executor.md` (matérialisé, pas dans `gsd-core/`) — préconditions (:150), auto-mode checkpoint (:328-332).
 - `$HOME/.claude/gsd-core/templates/summary-standard.md` — frontmatter `actuals`, absence de champ `repairs`.
 - Sortie live `node $HOME/.claude/gsd-core/bin/gsd-tools.cjs loop render-hooks <point> --raw` sur les 12 points, exécutée sur ce lab cette session.
-- `/Users/samuel/Documents/dev/vibeflow-os-p23/.planning/config.json` — lu intégralement cette session.
+- `../vibeflow-os-p23/.planning/config.json` — lu intégralement cette session.
 - `plugin/dev-orchestrator/references/GSD-PIPELINE.md`, `mission-contracts.md` (258 lignes, 16.4K), `mission-flow.md` (263 lignes), `docs-flow.md` (111 lignes) — lus intégralement.
 - `plugin/dev-orchestrator/agents/vf-coder.md` (74/75 lignes), `vf-dev-manager.md` (236/237 lignes) — lus intégralement.
 - `plugin/dev-orchestrator/scripts/build-gsd-index.sh` (138 lignes), `check-doc-drift.sh` (153 lignes) — lus intégralement, patrons D-07/D-17.

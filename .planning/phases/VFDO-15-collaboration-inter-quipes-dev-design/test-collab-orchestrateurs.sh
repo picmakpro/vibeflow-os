@@ -8,7 +8,9 @@
 # T4 — reopen cross-métier : un craft sous le seuil rouvre, les nœuds dev dépendants rebloquent
 
 set -uo pipefail
-REPO="/Users/samuel/Documents/dev/vibeflow-os"
+# Racine dérivée de l'emplacement de ce script (.planning/phases/<phase>/), jamais du cwd ni d'un
+# chemin de machine : ce fichier est versionné et doit rester rejouable sur n'importe quel poste.
+REPO="$(cd "$(dirname "$0")/../../.." && pwd)"
 S="$REPO/plugin/conductor/scripts"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/collab-test.XXXXXX")"
 export VF_DRIVER_LOCK="$WORK/DRIVER.lock"

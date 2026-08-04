@@ -70,7 +70,7 @@ Convergence des 5 audits :
 - **Doctrines contradictoires** : `vf-decide` interdit de router vers un agent en direct (`SKILL.md:22`) mais `vf-dev-manager.md:59` dispatche `gsd-advisor-researcher` en direct. `commands/vf-planning.md:2` répond encore à « où en est-on ? » contre ADR-055.
 - **3 objets nommés `skill-creator`** (agent module, skill module, skill Anthropic) dont deux copies verbatim de 485 L dans le repo (diff vide).
 - **Quatuor amont** (explore/brainstorm/spike/spec) + vf-decide : 5 verbes dont la frontière « idée floue vs formulée » est maintenue à la main dans 5 endroits.
-- **Poids mort** : `docs/reference/` doublon divergent de `plugin/reference/content/` (832K, drift déjà entamé sur 2 fichiers) ; `.superpowers/sdd/` 232K + `docs/superpowers/` 172K d'artefacts de session commités ; `gsd-skills-index.md` snapshot machine-spécifique (chemin `/Users/samuel/...`) versionné et distribué.
+- **Poids mort** : `docs/reference/` doublon divergent de `plugin/reference/content/` (832K, drift déjà entamé sur 2 fichiers) ; `.superpowers/sdd/` 232K + `docs/superpowers/` 172K d'artefacts de session commités ; `gsd-skills-index.md` snapshot machine-spécifique (chemin `/Users/<user>/...`) versionné et distribué.
 
 ### Remèdes
 

@@ -9,7 +9,7 @@ requirements: [GSDA-10, GSDA-11]
 
 # 24-07 — ADR-068 : profils de contexte refusés, seuil inline mesuré et inchangé
 
-Livrable unique : l'entrée **ADR-068** dans `/Users/samuel/Documents/dev/vibeflow-os/docs/ADR.md`,
+Livrable unique : l'entrée **ADR-068** dans `docs/ADR.md`,
 couvrant les deux items de la zone 4 (A4 profils de contexte, A6 `inline_plan_threshold`), plus une
 ligne de registre sur le numéro `ADR-065` non attribué.
 
@@ -150,7 +150,7 @@ précisément pour qu'on ne « répare » pas un trou intact.
 ## Périmètre respecté
 
 Un seul fichier modifié et commité, par pathspec explicite (`git commit docs/ADR.md -m …`, jamais
-`git add`) : `/Users/samuel/Documents/dev/vibeflow-os/docs/ADR.md`. Aucune touche à
+`git add`) : `docs/ADR.md`. Aucune touche à
 `.github/workflows/ci.yml`, aux `24-NN-PLAN.md`, à `24-COLLISIONS.md`, `.planning/config.json`,
 `.planning/WINDOWS.md`, `.planning/codebase/CONCERNS.md`, `plugin/**`, `.planning/STATE.md`,
 `.planning/ROADMAP.md`, `.planning/missions/`, `.planning/DRIVER.lock`. Aucun bump de version,

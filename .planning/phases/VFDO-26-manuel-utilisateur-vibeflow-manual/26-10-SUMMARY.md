@@ -127,7 +127,7 @@ C1 reste vert pendant que C2 rougit : preuve que les deux contrôles sont réell
 (pas de « vert par construction »). Suppression du fichier orphelin → C0-C6 repassent tous ✓.
 
 Après les deux mutations et leurs restaurations, `check-manual.sh` rejoué sur le **manuel réel**
-(`/Users/samuel/Documents/dev/vibeflow-os/manual`, jamais touché par ces expériences) reste vert
+(`manual`, jamais touché par ces expériences) reste vert
 — confirmé explicitement ci-dessous.
 
 ## Sortie complète de `check-manual.sh` sur le manuel réel
