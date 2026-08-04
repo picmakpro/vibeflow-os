@@ -156,7 +156,7 @@
         "plugin/dev-orchestrator/references/GSD-PIPELINE.md",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "revue-05",
@@ -170,7 +170,7 @@
         "plugin/dev-orchestrator/agents/vf-dev-manager.md",
         "plugin/dev-orchestrator/references/GSD-PIPELINE.md"
       ],
-      "status": "blocked",
+      "status": "ready",
       "review_regime": "full"
     },
     {
