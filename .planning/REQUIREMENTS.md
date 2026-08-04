@@ -430,13 +430,13 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | DOCF-05 | Phase 22 | Planned — plan 22-02 |
 | DOCF-06 | Phase 22 | Planned — plans 22-01 et 22-02 |
 | DOCF-07 | Phase 22 | Planned — plan 22-03 |
-| GSDC-01 | Phase 23 | Planned — plan 23-01 |
-| GSDC-02 | Phase 23 | Planned — plan 23-01 |
-| GSDC-03 | Phase 23 | Planned — plan 23-03 |
-| GSDC-04 | Phase 23 | Planned — plan 23-04 |
-| GSDC-05 | Phase 23 | Planned — plan 23-05 |
+| GSDC-01 | Phase 23 | Done — plan 23-01 (exécuté + revue en régime plein) |
+| GSDC-02 | Phase 23 | Done — plan 23-01 (exécuté + revue en régime plein) |
+| GSDC-03 | Phase 23 | Done — plan 23-03 (exécuté + revue en régime plein) |
+| GSDC-04 | Phase 23 | Done — plan 23-04 (exécuté + revue en régime plein) |
+| GSDC-05 | Phase 23 | Done — plan 23-05 (exécuté + revue en régime plein) |
 | GSDC-06 | Phase 23 | Planned — plan 23-06 |
-| GSDC-07 | Phase 23 | Planned — plan 23-02 |
+| GSDC-07 | Phase 23 | Done — plan 23-02 (exécuté + revue en régime plein) |
 | GSDC-08 | Phase 23 | Planned — plan 23-07 |
 | GSDC-09 | Phase 23 | Planned — plan 23-07 |
 | GSDC-10 | Phase 23 | Planned — plan 23-08 |

@@ -509,6 +509,21 @@ Progress: [██████░░░░] 59%
 - 2026-07-25 : compteurs de `progress` corrigés — ils affichaient `total_plans: 0` alors que la Phase 12
   comptait déjà 6 plans dont 1 livré (12-01). Réel : 12 plans posés (6 en Phase 12, 6 en Phase 14), 1 livré.
 
+- 2026-08-04 : **Phase 23 — 6 plans sur 8 exécutés et revus** (mission d'équipe `vf-dev-manager`,
+  worktree `vibeflow-os-p23`, branche `feat/phase-23-couplage-gsd`). 23-01 à 23-05 sont clos
+  (exécution + revue en régime plein) ; 23-06 est exécuté, sa revue tourne. Restent 23-07 et 23-08.
+  Le suivi détaillé, les arbitrages et les dettes vivent dans `.planning/HANDOFF.json` et
+  `.planning/MISSION-23.dag.json` du worktree — **c'est là qu'il faut regarder pour reprendre**,
+  pas ici.
+  **Deux faits structurants pour la suite** : (a) `vf-dev-manager.md` est à **241/250** (ADR-029),
+  soit **9 lignes de marge** alors que 23-07 ET 23-08 le touchent tous les deux — la soupape est
+  le déport vers `plugin/dev-orchestrator/references/`, qui n'est pas plafonné ; (b) **aucune
+  exécution GitHub Actions n'a eu lieu sur cette branche** (`gh run list` vide), donc la CI de la
+  phase — y compris le canari de forme du moteur ajouté par 23-02 — n'a jamais tourné pour de vrai.
+  **Arbitrages rendus en mission** : A-15 (A-10 périmée sur `mission-flow.md`, appliquée sur
+  `check-gsd-config.sh`). **En attente de Samuel** : fuite d'info par symlink dans `slurp()` des
+  deux scripts, promotion d'A-15 en ADR, push de la branche pour exercer la CI, ratification O-16.
+
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).

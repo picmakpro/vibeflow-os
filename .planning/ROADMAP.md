@@ -1322,24 +1322,24 @@ quasi-séquentielle ; seuls 23-01 et 23-02 sont parallélisables en vague 1)
 
 Plans:
 
-- [ ] 23-01-PLAN.md — **Zone 1, SÛRETÉ, priorité imposée** : champ `gate` et mapping unique vers
+- [x] 23-01-PLAN.md — **Zone 1, SÛRETÉ, priorité imposée** : champ `gate` et mapping unique vers
   `human_needed` de bout en bout, reset de `workflow._auto_chain_active` au démarrage de mission,
   minimum de reprise, halt de nœud, réponse humaine portée par le manager. Blocs T24/T25/T26,
   discriminance prouvée par mutation. (GSDC-01, GSDC-02)
 
-- [ ] 23-02-PLAN.md — **Zone 5, parallèle de 23-01** : `check-gsd-config.sh` (advisory, exit 0/3/64,
+- [x] 23-02-PLAN.md — **Zone 5, parallèle de 23-01** : `check-gsd-config.sh` (advisory, exit 0/3/64,
   clés connues lues depuis `gsd-core`) + suite dédiée + câblage `SessionStart` ; blocs `gates` et
   `safety` supprimés du `config.json` du lab et 5 toggles écrits à une valeur décidée. (GSDC-07)
 
-- [ ] 23-03-PLAN.md — **Zone 2** : `GSD-PIPELINE.md` §9 doctrine de flags de cycle en **allowlist
+- [x] 23-03-PLAN.md — **Zone 2** : `GSD-PIPELINE.md` §9 doctrine de flags de cycle en **allowlist
   stricte** (clause de fermeture par défaut, gradation `--research` factuelle, renvoi croisé vers
   `docs-flow.md`), ligne `gsd-ship` du cycle canonique corrigée. Bloc T27. (GSDC-03)
 
-- [ ] 23-04-PLAN.md — **Zone 2** : générateur `build-gsd-capabilities-index.sh` →
+- [x] 23-04-PLAN.md — **Zone 2** : générateur `build-gsd-capabilities-index.sh` →
   `references/gsd-capabilities-index.md` sur les **12** points de hook (liste découverte depuis le
   registre amont), renvoi depuis la doctrine, régénération à l'install. Bloc T28. (GSDC-04)
 
-- [ ] 23-05-PLAN.md — **Zone 3, le trou le plus grave** : voie dégradée supprimée du corps de
+- [x] 23-05-PLAN.md — **Zone 3, le trou le plus grave** : voie dégradée supprimée du corps de
   prompt de `vf-coder`, `gsd-planner`/`gsd-executor` retirés des lignes `tools:` des **deux**
   agents (arbitrage du Finding 1), doctrine de voie unique et continuation par voie skill. Bloc
   T29. (GSDC-05)
