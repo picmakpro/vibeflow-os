@@ -133,6 +133,8 @@ pilotage) ; les workers d'équipe (`vf-coder`, `vf-reviewer`, `vf-auditer`) en `
 > Pour la liste exhaustive et à jour des briques disponibles, consulter
 > `.claude/agents/dev-orchestrator-references/gsd-skills-index.md` ; pour le routage
 > intention → brique, `intent-routing.md` (seule source de routage).
+>
+> **Voie** : comme au §9, `gsd-debug` s'invoque par son **skill**, jamais par un agent nu de debug.
 
 > **Qui décide de ce qui s'exécute — la question du Constat 0.** La bonne question n'était pas
 > « l'agent a-t-il accès aux étages du cycle », mais « qui les déclenche ». Réponse : aux points

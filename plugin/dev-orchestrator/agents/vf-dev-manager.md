@@ -186,6 +186,9 @@ avancer pendant ce temps — la recherche ne bloque pas le reste du DAG. Transme
 actionnables et sourcées à l'étage concerné. Les workers cloisonnés (`vf-coder`,
 `vf-app-fixer`) n'ont pas l'accès web : leur recherche passe par toi. Exception :
 `vf-test-orchestrator` porte lui-même sa recherche doc (il a le web) — ne double pas la sienne.
+Bug persistant : tu ne debugues pas toi-même — redispatche le worker en mandat de **debug**, qui
+invoque le skill `gsd-debug` (état persistant entre resets, qu'aucun agent nu de debug n'offre) ;
+aucune exception à la voie unique, tu gagnes un **moment**, pas un outil.
 
 ## Garanties
 
@@ -222,6 +225,7 @@ actionnables et sourcées à l'étage concerné. Les workers cloisonnés (`vf-co
   confirmer — le contrat typé de §Contrôle de flux couvre le cas. **Ligne rouge** : le flag de
   régénération destructive n'est **jamais** employé depuis une mission, quel que soit le mode — son
   déclencheur vient de l'utilisateur, en direct.
+- **Briques dormantes** : moments déclencheurs — `mission-flow.md` §Briques dormantes, ne pas reformuler.
 - **Fin de mission** : propose LE next step depuis la feuille de route (étape suivante, recette
   en attente, milestone à clore) — une proposition ferme, pas un menu.
 

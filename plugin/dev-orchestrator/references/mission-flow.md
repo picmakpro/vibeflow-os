@@ -295,6 +295,22 @@ vient d'échouer plusieurs fois sur le sujet, donc la partie la moins fiable du 
 
 ---
 
+## Briques dormantes — moments déclencheurs (D-23, D-24)
+
+Le geste se pose quand **au moins un** de ces déclencheurs tombe. Chacun reste un **FAIT
+constatable** (même gabarit que `docs-flow.md` §Déclencheurs), jamais un jugement au feeling :
+
+| Déclencheur | Constat |
+|---|---|
+| **étape vérifiée et clôturée** | la famille est déjà doctrinée par `docs-flow.md` (Phase 22) ; la ligne se raccorde au nœud documentaire de fin de mission existant plutôt que d'en poser un nouveau — conditions exactes : `docs-flow.md`, ne pas les reformuler ici (ADR-057). Brique : `gsd-extract-learnings`. |
+| **verdict de validation nyquist partiel** | le gate constate aujourd'hui les trous sans les combler ; cette ligne transforme un constat en action. Brique : `gsd-add-tests`. |
+| **le QUOI d'une étape n'est pas stabilisé** | le fichier de spec est lu par le cadrage, qui cesse alors de poser des questions de périmètre. Brique : `gsd-spec-phase`. |
+| **mission ratée, ou blocage à comprendre** | aucune procédure écrite aujourd'hui, le manager improvise. Briques : `gsd-undo` (annulation) / `gsd-forensics` (analyse post-mortem). |
+
+Aucun déclencheur qui ne tombe est un **état normal**, pas un manque.
+
+---
+
 ## Pattern F — Étage cadrage porté par le manager (A-1ter geste 2, motif A-13)
 
 **Qui exécute** : le manager, lui-même, dans sa propre fenêtre — seule exception à « il ne produit
