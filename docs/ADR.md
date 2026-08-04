@@ -37,6 +37,7 @@
 | ADR-066 | 2026-08-04 | La zone 2 est activée, pas différée : un prérequis de version insatisfiable ne gate pas, et le risque mesuré est inexistant | Validée |
 | ADR-067 | 2026-08-04 | `hooks.community` refusé : c'est une mesure de style, pas de conformité — 6 types maison hors liste amont, 68 % des sujets > 72 caractères | Validée |
 | ADR-068 | 2026-08-04 | Profils de contexte du moteur refusés (rien à activer, notre contrat typé est per-rôle et plus strict) — et `workflow.inline_plan_threshold` inchangé à 2, la mesure étant le livrable | Validée |
+| ADR-069 | 2026-08-04 | Les workstreams GSD sont adoptés, avec leurs quatre limites datées, la condition dure « aucune partition tant qu'une phase est en vol », la révision de l'Iron Law 2 et l'amendement d'ADR-064 | Validée |
 
 > **`ADR-065` : numéro non attribué** — constaté le 2026-08-04. Le registre saute de `ADR-064` à
 > `ADR-066` ; aucune décision ne porte ce numéro et aucune n'a été retirée. Un registre qui saute
@@ -1913,3 +1914,250 @@ Le seuil inline n'est plus présentable comme un « **levier de coût inconnu** 
 population est nommée, sa méthode est reproductible en une commande. Tout retour sur ce réglage
 devra **citer cette mesure et l'infirmer** — sur un corpus nommé, avec la même regex — et non
 rouvrir la question à neuf comme si rien n'avait été mesuré.
+
+---
+
+## ADR-069 : Les workstreams GSD sont adoptés — avec leurs quatre limites datées, une condition dure, et la révision de l'Iron Law 2
+
+**Date** : 2026-08-04 · **Statut** : Validée · **Décideur** : Samuel (arbitrage
+`24-ARBITRAGES.md`, zone 5, **option C — contre la recommandation D du cadrage**) ·
+**Voisines** : ADR-064 (**amendée par cette entrée**), ADR-066, ADR-067, ADR-068 (même arbitrage) ·
+**Collisions** : `24-COLLISIONS.md` § C-1 (Iron Law 2), § C-6 (ADR-064), § M-1 (mesure de couverture)
+
+### Décision
+
+**Les workstreams du moteur GSD sont adoptés.** Le mot est **adoption**, et il est choisi contre les
+trois autres branches que l'arbitrage avait posées : ni le refus (option A), ni l'usage restreint
+sous liste d'exclusions (option B), ni le refus assorti d'une remontée amont (option D, qui était la
+**recommandation du cadrage** et qui est **non retenue**).
+
+La doctrine surplombante qui fonde ce choix est le verbatim de Samuel, et il faut l'écrire parce
+qu'il déclasse un motif de décision précis :
+
+> « *je veux coller au max à ce que fait GSD, je préfère jeter des IronLaw outdated que de sacrifier
+> l'efficience* »
+
+Ce que cette doctrine déclasse, c'est le motif « **c'est conforme à une décision interne** ». Elle
+ne déclasse **pas** les motifs factuels — « la mesure dit non », « il n'y a pas de consommateur »,
+« le canal n'existe pas ». Elle impose donc, en retour, **deux obligations** que cette ADR honore :
+toute collision avec notre doctrine se **consigne et se traite**, jamais ne se contourne en silence ;
+et les incompatibilités mesurées se portent comme des **risques à mitiger**, parce que **la décision
+d'adopter ne les efface pas**.
+
+### Ce que l'adoption a coûté — depuis les faits livrés, pas depuis l'intention
+
+| Livrable | Emplacement | Plan |
+|---|---|---|
+| Gate de démarrage rendu workstream-aware | `plugin/conductor/scripts/check-dev-bootstrap.sh` | `24-04` |
+| Gate d'intégrité d'état rendu workstream-aware | `plugin/conductor/scripts/check-state-integrity.sh` | `24-04` |
+| Injection de contexte rendue workstream-aware | `plugin/planning-core/scripts/planning-context.sh` | `24-04` |
+| Gate de pointeur créé (5 codes de sortie, 17 cas de test) | `plugin/conductor/scripts/check-workstream-pointer.sh` | `24-05` |
+| `--ws` et `GSD_WORKSTREAM` câblés dans les deux agents du chemin de dev | `vf-dev-manager.md`, `vf-coder.md` | `24-08` |
+| Référence de module — voix unique sur les workstreams | `plugin/dev-orchestrator/references/workstreams.md` | `24-08` |
+| CI étendue à un arbre réellement partitionné, construit par le job | `.github/workflows/ci.yml` | `24-09` |
+
+Trois scripts, un gate neuf, deux agents, une référence, une étape de CI. **C'est le prix payé** — il
+est écrit ici pour qu'un futur réexamen le connaisse au lieu de le ré-estimer.
+
+### Méthode, avant les chiffres — le chiffre de couverture ne se recopie pas, il se re-dérive
+
+Ce dépôt s'est fait prendre trois fois par un chiffre gravé sans sa méthode. La règle qui en découle
+s'applique à cette entrée : **tout chiffre gravé dans une ADR porte son corpus, son critère
+d'inclusion nommé et sa commande rejouable.**
+
+- **Corpus** : `$HOME/.claude/gsd-core/workflows/*.md`, **profondeur 1 uniquement** — **91 fichiers**,
+  sur `@opengsd/gsd-core` **1.9.1**. Le qualificatif « racine » est porteur : le même dossier en
+  compte **115** en récursif. Le compte 91 se vérifie par un **compteur d'atteinte** inclus dans la
+  commande, parce qu'une invocation antérieure a rendu **4** en silence.
+- **Critère d'inclusion, nommé** : **K2** — « le workflow porte le mot `workstream` **ou** l'option
+  `--ws` », c'est-à-dire *sait résoudre un scope*. C'est le critère qui répond à la question posée
+  par cette ADR ; K1 (« le mot seul ») demande *le mot apparaît-il ?*, K3 (« ou la variable
+  `GSD_WS` ») demande *la variable transite-t-elle ?*.
+
+| # | Critère | Conscients | Taux | En dur | Aveugles |
+|---|---|---|---|---|---|
+| K1 | le mot `workstream` seul | 5 | 5,5 % | 45 | 43 |
+| **K2** | **le mot `workstream` ou l'option `--ws` — *résout le scope*** | **7** | **7,7 %** | **45** | **42** |
+| K3 | K2 ou la variable `GSD_WS` — toute forme de surface | 16 | 17,6 % | 45 | 35 |
+
+```bash
+W="$HOME/.claude/gsd-core/workflows"; T1=$(mktemp); H=$(mktemp); seen=0
+for f in "$W"/*.md; do
+  [ -f "$f" ] || continue; seen=$((seen+1))
+  awk -v F="$f" 'tolower($0) ~ /workstream/ || /--ws([^a-zA-Z0-9-]|$)/ { print F; exit }' "$f" >> "$T1"
+  awk -v F="$f" '/\.planning\/(ROADMAP\.md|STATE\.md|phases)/           { print F; exit }' "$f" >> "$H"
+done
+sort -u "$T1" -o "$T1"; sort -u "$H" -o "$H"
+echo "atteinte=$seen (doit valoir 91)"
+echo "K2=$(awk 'END{print NR+0}' "$T1")  en dur=$(awk 'END{print NR+0}' "$H")  aveugles=$(comm -13 "$T1" "$H" | awk 'END{print NR+0}')"
+```
+
+`awk` et `comm` uniquement — **jamais** `grep` piped, qui tronque en silence sur ce poste.
+**Re-dérivé à l'écriture de cette ADR, le 2026-08-04** : `atteinte=91`, `K2=7`, `en dur=45`,
+`aveugles=42` — identique au fichier près à la mesure de `24-COLLISIONS.md` § M-1.
+
+**Deux corrections que cette re-dérivation impose, et qu'il ne faut pas recopier depuis les sources
+antérieures :**
+
+1. **L'écart 7 vs 5 n'est pas un désaccord de mesure, c'est un critère non déclaré.** L'arbitrage
+   citait 7/91 (42 aveugles) : c'est **exactement K2**. Une re-mesure indépendante citait 5/91
+   (43 aveugles) : c'est **exactement K1**. Les deux se reproduisent au fichier près, **aucune n'est
+   fausse**. Ce qui manquait n'était pas une mesure juste, c'était un critère nommé.
+2. **« Bien pire que 18 % » ne survit pas.** La fiche `24-CONTEXT.md` F-34 concluait que la
+   couverture était « PÉRIMÉ — BIEN PIRE que 18 % ». Le ~18 % du ROADMAP est **retrouvé** par K3
+   (17,6 %). L'écart 18 % → 7,7 % est un **changement de critère non déclaré**, pas une régression
+   amont ni un état pire découvert. L'écrire comme un fait sur le produit graverait un artefact de
+   méthode.
+
+### Les quatre risques mesurés, datés du 2026-08-04, portés comme risques à mitiger
+
+La décision d'adopter ne les efface pas. Chacun porte sa mitigation nommée.
+
+#### (a) La couverture amont est de 7 workflows sur 91, soit 7,7 %
+
+**45 workflows codent en dur** `.planning/ROADMAP.md`, `.planning/STATE.md` ou `.planning/phases`,
+dont **42 sans aucune conscience** des workstreams. Les principaux, nommés : exécution de phase
+(`execute-phase.md`), exécution de plan (`execute-plan.md`), planification (`plan-phase.md`),
+cadrage (`discuss-phase.md`), pas suivant (`next.md`), expédition (`ship.md`), branche de PR
+(`pr-branch.md`), tâche rapide (`quick.md`), avancement (`progress.md`), clôture de jalon
+(`complete-milestone.md`), extraction de leçons (`extract-learnings.md`).
+
+**Mitigation.** `plugin/dev-orchestrator/references/workstreams.md` prescrit le geste : sur un dépôt
+partitionné, **vérifier quel chemin le workflow a effectivement lu** avant de se fier à son verdict.
+Lui passer `--ws` ne le sauve pas — il ne sait pas le lire, et il écrira à la racine quoi qu'on lui
+ait passé.
+
+#### (b) La classification de branche de PR s'inverse
+
+Les regex de `pr-branch.md:235-236` sont **ancrées** sur
+`^\.planning/(STATE|ROADMAP|MILESTONES|PROJECT|REQUIREMENTS)\.md` et `^\.planning/milestones/`. Sur
+un arbre partitionné, `.planning/workstreams/dev/STATE.md` **ne matche plus `STRUCTURAL`** : il
+tombe en **transient → EXCLUDED**. Conséquence : **les commits de feuille de route disparaissent
+silencieusement des branches de PR**.
+
+**Mitigation.** Vérification explicite avant ouverture de PR, écrite comme un geste dans la référence
+de module — le défaut est silencieux, donc il ne se rattrape que par un contrôle délibéré.
+
+#### (c) Le pointeur de session ne compose pas avec ADR-064
+
+Le pointeur de workstream actif vit dans
+`os.tmpdir()/gsd-workstream-sessions/<sha1 tronqué 16 du chemin absolu réel du .planning>/<clé de
+session>` : **effacé au redémarrage, indexé sur le chemin absolu, donc distinct par worktree et
+jamais hérité**.
+
+Ce risque est **confirmé pour notre runtime, et il n'est pas générique** — la distinction compte.
+`getWorkstreamSessionKey()` balaie neuf clés d'environnement, dont `CLAUDE_CODE_SSE_PORT`,
+**mesurée présente sous Claude Code le 2026-08-04** : c'est donc bien l'adaptateur `os.tmpdir()` qui
+est retenu ici. Un runtime sans clé de session tomberait sur le pointeur in-repo
+`<cwd>/.planning/active-workstream`, lui naturellement composable.
+
+**Mesure de première main, 2026-08-04** — sur une fixture portant `.planning/active-workstream`
+contenant `dev` et `.planning/workstreams/dev/` existant, `CLAUDE_CODE_SSE_PORT` présent :
+`getActiveWorkstream()` rend **`null`**, tandis que `resolveActiveWorkstream()` avec
+`GSD_WORKSTREAM=dev` rend `{ ws: "dev", source: "env" }`. **Le canal fichier n'est jamais lu sous ce
+runtime.**
+
+**Deux mitigations**, dont la première **n'était pas dans l'inventaire de risques de l'arbitrage** :
+
+1. **`GSD_WORKSTREAM` est un canal de premier rang** de `resolveActiveWorkstream`
+   (`active-workstream-store.cjs:252-277`), immédiatement après `--ws` et **avant** le pointeur. Un
+   worktree qui l'exporte résout son workstream **sans jamais toucher au fichier temporaire**.
+2. **`check-workstream-pointer.sh`** rend **bruyante** la défaillance que l'amont traite en silence :
+   `getActiveWorkstream` **auto-nettoie** — un nom invalide **ou** un `.planning/workstreams/<nom>/`
+   inexistant déclenche `adapter.clear()` puis rend « aucun workstream », **sans un mot**.
+
+#### (d) La divergence est invisible pour Git
+
+`git merge-tree` — l'outil de fusion à trois branches — sort **en succès (exit 0)** sur une branche
+post-partition portant un dossier de phase **orphelin** à la racine, pendant que le `STATE.md` du
+workstream le déclare courant. **Git ne signale rien.**
+
+**Mitigation.** La condition dure ci-dessous — **aucune partition tant qu'une phase est en vol** —,
+plus la comparaison manuelle des dossiers de phase, prescrite comme geste dans la référence de
+module.
+
+### La condition dure — interdiction opposable
+
+> **Aucune partition tant qu'une phase est en vol.**
+
+Ce n'est **pas une précaution**, c'est une interdiction. Elle est **conservée telle quelle** depuis
+le cadrage, où elle était commune à **toutes** les options — y compris celles qui refusaient
+l'adoption. Elle survit donc au changement de décision, et l'adoption ne la relâche pas. Son motif
+est le risque (d) : puisque Git ne signale pas la divergence, la seule garde possible est **de ne
+jamais créer les conditions du conflit**. La CI l'honore déjà — son arbre partitionné est une
+fixture jetable construite dans un `mktemp -d`, jamais une partition du dépôt.
+
+### La révision de l'Iron Law 2
+
+C'est la **seule révision de loi autorisée par cette phase** (verdict zone 5, point 1 :
+« soit on la révise, soit on écrit pourquoi elle ne s'applique pas — ne pas la contourner en
+silence »). Elle est portée dans `plugin/conductor/AGENT.md`, avec sa formulation antérieure
+conservée en trace.
+
+| | Formulation |
+|---|---|
+| **Avant** | **Router, jamais réimplémenter.** |
+| **Après** | **Router, jamais forker — une capacité amont partiellement couverte se câble en écrivant ses limites, elle ne se réimplémente pas** (ADR-069). |
+
+**Pourquoi la loi devait bouger.** Telle qu'écrite, elle visait le **fork d'une capacité** — réécrire
+localement ce que le moteur fait. Lue à la lettre sur une capacité couverte à 7,7 %, elle interdisait
+aussi l'**adaptation d'un gate local**, et rendait donc l'adoption indéfendable *par construction*.
+Ce sont deux objets différents : refaire une capacité amont, et apprendre à un gate maison à lire le
+chemin que la capacité amont a déplacé.
+
+**Ce que la révision ne relâche pas.** Le premier interdit — forker une capacité du moteur — est
+**maintenu**, et c'est ce qui protège encore la ligne « Out of Scope » de `REQUIREMENTS.md` contre le
+fork des skills GSD. Ce que la loi autorise désormais, elle l'autorise **sous condition écrite** :
+la limite de la capacité doit être **consignée**, ce que fait précisément la section (a) à (d)
+ci-dessus.
+
+**Ce que la révision n'éteint pas.** L'objection que la loi portait — *ne pas faire tourner le lab
+contre une chaîne d'outils qui ne le couvre pas* — est **réelle et mesurée**. Elle ne disparaît pas
+par décision. Elle change de nature : d'interdiction, elle devient **un risque écrit, daté et
+mitigé**. Cette entrée est le lieu où ce risque vit désormais.
+
+Le bloc `## Garde-fous` du même fichier n'est **pas** touché : sa ligne « ne jamais réimplémenter la
+logique d'un module » porte sur un **module de ce dépôt**, objet différent d'une capacité du moteur
+amont. Les confondre aurait élargi la révision au-delà de ce qui a été autorisé.
+
+### L'amendement d'ADR-064 — `GSD_WORKSTREAM` est le canal nominal
+
+Deuxième révision doctrinale autorisée de cette phase, et elle **ne contredit pas** ADR-064 : elle en
+précise la **mécanique de composition**.
+
+**ADR-064 (« un écrivain = un worktree ») reste en vigueur, principe intact.** L'amendement dit ceci :
+sur un arbre partitionné en workstreams, l'isolation « un écrivain = un worktree » se **compose** avec
+les workstreams **via l'export de `GSD_WORKSTREAM` par worktree**, et **jamais** via le pointeur de
+session — lequel, sous ce runtime, est indexé sur un chemin absolu et n'est pas hérité.
+
+`GSD_WORKSTREAM` n'est donc **pas un contournement** : c'est le **canal nominal**, le niveau 2 de la
+résolution amont, qui court-circuite le pointeur par conception. La non-composabilité relevée par
+l'arbitrage était réelle **sur le seul canal qu'il avait inventorié** ; elle tombe dès qu'on emprunte
+le canal de premier rang.
+
+### Le solde du rendez-vous — et aucune phase ajoutée
+
+La **PR #27** (partition de `.planning/` en workstreams, proposée par Willy) a été **fermée par son
+auteur lui-même** le **2026-08-03T06:56:32Z**, en **ratification de la revue de Samuel** — pas un
+refus imposé. La branche `gouvernance/partition-planning-workstreams` est conservée : 122 renommages,
+210 blobs, **aucun perdu**.
+
+Le sujet **n'était pas abandonné** — la recherche du cadrage concluait à un rendez-vous en
+« Phase 27 ». **L'arbitrage a renversé cette conclusion** : le rendez-vous se solde **ici, dans la
+Phase 24**, et **aucune phase n'est ajoutée au ROADMAP**. C'est écrit explicitement parce que la
+source de recherche dit le contraire, et qu'un lecteur qui la retrouverait sans cette ligne
+conclurait qu'une phase manque.
+
+### Déclencheur de réexamen
+
+Rouvrir **ssi** l'un de ces faits change, chacun re-dérivable par la commande ci-dessus :
+
+- la couverture K2 dépasse **50 %** des workflows racine — le lab cesserait alors de tourner contre
+  une chaîne d'outils majoritairement aveugle, et les gestes de mitigation (a) deviendraient inutiles ;
+- les regex de `pr-branch.md` cessent d'être ancrées à la racine, ce qui referme le risque (b) ;
+- l'amont fait du pointeur in-repo l'adaptateur retenu en présence d'une clé de session, ce qui
+  referme le risque (c) sans passer par `GSD_WORKSTREAM`.
+
+Ce déclencheur est **objectif et sans échéance** : une date de revue rouvrirait un dossier vide,
+alors que chacune des trois conditions ci-dessus ne se déclenche que s'il s'est réellement passé
+quelque chose en amont.
