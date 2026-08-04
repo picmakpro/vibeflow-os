@@ -201,6 +201,19 @@ DELETED_RE="(${DELETED_RE})([^a-z0-9-]|\$)"
 # « $1 (fichier) référence-t-il un verbe supprimé ? » → imprime les hits (vide sinon).
 deleted_hits() { "$GREP" -oE "$DELETED_RE" "$1" 2>/dev/null | "$GREP" -oE 'vf-[a-z-]+' | sort -u | tr '\n' ' '; }
 
+# Les deux agents nus de cycle dont le DISPATCH DIRECT est fermé (Lacune 5, plan 23-05) : la voie
+# unique d'invocation des briques de cycle est le skill (D-09). FONCTION PARTAGÉE AU NIVEAU DU
+# FICHIER, jamais dans un sous-shell de bloc : 23-07-PLAN.md prescrit à son bloc `T32` de la
+# réutiliser telle quelle et interdit une seconde fonction de détection — patron `deleted_hits()`
+# ci-dessus, même portée fichier.
+BRIQUES_NUES_RE='gsd-planner|gsd-executor'
+# « $1 (fichier) offre-t-il le dispatch direct d'une brique nue de cycle, DANS SON CORPS DE
+# PROMPT (hors ligne `tools:`) ? » → imprime les hits (vide sinon). La ligne `tools:` est un
+# contrat d'allowlist documenté, pas un dispatch prescrit : elle est vérifiée SÉPARÉMENT, par
+# égalité d'ensemble sur les entrées `Agent(...)` (T29 assertion sur vf-coder.md, T29/T18 sur
+# vf-dev-manager.md) — jamais confondue avec un dispatch en corps de prompt.
+brique_nue_dispatch_hits() { awk '!/^tools:/' "$1" 2>/dev/null | "$GREP" -oE "$BRIQUES_NUES_RE" | sort -u | tr '\n' ' '; }
+
 ROUTING="$REFS_DIR/intent-routing.md"
 
 echo "== test-dev-orchestrator (module: $MOD) =="
@@ -1648,8 +1661,10 @@ CODER_FILE="$MOD/agents/vf-coder.md"
 REVIEWER_FILE="$MOD/agents/vf-reviewer.md"
 AUDITER_FILE="$MOD/agents/vf-auditer.md"
 
+# gsd-planner et gsd-executor RETIRÉS (Lacune 5, plan 23-05, T29) : dispatch direct des agents
+# nus de cycle fermé, voie unique = skill (D-09). Les 20 autres entrées n'ont pas bougé.
 CODER_ALLOWED="vf-reviewer general-purpose gsd-assumptions-analyzer gsd-phase-researcher \
-gsd-pattern-mapper gsd-planner gsd-plan-checker gsd-executor gsd-codebase-mapper gsd-verifier \
+gsd-pattern-mapper gsd-plan-checker gsd-codebase-mapper gsd-verifier \
 gsd-code-reviewer gsd-code-fixer gsd-debugger gsd-integration-checker gsd-nyquist-auditor \
 gsd-ui-researcher gsd-ui-checker gsd-ui-auditor gsd-framework-selector gsd-ai-researcher \
 gsd-domain-researcher gsd-eval-planner"
@@ -5057,6 +5072,66 @@ else
   ok "T28 atteinte : $t28_derived point(s) de hook dérivé(s) du registre du moteur (C, D et E mesurent sur cette liste) ; fraîcheur F : $t28_f_state ; repli d'install G2 : $t28_g2_state"
 fi
 # >>> T28 FIN
+
+# ---------------------------------------------------------------------------
+# T29 (Lacune 5, plan 23-05, D-09/D-11/D-12) — la voie dégradée disparaît des DEUX workers du
+# module : plus de dispatch direct des agents nus `gsd-planner`/`gsd-executor`, ni en corps de
+# prompt ni en allowlist `tools:`. Fonction de détection au niveau du FICHIER
+# (`brique_nue_dispatch_hits`, définie plus haut) — PARTAGÉE avec le bloc `T32` de 23-07-PLAN.md,
+# qui l'interdit de la redéfinir : deux fonctions de détection pour la même chose serait la
+# régression que ce gate ferme.
+# ---------------------------------------------------------------------------
+t29_ok=1
+
+# assertion A : vf-coder.md ne contient les deux noms interdits NULLE PART (frontmatter compris).
+t29_a_hits="$("$GREP" -oE "$BRIQUES_NUES_RE" "$CODER_FILE" 2>/dev/null | sort -u | tr '\n' ' ')"
+if [ -n "$t29_a_hits" ]; then
+  ko "T29-A : vf-coder.md contient encore [ $t29_a_hits] — la voie dégradée n'est pas fermée"; t29_ok=0
+else
+  ok "T29-A : vf-coder.md ne contient plus aucune occurrence de gsd-planner/gsd-executor, ni en frontmatter ni en corps"
+fi
+
+# assertion B : aucun fichier d'agent du module n'offre un dispatch direct dans son CORPS de prompt.
+t29_b_hits=""
+for t29_bf in "$MOD"/agents/*.md; do
+  [ -f "$t29_bf" ] || continue
+  t29_bh="$(brique_nue_dispatch_hits "$t29_bf")"
+  [ -n "$t29_bh" ] && t29_b_hits="$t29_b_hits [$(basename "$t29_bf") : $t29_bh]"
+done
+if [ -n "$t29_b_hits" ]; then
+  ko "T29-B : dispatch direct offert dans le corps de prompt —$t29_b_hits"; t29_ok=0
+else
+  ok "T29-B : aucun agent de $MOD/agents/ n'offre le dispatch direct de gsd-planner/gsd-executor dans son corps de prompt"
+fi
+
+# assertion C : la voie LÉGITIME (les deux skills) reste nommée dans vf-coder.md — le retrait de
+# la voie dégradée n'a pas emporté la voie de cycle avec elle.
+if "$GREP" -q 'gsd-plan-phase' "$CODER_FILE" && "$GREP" -q 'gsd-execute-phase' "$CODER_FILE"; then
+  ok "T29-C : vf-coder.md invoque toujours nommément gsd-plan-phase ET gsd-execute-phase (voie légitime intacte)"
+else
+  ko "T29-C : vf-coder.md a perdu le nom d'au moins un des deux skills de cycle légitimes"; t29_ok=0
+fi
+
+# assertion D (DISCRIMINANTE, par mutation) — sur une COPIE de vf-coder.md où la phrase de
+# dispatch direct est réinjectée, la fonction doit remonter l'occurrence ; sur le fichier réel,
+# zéro. Exclusion motivée de scripts/tests/ (fixture de mutation ci-dessous, forme interdite par
+# construction) — même règle qu'en T25.
+T29_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T29_TMPDIR"
+T29_MUT="$T29_TMPDIR/mutant-coder-dispatch-direct.md"
+{ cat "$CODER_FILE"; printf '\n1. **Plan** : invoque `gsd-plan-phase` (ou dispatche l'\''agent `gsd-planner` via l'\''outil Agent).\n'; } > "$T29_MUT"
+if cmp -s "$CODER_FILE" "$T29_MUT"; then
+  ko "T29-D : mutant IDENTIQUE à vf-coder.md — l'injection n'a rien mordu, la preuve ne vaut rien"; t29_ok=0
+else
+  t29_d_hit="$(brique_nue_dispatch_hits "$T29_MUT")"
+  t29_d_reel="$(brique_nue_dispatch_hits "$CODER_FILE")"
+  if [ -n "$t29_d_hit" ] && [ -z "$t29_d_reel" ]; then
+    ok "T29-D (DISCRIMINANTE, par mutation) : la phrase de dispatch direct réinjectée dans une copie est détectée ([ $t29_d_hit]), le fichier RÉEL en reste à zéro"
+  else
+    ko "T29-D NON DISCRIMINANTE : mutant=[$t29_d_hit] réel=[$t29_d_reel] — la fonction ne sépare pas la copie fautive du fichier réel"; t29_ok=0
+  fi
+fi
+
+[ "$t29_ok" -eq 1 ] && ok "T29 : voie dégradée fermée sur vf-coder.md (corps ET allowlist), voie légitime intacte, discriminance prouvée par mutation"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
