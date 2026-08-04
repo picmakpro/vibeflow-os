@@ -56,7 +56,7 @@
 - [x] Phase 20: Fluidité du flux de dev sans perte de qualité (completed 2026-07-31)
 - [x] Phase 21: Alignement du moteur GSD sur gsd-core 1.9.0 (completed 2026-07-31)
 - [x] Phase 22: Hygiène documentaire — doctrine de sortie et captation d'intention (completed 2026-07-31)
-- [ ] Phase 23: Couplage explicite au moteur GSD — capabilities, flags et voie unique
+- [x] Phase 23: Couplage explicite au moteur GSD — capabilities, flags et voie unique
 - [ ] Phase 24: Activation et mesure du moteur GSD — capacités dormantes et faits de runtime
 - [ ] Phase 25: Budget d'instructions et étage d'alignement court
 - [x] Phase 26: Manuel utilisateur VibeFlow (manual/) (completed 2026-08-02)

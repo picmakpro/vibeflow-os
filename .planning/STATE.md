@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
 current_phase: 26
-current_phase_name: Manuel utilisateur VibeFlow (manual/) — livrée, PR ouverte (branche feat/phase-26-manuel-utilisateur)
+current_phase_name: jalon gsd-migration — dernière livraison : Phase 23 (couplage explicite au moteur GSD), publiée en v2.47.0 ; prochaine phase à traiter : 24
 status: complete
-stopped_at: "Phase 26 CLOSE — 9/9 plans livrés. Le manuel est PUBLIC et commité depuis le 2026-08-02 (94 fichiers : 88 pages 44x2 langues, 3 index, toc.yml, .tools/ ; gate manual/.tools/check-manual.sh exit 0). Renversement de la contrainte fondatrice par Samuel : D-14 (aucun git add sous manual/) RÉVOQUÉE, exclusion .git/info/exclude levée, rien dans .gitignore. D-7/D-8 DÉGELÉES TOTALEMENT le 2026-08-02 : dégraissage livré — README.md 295->180 lignes, README.fr.md 301->185, INSTALL.md 192->22 (stub de redirection). Le README raconte le projet, le manuel raconte l'usage (frontiere ecrite dans manual/fr/README.md:12). Parite 12/12 sections. Tous les liens visiteur resolvent ; lien mort pre-existant plugin/consolidator/README.md:32 (../INSTALL.md -> ../../INSTALL.md) corrige au passage. Deux points ouverts tranchés par Samuel en cours de mission : O-1 (slugs anglais sous manual/en/, hypothèse H-1 du toc.yml levée, appariement FR/EN devenu explicite) et la parité de contenu FR/EN (alignement par le haut, 31 pages portées sur 44, vérifiées 44/44 par juge frais). Volet GELÉ, non livré : le dégraissage de README.md/README.fr.md/INSTALL.md (D-7, D-8) — pointer vers un dossier absent du dépôt casserait les liens des visiteurs ; à reprendre le jour où le manuel sera publié. Prochain geste humain : merger la PR (aucun merge fait, ADR-059)."
-last_updated: "2026-08-02T00:00:00.000Z"
-last_activity: 2026-08-02 (Phase 26 — clôture, manuel livré hors git, PR ouverte)
+stopped_at: "Phase 23 CLOSE et PUBLIÉE — 8/8 plans exécutés et revus, PR #30 mergée, release racine v2.47.0 taggée et publiée (gate check-release-tag --remote vert). 9 exigences GSDC sur 10 soldées ; GSDC-08 en [~] sur l'écart D-22 (gsd-debugger présent dans vf-coder.md contre une décision « aucune exception » ET exigé par le gate T19 — les deux se tranchent ensemble, arbitrage humain). Deux RCE fermées. Suite du module 102 -> 161 cas, 47 suites vertes. Livré hors phase au passage : correctif de la course de récupération du lock de driver (PR #31, conductor v1.19.1) — jusqu'à 5 acquéreurs simultanés mesurés, lock devenu lien symbolique remplacé par rename(2). Reste ouvert et NON traité : la fuite d'info par symlink (slurp sans O_NOFOLLOW, sur les deux scripts, absente du threat model), la promotion d'A-15 en ADR, et nyquist_compliant=false sur 23-VALIDATION.md (rempli a posteriori, la continuité d'échantillonnage n'a pas pu être mesurée). Prochaine phase : 24."
+last_updated: "2026-08-04T00:00:00.000Z"
+last_activity: 2026-08-04 (Phase 23 — livrée, mergée, publiée en v2.47.0 ; worktrees p21/p23 élagués)
 
 # ⚠ Phase 21 close par sa gouvernance (plan 21-05), même patron que 20-07/c01f813 : 5/5 plans
 # livrés, vérification PASS PARTIEL 7/8 comblée (CI remise au vert — compteur de suites 44→45 —,
@@ -19,9 +19,9 @@ last_activity: 2026-08-02 (Phase 26 — clôture, manuel livré hors git, PR ouv
 # humain : merger la PR, puis `git tag -a v2.45.0` et `gh release create`.
 progress:
   total_phases: 26
-  completed_phases: 22
-  total_plans: 71
-  completed_plans: 71
+  completed_phases: 23
+  total_plans: 79
+  completed_plans: 79
 # ⚠ Compteurs curés À LA MAIN — PAS régénérés par `gsd-tools state` (ADR-063, cf.
 # plugin/dev-orchestrator/references/mission-contracts.md §STATE.md : toute invocation force
 # resync:true non désactivable et reproduirait la régression corrigée ici). Toute future mise à
