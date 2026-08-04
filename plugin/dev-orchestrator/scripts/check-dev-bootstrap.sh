@@ -42,18 +42,21 @@
 #   check-dev-bootstrap.sh [--path <dir>] [--hook] [--quiet]
 # Defaults: --path .
 #
-# --hook change UNIQUEMENT le format d'affichage (parité avec les deux autres scripts de la
-# phase) ; les 4 exits restent identiques avec ou sans. --hook et --quiet ensemble → exit 64.
+# --hook est accepté pour la PARITÉ D'INTERFACE avec les autres scripts de la phase, et il arme le
+# gate de mutuelle exclusion avec --quiet. Il ne change NI les 4 exits, NI le rendu : contrairement
+# à ses voisins, ce script est déjà en forme « hook » par construction — le signal part sur stdout,
+# les diagnostics humains sur stderr via `say`. Il n'y a donc rien à commuter, et la précédente
+# rédaction (« --hook change UNIQUEMENT le format d'affichage ») annonçait un comportement que le
+# code n'a jamais eu. Rendre stdout dépendant du drapeau serait un changement de contrat, pas une
+# correction : c'est la DOCUMENTATION qui était fausse. --hook et --quiet ensemble → exit 64.
 #
 # Workstreams GSD (GSDA-13) — QUELS CHEMINS BOUGENT, LESQUELS NE BOUGENT PAS :
 # Le moteur amont peut partitionner le planning en compartiments `.planning/workstreams/<nom>/`.
-# Le workstream actif est résolu dans cet ordre COURT-CIRCUITANT : VF_BOOTSTRAP_WORKSTREAM, puis
-# GSD_WORKSTREAM (canal de premier rang du moteur), puis la 1re ligne du pointeur PARTAGÉ in-repo
-# `<planning>/active-workstream`. Le nom est validé contre la politique du moteur
-# (workstream-name-policy.cjs : 1er caractère alphanumérique, puis alphanumériques, point,
-# souligné, tiret ; ni séparateur de chemin, ni `.`/`..`, ni `..` en sous-chaîne) plus une borne
-# locale de 80 caractères. Un nom hors politique est traité comme « aucun workstream » et n'est
-# JAMAIS concaténé dans un chemin (T-24-04-01).
+# Le workstream actif est résolu par `workstream-policy.sh` (planning-core), fichier SOURCÉ et
+# partagé par les quatre gates — voir son en-tête pour la politique UNIQUE, la parité amont exacte
+# et la gradation par rôle du cas « résolu mais dossier absent ». La surcharge historique
+# VF_BOOTSTRAP_WORKSTREAM reste le premier canal. Un nom hors politique est traité comme « aucun
+# workstream » et n'est JAMAIS concaténé dans un chemin ni réimprimé (T-24-04-01).
 #
 # FRONTIÈRE ASSUMÉE : le pointeur de SESSION en os.tmpdir() n'est PAS lu ici — il est indexé sur un
 # condensat du chemin absolu ET sur une clé de session que bash ne peut pas reproduire fidèlement.
@@ -106,47 +109,32 @@ say() { [ "$QUIET" -eq 1 ] || echo "[check-dev-bootstrap] $*" >&2; }
 PLANNING_DIR="${VF_BOOTSTRAP_PLANNING_DIR:-$ROOT/.planning}"
 
 # --- Résolution du workstream actif (GSDA-13) -------------------------------------------------
-# Politique de nom recopiée du moteur amont (workstream-name-policy.cjs) : la borne de longueur est
-# une addition LOCALE, strictement plus sévère — elle ne peut donc jamais accepter un nom qu'amont
-# refuserait. Le rejet est TOTAL : aucune concaténation, et la valeur brute n'est pas ré-imprimée
-# (elle est non maîtrisée par construction — T-24-04-01).
-ws_trim() { printf '%s' "$1" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'; }
-
-ws_name_valid() { # <nom>
-  local n="$1"
-  [ -n "$n" ] || return 1
-  [ "${#n}" -le 80 ] || return 1
-  case "$n" in */*|*\\*|.|..|*..*) return 1 ;; esac
-  printf '%s' "$n" | grep -Eq '^[a-zA-Z0-9][a-zA-Z0-9._-]*$'
-}
-
-# Imprime le nom résolu ET valide, ou RIEN. Sort en 2 (et n'imprime rien) quand un nom a bien été
-# résolu mais qu'il est hors politique — l'appelant distingue ainsi « aucun workstream » de
-# « workstream rejeté », sans jamais voir la valeur brute.
-ws_resolve() {
-  local n=""
-  if [ -n "${VF_BOOTSTRAP_WORKSTREAM:-}" ]; then
-    n="$VF_BOOTSTRAP_WORKSTREAM"
-  elif [ -n "${GSD_WORKSTREAM:-}" ]; then
-    n="$GSD_WORKSTREAM"
-  elif [ -r "$PLANNING_DIR/active-workstream" ]; then
-    n="$(head -n 1 "$PLANNING_DIR/active-workstream" 2>/dev/null)"
-  fi
-  n="$(ws_trim "$n")"
-  [ -n "$n" ] || return 0
-  ws_name_valid "$n" || return 2
-  printf '%s' "$n"
-}
-
-WORKSTREAM="$(ws_resolve)"; ws_rc=$?
+# La politique de nom n'est PLUS recopiée ici : elle est SOURCÉE depuis planning-core (voir son
+# en-tête pour la politique UNIQUE et sa gradation par rôle). Quatre copies en deux variantes
+# divergentes rendaient QUATRE verdicts différents sur le même arbre.
+WS_POLICY=""
+for _cand in "$(dirname "$0")/workstream-policy.sh" \
+             "$(dirname "$0")/../../planning-core/scripts/workstream-policy.sh"; do
+  [ -r "$_cand" ] && { WS_POLICY="$_cand"; break; }
+done
 PLANNING_SCOPE="$PLANNING_DIR"
-if [ "$ws_rc" -eq 2 ]; then
-  say "nom de workstream hors politique — rejeté, aucun chemin construit, lecture sur la racine."
-elif [ -n "$WORKSTREAM" ]; then
-  if [ -d "$PLANNING_DIR/workstreams/$WORKSTREAM" ]; then
-    PLANNING_SCOPE="$PLANNING_DIR/workstreams/$WORKSTREAM"
-  else
-    say "workstream « $WORKSTREAM » résolu mais $PLANNING_DIR/workstreams/$WORKSTREAM absent — lecture sur la racine."
+if [ -z "$WS_POLICY" ]; then
+  # RÔLE INJECTEUR (hook SessionStart) : fail-open, mais JAMAIS muet. Un exit non nul ici
+  # dégraderait toutes les sessions ; un silence masquerait l'absence d'outillage.
+  say "workstream-policy.sh introuvable — aucun compartiment résolu, lecture sur la racine."
+else
+  # shellcheck source=/dev/null
+  . "$WS_POLICY"
+  vf_ws_resolve "$PLANNING_DIR" "${VF_BOOTSTRAP_WORKSTREAM:-}"; ws_rc=$?
+  if [ "$ws_rc" -eq 2 ]; then
+    # Seule la RAISON est dite — la valeur brute est non maîtrisée par construction (T-24-04-01).
+    say "workstream rejeté par la politique amont ($VF_WS_REASON, canal $VF_WS_SOURCE) — aucun chemin construit, lecture sur la racine."
+  elif [ -n "$VF_WS_NAME" ]; then
+    if [ -d "$PLANNING_DIR/workstreams/$VF_WS_NAME" ]; then
+      PLANNING_SCOPE="$PLANNING_DIR/workstreams/$VF_WS_NAME"
+    else
+      say "workstream « $VF_WS_NAME » résolu mais $PLANNING_DIR/workstreams/$VF_WS_NAME absent — lecture sur la racine."
+    fi
   fi
 fi
 
