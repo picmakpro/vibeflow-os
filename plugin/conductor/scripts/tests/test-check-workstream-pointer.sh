@@ -289,10 +289,15 @@ fi
 # === MUT-2 — mutation du SCRIPT : neutraliser la branche « dossier absent » ========================
 # Le nom introuvable retombe alors sur un exit 0 : le cas 4 DOIT rougir. Restauration → vert.
 MUTD="$TMP/mutants"; mkdir -p "$MUTD"
+# Le motif suit la LETTRE du script : la condition de cette branche n'est plus `[ ! -d "$WS_DIR" ]`
+# mais le code rendu par `vf_ws_dir_resolve` (la construction de chemin suivie d'un `[ -d ]` a été
+# retirée — `[ -d ]` traverse les liens symboliques, ce qui faisait bénir « conforme » un
+# compartiment pointant hors du lab). Le mutant, lui, est inchangé dans son INTENTION : neutraliser
+# la branche « dossier absent » pour que le nom introuvable retombe sur un exit 0.
 cat > "$MUTD/neutralise-dossier-absent.awk" <<'AWKEOF'
 {
-  if (!fait && index($0, "if [ ! -d \"$WS_DIR\" ]; then") > 0) {
-    sub(/\[ ! -d "\$WS_DIR" \]/, "false")
+  if (!fait && index($0, "if [ \"$WS_DIR_RC\" -ne 0 ]; then") > 0) {
+    sub(/\[ "\$WS_DIR_RC" -ne 0 \]/, "false")
     fait = 1
   }
   print
