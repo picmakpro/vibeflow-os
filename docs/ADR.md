@@ -34,6 +34,8 @@
 | ADR-062 | 2026-07-31 | Les deux hooks 1.9.0 non câblés restent hors périmètre de `merge-hooks.sh` | Validée |
 | ADR-063 | 2026-07-31 | Anomalie d'agrégation `.planning/STATE.md` : dette d'artefact locale + bug amont non scopé — gate local, jamais de correction par `gsd-tools state` | Validée |
 | ADR-064 | 2026-08-01 | Un écrivain = un worktree : l'isolation des sessions concurrentes devient physique, et le claim de branche se dit à tout le monde (advisory) | Validée |
+| ADR-066 | 2026-08-04 | La zone 2 est activée, pas différée : un prérequis de version insatisfiable ne gate pas, et le risque mesuré est inexistant | Validée |
+| ADR-067 | 2026-08-04 | `hooks.community` refusé : c'est une mesure de style, pas de conformité — 6 types maison hors liste amont, 68 % des sujets > 72 caractères | Validée |
 
 ### ADR héritées les plus citées (définitions canoniques)
 
@@ -1549,3 +1551,155 @@ Reste non couvert, et assumé : deux sessions dans le **même** arbre sur la **m
 partagent un arbre, elles se voient — mais rien ne les empêche de committer l'une par-dessus
 l'autre. C'est le cas que l'utilisateur crée délibérément ; le fermer demanderait un verrou
 d'écriture dur, écarté ci-dessus.
+
+---
+
+## ADR-066 : La zone 2 est activée, pas différée — un prérequis insatisfiable ne gate pas
+
+**Date** : 2026-08-04 · **Statut** : Validée · **Décideur** : Samuel (dégel explicite du verdict
+`24-ARBITRAGES.md` zone 2) · **Complète** : ADR-063 (dette d'artefact locale vs bug amont)
+
+### Contexte
+
+Le verdict initial de la zone 2 — `workflow.windows_enforce` et `hooks.workflow_guard` — était
+**gaté sur un prérequis dur** : ne rien activer tant que `@opengsd/gsd-core` ne serait pas monté
+au-delà de **1.9.1**, à cause de l'issue amont **#2893** (`windows append`/`waive`/`fixed`
+réécrivent intégralement `WINDOWS.md` via `writeLedgerAtomic` → `renderLedger`, détruisant toute
+prose sous le ledger, et rapportant `ok: true`).
+
+Deux faits, re-vérifiés de première main le 2026-08-04, retirent au prérequis sa raison d'être.
+
+**1. Le prérequis est insatisfiable.** Le registre npm donne `dist-tags.latest` = **`1.9.1`**,
+publiée le **2026-07-31**, et **aucune version au-delà** : ni `1.9.2`, ni `1.10.x`, ni RC
+postérieure. La PR corrective **#2975** est mergée mais **non publiée**. Un gate dont la condition
+de levée n'existe pas n'est pas un gate prudent : c'est un **ajournement sans terme**, déguisé en
+précaution. La version installée sur la machine est bien 1.9.1 (`~/.claude/gsd-core/VERSION`).
+
+**2. Le risque mesuré est inexistant *sur ce fichier*.** `.planning/WINDOWS.md` fait **87 lignes**
+et ne porte **aucune prose libre** sous son ledger : frontmatter, en-tête figé que `renderLedger`
+régénère mot pour mot, table, miroir JSON — et rien d'autre. Le bug #2893 **n'a rien à détruire
+ici**. La prémisse qui fondait l'ajournement (« notre `WINDOWS.md` porte de la prose sous son
+ledger ») était **fausse en l'état**.
+
+### Décision
+
+**Doctrine GSD-first : on n'ajourne pas une capacité native du moteur contre un risque mesuré
+inexistant.** En conséquence, et dans cet ordre :
+
+**1. La fenêtre #3 est dérogée** (`gsd-tools windows waive 3`), et non « fermée » : la recette
+humaine XcodeBuildMCP (valider `test_sim`/`build_sim`/`clean` contre un serveur vivant) est
+**structurellement infermable dans ce dépôt** — aucun `.mcp.json`, aucun projet iOS, aucun
+simulateur. `vibeflow-os` est le repo de **distribution** du plugin ; cette recette appartient à un
+lab iOS équipé. Une fenêtre qu'aucun travail légitime dans ce dépôt ne peut clore n'est pas une
+dette : c'est une dérogation, et elle se dit comme telle, avec sa raison au ledger.
+
+**2. Les deux clés sont posées** dans `.planning/config.json` : `workflow.windows_enforce: true`
+et `hooks.workflow_guard: true`.
+
+### Ce qui a été vérifié, et comment
+
+**L'innocuité du `waive`, avant de l'exécuter pour de bon.** La commande a d'abord été **répétée
+sur une copie jetable** du fichier (`--cwd` vers un dépôt temporaire), et seulement ensuite jouée
+sur le vrai. Constat identique dans les deux cas : **87 lignes avant, 87 après**, fence JSON
+unique et refermée, miroir reparsé sans erreur (**5 entrées**, dont les **4 `fixed` intactes**),
+`open_count` 1 → 0 et `waived_count` 0 → 1. Le `git diff` ne porte que trois hunks, tous attendus.
+**Le bug #2893 ne s'est pas manifesté** — conformément à la mesure ci-dessus, il n'avait aucune
+prose à emporter.
+
+**L'armement réel du gate, par la requête même qu'exécute `/gsd-ship`.** Le workflow de ship
+n'interroge pas la clé de config : il résout les hooks actifs
+(`gsd-tools loop render-hooks ship:pre`) puis cherche un hook `capId == "broken-windows"`,
+`kind == "gate"`, `blocking == true`. Cette requête rend désormais ce hook. **Contre-épreuve
+jouée** sur une copie de la config **sans** la clé : seul le gate `security` s'y arme,
+`broken-windows` est absent. La clé est donc bien la cause, et le gate n'est pas déclaré mais
+**actif**. Le prédicat qu'il évaluera est `open_count == 0` en **égalité stricte**, avec `onError:
+halt` — sur un ledger illisible il **bloque**, il ne laisse pas passer.
+
+**La garde d'enchaînement, constatée en vol.** `hooks.workflow_guard` s'est manifestée pendant la
+rédaction même de cette entrée : l'édition directe de `docs/ADR.md` a déclenché son avis
+(« cette édition ne sera pas tracée dans STATE.md »). Elle est **advisory**, non bloquante —
+ADR-031 tenu.
+
+### Ce que la décision n'est pas
+
+**Ce n'est pas un blanc-seing sur les commandes `windows`.** Le défaut amont #2893 est **réel** et
+non corrigé dans 1.9.1. Ce qui est acté, c'est qu'il est **sans effet sur ce fichier tel qu'il
+est** — pas qu'il a disparu. D'où la précaution qui reste due, et qui est le vrai coût de cette
+décision : **si `.planning/WINDOWS.md` venait à recevoir de la prose libre sous son ledger, tout
+`windows append|waive|fixed` la détruirait silencieusement.** Tant que la version installée est
+≤ 1.9.1, le ledger reste un fichier **purement généré** : on n'y écrit pas à la main, et on le
+commite avant toute manipulation pour que le dégât reste récupérable.
+
+**Ce n'est pas une fermeture de la fenêtre #3.** Une dérogation n'est pas une résolution. La
+recette reste à faire, ailleurs, sur un lab équipé.
+
+### Note de veille — elle ne gate plus rien
+
+Le déclencheur de version qui figurait au verdict initial (« rouvrir ssi une version strictement
+supérieure à 1.9.1 portant le correctif #2893 est publiée ») **n'est plus une condition de
+reprise** : la zone 2 est activée, elle **n'attend plus rien**. Ce qui subsiste est une simple
+**veille d'hygiène** : quand une telle version paraîtra, la monter lèvera la fragilité résiduelle
+décrite ci-dessus et rendra le ledger manipulable sans précaution particulière. Aucun travail
+n'est suspendu à cette montée. Un lecteur qui croirait la zone 2 « en attente » se tromperait.
+
+---
+
+## ADR-067 : `hooks.community` refusé — c'est une mesure de style, pas de conformité
+
+**Date** : 2026-08-04 · **Statut** : Validée · **Décideur** : Samuel (arbitrage
+`24-ARBITRAGES.md`, zone 2) · **Voisine** : ADR-066 (même arbitrage, verdict inverse)
+
+### Contexte
+
+`hooks.community` arme un hook de **Conventional Commits bloquant** : liste de types figée
+(`feat|fix|docs|style|refactor|perf|test|build|ci|chore`) et sujet plafonné à **72 caractères**.
+
+Le refus doit être motivé par ce qu'il ferait à **notre** historique, pas par une préférence. La
+mesure ci-dessous a été **rejouée le 2026-08-04**, en caractères et non en octets — un décompte en
+octets sur des sujets français gonfle mécaniquement la longueur et fabriquerait un faux motif.
+
+### La mesure
+
+Corpus **nommé** : les **400 derniers commits sans merge** du dépôt (la mesure antérieure de la
+phase portait sur un corpus de 109 commits qui n'est plus reproductible tel quel ; les deux
+convergent sur la conclusion, ce qui compte davantage que le chiffre exact).
+
+| Confrontation à la règle amont | Résultat |
+|---|---|
+| Sujet dépassant **72 caractères** | **275 / 400 — 68 %** |
+| Type hors de la liste amont | **65 / 400 — 16 %** |
+
+Les préfixes fautifs sont **nos six types maison**, et ils ne sont pas anecdotiques :
+`release:` (29 occurrences), `planning:` (14), `doctrine:` (3), `plan`, `bump`, `spec`. Ils
+décrivent des gestes que la liste amont ne sait pas nommer — publier une version, tenir le
+planning, acter une doctrine.
+
+**Ce que dit ce tableau.** Le hook ne détecterait pas des commits négligés : il rejetterait
+**plus des deux tiers de notre manière d'écrire**, et six catégories de travail que nous faisons
+réellement. Ce n'est pas un gate de **conformité** — rien de ce qu'il refuse n'est incorrect. C'est
+un gate de **style**, et il impose un style qui n'est pas le nôtre. Un gate qu'on doit contourner
+tous les jours est un gate qu'on finit par désarmer, et le désarmer use la crédibilité de tous les
+autres.
+
+### Décision
+
+`hooks.community` **n'est pas posé** dans `.planning/config.json`.
+
+Le refus ne coûte aucune manipulation : `gsd-validate-commit.sh` s'auto-gate sur la config et sort
+`0` tant que `hooks.community !== true`. Refuser, c'est **ne pas poser la clé** — l'état de fait,
+désormais motivé plutôt que subi.
+
+### Le fait que cette ADR redresse
+
+Le ROADMAP §Phase 24 affirmait que « le lab impose déjà des commits conventionnels en français par
+consigne — un gate existe ». **C'est faux.** Aucun `plugin/*/hooks/hooks.json` ne déclare de gate
+de message de commit, et `scripts/hooks/pre-push` est le gate de **tag de release**, pas de
+message. La convention de commit de ce dépôt est une **consigne du `CLAUDE.md`** (« messages en
+français, cohérents avec l'historique »), **jamais une garantie machine**. C'est acté ici pour
+qu'on ne puisse plus invoquer un gate qui n'existe pas.
+
+### Déclencheur de réexamen
+
+Rouvrir **ssi** la liste de types amont s'élargit à nos six types maison, **ou** que sa limite de
+sujet dépasse 72 caractères, **ou** que nous décidions de réaligner notre convention sur la liste
+amont — cette dernière étant une décision de `CLAUDE.md`, pas de configuration.
