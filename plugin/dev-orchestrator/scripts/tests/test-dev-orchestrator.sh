@@ -4609,10 +4609,61 @@ T28_CORE_LIB="$(t28_core_lib)"
 T28_REG=""
 [ -n "$T28_CORE_LIB" ] && T28_REG="$T28_CORE_LIB/capability-registry.cjs"
 
+# DÉRIVATION DE LA VÉRITÉ TERRAIN — require()-FREE (F4, plan 23-04b). Le registre résolu par
+# t28_core_lib() suit la MÊME priorité repo-local que la cascade du générateur : un require() ici
+# EXÉCUTAIT donc le même fichier potentiellement piégé que celui que le générateur ne doit plus
+# charger — un test qui exécute le piège qu'il prétend refuser est le faux vert le plus coûteux de
+# la phase. Cette extraction est INDÉPENDANTE de celle du générateur (algorithme distinct : ici un
+# comptage de profondeur direct sur les clés de PREMIER NIVEAU, jamais jsLiteralToJSON) — une
+# suite qui dériverait sa vérité terrain EN APPELANT le générateur ne vérifierait que la cohérence
+# du générateur avec lui-même (voir le commentaire de t28_core_lib ci-dessus). Gardée par le même
+# triptyque de type/taille que le lecteur du générateur (openSync non bloquant + fstat + isFile +
+# plafond), pour ne pas rouvrir via ce chemin le DoS que F6 ferme côté générateur.
 T28_POINTS="$T28_TMPDIR/points.txt"; : > "$T28_POINTS"
+T28_GT="$T28_TMPDIR/verite-terrain.js"
+cat > "$T28_GT" <<'NODE_GT'
+'use strict';
+var fs = require('fs');
+var p = process.argv[2];
+var MAXB = 2 * 1024 * 1024;
+var txt = null, fd = -1;
+try {
+  fd = fs.openSync(p, fs.constants.O_RDONLY | (fs.constants.O_NONBLOCK || 0));
+  var st = fs.fstatSync(fd);
+  if (st.isFile() && st.size <= MAXB) txt = fs.readFileSync(fd, 'utf8');
+} catch (e) { /* garde : rien à lire */ }
+finally { if (fd >= 0) { try { fs.closeSync(fd); } catch (e2) {} } }
+if (txt === null) process.exit(0);
+var anchor = /\bbyLoopPoint\s*[:=]\s*\{/.exec(txt);
+if (!anchor) process.exit(0);
+var start = anchor.index + anchor[0].length - 1, depth = 0, inStr = null, esc = false, end = -1;
+for (var i = start; i < txt.length; i++) {
+  var c = txt[i];
+  if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === inStr) inStr = null; continue; }
+  if (c === '"' || c === "'" || c === '`') { inStr = c; continue; }
+  if (c === '{') depth++;
+  else if (c === '}') { depth--; if (depth === 0) { end = i; break; } }
+}
+if (end < 0) process.exit(0);
+var region = txt.slice(start, end + 1);
+var d2 = 0, s2 = null, esc2 = false;
+for (var j = 0; j < region.length; j++) {
+  var cc = region[j];
+  if (s2) { if (esc2) esc2 = false; else if (cc === '\\') esc2 = true; else if (cc === s2) s2 = null; continue; }
+  if (cc === '"' || cc === "'") {
+    if (d2 === 1) {
+      var rest = region.slice(j);
+      var m = new RegExp("^(['\"])((?:\\\\.|(?!\\1)[^\\\\])*)\\1\\s*:").exec(rest);
+      if (m) process.stdout.write(m[2] + '\n');
+    }
+    s2 = cc; continue;
+  }
+  if (cc === '{') d2++;
+  else if (cc === '}') d2--;
+}
+NODE_GT
 if [ -n "$T28_REG" ] && [ -f "$T28_REG" ] && command -v node >/dev/null 2>&1; then
-  node -e 'var r = require(process.argv[1]); var b = (r && r.byLoopPoint) || {}; Object.keys(b).forEach(function (k) { process.stdout.write(k + "\n"); });' \
-    "$T28_REG" > "$T28_POINTS" 2>/dev/null || : > "$T28_POINTS"
+  node "$T28_GT" "$T28_REG" 2>/dev/null | sort -u > "$T28_POINTS" || : > "$T28_POINTS"
 fi
 t28_points_n="$(awk 'END{print NR+0}' "$T28_POINTS")"
 [ "$t28_points_n" -gt 0 ] && t28_derived="$t28_points_n"
@@ -4752,6 +4803,411 @@ else
     ko "T28-G2 : le repli best-effort ne tient pas — exit=$t28_g2_rc (attendu 0), agent posé=$t28_g2_agent, références posées=$t28_g2_refs, ligne(s) de repli=$t28_g2_log (attendu ≥ 1) : un moteur absent doit dégrader, jamais amputer l'install"
   fi
 fi
+
+# ---------------------------------------------------------------------------
+# T28-H/I/J/K — Fermeture de F1/T-23-04-07 (RCE via require(), arbitrage A-12) et de ses
+# corollaires F3/F4/F6 (23-ARBITRAGES.md §A-12 : « traiter F2, F3, F4 et F6 AVEC F1, même racine »).
+#
+# Les fonctions t28h_verify / t28i_verify / t28k_verify sont PARAMÉTRÉES par le script générateur
+# à tester (défaut $T28_GEN) : c'est ce qui permet de les REJOUER telles quelles contre une copie
+# MUTÉE plus bas, sans dupliquer la logique — une seconde implémentation prouverait la mutation,
+# pas l'original.
+# ---------------------------------------------------------------------------
+
+# === T28-H — NON-EXÉCUTION (F1/F3 volet dynamique, cas 34 de check-gsd-config.sh) ===============
+# Le vecteur : default_core_lib() (build-gsd-capabilities-index.sh:63-80) résout en PREMIER
+# $root/.claude/gsd-core/bin/lib — un chemin DANS le dépôt audité. Tant que le générateur faisait
+# require(registryPath), un capability-registry.cjs à effet de bord déposé dans un dépôt cloné
+# suffisait à exécuter du code arbitraire à la régénération — chaîne bouclée par l'auditeur
+# jusqu'à `vibeflow-update.sh install dev-orchestrator`, rc=0, silencieux (l'appel post-install
+# best-effort absorbe l'échec). La cascade n'a pas changé ; c'est l'exécution qui a disparu.
+#
+# ANTI « VERT À VIDE » : un témoin qui ne s'écrit jamais ne prouve rien seul — un générateur qui
+# échouerait avant même d'ouvrir le fichier, ou qui fabriquerait un succès vide, satisferait
+# « aucun témoin » tout aussi bien qu'un générateur qui lit correctement. Le fixture porte donc
+# AUSSI un point réel avec un schéma de version et un capId distinctifs, et l'assertion exige que
+# ce contenu ressorte dans la table produite.
+T28H_LIB="$T28_TMPDIR/registre-piege-h"; mkdir -p "$T28H_LIB"
+T28H_WITNESS="$T28_TMPDIR/witness-h.txt"
+cat > "$T28H_LIB/capability-registry.cjs" <<'T28_FIXTURE_H'
+require('fs').writeFileSync(process.env.T28H_WITNESS_PATH, 'PWNED');
+module.exports = {
+  version: '9',
+  byLoopPoint: {
+    'fixture:h-alpha': { steps: [{ capId: 'fx-alpha-h28', when: 'fixture.alpha.h28', onError: 'skip' }], contributions: [], gates: [] }
+  }
+};
+T28_FIXTURE_H
+
+t28h_verify() { # <script generateur> -> T28H_OK (0/1), T28H_MSG
+  local gen="$1" out rc witness=0 content=0 capid=0 version=0
+  rm -f "$T28H_WITNESS"
+  out="$T28_TMPDIR/index-h-$(basename "$gen").md"
+  T28H_WITNESS_PATH="$T28H_WITNESS" VF_GSD_CORE_LIB="$T28H_LIB" VF_CAPS_INDEX_OUT="$out" bash "$gen" >/dev/null 2>&1
+  rc=$?
+  [ -f "$T28H_WITNESS" ] && witness=1
+  [ -f "$out" ] && "$GREP" -qF 'fixture:h-alpha' "$out" && content=1
+  [ -f "$out" ] && "$GREP" -qF 'fx-alpha-h28' "$out" && capid=1
+  [ -f "$out" ] && "$GREP" -qF '`9`' "$out" && version=1
+  if [ "$rc" -eq 0 ] && [ "$witness" -eq 0 ] && [ "$content" -eq 1 ] && [ "$capid" -eq 1 ] && [ "$version" -eq 1 ]; then
+    T28H_OK=1; T28H_MSG="rc=$rc temoin=$witness contenu=$content capid=$capid version=$version"
+  else
+    T28H_OK=0; T28H_MSG="rc=$rc (attendu 0) temoin=$witness (attendu 0 — sa présence prouve une RCE) contenu=$content capid=$capid version=$version (les trois derniers attendus à 1)"
+  fi
+}
+
+if [ -x "$T28_GEN" ] && command -v node >/dev/null 2>&1; then
+  t28h_verify "$T28_GEN"
+  if [ "$T28H_OK" -eq 1 ]; then
+    ok "T28-H NON-EXÉCUTION (F1/F3, cas 34) : un registre piégé (effet de bord à l'écriture) résolu via VF_GSD_CORE_LIB n'écrit AUCUN témoin — le générateur ne l'exécute pas — ET produit la table depuis son contenu réel (point, capId, schéma de version) : il a bien été LU, pas juste évité en silence ($T28H_MSG)"
+  else
+    ko "T28-H NON-EXÉCUTION : $T28H_MSG"
+  fi
+else
+  skip "T28-H NON-EXÉCUTION : générateur absent/non exécutable ou node introuvable — rien à mesurer"
+  T28H_OK=-1
+fi
+
+# === T28-I — CRITÈRE STATIQUE (F3 volet statique, cas 35 de check-gsd-config.sh) =================
+# Pendant du cas 34 : celui-ci mesure une PROPRIÉTÉ DU TEXTE du programme node, donc vaut pour tout
+# moteur, y compris ceux qu'aucune fixture ne représente. Même doctrine qu'à check-gsd-config.sh :
+# neutraliser d'abord (commentaires, chaînes, littéraux de regex, gabarits), éroder ensuite les
+# SEULES formes licites de ce programme — require('fs') (aucun require('path') : ce générateur ne
+# lit qu'UN fichier, passé déjà résolu en argv, jamais path.join) et process.(argv|exit|stderr|stdout)
+# — puis exiger un RÉSIDU VIDE sur require/eval/import/module/constructor/global/reflect/_load/
+# binding/dlopen/webassembly/vm/process. Listes blanches d'appels et de regex dérivées de CE
+# programme précis (voir commentaire d'origine dans check-gsd-config.sh pour le détail des choix).
+t28i_verify() { # <script generateur> -> T28I_OK (0/1), T28I_MSG
+  local gen="$1" np lexout lexerr rxout callout
+  np="$T28_TMPDIR/np-$(basename "$gen").js"
+  awk '
+    /^cat > "\$prog_tmp" <<.NODE_PROGRAM./ { inb = 1; next }
+    inb && /^NODE_PROGRAM$/                { inb = 0; next }
+    inb                                    { print }
+  ' "$gen" > "$np"
+  local n_at="$(awk '{ n += gsub(/@/, "") } END{ print n+0 }' "$np")"
+  lexout="$T28_TMPDIR/np-neutre-$(basename "$gen").txt"; lexerr="$T28_TMPDIR/np-lex-$(basename "$gen").txt"
+  rxout="$T28_TMPDIR/np-regex-$(basename "$gen").txt"; callout="$T28_TMPDIR/np-calls-$(basename "$gen").txt"
+  : > "$rxout"; : > "$callout"
+  awk -v REGEX_OUT="$rxout" '
+    BEGIN { st = "n"; unterm = 0; nregex = 0; tn = 0; bdepth = 0 }
+    {
+      line = $0; outl = (st == "t") ? "@" : ""; i = 1; L = length(line)
+      while (i <= L) {
+        c = substr(line, i, 1)
+        if (st == "n") {
+          d = substr(line, i, 2)
+          if (d == "//") { i = L + 1; continue }
+          if (d == "/*") { st = "b"; i += 2; continue }
+          if (c == "/") {
+            j = i + 1; inclass = 0; lit = "/"
+            while (j <= L) {
+              e = substr(line, j, 1)
+              if (e == "\\") { lit = lit substr(line, j, 2); j += 2; continue }
+              if (e == "[") inclass = 1
+              else if (e == "]") inclass = 0
+              else if (e == "/" && inclass == 0) break
+              lit = lit e; j++
+            }
+            if (j > L) { regex_bad++; outl = outl "@@"; i = L + 1; continue }
+            lit = lit "/"; j++
+            while (j <= L && substr(line, j, 1) ~ /[a-z]/) { lit = lit substr(line, j, 1); j++ }
+            print lit > REGEX_OUT
+            nregex++; outl = outl "@@"; i = j; continue
+          }
+          if (c == "\047") { st = "s"; outl = outl "@"; i++; continue }
+          if (c == "\"")   { st = "d"; outl = outl "@"; i++; continue }
+          if (c == "`")    { st = "t"; outl = outl "@"; i++; continue }
+          if (c == "{") { bdepth++; outl = outl c; i++; continue }
+          if (c == "}") {
+            if (bdepth > 0) { bdepth-- }
+            else if (tn > 0) { st = "t"; bdepth = tsave[tn]; tn--; outl = outl "@"; i++; continue }
+            outl = outl c; i++; continue
+          }
+          outl = outl c; i++; continue
+        }
+        if (st == "b") {
+          e = index(substr(line, i), "*/")
+          if (e == 0) { i = L + 1 } else { i = i + e + 1; st = "n" }
+          continue
+        }
+        if (c == "\\") { i += 2; continue }
+        if (st == "t" && substr(line, i, 2) == "${") {
+          tn++; tsave[tn] = bdepth; bdepth = 0; st = "n"; outl = outl "@"; i += 2; continue
+        }
+        if ((st == "s" && c == "\047") || (st == "d" && c == "\"") || (st == "t" && c == "`")) {
+          st = "n"; outl = outl "@"; i++; continue
+        }
+        outl = outl c; i++
+      }
+      if (st == "s" || st == "d") { unterm++; st = "n"; outl = outl "@" }
+      else if (st == "t") { outl = outl "@" }
+      print outl
+    }
+    END { printf "%d %s %d %d %d\n", unterm, st, nregex, regex_bad + 0, tn > REGEX_STAT }
+  ' REGEX_STAT="$lexerr" "$np" > "$lexout"
+  local lex_unterm lex_state lex_nrx lex_rxbad lex_tn
+  lex_unterm="$(awk '{print $1}' "$lexerr")"; lex_state="$(awk '{print $2}' "$lexerr")"
+  lex_nrx="$(awk '{print $3}' "$lexerr")"; lex_rxbad="$(awk '{print $4}' "$lexerr")"; lex_tn="$(awk '{print $5}' "$lexerr")"
+
+  eval "$(awk -v CALLS_OUT="$callout" '
+    {
+      l = $0
+      n_core   += gsub(/require\(@fs@\)/, "", l)
+      n_procok += gsub(/process\.(argv|exit|stderr|stdout)/, "", l)
+      gsub(/@[^@]*@/, "@@", l)
+      n_bigF   += gsub(/Function/, "", l)
+      ll = tolower(l)
+      n_res += gsub(/require|eval|import|module|constructor|global|reflect|_load|binding|dlopen|webassembly|process/, "", ll)
+      n_res += gsub(/(^|[^a-z0-9_$])vm([^a-z0-9_$]|$)/, "", ll)
+      while (match(l, /[A-Za-z_$][A-Za-z0-9_$]*[ \t]*\(/)) {
+        tok = substr(l, RSTART, RLENGTH); sub(/[ \t]*\($/, "", tok)
+        print tok > CALLS_OUT
+        l = substr(l, RSTART + RLENGTH)
+      }
+    }
+    END { printf "n_core=%d; n_procok=%d; n_bigF=%d; n_res=%d\n", n_core, n_procok, n_bigF, n_res }
+  ' "$lexout")"
+
+  local calls_seen calls_allow rx_seen rx_allow calls_intrus rx_intrus n_calls n_np n_registrypath has_src
+  calls_seen="$T28_TMPDIR/cs-$(basename "$gen").txt"; calls_allow="$T28_TMPDIR/ca-$(basename "$gen").txt"
+  rx_seen="$T28_TMPDIR/rs-$(basename "$gen").txt"; rx_allow="$T28_TMPDIR/ra-$(basename "$gen").txt"
+  sort -u "$callout" > "$calls_seen"; sort -u "$rxout" > "$rx_seen"
+  printf '%s\n' RegExp String balancedRegions catch cell closeSync code exec fstatSync for \
+    if indexOf isArray isFile join jsLiteralToJSON keys openSync parse push readByLoopPoint \
+    readFileSync readQuotedStringAt readVersion replace slice slurp stringify test trim while write \
+    | sort -u > "$calls_allow"
+  { printf '%s\n' '/([A-Za-z_$][A-Za-z0-9_$]*)(\s*):/y' '/,(\s*[}\]])/g' '/[\r\n]+/g' '/\\'"'"'/g' \
+      '/\bversion\s*:\s*/g' '/\s/' '/\|/g' '/s$/'; } | sort -u > "$rx_allow"
+  calls_intrus="$(comm -23 "$calls_seen" "$calls_allow" | tr '\n' ' ')"
+  rx_intrus="$(comm -23 "$rx_seen" "$rx_allow" | tr '\n' ' ')"
+  n_calls="$(awk 'END{print NR+0}' "$calls_seen")"
+  n_np="$(awk 'END{print NR+0}' "$np")"
+  n_registrypath="$(awk '{ n += gsub(/slurp\(registryPath\)/, "") } END{ print n+0 }' "$np")"
+  has_src=0; case "$(cat "$np")" in *byLoopPoint*) has_src=1 ;; esac
+
+  local extracted=0 lexsain=0
+  [ "$n_np" -ge 100 ] && [ "$has_src" -eq 1 ] && [ "$n_registrypath" -ge 1 ] \
+    && [ "$n_calls" -ge 15 ] && [ "$lex_nrx" -ge 4 ] && extracted=1
+  [ "$n_at" -eq 0 ] && [ "$lex_unterm" -eq 0 ] && [ "$lex_state" = "n" ] \
+    && [ "$lex_rxbad" -eq 0 ] && [ "$lex_tn" -eq 0 ] && lexsain=1
+
+  if [ "$extracted" -eq 1 ] && [ "$lexsain" -eq 1 ] \
+     && [ "$n_res" -eq 0 ] && [ "$n_bigF" -eq 0 ] && [ "$n_core" -ge 1 ] \
+     && [ -z "$calls_intrus" ] && [ -z "$rx_intrus" ]; then
+    T28I_OK=1
+    T28I_MSG="corps=$n_np lignes coeur=$n_core residu=$n_res appels=$n_calls regex=$lex_nrx"
+  else
+    T28I_OK=0
+    T28I_MSG="corps=$n_np (plancher 100) src=$has_src registrypath=$n_registrypath lexeur(@=$n_at chaine_ouverte=$lex_unterm etat=$lex_state regex_cassee=$lex_rxbad interpolation=$lex_tn) coeur=$n_core residu=$n_res Function=$n_bigF appels=$n_calls intrus_appels=[$calls_intrus] regex=$lex_nrx intrus_regex=[$rx_intrus]"
+  fi
+}
+
+t28i_verify "$T28_GEN"
+if [ "$T28I_OK" -eq 1 ]; then
+  ok "T28-I CRITÈRE STATIQUE (F3, cas 35) : le programme node du générateur n'a, après neutralisation des commentaires/chaînes/regex/gabarits et érosion de son unique chargement cœur licite (require('fs')) et de ses accès process licites, AUCUN résidu de chargement — noms appelés et littéraux de regex tous dans la liste blanche ($T28I_MSG)"
+else
+  ko "T28-I CRITÈRE STATIQUE : $T28I_MSG"
+fi
+
+# === T28-J — GARDE DE LECTURE : bornée en durée, sur les trois pièges (F6) ========================
+# Le cas 34 prouve que le registre n'est pas EXÉCUTÉ ; celui-ci prouve qu'il n'est pas lu n'importe
+# comment. `[ -f "$REGISTRY" ]` (build-gsd-capabilities-index.sh:96) protège déjà INCIDEMMENT de la
+# FIFO et du lien-périphérique pour CE script (contrairement à check-gsd-config.sh, qui lit SIX
+# cibles dont cinq non gardées côté shell) : c'est mesuré ci-dessous, pas supposé — les deux pièges
+# sont donc rejetés avant même que node ne tourne. La garde de TYPE ET DE TAILLE posée dans le
+# programme node reste la ligne de défense qui compte pour (a) le plafond de TAILLE, qu'aucun
+# `[ -f ]` ne borne, et (b) la fenêtre TOCTOU entre ce test shell et la lecture. La preuve la plus
+# nette du volet « moitié 1 » (un lecteur qui ne CHARGE pas ne peut pas BOUCLER) est une boucle
+# infinie au niveau MODULE : require() y resterait bloqué à jamais (mesuré séparément, non rejoué
+# ici pour ne pas dépendre d'un process tué en boucle dans la suite), le lecteur de texte, lui,
+# n'exécute jamais ce corps et termine immédiatement.
+T28J_PLAFOND=3
+run_borne_t28j() { # <budget-s> <commande...> -> T28J_RC, T28J_SEC, contenu dans T28J_OUT
+  local budget="$1"; shift
+  local t0=$SECONDS pid wd r
+  T28J_OUT="$T28_TMPDIR/borne-j.out"; : > "$T28J_OUT"
+  { "$@" >"$T28J_OUT" 2>/dev/null & pid=$!
+    { sleep "$budget"; kill -9 "$pid"; } >/dev/null 2>&1 &
+    wd=$!
+    wait "$pid"; r=$?
+    kill "$wd" 2>/dev/null; wait "$wd" 2>/dev/null
+  } 2>/dev/null
+  T28J_RC=$r; T28J_SEC=$((SECONDS - t0))
+}
+
+t28j_ko=""
+if [ -x "$T28_GEN" ]; then
+  # (1) fichier ordinaire hors plafond de taille — le seul piège que `[ -f ]` ne ferme pas.
+  T28J_LAB="$T28_TMPDIR/lab-taille-j"; mkdir -p "$T28J_LAB"
+  awk 'BEGIN{ pad = sprintf("%1000s", ""); for (i = 0; i < 2600; i++) printf "// %s\n", pad }' > "$T28J_LAB/capability-registry.cjs"
+  printf 'module.exports = { version: "1", byLoopPoint: { "x": {} } };\n' >> "$T28J_LAB/capability-registry.cjs"
+  run_borne_t28j "$T28J_PLAFOND" env VF_GSD_CORE_LIB="$T28J_LAB" VF_CAPS_INDEX_OUT="$T28_TMPDIR/out-j-taille.md" bash "$T28_GEN"
+  [ "$T28J_RC" -lt 128 ] || t28j_ko="$t28j_ko [taille NON-TERMINE-tue-apres-${T28J_PLAFOND}s]"
+  case "$T28J_RC" in 0|1) : ;; *) t28j_ko="$t28j_ko [taille hors-contrat-rc=$T28J_RC]" ;; esac
+  [ "$T28J_SEC" -le "$T28J_PLAFOND" ] || t28j_ko="$t28j_ko [taille duree=${T28J_SEC}s>plafond]"
+  [ "$T28J_RC" -eq 1 ] || t28j_ko="$t28j_ko [taille rc=$T28J_RC attendu 1 (garde de taille doit refuser)]"
+
+  # (2) FIFO à la place du registre — déjà rejetée par `[ -f ]`, mesuré (rien de non-ordinaire ne
+  # doit jamais atteindre le SessionStart/install, quelle que soit la ligne de défense qui l'arrête).
+  T28J_LABF="$T28_TMPDIR/lab-fifo-j"; mkdir -p "$T28J_LABF"; rm -f "$T28J_LABF/capability-registry.cjs"
+  mkfifo "$T28J_LABF/capability-registry.cjs" 2>/dev/null
+  run_borne_t28j "$T28J_PLAFOND" env VF_GSD_CORE_LIB="$T28J_LABF" VF_CAPS_INDEX_OUT="$T28_TMPDIR/out-j-fifo.md" bash "$T28_GEN"
+  [ "$T28J_RC" -lt 128 ] || t28j_ko="$t28j_ko [fifo NON-TERMINE-tue-apres-${T28J_PLAFOND}s]"
+  case "$T28J_RC" in 0|1) : ;; *) t28j_ko="$t28j_ko [fifo hors-contrat-rc=$T28J_RC]" ;; esac
+  [ "$T28J_SEC" -le "$T28J_PLAFOND" ] || t28j_ko="$t28j_ko [fifo duree=${T28J_SEC}s>plafond]"
+
+  # (3) lien vers /dev/zero — invérifiable sans /dev/zero caractère (même doctrine que le cas 31/36
+  # de check-gsd-config.sh : KO « non vérifiable », jamais dégradé en vert).
+  if [ -c /dev/zero ]; then
+    T28J_LABZ="$T28_TMPDIR/lab-devzero-j"; mkdir -p "$T28J_LABZ"; rm -f "$T28J_LABZ/capability-registry.cjs"
+    ln -s /dev/zero "$T28J_LABZ/capability-registry.cjs"
+    run_borne_t28j "$T28J_PLAFOND" env VF_GSD_CORE_LIB="$T28J_LABZ" VF_CAPS_INDEX_OUT="$T28_TMPDIR/out-j-devzero.md" bash "$T28_GEN"
+    [ "$T28J_RC" -lt 128 ] || t28j_ko="$t28j_ko [devzero NON-TERMINE-tue-apres-${T28J_PLAFOND}s]"
+    case "$T28J_RC" in 0|1) : ;; *) t28j_ko="$t28j_ko [devzero hors-contrat-rc=$T28J_RC]" ;; esac
+    [ "$T28J_SEC" -le "$T28J_PLAFOND" ] || t28j_ko="$t28j_ko [devzero duree=${T28J_SEC}s>plafond]"
+    t28j_devzero_ok=1
+  else
+    t28j_devzero_ok=0
+  fi
+
+  if [ "$t28j_devzero_ok" -ne 1 ]; then
+    ko "T28-J GARDE DE LECTURE : /dev/zero absent ou non caractère : le piège qui exercerait la garde de TYPE côté node est INVÉRIFIABLE sur ce poste — cas non vérifiable, pas un succès"
+  elif [ -z "$t28j_ko" ]; then
+    ok "T28-J GARDE DE LECTURE (F6) : les trois pièges (taille hors plafond, FIFO, lien vers /dev/zero) TERMINENT sous le plafond de ${T28J_PLAFOND}s et restent dans le contrat {0,1} — aucun n'a pu faire attendre indéfiniment le processus d'install best-effort qui invoque ce générateur"
+  else
+    ko "T28-J GARDE DE LECTURE : aucune cible non ordinaire ou hors plafond ne doit faire attendre indéfiniment — echecs=[$t28j_ko]"
+  fi
+else
+  skip "T28-J GARDE DE LECTURE : générateur absent ou non exécutable — rien à mesurer"
+fi
+
+# === T28-K — SIGNAL A-9 : trois constats DISTINCTS, jamais confondus =============================
+# (a) EXTRACTION PÉRIMÉE (ancre byLoopPoint introuvable — la forme du moteur a changé) ;
+# (b) DÉCLARATION CALCULÉE (ancre présente mais non-littérale : `byLoopPoint = buildTable();`),
+#     même famille que (a) — l'extraction ne suit aucune indirection, elle échoue pareillement ;
+# (c) VIDE MAIS LU (byLoopPoint: {}) — une DONNÉE, pas une panne : message DIFFÉRENT de (a)/(b), et
+#     ne doit JAMAIS porter la mention « PERIMEE ». Les confondre ferait crier au périmé sur un
+#     moteur parfaitement lisible (a), ou masquerait un moteur devenu illisible derrière le message
+#     paisible d'un moteur simplement vide (b, c).
+T28K_S="$T28_TMPDIR/registre-stale";  mkdir -p "$T28K_S"
+printf 'module.exports = { version: "1", autreChose: {} };\n' > "$T28K_S/capability-registry.cjs"
+T28K_C="$T28_TMPDIR/registre-calcule"; mkdir -p "$T28K_C"
+printf 'const byLoopPoint = buildTable();\nmodule.exports = { version: "1", byLoopPoint: byLoopPoint };\n' > "$T28K_C/capability-registry.cjs"
+T28K_V="$T28_TMPDIR/registre-vide"; mkdir -p "$T28K_V"
+printf 'module.exports = { version: "1", byLoopPoint: {} };\n' > "$T28K_V/capability-registry.cjs"
+
+t28k_verify() { # <script generateur> -> T28K_OK (0/1), T28K_MSG
+  local gen="$1" out_s out_c out_v err_s err_c err_v rc_s rc_c rc_v
+  out_s="$T28_TMPDIR/out-k-s-$(basename "$gen").md"; out_c="$T28_TMPDIR/out-k-c-$(basename "$gen").md"; out_v="$T28_TMPDIR/out-k-v-$(basename "$gen").md"
+  err_s="$T28_TMPDIR/err-k-s-$(basename "$gen").txt"; err_c="$T28_TMPDIR/err-k-c-$(basename "$gen").txt"; err_v="$T28_TMPDIR/err-k-v-$(basename "$gen").txt"
+  VF_GSD_CORE_LIB="$T28K_S" VF_CAPS_INDEX_OUT="$out_s" bash "$gen" >/dev/null 2>"$err_s"; rc_s=$?
+  VF_GSD_CORE_LIB="$T28K_C" VF_CAPS_INDEX_OUT="$out_c" bash "$gen" >/dev/null 2>"$err_c"; rc_c=$?
+  VF_GSD_CORE_LIB="$T28K_V" VF_CAPS_INDEX_OUT="$out_v" bash "$gen" >/dev/null 2>"$err_v"; rc_v=$?
+  local perime_s=0 perime_c=0 perime_v=0 vide_v=0
+  "$GREP" -qF 'PERIMEE' "$err_s" && perime_s=1
+  "$GREP" -qF 'PERIMEE' "$err_c" && perime_c=1
+  "$GREP" -qF 'PERIMEE' "$err_v" && perime_v=1
+  "$GREP" -qF 'ne declare aucun point de hook' "$err_v" && vide_v=1
+  if [ "$rc_s" -eq 1 ] && [ "$perime_s" -eq 1 ] \
+     && [ "$rc_c" -eq 1 ] && [ "$perime_c" -eq 1 ] \
+     && [ "$rc_v" -eq 1 ] && [ "$perime_v" -eq 0 ] && [ "$vide_v" -eq 1 ]; then
+    T28K_OK=1; T28K_MSG="stale(rc=$rc_s perime=$perime_s) calcule(rc=$rc_c perime=$perime_c) vide(rc=$rc_v perime=$perime_v vide=$vide_v)"
+  else
+    T28K_OK=0; T28K_MSG="stale(rc=$rc_s attendu 1 perime=$perime_s attendu 1) calcule(rc=$rc_c attendu 1 perime=$perime_c attendu 1) vide(rc=$rc_v attendu 1 perime=$perime_v attendu 0 vide=$vide_v attendu 1) — PERIMEE et « aucun point declare » doivent rester deux constats DISTINCTS"
+  fi
+}
+
+if [ -x "$T28_GEN" ]; then
+  t28k_verify "$T28_GEN"
+  if [ "$T28K_OK" -eq 1 ]; then
+    ok "T28-K SIGNAL A-9 (F1 corollaire) : ancre introuvable et déclaration calculée sortent tous deux en EXTRACTION PÉRIMÉE (rc=1, signal distinct — la forme du moteur a changé) tandis qu'un byLoopPoint RÉELLEMENT VIDE, lui, sort en « aucun point de hook » SANS jamais porter la mention périmée ($T28K_MSG)"
+  else
+    ko "T28-K SIGNAL A-9 : $T28K_MSG"
+  fi
+else
+  skip "T28-K SIGNAL A-9 : générateur absent ou non exécutable — rien à mesurer"
+  T28K_OK=-1
+fi
+
+# === Mutants (matérialisés, rejouables) — le filet est-il capable de rougir ? ====================
+# Chaque mutant est une réécriture MÉCANIQUE d'une COPIE du générateur, via awk, rejouable par
+# quiconque relance cette suite. Deux garde-fous avant tout verdict : la mutation doit avoir CHANGÉ
+# le fichier (`cmp -s`, jamais `diff`) et le mutant doit rester un script valide (`bash -n`), sinon
+# il rougirait pour la mauvaise raison — un mutant qui ne mute rien « passe » sans rien prouver.
+t28_mutant() { # <nom> <awk> <fonctions-a-rejouer: "h" "i" "k" separees par espace> <attendu-rouge 0/1 par fonction, meme ordre> <intention>
+  local nom="$1" prog="$2" fns="$3" attendus="$4" intention="$5"
+  local m="$T28_TMPDIR/mut-$nom.sh"
+  awk -f "$prog" "$T28_GEN" > "$m"
+  if cmp -s "$m" "$T28_GEN"; then
+    ko "MUT T28-$nom — $intention : la mutation n'a RIEN changé (motif introuvable) — mutant NON OPPOSABLE, pas mutant satisfait"
+    return
+  fi
+  if ! bash -n "$m" 2>/dev/null; then
+    ko "MUT T28-$nom — $intention : le mutant n'est pas un script valide : il rougirait pour la mauvaise raison"
+    return
+  fi
+  chmod +x "$m"
+  local fn att i=0 tag flipped_ok=1 detail=""
+  for fn in $fns; do
+    i=$((i + 1))
+    att="$(printf '%s\n' $attendus | awk -v n="$i" 'NR==n')"
+    case "$fn" in
+      h) t28h_verify "$m"; tag="H($T28H_OK)"; [ "$att" = "0" ] && [ "$T28H_OK" -eq 1 ] && { flipped_ok=0; detail="$detail T28-H attendu rouge, resté vert"; } ;;
+      i) t28i_verify "$m"; tag="I($T28I_OK)"; [ "$att" = "0" ] && [ "$T28I_OK" -eq 1 ] && { flipped_ok=0; detail="$detail T28-I attendu rouge, resté vert"; } ;;
+      k) t28k_verify "$m"; tag="K($T28K_OK)"; [ "$att" = "0" ] && [ "$T28K_OK" -eq 1 ] && { flipped_ok=0; detail="$detail T28-K attendu rouge, resté vert"; } ;;
+    esac
+    [ "$att" = "1" ] && [ "$([ "$fn" = h ] && echo "$T28H_OK" || { [ "$fn" = i ] && echo "$T28I_OK" || echo "$T28K_OK"; })" -eq 0 ] \
+      && { flipped_ok=0; detail="$detail $tag attendu vert, tourné rouge (mutant NON opposable ou sur-ajusté)"; }
+  done
+  # Restaure l'état de référence pour les appels normaux qui suivraient (aucun n'en fait usage plus
+  # bas dans ce fichier, mais un futur ajout ne doit pas hériter silencieusement de l'état du mutant).
+  t28h_verify "$T28_GEN" >/dev/null 2>&1; t28i_verify "$T28_GEN" >/dev/null 2>&1; t28k_verify "$T28_GEN" >/dev/null 2>&1
+  if [ "$flipped_ok" -eq 1 ]; then
+    ok "MUT T28-$nom — $intention : bascule conforme"
+  else
+    ko "MUT T28-$nom — $intention : $detail"
+  fi
+}
+
+cat > "$T28_TMPDIR/mut-alias.awk" <<'AWK'
+{ print }
+/^function readByLoopPoint\(src\) \{$/ { print "  var _alias = require; try { return _alias(registryPath).byLoopPoint; } catch (e) {}" }
+AWK
+cat > "$T28_TMPDIR/mut-silence.awk" <<'AWK'
+{
+  # Ancre sur l'APPEL réel (process.stderr.write(...)), jamais sur le simple SUBSTRING
+  # "EXTRACTION PERIMEE" : ce dernier apparaît AUSSI dans le commentaire d'en-tête qui documente
+  # le signal — un ancrage trop large y injecterait un fragment JS au milieu d'un commentaire bash
+  # et casserait la syntaxe du mutant pour la MAUVAISE raison (rejeté par la garde bash -n, qui
+  # masquerait alors la vraie discriminance de ce mutant).
+  if ($0 ~ /process\.stderr\.write\(.EXTRACTION PERIMEE/) {
+    print "  process.stderr.write(\x27le registre ne declare aucun point de hook\\n\x27);"
+  } else print
+}
+AWK
+cat > "$T28_TMPDIR/mut-muet.awk" <<'AWK'
+BEGIN { skip = 0 }
+/^if \(byLoopPoint === null\) \{$/ {
+  print "if (byLoopPoint === null) { byLoopPoint = { \x27mute:fabrique\x27: {} }; }"
+  skip = 1; next
+}
+skip && /^\}$/ { skip = 0; next }
+skip { next }
+{ print }
+AWK
+cat > "$T28_TMPDIR/mut-licite.awk" <<'AWK'
+{ print }
+/^'use strict';$/ {
+  print "/* Interdits documentes ici en toutes lettres, JAMAIS utilises plus bas : require(, eval, new Function, module.constructor._load, process.binding, import(, Reflect.apply, WebAssembly.instantiate, vm.runInNewContext */"
+  print "var NOTE = `un gabarit qui cite eval et require( sans jamais les appeler`;"
+}
+AWK
+
+t28_mutant alias   "$T28_TMPDIR/mut-alias.awk"   "h i" "0 0" "require ALIASÉ (const _alias = require) réintroduit dans le lecteur — la RCE d'origine, sous un autre nom"
+t28_mutant silence "$T28_TMPDIR/mut-silence.awk" "k"   "0"   "silence de péremption rétabli — EXTRACTION PÉRIMÉE redevient indistincte d'un registre réellement vide"
+t28_mutant muet    "$T28_TMPDIR/mut-muet.awk"    "k"   "0"   "script totalement MUET sur l'extraction périmée — fabrique un succès vide au lieu d'échouer bruyamment (ferme le vert à vide)"
+t28_mutant licite  "$T28_TMPDIR/mut-licite.awk"  "i"   "1"   "réécriture LICITE (commentaire de bloc + gabarit) nommant les interdits sans les appeler — doit rester VERTE"
 
 # >>> T28 FIXTURE MUTATION DEBUT
 # --- E (DISCRIMINANTE, par mutation) : registre factice à 2 points ⇒ la couverture C doit ROUGIR.
