@@ -5330,7 +5330,109 @@ else
   fi
 fi
 
-[ "$t30_ok" -eq 1 ] && ok "T30 : le bloc typé porte les verdicts déjà rendus par les hooks (code_review/nyquist/secure), valeur d'absence distincte du succès, discriminance prouvée par mutation"
+# assertion E (plan 23-06, tâche 3) : ADR-061 porte bien le TROISIÈME objet, reconnaissable au
+# fichier de dette du projet dans son texte — c'est le fait discriminant du Couple 2 (D-14) : le
+# hook d'audit de sécurité ne lit pas ce fichier, l'auditeur VibeFlow oui.
+#
+# $REPO (résolu tout en haut du fichier) est le PARENT du module (plugin/), pas la racine du dépôt
+# — docs/ADR.md vit encore un niveau au-dessus. SKIP explicite (jamais un crash awk) si cette
+# disposition n'a pas de docs/ADR.md du tout (lab installé hors du dépôt source VibeFlow).
+T30_REPO_ROOT="$(cd "$REPO/.." 2>/dev/null && pwd || true)"
+T30_ADR="${T30_REPO_ROOT:+$T30_REPO_ROOT/docs/ADR.md}"
+if [ -n "$T30_ADR" ] && [ -f "$T30_ADR" ]; then
+  T30_ADR061_BLOCK="$(awk '/^## ADR-061/{f=1} f{print} /^## ADR-062/{exit}' "$T30_ADR")"
+  if printf '%s\n' "$T30_ADR061_BLOCK" | "$GREP" -q 'CONCERNS.md'; then
+    ok "T30-E : ADR-061 porte le troisième objet, reconnaissable à CONCERNS.md (delta du Couple 2, que le hook ne lit pas)"
+  else
+    ko "T30-E : ADR-061 ne nomme pas CONCERNS.md dans son bloc — le troisième objet n'est pas reconnaissable"; t30_ok=0
+  fi
+else
+  skip "T30-E : docs/ADR.md introuvable dans cette disposition (hors dépôt source VibeFlow) — assertion sautée, pas un échec"
+fi
+
+# assertion F (NÉGATIVE, ADR-057, tâche 3) : le critère de disjonction à 3 axes ne vit QU'À UN
+# SEUL ENDROIT (ADR-061) — aucun fichier de plugin/dev-orchestrator/references/ ne le REFORMULE.
+#
+# MOTIF RETENU — les trois axes NUMÉROTÉS, sur leurs libellés COMPLETS. Est fautif un fichier qui
+# contient trois lignes, chacune un item de liste NUMÉROTÉ (^[[:space:]]*[0-9]+\.), portant
+# respectivement [Oo]bjet revu, [Mm]oment du cycle et [Qq]ui déclenche. Les trois conditions
+# doivent tenir DANS LE MÊME FICHIER — c'est la FORME d'une copie du bloc ### Décision d'ADR-061
+# (qui reproduit cette énumération numérotée), pas la simple mention du sujet.
+#
+# PISTE ÉCARTÉE — les mots nus (objet / moment / déclenche) en co-occurrence de section. Mesuré sur
+# l'arbre RÉEL : cette forme est ROUGE AUJOURD'HUI, sur une ligne parfaitement légitime — le
+# pointeur bref de mission-contracts.md §Étage revue (« … sont deux étages disjoints — objet revu,
+# moment du cycle et déclencheur diffèrent … »), où « déclencheur » contient « déclenche » comme
+# sous-chaîne. C'est EXACTEMENT la ligne que la tâche 2 de ce plan étend : un motif sur les mots nus
+# ferait donc échouer cette assertion sur le livrable de la tâche 2 elle-même. Preuve conservée :
+# `naked_motif_hits` (script jetable, non versionné) rend un hit sur mission-contracts.md sous ce
+# motif, aucun sous le motif numéroté retenu.
+#
+# Pourquoi pas l'exclusion des renvois nommant ADR-061 (autre piste envisagée) : au grain LIGNE,
+# elle ne corrige rien (la ligne fautive ne nomme pas ADR-061 elle-même, c'est la ligne suivante qui
+# le fait) ; au grain SECTION, elle exclut §Étage revue en entier — l'angle mort exact où une
+# reformulation a le plus de chances d'être écrite. Le motif numéroté n'a ni défaut.
+#
+# Balayage : les 10 fichiers de plugin/dev-orchestrator/references/ — `plugin/dev-orchestrator/
+# scripts/tests/` n'y figure JAMAIS (le glob scanné, $REFS_DIR/*.md, ne recouvre structurellement
+# pas ce répertoire), même motif et même commentaire d'exclusion que T25/T26/T29.
+T30_AXIS_OBJET='[Oo]bjet revu'
+T30_AXIS_MOMENT='[Mm]oment du cycle'
+T30_AXIS_QUI='[Qq]ui déclenche'
+T30_NUM_RE='^[[:space:]]*[0-9]+\.'
+t30_file_reformulates() { # <file> — rc=0 si les 3 axes NUMÉROTÉS complets y cohabitent
+  local f="$1"
+  [ -f "$f" ] || return 1
+  "$GREP" -E "$T30_NUM_RE" "$f" | "$GREP" -Eq "$T30_AXIS_OBJET"  || return 1
+  "$GREP" -E "$T30_NUM_RE" "$f" | "$GREP" -Eq "$T30_AXIS_MOMENT" || return 1
+  "$GREP" -E "$T30_NUM_RE" "$f" | "$GREP" -Eq "$T30_AXIS_QUI"    || return 1
+  return 0
+}
+t30_f_hits=""
+for t30_rf in "$REFS_DIR"/*.md; do
+  [ -f "$t30_rf" ] || continue
+  t30_file_reformulates "$t30_rf" && t30_f_hits="$t30_f_hits $(basename "$t30_rf")"
+done
+if [ -z "$t30_f_hits" ]; then
+  ok "T30-F (NÉGATIVE, ADR-057) : aucun des 10 fichiers de references/ ne reformule le critère à 3 axes (items numérotés portant les 3 libellés complets) — voir commentaire pour les deux pistes et le motif retenu"
+else
+  ko "T30-F : reformulation numérotée du critère à 3 axes détectée dans :$t30_f_hits"; t30_ok=0
+fi
+
+# assertion G (DISCRIMINANTE, par mutation — DANS LES DEUX SENS). Une sonde prouvée sur un seul
+# échantillon ne prouve rien de l'espace des formes.
+#
+# G(a) — sens ROUGE : reformulation numérotée injectée dans une COPIE de mission-flow.md (calquée
+# sur le bloc ### Décision d'ADR-061 : 3 items 1./2./3. portant les 3 libellés complets) — le motif
+# retenu doit la détecter.
+T30_MUT_REFORM="$T30_TMPDIR/mutant-reformulation-numerotee.md"
+{
+  cat "$MFLOW"
+  printf '\n1. **Objet revu** — copie du critère ADR-061, mordue par erreur.\n'
+  printf '2. **Moment du cycle** — idem.\n'
+  printf '3. **Qui déclenche et qui relit** — idem.\n'
+} > "$T30_MUT_REFORM"
+if cmp -s "$MFLOW" "$T30_MUT_REFORM"; then
+  ko "T30-G(a) : mutant IDENTIQUE à mission-flow.md — l'injection n'a rien mordu, la preuve ne vaut rien"; t30_ok=0
+else
+  if t30_file_reformulates "$T30_MUT_REFORM"; then
+    ok "T30-G(a) (DISCRIMINANTE, par mutation) : la reformulation numérotée injectée dans une copie est détectée — F rougirait dessus"
+  else
+    ko "T30-G(a) NON DISCRIMINANTE : la reformulation numérotée injectée n'est pas détectée par le motif retenu"; t30_ok=0
+  fi
+fi
+
+# G(b) — CONTRE-ÉPREUVE VERTE : le pointeur bref RÉEL de mission-contracts.md §Étage revue, tel
+# qu'il existe APRÈS la tâche 2 (renvoi en prose, 3 axes nommés inline, AUCUN item numéroté), doit
+# rester VERT sous le motif retenu — c'est ce volet, et lui seul, qui empêche cette assertion de
+# condamner le livrable de la tâche 2 du même plan.
+if t30_file_reformulates "$T30_CONTRACTS"; then
+  ko "T30-G(b) FAUX ROUGE : le pointeur bref de mission-contracts.md (tâche 2, prose, sans item numéroté) est détecté à tort comme une reformulation"; t30_ok=0
+else
+  ok "T30-G(b) contre-épreuve : le pointeur bref de mission-contracts.md (tâche 2 — prose, 3 axes nommés inline, aucun item numéroté) reste vert sous F"
+fi
+
+[ "$t30_ok" -eq 1 ] && ok "T30 : le bloc typé porte les verdicts déjà rendus par les hooks (code_review/nyquist/secure), valeur d'absence distincte du succès, ADR-061 porte le troisième objet (CONCERNS.md), critère de disjonction vérifié absent partout ailleurs (assertion négative, discriminance prouvée par mutation dans les deux sens)"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
