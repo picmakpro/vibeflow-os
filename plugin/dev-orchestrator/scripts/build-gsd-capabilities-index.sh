@@ -14,6 +14,15 @@
 # C'est cette propriété, et elle seule, qui rend la copie versionnée comparable d'un lab à
 # l'autre — donc vérifiable par la garde de fraîcheur de la suite de tests (T28-F).
 #
+# LECTURE, JAMAIS EXÉCUTION (T-23-04-07, arbitrage A-12). `default_core_lib()` ci-dessous résout en
+# PREMIER $root/.claude/gsd-core/bin/lib — un chemin DANS le dépôt audité (un lab en VF_SCOPE=project
+# y a légitimement son moteur ; cette priorité est conservée). Le registre est donc une entrée NON
+# MAÎTRISÉE, au même titre que le config.json de check-gsd-config.sh (A-6). Le programme node ne
+# require() JAMAIS le registre : il LIT son texte (port du lecteur de littéraux de 23-02, même garde
+# de type et de taille — voir le corps du programme), et affiche un signal EXPLICITE et DISTINCT
+# (« EXTRACTION PERIMEE ») si sa forme cesse d'être lisible, plutôt que de se taire ou de fabriquer un
+# succès vide (même doctrine A-9 que check-gsd-config.sh, appliquée une seconde fois sur ce script).
+#
 # CE QUI N'EST PAS UNE SOURCE : `gsd-tools loop render-hooks <point> --raw`. Cette commande rend
 # les hooks ACTIFS, filtrés par les toggles du lab courant (mesuré : 10 entrées actives sur le
 # point de pré-plan là où le registre en déclare 13). Une table bâtie dessus porterait la
@@ -49,7 +58,7 @@
 # L'appel post-install est best-effort côté installeur : c'est LÀ que l'échec est absorbé, pas ici.
 #
 # Référence : IDX-01 (index factuel), IDX-02 (ré-exécutable + paramétrable), D4, D7, D-07,
-#             ADR-054 (portabilité bash), T-23-04-01 → T-23-04-05.
+#             ADR-054 (portabilité bash), T-23-04-01 → T-23-04-07, arbitrage A-12 (23-ARBITRAGES.md).
 
 set -euo pipefail
 
@@ -110,18 +119,143 @@ trap 'rm -f "$body_tmp" "$prog_tmp"' EXIT
 # interpolation shell, aucun `eval`, aucun `bash -c` sur du contenu non maîtrisé (T-23-04-02).
 cat > "$prog_tmp" <<'NODE_PROGRAM'
 'use strict';
+var fs = require('fs');
 var registryPath = process.argv[2];
 var generatedAt = process.argv[3];
-var reg;
-try {
-  reg = require(registryPath);
-} catch (e) {
-  process.stderr.write('registre illisible: ' + (e && e.message) + '\n');
+
+// --- Acquisition par LECTURE, jamais par exécution (T-23-04-07, arbitrage A-12) ----------------
+// Le registre est résolu par une cascade qui fait PRIMER le lab courant (default_core_lib ci-dessus,
+// premiere branche $root/.claude/gsd-core/bin/lib) : un dépôt cloné et non maîtrisé peut donc le
+// fournir. `require(registryPath)` EXÉCUTAIT ce fichier — même vecteur que celui fermé sur
+// check-gsd-config.sh (A-6) : y déposer un capability-registry.cjs piégé suffisait à exécuter du
+// code arbitraire à la régénération de cette table, avec l'appel post-install best-effort qui
+// absorbe l'échec (donc silencieusement). Ce programme ne require() PLUS JAMAIS un chemin issu de
+// la cascade : il LIT le texte, port intégral du lecteur de littéraux de 23-02
+// (check-gsd-config.sh) — mêmes fonctions, même garde de type et de taille, même coût linéaire.
+// Aucun require() hors de 'fs' (module cœur), aucun eval, aucun vm, aucun import() dynamique.
+
+// GARDE DE TYPE ET DE TAILLE, AVANT TOUTE LECTURE (A-12, moitié 2 — indissociable de la moitié 1).
+// Ne pas exécuter ferme l'exécution de code, PAS le déni de service : le `[ -f "$REGISTRY" ]` du
+// shell protège INCIDEMMENT de la FIFO (rc=1 en 1 s), mais rien ne protégeait d'un lien vers
+// /dev/zero ni d'un fichier hors plafond avant readFileSync. Fermer la RCE sans reposer cette garde
+// aurait rouvert un DoS — exactement le mode de défaillance N1 de cette phase. Trois propriétés,
+// aucune décorative : O_NONBLOCK à l'ouverture (l'attente sur une FIFO a lieu DANS open(), avant
+// tout fstat) ; fstat SUR LE DESCRIPTEUR, jamais stat sur le chemin (ferme la fenêtre
+// vérification/lecture) ; TAILLE PLAFONNÉE (refus, jamais troncature — une lecture partielle
+// couperait un littéral en deux). Le plafond vaut ~7x le module réel (273 Ko sur gsd-core 1.9.0).
+var MAX_LU = 2 * 1024 * 1024;
+var O_NB = fs.constants.O_NONBLOCK || 0;
+function slurp(p) {
+  var fd = -1;
+  try {
+    fd = fs.openSync(p, fs.constants.O_RDONLY | O_NB);
+    var st = fs.fstatSync(fd);
+    if (!st.isFile() || st.size > MAX_LU) return null;
+    return fs.readFileSync(fd, 'utf8');
+  } catch (e) { return null; }
+  finally { if (fd >= 0) { try { fs.closeSync(fd); } catch (e2) {} } }
+}
+
+// Chaîne entre guillemets ' ou ", échappements bruts conservés (aucune interprétation JS réelle :
+// mieux vaut ne rien lire que lire faux). Renvoie {value, next} ou null si jamais refermée.
+function readQuotedStringAt(txt, i) {
+  var q = txt[i];
+  if (q !== '"' && q !== "'") return null;
+  var j = i + 1, buf = '';
+  while (j < txt.length) {
+    if (txt[j] === '\\') { buf += txt[j] + txt[j + 1]; j += 2; continue; }
+    if (txt[j] === q) return { value: buf.replace(/\\'/g, "'"), next: j + 1 };
+    buf += txt[j]; j++;
+  }
+  return null;
+}
+
+// Régions à délimiteurs équilibrés ouvertes par une ancre (port intégral de check-gsd-config.sh).
+// COÛT LINÉAIRE, EXIGÉ : la région lue vient du dépôt audité, donc d'un attaquant potentiel — une
+// boucle quadratique sur une entrée hostile serait un déni de service que ni le best-effort de
+// l'installeur ni le contrat de sortie ne raccourcissent.
+function balancedRegions(src, anchorSrc, open, close) {
+  var out = [];
+  var re = new RegExp(anchorSrc, 'g');
+  var m;
+  while ((m = re.exec(src)) !== null) {
+    var start = m.index + m[0].length - 1;
+    var depth = 0, inStr = null, esc = false;
+    for (var j = start; j < src.length; j++) {
+      var c = src[j];
+      if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === inStr) inStr = null; continue; }
+      if (c === '"' || c === "'" || c === '`') { inStr = c; continue; }
+      if (c === open) depth++;
+      else if (c === close) { depth--; if (depth === 0) { out.push(src.slice(start, j + 1)); break; } }
+    }
+    if (out.length >= 8) break;
+    if (re.lastIndex <= m.index) re.lastIndex = m.index + 1;
+  }
+  return out;
+}
+
+// Littéral JS « simple » -> JSON (port intégral de check-gsd-config.sh, mêmes limites assumées :
+// variable/appel/spread font échouer JSON.parse et rendent null, jamais une lecture fausse).
+var IDRE = /([A-Za-z_$][A-Za-z0-9_$]*)(\s*):/y;
+function jsLiteralToJSON(txt) {
+  var out = '', i = 0, lastNb = ''; var n = txt.length;
+  while (i < n) {
+    var c = txt[i];
+    if (c === '"' || c === "'") {
+      var r = readQuotedStringAt(txt, i);
+      if (!r) return null;
+      out += JSON.stringify(r.value); lastNb = '"'; i = r.next; continue;
+    }
+    if (c === '/' && txt[i + 1] === '/') { while (i < n && txt[i] !== '\n') i++; continue; }
+    if (c === '/' && txt[i + 1] === '*') { var e = txt.indexOf('*/', i); if (e < 0) return null; i = e + 2; continue; }
+    IDRE.lastIndex = i;
+    var idm = IDRE.exec(txt);
+    if (idm && idm[1] !== 'true' && idm[1] !== 'false' && idm[1] !== 'null'
+        && (lastNb === '' || lastNb === '{' || lastNb === ',' || lastNb === '[')) {
+      out += '"' + idm[1] + '":'; lastNb = ':'; i += idm[0].length; continue;
+    }
+    out += c; if (!/\s/.test(c)) lastNb = c; i++;
+  }
+  out = out.replace(/,(\s*[}\]])/g, '$1');
+  try { return JSON.parse(out); } catch (e) { return null; }
+}
+
+// SOURCE UNIQUE, ancrée sur l'export `byLoopPoint` de capability-registry.cjs — c'est un littéral
+// JSON pur sur gsd-core 1.9 (mesuré), mais jsLiteralToJSON tolère aussi des identifiants nus en
+// clé si une version future du moteur change de forme sans devenir calculée.
+function readByLoopPoint(src) {
+  var regions = balancedRegions(src, '\\bbyLoopPoint\\s*[:=]\\s*\\{', '{', '}');
+  if (regions.length === 0) return null;
+  for (var i = 0; i < regions.length; i++) {
+    var v = jsLiteralToJSON(regions[i]);
+    if (v && typeof v === 'object' && !Array.isArray(v)) return v;
+  }
+  return null;
+}
+// Champ d'AFFICHAGE seul (jamais utilisé en logique) : `version: '1'` dans module.exports. Ce bloc
+// référence des identifiants nus comme valeurs (capabilities, bySkill, …) et n'est donc PAS un
+// littéral JSON valide dans son ensemble — seul CE champ, une chaîne simple, est lu isolément.
+function readVersion(src) {
+  var re = /\bversion\s*:\s*/g;
+  var m;
+  while ((m = re.exec(src)) !== null) {
+    var r = readQuotedStringAt(src, m.index + m[0].length);
+    if (r) return r.value;
+    if (re.lastIndex <= m.index) re.lastIndex = m.index + 1;
+  }
+  return null;
+}
+
+// --- Lecture, dans cet ordre : fichier introuvable/non-ordinaire, puis forme illisible (A-9,
+// signal PÉRIMÉ — distinct de « aucun point déclaré », jamais confondu), puis cardinalité réelle.
+var src = slurp(registryPath);
+if (src === null) {
+  process.stderr.write('registre illisible ou de type non ordinaire (garde de taille/type) : ' + registryPath + '\n');
   process.exit(1);
 }
-var byLoopPoint = reg && reg.byLoopPoint;
-if (!byLoopPoint || typeof byLoopPoint !== 'object') {
-  process.stderr.write('le registre ne porte pas de table de points de hook\n');
+var byLoopPoint = readByLoopPoint(src);
+if (byLoopPoint === null) {
+  process.stderr.write('EXTRACTION PERIMEE : l\'ancre byLoopPoint est introuvable ou illisible dans ' + registryPath + ' -- ce n\'est PAS "aucun point declare", c\'est le lecteur de texte qui ne suit plus la forme du moteur installe.\n');
   process.exit(1);
 }
 var points = Object.keys(byLoopPoint);
@@ -129,6 +263,7 @@ if (points.length === 0) {
   process.stderr.write('le registre ne declare aucun point de hook\n');
   process.exit(1);
 }
+var version = readVersion(src);
 
 function cell(v) {
   if (v === undefined || v === null || v === '') return '—';
@@ -145,7 +280,7 @@ function code(v) {
 var out = [];
 out.push('# GSD Capabilities Index (auto-généré — NE PAS ÉDITER)');
 out.push('> Généré le ' + generatedAt + ' par build-gsd-capabilities-index.sh');
-out.push('> Source : registre de capabilities du moteur GSD (`capability-registry.cjs`), schéma déclaré `' + cell(reg.version) + '`');
+out.push('> Source : registre de capabilities du moteur GSD (`capability-registry.cjs`), schéma déclaré `' + cell(version) + '`');
 out.push('');
 out.push('**Ce que cette table dit.** Elle énumère ce que le moteur **déclare** à la version depuis');
 out.push('laquelle elle a été générée : quels étages *peuvent* se déclencher à chaque point de hook du');
