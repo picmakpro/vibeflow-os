@@ -1,5 +1,25 @@
 # Changelog — planning-core
 
+## [v2.6.0] — 2026-08-04 (une politique de nom de workstream, UNE seule, sourcée par les gates)
+
+### Ajouté
+- **`scripts/workstream-policy.sh`** — la politique de nom de workstream devient **unique** et
+  partagée. Quatre gates la validaient chacun à leur façon : quatre variantes divergentes d'une même
+  règle, donc quatre occasions d'accepter ce que le voisin refuse. Ils la **sourcent** désormais tous
+  (`check-workstream-pointer.sh`, `check-state-integrity.sh`, `check-dev-bootstrap.sh`,
+  `planning-context.sh`) et l'appliquent à l'identique. La politique est conforme à l'amont, et sa
+  suite `test-workstream-policy.sh` le vérifie — angles morts compris (`.`, `..`, lien symbolique).
+
+  Le module hôte est `planning-core` parce que sa fermeture de dépendances est réduite à lui-même :
+  les quatre consommateurs peuvent le sourcer sans tirer de module supplémentaire.
+
+### Modifié
+- **`planning-context.sh` injecte le `STATE.md` du compartiment actif et le nomme** (GSDA-14) : sur
+  un `.planning/` partitionné, le contexte servi provenait de la racine quel que soit le workstream
+  résolu — il décrivait donc un autre chantier que celui en cours, sans jamais le dire.
+- **`planning-context.sh --max-lines`** cesse d'injecter une erreur d'outil dans le contexte produit :
+  un message d'erreur passé pour du contenu est pire qu'une troncature annoncée.
+
 ## [v2.5.3] — 2026-07-31
 
 ### Corrigé

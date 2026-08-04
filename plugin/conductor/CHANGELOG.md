@@ -1,5 +1,35 @@
 # Changelog — conductor
 
+## [v1.20.0] — 2026-08-04 (le workstream cesse d'être un silence, et `effort:` cesse d'être facultatif)
+
+### Ajouté
+- **`check-workstream-pointer.sh`** (GSDA-16) — nouveau gate : quand un `.planning/` est
+  **partitionné** en workstreams et qu'aucun canal ne résout de compartiment actif, le moteur ne
+  disait rien du tout. Le silence devient audible, en **advisory strict** : le gate signale, il ne
+  bloque pas. Il refuse le lien symbolique et intègre la politique de nom amont dans son intégralité
+  plutôt que d'en réimplémenter une variante. Câblé au `SessionStart` de `hooks.json`, en `|| true`
+  comme ses voisins — un gate advisory ne peut pas faire échouer l'ouverture d'une session.
+  Suite dédiée `test-check-workstream-pointer.sh`, discriminance prouvée par mutation.
+
+### Modifié
+- **`check-agents.sh` EXIGE désormais `effort:`** (GSDA-21) au lieu de se contenter de le valider
+  quand il est présent. Un champ validé-s'il-est-là n'est pas un champ requis : les agents qui ne le
+  déclaraient pas passaient le gate en silence. La population réellement gatée est de **31 fichiers
+  d'agents** — `plugin/*/agents/<nom>.md` **et** `plugin/*/AGENT.md` à la racine des modules
+  mono-agent, les deux familles que l'installeur pose dans `.claude/agents/` — et non 25 : le
+  durcissement appliqué aux seuls 25 aurait laissé 5 modules non conformes jusqu'au Gate C d'un lab
+  frais. `AGENT.md` du module porte `effort: high`.
+- **`check-state-integrity.sh` suit le workstream actif** (GSDA-13) sans jamais écraser `--file`,
+  qui reste prioritaire sur toute résolution de compartiment — c'est ce qui permet à la CI de figer
+  la cible du gate ADR-063 sur le `STATE.md` de la racine. Trois faux verts et un faux rouge fermés
+  au passage, chacun tenu par un cas de test (`.`/`..`, lien symbolique, et les tests qui encodaient
+  le défaut au lieu de le révéler).
+- **`guard-agent-write.sh`** — le message d'erreur annonçait `effort: <optionnel>` alors que le gate
+  l'exige : il énonce désormais les valeurs admises (`low|medium|high|xhigh|max`). Un message qui
+  décrit une contrainte périmée est faux même quand le code, lui, est juste.
+- **`references/team-kernel.md`** — la marge de profondeur de dispatch est écrite (GSDA-22).
+- **`AGENT.md`** — Iron Law 2 révisée (ADR-069, adoption des workstreams GSD).
+
 ## [v1.19.2] — 2026-08-04 (le bandeau cesse de mentir après /vf-update)
 
 ### Corrigé

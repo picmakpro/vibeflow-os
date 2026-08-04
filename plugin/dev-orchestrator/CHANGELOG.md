@@ -1,5 +1,43 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.12.0] — 2026-08-04 (une entrée de doc ne promet plus un geste inerte)
+
+### Ajouté
+- **`check-capability-activation.sh`** (GSDA-09) — nouveau gate : la documentation du module pouvait
+  annoncer une capability que rien n'activait, et le routage suffisait à la réputer vivante. Le gate
+  relie chaque entrée de doc à l'**activation** réelle de la capability qu'elle promet. Il est
+  **câblé au job `gates` de la CI** dès sa livraison — une garde que la chaîne d'intégration ne lance
+  jamais est une garde absente, et ce gate existe précisément pour fermer ce mode d'échec ; le
+  laisser invoqué par sa seule suite l'aurait reproduit sur lui-même. Aucune surcharge d'environnement
+  en CI : la cascade de résolution est exercée telle qu'elle tourne chez l'utilisateur, et un exit 2
+  (« non vérifiable ») échoue le job au même titre qu'un exit 1 — un gate qui ne peut pas se
+  prononcer n'est pas un gate vert. Suite dédiée `test-check-capability-activation.sh`,
+  discriminance prouvée dans les deux sens.
+- **`references/workstreams.md`** — la voix unique du module sur le compartiment de planning
+  (GSDA-10) : ce que GSD appelle un workstream, ce que le lab en fait, et **4 limites datées**. La
+  couverture amont y est re-dérivée sous un critère **nommé** et une commande rejouable, pas sur un
+  chiffre recopié.
+
+### Modifié
+- **`build-gsd-capabilities-index.sh`** — l'index porte enfin les capabilities **sans étage**
+  (`graphify`, `profile-pipeline`), qu'il omettait purement et simplement. Il cesse aussi de
+  **deviner** ses toggles et de sortir de son ancre. La table reste générée depuis le moteur installé,
+  jamais écrite à la main.
+- **`check-dev-bootstrap.sh`** voit un `.planning/` partitionné (GSDA-13) et consomme la politique de
+  nom de workstream **partagée** (`planning-core/scripts/workstream-policy.sh`) au lieu d'en porter
+  une copie ; son en-tête est réaligné sur ce qu'il fait réellement.
+- **`references/GSD-PIPELINE.md` §10** — portée réelle du canal `agent_skills` (slot `PLANNER`
+  câblé : la doctrine du lab atteint enfin `gsd-planner`) et **refus motivé de `tdd_mode`**.
+- **`references/intent-routing.md`** — les trois routes conditionnelles sont marquées comme telles,
+  et la frontière `codebase/` ↔ `intel/` est écrite. La capability `intel` est activée : la promesse
+  de `--query` que notre doc publiait devient tenue.
+- **`agents/vf-coder.md`, `agents/vf-dev-manager.md`** — les deux agents du chemin de dev savent dire
+  sur quel chantier ils travaillent (câblage `--ws`, GSDA-08).
+- **`references/docs-flow.md`**, `AGENT.md` et les 4 agents du module : `effort:` par rôle
+  (pilotage et jugement `high`, exécution `medium`).
+- **`test-dev-orchestrator.sh`** — le gate d'exhaustivité T14 interroge désormais l'**activation**,
+  pas seulement le routage (+ T34, T35).
+
 ## [v2.11.1] — 2026-08-04 (l'index des skills cesse de mentir sur sa propre provenance)
 
 ### Corrigé
