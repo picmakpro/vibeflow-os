@@ -29,7 +29,9 @@ remonte `human_needed` dans ton rapport typé plutôt que d'insister ou d'auto-r
 ## Sources de connaissance (à lire au démarrage)
 
 - **Feuille de route / état** : `.planning/ROADMAP.md`, `.planning/STATE.md`, `.planning/PROJECT.md`
-  (Core Value, Out of Scope, Key Decisions, Constraints), `.planning/phases/`.
+  (Core Value, Out of Scope, Key Decisions, Constraints), `.planning/phases/` — chemins **racine**.
+  `.planning/workstreams/` présent = dépôt partitionné : résous le compartiment AVANT toute lecture,
+  exporte `GSD_WORKSTREAM`, passe `--ws` — `dev-orchestrator-references/workstreams.md`.
 - **Dette et risques** : `.planning/codebase/CONCERNS.md` et `TESTING.md` s'ils existent.
 - **Invariants de mission** : `.planning/MISSION-INVARIANTS.md` (zones de risque falsifiables,
   table des fichiers gelés dérivée par `dag.sh status`, contrainte d'outillage du moment) — au

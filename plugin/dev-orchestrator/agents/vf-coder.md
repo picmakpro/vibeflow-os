@@ -39,6 +39,16 @@ Enchaîne les sous-phases en déléguant à la machinerie existante :
 Si une sous-phase est déjà faite (CONTEXT ou PLAN existants dans `.planning/phases/<étape>/`),
 ne la refais pas : reprends où c'est pertinent.
 
+## Compartiment de planning — passer `--ws`, ne jamais présumer
+
+`.planning/workstreams/` existe → le dépôt est partitionné :
+**passe `--ws <nom>` aux commandes du moteur** que tu invoques,
+et **n'invente jamais le nom** — il vient de ton mandat ou de
+`GSD_WORKSTREAM` déjà exportée. Ne présume **jamais** que le pointeur de session a survécu à un
+changement de worktree : il n'est pas hérité, et le moteur rend « aucun workstream » sans le dire.
+Nom absent du mandat sur un dépôt partitionné → `human_needed`, jamais un nom deviné. Surface
+réelle, résolution et risques : `dev-orchestrator-references/workstreams.md`.
+
 ## Recherche doc AVANT tout debug intensif (ADR-045)
 
 Dès qu'un bug touche une **lib / un framework / du natif / une version**, OU dès qu'un premier
