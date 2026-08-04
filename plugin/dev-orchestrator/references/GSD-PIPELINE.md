@@ -173,21 +173,15 @@ doctrine referme.
 
 | Brique de cycle | Flags autorisés | Flags fermés | Motif (fait + source vérifiable) |
 |---|---|---|---|
-| Cadrage — `gsd-discuss-phase` | `--auto` | `--chain`, et tout autre | **Transitoire — périme au plan 23-05.** `--auto` déclenche ici le pipeline entier (`chain.md:45-61`, étape 5), donc la règle 5 de `checkpoints.md:11` sur tout ce qui suit, bornée par la règle 6 (`checkpoints.md:12`). Ouvert faute d'`AskUserQuestion` chez `vf-coder` ; raisonnement complet et coût chiffré : note « `--auto` au cadrage » sous la table. `--chain` fermé pour le même fait, aggravé — il ouvre le mode interactif. |
+| Cadrage — `gsd-discuss-phase` | *(aucun)* | `--auto`, `--chain`, et tout autre | Le mode d'enchaînement déclenche ici le pipeline entier (`chain.md:45-61`, étape 5), donc la règle 5 de `checkpoints.md:11` sur tout ce qui suit, bornée par la règle 6 (`checkpoints.md:12`). La brique est portée par le manager, qui n'en a pas besoin (`mission-flow.md` §Pattern F) — raisonnement complet et coût nommé : note ci-dessous. |
 | Plan — `gsd-plan-phase` | `--research`, `--skip-research` | `--auto`, `--chain`, et tout autre | La gradation de la recherche se décide **ici**, et nulle part ailleurs : `gsd-discuss-phase` n'en consomme aucun flag (sa table `progressive_disclosure` de `discuss-phase.md` n'en liste aucun). Sur une phase neuve et en l'absence des deux, le workflow **prompte** (`plan-phase.md` §5.1) et `vf-coder`, privé d'`AskUserQuestion`, y reste bloqué : le flag n'est donc jamais omis — borne de ce « jamais » en note sous la table. `--auto` et `--chain` fermés en invocation directe, même fait qu'au cadrage (`chain.md:45-61` + règle 5 de `checkpoints.md:11`, bornée par la règle 6 de `checkpoints.md:12`). |
 | Exécution — `gsd-execute-phase` | *(aucun)* | `--auto`, `--chain`, et tout autre | Même fait qu'au cadrage (`chain.md:45-61` + règle 5 de `checkpoints.md:11`, bornée par la règle 6 de `checkpoints.md:12`). De surcroît, exécuter au-delà de la frontière du nœud contredirait le pipelining modélisé dans `mission-flow.md` : le manager tient le DAG, l'exécution ne le déborde pas. |
 
-**`--auto` au cadrage — pourquoi il reste ouvert, et jusqu'à quand (D-06)** : sur cette brique,
-`--auto` ne pose pas seulement un état, il déclenche le pipeline entier — cadrage → plan →
-exécution dans le même appel (`chain.md:45-61`, étape 5). La **règle 5** de `checkpoints.md:11` joue
-donc sur tout le plan et toute l'exécution qui suivent : vérification humaine **auto-approuvée**,
-décision **auto-sélectionnée sur la première option**. Portée **bornée**, à ne pas surestimer : la
-**règle 6** (`checkpoints.md:12`) protège les gates `gate="blocking-human"`, jamais auto-approuvés,
-même en auto-mode. Reste ouvert aujourd'hui parce que `vf-coder` n'a pas `AskUserQuestion` : le
-fermer maintenant le mettrait en impasse, constatée et chiffrée en `23-ARBITRAGES-OUVERTS.md` §O-8
-(voie 2). Autorisation **assumée par écrit**, coût nommé, plutôt qu'accordée en silence. Correctif
-structurel instruit au **plan 23-05** (le manager porte le cadrage, il a `AskUserQuestion`) : le
-jour où 23-05 passe, cette ligne devient fermée.
+**`--auto` au cadrage — état ATTEINT (A-1ter geste 2)** : sur cette brique, `--auto` ne posait pas
+seulement un état, il déclenchait le pipeline entier — cadrage → plan → exécution dans le même
+appel (`chain.md:45-61`, étape 5), et la **règle 5** de `checkpoints.md:11` jouait donc sur tout le
+plan et toute l'exécution qui suivaient. La brique est désormais portée par le manager
+(`mission-flow.md` §Pattern F), qui n'a plus besoin de ce mode : la ligne est fermée.
 
 **Gradation de la recherche (D-05) — sur un FAIT constatable, jamais sur un ressenti (ADR-055 §3)** :
 

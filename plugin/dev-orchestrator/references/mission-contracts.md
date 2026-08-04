@@ -207,7 +207,7 @@ amont **par son rôle**, sans en reproduire les intitulés de bloc.
 `vf-coder` avec le champ `reprise` ; le skill d'exécution reprend de lui-même au premier plan sans
 rapport de plan, et son garde-fou de reprise sûre refuse de relancer un exécuteur sur des commits
 de production orphelins en offrant trois recours. Doctrine de voie unique qui encadre ce constat :
-plan 23-05 (y renvoyer une fois qu'elle existe).
+`GSD-PIPELINE.md` §9.
 
 ## Étage revue — deux objets disjoints (ADR-060 / ADR-061)
 

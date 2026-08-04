@@ -3882,7 +3882,7 @@ t33_allowlist_ko() { # <fichier §9> <étiquette de run>
     printf '%s' " [J/$tag : section §9 introuvable ou VIDE ($s9) — rien n'a été mesuré, la SONDE EST À RÉANCRER : ce rouge ne dit rien de la doctrine]"
     return 0
   fi
-  for spec in 'gsd-discuss-phase|--auto|--chain' \
+  for spec in 'gsd-discuss-phase||--auto --chain' \
               'gsd-plan-phase|--research --skip-research|--auto --chain' \
               'gsd-execute-phase||--auto --chain'; do
     brique="${spec%%|*}"; rest="${spec#*|}"; attendus="${rest%%|*}"; fermes="${rest#*|}"
@@ -3985,32 +3985,44 @@ t33_assert_al_green "flags réordonnés dans la cellule" "$T33_TMPDIR/lic-al-1.t
 awk -F'|' -v OFS='|' '/^\| / && $2 ~ /gsd-execute-phase/ { $3 = " *(aucun flag)* " } { print }' \
   "$T33_S9" > "$T33_TMPDIR/lic-al-2.txt"
 t33_assert_al_green "« (aucun) » reformulé en « (aucun flag) »" "$T33_TMPDIR/lic-al-2.txt" lic2
-awk -F'|' -v OFS='|' '/^\| / && $2 ~ /gsd-discuss-phase/ { $4 = " `--chain`, et tout flag non nommé " } { print }' \
+awk -F'|' -v OFS='|' '/^\| / && $2 ~ /gsd-discuss-phase/ { $4 = " `--auto`, `--chain`, et tout flag non nommé " } { print }' \
   "$T33_S9" > "$T33_TMPDIR/lic-al-3.txt"
-t33_assert_al_green "cellule « flags fermés » reformulée, --chain conservé" "$T33_TMPDIR/lic-al-3.txt" lic3
+t33_assert_al_green "cellule « flags fermés » reformulée, --auto/--chain conservés" "$T33_TMPDIR/lic-al-3.txt" lic3
 awk -F'|' -v OFS='|' '/^\| / && $2 ~ /gsd-plan-phase/ { $5 = " Motif entièrement réécrit, sans aucun flag cité. " } { print }' \
   "$T33_S9" > "$T33_TMPDIR/lic-al-4.txt"
 t33_assert_al_green "cellule de MOTIF réécrite (hors périmètre de J)" "$T33_TMPDIR/lic-al-4.txt" lic4
 
-# --- I : marque transitoire ET échéance, dans la CELLULE DE MOTIF de la ligne de cadrage -------
-# Contrat des trois regexes ci-dessous : la marque doit être AFFIRMÉE sur cette ligne. Une
-# méta-prohibition de même vocabulaire (« ne jamais présenter cette autorisation comme
-# transitoire… ») porte les deux tokens et doit être REJETÉE. Le garde est STRUCTUREL comme celui
-# de la clause de fermeture : une particule de négation qui PRÉCÈDE l'une des deux marques dans la
-# même proposition, quel que soit le verbe qu'elle porte.
+# --- I (RETOURNÉE, A-1ter geste 2, plan 23-05) : la cellule de MOTIF de la ligne de cadrage ne
+# porte PLUS ni marque de transitoire ni échéance AFFIRMÉE — l'autorisation est refermée, pas
+# permanente par oubli. Assertion RETOURNÉE, jamais retirée : une autorisation refermée qui
+# garderait sa marque de transitoire se relit comme encore ouverte.
+#
+# Contrat des regexes : `T33_TRANSIT_RE`/`T33_ECHEANCE_RE` sont CONSERVÉES — leur CO-PRÉSENCE
+# affirmée (les deux, sans négation directe du verbe être) signe une cellule ENCORE OUVERTE.
+# `T33_TRANSIT_FERME_RE` (nouveau) reconnaît la SEULE forme de négation qui décrit un état FERMÉ :
+# le verbe être directement nié devant la marque (« n'est plus transitoire », « n'est pas
+# transitoire »), jamais une négation qui porte sur un AUTRE verbe. C'est ce qui sépare une
+# fermeture énoncée (prédicat nié) d'une MÉTA-PROHIBITION (« ne jamais qualifier de transitoire »)
+# qui, elle, ne nie pas l'état — elle interdit d'en PARLER, ce qui n'est ni une affirmation ni une
+# description de fermeture, et reste FAUTIVE dans les deux régimes (fonction qui SURVIT à la
+# bascule, cf. `T33_TRANSIT_NEG_RE` gardée ici pour cette seule fin, dans les fixtures ci-dessous).
 T33_TRANSIT_RE='[Tt]ransitoire'
 T33_ECHEANCE_RE='23-05'
 T33_TRANSIT_NEG_RE="${T33_NEGPART_RE}[^.!?;:]*([Tt]ransitoire|23-05)"
+T33_TRANSIT_FERME_RE="${T33_NEGPART_RE}(est|était|sera)[[:space:]]+[^.!?;:]*([Tt]ransitoire|23-05)"
 # PRÉMISSES MORTES (plan 23-03, l. 234-243). Deux motifs sont interdits NOMMÉMENT parce qu'ils sont
 # FAUX : la persistance du mode dans `.planning/config.json` (démentie par A-1ter) et `T25`/`T25b`
 # présentés comme la mitigation (gate dégazé le 2026-08-03). Le texte livré les évite — mais rien
 # ne le MAINTENAIT : une réécriture pouvait les ressusciter sans qu'une seule assertion rougisse.
+# CONSERVÉE TELLE QUELLE par la bascule (T-23-05-08) : le risque de résurrection AUGMENTE quand le
+# gate qu'elle incarnait a disparu, elle n'en devient que plus utile.
 T33_MORTE_RE='T25b?([^0-9]|$)|survi[tv][^.]*session|persist|config[.]json'
-t33_transit_ok() { # <cellule de motif>
-  printf '%s\n' "$1" | "$GREP" -qE "$T33_TRANSIT_RE"     || return 1
-  printf '%s\n' "$1" | "$GREP" -qE "$T33_ECHEANCE_RE"    || return 1
-  printf '%s\n' "$1" | "$GREP" -qE "$T33_TRANSIT_NEG_RE" && return 1
-  printf '%s\n' "$1" | "$GREP" -qE "$T33_MORTE_RE"       && return 1
+t33_transit_closed_ok() { # <cellule de motif> — rc=0 FERMÉE (licite), rc=1 encore OUVERTE (fautive)
+  printf '%s\n' "$1" | "$GREP" -qE "$T33_MORTE_RE" && return 1
+  printf '%s\n' "$1" | "$GREP" -qE "$T33_TRANSIT_FERME_RE" && return 0
+  if printf '%s\n' "$1" | "$GREP" -qE "$T33_TRANSIT_RE" && printf '%s\n' "$1" | "$GREP" -qE "$T33_ECHEANCE_RE"; then
+    return 1
+  fi
   return 0
 }
 t33_row_cadrage="$(t33_row "$T33_S9" 'gsd-discuss-phase')"
@@ -4018,44 +4030,45 @@ if [ -z "$t33_row_cadrage" ]; then
   t33_ko="$t33_ko [I : aucune ligne de table de la §9 dont la première cellule nomme gsd-discuss-phase]"
 else
   t33_cell_cadrage="$(t33_cell "$t33_row_cadrage" 5)"
-  t33_transit_ok "$t33_cell_cadrage" \
-    || t33_ko="$t33_ko [I : la cellule de MOTIF de la ligne de cadrage ne porte pas, sur elle-même, la marque de transitoire ET l'échéance nommée (plan 23-05) — une autorisation dont l'échéance vit ailleurs devient permanente par oubli (A-1ter)]"
+  t33_transit_closed_ok "$t33_cell_cadrage" \
+    || t33_ko="$t33_ko [I : la cellule de MOTIF de la ligne de cadrage porte encore une marque de transitoire ou une échéance AFFIRMÉE (\`echo \"$t33_cell_cadrage\"\`) — une autorisation refermée qui garde sa marque de transitoire se relit comme encore ouverte (A-1ter)]"
 fi
-# Fixtures de la marque transitoire, dans les deux sens.
+# Fixtures de la marque transitoire, dans les deux sens (verdict RETOURNÉ pour celles qui
+# testaient la PRÉSENCE affirmée ; méta-prohibition et prémisses mortes INCHANGÉES — cf. en-tête).
 t33_fx_transit() { # <libellé> <ATTENDU: vert|rouge> <cellule>
   if [ "$2" = "vert" ]; then
     t33_fx_licites=$((t33_fx_licites + 1))
-    t33_transit_ok "$3" || t33_ko="$t33_ko [FAUX ROUGE ($1) : une marque de transitoire licite est rejetée]"
+    t33_transit_closed_ok "$3" || t33_ko="$t33_ko [FAUX ROUGE ($1) : une cellule FERMÉE licite est rejetée]"
   else
     t33_fx_fautives=$((t33_fx_fautives + 1))
-    t33_transit_ok "$3" && t33_ko="$t33_ko [FAUX VERT ($1) : une cellule FAUTIVE satisfait la marque de transitoire]"
+    t33_transit_closed_ok "$3" && t33_ko="$t33_ko [FAUX VERT ($1) : une cellule ENCORE OUVERTE satisfait la fermeture]"
   fi
 }
-t33_fx_transit "licite, autre graphie de la marque" vert \
+t33_fx_transit "RETOURNÉE — autre graphie de la marque, encore AFFIRMÉE (encore ouverte)" rouge \
   " Autorisation transitoire, elle périme au plan 23-05 dès que le manager porte le cadrage. "
-t33_fx_transit "licite, ordre inversé (échéance avant la marque)" vert \
+t33_fx_transit "RETOURNÉE — ordre inversé, encore AFFIRMÉE (encore ouverte)" rouge \
   " Le plan 23-05 referme cette ligne : autorisation transitoire, assumée par écrit. "
-t33_fx_transit "licite, prose portant une négation APRÈS les deux marques" vert \
+t33_fx_transit "RETOURNÉE — marque affirmée malgré une négation SANS RAPPORT ailleurs" rouge \
   " Transitoire — périme au plan 23-05. Ouvert faute d'AskUserQuestion, ce que nul autre mode ne compense. "
-t33_fx_transit "fautive, échéance SANS marque de transitoire" rouge \
+t33_fx_transit "RETOURNÉE — échéance seule, SANS le mot transitoire (n'affirme plus le couple)" vert \
   " Autorisation ouverte, revue au plan 23-05 si le besoin se confirme. "
-t33_fx_transit "fautive, marque SANS échéance nommée" rouge \
+t33_fx_transit "RETOURNÉE — marque seule, SANS échéance nommée (n'affirme plus le couple)" vert \
   " Autorisation transitoire, à refermer dès qu'un correctif structurel existe. "
-t33_fx_transit "fautive, MÉTA-PROHIBITION, verbe de l'ancienne liste : présenter" rouge \
+t33_fx_transit "fautive, MÉTA-PROHIBITION, verbe de l'ancienne liste : présenter (INCHANGÉE)" rouge \
   " Ne jamais présenter cette autorisation comme transitoire ni la dater du plan 23-05. "
-t33_fx_transit "fautive, MÉTA-PROHIBITION, verbe HORS ancienne liste : qualifier" rouge \
+t33_fx_transit "fautive, MÉTA-PROHIBITION, verbe HORS ancienne liste : qualifier (INCHANGÉE)" rouge \
   " Ne jamais qualifier cette autorisation de transitoire, ni l'adosser au plan 23-05. "
-t33_fx_transit "fautive, MÉTA-PROHIBITION, verbe HORS ancienne liste : suggérer" rouge \
+t33_fx_transit "fautive, MÉTA-PROHIBITION, verbe HORS ancienne liste : suggérer (INCHANGÉE)" rouge \
   " Ne plus suggérer que la marque transitoire du plan 23-05 vaut engagement. "
-t33_fx_transit "fautive, NÉGATION de la marque (« n'est plus »)" rouge \
+t33_fx_transit "RETOURNÉE — NÉGATION de la marque (« n'est plus ») décrit l'état FERMÉ" vert \
   " Cette autorisation n'est plus transitoire depuis le plan 23-05. "
-t33_fx_transit "fautive, NÉGATION universelle devant la marque" rouge \
+t33_fx_transit "RETOURNÉE — NÉGATION universelle décrit l'état FERMÉ" vert \
   " Aucune autorisation n'est transitoire ici, pas même jusqu'au plan 23-05. "
-t33_fx_transit "fautive, PRÉMISSE MORTE ressuscitée : persistance config.json" rouge \
+t33_fx_transit "fautive, PRÉMISSE MORTE ressuscitée : persistance config.json (INCHANGÉE)" rouge \
   " Transitoire — périme au plan 23-05. Le mode persiste dans .planning/config.json et survit à la session. "
-t33_fx_transit "fautive, PRÉMISSE MORTE ressuscitée : T25b présenté comme la borne" rouge \
+t33_fx_transit "fautive, PRÉMISSE MORTE ressuscitée : T25b présenté comme la borne (INCHANGÉE)" rouge \
   " Transitoire — périme au plan 23-05. T25b borne la fenêtre d'armement du flag. "
-t33_fx_transit "fautive, PRÉMISSE MORTE ressuscitée : les DEUX à la fois" rouge \
+t33_fx_transit "fautive, PRÉMISSE MORTE ressuscitée : les DEUX à la fois (INCHANGÉE)" rouge \
   " Transitoire — périme au plan 23-05. Le mode persiste dans le config.json et survit à la session ; T25b borne la fenêtre. "
 
 # --- D : renvoi croisé en CO-PRÉSENCE sur une même ligne, non-duplication PAR LISTE ------------
@@ -4341,7 +4354,7 @@ fi
 if [ -n "$t33_ko" ]; then
   ko "T33 (Lacune 3, §9 allowlist stricte + D-21, DISCRIMINANT) : la doctrine de flags de cycle ne tient pas —$t33_ko"; t33_ok=0
 else
-  ok "T33 (Lacune 3, §9 allowlist stricte + D-21, DISCRIMINANT) : la clause de fermeture par défaut GOUVERNE la table (détectée dans les $((t33_first_table - 1)) ligne(s) qui la précèdent, §9 de $t33_s9_n lignes) et la co-présence portée/prédicat est bornée à la PROPOSITION, pas au bloc ; le CONTENU de l'allowlist est gaté par ÉGALITÉ D'ENSEMBLE cellule par cellule sur les 3 briques ($t33_al_flags_n flag(s) distinct(s) extraits, intersection autorisés∩fermés vide, --chain fermé partout) ; les deux formes de gradation de la recherche sont dans la CELLULE « flags autorisés » de la brique de plan ; la ligne de cadrage porte dans sa PROPRE cellule de motif la marque de transitoire ET l'échéance (plan 23-05) sans ressusciter les prémisses mortes (persistance config.json, T25b comme borne) ; le renvoi croisé tient sur UNE ligne physique (docs-flow.md + ADR-057) avec intersection de flags VIDE sur $t33_d_src flag(s) documentaires extraits ; vf-coder.md renvoie depuis son bloc Cadrage ; la ligne de gsd-ship porte elle-même son ADR et le motif de D-21 est lisible dans CHACUNE des sections amendées (§1 de $t33_s1_rows lignes de données, et §6) — $t33_fx_fautives formulation(s)/mutant(s) FAUTIFS font rougir les sondes, $t33_fx_licites reformulation(s) LICITES restent vertes"
+  ok "T33 (Lacune 3, §9 allowlist stricte + D-21, DISCRIMINANT) : la clause de fermeture par défaut GOUVERNE la table (détectée dans les $((t33_first_table - 1)) ligne(s) qui la précèdent, §9 de $t33_s9_n lignes) et la co-présence portée/prédicat est bornée à la PROPOSITION, pas au bloc ; le CONTENU de l'allowlist est gaté par ÉGALITÉ D'ENSEMBLE cellule par cellule sur les 3 briques ($t33_al_flags_n flag(s) distinct(s) extraits, intersection autorisés∩fermés vide, --chain fermé partout) ; les deux formes de gradation de la recherche sont dans la CELLULE « flags autorisés » de la brique de plan ; la ligne de cadrage porte dans sa PROPRE cellule de motif un état FERMÉ (ni marque de transitoire ni échéance affirmée, A-1ter geste 2) sans ressusciter les prémisses mortes (persistance config.json, T25b comme borne) ; le renvoi croisé tient sur UNE ligne physique (docs-flow.md + ADR-057) avec intersection de flags VIDE sur $t33_d_src flag(s) documentaires extraits ; vf-coder.md renvoie depuis son bloc Plan et vf-dev-manager.md depuis son bloc Cadrage (2 foyers) ; la ligne de gsd-ship porte elle-même son ADR et le motif de D-21 est lisible dans CHACUNE des sections amendées (§1 de $t33_s1_rows lignes de données, et §6) — $t33_fx_fautives formulation(s)/mutant(s) FAUTIFS font rougir les sondes, $t33_fx_licites reformulation(s) LICITES restent vertes"
 fi
 
 # ---------------------------------------------------------------------------
