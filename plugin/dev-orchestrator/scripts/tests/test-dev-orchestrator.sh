@@ -323,6 +323,65 @@ fi
 rm -f "$T1D_OUT"; rm -rf "$T1D_HOME" "$T1D_CCD"
 
 # ---------------------------------------------------------------------------
+# T1e/T1f — provenance de l'en-tête : la VERSION est LUE, jamais figée
+# ---------------------------------------------------------------------------
+# Ce que ces cas protègent : l'en-tête « depuis @opengsd/gsd-core@X » a porté un littéral figé
+# (`1.9.0`) pendant que le moteur installé passait à 1.9.1 — un index qui MENT sur sa propre
+# provenance, et une contradiction avec la doctrine que build-gsd-capabilities-index.sh énonce en
+# tête (« aucune version de moteur n'est figée dans la logique »).
+#
+# T1e est DISCRIMINANT par construction : la fixture déclare une version qu'aucun littéral
+# plausible ne contient. Un retour au figé rougit ici, immédiatement.
+T1E_HOME="$(mktemp -d)"
+mkdir -p "$T1E_HOME/.claude/gsd-core/workflows" "$T1E_HOME/empty-skills"
+echo "9.9.9-fixture" > "$T1E_HOME/.claude/gsd-core/VERSION"
+T1E_OUT="$(mktemp)"
+if env -u VF_GSD_WORKFLOWS_DIR -u VF_GSD_CORE_PACKAGE HOME="$T1E_HOME" VF_GSD_SKILLS_DIR="$T1E_HOME/empty-skills" VF_INDEX_OUT="$T1E_OUT" bash "$MOD/scripts/build-gsd-index.sh" >/dev/null 2>&1 \
+  && "$GREP" -qF "depuis @opengsd/gsd-core@9.9.9-fixture" "$T1E_OUT"; then
+  ok "T1e (DISCRIMINANT) provenance : VERSION lue sur le moteur résolu, pas un littéral figé"
+else
+  ko "T1e (DISCRIMINANT) provenance : en-tête n'a pas repris la VERSION du moteur (version figée ?)"
+fi
+rm -f "$T1E_OUT"
+
+# Même arbre, VERSION retirée : l'en-tête doit DIRE son ignorance, jamais affirmer un numéro.
+rm -f "$T1E_HOME/.claude/gsd-core/VERSION"
+T1E_OUT2="$(mktemp)"
+if env -u VF_GSD_WORKFLOWS_DIR -u VF_GSD_CORE_PACKAGE HOME="$T1E_HOME" VF_GSD_SKILLS_DIR="$T1E_HOME/empty-skills" VF_INDEX_OUT="$T1E_OUT2" bash "$MOD/scripts/build-gsd-index.sh" >/dev/null 2>&1 \
+  && "$GREP" -qF "(version inconnue)" "$T1E_OUT2" \
+  && ! "$GREP" -Eq 'depuis @opengsd/gsd-core@[0-9]' "$T1E_OUT2"; then
+  ok "T1e provenance : VERSION absente → « (version inconnue) », aucun numéro affirmé"
+else
+  ko "T1e provenance : VERSION absente mais l'en-tête affirme quand même une version"
+fi
+rm -f "$T1E_OUT2"
+
+# VERSION non maîtrisée : substitution de commande dans le fichier → neutralisée, jamais évaluée.
+printf '1.9.1$(touch %s/pwned)\n' "$T1E_HOME" > "$T1E_HOME/.claude/gsd-core/VERSION"
+T1E_OUT3="$(mktemp)"
+if env -u VF_GSD_WORKFLOWS_DIR -u VF_GSD_CORE_PACKAGE HOME="$T1E_HOME" VF_GSD_SKILLS_DIR="$T1E_HOME/empty-skills" VF_INDEX_OUT="$T1E_OUT3" bash "$MOD/scripts/build-gsd-index.sh" >/dev/null 2>&1 \
+  && "$GREP" -qF "(version inconnue)" "$T1E_OUT3" && [ ! -e "$T1E_HOME/pwned" ]; then
+  ok "T1e provenance : VERSION vérolée neutralisée (aucune substitution évaluée)"
+else
+  ko "T1e provenance : VERSION vérolée non neutralisée"
+fi
+rm -f "$T1E_OUT3"; rm -rf "$T1E_HOME"
+
+# T1f : disposition legacy → l'index ne prétend PAS que la source est @opengsd/gsd-core.
+T1F_HOME="$(mktemp -d)"
+mkdir -p "$T1F_HOME/.claude/get-shit-done/workflows" "$T1F_HOME/empty-skills"
+echo "1.42.3" > "$T1F_HOME/.claude/get-shit-done/VERSION"
+T1F_OUT="$(mktemp)"
+if env -u VF_GSD_WORKFLOWS_DIR -u VF_GSD_CORE_PACKAGE HOME="$T1F_HOME" VF_GSD_SKILLS_DIR="$T1F_HOME/empty-skills" VF_INDEX_OUT="$T1F_OUT" bash "$MOD/scripts/build-gsd-index.sh" >/dev/null 2>&1 \
+  && "$GREP" -qF "depuis get-shit-done-cc@1.42.3" "$T1F_OUT" \
+  && ! "$GREP" -qF "@opengsd/gsd-core@" "$T1F_OUT"; then
+  ok "T1f provenance : moteur legacy nommé pour ce qu'il est, pas maquillé en gsd-core"
+else
+  ko "T1f provenance : moteur legacy annoncé sous le nom du paquet gsd-core"
+fi
+rm -f "$T1F_OUT"; rm -rf "$T1F_HOME"
+
+# ---------------------------------------------------------------------------
 # T2 — ensure-deps.sh idempotent (dry-run, 2 runs, exit 0 aux deux)
 # ---------------------------------------------------------------------------
 VF_ENSURE_DRY_RUN=1 bash "$MOD/scripts/ensure-deps.sh" >/dev/null 2>&1
