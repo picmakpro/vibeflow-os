@@ -242,6 +242,83 @@ sortir `fbdb300` de `main`, le geste est non destructif (le commit vit sur la br
 git branch -f main 08a563d      # depuis une autre branche que main
 ```
 
+## Arbitrages rendus par Samuel (2026-08-04) et doctrine élargie
+
+8 arbitrages rendus en un passage : Z1=A, Z2=C, Z3=A, Z4=A, **Z5=ADOPTION (option C, contre la
+recommandation D du cadrage)**, Z6=A, préalable « monter gsd-core », « pas de Phase 27 ».
+Verdicts posés en tête de chaque zone de `24-ARBITRAGES.md` (commit `bb29d35`).
+
+**Doctrine élargie « GSD-first »**, posée après les arbitrages : les choix suivent l'**usage réel de
+GSD** plutôt que la conformité aux ADR/Iron Laws internes ; **toute collision se CONSIGNE
+(`24-COLLISIONS.md`), jamais ne se contourne en silence** ; la révision effective d'une loi reste
+validée par Samuel ; ADR-031 et la release racine gatée restent en vigueur.
+
+## Nœud `plan` — 12 plans, 4 vagues, `gsd-plan-checker` PASS
+
+Ledger `GSDA-01..22`, couverture **22/22** vérifiée en `comm`, 0 orpheline, 0 inventée. Disjonction
+des périmètres re-vérifiée indépendamment du planner : **0 collision dans chacune des 4 vagues**.
+
+**Deux faits de recherche ont falsifié des prémisses d'arbitrage :**
+
+1. **Il n'existe AUCUNE version de `@opengsd/gsd-core` au-delà de `1.9.1`** (`dist-tags.latest =
+   1.9.1`, 2026-07-31 ; PR #2975 mergée le 2026-08-01, après ; `dist-tags.next = 1.7.0-rc.6`,
+   antérieur). **Le prérequis dur de la zone 2 est insatisfiable** → clause de repli `GSDA-01` :
+   zone 2 différée, déclencheur objectif gravé.
+2. **Notre `WINDOWS.md` ne porte AUCUNE prose sous son ledger** (87 l., en-tête identique au rendu
+   canonique). La prémisse qui motivait le prérequis est donc **fausse en l'état** : un `waive` ne
+   détruirait rien aujourd'hui. Confirmé au passage que `waive` porte la **même** destruction
+   qu'`append` (`writeLedgerAtomic` → `renderLedger` réécrit intégralement).
+
+**Défaut réel trouvé et corrigé au plan** : `24-10` ancrait sa garde « aucune phase ajoutée » sur
+`### Phase ` seul → comptait **13** au lieu de 26 (le ROADMAP mêle `###` et `####`). Aurait rougi à
+tort et poussé un exécuteur à « réparer » un ROADMAP intact.
+
+## Vague 1 exécutée — 4 plans en parallèle, périmètres disjoints
+
+`24-01` (`effort:` × agents, `check-agents.sh` durci, marge de dispatch) · `24-03` (slot
+`agent_skills.gsd-planner`, §10 de `GSD-PIPELINE.md`) · `24-04` (3 gates workstream-aware) ·
+`24-05` (gate sur le pointeur + hook `SessionStart`). **25 commits** depuis le plan.
+
+### Les juges ont trouvé ce que les 4 workers ne pouvaient pas voir
+
+Revue de jointure + audit dispatchés **en parallèle** (juges read-only). Les deux convergent : *les
+lots pris isolément sont bien faits, c'est la **composition** qui casse.*
+
+- **La population d'agents est 31, pas 25.** L'installeur copie aussi chaque `plugin/*/AGENT.md`
+  dans `.claude/agents/` (`vibeflow-update.sh:479`). **5 des 6 `AGENT.md` sans `effort:`** →
+  **CI Gate C rouge** (`ci.yml:328`, sous `set -eu`) et T20 en KO. Deuxième fois que ce dépôt se
+  fait avoir par un **univers de liste sous-estimé**.
+- **`check-state-integrity.sh` — 3 faux verts + 1 faux rouge** sur le gate ADR-063 : handler de
+  rejet **fail-open**, test de vacuité avant le trim, borne locale de 80 caractères **non-amont**
+  (`isValidActiveWorkstreamName("a"×100)` = `true` en amont), et absence de précondition de
+  partitionnement.
+- **`check-workstream-pointer.sh` rendait « conforme » sur `..` et `.`**, et **fabriquait un vert
+  sur un nom qu'il avait lui-même réécrit** (`tr -d ' '` supprimait tous les espaces : un pointeur
+  `de v` devenait `« dev »`).
+- **Fuite d'information au `SessionStart` par symlink versionné** — motif de la Phase 23 rouvert
+  **et élargi** : auto-déclenché, sans borne, la 1ʳᵉ ligne du fichier cible réimprimée verbatim
+  dans le contexte de session.
+- **Le gate CI anti-régression ADR-063 se désarmait par `export`** (`ci.yml:293` sans `--file`).
+- **Cause commune de la divergence** : 4 copies de la politique de nom en 2 variantes, écrites
+  contre deux lectures différentes du même fichier amont — **aucune correcte**.
+
+### Correction ciblée — un seul `reopen`, 6 bloquants fermés par mutation
+
+Findings des deux juges **fusionnés et dédoublonnés** avant un `reopen` unique (jamais un par
+juge). Fermetures **prouvées par mesure, pas par relecture** : Gate C `CI_GATE_EXIT=0` (et `1` sous
+mutation), T20 vert, suite dev-orchestrator **165 OK / 0 KO**, les 3 faux verts et le faux rouge
+inversés, `..`/`.`/`.hidden`/`-x`/`de v` tous passés en `2`, fuite symlink refermée et **garde
+isolée par mutation** (`-L` retiré → la fuite réapparaît). **49 suites découvertes, 0 échec.**
+
+La politique de nom est désormais **écrite une seule fois** dans une lib sourcée partagée —
+dépendance inter-modules vérifiée tenable contre l'hypothèse initiale — avec une suite de 13 cas
+dont un **différentiel contre le vrai `workstream-name-policy.cjs`** (verdict identique sur 19
+noms) et une preuve d'**identité de classification des 4 gates**.
+
+**Contradiction de mesure tranchée par re-mesure** : `24-03` annonçait 165/0, `24-04` 164/1 sur la
+même suite. La baseline était **164/1** — la mesure de `24-03` n'était pas fausse, elle a été
+**invalidée après coup** par le commit `a29cd60` d'un autre lot. Défaut de jointure, pas de plan.
+
 ## Points ouverts, non tranchés par cette mission
 
 - **Recalage du ROADMAP** — 8 faits périmés dans la section Phase 24. Différé au nœud `docs` de fin

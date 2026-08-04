@@ -8,7 +8,15 @@ status: complete
 stopped_at: "Phase 23 CLOSE et PUBLIÉE — 8/8 plans exécutés et revus, PR #30 mergée, release racine v2.47.0 taggée et publiée (gate check-release-tag --remote vert). 9 exigences GSDC sur 10 soldées ; GSDC-08 en [~] sur l'écart D-22 (gsd-debugger présent dans vf-coder.md contre une décision « aucune exception » ET exigé par le gate T19 — les deux se tranchent ensemble, arbitrage humain). Deux RCE fermées. Suite du module 102 -> 161 cas, 47 suites vertes. Livré hors phase au passage : correctif de la course de récupération du lock de driver (PR #31, conductor v1.19.1) — jusqu'à 5 acquéreurs simultanés mesurés, lock devenu lien symbolique remplacé par rename(2). Reste ouvert et NON traité : la fuite d'info par symlink (slurp sans O_NOFOLLOW, sur les deux scripts, absente du threat model), la promotion d'A-15 en ADR, et nyquist_compliant=false sur 23-VALIDATION.md (rempli a posteriori, la continuité d'échantillonnage n'a pas pu être mesurée). Prochaine phase : 24."
 last_updated: "2026-08-04T00:00:00.000Z"
 last_activity: 2026-08-04 (quick 260804-ki4 — cache du bandeau update invalidé puis régénéré en queue de /vf-update, conductor v1.19.2)
-# ⏸ Mission Phase 24 EN PAUSE sur checkpoint humain (2026-08-04, branche
+# ▶ Mission Phase 24 EN COURS (2026-08-04, branche `feat/phase-24-activation-moteur-gsd`).
+# Arbitrages rendus (8), plan complet (12 plans / 4 vagues, plan-checker PASS, ledger GSDA-01..22),
+# VAGUE 1 LIVRÉE ET CORRIGÉE : plans 24-01/03/04/05, revue de jointure + audit, 6 bloquants fermés
+# par mutation (dont 2 CRITICAL : fuite symlink au SessionStart, gate CI ADR-063 désarmable).
+# 49 suites, 0 échec. RESTE : plans 24-06..24-12 (vagues 2-4) + 24-02 GELÉ (zone 2, prémisse
+# falsifiée : aucune version de gsd-core au-delà de 1.9.1 n'existe). Détail complet :
+# .planning/missions/2026-08-04-phase-24-activation-moteur-gsd.md
+# ⚠ check-version-sync ROUGE assumé : README « 47 suites » vs 49 réelles — le plan 24-12 le referme.
+# (Historique) Mission mise en pause sur checkpoint humain plus tôt le 2026-08-04, branche
 # `feat/phase-24-activation-moteur-gsd`). Cadrage FAIT et commité : 24-CONTEXT.md, 24-ARBITRAGES.md
 # (6 zones, 4 options chacune), 24-DISCUSSION-LOG.md. Aucun plan, aucune exécution — la phase attend
 # 6 arbitrages de Samuel. Détail, faits re-vérifiés et recherche amont :

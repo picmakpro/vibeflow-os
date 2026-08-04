@@ -18,7 +18,7 @@
         "facts"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "plan",
@@ -30,7 +30,7 @@
       "scope": [
         ".planning/phases/VFDO-24-activation-et-mesure-du-moteur-gsd-capacit-s-dormantes-et-fa/"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "plancheck",
@@ -40,7 +40,7 @@
         "plan"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "research-web",
@@ -48,6 +48,92 @@
       "stage": "",
       "deps": [],
       "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-01",
+      "step": "Zone 6 — effort: x25, gate durci, marge de dispatch",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/*/agents/*.md",
+        "plugin/conductor/scripts/check-agents.sh",
+        "plugin/conductor/references/team-kernel.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-03",
+      "step": "Zone 1 — slot AGENT_SKILLS_PLANNER",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/config.json",
+        "plugin/dev-orchestrator/references/GSD-PIPELINE.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-04",
+      "step": "Zone 5a — 3 gates workstream-aware",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/conductor/scripts/check-dev-bootstrap.sh",
+        "plugin/conductor/scripts/check-state-integrity.sh",
+        "plugin/planning-core/scripts/planning-context.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-05",
+      "step": "Zone 5b — gate sur le pointeur de workstream",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/conductor/scripts/check-workstream-pointer.sh",
+        "plugin/conductor/hooks/hooks.json"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-02",
+      "step": "Zone 2 — GELE: premisse falsifiee, arbitrage humain requis",
+      "stage": "",
+      "deps": [
+        "exec-24-01"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "revue-vague-1",
+      "step": "revue de jointure des 4 lots paralleles",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "audit-vague-1",
+      "step": "audit infra: hooks, gates, CI",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-vague-1",
+      "step": "correction ciblee: 12 bloquants fusionnes des 2 juges",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/*/AGENT.md",
+        "plugin/conductor/scripts/check-state-integrity.sh",
+        "plugin/conductor/scripts/check-workstream-pointer.sh",
+        "plugin/planning-core/scripts/planning-context.sh",
+        ".github/workflows/ci.yml"
+      ],
       "status": "done"
     }
   ]
