@@ -375,6 +375,60 @@ méthode et sa date, **la valeur périmée conservée et attribuée à sa source
 - **Piège outillé à connaître** : `check-agents.sh` n'accepte que `--agents-dir=PATH` (forme `=`). Avec
   un espace, il rend **exit 3 sur les 6 dossiers** — un faux rouge indiscernable d'un parc non conforme.
 
+## Vagues 2-3 — 11 des 12 plans livrés, revus, audités
+
+`24-06` (intel activé, 2 refus indexés, générateur étendu) · `24-07` (ADR-068) · `24-08`
+(workstreams dans les agents) · `24-09` (CI sur arbre partitionné) · `24-10` (**Iron Law 2
+révisée**, **ADR-069** adoption, remontée amont préparée) · `24-11` (gate d'activation
+doc ↔ capability, T14 étendu 167 → 182).
+
+### P2 n'était pas un écart de mesure — c'était un critère non déclaré
+
+**Ma propre consigne de propagation était fautive.** J'avais fait écrire que 7/91 « ne se reproduit
+pas ». `24-10` puis une re-vérification indépendante ont établi l'inverse : avec le critère nommé
+**K2**, `7/91` se reproduit **exactement** — `atteinte=91 · K1=5 · K2=7 · K3=16 · 45 en dur ·
+42 aveugles K2`, gsd-core 1.9.1. Corollaire : « bien pire que 18 % » **ne survit pas**, le ~18 % se
+retrouve sous K3 (17,6 %). ADR-069 grave K2 avec sa commande et son critère.
+
+**La leçon dépasse la correction** : avant de déclarer un chiffre « non reproductible », vérifier
+que les deux mesures parlent du **même univers**. Même mode d'erreur que la population d'agents
+(25 annoncés, 31 réels). Trois documents aval ont dû être corrigés ; la fiche source
+`24-CONTEXT.md` et `24-ARBITRAGES.md` portaient encore la conclusion invalidée — corrigées par
+renvoi, la trace préservée.
+
+### Les juges, encore une fois, ont trouvé ce que les workers ne pouvaient pas voir
+
+**1 bloquant, 8 majeurs, 3 HIGH de sécurité** — tous fermés par mutation :
+
+- **Le gate créé par `24-11` laissait passer exactement la régression qu'il existe pour empêcher** :
+  la règle 2 cherchait le **nom du toggle**, le défaut d'origine porte sur le **nom de la brique
+  routée**. Retirer le parenthétique en gardant la promesse rendait le gate **vert**. Pire, la suite
+  **rationalisait** l'absence du cas et sa fixture conservait le littéral que le corpus réel ne
+  conserve pas. Fermé en indexant les identifiants de brique (`bySkill`, jamais lu jusque-là).
+- **Le même gate était cassé chez l'utilisateur** : `ROOT` se résolvait **hors du lab** → suite rouge
+  en lab installé, et lecture du `config.json` **d'un autre projet**.
+- **Une assertion CI comparait deux chaînes vides** (`"" != ""`) : R1 serait resté vert même si la
+  résolution de workstream fuyait totalement.
+- **Échappement par lien symbolique rouvert** dans le générateur d'index — **troisième passage du
+  motif de la Phase 23** dans ce dépôt. Contenu hors dépôt reflété verbatim dans un index versionné.
+- **Le canal NOMINAL n'avait aucune borne de longueur** : la borne était posée sur le canal
+  rétrogradé. 200 000 octets → 400 Ko en sortie de deux hooks `SessionStart`.
+- **Une valeur machine réelle publiée dans un dépôt PUBLIC** (`claude-code-sse-port-25130`), alors
+  que le threat model du lot acceptait le risque au motif que seule « la forme » serait décrite.
+- **`governingKey` fabriquait des toggles** : 6 `review.models.*` (qui nomment un modèle, pas une
+  activation) promus au rang d'activations, polluant l'univers servi comme preuve anti-vert-à-vide.
+- **Le gate neuf n'avait aucun appelant en production** — absent du job `gates`, distribué dans des
+  labs où rien ne l'exécuterait.
+
+### `/gsd-ship` est bloqué, et le blocage est exact
+
+Le gate `security` de `ship:pre` était actif depuis toujours (`security_enforcement: true`) et
+cherchait un `*-SECURITY.md` **inexistant**. `24-SECURITY.md` est désormais écrit, avec
+**`threats_open: 18` — calculé, pas posé**. Fait mesuré en l'écrivant : **les 12 plans portent
+56 menaces, et aucun des 11 SUMMARY n'enregistre de verdict dessus.** Poser `0` aurait été le
+verdict inventé que le mandat interdit. Seul `/gsd-secure-phase 24` peut faire descendre ce
+compteur.
+
 ## Points ouverts, non tranchés par cette mission
 
 - **Recalage du ROADMAP** — 8 faits périmés dans la section Phase 24. Différé au nœud `docs` de fin

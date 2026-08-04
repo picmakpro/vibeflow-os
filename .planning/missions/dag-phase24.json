@@ -150,7 +150,101 @@
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "failed"
+      "status": "done"
+    },
+    {
+      "id": "exec-24-07",
+      "step": "ADR de refus context_profile",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-06",
+      "step": "vague 2-3",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-10",
+      "step": "vague 2-3",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-11",
+      "step": "vague 2-3",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-propagation",
+      "step": "vague 2-3",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-vague-2",
+      "step": "revue jointure v2-3",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "audit-vague-2",
+      "step": "audit v2-3",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-vague-2",
+      "step": "correction fusionnee des 2 juges",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-12",
+      "step": "cloture: triades 8 modules + compteur READMEs",
+      "stage": "",
+      "deps": [
+        "fix-vague-2"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "secure-phase",
+      "step": "gsd-secure-phase 24 (threats_open 18)",
+      "stage": "",
+      "deps": [
+        "fix-vague-2"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire de fin de mission",
+      "stage": "",
+      "deps": [
+        "exec-24-12"
+      ],
+      "scope": [],
+      "status": "blocked"
     }
   ]
 }

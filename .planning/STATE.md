@@ -14,14 +14,18 @@ last_activity: 2026-08-04 (quick 260804-ki4 — cache du bandeau update invalid�
 # par mutation (dont 2 CRITICAL : fuite symlink au SessionStart, gate CI ADR-063 désarmable).
 # 49 suites, 0 échec. VAGUE 2 : 24-02 (zone 2 DÉGELÉE et activée — waive #3 joué, ledger intact,
 # bug #2893 non manifesté ; ADR-066/067) et 24-08 (workstreams dans les agents) LIVRÉS.
-# 24-09 EN ÉCHEC : deux mandats coupés par erreur réseau, AUCUN commit, arbre propre — à refaire.
-# RESTE : 24-09, puis 24-06, 24-07, 24-10, 24-11, 24-12.
-# ⚠️ DEUX LANDMINES avant de reprendre (détail dans le rapport de mission) :
-#   P1 — contrôle négatif INVERSÉ par le dégel de la zone 2 : 24-06-PLAN.md:100 et 24-03-PLAN.md:98
-#        affirment que windows_enforce/workflow_guard sont ABSENTS ; ils valent true. 24-06 échouera.
-#        24-12 à re-dériver (non trouvé par la sonde awk).
-#   P2 — couverture workstreams re-mesurée 5/91 (5,5 %), pas 7/91 : à trancher AVANT qu'ADR-069
-#        (plan 24-10) ne grave « les limites connues datées ».
+# VAGUES 2-3 LIVRÉES : 24-06 (intel), 24-07 (ADR-068), 24-08 (workstreams agents), 24-09 (CI
+# partitionnée), 24-10 (Iron Law 2 RÉVISÉE + ADR-069 adoption + remontée amont), 24-11 (gate
+# d'activation doc↔capability). Revue de jointure + audit passés : 1 bloquant + 8 majeurs + 2 HIGH
+# de sécurité, TOUS fermés par mutation (B1→B11). 50 suites vertes.
+# P1 et P2 SOLDÉES : P1 inversée chez ses porteurs réels ; P2 n'était PAS un écart de mesure mais
+# un CRITÈRE NON DÉCLARÉ — K1=5, K2=7, K3=16 sur 91, atteinte 91, gsd-core 1.9.1. ADR-069 grave
+# K2=7/91 avec sa commande. Re-vérifié indépendamment deux fois.
+# RESTE : 24-12 (clôture — triades des 8 modules + compteur des 2 README à porter de 47 à **50**,
+# à RE-MESURER au moment de l'écriture), /gsd-secure-phase 24, puis le nœud docs de fin de mission.
+# ⚠️ /gsd-ship est BLOQUÉ, et c'est exact : 24-SECURITY.md porte threats_open: 18 (calculé, pas
+# posé — les 12 plans portent 56 menaces et aucun des 11 SUMMARY n'enregistre de verdict).
+# Seul /gsd-secure-phase 24 peut faire descendre ce compteur.
 # Détail complet :
 # .planning/missions/2026-08-04-phase-24-activation-moteur-gsd.md
 # ⚠ check-version-sync ROUGE assumé : README « 47 suites » vs 49 réelles — le plan 24-12 le referme.
