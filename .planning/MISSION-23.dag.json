@@ -179,6 +179,7 @@
       "stage": "exec",
       "deps": [
         "plancheck-06",
+        "replan-06",
         "revue-05"
       ],
       "scope": [
@@ -738,7 +739,19 @@
       "scope": [
         ".planning/phases/VFDO-23-*/23-06-PLAN.md"
       ],
-      "status": "ready"
+      "status": "done"
+    },
+    {
+      "id": "replan-06",
+      "step": "Amendement cible du plan 23-06 : 4 bloquants (assertion F rouge sur l arbre actuel, 3 recettes incapables d echouer, forme d option check-agents, critere vert avant travail) + purge des numeros de ligne",
+      "stage": "plan",
+      "deps": [
+        "plancheck-06"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-*/23-06-PLAN.md"
+      ],
+      "status": "running"
     }
   ]
 }
