@@ -147,7 +147,8 @@
         "audit-infra",
         "fix-a5",
         "plancheck-05b",
-        "replan-05"
+        "replan-05",
+        "replan-05b"
       ],
       "scope": [
         "plugin/dev-orchestrator/agents/vf-coder.md",
@@ -712,7 +713,19 @@
       "scope": [
         ".planning/phases/VFDO-23-*/23-05-PLAN.md"
       ],
-      "status": "ready"
+      "status": "done"
+    },
+    {
+      "id": "replan-05b",
+      "step": "Amendement cible du plan 23-05 sur les 3 bloquants + W-1 de plancheck-05b (forme d option check-agents, motif A-13 substitue, tache 0 perimee, recettes incapables d echouer)",
+      "stage": "plan",
+      "deps": [
+        "plancheck-05b"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-*/23-05-PLAN.md"
+      ],
+      "status": "running"
     }
   ]
 }
