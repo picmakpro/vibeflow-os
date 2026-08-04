@@ -120,6 +120,7 @@ jobs:
           # canari doit mesurer le chemin RÉEL, pas une surcharge d'environnement.
           out="$(env -u VF_CONFIG_PATH -u VF_GSD_CORE_LIB bash plugin/dev-orchestrator/scripts/check-gsd-config.sh --path "$LAB" 2>/dev/null)" || rc=$?
           rc="${rc:-0}"
+          rm -rf "$LAB"
           echo "== sortie du gate (rc=$rc) =="
           printf '%s\n' "$out"
 
