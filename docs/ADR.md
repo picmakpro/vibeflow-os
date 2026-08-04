@@ -36,6 +36,12 @@
 | ADR-064 | 2026-08-01 | Un écrivain = un worktree : l'isolation des sessions concurrentes devient physique, et le claim de branche se dit à tout le monde (advisory) | Validée |
 | ADR-066 | 2026-08-04 | La zone 2 est activée, pas différée : un prérequis de version insatisfiable ne gate pas, et le risque mesuré est inexistant | Validée |
 | ADR-067 | 2026-08-04 | `hooks.community` refusé : c'est une mesure de style, pas de conformité — 6 types maison hors liste amont, 68 % des sujets > 72 caractères | Validée |
+| ADR-068 | 2026-08-04 | Profils de contexte du moteur refusés (rien à activer, notre contrat typé est per-rôle et plus strict) — et `workflow.inline_plan_threshold` inchangé à 2, la mesure étant le livrable | Validée |
+
+> **`ADR-065` : numéro non attribué** — constaté le 2026-08-04. Le registre saute de `ADR-064` à
+> `ADR-066` ; aucune décision ne porte ce numéro et aucune n'a été retirée. Un registre qui saute
+> est un fait bénin ; le combler ou renuméroter casserait des références existantes — ne rien faire
+> est la bonne action, et cette ligne existe pour qu'on ne « répare » pas un trou intact.
 
 ### ADR héritées les plus citées (définitions canoniques)
 
@@ -1703,3 +1709,207 @@ qu'on ne puisse plus invoquer un gate qui n'existe pas.
 Rouvrir **ssi** la liste de types amont s'élargit à nos six types maison, **ou** que sa limite de
 sujet dépasse 72 caractères, **ou** que nous décidions de réaligner notre convention sur la liste
 amont — cette dernière étant une décision de `CLAUDE.md`, pas de configuration.
+
+---
+
+## ADR-068 : Les profils de contexte du moteur sont refusés — il n'y a rien à activer, et notre contrat typé est per-rôle et plus strict
+
+**Date** : 2026-08-04 · **Statut** : Validée · **Décideur** : Samuel (arbitrage
+`24-ARBITRAGES.md`, zone 4, option A) · **Voisines** : ADR-066, ADR-067 (même arbitrage)
+
+Cette entrée couvre les **deux items de la zone 4**. Ils partagent une même leçon et c'est pourquoi
+ils partagent une ADR : dans les deux cas, le livrable n'est pas un réglage posé, c'est **le fait
+établi qui rend le non-réglage informé**.
+
+---
+
+### Volet 1 — Les profils de contexte : refus
+
+#### La clé n'est pas celle que les fichiers nomment
+
+Le moteur livre trois fichiers de profil — `contexts/dev.md`, `contexts/review.md`,
+`contexts/research.md` — et chacun se présente en ligne 3 par la même formule :
+« *Loaded when `context: dev` is set in config.json* ».
+
+Cette ligne d'en-tête est le piège du sujet, et il faut nommer les **deux états** distincts qu'elle
+recouvre, car ils ne coïncident pas :
+
+| Périmètre | Ce qui y est vrai | Source |
+|---|---|---|
+| **Notre runtime installé, `gsd-core` 1.9.1** | La clé validée comme énumération `['dev', 'research', 'review']` est bien **`context`** (`bin/lib/config.cjs:690-692`). `context_profile` : **0 occurrence dans tout le payload installé** — le répertoire `docs/` amont n'est même pas embarqué dans le paquet. Vérifié de première main le 2026-08-04. |
+| **Le dépôt amont, après la scission de schéma** | Le schéma porte **deux clés distinctes** : `context` (texte libre injecté dans chaque prompt, sans rapport avec les profils) et **`context_profile`** (les presets `dev`/`research`/`review`, « *Added in v1.34* »). Les trois fichiers livrés continuent de nommer `context:` en en-tête : ils **nomment une clé qui ne porte plus cette sémantique au schéma**. Fait issu de la recherche amont du cadrage (`24-CONTEXT.md` F-20, `24-ARBITRAGES.md` zone 4), non re-vérifiable localement — ce dépôt n'a pas accès au dépôt amont. |
+
+**Le désalignement en-tête ↔ schéma est en soi un fait à consigner**, et c'est lui qui a fait paraître
+le sujet actionnable : on croit lire une clé documentée et vivante, on lit un en-tête resté en place
+après que le schéma a bougé sous lui.
+
+La clé porteuse de la sémantique s'appelle **`context_profile`**. C'est elle, et aucune autre, que
+cette ADR refuse.
+
+#### État réel : documentée, livrée, jamais câblée, abandonnée de fait
+
+L'état de ce canal n'est **aucun des deux états habituels** — ni « vivant », ni retiré par l'amont.
+C'est un **troisième état**, et il se dit dans ces termes exacts :
+
+> **documentée, livrée, jamais câblée, abandonnée de fait depuis avril 2026.**
+
+Ce vocabulaire est contraint, et la contrainte est factuelle. L'amont **n'a annoncé aucun retrait,
+aucune fin de vie, aucun remplacement** : zéro annonce, zéro issue, zéro PR sur le sujet. Employer
+le vocabulaire du retrait rendrait cette ADR **factuellement fausse** — nous décrivons un abandon
+constaté par l'inaction, pas un retrait déclaré. La nuance n'est pas cosmétique : un canal retiré ne
+revient pas, un canal abandonné de fait peut se réveiller à tout moment. C'est précisément pourquoi
+le refus est assorti d'un déclencheur (ci-dessous) plutôt que d'une fermeture définitive.
+
+Ce qui fonde « abandonnée de fait » : les trois fichiers n'ont été touchés que **deux fois dans
+toute l'histoire du dépôt amont** — création le 2026-04-05, puis renommage de répertoire le
+2026-06-02. **Quatre mois sans une seule modification fonctionnelle**, sur un canal dont le schéma a
+entre-temps bougé sans que les fichiers suivent. (Historique amont relevé au cadrage.)
+
+#### Motif du refus, en deux temps
+
+**1. Il n'y a rien à activer.** `context_profile` compte **6 occurrences amont, toutes situées dans
+`docs/`** — aucune dans `src/`, `workflows/`, `agents/` ni `bin/` (relevé du cadrage). Sur notre
+runtime installé, le compte re-vérifié le 2026-08-04 est plus tranchant encore : **0 occurrence**,
+et les seuls hits du préfixe sont **3 lignes auto-déclaratives** — l'en-tête de chacun des trois
+fichiers de profil, qui se décrit lui-même et que personne ne lit. Le seul appel de configuration du
+moteur qui commence par le même préfixe porte sur `context_window`, la taille de la fenêtre de
+contexte : **une autre clé, une autre affaire.**
+
+**Aucun consommateur n'existe.** Le ROADMAP présentait A4 comme « ce que le moteur porte en config et
+que nous ré-implémentons en doctrine ». Le fait s'inverse : **le moteur ne le porte pas, il le
+déclare.** Adopter la clé poserait un réglage décoratif — une ligne de configuration dont on ne
+pourrait jamais observer l'effet, ni en présence ni en absence.
+
+**2. Notre contrat est plus strict, et de forme incompatible.** Le profil amont est un **scalaire
+global** : une valeur unique pour tout le projet. Notre Pattern C est un **contrat par rôle** —
+quatre rôles, un schéma JSON par retour (`mission-flow.md:136-152`). L'amont sait faire du par-agent
+quand il le veut : `agent_skills` est bien une map par agent. Le profil de contexte, lui, ne l'est
+pas ; il ne peut donc pas exprimer ce que notre contrat exprime.
+
+Et si le canal s'implémentait un jour, il n'arriverait pas neutre — il entrerait en **collision
+frontale** :
+
+| Point de collision | Amont | Chez nous |
+|---|---|---|
+| Verbosité en recherche | `research.md:20-23` — « *Verbosity **High** … Include background context even if the developer likely knows it* » | `mission-flow.md:139-142` — « **la prose libre est du volume mort** » (audit 2026-07-25) |
+| Vocabulaire de sévérité | `blocking` / `important` / `nit` (`review.md:8`) | `bloquant` / `majeur` / `mineur` (`mission-flow.md:148`) |
+
+Seul `dev.md:21` (« Verbosity Low ») serait compatible. Un canal dont un tiers des valeurs
+contredit notre doctrine et un autre tiers renomme notre vocabulaire n'est pas un canal à adopter
+d'avance.
+
+#### Décision
+
+**Ni `context` ni `context_profile` n'est posée dans `.planning/config.json`.** Le refus ne coûte
+aucune manipulation : ne pas poser la clé *est* le refus. L'état de fait, désormais motivé plutôt
+que subi.
+
+Ce que nous gardons à la place existe déjà et fait mieux : le contrat typé per-rôle du Pattern C.
+
+#### Déclencheur de réexamen
+
+Rouvrir **ssi** `context_profile` apparaît **hors de la documentation** — dans le code, les
+workflows, les agents ou les binaires — d'une release amont, **ou** qu'une issue amont le mentionne.
+
+Ce déclencheur est **objectif et sans échéance**, délibérément. Une date de revue serait un
+rendez-vous : elle se tiendrait qu'il se soit passé quelque chose ou non, et elle rouvrirait un
+dossier vide. La condition ci-dessus, elle, ne se déclenche que s'il s'est réellement passé quelque
+chose — l'apparition d'un consommateur, c'est-à-dire exactement le fait dont l'absence motive le
+refus.
+
+---
+
+### Volet 2 — `inline_plan_threshold` : inchangé à 2, et la mesure est le livrable
+
+#### Ce que le réglage fait
+
+`workflow.inline_plan_threshold` vaut **2** par défaut, dans une plage `0`–`10`
+(`references/planning-config.md:41` et `:276`). Il est lu dans `execute-plan.md:94` et appliqué
+en `:100` : un plan dont le compte de tâches est **≤ seuil** s'exécute **inline** (Pattern C) au lieu
+de faire naître un sous-agent — l'amont motive par « *avoids ~14K token subagent spawn overhead and
+preserves prompt cache* ».
+
+#### La méthode, avant les chiffres
+
+Le compte de tâches n'est pas laissé à l'appréciation : la mesure emploie **la regex exacte du
+moteur**, relevée dans `execute-plan.md:93` :
+
+```
+^\s*<task[[:space:]>]
+```
+
+Population : tous les fichiers `*-PLAN.md` des dossiers de phase **20 à 26** de `.planning/phases/`.
+Commande reproductible, en `awk` — jamais en `grep` piped, qui tronque silencieusement sur ce
+runtime :
+
+```bash
+for f in .planning/phases/*/2[0-6]-*-PLAN.md; do
+  awk '/^[[:space:]]*<task[[:space:]>]/{n++} END{print n+0}' "$f"
+done | sort -n | uniq -c
+```
+
+Un plan à **0 tâche** n'est pas un petit plan : ce sont les **rétro-plans de la Phase 21**, écrits
+sans balise `<task>`. C'est un **artefact de format**, et ils sont donc exclus du dénominateur des
+plans *exécutables* — les inclure gonflerait mécaniquement la part « sous le seuil » avec des
+fichiers que le moteur ne route pas.
+
+#### Les deux mesures
+
+Elles portent la **même date calendaire** et ce n'est pas une négligence : elles sont séparées par
+la **population**, pas par le temps. C'est même le fait le plus instructif des deux — un corpus de
+plans peut bouger de plus d'un tiers **dans la même journée**, et un chiffre publié sans sa
+population est donc périssable en heures, pas en mois.
+
+| | **Mesure de cadrage** | **Re-mesure d'exécution** |
+|---|---|---|
+| Date | 2026-08-04 | 2026-08-04 |
+| Moment | pendant le cadrage de la Phase 24, **avant** que ses plans soient écrits | à l'exécution du plan `24-07`, **après** l'écriture des 12 plans de la Phase 24 |
+| Population totale | **32** `*-PLAN.md` | **44** `*-PLAN.md` |
+| Rétro-plans à 0 tâche (exclus) | 4 | 4 |
+| Plans exécutables | **28** | **40** |
+| Distribution | 0 → 4 · **2 → 4** · 3 → 20 · 4 → 2 · 6 → 2 | 0 → 4 · **2 → 8** · 3 → 28 · 4 → 2 · 6 → 2 |
+| **Sous le seuil (≤ 2)** | **4 / 28 — 14 %** | **8 / 40 — 20 %** |
+| **Mode** | **3 tâches** (20 plans) | **3 tâches** (28 plans) |
+
+**Le delta est nommé et attribué** : les 12 fichiers d'écart sont **exactement les 12 plans de la
+Phase 24** (`24-01` à `24-12`), inexistants au moment du cadrage. Quatre d'entre eux (`24-03`,
+`24-07`, `24-08`, `24-09`) portent 2 tâches et rejoignent la population sous le seuil — d'où
+14 % → 20 %. Aucune autre phase n'a bougé.
+
+**Ce que les deux mesures disent de concert** : le levier est **réel mais minoritaire**, et le
+**mode de nos plans est à 3 tâches — juste au-dessus du seuil**, aux deux mesures. Le porter à 3
+ferait basculer le mode entier vers l'inline : on échangerait l'isolation de contexte sur la
+**majorité** de nos plans contre une économie sur des plans qui ne sont pas notre coût dominant. Le
+mettre à 0 achèterait une homogénéité qu'aucun problème constaté ne réclame.
+
+#### Ce que le seuil ne contredit pas — la disjonction acteur / mécanisme
+
+Le seuil pourrait se lire comme une entorse à la doctrine de délégation systématique du module. Il
+n'en est pas une, parce que **les deux ne parlent pas du même objet** :
+
+- la **doctrine vise l'acteur** — *qui* fait le travail. « Je détecte, je délègue à la brique
+  outillée » ; « déléguer, jamais réimplémenter ni court-circuiter la brique choisie »
+  (`AGENT.md:165-166,172`). Ce qu'elle interdit, c'est qu'un agent du module fasse à la main ce
+  qu'une brique sait faire ;
+- le **seuil vise le mécanisme interne** de la brique — il est lu **dans** `execute-plan.md`,
+  **après** que la brique a été atteinte. C'est exactement la distinction « atteint PAR le skill ≠
+  dispatché EN DIRECT » que porte la voie unique (`GSD-PIPELINE.md:188-199`) : le moteur, dans le
+  skill, choisit lui-même d'exécuter inline ou de spawner — comportement voulu, avec tous ses
+  étages. Rien n'est court-circuité, rien ne saute.
+
+Une doctrine sur l'acteur et un réglage sur le mécanisme ne peuvent pas se contredire. Sans cette
+disjonction écrite, la mesure ci-dessus se relirait comme l'aveu d'une entorse ; elle n'en est pas
+une.
+
+#### Décision
+
+**`workflow.inline_plan_threshold` reste inchangé à 2** — la valeur par défaut de l'amont — et **la
+clé n'est pas posée** dans `.planning/config.json`. Ne pas toucher un réglage dont on vient de
+mesurer qu'il mord peu est ici le choix **informé**, pas le choix paresseux.
+
+#### Ce que cette mesure rend impossible
+
+Le seuil inline n'est plus présentable comme un « **levier de coût inconnu** ». Il est chiffré, sa
+population est nommée, sa méthode est reproductible en une commande. Tout retour sur ce réglage
+devra **citer cette mesure et l'infirmer** — sur un corpus nommé, avec la même regex — et non
+rouvrir la question à neuf comme si rien n'avait été mesuré.
