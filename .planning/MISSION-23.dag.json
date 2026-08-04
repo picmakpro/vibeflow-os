@@ -170,7 +170,7 @@
         "plugin/dev-orchestrator/agents/vf-dev-manager.md",
         "plugin/dev-orchestrator/references/GSD-PIPELINE.md"
       ],
-      "status": "ready",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -178,6 +178,7 @@
       "step": "23-06 disjonction hooks moteur vs etages VibeFlow (Lacune 1, ADR)",
       "stage": "exec",
       "deps": [
+        "plancheck-06",
         "revue-05"
       ],
       "scope": [
@@ -726,6 +727,18 @@
         ".planning/phases/VFDO-23-*/23-05-PLAN.md"
       ],
       "status": "done"
+    },
+    {
+      "id": "plancheck-06",
+      "step": "RE-VALIDATION LECTURE SEULE du plan 23-06 : ses 5 fichiers cibles viennent TOUS d etre modifies par exec-05, ses ancres sont donc suspectes. Re-deriver AVANT exec-06",
+      "stage": "verif",
+      "deps": [
+        "revue-05"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-*/23-06-PLAN.md"
+      ],
+      "status": "ready"
     }
   ]
 }
