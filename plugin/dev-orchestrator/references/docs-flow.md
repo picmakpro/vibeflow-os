@@ -21,7 +21,7 @@ la seule affaire d'`intent-routing.md` (ADR-057).
 |---|---|---|
 | **produit** | `gsd-docs-update` | 6 docs toujours-on (README, ARCHITECTURE, GETTING-STARTED, DEVELOPMENT, TESTING, CONFIGURATION) + 3 conditionnelles (API si routes, CONTRIBUTING si open source, DEPLOYMENT si config de déploiement), une review queue des docs manuscrites, la détection de trous. **CHANGELOG jamais régénéré.** |
 | **code** | `gsd-map-codebase` | `.planning/codebase/` — 7 documents produits par 4 mappeurs parallèles. |
-| **savoir** | `gsd-extract-learnings`, `gsd-graphify` | LEARNINGS.md d'étape et graphe de connaissance. |
+| **savoir** | `gsd-extract-learnings` ; `gsd-graphify` (refusée Phase 24 — voir §Famille savoir) | LEARNINGS.md d'étape et graphe de connaissance. |
 | **entrée** | `gsd-ingest-docs`, `gsd-import` | specs/ADR/PRD → `.planning/` — doctrinée ailleurs, voir plus bas. |
 
 ## Famille produit — gsd-docs-update
@@ -45,13 +45,22 @@ Deux modes : `--fast` (avec `--focus`, cartographie ciblée, rapide) et `--query
 inconnu de la session ou que `.planning/codebase/` est absent ou daté ; la régénérer seulement
 quand la structure du code a matériellement changé, jamais par réflexe.
 
+**`--query` dépend de `intel.enabled`** — le skill amont l'exige littéralement
+(`gsd-map-codebase/SKILL.md:29`). Ce lab l'a **activé en Phase 24**, précisément parce que ce
+fichier publiait `--query` comme régime normal alors que le geste était inerte : la promesse est
+désormais tenue. Un lab qui laisserait `intel.enabled` au défaut amont (`false`) perd ce mode
+entier — `--fast` et la cartographie complète continuent, eux, de fonctionner sans lui.
+
 ## Famille savoir — gsd-extract-learnings, gsd-graphify
 
 `gsd-extract-learnings` produit le LEARNINGS.md d'une étape — décisions, leçons, patterns,
-surprises — dérivé de PLAN, SUMMARY, VERIFICATION, UAT et STATE. `gsd-graphify` construit et
-interroge le graphe de connaissance du projet. Cette famille se déclenche **après** une
-vérification ou une clôture d'étape — jamais pendant, le matériau qu'elle synthétise n'existe pas
-encore.
+surprises — dérivé de PLAN, SUMMARY, VERIFICATION, UAT et STATE. Cette famille se déclenche
+**après** une vérification ou une clôture d'étape — jamais pendant, le matériau qu'elle synthétise
+n'existe pas encore.
+
+`gsd-graphify` (conditionnelle : graphify.enabled) — refusée en Phase 24 :
+aucun consommateur prescrit dans le module ; poser ce toggle est ce qui la rendrait active.
+Elle construirait et interrogerait le graphe de connaissance du projet dans `.planning/graphs/`.
 
 ## Famille entrée — renvoi, jamais de copie
 
@@ -60,6 +69,32 @@ est la **source unique** — découverte outillée par `discover-unintegrated-do
 manifest, garde-fous BRDG-03, gate BLOCKER, précédence `ADR > SPEC > PRD > DOC`, cap 50 documents.
 Rien de tout cela n'est redit ici (D-02, ADR-057) : la valeur de ce fichier est le discernement
 entre familles, pas la réécriture de ce qui existe déjà ailleurs.
+
+## Frontière `.planning/codebase/` ↔ `.planning/intel/`
+
+L'activation d'`intel` (Phase 24) fait cohabiter deux magasins qui parlent tous les deux du code.
+Ils ne se remplacent pas, et **les formats le disent avant toute doctrine** — c'est un fait
+constatable, pas une convention qu'on aurait décrétée ici.
+
+**`.planning/codebase/`** — sept documents **markdown narratifs** portant du jugement humain daté :
+dette technique, limites de montée en charge, fonctionnalités critiques manquantes
+(`CONCERNS.md`), contraintes d'architecture (`ARCHITECTURE.md`). Ses lecteurs sont **prescrits
+nommément**, pas opportunistes : `vf-dev-manager.md:32`, `vf-auditer.md:3,23`,
+`check-dev-bootstrap.sh:27`, `gsd-planner.md:635-653`. Produit par `gsd-map-codebase`.
+
+**`.planning/intel/`** — cinq **JSON machine** (`stack`, `file-roles`, `api-map`,
+`dependency-graph`, `arch-decisions`) plus une surface d'API (`API-SURFACE.md`), horodatés et
+hashés (`.last-refresh.json`). L'amont **interdit explicitement le temporel** dans ce qu'il y écrit
+et n'y reconnaît **qu'un seul consommateur automatique**, auquel il appose lui-même la mention
+« indice seulement, possiblement incomplet » (`HINT ONLY … MAY BE INCOMPLETE`). C'est un fait
+dérivé, rafraîchissable à volonté et sans coût de jugement.
+
+**La règle qui les sépare**, non négociable : un fait dérivé rafraîchissable ne se substitue
+**jamais** à un jugement humain daté. `intel/` alimente une **recherche** — retrouver où quelque
+chose vit, quelle surface bouge ; il n'est **jamais cité comme preuve** dans une décision, un
+arbitrage ou un rapport d'audit, et il ne **dispense jamais** de rafraîchir `codebase/`. Une
+carte qui se régénère toute seule ne peut pas, par construction, porter ce qu'un humain a constaté
+et daté.
 
 ## Déclencheurs (le FAIT, jamais le jugement)
 
