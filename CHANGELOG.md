@@ -5,6 +5,88 @@ dernières entrées et pointent ici). Chaque module a par ailleurs son propre `C
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.47.1] — 2026-08-04
+
+**L'index des skills cesse de mentir sur sa propre provenance, et l'historique reçoit l'entrée
+qu'une release avait sautée.**
+
+Origine : la mise à jour du moteur `@opengsd/gsd-core` de 1.9.0 vers **1.9.1**, et la question de
+savoir si le couplage tenait encore. **Il tient sur toute sa surface, vérifié plutôt que déduit** :
+le plafond `^1` de `ensure-deps.sh` couvre 1.9.1 ; les flags `--claude`, `--global`, `--local`
+existent tous dans l'installeur 1.9.1 ; les commandes appelées (`loop render-hooks`, `state`,
+`state record-session`, `roadmap analyze`) sortent toutes en 0 ; et les capabilities **déclarées**
+sont identiques entre les deux versions — index régénéré depuis le registre de chacun des deux
+tarballs, 12 points de hook, 35 étages, sortie identique à l'octet près. Le delta amont porte sur
+les runtimes non-Claude (config Codex, `~/.gsd/defaults.json`) et un troisième registre de
+découvrabilité, pas sur le contrat consommé ici.
+
+**Le seul défaut actif**, trouvé en le vérifiant : l'en-tête de `gsd-skills-index.md` annonçait
+`@opengsd/gsd-core@1.9.0` — un **littéral figé** dans `build-gsd-index.sh`. Un fichier auto-généré
+ET versionné qui affirme une provenance fausse, et qui contredisait frontalement la doctrine que le
+script voisin `build-gsd-capabilities-index.sh` énonce dans son propre en-tête (« aucune version de
+moteur n'est figée dans la logique »). La version est désormais **lue** sur le moteur résolu, selon
+une règle unique — le moteur est le dossier parent de la source de workflows que la cascade
+dual-layout a déjà résolue —, si bien qu'elle décrit toujours l'arbre d'où sortent réellement les
+entrées de l'index, sans seconde cascade à maintenir.
+
+Trois conduites de bord, chacune tenue par un test : VERSION absente ou illisible → l'en-tête
+**dit** « (version inconnue) » plutôt que d'affirmer un numéro ; VERSION non maîtrisée → lecture
+bornée à 200 octets puis classe de caractères restreinte avant impression (port du garde de
+`check-gsd-engine.sh`, T-19-01-04), une substitution de commande écrite dans le fichier est
+neutralisée et jamais évaluée ; disposition **legacy** → l'index nomme `get-shit-done-cc`, il ne
+maquille pas un moteur legacy en `@opengsd/gsd-core`. `T1e` est **DISCRIMINANT par construction**
+(fixture `9.9.9-fixture`, qu'aucun littéral plausible ne contient), discriminance prouvée dans les
+deux sens : 4 KO avec la version figée restaurée, 165 OK / 0 KO après. Suite du module 161 → **165
+cas**.
+
+**Dette d'historique soldée au passage** : la **v2.47.0** avait été taggée et publiée sur GitHub
+sans jamais recevoir son entrée dans ce fichier, qui se présente pourtant comme le canon unique de
+l'historique. L'entrée est rédigée ci-dessous, a posteriori et signalée comme telle. C'est la même
+classe de défaut que la page Releases bloquée de v2.29.0 à v2.39.0 : un artefact publié qui affirme
+une complétude qu'il n'a pas.
+
+Module `dev-orchestrator` v2.11.1. **47 suites** vertes.
+
+## [v2.47.0] — 2026-08-04
+
+> Entrée rédigée a posteriori le 2026-08-04, en préparant la v2.47.1 : la v2.47.0 avait été
+> taggée et publiée sur GitHub **sans jamais recevoir son entrée ici**. Le fichier se présente
+> comme le « canon unique » de l'historique — un trou y vaut la page Releases bloquée que la
+> discipline de release de `CLAUDE.md` interdit déjà par ailleurs.
+
+**Le moteur de dev est explicitement couplé à GSD, et le lock de driver cesse de s'ouvrir pendant
+qu'il se récupère.** Deux volets.
+
+**(1) Phase 23 — couplage explicite** (10 exigences `GSDC-01..10`, 9 soldées). Le module raisonnait
+comme si GSD était une liste de skills à appeler, alors que 1.9 est un **moteur à capabilities**
+qui insère ses étages lui-même — `grep -r "capabilit\|render-hooks"` sur `dev-orchestrator/`
+rendait **zéro**. Livrés : une **voie unique d'invocation** (la voie de l'agent nu désactivait en
+silence research, pattern-mapper, plan-checker, gap-analysis, waves, verifier, code-review, nyquist
+et secure-phase, tout en rendant `passed`) ; une **doctrine de flags en allowlist stricte**, qui
+ferme par défaut au lieu d'ouvrir par omission ; une table capabilities/hooks **générée depuis le
+moteur installé** au lieu d'être écrite à la main — elle ne peut plus dériver en silence ; un
+**contrat de checkpoint relayé et jamais recalculé** ; et **un budget de tours par étape** au lieu
+de deux boucles qui additionnaient les leurs. `GSDC-08` part en `[~]` : l'écart `D-22`
+(`gsd-debugger` présent contre une décision « aucune exception » **et** exigé par le gate `T19`)
+relève de l'arbitrage, pas du code. **Deux RCE fermées**, dont une réintroduite par un script neuf
+via une prémisse de sécurité jamais propagée d'un plan à l'autre — prouvée close en rejouant
+l'install complète depuis un dépôt piégé : le piège est prouvé **lu**, pas évité en silence. Suite
+du module 102 → **161 cas**. (PR #30)
+
+**(2) Une course de récupération dans `driver-lock.sh`.** Récupérer un claim périmé **déplaçait** le
+dossier de lock avant de le recréer ; pendant ce déplacement le chemin n'existe pas, et le `mkdir`
+de la voie normale — incapable de distinguer « libre » de « en cours de récupération » — y entrait.
+Jusqu'à **5 gagnants simultanés** mesurés sur 24 acquisitions concurrentes, sur macOS comme sur
+Linux. Ce n'était pas une fenêtre à rétrécir : deux correctifs de fenêtre ont été mesurés **pires**
+que l'original (8 et 6). Le lock devient un **lien symbolique** remplacé par `rename(2)` — jamais
+absent, donc jamais apparemment libre —, la génération est publiée complète, la récupération est
+sérialisée par un mutex nommé d'après elle, et le verdict de péremption est relu après lui. Les
+locks au format dossier restent lus et récupérables : une mise à jour ne gèle pas les sessions en
+cours. `T13` passe de 6 concurrents en un tirage à **24 × 5 rounds**, les deux bornes gardées.
+(PR #31)
+
+Modules `dev-orchestrator` v2.11.0, `conductor` v1.19.1. **47 suites** vertes.
+
 ## [v2.46.0] — 2026-08-01
 
 **Le suivi cesse de mentir, et deux sessions cessent de pouvoir se marcher dessus sans le savoir.**
