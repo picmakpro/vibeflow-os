@@ -10,8 +10,12 @@
 #   VF_GSD_SKILLS_DIR=/tmp/fixtures ./build-gsd-index.sh # source surchargeable (tests)
 #
 # Variables d'environnement :
-#   VF_GSD_SKILLS_DIR (défaut $HOME/.claude/skills) — racine des skills à scanner
-#   VF_INDEX_OUT      (défaut references/gsd-skills-index.md) — fichier de sortie ; dossier parent créé si besoin
+#   VF_GSD_SKILLS_DIR    (défaut $HOME/.claude/skills) — racine des skills à scanner
+#   VF_INDEX_OUT         (défaut references/gsd-skills-index.md) — fichier de sortie ; dossier parent créé si besoin
+#   VF_GSD_WORKFLOWS_DIR (défaut : cascade dual-layout) — source secondaire ; fixe AUSSI le moteur
+#                        dont la VERSION est lue pour l'en-tête (son dossier parent)
+#   VF_GSD_CORE_PACKAGE  (défaut : nom + VERSION lus sur le moteur résolu) — étiquette de
+#                        provenance de l'en-tête ; surcharge réservée aux tests
 #
 # Comportement : idempotent (overwrite complet à chaque run). Si aucun skill gsd-* trouvé,
 # écrit un header avec message clair et exit 0 (l'index sera régénéré après install GSD).
@@ -24,11 +28,6 @@ set -euo pipefail
 SKILLS_DIR="${VF_GSD_SKILLS_DIR:-$HOME/.claude/skills}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUT="${VF_INDEX_OUT:-$SCRIPT_DIR/../references/gsd-skills-index.md}"
-# Provenance affichée dans l'en-tête de sortie : nomme le paquet source (stable, reproductible)
-# plutôt que $SKILLS_DIR (chemin de système de fichiers — varie selon la machine/sandbox qui
-# régénère l'index, ex. un tarball extrait en /tmp).
-GSD_CORE_PACKAGE="${VF_GSD_CORE_PACKAGE:-@opengsd/gsd-core@1.9.0}"
-
 # Fenêtre de compat dual-layout (D-01, 11-CONTEXT.md), même cascade que detect-gsd-engine.sh :
 # projet-local gsd-core > $CLAUDE_CONFIG_DIR|$HOME gsd-core > legacy get-shit-done > défaut.
 # VF_GSD_WORKFLOWS_DIR explicite reste toujours prioritaire (source surchargeable pour les tests).
@@ -47,6 +46,57 @@ default_workflows_dir() {
   fi
 }
 WORKFLOWS_DIR="${VF_GSD_WORKFLOWS_DIR:-$(default_workflows_dir)}"
+
+# Provenance affichée dans l'en-tête de sortie : nomme le paquet source (stable, reproductible)
+# plutôt que $SKILLS_DIR (chemin de système de fichiers — varie selon la machine/sandbox qui
+# régénère l'index, ex. un tarball extrait en /tmp).
+#
+# La VERSION est LUE sur le moteur résolu, jamais figée dans la logique (même doctrine que
+# build-gsd-capabilities-index.sh, qui l'énonce en tête : « aucune version de moteur n'est figée
+# dans la logique »). Un littéral y contredisait le fichier voisin ET mentait dès le premier
+# correctif publié en amont : l'en-tête a annoncé `@1.9.0` sur un index extrait d'un moteur 1.9.1.
+#
+# Une SEULE règle de résolution, pas une deuxième cascade à maintenir : le moteur est le PARENT
+# du dossier de workflows effectivement utilisé ci-dessus. Ainsi la version affichée décrit
+# toujours l'arbre d'où sortent réellement les entrées de l'index — y compris quand
+# VF_GSD_WORKFLOWS_DIR le déplace. Quand ce parent ne porte pas de VERSION lisible (fixture de
+# test, tarball non installé — le fichier VERSION est écrit à l'install, pas empaqueté), l'en-tête
+# dit « (version inconnue) » : ignorer une version est acceptable, en AFFIRMER une fausse ne
+# l'est pas.
+#
+# Le nom du paquet suit la même lecture : sur la disposition legacy, l'engin n'est pas
+# `@opengsd/gsd-core` et l'index ne doit pas prétendre le contraire.
+GSD_CORE_ROOT="$(dirname "$WORKFLOWS_DIR")"
+
+# Lecture BORNÉE en amont (200 octets — jamais un `cat` intégral d'un fichier de taille
+# arbitraire) puis validation contre une classe de caractères restreinte, avant toute impression.
+# Port du garde de check-gsd-engine.sh (T-19-01-04) : la VERSION est une entrée NON MAÎTRISÉE.
+sanitize_version() { # <raw>
+  local v="$1"
+  if [ "${#v}" -gt 80 ]; then
+    printf '%s' "(version inconnue)"
+    return 1
+  fi
+  if printf '%s' "$v" | grep -Eq '^[0-9A-Za-z._-]{1,80}$'; then
+    printf '%s' "$v"
+    return 0
+  fi
+  printf '%s' "(version inconnue)"
+  return 1
+}
+
+resolve_core_package() {
+  local pkg_name raw
+  case "$(basename "$GSD_CORE_ROOT")" in
+    get-shit-done) pkg_name="get-shit-done-cc" ;;
+    *)             pkg_name="@opengsd/gsd-core" ;;
+  esac
+  raw="$(head -c 200 "$GSD_CORE_ROOT/VERSION" 2>/dev/null || true)"
+  # Normalisation avant validation : le fichier VERSION porte un saut de ligne final.
+  raw="$(printf '%s' "$raw" | tr -d '\r\n')"
+  printf '%s@%s' "$pkg_name" "$(sanitize_version "$raw")"
+}
+GSD_CORE_PACKAGE="${VF_GSD_CORE_PACKAGE:-$(resolve_core_package)}"
 
 # ---------- Helpers ----------
 log() {

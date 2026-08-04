@@ -1,5 +1,40 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.11.1] — 2026-08-04 (l'index des skills cesse de mentir sur sa propre provenance)
+
+### Corrigé
+- **`build-gsd-index.sh`** — la version du moteur affichée en en-tête de `gsd-skills-index.md`
+  était un **littéral figé** (`@opengsd/gsd-core@1.9.0`). Le moteur est passé à 1.9.1 sans que
+  l'index le sache : un fichier auto-généré, versionné, qui affirme une provenance fausse. Deux
+  torts distincts — le numéro est faux, et le figer contredisait frontalement la doctrine que le
+  script voisin `build-gsd-capabilities-index.sh` énonce dans son propre en-tête (« aucune
+  version de moteur n'est figée dans la logique »).
+
+  La version est désormais **lue** sur le moteur résolu, selon une règle unique : le moteur est le
+  dossier parent de la source de workflows déjà résolue par la cascade dual-layout — donc la
+  version décrit toujours l'arbre d'où sortent réellement les entrées de l'index, y compris quand
+  `VF_GSD_WORKFLOWS_DIR` le déplace. Aucune deuxième cascade à maintenir.
+
+  Trois conduites de bord, toutes tenues par des tests : VERSION absente ou illisible → l'en-tête
+  **dit** « (version inconnue) » au lieu d'affirmer un numéro ; VERSION non maîtrisée (lecture
+  bornée à 200 octets + classe de caractères restreinte, port du garde de `check-gsd-engine.sh`,
+  T-19-01-04) → neutralisée, jamais évaluée ; disposition **legacy** → l'index nomme
+  `get-shit-done-cc`, il ne maquille pas un moteur legacy en `@opengsd/gsd-core`.
+
+### Ajouté
+- **`test-dev-orchestrator.sh` T1e/T1f** — 4 cas sur la provenance de l'en-tête. T1e est
+  DISCRIMINANT par construction (fixture `9.9.9-fixture` : aucun littéral plausible ne la
+  contient). Preuve de discrimination faite : 4 KO avec la version figée, 165 OK / 0 KO après.
+
+### Vérifié (rien à changer)
+- **Couplage `@opengsd/gsd-core` 1.9.1** — le plafond `^1` de `ensure-deps.sh` couvre 1.9.1 ;
+  `--claude`, `--global`, `--local` existent tous dans l'installeur 1.9.1 ; les commandes
+  appelées (`loop render-hooks`, `state`, `state record-session`, `roadmap analyze`) sortent en 0.
+  Les capabilities **déclarées** sont identiques entre 1.9.0 et 1.9.1 (index régénéré depuis le
+  registre de chacun des deux tarballs : 12 points de hook, 35 étages, sortie identique) — le
+  delta amont porte sur les runtimes non-Claude et un troisième registre de découvrabilité, pas
+  sur le contrat consommé ici.
+
 ## [v2.11.0] — 2026-08-04 (couplage explicite au moteur GSD — capabilities, flags, voie unique, Phase 23)
 
 Couplage explicite du module au moteur `@opengsd/gsd-core` : un gate qui vérifie que ce que le lab
