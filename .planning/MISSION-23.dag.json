@@ -234,7 +234,7 @@
         "plugin/dev-orchestrator/references/mission-flow.md",
         "plugin/dev-orchestrator/references/mission-contracts.md"
       ],
-      "status": "running",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -242,6 +242,7 @@
       "step": "23-08 gouvernance — bump module, README, CHANGELOG, gates verts",
       "stage": "exec",
       "deps": [
+        "plancheck-08",
         "revue-07"
       ],
       "scope": [
@@ -786,6 +787,18 @@
         ".planning/phases/VFDO-23-*/23-07-PLAN.md"
       ],
       "status": "done"
+    },
+    {
+      "id": "plancheck-08",
+      "step": "RE-VALIDATION LECTURE SEULE du plan 23-08 (gouvernance) + mesure de l ecart avec origin/main avant re-mesure des compteurs README",
+      "stage": "verif",
+      "deps": [
+        "revue-07"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-*/23-08-PLAN.md"
+      ],
+      "status": "ready"
     }
   ]
 }
