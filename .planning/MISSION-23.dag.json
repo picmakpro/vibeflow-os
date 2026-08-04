@@ -107,7 +107,7 @@
         "plugin/_internal/vibeflow-update.sh",
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "revue-04",
@@ -120,7 +120,7 @@
         "plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh",
         "plugin/_internal/vibeflow-update.sh"
       ],
-      "status": "blocked",
+      "status": "ready",
       "review_regime": "full"
     },
     {
@@ -128,7 +128,7 @@
       "step": "audit infra — engine install + hooks + scripts gates (23-02 + 23-04)",
       "stage": "audit",
       "deps": [
-        "revue-04"
+        "exec-04"
       ],
       "scope": [
         "plugin/_internal/vibeflow-update.sh",
@@ -136,7 +136,7 @@
         "plugin/dev-orchestrator/scripts/check-gsd-config.sh",
         "plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "exec-05",
@@ -665,7 +665,7 @@
       "scope": [
         ".github/workflows/"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "exec-04b",
@@ -681,7 +681,7 @@
         "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh",
         ".github/workflows/ci.yml"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "arbitrage-a10-re",
