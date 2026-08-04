@@ -212,7 +212,17 @@ BRIQUES_NUES_RE='gsd-planner|gsd-executor'
 # contrat d'allowlist documenté, pas un dispatch prescrit : elle est vérifiée SÉPARÉMENT, par
 # égalité d'ensemble sur les entrées `Agent(...)` (T29 assertion sur vf-coder.md, T29/T18 sur
 # vf-dev-manager.md) — jamais confondue avec un dispatch en corps de prompt.
-brique_nue_dispatch_hits() { awk '!/^tools:/' "$1" 2>/dev/null | "$GREP" -oE "$BRIQUES_NUES_RE" | sort -u | tr '\n' ' '; }
+#
+# Constante DÉRIVÉE (jamais une recopie) : la détection de DISPATCH ci-dessous doit AUSSI repérer
+# l'agent nu de debug (D-22, plan 23-07 tâche 3) — extension mesurée, portée à la SEULE détection
+# de dispatch en corps de prompt. Étendre directement BRIQUES_NUES_RE serait ROUGE (mesuré) : elle
+# balaie aussi le fichier ENTIER, ligne `tools:` comprise (T29-A/E/G), et couplerait ce gate à
+# l'écart D-22 encore en attente d'arbitrage humain sur cette ligne-là. La dérivation rend le
+# couplage visible et mécanique : une évolution de BRIQUES_NUES_RE se propage d'elle-même, deux
+# listes recopiées divergeraient en silence. Consommateurs : T29 (via brique_nue_dispatch_hits,
+# motif étendu) ET T32.
+BRIQUES_NUES_DISPATCH_RE="${BRIQUES_NUES_RE}|gsd-debugger"
+brique_nue_dispatch_hits() { awk '!/^tools:/' "$1" 2>/dev/null | "$GREP" -oE "$BRIQUES_NUES_DISPATCH_RE" | sort -u | tr '\n' ' '; }
 
 ROUTING="$REFS_DIR/intent-routing.md"
 
@@ -5519,6 +5529,137 @@ else
 fi
 
 [ "$t31_ok" -eq 1 ] && ok "T31 : budget de tours UNIQUE et partagé par ÉTAPE (le grain, pas une liste fermée de boucles), décompte complet à l'épuisement, invisibilité amont du coût interne du moteur nommée, valeur du budget inchangée (D-25), discriminance prouvée par mutation"
+
+# ---------------------------------------------------------------------------
+# T32 (D-22, D-23, D-24, plan 23-07 tâche 3) — la table des briques dormantes ne peut pas perdre
+# une brique en silence, et aucun agent du module ne peut dispatcher un agent nu de debug en
+# corps de prompt. Réutilise brique_nue_dispatch_hits() (motif étendu par
+# BRIQUES_NUES_DISPATCH_RE, définie plus haut) — AUCUNE seconde fonction de détection ici.
+# ---------------------------------------------------------------------------
+t32_ok=1
+T32_MFLOW="$MFLOW"
+T32_DEVMGR="$DEVMGR"
+
+# assertion A : mission-flow.md porte la table au gabarit Déclencheur|Constat ET la phrase de
+# clôture sur l'état normal — vérifier les deux, une table sans cette phrase se lit comme une
+# liste d'obligations.
+if "$GREP" -qF '| Déclencheur | Constat |' "$T32_MFLOW" && "$GREP" -qi 'état normal' "$T32_MFLOW"; then
+  ok "T32-A : mission-flow.md porte la table au gabarit Déclencheur|Constat ET la phrase de clôture « état normal »"
+else
+  ko "T32-A : table au gabarit Déclencheur|Constat et/ou phrase de clôture « état normal » absentes de mission-flow.md"; t32_ok=0
+fi
+
+# assertion B : les quatre briques sont nommées, UNE PAR UNE (boucle sur une liste de noms
+# exacts), avec la précaution anti-homonyme de T19f — un nom ne doit jamais être validé par le
+# préfixe d'un autre. Le 4e nom (récupération) accepte gsd-undo OU gsd-forensics (les deux sont
+# écrits dans la table, un seul suffit à valider la brique — tâche 2, acceptance criteria).
+T32_BRIQUES="gsd-extract-learnings gsd-add-tests gsd-spec-phase"
+t32_b_ok=1
+t32_b_missing=""
+for t32_bn in $T32_BRIQUES; do
+  "$GREP" -qE "${t32_bn}([^a-z0-9-]|\$)" "$T32_MFLOW" || { t32_b_ok=0; t32_b_missing="$t32_b_missing $t32_bn"; }
+done
+if ! "$GREP" -qE 'gsd-undo([^a-z0-9-]|$)' "$T32_MFLOW" && ! "$GREP" -qE 'gsd-forensics([^a-z0-9-]|$)' "$T32_MFLOW"; then
+  t32_b_ok=0; t32_b_missing="$t32_b_missing gsd-undo/gsd-forensics"
+fi
+if [ "$t32_b_ok" -eq 1 ]; then
+  ok "T32-B : les quatre briques dormantes sont nommées une par une dans mission-flow.md, anti-homonyme (extract-learnings, add-tests, spec-phase, undo/forensics)"
+else
+  ko "T32-B : brique(s) manquante(s) dans mission-flow.md —$t32_b_missing"; t32_ok=0
+fi
+
+# assertion C : vf-dev-manager.md nomme le skill de debug ET renvoie (co-localisé, patron
+# t23_triggers_colocated) vers la table plutôt que de la reformuler.
+t32_c_hit="$(md_blocks_matching "$T32_DEVMGR" '.' | "$GREP" -F -- 'mission-flow.md' | "$GREP" -F -- 'dormante')"
+if "$GREP" -q 'gsd-debug' "$T32_DEVMGR" && [ -n "$t32_c_hit" ]; then
+  ok "T32-C : vf-dev-manager.md nomme le skill gsd-debug ET renvoie (co-localisé) vers la table de mission-flow.md"
+else
+  ko "T32-C : le skill gsd-debug et/ou le renvoi co-localisé vers mission-flow.md sont absents de vf-dev-manager.md"; t32_ok=0
+fi
+
+# assertion D (NÉGATIVE) : aucun fichier d'agent du module ne prescrit le dispatch d'un agent nu
+# de debug — réutilise brique_nue_dispatch_hits(), PAS de seconde fonction de détection.
+t32_d_hits=""
+for t32_df in "$MOD"/agents/*.md; do
+  [ -f "$t32_df" ] || continue
+  t32_dh="$(brique_nue_dispatch_hits "$t32_df")"
+  [ -n "$t32_dh" ] && t32_d_hits="$t32_d_hits [$(basename "$t32_df") : $t32_dh]"
+done
+if [ -n "$t32_d_hits" ]; then
+  ko "T32-D : dispatch direct d'un agent nu de debug offert dans le corps de prompt —$t32_d_hits"; t32_ok=0
+else
+  ok "T32-D : aucun agent de $MOD/agents/ n'offre le dispatch direct d'un agent nu de debug dans son corps de prompt"
+fi
+
+# Garde de fonction UNIQUE : brique_nue_dispatch_hits n'est définie qu'une fois dans le fichier —
+# pas de fonction sœur introduite pour T32.
+t32_fn_defs="$("$GREP" -cE '^brique_nue_dispatch_hits\(\)[[:space:]]*\{' "$0" 2>/dev/null || echo 0)"
+if [ "$t32_fn_defs" -eq 1 ]; then
+  ok "T32 (garde) : brique_nue_dispatch_hits() n'est définie qu'UNE fois dans le fichier — aucune seconde fonction de détection"
+else
+  ko "T32 (garde) : brique_nue_dispatch_hits() est définie $t32_fn_defs fois — une seconde fonction de détection a été introduite"; t32_ok=0
+fi
+
+# assertion D-bis (DISCRIMINANTE, par mutation, DANS LES DEUX SENS) — l'extension du motif n'a de
+# valeur que prouvée dans les deux sens.
+T32_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T32_TMPDIR"
+
+# sens ROUGE : dispatch direct de l'agent nu de debug injecté en corps de prompt d'une copie.
+T32_MUT_DISPATCH="$T32_TMPDIR/mutant-devmgr-dispatch-debug.md"
+{ cat "$T32_DEVMGR"; printf '\n1. **Debug** : dispatche directement l'\''agent `gsd-debugger` via l'\''outil Agent.\n'; } > "$T32_MUT_DISPATCH"
+if cmp -s "$T32_DEVMGR" "$T32_MUT_DISPATCH"; then
+  ko "T32-Dbis(rouge) : mutant IDENTIQUE à vf-dev-manager.md — l'injection n'a rien mordu, la preuve ne vaut rien"; t32_ok=0
+else
+  t32_dbis_hit="$(brique_nue_dispatch_hits "$T32_MUT_DISPATCH")"
+  if printf '%s' "$t32_dbis_hit" | "$GREP" -q 'gsd-debugger'; then
+    ok "T32-Dbis (DISCRIMINANTE, par mutation, sens ROUGE) : le dispatch direct de l'agent nu de debug injecté est détecté ([ $t32_dbis_hit])"
+  else
+    ko "T32-Dbis(rouge) NON DISCRIMINANTE : l'injection n'est pas détectée (hits=[$t32_dbis_hit])"; t32_ok=0
+  fi
+fi
+
+# sens VERT : le fichier RÉEL rend zéro, ET une copie ne nommant QUE le skill (préfixe strict du
+# nom d'agent) reste verte — contre-épreuve qui empêche l'extension de condamner à tort le
+# livrable de la tâche 2.
+t32_dbis_reel="$(brique_nue_dispatch_hits "$T32_DEVMGR")"
+T32_LIC_SKILL="$T32_TMPDIR/licite-devmgr-skill-seul.md"
+{ cat "$T32_DEVMGR"; printf '\n1. **Debug** : invoque le skill `gsd-debug`.\n'; } > "$T32_LIC_SKILL"
+t32_dbis_lic="$(brique_nue_dispatch_hits "$T32_LIC_SKILL")"
+if [ -z "$t32_dbis_reel" ] && [ -z "$t32_dbis_lic" ]; then
+  ok "T32-Dbis (sens VERT) : le fichier réel rend zéro, et une copie ne nommant que le skill gsd-debug reste verte"
+else
+  ko "T32-Dbis(vert) FAUX ROUGE : réel=[$t32_dbis_reel] copie-skill-seul=[$t32_dbis_lic] — l'extension condamne à tort le livrable de la tâche 2"; t32_ok=0
+fi
+
+# assertion E (NÉGATIVE, ADR-057) : vf-dev-manager.md ne reformule pas les constats de la table
+# (il la renvoie) — même forme d'assertion que T23 pour la doctrine documentaire.
+T32_DISTINCTIVE='cesse alors de poser des questions de périmètre'
+if "$GREP" -qF '| Déclencheur | Constat |' "$T32_DEVMGR" || "$GREP" -qF "$T32_DISTINCTIVE" "$T32_DEVMGR"; then
+  ko "T32-E (NÉGATIVE, ADR-057) : vf-dev-manager.md reformule la table des briques dormantes au lieu de la renvoyer"; t32_ok=0
+else
+  ok "T32-E (NÉGATIVE, ADR-057) : vf-dev-manager.md ne reformule pas les constats de la table (renvoi seulement)"
+fi
+
+# assertion F (DISCRIMINANTE, par mutation) : sur une copie de mission-flow.md privée d'une des
+# quatre lignes de brique, l'assertion B doit échouer en nommant la brique manquante — ce qui
+# prouve que la boucle vérifie bien quatre entrées et pas « au moins une ».
+T32_MUT_MISSING="$T32_TMPDIR/mutant-mflow-brique-manquante.md"
+"$GREP" -v 'gsd-add-tests' "$T32_MFLOW" > "$T32_MUT_MISSING"
+if cmp -s "$T32_MFLOW" "$T32_MUT_MISSING"; then
+  ko "T32-F : mutant IDENTIQUE à mission-flow.md — le retrait n'a rien mordu, la preuve ne vaut rien"; t32_ok=0
+else
+  t32_f_missing=""
+  for t32_fbn in $T32_BRIQUES; do
+    "$GREP" -qE "${t32_fbn}([^a-z0-9-]|\$)" "$T32_MUT_MISSING" || t32_f_missing="$t32_f_missing $t32_fbn"
+  done
+  if [ "$t32_f_missing" = " gsd-add-tests" ]; then
+    ok "T32-F (DISCRIMINANTE, par mutation) : le retrait de la ligne gsd-add-tests fait échouer B en nommant précisément la brique manquante"
+  else
+    ko "T32-F NON DISCRIMINANTE : le retrait attendu (gsd-add-tests) ne produit pas exactement ce manquant (obtenu :$t32_f_missing)"; t32_ok=0
+  fi
+fi
+
+[ "$t32_ok" -eq 1 ] && ok "T32 : table des briques dormantes gatée (gabarit + 4 noms anti-homonyme + clôture), mandat de debug via skill uniquement (fonction de détection unique BRIQUES_NUES_DISPATCH_RE, aucun agent nu dispatché en corps de prompt, discriminance prouvée dans les deux sens), non-duplication ADR-057"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
