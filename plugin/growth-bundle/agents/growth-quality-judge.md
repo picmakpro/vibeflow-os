@@ -4,6 +4,7 @@ description: Juge qualité de l'équipe growth — les critères anti-slop et le
 tools: Read, Glob, Grep
 disallowedTools: Write, Edit
 model: sonnet
+effort: high
 memory: project
 vf-internal: true
 ---

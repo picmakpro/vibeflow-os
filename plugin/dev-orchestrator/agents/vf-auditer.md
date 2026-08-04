@@ -4,6 +4,7 @@ description: Audit sécurité et dette technique au niveau d'une étape. Délèg
 tools: Read, Bash, Glob, Grep, Agent(gsd-security-auditor)
 disallowedTools: Write, Edit
 model: sonnet
+effort: high
 memory: project
 vf-internal: true
 ---

@@ -4,6 +4,7 @@ description: Juge de clarté de l'équipe content — le gate de clarté des blu
 tools: Read, Glob, Grep
 disallowedTools: Write, Edit
 model: sonnet
+effort: high
 memory: project
 vf-internal: true
 ---

@@ -4,6 +4,7 @@ description: Juge critique FRAIS de l'équipe design — score UN écran/spec co
 tools: Read, Bash, Glob, Grep
 disallowedTools: Write, Edit
 model: sonnet
+effort: high
 memory: project
 vf-internal: true
 ---
