@@ -5190,7 +5190,72 @@ else
   fi
 fi
 
-[ "$t29_ok" -eq 1 ] && ok "T29 : voie dégradée fermée sur vf-coder.md ET vf-dev-manager.md (corps ET allowlist des deux), voie légitime intacte, discriminance prouvée par mutation dans les deux sens"
+# assertion H (plan 23-05, tâche 5) : §9 de GSD-PIPELINE.md porte la règle de voie unique ET le
+# garde-fou de reprise sûre (le BÉNÉFICE écrit en faits, pas seulement l'interdit — sans lui, la
+# doctrine se lit comme une interdiction gratuite et se contourne au premier cas limite).
+t29_h_ok=1
+if [ ! -s "$T33_S9" ]; then
+  ko "T29-H : section §9 de GSD-PIPELINE.md introuvable ou VIDE — rien n'a été mesuré"; t29_h_ok=0; t29_ok=0
+else
+  "$GREP" -qF 'gsd-plan-phase' "$T33_S9" || { ko "T29-H : la §9 extraite ne nomme pas gsd-plan-phase"; t29_h_ok=0; t29_ok=0; }
+  "$GREP" -qF 'gsd-execute-phase' "$T33_S9" || { ko "T29-H : la §9 extraite ne nomme pas gsd-execute-phase"; t29_h_ok=0; t29_ok=0; }
+  "$GREP" -qF 'garde-fou de reprise' "$T33_S9" || { ko "T29-H : la §9 extraite ne porte pas le garde-fou de reprise sûre — le bénéfice de la voie ouverte n'est pas écrit"; t29_h_ok=0; t29_ok=0; }
+  "$GREP" -qF 'mission-contracts.md' "$T33_S9" || { ko "T29-H : la §9 extraite ne renvoie pas à mission-contracts.md pour la forme du champ de reprise"; t29_h_ok=0; t29_ok=0; }
+  [ "$t29_h_ok" -eq 1 ] && ok "T29-H : §9 de GSD-PIPELINE.md porte la règle de voie unique (gsd-plan-phase, gsd-execute-phase nommés) ET le bénéfice écrit en faits (garde-fou de reprise sûre, renvoi mission-contracts.md)"
+fi
+
+# assertion I (DISCRIMINANTE, par mutation) : §9 privée du paragraphe de voie unique doit faire
+# échouer H.
+awk '
+  BEGIN { skip = 0 }
+  /^\*\*Voie unique/ { skip = 1 }
+  /^\*\*Gradation de la recherche/ { skip = 0 }
+  skip == 0 { print }
+' "$T33_PIPE" > "$T29_TMPDIR/mutant-pipeline-sans-voie-unique.md"
+T29_MUT_S9_NOVOIE="$T29_TMPDIR/mutant-s9-sans-voie-unique.txt"
+t33_section "$T29_TMPDIR/mutant-pipeline-sans-voie-unique.md" 9 "$T29_MUT_S9_NOVOIE"
+if cmp -s "$T33_S9" "$T29_MUT_S9_NOVOIE"; then
+  ko "T29-I : mutant IDENTIQUE à la §9 réelle — le paragraphe de voie unique n'a pas été retiré, la preuve ne vaut rien"; t29_ok=0
+elif "$GREP" -qF 'garde-fou de reprise' "$T29_MUT_S9_NOVOIE"; then
+  ko "T29-I NON DISCRIMINANTE : la §9 privée du paragraphe de voie unique satisfait encore H (garde-fou de reprise toujours présent)"; t29_ok=0
+else
+  ok "T29-I (DISCRIMINANTE, par mutation) : la §9 privée du paragraphe de voie unique fait échouer H (garde-fou de reprise disparu)"
+fi
+
+# assertion J (GARDE ANTI-NETTOYAGE de la §8) : la phrase de la §8 qui présente la chaîne
+# « worker → skill de plan → agent nu de planification en modèle fort » comme le comportement
+# VOULU est toujours présente, ET la nouvelle sous-section porte la distinction « atteint par le
+# skill ≠ dispatché en direct ». Discriminance DANS LES DEUX SENS : (a) §8 retirée → J rougit ;
+# (b) §8 reformulée sans perdre la proposition → J reste verte (ne gèle pas une tournure de prose).
+T29_S8_MARQUEUR='comportement[[:space:]]+\*\*voulu\*\*'
+T29_DISTINCTION_MARQUEUR='dispatché[[:space:]]+EN[[:space:]]+DIRECT'
+if "$GREP" -qE "$T29_S8_MARQUEUR" "$T33_PIPE" && "$GREP" -qE "$T29_DISTINCTION_MARQUEUR" "$T33_S9"; then
+  ok "T29-J : la §8 (« comportement voulu ») est toujours présente, et la §9 porte la distinction atteint-par-le-skill ≠ dispatché-en-direct"
+else
+  ko "T29-J : la §8 a perdu sa proposition « comportement voulu », ou la §9 ne porte plus la distinction atteint/dispatché"; t29_ok=0
+fi
+# (a) mutant ROUGE : §8 privée de la phrase « comportement voulu ».
+T29_MUT_PIPE_SANS_S8="$T29_TMPDIR/mutant-pipeline-sans-s8.md"
+awk '!/comportement[[:space:]]+\*\*voulu\*\*/' "$T33_PIPE" > "$T29_MUT_PIPE_SANS_S8"
+if cmp -s "$T33_PIPE" "$T29_MUT_PIPE_SANS_S8"; then
+  ko "T29-J(a) : mutant IDENTIQUE à GSD-PIPELINE.md — la phrase §8 n'a pas été retirée"; t29_ok=0
+elif "$GREP" -qE "$T29_S8_MARQUEUR" "$T29_MUT_PIPE_SANS_S8"; then
+  ko "T29-J(a) NON DISCRIMINANTE : la §8 privée de sa phrase satisfait encore J"; t29_ok=0
+else
+  ok "T29-J(a) (DISCRIMINANTE, par mutation) : la §8 privée de sa phrase « comportement voulu » fait rougir J"
+fi
+# (b) contre-épreuve VERTE : §8 reformulée (autres mots), même proposition conservée.
+T29_LIC_PIPE_S8="$T29_TMPDIR/licite-pipeline-s8-reformule.md"
+sed 's/est le comportement \*\*voulu\*\*/reste le comportement **voulu** de ce module/' "$T33_PIPE" > "$T29_LIC_PIPE_S8"
+if cmp -s "$T33_PIPE" "$T29_LIC_PIPE_S8"; then
+  ko "T29-J(b) : reformulation IDENTIQUE à l'original — rien n'a été mesuré"; t29_ok=0
+elif "$GREP" -qE "$T29_S8_MARQUEUR" "$T29_LIC_PIPE_S8"; then
+  ok "T29-J(b) contre-épreuve : la §8 reformulée (autres mots, même proposition) reste verte — J ne gèle pas une tournure de prose"
+else
+  ko "T29-J(b) FAUX ROUGE : une reformulation licite de la §8 qui garde la proposition est rejetée"; t29_ok=0
+fi
+
+[ "$t29_ok" -eq 1 ] && ok "T29 : voie dégradée fermée sur vf-coder.md ET vf-dev-manager.md (corps ET allowlist des deux), voie unique actée en doctrine (§9) avec son bénéfice, §8 protégée, voie légitime intacte, discriminance prouvée par mutation dans les deux sens"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="

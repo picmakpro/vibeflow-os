@@ -183,6 +183,22 @@ appel (`chain.md:45-61`, étape 5), et la **règle 5** de `checkpoints.md:11` jo
 plan et toute l'exécution qui suivaient. La brique est désormais portée par le manager
 (`mission-flow.md` §Pattern F), qui n'a plus besoin de ce mode : la ligne est fermée.
 
+**Voie unique d'invocation (D-09) — corollaire de la fermeture par défaut ci-dessus.** Les briques
+de cycle s'invoquent par leur **skill** ; le dispatch direct des agents nus de planification et
+d'exécution est fermé. **Atteint PAR le skill ≠ dispatché EN DIRECT** : le moteur, dans le skill,
+spawne lui-même le sous-agent en modèle fort avec tous ses étages — comportement **voulu** de la
+§8 ci-dessus, qui le reste. Ce qui est fermé, c'est qu'un agent du module court-circuite le skill
+pour dispatcher ce sous-agent lui-même : même nom, aucun étage, rien qui le signale.
+
+Coût de la voie fermée, en FAIT : l'agent nu fait sauter recherche, cartographie, vérification de
+plan, analyse de manques, gate de dérive, vagues, vérificateur, revue de code, nyquist et audit
+sécurité — un raccourci **muet**, pas seulement coûteux. Bénéfice de la voie ouverte, en FAIT
+aussi : le skill reprend de lui-même au premier plan sans rapport, et son garde-fou de reprise
+sûre refuse de relancer un exécuteur sur des commits de production orphelins, avec trois recours.
+D'où **D-10** : la continuation d'un worker interrompu passe par un **nouveau** worker, voie
+skill, avec le minimum de reprise du bloc typé (`mission-contracts.md` §Contrat de checkpoint
+amont) — aucune exception.
+
 **Gradation de la recherche (D-05) — sur un FAIT constatable, jamais sur un ressenti (ADR-055 §3)** :
 
 - `--research` quand l'étape touche une **lib, un framework, du natif ou une version**, ou un
