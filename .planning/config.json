@@ -44,6 +44,9 @@
     "context_warnings": true,
     "workflow_guard": true
   },
+  "intel": {
+    "enabled": true
+  },
   "project_code": "VFDO",
   "agent_skills": {
     "gsd-planner": [
