@@ -5258,5 +5258,80 @@ fi
 [ "$t29_ok" -eq 1 ] && ok "T29 : voie dégradée fermée sur vf-coder.md ET vf-dev-manager.md (corps ET allowlist des deux), voie unique actée en doctrine (§9) avec son bénéfice, §8 protégée, voie légitime intacte, discriminance prouvée par mutation dans les deux sens"
 
 # ---------------------------------------------------------------------------
+# T30 (tracer, D-15, plan 23-06) — le bloc typé porte les verdicts DÉJÀ RENDUS par les hooks du
+# moteur (verdicts.code_review / .nyquist / .secure), avec une valeur d'ABSENCE distincte de la
+# valeur de succès — un verdict jamais vu ne peut plus se présenter comme un `pass`.
+# ---------------------------------------------------------------------------
+t30_ok=1
+T30_CONTRACTS="$CONTRACTS_FILE"   # $CODER_FILE et $DEVMGR : déjà résolus plus haut (T24)
+
+# Section bornée « Contrat de checkpoint amont » de mission-contracts.md — jamais le compte
+# global du fichier : le mot « verdicts » y vit déjà une fois dans « Rapport de mission », un
+# gate global serait vert avant tout travail (mesuré : 1 avant, dans cette section : 0 avant).
+T30_CKPT_SECTION="$(awk '/^## Contrat de checkpoint amont/{f=1} f{print} /^## Étage revue/{exit}' "$T30_CONTRACTS")"
+
+# assertion A : mission-contracts.md nomme le champ ET ses trois sous-champs, DANS cette section.
+if printf '%s\n' "$T30_CKPT_SECTION" | "$GREP" -q 'verdicts' \
+  && printf '%s\n' "$T30_CKPT_SECTION" | "$GREP" -q 'code_review' \
+  && printf '%s\n' "$T30_CKPT_SECTION" | "$GREP" -q 'nyquist' \
+  && printf '%s\n' "$T30_CKPT_SECTION" | "$GREP" -q 'secure'; then
+  ok "T30-A : mission-contracts.md nomme 'verdicts' et ses trois sous-champs (code_review/nyquist/secure) DANS §Contrat de checkpoint amont"
+else
+  ko "T30-A : le champ verdicts et/ou ses trois sous-champs sont absents de §Contrat de checkpoint amont"; t30_ok=0
+fi
+
+# assertion B : la valeur d'ABSENCE co-occurre avec le champ, DANS LE MÊME BLOC que code_review —
+# ancrage OBLIGATOIRE sur code_review (base 0) : `grep -c 'absent'` global vaut déjà 3 avant tout
+# travail (occurrences sans rapport avec les verdicts) ; un critère « absent >= 1 » global ne
+# prouverait rien de ce plan.
+t30_b_block="$(md_blocks_matching "$T30_CONTRACTS" 'code_review')"
+if [ -n "$t30_b_block" ] \
+  && printf '%s\n' "$t30_b_block" | "$GREP" -q 'pass' \
+  && printf '%s\n' "$t30_b_block" | "$GREP" -q 'fail' \
+  && printf '%s\n' "$t30_b_block" | "$GREP" -q 'absent'; then
+  ok "T30-B : le bloc qui nomme code_review nomme aussi pass/fail/absent — un verdict jamais vu ne peut pas se lire comme réussi"
+else
+  ko "T30-B : le bloc portant code_review ne co-nomme pas les trois valeurs pass/fail/absent"; t30_ok=0
+fi
+
+# assertion C : vf-coder.md ET vf-dev-manager.md nomment tous deux le champ — pour vf-dev-manager,
+# DANS §Rapport de mission (base 0 dans cette section) ET compte global STRICTEMENT > 2 (le compte
+# global vaut déjà 2 avant travail, hors de cette section — un simple >=1 global serait vert
+# d'avance).
+if "$GREP" -q 'verdicts' "$CODER_FILE"; then
+  ok "T30-C1 : vf-coder.md nomme 'verdicts'"
+else
+  ko "T30-C1 : vf-coder.md ne nomme pas 'verdicts'"; t30_ok=0
+fi
+t30_dm_rapport="$(awk '/^## Rapport de mission/{f=1} f{print}' "$DEVMGR")"
+t30_dm_global="$("$GREP" -c 'verdicts' "$DEVMGR" 2>/dev/null || true)"
+if printf '%s\n' "$t30_dm_rapport" | "$GREP" -q 'verdicts' && [ "${t30_dm_global:-0}" -gt 2 ]; then
+  ok "T30-C2 : vf-dev-manager.md nomme 'verdicts' dans §Rapport de mission (compte global $t30_dm_global > 2, ligne de base)"
+else
+  ko "T30-C2 : vf-dev-manager.md ne nomme pas 'verdicts' dans §Rapport de mission, ou le compte global n'a pas dépassé la ligne de base (2)"; t30_ok=0
+fi
+
+# assertion D (DISCRIMINANTE, par mutation) — sur une copie de mission-contracts.md où les DEUX
+# mentions de la valeur `absent` sont retirées CHIRURGICALEMENT (le token seul, pas la ligne
+# entière — sinon `code_review`, sur la MÊME ligne que la première mention, disparaîtrait avec
+# elle et ferait échouer B pour une raison étrangère à la mutation visée), l'assertion B doit
+# échouer.
+T30_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T30_TMPDIR"
+T30_MUT_ABSENT="$T30_TMPDIR/mutant-sans-absent.md"
+sed -E "s/ ou \`absent\`//g; s/vaut \`absent\`,? ?/vaut le succès, /g" "$T30_CONTRACTS" > "$T30_MUT_ABSENT"
+if cmp -s "$T30_CONTRACTS" "$T30_MUT_ABSENT"; then
+  ko "T30-D : mutant IDENTIQUE à mission-contracts.md — l'ablation n'a rien mordu, la preuve ne vaut rien"; t30_ok=0
+else
+  t30_d_block="$(md_blocks_matching "$T30_MUT_ABSENT" 'code_review')"
+  if [ -n "$t30_d_block" ] && printf '%s\n' "$t30_d_block" | "$GREP" -q 'pass' && printf '%s\n' "$t30_d_block" | "$GREP" -q 'fail' && printf '%s\n' "$t30_d_block" | "$GREP" -q 'absent'; then
+    ko "T30-D NON DISCRIMINANTE : le mutant privé de 'absent' satisfait encore B"; t30_ok=0
+  else
+    ok "T30-D (DISCRIMINANTE, par mutation) : le mutant privé de la valeur d'absence (code_review et pass/fail intacts) fait échouer B"
+  fi
+fi
+
+[ "$t30_ok" -eq 1 ] && ok "T30 : le bloc typé porte les verdicts déjà rendus par les hooks (code_review/nyquist/secure), valeur d'absence distincte du succès, discriminance prouvée par mutation"
+
+# ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
 [ "$fail" -eq 0 ]

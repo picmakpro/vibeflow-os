@@ -209,6 +209,17 @@ rapport de plan, et son garde-fou de reprise sûre refuse de relancer un exécut
 de production orphelins en offrant trois recours. Doctrine de voie unique qui encadre ce constat :
 `GSD-PIPELINE.md` §9.
 
+**Verdicts de hooks moteur (D-15, ce plan)** : le bloc typé de `vf-coder` gagne un **troisième**
+champ optionnel frère de `gate`/`reprise` : `verdicts`, avec exactement trois sous-champs —
+`code_review`, `nyquist`, `secure` — dont les valeurs sont `pass`, `fail` ou `absent`. Mêmes règles
+que les champs frères, à écrire explicitement parce que c'est là que la fidélité se perd : les
+valeurs sont celles **déjà rendues par les hooks du moteur**, recopiées verbatim ; VibeFlow ne
+rejoue **aucun** de ces étages pour les produire ; un verdict qu'on n'a pas vu passer vaut `absent`,
+**jamais** `pass`. **Fait dimensionnant** : le workflow d'exécution du moteur rend à lui seul le
+point de hook de post-exécution **et** celui de post-vérification — donc **un seul appel** du skill
+`gsd-execute-phase` déclenche revue de code, validation nyquist et audit de sécurité. C'est ce fait,
+pas une préférence, qui justifie que le manager cesse de redemander ce qui est déjà fait.
+
 ## Étage revue — deux objets disjoints (ADR-060 / ADR-061)
 
 La revue de **diff de code** (`vf-reviewer` → `gsd-code-reviewer`, nœud `revue-N` posé
@@ -236,7 +247,7 @@ Retour **compact**. Le détail vit sur disque, pas dans la conversation.
 ```
 RAPPORT DE MISSION
 - Verdict global : ✅ | partiel | bloqué
-- Par sprint : fait / verdicts (recette, revue, audit) / commits (SHA)
+- Par sprint : fait / verdicts (recette, revue, audit + hooks moteur relayés verbatim) / commits (SHA)
 - Calibration (si portée) : estimate vs actuals par sprint — recopiés verbatim, jamais recalculés
 - Décisions prises en autonomie (et par quel panel)
 - Blocages & points nécessitant l'utilisateur

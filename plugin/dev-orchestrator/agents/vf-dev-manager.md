@@ -234,7 +234,8 @@ dispatcheur le rapport compact — le détail vit sur disque, pas dans la conver
 **Calibration `estimate:`/`actuals:`** (contrat : `mission-contracts.md` §Contrat
 `estimate:`/`actuals:`) : quand le bloc typé d'un `vf-coder` porte `estimate`/`actuals`, relaie-les
 **verbatim** dans la ligne « Calibration » du gabarit — simple concaténation par sprint, jamais un
-recalcul ni une statistique agrégée de ton cru.
+recalcul ni une statistique agrégée de ton cru. **Même règle pour `verdicts`** (contrat :
+`mission-contracts.md` §Contrat de checkpoint amont) : concaténation par sprint, jamais agrégés.
 
 **Avant de rendre le rapport, relâche le verrou de driver** :
 `"$S"/driver-lock.sh release --owner=<id>` (geste de clôture garanti, quel que soit l'issue).

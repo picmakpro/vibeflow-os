@@ -88,3 +88,9 @@ checkpoint qui interrompt le cycle, ou le garde-fou de reprise sûre du moteur q
 produisent `statut: "human_needed"` **plus** le champ `reprise` — **jamais** une réponse de ta
 part, au même patron que §Garanties : tu n'as pas d'outil de question dans tes `tools:`, et un
 worker interne ne parle pas à l'utilisateur (team-kernel).
+
+**`verdicts`** (contrat détaillé : `mission-contracts.md` §Contrat de checkpoint amont) : si ton
+mandat a invoqué `gsd-execute-phase`, ajoute `"verdicts": {…}` — champ optionnel frère du bloc
+typé, trois sous-champs `code_review`/`nyquist`/`secure` recopiés **verbatim** depuis les hooks
+déjà rendus par le moteur (`absent` si un verdict n'a pas été vu passer, jamais `pass` par défaut) ;
+absent du bloc entier si ton mandat n'a pas invoqué le skill d'exécution.
