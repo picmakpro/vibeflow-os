@@ -71,11 +71,20 @@ rouge d'abord sur un critère mesurable (`software-architecture/references/princ
 
 - `jq empty .planning/config.json` : OK · `.agent_skills["gsd-planner"] | length == 2` : **vrai** ·
   `.agent_skills | keys | length == 1` : **vrai** (`gsd-executor` n'y figure pas).
-- **Contrôles négatifs — les 9 clés refusées ou différées sont TOUTES absentes**, chacune vérifiée
-  individuellement (`jq -e` échoue sur chacune) : `workflow.tdd_mode`, `workflow.windows_enforce`,
-  `workflow.inline_plan_threshold`, `hooks.workflow_guard`, `hooks.community`, `context`,
-  `context_profile`, `graphify`, `profile-pipeline`. Ces absences sont des décisions écrites
-  (ADR-066, ADR-067, ADR-068), pas des oublis.
+- **Contrôles négatifs — 7 des 9 clés refusées ou différées sont absentes ; 2 ont été POSÉES
+  depuis**, chacune re-vérifiée individuellement par `jq -e` le 2026-08-04 au soir :
+  - **absentes (7)** : `workflow.tdd_mode`, `workflow.inline_plan_threshold`, `hooks.community`,
+    `context`, `context_profile`, `graphify`, `profile-pipeline`. Ces absences sont des décisions
+    écrites (ADR-067, ADR-068), pas des oublis.
+  - **présentes et à `true` (2)** : `workflow.windows_enforce` et `hooks.workflow_guard`.
+  > **Pourquoi ce résumé disait le contraire, et pourquoi ce n'était pas une erreur de mesure.**
+  > Les deux clés ont été posées par le plan **24-02** sous **ADR-066** (dégel de la zone 2 :
+  > « un prérequis de version insatisfiable ne gate pas »), commit `b3cb402` du 2026-08-04 à
+  > **19:24**. Ce résumé a été écrit à **19:10** — quatorze minutes plus tôt. L'affirmation était
+  > donc **vraie à sa rédaction** et a été **périmée par une décision postérieure**, pas
+  > contredite par une mesure fausse. C'est le même motif que la propagation P1 déjà traitée sur
+  > les plans : un fait daté cité sans sa date se retourne en affirmation fausse dès que l'arbre
+  > bouge sous lui.
 - `GSD-PIPELINE.md` porte les **8 littéraux** exigés, vérifiés un à un : `agent_skills`,
   `gsd-planner`, `execute-phase.md:715`, `execute-phase.md:28-31`, `mission-contracts.md:62`,
   `tdd_mode`, `onError: skip`, `execute-phase.md:693`.
