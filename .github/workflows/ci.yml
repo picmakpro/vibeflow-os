@@ -258,6 +258,36 @@ jobs:
           echo "== $found dossier(s) d'agents vérifié(s), $fail échec(s) =="
           [ "$fail" -eq 0 ]
 
+      - name: check-agents --strict sur chaque plugin/*/AGENT.md (module mono-agent)
+        # POURQUOI CETTE ÉTAPE EXISTE : le balayage ci-dessus ne voit QUE `plugin/*/agents/`, alors
+        # que l'installeur pose DEUX familles d'agents dans `.claude/agents/` — `agents/<nom>.md`
+        # (Type 3b) ET `AGENT.md` à la racine du module (Type 3, `vibeflow-update.sh` : `cp
+        # "$module_dir/AGENT.md" "$TARGET_ROOT/agents/${mod}.md"`). La population réelle est de 31
+        # fichiers, pas 25. Un durcissement de check-agents.sh (l'exigence de `effort:`) appliqué
+        # aux seuls 25 a donc laissé passer 5 modules non conformes jusqu'au Gate C du lab frais,
+        # qui les découvre trop tard et sous `set -eu`. Le gate par module doit voir la MÊME
+        # population que l'install, sinon il rend un vert sur un sous-ensemble.
+        run: |
+          set -u
+          found=0
+          fail=0
+          # `--file <path>` en DEUX arguments : la forme `--file=<path>` n'est PAS reconnue par
+          # check-agents.sh (seul `--agents-dir=` accepte le `=`), elle dégrade en cible vide —
+          # et sans `--strict`, une cible vide rend 0. `--strict` est donc le garde-fou qui
+          # transforme ce vert-à-vide en exit 3 audible : ne pas le retirer d'ici.
+          for f in plugin/*/AGENT.md; do
+            [ -f "$f" ] || continue
+            found=$((found + 1))
+            echo "== $f =="
+            bash plugin/conductor/scripts/check-agents.sh --strict --file "$f" || fail=$((fail + 1))
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "::error::aucun plugin/*/AGENT.md découvert — la CI refuse de rendre un verdict vide"
+            exit 1
+          fi
+          echo "== $found AGENT.md vérifié(s), $fail échec(s) =="
+          [ "$fail" -eq 0 ]
+
       - name: check-agents --resolve-agents=strict (monde fermé — union de tous les plugin/*/agents)
         # Le monde fermé n'est légitime qu'ici : la CI est le seul endroit où l'univers complet des
         # agents du repo est connu (cf. en-tête check-agents.sh). Chaque run par module ci-dessus
@@ -290,7 +320,13 @@ jobs:
         run: bash scripts/check-version-sync.sh
 
       - name: check-state-integrity (anti-régression du frontmatter .planning/STATE.md, ADR-063)
-        run: bash plugin/conductor/scripts/check-state-integrity.sh
+        # `--file` EXPLICITE, en défense en profondeur : sans lui, le fichier vérifié dépend de
+        # l'environnement (GSD_WORKSTREAM, pointeur in-repo) et un simple `export` suffirait à
+        # détourner le gate vers un autre STATE.md — ou à le désarmer. Le script fait primer
+        # `--file` sur toute résolution de workstream (FILE_REL_EXPLICIT) : c'est précisément le
+        # remède, il suffit que la CI l'utilise. Ce qui est protégé ici est le STATE.md de la
+        # RACINE, celui dont ADR-063 garde les compteurs.
+        run: bash plugin/conductor/scripts/check-state-integrity.sh --file .planning/STATE.md
 
       - name: check-release-tag (main uniquement — VERSION doit être taggée et poussée)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
