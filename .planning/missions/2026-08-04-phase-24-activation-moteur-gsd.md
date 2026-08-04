@@ -319,6 +319,62 @@ noms) et une preuve d'**identité de classification des 4 gates**.
 même suite. La baseline était **164/1** — la mesure de `24-03` n'était pas fausse, elle a été
 **invalidée après coup** par le commit `a29cd60` d'un autre lot. Défaut de jointure, pas de plan.
 
+## Vague 2 — deux lots sur trois livrés
+
+Samuel a **dégelé la zone 2** (le prérequis « monter gsd-core » étant insatisfiable — `latest = 1.9.1`,
+aucune version au-delà — et le risque #2893 sans objet ici, `WINDOWS.md` ne portant aucune prose sous
+son ledger) et **amendé ADR-064** (`GSD_WORKSTREAM` devient le canal nominal, composable avec les
+worktrees). Deuxième révision doctrinale autorisée de la phase, après l'Iron Law 2.
+
+- **`24-02` — zone 2 activée.** Dérogation de la fenêtre #3 jouée après répétition sur copie jetable :
+  `open_count 1 → 0`, `waived_count 0 → 1`, **miroir JSON intact, 4 entrées `fixed` préservées, 87
+  lignes avant comme après — le bug #2893 ne s'est pas manifesté.** `windows_enforce` et
+  `workflow_guard` posés (diff de 2 lignes, `auto_advance`/`_auto_chain_active` toujours `false`).
+  ADR-066 et ADR-067 écrits. **Le gate de ship a été vérifié par la requête qu'exécute le workflow
+  lui-même** (`loop render-hooks ship:pre --raw` → `broken-windows, blocking=true`), avec
+  contre-épreuve sans la clé — pas par relecture de la config.
+- **`24-08` — workstreams câblés dans les agents.** `references/workstreams.md` créé (135 l.), renvois
+  courts dans `vf-dev-manager.md` (**248/250, marge 2**) et `vf-coder.md` (107/250). Fait re-vérifié en
+  direct : sans canal, `getActiveWorkstream` rend `null` alors que le pointeur contient `dev`.
+- **`24-09` — NON LIVRÉ.** Deux mandats coupés par des erreurs réseau (`Response stalled mid-stream`),
+  **aucun commit, arbre propre de son périmètre, aucun état partiel à réconcilier.** Échec
+  d'infrastructure, pas de conception : les deux mandats étaient arrivés au banc de mutation.
+
+### ⚠️ Deux propagations DUES, non faites — landmines pour la prochaine session
+
+Elles étaient jointes au mandat `24-09` et sont tombées avec lui.
+
+**P1 — un contrôle négatif est INVERSÉ et fera échouer `24-06` puis `24-12`.** Le plan `24-02` a été
+exécuté **contre trois de ses propres `must_haves`** (le dégel est arrivé après sa rédaction). Son
+`<verification>` déléguait à `24-03`, `24-06` et `24-12` le contrôle « les deux clés sont **absentes**
+du `config.json` » — elles y sont désormais **présentes et à `true`**. Occurrences localisées en `awk` :
+
+- `24-03-PLAN.md:98` — `jq -e` de contrôle négatif (plan déjà exécuté ; à corriger pour que sa
+  relecture ne soit pas trompeuse)
+- `24-06-PLAN.md:100` — « les quatre contrôles négatifs de 24-03 tiennent toujours » → **bloquant**
+- `24-02-PLAN.md:211` et `:254` — texte historique, à annoter plutôt qu'à réécrire
+- `24-12` — **non trouvé par cette sonde, à re-dériver** avant exécution
+
+**P2 — le chiffre de couverture des workstreams n'est pas reproductible.** L'arbitrage et
+`24-COLLISIONS.md` citent **7/91 conscients (7,7 %)** et 42 aveugles. Re-mesure indépendante en
+`awk`+`comm` par le worker `24-08` : **5 conscients (5,5 %)** — `new-milestone`, `settings`,
+`settings-advanced`, `settings-integrations`, `transition` — **45 en dur dont 43 aveugles**. Aucun
+motif alternatif ne remonte à 7. L'écart va **dans le sens du pire**, il ne fragilise donc pas
+l'adoption — mais **ADR-069 (plan `24-10`) s'apprête à graver « les limites connues datées »** et ne
+doit pas inscrire un chiffre invérifiable. À re-mesurer une troisième fois, puis inscrire avec sa
+méthode et sa date, **la valeur périmée conservée et attribuée à sa source**.
+
+### Autres constats de la vague 2
+
+- **`ADR-065` n'existe pas** : le registre saute de 064 à 066. Trou réel, non comblé (hors périmètre).
+- **La mesure « 23/109 commits » de l'arbitrage n'est pas reproductible** (aucun range git ne rend 109).
+  Le worker `24-02` a rejoué sur un corpus nommé, **en caractères et non en octets** (un décompte en
+  octets gonfle les sujets français et fabriquerait un faux motif) : **275/400 = 68 %** au-delà de
+  72 caractères, **65/400 = 16 %** hors liste amont, les 6 types maison confirmés. Conclusion
+  identique, chiffre honnête — c'est celui qu'ADR-067 porte.
+- **Piège outillé à connaître** : `check-agents.sh` n'accepte que `--agents-dir=PATH` (forme `=`). Avec
+  un espace, il rend **exit 3 sur les 6 dossiers** — un faux rouge indiscernable d'un parc non conforme.
+
 ## Points ouverts, non tranchés par cette mission
 
 - **Recalage du ROADMAP** — 8 faits périmés dans la section Phase 24. Différé au nœud `docs` de fin

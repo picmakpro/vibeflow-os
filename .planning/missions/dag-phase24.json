@@ -104,7 +104,7 @@
         "exec-24-01"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "revue-vague-1",
@@ -135,6 +135,22 @@
         ".github/workflows/ci.yml"
       ],
       "status": "done"
+    },
+    {
+      "id": "exec-24-08",
+      "step": "vague 2 lot A",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-09",
+      "step": "vague 2 lot A",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "failed"
     }
   ]
 }

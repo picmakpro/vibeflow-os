@@ -12,8 +12,17 @@ last_activity: 2026-08-04 (quick 260804-ki4 — cache du bandeau update invalid�
 # Arbitrages rendus (8), plan complet (12 plans / 4 vagues, plan-checker PASS, ledger GSDA-01..22),
 # VAGUE 1 LIVRÉE ET CORRIGÉE : plans 24-01/03/04/05, revue de jointure + audit, 6 bloquants fermés
 # par mutation (dont 2 CRITICAL : fuite symlink au SessionStart, gate CI ADR-063 désarmable).
-# 49 suites, 0 échec. RESTE : plans 24-06..24-12 (vagues 2-4) + 24-02 GELÉ (zone 2, prémisse
-# falsifiée : aucune version de gsd-core au-delà de 1.9.1 n'existe). Détail complet :
+# 49 suites, 0 échec. VAGUE 2 : 24-02 (zone 2 DÉGELÉE et activée — waive #3 joué, ledger intact,
+# bug #2893 non manifesté ; ADR-066/067) et 24-08 (workstreams dans les agents) LIVRÉS.
+# 24-09 EN ÉCHEC : deux mandats coupés par erreur réseau, AUCUN commit, arbre propre — à refaire.
+# RESTE : 24-09, puis 24-06, 24-07, 24-10, 24-11, 24-12.
+# ⚠️ DEUX LANDMINES avant de reprendre (détail dans le rapport de mission) :
+#   P1 — contrôle négatif INVERSÉ par le dégel de la zone 2 : 24-06-PLAN.md:100 et 24-03-PLAN.md:98
+#        affirment que windows_enforce/workflow_guard sont ABSENTS ; ils valent true. 24-06 échouera.
+#        24-12 à re-dériver (non trouvé par la sonde awk).
+#   P2 — couverture workstreams re-mesurée 5/91 (5,5 %), pas 7/91 : à trancher AVANT qu'ADR-069
+#        (plan 24-10) ne grave « les limites connues datées ».
+# Détail complet :
 # .planning/missions/2026-08-04-phase-24-activation-moteur-gsd.md
 # ⚠ check-version-sync ROUGE assumé : README « 47 suites » vs 49 réelles — le plan 24-12 le referme.
 # (Historique) Mission mise en pause sur checkpoint humain plus tôt le 2026-08-04, branche
