@@ -1,5 +1,36 @@
 # Changelog — conductor
 
+## [v1.19.2] — 2026-08-04 (le bandeau cesse de mentir après /vf-update)
+
+### Corrigé
+- **`vf-update-run.sh`** — le bandeau « mise à jour disponible » ne se taisait qu'au SECOND
+  redémarrage après un `/vf-update` réussi. Cause : `update-banner.sh` (hook SessionStart) lit un
+  cache écrit **en tâche de fond par la session précédente**, et `/vf-update` ne le touchait
+  jamais — le faux positif d'avant la mise à jour survivait donc intact au premier redémarrage, le
+  rafraîchissement de fond de ce démarrage-là ne corrigeant l'état que pour le démarrage
+  **suivant**.
+
+  Le correctif invalide le cache **avant** de le régénérer, jamais l'inverse : le vérificateur
+  (`check-plugin-update.sh`) garde délibérément l'ancien cache quand le réseau est KO, si bien
+  qu'une régénération seule serait aveugle exactement là où elle est nécessaire — un cache absent
+  est un état de repli correct, il n'affiche rien et se reconstruit au démarrage suivant. La
+  relecture est synchrone et donne la version **post-mise-à-jour** parce que l'étape 4a du skill
+  (`claude plugin update`) tourne avant ce script et a déjà réécrit `installed_plugins.json`. Le
+  vérificateur est pris dans la copie la plus fraîche du cache plugin (`$NEW/conductor/scripts/`),
+  pas dans l'ancienne copie voisine du script — sans quoi la version relue resterait celle d'avant
+  la mise à jour. Toute la séquence est best-effort : le script sort toujours 0 après cette étape,
+  une mise à jour réussie ne peut jamais être signalée en échec à cause du bandeau.
+
+### Tests
+- 3 cas nouveaux dans `test-vf-update.sh`, discriminance prouvée par mutation (pas affirmée) :
+  retirer l'appel en queue de script fait virer les cas régénération et invalidation au rouge ;
+  garder l'appel mais retirer le `rm -f` préalable (régénération seule) fait virer **seulement**
+  le cas d'invalidation au rouge — c'est la mutation qui sépare l'invalidation de la régénération,
+  celle qui prouve que l'ordre des deux opérations compte réellement ; inverser l'ordre de
+  résolution du vérificateur fait virer le cas de régénération au rouge sur la version relue.
+  Fixtures durcies au passage : le cas préexistant de sélection du cache le plus récent stube
+  désormais `check-plugin-update.sh`, éliminant le seul accès réseau resté dans la suite.
+
 ## [v1.19.1] — 2026-08-04 (course de récupération du lock de driver)
 
 ### Corrigé
