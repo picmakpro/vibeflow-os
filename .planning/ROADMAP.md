@@ -450,7 +450,7 @@ Plans:
 | 20. Fluidité du flux de dev sans perte de qualité | — | 7/7 | Complete — **mergée dans `main`** (PR #21, `d549b2d`), release `v2.44.0`, VERIFICATION produite | 2026-07-31 |
 | 21. Alignement du moteur GSD sur gsd-core 1.9.0 | — | 5/5 | Complete — **mergée dans `main`** (PR #22, `d89a60e`), release `v2.45.0`, VERIFICATION produite, ADR-061/062/063 | 2026-07-31 |
 | 22. Hygiène documentaire — doctrine de sortie | — | 3/3 | Complete — **mergée dans `main`** (PR #23, `474c3eb`), `dev-orchestrator` v2.9.0 + `design-orchestrator` v1.4.0 | 2026-07-31 |
-| 23. Couplage explicite au moteur GSD | gsd-alignement | 0/0 | Inscrite — 7 lacunes, sûreté en premier ; dépendance 21+22 **levée** (les deux mergées le 2026-07-31) | — |
+| 23. Couplage explicite au moteur GSD | gsd-alignement | 8/8 | In Progress|  |
 | 24. Activation et mesure du moteur GSD | gsd-alignement | 0/0 | Inscrite — lot MESURE : M2 **rendu** le 2026-07-31, M1/M3 à instruire ; lot ACTIVATION : 8 items | — |
 | 25. Budget d'instructions et étage d'alignement court | gsd-alignement | 0/0 | Inscrite — G1 (compteur d'instructions dans `check-agents.sh`) après 24 ; G2 (outline court `discuss`→`plan`) dépend de 23 | — |
 
@@ -1317,7 +1317,7 @@ GSDC-10 *(créés au plan du 2026-08-01, préfixe `GSDC` — cf. `.planning/REQU
 **Recoupements à instruire, pas des dépendances d'ordre** : Phase 21 (changement 3 — arbitrage des
 étages de revue) et Phase 22 (doctrine de flags documentaires). L'ordre est libre ; l'arbitrage
 écrit par la première exécutée **fait autorité**, la suivante s'y réfère sans le dupliquer.
-**Plans:** 8 plans (7 vagues — le périmètre à fichiers partagés impose une exécution
+**Plans:** 8/8 plans executed
 quasi-séquentielle ; seuls 23-01 et 23-02 sont parallélisables en vague 1)
 
 Plans:
@@ -1348,11 +1348,11 @@ Plans:
   étendue d'un **troisième objet revu** sur les mêmes 3 axes (hook vs `revue-N`, hook vs
   `vf-auditer` avec le delta `CONCERNS.md`). Bloc T30. (GSDC-06)
 
-- [ ] 23-07-PLAN.md — **Zones 6 et 7** : budget de tours **partagé par étape**, halt `blocked` +
+- [x] 23-07-PLAN.md — **Zones 6 et 7** : budget de tours **partagé par étape**, halt `blocked` +
   décompte complet avec l'invisibilité `node_repair` nommée, table des moments déclencheurs des 4
   briques dormantes, mandat de debug par le skill. Blocs T31/T32. (GSDC-08, GSDC-09)
 
-- [ ] 23-08-PLAN.md — **Clôture** : bump **minor** du module (v2.10.0 → v2.11.0), triade +
+- [x] 23-08-PLAN.md — **Clôture** : bump **minor** du module (v2.10.0 → v2.11.0), triade +
   CHANGELOG, compteur de suites des 2 README racine 46 → 47, `check-version-sync.sh` ✓, ledger
   d'exigences, rejeu des 11 gates de sortie. Release racine **hors périmètre**, réservée à
   validation humaine. (GSDC-10)
@@ -1532,15 +1532,18 @@ l'arbitrage :
   de route absente`. `check-state-integrity.sh` (câblé `ci.yml:117` en Phase 21) sort **exit 2**.
   `vf-dev-manager.md` lit les chemins racine en dur (7 occurrences) ; sur tout `plugin/`, **3
   fichiers** mentionnent « workstream », tous des tables de routage.
+
 - **`/gsd-pr-branch` s'inverse.** Ses regex sont ancrées (`pr-branch.md:232-234`) :
   `.planning/workstreams/dev/STATE.md` ne matche plus `STRUCTURAL` → reclassé **transient →
   EXCLUDED**. Les commits de feuille de route disparaissent silencieusement des branches de PR.
+
 - **Le pointeur de workstream ne vit pas où on croit.** Dès qu'une clé de session résout, ce n'est
   pas `.planning/active-workstream` mais
   `os.tmpdir()/gsd-workstream-sessions/<sha1(chemin absolu du .planning)>/<clé>`
   (`active-workstream-store.cjs:95-111`) : effacé au reboot, **et indexé sur le chemin absolu, donc
   distinct par worktree, jamais hérité**. Sur cette machine `CLAUDE_SESSION_ID` n'est pas défini —
   la clé effective est `CLAUDE_CODE_SSE_PORT`, un port recyclable par l'OS.
+
 - **Migration à conflit nul, donc à divergence invisible.** `git merge-tree` d'une branche de travail
   post-partition → **exit 0** avec le dossier de phase en cours **orphelin à la racine** pendant que
   le `STATE.md` du workstream le déclare courant. Git ne signale rien.
