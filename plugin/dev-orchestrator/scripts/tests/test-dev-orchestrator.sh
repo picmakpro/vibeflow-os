@@ -1508,8 +1508,11 @@ allowlist_has_name() {
 # manager→manager interdite) pour ce module.
 DEVMGR="$MOD/agents/vf-dev-manager.md"
 dev_tools_line() { "$GREP" -m1 '^tools:' "$1" 2>/dev/null; }
+# gsd-planner RETIRÉ (Finding 1 du RESEARCH, plan 23-05, T29-E/F/G) : le manager ne code, ne
+# teste ni n'audite jamais lui-même, et rien dans son corps de prompt ne mobilisait cette entrée
+# — la laisser aurait piloté par omission. Les 17 autres entrées n'ont pas bougé.
 T18_ALLOWED="vf-coder vf-reviewer vf-auditer vf-test-orchestrator gsd-advisor-researcher \
-general-purpose gsd-phase-researcher gsd-plan-checker gsd-planner gsd-pattern-mapper \
+general-purpose gsd-phase-researcher gsd-plan-checker gsd-pattern-mapper \
 gsd-doc-verifier gsd-doc-writer gsd-doc-classifier gsd-doc-synthesizer gsd-roadmapper \
 gsd-integration-checker vf-crafter vf-design-judge"
 
@@ -1542,7 +1545,7 @@ else
   elif [ "$dmt_rc" -eq 1 ]; then
     ko "T18 cloisonnement : allowlist Agent(...) non refermée (parenthèses déséquilibrées, comptage de profondeur)"; t18_ok=0
   else
-    # Chacun des 18 noms attendus, testé UN PAR UN (jamais un grep global satisfait par le premier),
+    # Chacun des 17 noms attendus, testé UN PAR UN (jamais un grep global satisfait par le premier),
     # et par ÉGALITÉ DE TOKEN dans le contenu des parenthèses (jamais une sous-chaîne de la ligne).
     for name in $T18_ALLOWED; do
       allowlist_has_name "$dmt_content" "$name" || { ko "T18 cloisonnement : « $name » absent de l'allowlist Agent(...) du manager (extraction bornée aux parenthèses)"; t18_ok=0; }
@@ -1557,7 +1560,7 @@ else
   # « vf-design-manager », qui ne peut pas matcher « vf-design-judge » (suffixe différent).
   echo "$dmt" | "$GREP" -qF -- "vf-design-manager" && { ko "T18 cloisonnement : vf-design-manager présent dans l'allowlist (imbrication manager→manager)"; t18_ok=0; }
 fi
-[ "$t18_ok" -eq 1 ] && ok "T18 cloisonnement : allowlist Agent(...) complète (18 noms), vf-design-manager absent, parenthèse fermée"
+[ "$t18_ok" -eq 1 ] && ok "T18 cloisonnement : allowlist Agent(...) complète (17 noms), vf-design-manager absent, parenthèse fermée"
 
 # ---------------------------------------------------------------------------
 # T18c (DISCRIMINANT) — la vérification de T18 mesure l'APPARTENANCE À L'ALLOWLIST, pas la présence
@@ -5131,7 +5134,63 @@ else
   fi
 fi
 
-[ "$t29_ok" -eq 1 ] && ok "T29 : voie dégradée fermée sur vf-coder.md (corps ET allowlist), voie légitime intacte, discriminance prouvée par mutation"
+# assertion E (Finding 1 du RESEARCH, arbitrage tranché en tête du plan) : vf-dev-manager.md ne
+# contient les deux noms interdits NULLE PART (frontmatter compris) — sa doctrine dit noir sur
+# blanc qu'il ne code, ne teste ni n'audite jamais lui-même ; laisser gsd-planner dans son
+# allowlist aurait piloté par omission.
+t29_e_hits="$("$GREP" -oE "$BRIQUES_NUES_RE" "$DEVMGR" 2>/dev/null | sort -u | tr '\n' ' ')"
+if [ -n "$t29_e_hits" ]; then
+  ko "T29-E : vf-dev-manager.md contient encore [ $t29_e_hits] — le retrait n'est pas chirurgical"; t29_ok=0
+else
+  ok "T29-E : vf-dev-manager.md ne contient plus aucune occurrence de gsd-planner/gsd-executor"
+fi
+
+# assertion F : les 17 entrées CONSERVÉES sont toujours présentes, nom par nom, même précaution
+# anti-homonyme que T19f (un nom ne doit jamais être validé par le préfixe d'un autre) — preuve
+# que le retrait a été chirurgical et n'a pas emporté de voisin.
+t29_f_dmt="$(dev_tools_line "$DEVMGR")"
+t29_f_content="$(extract_agent_allowlist "$t29_f_dmt")"
+t29_f_ok=1
+for t29_fn in $T18_ALLOWED; do
+  allowlist_has_name "$t29_f_content" "$t29_fn" \
+    || { t29_f_ok=0; t29_e_hits="$t29_e_hits [$t29_fn manquant]"; }
+done
+if [ "$t29_f_ok" -eq 1 ]; then
+  ok "T29-F : les 17 entrées conservées de l'allowlist de vf-dev-manager.md sont toutes présentes, nom par nom (anti-homonyme T19f)"
+else
+  ko "T29-F : au moins un voisin de l'allowlist du manager a été emporté par le retrait —$t29_e_hits"; t29_ok=0
+fi
+
+# assertion G (DISCRIMINANTE, par mutation) — sur une copie où gsd-planner est réinjecté dans la
+# ligne tools:, l'assertion E doit échouer.
+T29_MUT_DEVMGR="$T29_TMPDIR/mutant-devmgr-tools-reinjecte.md"
+sed 's/Agent(vf-coder,/Agent(vf-coder, gsd-planner,/' "$DEVMGR" > "$T29_MUT_DEVMGR"
+if cmp -s "$DEVMGR" "$T29_MUT_DEVMGR"; then
+  ko "T29-G : mutant IDENTIQUE à vf-dev-manager.md — la réinjection n'a rien mordu, la preuve ne vaut rien"; t29_ok=0
+else
+  t29_g_hits="$("$GREP" -oE "$BRIQUES_NUES_RE" "$T29_MUT_DEVMGR" 2>/dev/null | sort -u | tr '\n' ' ')"
+  if [ -n "$t29_g_hits" ]; then
+    ok "T29-G (DISCRIMINANTE, par mutation) : gsd-planner réinjecté dans une copie de la ligne tools: est détecté ([ $t29_g_hits]), le fichier RÉEL en reste à zéro"
+  else
+    ko "T29-G NON DISCRIMINANTE : la réinjection dans la copie n'est pas détectée"; t29_ok=0
+  fi
+  # Contre-épreuve LICITE : une reformulation de la ligne tools: qui conserve EXACTEMENT le même
+  # ensemble d'entrées (espacement/retours à la ligne différents) doit laisser la suite verte.
+  T29_LIC_DEVMGR="$T29_TMPDIR/licite-devmgr-tools-respace.md"
+  sed 's/Agent(vf-coder, vf-reviewer,/Agent(vf-coder,  vf-reviewer,/' "$DEVMGR" > "$T29_LIC_DEVMGR"
+  if cmp -s "$DEVMGR" "$T29_LIC_DEVMGR"; then
+    ko "T29-G contre-épreuve : mutant IDENTIQUE — le réespacement n'a rien mordu"; t29_ok=0
+  else
+    t29_lic_hits="$("$GREP" -oE "$BRIQUES_NUES_RE" "$T29_LIC_DEVMGR" 2>/dev/null | sort -u | tr '\n' ' ')"
+    if [ -n "$t29_lic_hits" ]; then
+      ko "T29-G contre-épreuve : un réespacement licite de la ligne tools: fait apparaître [ $t29_lic_hits] — FAUX ROUGE"; t29_ok=0
+    else
+      ok "T29-G contre-épreuve : un réespacement licite de la ligne tools: (même ensemble d'entrées) laisse la suite verte"
+    fi
+  fi
+fi
+
+[ "$t29_ok" -eq 1 ] && ok "T29 : voie dégradée fermée sur vf-coder.md ET vf-dev-manager.md (corps ET allowlist des deux), voie légitime intacte, discriminance prouvée par mutation dans les deux sens"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
