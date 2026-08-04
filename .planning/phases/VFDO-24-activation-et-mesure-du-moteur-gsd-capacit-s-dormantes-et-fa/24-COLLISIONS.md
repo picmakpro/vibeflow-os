@@ -7,9 +7,15 @@ l'efficience* ».
 
 > ## ⛔ STATUT DE CE DOCUMENT
 >
-> **Chaque entrée est une PROPOSITION. Aucune n'est appliquée.** La seule exception est la
-> **collision C-1** (Iron Law 2), dont Samuel a **déjà explicitement autorisé la révision effective**
-> dans le verdict de la zone 5 — elle est portée en tâche du plan `24-10`.
+> **Chaque entrée est une PROPOSITION.** La seule exception est la **collision C-1** (Iron Law 2),
+> dont Samuel a **explicitement autorisé la révision effective** dans le verdict de la zone 5 :
+> elle a été **APPLIQUÉE le 2026-08-04** par le plan `24-10` (tâche 1), et actée par **ADR-069**.
+>
+> ⚠️ **Statut de C-6 à re-vérifier — hors périmètre de `24-10`.** ADR-069 porte l'**amendement
+> d'ADR-064** (`GSD_WORKSTREAM` écrit comme **canal nominal**), c'est-à-dire précisément la
+> proposition de C-6, que Samuel a autorisée comme 2ᵉ révision doctrinale de la phase. La ligne de
+> statut de C-6 ci-dessous (« PROPOSÉE — non appliquée ») n'a **pas** été mise à jour : le mandat de
+> `24-10` bornait ce document au **statut de C-1**. À reprendre par un mandat ciblé.
 >
 > Les collisions C-2 à C-6 attendent un **arbitrage humain**. Elles n'ont **rien changé** aux
 > verdicts en vigueur : les 12 plans de la phase exécutent les verdicts **tels qu'arbitrés le
@@ -27,7 +33,7 @@ refus repose, **en tout ou partie**, sur de la conformité interne plutôt que s
 
 | # | Loi / ADR | Usage GSD contrarié | Fondé sur | Proposition |
 |---|---|---|---|---|
-| **C-1** | Iron Law 2 — `plugin/conductor/AGENT.md:114` | Adoption des workstreams | conformité interne | **RÉVISER** — ✅ autorisé par Samuel |
+| **C-1** | Iron Law 2 — `plugin/conductor/AGENT.md:115` | Adoption des workstreams | conformité interne | **RÉVISÉE — ✅ APPLIQUÉE le 2026-08-04** (ADR-069) |
 | **C-2** | Phase 23 — allowlist de `vf-coder` | Slot `AGENT_SKILLS_EXECUTOR` | conformité interne | **MAINTENIR** — mais la mesure invalide le gain |
 | **C-3** | `CLAUDE.md` — vocabulaire de commit | `hooks.community` (capability native) | conformité interne | **MAINTENIR**, motif requalifié |
 | **C-4** | ADR-057 « une capacité, une seule voix » | `graphify`, `profile-pipeline` (natives) | **fait mesuré** | **MAINTENIR** — hors doctrine, tracé pour relisibilité |
@@ -61,9 +67,19 @@ le moteur fait) ; elle n'a jamais visé l'**adaptation d'un gate local à une ca
 révision doit préserver le premier interdit tout en autorisant le second. Formulation à arbitrer dans
 `24-10` — la trace de la formulation antérieure est conservée.
 
-**Statut : ✅ RÉVISION AUTORISÉE PAR SAMUEL** (verdict zone 5, point 1 : « soit on la révise, soit on
-écrit pourquoi elle ne s'applique pas — ne pas la contourner en silence »). Portée par `24-10`,
-tâche 1. **Seule entrée de cet inventaire dont la révision effective est déjà validée.**
+**Statut : ✅ RÉVISION APPLIQUÉE le 2026-08-04** par `24-10`, tâche 1 (autorisation : verdict zone 5,
+point 1 — « soit on la révise, soit on écrit pourquoi elle ne s'applique pas — ne pas la contourner
+en silence »). **Seule entrée de cet inventaire dont la révision effective a été validée, et la
+seule appliquée.**
+
+**Ce qui a été écrit.** L'item 2 du bloc `## Iron Laws` de `plugin/conductor/AGENT.md` devient
+« **Router, jamais forker — une capacité amont partiellement couverte se câble en écrivant ses
+limites, elle ne se réimplémente pas** (ADR-069) ». Le bornage proposé ci-dessus est tenu : le fork
+d'une capacité amont reste interdit, seule l'**adaptation d'un gate local** est autorisée, et elle
+l'est **sous condition écrite** — les limites de la capacité doivent être consignées, ce que fait
+ADR-069 § « Les quatre risques mesurés ». La formulation antérieure est **conservée en trace** sous
+le bloc des lois, avec sa date de révision et le renvoi à ce document. Items 1, 3, 4 et le bloc
+`## Garde-fous` prouvés bit-à-bit inchangés.
 
 ---
 
