@@ -4,7 +4,7 @@ slug: activation-et-mesure-du-moteur-gsd
 status: draft
 # threats_open = menaces OUVERTES de sévérité >= workflow.security_block_on (« high » sur ce lab).
 # Ce nombre est CALCULÉ à partir du registre ci-dessous, jamais posé pour satisfaire un gate.
-threats_open: 4
+threats_open: 1
 asvs_level: 1
 register_authored_at_plan_time: true
 created: 2026-08-04
@@ -40,8 +40,13 @@ entrée y renvoie à une **mutation** rejouable, jamais à une relecture.
 `/gsd-secure-phase 24` a tourné : 5 instances de `gsd-security-auditor` ont instruit les
 **34 menaces ouvertes** du registre A, réparties par groupes de plans, en ASVS L1 avec
 approfondissement quand il était bon marché (traçage des sites d'appel, rejeu de suites,
-exécution réelle). **27 menaces ont été fermées sur preuve citée** ; **7 restent ouvertes** ;
+exécution réelle). **27 menaces ont été fermées sur preuve citée** ; **7 restaient ouvertes** ;
 **1 menace nouvelle** a été découverte et enregistrée au registre C.
+
+**Puis, le soir du même jour**, un mandat de correction ciblée en a fermé **trois de plus** :
+`T-24-14-C1` par un correctif prouvé par mutation, `T-24-12-01` et `T-24-12-03` sur les commits
+du plan 24-12 une fois celui-ci livré. `threats_open` passe de **4** à **1**. La seule bloquante
+restante, `T-24-02-01`, n'attend pas du code — elle attend une **décision humaine**.
 
 Trois principes ont gouverné les verdicts, et expliquent pourquoi le compteur ne tombe pas à 0 :
 
@@ -117,26 +122,42 @@ règle unique, énoncée ici et appliquée sans exception :
 | T-24-11-02 | Tampering | dérive inverse (marqueur périmé) | high | mitigate | closed — Re-prouvée : MUT2 vérifie la RAISON du rouge (règle 3 + PERIME), plus seulement le rc. |
 | T-24-11-03 | Denial of Service | job `tests` de la CI | high | mitigate | closed — preuve **plus forte que la comparaison d'ensembles déclarée** : `git show --numstat b14a040` = `254 0` sur `test-dev-orchestrator.sh`, soit **0 suppression** — aucune ligne préexistante retirée ni modifiée. Fixtures synthétiques et temporaires (`mktemp -d` + `rm -rf`, `trap … EXIT` à `test-check-capability-activation.sh:41-42`). Contre-épreuve exécutée : suite → **exit 0, 184 OK / 0 KO**, arbre inchangé après le run. |
 | T-24-11-04 | Tampering | extraction par `grep` piped | medium | mitigate | closed — `check-capability-activation.sh:265` : un **seul** `awk -F'\|'` produit les deux ensembles (T depuis l'index `:318-351`, repérage par section et non par arité ; M depuis le corpus `:355-369`). Balayage des 443 lignes : **3 lignes seulement contiennent `grep`** (`:27`, `:162`, `:163`) — **toutes des commentaires d'interdiction** ; **0 `grep` exécuté**. Suite dédiée 29/29. |
-| T-24-12-01 | Denial of Service | job `gates` de la CI | high | mitigate | open — **plan 24-12 EN VOL** (voir la note ci-dessous). |
-| T-24-12-02 | Repudiation | CHANGELOG décrivant l'intention | medium | mitigate | open — **plan 24-12 EN VOL.** |
-| T-24-12-03 | Elevation of Privilege | franchissement de la frontière de release | high | mitigate | open — **plan 24-12 EN VOL.** |
-| T-24-12-04 | Tampering | modules hors périmètre bumpés | medium | mitigate | open — **plan 24-12 EN VOL.** |
+| T-24-12-01 | Denial of Service | job `gates` de la CI | high | mitigate | closed — **exécuté, pas déduit d'un SUMMARY.** `scripts/check-version-sync.sh` rejoué dans un worktree détaché **sur le commit de clôture exact du plan** (`2a480f6`) : **exit 0, 15 contrôles ✓ / 0 ✗**, `sources synchronisées (v2.47.1, 17 modules)`. Rejoué à nouveau sur la tête de branche après le correctif T-24-14-C1 : **exit 0**. C'est ce gate qui est le critère de vérification des trois tâches du plan et l'étape qui bloquerait le job `gates` — il passe aux deux bornes. |
+| T-24-12-02 | Repudiation | CHANGELOG décrivant l'intention | medium | mitigate | open — **non instruite** par le mandat de correction ciblée du 2026-08-04, qui a adjugé les deux menaces **bloquantes** de ce plan. Sous le seuil `security_block_on` : sans effet sur `threats_open`. Se ferme par `/gsd-secure-phase 24` rejoué. |
+| T-24-12-03 | Elevation of Privilege | franchissement de la frontière de release | high | mitigate | closed — **preuve machine, sur les commits eux-mêmes.** `git show --numstat` des **trois** commits du plan (`2b95db2` 12 fichiers, `edacec5` 28, `2a480f6` 2) : **aucun** ne touche `VERSION`, `plugin/.claude-plugin/plugin.json` ni `.claude-plugin/marketplace.json`. Contrôle **plus large que la menace ne l'exigeait**, sur toute la branche : `git diff --numstat main...HEAD` restreint à ces trois chemins rend **0 ligne** — la frontière de release n'a pas bougé d'un octet depuis `main`, racine toujours `v2.47.1`. Les deux README ne sont touchés que sur leur ligne de compteur de suites, jamais sur leurs lignes d'historique (faits datés). |
+| T-24-12-04 | Tampering | modules hors périmètre bumpés | medium | mitigate | open — **non instruite** (même motif que T-24-12-02). Observation versée au dossier sans valoir verdict : les modules bumpés sont **10** et non 8 (`kpi-analyst` et `validator` sont des **mono-agents**, invisibles au balayage `plugin/*/agents/`), et `plugin/reference/VERSION` est **inchangé** (`git diff --numstat main...HEAD` → 0 ligne). Sous le seuil `security_block_on`. |
 
-### Pourquoi les quatre menaces de 24-12 ne sont pas adjudicables aujourd'hui
+### Pourquoi les quatre menaces de 24-12 n'étaient pas adjudicables — et pourquoi deux le sont maintenant
 
-Le plan `24-12` n'a pas de `SUMMARY`, et il est **en cours d'exécution par un autre worker au
-moment de cet audit** (commit `2b95db2` « bump mineur des 3 modules qui gagnent une capacité »,
-21 fichiers `VERSION` / `module.json` / `CHANGELOG.md` modifiés dans l'arbre de travail). Ses
-menaces portent précisément sur l'**état final** de ces fichiers : triades de version
-cohérentes, frontière de release non franchie, modules hors périmètre non bumpés.
+**L'état au moment de l'audit (matin du 2026-08-04).** Le plan `24-12` n'avait pas de `SUMMARY` et
+il était **en cours d'exécution par un autre worker** (commit `2b95db2`, fichiers `VERSION` /
+`module.json` / `CHANGELOG.md` en mouvement dans l'arbre de travail). Ses menaces portent
+précisément sur l'**état final** de ces fichiers. Un verdict rendu à cet instant aurait porté sur
+une **cible mouvante** — il aurait été faux avant d'être écrit. L'observation instantanée était
+*conforme* à ce que promettent T-24-12-03 et T-24-12-04, mais une observation instantanée sur un
+travail en vol n'est pas une preuve, et la transformer en fermeture aurait été exactement le
+verdict inventé que ce document refuse depuis sa première version. Ce raisonnement reste juste :
+il est conservé ici parce qu'il explique le verdict rendu ce jour-là, pas pour être défait.
 
-Un verdict rendu maintenant porterait sur une **cible mouvante** — il serait faux avant d'être
-écrit. L'observation instantanée (racine `VERSION`, `plugin.json` et `marketplace.json` absents
-du statut git ; 7 `VERSION` de modules modifiés) est *conforme* à ce que promettent T-24-12-03
-et T-24-12-04, mais une observation instantanée sur un travail en vol n'est pas une preuve, et
-la transformer en fermeture serait exactement le verdict inventé que ce document refuse depuis
-sa première version. **Ces quatre menaces se ferment par `/gsd-secure-phase 24` rejoué après la
-clôture du plan 24-12**, pas autrement.
+**Ce qui a changé (fin de journée du 2026-08-04).** Le plan est **livré** — trois commits
+(`2b95db2`, `edacec5`, `2a480f6`), 10 modules bumpés, compteur des deux README recalé. La cible
+n'est plus mouvante : les commits sont immuables, et c'est **sur eux** que les deux menaces
+bloquantes ont été instruites, non sur un SUMMARY. Chaque fermeture ci-dessus cite une commande
+rejouable et son résultat mesuré :
+
+- **T-24-12-01** — `check-version-sync.sh` **exécuté** dans un worktree détaché sur le commit de
+  clôture `2a480f6` (exit 0, 15 contrôles verts), et **re-exécuté** sur la tête de branche après
+  le correctif T-24-14-C1. Le gate passe **aux deux bornes** : rien n'est déduit de l'intervalle.
+- **T-24-12-03** — `git show --numstat` des trois commits, puis `git diff --numstat main...HEAD`
+  restreint aux trois chemins de la frontière de release : **0 ligne**. Contrôle volontairement
+  **plus large** que la menace : elle demandait l'absence du statut git, on prouve l'absence de
+  tout écart depuis `main`.
+
+**Les deux autres (T-24-12-02, T-24-12-04) restent ouvertes.** Elles n'ont pas été instruites :
+le mandat du soir était une correction ciblée sur les deux bloquantes, et rendre un verdict non
+demandé sur les deux autres serait la même faute, dans l'autre sens, que de les fermer sur la foi
+d'un résumé. Elles sont **sous le seuil** `security_block_on: "high"` — sans effet sur
+`threats_open` — et se ferment par `/gsd-secure-phase 24` rejoué.
 
 ---
 
@@ -167,18 +188,51 @@ vert ne prouve que l'absence de symptôme aujourd'hui.
 
 Le contrat de `gsd-security-auditor` classe une surface nouvelle sans mitigation déclarée en
 `unregistered_flag` **non bloquant** — au motif qu'aucune mitigation déclarée n'y manque. Ce
-document **enregistre quand même C1 comme menace ouverte et la compte**, pour une raison qui
+document a **enregistré quand même C1 comme menace ouverte et l'a comptée**, pour une raison qui
 tient en une phrase : *le gate de sécurité existe pour empêcher de livrer une exposition, pas
 pour récompenser une taxonomie*. Une fuite **reproduite** ne cesse pas d'en être une parce
-qu'elle n'était pas prévue au registre d'origine. Le choix est inscrit ici pour qu'un humain
+qu'elle n'était pas prévue au registre d'origine. Le choix a été inscrit ici pour qu'un humain
 puisse le renverser **en connaissance de cause**, jamais par inadvertance.
+
+**Ce choix a payé.** Compter C1 est ce qui l'a fait corriger le jour même plutôt que classer en
+`unregistered_flag` non bloquant. La ligne est aujourd'hui `closed` — mais par un **correctif
+livré et prouvé**, pas par une requalification taxonomique.
 
 | Menace | Catégorie | Composant | Sévérité | Disposition | Statut |
 |---|---|---|---|---|---|
-| T-24-14-C1 | Information Disclosure | répertoire de compartiment `.planning/workstreams/<nom>` | high | mitigate | open — **REPRODUITE, non mitigée.** La validation de nom ferme la traversée `..` et le trou du pointeur-**fichier** en lien symbolique (`workstream-policy.sh:153-156`), mais **rien ne contraint le répertoire de compartiment lui-même**. Avec `.planning/workstreams/dev` en lien symbolique vers un répertoire **hors du lab**, `[ -d ]` le suit et `planning-context.sh:168` injecte le `STATE.md` de la cible **verbatim dans le contexte de session**. Reproduit sur fixture jetable : à **exit 0**, sous l'en-tête `STATE.md du workstream dev`, une ligne sentinelle lue hors de l'arbre du lab. Même portée pour `check-dev-bootstrap.sh:286` (réduite à 3 valeurs ≤ 80 caractères par la liste blanche) et `check-state-integrity.sh:145`. Préconditions **identiques** à celles du trou pointeur que cette phase a jugé réel et fermé (`test-check-workstream-pointer.sh:191-198`) : une entrée mode 120000 committée sous `.planning/`, puis n'importe quelle ouverture de session. Mitigation attendue : contrôle de confinement sur le chemin **résolu** du compartiment — le motif T28-M déjà employé dans `build-gsd-capabilities-index.sh`. |
+| T-24-14-C1 | Information Disclosure | répertoire de compartiment `.planning/workstreams/<nom>` | high | mitigate | closed — **fermée par mutation, sur les quatre gates à la fois** (commits `960055d` correctif, `a64df96` preuve). La résolution du compartiment passe dans la politique partagée : `workstream-policy.sh` `vf_ws_dir_resolve` (les **deux** segments du chemin — `workstreams/` puis `workstreams/<nom>` — contraints par `[ -L ]` **avant** tout `[ -d ]`, qui suit le lien) et `vf_ws_file_in_ws` (le `STATE.md` lu, sans quoi la fuite se rejouait un cran plus bas via `[ -f ]`). Refus de **traverser**, jamais une tentative de décider si la cible est « dans le lab » — un tel test se réécrit avec `..`, dépend d'un `readlink -f` absent de macOS et ne survit pas à un remontage ; c'est la posture déjà retenue pour le pointeur-fichier. Sévérité par rôle, celle que la politique déclarait déjà : vérification → exit 2, constat → exit 2, injecteurs → repli sur la racine **plus** une ligne qui nomme le refus. Preuve : `test-workstream-symlink-escape.sh`, **10 cas verts**, dont (a) fixture piégée assertée **discriminante avant** toute mesure, (b) les 4 gates refusent et le marqueur de la cible n'apparaît nulle part, (c) **mutation** de la politique (3 gardes neutralisées, mutant refusé s'il n'a rien changé : `cmp` + plancher de substitutions) → les **4** refuient, `check-state-integrity` rendant alors `rc=0 « conforme »` sur le fichier hors lab, (d) cas licite vert à l'octet près, (e) cible **intacte** après passage des quatre. Reproduction d'origine conservée ci-dessous. |
 
-**C1 est le quatrième passage du motif d'échappement par lien symbolique dans ce dépôt.** Voir
-l'analyse transverse en fin de document.
+**Le constat d'origine, conservé mot pour mot** — il n'est PAS une seconde ligne de registre (une
+ligne périmée dans une table comptée par un extracteur est un piège à décompte), mais la trace de
+ce qui a été mesuré avant correctif, sans laquelle la fermeture ci-dessus ne serait pas
+opposable :
+
+> **REPRODUITE, non mitigée.** La validation de nom ferme la traversée `..` et le trou du
+> pointeur-**fichier** en lien symbolique (`workstream-policy.sh:153-156`), mais **rien ne
+> contraint le répertoire de compartiment lui-même**. Avec `.planning/workstreams/dev` en lien
+> symbolique vers un répertoire **hors du lab**, `[ -d ]` le suit et `planning-context.sh:168`
+> injecte le `STATE.md` de la cible **verbatim dans le contexte de session**. Reproduit sur
+> fixture jetable : à **exit 0**, sous l'en-tête `STATE.md du workstream dev`, une ligne
+> sentinelle lue hors de l'arbre du lab. Même portée pour `check-dev-bootstrap.sh:286` (réduite à
+> 3 valeurs ≤ 80 caractères par la liste blanche) et `check-state-integrity.sh:145`. Préconditions
+> **identiques** à celles du trou pointeur que cette phase a jugé réel et fermé
+> (`test-check-workstream-pointer.sh:191-198`) : une entrée mode 120000 committée sous
+> `.planning/`, puis n'importe quelle ouverture de session. Mitigation attendue : contrôle de
+> confinement sur le chemin **résolu** du compartiment — le motif T28-M déjà employé dans
+> `build-gsd-capabilities-index.sh`.
+
+**Un écart assumé avec la mitigation attendue par ce constat, et pourquoi.** Le constat appelait
+un « contrôle de confinement sur le chemin **résolu** ». Le correctif fait l'inverse : il **refuse
+de résoudre**. Motif mesuré — confiner un chemin résolu suppose de le canoniser, donc un
+`readlink -f` que macOS n'a pas, une réécriture par `..` toujours possible, et une comparaison de
+préfixes qui ne survit pas à un remontage. Le refus de traverser n'a aucune de ces dépendances,
+et c'est déjà la posture retenue pour le pointeur-**fichier** dans ce même fichier : une seule
+doctrine, pas deux. Le coût est nommé : un compartiment délibérément symlinké par l'opérateur est
+désormais refusé — **audiblement**, jamais en silence.
+
+**C1 était le quatrième passage du motif d'échappement par lien symbolique dans ce dépôt.** Voir
+l'analyse transverse en fin de document : la fermeture d'aujourd'hui traite ce passage-ci, pas la
+cause qui les produit — la dette de contrôle transverse reste entière.
 
 ---
 
@@ -223,6 +277,7 @@ installation de la phase est le `npx -y "@opengsd/gsd-core@^1"` du job `tests`.*
 |---|---|---|---|---|
 | 2026-08-04 | 66 (56 plans + 10 nœud 24-13) | 16 | 34 dont **18 de sévérité >= high** | nœud de correction 24-13 (`vf-coder`), sur la matière de la revue de jointure et de l'audit des vagues 2-3 |
 | 2026-08-04 | 67 (56 plans + 10 nœud 24-13 + 1 découverte C1) | 43 | 8 dont **4 de sévérité >= high** | `/gsd-secure-phase 24` — 5 `gsd-security-auditor` en parallèle sur les 12 plans, ASVS L1 |
+| 2026-08-04 (soir) | 67 | 46 | 5 dont **1 de sévérité >= high** | mandat de correction ciblée (`vf-coder`) — T-24-14-C1 fermée **par correctif + mutation**, T-24-12-01 et T-24-12-03 fermées **sur les commits** du plan 24-12 livré. Aucune fermeture sur la foi d'un SUMMARY. |
 
 ### Méthode de calcul de `threats_open`
 
@@ -233,11 +288,25 @@ fichier directement — **jamais par un décompte issu d'un pipe** : le `grep` p
 runtime tronque silencieusement (mesuré : 31 lignes rendues sur 102, et 1 sur 91). Tout statut
 non reconnu est compté comme bloquant (`fail-closed`), jamais ignoré.
 
-Décompte du 2026-08-04, après audit :
+Décompte du 2026-08-04 **au matin**, après audit :
 
 - **4 bloquantes** : `T-24-02-01` (mitigation falsifiée), `T-24-12-01` et `T-24-12-03` (plan en
   vol), `T-24-14-C1` (fuite reproduite).
 - 4 non bloquantes : `T-24-02-02`, `T-24-03-03`, `T-24-12-02`, `T-24-12-04`.
+
+Décompte du 2026-08-04 **au soir**, après le mandat de correction ciblée — extracteur rejoué sur
+le fichier tel qu'il est, jamais un décompte à la main : **51 lignes de menace lues, 46 `closed`,
+5 `open`, 0 statut non reconnu** → `threats_open` = **1**.
+
+- **1 bloquante** : `T-24-02-01` — la seule qui ne se ferme pas par du travail d'ingénierie. Elle
+  demande un **acte d'autorité humaine** (re-disposition en `accept` avec entrée nominative, ou
+  réécriture de la mitigation autour des contrôles réellement en place).
+- 4 non bloquantes : `T-24-02-02`, `T-24-03-03`, `T-24-12-02`, `T-24-12-04`.
+
+Les trois fermetures du soir sont rangées à leur ligne de registre avec leur preuve. Aucune n'est
+un verdict d'opportunité : `T-24-14-C1` est fermée par un **correctif prouvé par mutation** (la
+garde retirée, les quatre gates refuient), les deux autres par des **commandes rejouées sur les
+commits immuables** du plan 24-12 livré.
 
 **Verdict de l'audit des vagues 2-3, désormais recoupé.** Il rapportait « 29 menaces instruites,
 28 fermées » sans correspondance transmise. Le recoupement demandé est fait : ce passage a
@@ -259,11 +328,17 @@ aucune ligne n'a été fermée deux fois, aucune n'a été fermée sur la foi de
    possibles, toutes deux humaines : **(a)** re-disposer en `accept` avec entrée nominative au
    journal ci-dessus (justification ADR-066 + les quatre contrôles) ; **(b)** réécrire la
    mitigation autour des contrôles réellement en place. Puis rejouer `/gsd-secure-phase 24`.
-2. **T-24-14-C1 — corriger ou accepter.** Confinement du chemin résolu du compartiment (motif
-   T28-M), ou acceptation motivée au journal. C'est la seule des quatre bloquantes qui décrit
-   une **exposition technique** plutôt qu'une question de gouvernance.
-3. **T-24-12-01 et T-24-12-03 — attendre la clôture du plan 24-12**, puis rejouer
-   `/gsd-secure-phase 24`. Rien d'autre ne les fermera honnêtement.
+2. ~~**T-24-14-C1 — corriger ou accepter.**~~ **FAIT** (2026-08-04 au soir) — corrigée, pas
+   acceptée. Le correctif refuse de **traverser** au lieu de confiner un chemin résolu (écart
+   assumé et motivé au registre C) ; la fermeture est prouvée par mutation sur les quatre gates.
+3. ~~**T-24-12-01 et T-24-12-03 — attendre la clôture du plan 24-12.**~~ **FAIT** (2026-08-04 au
+   soir) — le plan est livré, les commits sont immuables, et les deux menaces sont instruites
+   **sur eux** : gate rejoué aux deux bornes, frontière de release mesurée à 0 ligne d'écart
+   depuis `main`.
+
+**Il ne reste donc que le point 1**, et il n'appartient pas à un agent. Tant qu'il n'est pas
+tranché, `threats_open: 1` et le gate de ship reste bloquant — ce qui est le comportement voulu :
+une décision d'acceptation de risque engage une responsabilité humaine, elle ne se délègue pas.
 
 ---
 
@@ -340,9 +415,13 @@ trier, rien de plus.
 - [x] Toute menace porte une disposition (mitigate / accept / transfer)
 - [x] Les risques acceptés sont au journal des risques acceptés
 - [x] Chaque menace `closed` porte une preuve citée dans le code livré, opposable et re-vérifiable
-- [ ] `threats_open: 0` confirmé — **NON** : 4 menaces ouvertes de sévérité >= high
-- [ ] `status: verified` en frontmatter — **NON** : `draft`. Un audit a tourné, mais quatre
-      menaces bloquantes restent ouvertes — dont une exigeant une décision humaine (T-24-02-01),
-      une exposition reproduite (T-24-14-C1) et deux suspendues à un plan en vol.
+- [ ] `threats_open: 0` confirmé — **NON** : **1** menace ouverte de sévérité >= high
+      (`T-24-02-01`). Les trois autres bloquantes du matin ont été fermées le soir même, sur
+      preuve : mutation pour `T-24-14-C1`, commandes rejouées sur les commits livrés pour
+      `T-24-12-01` et `T-24-12-03`.
+- [ ] `status: verified` en frontmatter — **NON** : `draft`. Il ne reste **aucun** travail
+      d'ingénierie à faire pour lever le gate ; il reste une **décision humaine** (T-24-02-01,
+      re-disposition en `accept` avec entrée nominative, ou réécriture de la mitigation). Aucun
+      agent ne peut la prendre, et ce document ne la prendra pas à sa place.
 
 **Approbation : en attente.** Ce document est un constat honnête, pas une validation.
