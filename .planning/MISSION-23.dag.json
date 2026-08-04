@@ -243,6 +243,7 @@
       "stage": "exec",
       "deps": [
         "plancheck-08",
+        "replan-08",
         "revue-07"
       ],
       "scope": [
@@ -798,7 +799,32 @@
       "scope": [
         ".planning/phases/VFDO-23-*/23-08-PLAN.md"
       ],
-      "status": "ready"
+      "status": "done"
+    },
+    {
+      "id": "sync-main",
+      "step": "Integrer origin/main DANS la branche avant 23-08 : le commit de retard reecrit les deux README et supprime l encadre mermaid que le plan cite",
+      "stage": "exec",
+      "deps": [
+        "plancheck-08"
+      ],
+      "scope": [
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "replan-08",
+      "step": "Amendement du plan 23-08 : 6 bloquants (gardes vertes a vide, forme d option, tail, 9 criteres verts d avance, wc redirige, ancres README post-synchro)",
+      "stage": "plan",
+      "deps": [
+        "sync-main"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-*/23-08-PLAN.md"
+      ],
+      "status": "blocked"
     }
   ]
 }
