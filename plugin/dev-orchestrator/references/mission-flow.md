@@ -159,9 +159,34 @@ a consigne de ne piloter que sur le bloc typé, la prose libre est du volume mor
 - **`noeuds_debloques`** : les nœuds DAG que ce retour permet de marquer `done` → le manager fait
   `dag.sh mark` puis re-dispatche la nouvelle frontière.
 
-**Contrôle de flux du manager** (déterministe, plus d'interprétation de prose) :
-`passed` → `mark done` + frontière suivante · `gaps_found` → `reopen`/relance de comblement ·
-`human_needed` ou finding `ask-user` → **escalade humaine** · `blocked` → laisser `blocked`, traiter la dep.
+### Contrôle de flux du manager — table de pilotage (foyer UNIQUE)
+
+Déterministe, plus d'interprétation de prose. Cette table est l'énoncé **faisant autorité** : le
+`vf-dev-manager` y RENVOIE et ne la reformule pas (ADR-030, une seule voix). Elle a été déportée
+ici depuis l'agent (arbitrage A-4) — l'agent tenait 249/250 lignes du plafond ADR-029, une marge
+d'une ligne que huit plans restants auraient crevée ; rien de son sens n'a bougé au passage.
+
+- **Verdict d'étape (rapport typé, ADR-053)** : le `statut` du rapport de worker — recoupé au
+  `*-VERIFICATION.md` — pilote le flux de façon déterministe : `passed` → `dag.sh mark done` +
+  frontière suivante · `human_needed` — déclenché par `gate="blocking-human"` amont OU par une
+  précondition amont non satisfaite (`mission-contracts.md` §Contrat de checkpoint amont : une
+  règle, deux motifs), ou par tout finding `action: ask-user` — → **escalade départagée par le
+  MODE**, jamais tranchée seule : en mode **superviser**, c'est le manager qui **répond aux
+  attentes humaines** du moteur (checkpoint, garde-fou de reprise sûre) : il pose la question, il
+  attend, puis il redispatche `vf-coder` avec le champ `reprise` — qui transporte la réponse ET
+  les tâches faites, sans quoi le worker neuf retombe sur le même checkpoint
+  (`mission-contracts.md` §Minimum de reprise) —, avec le même filet de repli qu'au §Entrée de
+  l'agent si l'outil de question est indisponible au runtime ; en mode **autonome**, il n'y répond
+  JAMAIS à la place de l'utilisateur, absent par définition (ADR-031) : **GELER le nœud porteur,
+  halte de nœud, jamais de mission**, le laisser `blocked`/`failed`, ne poursuivre QUE les nœuds
+  indépendants, consigner la question au rapport · `gaps_found` → `dag.sh reopen` + UNE relance de
+  comblement via `vf-coder`, puis si les manques persistent : consigner et arbitrer · `blocked` →
+  laisser le nœud `blocked`, traiter la dépendance. Findings `action: auto-fix` → repartent à
+  `vf-coder` (jamais corrigés par le manager) ; `no-op` ignorés.
+- **Blocage** (étage en échec répété) : 3 options — réessayer l'étage · sauter l'étape (documenté)
+  · arrêter la mission (rapport partiel). En mode **autonome** : trancher via panel ; en mode
+  **superviser** : demander (AskUserQuestion) — même filet de repli si l'outil est indisponible au
+  runtime : `human_needed` au rapport, jamais d'auto-réponse.
 
 ---
 
@@ -200,10 +225,14 @@ manager↔worker↔worker de revue). Sur un rapport typé `gaps_found` :
    jamais un cycle cadrage → plan → exécution complet.
 3. Re-dispatch `vf-reviewer` sur le diff corrigé.
 
-Budget **3 tours** ; au-delà, escalade humaine (jamais de raffinage infini) — cette boucle s'articule
-sur la MÊME table de pilotage déterministe que le reste du contrôle de flux (Pattern C), une seule
-règle : `passed` → `mark done` + frontière suivante · `gaps_found` → la boucle ci-dessus ·
-`human_needed`/finding `ask-user` → escalade.
+Budget **3 tours**, au grain **étape** et **partagé** avec les autres boucles de correction de la
+même étape (§6 ci-dessous) — un budget séparé par boucle se contournerait mécaniquement, par
+renommage du problème, ce que ce Pattern dit précisément vouloir empêcher. La valeur ne bouge pas
+(D-25) : elle reste celle mesurée à son rendement actuel, on ne plafonne pas avant d'avoir des
+chiffres réels. Au-delà, escalade humaine — cette boucle s'articule sur la MÊME table de pilotage
+déterministe que le reste du contrôle de flux (Pattern C), une seule règle : `passed` → `mark done`
++ frontière suivante · `gaps_found` → la boucle ci-dessus · `human_needed`/finding `ask-user` →
+escalade.
 
 ### 3. Gradation par risque, jamais par volume
 
@@ -244,6 +273,67 @@ que soit la nature du lot d'origine.** Garant MACHINE, pas une consigne : `dag.s
 lui-même `review_regime=full` sur tout nœud `revue-*`/`join-*` rouvert (et ses dépendants
 transitifs) — une consigne se contourne par interprétation, un champ écrit par l'outil ne se
 contourne pas.
+
+### 6. Épuisement du budget (D-26, D-27, D-28)
+
+Budget épuisé (§2) ⇒ statut de rapport typé `blocked`, assorti d'un **décompte complet** de ce qui
+a été tenté : tours de revue consommés, tours de comblement consommés, findings restés non
+résolus. **Le décompte EST la livraison** : sans lui, un budget partagé ne serait qu'un chiffre
+plus petit, pas une information. Champ porteur : `decompte` (`mission-contracts.md` §Décompte de
+budget épuisé).
+
+**L'invisibilité amont, nommée (D-26).** Le décompte porte les tours d'ÉQUIPE — ceux que VibeFlow
+pilote et compte lui-même. Le nombre de réparations `node_repair` consommées **à l'intérieur d'un
+plan** par le moteur est **invisible** sans parser la prose libre de chaque rapport de plan, format
+non contractuel — fait daté et sourcé : le journal amont est de la prose dans une section markdown,
+aucun gabarit de rapport amont ne porte de champ de comptage. Ne **jamais** fabriquer un total
+agrégé qui laisserait croire à une mesure exhaustive : un manque nommé vaut mieux qu'un chiffre
+inventé.
+
+Aucune proposition de next step n'accompagne le décompte : elle serait produite par l'agent qui
+vient d'échouer plusieurs fois sur le sujet, donc la partie la moins fiable du rapport.
+
+---
+
+## Briques dormantes — moments déclencheurs (D-23, D-24)
+
+Le geste se pose quand **au moins un** de ces déclencheurs tombe. Chacun reste un **FAIT
+constatable** (même gabarit que `docs-flow.md` §Déclencheurs), jamais un jugement au feeling :
+
+| Déclencheur | Constat |
+|---|---|
+| **étape vérifiée et clôturée** | la famille est déjà doctrinée par `docs-flow.md` (Phase 22) ; la ligne se raccorde au nœud documentaire de fin de mission existant plutôt que d'en poser un nouveau — conditions exactes : `docs-flow.md`, ne pas les reformuler ici (ADR-057). Brique : `gsd-extract-learnings`. |
+| **verdict de validation nyquist partiel** | le gate constate aujourd'hui les trous sans les combler ; cette ligne transforme un constat en action. Brique : `gsd-add-tests`. |
+| **le QUOI d'une étape n'est pas stabilisé** | le fichier de spec est lu par le cadrage, qui cesse alors de poser des questions de périmètre. Brique : `gsd-spec-phase`. |
+| **mission ratée, ou blocage à comprendre** | aucune procédure écrite aujourd'hui, le manager improvise. Briques : `gsd-undo` (annulation) / `gsd-forensics` (analyse post-mortem). |
+
+Aucun déclencheur qui ne tombe est un **état normal**, pas un manque.
+
+---
+
+## Pattern F — Étage cadrage porté par le manager (A-1ter geste 2, motif A-13)
+
+**Qui exécute** : le manager, lui-même, dans sa propre fenêtre — seule exception à « il ne produit
+rien lui-même » : le cadrage n'est ni du code, ni un test, ni un audit, c'est une conversation de
+décision, et le manager est le nœud de l'équipe où les décisions de mission se prennent.
+
+**Pourquoi, en FAIT (motif A-13, le seul autorisé ici)** : sur `gsd-core@1.9.0`, le seul mode non
+interactif de la brique de cadrage enchaîne cadrage → plan → exécution dans le même appel — le
+porteur ne reprend la main qu'à la fin du pipeline entier, et pendant ce temps la **règle 5** de
+`checkpoints.md` auto-approuve les `human-verify` et auto-sélectionne la première option des
+`decision`. Le cadrage porté par le manager, **plus aucun mode d'enchaînement n'est passé à cette
+brique** : la règle 5 cesse de s'appliquer au plan et à l'exécution qui suivent — le problème
+disparaît, il n'est pas borné.
+
+**Discipline de flags** : `GSD-PIPELINE.md` §9 porte la table (ne pas la recopier ici, ADR-030).
+
+**Modélisation du nœud** : sous-section de pipelining N/N+1 du Pattern B ci-dessus, qui pose déjà
+le nœud de cadrage et ses dépendances — seul change qui exécute le nœud, pas le graphe.
+
+**Outil de question indisponible** : cas réel, déjà documenté au filet de repli D-09 du manager
+(§Entrée) — `human_needed` remonté, jamais un retour au mode d'enchaînement.
+
+**Ce que le worker ne fait plus** : `vf-coder` n'invoque plus jamais le cadrage lui-même.
 
 ---
 

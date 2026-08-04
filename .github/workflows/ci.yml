@@ -26,6 +26,182 @@ jobs:
           jq --version
           python3 --version
 
+      # Node 22+ est un prérequis DUR de @opengsd/gsd-core (garde explicite dans
+      # plugin/dev-orchestrator/scripts/ensure-deps.sh). Épinglé ici plutôt que subi depuis l'image
+      # du runner : une image qui redescendrait sous 22 ferait échouer l'install, donc les cas 20/26.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Installer le moteur GSD (@opengsd/gsd-core@^1) — sans lui, deux cas ne peuvent rien prouver
+        run: |
+          set -eu
+          # POURQUOI (arbitrage A-7, Phase 23). Les cas 20 et 26 de
+          # plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh tournent contre le moteur
+          # RÉELLEMENT INSTALLÉ — c'est leur raison d'être : compteur d'ATTEINTE (20) et détection de
+          # dérive du mirroir engineExtra (26). Sur un runner sans moteur ils sortent en `ko`, et ils
+          # sortent en `ko` À BON DROIT. Ils ne doivent JAMAIS être dégradés en `skip`, en `ok`
+          # conditionnel, ni être entourés d'un `|| true` : ce serait rouvrir le « vert à vide » qu'ils
+          # existent pour fermer. La cause se traite ICI, dans l'environnement d'exécution.
+          #
+          # OÙ (cascade de check-gsd-config.sh — DEUX branches, premier trouvé gagne) :
+          #   1. <repo>/.claude/gsd-core/bin/lib             — ÉCARTÉE : ce dépôt ignore .claude/
+          #      délibérément (« le repo est la SOURCE des modules, PAS un lab », .gitignore) ;
+          #      y déposer le distribuable contredirait cette règle et déplacerait le GSD_HOME dérivé
+          #      par check-gsd-engine.sh / ensure-deps.sh.
+          #   2. $HOME/.claude/gsd-core/bin/lib               — CELLE-CI : c'est ce que pose
+          #      l'installeur officiel en scope global, et c'est la topologie d'un poste de dev réel.
+          #
+          # Une TROISIÈME branche existait, <repo>/node_modules/@opengsd/gsd-core/bin/lib, et elle a
+          # été RETIRÉE du script (arbitrage A-10). C'est ce job qui l'avait mesurée morte : le
+          # paquet publié dépose son payload sous .../@opengsd/gsd-core/gsd-core/bin/lib — DOUBLE
+          # SEGMENT. Un bin/lib existe bien un cran plus haut, mais il ne contient que
+          # ui-safety-gate.cjs, pas config.cjs : le `[ -f "$candidate/config.cjs" ]` de la cascade
+          # n'y a jamais réussi, sur aucune version (défaut identique 1.8.0 / 1.9.0). Ne pas la
+          # rétablir « au cas où » : elle ouvrirait une voie de résolution neuve pour un moteur non
+          # maîtrisé, au moment précis où l'on ferme un vecteur d'exécution de code.
+          #
+          # COMMENT : la commande du dépôt lui-même (ensure-deps.sh), plafond "^1" — dernier 1.x, mais
+          # un saut de MAJEURE reste une décision humaine (arbitrage 2026-07-26, audit Phase 11).
+          npx -y "@opengsd/gsd-core@^1" --claude --global
+
+          # Échec VISIBLE : l'installeur peut sortir 0 sans avoir posé le payload attendu (changement
+          # de layout amont, install partielle). Sans cette assertion, les cas 20/26 repartiraient en
+          # `ko` en accusant la suite alors que la panne est ici.
+          LIB="$HOME/.claude/gsd-core/bin/lib"
+          for f in config.cjs config-loader.cjs capability-registry.cjs configuration.cjs; do
+            if [ ! -f "$LIB/$f" ]; then
+              echo "::error::moteur GSD absent après install : $LIB/$f introuvable — les cas 20 et 26 de test-check-gsd-config.sh ne pourraient rien prouver"
+              exit 1
+            fi
+          done
+          echo "== moteur GSD $(cat "$HOME/.claude/gsd-core/VERSION" 2>/dev/null || echo '?') résolu par la branche 3 de la cascade : $LIB =="
+
+      # ------------------------------------------------------------------------------------------
+      # CANARI DE FORME DU MOTEUR GSD (arbitrage A-9, voie c d'O-13)
+      #
+      # POURQUOI ICI ET PAS DANS UNE SUITE. Les scripts qui couplent ce dépôt au moteur GSD ne
+      # l'exécutent plus, ils le LISENT (arbitrage A-6). Le prix de cette mesure est qu'une lecture
+      # de texte ne suit AUCUNE indirection : le jour où le moteur déplace un manifeste, écrit
+      # `new Set(VARIABLE)` ou calcule ses défauts, l'extraction rend zéro. Le script le DIT
+      # désormais (signal « moteur périmé »), mais il le dit sur le poste de l'utilisateur, au
+      # SessionStart, sous le `|| true` du hook — c'est-à-dire au pire endroit possible. Ce canari
+      # déplace la détection ICI : il rougit à la première montée de version qui casse la forme
+      # lisible, avant que quiconque ne le découvre en session.
+      #
+      # CE QU'IL MESURE, ET POURQUOI IL NE PEUT PAS ÊTRE VERT À VIDE. Trois discriminants dans UN
+      # SEUL fichier audité, un par source de clés connues — un jeu de clés vide échouerait sur le
+      # premier, un jeu universel sur le second :
+      #   1. `bloc_canari_inexistant` DOIT être signalé  → source 1 (VALID_CONFIG_KEYS) lue, et
+      #      discriminante : elle ne reconnaît pas n'importe quoi ;
+      #   2. `workflow.ui_review`, ÉCRIT dans le fichier, ne doit PAS être signalé inconnu →
+      #      source 2 (configKeys du registre) lue : c'est la SEULE source où cette clé existe ;
+      #   3. au moins 3 toggles rendus « au défaut amont (valeur) » → source 3 (CONFIG_DEFAULTS)
+      #      lue AVEC ses valeurs. C'est le mode d'échec le plus vicieux : des défauts calculés
+      #      laissent le gate parler tout en affirmant des absences fausses.
+      #   4. AUCUN signal « moteur périmé » — la garde générale, qui couvre les trois sources.
+      #
+      # SECOND SCRIPT DU MODULE — IMPLÉMENTÉ (Phase 23, plan 23-04b, arbitrage A-12). Le point
+      # d'extension annoncé ici a été tenu : build-gsd-capabilities-index.sh a basculé lui aussi en
+      # lecture de texte (require(registryPath) fermait T-23-04-07, une RCE de même vecteur que
+      # celle fermée sur check-gsd-config.sh) et sa sonde vit plus bas, DANS CETTE MÊME ÉTAPE, sous
+      # le même `set -eu` et le même bilan `fail`/`note` — toujours pas de second job, pas de `|| true`.
+      - name: Canari de forme du moteur GSD (lecture de texte — check-gsd-config.sh)
+        run: |
+          set -eu
+          LAB="$(mktemp -d)"
+          mkdir -p "$LAB/.planning"
+          cat > "$LAB/.planning/config.json" <<'JSON'
+          { "bloc_canari_inexistant": { "x": 1 },
+            "workflow": { "ui_review": false } }
+          JSON
+
+          # La cascade du script est laissée faire (branche $HOME, posée à l'étape précédente) : le
+          # canari doit mesurer le chemin RÉEL, pas une surcharge d'environnement.
+          out="$(env -u VF_CONFIG_PATH -u VF_GSD_CORE_LIB bash plugin/dev-orchestrator/scripts/check-gsd-config.sh --path "$LAB" 2>/dev/null)" || rc=$?
+          rc="${rc:-0}"
+          rm -rf "$LAB"
+          echo "== sortie du gate (rc=$rc) =="
+          printf '%s\n' "$out"
+
+          fail=0
+          note() { echo "::error::canari de forme du moteur GSD : $1"; fail=$((fail + 1)); }
+
+          case "$rc" in 0|3|64) : ;; *) note "rc=$rc HORS du contrat de sortie {0, 3, 64}" ;; esac
+
+          case "$out" in
+            *"une source de clés connues n'a rien rendu"*)
+              note "le gate se déclare PÉRIMÉ sur le moteur installé — la forme du moteur a changé et la lecture de texte ne la suit plus. Corriger l'extraction dans check-gsd-config.sh ; ne PAS neutraliser ce canari." ;;
+          esac
+
+          case "$out" in
+            *bloc_canari_inexistant*) : ;;
+            *) note "source 1 (VALID_CONFIG_KEYS) : un bloc de premier niveau qui n'existe dans AUCUNE version du moteur n'est pas signalé — les clés connues ne sont plus lues, ou l'ensemble lu est devenu universel" ;;
+          esac
+
+          # La clé est cherchée SUR la ligne des sous-clés inconnues, jamais dans tout le blob : une
+          # co-présence (« inconnues » ici, « ui_review » trois lignes plus bas) ferait rougir le
+          # canari pour la mauvaise raison.
+          sub_line="$(printf '%s\n' "$out" | awk '/sous-clés inconnues/ { print }')"
+          case "$sub_line" in
+            *ui_review*)
+              note "source 2 (configKeys du registre de capabilities) : workflow.ui_review est signalé inconnu alors qu'il est ÉCRIT et légitime — c'est la seule source où cette clé existe, elle n'est donc plus lue" ;;
+          esac
+
+          n_def="$(printf '%s\n' "$out" | awk '/au défaut amont \(/ { n++ } END { print n+0 }')"
+          echo "== toggles rendus avec leur défaut amont : $n_def =="
+          if [ "$n_def" -lt 3 ]; then
+            note "source 3 (CONFIG_DEFAULTS) : seulement $n_def toggle(s) rendu(s) avec une valeur de défaut lue (plancher 3). Des défauts devenus calculés font AFFIRMER au gate des absences fausses."
+          fi
+
+          # ----------------------------------------------------------------------------------------
+          # CANARI DE FORME DU MOTEUR GSD — GÉNÉRATEUR (arbitrage A-12, T-23-04-07). Même principe :
+          # build-gsd-capabilities-index.sh ne require() plus le registre de capabilities, il le LIT
+          # (le vecteur qu'il fermait — un capability-registry.cjs piégé résolu depuis le dépôt audité
+          # exécuté par require() — est le MÊME que celui fermé par check-gsd-config.sh sous A-6). Le
+          # prix est le même aussi : une lecture de texte ne suit aucune indirection, donc le jour où
+          # le moteur déplace ou calcule `byLoopPoint`, l'extraction échoue. Le générateur le DIT
+          # (« EXTRACTION PERIMEE », rc=1) au lieu de produire un index tronqué ou périmé en silence.
+          #
+          # CE QU'IL MESURE, ET POURQUOI IL NE PEUT PAS ÊTRE VERT À VIDE :
+          #   1. le générateur tourne contre le moteur RÉELLEMENT installé (posé à l'étape
+          #      précédente) et DOIT réussir (rc=0), sans jamais afficher le signal périmé — sinon la
+          #      forme de `byLoopPoint` a changé et la lecture de texte ne la suit plus ;
+          #   2. la table produite nomme un point de hook réellement déclaré par CE moteur
+          #      (`plan:pre`, présent sur toute version connue) — sans ce plancher, un générateur qui
+          #      ne lirait plus rien satisferait « rc=0 » sur une table vide.
+          # Sortie dans un TEMPORAIRE, jamais dans references/gsd-capabilities-index.md : ce canari
+          # mesure la LISIBILITÉ du moteur, il ne doit pas modifier le fichier versionné du checkout.
+          gen_out="$(mktemp)"
+          gen_index="$(mktemp)"
+          gen_rc=0
+          VF_GSD_CORE_LIB="$HOME/.claude/gsd-core/bin/lib" VF_CAPS_INDEX_OUT="$gen_index" \
+            bash plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh \
+            > /dev/null 2>"$gen_out" || gen_rc=$?
+          echo "== sortie du générateur (rc=$gen_rc) =="
+          cat "$gen_out"
+
+          case "$gen_rc" in 0|1) : ;; *) note "générateur : rc=$gen_rc HORS du contrat de sortie {0, 1}" ;; esac
+          if [ "$gen_rc" -ne 0 ]; then
+            note "générateur : n'a PAS réussi contre le moteur installé (rc=$gen_rc) — voir la sortie ci-dessus"
+          fi
+          case "$(cat "$gen_out")" in
+            *"EXTRACTION PERIMEE"*)
+              note "générateur : se déclare PÉRIMÉ sur le moteur installé — la forme de byLoopPoint a changé et la lecture de texte ne la suit plus. Corriger l'extraction dans build-gsd-capabilities-index.sh ; ne PAS neutraliser ce canari." ;;
+          esac
+          if grep -qF 'plan:pre' "$gen_index" 2>/dev/null; then
+            :
+          else
+            note "générateur : le point de hook plan:pre (présent sur toute version connue du moteur) n'apparaît pas dans l'index régénéré — la table produite est vide ou n'a pas été régénérée"
+          fi
+          rm -f "$gen_out" "$gen_index"
+
+          if [ "$fail" -ne 0 ]; then
+            echo "== canari ROUGE : $fail écart(s) entre la forme attendue du moteur et la forme lisible =="
+            exit 1
+          fi
+          echo "== canari VERT : les trois sources du moteur installé restent lisibles par extraction de texte, ET le registre de capabilities reste lisible par le générateur =="
+
       - name: Découvrir et lancer toutes les suites
         run: |
           set -u

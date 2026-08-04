@@ -1,5 +1,5 @@
 {
-  "description": "Signaux de démarrage du moteur de dev : état du bootstrap projet, documents de cadrage orphelins de la feuille de route, dérive documentaire. Advisory (ADR-031) — chaque signal propose un geste, aucun ne l'exécute.",
+  "description": "Signaux de démarrage du moteur de dev : état du bootstrap projet, documents de cadrage orphelins de la feuille de route, dérive documentaire, alignement du .planning/config.json sur le moteur GSD installé. Advisory (ADR-031) — chaque signal propose un geste, aucun ne l'exécute.",
   "hooks": {
     "SessionStart": [
       {
@@ -7,7 +7,8 @@
         "hooks": [
           { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-dev-bootstrap.sh --hook || true" },
           { "type": "command", "command": "bash {{VF_SCRIPTS}}/discover-unintegrated-docs.sh --hook || true" },
-          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-doc-drift.sh --hook || true" }
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-doc-drift.sh --hook || true" },
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-gsd-config.sh --hook || true" }
         ]
       }
     ]

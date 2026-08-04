@@ -167,14 +167,79 @@ de même en les relayant dans son « Rapport de mission » : simple concaténati
 statistique agrégée de son cru — la boucle de calibration reste amont, notre seul devoir est de ne
 pas couper le fil.
 
+## Contrat de checkpoint amont (gsd-core 1.9.0)
+
+`gsd-executor` (1.9.0) peut refuser d'auto-approuver un checkpoint : soit `gate="blocking-human"`
+porté par le `PLAN.md`, soit une **précondition** amont non satisfaite (cf.
+`gsd-core/references/checkpoints.md` règles 5/6 ; `$HOME/.claude/agents/gsd-executor.md`
+§Préconditions/checkpoints — sources amont, non recopiées ici). Le bloc typé de `vf-coder` gagne
+un champ **optionnel** `gate`, frère de `statut`/`findings`/`noeuds_debloques` : présent
+**uniquement** quand un checkpoint est survenu pendant le mandat, portant la valeur amont
+**recopiée verbatim** — jamais calculée, jamais déduite du **type** de checkpoint côté VibeFlow
+(un pilotage sur le type seul annulerait le refus que l'amont vient d'exprimer, un étage plus
+haut).
+
+**Règle unique de mapping** (une règle, deux motifs, ADR-030) : `gate="blocking-human"` **OU**
+précondition amont non satisfaite ⇒ `statut: "human_needed"`. Un refus d'auto-approbation amont
+est un refus, quel qu'en soit le motif.
+
+**Minimum de reprise (D-03, élargi par A-3)** : quand le statut est celui d'escalade humaine, le
+bloc typé porte un champ optionnel `reprise` dont les sous-champs sont exactement `plan_id`,
+`checkpoint` (le **type** de checkpoint amont), `gate`, `attendu` (ce que le moteur déclare
+attendre, recopié verbatim), `reponse_humaine` (la réponse donnée par l'humain, recopiée verbatim ;
+absent tant qu'il n'a pas répondu) et `taches_faites` (l'état d'avancement du mandat interrompu,
+tel que mesuré) — **rien d'autre**. Les deux derniers sont un ajout gouverné, pas un relâchement de
+la garde ADR-030 : le distinguo qui les autorise est écrit juste en dessous.
+
+**Pourquoi les deux derniers, et pourquoi ce n'est PAS la duplication que ADR-030 interdit.** Les
+quatre premiers décrivent tous *la question*. Un manager qui redispatche « avec l'attendu »
+redispatche donc la question qu'il vient de reposer : le worker neuf retombe sur le même
+checkpoint et rend `human_needed` — ping-pong sur un gate bloquant. L'amont exige d'ailleurs la
+réponse de l'utilisateur pour reprendre. **Distinguo à ne jamais réduire** : la garde
+anti-duplication ADR-030 vise la recopie de **doctrine amont** — les intitulés du contrat de
+retour **interne** de l'exécuteur, que le skill d'exécution orchestre déjà lui-même (il présente le
+checkpoint puis relance une continuation) — et **pas** le transport d'un **état de reprise** d'un
+mandat vers son successeur. Une doctrine recopiée se relit à sa source ; un état mesuré, lui, n'est
+nulle part ailleurs et se perd si personne ne le transporte. On continue de désigner le contrat
+amont **par son rôle**, sans en reproduire les intitulés de bloc.
+
+**Continuation (D-10, forme minimale ici)** : la reprise se fait en redispatchant un **nouveau**
+`vf-coder` avec le champ `reprise` ; le skill d'exécution reprend de lui-même au premier plan sans
+rapport de plan, et son garde-fou de reprise sûre refuse de relancer un exécuteur sur des commits
+de production orphelins en offrant trois recours. Doctrine de voie unique qui encadre ce constat :
+`GSD-PIPELINE.md` §9.
+
+**Verdicts de hooks moteur (D-15, plan 23-06)** : le bloc typé de `vf-coder` gagne un **troisième**
+champ optionnel frère de `gate`/`reprise` : `verdicts`, avec exactement trois sous-champs —
+`code_review`, `nyquist`, `secure` — dont les valeurs sont `pass`, `fail` ou `absent`. Mêmes règles
+que les champs frères, à écrire explicitement parce que c'est là que la fidélité se perd : les
+valeurs sont celles **déjà rendues par les hooks du moteur**, recopiées verbatim ; VibeFlow ne
+rejoue **aucun** de ces étages pour les produire ; un verdict qu'on n'a pas vu passer vaut `absent`,
+**jamais** `pass`. **Fait dimensionnant** : le workflow d'exécution du moteur rend à lui seul le
+point de hook de post-exécution **et** celui de post-vérification — donc **un seul appel** du skill
+`gsd-execute-phase` déclenche revue de code, validation nyquist et audit de sécurité. C'est ce fait,
+pas une préférence, qui justifie que le manager cesse de redemander ce qui est déjà fait.
+
+## Décompte de budget épuisé (D-26, D-27, D-28, plan 23-07)
+
+Le bloc typé de `vf-dev-manager` (Pattern C, `mission-flow.md`) gagne un **quatrième** champ
+optionnel frère de `gate`/`reprise`/`verdicts` : `decompte`, présent **uniquement** avec le statut
+`blocked` — tours de revue consommés, tours de comblement consommés, findings restés non résolus.
+Mêmes règles que les champs frères : recopié/compté par celui qui pilote la boucle, jamais estimé,
+absent quand le statut n'est pas `blocked`. Doctrine complète (grain étape, budget partagé, garde
+contre le contournement mécanique, invisibilité amont nommée) : `mission-flow.md` §Pattern E §6
+Épuisement du budget — ne pas la reformuler ici (ADR-030).
+
 ## Étage revue — deux objets disjoints (ADR-060 / ADR-061)
 
 La revue de **diff de code** (`vf-reviewer` → `gsd-code-reviewer`, nœud `revue-N` posé
 systématiquement par le manager, ADR-060) et la revue **cross-AI de plans** amont (`gsd-review`,
 lanes déclarées par `review-lane-descriptor.cjs`, ADR-2782 Phase 1, opt-in utilisateur via
 `--reviews`) sont deux étages **disjoints** — objet revu, moment du cycle et déclencheur diffèrent
-sur les trois axes. Arbitrage complet, avec le critère écrit : `docs/ADR.md` ADR-061. Aucun
-câblage automatique de `gsd-review` dans le DAG de mission — décision distincte, non prise ici.
+sur les trois axes. Arbitrage complet, avec le critère écrit : `docs/ADR.md` ADR-061 — qui couvre
+désormais aussi, sur les mêmes axes, le hook de revue de code du moteur face au nœud `revue-N`, et
+le hook d'audit de sécurité face à l'auditeur VibeFlow (Phase 23, plan 23-06). Aucun câblage
+automatique de `gsd-review` dans le DAG de mission — décision distincte, non prise ici.
 
 ## `.planning/STATE.md` — ne jamais « réparer » via `gsd-tools state` (ADR-063)
 
@@ -194,10 +259,11 @@ Retour **compact**. Le détail vit sur disque, pas dans la conversation.
 ```
 RAPPORT DE MISSION
 - Verdict global : ✅ | partiel | bloqué
-- Par sprint : fait / verdicts (recette, revue, audit) / commits (SHA)
+- Par sprint : fait / verdicts (recette, revue, audit + hooks moteur relayés verbatim) / commits (SHA)
 - Calibration (si portée) : estimate vs actuals par sprint — recopiés verbatim, jamais recalculés
 - Décisions prises en autonomie (et par quel panel)
 - Blocages & points nécessitant l'utilisateur
+- Décompte (si bloqué) : tours consommés par boucle + findings non résolus — recopié verbatim, jamais recalculé
 - Rapport détaillé : <chemin du fichier écrit sur disque>
 ```
 

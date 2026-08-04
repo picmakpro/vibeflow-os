@@ -339,6 +339,16 @@ Progress: [██████░░░░] 59%
 
 ### Roadmap Evolution
 
+- 2026-08-01 : **Phase 23 plan 01 exécuté hors-bande** — mandat étroit (un seul plan sur 8) confié
+  dans le worktree `vibeflow-os-p23` (branche `feat/phase-23-couplage-gsd`), sans passer par
+  `gsd-execute-phase` pour la phase entière. Livré : le contrat de checkpoint amont (`gate`,
+  `reprise`) et le désarmement du flag `workflow._auto_chain_active` — détail complet :
+  `.planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-01-SUMMARY.md`.
+  Compteurs `total_plans`/`completed_plans` incrémentés en conséquence (+1 chacun) ;
+  `current_phase`/narratif Phase 21 volontairement laissés intacts (ADR-063 : ne jamais
+  réparer ce fichier par `gsd-tools state`, et la Phase 23 n'est pas encore la phase courante
+  suivie ici). Les 7 autres plans de la Phase 23 restent à exécuter.
+
 - 2026-08-01 : **Phase 26 ajoutée** — « Manuel utilisateur VibeFlow (manual/) ». Origine : demande
   de Samuel (réorganiser les specs et offrir une doc lisible aux arrivants sans les plonger dans
   les docs de gestion de projet). Un manuel « vitrine » sous `manual/` à la racine : arborescence
@@ -498,6 +508,21 @@ Progress: [██████░░░░] 59%
 
 - 2026-07-25 : compteurs de `progress` corrigés — ils affichaient `total_plans: 0` alors que la Phase 12
   comptait déjà 6 plans dont 1 livré (12-01). Réel : 12 plans posés (6 en Phase 12, 6 en Phase 14), 1 livré.
+
+- 2026-08-04 : **Phase 23 — 6 plans sur 8 exécutés et revus** (mission d'équipe `vf-dev-manager`,
+  worktree `vibeflow-os-p23`, branche `feat/phase-23-couplage-gsd`). 23-01 à 23-05 sont clos
+  (exécution + revue en régime plein) ; 23-06 est exécuté, sa revue tourne. Restent 23-07 et 23-08.
+  Le suivi détaillé, les arbitrages et les dettes vivent dans `.planning/HANDOFF.json` et
+  `.planning/MISSION-23.dag.json` du worktree — **c'est là qu'il faut regarder pour reprendre**,
+  pas ici.
+  **Deux faits structurants pour la suite** : (a) `vf-dev-manager.md` est à **241/250** (ADR-029),
+  soit **9 lignes de marge** alors que 23-07 ET 23-08 le touchent tous les deux — la soupape est
+  le déport vers `plugin/dev-orchestrator/references/`, qui n'est pas plafonné ; (b) **aucune
+  exécution GitHub Actions n'a eu lieu sur cette branche** (`gh run list` vide), donc la CI de la
+  phase — y compris le canari de forme du moteur ajouté par 23-02 — n'a jamais tourné pour de vrai.
+  **Arbitrages rendus en mission** : A-15 (A-10 périmée sur `mission-flow.md`, appliquée sur
+  `check-gsd-config.sh`). **En attente de Samuel** : fuite d'info par symlink dans `slurp()` des
+  deux scripts, promotion d'A-15 en ADR, push de la branche pour exercer la CI, ratification O-16.
 
 ### Decisions
 
@@ -760,6 +785,17 @@ Recent decisions affecting current work:
   `10-APPROFONDISSEMENT.md` §5 — release finale réservée à validation humaine.
 
 ### Blockers/Concerns
+
+- **Phase 23 — 7 arbitrages humains en attente, la phase est GELÉE derrière eux** (mission du
+  2026-08-02). Le nœud `exec-01` est livré et gaté ; `revue-01` est `ready` mais non re-dispatché
+  (budget de boucle atteint). Les plans 23-02 à 23-08 restent `blocked`. Quatre décisions portent
+  sur la **doctrine** (fichiers gelés `mission-contracts.md`, `mission-flow.md`, `vf-coder.md`,
+  `vf-dev-manager.md`) : D-02 inerte (le désarmement du flag d'enchaînement crée la condition de son
+  propre ré-armement) · `workflow.auto_advance` jamais désarmé · le minimum de reprise ne transporte
+  pas la **réponse** humaine (boucle sur un gate `blocking-human`) · geler le nœud **ou** poser la
+  question, en mode autonome. Trois portent sur la **couverture de test** : rc=3 contraint la forme
+  rédactionnelle · porosité assumée de T25 · déclassement de T26 A′. Détail et options :
+  `.planning/missions/2026-08-02-phase-23-couplage-gsd.md`.
 
 - Migration package GSD `get-shit-done-cc` → `@opengsd/gsd-core` : milestone `gsd-migration` (VOC-02),
   ouvert et **en attente** — non bloquant pour vf-routing. Le go/no-go de la Phase 10 dépend de la

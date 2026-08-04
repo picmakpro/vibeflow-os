@@ -1144,6 +1144,43 @@ décision ne pose aucun nœud DAG `plan-review-N` — sur-ingénierie évitée t
 lanes amont (`invoke_reviewers`) reste écrite à la main. Si VibeFlow veut un jour orchestrer ce
 review cross-AI automatiquement, c'est une décision distincte, non tranchée ici.
 
+**Extension (Phase 23, plan 23-06, 2026-08-04)** — un **troisième objet** revu rejoint la
+disjonction, sur les **mêmes 3 axes**, pour fermer la Lacune 1 (doublons d'étage non arbitrés) : le
+workflow d'exécution du moteur rend à lui seul le point de hook de post-exécution ET celui de
+post-vérification, donc un seul appel de `gsd-execute-phase` déclenche revue de code, nyquist et
+audit de sécurité — un fait qui aggrave le silence si l'arbitrage n'est écrit nulle part.
+
+**Couple 1 (D-13, plan 23-06)** — hook de revue de code du moteur (`gsd-code-reviewer`, inséré par
+`gsd-execute-phase`) *versus* nœud `revue-N` du manager (`vf-reviewer`, ADR-060) :
+
+- **Objet revu** — le hook relit le diff **d'un plan**, au moment où ce plan se ferme ; le nœud
+  relit le diff de **jointure** d'une étape — l'intégration entre plans et la cohérence avec
+  l'existant.
+- **Moment du cycle** — le hook tombe sur le point de post-exécution, à l'intérieur du skill ; le
+  nœud tombe après le nœud d'exécution, au grain étape.
+- **Qui déclenche et qui relit** — le hook est inséré par le moteur selon un toggle ; le nœud est
+  posé systématiquement par le manager, sans condition.
+
+Conclusion : **les deux restent**, et le coût devient **assumé et nommé** au lieu d'être une
+superposition subie. **Option écartée** : éteindre le toggle de revue du moteur pour « éviter le
+doublon » — ferait perdre sa revue à tout appel direct du skill d'exécution par l'utilisateur, hors
+mission.
+
+**Couple 2 (D-14, plan 23-06)** — hook d'audit de sécurité du moteur *versus* auditeur VibeFlow
+(`vf-auditer`). Le delta est un **FAIT**, pas une préférence, sur les mêmes 3 axes :
+
+- **Objet revu** — le hook vérifie les mitigations du **threat model du plan** ; l'auditeur y
+  ajoute le **recoupement avec la dette connue du projet** (`.planning/codebase/CONCERNS.md`), un
+  delta que le hook **ne peut pas** produire, parce qu'il ne lit pas ce fichier.
+- **Moment du cycle** — les deux tombent en vérification, après `exec-N`, en parallèle de la revue
+  (`mission-flow.md` §Pattern E, point 3).
+- **Qui déclenche et qui relit** — le hook est inséré par le moteur selon un toggle ; l'auditeur
+  (`vf-auditer`) est dispatché par le manager quand l'étape touche sécurité, données sensibles ou
+  infra.
+
+**Option écartée** : conditionner l'auditeur au verdict du hook — ferait perdre le recoupement
+exactement dans le cas où le hook ne voit rien, or c'est là que la dette connue sert le plus.
+
 ### Conséquences
 
 **Positives** : la question ne peut plus être redécouverte — le critère est écrit et vérifiable sur
@@ -1157,7 +1194,10 @@ de mission.
 
 - `docs/ADR.md` (cette entrée)
 - `plugin/dev-orchestrator/references/mission-contracts.md` — pointeur bref vers cette ADR
-  (§Étage revue — deux objets disjoints)
+  (§Étage revue — deux objets disjoints), et §Contrat de checkpoint amont pour le champ
+  `verdicts` qui rend le coût des deux couples lisible (Phase 23, plan 23-06)
+- `plugin/dev-orchestrator/references/mission-flow.md` — §Pattern E (étage revue de premier rang),
+  qui documente le comportement réel du nœud `revue-N` distingué au Couple 1 (Phase 23, plan 23-06)
 
 ### Rules Associées
 

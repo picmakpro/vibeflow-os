@@ -1,0 +1,830 @@
+{
+  "nodes": [
+    {
+      "id": "exec-01",
+      "step": "23-01 Lacune 6 — taxonomie checkpoint GSD, gate blocking-human (jointure des sous-noeuds 01a..01d)",
+      "stage": "exec",
+      "deps": [
+        "exec-01d",
+        "exec-01c2"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/references/mission-contracts.md",
+        "plugin/dev-orchestrator/agents/vf-coder.md",
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-01",
+      "step": "revue code 23-01",
+      "stage": "revue",
+      "deps": [
+        "exec-01"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/references/mission-contracts.md",
+        "plugin/dev-orchestrator/agents/vf-coder.md",
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "exec-02",
+      "step": "23-02 check-gsd-config.sh + hooks + config.json",
+      "stage": "exec",
+      "deps": [
+        "revue-01"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/check-gsd-config.sh",
+        "plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh",
+        "plugin/dev-orchestrator/hooks/hooks.json",
+        ".planning/config.json"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-02",
+      "step": "revue code 23-02",
+      "stage": "revue",
+      "deps": [
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/check-gsd-config.sh",
+        "plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh",
+        "plugin/dev-orchestrator/hooks/hooks.json"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "exec-03",
+      "step": "23-03 Lacune 3 — doctrine de flags de cycle (GSD-PIPELINE §9)",
+      "stage": "exec",
+      "deps": [
+        "revue-02",
+        "arbitrage-O8",
+        "fix-a5"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/references/GSD-PIPELINE.md",
+        "plugin/dev-orchestrator/agents/vf-coder.md",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-03",
+      "step": "revue code 23-03",
+      "stage": "revue",
+      "deps": [
+        "exec-03"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/references/GSD-PIPELINE.md",
+        "plugin/dev-orchestrator/agents/vf-coder.md"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "exec-04",
+      "step": "23-04 table capabilities/hooks generee",
+      "stage": "exec",
+      "deps": [
+        "arbitrage-f1-rce",
+        "revue-03"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh",
+        "plugin/dev-orchestrator/references/gsd-capabilities-index.md",
+        "plugin/dev-orchestrator/references/GSD-PIPELINE.md",
+        "plugin/_internal/vibeflow-update.sh",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-04",
+      "step": "revue code 23-04",
+      "stage": "revue",
+      "deps": [
+        "exec-04"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh",
+        "plugin/_internal/vibeflow-update.sh"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "audit-infra",
+      "step": "audit infra — engine install + hooks + scripts gates (23-02 + 23-04)",
+      "stage": "audit",
+      "deps": [
+        "exec-04"
+      ],
+      "scope": [
+        "plugin/_internal/vibeflow-update.sh",
+        "plugin/dev-orchestrator/hooks/hooks.json",
+        "plugin/dev-orchestrator/scripts/check-gsd-config.sh",
+        "plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-05",
+      "step": "23-05 voie unique d'invocation (Lacune 5)",
+      "stage": "exec",
+      "deps": [
+        "arbitrage-a1ter-premisse",
+        "audit-infra",
+        "fix-a5",
+        "plancheck-05b",
+        "replan-05",
+        "replan-05b"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/agents/vf-coder.md",
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md",
+        "plugin/dev-orchestrator/references/GSD-PIPELINE.md",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-05",
+      "step": "revue code 23-05",
+      "stage": "revue",
+      "deps": [
+        "exec-05"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/agents/vf-coder.md",
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md",
+        "plugin/dev-orchestrator/references/GSD-PIPELINE.md"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "exec-06",
+      "step": "23-06 disjonction hooks moteur vs etages VibeFlow (Lacune 1, ADR)",
+      "stage": "exec",
+      "deps": [
+        "plancheck-06",
+        "replan-06",
+        "revue-05"
+      ],
+      "scope": [
+        "docs/ADR.md",
+        "plugin/dev-orchestrator/references/mission-contracts.md",
+        "plugin/dev-orchestrator/agents/vf-coder.md",
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-06",
+      "step": "revue code 23-06",
+      "stage": "revue",
+      "deps": [
+        "exec-06"
+      ],
+      "scope": [
+        "docs/ADR.md",
+        "plugin/dev-orchestrator/references/mission-contracts.md"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "exec-07",
+      "step": "23-07 budgets de boucle additionnes + briques dormantes",
+      "stage": "exec",
+      "deps": [
+        "plancheck-07",
+        "replan-07",
+        "revue-06"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/references/mission-flow.md",
+        "plugin/dev-orchestrator/references/mission-contracts.md",
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md",
+        "plugin/dev-orchestrator/references/GSD-PIPELINE.md",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-07",
+      "step": "revue code 23-07",
+      "stage": "revue",
+      "deps": [
+        "exec-07"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/references/mission-flow.md",
+        "plugin/dev-orchestrator/references/mission-contracts.md"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "exec-08",
+      "step": "23-08 gouvernance — bump module, README, CHANGELOG, gates verts",
+      "stage": "exec",
+      "deps": [
+        "plancheck-08",
+        "replan-08",
+        "revue-07"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/VERSION",
+        "plugin/dev-orchestrator/module.json",
+        "plugin/dev-orchestrator/README.md",
+        "plugin/dev-orchestrator/CHANGELOG.md",
+        "README.md",
+        "README.fr.md",
+        ".planning/REQUIREMENTS.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-08",
+      "step": "revue finale 23-08 + coherence de phase",
+      "stage": "revue",
+      "deps": [
+        "exec-08"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/**",
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "exec-01a",
+      "step": "23-01a deport du bloc controle de flux (A-4) vers references/ — retablir la marge ADR-029 sur vf-dev-manager",
+      "stage": "exec",
+      "deps": [],
+      "scope": [
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md",
+        "plugin/dev-orchestrator/references/mission-flow.md",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-01b",
+      "step": "23-01b A-1bis — vf-coder garde --auto et desarme adjacent ; gate inverse ; A-2 coherente",
+      "stage": "exec",
+      "deps": [
+        "exec-01a"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/agents/vf-coder.md",
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-01c",
+      "step": "23-01c B6 garde ADR-030 insensible au wrap + B4 sonde A-4 sur les trois cibles (B5 ferme par 01a)",
+      "stage": "exec",
+      "deps": [
+        "exec-01b"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh",
+        "plugin/dev-orchestrator/references/mission-contracts.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-01d",
+      "step": "23-01d re-derivation et fermeture de B2, B3, B7, M1 (famille : existence au lieu de relation, tautologie assumee)",
+      "stage": "exec",
+      "deps": [
+        "exec-01c"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-01c2",
+      "step": "23-01c2 couverture du 3e foyer — la paraphrase A-4 de vf-dev-manager echappe au gate (O-1, doctrine NON tranchee)",
+      "stage": "exec",
+      "deps": [
+        "exec-01c"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-O8",
+      "step": "ARBITRAGE HUMAIN — O-8 : A-1bis démentie sur ses faits (--auto lance discuss→plan→execute). Bloque 23-03 par construction (la Lacune 3 ne peut être écrite sans savoir ce qu'un --auto auto-approuve). O-9 et O-10 à trancher au même passage.",
+      "stage": "human",
+      "deps": [
+        "revue-01"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-01e",
+      "step": "23-01e A-1ter geste 1 — retirer a T25b la promesse qu'il ne tient pas (adjacence TEXTUELLE, aucune fenetre runtime bornee) + documenter le trou + inscrire la contrainte d'entree de 23-05",
+      "stage": "exec",
+      "deps": [
+        "arbitrage-O8"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-05-PLAN.md",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-01-SUMMARY.md",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-ARBITRAGES-OUVERTS.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-01e",
+      "step": "revue ciblee exec-01e — le libelle ne promet plus que ce qu'il mesure ET le COMPORTEMENT de la sonde est inchange (memes rc sur reel, fixtures g..k, mutants M1..M4)",
+      "stage": "revue",
+      "deps": [
+        "exec-01e"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-A1ter-vfcoder",
+      "step": "ARBITRAGE HUMAIN — vf-coder.md:30-31 affirme encore 'borne la fenetre armee au seul cadrage de cette etape', fait demenmti par A-1ter. Le gate ne ment plus, la doctrine qu'il verifie ment toujours. Correctif texte minimal maintenant, ou statu quo jusqu'a 23-05 ?",
+      "stage": "human",
+      "deps": [
+        "exec-01e"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/agents/vf-coder.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-03",
+      "step": "re-validation du plan 23-03 contre A-1ter — le plan a ete redige AVANT que la semantique d'un --auto soit connue (lecture seule, aucune ecriture)",
+      "stage": "plan",
+      "deps": [
+        "arbitrage-O8"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "replan-03",
+      "step": "amendement du plan 23-03 sur les 3 bloquants du plancheck (table d'allowlist contradictoire sous A-1ter, motif adosse a un gate degaze, tracabilite amont absente) + les 6 warnings de sondes a token",
+      "stage": "plan",
+      "deps": [
+        "plancheck-03"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-03-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-overlay-federe",
+      "step": "ARBITRAGE HUMAIN — check-gsd-config.sh ne lit pas l'overlay federe de capabilities tierces : faux positif possible, jamais faux negatif, gate advisory. Elargir la portee (hors perimetre 23-02) ou acter la limite documentee ?",
+      "stage": "human",
+      "deps": [
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/check-gsd-config.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "alloc-blocs-test",
+      "step": "allocation des identifiants de bloc de test a travers 23-03..23-08 — T24,T25,T25b,T25c,T26,T27,T27b,T27c sont DEJA poses par 23-01, les plans restants les revendiquent encore (lecture seule)",
+      "stage": "plan",
+      "deps": [
+        "replan-03"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-04",
+      "step": "re-validation du plan 23-04 contre A-1ter et contre les 3 familles de defauts trouvees sur 23-03 et 23-02 (lecture seule)",
+      "stage": "plan",
+      "deps": [
+        "replan-03"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "replan-03b",
+      "step": "23-03 : renumerotation T27 -> T33 (seule collision de la phase), suppression de la section QUESTION OUVERTE, + boilerplate de plage T24 a T33 dans 23-05..23-08",
+      "stage": "plan",
+      "deps": [
+        "alloc-blocs-test"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-03-PLAN.md",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-05-PLAN.md",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-06-PLAN.md",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-07-PLAN.md",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-08-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "replan-04",
+      "step": "amendement du plan 23-04 sur les 3 bloquants du plancheck (garde de fraicheur absente sur la copie versionnee, T28-C vert a vide, critere non exprimable) + 7 warnings",
+      "stage": "plan",
+      "deps": [
+        "plancheck-04"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-04-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-sessionstart-rce",
+      "step": "ARBITRAGE HUMAIN SECURITE — check-gsd-config.sh, cable sur SessionStart, resout sa cascade lab-first et fait require() par node -e d'un config.cjs du depot audite : un depot piege s'execute a chaque demarrage de session, et le || true masque tout. La cascade lab-first est PRESCRITE par le plan (VF_SCOPE=project legitime). Durcir comment ?",
+      "stage": "human",
+      "deps": [
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/check-gsd-config.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-known-top",
+      "step": "ARBITRAGE HUMAIN — 'faux positif possible, jamais faux negatif' est FAUX : le script inclut configKeys et CONFIG_DEFAULTS que le moteur n'inclut pas dans KNOWN_TOP_LEVEL, donc il TAIT des cles que loadConfig signale (prouve sur _comment). Parite stricte (rouvre des faux positifs federes) ou limite reecrite honnetement ?",
+      "stage": "human",
+      "deps": [
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/check-gsd-config.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-ci-gsd-core",
+      "step": "ci.yml n'installe pas gsd-core : la suite test-check-gsd-config.sh sort 24 ok / 2 ko / exit 1 sur runner vierge. Installer gsd-core dans le job, JAMAIS degrader le ko (ce serait rouvrir le vert a vide). Verifier aussi test-check-gsd-engine.sh (23-01), meme trait probable",
+      "stage": "exec",
+      "deps": [
+        "exec-02"
+      ],
+      "scope": [
+        ".github/workflows/ci.yml"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-05",
+      "step": "re-validation du plan 23-05 (AMENDE apres coup par la contrainte d'entree A-1ter geste 2 — obligatoire avant exec-05) + les 4 familles de defauts trouvees sur 23-02/03/04",
+      "stage": "plan",
+      "deps": [
+        "replan-04"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "replan-05",
+      "step": "REECRITURE PARTIELLE du plan 23-05 — il documente A-1ter geste 2 sur 43 lignes et n'en execute rien ; son critere l.300 INTERDIT le geste attendu. Ajouter la tache de portage du cadrage, la tache de retrait de T25b avec ses 3 renvois, viser les DEUX sites du mensonge doctrinal",
+      "stage": "plan",
+      "deps": [
+        "plancheck-05",
+        "revue-03"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-05-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-a5",
+      "step": "A-5 — correctif TEXTE du mensonge doctrinal sur les deux foyers (vf-coder.md §Cadrage, vf-dev-manager.md geste 5)",
+      "stage": "exec",
+      "deps": [],
+      "scope": [
+        "plugin/dev-orchestrator/agents/vf-coder.md",
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-a6",
+      "step": "A-6 — check-gsd-config.sh n'execute plus le fichier resolu : extraction par LECTURE DE TEXTE. Cascade lab-first inchangee. + section Securite en-tete + threat model de phase",
+      "stage": "exec",
+      "deps": [
+        "exec-02",
+        "fix-ci-gsd-core"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/check-gsd-config.sh",
+        "plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-02-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-a6",
+      "step": "revue de securite ciblee du correctif A-6 : non-execution prouvee, equivalence d'extraction, aucune regression de la cascade legitime",
+      "stage": "revue",
+      "deps": [
+        "fix-a6"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/check-gsd-config.sh",
+        "plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "summary-03",
+      "step": "23-03-SUMMARY.md — livrable exige par le <output> du plan, absent de files_modified donc non ecrit par exec-03",
+      "stage": "exec",
+      "deps": [
+        "exec-03"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-03-SUMMARY.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-o16",
+      "step": "O-16 RATIFICATION — gradation de recherche portee par la ligne PLAN et non CADRAGE (ecart a plan doublement re-valide, fait verifie deux fois)",
+      "stage": "arbitrage",
+      "deps": [
+        "exec-03"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/references/GSD-PIPELINE.md"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "verif-o12",
+      "step": "O-12 — verifier que la cascade $S de mission-flow.md porte le MEME defaut que la branche 2 de check-gsd-config.sh (double segment gsd-core/gsd-core dans le tarball npm) : couverture apparente qui n'en est pas une. LECTURE SEULE, consignation seule",
+      "stage": "verif",
+      "deps": [],
+      "scope": [
+        "plugin/conductor/references/mission-flow.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-a1ter-premisse",
+      "step": "ARBITRAGE HUMAIN — la premisse d A-1ter (le manager A AskUserQuestion) est DEMENTIE dans la configuration nominale : dispatche en sous-agent, le runtime peut ne pas la lui fournir malgre sa presence declaree (filet D-09 de vf-dev-manager.md, a deja gele une mission au noeud checkpoint-doctrine). Le GAIN du portage subsiste et n en depend pas, mais le MOTIF ecrit est plus faible que le motif reel. 4e premisse fausse de la serie D-02",
+      "stage": "human",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-ARBITRAGES.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-f1-rce",
+      "step": "ARBITRAGE HUMAIN BLOQUANT — RCE REINTRODUITE par build-gsd-capabilities-index.sh:117 (require du registre resolu depuis le DEPOT AUDITE, cascade :63-80). Chaine d install reelle bouclee par l auditeur : vibeflow-update.sh install dev-orchestrator depuis un depot piege -> code execute, rc=0. Le correctif impose de toucher la cascade qu A-6 prescrit de laisser INCHANGEE, et la voie evidente (porter le lecteur de litteraux de 23-02) rouvre O-13 sur un second script ET exige de reposer la garde de type que require() fournissait gratuitement (protection DoS mesuree). ADR-031 : arbitrage, pas geste de worker",
+      "stage": "human",
+      "deps": [],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "propagation-a6",
+      "step": "A-12 cause racine documentaire : propager la requalification de frontiere A-6 a TOUS les plans, threat model T-23-04-07, motif A-1ter (A-13)",
+      "stage": "build",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-config-a9-a10-a14",
+      "step": "A-14 garde de type non-ordinaire + A-9 signal explicite 0 cle + canari CI + A-10 retrait branche 2 morte (check-gsd-config.sh uniquement)",
+      "stage": "build",
+      "deps": [],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/check-gsd-config.sh",
+        "plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh",
+        ".github/workflows/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "escalade-a10-missionflow",
+      "step": "FERME le 2026-08-04 par le verdict A-15 (le HALT avait ete leve par Samuel lui-meme, pas par le manager)",
+      "stage": "arbitrage",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "balayage-frontiere",
+      "step": "A-12 balayage : chercher la redaction perimee de frontiere dans les 8 plans, corriger 23-05..23-08",
+      "stage": "build",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-05-PLAN.md",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-06-PLAN.md",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-07-PLAN.md",
+        ".planning/phases/VFDO-23-couplage-explicite-au-moteur-gsd-capabilities-flags-et-voie-/23-08-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "canari-generateur",
+      "step": "A-9 : etendre le canari CI au generateur une fois les deux scripts en lecture de texte",
+      "stage": "build",
+      "deps": [
+        "exec-04",
+        "fix-config-a9-a10-a14"
+      ],
+      "scope": [
+        ".github/workflows/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-04b",
+      "step": "A-12 : lecteur de litteraux porte au generateur + garde de type reposee + F3 (non-execution assertee dans les deux sens) + F4 (retrait des 3 chemins d execution du piege) + F6 (borne de DUREE) + signal A-9 cote generateur + extension du canari CI",
+      "stage": "exec",
+      "deps": [
+        "arbitrage-f1-rce",
+        "propagation-a6",
+        "fix-config-a9-a10-a14"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh",
+        ".github/workflows/ci.yml"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-a10-re",
+      "step": "ARBITRAGE PLEIN d'A-10 sur son INTENTION, mandate par Samuel le 2026-08-04 (option 2 sur 3 : re-arbitrer en entier). Instruit par un panel de 3 chercheurs. VERDICT RENDU : A-15 — moitie mission-flow.md CADUQUE, moitie check-gsd-config.sh maintenue, intention re-imputee a O-19(d) et O-20 qui restent ouverts",
+      "stage": "human",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-23-*/23-ARBITRAGES*.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-fuite-info",
+      "step": "ARBITRAGE HUMAIN (ADR-031) — FUSION DES DEUX JUGES : T-23-04-01 Information Disclosure est mitigee sur le papier, mais NI la garde runtime NI le filet anti-regression ne couvrent la classe. Gele, ne bloque aucun noeud",
+      "stage": "human",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-23-*/23-ARBITRAGES-OUVERTS.md"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "plancheck-05b",
+      "step": "RE-VALIDATION LECTURE SEULE du plan 23-05 : ses read_first sont DEMENTIS par mesure et fix-a5 a modifie les deux agents cibles depuis la redaction. Re-deriver les ancres AVANT exec-05",
+      "stage": "verif",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-23-*/23-05-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "replan-05b",
+      "step": "Amendement cible du plan 23-05 sur les 3 bloquants + W-1 de plancheck-05b (forme d option check-agents, motif A-13 substitue, tache 0 perimee, recettes incapables d echouer)",
+      "stage": "plan",
+      "deps": [
+        "plancheck-05b"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-*/23-05-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-06",
+      "step": "RE-VALIDATION LECTURE SEULE du plan 23-06 : ses 5 fichiers cibles viennent TOUS d etre modifies par exec-05, ses ancres sont donc suspectes. Re-deriver AVANT exec-06",
+      "stage": "verif",
+      "deps": [
+        "revue-05"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-*/23-06-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "replan-06",
+      "step": "Amendement cible du plan 23-06 : 4 bloquants (assertion F rouge sur l arbre actuel, 3 recettes incapables d echouer, forme d option check-agents, critere vert avant travail) + purge des numeros de ligne",
+      "stage": "plan",
+      "deps": [
+        "plancheck-06"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-*/23-06-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-07",
+      "step": "RE-VALIDATION LECTURE SEULE du plan 23-07 avant exec-07 — troisieme fois que ce noeud se paie tout seul",
+      "stage": "verif",
+      "deps": [
+        "revue-06"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-*/23-07-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-d22-debugger",
+      "step": "HALT ADR-031 — D-22 dit 'aucune exception' mais vf-coder.md:4 porte gsd-debugger, et le gate de 23-07 est calibre pour ne pas le voir (la fonction exclut la ligne tools:). Reduction de perimetre sur une decision verrouillee",
+      "stage": "human",
+      "deps": [],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "replan-07",
+      "step": "Amendement cible du plan 23-07 : B1 forme d option, B2 trois recettes incapables d echouer, B3 assertion D vacue par construction, W1-W5. B4 EXCLU du mandat, escalade",
+      "stage": "plan",
+      "deps": [
+        "plancheck-07"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-*/23-07-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-08",
+      "step": "RE-VALIDATION LECTURE SEULE du plan 23-08 (gouvernance) + mesure de l ecart avec origin/main avant re-mesure des compteurs README",
+      "stage": "verif",
+      "deps": [
+        "revue-07"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-*/23-08-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "sync-main",
+      "step": "Integrer origin/main DANS la branche avant 23-08 : le commit de retard reecrit les deux README et supprime l encadre mermaid que le plan cite",
+      "stage": "exec",
+      "deps": [
+        "plancheck-08"
+      ],
+      "scope": [
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "replan-08",
+      "step": "Amendement du plan 23-08 : 6 bloquants (gardes vertes a vide, forme d option, tail, 9 criteres verts d avance, wc redirige, ancres README post-synchro)",
+      "stage": "plan",
+      "deps": [
+        "sync-main"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-23-*/23-08-PLAN.md"
+      ],
+      "status": "done"
+    }
+  ]
+}
