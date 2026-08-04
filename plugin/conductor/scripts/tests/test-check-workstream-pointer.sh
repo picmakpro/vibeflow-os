@@ -121,6 +121,93 @@ if [ "$rc" -eq 2 ] && ! printf '%s' "$out" | grep -qF '../evil'; then
   ok "6b nom hors classe via GSD_WORKSTREAM → exit 2, valeur non reimprimee"
 else ko "6b nom hors classe via env → exit 2" "rc=$rc out=[$out]"; fi
 
+# === Cas 6c — ANGLE MORT ferme : noms ENTIEREMENT dans la classe mais refuses par le moteur ========
+# La copie locale de la politique n'avait repris que la CLASSE DE CARACTERES amont, en abandonnant
+# `hasInvalidPathSegment` et l'ancre alphanumerique initiale. `.` et `..` sont entierement dans la
+# classe : ce gate rendait donc « exit 0 conforme » sur `..`, et `WS_DIR="$WS_ROOT/.."` satisfait
+# trivialement `[ -d ]`. La suite ne contenait que `../evil`, attrape par le `/` — c'est ce trou
+# exact qui a laisse passer le defaut. Aucun de ces noms ne doit resoudre.
+# NB sur la forme des assertions : un test de sous-chaine BRUTE sur ces noms-la serait ininterpretable
+# — le message de rejet DECRIT la politique (« ni '.'/'..', ni '..' en sous-chaine »), il contient
+# donc `.` et `..` legitimement. On assert donc ce qui a un sens : jamais concatene dans un chemin
+# (`workstreams/<nom>`), jamais NOMME comme resolu (« <nom> »). La non-reimpression verbatim est
+# prouvee juste apres, sur un marqueur distinctif que rien d'autre ne peut produire.
+D="$(mk_git_root c6c)"; mkdir -p "$D/.planning/workstreams/dev"
+c6c_ok=1; c6c_detail=""
+for bad in '.' '..' '.hidden' '-x' 'a..b' '_lead'; do
+  out="$(run "$bad" --path "$D")"; rc=$?
+  [ "$rc" -eq 2 ] || { c6c_ok=0; c6c_detail="$bad -> rc=$rc (attendu 2)"; }
+  printf '%s' "$out" | awk -v b="workstreams/$bad" 'index($0, b) { f=1 } END { exit !f }' \
+    && { c6c_ok=0; c6c_detail="$bad concatene dans un chemin"; }
+  printf '%s' "$out" | awk -v b="« $bad »" 'index($0, b) { f=1 } END { exit !f }' \
+    && { c6c_ok=0; c6c_detail="$bad nomme comme workstream resolu"; }
+done
+note_rc 2
+if [ "$c6c_ok" -eq 1 ]; then
+  ok "6c noms dans la classe mais hors politique amont (. .. .hidden -x a..b _lead) → exit 2, jamais concatenes ni nommes"
+else ko "6c noms hors politique amont" "$c6c_detail"; fi
+
+# Non-reimpression VERBATIM, prouvee sur un marqueur distinctif : aucune partie du script ne peut
+# produire cette chaine autrement qu'en reimprimant la valeur rejetee.
+MARQUEUR='zzSECRETMARKERzz..q'
+out="$(run "$MARQUEUR" --path "$D")"; rc=$?
+fuite=$(printf '%s' "$out" | awk '/zzSECRETMARKERzz/ { print "oui" }')
+if [ "$rc" -eq 2 ] && [ -z "$fuite" ]; then
+  ok "6c-bis nom rejete distinctif → exit 2, et la valeur brute n'apparait nulle part dans la sortie"
+else ko "6c-bis reimpression verbatim d'une valeur rejetee" "rc=$rc out=[$out]"; fi
+
+# === Cas 6d — le gate ne doit pas FABRIQUER un nom absent du fichier ===============================
+# `tr -d ' \011\013\014\015'` supprimait TOUS les espaces, pas seulement ceux des bords : un pointeur
+# contenant « de v » (que le moteur rejette) rendait « conforme — workstream « dev » resolu ». Le gate
+# fabriquait un vert sur un nom qui n'etait pas dans le fichier. Le rognage ne touche que les BORDS.
+D="$(mk_git_root c6d)"; mkdir -p "$D/.planning/workstreams/dev"
+printf 'de v\n' > "$D/.planning/active-workstream"
+out="$(run "" --path "$D")"; rc=$?
+fabrique=$(printf '%s' "$out" | awk '/workstream . dev ./ || /« dev »/ { print "oui" }')
+if [ "$rc" -eq 2 ] && [ -z "$fabrique" ]; then
+  ok "6d pointeur « de v » → exit 2 ; aucun « dev » fabrique a partir d'un nom absent du fichier"
+else ko "6d fabrication d'un nom par suppression des espaces internes" "rc=$rc out=[$out]"; fi
+
+# Le rognage des BORDS, lui, reste actif : « \n  dev  \n » vaut bien « dev » (parite `raw.trim()`).
+printf '  dev  \n' > "$D/.planning/active-workstream"
+out="$(run "" --path "$D")"; rc=$?
+if [ "$rc" -eq 0 ]; then
+  ok "6d-bis pointeur «   dev   » → exit 0 : les bords sont bien rognes (parite avec .trim() amont)"
+else ko "6d-bis rognage des bords" "rc=$rc out=[$out]"; fi
+
+# Le fichier ENTIER est rogne, pas sa 1re ligne : « dev\nautre » est INVALIDE amont (`raw.trim()`
+# laisse le saut de ligne interne), la lecture ligne a ligne le rendait « dev ».
+printf 'dev\nautre\n' > "$D/.planning/active-workstream"
+out="$(run "" --path "$D")"; rc=$?
+if [ "$rc" -eq 2 ]; then
+  ok "6d-ter pointeur « dev\\nautre » → exit 2 : le fichier entier est evalue, pas sa 1re ligne"
+else ko "6d-ter lecture du fichier entier" "rc=$rc out=[$out]"; fi
+
+# === Cas 6e — FUITE D'INFORMATION par lien symbolique versionne (SessionStart) =====================
+# Un `.planning/active-workstream` versionne en mode 120000 vers `../../victime/.env` faisait
+# imprimer la 1re ligne du fichier cible VERBATIM sur stdout du hook, donc dans le contexte de
+# session, sans aucune action de la victime au-delà de l'ouverture de session. Seule condition : que
+# la ligne tienne dans la classe de caracteres. Le refus de suivre le lien est la garde portante.
+D="$(mk_git_root c6e)"; mkdir -p "$D/.planning/workstreams/dev"
+printf 'sk-live-FUITE-0001.SECRET\n' > "$TMP/victime.env"
+ln -sf "$TMP/victime.env" "$D/.planning/active-workstream"
+out="$(run "" --path "$D" --hook)"; rc=$?
+fuite=$(printf '%s' "$out" | awk '/sk-live-FUITE-0001/ { print "oui" }')
+if [ "$rc" -eq 2 ] && [ -z "$fuite" ]; then
+  ok "6e pointeur = lien symbolique → exit 2 ; le contenu de la cible ne traverse PAS vers la sortie"
+else ko "6e fuite par lien symbolique" "rc=$rc out=[$out]"; fi
+rm -f "$D/.planning/active-workstream"
+
+# === Cas 6f — pointeur non borne : la sortie ne doit pas porter la valeur, ni sa taille ============
+# La valeur rejetee etait reimprimee sans aucune borne de longueur.
+D="$(mk_git_root c6f)"; mkdir -p "$D/.planning/workstreams/dev"
+awk 'BEGIN { s=""; for (i=0;i<5000;i++) s=s"a"; print s }' > "$D/.planning/active-workstream"
+out="$(run "" --path "$D" --hook)"; rc=$?
+maxlen=$(printf '%s' "$out" | awk 'BEGIN{m=0} {if (length($0)>m) m=length($0)} END{print m+0}')
+if [ "$rc" -eq 2 ] && [ "$maxlen" -lt 512 ]; then
+  ok "6f pointeur de 5000 car. → exit 2, et aucune ligne de sortie ne porte la valeur (max ${maxlen} car.)"
+else ko "6f borne de lecture du pointeur" "rc=$rc ligne la plus longue=$maxlen"; fi
+
 # === Cas 7 — repertoire hors depot git → exit 2, JAMAIS 0 =========================================
 D="$TMP/c7-hors-git"; mkdir -p "$D/.planning/workstreams/dev"
 out="$(run "" --path "$D")"; rc=$?

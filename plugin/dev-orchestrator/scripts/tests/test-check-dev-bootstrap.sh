@@ -277,20 +277,40 @@ else
 fi
 
 # === Cas 27 — Nom hors politique : traité comme « aucun workstream », JAMAIS concaténé ===========
-# Traversée de chemin, séparateur, espace, nom vide après trim, premier caractère non alphanumérique.
+# Traversée de chemin, séparateur, espace, `..` en sous-chaîne, premier caractère non alphanumérique.
+# RÔLE INJECTEUR : le rejet est fail-OPEN (repli racine, exit 0) — c'est la gradation déclarée dans
+# workstream-policy.sh, et elle est délibérée : ce script est un hook SessionStart, un exit non nul
+# y dégraderait toutes les sessions. Ce qu'il ne fait jamais, c'est se taire ou construire un chemin.
 D="$(mk_partitioned c27 dev)"
 bad_all_ok=1
-for bad in '../evil' 'a/b' '.' '..' 'a b' '-lead' 'x;y' "$(printf 'x%.0s' $(seq 1 90))"; do
+bad_detail=""
+for bad in '../evil' 'a/b' '.' '..' 'a b' '-lead' 'x;y' 'a..b' '.hidden'; do
   o="$(GSD_WORKSTREAM="$bad" bash "$SCRIPT" --path "$D" 2>&1)"; r=$?
   # Aucun chemin construit avec ce nom, et le verdict est celui de l'arbre NON partitionné.
-  case "$o" in *"workstreams/$bad"*) bad_all_ok=0 ;; esac
-  case "$o" in *"[bootstrap]"*"feuille de route absente"*) : ;; *) bad_all_ok=0 ;; esac
-  case "$r" in 0) : ;; *) bad_all_ok=0 ;; esac
+  case "$o" in *"workstreams/$bad"*) bad_all_ok=0; bad_detail="$bad concaténé" ;; esac
+  case "$o" in *"[bootstrap]"*"feuille de route absente"*) : ;; *) bad_all_ok=0; bad_detail="$bad → verdict inattendu" ;; esac
+  case "$r" in 0) : ;; *) bad_all_ok=0; bad_detail="$bad → rc=$r" ;; esac
 done
 if [ "$bad_all_ok" -eq 1 ]; then
-  ok "27 noms hors politique (8 formes, dont ../ et /) → aucun chemin construit, verdict racine"
+  ok "27 noms hors politique (9 formes, dont ../ et /) → aucun chemin construit, verdict racine"
 else
-  ko "27 noms hors politique → aucune concaténation" "un des 8 noms a fui ou changé le verdict"
+  ko "27 noms hors politique → aucune concaténation" "$bad_detail"
+fi
+
+# === Cas 27a — Nom LONG (90 car.) : amont l'ACCEPTE, ce script ne doit PAS le rejeter =============
+# `isValidActiveWorkstreamName` n'a AUCUNE borne de longueur (workstream-name-policy.cjs) ; la borne
+# LOCALE de 80 caractères qui vivait ici rejetait donc des noms parfaitement valides. Ce cas figurait
+# auparavant dans la liste des noms « hors politique » ci-dessus — il y était par erreur, et cette
+# erreur était la copie locale de la politique, pas le nom. Traitement attendu : nom VALIDE, donc
+# compartiment cherché, absent, d'où le repli NOMMÉ (contrat du cas 26).
+LONG_WS="$(awk 'BEGIN{s="";for(i=0;i<90;i++)s=s"x";print s}')"
+err="$(GSD_WORKSTREAM="$LONG_WS" bash "$SCRIPT" --path "$D" 2>&1 >/dev/null)"; rc=$?
+named=0; case "$err" in *"$LONG_WS"*) named=1 ;; esac
+rejected=0; case "$err" in *"hors-politique"*) rejected=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$named" -eq 1 ] && [ "$rejected" -eq 0 ]; then
+  ok "27a nom de 90 car. (valide amont) → résolu puis repli NOMMÉ, jamais un rejet de politique"
+else
+  ko "27a nom long accepté par amont" "rc=$rc nommé=$named rejeté=$rejected err=[$err]"
 fi
 
 # === Cas 27b — T-24-04-01 : traversée qui RÉSOUT VRAIMENT vers un compartiment réel ==============

@@ -369,11 +369,15 @@ else
   ko "19b --file vers le compartiment" "rc=$rc out=[$out]"
 fi
 
-# === Cas 20 — Workstream nommé, dossier ABSENT → exit 2 + stderr qui NOMME le workstream =============
+# === Cas 20 — Dépôt PARTITIONNÉ, workstream nommé, compartiment ABSENT → exit 2 + stderr qui NOMME ===
 # Fail-closed : jamais un repli silencieux sur la racine, qui rendrait « conforme » sur un fichier
 # que l'appelant ne croyait pas vérifier.
+# Le `.planning/workstreams/` doit EXISTER pour que ce cas soit celui-ci : « résolu mais compartiment
+# absent » n'a de sens que sur un dépôt partitionné. Sans ce répertoire, le dépôt n'est pas
+# partitionné du tout et la résolution ne s'arme pas (cas 20d).
 D="$(mk_git_root c20)"
 write_state "$D" "m1" 20 22 12 54 39 "Phase: 20 complète"
+mkdir -p "$D/.planning/workstreams"
 err="$(GSD_WORKSTREAM=inexistant bash "$SCRIPT" --path "$D" 2>&1 >/dev/null)"; rc=$?
 named=0; case "$err" in *"inexistant"*) named=1 ;; esac
 if [ "$rc" -eq 2 ] && [ "$named" -eq 1 ]; then
@@ -389,6 +393,41 @@ if [ "$rc_racine" -eq 0 ] && [ "$rc_absent" -eq 2 ]; then
   ok "20c discrimination — même dépôt : rc(racine)=$rc_racine, rc(ws introuvable)=$rc_absent"
 else
   ko "20c discrimination repli vs fail-closed" "rc_racine=$rc_racine rc_absent=$rc_absent"
+fi
+
+# === Cas 20d — FAUX ROUGE fermé : dépôt NON partitionné + GSD_WORKSTREAM posé ========================
+# Ce script était le SEUL des quatre sans précondition de partitionnement : sur un dépôt réel sans
+# `.planning/workstreams/`, `GSD_WORKSTREAM=feature-x` le faisait sortir en 2 (« intégrité non
+# vérifiable ») là où ses trois pairs poursuivaient. Le déclencheur n'a rien d'hypothétique :
+# check-workstream-pointer.sh PRESCRIT littéralement `export GSD_WORKSTREAM=<nom>` comme remède —
+# appliquer le remède d'un gate cassait donc l'autre. Sans compartiment, il n'y a rien à suivre : la
+# racine est le seul fichier qui existe, et c'est bien elle qui doit être vérifiée.
+D="$(mk_git_root c20d)"
+write_state "$D" "m1" 20 22 12 54 39 "Phase: 20 complète"
+out="$(GSD_WORKSTREAM=feature-x bash "$SCRIPT" --path "$D" 2>&1)"; rc=$?
+names_root=0; case "$out" in *".planning/STATE.md conforme"*) names_root=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$names_root" -eq 1 ]; then
+  ok "20d dépôt non partitionné + GSD_WORKSTREAM → vérifie la racine (exit 0), jamais un faux rouge"
+else
+  ko "20d non partitionné + GSD_WORKSTREAM → racine" "rc=$rc out=[$out]"
+fi
+
+# === Cas 20e — Nom LONG (100 car.) : amont l'ACCEPTE, ce gate ne doit pas le rejeter =================
+# `isValidActiveWorkstreamName("a"×100)` rend `true` amont (workstream-name-policy.cjs : aucune borne
+# de longueur). L'ancienne borne LOCALE de 80 caractères le rejetait — et le rejet retombait sur la
+# racine en rendant « exit 0 conforme » : un nom parfaitement valide DÉSARMAIT le gate. Ici le
+# compartiment n'existe pas, donc le verdict attendu est le fail-closed du cas 20, jamais un 0.
+LONG_WS="$(awk 'BEGIN{s="";for(i=0;i<100;i++)s=s"a";print s}')"
+err="$(GSD_WORKSTREAM="$LONG_WS" bash "$SCRIPT" --path "$D" 2>&1 >/dev/null)"; rc_long=$?
+D2="$(mk_git_root c20e)"
+write_state "$D2" "m1" 20 22 12 54 39 "Phase: 20 complète"
+mkdir -p "$D2/.planning/workstreams"
+err2="$(GSD_WORKSTREAM="$LONG_WS" bash "$SCRIPT" --path "$D2" 2>&1 >/dev/null)"; rc_long2=$?
+named_long=0; case "$err2" in *"$LONG_WS"*) named_long=1 ;; esac
+if [ "$rc_long" -eq 0 ] && [ "$rc_long2" -eq 2 ] && [ "$named_long" -eq 1 ]; then
+  ok "20e nom de 100 car. (valide amont) → traité comme un nom valide, jamais comme un rejet"
+else
+  ko "20e nom long accepté par amont" "rc(non-part)=$rc_long rc(part)=$rc_long2 nommé=$named_long"
 fi
 
 # === Cas 21 — Pointeur partagé in-repo, et précédence VF_STATE_WORKSTREAM ============================
@@ -412,23 +451,42 @@ else
   ko "21b précédence VF_STATE_WORKSTREAM" "rc=$rc err=[$err]"
 fi
 
-# === Cas 22 — Nom hors politique : « aucun workstream », JAMAIS concaténé ============================
-# Le compartiment `dev` du dépôt c21 régresserait s'il était atteint : un nom qui s'évaderait vers lui
-# rendrait 1. Le fail-closed du cas 20 rendrait 2. Le seul verdict admissible est 0 sur la racine.
+# === Cas 22 — Nom hors politique : REJET FAIL-CLOSED, JAMAIS concaténé, valeur JAMAIS réimprimée =====
+# Le rejet d'un nom retombait sur le STATE.md de la RACINE en rendant « exit 0 conforme » — un
+# fail-OPEN, exactement ce que l'en-tête du script jure de ne jamais faire (« on ne retombe JAMAIS en
+# silence sur le STATE.md de la racine, ce serait rendre conforme sur un fichier que l'on n'a pas
+# vérifié »). Un nom rejeté DÉSARMAIT donc le gate. Le verdict admissible est 2 : le nom résolu n'est
+# pas exploitable, et le script ne sait pas quel fichier il devrait vérifier.
+# Trois assertions, jamais une seule : (a) exit 2, (b) aucun chemin construit avec ce nom, (c) la
+# valeur brute n'apparaît NULLE PART dans la sortie (T-24-04-01 — elle est non maîtrisée).
+# Le compartiment `dev` régresse : un nom qui s'évaderait vers lui rendrait 1, ce qui se verrait.
 D="$(mk_git_root c22)"
 write_state "$D" "m1" 20 22 12 54 39 "Phase: 20 complète"
 write_ws_state "$D" "dev" "m1" 3 5 2 9 6 "Phase: 3 en cours"
 sed -i.bak 's/completed_plans: 6/completed_plans: 1/' "$D/.planning/workstreams/dev/STATE.md"
 bad_all_ok=1
-for bad in '../workstreams/dev' '..' '.' 'a/b' 'a b' '-lead' 'x;y'; do
+bad_detail=""
+for bad in '../workstreams/dev' '..' '.' 'a/b' 'a b' '-lead' 'x;y' 'a..b' '.hidden'; do
   o="$(GSD_WORKSTREAM="$bad" bash "$SCRIPT" --path "$D" 2>&1)"; r=$?
-  case "$o" in *"workstreams/$bad"*) bad_all_ok=0 ;; esac
-  [ "$r" -eq 0 ] || bad_all_ok=0
+  case "$o" in *"workstreams/$bad"*) bad_all_ok=0; bad_detail="$bad concaténé" ;; esac
+  case "$o" in *"$bad"*) bad_all_ok=0; bad_detail="$bad réimprimé" ;; esac
+  [ "$r" -eq 2 ] || { bad_all_ok=0; bad_detail="$bad → rc=$r (attendu 2)"; }
 done
 if [ "$bad_all_ok" -eq 1 ]; then
-  ok "22 noms hors politique (7 formes, dont ../workstreams/dev résolvable) → exit 0 sur la racine"
+  ok "22 noms hors politique (9 formes, dont ../workstreams/dev résolvable) → exit 2, valeur jamais réimprimée"
 else
-  ko "22 noms hors politique → aucune concaténation" "un nom a fui ou changé le verdict"
+  ko "22 noms hors politique → rejet fail-closed" "$bad_detail"
+fi
+
+# === Cas 22b — DISCRIMINATION du cas 22 : sur CE dépôt, le repli racine aurait rendu 0 ===============
+# Sans cette mesure, le cas 22 ne prouverait pas que le fail-open est fermé : il faut établir que la
+# racine, elle, est bien conforme — donc qu'un repli silencieux aurait produit un VERT.
+rc_racine22=$(env -u GSD_WORKSTREAM -u VF_STATE_WORKSTREAM bash "$SCRIPT" --path "$D" >/dev/null 2>&1; echo $?)
+rc_dev22=$(GSD_WORKSTREAM=dev bash "$SCRIPT" --path "$D" >/dev/null 2>&1; echo $?)
+if [ "$rc_racine22" -eq 0 ] && [ "$rc_dev22" -eq 1 ]; then
+  ok "22b discrimination — racine=$rc_racine22 (un repli aurait donc rendu VERT), compartiment=$rc_dev22"
+else
+  ko "22b discrimination du rejet" "rc_racine=$rc_racine22 rc_dev=$rc_dev22"
 fi
 
 # === Cas 23 — Contrat de sortie : aucun code hors {0, 1, 2, 64} =======================================
