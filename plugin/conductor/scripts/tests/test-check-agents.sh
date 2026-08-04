@@ -67,6 +67,10 @@
 #   T74 — meme manque sur un agent TIERS (prefixe gsd- par defaut) → 0 erreur, 0 warning (T-24-01-01)
 #   T75 — DISCRIMINANCE PAR MUTATION sur l'arbre reel : ligne effort: retiree → rouge, restauree
 #         → vert ; mutation confirmee effective par `cmp` (jamais par `diff`, menteur ici)
+#
+# Marge de profondeur de dispatch (zone 6, Phase 24 — GSDA-22) :
+#   T76 — team-kernel.md porte la limite (maxDepth), la marge (deux niveaux) ET ce qu'elle
+#         autorise (sous-worker), datees et sourcees, descripteur recopie verbatim
 
 set -uo pipefail
 
@@ -1382,6 +1386,35 @@ else
     fi
   fi
   rm -rf "$MUT_AG"; rm -f "$T75_ORIG"
+fi
+
+# ---------- T76 : la marge de profondeur de dispatch est ECRITE (zone 6, GSDA-22) ----------
+# maxDepth: 5, 3 consommes, 2 de marge : un fait de runtime commun a TOUTES les equipes du kernel,
+# donc loge dans team-kernel.md (ADR-057 — une capacite, une seule voix), pas dans un module metier.
+# Trois litteraux gardes, chacun portant un des trois faits, et pas seulement le premier :
+#   maxDepth              → la LIMITE du runtime
+#   deux niveaux de marge → la CONSOMMATION reelle mesuree contre elle
+#   sous-worker           → ce que la marge AUTORISE (une permission, pas une observation)
+# Une doctrine qui n'enonce que sa limite sans dire ce qu'elle permet se fait reposer la question
+# a chaque audit : c'est precisement le trou que cette section ferme.
+T76_KERNEL="$(cd "$SCRIPTS_DIR/.." && pwd)/references/team-kernel.md"
+if [ ! -f "$T76_KERNEL" ]; then
+  ko "T76 team-kernel.md introuvable ($T76_KERNEL) — anti 'vert a vide'"
+else
+  T76_MANQUANTS=""
+  for lit in "maxDepth" "deux niveaux de marge" "sous-worker" "2026-08-04" "1.9.1"; do
+    grep -qF "$lit" "$T76_KERNEL" || T76_MANQUANTS="$T76_MANQUANTS [$lit]"
+  done
+  # les 7 champs du descripteur, recopies verbatim
+  for champ in "namedDispatch: true" "nested: true" "maxDepth: 5" "background: true" \
+               "backgroundDispatch: false" "subagentToolkit: \"full\"" "isolation: \"harness-worktree\""; do
+    grep -qF "$champ" "$T76_KERNEL" || T76_MANQUANTS="$T76_MANQUANTS [$champ]"
+  done
+  if [ -z "$T76_MANQUANTS" ]; then
+    ok "T76 team-kernel.md : limite (maxDepth), marge (deux niveaux) et permission (sous-worker) ecrites, datees 2026-08-04, sourcees 1.9.1, descripteur verbatim (7 champs)"
+  else
+    ko "T76 team-kernel.md — litteraux manquants :$T76_MANQUANTS"
+  fi
 fi
 
 # ---------- T72 : assertion sur l'arbre REEL (pas une fixture) — WINDOWS #1 ----------
