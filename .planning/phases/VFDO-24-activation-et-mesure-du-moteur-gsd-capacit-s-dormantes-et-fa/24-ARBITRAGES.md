@@ -1,6 +1,23 @@
 # Phase 24 — Fiche d'arbitrage
 
+> # ⚖️ ARBITRÉ PAR SAMUEL LE 2026-08-04 — LES VERDICTS PRIMENT SUR LES RECOMMANDATIONS CI-DESSOUS
+>
+> Les 6 zones sont tranchées. **Chaque zone porte son verdict en tête de section.** Là où le verdict
+> contredit la recommandation du cadrage, celle-ci est barrée et marquée **NON RETENUE** — le
+> raisonnement est **conservé volontairement** : il documente ce qui a été pesé, il ne prescrit plus
+> rien.
+>
+> **Une seule inversion : la zone 5.** Le cadrage recommandait **D** (refuser les workstreams) ;
+> Samuel tranche **C — ADOPTION**. Toute lecture de la zone 5 doit partir du verdict, jamais de la
+> recommandation.
+>
+> **Deux décisions n'existaient dans aucune option du cadrage** et sont ajoutées par l'arbitrage :
+> le **prérequis dur de montée de `@opengsd/gsd-core` au-delà de 1.9.1** (bug #2893, gate de la
+> zone 2) et le **refus explicite d'inscrire une Phase 27** (le rendez-vous workstreams se solde
+> dans la Phase 24 elle-même).
+
 **Établie le :** 2026-08-04, contre `@opengsd/gsd-core@1.9.1` et le dépôt en `v2.47.1`
+**Arbitrée le :** 2026-08-04 par Samuel
 **Pour :** Samuel — **6 questions fermées, un seul passage**
 **Par :** `vf-coder` (cadrage seul — aucune de ces décisions n'a été tranchée par l'agent)
 
@@ -16,6 +33,13 @@
 ## Zone 1 — Comment notre doctrine de dev atteint les agents du moteur
 
 **Items couverts :** A2 (`agent_skills`) · A3 (`workflow.tdd_mode`)
+
+> ### ✅ VERDICT SAMUEL — **OPTION A** (conforme à la recommandation)
+>
+> Slot `AGENT_SKILLS_PLANNER` **seul**, **sans** `tdd_mode`.
+>
+> **Contrainte de rédaction imposée :** écrire tel quel que la doctrine atteint le **plan**, pas
+> l'exécution. **Ne plus jamais présenter A2 comme résolu côté exécuteur.**
 
 ### État de fait re-vérifié
 
@@ -60,6 +84,26 @@ résolu côté exécuteur.
 
 **Items couverts :** A1 (`workflow.windows_enforce`) · A5 (`hooks.community`, `hooks.workflow_guard`)
 
+> ### ✅ VERDICT SAMUEL — **OPTION C** (conforme à la recommandation), **GATÉE SUR UN PRÉREQUIS DUR**
+>
+> `workflow.windows_enforce` **et** `hooks.workflow_guard` activés ; `hooks.community` **refusé par
+> ADR** (motif mesuré : 6 types de commit maison absents de la liste amont, 69 % des sujets
+> > 72 caractères). Dérogation de la fenêtre #3 tracée via
+> `gsd-tools windows waive 3 "<raison>"` (recette XcodeBuildMCP, structurellement infermable dans
+> ce dépôt).
+>
+> **⛔ PRÉREQUIS DUR — MONTER `@opengsd/gsd-core` AU-DELÀ DE 1.9.1, EN DÉBUT DE PHASE.**
+> Cette décision **n'existait dans aucune option du cadrage** : elle vient de la recherche web.
+> Motif : issue amont [#2893](https://github.com/open-gsd/gsd-core/issues/2893) (`confirmed-bug`) —
+> `windows append` **détruit toute la prose sous le ledger JSON et rapporte `ok: true`**. La PR
+> corrective #2975 a été mergée le **2026-08-01**, soit **après** la publication de 1.9.1
+> (2026-07-31) : **le bug est présent dans la version installée**, et notre `.planning/WINDOWS.md`
+> porte précisément de la prose sous son ledger.
+>
+> Le plan doit **déterminer la version cible réellement publiée sur npm**, vérifier que le correctif
+> y est, et **modéliser la montée comme une dépendance dure** de tout ce qui touche la zone 2
+> (activation comme dérogation).
+
 ### État de fait re-vérifié
 
 | Fait | Statut | Valeur au 2026-08-04 |
@@ -103,6 +147,18 @@ conventionnels » comme une garantie machine — ce sera explicitement une consi
 **Items couverts :** A7 (`intel`) · A8 (`graphify`, `profile-pipeline`) — **plus une troisième route
 non vue par le ROADMAP**
 
+> ### ✅ VERDICT SAMUEL — **OPTION A** (conforme à la recommandation)
+>
+> Activer `intel` ; **refuser** `graphify` et `profile-pipeline`, leurs entrées de routage marquées
+> **conditionnelles** ; **ajouter le gate d'activation doc ↔ capability** et **étendre le gate T14**
+> de `test-dev-orchestrator.sh`.
+>
+> **Conséquence actée :** l'index D-07 (`gsd-capabilities-index.md`) **devra porter `graphify` et
+> `profile-pipeline` avec leur état** — sinon le gate d'activation n'a rien à lire.
+>
+> **Ne pas oublier la troisième route** : `docs-flow.md:43-44` publie `--query` comme mode normal de
+> `gsd-map-codebase`, lequel exige `intel.enabled: true`.
+
 ### État de fait re-vérifié
 
 | Fait | Statut | Valeur au 2026-08-04 |
@@ -144,6 +200,22 @@ le gate d'activation n'a rien à lire.
 ## Zone 4 — Les réglages du moteur que nous ré-implémentons en doctrine
 
 **Items couverts :** A4 (profils de contexte) · A6 (`workflow.inline_plan_threshold`)
+
+> ### ✅ VERDICT SAMUEL — **OPTION A** (conforme à la recommandation)
+>
+> **Refuser les profils de contexte par ADR** (motif : notre contrat typé est per-rôle et plus
+> strict ; **et aucune clé n'est lue par le moteur**). `inline_plan_threshold` **inchangé à 2** — **la
+> mesure est le livrable** (4 plans sur 28 concernés, mode à 3 tâches).
+>
+> **Contraintes de rédaction imposées par la recherche amont :**
+> 1. La vraie clé est **`context_profile`**, pas `context:`. Les 3 fichiers livrés nomment en
+>    en-tête une clé (`context:`) qui **ne porte pas cette sémantique au schéma**. L'ADR doit nommer
+>    la bonne clé.
+> 2. État réel : **documentée, livrée, jamais câblée, abandonnée de fait depuis avril 2026**.
+>    **N'écrire JAMAIS « dépréciée »** — l'amont ne l'a jamais dit, l'ADR serait factuellement faux.
+> 3. Le refus est assorti d'un **déclencheur de réexamen objectif, pas d'une date** : rouvrir **ssi**
+>    `context_profile` apparaît hors de `docs/` dans une release amont, **ou** qu'une issue amont le
+>    mentionne.
 
 ### État de fait re-vérifié
 
@@ -190,6 +262,47 @@ désormais chiffré, et tout retour dessus devra citer la mesure, pas la rouvrir
 
 **Item couvert :** A9
 
+> ### ⚠️ VERDICT SAMUEL — **OPTION C : ADOPTION** — **CONTRE la recommandation D du cadrage**
+>
+> Verbatim : « *je veux coller au max à ce que fait GSD, je préfère jeter des IronLaw outdated que
+> de sacrifier l'efficience* ».
+>
+> **La décision d'adopter n'est pas à rediscuter.** La recommandation **D ci-dessous est NON
+> RETENUE** ; son raisonnement est conservé, non pas comme prescription, mais comme **inventaire des
+> risques à mitiger** dans le plan.
+>
+> **Le plan doit porter :**
+>
+> 1. **La révision doctrinale de l'Iron Law 2, explicitement** (`plugin/conductor/AGENT.md:114`).
+>    Samuel assume d'amender la loi si elle s'oppose à l'adoption. **Ne pas la contourner en
+>    silence** : soit on la révise, soit on écrit pourquoi elle ne s'applique pas. C'est **une tâche
+>    du plan**, pas un sous-entendu.
+> 2. **Le chantier complet** : `check-dev-bootstrap.sh` (`:111`) et `check-state-integrity.sh`
+>    (`:53`) rendus workstream-aware (chemins en dur aujourd'hui), `planning-context.sh`
+>    workstream-aware, `--ws` câblé dans les agents `vf-*`, **gate sur le pointeur de session**,
+>    CI étendue.
+> 3. **Les incompatibilités mesurées traitées en RISQUES À MITIGER — pas dissoutes par la
+>    décision** :
+>    - couverture amont **7/91 = 7,7 %** (45 workflows à chemins en dur, dont **42 sans aucune
+>      conscience** des workstreams) ;
+>    - `pr-branch.md:235-236` — les regex ancrées reclassent `.planning/workstreams/dev/STATE.md` de
+>      `STRUCTURAL` en **transient → EXCLUDED** : les commits de feuille de route **disparaissent
+>      silencieusement** des branches de PR ;
+>    - le pointeur vit dans `os.tmpdir()/gsd-workstream-sessions/<sha1(realpath du .planning)>/<clé>`
+>      — **effacé au reboot, indexé sur le chemin absolu, donc distinct par worktree et jamais
+>      hérité** : **non composable avec ADR-064** (« un écrivain = un worktree ») ;
+>    - **divergence invisible** : `git merge-tree` sort **exit 0** sur une branche post-partition
+>      avec un dossier de phase orphelin — Git ne signale rien.
+>    - **Condition dure conservée : aucune partition tant qu'une phase est en vol.**
+> 4. **La remontée amont des 42 workflows aveugles reste au plan** — confirmée **compatible** avec
+>    l'adoption, les deux ne s'excluent pas. Même gabarit que la voie 2 de M2 ; précédent de forme
+>    accepté en amont : l'issue **#2598**.
+> 5. **L'ADR dira « adoption », avec les limites connues DATÉES.**
+> 6. **PAS DE PHASE 27.** Samuel : « le faire dans la phase 24 ». Le rendez-vous workstreams pris
+>    avec Willy (PR #27, **fermée par son auteur en ratification de la revue de Samuel** ; branche
+>    `gouvernance/partition-planning-workstreams` conservée : 122 renommages, 210 blobs, 0 perdu)
+>    **se solde ici**. **N'ajouter aucune phase au ROADMAP.**
+
 ### État de fait re-vérifié
 
 | Fait | Statut | Valeur au 2026-08-04 |
@@ -211,7 +324,11 @@ désormais chiffré, et tout retour dessus devra citer la mesure, pas la rouvrir
 | **C** | **Adopter et payer la mise à niveau de toute notre couche** | `check-dev-bootstrap.sh` + `check-state-integrity.sh` + `planning-context.sh` workstream-aware, `--ws` câblé dans les agents `vf-*`, gate sur le pointeur, CI étendue | Le lab tourne contre une chaîne d'outils couverte à 7,7 % — le cas que l'**Iron Law 2** interdit (`conductor/AGENT.md:114`). |
 | **D** | **Refuser maintenant, remonter les 42 workflows aveugles en amont** | Option A + une remontée sourcée à `@opengsd/gsd-core` | Même posture que la voie 2 de M2 (déjà retenue) : bénéfice collectif, et rouvre la question quand la couverture aura monté. |
 
-### Recommandation — **D**
+### ~~Recommandation — **D**~~ — ❌ NON RETENUE (arbitrage du 2026-08-04 : **option C, adoption**)
+
+> **Statut de ce qui suit.** Ce raisonnement **ne prescrit plus rien**. Il est conservé parce qu'il
+> reste **factuellement exact** et qu'il constitue l'inventaire des risques que le plan d'adoption
+> doit mitiger (cf. verdict, point 3). Ne jamais le citer comme la décision de la phase.
 
 Trois faits convergent et rendent l'adoption indéfendable aujourd'hui : la couverture amont mesurée
 est de **7,7 %**, pas 18 % ; la **PR #27 est close** — plus personne ne porte la proposition ; et
@@ -226,16 +343,35 @@ cible qui bouge à chaque version amont : c'est un gate qu'on ne peut pas tenir.
 rendre, alors que nous avons une mesure reproductible (7/91, méthode `awk`+`comm`) qui vaut d'être
 remontée — exactement le patron déjà retenu pour M2 voie 2 et pour la RFC de la Phase 18.
 
-**Si D est retenue, devient impossible :** relancer une partition de `.planning/` dans ce dépôt sans
-rouvrir l'ADR — et la condition commune à toutes les options reste vraie de toute façon : **aucune
-partition tant qu'une phase est en vol** (`git merge-tree` sort **exit 0** sur une divergence
-post-partition : Git ne signale rien).
+~~**Si D est retenue, devient impossible :** relancer une partition de `.planning/` dans ce dépôt sans
+rouvrir l'ADR~~ — **caduc : C est retenue.** En revanche, **la condition commune à toutes les
+options reste vraie et s'applique pleinement à l'adoption** : **aucune partition tant qu'une phase
+est en vol** (`git merge-tree` sort **exit 0** sur une divergence post-partition : Git ne signale
+rien).
+
+**Ce que l'option C retenue rend impossible :** invoquer l'Iron Law 2 (`conductor/AGENT.md:114`)
+telle qu'écrite pour bloquer l'adoption — le plan doit la **réviser explicitement**, ou écrire
+pourquoi elle ne s'applique pas. Et se dispenser de mitiger les 4 risques mesurés du point 3 : la
+décision d'adopter **ne les efface pas**.
 
 ---
 
 ## Zone 6 — Les faits de runtime par rôle, écrits nulle part
 
 **Items couverts :** M1 (profondeur de dispatch) · M3 (`effort:`)
+
+> ### ✅ VERDICT SAMUEL — **OPTION A** (conforme à la recommandation)
+>
+> Écrire la **marge de profondeur de dispatch** (`maxDepth: 5`, nous en consommons **3**, **deux
+> niveaux de marge** — un worker peut donc légitimement dispatcher un sous-worker) **et** propager
+> `effort:` **par rôle** sur les **25 agents livrés** (`plugin/*/agents/*.md`, aujourd'hui 0 sur 25).
+>
+> **Le barème existe déjà** dans 3 agents-templates (`business-agent-template.md: medium`,
+> `clarity-feature-template.md: high`, `orchestrator-template.md: high`) : **on le propage, on ne
+> l'invente pas.** Pilotage et jugement haut, exécution mécanique bas — **jamais uniformément**.
+>
+> **Durcir `check-agents.sh:514-516`** de « valide si présent » à « **exige** » — les 25 agents,
+> aucun laissé de côté.
 
 ### État de fait re-vérifié
 
@@ -279,13 +415,28 @@ doctrine · découpage en plans et leur ordre · numérotation des ADR · choix 
 de référence existant et en créer un (sous ADR-057, « une capacité, une seule voix ») · formulation
 de la raison de dérogation `windows waive` · libellés des entrées conditionnelles de routage.
 
-## Points qui ne se referment pas sans accès web
+## ~~Points qui ne se referment pas sans accès web~~ — ✅ TOUS REFERMÉS le 2026-08-04
 
-- **État de la PR #27** — lu via `gh` (CLOSE au 2026-08-03). La **raison** de la fermeture (retrait
-  par l'auteur ? décision de Samuel ?) n'est pas lisible depuis les métadonnées et pèse sur la
-  formulation de l'ADR de la zone 5.
-- **Issues amont #853, #1950, #2608** — citées par le ROADMAP et par les descriptions de capability.
-  Leur état courant conditionne la voie 2 de M2 (déjà retenue) et la remontée de la zone 5 option D.
-- **Doc amont `@opengsd/gsd-core`** sur le canal `context:` — savoir s'il s'agit d'une clé
-  **abandonnée** ou **pas encore câblée** change le libellé de l'ADR de la zone 4 (refus définitif vs
-  refus daté).
+Le nœud `research-web` de la mission a refermé ces points. **Résultats faisant foi :
+`.planning/missions/2026-08-04-phase-24-activation-moteur-gsd.md` §`research-web`.** Résumé des
+conséquences, toutes déjà intégrées aux verdicts ci-dessus :
+
+- **PR #27** — fermée **par Willy (`picmakpro`) lui-même** le 2026-08-03T06:56:32Z : **acquiescement
+  de l'auteur à la revue de Samuel**, pas un refus imposé. Branche
+  `gouvernance/partition-planning-workstreams` conservée (122 renommages, 210 blobs, 0 perdu).
+  ⚠️ La recherche concluait « rendez-vous en Phase 27 » — **Samuel a tranché l'inverse : pas de
+  Phase 27, le sujet se solde dans la Phase 24** (verdict zone 5, point 6).
+- **Broken windows** — aucun critère amont de bascule (décision purement locale) ; la dérogation
+  `gsd-tools windows waive <id> "<raison>"` est officielle, auditable et reste visible dans
+  `/gsd-progress`. **Mais** l'issue #2893 (`confirmed-bug`, PR corrective #2975 mergée le
+  2026-08-01, **après** 1.9.1) rend la zone 2 **non exécutable sur 1.9.1** → d'où le prérequis dur
+  de montée de `gsd-core` (verdict zone 2).
+- **Canal `context:`** — la clé porteuse de la sémantique est **`context_profile`** (6 occurrences
+  amont, **toutes dans `docs/`**) ; les 3 fichiers livrés nomment la mauvaise clé en en-tête. État :
+  **documentée, livrée, jamais câblée, abandonnée de fait**. **Jamais « dépréciée »** (verdict
+  zone 4).
+- **Canal de remontée amont vivant** — #853 CLOSED sans corriger la limitation
+  (`backgroundDispatch: false` encodé comme permanent) ; **#2598 = précédent exact de forme
+  acceptée** ; #2939 ouverte sur un autre runtime. **Personne n'a posé le cas Claude Code** : la
+  remontée est légitime et sans doublon, à formuler en « **descripteur non descriptif du runtime** »,
+  jamais en « bug de comportement ».
