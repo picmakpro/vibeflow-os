@@ -330,6 +330,28 @@
       "name": "replan-08 — les 6 bloquants et 5 warnings du DERNIER plan combles. Commit 0930d3e, 294 -> 500 lignes. IL M'A INFIRME SUR LA CAUSE, ET SON DIAGNOSTIC EST MEILLEUR QUE LE MIEN. J'avais conclu << aucune forme de git diff n'est fiable >> apres deux mesures contradictoires. Lui a mesure que LES TROIS FORMES DE PLAGE SONT CONCORDANTES dans un contexte donne (52/52/52 sans proxy, 49/49/49 avec) et que l'ecart 52 vs 49 n'est PAS un desaccord git : comm isole exactement TROIS LIGNES INJECTEES PAR LE PROXY, dont `--- Changes ---`, et ZERO chemin de difference. J'ai re-mesure : 49/49/49 partout, delta nul. LA REGLE OPERANTE N'EST DONC PAS << la forme ment >> MAIS << ne compte jamais les lignes d'une sortie proxifiee >>, ce qui etait deja dans ma liste de pieges. La construction prescrite reste la bonne PARCE QU'ELLE JUGE LE CONTENU ET NON LE COMPTE. Memoire corrigee une seconde fois, sur la cause cette fois. B1 : garde de non-entame reecrite en trois temps dans les DEUX taches. FAUX VERT PROUVE : sur liste vide, la garde des interdits sort rc=0 (verte a vide) et c'est la non-vacuite qui l'attrape. VACUITE DE L'ANCIENNE FORME PROUVEE : `git diff --name-only` nu mesure l'arbre de travail, vide, donc verte par construction apres commit. B4 : criteres scindes en bloc LIVRAISON et bloc NON-REGRESSION etiquete, rien supprime. LES 3 NOUVEAUX CRITERES DE LIVRAISON SONT VERIFIES DISCRIMINANTS sur arbre intact (rc=1 chacun). IL A CORRIGE MON BRIEF : les dix cases ne sont PAS dans le plan mais dans REQUIREMENTS.md L274-334 — je m'etais trompe de fichier. B6 : une SEULE mention vivante par README, aux formes DIFFERENTES entre EN et FR (accents graves d'un cote seulement), et 3 mentions datees a NE PAS toucher. Angle mort du gate traite : check-version-sync ne lit que la PREMIERE occurrence. W1 : ecart D-22 CABLE dans une truth, un SC, l'action de la tache 2 et une rubrique obligatoire du SUMMARY — il ne peut plus disparaitre a la PR. Le plan INTERDIT explicitement a l'executeur de retirer gsd-debugger << pour rendre le ledger vrai >>. TROUVAILLE HORS BRIEF, PRECIEUSE : les 7 puces DOCF-01..07 de la Phase 22 sont restees vides sur une phase CLOSE. Il l'a signalee SANS la corriger (hors perimetre) et surtout a INTERDIT d'en deduire une convention — sans cet avertissement, un executeur voyant 7 puces vides aurait pu conclure << on ne coche jamais >> et sauter le geste. Mesure qui tranche : 63 puces cochees, 17 vides, 1 partielle. La convention EST de cocher",
       "status": "done",
       "commit": "0930d3e"
+    },
+    {
+      "id": 56,
+      "name": "exec-08 — CLOTURE DE GOUVERNANCE LIVREE, derniere etape de la phase. 4 commits (26c40d3 bump module v2.10.0 -> v2.11.0 + triade + compteurs, ea1845c ledger GSDC-01..10 avec GSDC-08 en [~], 4cf1b97 SUMMARY + cases ROADMAP 8/8, d2f3932 documentation d'incident). estimate {50000 tokens, 2 taches} / actuals {4137 tokens, 2 taches, 2 commits}, relayes VERBATIM. LIGNE ROUGE VERIFIEE PAR LE MANAGER AVEC LA CONSTRUCTION EN TROIS TEMPS : non-vacuite d'abord (56 chemins, seuil 10), puis awk a correspondance exacte — AUCUN des trois fichiers de version racine dans le diff de branche, 0 tag cree. Module a v2.11.0, racine INCHANGEE a v2.46.0. Compteurs README a 47 sur les mentions vivantes (l.124 EN, l.128 FR). GSDC-08 bien en [~] avec sa raison, pas en [x]. INCIDENT DETECTE ET NEUTRALISE PAR L'EXECUTANT, exactement le piege que la memoire projet documente : une commande `gsd-tools query roadmap.update-plan-progress` a declenche un RESYNC NON DESACTIVABLE de gsd-tools state qui a REGRESSE STATE.md (retour a une baseline pre-Phase-26, effacement du bloc de commentaires cure a la main portant l'avertissement ADR-063). Il l'a vu AU DIFF AVANT TOUT COMMIT et restaure par git checkout --, en conservant la modification LEGITIME que la meme commande avait produite sur ROADMAP.md. Verifie par le manager : current_phase 26 intact, mon entree Phase 23 toujours la. CONSIGNE POUR LA SUITE : aucune commande gsd-tools query state.* ou roadmap.update-* ne doit etre relancee sur ce depot sans revarifier le diff de STATE.md avant commit. DEUX POINTS REMONTES SANS ETRE TRANCHES : l'ecart D-22 (deux branches exclusives, documente au SUMMARY) et la dette de cloture de la Phase 22 (DOCF-01..07 restes vides), hors perimetre. SIX GESTES DE RELEASE RACINE RESTENT A SAMUEL, listes en tete du SUMMARY : bump de la triade racine, badges, historiques README, tag annote, release GitHub, check-release-tag.sh --remote",
+      "status": "done",
+      "commits": [
+        "26c40d3",
+        "ea1845c",
+        "4cf1b97",
+        "d2f3932"
+      ],
+      "estimate": {
+        "tokens": 50000,
+        "raw_tokens": 50000,
+        "tasks": 2,
+        "confidence": "low"
+      },
+      "actuals": {
+        "tokens": 4137,
+        "tasks": 2,
+        "commits": 2
+      }
     }
   ],
   "remaining_tasks": [

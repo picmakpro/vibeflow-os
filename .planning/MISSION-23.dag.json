@@ -255,7 +255,7 @@
         "README.fr.md",
         ".planning/REQUIREMENTS.md"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "revue-08",
@@ -269,7 +269,7 @@
         "README.md",
         "README.fr.md"
       ],
-      "status": "blocked",
+      "status": "running",
       "review_regime": "full"
     },
     {
