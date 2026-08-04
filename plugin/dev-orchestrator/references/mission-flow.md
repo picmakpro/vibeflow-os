@@ -272,6 +272,32 @@ contourne pas.
 
 ---
 
+## Pattern F — Étage cadrage porté par le manager (A-1ter geste 2, motif A-13)
+
+**Qui exécute** : le manager, lui-même, dans sa propre fenêtre — seule exception à « il ne produit
+rien lui-même » : le cadrage n'est ni du code, ni un test, ni un audit, c'est une conversation de
+décision, et le manager est le nœud de l'équipe où les décisions de mission se prennent.
+
+**Pourquoi, en FAIT (motif A-13, le seul autorisé ici)** : sur `gsd-core@1.9.0`, le seul mode non
+interactif de la brique de cadrage enchaîne cadrage → plan → exécution dans le même appel — le
+porteur ne reprend la main qu'à la fin du pipeline entier, et pendant ce temps la **règle 5** de
+`checkpoints.md` auto-approuve les `human-verify` et auto-sélectionne la première option des
+`decision`. Le cadrage porté par le manager, **plus aucun mode d'enchaînement n'est passé à cette
+brique** : la règle 5 cesse de s'appliquer au plan et à l'exécution qui suivent — le problème
+disparaît, il n'est pas borné.
+
+**Discipline de flags** : `GSD-PIPELINE.md` §9 porte la table (ne pas la recopier ici, ADR-030).
+
+**Modélisation du nœud** : sous-section de pipelining N/N+1 du Pattern B ci-dessus, qui pose déjà
+le nœud de cadrage et ses dépendances — seul change qui exécute le nœud, pas le graphe.
+
+**Outil de question indisponible** : cas réel, déjà documenté au filet de repli D-09 du manager
+(§Entrée) — `human_needed` remonté, jamais un retour au mode d'enchaînement.
+
+**Ce que le worker ne fait plus** : `vf-coder` n'invoque plus jamais le cadrage lui-même.
+
+---
+
 ## Pattern D — Étages croisés dev ↔ design (renvoi)
 
 Doctrine complète (quand insérer l'étage de l'autre métier, forme DAG, budgets, invariants) :

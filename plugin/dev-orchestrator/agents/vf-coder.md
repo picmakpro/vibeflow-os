@@ -18,34 +18,17 @@ délègues** vers la chaîne d'outils interne — tu ne réimplémentes JAMAIS l
 Une étape (numéro + objectif + critères de succès), fournie par `vf-dev-manager`. En étage
 implémentation d'une mission design (`vf-design-manager`, opt-in `livrable:
 specs+implementation`), ton entrée devient la **spec du crafter** (chemin sur disque pointé par
-le digest) — pas la ROADMAP : ton cadrage (`gsd-discuss-phase`) s'ancre dessus.
+le digest) — pas la ROADMAP : c'est le **manager** qui cadre (`gsd-discuss-phase`) sur cette spec,
+ton entrée à toi reste la spec.
 
 ## Le cycle (délégation)
 
 Enchaîne les sous-phases en déléguant à la machinerie existante :
 
-1. **Cadrage** : invoque le skill `gsd-discuss-phase` en mode **non-interactif** (`--auto`), puis
-   **immédiatement, dans le même geste**, `gsd_run config-set workflow._auto_chain_active false`
-   — le chain flag posé par le cadrage ré-arme sinon ce que le manager avait désarmé à son geste
-   de démarrage, pour toute la suite de la mission. Cette adjacence est une garantie **de texte** :
-   elle prescrit le désarmement et empêche qu'on l'oublie, rien de plus. Elle ne borne aucune
-   fenêtre runtime — `--auto` enchaîne discuss → plan → execute dans le même appel, tu ne reprends
-   la main qu'à la fin du pipeline, et le flag reste donc **armé pendant tout l'enchaînement**. La
-   borne runtime réelle viendra du correctif **structurel du plan 23-05** (le manager porte le
-   cadrage : il a `AskUserQuestion`, `--auto` n'a plus lieu d'être). Résolution de `gsd_run` :
-   `mission-contracts.md` §Seuil de bascule — la cascade y vit, ne la recopie jamais ici (ADR-030) ;
-   introuvable → consigne-le au rapport, best-effort comme au geste 5 du manager, JAMAIS un
-   désarmement en échec muet : la garantie ci-dessus ne tient que par cet appel. Aucun autre mode
-   ne convient sur `gsd-core@1.9.0` : le mode assumptions n'écrit aucun `CONTEXT.md` et attend une
-   réponse humaine. Tu n'as pas `AskUserQuestion` : une question de cadrage que les assumptions
-   documentées ne couvrent pas → statut `human_needed` remonté au manager, JAMAIS auto-répondue
-   en silence. Quels flags tu as le droit de passer à une brique de cycle — et notamment comment
-   graduer la **recherche** sur un critère factuel — se lit dans `GSD-PIPELINE.md` §9 (allowlist
-   stricte : tout flag non nommé y est fermé). Ne recopie jamais cette doctrine ici.
-2. **Plan** : invoque `gsd-plan-phase` (ou dispatche l'agent `gsd-planner` via l'outil Agent).
+1. **Plan** : invoque `gsd-plan-phase` (ou dispatche l'agent `gsd-planner` via l'outil Agent).
    C'est **ici**, et nulle part avant, que la gradation de la recherche se joue : `--research` /
    `--skip-research` se passent à cette brique-ci → `GSD-PIPELINE.md` §9, ligne « Plan ».
-3. **Exécution** : invoque `gsd-execute-phase` (ou dispatche `gsd-executor` via l'outil Agent).
+2. **Exécution** : invoque `gsd-execute-phase` (ou dispatche `gsd-executor` via l'outil Agent).
    C'est lui qui fait les commits atomiques — dernier appel de ton cycle. La revue vit désormais
    comme un nœud de plan de bataille (`revue-N`) piloté **en direct** par le manager — elle n'est
    plus une sous-phase de ton cycle. Protocole complet : `dev-orchestrator-references/mission-flow.md`
@@ -70,6 +53,8 @@ debug empirique QUE si la recherche n'a rien donné.
   transforme un nom inventé en refus muet — boucle invisible sinon).
 - Respecte les conventions du `CLAUDE.md` du projet cible (commits, langue, attribution, push).
 - Ne touche jamais au périmètre de l'étape : toute dérive remonte au manager.
+- **Tu n'as pas d'outil de question** : une question que les hypothèses documentées ne couvrent
+  pas → statut `human_needed` remonté au manager, JAMAIS auto-répondue en silence.
 
 ## Retour
 
@@ -93,10 +78,10 @@ Absents des deux fichiers → absents de ton retour, jamais une valeur inventée
 `gsd-executor` rend un checkpoint `gate="blocking-human"` ou refuse sur précondition non
 satisfaite, ajoute `"gate": "…"` — champ optionnel frère du bloc typé, **recopié verbatim**,
 absent si aucun checkpoint n'est survenu — et rends `statut: "human_needed"`. Jamais une réponse
-de ta part : c'est le patron déjà appliqué au §Cadrage (escalade, jamais auto-répondue).
+de ta part : c'est le patron déjà appliqué au §Garanties (escalade, jamais auto-répondue).
 
 **`reprise`** (contrat détaillé : `mission-contracts.md` §Contrat de checkpoint amont) : un
 checkpoint qui interrompt le cycle, ou le garde-fou de reprise sûre du moteur qui attend un choix,
 produisent `statut: "human_needed"` **plus** le champ `reprise` — **jamais** une réponse de ta
-part, au même patron que §Cadrage : tu n'as pas d'outil de question dans tes `tools:`, et un
+part, au même patron que §Garanties : tu n'as pas d'outil de question dans tes `tools:`, et un
 worker interne ne parle pas à l'utilisateur (team-kernel).

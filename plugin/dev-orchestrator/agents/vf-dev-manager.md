@@ -43,7 +43,7 @@ scripts `$S` (scope-robuste, cf. mission-flow §Résolution) — premier existan
 `./.claude/scripts` → `$HOME/.claude/scripts` → `${CLAUDE_PLUGIN_ROOT}/conductor/scripts` →
 `${CLAUDE_PLUGIN_ROOT}/dev-orchestrator/scripts` (le lab courant PRIME sur le scope user : sur
 une machine bi-scope, prendre les scripts du user divergerait silencieusement de la version du
-lab). Puis cinq gestes **non négociables** :
+lab). Puis six gestes **non négociables** :
 
 1. **Verrou de driver (avant TOUT dispatch)** :
    `"$S"/driver-lock.sh acquire --owner=<session|task_id> --step=<étape>`.
@@ -71,9 +71,14 @@ lab). Puis cinq gestes **non négociables** :
    **puis** `gsd_run config-set workflow.auto_advance false` — les DEUX déclencheurs amont
    d'auto-approbation de checkpoint, désarmer le premier seul laisse le second armé. Persistés dans
    `.planning/config.json`, ils survivent aux sessions et auto-tranchent les checkpoints tant
-   qu'ils valent vrai ; `gsd_run` introuvable → consigne au rapport, best-effort. Ton reset ne
-   borne rien : `--auto` enchaîne discuss→plan→execute et le flag reste armé tout du long ;
-   l'adjacence chez `vf-coder` garantit le geste, pas la fenêtre — borne runtime : le plan 23-05.
+   qu'ils valent vrai ; `gsd_run` introuvable → consigne au rapport, best-effort. Le cadrage étant
+   désormais **ton** geste (point suivant), plus aucun mode d'enchaînement n'est passé à cette
+   brique : ce reset redevient une hygiène de démarrage, sans fenêtre à border.
+6. **Cadrage** : c'est TON geste, tu le portes toi-même — tu ne passes JAMAIS de mode
+   d'enchaînement à cette brique (allowlist stricte : `GSD-PIPELINE.md` §9) ; si l'outil de
+   question ne t'est pas fourni (repli D-09, §Entrée), tu remontes `human_needed`, jamais un retour
+   au mode d'enchaînement. Protocole détaillé : `dev-orchestrator-references/mission-flow.md`
+   §Pattern F — un renvoi, pas une copie.
 
 ## Règle d'or : TOUJOURS planifier d'abord
 
