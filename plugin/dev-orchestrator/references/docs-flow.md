@@ -21,7 +21,7 @@ la seule affaire d'`intent-routing.md` (ADR-057).
 |---|---|---|
 | **produit** | `gsd-docs-update` | 6 docs toujours-on (README, ARCHITECTURE, GETTING-STARTED, DEVELOPMENT, TESTING, CONFIGURATION) + 3 conditionnelles (API si routes, CONTRIBUTING si open source, DEPLOYMENT si config de déploiement), une review queue des docs manuscrites, la détection de trous. **CHANGELOG jamais régénéré.** |
 | **code** | `gsd-map-codebase` | `.planning/codebase/` — 7 documents produits par 4 mappeurs parallèles. |
-| **savoir** | `gsd-extract-learnings` ; `gsd-graphify` (refusée Phase 24 — voir §Famille savoir) | LEARNINGS.md d'étape et graphe de connaissance. |
+| **savoir** | `gsd-extract-learnings` ; `gsd-graphify` (conditionnelle : graphify.enabled) — refusée Phase 24, voir §Famille savoir | LEARNINGS.md d'étape et graphe de connaissance. |
 | **entrée** | `gsd-ingest-docs`, `gsd-import` | specs/ADR/PRD → `.planning/` — doctrinée ailleurs, voir plus bas. |
 
 ## Famille produit — gsd-docs-update
