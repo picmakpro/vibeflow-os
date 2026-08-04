@@ -184,6 +184,145 @@ bash "$SCRIPT" --path "$D" >/dev/null 2>&1
 after="$(find "$D" | LC_ALL=C sort)"
 if [ "$before" = "$after" ]; then ok "21 lecture seule D-15 — empreinte find identique avant/après"; else ko "21 lecture seule D-15 — empreinte find identique avant/après" "before=[$before] after=[$after]"; fi
 
+# ================================================================================================
+# Workstreams GSD (GSDA-13) — ROADMAP.md et STATE.md suivent le compartiment actif.
+# ================================================================================================
+
+# Fixture PARTITIONNÉE : racine complète SAUF ROADMAP/STATE, qui vivent dans workstreams/<ws>/.
+# Le sous-dossier est donc DISCRIMINANT par construction — sans résolution, roadmap_missing() dit
+# « feuille de route absente » et le script rend [bootstrap] au lieu de [gsd-engine].
+mk_partitioned() { # <nom> <workstream>
+  local d="$TMP/$1" ws="$2"
+  mkdir -p "$d/.planning/codebase" "$d/.planning/workstreams/$ws"
+  printf '# proj\n' > "$d/.planning/PROJECT.md"
+  printf '{}' > "$d/.planning/config.json"
+  printf 'x' > "$d/.planning/codebase/ARCH.md"
+  printf '### Phase 1: x\n' > "$d/.planning/workstreams/$ws/ROADMAP.md"
+  printf -- '---\nmilestone: ws-milestone\ncurrent_phase: 4\nstatus: shipped\n---\n' \
+    > "$d/.planning/workstreams/$ws/STATE.md"
+  printf '%s' "$d"
+}
+
+# === Cas 23 — NON-RÉGRESSION : arbre non partitionné, aucune variable posée =====================
+# Le verdict de l'état 3 est celui d'avant l'ajout des workstreams, à l'octet près.
+D="$(mk_complete_planning c23 gsd-migration 12 shipped)"
+out="$(env -u GSD_WORKSTREAM -u VF_BOOTSTRAP_WORKSTREAM bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+nlines="$(printf '%s\n' "$out" | wc -l | tr -d ' ')"
+if [ "$rc" -eq 3 ] && [ "$nlines" = "2" ] && printf '%s' "$out" | grep -q '\[gsd-engine\]' && printf '%s' "$out" | grep -q 'gsd-migration'; then
+  ok "23 non-régression — arbre non partitionné, aucune variable → verdict état 3 inchangé"
+else
+  ko "23 non-régression — arbre non partitionné" "rc=$rc out=[$out]"
+fi
+
+# === Cas 23b — NON-RÉGRESSION : la fixture PARTITIONNÉE sans variable est DISCRIMINANTE ==========
+# Preuve que le vert du cas 24 ne vient pas de la fixture : sans résolution, elle rend [bootstrap].
+D="$(mk_partitioned c23b dev)"
+out="$(env -u GSD_WORKSTREAM -u VF_BOOTSTRAP_WORKSTREAM bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+disc=0; case "$out" in *"[bootstrap]"*"feuille de route absente"*) disc=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$disc" -eq 1 ]; then
+  ok "23b fixture partitionnée SANS workstream → [bootstrap] feuille de route absente (fixture discriminante)"
+else
+  ko "23b fixture partitionnée sans workstream → [bootstrap]" "rc=$rc out=[$out]"
+fi
+
+# === Cas 24 — GSD_WORKSTREAM : la fixture partitionnée devient état 3 ============================
+out="$(GSD_WORKSTREAM=dev bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+leak=0; case "$out" in *"[bootstrap]"*|*"[onboard]"*) leak=1 ;; esac
+if [ "$rc" -eq 3 ] && printf '%s' "$out" | grep -q '\[gsd-engine\]' && printf '%s' "$out" | grep -q 'ws-milestone' && [ "$leak" -eq 0 ]; then
+  ok "24 GSD_WORKSTREAM=dev — ROADMAP et STATE lus dans le compartiment → [gsd-engine], exit 3"
+else
+  ko "24 GSD_WORKSTREAM=dev → [gsd-engine]" "rc=$rc out=[$out]"
+fi
+
+# === Cas 24b — DISCRIMINATION MACHINE : même fixture, seul l'environnement change ================
+rc_sans=$(env -u GSD_WORKSTREAM -u VF_BOOTSTRAP_WORKSTREAM bash "$SCRIPT" --path "$D" >/dev/null 2>&1; echo $?)
+rc_avec=$(GSD_WORKSTREAM=dev bash "$SCRIPT" --path "$D" >/dev/null 2>&1; echo $?)
+if [ "$rc_sans" -eq 0 ] && [ "$rc_avec" -eq 3 ] && [ "$rc_sans" -ne "$rc_avec" ]; then
+  ok "24b discrimination machine — rc(sans ws)=$rc_sans != rc(avec ws)=$rc_avec sur la MÊME fixture"
+else
+  ko "24b discrimination machine sans/avec workstream" "rc_sans=$rc_sans rc_avec=$rc_avec"
+fi
+
+# === Cas 25 — Pointeur partagé in-repo : même résultat que la variable ===========================
+D="$(mk_partitioned c25 dev)"
+printf 'dev\n' > "$D/.planning/active-workstream"
+out="$(env -u GSD_WORKSTREAM -u VF_BOOTSTRAP_WORKSTREAM bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 3 ] && printf '%s' "$out" | grep -q '\[gsd-engine\]' && printf '%s' "$out" | grep -q 'ws-milestone'; then
+  ok "25 pointeur partagé .planning/active-workstream → même résolution que GSD_WORKSTREAM"
+else
+  ko "25 pointeur partagé → [gsd-engine]" "rc=$rc out=[$out]"
+fi
+
+# === Cas 25b — Précédence : VF_BOOTSTRAP_WORKSTREAM prime sur GSD_WORKSTREAM et sur le pointeur ==
+# Le pointeur dit `dev` (valide), GSD_WORKSTREAM dit `dev` (valide), la surcharge dit `autre`
+# (dossier absent) → c'est la surcharge qui gagne, donc la ligne de signalement doit citer `autre`.
+err="$(VF_BOOTSTRAP_WORKSTREAM=autre GSD_WORKSTREAM=dev bash "$SCRIPT" --path "$D" 2>&1 >/dev/null)"; rc=$?
+named=0; case "$err" in *"autre"*) named=1 ;; esac
+if [ "$named" -eq 1 ]; then
+  ok "25b précédence — VF_BOOTSTRAP_WORKSTREAM prime sur GSD_WORKSTREAM et sur le pointeur"
+else
+  ko "25b précédence VF_BOOTSTRAP_WORKSTREAM" "rc=$rc err=[$err]"
+fi
+
+# === Cas 26 — Workstream nommé, dossier ABSENT → signalement NOMMÉ + repli racine, jamais silence =
+D="$(mk_complete_planning c26 gsd-migration 8 shipped)"
+err="$(GSD_WORKSTREAM=absent bash "$SCRIPT" --path "$D" 2>&1 >/dev/null)"; rc=$?
+out="$(GSD_WORKSTREAM=absent bash "$SCRIPT" --path "$D" 2>/dev/null)"
+named=0; case "$err" in *"absent"*) named=1 ;; esac
+fallback=0; case "$out" in *"[gsd-engine]"*"gsd-migration"*) fallback=1 ;; esac
+if [ "$rc" -eq 3 ] && [ "$named" -eq 1 ] && [ "$fallback" -eq 1 ]; then
+  ok "26 workstream nommé sans dossier → ligne de signalement qui le NOMME + repli sur la racine"
+else
+  ko "26 workstream nommé sans dossier → signalement + repli" "rc=$rc out=[$out] err=[$err]"
+fi
+
+# === Cas 27 — Nom hors politique : traité comme « aucun workstream », JAMAIS concaténé ===========
+# Traversée de chemin, séparateur, espace, nom vide après trim, premier caractère non alphanumérique.
+D="$(mk_partitioned c27 dev)"
+bad_all_ok=1
+for bad in '../evil' 'a/b' '.' '..' 'a b' '-lead' 'x;y' "$(printf 'x%.0s' $(seq 1 90))"; do
+  o="$(GSD_WORKSTREAM="$bad" bash "$SCRIPT" --path "$D" 2>&1)"; r=$?
+  # Aucun chemin construit avec ce nom, et le verdict est celui de l'arbre NON partitionné.
+  case "$o" in *"workstreams/$bad"*) bad_all_ok=0 ;; esac
+  case "$o" in *"[bootstrap]"*"feuille de route absente"*) : ;; *) bad_all_ok=0 ;; esac
+  case "$r" in 0) : ;; *) bad_all_ok=0 ;; esac
+done
+if [ "$bad_all_ok" -eq 1 ]; then
+  ok "27 noms hors politique (8 formes, dont ../ et /) → aucun chemin construit, verdict racine"
+else
+  ko "27 noms hors politique → aucune concaténation" "un des 8 noms a fui ou changé le verdict"
+fi
+
+# === Cas 27b — T-24-04-01 : traversée qui RÉSOUT VRAIMENT vers un compartiment réel ==============
+# Les noms du cas 27 échouent à se résoudre même sans validation — ils ne discriminent donc pas le
+# verdict. Celui-ci si : `../workstreams/dev` concaténé donnerait `<pl>/workstreams/../workstreams/dev`,
+# c'est-à-dire EXACTEMENT le compartiment `dev` qui existe. Sans validation de nom, le verdict
+# basculerait en [gsd-engine] ; avec elle, il reste celui de la racine.
+out="$(GSD_WORKSTREAM='../workstreams/dev' bash "$SCRIPT" --path "$D" 2>&1)"; rc=$?
+escaped=0; case "$out" in *"[gsd-engine]"*|*"ws-milestone"*) escaped=1 ;; esac
+grounded=0; case "$out" in *"[bootstrap]"*"feuille de route absente"*) grounded=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$escaped" -eq 0 ] && [ "$grounded" -eq 1 ]; then
+  ok "27b traversée résolvable (../workstreams/dev) → rejetée, le compartiment réel n'est PAS atteint"
+else
+  ko "27b traversée résolvable rejetée" "rc=$rc escaped=$escaped out=[$out]"
+fi
+
+# === Cas 28 — Contrat de sortie : la suite entière ne produit QUE {0, 3, 64} =====================
+codes_ok=1
+D="$(mk_partitioned c28 dev)"
+for e in "GSD_WORKSTREAM=dev" "GSD_WORKSTREAM=absent" "GSD_WORKSTREAM=../evil" "VF_BOOTSTRAP_WORKSTREAM=dev"; do
+  r=$(env "$e" bash "$SCRIPT" --path "$D" >/dev/null 2>&1; echo $?)
+  case "$r" in 0|3|64) : ;; *) codes_ok=0 ;; esac
+done
+if [ "$codes_ok" -eq 1 ]; then ok "28 contrat de sortie inchangé — aucun code hors {0, 3, 64}"; else ko "28 contrat de sortie {0,3,64}" "code hors contrat produit"; fi
+
+# === Cas 29 — Lecture seule préservée sous workstream : aucune écriture dans le compartiment =====
+D="$(mk_partitioned c29 dev)"
+before="$(find "$D" | LC_ALL=C sort)"
+GSD_WORKSTREAM=dev bash "$SCRIPT" --path "$D" >/dev/null 2>&1
+after="$(find "$D" | LC_ALL=C sort)"
+if [ "$before" = "$after" ]; then ok "29 lecture seule sous workstream — empreinte find identique"; else ko "29 lecture seule sous workstream" "arbre modifié"; fi
+
 # === Cas 22 — bash -n passe sur le script (syntaxe) =============================================
 if bash -n "$SCRIPT" 2>/dev/null; then ok "22 bash -n passe sur check-dev-bootstrap.sh"; else ko "22 bash -n passe sur check-dev-bootstrap.sh" "syntax error"; fi
 

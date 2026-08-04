@@ -45,8 +45,29 @@
 # --hook change UNIQUEMENT le format d'affichage (parité avec les deux autres scripts de la
 # phase) ; les 4 exits restent identiques avec ou sans. --hook et --quiet ensemble → exit 64.
 #
+# Workstreams GSD (GSDA-13) — QUELS CHEMINS BOUGENT, LESQUELS NE BOUGENT PAS :
+# Le moteur amont peut partitionner le planning en compartiments `.planning/workstreams/<nom>/`.
+# Le workstream actif est résolu dans cet ordre COURT-CIRCUITANT : VF_BOOTSTRAP_WORKSTREAM, puis
+# GSD_WORKSTREAM (canal de premier rang du moteur), puis la 1re ligne du pointeur PARTAGÉ in-repo
+# `<planning>/active-workstream`. Le nom est validé contre la politique du moteur
+# (workstream-name-policy.cjs : 1er caractère alphanumérique, puis alphanumériques, point,
+# souligné, tiret ; ni séparateur de chemin, ni `.`/`..`, ni `..` en sous-chaîne) plus une borne
+# locale de 80 caractères. Un nom hors politique est traité comme « aucun workstream » et n'est
+# JAMAIS concaténé dans un chemin (T-24-04-01).
+#
+# FRONTIÈRE ASSUMÉE : le pointeur de SESSION en os.tmpdir() n'est PAS lu ici — il est indexé sur un
+# condensat du chemin absolu ET sur une clé de session que bash ne peut pas reproduire fidèlement.
+# Ce trou est l'objet d'un gate dédié, jamais d'une approximation à cet endroit.
+#
+# Seuls DEUX chemins suivent le compartiment actif : ROADMAP.md et STATE.md. config.json, codebase/
+# et PROJECT.md restent à la RACINE du .planning/ — c'est le modèle de partition du moteur, pas un
+# oubli. Un workstream résolu dont le dossier est ABSENT → ligne de signalement qui le nomme, PUIS
+# repli sur la racine ; jamais un silence.
+#
 # Env (surcharge — testabilité, modèle VF_INGEST_* de discover-unintegrated-docs.sh):
 #   VF_BOOTSTRAP_PLANNING_DIR (défaut <path>/.planning)
+#   VF_BOOTSTRAP_WORKSTREAM   (workstream actif ; prime sur GSD_WORKSTREAM et sur le pointeur)
+#   GSD_WORKSTREAM            (canal de premier rang du moteur GSD amont)
 #
 # Exit codes:
 #   0  = signal [onboard] ou [bootstrap] émis (démarrage incomplet)
@@ -84,6 +105,51 @@ say() { [ "$QUIET" -eq 1 ] || echo "[check-dev-bootstrap] $*" >&2; }
 
 PLANNING_DIR="${VF_BOOTSTRAP_PLANNING_DIR:-$ROOT/.planning}"
 
+# --- Résolution du workstream actif (GSDA-13) -------------------------------------------------
+# Politique de nom recopiée du moteur amont (workstream-name-policy.cjs) : la borne de longueur est
+# une addition LOCALE, strictement plus sévère — elle ne peut donc jamais accepter un nom qu'amont
+# refuserait. Le rejet est TOTAL : aucune concaténation, et la valeur brute n'est pas ré-imprimée
+# (elle est non maîtrisée par construction — T-24-04-01).
+ws_trim() { printf '%s' "$1" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'; }
+
+ws_name_valid() { # <nom>
+  local n="$1"
+  [ -n "$n" ] || return 1
+  [ "${#n}" -le 80 ] || return 1
+  case "$n" in */*|*\\*|.|..|*..*) return 1 ;; esac
+  printf '%s' "$n" | grep -Eq '^[a-zA-Z0-9][a-zA-Z0-9._-]*$'
+}
+
+# Imprime le nom résolu ET valide, ou RIEN. Sort en 2 (et n'imprime rien) quand un nom a bien été
+# résolu mais qu'il est hors politique — l'appelant distingue ainsi « aucun workstream » de
+# « workstream rejeté », sans jamais voir la valeur brute.
+ws_resolve() {
+  local n=""
+  if [ -n "${VF_BOOTSTRAP_WORKSTREAM:-}" ]; then
+    n="$VF_BOOTSTRAP_WORKSTREAM"
+  elif [ -n "${GSD_WORKSTREAM:-}" ]; then
+    n="$GSD_WORKSTREAM"
+  elif [ -r "$PLANNING_DIR/active-workstream" ]; then
+    n="$(head -n 1 "$PLANNING_DIR/active-workstream" 2>/dev/null)"
+  fi
+  n="$(ws_trim "$n")"
+  [ -n "$n" ] || return 0
+  ws_name_valid "$n" || return 2
+  printf '%s' "$n"
+}
+
+WORKSTREAM="$(ws_resolve)"; ws_rc=$?
+PLANNING_SCOPE="$PLANNING_DIR"
+if [ "$ws_rc" -eq 2 ]; then
+  say "nom de workstream hors politique — rejeté, aucun chemin construit, lecture sur la racine."
+elif [ -n "$WORKSTREAM" ]; then
+  if [ -d "$PLANNING_DIR/workstreams/$WORKSTREAM" ]; then
+    PLANNING_SCOPE="$PLANNING_DIR/workstreams/$WORKSTREAM"
+  else
+    say "workstream « $WORKSTREAM » résolu mais $PLANNING_DIR/workstreams/$WORKSTREAM absent — lecture sur la racine."
+  fi
+fi
+
 # --- find borné : élaguer les dossiers vendorés/générés ET les dossiers hors-code AVANT la
 # descente (-prune, pas filtre post). POURQUOI : un node_modules réel gèlerait le SessionStart
 # (hook tué au timeout). docs/, .planning/, .claude/ sont étendus au motif PRUNE_VENDOR de
@@ -107,8 +173,10 @@ codebase_missing() {
   [ -z "$any" ]
 }
 
+# ROADMAP.md suit le compartiment actif (GSDA-13) — cf. docstring : config.json/codebase/PROJECT.md
+# restent à la racine, seuls ROADMAP.md et STATE.md bougent.
 roadmap_missing() {
-  local f="$PLANNING_DIR/ROADMAP.md"
+  local f="$PLANNING_SCOPE/ROADMAP.md"
   [ -f "$f" ] || return 0
   if grep -qE '^#{1,6}[[:space:]]*Phase[[:space:]]+[0-9]+' "$f" 2>/dev/null; then
     return 1
@@ -227,12 +295,12 @@ if [ -f "$PLANNING_DIR/PROJECT.md" ]; then
   fi
 
   # --- État 3 — tous les items posés : orientation [gsd-engine], exit 3 (D-01, D-14) ---------
-  if OUT="$(state3_signal "$PLANNING_DIR/STATE.md")"; then
+  if OUT="$(state3_signal "$PLANNING_SCOPE/STATE.md")"; then
     say "projet complètement cadré — orientation gsd-engine."
     printf '%s\n' "$OUT"
     exit 3
   fi
-  say "frontmatter de $PLANNING_DIR/STATE.md illisible ou invalide — silence (D-04)."
+  say "frontmatter de $PLANNING_SCOPE/STATE.md illisible ou invalide — silence (D-04)."
   exit 3
 fi
 
