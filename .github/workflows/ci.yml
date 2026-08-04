@@ -101,12 +101,11 @@ jobs:
       #      laissent le gate parler tout en affirmant des absences fausses.
       #   4. AUCUN signal « moteur périmé » — la garde générale, qui couvre les trois sources.
       #
-      # POINT D'EXTENSION — NOMMÉ, PAS IMPLÉMENTÉ. Un SECOND script du module,
-      # plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh, doit basculer lui aussi en
-      # lecture de texte (nœud voisin de la Phase 23) et aura EXACTEMENT le même besoin de canari.
-      # Quand ce sera fait : ajouter sa sonde DANS CETTE ÉTAPE, sous le même `set -eu` et le même
-      # bilan — surtout pas un second job, ni un `|| true`. Un canari qu'on peut contourner ne
-      # canarie rien.
+      # SECOND SCRIPT DU MODULE — IMPLÉMENTÉ (Phase 23, plan 23-04b, arbitrage A-12). Le point
+      # d'extension annoncé ici a été tenu : build-gsd-capabilities-index.sh a basculé lui aussi en
+      # lecture de texte (require(registryPath) fermait T-23-04-07, une RCE de même vecteur que
+      # celle fermée sur check-gsd-config.sh) et sa sonde vit plus bas, DANS CETTE MÊME ÉTAPE, sous
+      # le même `set -eu` et le même bilan `fail`/`note` — toujours pas de second job, pas de `|| true`.
       - name: Canari de forme du moteur GSD (lecture de texte — check-gsd-config.sh)
         run: |
           set -eu
@@ -154,11 +153,53 @@ jobs:
             note "source 3 (CONFIG_DEFAULTS) : seulement $n_def toggle(s) rendu(s) avec une valeur de défaut lue (plancher 3). Des défauts devenus calculés font AFFIRMER au gate des absences fausses."
           fi
 
+          # ----------------------------------------------------------------------------------------
+          # CANARI DE FORME DU MOTEUR GSD — GÉNÉRATEUR (arbitrage A-12, T-23-04-07). Même principe :
+          # build-gsd-capabilities-index.sh ne require() plus le registre de capabilities, il le LIT
+          # (le vecteur qu'il fermait — un capability-registry.cjs piégé résolu depuis le dépôt audité
+          # exécuté par require() — est le MÊME que celui fermé par check-gsd-config.sh sous A-6). Le
+          # prix est le même aussi : une lecture de texte ne suit aucune indirection, donc le jour où
+          # le moteur déplace ou calcule `byLoopPoint`, l'extraction échoue. Le générateur le DIT
+          # (« EXTRACTION PERIMEE », rc=1) au lieu de produire un index tronqué ou périmé en silence.
+          #
+          # CE QU'IL MESURE, ET POURQUOI IL NE PEUT PAS ÊTRE VERT À VIDE :
+          #   1. le générateur tourne contre le moteur RÉELLEMENT installé (posé à l'étape
+          #      précédente) et DOIT réussir (rc=0), sans jamais afficher le signal périmé — sinon la
+          #      forme de `byLoopPoint` a changé et la lecture de texte ne la suit plus ;
+          #   2. la table produite nomme un point de hook réellement déclaré par CE moteur
+          #      (`plan:pre`, présent sur toute version connue) — sans ce plancher, un générateur qui
+          #      ne lirait plus rien satisferait « rc=0 » sur une table vide.
+          # Sortie dans un TEMPORAIRE, jamais dans references/gsd-capabilities-index.md : ce canari
+          # mesure la LISIBILITÉ du moteur, il ne doit pas modifier le fichier versionné du checkout.
+          gen_out="$(mktemp)"
+          gen_index="$(mktemp)"
+          gen_rc=0
+          VF_GSD_CORE_LIB="$HOME/.claude/gsd-core/bin/lib" VF_CAPS_INDEX_OUT="$gen_index" \
+            bash plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh \
+            > /dev/null 2>"$gen_out" || gen_rc=$?
+          echo "== sortie du générateur (rc=$gen_rc) =="
+          cat "$gen_out"
+
+          case "$gen_rc" in 0|1) : ;; *) note "générateur : rc=$gen_rc HORS du contrat de sortie {0, 1}" ;; esac
+          if [ "$gen_rc" -ne 0 ]; then
+            note "générateur : n'a PAS réussi contre le moteur installé (rc=$gen_rc) — voir la sortie ci-dessus"
+          fi
+          case "$(cat "$gen_out")" in
+            *"EXTRACTION PERIMEE"*)
+              note "générateur : se déclare PÉRIMÉ sur le moteur installé — la forme de byLoopPoint a changé et la lecture de texte ne la suit plus. Corriger l'extraction dans build-gsd-capabilities-index.sh ; ne PAS neutraliser ce canari." ;;
+          esac
+          if grep -qF 'plan:pre' "$gen_index" 2>/dev/null; then
+            :
+          else
+            note "générateur : le point de hook plan:pre (présent sur toute version connue du moteur) n'apparaît pas dans l'index régénéré — la table produite est vide ou n'a pas été régénérée"
+          fi
+          rm -f "$gen_out" "$gen_index"
+
           if [ "$fail" -ne 0 ]; then
             echo "== canari ROUGE : $fail écart(s) entre la forme attendue du moteur et la forme lisible =="
             exit 1
           fi
-          echo "== canari VERT : les trois sources du moteur installé restent lisibles par extraction de texte =="
+          echo "== canari VERT : les trois sources du moteur installé restent lisibles par extraction de texte, ET le registre de capabilities reste lisible par le générateur =="
 
       - name: Découvrir et lancer toutes les suites
         run: |
