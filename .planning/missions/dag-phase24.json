@@ -1,0 +1,54 @@
+{
+  "nodes": [
+    {
+      "id": "facts",
+      "step": "constat sur pièce M1/M3 + A1-A9 et fiche d'arbitrage",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-24-activation-et-mesure-du-moteur-gsd-capacit-s-dormantes-et-fa/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "checkpoint-arbitrages",
+      "step": "arbitrage humain groupé par zone",
+      "stage": "",
+      "deps": [
+        "facts"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "plan",
+      "step": "plan de phase 24 (gsd-plan-phase)",
+      "stage": "",
+      "deps": [
+        "checkpoint-arbitrages"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-24-activation-et-mesure-du-moteur-gsd-capacit-s-dormantes-et-fa/"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "plancheck",
+      "step": "re-validation des plans avant exécution",
+      "stage": "",
+      "deps": [
+        "plan"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "research-web",
+      "step": "3 points web: PR #27, issues amont, cle context:",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}
