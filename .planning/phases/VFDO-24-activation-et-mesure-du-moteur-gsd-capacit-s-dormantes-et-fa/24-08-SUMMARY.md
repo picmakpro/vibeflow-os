@@ -133,7 +133,7 @@ Vérifié en direct contre `gsd-core` 1.9.1, ce 2026-08-04, plutôt que déduit 
 | `--ws dev` | `dev`, source `cli`, drapeau et valeur retirés des arguments |
 
 La clé de session effective sous Claude Code est `CLAUDE_CODE_SSE_PORT` (les huit autres sondées
-sont absentes) ; elle valait `claude-code-sse-port-25130` — un **numéro de port, donc recyclable**.
+sont absentes) ; elle valait `claude-code-sse-port-<port>` — un **numéro de port, donc recyclable**.
 C'est bien l'adaptateur `os.tmpdir()` qui est retenu ici, et le canal fichier in-repo n'est **jamais
 lu**. La ligne 1 du tableau est la démonstration complète : le fichier dit `dev`, le moteur dit
 « aucun workstream », et personne n'est averti.

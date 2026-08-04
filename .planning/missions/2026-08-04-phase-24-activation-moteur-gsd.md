@@ -413,7 +413,8 @@ renvoi, la trace préservée.
   motif de la Phase 23** dans ce dépôt. Contenu hors dépôt reflété verbatim dans un index versionné.
 - **Le canal NOMINAL n'avait aucune borne de longueur** : la borne était posée sur le canal
   rétrogradé. 200 000 octets → 400 Ko en sortie de deux hooks `SessionStart`.
-- **Une valeur machine réelle publiée dans un dépôt PUBLIC** (`claude-code-sse-port-25130`), alors
+- **Une valeur machine réelle publiée dans un dépôt PUBLIC** (la clé de session résolue, sous la
+  forme `claude-code-sse-port-<port>` — la valeur littérale est délibérément non reproduite ici), alors
   que le threat model du lot acceptait le risque au motif que seule « la forme » serait décrite.
 - **`governingKey` fabriquait des toggles** : 6 `review.models.*` (qui nomment un modèle, pas une
   activation) promus au rang d'activations, polluant l'univers servi comme preuve anti-vert-à-vide.
