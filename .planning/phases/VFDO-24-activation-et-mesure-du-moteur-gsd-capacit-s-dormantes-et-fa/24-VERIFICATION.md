@@ -1,79 +1,43 @@
 ---
 phase: VFDO-24-activation-et-mesure-du-moteur-gsd-capacit-s-dormantes-et-fa
-verified: 2026-08-05T01:17:56Z
-status: gaps_found
-verdict: PASS — la CI est VERTE et gagnée par mutation ; 1 gap résiduel de ledger, non bloquant pour le Goal
-score: 12/12 constats du tableau de clôture vérifiés — 1 gap transverse restant (contre 3)
+verified: 2026-08-05T01:27:19Z
+status: passed
+verdict: PASS — CI verte prouvée par mutation, ledger cohérent, 12/12, 0 gap
+score: 12/12 constats du tableau de clôture vérifiés — 0 gap
 behavior_unverified: 0
 overrides_applied: 0
-diff_verified: fbdb300..9889fa0 (101 commits, branche feat/phase-24-activation-moteur-gsd, PR #34)
+diff_verified: fbdb300..0a875ef (103 commits, branche feat/phase-24-activation-moteur-gsd, PR #34)
 re_verification:
-  previous_verified: 2026-08-05T00:34:14Z
+  passes: 3
+  previous_verified: 2026-08-05T01:17:56Z
   previous_status: gaps_found
-  previous_verdict: PASS PARTIEL — CI ROUGE
-  previous_score: 10/12
-  previous_measurement_base: 479eee9
-  diff_since_previous_document: f18b744..9889fa0 (4 commits — b25ed19, e6ac65b, 9be2552, 9889fa0)
-  diff_since_previous_measurement_base: 479eee9..9889fa0 (6 commits, 6 fichiers)
+  previous_verdict: PASS — 1 gap de ledger
+  previous_score: 12/12 avec 1 gap transverse
+  diff_since_previous_document: 9723e92..0a875ef (1 commit — 0a875ef, 1 fichier, +9/-3)
   gaps_closed:
-    - "L'outillage workstream est exercé en CI, et la CI de la branche certifie la phase — VERTE sur les 3 jobs, et la fermeture est prouvée par mutation des DEUX assertions concernées"
-    - "M2 — le tableau qui fait foi cesse d'affirmer un livrable absent (`ROADMAP.md:1622` recalé sur la mesure)"
-  gaps_partially_closed:
-    - "Ledger GSDA — la colonne de mapping passe de 22× « Planned » à 22× « Done » ; la glose « non activé » de GSDA-04/05 SUBSISTE et reste fausse contre le config"
-  gaps_remaining:
-    - "REQUIREMENTS.md:571-572 — GSDA-04/05 portent « non activé » alors que les deux clés sont à true"
+    - "L'outillage workstream est exercé en CI, et la CI de la branche certifie la phase (passe 2 — fermé par correction du sujet ET d'une assertion fausse, les deux prouvées par mutation)"
+    - "M2 — le tableau qui fait foi cesse d'affirmer un livrable absent (passe 2)"
+    - "Le ledger d'exigences ne se contredit pas lui-même (passe 3 — `0a875ef` : les 2 lignes de mapping ET la note d'ordre imposé qui en était la source amont)"
+  gaps_remaining: []
   gaps_new: []
   regressions: []
-  warnings_resolved: [W5, W9b-partiel]
-  warnings_new: [W13, W14, W15, W16, W17]
-gaps:
-  - truth: "Le ledger d'exigences ne se contredit pas lui-même"
-    status: partial
-    severity: "non bloquant pour le Goal — falsité vive dans le document de record"
-    reason: >
-      **La moitié qui manquait a été livrée.** Le commit `9be2552` a fait passer les **22** lignes de
-      la table de mapping `.planning/REQUIREMENTS.md:568-589` de « **Planned** » à « **Done —
-      plan 24-0N** » : recompte indépendant par colonne (`awk -F'|'` sur la 4ᵉ cellule des lignes
-      `^| GSDA-\d\d |`) → **Done = 22, Planned = 0, total = 22**. La contradiction de masse avec les
-      **22** cases `- [x]` (recomptées : `x=22`, `0` `[ ]`, `0` `[~]`, **22** identifiants distincts)
-      est **levée**. Contraste avec la Phase 23 rétabli.
-      **Ce qui reste, et qui était nommé mot pour mot dans le `missing` de la passe précédente :**
-      les lignes **571** et **572** portent toujours la glose « (**différé**, déclencheur objectif —
-      **non activé**, gaté sur GSDA-01) ». Cette glose est **fausse à `HEAD`**, et sur trois plans à
-      la fois : (1) `.planning/config.json` relu à l'instant porte `workflow.windows_enforce: true`
-      et `hooks.workflow_guard: true` ; (2) les corps d'exigence du **même fichier** (`:374`, `:379`)
-      écrivent « **est activé** » ; (3) le tableau de clôture du ROADMAP (`A1`, `A5`) écrit
-      « **PÉRIMÉ** — présent et à `true` ». Le volet le plus lourd de `GSDA-04` est par ailleurs
-      **soldé sur pièce** : `.planning/WINDOWS.md` porte `open_count: 0`, `waived_count: 1`, et
-      l'entrée **#3** est en `waived` avec sa raison horodatée du 2026-08-04 — exactement ce que
-      l'exigence demande. Un relecteur du ledger conclurait le contraire de ce que la machine dit.
-      **Pourquoi ce gap n'est pas un blocker et le reste quand même.** La substance EST livrée et
-      vérifiable par machine ; le Goal de la phase ne dépend pas de cette prose. Mais c'est un
-      `missing` explicitement posé par la vérification précédente, resté non fait, et il fait mentir
-      le document que `/gsd-audit-milestone` lira. Le refus tient parce que la correction coûte
-      deux lignes, pas parce que le défaut est grave.
-    artifacts:
-      - path: ".planning/REQUIREMENTS.md"
-        issue: "lignes 571-572 — « différé … non activé » contre config.json true/true, contre les corps :374/:379, et contre le ROADMAP A1/A5"
-    missing:
-      - "Effacer la glose « différé, déclencheur objectif — non activé » de GSDA-04 et GSDA-05 (:571-572) — ADR-066 a levé le gate, la clause de repli de GSDA-01 ne s'applique plus"
-      - "Accessoirement recaler :618-622, qui écrit encore « GSDA-04 et GSDA-05 sont planifiés en DIFFÉRÉ ÉCRIT, pas en activation » — vrai du CADRAGE, trompeur en l'état pour un lecteur de clôture"
+  warnings_new: [W18]
+gaps: []
 deferred:
   - truth: "Publier une release racine (bump de la triade, tag annoté, release GitHub, check-release-tag.sh --remote ✓)"
     addressed_in: "Geste humain post-fusion, réservé à Samuel (CLAUDE.md § Discipline de release)"
     evidence: >
-      Frontière re-vérifiée **non franchie** : `git diff --stat main..HEAD` sur `VERSION`,
-      `plugin/.claude-plugin/plugin.json` et `.claude-plugin/marketplace.json` rend **0 ligne** ;
-      `VERSION` = `v2.47.1` des deux côtés ; `scripts/check-release-tag.sh` sort en **rc=0**.
-      Ce n'est pas un manque, c'est le contrat.
+      Frontière re-vérifiée **non franchie** à `0a875ef` : `git diff --name-only main..HEAD` sur
+      `VERSION`, `plugin/.claude-plugin/plugin.json` et `.claude-plugin/marketplace.json` rend
+      **0 fichier** ; `VERSION` = `v2.47.1` des deux côtés ; `scripts/check-release-tag.sh` sort en
+      **rc=0**. Ce n'est pas un manque, c'est le contrat.
   - truth: "M2 voie 2 — remonter en amont que `backgroundDispatch: false` est fail-closed et non descriptif du runtime Claude Code"
     addressed_in: "Aucune phase, aucun BACKLOG — **non-livrable désormais déclaré**, mais sans successeur"
     evidence: >
-      `ROADMAP.md:1622` déclare désormais explicitement « **voie 2 non livrée** ». La mesure le
-      confirme : `.planning/upstream/` contient **un seul fichier**
-      (`2026-08-04-workflows-aveugles-aux-workstreams.md`, GSDA-19) et **0** occurrence de
-      `backgroundDispatch`. Le fait n'est plus travesti — voir **W15** pour le fait qu'il n'est
-      suivi nulle part.
+      `ROADMAP.md:1622` déclare explicitement « **voie 2 non livrée** ». La mesure le confirme :
+      `.planning/upstream/` contient **un seul fichier** (`2026-08-04-workflows-aveugles-aux-workstreams.md`,
+      GSDA-19) et **0** occurrence de `backgroundDispatch`. Le fait n'est plus travesti — voir
+      **W15** pour le fait qu'il n'est suivi nulle part.
 warnings:
   - id: W1
     status: toujours ouvert
@@ -81,10 +45,10 @@ warnings:
     statement: >
       La note de fin de section ROADMAP (`:1697-1700`) écrit toujours que « le gate de sécurité reste
       **bloquant** (`24-SECURITY.md`, `threats_open: 1`) sur `T-24-02-01` ». **Périmé.** Recompté
-      indépendamment aujourd'hui par position de colonne (sévérité = 5ᵉ cellule, statut = premier mot
-      de la 7ᵉ — jamais par recherche du mot « open » dans la ligne, qui produit un faux positif dans
-      la prose des mitigations) : sur les **51** lignes `T-24-*`, **31 high closed · 13 medium
-      closed · 4 medium open · 3 low closed**. Soit **0** menace ouverte de sévérité ≥ `high`
+      indépendamment par position de colonne (sévérité = 5ᵉ cellule, statut = premier mot de la 7ᵉ —
+      jamais par recherche du mot « open » dans la ligne, qui produit un faux positif dans la prose
+      des mitigations) : sur les **51** lignes `T-24-*`, **31 high closed · 13 medium closed ·
+      4 medium open · 3 low closed**. Soit **0** menace ouverte de sévérité ≥ `high`
       (`security_block_on` du lab). `threats_open: 0` est calculé-cohérent ; le gate de `ship:pre`
       passerait.
     suggestion: "Recaler la note de fin de § Phase 24 sur threats_open: 0."
@@ -95,12 +59,12 @@ warnings:
       ADR-067 (`docs/ADR.md:1677`) grave « les **400 derniers commits sans merge** » → « sujet
       dépassant 72 caractères : **275 / 400 — 68 %** ». **Toujours non reproductible.**
       Re-dérivation sur exactement ce corpus (`git log --no-merges -n 400 --format=%s`, longueur en
-      caractères, `awk`) : **306 / 400 = 77 %** à `HEAD` (308 à la passe précédente, 305 à
-      l'initiale — le corpus glisse, la conclusion pas) ; variante `>= 72` → **312**. La conclusion
-      de l'ADR (« le hook rejetterait plus des deux tiers de notre manière d'écrire ») en sort
-      **renforcée**, jamais affaiblie. Corollaire machine : c'est ce chiffre qui fait rougir
-      l'assertion `<automated>` `24-02__2`, laquelle épingle `69 %` — **trois valeurs pour un même
-      fait** (69 pinné, 68 gravé, 77 mesuré).
+      caractères, `awk`) : **306 / 400 = 77 %** (308 à la passe 2, 305 à l'initiale — le corpus
+      glisse, la conclusion pas) ; variante `>= 72` → **312**. La conclusion de l'ADR (« le hook
+      rejetterait plus des deux tiers de notre manière d'écrire ») en sort **renforcée**, jamais
+      affaiblie. Corollaire machine : c'est ce chiffre qui fait rougir l'assertion `<automated>`
+      `24-02__2`, laquelle épingle `69 %` — **trois valeurs pour un même fait** (69 pinné, 68 gravé,
+      77 mesuré).
     suggestion: "Ajouter à ADR-067 la commande rejouable qu'ADR-069 exige, et recaler 275/400 sur ce qu'elle rend."
   - id: W4
     status: toujours ouvert
@@ -116,7 +80,7 @@ warnings:
     status: toujours ouvert
     severity: cohérence de frontmatter — non bloquant
     statement: >
-      `24-SECURITY.md` porte toujours `status: draft` avec `audited: 2026-08-05` et
+      `24-SECURITY.md:4` porte toujours `status: draft` avec `audited: 2026-08-05` et
       `threats_open: 0`, pour un registre de **51** menaces intégralement instruit. Le gate de
       `ship:pre` ne lit que `threats_open` — rien ne bloque — mais un document audité et soldé qui se
       déclare brouillon est un piège de relecture.
@@ -135,201 +99,199 @@ warnings:
     severity: marge nulle et rationnel encore périmé en amont du bloc — non bloquant
     statement: >
       **(a) Marge nulle, inchangée.** Le délimiteur fermant du frontmatter de `.planning/STATE.md`
-      est **exactement à la ligne 60** (`awk` sur le 2ᵉ `^---$`), et la garde de
-      `check-dev-bootstrap.sh:215` est `NR > 60 { exit }`. Une ligne de plus et le signal se retait.
-      Aucun garde-fou machine ne surveille cette borne : `test-check-dev-bootstrap.sh` n'a toujours
-      **aucun cas de dépassement** (balayage du motif « 61 » / « borne » : les seules occurrences
-      portent sur la borne d'octets du pointeur, pas sur celle du frontmatter).
+      est **exactement à la ligne 60**, et la garde de `check-dev-bootstrap.sh:215` est
+      `NR > 60 { exit }`. Une ligne de plus et le signal de démarrage se retait. Aucun garde-fou
+      machine ne surveille cette borne : `test-check-dev-bootstrap.sh` n'a **aucun cas de
+      dépassement** (ses seules occurrences de « borne » portent sur la borne d'octets du pointeur).
       **(b) Rationnel de `ci.yml` : la moitié qui rougissait est refaite, celle qui précède ne l'est
-      pas.** Le bloc `:543-563` a été intégralement réécrit par `e6ac65b` et décrit désormais l'état
-      réel. Mais `:527-540`, juste au-dessus, écrit encore « **CE JOB N'AURA JAMAIS TOURNÉ POUR DE
-      VRAI** » (il a tourné **8 fois** sur cette branche) et « le frontmatter de `.planning/STATE.md`
-      fait **81 lignes** […] **stdout VIDE** » (il fait **60**, et stdout porte **169** caractères).
-      Un relecteur qui commence par le haut se forme l'inverse de l'état courant.
+      pas.** Le bloc `:543-563` a été intégralement réécrit par `e6ac65b` et décrit l'état réel. Mais
+      `:527-540`, juste au-dessus, écrit encore « **CE JOB N'AURA JAMAIS TOURNÉ POUR DE VRAI** » (il
+      a tourné **10 fois** sur cette branche) et « le frontmatter de `.planning/STATE.md` fait
+      **81 lignes** […] **stdout VIDE** » (il fait **60**, et stdout porte **169** caractères). Un
+      relecteur qui commence par le haut se forme l'inverse de l'état courant.
     suggestion: "Ajouter un cas « frontmatter de 61 lignes → silence » à test-check-dev-bootstrap.sh, et purger le rationnel périmé de ci.yml:527-540."
   - id: W10
-    status: toujours ouvert — et le périmètre s'est ÉLARGI
+    status: toujours ouvert
     severity: traçabilité de distribution — non bloquant
     statement: >
-      Trois modules portent désormais du **contenu distribué posé après leur bump**, sans entrée de
-      CHANGELOG. Les `VERSION` des trois ont été figées au commit `2b95db2` (plan 24-12) ; depuis :
+      Trois modules portent du **contenu distribué posé après leur bump**, sans entrée de CHANGELOG.
+      Les `VERSION` des trois ont été figées au commit `2b95db2` (plan 24-12) ; depuis :
       `plugin/conductor` (**4** commits de contenu, dont la doctrine M2 de `team-kernel.md`),
-      `plugin/dev-orchestrator` (**3**, dont Pattern G), et — **nouveau et le plus lourd** —
-      `plugin/planning-core` (**4**, dont **`b25ed19`, une correction de COMPORTEMENT** : la borne de
-      sûreté `VF_WS_VALUE_MAX_BYTES` ne s'appliquait pas sur Linux). Le CHANGELOG de
-      `planning-core v2.6.0` ne mentionne **pas** ce correctif : un seul commit a touché les trois
-      CHANGELOG depuis le bump (`55d1c58`, sur le correctif symlink). `scripts/check-version-sync.sh`
-      sort en **rc=0** — il vérifie la cohérence de la triade, jamais l'adéquation contenu ↔ bump.
+      `plugin/dev-orchestrator` (**3**, dont Pattern G), et — le plus lourd — `plugin/planning-core`
+      (**4**, dont **`b25ed19`, une correction de COMPORTEMENT** : la borne de sûreté
+      `VF_WS_VALUE_MAX_BYTES` ne s'appliquait pas sur Linux). Le CHANGELOG de `planning-core v2.6.0`
+      ne mentionne **pas** ce correctif : un seul commit a touché les trois CHANGELOG depuis le bump
+      (`55d1c58`, sur le correctif symlink). `scripts/check-version-sync.sh` sort en **rc=0** — il
+      vérifie la cohérence de la triade, jamais l'adéquation contenu ↔ bump.
     suggestion: "Une entrée de CHANGELOG sous la version courante des trois modules, ou un bump patch avant la fusion."
   - id: W11
     status: toujours ouvert
     severity: périmètre de branche — non bloquant
     statement: >
-      Le commit `479eee9` (Pattern G) n'est toujours réclamé par aucun plan, aucune `GSDA`, aucun
-      `*-SUMMARY.md` : balayage `awk` de « Pattern G » sur les **872** fichiers suivis → **8**
-      emplacements, dont **6 dans ce seul document** et **2 dans le contenu distribué**
-      (`vf-dev-manager.md:176`, `mission-flow.md:350`). Le contenu est légitime et sa conformité
-      tient (`check-agents.sh --strict --agents-dir` → **rc=0** sur les **6** modules porteurs d'un
-      dossier `agents/`), mais il entre en distribution sans porteur documentaire.
+      Le commit `479eee9` (Pattern G) n'est réclamé par aucun plan, aucune `GSDA`, aucun
+      `*-SUMMARY.md` : balayage `awk` de « Pattern G » sur les **872** fichiers suivis → les seules
+      occurrences hors de ce document sont les **2** du contenu distribué (`vf-dev-manager.md:176`,
+      `mission-flow.md:350`). Le contenu est légitime et sa conformité tient
+      (`check-agents.sh --strict --agents-dir` → **rc=0** sur les **6** modules porteurs d'un dossier
+      `agents/`), mais il entre en distribution sans porteur documentaire.
     suggestion: "Nommer Pattern G dans le SUMMARY de clôture ou dans le tableau du ROADMAP."
   - id: W12
-    status: toujours ouvert — et l'écart se confirme
+    status: toujours ouvert
     severity: écart de mesure sans conséquence — non bloquant
     statement: >
       `24-VALIDATION.md` annonce une latence de retour de **37 s** au pire cas
-      (`test-dev-orchestrator.sh`). Re-chronométrée de première main aujourd'hui : **22 s**
-      (184 OK / 0 KO / 0 SKIP) — après **24 s** hier. Deux mesures indépendantes sous la moitié de
-      la valeur annoncée : ce n'est plus du bruit, c'est une valeur unique qui ne décrit pas la
-      distribution. Le critère de sign-off (« Feedback latency < 60 s ») tient dans tous les cas.
+      (`test-dev-orchestrator.sh`). Re-chronométrée de première main : **22 s** (184 OK / 0 KO /
+      0 SKIP), après **24 s** la veille. Deux mesures indépendantes sous la moitié de la valeur
+      annoncée : ce n'est plus du bruit, c'est une valeur unique qui ne décrit pas la distribution.
+      Le critère de sign-off (« Feedback latency < 60 s ») tient dans tous les cas.
     suggestion: "Écrire « ~20-40 s selon charge » plutôt qu'une valeur unique."
   - id: W13
-    status: nouveau
+    status: toujours ouvert
     severity: fait périmé dans un document de gouvernance — non bloquant
     statement: >
       `24-VALIDATION.md` motive sa non-conformité Nyquist par **trois motifs cumulés**, et son
-      motif **(a)** est désormais **FAUX** : « **La CI est ROUGE sur la branche poussée** […] les 2
-      derniers sur la tête poussée `7e3c39c` ». Le document le qualifie lui-même de « **le plus
-      grave des trois** ». Il est mort avec `b25ed19` et `e6ac65b`. Les motifs **(b)** et **(c)**
-      **tiennent**, re-dérivés ici : (b) les **32** blocs `<automated>` ré-extraits, dés-échappés et
-      ré-exécutés rendent **27 rc=0 / 5 rc=1**, et ce sont **les mêmes cinq** ; (c) le document reste
-      renseigné a posteriori. `nyquist_compliant: false` reste donc **juste** — mais pour deux
-      motifs, plus trois. **Ce n'est pas un gap** : la passe précédente demandait l'existence du
-      document, elle est acquise, et le refus de forger un `true` reste le bon geste.
+      motif **(a)** est **FAUX** depuis `b25ed19`/`e6ac65b` : « **La CI est ROUGE sur la branche
+      poussée** […] les 2 derniers sur la tête poussée `7e3c39c` ». Le document le qualifie lui-même
+      de « **le plus grave des trois** ». Les motifs **(b)** et **(c)** **tiennent**, re-dérivés
+      ici : (b) les **32** blocs `<automated>` ré-extraits, dés-échappés et ré-exécutés rendent
+      **27 rc=0 / 5 rc=1**, et ce sont **les mêmes cinq** ; (c) le document reste renseigné a
+      posteriori. `nyquist_compliant: false` reste donc **juste** — mais pour deux motifs, plus
+      trois. **Ce n'est pas un gap** : le gap Nyquist était l'**absence** du document, elle est
+      soldée, et le refus de forger un `true` reste le bon geste.
     suggestion: "Barrer le motif (a) en le datant, sans toucher à nyquist_compliant."
   - id: W14
-    status: nouveau
+    status: toujours ouvert
     severity: chiffre auto-référentiel — non bloquant
     statement: >
       `ROADMAP.md:1622`, écrit par `9889fa0`, affirme « `backgroundDispatch` compte **24
-      occurrences** sur 872 fichiers suivis ». Re-dérivé à `HEAD` par balayage `awk` de **toutes**
-      les occurrences (pas des lignes porteuses) sur `git ls-files` : **25**. Le compte était juste
-      **au commit parent** (`9be2552` : le ROADMAP en portait 4, il en porte 5) — **c'est l'écriture
-      du chiffre qui a changé le chiffre**. Le fait porteur, lui, est intact et c'est celui qui
-      compte : **0** occurrence dans `.planning/upstream/`, qui contient **un seul fichier**.
-      Le même piège vaut pour ce document-ci, qui en ajoute d'autres.
+      occurrences** sur 872 fichiers suivis ». Re-dérivé par balayage `awk` de **toutes** les
+      occurrences (pas des lignes porteuses) sur `git ls-files` : **25**. Le compte était juste **au
+      commit parent** (`9be2552` : le ROADMAP en portait 4, il en porte 5) — **c'est l'écriture du
+      chiffre qui a changé le chiffre**. Le fait porteur, lui, est intact et c'est celui qui compte :
+      **0** occurrence dans `.planning/upstream/`, qui contient **un seul fichier**. Le même piège
+      vaut pour ce document-ci, qui en ajoute d'autres.
     suggestion: "Écrire « 0 dans .planning/upstream/ » sans total absolu, ou dater le total et nommer le commit de mesure."
   - id: W15
-    status: nouveau
+    status: toujours ouvert
     severity: livrable abandonné sans successeur — non bloquant
     statement: >
       La recalibration de `ROADMAP.md:1622` supprime la falsité, mais **n'ouvre aucune suite** :
-      balayage de `.planning/BACKLOG.md` (0 occurrence de `backgroundDispatch` ni de « remontée
-      amont »), et les deux seules phases postérieures du jalon (**25** budget d'instructions,
+      `.planning/BACKLOG.md` ne porte aucune occurrence de `backgroundDispatch` ni de « remontée
+      amont », et les deux seules phases postérieures du jalon (**25** budget d'instructions,
       **26** manuel utilisateur) ne la couvrent pas. La voie 2 était présentée au cadrage
       (`ROADMAP.md:1435-1437`) comme un **bénéfice collectif** (« débloquerait le parallélisme
       intra-étape pour tous les labs ») et l'option 3 (`claude_orchestration`) est écartée « **à
       reconsidérer si la voie 2 échoue** » — ce conditionnel n'a plus de branche vivante.
     suggestion: "Une entrée BACKLOG nommant la voie 2 et son déclencheur, pour qu'elle ne s'évapore pas avec la clôture."
   - id: W16
-    status: nouveau
+    status: toujours ouvert
     severity: chiffre de commentaire non reproductible — non bloquant
     statement: >
       Le rationnel réécrit de `ci.yml:550-551` affirme que le stdout du gate porte « le signal métier
-      réel (« … orientation gsd-engine », **137 octets**) ». Mesuré de première main sur l'arbre
-      courant : le stdout fait **169 caractères** (`${#var}` sous locale UTF-8 — c'est la grandeur
-      que l'étape imprime réellement) et **177 octets** (`wc -c`). **137 ne correspond à ni l'un ni
-      l'autre.** Le label de l'étape dit « octet(s) » là où bash compte des caractères. Sans effet
-      sur l'assertion, qui compare des chaînes et non des longueurs.
+      réel (« … orientation gsd-engine », **137 octets**) ». Mesuré de première main : le stdout fait
+      **169 caractères** (`${#var}` sous locale UTF-8 — c'est la grandeur que l'étape imprime
+      réellement, et le runner affiche bien 169) et **177 octets** (`wc -c`). **137 ne correspond à
+      ni l'un ni l'autre.** Le label de l'étape dit « octet(s) » là où bash compte des caractères.
+      Sans effet sur l'assertion, qui compare des chaînes et non des longueurs.
     suggestion: "Recaler 137 → 169, et dire « caractère(s) » dans le label de l'étape."
   - id: W17
-    status: nouveau
+    status: toujours ouvert
     severity: plafond ADR-029 atteint hors du périmètre gardé — non bloquant
     statement: >
       Deux agents sont **exactement à 250 lignes**, le plafond ADR-029 : `vf-dev-manager.md`
       (marge 0, **machine-gardée** — `test-dev-orchestrator.sh` T35 (d) et (e) prouvent le plafond
       détectable par mutation à 255) et **`plugin/validator/AGENT.md`**, passé de **249 à 250** par
-      `a781090` (effort par rôle sur les `AGENT.md`) et **gardé par rien**. Corollaire : la passe
-      précédente écrivait « aucun autre agent du dépôt ne dépasse 250 (balayage des **25** fichiers
-      `plugin/*/agents/*.md`) » — **balayage juste sur le mauvais ensemble**, celui-là même que la
-      phase s'est donné pour règle de ne plus commettre : les **6** `AGENT.md` en étaient exclus.
+      `a781090` et **gardé par rien**. Corollaire : la passe 2 écrivait « aucun autre agent du dépôt
+      ne dépasse 250 (balayage des **25** fichiers `plugin/*/agents/*.md`) » — **balayage juste sur
+      le mauvais ensemble**, celui-là même que la phase s'est donné pour règle de ne plus commettre :
+      les **6** `AGENT.md` en étaient exclus.
     suggestion: "Étendre le contrôle de plafond aux 31 agents (25 + 6), ou reprendre une ligne à validator/AGENT.md."
+  - id: W18
+    status: nouveau — résiduel de la fermeture du gap de ledger
+    severity: lisibilité d'un record de cadrage — non bloquant
+    statement: >
+      `0a875ef` a levé la contradiction **là où elle était fausse** (les deux lignes de mapping et la
+      note d'ordre imposé qui en était la source amont). **Trois formulations de cadrage
+      subsistent**, et elles ne sont pas fausses — elles décrivent l'état **au plan du 2026-08-04**,
+      avant ADR-066 — mais un lecteur de clôture les prendra pour l'état courant :
+      `REQUIREMENTS.md:383` et `:387` portent « **Gaté sur `GSDA-01`.** » dans les corps de
+      `GSDA-04`/`GSDA-05`, et `:624-628` écrit « **`GSDA-04` et `GSDA-05` sont planifiés en DIFFÉRÉ
+      ÉCRIT, pas en activation** […] la clause de repli de `GSDA-01` **s'applique** ». Le même
+      fichier écrit désormais, 263 lignes plus haut (`:361`), « **activés**, pas différés ».
+      **Pourquoi c'est un warning et pas un gap** : le défaut que la vérification opposait était une
+      **falsité** (« non activé » sur une clé à `true`) ; elle est supprimée. Ce qui reste est un
+      record de cadrage dont la lecture temporelle est exacte — même famille que **W1**, **W6**,
+      **W9(b)** et **W13**, tous classés warnings. En faire un blocage après avoir classé W1 (une
+      affirmation **fausse** dans un document qui fait foi) en warning serait incohérent, et
+      l'incohérence est ce qui fait perdre sa valeur à un verdict.
+    suggestion: "Mettre :383/:387/:624-628 à l'imparfait, comme :353 vient de l'être, ou y renvoyer à ADR-066."
 behavior_unverified_items: []
 human_verification: []
 ---
 
-# Phase 24 : Activation et mesure du moteur GSD — Rapport de RE-VÉRIFICATION (2ᵉ passe)
+# Phase 24 : Activation et mesure du moteur GSD — Rapport de VÉRIFICATION (3ᵉ passe)
 
 **Goal ROADMAP** : cesser de payer l'installation d'un moteur sans en prendre les bénéfices —
 **activer** les capacités GSD déjà installées mais dormantes, **mesurer** les faits de runtime que
 VibeFlow présume, et **fermer** les routes qui mènent à un geste inerte.
 
-**Re-vérifié** : 2026-08-05T01:17:56Z · **`HEAD`** : `9889fa0` (confirmé par `git rev-parse`, arbre
-de travail **propre**, `git ls-remote` rend la **même** empreinte que le local)
-**Diff global** : `fbdb300..9889fa0` (**101** commits) · **Depuis le document précédent** :
-`f18b744..9889fa0` (**4** commits, **4** fichiers) · **Depuis sa base de mesure `479eee9`** :
-**6** commits, **6** fichiers.
-**Verdict** : **PASS — le motif dominant a disparu, et sa disparition est prouvée par mutation.**
-**Statut** : `gaps_found` pour **un** gap résiduel de ledger, non bloquant pour le Goal.
+**Vérifié** : 2026-08-05T01:27:19Z · **`HEAD`** : `0a875ef` (`git rev-parse`, arbre de travail
+**propre**, `git ls-remote` rend la **même** empreinte) · **Diff global** : `fbdb300..0a875ef`
+(**103** commits) · **Depuis la passe 2** : **1** commit, **1** fichier (+9 / −3).
+**Verdict** : **PASS — 12 / 12 constats, 0 gap.**
 
 ---
 
-## Le motif dominant de la passe précédente a disparu — et je l'ai vérifié en essayant de le faire revenir
+## Le dernier gap est fermé — et il l'est à sa source, pas seulement à sa surface
 
-La passe du 2026-08-05T00:34 refusait sur un fait unique et opposable : **la CI était rouge**. Le
-mandat de cette passe annonçait la réparation. Une réparation annoncée n'est pas une réparation :
-un vert peut s'obtenir en **désarmant l'assertion** aussi bien qu'en corrigeant le sujet. C'est
-exactement ce que j'ai cherché.
+Le gap de la passe 2 tenait en une falsité : `.planning/REQUIREMENTS.md:571-572` déclarait
+`GSDA-04` / `GSDA-05` « **différé**, déclencheur objectif — **non activé** » alors que les deux clés
+étaient à `true`. Le commit `0a875ef` (`+9 / −3`, **un seul fichier**) fait deux choses, dont **une
+que je n'avais pas demandée** :
 
-### 1. La CI est verte, et elle l'est sur la tête courante
+1. **Les deux lignes de mapping** portent l'état réel — et rien d'autre.
+2. **La note d'« ordre imposé »** (`:353`), qui posait `GSDA-01` en prérequis dur **au présent**,
+   passe à l'imparfait et gagne un paragraphe qui **écrit pourquoi** le gate a été relâché. C'était
+   la source amont de l'incohérence : recaler les deux lignes sans elle aurait laissé la
+   contradiction se reformer à la première relecture.
 
-| Fait | Mesure de première main |
-|---|---|
-| Runs sur `9889fa0` | `30965106744` (push) et `30965108999` (pull_request) — **`success` tous les deux** |
-| Jobs par run | **3 / 3 verts** : « Suites de tests », « Gates de qualité (mode strict) », « Lab frais » |
-| PR #34 | `OPEN`, `MERGEABLE`, **8 / 8** checks `SUCCESS` (les 3 jobs × 2 runs + 2 Socket) |
-| Runs rouges antérieurs | 6, dont les 2 sur `479eee9` que la passe précédente a lus |
+### Les six sources doivent dire la même chose — re-dérivées une par une
 
-Verdicts lus **dans le log du runner** (`gh run view --log`), jamais dans un rapport :
+| Source | Ce qu'elle dit à `0a875ef` | Mesure |
+|---|---|---|
+| Table de mapping `:577-578` | « `windows_enforce: true`, fenêtre #3 dérogée » · « `workflow_guard: true` » — les deux renvoient à **ADR-066** | balayage : **0** ligne `GSDA-\d\d` portant encore « non activé » |
+| Note d'ordre imposé `:353-361` | « **était** un prérequis dur » + « Gate relâché le 2026-08-04 (ADR-066) […] **activés**, pas différés » | lu sur pièce |
+| Corps d'exigence `:380`, `:385` | « `workflow.windows_enforce` **est activé** » · « `hooks.workflow_guard` **est activé** » | lu sur pièce |
+| `.planning/config.json` | `workflow.windows_enforce: true` · `hooks.workflow_guard: true` (et `community` **absent**) | relu à `HEAD` |
+| `ROADMAP.md:1624`, `:1628` | A1 « **PÉRIMÉ** — présent et à **`true`** (dégel, ADR-066) » · A5 « **à `true`** » | lu sur pièce |
+| `.planning/WINDOWS.md` | `open_count: 0`, `waived_count: 1`, entrée **#3** en `waived` | frontmatter + 8ᵉ cellule de la ligne 3 |
 
-```
-== R1 check-dev-bootstrap racine : rc(sans)=3 rc(avec)=3, stdout 169/169 octet(s),
-   stderr hors-repli 73/73 octet(s) ==
-== BILAN : 0 écart(s) sur 6 verdicts partitionnés + 3 verdicts racine ==
-== 52 suite(s) découverte(s) ==
-== bilan : 52 suite(s), 0 échec(s) ==
-  ✓ A5d GSD_WORKSTREAM de 200000 octets → refus POUR SA TAILLE (raison distincte de
-    hors-politique), aucun nom rendu ; la MEME forme en 4 octets reste acceptee
-```
+**Les six concordent.** La contradiction est levée.
 
-### 2. R1 n'a pas été désarmée — quatre mutants le prouvent
+### Les faits que la nouvelle note invoque — re-dérivés, pas crus
 
-J'ai rejoué le bloc `ci.yml:564-588` **verbatim** en local, avec le **sujet substituable**. Résultat
-nominal identique au runner (**stdout 169/169, stderr hors-repli 73/73, 0 écart**). Puis j'ai
-substitué quatre sujets simulés :
+Elle ne se contente pas d'affirmer : elle renvoie à ADR-066 et en reprend les deux fondements. J'ai
+mesuré les deux moi-même :
 
-| Mutant | Ce qu'il simule | Verdict de R1 | Attendu |
-|---|---|---|---|
-| **A** | le gate **fuit** `GSD_WORKSTREAM` dans **stdout** | **ROUGE** — « le stdout CHANGE selon GSD_WORKSTREAM » | rouge ✓ |
-| **B** | stderr change **hors** du motif de repli documenté | **ROUGE** — « le stderr change AU-DELÀ de la ligne de repli » | rouge ✓ |
-| **C** | les **deux** stdout sont vides | **ROUGE** — « NON OPPOSABLE » (plancher conservé) | rouge ✓ |
-| **D** | **seule** la ligne de repli documentée diffère | **VERT** | vert ✓ |
+| Affirmation | Ma mesure indépendante | Verdict |
+|---|---|---|
+| « `WINDOWS.md` ne porte **aucune prose sous son ledger** » — c'est ce que le bug amont #2893 détruirait | balayage des lignes non vides **après** la fin du bloc `json` : **0** | ✓ le risque protégé est **absent de ce dépôt** |
+| « **87 lignes** et miroir JSON intacts » | `awk END{NR}` → **87** ; bloc JSON `:24-87` extrait et parsé par `node` → **valide, 5 entrées, 1 `waived` (id 3), 0 `open`** — cohérent avec `total_count: 5` / `waived_count: 1` / `open_count: 0` | ✓ exact |
+| ADR-066 existe et dit cela | `docs/ADR.md:1565` — « **La zone 2 est activée, pas différée — un prérequis insatisfiable ne gate pas** », **Statut : Validée**, 2026-08-04, et ses deux motifs sont mot pour mot ceux repris dans la note | ✓ |
+| « aucune version npm > 1.9.1 » | **non re-testé ici** (fait externe, daté du 2026-08-04, établi par `24-RESEARCH.md` R-1 et gravé dans ADR-066 avec `dist-tags.latest = 1.9.1`) | fait hérité, non contredit |
 
-Le plancher de non-opposabilité — le garde-fou qui interdit à l'assertion d'être verte en comparant
-deux chaînes vides — **a été conservé** dans la réécriture, et il mord (mutant C). Le filtre `grep
--Ev` ne blanchit **que** les lignes préfixées `[check-dev-bootstrap] ` **et** terminées par
-« lecture sur la racine. » : tout autre écart de stderr est attrapé (mutant B). **R1 est plus
-opposable qu'avant, pas moins** : avant `795b984` elle comparait deux sorties vides et n'aurait rien
-pu dire ; elle compare aujourd'hui deux canaux **non vides** (169 et 73), sur deux axes distincts.
+### Ce qui reste, et pourquoi ce n'est pas un gap
 
-### 3. La borne du canal nominal est réellement exercée — la mutation le prouve
+Trois formulations de **cadrage** subsistent (`:383`, `:387` « Gaté sur `GSDA-01`. » ; `:624-628`
+« sont planifiés en DIFFÉRÉ ÉCRIT, pas en activation »). Elles ne sont **pas fausses** : elles
+décrivent l'état au plan du 2026-08-04, avant ADR-066 — et je les avais moi-même adjugées « **vrai
+du CADRAGE** » et leur remédiation « accessoire » à la passe 2. Le défaut que la vérification
+opposait était une **falsité**, et la falsité est supprimée.
 
-Le défaut Linux était le plus intéressant de la phase : `vf_ws_trim` forkait `awk` avec
-`GSD_WORKSTREAM` (200 000 octets) **exportée** ; le noyau Linux borne chaque chaîne d'`envp` à
-`MAX_ARG_STRLEN` ; `execve` échouait en `E2BIG` ; la substitution de commande rendait vide ; `raw`
-repartait vide et sortait par `:293` **avant** d'atteindre la borne `:301`. La borne de sûreté
-n'avait donc **rien à refuser** — et le test était vert sur macOS, qui n'impose pas cette limite.
-
-La réécriture (`b25ed19`) est en **builtins bash purs** (`[[ =~ ]]` + découpage par indices, classe
-de blancs explicite plutôt que `[[:space:]]` dépendant de la locale) : **aucun `execve()`**, donc la
-taille de la valeur n'entre plus en jeu pour l'outil qui la rogne. Lu dans le code, pas dans le
-message de commit.
-
-**Contre-épreuve par mutation, jouée ici** : borne portée de `4096` à `10^9` dans
-`workstream-policy.sh:91`, suite rejouée → **13 ok / 1 ko, rc=1**, le cas rouge étant `A5d` avec la
-signature `rc=0 … nom=[aaaa…]`. Fichier restauré, `git status` propre. La borne est donc **vivante
-et mesurée** : la valeur **atteint** désormais la garde (le nom est porté jusqu'à elle), là où sur
-le runner d'hier elle rendait `nom=[]` — la signature exacte de la sortie prématurée. **La sonde
-prouve ce qu'elle prétend prouver.**
+**Le test de cohérence qui tranche** : `W1` — la note ROADMAP qui écrit `threats_open: 1` quand la
+mesure rend `0` — est une affirmation **plainement fausse** dans un document qui fait foi, et elle
+est classée **warning**. Bloquer sur un record de cadrage temporellement exact tout en laissant
+passer une falsité serait incohérent. Le résiduel devient **W18**.
 
 ---
 
@@ -337,177 +299,125 @@ prouve ce qu'elle prétend prouver.**
 
 | # | Constat | Statut | Preuve re-dérivée |
 |---|---|--------|--------|
-| **M1** | profondeur de dispatch écrite dans les agents | ✓ VERIFIED | `team-kernel.md:33-36` porte le descripteur verbatim ; `T76` exige **5 littéraux** (`maxDepth`, « deux niveaux de marge », « sous-worker », `2026-08-04`, `1.9.1`) **et 7 champs** ; `test-check-agents.sh` rejouée → **81 OK / 0 KO** |
-| **M2** | voie 1 livrée · **voie 2 non livrée** | ✓ VERIFIED **en tant que constat** | Voie 1 sur pièce : `team-kernel.md:55-89`, prescriptive (« n'attendez aucun gain de parallélisme d'un découpage en plans multiples », « sérialisation observée ≠ panne »). Voie 2 : `.planning/upstream/` = **1** fichier, **0** `backgroundDispatch` — et `:1622` **le dit désormais**. Réserves : **W14** (chiffre), **W15** (pas de successeur) |
-| **M3** | `effort:` déclaré par **31 agents sur 31** | ✓ VERIFIED | Univers redéfini à la main (le glob `git ls-files 'plugin/*/agents/*.md'` traverse les `/` et rend **49** : piège écarté) → **25** à profondeur exacte + **6** `AGENT.md` = **31** ; balayage fichier par fichier : **31 porteurs, 0 manquant** |
-| **A1** | `windows_enforce` présent et à `true` | ✓ VERIFIED | `config.json` → `true` ; **et** le volet fenêtre : `WINDOWS.md` `open_count: 0`, entrée **#3** `waived` avec raison horodatée |
-| **A2** | slot PLANNER ouvert (2 skills) | ✓ VERIFIED | `agent_skills.gsd-planner` = **2** entrées. Réserve : **W4** |
-| **A3** | `tdd_mode` inchangé, par décision écrite | ✓ VERIFIED | clé **absente** du config |
+| **M1** | profondeur de dispatch écrite dans les agents | ✓ VERIFIED | `team-kernel.md:33-36` porte le descripteur verbatim ; `T76` exige **5 littéraux** et **7 champs** ; `test-check-agents.sh` → **81 OK / 0 KO** |
+| **M2** | voie 1 livrée · **voie 2 non livrée** | ✓ VERIFIED **en tant que constat** | Voie 1 sur pièce : `team-kernel.md:55-89`, prescriptive. Voie 2 : `.planning/upstream/` = **1** fichier, **0** `backgroundDispatch` — et `:1622` **le dit**. Réserves : **W14**, **W15** |
+| **M3** | `effort:` déclaré par **31 agents sur 31** | ✓ VERIFIED | univers redéfini à la main (le glob git traverse les `/` et rend **49** : piège écarté) → **25** + **6** = **31** ; **31 porteurs, 0 manquant** |
+| **A1** | `windows_enforce` présent et à `true` | ✓ VERIFIED | config `true` ; `WINDOWS.md` `open_count: 0`, fenêtre **#3** `waived` ; ledger désormais concordant |
+| **A2** | slot PLANNER ouvert (2 skills) | ✓ VERIFIED | `agent_skills.gsd-planner` = **2**. Réserve : **W4** |
+| **A3** | `tdd_mode` inchangé, par décision écrite | ✓ VERIFIED | clé **absente** |
 | **A4** | profils de contexte refusés, par décision écrite | ✓ VERIFIED | clé `context` **absente** ; ADR-068 volet 1 |
-| **A5** | `workflow_guard` à `true` ; `hooks.community` refusé | ✓ VERIFIED | `hooks: { context_warnings: true, workflow_guard: true }`, `community` **absent**. Réserve : **W3** |
+| **A5** | `workflow_guard` à `true` ; `hooks.community` refusé | ✓ VERIFIED | `workflow_guard: true`, `community` **absent**. Réserve : **W3** |
 | **A6** | seuil inline chiffré, laissé au défaut | ✓ VERIFIED | `inline_plan_threshold` **non posé** |
-| **A7** | `intel.enabled: true` | ✓ VERIFIED | `config.json` → `intel: { enabled: true }` |
-| **A8** | refus indexés, entrées conditionnelles, trou fermé par un gate câblé en CI | ✓ VERIFIED | `intent-routing.md:104,147` portent « conditionnelle : …enabled — refusée en Phase 24 » ; `check-capability-activation.sh` **rc=0** local **et** étape `ci.yml:331-342` **verte sur runner** |
-| **A9** | outillage workstream **exercé en CI** ; adoption acquise | ✓ VERIFIED **— et c'est le constat qui bascule** | CI **verte** : `BILAN 0 écart(s)` sur **9** verdicts, **52** suites **0** échec, `A5d` **vert sur Linux**. Adoption : commande d'ADR-069 **rejouée telle quelle** → `atteinte=91`, `K2=7`, `en dur=45`, `aveugles=42` — **identique au chiffre gravé** |
+| **A7** | `intel.enabled: true` | ✓ VERIFIED | `intel: { enabled: true }` |
+| **A8** | refus indexés, entrées conditionnelles, trou fermé par un gate câblé en CI | ✓ VERIFIED | `intent-routing.md:104,147` conditionnelles ; `check-capability-activation.sh` **rc=0** **et** étape `ci.yml:331-342` **verte sur runner** |
+| **A9** | outillage workstream **exercé en CI** ; adoption acquise | ✓ VERIFIED | CI **verte** ; commande d'ADR-069 rejouée → `atteinte=91`, `K2=7`, `en dur=45`, `aveugles=42` — **identique au chiffre gravé** |
 
-**Score : 12 / 12** (contre 10/12). **A9** bascule sur un fait neuf et opposable — la même rigueur
-qui l'avait fait tomber. **M2** bascule parce que la ligne qui mentait a été recalée : la voie 2
-n'est **toujours pas** livrée, et c'est maintenant **écrit** là où c'est lu.
+**Score : 12 / 12 · 0 gap.**
 
 > **Ce que « M2 ✓ » ne veut pas dire.** Le constat est vérifié parce que le document de record dit
 > le vrai — pas parce que le livrable existe. Le livrable **n'existe pas**, il est porté en
-> `deferred` et en **W15**. Écrire l'inverse serait exactement le défaut que cette phase traque.
+> `deferred` et en **W15**.
 
 ---
 
-## Les 3 gaps de la passe précédente, re-mesurés
+## La CI, re-vérifiée sur la tête courante — et gagnée par mutation, pas par désarmement
 
-### Gap A — « outillage workstream exercé en CI » : **FERMÉ**
+Un vert s'obtient aussi bien en désarmant l'assertion qu'en corrigeant le sujet. C'est ce que la
+passe 2 a cherché, et le résultat tient à `0a875ef`.
 
-Traité en tête de document. Fermé par correction du **sujet** (portabilité de `vf_ws_trim`) et par
-correction d'une **assertion fausse** (R1 lisait une ligne de repli voulue comme une fuite), les
-deux prouvées par mutation, jamais par désarmement.
-
-### Gap B — M2 : **FERMÉ par l'exit documentée**
-
-La passe précédente offrait **deux** sorties explicites : livrer la voie 2, **ou** recaler
-`ROADMAP.md:1622` pour qu'il cesse d'affirmer un livrable absent. La seconde a été prise
-(`9889fa0`). La ligne écrit désormais « **voie 2 non livrée** » avec sa mesure. C'est la même
-famille de geste que `nyquist_compliant: false` : déclarer plutôt que maquiller.
-
-### Gap C — ledger `GSDA` : **à moitié fermé, et c'est le gap restant**
-
-| Moitié | Mesure indépendante | Verdict |
-|---|---|---|
-| Cases `- [x]` | **22 `[x]` · 0 `[ ]` · 0 `[~]` · 22 identifiants distincts** | ✓ soldée (déjà) |
-| Colonne de mapping `:568-589` | **Done = 22 · Planned = 0** (recompte par 4ᵉ cellule) | ✓ **fermée par `9be2552`** |
-| Glose de `GSDA-04` / `GSDA-05` | `:571` et `:572` portent toujours « **non activé** » | ✗ **intacte** |
-
-Contre le config relu : `windows_enforce: true`, `workflow_guard: true`. Contre le même fichier :
-`:374` « est activé », `:379` « est activé ». Contre `WINDOWS.md` : fenêtre #3 `waived`,
-`open_count: 0`. **Le ledger dit inerte ce que la machine dit actif** — l'exact miroir du défaut que
-la phase a construit un gate pour attraper dans l'autre sens (`check-capability-activation.sh`).
-
----
-
-## Les 32 blocs `<automated>` des 12 plans, ré-exécutés
-
-Extraction mécanique (32 ouvrantes / 32 fermantes, répartition `3,3,2,3,3,3,2,2,2,3,3,3`),
-dés-échappement XML, exécution une par une : **27 rc=0 / 5 rc=1**, et ce sont **les cinq mêmes**.
-Diagnostiqués **clause par clause**, ce que la passe précédente n'avait pas fait :
-
-| Assertion | Clause qui tombe | Nature |
-|---|---|---|
-| `24-02__1` | littéral « strictement supérieure à 1.9.1 » **absent de `docs/ADR.md`** (les 5 autres littéraux et la ligne d'index sont là) | dérive de formulation |
-| `24-02__2` | motif `/69 ?%/` **absent** — l'ADR écrit `68 %`, la mesure rend **77 %** | **W3**, trois valeurs pour un fait |
-| `24-02__3` | même littéral absent de `.planning/codebase/CONCERNS.md` | dérive de formulation |
-| `24-07__1` | `ENDFILE`, **extension gawk** — indisponible sur l'`awk` de ce poste | portabilité de l'assertion |
-| `24-10__2` | attend `### Phase` = **26**, mesuré **13** (+ **13** `#### Phase`) | **univers faux** — le fil rouge de la phase, dans une assertion de la phase |
-
-**Aucun des cinq ne signale un livrable manquant** : les quatre premiers échouent sur une chaîne,
-le cinquième sur un décompte porté sur le mauvais ensemble. La caractérisation de `24-VALIDATION.md`
-(« défauts d'ASSERTION, pas des manques de livrable ») **tient sous re-dérivation**.
-
----
-
-## Gates et suites rejoués sur `9889fa0` (poste local)
-
-**20 gates** — univers : `scripts/check-*.sh` (**3**) + `plugin/*/scripts/check-*.sh` à profondeur
-exacte (**17**). Convention : `0` conforme, `1` écart, `3` sain/silence. **Aucun `1`.**
-
-| rc | Gates |
+| Fait | Mesure |
 |---|---|
-| **0** (11) | `check-machine-paths` (872 fichiers balayés) · `check-version-sync` · `check-release-tag` · `check-debug-research` · `check-legacy` · `check-overlaps` · `check-plugin-update` · `check-state-integrity` · `check-registres` · `check-capability-activation` · `check-planning-state` |
-| **3** (6) | `check-branch-claim` · `check-mission-invariants` · `check-workstream-pointer` · `check-dev-bootstrap` (imprime son signal) · `check-doc-drift` · `check-gsd-config` · `check-gsd-engine` |
-| — | `check-file-size` (usage seul, sans cible) · `check-agents` invoqué ci-dessous |
+| Runs sur **`0a875ef`** | `30966241888` (push) et `30966243730` (pull_request) — **`success`**, **3 jobs sur 3** chacun |
+| PR #34 | `OPEN`, `MERGEABLE`, **8 / 8** checks `SUCCESS` |
+| Historique de la branche | **10** runs : **4 verts** (les 2 têtes récentes), **6 rouges** (jusqu'à `479eee9` inclus) |
 
-`check-agents.sh --strict --agents-dir=<d>` → **rc=0** sur les **6** modules porteurs d'un dossier
-`agents/`. *(Note de méthode : `--path` n'existe pas pour ce gate et dégrade en cible vide, `rc=3` —
-la forme correcte est celle de `ci.yml:252`.)*
+**R1 n'a pas été désarmée** — bloc `ci.yml:564-588` rejoué verbatim en local à `HEAD` (**stdout
+169/169, stderr hors-repli 73/73, 0 écart**, identique au runner), puis quatre sujets mutants :
 
-| Suite rejouée | rc | Résultat | Durée |
+| Mutant | Ce qu'il simule | Verdict | Attendu |
 |---|---|---|---|
-| `test-dev-orchestrator.sh` | 0 | **184 OK / 0 KO / 0 SKIP** | **22 s** |
-| `test-check-agents.sh` | 0 | **81 OK / 0 KO** | 3 s |
-| `test-workstream-policy.sh` | 0 | **14 ok / 0 ko** — **et vert sur le runner Linux** | 4 s |
-| `test-workstream-policy.sh` **muté** (borne → 10⁹) | **1** | **13 ok / 1 ko** — `A5d` rouge | 4 s |
+| **A** | le gate **fuit** `GSD_WORKSTREAM` dans **stdout** | **ROUGE** | rouge ✓ |
+| **B** | stderr change **hors** du motif de repli documenté | **ROUGE** | rouge ✓ |
+| **C** | les **deux** stdout sont vides | **ROUGE** — plancher « NON OPPOSABLE » conservé | rouge ✓ |
+| **D** | **seule** la ligne de repli documentée diffère | **VERT** | vert ✓ |
 
-Les **52** suites ont par ailleurs tourné **en une seule fois** sur le runner (`0 échec`) : les
-rejouer toutes en local n'aurait rien ajouté à cette preuve.
+**La borne du canal nominal est vivante** — `VF_WS_VALUE_MAX_BYTES` portée de `4096` à `10⁹` →
+suite à **13 ok / 1 ko, rc=1**, `A5d` rouge avec `nom=[aaaa…]` : la valeur **atteint** désormais la
+garde, là où le runner d'avant `b25ed19` rendait `nom=[]` (signature de la sortie prématurée `:293`,
+`execve(awk)` en `E2BIG` sous `MAX_ARG_STRLEN`). Arbre restauré, `git status` propre.
 
 ---
 
-## Menaces — recompte indépendant (`24-SECURITY.md`)
+## Gates, suites et frontière — rejoués à `0a875ef`
 
-Recompté **par position de colonne** (sévérité = 5ᵉ cellule, statut = premier mot de la 7ᵉ), jamais
-par recherche du mot « open » dans la ligne :
+**18 gates exécutables** (`scripts/check-*.sh` = 3 · `plugin/*/scripts/check-*.sh` = 17, moins
+`check-agents.sh` et `check-file-size.sh` qui exigent une cible) : **11 en `rc=0`**, **7 en `rc=3`**
+(sain / silence), **0 écart**. `check-agents.sh --strict --agents-dir` → **rc=0** sur les **6**
+modules porteurs d'un dossier `agents/`.
 
-| Sévérité | closed | open |
+| Suite | rc | Résultat |
 |---|---|---|
-| high | **31** | **0** |
-| medium | 13 | 4 |
-| low | 3 | 0 |
-| **Total lignes `T-24-*`** | **51** | |
+| `test-dev-orchestrator.sh` | 0 | **184 OK / 0 KO / 0 SKIP** (22 s) |
+| `test-check-agents.sh` | 0 | **81 OK / 0 KO** |
+| `test-workstream-policy.sh` | 0 | **14 ok / 0 ko** — **et vert sur le runner Linux** |
+| `test-workstream-policy.sh` **muté** | **1** | **13 ok / 1 ko** — `A5d` rouge : la sonde discrimine |
 
-**0** menace ouverte de sévérité ≥ `high` (`security_block_on` du lab). `threats_open: 0` est
-calculé-cohérent. Seule la note du ROADMAP est en retard (**W1**).
+Les **52** suites ont tourné en un seul passage sur le runner (`0 échec`).
 
----
+**Ledger d'exigences** : **22** cases `- [x]` · **0** `[ ]` · **0** `[~]` · **22** identifiants
+distincts · table de mapping **22 « Done », 0 « Planned »**, **0** ligne portant « non activé ».
 
-## Univers déclarés — et leurs pièges
+**Menaces** : **51** lignes `T-24-*` → **31 high closed · 13 medium closed · 4 medium open ·
+3 low closed**. **0** ouverte de sévérité ≥ `high`. `threats_open: 0` calculé-cohérent.
 
-| Univers | Définition **exacte** | Compte | Piège écarté |
-|---|---|---|---|
-| Fichiers suivis | `git ls-files` | **872** | — |
-| Agents | `plugin/<m>/agents/<n>.md` (**25**) ∪ `plugin/<m>/AGENT.md` (**6**) | **31** | le glob git traverse les `/` et rend **49** (blueprints, templates, exemples) |
-| Gates | `scripts/check-*.sh` (**3**) + `plugin/<m>/scripts/check-*.sh` (**17**) | **20** | — |
-| Suites | chemins suivis en `*/tests/test-*.sh` sous `plugin/` ou `scripts/` | **52** | confirmé par la CI (« 52 suite(s) découverte(s) ») |
-| Blocs `<automated>` | balises ouvrantes sur les 12 `*-PLAN.md` | **32** | fermantes : 32 |
-| Exigences | `GSDA-\d\d` distincts | **22** | cases **22** = mapping **22** |
-| Workflows amont | `~/.claude/gsd-core/workflows/*.md`, profondeur 1 | **91** | compteur d'atteinte inclus dans la commande |
-| Modules bumpés | `plugin/*/VERSION` figés à `2b95db2` | **3** touchés depuis | **W10** |
+**Marqueurs de dette** : `0a875ef` n'en introduit **aucun** (`TBD`/`FIXME`/`XXX`/`TODO` sur les
+lignes ajoutées : néant). Les `TBD` présents dans `ROADMAP.md` / `REQUIREMENTS.md` sont les
+placeholders idiomatiques des phases **non encore planifiées** (`TBD (run /gsd-plan-phase 25 to
+break down)`) et préexistent à cette phase.
 
-**Méthode.** `grep` et `find` étant proxifiés et tronquants sur ce poste — et `git log` l'ayant
-démontré à la passe précédente en masquant un commit —, tous les comptes sont faits en `awk` lisant
-les fichiers lui-même, en `comm` sur listes triées, ou en `git` invoqué par chemin absolu, et
-croisés sur deux formes quand le nombre est porteur. Trois chiffres de la passe précédente n'ont
-**pas** survécu à ce traitement et sont corrigés ici : « les 5 littéraux et les **6** champs » de
-T76 (c'est **7** champs), « aucun autre agent ne dépasse 250 » (**W17** — `validator/AGENT.md` y est
-aussi, l'ancien balayage ne portait que sur 25 des 31), et « 308 / 400 » du corpus W3 (**306** à
-`HEAD`, le corpus glisse).
+**Frontière de release — non franchie** : `git diff --name-only main..HEAD` sur la triade rend
+**0 fichier** ; `VERSION = v2.47.1` des deux côtés ; `check-release-tag.sh` **rc=0**. Geste humain
+gaté, conforme au contrat.
 
 ---
 
-## Synthèse — ce qu'il reste avant `/gsd-ship`
+## Ce qui reste à faire — 0 bloquant, 14 warnings
 
-1. **Le gap, et il tient en deux lignes** : effacer « différé, déclencheur objectif — **non
-   activé** » de `REQUIREMENTS.md:571-572`. Le ledger fait mentir la machine sur `GSDA-04` /
-   `GSDA-05`, alors que le config, les corps d'exigence, le ROADMAP et `WINDOWS.md` disent tous
-   l'inverse. C'est le seul `missing` explicitement posé par la passe précédente qui soit resté
-   non fait.
-2. **W1** (note ROADMAP sur `threats_open: 1`), **W13** (motif (a) de `24-VALIDATION.md` périmé),
-   **W9(b)** (`ci.yml:527-540` écrit encore « ce job n'aura jamais tourné »), **W10** (trois modules
-   dont `planning-core` avec une correction de **comportement** hors CHANGELOG) — quatre faits
-   périmés ou non tracés dans des documents de gouvernance. Non bloquants, tous corrigibles à
-   la ligne.
-3. **W15** : donner un successeur à la voie 2 de M2, sans quoi elle s'évapore avec la clôture.
-4. **W3, W4, W6, W7, W9(a), W11, W12, W14, W16, W17** — signalés, non bloquants.
+Aucun n'empêche la fusion. Par ordre d'utilité :
 
-**La release racine reste hors périmètre et re-vérifiée non franchie** : **0** ligne d'écart depuis
-`main` sur la triade, `VERSION = v2.47.1` des deux côtés, `check-release-tag.sh` **rc=0**. Geste
-humain gaté, conforme au contrat.
-
-**Ce que cette passe retire du verdict, et pourquoi c'est le point le plus important.** Le motif
-dominant — « CI ROUGE » — **disparaît**, et il disparaît parce qu'il a été **falsifié**, pas parce
-qu'il a vieilli : quatre mutants de R1, une mutation de la borne `A5d`, un rejeu verbatim du bloc
-d'assertion. Un motif corrigé qu'on garderait par prudence serait aussi malhonnête qu'un motif
-inventé. Symétriquement, un `missing` nommé et resté non fait ne se dissout pas parce que le reste
-s'est amélioré : le gap C tient, et le refus avec lui.
+1. **Faits périmés dans des documents qui font foi** : **W1** (note ROADMAP `threats_open: 1` quand
+   la mesure rend 0), **W13** (motif (a) de `24-VALIDATION.md` : « la CI est ROUGE » ne l'est plus),
+   **W9(b)** (`ci.yml:527-540` : « ce job n'aura jamais tourné », il a tourné 10 fois), **W18**
+   (trois formulations de cadrage au présent dans `REQUIREMENTS.md`). Quatre corrections à la ligne.
+2. **W10** — trois modules avec du contenu distribué après leur bump, dont `planning-core` avec une
+   correction de **comportement** absente de son CHANGELOG. Le seul warning qui touche ce qu'un lab
+   recevra après la fusion.
+3. **W15** — donner un successeur à la voie 2 de M2, sans quoi elle s'évapore avec la clôture.
+4. **W3, W4, W6, W7, W9(a), W11, W12, W14, W16, W17** — signalés, sans effet sur la fusion.
 
 ---
 
-_Re-vérifié : 2026-08-05T01:17:56Z_
-_Vérificateur : Claude (gsd-verifier) — analyse goal-backward, 2ᵉ re-vérification. Gates, suites,
-mutations, fixtures, les 32 commandes `<automated>` et la commande rejouable d'ADR-069 exécutés de
-première main ; logs CI lus au runner via `gh run view --log`, jamais dans un SUMMARY ; arbre
-restauré et `git status` propre après chaque mutation._
+## Note de méthode
+
+`grep` et `find` étant proxifiés et tronquants sur ce poste — et `git log` l'ayant démontré à la
+passe 2 en masquant un commit —, tous les comptes sont faits en `awk` lisant les fichiers lui-même,
+en `comm` sur listes triées, en `node` pour parser le JSON, ou en `git` invoqué par chemin absolu, et
+croisés sur deux formes quand le nombre est porteur. **Quatre chiffres n'ont pas survécu à ce
+traitement au fil des trois passes et sont corrigés** : « les 5 littéraux et les **6** champs » de
+T76 (c'est **7**), « aucun autre agent ne dépasse 250 » (**W17** — le balayage ne portait que sur 25
+des 31), « 308 / 400 » du corpus W3 (**306**), et « 24 occurrences » de `backgroundDispatch`
+(**25** — **W14**, le chiffre a changé en s'écrivant). C'est la règle que la phase s'est donnée, et
+elle mord d'abord sur ses propres documents de vérification.
+
+**Trois refus de forger ont tenu** au long de cette phase — l'absence de `24-VERIFICATION.md`, un
+`threats_open: 0` non calculé, un `nyquist_compliant: true` de confort. Le `passed` posé ici n'a de
+valeur que parce que ces trois refus l'ont précédé, et parce que le motif dominant de la passe 2 a
+été **falsifié** avant d'être retiré, jamais laissé s'éteindre.
+
+---
+
+_Vérifié : 2026-08-05T01:27:19Z_
+_Vérificateur : Claude (gsd-verifier) — analyse goal-backward, 3ᵉ passe. Gates, suites, mutations,
+fixtures, les 32 commandes `<automated>` et la commande rejouable d'ADR-069 exécutés de première
+main ; logs CI lus au runner via `gh run view --log`, jamais dans un SUMMARY ; arbre restauré et
+`git status` propre après chaque mutation._
