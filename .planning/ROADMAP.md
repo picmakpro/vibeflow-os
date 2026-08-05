@@ -1619,7 +1619,7 @@ trois : **aucune partition tant qu'une phase est en vol** (cf. divergence invisi
 | Constat du cadrage | État mesuré à la clôture | Où |
 |---|---|---|
 | **M1** — profondeur 5 disponible, 3 consommée, écrite nulle part | **écrite** dans les agents | 24-01 |
-| **M2** — ✅ mesuré le 2026-07-31 | inchangé — acté en doctrine (voie 1), remontée amont déposée (voie 2) | 24-01, 24-10 |
+| **M2** — ✅ mesuré le 2026-07-31 | **voie 1 livrée** — acté en doctrine (`team-kernel.md:55-89`) ; **voie 2 non livrée** — `backgroundDispatch` compte 24 occurrences sur 872 fichiers suivis, **0 dans `.planning/upstream/`** (1 seul fichier, sans rapport avec M2) : aucune remontée amont du descripteur n'a été rédigée ni déposée | 24-01, 24-10 |
 | **M3** — « `effort:` déclaré par **aucun** agent » | **PÉRIMÉ** — **31 agents sur 31** le déclarent (25 en `agents/<nom>.md` **+ 6 en `AGENT.md`** de module : le second balayage est celui que le cadrage oubliait) | 24-01 |
 | **A1** — `workflow.windows_enforce` absent → défaut `false` | **PÉRIMÉ** — présent et à **`true`** (dégel, ADR-066) | 24-02 |
 | **A2** — `agent_skills: {}` | **PÉRIMÉ** — slot **PLANNER ouvert** (2 skills) ; `gsd-executor` délibérément non câblé | 24-03 |
