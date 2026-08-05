@@ -103,14 +103,29 @@ VF_WS_DIR=""
 # `normalizeWorkstreamNameInput`. NE TOUCHE JAMAIS À L'INTÉRIEUR : un `tr -d ' '` global faisait
 # passer le pointeur « de v » pour « dev », c'est-à-dire un vert fabriqué sur un nom qui n'était
 # pas dans le fichier.
+#
+# BASH PUR, AUCUN SOUS-PROCESSUS (CI Linux, A5d, mesuré). La forme précédente pipait `$1` vers
+# `awk`. Sur le canal NOMINAL (`GSD_WORKSTREAM`), `$1` peut faire 200 000 octets AVANT la borne de
+# taille (celle-ci lit le résultat DE ce rognage — il doit donc tourner sur la valeur brute, pas
+# après l'avoir réduite). Or `GSD_WORKSTREAM` reste EXPORTÉE pendant tout l'appel : `awk`, exécuté
+# via `execve()`, en hérite dans son propre environnement. Le noyau Linux borne CHAQUE chaîne
+# individuelle d'argv/envp à `MAX_ARG_STRLEN` (32 pages, 128 KiO, `fs/exec.c`) — une borne PAR
+# CHAÎNE, indépendante d'`ARG_MAX` global, et qu'une chaîne de 200 000 octets dépasse. `execve(awk)`
+# échoue alors en `E2BIG` (« Argument list too long ») : le pipeline ne tourne jamais, la
+# substitution de commande capture une sortie VIDE, et `raw` repart vide au lieu de porter la
+# valeur démesurée — la borne de sûreté qui suit (`VF_WS_VALUE_MAX_BYTES`) ne voit alors plus rien
+# à refuser. macOS n'impose pas cette limite par chaîne : le même code y était vert, faussement.
+# En restant en BUILTINS bash (`[[ =~ ]]`, découpage par indices) aucun `execve()` n'a lieu : la
+# taille de la valeur n'entre plus jamais en jeu pour l'outil qui la rogne.
+# Classe explicite (pas `[[:space:]]`) : POSIX la laisse dépendre de la locale ; la classe amont a
+# six caractères fixes, jamais plus.
 vf_ws_trim() {
-  printf '%s' "$1" | awk '
-    { buf = (NR == 1 ? $0 : buf "\n" $0) }
-    END {
-      gsub(/^[ \t\r\n\013\014]+/, "", buf)
-      gsub(/[ \t\r\n\013\014]+$/, "", buf)
-      printf "%s", buf
-    }'
+  local s="$1"
+  local re_lead=$'^[ \t\r\n\v\f]+'
+  local re_trail=$'[ \t\r\n\v\f]+$'
+  if [[ "$s" =~ $re_lead ]]; then s="${s:${#BASH_REMATCH[0]}}"; fi
+  if [[ "$s" =~ $re_trail ]]; then s="${s:0:${#s}-${#BASH_REMATCH[0]}}"; fi
+  printf '%s' "$s"
 }
 
 # Parité EXACTE avec `isValidActiveWorkstreamName` amont. LC_ALL=C rend les plages de caractères
