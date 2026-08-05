@@ -62,10 +62,16 @@ décision**. `backgroundDispatch: false` est *fail-closed* par conception : cons
 descriptif** de la capacité réelle du poste.
 
 **La conséquence doctrinale, en une ligne :** sur ce runtime, le parallélisme **intra-étape** (les
-vagues de plans d'une même étape, côté moteur) est **perdu**, et le parallélisme **inter-nœuds**
-porté par la frontière `ready` de `vf-dev-manager` est le **seul effectif**. Notre couche
-d'orchestration ne duplique donc pas celle du moteur : **elle est la seule qui parallélise
-réellement**.
+vagues de plans d'une même étape, côté moteur) est **éteint par défaut** — un drapeau default-off,
+restaurable, pas une perte définitive. Le chemin qui le restaure ne passe **pas** par
+`shouldFlattenDispatch()` (qui rend bien `true` sous Claude Code, ce fait ne change pas) mais par la
+capability amont `claude_orchestration` : son gate n°4 lit `dispatch.nested === true &&
+dispatch.background === true`, **jamais** `backgroundDispatch`. Tant qu'elle n'est pas activée, le
+parallélisme **inter-nœuds** porté par la frontière `ready` de `vf-dev-manager` reste le **seul
+effectif aujourd'hui** — le champ `stages` de `dag.sh ready` affine cette frontière en calculant la
+disjonction de périmètres entre nœuds ; doctrine complète dans
+`dev-orchestrator-references/mission-flow.md`. Notre couche d'orchestration ne duplique donc pas
+celle du moteur : **elle reste, pour l'instant, la seule qui parallélise réellement**.
 
 **Ce qui en découle pour un manager**, et qui n'est pas facultatif :
 
