@@ -470,6 +470,67 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   un agent posé sans `effort:` fait **échouer** le gate. Les **25** agents passent, **aucun laissé de
   côté**. Discriminance prouvée par mutation. *(M3, verdict zone 6)*
 
+## Hors-milestone — Phase 27 : parallélisation d'exécution (granulaire, simple, sans collision d'écriture)
+
+> **IDs proposés au plan du 2026-08-05**, préfixe `PAEX` (« PArallélisation d'EXécution ). La
+> ROADMAP portait `TBD (run /gsd-plan-phase 27 to break down)`.
+>
+> Source : `27-CONTEXT.md` (13 décisions D-01 → D-13, toutes sourcées fichier + ligne) et les 6
+> plans `27-01` → `27-06`. **Aucun `27-ARBITRAGES.md`** : le cadrage a vérifié les 5 candidats à
+> l'arbitrage un par un et conclu qu'aucun ne résistait aux sources — deux étaient déjà tranchés
+> par Samuel (**A** : repli « un étage = un workflow » ; **B** : `worktree.baseRef: "head"`).
+>
+> **Phase INCOMPLÈTE et gelée** — mission `.planning/missions/2026-08-05-phase-27-parallelisation-execution.md`,
+> branche `feat/phase-27-parallelisation-execution` **non mergée**. Les cases ci-dessous ne sont
+> cochées que pour ce qui est livré ET vérifié.
+>
+> **Ordre non négociable, câblé deux fois** (`depends_on` + précondition machine) : la baseline
+> d'horloge de `PAEX-09` se capture **AVANT** toute activation de `PAEX-08`. Un plan qui active
+> d'abord a détruit sa propre référence, et c'est irrattrapable.
+
+- [x] **PAEX-01**: La doctrine de `plugin/conductor/references/team-kernel.md:64-65` cesse d'affirmer
+  que le parallélisme intra-étape est « **perdu** » et dit « **éteint par défaut** » — un drapeau
+  default-off, restaurable. *(livrable 1, plan 27-02)*
+- [x] **PAEX-02**: La même doctrine nomme le **vrai chemin** : gate n° 4 de `claude_orchestration`
+  lisant `dispatch.nested && dispatch.background`, **jamais** `backgroundDispatch` ; et
+  `shouldFlattenDispatch()` n'est plus cité comme la cause. *(livrable 1)*
+- [x] **PAEX-03**: La même doctrine nomme le **verrou pratique** — gate n° 5
+  (`agent_sdk_version_unknown`), le SDK étant embarqué dans un binaire au lieu d'un paquet npm — et
+  `GSD_AGENT_SDK_VERSION` comme contournement amont. *(livrable 1, ajouté sur finding M3 de revue)*
+- [x] **PAEX-04**: `dag.sh ready` porte un champ **additif** `stages` calculant la disjonction des
+  périmètres entre nœuds. Rétro-compatible : `ready`/`count` inchangés, consommateur hors diff
+  re-testé au vert. *(livrable 3, plan 27-01)*
+- [x] **PAEX-05**: `stages` est **câblé** sur `partitionStages()` amont via un sous-processus
+  `gsd-tools claude-orchestration emit-workflow` — **jamais réimplémenté localement** (ADR-069,
+  Iron Law 2 révisée). Manifeste par `mkstemp` 0600 exclusif, suppression en `finally`. *(livrable 3)*
+- [ ] **PAEX-06**: Le repli de `stages` est prouvé **fail-closed sur toutes ses branches**.
+  **NON TENU** : un mutant remplaçant `stages: null` par `stages: []` sur la branche « CLI résolue
+  mais qui échoue » survit aux 87 tests, alors que la doctrine livrée interdit explicitement cette
+  confusion ; et T29 exerce une autre branche que celle que son commentaire annonce (dépendant de
+  `~/.claude/gsd-core`, donc de l'environnement). **Différé volontairement** avec `PAEX-11`.
+- [x] **PAEX-07**: `.worktreeinclude` et l'entrée `.gitignore` couvrant `.claude/worktrees/` sont
+  posés, et la portée de l'isolation est écrite (`27-ISOLATION-PORTEE.md`, 13 agents écrivains
+  re-dérivés : 19 porteurs de `Write`/`Edit` moins 6 managers). *(livrable 2, plan 27-03)*
+- [ ] **PAEX-08**: `isolation: worktree` est **armé** sur les 13 agents écrivains. **GELÉ** —
+  **0 agent sur 25** le déclare. La tâche est gatée derrière la **ratification humaine** de
+  `worktree.baseRef: "head"` (ADR-031). Le réglage a été appliqué **hors checkpoint** par un effet
+  de bord de worker (`.claude/settings.local.json`, gitignoré) : l'assertion machine passe donc au
+  vert **sans qu'aucun humain n'ait ratifié**. Un gate vert n'est pas un feu vert.
+- [ ] **PAEX-09**: `claude_orchestration` est instruit par un spike puis une **décision écrite**
+  (activation ou refus motivé). **GELÉ** — checkpoint humain par construction. `GSD_AGENT_SDK_VERSION`
+  doit être **persistée** au runtime, pas seulement passée en drapeau : sans cela, un PASS laisserait
+  `enabled: true` pendant que tout dispatch réel retombe sur `inline` au gate n° 5.
+- [ ] **PAEX-10**: Le gain réel est **mesuré** — baseline d'horloge avant, mesure après, méthode
+  écrite. **NON COMMENCÉ.** Le plafond d'étages **3,00×** est une compression d'étages, **jamais**
+  un gain d'horloge ; le **1,8-2,5×** reste une **estimation**, dite comme telle.
+- [ ] **PAEX-11**: Aucune régression de sécurité de la Phase 24. **NON TENU — finding CRITIQUE.**
+  `dag.sh:124` résout un candidat `gsd-tools.cjs` **relatif au CWD** et l'exécute via `node` sans
+  ancrage : **RCE reproduite par PoC**, sans symlink ni PATH compromis, dans le socle que les 5
+  managers invoquent en routine. **5ᵉ passage** du motif de confinement de chemin, littéralement
+  prédit par `CONCERNS.md`. Le threat register ne le couvre pas : `T-27-01-04` n'examinait que
+  `PATH`, dont le raisonnement d'acceptation ne vaut pas pour le CWD. Sur ce dépôt le candidat est
+  une **branche morte** (`gsd-core/` absent de la racine). Retirer ou ancrer = **arbitrage humain**.
+
 ## v2 Requirements
 
 ### Vocabulaire & UX

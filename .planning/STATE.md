@@ -533,6 +533,41 @@ Progress: [██████░░░░] 59%
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
 
+- **2026-08-05 — Phase 27 (parallélisation d'exécution) : vague 1 livrée, phase GELÉE sur
+  arbitrage humain** (mission `.planning/missions/2026-08-05-phase-27-parallelisation-execution.md`,
+  branche `feat/phase-27-parallelisation-execution`, non mergée). **Livré** : livrable 1 — la
+  doctrine fausse de `team-kernel.md:64-65` est corrigée (« perdu » → « **éteint par défaut** »),
+  le gate n° 4 (`nested && background`, jamais `backgroundDispatch`) et le verrou pratique
+  gate n° 5 (`agent_sdk_version_unknown`) y sont nommés ; livrable 3 — `dag.sh ready` porte un
+  champ **additif** `stages` câblé sur `partitionStages()` amont **en sous-processus**, jamais
+  réimplémenté (ADR-069, Iron Law 2 révisée), 87 PASS / 0 FAIL contre 71/0 avant ; livrable 2
+  **partiel** — `.worktreeinclude` (une seule entrée, `.claude/agent-memory/`) et `.gitignore`
+  posés, `27-ISOLATION-PORTEE.md` écrit, mais **0 agent sur 25 armé**. **Trois gels, tous
+  ADR-031** : (a) **finding CRITIQUE d'audit, RCE reproduite par PoC** — `dag.sh:124` résout un
+  candidat `gsd-tools.cjs` **relatif au CWD** et l'exécute via `node` sans ancrage ; un simple
+  fichier tracké suffit, sans symlink ni PATH compromis, dans le socle que les 5 managers
+  invoquent en routine. **5ᵉ passage** du motif de confinement de chemin, littéralement prédit par
+  `CONCERNS.md`. Non couvert par le threat register : T-27-01-04 n'examinait que `PATH`, dont le
+  raisonnement d'acceptation (« un PATH compromis compromet toute la session ») **ne vaut pas**
+  pour le CWD. Sur ce dépôt le candidat est une **branche morte** (`gsd-core/` absent de la
+  racine) ; (b) tâche 4 de 27-03 (armement des 13 agents écrivains) gatée derrière la
+  **ratification** de `worktree.baseRef: "head"` — le réglage a été appliqué hors checkpoint par
+  un effet de bord de worker (`.claude/settings.local.json`, gitignoré), donc l'assertion machine
+  passe au vert **sans qu'aucun humain n'ait ratifié** ; (c) spike `claude_orchestration` (27-05)
+  et mesure post-activation (27-06), checkpoints humains par construction.
+  **Deux findings de revue délibérément DIFFÉRÉS avec (a)** : la branche « CLI résolue mais qui
+  échoue » n'est pas prouvée (un mutant remplaçant `stages: null` par `stages: []` survit aux 87
+  tests, alors que la doctrine livrée interdit cette confusion), et T29 teste une autre branche
+  que son commentaire (dépendant de `~/.claude/gsd-core`, donc de l'environnement). Motif du
+  report : écrire ces tests avant l'arbitrage graverait comme comportement attendu la branche qui
+  pourrait être retirée. **Preuve empirique produite par la phase sur elle-même** : un commit de
+  `27-03` a emporté `team-kernel.md`, propriété du plan concurrent `27-02` — un `git add` ciblé
+  chez l'un plus un `git commit` sans pathspec chez l'autre suffisent, index partagé. La
+  disjonction déclarée gouverne **le dispatch**, jamais **le commit** : seule l'isolation physique
+  (`isolation: worktree`) le ferait. **Chiffres re-dérivés** (moteur gsd-core 1.9.1, non épinglable
+  — corpus hors dépôt) : ADR-069 tient sur ses deux comptages, `workstream` K2 = **7/91** et
+  `.planning/` en dur = **45** ; l'encadré « chiffres divergents » du ROADMAP est levé.
+
 - **2026-08-02 — Le manuel utilisateur (Phase 26) vit sur disque, hors git, et sa disposition
   bilingue est un miroir de dossiers** (mission `.planning/missions/2026-08-01-phase-26-manuel-utilisateur.md`,
   13 décisions D-1..D-13 + point ouvert O-1). Contrainte de Samuel posée en cours de mission :
