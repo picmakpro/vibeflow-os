@@ -5,6 +5,10 @@
 # T3 reopen = ré-entrée (dépendants transitifs remis blocked) · T4 collision d'id remappée
 # T5 mark id inconnu / statut invalide → erreur · T6 status compteurs
 # T9 tree = rendu arbre (ids + connecteurs) · T10 tree borne les cycles (pas de hang)
+# T25 ready : stages recouvrement -> etages distincts · T26 stages disjoint -> meme etage
+# T27 ready/count inchanges en presence de stages + determinisme de ready
+# T28 stages sur DAG sans cle scope (P-02) · T29 repli CLI amont absente -> stages:null
+# T30 frontiere vide -> stages=[] sans sous-processus
 #
 # Exit 0 si tout passe, 1 sinon.
 
@@ -311,6 +315,90 @@ S1="$WORK_DIR/s1.json"; S2="$WORK_DIR/s2.json"
 "$SCRIPT" status --file="$FZ" > "$S2"
 if diff -q "$S1" "$S2" >/dev/null; then diffres="identical"; else diffres="differ"; fi
 assert "T24.1 — deux invocations successives produisent une sortie identique" "$diffres" "identical"
+
+echo "=== T25 — deux noeuds ready declarant le meme chemin dans scope[] sortent dans deux etages distincts ==="
+F25="$WORK_DIR/t25.dag.json"; "$SCRIPT" init --file="$F25" >/dev/null
+"$SCRIPT" add --file="$F25" --id=p1 --step=p1 --scope=src/shared.ts >/dev/null
+"$SCRIPT" add --file="$F25" --id=p2 --step=p2 --scope=src/shared.ts >/dev/null
+out25=$("$SCRIPT" ready --file="$F25")
+same_stage25=$(printf '%s' "$out25" | python3 -c "
+import json, sys
+st = json.load(sys.stdin)['stages']
+print(any(('p1' in s) and ('p2' in s) for s in st))
+")
+assert      "T25.1 — p1 et p2 (meme scope) ne partagent jamais le meme etage" "$same_stage25" "False"
+count25=$(printf '%s' "$out25" | python3 -c "import json,sys; print(len(json.load(sys.stdin)['stages']))")
+assert      "T25.2 — exactement 2 etages produits"                           "$count25"      "2"
+
+echo "=== T26 — deux noeuds ready a scope disjoint sortent dans un seul et meme etage ==="
+F26="$WORK_DIR/t26.dag.json"; "$SCRIPT" init --file="$F26" >/dev/null
+"$SCRIPT" add --file="$F26" --id=q1 --step=q1 --scope=src/a.ts >/dev/null
+"$SCRIPT" add --file="$F26" --id=q2 --step=q2 --scope=src/b.ts >/dev/null
+out26=$("$SCRIPT" ready --file="$F26")
+same_stage26=$(printf '%s' "$out26" | python3 -c "
+import json, sys
+st = json.load(sys.stdin)['stages']
+print(any(('q1' in s) and ('q2' in s) for s in st))
+")
+assert      "T26.1 — q1 et q2 (scope disjoint) partagent le meme etage" "$same_stage26" "True"
+count26=$(printf '%s' "$out26" | python3 -c "import json,sys; print(len(json.load(sys.stdin)['stages']))")
+assert      "T26.2 — un seul etage produit"                             "$count26"      "1"
+
+echo "=== T27 — en presence de stages, ready/count gardent exactement leurs valeurs d'avant ce plan + determinisme ==="
+assert "T27.1 — ready = [p1, p2] (2 ids exacts, tableau plat inchange)" "$out25" '"ready": ['$'\n''    "p1",'$'\n''    "p2"'
+assert "T27.2 — count = 2 (inchange)"                                  "$out25" '"count": 2'
+R1="$WORK_DIR/ready1.json"; R2="$WORK_DIR/ready2.json"
+"$SCRIPT" ready --file="$F25" > "$R1"
+"$SCRIPT" ready --file="$F25" > "$R2"
+if diff -q "$R1" "$R2" >/dev/null; then readydiff="identical"; else readydiff="differ"; fi
+assert "T27.3 — deux invocations successives de ready produisent une sortie identique (sur le modele de T24)" "$readydiff" "identical"
+
+echo "=== T28 — DAG ecrit sans cle scope du tout (version anterieure au champ, P-02) produit un stages calcule, non nul ==="
+F28="$WORK_DIR/t28.dag.json"
+cat > "$F28" <<'JSONEOF'
+{
+  "nodes": [
+    {"id": "r1", "step": "r1", "stage": "", "deps": [], "status": "ready"},
+    {"id": "r2", "step": "r2", "stage": "", "deps": [], "status": "ready"}
+  ]
+}
+JSONEOF
+out28=$("$SCRIPT" ready --file="$F28"); rc28=$?
+assert_exit "T28.1 — ready sur DAG sans scope (exit 0)"                                   "$rc28" 0
+stages28=$(printf '%s' "$out28" | python3 -c "import json,sys; print(json.load(sys.stdin)['stages'])")
+assert_not  "T28.2 — stages calcule, non nul (pas de crash sur l'absence de cle scope)"    "$stages28" "None"
+assert      "T28.3 — r1 et r2 coexistent (scope absent = aucun recouvrement declare, P-02)" "$stages28" "'r1', 'r2'"
+
+echo "=== T29 — CLI amont introuvable (PATH tronque + GSD_TOOLS neutralisee) : stages:null, ready/count intacts, exit 0 ==="
+F29="$WORK_DIR/t29.dag.json"; "$SCRIPT" init --file="$F29" >/dev/null
+"$SCRIPT" add --file="$F29" --id=n1 --step=n1 --scope=src/x.ts >/dev/null
+"$SCRIPT" add --file="$F29" --id=n2 --step=n2 --scope=src/x.ts >/dev/null
+# Restreint le PATH a un repertoire ne contenant QUE python3 (dag.sh en depend deja pour tourner
+# du tout) — ni `gsd-tools` ni `node` n'y sont resolvables. Invoque via le binaire bash resolu
+# AVANT la restriction : un PATH tronque passe a `"$SCRIPT"` directement ferait echouer la
+# resolution du shebang `#!/usr/bin/env bash` lui-meme (env ne trouverait pas bash), ce qui
+# testerait un tout autre echec que celui vise ici.
+BASH_BIN="$(command -v bash)"
+RESTRICTED_BIN="$WORK_DIR/restricted-bin"; mkdir -p "$RESTRICTED_BIN"
+ln -s "$(command -v python3)" "$RESTRICTED_BIN/python3"
+out29=$(PATH="$RESTRICTED_BIN" GSD_TOOLS="/nonexistent/gsd-tools.cjs" "$BASH_BIN" "$SCRIPT" ready --file="$F29"); rc29=$?
+assert_exit "T29.1 — exit 0 malgre la CLI amont indisponible (jamais un crash du socle)" "$rc29" 0
+assert      "T29.2 — ready reste intact"                                                 "$out29" '"ready": ['$'\n''    "n1",'$'\n''    "n2"'
+assert      "T29.3 — count reste intact"                                                 "$out29" '"count": 2'
+assert      "T29.4 — stages degrade a null (jamais absent, jamais un tableau vide)"      "$out29" '"stages": null'
+
+echo "=== T30 — frontiere vide (tous les noeuds blocked ou done) : stages=[] et aucun sous-processus n'est lance ==="
+F30="$WORK_DIR/t30.dag.json"; "$SCRIPT" init --file="$F30" >/dev/null
+"$SCRIPT" add --file="$F30" --id=z1 --step=z1 >/dev/null
+"$SCRIPT" add --file="$F30" --id=z2 --step=z2 --deps=z1 >/dev/null
+"$SCRIPT" mark --file="$F30" --id=z1 --status=running >/dev/null   # z1 running (ni ready ni done) ; z2 reste blocked
+out30=$("$SCRIPT" ready --file="$F30")
+assert "T30.1 — frontiere vide : ready=[] et count=0"                                              "$out30" '"ready": [],'$'\n''  "count": 0'
+# stages=[] (et non null) prouve le court-circuit : si compute_stages() etait quand meme invoquee
+# sur une liste vide, emit-workflow rejetterait un `plans` vide (ok:false) et degraderait a null —
+# un mutant qui supprimerait la garde « if frontier_nodes else [] » ferait donc echouer CE test,
+# pas seulement produire un resultat different sans verification (cas discriminant).
+assert "T30.2 — stages=[] (jamais null) : preuve que compute_stages() n'a pas ete appelee"          "$out30" '"stages": []'
 
 echo ""
 echo "=================================="
