@@ -117,6 +117,18 @@ là-bas.
   synthétise. Toute production vit dans les workers.
 - **Dispatch parallèle par défaut** : ≥ 2 nœuds `ready` à périmètres disjoints → un seul
   message, plusieurs Task. Périmètres douteux → séquentiel ou `isolation: worktree`.
+- **Le commit reste discipliné même à périmètres disjoints (Phase 27)** : la disjonction
+  gouverne le *dispatch*, jamais le *commit*. Tant que N acteurs — workers **et** manager —
+  partagent un même `.git/index` (pas d'`isolation: worktree`) : **jamais** `git add` (même
+  ciblé sur son propre fichier), **jamais** `git commit -m`/`-a` sans pathspec (`-A`/`.`/`-u`
+  inclus) — `git commit` nu commite tout l'index partagé, y compris ce qu'un autre acteur
+  vient d'y ajouter. Forme imposée : `git commit <chemin> [<chemin>...] -m "..."` (ignore
+  l'index). Seule exception, fichier neuf (inatteignable autrement) :
+  `git add <chemin exact> && git commit <chemin exact> -m "..."` en une seule commande
+  enchaînée, jamais de stage en attente. Chaque mandat nomme les fichiers tenus par ses
+  voisins **en ce moment** — un périmètre positif seul ne suffit pas. Trou identifié mais
+  laissé ouvert par `mission-contracts.md` §Isolation de branche (« non tranchée ici ») :
+  tranché ici.
 - **Digest dans chaque mandat**, détail sur disque, bloc typé au retour — jamais de pilotage
   à la prose.
 - **Proportionnalité** : en dessous du seuil d'équipe du métier (dev : `SEUIL_EQUIPE`,
