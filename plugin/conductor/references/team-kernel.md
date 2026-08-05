@@ -66,8 +66,12 @@ vagues de plans d'une même étape, côté moteur) est **éteint par défaut** �
 restaurable, pas une perte définitive. Le chemin qui le restaure ne passe **pas** par
 `shouldFlattenDispatch()` (qui rend bien `true` sous Claude Code, ce fait ne change pas) mais par la
 capability amont `claude_orchestration` : son gate n°4 lit `dispatch.nested === true &&
-dispatch.background === true`, **jamais** `backgroundDispatch`. Tant qu'elle n'est pas activée, le
-parallélisme **inter-nœuds** porté par la frontière `ready` de `vf-dev-manager` reste le **seul
+dispatch.background === true`, **jamais** `backgroundDispatch`. Le gate n°4 passe déjà sur ce
+runtime ; le verrou pratique est ailleurs, au **gate n°5** (`agent_sdk_version_unknown`) : Claude
+Code embarque son SDK dans un binaire plutôt que de l'exposer en paquet npm, donc le routeur ne
+trouve aucune version sur disque. `GSD_AGENT_SDK_VERSION` est le contournement documenté en amont —
+détail dans `.planning/ROADMAP.md` §« La correction de prémisse ». Tant que ce gate n'est pas levé,
+le parallélisme **inter-nœuds** porté par la frontière `ready` de `vf-dev-manager` reste le **seul
 effectif aujourd'hui** — le champ `stages` de `dag.sh ready` affine cette frontière en calculant la
 disjonction de périmètres entre nœuds ; doctrine complète dans
 `dev-orchestrator-references/mission-flow.md`. Notre couche d'orchestration ne duplique donc pas

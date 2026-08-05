@@ -1915,9 +1915,14 @@ dispatche les agents **ne connaît pas le concept**. Les workstreams compartimen
 >   justes sur des ensembles différents, pas contradictoires.
 > - `.planning/` en dur : **45 tient** (motif étroit `.planning/(ROADMAP.md|STATE.md|phases)`, les 3
 >   seuls artefacts que la partition déplace, écrit à
->   `plugin/dev-orchestrator/references/workstreams.md:101`). Le 73 comptait toute mention de
->   `.planning/` en récursif, incluant 25 chemins que la partition ne déplace pas ; 45 ⊂ 70 (vérifié
->   par `comm -23` vide).
+>   `plugin/dev-orchestrator/references/workstreams.md:101`). Réconciliation avec le 73 : **73 = 70 + 3**
+>   — 70 fichiers `workflows/*.md` à la racine (profondeur 1) plus 3 fichiers imbriqués sous
+>   `help/modes/`, atteints uniquement par le parcours récursif. Sur ces 70, le motif large (toute
+>   mention de `.planning/` en récursif) ajoute **25** chemins racine que le motif étroit ne compte
+>   pas : **70 − 45 = 25**, et **45 ⊂ 70** (vérifié par `comm -23` vide). Corpus :
+>   `$HOME/.claude/gsd-core/workflows/`, moteur **gsd-core 1.9.1** — profondeur 1 = 91 fichiers, en
+>   récursif = 115 (mêmes bornes que le critère K2 ci-dessus) ; mesure non épinglable à un commit de
+>   ce dépôt, voir la limite actée juste en dessous.
 > - ADR-069 n'a besoin d'aucune correction — ses deux chiffres se re-dérivent au fichier près.
 > - **Limite à écrire, pas taire** : le corpus (`~/.claude/gsd-core/`) vit hors dépôt, la mesure
 >   n'est **pas épinglable à un commit** de ce dépôt — la seule ancre valide est
