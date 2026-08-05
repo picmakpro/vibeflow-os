@@ -1938,5 +1938,19 @@ engage au-delà de cette phase.
 - **La mesure du gain est un livrable, pas une promesse** : baseline d'horloge avant, mesure après,
   méthode écrite. Un plafond d'étages n'est pas un gain d'horloge.
 
-**Plans**:
-- [ ] TBD (run /gsd-plan-phase 27 to break down)
+**Requirements**: PAEX-01 → PAEX-11 (préfixe `PAEX` — « PArallélisation d'EXécution » — **proposé au
+plan du 2026-08-05** ; aucun préfixe existant `DOCF`/`GSDC`/`GSDA` ne couvre la parallélisation
+d'exécution. À inscrire au ledger `REQUIREMENTS.md` par le manager de mission, comme aux Phases
+22/23/24 où les préfixes ont été créés au plan.)
+
+**Plans**: 6 plans en 4 vagues
+- [ ] 27-01-PLAN.md — **TRACER** : `dag.sh ready` calcule la disjonction de périmètres en câblant `partitionStages()` amont (jamais réimplémentée, ADR-069), champ `stages` additif, repli prouvé par test, doctrine et limites dans `mission-flow.md` — livrable 3 (vague 1)
+- [ ] 27-02-PLAN.md — Doctrine corrigée : `team-kernel.md` dit « éteint par défaut » et nomme le chemin qui rallume ; le callout de comptages divergents du ROADMAP laisse place au résultat re-dérivé — livrables 1 + lift ROADMAP (vague 1)
+- [ ] 27-03-PLAN.md — `isolation: worktree` sur les 13 écrivains non-managers, `.worktreeinclude` posé, statut `.gitignore` tranché sur pièce, portée écrite (groupe B, `worktree.baseRef`, 4 hypothèses + sondes) — livrable 2 (vague 1)
+- [ ] 27-04-PLAN.md — Baseline d'horloge capturée **avant** toute activation, corpus étalon versionné et prouvé parallélisable, méthode écrite — livrable 5, moitié « avant » (vague 2)
+- [ ] 27-05-PLAN.md — Spike `claude_orchestration` : SDK établi par installation réelle, échelle de 7 gates, run Workflow réel, sous-expérience Décision A, décision écrite (activation ou refus motivé) — livrable 4, **checkpoint bloquant** (vague 3)
+- [ ] 27-06-PLAN.md — Mesure après activation sur le même corpus étalon, écart et limites écrits — ou non-mesurabilité motivée avec déclencheur de reprise — livrable 5, moitié « après », **checkpoint bloquant** (vague 4)
+
+**Ordre non négociable, câblé deux fois.** La baseline (`27-04`) précède l'activation (`27-05`) par
+`depends_on` **et** par une précondition vérifiée à l'exécution sur l'absence de la clé de capability :
+une baseline prise après activation est détruite sans rattrapage.
