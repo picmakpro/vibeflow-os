@@ -186,6 +186,49 @@ pourra transcrire ce qui est réellement observé pour chacune des quatre lignes
 
 ---
 
+## Partie 4 — Preuve empirique : la disjonction déclarative ne protège pas au niveau du commit
+
+**Ce que cette phase a produit sur elle-même, sans le chercher, est l'argument le plus fort de ce
+document.** La « Disjonction d'écriture déclarée » de `27-03-PLAN.md` (en tête du plan) affirme que
+ce plan écrit seize fichiers « tous disjoints des cinq autres plans de la phase ». C'est vrai **au
+niveau de la déclaration de périmètre** — et pourtant, l'exécution réelle de la vague 1 (27-01,
+27-02, 27-03 : trois workers `vf-coder` concurrents, un seul arbre de travail, un seul index git
+partagé, **aucune isolation worktree**) a produit une fuite de commit qui contredit cette garantie
+au niveau du commit lui-même.
+
+**Le mécanisme, reconstitué depuis `git log` et `27-02-SUMMARY.md`** (§Déviations) : le worker du
+plan `27-02` a fait `git add plugin/conductor/references/team-kernel.md` (un `git add` isolé,
+laissant le fichier indexé mais non commité) puis, avant son propre `git commit`, le worker de ce
+plan (`27-03`) a fait `git add 27-ISOLATION-PORTEE.md` suivi de `git commit -m "..."`
+**sans pathspec**. Un `git commit` sans pathspec commite tout ce qui est alors indexé — y compris le
+`team-kernel.md` de 27-02, resté dans l'index partagé. Résultat : le commit `da8ad8a`
+(« docs(27-03): écrit la portée de l'isolation worktree… ») porte deux fichiers de deux plans
+différents (`git show --stat da8ad8a` : `27-ISOLATION-PORTEE.md` + `plugin/conductor/references/
+team-kernel.md`, +206/-4 au total), et son message ne mentionne ni `team-kernel.md` ni la
+correction de doctrine qu'il transporte.
+
+**Le contenu n'est pas corrompu — vérifié** (`git show da8ad8a -- plugin/conductor/references/
+team-kernel.md` : diff exact attendu, rien d'autre ; les deux gates `<verify>` du plan `27-02`
+passent contre le HEAD courant). **Seule l'attribution est fausse.** Ce document ne réécrit pas
+l'historique pour la corriger : six commits sont déjà empilés par-dessus `da8ad8a`
+(`8b37b69`…`509f56e`), et un rebase/amend sur une branche alors sous écriture concurrente live
+aurait risqué d'orpheliner un commit en vol d'un voisin — strictement pire qu'un commit mal
+attribué mais correct.
+
+**Ce que ça prouve, pour l'objet même de ce plan.** La disjonction de fichiers *déclarée* en tête de
+plan (« seize fichiers, tous disjoints ») décrit correctement ce que **chaque plan a l'intention
+d'écrire** ; elle ne décrit pas ce qu'un **commit réel** finit par transporter quand plusieurs
+workers partagent le même arbre et le même index git. La garantie de non-collision de cette phase,
+jusqu'à la tâche 4 de ce plan, repose entièrement sur la discipline humaine d'un pathspec explicite
+par appel (`git commit <chemins> -m ...`, jamais `git add` séparé) — une discipline qui a déjà
+failli une fois, sur cette phase même, en dépit d'un mandat qui la prescrivait explicitement. Seule
+l'isolation **physique** (`isolation: worktree`, arbre de travail et index git propres à chaque
+worker) supprimerait la classe d'erreur entière plutôt que de compter sur la vigilance de chaque
+commit. C'est le fait le plus concret que cette phase avance en faveur de sa propre tâche 4 —
+produit par la phase sur elle-même, pas par un raisonnement abstrait.
+
+---
+
 ## Références
 
 `27-CONTEXT.md` (D-03, D-05, D-11, D-13) · `27-RESEARCH.md` (§Livrable 2, Q2/Q3, §« `worktree.baseRef`
@@ -193,4 +236,7 @@ pourra transcrire ce qui est réellement observé pour chacune des quatre lignes
 §`.gitignore`) · `27-03-PLAN.md` (tâches 1-4, `<threat_model>` T-27-03-03/T-27-03-07) ·
 `plugin/conductor/references/team-kernel.md:104-117` (Règles d'instanciation, P3) ·
 `.planning/phases/VFDO-24-.../24-COLLISIONS.md` (convention de document de décision imitée ici,
-et précédent de re-dérivation d'un chiffre — §M-1).
+et précédent de re-dérivation d'un chiffre — §M-1) · `27-02-SUMMARY.md` §Déviations (mécanisme
+exact de la fuite de commit `da8ad8a`, reconstitué par le worker de 27-02 lui-même) ·
+commit `da8ad8a` (`git show --stat`/`git show -- plugin/conductor/references/team-kernel.md`,
+preuve empirique de la Partie 4).
