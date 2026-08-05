@@ -1837,6 +1837,9 @@ cohérent, `check-manual.sh` au vert. La priorité du mandat est tenue dès la v
 > marchent dessus. » La recherche de cadrage (2026-08-05, scratchpad `parallel-research.md`) a
 > **renversé la prémisse** sur laquelle la demande reposait — voir ci-dessous.
 
+> **Spec** : `docs/superpowers/specs/2026-08-05-parallelisation-execution-design.md`
+> **Recherche** : `.planning/research/2026-08-05-parallelisation-execution.md`
+
 **Goal**: Prendre un gain de vitesse **déjà disponible et non pris**, et le rendre **sûr par
 construction**. La Phase 24 avait conclu que le parallélisme intra-étape était *perdu* ; la
 re-vérification montre qu'il est seulement **désactivé par défaut**. Dans le même temps, la
