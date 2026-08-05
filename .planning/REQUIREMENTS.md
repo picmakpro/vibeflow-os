@@ -565,28 +565,28 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | GSDC-08 | Phase 23 | Partiel — plan 23-07 (volet dispatch couvert, volet allowlist ouvert sur `D-22`, non tranché) |
 | GSDC-09 | Phase 23 | Done — plan 23-07 (exécuté + revue en régime plein) |
 | GSDC-10 | Phase 23 | Done — plan 23-08 (exécuté) |
-| GSDA-01 | Phase 24 | Planned — plan 24-02 (différé écrit : aucune version npm > 1.9.1 au 2026-08-04) |
-| GSDA-02 | Phase 24 | Planned — plans 24-03 et 24-11 |
-| GSDA-03 | Phase 24 | Planned — plan 24-03 |
-| GSDA-04 | Phase 24 | Planned — plan 24-02 (**différé**, déclencheur objectif — non activé) |
-| GSDA-05 | Phase 24 | Planned — plan 24-02 (**différé**, déclencheur objectif — non activé) |
-| GSDA-06 | Phase 24 | Planned — plan 24-02 (ADR-067, non gaté) |
-| GSDA-07 | Phase 24 | Planned — plan 24-06 |
-| GSDA-08 | Phase 24 | Planned — plans 24-06 et 24-11 |
-| GSDA-09 | Phase 24 | Planned — plans 24-11 et 24-12 |
-| GSDA-10 | Phase 24 | Planned — plan 24-07 (ADR-068) |
-| GSDA-11 | Phase 24 | Planned — plan 24-07 |
-| GSDA-12 | Phase 24 | Planned — plan 24-10, tâche 1 (révision de l'Iron Law 2) |
-| GSDA-13 | Phase 24 | Planned — plans 24-04 et 24-12 |
-| GSDA-14 | Phase 24 | Planned — plans 24-04 et 24-12 (module `planning-core`, cf. 24-RESEARCH.md R-2d) |
-| GSDA-15 | Phase 24 | Planned — plans 24-08, 24-11 et 24-12 |
-| GSDA-16 | Phase 24 | Planned — plans 24-05 et 24-12 |
-| GSDA-17 | Phase 24 | Planned — plan 24-09 |
-| GSDA-18 | Phase 24 | Planned — plan 24-10 (ADR-069) |
-| GSDA-19 | Phase 24 | Planned — plan 24-10 |
-| GSDA-20 | Phase 24 | Planned — plans 24-01 et 24-12 |
-| GSDA-21 | Phase 24 | Planned — plans 24-01 et 24-12 |
-| GSDA-22 | Phase 24 | Planned — plans 24-01 et 24-12 |
+| GSDA-01 | Phase 24 | Done — plan 24-02 (différé écrit : aucune version npm > 1.9.1 au 2026-08-04) |
+| GSDA-02 | Phase 24 | Done — plans 24-03 et 24-11 |
+| GSDA-03 | Phase 24 | Done — plan 24-03 |
+| GSDA-04 | Phase 24 | Done — plan 24-02 (**différé**, déclencheur objectif — non activé, gaté sur GSDA-01) |
+| GSDA-05 | Phase 24 | Done — plan 24-02 (**différé**, déclencheur objectif — non activé, gaté sur GSDA-01) |
+| GSDA-06 | Phase 24 | Done — plan 24-02 (ADR-067, non gaté) |
+| GSDA-07 | Phase 24 | Done — plan 24-06 |
+| GSDA-08 | Phase 24 | Done — plans 24-06 et 24-11 |
+| GSDA-09 | Phase 24 | Done — plans 24-11 et 24-12 |
+| GSDA-10 | Phase 24 | Done — plan 24-07 (ADR-068) |
+| GSDA-11 | Phase 24 | Done — plan 24-07 |
+| GSDA-12 | Phase 24 | Done — plan 24-10, tâche 1 (révision de l'Iron Law 2) |
+| GSDA-13 | Phase 24 | Done — plans 24-04 et 24-12 |
+| GSDA-14 | Phase 24 | Done — plans 24-04 et 24-12 (module `planning-core`, cf. 24-RESEARCH.md R-2d) |
+| GSDA-15 | Phase 24 | Done — plans 24-08, 24-11 et 24-12 |
+| GSDA-16 | Phase 24 | Done — plans 24-05 et 24-12 |
+| GSDA-17 | Phase 24 | Done — plan 24-09 |
+| GSDA-18 | Phase 24 | Done — plan 24-10 (ADR-069) |
+| GSDA-19 | Phase 24 | Done — plan 24-10 |
+| GSDA-20 | Phase 24 | Done — plans 24-01 et 24-12 |
+| GSDA-21 | Phase 24 | Done — plans 24-01 et 24-12 |
+| GSDA-22 | Phase 24 | Done — plans 24-01 et 24-12 |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
