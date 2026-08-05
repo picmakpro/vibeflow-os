@@ -38,13 +38,20 @@ created: 2026-08-05
 
 ## Per-Task Verification Map
 
+> **Réalignée suite à revue (M7)** — la table précédente mappait `27-01=doctrine`, `27-04=spike`,
+> `27-05=mesure` : ce n'est pas la découpe finale des plans. La correspondance réelle Plan ↔ Livrable
+> est : `27-01=Livrable 3 (dag.sh)` · `27-02=Livrable 1 (doctrine)` · `27-03=Livrable 2 (isolation)` ·
+> `27-04=Livrable 5, volet « avant » (baseline)` · `27-05=Livrable 4 (spike)` · `27-06=Livrable 5,
+> volet « après » (mesure)`.
+
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 27-01-01 | 01 | 1 | Livrable 1 (doctrine) | — | `team-kernel.md:64-68` ne contient plus « perdu » | non testable par machine — grep de non-régression | `grep -c "perdu" plugin/conductor/references/team-kernel.md` (doit décroître) | ✅ (fichier existant) | ⬜ pending |
-| 27-02-01 | 02 | 1 | Livrable 2 (isolation) | — | `isolation: worktree` posé sur les agents candidats, gate `check-agents.sh` valide | unitaire | `bash plugin/conductor/scripts/tests/test-check-agents.sh` | ✅ existant | ⬜ pending |
-| 27-03-01 | 03 | 1/2 | Livrable 3 (dag.sh) | — | `dag.sh ready` calcule/expose la disjonction par étage, sans casser le contrat existant `{ready,count}` | unitaire | `bash plugin/conductor/scripts/tests/test-dag.sh` | ✅ existant — cas neufs à ajouter (nœuds à scope recouvrant) | ⬜ pending |
-| 27-04-01 | 04 | 2/3 | Livrable 4 (spike) | — | Gate ladder + run Workflow réel + sous-expérience Décision A, critères PASS/FAIL écrits à l'avance respectés | unitaire (gate ladder) + manuel/spike (run réel) | `node ~/.claude/gsd-core/bin/gsd-tools.cjs claude-orchestration detect-backend` | ⚠️ pas de test dédié dans ce dépôt — à créer au Wave 0 | ⬜ pending |
-| 27-05-01 | 05 | 3 | Livrable 5 (mesure) | — | Méthode de mesure écrite, baseline capturée avant toute activation de `claude_orchestration` | manuel — mesure d'horloge, pas un test automatisable | — | ❌ Wave 0 : créer le document de méthode lui-même | ⬜ pending |
+| 27-02-01 | 02 | 1 | Livrable 1 (doctrine) | — | `team-kernel.md:64-68` ne contient plus « perdu », `.planning/ROADMAP.md` porte le résultat re-dérivé | non testable par machine — grep de non-régression | `grep -c "perdu" plugin/conductor/references/team-kernel.md` (doit décroître) | ✅ (fichiers existants) | ⬜ pending |
+| 27-03-01/02/03 | 03 | 1 | Livrable 2 (isolation) | T-27-03-* | `.worktreeinclude` posé, `isolation: worktree` sur les 13 agents écrivains, gate `check-agents.sh` valide, portée écrite (`27-ISOLATION-PORTEE.md`) | unitaire | `bash plugin/conductor/scripts/check-agents.sh` && `bash plugin/conductor/scripts/tests/test-check-agents.sh` | ✅ existant | ⬜ pending |
+| 27-01-01/02/03 | 01 | 1 | Livrable 3 (dag.sh) | T-27-01-* | `dag.sh ready` calcule/expose la disjonction par étage (`stages`), sans casser le contrat existant `{ready,count}` | unitaire | `bash plugin/conductor/scripts/tests/test-dag.sh` | ✅ existant — cas T25-T30 ajoutés par ce plan (nœuds à scope recouvrant) | ⬜ pending |
+| 27-04-01/02 | 04 | 2 | Livrable 5, volet « avant » (baseline) | T-27-04-* | Baseline d'horloge du dispatch inline capturée **avant** toute activation, corpus étalon versionné et prouvé parallélisable | unitaire (parallélisabilité du corpus) + manuel (capture d'horloge) | `node ~/.claude/gsd-core/bin/gsd-tools.cjs claude-orchestration emit-workflow --waves 27-mesure/waves-toy.json --run-id mesure-27-baseline` | ❌ Wave 0 : `27-mesure/waves-toy.json` et `27-MESURE-GAIN.md` n'existent pas encore | ⬜ pending |
+| 27-05-01/02/03 | 05 | 3 | Livrable 4 (spike) | T-27-05-* | Gate ladder + run Workflow réel + sous-expérience Décision A, critères PASS/FAIL écrits à l'avance respectés | unitaire (gate ladder) + manuel/spike (run réel, checkpoint bloquant tâche 2) | `node ~/.claude/gsd-core/bin/gsd-tools.cjs claude-orchestration detect-backend` | ⚠️ pas de test dédié dans ce dépôt — à créer au Wave 0 | ⬜ pending |
+| 27-06-01/02 | 06 | 4 | Livrable 5, volet « après » (mesure) | T-27-06-* | Bloc 3 de `27-MESURE-GAIN.md` rempli (A/B contrôlé sous checkpoint, ou non-mesurabilité motivée) | manuel — mesure d'horloge, pas un test automatisable | — | ❌ Wave 0 : le bloc 3 (structure posée par `27-04`) n'est rempli qu'ici | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
