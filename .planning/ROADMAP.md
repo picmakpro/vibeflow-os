@@ -1906,10 +1906,23 @@ dispatche les agents **ne connaît pas le concept**. Les workstreams compartimen
 (feuille de route, état), jamais l'**exécution**. Le mécanisme qui répond au besoin s'appelle
 `isolation: worktree`.
 
-> **Chiffres divergents, à ne pas recopier.** La recherche obtient **6** fichiers mentionnant
-> `workstream` et **73** codant `.planning/` en dur, là où la Phase 24 (ADR-069) grave **7/91** et
-> **45**. L'écart sur 45 → 73 est trop large pour du bruit. À re-dériver avec un critère nommé avant
-> toute citation ; ADR-069 fait foi jusque-là.
+> **Comptages re-dérivés, méthode incluse.** La divergence relevée le 2026-08-05 est close ; les
+> deux chiffres d'ADR-069 tiennent, chacun sur son ensemble nommé.
+>
+> - `workstream` : **7/91 tient** (critère K2, `~/.claude/gsd-core/workflows/*.md` profondeur 1,
+>   non récursif). Le 6 obtenu par la recherche du 2026-08-05 venait d'un motif récursif K1
+>   différent (`--ws ` espace littéral, qui ne matchait aucun fichier) — les deux mesures étaient
+>   justes sur des ensembles différents, pas contradictoires.
+> - `.planning/` en dur : **45 tient** (motif étroit `.planning/(ROADMAP.md|STATE.md|phases)`, les 3
+>   seuls artefacts que la partition déplace, écrit à
+>   `plugin/dev-orchestrator/references/workstreams.md:101`). Le 73 comptait toute mention de
+>   `.planning/` en récursif, incluant 25 chemins que la partition ne déplace pas ; 45 ⊂ 70 (vérifié
+>   par `comm -23` vide).
+> - ADR-069 n'a besoin d'aucune correction — ses deux chiffres se re-dérivent au fichier près.
+> - **Limite à écrire, pas taire** : le corpus (`~/.claude/gsd-core/`) vit hors dépôt, la mesure
+>   n'est **pas épinglable à un commit** de ce dépôt — la seule ancre valide est
+>   `~/.claude/gsd-core/VERSION = 1.9.1`. Toute citation future de ces deux chiffres doit porter
+>   profondeur + motif + version du moteur, pas juste le nombre.
 
 #### Les trois options, et le chemin
 
