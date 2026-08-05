@@ -1,483 +1,558 @@
 ---
 phase: VFDO-24-activation-et-mesure-du-moteur-gsd-capacit-s-dormantes-et-fa
-verified: 2026-08-04T22:49:02Z
+verified: 2026-08-05T00:34:14Z
 status: gaps_found
-verdict: PASS PARTIEL
-score: 11/12 constats du tableau de clôture vérifiés (M2 non livré) — 3 gaps transverses en sus
+verdict: PASS PARTIEL — CI ROUGE sur la branche poussée, le ship reste bloqué
+score: 10/12 constats du tableau de clôture vérifiés (M2 et A9 en échec) — 3 gaps transverses
 behavior_unverified: 0
 overrides_applied: 0
-diff_verified: fbdb300..012ce1b (90 commits, branche feat/phase-24-activation-moteur-gsd)
-re_verification: null
+diff_verified: fbdb300..479eee9 (95 commits, branche feat/phase-24-activation-moteur-gsd)
+re_verification:
+  previous_verified: 2026-08-04T22:49:02Z
+  previous_status: gaps_found
+  previous_verdict: PASS PARTIEL
+  previous_score: 11/12
+  diff_since_previous: 012ce1b..479eee9 (5 commits — e639380, 795b984, 7e3c39c, f738e8c, 479eee9)
+  head_note: >
+    Le mandat annonçait `HEAD = f738e8c`. **C'est faux au moment de cette re-vérification** :
+    `git rev-parse HEAD` rend **`479eee9`** (« docs(24): Pattern G — reveiller un worker coupe
+    avant de le redispatcher »), un cinquième commit posé APRÈS la validation Nyquist. Il n'était
+    visible ni dans `git log --oneline -12` passé par le proxy (troncature silencieuse), ni dans
+    la somme des `git show --stat` des quatre commits annoncés — il a fallu croiser
+    `git diff --name-only` et `git log -- <fichier>` en `git` direct pour le voir. Toutes les
+    mesures ci-dessous portent sur `479eee9`.
+  gaps_closed:
+    - "Le Goal ferme les routes qui mènent à un geste inerte — sans en ouvrir une (garde NR>60 de check-dev-bootstrap.sh)"
+    - "La phase est validée au sens Nyquist, comme le lab l'exige de lui-même"
+  gaps_partially_closed:
+    - "M2 — voie 1 (doctrine) LIVRÉE et substantielle ; voie 2 (remontée amont) toujours absente"
+    - "Ledger d'exigences GSDA — les 22 cases sont soldées ; la table de mapping :568-589 est INTACTE"
+  gaps_remaining:
+    - "M2 voie 2 — remontée amont du descripteur backgroundDispatch"
+    - "Table de mapping GSDA — 22× « Planned », dont GSDA-04/05 « non activé » contre le config"
+  gaps_new:
+    - "La CI a TOURNÉ pour de vrai et elle est ROUGE — 2 jobs en échec sur le commit de HEAD"
+  regressions:
+    - >
+      R1 (`ci.yml`, non-régression racine) est passée de **verte à vide** à **rouge
+      discriminante** du fait du commit de fermeture du gap 1 (`795b984`). Le commentaire de
+      `ci.yml:551-557` avait mesuré et écrit que la comparaison était vide (`len_sans=0
+      len_avec=0`) tant que le signal de démarrage était muet. Le signal restauré, R1 mesure enfin
+      quelque chose — et rend **écart**. Ce n'est pas la fermeture du gap 1 qui a cassé R1 : c'est
+      elle qui a rendu R1 capable de dire non.
+  warnings_resolved: [W2, W5, W8]
 gaps:
-  - truth: "Le Goal ferme les routes qui mènent à un geste inerte — sans en ouvrir une"
-    status: failed
-    reason: >
-      La phase a rendu MUET, sur le dépôt réel, le signal d'orientation de démarrage qu'elle
-      prétend par ailleurs durcir. `check-dev-bootstrap.sh` borne la lecture du frontmatter de
-      `.planning/STATE.md` à 60 lignes (soupape D-04, `:203-227`) ; ce frontmatter fermait à la
-      ligne 56 sur `main` (`fbdb300`) et ferme à la ligne 97 sur `HEAD` (`012ce1b`). Discrimination
-      jouée sur fixture, MÊME script, MÊME arbre de config, seul le STATE.md change :
-      version `main` → rc=3 + « [gsd-engine] Projet piloté par GSD — milestone gsd-migration,
-      phase 26 complete » ; version `HEAD` → rc=3 + « frontmatter illisible ou invalide — silence
-      (D-04) », stdout VIDE. Le premier dépassement est attribuable au commit `05ec458`
-      (« docs(24): etat — mission Phase 24 en pause sur checkpoint humain »), délimiteur porté à
-      la ligne 64, puis 97 à HEAD. Le défaut EST connu — `.github/workflows/ci.yml:532-540` le
-      décrit exactement — mais il n'est ni corrigé ni porté par un ledger : `WINDOWS.md` est à
-      `open_count: 0`, `.planning/codebase/CONCERNS.md` n'en dit rien, `REQUIREMENTS.md` non plus.
-      Il ne vit que dans un commentaire de CI. C'est le motif A8 du cadrage (« une entrée qui
-      promet un geste inerte ») reproduit au niveau du signal de session.
-    artifacts:
-      - path: ".planning/STATE.md"
-        issue: "frontmatter de 97 lignes (56 sur main) — au-delà de la garde anti-gel de 60 lignes"
-      - path: "plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh"
-        issue: "soupape D-04 atteinte sur l'arbre réel : le gate est armé mais rendu silencieux"
-      - path: ".github/workflows/ci.yml"
-        issue: "lignes 532-540 : le défaut est documenté en commentaire, jamais inscrit en dette"
-    missing:
-      - "Sortir les ~85 lignes de commentaire de mission du frontmatter de .planning/STATE.md (les déplacer sous le délimiteur fermant, ou dans .planning/missions/), pour repasser sous la garde de 60 lignes"
-      - "Ou relever la borne de check-dev-bootstrap.sh et l'asserter dans test-check-dev-bootstrap.sh"
-      - "Dans les deux cas : inscrire la dette au ledger (WINDOWS ou CONCERNS.md) tant qu'elle est ouverte — un commentaire de ci.yml n'est lu par aucun workflow"
   - truth: "M2 — les deux voies retenues le 2026-07-31 (acter en doctrine · signaler le descripteur en amont) sont livrées"
-    status: failed
+    status: partial
     reason: >
-      Aucune des deux n'existe dans l'arbre. **Voie 1** — la doctrine à écrire (« sur ce runtime le
-      parallélisme inter-nœuds porté par `vf-dev-manager` est le seul effectif, et le parallélisme
-      intra-étape des vagues GSD est perdu par décision du moteur ») : balayage `awk` fichier par
-      fichier sur les **870 fichiers suivis**, motifs `intra-.tape|inter-n.uds` → **14 occurrences,
-      toutes dans `.planning/`** (ROADMAP, mission du 2026-07-31, 24-ARBITRAGES, 24-COLLISIONS),
-      **zéro dans `plugin/` et zéro dans `docs/`**. `team-kernel.md:28-53` porte le descripteur
-      (dont `backgroundDispatch: false`) au titre de M1, pas la conséquence doctrinale de M2.
-      **Voie 2** — la remontée amont du descripteur : `.planning/upstream/` ne contient qu'un seul
-      fichier, celui des 42 workflows aveugles aux workstreams (GSDA-19). Aucun brouillon, aucune
-      référence d'issue sur `backgroundDispatch`. Corroboration : `M2` n'apparaît **pas une seule
-      fois** dans `24-01-PLAN.md`, `24-10-PLAN.md` ni `24-10-SUMMARY.md` — les deux nœuds que le
-      tableau de clôture désigne en colonne « Où » —, et **aucune des 22 exigences `GSDA` ne couvre
-      M2** (zone 6 = GSDA-20/21/22 = M1 + M3). Les deux voies n'ont jamais été des tâches de plan.
+      **Voie 1 : LIVRÉE, et bien.** `plugin/conductor/references/team-kernel.md:55-89` (commit
+      `7e3c39c`, +35 lignes) porte désormais la conséquence doctrinale, **dans `plugin/`, là où un
+      agent la lira** : « le parallélisme **intra-étape** […] est **perdu**, et le parallélisme
+      **inter-nœuds** porté par la frontière `ready` de `vf-dev-manager` est le **seul effectif** ».
+      Elle est opérationnelle, pas décorative — quatre conséquences prescriptives pour un manager
+      (« n'attendez aucun gain de parallélisme d'un découpage en plans multiples au sein d'une même
+      étape », « sérialisation observée ≠ panne »), le renvoi à la mission horodatée sans recopier
+      ses chiffres, et le rappel que `claude_orchestration` reste un opt-in. Le gap est levé sur ce
+      volet.
+      **Voie 2 : TOUJOURS ABSENTE.** Balayage `awk` fichier par fichier du motif
+      `backgroundDispatch` sur les **872 fichiers suivis** (`git ls-files`) → **24 occurrences**,
+      dont **0 dans `.planning/upstream/`**. Ce dossier contient toujours **un seul fichier**,
+      celui des 42 workflows aveugles (GSDA-19). Aucun brouillon, aucune référence d'issue sur le
+      descripteur. Et le tableau qui « fait foi » (`.planning/ROADMAP.md:1622`) écrit **toujours**
+      « acté en doctrine (voie 1), **remontée amont déposée (voie 2)** » — cette ligne n'a pas été
+      touchée par `7e3c39c`, dont le diff sur le ROADMAP se limite à l'encadré de lettrage A9 et à
+      la ligne A9. Aucune des deux sorties offertes (livrer, ou recaler le tableau) n'a été prise.
     artifacts:
-      - path: "plugin/conductor/references/team-kernel.md"
-        issue: "porte le descripteur de dispatch (M1) mais aucune conséquence doctrinale sur le parallélisme (M2 voie 1)"
       - path: ".planning/upstream/"
-        issue: "un seul fichier — workstreams ; rien sur backgroundDispatch (M2 voie 2)"
+        issue: "un seul fichier (workstreams) ; 0 occurrence de backgroundDispatch (M2 voie 2)"
       - path: ".planning/ROADMAP.md"
-        issue: "ligne 1602, tableau de clôture : « acté en doctrine (voie 1), remontée amont déposée (voie 2) | 24-01, 24-10 » — non étayé par ces deux nœuds"
+        issue: "ligne 1622 — affirme toujours « remontée amont déposée (voie 2) », non étayé par l'arbre"
     missing:
-      - "Écrire la conséquence doctrinale de M2 là où un agent la lira (team-kernel.md ou mission-flow.md), pas seulement dans .planning/"
-      - "Rédiger la remontée amont du descripteur `backgroundDispatch: false` au même gabarit que celle des workstreams (rédigée, non postée, ADR-031)"
-      - "Ou recaler le tableau de clôture pour qu'il cesse d'affirmer deux livrables absents"
+      - "Rédiger la remontée amont du descripteur `backgroundDispatch: false` au gabarit de `.planning/upstream/2026-08-04-workflows-aveugles-aux-workstreams.md` (rédigée, non postée, ADR-031)"
+      - "Ou recaler `.planning/ROADMAP.md:1622` pour qu'il cesse d'affirmer un livrable absent"
   - truth: "Le ledger d'exigences est soldé à la clôture de la phase"
-    status: failed
+    status: partial
     reason: >
-      Les **22 identifiants distincts `GSDA-01..22`** de `.planning/REQUIREMENTS.md` (univers =
-      ce seul fichier, comptés par `awk` + `sort -u`) sont **tous à `- [ ]`** : `0` coché, `0` en
-      `[~]`, `22` vides. La table de mapping (`:568-589`) porte « Planned » sur les 22. Contraste
-      immédiat dans le même fichier : les **10** exigences `GSDC` de la Phase 23 sont toutes
-      `- [x]` avec « Done — plan 23-0N ». Deux entrées sont en outre **factuellement fausses au
-      regard du config** : `GSDA-04` et `GSDA-05` sont décrites « **différé**, déclencheur objectif
-      — **non activé** » alors que `.planning/config.json` porte `workflow.windows_enforce: true`
-      et `hooks.workflow_guard: true`, dégel acté par ADR-066. Le ledger décrit un état que la
-      phase a dépassé il y a plusieurs jours.
+      **Moitié 1 : SOLDÉE.** Les **22** identifiants `GSDA-01..22` sont **tous à `- [x]`**
+      (recompte `awk` : `x=22`, aucun `[ ]`, aucun `[~]`). Le commit `7e3c39c` compte exactement
+      **22 hunks d'une ligne**, tous des bascules de case, et les corps d'exigence ont été
+      recalés : `GSDA-04` lit désormais « `workflow.windows_enforce` **est activé** » là où il
+      décrivait un différé.
+      **Moitié 2 : INTACTE.** La table de mapping `.planning/REQUIREMENTS.md:568-589` n'a reçu
+      **aucun hunk** — les **22** lignes portent toujours « **Planned** », et **`GSDA-04` / `GSDA-05`
+      portent toujours « **différé**, déclencheur objectif — **non activé** »** alors que
+      `.planning/config.json` porte `workflow.windows_enforce: true` et `hooks.workflow_guard: true`
+      (relu à l'instant). Le même fichier se contredit désormais **à 200 lignes d'écart** : la case
+      dit fait, la table dit planifié et non activé. Contraste inchangé avec la Phase 23, dont les
+      10 `GSDC` portent « Done — plan 23-0N » (et un « Partiel » motivé pour `GSDC-08`).
     artifacts:
       - path: ".planning/REQUIREMENTS.md"
-        issue: "22/22 GSDA non cochées ; table de mapping « Planned » sur les 22 ; GSDA-04/05 décrites « non activé » contre le config"
+        issue: "table :568-589 — 22× « Planned » ; GSDA-04/05 « non activé » contre le config ; contredit les 22 cases [x] du même fichier"
     missing:
-      - "Passer les 22 GSDA à [x] / [~] selon leur état réel, et la colonne de mapping de « Planned » à « Done »/« Partiel » avec le plan porteur"
-      - "Recaler GSDA-01/04/05 sur ADR-066 (dégel), qui a levé le différé"
-  - truth: "La phase est validée au sens Nyquist, comme le lab l'exige de lui-même"
+      - "Passer la colonne de mapping de « Planned » à « Done »/« Partiel » avec le plan porteur, sur les 22 lignes"
+      - "Effacer la glose « différé — non activé » de GSDA-04 et GSDA-05 (ADR-066 a levé le différé)"
+  - truth: "L'outillage workstream est exercé en CI, et la CI de la branche certifie la phase"
     status: failed
     reason: >
-      `.planning/config.json` porte `workflow.nyquist_validation: true`, et
-      `plugin/dev-orchestrator/references/gsd-capabilities-index.md:199,211` rattache
-      `gsd-validate-phase` et `gsd-nyquist-auditor` à la capability `nyquist` gouvernée par ce
-      toggle — la capacité est donc **active**. Or **aucun `24-VALIDATION.md` n'existe** : balayage
-      `ls .planning/phases/*/*VALIDATION*.md` → **2 fichiers**, ceux des Phases **20** et **23**,
-      aucun pour la 24. Et `nyquist` compte **0 occurrence** sur les **31 fichiers** du dossier de
-      phase (`awk` fichier par fichier, insensible à la casse). L'angle mort relevé sur la Phase 23
-      n'est donc pas seulement reproduit : il est **aggravé** — la 23 avait au moins un
-      `23-VALIDATION.md` en `status: validated` / `nyquist_compliant: false`, la 24 n'a rien.
-      Une phase de 12 plans sur laquelle la continuité d'échantillonnage n'a jamais été posée.
+      **Fait nouveau et décisif : la branche est POUSSÉE et la CI a TOURNÉ.**
+      `git ls-remote --heads origin feat/phase-24-activation-moteur-gsd` rend **1 référence**,
+      identique à `HEAD` (`479eee9…`), et la PR **#34** est ouverte. Le warning **W5** de la
+      vérification initiale (« ce job n'aura jamais tourné pour de vrai ») est donc levé — mais ce
+      que la CI dit maintenant qu'elle parle est **rouge**, et sur les deux jobs qui portent la
+      phase. Sur le run du commit de `HEAD` (`30963489338`, jobs `92172314339` et `92172314385`),
+      relu de première main via `gh run view --log-failed`, jamais via un rapport :
+      **(1) Job « Gates de qualité (mode strict) » → ÉCHEC.** L'étape « Gates workstream-aware sur
+      un arbre RÉELLEMENT partitionné + non-régression racine » sort en 1. Verdicts observés :
+      les **six** assertions de capacité **PASSENT sur le runner** (`1/6 rc=3 · 2/6 rc=0 · 3/6 rc=0
+      · 4/6 rc=0 · 5/6 rc=0 · 6/6 rc=1`) — c'est un gain réel et il faut le dire. Mais le bloc de
+      non-régression racine échoue : `== R1 check-dev-bootstrap racine : rc(sans)=3 rc(avec)=3,
+      sorties de 243 et 356 octet(s) ==`, annotation `::error` « la sortie CHANGE selon
+      GSD_WORKSTREAM sur un arbre NON partitionné — la résolution de workstream a fui hors de son
+      domaine ». `BILAN : 1 écart(s)`. **Reproduit localement** : le delta est **une seule ligne de
+      diagnostic sur stderr** — « workstream « dev » résolu mais ./.planning/workstreams/dev absent
+      — lecture sur la racine ». La résolution ne fuit donc PAS : elle retombe correctement sur la
+      racine et le dit. C'est l'assertion R1 qui est trop stricte (égalité d'octets sur un canal
+      **fusionné** stdout+stderr, ce qui interdit toute ligne de diagnostic). Mais le fait
+      opposable reste : **le job est rouge**.
+      **(2) Job « Suites de tests (découverte non vide) » → ÉCHEC.** `52 suite(s) découverte(s)`,
+      un seul cas rouge : `✗ A5d borne du canal nominal — long: rc=0 raison= nom=[] / court: rc=0
+      nom=[aaaa]` (`plugin/planning-core/scripts/tests/test-workstream-policy.sh:160-185`). Ce cas
+      est **vert sur ce poste** (`14 ok / 0 ko`, rejoué) et **rouge sur le runner Linux**. Lu dans
+      le code : `workstream-policy.sh:286-290` borne bien la valeur (`VF_WS_VALUE_MAX_BYTES=4096`,
+      raison `valeur-trop-longue`, `return 2`), mais sur le runner la fonction rend `rc=0` avec un
+      nom **vide** — soit la branche `:278` `[ -n "$raw" ] || return 0` : la valeur de 200 000
+      octets **n'est jamais arrivée** jusqu'à la borne. La borne de sûreté du canal nominal
+      `GSD_WORKSTREAM` est donc **non prouvée sur Linux** : la sonde censée l'établir emprunte un
+      autre chemin et n'assure rien. C'est exactement la classe « vert chez moi, rouge en CI » que
+      la Phase 24 s'était donné pour objet de fermer.
     artifacts:
-      - path: ".planning/phases/VFDO-24-activation-et-mesure-du-moteur-gsd-capacit-s-dormantes-et-fa/"
-        issue: "aucun 24-VALIDATION.md ; 0 occurrence de « nyquist » sur les 31 fichiers de la phase"
-      - path: ".planning/config.json"
-        issue: "workflow.nyquist_validation: true — capacité active, jamais employée sur cette phase"
+      - path: ".github/workflows/ci.yml"
+        issue: "assertion R1 — égalité d'octets sur stdout+stderr fusionnés, incompatible avec toute ligne de diagnostic ; rouge depuis 795b984"
+      - path: "plugin/planning-core/scripts/tests/test-workstream-policy.sh"
+        issue: "cas A5d vert sur macOS, rouge sur le runner Linux — la borne du canal nominal n'y est pas exercée"
+      - path: "plugin/planning-core/scripts/workstream-policy.sh"
+        issue: "borne :286-290 non atteinte sur Linux (raw vide, sortie par :278) — la valeur démesurée ne parvient pas à la garde"
     missing:
-      - "Lancer /gsd-validate-phase 24 (ou acter par écrit, ADR ou ligne de ROADMAP, que la validation Nyquist est renoncée pour cette phase et pourquoi) — le silence n'est pas une décision"
+      - "Rendre R1 opposable sans être fausse : comparer stdout seul et asserter l'invariance du DIAGNOSTIC séparément, ou tolérer explicitement la ligne « workstream résolu mais … absent — lecture sur la racine »"
+      - "Diagnostiquer pourquoi GSD_WORKSTREAM n'atteint pas la borne :286 sur Linux (limite MAX_ARG_STRLEN / substitution de commande dans la chaîne de résolution), puis rendre le cas A5d portable — ou la borne elle-même"
+      - "Ne pas fusionner : tant que ces deux points ne sont pas soldés, la phase ne peut pas affirmer « exercés en CI » comme un acquis vert"
 deferred:
   - truth: "Publier une release racine (bump VERSION/plugin.json/marketplace.json, tag annoté, release GitHub, check-release-tag.sh --remote ✓)"
     addressed_in: "Geste humain post-fusion, réservé à Samuel (CLAUDE.md § Discipline de release)"
     evidence: >
-      Frontière **non franchie et vérifiée telle** : `git diff main..HEAD` sur les trois fichiers de
-      la triade rend **0 ligne** ; `VERSION` = `v2.47.1`, valeur de `main`. C'est exactement le
-      contrat écrit du plan 24-12 et de la note de fin de section ROADMAP. Ce n'est pas un manque.
+      Frontière **toujours non franchie et re-vérifiée telle** : `git diff --stat main..HEAD` sur
+      les trois fichiers de la triade rend **0 ligne** ; `VERSION` = `v2.47.1`, valeur de `main` ;
+      `scripts/check-release-tag.sh` sort en **rc=0**. Ce n'est pas un manque.
 warnings:
   - id: W1
-    severity: documentaire — non bloquant
+    status: toujours ouvert
+    severity: fait périmé dans le document qui fait foi — non bloquant
     statement: >
-      La note de fin de section ROADMAP (`:1673-1676`) écrit encore que « le gate de sécurité reste
-      **bloquant** (`24-SECURITY.md`, `threats_open: 1`) sur `T-24-02-01` ». **C'est périmé, et la
-      fermeture est RÉELLE, pas cosmétique** — vérifié de première main, contrôle par contrôle,
-      sans faire confiance au fichier : (1) `git show --numstat 7b96e34` → **1 fichier, 7
-      insertions, 7 suppressions**, exactement ce que la mitigation réécrite annonce ; (2)
-      `.planning/WINDOWS.md` compté par `awk` à **87 lignes avant (`7b96e34^`), 87 après
-      (`7b96e34`), 87 aujourd'hui** ; (3) `d89a60e` est bien un commit antérieur et propre ; (4)
-      recomptage indépendant du registre — sur les **51 lignes `T-24-*`** du fichier, **0** porte
-      simultanément un statut `open` et une sévérité `high`/`critical`, donc `threats_open: 0` est
-      **calculé-cohérent**, jamais posé pour satisfaire un gate. Le workflow amont
-      (`ship.md:112-114`) ne lit que `threats_open` : le gate passerait. Seule la ROADMAP est
-      en retard.
-    suggestion: "Recaler la note de fin de § Phase 24 sur threats_open: 0 (hors périmètre de cette vérification — signalé, non corrigé)."
+      La note de fin de section ROADMAP (`:1697-1700`) écrit toujours que « le gate de sécurité
+      reste **bloquant** (`24-SECURITY.md`, `threats_open: 1`) sur `T-24-02-01` ». **Périmé, et la
+      fermeture est réelle** — recomptée indépendamment aujourd'hui, colonne par colonne et non par
+      recherche de mot (« open » apparaît dans la prose des mitigations, ce qui produit un faux
+      positif si on lit la ligne entière) : sur les **51** lignes `T-24-*` du registre,
+      **31 high closed · 13 medium closed · 4 medium open · 3 low closed**, soit **0** menace
+      ouverte de sévérité ≥ `high` (seuil `security_block_on` du lab). `threats_open: 0` est
+      calculé-cohérent. Le gate amont (`ship.md:112`) ne lit que ce champ : il passerait.
+    suggestion: "Recaler la note de fin de § Phase 24 sur threats_open: 0."
   - id: W2
-    severity: contradiction interne au tableau qui « fait foi » — non bloquant
+    status: RÉSOLU
+    severity: —
     statement: >
-      Le tableau de clôture (`:1614`) écrit « **La décision A9, écrite : voie (c) bornée** ». Dans
-      la numérotation du cadrage ROADMAP (`:1574-1582`), **(c) = « borner — workstreams réservés à
-      un usage où les 42 workflows aveugles ne sont jamais sollicités, ce qui demande de dire
-      lesquels »**. Or l'arbitrage et l'ADR disent l'inverse : `24-ARBITRAGES.md:265` porte
-      « **VERDICT SAMUEL — OPTION C : ADOPTION** », et `docs/ADR.md:1930-1933` écrit « *Les
-      workstreams du moteur GSD sont adoptés. Le mot est adoption* […] ni **l'usage restreint sous
-      liste d'exclusions (option B)** », option B qui est précisément le « borner » du ROADMAP,
-      rejeté comme intenable (`24-ARBITRAGES.md:339-340` : « maintenir à la main une liste de 42
-      exclusions contre une cible qui bouge à chaque version amont : c'est un gate qu'on ne peut
-      pas tenir »). Il n'existe donc **aucune liste d'exclusion de workflows hors périmètre**, et
-      il ne doit pas en exister. Ce qui existe — et qui est **substantiel** — est le bornage par
-      limites écrites : `plugin/dev-orchestrator/references/workstreams.md` (166 lignes, 4 risques
-      chacun avec son geste, 10 workflows aveugles nommés, critère K2 déclaré) et ADR-069. La
-      **condition dure « aucune partition tant qu'une phase est en vol »** est portée par
-      `workstreams.md:159-166` **et** `docs/ADR.md:2087-2096`, **par écrit et non par un gate** —
-      aucun script ne l'enforce ; le seul garde-fou machine adjacent est
-      `check-workstream-pointer.sh`, qui échoue bruyamment quand un arbre partitionné n'a aucun
-      canal résolvant (vérifié rc=1 sur fixture). Le mandat demandait si le bornage est écrit :
-      la réponse est **oui pour les limites, non pour la liste d'exclusions — et c'est délibéré**,
-      mais le tableau de clôture nomme mal sa propre décision.
-    suggestion: "Remplacer « voie (c) bornée » par « option C de l'arbitrage — ADOPTION, avec quatre limites datées et une condition dure », pour que le tableau qui fait foi cesse de contredire l'ADR qu'il cite."
+      Le contresens de lettrage A9 est **soldé** (`7e3c39c`). Le ROADMAP porte un encadré
+      « Lettrage » (`:1584-1602`) avec table de correspondance et la règle « ne jamais désigner une
+      voie A9 par une lettre nue » ; `24-ARBITRAGES.md:265-282` porte l'encadré symétrique et
+      déclare son propre lettrage normatif ; la ligne de décision (`:1634-1638`) écrit désormais
+      « **ADOPTION — option C de l'arbitrage** […] soit la voie (a) du lettrage historique », et
+      nomme l'option B (= voie `(c)`) comme **explicitement rejetée**. Conforme à ADR-069
+      (`docs/ADR.md:1930-1933`) et au verdict de Samuel. La décision est bien l'**adoption**.
   - id: W3
+    status: toujours ouvert
     severity: reproductibilité d'un chiffre gravé — non bloquant
     statement: >
-      ADR-067 (`docs/ADR.md:1669-1678`) grave « corpus nommé : les **400 derniers commits sans
-      merge** du dépôt » → « sujet dépassant 72 caractères : **275 / 400 — 68 %** ». **Non
-      reproductible.** Re-dérivation de première main sur exactement ce corpus
-      (`git log --no-merges -n 400 --format=%s`, longueur en caractères puis en octets, `awk`) :
-      **305 / 400 = 76 %** à `HEAD`, **302 / 400** au commit d'écriture de la zone 5 (`1fe5317`) ;
-      la variante `>= 72` donne 311. Aucune lecture naturelle de la définition ne rend 275. Le
-      second chiffre, lui, tient : **63 / 400 = 15 %** de types hors liste amont contre 65 / 400 =
-      16 % annoncés (écart de régex sur le scope/`!`). **La conclusion de l'ADR n'est pas
-      affectée — elle est renforcée** (76 % rejetés au lieu de 68 %). Mais c'est exactement le
-      défaut qu'ADR-069 érige en règle deux entrées plus loin (« tout chiffre gravé dans une ADR
-      porte son corpus, son critère d'inclusion nommé et **sa commande rejouable** ») : ADR-067
-      nomme son corpus et ne porte pas sa commande.
-    suggestion: "Ajouter à ADR-067 la commande rejouable, et recaler 275/400 sur la valeur qu'elle rend."
+      ADR-067 (`docs/ADR.md:1671-1677`) grave « les **400 derniers commits sans merge** » →
+      « sujet dépassant 72 caractères : **275 / 400 — 68 %** ». **Toujours non reproductible.**
+      Re-dérivation de première main sur exactement ce corpus (`git log --no-merges -n 400
+      --format=%s`, longueur en caractères, `awk`) : **308 / 400 = 77 %** à `HEAD` (305 à la
+      vérification initiale — le corpus a glissé de 4 commits, la conclusion pas) ; variante
+      `>= 72` → 314. `docs/ADR.md` n'a reçu depuis qu'**un seul hunk d'une ligne** (correction du
+      chemin de `check-dev-bootstrap.sh` dans le tableau de livrables d'ADR-069) : le chiffre n'a
+      pas été touché. **La conclusion de l'ADR reste renforcée, pas affaiblie.** Corollaire mesuré
+      par `24-VALIDATION.md` §G2 : l'assertion `<automated>` du plan 24-02 pin `69 %`, l'ADR écrit
+      `68 %`, et la mesure rend `77 %` — trois valeurs, aucune commande rejouable.
+    suggestion: "Ajouter à ADR-067 la commande rejouable qu'ADR-069 exige, et recaler 275/400 sur ce qu'elle rend."
   - id: W4
+    status: toujours ouvert
     severity: portabilité du canal A2 — non bloquant
     statement: >
-      Le slot PLANNER est peuplé avec la forme **globale nue** `global:software-architecture` /
-      `global:audit-architecture`, **pas** la forme de plugin namespacée `global:<plugin>:<skill>`
-      qu'annonçait le cadrage A2. Lu dans le moteur (`init.cjs:1765-1816`) : sans second `:`,
-      `isNamespaced` est faux et la résolution est **système de fichiers**, vers le dossier de
-      skills globales du compte ; un skill absent produit un `WARNING` sur stderr et est
-      **silencieusement écarté**. Ici les deux résolvent — vérifié en exécution réelle,
-      `gsd-tools agent-skills gsd-planner` rend le bloc `<agent_skills>` avec les deux entrées et
-      **0 warning**. Mais la doctrine du lab n'atteint `gsd-planner` que **si ces deux skills sont
-      posées dans le compte** : la dépendance est machine-locale, elle ne voyage pas avec le
-      plugin.
-    suggestion: "Écrire cette dépendance d'installation dans GSD-PIPELINE.md §10 (une ligne), ou basculer sur la forme namespacée si les deux skills sont distribuées par un plugin."
+      Le slot PLANNER reste peuplé à la forme **globale nue** (`global:software-architecture`,
+      `global:audit-architecture` — relu dans `.planning/config.json`), pas à la forme namespacée
+      `global:<plugin>:<skill>`. La résolution est donc système de fichiers vers le dossier de
+      skills du compte, et un skill absent est **silencieusement écarté** après un `WARNING` sur
+      stderr. La dépendance est machine-locale : elle ne voyage pas avec le plugin. Non re-testé en
+      exécution cette fois — `gsd-tools` n'est pas sur le `PATH` de ce shell — mais l'exécution
+      réelle de la vérification initiale (bloc `<agent_skills>` rendu, 2 entrées, 0 warning) n'est
+      pas remise en cause : le config n'a pas changé.
+    suggestion: "Écrire cette dépendance d'installation dans GSD-PIPELINE.md §10, ou basculer sur la forme namespacée."
   - id: W5
-    severity: preuve d'exécution — non bloquant
+    status: RÉSOLU — et il ouvre le gap CI
+    severity: —
     statement: >
-      Le tableau de clôture écrit que les quatre gates workstream sont « **exercés en CI** sur un
-      arbre réellement partitionné » (A9) et que `check-capability-activation.sh` est « câblé au
-      job `gates` de la CI » (A8). Le **câblage est réel** (`ci.yml:331-342` et `:361-596`), mais
-      **le job n'a jamais tourné** : `git ls-remote --heads origin
-      feat/phase-24-activation-moteur-gsd` → **0 référence**, la branche n'est pas poussée. Le
-      fichier l'écrit d'ailleurs lui-même (`ci.yml:527-530` : « CE JOB N'AURA JAMAIS TOURNÉ POUR DE
-      VRAI »). **J'ai donc rejoué les six assertions à la main**, sur une fixture partitionnée
-      construite au même patron (`mktemp -d`, dépôt git initialisé et commité) — résultats en
-      section « Gates rejoués ». Elles passent toutes et sont discriminantes. Le constat reste :
-      « exercé en CI » sera vrai au premier push, pas avant.
-    suggestion: "Aucune action de code — la formulation du tableau de clôture devance d'un push l'état des faits."
+      « Le job n'a jamais tourné » n'est **plus vrai** : la branche est poussée
+      (`git ls-remote` → 1 référence, `479eee9…`), la PR #34 est ouverte, et **six runs** existent
+      sur la branche. Les **six assertions de capacité workstream** sont donc désormais
+      **réellement exercées sur un runner GitHub**, et elles **passent** — c'est un acquis dur que
+      la vérification initiale ne pouvait qu'approcher par fixture locale. La contrepartie est le
+      gap 3 ci-dessus : le même job échoue sur sa non-régression racine, et la suite
+      `test-workstream-policy.sh` échoue sur Linux. La CI a cessé d'être une promesse ; elle est
+      devenue un verdict, et il est rouge.
   - id: W6
+    status: toujours ouvert
     severity: cohérence de frontmatter — non bloquant
     statement: >
-      `24-SECURITY.md` porte `status: draft` alors qu'il porte aussi `audited: 2026-08-05` et
-      `threats_open: 0`, et qu'il relate un audit complet de 51 menaces. Le gate de `ship:pre` ne
-      lit que `threats_open` (`ship.md:112-114`), donc rien ne bloque — mais un document audité et
-      soldé qui se déclare brouillon est un piège de relecture. C'est le seul `*-SECURITY.md` du
-      dépôt : aucun précédent de forme ne tranche.
-    suggestion: "Passer status: draft → audited (ou la valeur que le gabarit amont prescrit)."
+      `24-SECURITY.md` porte toujours `status: draft` avec `audited: 2026-08-05` et
+      `threats_open: 0`, pour un registre de 51 menaces intégralement instruit. Le gate de
+      `ship:pre` ne lit que `threats_open` — rien ne bloque — mais un document audité et soldé qui
+      se déclare brouillon est un piège de relecture.
+    suggestion: "Passer status: draft → audited."
   - id: W7
+    status: toujours ouvert
     severity: sortie utilisateur — non bloquant
     statement: >
-      `planning-context.sh` (rendu workstream-aware au plan 24-04, injecté à chaque session) imprime
-      un en-tête inversé quand le fichier est plus court que la borne : « État courant du lab
-      (**45 premières lignes sur 13** — lis le reste à la demande) ». Constaté en exécution réelle
-      sur la fixture partitionnée (STATE.md de 13 lignes, borne d'extrait 45). Cosmétique, mais
-      c'est du texte injecté en contexte de session à chaque démarrage.
-    suggestion: "Borner l'affichage : n'annoncer « N premières lignes sur M » que si N < M."
+      `plugin/planning-core/scripts/planning-context.sh:183` imprime toujours l'en-tête sans
+      borner : `"État courant du lab (${MAX_LINES} premières lignes sur ${total} …)"`, ce qui rend
+      « 45 premières lignes sur 13 » quand le fichier est plus court que l'extrait. Texte injecté
+      en contexte à chaque `SessionStart`.
+    suggestion: "N'annoncer « N premières lignes sur M » que si N < M."
   - id: W8
-    severity: constat périmé dans l'état — non bloquant
+    status: RÉSOLU
+    severity: —
     statement: >
-      `.planning/STATE.md:37-38` inscrit comme reste à arbitrer : « ~70 fichiers suivis portent un
-      chemin absolu contenant le nom d'utilisateur — dépôt PUBLIC, classe non couverte par le
-      scrub ». **Mesuré faux aujourd'hui, deux fois** : `scripts/check-machine-paths.sh` sort en
-      **rc=0** (« 870 fichier(s) suivi(s) balayé(s), aucun chemin absolu de machine ») et mon
-      balayage indépendant `awk` du littéral de chemin de compte sur les **870 fichiers suivis**
-      rend **0**. Soit le constat a été soldé sans être effacé, soit il visait une autre classe
-      (par ex. `$HOME` interpolé) qu'il ne nomme pas.
-    suggestion: "Effacer l'entrée ou la requalifier avec la classe exacte qu'elle vise."
+      Le constat périmé « ~70 fichiers suivis portent un chemin absolu contenant le nom
+      d'utilisateur » a **disparu de `.planning/STATE.md`** avec la compression du frontmatter
+      (`795b984`) — balayage `awk` du motif sur le fichier entier : plus aucune occurrence de ce
+      constat. Le fait qu'il décrivait est par ailleurs re-mesuré faux :
+      `scripts/check-machine-paths.sh` sort en **rc=0** (« 872 fichier(s) suivi(s) balayé(s), aucun
+      chemin absolu de machine »).
+  - id: W9
+    status: nouveau — résiduel de la fermeture du gap 1
+    severity: marge nulle et rationnel périmé — non bloquant
+    statement: >
+      La fermeture du gap 1 est **réelle et vérifiée par discrimination**, mais elle laisse
+      **zéro marge**. Le délimiteur fermant du frontmatter de `.planning/STATE.md` est **exactement
+      à la ligne 60**, et la garde de `check-dev-bootstrap.sh:215` est `NR > 60 { exit }` : une
+      seule ligne de plus et le signal se retait. **Aucun garde-fou machine** ne surveille cette
+      borne — `check-state-integrity.sh` (rc=0) ne mesure que la non-régression des compteurs, et
+      la suite `test-check-dev-bootstrap.sh` (35 cas) n'a **aucun cas de dépassement de borne** (ses
+      trois cas D-04 couvrent l'absence de fichier, la ligne 1 non conforme et une clé manquante).
+      Second point : le commentaire de `ci.yml:532-540` et `:551-557` est désormais **factuellement
+      faux** — il écrit « le frontmatter de .planning/STATE.md fait 81 lignes », « stdout VIDE »,
+      « `len_sans=0 len_avec=0` ». Un relecteur qui s'y fie conclura que R1 est vide, alors que R1
+      est précisément ce qui rougit aujourd'hui.
+    suggestion: "Ajouter un cas « frontmatter de 61 lignes → silence » à test-check-dev-bootstrap.sh, et recaler le rationnel de ci.yml sur l'état réel."
+  - id: W10
+    status: nouveau
+    severity: traçabilité de distribution — non bloquant
+    statement: >
+      Deux modules ont reçu du **contenu distribué après leur bump**, sans entrée de CHANGELOG :
+      `plugin/conductor/references/team-kernel.md` **+35 lignes** (`7e3c39c`, la doctrine M2) et
+      `plugin/dev-orchestrator/references/mission-flow.md` **+26** / `agents/vf-dev-manager.md`
+      **+2** (`479eee9`, Pattern G). Or `plugin/conductor/VERSION` (`v1.20.0`) et
+      `plugin/dev-orchestrator/VERSION` (`v2.12.0`) ont été figés au commit `2b95db2` du plan
+      24-12. La « correspondance exacte 10 touchés / 10 bumpés / 10 CHANGELOG » que la clôture
+      revendiquait n'est **plus vraie**. `scripts/check-version-sync.sh` sort en **rc=0** : il
+      vérifie la cohérence de la triade, jamais l'adéquation contenu ↔ bump. Un lab qui installera
+      `conductor v1.20.0` après la fusion recevra une doctrine que le CHANGELOG de v1.20.0 ne
+      mentionne pas.
+    suggestion: "Soit une entrée de CHANGELOG sous la version courante, soit un bump patch des deux modules avant la fusion."
+  - id: W11
+    status: nouveau
+    severity: périmètre de branche — non bloquant
+    statement: >
+      Le commit `479eee9` (Pattern G — « réveiller un worker coupé avant de le redispatcher »)
+      **n'appartient à aucun plan de la phase** : il n'est réclamé par aucune des 22 `GSDA`, ne
+      figure dans aucun des 12 `*-PLAN.md`, et est postérieur à la fois à la vérification et à la
+      validation Nyquist — laquelle décrit donc un arbre qui n'est plus celui de `HEAD`. Le contenu
+      est légitime (retour d'expérience mesuré de la phase, correctement placé en référence, et
+      `check-agents.sh --strict` reste **rc=0 sur les 6 modules**), mais il entre en distribution
+      sans être passé par un plan. Effet de bord mesuré : `vf-dev-manager.md` passe de 248 à
+      **exactement 250 lignes**, soit le plafond ADR-029 pile — **plus aucune marge**, et aucun
+      autre agent du dépôt ne dépasse 250 (balayage `awk` des 25 fichiers `plugin/*/agents/*.md`).
+    suggestion: "Nommer Pattern G dans le SUMMARY de clôture ou dans le tableau du ROADMAP, pour qu'il ne soit pas du contenu distribué sans porteur."
+  - id: W12
+    status: nouveau
+    severity: écart de mesure sans conséquence — non bloquant
+    statement: >
+      `24-VALIDATION.md` annonce une latence de retour de **37 s** au pire cas
+      (`test-dev-orchestrator.sh`). Re-chronométrée de première main aujourd'hui : **24 s** (184 OK
+      / 0 KO). L'écart est une variance de charge machine, pas un chiffre forgé, et le critère du
+      sign-off (« Feedback latency < 60 s ») **tient dans les deux cas**. Signalé pour que le
+      chiffre ne soit pas cité comme une constante.
+    suggestion: "Aucune action — ou écrire « ~25-40 s selon charge » plutôt qu'une valeur unique."
 behavior_unverified_items: []
 human_verification: []
 ---
 
-# Phase 24 : Activation et mesure du moteur GSD — Rapport de vérification
+# Phase 24 : Activation et mesure du moteur GSD — Rapport de RE-VÉRIFICATION
 
 **Goal ROADMAP** : cesser de payer l'installation d'un moteur sans en prendre les bénéfices —
 **activer** les capacités GSD déjà installées mais dormantes, **mesurer** les faits de runtime que
 VibeFlow présume, et **fermer** les routes qui mènent à un geste inerte.
 
-**Vérifié** : 2026-08-04T22:49:02Z · **Diff** : `fbdb300..012ce1b` (90 commits)
-**Verdict** : **PASS PARTIEL** — l'axe **activer** est livré, éprouvé et substantiel (11 constats
-sur 12) ; l'axe **mesurer** est amputé de M2, dont les deux voies retenues n'ont jamais été des
-tâches de plan ; et l'axe **fermer** est **contredit par la phase elle-même**, qui a rendu muet le
-signal d'orientation de session sur le dépôt réel.
-**Re-vérification** : non — vérification initiale.
+**Re-vérifié** : 2026-08-05T00:34:14Z · **`HEAD` réel** : `479eee9` · **Diff global** :
+`fbdb300..479eee9` (95 commits) · **Diff de re-vérification** : `012ce1b..479eee9` (5 commits)
+**Verdict** : **PASS PARTIEL — la CI est rouge, le ship reste bloqué.**
+**Re-vérification** : oui — après les commits de fermeture des 4 gaps de la vérification initiale
+du 2026-08-04T22:49:02Z (`gaps_found`, 11/12).
 
-## Comment cette vérification a été conduite
+## Ce que cette re-vérification a trouvé que le mandat ne disait pas
 
-Le tableau « État à la clôture » du ROADMAP (`:1599-1612`) fait foi : ses **12 lignes** (M1, M2, M3,
-A1→A9) sont la liste de must-haves. Elles n'ont pas été recopiées — chacune affirme un état de
-l'arbre, et chacune a été constatée sur pièce. Aucun `SUMMARY.md` n'a été accepté comme preuve.
+Deux faits, tous deux constatés en croisant les outils parce que le proxy tronque :
 
-**Univers déclarés** (ce dépôt a payé quatre fois le piège d'univers ; chaque nombre ci-dessous
-porte le sien) :
+1. **`HEAD` n'est pas `f738e8c`.** `git rev-parse HEAD` rend **`479eee9`**. Un cinquième commit
+   (Pattern G) existe. `git log --oneline -12` passé par le proxy ne le montrait **pas**, et la
+   somme des `git show --stat` des quatre commits annoncés ne totalisait pas les 10 fichiers du
+   `git diff --name-only`. C'est ce trou de deux fichiers qui a mené à la découverte.
+2. **La branche est poussée, la PR #34 est ouverte, et la CI a tourné — elle est rouge.** Le
+   warning W5 (« ce job n'aura jamais tourné pour de vrai ») est levé, et ce qu'il a révélé est le
+   gap central de cette re-vérification.
+
+## Les 4 gaps de la vérification initiale, re-mesurés un par un
+
+### Gap 1 — la garde `NR > 60` de `check-dev-bootstrap.sh` : **FERMÉ**
+
+Discrimination rejouée sur fixture jetable — **même script, même `PROJECT.md`, même `config.json`,
+même `ROADMAP.md`**, seul le `STATE.md` change :
+
+| Fixture (`STATE.md` de…) | Délimiteur fermant | rc | stdout |
+|---|---|---|---|
+| `main` (`fbdb300`) | ligne **56** | 3 | `[gsd-engine] Projet piloté par GSD — milestone gsd-migration, phase 26 complete.` |
+| `012ce1b` (état vérifié initialement) | ligne **97** | 3 | **vide** — silence D-04 |
+| **`479eee9` (`HEAD`)** | ligne **60** | 3 | **`[gsd-engine] Projet piloté par GSD — milestone gsd-migration, phase 26 complete.`** |
+
+Et sur le dépôt réel, exécuté à la racine : **rc=3, signal imprimé**. Le commit `795b984`
+(`.planning/STATE.md`, **4 insertions / 41 suppressions**) a sorti les blocs de commentaire de
+mission du frontmatter. Le signal d'orientation de session parle de nouveau. **Gap fermé.**
+
+Résiduel en **W9** : le délimiteur ferme à **exactement 60**, la garde est `NR > 60` — marge nulle,
+aucun garde-fou machine, et le rationnel de `ci.yml:532-557` décrit encore l'ancien état.
+
+### Gap 2 — M2 : **voie 1 fermée, voie 2 toujours ouverte**
+
+**Voie 1 : livrée, et substantielle.** `team-kernel.md:55-89` porte la conséquence doctrinale
+dans `plugin/`, là où un agent la lit au moment de décider comment paralléliser. Elle est
+prescriptive, pas descriptive.
+
+**Voie 2 : absente.** `backgroundDispatch` compte **24 occurrences** sur les **872 fichiers
+suivis** — **0 dans `.planning/upstream/`**, qui contient toujours **un seul fichier**. Et
+`ROADMAP.md:1622` affirme toujours « remontée amont déposée (voie 2) ». Le commit `7e3c39c` n'a pas
+touché cette ligne : son diff sur le ROADMAP se limite à l'encadré de lettrage et à la ligne A9.
+
+### Gap 3 — ledger `GSDA` : **cases soldées, table de mapping intacte**
+
+Les deux moitiés ont bien divergé, exactement comme le mandat le pressentait :
+
+| Moitié | Mesure | Verdict |
+|---|---|---|
+| Cases `- [ ]` / `- [x]` | **22 `[x]` · 0 `[ ]` · 0 `[~]`** — 22 hunks d'une ligne dans `7e3c39c`, corps d'exigence recalés | ✓ **soldée** |
+| Table de mapping `:568-589` | **22× « Planned »** ; `GSDA-04` et `GSDA-05` portent toujours « **différé**, déclencheur objectif — **non activé** » | ✗ **intacte** |
+
+Contre le config relu à l'instant : `workflow.windows_enforce: true`, `hooks.workflow_guard: true`.
+Le fichier se contredit lui-même à 200 lignes d'écart.
+
+### Gap 4 — validation Nyquist : **FERMÉ**
+
+`24-VALIDATION.md` existe (`f738e8c`, 236 lignes), `status: validated`,
+`nyquist_compliant: false`, motif mesuré en frontmatter, au patron de la Phase 23. **Le silence
+est rompu, et il l'est par une décision écrite plutôt que par un vert forgé.**
+
+Le mandat demandait de **re-dériver ses chiffres, pas de les recopier**. Fait, un par un :
+
+| Affirmation de `24-VALIDATION.md` | Ma re-dérivation indépendante | Verdict |
+|---|---|---|
+| **32** blocs `<automated>` sur les 12 plans | balises ouvrantes **32**, fermantes **32**, `<task>` **32** ; répartition par plan identique (3,3,2,3,3,3,2,2,2,3,3,3) | ✓ exact |
+| **27 verts / 5 rouges** sur `HEAD` | extraction mécanique + dés-échappement + ré-exécution des 32 : **27 rc=0 / 5 rc=1** | ✓ exact |
+| Identité des 5 rouges (24-02 ×3, 24-07 T1, 24-10 T2) | rouges observés : `24-02__1/2/3`, `24-07__1`, `24-10__2` | ✓ **les mêmes** |
+| **22 / 22** exigences réclamées | union `GSDA` des 12 plans = **22** ; univers `REQUIREMENTS.md` = **22** ; `comm -23` et `comm -13` rendent **0** des deux côtés | ✓ exact, 0 orpheline |
+| **10** suites vertes | 10 suites rejouées : **rc=0 partout**, et **chaque compte d'assertions correspond** (184, 81, 40, 24, 14, 29, 35, 38, 14, 10) | ✓ exact |
+| G5 : `### Phase` = 13, `#### Phase` = 13, total 26 | **13 et 13** | ✓ exact |
+| G2 : l'ADR écrit 68 %, l'assertion pin 69 % | `ADR.md:1677` → « **275 / 400 — 68 %** » | ✓ exact |
+| Latence **37 s** | re-chronométrée : **24 s** | ⚠ **W12** — variance de charge ; le critère « < 60 s » tient |
+
+Un seul écart, de mesure et non de fait, sans effet sur le sign-off. **Le document est honnête :
+il déclare sa non-conformité au lieu de la maquiller, et ses chiffres tiennent sous
+re-dérivation.** Gap fermé.
+
+## Le gap nouveau, et c'est le plus lourd — la CI parle, et elle dit non
+
+Run du commit de `HEAD` (`30963489338`) et run précédent (`30962911735`) : **mêmes deux échecs**.
+
+### Job « Gates de qualité (mode strict) » — ÉCHEC
+
+Verdicts lus dans le log du runner, pas dans un rapport :
+
+| Assertion | Attendu | Obtenu sur le runner |
+|---|---|---|
+| 1/6 `check-dev-bootstrap` avec ws | rc 3 | **rc=3** ✓ |
+| 2/6 `check-state-integrity` avec ws | rc 0 | **rc=0** ✓ |
+| 3/6 `planning-context` avec ws | rc 0 | **rc=0** ✓ |
+| 4/6 `check-workstream-pointer` avec ws | rc 0 | **rc=0** ✓ |
+| 5/6 `check-dev-bootstrap` sans ws | rc 0 | **rc=0** ✓ |
+| 6/6 `check-workstream-pointer` sans ws | rc 1 | **rc=1** ✓ |
+| **R1** non-régression racine | sortie invariante | **243 vs 356 octets — ÉCART** ✗ |
+| R2 / R3 | rc 3 / rc 0 | ✓ / ✓ |
+
+**Les six assertions de capacité passent réellement sur un runner** — c'est un acquis dur, et il
+faut le porter au crédit de la phase : ce que la vérification initiale n'avait pu qu'approcher par
+fixture locale est maintenant établi. Mais `BILAN : 1 écart(s)`, et le job sort en 1.
+
+**Diagnostic du R1, reproduit localement.** Le delta entre les deux sorties est **une seule ligne
+de diagnostic sur stderr** : « workstream « dev » résolu mais `./.planning/workstreams/dev` absent
+— lecture sur la racine ». La résolution **ne fuit pas** : elle retombe correctement sur la racine
+et l'annonce. L'assertion R1 exige une **égalité d'octets sur stdout et stderr fusionnés**, ce qui
+interdit structurellement toute ligne de diagnostic. **Elle est trop stricte, pas fausse dans son
+intention** — et elle n'était verte auparavant que parce qu'elle comparait deux sorties vides
+(`ci.yml:551-557` le mesure et l'écrit noir sur blanc). Fermer le gap 1 lui a rendu la parole ;
+elle s'en sert pour dire non.
+
+### Job « Suites de tests » — ÉCHEC
+
+`52 suite(s) découverte(s)`, **un seul cas rouge**, et il n'est pas anodin :
+
+```
+✗ A5d borne du canal nominal — long: rc=0 raison= nom=[] / court: rc=0 nom=[aaaa]
+```
+
+`test-workstream-policy.sh:160-185`. Le cas est **vert sur ce poste** (14 ok / 0 ko, rejoué
+aujourd'hui) et **rouge sur le runner Linux**. Ce qu'il prétend prouver est une **borne de
+sûreté** : qu'une valeur de `GSD_WORKSTREAM` de 200 000 octets est refusée **pour sa taille** —
+son commentaire rappelle que sans elle, 400 Ko partent dans le contexte de session par deux hooks
+`SessionStart`.
+
+Lu dans le code : `workstream-policy.sh:286-290` porte bien la borne (`VF_WS_VALUE_MAX_BYTES=4096`,
+raison `valeur-trop-longue`, `return 2`). Mais sur le runner, la fonction rend **`rc=0`, raison
+vide, nom vide** — la signature exacte de la sortie `:278` `[ -n "$raw" ] || return 0`. **La valeur
+n'arrive jamais jusqu'à la borne.** Sur Linux, la borne du canal nominal n'est donc **pas
+exercée**, et la sonde qui devait l'établir n'assure rien.
+
+C'est, mot pour mot, le motif que la Phase 24 s'était donné pour objet de fermer : **une couverture
+verte qui masque un geste mort**. Cette fois sur son propre banc de test.
+
+## Vérité par constat du tableau de clôture (`ROADMAP.md:1619-1632`)
+
+| # | Constat | Statut | Preuve re-mesurée |
+|---|---|--------|--------|
+| **M1** | profondeur de dispatch écrite dans les agents | ✓ VERIFIED | `team-kernel.md:34-35` porte les 5 littéraux du descripteur ; `test-check-agents.sh` rejouée → **81 OK / 0 KO** (T76 exige les 5 littéraux et les 6 champs) |
+| **M2** | acté en doctrine (voie 1) + remontée amont déposée (voie 2) | ✗ **FAILED (partiel)** | voie 1 ✓ (`team-kernel.md:55-89`) · voie 2 ✗ (`.planning/upstream/` = 1 fichier, 0 `backgroundDispatch`) · `ROADMAP.md:1622` l'affirme toujours |
+| **M3** | `effort:` déclaré par **31 agents sur 31** | ✓ VERIFIED | balayage `awk` de `^effort:(low\|medium\|high\|xhigh\|max)$` sur **25 + 6 = 31** : **31 porteurs, 0 manquant** ; `check-agents.sh --strict` **rc=0 sur les 6 modules** |
+| **A1** | `windows_enforce` présent et à `true` | ✓ VERIFIED | `.planning/config.json` relu → `workflow.windows_enforce: true` ; `check-state-integrity.sh` rc=0 |
+| **A2** | slot PLANNER ouvert (2 skills) | ✓ VERIFIED | `agent_skills.gsd-planner` = 2 entrées. Réserve de portabilité inchangée : **W4** |
+| **A3** | `tdd_mode` inchangé, par décision écrite | ✓ VERIFIED | clé **absente** du config ; refus motivé `GSD-PIPELINE.md:268-287` |
+| **A4** | profils de contexte refusés, par décision écrite | ✓ VERIFIED | clé `context` **absente** ; ADR-068 volet 1 |
+| **A5** | `workflow_guard` à `true` ; `hooks.community` refusé | ✓ VERIFIED | `hooks: { context_warnings: true, workflow_guard: true }` — `community` absent ; ADR-067. Réserve : **W3** |
+| **A6** | seuil inline chiffré, laissé au défaut | ✓ VERIFIED | clé non posée ; ADR-068 volet 2 |
+| **A7** | `intel.enabled: true` | ✓ VERIFIED | `.planning/config.json` → `intel: { enabled: true }` |
+| **A8** | refus indexés, entrées conditionnelles, trou fermé par un gate câblé en CI | ✓ VERIFIED **— et désormais prouvé sur runner** | `intent-routing.md:104,147` conditionnelles ; `check-capability-activation.sh` **rc=0** localement **ET étape ✓ verte dans le job CI** ; `test-check-capability-activation.sh` **29 / 29** |
+| **A9** | outillage workstream-aware **exercé en CI** ; adoption acquise | ✗ **FAILED (partiel)** | Adoption ✓ (ADR-069, lettrage corrigé, W2 résolu ; mesure re-dérivée **à l'identique** : `atteinte=91`, `K2=7`, `en dur=45`, `aveugles=42`). Exercice CI : **les 6 assertions passent sur runner**, mais le job **échoue** (R1) et `test-workstream-policy.sh` **échoue sur Linux** (A5d) |
+
+**Score : 10 / 12 constats vérifiés** (contre 11 / 12 à l'initiale — M2 progresse sans être soldé,
+A9 régresse parce que la CI a cessé de se taire).
+
+## Gates et suites rejoués sur `479eee9` (poste local)
+
+**20 gates** (`scripts/check-*.sh` = 3 · `plugin/*/scripts/check-*.sh` = 17). Convention : `0` =
+conforme, `1` = écart, `3` = sain/silence, `64` = usage. **Aucun `1`.**
+
+| Gate | rc | Note |
+|---|---|---|
+| `check-machine-paths.sh` | **0** | **872** fichiers suivis balayés, aucun chemin absolu de machine |
+| `check-version-sync.sh` | **0** | triade `v2.47.1`, badges, 52 suites |
+| `check-release-tag.sh` | **0** | `VERSION` ↔ tag |
+| `check-agents.sh --strict` ×6 modules | **0** ×6 | conformes après Pattern G |
+| `check-branch-claim.sh` · `check-mission-invariants.sh` · `check-workstream-pointer.sh` · `check-dev-bootstrap.sh` · `check-doc-drift.sh` · `check-gsd-config.sh` · `check-gsd-engine.sh` · `check-file-size.sh` | **3** | sains / silence — `check-dev-bootstrap` **imprime enfin son signal** |
+| `check-legacy.sh` · `check-overlaps.sh` · `check-state-integrity.sh` · `check-debug-research.sh` · `check-plugin-update.sh` · `check-registres.sh` · `check-capability-activation.sh` · `check-planning-state.sh` | **0** | conformes |
+
+| Suite rejouée | rc | Résultat | Durée |
+|---|---|---|---|
+| `test-dev-orchestrator.sh` | 0 | **184 OK / 0 KO / 0 SKIP** | 24 s |
+| `test-check-agents.sh` | 0 | **81 OK / 0 KO** | 3 s |
+| `test-check-state-integrity.sh` | 0 | **40 ok / 0 ko** | 5 s |
+| `test-check-workstream-pointer.sh` | 0 | **24 ok / 0 ko** | 1 s |
+| `test-guard-agent-write.sh` | 0 | **14 OK / 0 KO** | 0 s |
+| `test-check-capability-activation.sh` | 0 | **29 OK / 0 KO** | 1 s |
+| `test-check-dev-bootstrap.sh` | 0 | **35 ok / 0 ko** | 1 s |
+| `test-planning-context-hardening.sh` | 0 | **38 passés / 0 échoués** | 1 s |
+| **`test-workstream-policy.sh`** | **0** | **14 ok / 0 ko** — ⚠ **rouge sur le runner Linux (A5d)** | 4 s |
+| `test-workstream-symlink-escape.sh` | 0 | **10 ok / 0 ko** | 1 s |
+
+**Le poste local ne suffit plus à certifier cette phase** : la ligne `test-workstream-policy.sh` est
+verte ici et rouge là-bas. C'est le seul enseignement dont on ne pouvait pas disposer avant le push.
+
+## Menaces — recompte indépendant du registre (`24-SECURITY.md`)
+
+Recompté **par colonne**, pas par recherche du mot « open » dans la ligne (qui produit un faux
+positif : la prose des mitigations contient « reopen », « ouvert ») :
+
+| Sévérité | closed | open |
+|---|---|---|
+| high | **31** | **0** |
+| medium | 13 | 4 |
+| low | 3 | 0 |
+| **Total lignes `T-24-*`** | **51** | |
+
+**0** menace ouverte de sévérité ≥ `high` (seuil `security_block_on` du lab). `threats_open: 0` est
+**calculé-cohérent**. L'acquis `T-24-02-01` tient. Seule la note du ROADMAP est en retard (**W1**).
+
+## Univers déclarés
 
 | Univers | Définition exacte | Compte |
 |---|---|---|
-| Fichiers suivis | `git ls-files` | **870** |
-| Fichiers modifiés par la phase | `git diff --name-only fbdb300..012ce1b` | **159** |
-| Agents | `plugin/*/agents/*.md` (**25**) **+** `plugin/*/AGENT.md` (**6**) | **31** |
-| Modules | `plugin/*/module.json` | **17** (dont **10** touchés) |
-| Gates | `scripts/check-*.sh` (**3**) **+** `plugin/*/scripts/check-*.sh` (**17**) | **20** |
-| Suites de test | `find plugin scripts -path '*/tests/test-*.sh'` (**récursif** — le glob à profondeur 1 n'en rend que 46) | **52** |
-| Exigences de la phase | identifiants `GSDA-\d\d` distincts dans `.planning/REQUIREMENTS.md` | **22** |
-| Workflows amont | `~/.claude/gsd-core/workflows/*.md`, profondeur 1, gsd-core **1.9.1** | **91** |
+| Fichiers suivis | `git ls-files` | **872** |
+| Fichiers modifiés depuis la vérification initiale | `git diff --name-only 012ce1b..479eee9` | **10** |
+| Agents | `plugin/*/agents/*.md` (**25**) + `plugin/*/AGENT.md` (**6**) | **31** |
+| Gates | `scripts/check-*.sh` (**3**) + `plugin/*/scripts/check-*.sh` (**17**) | **20** |
+| Suites de test | `find plugin scripts -type f -path '*/tests/test-*.sh'` | **52** (confirmé par la CI : « 52 suite(s) découverte(s) ») |
+| Blocs `<automated>` de la phase | balises ouvrantes sur les 12 `*-PLAN.md` | **32** (fermantes : 32) |
+| Exigences de la phase | `GSDA-\d\d` distincts dans `.planning/REQUIREMENTS.md` | **22** (union des plans : 22, écart nul aux deux sens) |
+| Workflows amont | `~/.claude/gsd-core/workflows/*.md`, profondeur 1 | **91** (compteur d'atteinte de la commande ADR-069) |
 
-`grep` et `find` étant proxifiés et tronquants sur ce poste, tous les comptes ci-dessus sont faits
-en `awk` lisant les fichiers lui-même, ou en `comm` sur listes triées, et croisés sur deux formes
-quand le nombre est porteur.
+`grep` et `find` étant proxifiés et tronquants sur ce poste — et `git log` l'ayant démontré en
+masquant un commit —, tous les comptes sont faits en `awk` lisant les fichiers lui-même, en `comm`
+sur listes triées, ou en `git` invoqué directement, et croisés sur deux formes quand le nombre est
+porteur.
 
-## Vérité par constat du tableau de clôture
+## Synthèse — ce qu'il reste avant `/gsd-ship`
 
-| # | Constat | Statut | Preuve |
-|---|---|--------|--------|
-| **M1** | profondeur de dispatch écrite dans les agents | ✓ VERIFIED | `plugin/conductor/references/team-kernel.md:28-53` — descripteur recopié verbatim (`maxDepth: 5`, `backgroundDispatch: false`, `subagentToolkit: "full"`), consommation nommée (**3 sur 5**), marge écrite **comme une permission** (« un worker peut légitimement dispatcher un sous-worker »), et **sa borne** (la marge n'autorise ni le contournement de la voie unique GSDC-05 ni celui des allowlists P12). Gardé par assertion machine : `test-check-agents.sh:1391-1414` (T76) exige les 5 littéraux et les 6 champs du descripteur. Suite rejouée : **81 OK / 0 KO**. |
-| **M2** | acté en doctrine (voie 1) + remontée amont déposée (voie 2) | ✗ **FAILED** | **Ni l'un ni l'autre.** Balayage `awk` des **870 fichiers suivis** sur `intra-.tape\|inter-n.uds` → **14 hits, tous dans `.planning/`**, **0 dans `plugin/`, 0 dans `docs/`**. `.planning/upstream/` ne contient qu'un fichier (workstreams). `M2` est absent de `24-01-PLAN.md`, `24-10-PLAN.md` et `24-10-SUMMARY.md` — les deux nœuds cités en colonne « Où » — et aucune des 22 `GSDA` ne le couvre. Voir `gaps`. |
-| **M3** | « `effort:` déclaré par aucun agent » → **31 sur 31** | ✓ VERIFIED | Balayage `awk` de `^effort:\s*(low\|medium\|high\|xhigh\|max)$` sur l'univers **25 + 6 = 31** : **31 porteurs, 0 manquant**. Gate durci et **discriminant par mutation réelle** : copie de `plugin/dev-orchestrator/agents/` avec `^effort:` retiré d'un fichier → `check-agents.sh --strict` sort en **rc=1**, « `vf-auditer.md` : effort absent — bareme par role requis ». Sur l'arbre réel, les **6** modules à dossier `agents/` sortent tous en **rc=0**. Réserve de forme : `24-01-SUMMARY.md:13,36` dit encore « les 25 agents » — le second balayage (`AGENT.md`) n'y est pas ; le tableau de clôture l'a corrigé, le SUMMARY non. |
-| **A1** | `windows_enforce` **présent et à `true`** (dégel, ADR-066) | ✓ VERIFIED | `.planning/config.json` → `workflow.windows_enforce: true`. Ledger cohérent : `open_count: 0`, `waived_count: 1`, `fixed_count: 4`, `total_count: 5`. Fenêtre **#3** effectivement `"status": "waived"` avec motif écrit (recette XcodeBuildMCP structurellement infermable — aucun `.mcp.json`, aucun projet iOS). Intégrité du waive re-vérifiée indépendamment : commit `7b96e34` = **1 fichier / 7+ / 7−**, fichier à **87 lignes avant, après et aujourd'hui**. ADR-066 (`docs/ADR.md:1565-1653`) motive le dégel et pose le résiduel opposable (« la première prose écrite sous le ledger rouvre l'entrée »). |
-| **A2** | slot **PLANNER** ouvert (2 skills) ; `gsd-executor` délibérément non câblé | ✓ VERIFIED | **Résolution éprouvée en exécution réelle**, pas lue : `gsd-tools agent-skills gsd-planner` rend le bloc `<agent_skills>` avec les **deux** entrées et **0 warning** (`buildAgentSkillsBlock` appelé directement rend le même bloc, `diagnostics.warnings = []`). Les deux `SKILL.md` existent. Slot consommé par **3** workflows amont sur 91 (`plan-phase.md`, `quick.md`, `verify-work.md`). **Le non-câblage de l'exécuteur est écrit, motivé et opposable** — `plugin/dev-orchestrator/references/GSD-PIPELINE.md:246-258` : l'injection ne vit que dans le prompt de dispatch d'`execute-phase.md:715`, `gsd-executor` est hors de l'allowlist de `vf-coder` depuis GSDC-05, et le repli inline n'emprunte aucun prompt de dispatch → « peupler le slot exécuteur serait un **vert à vide** ». Suivi d'une **interdiction** explicite et d'une charge de la preuve inversée. Ce n'est pas un abandon silencieux. Réserve de portabilité : **W4**. |
-| **A3** | `tdd_mode` inchangé, **par décision écrite** | ✓ VERIFIED | Clé **absente** du config (défaut amont `false` s'applique). Refus écrit avec **quatre faits mesurés** : `GSD-PIPELINE.md:268-287` — `references/tdd.md` (330 l.) déjà injecté sans condition (`execute-phase.md:693`), hook `execute:post` `blocking: false` / `onError: skip`, ce que le toggle ajoute réellement, et l'inadéquation de l'heuristique amont à un dépôt bash + markdown. |
-| **A4** | profils de contexte **refusés**, par décision écrite | ✓ VERIFIED | **ADR-068** (`docs/ADR.md:1717-1822`, enregistrée `:39`). Substantielle et **auto-corrective** : elle rectifie le nom de la clé porteuse (`context_profile`, et non `context:` comme l'écrivaient les trois fichiers livrés), refuse d'écrire « dépréciée » que l'amont n'a jamais dit, motive par « il n'y a rien à activer » (6 occurrences amont, toutes dans `docs/`), et pose un **déclencheur de réexamen objectif et sans date**. Clé `context` **absente** du config — cohérent. |
-| **A5** | `workflow_guard` **à `true`** ; `hooks.community` **refusé** | ✓ VERIFIED | `.planning/config.json` → `hooks.workflow_guard: true`, `hooks.community` absent. Refus acté par **ADR-067** (`docs/ADR.md:1655-1716`, enregistrée `:38`) avec corpus nommé et les six types maison énumérés. Réserve sur un chiffre : **W3**. |
-| **A6** | seuil inline **chiffré**, laissé au défaut | ✓ VERIFIED | **ADR-068 volet 2** (`docs/ADR.md:1824-1910`) : mesure sur les `*-PLAN.md`, regex du moteur, **4 / 28 = 14 %** sous le seuil, **mode à 3 tâches — juste au-dessus**, ré-instrumentée à 8 / 40 = 20 % après extension du corpus. Résout la contradiction apparente avec la doctrine de délégation (la doctrine vise l'**acteur**, le seuil se lit **dans** la brique). Clé non posée → défaut `2`. A6 n'est plus un « levier inconnu ». |
-| **A7** | `intel.enabled: true` | ✓ VERIFIED | `.planning/config.json` → `intel: { enabled: true }`. Frontière écrite là où elle sera lue : `plugin/dev-orchestrator/references/docs-flow.md:73-93` — `.planning/codebase/` = jugement humain daté, lecteurs prescrits ; `.planning/intel/` = cinq JSON machine, fait dérivé rafraîchissable. La promesse publiée par notre propre doc (le mode `--query` comme l'un des deux modes normaux) devient tenue. |
-| **A8** | refus indexés, entrées **conditionnelles**, trou fermé par un **gate** câblé en CI | ✓ VERIFIED | Entrées marquées à la forme littérale contractuelle : `intent-routing.md:104` (« `gsd-graphify` (conditionnelle : graphify.enabled) — refusée en Phase 24 ») et `:147` (idem `gsd-profile-user` / `profile-pipeline.enabled`). `gsd-capabilities-index.md` porte les toggles (`:196`, `:200`, `:213`). Gate câblé au job `gates` : `ci.yml:331-342`. **Discriminance prouvée par mutation réelle** — sur une copie de l'arbre, retrait du seul parenthétique `(conditionnelle : graphify.enabled)` de la ligne 104 → **rc=1**, « ECART regle 2bis : la brique « gsd-graphify » est promise par une entree de table alors que son toggle « graphify.enabled » est INACTIF ». Sur l'arbre réel : **rc=0**, univers balayé annoncé (23 toggles, 7 inactifs, 10 briques routées dont 6 sous toggle inactif, 2 toggles sous marqueur). Suite : **29 / 29**. |
-| **A9** | outillage **workstream-aware**, exercé sur un arbre partitionné ; adoption non acquise | ✓ VERIFIED | Les **quatre** gates sont workstream-aware et **je les ai exercés moi-même** sur une fixture réellement partitionnée (section suivante) : les six assertions passent, la discriminance est réelle. Iron Law 2 révisée et **lue à l'ancre annoncée** : `plugin/conductor/AGENT.md:115`, avec sa **trace de révision** `:119-126` conservant la formulation antérieure. **ADR-069** (`docs/ADR.md:1921-2140`) est substantielle : prix de l'adoption tabulé, méthode avant les chiffres, quatre risques chacun avec sa mitigation, condition dure motivée, ADR-064 amendée. **Sa mesure se re-dérive exactement** : commande d'ADR-069 rejouée telle quelle → `atteinte=91`, `K2=7`, `en dur=45`, `aveugles=42`. Réserves de nommage et d'exécution : **W2**, **W5**. |
+1. **Rendre la CI verte** (bloquant, et c'est nouveau). Deux points distincts :
+   **(a)** R1 asserte une égalité d'octets sur un canal fusionné et interdit donc toute ligne de
+   diagnostic — la rendre opposable sans être fausse ; **(b)** le cas A5d n'exerce pas la borne du
+   canal nominal sur Linux : la borne y est **non prouvée**, ce qui est un fait de sûreté, pas un
+   fait de test.
+2. **M2 voie 2** : rédiger la remontée amont du descripteur au gabarit déjà validé, ou recaler
+   `ROADMAP.md:1622` pour qu'il cesse d'affirmer un livrable absent.
+3. **Table de mapping des exigences** : 22 lignes « Planned » → état réel, et effacer la glose
+   « différé — non activé » de `GSDA-04` / `GSDA-05`.
+4. **W1** (note ROADMAP sur `threats_open`), **W9** (marge nulle sur la borne de 60 + rationnel
+   `ci.yml` périmé), **W10** (deux modules avec du contenu distribué après leur bump) — à traiter,
+   non bloquants.
+5. **W3, W4, W6, W7, W11, W12** — signalés, non bloquants.
 
-**Score : 11 / 12 constats du tableau de clôture vérifiés.**
+**La release racine reste hors périmètre et re-vérifiée non franchie** : `0` ligne d'écart depuis
+`main` sur la triade, `VERSION = v2.47.1`, `check-release-tag.sh` rc=0. Geste humain gaté, conforme
+au contrat.
 
-## Le point qui coûte le plus — l'axe « fermer » retourné contre la phase
-
-C'est le seul gap que je n'attendais pas, et c'est le plus sérieux.
-
-`check-dev-bootstrap.sh` est le gate qui, au `SessionStart`, dit à l'agent où en est le lab. Sa
-lecture du frontmatter de `.planning/STATE.md` est **bornée à 60 lignes** (soupape D-04,
-`:203-227`) : au-delà, il ne rend **rien**, délibérément, pour ne jamais imprimer une valeur non
-assainie.
-
-Le frontmatter de `.planning/STATE.md` fermait à la **ligne 56** sur `main` (`fbdb300`, qui est
-aussi le `merge-base`). Il ferme à la **ligne 97** sur `HEAD`. **+41 lignes**, toutes des blocs de
-commentaire de mission Phase 24 (`:11-96`), le premier dépassement étant attribuable au commit
-`05ec458` (« docs(24): etat — mission Phase 24 en pause sur checkpoint humain »), qui porte le
-délimiteur à 64.
-
-Discrimination jouée en zone temporaire, **même script, même `PROJECT.md`, même `config.json`,
-même `ROADMAP.md`** — seul le `STATE.md` change :
-
-| Fixture | rc | stdout |
-|---|---|---|
-| `STATE.md` de `main` (`fbdb300`) | 3 | `[gsd-engine] Projet piloté par GSD — milestone gsd-migration, phase 26 complete.` |
-| `STATE.md` de `HEAD` (`012ce1b`) | 3 | **vide** — `[check-dev-bootstrap] frontmatter […] illisible ou invalide — silence (D-04).` |
-
-Sur le dépôt réel, aujourd'hui, le signal d'orientation de session est **mort**.
-
-Ce n'est pas une découverte : `ci.yml:532-540` décrit exactement le mécanisme, nomme la fiche
-`F-35` comme périmée, et **choisit d'écrire l'assertion autour du défaut** plutôt que de le
-corriger — pour de bonnes raisons de CI (asserter la sous-chaîne rougirait le job ; asserter
-« stdout vide » graverait l'état dégradé comme norme). Le choix est défendable **pour l'assertion**.
-Ce qui ne l'est pas, c'est que la dette n'existe **nulle part où un workflow la lira** :
-`WINDOWS.md` est à `open_count: 0`, `.planning/codebase/CONCERNS.md` n'en dit pas un mot,
-`REQUIREMENTS.md` non plus. Un commentaire de `ci.yml` n'est pas un ledger.
-
-Le cadrage A8 nommait le motif : « une couverture verte peut masquer un geste mort ». La phase a
-fermé ce trou pour la documentation (gate d'activation, mutation à l'appui) et l'a **rouvert d'un
-cran plus haut**, sur son propre signal de démarrage.
-
-## Gates rejoués sur `HEAD` — codes de sortie observés
-
-Univers : **20** gates (`scripts/check-*.sh` = 3, `plugin/*/scripts/check-*.sh` = 17). Convention du
-dépôt : `0` = conforme, `1` = écart, `3` = sain/silence, `64` = usage.
-
-| Gate | rc | Verdict observé |
-|---|---|---|
-| `scripts/check-machine-paths.sh` | **0** | 870 fichiers suivis balayés, aucun chemin absolu de machine |
-| `scripts/check-version-sync.sh` | **0** | triade 2.47.1, badges, **52 suites** ✓ |
-| `scripts/check-release-tag.sh` | **0** | `VERSION=v2.47.1 ↔ tag v2.47.1` |
-| `plugin/conductor/scripts/check-agents.sh --strict` (×6 modules) | **0** ×6 | conformes ; mutation « effort retiré » → **1** |
-| `plugin/conductor/scripts/check-branch-claim.sh` | **3** | branche pilotée depuis cet arbre |
-| `plugin/conductor/scripts/check-legacy.sh` | **0** | à jour (ADR-052/053) |
-| `plugin/conductor/scripts/check-mission-invariants.sh` | **3** | tous les globs matchent |
-| `plugin/conductor/scripts/check-overlaps.sh` | **0** | recouvrements connus (ADR-057) |
-| `plugin/conductor/scripts/check-state-integrity.sh` | **0** | `.planning/STATE.md` conforme |
-| `plugin/conductor/scripts/check-workstream-pointer.sh` | **3** | silence — dépôt non partitionné |
-| `plugin/conductor/scripts/check-debug-research.sh` | **0** | rien à vérifier |
-| `plugin/conductor/scripts/check-plugin-update.sh` | **0** | — |
-| `plugin/consolidator/scripts/check-registres.sh` | **0** | rien à vérifier |
-| `plugin/dev-orchestrator/scripts/check-capability-activation.sh` | **0** | conforme ; **mutation → 1** |
-| `plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh` | **3** | ⚠ **silence D-04** — voir le gap ci-dessus |
-| `plugin/dev-orchestrator/scripts/check-doc-drift.sh` | **3** | 4 commits < seuil 20 |
-| `plugin/dev-orchestrator/scripts/check-gsd-engine.sh` | **3** | moteur `@opengsd/gsd-core` détecté |
-| `plugin/planning-core/scripts/check-planning-state.sh` | **0** | STATE.md frais |
-| `plugin/software-architecture/scripts/check-file-size.sh` | **3** | usage (attend `--staged`/`--all`/fichiers) |
-
-### Suites de la phase, rejouées
-
-| Suite | Résultat |
-|---|---|
-| `test-check-agents.sh` | **81 OK / 0 KO** |
-| `test-check-capability-activation.sh` | **29 OK / 0 KO** |
-| `test-check-workstream-pointer.sh` | **24 ok / 0 ko** |
-| `test-check-dev-bootstrap.sh` | **35 ok / 0 ko** |
-| `test-check-state-integrity.sh` | **40 ok / 0 ko** |
-| `test-planning-context-hardening.sh` | **38 passés / 0 échoués** |
-| `test-workstream-policy.sh` | **14 ok / 0 ko / 0 skip** |
-| `test-workstream-symlink-escape.sh` | **10 ok / 0 ko** |
-
-### Le job CI workstream, rejoué à la main (il n'a jamais tourné — W5)
-
-Fixture reconstruite au patron de `ci.yml:379-428` : `mktemp -d`, `.planning/workstreams/dev/`
-peuplé, racine du `.planning` **vide** de `ROADMAP.md` et `STATE.md` (c'est ce qui rend la fixture
-discriminante), dépôt git initialisé et commité.
-
-| # | Assertion | Attendu | Obtenu |
-|---|---|---|---|
-| 1/6 | `check-dev-bootstrap` avec `GSD_WORKSTREAM=dev` | rc 3 + orientation gsd-engine | **rc=3** — « [gsd-engine] Projet piloté par GSD — milestone fixture, phase 1 en cours. » |
-| 2/6 | `check-state-integrity` avec ws | rc 0 sur le fichier du compartiment | **rc=0** — « ✓ `.planning/workstreams/dev/STATE.md` conforme » |
-| 3/6 | `planning-context` avec ws | rc 0, en-tête nommant le compartiment | **rc=0** — « STATE.md du workstream `dev` » |
-| 4/6 | `check-workstream-pointer` avec ws | rc 0, canal nommé | **rc=0** — « résolu par le canal env (GSD_WORKSTREAM) […] composable avec ADR-064 » |
-| 5/6 | `check-dev-bootstrap` **sans** ws (discriminance) | rc 0 + « feuille de route absente » | **rc=0** — « [bootstrap] démarrage inachevé : feuille de route absente » |
-| 6/6 | `check-workstream-pointer` **sans** ws | rc 1 + remède + motif + ADR-064 | **rc=1** — « `.planning/` est PARTITIONNÉ mais aucun canal composable ne résout de workstream » |
-
-Les six passent. **1/6 ≠ 5/6 et 4/6 ≠ 6/6** : la fixture discrimine réellement, ces gates ne sont
-pas verts à vide. La mesure d'ADR-069 se re-dérive à l'identique (`atteinte=91`, `K2=7`,
-`en dur=45`, `aveugles=42`).
-
-## Couverture des exigences
-
-Les **22** identifiants `GSDA-01..22` (univers = `.planning/REQUIREMENTS.md`) ont été confrontés au
-code, pas à leur case.
-
-| Exigence | Statut dans le code | Preuve |
-|---|---|---|
-| GSDA-01 | ✓ SATISFAITE (par dégel) | ADR-066 : prérequis déclaré **insatisfiable** (npm `latest` = 1.9.1), risque #2893 mesuré nul sur un `WINDOWS.md` sans prose, résiduel opposable écrit |
-| GSDA-02 | ✓ SATISFAITE | slot résolu en exécution réelle, 0 warning ; portée réelle et **interdiction** écrites (`GSD-PIPELINE.md:246-258`) |
-| GSDA-03 | ✓ SATISFAITE | clé absente ; refus + 4 faits mesurés (`GSD-PIPELINE.md:268-287`) |
-| GSDA-04 | ✓ SATISFAITE | `windows_enforce: true` ; #3 `waived` avec motif ; intégrité du waive re-vérifiée (87/87/87, 7+/7−) |
-| GSDA-05 | ✓ SATISFAITE | `hooks.workflow_guard: true`, aucune édition de `settings.json` |
-| GSDA-06 | ✓ SATISFAITE (chiffre à recaler) | ADR-067 ; le taux gravé n'est pas reproductible → **W3**, conclusion inchangée |
-| GSDA-07 | ✓ SATISFAITE | `intel.enabled: true` + frontière `docs-flow.md:73-93` |
-| GSDA-08 | ✓ SATISFAITE | `intent-routing.md:104,147` conditionnelles ; index porteur des toggles |
-| GSDA-09 | ✓ SATISFAITE | gate créé, câblé `ci.yml:331-342`, **discriminance par mutation** (rc=1), suite 29/29 |
-| GSDA-10 | ✓ SATISFAITE | ADR-068 volet 1, factuellement auto-corrigée, déclencheur objectif |
-| GSDA-11 | ✓ SATISFAITE | ADR-068 volet 2, 4/28 = 14 %, mode à 3, seuil laissé à 2 |
-| GSDA-12 | ✓ SATISFAITE | Iron Law 2 révisée, `conductor/AGENT.md:115` + trace `:119-126` |
-| GSDA-13 | ✓ SATISFAITE | assertions 1/6, 2/6, 5/6 rejouées ci-dessus |
-| GSDA-14 | ✓ SATISFAITE | assertion 3/6 rejouée |
-| GSDA-15 | ✓ SATISFAITE | `--ws`/`GSD_WORKSTREAM` portés par **2** agents sur 31 — `vf-dev-manager.md:34`, `vf-coder.md:42`, les deux du chemin de dev, périmètre écrit en ADR-069 ; référence de module `workstreams.md` (166 l.) ; **23** fichiers de `plugin/` mentionnent « workstream » contre **3** au cadrage |
-| GSDA-16 | ✓ SATISFAITE | `check-workstream-pointer.sh` (assertions 4/6 et 6/6), suite 24/24 |
-| GSDA-17 | ⚠ SATISFAITE EN CODE, **jamais exécutée** | `ci.yml:361-596` ; branche non poussée → **W5**. Les six assertions rejouées à la main passent |
-| GSDA-18 | ✓ SATISFAITE | ADR-069, quatre risques + condition dure ; mesure re-dérivée à l'identique |
-| GSDA-19 | ✓ SATISFAITE | `.planning/upstream/2026-08-04-workflows-aveugles-aux-workstreams.md`, **178 lignes**, bandeau « rédigé, non posté » (ADR-031) — exactement ce que l'exigence demande |
-| GSDA-20 | ✓ SATISFAITE | `team-kernel.md:28-53` + garde T76 |
-| GSDA-21 | ✓ SATISFAITE | 31/31 (l'exigence dit « 25 » — l'univers a été corrigé en cours de phase) |
-| GSDA-22 | ✓ SATISFAITE | durcissement + mutation rc=1 |
-
-**22 / 22 satisfaites dans le code.** Mais **0 / 22 soldées au ledger** : les 22 cases sont à
-`- [ ]` et la table de mapping (`:568-589`) porte « Planned » sur les 22, dont deux entrées
-(`GSDA-04`, `GSDA-05`) qui décrivent un différé que le config a levé. Voir `gaps`. Aucune exigence
-orpheline : la ROADMAP annonce `GSDA-01 → GSDA-22`, les 22 sont réclamées par au moins un plan.
-
-## M2 — pourquoi c'est un manque et pas une omission de rédaction
-
-Le lot MESURE avait trois faits. M1 et M3 sont livrés, et bien. M2 avait été **mesuré** le
-2026-07-31 (sondes horodatées, 91 % et 92 % de recouvrement) — ce travail est réel et n'est pas en
-cause. Ce qui est en cause, ce sont les **deux voies retenues par arbitrage** sur cette mesure :
-
-1. **Acter et documenter** que sur ce runtime le parallélisme inter-nœuds de `vf-dev-manager` est le
-   seul effectif, et que celui, intra-étape, des vagues GSD est perdu par décision du moteur.
-   → **Absent de `plugin/` et de `docs/`.** Le constat ne vit que dans `.planning/`, c'est-à-dire
-   là où aucun agent ne le lira au moment de décider comment paralléliser. Le ROADMAP écrivait
-   pourtant « écrire **en doctrine** », et qualifiait la voie de « gratuite, immédiate ».
-2. **Signaler le descripteur en amont** (`backgroundDispatch: false` est *fail-closed*, non
-   descriptif du runtime Claude Code), mesure horodatée à l'appui.
-   → **Aucun artefact.** Le seul fichier de `.planning/upstream/` porte les workstreams. Le gabarit
-   de forme (issue amont `#2598`) a bien été réutilisé — mais pour GSDA-19, pas pour M2.
-
-Aucune des deux n'a été inscrite comme tâche : `M2` compte **zéro occurrence** dans `24-01-PLAN.md`,
-`24-10-PLAN.md` et `24-10-SUMMARY.md`, et aucune des 22 exigences ne la porte. Le tableau de clôture
-affirme donc deux livrables qui n'ont jamais eu de porteur. Sur un axe du Goal qui s'appelle
-**mesurer**, c'est le seul des trois faits dont la conclusion n'a pas été rendue opposable.
-
-## Densité (ADR-029) et anti-patterns
-
-| Fichier touché | Lignes | Plafond | Statut |
-|---|---|---|---|
-| `plugin/dev-orchestrator/agents/vf-dev-manager.md` | **248** | 250 | ✓ — 2 lignes de marge |
-| `plugin/dev-orchestrator/agents/vf-coder.md` | 107 | 250 | ✓ |
-| `plugin/dev-orchestrator/references/workstreams.md` | 166 | — (référence) | ✓ |
-
-Marqueurs de dette sur les **159** fichiers du diff, hors `.planning/` : **19 correspondances
-`TBD|FIXME|XXX`, toutes des faux positifs de forme** — gabarits d'identifiants (`CLI-XXX`,
-`EVAL-XXX`, `DEC-XXX`, `ADR-XXX`), un motif `mktemp … XXXXXX`, et deux chaînes de mutation de test
-(`GSD_XXXXXXXXXX`). **Aucun marqueur de dette réel.**
-
-Cohérence de distribution : **10** modules touchés, **10** `VERSION` bumpés, **10** `CHANGELOG.md`
-mis à jour — correspondance exacte, aucun module sous-recensé (le plan 24-12 avait rattrapé
-`kpi-analyst` et `validator`, invisibles au balayage `plugin/*/agents/`). `VERSION` ↔ `module.json`
-cohérents sur les **17** modules, **0 écart**.
-
-## Synthèse — ce qu'il reste à faire avant `/gsd-ship`
-
-1. **Rendre la parole au gate de démarrage** (bloquant, et c'est l'axe « fermer » du Goal) : sortir
-   les blocs de commentaire de mission du frontmatter de `.planning/STATE.md`, ou relever la borne
-   de `check-dev-bootstrap.sh` **et l'asserter**. Puis inscrire la dette au ledger tant qu'elle est
-   ouverte.
-2. **Livrer M2**, ou recaler le tableau de clôture pour qu'il cesse d'affirmer deux livrables
-   absents. Une ligne de doctrine dans `team-kernel.md` et un brouillon dans `.planning/upstream/`
-   au gabarit déjà validé suffisent — c'est le coût que le ROADMAP lui-même qualifiait de « gratuit,
-   immédiat ».
-3. **Solder le ledger d'exigences** : 22 cases, la table de mapping, et le recalage de
-   `GSDA-01/04/05` sur ADR-066.
-4. **Trancher la validation Nyquist** : la lancer, ou écrire qu'on y renonce et pourquoi. Deux
-   phases de suite sans, dont une sans document du tout, ce n'est plus un oubli.
-5. **W1 / W2** (ROADMAP périmée sur `threats_open`, et « voie (c) bornée » qui contredit l'ADR
-   qu'elle cite) — hors périmètre de cette vérification, signalés et non corrigés.
-6. **W3** (chiffre d'ADR-067 non rejouable), **W4** (dépendance d'installation du canal A2),
-   **W6** (`status: draft`), **W7** (« 45 premières lignes sur 13 »), **W8** (constat périmé dans
-   `STATE.md`) — non bloquants.
-
-**La release racine reste hors périmètre** : frontière vérifiée non franchie, `0` ligne d'écart
-depuis `main` sur les trois fichiers de la triade. Geste humain gaté, conforme au contrat.
+**Ce que cette phase a gagné depuis la vérification initiale**, et qui mérite d'être dit : le signal
+de démarrage parle de nouveau, la doctrine M2 a quitté `.planning/` pour l'endroit où on la lit, le
+contresens de lettrage A9 est réparé des deux côtés, les 22 exigences sont soldées sur preuve, la
+validation Nyquist existe et refuse de se déclarer conforme, et **les six assertions workstream ont
+enfin tourné sur un vrai runner et sont passées**. Ce qu'elle a perdu, c'est le confort de
+l'ignorance : la CI a cessé de se taire.
 
 ---
 
-_Vérifié : 2026-08-04T22:49:02Z_
-_Vérificateur : Claude (gsd-verifier) — analyse goal-backward ; gates, suites, mutations et fixture
-partitionnée exécutés de première main, jamais lus dans un SUMMARY_
+_Re-vérifié : 2026-08-05T00:34:14Z_
+_Vérificateur : Claude (gsd-verifier) — analyse goal-backward. Gates, suites, mutations, fixtures et
+les 32 commandes `<automated>` exécutés de première main ; logs CI lus au runner via
+`gh run view --log-failed`, jamais dans un SUMMARY._
