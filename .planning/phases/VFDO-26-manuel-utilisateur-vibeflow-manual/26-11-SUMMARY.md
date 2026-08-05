@@ -181,7 +181,7 @@ périmètre.
 
 ```
 $ bash manual/.tools/build-nav.sh
-✓ build-nav: 44 page(s) × 2 langues, 7 thème(s) — arbre régénéré sous /Users/samuel/Documents/dev/vibeflow-os/manual
+✓ build-nav: 44 page(s) × 2 langues, 7 thème(s) — arbre régénéré sous <racine du dépôt>/manual
 
 $ bash manual/.tools/check-manual.sh
 ✓ C0 verdict non vide — 44 page(s) sur disque, 44 dans toc.yml.

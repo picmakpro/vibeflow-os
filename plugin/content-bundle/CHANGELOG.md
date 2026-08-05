@@ -1,5 +1,15 @@
 # CHANGELOG — content-bundle
 
+## [v2.0.4] — 2026-08-04 (`effort:` par rôle sur les 5 agents, Phase 24)
+
+### Modifié
+- **Les 5 agents du bundle déclarent `effort:`** — `vf-content-manager` **high** et
+  `content-clarity-judge` **high** (pilotage et jugement) ; `vf-content-strategist`,
+  `vf-content-writer` et `vf-content-repurposer` **medium** (exécution). Barème par rôle repris des
+  agents-templates de `plugin/reference/`, qui ont été **lus, jamais modifiés**.
+- Motif : `check-agents.sh` **exige** désormais le champ (conductor v1.20.0) au lieu de le valider
+  seulement quand il est présent — un agent sans `effort:` échoue le gate.
+
 ## [v2.0.3] — 2026-07-31 (barrière d'écriture réelle de `content-clarity-judge`, Phase 20)
 
 ### Corrigé

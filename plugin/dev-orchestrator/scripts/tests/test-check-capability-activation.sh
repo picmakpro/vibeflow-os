@@ -1,0 +1,630 @@
+#!/usr/bin/env bash
+# test-check-capability-activation.sh — Suite de vérification de check-capability-activation.sh
+# (Phase 24, plans 24-11 puis 24-13 — GSDA-09).
+#
+# Ce que cette suite prouve, et pourquoi elle est bâtie ainsi.
+#
+# Le gate testé existe pour fermer un mode d'échec précis : une couverture verte qui masque un
+# geste mort. Une suite qui ne vérifierait que l'état nominal reproduirait exactement ce mode
+# d'échec un étage plus haut — elle serait verte parce qu'elle ne sait pas rougir. La discriminance
+# est donc prouvée par MUTATION, dans les DEUX sens :
+#   - retirer un marqueur conditionnel d'une entrée de doc dont le toggle est inactif → le gate
+#     DOIT rougir (règles 2 et 2bis) ;
+#   - activer le toggle d'une entrée qui porte encore son marqueur → le gate DOIT rougir aussi
+#     (règle 3). Sans cette seconde mutation, le gate ne serait discriminant que dans un sens.
+#
+# CORRECTION DE FOND APPORTÉE À CETTE SUITE (24-13). La version précédente RATIONALISAIT l'absence
+# du cas décisif : elle écrivait que « retirer la ligne entière rendrait le gate vert à juste
+# titre » et sa mutation MUT1 CONSERVAIT le littéral du toggle (`(conditionnelle : demo.enabled)` →
+# `(demo.enabled)`). Le corpus réel ne fait pas cela : quand on ôte le parenthétique d'une entrée de
+# routage, le nom du toggle DISPARAÎT et seul l'identifiant de la brique reste. La mutation passait
+# donc pendant que le défaut réel, lui, ne rougissait pas. Les mutations de cette suite reproduisent
+# désormais la LETTRE du corpus, jamais une forme commode.
+#
+# Règle absolue héritée de `test-check-gsd-config.sh` : une mutation doit avoir CHANGÉ le fichier,
+# constaté par `cmp` et JAMAIS par `diff` (le `diff` de ce poste est proxifié et ment). Un motif de
+# mutation introuvable rend le mutant NON OPPOSABLE — un échec, jamais un succès silencieux.
+#
+# Toutes les fixtures sont SYNTHÉTIQUES et vivent dans un `mktemp -d` nettoyé par `trap` : l'arbre
+# réel bougera (l'index est régénéré à chaque évolution du moteur), une suite ancrée dessus se
+# périmerait. Le seul cas ancré sur l'arbre réel est un contrôle final, explicitement NON
+# discriminant, placé APRÈS les mutations et jamais à leur place.
+
+set -uo pipefail
+
+SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/check-capability-activation.sh"
+
+PASS=0; FAIL=0
+ok() { echo "  ✓ $1"; PASS=$((PASS+1)); }
+ko() { echo "  ✗ $1 — $2"; FAIL=$((FAIL+1)); }
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+# --- Fabriques de fixtures ---------------------------------------------------------------------
+# L'index synthétique reproduit les QUATRE sections de l'index réel : la table par point de hook
+# (5 colonnes), celle des capabilities hors point de hook (3 colonnes), celle des toggles
+# gouvernants (4 colonnes, avec TYPE et DÉFAUT AMONT) et celle des briques routées (3 colonnes).
+# Une fixture qui n'en aurait qu'une partie laisserait autant de chemins du parseur non testés — et
+# les deux dernières sont précisément celles qui portent la règle 2bis et la résolution par défaut.
+mk_index() { # <chemin>
+  cat > "$1" <<'IDX'
+# GSD Capabilities Index (auto-généré — NE PAS ÉDITER)
+
+## `plan:pre`
+
+| Capability | Nature | Toggle gouvernant | Bloquant | Conduite sur erreur |
+|---|---|---|---|---|
+| `demo-stage` | step | `workflow.demo_stage` | — | `skip` |
+| `sans-cle` | step | — | — | `skip` |
+
+## Capabilities hors point de hook
+
+| Capability | Rôle | Clé de configuration gouvernante |
+|---|---|---|
+| `demo` | feature | `demo.enabled` |
+| `autre` | feature | `autre.enabled` |
+| `un-runtime` | runtime | — |
+
+## Toggles gouvernants déclarés par le registre
+
+| Toggle gouvernant | Propriétaire | Type | Défaut amont |
+|---|---|---|---|
+| `workflow.demo_stage` | `demo-stage` | boolean | non |
+| `demo.enabled` | `demo` | boolean | non |
+| `autre.enabled` | `autre` | boolean | non |
+| `defaut.actif` | `par-defaut` | boolean | oui |
+| `sans.defaut` | `mystere` | — | — |
+
+## Briques routées et leur toggle gouvernant
+
+| Brique | Capability | Toggle gouvernant |
+|---|---|---|
+| `gsd-demo` | `demo` | `demo.enabled` |
+| `gsd-autre` | `autre` | `autre.enabled` |
+| `gsd-defaut` | `par-defaut` | `defaut.actif` |
+| `gsd-mystere` | `mystere` | `sans.defaut` |
+IDX
+}
+
+# Configuration synthétique : `demo.enabled` PRÉSENT à false (inactivité déclarée) et
+# `workflow.demo_stage` ABSENT (inactivité par le défaut amont) — les deux formes d'inactivité que
+# la règle 2 doit traiter identiquement. `defaut.actif` et `sans.defaut` sont absents eux aussi :
+# le premier est ACTIF par son défaut amont, le second reste INDÉTERMINÉ.
+mk_config() { # <chemin>
+  cat > "$1" <<'CFG'
+{
+  "demo": {
+    "enabled": false
+  },
+  "workflow": {
+    "autre_chose": true
+  }
+}
+CFG
+}
+
+# Corpus conforme : chaque brique dont le toggle est inactif est citée SOUS marqueur, sur sa ligne.
+#
+# DEUX marqueurs, et c'est délibéré — le corpus réel en porte trois. Avec un seul, retirer LE
+# marqueur viderait M et ferait sortir le plancher de la règle 1 (« non vérifiable », 2) AVANT que
+# la règle 2 puisse voir la promesse démarquée : la mutation aurait prouvé le plancher, pas la
+# règle qu'elle vise. Le gate reste rouge dans les deux cas — jamais vert — mais un mutant qui
+# rougit pour la mauvaise raison ne prouve rien.
+#
+# Les DEUX dernières lignes ne sont pas décoratives : `gsd-defaut` prouve que le DÉFAUT AMONT est
+# lu (sans lui, une clé absente passerait pour inactive et cette ligne rougirait à tort), et
+# `gsd-mystere` prouve qu'un toggle INDÉTERMINÉ ne fait rien conclure au gate.
+mk_corpus_ok() { # <chemin>
+  cat > "$1" <<'DOC'
+# Carte de routage synthétique
+
+| intention | brique |
+|---|---|
+| faire la démo | `gsd-demo` (conditionnelle : demo.enabled) — refusée, aucun consommateur prescrit |
+| faire autre chose | `gsd-autre` (conditionnelle : autre.enabled) — refusée, aucun consommateur prescrit |
+| cas actif par défaut | `gsd-defaut` — actif par le défaut amont du registre, aucun marqueur requis |
+| cas indéterminé | `gsd-mystere` — le registre ne déclare aucun défaut, le gate ne conclut pas |
+DOC
+}
+
+run() { # <fixture-dir> [args...] -> imprime stderr, rend le rc du gate
+  local d="$1"; shift
+  VF_CAPACT_INDEX="$d/index.md" \
+  VF_CAPACT_CONFIG="$d/config.json" \
+  VF_CAPACT_CORPUS="$d/corpus.md" \
+  bash "$SCRIPT" "$@" 2>&1 >/dev/null
+}
+
+rc_of() { # <fixture-dir> [args...] -> rend le rc du gate, sortie muette
+  local d="$1"; shift
+  VF_CAPACT_INDEX="$d/index.md" \
+  VF_CAPACT_CONFIG="$d/config.json" \
+  VF_CAPACT_CORPUS="$d/corpus.md" \
+  bash "$SCRIPT" "$@" >/dev/null 2>&1
+  echo "$?"
+}
+
+mk_fixture() { # <nom> -> imprime le chemin ; état conforme complet
+  local d="$TMP/$1"
+  mkdir -p "$d"
+  mk_index "$d/index.md"
+  mk_config "$d/config.json"
+  mk_corpus_ok "$d/corpus.md"
+  printf '%s' "$d"
+}
+
+echo "== test-check-capability-activation =="
+
+# === Cas 1 — état conforme : toggle inactif cité SOUS marqueur → 0 =============================
+D="$(mk_fixture c1)"
+rc="$(rc_of "$D")"
+out="$(run "$D")"
+has_universe=0; case "$out" in *"univers balaye"*) has_universe=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has_universe" -eq 1 ]; then
+  ok "1 conforme — toggle inactif cité sous marqueur → 0, et le rapport NOMME l'univers balayé"
+else
+  ko "1 conforme → 0 + univers nommé" "rc=$rc out=[$out]"
+fi
+
+# === Cas 1b — le rapport compte SÉPARÉMENT inactifs, indéterminés et briques ===================
+# Un rapport qui agrégerait les trois laisserait un toggle indéterminé se lire comme inactif : ce
+# serait un verdict tenu sur un état que le gate ne connaît pas.
+D="$(mk_fixture c1b)"
+out="$(run "$D")"
+c_inact=0; case "$out" in *"3 inactif(s)"*) c_inact=1 ;; esac
+c_unk=0;   case "$out" in *"1 indetermine(s)"*) c_unk=1 ;; esac
+c_brick=0; case "$out" in *"4 brique(s) routee(s)"*) c_brick=1 ;; esac
+if [ "$c_inact" -eq 1 ] && [ "$c_unk" -eq 1 ] && [ "$c_brick" -eq 1 ]; then
+  ok "1b rapport — 3 inactifs, 1 indéterminé et 4 briques comptés SÉPARÉMENT"
+else
+  ko "1b rapport — compteurs séparés" "inact=$c_inact unk=$c_unk brick=$c_brick out=[$out]"
+fi
+
+# === Cas 2 — promesse non marquée : le même toggle inactif cité HORS marqueur → 1 ==============
+# Le message doit nommer le toggle ET le fichier : un « écart constaté » anonyme est inactionnable.
+D="$(mk_fixture c2)"
+printf 'Le mode avancé dépend de demo.enabled et sera bientôt là.\n' >> "$D/corpus.md"
+rc="$(rc_of "$D")"
+out="$(run "$D")"
+names_toggle=0; case "$out" in *"demo.enabled"*) names_toggle=1 ;; esac
+names_file=0;   case "$out" in *"corpus.md"*)    names_file=1 ;; esac
+says_r2=0;      case "$out" in *"regle 2 "*)     says_r2=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$names_toggle" -eq 1 ] && [ "$names_file" -eq 1 ] && [ "$says_r2" -eq 1 ]; then
+  ok "2 règle 2 — toggle inactif cité hors marqueur → 1, message nommant le toggle et le fichier"
+else
+  ko "2 règle 2 → 1 + toggle + fichier" "rc=$rc names_toggle=$names_toggle names_file=$names_file out=[$out]"
+fi
+
+# === Cas 2bis — promesse par IDENTIFIANT DE BRIQUE, sans jamais nommer le toggle ===============
+# LE cas que le gate existe pour voir, et celui que sa première version laissait passer : une
+# entrée de table promet `gsd-demo` et ne nomme le toggle NULLE PART. Aucune règle cherchant un nom
+# de toggle ne peut le voir.
+D="$(mk_fixture c2bis)"
+printf '| une intention neuve | `gsd-demo` — le geste promis, sans le moindre avertissement |\n' >> "$D/corpus.md"
+rc="$(rc_of "$D")"
+out="$(run "$D")"
+names_brick=0; case "$out" in *"gsd-demo"*)   names_brick=1 ;; esac
+says_r2b=0;    case "$out" in *"regle 2bis"*) says_r2b=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$names_brick" -eq 1 ] && [ "$says_r2b" -eq 1 ]; then
+  ok "2bis règle 2bis — brique promise en table, toggle jamais nommé → 1, la brique est nommée"
+else
+  ko "2bis règle 2bis → 1 + brique nommée" "rc=$rc out=[$out]"
+fi
+
+# === Cas 2ter — la règle 2bis ne juge QUE les lignes de table ==================================
+# Frontière déclarée dans la docstring du gate : un titre ou un paragraphe qui NOMME une brique ne
+# la PROMET pas (« `gsd-x` est délibérément absent de toute table de routage »). Sans ce cas, rien
+# n'empêcherait un durcissement futur d'élargir la règle en silence et de rendre inécrivable toute
+# prose citant une brique désactivée.
+D="$(mk_fixture c2ter)"
+printf '\n## Section citant `gsd-demo` dans son titre\n\nUn paragraphe qui mentionne `gsd-demo` sans rien promettre.\n' >> "$D/corpus.md"
+rc="$(rc_of "$D")"
+if [ "$rc" -eq 0 ]; then
+  ok "2ter portée — titre et prose citant la brique : PAS un écart (seules les lignes de table le sont)"
+else
+  ko "2ter portée — prose citant la brique ne doit rien déclencher" "rc=$rc out=[$(run "$D")]"
+fi
+
+# === Cas 3 — marqueur périmé : le toggle est ACTIF mais l'entrée porte encore son marqueur → 1 ==
+D="$(mk_fixture c3)"
+cat > "$D/config.json" <<'CFG'
+{
+  "demo": {
+    "enabled": true
+  }
+}
+CFG
+rc="$(rc_of "$D")"
+out="$(run "$D")"
+says_r3=0;     case "$out" in *"regle 3"*) says_r3=1 ;; esac
+says_perime=0; case "$out" in *"PERIME"*)  says_perime=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$says_r3" -eq 1 ] && [ "$says_perime" -eq 1 ]; then
+  ok "3 règle 3 — marqueur survivant à l'activation de sa capability → 1 (dérive INVERSE vue)"
+else
+  ko "3 règle 3 marqueur périmé → 1" "rc=$rc out=[$out]"
+fi
+
+# === Cas 4 — marqueur inconnu : le marqueur nomme un toggle absent de l'index → 1 ==============
+D="$(mk_fixture c4)"
+printf '| autre | `gsd-autre` (conditionnelle : fantome.enabled) |\n' >> "$D/corpus.md"
+rc="$(rc_of "$D")"
+out="$(run "$D")"
+names_ghost=0; case "$out" in *"fantome.enabled"*) names_ghost=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$names_ghost" -eq 1 ]; then
+  ok "4 règle 3 — marqueur nommant un toggle absent de l'index → 1, le fantôme est nommé"
+else
+  ko "4 règle 3 marqueur inconnu → 1" "rc=$rc out=[$out]"
+fi
+
+# === Cas 5 — plancher A : index sans aucun toggle lisible → 2, jamais 0 ========================
+# Le gate ne doit pas pouvoir être vert à vide : c'est le mode d'échec qu'il existe pour fermer.
+D="$(mk_fixture c5)"
+printf '# index vidé de toute table\n' > "$D/index.md"
+rc="$(rc_of "$D")"
+out="$(run "$D")"
+says_nv=0; case "$out" in *"NON VERIFIABLE"*|*"NON VÉRIFIABLE"*) says_nv=1 ;; esac
+if [ "$rc" -eq 2 ] && [ "$says_nv" -eq 1 ]; then
+  ok "5 plancher A — index sans toggle → 2 « non vérifiable » (JAMAIS 0)"
+else
+  ko "5 plancher A index vide → 2" "rc=$rc out=[$out]"
+fi
+
+# === Cas 5bis — plancher C : index SANS table de briques → 2 ===================================
+# Sans ce plancher, un index amputé de sa seule table de briques désarmerait la règle 2bis EN
+# SILENCE : le gate resterait vert en ne vérifiant plus que les noms de toggle, c'est-à-dire dans
+# l'état exact qu'on vient de corriger. C'est le plancher anti-régression du correctif lui-même.
+D="$(mk_fixture c5bis)"
+awk '/^## Briques rout/{stop=1} !stop{print}' "$D/index.md" > "$D/index.trim" && mv "$D/index.trim" "$D/index.md"
+rc="$(rc_of "$D")"
+out="$(run "$D")"
+says_brick=0; case "$out" in *"aucune brique routee"*) says_brick=1 ;; esac
+says_inerte=0; case "$out" in *"INERTE"*) says_inerte=1 ;; esac
+if [ "$rc" -eq 2 ] && [ "$says_brick" -eq 1 ] && [ "$says_inerte" -eq 1 ]; then
+  ok "5bis plancher C — index sans table de briques → 2, et le message dit que la règle 2bis serait INERTE"
+else
+  ko "5bis plancher C index sans briques → 2" "rc=$rc out=[$out]"
+fi
+
+# === Cas 6 — plancher B : corpus sans aucun marqueur → 2 ======================================
+# Exercé SÉPARÉMENT du plancher A : un seul des deux testé laisserait l'autre chemin non couvert.
+D="$(mk_fixture c6)"
+printf '# corpus sans le moindre marqueur conditionnel\n' > "$D/corpus.md"
+rc="$(rc_of "$D")"
+out="$(run "$D")"
+says_nv=0; case "$out" in *"NON VERIFIABLE"*|*"NON VÉRIFIABLE"*) says_nv=1 ;; esac
+if [ "$rc" -eq 2 ] && [ "$says_nv" -eq 1 ]; then
+  ok "6 plancher B — corpus sans marqueur → 2 « non vérifiable » (JAMAIS 0)"
+else
+  ko "6 plancher B corpus sans marqueur → 2" "rc=$rc out=[$out]"
+fi
+
+# === Cas 6b — priorité du plancher sur la règle 2, et jamais 0 dans l'angle mort ===============
+# Cas limite mesuré en écrivant cette suite : un corpus qui perdrait TOUS ses marqueurs ET
+# citerait un toggle inactif hors marqueur relève à la fois du plancher (règle 1) et de la
+# règle 2. L'ordre prescrit donne la priorité au plancher : la sortie est 2, pas 1. Ce qui compte
+# et qui est asserté ici, c'est que ce recouvrement ne produise JAMAIS un 0 — l'angle mort du
+# gate serait précisément un « rien à signaler » sur une doc qui promet un geste inerte.
+D="$(mk_fixture c6b)"
+printf 'Le mode avancé dépend de demo.enabled, sans le moindre marqueur nulle part.\n' > "$D/corpus.md"
+rc="$(rc_of "$D")"
+out="$(run "$D")"
+says_nv=0; case "$out" in *"NON VERIFIABLE"*|*"NON VÉRIFIABLE"*) says_nv=1 ;; esac
+if [ "$rc" -eq 2 ] && [ "$says_nv" -eq 1 ]; then
+  ok "6b ordre des règles — plancher ET promesse démarquée ensemble : 2 (plancher prioritaire), jamais 0"
+else
+  ko "6b ordre des règles — recouvrement plancher/règle 2 → 2, jamais 0" "rc=$rc out=[$out]"
+fi
+
+# === Cas 7 — usage : argument inconnu → 64 =====================================================
+D="$(mk_fixture c7)"
+rc="$(rc_of "$D" --pas-un-vrai-flag)"
+rc_path="$(rc_of "$D" --path)"
+if [ "$rc" -eq 64 ] && [ "$rc_path" -eq 64 ]; then
+  ok "7 usage — argument inconnu et --path sans valeur → 64 tous les deux"
+else
+  ko "7 usage → 64" "rc_inconnu=$rc rc_path_sans_valeur=$rc_path"
+fi
+
+# === Cas 8 — index absent → 2 (précondition, jamais un conforme par défaut) ====================
+D="$(mk_fixture c8)"
+rm -f "$D/index.md"
+rc="$(rc_of "$D")"
+if [ "$rc" -eq 2 ]; then
+  ok "8 précondition — index absent → 2"
+else
+  ko "8 précondition index absent → 2" "rc=$rc"
+fi
+
+# === Cas 9 — configuration absente → 2 ========================================================
+D="$(mk_fixture c9)"
+rm -f "$D/config.json"
+rc="$(rc_of "$D")"
+if [ "$rc" -eq 2 ]; then
+  ok "9 précondition — configuration absente → 2"
+else
+  ko "9 précondition configuration absente → 2" "rc=$rc"
+fi
+
+# === Cas 10 — --help imprime la docstring et énumère les QUATRE codes du contrat ===============
+help_out="$(bash "$SCRIPT" --help 2>/dev/null)"; rc=$?
+n_codes=0
+for c in "0  =" "1  =" "2  =" "64 ="; do
+  case "$help_out" in *"$c"*) n_codes=$((n_codes+1)) ;; esac
+done
+if [ "$rc" -eq 0 ] && [ "$n_codes" -eq 4 ]; then
+  ok "10 contrat — --help énumère les 4 codes de sortie (0, 1, 2, 64)"
+else
+  ko "10 contrat --help énumère 4 codes" "rc=$rc n_codes=$n_codes"
+fi
+
+# === Cas 11 — comparaison PAR FRONTIÈRE : une clé plus longue ne compte pas pour la courte =====
+# La paire piège existe dans le lab réel (`workflow.code_review` / `workflow.code_review_command`).
+# Avec une comparaison par sous-chaîne nue, citer la clé LONGUE — parfaitement licite — fabriquait
+# un écart sur la COURTE, et cet écart était incorrigible : aucune rédaction ne satisfait un gate
+# qui cherche le mauvais nom. La fixture reproduit exactement la forme de la paire réelle.
+D="$(mk_fixture c11)"
+printf 'Le réglage demo.enabled_command reste libre et ne promet aucun geste.\n' >> "$D/corpus.md"
+rc="$(rc_of "$D")"
+if [ "$rc" -eq 0 ]; then
+  ok '11 frontière — demo.enabled_command cité ne compte PAS comme demo.enabled (aucun écart inventé)'
+else
+  ko "11 frontière — clé longue citée ne doit pas déclencher la clé courte" "rc=$rc out=[$(run "$D")]"
+fi
+
+# === Cas 12 — corpus dont le CHEMIN CONTIENT UN ESPACE =========================================
+# `~/Library/Mobile Documents/` est un emplacement de lab courant sous macOS. Avec un corpus
+# découpé sur l'espace, un tel chemin était par construction inexprimable et le gate sortait 2 en
+# permanence — un gate désarmé par l'emplacement du lab, jamais par son contenu.
+D_ESP="$TMP/avec espace/refs"
+mkdir -p "$D_ESP"
+mk_index "$D_ESP/index.md"; mk_config "$D_ESP/config.json"; mk_corpus_ok "$D_ESP/corpus.md"
+rc_esp=0
+VF_CAPACT_INDEX="$D_ESP/index.md" VF_CAPACT_CONFIG="$D_ESP/config.json" \
+  VF_CAPACT_CORPUS="$D_ESP/corpus.md" bash "$SCRIPT" >/dev/null 2>&1 || rc_esp=$?
+if [ "$rc_esp" -eq 0 ]; then
+  ok "12 chemin à espace — un corpus sous « avec espace/ » est lu normalement (→ 0)"
+else
+  ko "12 chemin à espace — le gate ne doit pas se désarmer sur l'emplacement du lab" "rc=$rc_esp"
+fi
+
+# === Cas 13 — le corpus n'est PAS développé comme un glob =====================================
+# `VF_CAPACT_CORPUS="$D/*.md"` aspirait des fichiers que personne n'avait nommés (index.md compris),
+# ce qui faussait jusqu'au compteur « N fichier(s) de corpus » du rapport. Le motif doit désormais
+# être traité comme un NOM DE FICHIER, donc illisible, donc 2 — jamais comme une liste implicite.
+D="$(mk_fixture c13)"
+rc_glob=0
+VF_CAPACT_INDEX="$D/index.md" VF_CAPACT_CONFIG="$D/config.json" \
+  VF_CAPACT_CORPUS="$D/*.md" bash "$SCRIPT" >/dev/null 2>&1 || rc_glob=$?
+out_glob="$(VF_CAPACT_INDEX="$D/index.md" VF_CAPACT_CONFIG="$D/config.json" \
+  VF_CAPACT_CORPUS="$D/*.md" bash "$SCRIPT" 2>&1 >/dev/null)"
+says_illisible=0; case "$out_glob" in *"fichier de corpus illisible"*) says_illisible=1 ;; esac
+if [ "$rc_glob" -eq 2 ] && [ "$says_illisible" -eq 1 ]; then
+  ok "13 glob — un motif dans VF_CAPACT_CORPUS est un NOM, pas une liste : 2 « illisible », aucun fichier aspiré"
+else
+  ko "13 glob — le corpus ne doit jamais être développé" "rc=$rc_glob out=[$out_glob]"
+fi
+
+# === Cas 14 — LAB INSTALLÉ : la racine est le lab, jamais le projet du dessus ==================
+# Chez l'utilisateur, l'installeur dépose les scripts À PLAT dans `.claude/scripts/` et les
+# références dans `.claude/agents/<module>-references/`. Une racine déduite de `$0/../..` désignait
+# alors le PARENT du lab : le gate lisait le `.planning/config.json` d'un AUTRE projet, ou sortait 2.
+# La fixture rend le cas DISCRIMINANT — le voisin porte une configuration qui rendrait le verdict
+# ROUGE (marqueur périmé). Lire le bon fichier est donc la seule façon d'obtenir 0.
+VOISIN="$TMP/b2"
+LAB="$VOISIN/lab"
+mkdir -p "$VOISIN/.planning" "$LAB/.planning" "$LAB/.claude/scripts" "$LAB/.claude/agents/dev-orchestrator-references"
+cat > "$VOISIN/.planning/config.json" <<'CFG'
+{ "demo": { "enabled": true }, "autre": { "enabled": true } }
+CFG
+mk_config "$LAB/.planning/config.json"
+cp "$SCRIPT" "$LAB/.claude/scripts/check-capability-activation.sh"
+mk_index  "$LAB/.claude/agents/dev-orchestrator-references/gsd-capabilities-index.md"
+mk_corpus_ok "$LAB/.claude/agents/dev-orchestrator-references/intent-routing.md"
+printf '# doc-flow synthétique, sans marqueur ni brique\n' > "$LAB/.claude/agents/dev-orchestrator-references/docs-flow.md"
+rc_lab=0
+out_lab="$(cd "$TMP" && env -u VF_CAPACT_INDEX -u VF_CAPACT_CONFIG -u VF_CAPACT_CORPUS \
+  bash "$LAB/.claude/scripts/check-capability-activation.sh" 2>&1 >/dev/null)" || rc_lab=$?
+reads_lab=0; case "$out_lab" in *"2 fichier(s) de corpus"*) reads_lab=1 ;; esac
+if [ "$rc_lab" -eq 0 ] && [ "$reads_lab" -eq 1 ]; then
+  ok "14 lab installé — racine = le lab (et non son parent), références trouvées sous agents/<mod>-references/ → 0"
+else
+  ko "14 lab installé — le gate doit lire le lab, pas le projet voisin" "rc=$rc_lab out=[$out_lab]"
+fi
+
+# Contre-épreuve du cas 14 : la configuration du VOISIN, appliquée au même corpus, rougit. Sans
+# elle, le vert ci-dessus serait satisfait par n'importe quelle configuration — y compris celle du
+# voisin — et ne prouverait donc RIEN sur le fichier réellement lu.
+rc_voisin=0
+VF_CAPACT_INDEX="$LAB/.claude/agents/dev-orchestrator-references/gsd-capabilities-index.md" \
+VF_CAPACT_CONFIG="$VOISIN/.planning/config.json" \
+VF_CAPACT_CORPUS="$LAB/.claude/agents/dev-orchestrator-references/intent-routing.md" \
+  bash "$SCRIPT" >/dev/null 2>&1 || rc_voisin=$?
+if [ "$rc_voisin" -eq 1 ]; then
+  ok "14b contre-épreuve — la configuration du VOISIN, elle, rougit (1) : le cas 14 est discriminant"
+else
+  ko "14b contre-épreuve — la config du voisin doit rougir, sinon le cas 14 ne prouve rien" "rc=$rc_voisin"
+fi
+
+# ===============================================================================================
+# == MUTATIONS — le gate sait-il rougir ? Discriminance prouvée dans les DEUX sens.
+# ===============================================================================================
+# Chaque mutation est mécanique et rejouable. Trois garde-fous avant tout verdict :
+#   - la CIBLE n'est jamais tronquée avant que le programme de mutation ait réussi. `awk … > cible`
+#     ouvre la cible et la vide AVANT d'exécuter le programme : un `awk` en échec laissait donc un
+#     fichier VIDE que `cmp -s` déclarait « changé », et la suite jugeait alors un mutant JAMAIS
+#     CONSTRUIT. La production passe par un temporaire, et le dépôt n'a lieu qu'en cas de succès ;
+#   - la mutation doit avoir CHANGÉ le fichier — constaté par `cmp`, JAMAIS par `diff` ;
+#   - le vert doit être RETROUVÉ après restauration, sinon le rouge ne prouve rien sur la mutation
+#     (il pourrait venir d'une fixture cassée).
+echo ""
+echo "== mutations =="
+
+mutate() { # <src> <dst> <programme awk> — 0 si le mutant a été déposé, 1 sinon (cible INTACTE)
+  local tmp="$2.mut.$$"
+  if ! awk "$3" "$1" > "$tmp" 2>/dev/null; then
+    rm -f "$tmp"
+    return 1
+  fi
+  if [ ! -s "$tmp" ]; then
+    rm -f "$tmp"
+    return 1
+  fi
+  mv "$tmp" "$2"
+  return 0
+}
+
+# --- Mutation 1 (règle 2bis) : retirer le PARENTHÉTIQUE, à la LETTRE du corpus réel. ------------
+# Ce que fait vraiment une régression de rédaction : le parenthétique disparaît, la promesse de
+# routage reste, et le nom du toggle N'EXISTE PLUS NULLE PART sur la ligne. C'est le mutant que la
+# version précédente de cette suite évitait (elle conservait `(demo.enabled)`, donc le littéral du
+# toggle, donc un motif que la règle 2 pouvait encore voir) — et c'est la raison pour laquelle elle
+# restait verte pendant que le défaut réel passait.
+D="$(mk_fixture m1)"
+cp "$D/corpus.md" "$TMP/m1.corpus.orig"
+if ! mutate "$TMP/m1.corpus.orig" "$D/corpus.md" '{ sub(/ \(conditionnelle : demo\.enabled\)/, ""); print }'; then
+  ko "MUT1 règle 2bis — retrait du parenthétique" "le programme de mutation a ÉCHOUÉ — mutant NON CONSTRUIT, jamais mutant satisfait"
+elif cmp -s "$D/corpus.md" "$TMP/m1.corpus.orig"; then
+  ko "MUT1 règle 2bis — retrait du parenthétique" "la mutation n'a RIEN changé (motif introuvable) — mutant NON OPPOSABLE, pas mutant satisfait"
+else
+  # Garde-fou supplémentaire : le mutant ne doit plus contenir le nom du toggle nulle part. Sinon
+  # la mutation ne reproduit pas la lettre du corpus et un rc=1 obtenu par la règle 2 mentirait.
+  still=0
+  awk 'index($0, "demo.enabled") > 0 { n++ } END { exit (n > 0 ? 1 : 0) }' "$D/corpus.md" || still=1
+  rc_mut="$(rc_of "$D")"
+  out_mut="$(run "$D")"
+  cp "$TMP/m1.corpus.orig" "$D/corpus.md"
+  rc_back="$(rc_of "$D")"
+  r2b_mut=0; case "$out_mut" in *"regle 2bis"*) r2b_mut=1 ;; esac
+  tgt_mut=0; case "$out_mut" in *"gsd-demo"*)   tgt_mut=1 ;; esac
+  if [ "$still" -eq 0 ] && [ "$rc_mut" -eq 1 ] && [ "$r2b_mut" -eq 1 ] && [ "$tgt_mut" -eq 1 ]; then
+    ok "MUT1 règle 2bis — parenthétique retiré (le toggle n'est plus nommé NULLE PART), promesse conservée : le gate ROUGIT (rc=1) par la RÈGLE 2bis sur gsd-demo — $out_mut"
+  else
+    ko "MUT1 règle 2bis — le gate doit rougir par la règle 2bis sur parenthétique retiré" "toggle_encore_present=$still rc=$rc_mut regle2bis=$r2b_mut cible=$tgt_mut out=[$out_mut]"
+  fi
+  if [ "$rc_back" -eq 0 ]; then
+    ok "MUT1 règle 2bis — parenthétique restauré : le VERT est retrouvé (rc=0), le rouge venait bien de la mutation"
+  else
+    ko "MUT1 règle 2bis — le vert doit être retrouvé après restauration" "rc=$rc_back"
+  fi
+fi
+
+# --- Mutation 1bis (règle 2) : garder le toggle, lui ôter son marqueur. -------------------------
+# L'autre forme de dérive, conservée telle quelle : la doc continue de nommer le toggle mais ne
+# l'entoure plus de son marqueur. Elle prouve la règle 2, là où MUT1 prouve la règle 2bis — les
+# deux règles sont distinctes et chacune a besoin de son mutant.
+D="$(mk_fixture m1bis)"
+cp "$D/corpus.md" "$TMP/m1bis.corpus.orig"
+if ! mutate "$TMP/m1bis.corpus.orig" "$D/corpus.md" '{ sub(/\(conditionnelle : demo\.enabled\)/, "(demo.enabled)"); print }'; then
+  ko "MUT1bis règle 2 — marqueur dégradé" "le programme de mutation a ÉCHOUÉ — mutant NON CONSTRUIT"
+elif cmp -s "$D/corpus.md" "$TMP/m1bis.corpus.orig"; then
+  ko "MUT1bis règle 2 — marqueur dégradé" "la mutation n'a RIEN changé (motif introuvable) — mutant NON OPPOSABLE"
+else
+  rc_mut="$(rc_of "$D")"
+  out_mut="$(run "$D")"
+  cp "$TMP/m1bis.corpus.orig" "$D/corpus.md"
+  rc_back="$(rc_of "$D")"
+  r2_mut=0;  case "$out_mut" in *"regle 2 "*)     r2_mut=1 ;; esac
+  tgt_mut=0; case "$out_mut" in *"demo.enabled"*) tgt_mut=1 ;; esac
+  if [ "$rc_mut" -eq 1 ] && [ "$r2_mut" -eq 1 ] && [ "$tgt_mut" -eq 1 ]; then
+    ok "MUT1bis règle 2 — marqueur ôté, toggle conservé : le gate ROUGIT (rc=1) par la RÈGLE 2 sur demo.enabled"
+  else
+    ko "MUT1bis règle 2 — le gate doit rougir par la règle 2" "rc=$rc_mut regle2=$r2_mut cible=$tgt_mut out=[$out_mut]"
+  fi
+  if [ "$rc_back" -eq 0 ]; then
+    ok "MUT1bis règle 2 — marqueur restauré : le VERT est retrouvé (rc=0)"
+  else
+    ko "MUT1bis règle 2 — le vert doit être retrouvé après restauration" "rc=$rc_back"
+  fi
+fi
+
+# --- Mutation 2 (règle 3) : activer le toggle en laissant le marqueur en place. -----------------
+# C'est la dérive INVERSE. Sans cette mutation, le gate pourrait n'être discriminant que sur le
+# retrait d'un marqueur, et laisser passer un marqueur qui survit à l'activation de sa capability.
+# Le rc ne suffit PAS : MUT1 pose la règle inverse (rougir pour LA BONNE RAISON), et l'omettre ici
+# laisserait un rc=1 obtenu par la règle 2 valider un mutant de règle 3.
+D="$(mk_fixture m2)"
+cp "$D/config.json" "$TMP/m2.config.orig"
+if ! mutate "$TMP/m2.config.orig" "$D/config.json" '{ sub(/"enabled": false/, "\"enabled\": true"); print }'; then
+  ko "MUT2 règle 3 — activation du toggle marqué" "le programme de mutation a ÉCHOUÉ — mutant NON CONSTRUIT"
+elif cmp -s "$D/config.json" "$TMP/m2.config.orig"; then
+  ko "MUT2 règle 3 — activation du toggle marqué" "la mutation n'a RIEN changé (motif introuvable) — mutant NON OPPOSABLE"
+else
+  rc_mut="$(rc_of "$D")"
+  out_mut="$(run "$D")"
+  cp "$TMP/m2.config.orig" "$D/config.json"
+  rc_back="$(rc_of "$D")"
+  r3_mut=0;  case "$out_mut" in *"regle 3"*)      r3_mut=1 ;; esac
+  per_mut=0; case "$out_mut" in *"PERIME"*)       per_mut=1 ;; esac
+  tgt_mut=0; case "$out_mut" in *"demo.enabled"*) tgt_mut=1 ;; esac
+  if [ "$rc_mut" -eq 1 ] && [ "$r3_mut" -eq 1 ] && [ "$per_mut" -eq 1 ] && [ "$tgt_mut" -eq 1 ]; then
+    ok "MUT2 règle 3 — toggle activé, marqueur conservé : le gate ROUGIT (rc=1) par la RÈGLE 3, verdict PERIME sur demo.enabled"
+  else
+    ko "MUT2 règle 3 — le gate doit rougir par la règle 3 (PERIME), pas seulement rougir" "rc=$rc_mut regle3=$r3_mut perime=$per_mut cible=$tgt_mut out=[$out_mut]"
+  fi
+  if [ "$rc_back" -eq 0 ]; then
+    ok "MUT2 règle 3 — configuration restaurée : le VERT est retrouvé (rc=0), le rouge venait bien de la mutation"
+  else
+    ko "MUT2 règle 3 — le vert doit être retrouvé après restauration" "rc=$rc_back"
+  fi
+fi
+
+# --- Mutation 3 (colonne « Défaut amont ») : la colonne est-elle LUE ? -------------------------
+# `gsd-defaut` est cité SANS marqueur, ce qui n'est licite que parce que son toggle est ACTIF par
+# son défaut amont. Basculer ce défaut de `oui` à `non` doit rendre l'entrée illicite. Sans cette
+# mutation, la colonne pourrait n'être jamais lue et la résolution retomber sur « absent ⇒ inactif »
+# sans que rien ne rougisse — un vert à vide sur la moitié neuve du parseur.
+D="$(mk_fixture m3)"
+cp "$D/index.md" "$TMP/m3.index.orig"
+if ! mutate "$TMP/m3.index.orig" "$D/index.md" '{ sub(/^\| `defaut\.actif` \| `par-defaut` \| boolean \| oui \|$/, "| `defaut.actif` | `par-defaut` | boolean | non |"); print }'; then
+  ko "MUT3 défaut amont — bascule oui→non" "le programme de mutation a ÉCHOUÉ — mutant NON CONSTRUIT"
+elif cmp -s "$D/index.md" "$TMP/m3.index.orig"; then
+  ko "MUT3 défaut amont — bascule oui→non" "la mutation n'a RIEN changé (motif introuvable) — mutant NON OPPOSABLE"
+else
+  rc_mut="$(rc_of "$D")"
+  out_mut="$(run "$D")"
+  cp "$TMP/m3.index.orig" "$D/index.md"
+  rc_back="$(rc_of "$D")"
+  tgt_mut=0; case "$out_mut" in *"gsd-defaut"*) tgt_mut=1 ;; esac
+  if [ "$rc_mut" -eq 1 ] && [ "$tgt_mut" -eq 1 ]; then
+    ok "MUT3 défaut amont — défaut basculé oui→non : le gate ROUGIT (rc=1) sur gsd-defaut, la colonne est bien LUE"
+  else
+    ko "MUT3 défaut amont — la colonne « Défaut amont » doit être lue" "rc=$rc_mut cible=$tgt_mut out=[$out_mut]"
+  fi
+  if [ "$rc_back" -eq 0 ]; then
+    ok "MUT3 défaut amont — index restauré : le VERT est retrouvé (rc=0)"
+  else
+    ko "MUT3 défaut amont — le vert doit être retrouvé après restauration" "rc=$rc_back"
+  fi
+fi
+
+# === Cas final — contrôle sur l'arbre RÉEL ====================================================
+# NON discriminant à lui seul (il ne prouve que l'absence d'écart aujourd'hui) : il vient donc
+# APRÈS les mutations, et jamais à leur place.
+#
+# Il est de surcroît CONDITIONNÉ à la présence des trois artefacts. Dans un lab installé en scope
+# UTILISATEUR (`~/.claude/scripts/`), le gate ne peut pas savoir quel lab il sert : exiger 0 y
+# ferait rougir la suite du module pour une raison qui n'a rien à voir avec sa qualité. Le cas
+# annonce alors ce qui manque, et ne se prétend jamais vert : c'est un contrôle NON APPLICABLE,
+# pas un contrôle réussi. En intégration continue les trois artefacts sont là, et le contrôle est
+# donc réellement exercé à chaque exécution.
+echo ""
+echo "== contrôle sur l'arbre réel =="
+REAL_REF="$(cd "$(dirname "$0")/../.." && pwd)/references"
+REAL_ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+if [ -r "$REAL_REF/gsd-capabilities-index.md" ] && [ -r "$REAL_REF/intent-routing.md" ] \
+   && [ -r "$REAL_ROOT/.planning/config.json" ]; then
+  bash "$SCRIPT" >/dev/null 2>&1; rc=$?
+  if [ "$rc" -eq 0 ]; then
+    ok "15 contrôle réel — le gate sort 0 sur le dépôt (état livré par les plans 24-06 et 24-13)"
+  else
+    ko "15 contrôle réel — le gate doit sortir 0 sur le dépôt" "rc=$rc — $(bash "$SCRIPT" 2>&1 >/dev/null)"
+  fi
+else
+  echo "  · 15 contrôle réel NON APPLICABLE — les trois artefacts ne sont pas réunis sous $REAL_ROOT (installation en scope utilisateur ?)"
+fi
+
+echo ""
+echo "== bilan : $((PASS + FAIL)) cas — $PASS OK / $FAIL KO =="
+[ "$FAIL" -eq 0 ] || exit 1
+exit 0

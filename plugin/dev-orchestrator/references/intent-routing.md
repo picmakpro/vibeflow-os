@@ -101,7 +101,7 @@ l'inverse : on n'édite pas l'index pour faire tomber une couverture juste.
 | vérifie que la doc dit encore vrai / la doc est-elle à jour / la doc correspond plus au code / audite la doc sans rien changer (doctrine : `docs-flow.md`) | `gsd-docs-update --verify-only` — **read-only, libre** |
 | mets à jour la doc / génère le README / la doc est périmée / la doc est fausse / il manque la doc d'API / documente ce module (doctrine : `docs-flow.md`) | `gsd-docs-update` — **confirmation humaine requise** |
 | refais toute la doc / repars de zéro sur la doc / on a changé l'archi, reprends tout (doctrine : `docs-flow.md`) | `gsd-docs-update --force` — annoncer ce qui sera écrasé, **jamais en mission ni en autonome** |
-| qu'est-ce qu'on a appris / extrais les décisions / le bilan de l'étape / le graphe de connaissance (famille **savoir**, doctrine : `docs-flow.md`) | `gsd-extract-learnings`, `gsd-graphify` |
+| qu'est-ce qu'on a appris / extrais les décisions / le bilan de l'étape / le graphe de connaissance (famille **savoir**, doctrine : `docs-flow.md`) | `gsd-extract-learnings` ; `gsd-graphify` (conditionnelle : graphify.enabled) — refusée en Phase 24, aucun consommateur prescrit dans le module ; poser ce toggle est ce qui la rendrait active |
 
 > **Désambiguïsation — « mets à jour la doc » vise quatre familles.** Router **au jugement du
 > contexte** (heuristique 5 d'`AGENT.md`, pas une règle nouvelle) : une étape vient d'être exécutée
@@ -144,7 +144,7 @@ l'inverse : on n'édite pas l'index pour faire tomber une couverture juste.
 | pilote plusieurs étapes depuis un terminal | `gsd-manager` |
 | fais relire le plan par une autre IA / revue croisée | `gsd-review`, `gsd-plan-review-convergence` |
 | planifie dans le cloud / ultraplan | `gsd-ultraplan-phase` |
-| profile ma façon de bosser | `gsd-profile-user` |
+| profile ma façon de bosser | `gsd-profile-user` (conditionnelle : profile-pipeline.enabled) — refusée en Phase 24, aucun consommateur prescrit dans le module ; poser ce toggle est ce qui la rendrait active |
 | cette étape intègre de l'IA / un LLM / des agents | `gsd-ai-integration-phase` |
 | audite les évaluations de l'étape IA | `gsd-eval-review` |
 | navigation par familles de commandes internes | `gsd-ns-context`, `gsd-ns-ideate`, `gsd-ns-manage`, `gsd-ns-project`, `gsd-ns-review`, `gsd-ns-workflow` |

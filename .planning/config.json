@@ -24,6 +24,7 @@
     "node_repair": true,
     "node_repair_budget": 2,
     "ui_review": false,
+    "windows_enforce": true,
     "_auto_chain_active": false
   },
   "planning": {
@@ -40,9 +41,18 @@
     "min_plans_for_parallel": 2
   },
   "hooks": {
-    "context_warnings": true
+    "context_warnings": true,
+    "workflow_guard": true
+  },
+  "intel": {
+    "enabled": true
   },
   "project_code": "VFDO",
-  "agent_skills": {},
+  "agent_skills": {
+    "gsd-planner": [
+      "global:software-architecture",
+      "global:audit-architecture"
+    ]
+  },
   "claude_md_path": "./CLAUDE.md"
 }

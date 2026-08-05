@@ -1,5 +1,89 @@
 # Changelog — conductor
 
+## [v1.20.0] — 2026-08-04 (le workstream cesse d'être un silence, et `effort:` cesse d'être facultatif)
+
+### Ajouté
+- **`check-workstream-pointer.sh`** (GSDA-16) — nouveau gate : quand un `.planning/` est
+  **partitionné** en workstreams et qu'aucun canal ne résout de compartiment actif, le moteur ne
+  disait rien du tout. Le silence devient audible, en **advisory strict** : le gate signale, il ne
+  bloque pas. Il refuse le lien symbolique et intègre la politique de nom amont dans son intégralité
+  plutôt que d'en réimplémenter une variante. Câblé au `SessionStart` de `hooks.json`, en `|| true`
+  comme ses voisins — un gate advisory ne peut pas faire échouer l'ouverture d'une session.
+  Suite dédiée `test-check-workstream-pointer.sh`, discriminance prouvée par mutation.
+
+### Modifié
+- **`check-agents.sh` EXIGE désormais `effort:`** (GSDA-21) au lieu de se contenter de le valider
+  quand il est présent. Un champ validé-s'il-est-là n'est pas un champ requis : les agents qui ne le
+  déclaraient pas passaient le gate en silence. La population réellement gatée est de **31 fichiers
+  d'agents** — `plugin/*/agents/<nom>.md` **et** `plugin/*/AGENT.md` à la racine des modules
+  mono-agent, les deux familles que l'installeur pose dans `.claude/agents/` — et non 25 : le
+  durcissement appliqué aux seuls 25 aurait laissé 5 modules non conformes jusqu'au Gate C d'un lab
+  frais. `AGENT.md` du module porte `effort: high`.
+- **`check-state-integrity.sh` suit le workstream actif** (GSDA-13) sans jamais écraser `--file`,
+  qui reste prioritaire sur toute résolution de compartiment — c'est ce qui permet à la CI de figer
+  la cible du gate ADR-063 sur le `STATE.md` de la racine. Trois faux verts et un faux rouge fermés
+  au passage, chacun tenu par un cas de test (`.`/`..`, lien symbolique, et les tests qui encodaient
+  le défaut au lieu de le révéler).
+- **`guard-agent-write.sh`** — le message d'erreur annonçait `effort: <optionnel>` alors que le gate
+  l'exige : il énonce désormais les valeurs admises (`low|medium|high|xhigh|max`). Un message qui
+  décrit une contrainte périmée est faux même quand le code, lui, est juste.
+- **`references/team-kernel.md`** — la marge de profondeur de dispatch est écrite (GSDA-22).
+- **`AGENT.md`** — Iron Law 2 révisée (ADR-069, adoption des workstreams GSD).
+
+### Corrigé
+
+- **Les deux gates de compartiment cessent de traverser un lien symbolique** (`T-24-14-C1`, 4ᵉ
+  passage du motif dans ce dépôt). `[ -d ]` **suit le lien** : un `.planning/workstreams/<nom>`
+  versionné en mode `120000` vers un répertoire hors du lab suffisait à leur faire quitter l'arbre du
+  lab. La résolution est déléguée aux primitives partagées de `planning-core`
+  (`vf_ws_dir_resolve` / `vf_ws_file_in_ws`) plutôt que réimplémentée une cinquième fois.
+
+  - **`check-state-integrity.sh`** rendait un verdict de conformité sur un `STATE.md` qui **n'est pas
+    celui que l'appelant croit vérifier** — exactement le fail-open qui avait motivé ce gate. **Rôle
+    de vérification → exit 2, « non vérifiable »** : le refus est audible, la cible n'est ni lue ni
+    nommée, seule la raison sort. Le `STATE.md` est contrôlé **au même titre** que le répertoire,
+    sinon la fuite se rejoue un cran plus bas.
+  - **`check-workstream-pointer.sh`** **bénissait la partition** (« dossier présent », exit 0) — le
+    vert sur lequel les trois autres gates s'appuient pour lire le compartiment. Il rend désormais
+    **exit 2** (il n'a **pas pu** regarder le compartiment) et non l'état 3 « signal », qui constate
+    une absence qu'il **a** pu voir. Trois raisons distinctes, énumération fermée, chacune expliquant
+    ce que la traversée aurait ouvert.
+
+  Cas licite **inchangé à l'octet près** : un vrai répertoire reste vert. Fermeture prouvée **par
+  mutation sur les quatre gates à la fois** (`planning-core/scripts/tests/test-workstream-symlink-escape.sh`) ;
+  `test-check-workstream-pointer.sh` reçoit son cas de non-régression.
+
+## [v1.19.2] — 2026-08-04 (le bandeau cesse de mentir après /vf-update)
+
+### Corrigé
+- **`vf-update-run.sh`** — le bandeau « mise à jour disponible » ne se taisait qu'au SECOND
+  redémarrage après un `/vf-update` réussi. Cause : `update-banner.sh` (hook SessionStart) lit un
+  cache écrit **en tâche de fond par la session précédente**, et `/vf-update` ne le touchait
+  jamais — le faux positif d'avant la mise à jour survivait donc intact au premier redémarrage, le
+  rafraîchissement de fond de ce démarrage-là ne corrigeant l'état que pour le démarrage
+  **suivant**.
+
+  Le correctif invalide le cache **avant** de le régénérer, jamais l'inverse : le vérificateur
+  (`check-plugin-update.sh`) garde délibérément l'ancien cache quand le réseau est KO, si bien
+  qu'une régénération seule serait aveugle exactement là où elle est nécessaire — un cache absent
+  est un état de repli correct, il n'affiche rien et se reconstruit au démarrage suivant. La
+  relecture est synchrone et donne la version **post-mise-à-jour** parce que l'étape 4a du skill
+  (`claude plugin update`) tourne avant ce script et a déjà réécrit `installed_plugins.json`. Le
+  vérificateur est pris dans la copie la plus fraîche du cache plugin (`$NEW/conductor/scripts/`),
+  pas dans l'ancienne copie voisine du script — sans quoi la version relue resterait celle d'avant
+  la mise à jour. Toute la séquence est best-effort : le script sort toujours 0 après cette étape,
+  une mise à jour réussie ne peut jamais être signalée en échec à cause du bandeau.
+
+### Tests
+- 3 cas nouveaux dans `test-vf-update.sh`, discriminance prouvée par mutation (pas affirmée) :
+  retirer l'appel en queue de script fait virer les cas régénération et invalidation au rouge ;
+  garder l'appel mais retirer le `rm -f` préalable (régénération seule) fait virer **seulement**
+  le cas d'invalidation au rouge — c'est la mutation qui sépare l'invalidation de la régénération,
+  celle qui prouve que l'ordre des deux opérations compte réellement ; inverser l'ordre de
+  résolution du vérificateur fait virer le cas de régénération au rouge sur la version relue.
+  Fixtures durcies au passage : le cas préexistant de sélection du cache le plus récent stube
+  désormais `check-plugin-update.sh`, éliminant le seul accès réseau resté dans la suite.
+
 ## [v1.19.1] — 2026-08-04 (course de récupération du lock de driver)
 
 ### Corrigé

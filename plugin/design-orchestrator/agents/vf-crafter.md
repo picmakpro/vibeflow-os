@@ -3,6 +3,7 @@ name: vf-crafter
 description: Worker de production design de l'équipe — applique la chaîne d'outils design du module (référentiel UX, direction créative, atelier de craft — il délègue aux briques, ne réimplémente jamais) sur UN écran/composant à la fois, selon la direction artistique du lab et le digest de mission reçu. Produit des specs + tokens génériques multi-stack (jamais de code framework-locké imposé) et termine par un rapport typé. Ne juge pas son propre travail — la critique scorée revient à vf-design-judge via le manager. Worker interne de l'équipe — dispatché UNIQUEMENT par un manager du team-kernel (vf-design-manager, vf-dev-manager), pas en usage direct.
 tools: Read, Write, Edit, Bash, Glob, Grep, Skill
 model: sonnet
+effort: medium
 memory: project
 vf-internal: true
 ---

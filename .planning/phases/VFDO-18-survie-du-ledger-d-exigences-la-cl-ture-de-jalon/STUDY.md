@@ -5,8 +5,8 @@ capability, en volant les conventions d'OpenSpec sans son outil, améliore-t-il 
 repo, (b) l'expérience de dev quotidienne dans un lab, (c) la qualité du spec-driven development ?
 Critère : **valeur ajoutée nette**, pas faisabilité technique.
 
-**Base** : `/Users/samuel/Documents/dev/vibeflow-os` @ `9b50891`, `VERSION` = `v2.42.0`.
-**Moteur lu** : `/Users/samuel/.claude/gsd-core/` (`VERSION` = `1.8.0`).
+**Base** : `<racine du dépôt>` @ `9b50891`, `VERSION` = `v2.42.0`.
+**Moteur lu** : `~/.claude/gsd-core/` (`VERSION` = `1.8.0`).
 **Date** : 2026-07-28. **Aucune écriture hors de ce fichier.**
 
 Convention de lecture : les blocs **FAITS SOURCÉS** sont vérifiables par chemin + commande ; les
@@ -48,7 +48,7 @@ par des skills qui existent déjà, sans introduire de nouvel objet dans le socl
 
 ## 2. Ce que la Phase 18 propose vraiment
 
-**FAITS SOURCÉS** — texte du Goal, `/Users/samuel/Documents/dev/vibeflow-os/.planning/ROADMAP.md:591`
+**FAITS SOURCÉS** — texte du Goal, `.planning/ROADMAP.md:591`
 (`### Phase 18: Capability living-specs (conventions OpenSpec)`) :
 
 > « Doter les labs d'un ledger de specs vivantes accumulées par capability — « ce que le système
@@ -208,22 +208,22 @@ pris avec un autre sens.
 
 | # | Brique visée | Équivalent existant (chemin absolu) | Recouvrement | Commentaire |
 |---|---|---|---|---|
-| 1 | **Ledger d'exigences accumulé et durable** | `/Users/samuel/Documents/dev/vibeflow-os/.planning/REQUIREMENTS.md` — 21 133 octets (20,6 KiB), **5 blocs de jalon** (`## v1 Requirements`, `## Milestone 2`, `## Milestone 3`, `## Milestone gsd-migration`, `## Milestone vf-routing`), **18 préfixes d'ID stables** (`ABS ALTI BOOT BRDG CONS FIRST GSDM IDX INST MANIF PHIL PLUG RND ROUT SCOPE VERB VERIF VOC`), table `## Traceability` | **PARTIEL (fort)** | Indexé par **milestone**, pas par capability. Surtout : `/Users/samuel/.claude/gsd-core/workflows/complete-milestone.md:527,530,864` le **supprime** (`git rm .planning/REQUIREMENTS.md`, « fresh for next milestone »). Sa survie ici est une **déviation manuelle non reproductible**. |
-| 2 | **Description de « ce que le système EST »** | `/Users/samuel/Documents/dev/vibeflow-os/.planning/codebase/` (7 docs, `gsd-map-codebase`) | **PARTIEL** | Descriptif, sans ID, non falsifiable, **régénéré en bloc** → dérive prouvée : `.planning/codebase/ARCHITECTURE.md:8` dit « (v2.36.1) » contre `VERSION` = `v2.42.0`. |
-| 3 | **Spec falsifiable au grain exigence** | `gsd-spec-phase` → `{phase_dir}/{padded_phase}-SPEC.md` (`/Users/samuel/.claude/gsd-core/workflows/spec-phase.md:453`), template `Current` / `Target` / `Acceptance` | **PARTIEL** | Grain **phase**, **jetable**, et **aucune écriture vers `REQUIREMENTS.md` depuis `spec-phase.md`** : le fichier n'y est cité qu'une fois, en **lecture** (`spec-phase.md:118`, « based only on what ROADMAP.md and REQUIREMENTS.md say »). *Portée de l'affirmation* : le reste de gsd-core y écrit bien — `new-milestone.md:475` le **génère de zéro**, `complete-milestone.md:118` en parse la traçabilité — mais **aucun chemin ne remonte une spec de phase vers le ledger**. Et `gsd-spec-phase` est **jamais utilisé ici** : `find .planning/phases -name '*SPEC*'` → **0** sur **17 phases exécutées** (18 dossiers, dont celui de la Phase 18, non tracké et jamais exécuté). |
+| 1 | **Ledger d'exigences accumulé et durable** | `.planning/REQUIREMENTS.md` — 21 133 octets (20,6 KiB), **5 blocs de jalon** (`## v1 Requirements`, `## Milestone 2`, `## Milestone 3`, `## Milestone gsd-migration`, `## Milestone vf-routing`), **18 préfixes d'ID stables** (`ABS ALTI BOOT BRDG CONS FIRST GSDM IDX INST MANIF PHIL PLUG RND ROUT SCOPE VERB VERIF VOC`), table `## Traceability` | **PARTIEL (fort)** | Indexé par **milestone**, pas par capability. Surtout : `~/.claude/gsd-core/workflows/complete-milestone.md:527,530,864` le **supprime** (`git rm .planning/REQUIREMENTS.md`, « fresh for next milestone »). Sa survie ici est une **déviation manuelle non reproductible**. |
+| 2 | **Description de « ce que le système EST »** | `.planning/codebase/` (7 docs, `gsd-map-codebase`) | **PARTIEL** | Descriptif, sans ID, non falsifiable, **régénéré en bloc** → dérive prouvée : `.planning/codebase/ARCHITECTURE.md:8` dit « (v2.36.1) » contre `VERSION` = `v2.42.0`. |
+| 3 | **Spec falsifiable au grain exigence** | `gsd-spec-phase` → `{phase_dir}/{padded_phase}-SPEC.md` (`~/.claude/gsd-core/workflows/spec-phase.md:453`), template `Current` / `Target` / `Acceptance` | **PARTIEL** | Grain **phase**, **jetable**, et **aucune écriture vers `REQUIREMENTS.md` depuis `spec-phase.md`** : le fichier n'y est cité qu'une fois, en **lecture** (`spec-phase.md:118`, « based only on what ROADMAP.md and REQUIREMENTS.md say »). *Portée de l'affirmation* : le reste de gsd-core y écrit bien — `new-milestone.md:475` le **génère de zéro**, `complete-milestone.md:118` en parse la traçabilité — mais **aucun chemin ne remonte une spec de phase vers le ledger**. Et `gsd-spec-phase` est **jamais utilisé ici** : `find .planning/phases -name '*SPEC*'` → **0** sur **17 phases exécutées** (18 dossiers, dont celui de la Phase 18, non tracké et jamais exécuté). |
 | 4 | **Grammaire delta ADDED/MODIFIED/REMOVED/RENAMED** | Rien d'outillé. Pratiqué **en prose** : `.planning/PROJECT.md:84` « D2 … ✗ Renversée (v2.33.0) » ; `.planning/REQUIREMENTS.md` (tail) « VERB-02 … caduc depuis v2.33.0 » | **NUL (outillé) / PARTIEL (manuel)** | La sémantique de révision est déjà pratiquée. Manque uniquement la **parsabilité machine** — sans valeur si aucun parseur ne la consomme. |
-| 5 | **Grammaire `#### Scenario:` Given/When/Then** | Aucune. Dans tout gsd-core, GWT n'apparaît que dans deux fichiers : `/Users/samuel/.claude/gsd-core/workflows/spike.md` (9 lignes — l. 73, 85, 153, 156 = **mentions** de la formule à employer ; l. 158-160, 292, 301 = **exemples** de questions de spike) et `workflows/help/modes/full.md:341` (texte d'aide). **Aucune ne porte une exigence.** | **NUL** | Fonction équivalente déjà assurée par `Acceptance:` du template `spec.md`. Gain net = comparabilité, pas capacité neuve. |
-| 6 | **Merge accumulatif à la clôture** | `gsd-complete-milestone` (archive puis **supprime**) ; **`gsd-ingest-docs --mode merge`** + `/Users/samuel/.claude/gsd-core/references/doc-conflict-engine.md` (artefact **gsd-core**, pas de ce repo) + agents `gsd-doc-classifier` / `gsd-doc-synthesizer` (précédence `ADR > SPEC > PRD > DOC`, gate BLOCKER, rapport `.planning/INGEST-CONFLICTS.md`) | **PARTIEL** | **Le moteur de merge d'exigences avec détection de contradiction existe déjà et est déjà câblé ici** (Phase 13, `BRDG-01`, `.planning/REQUIREMENTS.md:168`). Il est orienté ingestion ponctuelle, pas clôture récurrente. Le réimplémenter violerait l'Iron Law 2 de `/Users/samuel/Documents/dev/vibeflow-os/plugin/conductor/AGENT.md:114` (« **Router, jamais réimplémenter.** »). |
-| 7 | **Archive du delta consommé** | `/Users/samuel/Documents/dev/vibeflow-os/.planning/milestones/` (4 fichiers : 2 `*-ROADMAP.md` + 2 `*-REQUIREMENTS.md`) + `.planning/MILESTONES.md` (**7** entrées de jalon marquées closes, `grep -c "^## " ` → 7) | **TOTAL** | Rien à construire — et **à corriger** : sur 7 jalons clos, **2 seulement** ont une archive d'exigences ; et ces archives sont des **supersets emboîtés**, pas des instantanés disjoints (`install-ux-v1.0-REQUIREMENTS.md` contient les 6 préfixes de `vfdo-v1.0-REQUIREMENTS.md` **plus** 5 autres), sans en-tête d'archive alors que `complete-milestone.md:450` en promet un, et avec un **titre erroné** (les 9 premières lignes de l'archive `install-ux` sont celles de l'archive `vfdo`). `ROUT-01` est donc en **3 copies indiscernables**, cf. ci-dessous. |
-| 8 | **Ancrage capability overlay `.gsd/capabilities/` @ `ship:post`** | Mécanisme réel de gsd-core 1.8.0 : `/Users/samuel/.claude/gsd-core/bin/lib/capability-loader.cjs:12-13`, `POINT_ORDER` (`capability-validator.cjs:28-41`, 12 points), dispatch `/Users/samuel/.claude/gsd-core/workflows/ship.md:458` | **NUL (place libre)** | `/Users/samuel/Documents/dev/vibeflow-os/.gsd` **n'existe pas**. Faisabilité confirmée, mais l'ancrage est **inopérant sur ce repo** — voir §5. |
-| 9 | **Gate de cohérence spec ↔ code** | `/Users/samuel/Documents/dev/vibeflow-os/plugin/dev-orchestrator/scripts/check-doc-drift.sh` (**153 l.**, Phase 17) | **NUL sur le fond / PARTIEL sur le déclencheur** | Son propre en-tête, **l. 4-6** : « **Ce script ne dit JAMAIS que la doc est fausse ou périmée — seulement qu'elle N'A PAS BOUGÉ depuis N commits de code.** » Compteur de commits, seuil 20, périmètre `docs/` + `README*` **racine** → **`.planning/` hors champ**. Ce n'est pas un concurrent — et son refus explicite de conclure au « périmé » depuis un « n'a pas bougé » est une **contrainte de conception** reprise au §7.2. |
-| 10 | **Le mot « capability » comme clé d'indexation** | `/Users/samuel/Documents/dev/vibeflow-os/plugin/conductor/skills/vf-new-lab/references/capability-manifest.md:11` : « **Une capacité = un skill à créer.** » Sortie `docs/CAPABILITY_MANIFEST.md`, entrées `### CAP-01 — …` | **COLLISION** | Deux sens de « capability », deux `CAP-xx`, dans un repo qui a `docs/ADR.md:770` (ADR-057, frontières entre briques) et `plugin/conductor/scripts/check-overlaps.sh` **précisément pour interdire ça**. |
+| 5 | **Grammaire `#### Scenario:` Given/When/Then** | Aucune. Dans tout gsd-core, GWT n'apparaît que dans deux fichiers : `~/.claude/gsd-core/workflows/spike.md` (9 lignes — l. 73, 85, 153, 156 = **mentions** de la formule à employer ; l. 158-160, 292, 301 = **exemples** de questions de spike) et `workflows/help/modes/full.md:341` (texte d'aide). **Aucune ne porte une exigence.** | **NUL** | Fonction équivalente déjà assurée par `Acceptance:` du template `spec.md`. Gain net = comparabilité, pas capacité neuve. |
+| 6 | **Merge accumulatif à la clôture** | `gsd-complete-milestone` (archive puis **supprime**) ; **`gsd-ingest-docs --mode merge`** + `~/.claude/gsd-core/references/doc-conflict-engine.md` (artefact **gsd-core**, pas de ce repo) + agents `gsd-doc-classifier` / `gsd-doc-synthesizer` (précédence `ADR > SPEC > PRD > DOC`, gate BLOCKER, rapport `.planning/INGEST-CONFLICTS.md`) | **PARTIEL** | **Le moteur de merge d'exigences avec détection de contradiction existe déjà et est déjà câblé ici** (Phase 13, `BRDG-01`, `.planning/REQUIREMENTS.md:168`). Il est orienté ingestion ponctuelle, pas clôture récurrente. Le réimplémenter violerait l'Iron Law 2 de `plugin/conductor/AGENT.md:114` (« **Router, jamais réimplémenter.** »). |
+| 7 | **Archive du delta consommé** | `.planning/milestones/` (4 fichiers : 2 `*-ROADMAP.md` + 2 `*-REQUIREMENTS.md`) + `.planning/MILESTONES.md` (**7** entrées de jalon marquées closes, `grep -c "^## " ` → 7) | **TOTAL** | Rien à construire — et **à corriger** : sur 7 jalons clos, **2 seulement** ont une archive d'exigences ; et ces archives sont des **supersets emboîtés**, pas des instantanés disjoints (`install-ux-v1.0-REQUIREMENTS.md` contient les 6 préfixes de `vfdo-v1.0-REQUIREMENTS.md` **plus** 5 autres), sans en-tête d'archive alors que `complete-milestone.md:450` en promet un, et avec un **titre erroné** (les 9 premières lignes de l'archive `install-ux` sont celles de l'archive `vfdo`). `ROUT-01` est donc en **3 copies indiscernables**, cf. ci-dessous. |
+| 8 | **Ancrage capability overlay `.gsd/capabilities/` @ `ship:post`** | Mécanisme réel de gsd-core 1.8.0 : `~/.claude/gsd-core/bin/lib/capability-loader.cjs:12-13`, `POINT_ORDER` (`capability-validator.cjs:28-41`, 12 points), dispatch `~/.claude/gsd-core/workflows/ship.md:458` | **NUL (place libre)** | `.gsd` **n'existe pas**. Faisabilité confirmée, mais l'ancrage est **inopérant sur ce repo** — voir §5. |
+| 9 | **Gate de cohérence spec ↔ code** | `plugin/dev-orchestrator/scripts/check-doc-drift.sh` (**153 l.**, Phase 17) | **NUL sur le fond / PARTIEL sur le déclencheur** | Son propre en-tête, **l. 4-6** : « **Ce script ne dit JAMAIS que la doc est fausse ou périmée — seulement qu'elle N'A PAS BOUGÉ depuis N commits de code.** » Compteur de commits, seuil 20, périmètre `docs/` + `README*` **racine** → **`.planning/` hors champ**. Ce n'est pas un concurrent — et son refus explicite de conclure au « périmé » depuis un « n'a pas bougé » est une **contrainte de conception** reprise au §7.2. |
+| 10 | **Le mot « capability » comme clé d'indexation** | `plugin/conductor/skills/vf-new-lab/references/capability-manifest.md:11` : « **Une capacité = un skill à créer.** » Sortie `docs/CAPABILITY_MANIFEST.md`, entrées `### CAP-01 — …` | **COLLISION** | Deux sens de « capability », deux `CAP-xx`, dans un repo qui a `docs/ADR.md:770` (ADR-057, frontières entre briques) et `plugin/conductor/scripts/check-overlaps.sh` **précisément pour interdire ça**. |
 
 **Le double état existe déjà, sans la Phase 18** — `grep -rn "ROUT-01" .planning/` →
 le texte intégral de l'exigence est présent dans **3 fichiers**, tous à la ligne 10 :
-`/Users/samuel/Documents/dev/vibeflow-os/.planning/REQUIREMENTS.md:10`,
-`/Users/samuel/Documents/dev/vibeflow-os/.planning/milestones/vfdo-v1.0-REQUIREMENTS.md:10`,
-`/Users/samuel/Documents/dev/vibeflow-os/.planning/milestones/install-ux-v1.0-REQUIREMENTS.md:10`.
+`.planning/REQUIREMENTS.md:10`,
+`.planning/milestones/vfdo-v1.0-REQUIREMENTS.md:10`,
+`.planning/milestones/install-ux-v1.0-REQUIREMENTS.md:10`.
 
 Et ce ne sont **pas** trois strates historiques distinctes : aucun des deux fichiers d'archive ne
 porte d'en-tête signalant qu'il est mort, l'archive du jalon 2 est un **superset** de celle du
@@ -250,16 +250,16 @@ ce que `.planning/specs/` **remplace** — ce que fait la variante réduite du �
 
 **FAITS SOURCÉS — ce qui existe vraiment, rien n'est fabriqué**
 
-- `@opengsd/gsd-core` installé = **1.8.0** (`/Users/samuel/.claude/gsd-core/VERSION`), publié
+- `@opengsd/gsd-core` installé = **1.8.0** (`~/.claude/gsd-core/VERSION`), publié
   2026-07-22 (6 jours avant la sonde).
 - Le sous-système de capabilities est **complet** : 13 modules `capability-*.cjs` (**792 Ko**) sous
-  `/Users/samuel/.claude/gsd-core/bin/lib/`. `capability-loader.cjs:12-13` lit bien
+  `~/.claude/gsd-core/bin/lib/`. `capability-loader.cjs:12-13` lit bien
   `$GSD_HOME/.gsd/capabilities/<id>/capability.json` (global) et
   `<projectRoot>/.gsd/capabilities/<id>/capability.json` (projet).
 - `ship:post` est le **12ᵉ et dernier** point de `POINT_ORDER`
-  (`/Users/samuel/.claude/gsd-core/bin/lib/capability-validator.cjs:28-41` — ouverture l. 28,
+  (`~/.claude/gsd-core/bin/lib/capability-validator.cjs:28-41` — ouverture l. 28,
   `'discuss:pre'` l. 29, `'ship:post'` l. 40, fermeture l. 41), dispatché par
-  `/Users/samuel/.claude/gsd-core/workflows/ship.md:458`.
+  `~/.claude/gsd-core/workflows/ship.md:458`.
 - **ADR-1244 est authentique** : `https://github.com/open-gsd/gsd-core/blob/next/docs/adr/1244-capability-ecosystem.md`,
   **Status: Accepted — ratifié 2026-07-17**, target release 1.6.0. Son **D2** (« Runtime Capability
   Registry overlay… first-party ∪ installed overlay… `~/.gsd/capabilities/<id>/` ;
@@ -267,18 +267,18 @@ ce que `.planning/specs/` **remplace** — ce que fait la variante réduite du �
   fabrication.** Seul raccourci de citation : `ship:post` relève du contrat de boucle
   (`loop-host-contract`), pas de D2 stricto sensu — nuance de sourcing, pas erreur de fond.
 - `.planning/specs/` est **libre** : `grep -rn "\.planning/specs" ~/.claude/gsd-core/` → 0 résultat ;
-  `/Users/samuel/Documents/dev/vibeflow-os/.planning/specs` n'existe pas.
+  `.planning/specs` n'existe pas.
 - Patron de référence disponible : `mempalace` (`capability-registry.cjs:1744`) + agent
-  `/Users/samuel/.claude/agents/gsd-mempalace-curator.md` (**48 lignes**).
+  `~/.claude/agents/gsd-mempalace-curator.md` (**48 lignes**).
 
 **FAITS SOURCÉS — les six preuves d'instabilité**
 
 **(a) `ship:post` ne fire que dans `/gsd-ship`, chemin que ce repo n'emprunte pas.**
-`/Users/samuel/.claude/gsd-core/workflows/ship.md` en-tête l. 3 : `points: ship:pre, ship:post`. Le
+`~/.claude/gsd-core/workflows/ship.md` en-tête l. 3 : `points: ship:pre, ship:post`. Le
 workflow exige préflight + remote + `gh` + **création de PR**. Le non-usage repose sur **trois
 mesures convergentes**, pas sur une seule :
 
-1. `grep -c "gsd-ship" /Users/samuel/Documents/dev/vibeflow-os/.planning/STATE.md` → **0** ;
+1. `grep -c "gsd-ship" .planning/STATE.md` → **0** ;
 2. les **9** occurrences de `gsd-ship` sous `.planning/` (hors le présent STUDY.md) sont **toutes**
    dans `.planning/phases/01-dev-orchestrator/` (`01-03-PLAN.md:82,86,98,145`,
    `01-04-PLAN.md:107,162`, `01-04-SUMMARY.md:47,85`, `01-05-PLAN.md:125`) et **toutes** des cibles
@@ -309,7 +309,7 @@ qui échoue **passe inaperçu**.
 **(e) Zéro capability tierce publiée au monde.** `docs/registries/capabilities.json` (upstream) =
 `[]`. Les **38** capabilities listées par
 `node ~/.claude/gsd-core/bin/gsd-tools.cjs capability list --json` sont **toutes `first-party`**.
-`~/.gsd/capabilities/` n'existe pas ; `/Users/samuel/Documents/dev/vibeflow-os/.gsd` n'existe pas.
+`~/.gsd/capabilities/` n'existe pas ; `.gsd` n'existe pas.
 **`mempalace` est first-party, compilée dans `capability-registry.cjs` — ce n'est pas une
 implémentation de référence du chemin overlay tiers.** VibeFlow serait le **premier consommateur
 tiers au monde** de ce contrat.
@@ -348,7 +348,7 @@ coût de pionnier assumé pour une brique dont §4 montre qu'elle n'a pas de val
 | **Agent curateur** | ≤ 250 lignes (plafond ADR-029) | `gsd-mempalace-curator.md` = **48 lignes**, mais il ne fait qu'appeler des skills ; un curateur de specs a besoin de `Write`/`Edit` et d'une doctrine de merge. |
 | **Parseur + gate de la grammaire delta** | **300-500 lignes bash** (ou renoncement) | Équivalents OpenSpec : `requirement-blocks.ts` 323 l. + `spec-structure.ts` 82 l. = 405 l. **TypeScript**. En bash, davantage. |
 | **Doc** (README module, CHANGELOG, référence doctrine, 2 README racine) | 150-250 lignes | Convention du repo : `plugin/conductor/CHANGELOG.md` = 25,5 K. |
-| **Tests** | 150-300 lignes | Convention : **10** fichiers de test sous `/Users/samuel/Documents/dev/vibeflow-os/plugin/conductor/scripts/tests/`. |
+| **Tests** | 150-300 lignes | Convention : **10** fichiers de test sous `plugin/conductor/scripts/tests/`. |
 | **Total** | **≈ 1 300 - 2 000 lignes de surface neuve** | |
 
 ### 6.2 Impact ADR-029 — FAIT + JUGEMENT
@@ -381,7 +381,7 @@ automatiste (« la discipline manuelle échoue, c'est justement l'argument POUR 
 1. **`ship:post` ne se déclencherait pas** sur ce repo — `/gsd-ship` n'est pas son chemin de release
    (§5-a, trois mesures convergentes) ;
 2. **s'il se déclenchait, son échec serait muet** — `onError: skip`, verbatim dans
-   `/Users/samuel/.claude/gsd-core/workflows/ship.md:458` (§5-d) ;
+   `~/.claude/gsd-core/workflows/ship.md:458` (§5-d) ;
 3. **il se désarmerait à la première édition du bundle** — gate `bundleContentHash`
    (`capability-loader.cjs:618,641`), silencieusement, sur chaque machine et chaque clone (§5-c).
 
@@ -431,7 +431,7 @@ démontrée**.
 
 ### 7.1 Le trou résiduel, réduit à l'os
 
-**FAIT** — `/Users/samuel/.claude/gsd-core/workflows/complete-milestone.md` :
+**FAIT** — `~/.claude/gsd-core/workflows/complete-milestone.md` :
 
 | Ligne | Contenu |
 |---|---|
@@ -452,7 +452,7 @@ pas sur `REQUIREMENTS.md` ; il n'existe **pas** d'option `--keep-requirements`. 
 bien la suppression (l. 522 avant l. 530) : la donnée n'est pas perdue au sens git, mais le **ledger
 vivant**, lui, disparaît à coup sûr.
 
-**L'autre bout du cycle confirme** : `/Users/samuel/.claude/gsd-core/workflows/new-milestone.md:475`
+**L'autre bout du cycle confirme** : `~/.claude/gsd-core/workflows/new-milestone.md:475`
 (« **Generate REQUIREMENTS.md:** ») **régénère le fichier de zéro** au jalon suivant, avec une
 section de traçabilité vide ; le seul report d'un jalon au suivant est la numérotation des IDs. Le
 fichier n'est donc **jamais amendé**, il est détruit puis recréé.
@@ -472,10 +472,10 @@ grammaire, un overlay et un skill de merge agentique : il se comble avec **un ge
 
 | Question | Réponse |
 |---|---|
-| **Quel fichier ?** | `/Users/samuel/Documents/dev/vibeflow-os/.planning/REQUIREMENTS.md` — **aucun fichier créé**. |
+| **Quel fichier ?** | `.planning/REQUIREMENTS.md` — **aucun fichier créé**. |
 | **Quel skill l'écrit déjà ?** | `gsd-new-milestone` (génération, `new-milestone.md:475`), `gsd-roadmapper` (traçabilité), `gsd-complete-milestone` (archivage + parsing, `complete-milestone.md:118` « Parse REQUIREMENTS.md traceability table »), `gsd-ingest-docs --mode merge` (fusion avec détection de contradiction, précédence `ADR > SPEC > PRD > DOC`, gate BLOCKER — déjà câblé ici en Phase 13, `BRDG-01`, `.planning/REQUIREMENTS.md:168`). **Rien à réimplémenter.** |
 | **Quel geste à la clôture ?** | Au lieu de `git rm .planning/REQUIREMENTS.md`, le fichier **reste** : les exigences du jalon clos y sont conservées avec leur statut final (`Livré vX.Y.Z` / `caduc depuis vX.Y.Z`), sémantique déjà pratiquée en prose (`.planning/REQUIREMENTS.md` tail : « VERB-02 … caduc depuis v2.33.0 »). L'archive `milestones/v[X.Y]-REQUIREMENTS.md` garde son rôle d'instantané. |
-| **Ce que VibeFlow livre concrètement** | (1) **un gate machine** dans `/Users/samuel/Documents/dev/vibeflow-os/plugin/dev-orchestrator/scripts/` — sur le modèle exact de `check-doc-drift.sh` — qui **échoue si `.planning/MILESTONES.md` déclare un jalon clos alors que `.planning/REQUIREMENTS.md` est absent**. **Détection d'absence uniquement.** *Motif du périmètre* : le volet « ou n'a pas bougé », envisagé d'abord, est exactement l'heuristique que `check-doc-drift.sh` **se refuse explicitement** en en-tête (l. 4-6 : « ce script ne dit JAMAIS que la doc est fausse ou périmée — seulement qu'elle N'A PAS BOUGÉ ») ; un non-mouvement ne peut pas fonder l'**échec** d'un gate sans reproduire le défaut que le repo a identifié et neutralisé en Phase 17. L'absence, elle, est binaire et falsifiable. (2) **une ligne de doctrine** dans `plugin/dev-orchestrator/AGENT.md` : « à la clôture de jalon, le ledger d'exigences survit ; l'archive est un instantané, pas un déménagement ». (3) **une RFC upstream** vers `open-gsd/gsd-core` proposant de rendre la suppression optionnelle (`complete-milestone.md:530`) — **ce n'est pas un bonus, c'est la dépendance critique de la variante, et elle est hors du contrôle de VibeFlow** (voir encadré ci-dessous). |
+| **Ce que VibeFlow livre concrètement** | (1) **un gate machine** dans `plugin/dev-orchestrator/scripts/` — sur le modèle exact de `check-doc-drift.sh` — qui **échoue si `.planning/MILESTONES.md` déclare un jalon clos alors que `.planning/REQUIREMENTS.md` est absent**. **Détection d'absence uniquement.** *Motif du périmètre* : le volet « ou n'a pas bougé », envisagé d'abord, est exactement l'heuristique que `check-doc-drift.sh` **se refuse explicitement** en en-tête (l. 4-6 : « ce script ne dit JAMAIS que la doc est fausse ou périmée — seulement qu'elle N'A PAS BOUGÉ ») ; un non-mouvement ne peut pas fonder l'**échec** d'un gate sans reproduire le défaut que le repo a identifié et neutralisé en Phase 17. L'absence, elle, est binaire et falsifiable. (2) **une ligne de doctrine** dans `plugin/dev-orchestrator/AGENT.md` : « à la clôture de jalon, le ledger d'exigences survit ; l'archive est un instantané, pas un déménagement ». (3) **une RFC upstream** vers `open-gsd/gsd-core` proposant de rendre la suppression optionnelle (`complete-milestone.md:530`) — **ce n'est pas un bonus, c'est la dépendance critique de la variante, et elle est hors du contrôle de VibeFlow** (voir encadré ci-dessous). |
 | **Pourquoi elle échappe au double état** | Elle **n'introduit aucun objet**. Elle **réduit** même le double état existant : le rôle de `.planning/milestones/*-REQUIREMENTS.md` devient explicitement « instantané historique », donc `.planning/REQUIREMENTS.md` redevient la **seule** source vivante — les 3 copies de `ROUT-01` cessent d'être 3 candidats à la vérité. |
 | **Pourquoi elle échappe au chemin fragile** | Aucun merge agent-driven de deltas Markdown : la mise à jour reste le geste déjà pratiqué (édition d'une ligne à IDs stables), avec le moteur `doc-conflict-engine` disponible pour les fusions lourdes. Aucune des 16 gardes d'OpenSpec n'est nécessaire, parce qu'aucune opération de merge structurel n'est introduite. |
 
@@ -490,7 +490,7 @@ l'acceptation de la RFC, ni son délai, ni sa forme.
 conflit direct avec le moteur**. À chaque clôture de jalon, le moteur supprimerait le fichier et le
 gate échouerait — VibeFlow se retrouverait à planter un piquet contre sa propre chaîne d'outils,
 c'est-à-dire dans le cas précisément interdit par l'Iron Law 2 que cette étude invoque contre la
-Phase 18 (`/Users/samuel/Documents/dev/vibeflow-os/plugin/conductor/AGENT.md:114`, « **Router, jamais
+Phase 18 (`plugin/conductor/AGENT.md:114`, « **Router, jamais
 réimplémenter.** »). La déviation manuelle actuelle survit précisément parce qu'aucun gate ne
 l'oppose au moteur ; l'ajouter sans le levier upstream **transforme une déviation tolérée en
 conflit récurrent**.
@@ -502,8 +502,8 @@ reçoit sa propre condition d'invalidation, **D3** au §8.
 
 | Livrable | Lignes | Point d'appui du chiffrage |
 |---|---|---|
-| Gate `check-requirements-survival.sh` | **~100-150** | `/Users/samuel/Documents/dev/vibeflow-os/plugin/dev-orchestrator/scripts/check-doc-drift.sh` = **153 l.** |
-| **Tests du gate** | **~150-230** | Convention réelle mesurée sur l'analogue exact : `/Users/samuel/Documents/dev/vibeflow-os/plugin/dev-orchestrator/scripts/tests/test-check-doc-drift.sh` = **232 lignes** de test pour un script de **153** → **ratio 1,5×**. Un gate de 100-150 l. demande donc 150-230 l. de tests. |
+| Gate `check-requirements-survival.sh` | **~100-150** | `plugin/dev-orchestrator/scripts/check-doc-drift.sh` = **153 l.** |
+| **Tests du gate** | **~150-230** | Convention réelle mesurée sur l'analogue exact : `plugin/dev-orchestrator/scripts/tests/test-check-doc-drift.sh` = **232 lignes** de test pour un script de **153** → **ratio 1,5×**. Un gate de 100-150 l. demande donc 150-230 l. de tests. |
 | Doctrine (`AGENT.md` + référence) | ~20-30 | |
 | Doc module (README + CHANGELOG + bump `VERSION`) | ~40 | |
 | RFC upstream (hors repo) | ~60 | **hors du contrôle de VibeFlow** — coût d'écriture borné, mais **délai et issue indéterminés** (§7.2, encadré) |
@@ -547,7 +547,7 @@ et le bloc E est le seul dont la bascule n'invalide rien mais **rouvre** une bri
 
 | # | Condition | Vérification |
 |---|---|---|
-| A1 | `/gsd-ship` devient le chemin de release réel de ce repo | `grep -c "gsd-ship" /Users/samuel/Documents/dev/vibeflow-os/.planning/STATE.md` **> 0**, ou une entrée `ship` dans `.planning/phases/*/*-SUMMARY.md` |
+| A1 | `/gsd-ship` devient le chemin de release réel de ce repo | `grep -c "gsd-ship" .planning/STATE.md` **> 0**, ou une entrée `ship` dans `.planning/phases/*/*-SUMMARY.md` |
 | A2 | Le registre des capabilities tierces se peuple — VibeFlow n'est plus pionnier | `curl -s https://raw.githubusercontent.com/open-gsd/gsd-core/next/docs/registries/capabilities.json \| jq 'length'` **> 0** |
 | A3 | L'epic de durcissement est close et le contrat stabilisé | `gh issue view 1900 --repo open-gsd/gsd-core --json state` → `CLOSED`, **et** un CHANGELOG gsd-core sans nouveau correctif « installed but inert » sur 2 releases consécutives |
 | A4 | Le gate de consentement cesse de désactiver silencieusement sur édition | `grep -n "bundleContentHash" ~/.claude/gsd-core/bin/lib/capability-loader.cjs` → absent, ou remplacé par un mécanisme qui échoue bruyamment |
@@ -564,8 +564,8 @@ et le bloc E est le seul dont la bascule n'invalide rien mais **rouvre** une bri
 
 | # | Condition | Vérification |
 |---|---|---|
-| C1 | Ce repo prouve qu'il consomme son propre outillage de spec | `find /Users/samuel/Documents/dev/vibeflow-os/.planning/phases -name '*SPEC*' \| wc -l` **≥ 3**, sur 3 phases consécutives |
-| C2 | Ce repo prouve qu'il tient ses registres d'état | La version citée dans `/Users/samuel/Documents/dev/vibeflow-os/.planning/codebase/ARCHITECTURE.md:8` **égale** le contenu de `/Users/samuel/Documents/dev/vibeflow-os/VERSION` |
+| C1 | Ce repo prouve qu'il consomme son propre outillage de spec | `find .planning/phases -name '*SPEC*' \| wc -l` **≥ 3**, sur 3 phases consécutives |
+| C2 | Ce repo prouve qu'il tient ses registres d'état | La version citée dans `.planning/codebase/ARCHITECTURE.md:8` **égale** le contenu de `VERSION` |
 | C3 | La couverture de vérification remonte | `find .planning/phases -name '*VERIFICATION*' \| wc -l` **≥ 12** (aujourd'hui : **5 / 17 phases exécutées**) |
 
 ### Bloc D — rend la variante réduite du §7 caduque (donc annule aussi le GO)
@@ -587,7 +587,7 @@ réduite n'introduit **aucun** vocabulaire « capability » : sa validité ne d�
 
 | # | Condition | Vérification |
 |---|---|---|
-| E1 | La collision de vocabulaire « capability » est résolue de part et d'autre | `docs/glossary.md` d'OpenSpec réintroduit « capability » comme terme canonique (aujourd'hui : **0 occurrence**, seul « **Domain.** » est défini, l. 19), **et** `/Users/samuel/Documents/dev/vibeflow-os/plugin/conductor/skills/vf-new-lab/references/capability-manifest.md:11` cesse de définir « **Une capacité = un skill à créer.** » → l'indexation par capability redevient nommable sans violer ADR-057 |
+| E1 | La collision de vocabulaire « capability » est résolue de part et d'autre | `docs/glossary.md` d'OpenSpec réintroduit « capability » comme terme canonique (aujourd'hui : **0 occurrence**, seul « **Domain.** » est défini, l. 19), **et** `plugin/conductor/skills/vf-new-lab/references/capability-manifest.md:11` cesse de définir « **Une capacité = un skill à créer.** » → l'indexation par capability redevient nommable sans violer ADR-057 |
 | E2 | Le besoin d'indexation par domaine devient mesurable ici | Une question du type « que garantit le routage aujourd'hui ? » exige de réconcilier ≥ 3 emplacements **plus de 2 fois** dans l'historique documenté (aujourd'hui : 1 cas relevé, `ROUT-01..04` / `VERB-02` / `PROJECT.md:84`) → le coût de la pile chronologique cesse d'être anecdotique |
 
 ---
@@ -611,7 +611,7 @@ et il ne faut pas les additionner (§6.4).
 sur la variante.**
 
 > **Limite méthodologique, déclarée avant l'argument** : **aucun lab installé n'a été observé.**
-> Toutes les mesures du §6.4 portent sur `/Users/samuel/Documents/dev/vibeflow-os`, dont le
+> Toutes les mesures du §6.4 portent sur `<racine du dépôt>`, dont le
 > `CLAUDE.md` (l. 3-4) précise qu'il est « *le repo de distribution du plugin VibeFlow, **pas un lab
 > qui l'installe*** ». Le sujet mesuré est donc **atypique par construction** : il produit le
 > framework, il ne le consomme pas. Ce volet est **inféré a priori**, pas mesuré, et il ne doit pas
@@ -636,7 +636,7 @@ qualité, pas un registre de plus.
 
 ## 10. Sources
 
-**Primaires — repo `/Users/samuel/Documents/dev/vibeflow-os`**
+**Primaires — repo `<racine du dépôt>`**
 `VERSION` · `.planning/ROADMAP.md` (Phase 18) · `.planning/STATE.md` · `.planning/REQUIREMENTS.md` ·
 `.planning/PROJECT.md` · `.planning/MILESTONES.md` · `.planning/milestones/` ·
 `.planning/codebase/ARCHITECTURE.md` · `.planning/config.json` · `CLAUDE.md` · `docs/ADR.md` ·
@@ -646,7 +646,7 @@ qualité, pas un registre de plus.
 `plugin/dev-orchestrator/scripts/tests/test-check-doc-drift.sh` · `plugin/dev-orchestrator/AGENT.md` ·
 `.planning/phases/01-dev-orchestrator/` (occurrences `gsd-ship`)
 
-**Primaires — moteur `/Users/samuel/.claude/gsd-core/` (1.8.0)**
+**Primaires — moteur `~/.claude/gsd-core/` (1.8.0)**
 `VERSION` · `workflows/complete-milestone.md` · `workflows/new-milestone.md` ·
 `workflows/spec-phase.md` · `workflows/ship.md` · `workflows/spike.md` ·
 `workflows/help/modes/full.md` · `bin/lib/capability-loader.cjs` ·

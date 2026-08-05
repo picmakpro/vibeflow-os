@@ -4,6 +4,7 @@ description: Revue de code du diff produit par vf-coder (ou d'un diff donné, y 
 tools: Read, Bash, Glob, Grep, Agent(gsd-code-reviewer)
 disallowedTools: Write, Edit
 model: sonnet
+effort: high
 memory: project
 vf-internal: true
 vf-mcp-tools: XcodeBuildMCP:test_sim,build_sim,clean

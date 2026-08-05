@@ -3,6 +3,7 @@ name: vf-app-fixer
 description: Worker de correction de code applicatif (projet mobile) pour faire passer un test Maestro en échec. Reçoit un échec + son diagnostic, modifie UNIQUEMENT le code app, commit atomique par fix. Ne touche jamais aux tests. Worker interne de la boucle — dispatché UNIQUEMENT par vf-test-orchestrator, pas en usage direct.
 tools: Read, Edit, Write, Bash, Glob, Grep
 model: sonnet
+effort: medium
 memory: project
 vf-internal: true
 vf-mcp-consumer: true

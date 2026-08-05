@@ -1392,6 +1392,130 @@ else
       ok "T14c : aucune brique ne dépend d'un repli SKILL.md — la carte couvre tout ce qu'elle doit couvrir"
     fi
   fi
+
+  # -------------------------------------------------------------------------
+  # T14d — TROISIÈME catégorie de brique : « routée MAIS conditionnelle » (plan 24-11, GSDA-09).
+  # -------------------------------------------------------------------------
+  # Ce que T14 ne faisait PAS, et qui a coûté deux gestes morts. T14 vérifiait qu'une brique de
+  # l'index est ROUTÉE par la carte. Il n'a jamais interrogé l'ACTIVATION de la capability qui la
+  # porte : `gsd-graphify` et `gsd-profile-user` étaient routés alors que `graphify.enabled` et
+  # `profile-pipeline.enabled` étaient inactifs. T14 était VERT sur deux promesses inertes — le
+  # mode d'échec exact que la Phase 24 referme.
+  #
+  # La catégorie suit la MÊME forme que INTENTIONALLY_UNROUTED (liste blanche nommée + fonction
+  # `case`), jamais une variable booléenne éparse : la forme est ce qui rend l'exception
+  # énumérable et auditable. Sémantique DIFFÉRENTE de INTENTIONALLY_UNROUTED, en revanche : ces
+  # briques SONT routées et comptent pour l'exhaustivité — mais leur ligne doit PORTER le marqueur
+  # conditionnel posé par le plan 24-06. Toute nouvelle entrée conditionnelle s'écrit dans
+  # intent-routing.md ET ici.
+  ROUTED_CONDITIONAL="gsd-graphify gsd-profile-user"
+  is_routed_conditional() {
+    case " $ROUTED_CONDITIONAL " in *" $1 "*) return 0 ;; esac
+    return 1
+  }
+  # Rend les briques conditionnelles CITÉES par la carte sur au moins une ligne SANS marqueur.
+  # Granularité assumée : cette fonction travaille à la LIGNE de routage ; l'appariement fin
+  # « ce marqueur nomme bien le toggle de cette capability » est le travail de
+  # check-capability-activation.sh, invoqué plus bas. Les deux étages sont complémentaires, pas
+  # redondants — celui-ci garde la carte, celui-là garde la cohérence des trois artefacts.
+  conditional_unmarked() { # <fichier de routage> -> liste des briques citées hors marqueur
+    local f="$1" b
+    for b in $ROUTED_CONDITIONAL; do
+      awk -v brique="$b" '
+        index($0, brique) == 0 { next }
+        { cite++ }
+        index($0, "(conditionnelle : ") == 0 { nue++ }
+        END { if (cite > 0 && nue > 0) printf "%s", " " brique }
+      ' "$f"
+    done
+  }
+  t14d_ok=1
+
+  # (a) la liste blanche n'est pas morte : chaque nom qu'elle porte est réellement routé par la
+  # carte. Une liste blanche qui nomme des briques disparues exempte du vide et ne garde rien.
+  t14d_absentes=""
+  for s in $ROUTED_CONDITIONAL; do
+    brick_routed "$s" || t14d_absentes="$t14d_absentes $s"
+  done
+  if [ -z "$t14d_absentes" ]; then
+    ok "T14d (a) : les $(printf '%s' "$ROUTED_CONDITIONAL" | awk '{print NF}') brique(s) déclarée(s) conditionnelle(s) sont toutes réellement routées par la carte (liste blanche vivante)"
+  else
+    ko "T14d (a) : brique(s) déclarée(s) conditionnelle(s) mais ABSENTE(s) de la carte —$t14d_absentes (liste blanche périmée : elle exempte du vide)"; t14d_ok=0
+  fi
+
+  # (b) l'assertion neuve : toute ligne citant une brique conditionnelle porte son marqueur.
+  t14d_nues="$(conditional_unmarked "$ROUTING")"
+  if [ -z "$t14d_nues" ]; then
+    ok "T14d (b) : chaque brique conditionnelle est citée SOUS marqueur dans la carte — aucune promesse inerte non signalée"
+  else
+    ko "T14d (b) : brique(s) conditionnelle(s) citée(s) SANS marqueur dans $ROUTING —$t14d_nues (T14 les compterait routées, elles restent inertes)"; t14d_ok=0
+  fi
+
+  # (c) DISCRIMINANCE par mutation : sur une copie privée du marqueur de gsd-graphify, (b) doit
+  # rougir EN NOMMANT gsd-graphify — et le fichier réel doit rester vert. Sans ce couple, (b)
+  # pourrait être une assertion qui ne sait pas rougir.
+  T14D_TMPDIR="$(mktemp -d)"
+  T14D_MUT="$T14D_TMPDIR/carte-sans-marqueur-graphify.md"
+  awk '/gsd-graphify/ { sub(/\(conditionnelle : [A-Za-z0-9_.-]+\)/, "") } { print }' "$ROUTING" > "$T14D_MUT"
+  if cmp -s "$ROUTING" "$T14D_MUT"; then
+    ko "T14d (c) : mutant IDENTIQUE à la carte — le marqueur de gsd-graphify est introuvable, mutant NON OPPOSABLE (pas mutant satisfait)"; t14d_ok=0
+  else
+    t14d_mut_nues="$(conditional_unmarked "$T14D_MUT")"
+    if [ "$t14d_mut_nues" = " gsd-graphify" ]; then
+      ok "T14d (c) (DISCRIMINANT, par mutation) : marqueur retiré de gsd-graphify → (b) rougit en nommant précisément gsd-graphify ; la carte réelle reste verte"
+    else
+      ko "T14d (c) NON DISCRIMINANTE : le retrait du marqueur de gsd-graphify devrait produire exactement [ gsd-graphify] (obtenu : [$t14d_mut_nues])"; t14d_ok=0
+    fi
+  fi
+  rm -rf "$T14D_TMPDIR"
+
+  # (d) LE CÂBLAGE : le gate d'activation est invoqué ICI, sur le corpus réel du module. Sans cette
+  # invocation, check-capability-activation.sh existerait sans que personne ne le lance — une
+  # garde jamais exécutée est une garde absente. Ses chemins d'entrée sont passés explicitement
+  # depuis $REFS_DIR, seul endroit qui résout les DEUX dispositions (source et lab installé).
+  CAPACT="$MOD/scripts/check-capability-activation.sh"
+  if [ ! -f "$CAPACT" ]; then
+    ko "T14d (d) : $CAPACT introuvable — le gate d'activation doc ↔ capability n'est pas livré"; t14d_ok=0
+  else
+    # Corpus séparé par des SAUTS DE LIGNE, jamais par des espaces : le séparateur « espace »
+    # rendait tout chemin en contenant un inexprimable — et il développait les globs, si bien
+    # qu'un motif aspirait des fichiers que personne n'avait nommés.
+    capact_out="$(VF_CAPACT_INDEX="$REFS_DIR/gsd-capabilities-index.md" \
+                  VF_CAPACT_CORPUS="$ROUTING
+$REFS_DIR/docs-flow.md" \
+                  bash "$CAPACT" 2>&1 >/dev/null)"
+    capact_rc=$?
+    if [ "$capact_rc" -eq 0 ]; then
+      ok "T14d (d) : check-capability-activation.sh invoqué sur le corpus réel → 0 — $capact_out"
+    else
+      ko "T14d (d) : check-capability-activation.sh sort $capact_rc (attendu 0) — $capact_out"; t14d_ok=0
+    fi
+
+    # (e) LE GATE SANS AUCUNE SURCHARGE — c'est-à-dire tel qu'il tourne CHEZ L'UTILISATEUR.
+    # (d) ne surcharge que INDEX et CORPUS : la résolution de la RACINE du lab (donc du
+    # `.planning/config.json` lu) n'y était jamais exercée. Elle était pourtant fausse hors du
+    # dépôt de distribution — les scripts atterrissent à plat dans `.claude/scripts/`, et la
+    # racine déduite désignait alors le PARENT du lab. Le gate sortait 2 chez l'utilisateur, donc
+    # la suite du module y rougissait ; et quand un projet voisin existait, il lisait SA
+    # configuration. Ce cas exerce la cascade complète, sans rien lui souffler.
+    capact_nu_out="$(env -u VF_CAPACT_INDEX -u VF_CAPACT_CONFIG -u VF_CAPACT_CORPUS \
+                     bash "$CAPACT" 2>&1 >/dev/null)"
+    capact_nu_rc=$?
+    capact_nu_rel=0
+    case "$capact_nu_out" in
+      */Users/*|*/home/*) capact_nu_rel=0 ;;
+      *) capact_nu_rel=1 ;;
+    esac
+    if [ "$capact_nu_rc" -ne 0 ]; then
+      ko "T14d (e) : le gate SANS surcharge sort $capact_nu_rc (attendu 0) — sa cascade de résolution ne trouve pas le lab : $capact_nu_out"; t14d_ok=0
+    elif [ "$capact_nu_rel" -ne 1 ]; then
+      ko "T14d (e) : le gate imprime des chemins ABSOLUS dans son verdict — ces messages finissent en clair dans des rapports versionnés : $capact_nu_out"; t14d_ok=0
+    else
+      ok "T14d (e) : le gate sans AUCUNE surcharge résout seul le lab et sort 0, en chemins relatifs — $capact_nu_out"
+    fi
+  fi
+
+  [ "$t14d_ok" -eq 1 ] && ok "T14d : T14 interroge enfin l'ACTIVATION et plus seulement le routage (liste blanche vivante, marqueurs présents, discriminance prouvée, gate câblé)"
 fi
 
 # ---------------------------------------------------------------------------
@@ -4713,10 +4837,19 @@ fi
 # ce contenu ressorte dans la table produite.
 T28H_LIB="$T28_TMPDIR/registre-piege-h"; mkdir -p "$T28H_LIB"
 T28H_WITNESS="$T28_TMPDIR/witness-h.txt"
+# Le fixture déclare AUSSI `capabilities` : depuis l'extension de la Phase 24, le générateur lit
+# les DEUX exports et refuse d'écrire quoi que ce soit s'il n'arrive pas à lire le second (une
+# section vide passerait pour « aucune capability hors point de hook »). Un registre réel porte
+# toujours cet export — un fixture qui l'omettrait ne modéliserait plus aucun moteur réel et ferait
+# rougir T28-H pour une raison étrangère à ce qu'il mesure (la NON-EXÉCUTION).
 cat > "$T28H_LIB/capability-registry.cjs" <<'T28_FIXTURE_H'
 require('fs').writeFileSync(process.env.T28H_WITNESS_PATH, 'PWNED');
 module.exports = {
   version: '9',
+  capabilities: {
+    'fx-alpha-h28': { id: 'fx-alpha-h28', role: 'feature', activationKey: 'fixture.alpha.h28' },
+    'fx-dormant-h28': { id: 'fx-dormant-h28', role: 'feature', activationKey: 'fixture.dormant.h28' }
+  },
   byLoopPoint: {
     'fixture:h-alpha': { steps: [{ capId: 'fx-alpha-h28', when: 'fixture.alpha.h28', onError: 'skip' }], contributions: [], gates: [] }
   }
@@ -4857,12 +4990,28 @@ t28i_verify() { # <script generateur> -> T28I_OK (0/1), T28I_MSG
   calls_seen="$T28_TMPDIR/cs-$(basename "$gen").txt"; calls_allow="$T28_TMPDIR/ca-$(basename "$gen").txt"
   rx_seen="$T28_TMPDIR/rs-$(basename "$gen").txt"; rx_allow="$T28_TMPDIR/ra-$(basename "$gen").txt"
   sort -u "$callout" > "$calls_seen"; sort -u "$rxout" > "$rx_seen"
+  # Liste blanche des noms APPELÉS dans le programme node du générateur. Elle se maintient à la
+  # main, volontairement : tout nouvel appelé doit être regardé avant d'être admis — c'est
+  # précisément ce qui rend cette garde capable de voir arriver un chargeur déguisé.
+  # Phase 24 : readCapabilities / readObjectExport (lecture du SECOND export du registre, même
+  # lecteur de texte, aucune indirection nouvelle) et governingKey (dérivation de la clé de
+  # configuration gouvernante, pure manipulation d'objet déjà parsé).
+  # Phase 24 / plan 24-13 : trois lecteurs de plus sur le MÊME lecteur de texte
+  # (readConfigSchema / readBySkill / readByAgent, tous passant par readObjectExportOptional, qui
+  # distingue « ancre absente » de « ancre illisible » et n'ajoute aucune indirection), et quatre
+  # fonctions de pure manipulation d'objet déjà parsé (schemaEntry / schemaType / schemaDefault,
+  # qui lisent le type et le défaut amont d'une clé ; noteToggle et pushBrick, qui accumulent deux
+  # listes ordonnées). Aucune ne prend de nom de module, aucune ne charge quoi que ce soit.
   printf '%s\n' RegExp String balancedRegions catch cell closeSync code exec fstatSync for \
-    if indexOf isArray isFile join jsLiteralToJSON keys openSync parse push readByLoopPoint \
+    governingKey if indexOf isArray isFile join jsLiteralToJSON keys openSync parse push \
+    readByLoopPoint readCapabilities readObjectExport \
+    readByAgent readBySkill readConfigSchema readObjectExportOptional \
+    noteToggle pushBrick schemaDefault schemaEntry schemaType \
     readFileSync readQuotedStringAt readVersion replace slice slurp stringify test trim while write \
     | sort -u > "$calls_allow"
   { printf '%s\n' '/([A-Za-z_$][A-Za-z0-9_$]*)(\s*):/y' '/,(\s*[}\]])/g' '/[\r\n]+/g' '/\\'"'"'/g' \
-      '/\bversion\s*:\s*/g' '/\s/' '/\|/g' '/s$/'; } | sort -u > "$rx_allow"
+      '/\bversion\s*:\s*/g' '/\s/' '/\|/g' '/s$/' \
+      '/^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)+$/'; } | sort -u > "$rx_allow"
   calls_intrus="$(comm -23 "$calls_seen" "$calls_allow" | tr '\n' ' ')"
   rx_intrus="$(comm -23 "$rx_seen" "$rx_allow" | tr '\n' ' ')"
   n_calls="$(awk 'END{print NR+0}' "$calls_seen")"
@@ -4974,12 +5123,20 @@ fi
 #     ne doit JAMAIS porter la mention « PERIMEE ». Les confondre ferait crier au périmé sur un
 #     moteur parfaitement lisible (a), ou masquerait un moteur devenu illisible derrière le message
 #     paisible d'un moteur simplement vide (b, c).
+#
+# Les trois fixtures déclarent un `capabilities` PARFAITEMENT LISIBLE. Ce n'est pas décoratif :
+# depuis la Phase 24 le générateur porte un SECOND signal de péremption, sur `capabilities`. Un
+# fixture qui omettrait cet export ferait déclencher ce second signal et RATTRAPERAIT ainsi un
+# mutant qui aurait muselé le premier — le mutant `muet` resterait vert en paraissant discriminant.
+# En rendant `capabilities` lisible, on isole ce que T28-K mesure : le signal de `byLoopPoint`,
+# et lui seul.
+T28K_CAPS='capabilities: { "fx-k": { id: "fx-k", role: "feature", activationKey: "fixture.k" } }'
 T28K_S="$T28_TMPDIR/registre-stale";  mkdir -p "$T28K_S"
-printf 'module.exports = { version: "1", autreChose: {} };\n' > "$T28K_S/capability-registry.cjs"
+printf 'module.exports = { version: "1", %s, autreChose: {} };\n' "$T28K_CAPS" > "$T28K_S/capability-registry.cjs"
 T28K_C="$T28_TMPDIR/registre-calcule"; mkdir -p "$T28K_C"
-printf 'const byLoopPoint = buildTable();\nmodule.exports = { version: "1", byLoopPoint: byLoopPoint };\n' > "$T28K_C/capability-registry.cjs"
+printf 'const byLoopPoint = buildTable();\nmodule.exports = { version: "1", %s, byLoopPoint: byLoopPoint };\n' "$T28K_CAPS" > "$T28K_C/capability-registry.cjs"
 T28K_V="$T28_TMPDIR/registre-vide"; mkdir -p "$T28K_V"
-printf 'module.exports = { version: "1", byLoopPoint: {} };\n' > "$T28K_V/capability-registry.cjs"
+printf 'module.exports = { version: "1", %s, byLoopPoint: {} };\n' "$T28K_CAPS" > "$T28K_V/capability-registry.cjs"
 
 t28k_verify() { # <script generateur> -> T28K_OK (0/1), T28K_MSG
   local gen="$1" out_s out_c out_v err_s err_c err_v rc_s rc_c rc_v
@@ -5014,6 +5171,70 @@ else
   T28K_OK=-1
 fi
 
+# === T28-L — SIGNAL A-9 sur le SECOND export (`capabilities`, Phase 24) =========================
+# Le générateur lit désormais DEUX exports. `byLoopPoint` ne peut, par construction, nommer que les
+# capabilities qui déclarent un étage : celles qui n'en déclarent aucune lui sont invisibles. C'est
+# `capabilities` qui les porte — donc un second point de rupture, qui mérite le même traitement A-9
+# que le premier. Deux constats, jamais confondus :
+#  (a) `capabilities` présent mais NON-LITTÉRAL (calculé) — le lecteur de texte ne suit aucune
+#      indirection : EXTRACTION PÉRIMÉE, rc=1, et AUCUN fichier écrit (une section absente vaudrait
+#      « aucune capability hors point de hook », mensonge par omission) ;
+#  (b) `capabilities` LU, mais toute capability déclarée apparaît à un point de hook — la liste est
+#      légitimement VIDE : rc=0, fichier écrit, et JAMAIS la mention périmée.
+# Sans (b), (a) ne prouverait rien : un générateur qui échouerait sur tout registre satisferait (a).
+T28L_I="$T28_TMPDIR/registre-caps-calcule"; mkdir -p "$T28L_I"
+cat > "$T28L_I/capability-registry.cjs" <<'T28_FIXTURE_L_I'
+const capabilities = buildCapabilities();
+module.exports = {
+  version: '1',
+  capabilities: capabilities,
+  byLoopPoint: { 'fixture:l': { steps: [{ capId: 'fx-l', when: 'fixture.l', onError: 'skip' }] } }
+};
+T28_FIXTURE_L_I
+T28L_V="$T28_TMPDIR/registre-caps-couvert"; mkdir -p "$T28L_V"
+cat > "$T28L_V/capability-registry.cjs" <<'T28_FIXTURE_L_V'
+module.exports = {
+  version: '1',
+  capabilities: { 'fx-l': { id: 'fx-l', role: 'feature', activationKey: 'fixture.l' } },
+  byLoopPoint: { 'fixture:l': { steps: [{ capId: 'fx-l', when: 'fixture.l', onError: 'skip' }] } }
+};
+T28_FIXTURE_L_V
+
+t28l_verify() { # <script generateur> -> T28L_OK (0/1), T28L_MSG
+  local gen="$1" out_i out_v err_i err_v rc_i rc_v
+  local perime_i=0 nomme_i=0 intact_i=0 perime_v=0 ecrit_v=0 vide_v=0
+  out_i="$T28_TMPDIR/out-l-i-$(basename "$gen").md"; out_v="$T28_TMPDIR/out-l-v-$(basename "$gen").md"
+  err_i="$T28_TMPDIR/err-l-i-$(basename "$gen").txt"; err_v="$T28_TMPDIR/err-l-v-$(basename "$gen").txt"
+  # Cible TÉMOIN au contenu connu : l'échec doit la laisser bit-à-bit intacte, jamais la tronquer.
+  rm -f "$out_i" "$out_v"; printf 'TEMOIN-L-INTACT\n' > "$out_i"
+  VF_GSD_CORE_LIB="$T28L_I" VF_CAPS_INDEX_OUT="$out_i" bash "$gen" >/dev/null 2>"$err_i"; rc_i=$?
+  "$GREP" -qF 'PERIMEE' "$err_i" && perime_i=1
+  "$GREP" -qF 'capabilities' "$err_i" && nomme_i=1
+  [ "$(cat "$out_i")" = "TEMOIN-L-INTACT" ] && intact_i=1
+  VF_GSD_CORE_LIB="$T28L_V" VF_CAPS_INDEX_OUT="$out_v" bash "$gen" >/dev/null 2>"$err_v"; rc_v=$?
+  "$GREP" -qF 'PERIMEE' "$err_v" && perime_v=1
+  [ -s "$out_v" ] && ecrit_v=1
+  [ -f "$out_v" ] && "$GREP" -qF 'Aucune : toute capability' "$out_v" && vide_v=1
+  if [ "$rc_i" -eq 1 ] && [ "$perime_i" -eq 1 ] && [ "$nomme_i" -eq 1 ] && [ "$intact_i" -eq 1 ] \
+     && [ "$rc_v" -eq 0 ] && [ "$perime_v" -eq 0 ] && [ "$ecrit_v" -eq 1 ] && [ "$vide_v" -eq 1 ]; then
+    T28L_OK=1; T28L_MSG="calcule(rc=$rc_i perime=$perime_i nomme=$nomme_i cible_intacte=$intact_i) couvert(rc=$rc_v perime=$perime_v ecrit=$ecrit_v liste_vide=$vide_v)"
+  else
+    T28L_OK=0; T28L_MSG="calcule(rc=$rc_i attendu 1, perime=$perime_i attendu 1, nomme_capabilities=$nomme_i attendu 1, cible_intacte=$intact_i attendu 1) couvert(rc=$rc_v attendu 0, perime=$perime_v attendu 0, ecrit=$ecrit_v attendu 1, liste_vide=$vide_v attendu 1) — « illisible » et « legitimement vide » doivent rester DISTINCTS"
+  fi
+}
+
+if [ -x "$T28_GEN" ] && command -v node >/dev/null 2>&1; then
+  t28l_verify "$T28_GEN"
+  if [ "$T28L_OK" -eq 1 ]; then
+    ok "T28-L SIGNAL A-9 sur l'export capabilities (Phase 24) : un export CALCULÉ sort en EXTRACTION PÉRIMÉE (rc=1, message nommant capabilities) en laissant la cible bit-à-bit INTACTE, tandis qu'un registre dont toute capability est couverte par un point de hook produit la table avec une liste explicitement VIDE (rc=0, aucune mention périmée) — l'illisible et le vide ne se confondent jamais ($T28L_MSG)"
+  else
+    ko "T28-L SIGNAL A-9 sur capabilities : $T28L_MSG"
+  fi
+else
+  skip "T28-L SIGNAL A-9 sur capabilities : générateur absent/non exécutable ou node introuvable — rien à mesurer"
+  T28L_OK=-1
+fi
+
 # === Mutants (matérialisés, rejouables) — le filet est-il capable de rougir ? ====================
 # Chaque mutant est une réécriture MÉCANIQUE d'une COPIE du générateur, via awk, rejouable par
 # quiconque relance cette suite. Deux garde-fous avant tout verdict : la mutation doit avoir CHANGÉ
@@ -5040,8 +5261,14 @@ t28_mutant() { # <nom> <awk> <fonctions-a-rejouer: "h" "i" "k" separees par espa
       h) t28h_verify "$m"; tag="H($T28H_OK)"; [ "$att" = "0" ] && [ "$T28H_OK" -eq 1 ] && { flipped_ok=0; detail="$detail T28-H attendu rouge, resté vert"; } ;;
       i) t28i_verify "$m"; tag="I($T28I_OK)"; [ "$att" = "0" ] && [ "$T28I_OK" -eq 1 ] && { flipped_ok=0; detail="$detail T28-I attendu rouge, resté vert"; } ;;
       k) t28k_verify "$m"; tag="K($T28K_OK)"; [ "$att" = "0" ] && [ "$T28K_OK" -eq 1 ] && { flipped_ok=0; detail="$detail T28-K attendu rouge, resté vert"; } ;;
+      l) t28l_verify "$m"; tag="L($T28L_OK)"; [ "$att" = "0" ] && [ "$T28L_OK" -eq 1 ] && { flipped_ok=0; detail="$detail T28-L attendu rouge, resté vert"; } ;;
     esac
-    [ "$att" = "1" ] && [ "$([ "$fn" = h ] && echo "$T28H_OK" || { [ "$fn" = i ] && echo "$T28I_OK" || echo "$T28K_OK"; })" -eq 0 ] \
+    # Sélection EXPLICITE du verdict de la fonction rejouée. L'ancienne cascade imbriquée traitait
+    # « tout ce qui n'est ni h ni i » comme K : une lettre ajoutée aurait été silencieusement
+    # évaluée contre le mauvais verdict — un mutant vert pour la mauvaise raison.
+    t28_verdict=""
+    case "$fn" in h) t28_verdict="$T28H_OK" ;; i) t28_verdict="$T28I_OK" ;; k) t28_verdict="$T28K_OK" ;; l) t28_verdict="$T28L_OK" ;; esac
+    [ "$att" = "1" ] && [ "$t28_verdict" -eq 0 ] \
       && { flipped_ok=0; detail="$detail $tag attendu vert, tourné rouge (mutant NON opposable ou sur-ajusté)"; }
   done
   # Restaure l'état de référence pour les appels normaux qui suivraient (aucun n'en fait usage plus
@@ -5088,10 +5315,22 @@ cat > "$T28_TMPDIR/mut-licite.awk" <<'AWK'
 }
 AWK
 
+cat > "$T28_TMPDIR/mut-muet-caps.awk" <<'AWK'
+BEGIN { skip = 0 }
+/^if \(capabilities === null\) \{$/ {
+  print "if (capabilities === null) { capabilities = { \x27mute:caps\x27: {} }; }"
+  skip = 1; next
+}
+skip && /^\}$/ { skip = 0; next }
+skip { next }
+{ print }
+AWK
+
 t28_mutant alias   "$T28_TMPDIR/mut-alias.awk"   "h i" "0 0" "require ALIASÉ (const _alias = require) réintroduit dans le lecteur — la RCE d'origine, sous un autre nom"
 t28_mutant silence "$T28_TMPDIR/mut-silence.awk" "k"   "0"   "silence de péremption rétabli — EXTRACTION PÉRIMÉE redevient indistincte d'un registre réellement vide"
 t28_mutant muet    "$T28_TMPDIR/mut-muet.awk"    "k"   "0"   "script totalement MUET sur l'extraction périmée — fabrique un succès vide au lieu d'échouer bruyamment (ferme le vert à vide)"
 t28_mutant licite  "$T28_TMPDIR/mut-licite.awk"  "i"   "1"   "réécriture LICITE (commentaire de bloc + gabarit) nommant les interdits sans les appeler — doit rester VERTE"
+t28_mutant muet-caps "$T28_TMPDIR/mut-muet-caps.awk" "l" "0" "script MUET sur l'illisibilité du SECOND export — fabrique un capabilities vide au lieu d'échouer, et publierait une section « aucune capability hors point de hook » MENSONGÈRE"
 
 # >>> T28 FIXTURE MUTATION DEBUT
 # --- E (DISCRIMINANTE, par mutation) : registre factice à 2 points ⇒ la couverture C doit ROUGIR.
@@ -5106,6 +5345,9 @@ else
   cat > "$T28_FX_LIB/capability-registry.cjs" <<'T28_FIXTURE_REGISTRE'
 module.exports = {
   version: '1',
+  capabilities: {
+    'fx-alpha': { id: 'fx-alpha', role: 'feature', activationKey: 'fixture.alpha' }
+  },
   byLoopPoint: {
     'fixture:alpha': {
       steps: [{ capId: 'fx-alpha', when: 'fixture.alpha', onError: 'skip' }],
@@ -5119,7 +5361,11 @@ T28_FIXTURE_REGISTRE
   T28_FX_OUT="$T28_TMPDIR/index-mute.md"
   if VF_GSD_CORE_LIB="$T28_FX_LIB" VF_CAPS_INDEX_OUT="$T28_FX_OUT" bash "$T28_GEN" >/dev/null 2>&1 \
      && [ -s "$T28_FX_OUT" ]; then
-    t28_fx_sections="$(awk '/^## /{n++} END{print n+0}' "$T28_FX_OUT")"
+    # Ne compter QUE les titres de point de hook : ils sont encadrés de back-quotes (`## ` + '`').
+    # Depuis la Phase 24 la table porte une section finale « hors point de hook » au titre nu ; un
+    # `^## ` large en compterait 3 là où le registre factice n'en déclare que 2, et ferait crier à
+    # une sonde à réancrer sur un générateur parfaitement correct.
+    t28_fx_sections="$(awk '/^## `/{n++} END{print n+0}' "$T28_FX_OUT")"
     t28_fx_miss="$(t28_missing_points "$T28_FX_OUT" "$T28_POINTS")"
     t28_fx_miss_n="$(printf '%s\n' "$t28_fx_miss" | awk '{n+=NF} END{print n+0}')"
     if [ "$t28_fx_sections" -ne 2 ]; then
@@ -5134,6 +5380,84 @@ T28_FIXTURE_REGISTRE
   fi
 fi
 # >>> T28 FIXTURE MUTATION FIN
+
+# --- T28-M (DISCRIMINANTE, par mutation) : ÉCHAPPEMENT PAR LIEN SYMBOLIQUE ---------------------
+# Le durcissement existant du générateur (O_NONBLOCK + fstat sur le descripteur + plafond de
+# taille) ferme l'exécution de code et le déni de service. Il ne dit RIEN de l'ENDROIT d'où vient
+# l'octet lu : un `capability-registry.cjs` posé en LIEN SYMBOLIQUE vers l'extérieur du dépôt
+# audité reste un fichier ordinaire, de taille modeste, parfaitement lisible — et son contenu se
+# retrouvait reflété VERBATIM dans un index VERSIONNÉ, donc committé et publié. C'est le troisième
+# passage de ce motif dans ce dépôt.
+#
+# Ce test est bâti dans les DEUX sens, et le second est celui qui compte : la garde EN PLACE doit
+# refuser, et la garde RETIRÉE doit laisser l'échappement réapparaître. Sans le mutant, un refus
+# obtenu pour une tout autre raison (registre illisible, node absent…) passerait pour une preuve.
+if [ ! -x "$T28_GEN" ]; then
+  skip "T28-M confinement : générateur introuvable — l'échappement par lien symbolique ne peut pas être rejoué"
+else
+  T28M_ROOT="$T28_TMPDIR/confinement"
+  T28M_LAB="$T28M_ROOT/lab"
+  T28M_HORS="$T28M_ROOT/hors-depot"
+  mkdir -p "$T28M_LAB/.claude/gsd-core/bin/lib" "$T28M_HORS"
+  # Registre CIBLE, hors du lab. Le jeton `fx-EXFILTRE` n'existe nulle part ailleurs : le voir
+  # apparaître dans l'index produit EST la preuve que du contenu hors ancre a traversé.
+  cat > "$T28M_HORS/capability-registry.cjs" <<'T28M_FIXTURE'
+module.exports = {
+  version: '1',
+  capabilities: {
+    'fx-EXFILTRE': { id: 'fx-EXFILTRE', role: 'feature', activationKey: 'exfiltre.actif' }
+  },
+  byLoopPoint: {
+    'fixture:hors': {
+      steps: [{ capId: 'fx-EXFILTRE', when: 'exfiltre.actif', onError: 'skip' }],
+      contributions: [],
+      gates: []
+    }
+  }
+};
+T28M_FIXTURE
+  ln -s "$T28M_HORS/capability-registry.cjs" "$T28M_LAB/.claude/gsd-core/bin/lib/capability-registry.cjs"
+
+  # --- Sens 1 : garde EN PLACE. Le lab n'est pas un dépôt git, donc `default_core_lib` retombe sur
+  # `pwd` comme racine — c'est-à-dire le lab lui-même, exactement la branche NON MAÎTRISÉE visée.
+  T28M_OUT="$T28M_ROOT/index-confine.md"
+  t28m_rc=0
+  t28m_err="$( (cd "$T28M_LAB" && env -u VF_GSD_CORE_LIB -u VF_GSD_TOOLS \
+    VF_CAPS_INDEX_OUT="$T28M_OUT" bash "$T28_GEN" 2>&1 >/dev/null) )" || t28m_rc=$?
+  t28m_dit_hors=0; case "$t28m_err" in *"HORS de son ancre"*) t28m_dit_hors=1 ;; esac
+  t28m_ecrit=0; [ -e "$T28M_OUT" ] && t28m_ecrit=1
+
+  # --- Sens 2 : garde RETIRÉE (mutant). La branche de confinement est neutralisée — et RIEN
+  # d'autre. Si le motif n'est pas trouvé, le mutant est NON OPPOSABLE : la sonde est à réancrer,
+  # ce n'est jamais un succès.
+  T28M_MUT="$T28M_ROOT/generateur-sans-garde.sh"
+  awk '{ if (index($0, "\"$real_anchor\"/*) : ;;") > 0) { print "  *) : ;;" ; muted=1 } else print }
+       END { exit (muted ? 0 : 3) }' "$T28_GEN" > "$T28M_MUT"
+  t28m_mut_construit=$?
+  T28M_OUT_MUT="$T28M_ROOT/index-sans-garde.md"
+  t28m_mut_rc=1
+  t28m_exfiltre=0
+  if [ "$t28m_mut_construit" -eq 0 ] && ! cmp -s "$T28M_MUT" "$T28_GEN"; then
+    ( cd "$T28M_LAB" && env -u VF_GSD_CORE_LIB -u VF_GSD_TOOLS \
+      VF_CAPS_INDEX_OUT="$T28M_OUT_MUT" bash "$T28M_MUT" >/dev/null 2>&1 ) && t28m_mut_rc=0 || t28m_mut_rc=$?
+    if [ -s "$T28M_OUT_MUT" ]; then
+      awk 'index($0, "fx-EXFILTRE") > 0 { n++ } END { exit (n > 0 ? 0 : 1) }' "$T28M_OUT_MUT" \
+        && t28m_exfiltre=1
+    fi
+  fi
+
+  if [ "$t28m_mut_construit" -ne 0 ]; then
+    ko "T28-M confinement : le mutant n'a PAS pu être construit (motif de la garde introuvable) — mutant NON OPPOSABLE, SONDE À RÉANCRER"
+  elif [ "$t28m_exfiltre" -ne 1 ]; then
+    ko "T28-M confinement NON DISCRIMINANTE : garde retirée, l'échappement ne se reproduit PAS (rc=$t28m_mut_rc) — le test ne mesure pas ce qu'il prétend, SONDE À RÉANCRER"
+  elif [ "$t28m_rc" -eq 0 ] || [ "$t28m_ecrit" -eq 1 ]; then
+    ko "T28-M confinement : garde EN PLACE, le générateur a tout de même abouti (rc=$t28m_rc, fichier écrit=$t28m_ecrit) — l'échappement par lien symbolique reste OUVERT"
+  elif [ "$t28m_dit_hors" -ne 1 ]; then
+    ko "T28-M confinement : le refus a bien eu lieu (rc=$t28m_rc) mais il ne nomme pas le confinement — un refus pour une autre raison ne prouve rien : [$t28m_err]"
+  else
+    ok "T28-M (DISCRIMINANTE, par mutation) : un registre en lien symbolique HORS du lab est refusé (rc=$t28m_rc, cible laissée intacte, message nommant l'ancre) — et la MÊME fixture, garde retirée, fait réapparaître le jeton \`fx-EXFILTRE\` dans l'index produit"
+  fi
+fi
 
 # --- T28 ATTEINTE : ce qui a été RÉELLEMENT dérivé, jamais ce qui a été ouvert -----------------
 if [ "$t28_points_n" -eq 0 ]; then
@@ -5721,6 +6045,163 @@ else
 fi
 
 [ "$t32_ok" -eq 1 ] && ok "T32 : table des briques dormantes gatée (gabarit + 4 noms anti-homonyme + clôture), mandat de debug via skill uniquement (fonction de détection unique BRIQUES_NUES_DISPATCH_RE, aucun agent nu dispatché en corps de prompt, discriminance prouvée dans les deux sens), non-duplication ADR-057"
+
+# ---------------------------------------------------------------------------
+# T34 (assertion DÉLÉGUÉE par le plan 24-03) — doctrine du canal `agent_skills`
+# ---------------------------------------------------------------------------
+# Motif du gardiennage : ce sont deux contraintes de RÉDACTION imposées par un arbitrage, et une
+# contrainte de rédaction qu'aucune machine ne garde finit par se relâcher. Les deux doivent
+# survivre ensemble dans GSD-PIPELINE.md :
+#   1. le constat — la doctrine du lab atteint le PLAN, pas l'EXÉCUTION ;
+#   2. l'interdiction qui en découle — ce canal ne doit plus jamais être présenté comme résolu du
+#      côté de l'exécuteur.
+# Garder la seule (1) laisserait réécrire l'interdiction ; garder la seule (2) laisserait effacer
+# le fait qui la fonde. Le bloc échoue dès que L'UNE des deux disparaît.
+#
+# Les deux motifs sont cherchés sur le fichier REPLIÉ (md_folded) avec des blancs ÉLASTIQUES : le
+# constat (1) est en gras et le wrap à 100 colonnes le coupe AUJOURD'HUI entre « n'atteint » et
+# « pas l'exécution ». Un littéral à espaces figés serait invisible sur le fichier intact — faux
+# rouge garanti au premier re-wrap, et pire : une garde qui rougit sur une réécriture licite.
+T34_PIPE="$REFS_DIR/GSD-PIPELINE.md"
+T34_PHRASE1="la doctrine de dev du lab atteint le plan, elle n'atteint pas l'exécution"
+T34_PHRASE2="Ce canal ne doit plus jamais être présenté comme résolu du côté de l'exécuteur"
+
+# Un littéral en prose -> une ERE dont CHAQUE blanc est élastique (variante md_folded).
+t34_elastic() { printf '%s' "$1" | awk '{ gsub(/ /, "[[:space:]]+"); print }'; }
+# Idem, variante md_sed_folded (les blancs doivent aussi absorber l'octet de pli).
+t34_elastic_fold() { printf '%s' "$1" | awk -v sp="$MDSP" '{ gsub(/ /, sp); print }'; }
+
+t34_has() { # <fichier> <phrase en clair>
+  md_folded "$1" | "$GREP" -qE "$(t34_elastic "$2")"
+}
+
+t34_ok=1
+if [ ! -f "$T34_PIPE" ]; then
+  ko "T34 doctrine agent_skills : $T34_PIPE introuvable"; t34_ok=0
+else
+  # (a) état nominal : les DEUX phrases sont là.
+  t34_manquantes=""
+  t34_has "$T34_PIPE" "$T34_PHRASE1" || t34_manquantes="$t34_manquantes [constat plan/exécution]"
+  t34_has "$T34_PIPE" "$T34_PHRASE2" || t34_manquantes="$t34_manquantes [interdiction côté exécuteur]"
+  if [ -z "$t34_manquantes" ]; then
+    ok "T34 (a) : GSD-PIPELINE.md porte le constat (doctrine → plan, pas exécution) ET l'interdiction de présenter le canal comme résolu côté exécuteur"
+  else
+    ko "T34 (a) : phrase(s) doctrinale(s) absente(s) de GSD-PIPELINE.md —$t34_manquantes (arbitrage 24-03 relâché)"; t34_ok=0
+  fi
+
+  # (b) et (c) DISCRIMINANCE par mutation, une phrase à la fois — c'est ce qui prouve que le bloc
+  # échoue sur la disparition de L'UNE, et pas seulement quand les deux tombent ensemble.
+  T34_TMPDIR="$(mktemp -d)"
+  t34_mutation() { # <étiquette> <phrase visée> <phrase à préserver> <nom de fichier mutant>
+    local etiquette="$1" phrase="$2" temoin="$3" mut="$T34_TMPDIR/$4"
+    md_sed_folded "s/$(t34_elastic_fold "$phrase")/PHRASE DOCTRINALE NEUTRALISEE/" "$T34_PIPE" > "$mut"
+    if cmp -s "$T34_PIPE" "$mut"; then
+      ko "T34 ($etiquette) : mutant IDENTIQUE à GSD-PIPELINE.md — le motif n'a rien mordu, mutant NON OPPOSABLE"; t34_ok=0
+      return
+    fi
+    if t34_has "$mut" "$phrase"; then
+      ko "T34 ($etiquette) NON DISCRIMINANTE : la phrase retirée est encore vue dans le mutant"; t34_ok=0
+      return
+    fi
+    # La mutation doit être CHIRURGICALE : la phrase TÉMOIN survit dans le mutant. Sans ce
+    # contrôle, une mutation trop large (qui emporterait les deux phrases) produirait le même
+    # rouge et prouverait seulement que le bloc échoue quand tout disparaît — jamais qu'il
+    # échoue sur la disparition de L'UNE, qui est exactement ce que l'arbitrage 24-03 exige.
+    if ! t34_has "$mut" "$temoin"; then
+      ko "T34 ($etiquette) : mutation TROP LARGE — la phrase témoin a disparu du mutant, le rouge ne prouve pas la détection isolée"; t34_ok=0
+      return
+    fi
+    # Le VERT RETROUVÉ : le fichier réel porte toujours la phrase visée.
+    if t34_has "$T34_PIPE" "$phrase"; then
+      ok "T34 ($etiquette) (DISCRIMINANT, par mutation) : phrase neutralisée SEULE (témoin intact) → l'assertion (a) rougit ; fichier réel restauré → elle redevient verte"
+    else
+      ko "T34 ($etiquette) : le fichier RÉEL ne porte plus la phrase — la restauration ne rend pas le vert"; t34_ok=0
+    fi
+  }
+  t34_mutation "b" "$T34_PHRASE1" "$T34_PHRASE2" "pipeline-sans-constat.md"
+  t34_mutation "c" "$T34_PHRASE2" "$T34_PHRASE1" "pipeline-sans-interdiction.md"
+  rm -rf "$T34_TMPDIR"
+fi
+[ "$t34_ok" -eq 1 ] && ok "T34 : les deux contraintes de rédaction de l'arbitrage 24-03 sont gardées par une machine, chacune prouvée détectable séparément"
+
+# ---------------------------------------------------------------------------
+# T35 (assertion DÉLÉGUÉE par le plan 24-08) — câblage --ws / GSD_WORKSTREAM + plafond ADR-029
+# ---------------------------------------------------------------------------
+# Les deux agents du chemin de dev doivent CHACUN porter la mention du compartiment de planning
+# (`--ws` ou `GSD_WORKSTREAM`) ET renvoyer à workstreams.md. « Chacun » est le mot qui compte :
+# une assertion qui balaierait les deux fichiers et se contenterait d'un seul succès resterait
+# VERTE quand l'un des deux perd sa mention — c'est le mode d'erreur « existence au lieu de
+# relation ». Les mutations (b) et (c) le prouvent en frappant les deux fichiers SÉPARÉMENT.
+T35_AGENTS="vf-coder vf-dev-manager"
+T35_PLAFOND=250
+t35_ok=1
+
+t35_agent_cable() { # <fichier agent> -> 0 si mention ET renvoi présents
+  "$GREP" -qE -- '--ws|GSD_WORKSTREAM' "$1" || return 1
+  "$GREP" -q -- 'workstreams\.md' "$1" || return 1
+  return 0
+}
+
+# (a) état nominal, fichier par fichier.
+t35_manquants=""
+for a in $T35_AGENTS; do
+  f="$MOD/agents/$a.md"
+  if [ ! -f "$f" ]; then
+    t35_manquants="$t35_manquants $a(absent)"
+  else
+    t35_agent_cable "$f" || t35_manquants="$t35_manquants $a"
+  fi
+done
+if [ -z "$t35_manquants" ]; then
+  ok "T35 (a) : vf-coder.md ET vf-dev-manager.md portent chacun la mention --ws/GSD_WORKSTREAM et renvoient à workstreams.md"
+else
+  ko "T35 (a) : agent(s) sans mention de compartiment ou sans renvoi workstreams.md —$t35_manquants (câblage 24-08 relâché)"; t35_ok=0
+fi
+
+# (b)(c) DISCRIMINANCE : chaque agent est muté SÉPARÉMENT. Un bloc qui ne muterait qu'un fichier
+# ne prouverait rien sur l'autre.
+T35_TMPDIR="$(mktemp -d)"
+for a in $T35_AGENTS; do
+  f="$MOD/agents/$a.md"
+  [ -f "$f" ] || continue
+  mut="$T35_TMPDIR/$a-sans-ws.md"
+  awk '{ gsub(/--ws/, "--XX"); gsub(/GSD_WORKSTREAM/, "GSD_XXXXXXXXXX"); print }' "$f" > "$mut"
+  if cmp -s "$f" "$mut"; then
+    ko "T35 (mutation $a) : mutant IDENTIQUE à l'original — aucune mention à retirer, mutant NON OPPOSABLE"; t35_ok=0
+  elif t35_agent_cable "$mut"; then
+    ko "T35 (mutation $a) NON DISCRIMINANTE : $a privé de --ws ET de GSD_WORKSTREAM passe encore le contrôle"; t35_ok=0
+  elif t35_agent_cable "$f"; then
+    ok "T35 (mutation $a) (DISCRIMINANT) : $a.md privé de sa mention → rouge ; fichier réel → vert. Le contrôle porte bien sur CE fichier, pas sur la paire."
+  else
+    ko "T35 (mutation $a) : le fichier RÉEL ne passe plus le contrôle — la restauration ne rend pas le vert"; t35_ok=0
+  fi
+done
+
+# (d) plafond ADR-029 sur vf-dev-manager.md, compté en awk (jamais déduit d'un autre compteur),
+# avec sa mutation : une copie allongée doit franchir le plafond.
+T35_MGR="$MOD/agents/vf-dev-manager.md"
+if [ ! -f "$T35_MGR" ]; then
+  ko "T35 (d) : $T35_MGR introuvable"; t35_ok=0
+else
+  t35_lignes="$(awk 'END{print NR}' "$T35_MGR")"
+  if [ "$t35_lignes" -le "$T35_PLAFOND" ]; then
+    ok "T35 (d) plafond ADR-029 : vf-dev-manager.md fait $t35_lignes ligne(s) (≤ $T35_PLAFOND) — marge de $((T35_PLAFOND - t35_lignes))"
+  else
+    ko "T35 (d) plafond ADR-029 : vf-dev-manager.md fait $t35_lignes ligne(s) (> $T35_PLAFOND)"; t35_ok=0
+  fi
+  t35_mut_long="$T35_TMPDIR/vf-dev-manager-trop-long.md"
+  { cat "$T35_MGR"; awk -v n=$((T35_PLAFOND + 5 - t35_lignes)) 'BEGIN{ for (i = 1; i <= n; i++) print "ligne de remplissage" }'; } > "$t35_mut_long"
+  t35_lignes_mut="$(awk 'END{print NR}' "$t35_mut_long")"
+  if cmp -s "$T35_MGR" "$t35_mut_long"; then
+    ko "T35 (e) : mutant IDENTIQUE à l'original — aucune ligne ajoutée, mutant NON OPPOSABLE"; t35_ok=0
+  elif [ "$t35_lignes_mut" -gt "$T35_PLAFOND" ] && [ "$t35_lignes" -le "$T35_PLAFOND" ]; then
+    ok "T35 (e) (DISCRIMINANT, par mutation) : copie allongée à $t35_lignes_mut ligne(s) → le plafond est franchi et vu ; fichier réel à $t35_lignes → vert"
+  else
+    ko "T35 (e) NON DISCRIMINANTE : la copie allongée ($t35_lignes_mut l.) ne franchit pas le plafond $T35_PLAFOND"; t35_ok=0
+  fi
+fi
+rm -rf "$T35_TMPDIR"
+[ "$t35_ok" -eq 1 ] && ok "T35 : câblage --ws/GSD_WORKSTREAM gardé PAR AGENT (jamais sur la paire) et plafond ADR-029 tenu, les deux prouvés détectables par mutation"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="

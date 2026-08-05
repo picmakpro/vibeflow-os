@@ -53,7 +53,7 @@ rend **0 ligne divergente**. Le contenu est strictement identique, seule la posi
 `[B]` rougit. C'est exactement ce qu'une assertion de *relation* doit faire, et ce qu'une assertion
 de *présence* n'aurait jamais fait. Restauration vérifiée : `103 OK / 0 KO` retrouvé après.
 
-**Les ancres amont sont factuelles** (lues dans `gsd-core@1.9.0`, `/Users/samuel/.claude/gsd-core/`) :
+**Les ancres amont sont factuelles** (lues dans `gsd-core@1.9.0`, `~/.claude/gsd-core/`) :
 
 - `workflows/discuss-phase/modes/chain.md:45` — « **If `--auto` flag present OR `--chain` flag
   present OR `AUTO_MODE` is true:** display banner and launch plan-phase », et `:60`

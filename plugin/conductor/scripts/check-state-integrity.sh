@@ -34,8 +34,26 @@
 #   check-state-integrity.sh [--path <dir>] [--file <relpath>] [--current-ref <ref>] [--against <ref>]
 #   check-state-integrity.sh --help
 #
-# Defaults: --path .  --file .planning/STATE.md  --current-ref <fichier de travail, non commité>
-#           --against HEAD
+# Defaults: --path .  --file <résolu : racine OU compartiment de workstream, cf. ci-dessous>
+#           --current-ref <fichier de travail, non commité>  --against HEAD
+#
+# WORKSTREAMS GSD (GSDA-13) — RÉSOLUTION DU DÉFAUT DE `--file` :
+# Le moteur amont peut partitionner le planning en `.planning/workstreams/<nom>/`. Quand `--file`
+# n'est PAS fourni, le défaut est résolu : workstream actif → `.planning/workstreams/<nom>/STATE.md`,
+# sinon `.planning/STATE.md` (comportement historique, strictement inchangé).
+# `--file` EXPLICITE PRIME TOUJOURS : la résolution automatique ne le réécrase JAMAIS, quelle que
+# soit la valeur de GSD_WORKSTREAM ou du pointeur.
+# PRÉCONDITION DE PARTITIONNEMENT : la résolution ne s'arme QUE si `<path>/.planning/workstreams/`
+# existe. Sans elle, ce script était le seul des quatre à rendre un verdict sur un dépôt NON
+# partitionné : `GSD_WORKSTREAM=feature-x` le faisait sortir en 2 là où ses trois pairs
+# poursuivaient — et le déclencheur n'avait rien d'hypothétique, `check-workstream-pointer.sh`
+# PRESCRIT littéralement `export GSD_WORKSTREAM=<nom>` comme remède.
+# Politique de nom et ordre de résolution : `workstream-policy.sh` (planning-core), fichier SOURCÉ
+# et partagé par les quatre gates — voir son en-tête pour la politique UNIQUE, la parité amont et
+# la gradation par rôle du cas « résolu mais dossier absent ». La surcharge historique
+# VF_STATE_WORKSTREAM reste le premier canal.
+# FRONTIÈRE ASSUMÉE : le pointeur de SESSION en os.tmpdir() n'est PAS lu ici — indexé sur un
+# condensat de chemin absolu et une clé de session que bash ne reproduit pas fidèlement.
 #
 # --current-ref permet de comparer deux refs git entre elles (utile en CI post-commit ou en test) ;
 # par défaut, "courant" désigne le fichier de travail tel qu'il est sur disque — le point d'usage
@@ -45,12 +63,20 @@
 # un `--file` absolu combiné à `--current-ref` n'est pas un usage supporté.
 #
 # Codes de sortie : 0 = conforme · 1 = régression ou invariant rompu (message stderr précise lequel)
-#                   2 = erreur d'intégrité (hors dépôt git, fichier/ref illisible, champ imparsable)
+#                   2 = erreur d'intégrité (hors dépôt git, fichier/ref illisible, champ imparsable,
+#                       workstream résolu dont le dossier `.planning/workstreams/<nom>/` est
+#                       introuvable, OU nom/pointeur REJETÉ par la politique amont — même posture
+#                       fail-closed que ligne « hors dépôt git » : on ne retombe JAMAIS en silence
+#                       sur le STATE.md de la racine, ce serait rendre « conforme » sur un fichier
+#                       que l'on n'a pas vérifié. Le rejet d'un nom retombait précisément sur la
+#                       racine en rendant « exit 0 conforme » — fail-OPEN, l'exact inverse de ce
+#                       que cette ligne jure.)
 #                   64 = usage
 set -uo pipefail
 
 ROOT="."
 FILE_REL=".planning/STATE.md"
+FILE_REL_EXPLICIT=0   # 1 dès que --file est fourni → la résolution de workstream se retire
 CURRENT_REF=""       # vide = fichier de travail
 AGAINST_REF="HEAD"
 
@@ -61,7 +87,7 @@ while [ "$#" -gt 0 ]; do
       ROOT="$2"; shift 2 ;;
     --file)
       [ "$#" -ge 2 ] || { echo "[check-state-integrity] --file nécessite une valeur" >&2; exit 64; }
-      FILE_REL="$2"; shift 2 ;;
+      FILE_REL="$2"; FILE_REL_EXPLICIT=1; shift 2 ;;
     --current-ref)
       [ "$#" -ge 2 ] || { echo "[check-state-integrity] --current-ref nécessite une valeur" >&2; exit 64; }
       CURRENT_REF="$2"; shift 2 ;;
@@ -81,6 +107,66 @@ git_safe() { git -C "$ROOT" -c core.fsmonitor= -c core.hooksPath=/dev/null --no-
 if ! git_safe rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "[check-state-integrity] $ROOT hors d'un dépôt git — intégrité non vérifiable" >&2
   exit 2
+fi
+
+# --- Résolution du workstream actif (GSDA-13) — APRÈS le gate « hors dépôt git » -------------------
+# Position volontaire : la précondition « on est dans un dépôt » reste le premier échec de premier
+# rang. Position volontaire aussi vis-à-vis de `--file` : la résolution ne s'applique QUE si
+# l'appelant n'a rien imposé (FILE_REL_EXPLICIT=0), jamais l'inverse.
+# La politique de nom n'est PLUS recopiée ici : elle est SOURCÉE (voir en-tête). Une copie locale
+# avait divergé du moteur amont ET de ses trois pairs en un seul lot de travail parallèle.
+WS_POLICY=""
+for _cand in "$(dirname "$0")/workstream-policy.sh" \
+             "$(dirname "$0")/../../planning-core/scripts/workstream-policy.sh"; do
+  [ -r "$_cand" ] && { WS_POLICY="$_cand"; break; }
+done
+if [ -z "$WS_POLICY" ]; then
+  # Fail-closed, même posture que « hors dépôt git » : sans la politique, ce script ne peut pas
+  # savoir QUEL fichier il doit vérifier. Rendre « conforme » sur la racine serait un vert rendu
+  # par défaut d'outillage. Le cas est structurellement impossible dans un lab conforme (conductor
+  # requiert planning-core), donc jamais un coût en régime nominal.
+  echo "[check-state-integrity] workstream-policy.sh introuvable — politique de workstream non chargeable, intégrité non vérifiable" >&2
+  exit 2
+fi
+# shellcheck source=/dev/null
+. "$WS_POLICY"
+
+if [ "$FILE_REL_EXPLICIT" -eq 0 ] && [ -d "$ROOT/.planning/workstreams" ]; then
+  vf_ws_resolve "$ROOT/.planning" "${VF_STATE_WORKSTREAM:-}"; ws_rc=$?
+  if [ "$ws_rc" -eq 2 ]; then
+    # Le REJET est fail-closed, comme le dossier absent ci-dessous. Il retombait auparavant sur le
+    # STATE.md de la racine en rendant « exit 0 conforme » : un nom rejeté désarmait le gate.
+    # Seule la RAISON est imprimée — jamais la valeur, non maîtrisée par construction (T-24-04-01).
+    echo "[check-state-integrity] workstream rejeté par la politique amont ($VF_WS_REASON, canal $VF_WS_SOURCE) — aucun chemin construit, intégrité non vérifiable" >&2
+    exit 2
+  fi
+  if [ -n "$VF_WS_NAME" ]; then
+    # `[ -d ]` SUIT les liens symboliques : un `workstreams/<nom>` versionné en mode 120000 vers un
+    # répertoire hors du lab faisait rendre à ce gate un verdict de conformité sur un STATE.md qui
+    # n'est PAS celui que l'appelant croit vérifier — exactement le fail-open qui a motivé la
+    # politique partagée. Elle refuse désormais de traverser ; le STATE.md est contrôlé au même
+    # titre, sans quoi la fuite se rejoue un cran plus bas.
+    vf_ws_dir_resolve "$ROOT/.planning" "$VF_WS_NAME"; dir_rc=$?
+    if [ "$dir_rc" -eq 2 ]; then
+      # GATE DE VÉRIFICATION → exit 2, « non vérifiable » (gradation par rôle de la politique).
+      # La cible n'est ni lue ni nommée : seule la raison, prise dans l'énumération fermée, sort.
+      echo "[check-state-integrity] compartiment « $VF_WS_NAME » refusé ($VF_WS_REASON) — aucune traversée, cible non lue, intégrité non vérifiable" >&2
+      exit 2
+    fi
+    if [ "$dir_rc" -eq 0 ]; then
+      vf_ws_file_in_ws "$VF_WS_DIR/STATE.md"; f_rc=$?
+      if [ "$f_rc" -eq 2 ]; then
+        echo "[check-state-integrity] état du compartiment « $VF_WS_NAME » refusé ($VF_WS_REASON) — aucune traversée, cible non lue, intégrité non vérifiable" >&2
+        exit 2
+      fi
+      FILE_REL=".planning/workstreams/$VF_WS_NAME/STATE.md"
+    else
+      # Fail-closed : ne JAMAIS retomber sur le STATE.md de la racine — ce serait rendre un verdict
+      # de conformité sur un fichier autre que celui que l'appelant croit vérifier.
+      echo "[check-state-integrity] workstream « $VF_WS_NAME » actif mais .planning/workstreams/$VF_WS_NAME introuvable sous $ROOT — intégrité non vérifiable" >&2
+      exit 2
+    fi
+  fi
 fi
 
 case "$FILE_REL" in

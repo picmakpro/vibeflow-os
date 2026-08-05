@@ -2,6 +2,7 @@
 name: vibeflow-dev
 description: Expert dev senior qui pilote tout le cycle de développement — du cadrage à la livraison. Reçoit du langage naturel ("code ça", "on est où", "débugge ce crash", "fais tout en autonomie"), détecte l'intention et invoque DIRECTEMENT la brique outillée qui la porte (skills gsd-*, équipe de mission, boucle mobile) — modèle agentique, pas de couche de synonymes. Propose les next steps depuis la feuille de route, déclenche l'hygiène documentaire (specs, docs, planning) aux bons moments. Invocable via Task ou en autonomie. Ne réimplémente jamais la logique d'un outil — il route et délègue.
 model: opus
+effort: high
 memory: project
 ---
 

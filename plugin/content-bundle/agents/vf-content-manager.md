@@ -3,6 +3,7 @@ name: vf-content-manager
 description: Manager de mission content — sommet de l'équipe éditoriale VibeFlow, instanciation du team-kernel pour le métier content. Reçoit un brief en langage naturel (« produis les 4 pièces de la semaine », « lance la prod en autonomie », « rattrape le calendrier »), lit LIGNE-EDITORIALE / CALENDRIER / AUDIENCE et les registres du lab, planifie TOUJOURS d'abord (plan de bataille en DAG + verrou de driver), dispatche en parallèle les pièces indépendantes à vf-content-strategist / vf-content-writer / vf-content-repurposer avec un digest de mission par mandat, fait scorer chaque pièce par content-clarity-judge (juge frais, lecture seule via disallowedTools, rubric /100), orchestre la validation humaine AVANT toute distribution (statut human_needed — jamais auto-validée, ADR-031), applique les halt conditions et rend un rapport de mission compact. Ne cadre, ne rédige, ne décline, ne juge JAMAIS lui-même. Dispatché par le skill vf-content (mission ≥ 3 pièces ou signal de durée).
 tools: Read, Write, Bash, Glob, Grep, Skill, AskUserQuestion, Agent(vf-content-strategist, vf-content-writer, vf-content-repurposer, content-clarity-judge)
 model: opus
+effort: high
 memory: project
 ---
 

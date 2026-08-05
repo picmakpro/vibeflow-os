@@ -219,5 +219,69 @@ le point de hook de pré-plan (le moteur spawne lui-même son chercheur) ; le fl
 **prompt**. Toggle à vrai ⇒ la recherche a lieu de toute façon, le flag décide seulement si le
 worker se fait interroger. Deux couches distinctes, pas interchangeables.
 
+**Toggle refusé ≠ toggle oublié** : un toggle qu'on choisit de **ne pas poser** se documente avec
+son motif mesuré, sinon l'absence se relit plus tard comme un oubli. Cas traité : `workflow.tdd_mode`
+au §10.1.
+
 **Flags documentaires** : leur doctrine est `docs-flow.md`, jamais recopiée ici (ADR-057).
 Elle fait autorité sur sa famille — une capacité, une seule voix.
+
+---
+
+## 10. Canal `agent_skills` — ce qu'il atteint, et ce qu'il n'atteint pas
+
+### Ce que le canal atteint
+
+`agent_skills` (`.planning/config.json`) est le canal **officiel** par lequel la doctrine d'un lab
+rejoint les agents du moteur : `buildAgentSkillsBlock` (`init.cjs:1731`) injecte des skills du lab
+dans le prompt des agents `gsd-*` via **17 slots**, consommés par **30 workflows** (mesure du
+2026-08-04 contre `@opengsd/gsd-core` 1.9.1).
+
+Nous n'en peuplons **qu'un seul** : celui de `gsd-planner` (`plan-phase.md:74`, injections `:769` et
+`:1247`), avec `software-architecture` (SOLID / SoC / Clean Architecture / Clean Code, puis DRY /
+KISS / YAGNI) et `audit-architecture` (doctrine d'audit multi-couches, ADR-036). La conséquence
+s'écrit telle quelle, sans euphémisme : **la doctrine de dev du lab atteint le plan, elle n'atteint
+pas l'exécution.**
+
+### Pourquoi le slot exécuteur n'est pas atteignable — et l'interdiction qui en découle
+
+L'injection du slot exécuteur ne vit que dans le **prompt de dispatch** d'`execute-phase.md`
+(chargement `:86`, injection `execute-phase.md:715`) ; `execute-plan.md` n'en porte **aucune**. Or
+`gsd-executor` et `gsd-planner` sont sortis de l'allowlist `tools:` de `vf-coder` en Phase 23
+(GSDC-05, voie unique du §9), et le repli documenté quand l'outil de dispatch est indisponible est
+l'**exécution inline séquentielle** (`execute-phase.md:28-31`) — un chemin **sans prompt de
+dispatch, donc sans injection**. Peupler le slot exécuteur serait un **vert à vide** sur notre
+chemin réel : la clé serait posée, le prompt de l'exécuteur inchangé.
+
+**Interdiction.** Ce canal ne doit plus jamais être présenté comme résolu du côté de l'exécuteur.
+Toute affirmation inverse doit **d'abord produire la preuve** que le prompt de dispatch
+d'`execute-phase` est bien emprunté sur le chemin considéré — pas la preuve que la clé existe.
+
+### Pourquoi le digest de mission ne remplace pas ce canal
+
+Le digest borne les conventions à **deux ou trois lignes du `CLAUDE.md` projet**
+(`mission-contracts.md:62`) sous un plafond de **trente lignes** (`:51`), et notre `CLAUDE.md` ne
+contient ni SOLID, ni DRY, ni KISS, ni YAGNI, ni Clean Archi, ni TDD. Le digest ne peut donc
+**structurellement pas** porter la doctrine : c'est un fait de dimension, pas un oubli de rédaction
+qu'un meilleur digest corrigerait.
+
+### 10.1 Refus de `workflow.tdd_mode` — quatre faits mesurés
+
+La clé n'est **pas posée** ; le défaut amont (`false`) s'applique. Motifs, tous mesurés le
+2026-08-04 :
+
+1. **La doctrine TDD est déjà injectée sans condition.** `references/tdd.md` (330 lignes) entre dans
+   le prompt de l'exécuteur quel que soit le toggle (`execute-phase.md:693`) : `tdd_mode` **n'ajoute
+   pas** la doctrine TDD, elle y est déjà.
+2. **Le gate ajouté ne bloque rien.** Le hook `execute:post` de la capability est `blocking: false`,
+   `onError: skip` — il signale, il n'arrête pas.
+3. **Ce que le toggle ajoute réellement se réduit à deux choses** : le planner pose un type de tâche
+   dédié sur les tâches jugées éligibles, et ce gate de fin d'exécution s'installe.
+4. **L'heuristique d'éligibilité amont ne correspond pas à ce dépôt.** Elle classe **par type de
+   tâche** (business logic d'un côté ; UI, config, glue et CRUD de l'autre). Ce dépôt est du bash et
+   du markdown : **aucune des sept catégories amont ne correspond**, si bien qu'elle rangerait la
+   quasi-totalité de nos tâches du mauvais côté — alors que notre pratique réelle écrit le test
+   rouge d'abord, sur un critère **mesurable**
+   (`plugin/software-architecture/references/principles.md:61-63`).
+
+Décision : le canal de doctrine passe par le slot planner ci-dessus, pas par ce toggle.

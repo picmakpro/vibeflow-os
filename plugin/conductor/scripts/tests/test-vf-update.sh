@@ -28,11 +28,45 @@ ok "silencieux si à jour"                    "$(echo "$out" | grep -q 'systemMe
 echo "== vf-update-run.sh (sélection du cache semver le plus récent) =="
 FAKE="$TMP/cache-base"
 for v in 2.4.1 2.18.0 2.9.0; do
-  mkdir -p "$FAKE/$v/_internal"
+  mkdir -p "$FAKE/$v/_internal" "$FAKE/$v/conductor/scripts"
   printf '#!/usr/bin/env bash\necho "ENGINE cache=$VIBEFLOW_CACHE"\n' > "$FAKE/$v/_internal/vibeflow-update.sh"
+  # Stub de check-plugin-update.sh : écrit un cache dont "installed" porte le nom du dossier de
+  # version d'origine — sonde d'origine pour le cas A ci-dessous — et éteint tout risque réseau
+  # (sans lui, le cas « sélectionne 2.18.0 » ferait un vrai git ls-remote une fois le bloc de
+  # production posé, faute de vérificateur dans $FAKE/2.18.0/).
+  printf '#!/usr/bin/env bash\nset -uo pipefail\nCF="${XDG_CACHE_HOME:-$HOME/.cache}/vibeflow/update-check.json"\nmkdir -p "$(dirname "$CF")"\nprintf '"'"'{"update_available":false,"installed":"%s","latest":"%s","checked_at":"x"}'"'"' "%s" "%s" > "$CF"\n' "$v" "$v" > "$FAKE/$v/conductor/scripts/check-plugin-update.sh"
+  chmod +x "$FAKE/$v/conductor/scripts/check-plugin-update.sh"
 done
 out="$(VF_CACHE_BASE="$FAKE" bash "$DIR/vf-update-run.sh" 2>&1)"
 ok "sélectionne 2.18.0 (max semver, pas 2.9.0)" "$(echo "$out" | grep -q 'cache le plus récent : 2.18.0' && echo true || echo false)"
+
+echo "== vf-update-run.sh (invalidation + régénération du cache du bandeau) =="
+# Isolation HOME (même motif que run_banner ligne 18) : le repli du bloc de production et le
+# chemin par défaut du cache dérivent tous deux de $HOME. XDG_CACHE_HOME est déjà exporté
+# (ligne 10) vers $TMP/cache pour toute la suite — c'est donc LUI, pas HOME, qui fixe le chemin
+# du cache ici (même précédence que dans le script de production).
+RB_HOME="$TMP/rb-home"; mkdir -p "$RB_HOME"
+RB_CACHE="$XDG_CACHE_HOME/vibeflow/update-check.json"
+
+# Cas A — régénération depuis la copie la plus fraîche ($NEW/conductor/scripts/…).
+echo '{"update_available":true,"installed":"0.0.0","latest":"9.9.9","checked_at":"x"}' > "$RB_CACHE"
+HOME="$RB_HOME" VF_CACHE_BASE="$FAKE" bash "$DIR/vf-update-run.sh" >/dev/null 2>&1
+ok "cas A : cache régénéré, update_available=false" "$([ -f "$RB_CACHE" ] && grep -q '"update_available":false' "$RB_CACHE" && echo true || echo false)"
+ok "cas A : version relue = celle de \$NEW (2.18.0)" "$([ -f "$RB_CACHE" ] && grep -q '"installed":"2.18.0"' "$RB_CACHE" && echo true || echo false)"
+
+# Cas B/C — la régénération échoue (vérificateur sort 1 sans rien écrire) : le cache doit rester
+# ABSENT (pas régénéré seul — c'est ce qui distingue « supprimer puis régénérer » de « régénérer
+# seul »), et le script doit quand même sortir 0 (best-effort, cas C).
+FAKE_FAIL="$TMP/cache-base-fail"
+mkdir -p "$FAKE_FAIL/1.0.0/_internal" "$FAKE_FAIL/1.0.0/conductor/scripts"
+printf '#!/usr/bin/env bash\necho "ENGINE cache=$VIBEFLOW_CACHE"\n' > "$FAKE_FAIL/1.0.0/_internal/vibeflow-update.sh"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$FAKE_FAIL/1.0.0/conductor/scripts/check-plugin-update.sh"
+chmod +x "$FAKE_FAIL/1.0.0/conductor/scripts/check-plugin-update.sh"
+echo '{"update_available":true,"installed":"0.0.0","latest":"9.9.9","checked_at":"x"}' > "$RB_CACHE"
+HOME="$RB_HOME" VF_CACHE_BASE="$FAKE_FAIL" bash "$DIR/vf-update-run.sh" >/dev/null 2>&1
+rc=$?
+ok "cas B : régénération en échec → cache ABSENT (pas de faux positif)" "$([ ! -f "$RB_CACHE" ] && echo true || echo false)"
+ok "cas C : sortie 0 même si le vérificateur échoue (best-effort)" "$([ "$rc" -eq 0 ] && echo true || echo false)"
 
 echo "== vibeflow-update.sh (baseline mandatory + resync gouvernance) =="
 ENGINE="$DIR/../../_internal/vibeflow-update.sh"

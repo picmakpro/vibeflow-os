@@ -96,7 +96,7 @@ Vérifié sur pièce, pas supposé :
   par #1995 cité dans le digest de mission. **Aucun défaut** : le hook a été mis à jour par
   l'installation 1.9.0 en même temps que le reste du moteur.
 - Cas réel confronté (ce worktree de mission lui-même) : `git rev-parse --git-dir` renvoie
-  `/Users/samuel/Documents/dev/vibeflow-os/.git/worktrees/vibeflow-os-p21` (donc bien un worktree
+  `.git/worktrees/vibeflow-os-p21` (donc bien un worktree
   lié) ; `git symbolic-ref --short HEAD` renvoie `feat/phase-21-alignement-gsd-core-190`, qui ne
   matche PAS le motif `agent-*`. Comportement attendu : le hook est un **no-op** ici, car cette
   branche n'est pas un worktree géré par `gsd-executor` (`isolation="worktree"`) mais un worktree

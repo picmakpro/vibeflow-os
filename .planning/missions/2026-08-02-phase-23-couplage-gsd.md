@@ -1,7 +1,7 @@
 # Mission — Phase 23 « Couplage explicite au moteur GSD », reprise après pause
 
 - **Date** : 2026-08-02
-- **Worktree** : `/Users/samuel/Documents/dev/vibeflow-os-p23`, branche `feat/phase-23-couplage-gsd`
+- **Worktree** : `../vibeflow-os-p23`, branche `feat/phase-23-couplage-gsd`
 - **Base** : `0c50d6b` (handoff de la session précédente)
 - **Driver lock** : `mission-phase23-couplage-gsd`, acquis puis récupéré une fois (périmé pendant un
   dispatch de 30 min), relâché à la clôture.

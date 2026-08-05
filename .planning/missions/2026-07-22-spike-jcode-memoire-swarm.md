@@ -93,9 +93,9 @@ isolés (ADR-048/049).
 
 ## Livrables (chemins absolus)
 
-- `/Users/samuel/Documents/dev/vibeflow-os/.planning/phases/VFDO-09-spike-transposition-jcode-m-moire-swarm/09-GO-NOGO-memoire.md`
-- `/Users/samuel/Documents/dev/vibeflow-os/.planning/phases/VFDO-09-spike-transposition-jcode-m-moire-swarm/09-CADRAGE-swarm.md`
-- `/Users/samuel/Documents/dev/vibeflow-os/.planning/phases/VFDO-09-spike-transposition-jcode-m-moire-swarm/spike/decay-pass.py`
-- `/Users/samuel/Documents/dev/vibeflow-os/.planning/phases/VFDO-09-spike-transposition-jcode-m-moire-swarm/spike/seed-lab.py`
-- `/Users/samuel/Documents/dev/vibeflow-os/.planning/phases/VFDO-09-spike-transposition-jcode-m-moire-swarm/spike/run-output.txt`
+- `.planning/phases/VFDO-09-spike-transposition-jcode-m-moire-swarm/09-GO-NOGO-memoire.md`
+- `.planning/phases/VFDO-09-spike-transposition-jcode-m-moire-swarm/09-CADRAGE-swarm.md`
+- `.planning/phases/VFDO-09-spike-transposition-jcode-m-moire-swarm/spike/decay-pass.py`
+- `.planning/phases/VFDO-09-spike-transposition-jcode-m-moire-swarm/spike/seed-lab.py`
+- `.planning/phases/VFDO-09-spike-transposition-jcode-m-moire-swarm/spike/run-output.txt`
 - Suivi mis à jour : `STATE.md`, `ROADMAP.md`, `REQUIREMENTS.md`.

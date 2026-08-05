@@ -78,6 +78,105 @@
 - Impact: le backlog perd sa valeur de radar si les déclencheurs ne sont pas honorés.
 - Fix approach: ré-arbitrage explicite (reprendre / re-différer avec nouveau déclencheur / abandonner).
 
+**`.planning/WINDOWS.md` est un fichier purement généré tant que gsd-core ≤ 1.9.1** — Sévérité : **MEDIUM**
+- Issue: bug amont **#2893** — `gsd-tools windows append|waive|fixed` passent tous les trois par le
+  même `writeLedgerAtomic` → `renderLedger`, qui **réécrit le fichier intégralement** (frontmatter +
+  en-tête figé + table + miroir JSON, et rien d'autre) et rapporte `ok: true`. Toute prose libre
+  ajoutée sous le ledger serait détruite **sans avertissement**. La PR corrective **#2975** est
+  mergée mais **non publiée** : `dist-tags.latest` = `1.9.1` (2026-07-31), aucune version au-delà.
+- Files: `~/.claude/gsd-core/bin/lib/broken-windows.cjs` (version installée 1.9.1) ;
+  `.planning/WINDOWS.md` (87 lignes, aucune prose libre sous le ledger au 2026-08-04)
+- Impact: **nul en l'état** — c'est précisément ce qui a permis d'activer la zone 2 (ADR-066) : le
+  bug n'a rien à détruire sur ce fichier. Le risque n'apparaîtrait que si quelqu'un ajoutait de la
+  prose sous le ledger, ou éditait le fichier à la main.
+- Fix approach: **ne pas écrire à la main dans `.planning/WINDOWS.md`** et ne pas y ajouter de prose
+  sous le ledger ; **le committer avant toute commande `windows`** pour que tout dégât reste
+  récupérable (répéter d'abord sur une copie jetable via `--cwd` est bon marché et concluant).
+  Résolution définitive : monter `@opengsd/gsd-core` dès qu'une version strictement supérieure à
+  1.9.1 portant le correctif #2893 est publiée. **Cette montée ne gate aucun travail** — la zone 2
+  est activée, elle n'attend rien (ADR-066, § Note de veille).
+
+**Fenêtre #3 du ledger dérogée, pas résolue — la recette XcodeBuildMCP reste à faire ailleurs** — Sévérité : **LOW**
+- Issue: valider `test_sim`/`build_sim`/`clean` (tokens `vf-mcp-tools`) contre un serveur
+  XcodeBuildMCP **vivant** est impossible dans ce dépôt : aucun `.mcp.json`, aucun projet iOS, aucun
+  simulateur. La fenêtre a donc été **dérogée** (`waived`) le 2026-08-04, pas fermée.
+- Files: `.planning/WINDOWS.md` (entrée id 3, `status: waived`) ;
+  `plugin/dev-orchestrator/agents/vf-reviewer.md`
+- Impact: `open_count` = 0, donc `/gsd-ship` ne bloque plus — mais la recette humaine n'a **jamais
+  été jouée**. Ne pas lire cette dérogation comme une validation.
+- Fix approach: rejouer la recette sur un **lab iOS équipé** (projet Xcode + `.mcp.json` + simulateur),
+  puis reporter le constat ici. La dérogation se réexamine si `vibeflow-os` acquiert un projet iOS.
+
+**Aucune primitive partagée de confinement de chemin — le motif symlink en est à son 4ᵉ passage** — Sévérité : **HIGH**
+- Issue: le même défaut (un chemin dérivé d'une entrée non maîtrisée qui sort de son arbre par
+  lien symbolique) a été fermé **quatre fois, à quatre endroits, sans jamais l'être une fois pour
+  toutes** : deux scripts en Phase 23 ; `check-workstream-pointer.sh` (vague 1, refus `[ -L ]`) ;
+  `build-gsd-capabilities-index.sh` (vague 2, `vf_realpath` node + comparaison de préfixe) ; et
+  le répertoire de compartiment (découvert le 2026-08-04, **fermé le soir même** par `960055d` —
+  voir T-24-14-C1 ; le motif, lui, reste ouvert : il s'est fermé **là**, une 4ᵉ fois, sans primitive
+  partagée, et le segment RACINE reste non couvert — voir Security Considerations). Le
+  commentaire du 3ᵉ passage écrit lui-même « *C'est le troisième passage de ce motif dans ce
+  dépôt ; il se ferme ici* » (`build-gsd-capabilities-index.sh:166`) — il s'est fermé **là**, et
+  le motif est réapparu ailleurs. Trois causes mesurées :
+  **(1)** six implémentations du même besoin coexistent dans **trois langages** — `[ -L ]`
+  (`workstream-policy.sh:153`), `vf_realpath` node (`build-gsd-capabilities-index.sh:174-176`),
+  `os.path.realpath` python (`guard-agent-write.sh:78`), `pwd -P`
+  (`check-branch-claim.sh:128`), `os.path.normpath` (`guard-read-registres.sh:25`) ;
+  **(2)** la primitive existe déjà mais **déguisée en règle métier** — `vf_ws_read_pointer()`
+  (`workstream-policy.sh:149-171`) est une lecture sûre générique (ses 3 refus — lien
+  symbolique, fichier non régulier, taille — n'ont rien de spécifique au workstream) mais son
+  nommage (`VF_WS_RAW`, `VF_WS_REASON`) la rend invisible à qui résout un autre genre de chemin ;
+  **(3)** le contrôle anti-duplication existe déjà mais **sur un roster figé** —
+  `test-workstream-policy.sh` C1 (`:301-313`) / C2 (`:316-322`) / C3 (mutation, `:324+`) est
+  exactement la bonne forme, mais C1 itère sur **quatre chemins écrits en dur**. Un script neuf
+  n'appartient à aucun roster : il peut ré-inventer le confinement sans que rien ne s'en
+  aperçoive. **Le contrôle est aveugle aux nouveaux entrants, qui sont précisément la population
+  qui reproduit le motif.**
+- Files: `plugin/planning-core/scripts/workstream-policy.sh:149-171`,
+  `plugin/planning-core/scripts/tests/test-workstream-policy.sh:301-322`,
+  `plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh:160-192`,
+  `plugin/conductor/scripts/guard-agent-write.sh:78`,
+  `plugin/conductor/scripts/check-branch-claim.sh:128`,
+  `plugin/consolidator/scripts/guard-read-registres.sh:25`
+- Impact: sur les 52 scripts hors tests de `plugin/*/scripts/`, **37** lisent un fichier à un
+  chemin porté par une variable et **29** ne portent aucun marqueur de confinement. Ce chiffre
+  est un **majorant de candidats à trier, pas un décompte de vulnérabilités** (beaucoup de ces
+  chemins dérivent de la racine du dépôt et ne sont pas pilotables). Il donne l'ordre de
+  grandeur de la surface. Tant que le contrôle reste par-script, un 5ᵉ passage est attendu.
+- Fix approach: **(a)** primitive partagée dans `plugin/planning-core/scripts/` (le précédent est
+  là : la politique de workstream y vit et est sourcée par 4 scripts de 3 modules, et sa
+  fermeture de dépendances est réduite à elle-même) — **deux** fonctions, car le motif a deux
+  moitiés que les quatre passages confondent : `vf_path_refuse_link` (refuser de suivre — cas
+  pointeur) et `vf_path_confine <candidat> <ancre>` (chemin réel sous ancre réelle — cas registre
+  et cas compartiment) ; **(b)** généraliser C1/C2 du roster figé à l'**énumération** de
+  `plugin/*/scripts/*.sh`, chaque script lisant un chemin dérivé d'une entrée devant soit sourcer
+  la primitive, soit figurer dans une liste d'exemptions **nommée et motivée** ; **(c)** cas de
+  **mutation obligatoire** sur le modèle de C3 — un script neuf non confiné ajouté au corpus doit
+  faire rougir la suite, sans quoi la garde n'est qu'une assertion d'*existence* (« la primitive
+  existe quelque part ») qui reste verte pendant que la *relation* se rompt.
+
+**`hooks.workflow_guard` se déclenche sur des fichiers HORS du dépôt** — Sévérité : **LOW**
+- Issue: la capacité a été activée par la Phase 24 (ADR-066) et se comporte comme annoncé sur le
+  dépôt — mais son périmètre ne s'arrête pas à l'arbre du projet. Constaté **de première main le
+  2026-08-05**, pendant le mandat de correction ciblée : l'écriture d'un script de travail dans le
+  scratchpad de session (`/private/tmp/claude-501/…/scratchpad/`, **hors du dépôt**) a déclenché
+  l'avis « cette édition ne sera pas tracée dans STATE.md ». Même signalement rapporté sur une
+  écriture dans `~/.claude/projects/…`, sans rapport avec le projet. L'avis est donc **juste sur sa
+  lettre** (aucun `/gsd-*` n'était en cours) et **hors sujet sur son objet** : ces fichiers n'ont
+  aucune vocation à être tracés dans le `STATE.md` d'un projet.
+- Files: capacité amont `workflow_guard` du moteur GSD (`~/.claude/gsd-core/hooks/gsd-workflow-guard.sh`
+  dans l'installation de référence) ; activée par `.planning/config.json` (`hooks.workflow_guard: true`)
+- Impact: **non bloquant** — le hook est advisory (ADR-031 tenu), il n'a jamais empêché une écriture.
+  Le coût est du **bruit** : sur un mandat qui écrit hors du dépôt (scratchpad, fixtures jetables), un
+  avis identique se répète à chaque écriture et devient un signal qu'on apprend à ignorer. C'est le
+  chemin classique par lequel une garde advisory se désarme sans que personne ne la débranche.
+  **La prochaine phase doit savoir d'où vient ce bruit** avant de conclure à un défaut du projet.
+- Fix approach: (a) mesurer d'abord la règle de périmètre réelle du hook amont sur l'installation
+  courante (est-il censé se borner à la racine du projet ?) ; (b) si le comportement est conforme
+  à l'amont, c'est une **remontée upstream**, pas un correctif local — ce dépôt câble la capacité,
+  il ne la fourche (Iron Law 2 révisée, ADR-069) ; (c) ne PAS désactiver le toggle pour faire taire
+  le bruit : ce serait perdre la garde sur le dépôt, qui, elle, fonctionne.
+
 ## Known Bugs
 
 Aucun bug ouvert confirmé sur disque au 2026-07-26. Les comportements gênants connus (survie de
@@ -132,6 +231,85 @@ capturées au backlog — voir Tech Debt.
   sur ce repo doit être remplacée par l'invocation `--file` explicite du (des) `AGENT.md` racine de
   module ; ou faire pointer l'invocation nue sur les emplacements réels des `AGENT.md` du repo plutôt
   que sur `.claude/agents` (répertoire d'un lab qui a *installé* le plugin, pas de ce repo lui-même).
+
+**Fuite hors-lab par répertoire de compartiment en lien symbolique (T-24-14-C1)** — Sévérité : **HIGH** — **FERMÉE le 2026-08-04**
+- Risk: le nom de workstream est validé et le pointeur-*fichier* refuse les liens symboliques
+  (`plugin/planning-core/scripts/workstream-policy.sh:153-156`), mais **rien ne contraint le
+  répertoire de compartiment lui-même**. Avec `.planning/workstreams/<nom>` posé en lien
+  symbolique vers un répertoire hors du lab, `[ -d ]` le suit et
+  `plugin/planning-core/scripts/planning-context.sh:168` injecte le `STATE.md` de la cible
+  **verbatim dans le contexte de session**. **Reproduit** le 2026-08-04 sur fixture jetable : à
+  exit 0, une ligne sentinelle lue hors de l'arbre du lab apparaît dans la sortie du hook.
+  Préconditions identiques à celles du trou pointeur que la Phase 24 a jugé réel et fermé : une
+  entrée mode 120000 committée sous `.planning/`, puis n'importe quelle ouverture de session.
+- Files: `plugin/planning-core/scripts/planning-context.sh:168`,
+  `plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh:286` (portée réduite à 3 valeurs
+  ≤ 80 caractères par la liste blanche), `plugin/conductor/scripts/check-state-integrity.sh:145`
+- Current mitigation: **fermée le 2026-08-04** (correctif `960055d`, preuve `a64df96`). Les deux
+  segments du compartiment et les fichiers qu'on y lit passent par `vf_ws_dir_resolve` /
+  `vf_ws_file_in_ws` (`plugin/planning-core/scripts/workstream-policy.sh`), qui **refusent de
+  traverser** au lieu de tenter de décider si la cible est « dans le lab » — un tel test se réécrit
+  avec `..`, dépend d'un `readlink -f` absent de macOS et ne survit pas à un remontage. La cible
+  n'est jamais lue ni nommée ; seule la raison sort, d'une énumération fermée. Gradation par rôle :
+  vérification → exit 2, injecteurs → repli sur la racine **plus** une ligne qui nomme le refus.
+  Fermeture prouvée **par mutation sur les quatre gates à la fois**
+  (`plugin/planning-core/scripts/tests/test-workstream-symlink-escape.sh`). Registre C de
+  `.planning/phases/VFDO-24-*/24-SECURITY.md` : statut `closed`.
+- Recommendations: **rien de plus sur ce vecteur.** Ce qui reste ouvert n'est pas cette menace mais
+  le **motif** : c'est son 4ᵉ passage, refermé une 4ᵉ fois localement — voir Tech Debt (primitive
+  partagée de confinement) — et le **segment racine** reste hors couverture, voir l'entrée
+  « `.planning` lui-même en lien symbolique » plus bas.
+
+**T-24-02-01 — mitigation falsifiée, en attente d'un arbitrage humain** — Sévérité : **HIGH** — **TRANCHÉE le 2026-08-05**
+- Risk: le modèle de menaces du plan 24-02 mitigeait le risque `gsd-tools windows *` par
+  **abstinence** (« aucune tâche ne les invoque ») plus une interdiction écrite. Les deux moitiés
+  sont tombées : ADR-066 ne porte aucune formulation d'interdiction et **acte** l'exécution
+  (`docs/ADR.md:1597`), et la commande **a été invoquée** (commit `7b96e34`,
+  `.planning/WINDOWS.md:3-4`, entrée id 3 `"status": "waived"`). Le dégel était une décision
+  humaine légitime — mais le registre de menaces n'a jamais été révisé en conséquence, et aucune
+  entrée n'existe au journal des risques acceptés.
+- Files: `docs/ADR.md:1565-1651` (ADR-066), `.planning/WINDOWS.md`,
+  `.planning/phases/VFDO-24-*/24-SECURITY.md` (registre A)
+- Current mitigation: contrôles compensatoires réels mais non déclarés comme la mitigation —
+  répétition préalable sur copie jetable via `--cwd` (`docs/ADR.md:1609-1611`), post-conditions
+  vérifiées (`:1611-1615`), risque résiduel acté (`:1633-1639`), et **aucun script du dépôt
+  n'invoque ces commandes** (balayage `.sh`/`.md`/`.json`/`.yml` : prose uniquement).
+- Recommendations: **soldé le 2026-08-05 — Samuel a tranché pour la RÉÉCRITURE de la mitigation ;
+  la re-disposition en `accept` avec entrée nominative est écartée.** La mitigation n'avait pas été
+  violée : elle a été **rendue caduque par ADR-066**, décision d'un niveau supérieur et postérieure
+  à sa rédaction. Elle décrit désormais les quatre contrôles qui ont réellement protégé l'opération
+  (répétition sur copie jetable via `--cwd` ; `WINDOWS.md` commité et propre à `d89a60e`, `waive`
+  borné à 1 fichier / 7+ / 7− en `7b96e34` ; intégrité constatée après — 87 lignes avant/après, 1
+  fence JSON, 4 entrées `fixed` intactes, `fixed_count` et `total_count` inchangés ; résiduel nommé
+  et opposable). Formulation d'origine **conservée en trace** dans `24-02-PLAN.md`, à la forme de la
+  trace de révision de l'Iron Law 2. **Le journal des risques acceptés n'a reçu aucune entrée** :
+  la menace est mitigée, pas acceptée, et aucune signature humaine n'est empruntée. `threats_open`
+  passe de 1 à **0** — recalculé par extracteur `awk`, contre-épreuve jouée.
+
+**`.planning` lui-même en lien symbolique — surface NON COUVERTE, pas exposition vivante** — Sévérité : **LOW**
+- Risk: le correctif `T-24-14-C1` contraint les **deux segments du compartiment**
+  (`<planning>/workstreams` puis `<planning>/workstreams/<nom>`) et les fichiers qu'on y lit. Il ne
+  contraint **pas le segment racine** : `<planning>` est fourni par `--path` ou par l'environnement, et
+  arrive dans `vf_ws_dir_resolve` **déjà résolu par l'appelant**. Un `.planning` versionné en mode
+  `120000`, ou une racine passée par `--path` qui en traverse un, rejouerait le **même vecteur un cran
+  plus haut** : `[ -d ]`/`[ -f ]` suivent le lien exactement de la même façon. Ce serait, en toutes
+  lettres, le **5ᵉ passage** du motif inventorié en Tech Debt.
+- Files: `plugin/planning-core/scripts/workstream-policy.sh` (`vf_ws_dir_resolve` : le paramètre
+  `<planning_dir>` n'est pas contrôlé, par construction), et les quatre appelants qui le lui
+  fournissent — `planning-context.sh`, `check-dev-bootstrap.sh`, `check-state-integrity.sh`,
+  `check-workstream-pointer.sh`
+- Impact: **THÉORIQUE DANS CE DÉPÔT, et la nuance est le fond de l'entrée.** Vérifié de première main
+  le 2026-08-05 : `.planning` est un **vrai répertoire** (`[ -L ]` faux, `[ -d ]` vrai), et
+  `.planning/workstreams` **n'existe pas** — ce dépôt n'est pas partitionné. Il n'y a donc **rien à
+  exploiter ici aujourd'hui** : c'est une **surface non couverte**, pas une fuite ouverte. L'inscrire
+  comme exposition vivante serait aussi faux que de la taire — et brouillerait la lecture du registre
+  de menaces, où une entrée `high` engage un blocage de ship.
+- Recommendations: ne PAS refermer cette surface en durcissant `vf_ws_dir_resolve` sur son propre
+  paramètre — la primitive ne peut pas savoir ce que son appelant a le droit de désigner, et un refus
+  y casserait les usages légitimes (`--path` vers une fixture, worktree). La fermeture appartient à la
+  **primitive partagée de confinement de chemin** déjà recommandée en Tech Debt (`vf_path_refuse_link`
+  / `vf_path_confine`), appliquée **au point où la racine est résolue**. À traiter avec elle, pas
+  avant : deux correctifs séparés sur le même motif, c'est ce qui a produit les quatre passages.
 
 ## Performance Bottlenecks
 
@@ -266,6 +444,48 @@ vrais dans le code mais sans impact observé — sévérité **LOW**, ne pas pri
 - Files: `plugin/mobile-test-team/agents/`, `plugin/mobile-test-team/README.md:11`
 - Risk: le module vend une capacité autonome non démontrée.
 
+**Gestes documentés de la Phase 24 sans aucune garde machine** — Priority: **HIGH**
+- What's not tested: trois mitigations **présentes aujourd'hui, gardées par rien demain**,
+  relevées par l'audit sécurité du 2026-08-04 (fermées au registre parce qu'elles livrent ce
+  qu'elles promettaient, mais sans non-régression) :
+  **(1)** `hooks.json` — le `|| true` sur les 5 commandes `SessionStart` de conductor (T-24-05-02).
+  Le filtre `jq` qui devait le vérifier ne vit que dans le bloc `<verify>` du plan, un one-shot
+  d'exécution. Aucune suite ni étape CI ne l'asserte. Le précédent existe pourtant :
+  `plugin/consolidator/scripts/tests/test-consolidator.sh:295-296` (T-CSL11) fait exactement cela
+  pour le `PostToolUse` de consolidator.
+  **(2)** `workstreams.md` — le geste de vérification avant PR (T-24-08-03) et l'ordonnancement
+  « résous le compartiment **AVANT** toute lecture » (T-24-08-01). Le seul exécutable qui
+  mentionne `workstreams.md` est `test-dev-orchestrator.sh:6139-6158` (T35), et il ne vérifie que
+  le **renvoi** depuis les deux agents, jamais le **contenu**. Concrètement : supprimer le geste
+  PR, les quatre gestes, ou le mot « AVANT » laisse **toute la CI verte**.
+  **(3)** plafond ADR-029 sur les deux modules injectés en `agent_skills` (T-24-03-03) :
+  `test-dev-orchestrator.sh:1052` borne T5 à `"$MOD"/skills/vf-*/SKILL.md`, or
+  `plugin/software-architecture/SKILL.md` et `plugin/audit-architecture/SKILL.md` sont à la racine
+  de modules autonomes, sans préfixe `vf-`. Le volume injecté dans le prompt de `gsd-planner`
+  (269 lignes aujourd'hui) peut croître au-delà de 500 sans qu'aucun gate ne rougisse.
+- Files: `plugin/conductor/hooks/hooks.json:16-20`,
+  `plugin/dev-orchestrator/references/workstreams.md:138-145`,
+  `plugin/dev-orchestrator/agents/vf-dev-manager.md:33-34`,
+  `plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh:1052`
+- Risk: une régression sur l'une de ces trois rouvre une menace **fermée** de la Phase 24 sans
+  qu'aucun signal ne se déclenche — le mode d'échec exact que le registre de menaces existe pour
+  empêcher.
+
+**`24-03-SUMMARY.md` affirme le contraire de l'arbre courant** — Priority: **MEDIUM**
+- What's not tested: rien ne vérifie qu'un SUMMARY reste vrai après coup. `24-03-SUMMARY.md:74-78`
+  affirme que « les **9** clés refusées ou différées sont **TOUTES absentes**, chacune vérifiée
+  individuellement ». Or `.planning/config.json:27` porte `"windows_enforce": true` et `:45`
+  porte `"workflow_guard": true` — posées par le plan **24-02** sous ADR-066. Le PLAN a été
+  corrigé et daté (`24-03-PLAN.md:88-93`, `:104`), le SUMMARY ne l'a pas été. Un relecteur du
+  SUMMARY conclurait que la zone 2 est désarmée alors qu'elle est **armée et bloquante** à
+  `ship:pre`.
+- Files: `.planning/phases/VFDO-24-*/24-03-SUMMARY.md:74-78`, `.planning/config.json:27,45`
+- Risk: c'est la classe de fait la plus dangereuse du dépôt — un artefact de traçabilité qui dit
+  le contraire du réel et que personne ne re-mesure. Non corrigé ici : le mandat d'audit
+  autorisait à *enregistrer un verdict* dans les SUMMARY, pas à les réécrire.
+
 ---
 
 *Concerns audit: 2026-07-26 — v2.36.1, 17 modules, 37 suites CI*
+*Complété 2026-08-04 par `/gsd-secure-phase 24` : 4 entrées (1 dette d'architecture HIGH,
+2 sécurité HIGH, 2 lacunes de couverture) issues de l'audit des 34 menaces ouvertes.*

@@ -60,6 +60,17 @@
 # plugin/*/agents (perimetre exact des 6 dossiers audites par la CI), pas une liste codee en dur.
 #   T72 — chaque agent memory: + tools: sans Write/Edit porte disallowedTools: Write, Edit ;
 #         echoue si la decouverte est vide (anti "vert a vide", precedent Phase 19)
+#
+# effort: EXIGE (zone 6, Phase 24 — GSDA-20/21) : le champ etait valide S'IL ETAIT PRESENT,
+# donc omissible en silence. Le durcissement transpose le patron du bloc model:.
+#   T73 — agent LOCAL complet mais sans effort: → ERREUR bloquante nommant effort + ses valeurs
+#   T74 — meme manque sur un agent TIERS (prefixe gsd- par defaut) → 0 erreur, 0 warning (T-24-01-01)
+#   T75 — DISCRIMINANCE PAR MUTATION sur l'arbre reel : ligne effort: retiree → rouge, restauree
+#         → vert ; mutation confirmee effective par `cmp` (jamais par `diff`, menteur ici)
+#
+# Marge de profondeur de dispatch (zone 6, Phase 24 — GSDA-22) :
+#   T76 — team-kernel.md porte la limite (maxDepth), la marge (deux niveaux) ET ce qu'elle
+#         autorise (sous-worker), datees et sourcees, descripteur recopie verbatim
 
 set -uo pipefail
 
@@ -89,6 +100,7 @@ good_agent() {
 name: $1
 description: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee ou analysee.
 model: sonnet
+effort: medium
 memory: project
 skills:
   - petit-skill
@@ -131,7 +143,7 @@ rm -f "$AG"/*.md
 
 # T5 — champ inconnu = warning seulement
 good_agent "typo-agent"
-printf -- '---\nname: typo-agent\ndescription: Agent valide avec un champ au nom errone pour tester la detection. Use when test.\nmodle: sonnet\nmodel: sonnet\nmemory: project\n---\ncorps\n' > "$AG/typo-agent.md"
+printf -- '---\nname: typo-agent\ndescription: Agent valide avec un champ au nom errone pour tester la detection. Use when test.\nmodle: sonnet\nmodel: sonnet\neffort: medium\nmemory: project\n---\ncorps\n' > "$AG/typo-agent.md"
 OUT="$(run_check 2>&1)"; RC=$?
 if [ $RC -eq 0 ] && echo "$OUT" | grep -q "champ inconnu du runtime — modle"; then
   ok "T5 champ inconnu (typo) → warning non bloquant"
@@ -146,6 +158,7 @@ cat > "$AG/halluc.md" <<'EOF'
 name: halluc
 description: Agent qui declare un skill jamais cree, pour tester le gate anti-hallucination.
 model: sonnet
+effort: medium
 memory: project
 skills:
   - skill-fantome
@@ -167,6 +180,7 @@ cat > "$AG/lourd.md" <<'EOF'
 name: lourd
 description: Agent qui precharge un gros skill, pour tester le budget de prechargement.
 model: sonnet
+effort: medium
 memory: project
 skills:
   - gros-skill
@@ -190,6 +204,7 @@ cat > "$AG/interdit.md" <<'EOF'
 name: interdit
 description: Agent qui precharge un skill user-only, pour tester la restriction runtime.
 model: sonnet
+effort: medium
 memory: project
 skills:
   - forbidden-skill
@@ -241,6 +256,7 @@ cat > "$GOOD" <<'EOF'
 name: nouvel-agent
 description: Analyse les ventes du lab et prepare les relances. Use when un cycle de vente demarre.
 model: sonnet
+effort: medium
 memory: project
 ---
 corps
@@ -271,6 +287,7 @@ cat > "$AG/quoted.md" <<'EOF'
 name: "quoted"
 description: "Use when: un cycle de vente demarre et il faut analyser les relances du lab."
 model: 'sonnet'
+effort: medium
 memory: "project"
 ---
 corps
@@ -286,6 +303,7 @@ description:
   Analyse les ventes du lab et prepare les relances commerciales.
   Use when un cycle de vente demarre ou quand un prospect relance.
 model: sonnet
+effort: medium
 memory: project
 ---
 corps
@@ -299,6 +317,7 @@ cat > "$AG/chaine.md" <<'EOF'
 name: chaine
 description: Agent declarant ses skills en chaine plate, pour tester le contournement du gate.
 model: sonnet
+effort: medium
 memory: project
 skills: skill-fantome, petit-skill
 ---
@@ -315,6 +334,7 @@ cat >> "$AG/bom.md" <<'EOF'
 name: bom
 description: Agent avec BOM UTF-8 d origine externe, pour tester la tolerance d encodage.
 model: sonnet
+effort: medium
 memory: project
 ---
 corps
@@ -351,6 +371,7 @@ cat > "$AG/routeur.md" <<'EOF'
 name: routeur
 description: Agent declarant un skill par son name frontmatter et non par son dossier, pour tester la resolution.
 model: sonnet
+effort: medium
 memory: project
 skills:
   - vf-planning
@@ -366,6 +387,7 @@ cat > "$AG/routeur.md" <<'EOF'
 name: routeur
 description: Agent declarant un skill totalement inexistant, pour verifier que le gate reste actif.
 model: sonnet
+effort: medium
 memory: project
 skills:
   - skill-vraiment-fantome
@@ -387,6 +409,7 @@ cat > "$AG/vf-mixte.md" <<'EOF'
 name: vf-mixte
 description: Agent de test avec allowlist mixte native, tierce et cross-module, mission 16.
 model: sonnet
+effort: medium
 memory: project
 tools: Read, Write, Agent(vf-coder, vf-reviewer, general-purpose, gsd-planner)
 ---
@@ -402,6 +425,7 @@ cat > "$AG/nonferme.md" <<'EOF'
 name: nonferme
 description: Agent de test avec une allowlist Agent a parenthese non fermee.
 model: sonnet
+effort: medium
 memory: project
 tools: Read, Agent(vf-coder
 ---
@@ -421,6 +445,7 @@ cat > "$AG/vide.md" <<'EOF'
 name: vide
 description: Agent de test declarant une allowlist Agent totalement vide.
 model: sonnet
+effort: medium
 memory: project
 tools: Read, Agent()
 ---
@@ -436,6 +461,7 @@ cat > "$AG/reed.md" <<'EOF'
 name: reed
 description: Agent de test declarant l'outil Reed (typo) au lieu de Read.
 model: sonnet
+effort: medium
 memory: project
 tools: Reed, Agent(vf-coder)
 ---
@@ -454,6 +480,7 @@ cat > "$AG/lu.md" <<'EOF'
 name: lu
 description: Agent de test avec l'outil Read correctement orthographie, non-regression.
 model: sonnet
+effort: medium
 memory: project
 tools: Read, Agent(vf-coder)
 disallowedTools: Write, Edit
@@ -472,6 +499,7 @@ cat > "$AG/typo-nom.md" <<'EOF'
 name: typo-nom
 description: Agent de test declarant un nom d'agent mal orthographie dans son allowlist.
 model: sonnet
+effort: medium
 memory: project
 tools: Read, Agent(vf-codeur)
 disallowedTools: Write, Edit
@@ -497,6 +525,7 @@ cat > "$AG/nom-ok.md" <<'EOF'
 name: nom-ok
 description: Agent de test avec un nom d'agent correctement resolu via le registre.
 model: sonnet
+effort: medium
 memory: project
 tools: Read, Agent(vf-coder)
 ---
@@ -512,6 +541,7 @@ cat > "$AG/flow.md" <<'EOF'
 name: flow
 description: Agent de test declarant son allowlist en flow list YAML entre crochets.
 model: sonnet
+effort: medium
 memory: project
 tools: [Read, Agent(x, y), Bash(git:*)]
 disallowedTools: Write, Edit
@@ -556,6 +586,7 @@ cat > "$AG/taskalias.md" <<'EOF'
 name: taskalias
 description: Agent de test utilisant l'alias legacy Task au lieu d'Agent dans tools.
 model: sonnet
+effort: medium
 memory: project
 tools: Read, Task(vf-coder)
 disallowedTools: Write, Edit
@@ -572,6 +603,7 @@ cat > "$AG/nu-agent.md" <<'EOF'
 name: nu-agent
 description: Agent de test declarant Agent sans aucune allowlist parenthesee.
 model: sonnet
+effort: medium
 memory: project
 tools: Read, Agent
 ---
@@ -596,6 +628,7 @@ cat > "$AG/quote-tools.md" <<'EOF'
 name: quote-tools
 description: Agent de test avec un champ tools entierement quote entre guillemets.
 model: sonnet
+effort: medium
 memory: project
 tools: "Read, Write, Agent(vf-coder)"
 ---
@@ -617,6 +650,7 @@ cat > "$AG/blank-block.md" <<'EOF'
 name: blank-block
 description: Agent de test avec une ligne vide au milieu d'une liste bloc tools.
 model: sonnet
+effort: medium
 memory: project
 tools:
   - Read
@@ -642,6 +676,7 @@ cat > "$AG/extra-paren.md" <<'EOF'
 name: extra-paren
 description: Agent de test avec une parenthese fermante en trop dans une allowlist.
 model: sonnet
+effort: medium
 memory: project
 tools: Read, Agent(a))
 ---
@@ -657,6 +692,7 @@ cat > "$AG/orpheline.md" <<'EOF'
 name: orpheline
 description: Agent de test avec une virgule orpheline produisant une entree vide.
 model: sonnet
+effort: medium
 memory: project
 tools: Read,,Agent(x)
 ---
@@ -676,6 +712,7 @@ cat > "$AG/interne-vide.md" <<'EOF'
 name: interne-vide
 description: Agent de test avec une entree vide a l'interieur d'une allowlist Agent.
 model: sonnet
+effort: medium
 memory: project
 tools: Agent(a,,b)
 ---
@@ -695,6 +732,7 @@ cat > "$AG/espace-paren.md" <<'EOF'
 name: espace-paren
 description: Agent de test avec un espace entre le nom de l'outil et la parenthese.
 model: sonnet
+effort: medium
 memory: project
 tools: Read, Agent (vf-coder)
 ---
@@ -714,6 +752,7 @@ cat > "$AG/bare-charset.md" <<'EOF'
 name: bare-charset
 description: Agent de test avec un token bare contenant un caractere hors charset.
 model: sonnet
+effort: medium
 memory: project
 tools: Read, Bash@2
 ---
@@ -733,6 +772,7 @@ cat > "$AG/nom-invalide.md" <<'EOF'
 name: "Nom Invalide"
 description: Agent de test dont le name contient des majuscules et un espace.
 model: sonnet
+effort: medium
 memory: project
 ---
 corps
@@ -751,6 +791,7 @@ cat > "$AG/permmode.md" <<'EOF'
 name: permmode
 description: Agent de test avec un permissionMode qui n'existe pas dans l'enum attendu.
 model: sonnet
+effort: medium
 memory: project
 permissionMode: yolo
 ---
@@ -770,6 +811,7 @@ cat > "$AG/isol.md" <<'EOF'
 name: isol
 description: Agent de test avec une valeur isolation qui n'est pas worktree.
 model: sonnet
+effort: medium
 memory: project
 isolation: sandbox
 ---
@@ -789,6 +831,7 @@ cat > "$AG/bg.md" <<'EOF'
 name: bg
 description: Agent de test avec un champ background qui n'est ni true ni false.
 model: sonnet
+effort: medium
 memory: project
 background: maybe
 ---
@@ -808,6 +851,7 @@ cat > "$AG/maxt.md" <<'EOF'
 name: maxt
 description: Agent de test avec un champ maxTurns qui n'est pas un entier valide.
 model: sonnet
+effort: medium
 memory: project
 maxTurns: beaucoup
 ---
@@ -827,6 +871,7 @@ cat > "$AG/sans-skill.md" <<'EOF'
 name: sans-skill
 description: Agent de test sans aucun champ skills declare, pour verifier le warning.
 model: sonnet
+effort: medium
 memory: project
 ---
 corps
@@ -845,6 +890,7 @@ cat > "$AG/desc-courte.md" <<'EOF'
 name: desc-courte
 description: trop court
 model: sonnet
+effort: medium
 memory: project
 ---
 corps
@@ -863,6 +909,7 @@ cat > "$AG/sans-tools.md" <<'EOF'
 name: sans-tools
 description: Agent de test sans champ tools declare, pour verifier le warning d'heritage.
 model: sonnet
+effort: medium
 memory: project
 skills:
   - petit-skill
@@ -883,6 +930,7 @@ cat > "$AG/autre-fichier.md" <<'EOF'
 name: nom-different
 description: Agent de test dont le name ne correspond pas au nom du fichier sur disque.
 model: sonnet
+effort: medium
 memory: project
 ---
 corps
@@ -953,6 +1001,7 @@ cat > "$AG/vf-mixte2.md" <<'EOF'
 name: vf-mixte2
 description: Agent de test dont l'allowlist reference un agent tiers jamais materialise sur disque.
 model: sonnet
+effort: medium
 memory: project
 tools: Read, Agent(gsd-jamais-cree)
 ---
@@ -974,6 +1023,7 @@ cat > "$AG/extra-mot.md" <<'EOF'
 name: extra-mot
 description: Agent de test pour verifier le libelle exact de la parenthese en trop.
 model: sonnet
+effort: medium
 memory: project
 tools: Read, Agent(a))
 ---
@@ -1045,6 +1095,7 @@ cat > "$AG/silencieux.md" <<'EOF'
 name: silencieux
 description: Agent de test entierement conforme, aucun avertissement attendu ici.
 model: sonnet
+effort: medium
 memory: project
 tools: Read
 disallowedTools: Write, Edit
@@ -1068,6 +1119,7 @@ name: avec-warning
 description: Agent de test avec un champ inconnu, pour verifier le resume hook (D-21).
 modle: sonnet
 model: sonnet
+effort: medium
 memory: project
 tools: Read
 ---
@@ -1098,6 +1150,7 @@ mk_mcp_agent() { # $1 nom fichier, $2 valeur additionnelle de tools
 name: $1
 description: Agent de test MCP pour verifier le charset du joker terminal (D-22).
 model: sonnet
+effort: medium
 memory: project
 tools: Read, $2
 disallowedTools: Write, Edit
@@ -1137,6 +1190,7 @@ cat > "$AG/mcp-tools-ok.md" <<'EOF'
 name: mcp-tools-ok
 description: Agent de test declarant vf-mcp-tools, pour verifier que la clef est connue (D-05).
 model: sonnet
+effort: medium
 memory: project
 tools: Read
 disallowedTools: Write, Edit
@@ -1157,6 +1211,7 @@ cat > "$AG/mcp-tools-typo.md" <<'EOF'
 name: mcp-tools-typo
 description: Agent de test avec une typo de vf-mcp-tools, pour verifier que le gate reste actif.
 model: sonnet
+effort: medium
 memory: project
 tools: Read
 vf-mcp-tool: XcodeBuildMCP:test_sim
@@ -1179,6 +1234,7 @@ cat > "$AG/juge-sans-barriere.md" <<'EOF'
 name: juge-sans-barriere
 description: Agent de test qui omet Write/Edit de tools sans les fermer via disallowedTools.
 model: sonnet
+effort: medium
 memory: project
 tools: Read, Bash
 ---
@@ -1199,6 +1255,7 @@ cat > "$AG/juge-avec-barriere.md" <<'EOF'
 name: juge-avec-barriere
 description: Agent de test qui ferme explicitement Write/Edit via disallowedTools.
 model: sonnet
+effort: medium
 memory: project
 tools: Read, Bash
 disallowedTools: Write, Edit
@@ -1219,6 +1276,7 @@ cat > "$AG/producteur.md" <<'EOF'
 name: producteur
 description: Agent de test dont tools inclut deja Write, pour verifier l'absence de faux positif.
 model: sonnet
+effort: medium
 memory: project
 tools: Read, Write, Edit, Bash
 ---
@@ -1231,6 +1289,133 @@ else
   ko "T71 (rc=$RC) : $OUT"
 fi
 rm -f "$AG/producteur.md"
+
+# ---------- T73/T74/T75 : effort: EXIGE (zone 6, Phase 24 — GSDA-20/21) ----------
+# Le champ effort: etait valide S'IL ETAIT PRESENT (une seule branche : valeur hors enum).
+# Un agent qui l'omettait passait le gate en silence — donc 0 des 25 agents livres le portait.
+# Le durcissement transpose le patron du bloc model: (absence = ERREUR, puis validation de
+# valeur). Les trois cas ci-dessous bornent ce durcissement des deux cotes.
+
+# T73 — agent LOCAL complet (name/description/model/memory) mais SANS effort: → erreur nommant effort
+cat > "$AG/sans-effort.md" <<'EOF'
+---
+name: sans-effort
+description: Agent local complet sur le socle natif mais qui omet le champ effort, pour tester l'exigence.
+model: sonnet
+memory: project
+skills:
+  - petit-skill
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "effort absent" && echo "$OUT" | grep -q "low|medium|high|xhigh|max"; then
+  ok "T73 agent local sans effort: → ERREUR bloquante nommant effort et ses valeurs admises"
+else
+  ko "T73 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/sans-effort.md"
+
+# T73b — COHERENCE du message de refus : guard-agent-write.sh refuse desormais un agent sans
+# effort:, et son squelette canonique annoncait "effort: <optionnel>". Un refus qui declare
+# optionnel le champ pour l'absence duquel il refuse est pire qu'un refus muet — l'auteur
+# corrige tout SAUF la cause. Le squelette doit enumerer les valeurs, jamais dire optionnel.
+OUT="$(payload_write "$WORK/lab/.claude/agents/nouvel-agent.md" "$BAD" | run_guard)"
+if echo "$OUT" | grep -q "effort: low|medium|high|xhigh|max" && ! echo "$OUT" | grep -q "effort: <optionnel>"; then
+  ok "T73b squelette du guard : effort enumere comme requis, plus annonce optionnel"
+else
+  ko "T73b : ${OUT:-<vide>}"
+fi
+
+# T74 — NON-DEBORDEMENT : le meme manque sur un agent TIERS (prefixe --third-party-prefix, defaut
+# gsd-) ne doit produire NI erreur NI warning citant effort. Sans cette borne, chaque SessionStart
+# d'un lab equipe d'agents gsd-* cracherait un flot d'erreurs (T-24-01-01).
+cat > "$AG/gsd-sans-effort.md" <<'EOF'
+---
+name: gsd-sans-effort
+description: Agent tiers GSD depourvu d'effort, pour prouver que le durcissement ne deborde pas sur les labs.
+model: sonnet
+memory: project
+---
+corps
+EOF
+printf -- '---\nname: agent-conforme-t74\ndescription: Agent local conforme portant effort, pour que le run T74 ait un perimetre reel.\nmodel: sonnet\neffort: medium\nmemory: project\nskills:\n  - petit-skill\n---\ncorps\n' > "$AG/agent-conforme-t74.md"
+OUT="$(run_check --strict 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "effort"; then
+  ok "T74 agent tiers (prefixe gsd- par defaut) sans effort: → 0 erreur, 0 warning citant effort"
+else
+  ko "T74 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/gsd-sans-effort.md" "$AG/agent-conforme-t74.md"
+
+# T75 — DISCRIMINANCE PAR MUTATION, sur l'ARBRE REEL (pas une fixture ecrite pour l'occasion).
+# Deux garde-fous avant tout verdict, au patron mutant() de test-check-gsd-config.sh:1220 :
+#   - la mutation doit avoir CHANGE le fichier (comparaison par `cmp`, JAMAIS par `diff`,
+#     proxifie et menteur sur ce runtime) — sinon mutant NON OPPOSABLE, pas mutant satisfait ;
+#   - la reecriture LICITE (ligne restauree) doit rejouer VERT, sinon le critere serait
+#     inutilisable sur du code sain.
+T75_ROOT="$(cd "$SCRIPTS_DIR/../../.." && pwd)"
+T75_SRC=""
+for f in "$T75_ROOT"/plugin/*/agents/*.md; do
+  [ -f "$f" ] || continue
+  if awk 'FNR==1{fm=1;next} fm && /^---[[:space:]]*$/{fm=0} fm && /^effort:/{found=1} END{exit !found}' "$f"; then
+    T75_SRC="$f"; break
+  fi
+done
+if [ -z "$T75_SRC" ]; then
+  ko "T75 (aucun agent porteur d'effort: trouve sous $T75_ROOT/plugin/*/agents — anti 'vert a vide')"
+else
+  MUT_AG="$WORK/mut-agents"; rm -rf "$MUT_AG"; mkdir -p "$MUT_AG"
+  T75_BASE="$(basename "$T75_SRC")"
+  T75_ORIG="$WORK/t75-original"          # hors de $MUT_AG : le gate ne doit voir qu'UN fichier
+  cat "$T75_SRC" > "$T75_ORIG"
+  # mutant : la ligne effort: du frontmatter est retiree
+  awk 'FNR==1{fm=1;print;next} fm && /^---[[:space:]]*$/{fm=0;print;next} fm && /^effort:/{next} {print}' \
+    "$T75_ORIG" > "$MUT_AG/$T75_BASE"
+  if cmp -s "$MUT_AG/$T75_BASE" "$T75_ORIG"; then
+    ko "T75 la mutation n'a RIEN change (ligne effort: introuvable dans $T75_BASE) — mutant NON OPPOSABLE, pas mutant satisfait"
+  else
+    OUT_MUT="$(bash "$CHECK" --agents-dir="$MUT_AG" --skills-dir="$SK" 2>&1)"; RC_MUT=$?
+    # reecriture LICITE : la ligne est restauree a l'identique
+    cat "$T75_ORIG" > "$MUT_AG/$T75_BASE"
+    OUT_LIC="$(bash "$CHECK" --agents-dir="$MUT_AG" --skills-dir="$SK" 2>&1)"; RC_LIC=$?
+    if [ "$RC_MUT" -eq 1 ] && echo "$OUT_MUT" | grep -q "effort absent" && [ "$RC_LIC" -eq 0 ]; then
+      ok "T75 mutation sur l'arbre reel ($T75_BASE) : effort: retire → gate ROUGE (rc=1, message effort) ; ligne restauree → gate VERT (rc=0)"
+    else
+      ko "T75 (mutant rc=$RC_MUT, licite rc=$RC_LIC) mutant:[$OUT_MUT] licite:[$OUT_LIC]"
+    fi
+  fi
+  rm -rf "$MUT_AG"; rm -f "$T75_ORIG"
+fi
+
+# ---------- T76 : la marge de profondeur de dispatch est ECRITE (zone 6, GSDA-22) ----------
+# maxDepth: 5, 3 consommes, 2 de marge : un fait de runtime commun a TOUTES les equipes du kernel,
+# donc loge dans team-kernel.md (ADR-057 — une capacite, une seule voix), pas dans un module metier.
+# Trois litteraux gardes, chacun portant un des trois faits, et pas seulement le premier :
+#   maxDepth              → la LIMITE du runtime
+#   deux niveaux de marge → la CONSOMMATION reelle mesuree contre elle
+#   sous-worker           → ce que la marge AUTORISE (une permission, pas une observation)
+# Une doctrine qui n'enonce que sa limite sans dire ce qu'elle permet se fait reposer la question
+# a chaque audit : c'est precisement le trou que cette section ferme.
+T76_KERNEL="$(cd "$SCRIPTS_DIR/.." && pwd)/references/team-kernel.md"
+if [ ! -f "$T76_KERNEL" ]; then
+  ko "T76 team-kernel.md introuvable ($T76_KERNEL) — anti 'vert a vide'"
+else
+  T76_MANQUANTS=""
+  for lit in "maxDepth" "deux niveaux de marge" "sous-worker" "2026-08-04" "1.9.1"; do
+    grep -qF "$lit" "$T76_KERNEL" || T76_MANQUANTS="$T76_MANQUANTS [$lit]"
+  done
+  # les 7 champs du descripteur, recopies verbatim
+  for champ in "namedDispatch: true" "nested: true" "maxDepth: 5" "background: true" \
+               "backgroundDispatch: false" "subagentToolkit: \"full\"" "isolation: \"harness-worktree\""; do
+    grep -qF "$champ" "$T76_KERNEL" || T76_MANQUANTS="$T76_MANQUANTS [$champ]"
+  done
+  if [ -z "$T76_MANQUANTS" ]; then
+    ok "T76 team-kernel.md : limite (maxDepth), marge (deux niveaux) et permission (sous-worker) ecrites, datees 2026-08-04, sourcees 1.9.1, descripteur verbatim (7 champs)"
+  else
+    ko "T76 team-kernel.md — litteraux manquants :$T76_MANQUANTS"
+  fi
+fi
 
 # ---------- T72 : assertion sur l'arbre REEL (pas une fixture) — WINDOWS #1 ----------
 # team-kernel.md affirmait l'anti-triche P12 "verifie par les suites de test de chaque module" —

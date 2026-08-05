@@ -28,7 +28,7 @@ ont été produits par cette commande, jamais par lecture du README :
 ```bash
 python3 - <<'EOF'
 import json,glob,os
-os.chdir('/Users/samuel/Documents/dev/vibeflow-os')
+os.chdir(os.popen('git rev-parse --show-toplevel').read().strip())
 for f in sorted(glob.glob('plugin/*/module.json')):
     d=json.load(open(f)); mod=os.path.dirname(f)
     ag=sorted(os.path.basename(p) for p in glob.glob(mod+'/agents/*.md') if not p.endswith('.bak'))

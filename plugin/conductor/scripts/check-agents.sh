@@ -511,8 +511,16 @@ def check_file(path):
     elif memory not in MEMORY:
         errors.append(f\"{base} : memory invalide ({memory}) — attendu user|project|local\")
 
+    # effort EXIGE (zone 6, Phase 24 — ADR-044 etendu) : le champ etait valide S IL ETAIT
+    # PRESENT, donc omissible en silence — 0 des 25 agents livres le portait. Le bareme est
+    # PAR ROLE (pilotage et jugement haut, execution mecanique bas, jamais uniformement) :
+    # une omission n est pas un defaut par defaut, c est un role non declare. Meme forme a
+    # deux branches que le bloc model ci-dessus, et MEME perimetre : les agents ecartes par
+    # --third-party-prefix ne passent jamais ici (skip en amont, boucle principale).
     effort = fm.get(\"effort\")
-    if effort and effort not in EFFORT:
+    if not effort:
+        errors.append(f\"{base} : effort absent — bareme par role requis (low|medium|high|xhigh|max)\")
+    elif effort not in EFFORT:
         errors.append(f\"{base} : effort invalide ({effort}) — attendu low|medium|high|xhigh|max\")
     pm = fm.get(\"permissionMode\")
     if pm and pm not in PERM:

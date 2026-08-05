@@ -42,11 +42,35 @@
 #   check-dev-bootstrap.sh [--path <dir>] [--hook] [--quiet]
 # Defaults: --path .
 #
-# --hook change UNIQUEMENT le format d'affichage (parité avec les deux autres scripts de la
-# phase) ; les 4 exits restent identiques avec ou sans. --hook et --quiet ensemble → exit 64.
+# --hook est accepté pour la PARITÉ D'INTERFACE avec les autres scripts de la phase, et il arme le
+# gate de mutuelle exclusion avec --quiet. Il ne change NI les 4 exits, NI le rendu : contrairement
+# à ses voisins, ce script est déjà en forme « hook » par construction — le signal part sur stdout,
+# les diagnostics humains sur stderr via `say`. Il n'y a donc rien à commuter, et la précédente
+# rédaction (« --hook change UNIQUEMENT le format d'affichage ») annonçait un comportement que le
+# code n'a jamais eu. Rendre stdout dépendant du drapeau serait un changement de contrat, pas une
+# correction : c'est la DOCUMENTATION qui était fausse. --hook et --quiet ensemble → exit 64.
+#
+# Workstreams GSD (GSDA-13) — QUELS CHEMINS BOUGENT, LESQUELS NE BOUGENT PAS :
+# Le moteur amont peut partitionner le planning en compartiments `.planning/workstreams/<nom>/`.
+# Le workstream actif est résolu par `workstream-policy.sh` (planning-core), fichier SOURCÉ et
+# partagé par les quatre gates — voir son en-tête pour la politique UNIQUE, la parité amont exacte
+# et la gradation par rôle du cas « résolu mais dossier absent ». La surcharge historique
+# VF_BOOTSTRAP_WORKSTREAM reste le premier canal. Un nom hors politique est traité comme « aucun
+# workstream » et n'est JAMAIS concaténé dans un chemin ni réimprimé (T-24-04-01).
+#
+# FRONTIÈRE ASSUMÉE : le pointeur de SESSION en os.tmpdir() n'est PAS lu ici — il est indexé sur un
+# condensat du chemin absolu ET sur une clé de session que bash ne peut pas reproduire fidèlement.
+# Ce trou est l'objet d'un gate dédié, jamais d'une approximation à cet endroit.
+#
+# Seuls DEUX chemins suivent le compartiment actif : ROADMAP.md et STATE.md. config.json, codebase/
+# et PROJECT.md restent à la RACINE du .planning/ — c'est le modèle de partition du moteur, pas un
+# oubli. Un workstream résolu dont le dossier est ABSENT → ligne de signalement qui le nomme, PUIS
+# repli sur la racine ; jamais un silence.
 #
 # Env (surcharge — testabilité, modèle VF_INGEST_* de discover-unintegrated-docs.sh):
 #   VF_BOOTSTRAP_PLANNING_DIR (défaut <path>/.planning)
+#   VF_BOOTSTRAP_WORKSTREAM   (workstream actif ; prime sur GSD_WORKSTREAM et sur le pointeur)
+#   GSD_WORKSTREAM            (canal de premier rang du moteur GSD amont)
 #
 # Exit codes:
 #   0  = signal [onboard] ou [bootstrap] émis (démarrage incomplet)
@@ -84,6 +108,51 @@ say() { [ "$QUIET" -eq 1 ] || echo "[check-dev-bootstrap] $*" >&2; }
 
 PLANNING_DIR="${VF_BOOTSTRAP_PLANNING_DIR:-$ROOT/.planning}"
 
+# --- Résolution du workstream actif (GSDA-13) -------------------------------------------------
+# La politique de nom n'est PLUS recopiée ici : elle est SOURCÉE depuis planning-core (voir son
+# en-tête pour la politique UNIQUE et sa gradation par rôle). Quatre copies en deux variantes
+# divergentes rendaient QUATRE verdicts différents sur le même arbre.
+WS_POLICY=""
+for _cand in "$(dirname "$0")/workstream-policy.sh" \
+             "$(dirname "$0")/../../planning-core/scripts/workstream-policy.sh"; do
+  [ -r "$_cand" ] && { WS_POLICY="$_cand"; break; }
+done
+PLANNING_SCOPE="$PLANNING_DIR"
+# 1 uniquement quand PLANNING_SCOPE a quitté la racine pour un compartiment. C'est la condition
+# EXACTE sous laquelle les fichiers lus deviennent joignables par une indirection versionnée, donc
+# la seule sous laquelle il faille les contrôler (`ws_readable` plus bas). La racine garde son
+# comportement à l'octet près : ce correctif ferme le trou ouvert par les workstreams, il ne
+# requalifie pas le chemin nominal.
+WS_SCOPED=0
+if [ -z "$WS_POLICY" ]; then
+  # RÔLE INJECTEUR (hook SessionStart) : fail-open, mais JAMAIS muet. Un exit non nul ici
+  # dégraderait toutes les sessions ; un silence masquerait l'absence d'outillage.
+  say "workstream-policy.sh introuvable — aucun compartiment résolu, lecture sur la racine."
+else
+  # shellcheck source=/dev/null
+  . "$WS_POLICY"
+  vf_ws_resolve "$PLANNING_DIR" "${VF_BOOTSTRAP_WORKSTREAM:-}"; ws_rc=$?
+  if [ "$ws_rc" -eq 2 ]; then
+    # Seule la RAISON est dite — la valeur brute est non maîtrisée par construction (T-24-04-01).
+    say "workstream rejeté par la politique amont ($VF_WS_REASON, canal $VF_WS_SOURCE) — aucun chemin construit, lecture sur la racine."
+  elif [ -n "$VF_WS_NAME" ]; then
+    # `[ -d ]` SUIT les liens symboliques : un `workstreams/<nom>` en mode 120000 vers un répertoire
+    # hors du lab faisait lire le compartiment de la CIBLE et réimprimer son frontmatter
+    # (« milestone <valeur de l'attaquant> ») sur le stdout de ce hook SessionStart. La résolution
+    # est donc déléguée à la politique partagée, qui refuse de traverser (voir son en-tête).
+    vf_ws_dir_resolve "$PLANNING_DIR" "$VF_WS_NAME"; dir_rc=$?
+    if [ "$dir_rc" -eq 2 ]; then
+      # RÔLE INJECTEUR : fail-open sur la racine, jamais muet, et la cible n'est ni lue ni nommée.
+      say "compartiment « $VF_WS_NAME » refusé par la politique amont ($VF_WS_REASON) — cible non lue, lecture sur la racine."
+    elif [ "$dir_rc" -eq 0 ]; then
+      PLANNING_SCOPE="$VF_WS_DIR"
+      WS_SCOPED=1
+    else
+      say "workstream « $VF_WS_NAME » résolu mais $PLANNING_DIR/workstreams/$VF_WS_NAME absent — lecture sur la racine."
+    fi
+  fi
+fi
+
 # --- find borné : élaguer les dossiers vendorés/générés ET les dossiers hors-code AVANT la
 # descente (-prune, pas filtre post). POURQUOI : un node_modules réel gèlerait le SessionStart
 # (hook tué au timeout). docs/, .planning/, .claude/ sont étendus au motif PRUNE_VENDOR de
@@ -107,8 +176,23 @@ codebase_missing() {
   [ -z "$any" ]
 }
 
+# ROADMAP.md suit le compartiment actif (GSDA-13) — cf. docstring : config.json/codebase/PROJECT.md
+# restent à la racine, seuls ROADMAP.md et STATE.md bougent.
+# Un fichier DU COMPARTIMENT est-il lisible sans traverser un lien symbolique ? Fermer le répertoire
+# en laissant les fichiers ouverts verrouillerait la porte en laissant la fenêtre : `[ -f ]` suit le
+# lien exactement comme `[ -d ]`, et un `STATE.md` versionné en 120000 rejouerait la même fuite un
+# cran plus bas. Hors compartiment (WS_SCOPED=0), aucune indirection n'a été introduite : le chemin
+# racine reste inchangé, et la fonction rend « lisible » sans rien changer au verdict.
+ws_readable() { # <fichier>
+  [ "$WS_SCOPED" -eq 1 ] || return 0
+  vf_ws_file_in_ws "$1"
+  [ "$?" -ne 2 ] || { say "fichier de compartiment refusé ($VF_WS_REASON) — cible non lue."; return 1; }
+  return 0
+}
+
 roadmap_missing() {
-  local f="$PLANNING_DIR/ROADMAP.md"
+  local f="$PLANNING_SCOPE/ROADMAP.md"
+  ws_readable "$f" || return 0
   [ -f "$f" ] || return 0
   if grep -qE '^#{1,6}[[:space:]]*Phase[[:space:]]+[0-9]+' "$f" 2>/dev/null; then
     return 1
@@ -227,12 +311,14 @@ if [ -f "$PLANNING_DIR/PROJECT.md" ]; then
   fi
 
   # --- État 3 — tous les items posés : orientation [gsd-engine], exit 3 (D-01, D-14) ---------
-  if OUT="$(state3_signal "$PLANNING_DIR/STATE.md")"; then
+  # Même garde que sur ROADMAP.md, et c'est ICI qu'elle compte le plus : state3_signal REIMPRIME
+  # des valeurs du frontmatter (« milestone <valeur> ») sur le stdout d'un hook SessionStart.
+  if ws_readable "$PLANNING_SCOPE/STATE.md" && OUT="$(state3_signal "$PLANNING_SCOPE/STATE.md")"; then
     say "projet complètement cadré — orientation gsd-engine."
     printf '%s\n' "$OUT"
     exit 3
   fi
-  say "frontmatter de $PLANNING_DIR/STATE.md illisible ou invalide — silence (D-04)."
+  say "frontmatter de $PLANNING_SCOPE/STATE.md illisible ou invalide — silence (D-04)."
   exit 3
 fi
 

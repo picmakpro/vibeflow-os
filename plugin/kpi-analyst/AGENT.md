@@ -11,6 +11,7 @@ description: >
   à la main et n'invente JAMAIS de valeur — chaque KPI porte sa source. Acquisition de données externes
   (MCP/navigateur/API) = Tier 2, human-gated, jamais en autonomie sur des chiffres financiers.
 model: sonnet
+effort: medium
 memory: project
 skills:
   - kpi-analyst

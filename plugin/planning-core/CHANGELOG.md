@@ -1,5 +1,66 @@
 # Changelog — planning-core
 
+## [v2.6.0] — 2026-08-04 (une politique de nom de workstream, UNE seule, sourcée par les gates)
+
+### Ajouté
+- **`scripts/workstream-policy.sh`** — la politique de nom de workstream devient **unique** et
+  partagée. Quatre gates la validaient chacun à leur façon : quatre variantes divergentes d'une même
+  règle, donc quatre occasions d'accepter ce que le voisin refuse. Ils la **sourcent** désormais tous
+  (`check-workstream-pointer.sh`, `check-state-integrity.sh`, `check-dev-bootstrap.sh`,
+  `planning-context.sh`) et l'appliquent à l'identique. La politique est conforme à l'amont, et sa
+  suite `test-workstream-policy.sh` le vérifie — angles morts compris (`.`, `..`, lien symbolique).
+
+  Le module hôte est `planning-core` parce que sa fermeture de dépendances est réduite à lui-même :
+  les quatre consommateurs peuvent le sourcer sans tirer de module supplémentaire.
+
+### Modifié
+- **`planning-context.sh` injecte le `STATE.md` du compartiment actif et le nomme** (GSDA-14) : sur
+  un `.planning/` partitionné, le contexte servi provenait de la racine quel que soit le workstream
+  résolu — il décrivait donc un autre chantier que celui en cours, sans jamais le dire.
+- **`planning-context.sh --max-lines`** cesse d'injecter une erreur d'outil dans le contexte produit :
+  un message d'erreur passé pour du contenu est pire qu'une troncature annoncée.
+
+### Corrigé
+
+- **`vf_ws_trim` ne forke plus `awk`** — la borne de longueur du canal nominal était **inerte sur
+  Linux**. `vf_ws_trim` pipait sa valeur vers `awk` ; pendant cet appel `GSD_WORKSTREAM` reste
+  exportée, `execve()` en hérite, et le noyau Linux borne **chaque chaîne** d'`argv`/`envp` à
+  `MAX_ARG_STRLEN` (128 KiO) — une limite indépendante d'`ARG_MAX`, **absente sur macOS/BSD**. Au-delà,
+  `execve` échoue en `E2BIG`, le pipeline ne tourne jamais, la valeur revient vide et la borne
+  `VF_WS_VALUE_MAX_BYTES` qui suit n'a plus rien à refuser : une valeur de 200 000 octets passait.
+  Réécrite en bash pur (`[[ =~ ]]` + découpage par indices), sans aucun `execve()`, avec une classe
+  de blancs explicite plutôt que `[[:space:]]` dépendant de la locale. Le défaut n'était **pas
+  reproductible en local sur macOS** — il n'a été attrapé que sur le runner Linux de la CI.
+
+- **Échappement du répertoire de compartiment par lien symbolique** (`T-24-14-C1`, **4ᵉ passage du
+  motif dans ce dépôt**). La politique contraignait le **nom** du workstream et refusait un
+  pointeur-**fichier** en lien symbolique ; le **chemin** du compartiment, lui, n'était contraint par
+  rien. Les gates construisaient `<planning>/workstreams/<nom>` puis testaient `[ -d ]` — et `[ -d ]`
+  **suit le lien**. Un `.planning/workstreams/dev` versionné en mode `120000` vers un répertoire hors
+  du lab suffisait à faire **injecter le `STATE.md` de la cible dans le contexte de session**, en
+  exit 0 et **sans aucune action de la victime** au-delà de l'ouverture de session (hook
+  `SessionStart`). Reproduit sur dépôt piégé le 2026-08-04.
+
+  Deux primitives neuves dans **`workstream-policy.sh`** : `vf_ws_dir_resolve` (résout le
+  compartiment sans jamais traverser un lien — les **deux** segments sont contraints, `workstreams`
+  lui-même puis `workstreams/<nom>`, car détourner le premier détourne tous les compartiments d'un
+  coup) et `vf_ws_file_in_ws` (même contrôle sur les **fichiers** du compartiment : fermer le
+  répertoire en laissant le `STATE.md` ouvert verrouillerait la porte en laissant la fenêtre —
+  `[ -f ]` suit le lien exactement comme `[ -d ]`).
+
+  **Posture : on refuse de suivre**, on ne tente pas de décider si la cible est « dans le lab ». Un
+  tel test se réécrit avec `..`, dépend d'un `readlink -f` absent de macOS et ne survit pas à un
+  remontage. La cible n'est **jamais lue, jamais nommée** ; seule la raison sort, prise dans une
+  **énumération fermée** (`workstreams-lien-symbolique`, `compartiment-lien-symbolique`,
+  `fichier-compartiment-lien-symbolique`).
+
+  **`planning-context.sh`** consomme ces primitives selon la gradation par rôle déjà déclarée dans la
+  politique : **rôle injecteur** → repli sur la racine **plus une ligne qui nomme le refus**, jamais
+  un silence (un exit non nul dégraderait toutes les sessions). Le **cas licite est inchangé à
+  l'octet près** : un vrai répertoire reste vert. Nouvelle suite dédiée
+  `test-workstream-symlink-escape.sh` — la fermeture est prouvée **par mutation, sur les quatre
+  gates à la fois** (garde retirée → les quatre refuient).
+
 ## [v2.5.3] — 2026-07-31
 
 ### Corrigé

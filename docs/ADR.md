@@ -33,7 +33,16 @@
 | ADR-061 | 2026-07-31 | Les lanes de revue cross-AI de plans (amont) et l'étage de revue de code (ADR-060) sont des objets disjoints | Validée |
 | ADR-062 | 2026-07-31 | Les deux hooks 1.9.0 non câblés restent hors périmètre de `merge-hooks.sh` | Validée |
 | ADR-063 | 2026-07-31 | Anomalie d'agrégation `.planning/STATE.md` : dette d'artefact locale + bug amont non scopé — gate local, jamais de correction par `gsd-tools state` | Validée |
-| ADR-064 | 2026-08-01 | Un écrivain = un worktree : l'isolation des sessions concurrentes devient physique, et le claim de branche se dit à tout le monde (advisory) | Validée |
+| ADR-064 | 2026-08-01 | Un écrivain = un worktree : l'isolation des sessions concurrentes devient physique, et le claim de branche se dit à tout le monde (advisory) | Validée — amendée par ADR-069 (`GSD_WORKSTREAM` devient le canal nominal) |
+| ADR-066 | 2026-08-04 | La zone 2 est activée, pas différée : un prérequis de version insatisfiable ne gate pas, et le risque mesuré est inexistant | Validée |
+| ADR-067 | 2026-08-04 | `hooks.community` refusé : c'est une mesure de style, pas de conformité — 6 types maison hors liste amont, 68 % des sujets > 72 caractères | Validée |
+| ADR-068 | 2026-08-04 | Profils de contexte du moteur refusés (rien à activer, notre contrat typé est per-rôle et plus strict) — et `workflow.inline_plan_threshold` inchangé à 2, la mesure étant le livrable | Validée |
+| ADR-069 | 2026-08-04 | Les workstreams GSD sont adoptés, avec leurs quatre limites datées, la condition dure « aucune partition tant qu'une phase est en vol », la révision de l'Iron Law 2 et l'amendement d'ADR-064 | Validée |
+
+> **`ADR-065` : numéro non attribué** — constaté le 2026-08-04. Le registre saute de `ADR-064` à
+> `ADR-066` ; aucune décision ne porte ce numéro et aucune n'a été retirée. Un registre qui saute
+> est un fait bénin ; le combler ou renuméroter casserait des références existantes — ne rien faire
+> est la bonne action, et cette ligne existe pour qu'on ne « répare » pas un trou intact.
 
 ### ADR héritées les plus citées (définitions canoniques)
 
@@ -1460,6 +1469,7 @@ purement locale au repo de distribution.
 
 **Date** : 2026-08-01 · **Statut** : Validée · **Complète** : ADR-053 (verrou de driver), ADR-059
 (une mission = une branche) · **Quick** : `260801-17w`
+· **Amendée par** : **ADR-069** (2026-08-04) — composition avec les workstreams par `GSD_WORKSTREAM`.
 
 ### Contexte
 
@@ -1549,3 +1559,613 @@ Reste non couvert, et assumé : deux sessions dans le **même** arbre sur la **m
 partagent un arbre, elles se voient — mais rien ne les empêche de committer l'une par-dessus
 l'autre. C'est le cas que l'utilisateur crée délibérément ; le fermer demanderait un verrou
 d'écriture dur, écarté ci-dessus.
+
+---
+
+## ADR-066 : La zone 2 est activée, pas différée — un prérequis insatisfiable ne gate pas
+
+**Date** : 2026-08-04 · **Statut** : Validée · **Décideur** : Samuel (dégel explicite du verdict
+`24-ARBITRAGES.md` zone 2) · **Complète** : ADR-063 (dette d'artefact locale vs bug amont)
+
+### Contexte
+
+Le verdict initial de la zone 2 — `workflow.windows_enforce` et `hooks.workflow_guard` — était
+**gaté sur un prérequis dur** : ne rien activer tant que `@opengsd/gsd-core` ne serait pas monté
+au-delà de **1.9.1**, à cause de l'issue amont **#2893** (`windows append`/`waive`/`fixed`
+réécrivent intégralement `WINDOWS.md` via `writeLedgerAtomic` → `renderLedger`, détruisant toute
+prose sous le ledger, et rapportant `ok: true`).
+
+Deux faits, re-vérifiés de première main le 2026-08-04, retirent au prérequis sa raison d'être.
+
+**1. Le prérequis est insatisfiable.** Le registre npm donne `dist-tags.latest` = **`1.9.1`**,
+publiée le **2026-07-31**, et **aucune version au-delà** : ni `1.9.2`, ni `1.10.x`, ni RC
+postérieure. La PR corrective **#2975** est mergée mais **non publiée**. Un gate dont la condition
+de levée n'existe pas n'est pas un gate prudent : c'est un **ajournement sans terme**, déguisé en
+précaution. La version installée sur la machine est bien 1.9.1 (`~/.claude/gsd-core/VERSION`).
+
+**2. Le risque mesuré est inexistant *sur ce fichier*.** `.planning/WINDOWS.md` fait **87 lignes**
+et ne porte **aucune prose libre** sous son ledger : frontmatter, en-tête figé que `renderLedger`
+régénère mot pour mot, table, miroir JSON — et rien d'autre. Le bug #2893 **n'a rien à détruire
+ici**. La prémisse qui fondait l'ajournement (« notre `WINDOWS.md` porte de la prose sous son
+ledger ») était **fausse en l'état**.
+
+### Décision
+
+**Doctrine GSD-first : on n'ajourne pas une capacité native du moteur contre un risque mesuré
+inexistant.** En conséquence, et dans cet ordre :
+
+**1. La fenêtre #3 est dérogée** (`gsd-tools windows waive 3`), et non « fermée » : la recette
+humaine XcodeBuildMCP (valider `test_sim`/`build_sim`/`clean` contre un serveur vivant) est
+**structurellement infermable dans ce dépôt** — aucun `.mcp.json`, aucun projet iOS, aucun
+simulateur. `vibeflow-os` est le repo de **distribution** du plugin ; cette recette appartient à un
+lab iOS équipé. Une fenêtre qu'aucun travail légitime dans ce dépôt ne peut clore n'est pas une
+dette : c'est une dérogation, et elle se dit comme telle, avec sa raison au ledger.
+
+**2. Les deux clés sont posées** dans `.planning/config.json` : `workflow.windows_enforce: true`
+et `hooks.workflow_guard: true`.
+
+### Ce qui a été vérifié, et comment
+
+**L'innocuité du `waive`, avant de l'exécuter pour de bon.** La commande a d'abord été **répétée
+sur une copie jetable** du fichier (`--cwd` vers un dépôt temporaire), et seulement ensuite jouée
+sur le vrai. Constat identique dans les deux cas : **87 lignes avant, 87 après**, fence JSON
+unique et refermée, miroir reparsé sans erreur (**5 entrées**, dont les **4 `fixed` intactes**),
+`open_count` 1 → 0 et `waived_count` 0 → 1. Le `git diff` ne porte que trois hunks, tous attendus.
+**Le bug #2893 ne s'est pas manifesté** — conformément à la mesure ci-dessus, il n'avait aucune
+prose à emporter.
+
+**L'armement réel du gate, par la requête même qu'exécute `/gsd-ship`.** Le workflow de ship
+n'interroge pas la clé de config : il résout les hooks actifs
+(`gsd-tools loop render-hooks ship:pre`) puis cherche un hook `capId == "broken-windows"`,
+`kind == "gate"`, `blocking == true`. Cette requête rend désormais ce hook. **Contre-épreuve
+jouée** sur une copie de la config **sans** la clé : seul le gate `security` s'y arme,
+`broken-windows` est absent. La clé est donc bien la cause, et le gate n'est pas déclaré mais
+**actif**. Le prédicat qu'il évaluera est `open_count == 0` en **égalité stricte**, avec `onError:
+halt` — sur un ledger illisible il **bloque**, il ne laisse pas passer.
+
+**La garde d'enchaînement, constatée en vol.** `hooks.workflow_guard` s'est manifestée pendant la
+rédaction même de cette entrée : l'édition directe de `docs/ADR.md` a déclenché son avis
+(« cette édition ne sera pas tracée dans STATE.md »). Elle est **advisory**, non bloquante —
+ADR-031 tenu.
+
+### Ce que la décision n'est pas
+
+**Ce n'est pas un blanc-seing sur les commandes `windows`.** Le défaut amont #2893 est **réel** et
+non corrigé dans 1.9.1. Ce qui est acté, c'est qu'il est **sans effet sur ce fichier tel qu'il
+est** — pas qu'il a disparu. D'où la précaution qui reste due, et qui est le vrai coût de cette
+décision : **si `.planning/WINDOWS.md` venait à recevoir de la prose libre sous son ledger, tout
+`windows append|waive|fixed` la détruirait silencieusement.** Tant que la version installée est
+≤ 1.9.1, le ledger reste un fichier **purement généré** : on n'y écrit pas à la main, et on le
+commite avant toute manipulation pour que le dégât reste récupérable.
+
+**Ce n'est pas une fermeture de la fenêtre #3.** Une dérogation n'est pas une résolution. La
+recette reste à faire, ailleurs, sur un lab équipé.
+
+### Note de veille — elle ne gate plus rien
+
+Le déclencheur de version qui figurait au verdict initial (« rouvrir ssi une version strictement
+supérieure à 1.9.1 portant le correctif #2893 est publiée ») **n'est plus une condition de
+reprise** : la zone 2 est activée, elle **n'attend plus rien**. Ce qui subsiste est une simple
+**veille d'hygiène** : quand une telle version paraîtra, la monter lèvera la fragilité résiduelle
+décrite ci-dessus et rendra le ledger manipulable sans précaution particulière. Aucun travail
+n'est suspendu à cette montée. Un lecteur qui croirait la zone 2 « en attente » se tromperait.
+
+---
+
+## ADR-067 : `hooks.community` refusé — c'est une mesure de style, pas de conformité
+
+**Date** : 2026-08-04 · **Statut** : Validée · **Décideur** : Samuel (arbitrage
+`24-ARBITRAGES.md`, zone 2) · **Voisine** : ADR-066 (même arbitrage, verdict inverse)
+
+### Contexte
+
+`hooks.community` arme un hook de **Conventional Commits bloquant** : liste de types figée
+(`feat|fix|docs|style|refactor|perf|test|build|ci|chore`) et sujet plafonné à **72 caractères**.
+
+Le refus doit être motivé par ce qu'il ferait à **notre** historique, pas par une préférence. La
+mesure ci-dessous a été **rejouée le 2026-08-04**, en caractères et non en octets — un décompte en
+octets sur des sujets français gonfle mécaniquement la longueur et fabriquerait un faux motif.
+
+### La mesure
+
+Corpus **nommé** : les **400 derniers commits sans merge** du dépôt (la mesure antérieure de la
+phase portait sur un corpus de 109 commits qui n'est plus reproductible tel quel ; les deux
+convergent sur la conclusion, ce qui compte davantage que le chiffre exact).
+
+| Confrontation à la règle amont | Résultat |
+|---|---|
+| Sujet dépassant **72 caractères** | **275 / 400 — 68 %** |
+| Type hors de la liste amont | **65 / 400 — 16 %** |
+
+Les préfixes fautifs sont **nos six types maison**, et ils ne sont pas anecdotiques :
+`release:` (29 occurrences), `planning:` (14), `doctrine:` (3), `plan`, `bump`, `spec`. Ils
+décrivent des gestes que la liste amont ne sait pas nommer — publier une version, tenir le
+planning, acter une doctrine.
+
+**Ce que dit ce tableau.** Le hook ne détecterait pas des commits négligés : il rejetterait
+**plus des deux tiers de notre manière d'écrire**, et six catégories de travail que nous faisons
+réellement. Ce n'est pas un gate de **conformité** — rien de ce qu'il refuse n'est incorrect. C'est
+un gate de **style**, et il impose un style qui n'est pas le nôtre. Un gate qu'on doit contourner
+tous les jours est un gate qu'on finit par désarmer, et le désarmer use la crédibilité de tous les
+autres.
+
+### Décision
+
+`hooks.community` **n'est pas posé** dans `.planning/config.json`.
+
+Le refus ne coûte aucune manipulation : `gsd-validate-commit.sh` s'auto-gate sur la config et sort
+`0` tant que `hooks.community !== true`. Refuser, c'est **ne pas poser la clé** — l'état de fait,
+désormais motivé plutôt que subi.
+
+### Le fait que cette ADR redresse
+
+Le ROADMAP §Phase 24 affirmait que « le lab impose déjà des commits conventionnels en français par
+consigne — un gate existe ». **C'est faux.** Aucun `plugin/*/hooks/hooks.json` ne déclare de gate
+de message de commit, et `scripts/hooks/pre-push` est le gate de **tag de release**, pas de
+message. La convention de commit de ce dépôt est une **consigne du `CLAUDE.md`** (« messages en
+français, cohérents avec l'historique »), **jamais une garantie machine**. C'est acté ici pour
+qu'on ne puisse plus invoquer un gate qui n'existe pas.
+
+### Déclencheur de réexamen
+
+Rouvrir **ssi** la liste de types amont s'élargit à nos six types maison, **ou** que sa limite de
+sujet dépasse 72 caractères, **ou** que nous décidions de réaligner notre convention sur la liste
+amont — cette dernière étant une décision de `CLAUDE.md`, pas de configuration.
+
+---
+
+## ADR-068 : Les profils de contexte du moteur sont refusés — il n'y a rien à activer, et notre contrat typé est per-rôle et plus strict
+
+**Date** : 2026-08-04 · **Statut** : Validée · **Décideur** : Samuel (arbitrage
+`24-ARBITRAGES.md`, zone 4, option A) · **Voisines** : ADR-066, ADR-067 (même arbitrage)
+
+Cette entrée couvre les **deux items de la zone 4**. Ils partagent une même leçon et c'est pourquoi
+ils partagent une ADR : dans les deux cas, le livrable n'est pas un réglage posé, c'est **le fait
+établi qui rend le non-réglage informé**.
+
+---
+
+### Volet 1 — Les profils de contexte : refus
+
+#### La clé n'est pas celle que les fichiers nomment
+
+Le moteur livre trois fichiers de profil — `contexts/dev.md`, `contexts/review.md`,
+`contexts/research.md` — et chacun se présente en ligne 3 par la même formule :
+« *Loaded when `context: dev` is set in config.json* ».
+
+Cette ligne d'en-tête est le piège du sujet, et il faut nommer les **deux états** distincts qu'elle
+recouvre, car ils ne coïncident pas :
+
+| Périmètre | Ce qui y est vrai | Source |
+|---|---|---|
+| **Notre runtime installé, `gsd-core` 1.9.1** | La clé validée comme énumération `['dev', 'research', 'review']` est bien **`context`** (`bin/lib/config.cjs:690-692`). `context_profile` : **0 occurrence dans tout le payload installé** — le répertoire `docs/` amont n'est même pas embarqué dans le paquet. Vérifié de première main le 2026-08-04. |
+| **Le dépôt amont, après la scission de schéma** | Le schéma porte **deux clés distinctes** : `context` (texte libre injecté dans chaque prompt, sans rapport avec les profils) et **`context_profile`** (les presets `dev`/`research`/`review`, « *Added in v1.34* »). Les trois fichiers livrés continuent de nommer `context:` en en-tête : ils **nomment une clé qui ne porte plus cette sémantique au schéma**. Fait issu de la recherche amont du cadrage (`24-CONTEXT.md` F-20, `24-ARBITRAGES.md` zone 4), non re-vérifiable localement — ce dépôt n'a pas accès au dépôt amont. |
+
+**Le désalignement en-tête ↔ schéma est en soi un fait à consigner**, et c'est lui qui a fait paraître
+le sujet actionnable : on croit lire une clé documentée et vivante, on lit un en-tête resté en place
+après que le schéma a bougé sous lui.
+
+La clé porteuse de la sémantique s'appelle **`context_profile`**. C'est elle, et aucune autre, que
+cette ADR refuse.
+
+#### État réel : documentée, livrée, jamais câblée, abandonnée de fait
+
+L'état de ce canal n'est **aucun des deux états habituels** — ni « vivant », ni retiré par l'amont.
+C'est un **troisième état**, et il se dit dans ces termes exacts :
+
+> **documentée, livrée, jamais câblée, abandonnée de fait depuis avril 2026.**
+
+Ce vocabulaire est contraint, et la contrainte est factuelle. L'amont **n'a annoncé aucun retrait,
+aucune fin de vie, aucun remplacement** : zéro annonce, zéro issue, zéro PR sur le sujet. Employer
+le vocabulaire du retrait rendrait cette ADR **factuellement fausse** — nous décrivons un abandon
+constaté par l'inaction, pas un retrait déclaré. La nuance n'est pas cosmétique : un canal retiré ne
+revient pas, un canal abandonné de fait peut se réveiller à tout moment. C'est précisément pourquoi
+le refus est assorti d'un déclencheur (ci-dessous) plutôt que d'une fermeture définitive.
+
+Ce qui fonde « abandonnée de fait » : les trois fichiers n'ont été touchés que **deux fois dans
+toute l'histoire du dépôt amont** — création le 2026-04-05, puis renommage de répertoire le
+2026-06-02. **Quatre mois sans une seule modification fonctionnelle**, sur un canal dont le schéma a
+entre-temps bougé sans que les fichiers suivent. (Historique amont relevé au cadrage.)
+
+#### Motif du refus, en deux temps
+
+**1. Il n'y a rien à activer.** `context_profile` compte **6 occurrences amont, toutes situées dans
+`docs/`** — aucune dans `src/`, `workflows/`, `agents/` ni `bin/` (relevé du cadrage). Sur notre
+runtime installé, le compte re-vérifié le 2026-08-04 est plus tranchant encore : **0 occurrence**,
+et les seuls hits du préfixe sont **3 lignes auto-déclaratives** — l'en-tête de chacun des trois
+fichiers de profil, qui se décrit lui-même et que personne ne lit. Le seul appel de configuration du
+moteur qui commence par le même préfixe porte sur `context_window`, la taille de la fenêtre de
+contexte : **une autre clé, une autre affaire.**
+
+**Aucun consommateur n'existe.** Le ROADMAP présentait A4 comme « ce que le moteur porte en config et
+que nous ré-implémentons en doctrine ». Le fait s'inverse : **le moteur ne le porte pas, il le
+déclare.** Adopter la clé poserait un réglage décoratif — une ligne de configuration dont on ne
+pourrait jamais observer l'effet, ni en présence ni en absence.
+
+**2. Notre contrat est plus strict, et de forme incompatible.** Le profil amont est un **scalaire
+global** : une valeur unique pour tout le projet. Notre Pattern C est un **contrat par rôle** —
+quatre rôles, un schéma JSON par retour (`mission-flow.md:136-152`). L'amont sait faire du par-agent
+quand il le veut : `agent_skills` est bien une map par agent. Le profil de contexte, lui, ne l'est
+pas ; il ne peut donc pas exprimer ce que notre contrat exprime.
+
+Et si le canal s'implémentait un jour, il n'arriverait pas neutre — il entrerait en **collision
+frontale** :
+
+| Point de collision | Amont | Chez nous |
+|---|---|---|
+| Verbosité en recherche | `research.md:20-23` — « *Verbosity **High** … Include background context even if the developer likely knows it* » | `mission-flow.md:139-142` — « **la prose libre est du volume mort** » (audit 2026-07-25) |
+| Vocabulaire de sévérité | `blocking` / `important` / `nit` (`review.md:8`) | `bloquant` / `majeur` / `mineur` (`mission-flow.md:148`) |
+
+Seul `dev.md:21` (« Verbosity Low ») serait compatible. Un canal dont un tiers des valeurs
+contredit notre doctrine et un autre tiers renomme notre vocabulaire n'est pas un canal à adopter
+d'avance.
+
+#### Décision
+
+**Ni `context` ni `context_profile` n'est posée dans `.planning/config.json`.** Le refus ne coûte
+aucune manipulation : ne pas poser la clé *est* le refus. L'état de fait, désormais motivé plutôt
+que subi.
+
+Ce que nous gardons à la place existe déjà et fait mieux : le contrat typé per-rôle du Pattern C.
+
+#### Déclencheur de réexamen
+
+Rouvrir **ssi** `context_profile` apparaît **hors de la documentation** — dans le code, les
+workflows, les agents ou les binaires — d'une release amont, **ou** qu'une issue amont le mentionne.
+
+Ce déclencheur est **objectif et sans échéance**, délibérément. Une date de revue serait un
+rendez-vous : elle se tiendrait qu'il se soit passé quelque chose ou non, et elle rouvrirait un
+dossier vide. La condition ci-dessus, elle, ne se déclenche que s'il s'est réellement passé quelque
+chose — l'apparition d'un consommateur, c'est-à-dire exactement le fait dont l'absence motive le
+refus.
+
+---
+
+### Volet 2 — `inline_plan_threshold` : inchangé à 2, et la mesure est le livrable
+
+#### Ce que le réglage fait
+
+`workflow.inline_plan_threshold` vaut **2** par défaut, dans une plage `0`–`10`
+(`references/planning-config.md:41` et `:276`). Il est lu dans `execute-plan.md:94` et appliqué
+en `:100` : un plan dont le compte de tâches est **≤ seuil** s'exécute **inline** (Pattern C) au lieu
+de faire naître un sous-agent — l'amont motive par « *avoids ~14K token subagent spawn overhead and
+preserves prompt cache* ».
+
+#### La méthode, avant les chiffres
+
+Le compte de tâches n'est pas laissé à l'appréciation : la mesure emploie **la regex exacte du
+moteur**, relevée dans `execute-plan.md:93` :
+
+```
+^\s*<task[[:space:]>]
+```
+
+Population : tous les fichiers `*-PLAN.md` des dossiers de phase **20 à 26** de `.planning/phases/`.
+Commande reproductible, en `awk` — jamais en `grep` piped, qui tronque silencieusement sur ce
+runtime :
+
+```bash
+for f in .planning/phases/*/2[0-6]-*-PLAN.md; do
+  awk '/^[[:space:]]*<task[[:space:]>]/{n++} END{print n+0}' "$f"
+done | sort -n | uniq -c
+```
+
+Un plan à **0 tâche** n'est pas un petit plan : ce sont les **rétro-plans de la Phase 21**, écrits
+sans balise `<task>`. C'est un **artefact de format**, et ils sont donc exclus du dénominateur des
+plans *exécutables* — les inclure gonflerait mécaniquement la part « sous le seuil » avec des
+fichiers que le moteur ne route pas.
+
+#### Les deux mesures
+
+Elles portent la **même date calendaire** et ce n'est pas une négligence : elles sont séparées par
+la **population**, pas par le temps. C'est même le fait le plus instructif des deux — un corpus de
+plans peut bouger de plus d'un tiers **dans la même journée**, et un chiffre publié sans sa
+population est donc périssable en heures, pas en mois.
+
+| | **Mesure de cadrage** | **Re-mesure d'exécution** |
+|---|---|---|
+| Date | 2026-08-04 | 2026-08-04 |
+| Moment | pendant le cadrage de la Phase 24, **avant** que ses plans soient écrits | à l'exécution du plan `24-07`, **après** l'écriture des 12 plans de la Phase 24 |
+| Population totale | **32** `*-PLAN.md` | **44** `*-PLAN.md` |
+| Rétro-plans à 0 tâche (exclus) | 4 | 4 |
+| Plans exécutables | **28** | **40** |
+| Distribution | 0 → 4 · **2 → 4** · 3 → 20 · 4 → 2 · 6 → 2 | 0 → 4 · **2 → 8** · 3 → 28 · 4 → 2 · 6 → 2 |
+| **Sous le seuil (≤ 2)** | **4 / 28 — 14 %** | **8 / 40 — 20 %** |
+| **Mode** | **3 tâches** (20 plans) | **3 tâches** (28 plans) |
+
+**Le delta est nommé et attribué** : les 12 fichiers d'écart sont **exactement les 12 plans de la
+Phase 24** (`24-01` à `24-12`), inexistants au moment du cadrage. Quatre d'entre eux (`24-03`,
+`24-07`, `24-08`, `24-09`) portent 2 tâches et rejoignent la population sous le seuil — d'où
+14 % → 20 %. Aucune autre phase n'a bougé.
+
+**Ce que les deux mesures disent de concert** : le levier est **réel mais minoritaire**, et le
+**mode de nos plans est à 3 tâches — juste au-dessus du seuil**, aux deux mesures. Le porter à 3
+ferait basculer le mode entier vers l'inline : on échangerait l'isolation de contexte sur la
+**majorité** de nos plans contre une économie sur des plans qui ne sont pas notre coût dominant. Le
+mettre à 0 achèterait une homogénéité qu'aucun problème constaté ne réclame.
+
+#### Ce que le seuil ne contredit pas — la disjonction acteur / mécanisme
+
+Le seuil pourrait se lire comme une entorse à la doctrine de délégation systématique du module. Il
+n'en est pas une, parce que **les deux ne parlent pas du même objet** :
+
+- la **doctrine vise l'acteur** — *qui* fait le travail. « Je détecte, je délègue à la brique
+  outillée » ; « déléguer, jamais réimplémenter ni court-circuiter la brique choisie »
+  (`AGENT.md:165-166,172`). Ce qu'elle interdit, c'est qu'un agent du module fasse à la main ce
+  qu'une brique sait faire ;
+- le **seuil vise le mécanisme interne** de la brique — il est lu **dans** `execute-plan.md`,
+  **après** que la brique a été atteinte. C'est exactement la distinction « atteint PAR le skill ≠
+  dispatché EN DIRECT » que porte la voie unique (`GSD-PIPELINE.md:188-199`) : le moteur, dans le
+  skill, choisit lui-même d'exécuter inline ou de spawner — comportement voulu, avec tous ses
+  étages. Rien n'est court-circuité, rien ne saute.
+
+Une doctrine sur l'acteur et un réglage sur le mécanisme ne peuvent pas se contredire. Sans cette
+disjonction écrite, la mesure ci-dessus se relirait comme l'aveu d'une entorse ; elle n'en est pas
+une.
+
+#### Décision
+
+**`workflow.inline_plan_threshold` reste inchangé à 2** — la valeur par défaut de l'amont — et **la
+clé n'est pas posée** dans `.planning/config.json`. Ne pas toucher un réglage dont on vient de
+mesurer qu'il mord peu est ici le choix **informé**, pas le choix paresseux.
+
+#### Ce que cette mesure rend impossible
+
+Le seuil inline n'est plus présentable comme un « **levier de coût inconnu** ». Il est chiffré, sa
+population est nommée, sa méthode est reproductible en une commande. Tout retour sur ce réglage
+devra **citer cette mesure et l'infirmer** — sur un corpus nommé, avec la même regex — et non
+rouvrir la question à neuf comme si rien n'avait été mesuré.
+
+---
+
+## ADR-069 : Les workstreams GSD sont adoptés — avec leurs quatre limites datées, une condition dure, et la révision de l'Iron Law 2
+
+**Date** : 2026-08-04 · **Statut** : Validée · **Décideur** : Samuel (arbitrage
+`24-ARBITRAGES.md`, zone 5, **option C — contre la recommandation D du cadrage**) ·
+**Voisines** : ADR-064 (**amendée par cette entrée**), ADR-066, ADR-067, ADR-068 (même arbitrage) ·
+**Collisions** : `24-COLLISIONS.md` § C-1 (Iron Law 2), § C-6 (ADR-064), § M-1 (mesure de couverture)
+
+### Décision
+
+**Les workstreams du moteur GSD sont adoptés.** Le mot est **adoption**, et il est choisi contre les
+trois autres branches que l'arbitrage avait posées : ni le refus (option A), ni l'usage restreint
+sous liste d'exclusions (option B), ni le refus assorti d'une remontée amont (option D, qui était la
+**recommandation du cadrage** et qui est **non retenue**).
+
+La doctrine surplombante qui fonde ce choix est le verbatim de Samuel, et il faut l'écrire parce
+qu'il déclasse un motif de décision précis :
+
+> « *je veux coller au max à ce que fait GSD, je préfère jeter des IronLaw outdated que de sacrifier
+> l'efficience* »
+
+Ce que cette doctrine déclasse, c'est le motif « **c'est conforme à une décision interne** ». Elle
+ne déclasse **pas** les motifs factuels — « la mesure dit non », « il n'y a pas de consommateur »,
+« le canal n'existe pas ». Elle impose donc, en retour, **deux obligations** que cette ADR honore :
+toute collision avec notre doctrine se **consigne et se traite**, jamais ne se contourne en silence ;
+et les incompatibilités mesurées se portent comme des **risques à mitiger**, parce que **la décision
+d'adopter ne les efface pas**.
+
+### Ce que l'adoption a coûté — depuis les faits livrés, pas depuis l'intention
+
+| Livrable | Emplacement | Plan |
+|---|---|---|
+| Gate de démarrage rendu workstream-aware | `plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh` | `24-04` |
+| Gate d'intégrité d'état rendu workstream-aware | `plugin/conductor/scripts/check-state-integrity.sh` | `24-04` |
+| Injection de contexte rendue workstream-aware | `plugin/planning-core/scripts/planning-context.sh` | `24-04` |
+| Gate de pointeur créé (5 codes de sortie, 17 cas de test) | `plugin/conductor/scripts/check-workstream-pointer.sh` | `24-05` |
+| `--ws` et `GSD_WORKSTREAM` câblés dans les deux agents du chemin de dev | `vf-dev-manager.md`, `vf-coder.md` | `24-08` |
+| Référence de module — voix unique sur les workstreams | `plugin/dev-orchestrator/references/workstreams.md` | `24-08` |
+| CI étendue à un arbre réellement partitionné, construit par le job | `.github/workflows/ci.yml` | `24-09` |
+
+Trois scripts, un gate neuf, deux agents, une référence, une étape de CI. **C'est le prix payé** — il
+est écrit ici pour qu'un futur réexamen le connaisse au lieu de le ré-estimer.
+
+### Méthode, avant les chiffres — le chiffre de couverture ne se recopie pas, il se re-dérive
+
+Ce dépôt s'est fait prendre trois fois par un chiffre gravé sans sa méthode. La règle qui en découle
+s'applique à cette entrée : **tout chiffre gravé dans une ADR porte son corpus, son critère
+d'inclusion nommé et sa commande rejouable.**
+
+- **Corpus** : `$HOME/.claude/gsd-core/workflows/*.md`, **profondeur 1 uniquement** — **91 fichiers**,
+  sur `@opengsd/gsd-core` **1.9.1**. Le qualificatif « racine » est porteur : le même dossier en
+  compte **115** en récursif. Le compte 91 se vérifie par un **compteur d'atteinte** inclus dans la
+  commande, parce qu'une invocation antérieure a rendu **4** en silence.
+- **Critère d'inclusion, nommé** : **K2** — « le workflow porte le mot `workstream` **ou** l'option
+  `--ws` », c'est-à-dire *sait résoudre un scope*. C'est le critère qui répond à la question posée
+  par cette ADR ; K1 (« le mot seul ») demande *le mot apparaît-il ?*, K3 (« ou la variable
+  `GSD_WS` ») demande *la variable transite-t-elle ?*.
+
+| # | Critère | Conscients | Taux | En dur | Aveugles |
+|---|---|---|---|---|---|
+| K1 | le mot `workstream` seul | 5 | 5,5 % | 45 | 43 |
+| **K2** | **le mot `workstream` ou l'option `--ws` — *résout le scope*** | **7** | **7,7 %** | **45** | **42** |
+| K3 | K2 ou la variable `GSD_WS` — toute forme de surface | 16 bruts / **15 réels** | 17,6 % / **16,5 %** | 45 | 35 |
+
+> **La réserve de K3 est indissociable de son chiffre.** `reapply-patches.md:220` ne cite `${GSD_WS}`
+> que comme *exemple de dérive de variable* dans une doc de rapprochement de patchs : il n'est
+> workstream-aware en rien. K3 vaut donc **16 bruts / 15 réels**, soit **16,5 %** et non 17,6 %.
+> Toute la réhabilitation du « ~18 % » du ROADMAP repose sur ce taux — le citer sans sa réserve,
+> c'est refaire, un cran plus bas, l'erreur que cette ADR corrige : un nombre sans son critère.
+> (`24-COLLISIONS.md:324-326`.)
+
+```bash
+W="$HOME/.claude/gsd-core/workflows"; T1=$(mktemp); H=$(mktemp); seen=0
+for f in "$W"/*.md; do
+  [ -f "$f" ] || continue; seen=$((seen+1))
+  awk -v F="$f" 'tolower($0) ~ /workstream/ || /--ws([^a-zA-Z0-9-]|$)/ { print F; exit }' "$f" >> "$T1"
+  awk -v F="$f" '/\.planning\/(ROADMAP\.md|STATE\.md|phases)/           { print F; exit }' "$f" >> "$H"
+done
+sort -u "$T1" -o "$T1"; sort -u "$H" -o "$H"
+echo "atteinte=$seen (doit valoir 91)"
+echo "K2=$(awk 'END{print NR+0}' "$T1")  en dur=$(awk 'END{print NR+0}' "$H")  aveugles=$(comm -13 "$T1" "$H" | awk 'END{print NR+0}')"
+```
+
+`awk` et `comm` uniquement — **jamais** `grep` piped, qui tronque en silence sur ce poste.
+**Re-dérivé à l'écriture de cette ADR, le 2026-08-04** : `atteinte=91`, `K2=7`, `en dur=45`,
+`aveugles=42` — identique au fichier près à la mesure de `24-COLLISIONS.md` § M-1.
+
+**Deux corrections que cette re-dérivation impose, et qu'il ne faut pas recopier depuis les sources
+antérieures :**
+
+1. **L'écart 7 vs 5 n'est pas un désaccord de mesure, c'est un critère non déclaré.** L'arbitrage
+   citait 7/91 (42 aveugles) : c'est **exactement K2**. Une re-mesure indépendante citait 5/91
+   (43 aveugles) : c'est **exactement K1**. Les deux se reproduisent au fichier près, **aucune n'est
+   fausse**. Ce qui manquait n'était pas une mesure juste, c'était un critère nommé.
+2. **« Bien pire que 18 % » ne survit pas.** La fiche `24-CONTEXT.md` F-34 concluait que la
+   couverture était « PÉRIMÉ — BIEN PIRE que 18 % ». Le ~18 % du ROADMAP est **retrouvé** par K3
+   (17,6 %). L'écart 18 % → 7,7 % est un **changement de critère non déclaré**, pas une régression
+   amont ni un état pire découvert. L'écrire comme un fait sur le produit graverait un artefact de
+   méthode.
+
+### Les quatre risques mesurés, datés du 2026-08-04, portés comme risques à mitiger
+
+La décision d'adopter ne les efface pas. Chacun porte sa mitigation nommée.
+
+#### (a) La couverture amont est de 7 workflows sur 91, soit 7,7 %
+
+**45 workflows codent en dur** `.planning/ROADMAP.md`, `.planning/STATE.md` ou `.planning/phases`,
+dont **42 sans aucune conscience** des workstreams. Les principaux, nommés : exécution de phase
+(`execute-phase.md`), exécution de plan (`execute-plan.md`), planification (`plan-phase.md`),
+cadrage (`discuss-phase.md`), pas suivant (`next.md`), expédition (`ship.md`), branche de PR
+(`pr-branch.md`), tâche rapide (`quick.md`), avancement (`progress.md`), clôture de jalon
+(`complete-milestone.md`), extraction de leçons (`extract-learnings.md`).
+
+**Mitigation.** `plugin/dev-orchestrator/references/workstreams.md` prescrit le geste : sur un dépôt
+partitionné, **vérifier quel chemin le workflow a effectivement lu** avant de se fier à son verdict.
+Lui passer `--ws` ne le sauve pas — il ne sait pas le lire, et il écrira à la racine quoi qu'on lui
+ait passé.
+
+#### (b) La classification de branche de PR s'inverse
+
+Les regex de `pr-branch.md:235-236` sont **ancrées** sur
+`^\.planning/(STATE|ROADMAP|MILESTONES|PROJECT|REQUIREMENTS)\.md` et `^\.planning/milestones/`. Sur
+un arbre partitionné, `.planning/workstreams/dev/STATE.md` **ne matche plus `STRUCTURAL`** : il
+tombe en **transient → EXCLUDED**. Conséquence : **les commits de feuille de route disparaissent
+silencieusement des branches de PR**.
+
+**Mitigation.** Vérification explicite avant ouverture de PR, écrite comme un geste dans la référence
+de module — le défaut est silencieux, donc il ne se rattrape que par un contrôle délibéré.
+
+#### (c) Le pointeur de session ne compose pas avec ADR-064
+
+Le pointeur de workstream actif vit dans
+`os.tmpdir()/gsd-workstream-sessions/<sha1 tronqué 16 du chemin absolu réel du .planning>/<clé de
+session>` : **effacé au redémarrage, indexé sur le chemin absolu, donc distinct par worktree et
+jamais hérité**.
+
+Ce risque est **confirmé pour notre runtime, et il n'est pas générique** — la distinction compte.
+`getWorkstreamSessionKey()` balaie neuf clés d'environnement, dont `CLAUDE_CODE_SSE_PORT`,
+**mesurée présente sous Claude Code le 2026-08-04** : c'est donc bien l'adaptateur `os.tmpdir()` qui
+est retenu ici. Un runtime sans clé de session tomberait sur le pointeur in-repo
+`<cwd>/.planning/active-workstream`, lui naturellement composable.
+
+**Mesure de première main, 2026-08-04** — sur une fixture portant `.planning/active-workstream`
+contenant `dev` et `.planning/workstreams/dev/` existant, `CLAUDE_CODE_SSE_PORT` présent :
+`getActiveWorkstream()` rend **`null`**, tandis que `resolveActiveWorkstream()` avec
+`GSD_WORKSTREAM=dev` rend `{ ws: "dev", source: "env" }`. **Le canal fichier n'est jamais lu sous ce
+runtime.**
+
+**Deux mitigations**, dont la première **n'était pas dans l'inventaire de risques de l'arbitrage** :
+
+1. **`GSD_WORKSTREAM` est un canal de premier rang** de `resolveActiveWorkstream`
+   (`active-workstream-store.cjs:252-277`), immédiatement après `--ws` et **avant** le pointeur. Un
+   worktree qui l'exporte résout son workstream **sans jamais toucher au fichier temporaire**.
+2. **`check-workstream-pointer.sh`** rend **bruyante** la défaillance que l'amont traite en silence :
+   `getActiveWorkstream` **auto-nettoie** — un nom invalide **ou** un `.planning/workstreams/<nom>/`
+   inexistant déclenche `adapter.clear()` puis rend « aucun workstream », **sans un mot**.
+
+#### (d) La divergence est invisible pour Git
+
+`git merge-tree` — l'outil de fusion à trois branches — sort **en succès (exit 0)** sur une branche
+post-partition portant un dossier de phase **orphelin** à la racine, pendant que le `STATE.md` du
+workstream le déclare courant. **Git ne signale rien.**
+
+**Mitigation.** La condition dure ci-dessous — **aucune partition tant qu'une phase est en vol** —,
+plus la comparaison manuelle des dossiers de phase, prescrite comme geste dans la référence de
+module.
+
+### La condition dure — interdiction opposable
+
+> **Aucune partition tant qu'une phase est en vol.**
+
+Ce n'est **pas une précaution**, c'est une interdiction. Elle est **conservée telle quelle** depuis
+le cadrage, où elle était commune à **toutes** les options — y compris celles qui refusaient
+l'adoption. Elle survit donc au changement de décision, et l'adoption ne la relâche pas. Son motif
+est le risque (d) : puisque Git ne signale pas la divergence, la seule garde possible est **de ne
+jamais créer les conditions du conflit**. La CI l'honore déjà — son arbre partitionné est une
+fixture jetable construite dans un `mktemp -d`, jamais une partition du dépôt.
+
+### La révision de l'Iron Law 2
+
+C'est la **seule révision de loi autorisée par cette phase** (verdict zone 5, point 1 :
+« soit on la révise, soit on écrit pourquoi elle ne s'applique pas — ne pas la contourner en
+silence »). Elle est portée dans `plugin/conductor/AGENT.md`, avec sa formulation antérieure
+conservée en trace.
+
+| | Formulation |
+|---|---|
+| **Avant** | **Router, jamais réimplémenter.** |
+| **Après** | **Router, jamais forker — une capacité amont partiellement couverte se câble en écrivant ses limites, elle ne se réimplémente pas** (ADR-069). |
+
+**Pourquoi la loi devait bouger.** Telle qu'écrite, elle visait le **fork d'une capacité** — réécrire
+localement ce que le moteur fait. Lue à la lettre sur une capacité couverte à 7,7 %, elle interdisait
+aussi l'**adaptation d'un gate local**, et rendait donc l'adoption indéfendable *par construction*.
+Ce sont deux objets différents : refaire une capacité amont, et apprendre à un gate maison à lire le
+chemin que la capacité amont a déplacé.
+
+**Ce que la révision ne relâche pas.** Le premier interdit — forker une capacité du moteur — est
+**maintenu**, et c'est ce qui protège encore la ligne « Out of Scope » de `REQUIREMENTS.md` contre le
+fork des skills GSD. Ce que la loi autorise désormais, elle l'autorise **sous condition écrite** :
+la limite de la capacité doit être **consignée**, ce que fait précisément la section (a) à (d)
+ci-dessus.
+
+**Ce que la révision n'éteint pas.** L'objection que la loi portait — *ne pas faire tourner le lab
+contre une chaîne d'outils qui ne le couvre pas* — est **réelle et mesurée**. Elle ne disparaît pas
+par décision. Elle change de nature : d'interdiction, elle devient **un risque écrit, daté et
+mitigé**. Cette entrée est le lieu où ce risque vit désormais.
+
+Le bloc `## Garde-fous` du même fichier n'est **pas** touché : sa ligne « ne jamais réimplémenter la
+logique d'un module » porte sur un **module de ce dépôt**, objet différent d'une capacité du moteur
+amont. Les confondre aurait élargi la révision au-delà de ce qui a été autorisé.
+
+### L'amendement d'ADR-064 — `GSD_WORKSTREAM` est le canal nominal
+
+Deuxième révision doctrinale autorisée de cette phase, et elle **ne contredit pas** ADR-064 : elle en
+précise la **mécanique de composition**.
+
+**ADR-064 (« un écrivain = un worktree ») reste en vigueur, principe intact.** L'amendement dit ceci :
+sur un arbre partitionné en workstreams, l'isolation « un écrivain = un worktree » se **compose** avec
+les workstreams **via l'export de `GSD_WORKSTREAM` par worktree**, et **jamais** via le pointeur de
+session — lequel, sous ce runtime, est indexé sur un chemin absolu et n'est pas hérité.
+
+`GSD_WORKSTREAM` n'est donc **pas un contournement** : c'est le **canal nominal**, le niveau 2 de la
+résolution amont, qui court-circuite le pointeur par conception. La non-composabilité relevée par
+l'arbitrage était réelle **sur le seul canal qu'il avait inventorié** ; elle tombe dès qu'on emprunte
+le canal de premier rang.
+
+### Le solde du rendez-vous — et aucune phase ajoutée
+
+La **PR #27** (partition de `.planning/` en workstreams, proposée par Willy) a été **fermée par son
+auteur lui-même** le **2026-08-03T06:56:32Z**, en **ratification de la revue de Samuel** — pas un
+refus imposé. La branche `gouvernance/partition-planning-workstreams` est conservée : 122 renommages,
+210 blobs, **aucun perdu**.
+
+Le sujet **n'était pas abandonné** — la recherche du cadrage concluait à un rendez-vous en
+« Phase 27 ». **L'arbitrage a renversé cette conclusion** : le rendez-vous se solde **ici, dans la
+Phase 24**, et **aucune phase n'est ajoutée au ROADMAP**. C'est écrit explicitement parce que la
+source de recherche dit le contraire, et qu'un lecteur qui la retrouverait sans cette ligne
+conclurait qu'une phase manque.
+
+### Déclencheur de réexamen
+
+Rouvrir **ssi** l'un de ces faits change, chacun re-dérivable par la commande ci-dessus :
+
+- la couverture K2 dépasse **50 %** des workflows racine — le lab cesserait alors de tourner contre
+  une chaîne d'outils majoritairement aveugle, et les gestes de mitigation (a) deviendraient inutiles ;
+- les regex de `pr-branch.md` cessent d'être ancrées à la racine, ce qui referme le risque (b) ;
+- l'amont fait du pointeur in-repo l'adaptateur retenu en présence d'une clé de session, ce qui
+  referme le risque (c) sans passer par `GSD_WORKSTREAM`.
+
+Ce déclencheur est **objectif et sans échéance** : une date de revue rouvrirait un dossier vide,
+alors que chacune des trois conditions ci-dessus ne se déclenche que s'il s'est réellement passé
+quelque chose en amont.

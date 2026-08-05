@@ -347,6 +347,32 @@ implémentation) — le DAG reste métier-agnostique (prouvé T3/T4, `15-ETUDE-c
 le nœud `revue-N` du cross-team EST une instance de Pattern E, pas un cas séparé ; le lock reste au
 seul manager de la mission, jamais imbriqué (Pattern A).
 
+## Pattern G — Reprise après coupure : réveiller avant de redispatcher (D-25)
+
+Une coupure d'infrastructure (`Response stalled mid-stream`, `ENOTFOUND`, interruption d'outil) **n'est
+pas la mort du worker**. Le mandat coupé rend un `agentId`, et l'agent **garde son contexte** : ses
+mesures, ses fixtures, ses décisions intermédiaires. Redispatcher depuis zéro jette tout cela et refait
+payer le même travail — mesuré en Phase 24 : trois mandats successifs coupés sur le même lot, dont deux
+étaient arrivés au banc de mutation, et un troisième avait **déjà commité 4 fichiers** que le rapport
+d'échec ne mentionnait pas.
+
+**Ordre imposé, dans cet ordre exact :**
+
+1. **Constater le disque, jamais le rapport.** `git status` + `git log` + `ls` du périmètre. Une
+   interruption d'outil ne prouve pas qu'un worker n'a rien écrit — c'est le premier réflexe, et il a
+   payé quatre fois dans la seule Phase 24 (travail commité non rapporté, travail écrit non commité).
+   Du travail non commité se **récupère et se commite**, il ne se refait pas.
+2. **Réveiller l'agent coupé** — `SendMessage` vers son `agentId`, avec un résumé de ce que le disque
+   montre et la consigne de reprendre où il en était. Son contexte vit encore ; c'est la voie la moins
+   chère et la plus fidèle.
+3. **Redispatcher un mandat neuf seulement si le réveil échoue** ou si `SendMessage` n'est pas fourni au
+   manager. Dans ce cas, **le mandat neuf porte l'état exact du disque** (« voici ce qui est déjà
+   commité, voici ce qui reste ») et l'instruction de **commiter au fil de l'eau** plutôt qu'en fin de
+   course — c'est ce qui limite la perte à la coupure suivante.
+
+**Ne pas s'arrêter pour signaler la coupure** tant que l'arbre reste cohérent : la coupure est un fait
+d'infrastructure, pas une décision à remonter. Elle entre au rapport de mission, pas dans un checkpoint.
+
 ## Lignes rouges (rappel ADR-053)
 
 Pas de bus UDS / channels / `dm` temps réel (modèle `Task` = dispatch-and-join). Pas de RAII machine : le

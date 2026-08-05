@@ -105,7 +105,9 @@ a. **Couche plugin** : `claude plugin update vibeflow@vibeflow-os`. **Toujours l
 
 b. **Couche modules** : `bash <S>/vf-update-run.sh`. Le script localise **lui-même** le cache le
    plus récent (indispensable : la session courante garde encore l'ancien `${CLAUDE_PLUGIN_ROOT}`)
-   et relance l'engine `update --all` pour chaque scope ayant un registre. Relaie son résumé.
+   et relance l'engine `update --all` pour chaque scope ayant un registre. Il rafraîchit aussi le
+   cache du bandeau de mise à jour, ce qui évite qu'il réclame au redémarrage une mise à jour déjà
+   faite. Relaie son résumé.
 
 c. **Couche moteur** (seulement si la ligne moteur de l'étape 3 a été acceptée) : invoque
    `bash <S-moteur>/ensure-deps.sh --migrate-engine` et relaie son résumé. S'exécute **même si** la

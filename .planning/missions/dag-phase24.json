@@ -1,0 +1,250 @@
+{
+  "nodes": [
+    {
+      "id": "facts",
+      "step": "constat sur pièce M1/M3 + A1-A9 et fiche d'arbitrage",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-24-activation-et-mesure-du-moteur-gsd-capacit-s-dormantes-et-fa/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "checkpoint-arbitrages",
+      "step": "arbitrage humain groupé par zone",
+      "stage": "",
+      "deps": [
+        "facts"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plan",
+      "step": "plan de phase 24 (gsd-plan-phase)",
+      "stage": "",
+      "deps": [
+        "checkpoint-arbitrages"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-24-activation-et-mesure-du-moteur-gsd-capacit-s-dormantes-et-fa/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck",
+      "step": "re-validation des plans avant exécution",
+      "stage": "",
+      "deps": [
+        "plan"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "research-web",
+      "step": "3 points web: PR #27, issues amont, cle context:",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-01",
+      "step": "Zone 6 — effort: x25, gate durci, marge de dispatch",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/*/agents/*.md",
+        "plugin/conductor/scripts/check-agents.sh",
+        "plugin/conductor/references/team-kernel.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-03",
+      "step": "Zone 1 — slot AGENT_SKILLS_PLANNER",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/config.json",
+        "plugin/dev-orchestrator/references/GSD-PIPELINE.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-04",
+      "step": "Zone 5a — 3 gates workstream-aware",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/conductor/scripts/check-dev-bootstrap.sh",
+        "plugin/conductor/scripts/check-state-integrity.sh",
+        "plugin/planning-core/scripts/planning-context.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-05",
+      "step": "Zone 5b — gate sur le pointeur de workstream",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/conductor/scripts/check-workstream-pointer.sh",
+        "plugin/conductor/hooks/hooks.json"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-02",
+      "step": "Zone 2 — GELE: premisse falsifiee, arbitrage humain requis",
+      "stage": "",
+      "deps": [
+        "exec-24-01"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-vague-1",
+      "step": "revue de jointure des 4 lots paralleles",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "audit-vague-1",
+      "step": "audit infra: hooks, gates, CI",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-vague-1",
+      "step": "correction ciblee: 12 bloquants fusionnes des 2 juges",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/*/AGENT.md",
+        "plugin/conductor/scripts/check-state-integrity.sh",
+        "plugin/conductor/scripts/check-workstream-pointer.sh",
+        "plugin/planning-core/scripts/planning-context.sh",
+        ".github/workflows/ci.yml"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-08",
+      "step": "vague 2 lot A",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-09",
+      "step": "vague 2 lot A",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-07",
+      "step": "ADR de refus context_profile",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-06",
+      "step": "vague 2-3",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-10",
+      "step": "vague 2-3",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-11",
+      "step": "vague 2-3",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-propagation",
+      "step": "vague 2-3",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-vague-2",
+      "step": "revue jointure v2-3",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "audit-vague-2",
+      "step": "audit v2-3",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-vague-2",
+      "step": "correction fusionnee des 2 juges",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-24-12",
+      "step": "cloture: triades 8 modules + compteur READMEs",
+      "stage": "",
+      "deps": [
+        "fix-vague-2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "secure-phase",
+      "step": "gsd-secure-phase 24 (threats_open 18)",
+      "stage": "",
+      "deps": [
+        "fix-vague-2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire de fin de mission",
+      "stage": "",
+      "deps": [
+        "exec-24-12"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

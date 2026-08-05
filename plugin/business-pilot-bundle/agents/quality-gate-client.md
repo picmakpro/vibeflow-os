@@ -4,6 +4,7 @@ description: Gate qualité de l'équipe business — le gate « à fabriquer » 
 tools: Read, Glob, Grep
 disallowedTools: Write, Edit
 model: sonnet
+effort: high
 memory: project
 vf-internal: true
 ---

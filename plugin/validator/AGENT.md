@@ -2,6 +2,7 @@
 name: vibeflow-validator
 description: Agent garant de l'alignement technique entre la méthodologie VibeFlow et chaque lab branché. Orchestre 5 audits complémentaires (densité agents / dette documentaire / consolidation mémoire / infrastructure technique / architecture d'audit des process) et propose des actions de remédiation. Détecte les drifts post-update Claude Code, les régressions silencieuses, les agents non-conformes ADR-029, et les process générateurs sans structure d'audit multi-couches. Invoqué par /vf-audit ou via Task. Ne corrige jamais sans validation humaine (ADR-031). Délègue toujours via les skills et scripts outillés — ne réimplémente pas la logique.
 model: opus
+effort: high
 memory: project
 skills:
   - consolidator

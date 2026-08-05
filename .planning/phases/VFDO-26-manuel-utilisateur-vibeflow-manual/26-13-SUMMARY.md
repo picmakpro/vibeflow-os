@@ -58,7 +58,7 @@ liens relatifs reste intra-`manual/` (déjà couvert par C3 du gate). Ces deux l
 **résolvent désormais réellement** depuis la racine du dépôt : confirmé sur pièce, pas seulement
 déduit.
 
-**Recherche de chemins absolus machine** (`/Users/samuel/…`) dans tout `manual/**` : **aucune
+**Recherche de chemins absolus machine** (`/Users/<user>/…`) dans tout `manual/**` : **aucune
 occurrence**, ni dans un lien markdown ni dans le texte des pages.
 
 Aucun lien mort trouvé — rien à signaler en finding sur ce point, donc rien à faire remonter en

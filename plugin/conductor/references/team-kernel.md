@@ -25,6 +25,68 @@
 | **Dispatch nommé** (hypothèse datée, jamais construite en mécanisme) | `Agent(...)`/`Task` natif Claude Code, allowlists des managers | tient tant que VibeFlow reste Claude-Code-exclusif (`mission-contracts.md` §Seuil de bascule D5(a)) : chaque rôle nommé (`vf-coder`, `vf-reviewer`…) est résolu par un runtime à dispatch nommé. L'amont (`gsd-core/references/runtime-aware-dispatch.md`, 1.9.0) distingue désormais ces runtimes (Claude Code, OpenCode, Cursor, Cline — `hostIntegration.dispatch.namedDispatch: true`) des runtimes **built-in-only** (kimi-code : `coder`/`explore`/`plan` seulement, aucun enregistrement custom), où un nom de rôle est INCONNU et retombe sur le built-in le plus proche. Vérifié 2026-07-31 : `~/.claude/gsd-core/.gsd-runtime` = `claude` sur les postes actuels. **Aucun mécanisme de repli construit** — VibeFlow ne cible qu'un runtime à ce jour, en bâtir un pour un runtime non ciblé serait de la sur-ingénierie ; le jour où un lab tourne sous un runtime built-in-only, cette ligne est le premier endroit à vérifier |
 | **Namespace de branche des worktrees d'exécuteur** (recoupement vérifié conforme, Phase 21) | `gsd-worktree-path-guard.js` (hook `PreToolUse`, `~/.claude/hooks/`) | l'amont 1.9.0 a élargi son motif d'allow-list à `^(worktree-)?agent-[A-Za-z0-9._/-]+$` (#1995 — accepte `agent-<id>` **et** l'ancien `worktree-agent-<id>`) : vérifié sur pièce le 2026-07-31, déjà présent dans le hook installé, aucun défaut. Le nouveau cas d'échec `{committed: false, reason: 'staging_failed' \| 'staging_timeout'}` (#2608) est entièrement interne à `gsd-executor` amont — aucune logique de retry VibeFlow ne l'enveloppe, le seul retry documenté porte sur l'étage entier (`vf-dev-manager.md` §Contrôle de flux), jamais sur un `git add` individuel. Rien à câbler, constat écrit ici pour survivre au prochain delta amont (détail : `21-02-SUMMARY.md` §Constat changement 4) |
 
+### Marge de profondeur de dispatch (mesuré le 2026-08-04, `@opengsd/gsd-core` 1.9.1)
+
+Le descripteur `claude.runtime.hostIntegration.dispatch` du runtime `claude`, recopié verbatim —
+**inchangé depuis la 1.9.0** :
+
+```
+namedDispatch: true · nested: true · maxDepth: 5 · background: true
+backgroundDispatch: false · subagentToolkit: "full" · isolation: "harness-worktree"
+```
+
+**Ce que nous en consommons** : la chaîne la plus profonde du kernel —
+`vf-dev-manager` → `vf-coder` → agent `gsd-*` — occupe **3 niveaux sur 5**.
+Il reste donc deux niveaux de marge.
+
+**Ce que cette marge autorise** (c'est une permission, pas une simple observation) : un worker peut
+légitimement dispatcher un **sous-worker** sans franchir la limite du runtime. Un mandat qui a
+besoin d'un étage de délégation supplémentaire n'a pas à être réarchitecturé pour l'éviter, ni
+remonté au manager au seul motif de la profondeur. **Ce fait clôt la question du nesting** ouverte à
+l'ouverture de l'audit de la Phase 24 — elle n'a plus à être reposée.
+
+**Sa borne, en revanche, est stricte** : la marge est une permission de **profondeur**, jamais une
+permission de contourner la **voie unique d'invocation** (GSDC-05, Phase 23 — les briques de cycle
+s'invoquent par leur skill, jamais par dispatch direct d'un agent nu) ni le **cloisonnement des
+allowlists** `Agent(...)` (P12, ci-dessus). Deux niveaux disponibles ne rendent licite aucun
+chemin que la doctrine interdit par ailleurs — en particulier `manager → worker → manager`, que le
+verrou de driver refuse quelle que soit la profondeur restante.
+
+### Étage de parallélisme réellement effectif (mesuré le 2026-07-31, sondes horodatées)
+
+Le runtime **sait** paralléliser un fan-out depuis un sous-agent — c'est mesuré, pas déduit d'un
+descripteur. Le moteur, lui, **choisit** de ne pas s'en servir : `shouldFlattenDispatch()`
+(`bin/lib/host-integration.cjs`) renvoie **`true` pour Claude Code** dès que
+`background && backgroundDispatch` n'est pas vrai, et `gsd-execute-phase` **sérialise ses vagues par
+décision**. `backgroundDispatch: false` est *fail-closed* par conception : conservateur, **pas
+descriptif** de la capacité réelle du poste.
+
+**La conséquence doctrinale, en une ligne :** sur ce runtime, le parallélisme **intra-étape** (les
+vagues de plans d'une même étape, côté moteur) est **perdu**, et le parallélisme **inter-nœuds**
+porté par la frontière `ready` de `vf-dev-manager` est le **seul effectif**. Notre couche
+d'orchestration ne duplique donc pas celle du moteur : **elle est la seule qui parallélise
+réellement**.
+
+**Ce qui en découle pour un manager**, et qui n'est pas facultatif :
+
+- Le fan-out de la frontière `ready` et la recherche doc non bloquante (ADR-045) **tiennent** —
+  mesurés à **92 %** de recouvrement depuis un sous-agent, indiscernables du contrôle en fenêtre
+  principale (91 %), et un parent qui dispatche puis continue à travailler n'est **pas** bloqué.
+  Ces deux acquis décrivent des gains réels, pas une intention.
+- **N'attendez aucun gain de parallélisme d'un découpage en plans multiples au sein d'une même
+  étape** : le moteur les aplatira. Le gain se prend en **découpant en nœuds de DAG à périmètres
+  disjoints**, dispatchés en un seul message par le manager.
+- **Sérialisation observée ≠ panne.** Voir une étape enchaîner ses plans un par un est le
+  comportement nominal du moteur ici ; ce n'est ni un symptôme, ni un motif de halt condition, ni
+  quelque chose à corriger côté lab.
+- Toute bascule sur la capability amont `claude_orchestration` (BETA, default-off) qui prétendrait
+  restaurer le parallélisme intra-étape est un **opt-in explicite**, jamais un défaut.
+
+Protocole complet, trois configurations, horodatages bruts et réserves de la mesure (la profondeur
+2 → 3 n'a pas été mesurée) : `.planning/missions/2026-07-31-mesure-m2-dispatch-parallele.md` du
+dépôt VibeFlow. **Renvoi, pas copie** — les chiffres ne se recopient pas d'ici, ils se relisent
+là-bas.
+
 ## Ce que chaque métier paramètre (et RIEN d'autre)
 
 1. **Les spécialistes** : un manager (opus, seul à voir large), des producteurs (sonnet), des
