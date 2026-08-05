@@ -57,9 +57,10 @@
 - [x] Phase 21: Alignement du moteur GSD sur gsd-core 1.9.0 (completed 2026-07-31)
 - [x] Phase 22: Hygiène documentaire — doctrine de sortie et captation d'intention (completed 2026-07-31)
 - [x] Phase 23: Couplage explicite au moteur GSD — capabilities, flags et voie unique
-- [ ] Phase 24: Activation et mesure du moteur GSD — capacités dormantes et faits de runtime
+- [x] Phase 24: Activation et mesure du moteur GSD — capacités dormantes et faits de runtime (completed 2026-08-05, PR #34)
 - [ ] Phase 25: Budget d'instructions et étage d'alignement court
 - [x] Phase 26: Manuel utilisateur VibeFlow (manual/) (completed 2026-08-02)
+- [ ] Phase 27: Parallélisation d'exécution — granulaire, simple, sans collision d'écriture
 
 <details>
 <summary>✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04</summary>
@@ -1828,3 +1829,70 @@ Plans:
 casser le manuel ni son gate : `toc.yml` ne référence à tout instant que des pages réellement
 écrites dans les deux langues, donc un arrêt entre deux vagues laisse un manuel plus court et
 cohérent, `check-manual.sh` au vert. La priorité du mandat est tenue dès la vague 3.
+
+### Phase 27: Parallélisation d'exécution — granulaire, simple, sans collision d'écriture
+
+> **Origine** — demande directe de Samuel le 2026-08-05, à la clôture de la Phase 24 : « parallélisation
+> complète, simple et granulaire. Le but est de gagner du temps d'exécution sans que les agents se
+> marchent dessus. » Le déclencheur est le constat le plus utile de la Phase 24 : **le moteur ne
+> parallélise pas, et notre couche est la seule qui le fasse.** Une recherche d'état de l'art
+> (frameworks externes, mécanique réelle des workstreams GSD, options chiffrées) accompagne ce
+> cadrage et devra être versée avant `/gsd-plan-phase 27`.
+
+**Goal**: Faire du parallélisme un **résultat obtenu**, pas un effet de bord de la façon dont un
+manager découpe son DAG. Aujourd'hui le gain de vitesse dépend entièrement du jugement ponctuel de
+`vf-dev-manager` sur ce qui est disjoint ; il n'existe **aucune brique qui garantisse la disjonction**,
+aucune qui la vérifie avant dispatch, et aucune qui rattrape une collision quand elle survient. La
+phase doit rendre le parallélisme **granulaire** (la plus petite unité sûre, pas l'étape entière),
+**simple** (une règle qu'on peut tenir sans y penser) et **sûr par construction** (deux workers ne
+peuvent pas écrire au même endroit, la machine le refuse).
+
+**Le point de départ n'est ni une panne ni une capacité manquante — c'est un acquis non outillé.**
+
+#### Les faits mesurés qui bornent le cadrage (Phase 24, `plugin/conductor/references/team-kernel.md:28-84`)
+
+| Fait | Valeur mesurée | Conséquence |
+|---|---|---|
+| `shouldFlattenDispatch()` sous Claude Code | rend **`true`** dès que `background && backgroundDispatch` est faux ; le descripteur d'hôte porte `backgroundDispatch: false` | Le moteur **aplatit** les dispatches |
+| `gsd-execute-phase` | sérialise ses vagues **par décision**, pas par incapacité | Découper une étape en N plans **ne gagne rien** |
+| Parallélisme intra-étape | **perdu** | Aucun gain à attendre du moteur |
+| Parallélisme inter-nœuds (frontière `ready` du DAG de `vf-dev-manager`) | **seul effectif**, recouvrement mesuré à **92 %** depuis un sous-agent | Notre couche ne duplique pas le moteur : elle est la seule qui parallélise |
+| Profondeur de dispatch | `maxDepth: 5`, **3 consommés**, 2 de marge | Un worker peut légitimement déléguer à son tour — marge inexploitée |
+| Isolation disponible | `isolation: "harness-worktree"` exposée par le harness ; ADR-064 « un écrivain = un worktree » | L'isolation physique existe, elle n'est pas systématisée |
+| Sérialisation des écrivains | `driver-lock.sh` dans l'arbre principal | Protège, mais **sérialise** — c'est l'inverse du but recherché |
+| `claude_orchestration` (amont) | BETA, **default-off** | À instruire : restaure-t-elle l'intra-étape, et à quel prix ? |
+
+#### Ce que la phase doit trancher
+
+- **P1 — Quelle est la plus petite unité parallélisable sans collision ?** Le mot de Samuel est
+  *granulaire*. Aujourd'hui l'unité de fait est le nœud de DAG à périmètre disjoint, décidé à la main.
+  Faut-il descendre au fichier, au module, au répertoire — et qu'est-ce qui l'empêche ?
+- **P2 — La disjonction doit-elle être vérifiée par la machine avant dispatch ?** Un manager qui se
+  trompe de périmètre ne l'apprend qu'au conflit. Un gate de disjonction (déclaration de périmètre par
+  mandat, refus si recouvrement) est le candidat évident — reste à savoir s'il est tenable.
+- **P3 — Worktree systématique, ou verrou par périmètre ?** ADR-064 impose déjà un worktree par
+  écrivain, mais rien ne l'applique ; `driver-lock.sh` sérialise là où il faudrait cloisonner. Les deux
+  réponses s'excluent partiellement.
+- **P4 — Les workstreams sont-ils le bon outil ?** Samuel demande de s'en inspirer. Lecture à
+  vérifier : ils compartimentent le **planning** (feuille de route, état), pas l'**exécution** — et
+  leur couverture amont est de 7/91 workflows (Phase 24, ADR-069). S'ils ne répondent pas au besoin,
+  il faut le dire et nommer le mécanisme qui y répond.
+- **P5 — Que faire de la marge de profondeur ?** Deux niveaux de dispatch sont inexploités : un worker
+  pourrait paralléliser à son tour. Gain réel, ou complexité qui ne se pilote plus ?
+- **P6 — `claude_orchestration` : opt-in ou refus écrit ?** Même patron que les capacités dormantes de
+  la Phase 24 — l'instruire sur pièce, décider, et écrire la décision.
+
+#### Contraintes non négociables
+
+- **Simple avant complet.** Samuel l'a posé en premier. Une solution qui demande de penser à trois
+  choses avant chaque dispatch ne sera pas tenue, donc ne comptera pas.
+- **Aucune régression de sécurité de la Phase 24** — le motif d'échappement par lien symbolique en
+  était à son quatrième passage ; toute nouvelle primitive de chemin passe par les primitives partagées
+  de `workstream-policy.sh`, jamais par une réimplémentation locale (Iron Law 2 révisée, ADR-069).
+- **Tout chiffre gravé porte sa méthode et se re-dérive au moment de l'écriture** — la Phase 24 a
+  produit quatre décomptes justes portant sur le mauvais ensemble.
+- **La mesure du gain est un livrable, pas une promesse.** Une phase sur la vitesse qui ne mesure pas
+  la vitesse n'a rien démontré : baseline avant, mesure après, méthode écrite.
+
+**Plans**:
+- [ ] TBD (run /gsd-plan-phase 27 to break down)
