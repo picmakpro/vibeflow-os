@@ -22,6 +22,16 @@
 
 ### Corrigé
 
+- **`vf_ws_trim` ne forke plus `awk`** — la borne de longueur du canal nominal était **inerte sur
+  Linux**. `vf_ws_trim` pipait sa valeur vers `awk` ; pendant cet appel `GSD_WORKSTREAM` reste
+  exportée, `execve()` en hérite, et le noyau Linux borne **chaque chaîne** d'`argv`/`envp` à
+  `MAX_ARG_STRLEN` (128 KiO) — une limite indépendante d'`ARG_MAX`, **absente sur macOS/BSD**. Au-delà,
+  `execve` échoue en `E2BIG`, le pipeline ne tourne jamais, la valeur revient vide et la borne
+  `VF_WS_VALUE_MAX_BYTES` qui suit n'a plus rien à refuser : une valeur de 200 000 octets passait.
+  Réécrite en bash pur (`[[ =~ ]]` + découpage par indices), sans aucun `execve()`, avec une classe
+  de blancs explicite plutôt que `[[:space:]]` dépendant de la locale. Le défaut n'était **pas
+  reproductible en local sur macOS** — il n'a été attrapé que sur le runner Linux de la CI.
+
 - **Échappement du répertoire de compartiment par lien symbolique** (`T-24-14-C1`, **4ᵉ passage du
   motif dans ce dépôt**). La politique contraignait le **nom** du workstream et refusait un
   pointeur-**fichier** en lien symbolique ; le **chemin** du compartiment, lui, n'était contraint par
