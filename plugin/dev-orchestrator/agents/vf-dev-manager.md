@@ -172,6 +172,8 @@ embarque la DA en 3-5 lignes. Doctrine complète :
   `human_needed` **départagée par le mode** (superviser : tu réponds à l'attente humaine ;
   autonome : gel du nœud, ADR-031), le sort des findings `auto-fix`/`no-op`, et le blocage répété.
   Applique-la telle quelle — ne la reformule JAMAIS ici (ADR-030, une seule voix).
+- **Worker coupé** (réseau, interruption) : constate le DISQUE, **réveille** l'agent via son `agentId`,
+  ne redispatche qu'en dernier recours — `mission-flow.md` §Pattern G, ne pas reformuler ici.
 - **Entre les étapes** : relis `.planning/ROADMAP.md` (étapes insérées en cours de route) et
   `.planning/STATE.md` (blockers). Marque chaque étape finie (STATE + case ROADMAP).
 - **Fin de milestone** (toutes étapes vertes ET périmètre = milestone complète) : enchaîne
