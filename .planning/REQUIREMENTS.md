@@ -350,9 +350,15 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 > (zone 5 : adoption des workstreams, contre la recommandation D). Faits web refermés dans
 > `.planning/missions/2026-08-04-phase-24-activation-moteur-gsd.md`.
 >
-> **Ordre imposé** : `GSDA-01` (montée de `@opengsd/gsd-core`) est un **prérequis dur** de
+> **Ordre imposé** : `GSDA-01` (montée de `@opengsd/gsd-core`) était un **prérequis dur** de
 > `GSDA-04`/`GSDA-05` — le bug amont #2893 détruit la prose sous le ledger de `WINDOWS.md` et
 > rapporte `ok: true`. Le lot MESURE (zone 6) et le lot workstreams (zone 5) n'en dépendent pas.
+>
+> **Gate relâché le 2026-08-04 (ADR-066)** : aucune version npm > 1.9.1 n'existe (le correctif de
+> #2893 est postérieur à la dernière publication), et `WINDOWS.md` ne porte aucune prose sous son
+> ledger — le risque protégé est absent de ce dépôt. Le `waive` a été répété sur une copie jetable
+> avant d'être appliqué, fichier committé avant, intégrité vérifiée après : 87 lignes et miroir JSON
+> intacts. `GSDA-04`/`GSDA-05` sont donc **activés**, pas différés.
 
 - [x] **GSDA-01**: La version de `@opengsd/gsd-core` sous laquelle la zone 2 s'active est
   **déterminée contre le registre npm** et porte le correctif de l'issue amont **#2893** (`windows
@@ -568,8 +574,8 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | GSDA-01 | Phase 24 | Done — plan 24-02 (différé écrit : aucune version npm > 1.9.1 au 2026-08-04) |
 | GSDA-02 | Phase 24 | Done — plans 24-03 et 24-11 |
 | GSDA-03 | Phase 24 | Done — plan 24-03 |
-| GSDA-04 | Phase 24 | Done — plan 24-02 (**différé**, déclencheur objectif — non activé, gaté sur GSDA-01) |
-| GSDA-05 | Phase 24 | Done — plan 24-02 (**différé**, déclencheur objectif — non activé, gaté sur GSDA-01) |
+| GSDA-04 | Phase 24 | Done — plan 24-02 (`windows_enforce: true`, fenêtre #3 dérogée — gate GSDA-01 relâché, voir ADR-066) |
+| GSDA-05 | Phase 24 | Done — plan 24-02 (`workflow_guard: true` — gate GSDA-01 relâché, voir ADR-066) |
 | GSDA-06 | Phase 24 | Done — plan 24-02 (ADR-067, non gaté) |
 | GSDA-07 | Phase 24 | Done — plan 24-06 |
 | GSDA-08 | Phase 24 | Done — plans 24-06 et 24-11 |
