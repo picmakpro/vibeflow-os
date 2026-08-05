@@ -5,6 +5,110 @@ dernières entrées et pointent ici). Chaque module a par ailleurs son propre `C
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.48.0] — 2026-08-05
+
+**Les capacités dormantes du moteur GSD sont activées, mesurées ou refusées par écrit — et quatre
+gardes qui rendaient vert ne faisaient rien.**
+
+Phase 24, 12 plans, 6 arbitrages humains, PR #34.
+
+### Activé
+
+- **Slot `agent_skills` PLANNER** — la doctrine de dev du lab atteint enfin `gsd-planner`, l'agent
+  qui décide de la découpe. Le slot EXECUTOR est écarté pour un motif **factuel** et non de
+  conformité interne : son injection ne vit que dans le prompt de dispatch d'`execute-phase.md`, et
+  notre chemin réel tombe sur le repli inline qui n'injecte rien.
+- **`intel`** — notre propre `docs-flow.md` publiait `gsd-map-codebase --query` comme l'un des deux
+  modes normaux alors que la capacité était éteinte : une commande documentée qui ne faisait rien.
+- **`windows_enforce` et `workflow_guard`** — le préalable « monter `gsd-core` » s'est révélé
+  **inexécutable** (aucune version publiée au-delà de 1.9.1 ; le correctif de l'issue amont #2893
+  lui est postérieur), et le risque qu'il protégeait **absent de ce dépôt** (`WINDOWS.md` ne porte
+  aucune prose sous son ledger). Gate relâché par ADR-066 ; le `waive` a été répété sur une copie
+  jetable avant application, fichier commité avant, intégrité vérifiée après.
+
+### Refusé par écrit, avec la mesure
+
+- **`hooks.community`** (ADR-067) — 23 commits sur 109 échouent sur le type, 68 % des sujets
+  dépassent 72 caractères. Recomptés **en caractères et non en octets** : un décompte en octets
+  gonfle les sujets français accentués et aurait fabriqué un faux motif.
+- **Profils de contexte** (ADR-068) — la clé est validée et documentée en amont, mais la recherche
+  exhaustive ne rend que des occurrences auto-déclaratives : **aucun consommateur ne la lit**. Le
+  fait s'est inversé pendant le cadrage et a tranché la question seul.
+- **`graphify` et `profile-pipeline`** — aucun lecteur prescrit dans le module.
+
+### Workstreams adoptés — ADR-069
+
+Tranché par Samuel **contre la recommandation du cadrage**, sous la doctrine « coller au max à ce
+que fait GSD ». Livré : quatre gates rendus workstream-aware et **exercés en CI sur un arbre
+réellement partitionné**, `GSD_WORKSTREAM` adopté comme canal nominal (**ADR-064 amendée** — le
+pointeur de session vit dans `os.tmpdir()` indexé sur le chemin absolu réel, donc il ne compose
+jamais avec les worktrees, et sous Claude Code il n'est **jamais lu**), et **Iron Law 2 révisée**
+plutôt que contournée en silence. Limites datées gravées dans l'ADR avec leur critère et leur
+commande rejouable.
+
+### Sécurité — quatrième passage du motif symlink, celui-là vivant
+
+`.planning/workstreams/dev` en lien symbolique hors du lab faisait **injecter le `STATE.md` de la
+cible dans le contexte de session**, à exit 0, sans aucune action de la victime au-delà de
+l'ouverture de session. Le nom était validé, le pointeur-fichier refusait les liens — **le
+répertoire n'était contraint par rien**, et `[ -d ]` suit le lien. **Les quatre** gates
+workstream-aware portaient le trou, dont celui qui bénissait la partition « conforme » et sur lequel
+les trois autres s'appuyaient.
+
+Le vrai livrable est le diagnostic du **pourquoi il repasse** : **6 implémentations du même besoin
+en 3 langages**, une primitive sûre déjà existante mais **déguisée en règle métier**, et un contrôle
+anti-duplication qui **itère sur des chemins écrits en dur** — un script neuf n'est donc dans aucun
+roster. `build-gsd-capabilities-index.sh` a pu ré-inventer le confinement en écrivant dans son
+propre commentaire « c'est le troisième passage, il se ferme ici ». Dette nommée dans `CONCERNS.md`.
+
+**Menaces** : 56 portées par les 12 plans, **0 verdict enregistré** dans les 11 résumés — l'écart
+découvert en écrivant `24-SECURITY.md`. 18 ouvertes, fermées une par une **sur preuve citée**
+(commits vérifiés en `--numstat`, canaris et suites réellement rejoués), jamais sur la foi d'un
+résumé.
+
+### Quatre gardes vertes qui ne faisaient rien
+
+- **Borne de longueur du canal nominal, inerte sur Linux.** `vf_ws_trim` forkait `awk` ; pendant
+  l'appel `GSD_WORKSTREAM` reste exportée, `execve()` en hérite, et le noyau Linux borne **chaque
+  chaîne** d'`argv`/`envp` à `MAX_ARG_STRLEN` (128 KiO) — limite indépendante d'`ARG_MAX`, **absente
+  sur macOS/BSD**. Le fork échouait en `E2BIG`, la valeur revenait vide, et une entrée de 200 000
+  octets passait. Réécrite en bash pur, sans `execve()`.
+- **Assertion anti-régression comparant deux sorties vides.** `R1` fusionnait stdout et stderr, choix
+  fait quand stdout était muet ; refermer le gap de la bannière lui a rendu la parole et elle a lu
+  la ligne de repli documentée comme une fuite. Elle teste désormais le contrat réel, non-permissivité
+  prouvée sur 4 mutants.
+- **Trois faux verts et un faux rouge** dans `check-state-integrity.sh` (handler de rejet fail-open,
+  test de vacuité avant le trim, borne de 80 caractères non-amont).
+- **Un gate de pointeur** qui rendait « conforme » sur `..` et fabriquait un vert sur un nom qu'il
+  avait lui-même réécrit.
+
+Chacune fermée **par mutation, jamais par relecture**.
+
+### Densité, gates et hygiène
+
+- **`effort:` par rôle sur les 31 agents** — pas 25 : l'installeur copie aussi les
+  `plugin/*/AGENT.md`, et la preuve d'exhaustivité par `comm` avait porté sur le mauvais univers.
+  `check-agents.sh` durci de « valide si présent » à « **exige** ».
+- **Marge de profondeur de dispatch écrite** dans `team-kernel.md` : `maxDepth: 5`, 3 consommés.
+- **Gates neufs** : `check-capability-activation.sh` (relie une entrée de doc à l'activation de sa
+  capability — la cause structurelle des trois routes inertes, et le vrai livrable de la zone),
+  `check-machine-paths.sh` (bloquant, trois échappatoires, discriminance prouvée sur les trois
+  organes), `check-workstream-pointer.sh`.
+- **`24-VALIDATION.md`** porte `nyquist_compliant: false` **avec ses motifs** — le geste honnête
+  plutôt qu'un verdict forgé, comme l'avait fait la Phase 23.
+
+### Le fil rouge
+
+**Quatre fois un décompte juste a porté sur le mauvais ensemble** : 25 agents annoncés pour **31**
+réels, 47 suites pour **52**, 8 modules pour **10**, 1 gate troué pour **4**. D'où la règle que la
+phase adopte : *tout chiffre gravé porte sa méthode et se re-dérive au moment de l'écriture.* La
+variante la plus nette est une régression causée puis fermée en cours de mission — le frontmatter de
+`STATE.md` porté de 56 à 97 lignes, dépassant la garde `NR > 60` et **éteignant silencieusement la
+bannière de démarrage** : écrire l'état pour un lecteur humain sans mesurer ce qu'une machine en lit.
+
+**CI** : verte sur le runner Linux, où elle était **rouge depuis 5 runs** pendant que le local macOS
+annonçait tout vert — divergence de plateforme, pas un flake. Modules : 10 bumpés. **52 suites**, 0 échec.
+
 ## [v2.47.1] — 2026-08-04
 
 **L'index des skills cesse de mentir sur sa propre provenance, et l'historique reçoit l'entrée
