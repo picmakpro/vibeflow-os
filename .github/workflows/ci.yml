@@ -540,37 +540,51 @@ jobs:
           # mesure ce que ce bloc doit mesurer : l'INVARIANCE de la sortie, workstream posé ou non.
           echo "== non-régression sur le checkout racine (arbre NON partitionné) =="
 
-          # R1 — gate de démarrage : exit 3, et sortie strictement INVARIANTE selon GSD_WORKSTREAM.
+          # R1 — gate de démarrage : exit 3, stdout strictement INVARIANT selon GSD_WORKSTREAM, et
+          # stderr invariant HORS la ligne de repli DOCUMENTÉE de l'injecteur.
           #
-          # POURQUOI LES DEUX CANAUX SONT FUSIONNÉS ICI, à rebours de la consigne d'isolation du
-          # bloc 1. Le bloc 1 isole stderr parce qu'il cherche une SOUS-CHAÎNE : y accepter les deux
-          # voies laisserait une assertion se satisfaire depuis la mauvaise. Ici l'assertion est une
-          # ÉGALITÉ entre deux exécutions, pas la recherche d'un motif — et c'est la sortie TOTALE
-          # du processus qui doit être invariante, pas la moitié qu'on aurait choisie.
-          #
-          # SANS CETTE FUSION, L'ASSERTION ÉTAIT VIDE, et mesuré comme tel le 2026-08-04 :
-          # `rc_sans=3 rc_avec=3 len_sans=0 len_avec=0`. Le stdout de ce gate est VIDE sur la racine
-          # (soupape D-04 : frontmatter de .planning/STATE.md hors garde anti-gel, exit 3 muet) —
-          # le commentaire ci-dessus identifiait d'ailleurs ce stdout vide, puis en tirait la
-          # conclusion inverse. Comparer deux chaînes vides, c'est écrire `"" != ""` : R1 serait
-          # resté VERT même si la résolution de workstream avait totalement fui hors de son domaine.
-          # stderr, lui, porte 97 octets de diagnostic : la comparaison redevient opposable.
+          # POURQUOI STDOUT ET STDERR SONT DÉSORMAIS DISTINGUÉS, à rebours de la fusion posée le
+          # 2026-08-04. À cette date le stdout de ce gate était VIDE sur la racine (soupape D-04 :
+          # frontmatter de .planning/STATE.md hors garde anti-gel) — comparer deux stdout vides ne
+          # pouvait RIEN opposer, d'où la fusion des deux canaux pour rester discriminant.
+          # MESURÉ DEPUIS (frontmatter raccourci sous la garde) : stdout porte désormais le signal
+          # métier réel (« … orientation gsd-engine », 137 octets), IDENTIQUE avec et sans
+          # GSD_WORKSTREAM — la fusion n'est plus nécessaire pour rester opposable, ET elle était
+          # devenue FAUSSE : elle absorbait aussi la ligne de repli de l'injecteur — LÉGITIME et
+          # VOULUE par le rôle « INJECTEUR DE CONTEXTE » de workstream-policy.sh (« repli sur la
+          # racine PLUS une ligne qui NOMME le workstream ») — et la faisait lire comme une fuite
+          # (243 vs 356 octets, mesuré CI Linux, run 30963492481). Le contrat GSDA-13 porte sur ce
+          # que la session REÇOIT (stdout) ; la ligne de repli sur stderr, elle, est le contrat
+          # INVERSE (l'injecteur DOIT nommer le workstream quand il replie) et ne doit pas faire
+          # rougir celui-ci. `say()` (check-dev-bootstrap.sh) préfixe TOUTES ses lignes de
+          # `[check-dev-bootstrap] ` et les trois variantes de repli finissent par
+          # « lecture sur la racine. » (workstream résolu-dossier-absent, compartiment refusé,
+          # politique introuvable) : le motif ci-dessous couvre les trois, rien d'autre — un AUTRE
+          # écart de stderr (une erreur inattendue, un message qui change de forme) reste attrapé.
+          FALLBACK_RE='^\[check-dev-bootstrap\] .*lecture sur la racine\.$'
+          err_sans_file="$(mktemp)"; err_avec_file="$(mktemp)"
           rc=0
-          root_sans="$(env -u GSD_WORKSTREAM -u VF_WORKSTREAM -u VF_BOOTSTRAP_WORKSTREAM \
-            bash plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh --path . 2>&1)" || rc=$?
+          root_sans_out="$(env -u GSD_WORKSTREAM -u VF_WORKSTREAM -u VF_BOOTSTRAP_WORKSTREAM \
+            bash plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh --path . 2>"$err_sans_file")" || rc=$?
           rc2=0
-          root_avec="$(env -u VF_WORKSTREAM -u VF_BOOTSTRAP_WORKSTREAM GSD_WORKSTREAM=dev \
-            bash plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh --path . 2>&1)" || rc2=$?
-          echo "== R1 check-dev-bootstrap racine : rc(sans)=$rc rc(avec)=$rc2, sorties de ${#root_sans} et ${#root_avec} octet(s) =="
+          root_avec_out="$(env -u VF_WORKSTREAM -u VF_BOOTSTRAP_WORKSTREAM GSD_WORKSTREAM=dev \
+            bash plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh --path . 2>"$err_avec_file")" || rc2=$?
+          root_sans_err="$(grep -Ev "$FALLBACK_RE" "$err_sans_file" || true)"
+          root_avec_err="$(grep -Ev "$FALLBACK_RE" "$err_avec_file" || true)"
+          rm -f "$err_sans_file" "$err_avec_file"
+          echo "== R1 check-dev-bootstrap racine : rc(sans)=$rc rc(avec)=$rc2, stdout ${#root_sans_out}/${#root_avec_out} octet(s), stderr hors-repli ${#root_sans_err}/${#root_avec_err} octet(s) =="
           [ "$rc" -eq 3 ] || note "R1 check-dev-bootstrap racine sans workstream : rc=$rc, attendu 3"
           [ "$rc2" -eq 3 ] || note "R1 check-dev-bootstrap racine avec workstream : rc=$rc2, attendu 3 (un arbre non partitionné ne doit pas changer de verdict)"
-          # PLANCHER D'OPPOSABILITÉ, avant le verdict : deux sorties vides ne peuvent RIEN opposer.
+          # PLANCHER D'OPPOSABILITÉ, avant le verdict : deux stdout vides ne peuvent RIEN opposer.
           # Le dire est un échec, jamais un succès — patron `NON OPPOSABLE` de
           # test-check-capability-activation.sh, qui refuse le même repli sur `cmp -s`.
-          if [ -z "$root_sans" ] && [ -z "$root_avec" ]; then
-            note "R1 check-dev-bootstrap racine : les DEUX sorties sont vides — l'assertion d'invariance est NON OPPOSABLE (elle comparerait deux chaînes vides et serait verte quoi qu'il arrive au sujet)"
-          elif [ "$root_sans" != "$root_avec" ]; then
-            note "R1 check-dev-bootstrap racine : la sortie CHANGE selon GSD_WORKSTREAM sur un arbre NON partitionné — la résolution de workstream a fui hors de son domaine"
+          if [ -z "$root_sans_out" ] && [ -z "$root_avec_out" ]; then
+            note "R1 check-dev-bootstrap racine : les DEUX stdout sont vides — l'assertion d'invariance est NON OPPOSABLE (elle comparerait deux chaînes vides et serait verte quoi qu'il arrive au sujet)"
+          elif [ "$root_sans_out" != "$root_avec_out" ]; then
+            note "R1 check-dev-bootstrap racine : le stdout CHANGE selon GSD_WORKSTREAM sur un arbre NON partitionné — la résolution de workstream a fui hors de son domaine"
+          fi
+          if [ "$root_sans_err" != "$root_avec_err" ]; then
+            note "R1 check-dev-bootstrap racine : le stderr change AU-DELÀ de la ligne de repli documentée de l'injecteur — écart non attendu"
           fi
 
           # R2 — gate de pointeur : exit 3 ET stdout STRICTEMENT VIDE (le dépôt n'est pas
