@@ -164,6 +164,76 @@
         ".planning/REQUIREMENTS.md"
       ],
       "status": "blocked"
+    },
+    {
+      "id": "fix-rce",
+      "step": "RETRAIT du candidat cwd-relatif dag.sh:124 + docstring + mission-flow.md + tests M1/M2 + test de non-regression du vecteur",
+      "stage": "execution",
+      "deps": [],
+      "scope": [
+        "plugin/conductor/scripts/dag.sh",
+        "plugin/conductor/scripts/tests/test-dag.sh",
+        "plugin/dev-orchestrator/references/mission-flow.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "methode-adr",
+      "step": "Fait de methode : un threat register peut passer au vert sur un vecteur voisin jamais examine — ADR + renfort CONCERNS",
+      "stage": "doctrine",
+      "deps": [],
+      "scope": [
+        "docs/ADR.md",
+        ".planning/codebase/CONCERNS.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "git-discipline",
+      "step": "Graver la discipline de commit en worktree partage — les DEUX moities (aucun git add, jamais de commit nu)",
+      "stage": "doctrine",
+      "deps": [],
+      "scope": [
+        "plugin/conductor/references/team-kernel.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-reprise",
+      "step": "Revue PLEINE du diff de reprise (dag.sh = zone de risque des invariants)",
+      "stage": "revue",
+      "deps": [
+        "fix-rce",
+        "methode-adr",
+        "git-discipline"
+      ],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "audit-reprise",
+      "step": "Audit securite — fermeture du vecteur RCE verifiee, pas seulement annoncee",
+      "stage": "audit",
+      "deps": [
+        "fix-rce",
+        "methode-adr",
+        "git-discipline"
+      ],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "arm-agents",
+      "step": "Armement des 13 agents (isolation: worktree) — DERNIER dispatch de worker, ratification effective",
+      "stage": "execution",
+      "deps": [
+        "revue-reprise",
+        "audit-reprise"
+      ],
+      "scope": [
+        "plugin/*/agents/*.md"
+      ],
+      "status": "blocked"
     }
   ]
 }
