@@ -1,0 +1,23 @@
+{
+  "waves": [
+    {
+      "id": "toy-wave-1",
+      "plans": [
+        {
+          "id": "toy-a",
+          "brief": "Écrire un fichier daté (date -u +%Y-%m-%dT%H:%M:%SZ) dans .planning/phases/VFDO-27-.../27-mesure/scratch/toy-a.txt, sans lire ni modifier aucun autre chemin.",
+          "files_modified": [
+            ".planning/phases/VFDO-27-parall-lisation-d-ex-cution-granulaire-simple-sans-collision/27-mesure/scratch/toy-a.txt"
+          ]
+        },
+        {
+          "id": "toy-b",
+          "brief": "Écrire un fichier daté (date -u +%Y-%m-%dT%H:%M:%SZ) dans .planning/phases/VFDO-27-.../27-mesure/scratch/toy-b.txt, sans lire ni modifier aucun autre chemin.",
+          "files_modified": [
+            ".planning/phases/VFDO-27-parall-lisation-d-ex-cution-granulaire-simple-sans-collision/27-mesure/scratch/toy-b.txt"
+          ]
+        }
+      ]
+    }
+  ]
+}
