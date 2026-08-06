@@ -208,7 +208,7 @@
         "git-discipline"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "audit-reprise",
@@ -220,7 +220,7 @@
         "git-discipline"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "arm-agents",
@@ -233,7 +233,32 @@
       "scope": [
         "plugin/*/agents/*.md"
       ],
-      "status": "blocked"
+      "status": "ready"
+    },
+    {
+      "id": "fix-rce-propagation",
+      "step": "RETRAIT de la variante toplevel dans mission-contracts.md + balayage repo-wide du motif",
+      "stage": "execution",
+      "deps": [],
+      "scope": [
+        "plugin/dev-orchestrator/references/mission-contracts.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "corrections-juges",
+      "step": "Fusion des findings revue+audit — etats perimes, rename dans la doctrine de commit, T-27-01-04 borne selon ADR-070, cosmetique",
+      "stage": "execution",
+      "deps": [],
+      "scope": [
+        "docs/ADR.md",
+        ".planning/codebase/CONCERNS.md",
+        "plugin/conductor/references/team-kernel.md",
+        "plugin/conductor/scripts/tests/test-dag.sh",
+        ".planning/phases/VFDO-27-*/27-01-PLAN.md",
+        "plugin/dev-orchestrator/references/mission-contracts.md"
+      ],
+      "status": "done"
     }
   ]
 }
