@@ -1989,7 +1989,7 @@ d'exécution. À inscrire au ledger `REQUIREMENTS.md` par le manager de mission,
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 27-05-PLAN.md — Spike `claude_orchestration` : SDK établi par installation réelle, échelle de 7 gates, run Workflow réel, sous-expérience Décision A, décision écrite (activation ou refus motivé) — livrable 4, **checkpoint bloquant** (vague 3)
+- [x] 27-05-PLAN.md — Spike `claude_orchestration` : SDK établi par installation réelle, échelle de 7 gates, run Workflow réel, sous-expérience Décision A, décision écrite (activation ou refus motivé) — livrable 4, **checkpoint bloquant** (vague 3)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
