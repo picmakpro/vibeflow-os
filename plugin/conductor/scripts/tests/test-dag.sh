@@ -417,7 +417,7 @@ out31=$(PATH="$FAKE_BIN31:$PATH" GSD_TOOLS="" "$SCRIPT" ready --file="$F31"); rc
 assert_exit "T31.1 — exit 0 malgre l'echec de la CLI resolue"                  "$rc31" 0
 assert      "T31.2 — ready reste intact"                                       "$out31" '"ready": ['$'\n''    "m1",'$'\n''    "m2"'
 assert      "T31.3 — count reste intact"                                       "$out31" '"count": 2'
-assert      "T31.4 — stages degrade a null (CLI resolue MAIS returncode != 0, jamais []" "$out31" '"stages": null'
+assert      "T31.4 — stages degrade a null (CLI resolue MAIS returncode != 0, jamais [])" "$out31" '"stages": null'
 
 echo "=== T32 — node ABSENT mais gsd-tools (.cjs) RESOLU et present : stages:null via l'absence de node specifiquement (M2, revue) ==="
 # Cas distinct de T29 (rien ne resout) et de T31 (CLI resolue qui echoue) : ici la resolution
