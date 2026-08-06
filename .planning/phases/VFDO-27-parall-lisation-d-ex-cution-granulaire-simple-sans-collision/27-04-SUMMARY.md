@@ -165,6 +165,17 @@ None - aucune configuration de service externe requise.
   (plutôt que l'étalon jouet) comme référence secondaire, il doit filtrer explicitement la pause
   d'arbitrage humain identifiée ici (23:59:31 → 03:47:44) — sans quoi l'écart de vague se
   confondrait avec un temps d'attente humain plutôt qu'avec un temps de dispatch.
+- **Dérive de numérotation constatée, non corrigée par ce plan.** `27-04-PLAN.md` déclare
+  `requirements: [PAEX-07]` en frontmatter, mais `.planning/REQUIREMENTS.md` porte déjà `PAEX-07`
+  **coché**, rattaché au livrable de `27-03` (`.worktreeinclude`/`27-ISOLATION-PORTEE.md`) — sans
+  rapport avec la baseline de mesure produite ici. Le contenu de ce plan correspond, sur pièce, à
+  **`PAEX-10`** (« le gain réel est mesuré — baseline d'horloge avant, mesure après, méthode
+  écrite »), actuellement `[ ]` dans le ledger. **Ce plan ne coche PAS `PAEX-10`** : ce plan ne livre
+  que la moitié « avant » (Bloc 1 + Bloc 2) — la moitié « mesure après » (Bloc 3) reste vide et
+  réservée à `27-06`, cocher `PAEX-10` maintenant serait prématuré. Aucune modification de
+  `.planning/REQUIREMENTS.md` faite par ce plan ; la réconciliation de la numérotation `PAEX-07`
+  déclaré vs `PAEX-10` réel est remontée ici pour arbitrage (probablement lors de la clôture de
+  `27-06`, qui pourra cocher `PAEX-10` légitimement une fois le Bloc 3 rempli).
 
 ## Self-Check: PASSED
 
