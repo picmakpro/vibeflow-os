@@ -166,6 +166,15 @@ None - aucune configuration de service externe requise.
   d'arbitrage humain identifiée ici (23:59:31 → 03:47:44) — sans quoi l'écart de vague se
   confondrait avec un temps d'attente humain plutôt qu'avec un temps de dispatch.
 
+## Self-Check: PASSED
+
+- FOUND: `27-mesure/waves-toy.json`
+- FOUND: `27-MESURE-GAIN.md`
+- FOUND: `27-04-SUMMARY.md`
+- FOUND: commit `08ca108`
+- FOUND: commit `334a339`
+- FOUND: commit `0a465bf`
+
 ---
 *Phase: 27-parall-lisation-d-ex-cution-granulaire-simple-sans-collision*
 *Completed: 2026-08-06*
