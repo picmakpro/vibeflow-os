@@ -35,6 +35,11 @@ l'intention et invoque les briques directement — plus de couche de verbes-syno
 - [x] Mémoire vivante + swarm (ADR-052/053, shippé v2.28.0)
 - [~] Couche d'abstraction verbes `/vf-*` — livrée en v2.31.0 puis **délibérément supprimée**
       en v2.33.0 (bascule agentique) : l'abstraction est portée par l'agent, pas par des verbes
+- [x] Parallélisation d'exécution granulaire sans collision (Phase 27, 2026-08-06) — PAEX-01→11
+      soldées : champ `stages` de `dag.sh ready`, isolation worktree cadrée, RCE fermée ;
+      `claude_orchestration` instruite par spike réel et **refusée motivée** (run divergent du
+      chemin inline, déclencheur de reprise écrit) — le parallélisme effectif reste la frontière
+      `ready` inter-nœuds des managers
 
 ### Active
 
@@ -89,6 +94,6 @@ l'intention et invoque les briques directement — plus de couche de verbes-syno
 | D7 — Team-kernel transverse hébergé par `conductor` | Le pattern manager→workers→juges sert tous les métiers | ✓ Good (v2.34.0, ADR-053/057) |
 
 ---
-*Last updated: 2026-07-26 — charte rouverte : périmètre 17 modules, D2/D6 actées renversées
+*Last updated: 2026-08-06 — Phase 27 close (parallélisation d'exécution, refus motivé de claude_orchestration)
 (bascule agentique), requirements v1 validés, actifs réalignés sur Phase 13 + gsd-migration.
 Précédent : 2026-06-04 (scaffolding initial mono-module).*
