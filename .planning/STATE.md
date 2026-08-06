@@ -533,6 +533,37 @@ Progress: [██████░░░░] 59%
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
 
+- **2026-08-06 — Phase 27, reprise sur arbitrage : les trois gels sont levés, 9 exigences sur 11
+  tenues, seul le spike reste à faire en présence de Samuel.** (même mission et même branche
+  `feat/phase-27-parallelisation-execution`, PR #35 toujours ouverte et non mergée).
+  **Arbitrages de Samuel** : (1) `dag.sh:124` → **RETRAIT** du candidat cwd-relatif, sans ancrage ni
+  repli déguisé ; (2) `worktree.baseRef: "head"` → **RATIFIÉ**, prenant effet une fois le fix livré
+  et les tests verts ; (3) spike `claude_orchestration` → **ne pas lancer**, présence humaine voulue.
+  **Livré** : le vecteur RCE est fermé **dans les deux sites** — `dag.sh` (`4a532ec`) et, après
+  balayage repo-wide, `mission-contracts.md` (`08ad030`), où la variante `toplevel` portait le même
+  défaut. Fermeture **vérifiée en exécution** (PoC rejoué, plus jamais exécuté) et garde-fou `T33`
+  prouvé par **réintroduction réelle du comportement**. Suite : **99 PASS / 0 FAIL** (87 avant).
+  **13 agents écrivains armés** en `isolation: worktree`, **0 manager**, lint re-passé par
+  répertoire de module (6 répertoires, **25 fichiers réellement lintés**).
+  **Trois découvertes de méthode, toutes du même motif — un vert obtenu pour la mauvaise raison** :
+  (a) `check-agents.sh` **nu** sort `exit 0` sur « aucun agent dans `.claude/agents` » — il ne scanne
+  qu'un répertoire sans récursion, donc valider l'armement avec lui aurait confirmé 13 frontmatters
+  en ne regardant **rien** ; (b) un test de mutation **rougissait pour la mauvaise raison** (le
+  fixture piège mourait faute de `bash`/`cat` sur le `PATH` restreint et retombait par accident sur
+  la valeur attendue) — d'où la règle : exiger la **trace** du rouge, pas le verdict ; (c)
+  `git ls-files 'plugin/*/agents/*.md'` rend **49** fichiers là où l'ensemble réel en compte **25**,
+  le `*` d'un pathspec git traversant les `/`. **ADR-070** grave la règle générale : une disposition
+  `accept` **borne le vecteur qu'elle couvre**, jamais le risque en bloc — c'est ce raisonnement
+  non borné (`T-27-01-04`, juste pour `PATH`, faux pour le CWD) qui avait laissé passer la RCE.
+  **Doctrine posée** : `team-kernel.md` porte enfin la discipline de commit sous index partagé, avec
+  ses **deux moitiés** (jamais `git add` même ciblé, jamais `commit` nu) — elle n'était gravée
+  **nulle part** dans la doctrine distribuée, ce qui explique l'écrasement inter-workers du 2026-08-05
+  bien mieux qu'une négligence. `mission-contracts.md` §Isolation de branche avait d'ailleurs nommé
+  ce trou et l'avait laissé « non tranché ici » ; il est tranché.
+  **Reste** : `PAEX-09` (spike) et `PAEX-10` (mesure du gain), tous deux gelés par choix de Samuel.
+  `27-04` (baseline d'horloge) est débloqué mais **non capturé** — le `safe_resume_gate` du moteur
+  l'avait bloqué tant que `27-03-SUMMARY.md` manquait ; ce SUMMARY est désormais écrit (`183bff7`).
+
 - **2026-08-05 — Phase 27 (parallélisation d'exécution) : vague 1 livrée, phase GELÉE sur
   arbitrage humain** (mission `.planning/missions/2026-08-05-phase-27-parallelisation-execution.md`,
   branche `feat/phase-27-parallelisation-execution`, non mergée). **Livré** : livrable 1 — la
