@@ -2,61 +2,18 @@
 gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
-current_phase: 26
-current_phase_name: jalon gsd-migration — dernière livraison : Phase 23 (couplage explicite au moteur GSD), publiée en v2.47.0 ; prochaine phase à traiter : 24
-status: complete
+current_phase: 27
+current_phase_name: parall-lisation-d-ex-cution-granulaire-simple-sans-collision
+status: executing
 stopped_at: "Phase 23 CLOSE et PUBLIÉE — 8/8 plans exécutés et revus, PR #30 mergée, release racine v2.47.0 taggée et publiée (gate check-release-tag --remote vert). 9 exigences GSDC sur 10 soldées ; GSDC-08 en [~] sur l'écart D-22 (gsd-debugger présent dans vf-coder.md contre une décision « aucune exception » ET exigé par le gate T19 — les deux se tranchent ensemble, arbitrage humain). Deux RCE fermées. Suite du module 102 -> 161 cas, 47 suites vertes. Livré hors phase au passage : correctif de la course de récupération du lock de driver (PR #31, conductor v1.19.1) — jusqu'à 5 acquéreurs simultanés mesurés, lock devenu lien symbolique remplacé par rename(2). Reste ouvert et NON traité : la fuite d'info par symlink (slurp sans O_NOFOLLOW, sur les deux scripts, absente du threat model), la promotion d'A-15 en ADR, et nyquist_compliant=false sur 23-VALIDATION.md (rempli a posteriori, la continuité d'échantillonnage n'a pas pu être mesurée). Prochaine phase : 24."
-last_updated: "2026-08-04T00:00:00.000Z"
-last_activity: 2026-08-04 (quick 260804-ki4 — cache du bandeau update invalidé puis régénéré en queue de /vf-update, conductor v1.19.2)
-# ▶ Phase 24 (activation du moteur GSD) : 12/12 plans livrés, revus, audités ; vérification
-# PASS PARTIEL (4 gaps) donc /gsd-ship reste bloqué. Récit complet, chiffres et arbitrages :
-# .planning/missions/2026-08-04-phase-24-activation-moteur-gsd.md — TENU COURT ICI À DESSEIN :
-# check-dev-bootstrap.sh ne lit que les 60 premières lignes (garde NR>60), un frontmatter plus
-
-# ⚠ Phase 21 close par sa gouvernance (plan 21-05), même patron que 20-07/c01f813 : 5/5 plans
-# livrés, vérification PASS PARTIEL 7/8 comblée (CI remise au vert — compteur de suites 44→45 —,
-# dev-orchestrator bumpé v2.9.0, planning-core v2.5.3, ROADMAP §Phase 21 recalé, 4 warnings W1-W4
-# traités : check-state-integrity.sh câblé au job gates de la CI, ADR-063 23→25 cas, team-kernel.md
-# porte le recoupement #1995/#2608, inject-mcp-tools.sh nomme --force sur le rc=3 mode fichier
-# unique). Release racine v2.45.0 préparée en commits locaux (triade + 2 historiques README +
-# CHANGELOG racine) — AUCUN tag, AUCUN merge, AUCUN push : réservés à Samuel. Prochain geste
-# humain : merger la PR, puis `git tag -a v2.45.0` et `gh release create`.
+last_updated: "2026-08-06T12:05:38.975Z"
+last_activity: 2026-08-06
+last_activity_desc: Phase 27 execution started
 progress:
   total_phases: 26
-  completed_phases: 23
-  total_plans: 79
-  completed_plans: 79
-# ⚠ Compteurs curés À LA MAIN — PAS régénérés par `gsd-tools state` (ADR-063, cf.
-# plugin/dev-orchestrator/references/mission-contracts.md §STATE.md : toute invocation force
-# resync:true non désactivable et reproduirait la régression corrigée ici). Toute future mise à
-# jour de ce bloc = édition manuelle, gardée par plugin/conductor/scripts/check-state-integrity.sh
-# (compteurs non régressés au sein du même jalon `gsd-migration`).
-# ⚠ Recalé le 2026-07-31 à la fusion de `main` dans la branche Phase 21 : la PR #23 (Phase 22)
-# ayant été mergée AVANT la #22, ces compteurs cumulent les deux phases — +1 phase complète
-# (22) et +3 plans livrés (22-01..03), et total_phases passe à 25 (phases 23/24/25 inscrites au
-# ROADMAP par la Phase 22, hors périmètre, en attente d'arbitrage).
-# ⚠ Recompté le 2026-08-01 depuis le disque ET la checklist du ROADMAP, une fois celle-ci posée
-# (elle n'avait jamais existé : le moteur voyait 0 phase terminée). 21 phases complètes sur 25
-# — les 4 restantes (18, 23, 24, 25) sont inscrites sans aucun plan. 62 PLAN.md sur disque, tous
-# rattachés à une phase complète, d'où completed_plans = total_plans.
-#
-# Baseline héritée telle quelle (12/54/39), recalée le 2026-07-31 lors de la clôture 20-07 après une
-# régression constatée (completed_phases 11→10, total_plans 53→49, completed_plans 37→29,
-# current_phase resté à 19). Le plan 21-04 n'a PAS ré-audité l'exacte composition de ces 12
-# phases — seul le delta depuis cette baseline était vérifié : total_plans et completed_plans
-# +1/+1 (21-04 lui-même). Ce plan (21-05) ferme la Phase 21 par vérification goal-backward
-# (21-VERIFICATION.md, PASS PARTIEL 7/8, comblé) : completed_phases +1 (12→13), total_plans et
-# completed_plans +1/+1 (21-05 lui-même, PLAN+SUMMARY) — jamais un delta supposé, chaque
-# incrément correspond à un artefact livré et vérifiable sur disque.
-#
-# Point ouvert, NON tranché par ce plan (remonté à Samuel, ADR-063 §Décision) : une lecture
-# ROADMAP-trust stricte (« une phase shippée compte, qu'elle ait ou non un SUMMARY.md par plan » —
-# le repli que `roadmap analyze` amont applique et que `buildStateFrontmatter` n'applique pas,
-# Cause A) classerait significativement PLUS de phases complètes que 12 (`.planning/ROADMAP.md`
-# marque les Phases 1-17, 19 et 20 « Complete »/shippées). Trancher entre backfiller les
-# `SUMMARY.md` manquants (11/12/13/14) ou adopter durablement une lecture ROADMAP-trust locale
-# reste une décision produit, pas une extraction mécanique — non faite ici par choix, pas par
-# oubli.
+  completed_phases: 14
+  total_plans: 92
+  completed_plans: 68
 ---
 
 # Project State
@@ -66,7 +23,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26 — charte rouverte : 17 modules, D2/D6 renversées)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Phase 19 **terminée, vérifiée et SHIPPÉE `v2.43.0`** (2026-07-28) — la migration
+**Current focus:** Phase 27 — parall-lisation-d-ex-cution-granulaire-simple-sans-collision
 `get-shit-done-cc` → `@opengsd/gsd-core` livrée en v2.39.0 atteint enfin les **postes déjà équipés** :
 `/vf-update` dit l'état du moteur avant tout stop et propose la bascule sous confirmation ADR-031.
 Modules `dev-orchestrator` v2.7.0 + `conductor` v1.16.0. Verdict `19-VERIFICATION.md` : **PASS 6/7**.
@@ -98,7 +55,7 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 ## Current Position
 
-Phase: 21 **complète** — Alignement du moteur GSD sur `@opengsd/gsd-core` 1.9.0. Rituel allégé
+Phase: 27 (parall-lisation-d-ex-cution-granulaire-simple-sans-collision) — EXECUTING
 (arbitrage Samuel, `.planning/missions/2026-07-31-delta-gsd-core-1.9.0.md`) : pas de
 `gsd-discuss-phase` séparé, périmètre exhaustif directement dérivé du digest de mission. 5 plans :
 21-01 — défaut MCP actif corrigé (`inject-mcp-tools.sh` découvre le scope global MCP,
@@ -119,8 +76,8 @@ tranchés), les 4 warnings de `21-VERIFICATION.md` traités (`check-state-integr
 job `gates` de la CI, ADR-063 25 cas, `team-kernel.md` porte le recoupement #1995/#2608,
 `inject-mcp-tools.sh` nomme `--force` sur le rc=3 mode fichier unique), release racine v2.45.0
 préparée en commits locaux (jamais taguée).
-Status: Complète (5/5 plans exécutés, gates de sortie verts, release préparée non taguée).
-Last activity: 2026-07-31 (plan 21-05, clôture de gouvernance).
+Status: Executing Phase 27
+Last activity: 2026-08-06 — Phase 27 execution started
 
 **Anomalie d'agrégation instruite (ADR-063).** Le commentaire YAML du frontmatter ci-dessus daté du
 2026-07-31 signalait une régression silencieuse de `completed_phases`/`total_plans`/
@@ -626,6 +583,7 @@ Recent decisions affecting current work:
     indépendants). Reliquat soldé dans la foulée : 73 libellés de liens sur 26 pages EN affichaient
     encore des noms de fichiers **français** — les `href` avaient suivi le renommage, pas les
     libellés, ce qui vidait de son sens le renommage lui-même.
+
   - **Parité de contenu FR/EN — alignement PAR LE HAUT** : les paragraphes présents côté EN
     uniquement sont portés en FR, rien n'est coupé côté anglais. Relevé **re-dérivé du contenu réel**
     (les chemins de la revue étaient périmés depuis O-1) : **31 pages sur 44**, contre 21 estimées —

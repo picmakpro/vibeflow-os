@@ -1979,13 +1979,13 @@ d'exécution. À inscrire au ledger `REQUIREMENTS.md` par le manager de mission,
 **Plans**: 6 plans en 4 vagues
 **Wave 1**
 
-- [ ] 27-01-PLAN.md — **TRACER** : `dag.sh ready` calcule la disjonction de périmètres en câblant `partitionStages()` amont (jamais réimplémentée, ADR-069), champ `stages` additif, repli prouvé par test, doctrine et limites dans `mission-flow.md` — livrable 3 (vague 1)
-- [ ] 27-02-PLAN.md — Doctrine corrigée : `team-kernel.md` dit « éteint par défaut » et nomme le chemin qui rallume ; le callout de comptages divergents du ROADMAP laisse place au résultat re-dérivé — livrables 1 + lift ROADMAP (vague 1)
-- [ ] 27-03-PLAN.md — `isolation: worktree` sur les 13 écrivains non-managers, `.worktreeinclude` posé, statut `.gitignore` tranché sur pièce, portée écrite (groupe B, `worktree.baseRef`, 4 hypothèses + sondes) — livrable 2 (vague 1)
+- [x] 27-01-PLAN.md — **TRACER** : `dag.sh ready` calcule la disjonction de périmètres en câblant `partitionStages()` amont (jamais réimplémentée, ADR-069), champ `stages` additif, repli prouvé par test, doctrine et limites dans `mission-flow.md` — livrable 3 (vague 1)
+- [x] 27-02-PLAN.md — Doctrine corrigée : `team-kernel.md` dit « éteint par défaut » et nomme le chemin qui rallume ; le callout de comptages divergents du ROADMAP laisse place au résultat re-dérivé — livrables 1 + lift ROADMAP (vague 1)
+- [x] 27-03-PLAN.md — `isolation: worktree` sur les 13 écrivains non-managers, `.worktreeinclude` posé, statut `.gitignore` tranché sur pièce, portée écrite (groupe B, `worktree.baseRef`, 4 hypothèses + sondes) — livrable 2 (vague 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 27-04-PLAN.md — Baseline d'horloge capturée **avant** toute activation, corpus étalon versionné et prouvé parallélisable, méthode écrite — livrable 5, moitié « avant » (vague 2)
+- [x] 27-04-PLAN.md — Baseline d'horloge capturée **avant** toute activation, corpus étalon versionné et prouvé parallélisable, méthode écrite — livrable 5, moitié « avant » (vague 2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
