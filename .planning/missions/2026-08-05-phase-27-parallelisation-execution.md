@@ -1,9 +1,12 @@
 # Mission — Phase 27 : parallélisation d'exécution (granulaire, simple, sans collision d'écriture)
 
-> **Statut : VAGUE 1 LIVRÉE, PHASE GELÉE sur arbitrage humain.**
-> Branche `feat/phase-27-parallelisation-execution` — **non mergée**, PR laissée ouverte (ADR-059).
-> Manager : `vf-dev-manager`. Verrou de driver : `vf-dev-manager-phase27`.
-> Plan de bataille : `.planning/missions/dag-phase27.json` (13 nœuds).
+> **Statut au 2026-08-06 : LES TROIS GELS SONT LEVÉS. 9 exigences sur 11 tenues.**
+> Seuls restent le **spike `claude_orchestration`** (`PAEX-09`) et la **mesure du gain** (`PAEX-10`),
+> gelés **par choix de Samuel**, qui veut être présent — pas par un blocage technique.
+> Branche `feat/phase-27-parallelisation-execution` — **non mergée**, PR #35 laissée ouverte (ADR-059).
+> Manager : `vf-dev-manager`. Plan de bataille : `.planning/missions/dag-phase27.json`.
+> **Le détail de la reprise est en §9** ; les sections 1 à 8 décrivent l'état du 2026-08-05 et sont
+> conservées telles quelles — elles racontent comment les gels ont été posés, ce qui reste utile.
 
 ---
 
@@ -177,3 +180,72 @@ la revue et l'audit ont vécu comme nœuds de plan de bataille dispatchés en di
 - **Le nœud `docs` n'a pas tourné** — il dépend des nœuds gelés. `STATE.md` et `REQUIREMENTS.md` ont
   été tenus **à la main** par le manager, `gsd-tools state.*` étant écarté (précédent documenté
   d'écrasement destructif des compteurs `progress`).
+
+---
+
+## 9. Reprise du 2026-08-06 — les trois gels levés
+
+### 9.1 Les arbitrages de Samuel
+
+1. **`dag.sh:124` → RETRAIT** du candidat cwd-relatif. Pas d'ancrage, pas de repli déguisé.
+2. **`worktree.baseRef: "head"` → RATIFIÉ**, prenant effet une fois le fix livré et les tests verts.
+3. **Spike `claude_orchestration` → ne pas lancer**, ni « préparer un peu ». Présence humaine voulue.
+
+### 9.2 Ce qui est livré
+
+- **Le vecteur RCE est fermé DANS LES DEUX SITES.** `dag.sh` (`4a532ec`), puis — grâce au balayage
+  exigé au mandat — `mission-contracts.md` (`08ad030`), où la variante `toplevel` portait le même
+  défaut. **`git rev-parse --show-toplevel` n'est pas une frontière de confiance** : un dépôt hostile
+  a sa propre racine, et le repli `|| pwd` ramenait littéralement au CWD qu'on venait d'interdire.
+  Fermer le 5ᵉ passage sans balayer les voisins aurait garanti un 6ᵉ.
+- **Fermeture vérifiée EN EXÉCUTION**, pas annoncée : PoC rejoué dans deux configurations, le fichier
+  planté n'est plus jamais exécuté. Et `T33` rougit sur la **réintroduction réelle du comportement**,
+  pas sur une chaîne de source qu'un renommage contournerait.
+- **Les deux tests différés sont écrits** (`T31`, `T32`) et `T29` neutralise enfin
+  `HOME`/`CLAUDE_CONFIG_DIR`. **99 PASS / 0 FAIL** (87 avant). Le report était justifié : les écrire
+  plus tôt aurait gravé comme comportement attendu la branche qui a été retirée.
+- **13 agents écrivains armés** en `isolation: worktree`, **0 manager**. Lint re-passé **par
+  répertoire de module** : 6 répertoires, **25 fichiers réellement lintés**.
+- **ADR-070** grave la cause racine. **`team-kernel.md`** grave la discipline de commit.
+
+### 9.3 Trois verts obtenus pour la mauvaise raison — le fil rouge de cette reprise
+
+1. **`check-agents.sh` nu** sort `exit 0` sur « aucun agent dans `.claude/agents` » : il ne scanne
+   qu'un répertoire, sans récursion. Valider l'armement avec lui aurait confirmé 13 frontmatters
+   modifiés **en ne regardant rien** — ADR-070 retourné contre son propre auteur.
+2. **Un test de mutation rougissait pour la mauvaise raison** : le fixture piège mourait faute de
+   `bash` puis de `cat` sur le `PATH` restreint, et retombait **par accident** sur la valeur
+   attendue, masquant la mutation. Deux faux positifs avant un vrai rouge. Règle qui en découle :
+   exiger la **trace** du rouge (assertion, attendu, obtenu), jamais le verdict.
+3. **`git ls-files 'plugin/*/agents/*.md'` rend 49 fichiers** là où l'ensemble réel en compte **25** :
+   le `*` d'un pathspec git traverse les `/`. Deux décomptes justes sur des ensembles différents —
+   sur la mesure même censée valider un gate.
+
+### 9.4 Ce que la doctrine ignorait d'elle-même
+
+La discipline de commit **n'était gravée nulle part** dans la doctrine distribuée (`git grep` sur
+tout `plugin/**` : rien). Elle vivait dans la mémoire du manager et dans les mandats rédigés à la
+main — **aucun worker ne pouvait la lire**, ce qui explique l'écrasement du 2026-08-05 bien mieux
+qu'une négligence individuelle. Mieux : `mission-contracts.md` §Isolation de branche **avait nommé
+ce trou** et l'avait laissé « **non tranché ici** ». L'incident n'est donc pas survenu dans un angle
+mort, mais dans un manque **documenté** — un « non tranché » sans échéance finit tranché par un
+incident.
+
+### 9.5 Deux systèmes de suivi, deux vérités
+
+Le `safe_resume_gate` du moteur a bloqué `27-04` parce que `27-03-SUMMARY.md` manquait, alors que
+**mon DAG de mission marquait `exec-27-03: done`**. Les deux avaient raison à leur échelle : les
+écritures autonomes du plan étaient finies, sa tâche 4 ne l'était pas. J'ai refusé les trois recours
+du moteur (« clôturer manuellement », « ré-exécuter », « marquer et sauter ») — tous traitent le
+manque comme un défaut de comptabilité. Il n'en était pas un : **le SUMMARY manquait parce que le
+travail manquait**. Exécuter l'armement a refermé le gate par le haut (`183bff7`).
+
+### 9.6 Ce qui reste
+
+- **`PAEX-09`** — spike `claude_orchestration`. `GSD_AGENT_SDK_VERSION` doit être **persistée** au
+  runtime, pas passée en drapeau : sinon un PASS laisse `enabled: true` pendant que tout dispatch
+  réel retombe sur `inline` au gate n° 5.
+- **`PAEX-10`** — mesure du gain. `27-04` (baseline) est **débloqué mais non capturé**.
+- **Non-finding conservé** : `scripts/hooks/pre-push` porte la même forme, mais l'exposition est
+  **subsumée** (si `core.hooksPath` pointe dans le dépôt, le hook est lui-même du contenu versionné)
+  et le fichier est sur `main` bien avant cette phase.
