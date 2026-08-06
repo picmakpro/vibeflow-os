@@ -311,7 +311,11 @@ dans le message d'erreur ci-dessus et partout ailleurs dans ce document.
 Écarts assumés vs le snippet officiel amont (D5) : (a) les runtimes non-Claude du snippet sont
 retirés (VibeFlow est un plugin Claude Code) ; (b) `command -v gsd-tools` est placé après les
 chemins fichiers (le payload installé prime sur un bin npm global potentiellement d'une autre
-version) ; (c) ce document n'écrit jamais dans `CLAUDE_ENV_FILE` ; (d) **aucun candidat dérivé
+version) — **divergence connue** : `dag.sh` (`resolve_gsd_tools_cmd()`, ~l. 129-138) place `PATH`
+*avant* `CLAUDE_CONFIG_DIR`, ordre inverse de cette cascade-ci ; sur un poste où plusieurs versions
+sont installées, le manager (shell) et `dag.sh` (Python) peuvent donc résoudre deux binaires
+différents pour « la même » cascade — aucun des deux ordres n'est corrigé ici, seule la divergence
+est actée ; (c) ce document n'écrit jamais dans `CLAUDE_ENV_FILE` ; (d) **aucun candidat dérivé
 d'une racine de dépôt** (`git rev-parse --show-toplevel`, `pwd`, ou toute variable qui en hérite,
 p. ex. l'ancien `_GSD_ROOT`) — un tel candidat résout un chemin **tracké dans l'arbre de travail
 courant**, donc posable par quiconque peut y écrire un fichier (checkout d'une branche ou d'une PR

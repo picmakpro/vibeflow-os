@@ -114,6 +114,10 @@ def resolve_gsd_tools_cmd():
     resolu sur le PATH s'invoque directement. None si rien ne resout, ou si `node` est introuvable
     pour une cible `.cjs` — jamais une exception (T-27-01-01).
 
+    Divergence connue (documentee cote shell, mission-contracts.md §D5(b)) : la cascade shell des
+    managers place CLAUDE_CONFIG_DIR AVANT PATH, ordre inverse d'ici — deux binaires distincts
+    possibles pour "la meme" cascade si plusieurs versions sont installees.
+
     AUCUN candidat cwd/repo-relatif (ex. l'ancien `<cwd>/gsd-core/bin/gsd-tools.cjs`, retire) :
     un tel candidat resout un executable a un chemin RELATIF AU REPERTOIRE DE TRAVAIL COURANT puis
     l'invoque via `node` sans aucune verification d'ancrage. PoC rejoue en audit : un simple
