@@ -166,6 +166,9 @@
   que l'audit en tire (bornage explicite du vecteur qu'une disposition `accept` couvre) vit dans
   `docs/ADR.md` §ADR-070. Correctif du site (retirer ou ancrer le candidat CWD) : **arbitrage humain
   gelé**, `.planning/REQUIREMENTS.md` PAEX-11 — non traité ici.
+- Clôture 2026-08-06 : l'arbitrage ci-dessus est **tranché (retrait) et exécuté** — `dag.sh`
+  (`4a532ec`) et `mission-contracts.md` (`08ad030`). La prédiction de cette entrée s'est vérifiée
+  et le site est fermé ; voir `docs/ADR.md` §ADR-070 pour le détail.
 
 **`hooks.workflow_guard` se déclenche sur des fichiers HORS du dépôt** — Sévérité : **LOW**
 - Issue: la capacité a été activée par la Phase 24 (ADR-066) et se comporte comme annoncé sur le
