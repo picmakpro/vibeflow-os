@@ -2240,10 +2240,10 @@ d'une couverture réelle tant que personne ne le cherche activement.
 
 ### Ce que cette ADR ne tranche pas
 
-Le sort du candidat CWD dans `dag.sh:124` (le retirer, ou l'ancrer sous une racine vérifiée) reste un
-**arbitrage humain gelé** (`.planning/REQUIREMENTS.md` PAEX-11, mission Phase 27 §4.1) — cette entrée
-grave la règle de méthode que l'audit en tire, pas le correctif du site lui-même, qui n'appartient
-pas à son périmètre.
+Le sort du candidat CWD dans `dag.sh:124` (le retirer, ou l'ancrer sous une racine vérifiée) a été
+**tranché par Samuel : retrait**, exécuté dans `dag.sh` (`4a532ec`) et `mission-contracts.md`
+(`08ad030`) — cette entrée grave la règle de méthode que l'audit en tire, pas le correctif du site
+lui-même, qui n'appartenait pas à son périmètre.
 
 ### Déclencheur de réexamen
 
