@@ -48,7 +48,7 @@
     "enabled": true
   },
   "claude_orchestration": {
-    "enabled": true,
+    "enabled": false,
     "execution_backend": "auto"
   },
   "project_code": "VFDO",
