@@ -176,16 +176,67 @@ mesure contrôlée du Bloc 3 faute d'étalon partagé.
 
 ---
 
-## Bloc 3 — Mesure après activation (vide à ce stade)
+## Bloc 3 — Mesure après activation
 
-**Statut : structure posée par ce plan (27-04), remplissage réservé au plan `27-06`.** Ce bloc ne
-contient, à ce stade, aucun chiffre — seule sa structure et ses deux garde-fous d'énoncé, qui ne
-dépendent pas du résultat à venir.
+STATUT-BLOC-3: NON-MESURABLE
 
-### Protocole prévu (à exécuter tel quel par `27-06`)
+**Statut : rempli par ce plan (`27-06`), issue de non-mesurabilité.** Le plan `27-05` a rendu son
+verdict — refus motivé de l'activation de `claude_orchestration` — sur le checkpoint de sa tâche 2,
+conduit en session principale le 2026-08-06. Conformément à la branche « refus » du how-to-verify
+de la Tâche 1 de ce plan, l'A/B n'a **pas eu lieu** : ni côté inline, ni côté workflow, sur
+`27-mesure/waves-toy.json`. Ce bloc consigne le motif et le déclencheur de reprise, tels qu'écrits
+dans `27-DECISION-claude-orchestration.md`, jamais un blanc.
 
-1. **Même manifeste des deux côtés** : `27-mesure/waves-toy.json`, l'étalon posé par la Tâche 1 de ce
-   plan — jamais reconstruit à la volée, jamais un manifeste différent entre l'avant et l'après.
+### Motif du refus — recopié depuis `27-DECISION-claude-orchestration.md` (§6, Verdict)
+
+> **REFUS MOTIVÉ.** Le critère FAIL n°2 (« le run réel diverge du chemin inline : artefacts
+> différents, erreur non récupérée, worktree non nettoyé ») est constitué sur deux de ses trois
+> formes simultanément — artefacts différents (aucun commit de worker, aucun `SUMMARY.md`, aucun
+> merge vers l'arbre principal) et worktree non nettoyé — malgré un franchissement irréprochable de
+> l'échelle des 7 gates (PASS n°1) et une Décision A confirmée sûre (PASS n°3). Les critères FAIL sont
+> une disjonction : une seule condition suffit, et elle est ici doublement constituée. Ce n'est pas un
+> « PASS partiel » — ce cas suppose une Décision A *incertaine*, or elle a été tranchée sans ambiguïté
+> par l'observation 2.
+
+Contexte chiffré du run à l'origine de ce constat (§4 de la décision, hors verdict, pour mémoire) :
+run réel conduit via l'outil Workflow (`run ID wf_fea42b76-3e2`), terminé en 32 s, 2 agents
+parallèles, 0 erreur, échelle des 7 gates franchie **sans drapeau manuel**
+(`{"backend": "workflow", "reason": "workflow_backend_active"}`, SDK `0.3.223` résolu par la
+persistance option 3 de `GSD_AGENT_SDK_VERSION` posée dans `~/.claude`) — le franchissement des
+gates n'a donc jamais été la cause du refus. Le détail complet des sept gates, des trois observations
+et de la table de verdicts vit dans `27-DECISION-claude-orchestration.md`, pas ici.
+
+### Déclencheur objectif de reprise — recopié depuis `27-DECISION-claude-orchestration.md` (§6, « Déclencheur objectif de reprise »)
+
+> Sur le patron des capacités dormantes refusées en Phase 24 (GSDA-06, GSDA-08, GSDA-10) : le refus
+> ne porte pas de date de réexamen, il porte une **condition factuelle**. Rouvrir
+> `claude_orchestration` **ssi**, dans cet ordre, les deux faits suivants sont établis par un nouveau
+> run réel — pas supposés :
+>
+> 1. **Le brief émis pour un plan dispatché via l'outil Workflow embarque le protocole d'exécution
+>    GSD complet** (a minima l'équivalent de `execute-plan.md` : commit atomique par tâche,
+>    `SUMMARY.md` écrit, protocole de commit respecté) — pas seulement `agentType: "gsd-executor"`
+>    sur un brief d'une ligne, tel qu'il l'était dans ce spike.
+> 2. **Un mécanisme de merge et de nettoyage existe côté orchestrateur** pour les worktrees du run
+>    Workflow qui contiennent des changements (commités ou non) — pas seulement l'auto-nettoyage
+>    natif de l'outil, qui ne couvre que les worktrees inchangés (confirmé en creux par l'observation
+>    « Décision A » de ce document).
+>
+> Tant que ces deux faits ne sont pas établis sous un run réel, la divergence observée au §4 se
+> reproduira à l'identique : c'est un défaut structurel du couplage (brief jouet + outil Workflow),
+> pas un aléa d'exécution. **La décision de persistance de `GSD_AGENT_SDK_VERSION` (option 3, §2bis)
+> reste acquise** — elle n'est pas remise en cause par ce refus et n'a pas besoin d'être rejouée à la
+> reprise.
+
+### Protocole prévu, jamais exécuté — conservé tel quel pour la reprise
+
+Le protocole ci-dessous a été posé par le plan `27-04` avant que le verdict de `27-05` ne soit connu.
+Il reste valide et **inchangé** pour le jour où le déclencheur ci-dessus sera satisfait — un différé
+nommé, pas une réécriture à refaire de zéro.
+
+1. **Même manifeste des deux côtés** : `27-mesure/waves-toy.json`, l'étalon posé par la Tâche 1 du
+   plan `27-04` — jamais reconstruit à la volée, jamais un manifeste différent entre l'avant et
+   l'après.
 2. **Identifiant de run fixe** pour chaque répétition, afin que chaque exécution soit individuellement
    re-dérivable (`--run-id` distinct et nommé par répétition, jamais réutilisé entre deux mesures
    différentes).
@@ -197,29 +248,32 @@ dépendent pas du résultat à venir.
    répétitions « après », absent pour toute répétition « avant » réutilisée en contrôle).
 5. **Chiffres bruts et écart** : mêmes colonnes que le Bloc 2 (hash court, horodatage, écart), plus la
    comparaison inline vs activé sur le même corpus.
-6. **Limites** : reconduire explicitement les limites 1 à 4 du Bloc 2 (elles s'appliquent à toute
+6. **Verdict `backend` relevé avant chacune des deux répétitions côté workflow**, pas une seule fois
+   pour les deux (garde-fou ajouté par ce plan, `27-06`, suite à revue B3) : seul un verdict
+   `workflow` fait d'un run une mesure du côté workflow — un run silencieusement retombé sur `inline`
+   est un incident à écrire, jamais une moyenne à calculer en silence avec l'autre répétition.
+7. **Limites** : reconduire explicitement les limites 1 à 4 du Bloc 2 (elles s'appliquent à toute
    mesure d'horloge par commit, pas seulement à celle-ci), et ajouter toute limite propre au protocole
-   contrôlé (ex. écart introduit par l'activation elle-même, coût du premier appel à froid).
+   contrôlé (ex. écart introduit par l'activation elle-même, coût du premier appel à froid) — ainsi
+   que la limite propre au corpus jouet, écrite en toutes lettres au §Livrable 5 de `27-RESEARCH.md` :
+   le corpus étalon porte des briefs triviaux et mesure donc surtout le **coût fixe du dispatch**, pas
+   le gain sur des plans de taille réelle. Cette limite s'écrit, elle ne se compense pas.
 
 ### Les deux garde-fous d'énoncé, valables quel que soit le résultat
 
 - **Le plafond de la Phase 24 (3,00×, Bloc 1) ne sera jamais présenté comme un gain d'horloge** —
-  c'est une compression d'étages, et cette distinction reste vraie indépendamment de ce que le Bloc 3
-  mesurera.
+  c'est une compression d'étages, et cette distinction reste vraie que la mesure ait eu lieu ou non.
 - **L'estimation 1,8-2,5× de l'option 2** (citée dans `27-CONTEXT.md`/`27-RESEARCH.md` pour l'option
-  d'activation de `claude_orchestration`) reste **étiquetée estimée, jamais mesurée**, tant qu'un
-  chiffre réel produit par le protocole ci-dessus ne l'a pas remplacée.
+  d'activation de `claude_orchestration`) reste, de ce fait, **étiquetée estimée et jamais mesurée** :
+  aucun chiffre réel n'a remplacé cette estimation, puisque l'A/B n'a pas eu lieu. Le statut ne
+  changera qu'à la reprise, une fois le déclencheur ci-dessus satisfait et le protocole ci-dessus
+  exécuté.
 
-### Cas de sortie honnête — si l'activation est refusée
+### État de la capability à la clôture de ce bloc
 
-Si le plan `27-05` conclut au refus d'activer `claude_orchestration`, ce bloc devra consigner
-littéralement :
-
-> **Non mesurable — activation refusée.** Motif : [motif exact du refus, tel qu'écrit dans
-> `27-DECISION-claude-orchestration.md`]. Déclencheur objectif de reprise : [condition explicite qui,
-> si elle change, justifierait de relancer la mesure].
-
-— jamais un blanc, jamais une case vide sans explication.
+`claude_orchestration.enabled` reste à `false` dans `.planning/config.json`, tel que posé par le
+plan `27-05`. Ce plan (`27-06`) ne touche pas cette clé — voir « Disjonction d'écriture déclarée » de
+`27-06-PLAN.md` : ce plan n'écrit que ce bloc 3, aucun autre fichier.
 
 ---
 
