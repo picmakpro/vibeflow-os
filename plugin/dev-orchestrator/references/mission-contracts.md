@@ -282,17 +282,15 @@ Tâche simple sans signal → routage direct **sans question** (zéro friction s
 
 `SEUIL_EQUIPE = 3` — N = étapes restantes ciblées, comptées via `gsd-tools roadmap analyze`.
 
-Résolution — cascade de résolution, jamais un chemin en dur (D1 ; forme reprise, variante
-Claude-only, de `gsd-core/workflows/_runtime-launcher.snippet.sh`, gsd-core 1.9.0) :
+Résolution — cascade de résolution, jamais un chemin en dur (D1 ; forme **dérivée**, pas reprise
+telle quelle, de `gsd-core/workflows/_runtime-launcher.snippet.sh`, gsd-core 1.9.0 — divergences
+listées en D5 ci-dessous) :
 ```sh
-_GSD_ROOT="${RUNTIME_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
-GSD_TOOLS=""
-for _c in "$_GSD_ROOT/gsd-core/bin/gsd-tools.cjs" \
-          "$_GSD_ROOT/.claude/gsd-core/bin/gsd-tools.cjs" \
-          "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/gsd-core/bin/gsd-tools.cjs"; do
-  [ -f "$_c" ] && { GSD_TOOLS="$_c"; break; }
-done
-if   [ -n "$GSD_TOOLS" ];                  then gsd_run() { node "$GSD_TOOLS" "$@"; }
+GSD_TOOLS="${GSD_TOOLS:-}"
+if   [ -n "$GSD_TOOLS" ] && [ -f "$GSD_TOOLS" ]; then gsd_run() { node "$GSD_TOOLS" "$@"; }
+elif [ -f "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/gsd-core/bin/gsd-tools.cjs" ]; then
+     GSD_TOOLS="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/gsd-core/bin/gsd-tools.cjs"
+     gsd_run() { node "$GSD_TOOLS" "$@"; }
 elif command -v gsd-tools >/dev/null 2>&1; then GSD_TOOLS="$(command -v gsd-tools)"; gsd_run() { "$GSD_TOOLS" "$@"; }
 else echo "ERROR: gsd-tools.cjs introuvable. Installer : npx -y "@opengsd/gsd-core@^1" --claude --global" >&2; exit 1; fi
 ```
@@ -313,7 +311,18 @@ dans le message d'erreur ci-dessus et partout ailleurs dans ce document.
 Écarts assumés vs le snippet officiel amont (D5) : (a) les runtimes non-Claude du snippet sont
 retirés (VibeFlow est un plugin Claude Code) ; (b) `command -v gsd-tools` est placé après les
 chemins fichiers (le payload installé prime sur un bin npm global potentiellement d'une autre
-version) ; (c) ce document n'écrit jamais dans `CLAUDE_ENV_FILE`.
+version) ; (c) ce document n'écrit jamais dans `CLAUDE_ENV_FILE` ; (d) **aucun candidat dérivé
+d'une racine de dépôt** (`git rev-parse --show-toplevel`, `pwd`, ou toute variable qui en hérite,
+p. ex. l'ancien `_GSD_ROOT`) — un tel candidat résout un chemin **tracké dans l'arbre de travail
+courant**, donc posable par quiconque peut y écrire un fichier (checkout d'une branche ou d'une PR
+hostile). `git rev-parse --show-toplevel` n'est **pas** une frontière de confiance : c'est un autre
+chemin dérivé de l'endroit où l'on se trouve, et son repli `|| pwd` retombait littéralement sur le
+CWD qu'on cherche justement à exclure. Retrait arbitré sur le même motif que le vecteur RCE fermé
+dans `plugin/conductor/scripts/dag.sh` (5ᵉ passage du motif de confinement de chemin sur ce dépôt) —
+doctrine : ADR-070 (`docs/ADR.md`), pas recopiée ici. **Conséquence assumée, contournement qui
+reste** : un lab qui vendorise le moteur à sa propre racine (`<repo>/gsd-core/...`) perd la
+résolution automatique de ce candidat — poser `GSD_TOOLS=<chemin absolu>` en variable
+d'environnement (désormais vérifiée en tête de cascade, avant même `CLAUDE_CONFIG_DIR`).
 
 Application du seuil :
 
