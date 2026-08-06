@@ -233,7 +233,7 @@
       "scope": [
         "plugin/*/agents/*.md"
       ],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "fix-rce-propagation",
