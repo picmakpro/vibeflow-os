@@ -163,7 +163,7 @@
         ".planning/STATE.md",
         ".planning/REQUIREMENTS.md"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "fix-rce",
@@ -233,7 +233,7 @@
       "scope": [
         "plugin/*/agents/*.md"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "fix-rce-propagation",
