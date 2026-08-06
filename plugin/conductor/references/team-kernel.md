@@ -125,10 +125,12 @@ là-bas.
   vient d'y ajouter. Forme imposée : `git commit <chemin> [<chemin>...] -m "..."` (ignore
   l'index). Seule exception, fichier neuf (inatteignable autrement) :
   `git add <chemin exact> && git commit <chemin exact> -m "..."` en une seule commande
-  enchaînée, jamais de stage en attente. Chaque mandat nomme les fichiers tenus par ses
-  voisins **en ce moment** — un périmètre positif seul ne suffit pas. Trou identifié mais
-  laissé ouvert par `mission-contracts.md` §Isolation de branche (« non tranchée ici ») :
-  tranché ici.
+  enchaînée, jamais de stage en attente. Rename (ancien chemin supprimé + nouveau créé) : même
+  patron, les deux chemins exacts — `git add <nouveau> && git commit <ancien> <nouveau> -m "..."`.
+  Suppression pure : déjà couverte, `git commit <chemin>` stage et committe seul, sans `git rm`.
+  Chaque mandat nomme les fichiers tenus par ses voisins **en ce moment** — un périmètre positif
+  seul ne suffit pas. Trou identifié mais laissé ouvert par `mission-contracts.md` §Isolation de
+  branche (« non tranchée ici ») : tranché ici.
 - **Digest dans chaque mandat**, détail sur disque, bloc typé au retour — jamais de pilotage
   à la prose.
 - **Proportionnalité** : en dessous du seuil d'équipe du métier (dev : `SEUIL_EQUIPE`,
