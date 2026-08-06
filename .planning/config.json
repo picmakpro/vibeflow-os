@@ -47,6 +47,10 @@
   "intel": {
     "enabled": true
   },
+  "claude_orchestration": {
+    "enabled": true,
+    "execution_backend": "auto"
+  },
   "project_code": "VFDO",
   "agent_skills": {
     "gsd-planner": [
