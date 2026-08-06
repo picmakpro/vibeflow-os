@@ -109,21 +109,28 @@ def is_review_node(node_id):
 
 def resolve_gsd_tools_cmd():
     """Cascade de resolution de la CLI amont (D-07), dans cet ordre : variable d'environnement
-    GSD_TOOLS si elle pointe un fichier existant -> executable `gsd-tools` sur le PATH ->
-    gsd-core/bin/gsd-tools.cjs sous la racine du depot (cwd, convention "$S" de mission-flow.md)
-    -> sous CLAUDE_CONFIG_DIR puis sous ~/.claude. Une cible `.cjs` s'invoque via node ; un
-    executable resolu sur le PATH s'invoque directement. None si rien ne resout, ou si `node`
-    est introuvable pour une cible `.cjs` — jamais une exception (T-27-01-01)."""
+    GSD_TOOLS si elle pointe un fichier existant -> executable `gsd-tools` sur le PATH -> sous
+    CLAUDE_CONFIG_DIR puis sous ~/.claude. Une cible `.cjs` s'invoque via node ; un executable
+    resolu sur le PATH s'invoque directement. None si rien ne resout, ou si `node` est introuvable
+    pour une cible `.cjs` — jamais une exception (T-27-01-01).
+
+    AUCUN candidat cwd/repo-relatif (ex. l'ancien `<cwd>/gsd-core/bin/gsd-tools.cjs`, retire) :
+    un tel candidat resout un executable a un chemin RELATIF AU REPERTOIRE DE TRAVAIL COURANT puis
+    l'invoque via `node` sans aucune verification d'ancrage. PoC rejoue en audit : un simple
+    fichier tracke (`gsd-core/bin/gsd-tools.cjs` a la racine d'une branche ou d'une PR malveillante)
+    suffit a faire executer du code arbitraire — sans symlink, sans PATH compromis — et
+    `dag.sh ready` est invoque en routine par les cinq managers du team-kernel. 5e passage du motif
+    de confinement de chemin sur ce depot ; celui-ci se ferme par RETRAIT du candidat, pas par un
+    ancrage supplementaire (D-07 revise). Consequence assumee : un lab qui VENDORISE le moteur a sa
+    propre racine (`<repo>/gsd-core/...`) perd la resolution automatique de ce candidat ; le
+    contournement qui reste est `GSD_TOOLS=<chemin absolu>` en variable d'environnement — voir
+    mission-flow.md §Pattern B (note stages) pour la doctrine cote manager."""
     resolved = None
     env_tools = os.environ.get("GSD_TOOLS", "")
     if env_tools and os.path.isfile(env_tools):
         resolved = env_tools
     if resolved is None:
         resolved = shutil.which("gsd-tools")
-    if resolved is None:
-        cand = os.path.join(os.getcwd(), "gsd-core", "bin", "gsd-tools.cjs")
-        if os.path.isfile(cand):
-            resolved = cand
     if resolved is None:
         config_dir = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
         cand = os.path.join(config_dir, "gsd-core", "bin", "gsd-tools.cjs")
