@@ -503,19 +503,28 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [x] **PAEX-05**: `stages` est **câblé** sur `partitionStages()` amont via un sous-processus
   `gsd-tools claude-orchestration emit-workflow` — **jamais réimplémenté localement** (ADR-069,
   Iron Law 2 révisée). Manifeste par `mkstemp` 0600 exclusif, suppression en `finally`. *(livrable 3)*
-- [ ] **PAEX-06**: Le repli de `stages` est prouvé **fail-closed sur toutes ses branches**.
-  **NON TENU** : un mutant remplaçant `stages: null` par `stages: []` sur la branche « CLI résolue
-  mais qui échoue » survit aux 87 tests, alors que la doctrine livrée interdit explicitement cette
-  confusion ; et T29 exerce une autre branche que celle que son commentaire annonce (dépendant de
-  `~/.claude/gsd-core`, donc de l'environnement). **Différé volontairement** avec `PAEX-11`.
+- [x] **PAEX-06**: Le repli de `stages` est prouvé **fail-closed sur toutes ses branches**.
+  Le trou est **fermé** : `T31` couvre « CLI **résolue** mais qui échoue » (le mutant `stages: null`
+  → `stages: []` rougit désormais), `T32` couvre « `node` absent, `gsd-tools` présent », et `T29`
+  neutralise enfin `HOME`/`CLAUDE_CONFIG_DIR` pour épuiser réellement la cascade. Les trois sont
+  **prouvés discriminants par mutation**, vérifiés indépendamment par la revue et par l'audit.
+  Suite : **99 PASS / 0 FAIL** (87 avant). *(différé à dessein jusqu'à l'arbitrage de `PAEX-11` —
+  écrire ces tests plus tôt aurait gravé comme attendu la branche qui a été retirée)*
 - [x] **PAEX-07**: `.worktreeinclude` et l'entrée `.gitignore` couvrant `.claude/worktrees/` sont
   posés, et la portée de l'isolation est écrite (`27-ISOLATION-PORTEE.md`, 13 agents écrivains
   re-dérivés : 19 porteurs de `Write`/`Edit` moins 6 managers). *(livrable 2, plan 27-03)*
-- [ ] **PAEX-08**: `isolation: worktree` est **armé** sur les 13 agents écrivains. **GELÉ** —
-  **0 agent sur 25** le déclare. La tâche est gatée derrière la **ratification humaine** de
-  `worktree.baseRef: "head"` (ADR-031). Le réglage a été appliqué **hors checkpoint** par un effet
-  de bord de worker (`.claude/settings.local.json`, gitignoré) : l'assertion machine passe donc au
-  vert **sans qu'aucun humain n'ait ratifié**. Un gate vert n'est pas un feu vert.
+- [x] **PAEX-08**: `isolation: worktree` est **armé** sur les 13 agents écrivains — **fait**, après
+  **ratification explicite de Samuel** de `worktree.baseRef: "head"` et vérification de sa condition
+  suspensive (fix `PAEX-11` livré, suite verte). Mesuré après coup : **13** agents portent la clé,
+  **0 manager** (traitement distinct tenu). Lint re-passé **par répertoire de module** — 6
+  répertoires, **25 fichiers réellement lintés**, non-vacuité assertée.
+  **Trou de procédure consigné, pas tu** : `worktree.baseRef` avait été mis à `"head"` **hors
+  checkpoint** par un effet de bord de worker (`.claude/settings.local.json`, gitignoré) — le gate
+  machine était donc vert **avant** toute ratification. Le worker s'est arrêté quand même : un gate
+  vert n'est pas un feu vert. **Piège du gate lui-même** : `check-agents.sh` **nu** sort `exit 0`
+  sur « aucun agent dans `.claude/agents` » — il ne scanne qu'un répertoire, sans récursion. Validé
+  ainsi, l'armement de 13 frontmatters aurait été confirmé par un gate ne regardant **rien** :
+  l'anti-pattern d'ADR-070 retourné contre son propre auteur.
 - [ ] **PAEX-09**: `claude_orchestration` est instruit par un spike puis une **décision écrite**
   (activation ou refus motivé). **GELÉ** — checkpoint humain par construction. `GSD_AGENT_SDK_VERSION`
   doit être **persistée** au runtime, pas seulement passée en drapeau : sans cela, un PASS laisserait
@@ -523,13 +532,28 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [ ] **PAEX-10**: Le gain réel est **mesuré** — baseline d'horloge avant, mesure après, méthode
   écrite. **NON COMMENCÉ.** Le plafond d'étages **3,00×** est une compression d'étages, **jamais**
   un gain d'horloge ; le **1,8-2,5×** reste une **estimation**, dite comme telle.
-- [ ] **PAEX-11**: Aucune régression de sécurité de la Phase 24. **NON TENU — finding CRITIQUE.**
-  `dag.sh:124` résout un candidat `gsd-tools.cjs` **relatif au CWD** et l'exécute via `node` sans
-  ancrage : **RCE reproduite par PoC**, sans symlink ni PATH compromis, dans le socle que les 5
-  managers invoquent en routine. **5ᵉ passage** du motif de confinement de chemin, littéralement
-  prédit par `CONCERNS.md`. Le threat register ne le couvre pas : `T-27-01-04` n'examinait que
-  `PATH`, dont le raisonnement d'acceptation ne vaut pas pour le CWD. Sur ce dépôt le candidat est
-  une **branche morte** (`gsd-core/` absent de la racine). Retirer ou ancrer = **arbitrage humain**.
+- [x] **PAEX-11**: Aucune régression de sécurité de la Phase 24 — **le vecteur trouvé est fermé**,
+  et sa fermeture est **vérifiée en exécution**, pas annoncée.
+  **Le défaut** : `dag.sh:124` résolvait un `gsd-tools.cjs` **relatif au CWD** et l'exécutait via
+  `node` sans ancrage — **RCE reproduite par PoC**, sans symlink ni PATH compromis, dans le socle
+  que les 5 managers invoquent en routine. **5ᵉ passage** du motif de confinement de chemin,
+  littéralement prédit par `CONCERNS.md`.
+  **L'arbitrage** : Samuel a tranché le **RETRAIT** — pas d'ancrage, pas de repli déguisé.
+  **La fermeture** : retrait exécuté dans `dag.sh` (`4a532ec`) **et**, après balayage, dans
+  `mission-contracts.md` (`08ad030`) où la variante `toplevel` portait le même vecteur —
+  `git rev-parse --show-toplevel` n'est pas une frontière de confiance (un dépôt hostile a sa
+  propre racine), et son repli `|| pwd` ramenait au CWD qu'on venait d'interdire.
+  **La preuve** : PoC rejoué dans deux configurations, le fichier planté n'est plus jamais exécuté ;
+  et `T33` rougit sur la **réintroduction du comportement** (vérifié en réintroduisant réellement le
+  candidat), pas sur une chaîne de source qu'un renommage contournerait.
+  **La cause racine, gravée** : `T-27-01-04` acceptait « le spoofing de résolution » **en bloc** au
+  motif qu'un `PATH` compromis compromet déjà la session — raisonnement juste pour `PATH`, faux pour
+  le CWD, qui n'exige aucune compromission préalable. D'où **ADR-070** : une disposition `accept`
+  **borne le vecteur qu'elle couvre**, jamais le risque en bloc. `T-27-01-04` est réécrite selon
+  cette forme. **Balayage repo-wide** : une seule autre occurrence exécutante, `scripts/hooks/pre-push`
+  — qualifiée **subsumée** (si `core.hooksPath` pointe dans le dépôt, le hook est lui-même du contenu
+  versionné : qui peut détourner `$root` peut déjà réécrire le hook), et **déjà sur `main`** bien
+  avant cette phase.
 
 ## v2 Requirements
 
