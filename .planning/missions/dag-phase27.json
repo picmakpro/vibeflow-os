@@ -120,7 +120,7 @@
         ".planning/phases/VFDO-27-*/27-mesure/**",
         ".planning/phases/VFDO-27-*/27-MESURE-GAIN.md"
       ],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "exec-27-05",
