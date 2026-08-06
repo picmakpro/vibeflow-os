@@ -94,6 +94,6 @@ l'intention et invoque les briques directement — plus de couche de verbes-syno
 | D7 — Team-kernel transverse hébergé par `conductor` | Le pattern manager→workers→juges sert tous les métiers | ✓ Good (v2.34.0, ADR-053/057) |
 
 ---
-*Last updated: 2026-08-06 — Phase 27 close (parallélisation d'exécution, refus motivé de claude_orchestration)
-(bascule agentique), requirements v1 validés, actifs réalignés sur Phase 13 + gsd-migration.
-Précédent : 2026-06-04 (scaffolding initial mono-module).*
+*Last updated: 2026-08-06 — Phase 27 close (parallélisation d'exécution, refus motivé de
+claude_orchestration). Précédent : 2026-07-26 (charte rouverte : périmètre 17 modules, D2/D6
+actées renversées, bascule agentique) ; 2026-06-04 (scaffolding initial mono-module).*
