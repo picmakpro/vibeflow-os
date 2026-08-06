@@ -120,7 +120,7 @@
         ".planning/phases/VFDO-27-*/27-mesure/**",
         ".planning/phases/VFDO-27-*/27-MESURE-GAIN.md"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "exec-27-05",
@@ -133,7 +133,7 @@
         ".planning/config.json",
         ".planning/phases/VFDO-27-*/27-DECISION-claude-orchestration.md"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "exec-27-06",
@@ -145,7 +145,7 @@
       "scope": [
         ".planning/phases/VFDO-27-*/27-MESURE-GAIN.md"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "docs",

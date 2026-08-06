@@ -60,7 +60,7 @@
 - [x] Phase 24: Activation et mesure du moteur GSD — capacités dormantes et faits de runtime (completed 2026-08-05, PR #34)
 - [ ] Phase 25: Budget d'instructions et étage d'alignement court
 - [x] Phase 26: Manuel utilisateur VibeFlow (manual/) (completed 2026-08-02)
-- [ ] Phase 27: Parallélisation d'exécution — granulaire, simple, sans collision d'écriture
+- [x] Phase 27: Parallélisation d'exécution — granulaire, simple, sans collision d'écriture (completed 2026-08-06)
 
 <details>
 <summary>✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04</summary>

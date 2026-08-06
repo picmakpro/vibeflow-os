@@ -525,13 +525,20 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   sur « aucun agent dans `.claude/agents` » — il ne scanne qu'un répertoire, sans récursion. Validé
   ainsi, l'armement de 13 frontmatters aurait été confirmé par un gate ne regardant **rien** :
   l'anti-pattern d'ADR-070 retourné contre son propre auteur.
-- [ ] **PAEX-09**: `claude_orchestration` est instruit par un spike puis une **décision écrite**
-  (activation ou refus motivé). **GELÉ** — checkpoint humain par construction. `GSD_AGENT_SDK_VERSION`
-  doit être **persistée** au runtime, pas seulement passée en drapeau : sans cela, un PASS laisserait
-  `enabled: true` pendant que tout dispatch réel retombe sur `inline` au gate n° 5.
-- [ ] **PAEX-10**: Le gain réel est **mesuré** — baseline d'horloge avant, mesure après, méthode
-  écrite. **NON COMMENCÉ.** Le plafond d'étages **3,00×** est une compression d'étages, **jamais**
-  un gain d'horloge ; le **1,8-2,5×** reste une **estimation**, dite comme telle.
+- [x] **PAEX-09**: `claude_orchestration` est instruit par un spike puis une **décision écrite**
+  (activation ou refus motivé). **CLOS 2026-08-06 — REFUS MOTIVÉ** (`27-DECISION-claude-orchestration.md`,
+  plan 27-05) : l'échelle des 7 gates est franchie sans drapeau manuel — `GSD_AGENT_SDK_VERSION`
+  **persistée** par installation réelle (`npm --prefix ~/.claude`, SDK 0.3.223, option 3 tranchée par
+  Samuel au checkpoint) — mais le run réel diverge du chemin inline (critère FAIL n°2 : aucun commit
+  de worker, aucun SUMMARY, aucun merge, worktrees résiduels). `enabled: false`, jamais à demi activé ;
+  déclencheur objectif de reprise consigné dans la décision.
+- [x] **PAEX-10**: Le gain réel est **mesuré** — baseline d'horloge avant, mesure après, méthode
+  écrite. **CLOS 2026-08-06 par la branche prévue « refus »** : baseline capturée AVANT toute
+  activation (blocs 1-2, plan 27-04, précondition D-10 vérifiée), moitié « après » **non-mesurable
+  motivée** — `STATUT-BLOC-3: NON-MESURABLE` (plan 27-06), motif et déclencheur de reprise recopiés
+  de la décision, protocole A/B conservé intact pour la reprise. Le plafond d'étages **3,00×** reste
+  une compression d'étages, **jamais** un gain d'horloge ; le **1,8-2,5×** reste une **estimation**,
+  dite comme telle.
 - [x] **PAEX-11**: Aucune régression de sécurité de la Phase 24 — **le vecteur trouvé est fermé**,
   et sa fermeture est **vérifiée en exécution**, pas annoncée.
   **Le défaut** : `dag.sh:124` résolvait un `gsd-tools.cjs` **relatif au CWD** et l'exécutait via

@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
-current_phase: 27
-current_phase_name: parall-lisation-d-ex-cution-granulaire-simple-sans-collision
-status: executing
-stopped_at: "Phase 23 CLOSE et PUBLIÉE — 8/8 plans exécutés et revus, PR #30 mergée, release racine v2.47.0 taggée et publiée (gate check-release-tag --remote vert). 9 exigences GSDC sur 10 soldées ; GSDC-08 en [~] sur l'écart D-22 (gsd-debugger présent dans vf-coder.md contre une décision « aucune exception » ET exigé par le gate T19 — les deux se tranchent ensemble, arbitrage humain). Deux RCE fermées. Suite du module 102 -> 161 cas, 47 suites vertes. Livré hors phase au passage : correctif de la course de récupération du lock de driver (PR #31, conductor v1.19.1) — jusqu'à 5 acquéreurs simultanés mesurés, lock devenu lien symbolique remplacé par rename(2). Reste ouvert et NON traité : la fuite d'info par symlink (slurp sans O_NOFOLLOW, sur les deux scripts, absente du threat model), la promotion d'A-15 en ADR, et nyquist_compliant=false sur 23-VALIDATION.md (rempli a posteriori, la continuité d'échantillonnage n'a pas pu être mesurée). Prochaine phase : 24."
-last_updated: "2026-08-06T12:05:38.975Z"
+current_phase: 18
+current_phase_name: Survie du ledger d'exigences à la clôture de jalon
+status: planning
+stopped_at: "Phase 20 complète (7/7 plans) — clôture de gouvernance (20-07) : ADR-051 révisée + ADR-060 posée, doctrine transverse alignée, 6 modules bumpés (conductor v1.17.0, dev-orchestrator v2.8.0, design-orchestrator v1.3.2, 3 bundles v2.0.3). Gates verts sauf le seul rouge attendu (compteur de suites racine, 44 réel pas 43). Release racine réservée à validation humaine post-fusion (4 éléments consignés + WINDOWS.md)."
+last_updated: "2026-08-06T12:50:31.363Z"
 last_activity: 2026-08-06
-last_activity_desc: Phase 27 execution started
+last_activity_desc: Phase 27 complete, transitioned to Phase 18
 progress:
   total_phases: 26
-  completed_phases: 14
+  completed_phases: 15
   total_plans: 92
-  completed_plans: 68
+  completed_plans: 71
 ---
 
 # Project State
@@ -55,7 +55,7 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 ## Current Position
 
-Phase: 27 (parall-lisation-d-ex-cution-granulaire-simple-sans-collision) — EXECUTING
+Phase: 18 — Survie du ledger d'exigences à la clôture de jalon
 (arbitrage Samuel, `.planning/missions/2026-07-31-delta-gsd-core-1.9.0.md`) : pas de
 `gsd-discuss-phase` séparé, périmètre exhaustif directement dérivé du digest de mission. 5 plans :
 21-01 — défaut MCP actif corrigé (`inject-mcp-tools.sh` découvre le scope global MCP,
@@ -76,8 +76,8 @@ tranchés), les 4 warnings de `21-VERIFICATION.md` traités (`check-state-integr
 job `gates` de la CI, ADR-063 25 cas, `team-kernel.md` porte le recoupement #1995/#2608,
 `inject-mcp-tools.sh` nomme `--force` sur le rc=3 mode fichier unique), release racine v2.45.0
 préparée en commits locaux (jamais taguée).
-Status: Executing Phase 27
-Last activity: 2026-08-06 — Phase 27 execution started
+Status: Ready to plan
+Last activity: 2026-08-06 — Phase 27 complete, transitioned to Phase 18
 
 **Anomalie d'agrégation instruite (ADR-063).** Le commentaire YAML du frontmatter ci-dessus daté du
 2026-07-31 signalait une régression silencieuse de `completed_phases`/`total_plans`/
@@ -265,7 +265,7 @@ Progress: [██████░░░░] 59%
 
 **Velocity:**
 
-- Total plans completed: 26+ (13 mesurés phases 1-6 ci-dessous + 6 en Phase 12 + 7 en Phase 14 ;
+- Total plans completed: 18+ (13 mesurés phases 1-6 ci-dessous + 6 en Phase 12 + 7 en Phase 14 ;
   le compteur automatique n'a jamais été alimenté — reconstruit le 2026-07-26)
 
 - Average duration: ~6 min/plan (sur les 13 plans mesurés)
@@ -289,6 +289,7 @@ Progress: [██████░░░░] 59%
 | Phase 05 P01 | 2 | 3 tasks | 5 files |
 | Phase 06 P01 | 1min | 2 tasks | 2 files |
 | Phase VFDO-19 P01 | 15min | 3 tasks | 2 files |
+| 27 | 6 | - | - |
 **Per-Plan Metrics:**
 
 | Plan | Duration | Tasks | Files |
