@@ -1993,7 +1993,7 @@ d'exécution. À inscrire au ledger `REQUIREMENTS.md` par le manager de mission,
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 27-06-PLAN.md — Mesure après activation sur le même corpus étalon, écart et limites écrits — ou non-mesurabilité motivée avec déclencheur de reprise — livrable 5, moitié « après », **checkpoint bloquant** (vague 4)
+- [x] 27-06-PLAN.md — Mesure après activation sur le même corpus étalon, écart et limites écrits — ou non-mesurabilité motivée avec déclencheur de reprise — livrable 5, moitié « après », **checkpoint bloquant** (vague 4)
 
 **Ordre non négociable, câblé deux fois.** La baseline (`27-04`) précède l'activation (`27-05`) par
 `depends_on` **et** par une précondition vérifiée à l'exécution sur l'absence de la clé de capability :
