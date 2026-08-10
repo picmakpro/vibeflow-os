@@ -1,5 +1,12 @@
 # Changelog — mobile-test-team
 
+## [v1.4.3] — 2026-08-10 (armement worktree du groupe A)
+
+### Modifié
+- **2 workers armés `isolation: worktree`** (Phase 27, groupe A) : `vf-app-fixer`,
+  `vf-test-runner` — écritures isolées par worktree, mémoire d'agent embarquée via
+  `.worktreeinclude`. Précondition de sûreté : `worktree.baseRef: "head"`.
+
 ## v1.4.2 — 2026-08-04
 
 ### Modifié
