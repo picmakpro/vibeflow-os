@@ -7,6 +7,11 @@
 > consigne explicite de re-mesurer au cadrage plutôt que de reprendre ses faits. Tous les faits
 > ci-dessous ont été **re-mesurés sur disque le 2026-08-10**, après mise à jour. Ce qui a bougé est
 > nommé en `<code_context>` § « État re-mesuré ».
+>
+> **Complément du 2026-08-10 (même jour) :** cadrage recoupé avec un état de l'art marché
+> (`.planning/research/2026-08-10-agents-paralleles-etat-de-l-art.md`). Aucune décision n'a été
+> inversée — le marché les confirme toutes ; les ajouts sont marqués « état de l'art » dans D-02,
+> D-04, Claude's Discretion et `<deferred>`.
 
 <domain>
 ## Phase Boundary
@@ -85,6 +90,13 @@ capacité dont la précondition n'est posée par personne chez l'utilisateur —
   règle du gate, pas un contrat distribué. [arbitrage humain du 2026-08-10 ; mesuré ce jour :
   `plugin/_internal/merge-hooks.sh`, `plugin/_internal/vibeflow-update.sh:276-330`]
 
+  **Confirmation plateforme (état de l'art 2026-08-10) :** le trou n'est pas propre à l'engine —
+  le `settings.json` embarqué d'un plugin Claude Code ne supporte que les clés `agent` et
+  `subagentStatusLine`, **toute autre clé est ignorée en silence**. Aucun plugin ne peut distribuer
+  un réglage arbitraire par ce canal. Le véhicule officiel de la plateforme est `userConfig` de
+  `plugin.json` (collecte à l'activation, `required: true`) — consigné en `<deferred>`, pas ouvert
+  ici. [`.planning/research/2026-08-10-agents-paralleles-etat-de-l-art.md` §Volet C]
+
 - **D-02b — Le mécanisme de liaison artefact ↔ `ensure-*.sh` relève du plan, pas du cadrage.**
   Convention de nommage, champ de frontmatter nommant le script, ou registre : c'est un calcul
   d'implémentation. Seule contrainte de cadrage : la liaison doit être **explicite et vérifiable
@@ -109,6 +121,13 @@ capacité dont la précondition n'est posée par personne chez l'utilisateur —
   aujourd'hui que l'install *tient* (Gate C), jamais qu'elle est *cohérente avec ce qu'elle
   promet*. Une seule implémentation (D-03), exécutée **aussi** depuis `lab-frais`. — **Reversibility:**
   reversible — ajout d'une étape au job.
+
+  **Nom du pattern, à reprendre dans l'en-tête du gate (D-01b) :** *as-installed testing*
+  (autopkgtest Debian) — tester l'artefact **tel qu'installé** dans un environnement vierge, jamais
+  l'arbre source ; les tests sur l'arbre ne prouvent rien sur le packaging. Outillage plateforme à
+  évaluer au plan, sans obligation : `claude plugin validate --strict` (documenté pour la CI) et
+  `--plugin-url` sur un artefact zip (tester **le publié**, pas le checkout).
+  [`.planning/research/2026-08-10-agents-paralleles-etat-de-l-art.md` §Volet C, pattern 7]
 
 ### Portée — gate seul ou traitement de l'existant ?
 
@@ -139,6 +158,10 @@ capacité dont la précondition n'est posée par personne chez l'utilisateur —
   `check-file-size.sh` (D-03).
 - La forme du test de discriminance et son emplacement dans les suites (D-06).
 - L'articulation exacte avec `check-agents.sh` sur le cas `isolation:` (D-06, § recouvrement).
+- La distinction **précondition dure** vs **tuning à défaut sûr** dans le verdict (état de l'art,
+  pattern 1 : le natif `worktree.baseRef` a un défaut `"fresh"` + fallback gracieux — une capacité
+  qui *exige* un réglage nu est mal conçue pour la distribution). Si un armement déclare un défaut
+  sûr documenté, le plan tranche si cela vaut vert ou si seule la preuve `ensure-*` compte.
 - Découpage en plans, numérotation, nommage des artefacts produits.
 
 </decisions>
@@ -158,6 +181,11 @@ capacité dont la précondition n'est posée par personne chez l'utilisateur —
   question « qui l'écrit chez l'utilisateur ? » n'a jamais été posée.
 - `.planning/research/2026-08-05-parallelisation-execution.md:92-94` — la précondition, écrite mot
   pour mot, dix mois avant l'incident. **Produite sur gsd-core 1.9.1** ; le poste est en 1.10.0.
+- `.planning/research/2026-08-10-agents-paralleles-etat-de-l-art.md` — état de l'art marché
+  (worktree-based, isolations alternatives, patterns de gouvernance). Valide le cadrage décision
+  par décision (§Implications, tableau), fournit le nom du pattern de D-04 (*as-installed
+  testing*), le fait plateforme de D-02 (clés de settings de plugin ignorées en silence), et le
+  dossier du futur ré-armement (§Implications 3 — **à ne pas ouvrir dans cette phase**).
 
 ### L'incident et son correctif
 - Commit `bc825e6` — `fix(#38): isolation worktree retirée des 13 agents + garde-fou machine (#39)`.
@@ -266,10 +294,20 @@ capacité dont la précondition n'est posée par personne chez l'utilisateur —
 
 - **Ré-armer `isolation: worktree`** — fermé tant qu'`open-gsd/gsd-core#3302` n'est pas levée. Ne
   pas rouvrir depuis cette phase, même si le gate rend vert : un gate vert prouve que la précondition
-  est distribuée, jamais que le worker sait rendre son travail.
+  est distribuée, jamais que le worker sait rendre son travail. **Dossier prêt pour le jour venu**
+  (`2026-08-10-agents-paralleles-etat-de-l-art.md` §Implications 3) : le merge-back n'est prescrit
+  par aucune plateforme — les trois modèles éprouvés du marché sont branche + merge humain, merge
+  local outillé (squash → rebase → fast-forward, worktrunk/Crystal), et merge queue gatée machine
+  (Gastown) ; **aucun outil sérieux ne merge le travail d'un agent sans gate**. Côté préconditions,
+  `.worktreeinclude` (natif, versionné) n'existait pas quand la Phase 27 a armé. À re-mesurer alors.
 - **Ouvrir un véhicule de distribution de settings dans l'engine** (au-delà de `hooks`) — écarté par
   D-02. Redevient pertinent le jour où une précondition ne peut *pas* être vérifiée par un
-  `ensure-*.sh` runtime. Phase distincte : l'engine écrirait dans le settings de l'utilisateur.
+  `ensure-*.sh` runtime. **Correction d'horizon (état de l'art 2026-08-10)** : avant de construire
+  un véhicule dans l'engine, évaluer `userConfig` de `plugin.json` — le véhicule *officiel* de la
+  plateforme (collecte à l'activation, `required: true`, `sensitive`, substitution
+  `${user_config.KEY}`, env `CLAUDE_PLUGIN_OPTION_<KEY>`). Limite connue : il alimente hooks/MCP et
+  scripts, pas une clé arbitraire de `settings.json` utilisateur ; et depuis v2.1.207 les
+  `pluginConfigs` posés en settings *projet* sont ignorés. Phase distincte dans tous les cas.
 - **Solder les findings du gate sur l'existant** — écarté par D-05. Deux candidats déjà identifiés :
   les outils `mcp__*` de `plugin/dev-orchestrator/agents/vf-reviewer.md` (seul agent concerné), et la
   chaîne design couverte par `ensure-design-deps.sh` (bon candidat pour prouver le verdict **vert**,
