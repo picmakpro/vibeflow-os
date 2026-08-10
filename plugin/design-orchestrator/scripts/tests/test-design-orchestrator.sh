@@ -281,7 +281,22 @@ else
   # VF_SCOPE=bogus → exit 1 avec message de validation. Deux assertions distinctes (jamais un
   # `&&` qu'un seul côté satisferait).
   # ---------------------------------------------------------------------------
-  T9B_OUT="$(VF_DESIGN_ENSURE_DRY_RUN=1 VF_DESIGN_ENSURE_FORCE=1 VF_SCOPE=project bash "$EDD" 2>&1)"
+  # Stub `claude` OBLIGATOIRE ici : sans lui, le script part en état « indéterminé » (aucune source
+  # de vérification) et n'émet AUCUNE commande — le test passait sur un poste de dev équipé et
+  # échouait sur un runner CI nu, en mesurant la machine plutôt que le script. Le stub n'a pas
+  # besoin de fixture : FORCE bascule de toute façon les 4 plugins sur la branche « absent ».
+  T9B_BIN="$(mktemp -d)"
+  cat >"$T9B_BIN/claude" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = "plugin" ] && [ "$2" = "list" ] && [ "$3" = "--json" ]; then
+  echo '[]'
+  exit 0
+fi
+exit 0
+SH
+  chmod +x "$T9B_BIN/claude"
+  T9B_OUT="$(PATH="$T9B_BIN:$PATH" VF_DESIGN_ENSURE_DRY_RUN=1 VF_DESIGN_ENSURE_FORCE=1 VF_SCOPE=project bash "$EDD" 2>&1)"
+  rm -rf "$T9B_BIN"
   t9b_cmd_n=$(echo "$T9B_OUT" | "$GREP" -c '^\[ensure-design-deps\] (dry-run)')
   t9b_scoped_n=$(echo "$T9B_OUT" | "$GREP" -c -- '^\[ensure-design-deps\] (dry-run).*--scope project')
   if [ "$t9b_cmd_n" -ge 4 ] && [ "$t9b_cmd_n" = "$t9b_scoped_n" ]; then
