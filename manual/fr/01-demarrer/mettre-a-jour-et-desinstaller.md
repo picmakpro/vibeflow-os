@@ -44,6 +44,16 @@ C'est une migration qui ne se propose jamais sans que tu l'acceptes explicitemen
 À la fin, redémarre Claude Code : le plugin lui-même (commandes, agents) n'est pris en compte qu'au
 prochain démarrage de session.
 
+**Cette règle vaut pour toute modification d'un agent, pas seulement pour une mise à jour.** Le
+registre des agents est résolu **au démarrage** : si tu édites toi-même un fichier d'agent — pour
+tester un correctif, ajuster un outil, retirer une ligne — la session en cours continue d'utiliser
+la définition qu'elle a chargée en démarrant. Le piège est qu'il n'y a aucun signal : l'agent
+répond, il se comporte simplement comme avant ton édition, et rien ne dit que ta modification n'a
+pas pris. Et comme un agent peut exister en plusieurs copies sur le poste (la définition posée, le
+cache du plugin, le catalogue), éditer une seule copie ne suffit pas non plus. **Après toute
+modification d'un agent : redémarre la session, puis vérifie sur un geste réel** — c'est le seul
+moyen de savoir que c'est bien ta version qui tourne.
+
 ## Re-configurer, ajouter ou retirer un module
 
 `/vibeflow-install` n'est pas réservé à la première installation (voir

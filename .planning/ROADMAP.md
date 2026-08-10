@@ -454,6 +454,9 @@ Plans:
 | 23. Couplage explicite au moteur GSD | gsd-alignement | 8/8 | In Progress|  |
 | 24. Activation et mesure du moteur GSD | gsd-alignement | 0/0 | Inscrite — lot MESURE : M2 **rendu** le 2026-07-31, M1/M3 à instruire ; lot ACTIVATION : 8 items | — |
 | 25. Budget d'instructions et étage d'alignement court | gsd-alignement | 0/0 | Inscrite — G1 (compteur d'instructions dans `check-agents.sh`) après 24 ; G2 (outline court `discuss`→`plan`) dépend de 23 | — |
+| 26. Manuel utilisateur VibeFlow (manual/) | gsd-alignement | — | Complete (PR #28) | 2026-08-02 |
+| 27. Parallélisation d'exécution — granulaire, simple, sans collision | gsd-alignement | 6/6 | Complete (PR #35) — spike `claude_orchestration` refusé par écrit | 2026-08-10 |
+| 28. Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur | gsd-alignement | 0/0 | Inscrite — ouverte par la régression #38 (v2.49.0 → v2.50.1) ; **non cadrée**, mise à jour VibeFlow attendue avant | — |
 
 ### Phase 15: Collaboration inter-équipes dev ↔ design
 
@@ -1607,8 +1610,6 @@ trois : **aucune partition tant qu'une phase est en vol** (cf. divergence invisi
 > critère **K2** (43 au K1, 35 au K3), sur **45** qui codent des chemins en dur. Le critère fait
 > partie du chiffre — voir le tableau de clôture en fin de section, et ADR-069 pour la commande.
 
----
-
 #### État à la clôture — ce que la phase a effectivement tranché (2026-08-04)
 
 > **Comment lire tout ce qui précède.** Les lots MESURE et ACTIVATION ci-dessus décrivent l'état
@@ -1998,3 +1999,78 @@ d'exécution. À inscrire au ledger `REQUIREMENTS.md` par le manager de mission,
 **Ordre non négociable, câblé deux fois.** La baseline (`27-04`) précède l'activation (`27-05`) par
 `depends_on` **et** par une précondition vérifiée à l'exécution sur l'absence de la clé de capability :
 une baseline prise après activation est détruite sans rattrapage.
+
+---
+
+### Phase 28: Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur
+
+> **Origine** — régression **#38**, livrée en v2.49.0, corrigée en v2.50.1 le 2026-08-10. Ouverte
+> par Samuel dans la foulée du hotfix : *« corrige le trou structurel »*. La phase est **créée avec
+> le diagnostic, sans cadrage ni plan** — une mise à jour de VibeFlow est prévue avant de la
+> travailler, et ce qu'elle changera doit être re-mesuré au cadrage, jamais présumé ici.
+
+**Goal**: Qu'une capacité **armée** dans le plugin ne puisse pas être livrée quand le réglage qui
+la rend sûre n'est **posé par personne** chez l'utilisateur. Aujourd'hui rien ne relie les deux :
+l'armement voyage avec le plugin, la précondition reste dans le poste de développement, et tous les
+gates rendent vert.
+
+**Requirements**: TBD
+**Depends on:** Phase 27
+**Plans:** 0 plans
+
+#### Le fait qui ouvre la phase
+
+La Phase 27 a armé `isolation: worktree` sur 13 agents. Sa **propre recherche** avait identifié la
+précondition, mot pour mot : *« besoin de `baseRef: "head"`, sinon il part de `main` et perd le
+contexte de la mission »* (`.planning/research/2026-08-05-parallelisation-execution.md:92-94`). Le
+réglage a été posé — dans `.claude/settings.local.json` **de ce repo**, sous checkpoint humain,
+avant l'armement, dans le bon ordre.
+
+Puis les agents ont été distribués. Pas le réglage : **zéro occurrence de `baseRef`** dans
+`vibeflow-update.sh`, `merge-hooks.sh` et l'installeur. Chez l'utilisateur, les 13 workers partaient
+sur un worktree forké depuis la branche par défaut, sans les fichiers de leur mandat, et le manager
+se rabattait en silence sur un agent générique.
+
+**Le maillon manquant n'était pas la connaissance.** La précondition était identifiée, écrite,
+arbitrée et posée. Ce qui n'a jamais été posé, c'est la question suivante : **qui écrit ce réglage
+chez l'utilisateur ?**
+
+#### Pourquoi rien ne l'a vu
+
+| Garde en place | Ce qu'elle a vérifié | Pourquoi elle est passée |
+|---|---|---|
+| 52 suites + CI Linux | le comportement **dans ce repo** | le repo a le réglage dans son settings local |
+| `check-agents.sh` | la **forme** de `isolation:` (« seul `worktree` est admis ») | il ne pouvait pas savoir si la valeur était légitime — corrigé en v2.50.1 |
+| Checkpoint humain avant armement | que la précondition soit **posée** | jamais qu'elle soit **distribuée** |
+| Job CI « lab frais » | que la baseline passe **ses propres gates** dans un lab vierge | il ne compare aucun armement à sa précondition |
+
+Le job « lab frais » est l'endroit le plus proche du besoin — il installe déjà dans un lab vierge.
+Il vérifie que l'install **tient**, jamais que ce qu'elle pose est **cohérent avec ce qu'elle a
+promis**.
+
+#### Le précédent à reprendre, pas à réinventer
+
+`check-capability-activation.sh` (Phase 24) relie **une entrée de doc à l'activation de sa
+capability** — né exactement du même motif : trois routes documentées qui ne faisaient rien parce
+que la capacité était éteinte. La phase 28 est ce motif **d'un cran plus loin** : relier un
+**armement** à la **distribution** de sa précondition. Regarder d'abord si ce gate s'étend plutôt
+que d'en créer un sixième — la Phase 24 a documenté le coût de ce réflexe (6 implémentations d'un
+même besoin en 3 langages, et un script neuf dans aucun roster).
+
+#### Questions ouvertes, à trancher au cadrage — pas ici
+
+- **Qu'est-ce qu'un « armement » recensable ?** `isolation:` est le cas connu. Un hook, un flag de
+  capability, une clé de settings lue par un script posé, un `permissionMode` — la frontière n'est
+  pas établie, et un gate qui la devine sera soit inerte soit insupportable.
+- **Le lab frais doit-il porter le gate, ou faut-il un gate séparé ?** Le premier a l'environnement,
+  le second a la lisibilité. Non tranché.
+- **Faut-il distribuer `worktree.baseRef` et ré-armer ?** Question distincte, et **elle n'est pas
+  ouverte par cette phase** : le retour des commits d'un worker isolé reste non implémenté en amont
+  (`open-gsd/gsd-core#3302`). Tant que ce point n'est pas levé, ré-armer serait refaire #38 avec une
+  précondition de plus. Cette phase porte le **gate**, pas le ré-armement.
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 28 to break down)
+
+---

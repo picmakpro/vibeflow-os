@@ -44,6 +44,15 @@ without you explicitly accepting it.
 At the end, restart Claude Code: the plugin itself (commands, agents) only takes effect at the
 next session start.
 
+**This rule covers any change to an agent, not just an update.** The agent registry is resolved
+**at startup**: if you edit an agent file yourself — to test a fix, adjust a tool, remove a line —
+the running session keeps using the definition it loaded when it started. The trap is that there
+is no signal: the agent still answers, it simply behaves as it did before your edit, and nothing
+tells you your change did not take. And since an agent can exist in several copies on the machine
+(the installed definition, the plugin cache, the catalog), editing a single copy is not enough
+either. **After any change to an agent: restart the session, then verify on a real action** — that
+is the only way to know your version is the one running.
+
 ## Reconfiguring, adding, or removing a module
 
 `/vibeflow-install` isn't reserved for the first install (see
