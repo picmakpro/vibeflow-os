@@ -1,5 +1,19 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.13.0] — 2026-08-10 (les managers reçoivent la partition en étages, vf-coder passe en worktree)
+
+### Ajouté
+- **Doctrine `stages`** (`mission-flow.md`, Phase 27) — usage du champ `stages` de `dag.sh ready`
+  par les managers : garantie (aucun recouvrement de `scope[]` intra-étage), non-garantie (les
+  écritures non déclarées restent hors du contrat), dépendance dure (node + gsd-tools), repli
+  (`stages: null` → frontière plate).
+- **`vf-coder` armé `isolation: worktree`** — exécution isolée par worktree (groupe A, Phase 27) ;
+  `worktree.baseRef: "head"` posé en précondition de sûreté avant l'armement.
+
+### Modifié
+- **`mission-contracts.md`** — fermeture du vecteur RCE par confinement de chemin (variante
+  `toplevel`), propagation du fix ADR-070 de `dag.sh`.
+
 ## [v2.12.0] — 2026-08-04 (une entrée de doc ne promet plus un geste inerte)
 
 ### Ajouté

@@ -11,6 +11,16 @@
 # parallele (critere b de la gradation par risque) et a la table des fichiers geles (dag.sh
 # status). Absent sur les DAG ecrits avant ce champ : toute lecture tolere l'absence, jamais
 # d'acces direct a la cle (P-02).
+# stages (action `ready`) : partition de la frontiere `ready` en etages sans recouvrement de
+# scope[] entre nœuds d'un meme etage — calculee en CABLANT `partitionStages()`
+# (~/.claude/gsd-core/bin/lib/claude-orchestration.cjs) via un sous-processus
+# `gsd-tools claude-orchestration emit-workflow`, jamais reimplementee ici (ADR-069, Iron Law 2
+# revisee). Toujours presente, trois valeurs possibles : tableau d'etages (ex. [["a","b"],["c"]])
+# si le calcul reussit · [] si la frontiere ready est vide (aucun sous-processus lance) · null si
+# la CLI amont (node/gsd-tools) est introuvable ou echoue — repli sur `ready`/`count` seuls
+# (frontiere plate), jamais un crash de `dag.sh ready`. Dependance nouvelle et dure : `dag.sh`
+# n'invoquait jusqu'ici que python3, il depend desormais aussi d'une resolution fonctionnelle de
+# node et gsd-tools.
 # review_regime : ecrit UNIQUEMENT par `reopen`, valeur "full" — jamais une autre valeur (P-03).
 # Force le regime plein sur tout noeud de revue/jointure (id prefixe revue-/revue:/join-/join:
 # ou egal a "join") rouvert, la cible ET ses dependants transitifs — enforcement machine du
@@ -21,7 +31,7 @@
 # Usage:
 #   dag.sh init   --file=F
 #   dag.sh add    --file=F --id=N --step="..." [--stage=S] [--deps=a,b] [--scope=g1,g2]   # remap id::stage si collision
-#   dag.sh ready  --file=F                                                # frontiere ready (JSON)
+#   dag.sh ready  --file=F                                                # frontiere ready (JSON) + stages
 #   dag.sh mark   --file=F --id=N --status=running|done|failed            # + recalcule la frontiere
 #   dag.sh reopen --file=F --id=N                # re-entree : noeud + dependants, force review_regime=full sur revue/join
 #   dag.sh status --file=F     # compteurs + frontiere + perimetres GELES (JSON) — source vivante
@@ -54,7 +64,7 @@ done
 [ -n "$ACTION" ] || { echo "Usage: $0 {init|add|ready|mark|reopen|status|tree} --file=F [...]" >&2; exit 1; }
 
 python3 - "$ACTION" "$FILE" "$ID" "$STEP" "$STAGE" "$DEPS" "$STATUS" "$SCOPE" <<'PYEOF'
-import sys, os, json
+import sys, os, json, subprocess, tempfile, shutil
 
 action, file, nid, step, stage, deps_raw, status, scope_raw = sys.argv[1:9]
 VALID = {"blocked", "ready", "running", "done", "failed"}
@@ -97,6 +107,94 @@ def is_review_node(node_id):
             or node_id.startswith("join-") or node_id.startswith("join:")
             or node_id == "join")
 
+def resolve_gsd_tools_cmd():
+    """Cascade de resolution de la CLI amont (D-07), dans cet ordre : variable d'environnement
+    GSD_TOOLS si elle pointe un fichier existant -> executable `gsd-tools` sur le PATH -> sous
+    CLAUDE_CONFIG_DIR puis sous ~/.claude. Une cible `.cjs` s'invoque via node ; un executable
+    resolu sur le PATH s'invoque directement. None si rien ne resout, ou si `node` est introuvable
+    pour une cible `.cjs` — jamais une exception (T-27-01-01).
+
+    Divergence connue (documentee cote shell, mission-contracts.md §D5(b)) : la cascade shell des
+    managers place CLAUDE_CONFIG_DIR AVANT PATH, ordre inverse d'ici — deux binaires distincts
+    possibles pour "la meme" cascade si plusieurs versions sont installees.
+
+    AUCUN candidat cwd/repo-relatif (ex. l'ancien `<cwd>/gsd-core/bin/gsd-tools.cjs`, retire) :
+    un tel candidat resout un executable a un chemin RELATIF AU REPERTOIRE DE TRAVAIL COURANT puis
+    l'invoque via `node` sans aucune verification d'ancrage. PoC rejoue en audit : un simple
+    fichier tracke (`gsd-core/bin/gsd-tools.cjs` a la racine d'une branche ou d'une PR malveillante)
+    suffit a faire executer du code arbitraire — sans symlink, sans PATH compromis — et
+    `dag.sh ready` est invoque en routine par les cinq managers du team-kernel. 5e passage du motif
+    de confinement de chemin sur ce depot ; celui-ci se ferme par RETRAIT du candidat, pas par un
+    ancrage supplementaire (D-07 revise). Consequence assumee : un lab qui VENDORISE le moteur a sa
+    propre racine (`<repo>/gsd-core/...`) perd la resolution automatique de ce candidat ; le
+    contournement qui reste est `GSD_TOOLS=<chemin absolu>` en variable d'environnement — voir
+    mission-flow.md §Pattern B (note stages) pour la doctrine cote manager."""
+    resolved = None
+    env_tools = os.environ.get("GSD_TOOLS", "")
+    if env_tools and os.path.isfile(env_tools):
+        resolved = env_tools
+    if resolved is None:
+        resolved = shutil.which("gsd-tools")
+    if resolved is None:
+        config_dir = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
+        cand = os.path.join(config_dir, "gsd-core", "bin", "gsd-tools.cjs")
+        if os.path.isfile(cand):
+            resolved = cand
+    if resolved is None:
+        return None
+    if resolved.endswith(".cjs"):
+        node_bin = shutil.which("node")
+        return [node_bin, resolved] if node_bin else None
+    return [resolved]
+
+def build_ready_manifest(ready_nodes):
+    """Manifeste attendu par `emit-workflow` (27-RESEARCH.md Livrable 3 Q1) : une seule vague
+    `ready-frontier`, un plan par noeud de la frontiere. Lecture tolerante a l'absence (P-02) :
+    jamais d'acces direct a `scope`."""
+    plans = [
+        {
+            "id": n["id"],
+            "brief": n.get("step") or n["id"],
+            "files_modified": n.get("scope", []),
+        }
+        for n in ready_nodes
+    ]
+    return {"waves": [{"id": "ready-frontier", "plans": plans}]}
+
+def compute_stages(ready_nodes):
+    """Cable `partitionStages()` (~/.claude/gsd-core/bin/lib/claude-orchestration.cjs) via
+    `gsd-tools claude-orchestration emit-workflow` en sous-processus, manifeste passe par chemin
+    de fichier (jamais par argv) — ne reimplemente AUCUNE comparaison de scope[] localement
+    (ADR-069, Iron Law 2 revisee). Degrade en retournant None — jamais une exception, jamais un
+    sys.exit non nul — sur tout echec : CLI non resolue, code retour non nul, timeout, stdout non
+    parsable en JSON, summary/stagesByWave absent ou vide (T-27-01-01)."""
+    try:
+        cmd = resolve_gsd_tools_cmd()
+        if cmd is None:
+            return None
+        manifest = build_ready_manifest(ready_nodes)
+        fd, tmp_path = tempfile.mkstemp(prefix="dag-ready-", suffix=".json")  # creation exclusive, 0600 (T-27-01-03)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                json.dump(manifest, fh)  # jamais de concatenation de chaines (T-27-01-02)
+            result = subprocess.run(
+                cmd + ["claude-orchestration", "emit-workflow",
+                       "--waves", tmp_path, "--run-id", "dag-ready"],
+                capture_output=True, text=True, timeout=20, check=False,
+            )
+        finally:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+        if result.returncode != 0:
+            return None
+        payload = json.loads(result.stdout)
+        stages = payload.get("summary", {}).get("stagesByWave", [])[0]
+        return stages if isinstance(stages, list) else None
+    except Exception:
+        return None
+
 if action == "init":
     save({"nodes": []})
     emit({"file": file, "initialized": True, "nodes": 0})
@@ -132,8 +230,12 @@ if action == "add":
     sys.exit(0)
 
 if action == "ready":
-    frontier = [n["id"] for n in nodes if n["status"] == "ready"]
-    emit({"ready": frontier, "count": len(frontier)})
+    frontier_nodes = [n for n in nodes if n["status"] == "ready"]
+    frontier = [n["id"] for n in frontier_nodes]
+    # calcule uniquement si la frontiere est non vide : emit-workflow rejette un `plans` vide,
+    # l'appeler serait une erreur garantie (D-07) ; frontiere vide => stages = [] sans sous-processus.
+    stages = compute_stages(frontier_nodes) if frontier_nodes else []
+    emit({"ready": frontier, "count": len(frontier), "stages": stages})
     sys.exit(0)
 
 if action == "mark":

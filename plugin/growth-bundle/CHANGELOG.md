@@ -1,5 +1,12 @@
 # CHANGELOG — growth-bundle
 
+## [v2.0.5] — 2026-08-10 (armement worktree du groupe A)
+
+### Modifié
+- **3 agents armés `isolation: worktree`** (Phase 27, groupe A) : `campaign-analyst`,
+  `channel-strategist`, `copywriter-sequences` — écritures isolées par worktree, mémoire d'agent
+  embarquée via `.worktreeinclude`. Précondition de sûreté : `worktree.baseRef: "head"`.
+
 ## [v2.0.4] — 2026-08-04 (`effort:` par rôle sur les 5 agents, Phase 24)
 
 ### Modifié

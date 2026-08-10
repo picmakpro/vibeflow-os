@@ -12,6 +12,11 @@
 
 # Artefacts d'install locale (le repo est la SOURCE des modules, PAS un lab :
 # lancer l'engine en scope project/local y déposerait des copies du distribuable).
+# Worktrees d'agents isolés (isolation: worktree, Phase 27) : déjà couverts par cette
+# règle englobante — vérifié sur pièce (`git check-ignore -v .claude/worktrees/` →
+# matche cette ligne) ; aucune ligne `.claude/worktrees/` dédiée ajoutée, elle serait
+# inopérante. Le nom exact du dossier matérialisé par le harness reste une hypothèse
+# (A2, confiance BASSE) tant qu'aucun agent isolé n'a réellement tourné.
 .claude/
 docs/reference/
 

@@ -1,0 +1,264 @@
+{
+  "nodes": [
+    {
+      "id": "rederive-chiffres",
+      "step": "Re-derivation des comptages graves (workstream 6 vs 7/91 ; .planning/ en dur 45 vs 73) au commit de base f4d7447, avec critere nomme",
+      "stage": "recherche",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "discuss-27",
+      "step": "Cadrage GSD de la Phase 27 (gsd-discuss-phase 27) — arbitrages A et B deja tranches, injectes par digest",
+      "stage": "cadrage",
+      "deps": [],
+      "scope": [
+        ".planning/phases/27-*/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plan-27",
+      "step": "Planification GSD de la Phase 27 (gsd-plan-phase 27) — decoupe en plans, chemin 1 -> spike de 2 -> 2",
+      "stage": "plan",
+      "deps": [
+        "discuss-27",
+        "rederive-chiffres"
+      ],
+      "scope": [
+        ".planning/phases/27-*/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-27",
+      "step": "Re-validation lecture seule des plans (gsd-plan-checker) avant toute execution",
+      "stage": "plan",
+      "deps": [
+        "plan-27"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-27-01",
+      "step": "Livrable 3 — cablage dag.sh <-> partitionStages amont + tests",
+      "stage": "execution",
+      "deps": [
+        "plancheck-27"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/dag.sh",
+        "plugin/conductor/scripts/tests/test-dag.sh",
+        "plugin/dev-orchestrator/references/mission-flow.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-27-02",
+      "step": "Livrable 1 — correction doctrine team-kernel.md 64-65 + lift encadre ROADMAP 1898-1901",
+      "stage": "execution",
+      "deps": [
+        "plancheck-27"
+      ],
+      "scope": [
+        "plugin/conductor/references/team-kernel.md",
+        ".planning/ROADMAP.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-27-03",
+      "step": "Livrable 2 — isolation: worktree sur les 13 agents ecrivains + .gitignore + .worktreeinclude",
+      "stage": "execution",
+      "deps": [
+        "plancheck-27"
+      ],
+      "scope": [
+        ".worktreeinclude",
+        ".gitignore",
+        "plugin/*/agents/*.md",
+        ".planning/phases/VFDO-27-*/27-ISOLATION-PORTEE.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-v1",
+      "step": "Revue PLEINE de la vague 1 (dag.sh et agents = zones de risque des invariants, aucun allegement)",
+      "stage": "revue",
+      "deps": [
+        "exec-27-01",
+        "exec-27-02",
+        "exec-27-03"
+      ],
+      "scope": [],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "audit-v1",
+      "step": "Audit securite vague 1 — primitives de chemin, echappement par lien symbolique (4e passage), socle conductor",
+      "stage": "audit",
+      "deps": [
+        "exec-27-01",
+        "exec-27-02",
+        "exec-27-03"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-27-04",
+      "step": "Livrable 5 (avant) — baseline d'horloge, capturee AVANT toute activation",
+      "stage": "execution",
+      "deps": [
+        "revue-v1",
+        "audit-v1"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-27-*/27-mesure/**",
+        ".planning/phases/VFDO-27-*/27-MESURE-GAIN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-27-05",
+      "step": "Livrable 4 — spike claude_orchestration (checkpoint humain bloquant, ADR-031)",
+      "stage": "execution",
+      "deps": [
+        "exec-27-04"
+      ],
+      "scope": [
+        ".planning/config.json",
+        ".planning/phases/VFDO-27-*/27-DECISION-claude-orchestration.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-27-06",
+      "step": "Livrable 5 (apres) — mesure post-activation (checkpoint humain bloquant)",
+      "stage": "execution",
+      "deps": [
+        "exec-27-05"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-27-*/27-MESURE-GAIN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "Hygiene documentaire de fin de mission — STATE.md (edition manuelle), ledger REQUIREMENTS PAEX, item Phase 19 STATE:768-772",
+      "stage": "docs",
+      "deps": [
+        "exec-27-01",
+        "exec-27-02",
+        "exec-27-03",
+        "exec-27-04",
+        "exec-27-05",
+        "exec-27-06"
+      ],
+      "scope": [
+        ".planning/STATE.md",
+        ".planning/REQUIREMENTS.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-rce",
+      "step": "RETRAIT du candidat cwd-relatif dag.sh:124 + docstring + mission-flow.md + tests M1/M2 + test de non-regression du vecteur",
+      "stage": "execution",
+      "deps": [],
+      "scope": [
+        "plugin/conductor/scripts/dag.sh",
+        "plugin/conductor/scripts/tests/test-dag.sh",
+        "plugin/dev-orchestrator/references/mission-flow.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "methode-adr",
+      "step": "Fait de methode : un threat register peut passer au vert sur un vecteur voisin jamais examine — ADR + renfort CONCERNS",
+      "stage": "doctrine",
+      "deps": [],
+      "scope": [
+        "docs/ADR.md",
+        ".planning/codebase/CONCERNS.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "git-discipline",
+      "step": "Graver la discipline de commit en worktree partage — les DEUX moities (aucun git add, jamais de commit nu)",
+      "stage": "doctrine",
+      "deps": [],
+      "scope": [
+        "plugin/conductor/references/team-kernel.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-reprise",
+      "step": "Revue PLEINE du diff de reprise (dag.sh = zone de risque des invariants)",
+      "stage": "revue",
+      "deps": [
+        "fix-rce",
+        "methode-adr",
+        "git-discipline"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "audit-reprise",
+      "step": "Audit securite — fermeture du vecteur RCE verifiee, pas seulement annoncee",
+      "stage": "audit",
+      "deps": [
+        "fix-rce",
+        "methode-adr",
+        "git-discipline"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "arm-agents",
+      "step": "Armement des 13 agents (isolation: worktree) — DERNIER dispatch de worker, ratification effective",
+      "stage": "execution",
+      "deps": [
+        "revue-reprise",
+        "audit-reprise"
+      ],
+      "scope": [
+        "plugin/*/agents/*.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-rce-propagation",
+      "step": "RETRAIT de la variante toplevel dans mission-contracts.md + balayage repo-wide du motif",
+      "stage": "execution",
+      "deps": [],
+      "scope": [
+        "plugin/dev-orchestrator/references/mission-contracts.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "corrections-juges",
+      "step": "Fusion des findings revue+audit — etats perimes, rename dans la doctrine de commit, T-27-01-04 borne selon ADR-070, cosmetique",
+      "stage": "execution",
+      "deps": [],
+      "scope": [
+        "docs/ADR.md",
+        ".planning/codebase/CONCERNS.md",
+        "plugin/conductor/references/team-kernel.md",
+        "plugin/conductor/scripts/tests/test-dag.sh",
+        ".planning/phases/VFDO-27-*/27-01-PLAN.md",
+        "plugin/dev-orchestrator/references/mission-contracts.md"
+      ],
+      "status": "done"
+    }
+  ]
+}

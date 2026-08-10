@@ -154,6 +154,21 @@
   **mutation obligatoire** sur le modèle de C3 — un script neuf non confiné ajouté au corpus doit
   faire rougir la suite, sans quoi la garde n'est qu'une assertion d'*existence* (« la primitive
   existe quelque part ») qui reste verte pendant que la *relation* se rompt.
+- Update 2026-08-06 — **prédiction vérifiée, sur un site neuf, hors du sous-motif symlink** : le 5ᵉ
+  passage annoncé ci-dessus s'est produit dans `plugin/conductor/scripts/dag.sh:124`
+  (`resolve_gsd_tools_cmd()`), trouvé par l'audit de la Phase 27 — RCE reproduite par PoC (candidat
+  de résolution **relatif au CWD**, exécuté via `node` sans ancrage, sans symlink ni `PATH`
+  compromis). C'est un **mécanisme distinct** du sous-motif « suivi de lien symbolique » que
+  comptent les quatre passages ci-dessus : même famille (chemin dérivé d'une entrée non maîtrisée,
+  jamais confiné avant usage), vecteur différent (résolution CWD non ancrée, pas traversée de
+  lien) — les deux comptages ne se fusionnent pas. Le registre de menaces du plan (`T-27-01-04`)
+  couvrait le spoofing de résolution **uniquement via `PATH`**, jamais via CWD : la règle de méthode
+  que l'audit en tire (bornage explicite du vecteur qu'une disposition `accept` couvre) vit dans
+  `docs/ADR.md` §ADR-070. Correctif du site (retirer ou ancrer le candidat CWD) : **arbitrage humain
+  gelé**, `.planning/REQUIREMENTS.md` PAEX-11 — non traité ici.
+- Clôture 2026-08-06 : l'arbitrage ci-dessus est **tranché (retrait) et exécuté** — `dag.sh`
+  (`4a532ec`) et `mission-contracts.md` (`08ad030`). La prédiction de cette entrée s'est vérifiée
+  et le site est fermé ; voir `docs/ADR.md` §ADR-070 pour le détail.
 
 **`hooks.workflow_guard` se déclenche sur des fichiers HORS du dépôt** — Sévérité : **LOW**
 - Issue: la capacité a été activée par la Phase 24 (ADR-066) et se comporte comme annoncé sur le

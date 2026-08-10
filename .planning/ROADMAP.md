@@ -60,7 +60,7 @@
 - [x] Phase 24: Activation et mesure du moteur GSD — capacités dormantes et faits de runtime (completed 2026-08-05, PR #34)
 - [ ] Phase 25: Budget d'instructions et étage d'alignement court
 - [x] Phase 26: Manuel utilisateur VibeFlow (manual/) (completed 2026-08-02)
-- [ ] Phase 27: Parallélisation d'exécution — granulaire, simple, sans collision d'écriture
+- [x] Phase 27: Parallélisation d'exécution — granulaire, simple, sans collision d'écriture (completed 2026-08-06)
 
 <details>
 <summary>✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04</summary>
@@ -1669,28 +1669,39 @@ Plans:
 - [x] 24-01-PLAN.md — **Lot MESURE, M1 + M3** : profondeur de dispatch et parallélisme gravés dans
   les agents ; `effort:` propagé sur **31 agents sur 31** (barème par rôle) et exigé par
   `check-agents.sh`. `GSDA-20/21/22`.
+
 - [x] 24-02-PLAN.md — **Zone 2** : `workflow.windows_enforce` et `hooks.workflow_guard` **activés**
   (dégel, **ADR-066** — un prérequis de version insatisfiable ne gate pas) ; `hooks.community`
   **refusé**. `GSDA-01/04/05/06`.
+
 - [x] 24-03-PLAN.md — **Zone 1** : slot `agent_skills` **PLANNER** ouvert (la doctrine du lab
   atteint enfin `gsd-planner`) ; `tdd_mode` non posé, par décision écrite. `GSDA-02/03`.
+
 - [x] 24-04-PLAN.md — **Zone 4** : trois gates rendus **workstream-aware**, sur une politique de
   nom **partagée** et conforme au moteur amont. `GSDA-13/14`.
+
 - [x] 24-05-PLAN.md — **Zone 4** : `check-workstream-pointer.sh` — l'auto-nettoyage silencieux du
   moteur rendu **audible**, câblé au `SessionStart`. `GSDA-16`.
+
 - [x] 24-06-PLAN.md — **Zone 3** : `intel` **activé** (la promesse publiée par notre doc devient
   tenue) ; `graphify` et `profile-pipeline` **refusés**, et les refus **indexés**. `GSDA-07/08`.
+
 - [x] 24-07-PLAN.md — **Zones A4/A6** : profils de contexte **refusés** (**ADR-068**), seuil inline
   **chiffré** et laissé au défaut. `GSDA-10/11`.
+
 - [x] 24-08-PLAN.md — **Zone 4** : les agents `vf-*` savent enfin dire au moteur **sur quel scope**
   ils travaillent. `GSDA-15`.
+
 - [x] 24-09-PLAN.md — **Zone 4, CI** : les gates workstream exercés sur un arbre **réellement
   partitionné**, fixture prouvée **discriminante**, + non-régression sur la racine. `GSDA-17`.
+
 - [x] 24-10-PLAN.md — **Zone 5** : **ADR-069** — Iron Law 2 révisée (« router, jamais forker »),
   couverture workstreams gravée **avec son critère et sa commande**, remontée amont déposée.
   `GSDA-12/18/19`.
+
 - [x] 24-11-PLAN.md — **Zone 3, la cause** : `check-capability-activation.sh` — une entrée de doc
   ne peut plus promettre un geste inerte ; câblé au job `gates` de la CI. `GSDA-09/08/15/02`.
+
 - [x] 24-12-PLAN.md — **Clôture** : **10 modules** bumpés (dont 2 mono-agents que le plan avait
   sous-recensés), compteur de suites des deux README recalé, `check-version-sync.sh` vert, et la
   **frontière de release non franchie** — 0 ligne d'écart depuis `main`.
@@ -1895,10 +1906,28 @@ dispatche les agents **ne connaît pas le concept**. Les workstreams compartimen
 (feuille de route, état), jamais l'**exécution**. Le mécanisme qui répond au besoin s'appelle
 `isolation: worktree`.
 
-> **Chiffres divergents, à ne pas recopier.** La recherche obtient **6** fichiers mentionnant
-> `workstream` et **73** codant `.planning/` en dur, là où la Phase 24 (ADR-069) grave **7/91** et
-> **45**. L'écart sur 45 → 73 est trop large pour du bruit. À re-dériver avec un critère nommé avant
-> toute citation ; ADR-069 fait foi jusque-là.
+> **Comptages re-dérivés, méthode incluse.** La divergence relevée le 2026-08-05 est close ; les
+> deux chiffres d'ADR-069 tiennent, chacun sur son ensemble nommé.
+>
+> - `workstream` : **7/91 tient** (critère K2, `~/.claude/gsd-core/workflows/*.md` profondeur 1,
+>   non récursif). Le 6 obtenu par la recherche du 2026-08-05 venait d'un motif récursif K1
+>   différent (`--ws ` espace littéral, qui ne matchait aucun fichier) — les deux mesures étaient
+>   justes sur des ensembles différents, pas contradictoires.
+> - `.planning/` en dur : **45 tient** (motif étroit `.planning/(ROADMAP.md|STATE.md|phases)`, les 3
+>   seuls artefacts que la partition déplace, écrit à
+>   `plugin/dev-orchestrator/references/workstreams.md:101`). Réconciliation avec le 73 : **73 = 70 + 3**
+>   — 70 fichiers `workflows/*.md` à la racine (profondeur 1) plus 3 fichiers imbriqués sous
+>   `help/modes/`, atteints uniquement par le parcours récursif. Sur ces 70, le motif large (toute
+>   mention de `.planning/` en récursif) ajoute **25** chemins racine que le motif étroit ne compte
+>   pas : **70 − 45 = 25**, et **45 ⊂ 70** (vérifié par `comm -23` vide). Corpus :
+>   `$HOME/.claude/gsd-core/workflows/`, moteur **gsd-core 1.9.1** — profondeur 1 = 91 fichiers, en
+>   récursif = 115 (mêmes bornes que le critère K2 ci-dessus) ; mesure non épinglable à un commit de
+>   ce dépôt, voir la limite actée juste en dessous.
+> - ADR-069 n'a besoin d'aucune correction — ses deux chiffres se re-dérivent au fichier près.
+> - **Limite à écrire, pas taire** : le corpus (`~/.claude/gsd-core/`) vit hors dépôt, la mesure
+>   n'est **pas épinglable à un commit** de ce dépôt — la seule ancre valide est
+>   `~/.claude/gsd-core/VERSION = 1.9.1`. Toute citation future de ces deux chiffres doit porter
+>   profondeur + motif + version du moteur, pas juste le nombre.
 
 #### Les trois options, et le chemin
 
@@ -1927,16 +1956,45 @@ engage au-delà de cette phase.
 
 - **Simple avant complet.** Samuel l'a posé en premier. Une solution qui demande de penser à trois
   choses avant chaque dispatch ne sera pas tenue, donc ne comptera pas.
+
 - **Corriger la doctrine fausse** de `team-kernel.md:64-65` fait partie du périmètre — une doctrine
   livrée qui affirme « perdu » là où c'est « éteint » induit chaque lecteur en erreur.
+
 - **Aucune régression de sécurité de la Phase 24** — le motif d'échappement par lien symbolique en
   était à son quatrième passage ; toute primitive de chemin passe par les primitives partagées de
   `workstream-policy.sh`, jamais par une réimplémentation locale.
+
 - **Tout chiffre gravé porte sa méthode et se re-dérive au moment de l'écriture** — la Phase 24 a
   produit quatre décomptes justes portant sur le mauvais ensemble, et la divergence 45 → 73
   ci-dessus en est la cinquième occurrence.
+
 - **La mesure du gain est un livrable, pas une promesse** : baseline d'horloge avant, mesure après,
   méthode écrite. Un plafond d'étages n'est pas un gain d'horloge.
 
-**Plans**:
-- [ ] TBD (run /gsd-plan-phase 27 to break down)
+**Requirements**: PAEX-01 → PAEX-11 (préfixe `PAEX` — « PArallélisation d'EXécution » — **proposé au
+plan du 2026-08-05** ; aucun préfixe existant `DOCF`/`GSDC`/`GSDA` ne couvre la parallélisation
+d'exécution. À inscrire au ledger `REQUIREMENTS.md` par le manager de mission, comme aux Phases
+22/23/24 où les préfixes ont été créés au plan.)
+
+**Plans**: 6 plans en 4 vagues
+**Wave 1**
+
+- [x] 27-01-PLAN.md — **TRACER** : `dag.sh ready` calcule la disjonction de périmètres en câblant `partitionStages()` amont (jamais réimplémentée, ADR-069), champ `stages` additif, repli prouvé par test, doctrine et limites dans `mission-flow.md` — livrable 3 (vague 1)
+- [x] 27-02-PLAN.md — Doctrine corrigée : `team-kernel.md` dit « éteint par défaut » et nomme le chemin qui rallume ; le callout de comptages divergents du ROADMAP laisse place au résultat re-dérivé — livrables 1 + lift ROADMAP (vague 1)
+- [x] 27-03-PLAN.md — `isolation: worktree` sur les 13 écrivains non-managers, `.worktreeinclude` posé, statut `.gitignore` tranché sur pièce, portée écrite (groupe B, `worktree.baseRef`, 4 hypothèses + sondes) — livrable 2 (vague 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 27-04-PLAN.md — Baseline d'horloge capturée **avant** toute activation, corpus étalon versionné et prouvé parallélisable, méthode écrite — livrable 5, moitié « avant » (vague 2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 27-05-PLAN.md — Spike `claude_orchestration` : SDK établi par installation réelle, échelle de 7 gates, run Workflow réel, sous-expérience Décision A, décision écrite (activation ou refus motivé) — livrable 4, **checkpoint bloquant** (vague 3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [x] 27-06-PLAN.md — Mesure après activation sur le même corpus étalon, écart et limites écrits — ou non-mesurabilité motivée avec déclencheur de reprise — livrable 5, moitié « après », **checkpoint bloquant** (vague 4)
+
+**Ordre non négociable, câblé deux fois.** La baseline (`27-04`) précède l'activation (`27-05`) par
+`depends_on` **et** par une précondition vérifiée à l'exécution sur l'absence de la clé de capability :
+une baseline prise après activation est détruite sans rattrapage.

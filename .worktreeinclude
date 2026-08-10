@@ -1,0 +1,27 @@
+# .worktreeinclude — allow-list de chemins gitignorés à préserver dans un worktree
+# d'agent isolé (isolation: worktree, Phase 27). Rôle : ce que .gitignore exclut de
+# l'arbre de travail principal, ce fichier le fait recopier dans chaque worktree
+# d'agent — sans lui, un worker isolé démarre sans mémoire ni configuration locale.
+#
+# Exclusions décidées et leur motif (27-RESEARCH.md, Livrable 2, Q2 — énumération
+# exhaustive de `git status --ignored=matching -s`, 6 entrées) :
+#   - les 4 résidus *.bak (plugin/conductor/scripts/dag.sh.bak,
+#     plugin/design-orchestrator/agents/vf-design-manager.md.bak,
+#     plugin/dev-orchestrator/agents/vf-dev-manager.md.bak,
+#     plugin/dev-orchestrator/skills/vf-auto/SKILL.md.bak) : aucun lecteur au runtime
+#     identifié, ce sont des résidus d'édition — exclus.
+#   - docs/reference/ : exclu sur une ABSENCE DE PREUVE DE LECTURE par un worker au
+#     runtime, pas une preuve d'absence (hypothèse A5, confiance BASSE) — à inclure
+#     si un worker de documentation s'avère le lire.
+#
+# Syntaxe : la doc du harness Claude Code ne précise le format nulle part (absent de
+# gsd-core et de ce dépôt) — SUPPOSÉE de type .gitignore (motifs gitignore-style, un
+# par ligne) par analogie avec le nom et le rôle inverse du fichier (hypothèse A1,
+# confiance BASSE). Sonde qui la ferme : créer un worktree d'agent isolé, constater
+# si .claude/agent-memory/ y est bien présent.
+
+# Mémoire persistante d'agent (memory: project, déclaré par tous les agents
+# écrivains) — critique : sans cette entrée, un worker isolé perd tout
+# l'apprentissage accumulé à chaque dispatch — une régression fonctionnelle directe,
+# pas une gêne cosmétique.
+.claude/agent-memory/

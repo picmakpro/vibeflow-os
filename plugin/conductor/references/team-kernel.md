@@ -62,10 +62,20 @@ décision**. `backgroundDispatch: false` est *fail-closed* par conception : cons
 descriptif** de la capacité réelle du poste.
 
 **La conséquence doctrinale, en une ligne :** sur ce runtime, le parallélisme **intra-étape** (les
-vagues de plans d'une même étape, côté moteur) est **perdu**, et le parallélisme **inter-nœuds**
-porté par la frontière `ready` de `vf-dev-manager` est le **seul effectif**. Notre couche
-d'orchestration ne duplique donc pas celle du moteur : **elle est la seule qui parallélise
-réellement**.
+vagues de plans d'une même étape, côté moteur) est **éteint par défaut** — un drapeau default-off,
+restaurable, pas une perte définitive. Le chemin qui le restaure ne passe **pas** par
+`shouldFlattenDispatch()` (qui rend bien `true` sous Claude Code, ce fait ne change pas) mais par la
+capability amont `claude_orchestration` : son gate n°4 lit `dispatch.nested === true &&
+dispatch.background === true`, **jamais** `backgroundDispatch`. Le gate n°4 passe déjà sur ce
+runtime ; le verrou pratique est ailleurs, au **gate n°5** (`agent_sdk_version_unknown`) : Claude
+Code embarque son SDK dans un binaire plutôt que de l'exposer en paquet npm, donc le routeur ne
+trouve aucune version sur disque. `GSD_AGENT_SDK_VERSION` est le contournement documenté en amont —
+détail dans `.planning/ROADMAP.md` §« La correction de prémisse ». Tant que ce gate n'est pas levé,
+le parallélisme **inter-nœuds** porté par la frontière `ready` de `vf-dev-manager` reste le **seul
+effectif aujourd'hui** — le champ `stages` de `dag.sh ready` affine cette frontière en calculant la
+disjonction de périmètres entre nœuds ; doctrine complète dans
+`dev-orchestrator-references/mission-flow.md`. Notre couche d'orchestration ne duplique donc pas
+celle du moteur : **elle reste, pour l'instant, la seule qui parallélise réellement**.
 
 **Ce qui en découle pour un manager**, et qui n'est pas facultatif :
 
@@ -79,6 +89,11 @@ réellement**.
 - **Sérialisation observée ≠ panne.** Voir une étape enchaîner ses plans un par un est le
   comportement nominal du moteur ici ; ce n'est ni un symptôme, ni un motif de halt condition, ni
   quelque chose à corriger côté lab.
+- **Un worker `isolation: worktree` ne résout PAS son `GSD_WORKSTREAM`.** Fait observé, pas une
+  hypothèse : au run réel de la Phase 27 (sonde A4), la variable est **vide** depuis le worktree
+  isolé. Un manager qui cloisonne par workstream passe donc le workstream **explicitement dans le
+  mandat** du worker isolé — jamais en supposant l'héritage d'environnement. Registre :
+  T-27-03-06, `27-SECURITY.md` du dépôt VibeFlow.
 - Toute bascule sur la capability amont `claude_orchestration` (BETA, default-off) qui prétendrait
   restaurer le parallélisme intra-étape est un **opt-in explicite**, jamais un défaut.
 
@@ -107,6 +122,20 @@ là-bas.
   synthétise. Toute production vit dans les workers.
 - **Dispatch parallèle par défaut** : ≥ 2 nœuds `ready` à périmètres disjoints → un seul
   message, plusieurs Task. Périmètres douteux → séquentiel ou `isolation: worktree`.
+- **Le commit reste discipliné même à périmètres disjoints (Phase 27)** : la disjonction
+  gouverne le *dispatch*, jamais le *commit*. Tant que N acteurs — workers **et** manager —
+  partagent un même `.git/index` (pas d'`isolation: worktree`) : **jamais** `git add` (même
+  ciblé sur son propre fichier), **jamais** `git commit -m`/`-a` sans pathspec (`-A`/`.`/`-u`
+  inclus) — `git commit` nu commite tout l'index partagé, y compris ce qu'un autre acteur
+  vient d'y ajouter. Forme imposée : `git commit <chemin> [<chemin>...] -m "..."` (ignore
+  l'index). Seule exception, fichier neuf (inatteignable autrement) :
+  `git add <chemin exact> && git commit <chemin exact> -m "..."` en une seule commande
+  enchaînée, jamais de stage en attente. Rename (ancien chemin supprimé + nouveau créé) : même
+  patron, les deux chemins exacts — `git add <nouveau> && git commit <ancien> <nouveau> -m "..."`.
+  Suppression pure : déjà couverte, `git commit <chemin>` stage et committe seul, sans `git rm`.
+  Chaque mandat nomme les fichiers tenus par ses voisins **en ce moment** — un périmètre positif
+  seul ne suffit pas. Trou identifié mais laissé ouvert par `mission-contracts.md` §Isolation de
+  branche (« non tranchée ici ») : tranché ici.
 - **Digest dans chaque mandat**, détail sur disque, bloc typé au retour — jamais de pilotage
   à la prose.
 - **Proportionnalité** : en dessous du seuil d'équipe du métier (dev : `SEUIL_EQUIPE`,

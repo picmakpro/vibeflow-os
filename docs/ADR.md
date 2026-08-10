@@ -38,6 +38,7 @@
 | ADR-067 | 2026-08-04 | `hooks.community` refusé : c'est une mesure de style, pas de conformité — 6 types maison hors liste amont, 68 % des sujets > 72 caractères | Validée |
 | ADR-068 | 2026-08-04 | Profils de contexte du moteur refusés (rien à activer, notre contrat typé est per-rôle et plus strict) — et `workflow.inline_plan_threshold` inchangé à 2, la mesure étant le livrable | Validée |
 | ADR-069 | 2026-08-04 | Les workstreams GSD sont adoptés, avec leurs quatre limites datées, la condition dure « aucune partition tant qu'une phase est en vol », la révision de l'Iron Law 2 et l'amendement d'ADR-064 | Validée |
+| ADR-070 | 2026-08-06 | Une disposition `accept` de registre de menaces borne le vecteur qu'elle couvre, jamais le risque en bloc — RCE CWD dans `dag.sh`, 5ᵉ passage du motif de confinement de chemin | Validée |
 
 > **`ADR-065` : numéro non attribué** — constaté le 2026-08-04. Le registre saute de `ADR-064` à
 > `ADR-066` ; aucune décision ne porte ce numéro et aucune n'a été retirée. Un registre qui saute
@@ -2169,3 +2170,83 @@ Rouvrir **ssi** l'un de ces faits change, chacun re-dérivable par la commande c
 Ce déclencheur est **objectif et sans échéance** : une date de revue rouvrirait un dossier vide,
 alors que chacune des trois conditions ci-dessus ne se déclenche que s'il s'est réellement passé
 quelque chose en amont.
+
+---
+
+## ADR-070 : Une disposition `accept` de registre de menaces borne le vecteur qu'elle couvre, jamais le risque en bloc — RCE CWD dans `dag.sh`, 5ᵉ passage du motif de confinement de chemin
+
+**Date** : 2026-08-06 · **Statut** : Validée · **Décideur** : Samuel (mandat de doctrine sur finding
+d'audit Phase 27) · **Voisines** : ADR-069 (Iron Law 2 révisée, même phase), `T-27-01-04`
+(`27-01-PLAN.md:360`) · **Contexte** :
+`.planning/missions/2026-08-05-phase-27-parallelisation-execution.md` §4.1,
+`.planning/REQUIREMENTS.md` PAEX-11, `.planning/codebase/CONCERNS.md` §Tech Debt (primitive
+partagée de confinement de chemin)
+
+### Contexte / Problème
+
+L'audit de la Phase 27 a reproduit par PoC une RCE dans `plugin/conductor/scripts/dag.sh`
+(`resolve_gsd_tools_cmd()`, ligne 124) : la cascade de résolution de la CLI amont teste un candidat
+**relatif au répertoire de travail courant** (`os.getcwd()/gsd-core/bin/gsd-tools.cjs`) et l'exécute
+via `node`, sans aucun ancrage. Aucun symlink, aucun `PATH` compromis n'est requis — un simple
+fichier tracké au bon chemin relatif suffit, exactement ce que produirait le checkout d'une branche
+ou d'une PR malveillante. `dag.sh ready` est invoqué en routine par les **cinq managers** du
+team-kernel.
+
+Le registre de menaces du plan (`27-01-PLAN.md:360`, `T-27-01-04`) **couvrait** le spoofing de
+résolution de `gsd-tools` — mais **uniquement via `PATH`**, avec une disposition `accept` motivée
+ainsi : « *un `PATH` déjà compromis compromet l'ensemble de la session bien avant `dag.sh`* ». Ce
+raisonnement est correct **pour `PATH`** — un `PATH` empoisonné compromet en effet n'importe quelle
+commande de la session, pas seulement celle-ci — et **faux pour le CWD**, qui ne demande **aucune**
+compromission préalable de l'environnement : la seule condition est la présence d'un fichier dans
+l'arbre de travail. Le vecteur CWD n'a jamais été examiné par le registre — ni accepté, ni refusé,
+simplement absent d'une entrée dont le titre (« spoofing de résolution ») pouvait pourtant laisser
+croire qu'elle le couvrait.
+
+C'est aussi le **5ᵉ passage** du motif de confinement de chemin sur ce dépôt (`.planning/codebase/
+CONCERNS.md` §Tech Debt en dénombre quatre précédents : deux scripts en Phase 23,
+`check-workstream-pointer.sh`, `build-gsd-capabilities-index.sh`, et le répertoire de compartiment).
+Cette même entrée **prédisait littéralement** l'occurrence : « *tant que le contrôle reste
+par-script, un 5ᵉ passage est attendu* » — la prédiction s'est vérifiée dans la phase même qui la
+citait comme risque ouvert. Précision de méthode, pour ne pas confondre deux comptages : ce 5ᵉ
+passage n'est **pas** une instance du sous-motif « suivi de lien symbolique » des quatre précédents —
+c'est une résolution CWD non ancrée, un mécanisme distinct dans la même famille (confiance excessive
+dans un chemin dérivé d'une entrée non maîtrisée, jamais confiné avant usage).
+
+### Décision
+
+**Un registre de menaces n'est pas jugé sur les vecteurs qu'il traite, mais sur ceux qu'il tait sans
+les nommer.** Deux règles opérables en découlent, pour tout auditeur qui relit un registre de
+menaces (`*-PLAN.md` threat model, ou tout registre de risques d'ADR) :
+
+1. **Chercher activement ce que le registre ne nomme pas, pas seulement vérifier ce qu'il nomme.**
+   Pour toute entrée de catégorie spoofing / injection de chemin / résolution non fiable, énumérer
+   **toutes** les voies de résolution que le code implémente réellement — ici les cinq maillons de
+   `resolve_gsd_tools_cmd()` : variable d'environnement, `PATH`, CWD, répertoire de config, HOME —
+   puis vérifier qu'une entrée du registre couvre **chacune nommément**. Une entrée qui couvre un
+   maillon ne dit rien des autres : la couverture ne se déduit jamais par proximité de titre.
+2. **Une disposition `accept` doit citer le vecteur qu'elle accepte, jamais le risque en bloc.**
+   « Spoofing de résolution : accept » est une formulation qui invite à la relire comme couvrant
+   tout moyen de spoofer — c'est exactement l'erreur qui a laissé passer cette RCE. La forme
+   correcte borne explicitement : « accepté **pour `PATH`** (raison : un `PATH` compromis compromet
+   déjà toute la session) — **non évalué** pour les autres voies de résolution (CWD, config, HOME) ».
+   Un lecteur qui retrouve cette entrée sait immédiatement ce qu'elle ne couvre pas, sans avoir à
+   relire le code source pour le découvrir.
+
+**Corollaire pour ce dépôt** : toute entrée `accept` future d'un registre de menaces doit énumérer
+les vecteurs frères qu'elle **n'**accepte **pas**, dès lors que plusieurs mécanismes concurrents
+existent pour produire le même effet (ici : « résoudre un exécutable amont »). L'absence
+d'énumération n'est pas une preuve d'exhaustivité — c'est un point aveugle non déclaré, indiscernable
+d'une couverture réelle tant que personne ne le cherche activement.
+
+### Ce que cette ADR ne tranche pas
+
+Le sort du candidat CWD dans `dag.sh:124` (le retirer, ou l'ancrer sous une racine vérifiée) a été
+**tranché par Samuel : retrait**, exécuté dans `dag.sh` (`4a532ec`) et `mission-contracts.md`
+(`08ad030`) — cette entrée grave la règle de méthode que l'audit en tire, pas le correctif du site
+lui-même, qui n'appartenait pas à son périmètre.
+
+### Déclencheur de réexamen
+
+Rouvrir si une future revue de registre de menaces constate qu'une disposition `accept` bornée selon
+cette règle a quand même laissé passer un vecteur voisin non nommé — signe que la règle elle-même
+est insuffisante, pas seulement mal appliquée.

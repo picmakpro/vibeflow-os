@@ -4,7 +4,7 @@
 > vraiment »**. Ce module ajoute la boucle manquante : trois agents cloisonnés qui testent
 > l'app réelle sur cible mobile, corrigent, et re-testent jusqu'au vert — sans jamais tricher.
 
-**Type** : agents + rules · **Version** : v1.4.2 · **Dépend de** : `mobile-test`
+**Type** : agents + rules · **Version** : v1.4.3 · **Dépend de** : `mobile-test`
 
 ---
 

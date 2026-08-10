@@ -1,5 +1,12 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.4.2] — 2026-08-10 (armement worktree du groupe A)
+
+### Modifié
+- **`vf-crafter` armé `isolation: worktree`** (Phase 27, groupe A) — écritures isolées par
+  worktree, mémoire d'agent embarquée via `.worktreeinclude`. Précondition de sûreté :
+  `worktree.baseRef: "head"`.
+
 ## [v1.4.1] — 2026-08-04 (`effort:` par rôle sur les 4 fichiers d'agents, Phase 24)
 
 ### Modifié

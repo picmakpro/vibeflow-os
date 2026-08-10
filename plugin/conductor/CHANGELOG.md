@@ -1,5 +1,25 @@
 # Changelog — conductor
 
+## [v1.21.0] — 2026-08-10 (la frontière ready apprend les étages, et l'isolation dit enfin ce qu'elle ne transmet pas)
+
+### Ajouté
+- **Champ `stages` sur `dag.sh ready`** (PAEX-04/05/06, Phase 27) — partition machine de la
+  frontière `ready` en étages sans recouvrement de `scope[]` entre nœuds d'un même étage, calculée
+  en câblant `partitionStages()` amont via un sous-processus `gsd-tools claude-orchestration
+  emit-workflow` (jamais réimplémentée, ADR-069). Additif : `ready`/`count` intacts pour les 5
+  consommateurs. Repli fail-closed `stages: null` si node/gsd-tools indisponible — prouvé en
+  exécution (T29), jamais un crash. Cas T25-T33, suite `test-dag.sh` 99 PASS.
+- **Doctrine `GSD_WORKSTREAM` sous isolation** (`team-kernel.md`) — fait observé au run réel de la
+  Phase 27 (sonde A4) : un worker `isolation: worktree` ne résout PAS son `GSD_WORKSTREAM` ; le
+  manager passe le workstream explicitement dans le mandat. Registre : T-27-03-06.
+
+### Modifié
+- **`team-kernel.md`** — le parallélisme intra-étape n'est plus dit « perdu » mais « éteint par
+  défaut » ; le vrai chemin est nommé (capability `claude_orchestration`, gate n°4
+  `dispatch.nested && dispatch.background`, verrou pratique gate n°5 `GSD_AGENT_SDK_VERSION`).
+  Spike conduit en Phase 27 : refus motivé (run réel divergent du chemin inline), déclencheur de
+  reprise = open-gsd/gsd-core#3302.
+
 ## [v1.20.0] — 2026-08-04 (le workstream cesse d'être un silence, et `effort:` cesse d'être facultatif)
 
 ### Ajouté

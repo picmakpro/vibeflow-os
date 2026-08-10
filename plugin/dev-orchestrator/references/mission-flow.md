@@ -88,6 +88,42 @@ Le plan de bataille n'est plus une liste ordonnée : c'est un **graphe persistan
    ```bash
    "$S"/dag.sh mark --file="$DAG" --id=code --status=done   # promeut les blocked dont deps sont done
    ```
+
+   **`stages` — dispatcher tout un étage en un seul message.** En plus de `ready`/`count`
+   (strictement inchangés), `dag.sh ready` porte un champ additif `stages` : la frontière `ready`
+   partitionnée en étages tels qu'aucun nœud ne partage un chemin déclaré dans `scope[]` avec un
+   autre nœud du MÊME étage. `dag.sh` **cable** cette partition — il ne la réimplémente jamais
+   (ADR-069) — via un sous-processus `gsd-tools claude-orchestration emit-workflow`, sans dépendre
+   de l'activation de `claude_orchestration` (`emit-workflow` n'emprunte jamais l'échelle de gates
+   de `detectWorkflowBackend`). Renvoi, pas copie : l'algorithme est `partitionStages`
+   (`~/.claude/gsd-core/bin/lib/claude-orchestration.cjs`), pas décrit ici.
+
+   - **Ce qu'il garantit** : deux ids du MÊME étage (`stages[i]`) ne déclarent jamais un chemin
+     commun dans `scope[]` — un manager peut dispatcher tout un étage dans le même message SANS
+     arbitrer lui-même les périmètres, ce que `team-kernel.md:109` (« Périmètres douteux →
+     séquentiel ou `isolation: worktree` ») laissait jusqu'ici au jugement du manager.
+   - **Ce qu'il ne garantit pas** : la garantie ne vaut que ce que vaut le `scope[]` déclaré à la
+     pose du nœud (`dag.sh add --scope=...`) — un nœud qui écrit un fichier qu'il n'a pas déclaré
+     n'est couvert par rien, la même limite que le périmètre gelé de `dag.sh status` (§1 ci-dessus).
+   - **Dépendance dure introduite** : `dag.sh` n'invoquait jusqu'ici que `python3` ; il dépend
+     désormais aussi d'une résolution fonctionnelle de `node` et de `gsd-tools`, via une cascade à
+     **trois** emplacements — variable d'environnement `GSD_TOOLS` · `gsd-tools` sur le `PATH` ·
+     sous `CLAUDE_CONFIG_DIR` puis `~/.claude`. **Aucun candidat cwd/repo-relatif** (l'ancien
+     `gsd-core/bin/gsd-tools.cjs` sous la racine du dépôt, résolu via `os.getcwd()`, a été RETIRÉ) :
+     un tel candidat résolvait un exécutable à un chemin relatif au répertoire de travail courant
+     puis l'invoquait via `node` sans aucune vérification d'ancrage — un simple fichier tracké
+     (`gsd-core/bin/gsd-tools.cjs` à la racine d'une branche ou d'une PR malveillante) suffisait à
+     faire exécuter du code arbitraire, sans symlink ni PATH compromis, et `dag.sh ready` est
+     invoqué en routine par les cinq managers du team-kernel (5ᵉ passage du motif de confinement de
+     chemin sur ce dépôt). **Conséquence assumée** : un lab qui vendorise le moteur à sa propre
+     racine (`<repo>/gsd-core/...`) perd la résolution automatique de ce candidat — le
+     contournement qui reste est `GSD_TOOLS=<chemin absolu>` en variable d'environnement, posée par
+     l'opérateur du lab (pas déduite du dépôt).
+   - **Le repli** : `stages: null` signifie « non calculé, dégradé » (`node`/`gsd-tools`
+     introuvable ou en échec) — le manager retombe alors sur le régime d'aujourd'hui (son propre
+     jugement, séquentiel en cas de doute). `stages: []` signifie « frontière `ready` vide »,
+     JAMAIS « dégradé » — les deux ne se confondent pas. `ready`/`count` restent, dans tous les
+     cas, strictement inchangés.
 3. **Ré-entrée** — un correctif remonté par la revue/l'audit qui **rouvre** une étape :
    ```bash
    "$S"/dag.sh reopen --file="$DAG" --id=code   # code + ses dépendants (revue…) repassent blocked/ready
