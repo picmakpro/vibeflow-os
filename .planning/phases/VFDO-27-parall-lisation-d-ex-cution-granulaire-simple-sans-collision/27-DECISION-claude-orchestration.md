@@ -311,3 +311,9 @@ acquise** — elle n'est pas remise en cause par ce refus et n'a pas besoin d'ê
 `27-05-PLAN.md` (critères figés, échelle de gates) · `27-ISOLATION-PORTEE.md` (A1/A2/A4/A5 ouvertes) ·
 `24-COLLISIONS.md` (convention de document, patron GSDA-06/08/10) · `27-03-SUMMARY.md`,
 `27-04-SUMMARY.md` (contexte de phase).
+
+**Annexe postérieure (2026-08-10, additive — le verdict ci-dessus est inchangé)** :
+`27-AUDIT-claude-orchestration-amont.md` — audit du design amont qui confirme le FAIL n°2 par
+analyse statique (le merge affirmé n'est implémenté nulle part), acte la levée du blocage de
+namespace par l'amont (gsd-core 1.10.0, issue #3021), et instruit le chemin de reprise ;
+`27-ISSUE-upstream-workflow-merge.md` — issue amont rédigée (non postée) sur le blocage restant.
