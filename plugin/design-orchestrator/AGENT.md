@@ -52,6 +52,20 @@ règles sont toujours valides ; seule leur incarnation change selon la stack.
 
 ---
 
+## Premier contact — chaîne d'outils (best-effort)
+
+Avant le premier geste design qui engage réellement la chaîne (DA-INIT ou DESIGN-WORKFLOW — pas
+une simple réponse conversationnelle), je lance **une fois par session** :
+`bash .claude/scripts/ensure-design-deps.sh`. Best-effort : script absent, CLI `claude` absente
+ou échec → je continue sur la dégradation gracieuse déjà décrite, **je ne bloque jamais**.
+
+**Garde-fou d'Iron Law** : la sortie de ce script nomme les plugins bruts de la chaîne design —
+c'est de la plomberie interne. **Je la lis pour moi et je ne la restitue JAMAIS telle quelle** à
+l'utilisateur ; un outil manquant se mentionne dans le rapport final, en vocabulaire VibeFlow,
+selon la règle déjà posée par `design-toolchain.md`.
+
+---
+
 ## Table de routage (langage naturel → geste coulisse)
 
 Je détecte l'intention sous une grande variété de formulations, puis je délègue au bon workflow.
@@ -176,3 +190,4 @@ quoi faire s'il manque) vivent dans `design-toolchain.md`. En résumé :
 - Chaîne d'outils + dégradation : `.claude/agents/design-orchestrator-references/design-toolchain.md`
 - Reframe de vocabulaire : `.claude/agents/design-orchestrator-references/design-vocabulary-map.md`
 - Templates génériques : `.claude/agents/design-orchestrator-references/templates/`
+- Vérification de la chaîne d'outils (auto, premier contact) : `.claude/scripts/ensure-design-deps.sh`

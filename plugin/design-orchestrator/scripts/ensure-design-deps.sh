@@ -284,8 +284,11 @@ process_plugin() { # name marketplace mkt_add
       fi
       ;;
     absent)
+      # Le dépôt de marketplace est déclaré au MÊME scope que l'install qui suit (--scope
+      # commun aux deux gestes) : cohérent avec le contrat "toutes les commandes scopées" du
+      # dry-run observable (FORCE), et `claude plugin marketplace add` supporte bien `--scope`.
       if [ "$mkt_add" != "-" ]; then
-        run_cmd claude plugin marketplace add "$mkt_add" \
+        run_cmd claude plugin marketplace add "$mkt_add" --scope "$SCOPE" \
           || log "$name : ajout du marketplace $mkt_add en échec (peut-être déjà enregistré) — tentative d'install quand même."
       fi
       if run_cmd claude plugin install "${name}@${marketplace}" --scope "$SCOPE"; then

@@ -20,6 +20,21 @@
 #   T6  — Heuristique de proposition dans AGENT.md : signal mission design → PROPOSER
 #         Task(vf-design-manager) (jamais d'office).
 #   T7  — Densité du module (VERIF-02, wc -l uniquement) : AGENT.md ≤250L, skills ≤500L.
+#   T8  — Cloisonnement par tools : allowlist Agent(...) du manager (6 noms), vf-dev-manager absent.
+#   T8b — SC2 : doctrine étage implémentation croisée (opt-in, double juge, budgets 3+3).
+#
+# ensure-design-deps.sh (quick 260810-fh3, D-01..D-04) : présence ET activation de la chaîne
+# design, câblage double engine + agent —
+#   T9  — Idempotence : deux runs dry-run consécutifs, exit 0 aux deux, sorties identiques.
+#   T9b — Scope : dry-run forcé VF_SCOPE=project → commandes scopées ; VF_SCOPE=bogus → exit 1.
+#   T9c — LE CAS DE LA TÂCHE (D-02) : un `claude` stub JSON discrimine le plugin dont AU MOINS
+#         une entrée du même nom est active (satisfait, aucun geste) du plugin dont la SEULE
+#         entrée est inactive (`enable` scopé émis, jamais un `install` nu).
+#   T9d — Dégradation : CLI `claude` absente → exit 0, les 4 étapes manuelles affichées.
+#   T9e — Autonomie (D-04) : aucune dépendance d'exécution vers un autre module, `module.json`
+#         déclare toujours exactement `conductor`.
+#   T9f — Câblage double : hook nommé (double garde -f, branche else best-effort) dans
+#         `vibeflow-update.sh` ; section Premier contact + garde-fou non-restitution dans AGENT.md.
 #
 # Convention : asserts numérotés, helpers ok()/ko()/skip(), exit 0 si tout passe (SKIP non
 # bloquant), exit 1 si au moins un KO. Calqué sur test-dev-orchestrator.sh (pattern du repo).
@@ -238,6 +253,177 @@ t8b_ok=1
 "$GREP" -qi 'double juge' "$MANAGER" || { ko "T8b SC2 : double juge parallèle absent"; t8b_ok=0; }
 "$GREP" -q '3+3' "$MANAGER" || { ko "T8b SC2 : budgets 3+3 absents"; t8b_ok=0; }
 [ "$t8b_ok" -eq 1 ] && ok "T8b doctrine : étage implémentation croisée (SC2 — opt-in, double juge, budgets 3+3) présente"
+
+# ---------------------------------------------------------------------------
+# T9..T9f — ensure-design-deps.sh (quick 260810-fh3, D-01..D-04)
+# ---------------------------------------------------------------------------
+EDD="$MOD/scripts/ensure-design-deps.sh"
+if [ ! -f "$EDD" ]; then
+  skip "T9..T9f : ensure-design-deps.sh introuvable dans $MOD/scripts/"
+else
+  # T9 — IDEMPOTENCE : deux runs dry-run consécutifs, exit 0 aux deux, sorties identiques.
+  T9_OUT1="$(mktemp)"; T9_OUT2="$(mktemp)"
+  VF_DESIGN_ENSURE_DRY_RUN=1 bash "$EDD" >/dev/null 2>"$T9_OUT1"; t9_r1=$?
+  VF_DESIGN_ENSURE_DRY_RUN=1 bash "$EDD" >/dev/null 2>"$T9_OUT2"; t9_r2=$?
+  if [ "$t9_r1" -eq 0 ] && [ "$t9_r2" -eq 0 ] && diff -q "$T9_OUT1" "$T9_OUT2" >/dev/null 2>&1; then
+    ok "T9 idempotence : deux runs dry-run identiques, exit 0/0, no-op stable"
+  else
+    ko "T9 idempotence : run1=$t9_r1 run2=$t9_r2, sorties identiques=$(diff -q "$T9_OUT1" "$T9_OUT2" >/dev/null 2>&1 && echo oui || echo non)"
+  fi
+  rm -f "$T9_OUT1" "$T9_OUT2"
+
+  # ---------------------------------------------------------------------------
+  # T9b — SCOPE : dry-run forcé VF_SCOPE=project → chaque commande porte --scope project ;
+  # VF_SCOPE=bogus → exit 1 avec message de validation. Deux assertions distinctes (jamais un
+  # `&&` qu'un seul côté satisferait).
+  # ---------------------------------------------------------------------------
+  T9B_OUT="$(VF_DESIGN_ENSURE_DRY_RUN=1 VF_DESIGN_ENSURE_FORCE=1 VF_SCOPE=project bash "$EDD" 2>&1)"
+  t9b_cmd_n=$(echo "$T9B_OUT" | "$GREP" -c '^\[ensure-design-deps\] (dry-run)')
+  t9b_scoped_n=$(echo "$T9B_OUT" | "$GREP" -c -- '^\[ensure-design-deps\] (dry-run).*--scope project')
+  if [ "$t9b_cmd_n" -ge 4 ] && [ "$t9b_cmd_n" = "$t9b_scoped_n" ]; then
+    ok "T9b scope : $t9b_cmd_n commandes loguées, toutes porteuses de --scope project"
+  else
+    ko "T9b scope : $t9b_cmd_n commandes loguées dont seulement $t9b_scoped_n scopées --scope project"
+  fi
+  VF_DESIGN_ENSURE_DRY_RUN=1 VF_SCOPE=bogus bash "$EDD" >"$T9_OUT1" 2>&1; t9b_bogus_rc=$?
+  if [ "$t9b_bogus_rc" -eq 1 ] && "$GREP" -qi 'VF_SCOPE invalide' "$T9_OUT1"; then
+    ok "T9b validation : VF_SCOPE=bogus rejeté (exit 1) avec message de validation"
+  else
+    ko "T9b validation : VF_SCOPE=bogus non rejeté correctement (rc=$t9b_bogus_rc)"
+  fi
+  rm -f "$T9_OUT1"
+
+  # ---------------------------------------------------------------------------
+  # T9c — LE CAS DE LA TÂCHE (D-02), en deux sous-cas, avec un `claude` stub sur PATH qui répond
+  # à `plugin list --json` par une fixture. Pourquoi ce cas existe : c'est exactement ce qu'un
+  # `plugin list` filtré par simple grep de nom ne peut pas voir (les deux entrées matchent le
+  # nom, seul le champ enabled/disabled distingue le sous-cas 1 du sous-cas 2).
+  # ---------------------------------------------------------------------------
+  if ! command -v python3 >/dev/null 2>&1 && ! command -v python >/dev/null 2>&1; then
+    skip "T9c (D-02) : python3/python introuvables — parsing JSON impossible dans cette disposition"
+  else
+    T9C_BIN="$(mktemp -d)"; T9C_FIX="$(mktemp -d)"
+
+    # Sous-cas 1 : frontend-design@claude-code-plugins INACTIF ET
+    # frontend-design@claude-plugins-official ACTIF → SATISFAIT, aucune commande émise.
+    cat >"$T9C_FIX/fixture1.json" <<'JSON'
+[
+  {"id": "frontend-design@claude-code-plugins", "enabled": false, "version": "1.0.0"},
+  {"id": "frontend-design@claude-plugins-official", "enabled": true, "version": "1.0.0"},
+  {"id": "superpowers@claude-plugins-official", "enabled": true, "version": "1.0.0"},
+  {"id": "ui-ux-pro-max@ui-ux-pro-max-skill", "enabled": true, "version": "1.0.0"},
+  {"id": "impeccable@impeccable", "enabled": true, "version": "1.0.0"}
+]
+JSON
+    cat >"$T9C_BIN/claude" <<SH
+#!/usr/bin/env bash
+if [ "\$1" = "plugin" ] && [ "\$2" = "list" ] && [ "\$3" = "--json" ]; then
+  cat "$T9C_FIX/fixture1.json"
+  exit 0
+fi
+exit 1
+SH
+    chmod +x "$T9C_BIN/claude"
+    T9C_OUT1="$(PATH="$T9C_BIN:$PATH" bash "$EDD" 2>&1)"
+    if echo "$T9C_OUT1" | "$GREP" -q 'frontend-design : déjà actif' \
+      && ! echo "$T9C_OUT1" | "$GREP" -qE 'plugin (enable|install) frontend-design'; then
+      ok "T9c sous-cas 1 (D-02) : entrée active sur un second marketplace → SATISFAIT, aucune commande"
+    else
+      ko "T9c sous-cas 1 (D-02) : frontend-design aurait dû être satisfait sans geste (règle « au moins une entrée active »)"
+    fi
+
+    # Sous-cas 2 : la SEULE entrée frontend-design est inactive → `enable` scopé émis, JAMAIS un
+    # `install` nu pour ce plugin.
+    cat >"$T9C_FIX/fixture2.json" <<'JSON'
+[
+  {"id": "frontend-design@claude-plugins-official", "enabled": false, "version": "1.0.0"},
+  {"id": "superpowers@claude-plugins-official", "enabled": true, "version": "1.0.0"},
+  {"id": "ui-ux-pro-max@ui-ux-pro-max-skill", "enabled": true, "version": "1.0.0"},
+  {"id": "impeccable@impeccable", "enabled": true, "version": "1.0.0"}
+]
+JSON
+    cat >"$T9C_BIN/claude" <<SH
+#!/usr/bin/env bash
+if [ "\$1" = "plugin" ] && [ "\$2" = "list" ] && [ "\$3" = "--json" ]; then
+  cat "$T9C_FIX/fixture2.json"
+  exit 0
+fi
+if [ "\$1" = "plugin" ] && [ "\$2" = "enable" ]; then
+  echo "ENABLE_CALLED: \$*"
+  exit 0
+fi
+exit 1
+SH
+    chmod +x "$T9C_BIN/claude"
+    T9C_OUT2="$(PATH="$T9C_BIN:$PATH" bash "$EDD" 2>&1)"
+    if echo "$T9C_OUT2" | "$GREP" -q 'ENABLE_CALLED: plugin enable frontend-design@claude-plugins-official --scope' \
+      && ! echo "$T9C_OUT2" | "$GREP" -q 'plugin install frontend-design'; then
+      ok "T9c sous-cas 2 (D-02) : seule entrée inactive → enable scopé, jamais un install nu"
+    else
+      ko "T9c sous-cas 2 (D-02) : enable scopé attendu pour frontend-design, jamais install nu"
+    fi
+    rm -rf "$T9C_BIN" "$T9C_FIX"
+  fi
+
+  # ---------------------------------------------------------------------------
+  # T9d — DÉGRADATION : PATH restreint SANS `claude` → exit 0, aucune trace d'exception, les 4
+  # étapes manuelles affichées, dont la ligne à deux temps d'`impeccable`.
+  # ---------------------------------------------------------------------------
+  T9D_BIN="$(mktemp -d)"
+  T9D_OUT="$(PATH="$T9D_BIN:/usr/bin:/bin" bash "$EDD" 2>&1)"
+  T9D_RC=$?
+  if [ "$T9D_RC" -eq 0 ] \
+    && echo "$T9D_OUT" | "$GREP" -q 'superpowers' \
+    && echo "$T9D_OUT" | "$GREP" -q 'ui-ux-pro-max' \
+    && echo "$T9D_OUT" | "$GREP" -q 'frontend-design' \
+    && echo "$T9D_OUT" | "$GREP" -qi 'deux temps' \
+    && echo "$T9D_OUT" | "$GREP" -q 'marketplace add pbakaus/impeccable' \
+    && echo "$T9D_OUT" | "$GREP" -q 'plugin install impeccable@impeccable'; then
+    ok "T9d dégradation : CLI claude absente → exit 0, 4 étapes manuelles (dont la ligne à deux temps d'impeccable)"
+  else
+    ko "T9d dégradation : rc=$T9D_RC ou étapes manuelles incomplètes"
+  fi
+  rm -rf "$T9D_BIN"
+
+  # ---------------------------------------------------------------------------
+  # T9e — AUTONOMIE (D-04) : aucune dépendance d'EXÉCUTION vers un autre module (mentions en
+  # commentaire tolérées — la garde vise les APPELS, pas les mentions), et module.json ne déclare
+  # que `conductor`.
+  # ---------------------------------------------------------------------------
+  t9e_ok=1
+  EDD_STRIPPED="$("$GREP" -v '^[[:space:]]*#' "$EDD")"
+  echo "$EDD_STRIPPED" | "$GREP" -qE '(^|[^A-Za-z0-9_])source[[:space:]]' && { ko "T9e autonomie : 'source' détecté (appel, pas une mention) dans ensure-design-deps.sh"; t9e_ok=0; }
+  echo "$EDD_STRIPPED" | "$GREP" -qE '^[[:space:]]*\.[[:space:]]' && { ko "T9e autonomie : dot-source ('. ') détecté dans ensure-design-deps.sh"; t9e_ok=0; }
+  echo "$EDD_STRIPPED" | "$GREP" -qE 'bash[[:space:]]+.*(dev-orchestrator|conductor|planning-core|validator|skill-creator|consolidator)/' && { ko "T9e autonomie : invocation bash d'un script d'un autre module détectée"; t9e_ok=0; }
+  echo "$EDD_STRIPPED" | "$GREP" -qF '$(dirname "$0")' && { ko "T9e autonomie : résolution \$(dirname \"\$0\")/ détectée (motif croisé du bootstrap de dev)"; t9e_ok=0; }
+  MJ="$MOD/module.json"
+  req_list="$(sed -n '/"requires"/,/\]/p' "$MJ" 2>/dev/null | "$GREP" -o '"[A-Za-z0-9_-]*"' | "$GREP" -v '"requires"' | tr -d '"')"
+  [ "$req_list" = "conductor" ] || { ko "T9e module.json : requires attendu ['conductor'] seul, obtenu: ${req_list:-<vide>}"; t9e_ok=0; }
+  [ "$t9e_ok" -eq 1 ] && ok "T9e autonomie (D-04) : aucune dépendance d'exécution vers un autre module, module.json requires=['conductor']"
+
+  # ---------------------------------------------------------------------------
+  # T9f — CÂBLAGE DOUBLE : hook nommé (double garde -f, branche else best-effort) dans
+  # vibeflow-update.sh ; section Premier contact + garde-fou non-restitution dans AGENT.md.
+  # SKIP explicite en disposition lab (le fichier d'engine n'y existe pas).
+  # ---------------------------------------------------------------------------
+  VU="$REPO/_internal/vibeflow-update.sh"
+  if [ ! -f "$VU" ]; then
+    skip "T9f câblage (engine) : vibeflow-update.sh introuvable (disposition lab)"
+  else
+    t9f_ok=1
+    "$GREP" -qF '$module_dir/scripts/ensure-design-deps.sh' "$VU" || { ko "T9f câblage : garde -f source (\$module_dir) absente"; t9f_ok=0; }
+    "$GREP" -qF '$TARGET_ROOT/scripts/ensure-design-deps.sh' "$VU" || { ko "T9f câblage : garde -f cible (\$TARGET_ROOT) absente"; t9f_ok=0; }
+    hook_block="$("$GREP" -A8 -m1 'ensure-design-deps.sh' "$VU")"
+    echo "$hook_block" | "$GREP" -q 'else' || { ko "T9f câblage : branche else best-effort absente autour du hook"; t9f_ok=0; }
+    [ "$t9f_ok" -eq 1 ] && ok "T9f câblage double (engine) : hook nommé, double garde -f (source+cible), branche else best-effort"
+  fi
+
+  t9f2_ok=1
+  "$GREP" -qi 'Premier contact' "$AGENT_FILE" || { ko "T9f câblage : section « Premier contact » absente d'AGENT.md"; t9f2_ok=0; }
+  "$GREP" -q 'ensure-design-deps.sh' "$AGENT_FILE" || { ko "T9f câblage : ensure-design-deps.sh non cité dans AGENT.md"; t9f2_ok=0; }
+  "$GREP" -qi 'ne la restitue JAMAIS' "$AGENT_FILE" || { ko "T9f câblage : garde-fou de non-restitution brute absent d'AGENT.md"; t9f2_ok=0; }
+  [ "$t9f2_ok" -eq 1 ] && ok "T9f câblage double (agent) : section Premier contact + garde-fou non-restitution présents"
+fi
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="

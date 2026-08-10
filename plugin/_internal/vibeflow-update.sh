@@ -564,6 +564,21 @@ install_module() {
     fi
   fi
 
+  # Hook post-install (D-03a, quick 260810-fh3) : troisième hook nommé, STRICTEMENT symétrique de
+  # ses deux jumeaux ci-dessus (build-gsd-index.sh / build-gsd-capabilities-index.sh) — donc PAS de
+  # refactoring en boucle générique (même motif que le commentaire du second hook : le premier est
+  # stabilisé depuis la Phase 1, généraliser élargirait le périmètre à un fichier d'engine partagé
+  # par tous les modules, sans bénéfice). Ce hook ne doit JAMAIS amputer l'install d'un module
+  # (D-03a) : une chaîne d'outils design absente DÉGRADE (une ligne de journal), elle ne casse rien.
+  # VF_SCOPE est HÉRITÉ de l'export de tête de ce script (ligne ~78) — rien à passer explicitement.
+  if [ -f "$module_dir/scripts/ensure-design-deps.sh" ] && [ -f "$TARGET_ROOT/scripts/ensure-design-deps.sh" ]; then
+    if bash "$TARGET_ROOT/scripts/ensure-design-deps.sh" >/dev/null 2>&1; then
+      log "  chaîne d'outils design vérifiée/corrigée → ensure-design-deps.sh"
+    else
+      log "  (chaîne d'outils design non vérifiée — best-effort, voir ensure-design-deps.sh)"
+    fi
+  fi
+
   # Commande d'incarnation (ADR-042) : tout agent posé devient invocable nativement via `/<mod>`
   # dans la fenêtre principale. Après la copie des scripts ci-dessus, le générateur est dispo.
   if [ -f "$module_dir/AGENT.md" ]; then
