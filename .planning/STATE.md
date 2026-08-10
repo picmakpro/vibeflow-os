@@ -4,16 +4,16 @@ milestone: gsd-migration
 milestone_name: Migration package GSD
 current_phase: 18
 current_phase_name: Survie du ledger d'exigences à la clôture de jalon
-status: planning
+status: "Phase 27 shipped — PR #35"
 stopped_at: "Phase 20 complète (7/7 plans) — clôture de gouvernance (20-07) : ADR-051 révisée + ADR-060 posée, doctrine transverse alignée, 6 modules bumpés (conductor v1.17.0, dev-orchestrator v2.8.0, design-orchestrator v1.3.2, 3 bundles v2.0.3). Gates verts sauf le seul rouge attendu (compteur de suites racine, 44 réel pas 43). Release racine réservée à validation humaine post-fusion (4 éléments consignés + WINDOWS.md)."
-last_updated: "2026-08-06T12:50:31.363Z"
-last_activity: 2026-08-06
-last_activity_desc: Phase 27 complete, transitioned to Phase 18
+last_updated: "2026-08-10T09:25:06.431Z"
+last_activity: 2026-08-10
 progress:
   total_phases: 26
   completed_phases: 15
   total_plans: 92
   completed_plans: 71
+last_activity_desc: Phase 27 complete, transitioned to Phase 18
 ---
 
 # Project State
@@ -76,8 +76,8 @@ tranchés), les 4 warnings de `21-VERIFICATION.md` traités (`check-state-integr
 job `gates` de la CI, ADR-063 25 cas, `team-kernel.md` porte le recoupement #1995/#2608,
 `inject-mcp-tools.sh` nomme `--force` sur le rc=3 mode fichier unique), release racine v2.45.0
 préparée en commits locaux (jamais taguée).
-Status: Ready to plan
-Last activity: 2026-08-06 — Phase 27 complete, transitioned to Phase 18
+Status: Phase 27 shipped — PR #35
+Last activity: 2026-08-10
 
 **Anomalie d'agrégation instruite (ADR-063).** Le commentaire YAML du frontmatter ci-dessus daté du
 2026-07-31 signalait une régression silencieuse de `completed_phases`/`total_plans`/
