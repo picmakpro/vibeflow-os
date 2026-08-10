@@ -5,6 +5,86 @@ dernières entrées et pointent ici). Chaque module a par ailleurs son propre `C
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.50.0] — 2026-08-10
+
+**La chaîne d'outils design ne dégrade plus en silence — et la détection qui la surveillait était
+aveugle à la moitié du problème.**
+
+Quick task `260810-fh3`, 3 tâches + 2 correctifs, PR #36. Le module `design-orchestrator` dépend de
+4 plugins externes (`ui-ux-pro-max`, `frontend-design`, `impeccable`, `superpowers`) : si l'un
+manquait, rien ne bloquait et rien n'alertait — l'absence n'était mentionnée qu'en **rapport final**,
+une fois le travail déjà mené sur premiers principes.
+
+**Le trou était plus large que « il ne vérifie rien ».** La seule détection outillée du repo —
+`claude plugin list | grep <nom>`, héritée de `dev-orchestrator/scripts/ensure-deps.sh` — matche sur
+le nom seul : un plugin installé puis **désactivé** passait pour présent. Le cas n'est pas théorique,
+il a été mesuré sur le poste de dev : `frontend-design@claude-code-plugins` désactivé coexiste avec
+`frontend-design@claude-plugins-official` actif. Second constat de cadrage : `design-orchestrator` ne
+déclare que `"requires": ["conductor"]` — un lab qui l'installe seul n'hérite d'**aucun** bootstrap
+du module de dev, donc rien n'était empruntable.
+
+### Livré
+
+- **`plugin/design-orchestrator/scripts/ensure-design-deps.sh`** — bootstrap **autonome** (D-04 :
+  aucun `source`, aucun appel vers un autre module ; la parenté de forme avec `ensure-deps.sh` est
+  une duplication **délibérée**, documentée en en-tête, du même ordre que celle déjà assumée entre
+  `ensure-deps.sh` et `check-gsd-engine.sh`). Vérifie **présence ET activation** des 4 plugins et
+  corrige en non-interactif.
+- **Cascade de détection, jamais un verdict sans preuve** : source primaire `claude plugin list
+  --json` (structurée : `id`, `enabled`, `scope`), parsée via `python3` avec la garde ADR-054 du stub
+  Microsoft Store ; repli `awk` en machine à états sur la sortie décorée, qui discrimine sur les
+  **mots** `enabled`/`disabled` et **jamais sur les glyphes** — une décoration mutilée par la locale
+  ne doit pas retourner le verdict en silence ; aucune source exploitable → état **indéterminé** et
+  4 étapes manuelles affichées, jamais un « présent » par défaut.
+- **`installed_plugins.json` écarté explicitement** : il ne porte aucun champ `enabled`. C'est
+  l'origine même du trou fermé ici, et le commentaire du script le dit sur place.
+- **Règle « au moins une entrée du même nom active suffit »** pour les plugins présents sur plusieurs
+  marketplaces ; un plugin **désactivé** reçoit un `claude plugin enable <id> --scope`, **jamais** un
+  `install` nu qui n'aurait rien réactivé. Tout `id` issu d'une sortie de commande est validé (forme
+  stricte `<nom>@<marketplace>` **et** appartenance aux 4 littéraux de la table) avant de toucher une
+  ligne de commande — la table des 4 plugins est littérale, jamais dérivée de l'environnement.
+- **Câblage double** : hook post-install **nommé** dans `plugin/_internal/vibeflow-update.sh`,
+  strictement symétrique de ses deux jumeaux (`build-gsd-index.sh`,
+  `build-gsd-capabilities-index.sh`) — déclenché à l'install **et** à chaque update, double garde
+  `-f`, best-effort : il ne peut jamais amputer l'install d'un module ; et section « Premier
+  contact » dans `AGENT.md` (193 L, sous le budget ADR-029), une fois par session avant
+  DA-INIT/DESIGN-WORKFLOW, sous garde-fou d'Iron Law — l'agent lit la sortie pour lui et ne restitue
+  **jamais** les noms de plugins bruts.
+
+### Le défaut trouvé en revue — sur le résultat livré, pas sur le plan
+
+Le hook appelait le script avec `>/dev/null 2>&1` alors que **tout** sort sur stderr. Une install où
+les 4 plugins manquent et où l'auto-install échoue (CLI `claude` absente, réseau, marketplace
+injoignable) n'aurait produit **aucune ligne** — la dégradation silencieuse que ce module vient
+fermer, rejouée un cran plus haut. Correction en trois points : `log()` (routine, supprimée par
+`--quiet`) séparée de `notice()` (anomalie, traverse toujours) ; drapeau `ANOMALY` armé dès qu'un
+plugin n'était pas déjà actif — **y compris quand le geste réussit**, parce qu'une install qui pose
+des plugins dans le dos de l'utilisateur doit rester visible — qui décide si le résumé traverse
+`--quiet` ; hook en `--quiet` **sans** `2>&1`, motif écrit sur place pour qu'une future main ne
+« nettoie » pas la sortie en réintroduisant la redirection.
+
+### Deux rouges CI, une seule racine
+
+Du **contexte de la machine qui fuit dans le livrable**. (1) 3 `cd /Users/<user>/…` dans le PLAN,
+recopiés depuis les `files_to_read` passés au planner — `check-machine-paths.sh` les refuse, à juste
+titre ; remplacés par `cd "$(git rev-parse --show-toplevel)"`. (2) `T9b` **mesurait la machine
+plutôt que le script** : il compte les commandes du dry-run forcé, mais sans CLI `claude` sur le
+`PATH` le script part en état « indéterminé » et n'en émet aucune — vert sur un poste équipé, rouge
+par construction sur un runner nu. Ses voisins `T9c` et `T9g` stubbaient déjà `claude` ; lui avait
+été oublié. Suite re-vérifiée sous `PATH=/usr/bin:/bin`, la condition du runner.
+
+### Hors périmètre assumé
+
+**Aucun contrôle de version/fraîcheur** des 4 plugins : la moitié porte `version: "unknown"`, un
+contrôle serait du bruit. `design-toolchain.md` §Vérification de présence porte le contrat en
+4 points et reste **jumelle** de la table littérale du script — les faire diverger est le défaut
+nommé sur place, des deux côtés.
+
+Suite du module 12 → **24 cas** (T9..T9g), discriminance prouvée par mutation sur trois propriétés
+distinctes (règle enabled/disabled, non-silence du script, non-silence du hook), puis restauration et
+re-confirmation du vert. Aucun nouveau fichier de suite — compteur racine inchangé. Module : 1 bumpé
+(`design-orchestrator` v1.5.0). **52 suites** vertes, CI verte sur le runner Linux.
+
 ## [v2.49.0] — 2026-08-10
 
 **La parallélisation d'exécution devient granulaire et sûre par construction — et la voie « moteur »
