@@ -2014,9 +2014,9 @@ la rend sûre n'est **posé par personne** chez l'utilisateur. Aujourd'hui rien 
 l'armement voyage avec le plugin, la précondition reste dans le poste de développement, et tous les
 gates rendent vert.
 
-**Requirements**: TBD
+**Requirements**: ARMD-01, ARMD-02, ARMD-03, ARMD-04, ARMD-05, ARMD-06, ARMD-07, ARMD-08, ARMD-09, ARMD-10
 **Depends on:** Phase 27
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 #### Le fait qui ouvre la phase
 
@@ -2071,6 +2071,8 @@ même besoin en 3 langages, et un script neuf dans aucun roster).
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 28 to break down)
+- [ ] 28-01-PLAN.md — Tranche traçante : la règle 4 de bout en bout sur `isolation:` seul (registre-vocabulaire, 3ᵉ discriminant `FILENAME`, planchers anti-vert-à-vide, premier porteur réel de `# vf-provides:`, cas de preuve #38 rejoué rouge/vert). Vague 1.
+- [ ] 28-02-PLAN.md — Expansion : seconde ligne de la liste close (armements MCP), 5 déclarations `vf-requires: mcp-servers` sur les artefacts réellement armés, admission de la clé dans les `KNOWN` de `check-agents.sh`, opposabilité machine des porteurs de preuve, et les 5 bornes déclarées de l'en-tête du gate. Vague 2.
+- [ ] 28-03-PLAN.md — *As-installed testing* : le gate exercé tel qu'installé dans un lab vierge, sur un univers d'armement non vide (checkpoint humain — la forme dépasse le cadrage D-04), puis clôture des deux triades de module. Vague 3.
 
 ---
