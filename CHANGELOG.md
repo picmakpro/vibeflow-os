@@ -5,6 +5,59 @@ dernières entrées et pointent ici). Chaque module a par ailleurs son propre `C
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.49.0] — 2026-08-10
+
+**La parallélisation d'exécution devient granulaire et sûre par construction — et la voie « moteur »
+qui promettait plus est essayée pour de vrai, puis refusée par écrit.**
+
+Phase 27, 6 plans en 4 vagues, PR #35. Prémisse renversée dès le cadrage : le parallélisme
+intra-étape n'était pas « perdu », il est **éteint par défaut** — la doctrine le dit désormais, et
+nomme le vrai chemin (gate n°4 `nested && background`, verrou pratique gate n°5
+`GSD_AGENT_SDK_VERSION`).
+
+### Livré
+
+- **`dag.sh ready` porte `stages`** : partition machine de la frontière en étages sans recouvrement
+  de `scope[]`, câblée sur `partitionStages()` amont en sous-processus (ADR-069, jamais
+  réimplémentée), additive pour les 5 consommateurs, repli fail-closed `stages: null` prouvé en
+  exécution. Cas T25-T33, suite 99 PASS.
+- **Isolation worktree cadrée puis armée** : `.worktreeinclude` en allow-list énumérée (1 entrée,
+  `.claude/agent-memory/`), exclusion motivée des 6 managers (groupe B), `worktree.baseRef: "head"`
+  posé sous checkpoint humain AVANT l'armement des **13 agents écrivains** (groupe A) — l'ordre est
+  une précondition mécanique, pas une convention.
+- **Baseline d'horloge capturée avant toute activation** (D-10, précondition vérifiée : 0 occurrence
+  de la capability dans la config au moment de la capture) ; le plafond 3,00× reste écrit comme une
+  compression d'étages, jamais comme un gain d'horloge ; le 1,8-2,5× reste étiqueté estimé (D-13).
+
+### Refusé par écrit, avec la preuve
+
+- **`claude_orchestration` (backend Workflow)** : SDK réel 0.3.223, persistance tranchée par
+  arbitrage humain (option 3, installation réelle dans `~/.claude` — seule option sans valeur
+  épinglée), échelle des 7 gates franchie **sans drapeau manuel** sur le chemin réel de
+  production… et pourtant **REFUS** : le run Workflow réel diverge du chemin inline au sens exact du
+  critère FAIL n°2 — aucun commit de worker, aucun SUMMARY, aucun merge, worktrees résiduels.
+  Sous-expérience Décision A sûre (question remontée en rapport, rien d'écrit). Repli fail-closed
+  re-testé après manipulation de config, byte-identique à aujourd'hui. L'audit du design amont
+  confirme par analyse statique que le merge affirmé n'est implémenté nulle part ; le namespace a
+  été réglé en amont (gsd-core 1.10.0, #3021), le reliquat — manifeste de merge jamais peuplé — est
+  rapporté en **open-gsd/gsd-core#3302**, qui devient le déclencheur objectif de reprise.
+- **Boucle de mesure fermée sans blanc** : `STATUT-BLOC-3: NON-MESURABLE`, motif et déclencheur
+  recopiés de la décision, protocole A/B conservé intact pour la reprise.
+
+### Sécurité
+
+- **RCE fermée et propagée** (ADR-070) : `dag.sh` n'exécute plus de `gsd-tools.cjs` résolu
+  relativement au CWD ; la variante `toplevel` est propagée à `mission-contracts.md`.
+- **`27-SECURITY.md`** : 37 menaces au registre plan-time, 35 fermées sur preuve citée (gates
+  re-exécutés), 2 ouvertes non-bloquantes consignées telles quelles — dont T-27-03-06, hypothèse
+  **infirmée par le run réel** (`GSD_WORKSTREAM` vide sous worktree) et propagée en doctrine
+  `team-kernel.md` : un manager passe le workstream explicitement dans le mandat d'un worker isolé.
+  `threats_open: 0`.
+
+Modules : 7 bumpés (conductor v1.21.0, dev-orchestrator v2.13.0, business-pilot-bundle /
+content-bundle / growth-bundle v2.0.5, design-orchestrator v1.4.2, mobile-test-team v1.4.3).
+**52 suites** vertes, CI verte.
+
 ## [v2.48.0] — 2026-08-05
 
 **Les capacités dormantes du moteur GSD sont activées, mesurées ou refusées par écrit — et quatre
