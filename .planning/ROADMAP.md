@@ -2062,17 +2062,26 @@ même besoin en 3 langages, et un script neuf dans aucun roster).
 - **Qu'est-ce qu'un « armement » recensable ?** `isolation:` est le cas connu. Un hook, un flag de
   capability, une clé de settings lue par un script posé, un `permissionMode` — la frontière n'est
   pas établie, et un gate qui la devine sera soit inerte soit insupportable.
+
 - **Le lab frais doit-il porter le gate, ou faut-il un gate séparé ?** Le premier a l'environnement,
   le second a la lisibilité. Non tranché.
+
 - **Faut-il distribuer `worktree.baseRef` et ré-armer ?** Question distincte, et **elle n'est pas
   ouverte par cette phase** : le retour des commits d'un worker isolé reste non implémenté en amont
   (`open-gsd/gsd-core#3302`). Tant que ce point n'est pas levé, ré-armer serait refaire #38 avec une
   précondition de plus. Cette phase porte le **gate**, pas le ré-armement.
 
 Plans:
+**Wave 1**
 
 - [ ] 28-01-PLAN.md — Tranche traçante : la règle 4 de bout en bout sur `isolation:` seul (registre-vocabulaire, 3ᵉ discriminant `FILENAME`, planchers anti-vert-à-vide, premier porteur réel de `# vf-provides:`, cas de preuve #38 rejoué rouge/vert). Vague 1.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 28-02-PLAN.md — Expansion : seconde ligne de la liste close (armements MCP), 5 déclarations `vf-requires: mcp-servers` sur les artefacts réellement armés, admission de la clé dans les `KNOWN` de `check-agents.sh`, opposabilité machine des porteurs de preuve, et les 5 bornes déclarées de l'en-tête du gate. Vague 2.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 28-03-PLAN.md — *As-installed testing* : le gate exercé tel qu'installé dans un lab vierge, sur un univers d'armement non vide (checkpoint humain — la forme dépasse le cadrage D-04), puis clôture des deux triades de module. Vague 3.
 
 ---

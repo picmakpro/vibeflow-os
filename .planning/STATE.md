@@ -4,16 +4,16 @@ milestone: gsd-migration
 milestone_name: Migration package GSD
 current_phase: 18
 current_phase_name: Survie du ledger d'exigences à la clôture de jalon
-status: "Phase 27 shipped - PR 35"
+status: "Phase 28 planned - 3 plans, ready to execute"
 stopped_at: "Phase 20 complète (7/7 plans) — clôture de gouvernance (20-07) : ADR-051 révisée + ADR-060 posée, doctrine transverse alignée, 6 modules bumpés (conductor v1.17.0, dev-orchestrator v2.8.0, design-orchestrator v1.3.2, 3 bundles v2.0.3). Gates verts sauf le seul rouge attendu (compteur de suites racine, 44 réel pas 43). Release racine réservée à validation humaine post-fusion (4 éléments consignés + WINDOWS.md)."
-last_updated: "2026-08-10T09:25:06.431Z"
+last_updated: "2026-08-10T00:00:00.000Z"
 last_activity: 2026-08-10
 progress:
   total_phases: 26
   completed_phases: 15
-  total_plans: 92
+  total_plans: 95
   completed_plans: 71
-last_activity_desc: "Quick task 260810-fh3 complete - ensure-design-deps.sh, design-orchestrator v1.5.0"
+last_activity_desc: "Phase 28 planned - 3 plans in 3 waves, plan-checker PASSED, ARMD-01..10 created"
 ---
 
 # Project State
@@ -54,6 +54,28 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 `*.txt` ci-dessus ne les couvre pas (ce sont des `.md` dans un sous-dossier).
 
 ## Current Position
+
+**Phase 28 — PLANIFIÉE le 2026-08-10** (branche `docs/phase-28-cadrage`, non mergée). 3 plans en
+3 vagues : `28-01` (tracer — règle 4 du gate de bout en bout sur `isolation:` + registre-vocabulaire
++ cas #38 rejoué en fixture), `28-02` (expansion MCP, 5 déclarations réelles, bornes d'en-tête),
+`28-03` (*as-installed testing* — **`autonomous: false`, checkpoint bloquant**). Verdict
+`gsd-plan-checker` : **VERIFICATION PASSED**, 10/10 exigences `ARMD-01`…`ARMD-10` couvertes (IDs
+créés ce jour dans `REQUIREMENTS.md`, la ROADMAP portait `Requirements: TBD`). Arbitrages du manager
+consignés dans `28-ARBITRAGES.md` (A-1…A-9).
+
+> **Deux points à ressortir en vérification de phase :**
+> 1. **Override du gate `decision-coverage-plan`** — le gate rend `passed: false` avec
+>    `reason: "could-not-parse"`, **jamais** un manque de couverture : 3 puces de `28-CONTEXT.md`
+>    sont illisibles par son parseur (l. 75 et 100 — un `*` littéral dans `` `ensure-*.sh` `` à
+>    l'intérieur du gras ; l. 107-108 — gras courant sur deux lignes). La couverture réelle des
+>    décisions D-01→D-06 a été **vérifiée indépendamment** par `gsd-plan-checker`. Le correctif de
+>    mise en forme de `28-CONTEXT.md` est **hors périmètre du mandat de planification** et attend un
+>    arbitrage humain.
+> 2. **Dépassement de cadrage signalé sur D-04** — `28-03` propose un **second job CI** et une
+>    fermeture installée de **9 modules** (au lieu de « ajout d'une étape au job `lab-frais` »).
+>    Porté par un `checkpoint:decision` bloquant, non tranché en plan.
+
+---
 
 Phase: 18 — Survie du ledger d'exigences à la clôture de jalon
 (arbitrage Samuel, `.planning/missions/2026-07-31-delta-gsd-core-1.9.0.md`) : pas de

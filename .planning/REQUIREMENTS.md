@@ -562,6 +562,62 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   versionné : qui peut détourner `$root` peut déjà réécrire le hook), et **déjà sur `main`** bien
   avant cette phase.
 
+## Hors-milestone — Phase 28 : preuve que ce qui est armé dans le plugin est armé chez l'utilisateur
+
+> **IDs créés au plan du 2026-08-10**, préfixe `ARMD` (« ARMement ↔ Distribution »). La ROADMAP
+> portait `Requirements: TBD` (`.planning/ROADMAP.md:2017`) et `28-RESEARCH.md` §Phase Requirements
+> constatait qu'aucune correspondance REQ→test ne pouvait être produite sans en inventer.
+>
+> Sources : `28-CONTEXT.md` (décisions D-01 → D-06, arbitrées humainement), `28-ARBITRAGES.md`
+> (arbitrages A-1 → A-9, qui priment sur les recommandations de `28-RESEARCH.md` là où les deux
+> divergent), `28-RESEARCH.md` (mécanique fine mesurée, `fichier:ligne`).
+>
+> **Hors périmètre, verrouillé** : ré-armer `isolation: worktree` sur un artefact distribué,
+> distribuer `worktree.baseRef`, ouvrir un véhicule de distribution de settings dans l'engine,
+> solder l'ensemble des findings du gate sur l'existant.
+
+- [ ] **ARMD-01**: La liaison artefact ↔ preuve se fait par **identifiant de précondition** —
+  `vf-requires: <id>` dans le frontmatter de l'artefact armé, `# vf-provides: <id>` en en-tête du
+  script de preuve, plus un registre **vocabulaire seul** (liste close des armements + table des
+  `<id>` légaux). **Jamais** par nom de fichier, chemin, ni proximité de nom. *(D-02b, A-1)*
+- [ ] **ARMD-02**: La liste close des armements est **énumérée à la main** dans le gate — plancher
+  `isolation:` + outils `mcp__*` — chaque ligne portant son motif sur place. Jamais d'heuristique.
+  *(D-01 point 2)*
+- [ ] **ARMD-03**: Un armement de la liste close sans précondition distribuée rend **ROUGE** : exit
+  non nul, message nommant l'artefact, l'armement, la précondition manquante **et** `fichier:ligne`.
+  Le rouge ne dépend d'**aucune** déclaration — `vf-requires` ne fait que le lever. *(D-02, A-3)*
+- [ ] **ARMD-04**: Un `vf-requires: <id>` levé par un `# vf-provides: <id>` porté par un script
+  réellement distribué rend **VERT**. La jointure est **statique** : le gate n'exécute aucun
+  `ensure-*.sh`. *(D-02, A-4 i)*
+- [ ] **ARMD-05**: Un `ensure-*` incapable de rendre **non-zéro** quand sa précondition manque ne peut
+  pas déclarer `# vf-provides:`. La discriminance est **prouvée dans la suite de tests**, jamais
+  déclarée. Fait fondateur : `ensure-design-deps.sh:59-60` sort **toujours 0**, et son seul câblage
+  machine (`vibeflow-update.sh:581-586`) le traite en best-effort. *(A-4 ii)*
+- [ ] **ARMD-06**: Chaque règle neuve porte son **plancher anti-vert-à-vide** (patron
+  `check-capability-activation.sh:376-388`) : registre illisible, table vide, zéro artefact balayé ou
+  zéro `# vf-provides:` ⇒ « NON VÉRIFIABLE » (exit 2), **jamais** un repli vert. Le 3ᵉ discriminant
+  `FILENAME` est explicite (`:318` / `:355`) et la garde `jq` (`:204-207`) ne bloque plus les règles
+  qui n'en ont pas besoin.
+- [ ] **ARMD-07**: Le cas de preuve rejoue **#38 lui-même** sur fixture synthétique : armement remis
+  ⇒ ROUGE, désarmé (ou précondition prouvée) ⇒ VERT. Discriminance **bidirectionnelle**, mutation
+  vérifiée par `cmp` et jamais par `diff`. Le test établit que le **nouveau** gate rougit **de son
+  propre chef**, distinctement de `check-agents.sh:528-549`. *(D-05, D-06)*
+- [ ] **ARMD-08**: Le gate s'exécute **tel qu'installé** (*as-installed testing*) sur un univers
+  **non vide**, avec plancher anti-vert-à-vide et le cas `.planning/config.json` absent réglé.
+  Mesuré : la fermeture de `conductor` vaut **7 modules** sans `dev-orchestrator`, **0 armement**
+  posé — un branchement naïf rendrait vert à vide. Le vert actuel de Gate C n'est pas troublé.
+  *(D-04, A-7, A-8)*
+- [ ] **ARMD-09**: Le gate **écrit ses propres bornes** dans son en-tête : ce que la liste close
+  couvre et ne couvre pas, le nom du pattern *as-installed testing*, la hiérarchie avec
+  `check-agents.sh` (interdiction dure vs relation conditionnelle), le sort des `SKILL.md` (aucun
+  linter de frontmatter n'existe pour eux), et la limite « couverture **déclarée** ≠ couverture
+  **effective** ». *(D-01b, D-06 § recouvrement)*
+- [ ] **ARMD-10**: Le verdict tranche explicitement **précondition dure vs tuning à défaut sûr** et
+  l'écrit. Si `worktree.baseRef` bascule côté « défaut sûr », la ligne `isolation: worktree` n'est
+  **pas** évacuée en silence de la liste close : soit gardée avec motif réécrit, soit le cas de preuve
+  se fonde sur un armement à précondition réellement dure — dit comme tel. Jamais un cas de preuve
+  creux. *(A-9 ii)*
+
 ## v2 Requirements
 
 ### Vocabulaire & UX
