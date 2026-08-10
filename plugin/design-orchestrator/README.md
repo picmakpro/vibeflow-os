@@ -4,7 +4,7 @@
 > traduit l'intention design en le bon workflow — sans que l'utilisateur ait à connaître la
 > chaîne d'outils qui travaille en coulisse.
 
-**Type** : agent + skills + équipe de mission · **Version** : v1.4.2 · **Dépend de** : `conductor`
+**Type** : agent + skills + équipe de mission · **Version** : v1.5.0 · **Dépend de** : `conductor`
 
 ---
 
@@ -118,7 +118,8 @@ technique) → `gsd-spike` · la construction une fois la direction validée →
 | `references/design-vocabulary-map.md` | Table de reframe (plomberie → vocabulaire VibeFlow) |
 | `references/templates/DESIGN.md` | Template de bible visuelle (rôles stables, incarnation par stack) |
 | `references/templates/CLAUDE-design-section.md` | Template de section design pour `CLAUDE.md` |
-| `scripts/tests/test-design-orchestrator.sh` | Suite de tests — conformité des 3 agents (check-agents --strict), cloisonnement par tools (Pattern 12), densité ADR-029, câblage kernel, heuristique de routage |
+| `scripts/ensure-design-deps.sh` | Vérification présence + activation, auto-install/enable non-interactif des 4 plugins de la chaîne design — déclenché à l'install/update du module (hook engine) et au premier contact de l'agent |
+| `scripts/tests/test-design-orchestrator.sh` | Suite de tests — conformité des 3 agents (check-agents --strict), cloisonnement par tools (Pattern 12), densité ADR-029, câblage kernel, heuristique de routage, `ensure-design-deps.sh` (idempotence, scope, présence+activation, dégradation, autonomie, câblage double) |
 
 ---
 
@@ -127,8 +128,10 @@ technique) → `gsd-spike` · la construction une fois la direction validée →
 - **Produit des specs, pas l'écran final** : la construction réelle passe par le cycle de
   développement (`gsd-execute-phase`). Le module cadre, critique et crafte.
 - **La chaîne d'outils n'est pas embarquée** : référentiel UX, direction créative et atelier de
-  craft sont des plugins tiers. Absents, l'agent dégrade sur les premiers principes — la qualité
-  du craft s'en ressent, et il le signale.
+  craft restent des plugins tiers. Leur **présence et leur activation** sont désormais vérifiées
+  et rétablies automatiquement (`ensure-design-deps.sh`, présence + enabled/disabled) ; la
+  dégradation gracieuse sur les premiers principes reste le filet quand l'install échoue ou que
+  la CLI `claude` est absente, et l'agent le signale.
 - **Couverture inégale par stack** : le référentiel UX couvre web + mobile ; direction créative et
   atelier de craft sont **web only**. Sur SwiftUI/Flutter, le craft repose davantage sur les
   premiers principes.

@@ -13,7 +13,7 @@ progress:
   completed_phases: 15
   total_plans: 92
   completed_plans: 71
-last_activity_desc: Phase 27 complete, transitioned to Phase 18
+last_activity_desc: "Quick task 260810-fh3 complete - ensure-design-deps.sh, design-orchestrator v1.5.0"
 ---
 
 # Project State
@@ -836,6 +836,7 @@ Recent decisions affecting current work:
 |---|-------------|------|--------|-----------|
 | 260801-17w | Isolation multi-session : un écrivain = un worktree (ADR-064) + gate advisory de revendication de branche | 2026-08-01 | `efa20c5` | [260801-17w-isolation-multi-session](./quick/260801-17w-isolation-multi-session/) |
 | 260804-ki4 | Invalider et re-régénérer le cache du bandeau update après /vf-update (vf-update-run.sh) — conductor v1.19.2 | 2026-08-04 | `e4a6138` | [260804-ki4-invalider-et-re-r-g-n-rer-le-cache-du-ba](./quick/260804-ki4-invalider-et-re-r-g-n-rer-le-cache-du-ba/) |
+| 260810-fh3 | ensure-design-deps.sh : présence ET activation des 4 plugins de la chaîne design, auto-install non-interactif, câblage engine + agent — design-orchestrator v1.5.0 | 2026-08-10 | `e9b3650` | [260810-fh3-doter-design-orchestrator-d-un-ensure-de](./quick/260810-fh3-doter-design-orchestrator-d-un-ensure-de/) |
 
 ## Deferred Items
 
