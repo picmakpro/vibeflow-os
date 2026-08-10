@@ -1,5 +1,25 @@
 # Changelog — mobile-test-team
 
+## [v1.4.4] — 2026-08-10 (correctif #38 — `isolation: worktree` retiré du frontmatter)
+
+**Retrait d'`isolation: worktree` du frontmatter de `vf-test-runner` et `vf-app-fixer`.** Livrée en v2.49.0
+(Phase 27), la ligne rendait ces workers inutilisable dès qu'un manager mandatait une branche autre
+que la branche par défaut : le worktree du harness fork depuis la **branche par défaut**, jamais
+depuis le HEAD courant — le worker atterrissait sur une branche technique **sans aucun fichier du
+mandat**, se déclarait bloqué sans produire, et le manager se rabattait silencieusement sur un
+agent générique dépourvu de sa doctrine et de ses allowlists.
+
+La précondition qui corrige le fork — `worktree.baseRef: "head"` — vit dans le settings du poste
+et **n'est posée nulle part par l'engine** : elle avait été posée dans le settings local du repo
+de développement, et les agents ont été distribués sans elle. Même corrigée, elle ne suffirait
+pas : rien ne ramène les commits du worker vers la branche de mission (`open-gsd/gsd-core#3302`).
+
+L'isolation redevient ce que la doctrine du kernel dit déjà qu'elle est — une **décision de
+dispatch du manager**, jamais une propriété du worker. Désormais machine-enforced :
+`check-agents.sh` refuse `isolation:` dans un agent distribué.
+
+Référence : issue #38.
+
 ## [v1.4.3] — 2026-08-10 (armement worktree du groupe A)
 
 ### Modifié

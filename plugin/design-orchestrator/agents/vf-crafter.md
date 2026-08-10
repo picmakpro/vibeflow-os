@@ -5,7 +5,6 @@ tools: Read, Write, Edit, Bash, Glob, Grep, Skill
 model: sonnet
 effort: medium
 memory: project
-isolation: worktree
 vf-internal: true
 ---
 

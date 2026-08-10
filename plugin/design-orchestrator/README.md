@@ -4,7 +4,7 @@
 > traduit l'intention design en le bon workflow — sans que l'utilisateur ait à connaître la
 > chaîne d'outils qui travaille en coulisse.
 
-**Type** : agent + skills + équipe de mission · **Version** : v1.5.0 · **Dépend de** : `conductor`
+**Type** : agent + skills + équipe de mission · **Version** : v1.5.1 · **Dépend de** : `conductor`
 
 ---
 

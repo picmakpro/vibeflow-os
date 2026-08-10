@@ -5,7 +5,6 @@ tools: Read, Write, Edit, Bash, Glob, Grep, Skill, Agent(vf-reviewer, general-pu
 model: sonnet
 effort: medium
 memory: project
-isolation: worktree
 vf-internal: true
 vf-mcp-consumer: true
 ---

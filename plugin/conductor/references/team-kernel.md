@@ -121,7 +121,21 @@ là-bas.
 - **Un manager ne produit jamais** (P3) : il lit, planifie (DAG), dispatche la frontière,
   synthétise. Toute production vit dans les workers.
 - **Dispatch parallèle par défaut** : ≥ 2 nœuds `ready` à périmètres disjoints → un seul
-  message, plusieurs Task. Périmètres douteux → séquentiel ou `isolation: worktree`.
+  message, plusieurs Task. Périmètres douteux → **séquentiel** (voir la règle suivante avant
+  d'envisager `isolation: worktree`).
+- **L'isolation est une décision de DISPATCH, jamais une propriété du worker (issue #38).**
+  Aucun agent distribué ne porte `isolation: worktree` dans son frontmatter — c'est
+  machine-enforced par `check-agents.sh`. Motif, mesuré et non théorique : le worktree du harness
+  fork depuis la **branche par défaut**, pas depuis le HEAD courant. Quand un manager a préparé
+  une branche pour la mission, le worker atterrit sur une branche technique repartant de la
+  branche par défaut, **sans aucun fichier du mandat** — il se déclare bloqué sans produire, et le
+  manager se rabat silencieusement sur un agent générique qui n'a ni la doctrine ni les allowlists
+  du worker prévu. La précondition qui corrigerait le fork (`worktree.baseRef: "head"`) vit dans
+  le settings du poste et **n'est posée nulle part par l'engine** ; et même corrigée, elle ne
+  suffirait pas — rien ne ramène les commits du worker vers la branche de mission, le merge
+  affirmé n'étant implémenté nulle part en amont (`open-gsd/gsd-core#3302`, déjà le motif du refus
+  écrit de `claude_orchestration` en Phase 27). Porté par le frontmatter, `isolation` devient
+  **inconditionnel** et retire au manager l'arbitrage que cette section lui confie.
 - **Le commit reste discipliné même à périmètres disjoints (Phase 27)** : la disjonction
   gouverne le *dispatch*, jamais le *commit*. Tant que N acteurs — workers **et** manager —
   partagent un même `.git/index` (pas d'`isolation: worktree`) : **jamais** `git add` (même

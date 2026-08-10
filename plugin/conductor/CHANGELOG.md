@@ -1,5 +1,28 @@
 # Changelog — conductor
 
+## [v1.21.1] — 2026-08-10 (correctif #38 — le garde-fou machine contre `isolation: worktree`)
+
+**`check-agents.sh` refuse désormais `isolation:` dans le frontmatter d'un agent distribué, et
+`team-kernel.md` écrit pourquoi.** Le lint validait jusqu'ici la *forme* de la clé (« seul
+`worktree` est admis ») sans jamais interroger sa *légitimité* — il a donc laissé passer
+l'armement de 13 agents en v2.49.0.
+
+Motif, mesuré et non théorique (issue #38) : le worktree du harness fork depuis la **branche par
+défaut**, pas depuis le HEAD courant. Un worker mandaté sur une branche de mission atterrit sur
+une branche technique **sans aucun fichier du mandat**, se déclare bloqué sans produire, et le
+manager se rabat silencieusement sur un agent générique. La précondition `worktree.baseRef:
+"head"` vit dans le settings du poste et **n'est posée nulle part par l'engine** — vérifié : zéro
+occurrence de `baseRef` dans `vibeflow-update.sh`, `merge-hooks.sh` et l'installeur. Même
+corrigée, elle ne suffirait pas : rien ne ramène les commits du worker vers la branche de mission
+(`open-gsd/gsd-core#3302` — déjà le motif du refus écrit de `claude_orchestration` en Phase 27).
+
+`team-kernel.md` §Règles d'instanciation porte la règle en clair : **l'isolation est une décision
+de dispatch du manager, jamais une propriété du worker** — portée par le frontmatter elle devient
+inconditionnelle et retire au manager l'arbitrage que la doctrine lui confie. Lever le gate
+demandera de distribuer la précondition **et** de prouver le retour des commits.
+
+Référence : issue #38.
+
 ## [v1.21.0] — 2026-08-10 (la frontière ready apprend les étages, et l'isolation dit enfin ce qu'elle ne transmet pas)
 
 ### Ajouté

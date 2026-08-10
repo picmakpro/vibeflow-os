@@ -526,8 +526,27 @@ def check_file(path):
     if pm and pm not in PERM:
         errors.append(f\"{base} : permissionMode invalide ({pm})\")
     iso = fm.get(\"isolation\")
-    if iso and iso != \"worktree\":
-        errors.append(f\"{base} : isolation invalide ({iso}) — seul worktree est admis\")
+    # Issue #38 : \`isolation: worktree\` est INTERDIT dans le frontmatter d'un agent DISTRIBUE,
+    # tant que ses deux preconditions ne le sont pas elles-memes.
+    #   1. Le worktree du harness fork depuis la branche PAR DEFAUT, pas depuis le HEAD courant.
+    #      La precondition qui corrige ca — \`worktree.baseRef: \"head\"\` — vit dans le settings du
+    #      poste ; l'engine ne la pose NULLE PART chez l'utilisateur (verifie : zero occurrence de
+    #      \`baseRef\` dans vibeflow-update.sh, merge-hooks.sh et l'installeur). Elle a ete posee
+    #      dans le settings local de CE repo en Phase 27, et les 13 agents ont ete distribues sans
+    #      elle : le worker atterrit sur une branche technique repartant de la branche par defaut,
+    #      sans aucun fichier du mandat.
+    #   2. Meme avec baseRef corrige, rien ne ramene les commits du worker vers la branche de la
+    #      mission — le merge affirme n'est implemente nulle part en amont (open-gsd/gsd-core#3302,
+    #      deja le motif du refus ecrit de claude_orchestration en Phase 27).
+    # L'isolation reste une decision de DISPATCH du manager (team-kernel.md §Parallelisme), jamais
+    # une propriete du worker : portee par le frontmatter elle devient inconditionnelle et retire au
+    # manager l'arbitrage que sa propre doctrine lui confie.
+    # Lever ce gate demande de distribuer la precondition ET de prouver le retour des commits — pas
+    # de supprimer ces lignes.
+    if iso == \"worktree\":
+        errors.append(f\"{base} : isolation worktree interdite dans un agent distribue (issue #38) — le worktree fork depuis la branche par defaut, la precondition worktree.baseRef n'est pas distribuee, et rien ne ramene les commits. L'isolation est une decision de dispatch du manager.\")
+    elif iso:
+        errors.append(f\"{base} : isolation invalide ({iso}) — aucune valeur n'est admise dans un agent distribue (voir issue #38)\")
     bg = fm.get(\"background\")
     if bg and str(bg) not in (\"true\", \"false\"):
         errors.append(f\"{base} : background invalide ({bg}) — true|false\")

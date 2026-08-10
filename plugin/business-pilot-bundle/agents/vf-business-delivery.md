@@ -5,7 +5,6 @@ tools: Read, Write, Glob, Grep
 model: sonnet
 effort: medium
 memory: project
-isolation: worktree
 vf-internal: true
 ---
 
