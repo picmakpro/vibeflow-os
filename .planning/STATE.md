@@ -301,6 +301,14 @@ Progress: [██████░░░░] 59%
 
 ### Roadmap Evolution
 
+- 2026-08-10 : **Phase 28 ajoutée — « Preuve que ce qui est armé dans le plugin est armé chez
+  l'utilisateur »**, ouverte par la régression #38 (13 agents distribués avec `isolation: worktree`
+  alors que leur précondition `worktree.baseRef: "head"` n'était posée que dans le settings local de
+  ce repo). **Créée avec le diagnostic, délibérément NON cadrée** : Samuel met VibeFlow à jour
+  avant de la travailler, et ce que la mise à jour change doit être re-mesuré au cadrage plutôt que
+  présumé dans l'entrée de roadmap. Deux corrections d'hygiène au passage : le CLI amont
+  (`phase.add`) a inséré la phase **au milieu de la Phase 24** — bloc déplacé à la main en fin de
+  roadmap ; et la table de suivi, arrêtée à la Phase 25, a reçu les lignes 26, 27 et 28.
 - 2026-08-01 : **Phase 23 plan 01 exécuté hors-bande** — mandat étroit (un seul plan sur 8) confié
   dans le worktree `vibeflow-os-p23` (branche `feat/phase-23-couplage-gsd`), sans passer par
   `gsd-execute-phase` pour la phase entière. Livré : le contrat de checkpoint amont (`gate`,
