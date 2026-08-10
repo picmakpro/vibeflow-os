@@ -1,5 +1,40 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.5.0] — 2026-08-10 (auto-install de la chaîne d'outils design)
+
+**La détection existante du repo était aveugle à l'état enabled/disabled : un plugin de la
+chaîne design installé puis désactivé passait pour présent, sans jamais le signaler.**
+`claude plugin list | grep <nom>` (seule détection outillée précédente, héritée de
+`dev-orchestrator/scripts/ensure-deps.sh`) matche sur le nom seul — il ne regarde jamais le
+champ d'activation.
+
+### Ajouté
+- **`scripts/ensure-design-deps.sh`** — bootstrap autonome (D-04 : aucune dépendance
+  d'exécution vers `dev-orchestrator`) qui vérifie **présence ET activation** des 4 plugins
+  de la chaîne design (`superpowers`, `ui-ux-pro-max`, `frontend-design`, `impeccable`).
+  Source structurée retenue : `claude plugin list --json` (parsée via `python3`, garde ADR-054),
+  avec repli `awk` sur la sortie décorée si la CLI est trop ancienne. `installed_plugins.json`
+  écarté délibérément : il ne porte AUCUN champ `enabled` — c'est l'origine même du trou fermé
+  ici. Un plugin désactivé reçoit un `claude plugin enable … --scope …` scopé, **jamais** un
+  `install` nu ; un plugin actif sur au moins un marketplace parmi plusieurs entrées du même nom
+  compte comme présent (cas réel mesuré : `frontend-design` à la fois désactivé sur
+  `claude-code-plugins` et actif sur `claude-plugins-official`).
+- **Câblage double** : hook post-install nommé dans `plugin/_internal/vibeflow-update.sh`
+  (double garde `-f` source+cible, best-effort — D-03a, ne fait jamais échouer l'install d'un
+  module) ; section « Premier contact — chaîne d'outils (best-effort) » dans `AGENT.md`, lancée
+  une fois par session avant DA-INIT/DESIGN-WORKFLOW, avec le garde-fou d'Iron Law explicite
+  (la sortie du script ne remonte jamais telle quelle à l'utilisateur).
+- Bloc T9..T9f dans `scripts/tests/test-design-orchestrator.sh` (aucun nouveau fichier de suite
+  — compteur racine inchangé, 52) : idempotence, scope, le cas de la tâche (D-02, stub
+  `claude plugin list --json`), dégradation CLI absente, autonomie D-04, câblage double.
+
+### Hors périmètre assumé
+- **Aucun contrôle de version/fraîcheur** des 4 plugins : la moitié porte une version `unknown`,
+  un contrôle serait du bruit. `design-toolchain.md` §Vérification de présence documente le
+  contrat à trois points et reste jumelle de la table littérale du script.
+
+Référence : `.planning/quick/260810-fh3-doter-design-orchestrator-d-un-ensure-de/`.
+
 ## [v1.4.2] — 2026-08-10 (armement worktree du groupe A)
 
 ### Modifié

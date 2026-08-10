@@ -34,13 +34,26 @@
 
 ---
 
-## Vérification de présence
+## Vérification de présence (machine-vérifiée)
 
 ```bash
-claude plugin list 2>/dev/null
+bash .claude/scripts/ensure-design-deps.sh
 ```
 
-Marketplaces / commandes d'install (à proposer si un outil manque, jamais à imposer en silence) :
+Contrat du script (`scripts/ensure-design-deps.sh` du module) :
+
+1. **Présence ET activation** — un plugin installé mais **désactivé** compte comme manquant et
+   fait l'objet d'un `claude plugin enable … --scope …`, **jamais** d'un `install` nu. C'est le
+   trou fermé : `claude plugin list | grep <nom>` (ancienne détection outillée du repo) est aveugle
+   à l'état enabled/disabled.
+2. **Au moins une entrée active suffit** — un plugin dont une entrée du même nom est active compte
+   comme présent, même si une AUTRE entrée du même nom est désactivée (cas réel : `frontend-design`
+   installé à la fois sur `claude-code-plugins` désactivé et `claude-plugins-official` actif).
+3. **Aucun contrôle de version/fraîcheur** — hors périmètre assumé : la moitié des plugins portent
+   une version `unknown`, un contrôle de version serait du bruit.
+
+Marketplaces / commandes d'install (posées automatiquement par le script ci-dessus ; à proposer
+manuellement si le script est indisponible, jamais à imposer en silence) :
 
 | Plugin | Install |
 |---|---|
@@ -49,9 +62,18 @@ Marketplaces / commandes d'install (à proposer si un outil manque, jamais à im
 | `frontend-design` | `claude plugin install frontend-design@claude-plugins-official` |
 | `impeccable` | `claude plugin marketplace add pbakaus/impeccable && claude plugin install impeccable@impeccable` |
 
+> **Note de non-divergence** : cette table et la table littérale de `ensure-design-deps.sh` sont
+> **jumelles** — modifier l'une (nouveau plugin, marketplace renommé) impose de reporter le
+> changement dans l'autre (même forme que la note de non-divergence portée par `sanitize_version()`
+> dans le bootstrap de dev).
+
 ---
 
 ## Dégradation gracieuse (ne JAMAIS bloquer)
+
+> Cette section reste **inchangée et prioritaire** : le script d'auto-install ci-dessus corrige ce
+> qu'il peut, mais il n'a **jamais** le droit de bloquer un geste design. Script absent, CLI
+> `claude` absente ou geste en échec → on dégrade ici, exactement comme avant.
 
 L'objectif prime sur l'outillage. Ordre de priorité et repli :
 
