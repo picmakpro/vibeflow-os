@@ -1,9 +1,10 @@
 # Issue amont — prête à poster sur open-gsd/gsd-core
 
-> **Statut : RÉDIGÉE, NON POSTÉE.** Poster est un geste externe gaté humain — sur accord de
-> Samuel : `gh issue create --repo open-gsd/gsd-core --title "<titre ci-dessous>" --body-file <ce
-> corps>`. Rédigée le 2026-08-10 contre gsd-core **1.10.0** (post-#3021). Contexte lab :
-> `27-AUDIT-claude-orchestration-amont.md`.
+> **Statut : POSTÉE le 2026-08-10 sur accord de Samuel** —
+> [open-gsd/gsd-core#3302](https://github.com/open-gsd/gsd-core/issues/3302).
+> Rédigée le 2026-08-10 contre gsd-core **1.10.0** (post-#3021). Contexte lab :
+> `27-AUDIT-claude-orchestration-amont.md`. Le texte ci-dessous est la copie de référence
+> de ce qui a été soumis.
 
 ---
 
