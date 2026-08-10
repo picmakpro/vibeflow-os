@@ -24,9 +24,17 @@ champ d'activation.
   module) ; section « Premier contact — chaîne d'outils (best-effort) » dans `AGENT.md`, lancée
   une fois par session avant DA-INIT/DESIGN-WORKFLOW, avec le garde-fou d'Iron Law explicite
   (la sortie du script ne remonte jamais telle quelle à l'utilisateur).
-- Bloc T9..T9f dans `scripts/tests/test-design-orchestrator.sh` (aucun nouveau fichier de suite
+- **Flag `--quiet` et contrat de non-silence.** Le script écrit tout sur stderr et distingue la
+  ROUTINE (bannière, « déjà actif », résumé tout-vert — supprimée par `--quiet`) de l'ANOMALIE
+  (plugin absent ou désactivé, geste réellement exécuté, étape manuelle, résumé dès qu'un plugin
+  n'était pas déjà actif — qui traverse toujours `--quiet`). Le hook de l'engine appelle donc
+  `--quiet` **sans** `2>&1` : avaler stderr y aurait rejoué, un cran plus haut, la dégradation
+  silencieuse que cette version ferme — une install aurait pu ne poser aucun outil design sans
+  qu'une seule ligne l'indique.
+- Bloc T9..T9g dans `scripts/tests/test-design-orchestrator.sh` (aucun nouveau fichier de suite
   — compteur racine inchangé, 52) : idempotence, scope, le cas de la tâche (D-02, stub
-  `claude plugin list --json`), dégradation CLI absente, autonomie D-04, câblage double.
+  `claude plugin list --json`), dégradation CLI absente, autonomie D-04, câblage double, et
+  non-silence (muet à vide / parlant sur anomalie / hook qui n'avale pas stderr).
 
 ### Hors périmètre assumé
 - **Aucun contrôle de version/fraîcheur** des 4 plugins : la moitié porte une version `unknown`,

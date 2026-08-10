@@ -571,8 +571,15 @@ install_module() {
   # par tous les modules, sans bénéfice). Ce hook ne doit JAMAIS amputer l'install d'un module
   # (D-03a) : une chaîne d'outils design absente DÉGRADE (une ligne de journal), elle ne casse rien.
   # VF_SCOPE est HÉRITÉ de l'export de tête de ce script (ligne ~78) — rien à passer explicitement.
+  #
+  # `--quiet` SANS `2>&1` — et c'est le point entier du hook : le script parle sur stderr, ses
+  # lignes de routine sont supprimées par --quiet, mais ses ANOMALIES (plugin absent ou désactivé,
+  # geste réellement exécuté, étape manuelle quand l'auto-install n'a pas pu aboutir) doivent
+  # traverser jusqu'au journal de l'install. Avaler stderr ici rejouerait, un cran plus loin, la
+  # dégradation silencieuse que ce hook existe pour fermer. Seul stdout part au trou (le script
+  # n'y écrit rien — garde de forme contre une future régression).
   if [ -f "$module_dir/scripts/ensure-design-deps.sh" ] && [ -f "$TARGET_ROOT/scripts/ensure-design-deps.sh" ]; then
-    if bash "$TARGET_ROOT/scripts/ensure-design-deps.sh" >/dev/null 2>&1; then
+    if bash "$TARGET_ROOT/scripts/ensure-design-deps.sh" --quiet >/dev/null; then
       log "  chaîne d'outils design vérifiée/corrigée → ensure-design-deps.sh"
     else
       log "  (chaîne d'outils design non vérifiée — best-effort, voir ensure-design-deps.sh)"

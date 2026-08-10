@@ -51,6 +51,10 @@ Contrat du script (`scripts/ensure-design-deps.sh` du module) :
    installé à la fois sur `claude-code-plugins` désactivé et `claude-plugins-official` actif).
 3. **Aucun contrôle de version/fraîcheur** — hors périmètre assumé : la moitié des plugins portent
    une version `unknown`, un contrôle de version serait du bruit.
+4. **Ne dégrade jamais en silence** — tout part sur stderr. `--quiet` (ce que passe le hook
+   d'install) supprime la routine mais laisse TOUJOURS passer les anomalies : plugin absent ou
+   désactivé, geste réellement exécuté, étape manuelle. Un appelant ne doit donc jamais rediriger
+   stderr vers `/dev/null` — ce serait reproduire, un cran plus haut, le silence que ce script ferme.
 
 Marketplaces / commandes d'install (posées automatiquement par le script ci-dessus ; à proposer
 manuellement si le script est indisponible, jamais à imposer en silence) :

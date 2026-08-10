@@ -35,6 +35,10 @@
 #         déclare toujours exactement `conductor`.
 #   T9f — Câblage double : hook nommé (double garde -f, branche else best-effort) dans
 #         `vibeflow-update.sh` ; section Premier contact + garde-fou non-restitution dans AGENT.md.
+#   T9g — NON-SILENCE (le défaut d'origine, une couche plus haut) : `--quiet` est muet quand les 4
+#         plugins sont actifs, mais laisse TOUJOURS passer les anomalies ; et le hook de l'engine
+#         appelle bien `--quiet` SANS rediriger stderr — sinon les étapes manuelles disparaissent
+#         et l'install redevient silencieuse, exactement ce que cette tâche ferme.
 #
 # Convention : asserts numérotés, helpers ok()/ko()/skip(), exit 0 si tout passe (SKIP non
 # bloquant), exit 1 si au moins un KO. Calqué sur test-dev-orchestrator.sh (pattern du repo).
@@ -423,6 +427,86 @@ SH
   "$GREP" -q 'ensure-design-deps.sh' "$AGENT_FILE" || { ko "T9f câblage : ensure-design-deps.sh non cité dans AGENT.md"; t9f2_ok=0; }
   "$GREP" -qi 'ne la restitue JAMAIS' "$AGENT_FILE" || { ko "T9f câblage : garde-fou de non-restitution brute absent d'AGENT.md"; t9f2_ok=0; }
   [ "$t9f2_ok" -eq 1 ] && ok "T9f câblage double (agent) : section Premier contact + garde-fou non-restitution présents"
+
+  # ---------------------------------------------------------------------------
+  # T9g — NON-SILENCE. Le trou d'origine (chaîne design qui dégrade sans le dire) se rejoue à
+  # l'identique si le hook d'install avale la sortie du script. Trois asserts, du plus bas au plus
+  # haut : (1) `--quiet` muet quand tout est actif — sinon le hook devient inutilisable et
+  # quelqu'un le fera taire avec `2>&1` ; (2) `--quiet` NON muet sur anomalie — c'est la propriété
+  # qui porte toute la valeur ; (3) le hook de l'engine appelle `--quiet` et ne redirige PAS stderr.
+  # ---------------------------------------------------------------------------
+  if ! command -v python3 >/dev/null 2>&1 && ! command -v python >/dev/null 2>&1; then
+    skip "T9g non-silence : python3/python introuvables — stub JSON impossible dans cette disposition"
+  else
+    T9G_BIN="$(mktemp -d)"; T9G_FIX="$(mktemp -d)"
+
+    # (1) Les 4 actifs → --quiet doit produire ZÉRO ligne.
+    cat >"$T9G_FIX/all-enabled.json" <<'JSON'
+[
+  {"id": "superpowers@claude-plugins-official", "enabled": true, "version": "1.0.0"},
+  {"id": "ui-ux-pro-max@ui-ux-pro-max-skill", "enabled": true, "version": "1.0.0"},
+  {"id": "frontend-design@claude-plugins-official", "enabled": true, "version": "1.0.0"},
+  {"id": "impeccable@impeccable", "enabled": true, "version": "1.0.0"}
+]
+JSON
+    cat >"$T9G_BIN/claude" <<SH
+#!/usr/bin/env bash
+if [ "\$1" = "plugin" ] && [ "\$2" = "list" ] && [ "\$3" = "--json" ]; then
+  cat "$T9G_FIX/all-enabled.json"
+  exit 0
+fi
+exit 1
+SH
+    chmod +x "$T9G_BIN/claude"
+    T9G_QUIET="$(PATH="$T9G_BIN:$PATH" bash "$EDD" --quiet 2>&1)"
+    T9G_LINES="$(printf '%s' "$T9G_QUIET" | "$GREP" -c . || true)"
+    if [ "${T9G_LINES:-0}" -eq 0 ]; then
+      ok "T9g non-silence (1/3) : --quiet muet quand les 4 plugins sont actifs (0 ligne)"
+    else
+      ko "T9g non-silence (1/3) : --quiet a émis ${T9G_LINES} ligne(s) sur un état tout-vert"
+    fi
+
+    # (2) Un plugin désactivé → --quiet doit PARLER quand même (geste + résumé).
+    cat >"$T9G_FIX/one-disabled.json" <<'JSON'
+[
+  {"id": "superpowers@claude-plugins-official", "enabled": true, "version": "1.0.0"},
+  {"id": "ui-ux-pro-max@ui-ux-pro-max-skill", "enabled": true, "version": "1.0.0"},
+  {"id": "frontend-design@claude-plugins-official", "enabled": false, "version": "1.0.0"},
+  {"id": "impeccable@impeccable", "enabled": true, "version": "1.0.0"}
+]
+JSON
+    cat >"$T9G_BIN/claude" <<SH
+#!/usr/bin/env bash
+if [ "\$1" = "plugin" ] && [ "\$2" = "list" ] && [ "\$3" = "--json" ]; then
+  cat "$T9G_FIX/one-disabled.json"
+  exit 0
+fi
+if [ "\$1" = "plugin" ] && [ "\$2" = "enable" ]; then
+  exit 0
+fi
+exit 1
+SH
+    chmod +x "$T9G_BIN/claude"
+    T9G_ANOM="$(PATH="$T9G_BIN:$PATH" bash "$EDD" --quiet 2>&1)"
+    if echo "$T9G_ANOM" | "$GREP" -qi 'DÉSACTIVÉ' && echo "$T9G_ANOM" | "$GREP" -q 'Résumé'; then
+      ok "T9g non-silence (2/3) : --quiet laisse passer l'anomalie (plugin désactivé + résumé)"
+    else
+      ko "T9g non-silence (2/3) : --quiet a étouffé l'anomalie — la dégradation redevient silencieuse"
+    fi
+    rm -rf "$T9G_BIN" "$T9G_FIX"
+
+    # (3) Le hook de l'engine : `--quiet` présent ET pas de `2>&1` sur la ligne d'appel.
+    if [ ! -f "$REPO/_internal/vibeflow-update.sh" ]; then
+      skip "T9g non-silence (3/3) : vibeflow-update.sh introuvable (disposition lab)"
+    else
+      T9G_CALL="$("$GREP" -m1 'bash "$TARGET_ROOT/scripts/ensure-design-deps.sh"' "$REPO/_internal/vibeflow-update.sh" || true)"
+      if echo "$T9G_CALL" | "$GREP" -q -- '--quiet' && ! echo "$T9G_CALL" | "$GREP" -qF '2>&1'; then
+        ok "T9g non-silence (3/3) : le hook engine appelle --quiet sans avaler stderr"
+      else
+        ko "T9g non-silence (3/3) : le hook engine doit passer --quiet et NE PAS rediriger stderr (ligne: ${T9G_CALL:-<absente>})"
+      fi
+    fi
+  fi
 fi
 
 # ---------------------------------------------------------------------------

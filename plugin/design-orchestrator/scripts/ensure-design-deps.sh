@@ -24,6 +24,7 @@
 #
 # Usage :
 #   ./ensure-design-deps.sh                                  # détecte + corrige ce qui manque
+#   ./ensure-design-deps.sh --quiet                           # ne parle QUE s'il y a une anomalie
 #   VF_DESIGN_ENSURE_DRY_RUN=1 ./ensure-design-deps.sh        # logue les commandes SANS les exécuter
 #   VF_SCOPE=project ./ensure-design-deps.sh                  # scope (user|project|local), défaut user
 #   VF_DESIGN_ENSURE_DRY_RUN=1 VF_DESIGN_ENSURE_FORCE=1 ./ensure-design-deps.sh
@@ -51,10 +52,18 @@
 # Flags CLI (rétro-compat : tout argument inconnu est IGNORÉ avec une ligne log, jamais un exit
 # non-zéro — un rejet strict casserait un appelant non recensé) :
 #   -h | --help   Affiche cet en-tête (grep '^# ') et exit 0.
+#   --quiet       Supprime les lignes de ROUTINE (bannière, « déjà actif », résumé tout-vert).
+#                 Les ANOMALIES restent TOUJOURS émises : erreurs, étapes manuelles, gestes
+#                 réellement exécutés, et le résumé dès qu'un plugin n'était pas déjà actif.
 #
 # Contrat de sortie : toujours exit 0, SAUF `VF_SCOPE` invalide (exit 1, avant tout effet de
 # bord). Jamais d'échec silencieux : CLI `claude` absente → 4 étapes manuelles affichées, exit 0.
 # Idempotent : un 2e run consécutif en dry-run est un no-op stable (sortie identique).
+#
+# TOUT sort sur stderr (log/notice/err) — jamais sur stdout. Un appelant qui veut le silence de
+# routine passe `--quiet` ; il ne doit PAS rediriger stderr vers /dev/null, sinon les étapes
+# manuelles disparaissent et le script rejoue, un cran plus loin, le silence même qu'il ferme
+# (c'est le contrat que respecte le hook post-install de l'engine).
 #
 # Référence : D-01/D-02/D-03/D-04, threat register T-Q-01..T-Q-05 (voir PLAN quick 260810-fh3).
 
@@ -66,9 +75,24 @@ set -uo pipefail
 DRY_RUN="${VF_DESIGN_ENSURE_DRY_RUN:-}"
 FORCE="${VF_DESIGN_ENSURE_FORCE:-}"
 SCOPE="${VF_SCOPE:-user}"
+# Armé par --quiet (parsing en fin de fichier, AVANT main). Initialisé ici : sous `set -u`, une
+# lecture avant affectation tuerait le script au premier appel de log().
+QUIET=""
+# Armé dès qu'un plugin n'était PAS déjà actif (absent, désactivé, indéterminé, ou geste émis).
+# C'est ce drapeau qui décide si le résumé traverse `--quiet` : un run tout-vert reste muet, un
+# run qui a touché à quelque chose — ou qui n'a pas pu vérifier — parle toujours.
+ANOMALY=0
 
 # ---------- Helpers ----------
-log() { echo "[ensure-design-deps] $*" >&2; }
+# log()    — ROUTINE : supprimée par --quiet.
+# notice() — ANOMALIE ou action réelle : traverse --quiet, toujours émise.
+# err()    — erreur : traverse --quiet, toujours émise.
+# Les trois écrivent sur stderr (voir le contrat de sortie en en-tête).
+log() {
+  [ -n "$QUIET" ] && return 0
+  echo "[ensure-design-deps] $*" >&2
+}
+notice() { echo "[ensure-design-deps] $*" >&2; }
 err() { echo "[ensure-design-deps] ERROR: $*" >&2; }
 
 # ---------- Validation du scope — EN TÊTE, avant tout run_cmd et toute définition de main ----------
@@ -115,19 +139,22 @@ valid_plugin_id() {
 }
 
 # ---------- Étape manuelle par plugin (jumelle du tableau design-toolchain.md) ----------
+# `notice` et non `log` : une étape manuelle est le SEUL recours de l'utilisateur quand le geste
+# automatique n'a pas pu aboutir — la supprimer sous --quiet reproduirait la dégradation
+# silencieuse que ce script existe pour fermer.
 print_manual_step() {
   case "$1" in
     superpowers)
-      log "  Étape manuelle (superpowers) : claude plugin install superpowers@claude-plugins-official"
+      notice "  Étape manuelle (superpowers) : claude plugin install superpowers@claude-plugins-official"
       ;;
     ui-ux-pro-max)
-      log "  Étape manuelle (ui-ux-pro-max) : claude plugin install ui-ux-pro-max@ui-ux-pro-max-skill"
+      notice "  Étape manuelle (ui-ux-pro-max) : claude plugin install ui-ux-pro-max@ui-ux-pro-max-skill"
       ;;
     frontend-design)
-      log "  Étape manuelle (frontend-design) : claude plugin install frontend-design@claude-plugins-official"
+      notice "  Étape manuelle (frontend-design) : claude plugin install frontend-design@claude-plugins-official"
       ;;
     impeccable)
-      log "  Étape manuelle (impeccable, deux temps) : claude plugin marketplace add pbakaus/impeccable && claude plugin install impeccable@impeccable"
+      notice "  Étape manuelle (impeccable, deux temps) : claude plugin marketplace add pbakaus/impeccable && claude plugin install impeccable@impeccable"
       ;;
   esac
 }
@@ -224,6 +251,10 @@ set_final_state() {
     frontend-design) ST_frontend_design="$2" ;;
     impeccable) ST_impeccable="$2" ;;
   esac
+  # Tout ce qui n'est pas « était déjà actif » est une anomalie au sens de --quiet : y compris un
+  # geste RÉUSSI (installé/réactivé), parce qu'une install qui pose des plugins dans le dos de
+  # l'utilisateur doit rester visible.
+  [ "$2" = "actif" ] || ANOMALY=1
 }
 
 # ---------- Traitement d'un plugin de la table ----------
@@ -270,6 +301,7 @@ process_plugin() { # name marketplace mkt_add
         chosen="$(printf '%s\n' "$matches" | head -1 | awk '{print $1}')"
       fi
       if valid_plugin_id "$chosen"; then
+        notice "$name : installé mais DÉSACTIVÉ → réactivation scopée ($chosen, scope=$SCOPE)."
         if run_cmd claude plugin enable "$chosen" --scope "$SCOPE"; then
           final="réactivé"
         else
@@ -287,9 +319,10 @@ process_plugin() { # name marketplace mkt_add
       # Le dépôt de marketplace est déclaré au MÊME scope que l'install qui suit (--scope
       # commun aux deux gestes) : cohérent avec le contrat "toutes les commandes scopées" du
       # dry-run observable (FORCE), et `claude plugin marketplace add` supporte bien `--scope`.
+      notice "$name : absent → installation scopée (${name}@${marketplace}, scope=$SCOPE)."
       if [ "$mkt_add" != "-" ]; then
         run_cmd claude plugin marketplace add "$mkt_add" --scope "$SCOPE" \
-          || log "$name : ajout du marketplace $mkt_add en échec (peut-être déjà enregistré) — tentative d'install quand même."
+          || notice "$name : ajout du marketplace $mkt_add en échec (peut-être déjà enregistré) — tentative d'install quand même."
       fi
       if run_cmd claude plugin install "${name}@${marketplace}" --scope "$SCOPE"; then
         final="installé"
@@ -327,7 +360,13 @@ frontend-design claude-plugins-official -
 impeccable impeccable pbakaus/impeccable
 TABLE
 
-  log "Résumé : superpowers=${ST_superpowers} ; ui-ux-pro-max=${ST_ui_ux_pro_max} ; frontend-design=${ST_frontend_design} ; impeccable=${ST_impeccable}"
+  # Résumé : routine quand tout était déjà actif (donc muet sous --quiet), ANOMALIE dès qu'un
+  # plugin manquait, était désactivé, ou n'a pas pu être vérifié — auquel cas il traverse --quiet.
+  if [ "$ANOMALY" -eq 1 ]; then
+    notice "Résumé : superpowers=${ST_superpowers} ; ui-ux-pro-max=${ST_ui_ux_pro_max} ; frontend-design=${ST_frontend_design} ; impeccable=${ST_impeccable}"
+  else
+    log "Résumé : superpowers=${ST_superpowers} ; ui-ux-pro-max=${ST_ui_ux_pro_max} ; frontend-design=${ST_frontend_design} ; impeccable=${ST_impeccable}"
+  fi
   return 0
 }
 
@@ -340,6 +379,7 @@ for arg in "$@"; do
       grep '^# ' "$0" | sed 's/^# //'
       exit 0
       ;;
+    --quiet) QUIET=1 ;;
     *) log "argument ignoré (rétro-compat, non reconnu) : $arg" ;;
   esac
 done
