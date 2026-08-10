@@ -1,9 +1,69 @@
 # Changelog — vibeflow-os
 
-Historique des versions du **repo** (canon unique — les deux README n'affichent que les 3
-dernières entrées et pointent ici). Chaque module a par ailleurs son propre `CHANGELOG.md`
+Historique des versions du **repo** (canon unique — les deux README n'en affichent qu'un
+extrait récent et pointent ici). Chaque module a par ailleurs son propre `CHANGELOG.md`
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
+
+## [v2.50.1] — 2026-08-10
+
+**Correctif : `isolation: worktree` retiré des 13 agents écrivains — la ligne livrée en v2.49.0
+rendait les workers d'équipe inutilisables dès qu'un manager mandatait une branche.**
+
+Issue #38, PR #39. Signalé sur `vf-coder` et `vf-crafter`, corrigé sur les **13 agents des
+6 modules** : la cause est identique partout, n'en réparer que deux aurait laissé 11 workers
+cassés.
+
+### Le symptôme, et pourquoi il était invisible
+
+Le worktree du harness fork depuis la **branche par défaut**, jamais depuis le HEAD courant. Quand
+un manager avait préparé une branche pour la mission, deux règles se croisaient : git interdit de
+checkout la même branche dans deux worktrees, et l'agent isolé n'a pas accès au checkout partagé.
+Le worker atterrissait donc sur une branche technique repartant de la branche par défaut, **sans
+aucun fichier du mandat**, sans chemin de sortie — il se déclarait bloqué en deux minutes sans
+produire, et le manager se rabattait sur un agent générique dépourvu de sa doctrine, de ses
+allowlists et de la chaîne d'outils qu'il sait dispatcher. Du point de vue de l'utilisateur, la
+mission avançait : simplement pas avec l'agent prévu.
+
+### La cause n'est pas la ligne, c'est ce qui ne l'accompagnait pas
+
+La précondition qui corrige le fork — `worktree.baseRef: "head"` — vit dans le settings du
+**poste**. La Phase 27 l'a posée dans le settings local de **ce** repo, sous checkpoint humain,
+avant d'armer les 13 agents ; mais l'engine ne la pose **nulle part** chez l'utilisateur. Vérifié :
+zéro occurrence de `baseRef` dans `vibeflow-update.sh`, `merge-hooks.sh` et l'installeur. Les
+agents ont donc été distribués **armés sans leur précondition** — l'armement voyage, la garantie
+reste à la maison.
+
+Et même distribuée, elle n'aurait pas suffi : rien ne ramène les commits du worker vers la branche
+de mission. Le merge affirmé n'est implémenté nulle part en amont (`open-gsd/gsd-core#3302`) —
+c'était **déjà** le motif du refus écrit de `claude_orchestration`, dans cette même Phase 27. La
+preuve du refus et la cause de cette régression sont le même fait, consigné puis non reporté sur
+l'autre chemin.
+
+### Correctif
+
+- **`isolation: worktree` retiré du frontmatter des 13 agents** — `vf-coder`, `vf-crafter`,
+  `vf-test-runner`, `vf-app-fixer`, et les 9 agents des bundles business, content et growth.
+- **Garde-fou machine** — `check-agents.sh` validait la *forme* de la clé (« seul `worktree` est
+  admis ») sans jamais interroger sa *légitimité* : c'est ce qui a laissé passer l'armement. Il
+  refuse désormais tout `isolation:` dans un agent distribué, avec le motif et la **condition de
+  levée** écrits sur place — distribuer la précondition **et** prouver le retour des commits, pas
+  supprimer le gate. Discriminance vérifiée : la ligne remise fait sortir le lint en 1.
+- **Doctrine** — `team-kernel.md` §Règles d'instanciation porte la règle en clair : l'isolation est
+  une **décision de dispatch du manager**, jamais une propriété du worker. C'est ce que la doctrine
+  disait déjà (« périmètres douteux → séquentiel ou `isolation: worktree` », une décision **par
+  dispatch**) ; le frontmatter la contredisait en la rendant inconditionnelle et retirait au
+  manager l'arbitrage que sa propre doctrine lui confie.
+
+### Aussi
+
+La phrase « les deux README n'affichent que les 3 dernières entrées » disparaît des deux README et
+de l'en-tête de ce fichier : ils en affichaient **13**. Remplacée par une formulation **sans
+chiffre** — un compte gravé dans une prose que personne ne re-dérive redevient faux à la release
+suivante.
+
+Modules : 7 bumpés (`conductor` v1.21.1, `dev-orchestrator` v2.13.1, `design-orchestrator` v1.5.1,
+`mobile-test-team` v1.4.4, les 3 bundles v2.0.6). **52 suites** vertes.
 
 ## [v2.50.0] — 2026-08-10
 
