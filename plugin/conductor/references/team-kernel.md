@@ -89,6 +89,11 @@ celle du moteur : **elle reste, pour l'instant, la seule qui parallélise réell
 - **Sérialisation observée ≠ panne.** Voir une étape enchaîner ses plans un par un est le
   comportement nominal du moteur ici ; ce n'est ni un symptôme, ni un motif de halt condition, ni
   quelque chose à corriger côté lab.
+- **Un worker `isolation: worktree` ne résout PAS son `GSD_WORKSTREAM`.** Fait observé, pas une
+  hypothèse : au run réel de la Phase 27 (sonde A4), la variable est **vide** depuis le worktree
+  isolé. Un manager qui cloisonne par workstream passe donc le workstream **explicitement dans le
+  mandat** du worker isolé — jamais en supposant l'héritage d'environnement. Registre :
+  T-27-03-06, `27-SECURITY.md` du dépôt VibeFlow.
 - Toute bascule sur la capability amont `claude_orchestration` (BETA, default-off) qui prétendrait
   restaurer le parallélisme intra-étape est un **opt-in explicite**, jamais un défaut.
 
