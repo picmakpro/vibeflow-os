@@ -140,10 +140,34 @@ F2-F4 avertissements, F5-F6 info) + consigne de fermer la **famille** de défaut
   auteur — et l'auto-déclaration s'est trompée aux deux tours précédents (le tour 2 se disait `passed`
   alors qu'il avait *déplacé* le bloquant). **Ne pas traiter les plans comme vérifiés sur cette base.**
 
-**Premier geste à la reprise :** dispatcher une **troisième passe `gsd-plan-checker` indépendante** sur
-le delta `70538b1..960f354`, avec deux questions — (a) les sept correctifs sont-ils réellement clos, et
-(b) le balayage de famille annoncé est-il exhaustif ? Le juge a déjà démontré deux fois qu'il trouvait
-ce que l'auteur ne voyait pas.
+**Tour 3 de vérification — FAIT (reprise du 2026-08-11).** Verdict : **aucun bloquant, aucune
+régression, 2 avertissements**. Les sept correctifs sont clos et re-mesurés un par un (le `<verify>`
+substitué rejoué → `rc=0` ; le marqueur d'éligibilité re-vérifié aux deux portes
+`inject-mcp-tools.sh:310`/`:390` ; les quatre références `fichier:ligne` pointent juste). Le juge a
+**refait le balayage de famille lui-même** : 47 occurrences classées une par une dans `28-03`,
+`28-02` indemne. Son mot : **« techniquement, ces plans sont exécutables »**.
+
+### Les deux avertissements restants (budget épuisé → escalade, pas de 4ᵉ tour)
+
+- **W1 — famille surveillée, cosmétique.** `28-03-PLAN.md:234-236` (`<read_first>`) dit du job
+  `lab-frais` « c'est le patron à copier, pas à modifier » — faux sous `etape-dans-lab-frais`, où il
+  est justement la cible. Même défaut moindre à `:229` (`<reversibility>`). N'égare aucun exécutant :
+  le `<branching>` nomme la cible et substitue chaque étape.
+  **Geste (une ligne) :** à `28-03-PLAN.md:161`, élargir l'énumération de la clause de primauté en
+  `(<read_first>, <action>, <verify>, <acceptance_criteria>, <reversibility>, <done>)`. C'est la
+  correction qui ferme la famille **par construction** au lieu d'élément par élément — la seule des
+  trois tours qui traite la cause.
+- **W2 — asymétrie introduite par le correctif F4 lui-même.** `28-02-PLAN.md:334-336` : le sens
+  **vert** n'exige pas `vf-mcp-consumer: true` alors que la même porte s'y applique ; et `:301-302`
+  renvoie à T11 qui ne passe que grâce à `--force`, absent de la commande prescrite (`:316`). Une
+  fixture verte reprise telle quelle rendrait **3**, pas **0** ⇒ l'assertion est insatisfaisable en
+  l'état. Se révèle au premier run.
+  **Geste (une ligne) :** à `:334`, exiger le marqueur sur l'agent de fixture du sens vert aussi.
+
+**Recommandation ferme du manager : appliquer ces deux éditions d'une ligne avant d'exécuter**, en
+commençant par W1 `:161` (elle ferme la famille par construction). Ce n'est pas un 4ᵉ tour de
+correction au sens du budget — c'est l'application d'un geste déjà écrit, mesuré et localisé par le
+juge, non la relance d'un cycle. L'arbitrage revient à l'humain : le budget est formellement épuisé.
 - **Budget de correction épuisé** (3 tours). Si une re-vérification du tour 3 remonte encore un défaut de
   la même famille (affirmation écrite en dur pour `second-job-9-modules` hors portée de la clause de
   primauté), la conduite prévue est **l'escalade à l'humain**, pas un quatrième tour.

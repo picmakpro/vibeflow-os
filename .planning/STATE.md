@@ -13,7 +13,7 @@ progress:
   completed_phases: 15
   total_plans: 95
   completed_plans: 71
-last_activity_desc: "Phase 28 planned - 3 plans in 3 waves, plan-checker PASSED, ARMD-01..10 created"
+last_activity_desc: "Phase 28 planned - 3 plans in 3 waves, ARMD-01..10 created. 3 independent plan-checker passes + 3 targeted correction rounds; 2 non-blocking warnings left, escalated to human (correction budget exhausted). NOT executed."
 ---
 
 # Project State
