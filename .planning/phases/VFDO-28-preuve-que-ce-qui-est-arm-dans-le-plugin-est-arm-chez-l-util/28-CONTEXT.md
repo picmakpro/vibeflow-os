@@ -72,7 +72,7 @@ capacité dont la précondition n'est posée par personne chez l'utilisateur —
 
 ### Verdict — que fait le gate quand la précondition n'est posée par personne ?
 
-- **D-02 — Il bloque, et un `ensure-*.sh` déclaré vaut preuve de distribution.** Deux verdicts, pas
+- **D-02 — Il bloque, et un `ensure-….sh` déclaré vaut preuve de distribution.** Deux verdicts, pas
   un :
   - **Rouge** par défaut : armement sans précondition distribuée ⇒ exit non nul, message nommant
     l'artefact, l'armement, la précondition manquante **et** fichier:ligne (patron de message déjà
@@ -97,15 +97,16 @@ capacité dont la précondition n'est posée par personne chez l'utilisateur —
   `plugin.json` (collecte à l'activation, `required: true`) — consigné en `<deferred>`, pas ouvert
   ici. [`.planning/research/2026-08-10-agents-paralleles-etat-de-l-art.md` §Volet C]
 
-- **D-02b — Le mécanisme de liaison artefact ↔ `ensure-*.sh` relève du plan, pas du cadrage.**
+- **D-02b — Le mécanisme de liaison artefact ↔ `ensure-….sh` relève du plan, pas du cadrage.**
   Convention de nommage, champ de frontmatter nommant le script, ou registre : c'est un calcul
   d'implémentation. Seule contrainte de cadrage : la liaison doit être **explicite et vérifiable
   par machine**, jamais inférée d'une proximité de nom. — **Reversibility:** reversible.
 
 ### Emplacement — où vit le gate ?
 
-- **D-03 — Extension de `plugin/dev-orchestrator/scripts/check-capability-activation.sh`, pas un
-  sixième gate.** Le ROADMAP le demande nommément (« regarder d'abord si ce gate s'étend plutôt que
+- **D-03 — Extension de `check-capability-activation.sh`, pas un sixième gate.** Le fichier visé
+  est `plugin/dev-orchestrator/scripts/check-capability-activation.sh`. Le ROADMAP le demande
+  nommément (« regarder d'abord si ce gate s'étend plutôt que
   d'en créer un sixième ») et la Phase 24 a chiffré le coût du réflexe inverse : 6 implémentations
   d'un même besoin en 3 langages, et un script neuf dans aucun roster. Le script est déjà à
   **443 lignes** et très commenté : si l'extension le fait franchir le seuil de
