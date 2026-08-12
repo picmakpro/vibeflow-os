@@ -8,6 +8,7 @@ effort: high
 memory: project
 vf-internal: true
 vf-mcp-tools: XcodeBuildMCP:test_sim,build_sim,clean
+vf-requires: mcp-servers
 ---
 
 # Agent : vf-reviewer

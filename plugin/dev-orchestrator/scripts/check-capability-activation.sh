@@ -425,6 +425,17 @@ report="$(
     # nest distribuee par personne, et le second verrou open-gsd/gsd-core#3302 (retour des commits)
     # est intact. Ces deux tables ne recoivent AUCUNE variable de surcharge.
     ARM["isolation"] = "worktree-baseref"
+    # Seconde ligne (Phase 28, plan 28-02) : un artefact qui recoit une allowlist MCP derivee du
+    # lab depend dune precondition externe -- lexistence reelle des serveurs cites -- que rien ne
+    # garantit chez lutilisateur ; le contre-fait mesure est que ce depot na AUCUN .mcp.json, donc
+    # lallowlist nommee de vf-reviewer.md:10 ny est prouvee par rien. Les deux grammaires
+    # (vf-mcp-consumer: true selecteur booleen, vf-mcp-tools: serveur:outils allowlist nommee)
+    # exigent la MEME precondition mcp-servers, deja admise dans OKID depuis 28-01. Le token MCP
+    # litteral (mcp double-underscore) nentre JAMAIS dans cette table : la liste close se lit sur
+    # des CLES de frontmatter, et sa seule occurrence dans les sources est une phrase de prose
+    # (vf-reviewer.md:45) que la regle 4 ne doit surtout pas confondre avec un armement.
+    ARM["vf-mcp-consumer"] = "mcp-servers"
+    ARM["vf-mcp-tools"] = "mcp-servers"
     nArmTable = 0
     for (armk in ARM) nArmTable++
     OKID["worktree-baseref"] = 1

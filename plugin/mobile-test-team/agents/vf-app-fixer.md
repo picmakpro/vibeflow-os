@@ -7,6 +7,7 @@ effort: medium
 memory: project
 vf-internal: true
 vf-mcp-consumer: true
+vf-requires: mcp-servers
 ---
 
 Tu es `vf-app-fixer`, le correcteur de code applicatif de l'équipe de test autonome.

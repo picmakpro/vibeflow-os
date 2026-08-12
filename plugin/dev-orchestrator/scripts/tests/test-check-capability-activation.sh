@@ -949,6 +949,230 @@ else
   ko "R9 non-régression — le compteur de lignes de corpus doit rester inchangé" "base=$lines_base r4=$lines_r4 out_base=[$out_base] out_r4=[$out_r4]"
 fi
 
+# ===============================================================================================
+# == RÈGLE 4 — armements MCP (Phase 28, plan 28-02) : seconde ligne de la liste close ============
+# ===============================================================================================
+# Les deux grammaires MCP (vf-mcp-consumer: true, vf-mcp-tools: <serveur>:<outils>) exigent
+# désormais la même précondition mcp-servers (déjà légale dans OKID depuis 28-01). `decoy.sh`, déjà
+# fabriqué par `mk_script_decoy` ci-dessus, porte `# vf-provides: mcp-servers` : réutilisé tel
+# quel, aucun script de fixture neuf n'est nécessaire pour ces cas.
+
+mk_agent_mcp_consumer_sans_requires() { # <chemin> — vf-mcp-consumer: true SANS vf-requires
+  cat > "$1" <<'AGT'
+---
+name: agent-fixture-mcp-consumer
+vf-mcp-consumer: true
+---
+
+# Agent MCP consumer sans precondition declaree (fixture regle 4, Phase 28-02)
+AGT
+}
+
+mk_agent_mcp_consumer_avec_requires() { # <chemin> — vf-mcp-consumer: true + vf-requires legal
+  cat > "$1" <<'AGT'
+---
+name: agent-fixture-mcp-consumer-ok
+vf-mcp-consumer: true
+vf-requires: mcp-servers
+---
+
+# Agent MCP consumer conforme (fixture regle 4, Phase 28-02)
+AGT
+}
+
+mk_agent_mcp_tools_sans_requires() { # <chemin> — vf-mcp-tools: <serveur>:<outils> SANS vf-requires
+  cat > "$1" <<'AGT'
+---
+name: agent-fixture-mcp-tools
+vf-mcp-tools: XcodeBuildMCP:test_sim,build_sim,clean
+---
+
+# Agent MCP tools sans precondition declaree (fixture regle 4, Phase 28-02)
+AGT
+}
+
+mk_agent_mcp_frontiere() { # <chemin> — vf-mcp-consumer: true + vf-requires HORS table (régle 4bis)
+  cat > "$1" <<'AGT'
+---
+name: agent-fixture-mcp-frontiere
+vf-mcp-consumer: true
+vf-requires: mcp-servers-extra
+---
+
+# Agent vf-requires hors table des ids legaux (fixture regle 4bis, comparaison a frontiere)
+AGT
+}
+
+# Piège anti-prose : AUCUN armement en frontmatter, mais le CORPS cite le préfixe de token MCP dans
+# une phrase — reproduction fidèle de l'occurrence réelle mesurée à `vf-reviewer.md:45` (« ... c'est
+# pour ça que tu portes `vf-mcp-tools`, une allowlist nommée injectée à l'install (jamais un token
+# `mcp__` en dur dans ce fichier) »). Le gate ne lit QUE les clés entre les deux `---` : un gate qui
+# chercherait le littéral dans le corps rougirait ici à tort.
+mk_agent_mcp_prose() { # <chemin> — sans armement, prose citant le préfixe mcp__ dans le corps
+  cat > "$1" <<'AGT'
+---
+name: agent-fixture-mcp-prose
+---
+
+# Agent sans armement (fixture anti-prose, regle 4, Phase 28-02)
+
+Tu ne PRODUIS pas un verdict de compilation, tu en VERIFIES un — c'est pour ca que tu portes
+`vf-mcp-tools`, une allowlist nommee injectee a l'install (jamais un token `mcp__` en dur dans ce
+fichier). Protocole d'appel, non negociable :
+AGT
+}
+
+echo ""
+echo "== règle 4 — armements MCP (Phase 28-02) =="
+
+# === Cas R10 — vf-mcp-consumer: true SANS vf-requires → 1 (règle 4, sous-cas a) ================
+D="$(mk_regle4_fixture r10)"
+mk_agent_mcp_consumer_sans_requires "$D/agents/agentF.md"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md
+$D/agents/agentF.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+out="$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")"
+says_r4=0; case "$out" in *"ECART regle 4"*"agentF.md"*) says_r4=1 ;; esac
+names_key=0; case "$out" in *"arme « vf-mcp-consumer »"*) names_key=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$says_r4" -eq 1 ] && [ "$names_key" -eq 1 ]; then
+  ok "R10 règle 4 (mcp-consumer) — armé vf-mcp-consumer sans vf-requires → 1, ECART nommant agentF.md"
+else
+  ko "R10 règle 4 (mcp-consumer) sans vf-requires → 1" "rc=$rc regle4=$says_r4 cle=$names_key out=[$out]"
+fi
+
+# === Cas R11 — vf-mcp-consumer: true + vf-requires légal levé par decoy.sh (# vf-provides: mcp-servers) → 0
+D="$(mk_regle4_fixture r11)"
+mk_agent_mcp_consumer_avec_requires "$D/agents/agentG.md"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md
+$D/agents/agentG.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+if [ "$rc" -eq 0 ]; then
+  ok "R11 règle 4 (mcp-consumer) conforme — vf-requires légal levé par # vf-provides: mcp-servers (decoy.sh) → 0"
+else
+  ko "R11 règle 4 (mcp-consumer) conforme → 0" "rc=$rc out=[$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")]"
+fi
+
+# === Cas R12 — vf-mcp-tools: <serveur>:<outils> SANS vf-requires → 1 (seconde grammaire) =========
+D="$(mk_regle4_fixture r12)"
+mk_agent_mcp_tools_sans_requires "$D/agents/agentH.md"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md
+$D/agents/agentH.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+out="$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")"
+says_r4=0; case "$out" in *"ECART regle 4"*"agentH.md"*) says_r4=1 ;; esac
+names_key=0; case "$out" in *"arme « vf-mcp-tools »"*) names_key=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$says_r4" -eq 1 ] && [ "$names_key" -eq 1 ]; then
+  ok "R12 règle 4 (mcp-tools) — armé vf-mcp-tools sans vf-requires → 1, la seconde grammaire arme au même titre"
+else
+  ko "R12 règle 4 (mcp-tools) sans vf-requires → 1" "rc=$rc regle4=$says_r4 cle=$names_key out=[$out]"
+fi
+
+# === Cas R13 — anti-prose : AUCUN armement, corps citant le préfixe mcp__ (piège vf-reviewer.md:45) → 0
+D="$(mk_regle4_fixture r13)"
+mk_agent_mcp_prose "$D/agents/agentI.md"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md
+$D/agents/agentI.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+if [ "$rc" -eq 0 ]; then
+  ok "R13 anti-prose — corps citant le préfixe mcp__ SANS armement en frontmatter → 0 (piège vf-reviewer.md:45)"
+else
+  ko "R13 anti-prose — le corps ne doit jamais être lu comme un armement" "rc=$rc out=[$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")]"
+fi
+
+# === Cas R14 — frontière : vf-requires citant un id HORS table (mcp-servers-extra) → 1 (règle 4bis)
+# Preuve que la comparaison se fait par égalité STRICTE de clé (id in OKID), jamais par sous-chaîne :
+# « mcp-servers-extra » n'est PAS « mcp-servers », même s'il le contient comme préfixe.
+D="$(mk_regle4_fixture r14)"
+mk_agent_mcp_frontiere "$D/agents/agentJ.md"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md
+$D/agents/agentJ.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+out="$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")"
+says_r4bis=0; case "$out" in *"ECART regle 4bis"*) says_r4bis=1 ;; esac
+names_id=0; case "$out" in *"mcp-servers-extra"*) names_id=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$says_r4bis" -eq 1 ] && [ "$names_id" -eq 1 ]; then
+  ok "R14 règle 4bis — vf-requires « mcp-servers-extra » hors table (frontière stricte, pas une sous-chaîne de mcp-servers) → 1"
+else
+  ko "R14 règle 4bis — id hors table (frontière) → 1" "rc=$rc regle4bis=$says_r4bis id=$names_id out=[$out]"
+fi
+
+# === Cas R15 — mutation sur COPIES de l'arbre RÉEL : les 5 déclarations réelles, retrait de l'une
+# fait rougir en nommant précisément l'artefact =================================================
+# Copie des 5 artefacts réellement distribués dans un `mktemp -d` privé — l'arbre n'est JAMAIS
+# écrit. Le corpus de preuve reste `decoy.sh` de la fixture (# vf-provides: mcp-servers, patron déjà
+# éprouvé). L'état conforme des 5 copies est vérifié en premier, PUIS UNE seule est mutée
+# (vf-requires retiré) — `cmp -s` atteste le changement, jamais `diff`.
+REAL_ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+REAL5=(
+  "$REAL_ROOT/plugin/dev-orchestrator/agents/vf-coder.md"
+  "$REAL_ROOT/plugin/dev-orchestrator/agents/vf-reviewer.md"
+  "$REAL_ROOT/plugin/mobile-test-team/agents/vf-app-fixer.md"
+  "$REAL_ROOT/plugin/mobile-test-team/agents/vf-test-orchestrator.md"
+  "$REAL_ROOT/plugin/mobile-test-team/agents/vf-test-runner.md"
+)
+real5_present=1
+for f in "${REAL5[@]}"; do
+  [ -r "$f" ] || real5_present=0
+done
+if [ "$real5_present" -eq 1 ]; then
+  D="$(mk_regle4_fixture r15)"
+  mkdir -p "$D/real"
+  ARMED_LIST=""
+  for f in "${REAL5[@]}"; do
+    b="$(basename "$f")"
+    cp "$f" "$D/real/$b"
+    ARMED_LIST="$ARMED_LIST$D/real/$b
+"
+  done
+  PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+  rc_ok="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+  if [ "$rc_ok" -eq 0 ]; then
+    ok "R15 arbre réel (copie) — les 5 déclarations réelles, copiées, sont conformes → 0"
+  else
+    ko "R15 arbre réel (copie) conforme → 0" "rc=$rc_ok out=[$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")]"
+  fi
+  cp "$D/real/vf-coder.md" "$TMP/r15.vf-coder.orig"
+  if ! mutate "$TMP/r15.vf-coder.orig" "$D/real/vf-coder.md" '/^vf-requires:/{next} {print}'; then
+    ko "R15 mutation — retrait de vf-requires sur la copie de vf-coder.md" "le programme de mutation a ÉCHOUÉ — mutant NON CONSTRUIT"
+  elif cmp -s "$D/real/vf-coder.md" "$TMP/r15.vf-coder.orig"; then
+    ko "R15 mutation — retrait de vf-requires sur la copie de vf-coder.md" "la mutation n'a RIEN changé — mutant NON OPPOSABLE"
+  else
+    rc_mut="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+    out_mut="$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")"
+    cp "$TMP/r15.vf-coder.orig" "$D/real/vf-coder.md"
+    rc_back="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+    names_it=0; case "$out_mut" in *"vf-coder.md"*) names_it=1 ;; esac
+    if [ "$rc_mut" -eq 1 ] && [ "$names_it" -eq 1 ]; then
+      ok "R15 mutation — vf-requires retiré de la copie de vf-coder.md (une des 5 déclarations réelles) : le gate ROUGIT (rc=1) en nommant précisément vf-coder.md"
+    else
+      ko "R15 mutation — retirer UNE des 5 déclarations réelles doit rougir en nommant l'artefact" "rc=$rc_mut nomme=$names_it out=[$out_mut]"
+    fi
+    if [ "$rc_back" -eq 0 ]; then
+      ok "R15 mutation — vf-requires restauré sur la copie : le VERT est retrouvé (rc=0)"
+    else
+      ko "R15 mutation — le vert doit être retrouvé après restauration" "rc=$rc_back"
+    fi
+  fi
+else
+  echo "  · R15 arbre réel (copie) NON APPLICABLE — un des 5 artefacts réels est introuvable sous $REAL_ROOT"
+fi
+
 # === Cas final — contrôle sur l'arbre RÉEL ====================================================
 # NON discriminant à lui seul (il ne prouve que l'absence d'écart aujourd'hui) : il vient donc
 # APRÈS les mutations, et jamais à leur place.
