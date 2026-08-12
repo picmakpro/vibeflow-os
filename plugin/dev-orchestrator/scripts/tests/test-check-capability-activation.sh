@@ -900,9 +900,9 @@ says_r4=0; case "$out" in *"ECART regle 4 :"*"agentE.md"*) says_r4=1 ;; esac
 names_cite=0; case "$out" in *"vf-requires cite « mcp-servers »"*) names_cite=1 ;; esac
 names_exige=0; case "$out" in *"pas id exige « worktree-baseref »"*) names_exige=1 ;; esac
 if [ "$rc" -eq 1 ] && [ "$says_r4" -eq 1 ] && [ "$names_cite" -eq 1 ] && [ "$names_exige" -eq 1 ]; then
-  ok "R7bis règle 4 sous-cas (b) — vf-requires légal mais différent de l'id exigé → 1, ECART nommant les deux ids"
+  ok "R7bis règle 4 sous-cas (b) — vf-requires légal mais autre que l'id exigé → 1, ECART nommant les deux ids"
 else
-  ko "R7bis règle 4 sous-cas (b) — id légal différent de l'id exigé → 1" "rc=$rc regle4=$says_r4 cite=$names_cite exige=$names_exige out=[$out]"
+  ko "R7bis règle 4 sous-cas (b) — id légal autre que l'id exigé → 1" "rc=$rc regle4=$says_r4 cite=$names_cite exige=$names_exige out=[$out]"
 fi
 
 # === Cas R8 — contre-épreuve D-01 : vf-requires LÉGAL sans AUCUN armement → 0, jamais un écart ==
@@ -1171,6 +1171,218 @@ $D/scripts/decoy.sh"
   fi
 else
   echo "  · R15 arbre réel (copie) NON APPLICABLE — un des 5 artefacts réels est introuvable sous $REAL_ROOT"
+fi
+
+# ===============================================================================================
+# == OPPOSABILITÉ DES PORTEURS DE PREUVE (# vf-provides:), Phase 28, plan 28-02 ==================
+# ===============================================================================================
+# Pourquoi cette garde existe. Un marqueur statique seul ne prouve rien : `ensure-design-deps.sh`
+# déclare noir sur blanc « Contrat de sortie : toujours exit 0, SAUF VF_SCOPE invalide » —
+# précondition non satisfaite comprise — et son unique câblage machine
+# (`plugin/_internal/vibeflow-update.sh:581-586`) le traite en best-effort à l'install : les deux
+# branches loguent, aucune n'échoue. Accepter la seule PRÉSENCE d'un `# vf-provides:` comme preuve
+# reviendrait à rendre vert un gate adossé à un script incapable de rougir — c'est #38 rejoué d'un
+# cran. Conséquence pratique : `ensure-design-deps.sh` NE PEUT PAS déclarer `# vf-provides:` en
+# l'état ; lui donner un mode de vérification discriminant est un candidat de backlog nommé (D-05),
+# pas un livrable de cette phase.
+#
+# Aucun script ne peut donc porter `# vf-provides:` sans qu'une ligne de CETTE table, exécutée pour
+# de vrai, établisse qu'il sait rendre le code de sortie EXACT déclaré quand sa précondition manque
+# — jamais « non nul », qui laisserait passer un porteur qui ne sait dire que « je ne peux pas me
+# prononcer » (le sous-état 3 INDÉTERMINÉ, cousin du cran de `ensure-design-deps.sh` que cette
+# garde existe pour fermer).
+
+# --- Table nommée, écrite à la main (A-2, D-02b) : une ligne par porteur. Aujourd'hui UNE entrée.
+PROV_TABLE_ID=(mcp-servers)
+PROV_TABLE_SCRIPT=("plugin/dev-orchestrator/scripts/inject-mcp-tools.sh")
+PROV_TABLE_EXPECT_RED=(1)
+
+# --- Découverte du corpus RÉEL de porteurs distribués : deux dispositions, comme le gate lui-même
+# (`plugin/*/scripts/*.sh` en dépôt, `.claude/scripts/*.sh` en lab installé, s'il existe). Résolue
+# par VF_CAPACT_PROVIDERS — MÊME contrat de surcharge que le gate — pour rendre cette découverte
+# elle-même testable par mutation sur une copie, sans jamais écrire dans l'arbre réel.
+vf_capact_test_discover_provider_scripts() { # -> chemins des scripts a balayer, un par ligne
+  if [ -n "${VF_CAPACT_PROVIDERS+x}" ]; then
+    printf '%s\n' "$VF_CAPACT_PROVIDERS"
+    return 0
+  fi
+  for f in "$REAL_ROOT"/plugin/*/scripts/*.sh; do
+    [ -f "$f" ] && printf '%s\n' "$f"
+  done
+  if [ -d "$REAL_ROOT/.claude/scripts" ]; then
+    for f in "$REAL_ROOT"/.claude/scripts/*.sh; do
+      [ -f "$f" ] && printf '%s\n' "$f"
+    done
+  fi
+}
+
+# --- Extraction des ids # vf-provides: dans le bloc de commentaires de tete de CHAQUE script du
+# corpus (jusqu'a la premiere ligne NON commentee — meme frontiere que le gate). awk, jamais grep
+# pipe (le grep proxifie de ce poste tronque silencieusement, constat inscrit dans le gate).
+vf_capact_test_provider_ids() { # <chemins sur stdin, un par ligne> -> ids, un par ligne
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    [ -r "$f" ] || continue
+    awk '
+      FNR==1 { open=1 }
+      open {
+        if ($0 !~ /^#/) { open=0; next }
+        if ($0 ~ /^# vf-provides: /) {
+          id=$0; sub(/^# vf-provides: /,"",id); gsub(/^[ \t]+/,"",id); gsub(/[ \t]+$/,"",id)
+          if (id != "") print id
+        }
+      }
+    ' "$f"
+  done
+}
+
+REAL_ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+
+echo ""
+echo "== opposabilité des porteurs de preuve (# vf-provides:), Phase 28-02 =="
+
+DISK_IDS="$(vf_capact_test_discover_provider_scripts | vf_capact_test_provider_ids | sort -u)"
+TABLE_IDS_SORTED="$(printf '%s\n' "${PROV_TABLE_ID[@]}" | sort -u)"
+n_disk=$(printf '%s\n' "$DISK_IDS" | grep -c . || true)
+n_table=$(printf '%s\n' "$TABLE_IDS_SORTED" | grep -c . || true)
+only_disk="$(comm -23 <(printf '%s\n' "$DISK_IDS") <(printf '%s\n' "$TABLE_IDS_SORTED"))"
+only_table="$(comm -13 <(printf '%s\n' "$DISK_IDS") <(printf '%s\n' "$TABLE_IDS_SORTED"))"
+
+if [ "$n_disk" -eq 0 ] || [ "$n_table" -eq 0 ]; then
+  ko "opposabilité plancher — ensemble vide (disque=$n_disk, table=$n_table)" "une garde qui ne surveille personne ne prouve rien"
+else
+  ok "opposabilité plancher — ensembles non vides (disque=$n_disk porteur(s), table=$n_table entrée(s), état attendu : exactement UN porteur, inject-mcp-tools.sh)"
+fi
+if [ -z "$only_disk" ]; then
+  ok "opposabilité — aucun porteur non tabulé (comparaison d ensembles par comm)"
+else
+  ko "opposabilité — porteur non opposable : aucun cas ne prouve sa discriminance" "only_disk=[$only_disk]"
+fi
+if [ -z "$only_table" ]; then
+  ok "opposabilité — aucune entrée de table périmée (comparaison par comm)"
+else
+  ko "opposabilité — entrée de table périmée (aucun porteur sur disque)" "only_table=[$only_table]"
+fi
+
+# --- Plancher (mutation) : corpus VIDE des deux côtés — VF_CAPACT_PROVIDERS pointe un répertoire
+# vide, seule la fonction de découverte est testée ici (la table, elle, garde son unique entrée
+# réelle : c'est la comparaison disque-vide qui doit être vue, jamais un artefact du fixturing).
+EMPTY_PROV_DIR="$TMP/opposabilite-vide"
+mkdir -p "$EMPTY_PROV_DIR"
+DISK_IDS_VIDE="$(VF_CAPACT_PROVIDERS="" vf_capact_test_discover_provider_scripts | vf_capact_test_provider_ids | sort -u)"
+n_disk_vide=$(printf '%s\n' "$DISK_IDS_VIDE" | grep -c . || true)
+if [ "$n_disk_vide" -eq 0 ]; then
+  ok "opposabilité plancher (mutation) — VF_CAPACT_PROVIDERS=\"\" rend un corpus VRAIMENT vide (0 id), le plancher se déclencherait"
+else
+  ko "opposabilité plancher (mutation) — VF_CAPACT_PROVIDERS=\"\" doit rendre un corpus vide" "n_disk_vide=$n_disk_vide"
+fi
+
+# --- Mutation sur COPIE : un script portant # vf-provides: faux-id, absent de la table, DOIT faire
+# échouer la comparaison. L'arbre réel n'est JAMAIS touché — copie complète du corpus de scripts
+# dans un `mktemp -d` privé, VF_CAPACT_PROVIDERS pointe la suite sur cette copie (jamais sur le
+# dépôt), aucune écriture ni « restauration » après coup n'a lieu sur l'arbre distribué.
+COPY_CORPUS="$TMP/opposabilite-corpus"
+mkdir -p "$COPY_CORPUS"
+for f in "$REAL_ROOT"/plugin/*/scripts/*.sh; do
+  [ -f "$f" ] || continue
+  cp "$f" "$COPY_CORPUS/"
+done
+cat > "$COPY_CORPUS/faux-porteur.sh" <<'SCR'
+#!/usr/bin/env bash
+# faux-porteur.sh — fixture opposabilité (Phase 28-02), porteur NON TABULÉ
+# vf-provides: faux-id
+set -uo pipefail
+echo ok
+SCR
+COPY_LIST="$(for f in "$COPY_CORPUS"/*.sh; do printf '%s\n' "$f"; done)"
+DISK_IDS_MUT="$(VF_CAPACT_PROVIDERS="$COPY_LIST" vf_capact_test_discover_provider_scripts | vf_capact_test_provider_ids | sort -u)"
+mut_only_disk="$(comm -23 <(printf '%s\n' "$DISK_IDS_MUT") <(printf '%s\n' "$TABLE_IDS_SORTED"))"
+if [ -n "$mut_only_disk" ]; then
+  ok "opposabilité mutation — porteur NON TABULÉ (faux-id) ajouté sur COPIE (jamais l'arbre réel) : la comparaison échoue (only_disk=[$mut_only_disk])"
+else
+  ko "opposabilité mutation — un porteur non tabulé doit faire échouer la comparaison" "mut_only_disk vide alors qu'un faux porteur a été ajouté sur la copie"
+fi
+
+# --- Discriminance PROUVÉE PAR EXÉCUTION RÉELLE, pour l'unique entrée de la table (mcp-servers).
+# Isolation hermétique du scope GLOBAL (même patron que test-inject-mcp-tools.sh, Phase 21 Geste B) :
+# VF_CLAUDE_JSON pointe un chemin qui n'existe jamais, indifférent à la config personnelle du poste.
+PROVIDER_SCRIPT="$REAL_ROOT/${PROV_TABLE_SCRIPT[0]}"
+D_PROV="$TMP/opposabilite-verify"
+mkdir -p "$D_PROV"
+ABSENT_CLAUDE_JSON="$D_PROV/absent-claude.json"
+
+# Sens ROUGE : .mcp.json déclare un serveur (fixture-mcp-server), rendant `servers` non vide (donc
+# le verdict peut atteindre exit 1, pas le 3 de l'environnement totalement privé) ; l'agent porte
+# `vf-mcp-consumer: true` (sans ce marqueur il n'est pas retenu comme cible, `determined` reste faux
+# et le verdict serait 3, pas 1) et cite dans `tools:` un serveur INCONNU (`serveur-fantome`) au lieu
+# du serveur exigé — le token attendu (mcp__fixture-mcp-server__*) reste donc manquant.
+RED_AGENT="$D_PROV/rouge.md"
+cat > "$RED_AGENT" <<'AGT'
+---
+name: agent-fixture-mcpprov-rouge
+vf-mcp-consumer: true
+tools: Read, Bash, mcp__serveur-fantome__outil
+---
+
+# Agent MCP consumer citant un serveur inconnu (fixture opposabilité, regle 4, Phase 28-02)
+AGT
+RED_MCP="$D_PROV/mcp-rouge.json"
+printf '{ "mcpServers": { "fixture-mcp-server": {} } }' > "$RED_MCP"
+rc_red=0
+VF_CLAUDE_JSON="$ABSENT_CLAUDE_JSON" bash "$PROVIDER_SCRIPT" --target "$RED_AGENT" --mcp-json "$RED_MCP" --verify --strict >/dev/null 2>&1 || rc_red=$?
+if [ "$rc_red" -eq 1 ]; then
+  ok "opposabilité (mcp-servers, sens rouge) — précondition manquante -> code EXACT 1 (jamais « non nul »)"
+else
+  ko "opposabilité (mcp-servers, sens rouge) -> 1" "rc=$rc_red"
+fi
+
+# Sens VERT : la fixture réutilise le MÉCANISME EXACT du cas conforme déjà écrit dans
+# test-inject-mcp-tools.sh (T11 — injecter PUIS vérifier) plutôt que de fabriquer à la main la
+# chaîne mcp__<serveur>__* attendue, qui rougirait en « serveur manquant » (missing) au moindre
+# écart de forme. Même marqueur d'éligibilité que le sens rouge (vf-mcp-consumer: true).
+GREEN_AGENT="$D_PROV/vert.md"
+cat > "$GREEN_AGENT" <<'AGT'
+---
+name: agent-fixture-mcpprov-vert
+vf-mcp-consumer: true
+tools: Read, Bash
+---
+
+# Agent MCP consumer, cas conforme (fixture opposabilité, regle 4, Phase 28-02)
+AGT
+GREEN_MCP="$D_PROV/mcp-vert.json"
+printf '{ "mcpServers": { "fixture-mcp-server": {} } }' > "$GREEN_MCP"
+VF_CLAUDE_JSON="$ABSENT_CLAUDE_JSON" bash "$PROVIDER_SCRIPT" --target "$GREEN_AGENT" --mcp-json "$GREEN_MCP" >/dev/null 2>&1
+rc_green=0
+VF_CLAUDE_JSON="$ABSENT_CLAUDE_JSON" bash "$PROVIDER_SCRIPT" --target "$GREEN_AGENT" --mcp-json "$GREEN_MCP" --verify --strict >/dev/null 2>&1 || rc_green=$?
+if [ "$rc_green" -eq 0 ]; then
+  ok "opposabilité (mcp-servers, sens vert) — précondition satisfaite (injectée puis relue) -> code EXACT 0 : DISCRIMINANCE prouvée dans les deux sens"
+else
+  ko "opposabilité (mcp-servers, sens vert) -> 0" "rc=$rc_green"
+fi
+
+# Cas nommé distinct : environnement TOTALEMENT privé de source (aucun .mcp.json exploitable, scope
+# global neutralisé) -> 3 INDÉTERMINÉ, JAMAIS 1. Documente dans la suite elle-même que les deux sens
+# d'échec du porteur ne sont pas confondus — un « non nul » sur ce cas laisserait passer un porteur
+# qui ne sait dire que « je ne peux pas me prononcer », le cousin du cran de ensure-design-deps.sh.
+IND_AGENT="$D_PROV/indetermine.md"
+cat > "$IND_AGENT" <<'AGT'
+---
+name: agent-fixture-mcpprov-indetermine
+vf-mcp-consumer: true
+tools: Read, Bash
+---
+
+# Agent MCP consumer sans aucune source de serveur (fixture opposabilité, Phase 28-02)
+AGT
+EMPTY_MCP="$D_PROV/mcp-vide.json"
+printf '{ "mcpServers": {} }' > "$EMPTY_MCP"
+rc_ind=0
+VF_CLAUDE_JSON="$ABSENT_CLAUDE_JSON" bash "$PROVIDER_SCRIPT" --target "$IND_AGENT" --mcp-json "$EMPTY_MCP" --verify --strict >/dev/null 2>&1 || rc_ind=$?
+if [ "$rc_ind" -eq 3 ]; then
+  ok "opposabilité (mcp-servers) — environnement totalement privé de source -> code EXACT 3, distinct du sens rouge (1) : les deux échecs ne sont jamais confondus"
+else
+  ko "opposabilité (mcp-servers) — environnement sans aucune source -> 3, distinct de 1" "rc=$rc_ind"
 fi
 
 # === Cas final — contrôle sur l'arbre RÉEL ====================================================
