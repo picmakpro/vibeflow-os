@@ -173,6 +173,55 @@ None - aucune configuration de service externe requise.
 - Aucun blocage : arbre reel vert (`bash plugin/dev-orchestrator/scripts/check-capability-activation.sh` → 0), suites voisines (`test-inject-mcp-tools.sh`, `test-dev-orchestrator.sh` 184/0) inchangees, compteur de suites toujours 52.
 - Point d'attention hors perimetre de ce plan : `scripts/check-machine-paths.sh` rapporte 1 chemin absolu de machine dans `.planning/phases/VFDO-28-.../28-RESEARCH.md:858`, pre-existant (commit `ad03fc6`, hors du perimetre de fichiers de ce mandat) — a signaler au manager, pas corrige ici.
 
+## Correction ciblee post-revue (mandat vf-coder distinct, meme plan 28-01)
+
+Deux juges independants (revue de code + verification goal-backward) ont passe le diff `3c0f24b..HEAD`.
+Verdict global : la regle 4 fonctionne, D-06 est reellement discriminant, 41/41 cas passaient, arbre
+reel a 0, aucun artefact distribue ne porte `isolation:`. Quatre ecarts retenus, tous corriges ici :
+
+1. **MAJEUR — portabilite chemin a espace** (`check-capability-activation.sh:248-291`,
+   `vf_capact_glob_list`). Le `for f in $pat` non guillemete sur `"$ROOT/plugin/*/agents/*.md"`
+   faisait subir le word-splitting AVANT le globbing : un `$ROOT` a espace coupait le motif et plus
+   rien ne matchait (sortait 2 « aucun artefact lisible… la regle 4 serait INERTE »). Jamais un faux
+   vert (le plancher `nUnivArm==0` interceptait), mais le gate cassait pour un utilisateur reel — le
+   header du fichier cite lui-meme `~/Library/Mobile Documents/` comme cas courant. Corrige en
+   isolant la partie FIXE du motif (prefixe sans metacaractere, seule partie pouvant porter l'espace
+   de `$ROOT`) de sa partie GLOB (texte statique du script), `cd` dans la partie fixe (chemin quote),
+   puis globbing non-quote de la partie GLOB DANS ce repertoire — aucun `$ROOT` n'entre plus dans une
+   expression de glob. Preuve : reproduction sous `.../space lab/vibeflow-os` et
+   `.../nospacelab/vibeflow-os` (copies du depot), meme rapport `conforme` mot pour mot dans les deux
+   cas (23 toggles, 10 briques, 2 fichiers de corpus) apres correctif ; AVANT correctif, la copie a
+   espace sortait 2 (verifie par `git stash` du fichier corrige, rejoue puis restaure).
+2. **MAJEUR — MUT-R2 non discriminant entre sous-cas (a) et (b)**
+   (`tests/test-check-capability-activation.sh`, cas `MUT-R2`). Le mutant desarmant le garde du
+   sous-cas (a) (`check-capability-activation.sh:645` production, avant renumerotation) restait VERT :
+   `REQ_VAL[f]` auto-vivifiee a `""` par awk faisait retomber l'execution sur le message du sous-cas
+   (b), different mais contenant encore les deux substrings verifies (`ECART regle 4`, `agentA.md`).
+   Corrige en ajoutant l'assertion sur le libelle SPECIFIQUE du sous-cas (a)
+   (`sans precondition declaree (vf-requires: absent)`, litteral repris de la production). Preuve par
+   mutation sur copie scratch (`/private/tmp/.../mutscratch`, jamais le depot reel) :
+   `if (!(f in REQ_VAL) || REQ_VAL[f] == "")` → `if (0 && (...))` fait maintenant ECHOUER MUT-R2
+   (`sous_cas_a=0`, message rendu = celui du sous-cas (b) : `vf-requires cite «  », pas id exige
+   « worktree-baseref »`) — la discrimination attendue par la revue est prouvee.
+3. **WARNING — en-tete `inject-mcp-tools.sh` inexacte**. La phrase disait que la regle 4 lit son
+   verdict comme preuve de `worktree-baseref / mcp-servers` ; ce script ne fournit que `mcp-servers`
+   (`# vf-provides: mcp-servers`). Mention `worktree-baseref / ` retiree.
+4. **MINEUR, additif** — cas `R7bis` ajoute (`tests/test-check-capability-activation.sh`) : couvre le
+   sous-cas (b) de la regle 4 (`check-capability-activation.sh:623-627` avant renumerotation), non
+   exerce jusqu'ici — un artefact arme `isolation:` (exige `worktree-baseref`) mais dont
+   `vf-requires:` cite un id LEGAL mais DIFFERENT (`mcp-servers`). Additif strict : aucune ligne de
+   production touchee pour ce point, aucune assertion existante affaiblie. Suite passee de 41/41 a
+   42/42.
+
+**Barre de vert (correction ciblee) :** `test-check-capability-activation.sh` 42/42 (+1 vs 41
+avant) ; `test-inject-mcp-tools.sh` 26/26 (inchange) ; `test-dev-orchestrator.sh` 184/184 (inchange) ;
+`check-capability-activation.sh` sur l'arbre reel → 0.
+
+**Fichiers touches (mandat de correction, perimetre respecte) :**
+`plugin/dev-orchestrator/scripts/check-capability-activation.sh`,
+`plugin/dev-orchestrator/scripts/inject-mcp-tools.sh`,
+`plugin/dev-orchestrator/scripts/tests/test-check-capability-activation.sh`, ce SUMMARY.
+
 ---
 *Phase: VFDO-28-preuve-que-ce-qui-est-arm-dans-le-plugin-est-arm-chez-l-util*
 *Plan: 01*
