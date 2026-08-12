@@ -102,7 +102,7 @@
 #              verdict à trois exits (0 = conforme, 1 = serveur manquant, 3 = INDÉTERMINÉ) plutôt
 #              qu'un faux vert (D-09) — c'est ce verdict que la règle 4 de
 #              check-capability-activation.sh (Phase 28) lit comme preuve de la précondition
-#              `worktree-baseref` / `mcp-servers`.
+#              `mcp-servers`.
 # vf-provides: mcp-servers
 #
 # Référence : ADR-051 (allowlist MCP dérivée du lab), Pattern 12 (cloisonnement inchangé : on

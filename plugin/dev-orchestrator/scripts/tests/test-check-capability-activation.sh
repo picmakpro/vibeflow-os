@@ -730,10 +730,16 @@ else
   rc_back="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
   says_r4=0; case "$out_mut" in *"ECART regle 4"*) says_r4=1 ;; esac
   names_a=0; case "$out_mut" in *"agentA.md"*) names_a=1 ;; esac
-  if [ "$rc_mut" -eq 1 ] && [ "$says_r4" -eq 1 ] && [ "$names_a" -eq 1 ]; then
-    ok "MUT-R2 règle 4(a) — agent armé sans vf-requires : le gate ROUGIT (rc=1), ECART regle 4 nommant agentA.md"
+  # Assertion sur le libellé SPÉCIFIQUE du sous-cas (a) — pas seulement « ECART regle 4 » générique,
+  # qui est aussi émis par le sous-cas (b) (`REQ_VAL[f]` auto-vivifiée à "" par awk absorbe le
+  # retrait de vf-requires et retombe sur le message du sous-cas (b), différent mais contenant
+  # encore says_r4/names_a). Sans ce libellé, MUT-R2 ne discrimine pas « (a) marche » de « (a) est
+  # cassé et (b) l'absorbe avec un message dégradé ».
+  says_suba=0; case "$out_mut" in *"sans precondition declaree (vf-requires: absent)"*) says_suba=1 ;; esac
+  if [ "$rc_mut" -eq 1 ] && [ "$says_r4" -eq 1 ] && [ "$names_a" -eq 1 ] && [ "$says_suba" -eq 1 ]; then
+    ok "MUT-R2 règle 4(a) — agent armé sans vf-requires : le gate ROUGIT (rc=1), ECART regle 4 sous-cas (a) nommant agentA.md"
   else
-    ko "MUT-R2 règle 4(a) — le gate doit rougir sur armement sans précondition déclarée" "rc=$rc_mut regle4=$says_r4 nomme=$names_a out=[$out_mut]"
+    ko "MUT-R2 règle 4(a) — le gate doit rougir sur armement sans précondition déclarée, avec le libellé du sous-cas (a)" "rc=$rc_mut regle4=$says_r4 nomme=$names_a sous_cas_a=$says_suba out=[$out_mut]"
   fi
   if [ "$rc_back" -eq 0 ]; then
     ok "MUT-R2 règle 4(a) — vf-requires restauré : le VERT est retrouvé (rc=0)"
@@ -865,6 +871,38 @@ if [ "$rc" -eq 1 ] && [ "$says_r4bis" -eq 1 ] && [ "$names_id" -eq 1 ]; then
   ok "R7 règle 4bis — vf-requires citant un id hors table → 1, ECART regle 4bis nommant l'id inconnu"
 else
   ko "R7 règle 4bis id hors table → 1" "rc=$rc regle4bis=$says_r4bis id=$names_id out=[$out]"
+fi
+
+# === Cas R7bis — règle 4, sous-cas (b) : id légal mais DIFFÉRENT de celui exigé par l'armement ==
+# Additif (correction ciblée post-revue) : ce sous-cas était vérifié à la main par la revue mais
+# n'avait aucun cas de test dédié — branche de production entièrement non exercée par la suite
+# jusqu'ici (check-capability-activation.sh:623-627). Un artefact arme `isolation:` (exige
+# `worktree-baseref`) mais cite `vf-requires: mcp-servers` — LÉGAL (table OKID) mais PAS l'id exigé
+# par CET armement. Distinct de R7 (id hors table) et de MUT-R2 sous-cas (a) (vf-requires absent).
+D="$(mk_regle4_fixture r7bis)"
+cat > "$D/agents/agentE.md" <<'AGT'
+---
+name: agent-fixture-4b
+isolation: worktree
+vf-requires: mcp-servers
+---
+
+# Agent armé isolation, vf-requires légal mais DIFFÉRENT (fixture règle 4 sous-cas b)
+AGT
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md
+$D/agents/agentE.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+out="$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")"
+says_r4=0; case "$out" in *"ECART regle 4 :"*"agentE.md"*) says_r4=1 ;; esac
+names_cite=0; case "$out" in *"vf-requires cite « mcp-servers »"*) names_cite=1 ;; esac
+names_exige=0; case "$out" in *"pas id exige « worktree-baseref »"*) names_exige=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$says_r4" -eq 1 ] && [ "$names_cite" -eq 1 ] && [ "$names_exige" -eq 1 ]; then
+  ok "R7bis règle 4 sous-cas (b) — vf-requires légal mais différent de l'id exigé → 1, ECART nommant les deux ids"
+else
+  ko "R7bis règle 4 sous-cas (b) — id légal différent de l'id exigé → 1" "rc=$rc regle4=$says_r4 cite=$names_cite exige=$names_exige out=[$out]"
 fi
 
 # === Cas R8 — contre-épreuve D-01 : vf-requires LÉGAL sans AUCUN armement → 0, jamais un écart ==

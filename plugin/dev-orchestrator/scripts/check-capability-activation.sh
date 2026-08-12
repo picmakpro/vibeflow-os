@@ -248,17 +248,44 @@ CORPUS_FILES=("$@")
 vf_capact_glob_list() { # <motif...> -> chemins EXISTANTS, FICHIERS reguliers, jamais un lien
                          # symbolique ; bases exclues (contracts.md/README.md/AGENTS.md, patron
                          # check-agents.sh:165)
-  local pat f
+  # Chaque motif est de la forme `$ROOT/segment/fixe/*/reste/*.md` : un `for f in $pat` NU sur la
+  # CHAINE ENTIERE fait subir le word-splitting AVANT le globbing — si `$ROOT` contient un espace,
+  # le motif est coupe en deux mots et plus rien ne matche (meme piege que CORPUS_DEFAULT documente
+  # plus haut, `~/Library/Mobile Documents/`). Glober `"$parent"/$wildcard` (parent QUOTE) ne marche
+  # PAS non plus : le `*` a l'interieur d'une chaine quotee reste litteral, il n'est jamais reconnu
+  # comme metacaractere par le shell.
+  #
+  # La seule construction correcte : isoler la partie FIXE du motif (le prefixe SANS aucun
+  # metacaractere — c'est elle, et elle seule, qui peut contenir l'espace de `$ROOT`) de sa partie
+  # GLOB (le reste, un texte statique du script, jamais issu d'une variable), `cd` dans la partie
+  # fixe (chemin quote, donc l'espace ne la coupe pas), puis glober la partie GLOB, non quotee,
+  # DANS ce repertoire — ou aucun `$ROOT` n'entre plus en jeu.
+  local pat f head tail
   for pat in "$@"; do
-    for f in $pat; do
-      [ -e "$f" ] || continue
-      [ -L "$f" ] && continue
-      [ -f "$f" ] || continue
-      case "$(basename "$f")" in
-        contracts.md|README.md|AGENTS.md) continue ;;
+    head="$pat"; tail=""
+    while :; do
+      case "$head" in
+        *'*'*|*'?'*|*'['*) : ;;
+        *) break ;;
       esac
-      printf '%s\n' "$f"
+      case "$head" in
+        */*) tail="${head##*/}${tail:+/$tail}"; head="${head%/*}" ;;
+        *) tail="$head${tail:+/$tail}"; head="."; break ;;
+      esac
     done
+    [ -d "$head" ] || continue
+    ( cd "$head" 2>/dev/null || exit 0
+      # shellcheck disable=SC2231,SC2086
+      for f in $tail; do
+        [ -e "$f" ] || continue
+        [ -L "$f" ] && continue
+        [ -f "$f" ] || continue
+        case "$(basename "$f")" in
+          contracts.md|README.md|AGENTS.md) continue ;;
+        esac
+        printf '%s\n' "$f"
+      done
+    ) | while IFS= read -r f; do printf '%s/%s\n' "$head" "$f"; done
   done
 }
 
