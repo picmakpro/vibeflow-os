@@ -598,6 +598,199 @@ else
   fi
 fi
 
+# ===============================================================================================
+# == RÈGLE 4 (Phase 28, plan 28-01) — armement sans précondition distribuée ======================
+# ===============================================================================================
+# La tranche traçante : UN armement de la liste close (`isolation:`), UN cas de preuve rouge/vert
+# discriminant, câblé de bout en bout — du frontmatter de l'artefact jusqu'au code de sortie du
+# gate. Fixtures synthétiques dédiées (deux artefacts armés, jamais un seul — Pitfall 5 : retirer
+# l'unique artefact viderait l'univers et déclencherait un plancher, pas la règle visée).
+#
+# Isolation vis-à-vis de check-agents.sh : ces fixtures ne sont JAMAIS soumises qu'à
+# check-capability-activation.sh — aucun appel à check-agents.sh dans cette section. Et chaque
+# assertion porte sur le MESSAGE `ECART regle 4`, jamais sur le seul code de sortie : sans quoi un
+# exit 1 venu d'une autre règle passerait pour la preuve de la règle 4.
+
+mk_agent_arme() { # <chemin> — agent isolation:worktree + vf-requires:worktree-baseref, conforme
+  cat > "$1" <<'AGT'
+---
+name: agent-fixture-regle4
+isolation: worktree
+vf-requires: worktree-baseref
+---
+
+# Agent arme (fixture regle 4, Phase 28)
+AGT
+}
+
+mk_script_preuve() { # <chemin> — porteur reel du marqueur worktree-baseref
+  cat > "$1" <<'SCR'
+#!/usr/bin/env bash
+# provide.sh — fixture Phase 28, porteur de la precondition worktree-baseref
+# vf-provides: worktree-baseref
+set -uo pipefail
+echo ok
+SCR
+}
+
+mk_script_decoy() { # <chemin> — deuxieme porteur (id DIFFERENT), evite qu'un corpus de preuve
+                     # amputé de provide.sh tombe a ZERO fichier (ce qui relèverait d'un plancher
+                     # anti-vert-a-vide, une regle DIFFERENTE de la 4c que MUT-R3 vise)
+  cat > "$1" <<'SCR'
+#!/usr/bin/env bash
+# decoy.sh — fixture Phase 28, porteur d'un id DIFFERENT (jamais worktree-baseref)
+# vf-provides: mcp-servers
+set -uo pipefail
+echo ok
+SCR
+}
+
+mk_regle4_fixture() { # <nom> -> imprime le chemin ; DEUX artefacts armes + 2 scripts de preuve
+  local d="$TMP/$1"
+  mkdir -p "$d/agents" "$d/scripts"
+  mk_index "$d/index.md"
+  mk_config "$d/config.json"
+  mk_corpus_ok "$d/corpus.md"
+  mk_agent_arme "$d/agents/agentA.md"
+  mk_agent_arme "$d/agents/agentB.md"
+  mk_script_preuve "$d/scripts/provide.sh"
+  mk_script_decoy "$d/scripts/decoy.sh"
+  printf '%s' "$d"
+}
+
+run4() { # <fixture-dir> <armed-list> <providers-list> [args...] -> stderr du gate
+  local d="$1" armed="$2" prov="$3"; shift 3
+  VF_CAPACT_INDEX="$d/index.md" \
+  VF_CAPACT_CONFIG="$d/config.json" \
+  VF_CAPACT_CORPUS="$d/corpus.md" \
+  VF_CAPACT_ARMED="$armed" \
+  VF_CAPACT_PROVIDERS="$prov" \
+  bash "$SCRIPT" "$@" 2>&1 >/dev/null
+}
+
+rc4_of() { # <fixture-dir> <armed-list> <providers-list> [args...] -> rc du gate, sortie muette
+  local d="$1" armed="$2" prov="$3"; shift 3
+  VF_CAPACT_INDEX="$d/index.md" \
+  VF_CAPACT_CONFIG="$d/config.json" \
+  VF_CAPACT_CORPUS="$d/corpus.md" \
+  VF_CAPACT_ARMED="$armed" \
+  VF_CAPACT_PROVIDERS="$prov" \
+  bash "$SCRIPT" "$@" >/dev/null 2>&1
+  echo "$?"
+}
+
+echo ""
+echo "== règle 4 =="
+
+# === Cas R1 — état conforme : deux artefacts armés, vf-requires legal levé par # vf-provides → 0
+D="$(mk_regle4_fixture r1)"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+if [ "$rc" -eq 0 ]; then
+  ok "R1 règle 4 conforme — deux artefacts armés, vf-requires légal levé par # vf-provides → 0"
+else
+  ko "R1 règle 4 conforme → 0" "rc=$rc out=[$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")]"
+fi
+
+# === MUT-R2 (ROUGE, sous-cas a) — vf-requires retiré de l'agent A =============================
+D="$(mk_regle4_fixture r2)"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+cp "$D/agents/agentA.md" "$TMP/r2.agentA.orig"
+if ! mutate "$TMP/r2.agentA.orig" "$D/agents/agentA.md" '/^vf-requires:/{next} {print}'; then
+  ko "MUT-R2 règle 4(a) — retrait de vf-requires" "le programme de mutation a ÉCHOUÉ — mutant NON CONSTRUIT"
+elif cmp -s "$D/agents/agentA.md" "$TMP/r2.agentA.orig"; then
+  ko "MUT-R2 règle 4(a) — retrait de vf-requires" "la mutation n'a RIEN changé (motif introuvable) — mutant NON OPPOSABLE"
+else
+  rc_mut="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+  out_mut="$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")"
+  cp "$TMP/r2.agentA.orig" "$D/agents/agentA.md"
+  rc_back="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+  says_r4=0; case "$out_mut" in *"ECART regle 4"*) says_r4=1 ;; esac
+  names_a=0; case "$out_mut" in *"agentA.md"*) names_a=1 ;; esac
+  if [ "$rc_mut" -eq 1 ] && [ "$says_r4" -eq 1 ] && [ "$names_a" -eq 1 ]; then
+    ok "MUT-R2 règle 4(a) — agent armé sans vf-requires : le gate ROUGIT (rc=1), ECART regle 4 nommant agentA.md"
+  else
+    ko "MUT-R2 règle 4(a) — le gate doit rougir sur armement sans précondition déclarée" "rc=$rc_mut regle4=$says_r4 nomme=$names_a out=[$out_mut]"
+  fi
+  if [ "$rc_back" -eq 0 ]; then
+    ok "MUT-R2 règle 4(a) — vf-requires restauré : le VERT est retrouvé (rc=0)"
+  else
+    ko "MUT-R2 règle 4(a) — le vert doit être retrouvé après restauration" "rc=$rc_back"
+  fi
+fi
+
+# === MUT-R3 (ROUGE, sous-cas c) — provide.sh retiré du corpus de scripts balayé ================
+# Retrait de LISTE (VF_CAPACT_PROVIDERS), pas de fichier : le fichier disque reste lisible, seul le
+# corpus BALAYÉ change — décoy.sh reste présent pour que le corpus ne tombe jamais à zéro fichier
+# (sans quoi ce mutant prouverait un plancher anti-vert-à-vide, pas la règle 4c).
+D="$(mk_regle4_fixture r3)"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md"
+PROV_LIST_FULL="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+PROV_LIST_MUT="$D/scripts/decoy.sh"
+if [ "$PROV_LIST_FULL" = "$PROV_LIST_MUT" ]; then
+  ko "MUT-R3 règle 4(c) — retrait de provide.sh du corpus balayé" "la liste balayée n'a RIEN changé — mutant NON OPPOSABLE"
+else
+  rc_mut="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST_MUT")"
+  out_mut="$(run4 "$D" "$ARMED_LIST" "$PROV_LIST_MUT")"
+  rc_back="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST_FULL")"
+  says_r4=0;  case "$out_mut" in *"ECART regle 4"*)      says_r4=1 ;; esac
+  names_id=0; case "$out_mut" in *"worktree-baseref"*)   names_id=1 ;; esac
+  if [ "$rc_mut" -eq 1 ] && [ "$says_r4" -eq 1 ] && [ "$names_id" -eq 1 ]; then
+    ok "MUT-R3 règle 4(c) — provide.sh retiré du corpus balayé : le gate ROUGIT (rc=1), ECART regle 4 nommant worktree-baseref introuvable"
+  else
+    ko "MUT-R3 règle 4(c) — le gate doit rougir sur précondition légale non levée" "rc=$rc_mut regle4=$says_r4 id=$names_id out=[$out_mut]"
+  fi
+  if [ "$rc_back" -eq 0 ]; then
+    ok "MUT-R3 règle 4(c) — provide.sh remis dans le corpus balayé : le VERT est retrouvé (rc=0)"
+  else
+    ko "MUT-R3 règle 4(c) — le vert doit être retrouvé une fois provide.sh remis dans le corpus" "rc=$rc_back"
+  fi
+fi
+
+# === MUT-R4 (VERT par désarmement — le cas #38 rejoué) =========================================
+# `isolation: worktree` ET `vf-requires:` retirés des DEUX agents : plus aucun artefact armé, le
+# gate doit VERDIR. C'est le sens INVERSE de MUT-R2/MUT-R3 — sans lui la règle 4 ne serait
+# discriminante que dans un sens.
+D="$(mk_regle4_fixture r4)"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+cp "$D/agents/agentA.md" "$TMP/r4.agentA.orig"
+cp "$D/agents/agentB.md" "$TMP/r4.agentB.orig"
+okA=1; okB=1
+mutate "$TMP/r4.agentA.orig" "$D/agents/agentA.md" '/^isolation:/{next} /^vf-requires:/{next} {print}' || okA=0
+mutate "$TMP/r4.agentB.orig" "$D/agents/agentB.md" '/^isolation:/{next} /^vf-requires:/{next} {print}' || okB=0
+if [ "$okA" -eq 0 ] || [ "$okB" -eq 0 ]; then
+  ko "MUT-R4 désarmement (#38 rejoué) — retrait de isolation + vf-requires" "le programme de mutation a ÉCHOUÉ sur au moins un agent — mutant NON CONSTRUIT"
+elif cmp -s "$D/agents/agentA.md" "$TMP/r4.agentA.orig" || cmp -s "$D/agents/agentB.md" "$TMP/r4.agentB.orig"; then
+  ko "MUT-R4 désarmement (#38 rejoué) — retrait de isolation + vf-requires" "au moins un fichier n'a RIEN changé — mutant NON OPPOSABLE"
+else
+  rc_mut="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+  out_mut="$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")"
+  cp "$TMP/r4.agentA.orig" "$D/agents/agentA.md"
+  cp "$TMP/r4.agentB.orig" "$D/agents/agentB.md"
+  rc_back="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+  if [ "$rc_mut" -eq 0 ]; then
+    ok "MUT-R4 désarmement (#38 rejoué) — isolation et vf-requires retirés des DEUX agents : le gate VERDIT (rc=0)"
+  else
+    ko "MUT-R4 désarmement — le gate doit verdir quand l'armement disparaît des deux artefacts" "rc=$rc_mut out=[$out_mut]"
+  fi
+  if [ "$rc_back" -eq 0 ]; then
+    ok "MUT-R4 désarmement — fixture restaurée (armée + conforme) : le VERT est retrouvé (rc=0)"
+  else
+    ko "MUT-R4 désarmement — après restauration de l'état armé conforme, le gate doit être vert" "rc=$rc_back"
+  fi
+fi
+
 # === Cas final — contrôle sur l'arbre RÉEL ====================================================
 # NON discriminant à lui seul (il ne prouve que l'absence d'écart aujourd'hui) : il vient donc
 # APRÈS les mutations, et jamais à leur place.

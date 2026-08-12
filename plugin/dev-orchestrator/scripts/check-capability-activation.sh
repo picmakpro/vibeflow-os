@@ -96,6 +96,12 @@
 #                     ligne, jamais l'espace — un séparateur « espace » ne peut, par construction,
 #                     pas exprimer un chemin qui en contient, ce qui est le cas courant sous
 #                     `~/Library/Mobile Documents/`)
+#   VF_CAPACT_ARMED     liste des artefacts à balayer pour la règle 4 (armement `isolation:` etc.),
+#                       UN PAR LIGNE — défaut : `plugin/*/agents/*.md` + `plugin/*/AGENT.md` +
+#                       `plugin/*/SKILL.md` + `plugin/*/skills/*/SKILL.md` (dépôt) ou
+#                       `.claude/agents/*.md` + `.claude/skills/*/SKILL.md` (lab installé)
+#   VF_CAPACT_PROVIDERS liste des scripts à balayer pour le marqueur `# vf-provides:`, UN PAR LIGNE —
+#                       défaut : `plugin/*/scripts/*.sh` (dépôt) ou `.claude/scripts/*.sh` (lab)
 #
 # Exit codes:
 #   0  = conforme (le rapport nomme l'univers balayé : combien de toggles, sur quels fichiers)
@@ -230,6 +236,60 @@ for f in "$@"; do
     exit 2
   fi
 done
+CORPUS_FILES=("$@")
+
+# --- Regle 4 : corpus d'armement (frontmatter des artefacts distribues) et corpus de preuve
+# (en-tete des scripts distribues). Memes DEUX dispositions et meme decoupage DESARME que CORPUS
+# ci-dessus (VF_CAPACT_ARMED / VF_CAPACT_PROVIDERS : canaux de testabilite, patron VF_CAPACT_CORPUS).
+# Non surchargeables : la LISTE CLOSE des armements et la TABLE DES IDS legaux, elles, vivent dans
+# l'awk plus bas et ne recoivent JAMAIS de variable d'environnement (T-28-01-05) — la doctrine ne se
+# deplace pas par `export`.
+vf_capact_glob_list() { # <motif...> -> chemins EXISTANTS, FICHIERS reguliers, jamais un lien
+                         # symbolique ; bases exclues (contracts.md/README.md/AGENTS.md, patron
+                         # check-agents.sh:165)
+  local pat f
+  for pat in "$@"; do
+    for f in $pat; do
+      [ -e "$f" ] || continue
+      [ -L "$f" ] && continue
+      [ -f "$f" ] || continue
+      case "$(basename "$f")" in
+        contracts.md|README.md|AGENTS.md) continue ;;
+      esac
+      printf '%s\n' "$f"
+    done
+  done
+}
+
+if [ "$(basename "$MODULE_DIR")" = ".claude" ]; then
+  ARMED_DEFAULT="$(vf_capact_glob_list "$ROOT/.claude/agents/*.md" "$ROOT/.claude/skills/*/SKILL.md")"
+  PROVIDERS_DEFAULT="$(vf_capact_glob_list "$ROOT/.claude/scripts/*.sh")"
+else
+  ARMED_DEFAULT="$(vf_capact_glob_list "$ROOT/plugin/*/agents/*.md" "$ROOT/plugin/*/AGENT.md" "$ROOT/plugin/*/SKILL.md" "$ROOT/plugin/*/skills/*/SKILL.md")"
+  PROVIDERS_DEFAULT="$(vf_capact_glob_list "$ROOT/plugin/*/scripts/*.sh")"
+fi
+ARMED="${VF_CAPACT_ARMED:-$ARMED_DEFAULT}"
+PROVIDERS="${VF_CAPACT_PROVIDERS:-$PROVIDERS_DEFAULT}"
+
+_old_ifs="$IFS"
+set -f
+IFS='
+'
+# shellcheck disable=SC2086
+set -- $ARMED
+set +f
+IFS="$_old_ifs"
+ARMED_FILES=("$@")
+
+_old_ifs="$IFS"
+set -f
+IFS='
+'
+# shellcheck disable=SC2086
+set -- $PROVIDERS
+set +f
+IFS="$_old_ifs"
+PROV_FILES=("$@")
 
 # État effectif : chaque chemin PRÉSENT dans la configuration, avec son état. `paths` et non
 # `paths(scalars)` : une clé portant un objet ou un tableau est PRÉSENTE, et la doctrine énoncée
@@ -262,6 +322,8 @@ report="$(
   VF_CAPACT_REL_INDEX="$REL_INDEX" \
   VF_CAPACT_REL_CONFIG="$REL_CONFIG" \
   VF_CAPACT_ROOT="$ROOT" \
+  VF_CAPACT_ISARM="$(printf '%s\n' "${ARMED_FILES[@]+"${ARMED_FILES[@]}"}")" \
+  VF_CAPACT_ISPRV="$(printf '%s\n' "${PROV_FILES[@]+"${PROV_FILES[@]}"}")" \
   awk -F'|' '
   function isid(c) { return (c ~ /^[A-Za-z0-9_.-]$/) }
   # Comptage LITTERAL A FRONTIERE (index(), pas de regex : un nom de toggle porte des points et des
@@ -312,6 +374,28 @@ report="$(
     }
     nT = 0; nB = 0; nM = 0; nMarkers = 0; nCorpus = 0; nLines = 0
     nInactive = 0; nUnknown = 0; nBrickInactive = 0; bad = 0; sec = ""
+    # --- Regle 4 : vocabulaire, litteral et non surchargeable (A-1 : un registre = vocabulaire
+    # seul). Liste CLOSE des armements surveilles : issue #38, la precondition worktree.baseRef
+    # nest distribuee par personne, et le second verrou open-gsd/gsd-core#3302 (retour des commits)
+    # est intact. Ces deux tables ne recoivent AUCUNE variable de surcharge.
+    ARM["isolation"] = "worktree-baseref"
+    nArmTable = 0
+    for (armk in ARM) nArmTable++
+    OKID["worktree-baseref"] = 1
+    OKID["mcp-servers"] = 1
+    nOkidTable = 0
+    for (okidk in OKID) nOkidTable++
+    # Membres des deux corpus neufs, portes par lENVIRONNEMENT (jamais awk -v, motif ci-dessus) :
+    # ISARM/ISPRV sont des ensembles de FILENAME exacts, tels que passes en argv plus bas, pour que
+    # le troisieme discriminant (FILENAME in ISARM / FILENAME in ISPRV) fonctionne par egalite
+    # stricte de chaine.
+    nUnivArm = 0
+    n = split(ENVIRON["VF_CAPACT_ISARM"], isaArr, "\n")
+    for (i = 1; i <= n; i++) { if (isaArr[i] == "") continue; ISARM[isaArr[i]] = 1; nUnivArm++ }
+    nUnivPrv = 0
+    n = split(ENVIRON["VF_CAPACT_ISPRV"], ispArr, "\n")
+    for (i = 1; i <= n; i++) { if (ispArr[i] == "") continue; ISPRV[ispArr[i]] = 1; nUnivPrv++ }
+    nArmFiles = 0; nReqFiles = 0; nProv = 0
   }
   # --- Fichier 1 : index genere. Reperage par SECTION, jamais par arite : trois tables y vivent
   # desormais, dont deux de meme largeur — `NF` seul les confondrait.
@@ -348,6 +432,56 @@ report="$(
     k = trimcell($4)
     if (!iskey(k)) next                   # ecarte tiret cadratin, vide
     if (!(k in T)) { T[k] = 1; nT++; TORDER[nT] = k }
+    next
+  }
+  # --- Regle 4, fichier 2 : le frontmatter des artefacts armes. Insere AVANT le bloc corpus SANS
+  # CONDITION plus bas : sans cela ces frontmatters tomberaient dans nLines et fausseraient le
+  # compteur de corpus (non-regression exigee par la tache 2). Bloc ferme sur la LIGNE `---`
+  # exacte : nouvrir qua la premiere, fermer a la suivante, jamais au-dela.
+  FILENAME in ISARM {
+    if (FNR == 1) { afm_state = 0 }
+    if (afm_state == 0) {
+      if ($0 == "---") afm_state = 1
+      next
+    }
+    if (afm_state == 1) {
+      if ($0 == "---") { afm_state = 2; next }
+      t = index($0, ":")
+      if (t > 1) {
+        k = substr($0, 1, t - 1)
+        v = substr($0, t + 1)
+        gsub(/^[ \t]+/, "", k); gsub(/[ \t]+$/, "", k)
+        gsub(/^[ \t]+/, "", v); gsub(/[ \t]+$/, "", v)
+        gsub(/^"/, "", v); gsub(/"$/, "", v)
+        if ((k in ARM) && v != "" && !(FILENAME in ARM_LINE)) {
+          if (!(FILENAME in ARMFILE)) { ARMFILE[FILENAME] = 1; ARMFILE_ORDER[++nArmFiles] = FILENAME }
+          ARM_LINE[FILENAME] = FNR
+          ARM_KEY[FILENAME] = k
+        }
+        if (k == "vf-requires" && v != "") {
+          if (!(FILENAME in REQ_VAL)) { REQFILE_ORDER[++nReqFiles] = FILENAME }
+          REQ_VAL[FILENAME] = v
+          REQ_LINE[FILENAME] = FNR
+        }
+      }
+      next
+    }
+    next
+  }
+  # --- Regle 4, fichier 3 : le bloc de commentaires de tete des scripts porteurs de preuve. Le
+  # marqueur nest cherche que dans ce bloc — jusqua la premiere ligne NON commentee — jamais au
+  # milieu dun script (patron de la docstring imprimee en --help, :162-164 historique).
+  FILENAME in ISPRV {
+    if (FNR == 1) { prv_open = 1 }
+    if (prv_open) {
+      if ($0 !~ /^#/) { prv_open = 0; next }
+      if ($0 ~ /^# vf-provides: /) {
+        id = $0
+        sub(/^# vf-provides: /, "", id)
+        gsub(/^[ \t]+/, "", id); gsub(/[ \t]+$/, "", id)
+        if (id != "" && !(id in PROV)) { PROV[id] = 1; nProv++ }
+      }
+    }
     next
   }
   # --- Fichiers suivants : le corpus. Chaque ligne est memorisee pour le rebalayage par toggle
@@ -432,11 +566,37 @@ report="$(
         bad++
       }
     }
+    # --- Regle 4 : armement sans precondition distribuee (issue #38). Trois sous-cas ROUGE : (a)
+    # aucun vf-requires, (b) vf-requires ne cite pas lid exige par CET armement, (c) id legal mais
+    # aucun # vf-provides le levant dans le corpus de preuve balaye. Le ROUGE nait de l ARMEMENT
+    # SEUL (A-3) : vf-requires ne fait que le LEVER.
+    for (i = 1; i <= nArmFiles; i++) {
+      f = ARMFILE_ORDER[i]
+      armkey = ARM_KEY[f]
+      reqid = ARM[armkey]
+      relf = f
+      if (ROOT != "" && index(f, ROOT "/") == 1) relf = substr(f, length(ROOT) + 2)
+      if (!(f in REQ_VAL) || REQ_VAL[f] == "") {
+        print "[check-capability-activation] ECART regle 4 : artefact « " relf " » arme « " armkey " » sans precondition declaree (vf-requires: absent) — exige « " reqid " » — " relf ":" ARM_LINE[f]
+        bad++
+        continue
+      }
+      if (REQ_VAL[f] != reqid) {
+        print "[check-capability-activation] ECART regle 4 : artefact « " relf " » arme « " armkey " » mais vf-requires cite « " REQ_VAL[f] " », pas id exige « " reqid " » — " relf ":" ARM_LINE[f]
+        bad++
+        continue
+      }
+      if (!(reqid in PROV)) {
+        print "[check-capability-activation] ECART regle 4 : artefact « " relf " » arme « " armkey " », vf-requires « " reqid " » legal, mais aucun # vf-provides: " reqid " dans le corpus de scripts balaye — " relf ":" ARM_LINE[f]
+        bad++
+        continue
+      }
+    }
     if (bad > 0) exit 1
     print "[check-capability-activation] conforme — univers balaye : " nT " toggle(s) lus dans " RELIDX ", dont " nInactive " inactif(s) et " nUnknown " indetermine(s) sur " RELCFG " ; " nB " brique(s) routee(s), dont " nBrickInactive " sous toggle inactif ; " nM " toggle(s) sous marqueur (" nMarkers " occurrence(s)) dans " nCorpus " fichier(s) de corpus, " nLines " ligne(s)."
     exit 0
   }
-  ' "$INDEX" "$@"
+  ' "$INDEX" "${CORPUS_FILES[@]+"${CORPUS_FILES[@]}"}" "${ARMED_FILES[@]+"${ARMED_FILES[@]}"}" "${PROV_FILES[@]+"${PROV_FILES[@]}"}"
 )"
 rc=$?
 [ -n "$report" ] && printf '%s\n' "$report" >&2

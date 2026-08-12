@@ -97,6 +97,14 @@
 #              --force post-install GSD, puis --verify pour dire fort un écart, D-09) ·
 #              /vf-calibrate (re-injection sur évolution du .mcp.json).
 #
+# Fourni (# vf-provides) : mcp-servers — ce script confronte les serveurs MCP cités par un artefact
+#              aux deux sources réelles du lab (scope projet + scope global) et rend, en --verify, un
+#              verdict à trois exits (0 = conforme, 1 = serveur manquant, 3 = INDÉTERMINÉ) plutôt
+#              qu'un faux vert (D-09) — c'est ce verdict que la règle 4 de
+#              check-capability-activation.sh (Phase 28) lit comme preuve de la précondition
+#              `worktree-baseref` / `mcp-servers`.
+# vf-provides: mcp-servers
+#
 # Référence : ADR-051 (allowlist MCP dérivée du lab), Pattern 12 (cloisonnement inchangé : on
 #             n'injecte que des serveurs de build/test, pas d'accès web/doc).
 
