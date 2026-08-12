@@ -422,6 +422,23 @@ cp "$SCRIPT" "$LAB/.claude/scripts/check-capability-activation.sh"
 mk_index  "$LAB/.claude/agents/dev-orchestrator-references/gsd-capabilities-index.md"
 mk_corpus_ok "$LAB/.claude/agents/dev-orchestrator-references/intent-routing.md"
 printf '# doc-flow synthétique, sans marqueur ni brique\n' > "$LAB/.claude/agents/dev-orchestrator-references/docs-flow.md"
+# Univers de la règle 4 (planchers, tâche 2) : au moins UN artefact non armé et UN script porteur
+# d'un `# vf-provides:` — sans cela le corpus d'armement/de preuve par défaut de ce lab installé
+# serait vide et le plancher anti-vert-à-vide rendrait 2, pour une raison étrangère au cas 14.
+cat > "$LAB/.claude/agents/dummy-agent.md" <<'AGT'
+---
+name: dummy-agent
+---
+
+# Agent factice (case 14, sans armement)
+AGT
+cat > "$LAB/.claude/scripts/dummy-provider.sh" <<'SCR'
+#!/usr/bin/env bash
+# dummy-provider.sh — fixture case 14
+# vf-provides: mcp-servers
+set -uo pipefail
+echo ok
+SCR
 rc_lab=0
 out_lab="$(cd "$TMP" && env -u VF_CAPACT_INDEX -u VF_CAPACT_CONFIG -u VF_CAPACT_CORPUS \
   bash "$LAB/.claude/scripts/check-capability-activation.sh" 2>&1 >/dev/null)" || rc_lab=$?
@@ -789,6 +806,109 @@ else
   else
     ko "MUT-R4 désarmement — après restauration de l'état armé conforme, le gate doit être vert" "rc=$rc_back"
   fi
+fi
+
+# === Cas R5 — plancher : univers d'armement VIDE (aucun chemin déclaré) → 2, jamais 0 ==========
+D="$(mk_regle4_fixture r5)"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "" "$PROV_LIST")"
+out="$(run4 "$D" "" "$PROV_LIST")"
+says_inerte=0; case "$out" in *"regle 4 serait INERTE"*) says_inerte=1 ;; esac
+if [ "$rc" -eq 2 ] && [ "$says_inerte" -eq 1 ]; then
+  ok "R5 plancher — univers d'armement vide → 2, message nommant la règle 4 rendue INERTE (JAMAIS 0)"
+else
+  ko "R5 plancher univers d'armement vide → 2" "rc=$rc out=[$out]"
+fi
+
+# === Cas R6 — plancher : corpus de scripts sans AUCUN # vf-provides: → 2, jamais 0 =============
+D="$(mk_regle4_fixture r6)"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md"
+cat > "$D/scripts/aucun-marqueur.sh" <<'SCR'
+#!/usr/bin/env bash
+# aucun-marqueur.sh — fixture R6, ne déclare RIEN
+set -uo pipefail
+echo ok
+SCR
+rc="$(rc4_of "$D" "$ARMED_LIST" "$D/scripts/aucun-marqueur.sh")"
+out="$(run4 "$D" "$ARMED_LIST" "$D/scripts/aucun-marqueur.sh")"
+says_inerte=0; case "$out" in *"regle 4 serait INERTE"*) says_inerte=1 ;; esac
+if [ "$rc" -eq 2 ] && [ "$says_inerte" -eq 1 ]; then
+  ok "R6 plancher — corpus de scripts sans aucun # vf-provides: → 2, message nommant la règle 4 rendue INERTE (JAMAIS 0)"
+else
+  ko "R6 plancher corpus de preuve sans marqueur → 2" "rc=$rc out=[$out]"
+fi
+
+# === Cas R7 — règle 4bis : vf-requires citant un id HORS de la table des ids légaux → 1 ========
+# Artefact SANS armement (D-01 : la moitié déclarée reste ouverte), mais l'id cité est fantaisiste
+# — hygiène de déclaration, symétrique de la règle 3.
+D="$(mk_regle4_fixture r7)"
+cat > "$D/agents/agentC.md" <<'AGT'
+---
+name: agent-fixture-4bis
+vf-requires: id-fantaisiste-hors-table
+---
+
+# Agent sans armement, id inconnu (fixture règle 4bis)
+AGT
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md
+$D/agents/agentC.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+out="$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")"
+says_r4bis=0; case "$out" in *"ECART regle 4bis"*) says_r4bis=1 ;; esac
+names_id=0;   case "$out" in *"id-fantaisiste-hors-table"*) names_id=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$says_r4bis" -eq 1 ] && [ "$names_id" -eq 1 ]; then
+  ok "R7 règle 4bis — vf-requires citant un id hors table → 1, ECART regle 4bis nommant l'id inconnu"
+else
+  ko "R7 règle 4bis id hors table → 1" "rc=$rc regle4bis=$says_r4bis id=$names_id out=[$out]"
+fi
+
+# === Cas R8 — contre-épreuve D-01 : vf-requires LÉGAL sans AUCUN armement → 0, jamais un écart ==
+# La moitié déclarée de D-01 : un artefact peut annoncer une précondition légale que la liste close
+# ne gouverne PAS encore (aucune clé `isolation:`). Ce n'est jamais un écart.
+D="$(mk_regle4_fixture r8)"
+cat > "$D/agents/agentD.md" <<'AGT'
+---
+name: agent-fixture-d01
+vf-requires: mcp-servers
+---
+
+# Agent sans armement, id LEGAL (contre-épreuve D-01)
+AGT
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md
+$D/agents/agentD.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+if [ "$rc" -eq 0 ]; then
+  ok "R8 contre-épreuve D-01 — vf-requires légal (mcp-servers) sans armement → 0, jamais un écart"
+else
+  ko "R8 contre-épreuve D-01 vf-requires légal sans armement → 0" "rc=$rc out=[$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")]"
+fi
+
+# === Cas R9 — non-régression : le compteur de lignes de CORPUS n'est PAS pollué par les corpus ==
+# d'armement/de preuve neufs (garde ISARM/ISPRV insérée AVANT le bloc corpus SANS CONDITION).
+D_BASE="$(mk_fixture nr_base)"
+out_base="$(run "$D_BASE")"
+lines_base=""
+case "$out_base" in *" ligne(s)."*) lines_base="${out_base##*fichier(s) de corpus, }"; lines_base="${lines_base%% ligne*}" ;; esac
+D_R4="$(mk_regle4_fixture nr_r4)"
+ARMED_LIST="$D_R4/agents/agentA.md
+$D_R4/agents/agentB.md"
+PROV_LIST="$D_R4/scripts/provide.sh
+$D_R4/scripts/decoy.sh"
+out_r4="$(run4 "$D_R4" "$ARMED_LIST" "$PROV_LIST")"
+lines_r4=""
+case "$out_r4" in *" ligne(s)."*) lines_r4="${out_r4##*fichier(s) de corpus, }"; lines_r4="${lines_r4%% ligne*}" ;; esac
+if [ -n "$lines_base" ] && [ "$lines_base" = "$lines_r4" ]; then
+  ok "R9 non-régression — compteur de lignes de corpus inchangé ($lines_base) malgré l'ajout des corpus d'armement/de preuve"
+else
+  ko "R9 non-régression — le compteur de lignes de corpus doit rester inchangé" "base=$lines_base r4=$lines_r4 out_base=[$out_base] out_r4=[$out_r4]"
 fi
 
 # === Cas final — contrôle sur l'arbre RÉEL ====================================================

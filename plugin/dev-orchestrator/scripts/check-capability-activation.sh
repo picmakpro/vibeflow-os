@@ -105,9 +105,10 @@
 #
 # Exit codes:
 #   0  = conforme (le rapport nomme l'univers balayé : combien de toggles, sur quels fichiers)
-#   1  = écart constaté (règle 2, 2bis ou 3), message nommant lequel et où
+#   1  = écart constaté (règle 2, 2bis, 3, 4 ou 4bis), message nommant lequel et où
 #   2  = NON VÉRIFIABLE : index absent/illisible/sans toggle/sans brique, corpus absent/sans
-#        marqueur, configuration absente ou imparsable, `jq` introuvable
+#        marqueur, configuration absente ou imparsable, `jq` introuvable, corpus d'armement ou de
+#        preuve de la règle 4 vide/illisible ou sans aucun `# vf-provides:`
 #   64 = usage (argument inconnu, --path sans valeur)
 set -uo pipefail
 
@@ -268,8 +269,11 @@ else
   ARMED_DEFAULT="$(vf_capact_glob_list "$ROOT/plugin/*/agents/*.md" "$ROOT/plugin/*/AGENT.md" "$ROOT/plugin/*/SKILL.md" "$ROOT/plugin/*/skills/*/SKILL.md")"
   PROVIDERS_DEFAULT="$(vf_capact_glob_list "$ROOT/plugin/*/scripts/*.sh")"
 fi
-ARMED="${VF_CAPACT_ARMED:-$ARMED_DEFAULT}"
-PROVIDERS="${VF_CAPACT_PROVIDERS:-$PROVIDERS_DEFAULT}"
+# `-` et non `:-` : une surcharge EXPLICITEMENT vide (VF_CAPACT_ARMED="") doit rendre un univers
+# VRAIMENT vide (testabilité des planchers, tâche 2) — jamais retomber sur le défaut comme le
+# ferait `:-`. Seule l'ABSENCE totale de la variable retombe sur la cascade.
+ARMED="${VF_CAPACT_ARMED-$ARMED_DEFAULT}"
+PROVIDERS="${VF_CAPACT_PROVIDERS-$PROVIDERS_DEFAULT}"
 
 _old_ifs="$IFS"
 set -f
@@ -290,6 +294,21 @@ set -- $PROVIDERS
 set +f
 IFS="$_old_ifs"
 PROV_FILES=("$@")
+
+# Lisibilite : meme patron que la boucle CORPUS ci-dessus (:233-238). Un chemin ANNONCE (par
+# defaut ou par surcharge) mais illisible sort en 2, jamais un saut silencieux.
+for f in "${ARMED_FILES[@]+"${ARMED_FILES[@]}"}"; do
+  if [ ! -r "$f" ]; then
+    echo "[check-capability-activation] artefact d'armement illisible ($f) — activation NON VÉRIFIABLE" >&2
+    exit 2
+  fi
+done
+for f in "${PROV_FILES[@]+"${PROV_FILES[@]}"}"; do
+  if [ ! -r "$f" ]; then
+    echo "[check-capability-activation] script de preuve illisible ($f) — activation NON VÉRIFIABLE" >&2
+    exit 2
+  fi
+done
 
 # État effectif : chaque chemin PRÉSENT dans la configuration, avec son état. `paths` et non
 # `paths(scalars)` : une clé portant un objet ou un tableau est PRÉSENTE, et la doctrine énoncée
@@ -520,6 +539,26 @@ report="$(
       print "[check-capability-activation] aucun marqueur conditionnel dans le corpus (" nCorpus " fichier(s), " nLines " ligne(s)) — activation NON VERIFIABLE"
       exit 2
     }
+    # --- Planchers anti-vert-a-vide de la regle 4. Meme forme mot pour mot que ceux de la regle 1
+    # ci-dessus : chaque plancher nomme QUELLE regle il rend INERTE, et sort en 2. Aucune de ces
+    # quatre conditions ne peut se produire par une simple absence darmement (etat NORMAL) : elles
+    # signalent labsence de LUNIVERS lui-meme, jamais labsence de contenu arme dedans.
+    if (nUnivArm == 0) {
+      print "[check-capability-activation] aucun artefact lisible dans le corpus darmement (" nUnivArm " fichier(s) annonce(s)) — la regle 4 serait INERTE, activation NON VERIFIABLE"
+      exit 2
+    }
+    if (nProv == 0) {
+      print "[check-capability-activation] aucun marqueur # vf-provides: dans le corpus de scripts balaye (" nUnivPrv " fichier(s)) — la moitie preuve de la regle 4 serait INERTE, activation NON VERIFIABLE"
+      exit 2
+    }
+    if (nArmTable == 0) {
+      print "[check-capability-activation] table des armements surveilles vide — la regle 4 serait INERTE, activation NON VERIFIABLE"
+      exit 2
+    }
+    if (nOkidTable == 0) {
+      print "[check-capability-activation] table des ids de precondition legaux vide — la regle 4 et la regle 4bis seraient INERTES, activation NON VERIFIABLE"
+      exit 2
+    }
     # --- Regle 2 : promesse non marquee, par nom de TOGGLE.
     for (i = 1; i <= nT; i++) {
       k = TORDER[i]
@@ -591,6 +630,21 @@ report="$(
         bad++
         continue
       }
+    }
+    # --- Regle 4bis : hygiene de declaration, symetrique de la regle 3. Un vf-requires citant un
+    # id HORS de la table des ids legaux est une ERREUR DE DECLARATION (A-1), jamais un vert. A
+    # linverse, un vf-requires LEGAL porte par un artefact SANS armement nest jamais un ecart :
+    # cest la moitie declaree de D-01, elle doit rester ouverte aux preconditions que la liste
+    # close ne connait pas — cette boucle ne verifie QUE la legalite de lid, jamais la presence dun
+    # armement correspondant.
+    for (i = 1; i <= nReqFiles; i++) {
+      f = REQFILE_ORDER[i]
+      id = REQ_VAL[f]
+      if (id in OKID) continue
+      relf = f
+      if (ROOT != "" && index(f, ROOT "/") == 1) relf = substr(f, length(ROOT) + 2)
+      print "[check-capability-activation] ECART regle 4bis : artefact « " relf " » declare vf-requires « " id " », absent de la table des ids legaux — " relf ":" REQ_LINE[f]
+      bad++
     }
     if (bad > 0) exit 1
     print "[check-capability-activation] conforme — univers balaye : " nT " toggle(s) lus dans " RELIDX ", dont " nInactive " inactif(s) et " nUnknown " indetermine(s) sur " RELCFG " ; " nB " brique(s) routee(s), dont " nBrickInactive " sous toggle inactif ; " nM " toggle(s) sous marqueur (" nMarkers " occurrence(s)) dans " nCorpus " fichier(s) de corpus, " nLines " ligne(s)."
