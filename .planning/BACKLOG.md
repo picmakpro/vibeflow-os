@@ -1,5 +1,30 @@
 # Backlog — idées différées (hors milestone courant)
 
+## Notifications de progression des agents managers
+**Capturé :** 2026-08-11 · **À explorer :** au prochain arbitrage d'extension du team-kernel
+
+Les missions pilotées par les managers (`vf-dev-manager`, `vf-design-manager`,
+`vf-test-orchestrator`) sont longues et l'utilisateur n'est pas devant l'écran. Idée : **envoyer
+une notification quand un agent manager termine sa mission** — et, en extension, **des
+notifications aux passages d'étapes importantes** du plan de bataille (fin d'un nœud du DAG,
+verdict d'un juge/reviewer, halt condition déclenchée, checkpoint atteint).
+
+**Pistes techniques :**
+- Notification macOS native (`osascript -e 'display notification …'` ou `terminal-notifier`)
+  déclenchée par le manager en fin de mission / à chaque jalon.
+- S'appuyer sur l'existant : le skill `stop-notify` (hook Stop global → notification macOS) est
+  un précédent dans l'écosystème — ici c'est l'inverse, une notification **émise par le manager
+  lui-même** aux moments choisis, pas à chaque fin de tour.
+- Granularité configurable (fin de mission seulement vs jalons intermédiaires) pour ne pas
+  spammer ; vecteur = hook, script posé par l'engine, ou geste direct dans le protocole des
+  managers (à trancher — attention : un réglage settings ne voyage pas, cf. régression #38).
+
+**Pourquoi différé :** confort d'usage, pas bloquant ; à cadrer proprement (vecteur de
+distribution, granularité, portabilité macOS/Linux) avant tout code.
+
+**Déclencheur de resurgence :** prochaine évolution du team-kernel ou des protocoles managers,
+ou demande récurrente de suivi de mission longue distance.
+
 ## Convergence de contenu à l'update de module (manifeste par module)
 **Capturé :** 2026-07-26 · **Origine :** update réel de la machine 2.23.0 → 2.36.0
 
