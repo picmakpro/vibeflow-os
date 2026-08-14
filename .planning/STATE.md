@@ -4,16 +4,16 @@ milestone: gsd-migration
 milestone_name: Migration package GSD
 current_phase: 18
 current_phase_name: Survie du ledger d'exigences à la clôture de jalon
-status: "Phase 28 planned - 3 plans, ready to execute"
+status: "Phase 28 plans 01 et 02 executes et verifies - 28-03 en attente du checkpoint humain D-04"
 stopped_at: "Phase 20 complète (7/7 plans) — clôture de gouvernance (20-07) : ADR-051 révisée + ADR-060 posée, doctrine transverse alignée, 6 modules bumpés (conductor v1.17.0, dev-orchestrator v2.8.0, design-orchestrator v1.3.2, 3 bundles v2.0.3). Gates verts sauf le seul rouge attendu (compteur de suites racine, 44 réel pas 43). Release racine réservée à validation humaine post-fusion (4 éléments consignés + WINDOWS.md)."
-last_updated: "2026-08-10T00:00:00.000Z"
-last_activity: 2026-08-10
+last_updated: "2026-08-14T00:00:00.000Z"
+last_activity: 2026-08-14
 progress:
   total_phases: 26
   completed_phases: 15
   total_plans: 95
   completed_plans: 71
-last_activity_desc: "Phase 28 planned - 3 plans in 3 waves, ARMD-01..10 created. 3 independent plan-checker passes + 3 targeted correction rounds; 2 non-blocking warnings left, escalated to human (correction budget exhausted). NOT executed."
+last_activity_desc: "Phase 28 plans 01 et 02 executes sur branche docs/phase-28-cadrage. Regle 4 du gate d'activation (armement sans precondition distribuee) + regle 4bis + 4 planchers anti-vert-a-vide ; liste close a 2 lignes (isolation, MCP) ; 5 declarations vf-requires: mcp-servers sur agents reels ; opposabilite des porteurs # vf-provides: ; 5 bornes declarees en en-tete du gate. Suite 42 -> 58 cas, tous gates verts. Verification goal-backward 28-01 et 28-02 : GOAL ACHIEVED. 1 finding majeur escalade a l'humain (ARM_LINE mono-slot : faux vert possible sur un artefact a double armement, inerte sur le corpus reel). 28-03 NON demarre : checkpoint humain bloquant D-04. Compteurs progress laisses intacts (derive preexistante, deja signalee)."
 ---
 
 # Project State
