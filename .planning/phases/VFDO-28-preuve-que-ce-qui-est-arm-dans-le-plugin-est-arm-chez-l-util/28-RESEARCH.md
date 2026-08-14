@@ -855,7 +855,7 @@ c'est aussi ce que la doctrine des fixtures impose de toute façon (§8.3).
 
 ## 9. Outillage plateforme (D-04) — mesuré, pas présumé
 
-CLI `claude` **2.1.226**, `/Users/samuel/.local/bin/claude`
+CLI `claude` **2.1.226**, `~/.local/bin/claude`
 `[VERIFIED: command -v claude && claude --version, rejoué ce jour]`.
 
 | Commande | Existe ? | Ce qu'elle fait exactement (verbatim du `--help`) |
