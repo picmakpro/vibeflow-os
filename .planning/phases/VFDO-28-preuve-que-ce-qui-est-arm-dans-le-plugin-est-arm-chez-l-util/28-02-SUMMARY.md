@@ -17,7 +17,7 @@ affects: [VFDO-28-03, dev-orchestrator check-capability-activation.sh test suite
 
 actuals:
   tasks: 3
-  commits: 4
+  commits: 5
 
 tech-stack:
   added: []
@@ -48,7 +48,7 @@ requirements-completed: [ARMD-01, ARMD-02, ARMD-05, ARMD-09, ARMD-10]
 coverage:
   - id: D7
     description: "Les 5 artefacts distribues portant vf-mcp-consumer: ou vf-mcp-tools: declarent vf-requires: mcp-servers et le gate les rend VERTS ; retirer la declaration de l'un d'eux le fait rougir en le nommant."
-    requirement: "ARMD-05"
+    requirement: "ARMD-03 / ARMD-04"
     verification:
       - kind: unit
         ref: "plugin/dev-orchestrator/scripts/tests/test-check-capability-activation.sh#R10-R15"
@@ -56,7 +56,7 @@ coverage:
     human_judgment: false
   - id: D8
     description: "Le gate ne rougit pas sur la phrase de prose contenant le token MCP en vf-reviewer.md:45 : il ne lit que les cles du frontmatter."
-    requirement: "ARMD-09"
+    requirement: "ARMD-02"
     verification:
       - kind: unit
         ref: "plugin/dev-orchestrator/scripts/tests/test-check-capability-activation.sh (piege anti-prose vf-reviewer.md:45)"
@@ -64,15 +64,15 @@ coverage:
     human_judgment: false
   - id: D9
     description: "Tout script distribue portant # vf-provides: a, dans la suite, un cas prouvant qu'il rend non-zero quand sa precondition manque ; un porteur absent de la table du test fait echouer le test."
-    requirement: "ARMD-10"
+    requirement: "ARMD-05"
     verification:
       - kind: unit
         ref: "plugin/dev-orchestrator/scripts/tests/test-check-capability-activation.sh (opposabilite des porteurs, comparaison par comm)"
         status: pass
     human_judgment: false
   - id: D10
-    description: "L'en-tete du gate declare ce que la liste close couvre et ne couvre pas, la hierarchie avec check-agents.sh, le sort des SKILL.md, et la limite couverture declaree vs couverture effective."
-    requirement: "ARMD-02"
+    description: "L'en-tete du gate declare ce que la liste close couvre et ne couvre pas, la hierarchie avec check-agents.sh, le sort des SKILL.md, et la limite couverture declaree vs couverture effective (bornes 1-4) ; borne 5 et le corollaire A-9 tranchent explicitement precondition dure vs tuning a defaut sur pour isolation:, jamais evacuee en silence."
+    requirement: "ARMD-09 / ARMD-10"
     verification:
       - kind: unit
         ref: "bash plugin/dev-orchestrator/scripts/check-capability-activation.sh -h (cinq chaines litterales : as-installed testing, check-agents.sh, SKILL.md, couverture declaree, worktree.baseRef)"
@@ -148,7 +148,7 @@ status: complete
 - **Issue:** `check-machine-paths.sh` sortait 1 sur `/Users/<user>/.local/bin/claude` (§9, ligne 858 de `28-RESEARCH.md`) — violation preexistante, introduite par le commit de cadrage `ad03fc6`, hors `<files>` du plan 28-02, deja signalee par les deux revues de 28-01 (voir `28-01-SUMMARY.md`, section Next Phase Readiness).
 - **Fix:** correction minimale et portable (`/Users/<user>/.local/bin/claude` → `~/.local/bin/claude`), meme ligne, meme nombre de lignes du fichier (1329 avant/apres), aucune reformulation de la phrase.
 - **Files modified:** `.planning/phases/VFDO-28-preuve-que-ce-qui-est-arm-dans-le-plugin-est-arm-chez-l-util/28-RESEARCH.md`
-- **Verification:** `bash scripts/check-machine-paths.sh` → 0 (919 fichiers suivis, aucun chemin absolu de machine restant).
+- **Verification:** `bash scripts/check-machine-paths.sh` → 0 (920 fichiers suivis, aucun chemin absolu de machine restant).
 - **Committed in:** `34409cf`, commit separe et explicitement etiquete deviation.
 - **Perimetre :** seule violation trouvee (le rapport `check-machine-paths.sh` n'en nommait qu'une) ; correction jugee trivialement sure (litteral remplace par sa forme portable standard, aucune ambiguite).
 
