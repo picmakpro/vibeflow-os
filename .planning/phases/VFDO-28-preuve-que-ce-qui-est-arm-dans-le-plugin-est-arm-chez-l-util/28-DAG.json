@@ -38,7 +38,7 @@
         "verif-01"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "revue-02",
@@ -48,7 +48,7 @@
         "exec-02"
       ],
       "scope": [],
-      "status": "blocked",
+      "status": "ready",
       "review_regime": "full"
     },
     {
@@ -59,7 +59,7 @@
         "exec-02"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "docs",
@@ -70,7 +70,7 @@
         "exec-02"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     }
   ]
 }
