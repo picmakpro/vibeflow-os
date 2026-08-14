@@ -79,6 +79,63 @@
 # mauvais nom). Une occurrence ne compte que si ses deux voisins immédiats sortent de l'alphabet des
 # identifiants (`A-Za-z0-9_.-`).
 #
+# BORNES DÉCLARÉES DE LA RÈGLE 4 (Phase 28, plan 28-02) — ce qu'elle couvre, et ce qu'elle ne
+# couvre pas. Un gate qui laisse croire qu'il couvre plus que son périmètre réel est exactement le
+# mode d'échec qu'il existe pour fermer (D-01b).
+#
+# Borne 1 — LA LISTE CLOSE, énumérée à la main, jamais déduite. Deux lignes aujourd'hui :
+#   `isolation` et le couple de clés MCP (`vf-mcp-consumer`, `vf-mcp-tools`). Tout armement absent
+#   de cette liste n'est vu que s'il est DÉCLARÉ par l'artefact (moitié D-01, règle 4bis). La liste
+#   s'élargit ligne à ligne quand un cas nouveau se présente, jamais par heuristique — un gate qui
+#   devinerait la frontière serait « soit inerte soit insupportable » (`.planning/ROADMAP.md:2064`).
+#
+# Borne 2 — LA HIÉRARCHIE AVEC `check-agents.sh`. Deux gardes coexistent sur `isolation:`, et ne
+#   disent PAS la même chose. `check-agents.sh:546-549` est un PALIER DUR : interdiction de forme,
+#   aucune valeur d'`isolation:` n'est admise dans un agent distribué, corpus = les frontmatters
+#   d'agents d'un `agents_dir` à la fois, levée = distribuer la précondition ET prouver le retour
+#   des commits. La règle 4 de CE gate est un PALIER DE RELATION : un armement n'est admis que si
+#   sa précondition est distribuée, corpus = les artefacts distribués (agents, `AGENT.md`,
+#   `SKILL.md`, en deux dispositions), levée = prouver la précondition seule. Pourquoi l'autre
+#   subsiste : la règle 4 ne juge QUE la première des deux préconditions de #38 — le retour des
+#   commits d'un worker isolé (`open-gsd/gsd-core#3302`) n'est attestable par AUCUN
+#   `# vf-provides:`, donc un VERT de la règle 4 n'autorise JAMAIS de ré-armer `isolation:`.
+#
+# Borne 3 — L'ASYMÉTRIE AGENT / SKILL. Le corpus d'armement inclut les `SKILL.md` distribués, donc
+#   la règle 4 est le SEUL contrôle machine qui existe sur une clé de frontmatter de `SKILL.md` :
+#   aucun linter de clés n'existe pour eux dans ce dépôt (les scripts qui lisent un `SKILL.md` le
+#   font pour résoudre un `name:`, jamais pour valider un jeu de clés). Conséquence : la règle 4
+#   vérifie la RELATION armement ↔ précondition sur ces fichiers, et RIEN D'AUTRE de leur
+#   frontmatter.
+#
+# Borne 4 — LE NOM DU PATRON, ET LA LIMITE HONNÊTE. Le patron s'appelle as-installed testing
+#   (autopkgtest Debian) : tester l'artefact TEL QU'INSTALLÉ dans un lab vierge, jamais l'arbre
+#   source — tester l'arbre source ne prouve rien sur ce que l'install pose (D-04). Ce que la
+#   règle 4 établit ici est une couverture declaree, pas une couverture effective : elle vérifie
+#   qu'un `# vf-provides:` existe et qu'un cas de la suite prouve sa discriminance ; elle ne
+#   vérifie PAS, à l'instant de l'usage chez l'utilisateur, que la précondition est effectivement
+#   satisfaite — cela relève du script de preuve lui-même, que ce gate n'exécute JAMAIS (lecture
+#   seule stricte, ci-dessous).
+#
+# Borne 5 — PRÉCONDITION DURE CONTRE TUNING À DÉFAUT SÛR, TRANCHÉE. La règle 4 rend DEUX verdicts
+#   (VERT / ROUGE) et AUCUN troisième état PAR ARTEFACT ; le troisième état de la doctrine de ce
+#   gate reste porté par les PLANCHERS (exit 2, NON VÉRIFIABLE) ci-dessous, qui disent que le gate
+#   ne peut pas se prononcer, jamais qu'un artefact serait « à moitié armé ». Motif : la jointure
+#   est STATIQUE (A-4 i, ce gate n'exécute rien) — il ne peut donc pas observer une dégradation
+#   gracieuse au moment de l'usage ; un « jaune » par artefact serait un verdict qu'il ne peut pas
+#   tenir, ce que la doctrine des trois états ci-dessus interdit déjà explicitement (« Un gate ne se
+#   replie pas sur un verdict qu'il ne peut pas tenir »). C'est une DIVERGENCE ASSUMÉE avec la
+#   recommandation « trois verdicts » de `28-RESEARCH.md` Open Question 2, et A-9 l'autorise à
+#   condition d'écrire le motif — le voici.
+#
+#   Corollaire (garde-fou A-9 contre le cas de preuve creux) — `isolation:` RESTE dans la liste
+#   close, motif RÉÉCRIT pour gsd-core 1.10.0 : (a) le moteur ne casse plus en silence, il dégrade
+#   en séquentiel avec message — `worktree.baseRef` a bien glissé de PRÉCONDITION DURE vers TUNING
+#   À DÉFAUT SÛR ; (b) et cela ne désarme rien, parce que poser `baseRef: "head"` TAIT LA
+#   VÉRIFICATION SANS RÉSOUDRE LA BASE (le moteur le dit lui-même, `worktree-base-ref.cjs`), et
+#   parce que le second verrou (`open-gsd/gsd-core#3302`) est intact. Un armement dont le réglage
+#   « sûr » consiste à ÉTEINDRE le contrôle n'est pas un armement sûr. La ligne reste, avec ce
+#   motif — voir la table des armements plus bas.
+#
 # Lecture seule stricte : ce script n'écrit AUCUN fichier, ne déplace rien, n'efface rien. Son seul
 # effet est son code de sortie et son rapport sur stderr.
 #
@@ -421,9 +478,15 @@ report="$(
     nT = 0; nB = 0; nM = 0; nMarkers = 0; nCorpus = 0; nLines = 0
     nInactive = 0; nUnknown = 0; nBrickInactive = 0; bad = 0; sec = ""
     # --- Regle 4 : vocabulaire, litteral et non surchargeable (A-1 : un registre = vocabulaire
-    # seul). Liste CLOSE des armements surveilles : issue #38, la precondition worktree.baseRef
-    # nest distribuee par personne, et le second verrou open-gsd/gsd-core#3302 (retour des commits)
-    # est intact. Ces deux tables ne recoivent AUCUNE variable de surcharge.
+    # seul). Liste CLOSE des armements surveilles : issue #38.
+    #   isolation -> worktree-baseref. Motif REECRIT pour gsd-core 1.10.0 (Phase 28, plan 28-02,
+    #   borne 5 de len-tete) : (a) le moteur ne casse plus en silence, il degrade en sequentiel
+    #   avec message -- worktree.baseRef a bien glisse de PRECONDITION DURE vers TUNING A DEFAUT
+    #   SUR ; (b) et cela ne desarme rien : poser baseRef: head TAIT LA VERIFICATION SANS RESOUDRE
+    #   LA BASE (le moteur le dit lui-meme, worktree-base-ref.cjs), et le second verrou
+    #   open-gsd/gsd-core#3302 (retour des commits dun worker isole) reste intact. Un armement dont
+    #   le reglage sur consiste a ETEINDRE le controle nest pas un armement sur. La ligne reste.
+    # Ces deux tables ne recoivent AUCUNE variable de surcharge.
     ARM["isolation"] = "worktree-baseref"
     # Seconde ligne (Phase 28, plan 28-02) : un artefact qui recoit une allowlist MCP derivee du
     # lab depend dune precondition externe -- lexistence reelle des serveurs cites -- que rien ne
