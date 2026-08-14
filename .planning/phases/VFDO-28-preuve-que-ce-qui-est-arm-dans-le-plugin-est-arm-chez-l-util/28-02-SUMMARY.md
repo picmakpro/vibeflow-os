@@ -145,8 +145,8 @@ status: complete
 
 **2. [Deviation declaree] Chemin machine absolu dans `28-RESEARCH.md:858`**
 - **Found during:** verification de l'acceptance criterion `bash scripts/check-machine-paths.sh` (sort 0) de la tache 3.
-- **Issue:** `check-machine-paths.sh` sortait 1 sur `/Users/samuel/.local/bin/claude` (§9, ligne 858 de `28-RESEARCH.md`) — violation preexistante, introduite par le commit de cadrage `ad03fc6`, hors `<files>` du plan 28-02, deja signalee par les deux revues de 28-01 (voir `28-01-SUMMARY.md`, section Next Phase Readiness).
-- **Fix:** correction minimale et portable (`/Users/samuel/.local/bin/claude` → `~/.local/bin/claude`), meme ligne, meme nombre de lignes du fichier (1329 avant/apres), aucune reformulation de la phrase.
+- **Issue:** `check-machine-paths.sh` sortait 1 sur `/Users/<user>/.local/bin/claude` (§9, ligne 858 de `28-RESEARCH.md`) — violation preexistante, introduite par le commit de cadrage `ad03fc6`, hors `<files>` du plan 28-02, deja signalee par les deux revues de 28-01 (voir `28-01-SUMMARY.md`, section Next Phase Readiness).
+- **Fix:** correction minimale et portable (`/Users/<user>/.local/bin/claude` → `~/.local/bin/claude`), meme ligne, meme nombre de lignes du fichier (1329 avant/apres), aucune reformulation de la phrase.
 - **Files modified:** `.planning/phases/VFDO-28-preuve-que-ce-qui-est-arm-dans-le-plugin-est-arm-chez-l-util/28-RESEARCH.md`
 - **Verification:** `bash scripts/check-machine-paths.sh` → 0 (919 fichiers suivis, aucun chemin absolu de machine restant).
 - **Committed in:** `34409cf`, commit separe et explicitement etiquete deviation.
