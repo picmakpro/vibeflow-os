@@ -1243,8 +1243,8 @@ echo "== opposabilité des porteurs de preuve (# vf-provides:), Phase 28-02 =="
 
 DISK_IDS="$(vf_capact_test_discover_provider_scripts | vf_capact_test_provider_ids | sort -u)"
 TABLE_IDS_SORTED="$(printf '%s\n' "${PROV_TABLE_ID[@]}" | sort -u)"
-n_disk=$(printf '%s\n' "$DISK_IDS" | grep -c . || true)
-n_table=$(printf '%s\n' "$TABLE_IDS_SORTED" | grep -c . || true)
+n_disk=$(printf '%s\n' "$DISK_IDS" | awk 'length($0)>0{c++} END{print c+0}')
+n_table=$(printf '%s\n' "$TABLE_IDS_SORTED" | awk 'length($0)>0{c++} END{print c+0}')
 only_disk="$(comm -23 <(printf '%s\n' "$DISK_IDS") <(printf '%s\n' "$TABLE_IDS_SORTED"))"
 only_table="$(comm -13 <(printf '%s\n' "$DISK_IDS") <(printf '%s\n' "$TABLE_IDS_SORTED"))"
 
@@ -1270,7 +1270,7 @@ fi
 EMPTY_PROV_DIR="$TMP/opposabilite-vide"
 mkdir -p "$EMPTY_PROV_DIR"
 DISK_IDS_VIDE="$(VF_CAPACT_PROVIDERS="" vf_capact_test_discover_provider_scripts | vf_capact_test_provider_ids | sort -u)"
-n_disk_vide=$(printf '%s\n' "$DISK_IDS_VIDE" | grep -c . || true)
+n_disk_vide=$(printf '%s\n' "$DISK_IDS_VIDE" | awk 'length($0)>0{c++} END{print c+0}')
 if [ "$n_disk_vide" -eq 0 ]; then
   ok "opposabilité plancher (mutation) — VF_CAPACT_PROVIDERS=\"\" rend un corpus VRAIMENT vide (0 id), le plancher se déclencherait"
 else
