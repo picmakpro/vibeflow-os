@@ -640,9 +640,14 @@ réels comme cas de test AVANT de choisir le mécanisme.
      lease, TTL par défaut inchangé (un lock périmé ≠ une mission morte, constat du 2026-08-02)
      (LOCK-01).
 
-  2. Un commit sous le lock d'autrui est bloqué à la source (guard `PreToolUse(Bash)` distribué via
-     merge-hooks, armement prouvé par le gate règle 4 — jamais un settings local ni un hook git non
-     distribué) ; le contournement réel rejoué comme cas de test rougit sans le guard (LOCK-02).
+  2. Un commit sous le lock d'autrui est bloqué à la source (guard `PreToolUse(Bash)` dont
+     l'ENTRÉE naît toujours de `merge-hooks` — jamais posée à la main dans un settings ni via un
+     hook git hors du mécanisme distribué ; sa COMMANDE, elle, peut légitimement pointer un
+     chemin absolu machine-spécifique résolu par `merge-hooks` et rangé dans une cible
+     `--settings-local` *(arbitré par Samuel le 2026-08-15 : un chemin machine ne doit jamais
+     voyager ; les gardes restent distribuées — leur entrée naît toujours de `merge-hooks` — c'est
+     leur COMMANDE qui est locale)* ; armement prouvé par le gate règle 4) ; le contournement réel
+     rejoué comme cas de test rougit sans le guard (LOCK-02).
 
   3. Un checkout de branche sous le lock d'autrui est détecté et signalé bruyamment — blocage
      seulement si le spike `reference-transaction` le prouve sûr (LOCK-03).
