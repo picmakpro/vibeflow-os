@@ -579,9 +579,11 @@ sur `dag.sh --scope` sont `[VERIFIED]` (lues sur pièce, commit rejoué, ligne c
 `[ASSUMED]`. Les seules zones d'hypothèse sont celles explicitement déléguées à la discrétion du
 planner par `29-CONTEXT.md` (emplacement de G3, forme d'ID, cible exacte de G2).
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **G2 — quel « compartiment » exactement ?**
+   RESOLVED : tranché par le plan 29-04, qui adopte la recommandation telle quelle — deux
+   livrables séparés (contrainte ≤ 80 lignes sur `INDEX.md` + pattern `_index.md` nouveau).
    - What we know : le rapport ICM vise un `CONTEXT.md` de routing par unité de documentation ;
      `scaffold-docs.sh` pose déjà `docs/<projet>/INDEX.md` (routing pur, ≤ 80 lignes de fait vu sa
      taille actuelle) qui remplit presque ce rôle.
@@ -594,6 +596,8 @@ planner par `29-CONTEXT.md` (emplacement de G3, forme d'ID, cible exacte de G2).
      cités par le rapport ICM) et les gros `references/` de module.
 
 2. **G3 — lint-only v1 suffit-il, ou faut-il déjà prévoir le mode update ?**
+   RESOLVED : tranché par le plan 29-02 — lint-only livré, aucun mode correctif (ADR-031),
+   bornes de non-couverture écrites en en-tête du script.
    - What we know : ADR-031 impose la validation humaine ; `DOCF-03` a déjà le patron du garde-fou
      en trois temps si un mode update est un jour voulu.
    - What's unclear : CONTEXT.md laisse le choix « lint-only vs lint+update » explicitement à la
