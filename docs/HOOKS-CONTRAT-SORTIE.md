@@ -50,17 +50,18 @@ Les diagnostics humains (`say()` et équivalents) vont systématiquement sur **s
 stdout — c'est déjà la convention en place dans les 4 scripts du périmètre dev (task 2 de ce plan
 le vérifie et le corrige si besoin).
 
-## 4. L'inventaire — 25 entrées, recompte machine
+## 4. L'inventaire — 26 entrées, recompte machine
 
 Commande de recomptage (fait foi, D-08) :
 
 ```bash
-python3 -c "import json,glob; n=sum(len(h.get('hooks',[])) for f in sorted(glob.glob('plugin/*/hooks/hooks.json')) for gs in json.load(open(f))['hooks'].values() for h in gs); print(n); assert n==25, n"
+python3 -c "import json,glob; n=sum(len(h.get('hooks',[])) for f in sorted(glob.glob('plugin/*/hooks/hooks.json')) for gs in json.load(open(f))['hooks'].values() for h in gs); print(n); assert n==26, n"
 ```
 
-Rendue le 2026-08-15 : `25`. Toute dérive future (une 26e entrée apparue, une entrée disparue) fait
-échouer cette assertion — bruyamment, jamais en silence — et impose de mettre à jour l'inventaire
-et l'assertion **ensemble**, jamais l'un sans l'autre.
+Rendue le 2026-08-16 : `26` (25 recomptées le 2026-08-15, plus 1 : l'entrée n°26,
+`check-hook-paths.sh`, posée par le plan `30-09`). Toute dérive future (une 27e entrée apparue, une
+entrée disparue) fait échouer cette assertion — bruyamment, jamais en silence — et impose de mettre
+à jour l'inventaire et l'assertion **ensemble**, jamais l'un sans l'autre.
 
 **Colonnes** : module · événement · matcher · script · arguments d'invocation (au-delà du chemin du
 script lui-même) · `--hook` accepté (oui/non — et s'il change le CODE de sortie ou seulement le
@@ -91,7 +92,7 @@ exacte · classement **advisory** ou **bloquante**, avec le mécanisme · forme 
 | 12 | SessionStart · startup | `probe-memory-guards.sh` | (aucun — `--strict` existe mais n'est pas passé par ce fragment) | non | 0 (systématique sans `--strict` : « Silence = tout va bien. Advisory : exit 0 ») | advisory | shell + `\|\| true` | rien |
 | 13 | SessionEnd · (aucun matcher) | `archive.sh` | `--async --apply` | non | 0 (mode async : retour immédiat, la tâche réelle se relance en arrière-plan) | advisory | shell + `\|\| true` | rien |
 
-### dev-orchestrator — 4 entrées (périmètre code de cette phase, tâche 2)
+### dev-orchestrator — 5 entrées (périmètre code des plans 30-04/30-07/30-09)
 
 | # | Événement · matcher | Script | Invocation | `--hook` | Codes AVANT normalisation (30-04) | Codes APRÈS normalisation (30-04) | Classement | Forme | Action (Phase 30) |
 |---|---|---|---|---|---|---|---|---|
@@ -99,6 +100,22 @@ exacte · classement **advisory** ou **bloquante**, avec le mécanisme · forme 
 | 15 | SessionStart · startup | `discover-unintegrated-docs.sh` | `--hook` | oui — même profil | 0 (au moins un doc non intégré), 3 (rien à intégrer), 64 (usage) | 0 (silence traduit + signaux), 64 | advisory | shell (30-07) | normalisation livrée ici ; migration à 30-07 |
 | 16 | SessionStart · startup | `check-doc-drift.sh` | `--hook` | oui — même profil | 0 (seuil atteint), 3 (rien à signaler), 64 (usage) | 0 (silence traduit + signaux), 64 | advisory | shell (30-07) | normalisation livrée ici ; migration à 30-07 |
 | 17 | SessionStart · startup | `check-gsd-config.sh` | `--hook` | oui — même profil | 0 (au moins un signal `[gsd-config]`), 3 (aligné/illisible), 64 (usage) | 0 (silence traduit + signaux), 64 | advisory | shell (30-07) | normalisation livrée ici ; migration à 30-07 |
+| 26 | SessionStart · startup | `check-hook-paths.sh` | `--hook` | oui — traduit le silence interne (3→0), ne change pas le rendu | sans objet — entrée **née conforme** (plan 30-09) | 0 (silence traduit, et signal `[hook-paths]` sur constat), 1 (« verdict non rendu » — réglages illisibles ou interpréteur Python absent, bruyant sur stderr, stdout vide), 64 (usage) | **advisory** (ADR-031 — constate, ne répare rien, ne bloque jamais le démarrage) | **exec à `command` littéral** (nom nu `bash`, seule entrée du parc dans ce cas) | née à l'état cible (plan 30-09) |
+
+**Dérogation de l'entrée n°26 à ADR-071 §Décision 2** — cette entrée est la SEULE du parc dont le
+`command` est un nom nu (`bash`), là où ADR-071 §Décision 2 exige, pour toutes les autres, un chemin
+absolu d'interpréteur résolu et vérifié à l'install, **sans clause d'exception**. La raison est le
+paradoxe d'amorçage : ce script diagnostique la péremption d'un chemin d'interpréteur figé à
+l'install (angle mort assumé de D-01, one-way) — s'il dépendait lui-même de ce chemin figé, il
+mourrait exactement dans le cas qu'il sert à détecter. Cette dérogation est autorisée par
+l'**approbation humaine de l'addendum du 2026-08-15**, **PAS par ADR-071 elle-même** — ni sa
+Décision 2, ni sa section « Ce que cette ADR ne tranche pas » (qui vise la polarité gouvernance), ni
+son « Déclencheur de réexamen » (dont la portée est cette même migration à venir, pas ce cas-ci) ne
+documentent ce cas. Elle est gardée à la machine par le cas T9 de
+`plugin/dev-orchestrator/scripts/tests/test-check-hook-paths.sh` (discriminance prouvée par
+mutation). **Reliquat** : un amendement d'ADR-071 — ou une ADR dédiée — est dû pour fermer cet écart
+entre la doctrine écrite et le parc réel ; `docs/ADR.md` est hors périmètre du plan `30-09` (geste
+humain).
 
 ### infrastructure-audit — 1 entrée
 
@@ -129,11 +146,11 @@ exacte · classement **advisory** ou **bloquante**, avec le mécanisme · forme 
 |---|---|---|
 | conductor | 6 | `python3 -c "import json; d=json.load(open('plugin/conductor/hooks/hooks.json')); print(sum(len(h.get('hooks',[])) for gs in d['hooks'].values() for h in gs))"` |
 | consolidator | 7 | idem, `plugin/consolidator/hooks/hooks.json` |
-| dev-orchestrator | 4 | idem, `plugin/dev-orchestrator/hooks/hooks.json` |
+| dev-orchestrator | 5 | idem, `plugin/dev-orchestrator/hooks/hooks.json` |
 | infrastructure-audit | 1 | idem, `plugin/infrastructure-audit/hooks/hooks.json` |
 | planning-core | 6 | idem, `plugin/planning-core/hooks/hooks.json` |
 | software-architecture | 1 | idem, `plugin/software-architecture/hooks/hooks.json` |
-| **Total** | **25** | commande de recomptage globale, §4 ci-dessus |
+| **Total** | **26** | commande de recomptage globale, §4 ci-dessus |
 
 **Les deux entrées bloquantes mises en avant par le plan comme points de vigilance** (le
 classement n'est PAS déductible mécaniquement du type d'événement, RESEARCH.md Pitfall 4) :
@@ -147,8 +164,8 @@ classement n'est PAS déductible mécaniquement du type d'événement, RESEARCH.
 **L'inventaire machine complet fait apparaître trois bloquantes supplémentaires**, du même
 mécanisme JSON que #25 : `guard-agent-write.sh` (#1), `guard-read-registres.sh` (#7) et
 `guard-bash-registres.sh` (#8) — chacune sort toujours 0 et bloque via `permissionDecision: deny`.
-Soit **5 entrées bloquantes au total sur les 25** (4 via décision JSON + 1 via code de sortie), et
-**20 entrées advisory**.
+Soit **5 entrées bloquantes au total sur les 26** (4 via décision JSON + 1 via code de sortie), et
+**21 entrées advisory** (dont la nouvelle entrée n°26, `check-hook-paths.sh`, plan `30-09`).
 
 ## 6. Ce qui reste à la polarité gouvernance
 
