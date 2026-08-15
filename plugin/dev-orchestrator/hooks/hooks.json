@@ -1,14 +1,14 @@
 {
-  "description": "Signaux de démarrage du moteur de dev : état du bootstrap projet, documents de cadrage orphelins de la feuille de route, dérive documentaire, alignement du .planning/config.json sur le moteur GSD installé. Advisory (ADR-031) — chaque signal propose un geste, aucun ne l'exécute.",
+  "description": "Signaux de démarrage du moteur de dev : état du bootstrap projet, documents de cadrage orphelins de la feuille de route, dérive documentaire, alignement du .planning/config.json sur le moteur GSD installé. Classement advisory (ADR-031) — chaque signal propose un geste, aucun ne l'exécute ; en forme exec (contrat PR #29 §5, D-01), leur silence nominal est garanti par la traduction du code de sortie posée dans chaque script (docs/HOOKS-CONTRAT-SORTIE.md), plus jamais par un opérateur shell.",
   "hooks": {
     "SessionStart": [
       {
         "matcher": "startup",
         "hooks": [
-          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-dev-bootstrap.sh --hook || true" },
-          { "type": "command", "command": "bash {{VF_SCRIPTS}}/discover-unintegrated-docs.sh --hook || true" },
-          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-doc-drift.sh --hook || true" },
-          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-gsd-config.sh --hook || true" }
+          { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/check-dev-bootstrap.sh", "--hook"] },
+          { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/discover-unintegrated-docs.sh", "--hook"] },
+          { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/check-doc-drift.sh", "--hook"] },
+          { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/check-gsd-config.sh", "--hook"] }
         ]
       }
     ]
