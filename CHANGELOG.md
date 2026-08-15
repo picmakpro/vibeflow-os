@@ -5,6 +5,55 @@ extrait récent et pointent ici). Chaque module a par ailleurs son propre `CHANG
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.52.0] — 2026-08-15
+
+**La mémoire du framework cesse de tourner à vide : les registres sont instanciés, cloisonnés
+par projet, et couverts par la promesse de chaque scope.** Diagnostic remonté du terrain (« ma
+logique mémoire n'est pas là depuis que j'ai installé le module dev »), mesuré sur pièce en dépôt
+vierge : `consolidator` s'installait entier — hooks câblés, guards en place, 5 gabarits déposés —
+mais **aucun script ne les instanciait** : `.claude/memory/` n'existait pas, le lab échouait son
+propre gate, et la CI le masquait (`--allow-empty` convertissait rc=1 en rc=3 « indéterminé »,
+puis acceptait rc=3).
+
+### Livré
+
+- **`seed-registres.sh`** (consolidator v1.9.0) : instancie les registres canon manquants depuis
+  les gabarits. Appelé par un 4ᵉ hook post-install nommé **et** par `sync_module_governance` —
+  ce second point d'appel rend le correctif transparent à l'`update`, y compris quand la version
+  du module n'a pas bougé (le chemin « déjà à jour » ne repasse jamais par `install_module`).
+  **Un utilisateur touché reçoit donc sa mémoire au prochain `/vf-update`, sans aucun geste** —
+  prouvé par rejeu du scénario complet : lab v1.8.1 sans registres, contenu utilisateur ajouté à
+  la main, `update --all` → 4 registres manquants créés, le fichier du client **intact** (vérifié
+  par empreinte), le nouveau hook mergé dans son `settings.json` existant.
+- **Contrat non destructif sans exception** : le seeder ne sait que créer ce qui manque — les
+  registres sont append-only et portent l'historique réel du lab. Vérifié par empreinte, pas par
+  présence de fichier. Data-driven (`*-template.md` → `<NOM>.md`, aucun nom en dur). Validé sous
+  bash 3.2 (macOS), y compris le cas « gabarits vides + `set -u` ».
+- **Scope `user` : chaque projet a SA mémoire.** Trou structurel : les scripts y vivent dans
+  `~/.claude/`, donc le seed d'install remplissait la mémoire du compte pendant que le lint et
+  les guards résolvent `.claude/memory` **relativement au cwd** — home rempli, tous les projets
+  vides. Une install ne peut pas connaître les projets à l'avance ; l'ouverture de session, si :
+  mode `--project` + hook `SessionStart`, garde de lab (`.planning/` ou `.claude/` requis — un
+  dépôt git nu n'est jamais semé), échappatoire `VF_NO_AUTO_SEED`, cloisonnement prouvé (deux
+  labs, deux mémoires, zéro fuite).
+- **Scope `local` : SCOPE-04 tenu jusqu'aux registres.** L'engine gitignorait ses propres
+  artefacts mais laissait les registres semés apparaître en untracked — la promesse « rien ne
+  sera committé » s'arrêtait aux fichiers qu'il copiait lui-même. `gitignore_add_paths` couvre
+  désormais `.claude/memory/` (sélecteur = présence du seeder, data-driven), cas T3b.
+- **`consolidator` passe `mandatory`** : il n'arrivait que par l'arête indirecte
+  `conductor → validator` — retirer `validator` emportait silencieusement la mémoire.
+  `ensure_mandatory_baseline` rattrape les labs où il manque.
+- **`memory_bridge.enabled` → `true`** (planning-core v2.6.1) — déclaratif, dit sans détour :
+  aucun script ne lit cette clé, le pont est appliqué par le SKILL.
+- **MemPalace : refusé par écrit, avec la mesure.** Ni CLI ni MCP disponibles ; l'activer
+  insérerait 7 étages qui échouent à chaque phase. Apport propre (recall sémantique)
+  complémentaire, déclencheur de reprise consigné dans le CHANGELOG du module.
+- **CI** : baseline du job « lab frais » dérivée des `role=mandatory` du catalogue (elle codait
+  `conductor` en dur), `--allow-empty` retiré, `seed-registres.sh --check` ajouté.
+
+Modules : `consolidator` v1.9.0, `planning-core` v2.6.1. **55 suites** vertes
+(`test-seed-registres.sh` : 19 cas ; `test-vibeflow-update.sh` : 11, T3b).
+
 ## [v2.51.0] — 2026-08-15
 
 **Les gains de la deep-search ICM sont distillés dans l'outillage — les mécanismes, jamais le

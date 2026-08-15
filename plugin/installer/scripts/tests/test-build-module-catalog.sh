@@ -99,6 +99,17 @@ else
   ko "repo réel : conductor mandatory attendu, obtenu [$cline]"
 fi
 
+# consolidator présent ET marqué mandatory (socle de mémoire, v1.9.0). Sans lui en baseline, un lab
+# installé par le parcours nominal n'a ni registres ni guards de capitalisation — le défaut qui
+# faisait dire « ma logique mémoire a sauté » alors que rien n'avait été retiré.
+mline=$(printf '%s\n' "$real_out" | command grep '^consolidator	' || true)
+mrole=$(printf '%s' "$mline" | cut -f3)
+if [ -n "$mline" ] && [ "$mrole" = "mandatory" ]; then
+  ok "repo réel : consolidator présent et mandatory (socle de mémoire en baseline)"
+else
+  ko "repo réel : consolidator mandatory attendu, obtenu [$mline]"
+fi
+
 # les 3 bundles métier sont matérialisés (proposable:true, v2.0.0 chacun) et
 # DOIVENT apparaître au catalogue
 for bundle in content-bundle growth-bundle business-pilot-bundle; do

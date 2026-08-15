@@ -1111,6 +1111,83 @@ else
   ko "R14 règle 4bis — id hors table (frontière) → 1" "rc=$rc regle4bis=$says_r4bis id=$names_id out=[$out]"
 fi
 
+# === Cas R16/R17 — BI-ARMEMENT (correction ciblée post-revue, Phase 28) : un même artefact porte
+# DEUX armements de la liste close, chacun évalué INDÉPENDAMMENT contre vf-requires ==============
+# Le défaut fermé par cette correction : `ARM_LINE` (et les structures associées) n'enregistraient
+# que le PREMIER armement rencontré par fichier — un artefact bi-armé dont `vf-requires` ne
+# couvrait que ce premier armement rendait le gate CONFORME (rc=0), faux vert. Ces deux cas
+# prouvent que les DEUX armements sont désormais vus, dans les deux sens (rouge si un seul est
+# couvert, vert si les deux le sont).
+
+mk_agent_bi_arme_partiel() { # <chemin> — isolation (exige worktree-baseref) + vf-mcp-consumer
+                              # (exige mcp-servers), vf-requires ne couvre QUE isolation
+  cat > "$1" <<'AGT'
+---
+name: agent-fixture-bi-arme-partiel
+isolation: worktree
+vf-mcp-consumer: true
+vf-requires: worktree-baseref
+---
+
+# Agent bi-armé, un seul des deux armements couvert (fixture bi-armement, Phase 28)
+AGT
+}
+
+mk_agent_bi_arme_couvert() { # <chemin> — vf-mcp-consumer + vf-mcp-tools, DEUX armements exigeant
+                              # le MÊME id (mcp-servers) — le seul couple pour lequel un vf-requires
+                              # UNIQUE (grammaire actuelle : une seule valeur) peut couvrir les deux
+  cat > "$1" <<'AGT'
+---
+name: agent-fixture-bi-arme-couvert
+vf-mcp-consumer: true
+vf-mcp-tools: XcodeBuildMCP:test_sim,build_sim,clean
+vf-requires: mcp-servers
+---
+
+# Agent bi-armé, les deux armements couverts par le même vf-requires (fixture bi-armement, Phase 28)
+AGT
+}
+
+# === Cas R16 — sous-cas ROUGE : deux armements, un seul couvert → 1, ECART nommant précisément
+# l'armement NON couvert (vf-mcp-consumer), jamais l'armement couvert (isolation) ================
+D="$(mk_regle4_fixture r16)"
+mk_agent_bi_arme_partiel "$D/agents/agentK.md"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md
+$D/agents/agentK.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+out="$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")"
+# Compte le nombre de lignes ECART regle 4 qui nomment agentK.md : doit être EXACTEMENT 1 (le seul
+# armement non couvert), jamais 0 (faux vert du défaut fermé) ni 2 (l'armement couvert ne doit pas
+# être signalé à tort).
+n_ecarts_k=$(printf '%s\n' "$out" | awk '/ECART regle 4 :/ && /agentK\.md/ {c++} END{print c+0}')
+names_uncovered=0; case "$out" in *"arme « vf-mcp-consumer »"*"agentK.md"*) names_uncovered=1 ;; esac
+names_uncovered2=0; case "$out" in *"agentK.md"*"arme « vf-mcp-consumer »"*) names_uncovered2=1 ;; esac
+flags_covered=0; case "$out" in *"arme « isolation »"*) flags_covered=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$n_ecarts_k" -eq 1 ] && { [ "$names_uncovered" -eq 1 ] || [ "$names_uncovered2" -eq 1 ]; } && [ "$flags_covered" -eq 0 ]; then
+  ok "R16 bi-armement (ROUGE) — deux armements sur agentK.md, un seul couvert : le gate ROUGIT (rc=1), ECART nommant SEULEMENT vf-mcp-consumer (isolation, couvert, n'est pas signalé)"
+else
+  ko "R16 bi-armement (ROUGE) — un armement non couvert doit rougir en le nommant, sans signaler l'armement couvert" "rc=$rc n_ecarts_k=$n_ecarts_k uncovered=$names_uncovered/$names_uncovered2 covered_flagged=$flags_covered out=[$out]"
+fi
+
+# === Cas R17 — sous-cas VERT : deux armements sur le même artefact, TOUS DEUX couverts par le
+# même vf-requires (vf-mcp-consumer et vf-mcp-tools exigent le même id mcp-servers) → 0 ===========
+D="$(mk_regle4_fixture r17)"
+mk_agent_bi_arme_couvert "$D/agents/agentL.md"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md
+$D/agents/agentL.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+if [ "$rc" -eq 0 ]; then
+  ok "R17 bi-armement (VERT) — deux armements (vf-mcp-consumer + vf-mcp-tools) sur agentL.md, tous deux couverts par le même vf-requires « mcp-servers » → 0"
+else
+  ko "R17 bi-armement (VERT) — deux armements tous deux couverts → 0" "rc=$rc out=[$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")]"
+fi
+
 # === Cas R15 — mutation sur COPIES de l'arbre RÉEL : les 5 déclarations réelles, retrait de l'une
 # fait rougir en nommant précisément l'artefact =================================================
 # Copie des 5 artefacts réellement distribués dans un `mktemp -d` privé — l'arbre n'est JAMAIS

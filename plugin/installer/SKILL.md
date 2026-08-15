@@ -89,13 +89,14 @@ bug d'install vécu sur le terrain, ADR-054) :
    (cohérence **ID4** : le même scope s'applique à tout — modules VibeFlow + GSD + Superpowers).
    Reframe pour l'utilisateur : compte (user) / projet (project) / projet sans commit (local).
 
-3. **Baseline obligatoire — conductor posé d'office (INST-02a).** Lire le catalogue
+3. **Baseline obligatoire — posée d'office (INST-02a).** Lire le catalogue
    (invocation exacte dans la table « Chemins réels » ci-dessus) : il émet `name<TAB>description<TAB>role`.
-   Les entrées **`role == mandatory`** (aujourd'hui : `conductor`, le gardien méta du lab) sont
-   posées **automatiquement** avec leurs deps — **on ne les met PAS dans un toggle** : un lab sans
-   son orchestrateur méta n'a pas de filet de cohérence. On **informe** l'utilisateur (« je pose le
-   socle de gouvernance »), on ne lui demande pas de choisir. **Aucun nom de module en dur** : la
-   liste des mandatory sort du catalogue (`role`).
+   Les entrées **`role == mandatory`** (aujourd'hui : `conductor`, le gardien méta du lab, et
+   `consolidator`, le socle de mémoire) sont posées **automatiquement** avec leurs deps — **on ne
+   les met PAS dans un toggle** : un lab sans son orchestrateur méta n'a pas de filet de cohérence,
+   et un lab sans registres ne capitalise rien (principe 1 de VibeFlow). On **informe** l'utilisateur
+   (« je pose le socle de gouvernance et de mémoire »), on ne lui demande pas de choisir.
+   **Aucun nom de module en dur** : la liste des mandatory sort du catalogue (`role`).
 
 4. **Choix du type de lab (INST-02b — single-select).** Une fois le socle posé, **un seul** choix
    structurant, via l'UI de questions (pas un TUI bash) :
@@ -139,9 +140,11 @@ correspondre à celui où les modules ont été posés (sinon l'engine cherche a
 
 - **Un module** :
   `VIBEFLOW_CACHE="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/vibeflow-update.sh" --scope <s> uninstall <module>`
-  — **sauf un module `mandatory`** (conductor) : ne pas le retirer à l'unité (il porte la gouvernance
-  du lab). Il ne part qu'avec une désinstallation complète (`uninstall --all`). Si l'utilisateur
-  insiste, le prévenir que le lab perd son orchestrateur méta.
+  — **sauf un module `mandatory`** (conductor, consolidator) : ne pas le retirer à l'unité (ils
+  portent la gouvernance et la mémoire du lab). Ils ne partent qu'avec une désinstallation complète
+  (`uninstall --all`). Si l'utilisateur insiste, le prévenir de ce qu'il perd : l'orchestrateur méta
+  pour `conductor`, les registres et les guards de capitalisation pour `consolidator` — les fichiers
+  déjà écrits dans `.claude/memory/` restent, mais plus rien ne les tient.
 - **Tout** :
   `VIBEFLOW_CACHE="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/vibeflow-update.sh" --scope <s> uninstall --all`
   (lit le registre `<scope>/.claude/scripts/.vibeflow-installed` et retire chaque module : skills,
@@ -163,8 +166,8 @@ correspondre à celui où les modules ont été posés (sinon l'engine cherche a
 - **Scope pré-sélectionné, jamais un choix à froid** : la détection (repo git → `project`, sinon
   `user`, scope précédent prioritaire) pré-coche ; l'utilisateur **confirme en une touche** avec
   une ligne d'explication — il garde toujours la main pour choisir un autre scope.
-- **Baseline non négociable** : tout module `role=mandatory` du catalogue (conductor) est posé
-  d'office, jamais soumis à un toggle. Le premier usage offre **un seul** choix structurant —
+- **Baseline non négociable** : tout module `role=mandatory` du catalogue (conductor, consolidator)
+  est posé d'office, jamais soumis à un toggle. Le premier usage offre **un seul** choix structurant —
   *lab de développement* vs *nouveau lab métier (`vf-new-lab`)* — pas une liste brute de modules.
 - **Jamais proposer un module `proposable:false`** : exclu du catalogue par construction (bundles
   métier WIP). Ne le reproposer qu'une fois finalisé (repasser `proposable` à true / l'omettre).

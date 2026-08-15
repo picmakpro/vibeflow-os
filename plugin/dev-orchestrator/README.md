@@ -7,7 +7,7 @@
 > façade de verbes : GSD est l'interface directe du quotidien, l'agent est l'entrée
 > conversationnelle optionnelle.
 
-**Version** : v2.14.0
+**Version** : v2.15.0
 **Type** : agent + équipe d'agents + 2 skills + scripts
 
 ---

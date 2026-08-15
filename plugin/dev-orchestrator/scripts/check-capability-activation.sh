@@ -515,7 +515,7 @@ report="$(
     nUnivPrv = 0
     n = split(ENVIRON["VF_CAPACT_ISPRV"], ispArr, "\n")
     for (i = 1; i <= n; i++) { if (ispArr[i] == "") continue; ISPRV[ispArr[i]] = 1; nUnivPrv++ }
-    nArmFiles = 0; nReqFiles = 0; nProv = 0
+    nArmPairs = 0; nReqFiles = 0; nProv = 0
   }
   # --- Fichier 1 : index genere. Reperage par SECTION, jamais par arite : trois tables y vivent
   # desormais, dont deux de meme largeur — `NF` seul les confondrait.
@@ -573,10 +573,20 @@ report="$(
         gsub(/^[ \t]+/, "", k); gsub(/[ \t]+$/, "", k)
         gsub(/^[ \t]+/, "", v); gsub(/[ \t]+$/, "", v)
         gsub(/^"/, "", v); gsub(/"$/, "", v)
-        if ((k in ARM) && v != "" && !(FILENAME in ARM_LINE)) {
-          if (!(FILENAME in ARMFILE)) { ARMFILE[FILENAME] = 1; ARMFILE_ORDER[++nArmFiles] = FILENAME }
-          ARM_LINE[FILENAME] = FNR
-          ARM_KEY[FILENAME] = k
+        # Multi-cle, jamais mono-slot (correction ciblee, Phase 28 post-revue) : un artefact peut
+        # porter DEUX armements de la liste close a la fois (ex. isolation: worktree ET
+        # vf-mcp-consumer: true) ; enregistrer CHAQUE paire (fichier, armement) au lieu du seul
+        # premier armement rencontre par fichier evite le faux VERT ou seul le premier armement
+        # etait confronte a vf-requires. Cle de dedoublonnage = FILENAME SUBSEP k : la MEME cle
+        # relue deux fois (ligne dupliquee) ne cree pas deux entrees.
+        if ((k in ARM) && v != "") {
+          armpairkey = FILENAME SUBSEP k
+          if (!(armpairkey in ARM_SEEN)) {
+            ARM_SEEN[armpairkey] = 1
+            ARMPAIR_FILE[++nArmPairs] = FILENAME
+            ARMPAIR_KEY[nArmPairs] = k
+            ARMPAIR_LINE[nArmPairs] = FNR
+          }
         }
         if (k == "vf-requires" && v != "") {
           if (!(FILENAME in REQ_VAL)) { REQFILE_ORDER[++nReqFiles] = FILENAME }
@@ -710,24 +720,31 @@ report="$(
     # aucun vf-requires, (b) vf-requires ne cite pas lid exige par CET armement, (c) id legal mais
     # aucun # vf-provides le levant dans le corpus de preuve balaye. Le ROUGE nait de l ARMEMENT
     # SEUL (A-3) : vf-requires ne fait que le LEVER.
-    for (i = 1; i <= nArmFiles; i++) {
-      f = ARMFILE_ORDER[i]
-      armkey = ARM_KEY[f]
+    #
+    # Boucle sur les PAIRES (fichier, armement) — jamais sur les fichiers seuls (correction ciblee,
+    # Phase 28 post-revue) : un artefact bi-arme (ex. isolation: worktree ET vf-mcp-consumer: true)
+    # voit chacun de ses armements evalue INDEPENDAMMENT contre le meme vf-requires du fichier —
+    # sans cela, un vf-requires ne couvrant que le PREMIER armement rencontre laissait le SECOND
+    # totalement hors de vue, faux VERT (rc=0) sur un artefact reellement sous-arme.
+    for (i = 1; i <= nArmPairs; i++) {
+      f = ARMPAIR_FILE[i]
+      armkey = ARMPAIR_KEY[i]
+      armline = ARMPAIR_LINE[i]
       reqid = ARM[armkey]
       relf = f
       if (ROOT != "" && index(f, ROOT "/") == 1) relf = substr(f, length(ROOT) + 2)
       if (!(f in REQ_VAL) || REQ_VAL[f] == "") {
-        print "[check-capability-activation] ECART regle 4 : artefact « " relf " » arme « " armkey " » sans precondition declaree (vf-requires: absent) — exige « " reqid " » — " relf ":" ARM_LINE[f]
+        print "[check-capability-activation] ECART regle 4 : artefact « " relf " » arme « " armkey " » sans precondition declaree (vf-requires: absent) — exige « " reqid " » — " relf ":" armline
         bad++
         continue
       }
       if (REQ_VAL[f] != reqid) {
-        print "[check-capability-activation] ECART regle 4 : artefact « " relf " » arme « " armkey " » mais vf-requires cite « " REQ_VAL[f] " », pas id exige « " reqid " » — " relf ":" ARM_LINE[f]
+        print "[check-capability-activation] ECART regle 4 : artefact « " relf " » arme « " armkey " » mais vf-requires cite « " REQ_VAL[f] " », pas id exige « " reqid " » — " relf ":" armline
         bad++
         continue
       }
       if (!(reqid in PROV)) {
-        print "[check-capability-activation] ECART regle 4 : artefact « " relf " » arme « " armkey " », vf-requires « " reqid " » legal, mais aucun # vf-provides: " reqid " dans le corpus de scripts balaye — " relf ":" ARM_LINE[f]
+        print "[check-capability-activation] ECART regle 4 : artefact « " relf " » arme « " armkey " », vf-requires « " reqid " » legal, mais aucun # vf-provides: " reqid " dans le corpus de scripts balaye — " relf ":" armline
         bad++
         continue
       }

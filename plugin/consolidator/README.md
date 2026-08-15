@@ -2,7 +2,7 @@
 
 > Skill VibeFlow qui maintient les registres mémoire structurés (DECISIONS / LEARNINGS / BLOCKERS / EVALS / JOURNAL) scalables et propres au fil des sessions, plus la couche « mémoire vivante » fichier-par-entrée.
 
-**Version** : v1.8.1
+**Version** : v1.9.0
 **Référence** : ADR-032 (piliers 1-4) + ADR-052 (pilier 5) du Lab VibeFlow
 **Iron Law** : *"La lecture d'un registre = lecture de l'index uniquement par défaut."*
 
@@ -29,14 +29,38 @@ fin de session.
 
 ## Installation
 
-Voir [INSTALL.md du repo racine](../../INSTALL.md).
+Module **`mandatory`** depuis v1.9.0 : il fait partie de la baseline du lab et arrive d'office,
+sans toggle. Rien à lancer à la main — la commande ci-dessous n'est utile qu'en réparation.
 
 ```bash
 .claude/scripts/vibeflow-update.sh install consolidator
 ```
 
-Le module embarque aussi les **5 gabarits de registres** (`references/templates-memoire/`)
-posés dans un lab neuf.
+Le module embarque les **5 gabarits de registres** (`references/templates-memoire/`) et, depuis
+v1.9.0, les **instancie** réellement : `seed-registres.sh` crée `.claude/memory/DECISIONS.md`,
+`LEARNINGS.md`, `BLOCKERS.md`, `JOURNAL.md`, `EVALS.md` s'ils manquent. Il est appelé par l'engine
+à l'install **et** à chaque `update`, y compris quand la version du module n'a pas bougé — un lab
+configuré avant cette version reçoit donc sa mémoire tout seul.
+
+> **Non destructif, sans exception.** Le seeder ne sait que créer ce qui manque. Un registre déjà
+> présent n'est jamais écrasé, fusionné ni réordonné : les registres sont append-only et portent
+> l'historique réel du lab. Idempotent, donc sûr à rejouer.
+
+```bash
+.claude/scripts/seed-registres.sh --check   # diagnostic : exit 3 s'il manque des registres
+.claude/scripts/seed-registres.sh           # instancie les manquants
+```
+
+### Scope `user` : une mémoire par projet
+
+En scope `user`, les scripts vivent dans `~/.claude/` — mais le lint et les guards résolvent
+`.claude/memory` **relativement au projet ouvert**. L'install seule remplirait donc la mémoire du
+compte en laissant chaque projet vide. Un hook `SessionStart` appelle `seed-registres.sh --project`
+à chaque ouverture : **chaque lab reçoit sa propre mémoire, cloisonnée**, quel que soit le scope.
+
+- Le cwd n'est traité comme un lab que s'il porte `.planning/` ou `.claude/` — un dépôt git
+  quelconque n'est jamais semé.
+- `VF_NO_AUTO_SEED=1` coupe ce comportement sans désinstaller le module.
 
 ---
 

@@ -1,5 +1,20 @@
 # Changelog — planning-core
 
+## [v2.6.1] — 2026-08-15
+
+### Changé
+- **`memory_bridge.enabled` passe à `true` dans le gabarit de configuration.** Le pont
+  `.planning/` (l'avant) ↔ `.claude/memory/` (le passé) était éteint par défaut, ce qui contredisait
+  la doctrine du socle : la capitalisation est le principe 1 de VibeFlow. Cohérent avec le passage
+  de `consolidator` en module `mandatory` (v1.9.0) — les registres existent maintenant dans tout
+  lab, le pont peut donc être ouvert d'emblée.
+- **Portée réelle, dite sans détour** : aucun script ne lit cette clé aujourd'hui (`grep` sur tout
+  `plugin/` : la seule occurrence est le gabarit lui-même). Le pont est appliqué par le SKILL
+  `planning-core` — donc par jugement d'agent, pas par une garde machine. Ce basculement est
+  **déclaratif** : il aligne le défaut sur la doctrine et rend l'intention lisible pour l'agent qui
+  lit la config, il n'ajoute aucune contrainte exécutable. Si le pont doit devenir opposable, c'est
+  une garde à construire, pas ce flag à retourner.
+
 ## [v2.6.0] — 2026-08-04 (une politique de nom de workstream, UNE seule, sourcée par les gates)
 
 ### Ajouté

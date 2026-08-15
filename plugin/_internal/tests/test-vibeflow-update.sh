@@ -139,6 +139,34 @@ fi
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
+# T3b (local → registres mémoire sous SCOPE-04)
+# Le seed post-install crée .claude/memory/ ; en scope local, la promesse « rien ne
+# sera committé » doit couvrir ces fichiers-là aussi — pas seulement les artefacts
+# que l'engine copie lui-même. Sans la ligne dédiée de gitignore_add_paths, les 5
+# registres semés apparaissaient en untracked dans le git status du projet.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+if prepare_module "$CACHE" "consolidator"; then
+  (cd "$LAB" && git init -q && VF_SCOPE=local VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" install consolidator >/dev/null 2>&1)
+  miss=0
+  n=$("$GREP" -cxF ".claude/memory/" "$LAB/.gitignore" 2>/dev/null || true)
+  [ "${n:-0}" -eq 1 ] \
+    || { ko "T3b local : .claude/memory/ absent du .gitignore (ou en doublon : $n)"; miss=1; }
+  # Les registres doivent exister (seed exécuté) ET être invisibles au status.
+  [ -f "$LAB/.claude/memory/DECISIONS.md" ] \
+    || { ko "T3b local : registres non instanciés par le seed post-install"; miss=1; }
+  leaked=$(cd "$LAB" && git status --porcelain | "$GREP" -c "memory" || true)
+  [ "${leaked:-0}" -eq 0 ] \
+    || { ko "T3b local : $leaked entrée(s) memory dans le git status — SCOPE-04 violé"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T3b local : registres semés ET gitignorés (SCOPE-04 tenu jusqu'aux registres)"
+else
+  skip "T3b local : consolidator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
 # T4 (no clone) — assert statique sur le source de l'engine
 # ---------------------------------------------------------------------------
 if "$GREP" -nE 'git clone|git pull' "$INSTALLER" >/dev/null 2>&1; then
