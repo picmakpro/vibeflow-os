@@ -4,10 +4,10 @@ milestone: gsd-migration
 milestone_name: Migration package GSD
 current_phase: 18
 current_phase_name: Survie du ledger d'exigences à la clôture de jalon
-status: "Phase 28 plans 01 et 02 executes et verifies - 28-03 en attente du checkpoint humain D-04"
+status: "Phase 29 plans 01-04 executes verifies et committes - 29-05 taches 1-2 faites, tache 3 en attente du checkpoint humain bloquant T-29-05-3"
 stopped_at: "Phase 20 complète (7/7 plans) — clôture de gouvernance (20-07) : ADR-051 révisée + ADR-060 posée, doctrine transverse alignée, 6 modules bumpés (conductor v1.17.0, dev-orchestrator v2.8.0, design-orchestrator v1.3.2, 3 bundles v2.0.3). Gates verts sauf le seul rouge attendu (compteur de suites racine, 44 réel pas 43). Release racine réservée à validation humaine post-fusion (4 éléments consignés + WINDOWS.md)."
-last_updated: "2026-08-14T00:00:00.000Z"
-last_activity: 2026-08-14
+last_updated: "2026-08-15T00:00:00.000Z"
+last_activity: 2026-08-15
 progress:
   total_phases: 26
   completed_phases: 15
@@ -532,6 +532,23 @@ Progress: [██████░░░░] 59%
 
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
+
+- **2026-08-15 — Phase 29, mission d'équipe sur branche `docs/phase-29-icm-gains` : 12 des 13
+  tâches livrées, arrêt propre au checkpoint humain bloquant T-29-05-3.** D-03 (zéro régression
+  `dag.sh --scope`) tenue de bout en bout : `dag.sh` et `test-dag.sh` absents du diff de toute la
+  branche, baseline 99/99 rejouée à chaque étage. La voie « doctrine seule » établie par 29-01 a
+  effectivement permis de livrer G1 sans toucher au socle. **Décision de méthode prise en mission** :
+  après 4 défauts consécutifs de la même famille sur `normalize_path()` de `check-map-drift.sh`
+  (chacun trouvé par un juge externe, jamais par la suite, chaque correctif fermant le cas nommé
+  et laissant survivre son voisin), le budget de 3 tours a été **dépassé délibérément** pour un 4e
+  tour changeant de méthode : correction par **point fixe** et preuve de fermeture par **génération**
+  (produit cartésien 9 préfixes × 5 corps = 45 combinaisons, 10 rouges avant / 0 après) au lieu
+  d'une liste de cas énumérés. Leçon durable : une liste de formes ne ferme jamais une classe
+  d'équivalence — seul un test génératif + une propriété d'idempotence le font.
+  **En attente de Samuel** : (1) verdict « utile ou bavard » sur les 13 divergences réelles du gate ;
+  (2) sort de `docs/_transverse/` (untracked, débris d'une exécution non sandboxée de
+  `scaffold-docs.sh` à la racine) ; (3) oracle d'existence par traversée `../` dans `p2_sens_a`
+  (low, absent du registre STRIDE des plans, jamais corrigé en autonomie — ADR-031).
 
 - **2026-08-06 — Phase 27, reprise sur arbitrage : les trois gels sont levés, 9 exigences sur 11
   tenues, seul le spike reste à faire en présence de Samuel.** (même mission et même branche

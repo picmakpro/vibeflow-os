@@ -2107,16 +2107,16 @@ parallèle des périmètres disjoints du team-kernel.**
 Plans:
 **Wave 1**
 
-- [ ] 29-01-PLAN.md — Socle : baseline `test-dag.sh` verte constatée par exécution, rapport durable d'investigation `--scope` (historique en deux phases par commit, inventaire des consommateurs, couverture T13-T33, verdict intouchable/extensible, voie G1 avec clause de halte), et création des 12 exigences `ICMD-01..12` au ledger. Vague 1.
+- [x] 29-01-PLAN.md — Socle : baseline `test-dag.sh` verte constatée par exécution, rapport durable d'investigation `--scope` (historique en deux phases par commit, inventaire des consommateurs, couverture T13-T33, verdict intouchable/extensible, voie G1 avec clause de halte), et création des 12 exigences `ICMD-01..12` au ledger. Vague 1.
 
 **Wave 2** *(blocked on Wave 1 completion — périmètres disjoints, dispatchables en parallèle)*
 
-- [ ] 29-02-PLAN.md — **G3** : `check-map-drift.sh` (lint seul, deux paires carte↔disque bidirectionnelles, grammaire d'exit 0/1/3/64, wrapper git durci, plancher anti-vert-à-vide, bornes déclarées en en-tête) + sa suite née avec lui, mutations attestées à l'octet. Vague 2.
-- [ ] 29-03-PLAN.md — **G1 + G5** : bullet « NE charge PAS » dans le gabarit de digest (composée de champs déjà émis, zéro ligne dans `dag.sh`), table Charge / NE charge PAS dans la doctrine des agents (+ miroir `docs/`), et règle d'édition-à-la-source dans la doctrine du kernel. Vague 2.
-- [ ] 29-04-PLAN.md — **G2** : contrat de routage `CONTEXT.md` ≤ 80 lignes par compartiment de documentation posé par `scaffold-docs.sh`, pattern `_index.md` (> 10 fichiers) avec sa première application réelle, et première suite de tests du scaffolder. Vague 2.
+- [x] 29-02-PLAN.md — **G3** : `check-map-drift.sh` (lint seul, deux paires carte↔disque bidirectionnelles, grammaire d'exit 0/1/3/64, wrapper git durci, plancher anti-vert-à-vide, bornes déclarées en en-tête) + sa suite née avec lui, mutations attestées à l'octet. Vague 2.
+- [x] 29-03-PLAN.md — **G1 + G5** : bullet « NE charge PAS » dans le gabarit de digest (composée de champs déjà émis, zéro ligne dans `dag.sh`), table Charge / NE charge PAS dans la doctrine des agents (+ miroir `docs/`), et règle d'édition-à-la-source dans la doctrine du kernel. Vague 2.
+- [x] 29-04-PLAN.md — **G2** : contrat de routage `CONTEXT.md` ≤ 80 lignes par compartiment de documentation posé par `scaffold-docs.sh`, pattern `_index.md` (> 10 fichiers) avec sa première application réelle, et première suite de tests du scaffolder. Vague 2.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 29-05-PLAN.md — Clôture : câblage du gate comme 9e signal de la grille de dette documentaire à coût de densité nul, 4 triades de module bumpées, compteurs « N suites » re-dérivés, puis **checkpoint humain bloquant** (findings réels du gate présentés, jamais corrigés — ADR-031). `autonomous: false`. Vague 3.
+- [~] 29-05-PLAN.md — Clôture : câblage du gate comme 9e signal de la grille de dette documentaire à coût de densité nul, 4 triades de module bumpées, compteurs « N suites » re-dérivés, puis **checkpoint humain bloquant** (findings réels du gate présentés, jamais corrigés — ADR-031). `autonomous: false`. Vague 3.
 
 ---
