@@ -235,14 +235,28 @@ def split_fragment_hooks(frag_hooks):
             project_view[event] = project_groups
     return local_view, project_view
 
-def apply_merge(hooks, view_frag_hooks):
+def apply_merge(hooks, view_frag_hooks, other_hooks=None):
     """Algorithme de merge inchangé (dédup, réutilisation de groupe, substitution) — appliqué
     une fois par cible (projet, puis local si concernée) sur la vue scindée du fragment qui lui
-    revient. Aucune autre bascule de comportement que le routage lui-même."""
+    revient.
+
+    `other_hooks` (correction exec-30-01) : l'AUTRE cible du MÊME merge (local quand on traite
+    le projet, et réciproquement) — passée pour que la dédup purge aussi les entrées de même
+    basename qui s'y trouveraient. Sans ça, la purge d'idempotence ne voyait que `hooks` (la
+    cible passée à CET appel) : quand la destination d'une entrée change d'un merge au suivant
+    (forme shell↔exec, ou --settings-local fourni à un merge et pas au suivant), l'ancienne
+    entrée survivant dans l'AUTRE fichier n'était jamais retirée — le hook tournait deux fois.
+    `other_hooks` peut être None (pas de --settings-local sur CE run) : la purge croisée est
+    alors un no-op, comportement strictement identique à avant."""
     for event, groups in view_frag_hooks.items():
         ev = hooks.setdefault(event, [])
         if not isinstance(ev, list):
             die(f"settings.hooks.{event} n'est pas une liste — corriger avant merge")
+        other_ev = None
+        if other_hooks is not None:
+            other_ev = other_hooks.get(event)
+            if other_ev is not None and not isinstance(other_ev, list):
+                die(f"settings.hooks.{event} (autre cible) n'est pas une liste — corriger avant merge")
         for g in groups or []:
             matcher = g.get("matcher")
             target = None
@@ -309,10 +323,19 @@ def apply_merge(hooks, view_frag_hooks):
                 for eg in ev:
                     if isinstance(eg, dict):
                         eg["hooks"] = [x for x in eg.get("hooks", []) or [] if not references(x, own)]
+                # Même purge sur l'AUTRE cible (correction exec-30-01) : une entrée qui change
+                # de destination d'un merge au suivant laisse sinon un résidu orphelin dans le
+                # fichier qui la portait avant.
+                if other_ev is not None:
+                    for eg in other_ev:
+                        if isinstance(eg, dict):
+                            eg["hooks"] = [x for x in eg.get("hooks", []) or [] if not references(x, own)]
                 target["hooks"].append(resolved)
         # Purger les groupes vidés par la dédup cross-matcher (mutation EN PLACE : `ev`
         # doit rester la même liste pour les groupes suivants du fragment).
         ev[:] = [g2 for g2 in ev if not isinstance(g2, dict) or g2.get("hooks")]
+        if other_ev is not None:
+            other_ev[:] = [g2 for g2 in other_ev if not isinstance(g2, dict) or g2.get("hooks")]
 
 def apply_remove(hooks, basenames):
     """Retrait chirurgical inchangé — appliqué une fois par cible concernée."""
@@ -329,9 +352,12 @@ def apply_remove(hooks, basenames):
 
 if mode == "merge":
     local_view, project_view = split_fragment_hooks(frag_hooks)
-    apply_merge(hooks_project, project_view)
+    # `other_hooks` croisé (correction exec-30-01) : chaque appel purge aussi l'AUTRE cible pour
+    # le basename de l'entrée qu'il ajoute — hooks_local est None quand --settings-local n'est
+    # pas fournie sur CE run, auquel cas la purge croisée est un no-op (compat descendante).
+    apply_merge(hooks_project, project_view, other_hooks=hooks_local)
     if settings_local_path:
-        apply_merge(hooks_local, local_view)
+        apply_merge(hooks_local, local_view, other_hooks=hooks_project)
 else:  # remove
     basenames = frag_basenames()
     if not basenames:
