@@ -1,6 +1,6 @@
 {
   "name": "consolidator",
-  "version": "v1.9.0",
+  "version": "v1.10.0",
   "type": "single-skill+scripts",
   "description": "Socle de mémoire du lab (baseline) : registres DECISIONS/LEARNINGS/BLOCKERS/JOURNAL/EVALS, consolidation sur 5 piliers (indexation, archivage, fusion, promotion, mémoire vivante) + gouvernance machine par hooks (lecture index-first, reindex auto, lint, archivage de fin de session) + fork-config registres (BDR + surcharges custom).",
   "mandatory": true,

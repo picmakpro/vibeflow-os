@@ -1,5 +1,19 @@
 # CHANGELOG — infrastructure-audit
 
+## [v1.3.0] — 2026-08-16 (Portabilité Windows II — codes de sortie, PORT-03/D-07)
+
+### Changé
+- **`audit-infra.sh` gagne le drapeau `--hook`** (parité d'interface avec le reste du parc), pas
+  encore passé par son fragment `hooks.json` (qui reste `--quick --if-older-than=14d`) — ce
+  câblage appartient à la migration en forme exec de la polarité gouvernance, hors périmètre de
+  ce plan. Sous `--hook`, le code INDÉTERMINÉ (3, `--strict` + `.claude/` absent) devient 0 à la
+  frontière du harness — par parité structurelle avec le reste du parc, même si l'invocation
+  réelle du fragment n'atteint jamais `--strict` aujourd'hui. Les findings bloquants (`--strict`,
+  exit 1) et les erreurs d'usage de `--diff`/`--axis` ne sont jamais traduits. Sans `--hook` (CLI,
+  suites de tests), aucun code ne change.
+
+Voir `docs/HOOKS-CONTRAT-SORTIE.md` pour le contrat complet.
+
 ## [v1.2.2] — 2026-07-26
 
 ### Modifié

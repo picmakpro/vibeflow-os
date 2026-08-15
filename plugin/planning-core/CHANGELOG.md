@@ -1,5 +1,22 @@
 # Changelog — planning-core
 
+## [v2.7.0] — 2026-08-16 (Portabilité Windows II — codes de sortie, PORT-03/D-07)
+
+### Changé
+- **`check-planning-state.sh` et `detect-planning-debt.sh` gagnent le drapeau `--hook`** (parité
+  d'interface avec le reste du parc), pas encore passé par leur fragment `hooks.json` — ce
+  câblage appartient à la migration en forme exec de la polarité gouvernance, hors périmètre de
+  ce plan. Sous `--hook`, TOUS leurs codes advisory deviennent 0 à la frontière du harness (1/2/3
+  pour `check-planning-state.sh`, 1/3 pour `detect-planning-debt.sh`) — contrairement au reste du
+  parc, ni l'un ni l'autre n'avait de code « signal » déjà à 0 : leurs diagnostics vivent tous
+  hors de 0, donc les trois (ou deux) migrent ensemble pour continuer à injecter leur message
+  dans le contexte de session sous le nouveau contrat. `--hook` et `--quiet` ensemble → exit 64
+  (même code d'erreur d'argument que le reste du script). Sans `--hook` (CLI, suites de tests),
+  aucun code ne change. `guard-planning-updated.sh` — dont le blocage EST son code de sortie
+  (exit 2) — n'est PAS touché : c'est le comportement voulu, jamais un défaut de normalisation.
+
+Voir `docs/HOOKS-CONTRAT-SORTIE.md` pour le contrat complet.
+
 ## [v2.6.1] — 2026-08-15
 
 ### Changé

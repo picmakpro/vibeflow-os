@@ -1,5 +1,25 @@
 # Changelog — conductor
 
+## [v1.24.0] — 2026-08-16 (Portabilité Windows II — codes de sortie, PORT-03/D-07)
+
+**Minor** (nouveau contrat de sortie) : `check-agents.sh`, `check-branch-claim.sh` et
+`check-workstream-pointer.sh` traduisent désormais leur silence interne vers 0 à la frontière du
+harness, sous leur drapeau `--hook` — même fonction (`hook_exit`), même contrat que le périmètre
+dev normalisé au plan `VFDO-30-04`. Sans `--hook` (CLI, suites de tests), aucun code ne change.
+
+- **`check-agents.sh`** : le point de traduction est posé au SHELL, à la sortie du bloc Python
+  embarqué (le contrat interne du bloc Python — `sys.exit(3)` pour INDÉTERMINÉ — ne change pas ;
+  seule sa dépendance à `not hook` disparaît du déclenchement de l'exit, jamais de l'affichage).
+- **`check-branch-claim.sh`** : les DEUX codes silencieux (3 = SAIN, 4 = INDÉTERMINÉ) sont
+  traduits ; le signal (0) et l'erreur d'usage (64) ne le sont jamais.
+- **`check-workstream-pointer.sh`** : le code 2 (NON VÉRIFIABLE) est traduit — il ne doit jamais
+  collision­ner avec le code 2 réservé au blocage délibéré du harness
+  (`docs/HOOKS-CONTRAT-SORTIE.md` §1) — ainsi que le code 3 (SILENCE). L'en-tête, qui affirmait
+  « --hook ne change AUCUN code de sortie », est corrigé dans ce même commit.
+
+Voir `docs/HOOKS-CONTRAT-SORTIE.md` pour le contrat complet et l'inventaire recompté des 25
+entrées du parc.
+
 ## [v1.23.0] — 2026-08-15 (Phase 28 — `check-agents.sh` admet `vf-requires`)
 
 **Minor** (nouvelle capacité) : `vf-requires` (identifiant de précondition externe déclarée par

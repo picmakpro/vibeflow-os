@@ -1,5 +1,20 @@
 # CHANGELOG — consolidator
 
+## [v1.10.0] — 2026-08-16 (Portabilité Windows II — codes de sortie, PORT-03/D-07)
+
+### Changé
+- **`check-registres.sh` et `seed-registres.sh` traduisent leur silence interne vers 0 sous
+  `--hook`**, même patron (`hook_exit`) que le périmètre dev normalisé au plan `VFDO-30-04`.
+  `check-registres.sh` portait déjà le drapeau ; `seed-registres.sh` le gagne (parité
+  d'interface), avec la mutuelle exclusion `--hook`/`--quiet` (exit 64). Sans `--hook`, aucun
+  code ne change.
+- **Correctif au passage** : `check-registres.sh --strict --allow-empty` sortait
+  INCONDITIONNELLEMENT en 3 avec un message sur stdout, même sous `--hook` — ce chemin n'était
+  encore jamais passé par la garde `--hook` du tout. Il l'est désormais (stdout strictement vide
+  sous `--hook`, message inchangé sans `--hook`).
+
+Voir `docs/HOOKS-CONTRAT-SORTIE.md` pour le contrat complet.
+
 ## [v1.9.0] — 2026-08-15
 
 ### Changé

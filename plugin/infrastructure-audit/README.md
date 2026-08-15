@@ -3,7 +3,7 @@
 > Détecte les régressions silencieuses de l'infrastructure d'un lab après une mise à jour Claude
 > Code — *« une infrastructure non auditée est une infrastructure qui dérive silencieusement »*.
 
-> **Type** : single-skill + scripts + hook · **Version** : v1.2.2 · **Dépend de** : aucun (module autonome)
+> **Type** : single-skill + scripts + hook · **Version** : v1.3.0 · **Dépend de** : aucun (module autonome)
 > **ADR** : ADR-056 (vigilance support runtime) · ADR-043 (hooks posés à l'install) · LRN-106 (audit avant fix)
 
 ---
