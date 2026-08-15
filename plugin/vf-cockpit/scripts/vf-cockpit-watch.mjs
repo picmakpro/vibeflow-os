@@ -53,11 +53,15 @@ export function startWatch(planningRoot, onChange, logEvent = () => {}) {
       trigger(String(fname || 'unknown'));
     });
     logEvent('watch', `fs.watch actif sur ${planningRoot}`, { mode: 'watch' });
+    // Objet MUTABLE partagé avec l'appelant : si fs.watch échoue plus tard (pas à
+    // l'amorçage), on bascule sur le polling et on met à jour ce même objet en place
+    // plutôt que de retourner une nouvelle valeur que personne ne relirait.
+    const state = { mode: 'watch' };
     watcher.on?.('error', (e) => {
       logEvent('watch', 'fs.watch a échoué en cours de route, bascule polling', { error: String(e) });
-      startPolling();
+      state.mode = startPolling().mode;
     });
-    return { mode: 'watch' };
+    return state;
   } catch (e) {
     logEvent('watch', 'fs.watch indisponible, bascule polling', { error: String(e) });
     return startPolling();
