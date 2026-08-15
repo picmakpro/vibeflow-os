@@ -1,5 +1,5 @@
 {
-  "description": "Signaux de démarrage du moteur de dev : état du bootstrap projet, documents de cadrage orphelins de la feuille de route, dérive documentaire, alignement du .planning/config.json sur le moteur GSD installé. Classement advisory (ADR-031) — chaque signal propose un geste, aucun ne l'exécute ; en forme exec (contrat PR #29 §5, D-01), leur silence nominal est garanti par la traduction du code de sortie posée dans chaque script (docs/HOOKS-CONTRAT-SORTIE.md), plus jamais par un opérateur shell.",
+  "description": "Signaux de démarrage du moteur de dev : état du bootstrap projet, documents de cadrage orphelins de la feuille de route, dérive documentaire, alignement du .planning/config.json sur le moteur GSD installé, et péremption des chemins de hook figés à l'install. Classement advisory (ADR-031) — chaque signal propose un geste, aucun ne l'exécute ; en forme exec (contrat PR #29 §5, D-01), leur silence nominal est garanti par la traduction du code de sortie posée dans chaque script (docs/HOOKS-CONTRAT-SORTIE.md), plus jamais par un opérateur shell. Le 5e signal (check-hook-paths.sh) est le filet qui constate la péremption d'un chemin d'interpréteur figé à l'install (angle mort assumé de D-01, décision one-way) : son command est un nom nu littéral, jamais le jeton d'interpréteur substitué à l'install, sinon il mourrait dans le seul cas où il sert — dérogation à ADR-071 §Décision 2, autorisée par l'approbation humaine de l'addendum du 2026-08-15, pas par l'ADR elle-même, qui ne documente pas encore ce cas.",
   "hooks": {
     "SessionStart": [
       {
@@ -8,7 +8,8 @@
           { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/check-dev-bootstrap.sh", "--hook"] },
           { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/discover-unintegrated-docs.sh", "--hook"] },
           { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/check-doc-drift.sh", "--hook"] },
-          { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/check-gsd-config.sh", "--hook"] }
+          { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/check-gsd-config.sh", "--hook"] },
+          { "type": "command", "command": "bash", "args": ["{{VF_SCRIPTS}}/check-hook-paths.sh", "--hook"] }
         ]
       }
     ]
