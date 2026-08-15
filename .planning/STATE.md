@@ -59,7 +59,7 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 Phase: 30 (Portabilité Windows II) — not started
 Plan: —
 Status: Roadmap defined - ready to discuss/plan Phase 30
-Last activity: 2026-08-15 — ROADMAP fiabilite-v1.0 posée (8 phases : 30-35 + 18 et 25 héritées)
+Last activity: 2026-08-15 — Quick task 260815-tl6 : snapshot hebdo traffic/clones GitHub avec clones ajustés hors CI
 
 ## Performance Metrics
 
@@ -702,6 +702,7 @@ Recent decisions affecting current work:
 | 260801-17w | Isolation multi-session : un écrivain = un worktree (ADR-064) + gate advisory de revendication de branche | 2026-08-01 | `efa20c5` | [260801-17w-isolation-multi-session](./quick/260801-17w-isolation-multi-session/) |
 | 260804-ki4 | Invalider et re-régénérer le cache du bandeau update après /vf-update (vf-update-run.sh) — conductor v1.19.2 | 2026-08-04 | `e4a6138` | [260804-ki4-invalider-et-re-r-g-n-rer-le-cache-du-ba](./quick/260804-ki4-invalider-et-re-r-g-n-rer-le-cache-du-ba/) |
 | 260810-fh3 | ensure-design-deps.sh : présence ET activation des 4 plugins de la chaîne design, auto-install non-interactif, câblage engine + agent — design-orchestrator v1.5.0 | 2026-08-10 | `e9b3650` | [260810-fh3-doter-design-orchestrator-d-un-ensure-de](./quick/260810-fh3-doter-design-orchestrator-d-un-ensure-de/) |
+| 260815-tl6 | Snapshot hebdo traffic/clones GitHub (script + workflow cron + branche traffic-data) avec clones ajustés hors jobs CI | 2026-08-15 | `73363c1` | [260815-tl6-snapshot-hebdo-traffic-clones-github-ave](./quick/260815-tl6-snapshot-hebdo-traffic-clones-github-ave/) |
 
 ## Deferred Items
 
