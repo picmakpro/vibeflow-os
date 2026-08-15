@@ -57,10 +57,28 @@ DIGEST (cache — le disque fait foi)
 - Mission : <objectif en 1 ligne> · Mode : <superviser|autonome>
 - Étape courante : <n° + objectif + critères de succès>
 - Périmètre de fichiers du nœud : <déclaré au dag add>
+- NE charge PAS : <périmètres gelés des autres nœuds en vol, dérivés de `dag.sh status --frozen`>
 - Décisions actives : <2-5 lignes — panels tranchés, contraintes session>
 - Verdicts amont utiles : <revue/audit/test pertinents pour ce mandat>
 - Conventions cibles : <2-3 lignes du CLAUDE.md projet qui engagent ce mandat>
 ```
+
+### Composition du négatif (bullet « NE charge PAS », G1)
+
+1. **D'où vient la donnée** — deux champs que le socle émet déjà, jamais recalculés : (a) le
+   périmètre déclaré du nœud, tenu par le manager puisqu'il l'a posé au `dag add` ; (b) la table
+   des périmètres gelés des autres nœuds, dérivée par `dag.sh status --frozen`
+   (`[{ id, status, scope }]`, clé toujours présente, déterministe — T20/T21/T24).
+2. **L'opération** : périmètres gelés des **autres** nœuds moins le périmètre du nœud courant —
+   la liste des chemins que ce mandat ne doit ni ouvrir ni écrire, tenus par un mandat en vol.
+3. **Qui la compose** : le **manager**, à la rédaction du mandat. Aucun nouveau code n'entre dans
+   le plan de bataille pour cela — la comparaison de périmètres ne se réimplémente jamais
+   localement ; le négatif se **rédige** depuis des champs émis, il ne se **recalcule** pas.
+4. **Cas dégénérés** : aucun autre nœud gelé → valeur explicite d'absence, jamais une bullet vide
+   ni supprimée ; table des gelés indisponible → la bullet le dit et le worker retombe sur la
+   seule règle qui vaut toujours (le disque fait foi).
+5. **Statut** : un **cache**, comme le reste du digest — elle n'autorise ni n'interdit rien à
+   elle seule ; la clause de clôture ci-dessous continue de gouverner.
 
 **Variantes croisées (D-10)** — le format ne change pas, seul le contenu des bullets
 `Conventions cibles` / `Verdicts amont utiles` s'adapte à la direction du mandat :
