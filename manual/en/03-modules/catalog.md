@@ -70,7 +70,7 @@ and whether to pick one at all, is the subject of
 
 ## Specialized capabilities and documentation
 
-These five get added case by case. Two of them carry an **experimental status** declared in their
+These six get added case by case. Two of them carry an **experimental status** declared in their
 own `module.json` — it's said here because it changes what you can expect from them.
 
 - **`software-architecture`** — the architecture doctrine. It kicks in when you create or change
@@ -87,6 +87,9 @@ own `module.json` — it's said here because it changes what you can expect from
 - **`reference`** — the documentation module. It lays down neither agent nor script: it brings the
   VibeFlow methodology and its architecture patterns, to read when you want to understand *why* the
   framework is shaped the way it is.
+- **`vf-cockpit`** — a local web page that shows the current lab's `.planning/` live: milestone
+  phases, the active phase's plans, and the mission team's DAG with its driver lock. Strictly
+  read-only, no network access beyond `127.0.0.1`.
 
 One thing worth knowing as you read: these modules **do not all share the same documentation
 structure**. Most carry a `README.md`, a `CHANGELOG.md`, and a `VERSION` in the same place, but a

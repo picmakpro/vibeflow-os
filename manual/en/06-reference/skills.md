@@ -5,19 +5,19 @@
 <!-- /vf-manual:lang -->
 
 You don't type a skill — it fires on its own when your plain-language sentence matches what it
-knows how to do. This is VibeFlow's real front door, far more than the six [commands](./commands.md):
+knows how to do. This is VibeFlow's real front door, far more than the seven [commands](./commands.md):
 you never need to know a skill's name to invoke it, only to say what you want. What you actually
 need, then, isn't the technical names below but **the phrasings that trigger them** — that's what
 this page foregrounds for each one.
 
-This list comes from enumerating every `SKILL.md` file in the repo on 2026-08-01, module by
-module — explicitly excluding the skill templates under
+This list comes from enumerating every `SKILL.md` file in the repo, re-checked on 2026-08-16,
+module by module — explicitly excluding the skill templates under
 `plugin/reference/content/methodology/templates/skills/`, which aren't shipped skills but
-blueprints for building new ones. The disk holds twenty, grouped here by their originating module:
-you only have the ones whose module is installed — the [module catalog](../03-modules/catalog.md)
-says which one brings what.
+blueprints for building new ones. The disk holds twenty-one, grouped here by their originating
+module: you only have the ones whose module is installed — the
+[module catalog](../03-modules/catalog.md) says which one brings what.
 
-## The twenty skills, by module
+## The twenty-one skills, by module
 
 ### `installer`
 **`vibeflow-install`** — the very first thing you do after installing the plugin. Triggers on
@@ -104,6 +104,11 @@ for the lab, with an evaluation loop before delivery.
 yourself: it documents the five phases the `skill-creator` agent follows behind the scenes. You'll
 never name it in a sentence.
 
+### `vf-cockpit`
+**`vf-cockpit`** — "open the cockpit," "show me where the project stands," "what's running right
+now." Local, strictly read-only web page over the current lab's `.planning/` — trajectory, active
+phase, mission team DAG. Live-refreshing, never writes to disk.
+
 ## Two clarifications that avoid a mix-up
 
 First, two of the skills above (`vf-design` and `vf-sketch`) can look like commands at a
@@ -115,9 +120,9 @@ entirely to that.
 
 ## Where this list comes from
 
-Every skill above corresponds to a real `SKILL.md` file, enumerated on 2026-08-01 rather than
-copied from an existing doc. To check for yourself: from the repo root,
-`find plugin -iname 'SKILL.md' | grep -v reference/content` — the count should stay at twenty
+Every skill above corresponds to a real `SKILL.md` file, enumerated on 2026-08-01 and re-checked
+on 2026-08-16, rather than copied from an existing doc. To check for yourself: from the repo root,
+`find plugin -iname 'SKILL.md' | grep -v reference/content` — the count should stay at twenty-one
 unless a skill has been added, removed, or a template has drifted out of its templates folder.
 
 <!-- vf-manual:nav -->

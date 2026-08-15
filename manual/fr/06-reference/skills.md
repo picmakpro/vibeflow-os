@@ -5,20 +5,20 @@
 <!-- /vf-manual:lang -->
 
 Un skill ne se tape pas — il se déclenche tout seul quand ta phrase, dite en langage naturel,
-correspond à ce qu'il sait faire. C'est la vraie porte d'entrée de VibeFlow, bien plus que les six
+correspond à ce qu'il sait faire. C'est la vraie porte d'entrée de VibeFlow, bien plus que les sept
 [commandes](./commandes.md) : tu n'as jamais besoin de connaître le nom d'un skill pour
 l'invoquer, seulement de dire ce que tu veux. Ce dont tu as réellement besoin, ce ne sont donc pas
 les noms techniques ci-dessous, mais **les formulations qui les activent** — c'est ce que cette
 page met en avant pour chacun.
 
-Cette liste vient de l'énumération de tous les fichiers `SKILL.md` du dépôt le 2026-08-01, module
-par module — en excluant explicitement les modèles de skills sous
+Cette liste vient de l'énumération de tous les fichiers `SKILL.md` du dépôt, revérifiée le
+2026-08-16, module par module — en excluant explicitement les modèles de skills sous
 `plugin/reference/content/methodology/templates/skills/`, qui ne sont pas des skills livrés mais
-des gabarits pour en fabriquer de nouveaux. Le disque en porte vingt, groupés ici par module
+des gabarits pour en fabriquer de nouveaux. Le disque en porte vingt et un, groupés ici par module
 d'origine : tu n'as que ceux dont le module correspondant est installé — le
 [catalogue des modules](../03-modules/catalogue.md) dit lequel apporte quoi.
 
-## Les vingt skills, par module
+## Les vingt et un skills, par module
 
 ### `installer`
 **`vibeflow-install`** — le tout premier geste après avoir installé le plugin. Se déclenche sur
@@ -106,6 +106,12 @@ capacités pour le lab, avec une boucle d'évaluation avant livraison.
 déclenches toi-même : il documente les cinq phases que suit l'agent `skill-creator` en coulisse.
 Tu ne le nommeras jamais dans une phrase.
 
+### `vf-cockpit`
+**`vf-cockpit`** — « ouvre le cockpit », « montre-moi où en est le projet », « qu'est-ce qui
+tourne en ce moment ». Page web locale, strictement en lecture seule, sur le `.planning/` du lab
+courant — trajectoire, phase active, DAG de l'équipe en mission. Rafraîchissement en direct,
+n'écrit jamais sur disque.
+
 ## Deux précisions qui évitent une confusion
 
 D'abord, deux des skills ci-dessus (`vf-design` et `vf-sketch`) se ressemblent à des commandes en
@@ -116,11 +122,11 @@ page séparée de ce même thème, consacrée uniquement à ça.
 
 ## D'où vient cette liste
 
-Chaque skill ci-dessus correspond à un fichier `SKILL.md` réel, énuméré le 2026-08-01 plutôt que
-recopié d'une doc existante. Pour revérifier : depuis la racine du dépôt,
-`find plugin -iname 'SKILL.md' | grep -v reference/content` — le compte doit rester à vingt tant
-qu'aucun skill n'a été ajouté, retiré, ou qu'aucun modèle n'a glissé hors de son dossier de
-templates.
+Chaque skill ci-dessus correspond à un fichier `SKILL.md` réel, énuméré le 2026-08-01 et
+revérifié le 2026-08-16, plutôt que recopié d'une doc existante. Pour revérifier : depuis la
+racine du dépôt, `find plugin -iname 'SKILL.md' | grep -v reference/content` — le compte doit
+rester à vingt et un tant qu'aucun skill n'a été ajouté, retiré, ou qu'aucun modèle n'a glissé
+hors de son dossier de templates.
 
 <!-- vf-manual:nav -->
 [← Précédent](../06-reference/commandes.md) · [↑ Sommaire](../README.md) · [Suivant →](../06-reference/agents.md)

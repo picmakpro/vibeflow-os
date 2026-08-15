@@ -6,23 +6,23 @@
 
 Une commande tapée avec un `/` n'est pas la porte d'entrée du produit. VibeFlow entier est conçu
 pour qu'on lui parle en langage naturel — « améliore le design », « crée un lab de contenu »,
-« vérifie mon lab » — et que l'agent qui t'écoute route lui-même vers la bonne brique. Les six
+« vérifie mon lab » — et que l'agent qui t'écoute route lui-même vers la bonne brique. Les sept
 commandes de cette page sont des **raccourcis** : elles évitent de reformuler une phrase quand tu
 sais déjà exactement quel geste tu veux déclencher. Tu peux ignorer cette page entièrement et ne
 jamais taper de `/` — rien ne fonctionne moins bien pour autant.
 
-Cette liste a été établie en énumérant `plugin/commands/*.md` sur le disque le 2026-08-01 : six
-fichiers, aucun ailleurs dans le dépôt. C'est la liste complète, par construction — il ne peut pas
-en exister une septième non répertoriée ici.
+Cette liste a été établie en énumérant `plugin/commands/*.md` sur le disque, revérifiée le
+2026-08-16 : sept fichiers, aucun ailleurs dans le dépôt. C'est la liste complète, par
+construction — il ne peut pas en exister une huitième non répertoriée ici.
 
-## Les six commandes
+## Les sept commandes
 
 ### `/vibeflow`
 
 Le point d'entrée générique. Tape `/vibeflow` suivi de ta demande en langage naturel — « crée un
 lab d'acquisition », « vérifie le lab », « mets à jour » — et elle est transmise telle quelle à
 l'agent `vibeflow-conductor`, qui route vers la bonne action. Utile quand tu ne sais pas encore
-laquelle des cinq commandes suivantes correspond à ton besoin, ou quand ta demande touche plusieurs
+laquelle des six commandes suivantes correspond à ton besoin, ou quand ta demande touche plusieurs
 d'entre elles à la fois (par exemple installer un module puis vérifier la conformité). Elle ne fait
 jamais elle-même le travail métier — uniquement la configuration du lab.
 
@@ -81,6 +81,17 @@ que de se substituer l'une à l'autre.
 *Exemple* : `/vf-update --check` affiche l'écart de version et le changelog sans rien modifier ;
 `/vf-update --modules-only` met à jour les modules sans toucher au plugin lui-même.
 
+### `/vf-cockpit`
+
+Lance le cockpit local, strictement en lecture seule : une page web qui affiche en direct le
+`.planning/` du lab courant — les phases du milestone, les plans de la phase active, et le DAG de
+l'équipe en mission avec son driver lock. Écoute uniquement sur `127.0.0.1`, n'écrit jamais sur
+disque. Contrairement aux six autres, ce n'est pas de la configuration de lab — c'est un
+visualiseur, et elle délègue directement au skill `vf-cockpit` plutôt qu'à `vibeflow-conductor`.
+
+*Exemple* : `/vf-cockpit` seule démarre le serveur sur le port par défaut ; un argument optionnel
+permet de passer un port ou un chemin `.planning/` explicite.
+
 ## La frontière avec les skills
 
 Une commande et un skill ne sont pas la même chose, même si presque toutes les commandes de cette
@@ -96,10 +107,10 @@ ressemblent en surface.
 ## D'où vient cette liste
 
 Chaque commande ci-dessus correspond à un fichier réel sous `plugin/commands/`, énuméré au moment
-de l'écriture de cette page (2026-08-01) plutôt que recopié d'une documentation existante — c'est la
-règle qui s'applique à tout ce thème de référence. Si tu veux revérifier toi-même, la commande est
-`ls plugin/commands/*.md` depuis la racine du dépôt : le compte doit rester à six tant qu'aucune
-n'a été ajoutée ou retirée.
+de l'écriture de cette page (2026-08-01, revérifié le 2026-08-16) plutôt que recopié d'une
+documentation existante — c'est la règle qui s'applique à tout ce thème de référence. Si tu veux
+revérifier toi-même, la commande est `ls plugin/commands/*.md` depuis la racine du dépôt : le
+compte doit rester à sept tant qu'aucune n'a été ajoutée ou retirée.
 
 <!-- vf-manual:nav -->
 [← Précédent](../05-equipe-agents/equipes-specialisees.md) · [↑ Sommaire](../README.md) · [Suivant →](../06-reference/skills.md)

@@ -73,7 +73,7 @@ et s'il faut seulement en choisir un, c'est le sujet de
 
 ## Les capacités spécialisées et la documentation
 
-Ces cinq-là s'ajoutent au cas par cas. Deux d'entre eux portent un **statut expérimental** déclaré
+Ces six-là s'ajoutent au cas par cas. Deux d'entre eux portent un **statut expérimental** déclaré
 dans leur propre `module.json` — c'est dit ici parce que ça change ce que tu peux en attendre.
 
 - **`software-architecture`** — la doctrine d'architecture. Elle s'invoque quand tu crées ou
@@ -90,6 +90,9 @@ dans leur propre `module.json` — c'est dit ici parce que ça change ce que tu 
 - **`reference`** — le module de documentation. Il ne pose ni agent ni script : il apporte la
   méthodologie VibeFlow et ses patterns d'architecture, à lire quand tu veux comprendre *pourquoi*
   le framework est fait comme ça.
+- **`vf-cockpit`** — une page web locale qui affiche en direct le `.planning/` du lab courant :
+  les phases du milestone, les plans de la phase active, et le DAG de l'équipe en mission avec son
+  driver lock. Strictement en lecture seule, aucun accès réseau au-delà de `127.0.0.1`.
 
 Une précision utile pour ta lecture : ces modules **ne partagent pas tous la même structure de
 documentation**. La plupart ont un `README.md`, un `CHANGELOG.md` et un `VERSION` au même endroit,
