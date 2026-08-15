@@ -1,5 +1,67 @@
 # Backlog — idées différées (hors milestone courant)
 
+## Investiguer ICM (Interpretable Context Methodology) — « folder structure as agent architecture » — INVESTIGUÉ
+**Capturé :** 2026-08-15 · **Investigué :** 2026-08-15 (deep-search 4 agents) →
+**rapport : `reports/research/2026-08-15-icm-deep-search.md`**
+
+**Verdict** : rien à adopter tel quel (pas de benchmark, traction dans l'orbite commerciale de
+l'auteur, mono-agent linéaire — le team-kernel est structurellement au-dessus), mais **5
+mécanismes à distiller**, priorisés dans le rapport : G1 tables « Load / Do NOT Load » (anti-
+chargement déclaré), G2 CONTEXT.md par compartiment + `_index.md` de scaling, G3 sync anti-drift
+carte↔disque (frappe la plaie documentée n°1 du repo), G4 lab-starters clonables à placeholders
+pour `vf-new-lab` (recoupe les items `agency-agents` et « Template d'agent installable »), G5
+Edit-Source Principle dans la doctrine des managers. Suites à arbitrer — voir §7 du rapport.
+
+ICM remplace l'orchestration au niveau framework par la **structure du filesystem** : des dossiers
+numérotés représentent les étapes d'un workflow, des fichiers markdown portent les prompts et le
+contexte qui disent à UN agent quel rôle jouer à chaque étape. Deux fichiers racine (`IDENTITY.md`,
+`CONTEXT.md`) éliminent les tours perdus en « let me explore your filesystem » ; chaque étape opère
+sous un contrat strict (inputs / process / outputs) sur une hiérarchie de contexte à 5 couches ;
+les artefacts intermédiaires inspectables SONT le canal de communication entre étapes.
+
+**Sources :**
+- Papier : [arXiv 2603.16021](https://arxiv.org/abs/2603.16021) — *Interpretable Context
+  Methodology: Folder Structure as Agent Architecture* (Van Clief & McDermott, mars 2026, étendu
+  du pattern « LLM knowledge base » de Karpathy)
+- Repo de référence : [RinDig/Interpretable-Context-Methodology](https://github.com/RinDig/Interpretable-Context-Methodology)
+- Template model-agnostic : [ktnCodes/icm-template](https://github.com/ktnCodes/icm-template)
+
+**Angle VibeFlow à investiguer :** VibeFlow fait déjà du « filesystem as architecture » de fait
+(`.planning/`, modules toggables, digests de mission, rapports typés sur disque) mais avec une
+orchestration multi-agents par-dessus (team-kernel). Questions : que valide/invalide le papier de
+notre approche ? Le contrat par étape (CONTEXT.md à 5 couches) a-t-il quelque chose à apprendre à
+nos plans de bataille / mandats ? Le modèle mono-agent + dossiers numérotés est-il un concurrent,
+un complément (labs non-dev simples ?), ou une source de patterns à distiller ?
+
+**Reste ouvert :** l'arbitrage des 5 gains (G1-G5) — aucun n'est engagé ; le rapport les classe
+par levier/coût. Déclencheur naturel : prochaine évolution de `vf-new-lab`, de `scaffold-docs.sh`,
+du team-kernel ou de la chaîne validator.
+
+## Notifications de progression des agents managers
+**Capturé :** 2026-08-11 · **À explorer :** au prochain arbitrage d'extension du team-kernel
+
+Les missions pilotées par les managers (`vf-dev-manager`, `vf-design-manager`,
+`vf-test-orchestrator`) sont longues et l'utilisateur n'est pas devant l'écran. Idée : **envoyer
+une notification quand un agent manager termine sa mission** — et, en extension, **des
+notifications aux passages d'étapes importantes** du plan de bataille (fin d'un nœud du DAG,
+verdict d'un juge/reviewer, halt condition déclenchée, checkpoint atteint).
+
+**Pistes techniques :**
+- Notification macOS native (`osascript -e 'display notification …'` ou `terminal-notifier`)
+  déclenchée par le manager en fin de mission / à chaque jalon.
+- S'appuyer sur l'existant : le skill `stop-notify` (hook Stop global → notification macOS) est
+  un précédent dans l'écosystème — ici c'est l'inverse, une notification **émise par le manager
+  lui-même** aux moments choisis, pas à chaque fin de tour.
+- Granularité configurable (fin de mission seulement vs jalons intermédiaires) pour ne pas
+  spammer ; vecteur = hook, script posé par l'engine, ou geste direct dans le protocole des
+  managers (à trancher — attention : un réglage settings ne voyage pas, cf. régression #38).
+
+**Pourquoi différé :** confort d'usage, pas bloquant ; à cadrer proprement (vecteur de
+distribution, granularité, portabilité macOS/Linux) avant tout code.
+
+**Déclencheur de resurgence :** prochaine évolution du team-kernel ou des protocoles managers,
+ou demande récurrente de suivi de mission longue distance.
+
 ## Convergence de contenu à l'update de module (manifeste par module)
 **Capturé :** 2026-07-26 · **Origine :** update réel de la machine 2.23.0 → 2.36.0
 
