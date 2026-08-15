@@ -77,12 +77,27 @@ DEC-003 (format mission) + LRN pertinents.
 - ESCALADER au humain si cas piegeux (secteur ambigu, CA non declare)
 ```
 
+### Ce que l'agent ne charge pas
+
+Declarer ce qu'on charge ne borne rien tant que le negatif reste implicite : un agent sans liste
+d'exclusion ouvre par defaut, et le cout se paie en relecture integrale a chaque etape.
+
+| Tache | Charge | NE charge PAS |
+|-------|--------|----------------|
+| Qualification prospect | `DECISIONS.md`, `LEARNINGS.md`, brief du prospect soumis | `data/clients-actifs.csv`, `finance/factures/` |
+| Revue de livrable | `DEC-003` (format mission), le livrable soumis | `data/clients-actifs.csv`, l'historique des autres missions |
+| Diagnostic incident | `LOGS.md` du jour, `LEARNINGS.md` | `finance/factures/`, les briefs prospects non lies a l'incident |
+
+La colonne d'exclusion est **fermee** (elle nomme des fichiers ou des dossiers precis, elle ne dit
+jamais "le reste") et elle est **relue a chaque mandat**, jamais heritee d'un mandat precedent.
+
 ### Regles d'or
 
 1. **Un agent = une mission**. Si tu hesites a creer un agent qui fait deux choses, cree deux agents.
 2. **L'agent produit un format strict**. Pas de texte libre. Verdict structure.
 3. **L'agent lit les registres avant de decider**. La constitution + DECISIONS + LEARNINGS sont ses sources de verite.
 4. **L'agent escalade quand il doute**. Mieux vaut une question au humain qu'une hallucination.
+5. **La colonne "NE charge PAS" est fermee et relue a chaque mandat**, jamais un heritage tacite du mandat precedent.
 
 ### Charte de densite (v4.1)
 
@@ -169,6 +184,7 @@ Resultat : quand le studio recoit un brief, l'agent produit un tableau structure
 - **L'agent sans format** : produit du texte libre → impossibilite de comparer entre invocations
 - **L'agent sans contraintes** : "fais au mieux" → hallucinations sur les cas piegeux
 - **L'agent qui produit ET valide** : juge et partie. Toujours separer producteur et reviewer.
+- **L'agent sans colonne d'exclusion** : "NE charge PAS" vide ou generique ("le reste") → il redevient le generaliste que ce pattern combat depuis sa premiere ligne.
 
 ## Quand creer un nouvel agent
 
