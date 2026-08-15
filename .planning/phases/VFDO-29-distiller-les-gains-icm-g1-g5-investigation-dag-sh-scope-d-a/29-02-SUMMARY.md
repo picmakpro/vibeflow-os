@@ -170,6 +170,30 @@ coverage:
       - kind: other
         ref: "bash plugin/conductor/scripts/tests/test-check-map-drift.sh — 49/49 (16 cas ajoutés : 13 table normalize_path(), 3 attestations 86c3b0c) ; suites voisines non régressées (test-dag.sh 99/99, test-check-doc-drift.sh 21/21, test-check-agents.sh 81/81) ; dag.sh hors diff ; awk '!/^[ \\t]*#/' check-map-drift.sh | wc -l → 246 (< 250) ; grep -c git_safe → 7 ; grep -v '^#' | grep -c 'git -C' → 1"
         status: pass
+  - id: D12
+    description: "Correction ciblée exec-02 tour 4 (4e défaut de la même famille en p2_sens_b,
+      cette fois fermé par PREUVE GÉNÉRATIVE plutôt que par liste énumérée) : normalize_path()
+      appliquait le squeeze des '//' et le strip du './' de tête en DEUX passes indépendantes —
+      un squeeze qui EXPOSE un nouveau './' de tête (ex. '//./a.md' -> '/./a.md') n'était jamais
+      revu par la passe de strip déjà terminée, rendant './a.md' au lieu de 'a.md'. Faux positif
+      constaté en intégration (un `sub/_index.md` citant `//./a.md` vers `sub/a.md` réel signalé
+      à tort non cité). Remplacée par une boucle de POINT FIXE unique reboucLANT squeeze + strip
+      './' + strip '/' de tête jusqu'à stabilité ($prev != $p), garde-fou de terminaison par
+      raccourcissement strict de $p à chaque transformation effective. Fermeture de la classe
+      prouvée par GÉNÉRATION (produit cartésien de 9 préfixes x 5 corps de chemin = 45
+      combinaisons, vérification idempotence + forme canonique sur chacune), pas par une liste de
+      cas nommés — la leçon des 3 tours précédents. Attesté 10/45 en échec contre le commit
+      c7b35f3 (avant, deux passes indépendantes), 0/45 après. Correctifs mineurs : normalize_path
+      \"$f\" hissé hors de la boucle interne de p2_sens_b (invariant, reforké à chaque itération
+      sur 'entry' avant correctif) ; asymétrie p1_sens_a (exclut '/*' comme hors domaine) vs
+      normalize_path (strip silencieusement un '/' de tête, sans risque car aucun test
+      d'existence sur la chaîne normalisée) désormais documentée en commentaire ; exemple
+      malformé de commentaire corrigé ('./ /. /a' -> '././a')."
+    requirement: "ICMD-03, ICMD-04"
+    verification:
+      - kind: other
+        ref: "bash plugin/conductor/scripts/tests/test-check-map-drift.sh — 51/51 (2 cas ajoutés : table générative 45 combinaisons, attestation avant/après c7b35f3) ; suites voisines non régressées (test-dag.sh 99/99, test-check-doc-drift.sh 21/21, test-check-agents.sh 81/81) ; awk '!/^[ \\t]*#/' check-map-drift.sh | wc -l → 249 (< 250) ; intégration sub/_index.md citant '//./a.md' vers sub/a.md réel → 0 divergence (avant correctif : faux positif)"
+        status: pass
 ---
 
 ## Accomplishments
@@ -235,6 +259,21 @@ coverage:
   cas. Une régression a été détectée PENDANT l'écriture de la table : `${p//\/\//\/}` insérait un
   backslash littéral (le `\/` en position remplacement n'est pas déséchappé par bash), corrigée
   avant commit via un slash porté par variable — la table elle-même a joué son rôle discriminant.
+- Correction ciblée exec-02, **tour 4** (nœud rouvert une quatrième fois, même famille p2_sens_b) :
+  le correctif du tour 3 (`normalize_path()`) appliquait le squeeze des `//` et le strip du `./`
+  de tête en deux passes **indépendantes** — un squeeze qui expose un nouveau `./` de tête (ex.
+  `//./a.md` -> `/./a.md`) n'était jamais revu par la passe de strip déjà terminée, rendant
+  `./a.md` au lieu de `a.md`. Remplacé par une boucle de **point fixe** unique reboucLANT les
+  trois transformations ensemble jusqu'à stabilité. Changement de méthode de preuve, explicitement
+  demandé par le mandat : quatre tours d'affilée, une liste de cas nommés a laissé passer une
+  forme absente de la liste — la couverture est désormais prouvée par **génération** (produit
+  cartésien de 9 préfixes x 5 corps = 45 combinaisons, idempotence + forme canonique sur chacune),
+  jamais par énumération. Attesté 10/45 en échec contre le commit `c7b35f3` (avant), 0/45 après.
+  Deux correctifs mineurs dans le même commit : `normalize_path "$f"` hissé hors de la boucle
+  interne de `p2_sens_b` (était reforké à chaque itération sur une valeur invariante) et
+  l'asymétrie `p1_sens_a`/`normalize_path` sur le traitement d'un `/` de tête documentée en
+  commentaire. 49 → 51 cas de suite ; script 246 → 249 lignes hors commentaires (< 250, marge
+  d'1 ligne).
 
 ## Note pour le plan 29-05 (clôture de distribution)
 
