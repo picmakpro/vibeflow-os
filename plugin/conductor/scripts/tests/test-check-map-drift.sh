@@ -1,0 +1,258 @@
+#!/usr/bin/env bash
+# test-check-map-drift.sh — Suite de vérification de check-map-drift.sh (G3, plan 29-02).
+#
+# Un cas par comportement du bloc <behavior> du plan, dont le plancher anti-vert-à-vide et deux
+# preuves par mutation attestées à l'octet (cmp -s, jamais diff). Fixtures git isolées via
+# mktemp -d + git init, jamais sur le dépôt réel — même modèle que test-check-doc-drift.sh.
+
+set -uo pipefail
+
+SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/check-map-drift.sh"
+
+PASS=0; FAIL=0
+ok() { echo "  ✓ $1"; PASS=$((PASS+1)); }
+ko() { echo "  ✗ $1 — $2"; FAIL=$((FAIL+1)); }
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+# git_must — exécute une commande git de CONSTRUCTION DE FIXTURE et échoue BRUYAMMENT si elle
+# rate (voir test-check-doc-drift.sh:24-30 pour le motif : une fixture à moitié construite produit
+# un faux symptôme au moment de l'assertion, jamais la cause réelle).
+git_must() { # <description> <git-args...>
+  local what="$1"; shift
+  local out rc
+  out="$(git "$@" 2>&1)"; rc=$?
+  if [ "$rc" -ne 0 ]; then
+    echo "  ✗ FIXTURE — $what a échoué (rc=$rc)" >&2
+    echo "    commande : git $*" >&2
+    [ -n "$out" ] && echo "    stderr   : $out" >&2
+    echo "  == fixture non constructible — arrêt (aucune assertion n'aurait de sens) ==" >&2
+    exit 1
+  fi
+}
+
+mk_git_root() { # <name> -> imprime le chemin
+  local d="$TMP/$1"
+  mkdir -p "$d" || { echo "  ✗ FIXTURE — mkdir $d impossible" >&2; exit 1; }
+  if ! git -C "$d" init -q -b main >/dev/null 2>&1; then
+    git_must "git init (repli sans -b, git < 2.28)" -C "$d" init -q
+  fi
+  printf '%s' "$d"
+}
+
+# Écrit puis commit un fichier <dir>/<rel>, contenu = une ligne par argument restant.
+commit_file() { # <dir> <rel> <content-line...>
+  local d="$1" rel="$2"; shift 2
+  mkdir -p "$(dirname "$d/$rel")"
+  printf '%s\n' "$@" > "$d/$rel"
+  git_must "add $rel" -C "$d" -c user.email=t@t -c user.name=t add "$rel"
+  git_must "commit $rel" -C "$d" -c user.email=t@t -c user.name=t commit -q -m "add: $rel"
+}
+
+echo "== test-check-map-drift =="
+
+# === P1-A — pointeur @chemin absent du disque → divergence nommant le chemin et la carte =========
+D="$(mk_git_root p1a)"
+commit_file "$D" "CLAUDE.md" "# root" "" "@docs/absent/" ""
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+has_path=0; case "$out" in *"docs/absent"*) has_path=1 ;; esac
+has_card=0; case "$out" in *"CLAUDE.md"*) has_card=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has_path" -eq 1 ] && [ "$has_card" -eq 1 ]; then ok "P1-A pointeur @chemin absent → divergence nommant chemin+carte"; else ko "P1-A pointeur @chemin absent → divergence nommant chemin+carte" "rc=$rc out=[$out]"; fi
+
+# === P1-A bis — chemin entre accents graves avec '/' absent du disque → divergence ================
+D="$(mk_git_root p1abis)"
+commit_file "$D" "CLAUDE.md" "# root" "" '`plugin/disparu/x.md`' ""
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+has_path=0; case "$out" in *"plugin/disparu/x.md"*) has_path=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has_path" -eq 1 ]; then ok "P1-A bis chemin entre accents graves absent → divergence"; else ko "P1-A bis chemin entre accents graves absent → divergence" "rc=$rc out=[$out]"; fi
+
+# === P1-B — sous-dossier de premier niveau suivi par git, cité par aucun token → divergence ========
+D="$(mk_git_root p1b)"
+commit_file "$D" "CLAUDE.md" "# root" "" "aucun pointeur ici" ""
+commit_file "$D" "extra/file.txt" "hello"
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+has_dir=0; case "$out" in *"extra"*) has_dir=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has_dir" -eq 1 ]; then ok "P1-B sous-dossier non cité → divergence nommant le dossier"; else ko "P1-B sous-dossier non cité → divergence nommant le dossier" "rc=$rc out=[$out]"; fi
+
+# === P1-clean — tous les pointeurs existent et tous les sous-dossiers sont cités → 0 divergence ====
+D="$(mk_git_root p1clean)"
+commit_file "$D" "docs/x.md" "content"
+commit_file "$D" "CLAUDE.md" "# root" "" "@docs/" ""
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+has_zero=0; case "$out" in *"0 divergence"*"1 carte"*) has_zero=1 ;; esac
+if [ "$rc" -eq 3 ] && [ "$has_zero" -eq 1 ]; then ok "P1-clean → 0 divergence, compteur de cartes balayées ≥ 1"; else ko "P1-clean → 0 divergence, compteur de cartes balayées ≥ 1" "rc=$rc out=[$out]"; fi
+
+# === Plancher — cible sans aucune carte (dépôt git sans CLAUDE.md/index) → NON VÉRIFIABLE ==========
+D="$(mk_git_root plancher-sanscarte)"
+commit_file "$D" "readme.txt" "hi"
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+has_nv=0; case "$out" in *"NON VÉRIFIABLE"*) has_nv=1 ;; esac
+has_faux_vert=0; case "$out" in *"0 divergence"*) has_faux_vert=1 ;; esac
+if [ "$rc" -eq 3 ] && [ "$has_nv" -eq 1 ] && [ "$has_faux_vert" -eq 0 ]; then ok "Plancher (ICMD-05) — sans carte → NON VÉRIFIABLE, jamais '0 divergence'"; else ko "Plancher (ICMD-05) — sans carte → NON VÉRIFIABLE, jamais '0 divergence'" "rc=$rc out=[$out]"; fi
+
+# === Plancher — cible inexistante → NON VÉRIFIABLE, exit 3 =========================================
+out="$(bash "$SCRIPT" --path "$TMP/n-existe-pas-du-tout" 2>/dev/null)"; rc=$?
+has_nv=0; case "$out" in *"NON VÉRIFIABLE"*) has_nv=1 ;; esac
+if [ "$rc" -eq 3 ] && [ "$has_nv" -eq 1 ]; then ok "Plancher — cible inexistante → NON VÉRIFIABLE, exit 3"; else ko "Plancher — cible inexistante → NON VÉRIFIABLE, exit 3" "rc=$rc out=[$out]"; fi
+
+# === Plancher — cible hors d'un arbre de travail git → NON VÉRIFIABLE, exit 3 ======================
+D="$(mktemp -d)"
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+has_nv=0; case "$out" in *"NON VÉRIFIABLE"*) has_nv=1 ;; esac
+if [ "$rc" -eq 3 ] && [ "$has_nv" -eq 1 ]; then ok "Plancher — hors arbre de travail git → NON VÉRIFIABLE, exit 3"; else ko "Plancher — hors arbre de travail git → NON VÉRIFIABLE, exit 3" "rc=$rc out=[$out]"; fi
+
+# === Ignorés (1/3) — dossier point-préfixé suivi par git n'est jamais réclamé en P1-B ==============
+D="$(mk_git_root ignore-dot)"
+commit_file "$D" ".hidden/file.txt" "x"
+commit_file "$D" "CLAUDE.md" "# root" "" "rien à pointer" ""
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 3 ]; then ok "Ignorés — dossier point-préfixé jamais réclamé"; else ko "Ignorés — dossier point-préfixé jamais réclamé" "rc=$rc out=[$out]"; fi
+
+# === Ignorés (2/3) — node_modules suivi par git n'est jamais réclamé en P1-B ========================
+D="$(mk_git_root ignore-nodemod)"
+commit_file "$D" "node_modules/pkg/file.txt" "x"
+commit_file "$D" "CLAUDE.md" "# root" "" "rien à pointer" ""
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 3 ]; then ok "Ignorés — node_modules jamais réclamé"; else ko "Ignorés — node_modules jamais réclamé" "rc=$rc out=[$out]"; fi
+
+# === Ignorés (3/3) — accents graves SANS '/' = identifiant, jamais un chemin (aucune divergence) ===
+D="$(mk_git_root ignore-backtick)"
+commit_file "$D" "CLAUDE.md" "# root" "" 'identifiant `foo` sans separateur' ""
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 3 ]; then ok "Ignorés — accents graves sans '/' = identifiant, jamais un chemin"; else ko "Ignorés — accents graves sans '/' = identifiant, jamais un chemin" "rc=$rc out=[$out]"; fi
+
+# === Grammaire d'exit — argument inconnu → 64, rien sur stdout =====================================
+errfile="$TMP/err-arg.err"
+out="$(bash "$SCRIPT" --argument-inexistant 2>"$errfile")"; rc=$?
+err="$(cat "$errfile")"
+if [ "$rc" -eq 64 ] && [ -z "$out" ] && [ -n "$err" ]; then ok "argument inconnu → exit 64, stdout vide, stderr non vide"; else ko "argument inconnu → exit 64, stdout vide, stderr non vide" "rc=$rc out=[$out] err=[$err]"; fi
+
+# === Grammaire d'exit — --hook + --quiet ensemble → 64 =============================================
+bash "$SCRIPT" --hook --quiet >/dev/null 2>&1; rc=$?
+if [ "$rc" -eq 64 ]; then ok "--hook + --quiet ensemble → exit 64"; else ko "--hook + --quiet ensemble → exit 64" "rc=$rc"; fi
+
+# === Grammaire d'exit — --path sans valeur → 64 =====================================================
+bash "$SCRIPT" --path >/dev/null 2>&1; rc=$?
+if [ "$rc" -eq 64 ]; then ok "--path sans valeur → exit 64"; else ko "--path sans valeur → exit 64" "rc=$rc"; fi
+
+# === Grammaire d'exit — --map sans valeur → 64 ======================================================
+bash "$SCRIPT" --map >/dev/null 2>&1; rc=$?
+if [ "$rc" -eq 64 ]; then ok "--map sans valeur → exit 64"; else ko "--map sans valeur → exit 64" "rc=$rc"; fi
+
+# === --help → exit 0, sortie non vide, ≥ 15 lignes ==================================================
+out="$(bash "$SCRIPT" --help 2>/dev/null)"; rc=$?
+nlines="$(printf '%s\n' "$out" | wc -l | tr -d ' ')"
+if [ "$rc" -eq 0 ] && [ -n "$out" ] && [ "$nlines" -ge 15 ]; then ok "--help → exit 0, ≥ 15 lignes"; else ko "--help → exit 0, ≥ 15 lignes" "rc=$rc nlines=$nlines"; fi
+
+# === bash -n passe sur le script (syntaxe) ==========================================================
+if bash -n "$SCRIPT" 2>/dev/null; then ok "bash -n passe sur check-map-drift.sh"; else ko "bash -n passe sur check-map-drift.sh" "syntax error"; fi
+
+# === P2-A — cible *.md citée par l'index absente du dossier → divergence nommant index + cible =====
+D="$(mk_git_root p2a)"
+commit_file "$D" "refs/_index.md" "# Index" "" "[disparu.md](disparu.md)" ""
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+has_entry=0; case "$out" in *"disparu.md"*) has_entry=1 ;; esac
+has_card=0; case "$out" in *"_index.md"*) has_card=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has_entry" -eq 1 ] && [ "$has_card" -eq 1 ]; then ok "P2-A cible citée absente du dossier → divergence"; else ko "P2-A cible citée absente du dossier → divergence" "rc=$rc out=[$out]"; fi
+
+# === P2-B — fichier .md suivi par git dans le dossier, cité nulle part → divergence ================
+D="$(mk_git_root p2b)"
+commit_file "$D" "refs/_index.md" "# Index" "" "(rien de cite ici)" ""
+commit_file "$D" "refs/orphan.md" "orphan"
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+has_orphan=0; case "$out" in *"orphan.md"*) has_orphan=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has_orphan" -eq 1 ]; then ok "P2-B fichier .md non cité → divergence nommant le fichier"; else ko "P2-B fichier .md non cité → divergence nommant le fichier" "rc=$rc out=[$out]"; fi
+
+# === P2-self — l'index lui-même n'est jamais compté comme non cité =================================
+D="$(mk_git_root p2self)"
+commit_file "$D" "refs/_index.md" "# Index" ""
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+has_zero=0; case "$out" in *"0 divergence"*) has_zero=1 ;; esac
+if [ "$rc" -eq 3 ] && [ "$has_zero" -eq 1 ]; then ok "P2-self — l'index ne se compte jamais lui-même"; else ko "P2-self — l'index ne se compte jamais lui-même" "rc=$rc out=[$out]"; fi
+
+# === P2-non-récursif — un .md d'un sous-dossier de l'index n'est pas compté ========================
+D="$(mk_git_root p2nonrec)"
+commit_file "$D" "refs/_index.md" "# Index" ""
+commit_file "$D" "refs/sub/nested.md" "nested"
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+has_zero=0; case "$out" in *"0 divergence"*) has_zero=1 ;; esac
+if [ "$rc" -eq 3 ] && [ "$has_zero" -eq 1 ]; then ok "P2-non-récursif — .md d'un sous-dossier non compté"; else ko "P2-non-récursif — .md d'un sous-dossier non compté" "rc=$rc out=[$out]"; fi
+
+# === P2-absent — dossier sans fichier d'index n'est pas une carte (pas de divergence, pas de +1) ===
+D="$(mk_git_root p2absent)"
+commit_file "$D" "refs/onlyfile.md" "x"
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+has_nv=0; case "$out" in *"NON VÉRIFIABLE"*) has_nv=1 ;; esac
+if [ "$rc" -eq 3 ] && [ "$has_nv" -eq 1 ]; then ok "P2-absent — dossier sans index n'est pas une carte"; else ko "P2-absent — dossier sans index n'est pas une carte" "rc=$rc out=[$out]"; fi
+
+# === Cumul — une carte P1 et une carte P2, toutes deux propres → compteur de cartes balayées = 2 ===
+D="$(mk_git_root cumul)"
+commit_file "$D" "docs/x.md" "y"
+commit_file "$D" "CLAUDE.md" "# root" "" "@docs/" "" "@refs/" ""
+commit_file "$D" "refs/_index.md" "# Index" ""
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+has_deux="0"; case "$out" in *"sur 2 carte"*) has_deux=1 ;; esac
+has_zero=0; case "$out" in *"0 divergence"*) has_zero=1 ;; esac
+if [ "$rc" -eq 3 ] && [ "$has_deux" -eq 1 ] && [ "$has_zero" -eq 1 ]; then ok "Cumul — carte P1 + carte P2 → 2 cartes balayées, 0 divergence"; else ko "Cumul — carte P1 + carte P2 → 2 cartes balayées, 0 divergence" "rc=$rc out=[$out]"; fi
+
+# === Mutation P1 — neutraliser le sens B de P1 rend le cas P1-B rouge ==============================
+cp "$SCRIPT" "$TMP/orig_backup_p1.sh"
+sed 's@^.*# P1-SENS-B-CALL@  : # mutated (neutralized P1 sens B)@' "$SCRIPT" > "$TMP/mutated_p1.sh"
+D="$(mk_git_root mutation-p1)"
+commit_file "$D" "CLAUDE.md" "# root" "" "aucun pointeur ici" ""
+commit_file "$D" "extra/file.txt" "hello"
+out_mut="$(bash "$TMP/mutated_p1.sh" --path "$D" 2>/dev/null)"; rc_mut=$?
+# non muté : rc=0 (divergence détectée, cas P1-B). Muté (sens B neutralisé) : la divergence
+# disparaît → 0 divergence sur 1 carte balayée → exit 3, jamais 0.
+if [ "$rc_mut" -eq 3 ]; then ok "mutation P1 (sens B neutralisé) — cas P1-B devient rouge (divergence non détectée)"; else ko "mutation P1 (sens B neutralisé) — cas P1-B devient rouge (divergence non détectée)" "rc_mut=$rc_mut out=[$out_mut]"; fi
+if cmp -s "$SCRIPT" "$TMP/orig_backup_p1.sh"; then ok "mutation P1 — script original intact après mutation (cmp -s)"; else ko "mutation P1 — script original intact après mutation (cmp -s)" "cmp a signalé une différence"; fi
+
+# === Mutation P2 — neutraliser le sens A de P2 rend le cas P2-A rouge ==============================
+cp "$SCRIPT" "$TMP/orig_backup_p2.sh"
+sed 's@^.*# P2-SENS-A-CALL@  : # mutated (neutralized P2 sens A)@' "$SCRIPT" > "$TMP/mutated_p2.sh"
+D="$(mk_git_root mutation-p2)"
+commit_file "$D" "refs/_index.md" "# Index" "" "[disparu.md](disparu.md)" ""
+out_mut="$(bash "$TMP/mutated_p2.sh" --path "$D" 2>/dev/null)"; rc_mut=$?
+# non muté : rc=0 (divergence détectée, cas P2-A). Muté (sens A neutralisé) : plus aucune
+# divergence détectée → exit 3.
+if [ "$rc_mut" -eq 3 ]; then ok "mutation P2 (sens A neutralisé) — cas P2-A devient rouge (divergence non détectée)"; else ko "mutation P2 (sens A neutralisé) — cas P2-A devient rouge (divergence non détectée)" "rc_mut=$rc_mut out=[$out_mut]"; fi
+if cmp -s "$SCRIPT" "$TMP/orig_backup_p2.sh"; then ok "mutation P2 — script original intact après mutation (cmp -s)"; else ko "mutation P2 — script original intact après mutation (cmp -s)" "cmp a signalé une différence"; fi
+
+# === Bornes — --help cite les 4 motifs de non-couverture + ADR-031 + ADR-055 =======================
+out="$(bash "$SCRIPT" --help 2>/dev/null)"; rc=$?
+n_bornes=0; case "$out" in *"Bornes"*) n_bornes=1 ;; esac
+has_a=0; case "$out" in *"skills:"*) has_a=1 ;; esac
+has_b=0; case "$out" in *"DAG de mission"*) has_b=1 ;; esac
+has_c=0; case "$out" in *".planning/"*) has_c=1 ;; esac
+has_d=0; case "$out" in *"QUALITÉ"*) has_d=1 ;; esac
+has_adr031=0; case "$out" in *"ADR-031"*) has_adr031=1 ;; esac
+has_adr055=0; case "$out" in *"ADR-055"*) has_adr055=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$n_bornes" -eq 1 ] && [ "$has_a" -eq 1 ] && [ "$has_b" -eq 1 ] && [ "$has_c" -eq 1 ] && [ "$has_d" -eq 1 ] && [ "$has_adr031" -eq 1 ] && [ "$has_adr055" -eq 1 ]; then
+  ok "Bornes — --help cite les 4 motifs de non-couverture, ADR-031 et ADR-055"
+else
+  ko "Bornes — --help cite les 4 motifs de non-couverture, ADR-031 et ADR-055" "n_bornes=$n_bornes a=$has_a b=$has_b c=$has_c d=$has_d adr031=$has_adr031 adr055=$has_adr055"
+fi
+
+# === Garde — sur les fixtures déjà exercées, les seuls codes de sortie observés sont 0, 3, 64 =======
+RC_SEEN=""
+D="$(mk_git_root garde-clean)"; commit_file "$D" "docs/x.md" "y"; commit_file "$D" "CLAUDE.md" "# root" "" "@docs/" ""
+bash "$SCRIPT" --path "$D" >/dev/null 2>&1; RC_SEEN="$RC_SEEN $?"
+D="$(mk_git_root garde-div)"; commit_file "$D" "CLAUDE.md" "# root" "" "@docs/absent" ""
+bash "$SCRIPT" --path "$D" >/dev/null 2>&1; RC_SEEN="$RC_SEEN $?"
+D="$(mk_git_root garde-nv)"; commit_file "$D" "readme.txt" "x"
+bash "$SCRIPT" --path "$D" >/dev/null 2>&1; RC_SEEN="$RC_SEEN $?"
+bash "$SCRIPT" --argument-inexistant >/dev/null 2>&1; RC_SEEN="$RC_SEEN $?"
+bash "$SCRIPT" --hook --quiet >/dev/null 2>&1; RC_SEEN="$RC_SEEN $?"
+all_ok=1
+for code in $RC_SEEN; do
+  case "$code" in
+    0|3|64) : ;;
+    *) all_ok=0 ;;
+  esac
+done
+if [ "$all_ok" -eq 1 ]; then ok "Garde — seuls 0/3/64 observés sur les fixtures (code réservé 1 jamais rendu)"; else ko "Garde — seuls 0/3/64 observés sur les fixtures (code réservé 1 jamais rendu)" "codes vus=[$RC_SEEN]"; fi
+
+echo ""
+echo "== résultat : $PASS ok, $FAIL ko =="
+[ "$FAIL" -eq 0 ]
