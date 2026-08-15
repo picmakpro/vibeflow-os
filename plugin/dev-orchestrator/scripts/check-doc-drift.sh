@@ -48,12 +48,13 @@
 #   check-doc-drift.sh [--path <dir>] [--threshold <N>] [--hook] [--quiet]
 # Defaults: --path .  --threshold 20
 #
-# --hook change UNIQUEMENT le format d'affichage (parité avec les deux autres scripts de la phase) ;
-# ce script n'a qu'un seul gabarit de signal, donc --hook n'altère aucun rendu — il ne sert qu'à la
-# cohérence d'interface et au gate de mutuelle exclusion avec --quiet. Les 3 exits (0/3/64) restent
-# identiques avec ou sans --hook.
+# --hook ne change pas le rendu (parité avec les deux autres scripts de la phase ; ce script n'a
+# qu'un seul gabarit de signal) — il sert à la cohérence d'interface, au gate de mutuelle exclusion
+# avec --quiet, ET (D-06, Portabilité Windows II) arme la traduction du code de silence interne (3)
+# vers 0 à la frontière du harness via hook_exit(). Sans --hook (CLI, suites de tests), les 3 codes
+# ci-dessous restent INCHANGÉS. Voir docs/HOOKS-CONTRAT-SORTIE.md.
 #
-# Exit codes:
+# Exit codes (contrat interne, s'applique SANS --hook) :
 #   0  = signal [doc-drift] émis (seuil atteint ou dépassé)
 #   3  = rien à signaler (hors dépôt git, aucun commit de doc, ou compte < seuil)
 #   64 = argument inconnu, --path sans valeur, --threshold sans valeur ou invalide, ou --hook +
@@ -103,6 +104,19 @@ esac
 
 say() { [ "$QUIET" -eq 1 ] || echo "[check-doc-drift] $*" >&2; }
 
+# --- Traduction du silence interne vers le harness (D-06, uniquement sous --hook) ---------------
+# hook_exit <code> : sous --hook, le SEUL code de silence interne (3) devient 0 à la frontière du
+# harness — une TRADUCTION, jamais un masquage : elle ne touche ni le code d'erreur d'argument
+# (64), ni 0, ni aucun autre code. Sans --hook (CLI, suites de tests), le code reçu ressort
+# inchangé. Voir docs/HOOKS-CONTRAT-SORTIE.md §2.
+hook_exit() { # <code>
+  local code="$1"
+  if [ "$HOOK" -eq 1 ] && [ "$code" -eq 3 ]; then
+    exit 0
+  fi
+  exit "$code"
+}
+
 # --- Durcissement git (T-17-06) : un dépôt cloné non maîtrisé ne doit jamais pouvoir faire exécuter
 # un programme via sa propre configuration lors d'une simple lecture au SessionStart. Motif écrit
 # une seule fois, appliqué par TOUTES les invocations git de ce script via ce wrapper.
@@ -117,7 +131,7 @@ git_safe() { # <args...> — toute invocation git de ce script passe par ici, ja
 # --- Silence hors dépôt git (D-09) --------------------------------------------------------------
 if ! git_safe rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   say "$ROOT hors d'un arbre de travail git — rien à constater."
-  exit 3
+  hook_exit 3
 fi
 
 # --- SHA du dernier commit de doc (docs/ arbre entier, ou README* racine seulement) --------------
@@ -129,7 +143,7 @@ DOC_SHA="$(git_safe log -1 --format=%H -- docs 'README*' 2>/dev/null)"
 
 if [ -z "$DOC_SHA" ]; then
   say "aucun commit de documentation dans l'historique — rien à constater."
-  exit 3
+  hook_exit 3
 fi
 
 # --- Décompte des commits de code depuis ce SHA (exclu) jusqu'à HEAD -----------------------------
@@ -150,4 +164,4 @@ if [ "$COUNT" -ge "$THRESHOLD" ]; then
 fi
 
 say "${COUNT} commits de code depuis la dernière mise à jour de la doc, sous le seuil (${THRESHOLD}) — rien à signaler."
-exit 3
+hook_exit 3
