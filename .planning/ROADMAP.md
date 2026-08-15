@@ -473,7 +473,7 @@ Plans:
 | 27. Parallélisation d'exécution — granulaire, simple, sans collision | gsd-alignement | 6/6 | Complete (PR #35) — spike `claude_orchestration` refusé par écrit | 2026-08-10 |
 | 28. Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur | agentique-v1.0 | 3/3 | Complete — PR #42, release `v2.52.0`, CI main verte, gate + `lab-frais-arme` livrés | 2026-08-15 |
 | 29. Distiller les gains ICM (G1-G5) — investigation dag.sh --scope d'abord | — | 5/5 | Complete (PR #41) — release `v2.51.0`, D-03 tenue (`dag.sh` hors diff), checkpoint humain T-29-05-3 tranché le 2026-08-15 | 2026-08-15 |
-| 30. Portabilité Windows II | fiabilite-v1.0 | 0/0 | Not started — première du milestone (demande client) ; pré-requis de cadrage : PORT-04 tranché avec Willy avant le plan ; porte les gestes jour 1 (LEDG-03, WKTR-03) | — |
+| 30. Portabilité Windows II | fiabilite-v1.0 | 0/8 | Planned — 8 plans sur 4 vagues ; pré-requis PORT-04 LEVÉ le 2026-08-15 (tranché sans Willy, D-01/D-02/D-04) ; porte les gestes jour 1 (LEDG-03, WKTR-03) | — |
 | 31. Manifeste d'install + dry-run (issue #20) | fiabilite-v1.0 | 0/0 | Not started — strictement après la 30 (mêmes fichiers `_internal/`, jamais en parallèle) | — |
 | 32. Durcissement du driver-lock | fiabilite-v1.0 | 0/0 | Not started — son hook naît en forme exec (après 30) ; spike `reference-transaction` avant LOCK-03 | — |
 | 33. Watchdog & notifications des missions | fiabilite-v1.0 | 0/0 | Not started — heartbeat partagé avec la 32 (conçues ensemble, WTCH après LOCK) | — |
@@ -533,10 +533,12 @@ jamais un vert par défaut (l'ennemi n°1 du repo, incident D-04).
 (forme exec, codes de sortie normalisés, cascade `vf_python`) est réécrit une fois pour toutes, et
 les deux latences externes du milestone (RFC ledger, veille gsd-core) sont lancées le jour 1.
 Spec : `docs/superpowers/specs/2026-08-02-portabilite-windows-ii-design.md`.
-**Depends on**: — (première phase du milestone). **Pré-requis de cadrage bloquant** : PORT-04 —
-l'affectation §3.2 (résolution du chemin absolu de bash à l'install) est tranchée avec Willy et
-documentée AVANT le plan ; question ouverte au contrat PR #29 : exit code de
-`vf_guard_unavailable` sur PreToolUse.
+**Depends on**: — (première phase du milestone). **Pré-requis de cadrage LEVÉ le 2026-08-15** :
+PORT-04 a été tranché par Samuel sans Willy (le tracer 01-01 amont n'a jamais été livré) — la
+Phase 30 porte l'intégralité du volet `merge-hooks.sh` ET écrit elle-même `vf-portable.sh` +
+`copy_engine_lib()`. La question ouverte du contrat PR #29 (exit code de `vf_guard_unavailable`
+sur PreToolUse) est close : code non nul ≠ 2. Traces : `30-CONTEXT.md` (D-01, D-02, D-04),
+encart §3.2 de la spec, commentaire posté sur la PR #29.
 **Requirements**: PORT-01, PORT-02, PORT-03, PORT-04, PORT-05 + gestes jour 1 : LEDG-03, WKTR-03
 **Success Criteria** (what must be TRUE):
 
@@ -559,7 +561,18 @@ documentée AVANT le plan ; question ouverte au contrat PR #29 : exit code de
 
 **Transverse (QUAL-01)** : tout gate né dans la phase (contrat de sortie, dédup cross-forme) naît
 avec ses trois issues (PASS / FAIL / imparsable BRUYANT) et sa mutation rouge prouvée.
-**Plans**: TBD
+**Plans**: 8 plans (4 vagues — l'ordre spec §2 (a) moteur → (b) codes de sortie → (c) fragments est
+encodé en vagues dépendantes ; les 2 gestes jour 1 sont parallèles à la vague 1)
+Plans:
+
+- [ ] 30-01-PLAN.md — tracer : `merge-hooks.sh` apprend `args` + chemin absolu de bash à l'install, l'entrée `software-architecture` migre en forme exec, suite étendue (dédup cross-forme, remove exec, sonde de parc) — vague 1 (PORT-02, PORT-04)
+- [ ] 30-02-PLAN.md — geste jour 1 : RFC upstream `open-gsd/gsd-core` (brouillon, gate humain, dépôt, double traçabilité STATE/REQUIREMENTS) — vague 1 (LEDG-03)
+- [ ] 30-03-PLAN.md — geste jour 1 : veille de release gsd-core (sonde à cache quotidien, suite, armement local + trace versionnée) — vague 1 (WKTR-03)
+- [ ] 30-04-PLAN.md — inventaire machine des 25 entrées + contrat de sortie écrit + normalisation des 4 scripts dev + suite capturant stdout/stderr séparément — vague 2 (PORT-03)
+- [ ] 30-05-PLAN.md — lib `vf-portable.sh` (5 symboles, bloc localisateur) + `copy_engine_lib()` + les 3 consommateurs PYBIN + somme de contrôle du bloc — vague 2 (PORT-01)
+- [ ] 30-06-PLAN.md — normalisation du parc gouvernance (8 scripts, 4 modules) + suite de parc anti-vert-à-vide + bumps — vague 3 (PORT-03)
+- [ ] 30-07-PLAN.md — les 4 entrées `dev-orchestrator` en forme exec, classées advisory + preuve as-installed + ADR de suite + bumps dev — vague 3 (PORT-02)
+- [ ] 30-08-PLAN.md — preuve CI sur lab frais (forme exec telle qu'installée, conditions Windows simulées) + compteurs README + CI verte constatée — vague 4 (PORT-05)
 
 ### Phase 31: Manifeste d'install + dry-run (issue #20)
 
