@@ -17,6 +17,8 @@ module distribué au prochain milestone.
 - Lecture seule stricte de `.planning/` — le cockpit n'écrit jamais rien dans l'arbre
 - Le live s'appuie sur les artefacts existants (MISSION-*.dag.json `status` par nœud, DRIVER.lock/meta) — aucune instrumentation nouvelle du moteur
 - DA sombre simple type cockpit pour l'instant (DA VibeFlow à approfondir plus tard)
+- Hiérarchie visuelle stricte à 3 niveaux : Roadmap > Phase > Agents en cours, avec légende explicative (retour Samuel, itération 2 du spike 001)
+- Toute case de diagramme est cliquable → ouvre la description de la phase/du nœud, tirée des fichiers système (`ROADMAP.md` sections `### Phase N:`, dossiers `.planning/phases/VFDO-N-*/` paires PLAN/SUMMARY) — jamais de contenu rédigé à la main dans le cockpit
 
 ## Spikes
 

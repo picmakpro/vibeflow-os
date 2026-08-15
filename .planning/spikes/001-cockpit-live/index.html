@@ -12,125 +12,205 @@
   }
   * { box-sizing: border-box; margin: 0; }
   body { background: var(--bg); color: var(--ink); font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; padding: 1.2rem; }
-  header { display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
+  header { display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
   header h1 { font-size: 1.15rem; letter-spacing: .12em; text-transform: uppercase; }
   header h1 span { color: var(--accent); }
   .badge { border: 1px solid var(--line); border-radius: 99px; padding: .1rem .7rem; font-size: .78rem; color: var(--dim); }
   .badge.live { border-color: var(--ok); color: var(--ok); }
   .badge.stale { border-color: #f85149; color: #f85149; }
-  .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.2rem; overflow-x: auto; }
-  .panel.wide { grid-column: 1 / -1; }
-  .panel h2 { font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); margin-bottom: .8rem; }
-  .kv { display: grid; grid-template-columns: auto 1fr; gap: .15rem 1rem; font-size: .85rem; }
-  .kv dt { color: var(--dim); }
-  .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; margin: .6rem 0 .2rem; }
-  .bar i { display: block; height: 100%; background: var(--accent); transition: width .6s; }
-  ul.phases { list-style: none; display: flex; flex-direction: column; gap: .3rem; font-size: .85rem; }
-  ul.phases li::before { content: '○ '; color: var(--dim); }
-  ul.phases li.done::before { content: '● '; color: var(--ok); }
-  ul.phases li.current::before { content: '◉ '; color: var(--run); }
-  ul.phases li.done { color: var(--dim); }
-  ul.phases li .when { color: var(--dim); font-size: .75rem; }
-  .mermaid-host svg { max-width: 100%; height: auto; }
   #updated { margin-left: auto; font-size: .75rem; color: var(--dim); }
   #updated.flash { color: var(--accent); }
+
+  .stack { display: flex; flex-direction: column; gap: .9rem; max-width: 1200px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.2rem; overflow-x: auto; }
+  .panel h2 { font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); margin-bottom: .6rem; display: flex; gap: .6rem; align-items: baseline; }
+  .panel h2 .lvl { color: var(--accent); font-weight: 700; }
+  .hint { font-size: .72rem; color: var(--dim); font-weight: 400; text-transform: none; letter-spacing: 0; }
+
+  #legend { display: flex; gap: 1.2rem; flex-wrap: wrap; font-size: .78rem; color: var(--dim);
+            border: 1px dashed var(--line); border-radius: 10px; padding: .5rem 1rem; }
+  #legend b { color: var(--ink); font-weight: 600; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: .35rem; vertical-align: baseline; }
+
+  .mermaid-host svg { max-width: 100%; height: auto; }
+  .mermaid-host .node { cursor: pointer; }
+
+  .phasecard { display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap; cursor: pointer; }
+  .phasecard .goal { color: var(--dim); font-size: .85rem; max-width: 60ch; }
+  .plans { display: flex; gap: .35rem; flex-wrap: wrap; }
+  .plan { border: 1px solid var(--line); border-radius: 6px; padding: .15rem .5rem; font-size: .75rem; color: var(--blocked); }
+  .plan.done { border-color: var(--ok); color: var(--ok); }
+
+  #drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(520px, 92vw); background: var(--panel);
+            border-left: 1px solid var(--line); padding: 1.2rem 1.4rem; overflow-y: auto; z-index: 10;
+            transform: translateX(105%); transition: transform .25s; box-shadow: -12px 0 30px #0009; }
+  #drawer.open { transform: none; }
+  #drawer h3 { color: var(--accent); margin-bottom: .6rem; font-size: 1rem; }
+  #drawer .close { float: right; cursor: pointer; color: var(--dim); border: 1px solid var(--line); border-radius: 6px; padding: 0 .5rem; }
+  #drawer .body { font-size: .82rem; color: var(--ink); white-space: pre-wrap; line-height: 1.55; }
+  #drawer .body b { color: var(--accent); }
+  #drawer code { background: var(--bg); border-radius: 4px; padding: 0 .3rem; font-size: .78rem; }
+  details.history summary { cursor: pointer; color: var(--dim); font-size: .8rem; }
 </style>
 </head>
 <body>
 <header>
   <h1>vf-<span>cockpit</span></h1>
   <span class="badge" id="milestone">…</span>
-  <span class="badge" id="phase">…</span>
   <span class="badge" id="lock">…</span>
   <span id="updated"></span>
 </header>
 
-<div class="grid">
-  <section class="panel wide">
-    <h2>Mission en cours — DAG live</h2>
-    <div id="dag" class="mermaid-host"><em style="color:var(--dim)">aucune mission</em></div>
+<div class="stack">
+  <div id="legend">
+    <span><b>Hiérarchie :</b> ① Roadmap (les phases du milestone) → ② Phase courante (ses plans) → ③ Agents en cours (le DAG de la mission)</span>
+    <span><span class="dot" style="background:var(--ok)"></span>terminé</span>
+    <span><span class="dot" style="background:var(--run)"></span>en cours</span>
+    <span><span class="dot" style="background:var(--ready)"></span>prêt</span>
+    <span><span class="dot" style="background:var(--blocked)"></span>en attente / bloqué par dépendance</span>
+    <span><b>Clic</b> sur une case = description (lue depuis .planning/)</span>
+  </div>
+
+  <section class="panel">
+    <h2><span class="lvl">①</span> Roadmap — milestone courant <span class="hint">clic sur une phase → sa fiche</span></h2>
+    <div id="roadmap" class="mermaid-host"></div>
   </section>
 
   <section class="panel">
-    <h2>Milestone courant — phases</h2>
-    <div class="kv" id="stateKv"></div>
-    <div class="bar"><i id="progress" style="width:0"></i></div>
-    <div style="font-size:.75rem;color:var(--dim)" id="progressTxt"></div>
-    <ul class="phases" id="phases" style="margin-top:.8rem"></ul>
+    <h2><span class="lvl">②</span> Phase courante <span class="hint">ses plans, ● = SUMMARY posé</span></h2>
+    <div class="phasecard" id="phasecard"></div>
   </section>
 
   <section class="panel">
-    <h2>Historique — milestones clos</h2>
-    <div id="timeline" class="mermaid-host"></div>
+    <h2><span class="lvl">③</span> Agents en cours — DAG de la mission <span class="hint">clic sur un nœud → son mandat</span></h2>
+    <div id="dag" class="mermaid-host"><em style="color:var(--dim)">aucune mission active</em></div>
+  </section>
+
+  <section class="panel">
+    <details class="history"><summary>Historique — milestones clos</summary>
+      <div id="timeline" class="mermaid-host" style="margin-top:.8rem"></div>
+    </details>
   </section>
 </div>
+
+<aside id="drawer"><span class="close" onclick="drawer.classList.remove('open')">✕</span><div id="drawerContent"></div></aside>
 
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
 mermaid.initialize({ startOnLoad: false, theme: 'dark', themeVariables: { fontSize: '13px' } });
 
+const drawer = window.drawer = document.getElementById('drawer');
+const dContent = document.getElementById('drawerContent');
 const esc = s => String(s).replace(/"/g, "'").replace(/[\[\]{}<>]/g, ' ');
-let seq = 0; // ids mermaid uniques par re-rendu
+const escHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const md = s => escHtml(s).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>');
+let seq = 0, SNAP = null;
 
-function dagToMermaid(dag) {
-  const cls = { done: 'done', running: 'running', ready: 'ready', blocked: 'blocked' };
-  const lines = ['flowchart TD'];
-  const idx = new Map(dag.nodes.map((n, i) => [n.id, 'n' + i]));
-  for (const n of dag.nodes) {
-    const label = esc(n.step || n.id).slice(0, 55);
-    lines.push(`  ${idx.get(n.id)}["${label}"]:::${cls[n.status] || 'blocked'}`);
-    for (const d of n.deps || []) if (idx.has(d)) lines.push(`  ${idx.get(d)} --> ${idx.get(n.id)}`);
-  }
-  lines.push('  classDef done fill:#12261a,stroke:#3fb950,color:#3fb950');
-  lines.push('  classDef running fill:#2b2007,stroke:#d4a017,color:#d4a017,stroke-width:2px');
-  lines.push('  classDef ready fill:#0d1d2e,stroke:#58a6ff,color:#58a6ff');
-  lines.push('  classDef blocked fill:#161b22,stroke:#30363d,color:#6e7681');
-  return lines.join('\n');
-}
+const CLASSDEFS = [
+  'classDef done fill:#12261a,stroke:#3fb950,color:#3fb950',
+  'classDef running fill:#2b2007,stroke:#d4a017,color:#d4a017,stroke-width:2px',
+  'classDef ready fill:#0d1d2e,stroke:#58a6ff,color:#58a6ff',
+  'classDef blocked fill:#161b22,stroke:#30363d,color:#6e7681',
+].map(l => '  ' + l);
 
-function milestonesToMermaid(ms) {
-  const closed = ms.filter(m => m.closed && m.when).reverse();
-  const lines = ['timeline'];
-  for (const m of closed) lines.push(`  ${m.when} : ${esc(m.title).slice(0, 40)}`);
-  return lines.join('\n');
-}
-
-async function draw(el, def) {
+async function draw(el, def, onClick) {
   try {
     const { svg } = await mermaid.render('mm' + (seq++), def);
     el.innerHTML = svg;
-  } catch (e) { el.innerHTML = `<pre style="color:#f85149">${e.message}</pre>`; }
+    if (onClick) el.querySelectorAll('g.node').forEach(g => {
+      const m = g.id.match(/^flowchart-(.+?)-\d+$/);
+      if (m) g.addEventListener('click', () => onClick(m[1]));
+    });
+  } catch (e) { el.innerHTML = `<pre style="color:#f85149">${escHtml(e.message)}</pre>`; }
 }
 
+// ---------- niveau 1 : roadmap ----------
+function roadmapToMermaid(phases, cur) {
+  const undone = phases.filter(p => !p.done);
+  const chain = undone.filter(p => p.num >= cur);
+  const herited = undone.filter(p => p.num < cur);
+  const doneMs = phases.filter(p => p.done && p.num >= cur);
+  const node = p => `    p${p.num}["Phase ${p.num} — ${esc(p.name).slice(0, 32)}"]:::${p.done ? 'done' : p.num === cur ? 'running' : 'blocked'}`;
+  const lines = ['flowchart LR', '  subgraph M["milestone courant"]', '    direction LR'];
+  [...doneMs, ...chain].forEach(p => lines.push(node(p)));
+  const seqd = [...doneMs, ...chain];
+  for (let i = 1; i < seqd.length; i++) lines.push(`    p${seqd[i - 1].num} --> p${seqd[i].num}`);
+  lines.push('  end');
+  if (herited.length) {
+    lines.push('  subgraph H["héritées (sans ordre)"]');
+    herited.forEach(p => lines.push(node(p)));
+    lines.push('  end');
+  }
+  lines.push(...CLASSDEFS);
+  return lines.join('\n');
+}
+
+async function openPhase(num) {
+  const d = await (await fetch('/api/phase?num=' + num)).json();
+  const plans = d.plans.length
+    ? '<p style="margin:.6rem 0"><b>Plans :</b> ' + d.plans.map(p =>
+        `<span class="plan ${p.done ? 'done' : ''}">${p.done ? '●' : '○'} ${p.id}</span>`).join(' ') + '</p>'
+    : '';
+  dContent.innerHTML = `<h3>Phase ${d.num} — ${escHtml(d.name || '?')}</h3>
+    ${d.dir ? `<p class="hint">source : ROADMAP.md + .planning/phases/${escHtml(d.dir)}/</p>` : '<p class="hint">source : ROADMAP.md</p>'}
+    ${plans}<div class="body">${d.body ? md(d.body) : '<i>pas de section trouvée dans ROADMAP.md</i>'}</div>`;
+  drawer.classList.add('open');
+}
+
+// ---------- niveau 2 : phase courante ----------
+async function renderPhaseCard(cur) {
+  const d = await (await fetch('/api/phase?num=' + cur)).json();
+  const doneN = d.plans.filter(p => p.done).length;
+  document.getElementById('phasecard').innerHTML = `
+    <div style="min-width:220px"><b style="color:var(--run)">◉ Phase ${d.num} — ${escHtml(d.name || '?')}</b>
+      <div class="hint">${doneN}/${d.plans.length} plans terminés — clic pour la fiche complète</div></div>
+    <div class="plans">${d.plans.map(p => `<span class="plan ${p.done ? 'done' : ''}">${p.done ? '●' : '○'} ${p.id}</span>`).join('')}</div>
+    <div class="goal">${escHtml((d.goal || '').slice(0, 260))}</div>`;
+  document.getElementById('phasecard').onclick = () => openPhase(cur);
+}
+
+// ---------- niveau 3 : DAG ----------
+function dagToMermaid(dag) {
+  const lines = ['flowchart TD'];
+  const idx = new Map(dag.nodes.map((n, i) => [n.id, 'n' + i]));
+  for (const n of dag.nodes) {
+    lines.push(`  ${idx.get(n.id)}["${esc(n.step || n.id).slice(0, 55)}"]:::${['done','running','ready','blocked'].includes(n.status) ? n.status : 'blocked'}`);
+    for (const d of n.deps || []) if (idx.has(d)) lines.push(`  ${idx.get(d)} --> ${idx.get(n.id)}`);
+  }
+  lines.push(...CLASSDEFS);
+  return lines.join('\n');
+}
+
+function openDagNode(key, dag) {
+  const n = dag.nodes[Number(key.slice(1))];
+  if (!n) return;
+  dContent.innerHTML = `<h3>${escHtml(n.id)}</h3>
+    <p class="hint">source : .planning/${escHtml(SNAP.dags[0].file)}</p>
+    <div class="body"><b>Mandat :</b> ${escHtml(n.step || '—')}
+<b>Étage :</b> ${escHtml(n.stage || '—')}   <b>Statut :</b> ${escHtml(n.status)}
+<b>Dépend de :</b> ${(n.deps || []).map(escHtml).join(', ') || '—'}
+<b>Périmètre :</b>\n${(n.scope || []).map(f => '  · ' + escHtml(f)).join('\n') || '  —'}</div>`;
+  drawer.classList.add('open');
+}
+
+// ---------- refresh ----------
 async function refresh() {
-  const s = await (await fetch('/api/state')).json();
-  const st = s.state || {};
-  document.getElementById('milestone').textContent = `milestone : ${st.milestone || '?'} ${st.milestone_name || ''}`;
-  document.getElementById('phase').textContent = `phase ${st.current_phase || '?'} · ${st.status || '?'}`;
+  const s = SNAP = await (await fetch('/api/state')).json();
+  const st = s.state || {}, cur = Number(st.current_phase || 0);
+  const p = st.progress || {};
+  document.getElementById('milestone').textContent =
+    `milestone : ${st.milestone || '?'} · phase ${cur} (${st.status || '?'}) · ${p.completed_phases ?? '?'}/${p.total_phases ?? '?'} phases`;
   const lock = document.getElementById('lock');
   if (s.lock.present) {
     lock.textContent = `🔒 ${s.lock.owner} · ${s.lock.step} · ${s.lock.age_seconds}s`;
     lock.className = 'badge ' + (s.lock.stale ? 'stale' : 'live');
   } else { lock.textContent = '🔓 pas de mission'; lock.className = 'badge'; }
 
-  const kv = document.getElementById('stateKv');
-  kv.innerHTML = `<dt>phase courante</dt><dd>${st.current_phase_name || '?'}</dd>
-                  <dt>dernière activité</dt><dd>${st.last_activity_desc || '?'}</dd>`;
-  const p = st.progress || {};
-  document.getElementById('progress').style.width = (p.percent || 0) + '%';
-  document.getElementById('progressTxt').textContent =
-    `${p.completed_phases ?? '?'}/${p.total_phases ?? '?'} phases · ${p.percent ?? 0}%`;
-
-  const cur = Number(st.current_phase || 0);
-  const ul = document.getElementById('phases');
-  ul.innerHTML = s.phases.filter(ph => !ph.done || ph.num >= cur - 2).slice(-14).map(ph =>
-    `<li class="${ph.done ? 'done' : ph.num === cur ? 'current' : ''}">
-       Phase ${ph.num} — ${ph.name} ${ph.completed ? `<span class="when">(${ph.completed})</span>` : ''}
-     </li>`).join('');
-
-  if (s.dags.length) await draw(document.getElementById('dag'), dagToMermaid(s.dags[0]));
-  await draw(document.getElementById('timeline'), milestonesToMermaid(s.milestones));
+  await draw(document.getElementById('roadmap'), roadmapToMermaid(s.phases, cur), key => openPhase(key.slice(1)));
+  await renderPhaseCard(cur);
+  if (s.dags.length) await draw(document.getElementById('dag'), dagToMermaid(s.dags[0]), key => openDagNode(key, s.dags[0]));
+  await draw(document.getElementById('timeline'),
+    'timeline\n' + s.milestones.filter(m => m.closed && m.when).reverse().map(m => `  ${m.when} : ${esc(m.title).slice(0, 40)}`).join('\n'));
 
   const up = document.getElementById('updated');
   up.textContent = `maj ${new Date().toLocaleTimeString()}`;
