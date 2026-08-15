@@ -44,6 +44,9 @@
 #   c) .planning/ — lu, jamais écrit ; propriété du moteur GSD amont (ADR-055).
 #   d) la QUALITÉ d'une carte — ce gate constate un écart d'ENSEMBLES, il ne juge jamais qu'une
 #      carte est fausse ou périmée (le jugement reste à l'agent/l'utilisateur, cf. rôle ci-dessus).
+#   e) plugin/reference/content/examples/ — cartes d'un lab FICTIF (PetitsCoursFlow, exemple
+#      pédagogique) ; les vérifier reviendrait à exiger que la fiction existe sur disque (exec-02
+#      tour 5, cf. EXAMPLES_PREFIX ci-dessous).
 #
 # Absence de mode correctif, assumée (ADR-031) : cette version CONSTATE seulement. Toute évolution
 # vers un correctif serait gardée par le garde-fou trois temps déjà éprouvé dans ce dépôt
@@ -65,20 +68,20 @@ ROOT="."
 MAP_FILE=""
 HOOK=0
 QUIET=0
+# Borne (b), exec-02 tour 5 : les cartes sous ce préfixe décrivent un lab FICTIF (PetitsCoursFlow,
+# exemple pédagogique de plugin/reference/) — les vérifier reviendrait à exiger que la fiction
+# existe sur disque, jamais une divergence réelle. Exclusion par préfixe, appliquée aux DEUX
+# balayages automatiques (P1 et P2) en amont de la collecte des cartes — jamais un filtre de
+# sortie sur les findings déjà produits (principe directeur du mandat).
+EXAMPLES_PREFIX="plugin/reference/content/examples/"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --path)
-      if [ "$#" -lt 2 ]; then
-        echo "[check-map-drift] --path nécessite une valeur" >&2
-        exit 64
-      fi
+      [ "$#" -lt 2 ] && { echo "[check-map-drift] --path nécessite une valeur" >&2; exit 64; }
       ROOT="$2"; shift 2 ;;
     --map)
-      if [ "$#" -lt 2 ]; then
-        echo "[check-map-drift] --map nécessite une valeur" >&2
-        exit 64
-      fi
+      [ "$#" -lt 2 ] && { echo "[check-map-drift] --map nécessite une valeur" >&2; exit 64; }
       MAP_FILE="$2"; shift 2 ;;
     --hook) HOOK=1; shift ;;
     --quiet) QUIET=1; shift ;;
@@ -88,10 +91,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 # Gate de mutuelle exclusion, avant toute autre logique.
-if [ "$HOOK" -eq 1 ] && [ "$QUIET" -eq 1 ]; then
-  echo "[check-map-drift] --hook et --quiet sont mutuellement exclusifs" >&2
-  exit 64
-fi
+[ "$HOOK" -eq 1 ] && [ "$QUIET" -eq 1 ] && { echo "[check-map-drift] --hook et --quiet sont mutuellement exclusifs" >&2; exit 64; }
 
 say() { [ "$QUIET" -eq 1 ] || echo "[check-map-drift] $*" >&2; }
 
@@ -105,14 +105,18 @@ git_safe() { # <args...> — toute invocation git de ce script passe par ici, ja
 }
 
 INSIDE_GIT=1
-if ! git_safe rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  INSIDE_GIT=0
-  say "$ROOT hors d'un arbre de travail git (ou cible absente) — rien à constater."
-fi
+git_safe rev-parse --is-inside-work-tree >/dev/null 2>&1 || { INSIDE_GIT=0; say "$ROOT hors d'un arbre de travail git (ou cible absente) — rien à constater."; }
 
 CARTES_BALAYEES=0
 DIVERGENCES=0
 DETAILS=()
+
+# Compaction budget (exec-02 tour 5) : les 4 sites d'émission de divergence (P1 sens A/B, P2 sens
+# A/B) partageaient le même motif à 4 lignes — factorisé ici, aucun garde-fou ni message perdu.
+record_divergence() { # <message>
+  DIVERGENCES=$((DIVERGENCES + 1))
+  DETAILS+=("  - $1")
+}
 
 # --- Utilitaires communs -------------------------------------------------------------------------
 
@@ -142,9 +146,28 @@ top_level_dirs() {
 # Tokens de chemin bruts (avec @/accents graves) d'une carte P1 : pointeurs @chemin, et segments
 # entre accents graves contenant un séparateur '/' (un mot en accents graves sans '/' est un
 # identifiant, jamais un chemin — exclu par construction du motif, pas par filtre après-coup).
+# Borne (a), exec-02 tour 5 : une LIGNE DE COMMANDE citée en accents graves n'est pas un chemin
+# déclaré par la carte, même si l'un de ses arguments contient un '/' (ex. `bash script.sh --x`,
+# `git config core.hooksPath scripts/hooks`). Règle qui capture la CLASSE, pas les deux chaînes
+# observées : un jeton multi-mots dont le TOUT PREMIER mot (avant le premier espace) ne contient
+# aucun '/' est une invocation verbe+arguments, jamais un chemin — un vrai chemin, même à espace
+# dans son nom, porte son '/' dès son premier mot ('refs/un nom.md' -> premier mot 'refs/un'),
+# donc reste testé normalement (aucun chemin légitime mangé, cf. suite : cas P1-A-espace).
+is_command_invocation() { # <raw-backtick-token>
+  local inner="${1#\`}" first
+  inner="${inner%\`}"
+  first="${inner%% *}"
+  case "$first" in
+    */*) return 1 ;;
+    *) [ "$first" != "$inner" ] ;;
+  esac
+}
+
 extract_p1_tokens_raw() { # <file>
   grep -oE '@[A-Za-z0-9_./-]+' "$1" 2>/dev/null
-  grep -oE '`[^`]*/[^`]*`' "$1" 2>/dev/null
+  grep -oE '`[^`]*/[^`]*`' "$1" 2>/dev/null | while IFS= read -r raw; do
+    is_command_invocation "$raw" || printf '%s\n' "$raw"
+  done
 }
 
 normalize_token() { # <raw-token> -> chemin normalisé (sans @, sans accents graves, sans / final)
@@ -170,10 +193,7 @@ p1_sens_a() { # <card-file> <card-label>
     case "$tok" in
       /*) continue ;;
     esac
-    if [ ! -e "$ROOT/$tok" ]; then
-      DIVERGENCES=$((DIVERGENCES + 1))
-      DETAILS+=("  - ${label} : entrée déclarée sans contrepartie — ${tok}")
-    fi
+    [ -e "$ROOT/$tok" ] || record_divergence "${label} : entrée déclarée sans contrepartie — ${tok}"
   done < <(extract_p1_tokens_raw "$card")
 }
 
@@ -190,10 +210,7 @@ p1_sens_b() { # <card-file> <card-label>
         "$d"/*) found=1; break ;;
       esac
     done < <(extract_p1_tokens_raw "$card")
-    if [ "$found" -eq 0 ]; then
-      DIVERGENCES=$((DIVERGENCES + 1))
-      DETAILS+=("  - ${label} : élément suivi non cité — ${d}")
-    fi
+    [ "$found" -eq 0 ] && record_divergence "${label} : élément suivi non cité — ${d}"
   done < <(top_level_dirs)
 }
 
@@ -202,6 +219,7 @@ if [ -n "$MAP_FILE" ]; then
   [ -f "$MAP_FILE" ] && p1_cards+=("$MAP_FILE")
 elif [ "$INSIDE_GIT" -eq 1 ]; then
   while IFS= read -r f; do
+    case "$f" in "$EXAMPLES_PREFIX"*) continue ;; esac
     case "${f##*/}" in
       CLAUDE.md) p1_cards+=("$ROOT/$f") ;;
     esac
@@ -281,15 +299,18 @@ p2_sens_a() { # <card-relpath> <card-label>
   dossier="$(dirname_of "$card_rel")"
   while IFS= read -r raw; do
     [ -n "$raw" ] || continue
+    # Mitigation STRIDE (Information Disclosure, 29-05 STRIDE register) : une entrée '../' de tête
+    # ferait sortir 'target' de $ROOT — même traversée que l'absolu déjà écarté en p1_sens_a
+    # (:170-172). Le '-e' révélerait alors l'existence d'un chemin HORS domaine. Ignorée, sans
+    # jamais tester hors de $ROOT (ADR-031) ; résidu documenté : un '../' non initial (interne à
+    # 'raw') n'est pas couvert par cette mitigation triviale.
+    case "$raw" in ../*) continue ;; esac
     if [ "$dossier" = "." ]; then
       target="$ROOT/$raw"
     else
       target="$ROOT/$dossier/$raw"
     fi
-    if [ ! -e "$target" ]; then
-      DIVERGENCES=$((DIVERGENCES + 1))
-      DETAILS+=("  - ${label} : entrée déclarée sans contrepartie — ${raw}")
-    fi
+    [ -e "$target" ] || record_divergence "${label} : entrée déclarée sans contrepartie — ${raw}"
   done < <(extract_p2_entries_raw "$ROOT/$card_rel")
 }
 
@@ -327,16 +348,14 @@ p2_sens_b() { # <card-relpath> <card-label>
       fi
       if [ "$(normalize_path "$target_rel")" = "$f_norm" ]; then found=1; break; fi
     done < <(extract_p2_entries_raw "$ROOT/$card_rel")
-    if [ "$found" -eq 0 ]; then
-      DIVERGENCES=$((DIVERGENCES + 1))
-      DETAILS+=("  - ${label} : élément suivi non cité — ${f}")
-    fi
+    [ "$found" -eq 0 ] && record_divergence "${label} : élément suivi non cité — ${f}"
   done < <(git_safe ls-files 2>/dev/null)
 }
 
 p2_cards=()
 if [ "$INSIDE_GIT" -eq 1 ]; then
   while IFS= read -r f; do
+    case "$f" in "$EXAMPLES_PREFIX"*) continue ;; esac
     case "${f##*/}" in
       _index.md|INDEX.md) p2_cards+=("$f") ;;
     esac

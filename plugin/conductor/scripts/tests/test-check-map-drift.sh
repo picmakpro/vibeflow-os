@@ -437,6 +437,83 @@ for code in $RC_SEEN; do
 done
 if [ "$all_ok" -eq 1 ]; then ok "Garde — seuls 0/3/64 observés sur les fixtures (code réservé 1 jamais rendu)"; else ko "Garde — seuls 0/3/64 observés sur les fixtures (code réservé 1 jamais rendu)" "codes vus=[$RC_SEEN]"; fi
 
+# === Borne (a) sens 1 — ligne de commande citée en accents graves : IGNORÉE (0 divergence) ========
+# 'bash script.sh --x' et 'git config core.hooksPath scripts/hooks' sont les 2 faux positifs réels
+# constatés sur ./CLAUDE.md (mandat exec-02 tour 5, verdict humain T-29-05-3). D'abord rejoué
+# contre le code d'AVANT (HEAD, pré-correctif) pour attester le rouge : rc=0 avec le chemin cité
+# à tort, PUIS contre le code d'APRÈS : rc=3 (0 divergence, plus aucune trace de ces deux lignes).
+D="$(mk_git_root borne-a-commande)"
+commit_file "$D" "CLAUDE.md" "# root" "" '`bash scripts/check-release-tag.sh --remote`' '`git config core.hooksPath scripts/hooks`' ""
+OLD_HEAD_SCRIPT="$TMP/old_check_map_drift_HEAD.sh"
+if [ -n "$REPO_ROOT" ] && git -C "$REPO_ROOT" show HEAD:plugin/conductor/scripts/check-map-drift.sh > "$OLD_HEAD_SCRIPT" 2>/dev/null; then
+  out_old="$(bash "$OLD_HEAD_SCRIPT" --path "$D" 2>/dev/null)"; rc_old=$?
+  has_old_leak=0; case "$out_old" in *"check-release-tag.sh"*) has_old_leak=1 ;; esac
+  out_new="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc_new=$?
+  has_new_leak=0; case "$out_new" in *"check-release-tag.sh"*|*"hooksPath"*) has_new_leak=1 ;; esac
+  if [ "$rc_old" -eq 0 ] && [ "$has_old_leak" -eq 1 ] && [ "$rc_new" -eq 3 ] && [ "$has_new_leak" -eq 0 ]; then
+    ok "Borne (a) sens 1 — ligne de commande ignorée : avant rc=0 (faux positif), après rc=3 (0 divergence)"
+  else
+    ko "Borne (a) sens 1 — ligne de commande ignorée" "avant rc=$rc_old leak=$has_old_leak [$out_old] / après rc=$rc_new leak=$has_new_leak [$out_new]"
+  fi
+else
+  ko "Borne (a) sens 1 — ligne de commande ignorée" "HEAD introuvable dans ce dépôt — preuve non rejouable"
+fi
+
+# === Borne (a) sens 2 — un chemin LÉGITIME à espace dans son nom reste vérifié (mutation) ==========
+# 'refs/un nom avec espace.md' porte son '/' dès son PREMIER mot ('refs/un') : ce n'est jamais une
+# invocation de commande, la borne ne doit donc PAS l'avaler. Cible absente -> divergence attendue
+# nommant le chemin complet (preuve que l'existence est bien testée, pas court-circuitée).
+D="$(mk_git_root borne-a-espace-legitime)"
+commit_file "$D" "CLAUDE.md" "# root" "" '`refs/un nom avec espace.md`' ""
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+has_espace=0; case "$out" in *"refs/un nom avec espace.md"*) has_espace=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has_espace" -eq 1 ]; then ok "Borne (a) sens 2 — chemin légitime à espace non mangé par la borne, existence testée"; else ko "Borne (a) sens 2 — chemin légitime à espace non mangé par la borne, existence testée" "rc=$rc out=[$out]"; fi
+
+# === Borne (b) sens 1 — plugin/reference/content/examples/ jamais balayé (0 carte, NON VÉRIFIABLE)
+# Réplique la fixture réelle du dépôt sous ce préfixe : entrée @chemin absente ET sous-dossier non
+# cité — les deux devraient normalement produire 2 divergences. La borne doit ramener 0 carte
+# balayée pour CE fichier (NON VÉRIFIABLE), preuve que l'exclusion agit sur la collecte, pas sur un
+# filtre de sortie après coup.
+D="$(mk_git_root borne-b-examples)"
+commit_file "$D" "plugin/reference/content/examples/PetitsCoursFlow/CLAUDE.md" "# fictif" "" "@content/absent.md" ""
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+has_nv=0; case "$out" in *"NON VÉRIFIABLE"*) has_nv=1 ;; esac
+has_leak=0; case "$out" in *"absent.md"*) has_leak=1 ;; esac
+if [ "$rc" -eq 3 ] && [ "$has_nv" -eq 1 ] && [ "$has_leak" -eq 0 ]; then ok "Borne (b) sens 1 — plugin/reference/content/examples/ jamais balayé (NON VÉRIFIABLE)"; else ko "Borne (b) sens 1 — plugin/reference/content/examples/ jamais balayé (NON VÉRIFIABLE)" "rc=$rc out=[$out]"; fi
+
+# === Borne (b) sens 1 bis — même fixture SANS le préfixe examples : reste balayée (contre-épreuve)
+# Constate que l'exclusion cible bien le PRÉFIXE et pas le nom de fichier CLAUDE.md en général :
+# hors du préfixe, la même carte (même contenu) redevient balayée et rend la divergence attendue.
+D="$(mk_git_root borne-b-hors-examples)"
+commit_file "$D" "plugin/autredossier/CLAUDE.md" "# reel" "" "@content/absent.md" ""
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+has_leak=0; case "$out" in *"absent.md"*) has_leak=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has_leak" -eq 1 ]; then ok "Borne (b) sens 2 — carte hors du préfixe examples reste balayée (contre-épreuve)"; else ko "Borne (b) sens 2 — carte hors du préfixe examples reste balayée (contre-épreuve)" "rc=$rc out=[$out]"; fi
+
+# === Borne (b) — index sous examples/ jamais balayé non plus (P2) ==================================
+D="$(mk_git_root borne-b-examples-p2)"
+commit_file "$D" "plugin/reference/content/examples/PetitsCoursFlow/refs/_index.md" "# Index" "" "[disparu.md](disparu.md)" ""
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+has_nv=0; case "$out" in *"NON VÉRIFIABLE"*) has_nv=1 ;; esac
+has_leak=0; case "$out" in *"disparu.md"*) has_leak=1 ;; esac
+if [ "$rc" -eq 3 ] && [ "$has_nv" -eq 1 ] && [ "$has_leak" -eq 0 ]; then ok "Borne (b) — index P2 sous examples/ jamais balayé (NON VÉRIFIABLE)"; else ko "Borne (b) — index P2 sous examples/ jamais balayé (NON VÉRIFIABLE)" "rc=$rc out=[$out]"; fi
+
+# === Mitigation STRIDE — citation '../' de tête en P2 sens A : ignorée, jamais testée hors $ROOT ===
+# Sans la mitigation, 'target' sortirait de $ROOT et '-e' révélerait l'existence d'un chemin HORS
+# domaine (même risque que le token absolu déjà écarté en p1_sens_a). La cible '../reel.md' EXISTE
+# réellement hors du dépôt : avant mitigation ce serait 0 divergence (faux — l'existence hors
+# domaine ne devrait jamais influer sur le verdict) ; la mitigation doit produire le même verdict
+# qu'une cible absente non testée : 0 divergence, sans avoir jamais stat() la cible hors $ROOT.
+D="$(mk_git_root stride-dotdot)"
+printf 'x' > "$TMP/hors-repo-stride-reel.md"
+mkdir -p "$D/../hors-repo-stride-cache" 2>/dev/null || true
+commit_file "$D" "_index.md" "# Index" "" "[x](../hors-repo-stride-cache/reel.md)" ""
+printf 'x' > "$D/../hors-repo-stride-cache/reel.md" 2>/dev/null || true
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+has_zero=0; case "$out" in *"0 divergence"*) has_zero=1 ;; esac
+if [ "$rc" -eq 3 ] && [ "$has_zero" -eq 1 ]; then ok "Mitigation STRIDE — citation '../' de tête ignorée en P2 sens A (jamais testée hors \$ROOT)"; else ko "Mitigation STRIDE — citation '../' de tête ignorée en P2 sens A (jamais testée hors \$ROOT)" "rc=$rc out=[$out]"; fi
+rm -rf "$D/../hors-repo-stride-cache" 2>/dev/null || true
+
 echo ""
 echo "== résultat : $PASS ok, $FAIL ko =="
 [ "$FAIL" -eq 0 ]

@@ -259,6 +259,24 @@ coverage:
   cas. Une régression a été détectée PENDANT l'écriture de la table : `${p//\/\//\/}` insérait un
   backslash littéral (le `\/` en position remplacement n'est pas déséchappé par bash), corrigée
   avant commit via un slash porté par variable — la table elle-même a joué son rôle discriminant.
+- Correction ciblée exec-02, **tour 5** (nœud rouvert sur VERDICT HUMAIN, T-29-05-3) : le gate est
+  jugé utile mais 2 bornes trop larges. Borne (a) : une ligne de commande citée en accents graves
+  (`bash scripts/check-release-tag.sh --remote`, `git config core.hooksPath scripts/hooks`) n'est
+  pas un chemin déclaré — la règle capture la CLASSE (le TOUT PREMIER mot du jeton, avant le
+  premier espace, ne contient aucun `/` ⇒ invocation verbe+arguments) plutôt que les deux chaînes
+  observées, via `is_command_invocation()` filtrant `extract_p1_tokens_raw()`. Un chemin légitime
+  à espace dans son nom porte son `/` dès son premier mot et reste donc testé (prouvé par mutation
+  dédiée). Borne (b) : `plugin/reference/content/examples/` (lab fictif PetitsCoursFlow) est
+  désormais exclu des DEUX balayages (P1 et P2) en amont de la collecte des cartes — jamais un
+  filtre de sortie — via `EXAMPLES_PREFIX`, documenté en en-tête et au point de déclaration.
+  Registre STRIDE complété (`T-29-02-08`) : l'oracle d'existence par traversée de `p2_sens_a` sur
+  une citation `../` de tête est mitigé trivialement (écartée avant le test `-e`, même traitement
+  que le token absolu de `p1_sens_a`), résidu non-initial documenté `low`. Budget de lignes tenu
+  par compaction ailleurs dans le script (jamais par perte de signal) : les 4 sites d'émission de
+  divergence factorisés dans `record_divergence()`, 3 blocs `if...then...fi` à 4 lignes réduits en
+  gardes une ligne — 249 → 246 lignes hors commentaires après les deux bornes (< 250). Suite : 51 →
+  57 cas (+6 : borne (a) sens 1 attesté avant/après HEAD, borne (a) sens 2 mutation chemin à espace
+  légitime non mangé, borne (b) sens 1/1 bis/P2, mitigation STRIDE `../`).
 - Correction ciblée exec-02, **tour 4** (nœud rouvert une quatrième fois, même famille p2_sens_b) :
   le correctif du tour 3 (`normalize_path()`) appliquait le squeeze des `//` et le strip du `./`
   de tête en deux passes **indépendantes** — un squeeze qui expose un nouveau `./` de tête (ex.
