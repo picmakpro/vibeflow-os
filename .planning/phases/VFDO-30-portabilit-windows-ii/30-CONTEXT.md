@@ -1,7 +1,7 @@
 # Phase 30: Portabilité Windows II - Context
 
 **Gathered:** 2026-08-15
-**Status:** Ready for planning — **SAUF PORT-04** (gate de plan : l'affectation §3.2 doit être tranchée avec Willy et documentée AVANT le plan — voir D-01)
+**Status:** Ready for planning — PORT-04 tranché par Samuel le 2026-08-15 (voir D-01) : le plan est dégaté.
 
 <domain>
 ## Phase Boundary
@@ -9,8 +9,9 @@
 Réécrire une fois pour toutes le substrat des hooks pour qu'une install VibeFlow sur Windows pose
 des hooks qui fonctionnent : (a) `merge-hooks.sh` apprend la forme exec (`args`), (b) les codes de
 sortie des scripts de hooks sont normalisés (0 = silence à la frontière harness), (c) les
-`hooks.json` du périmètre dev passent en forme exec, (d) les 3 fichiers du lot PYBIN consomment la
-lib partagée `vf-portable.sh` (contrat PR #29). Plus deux gestes jour 1 asynchrones : la RFC
+`hooks.json` du périmètre dev passent en forme exec, (d) la lib partagée `vf-portable.sh` est
+**écrite par cette phase** (conforme au contrat PR #29, tracer 01-01 absorbé — D-04) et les 3
+fichiers du lot PYBIN la consomment. Plus deux gestes jour 1 asynchrones : la RFC
 upstream `open-gsd/gsd-core` (LEDG-03) et la veille de release gsd-core > 1.10.0 (WKTR-03).
 
 Hors scope : migration des hooks.json de la polarité gouvernance (Willy), partition workstreams,
@@ -22,28 +23,36 @@ toute autre migration de forme que celle de la spec.
 ## Implementation Decisions
 
 ### PORT-04 — Affectation §3.2 (chemin absolu de bash dans merge-hooks.sh)
-- **D-01:** L'affectation §3.2 n'a **pas encore été discutée avec Willy** — la discussion est à
-  lancer. **Le plan de phase reste gaté tant que la réponse n'est pas écrite** (exigence PORT-04 :
-  « tranchée et documentée avant le plan »). Geste immédiat de sortie de cadrage : rédiger le
-  commentaire pour la PR #29 posant la question d'affectation (draft validé par Samuel avant tout
-  post — geste externe gaté humain).
-- **D-02:** Exit code de `vf_guard_unavailable` sur PreToolUse : **pas de position maison — à faire
-  trancher par le contrat** (PR #29). La question est poussée dans le même commentaire que D-01 ;
-  le plan hérite de ce que le contrat écrira.
-- **D-03:** Documentation de la décision PORT-04 une fois tranchée : **amendement de la spec**
-  (`docs/superpowers/specs/2026-08-02-portabilite-windows-ii-design.md`, encart « tranché le… » au
-  §3.2) **+ commentaire sur la PR #29** (visible par Willy). Le CONTEXT/plan la reprennent.
+- **D-01:** **TRANCHÉ par Samuel le 2026-08-15, sans Willy** (le tracer 01-01 n'a jamais été
+  livré, la discussion n'a pas pu avoir lieu) : **la Phase 30 porte l'intégralité du volet
+  `merge-hooks.sh`** — apprentissage d'`args` (substitution, `frag_basenames()`, `references()`,
+  `remove`) ET résolution du chemin absolu de `bash` à l'install. PORT-04 est satisfait : la
+  décision est documentée ici, dans l'amendement de la spec (§3.2) et par commentaire informatif
+  sur la PR #29 (draft validé par Samuel avant post — geste externe gaté humain).
+  — **Reversibility:** one-way — le `settings.json` produit devient spécifique à la machine chez
+  chaque utilisateur qui update ; revenir en arrière exigerait une migration inverse du parc.
+- **D-02:** Exit code de `vf_guard_unavailable` sur PreToolUse : **décision maison — code non nul
+  ≠ 2** (« dégradé mais utilisable » : l'erreur est visible, l'édition passe). Aligné ADR-031
+  (advisory par défaut) — un lab sans Python reste utilisable, la garde hurle sans paralyser.
+- **D-03:** Documentation de la décision PORT-04 : **amendement de la spec**
+  (`docs/superpowers/specs/2026-08-02-portabilite-windows-ii-design.md`, encart « tranché le
+  2026-08-15 » au §3.2) **+ commentaire informatif sur la PR #29** (visible par Willy). Fait au
+  cadrage.
 
 ### Dépendance au contrat PR #29 (lot PYBIN)
-- **D-04:** Le lot PYBIN **s'implémente contre le contrat tel qu'écrit dans la PR #29 ouverte**
-  (sans attendre le merge ni la livraison de `vf-portable.sh` sur `main`) — risque de rebase
-  accepté si le contrat bouge avant merge. — **Reversibility:** costly — si le contrat change
-  (noms de symboles, bloc localisateur), chaque fichier consommateur édité doit être realigné et
-  les sommes de contrôle du gate de Willy recalculées.
-- **D-05:** `guard-file-size.sh` est **gaté séparément** si la lib tarde (dépendance dure :
-  `vf-portable.sh` + `vf_guard_unavailable` + `$VF_GUARD_HEALTH_DIR` + hook doctor conductor,
-  aucun n'existant à ce jour) : la phase peut se clore avec ce fichier non migré, exigence tracée
-  en reliquat explicite (`carried` trace), jamais un vert par défaut.
+- **D-04:** **On n'attend plus Willy : la Phase 30 écrit elle-même `vf-portable.sh`**
+  (`plugin/_internal/lib/`) **et `copy_engine_lib()`** dans `vibeflow-update.sh`, en conformité
+  stricte avec le contrat d'interface de la PR #29 (5 symboles, bloc localisateur à 4 candidats
+  entre marqueurs, sémantique `vf_py_probe`). La phase absorbe le tracer 01-01. Si le gate de
+  Willy arrive un jour, il doit passer au vert puisque le contrat est suivi à la lettre.
+  — **Reversibility:** costly — si le contrat de la PR #29 évolue avant merge, lib et
+  consommateurs doivent être réalignés (sommes de contrôle du bloc localisateur recalculées).
+- **D-05:** La dépendance dure de `guard-file-size.sh` est **levée par D-04** pour la lib et
+  `vf_guard_unavailable`. Reste le **hook doctor de conductor** (agrégation des marqueurs
+  `$VF_GUARD_HEALTH_DIR` + escalade après 3 sessions, contrat §4) : la Phase 30 en livre une
+  **version minimale** (agrégation en une ligne au SessionStart) ou le diffère avec reliquat tracé
+  — au choix du planner sur pièces. Les marqueurs s'accumulent sans casse tant que le doctor
+  n'existe pas.
 
 ### Codes de sortie (PORT-03)
 - **D-06:** Traduction vers le harness : **normalisation dans chaque script** (0 = cas silencieux,
@@ -134,7 +143,7 @@ toute autre migration de forme que celle de la spec.
 
 ### Integration Points
 - `plugin/_internal/vibeflow-update.sh` (l.252-270 : résolution d'`inject-mcp-tools.sh`) —
-  l'engine qui posera `vf-portable.sh` via `copy_engine_lib()` (à créer, côté Willy/gouvernance).
+  l'engine qui posera `vf-portable.sh` via `copy_engine_lib()` (à créer **dans cette phase**, D-04).
 - Gate de Willy (sommes de contrôle du bloc localisateur) — critère de succès externe n°0 :
   avertissement jusqu'au merge de cette phase, bascule bloquante dans le même commit que le dernier
   lot (spec §7).
@@ -146,8 +155,8 @@ toute autre migration de forme que celle de la spec.
 
 - Le « jour 1 » des gestes LEDG-03/WKTR-03 s'entend jour 1 du *travail* du milestone — la RFC passe
   par un draft validé par Samuel (D-09), la rapidité ne court-circuite pas le gate humain.
-- L'effet de bord §3.2 (le `settings.json` produit devient spécifique à la machine) est à instruire
-  explicitement dans le commentaire PR #29 — Willy doit le voir avant de trancher.
+- L'effet de bord §3.2 (le `settings.json` produit devient spécifique à la machine) est assumé
+  (D-01, one-way) et mentionné dans le commentaire informatif PR #29 pour que Willy le voie.
 
 </specifics>
 

@@ -819,7 +819,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | PORT-01 | Phase 30 | Pending |
 | PORT-02 | Phase 30 | Pending |
 | PORT-03 | Phase 30 | Pending |
-| PORT-04 | Phase 30 | Pending — pré-requis de cadrage bloquant (tranché avec Willy AVANT le plan) |
+| PORT-04 | Phase 30 | Tranché 2026-08-15 (Samuel, sans Willy — tracer 01-01 jamais livré) : la Phase 30 porte tout le volet merge-hooks.sh et écrit vf-portable.sh — plan dégaté, spec §3.2 amendée |
 | PORT-05 | Phase 30 | Pending |
 | MANI-01 | Phase 31 | Pending |
 | MANI-02 | Phase 31 | Pending |

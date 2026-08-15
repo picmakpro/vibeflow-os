@@ -213,6 +213,22 @@ reviennent à la polarité gouvernance pour leur **volet Python** — mais pas p
 
 ### 3.2 `merge-hooks.sh` — apprendre `args`
 
+> **✅ TRANCHÉ le 2026-08-15 (Samuel, cadrage Phase 30 — PORT-04).** Le tracer 01-01 de la
+> polarité gouvernance n'ayant jamais été livré et la discussion n'ayant pas pu avoir lieu, la
+> décision est prise unilatéralement et documentée :
+> - **La Phase 30 (polarité dev) porte l'intégralité du volet `merge-hooks.sh`** — apprentissage
+>   d'`args` ET résolution du chemin absolu de `bash` à l'install. Le trou d'affectation ci-dessous
+>   est comblé.
+> - **La Phase 30 écrit elle-même `vf-portable.sh` + `copy_engine_lib()`**, en conformité stricte
+>   avec le contrat d'interface de la PR #29 (le tracer 01-01 est absorbé). Le gate de Willy, s'il
+>   arrive, doit passer au vert.
+> - **Exit code de `vf_guard_unavailable` sur PreToolUse : code non nul ≠ 2** (« dégradé mais
+>   utilisable », aligné ADR-031) — la question ouverte du §3.1 est close.
+> - L'effet de bord (le `settings.json` produit devient spécifique à la machine) est **assumé**.
+>
+> Willy est informé par commentaire sur la PR #29. Trace : `.planning/phases/`
+> `VFDO-30-portabilit-windows-ii/30-CONTEXT.md` (D-01, D-02, D-04).
+
 > **⚠ Trou d'affectation dans le contrat — le point le plus important de cette spec.**
 > Le contrat §5 impose la forme exec et précise que `command` doit porter un **chemin absolu vers
 > `bash`, « résolu et vérifié à l'install »** (un nom nu reproduirait le bug qu'on corrige). C'est
