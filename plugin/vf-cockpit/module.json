@@ -1,0 +1,7 @@
+{
+  "name": "vf-cockpit",
+  "version": "v1.0.0",
+  "type": "skill + script + assets",
+  "description": "Cockpit web local en lecture seule, serveur Node zéro-dépendance (node:http + SSE + fs.watch) qui parse .planning/ et sert une page unique — roadmap, phase courante, agents en cours, historique. N'écrit jamais dans l'arbre.",
+  "requires": []
+}
