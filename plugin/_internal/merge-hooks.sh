@@ -292,6 +292,19 @@ def apply_merge(hooks, view_frag_hooks, other_hooks=None):
                 if VF_BASH_TOKEN in raw_command and not bash_abs:
                     die(f"{fragment_path} : entrée {entry_label} référence {VF_BASH_TOKEN} mais "
                         f"aucun bash absolu résolu — installer bash ou renseigner VF_BASH_BIN")
+                # Note de traçabilité (finding mineur, revue exec-30-01) : cette substitution est
+                # INCONDITIONNELLE — elle s'exécute pour TOUTE entrée portant {{VF_BASH}}, avant et
+                # indépendamment du routage is_local_entry() qui décide seulement de la CIBLE
+                # (settings projet vs settings local), pas si le chemin absolu machine-spécifique
+                # est écrit. Un fragment exec mergé SANS --settings-local écrirait donc ce chemin
+                # absolu directement dans une cible --settings de PROJET (potentiellement committée,
+                # voyageant via git). Sans risque AUJOURD'HUI uniquement parce que le contrat
+                # d'appel actuel (vibeflow-update.sh) passe --settings-local de façon uniforme pour
+                # les scopes project/local — jamais togglé entre deux merges d'un même run. Si ce
+                # contrat d'appel change un jour (un appelant pouvant omettre --settings-local pour
+                # certaines entrées d'un même run), la garantie « merge idempotent, jamais de fuite
+                # machine-spécifique » documentée en tête de fichier (lignes ~16-19) devrait être
+                # réévaluée précisément ici.
                 resolved["command"] = raw_command.replace(VF_SCRIPTS_TOKEN, prefix).replace(VF_BASH_TOKEN, bash_abs)
                 if "{{" in resolved["command"]:
                     die(f"{fragment_path} : placeholder non substitué dans command de l'entrée "
