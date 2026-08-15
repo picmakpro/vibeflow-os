@@ -24,6 +24,16 @@
 #       entrées tierce/gsd-core intactes octet pour octet
 # T14 — frontière de mot préservée sur args (régression lookaround, transposée depuis command)
 #
+# Routage borné --settings-local (contrat manque 1, correction exec-30-01) :
+# T15 — entrée {{VF_BASH}} + --settings-local fournie → atterrit dans le fichier local, absente
+#       du fichier projet (aucune clé hooks n'y apparaît pour cette entrée)
+# T16 — entrée SANS {{VF_BASH}} (forme shell) + --settings-local fournie → reste dans le fichier
+#       projet, fichier local non affecté par cette entrée
+# T17 — --settings-local ABSENTE → comportement identique à avant (entrée {{VF_BASH}} atterrit
+#       dans la cible --settings unique, preuve de compat descendante)
+# T18 — remove avec --settings-local fournie sur un merge antérieur mixte (entrée locale + entrée
+#       projet) → les deux disparaissent des deux fichiers respectivement, aucun résidu
+#
 # ISOLATION : tout sous mktemp. Le vrai ~/.claude n'est jamais touché.
 
 set -uo pipefail
@@ -402,6 +412,104 @@ assert any('gsd-archive.sh' in a for a in args), f'gsd-archive.sh purgé à tort
   ok "T14 frontière de mot sur args : gsd-archive.sh (exec) non purgé par un fragment archive.sh"
 else
   ko "T14 frontière de mot sur args (régression lookaround transposée)"
+fi
+
+# ---------- T15/T16/T17 : routage borné --settings-local ----------
+# Fragment mixte : une entrée exec {{VF_BASH}} (candidate au routage local) + une entrée shell
+# classique (jamais routée, quelle que soit la présence de --settings-local).
+FRAG_MIXED="$WORK/frag-mixed.json"
+cat > "$FRAG_MIXED" <<'EOF'
+{ "hooks": { "PreToolUse": [
+  { "matcher": "Bash", "hooks": [ { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/local-guard.sh"] } ] },
+  { "matcher": "Read", "hooks": [ { "type": "command", "command": "bash {{VF_SCRIPTS}}/shell-guard.sh" } ] }
+] } }
+EOF
+
+# ---------- T15 : entrée {{VF_BASH}} + --settings-local fournie → atterrit dans le fichier local ----------
+S15_PROJECT="$WORK/t15/settings.json"
+S15_LOCAL="$WORK/t15/settings-local.json"
+mkdir -p "$WORK/t15"
+VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_MIXED" --settings "$S15_PROJECT" --settings-local "$S15_LOCAL" --scripts-prefix "$PREFIX" 2>/dev/null
+if [ -f "$S15_LOCAL" ] && python3 -c "
+import json
+d = json.load(open('$S15_LOCAL'))
+entries = [h for g in d['hooks']['PreToolUse'] for h in g['hooks']]
+assert any(h.get('command') == '$BASH_ABS_TEST' and any('local-guard.sh' in a for a in h.get('args', [])) for h in entries), f'entree local-guard.sh absente du fichier local : {entries}'
+proj = json.load(open('$S15_PROJECT'))
+proj_cmds_args = []
+for ev in proj.get('hooks', {}).values():
+    for g in ev:
+        for h in g['hooks']:
+            proj_cmds_args.append(h.get('command',''))
+            proj_cmds_args.extend(a for a in h.get('args', []) if isinstance(a, str))
+assert not any('local-guard.sh' in c for c in proj_cmds_args), f'entree local-guard.sh fuite dans le fichier projet : {proj_cmds_args}'
+" 2>/dev/null; then
+  ok "T15 entrée {{VF_BASH}} + --settings-local fournie → atterrit dans le fichier local, absente du fichier projet"
+else
+  ko "T15 routage vers --settings-local"
+fi
+
+# ---------- T16 : entrée SANS {{VF_BASH}} (forme shell) + --settings-local fournie → reste projet ----------
+if python3 -c "
+import json
+proj = json.load(open('$S15_PROJECT'))
+proj_cmds = [h.get('command','') for g in proj['hooks']['PreToolUse'] for h in g['hooks']]
+assert any('shell-guard.sh' in c for c in proj_cmds), f'entree shell-guard.sh absente du fichier projet : {proj_cmds}'
+local_ = json.load(open('$S15_LOCAL'))
+local_cmds_args = []
+for ev in local_.get('hooks', {}).values():
+    for g in ev:
+        for h in g['hooks']:
+            local_cmds_args.append(h.get('command',''))
+            local_cmds_args.extend(a for a in h.get('args', []) if isinstance(a, str))
+assert not any('shell-guard.sh' in c for c in local_cmds_args), f'entree shell-guard.sh fuite dans le fichier local : {local_cmds_args}'
+" 2>/dev/null; then
+  ok "T16 entrée sans {{VF_BASH}} (forme shell) + --settings-local fournie → reste dans le fichier projet, fichier local non affecté"
+else
+  ko "T16 non-routage de l'entrée shell classique"
+fi
+
+# ---------- T17 : --settings-local ABSENTE → comportement identique à avant ----------
+S17="$WORK/t17/settings.json"
+mkdir -p "$WORK/t17"
+VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_MIXED" --settings "$S17" --scripts-prefix "$PREFIX" 2>/dev/null
+if python3 -c "
+import json
+d = json.load(open('$S17'))
+entries = [h for g in d['hooks']['PreToolUse'] for h in g['hooks']]
+assert any(h.get('command') == '$BASH_ABS_TEST' and any('local-guard.sh' in a for a in h.get('args', [])) for h in entries), f'entree local-guard.sh absente de la cible unique --settings : {entries}'
+assert any('shell-guard.sh' in h.get('command','') for h in entries), f'entree shell-guard.sh absente de la cible unique --settings : {entries}'
+" 2>/dev/null; then
+  ok "T17 --settings-local absente → les deux entrées atterrissent dans la cible --settings unique (compat descendante)"
+else
+  ko "T17 compat descendante sans --settings-local"
+fi
+
+# ---------- T18 : remove avec --settings-local fournie sur un merge antérieur mixte ----------
+S18_PROJECT="$WORK/t18/settings.json"
+S18_LOCAL="$WORK/t18/settings-local.json"
+mkdir -p "$WORK/t18"
+VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_MIXED" --settings "$S18_PROJECT" --settings-local "$S18_LOCAL" --scripts-prefix "$PREFIX" 2>/dev/null
+if bash "$MERGER" remove "$FRAG_MIXED" --settings "$S18_PROJECT" --settings-local "$S18_LOCAL" 2>/dev/null \
+   && python3 -c "
+import json
+proj = json.load(open('$S18_PROJECT'))
+local_ = json.load(open('$S18_LOCAL'))
+all_cmds_args = []
+for d in (proj, local_):
+    for ev in d.get('hooks', {}).values():
+        for g in ev:
+            for h in g['hooks']:
+                all_cmds_args.append(h.get('command',''))
+                all_cmds_args.extend(a for a in h.get('args', []) if isinstance(a, str))
+assert not any('local-guard.sh' in c for c in all_cmds_args), f'entree locale residuelle : {all_cmds_args}'
+assert not any('shell-guard.sh' in c for c in all_cmds_args), f'entree projet residuelle : {all_cmds_args}'
+assert 'hooks' not in proj, f'clé hooks residuelle cote projet : {proj}'
+assert 'hooks' not in local_, f'clé hooks residuelle cote local : {local_}'
+" 2>/dev/null; then
+  ok "T18 remove avec --settings-local fournie : les deux entrées d'un merge mixte antérieur disparaissent, aucun résidu"
+else
+  ko "T18 remove balaie les deux cibles"
 fi
 
 echo ""
