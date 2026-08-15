@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: gsd-migration
 milestone_name: Migration package GSD
-current_phase: 18
-current_phase_name: Survie du ledger d'exigences à la clôture de jalon
-status: "Phase 28 complete - 3/3 plans - PR et release reserves a Samuel"
-stopped_at: "Phase 20 complète (7/7 plans) — clôture de gouvernance (20-07) : ADR-051 révisée + ADR-060 posée, doctrine transverse alignée, 6 modules bumpés (conductor v1.17.0, dev-orchestrator v2.8.0, design-orchestrator v1.3.2, 3 bundles v2.0.3). Gates verts sauf le seul rouge attendu (compteur de suites racine, 44 réel pas 43). Release racine réservée à validation humaine post-fusion (4 éléments consignés + WINDOWS.md)."
-last_updated: "2026-08-15T00:00:00.000Z"
+current_phase: 28
+current_phase_name: Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur
+status: "Phase 28 shipped - PR 42 - release v2.52.0"
+stopped_at: "Phase 28 shippée et releasée (PR #42 → `8616224`, tag v2.52.0 + release GitHub, CI main 4/4 verte sur `f50b226`). Phase 29 shippée le même jour (PR #41, v2.51.0). Restent non planifiées : phases 18 et 25. Champs remis d'aplomb le 2026-08-15 sur mesure disque (dérive héritée signalée depuis la mission 28)."
+last_updated: "2026-08-15T17:11:29.000Z"
 last_activity: 2026-08-15
 progress:
-  total_phases: 26
-  completed_phases: 15
-  total_plans: 95
-  completed_plans: 71
-last_activity_desc: "Phase 28 COMPLETE (28-01/28-02/28-03). 28-01 et 28-02 sont deja livres dans main et publies en v2.51.0 via PR #41 (squash-merge). Ce lot ajoute, sur branche feat/phase-28-03-as-installed issue de main a jour : fermeture du trou ARM_LINE mono-slot (chaque armement d un artefact evalue independamment, suite 58 -> 60 cas) ; checkpoint D-04 rendu par Samuel = second-job-9-modules ; job CI lab-frais-arme qui exerce le gate TEL QU INSTALLE sur la fermeture dev-orchestrator (9 modules) avec plancher de 2 artefacts armes ; triades bumpees dev-orchestrator v2.15.0 et conductor v1.23.0 (bump reparti des valeurs posees par la Phase 29, decision humaine) avec les journaux de la Phase 28 enfin ecrits. Revue vf-reviewer : PASS. Verification goal-backward 28-03 : GOAL ACHIEVED, 6 falsifications prouvant que le job mord. Gates verts (capability-activation 0, version-sync 0, machine-paths 0). RESTE OUVERT : le critere << run CI vert constate >> (28-03-PLAN.md:438/454) - la branche n a jamais ete poussee, geste humain. Compteurs progress laisses intacts (derive preexistante, deja signalee)."
+  total_phases: 29
+  completed_phases: 27
+  total_plans: 105
+  completed_plans: 91
+last_activity_desc: "Synchro planning post-release : Phase 28 shippee et releasee (PR #42, tag v2.52.0, release GitHub, CI main verte sur f50b226), Phase 29 shippee via PR #41 (v2.51.0). ROADMAP : entrees 28 et 29 ajoutees a la liste des phases (elles n y figuraient pas), 3 plans de la 28 coches. STATE : champs herites remis d aplomb sur mesure disque (current_phase 18->28, compteurs 95/71 -> 105/91 par find PLAN/SUMMARY, total_phases 29, completed 27 - seules 18 et 25 restent non planifiees), stopped_at et Current Position reecrits au present."
 ---
 
 # Project State
@@ -55,25 +55,20 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 ## Current Position
 
-**Phase 28 — PLANIFIÉE le 2026-08-10** (branche `docs/phase-28-cadrage`, non mergée). 3 plans en
-3 vagues : `28-01` (tracer — règle 4 du gate de bout en bout sur `isolation:` + registre-vocabulaire
-+ cas #38 rejoué en fixture), `28-02` (expansion MCP, 5 déclarations réelles, bornes d'en-tête),
-`28-03` (*as-installed testing* — **`autonomous: false`, checkpoint bloquant**). Verdict
-`gsd-plan-checker` : **VERIFICATION PASSED**, 10/10 exigences `ARMD-01`…`ARMD-10` couvertes (IDs
-créés ce jour dans `REQUIREMENTS.md`, la ROADMAP portait `Requirements: TBD`). Arbitrages du manager
-consignés dans `28-ARBITRAGES.md` (A-1…A-9).
+**Phase 28 — SHIPPÉE ET RELEASÉE le 2026-08-15** (PR #42 squash-mergée → `8616224`, complétée par
+`f50b226` ; tag annoté `v2.52.0` + release GitHub, `check-release-tag --remote` ✓, CI main 4/4
+verte). Les 3 plans exécutés et vérifiés **GOAL ACHIEVED** : `28-01` (règle 4 + 4bis, registre
+`vf-requires:`/`# vf-provides:`, cas #38 rejoué), `28-02` (expansion MCP, bornes d'en-tête),
+`28-03` (job CI `lab-frais-arme`, *as-installed testing*, checkpoint D-04 rendu par Samuel =
+`second-job-9-modules` ; trou `ARM_LINE` mono-slot fermé sur arbitrage humain). La PR portait
+aussi le chantier mémoire (consolidator scope user, release v2.52.0) et 2 réparations de
+régressions du squash #41 (status STATE hors liste blanche D-04 ; pins SHA de
+`test-check-map-drift.sh` → fixtures committées). Les deux points signalés à la planification
+(parse de `28-CONTEXT.md`, dépassement D-04) sont **soldés** — voir `28-ARBITRAGES.md` et le
+rapport de mission `.planning/missions/2026-08-10-phase-28-planification.md`.
 
-> **Deux points à ressortir en vérification de phase :**
-> 1. **Override du gate `decision-coverage-plan`** — le gate rend `passed: false` avec
->    `reason: "could-not-parse"`, **jamais** un manque de couverture : 3 puces de `28-CONTEXT.md`
->    sont illisibles par son parseur (l. 75 et 100 — un `*` littéral dans `` `ensure-*.sh` `` à
->    l'intérieur du gras ; l. 107-108 — gras courant sur deux lignes). La couverture réelle des
->    décisions D-01→D-06 a été **vérifiée indépendamment** par `gsd-plan-checker`. Le correctif de
->    mise en forme de `28-CONTEXT.md` est **hors périmètre du mandat de planification** et attend un
->    arbitrage humain.
-> 2. **Dépassement de cadrage signalé sur D-04** — `28-03` propose un **second job CI** et une
->    fermeture installée de **9 modules** (au lieu de « ajout d'une étape au job `lab-frais` »).
->    Porté par un `checkpoint:decision` bloquant, non tranché en plan.
+**Prochaines candidates** : phases 18 et 25, jamais planifiées. Le ré-armement
+`isolation: worktree` reste fermé tant qu'`open-gsd/gsd-core#3302` n'est pas levée.
 
 ---
 

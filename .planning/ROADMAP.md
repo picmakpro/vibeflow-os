@@ -61,6 +61,8 @@
 - [ ] Phase 25: Budget d'instructions et étage d'alignement court
 - [x] Phase 26: Manuel utilisateur VibeFlow (manual/) (completed 2026-08-02)
 - [x] Phase 27: Parallélisation d'exécution — granulaire, simple, sans collision d'écriture (completed 2026-08-06)
+- [x] Phase 28: Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur (completed 2026-08-15)
+- [x] Phase 29: Distiller les gains ICM (G1-G5) — investigation dag.sh --scope d'abord (completed 2026-08-15)
 
 <details>
 <summary>✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04</summary>
@@ -2075,15 +2077,15 @@ même besoin en 3 langages, et un script neuf dans aucun roster).
 Plans:
 **Wave 1**
 
-- [ ] 28-01-PLAN.md — Tranche traçante : la règle 4 de bout en bout sur `isolation:` seul (registre-vocabulaire, 3ᵉ discriminant `FILENAME`, planchers anti-vert-à-vide, premier porteur réel de `# vf-provides:`, cas de preuve #38 rejoué rouge/vert). Vague 1.
+- [x] 28-01-PLAN.md — Tranche traçante : la règle 4 de bout en bout sur `isolation:` seul (registre-vocabulaire, 3ᵉ discriminant `FILENAME`, planchers anti-vert-à-vide, premier porteur réel de `# vf-provides:`, cas de preuve #38 rejoué rouge/vert). Vague 1.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 28-02-PLAN.md — Expansion : seconde ligne de la liste close (armements MCP), 5 déclarations `vf-requires: mcp-servers` sur les artefacts réellement armés, admission de la clé dans les `KNOWN` de `check-agents.sh`, opposabilité machine des porteurs de preuve, et les 5 bornes déclarées de l'en-tête du gate. Vague 2.
+- [x] 28-02-PLAN.md — Expansion : seconde ligne de la liste close (armements MCP), 5 déclarations `vf-requires: mcp-servers` sur les artefacts réellement armés, admission de la clé dans les `KNOWN` de `check-agents.sh`, opposabilité machine des porteurs de preuve, et les 5 bornes déclarées de l'en-tête du gate. Vague 2.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 28-03-PLAN.md — *As-installed testing* : le gate exercé tel qu'installé dans un lab vierge, sur un univers d'armement non vide (checkpoint humain — la forme dépasse le cadrage D-04), puis clôture des deux triades de module. Vague 3.
+- [x] 28-03-PLAN.md — *As-installed testing* : le gate exercé tel qu'installé dans un lab vierge, sur un univers d'armement non vide (checkpoint humain — la forme dépasse le cadrage D-04), puis clôture des deux triades de module. Vague 3.
 
 ### Phase 29: Distiller les gains ICM (G1-G5) — investigation dag.sh --scope d'abord
 
