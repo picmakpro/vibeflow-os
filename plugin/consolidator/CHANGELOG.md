@@ -1,5 +1,82 @@
 # CHANGELOG — consolidator
 
+## [v1.9.0] — 2026-08-15
+
+### Changé
+- **`mandatory: true` — le module passe en baseline du lab (INST-02a).** La capitalisation est le
+  principe 1 de VibeFlow (« le projet n'oublie jamais », `patterns/06-capitalisation.md`) ; le socle
+  qui la porte cesse de dépendre d'une arête transitive pour arriver dans un lab. Le module était
+  déjà entraîné en pratique par `conductor` → `validator` → `consolidator`, mais **indirectement** :
+  retirer `validator` d'un lab emportait silencieusement sa mémoire. `mandatory` en fait un invariant
+  déclaré, indépendant de la topologie des `requires`.
+- **Rattrapage automatique des labs existants** : `ensure_mandatory_baseline` (data-driven, aucun
+  nom de module en dur) installe la fermeture transitive de tout module `mandatory` absent au
+  prochain `update --all`. Même mécanisme que le rattrapage de `conductor` en v2.7.0.
+- **Description du catalogue corrigée** : elle annonçait « 4 piliers » alors que le pilier 5
+  (mémoire vivante, ADR-052) est livré depuis v1.6.0, et ne mentionnait ni les registres ni la
+  gouvernance par hooks — c'est pourtant ce que l'utilisateur cherche quand il parle de « mémoire ».
+
+### Corrigé — la mémoire arrive enfin toute seule
+- **`seed-registres.sh` : les gabarits sont désormais instanciés, plus seulement posés.** C'était le
+  vrai défaut, mesuré sur pièce le 2026-08-15 : après installation de la baseline dans un dépôt
+  vierge, `consolidator` était bien posé, ses hooks bien câblés, ses 5 gabarits bien déposés sous
+  `skills/consolidator/references/templates-memoire/` — mais `.claude/memory/` **n'existait pas** et
+  `check-registres.sh --strict` sortait en rc=1 avec les 5 registres canoniques manquants. Aucun
+  script n'allait chercher ces gabarits. La machinerie mémoire tournait à vide sur un dossier
+  inexistant, et c'est ce qui produisait le symptôme terrain « ma logique mémoire n'est pas là »,
+  bien plus que la question de savoir quel module était installé.
+- **Transparent à l'install ET à l'update.** Le seeder est appelé par un quatrième hook post-install
+  nommé dans l'engine (patron des 3 existants) **et** par `sync_module_governance`, c'est-à-dire
+  aussi sur le chemin « module déjà à jour » que prend `update --all`. Sans ce second point d'appel,
+  un lab configuré avant cette version n'aurait reçu ses registres qu'au prochain bump du module —
+  soit jamais s'il n'évolue plus. Un utilisateur existant n'a donc aucun geste à faire.
+- **Non destructif, par contrat et par test.** Le script ne sait que **créer ce qui manque** : un
+  registre existant n'est ni écrasé, ni fusionné, ni réordonné (les registres sont append-only et
+  portent l'historique réel du lab). Vérifié par empreinte dans `test-seed-registres.sh` T3/T4, pas
+  seulement par présence de fichier. Idempotent, donc sûr à rejouer à chaque install et update.
+- **Data-driven** : la liste des registres sort des gabarits présents (`*-template.md` → `<NOM>.md`),
+  aucun nom en dur — ajouter un 6e registre au module suffit à le faire poser (test T10).
+- **Scope `user` : chaque projet a enfin SA mémoire (`--project` + hook `SessionStart`).** Le hook
+  post-install seul ne pouvait pas suffire, et le trou était franc : en scope user les scripts vivent
+  dans `~/.claude/`, donc le seeder remplissait `~/.claude/memory/` — la mémoire du compte — pendant
+  que `check-registres.sh` et les guards de lecture résolvent `.claude/memory` **relativement au
+  cwd**, c'est-à-dire dans le projet ouvert. Résultat mesuré : le home rempli, chaque projet vide, et
+  le lint rouge dans tous les projets d'un poste où VibeFlow est pourtant installé. Une install ne
+  peut pas connaître à l'avance les projets qui l'utiliseront ; l'ouverture de session, si. Le mode
+  `--project` cible le lab courant et est appelé à chaque `SessionStart` : la mémoire arrive dans
+  chaque projet, sans geste, quel que soit le scope.
+- **Garde du mode `--project`** : le cwd n'est traité comme un lab que s'il porte déjà `.planning/`
+  ou `.claude/`. Un dépôt git quelconque ouvert au passage n'en fait délibérément pas partie — sans
+  cette garde, le hook déposerait 5 fichiers dans le premier dossier venu (test T14). Hors lab, sortie
+  0 silencieuse : un non-événement, pas une anomalie.
+- **Échappatoire `VF_NO_AUTO_SEED`** : coupe l'instanciation automatique de session sans désinstaller
+  le module ni éditer un hook (test T15). Le geste reste non destructif dans tous les cas — le hook
+  tourne à chaque ouverture de session et ne sait toujours que créer ce qui manque (T16).
+- **Cloisonnement vérifié** : deux labs distincts ont deux mémoires distinctes, sans fuite de l'un
+  vers l'autre (T17) — l'invariant que le scope user cassait en silence.
+- **Le trou de CI est fermé.** Le job « lab frais » passait `--allow-empty`, qui convertit
+  « 5 registres canon manquants » (rc=1) en « lab vierge, indéterminé » (rc=3), puis acceptait
+  rc=3 : la CI validait un lab **sans mémoire** en le prenant pour un lab neuf. Elle exige désormais
+  le vert dur, plus `seed-registres.sh --check`. Sa baseline cesse aussi de coder `conductor` en dur
+  et se dérive des modules `role=mandatory` du catalogue.
+
+### Décidé — MemPalace reste éteint (capability GSD)
+- Vérifié le 2026-08-15 : **ni la CLI `mempalace` ni un serveur MCP `mempalace_*` ne sont
+  disponibles** sur le poste. Activer `mempalace.enabled` insérerait 7 étages dans le cycle
+  (`discuss:pre/post`, `plan:pre/post`, …) qui résoudraient leur wing, tenteraient leur transport,
+  échoueraient et rapporteraient « unavailable » — un coût en tokens à chaque phase pour un bénéfice
+  nul. La frontière était déjà tranchée par `check-overlaps.sh` : `consolidator` = canon mémoire de
+  lab in-repo et machine-enforced ; `mempalace` = opt-in, non activé, non répliqué.
+- **Déclencheur de reprise** : le jour où MemPalace est réellement installé (CLI ou MCP). Son apport
+  propre est le *recall sémantique* — retrouver « requests hang under load » depuis « API times out
+  when many users connect », là où l'appariement par mots-clés échoue — et il est orthogonal aux
+  registres, pas redondant. Il ne devient intéressant qu'une fois les registres réellement remplis :
+  l'activer sur un lab qui n'en avait aucun aurait été mettre la charrue avant les bœufs.
+
+### Note de migration
+- `consolidator` ne se retire plus à l'unité (règle des modules `mandatory`, cf. `installer/SKILL.md`
+  §Désinstallation) : il ne part qu'avec `uninstall --all`.
+
 ## [v1.8.1] — 2026-07-27
 
 ### Corrigé

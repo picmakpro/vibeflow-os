@@ -22,7 +22,7 @@
     }
   },
   "memory_bridge": {
-    "enabled": false,
+    "enabled": true,
     "registries_path": ".claude/memory"
   }
 }

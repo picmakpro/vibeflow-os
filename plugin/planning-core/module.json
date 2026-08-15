@@ -1,6 +1,6 @@
 {
   "name": "planning-core",
-  "version": "v2.6.0",
+  "version": "v2.6.1",
   "type": "skill + references + scripts",
   "description": "Socle de planning & gestion documentaire universel : tronc commun .planning/ (PROJECT/REQUIREMENTS/ROADMAP/STATE/MILESTONES/phases) + topologie à compartiments (steering lab + INDEX + plan conditionnel typé deliverable/continuous + détection de dette), adapté à la logique métier de chaque lab — jamais imposé.",
   "requires": []
