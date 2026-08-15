@@ -1,5 +1,37 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.17.0] — 2026-08-16 (Phase 30 plan 30-09 — le filet de péremption des chemins de hook, addendum)
+
+**Minor** (nouvelle capacité : un 5e signal SessionStart, pas un simple correctif). Addendum
+approuvé le 2026-08-15, hors périmètre du cadrage d'origine de la Phase 30 : D-01 fait écrire, à
+l'install, un chemin absolu d'interpréteur `bash` dans le `command` des 4 entrées `SessionStart`
+existantes (décision **one-way**, assumée) — un angle mort silencieux que rien ne surveillait :
+quand ce chemin devient périmé (interpréteur mis à jour, Git Bash réinstallé, machine changée), le
+hook cesse simplement de tourner, sans erreur ni message.
+
+### Ajouté
+- **`check-hook-paths.sh`** — 5e signal `SessionStart` advisory (ADR-031) : relit les réglages
+  réellement posés (`.claude/settings.json` et `.claude/settings.local.json`, scope projet et scope
+  utilisateur), vérifie que chaque chemin absolu d'une entrée en forme exec existe et est
+  exécutable, et le dit — brièvement (7 lignes maximum) sur constat, **strictement rien** (zéro
+  octet stdout) sur le chemin nominal. Trois issues (silence, constat, « verdict non rendu » —
+  jamais un faux PASS sur réglages illisibles), jamais le code 2.
+- **Entrée de hook n°26**, `SessionStart` · `startup` : seule entrée du parc dont le `command` est
+  un **nom nu littéral** (`bash`), jamais le jeton d'interpréteur substitué à l'install — paradoxe
+  d'amorçage assumé (un filet qui dépendrait du chemin figé mourrait dans le cas qu'il détecte).
+  **Dérogation à ADR-071 §Décision 2** (qui exige l'inverse, sans clause d'exception), **autorisée
+  par l'approbation humaine de l'addendum du 2026-08-15 — pas par ADR-071 elle-même**, qui ne
+  documente pas encore ce cas (reliquat : un amendement d'ADR-071, ou une ADR dédiée, est dû).
+  Gardée à la machine par le cas T9 de `test-check-hook-paths.sh` (discriminance prouvée par
+  mutation).
+- **`docs/HOOKS-CONTRAT-SORTIE.md`** — inventaire durable porté à 26 entrées (5 dev-orchestrator,
+  21 advisory au total), avec le paragraphe de dérogation de l'entrée n°26.
+- **`plugin/dev-orchestrator/scripts/tests/test-check-hook-paths.sh`** — 61e suite du dépôt, 12 cas
+  (silence, constat sur `command`/`args`, illisible bruyant, les deux fichiers de réglages projet
+  lus indépendamment, absence totale de réglages, parité d'interface, garde anti-« réparation » de
+  l'entrée n°26, identité du bloc localisateur, aller-retour dans `merge-hooks.sh`, accord
+  doc/parc), 4 mutations tracées.
+
 ## [v2.16.0] — 2026-08-16 (Phase 30 tâche 07 — les 4 hooks SessionStart passent en forme exec, PORT-02)
 
 **Minor** (changement de forme des hooks + contrat de sortie, pas un simple correctif). Les 4
