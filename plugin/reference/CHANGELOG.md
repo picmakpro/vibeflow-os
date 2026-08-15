@@ -1,5 +1,14 @@
 # CHANGELOG — reference
 
+## [v2.5.3] — 2026-08-15
+
+### Ajouté
+- `content/methodology/patterns/03-agents.md` (+ miroir `docs/` gitignoré, tenu identique à
+  l'octet) — sous-section « Ce que l'agent ne charge pas » avec une table
+  `| Tâche | Charge | NE charge PAS |` (3 exemples fictifs, exclusions nommées précisément), une
+  puce ajoutée aux « Règles d'or » et un anti-pattern ajouté aux « Anti-patterns ». Patch : addition
+  doctrinale dans un pattern existant, pas un nouveau pattern.
+
 ## [v2.5.2] — 2026-07-26
 
 ### Corrigé

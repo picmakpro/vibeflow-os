@@ -79,6 +79,63 @@
 # mauvais nom). Une occurrence ne compte que si ses deux voisins immédiats sortent de l'alphabet des
 # identifiants (`A-Za-z0-9_.-`).
 #
+# BORNES DÉCLARÉES DE LA RÈGLE 4 (Phase 28, plan 28-02) — ce qu'elle couvre, et ce qu'elle ne
+# couvre pas. Un gate qui laisse croire qu'il couvre plus que son périmètre réel est exactement le
+# mode d'échec qu'il existe pour fermer (D-01b).
+#
+# Borne 1 — LA LISTE CLOSE, énumérée à la main, jamais déduite. Deux lignes aujourd'hui :
+#   `isolation` et le couple de clés MCP (`vf-mcp-consumer`, `vf-mcp-tools`). Tout armement absent
+#   de cette liste n'est vu que s'il est DÉCLARÉ par l'artefact (moitié D-01, règle 4bis). La liste
+#   s'élargit ligne à ligne quand un cas nouveau se présente, jamais par heuristique — un gate qui
+#   devinerait la frontière serait « soit inerte soit insupportable » (`.planning/ROADMAP.md:2064`).
+#
+# Borne 2 — LA HIÉRARCHIE AVEC `check-agents.sh`. Deux gardes coexistent sur `isolation:`, et ne
+#   disent PAS la même chose. `check-agents.sh:546-549` est un PALIER DUR : interdiction de forme,
+#   aucune valeur d'`isolation:` n'est admise dans un agent distribué, corpus = les frontmatters
+#   d'agents d'un `agents_dir` à la fois, levée = distribuer la précondition ET prouver le retour
+#   des commits. La règle 4 de CE gate est un PALIER DE RELATION : un armement n'est admis que si
+#   sa précondition est distribuée, corpus = les artefacts distribués (agents, `AGENT.md`,
+#   `SKILL.md`, en deux dispositions), levée = prouver la précondition seule. Pourquoi l'autre
+#   subsiste : la règle 4 ne juge QUE la première des deux préconditions de #38 — le retour des
+#   commits d'un worker isolé (`open-gsd/gsd-core#3302`) n'est attestable par AUCUN
+#   `# vf-provides:`, donc un VERT de la règle 4 n'autorise JAMAIS de ré-armer `isolation:`.
+#
+# Borne 3 — L'ASYMÉTRIE AGENT / SKILL. Le corpus d'armement inclut les `SKILL.md` distribués, donc
+#   la règle 4 est le SEUL contrôle machine qui existe sur une clé de frontmatter de `SKILL.md` :
+#   aucun linter de clés n'existe pour eux dans ce dépôt (les scripts qui lisent un `SKILL.md` le
+#   font pour résoudre un `name:`, jamais pour valider un jeu de clés). Conséquence : la règle 4
+#   vérifie la RELATION armement ↔ précondition sur ces fichiers, et RIEN D'AUTRE de leur
+#   frontmatter.
+#
+# Borne 4 — LE NOM DU PATRON, ET LA LIMITE HONNÊTE. Le patron s'appelle as-installed testing
+#   (autopkgtest Debian) : tester l'artefact TEL QU'INSTALLÉ dans un lab vierge, jamais l'arbre
+#   source — tester l'arbre source ne prouve rien sur ce que l'install pose (D-04). Ce que la
+#   règle 4 établit ici est une couverture declaree, pas une couverture effective : elle vérifie
+#   qu'un `# vf-provides:` existe et qu'un cas de la suite prouve sa discriminance ; elle ne
+#   vérifie PAS, à l'instant de l'usage chez l'utilisateur, que la précondition est effectivement
+#   satisfaite — cela relève du script de preuve lui-même, que ce gate n'exécute JAMAIS (lecture
+#   seule stricte, ci-dessous).
+#
+# Borne 5 — PRÉCONDITION DURE CONTRE TUNING À DÉFAUT SÛR, TRANCHÉE. La règle 4 rend DEUX verdicts
+#   (VERT / ROUGE) et AUCUN troisième état PAR ARTEFACT ; le troisième état de la doctrine de ce
+#   gate reste porté par les PLANCHERS (exit 2, NON VÉRIFIABLE) ci-dessous, qui disent que le gate
+#   ne peut pas se prononcer, jamais qu'un artefact serait « à moitié armé ». Motif : la jointure
+#   est STATIQUE (A-4 i, ce gate n'exécute rien) — il ne peut donc pas observer une dégradation
+#   gracieuse au moment de l'usage ; un « jaune » par artefact serait un verdict qu'il ne peut pas
+#   tenir, ce que la doctrine des trois états ci-dessus interdit déjà explicitement (« Un gate ne se
+#   replie pas sur un verdict qu'il ne peut pas tenir »). C'est une DIVERGENCE ASSUMÉE avec la
+#   recommandation « trois verdicts » de `28-RESEARCH.md` Open Question 2, et A-9 l'autorise à
+#   condition d'écrire le motif — le voici.
+#
+#   Corollaire (garde-fou A-9 contre le cas de preuve creux) — `isolation:` RESTE dans la liste
+#   close, motif RÉÉCRIT pour gsd-core 1.10.0 : (a) le moteur ne casse plus en silence, il dégrade
+#   en séquentiel avec message — `worktree.baseRef` a bien glissé de PRÉCONDITION DURE vers TUNING
+#   À DÉFAUT SÛR ; (b) et cela ne désarme rien, parce que poser `baseRef: "head"` TAIT LA
+#   VÉRIFICATION SANS RÉSOUDRE LA BASE (le moteur le dit lui-même, `worktree-base-ref.cjs`), et
+#   parce que le second verrou (`open-gsd/gsd-core#3302`) est intact. Un armement dont le réglage
+#   « sûr » consiste à ÉTEINDRE le contrôle n'est pas un armement sûr. La ligne reste, avec ce
+#   motif — voir la table des armements plus bas.
+#
 # Lecture seule stricte : ce script n'écrit AUCUN fichier, ne déplace rien, n'efface rien. Son seul
 # effet est son code de sortie et son rapport sur stderr.
 #
@@ -96,12 +153,19 @@
 #                     ligne, jamais l'espace — un séparateur « espace » ne peut, par construction,
 #                     pas exprimer un chemin qui en contient, ce qui est le cas courant sous
 #                     `~/Library/Mobile Documents/`)
+#   VF_CAPACT_ARMED     liste des artefacts à balayer pour la règle 4 (armement `isolation:` etc.),
+#                       UN PAR LIGNE — défaut : `plugin/*/agents/*.md` + `plugin/*/AGENT.md` +
+#                       `plugin/*/SKILL.md` + `plugin/*/skills/*/SKILL.md` (dépôt) ou
+#                       `.claude/agents/*.md` + `.claude/skills/*/SKILL.md` (lab installé)
+#   VF_CAPACT_PROVIDERS liste des scripts à balayer pour le marqueur `# vf-provides:`, UN PAR LIGNE —
+#                       défaut : `plugin/*/scripts/*.sh` (dépôt) ou `.claude/scripts/*.sh` (lab)
 #
 # Exit codes:
 #   0  = conforme (le rapport nomme l'univers balayé : combien de toggles, sur quels fichiers)
-#   1  = écart constaté (règle 2, 2bis ou 3), message nommant lequel et où
+#   1  = écart constaté (règle 2, 2bis, 3, 4 ou 4bis), message nommant lequel et où
 #   2  = NON VÉRIFIABLE : index absent/illisible/sans toggle/sans brique, corpus absent/sans
-#        marqueur, configuration absente ou imparsable, `jq` introuvable
+#        marqueur, configuration absente ou imparsable, `jq` introuvable, corpus d'armement ou de
+#        preuve de la règle 4 vide/illisible ou sans aucun `# vf-provides:`
 #   64 = usage (argument inconnu, --path sans valeur)
 set -uo pipefail
 
@@ -230,6 +294,105 @@ for f in "$@"; do
     exit 2
   fi
 done
+CORPUS_FILES=("$@")
+
+# --- Regle 4 : corpus d'armement (frontmatter des artefacts distribues) et corpus de preuve
+# (en-tete des scripts distribues). Memes DEUX dispositions et meme decoupage DESARME que CORPUS
+# ci-dessus (VF_CAPACT_ARMED / VF_CAPACT_PROVIDERS : canaux de testabilite, patron VF_CAPACT_CORPUS).
+# Non surchargeables : la LISTE CLOSE des armements et la TABLE DES IDS legaux, elles, vivent dans
+# l'awk plus bas et ne recoivent JAMAIS de variable d'environnement (T-28-01-05) — la doctrine ne se
+# deplace pas par `export`.
+vf_capact_glob_list() { # <motif...> -> chemins EXISTANTS, FICHIERS reguliers, jamais un lien
+                         # symbolique ; bases exclues (contracts.md/README.md/AGENTS.md, patron
+                         # check-agents.sh:165)
+  # Chaque motif est de la forme `$ROOT/segment/fixe/*/reste/*.md` : un `for f in $pat` NU sur la
+  # CHAINE ENTIERE fait subir le word-splitting AVANT le globbing — si `$ROOT` contient un espace,
+  # le motif est coupe en deux mots et plus rien ne matche (meme piege que CORPUS_DEFAULT documente
+  # plus haut, `~/Library/Mobile Documents/`). Glober `"$parent"/$wildcard` (parent QUOTE) ne marche
+  # PAS non plus : le `*` a l'interieur d'une chaine quotee reste litteral, il n'est jamais reconnu
+  # comme metacaractere par le shell.
+  #
+  # La seule construction correcte : isoler la partie FIXE du motif (le prefixe SANS aucun
+  # metacaractere — c'est elle, et elle seule, qui peut contenir l'espace de `$ROOT`) de sa partie
+  # GLOB (le reste, un texte statique du script, jamais issu d'une variable), `cd` dans la partie
+  # fixe (chemin quote, donc l'espace ne la coupe pas), puis glober la partie GLOB, non quotee,
+  # DANS ce repertoire — ou aucun `$ROOT` n'entre plus en jeu.
+  local pat f head tail
+  for pat in "$@"; do
+    head="$pat"; tail=""
+    while :; do
+      case "$head" in
+        *'*'*|*'?'*|*'['*) : ;;
+        *) break ;;
+      esac
+      case "$head" in
+        */*) tail="${head##*/}${tail:+/$tail}"; head="${head%/*}" ;;
+        *) tail="$head${tail:+/$tail}"; head="."; break ;;
+      esac
+    done
+    [ -d "$head" ] || continue
+    ( cd "$head" 2>/dev/null || exit 0
+      # shellcheck disable=SC2231,SC2086
+      for f in $tail; do
+        [ -e "$f" ] || continue
+        [ -L "$f" ] && continue
+        [ -f "$f" ] || continue
+        case "$(basename "$f")" in
+          contracts.md|README.md|AGENTS.md) continue ;;
+        esac
+        printf '%s\n' "$f"
+      done
+    ) | while IFS= read -r f; do printf '%s/%s\n' "$head" "$f"; done
+  done
+}
+
+if [ "$(basename "$MODULE_DIR")" = ".claude" ]; then
+  ARMED_DEFAULT="$(vf_capact_glob_list "$ROOT/.claude/agents/*.md" "$ROOT/.claude/skills/*/SKILL.md")"
+  PROVIDERS_DEFAULT="$(vf_capact_glob_list "$ROOT/.claude/scripts/*.sh")"
+else
+  ARMED_DEFAULT="$(vf_capact_glob_list "$ROOT/plugin/*/agents/*.md" "$ROOT/plugin/*/AGENT.md" "$ROOT/plugin/*/SKILL.md" "$ROOT/plugin/*/skills/*/SKILL.md")"
+  PROVIDERS_DEFAULT="$(vf_capact_glob_list "$ROOT/plugin/*/scripts/*.sh")"
+fi
+# `-` et non `:-` : une surcharge EXPLICITEMENT vide (VF_CAPACT_ARMED="") doit rendre un univers
+# VRAIMENT vide (testabilité des planchers, tâche 2) — jamais retomber sur le défaut comme le
+# ferait `:-`. Seule l'ABSENCE totale de la variable retombe sur la cascade.
+ARMED="${VF_CAPACT_ARMED-$ARMED_DEFAULT}"
+PROVIDERS="${VF_CAPACT_PROVIDERS-$PROVIDERS_DEFAULT}"
+
+_old_ifs="$IFS"
+set -f
+IFS='
+'
+# shellcheck disable=SC2086
+set -- $ARMED
+set +f
+IFS="$_old_ifs"
+ARMED_FILES=("$@")
+
+_old_ifs="$IFS"
+set -f
+IFS='
+'
+# shellcheck disable=SC2086
+set -- $PROVIDERS
+set +f
+IFS="$_old_ifs"
+PROV_FILES=("$@")
+
+# Lisibilite : meme patron que la boucle CORPUS ci-dessus (:233-238). Un chemin ANNONCE (par
+# defaut ou par surcharge) mais illisible sort en 2, jamais un saut silencieux.
+for f in "${ARMED_FILES[@]+"${ARMED_FILES[@]}"}"; do
+  if [ ! -r "$f" ]; then
+    echo "[check-capability-activation] artefact d'armement illisible ($f) — activation NON VÉRIFIABLE" >&2
+    exit 2
+  fi
+done
+for f in "${PROV_FILES[@]+"${PROV_FILES[@]}"}"; do
+  if [ ! -r "$f" ]; then
+    echo "[check-capability-activation] script de preuve illisible ($f) — activation NON VÉRIFIABLE" >&2
+    exit 2
+  fi
+done
 
 # État effectif : chaque chemin PRÉSENT dans la configuration, avec son état. `paths` et non
 # `paths(scalars)` : une clé portant un objet ou un tableau est PRÉSENTE, et la doctrine énoncée
@@ -262,6 +425,8 @@ report="$(
   VF_CAPACT_REL_INDEX="$REL_INDEX" \
   VF_CAPACT_REL_CONFIG="$REL_CONFIG" \
   VF_CAPACT_ROOT="$ROOT" \
+  VF_CAPACT_ISARM="$(printf '%s\n' "${ARMED_FILES[@]+"${ARMED_FILES[@]}"}")" \
+  VF_CAPACT_ISPRV="$(printf '%s\n' "${PROV_FILES[@]+"${PROV_FILES[@]}"}")" \
   awk -F'|' '
   function isid(c) { return (c ~ /^[A-Za-z0-9_.-]$/) }
   # Comptage LITTERAL A FRONTIERE (index(), pas de regex : un nom de toggle porte des points et des
@@ -312,6 +477,45 @@ report="$(
     }
     nT = 0; nB = 0; nM = 0; nMarkers = 0; nCorpus = 0; nLines = 0
     nInactive = 0; nUnknown = 0; nBrickInactive = 0; bad = 0; sec = ""
+    # --- Regle 4 : vocabulaire, litteral et non surchargeable (A-1 : un registre = vocabulaire
+    # seul). Liste CLOSE des armements surveilles : issue #38.
+    #   isolation -> worktree-baseref. Motif REECRIT pour gsd-core 1.10.0 (Phase 28, plan 28-02,
+    #   borne 5 de len-tete) : (a) le moteur ne casse plus en silence, il degrade en sequentiel
+    #   avec message -- worktree.baseRef a bien glisse de PRECONDITION DURE vers TUNING A DEFAUT
+    #   SUR ; (b) et cela ne desarme rien : poser baseRef: head TAIT LA VERIFICATION SANS RESOUDRE
+    #   LA BASE (le moteur le dit lui-meme, worktree-base-ref.cjs), et le second verrou
+    #   open-gsd/gsd-core#3302 (retour des commits dun worker isole) reste intact. Un armement dont
+    #   le reglage sur consiste a ETEINDRE le controle nest pas un armement sur. La ligne reste.
+    # Ces deux tables ne recoivent AUCUNE variable de surcharge.
+    ARM["isolation"] = "worktree-baseref"
+    # Seconde ligne (Phase 28, plan 28-02) : un artefact qui recoit une allowlist MCP derivee du
+    # lab depend dune precondition externe -- lexistence reelle des serveurs cites -- que rien ne
+    # garantit chez lutilisateur ; le contre-fait mesure est que ce depot na AUCUN .mcp.json, donc
+    # lallowlist nommee de vf-reviewer.md:10 ny est prouvee par rien. Les deux grammaires
+    # (vf-mcp-consumer: true selecteur booleen, vf-mcp-tools: serveur:outils allowlist nommee)
+    # exigent la MEME precondition mcp-servers, deja admise dans OKID depuis 28-01. Le token MCP
+    # litteral (mcp double-underscore) nentre JAMAIS dans cette table : la liste close se lit sur
+    # des CLES de frontmatter, et sa seule occurrence dans les sources est une phrase de prose
+    # (vf-reviewer.md:45) que la regle 4 ne doit surtout pas confondre avec un armement.
+    ARM["vf-mcp-consumer"] = "mcp-servers"
+    ARM["vf-mcp-tools"] = "mcp-servers"
+    nArmTable = 0
+    for (armk in ARM) nArmTable++
+    OKID["worktree-baseref"] = 1
+    OKID["mcp-servers"] = 1
+    nOkidTable = 0
+    for (okidk in OKID) nOkidTable++
+    # Membres des deux corpus neufs, portes par lENVIRONNEMENT (jamais awk -v, motif ci-dessus) :
+    # ISARM/ISPRV sont des ensembles de FILENAME exacts, tels que passes en argv plus bas, pour que
+    # le troisieme discriminant (FILENAME in ISARM / FILENAME in ISPRV) fonctionne par egalite
+    # stricte de chaine.
+    nUnivArm = 0
+    n = split(ENVIRON["VF_CAPACT_ISARM"], isaArr, "\n")
+    for (i = 1; i <= n; i++) { if (isaArr[i] == "") continue; ISARM[isaArr[i]] = 1; nUnivArm++ }
+    nUnivPrv = 0
+    n = split(ENVIRON["VF_CAPACT_ISPRV"], ispArr, "\n")
+    for (i = 1; i <= n; i++) { if (ispArr[i] == "") continue; ISPRV[ispArr[i]] = 1; nUnivPrv++ }
+    nArmFiles = 0; nReqFiles = 0; nProv = 0
   }
   # --- Fichier 1 : index genere. Reperage par SECTION, jamais par arite : trois tables y vivent
   # desormais, dont deux de meme largeur — `NF` seul les confondrait.
@@ -350,6 +554,56 @@ report="$(
     if (!(k in T)) { T[k] = 1; nT++; TORDER[nT] = k }
     next
   }
+  # --- Regle 4, fichier 2 : le frontmatter des artefacts armes. Insere AVANT le bloc corpus SANS
+  # CONDITION plus bas : sans cela ces frontmatters tomberaient dans nLines et fausseraient le
+  # compteur de corpus (non-regression exigee par la tache 2). Bloc ferme sur la LIGNE `---`
+  # exacte : nouvrir qua la premiere, fermer a la suivante, jamais au-dela.
+  FILENAME in ISARM {
+    if (FNR == 1) { afm_state = 0 }
+    if (afm_state == 0) {
+      if ($0 == "---") afm_state = 1
+      next
+    }
+    if (afm_state == 1) {
+      if ($0 == "---") { afm_state = 2; next }
+      t = index($0, ":")
+      if (t > 1) {
+        k = substr($0, 1, t - 1)
+        v = substr($0, t + 1)
+        gsub(/^[ \t]+/, "", k); gsub(/[ \t]+$/, "", k)
+        gsub(/^[ \t]+/, "", v); gsub(/[ \t]+$/, "", v)
+        gsub(/^"/, "", v); gsub(/"$/, "", v)
+        if ((k in ARM) && v != "" && !(FILENAME in ARM_LINE)) {
+          if (!(FILENAME in ARMFILE)) { ARMFILE[FILENAME] = 1; ARMFILE_ORDER[++nArmFiles] = FILENAME }
+          ARM_LINE[FILENAME] = FNR
+          ARM_KEY[FILENAME] = k
+        }
+        if (k == "vf-requires" && v != "") {
+          if (!(FILENAME in REQ_VAL)) { REQFILE_ORDER[++nReqFiles] = FILENAME }
+          REQ_VAL[FILENAME] = v
+          REQ_LINE[FILENAME] = FNR
+        }
+      }
+      next
+    }
+    next
+  }
+  # --- Regle 4, fichier 3 : le bloc de commentaires de tete des scripts porteurs de preuve. Le
+  # marqueur nest cherche que dans ce bloc — jusqua la premiere ligne NON commentee — jamais au
+  # milieu dun script (patron de la docstring imprimee en --help, :162-164 historique).
+  FILENAME in ISPRV {
+    if (FNR == 1) { prv_open = 1 }
+    if (prv_open) {
+      if ($0 !~ /^#/) { prv_open = 0; next }
+      if ($0 ~ /^# vf-provides: /) {
+        id = $0
+        sub(/^# vf-provides: /, "", id)
+        gsub(/^[ \t]+/, "", id); gsub(/[ \t]+$/, "", id)
+        if (id != "" && !(id in PROV)) { PROV[id] = 1; nProv++ }
+      }
+    }
+    next
+  }
   # --- Fichiers suivants : le corpus. Chaque ligne est memorisee pour le rebalayage par toggle
   # (deux fichiers de reference du module : quelques centaines de lignes, cout negligeable).
   {
@@ -384,6 +638,26 @@ report="$(
     }
     if (nM == 0) {
       print "[check-capability-activation] aucun marqueur conditionnel dans le corpus (" nCorpus " fichier(s), " nLines " ligne(s)) — activation NON VERIFIABLE"
+      exit 2
+    }
+    # --- Planchers anti-vert-a-vide de la regle 4. Meme forme mot pour mot que ceux de la regle 1
+    # ci-dessus : chaque plancher nomme QUELLE regle il rend INERTE, et sort en 2. Aucune de ces
+    # quatre conditions ne peut se produire par une simple absence darmement (etat NORMAL) : elles
+    # signalent labsence de LUNIVERS lui-meme, jamais labsence de contenu arme dedans.
+    if (nUnivArm == 0) {
+      print "[check-capability-activation] aucun artefact lisible dans le corpus darmement (" nUnivArm " fichier(s) annonce(s)) — la regle 4 serait INERTE, activation NON VERIFIABLE"
+      exit 2
+    }
+    if (nProv == 0) {
+      print "[check-capability-activation] aucun marqueur # vf-provides: dans le corpus de scripts balaye (" nUnivPrv " fichier(s)) — la moitie preuve de la regle 4 serait INERTE, activation NON VERIFIABLE"
+      exit 2
+    }
+    if (nArmTable == 0) {
+      print "[check-capability-activation] table des armements surveilles vide — la regle 4 serait INERTE, activation NON VERIFIABLE"
+      exit 2
+    }
+    if (nOkidTable == 0) {
+      print "[check-capability-activation] table des ids de precondition legaux vide — la regle 4 et la regle 4bis seraient INERTES, activation NON VERIFIABLE"
       exit 2
     }
     # --- Regle 2 : promesse non marquee, par nom de TOGGLE.
@@ -432,11 +706,52 @@ report="$(
         bad++
       }
     }
+    # --- Regle 4 : armement sans precondition distribuee (issue #38). Trois sous-cas ROUGE : (a)
+    # aucun vf-requires, (b) vf-requires ne cite pas lid exige par CET armement, (c) id legal mais
+    # aucun # vf-provides le levant dans le corpus de preuve balaye. Le ROUGE nait de l ARMEMENT
+    # SEUL (A-3) : vf-requires ne fait que le LEVER.
+    for (i = 1; i <= nArmFiles; i++) {
+      f = ARMFILE_ORDER[i]
+      armkey = ARM_KEY[f]
+      reqid = ARM[armkey]
+      relf = f
+      if (ROOT != "" && index(f, ROOT "/") == 1) relf = substr(f, length(ROOT) + 2)
+      if (!(f in REQ_VAL) || REQ_VAL[f] == "") {
+        print "[check-capability-activation] ECART regle 4 : artefact « " relf " » arme « " armkey " » sans precondition declaree (vf-requires: absent) — exige « " reqid " » — " relf ":" ARM_LINE[f]
+        bad++
+        continue
+      }
+      if (REQ_VAL[f] != reqid) {
+        print "[check-capability-activation] ECART regle 4 : artefact « " relf " » arme « " armkey " » mais vf-requires cite « " REQ_VAL[f] " », pas id exige « " reqid " » — " relf ":" ARM_LINE[f]
+        bad++
+        continue
+      }
+      if (!(reqid in PROV)) {
+        print "[check-capability-activation] ECART regle 4 : artefact « " relf " » arme « " armkey " », vf-requires « " reqid " » legal, mais aucun # vf-provides: " reqid " dans le corpus de scripts balaye — " relf ":" ARM_LINE[f]
+        bad++
+        continue
+      }
+    }
+    # --- Regle 4bis : hygiene de declaration, symetrique de la regle 3. Un vf-requires citant un
+    # id HORS de la table des ids legaux est une ERREUR DE DECLARATION (A-1), jamais un vert. A
+    # linverse, un vf-requires LEGAL porte par un artefact SANS armement nest jamais un ecart :
+    # cest la moitie declaree de D-01, elle doit rester ouverte aux preconditions que la liste
+    # close ne connait pas — cette boucle ne verifie QUE la legalite de lid, jamais la presence dun
+    # armement correspondant.
+    for (i = 1; i <= nReqFiles; i++) {
+      f = REQFILE_ORDER[i]
+      id = REQ_VAL[f]
+      if (id in OKID) continue
+      relf = f
+      if (ROOT != "" && index(f, ROOT "/") == 1) relf = substr(f, length(ROOT) + 2)
+      print "[check-capability-activation] ECART regle 4bis : artefact « " relf " » declare vf-requires « " id " », absent de la table des ids legaux — " relf ":" REQ_LINE[f]
+      bad++
+    }
     if (bad > 0) exit 1
     print "[check-capability-activation] conforme — univers balaye : " nT " toggle(s) lus dans " RELIDX ", dont " nInactive " inactif(s) et " nUnknown " indetermine(s) sur " RELCFG " ; " nB " brique(s) routee(s), dont " nBrickInactive " sous toggle inactif ; " nM " toggle(s) sous marqueur (" nMarkers " occurrence(s)) dans " nCorpus " fichier(s) de corpus, " nLines " ligne(s)."
     exit 0
   }
-  ' "$INDEX" "$@"
+  ' "$INDEX" "${CORPUS_FILES[@]+"${CORPUS_FILES[@]}"}" "${ARMED_FILES[@]+"${ARMED_FILES[@]}"}" "${PROV_FILES[@]+"${PROV_FILES[@]}"}"
 )"
 rc=$?
 [ -n "$report" ] && printf '%s\n' "$report" >&2

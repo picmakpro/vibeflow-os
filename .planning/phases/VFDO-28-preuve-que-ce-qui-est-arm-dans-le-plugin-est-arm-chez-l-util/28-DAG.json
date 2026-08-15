@@ -1,0 +1,76 @@
+{
+  "nodes": [
+    {
+      "id": "exec-01",
+      "step": "executer 28-01 (tranche tracante regle 4)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-01",
+      "step": "revue du diff 28-01",
+      "stage": "",
+      "deps": [
+        "exec-01"
+      ],
+      "scope": [],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "verif-01",
+      "step": "verification d'etape 28-01",
+      "stage": "",
+      "deps": [
+        "exec-01"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-02",
+      "step": "executer 28-02 (expansion MCP + bornes)",
+      "stage": "",
+      "deps": [
+        "revue-01",
+        "verif-01"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-02",
+      "step": "revue du diff 28-02",
+      "stage": "",
+      "deps": [
+        "exec-02"
+      ],
+      "scope": [],
+      "status": "ready",
+      "review_regime": "full"
+    },
+    {
+      "id": "verif-02",
+      "step": "verification d'etape 28-02",
+      "stage": "",
+      "deps": [
+        "exec-02"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "docs",
+      "step": "audit read-only de derive documentaire",
+      "stage": "",
+      "deps": [
+        "exec-01",
+        "exec-02"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

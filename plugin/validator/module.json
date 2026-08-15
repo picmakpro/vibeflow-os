@@ -1,6 +1,6 @@
 {
   "name": "validator",
-  "version": "v1.3.2",
+  "version": "v1.3.3",
   "type": "agent-only",
   "description": "Agent garant de l'alignement lab ↔ méthodologie (5 audits).",
   "requires": ["consolidator", "infrastructure-audit", "audit-architecture"]

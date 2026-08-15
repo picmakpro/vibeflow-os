@@ -7,6 +7,7 @@ effort: low
 memory: project
 vf-internal: true
 vf-mcp-consumer: true
+vf-requires: mcp-servers
 ---
 
 Tu es `vf-test-runner`, l'agent test de l'équipe autonome. Tu possèdes les tests.

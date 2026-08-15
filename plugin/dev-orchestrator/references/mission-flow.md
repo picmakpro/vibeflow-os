@@ -260,6 +260,7 @@ manager↔worker↔worker de revue). Sur un rapport typé `gaps_found` :
 2. Dispatch `vf-coder` en mandat de **correction CIBLÉE** : les findings remontés, rien d'autre —
    jamais un cycle cadrage → plan → exécution complet.
 3. Re-dispatch `vf-reviewer` sur le diff corrigé.
+   Un même verdict qui revient deux fois sur ce nœud : édition-à-la-source, pas un 4ᵉ redispatch — règle et seuil au niveau kernel (`team-kernel.md` §Règles d'instanciation, G5).
 
 Budget **3 tours**, au grain **étape** et **partagé** avec les autres boucles de correction de la
 même étape (§6 ci-dessous) — un budget séparé par boucle se contournerait mécaniquement, par

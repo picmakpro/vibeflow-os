@@ -1,5 +1,25 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.14.0] — 2026-08-15 (bullet contractuelle « NE charge PAS » + édition-à-la-source)
+
+**Minor** (nouvelle capacité, pas un simple correctif) : le gabarit de digest de mission porte
+désormais une bullet contractuelle que **tout mandat futur** émettra — c'est une extension du
+contrat de dispatch entre manager et worker, pas une correction de comportement existant.
+
+### Ajouté
+- `references/mission-contracts.md` — bullet `- NE charge PAS : <périmètres gelés des autres
+  nœuds en vol, dérivés de `dag.sh status --frozen`>` ajoutée au gabarit `DIGEST`, plus une
+  sous-section « Composition du négatif (bullet « NE charge PAS », G1) » qui documente la source
+  des données, l'opération (soustraction) et les deux cas dégénérés. Composée par le manager, en
+  doctrine — zéro ligne touchée dans `plugin/conductor/scripts/dag.sh` (D-03).
+- `references/team-kernel.md` §Règles d'instanciation — règle d'édition-à-la-source (G5) : seuil
+  chiffré (deux occurrences du même verdict sur le même objet), sources légitimes énumérées
+  (jamais le worker), comportement en mission autonome (consigner, pas amender), citant ADR-031.
+- `references/mission-flow.md` — 1 ligne de renvoi vers la règle d'édition-à-la-source (Pattern E
+  §2), sans reformulation.
+
+`agents/vf-dev-manager.md` reste à 250/250 (ADR-029, non touché).
+
 ## [v2.13.1] — 2026-08-10 (correctif #38 — `isolation: worktree` retiré du frontmatter)
 
 **Retrait d'`isolation: worktree` du frontmatter de `vf-coder`.** Livrée en v2.49.0

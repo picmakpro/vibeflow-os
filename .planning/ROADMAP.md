@@ -457,6 +457,7 @@ Plans:
 | 26. Manuel utilisateur VibeFlow (manual/) | gsd-alignement | — | Complete (PR #28) | 2026-08-02 |
 | 27. Parallélisation d'exécution — granulaire, simple, sans collision | gsd-alignement | 6/6 | Complete (PR #35) — spike `claude_orchestration` refusé par écrit | 2026-08-10 |
 | 28. Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur | gsd-alignement | 0/0 | Inscrite — ouverte par la régression #38 (v2.49.0 → v2.50.1) ; **non cadrée**, mise à jour VibeFlow attendue avant | — |
+| 29. Distiller les gains ICM (G1-G5) — investigation dag.sh --scope d'abord | — | 5/5 | Complete (PR #41) — release `v2.51.0`, D-03 tenue (`dag.sh` hors diff), checkpoint humain T-29-05-3 tranché le 2026-08-15 | 2026-08-15 |
 
 ### Phase 15: Collaboration inter-équipes dev ↔ design
 
@@ -2014,9 +2015,9 @@ la rend sûre n'est **posé par personne** chez l'utilisateur. Aujourd'hui rien 
 l'armement voyage avec le plugin, la précondition reste dans le poste de développement, et tous les
 gates rendent vert.
 
-**Requirements**: TBD
+**Requirements**: ARMD-01, ARMD-02, ARMD-03, ARMD-04, ARMD-05, ARMD-06, ARMD-07, ARMD-08, ARMD-09, ARMD-10
 **Depends on:** Phase 27
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 #### Le fait qui ouvre la phase
 
@@ -2062,15 +2063,60 @@ même besoin en 3 langages, et un script neuf dans aucun roster).
 - **Qu'est-ce qu'un « armement » recensable ?** `isolation:` est le cas connu. Un hook, un flag de
   capability, une clé de settings lue par un script posé, un `permissionMode` — la frontière n'est
   pas établie, et un gate qui la devine sera soit inerte soit insupportable.
+
 - **Le lab frais doit-il porter le gate, ou faut-il un gate séparé ?** Le premier a l'environnement,
   le second a la lisibilité. Non tranché.
+
 - **Faut-il distribuer `worktree.baseRef` et ré-armer ?** Question distincte, et **elle n'est pas
   ouverte par cette phase** : le retour des commits d'un worker isolé reste non implémenté en amont
   (`open-gsd/gsd-core#3302`). Tant que ce point n'est pas levé, ré-armer serait refaire #38 avec une
   précondition de plus. Cette phase porte le **gate**, pas le ré-armement.
 
 Plans:
+**Wave 1**
 
-- [ ] TBD (run /gsd-plan-phase 28 to break down)
+- [ ] 28-01-PLAN.md — Tranche traçante : la règle 4 de bout en bout sur `isolation:` seul (registre-vocabulaire, 3ᵉ discriminant `FILENAME`, planchers anti-vert-à-vide, premier porteur réel de `# vf-provides:`, cas de preuve #38 rejoué rouge/vert). Vague 1.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 28-02-PLAN.md — Expansion : seconde ligne de la liste close (armements MCP), 5 déclarations `vf-requires: mcp-servers` sur les artefacts réellement armés, admission de la clé dans les `KNOWN` de `check-agents.sh`, opposabilité machine des porteurs de preuve, et les 5 bornes déclarées de l'en-tête du gate. Vague 2.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 28-03-PLAN.md — *As-installed testing* : le gate exercé tel qu'installé dans un lab vierge, sur un univers d'armement non vide (checkpoint humain — la forme dépasse le cadrage D-04), puis clôture des deux triades de module. Vague 3.
+
+### Phase 29: Distiller les gains ICM (G1-G5) — investigation dag.sh --scope d'abord
+
+**Goal:** Distiller dans VibeFlow les 5 mécanismes retenus par la deep-search ICM
+(`reports/research/2026-08-15-icm-deep-search.md`, §5), sans jamais adopter le label ni le modèle
+mono-agent : G3 gate anti-drift carte↔disque (`check-map-drift.sh` — diffe ce que déclarent
+CLAUDE.md/frontmatters/compteurs contre le disque réel), G1 anti-chargement déclaré (tables
+« Load / DO NOT Load » dans les templates + le négatif du périmètre `--scope` dans les digests de
+mission), G5 Edit-Source Principle dans la doctrine des managers (correction récurrente = amender
+la source, jamais redispatcher le même fix), G2 CONTEXT.md ≤ 80 lignes par compartiment +
+`_index.md` des dossiers de références > 10 fichiers, G4 lab-starters clonables à placeholders
+pour `vf-new-lab` (à cadrer — candidat au découpage en phase propre, recoupe les items backlog
+`agency-agents` et « Template d'agent installable »). **Précondition transverse : investigation de
+l'historique et des consommateurs de `dag.sh --scope` (git log, tests, lecteurs du champ) AVANT
+tout geste G1 — zéro régression autorisée sur le mécanisme de scope, qui porte le dispatch
+parallèle des périmètres disjoints du team-kernel.**
+**Requirements**: ICMD-01, ICMD-02, ICMD-03, ICMD-04, ICMD-05, ICMD-06, ICMD-07, ICMD-08, ICMD-09, ICMD-10, ICMD-11, ICMD-12
+**Depends on:** Phase 28
+**Plans:** 5 plans
+
+Plans:
+**Wave 1**
+
+- [x] 29-01-PLAN.md — Socle : baseline `test-dag.sh` verte constatée par exécution, rapport durable d'investigation `--scope` (historique en deux phases par commit, inventaire des consommateurs, couverture T13-T33, verdict intouchable/extensible, voie G1 avec clause de halte), et création des 12 exigences `ICMD-01..12` au ledger. Vague 1.
+
+**Wave 2** *(blocked on Wave 1 completion — périmètres disjoints, dispatchables en parallèle)*
+
+- [x] 29-02-PLAN.md — **G3** : `check-map-drift.sh` (lint seul, deux paires carte↔disque bidirectionnelles, grammaire d'exit 0/1/3/64, wrapper git durci, plancher anti-vert-à-vide, bornes déclarées en en-tête) + sa suite née avec lui, mutations attestées à l'octet. Vague 2.
+- [x] 29-03-PLAN.md — **G1 + G5** : bullet « NE charge PAS » dans le gabarit de digest (composée de champs déjà émis, zéro ligne dans `dag.sh`), table Charge / NE charge PAS dans la doctrine des agents (+ miroir `docs/`), et règle d'édition-à-la-source dans la doctrine du kernel. Vague 2.
+- [x] 29-04-PLAN.md — **G2** : contrat de routage `CONTEXT.md` ≤ 80 lignes par compartiment de documentation posé par `scaffold-docs.sh`, pattern `_index.md` (> 10 fichiers) avec sa première application réelle, et première suite de tests du scaffolder. Vague 2.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 29-05-PLAN.md — Clôture : câblage du gate comme 9e signal de la grille de dette documentaire à coût de densité nul, 4 triades de module bumpées, compteurs « N suites » re-dérivés, puis **checkpoint humain bloquant** (findings réels du gate présentés, jamais corrigés — ADR-031). `autonomous: false`. Vague 3.
 
 ---

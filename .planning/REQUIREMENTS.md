@@ -562,6 +562,118 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   versionné : qui peut détourner `$root` peut déjà réécrire le hook), et **déjà sur `main`** bien
   avant cette phase.
 
+## Hors-milestone — Phase 28 : preuve que ce qui est armé dans le plugin est armé chez l'utilisateur
+
+> **IDs créés au plan du 2026-08-10**, préfixe `ARMD` (« ARMement ↔ Distribution »). La ROADMAP
+> portait `Requirements: TBD` (`.planning/ROADMAP.md:2017`) et `28-RESEARCH.md` §Phase Requirements
+> constatait qu'aucune correspondance REQ→test ne pouvait être produite sans en inventer.
+>
+> Sources : `28-CONTEXT.md` (décisions D-01 → D-06, arbitrées humainement), `28-ARBITRAGES.md`
+> (arbitrages A-1 → A-9, qui priment sur les recommandations de `28-RESEARCH.md` là où les deux
+> divergent), `28-RESEARCH.md` (mécanique fine mesurée, `fichier:ligne`).
+>
+> **Hors périmètre, verrouillé** : ré-armer `isolation: worktree` sur un artefact distribué,
+> distribuer `worktree.baseRef`, ouvrir un véhicule de distribution de settings dans l'engine,
+> solder l'ensemble des findings du gate sur l'existant.
+
+- [ ] **ARMD-01**: La liaison artefact ↔ preuve se fait par **identifiant de précondition** —
+  `vf-requires: <id>` dans le frontmatter de l'artefact armé, `# vf-provides: <id>` en en-tête du
+  script de preuve, plus un registre **vocabulaire seul** (liste close des armements + table des
+  `<id>` légaux). **Jamais** par nom de fichier, chemin, ni proximité de nom. *(D-02b, A-1)*
+- [ ] **ARMD-02**: La liste close des armements est **énumérée à la main** dans le gate — plancher
+  `isolation:` + outils `mcp__*` — chaque ligne portant son motif sur place. Jamais d'heuristique.
+  *(D-01 point 2)*
+- [ ] **ARMD-03**: Un armement de la liste close sans précondition distribuée rend **ROUGE** : exit
+  non nul, message nommant l'artefact, l'armement, la précondition manquante **et** `fichier:ligne`.
+  Le rouge ne dépend d'**aucune** déclaration — `vf-requires` ne fait que le lever. *(D-02, A-3)*
+- [ ] **ARMD-04**: Un `vf-requires: <id>` levé par un `# vf-provides: <id>` porté par un script
+  réellement distribué rend **VERT**. La jointure est **statique** : le gate n'exécute aucun
+  `ensure-*.sh`. *(D-02, A-4 i)*
+- [ ] **ARMD-05**: Un `ensure-*` incapable de rendre **non-zéro** quand sa précondition manque ne peut
+  pas déclarer `# vf-provides:`. La discriminance est **prouvée dans la suite de tests**, jamais
+  déclarée. Fait fondateur : `ensure-design-deps.sh:59-60` sort **toujours 0**, et son seul câblage
+  machine (`vibeflow-update.sh:581-586`) le traite en best-effort. *(A-4 ii)*
+- [ ] **ARMD-06**: Chaque règle neuve porte son **plancher anti-vert-à-vide** (patron
+  `check-capability-activation.sh:376-388`) : registre illisible, table vide, zéro artefact balayé ou
+  zéro `# vf-provides:` ⇒ « NON VÉRIFIABLE » (exit 2), **jamais** un repli vert. Le 3ᵉ discriminant
+  `FILENAME` est explicite (`:318` / `:355`) et la garde `jq` (`:204-207`) ne bloque plus les règles
+  qui n'en ont pas besoin.
+- [ ] **ARMD-07**: Le cas de preuve rejoue **#38 lui-même** sur fixture synthétique : armement remis
+  ⇒ ROUGE, désarmé (ou précondition prouvée) ⇒ VERT. Discriminance **bidirectionnelle**, mutation
+  vérifiée par `cmp` et jamais par `diff`. Le test établit que le **nouveau** gate rougit **de son
+  propre chef**, distinctement de `check-agents.sh:528-549`. *(D-05, D-06)*
+- [ ] **ARMD-08**: Le gate s'exécute **tel qu'installé** (*as-installed testing*) sur un univers
+  **non vide**, avec plancher anti-vert-à-vide et le cas `.planning/config.json` absent réglé.
+  Mesuré : la fermeture de `conductor` vaut **7 modules** sans `dev-orchestrator`, **0 armement**
+  posé — un branchement naïf rendrait vert à vide. Le vert actuel de Gate C n'est pas troublé.
+  *(D-04, A-7, A-8)*
+- [ ] **ARMD-09**: Le gate **écrit ses propres bornes** dans son en-tête : ce que la liste close
+  couvre et ne couvre pas, le nom du pattern *as-installed testing*, la hiérarchie avec
+  `check-agents.sh` (interdiction dure vs relation conditionnelle), le sort des `SKILL.md` (aucun
+  linter de frontmatter n'existe pour eux), et la limite « couverture **déclarée** ≠ couverture
+  **effective** ». *(D-01b, D-06 § recouvrement)*
+- [ ] **ARMD-10**: Le verdict tranche explicitement **précondition dure vs tuning à défaut sûr** et
+  l'écrit. Si `worktree.baseRef` bascule côté « défaut sûr », la ligne `isolation: worktree` n'est
+  **pas** évacuée en silence de la liste close : soit gardée avec motif réécrit, soit le cas de preuve
+  se fonde sur un armement à précondition réellement dure — dit comme tel. Jamais un cas de preuve
+  creux. *(A-9 ii)*
+
+## Hors-milestone — Phase 29 : distiller les gains de la deep-search (G1/G2/G3/G5) — investigation `dag.sh --scope` d'abord
+
+> **IDs créés au plan du 2026-08-15**, préfixe `ICMD` — un acronyme interne de traçabilité (« ICM
+> Distillation »), cohérent avec les préfixes précédents du dépôt qui nomment déjà leurs
+> identifiants d'après l'objet externe déclencheur (ex. `ARMD` pour la Phase 28). Ce préfixe **ne
+> constitue pas** une adoption de la méthodologie externe comme label ou vocabulaire dans un
+> artefact distribué — c'est l'interdiction explicite reprise ci-dessous en prohibition de phase.
+> La ROADMAP portait `Requirements: TBD` (`.planning/ROADMAP.md:2103`, désormais résolue par ces
+> 12 IDs).
+>
+> Sources : `29-CONTEXT.md` (décisions D-01 → D-03), `29-RESEARCH.md`, `29-PATTERNS.md`.
+>
+> **Hors périmètre, verrouillé** : **G4** (lab-starters clonables à placeholders pour
+> `vf-new-lab`), découpé en phase dédiée par **D-01** ; les gains secondaires du rapport source —
+> budgets de tokens par couche, colonne `Section/Scope` dans les mandats, cadrage « compilateur »,
+> pipelines mono-agent pour labs non-dev — hors périmètre par **D-02** ; toute modification de
+> `plugin/conductor/scripts/dag.sh` (**D-03**, zéro régression autorisée) ; toute restructuration
+> de `.planning/` (ADR-055, GSD propriétaire).
+
+- [ ] **ICMD-01**: L'investigation du mécanisme de périmètre est livrée comme rapport écrit
+  autonome et sourcé (historique en deux phases par commit, inventaire des consommateurs,
+  couverture de la suite de tests, verdict intouchable/extensible, voie retenue pour G1), avec la
+  forme de citation historique corrigée. *(D-03)*
+- [ ] **ICMD-02**: Zéro régression sur le mécanisme de périmètre : `plugin/conductor/scripts/dag.sh`
+  n'apparaît dans le `files_modified` d'**aucun** plan de la phase, et la suite `test-dag.sh` est
+  verte avant et après chaque geste. Toute exigence d'y toucher HALTE sur un `checkpoint:decision`
+  explicite, jamais un contournement silencieux. *(D-03)*
+- [ ] **ICMD-03**: G3 : un gate `check-map-drift.sh` en **lint seul**, en-tête « répond au FAIT,
+  jamais au métier », grammaire d'exit `0/1/3/64` du dépôt, wrapper git durci repris verbatim,
+  **aucun** mode correctif automatique (ADR-031).
+- [ ] **ICMD-04**: G3 : deux paires carte↔disque en v1, chacune **bidirectionnelle** (entrée
+  déclarée absente du disque ; élément du disque absent de la carte), discriminance de chaque
+  paire prouvée par mutation dans la suite, jamais déclarée.
+- [ ] **ICMD-05**: G3 : plancher anti-vert-à-vide — cible absente, cible vide ou hors dépôt git
+  rendent « rien à constater » (exit 3), **jamais** un exit 0 déguisé.
+- [ ] **ICMD-06**: G3 : le gate **écrit ses propres bornes** en en-tête — ce qu'il ne couvre pas
+  (les `skills:` de frontmatter, déjà couverts par `check-agents.sh` ; les DAG de mission, hors
+  domaine ; `.planning/` en lecture seule) et pourquoi.
+- [ ] **ICMD-07**: G1 : le gabarit de digest de mission porte une bullet « NE charge PAS »,
+  composée du croisement de deux champs **déjà émis** par le socle, avec **zéro** ligne modifiée
+  dans `dag.sh`. *(D-03)*
+- [ ] **ICMD-08**: G1 : la doctrine des agents porte une table `| Tâche | Charge | NE charge PAS |`
+  — l'anti-chargement devient déclaré, pas seulement le chargement.
+- [ ] **ICMD-09**: G5 : le principe d'édition-à-la-source (une correction récurrente amende la
+  source, jamais un redispatch du même correctif) est écrit dans la doctrine des managers, en
+  `references/` chargée on-demand — **jamais** inline dans un agent au plafond de densité ADR-029.
+- [ ] **ICMD-10**: G2 : `scaffold-docs.sh` pose un `CONTEXT.md` de routage ≤ 80 lignes par
+  compartiment qualifié, via le garde-fou d'idempotence existant, sur le compartiment de
+  **documentation de sous-projet** (ADR-042) — jamais le compartiment de planning homonyme.
+- [ ] **ICMD-11**: G2 : le pattern `_index.md` (dossier de références > 10 fichiers, table
+  `| Fichier | Résumé |`) existe, est distinct en nom **et** en sémantique de l'`INDEX.md` déjà
+  posé, et est appliqué à un dossier réel du dépôt qui franchit le seuil.
+- [ ] **ICMD-12**: Clôture de distribution : le gate G3 est câblé chez son consommateur à **coût
+  de densité nul**, les triades de module touchées sont bumpées, les compteurs « N suites » des
+  deux README racine sont **re-dérivés** (jamais recopiés) et `check-version-sync.sh` est vert.
+
 ## v2 Requirements
 
 ### Vocabulaire & UX
@@ -685,6 +797,18 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | GSDA-20 | Phase 24 | Done — plans 24-01 et 24-12 |
 | GSDA-21 | Phase 24 | Done — plans 24-01 et 24-12 |
 | GSDA-22 | Phase 24 | Done — plans 24-01 et 24-12 |
+| ICMD-01 | Phase 29 | Planned — plan 29-01 |
+| ICMD-02 | Phase 29 | Planned — plan 29-01 |
+| ICMD-03 | Phase 29 | Planned — plan 29-02 |
+| ICMD-04 | Phase 29 | Planned — plan 29-02 |
+| ICMD-05 | Phase 29 | Planned — plan 29-02 |
+| ICMD-06 | Phase 29 | Planned — plan 29-02 |
+| ICMD-07 | Phase 29 | Planned — plan 29-03 |
+| ICMD-08 | Phase 29 | Planned — plan 29-03 |
+| ICMD-09 | Phase 29 | Planned — plan 29-03 |
+| ICMD-10 | Phase 29 | Planned — plan 29-04 |
+| ICMD-11 | Phase 29 | Planned — plan 29-04 |
+| ICMD-12 | Phase 29 | Planned — plan 29-05 |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -718,7 +842,12 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   `@opengsd/gsd-core` au-delà de `1.9.1` n'est publiée sur npm**, si bien que le prérequis dur du
   verdict de la zone 2 ne peut pas être satisfait et que la clause de repli de `GSDA-01`
   s'applique — déclencheur de reprise objectif gravé, jamais un abandon silencieux.
+- Phase 29 (distiller les gains ICM G1/G2/G3/G5) : 12 requirements `ICMD-01..12` **créées au plan
+  du 2026-08-15** — mappées aux **5 plans** de la phase (`29-01` → `29-05`), **0 non-mappé**,
+  **0 inventé**. D-01 et D-02 sont des **non-livrables** vérifiables par l'absence de G4 et des
+  gains secondaires du `files_modified` des 5 plans ; D-03 est vérifiable par l'absence de
+  `plugin/conductor/scripts/dag.sh` de ce même ensemble.
 
 ---
 *Requirements defined: 2026-06-04*
-*Last updated: 2026-07-26 — remise à l'heure post-audit (Phase 12 annotée post-bascule v2.33.0, Phase 13 redéfinie sans verbe, Phase 14 = v2.30.0, milestones 2-3 shipped) ; précédent : 2026-07-25 — ajout Phase 14 au Milestone 6 (ALTI-01→05 : frontière d'altitude planning-core / moteur GSD, ADR-055)*
+*Last updated: 2026-08-15 — ajout Phase 29 (ICMD-01..12, distillation des gains ICM G1/G2/G3/G5) ; précédent : 2026-07-26 — remise à l'heure post-audit (Phase 12 annotée post-bascule v2.33.0, Phase 13 redéfinie sans verbe, Phase 14 = v2.30.0, milestones 2-3 shipped) ; précédent : 2026-07-25 — ajout Phase 14 au Milestone 6 (ALTI-01→05 : frontière d'altitude planning-core / moteur GSD, ADR-055)*

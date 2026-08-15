@@ -1,5 +1,16 @@
 # CHANGELOG — validator
 
+## [v1.3.3] — 2026-08-15
+
+### Ajouté
+- **9e signal de la grille de dette documentaire (Phase 3)** : `check-map-drift.sh` (module
+  conductor, mandatory) invoqué en item 4 de la délégation séquentielle — drift carte↔disque
+  (`CLAUDE.md`/index vs disque), `bash .claude/scripts/check-map-drift.sh --path .` (advisory).
+  Ligne ajoutée en regard à la table « Délégations strictes ». Câblage à coût de densité **nul** :
+  le retrait compensatoire a été pris sur le rapport d'exemple de la §Output standard (jamais sur
+  un signal, une Iron Law ou une ligne de la table) — `AGENT.md` reste à 250/250 (ADR-029, marge
+  zéro). Le gate reste **advisory** : aucun correctif appliqué (ADR-031).
+
 ## [v1.3.2] — 2026-08-04
 
 ### Modifié

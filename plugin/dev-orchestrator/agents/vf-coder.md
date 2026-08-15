@@ -7,6 +7,7 @@ effort: medium
 memory: project
 vf-internal: true
 vf-mcp-consumer: true
+vf-requires: mcp-servers
 ---
 
 # Agent : vf-coder

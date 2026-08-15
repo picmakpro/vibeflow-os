@@ -4,16 +4,16 @@ milestone: gsd-migration
 milestone_name: Migration package GSD
 current_phase: 18
 current_phase_name: Survie du ledger d'exigences à la clôture de jalon
-status: "Phase 27 shipped - PR 35"
+status: "Phase 29 COMPLETE - 13/13 taches, checkpoint humain T-29-05-3 rendu et approuve le 2026-08-15 - branche docs/phase-29-icm-gains non poussee, release racine reservee a Samuel"
 stopped_at: "Phase 20 complète (7/7 plans) — clôture de gouvernance (20-07) : ADR-051 révisée + ADR-060 posée, doctrine transverse alignée, 6 modules bumpés (conductor v1.17.0, dev-orchestrator v2.8.0, design-orchestrator v1.3.2, 3 bundles v2.0.3). Gates verts sauf le seul rouge attendu (compteur de suites racine, 44 réel pas 43). Release racine réservée à validation humaine post-fusion (4 éléments consignés + WINDOWS.md)."
-last_updated: "2026-08-10T09:25:06.431Z"
-last_activity: 2026-08-10
+last_updated: "2026-08-15T00:00:00.000Z"
+last_activity: 2026-08-15
 progress:
   total_phases: 26
   completed_phases: 15
-  total_plans: 92
+  total_plans: 95
   completed_plans: 71
-last_activity_desc: "Quick task 260810-fh3 complete - ensure-design-deps.sh, design-orchestrator v1.5.0"
+last_activity_desc: "Phase 28 plans 01 et 02 executes sur branche docs/phase-28-cadrage. Regle 4 du gate d'activation (armement sans precondition distribuee) + regle 4bis + 4 planchers anti-vert-a-vide ; liste close a 2 lignes (isolation, MCP) ; 5 declarations vf-requires: mcp-servers sur agents reels ; opposabilite des porteurs # vf-provides: ; 5 bornes declarees en en-tete du gate. Suite 42 -> 58 cas, tous gates verts. Verification goal-backward 28-01 et 28-02 : GOAL ACHIEVED. 1 finding majeur escalade a l'humain (ARM_LINE mono-slot : faux vert possible sur un artefact a double armement, inerte sur le corpus reel). 28-03 NON demarre : checkpoint humain bloquant D-04. Compteurs progress laisses intacts (derive preexistante, deja signalee)."
 ---
 
 # Project State
@@ -54,6 +54,28 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 `*.txt` ci-dessus ne les couvre pas (ce sont des `.md` dans un sous-dossier).
 
 ## Current Position
+
+**Phase 28 — PLANIFIÉE le 2026-08-10** (branche `docs/phase-28-cadrage`, non mergée). 3 plans en
+3 vagues : `28-01` (tracer — règle 4 du gate de bout en bout sur `isolation:` + registre-vocabulaire
++ cas #38 rejoué en fixture), `28-02` (expansion MCP, 5 déclarations réelles, bornes d'en-tête),
+`28-03` (*as-installed testing* — **`autonomous: false`, checkpoint bloquant**). Verdict
+`gsd-plan-checker` : **VERIFICATION PASSED**, 10/10 exigences `ARMD-01`…`ARMD-10` couvertes (IDs
+créés ce jour dans `REQUIREMENTS.md`, la ROADMAP portait `Requirements: TBD`). Arbitrages du manager
+consignés dans `28-ARBITRAGES.md` (A-1…A-9).
+
+> **Deux points à ressortir en vérification de phase :**
+> 1. **Override du gate `decision-coverage-plan`** — le gate rend `passed: false` avec
+>    `reason: "could-not-parse"`, **jamais** un manque de couverture : 3 puces de `28-CONTEXT.md`
+>    sont illisibles par son parseur (l. 75 et 100 — un `*` littéral dans `` `ensure-*.sh` `` à
+>    l'intérieur du gras ; l. 107-108 — gras courant sur deux lignes). La couverture réelle des
+>    décisions D-01→D-06 a été **vérifiée indépendamment** par `gsd-plan-checker`. Le correctif de
+>    mise en forme de `28-CONTEXT.md` est **hors périmètre du mandat de planification** et attend un
+>    arbitrage humain.
+> 2. **Dépassement de cadrage signalé sur D-04** — `28-03` propose un **second job CI** et une
+>    fermeture installée de **9 modules** (au lieu de « ajout d'une étape au job `lab-frais` »).
+>    Porté par un `checkpoint:decision` bloquant, non tranché en plan.
+
+---
 
 Phase: 18 — Survie du ledger d'exigences à la clôture de jalon
 (arbitrage Samuel, `.planning/missions/2026-07-31-delta-gsd-core-1.9.0.md`) : pas de
@@ -301,6 +323,18 @@ Progress: [██████░░░░] 59%
 
 ### Roadmap Evolution
 
+- 2026-08-15 (suite) : **Phase 29 cadrée** — CONTEXT.md posé (cadrage court choisi : périmètre
+  verrouillé D-01/D-02/D-03, zones grises en Claude's Discretion), DISCUSSION-LOG.md en trace.
+  Prochain geste : plan (researcher → planner → checker) puis **exécution complète via
+  `vf-dev-manager`** (demande explicite de Samuel, session du 2026-08-15).
+- 2026-08-15 : **Phase 29 ajoutée — « Distiller les gains ICM (G1-G5) — investigation dag.sh
+  --scope d'abord »**, issue de la deep-search ICM du même jour
+  (`reports/research/2026-08-15-icm-deep-search.md`, session en direct hors Phase 28). Périmètre :
+  les 5 gains distillables du rapport (anti-drift carte↔disque, Load/DO NOT Load, Edit-Source,
+  CONTEXT par compartiment, lab-starters clonables — ce dernier candidat au découpage), avec une
+  précondition transverse posée par Samuel : investiguer l'historique et les consommateurs de
+  `dag.sh --scope` avant tout geste G1, **zéro régression autorisée** sur le mécanisme de scope.
+  Branche dédiée `docs/phase-29-icm-gains` (la branche 28 reste vierge de tout contenu ICM).
 - 2026-08-10 : **Phase 28 ajoutée — « Preuve que ce qui est armé dans le plugin est armé chez
   l'utilisateur »**, ouverte par la régression #38 (13 agents distribués avec `isolation: worktree`
   alors que leur précondition `worktree.baseRef: "head"` n'était posée que dans le settings local de
@@ -498,6 +532,34 @@ Progress: [██████░░░░] 59%
 
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
+
+- **2026-08-15 — Phase 29, mission d'équipe sur branche `docs/phase-29-icm-gains` : 12 des 13
+  tâches livrées, arrêt propre au checkpoint humain bloquant T-29-05-3.** D-03 (zéro régression
+  `dag.sh --scope`) tenue de bout en bout : `dag.sh` et `test-dag.sh` absents du diff de toute la
+  branche, baseline 99/99 rejouée à chaque étage. La voie « doctrine seule » établie par 29-01 a
+  effectivement permis de livrer G1 sans toucher au socle. **Décision de méthode prise en mission** :
+  après 4 défauts consécutifs de la même famille sur `normalize_path()` de `check-map-drift.sh`
+  (chacun trouvé par un juge externe, jamais par la suite, chaque correctif fermant le cas nommé
+  et laissant survivre son voisin), le budget de 3 tours a été **dépassé délibérément** pour un 4e
+  tour changeant de méthode : correction par **point fixe** et preuve de fermeture par **génération**
+  (produit cartésien 9 préfixes × 5 corps = 45 combinaisons, 10 rouges avant / 0 après) au lieu
+  d'une liste de cas énumérés. Leçon durable : une liste de formes ne ferme jamais une classe
+  d'équivalence — seul un test génératif + une propriété d'idempotence le font.
+  **Checkpoint T-29-05-3 RENDU le 2026-08-15 (AskUserQuestion, Samuel)** — les 3 points tranchés :
+  (1) **gate UTILE**, resserrer 2 bornes *dans les bornes, jamais en filtrant la sortie* — (a) une
+  ligne de commande n'est pas un chemin déclaré, (b) `plugin/reference/content/examples/` exclu du
+  balayage (cartes volontairement fictives) ; les 3 findings « dossier suivi non cité » (`docs`,
+  `manual`, `reports`) restent **légitimes et non corrigés** — c'est le signal assumé. Le gate rend
+  désormais exactement ces 3 findings (13 → 3). (2) `docs/_transverse/` **supprimé** — vibeflow-os
+  est le repo de distribution, pas un lab, ADR-042 ne s'y applique pas. (3)
+  `parallelization.skip_checkpoints` passé à **`false`** : les 3 vecteurs d'auto-approbation de
+  checkpoint sont désormais neutralisés (doctrine « checkpoint toujours gaté humain »).
+  Registre STRIDE enrichi de `T-29-02-08` (oracle d'existence par traversée `../` en `p2_sens_a` :
+  `../` initial mitigé, résidu non-initial accepté `low` — fermeture complète non triviale sous
+  ADR-054, qui interdit `realpath`).
+  **Reste à Samuel, gestes humains gatés** : push de la branche, PR, et release racine (VERSION /
+  plugin.json / marketplace.json intouchés par la phase — 4 modules bumpés en attente de
+  distribution : validator v1.3.3, conductor v1.22.0, dev-orchestrator v2.14.0, reference v2.5.3).
 
 - **2026-08-06 — Phase 27, reprise sur arbitrage : les trois gels sont levés, 9 exigences sur 11
   tenues, seul le spike reste à faire en présence de Samuel.** (même mission et même branche

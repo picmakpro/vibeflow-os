@@ -154,10 +154,13 @@ registry_dirs = [p for p in os.environ.get(\"VF_REGISTRY_DIRS\", \"\").split(\":
 # + conventions VibeFlow : vf-internal (worker interne — pas de commande d'incarnation, cf. Pattern 12) ;
 #   vf-mcp-consumer (agent exécutant recevant l'allowlist MCP dérivée du lab à l'install, ADR-051) ;
 #   vf-mcp-tools (allowlist MCP NOMMÉE — un serveur, une liste d'outils explicites — consommée par
-#   le script d'injection du module dev-orchestrator ; coexiste avec vf-mcp-consumer sans le remplacer).
+#   le script d'injection du module dev-orchestrator ; coexiste avec vf-mcp-consumer sans le remplacer) ;
+#   vf-requires (identifiant de précondition externe déclarée par l'artefact — jointure par id avec
+#   # vf-provides: côté script, consommée par la règle 4 de check-capability-activation.sh, Phase 28).
 KNOWN = {\"name\", \"description\", \"tools\", \"disallowedTools\", \"model\", \"permissionMode\",
          \"maxTurns\", \"skills\", \"mcpServers\", \"hooks\", \"memory\", \"background\", \"effort\",
-         \"isolation\", \"color\", \"initialPrompt\", \"vf-internal\", \"vf-mcp-consumer\", \"vf-mcp-tools\"}
+         \"isolation\", \"color\", \"initialPrompt\", \"vf-internal\", \"vf-mcp-consumer\", \"vf-mcp-tools\",
+         \"vf-requires\"}
 MODELS = {\"sonnet\", \"opus\", \"haiku\", \"fable\", \"inherit\"}
 MEMORY = {\"user\", \"project\", \"local\"}
 EFFORT = {\"low\", \"medium\", \"high\", \"xhigh\", \"max\"}

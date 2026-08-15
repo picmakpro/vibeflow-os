@@ -1,5 +1,33 @@
 # Changelog — conductor
 
+## [v1.22.0] — 2026-08-15 (gate anti-drift carte↔disque + contrat de routage par dossier)
+
+**`scripts/check-map-drift.sh` (nouveau)** : gate lint-only qui constate deux paires carte↔disque
+bidirectionnelles — P1 (`CLAUDE.md` vs sous-dossiers de premier niveau suivis par git) et P2
+(`_index.md`/`INDEX.md` vs contenu `.md` direct, non récursif, de leur dossier). Wrapper
+`git_safe()` durci (dépôt cloné hostile), grammaire d'exit `0`/`3`/`64` partagée avec
+`check-doc-drift.sh`/`check-agents.sh`, plancher `NON VÉRIFIABLE` sur 0 carte balayée. Aucun mode
+correctif (ADR-031) ; aucun `jq`/`grep -P`/`sed -i` (ADR-054). **Deux bornes resserrées sur
+verdict humain (checkpoint T-29-05-3, 2026-08-15)** : (a) une ligne de commande citée en exemple
+dans un `CLAUDE.md` n'est plus prise pour un chemin déclaré (P1 sens 1) ; (b)
+`plugin/reference/content/examples/` — cartes volontairement fictives d'un exemple pédagogique —
+est exclu du balayage des deux paires. Mitigation STRIDE `T-29-02-08` : citation `../` de tête
+ignorée en P2 sens A, résidu non-initial accepté en risque `low`. Sur ce dépôt, le gate rend
+désormais **exactement 3 findings légitimes** (`docs`, `manual`, `reports` non cités par
+`./CLAUDE.md`) — signal assumé, non corrigé (ADR-031). Suite dédiée
+`scripts/tests/test-check-map-drift.sh` (**57 cas**), discriminance des deux paires prouvée par
+mutation (`cmp -s`), table générative de 45 combinaisons pour la classe des formes de chemin
+équivalentes.
+
+**`scripts/scaffold-docs.sh` (étendu)** : pose désormais un `CONTEXT.md` de routage (table
+Tâche/Charge/NE charge PAS, ≤ 80 lignes) par compartiment de documentation, et un flag `--index
+<dossier>` posant un `_index.md` de contenu pour tout dossier de références. Première application
+réelle sur `plugin/dev-orchestrator/references/` (11 fichiers). Première suite de tests du
+scaffolder (`scripts/tests/test-scaffold-docs.sh`, 26 cas), couvrant l'extension et le
+comportement préexistant.
+
+`scripts/dag.sh` (socle `--scope`, D-03) hors diff des deux livrables — vérifié à chaque étape.
+
 ## [v1.21.1] — 2026-08-10 (correctif #38 — le garde-fou machine contre `isolation: worktree`)
 
 **`check-agents.sh` refuse désormais `isolation:` dans le frontmatter d'un agent distribué, et

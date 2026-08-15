@@ -422,6 +422,23 @@ cp "$SCRIPT" "$LAB/.claude/scripts/check-capability-activation.sh"
 mk_index  "$LAB/.claude/agents/dev-orchestrator-references/gsd-capabilities-index.md"
 mk_corpus_ok "$LAB/.claude/agents/dev-orchestrator-references/intent-routing.md"
 printf '# doc-flow synthétique, sans marqueur ni brique\n' > "$LAB/.claude/agents/dev-orchestrator-references/docs-flow.md"
+# Univers de la règle 4 (planchers, tâche 2) : au moins UN artefact non armé et UN script porteur
+# d'un `# vf-provides:` — sans cela le corpus d'armement/de preuve par défaut de ce lab installé
+# serait vide et le plancher anti-vert-à-vide rendrait 2, pour une raison étrangère au cas 14.
+cat > "$LAB/.claude/agents/dummy-agent.md" <<'AGT'
+---
+name: dummy-agent
+---
+
+# Agent factice (case 14, sans armement)
+AGT
+cat > "$LAB/.claude/scripts/dummy-provider.sh" <<'SCR'
+#!/usr/bin/env bash
+# dummy-provider.sh — fixture case 14
+# vf-provides: mcp-servers
+set -uo pipefail
+echo ok
+SCR
 rc_lab=0
 out_lab="$(cd "$TMP" && env -u VF_CAPACT_INDEX -u VF_CAPACT_CONFIG -u VF_CAPACT_CORPUS \
   bash "$LAB/.claude/scripts/check-capability-activation.sh" 2>&1 >/dev/null)" || rc_lab=$?
@@ -596,6 +613,776 @@ else
   else
     ko "MUT3 défaut amont — le vert doit être retrouvé après restauration" "rc=$rc_back"
   fi
+fi
+
+# ===============================================================================================
+# == RÈGLE 4 (Phase 28, plan 28-01) — armement sans précondition distribuée ======================
+# ===============================================================================================
+# La tranche traçante : UN armement de la liste close (`isolation:`), UN cas de preuve rouge/vert
+# discriminant, câblé de bout en bout — du frontmatter de l'artefact jusqu'au code de sortie du
+# gate. Fixtures synthétiques dédiées (deux artefacts armés, jamais un seul — Pitfall 5 : retirer
+# l'unique artefact viderait l'univers et déclencherait un plancher, pas la règle visée).
+#
+# Isolation vis-à-vis de check-agents.sh : ces fixtures ne sont JAMAIS soumises qu'à
+# check-capability-activation.sh — aucun appel à check-agents.sh dans cette section. Et chaque
+# assertion porte sur le MESSAGE `ECART regle 4`, jamais sur le seul code de sortie : sans quoi un
+# exit 1 venu d'une autre règle passerait pour la preuve de la règle 4.
+
+mk_agent_arme() { # <chemin> — agent isolation:worktree + vf-requires:worktree-baseref, conforme
+  cat > "$1" <<'AGT'
+---
+name: agent-fixture-regle4
+isolation: worktree
+vf-requires: worktree-baseref
+---
+
+# Agent arme (fixture regle 4, Phase 28)
+AGT
+}
+
+mk_script_preuve() { # <chemin> — porteur reel du marqueur worktree-baseref
+  cat > "$1" <<'SCR'
+#!/usr/bin/env bash
+# provide.sh — fixture Phase 28, porteur de la precondition worktree-baseref
+# vf-provides: worktree-baseref
+set -uo pipefail
+echo ok
+SCR
+}
+
+mk_script_decoy() { # <chemin> — deuxieme porteur (id DIFFERENT), evite qu'un corpus de preuve
+                     # amputé de provide.sh tombe a ZERO fichier (ce qui relèverait d'un plancher
+                     # anti-vert-a-vide, une regle DIFFERENTE de la 4c que MUT-R3 vise)
+  cat > "$1" <<'SCR'
+#!/usr/bin/env bash
+# decoy.sh — fixture Phase 28, porteur d'un id DIFFERENT (jamais worktree-baseref)
+# vf-provides: mcp-servers
+set -uo pipefail
+echo ok
+SCR
+}
+
+mk_regle4_fixture() { # <nom> -> imprime le chemin ; DEUX artefacts armes + 2 scripts de preuve
+  local d="$TMP/$1"
+  mkdir -p "$d/agents" "$d/scripts"
+  mk_index "$d/index.md"
+  mk_config "$d/config.json"
+  mk_corpus_ok "$d/corpus.md"
+  mk_agent_arme "$d/agents/agentA.md"
+  mk_agent_arme "$d/agents/agentB.md"
+  mk_script_preuve "$d/scripts/provide.sh"
+  mk_script_decoy "$d/scripts/decoy.sh"
+  printf '%s' "$d"
+}
+
+run4() { # <fixture-dir> <armed-list> <providers-list> [args...] -> stderr du gate
+  local d="$1" armed="$2" prov="$3"; shift 3
+  VF_CAPACT_INDEX="$d/index.md" \
+  VF_CAPACT_CONFIG="$d/config.json" \
+  VF_CAPACT_CORPUS="$d/corpus.md" \
+  VF_CAPACT_ARMED="$armed" \
+  VF_CAPACT_PROVIDERS="$prov" \
+  bash "$SCRIPT" "$@" 2>&1 >/dev/null
+}
+
+rc4_of() { # <fixture-dir> <armed-list> <providers-list> [args...] -> rc du gate, sortie muette
+  local d="$1" armed="$2" prov="$3"; shift 3
+  VF_CAPACT_INDEX="$d/index.md" \
+  VF_CAPACT_CONFIG="$d/config.json" \
+  VF_CAPACT_CORPUS="$d/corpus.md" \
+  VF_CAPACT_ARMED="$armed" \
+  VF_CAPACT_PROVIDERS="$prov" \
+  bash "$SCRIPT" "$@" >/dev/null 2>&1
+  echo "$?"
+}
+
+echo ""
+echo "== règle 4 =="
+
+# === Cas R1 — état conforme : deux artefacts armés, vf-requires legal levé par # vf-provides → 0
+D="$(mk_regle4_fixture r1)"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+if [ "$rc" -eq 0 ]; then
+  ok "R1 règle 4 conforme — deux artefacts armés, vf-requires légal levé par # vf-provides → 0"
+else
+  ko "R1 règle 4 conforme → 0" "rc=$rc out=[$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")]"
+fi
+
+# === MUT-R2 (ROUGE, sous-cas a) — vf-requires retiré de l'agent A =============================
+D="$(mk_regle4_fixture r2)"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+cp "$D/agents/agentA.md" "$TMP/r2.agentA.orig"
+if ! mutate "$TMP/r2.agentA.orig" "$D/agents/agentA.md" '/^vf-requires:/{next} {print}'; then
+  ko "MUT-R2 règle 4(a) — retrait de vf-requires" "le programme de mutation a ÉCHOUÉ — mutant NON CONSTRUIT"
+elif cmp -s "$D/agents/agentA.md" "$TMP/r2.agentA.orig"; then
+  ko "MUT-R2 règle 4(a) — retrait de vf-requires" "la mutation n'a RIEN changé (motif introuvable) — mutant NON OPPOSABLE"
+else
+  rc_mut="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+  out_mut="$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")"
+  cp "$TMP/r2.agentA.orig" "$D/agents/agentA.md"
+  rc_back="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+  says_r4=0; case "$out_mut" in *"ECART regle 4"*) says_r4=1 ;; esac
+  names_a=0; case "$out_mut" in *"agentA.md"*) names_a=1 ;; esac
+  # Assertion sur le libellé SPÉCIFIQUE du sous-cas (a) — pas seulement « ECART regle 4 » générique,
+  # qui est aussi émis par le sous-cas (b) (`REQ_VAL[f]` auto-vivifiée à "" par awk absorbe le
+  # retrait de vf-requires et retombe sur le message du sous-cas (b), différent mais contenant
+  # encore says_r4/names_a). Sans ce libellé, MUT-R2 ne discrimine pas « (a) marche » de « (a) est
+  # cassé et (b) l'absorbe avec un message dégradé ».
+  says_suba=0; case "$out_mut" in *"sans precondition declaree (vf-requires: absent)"*) says_suba=1 ;; esac
+  if [ "$rc_mut" -eq 1 ] && [ "$says_r4" -eq 1 ] && [ "$names_a" -eq 1 ] && [ "$says_suba" -eq 1 ]; then
+    ok "MUT-R2 règle 4(a) — agent armé sans vf-requires : le gate ROUGIT (rc=1), ECART regle 4 sous-cas (a) nommant agentA.md"
+  else
+    ko "MUT-R2 règle 4(a) — le gate doit rougir sur armement sans précondition déclarée, avec le libellé du sous-cas (a)" "rc=$rc_mut regle4=$says_r4 nomme=$names_a sous_cas_a=$says_suba out=[$out_mut]"
+  fi
+  if [ "$rc_back" -eq 0 ]; then
+    ok "MUT-R2 règle 4(a) — vf-requires restauré : le VERT est retrouvé (rc=0)"
+  else
+    ko "MUT-R2 règle 4(a) — le vert doit être retrouvé après restauration" "rc=$rc_back"
+  fi
+fi
+
+# === MUT-R3 (ROUGE, sous-cas c) — provide.sh retiré du corpus de scripts balayé ================
+# Retrait de LISTE (VF_CAPACT_PROVIDERS), pas de fichier : le fichier disque reste lisible, seul le
+# corpus BALAYÉ change — décoy.sh reste présent pour que le corpus ne tombe jamais à zéro fichier
+# (sans quoi ce mutant prouverait un plancher anti-vert-à-vide, pas la règle 4c).
+D="$(mk_regle4_fixture r3)"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md"
+PROV_LIST_FULL="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+PROV_LIST_MUT="$D/scripts/decoy.sh"
+if [ "$PROV_LIST_FULL" = "$PROV_LIST_MUT" ]; then
+  ko "MUT-R3 règle 4(c) — retrait de provide.sh du corpus balayé" "la liste balayée n'a RIEN changé — mutant NON OPPOSABLE"
+else
+  rc_mut="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST_MUT")"
+  out_mut="$(run4 "$D" "$ARMED_LIST" "$PROV_LIST_MUT")"
+  rc_back="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST_FULL")"
+  says_r4=0;  case "$out_mut" in *"ECART regle 4"*)      says_r4=1 ;; esac
+  names_id=0; case "$out_mut" in *"worktree-baseref"*)   names_id=1 ;; esac
+  if [ "$rc_mut" -eq 1 ] && [ "$says_r4" -eq 1 ] && [ "$names_id" -eq 1 ]; then
+    ok "MUT-R3 règle 4(c) — provide.sh retiré du corpus balayé : le gate ROUGIT (rc=1), ECART regle 4 nommant worktree-baseref introuvable"
+  else
+    ko "MUT-R3 règle 4(c) — le gate doit rougir sur précondition légale non levée" "rc=$rc_mut regle4=$says_r4 id=$names_id out=[$out_mut]"
+  fi
+  if [ "$rc_back" -eq 0 ]; then
+    ok "MUT-R3 règle 4(c) — provide.sh remis dans le corpus balayé : le VERT est retrouvé (rc=0)"
+  else
+    ko "MUT-R3 règle 4(c) — le vert doit être retrouvé une fois provide.sh remis dans le corpus" "rc=$rc_back"
+  fi
+fi
+
+# === MUT-R4 (VERT par désarmement — le cas #38 rejoué) =========================================
+# `isolation: worktree` ET `vf-requires:` retirés des DEUX agents : plus aucun artefact armé, le
+# gate doit VERDIR. C'est le sens INVERSE de MUT-R2/MUT-R3 — sans lui la règle 4 ne serait
+# discriminante que dans un sens.
+D="$(mk_regle4_fixture r4)"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+cp "$D/agents/agentA.md" "$TMP/r4.agentA.orig"
+cp "$D/agents/agentB.md" "$TMP/r4.agentB.orig"
+okA=1; okB=1
+mutate "$TMP/r4.agentA.orig" "$D/agents/agentA.md" '/^isolation:/{next} /^vf-requires:/{next} {print}' || okA=0
+mutate "$TMP/r4.agentB.orig" "$D/agents/agentB.md" '/^isolation:/{next} /^vf-requires:/{next} {print}' || okB=0
+if [ "$okA" -eq 0 ] || [ "$okB" -eq 0 ]; then
+  ko "MUT-R4 désarmement (#38 rejoué) — retrait de isolation + vf-requires" "le programme de mutation a ÉCHOUÉ sur au moins un agent — mutant NON CONSTRUIT"
+elif cmp -s "$D/agents/agentA.md" "$TMP/r4.agentA.orig" || cmp -s "$D/agents/agentB.md" "$TMP/r4.agentB.orig"; then
+  ko "MUT-R4 désarmement (#38 rejoué) — retrait de isolation + vf-requires" "au moins un fichier n'a RIEN changé — mutant NON OPPOSABLE"
+else
+  rc_mut="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+  out_mut="$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")"
+  cp "$TMP/r4.agentA.orig" "$D/agents/agentA.md"
+  cp "$TMP/r4.agentB.orig" "$D/agents/agentB.md"
+  rc_back="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+  if [ "$rc_mut" -eq 0 ]; then
+    ok "MUT-R4 désarmement (#38 rejoué) — isolation et vf-requires retirés des DEUX agents : le gate VERDIT (rc=0)"
+  else
+    ko "MUT-R4 désarmement — le gate doit verdir quand l'armement disparaît des deux artefacts" "rc=$rc_mut out=[$out_mut]"
+  fi
+  if [ "$rc_back" -eq 0 ]; then
+    ok "MUT-R4 désarmement — fixture restaurée (armée + conforme) : le VERT est retrouvé (rc=0)"
+  else
+    ko "MUT-R4 désarmement — après restauration de l'état armé conforme, le gate doit être vert" "rc=$rc_back"
+  fi
+fi
+
+# === Cas R5 — plancher : univers d'armement VIDE (aucun chemin déclaré) → 2, jamais 0 ==========
+D="$(mk_regle4_fixture r5)"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "" "$PROV_LIST")"
+out="$(run4 "$D" "" "$PROV_LIST")"
+says_inerte=0; case "$out" in *"regle 4 serait INERTE"*) says_inerte=1 ;; esac
+if [ "$rc" -eq 2 ] && [ "$says_inerte" -eq 1 ]; then
+  ok "R5 plancher — univers d'armement vide → 2, message nommant la règle 4 rendue INERTE (JAMAIS 0)"
+else
+  ko "R5 plancher univers d'armement vide → 2" "rc=$rc out=[$out]"
+fi
+
+# === Cas R6 — plancher : corpus de scripts sans AUCUN # vf-provides: → 2, jamais 0 =============
+D="$(mk_regle4_fixture r6)"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md"
+cat > "$D/scripts/aucun-marqueur.sh" <<'SCR'
+#!/usr/bin/env bash
+# aucun-marqueur.sh — fixture R6, ne déclare RIEN
+set -uo pipefail
+echo ok
+SCR
+rc="$(rc4_of "$D" "$ARMED_LIST" "$D/scripts/aucun-marqueur.sh")"
+out="$(run4 "$D" "$ARMED_LIST" "$D/scripts/aucun-marqueur.sh")"
+says_inerte=0; case "$out" in *"regle 4 serait INERTE"*) says_inerte=1 ;; esac
+if [ "$rc" -eq 2 ] && [ "$says_inerte" -eq 1 ]; then
+  ok "R6 plancher — corpus de scripts sans aucun # vf-provides: → 2, message nommant la règle 4 rendue INERTE (JAMAIS 0)"
+else
+  ko "R6 plancher corpus de preuve sans marqueur → 2" "rc=$rc out=[$out]"
+fi
+
+# === Cas R7 — règle 4bis : vf-requires citant un id HORS de la table des ids légaux → 1 ========
+# Artefact SANS armement (D-01 : la moitié déclarée reste ouverte), mais l'id cité est fantaisiste
+# — hygiène de déclaration, symétrique de la règle 3.
+D="$(mk_regle4_fixture r7)"
+cat > "$D/agents/agentC.md" <<'AGT'
+---
+name: agent-fixture-4bis
+vf-requires: id-fantaisiste-hors-table
+---
+
+# Agent sans armement, id inconnu (fixture règle 4bis)
+AGT
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md
+$D/agents/agentC.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+out="$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")"
+says_r4bis=0; case "$out" in *"ECART regle 4bis"*) says_r4bis=1 ;; esac
+names_id=0;   case "$out" in *"id-fantaisiste-hors-table"*) names_id=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$says_r4bis" -eq 1 ] && [ "$names_id" -eq 1 ]; then
+  ok "R7 règle 4bis — vf-requires citant un id hors table → 1, ECART regle 4bis nommant l'id inconnu"
+else
+  ko "R7 règle 4bis id hors table → 1" "rc=$rc regle4bis=$says_r4bis id=$names_id out=[$out]"
+fi
+
+# === Cas R7bis — règle 4, sous-cas (b) : id légal mais DIFFÉRENT de celui exigé par l'armement ==
+# Additif (correction ciblée post-revue) : ce sous-cas était vérifié à la main par la revue mais
+# n'avait aucun cas de test dédié — branche de production entièrement non exercée par la suite
+# jusqu'ici (check-capability-activation.sh:623-627). Un artefact arme `isolation:` (exige
+# `worktree-baseref`) mais cite `vf-requires: mcp-servers` — LÉGAL (table OKID) mais PAS l'id exigé
+# par CET armement. Distinct de R7 (id hors table) et de MUT-R2 sous-cas (a) (vf-requires absent).
+D="$(mk_regle4_fixture r7bis)"
+cat > "$D/agents/agentE.md" <<'AGT'
+---
+name: agent-fixture-4b
+isolation: worktree
+vf-requires: mcp-servers
+---
+
+# Agent armé isolation, vf-requires légal mais DIFFÉRENT (fixture règle 4 sous-cas b)
+AGT
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md
+$D/agents/agentE.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+out="$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")"
+says_r4=0; case "$out" in *"ECART regle 4 :"*"agentE.md"*) says_r4=1 ;; esac
+names_cite=0; case "$out" in *"vf-requires cite « mcp-servers »"*) names_cite=1 ;; esac
+names_exige=0; case "$out" in *"pas id exige « worktree-baseref »"*) names_exige=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$says_r4" -eq 1 ] && [ "$names_cite" -eq 1 ] && [ "$names_exige" -eq 1 ]; then
+  ok "R7bis règle 4 sous-cas (b) — vf-requires légal mais autre que l'id exigé → 1, ECART nommant les deux ids"
+else
+  ko "R7bis règle 4 sous-cas (b) — id légal autre que l'id exigé → 1" "rc=$rc regle4=$says_r4 cite=$names_cite exige=$names_exige out=[$out]"
+fi
+
+# === Cas R8 — contre-épreuve D-01 : vf-requires LÉGAL sans AUCUN armement → 0, jamais un écart ==
+# La moitié déclarée de D-01 : un artefact peut annoncer une précondition légale que la liste close
+# ne gouverne PAS encore (aucune clé `isolation:`). Ce n'est jamais un écart.
+D="$(mk_regle4_fixture r8)"
+cat > "$D/agents/agentD.md" <<'AGT'
+---
+name: agent-fixture-d01
+vf-requires: mcp-servers
+---
+
+# Agent sans armement, id LEGAL (contre-épreuve D-01)
+AGT
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md
+$D/agents/agentD.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+if [ "$rc" -eq 0 ]; then
+  ok "R8 contre-épreuve D-01 — vf-requires légal (mcp-servers) sans armement → 0, jamais un écart"
+else
+  ko "R8 contre-épreuve D-01 vf-requires légal sans armement → 0" "rc=$rc out=[$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")]"
+fi
+
+# === Cas R9 — non-régression : le compteur de lignes de CORPUS n'est PAS pollué par les corpus ==
+# d'armement/de preuve neufs (garde ISARM/ISPRV insérée AVANT le bloc corpus SANS CONDITION).
+D_BASE="$(mk_fixture nr_base)"
+out_base="$(run "$D_BASE")"
+lines_base=""
+case "$out_base" in *" ligne(s)."*) lines_base="${out_base##*fichier(s) de corpus, }"; lines_base="${lines_base%% ligne*}" ;; esac
+D_R4="$(mk_regle4_fixture nr_r4)"
+ARMED_LIST="$D_R4/agents/agentA.md
+$D_R4/agents/agentB.md"
+PROV_LIST="$D_R4/scripts/provide.sh
+$D_R4/scripts/decoy.sh"
+out_r4="$(run4 "$D_R4" "$ARMED_LIST" "$PROV_LIST")"
+lines_r4=""
+case "$out_r4" in *" ligne(s)."*) lines_r4="${out_r4##*fichier(s) de corpus, }"; lines_r4="${lines_r4%% ligne*}" ;; esac
+if [ -n "$lines_base" ] && [ "$lines_base" = "$lines_r4" ]; then
+  ok "R9 non-régression — compteur de lignes de corpus inchangé ($lines_base) malgré l'ajout des corpus d'armement/de preuve"
+else
+  ko "R9 non-régression — le compteur de lignes de corpus doit rester inchangé" "base=$lines_base r4=$lines_r4 out_base=[$out_base] out_r4=[$out_r4]"
+fi
+
+# ===============================================================================================
+# == RÈGLE 4 — armements MCP (Phase 28, plan 28-02) : seconde ligne de la liste close ============
+# ===============================================================================================
+# Les deux grammaires MCP (vf-mcp-consumer: true, vf-mcp-tools: <serveur>:<outils>) exigent
+# désormais la même précondition mcp-servers (déjà légale dans OKID depuis 28-01). `decoy.sh`, déjà
+# fabriqué par `mk_script_decoy` ci-dessus, porte `# vf-provides: mcp-servers` : réutilisé tel
+# quel, aucun script de fixture neuf n'est nécessaire pour ces cas.
+
+mk_agent_mcp_consumer_sans_requires() { # <chemin> — vf-mcp-consumer: true SANS vf-requires
+  cat > "$1" <<'AGT'
+---
+name: agent-fixture-mcp-consumer
+vf-mcp-consumer: true
+---
+
+# Agent MCP consumer sans precondition declaree (fixture regle 4, Phase 28-02)
+AGT
+}
+
+mk_agent_mcp_consumer_avec_requires() { # <chemin> — vf-mcp-consumer: true + vf-requires legal
+  cat > "$1" <<'AGT'
+---
+name: agent-fixture-mcp-consumer-ok
+vf-mcp-consumer: true
+vf-requires: mcp-servers
+---
+
+# Agent MCP consumer conforme (fixture regle 4, Phase 28-02)
+AGT
+}
+
+mk_agent_mcp_tools_sans_requires() { # <chemin> — vf-mcp-tools: <serveur>:<outils> SANS vf-requires
+  cat > "$1" <<'AGT'
+---
+name: agent-fixture-mcp-tools
+vf-mcp-tools: XcodeBuildMCP:test_sim,build_sim,clean
+---
+
+# Agent MCP tools sans precondition declaree (fixture regle 4, Phase 28-02)
+AGT
+}
+
+mk_agent_mcp_frontiere() { # <chemin> — vf-mcp-consumer: true + vf-requires HORS table (régle 4bis)
+  cat > "$1" <<'AGT'
+---
+name: agent-fixture-mcp-frontiere
+vf-mcp-consumer: true
+vf-requires: mcp-servers-extra
+---
+
+# Agent vf-requires hors table des ids legaux (fixture regle 4bis, comparaison a frontiere)
+AGT
+}
+
+# Piège anti-prose : AUCUN armement en frontmatter, mais le CORPS cite le préfixe de token MCP dans
+# une phrase — reproduction fidèle de l'occurrence réelle mesurée à `vf-reviewer.md:45` (« ... c'est
+# pour ça que tu portes `vf-mcp-tools`, une allowlist nommée injectée à l'install (jamais un token
+# `mcp__` en dur dans ce fichier) »). Le gate ne lit QUE les clés entre les deux `---` : un gate qui
+# chercherait le littéral dans le corps rougirait ici à tort.
+mk_agent_mcp_prose() { # <chemin> — sans armement, prose citant le préfixe mcp__ dans le corps
+  cat > "$1" <<'AGT'
+---
+name: agent-fixture-mcp-prose
+---
+
+# Agent sans armement (fixture anti-prose, regle 4, Phase 28-02)
+
+Tu ne PRODUIS pas un verdict de compilation, tu en VERIFIES un — c'est pour ca que tu portes
+`vf-mcp-tools`, une allowlist nommee injectee a l'install (jamais un token `mcp__` en dur dans ce
+fichier). Protocole d'appel, non negociable :
+AGT
+}
+
+echo ""
+echo "== règle 4 — armements MCP (Phase 28-02) =="
+
+# === Cas R10 — vf-mcp-consumer: true SANS vf-requires → 1 (règle 4, sous-cas a) ================
+D="$(mk_regle4_fixture r10)"
+mk_agent_mcp_consumer_sans_requires "$D/agents/agentF.md"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md
+$D/agents/agentF.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+out="$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")"
+says_r4=0; case "$out" in *"ECART regle 4"*"agentF.md"*) says_r4=1 ;; esac
+names_key=0; case "$out" in *"arme « vf-mcp-consumer »"*) names_key=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$says_r4" -eq 1 ] && [ "$names_key" -eq 1 ]; then
+  ok "R10 règle 4 (mcp-consumer) — armé vf-mcp-consumer sans vf-requires → 1, ECART nommant agentF.md"
+else
+  ko "R10 règle 4 (mcp-consumer) sans vf-requires → 1" "rc=$rc regle4=$says_r4 cle=$names_key out=[$out]"
+fi
+
+# === Cas R11 — vf-mcp-consumer: true + vf-requires légal levé par decoy.sh (# vf-provides: mcp-servers) → 0
+D="$(mk_regle4_fixture r11)"
+mk_agent_mcp_consumer_avec_requires "$D/agents/agentG.md"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md
+$D/agents/agentG.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+if [ "$rc" -eq 0 ]; then
+  ok "R11 règle 4 (mcp-consumer) conforme — vf-requires légal levé par # vf-provides: mcp-servers (decoy.sh) → 0"
+else
+  ko "R11 règle 4 (mcp-consumer) conforme → 0" "rc=$rc out=[$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")]"
+fi
+
+# === Cas R12 — vf-mcp-tools: <serveur>:<outils> SANS vf-requires → 1 (seconde grammaire) =========
+D="$(mk_regle4_fixture r12)"
+mk_agent_mcp_tools_sans_requires "$D/agents/agentH.md"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md
+$D/agents/agentH.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+out="$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")"
+says_r4=0; case "$out" in *"ECART regle 4"*"agentH.md"*) says_r4=1 ;; esac
+names_key=0; case "$out" in *"arme « vf-mcp-tools »"*) names_key=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$says_r4" -eq 1 ] && [ "$names_key" -eq 1 ]; then
+  ok "R12 règle 4 (mcp-tools) — armé vf-mcp-tools sans vf-requires → 1, la seconde grammaire arme au même titre"
+else
+  ko "R12 règle 4 (mcp-tools) sans vf-requires → 1" "rc=$rc regle4=$says_r4 cle=$names_key out=[$out]"
+fi
+
+# === Cas R13 — anti-prose : AUCUN armement, corps citant le préfixe mcp__ (piège vf-reviewer.md:45) → 0
+D="$(mk_regle4_fixture r13)"
+mk_agent_mcp_prose "$D/agents/agentI.md"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md
+$D/agents/agentI.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+if [ "$rc" -eq 0 ]; then
+  ok "R13 anti-prose — corps citant le préfixe mcp__ SANS armement en frontmatter → 0 (piège vf-reviewer.md:45)"
+else
+  ko "R13 anti-prose — le corps ne doit jamais être lu comme un armement" "rc=$rc out=[$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")]"
+fi
+
+# === Cas R14 — frontière : vf-requires citant un id HORS table (mcp-servers-extra) → 1 (règle 4bis)
+# Preuve que la comparaison se fait par égalité STRICTE de clé (id in OKID), jamais par sous-chaîne :
+# « mcp-servers-extra » n'est PAS « mcp-servers », même s'il le contient comme préfixe.
+D="$(mk_regle4_fixture r14)"
+mk_agent_mcp_frontiere "$D/agents/agentJ.md"
+ARMED_LIST="$D/agents/agentA.md
+$D/agents/agentB.md
+$D/agents/agentJ.md"
+PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+rc="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+out="$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")"
+says_r4bis=0; case "$out" in *"ECART regle 4bis"*) says_r4bis=1 ;; esac
+names_id=0; case "$out" in *"mcp-servers-extra"*) names_id=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$says_r4bis" -eq 1 ] && [ "$names_id" -eq 1 ]; then
+  ok "R14 règle 4bis — vf-requires « mcp-servers-extra » hors table (frontière stricte, pas une sous-chaîne de mcp-servers) → 1"
+else
+  ko "R14 règle 4bis — id hors table (frontière) → 1" "rc=$rc regle4bis=$says_r4bis id=$names_id out=[$out]"
+fi
+
+# === Cas R15 — mutation sur COPIES de l'arbre RÉEL : les 5 déclarations réelles, retrait de l'une
+# fait rougir en nommant précisément l'artefact =================================================
+# Copie des 5 artefacts réellement distribués dans un `mktemp -d` privé — l'arbre n'est JAMAIS
+# écrit. Le corpus de preuve reste `decoy.sh` de la fixture (# vf-provides: mcp-servers, patron déjà
+# éprouvé). L'état conforme des 5 copies est vérifié en premier, PUIS UNE seule est mutée
+# (vf-requires retiré) — `cmp -s` atteste le changement, jamais `diff`.
+REAL_ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+REAL5=(
+  "$REAL_ROOT/plugin/dev-orchestrator/agents/vf-coder.md"
+  "$REAL_ROOT/plugin/dev-orchestrator/agents/vf-reviewer.md"
+  "$REAL_ROOT/plugin/mobile-test-team/agents/vf-app-fixer.md"
+  "$REAL_ROOT/plugin/mobile-test-team/agents/vf-test-orchestrator.md"
+  "$REAL_ROOT/plugin/mobile-test-team/agents/vf-test-runner.md"
+)
+real5_present=1
+for f in "${REAL5[@]}"; do
+  [ -r "$f" ] || real5_present=0
+done
+if [ "$real5_present" -eq 1 ]; then
+  D="$(mk_regle4_fixture r15)"
+  mkdir -p "$D/real"
+  ARMED_LIST=""
+  for f in "${REAL5[@]}"; do
+    b="$(basename "$f")"
+    cp "$f" "$D/real/$b"
+    ARMED_LIST="$ARMED_LIST$D/real/$b
+"
+  done
+  PROV_LIST="$D/scripts/provide.sh
+$D/scripts/decoy.sh"
+  rc_ok="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+  if [ "$rc_ok" -eq 0 ]; then
+    ok "R15 arbre réel (copie) — les 5 déclarations réelles, copiées, sont conformes → 0"
+  else
+    ko "R15 arbre réel (copie) conforme → 0" "rc=$rc_ok out=[$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")]"
+  fi
+  cp "$D/real/vf-coder.md" "$TMP/r15.vf-coder.orig"
+  if ! mutate "$TMP/r15.vf-coder.orig" "$D/real/vf-coder.md" '/^vf-requires:/{next} {print}'; then
+    ko "R15 mutation — retrait de vf-requires sur la copie de vf-coder.md" "le programme de mutation a ÉCHOUÉ — mutant NON CONSTRUIT"
+  elif cmp -s "$D/real/vf-coder.md" "$TMP/r15.vf-coder.orig"; then
+    ko "R15 mutation — retrait de vf-requires sur la copie de vf-coder.md" "la mutation n'a RIEN changé — mutant NON OPPOSABLE"
+  else
+    rc_mut="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+    out_mut="$(run4 "$D" "$ARMED_LIST" "$PROV_LIST")"
+    cp "$TMP/r15.vf-coder.orig" "$D/real/vf-coder.md"
+    rc_back="$(rc4_of "$D" "$ARMED_LIST" "$PROV_LIST")"
+    names_it=0; case "$out_mut" in *"vf-coder.md"*) names_it=1 ;; esac
+    if [ "$rc_mut" -eq 1 ] && [ "$names_it" -eq 1 ]; then
+      ok "R15 mutation — vf-requires retiré de la copie de vf-coder.md (une des 5 déclarations réelles) : le gate ROUGIT (rc=1) en nommant précisément vf-coder.md"
+    else
+      ko "R15 mutation — retirer UNE des 5 déclarations réelles doit rougir en nommant l'artefact" "rc=$rc_mut nomme=$names_it out=[$out_mut]"
+    fi
+    if [ "$rc_back" -eq 0 ]; then
+      ok "R15 mutation — vf-requires restauré sur la copie : le VERT est retrouvé (rc=0)"
+    else
+      ko "R15 mutation — le vert doit être retrouvé après restauration" "rc=$rc_back"
+    fi
+  fi
+else
+  echo "  · R15 arbre réel (copie) NON APPLICABLE — un des 5 artefacts réels est introuvable sous $REAL_ROOT"
+fi
+
+# ===============================================================================================
+# == OPPOSABILITÉ DES PORTEURS DE PREUVE (# vf-provides:), Phase 28, plan 28-02 ==================
+# ===============================================================================================
+# Pourquoi cette garde existe. Un marqueur statique seul ne prouve rien : `ensure-design-deps.sh`
+# déclare noir sur blanc « Contrat de sortie : toujours exit 0, SAUF VF_SCOPE invalide » —
+# précondition non satisfaite comprise — et son unique câblage machine
+# (`plugin/_internal/vibeflow-update.sh:581-586`) le traite en best-effort à l'install : les deux
+# branches loguent, aucune n'échoue. Accepter la seule PRÉSENCE d'un `# vf-provides:` comme preuve
+# reviendrait à rendre vert un gate adossé à un script incapable de rougir — c'est #38 rejoué d'un
+# cran. Conséquence pratique : `ensure-design-deps.sh` NE PEUT PAS déclarer `# vf-provides:` en
+# l'état ; lui donner un mode de vérification discriminant est un candidat de backlog nommé (D-05),
+# pas un livrable de cette phase.
+#
+# Aucun script ne peut donc porter `# vf-provides:` sans qu'une ligne de CETTE table, exécutée pour
+# de vrai, établisse qu'il sait rendre le code de sortie EXACT déclaré quand sa précondition manque
+# — jamais « non nul », qui laisserait passer un porteur qui ne sait dire que « je ne peux pas me
+# prononcer » (le sous-état 3 INDÉTERMINÉ, cousin du cran de `ensure-design-deps.sh` que cette
+# garde existe pour fermer).
+
+# --- Table nommée, écrite à la main (A-2, D-02b) : une ligne par porteur. Aujourd'hui UNE entrée.
+PROV_TABLE_ID=(mcp-servers)
+PROV_TABLE_SCRIPT=("plugin/dev-orchestrator/scripts/inject-mcp-tools.sh")
+PROV_TABLE_EXPECT_RED=(1)
+
+# --- Découverte du corpus RÉEL de porteurs distribués : deux dispositions, comme le gate lui-même
+# (`plugin/*/scripts/*.sh` en dépôt, `.claude/scripts/*.sh` en lab installé, s'il existe). Résolue
+# par VF_CAPACT_PROVIDERS — MÊME contrat de surcharge que le gate — pour rendre cette découverte
+# elle-même testable par mutation sur une copie, sans jamais écrire dans l'arbre réel.
+vf_capact_test_discover_provider_scripts() { # -> chemins des scripts a balayer, un par ligne
+  if [ -n "${VF_CAPACT_PROVIDERS+x}" ]; then
+    printf '%s\n' "$VF_CAPACT_PROVIDERS"
+    return 0
+  fi
+  for f in "$REAL_ROOT"/plugin/*/scripts/*.sh; do
+    [ -f "$f" ] && printf '%s\n' "$f"
+  done
+  if [ -d "$REAL_ROOT/.claude/scripts" ]; then
+    for f in "$REAL_ROOT"/.claude/scripts/*.sh; do
+      [ -f "$f" ] && printf '%s\n' "$f"
+    done
+  fi
+}
+
+# --- Extraction des ids # vf-provides: dans le bloc de commentaires de tete de CHAQUE script du
+# corpus (jusqu'a la premiere ligne NON commentee — meme frontiere que le gate). awk, jamais grep
+# pipe (le grep proxifie de ce poste tronque silencieusement, constat inscrit dans le gate).
+vf_capact_test_provider_ids() { # <chemins sur stdin, un par ligne> -> ids, un par ligne
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    [ -r "$f" ] || continue
+    awk '
+      FNR==1 { open=1 }
+      open {
+        if ($0 !~ /^#/) { open=0; next }
+        if ($0 ~ /^# vf-provides: /) {
+          id=$0; sub(/^# vf-provides: /,"",id); gsub(/^[ \t]+/,"",id); gsub(/[ \t]+$/,"",id)
+          if (id != "") print id
+        }
+      }
+    ' "$f"
+  done
+}
+
+REAL_ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+
+echo ""
+echo "== opposabilité des porteurs de preuve (# vf-provides:), Phase 28-02 =="
+
+DISK_IDS="$(vf_capact_test_discover_provider_scripts | vf_capact_test_provider_ids | sort -u)"
+TABLE_IDS_SORTED="$(printf '%s\n' "${PROV_TABLE_ID[@]}" | sort -u)"
+n_disk=$(printf '%s\n' "$DISK_IDS" | awk 'length($0)>0{c++} END{print c+0}')
+n_table=$(printf '%s\n' "$TABLE_IDS_SORTED" | awk 'length($0)>0{c++} END{print c+0}')
+only_disk="$(comm -23 <(printf '%s\n' "$DISK_IDS") <(printf '%s\n' "$TABLE_IDS_SORTED"))"
+only_table="$(comm -13 <(printf '%s\n' "$DISK_IDS") <(printf '%s\n' "$TABLE_IDS_SORTED"))"
+
+if [ "$n_disk" -eq 0 ] || [ "$n_table" -eq 0 ]; then
+  ko "opposabilité plancher — ensemble vide (disque=$n_disk, table=$n_table)" "une garde qui ne surveille personne ne prouve rien"
+else
+  ok "opposabilité plancher — ensembles non vides (disque=$n_disk porteur(s), table=$n_table entrée(s), état attendu : exactement UN porteur, inject-mcp-tools.sh)"
+fi
+if [ -z "$only_disk" ]; then
+  ok "opposabilité — aucun porteur non tabulé (comparaison d ensembles par comm)"
+else
+  ko "opposabilité — porteur non opposable : aucun cas ne prouve sa discriminance" "only_disk=[$only_disk]"
+fi
+if [ -z "$only_table" ]; then
+  ok "opposabilité — aucune entrée de table périmée (comparaison par comm)"
+else
+  ko "opposabilité — entrée de table périmée (aucun porteur sur disque)" "only_table=[$only_table]"
+fi
+
+# --- Plancher (mutation) : corpus VIDE des deux côtés — VF_CAPACT_PROVIDERS pointe un répertoire
+# vide, seule la fonction de découverte est testée ici (la table, elle, garde son unique entrée
+# réelle : c'est la comparaison disque-vide qui doit être vue, jamais un artefact du fixturing).
+EMPTY_PROV_DIR="$TMP/opposabilite-vide"
+mkdir -p "$EMPTY_PROV_DIR"
+DISK_IDS_VIDE="$(VF_CAPACT_PROVIDERS="" vf_capact_test_discover_provider_scripts | vf_capact_test_provider_ids | sort -u)"
+n_disk_vide=$(printf '%s\n' "$DISK_IDS_VIDE" | awk 'length($0)>0{c++} END{print c+0}')
+if [ "$n_disk_vide" -eq 0 ]; then
+  ok "opposabilité plancher (mutation) — VF_CAPACT_PROVIDERS=\"\" rend un corpus VRAIMENT vide (0 id), le plancher se déclencherait"
+else
+  ko "opposabilité plancher (mutation) — VF_CAPACT_PROVIDERS=\"\" doit rendre un corpus vide" "n_disk_vide=$n_disk_vide"
+fi
+
+# --- Mutation sur COPIE : un script portant # vf-provides: faux-id, absent de la table, DOIT faire
+# échouer la comparaison. L'arbre réel n'est JAMAIS touché — copie complète du corpus de scripts
+# dans un `mktemp -d` privé, VF_CAPACT_PROVIDERS pointe la suite sur cette copie (jamais sur le
+# dépôt), aucune écriture ni « restauration » après coup n'a lieu sur l'arbre distribué.
+COPY_CORPUS="$TMP/opposabilite-corpus"
+mkdir -p "$COPY_CORPUS"
+for f in "$REAL_ROOT"/plugin/*/scripts/*.sh; do
+  [ -f "$f" ] || continue
+  cp "$f" "$COPY_CORPUS/"
+done
+cat > "$COPY_CORPUS/faux-porteur.sh" <<'SCR'
+#!/usr/bin/env bash
+# faux-porteur.sh — fixture opposabilité (Phase 28-02), porteur NON TABULÉ
+# vf-provides: faux-id
+set -uo pipefail
+echo ok
+SCR
+COPY_LIST="$(for f in "$COPY_CORPUS"/*.sh; do printf '%s\n' "$f"; done)"
+DISK_IDS_MUT="$(VF_CAPACT_PROVIDERS="$COPY_LIST" vf_capact_test_discover_provider_scripts | vf_capact_test_provider_ids | sort -u)"
+mut_only_disk="$(comm -23 <(printf '%s\n' "$DISK_IDS_MUT") <(printf '%s\n' "$TABLE_IDS_SORTED"))"
+if [ -n "$mut_only_disk" ]; then
+  ok "opposabilité mutation — porteur NON TABULÉ (faux-id) ajouté sur COPIE (jamais l'arbre réel) : la comparaison échoue (only_disk=[$mut_only_disk])"
+else
+  ko "opposabilité mutation — un porteur non tabulé doit faire échouer la comparaison" "mut_only_disk vide alors qu'un faux porteur a été ajouté sur la copie"
+fi
+
+# --- Discriminance PROUVÉE PAR EXÉCUTION RÉELLE, pour l'unique entrée de la table (mcp-servers).
+# Isolation hermétique du scope GLOBAL (même patron que test-inject-mcp-tools.sh, Phase 21 Geste B) :
+# VF_CLAUDE_JSON pointe un chemin qui n'existe jamais, indifférent à la config personnelle du poste.
+PROVIDER_SCRIPT="$REAL_ROOT/${PROV_TABLE_SCRIPT[0]}"
+D_PROV="$TMP/opposabilite-verify"
+mkdir -p "$D_PROV"
+ABSENT_CLAUDE_JSON="$D_PROV/absent-claude.json"
+
+# Sens ROUGE : .mcp.json déclare un serveur (fixture-mcp-server), rendant `servers` non vide (donc
+# le verdict peut atteindre exit 1, pas le 3 de l'environnement totalement privé) ; l'agent porte
+# `vf-mcp-consumer: true` (sans ce marqueur il n'est pas retenu comme cible, `determined` reste faux
+# et le verdict serait 3, pas 1) et cite dans `tools:` un serveur INCONNU (`serveur-fantome`) au lieu
+# du serveur exigé — le token attendu (mcp__fixture-mcp-server__*) reste donc manquant.
+RED_AGENT="$D_PROV/rouge.md"
+cat > "$RED_AGENT" <<'AGT'
+---
+name: agent-fixture-mcpprov-rouge
+vf-mcp-consumer: true
+tools: Read, Bash, mcp__serveur-fantome__outil
+---
+
+# Agent MCP consumer citant un serveur inconnu (fixture opposabilité, regle 4, Phase 28-02)
+AGT
+RED_MCP="$D_PROV/mcp-rouge.json"
+printf '{ "mcpServers": { "fixture-mcp-server": {} } }' > "$RED_MCP"
+rc_red=0
+VF_CLAUDE_JSON="$ABSENT_CLAUDE_JSON" bash "$PROVIDER_SCRIPT" --target "$RED_AGENT" --mcp-json "$RED_MCP" --verify --strict >/dev/null 2>&1 || rc_red=$?
+if [ "$rc_red" -eq 1 ]; then
+  ok "opposabilité (mcp-servers, sens rouge) — précondition manquante -> code EXACT 1 (jamais « non nul »)"
+else
+  ko "opposabilité (mcp-servers, sens rouge) -> 1" "rc=$rc_red"
+fi
+
+# Sens VERT : la fixture réutilise le MÉCANISME EXACT du cas conforme déjà écrit dans
+# test-inject-mcp-tools.sh (T11 — injecter PUIS vérifier) plutôt que de fabriquer à la main la
+# chaîne mcp__<serveur>__* attendue, qui rougirait en « serveur manquant » (missing) au moindre
+# écart de forme. Même marqueur d'éligibilité que le sens rouge (vf-mcp-consumer: true).
+GREEN_AGENT="$D_PROV/vert.md"
+cat > "$GREEN_AGENT" <<'AGT'
+---
+name: agent-fixture-mcpprov-vert
+vf-mcp-consumer: true
+tools: Read, Bash
+---
+
+# Agent MCP consumer, cas conforme (fixture opposabilité, regle 4, Phase 28-02)
+AGT
+GREEN_MCP="$D_PROV/mcp-vert.json"
+printf '{ "mcpServers": { "fixture-mcp-server": {} } }' > "$GREEN_MCP"
+VF_CLAUDE_JSON="$ABSENT_CLAUDE_JSON" bash "$PROVIDER_SCRIPT" --target "$GREEN_AGENT" --mcp-json "$GREEN_MCP" >/dev/null 2>&1
+rc_green=0
+VF_CLAUDE_JSON="$ABSENT_CLAUDE_JSON" bash "$PROVIDER_SCRIPT" --target "$GREEN_AGENT" --mcp-json "$GREEN_MCP" --verify --strict >/dev/null 2>&1 || rc_green=$?
+if [ "$rc_green" -eq 0 ]; then
+  ok "opposabilité (mcp-servers, sens vert) — précondition satisfaite (injectée puis relue) -> code EXACT 0 : DISCRIMINANCE prouvée dans les deux sens"
+else
+  ko "opposabilité (mcp-servers, sens vert) -> 0" "rc=$rc_green"
+fi
+
+# Cas nommé distinct : environnement TOTALEMENT privé de source (aucun .mcp.json exploitable, scope
+# global neutralisé) -> 3 INDÉTERMINÉ, JAMAIS 1. Documente dans la suite elle-même que les deux sens
+# d'échec du porteur ne sont pas confondus — un « non nul » sur ce cas laisserait passer un porteur
+# qui ne sait dire que « je ne peux pas me prononcer », le cousin du cran de ensure-design-deps.sh.
+IND_AGENT="$D_PROV/indetermine.md"
+cat > "$IND_AGENT" <<'AGT'
+---
+name: agent-fixture-mcpprov-indetermine
+vf-mcp-consumer: true
+tools: Read, Bash
+---
+
+# Agent MCP consumer sans aucune source de serveur (fixture opposabilité, Phase 28-02)
+AGT
+EMPTY_MCP="$D_PROV/mcp-vide.json"
+printf '{ "mcpServers": {} }' > "$EMPTY_MCP"
+rc_ind=0
+VF_CLAUDE_JSON="$ABSENT_CLAUDE_JSON" bash "$PROVIDER_SCRIPT" --target "$IND_AGENT" --mcp-json "$EMPTY_MCP" --verify --strict >/dev/null 2>&1 || rc_ind=$?
+if [ "$rc_ind" -eq 3 ]; then
+  ok "opposabilité (mcp-servers) — environnement totalement privé de source -> code EXACT 3, distinct du sens rouge (1) : les deux échecs ne sont jamais confondus"
+else
+  ko "opposabilité (mcp-servers) — environnement sans aucune source -> 3, distinct de 1" "rc=$rc_ind"
 fi
 
 # === Cas final — contrôle sur l'arbre RÉEL ====================================================

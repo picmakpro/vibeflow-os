@@ -5,6 +5,54 @@ extrait récent et pointent ici). Chaque module a par ailleurs son propre `CHANG
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.51.0] — 2026-08-15
+
+**Les gains de la deep-search ICM sont distillés dans l'outillage — les mécanismes, jamais le
+label — et le socle `dag.sh --scope` traverse la phase sans qu'une seule de ses lignes bouge.**
+
+Phase 29 (5 plans, 13 tâches, 12 exigences `ICMD-01..12`), PR #41 — plus les plans 01-02 de la
+Phase 28 portés par la même branche. Origine : le rapport
+`reports/research/2026-08-15-icm-deep-search.md` (4 agents de recherche parallèles sur le papier
+arXiv 2603.16021, ses implémentations et son écosystème), dont le verdict — « rien à adopter tel
+quel, 5 mécanismes à distiller » — devient la phase. **La contrainte de cadrage D-03, ratée
+one-way, est tenue par construction** : l'investigation préalable a rétabli l'historique réel du
+mécanisme (`--scope` déclaré en **Phase 20** — D-13 de `20-CONTEXT.md`, commit `d549b2d` — la
+Phase 27 n'ajoutant que la partition `stages` et la fermeture RCE), recensé ses consommateurs et
+conclu que le « négatif du périmètre » réclamé par G1 se compose entièrement depuis les champs
+déjà émis — `dag.sh` et `test-dag.sh` sont absents du diff de toute la branche, la suite du socle
+(99 cas) rejouée verte à chaque étage. **Livré** : **G3**, `check-map-drift.sh` (conductor) — le
+gate anti-drift carte↔disque qui manquait structurellement (les gates existants détectent
+l'immobilité, jamais l'incohérence : compteurs faux de la Phase 22, folder maps qui mentent,
+skills fantômes), lint-only par ADR-031, grammaire 0/3/64 avec plancher `NON VÉRIFIABLE` sur
+cible vide, deux paires v1 (carte de dossiers d'un `CLAUDE.md` ↔ disque, index de dossier ↔
+contenu), bornes implémentées **comme classes et jamais comme filtres de sortie** après verdict
+humain sur exécution réelle (13 → 3 findings : une ligne de commande n'est pas un chemin déclaré,
+l'exemple pédagogique `examples/` est hors balayage — les 3 findings restants sont le signal
+assumé, cartes jamais retouchées) ; **G1**, la bullet « NE charge PAS » dans le digest de mission
+(`mission-contracts.md`), rédigée par le manager depuis le `scope[]` du nœud — l'anti-chargement
+devient une instruction de premier ordre ; **G5**, l'Edit-Source Principle dans `team-kernel.md`
+(une correction récurrente au même endroit est une information de debugging : on amende la source
+— contrat, skill, digest — on ne redispatche jamais le même fix), consigner-puis-proposer sous
+ADR-031 ; **G2**, `scaffold-docs.sh` gagne le pattern `_index.md` (dossiers de références > 10
+fichiers) et la contrainte ≤ 80 lignes sur les index — et sa **première suite de tests**, qui
+couvre aussi son comportement d'hier. **Le défaut de méthode qui compte** : 6 passes de juge sur
+`check-map-drift.sh`, 6 défauts réels, **aucun trouvé par la suite du worker** — chaque correctif
+fermait le cas nommé et laissait vivre son voisin, jusqu'au changement de méthode (preuve
+générative : 45 combinaisons, 10 rouges avant / 0 après, au lieu d'une liste de cas) ; et un cas
+de test qui s'attestait contre `git show HEAD:` — mutable — donc structurellement incapable de
+rougir une fois le correctif commité : rouge permanent corrigé en figeant le SHA. Les deux leçons
+sont consignées en mémoire d'agent. **Aussi** : `parallelization.skip_checkpoints` repasse à
+`false` (troisième vecteur d'auto-approbation de checkpoint neutralisé — l'arrêt du checkpoint
+humain de cette phase n'avait tenu que par la borne du mandat), G4 (lab-starters clonables) et
+les gains secondaires du rapport explicitement différés au backlog. **Phase 28, plans 01-02** (le
+plan 03 *as-installed testing* reste ouvert) : `check-capability-activation.sh` gagne les règles
+4 et 4bis — un artefact qui arme `isolation:` ou un serveur MCP sans que sa précondition soit
+distribuée sort en écart, planchers anti-vert-à-vide, porteurs `# vf-provides:` opposables par
+exécution (41/41 cas) — la généralisation structurelle de l'incident #38. Modules : 4 bumpés
+(`conductor` v1.22.0, `dev-orchestrator` v2.14.0, `validator` v1.3.3, `reference` v2.5.3).
+**54 suites** vertes (52 → 54 : `test-check-map-drift.sh`, `test-scaffold-docs.sh`), compteur
+re-dérivé jamais recopié.
+
 ## [v2.50.1] — 2026-08-10
 
 **Correctif : `isolation: worktree` retiré des 13 agents écrivains — la ligne livrée en v2.49.0

@@ -98,6 +98,9 @@ Délègue séquentiellement :
 3. **Dette de planning (8e signal)** — si `planning-core` est installé et le lab a des compartiments :
    `bash .claude/scripts/detect-planning-debt.sh --root projects` (advisory). Signale les compartiments
    actifs sans plan au-dessus du seuil d'autonomie → proposer typage + `/vf-planning`.
+4. **Drift carte↔disque (9e signal)** — script du module conductor (mandatory) :
+   `bash .claude/scripts/check-map-drift.sh --path .` (advisory). Remonte dans la dette
+   consolidée, propose une correction manuelle, jamais ne corrige (ADR-031).
 
 Sortie : liste consolidée de la dette (par sévérité).
 
@@ -146,6 +149,7 @@ Je ne réimplémente JAMAIS la logique. Je délègue toujours à un skill outill
 | Conformité + densité agents | script `check-agents.sh --strict` (ADR-044/029) |
 | Audit mémoire / registres | skill `consolidator` (mode audit) |
 | Détection dette documentaire | grille des 7 signaux (template méthodologie) |
+| Détection de drift carte↔disque | script `check-map-drift.sh` (module conductor, advisory, ADR-031) |
 | Architecture d'audit des process | skill `audit-architecture` (mode scan) |
 
 Si un besoin émerge sans skill correspondant → **créer le skill via `skill-creator`**, ne PAS le coder directement dans l'agent.
@@ -173,8 +177,7 @@ Rapport `reports/validator/YYYY-MM-DD-validator.md` :
 
 ## Phase 1 — Infrastructure
 - Claude Code version : X.Y.Z (whitelist OK / WARN)
-- Hooks : N valides / M erreurs
-- Scripts : N tests pass / M fail
+- Hooks : N valides / M erreurs · Scripts : N tests pass / M fail
 - Drift snapshot : aucun / N changements
 
 ## Phase 2 — Densité + conformité agents
@@ -183,15 +186,13 @@ Rapport `reports/validator/YYYY-MM-DD-validator.md` :
 - Refonte recommandée : [liste]
 
 ## Phase 3 — Dette + mémoire
-- Signaux dette : N (sur 7)
+- Signaux dette : N (sur 9 évalués)
 - Registres : index/body cohérents ? collisions ? promotions en attente ?
 
 ## Phase 4 — Architecture d'audit des process
 - Process énumérés : N
-- Process sous-audités : [liste + dimension manquante]
-- Structures cibles proposées : [résumé]
-<!-- En profil léger, cette section contient la seule ligne :
-     « Phase 4 sautée (profil léger — activable via --full) » -->
+- Process sous-audités : [liste + dimension manquante] ; structures cibles proposées : [résumé]
+<!-- En profil léger, cette section contient la seule ligne : « Phase 4 sautée (profil léger — activable via --full) » -->
 
 ## Phase 5 — Recommandations
 1. [Action prioritaire]
@@ -199,8 +200,7 @@ Rapport `reports/validator/YYYY-MM-DD-validator.md` :
 ...
 
 ## Prochaine session
-Prochain audit recommandé : à la prochaine release ou au prochain gros jalon (lab solo) ;
-YYYY-MM-DD (+30j) pour un lab d'équipe actif
+Prochain audit recommandé : à la prochaine release/gros jalon (lab solo) ; YYYY-MM-DD (+30j) pour un lab d'équipe actif
 ```
 
 ---
@@ -231,7 +231,7 @@ Si je détecte que le lab est désaligné avec la méthodologie de référence (
 
 - Skills `consolidator` + `infrastructure-audit` + `audit-architecture` installés via
   `vibeflow-update.sh install` (dépendances du module, résolues automatiquement)
-- Script `check-agents.sh` présent (module conductor, socle mandatory)
+- Scripts `check-agents.sh` + `check-map-drift.sh` présents (module conductor, socle mandatory)
 - Dossier `reports/validator/` créé (auto à la première invocation)
 
 ---
