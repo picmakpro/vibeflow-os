@@ -143,6 +143,39 @@ assert_mutant_differs() { # <src> <dst> <label>
   return 0
 }
 
+# mutant_case_leak_marker — variante DISCRIMINANTE de m2 pour les scripts dont le chemin SIGNAL
+# émet déjà un stdout non vide en régime normal (check-planning-state.sh, detect-planning-debt.sh).
+# Sur ces deux-là, `mutant_case ... empty` ne teste RIEN : le cas SIGNAL non muté produit déjà un
+# stdout non vide, donc l'assertion « stdout vide attendu » est déjà fausse AVANT toute mutation —
+# elle se rapporte "rougit comme attendu" indépendamment de la mutation (revue de jointure, 2026-08-16).
+# Propriété réellement discriminante : la présence LITTÉRALE du marqueur inséré par make_mutant_m2
+# ("mutation-m2-leak"), absente du code NON MUTÉ et présente SEULEMENT sous la mutation. Le contrôle
+# sur le code non muté (marqueur absent) est vérifié EXPLICITEMENT — c'est exactement le contrôle
+# qui manquait dans la version précédente de ce cas.
+MUT2_MARKER='mutation-m2-leak'
+mutant_case_leak_marker() { # <mutation_id> <label> <orig_script> <mutant_script> -- <args...>
+  local mid="$1" label="$2" orig="$3" mutant="$4"; shift 4
+  [ "${1:-}" = "--" ] && shift
+  local base_out mut_out base_has mut_has
+  base_out="$(mktemp -p "$CASES_DIR")"
+  mut_out="$(mktemp -p "$CASES_DIR")"
+  bash "$orig" "$@" >"$base_out" 2>/dev/null
+  bash "$mutant" "$@" >"$mut_out" 2>/dev/null
+  base_has="absent"; grep -qF "$MUT2_MARKER" "$base_out" && base_has="present"
+  mut_has="absent"; grep -qF "$MUT2_MARKER" "$mut_out" && mut_has="present"
+  # Contrôle VERT sur le code NON MUTÉ (attendu : marqueur absent) — sans ce contrôle explicite,
+  # une assertion qui serait déjà vraie côté non muté ne prouverait rien (c'est le trou trouvé).
+  if [ "$base_has" = "present" ]; then
+    ko "MUTATION $mid ($label) — CONTRÔLE invalide : marqueur(attendu absent sur le code NON MUTÉ, obtenu présent) — assertion non discriminante"
+    return
+  fi
+  if [ "$mut_has" = "present" ]; then
+    ok "MUTATION $mid ($label) rougit comme attendu : marqueur(attendu absent — comportement correct —, obtenu $mut_has sous la mutation) ; contrôle non muté : marqueur $base_has (vert confirmé)"
+  else
+    ko "MUTATION $mid ($label) — N'A PAS ROUGI : marqueur(attendu présent sous la mutation, obtenu $mut_has) — la suite ne discrimine pas ce défaut sur ce script"
+  fi
+}
+
 # ==================================================================================================
 # 1. check-agents.sh (conductor) — HOOK_MODE=true|false, silence = 3 (INDÉTERMINÉ, --strict+vide).
 # ==================================================================================================
@@ -261,7 +294,10 @@ if assert_mutant_differs "$SCRIPT" "$MUT1" "check-planning-state.sh m1"; then
 fi
 MUT2="$(mktemp -p "$CASES_DIR")"; make_mutant_m2 "$SCRIPT" "$MUT2"
 if assert_mutant_differs "$SCRIPT" "$MUT2" "check-planning-state.sh m2"; then
-  mutant_case "m2" "check-planning-state.sh" "$MUT2" 0 empty -- --path "$FIX/absent/.planning" --hook
+  # Le chemin SIGNAL (.planning/ absent) émet déjà un stdout non vide en régime normal — un test
+  # "stdout vide attendu" n'y serait jamais discriminant (revue de jointure, 2026-08-16). Propriété
+  # réellement discriminante : présence du marqueur de fuite, absent du code non muté.
+  mutant_case_leak_marker "m2" "check-planning-state.sh" "$SCRIPT" "$MUT2" -- --path "$FIX/absent/.planning" --hook
 fi
 
 # ==================================================================================================
@@ -284,7 +320,9 @@ if assert_mutant_differs "$SCRIPT" "$MUT1" "detect-planning-debt.sh m1"; then
 fi
 MUT2="$(mktemp -p "$CASES_DIR")"; make_mutant_m2 "$SCRIPT" "$MUT2"
 if assert_mutant_differs "$SCRIPT" "$MUT2" "detect-planning-debt.sh m2"; then
-  mutant_case "m2" "detect-planning-debt.sh" "$MUT2" 0 empty -- --root "$FIX/absent" --hook
+  # Même motif qu'à check-planning-state.sh : le chemin SIGNAL (racine absente) émet déjà un
+  # stdout non vide en régime normal — marqueur de fuite requis pour discriminer réellement.
+  mutant_case_leak_marker "m2" "detect-planning-debt.sh" "$SCRIPT" "$MUT2" -- --root "$FIX/absent" --hook
 fi
 
 # ==================================================================================================
