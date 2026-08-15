@@ -317,6 +317,59 @@ else
   ko "attestation rouge->vert (86c3b0c)" "commit 86c3b0c introuvable dans ce dépôt — preuve non rejouable"
 fi
 
+# === Table générative — fermeture de la CLASSE par PRODUIT CARTÉSIEN, pas par énumération (tour 4)
+# Quatre tours d'affilée où une liste de cas NOMMÉS a laissé passer une forme absente de la liste
+# (mandat exec-02 tour 4, dernier défaut : '//./a.md' -> './a.md' au lieu de 'a.md', deux passes
+# indépendantes squeeze/strip). Cette table construit le PRODUIT de préfixes de tête x corps de
+# chemin et vérifie deux propriétés qui ferment la classe sur CHAQUE combinaison générée, jamais
+# une liste figée : idempotence (normalize_path(normalize_path(x)) == normalize_path(x)) et égalité
+# à la forme canonique attendue.
+body_canon() { # <corps-brut> -> forme canonique attendue du corps SEUL (sans préfixe)
+  case "$1" in
+    "sub//a.md") printf '%s' "sub/a.md" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+GEN_PREFIXES=("" "." "/" "//" "./" ".//" "/./" "//./" "././")
+GEN_BODIES=("a.md" "sub/a.md" "sub//a.md" "nom avec espace.md" "-tiret.md")
+gen_run() { # <fn-normalize> -> imprime le nombre d'échecs (idempotence OU canon) sur stdout
+  local fail=0 pfx body form once twice canon expected
+  for pfx in "${GEN_PREFIXES[@]}"; do
+    for body in "${GEN_BODIES[@]}"; do
+      form="${pfx}${body}"
+      once="$("$1" "$form")"
+      twice="$("$1" "$once")"
+      canon="$(body_canon "$body")"
+      if [ "$pfx" = "." ]; then expected=".${canon}"; else expected="$canon"; fi
+      if [ "$once" != "$twice" ] || [ "$once" != "$expected" ]; then fail=$((fail + 1)); fi
+    done
+  done
+  printf '%s' "$fail"
+}
+GEN_TOTAL=$(( ${#GEN_PREFIXES[@]} * ${#GEN_BODIES[@]} ))
+GEN_FAIL_AFTER="$(gen_run normalize_path)"
+if [ "$GEN_FAIL_AFTER" -eq 0 ]; then
+  ok "génératif — $GEN_TOTAL combinaisons (9 préfixes x 5 corps), idempotence + forme canonique closes sur toutes"
+else
+  ko "génératif — $GEN_TOTAL combinaisons" "$GEN_FAIL_AFTER échec(s) — voir gen_run pour le détail"
+fi
+
+# === Attestation génération AVANT (c7b35f3, deux passes indépendantes) vs APRÈS (ce script) ========
+OLD3_SCRIPT="$TMP/old_check_map_drift_c7b35f3.sh"
+if [ -n "$REPO_ROOT" ] && git -C "$REPO_ROOT" show c7b35f3:plugin/conductor/scripts/check-map-drift.sh > "$OLD3_SCRIPT" 2>/dev/null; then
+  OLD3_FN="$(awk '/^normalize_path\(\) \{/{f=1} f{print; if (/^}/) exit}' "$OLD3_SCRIPT")"
+  normalize_path_old3() { :; }
+  eval "$(printf '%s' "$OLD3_FN" | sed '1s/^normalize_path/normalize_path_old3/')"
+  GEN_FAIL_BEFORE="$(gen_run normalize_path_old3)"
+  if [ "$GEN_FAIL_BEFORE" -gt 0 ] && [ "$GEN_FAIL_AFTER" -eq 0 ]; then
+    ok "attestation génération AVANT/APRÈS (c7b35f3) — $GEN_FAIL_BEFORE/$GEN_TOTAL échouaient avant, 0 après"
+  else
+    ko "attestation génération AVANT/APRÈS (c7b35f3)" "avant=$GEN_FAIL_BEFORE après=$GEN_FAIL_AFTER sur $GEN_TOTAL"
+  fi
+else
+  ko "attestation génération AVANT/APRÈS (c7b35f3)" "commit c7b35f3 introuvable dans ce dépôt — preuve non rejouable"
+fi
+
 # === Cumul — une carte P1 et une carte P2, toutes deux propres → compteur de cartes balayées = 2 ===
 D="$(mk_git_root cumul)"
 commit_file "$D" "docs/x.md" "y"

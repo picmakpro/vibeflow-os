@@ -228,8 +228,8 @@ extract_p2_entries_raw() { # <file>
 
 # Normalise un chemin RELATIF pour comparaison ensembliste par ÉGALITÉ DE CHAÎNE — bash pur
 # (ADR-054, ni jq/sed -i/grep -P/readlink -f). Traite la CLASSE des formes d'écriture équivalentes,
-# pas un cas nommé isolément (motif de récidive, cf. mandat exec-02 tour 3) :
-#   - segments './' de tête, un ou répétés ('./a', './/a', './/. /a') -> retirés jusqu'à épuisement
+# pas un cas nommé isolément (motif de récidive, cf. mandat exec-02 tours 1-3) :
+#   - segments './' de tête, un ou répétés ('./a', './/a', '././a') -> retirés jusqu'à épuisement
 #   - séparateurs '/' redondants, en tête ('//a') comme internes ('a//b') -> réduits à un seul '/'
 #   - '/' final -> retiré
 # Décision explicite sur '../' : PAS résolu ici, par choix — une résolution lexicale de '../' sans
@@ -238,19 +238,35 @@ extract_p2_entries_raw() { # <file>
 # ce gate ne teste jamais rien hors de sa cible). Un '../' résiduel après normalisation reste donc
 # tel quel : il ne correspondra jamais à un chemin rendu par `git ls-files` (qui n'en émet jamais)
 # et le cas reste marqué NON RECONNU dans la table de test — un choix documenté, pas un oubli.
+#
+# Asymétrie documentée avec p1_sens_a (:170-172) : celui-ci EXCLUT explicitement les tokens '/*'
+# comme hors domaine (ADR-031, absolus). Ici, un '/' de tête est au contraire silencieusement
+# retiré (traité comme du bruit de forme relative), donc '/etc/x.md' redevient 'etc/x.md' — sans
+# risque : cette fonction ne teste jamais l'existence sur le disque (seul p2_sens_a le fait, via
+# '-e', jamais sur une chaîne issue de normalize_path) et ne sort donc jamais de $ROOT.
 normalize_path() { # <chemin> -> chemin normalisé
-  local p="$1" slash="/" double="//"
+  local p="$1" slash="/" double="//" prev
   # Slash porté par variable, jamais littéral dans le motif de substitution : l'échappement
   # '\/' en position de REMPLACEMENT n'est pas déséchappé par bash (seuls '&' et '\\' le sont
   # dans ${var//pat/repl}) — un remplacement '\/' littéral insère un backslash constaté à l'essai,
   # bug qui aurait recréé le motif de récidive une quatrième fois s'il n'avait pas été prouvé ici.
-  while case "$p" in *//*) true ;; *) false ;; esac; do
-    p="${p//$double/$slash}"
+  #
+  # Point fixe (tour 4, correctif de la récidive) : les TROIS transformations reboucLENT ENSEMBLE
+  # jusqu'à stabilité, jamais en deux passes indépendantes — un squeeze de '//' EXPOSE parfois un
+  # './' de tête (ex. '//./a.md' -> '/./a.md' après squeeze) qu'une passe de strip déjà terminée
+  # ne revoit jamais ('//./a.md' rendait alors './a.md' au lieu de 'a.md'). Garde-fou de
+  # terminaison : la boucle s'arrête dès qu'une itération entière ne change plus $p — chaque
+  # transformation qui s'applique retire au moins un caractère, jamais l'inverse, donc le nombre
+  # d'itérations est borné par la longueur de $p (pas de boucle infinie possible).
+  prev=""
+  while [ "$prev" != "$p" ]; do
+    prev="$p"
+    while case "$p" in *//*) true ;; *) false ;; esac; do
+      p="${p//$double/$slash}"
+    done
+    case "$p" in ./*) p="${p#./}" ;; esac
+    case "$p" in /*) p="${p#/}" ;; esac
   done
-  while case "$p" in ./*) true ;; *) false ;; esac; do
-    p="${p#./}"
-  done
-  p="${p#/}"
   p="${p%/}"
   printf '%s' "$p"
 }
@@ -278,7 +294,7 @@ p2_sens_a() { # <card-relpath> <card-label>
 }
 
 p2_sens_b() { # <card-relpath> <card-label>
-  local card_rel="$1" label="$2" dossier f fdir entry found target_rel
+  local card_rel="$1" label="$2" dossier f fdir entry found target_rel f_norm
   dossier="$(dirname_of "$card_rel")"
   while IFS= read -r f; do
     [ -n "$f" ] || continue
@@ -287,6 +303,9 @@ p2_sens_b() { # <card-relpath> <card-label>
     fdir="$(dirname_of "$f")"
     [ "$fdir" = "$dossier" ] || continue
     found=0
+    # '$f' est invariant pour toute la boucle interne ci-dessous (fixé ci-dessus) — normalisé UNE
+    # SEULE fois ici, jamais reforké à chaque itération de la boucle interne sur 'entry'.
+    f_norm="$(normalize_path "$f")"
     # Comparaison sur le chemin résolu COMPLET, jamais un match de suffixe de basename : un match
     # de suffixe fait matcher 'refs/orphan.md' par une entrée 'refs/sub/orphan.md' qui cite un
     # fichier différent — faux négatif du gate constaté (correctif P2 sens B, tour 0).
@@ -306,7 +325,7 @@ p2_sens_b() { # <card-relpath> <card-label>
       else
         target_rel="$dossier/$entry"
       fi
-      if [ "$(normalize_path "$target_rel")" = "$(normalize_path "$f")" ]; then found=1; break; fi
+      if [ "$(normalize_path "$target_rel")" = "$f_norm" ]; then found=1; break; fi
     done < <(extract_p2_entries_raw "$ROOT/$card_rel")
     if [ "$found" -eq 0 ]; then
       DIVERGENCES=$((DIVERGENCES + 1))
