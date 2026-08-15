@@ -139,7 +139,7 @@ séparé, jamais inline dans `AGENT.md`), et vérifier au fil de l'eau — pas e
 
 ## Project Constraints (from CLAUDE.md)
 
-Extrait de `/Users/samuel/Documents/dev/vibeflow-os/CLAUDE.md`, directives applicables à cette
+Extrait de `CLAUDE.md`, directives applicables à cette
 phase :
 
 - **Densité (ADR-029)** : agents ≤ 250 lignes, skills ≤ 500 lignes, bootstrap SessionStart
