@@ -56,6 +56,18 @@
 # Ce script ne doit JAMAIS faire échouer une install (best-effort, doctrine des hooks post-install
 # de l'engine) : l'appelant ignore son code retour, et toute anomalie part sur stderr pour atterrir
 # dans le journal d'installation plutôt que d'être avalée en silence.
+#
+# --hook (D-06/D-07, Portabilité Windows II) — PARITÉ D'INTERFACE avec les autres scripts de hook
+# du dépôt : accepté par le parsing, mais PAS ENCORE passé par la ligne d'invocation du fragment
+# `hooks.json` (qui reste `--project --quiet`, sans --hook) — ce câblage appartient à la migration
+# en forme exec de la polarité gouvernance, hors périmètre de ce plan (D-07). Sous --hook, le
+# SEUL code advisory « anomalie de configuration » (1 — gabarits introuvables, aucun gabarit,
+# échec de création) devient 0 à la frontière du harness, cohérent avec la doctrine ci-dessus
+# (« ne doit jamais faire échouer une install ») : ce code était déjà avalé par `|| true` côté
+# fragment shell, hook_exit() reproduit la même absorption pour le seul cas advisory. Le code 3
+# (--check, un verdict délibérément demandé) n'est PAS traduit — --check et --hook ne se combinent
+# pas dans l'usage réel. --hook et --quiet ensemble → exit 64 (même code d'erreur d'argument que
+# les autres scripts du dépôt). Le rendu ne change pas : ce script n'écrit jamais sur stdout.
 
 set -uo pipefail
 
@@ -66,12 +78,14 @@ TEMPLATES_DIR="${TEMPLATES_DIR:-$SELF_DIR/../skills/consolidator/references/temp
 CHECK_ONLY=false
 QUIET=false
 PROJECT_MODE=false
+HOOK=false
 
 for arg in "$@"; do
   case "$arg" in
     --project)         PROJECT_MODE=true ;;
     --check)           CHECK_ONLY=true ;;
     --quiet)           QUIET=true ;;
+    --hook)            HOOK=true ;;
     --memory-dir=*)    MEMORY_DIR="${arg#*=}" ;;
     --templates-dir=*) TEMPLATES_DIR="${arg#*=}" ;;
     -h|--help)         grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
@@ -79,8 +93,30 @@ for arg in "$@"; do
   esac
 done
 
+# Gate de mutuelle exclusion (D-06/D-07), même code d'erreur d'argument que les autres scripts du
+# dépôt (64) — --hook et --quiet ensemble seraient contradictoires (l'un demande le rendu compact
+# advisory, l'autre demande le silence total).
+if [ "$HOOK" = true ] && [ "$QUIET" = true ]; then
+  echo "[seed-registres] --hook et --quiet sont mutuellement exclusifs" >&2
+  exit 64
+fi
+
 log()  { [ "$QUIET" = true ] || echo "[seed-registres] $*" >&2; }
 warn() { echo "[seed-registres] $*" >&2; }   # traverse --quiet : une anomalie doit être vue
+
+# --- Traduction du silence interne vers le harness (D-06/D-07, uniquement sous --hook) ----------
+# hook_exit <code> : sous --hook, le SEUL code advisory (1 = anomalie de configuration — gabarits
+# introuvables, aucun gabarit, échec de création) devient 0 à la frontière du harness, cohérent
+# avec la doctrine « ne doit jamais faire échouer une install ». Le code 3 (--check) n'est jamais
+# traduit. Sans --hook (CLI, suites de tests), le code recu ressort inchange. Voir
+# docs/HOOKS-CONTRAT-SORTIE.md §2.
+hook_exit() { # <code>
+  local code="$1"
+  if [ "$HOOK" = true ] && [ "$code" -eq 1 ]; then
+    exit 0
+  fi
+  exit "$code"
+}
 
 # Échappatoire globale : un utilisateur qui ne veut PAS que la mémoire se pose toute seule à
 # l'ouverture d'une session la coupe d'une variable, sans désinstaller le module ni éditer un hook.
@@ -108,7 +144,7 @@ fi
 if [ ! -d "$TEMPLATES_DIR" ]; then
   warn "gabarits introuvables ($TEMPLATES_DIR) — aucun registre instancié."
   warn "  le module consolidator est-il bien installé ? (skills/consolidator/references/templates-memoire/)"
-  exit 1
+  hook_exit 1
 fi
 
 # Inventaire des gabarits : `<nom>-template.md` → registre canon `<NOM>.md`.
@@ -121,7 +157,7 @@ done
 
 if [ "${#templates[@]}" -eq 0 ]; then
   warn "aucun gabarit *-template.md dans $TEMPLATES_DIR — aucun registre instancié."
-  exit 1
+  hook_exit 1
 fi
 
 created=0
@@ -148,7 +184,7 @@ for t in "${templates[@]}"; do
   # mkdir tardif : en --check on ne crée rien du tout, pas même le dossier.
   if ! mkdir -p "$MEMORY_DIR" 2>/dev/null; then
     warn "impossible de créer $MEMORY_DIR — registres non instanciés."
-    exit 1
+    hook_exit 1
   fi
 
   # `cp` sans -f et re-test d'existence : ceinture contre une course entre deux installs
@@ -179,7 +215,7 @@ fi
 
 if [ "$failed" -gt 0 ]; then
   warn "$failed registre(s) non créé(s) — mémoire partiellement instanciée, voir ci-dessus."
-  exit 1
+  hook_exit 1
 fi
 
 if [ "$created" -gt 0 ]; then

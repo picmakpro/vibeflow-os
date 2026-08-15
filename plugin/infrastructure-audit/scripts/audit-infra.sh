@@ -21,6 +21,19 @@
 #   3 = INDÉTERMINÉ (--strict et $CLAUDE_DIR absent : rien d'audité, aucun verdict)
 # NB : --strict s'applique aux modes full/quick/axis (pas snapshot/diff, qui restent advisory).
 #
+# --hook (D-06/D-07, Portabilité Windows II) — PARITÉ D'INTERFACE avec les autres scripts de hook
+# du dépôt : accepté par le parsing, mais PAS ENCORE passé par la ligne d'invocation du fragment
+# `hooks.json` (qui reste `--quick --if-older-than=14d`, sans --strict ni --hook) — ce câblage
+# appartient à la migration en forme exec de la polarité gouvernance, hors périmètre de ce plan
+# (D-07). Avec cette invocation réelle, --strict n'est jamais atteint : le SEUL code silencieux
+# atteignable ce jour est déjà 0. hook_exit() traduit malgré tout le code 3 (INDÉTERMINÉ,
+# --strict + $CLAUDE_DIR absent) vers 0 sous --hook, par parité structurelle avec le reste du parc
+# (même statut que l'INDÉTERMINÉ de check-agents.sh) et pour rester correct si --strict et --hook
+# se combinent un jour. Les findings bloquants (--strict, exit 1) et les erreurs d'usage de
+# --diff/--axis (exit 1, hors chemin SessionStart) ne sont JAMAIS traduits — ce sont de vrais
+# problèmes, pas des signaux silencieux. Sans --hook (CLI, suites de tests), tous les codes
+# documentés ci-dessus restent inchangés.
+#
 # Reference : skill infrastructure-audit + ADR-031
 
 set -uo pipefail
@@ -39,6 +52,7 @@ MODE="full"
 AXIS=""
 IF_OLDER_THAN=""
 STRICT=false
+HOOK=false
 # Accumulateur strict (VG-5) : les axes y versent leurs findings bloquants. Portée globale —
 # valable pour les modes qui appellent les axes DANS le shell courant (full/quick/axis).
 STRICT_ERRORS=0
@@ -49,6 +63,7 @@ for arg in "$@"; do
     --snapshot)          MODE="snapshot" ;;
     --diff)              MODE="diff" ;;
     --strict)            STRICT=true ;;
+    --hook)              HOOK=true ;;
     --axis=*)            AXIS="${arg#*=}"; MODE="axis" ;;
     --if-older-than=*)   IF_OLDER_THAN="${arg#*=}" ;;
     -h|--help)
@@ -60,11 +75,23 @@ done
 
 log() { echo "[audit-infra] $*" >&2; }
 
+# --- Traduction du silence interne vers le harness (D-06/D-07, uniquement sous --hook) ----------
+# hook_exit <code> : sous --hook, le SEUL code de silence interne (3 = INDÉTERMINÉ) devient 0 à la
+# frontière du harness. 1 (findings bloquants, erreurs d'usage --diff/--axis) n'est jamais traduit.
+# Sans --hook, le code recu ressort inchange. Voir docs/HOOKS-CONTRAT-SORTIE.md §2.
+hook_exit() { # <code>
+  local code="$1"
+  if [ "$HOOK" = true ] && [ "$code" -eq 3 ]; then
+    exit 0
+  fi
+  exit "$code"
+}
+
 # Contrat de découverte (F13, vacuous green) : sans $CLAUDE_DIR, toutes les boucles d'audit
 # sont sautées et l'exit 0 serait un vert non mérité. En --strict : exit 3 = INDÉTERMINÉ.
 if $STRICT && [ ! -d "$CLAUDE_DIR" ]; then
   log "✗ INDÉTERMINÉ : $CLAUDE_DIR absent — rien à auditer, aucun verdict rendu (exit 3)"
-  exit 3
+  hook_exit 3
 fi
 
 # ---------- if-older-than guard ----------
