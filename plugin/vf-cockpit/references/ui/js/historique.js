@@ -10,11 +10,15 @@ export function renderHistorique(snap) {
   if (!snap.availability.milestones || closed.length === 0) {
     det.classList.add('is-disabled');
     det.removeAttribute('open');
-    det.querySelector('summary').title = "Historique vide : ce lab n'a pas encore clos de jalon.";
+    const summary = det.querySelector('summary');
+    summary.title = "Historique vide : ce lab n'a pas encore clos de jalon.";
+    summary.setAttribute('aria-disabled', 'true');
     return;
   }
   det.classList.remove('is-disabled');
-  det.querySelector('summary').removeAttribute('title');
+  const summary = det.querySelector('summary');
+  summary.removeAttribute('title');
+  summary.removeAttribute('aria-disabled');
   const ul = document.createElement('ul');
   ul.className = 'vf-historique-list';
   closed.forEach((m) => {
