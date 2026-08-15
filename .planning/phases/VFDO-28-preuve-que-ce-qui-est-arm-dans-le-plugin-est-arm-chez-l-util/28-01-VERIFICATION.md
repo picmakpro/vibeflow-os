@@ -11,7 +11,7 @@ method: "goal-backward, execution reelle ; fixtures INDEPENDANTES du verificateu
 warnings:
   - id: W1
     severity: warning
-    what: "scripts/check-machine-paths.sh sort 1 sur l'arbre — c'est un gate CI (.github/workflows/ci.yml:359). Violation unique : .planning/phases/VFDO-28-.../28-RESEARCH.md:858 (« /Users/<user> »)."
+    what: "scripts/check-machine-paths.sh sort 1 sur l'arbre — c'est un gate CI (.github/workflows/ci.yml:359). Violation unique : .planning/phases/VFDO-28-.../28-RESEARCH.md:858 (« /Users/samuel »)." # vf-allow-machine-path — le littéral EST le sujet : ce rapport cite la violation constatée
     attributable_to_28_01: false
     evidence: "Le fichier fautif n'est PAS dans le diff 3c0f24b..HEAD (4 fichiers seulement) ; dernier commit le touchant = ad03fc6 (2026-08-10), anterieur aux 3 commits du plan. Declare honnetement dans 28-01-SUMMARY.md:174."
     action: "Decision humaine : corriger avant PR (le gate CI rougira sur cette branche) ou porter en tache de 28-02. Non imputable au plan 01."
