@@ -4,7 +4,7 @@ milestone: gsd-migration
 milestone_name: Migration package GSD
 current_phase: 18
 current_phase_name: Survie du ledger d'exigences à la clôture de jalon
-status: "Phase 29 COMPLETE - 13/13 taches, checkpoint humain T-29-05-3 rendu et approuve le 2026-08-15 - branche docs/phase-29-icm-gains non poussee, release racine reservee a Samuel"
+status: "Phase 28 COMPLETE - 3/3 plans, checkpoint D-04 rendu (second-job-9-modules) - branche feat/phase-28-03-as-installed non poussee, run CI reel et PR reserves a Samuel"
 stopped_at: "Phase 20 complète (7/7 plans) — clôture de gouvernance (20-07) : ADR-051 révisée + ADR-060 posée, doctrine transverse alignée, 6 modules bumpés (conductor v1.17.0, dev-orchestrator v2.8.0, design-orchestrator v1.3.2, 3 bundles v2.0.3). Gates verts sauf le seul rouge attendu (compteur de suites racine, 44 réel pas 43). Release racine réservée à validation humaine post-fusion (4 éléments consignés + WINDOWS.md)."
 last_updated: "2026-08-15T00:00:00.000Z"
 last_activity: 2026-08-15
@@ -13,7 +13,8 @@ progress:
   completed_phases: 15
   total_plans: 95
   completed_plans: 71
-last_activity_desc: "Phase 28 plans 01 et 02 executes sur branche docs/phase-28-cadrage. Regle 4 du gate d'activation (armement sans precondition distribuee) + regle 4bis + 4 planchers anti-vert-a-vide ; liste close a 2 lignes (isolation, MCP) ; 5 declarations vf-requires: mcp-servers sur agents reels ; opposabilite des porteurs # vf-provides: ; 5 bornes declarees en en-tete du gate. Suite 42 -> 58 cas, tous gates verts. Verification goal-backward 28-01 et 28-02 : GOAL ACHIEVED. 1 finding majeur escalade a l'humain (ARM_LINE mono-slot : faux vert possible sur un artefact a double armement, inerte sur le corpus reel). 28-03 NON demarre : checkpoint humain bloquant D-04. Compteurs progress laisses intacts (derive preexistante, deja signalee)."
+last_activity_desc: "Phase 28 COMPLETE (28-01/28-02/28-03). 28-01 et 28-02 sont deja livres dans main et publies en v2.51.0 via PR #41 (squash-merge). Ce lot ajoute, sur branche feat/phase-28-03-as-installed issue de main a jour : fermeture du trou ARM_LINE mono-slot (chaque armement d un artefact evalue independamment, suite 58 -> 60 cas) ; checkpoint D-04 rendu par Samuel = second-job-9-modules ; job CI lab-frais-arme qui exerce le gate TEL QU INSTALLE sur la fermeture dev-orchestrator (9 modules) avec plancher de 2 artefacts armes ; triades bumpees dev-orchestrator v2.15.0 et conductor v1.23.0 (bump reparti des valeurs posees par la Phase 29, decision humaine) avec les journaux de la Phase 28 enfin ecrits. Revue vf-reviewer : PASS. Verification goal-backward 28-03 : GOAL ACHIEVED, 6 falsifications prouvant que le job mord. Gates verts (capability-activation 0, version-sync 0, machine-paths 0). RESTE OUVERT : le critere << run CI vert constate >> (28-03-PLAN.md:438/454) - la branche n a jamais ete poussee, geste humain. Compteurs progress laisses intacts (derive preexistante, deja signalee)."
+
 ---
 
 # Project State
