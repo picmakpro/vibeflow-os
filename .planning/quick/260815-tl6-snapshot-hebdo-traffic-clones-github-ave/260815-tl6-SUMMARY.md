@@ -137,6 +137,16 @@ _Note: Task 2 (`tdd="true"`) est un unique commit `test(...)` car le script impl
 
 ## Deviations from Plan
 
+### Amendement post-livraison (2026-08-15, demandé par Samuel)
+
+**Passage du workflow en mode dormant « NON ACTIVÉ ».** Samuel n'a pas le temps de créer le PAT
+`TRAFFIC_PAT` : la garde du secret dans `traffic-snapshot.yml` a été assouplie — un run **cron**
+sans secret sort désormais en vert avec un `::warning::` « non activé » (au lieu d'un échec rouge
+chaque lundi), et seuls les trois steps de collecte sont sautés (`if: steps.garde.outputs.actif`).
+Un **workflow_dispatch** sans secret continue d'échouer explicitement (on teste activement, on veut
+le rappel de la marche à suivre). L'activation reste un pur geste de données : poser le secret
+suffit, aucun changement de code. État tracé dans STATE.md → Deferred Items.
+
 ### Auto-fixed Issues
 
 **1. [Rule 1 - Bug] `traffic-snapshot.sh` exigeait `gh` même sous couture de test**
