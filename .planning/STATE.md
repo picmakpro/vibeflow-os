@@ -323,6 +323,10 @@ Progress: [██████░░░░] 59%
 
 ### Roadmap Evolution
 
+- 2026-08-15 (suite) : **Phase 29 cadrée** — CONTEXT.md posé (cadrage court choisi : périmètre
+  verrouillé D-01/D-02/D-03, zones grises en Claude's Discretion), DISCUSSION-LOG.md en trace.
+  Prochain geste : plan (researcher → planner → checker) puis **exécution complète via
+  `vf-dev-manager`** (demande explicite de Samuel, session du 2026-08-15).
 - 2026-08-15 : **Phase 29 ajoutée — « Distiller les gains ICM (G1-G5) — investigation dag.sh
   --scope d'abord »**, issue de la deep-search ICM du même jour
   (`reports/research/2026-08-15-icm-deep-search.md`, session en direct hors Phase 28). Périmètre :
