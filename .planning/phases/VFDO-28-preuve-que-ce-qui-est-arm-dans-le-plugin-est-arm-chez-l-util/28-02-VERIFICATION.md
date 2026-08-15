@@ -7,7 +7,7 @@ score: 5/5 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0
 verdict: GOAL ACHIEVED
-base_diff: dfebe29..HEAD (fa6aec9)
+base_diff: 03fcc51..HEAD (4a7188a)
 scope: plan 28-02 seul — 28-01 clos, 28-03 non execute (ARMD-08 / D-04 hors portee)
 findings:
   - severite: warning
@@ -20,10 +20,10 @@ findings:
     quoi: "`couverture declaree` est ecrit SANS accents en `check-capability-activation.sh:113`, dans une phrase par ailleurs entierement accentuee (`regle 4 etablit` -> `règle 4 établit`), pour satisfaire le litteral du critere d'acceptation. Incoherence redactionnelle avec la convention du fichier ; aucune substance contournee (le paragraphe dit la limite en entier)."
     action: "Si l'accent est retabli un jour, mettre a jour le litteral du critere en meme temps."
   - severite: info
-    quoi: "`actuals.commits: 4` dans le SUMMARY alors que 5 commits existent sur dfebe29..HEAD (fa6aec9, auto-correction du SUMMARY, non compte). `check-machine-paths.sh` rapporte 920 fichiers suivis, le SUMMARY en cite 919 (derive due a l'ajout du SUMMARY lui-meme)."
+    quoi: "`actuals.commits: 4` dans le SUMMARY alors que 5 commits existent sur 03fcc51..HEAD (4a7188a, auto-correction du SUMMARY, non compte). `check-machine-paths.sh` rapporte 920 fichiers suivis, le SUMMARY en cite 919 (derive due a l'ajout du SUMMARY lui-meme)."
     action: "Aucune — ecart de comptage sans effet."
   - severite: info
-    quoi: "Le bloc `<verification>` du plan annonce « Le compte de suites reste 52 » ; la mesure est 53 a dfebe29 ET a HEAD. L'invariant (« reste ») tient, le chiffre 52 est perime. Compte de gates `check-*.sh` stable a 21 des deux cotes — D-03 respecte, aucun sixieme gate."
+    quoi: "Le bloc `<verification>` du plan annonce « Le compte de suites reste 52 » ; la mesure est 53 a 03fcc51 ET a HEAD. L'invariant (« reste ») tient, le chiffre 52 est perime. Compte de gates `check-*.sh` stable a 21 des deux cotes — D-03 respecte, aucun sixieme gate."
     action: "Aucune."
 noeuds_debloques:
   - "28-03 (as-installed testing sur lab frais, ARMD-08 / D-04) : la seconde ligne de la liste close, les 5 porteurs reels et l'opposabilite des porteurs de preuve sont en place et opposables."
@@ -70,11 +70,11 @@ faire ecrire au gate ses propres bornes.
 
 | Point | Verdict | Preuve |
 |---|---|---|
-| Garde dure `check-agents.sh` sur `isolation:` intacte | ✓ INTACTE | Le diff `dfebe29..HEAD` du fichier ne contient **qu'un seul hunk** (commentaire de doc + litteral `KNOWN`). Les deux branches sont mot pour mot celles du hotfix, deplacees de `:546-549` a `:549-552` par les +3 lignes au-dessus : `if iso == "worktree"` -> erreur #38, `elif iso:` -> « aucune valeur n'est admise ». Aucune attenuation, le champ reste ferme. |
-| Tache 3 ne modifie aucun comportement | ✓ CONFIRME INDEPENDAMMENT | `git show df875ab` : 1 fichier, +66/-3. Filtrage `awk` des lignes ajoutees/retirees non-commentaire : **0**. Test plus fort : les deux versions privees de TOUT commentaire sont **byte-identiques** (`cmp -s` -> egal, 426 lignes de chaque cote). |
-| Deviation 1 (reformattage cosmetique borne 4) | ✓ SANS CONTOURNEMENT | Absorbee dans `df875ab`, donc couverte par la preuve ci-dessus : zero ligne executable. Les cinq litteraux sont presents et le sens de la borne 4 est complet. |
-| Deviation 2 (`28-RESEARCH.md:858`) minimale | ✓ CONFORME A LA DECLARATION | `34409cf` : **1 fichier, +1/-1**. `/Users/<user>/.local/bin/claude` -> `~/.local/bin/claude`, meme ligne, aucune reformulation. Nombre de lignes du fichier **1329 avant, 1329 apres**. `check-machine-paths.sh` -> rc=0. |
-| Deviation 3 (auto-correction du SUMMARY) | ✓ SANS CONTOURNEMENT | `fa6aec9` : 2 lignes de prose du SUMMARY, substitution litterale du meme chemin machine. Aucun critere, aucune assertion, aucun code touche. |
+| Garde dure `check-agents.sh` sur `isolation:` intacte | ✓ INTACTE | Le diff `03fcc51..HEAD` du fichier ne contient **qu'un seul hunk** (commentaire de doc + litteral `KNOWN`). Les deux branches sont mot pour mot celles du hotfix, deplacees de `:546-549` a `:549-552` par les +3 lignes au-dessus : `if iso == "worktree"` -> erreur #38, `elif iso:` -> « aucune valeur n'est admise ». Aucune attenuation, le champ reste ferme. |
+| Tache 3 ne modifie aucun comportement | ✓ CONFIRME INDEPENDAMMENT | `git show f99b9ad` : 1 fichier, +66/-3. Filtrage `awk` des lignes ajoutees/retirees non-commentaire : **0**. Test plus fort : les deux versions privees de TOUT commentaire sont **byte-identiques** (`cmp -s` -> egal, 426 lignes de chaque cote). |
+| Deviation 1 (reformattage cosmetique borne 4) | ✓ SANS CONTOURNEMENT | Absorbee dans `f99b9ad`, donc couverte par la preuve ci-dessus : zero ligne executable. Les cinq litteraux sont presents et le sens de la borne 4 est complet. |
+| Deviation 2 (`28-RESEARCH.md:858`) minimale | ✓ CONFORME A LA DECLARATION | `cde2021` : **1 fichier, +1/-1**. `/Users/<user>/.local/bin/claude` -> `~/.local/bin/claude`, meme ligne, aucune reformulation. Nombre de lignes du fichier **1329 avant, 1329 apres**. `check-machine-paths.sh` -> rc=0. |
+| Deviation 3 (auto-correction du SUMMARY) | ✓ SANS CONTOURNEMENT | `4a7188a` : 2 lignes de prose du SUMMARY, substitution litterale du meme chemin machine. Aucun critere, aucune assertion, aucun code touche. |
 | Aucune deviation ne masque un contournement d'assertion | ✓ | Les trois gardes anti-contournement du plan sont verifiees a la main sur l'arbre reel : `-ne 0` en ligne executable = **0**, `diff` en ligne executable = **0**, `comm` present = **3**. Perimetre de fichiers touches = les 8 de `<files>` + `28-RESEARCH.md` (deviation declaree) + le SUMMARY. Aucune derive. |
 
 ## Couverture des exigences
@@ -107,7 +107,7 @@ Aucun. Balayage `TBD|FIXME|XXX` et `TODO|HACK|PLACEHOLDER` sur les 8 fichiers mo
 
 Aucune ecriture sur le depot : toutes les mutations (5 declarations, corps/frontmatter, porteur
 factice, litteral `KNOWN`) ont ete jouees sur des **copies** en `mktemp`-scratch. `git status` a la
-fin est identique a celui du debut (HEAD `fa6aec9`, `git diff HEAD` vide). Aucune commande
+fin est identique a celui du debut (HEAD `4a7188a`, `git diff HEAD` vide). Aucune commande
 `gsd-tools state.*`. Ce rapport n'est pas committe.
 
 ---

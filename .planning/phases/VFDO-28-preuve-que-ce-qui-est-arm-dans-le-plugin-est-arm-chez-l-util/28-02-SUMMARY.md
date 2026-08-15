@@ -100,7 +100,7 @@ status: complete
 
 - **Tasks:** 3
 - **Files modified:** 9 (8 dans le perimetre `<files>` du plan + `28-RESEARCH.md` au titre de la deviation encadree)
-- Session reprise : taches 1 et 2 committees en amont (`355e5a6`, `42f215d`), tache 3 ecrite mais non committee au moment de la reprise ; ce mandat a verifie, complete et cloture.
+- Session reprise : taches 1 et 2 committees en amont (`616c7c1`, `11c9313`), tache 3 ecrite mais non committee au moment de la reprise ; ce mandat a verifie, complete et cloture.
 
 ## Accomplishments
 
@@ -111,9 +111,9 @@ status: complete
 
 ## Task Commits
 
-1. **Tache 1: seconde ligne de la liste close (armements MCP) et 5 declarations reelles** - `355e5a6` (feat)
-2. **Tache 2: opposabilite des porteurs `# vf-provides:`, prouvee par execution** - `42f215d` (test)
-3. **Tache 3: la regle 4 ecrit ses cinq bornes declarees** - `df875ab` (docs)
+1. **Tache 1: seconde ligne de la liste close (armements MCP) et 5 declarations reelles** - `616c7c1` (feat)
+2. **Tache 2: opposabilite des porteurs `# vf-provides:`, prouvee par execution** - `11c9313` (test)
+3. **Tache 3: la regle 4 ecrit ses cinq bornes declarees** - `f99b9ad` (docs)
 
 ## Files Created/Modified
 
@@ -139,7 +139,7 @@ status: complete
 - **Fix:** reformattage des lignes 111-117 en blocs de largeur homogene, AUCUN mot ajoute, retire ou reformule.
 - **Files modified:** `plugin/dev-orchestrator/scripts/check-capability-activation.sh`
 - **Verification:** diff confirme (via `awk`) qu'aucune ligne non-commentaire n'est touchee par la tache 3 dans son ensemble ; `-h` toujours 0 avec les cinq chaines requises.
-- **Committed in:** `df875ab` (Tache 3, aucun commit separe — corrige avant le commit de la tache).
+- **Committed in:** `f99b9ad` (Tache 3, aucun commit separe — corrige avant le commit de la tache).
 
 ### Declared Deviations (hors `<files>` du plan, acceptance criterion oblige)
 
@@ -149,7 +149,7 @@ status: complete
 - **Fix:** correction minimale et portable (`/Users/<user>/.local/bin/claude` → `~/.local/bin/claude`), meme ligne, meme nombre de lignes du fichier (1329 avant/apres), aucune reformulation de la phrase.
 - **Files modified:** `.planning/phases/VFDO-28-preuve-que-ce-qui-est-arm-dans-le-plugin-est-arm-chez-l-util/28-RESEARCH.md`
 - **Verification:** `bash scripts/check-machine-paths.sh` → 0 (920 fichiers suivis, aucun chemin absolu de machine restant).
-- **Committed in:** `34409cf`, commit separe et explicitement etiquete deviation.
+- **Committed in:** `cde2021`, commit separe et explicitement etiquete deviation.
 - **Perimetre :** seule violation trouvee (le rapport `check-machine-paths.sh` n'en nommait qu'une) ; correction jugee trivialement sure (litteral remplace par sa forme portable standard, aucune ambiguite).
 
 ---
