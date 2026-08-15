@@ -10,10 +10,12 @@ requires:
 provides:
   - "plugin/conductor/scripts/check-map-drift.sh : gate lint-only anti-drift carte↔disque (paires
     P1 carte de dossiers CLAUDE.md↔disque, P2 index _index.md/INDEX.md↔contenu direct de dossier)"
-  - "plugin/conductor/scripts/tests/test-check-map-drift.sh : 32 cas, dont plancher NON VÉRIFIABLE,
-    2 preuves par mutation attestées à l'octet (cmp -s), et 4 cas ajoutés en correction ciblée
-    exec-02 (comparaison par suffixe de basename en P2 sens B, token @/chemin/absolu en P1 sens A,
-    nom de fichier à espace, nom à tiret initial)"
+  - "plugin/conductor/scripts/tests/test-check-map-drift.sh : 49 cas, dont plancher NON VÉRIFIABLE,
+    2 preuves par mutation attestées à l'octet (cmp -s), 4 cas ajoutés en correction ciblée exec-02
+    tour 2 (comparaison par suffixe de basename en P2 sens B, token @/chemin/absolu en P1 sens A,
+    nom de fichier à espace, nom à tiret initial), et 16 cas ajoutés en correction ciblée exec-02
+    tour 3 (table normalize_path() : 13 formes d'écriture + 3 attestations rouge->vert rejouées
+    contre 86c3b0c)"
 affects: [29-05]
 
 actuals:
@@ -144,6 +146,30 @@ coverage:
       - kind: other
         ref: "bash plugin/conductor/scripts/tests/test-check-map-drift.sh — cas P2-B-suffix, P1-A-absolu, Robustesse (espace), Robustesse (tiret initial) ; 32/32 ; suites voisines non régressées (test-dag.sh 99/99, test-check-doc-drift.sh 21/21, test-check-agents.sh 81/81) ; dag.sh hors diff"
         status: pass
+  - id: D11
+    description: "Correction ciblée exec-02 tour 3 (3e défaut de la même famille en p2_sens_b,
+      constaté à chaque tour par un juge externe) : la comparaison par './' de tête à un seul
+      niveau (tour 2) laissait passer './/a.md' (le strip ne retire qu'un niveau, un '/' résiduel
+      empêche le match). Remplacée par une fonction UNIQUE normalize_path() (bash pur, ADR-054)
+      traitant la CLASSE — './' de tête un ou répété, '/' redondants en tête comme internes, '/'
+      final — appliquée SYMÉTRIQUEMENT aux deux côtés de la comparaison p2_sens_b (entry ET $f).
+      '../' explicitement NON résolu par choix documenté (même risque de traversée hors $ROOT que
+      celui déjà écarté pour les tokens absolus en p1_sens_a). Couverte par une table de 13 formes
+      (dont espace, tiret initial, %/$/&, / final, ../) plutôt que des cas copiés-collés, et 3
+      attestations rouge->vert rejouées contre 86c3b0c (avant/après explicites). Le commentaire
+      inexact de check-map-drift.sh (affirmant qu'un '/' final est déjà retiré par
+      extract_p2_entries_raw, alors qu'une telle citation n'est jamais extraite — la regex exige
+      '.md)' littéral) corrigé. p1_sens_a et p2_sens_a vérifiés : les deux passent par `-e`, le
+      système de fichiers résout déjà './'/'//'/'/' final pour eux — asymétrie légitime documentée
+      en commentaire, jamais un défaut caché. Une régression réelle a été détectée PENDANT
+      l'écriture de la table elle-même (remplacement '\/' en position REMPLACEMENT de
+      ${var//pat/repl} non déséchappé par bash — insérait un backslash littéral), corrigée avant
+      commit via un slash porté par variable."
+    requirement: "ICMD-03, ICMD-04"
+    verification:
+      - kind: other
+        ref: "bash plugin/conductor/scripts/tests/test-check-map-drift.sh — 49/49 (16 cas ajoutés : 13 table normalize_path(), 3 attestations 86c3b0c) ; suites voisines non régressées (test-dag.sh 99/99, test-check-doc-drift.sh 21/21, test-check-agents.sh 81/81) ; dag.sh hors diff ; awk '!/^[ \\t]*#/' check-map-drift.sh | wc -l → 246 (< 250) ; grep -c git_safe → 7 ; grep -v '^#' | grep -c 'git -C' → 1"
+        status: pass
 ---
 
 ## Accomplishments
@@ -193,6 +219,22 @@ coverage:
   `Robustesse` espace, `Robustesse` tiret initial — 28 → 32 cas). Le cas `P2-B-suffix` a d'abord
   été rejoué sur le code d'avant correctif pour constater le rouge réel (`rc=3`, `0 divergence`,
   alors que `refs/orphan.md` aurait dû être signalé) avant d'appliquer le fix.
+- Correction ciblée exec-02, **tour 3** (nœud rouvert une troisième fois) : le correctif du tour 2
+  (strip d'un seul `./` de tête dans `p2_sens_b`) laissait passer `.//a.md` (un `/` résiduel après
+  le strip). Remplacé par une fonction unique `normalize_path()` traitant la classe des formes
+  d'écriture équivalentes (`./` de tête un ou répété, `/` redondants en tête/internes, `/` final),
+  appliquée symétriquement aux deux côtés de la comparaison (`entry` et `$f`), avec un choix
+  explicite documenté de ne pas résoudre `../` (même raison que le token absolu déjà écarté en
+  `p1_sens_a`). Le commentaire de `check-map-drift.sh` affirmant qu'une citation à `/` final est
+  « déjà retirée par `extract_p2_entries_raw` » a été corrigé (une telle citation n'est en réalité
+  jamais extraite, la regex exigeant `.md)` littéral). `p1_sens_a` et `p2_sens_a` vérifiés : les
+  deux passent par `-e`, donc le système de fichiers résout déjà ces formes pour eux — asymétrie
+  légitime, désormais documentée en commentaire plutôt que silencieuse. Couverture : 13 cas en
+  table (`normalize_path` extraite par `awk` depuis le script réel, jamais recopiée à la main) +
+  3 attestations rouge→vert rejouées contre le commit `86c3b0c` (avant/après explicites) — 32 → 49
+  cas. Une régression a été détectée PENDANT l'écriture de la table : `${p//\/\//\/}` insérait un
+  backslash littéral (le `\/` en position remplacement n'est pas déséchappé par bash), corrigée
+  avant commit via un slash porté par variable — la table elle-même a joué son rôle discriminant.
 
 ## Note pour le plan 29-05 (clôture de distribution)
 

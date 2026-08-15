@@ -253,6 +253,70 @@ out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
 has_zero=0; case "$out" in *"0 divergence"*) has_zero=1 ;; esac
 if [ "$rc" -eq 3 ] && [ "$has_zero" -eq 1 ]; then ok "P2-B dot-slash — citation './a.md' reconnue comme couvrant a.md, jamais un faux positif"; else ko "P2-B dot-slash — citation './a.md' reconnue comme couvrant a.md, jamais un faux positif" "rc=$rc out=[$out]"; fi
 
+# === Table — normalize_path() couvre la CLASSE des formes d'écriture équivalentes (exec-02 tour 3)
+# Récidive constatée sur 3 tours (suffixe de basename tour 0, chemin strict tour 1, strip './' à
+# un seul niveau tour 2) : chaque correctif traitait le cas nommé par le rapport et laissait tomber
+# son voisin immédiat. La fonction est extraite du script réel par awk (jamais recopiée à la main —
+# une copie divergerait silencieusement de l'implémentation testée) puis évaluée dans ce shell.
+NP_FN="$(awk '/^normalize_path\(\) \{/{f=1} f{print; if (/^}/) exit}' "$SCRIPT")"
+eval "$NP_FN"
+if [ "$(type -t normalize_path 2>/dev/null)" != "function" ]; then
+  echo "  ✗ FIXTURE — extraction de normalize_path() a échoué (rien à tester)" >&2
+  exit 1
+fi
+
+# forme d'écriture | attendu | raison si non trivial
+np_case() { # <label> <input> <expected>
+  local label="$1" input="$2" expected="$3" got
+  got="$(normalize_path "$input")"
+  if [ "$got" = "$expected" ]; then
+    ok "normalize_path — $label : '$input' -> '$expected'"
+  else
+    ko "normalize_path — $label : '$input' -> '$expected'" "obtenu='$got'"
+  fi
+}
+
+np_case "forme nue"                       "a.md"                    "a.md"
+np_case "./ de tête"                      "./a.md"                  "a.md"
+np_case ".// de tête (tour 2, finding 1)" ".//a.md"                 "a.md"
+np_case "./ répété"                       "././a.md"                "a.md"
+np_case "// de tête"                      "//a.md"                  "a.md"
+np_case "sous-dossier nu"                 "sub/a.md"                "sub/a.md"
+np_case "sous-dossier, ./ de tête"        "./sub/a.md"               "sub/a.md"
+np_case "sous-dossier, // interne"        "sub//a.md"               "sub/a.md"
+np_case "espace"                          "nom avec espace.md"      "nom avec espace.md"
+np_case "tiret initial"                   "-tiret.md"               "-tiret.md"
+np_case "%, \$, & littéraux"              'a%b$c&d.md'              'a%b$c&d.md'
+np_case "/ final"                         "a.md/"                   "a.md"
+np_case "../ — NON RÉSOLU PAR CHOIX (ADR-031 : jamais de résolution hors \$ROOT)" "../a.md" "../a.md"
+
+# === Table — attestation du rouge AVANT (86c3b0c, tour 2) vs APRÈS (ce script, tour 3) =============
+# 86c3b0c est le commit du tour 2 : il strip un seul './' de tête mais ne squeeze jamais les '/'
+# redondants ni ne boucle sur les './' répétés. Chaque forme ci-dessous DOIT changer de verdict.
+REPO_ROOT="$(git -C "$(dirname "$SCRIPT")" rev-parse --show-toplevel 2>/dev/null)"
+OLD_SCRIPT="$TMP/old_check_map_drift_86c3b0c.sh"
+if [ -n "$REPO_ROOT" ] && git -C "$REPO_ROOT" show 86c3b0c:plugin/conductor/scripts/check-map-drift.sh > "$OLD_SCRIPT" 2>/dev/null; then
+  attest_form() { # <label> <citation-form>
+    local label="$1" form="$2" D out_old rc_old out_new rc_new
+    D="$(mk_git_root "attest-$(echo "$label" | tr -c 'a-zA-Z0-9' '-')")"
+    commit_file "$D" "a.md" "content"
+    commit_file "$D" "_index.md" "# Index" "" "[a]($form)" ""
+    out_old="$(bash "$OLD_SCRIPT" --path "$D" 2>/dev/null)"; rc_old=$?
+    out_new="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc_new=$?
+    # attendu : AVANT rc=0 (faux positif — 'a.md' signalé à tort non cité), APRÈS rc=3 (0 divergence).
+    if [ "$rc_old" -eq 0 ] && [ "$rc_new" -eq 3 ]; then
+      ok "attestation rouge->vert — $label ('$form') : avant rc=0 (faux positif), après rc=3 (corrigé)"
+    else
+      ko "attestation rouge->vert — $label ('$form')" "avant rc=$rc_old [$out_old] / après rc=$rc_new [$out_new]"
+    fi
+  }
+  attest_form "point-slash double"   ".//a.md"
+  attest_form "point-slash repete"   "././a.md"
+  attest_form "slash-double tete"    "//a.md"
+else
+  ko "attestation rouge->vert (86c3b0c)" "commit 86c3b0c introuvable dans ce dépôt — preuve non rejouable"
+fi
+
 # === Cumul — une carte P1 et une carte P2, toutes deux propres → compteur de cartes balayées = 2 ===
 D="$(mk_git_root cumul)"
 commit_file "$D" "docs/x.md" "y"

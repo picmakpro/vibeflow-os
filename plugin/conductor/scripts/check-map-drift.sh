@@ -226,6 +226,40 @@ extract_p2_entries_raw() { # <file>
   grep -oE '`[^`]*\.md`' "$1" 2>/dev/null | sed -e 's/^`//' -e 's/`$//'
 }
 
+# Normalise un chemin RELATIF pour comparaison ensembliste par ÉGALITÉ DE CHAÎNE — bash pur
+# (ADR-054, ni jq/sed -i/grep -P/readlink -f). Traite la CLASSE des formes d'écriture équivalentes,
+# pas un cas nommé isolément (motif de récidive, cf. mandat exec-02 tour 3) :
+#   - segments './' de tête, un ou répétés ('./a', './/a', './/. /a') -> retirés jusqu'à épuisement
+#   - séparateurs '/' redondants, en tête ('//a') comme internes ('a//b') -> réduits à un seul '/'
+#   - '/' final -> retiré
+# Décision explicite sur '../' : PAS résolu ici, par choix — une résolution lexicale de '../' sans
+# connaître la racine du dépôt permettrait à un chemin cité de désigner une cible HORS de $ROOT,
+# même risque de traversée que celui déjà écarté pour les tokens absolus en p1_sens_a (ADR-031 :
+# ce gate ne teste jamais rien hors de sa cible). Un '../' résiduel après normalisation reste donc
+# tel quel : il ne correspondra jamais à un chemin rendu par `git ls-files` (qui n'en émet jamais)
+# et le cas reste marqué NON RECONNU dans la table de test — un choix documenté, pas un oubli.
+normalize_path() { # <chemin> -> chemin normalisé
+  local p="$1" slash="/" double="//"
+  # Slash porté par variable, jamais littéral dans le motif de substitution : l'échappement
+  # '\/' en position de REMPLACEMENT n'est pas déséchappé par bash (seuls '&' et '\\' le sont
+  # dans ${var//pat/repl}) — un remplacement '\/' littéral insère un backslash constaté à l'essai,
+  # bug qui aurait recréé le motif de récidive une quatrième fois s'il n'avait pas été prouvé ici.
+  while case "$p" in *//*) true ;; *) false ;; esac; do
+    p="${p//$double/$slash}"
+  done
+  while case "$p" in ./*) true ;; *) false ;; esac; do
+    p="${p#./}"
+  done
+  p="${p#/}"
+  p="${p%/}"
+  printf '%s' "$p"
+}
+
+# p2_sens_a s'appuie sur `-e` (existence disque) : le système de fichiers résout déjà lui-même
+# './', '//' et '/' final au moment du test — aucune normalisation de chaîne n'y est nécessaire,
+# même raison que p1_sens_a (commentaire ci-dessous). Seul p2_sens_b compare deux CHAÎNES sans
+# jamais toucher le disque : c'est le seul site qui a besoin de normalize_path(), appliquée aux
+# DEUX côtés de la comparaison pour rester symétrique.
 p2_sens_a() { # <card-relpath> <card-label>
   local card_rel="$1" label="$2" dossier raw target
   dossier="$(dirname_of "$card_rel")"
@@ -255,27 +289,24 @@ p2_sens_b() { # <card-relpath> <card-label>
     found=0
     # Comparaison sur le chemin résolu COMPLET, jamais un match de suffixe de basename : un match
     # de suffixe fait matcher 'refs/orphan.md' par une entrée 'refs/sub/orphan.md' qui cite un
-    # fichier différent — faux négatif du gate constaté (correctif P2 sens B).
+    # fichier différent — faux négatif du gate constaté (correctif P2 sens B, tour 0).
     #
-    # 'entry' est normalisé (./ de tête retiré) AVANT concaténation : une citation './a.md' doit
-    # matcher le fichier suivi 'a.md' exactement comme le ferait l'ancienne comparaison par
-    # suffixe (qui tolérait ce './' par accident, via -e résolu par le système de fichiers en
-    # sens A). Sans cette normalisation, target_rel devient './a.md' et ne correspond jamais à
-    # $f — faux positif symétrique du correctif de suffixe, régression constatée (tour 2, finding
-    # 1). Le '/' final éventuel est déjà retiré par extract_p2_entries_raw (jamais présent dans
-    # un lien vers *.md) ; un '//' interne resterait tel quel — hors domaine observé ici.
+    # Les DEUX côtés de la comparaison passent par normalize_path() — jamais un seul : 'entry'
+    # (la citation brute de l'index) ET '$f' (le chemin rendu par `git ls-files`, déjà canonique
+    # en pratique mais normalisé quand même pour ne dépendre d'aucune garantie implicite de git).
+    # Traiter uniquement 'entry' avait produit un faux positif symétrique au tour 2 (une citation
+    # './a.md' réduite à 'a.md' pouvait cesser de matcher '$f' selon la forme exacte rendue par
+    # git) — normaliser les deux côtés élimine la classe entière, pas seulement le cas nommé.
     while IFS= read -r entry; do
       [ -n "$entry" ] || continue
-      case "$entry" in
-        ./*) entry="${entry#./}" ;;
-      esac
+      entry="$(normalize_path "$entry")"
       [ -n "$entry" ] || continue
       if [ "$dossier" = "." ]; then
         target_rel="$entry"
       else
         target_rel="$dossier/$entry"
       fi
-      if [ "$target_rel" = "$f" ]; then found=1; break; fi
+      if [ "$(normalize_path "$target_rel")" = "$(normalize_path "$f")" ]; then found=1; break; fi
     done < <(extract_p2_entries_raw "$ROOT/$card_rel")
     if [ "$found" -eq 0 ]; then
       DIVERGENCES=$((DIVERGENCES + 1))
