@@ -1,5 +1,5 @@
 {
-  "description": "Gouvernance mémoire machine-enforced (ADR-032 + ADR-043) : lecture index-first bloquante, index auto-maintenu, lint format au démarrage, archivage en fin de session.",
+  "description": "Gouvernance mémoire machine-enforced (ADR-032 + ADR-043) : instanciation des registres du lab courant à l'ouverture de session (indispensable en scope user, où l'install ne peut pas connaître les projets à l'avance), lecture index-first bloquante, index auto-maintenu, lint format au démarrage, archivage en fin de session.",
   "hooks": {
     "PreToolUse": [
       {
@@ -27,6 +27,7 @@
       {
         "matcher": "startup",
         "hooks": [
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/seed-registres.sh --project --quiet || true" },
           { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-registres.sh --hook || true" },
           { "type": "command", "command": "bash {{VF_SCRIPTS}}/probe-memory-guards.sh || true" }
         ]
