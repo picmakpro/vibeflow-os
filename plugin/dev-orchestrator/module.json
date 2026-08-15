@@ -1,6 +1,6 @@
 {
   "name": "dev-orchestrator",
-  "version": "v2.15.0",
+  "version": "v2.16.0",
   "type": "agent+skills",
   "description": "Orchestrateur de développement en modèle agentique : l'agent vibeflow-dev détecte l'intention en langage naturel et invoque directement les briques gsd-*/superpowers installées (carte d'intention unique, next steps depuis la feuille de route, hygiène documentaire, garde-fou first-use). Inclut l'équipe de mission (vf-dev-manager — DAG, lock de driver, rapports typés, digest de mission, dispatch parallèle revue ∥ audit — + workers sonnet vf-coder/vf-reviewer/vf-auditer), 2 skills (vf-auto : porte d'autonomie avec seuil équipe ; vf-dev : point d'entrée générique), un fragment hooks/hooks.json (SessionStart : signaux de démarrage advisory — bootstrap, onboard, orientation moteur GSD, dérive documentaire) et la doctrine des garde-fous de boucle autonome.",
   "requires": [

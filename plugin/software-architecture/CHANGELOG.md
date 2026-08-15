@@ -1,5 +1,18 @@
 # Changelog — software-architecture
 
+## [v1.6.0] — 2026-08-16 (Phase 30 tâche 07 — doctrine de la forme exec gravée, PORT-02)
+
+**Minor** (aucun changement de code de ce module — son entrée `guard-file-size.sh` était déjà en
+forme exec depuis le plan `30-01`). Ce bump documente que `software-architecture` est désormais
+couvert par la doctrine gravée dans **ADR-071** (`docs/ADR.md`) : forme exec, chemin absolu
+d'interpréteur résolu et vérifié à l'install (conséquence assumée : `settings.json` devient
+spécifique à la machine), contrat de sortie normalisé sans lanceur intermédiaire. Son entrée reste
+classée **bloquante** (décision JSON `permissionDecision: deny`, Iron Law 300L) — inchangée par
+cette phase.
+
+Référence : `.planning/phases/VFDO-30-portabilit-windows-ii/30-07-PLAN.md`, PORT-02,
+`docs/HOOKS-CONTRAT-SORTIE.md`.
+
 ## [v1.5.2] — 2026-07-25
 
 ### Corrigé

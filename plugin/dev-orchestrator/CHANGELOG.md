@@ -1,5 +1,34 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.16.0] — 2026-08-16 (Phase 30 tâche 07 — les 4 hooks SessionStart passent en forme exec, PORT-02)
+
+**Minor** (changement de forme des hooks + contrat de sortie, pas un simple correctif). Les 4
+entrées `SessionStart` du fragment (`check-dev-bootstrap.sh`, `discover-unintegrated-docs.sh`,
+`check-doc-drift.sh`, `check-gsd-config.sh`) passent de la forme shell (`bash … || true`) à la
+forme exec (`command` = jeton d'interpréteur résolu en chemin absolu à l'install, `args` = chemin
+du script + `--hook` en élément séparé) — même gabarit que `software-architecture` (migré au plan
+`30-01`). L'opérateur d'absorption shell disparaît **par construction** : les 4 scripts traduisent
+désormais eux-mêmes leur silence interne (contrat posé au plan `30-04`, voir
+`docs/HOOKS-CONTRAT-SORTIE.md`) — plus jamais un `|| true` aveugle.
+
+### Ajouté
+- **Forme exec** sur les 4 entrées `SessionStart`, classées explicitement advisory (ADR-031) dans
+  la description du fragment, avec renvoi au document de contrat de sortie.
+- **ADR-071** (`docs/ADR.md`) : la doctrine de la forme exec pour le périmètre dev — chemin absolu
+  résolu et vérifié à l'install (conséquence assumée : `settings.json` devient spécifique à la
+  machine), contrat de sortie normalisé dans chaque script sans lanceur intermédiaire.
+- **Preuve d'install réelle** (`plugin/_internal/tests/test-vibeflow-update.sh`) : les 5 entrées du
+  périmètre dev sont exec TELLES QU'INSTALLÉES dans un lab temporaire (command absolu, exécutable,
+  aucun placeholder résiduel), et un lab qui portait l'ancienne forme shell converge sans doublon à
+  l'update.
+
+### Compatibilité
+- Un lab qui ne relance pas l'engine garde ses hooks en forme shell et ses anciens scripts :
+  comportement attendu, pas une régression — la migration n'a d'effet qu'au prochain
+  install/update.
+
+Référence : `.planning/phases/VFDO-30-portabilit-windows-ii/30-07-PLAN.md`, PORT-02.
+
 ## [v2.15.0] — 2026-08-15 (Phase 28 — le gate d'activation ferme #38 et se prouve chez l'utilisateur)
 
 **Minor** (nouvelle capacité, pas un simple correctif) : `check-capability-activation.sh` sait
