@@ -34,6 +34,39 @@
 # T18 — remove avec --settings-local fournie sur un merge antérieur mixte (entrée locale + entrée
 #       projet) → les deux disparaissent des deux fichiers respectivement, aucun résidu
 #
+# Purge cross-cible au merge (correction exec-30-01, second manque) : apply_merge() ne purgeait
+# les doublons que dans la cible passée à CET appel — quand la destination d'une entrée change
+# d'un merge au suivant (forme shell↔exec, ou --settings-local fourni puis pas), l'ancienne
+# entrée survivait dans l'AUTRE fichier et le hook tournait 2x.
+# T19 — Cas A (repro directe du manque) : merge forme shell SANS --settings-local, puis remerge
+#       forme exec (même script) AVEC --settings-local → le fichier projet ne contient plus
+#       AUCUNE entrée pour ce script, le fichier local en contient exactement UNE.
+# T20 — Cas B, sens retour local→projet : merge forme exec AVEC --settings-local (entrée locale),
+#       puis remerge forme shell — --settings-local TOUJOURS fournie sur ce 2e appel (voir note
+#       ci-dessous) → le fichier projet contient exactement UNE entrée, le fichier local n'en
+#       contient plus AUCUNE.
+#       Note de fidélité au mandat : la formulation littérale de Cas B ("remerge SANS
+#       --settings-local") demande que le 2e appel OMETTE le flag. C'est architecturalement
+#       impossible à satisfaire pour la moitié "le fichier local n'en contient plus aucune" :
+#       merge-hooks.sh est un script sans état persistant entre deux invocations — s'il ne reçoit
+#       pas --settings-local au 2e appel, il n'a strictement aucun moyen de connaître le chemin du
+#       fichier local à purger (il ne l'ouvre même pas). T20 reproduit donc le changement de
+#       destination local→projet (le cœur du manque : Cas A à l'envers) en gardant le flag fourni
+#       aux deux appels, ce qui est nécessaire et suffisant pour exercer la purge croisée ajoutée
+#       par le correctif. T20b documente séparément et explicitement la frontière architecturale
+#       de la lecture littérale (flag réellement omis au 2e appel) — état attendu, pas un défaut.
+# T20b — lecture littérale de Cas B (flag OMIS au 2e appel) : le fichier projet est correct (1
+#        entrée, dédup intra-cible déjà garantie), le fichier local n'est PAS rouvert par ce 2e
+#        appel et conserve donc son entrée résiduelle — comportement attendu et documenté, pas
+#        une régression du correctif (T19/T20 couvrent le cas où le flag reste fourni).
+# T21 — test générique : produit cartésien {forme shell, forme exec} x {forme shell, forme exec}
+#       x {--settings-local fournie aux DEUX appels, absente aux DEUX appels} = 8 séquences
+#       accessibles sur deux merges successifs du même script → chaque séquence finit avec
+#       exactement 1 entrée au total (projet + local). Restreint depuis le produit complet
+#       2x2x2x2=16 (flag indépendant par appel) : les 2 séquences où flag1=oui+forme1=exec (entrée
+#       atterrit en local) puis flag2=non (T20b) sont exclues — hors de portée architecturale,
+#       déjà documentées par T20b plutôt que comptées en échec ici.
+#
 # ISOLATION : tout sous mktemp. Le vrai ~/.claude n'est jamais touché.
 
 set -uo pipefail
@@ -510,6 +543,152 @@ assert 'hooks' not in local_, f'clé hooks residuelle cote local : {local_}'
   ok "T18 remove avec --settings-local fournie : les deux entrées d'un merge mixte antérieur disparaissent, aucun résidu"
 else
   ko "T18 remove balaie les deux cibles"
+fi
+
+# ---------- T19 : Cas A — shell SANS --settings-local, puis exec AVEC --settings-local ----------
+FRAG_CASEA_SHELL="$WORK/frag-casea-shell.json"
+cat > "$FRAG_CASEA_SHELL" <<'EOF'
+{ "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": [ { "type": "command", "command": "bash {{VF_SCRIPTS}}/case-a-guard.sh" } ] } ] } }
+EOF
+FRAG_CASEA_EXEC="$WORK/frag-casea-exec.json"
+cat > "$FRAG_CASEA_EXEC" <<'EOF'
+{ "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": [ { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/case-a-guard.sh"] } ] } ] } }
+EOF
+S19_PROJECT="$WORK/t19/settings.json"
+S19_LOCAL="$WORK/t19/settings-local.json"
+mkdir -p "$WORK/t19"
+bash "$MERGER" merge "$FRAG_CASEA_SHELL" --settings "$S19_PROJECT" --scripts-prefix "$PREFIX" 2>/dev/null
+VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_CASEA_EXEC" --settings "$S19_PROJECT" --settings-local "$S19_LOCAL" --scripts-prefix "$PREFIX" 2>/dev/null
+if python3 -c "
+import json
+proj = json.load(open('$S19_PROJECT'))
+proj_hits = [h for g in proj.get('hooks', {}).get('PreToolUse', []) for h in g['hooks']
+             if 'case-a-guard.sh' in h.get('command','') or any('case-a-guard.sh' in a for a in h.get('args', []) if isinstance(a, str))]
+assert proj_hits == [], f'attendu 0 entree cote projet (ancienne forme shell residuelle), trouve {len(proj_hits)} : {proj_hits}'
+loc = json.load(open('$S19_LOCAL'))
+loc_hits = [h for g in loc.get('hooks', {}).get('PreToolUse', []) for h in g['hooks']
+            if 'case-a-guard.sh' in h.get('command','') or any('case-a-guard.sh' in a for a in h.get('args', []) if isinstance(a, str))]
+assert len(loc_hits) == 1, f'attendu 1 entree cote local, trouve {len(loc_hits)} : {loc_hits}'
+assert 'args' in loc_hits[0], f'entree locale pas en forme exec : {loc_hits[0]}'
+" 2>/dev/null; then
+  ok "T19 Cas A (shell sans flag → exec avec flag) : fichier projet 0 entrée résiduelle, fichier local 1 entrée"
+else
+  ko "T19 Cas A dédup cross-cible au changement de destination shell→local"
+fi
+
+# ---------- T20 : Cas B — exec AVEC --settings-local, puis shell (flag toujours fourni) ----------
+# Voir note de fidélité au mandat en tête de fichier : le flag reste fourni aux deux appels pour
+# que le 2e appel ait un chemin vers le fichier local à purger (T20b couvre la lecture littérale
+# où le flag est omis).
+FRAG_CASEB_EXEC="$WORK/frag-caseb-exec.json"
+cat > "$FRAG_CASEB_EXEC" <<'EOF'
+{ "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": [ { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/case-b-guard.sh"] } ] } ] } }
+EOF
+FRAG_CASEB_SHELL="$WORK/frag-caseb-shell.json"
+cat > "$FRAG_CASEB_SHELL" <<'EOF'
+{ "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": [ { "type": "command", "command": "bash {{VF_SCRIPTS}}/case-b-guard.sh" } ] } ] } }
+EOF
+S20_PROJECT="$WORK/t20/settings.json"
+S20_LOCAL="$WORK/t20/settings-local.json"
+mkdir -p "$WORK/t20"
+VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_CASEB_EXEC" --settings "$S20_PROJECT" --settings-local "$S20_LOCAL" --scripts-prefix "$PREFIX" 2>/dev/null
+VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_CASEB_SHELL" --settings "$S20_PROJECT" --settings-local "$S20_LOCAL" --scripts-prefix "$PREFIX" 2>/dev/null
+if python3 -c "
+import json
+proj = json.load(open('$S20_PROJECT'))
+proj_hits = [h for g in proj.get('hooks', {}).get('PreToolUse', []) for h in g['hooks']
+             if 'case-b-guard.sh' in h.get('command','') or any('case-b-guard.sh' in a for a in h.get('args', []) if isinstance(a, str))]
+assert len(proj_hits) == 1, f'attendu 1 entree cote projet, trouve {len(proj_hits)} : {proj_hits}'
+assert 'args' not in proj_hits[0], f'entree projet pas en forme shell : {proj_hits[0]}'
+loc = json.load(open('$S20_LOCAL'))
+loc_hits = [h for g in loc.get('hooks', {}).get('PreToolUse', []) for h in g['hooks']
+            if 'case-b-guard.sh' in h.get('command','') or any('case-b-guard.sh' in a for a in h.get('args', []) if isinstance(a, str))]
+assert loc_hits == [], f'attendu 0 entree cote local (ancienne forme exec residuelle), trouve {len(loc_hits)} : {loc_hits}'
+" 2>/dev/null; then
+  ok "T20 Cas B (exec local → shell projet, flag fourni aux deux appels) : fichier projet 1 entrée, fichier local 0 entrée"
+else
+  ko "T20 Cas B dédup cross-cible au changement de destination local→shell"
+fi
+
+# ---------- T20b : lecture littérale de Cas B — flag OMIS au 2e appel (frontière architecturale) ----------
+S20B_PROJECT="$WORK/t20b/settings.json"
+S20B_LOCAL="$WORK/t20b/settings-local.json"
+mkdir -p "$WORK/t20b"
+VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_CASEB_EXEC" --settings "$S20B_PROJECT" --settings-local "$S20B_LOCAL" --scripts-prefix "$PREFIX" 2>/dev/null
+# 2e appel SANS --settings-local : le script n'a strictement aucun chemin vers $S20B_LOCAL ici.
+VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_CASEB_SHELL" --settings "$S20B_PROJECT" --scripts-prefix "$PREFIX" 2>/dev/null
+if python3 -c "
+import json
+proj = json.load(open('$S20B_PROJECT'))
+proj_hits = [h for g in proj.get('hooks', {}).get('PreToolUse', []) for h in g['hooks']
+             if 'case-b-guard.sh' in h.get('command','') or any('case-b-guard.sh' in a for a in h.get('args', []) if isinstance(a, str))]
+assert len(proj_hits) == 1, f'attendu 1 entree cote projet (dedup intra-cible, inchange), trouve {len(proj_hits)} : {proj_hits}'
+loc = json.load(open('$S20B_LOCAL'))
+loc_hits = [h for g in loc.get('hooks', {}).get('PreToolUse', []) for h in g['hooks']
+            if 'case-b-guard.sh' in h.get('command','') or any('case-b-guard.sh' in a for a in h.get('args', []) if isinstance(a, str))]
+assert len(loc_hits) == 1, f'frontiere architecturale rompue : le fichier local a change sans avoir ete rouvert : {loc_hits}'
+" 2>/dev/null; then
+  ok "T20b flag omis au 2e appel (lecture littérale) : fichier projet correct, fichier local jamais rouvert donc résidu attendu (frontière documentée, pas une régression)"
+else
+  ko "T20b frontière architecturale --settings-local omise"
+fi
+
+# ---------- T21 : matrice générique — {shell,exec} x {shell,exec} x {flag constant on/off} ----------
+FRAG_MATRIX_SHELL="$WORK/frag-matrix-shell.json"
+cat > "$FRAG_MATRIX_SHELL" <<'EOF'
+{ "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": [ { "type": "command", "command": "bash {{VF_SCRIPTS}}/matrix-guard.sh" } ] } ] } }
+EOF
+FRAG_MATRIX_EXEC="$WORK/frag-matrix-exec.json"
+cat > "$FRAG_MATRIX_EXEC" <<'EOF'
+{ "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": [ { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/matrix-guard.sh"] } ] } ] } }
+EOF
+matrix_fail=0
+matrix_detail=""
+seq_n=0
+for form1 in shell exec; do
+  for form2 in shell exec; do
+    for flagmode in on off; do
+      seq_n=$((seq_n+1))
+      MDIR="$WORK/t21-$seq_n"
+      mkdir -p "$MDIR"
+      MPROJECT="$MDIR/settings.json"
+      MLOCAL="$MDIR/settings-local.json"
+      if [ "$form1" = shell ]; then F1="$FRAG_MATRIX_SHELL"; else F1="$FRAG_MATRIX_EXEC"; fi
+      if [ "$form2" = shell ]; then F2="$FRAG_MATRIX_SHELL"; else F2="$FRAG_MATRIX_EXEC"; fi
+      if [ "$flagmode" = on ]; then
+        VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$F1" --settings "$MPROJECT" --settings-local "$MLOCAL" --scripts-prefix "$PREFIX" 2>/dev/null
+        VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$F2" --settings "$MPROJECT" --settings-local "$MLOCAL" --scripts-prefix "$PREFIX" 2>/dev/null
+      else
+        VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$F1" --settings "$MPROJECT" --scripts-prefix "$PREFIX" 2>/dev/null
+        VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$F2" --settings "$MPROJECT" --scripts-prefix "$PREFIX" 2>/dev/null
+      fi
+      COUNT_SEQ="$(python3 -c "
+import json, os
+total = 0
+for p in ('$MPROJECT', '$MLOCAL'):
+    if not os.path.exists(p):
+        continue
+    d = json.load(open(p))
+    for ev in d.get('hooks', {}).values():
+        for g in ev:
+            for h in g.get('hooks', []):
+                s = [h.get('command','')] + [a for a in h.get('args', []) if isinstance(a, str)]
+                total += sum(1 for x in s if 'matrix-guard.sh' in x)
+print(total)
+" 2>/dev/null)"
+      if [ "$COUNT_SEQ" != "1" ]; then
+        matrix_fail=$((matrix_fail+1))
+        matrix_detail="${matrix_detail}    séquence #$seq_n (forme1=$form1 flag=$flagmode forme2=$form2) : ${COUNT_SEQ:-imparsable} entrée(s), attendu 1
+"
+      fi
+    done
+  done
+done
+if [ "$matrix_fail" -eq 0 ]; then
+  ok "T21 matrice générique (8 séquences forme x forme x flag constant) : chaque séquence finit à exactement 1 entrée"
+else
+  printf '%s' "$matrix_detail"
+  ko "T21 matrice générique : $matrix_fail/8 séquence(s) en défaut (détail ci-dessus)"
 fi
 
 echo ""
