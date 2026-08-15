@@ -101,6 +101,11 @@ Last activity: 2026-08-15 — Quick task 260815-tl6 : snapshot hebdo traffic/clo
 
 ### Roadmap Evolution
 
+- 2026-08-16 : **Phase 36 ajoutée (HORS-MILESTONE, flottante)** — Cockpit v1.1, signal
+  « au travail » fiable + améliorations UX. Module `plugin/vf-cockpit/` v1.0.0 livré par mission
+  vf-dev-manager sur `feat/vf-cockpit-module` (à l'écart de main et des releases, décision
+  Samuel) ; spike 001 clos VALIDATED ; défaut fondateur : panneau équipe aveugle aux missions
+  sans DAG dans le `.planning` observé (worktrees, managers sans plan de bataille).
 - 2026-08-15 (roadmap fiabilite-v1.0) : **feuille de route du milestone posée — 8 phases**.
   Numérotation arbitrée par l'humain : les héritées gardent 18 et 25, les nouvelles continuent à
   30 (le milestone précédent s'est arrêté à 29). Ordre dicté par les fichiers (ARCHITECTURE.md

@@ -78,10 +78,14 @@ rapports actuels · densité ADR-029 du parc retouché (team-kernel.md + tous ma
 
 **Déclencheur de resurgence :** ouverture du prochain milestone (post fiabilite-v1.0).
 
-## Module `/vf-cockpit` — cockpit web local (roadmap, phases, missions live) — SPIKÉ
-**Capturé :** 2026-08-15 (cadrage AskUserQuestion, 4 décisions) · **Spiké :** 2026-08-15 →
-**spike : `.planning/spikes/001-cockpit-live/` (verdict au README), requirements :
-`.planning/spikes/MANIFEST.md` § vf-cockpit-local**
+## Module `/vf-cockpit` — cockpit web local (roadmap, phases, missions live) — LIVRÉ v1.0.0, PHASE 36 POSÉE
+**Capturé :** 2026-08-15 (cadrage AskUserQuestion, 4 décisions) · **Spiké :** 2026-08-15
+(spike 001 clos VALIDATED le 2026-08-16) · **Livré :** 2026-08-16 — mission vf-dev-manager en
+worktree, module `plugin/vf-cockpit/` v1.0.0 sur `feat/vf-cockpit-module` (poussée, tenue à
+l'écart de main et des releases sur décision de Samuel ; design 95/100, 38 tests) · **Suite :**
+**Phase 36 (hors-milestone, flottante)** posée au ROADMAP — signal « au travail » fiable
+(défaut : panneau équipe aveugle aux missions sans DAG dans le `.planning` observé) +
+améliorations UX + merge/bump/release gatés.
 
 Commande `/vf-cockpit` : serveur Node **zéro-dépendance** (http + SSE + fs.watch) qui lit
 `.planning/` (checklist machine de ROADMAP.md, frontmatter STATE.md, MILESTONES.md,

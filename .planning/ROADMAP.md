@@ -76,6 +76,7 @@
 - [ ] Phase 33: Watchdog & notifications des missions
 - [ ] Phase 34: Gaps agency-agents & cadrage skill-installer
 - [ ] Phase 35: Ré-armement worktree (conditionnelle)
+- [ ] Phase 36: Cockpit v1.1 — signal au-travail fiable et améliorations UX (hors-milestone, flottante)
 
 <details>
 <summary>✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04</summary>
@@ -834,3 +835,31 @@ bloquée par rien.
 **Transverse (QUAL-01)** : le comparateur semver de la précondition naît testé sur 1.9/1.10 avec
 ses trois issues (sortie npm imparsable = BRUYANT) et sa mutation rouge prouvée.
 **Plans**: TBD
+
+### Phase 36: Cockpit v1.1 — signal au-travail fiable et améliorations UX
+
+> **HORS-MILESTONE, flottante** — le périmètre de fiabilite-v1.0 (arbitré 2026-08-15) reste
+> intouché ; à prendre après le milestone ou en créneau libre, sur décision de Samuel.
+
+**Goal:** Le cockpit dit la vérité sur qui travaille, et son UX s'améliore grandement sans casser
+l'architecture validée (verdict Samuel 2026-08-16 : « l'architecture globale est bien »).
+Contexte : module `plugin/vf-cockpit/` v1.0.0 livré par mission vf-dev-manager sur la branche
+`feat/vf-cockpit-module` (poussée, tenue À L'ÉCART de main et des releases sur décision de
+Samuel) — spike 001 VALIDATED, design scoré 95/100, 38 tests, Mermaid vendorisé.
+**Défaut n°1** (constaté par Samuel, source de la phase) : le panneau équipe n'écoute que
+`MISSION-*.dag.json` du `.planning` ciblé (`references/ui/js/equipe.js`) — un dev manager actif
+en worktree ou sans DAG affiche à tort « Personne au travail ». Pistes actées : croiser le
+driver-lock au heartbeat (lock vivant = quelqu'un travaille même sans DAG ; lock stale ≠ mission
+morte — leçon TTL du 2026-08-02), découvrir les worktrees (`git worktree list`,
+`.claude/worktrees/*/.planning`) et agréger leurs missions, état « incertain » explicite plutôt
+qu'un faux « personne ». Autres axes : merge de `feat/vf-cockpit-module` dans main (bump minor +
+release — gestes humains gatés), amélioration design continue (la `DESIGN-SPEC.md` du module
+fait foi), rendu navigateur vérifié en CI si possible.
+**Requirements**: TBD (à dériver au cadrage — famille cockpit à créer)
+**Depends on:** rien de fiabilite-v1.0 (flottante) ; la branche `feat/vf-cockpit-module` doit
+exister (c'est le socle à améliorer)
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 36 to break down)
