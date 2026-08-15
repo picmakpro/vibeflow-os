@@ -1,0 +1,6 @@
+{
+  "total_count": 4,
+  "jobs": [
+    {"id": 90002, "run_id": 1002, "name": "Suites de tests (découverte non vide)", "status": "completed", "conclusion": "success"}
+  ]
+}

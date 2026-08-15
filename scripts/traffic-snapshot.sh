@@ -69,7 +69,12 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-command -v gh >/dev/null 2>&1 || { echo "[traffic-snapshot] gh introuvable — prérequis manquant" >&2; exit 2; }
+# `gh` n'est requis que hors couture de test : sous VF_TRAFFIC_FIXTURES, les quatre fonctions
+# d'appel ne le sollicitent jamais (elles lisent des fixtures sur disque) — l'exiger quand même
+# romprait la discriminance du test T9 (la suite doit rester verte sans gh sur le PATH).
+if [ -z "${VF_TRAFFIC_FIXTURES:-}" ]; then
+  command -v gh >/dev/null 2>&1 || { echo "[traffic-snapshot] gh introuvable — prérequis manquant" >&2; exit 2; }
+fi
 command -v jq >/dev/null 2>&1 || { echo "[traffic-snapshot] jq introuvable — prérequis manquant" >&2; exit 2; }
 
 # Appel authentifié à l'endpoint traffic (droit admin requis). $1 = chemin d'API relatif.

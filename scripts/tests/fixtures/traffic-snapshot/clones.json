@@ -1,0 +1,8 @@
+{
+  "count": 232,
+  "uniques": 28,
+  "clones": [
+    {"timestamp": "2026-08-05T00:00:00Z", "count": 5, "uniques": 3},
+    {"timestamp": "2026-08-04T00:00:00Z", "count": 227, "uniques": 25}
+  ]
+}
