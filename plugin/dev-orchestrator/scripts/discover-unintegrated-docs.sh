@@ -11,11 +11,14 @@
 #   discover-unintegrated-docs.sh [--path <dir>] [--hook] [--quiet]
 # Defaults: --path .
 #
-# --hook (plan 17-02, additif) : change UNIQUEMENT le format d'affichage — au lieu de la liste
-# grain<TAB>chemin, émet une ligne agrégée [docs-ingest] (compte total + ventilation spec/plan)
-# suivie de sa ligne de geste, dans les MÊMES conditions d'exit (0/3/64) que le mode par défaut.
-# Le contrat historique grain<TAB>chemin, consommé par ingestion-flow.md, reste le seul mode actif
-# sans --hook — il ne bouge pas d'un octet. --hook et --quiet sont mutuellement exclusifs (exit 64).
+# --hook (plan 17-02, additif) change le format d'affichage — au lieu de la liste grain<TAB>chemin,
+# émet une ligne agrégée [docs-ingest] (compte total + ventilation spec/plan) suivie de sa ligne de
+# geste. Le contrat historique grain<TAB>chemin, consommé par ingestion-flow.md, reste le seul mode
+# actif sans --hook — il ne bouge pas d'un octet, et sans --hook les 3 codes ci-dessous restent
+# INCHANGÉS (compat CLI/tests). Sous --hook (D-06, Portabilité Windows II), le SEUL code de silence
+# interne (3, « rien à intégrer ») est en outre traduit en 0 à la frontière du harness par
+# hook_exit() — le code 0 « signal émis » et le 64 restent inchangés. Voir
+# docs/HOOKS-CONTRAT-SORTIE.md. --hook et --quiet sont mutuellement exclusifs (exit 64).
 #
 # Sources scannées (grain) :
 #   <sources>/specs/*.md  → grain spec
@@ -41,7 +44,7 @@
 # Sortie : une ligne par document non intégré, "grain<TAB>chemin" (chemin relatif à --path),
 # triée. Rien d'autre — pas de prose, pas d'en-tête.
 #
-# Exit codes :
+# Exit codes (contrat interne, s'applique SANS --hook) :
 #   0  = au moins un document non intégré (listé sur stdout)
 #   3  = rien à intégrer (corpus vide, corpus entièrement cité, ou .planning/ absent)
 #   64 = argument inconnu
@@ -81,10 +84,23 @@ PLANS_DIR="$SOURCES_ROOT/plans"
 
 say() { [ "$QUIET" -eq 1 ] || echo "[discover-unintegrated-docs] $*" >&2; }
 
+# --- Traduction du silence interne vers le harness (D-06, uniquement sous --hook) ---------------
+# hook_exit <code> : sous --hook, le SEUL code de silence interne (3) devient 0 à la frontière du
+# harness — une TRADUCTION, jamais un masquage : elle ne touche ni le code d'erreur d'argument
+# (64), ni 0, ni aucun autre code. Sans --hook (CLI, suites de tests), le code reçu ressort
+# inchangé. Voir docs/HOOKS-CONTRAT-SORTIE.md §2.
+hook_exit() { # <code>
+  local code="$1"
+  if [ "$HOOK" -eq 1 ] && [ "$code" -eq 3 ]; then
+    exit 0
+  fi
+  exit "$code"
+}
+
 # --- .planning/ absent : pas de moteur de planning, rien à évaluer contre ---
 if [ ! -d "$PLANNING_DIR" ]; then
   say "$PLANNING_DIR absent — aucun registre à consulter."
-  exit 3
+  hook_exit 3
 fi
 
 # --- Collecte des documents source (grain, chemin relatif à --path) ---
@@ -98,7 +114,7 @@ for f in "$PLANS_DIR"/*.md; do printf 'plan\t%s\n' "$f" >> "$DOCS_TMP"; done
 
 if [ ! -s "$DOCS_TMP" ]; then
   say "Aucun document source sous $SPECS_DIR ou $PLANS_DIR."
-  exit 3
+  hook_exit 3
 fi
 
 # --- Concaténation des registres existants (les lignes glob sont filtrées au moment du match) ---
@@ -147,12 +163,13 @@ done < "$DOCS_TMP"
 
 if [ ! -s "$OUT_TMP" ]; then
   say "Corpus entièrement cité — rien à intégrer."
-  exit 3
+  hook_exit 3
 fi
 
-# --- Mode --hook (additif) : une ligne agrégée au lieu de la liste, mêmes exits (D-06) -----------
-# Compte total + ventilation par grain en une seule passe awk POSIX. Le calcul amont ($OUT_TMP) et
-# les trois exits ne sont pas modifiés — cette branche ne fait que remplacer le rendu.
+# --- Mode --hook (additif) : une ligne agrégée au lieu de la liste ------------------------------
+# Compte total + ventilation par grain en une seule passe awk POSIX. Le calcul amont ($OUT_TMP)
+# n'est pas modifié — cette branche ne fait que remplacer le rendu ; le code de silence (3, ci-
+# dessus) est traduit par hook_exit(), le code 0 « signal émis » ci-dessous reste inchangé.
 if [ "$HOOK" -eq 1 ]; then
   IFS="$(printf '\t')" read -r TOTAL NSPEC NPLAN <<HOOKEOF
 $(awk -F'\t' '{c[$1]++; n++} END{printf "%d\t%d\t%d\n", n, c["spec"]+0, c["plan"]+0}' "$OUT_TMP")

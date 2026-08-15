@@ -42,13 +42,14 @@
 #   check-dev-bootstrap.sh [--path <dir>] [--hook] [--quiet]
 # Defaults: --path .
 #
-# --hook est accepté pour la PARITÉ D'INTERFACE avec les autres scripts de la phase, et il arme le
-# gate de mutuelle exclusion avec --quiet. Il ne change NI les 4 exits, NI le rendu : contrairement
-# à ses voisins, ce script est déjà en forme « hook » par construction — le signal part sur stdout,
-# les diagnostics humains sur stderr via `say`. Il n'y a donc rien à commuter, et la précédente
-# rédaction (« --hook change UNIQUEMENT le format d'affichage ») annonçait un comportement que le
-# code n'a jamais eu. Rendre stdout dépendant du drapeau serait un changement de contrat, pas une
-# correction : c'est la DOCUMENTATION qui était fausse. --hook et --quiet ensemble → exit 64.
+# --hook arme désormais la TRADUCTION du code de silence interne (3) vers 0 à la frontière du
+# harness (D-06, Portabilité Windows II) — c'était vrai que « --hook ne change rien » tant que
+# `|| true` absorbait tout côté hooks.json ; ce n'est plus le cas dès que la forme exec le retire
+# (plan 30-07). Sans --hook (CLI, suites de tests), tous les codes documentés ci-dessous restent
+# INCHANGÉS : rc=3 reste 3. Le rendu, lui, ne bouge pas : le signal part sur stdout, les
+# diagnostics humains sur stderr via `say`, avec ou sans --hook. Voir docs/HOOKS-CONTRAT-SORTIE.md
+# pour le contrat complet et la raison de cette traduction conditionnée. --hook et --quiet
+# ensemble → exit 64.
 #
 # Workstreams GSD (GSDA-13) — QUELS CHEMINS BOUGENT, LESQUELS NE BOUGENT PAS :
 # Le moteur amont peut partitionner le planning en compartiments `.planning/workstreams/<nom>/`.
@@ -72,10 +73,13 @@
 #   VF_BOOTSTRAP_WORKSTREAM   (workstream actif ; prime sur GSD_WORKSTREAM et sur le pointeur)
 #   GSD_WORKSTREAM            (canal de premier rang du moteur GSD amont)
 #
-# Exit codes:
+# Exit codes (contrat interne, Phase 17 — inchangé, s'applique SANS --hook : CLI, suites de tests) :
 #   0  = signal [onboard] ou [bootstrap] émis (démarrage incomplet)
 #   3  = rien à signaler (état 0), OU orientation [gsd-engine] (état 3, sortie non vide — D-14)
 #   64 = argument inconnu, --path sans valeur, ou --hook + --quiet ensemble
+# Sous --hook (D-06, Portabilité Windows II) : le SEUL code de silence interne (3) est traduit en 0
+# à la frontière du harness par hook_exit() — 0 et 64 restent inchangés. Voir
+# docs/HOOKS-CONTRAT-SORTIE.md.
 set -uo pipefail
 shopt -s nullglob
 
@@ -105,6 +109,20 @@ if [ "$HOOK" -eq 1 ] && [ "$QUIET" -eq 1 ]; then
 fi
 
 say() { [ "$QUIET" -eq 1 ] || echo "[check-dev-bootstrap] $*" >&2; }
+
+# --- Traduction du silence interne vers le harness (D-06, uniquement sous --hook) ---------------
+# hook_exit <code> : sous --hook, le SEUL code de silence interne (3) devient 0 à la frontière du
+# harness — une TRADUCTION, jamais un masquage : elle ne touche ni le code d'erreur d'argument
+# (64), ni 0, ni aucun autre code. Sans --hook (CLI, suites de tests), le code reçu ressort
+# inchangé — c'est ce qui garde rc=3 vrai pour tout appelant manuel. Voir
+# docs/HOOKS-CONTRAT-SORTIE.md §2 pour le contrat complet.
+hook_exit() { # <code>
+  local code="$1"
+  if [ "$HOOK" -eq 1 ] && [ "$code" -eq 3 ]; then
+    exit 0
+  fi
+  exit "$code"
+}
 
 PLANNING_DIR="${VF_BOOTSTRAP_PLANNING_DIR:-$ROOT/.planning}"
 
@@ -272,7 +290,7 @@ HAS_PLANNING=0
 # --- État 0 — ni code source ni .planning/ : silence total, exit 3 ---------------------------
 if [ "$HAS_SOURCE" -eq 0 ] && [ "$HAS_PLANNING" -eq 0 ]; then
   say "ni code source ni $PLANNING_DIR — rien à signaler."
-  exit 3
+  hook_exit 3
 fi
 
 # --- État 1 — code source présent, .planning/ absent : signal [onboard], exit 0 --------------
@@ -316,12 +334,12 @@ if [ -f "$PLANNING_DIR/PROJECT.md" ]; then
   if ws_readable "$PLANNING_SCOPE/STATE.md" && OUT="$(state3_signal "$PLANNING_SCOPE/STATE.md")"; then
     say "projet complètement cadré — orientation gsd-engine."
     printf '%s\n' "$OUT"
-    exit 3
+    hook_exit 3
   fi
   say "frontmatter de $PLANNING_SCOPE/STATE.md illisible ou invalide — silence (D-04)."
-  exit 3
+  hook_exit 3
 fi
 
 # --- .planning/ présent sans PROJECT.md : aucun des 4 états ne matche, rien à inventer -------
 say "$PLANNING_DIR présent sans PROJECT.md — aucun état connu, rien à signaler."
-exit 3
+hook_exit 3
