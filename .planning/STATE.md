@@ -1,19 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: aucun
-milestone_name: agentique-v1.0 clos le 2026-08-15 — prochain milestone à cadrer (/gsd-new-milestone)
-current_phase: 28
-current_phase_name: Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur
-status: "Milestone agentique-v1.0 clos - phases 18 et 25 reportees - next a cadrer"
-stopped_at: "Phase 28 shippée et releasée (PR #42 → `8616224`, tag v2.52.0 + release GitHub, CI main 4/4 verte sur `f50b226`). Phase 29 shippée le même jour (PR #41, v2.51.0). Restent non planifiées : phases 18 et 25. Champs remis d'aplomb le 2026-08-15 sur mesure disque (dérive héritée signalée depuis la mission 28)."
-last_updated: "2026-08-15T17:11:29.000Z"
+milestone: fiabilite-v1.0
+milestone_name: Fiabilité — ce qui survit
+status: planning
+last_updated: "2026-08-15T17:37:46.094Z"
 last_activity: 2026-08-15
 progress:
-  total_phases: 29
-  completed_phases: 27
-  total_plans: 105
-  completed_plans: 91
-last_activity_desc: "Synchro planning post-release : Phase 28 shippee et releasee (PR #42, tag v2.52.0, release GitHub, CI main verte sur f50b226), Phase 29 shippee via PR #41 (v2.51.0). ROADMAP : entrees 28 et 29 ajoutees a la liste des phases (elles n y figuraient pas), 3 plans de la 28 coches. STATE : champs herites remis d aplomb sur mesure disque (current_phase 18->28, compteurs 95/71 -> 105/91 par find PLAN/SUMMARY, total_phases 29, completed 27 - seules 18 et 25 restent non planifiees), stopped_at et Current Position reecrits au present."
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -55,228 +52,10 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 ## Current Position
 
-**Phase 28 — SHIPPÉE ET RELEASÉE le 2026-08-15** (PR #42 squash-mergée → `8616224`, complétée par
-`f50b226` ; tag annoté `v2.52.0` + release GitHub, `check-release-tag --remote` ✓, CI main 4/4
-verte). Les 3 plans exécutés et vérifiés **GOAL ACHIEVED** : `28-01` (règle 4 + 4bis, registre
-`vf-requires:`/`# vf-provides:`, cas #38 rejoué), `28-02` (expansion MCP, bornes d'en-tête),
-`28-03` (job CI `lab-frais-arme`, *as-installed testing*, checkpoint D-04 rendu par Samuel =
-`second-job-9-modules` ; trou `ARM_LINE` mono-slot fermé sur arbitrage humain). La PR portait
-aussi le chantier mémoire (consolidator scope user, release v2.52.0) et 2 réparations de
-régressions du squash #41 (status STATE hors liste blanche D-04 ; pins SHA de
-`test-check-map-drift.sh` → fixtures committées). Les deux points signalés à la planification
-(parse de `28-CONTEXT.md`, dépassement D-04) sont **soldés** — voir `28-ARBITRAGES.md` et le
-rapport de mission `.planning/missions/2026-08-10-phase-28-planification.md`.
-
-**Prochaines candidates** : phases 18 et 25, jamais planifiées. Le ré-armement
-`isolation: worktree` reste fermé tant qu'`open-gsd/gsd-core#3302` n'est pas levée.
-
----
-
-Phase: 18 — Survie du ledger d'exigences à la clôture de jalon
-(arbitrage Samuel, `.planning/missions/2026-07-31-delta-gsd-core-1.9.0.md`) : pas de
-`gsd-discuss-phase` séparé, périmètre exhaustif directement dérivé du digest de mission. 5 plans :
-21-01 — défaut MCP actif corrigé (`inject-mcp-tools.sh` découvre le scope global MCP,
-`~/.claude.json`, plus seulement `./.mcp.json`), WINDOWS #4 clos ; 21-02 — les trois contrats amont
-(`estimate:`/`actuals:` relayés verbatim par `vf-coder`/`vf-dev-manager`, ADR-061 tranchant la
-disjonction lanes de revue cross-AI amont / étage de revue de code ADR-060, hypothèse datée sur le
-dispatch nommé dans `team-kernel.md`) ; 21-03 — purge de la dette de version figée 1.8.0 → 1.9.0
-(6 fichiers, cas 8 de `test-check-gsd-engine.sh` déplacé avec le texte qu'il vérifie, preuve par
-mutation) et ADR-062 (les 2 hooks 1.9.0 non câblés confrontés séparément à leur contrat
-d'activation — absence correcte dans les deux cas, `merge-hooks.sh` non modifié) ; 21-04 —
-`check-state-integrity.sh` (gate anti-régression du frontmatter de ce fichier, module `conductor`
-v1.18.0) et ADR-063 (arbitrage de l'anomalie d'agrégation ci-dessous : dette d'artefact locale
-doublée d'un vrai bug amont non scopé sur l'extraction `Phase`, cause de ce même correctif de
-mise en forme du corps de ce fichier) ; 21-05 — clôture de gouvernance : CI remise au vert
-(compteur de suites 44→45, `.planning/WINDOWS.md` recalé), `dev-orchestrator` bumpé v2.9.0,
-`planning-core` v2.5.3, `.planning/ROADMAP.md` §Phase 21 recalé (5/5 plans, Requirements
-tranchés), les 4 warnings de `21-VERIFICATION.md` traités (`check-state-integrity.sh` câblé au
-job `gates` de la CI, ADR-063 25 cas, `team-kernel.md` porte le recoupement #1995/#2608,
-`inject-mcp-tools.sh` nomme `--force` sur le rc=3 mode fichier unique), release racine v2.45.0
-préparée en commits locaux (jamais taguée).
-Status: Phase 27 shipped — PR #35
-Last activity: 2026-08-10
-
-**Anomalie d'agrégation instruite (ADR-063).** Le commentaire YAML du frontmatter ci-dessus daté du
-2026-07-31 signalait une régression silencieuse de `completed_phases`/`total_plans`/
-`completed_plans` et un `current_phase` resté figé après la clôture de la Phase 20. Diagnostic établi
-sur pièce dans `@opengsd/gsd-core` 1.9.0 : Cause A (dette d'artefact locale — `buildStateFrontmatter`
-n'a pas le repli ROADMAP que `roadmap analyze` a, les Phases 11/12/13/14 shippées sans `SUMMARY.md`
-le révèlent) et Cause B (vrai bug amont — `stateExtractField(body, 'Phase')` prend le premier
-`^Phase:` du corps entier sans scope, alors que la même fonction scope `Stopped At`/`Paused At` à
-`## Session`). Remédiation : aucun patch du paquet tiers ; `check-state-integrity.sh` garde les deux
-invariants (compteurs non régressés au sein d'un même jalon, une seule ligne `^Phase:` dans ce
-fichier) ; convention d'archivage posée ici même (`**Phase archivée :**` au lieu de `Phase:` pour
-toute section non courante) ; interdiction documentée d'invoquer `gsd-tools state` pour « réparer »
-ce fichier (force `resync: true`, régénérerait la régression) ; signalement amont rédigé pour les
-deux points de la Cause B, dépôt réservé à validation humaine. Le backfill des ~20 `SUMMARY.md`
-manquants (Cause A) n'est **pas tranché** — remonté à Samuel avec son coût (ADR-063 §Décision).
-
----
-
-**Phase archivée :** 19 **complète — vérifiée et shippée `v2.43.0`** (tag annoté + release GitHub, `check-release-tag --remote` ✓)
-Migration du moteur GSD pilotée par `/vf-update`. Livrée en mission d'équipe le 2026-07-28, en
-autonomie complète (DAG à 5 nœuds, `.planning/missions/dag-phase19.json` : n1 plan · n2 exécution ·
-n3 gate portabilité · n4 audit sécurité/infra · n5 clôture, avec **un `reopen` unique** de n2 après
-la vérification goal-backward). Cadrage préalable non refait (`19-CONTEXT.md`, 6 arbitrages tranchés
-par Samuel en conversation). Livré : `check-gsd-engine.sh` (3 états `absent`/`legacy`/`gsd-core`,
-exits 0/2/3, suite dédiée 15 cas), `ensure-deps.sh` (détecteur à 3 valeurs, fin du `skip` sur legacy,
-chemin `--migrate-engine` chaîné sur la ré-injection MCP, message de nettoyage exact et atteignable),
-`inject-mcp-tools.sh --verify`, `vf-update/SKILL.md` (diagnostic à deux volets, ligne de confirmation
-moteur indépendante, §Garde-fous réécrit), **ADR-058**. Modules `dev-orchestrator` **v2.7.0** et
-`conductor` **v1.16.0** (premier cas à deux modules bumpés dans la même phase).
-Status: Shippée (v2.43.0).
-Last activity: 2026-07-28 (clôture Phase 19 + release v2.43.0)
-
-**Verdict `19-VERIFICATION.md` : PASS, 6/7 critères.** SC2 reste `PRESENT_BEHAVIOR_UNVERIFIED` — le
-volet moteur du skill est présent et son contrat d'exit prouvé, mais c'est du **comportement d'agent**
-non éprouvable par test. **Recette humaine en attente** : parcours `/vf-update` sur un poste legacy,
-acceptation **puis** refus de la ligne moteur.
-
-**Le défaut que trois étages ont laissé passer — à retenir.** Revue de code (PASS), gate de
-portabilité (macOS + Ubuntu 24.04 + Debian 12, tout vert) et audit sécurité (6/6 angles PASS) ont
-tous validé un garde-fou **inerte** : `patch_gsd_executor_mcp()` appelait `inject-mcp-tools.sh
---verify` **sans `--force`**, alors que l'injection juste au-dessus le passait (obligatoire —
-`gsd-executor.md` ne porte pas `vf-mcp-consumer`). La cible était donc systématiquement écartée : le
-verdict sortait **toujours en 3**, jamais 0 « conforme » ni 1 « serveur manquant », et un `ERROR`
-bruyant tombait à chaque bootstrap sur tout lab sans `.mcp.json`. Seul le vérificateur goal-backward
-l'a vu, **en mutant le bloc livré** : sa suppression complète laissait la suite à 73 OK / 0 KO.
-Deux causes nommables : le compte rendu prouvait une **présence** (`grep -c 'verify' → 7`) et non un
-comportement ; les tests exerçaient `--force --verify`, **une forme que la production n'émettait
-jamais**. Corrigé (`94587c5`) avec contrat de relais F13 explicite (seul `rc=1` alarme, `rc=3` =
-INDÉTERMINÉ informatif) et cas **T2m** qui exerce le chaînage réel — létal sur 3 mutations.
-
-**Dette inscrite à `CONCERNS.md`** (commit `164ff35`) : la sonde cross-module `conductor` →
-`dev-orchestrator` s'éteindrait **sans aucun signal** si l'engine cessait de matérialiser les scripts
-de tous les modules à plat dans le même `.claude/scripts/`. Le silence sur script absent est voulu
-(un lab content/growth ne doit rien voir), mais il rend le mode dégradé indiscernable du nominal —
-même famille que le trou que cette phase vient de fermer. Risque auto-documenté en ADR-058.
-
-**Release `v2.43.0` PUBLIÉE** le 2026-07-28 (commit `70c5720`, tag annoté poussé, release GitHub,
-`check-release-tag.sh --remote` → ✓). Le compteur « N suites » des 2 README racine a été rattrapé
-dans le même commit (41 → **42**), comme prévu : `check-version-sync.sh` est repassé ✓ avant le tag.
-Gates rejoués avant release : **42 suites vertes**, `check-agents --strict` ✓ sur les 6 dossiers
-d'agents, 17 triades par module ✓.
-
-**Reste en attente — recette humaine de SC2** : le volet moteur du skill est présent et son contrat
-d'exit prouvé, mais c'est du **comportement d'agent** non éprouvable par test. À recetter : parcours
-`/vf-update` sur un poste legacy, **acceptation PUIS refus** de la ligne moteur.
-
----
-
-**Phase archivée :** 17 **complète — vérifiée et shippée `v2.42.0`** (tag annoté + release GitHub)
-<!-- Corrigé le 2026-07-28 : cette section affirmait encore « release racine en attente (VERSION
-     intouchée : 2.41.0) » alors que v2.42.0 était publiée depuis le matin. Contradiction interne
-     avec le §Current focus du même fichier, qui a fait conclure à tort à vf-dev-manager qu'il
-     restait DEUX phases non shippées (17 et 19). Vérifié sur pièce avant la release v2.43.0 :
-     `git show v2.42.0:plugin/dev-orchestrator/scripts/check-doc-drift.sh` répond — la Phase 17
-     est bien dans le tag. Une section de phase datée ne doit jamais contredire le focus courant. -->
-Signaux de démarrage du moteur de dev. Livrée en mission d'équipe (DAG à 5 nœuds : n1 cadrage+plan ·
-n2 exécution · n3 gate portabilité · n4 audit advisory/read-only · un `reopen` unique après fusion des
-deux juges · n5 clôture, `.planning/missions/dag-phase17.json`). Livré : `check-dev-bootstrap.sh`
-(continuum à 4 états), `check-doc-drift.sh`, `discover-unintegrated-docs.sh --hook`,
-`hooks/hooks.json`, section *Signaux de démarrage* dans `AGENT.md`, 2 nouvelles suites de tests.
-Module `dev-orchestrator` **v2.6.0** (collision de version résolue : la Phase 16 concurrente avait
-déjà pris v2.5.0, cible ajustée à v2.6.0 — commit `5a8b6a8`).
-Status: Shippée (v2.42.0).
-Last activity: 2026-07-28 (clôture Phase 17)
-
-**SC5 (advisory / lecture seule) — CONFORME.** Prouvé par exécution, pas par lecture : lecture seule
-OUI (seul `mktemp` de `discover-unintegrated-docs.sh:91-93`, apparié au `trap ... EXIT` ligne 94, borné
-à `$TMPDIR`) · aucun `exit 1` OUI (seuls 0/3/64 ; `set -uo pipefail`, pas de `set -e`) · aucun blocage
-de tour OUI (`hooks.json` = un seul groupe `SessionStart`, 3 commandes chacune suffixée `|| true`,
-aucun `Stop`/`PreToolUse`). Robustesse : 5 fixtures de frontmatter hostiles (injection shell, octet de
-contrôle 0x01, délimiteur tronqué, `$(whoami)`) → stdout VIDE et exit 3 dans les 5 cas ; `node_modules`
-de 20 000 fichiers → 0.007s (élagage `-prune` confirmé) ; hors dépôt git sur chemin à espace/UTF-8 →
-silence propre. Toutes les menaces `high` du threat model closes.
-
-**SC6 (portabilité macOS ET Linux) — PROUVÉ.** Compteurs **identiques** sur trois environnements :
-macOS bash 3.2.57, Debian 12 bash 5.2.15, Ubuntu 24.04 bash 5.2.21 (OS exact de
-`runs-on: ubuntu-latest`) → `test-check-dev-bootstrap.sh` 23 ok/0 ko · `test-check-doc-drift.sh` 21
-ok/0 ko · `test-discover-unintegrated-docs.sh` 22 ok/0 ko. Aucun test sauté silencieusement. Zéro
-piège BSD/GNU trouvé. Aucun edit de `ci.yml` nécessaire.
-
-**Comblement post-exécution** (commit `6e33b14`, après fusion des verdicts n3/n4) : cas 7 de
-`test-discover-unintegrated-docs.sh` rendu discriminant (il était tautologique : vert avec ou sans le
-filtre glob — prouvé par mutation, 21 ok/1 ko après retrait du filtre) ; boucle T21 de
-`test-dev-orchestrator.sh` élargie à `discover-unintegrated-docs.sh`, seul des 3 scripts à utiliser
-`mktemp`.
-
-**Deux dettes inscrites à `CONCERNS.md`** (constatées pendant la mission, pas corrigées — hors
-mandat de clôture) : le verrou de driver n'empêche techniquement rien (déclaratif, pas contraignant —
-la Phase 16 a continué à commiter pendant que la Phase 17 tenait le verrou) ; le gate ADR-044 est un
-faux vert dans son invocation nue prescrite par la spec (`check-agents.sh` sans argument sort exit 0
-sans rien vérifier, `.claude/agents` étant absent de ce repo).
-
-**Réservé à validation humaine** : release de clôture (bump `VERSION`/`plugin.json`/`marketplace.json`
-
-+ historique des 2 README, tag annoté poussé, release GitHub, `check-release-tag.sh --remote` → ✓).
-
-Pré-requis identifié : `scripts/check-version-sync.sh` est actuellement **rouge** — `README.md` et
-`README.fr.md` annoncent « 39 suites » contre 41 réelles (les 2 suites ajoutées par cette phase), à
-corriger avant tout bump.
-
----
-
-**Phase archivée :** 16 **complète — shippée `v2.41.0`** (tag annoté + release GitHub, `check-release-tag --remote` ✓)
-Cloisonnement complet des dispatches. Livrée en mission d'équipe le 2026-07-27, en autonomie complète
-(cadrage rétroactif, aucun checkpoint humain). **4/4 Success Criteria tenus**, SC3 amendé (voir plus
-bas). Suites rejouées à la main avant release : 58 check-agents · 51 dev · 12 design ·
-`check-version-sync` ✓ · 6/6 modules `--strict` exit 0 · 6/6 en monde fermé (`--resolve-agents=strict`,
-le job CI). Modules : `conductor` v1.15.0 · `dev-orchestrator` v2.5.0.
-Status: Shippée.
-Last activity: 2026-07-27 (mission d'équipe Phase 16 + release v2.41.0)
-
-**Amendement SC3 — une allowlist `Agent(...)` n'est pas un sandbox runtime.** Découverte de la
-mission, doc officielle citée verbatim dans l'en-tête de `check-agents.sh` : le runtime **ignore** la
-liste de noms entre parenthèses dans la définition d'un sous-agent ; seule la présence de
-`Agent`/`Task` dans `tools:` compte pour lui. L'allowlist n'est une vraie restriction runtime que
-pour un agent incarné en thread principal (`claude --agent`). Elle reste donc un **contrat documenté,
-enforcé par le lint et par lui seul** — ce qui vaut rétroactivement pour les allowlists des deux
-managers posées en Phase 15. Le cloisonnement est réel, mais c'est un gate machine, pas un bac à sable.
-
-**Deux dettes fermées** (retirées de `CONCERNS.md`) : accès `Agent` non scopé des 3 workers, et
-`check-agents --strict` sans périmètre tiers (les 66 faux positifs du scope user, réglés par
-`--third-party-prefix` et vérifiés empiriquement sur `~/.claude/agents`).
-
-**Incident de concurrence à traiter — verrou de driver expiré en cours de mission.** Le TTL est de
-30 min ; plusieurs workers ont tourné 10 à 22 min et les heartbeats du manager étaient placés *entre*
-les frontières de dispatch, jamais pendant. Le lock a expiré, la session concurrente (Phase 17) l'a
-récupéré, et le `release` final du manager Phase 16 a rendu `not-owner`. **Deux managers ont donc
-tourné en parallèle** — sans dégât ici parce que les périmètres étaient disjoints, mais par chance,
-pas par construction. L'invariant « un seul driver » n'est pas tenu face à des workers plus longs que
-le TTL. À instruire (candidat phase ou correctif kernel : heartbeat pendant l'attente d'un worker,
-ou TTL indexé sur la durée réelle des dispatches).
-
----
-
-**Phase archivée :** 13 **complète — shippée `v2.37.0`** — milestone vf-routing CLOS
-Plans: 13-01 ✅ (découverte outillée, BRDG-02) · 13-02 ✅ (câblage agent, BRDG-01/BRDG-03).
-Vérification goal-backward **PASS** (`13-VERIFICATION.md`) : 4/4 critères dans le mandat, 3/3 BRDG,
-22/22 must-haves, 0 blocker. Suites : 16 ok · 30 OK/0 KO · 10 OK · check-agents ✓ · check-version-sync ✓.
-Module `dev-orchestrator` bumpé **v2.2.0** ; `VERSION` racine volontairement **intouchée** (v2.36.2).
-Status: Milestone clos — release `v2.37.0` publiée et taggée le 2026-07-26.
-Last activity: 2026-07-26 (mission d'équipe : exécution complète de la Phase 13)
-
-**Phases 12 et 14 livrées et publiées sur `main`** :
-
-- Phase 12 (Routage fin & verbes `/vf-*`) — 6/6 plans · release **`v2.31.0`**. Livrait 31 verbes et la
-  rule de préséance ; **la façade `/vf-*` a été supprimée depuis en v2.33.0** (bascule agentique, spec
-  `2026-07-25-suppression-facade-vf-design.md`) — subsistent la carte d'intention unique de
-  `vibeflow-dev` et les skills `vf-auto` / `vf-dev`.
-
-- Phase 14 (Frontière d'altitude `planning-core` / moteur GSD) — 7/7 plans · release **`v2.30.0`** ·
-  **ADR-055** (renuméroté au merge : `ADR-054` était déjà pris par la portabilité Windows publiée en
-  v2.29.0). 92 assertions vertes.
-
-**Depuis la clôture des phases 12/14, 5 releases hors milestone** (v2.32.0 → v2.36.1) : enforcement CI,
-bascule agentique, team-kernel transverse, 3 bundles métier matérialisés, recettes UAT, refonte README.
-Versions modules au 2026-07-26 : dev-orchestrator v2.1.1 · design-orchestrator v1.2.1 ·
-conductor v1.14.1 · planning-core v2.5.1 · consolidator v1.8.0.
-
-Milestone `gsd-migration` (Phases 10-11) reste ouvert et **en attente** — chantier indépendant, non bloquant.
-Milestone précédent memory-swarm-rnd **SHIPPÉ v2.28.0** (ADR-052 mémoire vivante + ADR-053 swarm).
-
-Progress: [██████░░░░] 59%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-08-15 — Milestone fiabilite-v1.0 started
 
 ## Performance Metrics
 
@@ -322,6 +101,7 @@ Progress: [██████░░░░] 59%
   verrouillé D-01/D-02/D-03, zones grises en Claude's Discretion), DISCUSSION-LOG.md en trace.
   Prochain geste : plan (researcher → planner → checker) puis **exécution complète via
   `vf-dev-manager`** (demande explicite de Samuel, session du 2026-08-15).
+
 - 2026-08-15 : **Phase 29 ajoutée — « Distiller les gains ICM (G1-G5) — investigation dag.sh
   --scope d'abord »**, issue de la deep-search ICM du même jour
   (`reports/research/2026-08-15-icm-deep-search.md`, session en direct hors Phase 28). Périmètre :
@@ -330,6 +110,7 @@ Progress: [██████░░░░] 59%
   précondition transverse posée par Samuel : investiguer l'historique et les consommateurs de
   `dag.sh --scope` avant tout geste G1, **zéro régression autorisée** sur le mécanisme de scope.
   Branche dédiée `docs/phase-29-icm-gains` (la branche 28 reste vierge de tout contenu ICM).
+
 - 2026-08-10 : **Phase 28 ajoutée — « Preuve que ce qui est armé dans le plugin est armé chez
   l'utilisateur »**, ouverte par la régression #38 (13 agents distribués avec `isolation: worktree`
   alors que leur précondition `worktree.baseRef: "head"` n'était posée que dans le settings local de
@@ -338,6 +119,7 @@ Progress: [██████░░░░] 59%
   présumé dans l'entrée de roadmap. Deux corrections d'hygiène au passage : le CLI amont
   (`phase.add`) a inséré la phase **au milieu de la Phase 24** — bloc déplacé à la main en fin de
   roadmap ; et la table de suivi, arrêtée à la Phase 25, a reçu les lignes 26, 27 et 28.
+
 - 2026-08-01 : **Phase 23 plan 01 exécuté hors-bande** — mandat étroit (un seul plan sur 8) confié
   dans le worktree `vibeflow-os-p23` (branche `feat/phase-23-couplage-gsd`), sans passer par
   `gsd-execute-phase` pour la phase entière. Livré : le contrat de checkpoint amont (`gate`,

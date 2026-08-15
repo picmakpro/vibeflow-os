@@ -23,12 +23,32 @@ armement ↔ précondition distribuée (*as-installed testing*, job `lab-frais-a
 socle de mémoire par lab. Détail : `.planning/MILESTONES.md` et
 `.planning/milestones/agentique-v1.0-*`.
 
-**Next Milestone Goals** — à cadrer (`/gsd-new-milestone`). Candidats hérités : **Phase 18**
-(survie du ledger d'exigences à la clôture de jalon — la dérive qu'elle ferme a été re-constatée
-à cette clôture même), **Phase 25** (budget d'instructions et étage d'alignement court),
-durcissement du **driver-lock** (2 contournements constatés), et le **ré-armement
-`isolation: worktree`** le jour où `open-gsd/gsd-core#3302` est levée (dossier prêt dans
-`.planning/research/2026-08-10-agents-paralleles-etat-de-l-art.md` §Implications 3).
+## Current Milestone: fiabilite-v1.0 — « ce qui survit »
+
+**Goal :** fermer les dettes de gouvernance nées d'incidents réels du milestone précédent et
+rendre l'install/update digne de confiance sur toutes les plateformes — Windows en tête
+(demande client).
+
+**Target features (par priorité) :**
+- **Portabilité Windows II** — implémentation de la spec
+  `docs/superpowers/specs/2026-08-02-portabilite-windows-ii-design.md` (**prioritaire, demande
+  client**)
+- **Phase 18 héritée** — survie du ledger d'exigences à la clôture de jalon (dérive re-constatée
+  à la clôture d'agentique-v1.0)
+- **Phase 25 héritée** — budget d'instructions + étage d'alignement court
+- **Durcissement du driver-lock** — 2 contournements constatés (commit et checkout concurrents
+  sous lock)
+- **Notifications de progression des managers** — un stall silencieux de 18 h constaté
+- **Issue #20 + convergence à l'update, fusionnées** — manifeste fichier-par-fichier posé à
+  l'install, `--dry-run` avant pose (install + calibrate), suppression à l'update des chemins
+  disparus
+- **Ré-armement `isolation: worktree`** — `open-gsd/gsd-core#3302` close COMPLETED le
+  2026-08-14 ; **précondition dure** : fix releasé dans gsd-core > 1.10.0 ET installé (le gate
+  de la Phase 28 exigera cette preuve). Dossier :
+  `.planning/research/2026-08-10-agents-paralleles-etat-de-l-art.md` §Implications 3
+- **Gaps `agency-agents`** — combler les manques de couverture inspirés du catalogue
+- **Skill-installer global (multi-agents)** — item backlog de 2026-06-04, déclencheur atteint,
+  ré-arbitré ADOPTÉ le 2026-08-15
 
 ## Core Value
 
