@@ -155,6 +155,7 @@ code {
   overflow: visible;
   white-space: normal;
   text-overflow: clip;
+  overflow-wrap: anywhere;
   font-size: var(--vf-text-xl);
   font-weight: var(--vf-weight-semibold);
   line-height: var(--vf-leading-tight);
@@ -169,6 +170,13 @@ code {
   color: var(--vf-status-done);
 }
 .vf-badge-lock.vf-lock-stale {
+  /* le message de réassurance stale (§5) prime sur l'ellipsis générique du gabarit .vf-badge
+     (§4.1) : un message tronqué échoue à sa seule raison d'être. État rare et transitoire,
+     il peut s'enrouler sur plusieurs lignes — l'en-tête (min-height + flex-wrap) l'encaisse. */
+  max-width: none;
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
   background: var(--vf-status-stale-bg);
   color: var(--vf-status-stale);
 }
@@ -533,7 +541,12 @@ section {
   font-size: var(--vf-text-sm);
 }
 .vf-historique.is-disabled { opacity: .5; }
-.vf-historique.is-disabled summary { cursor: not-allowed; }
+.vf-historique.is-disabled summary {
+  cursor: not-allowed;
+  /* aria-disabled seul n'empêche pas un <details> natif de s'ouvrir au clic (§5) : le blocage
+     réel se fait ici (souris/tactile) + par une garde JS sur `toggle` (clavier, historique.js). */
+  pointer-events: none;
+}
 
 .vf-historique-list {
   list-style: none;

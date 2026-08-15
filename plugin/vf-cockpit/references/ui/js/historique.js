@@ -1,9 +1,25 @@
 // historique.js — milestones clos, repliés par défaut (§4/§5 DESIGN-SPEC).
 import { $, el, clearNode } from './dom.js';
 
+// `aria-disabled` ne suffit pas sur un <details> natif : le clic souris est bloqué par
+// `pointer-events: none` (styles.css), mais l'activation clavier (Entrée/Espace sur <summary>
+// focalisé) déclenche quand même `toggle`. Cette garde referme immédiatement toute ouverture
+// survenue pendant que l'historique est vide, sans jamais piéger le focus.
+let toggleGuardWired = false;
+function guardDisabledToggle(det) {
+  if (toggleGuardWired) return;
+  toggleGuardWired = true;
+  det.addEventListener('toggle', () => {
+    if (det.classList.contains('is-disabled') && det.open) {
+      det.removeAttribute('open');
+    }
+  });
+}
+
 export function renderHistorique(snap) {
   const det = $('#historique-details');
   const body = $('#historique-body');
+  guardDisabledToggle(det);
   clearNode(body);
   const milestones = snap.milestones || [];
   const closed = milestones.filter((m) => m.closed);

@@ -394,6 +394,13 @@ l'en-tête doit rester lisible quelle que soit cette longueur, à toute largeur 
   `overflow: hidden`, `text-overflow: ellipsis`, `white-space: nowrap`, avec un `max-width` en
   garde-fou (`.vf-badge` : `28rem` ; `.vf-updated` : `16rem`). Ils passent à la ligne suivante
   plutôt que de forcer le milestone à céder.
+  **Exception assumée : l'état verrou périmé (`.vf-lock-stale`, §5)** échappe à cette troncature
+  générique — `max-width: none`, `overflow: visible`, `white-space: normal`. Motif : ce message
+  existe pour rassurer (« rien n'est bloqué ici ») ; à `--vf-text-xs`, `28rem` coupe le texte en
+  plein milieu avant d'atteindre cette rassurance, ce qui est pire qu'un badge absent. L'état est
+  rare et transitoire (contrairement au badge nominal, affiché en continu) : il peut se permettre
+  de s'enrouler sur plusieurs lignes, l'en-tête (`min-height` + `flex-wrap`) l'encaisse. Un
+  `title` portant le message complet reste posé en filet de sécurité (cf. `historique.js`).
 - Nom du module (`.vf-app-name`) : `flex-shrink: 0` — toujours court (`vf-cockpit`), aucune raison
   de le faire céder.
 
@@ -494,7 +501,7 @@ un panneau de lecture régulière (cf. §0, « ce qui est bruit »).
 | **Vide — pas de `.planning/`** | Toute la page laisse place à un état centré unique : icône `⌁` discrète + « Aucun dossier `.planning/` trouvé à la racine du lab. Ce cockpit visualise un projet piloté par GSD — lancez-le depuis un lab qui en a un. » Aucune section vide n'est rendue en dessous. |
 | **Erreur serveur (`/api/state` 5xx ou réseau)** | Bandeau pleine largeur en tête, fond `--vf-status-failed-bg`, texte `--vf-status-failed` : « Impossible de lire l'état du lab. Nouvelle tentative automatique… » — la dernière donnée connue reste affichée en dessous, légèrement estompée (`opacity: .55`), jamais remplacée par un écran blanc. |
 | **Hors-ligne / SSE déconnecté** | Le point de pouls du badge verrou passe en `--vf-text-tertiary` fixe (plus d'animation), et un petit texte apparaît sous l'horodatage : « connexion perdue — dernière donnée à HH:MM:SS ». `EventSource` réessaie nativement (`retry: 1000`) ; dès un message reçu, le bandeau disparaît sans rechargement de page. |
-| **Lock périmé (stale)** | Badge verrou en `--vf-status-stale`/`stale-bg`, glyphe `⚠`, texte : « verrou périmé ({age}s) — probablement une mission interrompue. Lecture seule, rien n'est bloqué ici. » Le reste de la page fonctionne normalement (dernier snapshot connu). |
+| **Lock périmé (stale)** | Badge verrou en `--vf-status-stale`/`stale-bg`, glyphe `⚠`, texte : « verrou périmé ({age}s) — probablement une mission interrompue. Lecture seule, rien n'est bloqué ici. » **Non tronqué** : cet état déroge explicitement à l'ellipsis générique du §4.1 (`.vf-lock-stale` sort du `nowrap`/`max-width` de `.vf-badge`) — un message de réassurance amputé échoue à sa seule raison d'être, et l'état est rare/transitoire, donc il peut s'enrouler sur plusieurs lignes. `title` porte le message complet en filet de sécurité. Le reste de la page fonctionne normalement (dernier snapshot connu). |
 
 ### Trajectoire (①)
 

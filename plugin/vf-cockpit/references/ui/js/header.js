@@ -29,17 +29,19 @@ export function renderLockBadge(lock) {
   b.classList.remove('vf-lock-alive', 'vf-lock-stale', 'vf-lock-empty');
   if (!lock || lock.present === false) {
     b.classList.add('vf-lock-empty');
+    b.removeAttribute('title');
     b.appendChild(document.createTextNode('🔓 aucune mission'));
     return;
   }
   if (lock.stale) {
+    const message = `verrou périmé (${lock.age_seconds ?? '?'}s) — probablement une mission interrompue. Lecture seule, rien n'est bloqué ici.`;
     b.classList.add('vf-lock-stale');
+    b.title = message; // filet de sécurité (cf. historique.js) : message complet même si le rendu venait à re-tronquer
     b.appendChild(el('span', { class: 'vf-glyph', attrs: { 'aria-hidden': 'true' }, text: '⚠' }));
-    b.appendChild(document.createTextNode(
-      ` verrou périmé (${lock.age_seconds ?? '?'}s) — probablement une mission interrompue. Lecture seule, rien n'est bloqué ici.`,
-    ));
+    b.appendChild(document.createTextNode(` ${message}`));
     return;
   }
+  b.removeAttribute('title');
   b.classList.add('vf-lock-alive');
   b.appendChild(el('span', { class: 'vf-pulse-dot' + (esConnected ? '' : ' is-static'), attrs: { 'aria-hidden': 'true' } }));
   b.appendChild(document.createTextNode(` 🔒 ${lock.owner || '?'} · ${lock.step || '?'} · ${lock.age_seconds ?? '?'}s`));
