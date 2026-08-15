@@ -74,7 +74,8 @@ dans le périmètre dev**. Rien à faire de ce côté.
 
 ### 1.2 La forme shell des hooks n'est pas portable, et la doc amont tranche
 
-Nos 22 entrées de hook sont toutes en **forme shell** — `command` est une chaîne passée à `sh -c`
+Nos 25 entrées de hook (recompte machine, cadrage Phase 30 du 2026-08-15, D-08 — voir
+`docs/HOOKS-CONTRAT-SORTIE.md`) sont toutes en **forme shell** — `command` est une chaîne passée à `sh -c`
 (ou Git Bash / PowerShell sous Windows). La documentation Claude Code décrit une seconde forme,
 **exec** : quand `args` est présent, `command` est résolu comme exécutable et lancé directement avec
 `args` comme vecteur d'arguments, **sans shell**. Elle la **recommande explicitement pour les
@@ -112,7 +113,7 @@ porte des hooks doublés et un module non retirable, sans message d'erreur.
 
 ### 1.4 `|| true` porte l'advisory, et il n'existe pas en forme exec
 
-17 de nos 22 entrées se terminent par `|| true` — une construction **shell**, inexprimable en forme
+20 de nos 25 entrées se terminent par `|| true` — une construction **shell**, inexprimable en forme
 exec par définition (pas de shell). Or ce `|| true` est ce qui rend les signaux *advisory* au sens
 d'ADR-031 : un hook qui échoue ne doit jamais bloquer ni polluer la session.
 
@@ -263,7 +264,7 @@ cherche à éviter.
 
 ### 3.3 Codes de sortie des scripts de hook
 
-Inventaire des 22 entrées, puis normalisation : **0 sur le cas silencieux**, code non nul réservé
+Inventaire des 25 entrées (D-08, `docs/HOOKS-CONTRAT-SORTIE.md`), puis normalisation : **0 sur le cas silencieux**, code non nul réservé
 aux vraies erreurs. Le contrat de signaux de la Phase 17 (exit 3 = silence) reste valide **en interne**
 au script ; c'est sa **traduction vers le harness** qui change, puisque `|| true` disparaît.
 
@@ -273,26 +274,28 @@ inchangés et reste testable, mais réintroduit un niveau d'indirection sous Win
 
 ### 3.4 Les `hooks.json`
 
-Recensement complet du dépôt — **22 entrées sur 6 modules, 17 portant `|| true`** :
+Recensement complet du dépôt, **recompté à la machine au cadrage de la Phase 30 (D-08,
+`docs/HOOKS-CONTRAT-SORTIE.md`)** — les chiffres ci-dessous remplacent le décompte périmé de la
+rédaction initiale de cette spec : **25 entrées sur 6 modules, 20 portant `|| true`** :
 
 | Module | Entrées | dont `|| true` | Événements | Polarité |
 |---|---|---|---|---|
 | `planning-core` | 6 | 5 | SessionStart, UserPromptSubmit, Stop | gouvernance |
-| `consolidator` | 6 | 4 | PreToolUse, PostToolUse, SessionStart, SessionEnd | gouvernance |
-| `conductor` | 5 | 4 | PreToolUse, SessionStart | gouvernance |
-| **`dev-orchestrator`** | **3** | **3** | SessionStart | **dev (§7)** |
+| `consolidator` | 7 | 5 | PreToolUse, PostToolUse, SessionStart, SessionEnd | gouvernance |
+| `conductor` | 6 | 5 | PreToolUse, SessionStart | gouvernance |
+| **`dev-orchestrator`** | **4** | **4** | SessionStart | **dev (§7)** |
 | `infrastructure-audit` | 1 | 1 | SessionStart | gouvernance |
 | **`software-architecture`** | **1** | **0** | PreToolUse | **dev (§7)** |
 
-**Périmètre de cette phase : 4 entrées sur 2 modules.** `software-architecture` est le cas le plus
+**Périmètre de cette phase : 5 entrées sur 2 modules.** `software-architecture` est le cas le plus
 simple — une entrée, pas de `|| true`, garde `PreToolUse` : **candidat naturel au tracer-first**.
 
 Le contrat §7 ajoute une exigence que la forme exec ne porte pas d'elle-même : **classer chaque
-entrée `advisory` ou `bloquante`, explicitement**. Pour les trois entrées `SessionStart` de
+entrée `advisory` ou `bloquante`, explicitement**. Pour les quatre entrées `SessionStart` de
 `dev-orchestrator`, c'est directement le §1.4 — elles sont advisory par ADR-031, et leur exit 3 doit
 être traduit avant que `|| true` ne disparaisse.
 
-**Les 18 entrées de la polarité gouvernance dépendent du même moteur.** Que le trou d'affectation du
+**Les 20 entrées de la polarité gouvernance dépendent du même moteur.** Que le trou d'affectation du
 §3.2 soit comblé ou non les concerne autant que nous : si `merge-hooks.sh` n'apprend pas `args`,
 c'est tout le parc qui casse, pas seulement les labs ayant `software-architecture`.
 
@@ -346,8 +349,8 @@ VF résiduelle, zéro entrée tierce touchée.
 1. Les **3 fichiers du périmètre dev** (§1.1) ont rejoint la cascade `vf_python` : plus aucune
    résolution locale, bloc localisateur reproduit entre marqueurs, somme de contrôle identique à
    celle des autres consommateurs du dépôt.
-2. Les **4 entrées de hook du périmètre dev** sont en forme exec, chacune classée `advisory` ou
-   `bloquante` explicitement, et **aucune** ne dépend d'une construction shell.
+2. Les **5 entrées de hook du périmètre dev** (recompte D-08) sont en forme exec, chacune classée
+   `advisory` ou `bloquante` explicitement, et **aucune** ne dépend d'une construction shell.
 3. Un `install` puis un `update` puis un `remove` sur un `settings.json` portant l'**ancienne** forme
    laisse zéro entrée VF résiduelle et zéro entrée tierce modifiée — prouvé par la sonde de parc §4.
 4. Aucun hook n'écrit `{{VF_SCRIPTS}}` littéral dans un `settings.json`.
