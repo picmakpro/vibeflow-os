@@ -237,7 +237,8 @@
 # exactement sur fs ou sur path, jamais sur un chemin construit depuis le dossier du moteur
 # (T-23-02-07). Les deux sont vérifiés par la suite dédiée.
 #
-# Exit codes (contrat interne, s'applique SANS --hook) :
+# Exit codes:
+#   Contrat interne, ci-dessous — s'applique SANS --hook.
 #   0  = au moins un signal [gsd-config] émis — clés inconnues, toggles non écrits, OU moteur lu
 #        mais illisible (« gate périmé », arbitrage A-9 : ce cas PARLE, il ne se tait plus en 3)
 #   3  = rien à signaler (fichier audité absent ou illisible, JSON invalide, moteur introuvable,
