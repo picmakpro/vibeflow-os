@@ -70,7 +70,6 @@ async function refresh() {
     $('#log-link').textContent = `voir le journal (${logCount} événements)`;
     lastSnapshot = snap;
     markGoodFetch();
-    document.body.classList.remove('vf-booting');
     markFirstRenderDone();
   } catch {
     setErrorBanner(true);
