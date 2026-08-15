@@ -10,8 +10,8 @@ chunks relatifs et casserait le hors-ligne (constaté empiriquement au nœud de 
 
 Contrat de données de référence (spike 001, validé) : `GET /api/state` → `{generatedAt, state,
 phases[], milestones[], dags[], lock}` ; `GET /api/phase?num=N` → `{num, name, goal, body, dir,
-plans[]}` ; `GET /api/log` → `{count, events[]}` ; `GET /events` → SSE `{reason, at}`. Cette spec
-n'affiche rien que ce contrat ne fournit pas.
+plans[]}` ; `GET /api/log` → `{count, events[]}` ; `GET /api/events` → SSE `{reason, at}`. Cette
+spec n'affiche rien que ce contrat ne fournit pas.
 
 Il n'existe pas de `DESIGN.md` lab-wide : la DA ci-dessous est scopée au module `vf-cockpit`
 (décision actée au MANIFEST du spike : « DA sombre simple type cockpit »).
@@ -356,7 +356,9 @@ compactes du niveau ①, en `aria-label` si la place manque visuellement).
 ### 4.1 En-tête / barre d'état
 
 Anatomie : `<header>` sticky (`position: sticky; top: 0; z-index: 5`), fond `--vf-surface-1` avec
-`border-bottom: 1px solid var(--vf-border)`, hauteur `56px`, padding horizontal `--vf-space-5`.
+`border-bottom: 1px solid var(--vf-border)`, `min-height: 56px` (jamais `height` fixe — le contenu
+vient de fichiers utilisateur sans borne de longueur garantie, cf. stratégie anti-débordement
+ci-dessous), padding horizontal `--vf-space-5`.
 
 Contenu, de gauche à droite :
 1. Nom du module (`vf-cockpit`), `--vf-text-md`, `--vf-weight-semibold`, discret — ce n'est pas
@@ -375,8 +377,25 @@ Contenu, de gauche à droite :
    un libellé lisible, même discret).
 
 Dimensions : badge verrou en `--vf-text-xs`, hauteur de ligne `1.4` ; badge milestone en
-`--vf-text-xl` (seul élément de l'en-tête à ce corps, cf. §2.3) — jamais tronqués (le nom du
-milestone peut passer à la ligne suivante sous 640px, cf. §7).
+`--vf-text-xl` (seul élément de l'en-tête à ce corps, cf. §2.3).
+
+**Stratégie anti-débordement (défensive, indépendante de la largeur réelle du texte)** : le nom du
+milestone et l'`owner`/`step` du verrou viennent de fichiers `.planning/` sans borne de longueur —
+l'en-tête doit rester lisible quelle que soit cette longueur, à toute largeur de viewport :
+
+- `.vf-header` en `flex-wrap: wrap` (toujours, pas seulement sous 767px) avec `min-height: 56px` :
+  le contenu ne peut jamais être écrasé, un débordement se résout par un passage à la ligne, jamais
+  par un clip silencieux.
+- Le badge milestone (`.vf-badge-milestone`) est l'élément **dominant** : `flex: 1 1 auto`, jamais
+  tronqué, jamais rétréci pour faire de la place — c'est lui qui reçoit l'espace disponible en
+  priorité, et son propre texte peut s'enrouler sur plusieurs lignes si nécessaire (pas de
+  `white-space: nowrap` dessus).
+- Les éléments secondaires (badge verrou, horodatage) cèdent en premier : `min-width: 0`,
+  `overflow: hidden`, `text-overflow: ellipsis`, `white-space: nowrap`, avec un `max-width` en
+  garde-fou (`.vf-badge` : `28rem` ; `.vf-updated` : `16rem`). Ils passent à la ligne suivante
+  plutôt que de forcer le milestone à céder.
+- Nom du module (`.vf-app-name`) : `flex-shrink: 0` — toujours court (`vf-cockpit`), aucune raison
+  de le faire céder.
 
 ### 4.2 Carte de phase (niveau ① — chip de Trajectoire)
 
@@ -571,10 +590,18 @@ fenêtre partagée à ~1024px et en fenêtre étroite (moitié d'écran sur un 1
 | Rupture | Comportement |
 |---|---|
 | `≥ 1280px` | Layout de référence (§1). Colonne unique `max-width: 76rem` centrée, niveau ③ en deux colonnes (SVG + liste). |
-| `1024–1279px` | Identique, `max-width` fluide (`100% - 2 × padding`). Aucun réagencement structurel. |
+| `1024–1279px` | Identique, `max-width` fluide (`100% - 2 × padding`). Aucun réagencement structurel des sections ①②③. |
 | `768–1023px` | Le niveau ③ passe en une colonne (`grid-template-columns: 1fr`) : SVG Mermaid au-dessus, liste accessible en dessous, dans cet ordre pour préserver la lecture visuelle avant le détail textuel. Les chips de la Trajectoire restent en rangée avec `flex-wrap: wrap`. |
-| `640–767px` | En-tête passe en deux lignes (`flex-wrap: wrap`) : ligne 1 = nom du module + badge verrou, ligne 2 = badge milestone + horodatage. Le drawer perd son overlay de fond (occupe déjà l'essentiel de la largeur) et sa largeur passe à `100vw`. |
+| `640–767px` | Le drawer perd son overlay de fond (occupe déjà l'essentiel de la largeur) et sa largeur passe à `100vw`. |
 | `< 640px` | Les chips de phase passent enétiquette compacte (numéro + glyphe seuls, nom complet en `title=`/`aria-label`) pour éviter le débordement horizontal ; le connecteur `→` devient vertical (`↓`) et la chaîne se lit de haut en bas. |
+
+L'en-tête (§4.1) suit sa propre logique, indépendante de ces ruptures : `flex-wrap` est actif à
+**toute** largeur (défense contre un milestone ou un `owner` de verrou arbitrairement long, pas
+seulement en mobile) — badge milestone dominant et jamais tronqué, badge verrou et horodatage en
+troncature `ellipsis` puis passage à la ligne si l'espace manque encore. En pratique, aux largeurs
+de développeur (`≥ 1024px`) l'en-tête tient sur une ligne avec les données réelles observées ; sous
+`767px` il se répartit naturellement sur plusieurs lignes par ce même mécanisme, sans règle dédiée
+à cette rupture.
 
 Aucune media query ne change les tokens de couleur ou de statut : seule la mise en page réagit,
 jamais la palette (pas de « mode clair forcé mobile »).
