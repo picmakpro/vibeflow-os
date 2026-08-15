@@ -1,5 +1,35 @@
 # Backlog — idées différées (hors milestone courant)
 
+## Investiguer ICM (Interpretable Context Methodology) — « folder structure as agent architecture »
+**Capturé :** 2026-08-15 · **À explorer :** lecture du papier + confrontation à l'architecture VibeFlow
+
+ICM remplace l'orchestration au niveau framework par la **structure du filesystem** : des dossiers
+numérotés représentent les étapes d'un workflow, des fichiers markdown portent les prompts et le
+contexte qui disent à UN agent quel rôle jouer à chaque étape. Deux fichiers racine (`IDENTITY.md`,
+`CONTEXT.md`) éliminent les tours perdus en « let me explore your filesystem » ; chaque étape opère
+sous un contrat strict (inputs / process / outputs) sur une hiérarchie de contexte à 5 couches ;
+les artefacts intermédiaires inspectables SONT le canal de communication entre étapes.
+
+**Sources :**
+- Papier : [arXiv 2603.16021](https://arxiv.org/abs/2603.16021) — *Interpretable Context
+  Methodology: Folder Structure as Agent Architecture* (Van Clief & McDermott, mars 2026, étendu
+  du pattern « LLM knowledge base » de Karpathy)
+- Repo de référence : [RinDig/Interpretable-Context-Methodology](https://github.com/RinDig/Interpretable-Context-Methodology)
+- Template model-agnostic : [ktnCodes/icm-template](https://github.com/ktnCodes/icm-template)
+
+**Angle VibeFlow à investiguer :** VibeFlow fait déjà du « filesystem as architecture » de fait
+(`.planning/`, modules toggables, digests de mission, rapports typés sur disque) mais avec une
+orchestration multi-agents par-dessus (team-kernel). Questions : que valide/invalide le papier de
+notre approche ? Le contrat par étape (CONTEXT.md à 5 couches) a-t-il quelque chose à apprendre à
+nos plans de bataille / mandats ? Le modèle mono-agent + dossiers numérotés est-il un concurrent,
+un complément (labs non-dev simples ?), ou une source de patterns à distiller ?
+
+**Pourquoi différé :** pure investigation, aucun besoin bloquant ; commence par une lecture du
+papier, pas par du code.
+
+**Déclencheur de resurgence :** prochaine réflexion d'architecture sur le team-kernel, le format
+des digests de mission, ou la structure `.planning/`.
+
 ## Notifications de progression des agents managers
 **Capturé :** 2026-08-11 · **À explorer :** au prochain arbitrage d'extension du team-kernel
 
