@@ -256,7 +256,19 @@ p2_sens_b() { # <card-relpath> <card-label>
     # Comparaison sur le chemin résolu COMPLET, jamais un match de suffixe de basename : un match
     # de suffixe fait matcher 'refs/orphan.md' par une entrée 'refs/sub/orphan.md' qui cite un
     # fichier différent — faux négatif du gate constaté (correctif P2 sens B).
+    #
+    # 'entry' est normalisé (./ de tête retiré) AVANT concaténation : une citation './a.md' doit
+    # matcher le fichier suivi 'a.md' exactement comme le ferait l'ancienne comparaison par
+    # suffixe (qui tolérait ce './' par accident, via -e résolu par le système de fichiers en
+    # sens A). Sans cette normalisation, target_rel devient './a.md' et ne correspond jamais à
+    # $f — faux positif symétrique du correctif de suffixe, régression constatée (tour 2, finding
+    # 1). Le '/' final éventuel est déjà retiré par extract_p2_entries_raw (jamais présent dans
+    # un lien vers *.md) ; un '//' interne resterait tel quel — hors domaine observé ici.
     while IFS= read -r entry; do
+      [ -n "$entry" ] || continue
+      case "$entry" in
+        ./*) entry="${entry#./}" ;;
+      esac
       [ -n "$entry" ] || continue
       if [ "$dossier" = "." ]; then
         target_rel="$entry"

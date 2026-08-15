@@ -224,13 +224,34 @@ if [ "$rc" -eq 0 ] && [ "$has_espace" -eq 1 ]; then ok "Robustesse — nom de fi
 # Avant correctif, les 3 sites `basename "$f"` cassaient sur un nom commençant par '-'
 # ('basename: illegal option -- ...' en stderr) sur un dépôt cloné hostile ; le verdict final
 # restait correct mais la robustesse T-29-02-02 (mitigation) n'était pas réellement prouvée.
+#
+# Le fixture DOIT placer le fichier à la RACINE du dépôt de test — 'refs/-orphelin-tiret.md'
+# (utilisé au tour 1) ne reproduit rien : l'argument passé à basename commence par 'r', jamais
+# par '-'. Preuve rejouée contre le pré-fix b0346ed (tour 2, finding 2) :
+#   - fixture 'refs/-orphelin-tiret.md' contre b0346ed → sortie identique au post-fix, AUCUN
+#     'basename: illegal option' sur stderr (le crash ne se produit pas, quel que soit le code).
+#   - fixture '-orphelin-tiret.md' À LA RACINE contre b0346ed → 3x 'basename: illegal option --
+#     o' sur stderr (un par site basename), silence total en post-fix (ce script).
 D="$(mk_git_root robustesse-tiret)"
-commit_file "$D" "refs/_index.md" "# Index" "" "(rien de cite ici)" ""
-commit_file "$D" "refs/-orphelin-tiret.md" "content"
+commit_file "$D" "_index.md" "# Index" "" "(rien de cite ici)" ""
+commit_file "$D" "./-orphelin-tiret.md" "content"
 out="$(bash "$SCRIPT" --path "$D" 2>&1)"; rc=$?
 has_tiret=0; case "$out" in *"-orphelin-tiret.md"*) has_tiret=1 ;; esac
 has_illegal=0; case "$out" in *"illegal option"*) has_illegal=1 ;; esac
-if [ "$rc" -eq 0 ] && [ "$has_tiret" -eq 1 ] && [ "$has_illegal" -eq 0 ]; then ok "Robustesse — nom de fichier à tiret initial détecté sans crash de basename"; else ko "Robustesse — nom de fichier à tiret initial détecté sans crash de basename" "rc=$rc out=[$out]"; fi
+if [ "$rc" -eq 0 ] && [ "$has_tiret" -eq 1 ] && [ "$has_illegal" -eq 0 ]; then ok "Robustesse — nom de fichier à tiret initial (racine du dépôt) détecté sans crash de basename"; else ko "Robustesse — nom de fichier à tiret initial (racine du dépôt) détecté sans crash de basename" "rc=$rc out=[$out]"; fi
+
+# === Robustesse — citation d'index avec './' de tête reconnue (correctif tour 2, finding 1) ========
+# En remplaçant le match de suffixe de basename par une comparaison de chemins résolus (23cb5ad),
+# une régression symétrique était introduite : 'target_rel' concaténait 'entry' brut sans retirer
+# un './' de tête, alors que p2_sens_a tolérait ce même './' par construction (-e résout via le
+# système de fichiers, pas par égalité de chaîne). D'abord rouge sur 23cb5ad (avant ce correctif) :
+# rc attendu 0 avec 'a.md' faussement signalé comme non cité ; corrigé rc attendu 3 (0 divergence).
+D="$(mk_git_root p2b-dotslash)"
+commit_file "$D" "a.md" "content"
+commit_file "$D" "_index.md" "# Index" "" "[a](./a.md)" ""
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+has_zero=0; case "$out" in *"0 divergence"*) has_zero=1 ;; esac
+if [ "$rc" -eq 3 ] && [ "$has_zero" -eq 1 ]; then ok "P2-B dot-slash — citation './a.md' reconnue comme couvrant a.md, jamais un faux positif"; else ko "P2-B dot-slash — citation './a.md' reconnue comme couvrant a.md, jamais un faux positif" "rc=$rc out=[$out]"; fi
 
 # === Cumul — une carte P1 et une carte P2, toutes deux propres → compteur de cartes balayées = 2 ===
 D="$(mk_git_root cumul)"
