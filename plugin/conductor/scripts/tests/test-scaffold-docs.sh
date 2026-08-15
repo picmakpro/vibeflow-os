@@ -190,14 +190,28 @@ else
   ko "--index sans valeur : sort 2" "rc=$rc"
 fi
 
-# Cas 17 — --index sur un dossier inexistant : sort 2 et ne crée rien.
+# Cas 17 — --index sur un dossier inexistant : sort 2, échec ATOMIQUE — y compris aucun stub
+# transverse posé (l'argument --index est validé avant toute écriture).
 d="$(newcase case17)"
 rc=0
 (cd "$d" && bash "$SCRIPT" --index absent-du-tout >/dev/null 2>&1) || rc=$?
-if [ "$rc" -eq 2 ] && [ ! -e "$d/absent-du-tout" ]; then
-  ok "--index sur dossier inexistant : sort 2, rien créé"
+if [ "$rc" -eq 2 ] && [ ! -e "$d/absent-du-tout" ] && [ ! -e "$d/docs" ]; then
+  ok "--index sur dossier inexistant : sort 2, rien créé (y compris docs/_transverse/)"
 else
-  ko "--index sur dossier inexistant : sort 2, rien créé" "rc=$rc, existe=$([ -e "$d/absent-du-tout" ] && echo oui || echo non)"
+  ko "--index sur dossier inexistant : sort 2, rien créé (y compris docs/_transverse/)" \
+    "rc=$rc, existe=$([ -e "$d/absent-du-tout" ] && echo oui || echo non), docs/=$([ -e "$d/docs" ] && echo oui || echo non)"
+fi
+
+# Cas 17b — nom à tiret initial : rejeté par le parseur d'arguments (branche -*), exit 2, rien créé.
+# Couvre T-29-04-02 du threat model du plan (mitigation revendiquée mais absente jusqu'ici).
+d="$(newcase case17b)"
+rc=0
+(cd "$d" && bash "$SCRIPT" -evilname >/dev/null 2>&1) || rc=$?
+if [ "$rc" -eq 2 ] && [ ! -e "$d/docs" ]; then
+  ok "nom à tiret initial (-evilname) : rejeté par le parseur, exit 2, rien créé"
+else
+  ko "nom à tiret initial (-evilname) : rejeté par le parseur, exit 2, rien créé" \
+    "rc=$rc, docs/=$([ -e "$d/docs" ] && echo oui || echo non)"
 fi
 
 # Cas 18 — le stub _index.md ne s'auto-liste pas.
