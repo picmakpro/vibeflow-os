@@ -125,7 +125,7 @@ chaque module est sa documentation complète — même structure partout.
 ## 🔒 Confiance
 
 - **Source-available** : code et historique publics — voir [LICENSE](./LICENSE).
-- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`52 suites` en CI), install
+- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`54 suites` en CI), install
   **idempotente** avec backup avant écrasement.
 - **Le repo s'applique sa propre doctrine** : CI sur push/PR (tests + gates stricts) + job
   « **lab frais** » — la baseline est installée dans un lab vierge et doit passer ses propres

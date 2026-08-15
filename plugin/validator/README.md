@@ -5,7 +5,7 @@
 > process, synthèse — pour garantir qu'un lab reste fidèle à la méthodologie VibeFlow malgré
 > l'évolution Anthropic, l'append-only des registres et la dette inévitable.
 
-**Version** : v1.3.2
+**Version** : v1.3.3
 **Type** : agent-only
 **Densité** : `AGENT.md` = 249 lignes — le plafond ADR-029 est ≤ 250 : le module est **à 1 ligne
 du plafond**, tout ajout passe par un délestage préalable.
