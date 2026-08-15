@@ -1,5 +1,48 @@
 # Backlog — idées différées (hors milestone courant)
 
+## Concepts Semantica — « mémoire gouvernée » (graphe de décisions causal, conflits fail-closed, provenance)
+**Capturé :** 2026-08-16 — **une phase candidate au prochain milestone** (hors fiabilite-v1.0)
+
+> **Source :** [`semantica-agi/semantica`](https://github.com/semantica-agi/semantica) — plateforme
+> Python open source (MIT) de graphes de connaissances pour agents IA (« Palantir open source ») :
+> ingestion → extraction → KG → raisonnement déterministe → export avec provenance W3C PROV-O.
+> Analyse du 2026-08-16 : **concepts à distiller, pas de dépendance à adopter** — la plateforme
+> elle-même (infra Python auto-hébergée, Neo4j/Databricks…) serait disproportionnée pour VF ;
+> leurs skills/hooks de plugin Claude Code sont rudimentaires comparés aux nôtres.
+
+**Mapping des concepts (croisé avec l'existant le 2026-08-16, par valeur décroissante) :**
+
+1. **Decision Intelligence — décisions comme nœuds de graphe causal** (record/trace_chain/
+   find_precedents/analyze_impact) → **nouveau** : les ADRs et DECISION files de VF sont du
+   markdown plat — aucun lien causal machine-exploitable, pas de recherche de précédents.
+   Application : nœuds décision typés + arêtes causales dans `gsd-graphify` / MemPalace ;
+   `gsd-advisor-researcher` interroge les précédents avant de rechercher à neuf. Répond à
+   « cette régression vient de quelle décision ? » (cf. leçon #38).
+2. **Détection de conflits fail-closed avant écriture mémoire** → **nouveau** :
+   `extract-learnings` et `gsd-mempalace-curator` écrivent des faits sans vérifier la
+   contradiction avec une mémoire ou un ADR existant — c'est le geste manuel de la doctrine
+   GSD-first (« signaler les collisions ADR/Iron Laws ») à mécaniser. Ajout ciblé, peu coûteux.
+3. **Provenance sur les faits** (session/commit/phase d'origine dans le frontmatter des mémoires
+   + fichiers d'intel) → **nouveau** : rend la péremption des souvenirs détectable au lieu de
+   devinée (le système doit aujourd'hui rappeler que les mémoires « reflètent ce qui était vrai
+   au moment de l'écriture »).
+4. **Bi-temporalité** (valid time vs recorded time sur les décisions, snapshots point-in-time
+   « que savait l'agent à ce moment-là ? ») → extension naturelle du KG temporel MemPalace,
+   utile aux post-mortems type remédiation-périmé. Second rang.
+5. **Point de requête uniforme sur le graphe projet** (leur pattern « le KG est un serveur MCP
+   que tout agent interroge » vs graphify script-based où chaque agent re-lit les fichiers) →
+   **lointain**, suite logique si le point 1 prend.
+
+**Points de cadrage (gsd-discuss-phase, à l'ouverture) :** périmètre de la phase (1-3 forment le
+cœur cohérent ; 4-5 à re-différer ?) · schéma des nœuds décision (lien avec le format ADR existant,
+rétro-compat du parc) · où vit le graphe (extension `.planning/graphs/` vs wing MemPalace) et qui
+écrit (curator au ship vs geste manager en mission) · sémantique du conflit détecté (halt bruyant
+vs annotation, interaction avec ADR-031 jamais-de-fix-sans-validation) · coût en densité ADR-029
+des briques retouchées (curator, extract-learnings, advisor-researcher).
+
+**Déclencheur de resurgence :** ouverture du prochain milestone (post fiabilite-v1.0) — à arbitrer
+face aux concepts prime-agent (ci-dessous), même créneau.
+
 ## Concepts prime-agent — budgets de mission + protocole d'équipe (A2A, rapports par référence)
 **Capturé :** 2026-08-16 · **Arbitré :** 2026-08-16 (Samuel) — **une phase candidate au prochain
 milestone** (hors fiabilite-v1.0, périmètre arbitré du 2026-08-15 intouché)
