@@ -1,5 +1,40 @@
 # Backlog — idées différées (hors milestone courant)
 
+## Concepts prime-agent — budgets de mission + protocole d'équipe (A2A, rapports par référence)
+**Capturé :** 2026-08-16 · **Arbitré :** 2026-08-16 (Samuel) — **une phase candidate au prochain
+milestone** (hors fiabilite-v1.0, périmètre arbitré du 2026-08-15 intouché)
+
+> **Source :** [`PrimeIntellect-ai/prime-agent`](https://github.com/PrimeIntellect-ai/prime-agent)
+> — harness agentique open source (MIT) auto-améliorant pour tâches longues autonomes. Analyse du
+> 2026-08-16 : 4 concepts transposables identifiés. **Le volet RL (PRIME-RL, verifiers) est exclu
+> par arbitrage** — aucun entraînement de modèle ; VF roule sur les modèles Anthropic.
+
+**Mapping des concepts (croisé avec la roadmap le 2026-08-16) :**
+
+- **Heartbeats / persistance** (concept 3) → **déjà couvert**, rien à capturer : Phase 32
+  (LOCK-01 heartbeat séparé de la lease) + Phase 33 (WTCH-01/02 battement par nœud du DAG +
+  watchdog, WTCH-03 notifications OS) ; objectif persistant = STATE.md + `gsd-resume-work`.
+- **Budgets de mission** (concept 4) → **nouveau** : budgets explicites (tours / tokens / temps)
+  dans les mandats `vf-auto` et managers, avec portes de qualité à l'épuisement. ⚠️ Faux ami : la
+  Phase 25 « Budget d'instructions » (BUDG-01/02) borne la densité des **fichiers d'agents**, pas
+  les missions — famille d'exigences distincte à créer au cadrage.
+- **Messagerie A2A première classe + rapports par référence** (concepts 5+2, **fusionnés par
+  arbitrage granularité** — mêmes fichiers touchés) → **nouveau** : volet « protocole d'équipe »
+  du team-kernel. (a) Canal SendMessage première classe manager↔workers en cours de mission — le
+  hotfix « escalade vivante » du 2026-08-15 est installé machine, sa distribution source est un
+  reliquat connu (mémoire projet) que cette phase solde. (b) Contrat de rapport par référence,
+  inspiré du modèle RLM (contexte comme variables) : les workers renvoient chemins sur disque +
+  verdicts typés, jamais de contenu brut — durcissement doctrinal des digests compacts existants.
+
+**Points de cadrage (gsd-discuss-phase, à l'ouverture) :** sémantique du budget à l'épuisement
+(halt bruyant vs dégradé, interaction avec les halt conditions existantes) · unité de mesure
+réellement observable par un manager (tours de dispatch vs tokens) · vecteur de distribution du
+patch SendMessage — gate armement ↔ précondition obligatoire (leçon #38, un settings local ne
+voyage pas) · forme du contrat de rapport (schéma typé, validation machine ?) et rétro-compat des
+rapports actuels · densité ADR-029 du parc retouché (team-kernel.md + tous managers/workers).
+
+**Déclencheur de resurgence :** ouverture du prochain milestone (post fiabilite-v1.0).
+
 ## Module `/vf-cockpit` — cockpit web local (roadmap, phases, missions live) — SPIKÉ
 **Capturé :** 2026-08-15 (cadrage AskUserQuestion, 4 décisions) · **Spiké :** 2026-08-15 →
 **spike : `.planning/spikes/001-cockpit-live/` (verdict au README), requirements :
