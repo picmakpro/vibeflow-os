@@ -55,9 +55,21 @@ coverage:
         status: pass
     human_judgment: false
   - id: D2
-    description: "4 scripts dev-orchestrator normalisés — hook_exit() traduit le silence interne (3) en 0 sous --hook uniquement, jamais de lanceur d'enveloppe, contrat CLI/tests intact"
+    description: "4 scripts dev-orchestrator normalisés — hook_exit() traduit le silence interne (3) en 0 sous --hook uniquement, jamais de lanceur d'enveloppe, contrat CLI/tests intact. Couverture = les 4 suites dédiées de ces scripts + la suite générale du module, TOUTES les suites que la découverte CI (`find plugin scripts -type f -path '*/tests/test-*.sh'`) atteint sur le périmètre touché — pas un échantillon."
     requirement: "PORT-03"
     verification:
+      - kind: unit
+        ref: "plugin/dev-orchestrator/scripts/tests/test-check-dev-bootstrap.sh (35 ok, 0 ko)"
+        status: pass
+      - kind: unit
+        ref: "plugin/dev-orchestrator/scripts/tests/test-check-doc-drift.sh (21 ok, 0 ko)"
+        status: pass
+      - kind: unit
+        ref: "plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh (37 ok, 0 ko)"
+        status: pass
+      - kind: unit
+        ref: "plugin/dev-orchestrator/scripts/tests/test-discover-unintegrated-docs.sh (22 ok, 0 ko)"
+        status: pass
       - kind: unit
         ref: "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh (184 OK / 0 KO / 0 SKIP)"
         status: pass
@@ -233,10 +245,39 @@ None - no external service configuration required.
   (mandat), la mise à jour de progression de phase reste à la charge de l'orchestrateur de phase
   une fois les 6 plans de VFDO-30 réunis.
 
+## Correction ciblée post-revue (exec-30-04, rouvert)
+
+La revue a reproduit 3 cas préexistants cassés par ce lot, non détectés par la vérification initiale
+(qui n'avait exécuté que `test-dev-orchestrator.sh` et la suite neuve, pas les 4 suites dédiées des
+scripts touchés) :
+
+1. **`test-check-gsd-config.sh` cas 23** — le commit `3549d60` avait réécrit l'en-tête `# Exit codes
+   (contrat interne, s'applique SANS --hook) :`, faisant disparaître la sous-chaîne littérale `Exit
+   codes:` que le cas asserte sur la sortie `--help`. Restauré en `# Exit codes:` + précision `--hook`
+   sur la ligne suivante (commit `974b578`).
+2. **`test-discover-unintegrated-docs.sh` cas 18 et 19** — asseraient encore `rc=3` sous `--hook`,
+   c'est-à-dire l'ANCIEN contrat que D-06 change intentionnellement pour ce script (dans le périmètre
+   normalisé par `3549d60`). Corrigés en `rc=0`, stdout vide (commit `6a6af43`).
+
+**Vérification refaite — TOUTES les suites que la découverte CI atteint sur le périmètre touché,
+pas un échantillon** (`find plugin scripts -type f -path '*/tests/test-*.sh'`) :
+
+| Suite | Résultat |
+|---|---|
+| `test-check-dev-bootstrap.sh` | 35 ok, 0 ko |
+| `test-check-doc-drift.sh` | 21 ok, 0 ko |
+| `test-check-gsd-config.sh` | 37 ok, 0 ko |
+| `test-discover-unintegrated-docs.sh` | 22 ok, 0 ko |
+| `test-hook-exit-contract.sh` | 32 OK / 0 KO |
+| `test-dev-orchestrator.sh` | 184 OK / 0 KO / 0 SKIP |
+
 ---
 *Phase: VFDO-30-portabilit-windows-ii*
 *Completed: 2026-08-15*
 
 ## Self-Check: PASSED
 
-Tous les fichiers créés/modifiés existent sur disque, les 3 commits de tâche (`d8814e3`, `3549d60`, `2dbcc86`) sont vérifiés présents dans `git log --oneline --all`.
+Tous les fichiers créés/modifiés existent sur disque, les 3 commits de tâche initiaux (`d8814e3`,
+`3549d60`, `2dbcc86`) ET les 2 commits de correction ciblée (`974b578`, `6a6af43`) sont vérifiés
+présents dans `git log --oneline --all`. Les 6 suites du périmètre touché sont toutes vertes,
+rejouées individuellement (pas via un pipe qui masquerait leur code de sortie propre).
