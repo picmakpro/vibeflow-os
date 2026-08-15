@@ -14,7 +14,6 @@ progress:
   total_plans: 95
   completed_plans: 71
 last_activity_desc: "Phase 28 COMPLETE (28-01/28-02/28-03). 28-01 et 28-02 sont deja livres dans main et publies en v2.51.0 via PR #41 (squash-merge). Ce lot ajoute, sur branche feat/phase-28-03-as-installed issue de main a jour : fermeture du trou ARM_LINE mono-slot (chaque armement d un artefact evalue independamment, suite 58 -> 60 cas) ; checkpoint D-04 rendu par Samuel = second-job-9-modules ; job CI lab-frais-arme qui exerce le gate TEL QU INSTALLE sur la fermeture dev-orchestrator (9 modules) avec plancher de 2 artefacts armes ; triades bumpees dev-orchestrator v2.15.0 et conductor v1.23.0 (bump reparti des valeurs posees par la Phase 29, decision humaine) avec les journaux de la Phase 28 enfin ecrits. Revue vf-reviewer : PASS. Verification goal-backward 28-03 : GOAL ACHIEVED, 6 falsifications prouvant que le job mord. Gates verts (capability-activation 0, version-sync 0, machine-paths 0). RESTE OUVERT : le critere << run CI vert constate >> (28-03-PLAN.md:438/454) - la branche n a jamais ete poussee, geste humain. Compteurs progress laisses intacts (derive preexistante, deja signalee)."
-
 ---
 
 # Project State
