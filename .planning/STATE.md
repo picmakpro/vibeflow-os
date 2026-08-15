@@ -328,6 +328,20 @@ Last activity: 2026-08-15 — Quick task 260815-tl6 : snapshot hebdo traffic/clo
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
 
+- 2026-08-15 : **RFC upstream `open-gsd/gsd-core` déposée** (LEDG-03) —
+  https://github.com/open-gsd/gsd-core/issues/3556. Demande : rendre optionnelle la suppression
+  inconditionnelle de `.planning/REQUIREMENTS.md` à la clôture de jalon (`complete-milestone.md`,
+  `git rm` sans flag ni gate). Échéance amont : **2026-10-26**. Brouillon validé par Samuel
+  (D-09, AskUserQuestion 2026-08-15) avant post, corps identique bit-à-bit à la version approuvée
+  (`30-RFC-UPSTREAM.md`, commit `a3e9fcb`). **Repli si l'amont refuse ou ignore avant l'échéance** :
+  la variante réduite locale déjà arbitrée le 2026-07-28 (`STUDY.md`, verdict GO-RÉDUIT, condition
+  D3) — un gate local d'absence (`.planning/MILESTONES.md` déclare un jalon clos alors que
+  `.planning/REQUIREMENTS.md` est absent) doit alors être intégralement ré-arbitré : soit
+  renoncement au gate (doctrine seule, sans machine), soit acceptation assumée d'un gate en conflit
+  récurrent avec `complete-milestone` (le moteur continuerait de supprimer le fichier à chaque
+  clôture, sans le flag demandé par cette RFC). Ce repli est écrit ici au moment du dépôt, pas
+  découvert à l'échéance (Phase 18 n'a pas à re-décider dans l'urgence).
+
 - **2026-08-15 — Phase 29, mission d'équipe sur branche `docs/phase-29-icm-gains` : 12 des 13
   tâches livrées, arrêt propre au checkpoint humain bloquant T-29-05-3.** D-03 (zéro régression
   `dag.sh --scope`) tenue de bout en bout : `dag.sh` et `test-dag.sh` absents du diff de toute la

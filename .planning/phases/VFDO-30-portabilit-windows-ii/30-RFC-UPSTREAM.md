@@ -2,15 +2,19 @@
 
 ## Statut
 
-**brouillon — non posté** — 2026-08-15.
+**postée le 2026-08-15 — https://github.com/open-gsd/gsd-core/issues/3556**
 
-Rappel (D-09, `30-CONTEXT.md`) : ce brouillon doit être **validé par Samuel avant tout post
-public**. Aucun appel réseau d'écriture (`gh issue create`, `gh pr`, `gh api`) n'a été fait pour
-produire ce fichier — seule une consultation en lecture seule (`gh search issues --repo
-open-gsd/gsd-core`) a été menée pour vérifier qu'aucune RFC équivalente n'existe déjà (aucune
-trouvée : requête "REQUIREMENTS.md", "git rm REQUIREMENTS", "keep-requirements", "optional
-deletion milestone complete" — voir les issues fermées/ouvertes retournées, aucune ne porte sur la
-suppression inconditionnelle du ledger).
+Brouillon validé par Samuel tel quel (D-09, AskUserQuestion 2026-08-15, relayée par la session
+principale) avant tout post public. Corps posté vérifié bit-à-bit identique au corps validé
+(`gh issue view --json body` diffé contre la section « Corps de l'issue » ci-dessous — aucune
+différence). Aucune RFC équivalente ne préexistait (consultation en lecture seule menée avant
+rédaction : `gh search issues --repo open-gsd/gsd-core` sur "REQUIREMENTS.md", "git rm
+REQUIREMENTS", "keep-requirements", "optional deletion milestone complete" — aucun résultat
+pertinent).
+
+Traçabilité D-11 posée aux deux endroits : `.planning/REQUIREMENTS.md` (ligne LEDG-03 du tableau +
+puce de section) et `.planning/STATE.md` (§Decisions, entrée du 2026-08-15, avec le repli
+GO-RÉDUIT écrit).
 
 **Version `@opengsd/gsd-core` relevée sur ce poste** : `1.10.0` (fichier `~/.claude/gsd-core/VERSION`).
 Commande de relevé : `cat ~/.claude/gsd-core/VERSION` (aucun `package.json` accessible localement
