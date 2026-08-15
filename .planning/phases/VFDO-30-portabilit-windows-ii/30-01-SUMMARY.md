@@ -268,5 +268,121 @@ None - aucune configuration de service externe requise.
   `test-windows-crlf.sh` 10 ok · 0 ko, `test-vibeflow-update.sh` 11 OK / 0 KO / 0 SKIP.
 
 ---
+
+## Correction ciblée exec-30-01 (post-livraison, 2026-08-15)
+
+Mandat de correction sur le nœud DAG `exec-30-01` : le travail « forme exec » ci-dessus
+(commits `b290aee`, `7c55632`, `26b98c4`) n'a pas été remis en cause — deux manques précis,
+vérifiés sur disque, ont été comblés en complément, sur la branche
+`feat/phase-30-portabilite-windows-ii`, en exécution séquentielle sur l'arbre principal (pas de
+worktree isolé, index git partagé avec d'autres workers de la phase).
+
+### Manque 1 — routage borné `{{VF_BASH}}` vers une cible `--settings-local` optionnelle
+
+**Problème :** `merge-hooks.sh` n'avait qu'une seule cible (`--settings`). Le jeton `{{VF_BASH}}`
+introduit par le tracer 30-01 fait atterrir un chemin absolu machine-spécifique dans ce fichier
+unique — potentiellement un `settings.json` de PROJET, committé et voyageant via git. C'est le
+risque que la mitigation de Samuel devait fermer ; en l'état ça l'aggravait.
+
+**Comblé :** `merge-hooks.sh` apprend une seconde cible optionnelle `--settings-local <path>`
+(et `--settings-local=<path>`), pour `merge` et `remove`. Règle de répartition bornée : seule
+une entrée dont le `command` BRUT porte `{{VF_BASH}}` est routée vers `--settings-local`, si
+fournie — toute autre entrée (forme shell, ou forme exec sans `{{VF_BASH}}`) continue d'aller
+dans `--settings` comme avant. Implémentation par scission du fragment en deux vues
+(`project_view`/`local_view`) rejouant l'algorithme de merge/remove EXISTANT, séparément et sans
+aucune autre bascule de comportement — aucun changement à `references()`, `frag_basenames()`,
+`SCRIPT_RE`. `--settings-local` absent ⇒ comportement identique à avant, **prouvé** : les 15 cas
+de test historiques (T1-T14) restent verts sans une seule ligne modifiée. `remove` balaie les
+deux cibles quand `--settings-local` est fournie (sinon une désinstallation deviendrait
+partielle et laisserait des hooks orphelins dans le settings local). Écriture atomique
+indépendante par fichier (tempfile + `os.replace`, chacun son die() avant écriture).
+
+`plugin/_internal/tests/test-merge-hooks.sh` étend la suite de 15 à 19 cas (T15-T18) :
+- **T15** — entrée `{{VF_BASH}}` + `--settings-local` fournie ⇒ atterrit dans le fichier local,
+  absente du fichier projet.
+- **T16** — entrée sans `{{VF_BASH}}` (forme shell) + `--settings-local` fournie ⇒ reste dans le
+  fichier projet, fichier local non affecté par cette entrée.
+- **T17** — `--settings-local` absente ⇒ les deux entrées d'un fragment mixte atterrissent dans
+  la cible `--settings` unique (compat descendante).
+- **T18** — `remove` avec `--settings-local` fournie sur un merge antérieur mixte (une entrée
+  locale + une entrée projet) ⇒ les deux disparaissent des deux fichiers respectivement, aucun
+  résidu.
+
+**Discrimination par mutation (QUAL-01), appliquée puis restaurée** (fichier revérifié identique
+octet pour octet après chaque restauration, diff vide) :
+
+**m1 — retirer la condition `{{VF_BASH}}` dans `is_local_entry()`** (route toute entrée vers
+local dès que `--settings-local` est fournie, sans regarder son `command`) :
+```
+✗ T16 non-routage de l'entrée shell classique
+== Résultat : 18 OK · 1 KO ==
+```
+T16 rougit exactement comme prévu : `shell-guard.sh` migre à tort vers le fichier local sous
+cette mutation. T18 reste vert sous cette mutation — explication : la vérification de `remove`
+est agnostique du fichier d'atterrissage (elle retire les basenames de partout, où qu'ils
+soient, et vérifie juste l'absence de résidu global) ; ce n'est pas le mécanisme de routage que
+T18 discrimine, mais le balayage des deux cibles au remove. T15 et T17 restent verts aussi (non
+concernés par la présence/absence de la condition `{{VF_BASH}}` dans leurs propres scénarios).
+
+**m2 — `is_local_entry()` retourne toujours `False`** (tout route vers `--settings` même quand
+`--settings-local` est fournie) :
+```
+✗ T15 routage vers --settings-local
+== Résultat : 18 OK · 1 KO ==
+```
+T15 rougit exactement comme prévu : `local-guard.sh` n'atterrit jamais dans le fichier local
+(la lecture de `d['hooks']['PreToolUse']` échoue par `KeyError`, le fichier local ne contenant
+que `{"hooks": {}}`). T16 reste vert (comportement correct par accident sous cette mutation, la
+règle testée par T16 — « rester en projet » — reste vraie même quand TOUT reste en projet). T18
+reste vert pour la même raison qu'en m1 (agnostique du fichier d'atterrissage).
+
+Suite complète rejouée verte (19 OK · 0 KO) après restauration de chaque mutation.
+
+### Manque 2 — LOCK-02 (`.planning/ROADMAP.md`, critère de succès n°2)
+
+**Problème :** le critère de succès n°2 de LOCK-02 (lignes ~643-645) disait « jamais un settings
+local ni un hook git non distribué » — formulation contredite littéralement par le routage du
+Manque 1 : une commande locale existe désormais légitimement.
+
+**Comblé :** reformulation du critère n°2 SEUL (aucune autre partie du ROADMAP touchée), avec la
+trace datée de l'arbitrage de Samuel du 2026-08-15 : *« un chemin machine ne doit jamais
+voyager ; les gardes restent distribuées (leur entrée naît toujours de `merge-hooks`), c'est
+leur COMMANDE qui est locale »*. Le critère continue d'interdire un guard non distribué (entrée
+posée à la main dans un settings, ou hook git hors du mécanisme distribué) sans plus interdire
+une commande locale posée par `merge-hooks` lui-même dans une cible `--settings-local`.
+
+### Task Commits (correction)
+
+1. **Manque 1, code** — `ced85ee` (feat) : `merge-hooks.sh` apprend `--settings-local`.
+2. **Manque 1, tests** — `dbe9fac` (test) : T15-T18 + trace de mutation dans ce SUMMARY.
+3. **Manque 2** — `5c95cb0` (docs) : LOCK-02 critère n°2 reformulé, trace d'arbitrage.
+
+### Périmètre respecté
+
+Fichiers touchés, strictement les trois autorisés : `plugin/_internal/merge-hooks.sh`,
+`plugin/_internal/tests/test-merge-hooks.sh`, `.planning/ROADMAP.md`. Aucun fichier interdit
+(`vibeflow-update.sh`, `lib/`, `test-vibeflow-update.sh`, `dev-orchestrator/`, `conductor/`,
+`scripts/`, `STATE.md`, `REQUIREMENTS.md`, `.github/`, `README.md`, `README.fr.md`) n'a été lu en
+écriture. `git status --short` en fin de mandat ne montre que ces trois fichiers modifiés.
+
+### Actuals de la correction (#2632, chars/4)
+
+- **tokens (chars/4 sur le diff réalisé des 3 commits)** : 21387 chars / 4 ≈ **5347**
+- **tasks** : 3 (manque 1 code, manque 1 tests, manque 2 ROADMAP)
+- **commits** : 3
+
+### Self-Check correction : PASSED
+
+- FOUND: `plugin/_internal/merge-hooks.sh` (routage `--settings-local`)
+- FOUND: `plugin/_internal/tests/test-merge-hooks.sh` (T15-T18)
+- FOUND: commit `ced85ee`
+- FOUND: commit `dbe9fac`
+- FOUND: commit `5c95cb0`
+- `bash plugin/_internal/tests/test-merge-hooks.sh` rejoué à l'instant du self-check : **19 OK ·
+  0 KO**.
+- `.planning/ROADMAP.md` : diff vérifié (`rtk proxy git diff`) ne touche QUE le critère de succès
+  n°2 de LOCK-02 (lignes ~643-650).
+
+---
 *Phase: 30-portabilit-windows-ii*
 *Completed: 2026-08-15*
