@@ -2,6 +2,8 @@
 gsd_state_version: 1.0
 milestone: fiabilite-v1.0
 milestone_name: Fiabilité — ce qui survit
+current_phase: 30
+current_phase_name: Portabilité Windows II
 status: planning
 last_updated: "2026-08-15T18:07:05.215Z"
 last_activity: 2026-08-15
