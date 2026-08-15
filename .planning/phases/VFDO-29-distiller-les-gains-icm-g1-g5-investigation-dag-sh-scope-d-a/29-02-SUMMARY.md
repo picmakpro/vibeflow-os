@@ -10,8 +10,10 @@ requires:
 provides:
   - "plugin/conductor/scripts/check-map-drift.sh : gate lint-only anti-drift carte↔disque (paires
     P1 carte de dossiers CLAUDE.md↔disque, P2 index _index.md/INDEX.md↔contenu direct de dossier)"
-  - "plugin/conductor/scripts/tests/test-check-map-drift.sh : 28 cas, dont plancher NON VÉRIFIABLE
-    et 2 preuves par mutation attestées à l'octet (cmp -s)"
+  - "plugin/conductor/scripts/tests/test-check-map-drift.sh : 32 cas, dont plancher NON VÉRIFIABLE,
+    2 preuves par mutation attestées à l'octet (cmp -s), et 4 cas ajoutés en correction ciblée
+    exec-02 (comparaison par suffixe de basename en P2 sens B, token @/chemin/absolu en P1 sens A,
+    nom de fichier à espace, nom à tiret initial)"
 affects: [29-05]
 
 actuals:
@@ -65,11 +67,12 @@ coverage:
   - id: D2
     description: "Paire P2 (index _index.md/INDEX.md↔contenu direct) bidirectionnelle, non
       récursive, l'index ne se cite jamais lui-même, un dossier sans index n'est pas une carte,
-      cumul P1+P2 → 2 cartes balayées"
+      cumul P1+P2 → 2 cartes balayées ; comparaison sur le CHEMIN RÉSOLU COMPLET (jamais un match
+      par suffixe de basename — correction ciblée exec-02, D5-bis)"
     requirement: "ICMD-04"
     verification:
       - kind: other
-        ref: "bash plugin/conductor/scripts/tests/test-check-map-drift.sh — cas P2-A, P2-B, P2-self, P2-non-récursif, P2-absent, Cumul"
+        ref: "bash plugin/conductor/scripts/tests/test-check-map-drift.sh — cas P2-A, P2-B, P2-self, P2-non-récursif, P2-absent, P2-B-suffix, Cumul"
         status: pass
   - id: D3
     description: "Plancher anti-vert-à-vide : 0 carte balayée (cible sans carte, cible inexistante,
@@ -125,7 +128,21 @@ coverage:
     requirement: "ICMD-06"
     verification:
       - kind: other
-        ref: "awk '!/^[ \\t]*#/' check-map-drift.sh | wc -l → 226"
+        ref: "awk '!/^[ \\t]*#/' check-map-drift.sh | wc -l → 231 (après correction ciblée exec-02)"
+        status: pass
+  - id: D10
+    description: "Correction ciblée exec-02 (4 findings, revue + audit indépendants, tous deux
+      reproduits par expérience) : faux négatif P2 sens B (comparaison par suffixe de basename —
+      refs/orphan.md masqué par une entrée refs/sub/orphan.md de même basename) ; faux positif P1
+      sens A (token @/chemin/absolu jamais concaténé hors de $ROOT — désormais ignoré, documenté
+      en commentaire) ; les 3 appels basename externes remplacés par ${f##*/} bash pur (robustesse
+      sur un nom à tiret initial, sans dépendre de `basename -- `) ; 2 cas de suite manquants
+      ajoutés réellement (nom à espace, nom à tiret initial) — la mitigation T-29-02-02 du threat
+      model ne portait aucun cas correspondant avant ce correctif"
+    requirement: "ICMD-03, ICMD-04, ICMD-06"
+    verification:
+      - kind: other
+        ref: "bash plugin/conductor/scripts/tests/test-check-map-drift.sh — cas P2-B-suffix, P1-A-absolu, Robustesse (espace), Robustesse (tiret initial) ; 32/32 ; suites voisines non régressées (test-dag.sh 99/99, test-check-doc-drift.sh 21/21, test-check-agents.sh 81/81) ; dag.sh hors diff"
         status: pass
 ---
 
@@ -161,6 +178,21 @@ coverage:
   fichier final en 3 diffs aurait recréé des états intermédiaires fictifs plutôt que de refléter
   un historique réellement incrémental — chaque `acceptance_criteria` des 3 tâches est néanmoins
   vérifié individuellement dans la table `coverage` ci-dessus, sur le livrable final.
+- Correction ciblée exec-02 (nœud rouvert) : une revue et un audit indépendants ont chacun reproduit
+  par expérience 4 défauts sur le livrable initial — un faux négatif MAJEUR en P2 sens B (la
+  comparaison `case "$entry" in *"$base")` matchait par suffixe de basename, si bien qu'une entrée
+  `sub/orphan.md` citée masquait à tort un `refs/orphan.md` top-level jamais cité), un faux positif
+  MINEUR en P1 sens A (un token `@/chemin/absolu` n'était jamais traité comme hors du domaine
+  repo-relative de la carte et produisait une divergence même quand la cible absolue existait
+  réellement sur le disque), un défaut de robustesse MEDIUM (3 appels externes `basename "$f"`
+  cassaient sur un nom à tiret initial) et un vert-à-vide MEDIUM (la mitigation T-29-02-02 du
+  threat model affirmait un cas de suite couvrant les noms à espace, sans qu'aucun n'existe
+  réellement). Les 4 correctifs sont dans `check-map-drift.sh` (P2 sens B comparé sur le chemin
+  résolu complet, token absolu ignoré et documenté en commentaire, les 3 `basename` remplacés par
+  `${f##*/}` bash pur) et `test-check-map-drift.sh` (+4 cas : `P2-B-suffix`, `P1-A-absolu`,
+  `Robustesse` espace, `Robustesse` tiret initial — 28 → 32 cas). Le cas `P2-B-suffix` a d'abord
+  été rejoué sur le code d'avant correctif pour constater le rouge réel (`rc=3`, `0 divergence`,
+  alors que `refs/orphan.md` aurait dû être signalé) avant d'appliquer le fix.
 
 ## Note pour le plan 29-05 (clôture de distribution)
 
