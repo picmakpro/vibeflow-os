@@ -148,6 +148,27 @@ while IFS= read -r line; do
   esac
 done < "$TMP/unit-results.txt"
 
+# ---------- invariant "lecture seule" : garde statique anti-écriture disque ----------
+# Propriété centrale du produit (Iron Law du SKILL.md) — aujourd'hui protégée par la seule
+# discipline de revue, pas d'outillage. On ignore les lignes de commentaire (`//`) pour ne
+# pas faire échouer le test sur de la PROSE qui mentionne ces mots (ex: le commentaire d'en-
+# tête de vf-cockpit-serve.mjs cite "fs.write*/mkdir/rm/appendFile" en toutes lettres) — seul
+# du CODE réel doit compter. `res.write` (réponse HTTP, légitime) ne matche aucun motif
+# ci-dessous par construction (nom d'API, pas le mot nu "write"), donc n'a besoin d'aucune
+# exclusion dédiée.
+WRITE_PATTERN='writeFile|mkdirSync|appendFile|unlink|rmSync|createWriteStream|truncate|renameSync|copyFileSync'
+WRITE_HITS=0
+for f in "$SCRIPTS_DIR"/*.mjs; do
+  CODE_ONLY="$(sed -E 's#^[[:space:]]*//.*$##' "$f")"
+  if echo "$CODE_ONLY" | grep -qE "$WRITE_PATTERN"; then
+    WRITE_HITS=$((WRITE_HITS+1))
+    echo "    (motif d'écriture disque trouvé dans $(basename "$f"))"
+  fi
+done
+[ "$WRITE_HITS" -eq 0 ] \
+  && ok "invariant lecture seule: aucun motif d'écriture disque dans scripts/*.mjs" \
+  || nok "invariant lecture seule: motif d'écriture disque détecté (voir ci-dessus)"
+
 # ---------- tests serveur en direct (fetch node, jamais curl — cf CONVENTIONS.md) ----------
 PORT=$((20000 + RANDOM % 10000))
 VF_COCKPIT_PLANNING_ROOT="$FULL/.planning" VF_COCKPIT_PORT="$PORT" node "$SERVER" >"$TMP/server.log" 2>&1 &
@@ -207,6 +228,55 @@ while IFS= read -r line; do
   esac
 done < "$TMP/live-results.txt"
 
+# garde anti-traversée sur /assets/ — symétrique au test /api/phase ci-dessus, mais via
+# socket TCP brute : `fetch` normalise les dot-segments côté client avant même d'émettre
+# la requête, donc un test fetch() ne prouverait rien sur la garde serveur. On envoie la
+# ligne de requête HTTP à la main pour que le serveur reçoive le chemin NON normalisé.
+ASSET_TRAVERSAL_OUT="$(node -e "
+const net = require('net');
+function rawGet(reqPath) {
+  return new Promise((resolve) => {
+    const s = net.connect({ host: '127.0.0.1', port: $PORT }, () => {
+      s.write('GET ' + reqPath + ' HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n');
+    });
+    let data = '';
+    s.setTimeout(2000, () => { s.destroy(); resolve(data); });
+    s.on('data', (d) => { data += d; });
+    s.on('end', () => resolve(data));
+    s.on('error', () => resolve(data));
+  });
+}
+(async () => {
+  const results = [];
+
+  const raw1 = await rawGet('/assets/../../../../../../etc/passwd');
+  const status1 = (raw1.match(/^HTTP\/1\.1 (\d+)/) || [])[1];
+  results.push(['assets: traversée non-normalisée -> 404', status1 === '404']);
+  results.push(['assets: traversée non-normalisée -> pas de contenu sensible', !raw1.includes('root:')]);
+
+  const raw2 = await rawGet('/assets/..%2f..%2f..%2f..%2f..%2f..%2fetc%2fpasswd.css');
+  const status2 = (raw2.match(/^HTTP\/1\.1 (\d+)/) || [])[1];
+  results.push(['assets: traversée encodée (%2f) -> 404', status2 === '404']);
+  results.push(['assets: traversée encodée -> pas de contenu sensible', !raw2.includes('root:')]);
+
+  const raw3 = await rawGet('/assets/....//....//....//etc/passwd');
+  const status3 = (raw3.match(/^HTTP\/1\.1 (\d+)/) || [])[1];
+  results.push(['assets: traversée ....// -> 404', status3 === '404']);
+
+  console.log(JSON.stringify(results));
+})();
+")"
+echo "$ASSET_TRAVERSAL_OUT" | node -e "
+const results = JSON.parse(require('fs').readFileSync(0, 'utf8'));
+for (const [name, passed] of results) console.log((passed ? 'OK ' : 'KO ') + name);
+" > "$TMP/asset-traversal-results.txt"
+while IFS= read -r line; do
+  case "$line" in
+    OK\ *) ok "${line#OK }" ;;
+    KO\ *) nok "${line#KO }" ;;
+  esac
+done < "$TMP/asset-traversal-results.txt"
+
 kill "$SERVER_PID" >/dev/null 2>&1 || true
 wait "$SERVER_PID" 2>/dev/null || true
 SERVER_PID=""
@@ -258,7 +328,28 @@ s.on('error', () => process.exit(1));
 else
   nok "serveur écoute sur 127.0.0.1"
 fi
-grep -q "0.0.0.0" "$TMP/server-bare.log" 2>/dev/null && nok "aucune mention 0.0.0.0 dans le log" || ok "aucune mention 0.0.0.0 dans le log"
+# Le grep sur le littéral "0.0.0.0" est tautologique : le code n'émet jamais ce mot (le log
+# affiche `HOST`), donc il reste vert même si une régression faisait écouter le serveur sur
+# toutes les interfaces. Assertion qui peut réellement échouer : tenter une connexion sur
+# l'IP réseau non-loopback réelle de la machine et exiger un échec (ECONNREFUSED/timeout).
+# Se dégrade proprement (ok, pas nok) si la machine n'a aucune interface non-loopback — cas
+# CI fréquent — plutôt que d'échouer à tort sur une absence de réseau.
+BIND_CHECK="$(node -e "
+const net = require('net');
+const os = require('os');
+const ifaces = Object.values(os.networkInterfaces()).flat();
+const iface = (ifaces || []).find((i) => i && i.family === 'IPv4' && !i.internal);
+if (!iface) { console.log('SKIP'); process.exit(0); }
+const s = net.connect({ host: iface.address, port: $PORT2, timeout: 800 });
+s.on('connect', () => { s.destroy(); console.log('LISTENING'); });
+s.on('timeout', () => { s.destroy(); console.log('UNREACHABLE'); });
+s.on('error', () => { console.log('UNREACHABLE'); });
+" 2>/dev/null)"
+case "$BIND_CHECK" in
+  SKIP) ok "bind non-public: aucune interface non-loopback disponible (dégradé proprement)" ;;
+  UNREACHABLE) ok "bind non-public: injoignable via l'IP réseau réelle" ;;
+  *) nok "bind non-public: injoignable via l'IP réseau réelle (reçu: ${BIND_CHECK:-vide})" ;;
+esac
 
 kill "$SERVER_PID" >/dev/null 2>&1 || true
 wait "$SERVER_PID" 2>/dev/null || true
@@ -266,7 +357,11 @@ SERVER_PID=""
 
 # ---------- SANS .planning/ du tout : message clair, sortie propre ----------
 # Pas de dépendance à `timeout` (absent par défaut sur macOS) : on lance en fond et on tue.
-(cd "$NOLAB" && VF_COCKPIT_CWD="$NOLAB" VF_COCKPIT_PORT=0 node "$SCRIPTS_DIR/vf-cockpit-serve.mjs" >"$TMP/nolab.log" 2>&1) &
+# Lancer node SANS sous-shell englobant : `cd ... && node ...` dans un `( ... ) &` fait de
+# `$!` le PID du sous-shell, pas de node — kill n'atteint alors jamais node, qui survit en
+# orphelin (prouvé empiriquement : 2 runs → 2 process résiduels). On pousse cd/env dans le
+# process node lui-même via VF_COCKPIT_CWD, en calquant sur le lancement direct l.153.
+VF_COCKPIT_CWD="$NOLAB" VF_COCKPIT_PORT=0 node "$SCRIPTS_DIR/vf-cockpit-serve.mjs" >"$TMP/nolab.log" 2>&1 &
 NOLAB_PID=$!
 sleep 1
 kill "$NOLAB_PID" >/dev/null 2>&1 || true
