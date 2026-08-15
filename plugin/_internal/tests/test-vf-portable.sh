@@ -11,6 +11,14 @@
 # T7  — répertoire de marqueurs non créable : le motif est quand même imprimé, même code rendu.
 # T8  — cascade vf_resolve_python : candidat retenu mémorisé (pas de re-sonde au second appel).
 #
+# Intégration engine (tâche 2, copy_engine_lib()) :
+# T9  — install d'un module → la lib est posée À PLAT dans le répertoire de scripts du lab,
+#       NON exécutable, contenu identique à la source (cmp).
+# T10 — resync gouvernance (version inchangée, chemin `update`) → la lib reste posée et identique,
+#       aucun doublon de fichier.
+# T11 — lib source absente du cache (engine isolé, ni cache ni voisinage) → l'install ÉCHOUE,
+#       le message nomme la lib, le lab n'est PAS marqué installé (VG-3).
+#
 # Convention TESTING.md du dépôt : ok()/ko()/skip(), isolation mktemp, trois issues par cas
 # (jamais un skip silencieux sur les cas T1-T8 — seules les extensions d'intégration engine,
 # ajoutées par la tâche 2, peuvent SKIP proprement si l'environnement ne le permet pas).
@@ -19,6 +27,8 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 INTERNAL_DIR="$(cd "$HERE/.." && pwd)"
 LIB="$INTERNAL_DIR/lib/vf-portable.sh"
+REPO="$(cd "$INTERNAL_DIR/.." && pwd)"          # = .../plugin (même convention que test-vibeflow-update.sh)
+INSTALLER="$INTERNAL_DIR/vibeflow-update.sh"
 
 pass=0; fail=0; skipped=0
 ok()   { echo "  ✓ $1"; pass=$((pass+1)); }
@@ -144,6 +154,60 @@ if [ "$T8_OUT" = "SENTINEL" ]; then
 else
   ko "T8 vf_resolve_python a re-sondé au second appel — sortie=[$T8_OUT]"
 fi
+
+# ---------- T9 : install d'un module → lib posée à plat, non exécutable, contenu identique ----------
+if [ -f "$INSTALLER" ] && [ -d "$REPO/software-architecture" ]; then
+  T9_LAB="$(mktemp -d)"
+  (cd "$T9_LAB" && VIBEFLOW_CACHE="$REPO" VF_SCOPE=project bash "$INSTALLER" install software-architecture >/dev/null 2>&1)
+  T9_DEST="$T9_LAB/.claude/scripts/vf-portable.sh"
+  T9_OK=1
+  [ -f "$T9_DEST" ] || { ko "T9 lib absente après install → $T9_DEST"; T9_OK=0; }
+  if [ "$T9_OK" = "1" ]; then
+    [ ! -x "$T9_DEST" ] || { ko "T9 lib posée EXÉCUTABLE (attendu : sourcée seulement)"; T9_OK=0; }
+    cmp -s "$LIB" "$T9_DEST" || { ko "T9 contenu de la lib posée diffère de la source (cmp)"; T9_OK=0; }
+  fi
+  [ "$T9_OK" = "1" ] && ok "T9 install software-architecture : lib posée à plat, non exécutable, contenu identique (cmp)"
+
+  # ---------- T10 : resync gouvernance (version inchangée) → lib toujours présente, pas de doublon ----------
+  T10_BEFORE_COUNT=$(find "$T9_LAB/.claude/scripts" -maxdepth 1 -name 'vf-portable.sh*' | wc -l | tr -d ' ')
+  (cd "$T9_LAB" && VIBEFLOW_CACHE="$REPO" VF_SCOPE=project bash "$INSTALLER" update software-architecture >/dev/null 2>&1)
+  T10_AFTER_COUNT=$(find "$T9_LAB/.claude/scripts" -maxdepth 1 -name 'vf-portable.sh*' | wc -l | tr -d ' ')
+  T10_OK=1
+  [ -f "$T9_DEST" ] || { ko "T10 lib absente après resync (version inchangée)"; T10_OK=0; }
+  cmp -s "$LIB" "$T9_DEST" 2>/dev/null || { ko "T10 contenu de la lib diffère après resync"; T10_OK=0; }
+  [ "$T10_BEFORE_COUNT" = "1" ] && [ "$T10_AFTER_COUNT" = "1" ] \
+    || { ko "T10 doublon de fichier détecté (avant=$T10_BEFORE_COUNT après=$T10_AFTER_COUNT)"; T10_OK=0; }
+  [ "$T10_OK" = "1" ] && ok "T10 resync gouvernance (version inchangée) : lib toujours posée et identique, aucun doublon"
+  rm -rf "$T9_LAB"
+else
+  skip "T9/T10 intégration engine : installer ou module software-architecture introuvable"
+fi
+
+# ---------- T11 (VG-3) : lib source absente du cache → install ÉCHOUE, message nomme la lib ----------
+T11_LAB="$(mktemp -d)"
+T11_CACHE="$T11_LAB/cache"
+T11_ENGINE_DIR="$T11_LAB/engine"
+# Engine copié SEUL (même patron que T8 de test-vibeflow-update.sh) : ni $CACHE/_internal/lib/,
+# ni le repli $(dirname "$0")/lib/ n'existent → find_engine_lib() doit rendre une chaîne vide,
+# copy_engine_lib() doit échouer BRUYAMMENT (jamais un retour neutre, VG-3).
+mkdir -p "$T11_ENGINE_DIR" "$T11_CACHE/hooked/scripts"
+cp "$INSTALLER" "$T11_ENGINE_DIR/vibeflow-update.sh"
+echo v1.0.0 > "$T11_CACHE/hooked/VERSION"
+printf '{"name":"hooked","version":"v1.0.0"}\n' > "$T11_CACHE/hooked/module.json"
+printf '#!/usr/bin/env bash\necho x\n' > "$T11_CACHE/hooked/scripts/hooked.sh"
+T11_ERR="$T11_LAB/t11.err"
+T11_RC=0
+(cd "$T11_LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$T11_CACHE" \
+   bash "$T11_ENGINE_DIR/vibeflow-update.sh" install hooked >"$T11_ERR" 2>&1) || T11_RC=$?
+T11_OK=1
+[ "$T11_RC" -ne 0 ] || { ko "T11 install exit 0 malgré la lib source absente"; T11_OK=0; }
+grep -qF "vf-portable.sh" "$T11_ERR" \
+  || { ko "T11 le message d'échec ne nomme pas vf-portable.sh (contenu=[$(cat "$T11_ERR")])"; T11_OK=0; }
+if [ -f "$T11_LAB/.claude/scripts/.vibeflow-installed" ] && grep -q '^hooked=' "$T11_LAB/.claude/scripts/.vibeflow-installed" 2>/dev/null; then
+  ko "T11 module marqué installé alors que la lib de portabilité n'a pas pu être posée"; T11_OK=0
+fi
+[ "$T11_OK" = "1" ] && ok "T11 lib source absente du cache : install échoue (rc=$T11_RC), message nomme la lib, lab non marqué installé (VG-3)"
+rm -rf "$T11_LAB"
 
 echo "== $pass ok · $fail ko · $skipped skip =="
 [ "$fail" -eq 0 ]
