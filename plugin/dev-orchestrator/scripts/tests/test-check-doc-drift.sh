@@ -32,6 +32,28 @@ git_must() { # <description> <git-args...>
   local what="$1"; shift
   local out rc
   out="$(git "$@" 2>&1)"; rc=$?
+  # Course d'environnement CI, cette fois DIAGNOSTIQUÉE (runs main 31892069552 et 31895883647,
+  # verts au rerun sur le même SHA — flaky prouvé, pas un défaut du sujet) : un loose object
+  # committé disparaît entre deux commits d'une boucle serrée de fixture — « error: invalid
+  # object <blob> for 'sourceN.txt' » au commit suivant. Le WORKTREE, lui, est intact : un
+  # `git add -A` ré-écrit les blobs manquants depuis les fichiers, et la commande repasse.
+  # UNE retentative, BRUYANTE — ce n'est pas un affaiblissement d'assert (aucune assertion du
+  # sujet n'est concernée), c'est l'infrastructure de fixture qui se répare d'une interférence
+  # externe au lieu de tuer le run entier sur un aléa de runner. Un échec qui persiste après
+  # réparation reste fatal, avec les DEUX stderr.
+  if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -q "invalid object"; then
+    local dir="" i=0 prev=""
+    for a in "$@"; do [ "$prev" = "-C" ] && { dir="$a"; break; }; prev="$a"; done
+    if [ -n "$dir" ] && [ -d "$dir" ]; then
+      echo "  ⚠ FIXTURE — objet git disparu pendant « $what » (course d'environnement CI) — re-add + une retentative" >&2
+      git -C "$dir" -c user.email=t@t -c user.name=t add -A >/dev/null 2>&1 || true
+      local out2 rc2
+      out2="$(git "$@" 2>&1)"; rc2=$?
+      if [ "$rc2" -eq 0 ]; then return 0; fi
+      out="$out
+    (après réparation) : $out2"; rc=$rc2
+    fi
+  fi
   if [ "$rc" -ne 0 ]; then
     echo "  ✗ FIXTURE — $what a échoué (rc=$rc)" >&2
     echo "    commande : git $*" >&2
