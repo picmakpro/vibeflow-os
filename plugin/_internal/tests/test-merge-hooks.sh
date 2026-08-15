@@ -59,13 +59,24 @@
 #        entrée, dédup intra-cible déjà garantie), le fichier local n'est PAS rouvert par ce 2e
 #        appel et conserve donc son entrée résiduelle — comportement attendu et documenté, pas
 #        une régression du correctif (T19/T20 couvrent le cas où le flag reste fourni).
-# T21 — test générique : produit cartésien {forme shell, forme exec} x {forme shell, forme exec}
-#       x {--settings-local fournie aux DEUX appels, absente aux DEUX appels} = 8 séquences
-#       accessibles sur deux merges successifs du même script → chaque séquence finit avec
-#       exactement 1 entrée au total (projet + local). Restreint depuis le produit complet
-#       2x2x2x2=16 (flag indépendant par appel) : les 2 séquences où flag1=oui+forme1=exec (entrée
-#       atterrit en local) puis flag2=non (T20b) sont exclues — hors de portée architecturale,
-#       déjà documentées par T20b plutôt que comptées en échec ici.
+# T21 — matrice générique complète : produit cartésien {forme shell, forme exec} x {forme shell,
+#       forme exec} x {--settings-local on/off au 1er appel} x {--settings-local on/off au 2e appel}
+#       = 16 séquences (flag INDÉPENDANT par appel — corrige la version précédente qui figeait un
+#       flagmode constant aux deux appels et ne couvrait donc que la diagonale flag1==flag2 : 6 des
+#       8 séquences de cette diagonale n'exerçaient AUCUNE ligne du correctif, éprouvé par
+#       mutation lors de la revue précédente).
+#       2 des 16 séquences (form1=exec + flag1=on + flag2=off, form2 quelconque) restent hors de
+#       portée architecturale — même frontière que T20b : le 2e appel n'ayant jamais reçu
+#       --settings-local, il n'a structurellement aucun chemin vers le fichier local à purger.
+#       Exclues du comptage strict « 1 entrée totale », vérifiées séparément (fichier projet
+#       correct à 1 entrée, résidu local à 1 entrée attendu et documenté — pas une régression).
+#       Les 14 séquences restantes finissent toutes avec exactement 1 entrée au total. Parmi
+#       elles, 4 sont discriminantes pour la purge croisée (la destination change entre les deux
+#       appels : #3 shell-on→exec-on, #7 shell-off→exec-on, #9 exec-on→shell-on, #15 exec-off→
+#       exec-on — cette dernière est la transition minimale exigée par le mandat) — prouvées par
+#       mutation (purge croisée désactivée dans apply_merge, même mutation que la revue) : ce
+#       sont les 4 seules à passer de 1 à 2 entrées sous le code muté ; les 10 autres (contrôle,
+#       même cible aux deux appels) et les 2 exclues restent inchangées sous la mutation.
 #
 # ISOLATION : tout sous mktemp. Le vrai ~/.claude n'est jamais touché.
 
@@ -633,7 +644,7 @@ else
   ko "T20b frontière architecturale --settings-local omise"
 fi
 
-# ---------- T21 : matrice générique — {shell,exec} x {shell,exec} x {flag constant on/off} ----------
+# ---------- T21 : matrice générique — {shell,exec} x {shell,exec} x {flag1 on/off} x {flag2 on/off} ----------
 FRAG_MATRIX_SHELL="$WORK/frag-matrix-shell.json"
 cat > "$FRAG_MATRIX_SHELL" <<'EOF'
 { "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": [ { "type": "command", "command": "bash {{VF_SCRIPTS}}/matrix-guard.sh" } ] } ] } }
@@ -642,53 +653,184 @@ FRAG_MATRIX_EXEC="$WORK/frag-matrix-exec.json"
 cat > "$FRAG_MATRIX_EXEC" <<'EOF'
 { "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": [ { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/matrix-guard.sh"] } ] } ] } }
 EOF
-matrix_fail=0
-matrix_detail=""
-seq_n=0
-for form1 in shell exec; do
-  for form2 in shell exec; do
-    for flagmode in on off; do
-      seq_n=$((seq_n+1))
-      MDIR="$WORK/t21-$seq_n"
-      mkdir -p "$MDIR"
-      MPROJECT="$MDIR/settings.json"
-      MLOCAL="$MDIR/settings-local.json"
-      if [ "$form1" = shell ]; then F1="$FRAG_MATRIX_SHELL"; else F1="$FRAG_MATRIX_EXEC"; fi
-      if [ "$form2" = shell ]; then F2="$FRAG_MATRIX_SHELL"; else F2="$FRAG_MATRIX_EXEC"; fi
-      if [ "$flagmode" = on ]; then
-        VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$F1" --settings "$MPROJECT" --settings-local "$MLOCAL" --scripts-prefix "$PREFIX" 2>/dev/null
-        VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$F2" --settings "$MPROJECT" --settings-local "$MLOCAL" --scripts-prefix "$PREFIX" 2>/dev/null
-      else
-        VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$F1" --settings "$MPROJECT" --scripts-prefix "$PREFIX" 2>/dev/null
-        VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$F2" --settings "$MPROJECT" --scripts-prefix "$PREFIX" 2>/dev/null
-      fi
-      COUNT_SEQ="$(python3 -c "
+
+# run_matrix_seq <merger_bin> <workdir> <form1> <flag1> <form2> <flag2>
+# Exécute la séquence à deux appels (merge form1 avec flag1, puis merge form2 avec flag2, MÊME
+# script matrix-guard.sh) contre $mergerbin et imprime "<total> <compte_projet> <compte_local>".
+run_matrix_seq() {
+  local mergerbin="$1" mdir="$2" form1="$3" flag1="$4" form2="$5" flag2="$6"
+  local mproject="$mdir/settings.json" mlocal="$mdir/settings-local.json"
+  local f1 f2
+  if [ "$form1" = shell ]; then f1="$FRAG_MATRIX_SHELL"; else f1="$FRAG_MATRIX_EXEC"; fi
+  if [ "$form2" = shell ]; then f2="$FRAG_MATRIX_SHELL"; else f2="$FRAG_MATRIX_EXEC"; fi
+  if [ "$flag1" = on ]; then
+    VF_BASH_BIN="$BASH_ABS_TEST" bash "$mergerbin" merge "$f1" --settings "$mproject" --settings-local "$mlocal" --scripts-prefix "$PREFIX" 2>/dev/null
+  else
+    VF_BASH_BIN="$BASH_ABS_TEST" bash "$mergerbin" merge "$f1" --settings "$mproject" --scripts-prefix "$PREFIX" 2>/dev/null
+  fi
+  if [ "$flag2" = on ]; then
+    VF_BASH_BIN="$BASH_ABS_TEST" bash "$mergerbin" merge "$f2" --settings "$mproject" --settings-local "$mlocal" --scripts-prefix "$PREFIX" 2>/dev/null
+  else
+    VF_BASH_BIN="$BASH_ABS_TEST" bash "$mergerbin" merge "$f2" --settings "$mproject" --scripts-prefix "$PREFIX" 2>/dev/null
+  fi
+  python3 -c "
 import json, os
-total = 0
-for p in ('$MPROJECT', '$MLOCAL'):
+def count(p):
     if not os.path.exists(p):
-        continue
+        return 0
     d = json.load(open(p))
+    n = 0
     for ev in d.get('hooks', {}).values():
         for g in ev:
             for h in g.get('hooks', []):
                 s = [h.get('command','')] + [a for a in h.get('args', []) if isinstance(a, str)]
-                total += sum(1 for x in s if 'matrix-guard.sh' in x)
-print(total)
-" 2>/dev/null)"
-      if [ "$COUNT_SEQ" != "1" ]; then
-        matrix_fail=$((matrix_fail+1))
-        matrix_detail="${matrix_detail}    séquence #$seq_n (forme1=$form1 flag=$flagmode forme2=$form2) : ${COUNT_SEQ:-imparsable} entrée(s), attendu 1
+                n += sum(1 for x in s if 'matrix-guard.sh' in x)
+    return n
+p = count('$mproject')
+l = count('$mlocal')
+print(f'{p+l} {p} {l}')
 "
-      fi
+}
+
+# Génère les 16 séquences (form1,flag1,form2,flag2) dans l'ordre déterministe
+# {shell,exec} x {on,off} x {shell,exec} x {on,off} — c'est cet ORDRE qui fixe la numérotation
+# #1..#16 utilisée dans les traces ci-dessous et dans le commentaire d'en-tête.
+# SEQ_EXCLUDED : hors de portée architecturale (form1=exec, flag1=on, flag2=off — même
+# frontière que T20b). SEQ_DISCRIMINANT : la destination change entre les deux appels
+# (landed1 != landed2) ET la séquence n'est pas exclue — ce sont les séquences que la purge
+# croisée de la correction exec-30-01 exerce réellement.
+declare -a SEQ_FORM1=() SEQ_FLAG1=() SEQ_FORM2=() SEQ_FLAG2=() SEQ_EXCLUDED=() SEQ_DISCRIMINANT=()
+for form1 in shell exec; do
+  for flag1 in on off; do
+    for form2 in shell exec; do
+      for flag2 in on off; do
+        SEQ_FORM1+=("$form1"); SEQ_FLAG1+=("$flag1"); SEQ_FORM2+=("$form2"); SEQ_FLAG2+=("$flag2")
+        excluded=0
+        if [ "$form1" = exec ] && [ "$flag1" = on ] && [ "$flag2" = off ]; then excluded=1; fi
+        SEQ_EXCLUDED+=("$excluded")
+        landed1=project; if [ "$form1" = exec ] && [ "$flag1" = on ]; then landed1=local; fi
+        landed2=project; if [ "$form2" = exec ] && [ "$flag2" = on ]; then landed2=local; fi
+        discriminant=0
+        if [ "$landed1" != "$landed2" ] && [ "$excluded" -eq 0 ]; then discriminant=1; fi
+        SEQ_DISCRIMINANT+=("$discriminant")
+      done
     done
   done
 done
+
+# ---------- T21a : code sain — les 14 séquences valides finissent à 1 entrée, les 2 exclues
+#            respectent la frontière T20b (projet=1, résidu local=1, non compté en échec) ----------
+matrix_fail=0
+matrix_detail=""
+seq_n=0
+for i in "${!SEQ_FORM1[@]}"; do
+  seq_n=$((seq_n+1))
+  form1="${SEQ_FORM1[$i]}"; flag1="${SEQ_FLAG1[$i]}"
+  form2="${SEQ_FORM2[$i]}"; flag2="${SEQ_FLAG2[$i]}"
+  excluded="${SEQ_EXCLUDED[$i]}"
+  MDIR="$WORK/t21-$seq_n"
+  mkdir -p "$MDIR"
+  RESULT="$(run_matrix_seq "$MERGER" "$MDIR" "$form1" "$flag1" "$form2" "$flag2")"
+  TOTAL="$(echo "$RESULT" | awk '{print $1}')"
+  PCOUNT="$(echo "$RESULT" | awk '{print $2}')"
+  LCOUNT="$(echo "$RESULT" | awk '{print $3}')"
+  if [ "$excluded" -eq 1 ]; then
+    if [ "$PCOUNT" != "1" ] || [ "$LCOUNT" != "1" ]; then
+      matrix_fail=$((matrix_fail+1))
+      matrix_detail="${matrix_detail}    séquence #$seq_n EXCLUE (form1=$form1 flag1=$flag1 form2=$form2 flag2=$flag2, frontière T20b) : attendu projet=1/local=1(résidu), obtenu projet=$PCOUNT/local=$LCOUNT
+"
+    fi
+  else
+    if [ "$TOTAL" != "1" ]; then
+      matrix_fail=$((matrix_fail+1))
+      matrix_detail="${matrix_detail}    séquence #$seq_n (form1=$form1 flag1=$flag1 form2=$form2 flag2=$flag2) : attendu 1 entrée totale, obtenu $TOTAL (projet=$PCOUNT local=$LCOUNT)
+"
+    fi
+  fi
+done
 if [ "$matrix_fail" -eq 0 ]; then
-  ok "T21 matrice générique (8 séquences forme x forme x flag constant) : chaque séquence finit à exactement 1 entrée"
+  ok "T21a matrice générique (16 séquences, code sain) : 14 séquences valides à 1 entrée totale, 2 séquences exclues conformes à la frontière T20b (projet=1, résidu local=1)"
 else
   printf '%s' "$matrix_detail"
-  ko "T21 matrice générique : $matrix_fail/8 séquence(s) en défaut (détail ci-dessus)"
+  ko "T21a matrice générique : $matrix_fail séquence(s) en défaut (détail ci-dessus)"
+fi
+
+# ---------- T21b : preuve par mutation — purge croisée désactivée dans apply_merge (même
+#            mutation que la revue précédente) ----------
+MERGER_PRISTINE_COPY="$WORK/merger-pristine.sh"
+cp "$MERGER" "$MERGER_PRISTINE_COPY"
+MERGER_MUTANT="$WORK/merger-mutant.sh"
+cp "$MERGER" "$MERGER_MUTANT"
+if ! python3 - "$MERGER_MUTANT" <<'PYEOF'
+import re, sys
+path = sys.argv[1]
+with open(path, encoding="utf-8") as f:
+    content = f.read()
+# Deux blocs du fichier commencent par "if other_ev is not None:" — celui qui APPLIQUE la purge
+# (suivi de "for eg in other_ev:", ligne ~329) et celui qui nettoie ensuite les groupes vidés
+# (suivi de "other_ev[:] = ...", ligne ~337). Seul le premier doit être désarmé : le second est
+# un no-op une fois le premier désactivé (rien n'est jamais retiré, donc rien à nettoyer).
+pattern = re.compile(r'^([ \t]*)if other_ev is not None:\n\1[ \t]*for eg in other_ev:\n', re.MULTILINE)
+matches = pattern.findall(content)
+if len(matches) != 1:
+    sys.exit(f"mutation impossible : motif trouve {len(matches)}x (attendu 1)")
+content = pattern.sub(lambda m: f"{m.group(1)}if False and other_ev is not None:\n{m.group(1)}    for eg in other_ev:\n", content, count=1)
+with open(path, "w", encoding="utf-8") as f:
+    f.write(content)
+PYEOF
+then
+  ko "T21b mutation : patch d'injection du bug échoué (motif introuvable dans merge-hooks.sh)"
+else
+  mutant_fail=0
+  mutant_detail=""
+  seq_n=0
+  for i in "${!SEQ_FORM1[@]}"; do
+    seq_n=$((seq_n+1))
+    form1="${SEQ_FORM1[$i]}"; flag1="${SEQ_FLAG1[$i]}"
+    form2="${SEQ_FORM2[$i]}"; flag2="${SEQ_FLAG2[$i]}"
+    excluded="${SEQ_EXCLUDED[$i]}"; discriminant="${SEQ_DISCRIMINANT[$i]}"
+    MDIR="$WORK/t21-mut-$seq_n"
+    mkdir -p "$MDIR"
+    RESULT="$(run_matrix_seq "$MERGER_MUTANT" "$MDIR" "$form1" "$flag1" "$form2" "$flag2")"
+    TOTAL="$(echo "$RESULT" | awk '{print $1}')"
+    PCOUNT="$(echo "$RESULT" | awk '{print $2}')"
+    LCOUNT="$(echo "$RESULT" | awk '{print $3}')"
+    if [ "$excluded" -eq 1 ]; then
+      expected_bite=0
+      bit=0
+      { [ "$PCOUNT" = "1" ] && [ "$LCOUNT" = "1" ]; } || bit=1
+    elif [ "$discriminant" -eq 1 ]; then
+      expected_bite=1
+      bit=0
+      [ "$TOTAL" = "2" ] && bit=1
+      mutant_detail="${mutant_detail}    séquence #$seq_n MORD (discriminante, form1=$form1/flag1=$flag1 → form2=$form2/flag2=$flag2) : attendu total=1 (code sain, cf T21a), obtenu total=$TOTAL sous mutation (projet=$PCOUNT local=$LCOUNT)
+"
+    else
+      expected_bite=0
+      bit=0
+      [ "$TOTAL" = "1" ] || bit=1
+    fi
+    if [ "$bit" -ne "$expected_bite" ]; then
+      mutant_fail=$((mutant_fail+1))
+      mutant_detail="${mutant_detail}    séquence #$seq_n MORSURE INATTENDUE (form1=$form1 flag1=$flag1 form2=$form2 flag2=$flag2, excluded=$excluded discriminant=$discriminant) : attendu bite=$expected_bite, obtenu bite=$bit (total=$TOTAL projet=$PCOUNT local=$LCOUNT)
+"
+    fi
+  done
+  if [ "$mutant_fail" -eq 0 ]; then
+    printf '%s' "$mutant_detail"
+    ok "T21b preuve par mutation : exactement les 4 séquences discriminantes (#3, #7, #9, #15) mordent (total 1→2), les 10 séquences de contrôle et les 2 exclues restent inchangées"
+  else
+    printf '%s' "$mutant_detail"
+    ko "T21b preuve par mutation : $mutant_fail morsure(s) inattendue(s) (détail ci-dessus)"
+  fi
+fi
+
+# ---------- T21c : restauration — merge-hooks.sh réel jamais touché (mutation appliquée à une
+#            copie), reconfirmé par cmp ----------
+if cmp -s "$MERGER" "$MERGER_PRISTINE_COPY"; then
+  ok "T21c restauration : merge-hooks.sh identique à avant la manipulation de mutation (cmp)"
+else
+  ko "T21c restauration : merge-hooks.sh a été altéré par la manipulation de mutation"
 fi
 
 echo ""
