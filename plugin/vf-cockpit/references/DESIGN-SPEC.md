@@ -193,7 +193,8 @@ drawer (`overflow-y: auto`, hauteur `100vh` moins son padding).
 
   --vf-text-primary:   #e8ecf1; /* corps de texte, titres */
   --vf-text-secondary: #9aa4b2; /* méta, labels secondaires */
-  --vf-text-tertiary:  #6b7280; /* horodatages, texte le moins prioritaire — jamais en texte courant */
+  --vf-text-tertiary:  #6b7280; /* glyphes/séparateurs décoratifs seuls (→, pouls statique) — sous
+                                    le plancher AA (§3), jamais sur un libellé lisible */
 
   --vf-accent:         #e0a92d; /* accent cockpit — amber, phase courante, focus ring */
   --vf-accent-soft:    #2b2109; /* fond teinté pour chips d'accent */
@@ -234,10 +235,10 @@ Pile système uniquement (hors-ligne, zéro webfont) :
   --vf-text-base: 0.875rem;  /* 14px — corps par défaut */
   --vf-text-md:   1rem;      /* 16px — titres de carte */
   --vf-text-lg:   1.25rem;   /* 20px — titres de section (①②③) */
-  --vf-text-xl:   1.5rem;    /* 24px — nom du milestone en en-tête */
+  --vf-text-xl:   1.5rem;    /* 24px — nom du milestone en en-tête, seul élément à ce corps */
 
   --vf-weight-regular:  400;
-  --vf-weight-medium:   500; /* labels, chips actives */
+  --vf-weight-medium:   500; /* chips actives (§4.2, §4.3) — poids de base de toute chip cliquable */
   --vf-weight-semibold: 600; /* titres, statut courant */
 
   --vf-leading-tight:   1.25; /* titres */
@@ -288,7 +289,7 @@ composant** (SC 1.4.11).
 | `--vf-surface-1` / `--vf-text-primary` | 15.41:1 | texte sur panneau | AAA |
 | `--vf-surface-2` / `--vf-text-primary` | 14.54:1 | texte sur drawer | AAA |
 | `--vf-surface-1` / `--vf-text-secondary` | 7.25:1 | méta, labels | AAA |
-| `--vf-surface-1` / `--vf-text-tertiary` | 3.78:1 | horodatages seuls — **gros texte / non porteur d'information critique uniquement** | AA gros texte, pas AA texte courant → ne jamais l'utiliser sous `--vf-text-sm` |
+| `--vf-surface-1` / `--vf-text-tertiary` | 3.78:1 | glyphes/séparateurs décoratifs seuls (`→`, pouls statique) — **jamais un libellé lisible** | AA gros texte, pas AA texte courant → ne jamais l'utiliser sous `--vf-text-sm`, et jamais sur un libellé (voir note ci-dessous) |
 | `--vf-surface-1` / `--vf-accent` | 8.60:1 | libellés d'accent, focus | AAA |
 | `--vf-surface-1` / `--vf-status-done` | 9.67:1 | texte statut done | AAA |
 | `--vf-surface-1` / `--vf-status-ready` | 7.45:1 | texte statut ready | AAA |
@@ -307,6 +308,14 @@ composant** (SC 1.4.11).
 
 Conséquence directe : `--vf-border` délimite un panneau passif (lecture), `--vf-border-strong`
 délimite tout ce qui est cliquable, focalisable, ou change d'état.
+
+**Le plancher AA de ce §3 prime sur tout détail de composant du §4.** `--vf-text-tertiary` ne doit
+jamais porter un libellé lisible (horodatage, source, label de champ, lien de journal, libellé
+« héritées », orientation de légende) — ces éléments passent tous à `--vf-text-secondary` (7.25:1
+sur `--vf-surface-1`, 6.84:1 sur `--vf-surface-2`, 7.71:1 sur `--vf-bg` — AA/AAA selon fond). Ils
+restent volontairement discrets par la taille (`--vf-text-xs`) et l'absence de graisse, jamais par
+une couleur sous le seuil AA — c'est ce qui a fait dériver §4.1/§4.6/§4.7 avant correction (fix
+a11y, cf. CHANGELOG).
 
 ### Statut jamais porté par la couleur seule
 
@@ -352,17 +361,22 @@ Anatomie : `<header>` sticky (`position: sticky; top: 0; z-index: 5`), fond `--v
 Contenu, de gauche à droite :
 1. Nom du module (`vf-cockpit`), `--vf-text-md`, `--vf-weight-semibold`, discret — ce n'est pas
    l'information qu'on vient chercher.
-2. **Badge milestone** : `milestone · fiabilite-v1.0 — phase 30 (planning) · 0/8 phases`,
-   `--vf-text-sm`, fond `--vf-surface-2`, `--vf-radius-pill`, padding `.15rem .8rem`.
+2. **Badge milestone** — traitement typographique **dominant**, pas un badge générique (§0 : c'est
+   la priorité n°1 de la lecture en 3 secondes) : `milestone · fiabilite-v1.0 — phase 30
+   (planning) · 0/8 phases`, `--vf-text-xl`, `--vf-weight-semibold`, `--vf-text-primary`, sans fond
+   ni pilule (`.vf-badge-milestone` sort du gabarit `.vf-badge` générique).
 3. **Badge verrou** (pouls, §0/§6) : `🔒 owner · step · 4s` sur fond `--vf-status-done-bg` /
    couleur `--vf-status-done` si vivant ; `--vf-status-stale-bg`/`stale` avec glyphe `⚠` si périmé
    (`age_seconds > 1800`) ; `🔓 aucune mission` sur `--vf-surface-2`/`--vf-text-secondary` si
-   `lock.present === false`.
+   `lock.present === false`. Reste sur le gabarit `.vf-badge` (`--vf-text-xs`, pilule) — lui n'est
+   pas l'information n°1, juste un état secondaire.
 4. **Horodatage `maj HH:MM:SS`**, poussé à droite (`margin-left: auto`), `--vf-text-xs`,
-   `--vf-font-mono`, `--vf-text-tertiary`.
+   `--vf-font-mono`, `--vf-text-secondary` (le plancher a11y du §3 exclut `--vf-text-tertiary` sur
+   un libellé lisible, même discret).
 
-Dimensions : badges `--vf-text-xs`, hauteur de ligne `1.4`, jamais tronqués (le nom du milestone
-peut passer à la ligne suivante sous 640px, cf. §7).
+Dimensions : badge verrou en `--vf-text-xs`, hauteur de ligne `1.4` ; badge milestone en
+`--vf-text-xl` (seul élément de l'en-tête à ce corps, cf. §2.3) — jamais tronqués (le nom du
+milestone peut passer à la ligne suivante sous 640px, cf. §7).
 
 ### 4.2 Carte de phase (niveau ① — chip de Trajectoire)
 
@@ -376,8 +390,10 @@ focalisable) : `min-width: 8rem`, padding `--vf-space-2 --vf-space-3`, `--vf-rad
   niveau, c'est elle qui ancre le regard.
 - État `ready`/à venir : bordure `--vf-border`, glyphe `○`, `--vf-text-secondary`.
 - Connecteur entre chips consécutives de la même chaîne : `::after { content: "→"; color:
-  var(--vf-text-tertiary) }`, jamais entre le groupe *chantier* et le groupe *héritées* (rupture
-  visuelle : `gap: --vf-space-5` + libellé `« héritées »` en `--vf-text-xs` au-dessus du groupe).
+  var(--vf-text-tertiary) }` (glyphe décoratif, pas un libellé — le plancher a11y du §3 ne
+  s'applique pas), jamais entre le groupe *chantier* et le groupe *héritées* (rupture visuelle :
+  `gap: --vf-space-5` + libellé `« héritées »` en `--vf-text-xs --vf-text-secondary` au-dessus du
+  groupe).
 
 ### 4.3 Carte du chantier actuel (niveau ②)
 
@@ -421,15 +437,17 @@ gauche `1px solid var(--vf-border-strong)`, `box-shadow: var(--vf-shadow-drawer)
 Anatomie :
 - Bouton fermeture (`✕`), coin haut-droit, cible 44×44px, premier élément focalisable.
 - Titre `<h3 id="drawer-title">` : `Phase {num} — {name}` ou `{node.id}`.
-- Ligne de provenance (`--vf-text-xs --vf-text-tertiary`) : `source : ROADMAP.md +
-  .planning/phases/{dir}/` (fiche de phase) ou `source : .planning/{file}` (fiche de nœud) — traçer
-  systématiquement d'où vient la donnée, cohérent avec la nature lecture-seule de l'outil.
+- Ligne de provenance (`--vf-text-xs --vf-text-secondary` — plancher a11y du §3, discrétion portée
+  par la taille pas par la couleur) : `source : ROADMAP.md + .planning/phases/{dir}/` (fiche de
+  phase) ou `source : .planning/{file}` (fiche de nœud) — tracer systématiquement d'où vient la
+  donnée, cohérent avec la nature lecture-seule de l'outil.
 - Pour une phase : rangée de puces plans (identique à §4.3 mais complète, jamais tronquée) puis le
   corps Markdown-léger de la section ROADMAP (gras/`code` uniquement, pas de rendu Markdown complet
   — cohérent avec le parseur `md()` du spike).
 - Pour un nœud DAG : `Mandat`, `Étage`, `Statut` (glyphe + texte), `Dépend de` (liste), `Périmètre`
   (liste à puces des chemins déclarés) — champs directement mappés sur le schéma
-  `MISSION-*.dag.json`.
+  `MISSION-*.dag.json`. Libellés de champ (`dt`) en `--vf-text-xs --vf-text-secondary` (idem
+  provenance, plancher a11y du §3).
 
 Ouverture : `transform: translateX(0)` depuis `translateX(105%)`, `--vf-motion-base` ease-decel
 (§6). Le drawer se ferme sur `Échap`, clic sur `✕`, ou clic sur un overlay semi-transparent
@@ -438,8 +456,9 @@ d'overlay (le drawer occupe déjà l'essentiel de l'écran).
 
 ### 4.7 Ligne de journal (accès secondaire, pas un panneau principal)
 
-Un simple lien texte discret en pied de page (`--vf-text-xs`, `--vf-text-tertiary`), `voir le
-journal (N événements)`, qui ouvre le même drawer avec une liste de lignes `HH:MM:SS [cat] msg` en
+Un simple lien texte discret en pied de page (`--vf-text-xs`, `--vf-text-secondary` — plancher
+a11y du §3, discrétion portée par la taille), `voir le journal (N événements)`, qui ouvre le même
+drawer avec une liste de lignes `HH:MM:SS [cat] msg` en
 `--vf-font-mono --vf-text-sm`, catégorie colorée en `--vf-text-secondary` sauf `parse`/`watch`
 en erreur → `--vf-status-failed`. Volontairement en retrait : c'est un outil de diagnostic, pas
 un panneau de lecture régulière (cf. §0, « ce qui est bruit »).
@@ -524,7 +543,8 @@ Ce qui s'anime :
   `outline` amber qui apparaît puis s'efface, `--vf-motion-slow`, une seule fois par changement —
   jamais répété tant que le statut ne change pas à nouveau.
 - **Horodatage `maj HH:MM:SS`** : la classe `.flash` colore le texte en `--vf-accent` pendant
-  `400ms` puis repasse à `--vf-text-tertiary` — signal minimal, local, jamais un flash de page.
+  `400ms` puis repasse à `--vf-text-secondary` (plancher a11y du §3) — signal minimal, local,
+  jamais un flash de page.
 
 Ce qui ne s'anime jamais : le re-rendu du SVG Mermaid lui-même (remplacement direct du DOM, pas de
 fondu — un crossfade sur un diagramme technique ajoute de la charge cognitive sans bénéfice), le
