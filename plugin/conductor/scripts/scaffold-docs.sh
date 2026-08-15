@@ -22,12 +22,20 @@
 set -euo pipefail
 
 DOCS_DIR="docs"
+INDEX_DIR=""
 COMPARTMENTS=()
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --docs-dir)   DOCS_DIR="$2"; shift 2 ;;
     --docs-dir=*) DOCS_DIR="${1#--docs-dir=}"; shift ;;
+    --index)
+      if [ "$#" -lt 2 ]; then
+        echo "[scaffold-docs] --index nécessite une valeur" >&2
+        exit 2
+      fi
+      INDEX_DIR="$2"; shift 2 ;;
+    --index=*) INDEX_DIR="${1#--index=}"; shift ;;
     -*) echo "[scaffold-docs] argument inconnu : $1" >&2; exit 2 ;;
     *) COMPARTMENTS+=("$1"); shift ;;
   esac
@@ -119,3 +127,32 @@ for c in "${COMPARTMENTS[@]:-}"; do
 done
 
 log "✓ doc externalisée sous $DOCS_DIR/ (transverse${COMPARTMENTS:+ + ${#COMPARTMENTS[@]} compartiment(s)})"
+
+# ---- Index de dossier de références (--index <dossier>) ----
+# Pattern distinct de INDEX.md ci-dessus : un tableau de bord de compartiment (l.51-57) n'est pas
+# un index de contenu de dossier. Posé à la demande de l'appelant sur tout dossier de références
+# qui franchit 10 fichiers markdown — sous le seuil, le geste reste possible mais explicite.
+if [ -n "$INDEX_DIR" ]; then
+  if [ ! -d "$INDEX_DIR" ]; then
+    echo "[scaffold-docs] --index : dossier introuvable : $INDEX_DIR" >&2
+    exit 2
+  fi
+  n_md="$(find "$INDEX_DIR" -maxdepth 1 -type f -name '*.md' ! -name '_index.md' | wc -l | tr -d ' ')"
+  if [ "$n_md" -gt 10 ]; then
+    log "seuil franchi ($n_md fichiers > 10) : _index.md justifié dans $INDEX_DIR"
+  else
+    log "seuil non franchi ($n_md fichiers, seuil > 10) : _index.md posé sur demande explicite dans $INDEX_DIR"
+  fi
+  write_stub "$INDEX_DIR/_index.md" \
+    "# Index — $INDEX_DIR" \
+    "" \
+    "> Cet index existe pour qu'un agent choisisse un fichier sans les ouvrir tous. Il est posé à" \
+    "> partir de plus de 10 fichiers dans un dossier de références. Il liste, il ne fait pas" \
+    "> autorité." \
+    "" \
+    "| Fichier | Résumé |" \
+    "|---|---|" \
+    "| [nom-de-fichier.md] | [ce que ce fichier tranche] |" \
+    "" \
+    "Cet index doit rester cohérent avec le contenu du dossier."
+fi
