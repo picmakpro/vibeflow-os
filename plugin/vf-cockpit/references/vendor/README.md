@@ -2,6 +2,12 @@
 
 Ce dossier vendorise Mermaid pour que le cockpit fonctionne **hors ligne, sans CDN**.
 
+**Emplacement** : `plugin/vf-cockpit/references/vendor/` — pas sous `assets/`. Le moteur
+d'installation (`plugin/_internal/vibeflow-update.sh`) ne copie **aucun** dossier `assets/` dans
+le lab de l'utilisateur ; seul `references/` est recopié tel quel (`cp -r` non filtré) vers
+`.claude/skills/vf-cockpit/references/`. Un fichier posé sous `assets/` ne serait donc jamais
+livré. Front (`exec-ui`) doit référencer ce vendor sous ce chemin installé.
+
 ## Fichier vendorisé
 
 | Champ | Valeur |
