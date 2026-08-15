@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>vf-cockpit — spike</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --line: #21262d;
+    --ink: #e6edf3; --dim: #8b949e; --accent: #d4a017;
+    --ok: #3fb950; --run: #d4a017; --ready: #58a6ff; --blocked: #6e7681;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; padding: 1.2rem; }
+  header { display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
+  header h1 { font-size: 1.15rem; letter-spacing: .12em; text-transform: uppercase; }
+  header h1 span { color: var(--accent); }
+  .badge { border: 1px solid var(--line); border-radius: 99px; padding: .1rem .7rem; font-size: .78rem; color: var(--dim); }
+  .badge.live { border-color: var(--ok); color: var(--ok); }
+  .badge.stale { border-color: #f85149; color: #f85149; }
+  .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.2rem; overflow-x: auto; }
+  .panel.wide { grid-column: 1 / -1; }
+  .panel h2 { font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); margin-bottom: .8rem; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: .15rem 1rem; font-size: .85rem; }
+  .kv dt { color: var(--dim); }
+  .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; margin: .6rem 0 .2rem; }
+  .bar i { display: block; height: 100%; background: var(--accent); transition: width .6s; }
+  ul.phases { list-style: none; display: flex; flex-direction: column; gap: .3rem; font-size: .85rem; }
+  ul.phases li::before { content: '○ '; color: var(--dim); }
+  ul.phases li.done::before { content: '● '; color: var(--ok); }
+  ul.phases li.current::before { content: '◉ '; color: var(--run); }
+  ul.phases li.done { color: var(--dim); }
+  ul.phases li .when { color: var(--dim); font-size: .75rem; }
+  .mermaid-host svg { max-width: 100%; height: auto; }
+  #updated { margin-left: auto; font-size: .75rem; color: var(--dim); }
+  #updated.flash { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>vf-<span>cockpit</span></h1>
+  <span class="badge" id="milestone">…</span>
+  <span class="badge" id="phase">…</span>
+  <span class="badge" id="lock">…</span>
+  <span id="updated"></span>
+</header>
+
+<div class="grid">
+  <section class="panel wide">
+    <h2>Mission en cours — DAG live</h2>
+    <div id="dag" class="mermaid-host"><em style="color:var(--dim)">aucune mission</em></div>
+  </section>
+
+  <section class="panel">
+    <h2>Milestone courant — phases</h2>
+    <div class="kv" id="stateKv"></div>
+    <div class="bar"><i id="progress" style="width:0"></i></div>
+    <div style="font-size:.75rem;color:var(--dim)" id="progressTxt"></div>
+    <ul class="phases" id="phases" style="margin-top:.8rem"></ul>
+  </section>
+
+  <section class="panel">
+    <h2>Historique — milestones clos</h2>
+    <div id="timeline" class="mermaid-host"></div>
+  </section>
+</div>
+
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({ startOnLoad: false, theme: 'dark', themeVariables: { fontSize: '13px' } });
+
+const esc = s => String(s).replace(/"/g, "'").replace(/[\[\]{}<>]/g, ' ');
+let seq = 0; // ids mermaid uniques par re-rendu
+
+function dagToMermaid(dag) {
+  const cls = { done: 'done', running: 'running', ready: 'ready', blocked: 'blocked' };
+  const lines = ['flowchart TD'];
+  const idx = new Map(dag.nodes.map((n, i) => [n.id, 'n' + i]));
+  for (const n of dag.nodes) {
+    const label = esc(n.step || n.id).slice(0, 55);
+    lines.push(`  ${idx.get(n.id)}["${label}"]:::${cls[n.status] || 'blocked'}`);
+    for (const d of n.deps || []) if (idx.has(d)) lines.push(`  ${idx.get(d)} --> ${idx.get(n.id)}`);
+  }
+  lines.push('  classDef done fill:#12261a,stroke:#3fb950,color:#3fb950');
+  lines.push('  classDef running fill:#2b2007,stroke:#d4a017,color:#d4a017,stroke-width:2px');
+  lines.push('  classDef ready fill:#0d1d2e,stroke:#58a6ff,color:#58a6ff');
+  lines.push('  classDef blocked fill:#161b22,stroke:#30363d,color:#6e7681');
+  return lines.join('\n');
+}
+
+function milestonesToMermaid(ms) {
+  const closed = ms.filter(m => m.closed && m.when).reverse();
+  const lines = ['timeline'];
+  for (const m of closed) lines.push(`  ${m.when} : ${esc(m.title).slice(0, 40)}`);
+  return lines.join('\n');
+}
+
+async function draw(el, def) {
+  try {
+    const { svg } = await mermaid.render('mm' + (seq++), def);
+    el.innerHTML = svg;
+  } catch (e) { el.innerHTML = `<pre style="color:#f85149">${e.message}</pre>`; }
+}
+
+async function refresh() {
+  const s = await (await fetch('/api/state')).json();
+  const st = s.state || {};
+  document.getElementById('milestone').textContent = `milestone : ${st.milestone || '?'} ${st.milestone_name || ''}`;
+  document.getElementById('phase').textContent = `phase ${st.current_phase || '?'} · ${st.status || '?'}`;
+  const lock = document.getElementById('lock');
+  if (s.lock.present) {
+    lock.textContent = `🔒 ${s.lock.owner} · ${s.lock.step} · ${s.lock.age_seconds}s`;
+    lock.className = 'badge ' + (s.lock.stale ? 'stale' : 'live');
+  } else { lock.textContent = '🔓 pas de mission'; lock.className = 'badge'; }
+
+  const kv = document.getElementById('stateKv');
+  kv.innerHTML = `<dt>phase courante</dt><dd>${st.current_phase_name || '?'}</dd>
+                  <dt>dernière activité</dt><dd>${st.last_activity_desc || '?'}</dd>`;
+  const p = st.progress || {};
+  document.getElementById('progress').style.width = (p.percent || 0) + '%';
+  document.getElementById('progressTxt').textContent =
+    `${p.completed_phases ?? '?'}/${p.total_phases ?? '?'} phases · ${p.percent ?? 0}%`;
+
+  const cur = Number(st.current_phase || 0);
+  const ul = document.getElementById('phases');
+  ul.innerHTML = s.phases.filter(ph => !ph.done || ph.num >= cur - 2).slice(-14).map(ph =>
+    `<li class="${ph.done ? 'done' : ph.num === cur ? 'current' : ''}">
+       Phase ${ph.num} — ${ph.name} ${ph.completed ? `<span class="when">(${ph.completed})</span>` : ''}
+     </li>`).join('');
+
+  if (s.dags.length) await draw(document.getElementById('dag'), dagToMermaid(s.dags[0]));
+  await draw(document.getElementById('timeline'), milestonesToMermaid(s.milestones));
+
+  const up = document.getElementById('updated');
+  up.textContent = `maj ${new Date().toLocaleTimeString()}`;
+  up.classList.add('flash'); setTimeout(() => up.classList.remove('flash'), 800);
+}
+
+new EventSource('/events').onmessage = refresh;
+await refresh();
+</script>
+</body>
+</html>
