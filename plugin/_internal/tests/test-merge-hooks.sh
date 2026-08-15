@@ -12,6 +12,17 @@
 # T4 — remove → entrées du module retirées, tiers conservés, groupes vides nettoyés
 # T5 — intégration engine : install consolidator → hooks présents ; uninstall → retirés
 # T6 — settings corrompu → merge échoue proprement (exit ≠ 0), fichier non écrasé
+# T7 — changement de matcher entre versions du fragment → pas de doublon
+#
+# Forme exec (contrat PR #29 §5, D-01, plan 30-01) :
+# T8  — substitution du jeton {{VF_SCRIPTS}} dans args, aucune accolade double résiduelle
+# T9  — dédup cross-forme, sens shell → exec (le patron T7, transposé au changement de forme)
+# T10 — dédup cross-forme, sens exec → shell (réciproque — compat descendante, rollback)
+# T11 — remove d'un fragment 100% exec (preuve directe que frag_basenames() lit args)
+# T12 — idempotence sur trois passes (forme exec)
+# T13 — sonde de parc (spec §4) : settings réaliste, merge exec puis remove, zéro résidu VF,
+#       entrées tierce/gsd-core intactes octet pour octet
+# T14 — frontière de mot préservée sur args (régression lookaround, transposée depuis command)
 #
 # ISOLATION : tout sous mktemp. Le vrai ~/.claude n'est jamais touché.
 
@@ -46,6 +57,7 @@ cat > "$FRAG" <<'EOF'
 }
 EOF
 PREFIX='"$CLAUDE_PROJECT_DIR"/.claude/scripts'
+BASH_ABS_TEST="$(command -v bash)"
 
 # ---------- T1 : merge dans settings absent ----------
 S1="$WORK/t1/settings.json"
@@ -202,6 +214,194 @@ else
   else
     ko "T6 fichier corrompu écrasé malgré l'échec"
   fi
+fi
+
+# ---------- T8 : substitution du jeton {{VF_SCRIPTS}} dans args (forme exec) ----------
+FRAG_EXEC="$WORK/frag-exec.json"
+cat > "$FRAG_EXEC" <<'EOF'
+{ "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": [ { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/exec-guard.sh", "--hook"] } ] } ] } }
+EOF
+S8="$WORK/t8/settings.json"
+if VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_EXEC" --settings "$S8" --scripts-prefix "$PREFIX" 2>/dev/null \
+   && python3 -c "
+import json
+d = json.load(open('$S8'))
+h = d['hooks']['PreToolUse'][0]['hooks'][0]
+assert h['command'] == '$BASH_ABS_TEST', h['command']
+assert h['args'][0] == '$PREFIX/exec-guard.sh', h['args']
+assert h['args'][1] == '--hook', h['args']
+raw = open('$S8').read()
+assert '{{' not in raw, 'accolade double residuelle : ' + raw
+" 2>/dev/null; then
+  ok "T8 substitution {{VF_SCRIPTS}} dans args (forme exec), aucune accolade double résiduelle"
+else
+  ko "T8 substitution dans args"
+fi
+
+# ---------- T9/T10 : dédup cross-forme (fragments partagés shell ↔ exec) ----------
+FRAG_SHELL_DEDUP="$WORK/frag-shell-dedup.json"
+cat > "$FRAG_SHELL_DEDUP" <<'EOF'
+{ "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": [ { "type": "command", "command": "bash {{VF_SCRIPTS}}/dedup-guard.sh || true" } ] } ] } }
+EOF
+FRAG_EXEC_DEDUP="$WORK/frag-exec-dedup.json"
+cat > "$FRAG_EXEC_DEDUP" <<'EOF'
+{ "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": [ { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/dedup-guard.sh"] } ] } ] } }
+EOF
+
+# ---------- T9 : dédup cross-forme, sens shell → exec ----------
+S9="$WORK/t9/settings.json"
+bash "$MERGER" merge "$FRAG_SHELL_DEDUP" --settings "$S9" --scripts-prefix "$PREFIX" 2>/dev/null
+VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_EXEC_DEDUP" --settings "$S9" --scripts-prefix "$PREFIX" 2>/dev/null
+if python3 -c "
+import json
+d = json.load(open('$S9'))
+entries = [h for g in d['hooks']['PreToolUse'] for h in g['hooks']]
+matches = [h for h in entries if 'dedup-guard.sh' in h.get('command','') or any('dedup-guard.sh' in a for a in h.get('args',[]) if isinstance(a,str))]
+assert len(matches) == 1, f'attendu 1 entree, trouve {len(matches)} : {matches}'
+assert 'args' in matches[0], f'entree residuelle en forme shell, pas exec : {matches[0]}'
+" 2>/dev/null; then
+  ok "T9 dédup cross-forme shell→exec : 1 seule entrée, forme exec, ancienne entrée shell purgée"
+else
+  ko "T9 dédup cross-forme shell→exec"
+fi
+
+# ---------- T10 : dédup cross-forme, sens exec → shell (réciproque, rollback) ----------
+S10="$WORK/t10/settings.json"
+VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_EXEC_DEDUP" --settings "$S10" --scripts-prefix "$PREFIX" 2>/dev/null
+bash "$MERGER" merge "$FRAG_SHELL_DEDUP" --settings "$S10" --scripts-prefix "$PREFIX" 2>/dev/null
+if python3 -c "
+import json
+d = json.load(open('$S10'))
+entries = [h for g in d['hooks']['PreToolUse'] for h in g['hooks']]
+matches = [h for h in entries if 'dedup-guard.sh' in h.get('command','') or any('dedup-guard.sh' in a for a in h.get('args',[]) if isinstance(a,str))]
+assert len(matches) == 1, f'attendu 1 entree, trouve {len(matches)} : {matches}'
+assert 'args' not in matches[0], f'entree residuelle en forme exec, pas shell : {matches[0]}'
+" 2>/dev/null; then
+  ok "T10 dédup cross-forme exec→shell : 1 seule entrée, forme shell, ancienne entrée exec purgée"
+else
+  ko "T10 dédup cross-forme exec→shell (rollback de fragment)"
+fi
+
+# ---------- T11 : remove d'un fragment 100% exec ----------
+S11="$WORK/t11/settings.json"
+VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_EXEC_DEDUP" --settings "$S11" --scripts-prefix "$PREFIX" 2>/dev/null
+if bash "$MERGER" remove "$FRAG_EXEC_DEDUP" --settings "$S11" 2>/dev/null \
+   && python3 -c "
+import json
+d = json.load(open('$S11'))
+all_cmds_args = []
+for ev in d.get('hooks', {}).values():
+    for g in ev:
+        for h in g['hooks']:
+            all_cmds_args.append(h.get('command',''))
+            all_cmds_args.extend(a for a in h.get('args', []) if isinstance(a, str))
+assert not any('dedup-guard.sh' in c for c in all_cmds_args), 'entree exec non retiree'
+" 2>/dev/null; then
+  ok "T11 remove d'un fragment 100% exec — frag_basenames() lit args, désinstallation possible"
+else
+  ko "T11 remove d'un fragment 100% exec"
+fi
+
+# ---------- T12 : idempotence sur trois passes (forme exec) ----------
+S12="$WORK/t12/settings.json"
+VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_EXEC_DEDUP" --settings "$S12" --scripts-prefix "$PREFIX" 2>/dev/null
+VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_EXEC_DEDUP" --settings "$S12" --scripts-prefix "$PREFIX" 2>/dev/null
+VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_EXEC_DEDUP" --settings "$S12" --scripts-prefix "$PREFIX" 2>/dev/null
+if python3 -c "
+import json
+d = json.load(open('$S12'))
+groups = [g for g in d['hooks']['PreToolUse'] if g.get('matcher') == 'Bash']
+entries = [h for g in groups for h in g['hooks'] if 'dedup-guard.sh' in ' '.join(a for a in h.get('args', []) if isinstance(a, str))]
+assert len(groups) == 1, f'plusieurs groupes Bash : {groups}'
+assert len(entries) == 1, f'plusieurs entrees exec : {entries}'
+" 2>/dev/null; then
+  ok "T12 trois merges du même fragment exec → 1 seule entrée, 1 seul groupe"
+else
+  ko "T12 idempotence 3 passes (forme exec)"
+fi
+
+# ---------- T13 : sonde de parc (spec §4) — settings réaliste, merge exec puis remove ----------
+S13="$WORK/t13/settings.json"
+mkdir -p "$WORK/t13"
+cat > "$S13" <<'EOF'
+{
+  "permissions": { "allow": ["Bash(npm test:*)"] },
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Read", "hooks": [ { "type": "command", "command": "bash /lab/.claude/scripts/sonde-script-a.sh" } ] },
+      { "matcher": "Bash", "hooks": [ { "type": "command", "command": "echo tiers-sonde" } ] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Edit|Write", "hooks": [ { "type": "command", "command": "bash /lab/.claude/scripts/sonde-script-b.sh || true" } ] },
+      { "hooks": [ { "type": "command", "command": "node /lab/.claude/gsd-core/hooks/gsd-context-warning.js" } ] }
+    ]
+  }
+}
+EOF
+FRAG_T13="$WORK/frag-t13.json"
+cat > "$FRAG_T13" <<'EOF'
+{ "hooks": { "PreToolUse": [ { "matcher": "Read", "hooks": [ { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/sonde-script-a.sh"] } ] } ], "PostToolUse": [ { "matcher": "Edit|Write", "hooks": [ { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/sonde-script-b.sh"] } ] } ] } }
+EOF
+TIERS_BEFORE="$WORK/t13-tiers-before.json"
+GSD_BEFORE="$WORK/t13-gsd-before.json"
+python3 -c "
+import json
+d = json.load(open('$S13'))
+g = next(g for g in d['hooks']['PreToolUse'] if g.get('matcher') == 'Bash')
+json.dump(g, open('$TIERS_BEFORE','w'), sort_keys=True)
+"
+python3 -c "
+import json
+d = json.load(open('$S13'))
+g = next(g for g in d['hooks']['PostToolUse'] if 'matcher' not in g)
+json.dump(g, open('$GSD_BEFORE','w'), sort_keys=True)
+"
+VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_T13" --settings "$S13" --scripts-prefix "$PREFIX" 2>/dev/null
+VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" remove "$FRAG_T13" --settings "$S13" 2>/dev/null
+if python3 -c "
+import json
+d = json.load(open('$S13'))
+all_cmds_args = []
+for ev in d.get('hooks', {}).values():
+    for g in ev:
+        for h in g['hooks']:
+            all_cmds_args.append(h.get('command',''))
+            all_cmds_args.extend(a for a in h.get('args', []) if isinstance(a, str))
+assert not any('sonde-script-a.sh' in c for c in all_cmds_args), 'entree VF a residuelle'
+assert not any('sonde-script-b.sh' in c for c in all_cmds_args), 'entree VF b residuelle'
+tiers_after = next(g for g in d['hooks']['PreToolUse'] if g.get('matcher') == 'Bash')
+tiers_before = json.load(open('$TIERS_BEFORE'))
+assert tiers_after == tiers_before, f'entree tierce alteree : {tiers_after}'
+gsd_after = next(g for g in d['hooks']['PostToolUse'] if 'matcher' not in g)
+gsd_before = json.load(open('$GSD_BEFORE'))
+assert gsd_after == gsd_before, f'entree gsd-core alteree : {gsd_after}'
+assert d['permissions']['allow'] == ['Bash(npm test:*)'], 'permissions perdues'
+" 2>/dev/null; then
+  ok "T13 sonde de parc : zéro entrée VF résiduelle, entrées tierce/gsd-core intactes octet pour octet"
+else
+  ko "T13 sonde de parc"
+fi
+
+# ---------- T14 : frontière de mot préservée sur args (régression lookaround, transposée) ----------
+S14="$WORK/t14/settings.json"
+mkdir -p "$WORK/t14"
+cat > "$S14" <<'EOF'
+{ "hooks": { "SessionEnd": [ { "hooks": [ { "type": "command", "command": "/bin/bash", "args": ["/lab/.claude/scripts/gsd-archive.sh", "--async"] } ] } ] } }
+EOF
+FRAG_ARCHIVE="$WORK/frag-archive.json"
+cat > "$FRAG_ARCHIVE" <<'EOF'
+{ "hooks": { "SessionEnd": [ { "hooks": [ { "type": "command", "command": "bash {{VF_SCRIPTS}}/archive.sh --async --apply || true" } ] } ] } }
+EOF
+if bash "$MERGER" remove "$FRAG_ARCHIVE" --settings "$S14" 2>/dev/null \
+   && python3 -c "
+import json
+d = json.load(open('$S14'))
+args = d['hooks']['SessionEnd'][0]['hooks'][0]['args']
+assert any('gsd-archive.sh' in a for a in args), f'gsd-archive.sh purgé à tort par archive.sh : {args}'
+" 2>/dev/null; then
+  ok "T14 frontière de mot sur args : gsd-archive.sh (exec) non purgé par un fragment archive.sh"
+else
+  ko "T14 frontière de mot sur args (régression lookaround transposée)"
 fi
 
 echo ""
