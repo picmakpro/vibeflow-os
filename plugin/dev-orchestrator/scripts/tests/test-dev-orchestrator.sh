@@ -87,6 +87,47 @@
 
 set -uo pipefail
 
+# Ce fichier n'est PAS nommé au contrat PR #29 §7 (suite de test, pas un des 3 fichiers PYBIN
+# listés) — migré quand même pour fermer sa dernière résolution locale (2 gardes de saut). Voir
+# 30-RELIQUATS.md pour la raison de cette extension de périmètre.
+# >>> vf-portable:locator (bloc canonique, contrat PR #29 §3 / D-04 — Phase 30 plan 30-05. Ne
+# pas retaper à la main : copier depuis plugin/_internal/lib/vf-portable.sh entre ces deux
+# marqueurs — seul le préfixe de message varie d'un consommateur à l'autre (identité vérifiée
+# par somme de contrôle dans test-vf-portable.sh).
+# Préfixe de ce consommateur : [test-dev-orchestrator]
+#   1. $(dirname "$0")/vf-portable.sh              → install à plat (TARGET_ROOT/scripts)
+#   2. $(dirname "$0")/lib/vf-portable.sh           → engine dans le cache du plugin
+#   3. remontée bornée (<= 4 niveaux) depuis $(dirname "$0") vers _internal/lib/vf-portable.sh
+#      → module/installeur exécuté depuis le dépôt, quelle que soit sa profondeur réelle
+#   4. $(dirname "$0")/../../scripts/vf-portable.sh → extracteur kpi copié
+# Aucun candidat trouvé → message préfixé en stderr + sortie non-zéro. Jamais un `source` muet.
+_vf_portable_lib=""
+_vf_portable_dir="$(dirname "$0")"
+for _vf_portable_cand in "$_vf_portable_dir/vf-portable.sh" "$_vf_portable_dir/lib/vf-portable.sh"; do
+  [ -f "$_vf_portable_cand" ] && { _vf_portable_lib="$_vf_portable_cand"; break; }
+done
+if [ -z "$_vf_portable_lib" ]; then
+  _vf_portable_walk="$_vf_portable_dir"
+  for _vf_portable_i in 1 2 3 4; do
+    _vf_portable_walk="$_vf_portable_walk/.."
+    if [ -f "$_vf_portable_walk/_internal/lib/vf-portable.sh" ]; then
+      _vf_portable_lib="$_vf_portable_walk/_internal/lib/vf-portable.sh"
+      break
+    fi
+  done
+fi
+if [ -z "$_vf_portable_lib" ] && [ -f "$_vf_portable_dir/../../scripts/vf-portable.sh" ]; then
+  _vf_portable_lib="$_vf_portable_dir/../../scripts/vf-portable.sh"
+fi
+if [ -z "$_vf_portable_lib" ]; then
+  echo "[test-dev-orchestrator] vf-portable.sh introuvable (candidats épuisés — installer/mettre à jour vibeflow)" >&2
+  exit 1
+fi
+# shellcheck source=/dev/null
+. "$_vf_portable_lib"
+unset _vf_portable_lib _vf_portable_dir _vf_portable_cand _vf_portable_walk _vf_portable_i
+# <<< vf-portable:locator
+
 # Résolution du module (racine = dossier parent de scripts/tests/).
 MOD="$(cd "$(dirname "$0")/../.." && pwd)"
 REPO="$(cd "$MOD/.." && pwd)"
@@ -731,7 +772,7 @@ rm -rf "$T2G_HOME" "$T2G_PROJ" "$T2G_BIN"
 # patch_gsd_executor_mcp() dans le MÊME run. SKIP explicite (jamais KO) si python3 absent —
 # l'injecteur est best-effort par conception.
 # ---------------------------------------------------------------------------
-if ! command -v python3 >/dev/null 2>&1; then
+if ! vf_resolve_python >/dev/null 2>&1; then
   skip "T2h chaînage MCP : python3 absent — injecteur best-effort, cas non applicable"
 else
   T2H_HOME="$(mktemp -d)"
@@ -795,7 +836,7 @@ fi
 # l'appel --verify exec le VRAI inject-mcp-tools.sh. Le seul code exercé côté ensure-deps.sh est
 # donc bien le sien (patch_gsd_executor_mcp() réel), avec un verdict de vérification réel.
 # ---------------------------------------------------------------------------
-if ! command -v python3 >/dev/null 2>&1; then
+if ! vf_resolve_python >/dev/null 2>&1; then
   skip "T2m vérification réelle (--force sur --verify) : python3 absent — cas non applicable"
 else
   T2M_HOME="$(mktemp -d)"
@@ -867,7 +908,7 @@ fi
 # cité (présent, attendu, sans conséquence) — un simple grep sur le jeton nu "ERROR:" serait
 # faux-rouge ici.
 # ---------------------------------------------------------------------------
-if ! command -v python3 >/dev/null 2>&1; then
+if ! vf_resolve_python >/dev/null 2>&1; then
   skip "T2n rc=3 non alarmant (contrat F13) : python3 absent — cas non applicable"
 else
   T2N_HOME="$(mktemp -d)"
@@ -903,6 +944,10 @@ SH
   cp "$ENS" "$T2N_SCRIPTS/ensure-deps.sh"
   cp "$MOD/scripts/inject-mcp-tools.sh" "$T2N_SCRIPTS/inject-mcp-tools.sh"
   chmod +x "$T2N_SCRIPTS/inject-mcp-tools.sh"
+  # Depuis la migration PYBIN (Phase 30, D-04) : inject-mcp-tools.sh source vf-portable.sh via le
+  # bloc localisateur (candidat 1, "install à plat") — copie flat requise ici, EXACTEMENT le
+  # geste que copy_engine_lib() fait à un vrai install (même répertoire que le script consommateur).
+  cp "$REPO/_internal/lib/vf-portable.sh" "$T2N_SCRIPTS/vf-portable.sh"
 
   T2N_OUT=$(cd "$T2N_PROJ" && env -u VF_ENSURE_DRY_RUN -u VF_ENSURE_FORCE -u CLAUDE_CONFIG_DIR \
     HOME="$T2N_HOME" PATH="$T2N_BIN:/usr/bin:/bin" bash "$T2N_SCRIPTS/ensure-deps.sh" 2>&1)

@@ -34,17 +34,58 @@ case "$INPUT" in
   *) exit 0 ;;
 esac
 
-# ADR-054 : le `python3` du PATH Windows peut être le stub Microsoft Store — présent
-# (`command -v` réussit) mais inerte à l'exécution. Détection par CHEMIN (zéro spawn),
-# repli `python` ; sinon fail-open inchangé.
-PYBIN=python3
-case "$(command -v python3 2>/dev/null)" in
-  ''|*WindowsApps*) if command -v python >/dev/null 2>&1; then PYBIN=python; else exit 0; fi ;;
-esac
+# >>> vf-portable:locator (bloc canonique, contrat PR #29 §3 / D-04 — Phase 30 plan 30-05. Ne
+# pas retaper à la main : copier depuis plugin/_internal/lib/vf-portable.sh entre ces deux
+# marqueurs — seul le préfixe de message varie d'un consommateur à l'autre (identité vérifiée
+# par somme de contrôle dans test-vf-portable.sh).
+# Préfixe de ce consommateur : [guard-file-size]
+#   1. $(dirname "$0")/vf-portable.sh              → install à plat (TARGET_ROOT/scripts)
+#   2. $(dirname "$0")/lib/vf-portable.sh           → engine dans le cache du plugin
+#   3. remontée bornée (<= 4 niveaux) depuis $(dirname "$0") vers _internal/lib/vf-portable.sh
+#      → module/installeur exécuté depuis le dépôt, quelle que soit sa profondeur réelle
+#   4. $(dirname "$0")/../../scripts/vf-portable.sh → extracteur kpi copié
+# Aucun candidat trouvé → message préfixé en stderr + sortie non-zéro. Jamais un `source` muet.
+_vf_portable_lib=""
+_vf_portable_dir="$(dirname "$0")"
+for _vf_portable_cand in "$_vf_portable_dir/vf-portable.sh" "$_vf_portable_dir/lib/vf-portable.sh"; do
+  [ -f "$_vf_portable_cand" ] && { _vf_portable_lib="$_vf_portable_cand"; break; }
+done
+if [ -z "$_vf_portable_lib" ]; then
+  _vf_portable_walk="$_vf_portable_dir"
+  for _vf_portable_i in 1 2 3 4; do
+    _vf_portable_walk="$_vf_portable_walk/.."
+    if [ -f "$_vf_portable_walk/_internal/lib/vf-portable.sh" ]; then
+      _vf_portable_lib="$_vf_portable_walk/_internal/lib/vf-portable.sh"
+      break
+    fi
+  done
+fi
+if [ -z "$_vf_portable_lib" ] && [ -f "$_vf_portable_dir/../../scripts/vf-portable.sh" ]; then
+  _vf_portable_lib="$_vf_portable_dir/../../scripts/vf-portable.sh"
+fi
+if [ -z "$_vf_portable_lib" ]; then
+  echo "[guard-file-size] vf-portable.sh introuvable (candidats épuisés — installer/mettre à jour vibeflow)" >&2
+  exit 1
+fi
+# shellcheck source=/dev/null
+. "$_vf_portable_lib"
+unset _vf_portable_lib _vf_portable_dir _vf_portable_cand _vf_portable_walk _vf_portable_i
+# <<< vf-portable:locator
+
+# Profil RAPIDE (--fast, zéro spawn ajouté — amendement ADR-054 point 3) : ce guard tourne à
+# CHAQUE Edit/Write, un spawn `timeout` supplémentaire par appel serait une régression de latence
+# perceptible (Pitfall 3, RESEARCH.md). Renversement du silence (D-02) : le chemin « aucun
+# interpréteur utilisable », qui sortait 0 avant cette migration, appelle désormais le marqueur de
+# garde puis sort avec le code qu'il rend (non nul, différent de 2) — le reste du fail-open
+# (erreur interne du programme Python = allow silencieux) est PRÉSERVÉ à l'identique plus bas.
+if ! vf_resolve_python --fast; then
+  vf_guard_unavailable "guard-file-size.sh" "aucun interprète Python utilisable (profil rapide, PreToolUse)"
+  exit $?
+fi
 
 # NB : programme passé en -c (sans apostrophes) ; le payload est rejoué sur le stdin
 # du python. Le bash ne fait plus que router : le deny JSON est émis par python.
-printf '%s' "$INPUT" | "$PYBIN" -c '
+printf '%s' "$INPUT" | vf_python -c '
 import json, os, re, sys
 
 MARKER = "vibeflow:allow-large-file"

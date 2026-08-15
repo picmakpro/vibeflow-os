@@ -19,9 +19,16 @@
 # T11 — lib source absente du cache (engine isolé, ni cache ni voisinage) → l'install ÉCHOUE,
 #       le message nomme la lib, le lab n'est PAS marqué installé (VG-3).
 #
+# Identité du bloc localisateur (tâche 3, contrat §3/§6) :
+# T12 — les 3 consommateurs PYBIN (guard-file-size.sh, inject-mcp-tools.sh,
+#       test-dev-orchestrator.sh) reproduisent le MÊME bloc (une seule somme de contrôle après
+#       normalisation du préfixe de message, le seul jeton autorisé à varier).
+# T13 — l'extraction ne rend JAMAIS une somme sur un fichier sans les deux marqueurs appariés
+#       (échec BRUYANT, jamais un vert par défaut sur « aucun bloc trouvé »).
+#
 # Convention TESTING.md du dépôt : ok()/ko()/skip(), isolation mktemp, trois issues par cas
-# (jamais un skip silencieux sur les cas T1-T8 — seules les extensions d'intégration engine,
-# ajoutées par la tâche 2, peuvent SKIP proprement si l'environnement ne le permet pas).
+# (jamais un skip silencieux sur les cas T1-T8/T12/T13 — seules les extensions d'intégration
+# engine, ajoutées par la tâche 2, peuvent SKIP proprement si l'environnement ne le permet pas).
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -208,6 +215,83 @@ if [ -f "$T11_LAB/.claude/scripts/.vibeflow-installed" ] && grep -q '^hooked=' "
 fi
 [ "$T11_OK" = "1" ] && ok "T11 lib source absente du cache : install échoue (rc=$T11_RC), message nomme la lib, lab non marqué installé (VG-3)"
 rm -rf "$T11_LAB"
+
+# ---------- Contrôle d'identité du bloc localisateur (tâche 3, contrat §3/§6) ----------
+# Extrait le bloc CANONIQUE entre les deux marqueurs, normalise le SEUL jeton autorisé à varier
+# (le préfixe de message entre crochets), et calcule une somme de contrôle. Anticipe le gate amont
+# (check-portable-resolution.sh, pas encore livré dans ce dépôt) : toute dérive de copier-coller
+# entre les 3 consommateurs PYBIN doit être détectée à la machine, jamais par relecture.
+extract_locator_block() {
+  awk '/^# >>> vf-portable:locator/{flag=1} flag{print} /^# <<< vf-portable:locator/{flag=0; exit}' "$1"
+}
+
+sha256_of_stdin() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | awk '{print $1}'
+  else
+    shasum -a 256 | awk '{print $1}'
+  fi
+}
+
+# Rend "MISSING" (jamais une somme) si les DEUX marqueurs ne sont pas présents dans l'ordre —
+# c'est le garde-fou anti-« aucun bloc trouvé = vert par défaut » (piège nommé au contrat §6).
+checksum_locator_block() {
+  local f="$1" block
+  block="$(extract_locator_block "$f")"
+  case "$block" in
+    *'>>> vf-portable:locator'*'<<< vf-portable:locator'*) : ;;
+    *) echo "MISSING"; return 0 ;;
+  esac
+  printf '%s\n' "$block" | sed -E 's/\[[A-Za-z0-9_-]+\]/[PREFIX]/g' | sha256_of_stdin
+}
+
+# ---------- T12 : une SEULE somme de contrôle pour les 3 consommateurs réels ----------
+T12_GFS="$REPO/software-architecture/scripts/guard-file-size.sh"
+T12_IMT="$REPO/dev-orchestrator/scripts/inject-mcp-tools.sh"
+T12_TDO="$REPO/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+T12_OK=1
+T12_REPORT=""
+for T12_ENTRY in "guard-file-size.sh|$T12_GFS" "inject-mcp-tools.sh|$T12_IMT" "test-dev-orchestrator.sh|$T12_TDO"; do
+  T12_LABEL="${T12_ENTRY%%|*}"
+  T12_PATH="${T12_ENTRY#*|}"
+  if [ ! -f "$T12_PATH" ]; then
+    ko "T12 identité du bloc : consommateur introuvable — $T12_LABEL ($T12_PATH)"
+    T12_OK=0
+    continue
+  fi
+  T12_SUM="$(checksum_locator_block "$T12_PATH")"
+  if [ "$T12_SUM" = "MISSING" ]; then
+    ko "T12 identité du bloc : marqueurs absents/dépareillés dans $T12_LABEL — échec BRUYANT (jamais un vert par défaut)"
+    T12_OK=0
+    continue
+  fi
+  T12_REPORT="$T12_REPORT$T12_LABEL=$T12_SUM"$'\n'
+done
+if [ "$T12_OK" = "1" ]; then
+  T12_UNIQ="$(printf '%s' "$T12_REPORT" | awk -F= '{print $2}' | sort -u)"
+  T12_UNIQ_COUNT="$(printf '%s\n' "$T12_UNIQ" | grep -c .)"
+  if [ "$T12_UNIQ_COUNT" = "1" ]; then
+    ok "T12 identité du bloc localisateur : une seule somme de contrôle pour les 3 consommateurs ($T12_UNIQ)"
+  else
+    ko "T12 identité du bloc : sommes DIVERGENTES —
+$T12_REPORT"
+  fi
+fi
+
+# ---------- T13 : extraction bruyante — marqueurs absents/dépareillés ne rendent JAMAIS un vert ----------
+T13_NONE="$WORK/t13-no-markers.sh"
+printf '#!/usr/bin/env bash\necho hello\n' > "$T13_NONE"
+T13_OPEN_ONLY="$WORK/t13-open-only.sh"
+printf '#!/usr/bin/env bash\n# >>> vf-portable:locator\necho x\n' > "$T13_OPEN_ONLY"
+T13_OK=1
+for T13_F in "$T13_NONE" "$T13_OPEN_ONLY"; do
+  T13_SUM="$(checksum_locator_block "$T13_F")"
+  if [ "$T13_SUM" != "MISSING" ]; then
+    ko "T13 extraction : $T13_F sans marqueurs valides a quand même rendu une somme (faux vert) — [$T13_SUM]"
+    T13_OK=0
+  fi
+done
+[ "$T13_OK" = "1" ] && ok "T13 extraction bruyante : marqueurs absents/dépareillés → jamais une somme silencieuse (2 fixtures, échec explicite)"
 
 echo "== $pass ok · $fail ko · $skipped skip =="
 [ "$fail" -eq 0 ]
