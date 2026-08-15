@@ -166,18 +166,19 @@ out="$(bash "$SCRIPT" --hook --path "$D")"; rc=$?
 has_signal=0; case "$out" in *"[docs-ingest] 3 documents"*"2 spec"*"1 plan"*) has_signal=1 ;; esac
 if [ "$rc" -eq 0 ] && [ "$has_signal" -eq 1 ]; then ok "17 --hook sur 3 documents non cités (2 spec, 1 plan) → ligne agrégée, exit 0"; else ko "17 --hook sur 3 documents non cités (2 spec, 1 plan) → ligne agrégée, exit 0" "rc=$rc out=[$out]"; fi
 
-# === Cas 18 — --hook sur un corpus entièrement cité → stdout vide, exit 3 (mêmes conditions) ======
+# === Cas 18 — --hook sur un corpus entièrement cité → stdout vide, exit 0 (D-06 : silence interne
+# 3 traduit en 0 SOUS --hook, seulement sous --hook — mêmes conditions que le cas 11 sans --hook) ==
 D="$(mk_root c18)"
 echo '# spec' > "$D/docs/superpowers/specs/2026-01-18-trois-design.md"
 printf 'Spec : docs/superpowers/specs/2026-01-18-trois-design.md\n' > "$D/.planning/ROADMAP.md"
 out="$(bash "$SCRIPT" --hook --path "$D")"; rc=$?
-if [ "$rc" -eq 3 ] && [ -z "$out" ]; then ok "18 --hook sur corpus entièrement cité → stdout vide, exit 3"; else ko "18 --hook sur corpus entièrement cité → stdout vide, exit 3" "rc=$rc out=[$out]"; fi
+if [ "$rc" -eq 0 ] && [ -z "$out" ]; then ok "18 --hook sur corpus entièrement cité → stdout vide, exit 0 (D-06)"; else ko "18 --hook sur corpus entièrement cité → stdout vide, exit 0 (D-06)" "rc=$rc out=[$out]"; fi
 
-# === Cas 19 — --hook avec .planning/ absent → stdout vide, exit 3 =================================
+# === Cas 19 — --hook avec .planning/ absent → stdout vide, exit 0 (D-06, mêmes conditions que 10) =
 D="$TMP/c19"; mkdir -p "$D/docs/superpowers/specs"
 echo '# spec' > "$D/docs/superpowers/specs/2026-01-19-quatre-design.md"
 out="$(bash "$SCRIPT" --hook --path "$D")"; rc=$?
-if [ "$rc" -eq 3 ] && [ -z "$out" ]; then ok "19 --hook avec .planning/ absent → stdout vide, exit 3"; else ko "19 --hook avec .planning/ absent → stdout vide, exit 3" "rc=$rc out=[$out]"; fi
+if [ "$rc" -eq 0 ] && [ -z "$out" ]; then ok "19 --hook avec .planning/ absent → stdout vide, exit 0 (D-06)"; else ko "19 --hook avec .planning/ absent → stdout vide, exit 0 (D-06)" "rc=$rc out=[$out]"; fi
 
 # === Cas 20 — --hook + --quiet → exit 64, stdout vide, message non vide sur stderr ================
 errfile="$TMP/c20.err"
