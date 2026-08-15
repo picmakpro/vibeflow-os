@@ -262,6 +262,37 @@ else
   ko "application réelle : _index.md de dev-orchestrator/references (11 lignes, pas d'auto-listage)" "fichier absent : $REAL_INDEX"
 fi
 
+# ============================================================================
+# Tâche 3 — Bornes et vocabulaire, et garde .planning/ (ADR-055)
+# ============================================================================
+
+# Cas 23 — l'en-tête porte la section « Bornes et vocabulaire », nomme l'autre objet homonyme et
+# distingue les deux noms d'index.
+n_section="$(grep -c 'Bornes et vocabulaire' "$SCRIPT" || true)"
+n_compartments_doc="$(grep -c 'compartments.md' "$SCRIPT" || true)"
+n_index_md="$(grep -c 'INDEX.md' "$SCRIPT" || true)"
+n_underscore_index="$(grep -c '_index.md' "$SCRIPT" || true)"
+if [ "$n_section" -ge 1 ] && [ "$n_compartments_doc" -ge 1 ] && [ "$n_index_md" -ge 1 ] && [ "$n_underscore_index" -ge 1 ]; then
+  ok "en-tête : section Bornes et vocabulaire, deux objets homonymes, deux noms d'index"
+else
+  ko "en-tête : section Bornes et vocabulaire, deux objets homonymes, deux noms d'index" \
+    "section=$n_section, compartments.md=$n_compartments_doc, INDEX.md=$n_index_md, _index.md=$n_underscore_index"
+fi
+
+# Cas 24 — garde ADR-055 : aucune écriture sous un chemin .planning/. Fixture .planning/ factice,
+# identique à l'octet après une exécution complète (compartiment + --index).
+d="$(newcase case24)"
+mkdir -p "$d/.planning/phases"
+printf 'fixture .planning intouchable\n' > "$d/.planning/phases/FAKE.md"
+cp "$d/.planning/phases/FAKE.md" "$TMP/case24-avant.md"
+mkdir -p "$d/refs"
+(cd "$d" && bash "$SCRIPT" --index refs projet-a >/dev/null 2>&1)
+if cmp -s "$TMP/case24-avant.md" "$d/.planning/phases/FAKE.md" && [ ! -e "$d/.planning/docs" ]; then
+  ok "garde ADR-055 : .planning/ intact à l'octet après exécution complète"
+else
+  ko "garde ADR-055 : .planning/ intact à l'octet après exécution complète" "la fixture .planning/ a bougé"
+fi
+
 echo
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]

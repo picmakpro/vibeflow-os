@@ -12,12 +12,37 @@
 #   ./scaffold-docs.sh                       # squelette transverse seul (lab mono-projet)
 #   ./scaffold-docs.sh projet-a projet-b     # + un docs/<projet>/ par compartiment QUALIFIÉ
 #   ./scaffold-docs.sh --docs-dir docs projet-a
+#   ./scaffold-docs.sh --index plugin/mon-module/references  # pose un _index.md de dossier
 #
 # Proportionnalité : ne PAS passer un compartiment par micro-dossier. Passer uniquement les
 # compartiments qualifiés (même seuil d'autonomie que les .planning/ — cf. planning-core
 # references/compartments.md). Sous le seuil → pas de docs/<projet>/, une ligne d'index suffit.
 #
 # Garde-fous : IDEMPOTENT — ne touche JAMAIS un fichier doc existant (création de stubs manquants).
+#
+# ---- Bornes et vocabulaire ----
+#
+# Quel « compartiment » : ce script sert le compartiment de DOCUMENTATION de sous-projet (ADR-042),
+# PAS le compartiment de PLANNING à seuil d'autonomie décrit par
+# plugin/planning-core/references/compartments.md — deux objets homonymes sans lien. La clause de
+# proportionnalité ci-dessus emprunte quand même le SEUIL de ce dernier (même critère de
+# qualification), sans en être le même objet.
+#
+# Les trois fichiers d'un compartiment de documentation, rôles disjoints : INDEX.md liste ce que le
+# dossier contient · REFERENCE.md fait autorité sur le fond · CONTEXT.md route les tâches vers l'un
+# ou l'autre et déclare ce qu'on ne charge pas.
+#
+# Les deux noms d'index, pourquoi ils ne fusionnent pas : INDEX.md est le tableau de bord d'un
+# compartiment de documentation (posé toujours, ci-dessus) ; _index.md (préfixé d'un soulignement)
+# est l'index de CONTENU d'un dossier de références qui franchit le seuil de plus de 10 fichiers
+# (--index). Sémantiques différentes, portées différentes, jamais l'un renommé en l'autre.
+#
+# Borne de 80 lignes du CONTEXT.md : au-delà, le contrat de routage redevient le fichier de fond
+# qu'ADR-042 a précisément externalisé — il route, il ne documente pas.
+#
+# Ce que ce script NE fait PAS : il ne réécrit ni ne supprime jamais un fichier existant, il ne
+# vérifie pas la cohérence d'un _index.md avec son dossier (il pose, il ne juge pas), et il n'écrit
+# jamais sous un chemin .planning/ (domaine du moteur amont, ADR-055).
 
 set -euo pipefail
 
