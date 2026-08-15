@@ -95,3 +95,10 @@ et son absence est **signalée**, jamais masquée :
   `references/ui/` et `references/vendor/` ont bien été installés à côté du script). Si
   `/api/state` ne répond pas non plus, le serveur n'écoute pas (vérifie le port réel affiché au
   boot, pas forcément 4680 si un fallback a eu lieu).
+- **Liens symboliques dans `.planning/`** : le cockpit suit les liens symboliques qu'il rencontre
+  (un `STATE.md`/`ROADMAP.md`/`DRIVER.lock` symlinké hors `.planning/` est lu et servi comme
+  n'importe quel autre fichier) — c'est **assumé**, pas un oubli : outil 100 % local, mono-
+  utilisateur, lecture seule, où durcir casserait des dispositions légitimes (un `.planning/`
+  symlinké vers un emplacement partagé, un worktree). Si un lien pointe vers un contenu que tu ne
+  veux pas voir dans le cockpit, c'est le lien lui-même qu'il faut retirer — pas un réglage du
+  cockpit.
