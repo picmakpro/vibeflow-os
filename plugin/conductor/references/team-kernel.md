@@ -132,9 +132,15 @@ là-bas.
   manager se rabat silencieusement sur un agent générique qui n'a ni la doctrine ni les allowlists
   du worker prévu. La précondition qui corrigerait le fork (`worktree.baseRef: "head"`) vit dans
   le settings du poste et **n'est posée nulle part par l'engine** ; et même corrigée, elle ne
-  suffirait pas — rien ne ramène les commits du worker vers la branche de mission, le merge
-  affirmé n'étant implémenté nulle part en amont (`open-gsd/gsd-core#3302`, déjà le motif du refus
-  écrit de `claude_orchestration` en Phase 27). Porté par le frontmatter, `isolation` devient
+  suffirait pas — sur tout moteur installé (≤ 1.10.0), rien ne ramène les commits du worker vers
+  la branche de mission. Le merge-back est désormais **implémenté en amont**
+  (`open-gsd/gsd-core#3302`, close COMPLETED le 2026-08-14 — déjà le motif du refus écrit de
+  `claude_orchestration` en Phase 27) mais **pas releasé** : npm `latest` = `1.10.0` au
+  2026-08-15, et close ≠ releasé ≠ installé (Pitfall 11). Le ré-armement reste gaté par la
+  Phase 35 (flottante) : release **> 1.10.0** installée ET preuve du retour des commits rejouée
+  (WKTR-02) ; son seul déclencheur tracé est la sonde de veille WKTR-03
+  (`scripts/check-gsd-core-update.sh`, armement machine-local documenté dans
+  `30-VEILLE-GSD-CORE.md`). Porté par le frontmatter, `isolation` devient
   **inconditionnel** et retire au manager l'arbitrage que cette section lui confie.
 - **Le commit reste discipliné même à périmètres disjoints (Phase 27)** : la disjonction
   gouverne le *dispatch*, jamais le *commit*. Tant que N acteurs — workers **et** manager —
