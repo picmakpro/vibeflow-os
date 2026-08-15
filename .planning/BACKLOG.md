@@ -1,5 +1,22 @@
 # Backlog — idées différées (hors milestone courant)
 
+## Module `/vf-cockpit` — cockpit web local (roadmap, phases, missions live) — SPIKÉ
+**Capturé :** 2026-08-15 (cadrage AskUserQuestion, 4 décisions) · **Spiké :** 2026-08-15 →
+**spike : `.planning/spikes/001-cockpit-live/` (verdict au README), requirements :
+`.planning/spikes/MANIFEST.md` § vf-cockpit-local**
+
+Commande `/vf-cockpit` : serveur Node **zéro-dépendance** (http + SSE + fs.watch) qui lit
+`.planning/` (checklist machine de ROADMAP.md, frontmatter STATE.md, MILESTONES.md,
+`MISSION-*.dag.json`, `DRIVER.lock/meta`) et sert une page HTML unique avec Mermaid : DAG de
+mission live (statut par nœud), phases du milestone, historique, badge driver-lock au heartbeat.
+Décisions actées : nom `/vf-cockpit` · Node natif zéro-dep (NestJS écarté) · Mermaid **vendorisé**
+(CDN toléré au spike seulement ; diagram-design écarté pour le live, à garder comme inspiration
+DA) · lecture seule stricte de l'arbre. Idée d'origine : analyse d'Orca (stablyai) du 2026-08-15.
+À cadrer en phase au prochain milestone (feature, hors fiabilite-v1.0) — bump **minor** (module
+distribué complet : VERSION, module.json, CHANGELOG, README, gates). Points ouverts pour le
+cadrage : portabilité `fs.watch {recursive}` hors macOS (croise la Phase 30), taille du vendoring
+(~2 Mo) dans le plugin, et plus tard le fan-out compétitif comme vue additionnelle du cockpit.
+
 ## Investiguer ICM (Interpretable Context Methodology) — « folder structure as agent architecture » — INVESTIGUÉ
 **Capturé :** 2026-08-15 · **Investigué :** 2026-08-15 (deep-search 4 agents) →
 **rapport : `reports/research/2026-08-15-icm-deep-search.md`**
