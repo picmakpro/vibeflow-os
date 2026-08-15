@@ -1,5 +1,32 @@
 # Changelog — conductor
 
+## [v1.23.0] — 2026-08-15 (Phase 28 — `check-agents.sh` admet `vf-requires`)
+
+**Minor** (nouvelle capacité) : `vf-requires` (identifiant de précondition externe déclarée par
+l'artefact, cf. `dev-orchestrator` v2.15.0) rejoint l'ensemble `KNOWN` des champs de frontmatter
+reconnus. Même origine que la Phase 28 côté `dev-orchestrator` (issue #38) : la question n'était
+jamais « la précondition existe-t-elle ? » mais **« qui l'écrit chez l'utilisateur ? »** —
+`vf-requires` en est la déclaration lisible, et `check-agents.sh` doit la reconnaître au lieu de la
+signaler comme un champ inventé.
+
+**Précision mesurée, pour éviter de répéter une erreur de prémisse** : un champ inconnu de `KNOWN`
+n'a **jamais** été bloquant, même en `--strict` — c'est un `warnings.append` nu (`:621-623`), pas
+une entrée dans `errors`. L'admission de `vf-requires` ne lève donc aucun blocage : elle traite le
+**bruit** que le hook de démarrage aurait fait remonter sur les 5 agents qui portent désormais ce
+champ légitimement (`agents/vf-coder.md`, `agents/vf-reviewer.md`, et les 3 agents de
+`mobile-test-team`), pas une régression de gate.
+
+**Hiérarchie avec la garde dure voisine** : la garde `isolation: worktree` interdite dans un agent
+distribué (`:546-549`, issue #38) reste une **erreur** (`errors.append`, bloquante en `--strict`) —
+elle porte sur une précondition qui ne peut structurellement pas être distribuée par le harness. Le
+palier de relation du gate d'activation (`vf-requires` ↔ `# vf-provides`, `dev-orchestrator`) porte
+sur une précondition qui **peut** l'être, et dont la Phase 28 arme la vérification côté
+`check-capability-activation.sh`, pas côté `check-agents.sh`. Les deux gardes subsistent : elles
+ferment deux classes de préconditions distinctes, l'une catégoriquement interdite, l'autre
+admissible sous couverture prouvée ailleurs.
+
+Référence : issue #38.
+
 ## [v1.22.0] — 2026-08-15 (gate anti-drift carte↔disque + contrat de routage par dossier)
 
 **`scripts/check-map-drift.sh` (nouveau)** : gate lint-only qui constate deux paires carte↔disque

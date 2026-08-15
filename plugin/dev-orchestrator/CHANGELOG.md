@@ -1,5 +1,43 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.15.0] — 2026-08-15 (Phase 28 — le gate d'activation ferme #38 et se prouve chez l'utilisateur)
+
+**Minor** (nouvelle capacité, pas un simple correctif) : `check-capability-activation.sh` sait
+désormais dire quand une **précondition écrite dans le plugin n'est pas armée chez
+l'utilisateur** — la faille de fond de la régression #38, où la précondition
+`worktree.baseRef: "head"` était identifiée, écrite, arbitrée et posée... dans le settings local du
+dépôt de développement, jamais distribuée aux 13 agents qui en dépendaient. La question qui
+n'avait jamais été posée n'était pas « la précondition existe-t-elle ? » mais **« qui l'écrit chez
+l'utilisateur ? »**.
+
+### Ajouté
+- **Règle 4** — un armement de la liste close (`isolation`, `vf-mcp-consumer`, `vf-mcp-tools`)
+  sans précondition distribuée rend le gate ROUGE, en nommant l'artefact, l'armement et
+  `fichier:ligne`. Chaque armement d'un artefact est évalué **indépendamment** des autres
+  (correction ciblée post-revue, Phase 28 : la fermeture initiale était mono-slot et ne
+  confrontait à `vf-requires` que le premier armement rencontré par fichier).
+- **Règle 4bis** — symétrique de la règle 4 : un `vf-requires` porté par un artefact **sans**
+  armement de la liste close est halluciné, et rend rouge à son tour.
+- **Jointure statique par identifiant** — `vf-requires:` côté artefact, `# vf-provides:` côté
+  script (posé sur `inject-mcp-tools.sh`, `# vf-provides: mcp-servers`). Le gate confronte les
+  deux littéraux, il n'exécute **jamais** le script cité.
+- **5 déclarations `vf-requires: mcp-servers`** — `agents/vf-coder.md`, `agents/vf-reviewer.md`
+  (ce module), plus les 3 agents de `mobile-test-team` (`vf-test-runner`, `vf-test-orchestrator`,
+  `vf-app-fixer`).
+- **Quatre planchers anti-vert-à-vide** (univers d'armement vide, corpus de preuve vide, index de
+  capabilities vide, fermeture de modules dérivée sans le gate) — un gate qui ne peut rien balayer
+  refuse de rendre un verdict conforme.
+- **Cinq bornes déclarées** dans l'en-tête du gate (`-h`/`--help`) : ce que la liste close couvre
+  et ne couvre pas, sans jamais introduire de seuil de nombre de lignes (interdit explicitement par
+  le cadrage de la phase).
+- **Job CI `lab-frais-arme`** (*as-installed testing*) — le gate tourne désormais **là où l'install
+  le pose** (`.claude/scripts/`, fermeture `dev-orchestrator`, 9 modules), sur un univers
+  d'armement non vide (`vf-coder.md` + `vf-reviewer.md`), jamais seulement sur l'arbre source. Sans
+  ce job, la Phase 28 aurait prouvé la règle sur des fixtures et jamais sur ce que l'utilisateur
+  reçoit.
+
+Référence : issue #38.
+
 ## [v2.14.0] — 2026-08-15 (bullet contractuelle « NE charge PAS » + édition-à-la-source)
 
 **Minor** (nouvelle capacité, pas un simple correctif) : le gabarit de digest de mission porte
