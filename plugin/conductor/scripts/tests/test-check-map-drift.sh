@@ -294,8 +294,12 @@ np_case "../ — NON RÉSOLU PAR CHOIX (ADR-031 : jamais de résolution hors \$R
 # 86c3b0c est le commit du tour 2 : il strip un seul './' de tête mais ne squeeze jamais les '/'
 # redondants ni ne boucle sur les './' répétés. Chaque forme ci-dessous DOIT changer de verdict.
 REPO_ROOT="$(git -C "$(dirname "$SCRIPT")" rev-parse --show-toplevel 2>/dev/null)"
+# Les SHA figés (86c3b0c, c7b35f3, 0f8fa3a) appartenaient à des branches squash-mergées : les
+# objets ne sont plus atteignables sur un clone frais (CI). Chaque version d'AVANT vit donc en
+# FIXTURE COMMITTÉE sous fixtures/ ; `git show` reste en repli quand l'objet existe encore.
+FIXTURES_DIR="$(cd "$(dirname "$0")" && pwd)/fixtures"
 OLD_SCRIPT="$TMP/old_check_map_drift_86c3b0c.sh"
-if [ -n "$REPO_ROOT" ] && git -C "$REPO_ROOT" show 86c3b0c:plugin/conductor/scripts/check-map-drift.sh > "$OLD_SCRIPT" 2>/dev/null; then
+if { [ -f "$FIXTURES_DIR/check-map-drift-pre-86c3b0c.sh" ] && cp "$FIXTURES_DIR/check-map-drift-pre-86c3b0c.sh" "$OLD_SCRIPT" 2>/dev/null; } || { [ -n "$REPO_ROOT" ] && git -C "$REPO_ROOT" show 86c3b0c:plugin/conductor/scripts/check-map-drift.sh > "$OLD_SCRIPT" 2>/dev/null; }; then
   attest_form() { # <label> <citation-form>
     local label="$1" form="$2" D out_old rc_old out_new rc_new
     D="$(mk_git_root "attest-$(echo "$label" | tr -c 'a-zA-Z0-9' '-')")"
@@ -356,7 +360,7 @@ fi
 
 # === Attestation génération AVANT (c7b35f3, deux passes indépendantes) vs APRÈS (ce script) ========
 OLD3_SCRIPT="$TMP/old_check_map_drift_c7b35f3.sh"
-if [ -n "$REPO_ROOT" ] && git -C "$REPO_ROOT" show c7b35f3:plugin/conductor/scripts/check-map-drift.sh > "$OLD3_SCRIPT" 2>/dev/null; then
+if { [ -f "$FIXTURES_DIR/check-map-drift-pre-c7b35f3.sh" ] && cp "$FIXTURES_DIR/check-map-drift-pre-c7b35f3.sh" "$OLD3_SCRIPT" 2>/dev/null; } || { [ -n "$REPO_ROOT" ] && git -C "$REPO_ROOT" show c7b35f3:plugin/conductor/scripts/check-map-drift.sh > "$OLD3_SCRIPT" 2>/dev/null; }; then
   OLD3_FN="$(awk '/^normalize_path\(\) \{/{f=1} f{print; if (/^}/) exit}' "$OLD3_SCRIPT")"
   normalize_path_old3() { :; }
   eval "$(printf '%s' "$OLD3_FN" | sed '1s/^normalize_path/normalize_path_old3/')"
