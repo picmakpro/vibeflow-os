@@ -82,7 +82,8 @@ coverage:
 - `reports/research/2026-08-15-investigation-dag-scope.md` créé : consolide `29-RESEARCH.md`
   §Investigation (l.341-448) en livrable durable et autonome — historique en deux phases par
   commit (Phase 20 déclaration D-13, Phase 27 calcul `stages` + fermeture RCE ADR-069/070),
-  inventaire des 10 consommateurs de `scope[]` avec leur nature exacte, couverture des 33 cas de
+  inventaire de 11 lignes couvrant les objets liés à `scope[]` (9 consommateurs réels, 2 objets
+  distincts signalés comme tels et exclus du compte) avec leur nature exacte, couverture des 33 cas de
   `test-dag.sh` sur le périmètre, verdict INTOUCHABLE (4 entrées) / EXTENSIBLE SANS RISQUE
   (3 entrées), et la voie retenue pour G1 (négatif composé de deux champs déjà émis, zéro ligne de
   `dag.sh` à toucher) avec sa clause de halte.
