@@ -773,3 +773,109 @@ jobs:
             echo "::error::univers d'armement du lab installé < 2 ($armed_count) — le job refuse de rendre un verdict sur un univers vide"
             exit 1
           fi
+
+      - name: "Forme exec telle qu'installée (PORT-05) — settings.json/settings.local.json POSÉS par le lab armé"
+        # POURQUOI CETTE ÉTAPE EXISTE. Régression #38 : un gate qui n'exerce que l'arbre source ne
+        # prouve rien sur ce que l'install pose CHEZ L'UTILISATEUR — patron as-installed déjà en
+        # place plus haut dans ce même job (Phase 28, ARMD-06/ARMD-08), réutilisé ici pour PORT-05.
+        # Les assertions portent donc sur $LAB_ARME/.claude/settings*.json, jamais sur les fragments
+        # hooks.json de $GITHUB_WORKSPACE. La suite locale (plugin/_internal/tests/
+        # test-vibeflow-update.sh, T10, plan 30-07) prouve la même chose dans un mktemp -d local :
+        # cette étape-ci n'en duplique pas le code, elle l'exerce sur l'install réelle de CI.
+        #
+        # merge-hooks.sh route les entrées {{VF_BASH}} vers settings.local.json (chemin résolu et
+        # vérifié à l'install) et laisse en l'état, dans settings.json, la seule entrée dont le
+        # command est un nom nu volontaire : check-hook-paths.sh (dérogation nommée à ADR-071
+        # §Décision 2, approuvée le 2026-08-15 — paradoxe d'amorçage documenté par
+        # docs/HOOKS-CONTRAT-SORTIE.md §4, gardée par ailleurs par le cas T9 de
+        # test-check-hook-paths.sh). Les DEUX fichiers sont donc regardés ici ; l'exception est
+        # nommée explicitement, pas silencieuse.
+        run: |
+          set -eu
+          cd "$LAB_ARME"
+          python3 - <<'PYEOF'
+          import json, os, re, sys
+
+          # 5 dev-orchestrator (dont check-hook-paths.sh) + 1 software-architecture — docs/HOOKS-CONTRAT-SORTIE.md §4/§5
+          EXPECT_TOTAL = 6
+          BARE_COMMAND_EXCEPTION = "check-hook-paths.sh"
+          SHELL_METACHARS = ("&&", "||", ";", "|", "`", "$(")
+          SCRIPT_RE = re.compile(r"([A-Za-z0-9_-]+\.(?:sh|py))")
+
+          def find_script_name(args):
+              for a in args:
+                  if not isinstance(a, str):
+                      continue
+                  m = SCRIPT_RE.search(a)
+                  if m:
+                      return m.group(1)
+              return None
+
+          fail = []
+
+          def load(path):
+              if not os.path.isfile(path):
+                  return {}
+              raw = open(path, encoding="utf-8").read()
+              if "{{" in raw:
+                  fail.append(f"{path} : placeholder littéral {{ résiduel")
+              try:
+                  return json.loads(raw) if raw.strip() else {}
+              except Exception as e:
+                  fail.append(f"{path} : JSON invalide ({e})")
+                  return {}
+
+          entries = []
+          for path in (".claude/settings.json", ".claude/settings.local.json"):
+              d = load(path)
+              for ev, groups in d.get("hooks", {}).items():
+                  for g in groups or []:
+                      for h in g.get("hooks", []) or []:
+                          if "args" in h:
+                              entries.append((path, h))
+
+          if not entries:
+              print("::error::0 entrée VF posée dans settings.json/settings.local.json — garde anti-vert-à-vide")
+              sys.exit(1)
+
+          if len(entries) != EXPECT_TOTAL:
+              names = [find_script_name(h.get("args", []) or []) or "?" for _, h in entries]
+              fail.append(f"{len(entries)} entrée(s) VF posée(s), attendu {EXPECT_TOTAL} — présentes : {sorted(names)}")
+
+          for path, h in entries:
+              cmd = h.get("command", "")
+              args = h.get("args", []) or []
+              script_name = find_script_name(args)
+              is_bare_exception = script_name == BARE_COMMAND_EXCEPTION
+              if is_bare_exception:
+                  if cmd != "bash":
+                      fail.append(f"{path} : {script_name} — dérogation attendue (command=='bash'), obtenu {cmd!r}")
+              else:
+                  if not cmd.startswith("/") or not (os.path.isfile(cmd) and os.access(cmd, os.X_OK)):
+                      fail.append(f"{path} : {script_name or '?'} — command non absolu/exécutable sur ce runner : {cmd!r}")
+              for s in [cmd] + [a for a in args if isinstance(a, str)]:
+                  if any(m in s for m in SHELL_METACHARS):
+                      fail.append(f"{path} : {script_name or '?'} — construction shell détectée dans {s!r}")
+
+          if fail:
+              for f in fail:
+                  print(f"::error::{f}")
+              sys.exit(1)
+          print(f"== forme exec telle qu'installée : {len(entries)} entrée(s) VF, command absolu+exécutable (sauf dérogation nommée check-hook-paths.sh), aucun placeholder, aucune construction shell ==")
+          PYEOF
+
+      - name: "Conditions Windows simulées (PORT-05) — les deux suites nommées, repli assumé d'ADR-054"
+        # AUCUN runner Windows réel n'existe dans ce dépôt (ni ici, ni ailleurs dans ce workflow) :
+        # cette étape ne prouve PAS un comportement Windows natif. Elle exécute NOMMÉMENT, sur ce
+        # runner ubuntu-latest, les deux suites qui SIMULENT les conditions Windows par fixtures
+        # (retours chariot CRLF, antislashs, stub du magasin d'applications Windows) — repli
+        # explicitement assumé et documenté par ADR-054, pas une approximation silencieuse. Les deux
+        # suites tournent déjà par découverte dans le job "tests" plus haut ; les nommer ICI rend la
+        # preuve de PORT-05 lisible dans le journal de CI, au lieu de rester noyée dans une
+        # découverte anonyme parmi 61 suites.
+        run: |
+          set -eu
+          echo "== test-windows-crlf.sh (simulation CRLF/antislashs — pas de poste Windows réel) =="
+          bash plugin/_internal/tests/test-windows-crlf.sh
+          echo "== test-windows-guards.sh (simulation stub magasin d'applications — pas de poste Windows réel) =="
+          bash plugin/consolidator/scripts/tests/test-windows-guards.sh
