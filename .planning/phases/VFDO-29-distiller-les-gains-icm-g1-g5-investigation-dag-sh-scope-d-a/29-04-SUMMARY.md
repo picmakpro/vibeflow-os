@@ -10,7 +10,7 @@ requires:
 provides:
   - "scaffold-docs.sh pose un CONTEXT.md de routage (≤ 80 lignes) par compartiment de documentation"
   - "scaffold-docs.sh --index <dossier> pose un _index.md de contenu pour tout dossier de références"
-  - "première suite de tests du scaffolder (25 cas), couvrant l'extension ET le comportement préexistant"
+  - "première suite de tests du scaffolder (26 cas), couvrant l'extension ET le comportement préexistant"
   - "première application réelle du pattern _index.md : plugin/dev-orchestrator/references/_index.md"
 affects: ["29-05"]
 
@@ -94,7 +94,7 @@ status: complete
 - Flag `--index <dossier>` (formes séparée et accolée) posant un `_index.md` de contenu (`| Fichier | Résumé |`), sémantiquement distinct du tableau de bord `INDEX.md` déjà en place, idempotent, refusant un dossier inexistant (exit 2) ou une valeur absente (exit 2).
 - Première application réelle : `plugin/dev-orchestrator/references/_index.md`, 11 lignes de données (une par fichier markdown du dossier), résumés d'une ligne dérivés du rôle déclaré de chaque fichier, sans auto-citation.
 - Section « Bornes et vocabulaire » dans l'en-tête du script : tranche par écrit lequel des deux « compartiment » homonymes ce script sert (documentation ADR-042, pas planning), les trois rôles disjoints de fichiers, et les deux noms d'index qui ne fusionnent jamais.
-- Première suite de tests du scaffolder (25 cas), née avec l'extension et couvrant AUSSI le comportement préexistant (les 4 stubs `INDEX.md`/`REFERENCE.md`) — la non-régression est prouvée, pas supposée.
+- Première suite de tests du scaffolder (26 cas), née avec l'extension et couvrant AUSSI le comportement préexistant (les 4 stubs `INDEX.md`/`REFERENCE.md`) — la non-régression est prouvée, pas supposée.
 
 ## Task Commits
 
@@ -108,7 +108,7 @@ _Note : les 3 tâches sont TDD (tests écrits avant l'extension, tâche par tâc
 
 ## Files Created/Modified
 - `plugin/conductor/scripts/scaffold-docs.sh` — extension : CONTEXT.md de routage, flag `--index`, section « Bornes et vocabulaire ». Correction ciblée (exec-04, revue) : la validation de `--index` (dossier existant) est remontée AVANT toute écriture — auparavant les stubs transverses (`docs/_transverse/{INDEX,REFERENCE,CONTEXT}.md`) étaient posés avant l'échec, rendant « rien créé » faux ; un seul chemin d'écriture (`write_stub()`) toujours respecté.
-- `plugin/conductor/scripts/tests/test-scaffold-docs.sh` (créé) — 25 cas, `PASS=25 FAIL=0`. Correction ciblée : cas 17 durci (atomicité, vérifie aussi l'absence de `docs/`) + cas 17b ajouté (nom à tiret initial `-evilname`, mitigation T-29-04-02 réellement testée).
+- `plugin/conductor/scripts/tests/test-scaffold-docs.sh` (créé) — 26 cas, `PASS=26 FAIL=0`. Correction ciblée : cas 17 durci (atomicité, vérifie aussi l'absence de `docs/`) + cas 17b ajouté (nom à tiret initial `-evilname`, mitigation T-29-04-02 réellement testée) + cas 17c ajouté (nom de compartiment à espace `"projet a"`, second volet de T-29-04-02 — comportement réel constaté sandboxé : chemin quoté de bout en bout, les trois stubs atterrissent sous un seul dossier `docs/projet a/`, aucune découpe, aucun bug).
 - `plugin/dev-orchestrator/references/_index.md` (créé) — application réelle du pattern G2. Correction ciblée : résumé de `mission-flow.md` corrigé (« 7 patterns A à G », pas « 3 patterns »).
 
 ## Decisions Made

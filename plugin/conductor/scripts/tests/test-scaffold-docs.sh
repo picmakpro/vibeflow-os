@@ -214,6 +214,18 @@ else
     "rc=$rc, docs/=$([ -e "$d/docs" ] && echo oui || echo non)"
 fi
 
+# Cas 17c — nom de compartiment à espace : chemin quoté de bout en bout, les trois stubs
+# atterrissent sous un seul dossier "projet a" (pas de découpe en "projet" + "a").
+# Couvre T-29-04-02 du threat model du plan (mitigation revendiquée mais absente jusqu'ici).
+d="$(newcase case17c)"
+(cd "$d" && bash "$SCRIPT" "projet a" >/dev/null 2>&1)
+if [ -f "$d/docs/projet a/CONTEXT.md" ] && [ -f "$d/docs/projet a/INDEX.md" ] && [ -f "$d/docs/projet a/REFERENCE.md" ] && [ ! -e "$d/docs/projet" ]; then
+  ok "nom à espace (\"projet a\") : les trois stubs sous un seul dossier, chemin non découpé"
+else
+  ko "nom à espace (\"projet a\") : les trois stubs sous un seul dossier, chemin non découpé" \
+    "docs/projet a/CONTEXT.md=$([ -f "$d/docs/projet a/CONTEXT.md" ] && echo oui || echo non), docs/projet=$([ -e "$d/docs/projet" ] && echo oui || echo non)"
+fi
+
 # Cas 18 — le stub _index.md ne s'auto-liste pas.
 d="$(newcase case18)"
 mkdir -p "$d/refs"
