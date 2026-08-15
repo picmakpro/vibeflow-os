@@ -9,6 +9,13 @@
 - ✅ **gsd-migration** — Phases 10-11 — clos 2026-07-26, release `v2.39.0` — migration du package GSD `get-shit-done-cc` → `@opengsd/gsd-core@^1` (VOC-02)
 - ✅ **vf-routing** — Phases 12-14 — clos 2026-07-26, release `v2.37.0` — routage fin des intentions (verbes `/vf-*` à l'origine ; carte d'intention agentique depuis la bascule v2.33.0), couverture complète des skills GSD, pont spec → feuille de route, et frontière d'altitude avec le moteur de planning GSD
 - ✅ **agentique-v1.0** — Phases 15→29 (18 et 25 reportées) — **clos 2026-08-15**, releases `v2.40.0` → `v2.52.0` — durcissement du moteur d'équipes agentique : collaboration inter-équipes, cloisonnement, migration `/vf-update`, alignement gsd-core, couplage et activation du moteur GSD, manuel, parallélisation, gate armement ↔ précondition (*as-installed testing*), gains ICM. **Absorbe `gsd-alignement`** (ouvert 2026-08-01 pour les phases 23-25 ; 23-24 livrées ici, 25 reportée) et solde la dérive du label `gsd-migration` resté dans STATE trois semaines après sa clôture.
+- 🚧 **fiabilite-v1.0** — « ce qui survit » — Phases 30-35 + Phases 18 et 25 héritées — **démarré
+  2026-08-15** — fermer les dettes de gouvernance nées d'incidents réels du milestone précédent
+  (driver-lock contourné ×2, stall silencieux de 18 h, dérive du ledger re-constatée, régression
+  #38) et rendre l'install/update digne de confiance sur toutes les plateformes — Windows en tête
+  (demande client). Périmètre arbitré par Samuel le 2026-08-15 (familles PORT/MANI/LOCK/WTCH/LEDG/
+  BUDG/WKTR/SKIL/AGTS + QUAL-01 transverse). Recherche : `.planning/research/SUMMARY.md` +
+  `ARCHITECTURE.md` (ordre de construction dicté par les fichiers).
 
 > **Origine des Phases 23 à 25, dite franchement.** Elles ont été inscrites au ROADMAP le
 > 2026-07-31 par une session concurrente, **hors du périmètre confié** à la mission qui tournait
@@ -51,18 +58,24 @@
 - [x] Phase 15: Collaboration inter-équipes dev ↔ design (completed 2026-07-27)
 - [x] Phase 16: Cloisonnement complet des dispatches d'agents (completed 2026-07-27)
 - [x] Phase 17: Signaux de démarrage du moteur de dev (completed 2026-07-28)
-- [ ] Phase 18: Survie du ledger d'exigences à la clôture de jalon *(reportée au prochain milestone, 2026-08-15)*
+- [ ] Phase 18: Survie du ledger d'exigences à la clôture de jalon
 - [x] Phase 19: Migration du moteur GSD pilotée par /vf-update (completed 2026-07-28)
 - [x] Phase 20: Fluidité du flux de dev sans perte de qualité (completed 2026-07-31)
 - [x] Phase 21: Alignement du moteur GSD sur gsd-core 1.9.0 (completed 2026-07-31)
 - [x] Phase 22: Hygiène documentaire — doctrine de sortie et captation d'intention (completed 2026-07-31)
 - [x] Phase 23: Couplage explicite au moteur GSD — capabilities, flags et voie unique
 - [x] Phase 24: Activation et mesure du moteur GSD — capacités dormantes et faits de runtime (completed 2026-08-05, PR #34)
-- [ ] Phase 25: Budget d'instructions et étage d'alignement court *(reportée au prochain milestone, 2026-08-15)*
+- [ ] Phase 25: Budget d'instructions
 - [x] Phase 26: Manuel utilisateur VibeFlow (manual/) (completed 2026-08-02)
 - [x] Phase 27: Parallélisation d'exécution — granulaire, simple, sans collision d'écriture (completed 2026-08-06)
 - [x] Phase 28: Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur (completed 2026-08-15)
 - [x] Phase 29: Distiller les gains ICM (G1-G5) — investigation dag.sh --scope d'abord (completed 2026-08-15)
+- [ ] Phase 30: Portabilité Windows II
+- [ ] Phase 31: Manifeste d'install + dry-run (issue #20)
+- [ ] Phase 32: Durcissement du driver-lock
+- [ ] Phase 33: Watchdog & notifications des missions
+- [ ] Phase 34: Gaps agency-agents & cadrage skill-installer
+- [ ] Phase 35: Ré-armement worktree (conditionnelle)
 
 <details>
 <summary>✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04</summary>
@@ -427,7 +440,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 ✅ (R&D, shippée v2.28.0)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 ✅ (code complet, release en attente de validation humaine)** ; **14 ✅ (indépendante)** ; **15 ✅ (shippée v2.40.0) → 16 ✅ (shippée v2.41.0)** ; **17 ✅ (indépendante de 16, terminée et vérifiée — release en attente de validation humaine) → 18 inscrite (dépend de 17)** ; **19 ✅ (2026-07-28, ADR-058) → 20 ✅ (mergée dans `main` le 2026-07-31, PR #21, release `v2.44.0`)** — ce merge **satisfait** la dépendance « Phase 20 requise » de 21, 22 et 23 ; **21 ✅ (mergée le 2026-07-31, PR #22, release `v2.45.0`) + 22 ✅ (mergée le 2026-07-31, PR #23)** — les deux livrées par la mission `reprise-p21-p22`, sans fichier commun ; leur clôture **lève la dépendance** de 23 → **23 inscrite**, périmètre partagé sur `vf-dev-manager.md` / `intent-routing.md` (arbitré le 2026-07-31 : on ne planifie pas contre une base qui bouge ; l'arbitrage des étages de revue écrit par la 21 fait autorité) → **24 inscrite (dépendance doctrinale de 23, aucun fichier commun ; son lot MESURE est déjà rendu)** → **25 inscrite : après 24** (son volet G1 pose un gate sur `plugin/*/agents/*.md`, les fichiers mêmes que M3/`effort:` et A2/`agent_skills` éditent) **et dépendante de 23** (son volet G2 insère un étage dans `discuss → plan`, dont la voie unique d'invocation est arbitrée en 23)
+1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 ✅ (R&D, shippée v2.28.0)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 ✅ (code complet, release en attente de validation humaine)** ; **14 ✅ (indépendante)** ; **15 ✅ (shippée v2.40.0) → 16 ✅ (shippée v2.41.0)** ; **17 ✅ (indépendante de 16, terminée et vérifiée — release en attente de validation humaine) → 18 inscrite (dépend de 17)** ; **19 ✅ (2026-07-28, ADR-058) → 20 ✅ (mergée dans `main` le 2026-07-31, PR #21, release `v2.44.0`)** — ce merge **satisfait** la dépendance « Phase 20 requise » de 21, 22 et 23 ; **21 ✅ (mergée le 2026-07-31, PR #22, release `v2.45.0`) + 22 ✅ (mergée le 2026-07-31, PR #23)** — les deux livrées par la mission `reprise-p21-p22`, sans fichier commun ; leur clôture **lève la dépendance** de 23 → **23 inscrite**, périmètre partagé sur `vf-dev-manager.md` / `intent-routing.md` (arbitré le 2026-07-31 : on ne planifie pas contre une base qui bouge ; l'arbitrage des étages de revue écrit par la 21 fait autorité) → **24 inscrite (dépendance doctrinale de 23, aucun fichier commun ; son lot MESURE est déjà rendu)** → **25 inscrite : après 24** (son volet G1 pose un gate sur `plugin/*/agents/*.md`, les fichiers mêmes que M3/`effort:` et A2/`agent_skills` éditent) **et dépendante de 23** (son volet G2 insère un étage dans `discuss → plan`, dont la voie unique d'invocation est arbitrée en 23) ; **milestone fiabilite-v1.0 (2026-08-15)** : **30 → 31 (strictement séquentielles — mêmes fichiers `_internal/`) → 32 → 33 (adjacentes — heartbeat partagé, WTCH après LOCK) → 18 (héritée — livrée avant clôture ; sa RFC part en Phase 30) → 34 → 25 (héritée — avant-dernière, après tout ajout d'agents)** ; **35 flottante conditionnelle** (gsd-core > 1.10.0 releasé ET installé), jamais bloquante
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -448,18 +461,24 @@ Plans:
 | 15. Collaboration inter-équipes dev ↔ design | — | 7/7 | Complete — release `v2.40.0` (5/5 critères), 2 points escaladés → Phase 16 | 2026-07-27 |
 | 16. Cloisonnement complet des dispatches | — | 8/8 | Complete — release `v2.41.0` (4/4 critères, SC3 amendé : contrat + lint, pas sandbox runtime) | 2026-07-27 |
 | 17. Signaux de démarrage du moteur de dev | — | 3/3 | Complete — module v2.6.0, SC5/SC6 vérifiés par exécution, release racine en attente de validation humaine | 2026-07-28 |
-| 18. Survie du ledger d'exigences | reportée | 0/0 | **Reportée au prochain milestone** (2026-08-15) — périmètre réduit le 2026-07-28 par `18-STUDY.md`, jamais planifiée | — |
+| 18. Survie du ledger d'exigences | fiabilite-v1.0 | 0/0 | Not started — héritée (périmètre réduit 2026-07-28, `STUDY.md`) ; LEDG-03 (RFC) portée par la Phase 30 | — |
 | 19. Migration du moteur GSD par /vf-update | — | 3/3 | Complete — 3 plans exécutés, VERIFICATION produite, module `dev-orchestrator` v2.7.0 + `conductor` v1.16.0, ADR-058 | 2026-07-28 |
 | 20. Fluidité du flux de dev sans perte de qualité | — | 7/7 | Complete — **mergée dans `main`** (PR #21, `d549b2d`), release `v2.44.0`, VERIFICATION produite | 2026-07-31 |
 | 21. Alignement du moteur GSD sur gsd-core 1.9.0 | — | 5/5 | Complete — **mergée dans `main`** (PR #22, `d89a60e`), release `v2.45.0`, VERIFICATION produite, ADR-061/062/063 | 2026-07-31 |
 | 22. Hygiène documentaire — doctrine de sortie | — | 3/3 | Complete — **mergée dans `main`** (PR #23, `474c3eb`), `dev-orchestrator` v2.9.0 + `design-orchestrator` v1.4.0 | 2026-07-31 |
 | 23. Couplage explicite au moteur GSD | agentique-v1.0 | 8/8 | Complete — 8 SUMMARYs sur disque | 2026-08-04 |
 | 24. Activation et mesure du moteur GSD | agentique-v1.0 | 12/12 | Complete — 12 SUMMARYs sur disque | 2026-08-04 |
-| 25. Budget d'instructions et étage d'alignement court | reportée | 0/0 | **Reportée au prochain milestone** (2026-08-15) — G1 après 24 ; G2 dépend de 23 (les deux livrées depuis) | — |
+| 25. Budget d'instructions | fiabilite-v1.0 | 0/0 | Not started — héritée, périmètre réduit à BUDG-01/02 (G2/BUDG-03 différé) ; après la Phase 34 | — |
 | 26. Manuel utilisateur VibeFlow (manual/) | gsd-alignement | — | Complete (PR #28) | 2026-08-02 |
 | 27. Parallélisation d'exécution — granulaire, simple, sans collision | gsd-alignement | 6/6 | Complete (PR #35) — spike `claude_orchestration` refusé par écrit | 2026-08-10 |
 | 28. Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur | agentique-v1.0 | 3/3 | Complete — PR #42, release `v2.52.0`, CI main verte, gate + `lab-frais-arme` livrés | 2026-08-15 |
 | 29. Distiller les gains ICM (G1-G5) — investigation dag.sh --scope d'abord | — | 5/5 | Complete (PR #41) — release `v2.51.0`, D-03 tenue (`dag.sh` hors diff), checkpoint humain T-29-05-3 tranché le 2026-08-15 | 2026-08-15 |
+| 30. Portabilité Windows II | fiabilite-v1.0 | 0/0 | Not started — première du milestone (demande client) ; pré-requis de cadrage : PORT-04 tranché avec Willy avant le plan ; porte les gestes jour 1 (LEDG-03, WKTR-03) | — |
+| 31. Manifeste d'install + dry-run (issue #20) | fiabilite-v1.0 | 0/0 | Not started — strictement après la 30 (mêmes fichiers `_internal/`, jamais en parallèle) | — |
+| 32. Durcissement du driver-lock | fiabilite-v1.0 | 0/0 | Not started — son hook naît en forme exec (après 30) ; spike `reference-transaction` avant LOCK-03 | — |
+| 33. Watchdog & notifications des missions | fiabilite-v1.0 | 0/0 | Not started — heartbeat partagé avec la 32 (conçues ensemble, WTCH après LOCK) | — |
+| 34. Gaps agency-agents & cadrage skill-installer | fiabilite-v1.0 | 0/0 | Not started — après la 31 (MANI avant SKIL) ; SKIL-01 = cadrage go/no-go rattaché | — |
+| 35. Ré-armement worktree (conditionnelle) | fiabilite-v1.0 | 0/0 | Flottante — précondition externe NON satisfaite au 2026-08-15 (npm latest = 1.10.0) ; jamais bloquante | — |
 
 <details>
 <summary>✅ agentique-v1.0 — Durcissement du moteur d'équipes agentique (Phases 15→29, 18 et 25 reportées) — SHIPPED 2026-08-15</summary>
@@ -469,170 +488,296 @@ Snapshots : `.planning/milestones/agentique-v1.0-*`. Détails : `MILESTONES.md`.
 
 </details>
 
-## Phases reportées (prochain milestone)
+## 🚧 Milestone fiabilite-v1.0 — « ce qui survit » (Phases 30-35 + 18 et 25 héritées)
+
+**Milestone Goal :** fermer les dettes de gouvernance nées d'incidents réels du milestone précédent
+(deux contournements du driver-lock, un stall silencieux de 18 h, la dérive du ledger re-constatée à
+la clôture d'agentique-v1.0, la régression #38) et rendre l'install/update digne de confiance sur
+toutes les plateformes — Windows en tête (demande client). Périmètre arbitré par Samuel le
+2026-08-15 (`REQUIREMENTS.md` §Milestone fiabilite-v1.0 : 30 IDs en 9 familles + QUAL-01
+transverse). Recherche : `.planning/research/SUMMARY.md` (commit `5916899`) + `ARCHITECTURE.md`
+(ordre de construction en 9 étapes, rationale fichier-niveau).
+
+**Numérotation — arbitrage humain (2026-08-15) :** les phases héritées gardent leur numéro
+historique — la 18 (dossier `VFDO-18-survie-du-ledger-d-exigences-la-cl-ture-de-jalon/`, étude
+`STUDY.md`) et la 25 (dossier `VFDO-25-budget-d-instructions-et-tage-d-alignement-court/`, slug
+historique conservé). Les nouvelles phases continuent la numérotation du milestone précédent,
+arrêtée à 29 → elles démarrent à 30.
+
+**Ordre de construction (non négociable — dicté par les fichiers, ARCHITECTURE.md §4) :**
+
+- **30 → 31 strictement séquentielles** : les deux travaillent les mêmes fichiers
+  `plugin/_internal/` (`vibeflow-update.sh`, `merge-hooks.sh`) — jamais en parallèle, un seul
+  propriétaire du moteur à la fois.
+- **30 en premier** : Windows II réécrit le contrat de sortie des hooks et la forme exec que les
+  phases 32, 33 et 18 consomment — toute entrée de hook créée avant serait à re-migrer. C'est aussi
+  la demande client prioritaire.
+- **32 → 33 adjacentes** : LOCK et WTCH partagent le même battement (un émetteur, deux
+  consommateurs) — conçues ensemble, livrées séparément, WTCH après LOCK.
+- **18 avant la clôture du milestone** (sinon 3ᵉ dérive du ledger) ; sa latence externe (RFC
+  upstream, LEDG-03) part dès le jour 1, portée par la Phase 30.
+- **31 avant 34** : le manifeste est la fondation de tout uninstall propre — le cadrage
+  skill-installer (SKIL-01) ne se décide pas sans lui.
+- **25 avant-dernière** : ne jamais calibrer un seuil sur un corpus d'agents qui bouge — après la
+  Phase 34 et tout ajout d'agents.
+- **35 flottante, jamais bloquante** : conditionnée à une release externe (gsd-core > 1.10.0
+  releasé ET installé) ; sa veille (WKTR-03) est active dès le jour 1, portée par la Phase 30.
+
+**Critère transverse (QUAL-01), reporté sur chaque phase qui livre un gate :** le gate naît avec ses
+trois issues (PASS / FAIL / imparsable BRUYANT) et sa mutation rouge prouvée — l'imparsable n'est
+jamais un vert par défaut (l'ennemi n°1 du repo, incident D-04).
+
+### Phase 30: Portabilité Windows II
+
+**Goal**: Une install VibeFlow sur Windows pose des hooks qui fonctionnent — le substrat des hooks
+(forme exec, codes de sortie normalisés, cascade `vf_python`) est réécrit une fois pour toutes, et
+les deux latences externes du milestone (RFC ledger, veille gsd-core) sont lancées le jour 1.
+Spec : `docs/superpowers/specs/2026-08-02-portabilite-windows-ii-design.md`.
+**Depends on**: — (première phase du milestone). **Pré-requis de cadrage bloquant** : PORT-04 —
+l'affectation §3.2 (résolution du chemin absolu de bash à l'install) est tranchée avec Willy et
+documentée AVANT le plan ; question ouverte au contrat PR #29 : exit code de
+`vf_guard_unavailable` sur PreToolUse.
+**Requirements**: PORT-01, PORT-02, PORT-03, PORT-04, PORT-05 + gestes jour 1 : LEDG-03, WKTR-03
+**Success Criteria** (what must be TRUE):
+
+  1. La portabilité est prouvée en CI sur lab frais : suites windows-crlf + windows-guards + gates
+     verts (PORT-05) — par exécution, jamais par lecture.
+  2. `merge-hooks.sh` sait poser, dédupliquer (cross-forme) et retirer une entrée en forme exec
+     AVANT toute migration de fragments — ordre (a) moteur → (b) codes de sortie → (c) hooks.json
+     encodé en vagues dépendantes du plan (PORT-02, spec §1.3) ; un update ne double jamais un hook
+     et un module reste désinstallable.
+  3. Les scripts de hooks respectent le contrat de codes de sortie normalisé (0 = silence à la
+     frontière harness, classement advisory/bloquant explicite), inventaire des 19 entrées réalisé
+     (PORT-03) — un démarrage de session sain reste silencieux, aucun exit 2 involontaire.
+  4. Les 3 fichiers du lot PYBIN passent par la lib partagée `vf-portable.sh` (contrat PR #29
+     consommé, jamais réinventé) (PORT-01) ; l'affectation §3.2 est documentée avant le plan
+     (PORT-04) — `guard-file-size.sh` gaté séparément si la lib tarde (tracer 01-01 Willy).
+  5. Jour 1 (asynchrone, hors substrat) : la RFC upstream `open-gsd/gsd-core` (suppression de
+     `REQUIREMENTS.md` rendue optionnelle) est déposée et traçable depuis le repo (LEDG-03,
+     deadline amont 2026-10-26) ET la veille de release gsd-core > 1.10.0 est active
+     (`npm view @opengsd/gsd-core version`, jamais le dist-tag `next`) (WKTR-03).
+
+**Transverse (QUAL-01)** : tout gate né dans la phase (contrat de sortie, dédup cross-forme) naît
+avec ses trois issues (PASS / FAIL / imparsable BRUYANT) et sa mutation rouge prouvée.
+**Plans**: TBD
+
+### Phase 31: Manifeste d'install + dry-run (issue #20)
+
+**Goal**: L'install/update devient prévisible et réversible — chaque pose est tracée
+fichier-par-fichier, prévisualisable sans rien écrire, et l'update supprime ce qui a disparu sans
+jamais toucher un fichier tiers (le bug réel des verbes v1.x survivants ne peut plus se produire).
+**Depends on**: Phase 30 (mêmes fichiers `_internal/` — strictement séquentielles, jamais
+parallèles ; le `--dry-run` s'écrit une seule fois, contre le moteur de hooks final).
+**Requirements**: MANI-01, MANI-02, MANI-03, MANI-04
+**Success Criteria** (what must be TRUE):
+
+  1. Chaque module posé écrit son manifeste de chemins
+     (`$TARGET_ROOT/scripts/.vibeflow-manifest-<module>`, LF trié, un chemin relatif par ligne) —
+     l'engine est le seul écrivain (MANI-01).
+  2. `--dry-run` montre le plan de pose fichier-par-fichier (y compris le merge de hooks) sans rien
+     écrire, sur le MÊME chemin de code que la pose (install + calibrate) — prouvé par un test
+     « dry-run == diff disque réel », sous mutation (MANI-02).
+  3. À l'update, les chemins de l'ancien manifeste absents du nouveau sont supprimés avec backup
+     systématique et liste signalée à l'utilisateur ; un fichier tiers non manifesté reste intact
+     (test dédié) (MANI-03).
+  4. L'issue GitHub #20 est close par livraison, réponse postée sur l'issue (MANI-04).
+
+**Transverse (QUAL-01)** : la suite `test-manifest.sh` et le contrôle dry-run naissent avec leurs
+trois issues (manifeste illisible = BRUYANT) et leur mutation rouge prouvée.
+**Plans**: TBD
+
+### Phase 32: Durcissement du driver-lock
+
+**Goal**: Les deux contournements constatés pendant agentique-v1.0 (commit et checkout concurrents
+sous lock) ne peuvent plus se reproduire en silence — le lock a un battement distinct de sa lease,
+un enforcement à la source qui voyage avec le plugin, et un takeover toujours explicite. Le
+protocole d'acquisition symlink-génération, mesuré, n'est PAS rouvert : le durcissement s'ajoute
+autour.
+**Depends on**: Phase 30 (son entrée de hook naît en forme exec sur le moteur final) — ordonnée
+après la Phase 31 ; ne touche que `conductor`. **Research flag** : spike `reference-transaction`
+git AVANT d'en dépendre pour LOCK-03 (couverture checkout incertaine) ; rejouer les 2 contournements
+réels comme cas de test AVANT de choisir le mécanisme.
+**Requirements**: LOCK-01, LOCK-02, LOCK-03, LOCK-04, LOCK-05
+**Success Criteria** (what must be TRUE):
+
+  1. Un manager vivant renouvelle son battement sans que le TTL monte — heartbeat séparé de la
+     lease, TTL par défaut inchangé (un lock périmé ≠ une mission morte, constat du 2026-08-02)
+     (LOCK-01).
+  2. Un commit sous le lock d'autrui est bloqué à la source (guard `PreToolUse(Bash)` distribué via
+     merge-hooks, armement prouvé par le gate règle 4 — jamais un settings local ni un hook git non
+     distribué) ; le contournement réel rejoué comme cas de test rougit sans le guard (LOCK-02).
+  3. Un checkout de branche sous le lock d'autrui est détecté et signalé bruyamment — blocage
+     seulement si le spike `reference-transaction` le prouve sûr (LOCK-03).
+  4. Le takeover d'un lock périmé est explicite et tracé avec l'ID du repreneur — jamais
+     d'auto-steal au TTL (LOCK-04).
+  5. Les commits de mission portent un jeton de fence en trailer — « quel commit sous quel mandat »
+     est auditable (LOCK-05).
+
+**Transverse (QUAL-01)** : le guard naît bloquant déclaré, avec ses trois issues (dont fail-open
+BRUYANT si le lock est illisible — jamais un vert) et sa mutation rouge prouvée.
+**Plans**: TBD
+
+### Phase 33: Watchdog & notifications des missions
+
+**Goal**: Un stall de mission ne reste plus jamais silencieux 18 h — chaque nœud du DAG bat,
+l'absence de battement se voit et se signale, et les jalons de mission notifient nativement sur
+l'OS, sans jamais tuer ni spammer.
+**Depends on**: Phase 32 (même battement — conçues ensemble, WTCH consomme le heartbeat de LOCK).
+**Research flags** : hooks async / `asyncRewake` (feature jeune) à spiker avant engagement ; canal
+de notification Windows à valider au cadrage (`powershell.exe -Command` proposé, non prouvé
+terrain — le milestone est Windows-first, pas d'`osascript` en dur) ; la définition de « progrès »
+est la décision de cadrage n°1.
+**Requirements**: WTCH-01, WTCH-02, WTCH-03, WTCH-04
+**Success Criteria** (what must be TRUE):
+
+  1. Chaque nœud du DAG de mission écrit un battement de progression — même battement que LOCK-01,
+     deux consommateurs, aucun second mécanisme (WTCH-01).
+  2. Un stall est détecté par ABSENCE de battement au-delà du seuil — jamais par auto-déclaration ;
+     le watchdog signale et suggère, ne tue jamais (ADR-031) ; le cas « vivant mais bouclant » est
+     couvert par test (WTCH-02).
+  3. Une notification OS native part aux jalons de mission (fin de nœud, halt condition) — jamais à
+     chaque tour ; `notify.sh` est posé par l'engine (best-effort, fail-open silencieux), portable
+     Windows dès la v1 (WTCH-03).
+  4. L'armement (hooks, notify) passe par le gate armement ↔ précondition — jamais un settings
+     local (leçon #38 : un réglage local ne voyage pas) (WTCH-04).
+
+**Transverse (QUAL-01)** : le signal de stall naît avec ses trois issues (heartbeat illisible =
+BRUYANT, jamais un vert) et sa mutation rouge prouvée.
+**Plans**: TBD
 
 ### Phase 18: Survie du ledger d'exigences à la clôture de jalon
 
-> **Périmètre réduit le 2026-07-28** par l'étude d'implémentation
-> `.planning/phases/VFDO-18-survie-du-ledger-d-exigences-la-cl-ture-de-jalon/STUDY.md` (verdict
-> **GO-RÉDUIT**). L'intitulé précédent — *Capability living-specs (conventions OpenSpec)* — et ses
-> quatre briques (grammaire delta ADDED/MODIFIED/REMOVED/RENAMED, ledger indexé par capability,
-> ancrage overlay `.gsd/capabilities/` @ `ship:post`, skill de spec-sync agent-driven) sont
-> **écartés**, pour trois raisons prouvées : le plan créait un quatrième registre sans en retirer
-> aucun (`ROUT-01` existe déjà en 3 copies) ; il volait à OpenSpec le chemin agent-driven
-> (`/opsx:sync`) sans les ~2 253 lignes et 16 garde-fous du chemin `archive` déterministe qui le
-> rattrapent ; et l'ancrage `ship:post`, bien que réel en gsd-core 1.8.0, ne fire que dans
-> `/gsd-ship` — chemin que ce repo n'emprunte jamais — avec `onError: skip` masquant les échecs et
-> le gate `bundleContentHash` désarmant la capability à la première édition du bundle.
+> **Héritée d'agentique-v1.0** (numéro historique conservé — dossier
+> `.planning/phases/VFDO-18-survie-du-ledger-d-exigences-la-cl-ture-de-jalon/`, étude `STUDY.md`).
+> **Périmètre réduit le 2026-07-28** par l'étude d'implémentation (verdict **GO-RÉDUIT**) :
+> l'intitulé précédent — *Capability living-specs (conventions OpenSpec)* — et ses quatre briques
+> (grammaire delta, ledger par capability, overlay `.gsd/capabilities/` @ `ship:post`, skill de
+> spec-sync agent-driven) sont **écartés** — quatrième registre sans en retirer aucun, chemin
+> agent-driven d'OpenSpec sans ses 16 garde-fous, ancrage `ship:post` inopérant ici. Chiffrage
+> STUDY §7.3 : ≈ 370-470 lignes, soit 25-30 % du coût de la version écartée.
 
 **Goal**: Faire **survivre les exigences à la clôture de jalon** — un fichier qui existe déjà, aucun
 nouveau registre, aucune nouvelle grammaire, aucun overlay. Fait porteur (STUDY §7.1) :
-`gsd-complete-milestone` exécute `git rm .planning/REQUIREMENTS.md` **inconditionnellement** (aucun
-flag, aucune gate, aucun `--keep-requirements` — `complete-milestone.md:474, 527, 530, 786`) et
-`new-milestone.md:475` le régénère de zéro au jalon suivant. Conséquence : **aucun lab GSD conforme
-n'a de réponse durable à « qu'est-ce que ce système garantit aujourd'hui ? »** — seulement une pile
-d'archives par jalon jamais fusionnées ; le `REQUIREMENTS.md` à 5 blocs de ce repo est une déviation
-manuelle non reproductible ailleurs. La phase livre trois choses (STUDY §7.2) : (1) un **gate
-machine** `check-requirements-survival.sh` dans `plugin/dev-orchestrator/scripts/`, sur le modèle de
-`check-doc-drift.sh`, en **détection d'absence uniquement** — jamais « n'a pas bougé », heuristique
-que `check-doc-drift.sh` se refuse explicitement en en-tête ; (2) une **ligne de doctrine** dans
-`plugin/dev-orchestrator/AGENT.md` (« à la clôture de jalon, le ledger d'exigences survit ; l'archive
-est un instantané, pas un déménagement ») ; (3) une **RFC upstream** vers `open-gsd/gsd-core` rendant
-la suppression optionnelle. La variante réduit le double état existant au lieu d'en ajouter : les
-archives `.planning/milestones/*-REQUIREMENTS.md` deviennent explicitement des instantanés, donc
-`.planning/REQUIREMENTS.md` redevient la seule source vivante.
-
-**⚠ Dépendance bloquante — la RFC conditionne le GO, pas le code** (STUDY §7.2 encadré, condition
-**D3**) : le levier qui rend le geste durable est **chez un tiers**. Sans elle, le moteur supprime le
-fichier à chaque clôture et le gate échoue — VibeFlow planterait un piquet **contre sa propre chaîne
-d'outils**, cas interdit par l'Iron Law 2 (`plugin/conductor/AGENT.md:114`, « Router, jamais
-réimplémenter »). **La RFC part avant toute implémentation du gate.** Si elle est refusée ou reste
-sans réponse au **2026-10-26**, la phase est intégralement ré-arbitrée : doctrine seule sans machine,
-ou conflit récurrent assumé.
-
-**Requirements**: TBD (à dériver au cadrage)
-**Depends on:** Phase 17
+`gsd-complete-milestone` exécute `git rm .planning/REQUIREMENTS.md` **inconditionnellement** et le
+jalon suivant régénère de zéro — aucun lab GSD conforme n'a de réponse durable à « qu'est-ce que ce
+système garantit aujourd'hui ? ». La dérive a été **re-constatée à la clôture d'agentique-v1.0**
+(2026-08-15) : la conservation du ledger y est une déviation manuelle assumée, pas un comportement
+outillé — 2ᵉ occurrence ; cette phase existe pour qu'il n'y ait pas de 3ᵉ.
+**Depends on**: Phase 30 (la RFC upstream — LEDG-03 — part en jour 1 du milestone ; le hook
+`SessionStart` du gate naît en forme exec sur le moteur de la Phase 30). **La RFC conditionne le GO
+du gate, pas le code** : refusée ou sans réponse au **2026-10-26** → ré-arbitrage intégral (doctrine
+seule, ou gate en mode avertissement), jamais un piquet planté contre notre propre chaîne d'outils
+(Iron Law 2).
+**Requirements**: LEDG-01, LEDG-02 *(LEDG-03 — dépôt de la RFC — est portée par la Phase 30)*
 **Success Criteria** (what must be TRUE):
 
-  1. La RFC est **déposée** sur `open-gsd/gsd-core` (suppression de `REQUIREMENTS.md` rendue
-     optionnelle) **avant** que le gate ne soit posé, et son issue/PR est traçable depuis le repo.
+  1. La clôture de jalon fait un roll-over outillé du ledger : les exigences non livrées voyagent
+     avec trace `carried-from:` — rejoué sur la clôture réelle d'agentique-v1.0 (LEDG-01).
+  2. `check-requirements-survival.sh` rend ROUGE si une exigence disparaît du ledger sans issue
+     tracée (livrée / reportée / abandonnée) — gate **lecteur/diff en détection d'absence
+     uniquement**, jamais un régénérateur, jamais l'heuristique « n'a pas bougé » (neutralisée en
+     Phase 17) (LEDG-02).
+  3. La doctrine est écrite dans `plugin/dev-orchestrator/AGENT.md` : les archives
+     `milestones/*-REQUIREMENTS.md` sont des **instantanés**, `.planning/REQUIREMENTS.md` est la
+     seule source vivante.
+  4. Aucun objet nouveau dans le socle : zéro fichier de registre créé, zéro grammaire de merge,
+     zéro overlay ; gouvernance conductor tenue (`check-agents.sh` vert, densité ADR-029),
+     portabilité prouvée par exécution.
+  5. La phase est livrée **avant la clôture de ce milestone** — sinon 3ᵉ dérive du ledger.
 
-  2. `check-requirements-survival.sh` échoue si `.planning/MILESTONES.md` déclare un jalon clos alors
-     que `.planning/REQUIREMENTS.md` est **absent** — et **ne prétend jamais** qu'un fichier présent
-     mais figé serait périmé (pas de récidive de l'heuristique neutralisée en Phase 17).
+**Transverse (QUAL-01)** : `check-requirements-survival.sh` naît avec ses trois issues
+(PASS / FAIL / imparsable BRUYANT — un `MILESTONES.md` illisible n'est jamais un vert) et sa
+mutation rouge prouvée (convention du module : suite ~1,5× la taille du script).
 
-  3. Le gate est **falsifiable, prouvé par mutation** : sa suite de tests échoue si on le neutralise
-     (convention du module : ~1,5× la taille du script testé, cf. `test-check-doc-drift.sh`).
+**Bénéfice explicitement NON capté** — à ne pas revendiquer : l'indexation par capability. Un
+`REQUIREMENTS.md` qui survit reste indexé par jalon ; cette part du besoin reste ouverte sous les
+conditions E1/E2 du STUDY §8 — pas déclarée sans objet.
+**Plans**: TBD
 
-  4. La doctrine est écrite dans `plugin/dev-orchestrator/AGENT.md` et le rôle d'**instantané** des
-     archives `milestones/*-REQUIREMENTS.md` est explicite — `.planning/REQUIREMENTS.md` désigné
-     comme seule source vivante.
+### Phase 34: Gaps agency-agents & cadrage skill-installer
 
-  5. **Aucun objet nouveau dans le socle** : zéro fichier de registre créé, zéro grammaire de merge
-     introduite, zéro overlay `.gsd/capabilities/`. Gouvernance conductor tenue (`check-agents.sh`
-     vert, densité ADR-029), portabilité macOS + Linux prouvée par exécution.
+**Goal**: La couverture du parc d'agents est arbitrée sur pièces — la taxonomie du catalogue
+`agency-agents` est distillée, jamais importée — et le skill-installer global a un verdict go/no-go
+écrit avant toute ligne de code.
+**Depends on**: Phase 31 (le manifeste est la fondation de tout uninstall propre — MANI avant
+SKIL ; un éventuel GO hériterait du traçage manifeste dès le premier jour). AGTS-02 est
+conditionnée à la sortie du statut expérimental de `mobile-test` pendant le milestone.
+**Requirements**: AGTS-01, AGTS-02, SKIL-01
+**Success Criteria** (what must be TRUE):
 
-  6. Module `dev-orchestrator` bumpé, release racine + tag annoté poussé (discipline `CLAUDE.md`),
-     `check-release-tag.sh --remote` ✓.
+  1. Les gaps de couverture sont arbitrés en distillant la taxonomie du catalogue — **zéro persona
+     importée** (ADR-029 incompatible, zéro gouvernance) ; tout agent retenu passe
+     `check-agents.sh` (ADR-044) et la règle 4 s'il est armé (AGTS-01).
+  2. `web-test-team` est construite SI `mobile-test` sort du statut expérimental pendant le
+     milestone (seule piste alignée fiabilité, moule prouvé) ; sinon l'exigence est **reportée avec
+     trace** — jamais abandonnée en silence (AGTS-02).
+  3. Le cadrage SKIL-01 répond par écrit à « que fait-il de plus que le natif `/plugin` ? » —
+     abandon documenté si la réponse est creuse ; **aucun code avant le go** ; périmètre = câblage,
+     pas catalogue ; collision de nom = refus (SKIL-01).
 
-**Chiffrage** (STUDY §7.3) : ≈ **370-470 lignes**, 1 module bumpé — contre ≈ 1 300-2 000 lignes et
-5 objets à maintenir pour la version complète écartée. Soit **25-30 % du coût**.
+**Plans**: TBD
 
-**Bénéfice explicitement NON capté** — à ne pas revendiquer : l'**indexation par capability**. Un
-`REQUIREMENTS.md` qui survit reste indexé **par jalon** ; répondre à « que garantit le routage
-aujourd'hui ? » exigera toujours de réconcilier `ROUT-01..04`, `VERB-02` (« caduc depuis v2.33.0 »)
-et `PROJECT.md:84`. Cette part du besoin reste ouverte et peut être rouverte plus tard sous les
-conditions **E1/E2** du STUDY §8 — pas déclarée sans objet.
+### Phase 25: Budget d'instructions
 
-**Plans:** 0 plans
+> **Héritée d'agentique-v1.0** (numéro historique conservé — dossier
+> `.planning/phases/VFDO-25-budget-d-instructions-et-tage-d-alignement-court/`, slug historique
+> conservé). **Périmètre réduit à l'arbitrage du 2026-08-15 : BUDG-01/02 seulement** — le volet G2
+> (étage d'alignement court entre `discuss` et `plan`, ex-candidat BUDG-03) est **différé**
+> (mécanique de workflow neuve, utilité non démontrée, aucun incident lié — Out of Scope du
+> ledger). Origine (2026-07-31) : audit de `shanraisshan/claude-code-best-practice`, source
+> primaire Dex Horthy (HumanLayer) — les LLM frontier suivent ~150-200 instructions avec
+> constance ; ADR-029 borne les **lignes**, un proxy qui ne prédit pas l'adhérence (une skill de
+> 200 lignes portant 90 impératifs est plus dangereuse qu'une de 400 lignes en portant 30).
 
-Plans:
+**Goal**: La densité des agents distribués est bornée par une métrique qui prédit l'adhérence — la
+charge d'instructions est mesurée et publiée, et son gate monte en ratchet, jamais rouge des
+semaines.
+**Depends on**: Phase 34 (ne jamais calibrer un seuil sur un corpus d'agents qui bouge — après tous
+les ajouts d'agents du milestone).
+**Requirements**: BUDG-01, BUDG-02
+**Success Criteria** (what must be TRUE):
 
-- [ ] TBD (run /gsd-plan-phase 18 to break down)
+  1. Le budget d'instructions par fichier d'agent distribué est **mesuré et publié** — la métrique
+     (quelles formes comptent comme instruction normative), le seuil et la portée sont tranchés au
+     cadrage de la phase (BUDG-01).
+  2. Le gate est en **ratchet** : il avertit d'abord, bloque au merge qui livre la remédiation, et
+     n'est jamais rouge des semaines (précédent `workflow.windows_enforce`, spec Windows II §7)
+     (BUDG-02).
+  3. La mesure est calibrée sur le corpus **final** du milestone (post-Phase 34) — jamais sur un
+     état qui bouge.
 
+**Transverse (QUAL-01)** : le gate budget naît avec ses trois issues (un agent imparsable est
+BRUYANT, jamais compté vert) et sa mutation rouge prouvée.
+**Plans**: TBD
 
-### Phase 25: Budget d'instructions et étage d'alignement court
+### Phase 35: Ré-armement worktree (conditionnelle)
 
-> **Origine** — audit du 2026-07-31 de `shanraisshan/claude-code-best-practice` (65k ★, veille
-> communautaire Claude Code), demandé par Samuel pour vérifier si le pari GSD tenait. Verdict sur
-> ce point : **GSD y est cité** (rang 7/12 des workflows, `README.md:122`) — la ligne pointait
-> simplement le repo archivé, corrigé en amont par PR #169. Deux constats **méthodologiques**
-> survivent à l'audit et n'appartiennent ni à la Phase 23 ni à la Phase 24 : ils sont ci-dessous.
-> Source primaire commune : Dex Horthy (HumanLayer), *« Everything We Got Wrong About
-> Research-Plan-Implement »*, MLOps Community, 2026-03-24.
+> **Phase flottante, événementielle — jamais bloquante.** Elle se déclenche quand sa précondition
+> externe tombe : `open-gsd/gsd-core#3302` est close COMPLETED (2026-08-14) mais le fix n'est PAS
+> releasé — au 2026-08-15, npm latest = **1.10.0**, la précondition « > 1.10.0 » n'est PAS
+> satisfaite. La veille (WKTR-03) est active depuis la Phase 30. La Phase 28 a livré le **gate**
+> (armement ↔ précondition distribuée) ; cette phase porte le **ré-armement**, jamais l'inverse
+> (mémoire projet). Dossier : `.planning/research/2026-08-10-agents-paralleles-etat-de-l-art.md`
+> §Implications 3.
 
-**Goal**: Corriger deux défauts de **notre propre couche**, indépendants du moteur — (a) la densité
-d'agents et de skills est bornée par une métrique qui ne prédit pas l'adhérence, (b) le seul
-document que l'humain relit avant l'écriture du code est trop long pour être relu. Les deux
-attaquent la même chose : **ce que le modèle suit réellement, et ce que l'humain peut réellement
-corriger avant qu'il soit trop tard.**
+**Goal**: `isolation: worktree` est ré-armé sur les 13 agents écrivains **sous preuve machine
+distribuée** — close ≠ releasé ≠ installé — sans jamais rejouer la régression #38.
+**Depends on**: précondition externe (gsd-core > 1.10.0 releasé ET installé) ; plus simple après la
+stabilisation du parc de hooks (Phases 30-31), mais indépendante du reste — ne bloque rien et n'est
+bloquée par rien.
+**Requirements**: WKTR-01, WKTR-02 *(WKTR-03 — la veille — est portée par la Phase 30)*
+**Success Criteria** (what must be TRUE):
 
-**Le point de départ n'est ni une panne ni un couplage — c'est un mauvais instrument de mesure
-dans un cas, un artefact manquant dans l'autre.**
+  1. La précondition est machine-vérifiée : gsd-core > 1.10.0 **RELEASÉ** (sonde `npm view`, jamais
+     le dist-tag `next`) **ET installé**, prouvée as-installed — `vf-requires`/`# vf-provides`
+     porté par `ensure-deps.sh` (le seul à pouvoir attester l'install) + validation
+     `lab-frais-arme` (WKTR-01).
+  2. Le ré-armement des 13 agents n'a lieu qu'**après** preuve du retour des commits sur un cas
+     réel rejoué (scénario #3302 : commits de workers, SUMMARY, merge — les symptômes exacts du
+     refus PAEX-09) (WKTR-02).
+  3. Tant que la précondition n'est pas satisfaite, la phase reste flottante avec son déclencheur
+     objectif — jamais un ré-armement sur issue-close, jamais un abandon silencieux.
 
-#### G1 — Le budget d'instructions n'est pas mesuré
-
-Fait amont : les LLM frontier suivent **~150-200 instructions** avec constance ; au-delà,
-l'adhérence devient stochastique. HumanLayer l'a payé cash — leur méga-prompt `create_plan`
-portait **85 instructions** et **sautait ses étapes à plus haute valeur ~50 % du temps** (poser les
-questions, aligner avant d'écrire). Le correctif qui a marché n'a pas été une meilleure rédaction
-mais le **découpage** : `research → plan → implement` est devenu sept prompts de moins de 40
-instructions chacun.
-
-État du lab : **ADR-029 borne les lignes** (agents ≤ 250, skills ≤ 500) et `check-agents.sh`
-l'applique. Les lignes sont un proxy défaillant — une skill de 200 lignes portant 90 impératifs
-est plus dangereuse qu'une de 400 lignes en portant 30. Nous mesurons le volume, pas la charge
-d'instruction, et rien ne dit aujourd'hui laquelle de nos briques est en zone rouge.
-
-À trancher au plan : la métrique exacte (quelles formes comptent comme instruction normative), le
-seuil, la portée (agents seuls ou agents + skills), et si le dépassement **bloque** ou **signale** —
-recouper avec l'Axiome 1 et la doctrine ADR-031.
-
-#### G2 — L'étage d'alignement court manque entre `discuss` et `plan`
-
-Fait amont : *« Don't read the plans. Please read the code. »* Un plan de 1000 lignes produit
-~1000 lignes de code à 10 % près — le relire n'est pas du levier, c'est le même travail deux fois,
-et le code livré diffère du plan. Leur substitution : un **design doc ~200 lignes** puis un
-**structure outline de 2 pages** (« si le plan est l'implémentation, l'outline c'est le fichier
-`.h` ») revus **avant** l'écriture, où une correction coûte une phrase au lieu d'un refactor.
-
-État du lab, **vérifié sur pièce** (Phase 22) : l'étage « design » **existe déjà** —
-`22-CONTEXT.md` fait **361 lignes** et porte frontière, décisions et références. C'est l'étage
-**outline** qui manque : le document réellement soumis au jugement humain reste PLAN.md, soit
-**1291 lignes sur 3 plans** pour cette seule phase. Le dernier point de correction bon marché
-n'existe pas.
-
-Corollaire à instruire : le même travail établit que les modèles écrivent **systématiquement des
-plans horizontaux** (toute la DB, puis toute l'API, puis tout le front) et qu'**aucun prompt ne
-l'empêche** — l'outline est le seul correctif structurel connu. Le lab **pratique** déjà le
-tracer-first (3 plans Phase 22) **sans l'avoir doctriné** : à acter comme règle ou à écarter
-explicitement.
-
-À trancher au plan : forme de l'artefact (document propre, section de CONTEXT.md, ou capability
-accrochée à `plan:pre`), et si CONTEXT.md doit maigrir en conséquence plutôt que s'ajouter à la
-pile.
-
-#### Frontières — ce que cette phase ne fait pas
-
-- **vs Phase 23 (couplage explicite au moteur).** G2 insère un étage dans la chaîne
-  `discuss → plan`. Le point d'insertion **ne peut pas être décidé** avant que la voie unique
-  d'invocation et la doctrine de flags soient arrêtées. Cette phase **dépend** de 23 et ne la
-  préempte pas ; si l'artefact prend la forme d'une capability `plan:pre`, la table
-  capabilities/hooks de la Phase 23 fait foi.
-
-- **vs Phase 24 (activation et mesure).** M3 (`effort:` par rôle) et A2 (`agent_skills`)
-  éditent tous deux `plugin/*/agents/*.md` — les fichiers mêmes sur lesquels G1 pose un gate.
-  Ordonnancement **après 24** pour ne pas calibrer un seuil sur un état qui bouge, et pour éviter
-  les éditions concurrentes.
-
-- **G1 n'est pas une capability GSD.** C'est une règle de densité propre à VibeFlow (ADR-029)
-  outillée par notre propre gate. Aucun recouvrement avec le lot ACTIVATION de la Phase 24.
-
-**Requirements**: TBD (à mapper au ledger pendant le plan)
-**Depends on:** Phase 24 (et Phase 23 pour le volet G2)
-**Plans:** 0 plans
-
-Plans:
-
-- [ ] TBD (run /gsd-plan-phase 25 to break down)
-
+**Transverse (QUAL-01)** : le comparateur semver de la précondition naît testé sur 1.9/1.10 avec
+ses trois issues (sortie npm imparsable = BRUYANT) et sa mutation rouge prouvée.
+**Plans**: TBD

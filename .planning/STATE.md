@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: fiabilite-v1.0
 milestone_name: Fiabilité — ce qui survit
 status: planning
-last_updated: "2026-08-15T17:37:46.094Z"
+last_updated: "2026-08-15T18:07:05.215Z"
 last_activity: 2026-08-15
 progress:
-  total_phases: 0
+  total_phases: 8
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,7 +20,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26 — charte rouverte : 17 modules, D2/D6 renversées)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Phase 27 — parall-lisation-d-ex-cution-granulaire-simple-sans-collision
+**Current focus:** Milestone fiabilite-v1.0 — Phase 30 (Portabilité Windows II) à cadrer ; gestes jour 1 : RFC upstream (LEDG-03) + veille gsd-core (WKTR-03)
 `get-shit-done-cc` → `@opengsd/gsd-core` livrée en v2.39.0 atteint enfin les **postes déjà équipés** :
 `/vf-update` dit l'état du moteur avant tout stop et propose la bascule sous confirmation ADR-031.
 Modules `dev-orchestrator` v2.7.0 + `conductor` v1.16.0. Verdict `19-VERIFICATION.md` : **PASS 6/7**.
@@ -52,10 +52,10 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 30 (Portabilité Windows II) — not started
 Plan: —
-Status: Defining requirements
-Last activity: 2026-08-15 — Milestone fiabilite-v1.0 started
+Status: Roadmap defined - ready to discuss/plan Phase 30
+Last activity: 2026-08-15 — ROADMAP fiabilite-v1.0 posée (8 phases : 30-35 + 18 et 25 héritées)
 
 ## Performance Metrics
 
@@ -96,6 +96,20 @@ Last activity: 2026-08-15 — Milestone fiabilite-v1.0 started
 ## Accumulated Context
 
 ### Roadmap Evolution
+
+- 2026-08-15 (roadmap fiabilite-v1.0) : **feuille de route du milestone posée — 8 phases**.
+  Numérotation arbitrée par l'humain : les héritées gardent 18 et 25, les nouvelles continuent à
+  30 (le milestone précédent s'est arrêté à 29). Ordre dicté par les fichiers (ARCHITECTURE.md
+  §4) : **30** Windows II (première — demande client ; porte les gestes jour 1 : LEDG-03/RFC
+  upstream + WKTR-03/veille gsd-core) → **31** Manifeste + dry-run (#20 ; strictement après 30,
+  mêmes fichiers `_internal/`) → **32** Driver-lock → **33** Watchdog (adjacentes — heartbeat
+  partagé, WTCH après LOCK) → **18** héritée (survie du ledger — livrée avant clôture, sinon 3ᵉ
+  dérive) → **34** Gaps agency-agents + cadrage SKIL-01 rattaché → **25** héritée (budget
+  d'instructions, avant-dernière, périmètre réduit BUDG-01/02) ; **35** Ré-armement worktree
+  flottante conditionnelle (gsd-core > 1.10.0 releasé ET installé — NON satisfaite au 2026-08-15,
+  npm latest = 1.10.0). Couverture : 30/30 IDs du ledger mappés (0 orphelin, 0 doublon) ; QUAL-01
+  transverse, reporté en critère sur chaque phase livrant un gate. Pré-requis de cadrage bloquant
+  de la Phase 30 : PORT-04 (affectation §3.2 tranchée avec Willy avant le plan).
 
 - 2026-08-15 (suite) : **Phase 29 cadrée** — CONTEXT.md posé (cadrage court choisi : périmètre
   verrouillé D-01/D-02/D-03, zones grises en Claude's Discretion), DISCUSSION-LOG.md en trace.

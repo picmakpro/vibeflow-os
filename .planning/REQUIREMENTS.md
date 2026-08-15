@@ -816,6 +816,36 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | ICMD-10 | Phase 29 | Planned — plan 29-04 |
 | ICMD-11 | Phase 29 | Planned — plan 29-04 |
 | ICMD-12 | Phase 29 | Planned — plan 29-05 |
+| PORT-01 | Phase 30 | Pending |
+| PORT-02 | Phase 30 | Pending |
+| PORT-03 | Phase 30 | Pending |
+| PORT-04 | Phase 30 | Pending — pré-requis de cadrage bloquant (tranché avec Willy AVANT le plan) |
+| PORT-05 | Phase 30 | Pending |
+| MANI-01 | Phase 31 | Pending |
+| MANI-02 | Phase 31 | Pending |
+| MANI-03 | Phase 31 | Pending |
+| MANI-04 | Phase 31 | Pending |
+| LOCK-01 | Phase 32 | Pending |
+| LOCK-02 | Phase 32 | Pending |
+| LOCK-03 | Phase 32 | Pending — blocage conditionné au spike `reference-transaction` |
+| LOCK-04 | Phase 32 | Pending |
+| LOCK-05 | Phase 32 | Pending |
+| WTCH-01 | Phase 33 | Pending |
+| WTCH-02 | Phase 33 | Pending |
+| WTCH-03 | Phase 33 | Pending — canal Windows à valider au cadrage |
+| WTCH-04 | Phase 33 | Pending |
+| LEDG-01 | Phase 18 | Pending |
+| LEDG-02 | Phase 18 | Pending |
+| LEDG-03 | Phase 30 | Pending — geste jour 1 (RFC upstream, deadline amont 2026-10-26) |
+| BUDG-01 | Phase 25 | Pending |
+| BUDG-02 | Phase 25 | Pending |
+| WKTR-01 | Phase 35 | Pending — conditionnelle (gsd-core > 1.10.0 releasé ET installé) |
+| WKTR-02 | Phase 35 | Pending — conditionnelle |
+| WKTR-03 | Phase 30 | Pending — geste jour 1 (veille `npm view`, jamais le dist-tag `next`) |
+| SKIL-01 | Phase 34 | Pending — cadrage go/no-go, aucun code avant le go |
+| AGTS-01 | Phase 34 | Pending |
+| AGTS-02 | Phase 34 | Pending — conditionnée à la sortie d'expérimental de mobile-test |
+| QUAL-01 | Transverse — Phases 30, 31, 32, 33, 18, 25, 35 | Pending — reporté en critère sur chaque phase livrant un gate |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -854,6 +884,15 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   **0 inventé**. D-01 et D-02 sont des **non-livrables** vérifiables par l'absence de G4 et des
   gains secondaires du `files_modified` des 5 plans ; D-03 est vérifiable par l'absence de
   `plugin/conductor/scripts/dag.sh` de ce même ensemble.
+
+- Milestone fiabilite-v1.0 : **30 IDs au ledger** (9 familles + QUAL-01 transverse ; le « 26 » de
+  l'arbitrage compte les features avant frappe des IDs transverses et jour 1) — mappés le
+  2026-08-15 aux **8 phases** du milestone (30-35 + 18 et 25 héritées), **0 non-mappé**, **0
+  doublon** ✓. Gestes jour 1 portés par la Phase 30 : LEDG-03 (RFC upstream) et WKTR-03 (veille
+  gsd-core). QUAL-01 est **transverse** : reporté en critère de succès sur chaque phase qui livre
+  un gate (30, 31, 32, 33, 18, 25, 35), vérifié à chaque livraison de gate plutôt qu'en une phase
+  propre. La Phase 34 (AGTS-01/02 + SKIL-01) n'attend aucun gate neuf — QUAL-01 s'y appliquerait de
+  plein droit si un gate y naissait.
 
 ## Milestone fiabilite-v1.0 — « ce qui survit » (démarré 2026-08-15)
 
@@ -929,4 +968,4 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 
 ---
 *Requirements defined: 2026-06-04*
-*Last updated: 2026-08-15 — ajout milestone fiabilite-v1.0 (26 exigences en 9 familles, audit d utilite prealable, Out of Scope motive) ; precedent : ajout Phase 29 (ICMD-01..12, distillation des gains ICM G1/G2/G3/G5) ; précédent : 2026-07-26 — remise à l'heure post-audit (Phase 12 annotée post-bascule v2.33.0, Phase 13 redéfinie sans verbe, Phase 14 = v2.30.0, milestones 2-3 shipped) ; précédent : 2026-07-25 — ajout Phase 14 au Milestone 6 (ALTI-01→05 : frontière d'altitude planning-core / moteur GSD, ADR-055)*
+*Last updated: 2026-08-15 — roadmap fiabilite-v1.0 posée : traçabilité mappée aux phases 30-35 + 18/25 héritées (30 IDs, 0 orphelin) ; précédent : ajout milestone fiabilite-v1.0 (26 exigences en 9 familles, audit d utilite prealable, Out of Scope motive) ; precedent : ajout Phase 29 (ICMD-01..12, distillation des gains ICM G1/G2/G3/G5) ; précédent : 2026-07-26 — remise à l'heure post-audit (Phase 12 annotée post-bascule v2.33.0, Phase 13 redéfinie sans verbe, Phase 14 = v2.30.0, milestones 2-3 shipped) ; précédent : 2026-07-25 — ajout Phase 14 au Milestone 6 (ALTI-01→05 : frontière d'altitude planning-core / moteur GSD, ADR-055)*
