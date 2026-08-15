@@ -650,3 +650,100 @@ jobs:
           if [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ]; then echo "::error::check-registres rc=$rc inattendu"; exit 1; fi
           echo "== hooks de gouvernance présents dans settings.json =="
           grep -q "guard" .claude/settings.json
+
+  # POURQUOI CE JOB EXISTE (Phase 28, ARMD-06/ARMD-08 — as-installed testing, #38). Le job
+  # ci-dessus (lab-frais) installe la fermeture de `conductor` (7 modules) : elle ne pose NI le
+  # gate `check-capability-activation.sh` NI un seul artefact arme — un gate exerce seulement sur
+  # l'arbre source (la suite du module) ne peut donc RIEN prouver sur ce que l'install pose CHEZ
+  # L'UTILISATEUR. C'est la faille de fond de #38 : « il verifie que l'install tient, jamais que ce
+  # qu'elle pose est coherent avec ce qu'elle a promis » (.planning/ROADMAP.md:2047-2049). Ce job
+  # installe donc sa PROPRE fermeture, `dev-orchestrator` (9 modules, la seule fermeture mesuree qui
+  # pose a la fois le gate et des artefacts armes), dans son PROPRE lab, sans toucher a une seule
+  # ligne de `lab-frais` ni de son Gate C.
+  lab-frais-arme:
+    name: Lab frais arme (as-installed testing — le gate installe, sur un univers non vide, #38)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dépendances (bash, jq, python3)
+        # Ni `gates` ni `lab-frais` n'assertent cet outillage aujourd'hui ; leur présence sur
+        # ubuntu-latest est une DÉDUCTION tirée du vert actuel, pas une mesure. Un gate qui sort 2
+        # pour outil manquant doit le dire par un message d'assertion, jamais par un diagnostic
+        # trompeur venu d'ailleurs.
+        run: |
+          bash --version | head -1
+          jq --version
+          python3 --version
+
+      - name: "Installer la fermeture dev-orchestrator (9 modules) dans un lab armé, distinct de $LAB"
+        run: |
+          set -eu
+          LAB_ARME="$(mktemp -d)"
+          echo "LAB_ARME=$LAB_ARME" >> "$GITHUB_ENV"
+          cd "$LAB_ARME" && git init -q
+          closure=$(cd "$GITHUB_WORKSPACE" && bash plugin/_internal/resolve-deps.sh dev-orchestrator)
+          echo "== fermeture armée : $closure =="
+          # Échec VISIBLE si la fermeture a dérivé et ne contient plus dev-orchestrator : sans cette
+          # assertion (awk, jamais grep pipé — le grep de ce poste tronque silencieusement), ce job
+          # rendrait vert à vide, exactement le mode d'échec que la phase existe pour fermer.
+          if ! printf '%s\n' "$closure" | awk '$0=="dev-orchestrator"{f=1} END{exit !f}'; then
+            echo "::error::fermeture résolue sans dev-orchestrator — le gate ne serait pas installé, ce job rendrait vert à vide"
+            exit 1
+          fi
+          for m in $closure; do
+            VIBEFLOW_CACHE="$GITHUB_WORKSPACE/plugin" VF_SCOPE=project \
+              bash "$GITHUB_WORKSPACE/plugin/_internal/vibeflow-update.sh" install "$m"
+          done
+
+      - name: "Doter le lab armé d'une configuration minimale (plafond : trois clés)"
+        # Mesuré (Phase 28, plan 03) : un lab installé avec cette fermeture et un
+        # .planning/config.json VIDE sort en ÉCART règle 2 sur intel.enabled (toggle INACTIF cité
+        # hors marqueur conditionnel dans docs-flow.md) — une règle ÉTRANGÈRE au périmètre de cette
+        # phase. Le corpus, l'index et la règle ne sont PAS touchés : seule la clé strictement
+        # nécessaire est posée ici. Une seule clé a suffi à la mesure, bien sous le plafond de trois.
+        run: |
+          set -eu
+          mkdir -p "$LAB_ARME/.planning"
+          cat > "$LAB_ARME/.planning/config.json" <<'JSON'
+          {
+            "intel": { "enabled": true }
+          }
+          JSON
+
+      - name: "Invoquer le gate INSTALLÉ, sans surcharge — un exit 2 échoue comme un exit 1"
+        # Aucune surcharge VF_CAPACT_* : la cascade de résolution est exercée telle qu'elle tourne
+        # chez l'utilisateur, exactement comme le fait l'invocation nue du job `gates`. Ne JAMAIS
+        # invoquer le script depuis $GITHUB_WORKSPACE : tester l'arbre source contre un lab est le
+        # geste que le pattern *as-installed testing* condamne, et c'est la confusion qui a produit
+        # #38.
+        run: |
+          set -eu
+          cd "$LAB_ARME"
+          rc=0
+          bash .claude/scripts/check-capability-activation.sh || rc=$?
+          echo "== gate installé (rc=$rc) =="
+          # Un exit 2 (NON VÉRIFIABLE) échoue le job au même titre qu'un exit 1 — un gate qui ne peut
+          # pas se prononcer n'est pas un gate vert.
+          [ "$rc" -eq 0 ]
+
+      - name: "Plancher d'opposabilité du job : au moins deux artefacts armés installés"
+        # Deux et non un : avec un seul, un futur changement de fermeture viderait l'ensemble sans
+        # que ce job ne le distingue d'un vert légitime. État mesuré (Phase 28) : vf-coder.md et
+        # vf-reviewer.md, tous deux posés par dev-orchestrator, tous deux porteurs de
+        # `vf-requires: mcp-servers` depuis 28-02 ; les trois agents de mobile-test-team restent hors
+        # champ, ce module n'appartenant à aucune fermeture mesurée. Compte en awk, jamais en grep
+        # pipé (le grep de ce poste tronque silencieusement).
+        run: |
+          set -eu
+          cd "$LAB_ARME"
+          armed_count=$(awk '
+            FNR==1 { fm=0 }
+            $0=="---" { fm++; next }
+            fm==1 && ($0 ~ /^isolation:[ \t]*[^ \t]/ || $0 ~ /^vf-mcp-consumer:[ \t]*[^ \t]/ || $0 ~ /^vf-mcp-tools:[ \t]*[^ \t]/) { print FILENAME }
+          ' .claude/agents/*.md 2>/dev/null | sort -u | awk 'END{print NR+0}')
+          echo "== artefacts armés installés : $armed_count =="
+          if [ "$armed_count" -lt 2 ]; then
+            echo "::error::univers d'armement du lab installé < 2 ($armed_count) — le job refuse de rendre un verdict sur un univers vide"
+            exit 1
+          fi
