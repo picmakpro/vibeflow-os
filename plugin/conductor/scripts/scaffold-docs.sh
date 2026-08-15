@@ -47,6 +47,15 @@ write_stub() {
   log "créé : $path"
 }
 
+# Corps de routage commun aux CONTEXT.md (table Tâche / Charge / NE charge PAS). Routage pur,
+# jamais de contenu de fond (ADR-042) — c'est ce qui tient le fichier sous 80 lignes.
+routing_table() {
+  echo "| Tâche | Charge | NE charge PAS |"
+  echo "|---|---|---|"
+  echo "| [tâche à préciser] | [fichier ou dossier précis] | [fichier ou dossier précis] |"
+  echo "| [tâche à préciser] | [fichier ou dossier précis] | [fichier ou dossier précis] |"
+}
+
 # ---- Doc transverse (toujours) ----
 write_stub "$DOCS_DIR/_transverse/INDEX.md" \
   "# Documentation transverse" \
@@ -54,6 +63,7 @@ write_stub "$DOCS_DIR/_transverse/INDEX.md" \
   "> Doc commune à tout le lab. Le \`CLAUDE.md\` racine pointe ici via \`@$DOCS_DIR/_transverse/\`." \
   "" \
   "- [REFERENCE.md](REFERENCE.md) — source de vérité transverse (vocabulaire, conventions, stack)." \
+  "- [CONTEXT.md](CONTEXT.md) — contrat de routage : quelle tâche charge quoi ici." \
   "- Ajouter ici les docs qui concernent l'ensemble des sous-projets."
 
 write_stub "$DOCS_DIR/_transverse/REFERENCE.md" \
@@ -67,6 +77,17 @@ write_stub "$DOCS_DIR/_transverse/REFERENCE.md" \
   "" \
   "## Stack / contraintes communes"
 
+write_stub "$DOCS_DIR/_transverse/CONTEXT.md" \
+  "# Contrat de routage — transverse" \
+  "" \
+  "> Ce fichier route, il ne contient rien : le fond vit dans les fichiers pointés (ADR-042)." \
+  "> Tenu en 80 lignes par contrat." \
+  "" \
+  "$(routing_table)" \
+  "" \
+  "Voir aussi : [INDEX.md](INDEX.md) liste ce que ce dossier contient · [REFERENCE.md](REFERENCE.md)" \
+  "fait autorité sur le fond transverse · ce fichier route seulement."
+
 # ---- Doc contextuelle par compartiment qualifié ----
 for c in "${COMPARTMENTS[@]:-}"; do
   [ -n "$c" ] || continue
@@ -76,6 +97,7 @@ for c in "${COMPARTMENTS[@]:-}"; do
     "> Doc CONTEXTUELLE du sous-projet \`$c\`. Le \`CLAUDE.md\` racine y pointe via \`@$DOCS_DIR/$c/\`." \
     "" \
     "- [REFERENCE.md](REFERENCE.md) — source de vérité propre à $c." \
+    "- [CONTEXT.md](CONTEXT.md) — contrat de routage : quelle tâche charge quoi ici." \
     "" \
     "Ajouter ici uniquement ce qui est spécifique à $c (les éléments transverses vont dans \`_transverse/\`)."
   write_stub "$DOCS_DIR/$c/REFERENCE.md" \
@@ -84,6 +106,16 @@ for c in "${COMPARTMENTS[@]:-}"; do
     "## Objectif du sous-projet" \
     "" \
     "## Spécificités (vs transverse)"
+  write_stub "$DOCS_DIR/$c/CONTEXT.md" \
+    "# Contrat de routage — $c" \
+    "" \
+    "> Ce fichier route, il ne contient rien : le fond vit dans les fichiers pointés (ADR-042)." \
+    "> Tenu en 80 lignes par contrat." \
+    "" \
+    "$(routing_table)" \
+    "" \
+    "Voir aussi : [INDEX.md](INDEX.md) liste ce que ce dossier contient · [REFERENCE.md](REFERENCE.md)" \
+    "fait autorité sur le fond de $c · ce fichier route seulement."
 done
 
 log "✓ doc externalisée sous $DOCS_DIR/ (transverse${COMPARTMENTS:+ + ${#COMPARTMENTS[@]} compartiment(s)})"
