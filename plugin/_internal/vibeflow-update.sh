@@ -221,6 +221,23 @@ gitignore_add_paths() {
   [ -f "$module_dir/scripts/seed-registres.sh" ] && gitignore_add_one ".claude/memory/"
   # Config template posé à côté d'un SKILL.md racine.
   [ -d "$module_dir/config" ] && [ -f "$module_dir/SKILL.md" ] && gitignore_add_one ".claude/skills/$mod/config/"
+  # settings.json (SCOPE-04, Phase 30 tâche 4) : en scope LOCAL, `merge_module_hooks()` écrit dans
+  # $TARGET_ROOT/settings.json — la même promesse « rien ne sera committé » que le reste de cette
+  # fonction s'applique à ce fichier aussi, ce qu'aucune ligne ne couvrait avant ce plan. Sélecteur
+  # data-driven (même style que la ligne seed-registres.sh ci-dessus) : seul un module qui PORTE
+  # un fragment hooks/hooks.json (donc qui écrit réellement dans settings.json à cette install)
+  # déclenche l'ajout. `settings.local.json` lui-même n'est PAS gitignoré ici : il est déjà nommé
+  # pour ne jamais être committé par convention, et gitignorer un fichier potentiellement absent
+  # n'apporterait rien au-delà de ce que ce plan demande explicitement.
+  [ -f "$module_dir/hooks/hooks.json" ] && gitignore_add_one ".claude/settings.json"
+  # Lib partagée de portabilité (Phase 30 tâche 2, copy_engine_lib()) : posée par l'ENGINE, pas
+  # par un module — donc jamais vue par la boucle scripts/ plus haut (elle vient du cache
+  # _internal, jamais de $module_dir/scripts). Gap constaté en tâche 4 lors de la vérification
+  # manuelle de ce plan (Rule 2, deviation documentée au SUMMARY) : sans cette ligne,
+  # .claude/scripts/vf-portable.sh échappait à la promesse « rien ne sera committé » du scope
+  # local. Inconditionnel : copy_engine_lib() la pose à CHAQUE exécution de l'engine en scope
+  # local, quel que soit le module installé — gitignore_add_one() reste idempotent.
+  gitignore_add_one ".claude/scripts/vf-portable.sh"
 }
 
 # ---------- Commande d'incarnation (ADR-042) ----------
@@ -360,7 +377,26 @@ merge_module_hooks() {
     mkdir -p "$BACKUP_DIR"
     cp "$TARGET_ROOT/settings.json" "$BACKUP_DIR/settings-$(date +%Y%m%d-%H%M%S).json"
   fi
-  if bash "$merger" merge "$fragment" --settings "$TARGET_ROOT/settings.json" --scripts-prefix "$(scripts_prefix_for_scope)"; then
+  # Routage --settings-local (Phase 30 tâche 4, D-01) : en scope project/local, merge-hooks.sh
+  # bascule vers CE fichier les seules entrées portant {{VF_BASH}} — un chemin absolu de bash
+  # résolu à CETTE install, donc machine-spécifique. Sans ce routage, un tel chemin atterrirait
+  # dans settings.json de PROJET, qui voyage via git. Scope user : no-op assumé, $HOME/.claude est
+  # déjà par-machine. Tableau vide sous `set -u` (bash 3.2 : ne JAMAIS expanser "${arr[@]}" d'un
+  # tableau vide sans le garder derrière un test de longueur — même garde que `_positional` plus
+  # haut dans ce fichier), jamais une variable non définie.
+  local -a settings_local_args=()
+  case "$VF_SCOPE" in
+    project|local) settings_local_args=(--settings-local "$TARGET_ROOT/settings.local.json") ;;
+  esac
+  local merge_rc=0
+  if [ "${#settings_local_args[@]}" -gt 0 ]; then
+    bash "$merger" merge "$fragment" --settings "$TARGET_ROOT/settings.json" \
+      --scripts-prefix "$(scripts_prefix_for_scope)" "${settings_local_args[@]}" || merge_rc=$?
+  else
+    bash "$merger" merge "$fragment" --settings "$TARGET_ROOT/settings.json" \
+      --scripts-prefix "$(scripts_prefix_for_scope)" || merge_rc=$?
+  fi
+  if [ "$merge_rc" -eq 0 ]; then
     log "  hooks mergés → $TARGET_ROOT/settings.json"
   else
     log "  ERROR: merge hooks ÉCHOUÉ pour $mod — gouvernance NON câblée (corriger settings.json puis réinstaller)"
@@ -376,7 +412,20 @@ remove_module_hooks() {
   local merger
   merger="$(find_hooks_merger)"
   [ -n "$merger" ] || { log "  (retrait hooks impossible — merge-hooks.sh absent)"; return 0; }
-  if bash "$merger" remove "$fragment" --settings "$TARGET_ROOT/settings.json"; then
+  # Même routage --settings-local que merge_module_hooks (Phase 30 tâche 4) : en mode remove,
+  # merge-hooks.sh balaie les DEUX cibles quand --settings-local est fournie — sans ce miroir, une
+  # désinstallation deviendrait partielle et laisserait un hook orphelin dans le settings local.
+  local -a settings_local_args=()
+  case "$VF_SCOPE" in
+    project|local) settings_local_args=(--settings-local "$TARGET_ROOT/settings.local.json") ;;
+  esac
+  local remove_rc=0
+  if [ "${#settings_local_args[@]}" -gt 0 ]; then
+    bash "$merger" remove "$fragment" --settings "$TARGET_ROOT/settings.json" "${settings_local_args[@]}" || remove_rc=$?
+  else
+    bash "$merger" remove "$fragment" --settings "$TARGET_ROOT/settings.json" || remove_rc=$?
+  fi
+  if [ "$remove_rc" -eq 0 ]; then
     log "  hooks retirés de $TARGET_ROOT/settings.json"
   else
     log "  (retrait hooks échoué pour $mod — best-effort, nettoyer settings.json à la main)"

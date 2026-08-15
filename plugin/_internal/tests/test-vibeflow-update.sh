@@ -8,6 +8,9 @@
 #                  du lab ; rétro-compat dev-orchestrator (agent + references D7 présents).
 #   T3 (local)   — VF_SCOPE=local install → ./.gitignore du lab contient les chemins ;
 #                  2e run = pas de doublon (idempotent, grep -c == 1).
+#   T3c (local)  — Phase 30 tâche 4 : .claude/settings.json (écrit par merge_module_hooks sur un
+#                  module à hooks) est gitignoré exactement une fois, idempotent ; en scope
+#                  project le même module ne crée/ne touche PAS .gitignore (SCOPE-04 borné).
 #   T4 (no clone)— aucun `git clone`/`git pull` dans le source de l'engine (assert statique).
 #   T5 (résolveur RÉELLEMENT exercé) — resolve-deps.sh copié dans $CACHE/_internal/, puis
 #                  install --with-deps validator → fermeture {consolidator, infrastructure-audit,
@@ -163,6 +166,48 @@ if prepare_module "$CACHE" "consolidator"; then
   [ "$miss" -eq 0 ] && ok "T3b local : registres semés ET gitignorés (SCOPE-04 tenu jusqu'aux registres)"
 else
   skip "T3b local : consolidator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T3c (local → .claude/settings.json gitignoré, Phase 30 tâche 4) — un module qui PORTE un
+# fragment hooks/hooks.json écrit dans $TARGET_ROOT/settings.json (merge_module_hooks) ; en scope
+# local, la promesse « rien ne sera committé » doit couvrir ce fichier aussi. Avant ce plan, aucune
+# ligne de gitignore_add_paths() ne le couvrait — mesuré à la lecture réelle du fichier, pas
+# supposé (voir SUMMARY, écart de comptage ~12 vs réel).
+# Cas négatif : le même module en scope PROJECT ⇒ .gitignore n'est ni créé ni modifié (SCOPE-04
+# reste borné au scope local, gitignore_add_paths() retourne tôt sur tout autre scope).
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  (cd "$LAB" && git init -q && VF_SCOPE=local VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" install dev-orchestrator >/dev/null 2>&1)
+  # 2e run sur le même lab : idempotence, pas de doublon.
+  (cd "$LAB" && VF_SCOPE=local VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" install dev-orchestrator >/dev/null 2>&1)
+  miss=0
+  n=$("$GREP" -cxF ".claude/settings.json" "$LAB/.gitignore" 2>/dev/null || true)
+  [ "${n:-0}" -eq 1 ] \
+    || { ko "T3c local : .claude/settings.json apparaît $n fois dans .gitignore (attendu 1)"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T3c local : .claude/settings.json gitignoré exactement une fois, idempotent après 2 runs"
+else
+  skip "T3c local : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  (cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" install dev-orchestrator >/dev/null 2>&1)
+  if [ -f "$LAB/.gitignore" ]; then
+    ko "T3c (négatif) project : .gitignore créé alors que le scope n'est pas local (SCOPE-04 violé)"
+  else
+    ok "T3c (négatif) project : .gitignore absent/inchangé — SCOPE-04 reste borné au scope local"
+  fi
+else
+  skip "T3c (négatif) project : dev-orchestrator non copiable dans le cache de test"
 fi
 rm -rf "$LAB"
 
