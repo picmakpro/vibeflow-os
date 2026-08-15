@@ -277,6 +277,52 @@ inject_lab_mcp_into_agents() {
   fi
 }
 
+# ---------- Lib partagée de portabilité (contrat PR #29, D-04, Phase 30) ----------
+# vf-portable.sh (résolution Python centralisée, jqx, vf_guard_unavailable) est possédée par
+# l'ENGINE — jamais par un module, sans quoi elle disparaîtrait à la désinstallation du module qui
+# l'aurait portée (contrat §2). Posée par copy_engine_lib(), même patron de cascade que
+# find_hooks_merger()/find_mcp_injector() ci-dessous : cache du plugin d'abord, lib voisine du
+# script ensuite (aucun candidat relatif au répertoire courant).
+find_engine_lib() {
+  local c
+  c="$CACHE_DIR/_internal/lib/vf-portable.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  c="$(dirname "$0")/lib/vf-portable.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  echo ""
+}
+
+# Idempotence INTRA-PROCESSUS (Phase 30, RESEARCH.md §copy_engine_lib) : appelée depuis DEUX
+# chemins qui posent des fichiers chez l'utilisateur — install_module() et sync_module_governance()
+# (le chemin « version inchangée » de update_module()) — sans ce garde-fou elle recopierait la lib
+# à chaque module d'une boucle --all. Un seul appel a un effet ; les suivants sont des no-op.
+VF_ENGINE_LIB_COPIED="0"
+
+copy_engine_lib() {
+  [ "$VF_ENGINE_LIB_COPIED" = "1" ] && return 0
+  local src dest tmp
+  src="$(find_engine_lib)"
+  if [ -z "$src" ]; then
+    # VG-3 (même discipline que merge_module_hooks) : jamais un retour neutre silencieux. Un lab
+    # sans la lib casse le `source` des 3 consommateurs PYBIN au premier appel (Runtime State
+    # Inventory, RESEARCH.md) — l'absence de lib est un échec d'install, pas un détail dégradé.
+    log "  ERROR: vf-portable.sh introuvable dans le cache — lib de portabilité NON posée (installer/mettre à jour l'engine)"
+    return 1
+  fi
+  mkdir -p "$TARGET_ROOT/scripts"
+  dest="$TARGET_ROOT/scripts/vf-portable.sh"
+  tmp="$dest.tmp.$$"
+  # Écriture ATOMIQUE (copie vers un temporaire du MÊME répertoire, puis renommage) : une install
+  # interrompue laisse soit l'ancienne lib, soit la nouvelle, jamais un fichier tronqué qu'un
+  # consommateur sourcerait à moitié. SANS chmod +x : la lib est sourcée, jamais lancée seule.
+  if cp "$src" "$tmp" 2>/dev/null && mv -f "$tmp" "$dest" 2>/dev/null; then
+    VF_ENGINE_LIB_COPIED="1"
+    log "  lib vf-portable.sh posée → $dest"
+    return 0
+  fi
+  rm -f "$tmp" 2>/dev/null || true
+  log "  ERROR: pose de vf-portable.sh ÉCHOUÉE → $dest"
+  return 1
+}
+
 # ---------- Hooks de gouvernance (ADR-043) ----------
 # Un module peut déclarer hooks/hooks.json (format Claude Code, placeholder {{VF_SCRIPTS}}).
 # L'install MERGE le fragment dans le settings.json du scope ; l'uninstall le retire.
@@ -390,6 +436,9 @@ seed_module_registres() {
 
 sync_module_governance() {
   local mod="$1"
+  # Chemin « version inchangée » (D-04) : sans cet appel, un lab déjà à jour n'obtiendrait JAMAIS
+  # la lib de portabilité — idempotent au sein du même processus (VF_ENGINE_LIB_COPIED).
+  copy_engine_lib
   copy_module_scripts "$mod"
   merge_module_hooks "$mod"
   # Ordre imposé : le seeder est posé par copy_module_scripts juste au-dessus. L'appeler avant
@@ -475,6 +524,11 @@ install_module() {
   local version
   version=$(module_version_available "$mod")
   log "Installation $mod $version (scope=$VF_SCOPE → $TARGET_ROOT)..."
+
+  # Lib de portabilité (contrat PR #29, D-04) : posée une fois par exécution, avant le traitement
+  # du module — idempotent au sein du même processus (VF_ENGINE_LIB_COPIED), donc sans coût
+  # supplémentaire réel sur une boucle `install --all`/`--with-deps`.
+  copy_engine_lib
 
   # Backup if existing install
   local installed
