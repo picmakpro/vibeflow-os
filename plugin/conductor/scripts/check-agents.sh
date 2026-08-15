@@ -539,8 +539,11 @@ def check_file(path):
     #      elle : le worker atterrit sur une branche technique repartant de la branche par defaut,
     #      sans aucun fichier du mandat.
     #   2. Meme avec baseRef corrige, rien ne ramene les commits du worker vers la branche de la
-    #      mission — le merge affirme n'est implemente nulle part en amont (open-gsd/gsd-core#3302,
-    #      deja le motif du refus ecrit de claude_orchestration en Phase 27).
+    #      mission sur un moteur installe (<= 1.10.0). Le merge-back est desormais implemente en
+    #      amont (open-gsd/gsd-core#3302, close COMPLETED 2026-08-14 — deja le motif du refus
+    #      ecrit de claude_orchestration en Phase 27) mais PAS release : close != release !=
+    #      installe. Le re-armement reste gate par la Phase 35 (release > 1.10.0 installee ET
+    #      preuve du retour des commits rejouee, WKTR-02).
     # L'isolation reste une decision de DISPATCH du manager (team-kernel.md §Parallelisme), jamais
     # une propriete du worker : portee par le frontmatter elle devient inconditionnelle et retire au
     # manager l'arbitrage que sa propre doctrine lui confie.
