@@ -4,7 +4,7 @@ milestone: gsd-migration
 milestone_name: Migration package GSD
 current_phase: 18
 current_phase_name: Survie du ledger d'exigences à la clôture de jalon
-status: "Phase 29 plans 01-04 executes verifies et committes - 29-05 taches 1-2 faites, tache 3 en attente du checkpoint humain bloquant T-29-05-3"
+status: "Phase 29 COMPLETE - 13/13 taches, checkpoint humain T-29-05-3 rendu et approuve le 2026-08-15 - branche docs/phase-29-icm-gains non poussee, release racine reservee a Samuel"
 stopped_at: "Phase 20 complète (7/7 plans) — clôture de gouvernance (20-07) : ADR-051 révisée + ADR-060 posée, doctrine transverse alignée, 6 modules bumpés (conductor v1.17.0, dev-orchestrator v2.8.0, design-orchestrator v1.3.2, 3 bundles v2.0.3). Gates verts sauf le seul rouge attendu (compteur de suites racine, 44 réel pas 43). Release racine réservée à validation humaine post-fusion (4 éléments consignés + WINDOWS.md)."
 last_updated: "2026-08-15T00:00:00.000Z"
 last_activity: 2026-08-15
@@ -545,10 +545,21 @@ Recent decisions affecting current work:
   (produit cartésien 9 préfixes × 5 corps = 45 combinaisons, 10 rouges avant / 0 après) au lieu
   d'une liste de cas énumérés. Leçon durable : une liste de formes ne ferme jamais une classe
   d'équivalence — seul un test génératif + une propriété d'idempotence le font.
-  **En attente de Samuel** : (1) verdict « utile ou bavard » sur les 13 divergences réelles du gate ;
-  (2) sort de `docs/_transverse/` (untracked, débris d'une exécution non sandboxée de
-  `scaffold-docs.sh` à la racine) ; (3) oracle d'existence par traversée `../` dans `p2_sens_a`
-  (low, absent du registre STRIDE des plans, jamais corrigé en autonomie — ADR-031).
+  **Checkpoint T-29-05-3 RENDU le 2026-08-15 (AskUserQuestion, Samuel)** — les 3 points tranchés :
+  (1) **gate UTILE**, resserrer 2 bornes *dans les bornes, jamais en filtrant la sortie* — (a) une
+  ligne de commande n'est pas un chemin déclaré, (b) `plugin/reference/content/examples/` exclu du
+  balayage (cartes volontairement fictives) ; les 3 findings « dossier suivi non cité » (`docs`,
+  `manual`, `reports`) restent **légitimes et non corrigés** — c'est le signal assumé. Le gate rend
+  désormais exactement ces 3 findings (13 → 3). (2) `docs/_transverse/` **supprimé** — vibeflow-os
+  est le repo de distribution, pas un lab, ADR-042 ne s'y applique pas. (3)
+  `parallelization.skip_checkpoints` passé à **`false`** : les 3 vecteurs d'auto-approbation de
+  checkpoint sont désormais neutralisés (doctrine « checkpoint toujours gaté humain »).
+  Registre STRIDE enrichi de `T-29-02-08` (oracle d'existence par traversée `../` en `p2_sens_a` :
+  `../` initial mitigé, résidu non-initial accepté `low` — fermeture complète non triviale sous
+  ADR-054, qui interdit `realpath`).
+  **Reste à Samuel, gestes humains gatés** : push de la branche, PR, et release racine (VERSION /
+  plugin.json / marketplace.json intouchés par la phase — 4 modules bumpés en attente de
+  distribution : validator v1.3.3, conductor v1.22.0, dev-orchestrator v2.14.0, reference v2.5.3).
 
 - **2026-08-06 — Phase 27, reprise sur arbitrage : les trois gels sont levés, 9 exigences sur 11
   tenues, seul le spike reste à faire en présence de Samuel.** (même mission et même branche

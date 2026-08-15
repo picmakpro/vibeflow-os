@@ -3,7 +3,8 @@
 **Date :** 2026-08-15
 **Branche :** `docs/phase-29-icm-gains` (aucun push, aucune PR, aucun merge)
 **Mode :** autonome jusqu'aux gates
-**Issue :** arrêt propre au checkpoint humain bloquant **T-29-05-3** — l'issue attendue.
+**Issue :** **phase COMPLÈTE, 13/13 tâches.** Arrêt au checkpoint humain bloquant **T-29-05-3**,
+verdict rendu par Samuel le 2026-08-15, mission reprise et close sur ce verdict.
 **Verrou de driver :** acquis au démarrage (`mission-phase-29`), battu entre les étapes, relâché en clôture.
 **Invariants de mission :** `check-mission-invariants.sh` → exit **3 (SAIN)** avant le premier dispatch.
 
@@ -108,7 +109,53 @@ tolérante acceptait *par accident* — ou mieux, prouver la propriété par gé
 
 ---
 
-## En attente de Samuel — les 3 points du checkpoint
+## Reprise sur verdict humain (2026-08-15) — les 3 points, tranchés et appliqués
+
+| Point | Verdict de Samuel | Livré |
+|---|---|---|
+| Gate | **UTILE**, resserrer 2 bornes | `8cf5198` + `423671f` — gate de **13 → 3 findings** |
+| `docs/_transverse/` | **SUPPRIMER** (repo de distribution, pas un lab) | supprimé, aucun `git rm` nécessaire |
+| `skip_checkpoints` | **`false` maintenant** | `8cbf71b` — 3e vecteur neutralisé |
+
+**Borne (a)** — « une ligne de commande n'est pas un chemin déclaré » : implémentée comme **classe**
+(`is_command_invocation()`), pas comme liste noire des deux chaînes observées — une liste noire
+aurait été un filtre de sortie déguisé, contraire à l'instruction.
+**Borne (b)** — `plugin/reference/content/examples/` exclu **avant** toute production de finding, sur
+les deux collectes (P1 et P2) ; contre-épreuve posée : `examples-reels/` reste balayé.
+**Les 3 findings restants (`docs`, `manual`, `reports`) n'ont PAS été corrigés** dans les cartes :
+signal assumé, conformément au verdict. Aucun `CLAUDE.md` touché de toute la mission.
+**STRIDE `T-29-02-08`** ajouté : `../` initial mitigé dans `p2_sens_a` ; résidu non-initial
+(`sub/../../x.md`) accepté **`low`** — fermeture complète non triviale sous ADR-054 (qui interdit
+`realpath`), un rétrécissement partiel (`../*` → `*../*`) reste possible pour un futur tour.
+
+### Deux défauts trouvés pendant la clôture — la vérification a payé
+
+1. **Suite rouge en permanence** (`test-check-map-drift.sh`) : le cas « Borne (a) sens 1 » attestait
+   son rouge contre `git show HEAD:…`. **`HEAD` est mutable** — dès que le commit du correctif est
+   devenu HEAD, le test comparait le script à lui-même et sortait `ko` pour toujours (56 ok / 1 ko).
+   Le worker avait rapporté « 57/57 » en toute bonne foi : il avait rejoué la suite **avant** son
+   propre commit. Corrigé en figeant le SHA (`0f8fa3a`), avec balayage de la classe — aucune autre
+   référence mutable dans le fichier.
+2. **Doc périmée par sa propre phase** : `plugin/conductor/CHANGELOG.md` décrivait `v1.22.0` avec
+   « 51 cas », état intermédiaire figé **avant** les tours 5-6. Rattrapé par le nœud `docs` (57 cas
+   re-dérivés, les deux bornes, la mitigation STRIDE) — sans re-bump, `v1.22.0` n'étant pas publiée.
+
+**Leçon transverse** : rejouer une suite **avant** le commit qui la modifie ne prouve rien. Toute
+attestation doit référencer un SHA **figé**, et toute mesure doit être prise **après** le commit.
+
+---
+
+## Bilan de la vérification : 6 passes de juge, 6 défauts réels
+
+Sur `check-map-drift.sh`, **chaque passe de juge a trouvé un défaut réel — 6 sur 6**, aucun n'ayant
+été trouvé par la suite du worker. Aucune de ces passes n'était superflue. C'est l'argument le plus
+net de cette mission en faveur de la revue systématique sur coût d'erreur asymétrique : le fichier
+est distribué à tous les labs, et son mode d'échec est le **silence** (un gate qui se tait passe
+pour vert).
+
+---
+
+## Historique du checkpoint (état au moment de l'arrêt)
 
 1. **Verdict « utile ou bavard »** sur les **13 divergences réelles** rendues par
    `check-map-drift.sh --path .` (code 0), sur 3 cartes balayées :
@@ -132,11 +179,29 @@ tolérante acceptait *par accident* — ou mieux, prouver la propriété par gé
 
 ---
 
-## Observation d'outillage (hors périmètre, signalée)
+## Observation d'outillage — tranchée
 
-`.planning/config.json` porte `parallelization.skip_checkpoints: true`. Les deux drapeaux
-d'enchaînement de mon protocole (`workflow._auto_chain_active`, `workflow.auto_advance`) étaient
-déjà à `false`, mais celui-ci est un **troisième vecteur** d'auto-approbation de checkpoint. Il n'a
-pas été modifié (hors périmètre de phase) : l'arrêt avant T-29-05-3 a été garanti par la **borne
-explicite du mandat** (« tâches 1 et 2 seulement »), pas par la configuration. À arbitrer hors
-mission.
+`.planning/config.json` portait `parallelization.skip_checkpoints: true`, **troisième vecteur**
+d'auto-approbation de checkpoint à côté des deux drapeaux de mon protocole
+(`workflow._auto_chain_active`, `workflow.auto_advance`, déjà à `false`). L'arrêt avant T-29-05-3
+avait été garanti par la **borne explicite du mandat** (« tâches 1 et 2 seulement »), pas par la
+configuration — une garantie de rédaction, pas de machine. Sur verdict de Samuel, le drapeau est
+passé à **`false`** (`8cbf71b`) : **les trois vecteurs sont désormais neutralisés**, et la doctrine
+« checkpoint toujours gaté humain » est enfin tenue par la configuration elle-même.
+
+---
+
+## État final et gestes humains restants
+
+**34 commits**, arbre propre (seuls `.gsd/` et les fichiers de verrou restent untracked).
+Gates finaux rejoués **après** le dernier commit : `check-version-sync.sh` rc=0 (17 modules,
+54/54 suites) · `check-agents.sh --strict` 12/12 verts · `check-map-drift.sh --path .` 3 findings
+légitimes, rc=0 · 6 suites : **57 / 26 / 99 / 21 / 81 / 184, zéro échec**.
+
+**Réservé à Samuel** (gestes humains gatés, non exécutés) :
+1. `git push` de la branche `docs/phase-29-icm-gains` ;
+2. ouverture de la PR ;
+3. **release racine** — `VERSION`, `plugin.json`, `marketplace.json` intouchés par la phase. Quatre
+   modules attendent leur distribution : validator **v1.3.3**, conductor **v1.22.0**,
+   dev-orchestrator **v2.14.0**, reference **v2.5.3**. Rappel du `CLAUDE.md` : toute release = un
+   tag annoté **plus** une release GitHub, gate `check-release-tag.sh --remote`.

@@ -2117,6 +2117,6 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [~] 29-05-PLAN.md — Clôture : câblage du gate comme 9e signal de la grille de dette documentaire à coût de densité nul, 4 triades de module bumpées, compteurs « N suites » re-dérivés, puis **checkpoint humain bloquant** (findings réels du gate présentés, jamais corrigés — ADR-031). `autonomous: false`. Vague 3.
+- [x] 29-05-PLAN.md — Clôture : câblage du gate comme 9e signal de la grille de dette documentaire à coût de densité nul, 4 triades de module bumpées, compteurs « N suites » re-dérivés, puis **checkpoint humain bloquant** (findings réels du gate présentés, jamais corrigés — ADR-031). `autonomous: false`. Vague 3.
 
 ---
