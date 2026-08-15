@@ -275,8 +275,11 @@ coverage:
   par compaction ailleurs dans le script (jamais par perte de signal) : les 4 sites d'émission de
   divergence factorisés dans `record_divergence()`, 3 blocs `if...then...fi` à 4 lignes réduits en
   gardes une ligne — 249 → 246 lignes hors commentaires après les deux bornes (< 250). Suite : 51 →
-  57 cas (+6 : borne (a) sens 1 attesté avant/après HEAD, borne (a) sens 2 mutation chemin à espace
-  légitime non mangé, borne (b) sens 1/1 bis/P2, mitigation STRIDE `../`).
+  57 cas (+6 : borne (a) sens 1 attesté avant/après SHA figé `0f8fa3a` — corrigé en aval, la
+  version initialement committée référençait `HEAD`, mutable, ce qui rendait le cas rouge dès que
+  le commit du correctif devenait lui-même HEAD (le script se comparait à lui-même) ; borne (a)
+  sens 2 mutation chemin à espace légitime non mangé, borne (b) sens 1/1 bis/P2, mitigation STRIDE
+  `../`). Rejoué **après** le commit du correctif de ce défaut : 57 ok, 0 ko.
 - Correction ciblée exec-02, **tour 4** (nœud rouvert une quatrième fois, même famille p2_sens_b) :
   le correctif du tour 3 (`normalize_path()`) appliquait le squeeze des `//` et le strip du `./`
   de tête en deux passes **indépendantes** — un squeeze qui expose un nouveau `./` de tête (ex.

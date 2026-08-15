@@ -440,13 +440,16 @@ if [ "$all_ok" -eq 1 ]; then ok "Garde — seuls 0/3/64 observés sur les fixtur
 # === Borne (a) sens 1 — ligne de commande citée en accents graves : IGNORÉE (0 divergence) ========
 # 'bash script.sh --x' et 'git config core.hooksPath scripts/hooks' sont les 2 faux positifs réels
 # constatés sur ./CLAUDE.md (mandat exec-02 tour 5, verdict humain T-29-05-3). D'abord rejoué
-# contre le code d'AVANT (HEAD, pré-correctif) pour attester le rouge : rc=0 avec le chemin cité
-# à tort, PUIS contre le code d'APRÈS : rc=3 (0 divergence, plus aucune trace de ces deux lignes).
+# contre le code d'AVANT — SHA FIGÉ 0f8fa3a, le parent pré-tour-5 sur ce fichier, jamais HEAD :
+# HEAD est mutable et devient le commit qui applique CE correctif dès qu'il est committé, ce qui
+# ferait comparer le script à lui-même (même patron que 86c3b0c/c7b35f3 ci-dessus) — pour attester
+# le rouge : rc=0 avec le chemin cité à tort, PUIS contre le code d'APRÈS : rc=3 (0 divergence,
+# plus aucune trace de ces deux lignes).
 D="$(mk_git_root borne-a-commande)"
 commit_file "$D" "CLAUDE.md" "# root" "" '`bash scripts/check-release-tag.sh --remote`' '`git config core.hooksPath scripts/hooks`' ""
-OLD_HEAD_SCRIPT="$TMP/old_check_map_drift_HEAD.sh"
-if [ -n "$REPO_ROOT" ] && git -C "$REPO_ROOT" show HEAD:plugin/conductor/scripts/check-map-drift.sh > "$OLD_HEAD_SCRIPT" 2>/dev/null; then
-  out_old="$(bash "$OLD_HEAD_SCRIPT" --path "$D" 2>/dev/null)"; rc_old=$?
+OLD_PRE5_SCRIPT="$TMP/old_check_map_drift_0f8fa3a.sh"
+if [ -n "$REPO_ROOT" ] && git -C "$REPO_ROOT" show 0f8fa3a:plugin/conductor/scripts/check-map-drift.sh > "$OLD_PRE5_SCRIPT" 2>/dev/null; then
+  out_old="$(bash "$OLD_PRE5_SCRIPT" --path "$D" 2>/dev/null)"; rc_old=$?
   has_old_leak=0; case "$out_old" in *"check-release-tag.sh"*) has_old_leak=1 ;; esac
   out_new="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc_new=$?
   has_new_leak=0; case "$out_new" in *"check-release-tag.sh"*|*"hooksPath"*) has_new_leak=1 ;; esac
@@ -456,7 +459,7 @@ if [ -n "$REPO_ROOT" ] && git -C "$REPO_ROOT" show HEAD:plugin/conductor/scripts
     ko "Borne (a) sens 1 — ligne de commande ignorée" "avant rc=$rc_old leak=$has_old_leak [$out_old] / après rc=$rc_new leak=$has_new_leak [$out_new]"
   fi
 else
-  ko "Borne (a) sens 1 — ligne de commande ignorée" "HEAD introuvable dans ce dépôt — preuve non rejouable"
+  ko "Borne (a) sens 1 — ligne de commande ignorée" "0f8fa3a introuvable dans ce dépôt — preuve non rejouable"
 fi
 
 # === Borne (a) sens 2 — un chemin LÉGITIME à espace dans son nom reste vérifié (mutation) ==========
