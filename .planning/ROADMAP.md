@@ -457,6 +457,7 @@ Plans:
 | 26. Manuel utilisateur VibeFlow (manual/) | gsd-alignement | — | Complete (PR #28) | 2026-08-02 |
 | 27. Parallélisation d'exécution — granulaire, simple, sans collision | gsd-alignement | 6/6 | Complete (PR #35) — spike `claude_orchestration` refusé par écrit | 2026-08-10 |
 | 28. Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur | gsd-alignement | 0/0 | Inscrite — ouverte par la régression #38 (v2.49.0 → v2.50.1) ; **non cadrée**, mise à jour VibeFlow attendue avant | — |
+| 29. Distiller les gains ICM (G1-G5) — investigation dag.sh --scope d'abord | — | 0/0 | Inscrite — issue de la deep-search ICM (`reports/research/2026-08-15-icm-deep-search.md`) ; zéro régression autorisée sur `--scope` | — |
 
 ### Phase 15: Collaboration inter-équipes dev ↔ design
 
@@ -2083,5 +2084,28 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [ ] 28-03-PLAN.md — *As-installed testing* : le gate exercé tel qu'installé dans un lab vierge, sur un univers d'armement non vide (checkpoint humain — la forme dépasse le cadrage D-04), puis clôture des deux triades de module. Vague 3.
+
+### Phase 29: Distiller les gains ICM (G1-G5) — investigation dag.sh --scope d'abord
+
+**Goal:** Distiller dans VibeFlow les 5 mécanismes retenus par la deep-search ICM
+(`reports/research/2026-08-15-icm-deep-search.md`, §5), sans jamais adopter le label ni le modèle
+mono-agent : G3 gate anti-drift carte↔disque (`check-map-drift.sh` — diffe ce que déclarent
+CLAUDE.md/frontmatters/compteurs contre le disque réel), G1 anti-chargement déclaré (tables
+« Load / DO NOT Load » dans les templates + le négatif du périmètre `--scope` dans les digests de
+mission), G5 Edit-Source Principle dans la doctrine des managers (correction récurrente = amender
+la source, jamais redispatcher le même fix), G2 CONTEXT.md ≤ 80 lignes par compartiment +
+`_index.md` des dossiers de références > 10 fichiers, G4 lab-starters clonables à placeholders
+pour `vf-new-lab` (à cadrer — candidat au découpage en phase propre, recoupe les items backlog
+`agency-agents` et « Template d'agent installable »). **Précondition transverse : investigation de
+l'historique et des consommateurs de `dag.sh --scope` (git log, tests, lecteurs du champ) AVANT
+tout geste G1 — zéro régression autorisée sur le mécanisme de scope, qui porte le dispatch
+parallèle des périmètres disjoints du team-kernel.**
+**Requirements**: TBD
+**Depends on:** Phase 28
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 29 to break down)
 
 ---

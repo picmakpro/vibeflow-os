@@ -323,6 +323,14 @@ Progress: [██████░░░░] 59%
 
 ### Roadmap Evolution
 
+- 2026-08-15 : **Phase 29 ajoutée — « Distiller les gains ICM (G1-G5) — investigation dag.sh
+  --scope d'abord »**, issue de la deep-search ICM du même jour
+  (`reports/research/2026-08-15-icm-deep-search.md`, session en direct hors Phase 28). Périmètre :
+  les 5 gains distillables du rapport (anti-drift carte↔disque, Load/DO NOT Load, Edit-Source,
+  CONTEXT par compartiment, lab-starters clonables — ce dernier candidat au découpage), avec une
+  précondition transverse posée par Samuel : investiguer l'historique et les consommateurs de
+  `dag.sh --scope` avant tout geste G1, **zéro régression autorisée** sur le mécanisme de scope.
+  Branche dédiée `docs/phase-29-icm-gains` (la branche 28 reste vierge de tout contenu ICM).
 - 2026-08-10 : **Phase 28 ajoutée — « Preuve que ce qui est armé dans le plugin est armé chez
   l'utilisateur »**, ouverte par la régression #38 (13 agents distribués avec `isolation: worktree`
   alors que leur précondition `worktree.baseRef: "head"` n'était posée que dans le settings local de
