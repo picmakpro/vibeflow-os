@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vf-cockpit</title>
+<link rel="stylesheet" href="/assets/ui/styles.css">
+</head>
+<body class="vf-booting">
+
+<header class="vf-header">
+  <span class="vf-app-name">vf-cockpit</span>
+  <span id="milestone-badge" class="vf-badge vf-badge-milestone">…</span>
+  <span id="lock-badge" class="vf-badge vf-badge-lock">…</span>
+  <span id="updated-at" class="vf-updated">maj --:--:--</span>
+</header>
+
+<div id="error-banner" class="vf-error-banner" role="alert" hidden>
+  Impossible de lire l'état du lab. Nouvelle tentative automatique…
+</div>
+<div id="offline-banner" class="vf-offline-banner" role="status" hidden></div>
+
+<main class="stack">
+
+  <div id="empty-state" class="vf-empty-page" hidden>
+    <span class="vf-empty-icon" aria-hidden="true">⌁</span>
+    <p>Aucun dossier <code>.planning/</code> trouvé à la racine du lab. Ce cockpit visualise un
+    projet piloté par GSD — lancez-le depuis un lab qui en a un.</p>
+  </div>
+
+  <div id="app-content">
+
+    <div class="vf-legend">
+      <span class="vf-legend-item"><span class="vf-glyph" aria-hidden="true">●</span> terminé</span>
+      <span class="vf-legend-item"><span class="vf-glyph" aria-hidden="true">◉</span> en cours</span>
+      <span class="vf-legend-item"><span class="vf-glyph" aria-hidden="true">○</span> prêt</span>
+      <span class="vf-legend-item"><span class="vf-glyph" aria-hidden="true">┄</span> en attente</span>
+      <span class="vf-legend-item"><span class="vf-glyph" aria-hidden="true">✕</span> échoué</span>
+      <span class="vf-legend-item"><span class="vf-glyph" aria-hidden="true">⚠</span> périmé</span>
+      <span class="vf-legend-orient">① Trajectoire → ② Chantier actuel → ③ Équipe en mission — clic sur une case pour sa fiche</span>
+    </div>
+
+    <section id="section-trajectoire" aria-labelledby="h-trajectoire">
+      <h2 id="h-trajectoire" class="vf-section-title">① Trajectoire</h2>
+      <div id="trajectoire-body" class="vf-section-body">
+        <div class="vf-section-skel" aria-hidden="true"></div>
+      </div>
+    </section>
+
+    <section id="section-chantier" aria-labelledby="h-chantier">
+      <h2 id="h-chantier" class="vf-section-title">② Chantier actuel</h2>
+      <div id="chantier-body" class="vf-section-body">
+        <div class="vf-section-skel" aria-hidden="true"></div>
+      </div>
+    </section>
+
+    <section id="section-equipe" aria-labelledby="h-equipe">
+      <h2 id="h-equipe" class="vf-section-title">③ Équipe en mission</h2>
+      <div id="equipe-body" class="vf-equipe-grid">
+        <div id="equipe-empty" class="vf-empty-block" hidden>
+          <span class="vf-empty-icon" aria-hidden="true">◌</span>
+          <p>Personne au travail pour l'instant. La prochaine mission apparaîtra ici
+          automatiquement, sans rechargement.</p>
+        </div>
+        <div id="equipe-svg" class="vf-equipe-svg" aria-hidden="true" hidden></div>
+        <div id="equipe-list-wrap" class="vf-equipe-list-wrap" hidden>
+          <h3 class="sr-only">Mandats de la mission</h3>
+          <ul id="equipe-list" class="vf-equipe-list"></ul>
+        </div>
+      </div>
+    </section>
+
+    <details id="historique-details" class="vf-historique">
+      <summary>▸ Historique — milestones clos</summary>
+      <div id="historique-body"></div>
+    </details>
+
+  </div>
+</main>
+
+<footer class="vf-footer">
+  <button id="log-link" class="vf-log-link" type="button">voir le journal (0 événements)</button>
+</footer>
+
+<div id="drawer-overlay" class="vf-overlay" hidden></div>
+<aside id="drawer" class="vf-drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" hidden>
+  <button id="drawer-close" class="vf-drawer-close" type="button" aria-label="Fermer">✕</button>
+  <h3 id="drawer-title" class="vf-drawer-title"></h3>
+  <p id="drawer-source" class="vf-drawer-source"></p>
+  <div id="drawer-body" class="vf-drawer-body"></div>
+</aside>
+
+<script src="/assets/vendor/mermaid.min.js"></script>
+<script type="module" src="/assets/ui/app.js"></script>
+</body>
+</html>
