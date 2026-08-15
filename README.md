@@ -12,7 +12,7 @@ not promises.
 
 [![Version](https://img.shields.io/badge/version-2.52.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
-[![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
+[![Modules](https://img.shields.io/badge/modules-18-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
 [The dev cycle](#-the-dev-cycle--spec-driven) · [Missions](#-long-missions--the-team) · [Labs & design](#-beyond-dev--a-lab-for-any-domain) · [Memory](#-memory-that-holds) · [Install](#-install) · [Modules](#-modules)
@@ -107,7 +107,7 @@ module picker, dependencies resolved and recapped before anything is written. Up
 
 ## 📦 Modules
 
-17 modules, each versioned with its own `CHANGELOG.md`. At install: `conductor` is the
+18 modules, each versioned with its own `CHANGELOG.md`. At install: `conductor` is the
 **mandatory baseline**, then one choice — *dev lab* or *tailor-made domain lab*. Each
 module's README is its full documentation — same structure everywhere.
 
@@ -121,7 +121,7 @@ module's README is its full documentation — same structure everywhere.
 ## 🔒 Trust
 
 - **Source-available**: public code and history — see [LICENSE](./LICENSE).
-- **Auditable**: bash + `jq`, every script covered by its suite (55 suites in CI),
+- **Auditable**: bash + `jq`, every script covered by its suite (60 suites in CI),
   **idempotent** install with backup before overwrite.
 - **The repo applies its own doctrine**: CI on push/PR (tests + strict gates) + a
   "**fresh lab**" job — the baseline is installed into a blank lab and must pass its own

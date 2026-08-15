@@ -12,7 +12,7 @@ machine** vérifient — pas des promesses.
 
 [![Version](https://img.shields.io/badge/version-2.52.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
-[![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
+[![Modules](https://img.shields.io/badge/modules-18-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
 [Le cycle dev](#-le-cycle-dev--spec-driven) · [Missions](#-missions-longues--léquipe) · [Labs & design](#-au-delà-du-dev--un-lab-pour-chaque-métier) · [Mémoire](#-la-mémoire-qui-tient) · [Installation](#-installation) · [Modules](#-modules)
@@ -111,7 +111,7 @@ choix des modules, dépendances résolues et récapitulées avant toute pose. Mi
 
 ## 📦 Modules
 
-17 modules, chacun versionné avec son `CHANGELOG.md`. À l'install : `conductor` est le
+18 modules, chacun versionné avec son `CHANGELOG.md`. À l'install : `conductor` est le
 **socle obligatoire**, puis un choix — *lab de dev* ou *lab métier sur mesure*. Le README de
 chaque module est sa documentation complète — même structure partout.
 
@@ -125,7 +125,7 @@ chaque module est sa documentation complète — même structure partout.
 ## 🔒 Confiance
 
 - **Source-available** : code et historique publics — voir [LICENSE](./LICENSE).
-- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`55 suites` en CI), install
+- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`60 suites` en CI), install
   **idempotente** avec backup avant écrasement.
 - **Le repo s'applique sa propre doctrine** : CI sur push/PR (tests + gates stricts) + job
   « **lab frais** » — la baseline est installée dans un lab vierge et doit passer ses propres
