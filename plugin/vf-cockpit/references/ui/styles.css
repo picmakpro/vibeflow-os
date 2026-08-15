@@ -112,15 +112,18 @@ code {
   top: 0;
   z-index: 5;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--vf-space-4);
-  height: 56px;
+  gap: var(--vf-space-2) var(--vf-space-4);
+  min-height: 56px;
+  padding-block: var(--vf-space-2);
   padding-inline: var(--vf-space-5);
   background: var(--vf-surface-1);
   border-bottom: 1px solid var(--vf-border);
 }
 
 .vf-app-name {
+  flex-shrink: 0;
   font-size: var(--vf-text-md);
   font-weight: var(--vf-weight-semibold);
   color: var(--vf-text-secondary);
@@ -130,15 +133,28 @@ code {
   display: inline-flex;
   align-items: center;
   gap: var(--vf-space-1);
+  min-width: 0;
+  max-width: 28rem;
   font-size: var(--vf-text-xs);
   line-height: 1.4;
-  padding: .15rem .8rem;
+  padding: var(--vf-space-1) var(--vf-space-3);
   border-radius: var(--vf-radius-pill);
   background: var(--vf-surface-2);
   color: var(--vf-text-secondary);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .vf-badge-milestone {
+  /* dominant de l'en-tête (§0/§4.1) : jamais tronqué, jamais rétréci pour faire de la place
+     aux éléments secondaires — ce sont eux qui cèdent (troncature ellipsis, §4.1/§7). */
+  flex: 1 1 auto;
+  min-width: 12rem;
+  max-width: none;
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
   font-size: var(--vf-text-xl);
   font-weight: var(--vf-weight-semibold);
   line-height: var(--vf-leading-tight);
@@ -181,6 +197,11 @@ code {
 
 .vf-updated {
   margin-left: auto;
+  min-width: 0;
+  max-width: 16rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font-family: var(--vf-font-mono);
   font-size: var(--vf-text-xs);
   color: var(--vf-text-secondary);
@@ -651,7 +672,6 @@ body.vf-drawer-open { overflow: hidden; }
 /* ---------- responsive (§7) ---------- */
 
 @media (max-width: 767px) {
-  .vf-header { flex-wrap: wrap; height: auto; padding-block: var(--vf-space-2); }
   .vf-updated { margin-left: 0; }
 }
 
