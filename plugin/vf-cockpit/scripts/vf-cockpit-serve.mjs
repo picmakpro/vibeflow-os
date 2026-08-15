@@ -33,7 +33,17 @@ function logEvent(cat, msg, meta = {}) {
 const clients = new Set();
 function broadcast(reason) {
   logEvent('sse', `broadcast → ${clients.size} client(s)`, { reason });
-  for (const res of clients) res.write(`data: ${JSON.stringify({ reason, at: Date.now() })}\n\n`);
+  const payload = `data: ${JSON.stringify({ reason, at: Date.now() })}\n\n`;
+  for (const res of clients) {
+    try {
+      res.write(payload);
+    } catch (e) {
+      // Un client dont le socket casse pendant l'écriture ne doit jamais interrompre
+      // la diffusion aux autres clients ni faire tomber le processus.
+      logEvent('sse', 'write en échec, client retiré', { error: String(e) });
+      clients.delete(res);
+    }
+  }
 }
 
 // ---------- construction du serveur (exportée pour les tests) ----------
@@ -79,14 +89,14 @@ export function createCockpitServer({ planningRoot, referencesDir } = {}) {
 
     if (url.pathname === '/api/phase') {
       const raw = url.searchParams.get('num');
-      if (!planningRoot) {
-        res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify({ num: null, name: null, goal: null, body: null, dir: null, plans: [], error: 'aucune racine .planning/ résolue' }));
-        return;
-      }
       if (raw === null || !/^\d+$/.test(raw)) {
         res.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ error: 'paramètre num invalide — entier positif attendu' }));
+        return;
+      }
+      if (!planningRoot) {
+        res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ num: null, name: null, goal: null, body: null, dir: null, plans: [], error: 'aucune racine .planning/ résolue' }));
         return;
       }
       res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
@@ -109,15 +119,22 @@ export function createCockpitServer({ planningRoot, referencesDir } = {}) {
       res.write('retry: 1000\n\n');
       clients.add(res);
       req.on('close', () => clients.delete(res));
+      res.on('error', () => clients.delete(res));
       return;
     }
 
     if (url.pathname === '/') {
       const indexPath = referencesDir ? safeJoin(referencesDir, path.join('ui', 'index.html')) : null;
-      if (indexPath && fs.existsSync(indexPath)) {
-        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-        res.end(fs.readFileSync(indexPath));
-        return;
+      if (indexPath) {
+        try {
+          const body = fs.readFileSync(indexPath);
+          res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+          res.end(body);
+          return;
+        } catch {
+          // Disparu entre la résolution du chemin et la lecture (TOCTOU) : on retombe
+          // sur la page de secours ci-dessous plutôt que de laisser jeter readFileSync.
+        }
       }
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       res.end(
@@ -135,10 +152,18 @@ export function createCockpitServer({ planningRoot, referencesDir } = {}) {
       const ext = path.extname(rel).toLowerCase();
       const mime = MIME_ALLOWLIST[ext];
       const target = mime ? safeJoin(referencesDir, rel) : null;
-      if (target && fs.existsSync(target) && fs.statSync(target).isFile()) {
-        res.writeHead(200, { 'content-type': mime });
-        res.end(fs.readFileSync(target));
-        return;
+      if (target) {
+        try {
+          if (fs.statSync(target).isFile()) {
+            const body = fs.readFileSync(target);
+            res.writeHead(200, { 'content-type': mime });
+            res.end(body);
+            return;
+          }
+        } catch {
+          // Disparu entre la résolution et la lecture (TOCTOU), ou pas un fichier :
+          // on tombe proprement sur le 404 ci-dessous plutôt que de laisser jeter.
+        }
       }
       res.writeHead(404, { 'content-type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ error: 'not found' }));
