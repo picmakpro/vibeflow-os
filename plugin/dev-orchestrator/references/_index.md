@@ -15,7 +15,7 @@
 | [intent-routing.md](intent-routing.md) | Carte d'intention complète : quelle formulation utilisateur route vers quelle brique outillée. |
 | [mission-contracts.md](mission-contracts.md) | Contrats de mission de l'équipe manager : ce qui relie la conversation principale et les managers d'équipe. |
 | [mission-cross-team.md](mission-cross-team.md) | Doctrine business des étages croisés entre `vf-dev-manager` et `vf-design-manager` (Phase 15, étend ADR-053). |
-| [mission-flow.md](mission-flow.md) | Les 3 patterns de sûreté du contrôle de flux de mission que `vf-dev-manager` doit suivre (ADR-053). |
+| [mission-flow.md](mission-flow.md) | Les 7 patterns de sûreté du contrôle de flux de mission que `vf-dev-manager` doit suivre (Patterns A à G, ADR-053). |
 | [workstreams.md](workstreams.md) | Doctrine du compartiment de planning workstreams du moteur GSD : surface réelle, résolution, risques (GSDA-13→17). |
 
 Cet index doit rester cohérent avec le contenu du dossier.
