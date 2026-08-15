@@ -6,11 +6,16 @@
 #
 # check-release-tag ne tourne que sur main : une branche de feature porte légitimement une
 # VERSION dont le tag n'existe pas encore (le tag est posé après merge, cf. CLAUDE.md).
+#
+# `traffic-data` est exclue de push : cette branche ne porte que de la donnée (traffic.json),
+# aucun gate n'a de cible à y trouver, et surtout chaque job qu'on y déclencherait ferait un
+# `actions/checkout`, donc un clone de plus — la sonde polluerait précisément la mesure qu'elle
+# produit (scripts/traffic-snapshot.sh).
 name: CI
 
 on:
   push:
-    branches: ["**"]
+    branches: ["**", "!traffic-data"]
   pull_request:
 
 jobs:

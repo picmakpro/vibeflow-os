@@ -1,0 +1,84 @@
+# Snapshot hebdomadaire des stats GitHub traffic (clones, vues) — GitHub ne conserve que 14 jours
+# glissants, donc sans ce workflow la donnée disparaît par glissement de fenêtre. Le script
+# scripts/traffic-snapshot.sh corrige aussi le biais CI : chaque job Actions avec `actions/checkout`
+# compte comme un clone (~42 % du volume mesuré le 2026-08-15) — `clones_adjusted` retire ce bruit.
+#
+# GESTE HUMAIN REQUIS — le seul que ce workflow ne peut pas faire lui-même :
+#   1. Créer un PAT *fine-grained* limité au seul dépôt picmakpro/vibeflow-os, avec les permissions
+#      "Administration: read" et "Metadata: read" (rien de plus — pas de "Contents", pas de token
+#      classic).
+#   2. Le poser en secret de DÉPÔT (pas d'organisation) nommé TRAFFIC_PAT :
+#      Settings → Secrets and variables → Actions → New repository secret.
+#   Pourquoi le GITHUB_TOKEN d'Actions ne suffit pas : l'endpoint `traffic/clones` et
+#   `traffic/views` exige un droit "Administration: read" que le jeton d'Actions ne porte jamais
+#   (portée limitée au dépôt courant, sans droit d'administration) — l'appel repart en 403 sans
+#   TRAFFIC_PAT. Le comptage des jobs CI (`actions/runs`, `actions/runs/<id>/jobs`), lui, se
+#   contente du GITHUB_TOKEN ambiant : c'est la séparation des jetons décidée au cadrage de
+#   scripts/traffic-snapshot.sh.
+#
+# Boucle : ce workflow est lui-même un run Actions d'un seul job — son propre `actions/checkout`
+# est donc compté dans `ci_jobs` comme n'importe quel autre, et l'ajustement reste cohérent sans
+# cas particulier. Ne pas ajouter d'exclusion pour lui-même.
+name: Traffic snapshot
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # lundi 06:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: traffic-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    name: Snapshot hebdomadaire (clones + vues, ajusté du bruit CI)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Garde du secret TRAFFIC_PAT
+        run: |
+          if [ -z "${{ secrets.TRAFFIC_PAT }}" ]; then
+            echo "::error::Secret TRAFFIC_PAT manquant — voir l'en-tête de ce fichier (.github/workflows/traffic-snapshot.yml) pour la marche à suivre (PAT fine-grained, permission Administration: read, dépôt picmakpro/vibeflow-os seul)."
+            exit 1
+          fi
+
+      - name: Préparer le dossier de données (branche traffic-data)
+        run: |
+          set -euo pipefail
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          REMOTE="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git clone --depth 1 --single-branch --branch traffic-data "$REMOTE" data; then
+            echo "[traffic-snapshot] branche traffic-data clonée"
+          else
+            echo "[traffic-snapshot] branche traffic-data absente — création orpheline"
+            mkdir -p data
+            git -C data init -q
+            git -C data checkout --orphan traffic-data
+            git -C data remote add origin "$REMOTE"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Snapshot
+        run: bash scripts/traffic-snapshot.sh --out data/traffic.json
+        env:
+          TRAFFIC_PAT: ${{ secrets.TRAFFIC_PAT }}
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Commit + push (seulement si le contenu a changé)
+        working-directory: data
+        run: |
+          set -euo pipefail
+          git add traffic.json
+          if git diff --cached --quiet; then
+            echo "[traffic-snapshot] aucun changement — pas de commit"
+          else
+            git commit -m "chore(traffic): snapshot hebdomadaire"
+            git push origin HEAD:traffic-data
+          fi
