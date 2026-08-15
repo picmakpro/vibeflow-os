@@ -661,7 +661,7 @@ jobs:
   # pose a la fois le gate et des artefacts armes), dans son PROPRE lab, sans toucher a une seule
   # ligne de `lab-frais` ni de son Gate C.
   lab-frais-arme:
-    name: Lab frais arme (as-installed testing — le gate installe, sur un univers non vide, #38)
+    name: "Lab frais arme (as-installed testing — le gate installe, sur un univers non vide, #38)"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

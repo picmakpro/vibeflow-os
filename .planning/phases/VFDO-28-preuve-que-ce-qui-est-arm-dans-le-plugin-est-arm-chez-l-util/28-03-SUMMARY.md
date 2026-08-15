@@ -49,7 +49,7 @@ requirements-completed: [ARMD-06, ARMD-08]
 coverage:
   - id: D1
     description: "Job CI `lab-frais-arme` : installe la fermeture dev-orchestrator (9 modules) dans son propre lab, pose une config minimale, invoque le gate INSTALLÉ sans surcharge, échoue sur exit 2 comme sur exit 1, refuse un univers d'armement < 2"
-    requirement: "ARMD-06"
+    requirement: "ARMD-06, ARMD-08"
     verification:
       - kind: other
         ref: "reproduction locale pas-à-pas des 5 étapes du job (install closure, config, gate rc=0, armed_count=2) — voir section « Vérification de bout en bout »"
@@ -58,7 +58,6 @@ coverage:
     rationale: "Le job n'a pas été exécuté en conditions réelles GitHub Actions (aucun push effectué — hors périmètre de ce mandat d'exécution, ni ship ni PR ne sont autorisés). La reproduction locale, étape par étape, avec les mêmes commandes que le YAML, est probante mais reste une simulation ; le run CI réel doit être lu par le manager/l'humain avant de considérer ce critère définitivement clos."
   - id: D2
     description: "Triades de version cohérentes (VERSION/module.json/CHANGELOG/README) pour dev-orchestrator (v2.15.0) et conductor (v1.23.0), VERSION racine intacte"
-    requirement: "ARMD-08"
     verification:
       - kind: other
         ref: "bash scripts/check-version-sync.sh"
