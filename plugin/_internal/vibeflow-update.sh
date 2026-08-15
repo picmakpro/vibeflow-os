@@ -221,15 +221,18 @@ gitignore_add_paths() {
   [ -f "$module_dir/scripts/seed-registres.sh" ] && gitignore_add_one ".claude/memory/"
   # Config template posé à côté d'un SKILL.md racine.
   [ -d "$module_dir/config" ] && [ -f "$module_dir/SKILL.md" ] && gitignore_add_one ".claude/skills/$mod/config/"
-  # settings.json (SCOPE-04, Phase 30 tâche 4) : en scope LOCAL, `merge_module_hooks()` écrit dans
-  # $TARGET_ROOT/settings.json — la même promesse « rien ne sera committé » que le reste de cette
-  # fonction s'applique à ce fichier aussi, ce qu'aucune ligne ne couvrait avant ce plan. Sélecteur
-  # data-driven (même style que la ligne seed-registres.sh ci-dessus) : seul un module qui PORTE
-  # un fragment hooks/hooks.json (donc qui écrit réellement dans settings.json à cette install)
-  # déclenche l'ajout. `settings.local.json` lui-même n'est PAS gitignoré ici : il est déjà nommé
-  # pour ne jamais être committé par convention, et gitignorer un fichier potentiellement absent
-  # n'apporterait rien au-delà de ce que ce plan demande explicitement.
+  # settings.json + settings.local.json (SCOPE-04, Phase 30 tâche 4, corrigé en revue) : en scope
+  # LOCAL, `merge_module_hooks()` écrit dans $TARGET_ROOT/settings.json ET, depuis le routage
+  # --settings-local (tâche 4), dans $TARGET_ROOT/settings.local.json pour toute entrée portant le
+  # chemin absolu machine {{VF_BASH}}. La même promesse « rien ne sera committé » que le reste de
+  # cette fonction s'applique aux DEUX fichiers : le premier vérifié initialement par lecture du
+  # code (pas par convention supposée), le second ajouté après que la revue a testé — et invalidé —
+  # l'hypothèse qu'une convention hors-dépôt (gitignore global du mainteneur) suffisait à couvrir un
+  # lab cible frais. Sélecteur data-driven identique aux deux lignes (même style que
+  # seed-registres.sh ci-dessus) : seul un module qui PORTE un fragment hooks/hooks.json (donc qui
+  # écrit réellement dans ces fichiers à cette install) déclenche l'ajout.
   [ -f "$module_dir/hooks/hooks.json" ] && gitignore_add_one ".claude/settings.json"
+  [ -f "$module_dir/hooks/hooks.json" ] && gitignore_add_one ".claude/settings.local.json"
   # Lib partagée de portabilité (Phase 30 tâche 2, copy_engine_lib()) : posée par l'ENGINE, pas
   # par un module — donc jamais vue par la boucle scripts/ plus haut (elle vient du cache
   # _internal, jamais de $module_dir/scripts). Gap constaté en tâche 4 lors de la vérification

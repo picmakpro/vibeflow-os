@@ -170,11 +170,16 @@ fi
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
-# T3c (local → .claude/settings.json gitignoré, Phase 30 tâche 4) — un module qui PORTE un
-# fragment hooks/hooks.json écrit dans $TARGET_ROOT/settings.json (merge_module_hooks) ; en scope
-# local, la promesse « rien ne sera committé » doit couvrir ce fichier aussi. Avant ce plan, aucune
-# ligne de gitignore_add_paths() ne le couvrait — mesuré à la lecture réelle du fichier, pas
-# supposé (voir SUMMARY, écart de comptage ~12 vs réel).
+# T3c (local → .claude/settings.json + .claude/settings.local.json gitignorés, Phase 30 tâche 4 +
+# correction ciblée post-revue) — un module qui PORTE un fragment hooks/hooks.json écrit dans
+# $TARGET_ROOT/settings.json (merge_module_hooks) ET, depuis le routage --settings-local, dans
+# $TARGET_ROOT/settings.local.json pour toute entrée portant {{VF_BASH}} ; en scope local, la
+# promesse « rien ne sera committé » doit couvrir les DEUX fichiers. Avant ce plan, aucune ligne de
+# gitignore_add_paths() ne couvrait settings.json — mesuré à la lecture réelle du fichier, pas
+# supposé (voir SUMMARY, écart de comptage ~12 vs réel). settings.local.json est resté NON couvert
+# une itération de plus : la revue a testé — et invalidé — l'hypothèse que la convention de nommage
+# suffisait sans une entrée .gitignore explicite du DÉPÔT CIBLE (elle ne tenait que via le
+# ~/.config/git/ignore personnel du mainteneur, absent sur un lab frais).
 # Cas négatif : le même module en scope PROJECT ⇒ .gitignore n'est ni créé ni modifié (SCOPE-04
 # reste borné au scope local, gitignore_add_paths() retourne tôt sur tout autre scope).
 # ---------------------------------------------------------------------------
@@ -191,6 +196,11 @@ if prepare_module "$CACHE" "dev-orchestrator"; then
   [ "${n:-0}" -eq 1 ] \
     || { ko "T3c local : .claude/settings.json apparaît $n fois dans .gitignore (attendu 1)"; miss=1; }
   [ "$miss" -eq 0 ] && ok "T3c local : .claude/settings.json gitignoré exactement une fois, idempotent après 2 runs"
+  miss=0
+  n=$("$GREP" -cxF ".claude/settings.local.json" "$LAB/.gitignore" 2>/dev/null || true)
+  [ "${n:-0}" -eq 1 ] \
+    || { ko "T3c local : .claude/settings.local.json apparaît $n fois dans .gitignore (attendu 1)"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T3c local : .claude/settings.local.json gitignoré exactement une fois, idempotent après 2 runs (correction post-revue)"
 else
   skip "T3c local : dev-orchestrator non copiable dans le cache de test"
 fi
