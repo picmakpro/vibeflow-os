@@ -1,12 +1,14 @@
 ---
 gsd_state_version: 1.0
 milestone: fiabilite-v1.0
-milestone_name: Fiabilité — ce qui survit
+milestone_name: « ce qui survit »
 current_phase: 30
 current_phase_name: Portabilité Windows II
 status: planning
-last_updated: "2026-08-15T18:07:05.215Z"
+stopped_at: Phase 30 context gathered
+last_updated: "2026-08-15T18:34:45.722Z"
 last_activity: 2026-08-15
+last_activity_desc: "ROADMAP fiabilite-v1.0 posée (8 phases : 30-35 + 18 et 25 héritées)"
 progress:
   total_phases: 8
   completed_phases: 0
@@ -710,10 +712,10 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-**Resume file:** None
+**Resume file:** .planning/phases/VFDO-30-portabilit-windows-ii/30-CONTEXT.md
 
-Last session: 2026-07-31T10:26:41.586Z
-Stopped at: Phase 20 complète (7/7 plans) — clôture de gouvernance (20-07) : ADR-051 révisée + ADR-060 posée, doctrine transverse alignée, 6 modules bumpés (conductor v1.17.0, dev-orchestrator v2.8.0, design-orchestrator v1.3.2, 3 bundles v2.0.3). Gates verts sauf le seul rouge attendu (compteur de suites racine, 44 réel pas 43). Release racine réservée à validation humaine post-fusion (4 éléments consignés + WINDOWS.md).
+Last session: 2026-08-15T18:34:45.705Z
+Stopped at: Phase 30 context gathered
 ubuntu:24.04) — 3 jobs verts au run 30257419335. Modules bumpés : conductor v1.14.5,
 consolidator v1.8.1, dev-orchestrator v2.3.2. Leçon durable : tout bash développé sur macOS/BSD
 doit être reproduit sous `docker run ubuntu:24.04` avant push (stat/-f, TMPDIR, outillage hôte).
