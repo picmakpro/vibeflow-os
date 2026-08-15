@@ -150,24 +150,80 @@ done < "$TMP/unit-results.txt"
 
 # ---------- invariant "lecture seule" : garde statique anti-écriture disque ----------
 # Propriété centrale du produit (Iron Law du SKILL.md) — aujourd'hui protégée par la seule
-# discipline de revue, pas d'outillage. On ignore les lignes de commentaire (`//`) pour ne
-# pas faire échouer le test sur de la PROSE qui mentionne ces mots (ex: le commentaire d'en-
-# tête de vf-cockpit-serve.mjs cite "fs.write*/mkdir/rm/appendFile" en toutes lettres) — seul
-# du CODE réel doit compter. `res.write` (réponse HTTP, légitime) ne matche aucun motif
-# ci-dessous par construction (nom d'API, pas le mot nu "write"), donc n'a besoin d'aucune
-# exclusion dédiée.
-WRITE_PATTERN='writeFile|mkdirSync|appendFile|unlink|rmSync|createWriteStream|truncate|renameSync|copyFileSync'
-WRITE_HITS=0
-for f in "$SCRIPTS_DIR"/*.mjs; do
-  CODE_ONLY="$(sed -E 's#^[[:space:]]*//.*$##' "$f")"
-  if echo "$CODE_ONLY" | grep -qE "$WRITE_PATTERN"; then
-    WRITE_HITS=$((WRITE_HITS+1))
-    echo "    (motif d'écriture disque trouvé dans $(basename "$f"))"
+# discipline de revue, pas d'outillage. ALLOWLIST (point fixe), pas denylist énumératif :
+# un denylist retombe muet au premier membre `fs` non anticipé (constaté par mutation :
+# fs.promises.mkdir / fs.openSync+fs.writeSync / fs.rmdirSync passaient tous inaperçus).
+# On extrait ici l'ensemble RÉEL des membres `fs` appelés dans scripts/**/*.mjs (récursif)
+# et on échoue sur tout ce qui n'est pas dans l'allowlist de lecture — un membre inconnu
+# échoue PAR DÉFAUT, il n'a pas besoin d'être anticipé un par un.
+#
+# On ignore les lignes de commentaire (`//`) pour ne pas faire échouer le test sur de la
+# PROSE qui mentionne ces mots (ex: un commentaire citant "fs.watch" en toutes lettres).
+# `res.write` (réponse HTTP, légitime) ne matche jamais ces motifs par construction : on
+# ne cible que des accès au module `fs` (alias importé depuis 'node:fs'/'node:fs/promises'
+# ou noms importés nommément), jamais le mot nu "write".
+FS_READ_ALLOWLIST='^(readFileSync|existsSync|statSync|lstatSync|readdirSync|realpathSync|watch|watchFile)$'
+BAD_MEMBERS=0
+
+extract_alias() {
+  # $1 = fichier (code sans commentaires), $2 = specifier du module (ex: node:fs)
+  echo "$1" | grep -oE "import[[:space:]]+(\*[[:space:]]+as[[:space:]]+)?[A-Za-z_$][A-Za-z0-9_$]*[[:space:]]+from[[:space:]]+['\"]${2}['\"]" \
+    | sed -E "s/^import[[:space:]]+(\*[[:space:]]+as[[:space:]]+)?//; s/[[:space:]]+from.*\$//"
+}
+
+extract_named() {
+  # $1 = fichier (code sans commentaires), $2 = specifier du module (ex: node:fs)
+  echo "$1" | grep -oE "import[[:space:]]*\{[^}]*\}[[:space:]]*from[[:space:]]*['\"]${2}['\"]" \
+    | sed -E "s/^import[[:space:]]*\{//; s/\}.*\$//" \
+    | tr ',' '\n' \
+    | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//; s/^.*[[:space:]]as[[:space:]]+//' \
+    | sed '/^$/d'
+}
+
+check_member() {
+  # $1 = nom du membre fs appelé, $2 = fichier source (pour le message)
+  if ! echo "$1" | grep -qE "$FS_READ_ALLOWLIST"; then
+    BAD_MEMBERS=$((BAD_MEMBERS+1))
+    echo "    (membre fs hors allowlist: fs.$1 dans $(basename "$2"))"
   fi
-done
-[ "$WRITE_HITS" -eq 0 ] \
-  && ok "invariant lecture seule: aucun motif d'écriture disque dans scripts/*.mjs" \
-  || nok "invariant lecture seule: motif d'écriture disque détecté (voir ci-dessus)"
+}
+
+while IFS= read -r f; do
+  CODE_ONLY="$(sed -E 's#^[[:space:]]*//.*$##' "$f")"
+
+  NS_ALIAS="$(extract_alias "$CODE_ONLY" 'node:fs' || true)"
+  NSP_ALIAS="$(extract_alias "$CODE_ONLY" 'node:fs/promises' || true)"
+
+  if [ -n "$NS_ALIAS" ]; then
+    while IFS= read -r m; do
+      [ -z "$m" ] && continue
+      check_member "$m" "$f"
+    done < <(echo "$CODE_ONLY" | grep -oE "\b${NS_ALIAS}\.[A-Za-z_$][A-Za-z0-9_$]*\(" | sed -E "s/^${NS_ALIAS}\.//; s/\($//")
+
+    while IFS= read -r m; do
+      [ -z "$m" ] && continue
+      check_member "$m" "$f"
+    done < <(echo "$CODE_ONLY" | grep -oE "\b${NS_ALIAS}\.promises\.[A-Za-z_$][A-Za-z0-9_$]*\(" | sed -E "s/^${NS_ALIAS}\.promises\.//; s/\($//")
+  fi
+
+  if [ -n "$NSP_ALIAS" ]; then
+    while IFS= read -r m; do
+      [ -z "$m" ] && continue
+      check_member "$m" "$f"
+    done < <(echo "$CODE_ONLY" | grep -oE "\b${NSP_ALIAS}\.[A-Za-z_$][A-Za-z0-9_$]*\(" | sed -E "s/^${NSP_ALIAS}\.//; s/\($//")
+  fi
+
+  while IFS= read -r name; do
+    [ -z "$name" ] && continue
+    if echo "$CODE_ONLY" | grep -qE "\b${name}[[:space:]]*\("; then
+      check_member "$name" "$f"
+    fi
+  done < <(extract_named "$CODE_ONLY" 'node:fs'; extract_named "$CODE_ONLY" 'node:fs/promises')
+done < <(find "$SCRIPTS_DIR" -type f -name '*.mjs' | sort)
+
+[ "$BAD_MEMBERS" -eq 0 ] \
+  && ok "invariant lecture seule: tous les membres fs de scripts/**/*.mjs sont dans l'allowlist de lecture" \
+  || nok "invariant lecture seule: membre fs hors allowlist détecté (voir ci-dessus)"
 
 # ---------- tests serveur en direct (fetch node, jamais curl — cf CONVENTIONS.md) ----------
 PORT=$((20000 + RANDOM % 10000))
