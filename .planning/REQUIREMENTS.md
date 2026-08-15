@@ -836,7 +836,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | WTCH-04 | Phase 33 | Pending |
 | LEDG-01 | Phase 18 | Pending |
 | LEDG-02 | Phase 18 | Pending |
-| LEDG-03 | Phase 30 | Pending — geste jour 1 (RFC upstream, deadline amont 2026-10-26) |
+| LEDG-03 | Phase 30 | Ouverte le 2026-08-15 — https://github.com/open-gsd/gsd-core/issues/3556 — deadline amont 2026-10-26 |
 | BUDG-01 | Phase 25 | Pending |
 | BUDG-02 | Phase 25 | Pending |
 | WKTR-01 | Phase 35 | Pending — conditionnelle (gsd-core > 1.10.0 releasé ET installé) |
@@ -931,7 +931,8 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 ### Survie du ledger d'exigences (Phase 18 héritée)
 - [ ] **LEDG-01**: La clôture de jalon fait un roll-over outillé du ledger — les exigences non livrées voyagent avec trace `carried-from:`
 - [ ] **LEDG-02**: Un gate rend rouge si une exigence disparaît du ledger sans issue tracée (livrée / reportée / abandonnée)
-- [ ] **LEDG-03**: La RFC upstream est ouverte dès le jour 1 du milestone (deadline amont 2026-10-26)
+- [ ] **LEDG-03**: La RFC upstream est ouverte dès le jour 1 du milestone (deadline amont
+  2026-10-26) — https://github.com/open-gsd/gsd-core/issues/3556, ouverte le 2026-08-15.
 
 ### Budget d'instructions (Phase 25 héritée, réduite)
 - [ ] **BUDG-01**: Le budget d'instructions par fichier d'agent distribué est mesuré et publié (métrique tranchée au cadrage de la phase)
