@@ -1,11 +1,11 @@
 {
-  "description": "Porte blindée Iron Law 300L (ADR-035 + ADR-043) : édition d'un fichier de code >= 300 lignes bloquée sans découpe ou dette tracée.",
+  "description": "Porte blindée Iron Law 300L (ADR-035 + ADR-043) : édition d'un fichier de code >= 300 lignes bloquée sans découpe ou dette tracée. Forme exec (contrat PR #29 §5, D-01) — entrée BLOQUANTE : c'est sa décision JSON `permissionDecision: deny` qui bloque l'appel d'outil, pas son code de sortie.",
   "hooks": {
     "PreToolUse": [
       {
         "matcher": "Edit|Write",
         "hooks": [
-          { "type": "command", "command": "bash {{VF_SCRIPTS}}/guard-file-size.sh" }
+          { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/guard-file-size.sh"] }
         ]
       }
     ]

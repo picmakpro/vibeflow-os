@@ -70,13 +70,47 @@ for cand in python3 python; do
 done
 [ -n "$PYBIN" ] || err "python3 requis (manipulation JSON fiable) — Windows : installer depuis python.org en cochant « Add to PATH » (le stub Microsoft Store 'python3' ne suffit pas)"
 
-MODE="$MODE" FRAGMENT="$FRAGMENT" SETTINGS="$SETTINGS" PREFIX="$PREFIX" "$PYBIN" - <<'PYEOF'
+# Chemin absolu de bash, résolu et vérifié à l'install (contrat PR #29 §5, D-01) : une
+# entrée de hook en forme exec porte ce chemin dans `command`, jamais un nom nu (`command`
+# est résolu sur le PATH même en forme exec — un nom nu reproduirait le bug ADR-054).
+# Cascade : VF_BASH_BIN (surcharge réservée aux tests, même convention que BASH_BIN dans
+# test-windows-guards.sh) — surcharge AUTORITAIRE, aucun repli déguisé si invalide ; puis
+# $BASH, le chemin de l'interpréteur qui exécute déjà ce script (aucune recherche PATH) ;
+# puis `command -v bash`. Un candidat n'est retenu que s'il commence par "/", existe, est
+# un fichier régulier et est exécutable — un candidat relatif est REJETÉ sans repli déguisé
+# (motif de confinement de chemin fermé en Phase 27, ADR-070 : une acceptation borne le
+# vecteur qu'elle couvre, jamais le risque en bloc).
+resolve_bash_abs() {
+  local cand
+  if [ -n "${VF_BASH_BIN:-}" ]; then
+    cand="$VF_BASH_BIN"
+    case "$cand" in
+      /*) [ -f "$cand" ] && [ -x "$cand" ] && { printf '%s' "$cand"; return 0; } ;;
+    esac
+    err "VF_BASH_BIN rejeté (chemin non absolu, inexistant, ou non exécutable) : $cand"
+  fi
+  for cand in "${BASH:-}" "$(command -v bash 2>/dev/null || true)"; do
+    [ -n "$cand" ] || continue
+    case "$cand" in
+      /*) [ -f "$cand" ] && [ -x "$cand" ] && { printf '%s' "$cand"; return 0; } ;;
+    esac
+  done
+  printf ''
+}
+
+BASH_ABS="$(resolve_bash_abs)" || exit 1
+
+MODE="$MODE" FRAGMENT="$FRAGMENT" SETTINGS="$SETTINGS" PREFIX="$PREFIX" BASH_ABS="$BASH_ABS" "$PYBIN" - <<'PYEOF'
 import json, os, re, sys, tempfile
 
 mode = os.environ["MODE"]
 fragment_path = os.environ["FRAGMENT"]
 settings_path = os.environ["SETTINGS"]
 prefix = os.environ.get("PREFIX", "")
+bash_abs = os.environ.get("BASH_ABS", "")
+
+VF_SCRIPTS_TOKEN = "{{VF_SCRIPTS}}"
+VF_BASH_TOKEN = "{{VF_BASH}}"
 
 def die(msg):
     sys.stderr.write(f"[merge-hooks] ERROR: {msg}\n")
@@ -106,16 +140,25 @@ if not isinstance(settings, dict):
 SCRIPT_RE = re.compile(r"([A-Za-z0-9._-]+\.(?:sh|py))")
 
 def frag_basenames():
-    """Basenames de tous les scripts référencés par les commands du fragment."""
+    """Basenames de tous les scripts référencés par les commands (et args, forme exec) du fragment."""
     names = set()
     for groups in frag_hooks.values():
         for g in groups or []:
             for h in g.get("hooks", []) or []:
                 names.update(SCRIPT_RE.findall(h.get("command", "")))
+                for a in h.get("args", []) or []:
+                    if isinstance(a, str):
+                        names.update(SCRIPT_RE.findall(a))
     return names
 
 def references(entry, basenames):
-    cmd = entry.get("command", "")
+    # Forme shell : le script vit dans `command`. Forme exec : il vit dans un élément
+    # d'`args` (jamais concaténés — chaque chaîne est vérifiée séparément, la frontière
+    # de mot reste locale à chacune).
+    strings_to_check = [entry.get("command", "")]
+    for a in entry.get("args", []) or []:
+        if isinstance(a, str):
+            strings_to_check.append(a)
     for b in basenames:
         # Frontière fermée par construction plutôt qu'énumération de métacaractères shell :
         # un basename ne peut être suivi/précédé d'un caractère qui ferait partie d'un nom de
@@ -126,8 +169,9 @@ def references(entry, basenames):
         # risque d'oubli d'un futur métacaractère. `(?<!...)`/`(?!...)` réussissent naturellement
         # en début/fin de chaîne (rien à faire correspondre), ce qui couvre aussi `^`/`$`.
         pattern = r"(?<![A-Za-z0-9._-])" + re.escape(b) + r"(?![A-Za-z0-9._-])"
-        if re.search(pattern, cmd):
-            return True
+        for s in strings_to_check:
+            if re.search(pattern, s):
+                return True
     return False
 
 hooks = settings.setdefault("hooks", {})
@@ -152,6 +196,9 @@ if mode == "merge":
                     for gg in groups or []:
                         for hh in gg.get("hooks", []) or []:
                             frag_names.update(SCRIPT_RE.findall(hh.get("command", "")))
+                            for aa in hh.get("args", []) or []:
+                                if isinstance(aa, str):
+                                    frag_names.update(SCRIPT_RE.findall(aa))
                     if existing_hooks and not all(references(h, frag_names) for h in existing_hooks):
                         continue  # groupe mixte — ne pas réutiliser, en chercher un autre / en créer un nouveau
                     target = eg
@@ -164,8 +211,34 @@ if mode == "merge":
             target.setdefault("hooks", [])
             for h in g.get("hooks", []) or []:
                 resolved = dict(h)
-                resolved["command"] = h.get("command", "").replace("{{VF_SCRIPTS}}", prefix)
+                raw_command = h.get("command", "")
+                entry_label = f"{event}/{matcher}"
+                if VF_BASH_TOKEN in raw_command and not bash_abs:
+                    die(f"{fragment_path} : entrée {entry_label} référence {VF_BASH_TOKEN} mais "
+                        f"aucun bash absolu résolu — installer bash ou renseigner VF_BASH_BIN")
+                resolved["command"] = raw_command.replace(VF_SCRIPTS_TOKEN, prefix).replace(VF_BASH_TOKEN, bash_abs)
+                if "{{" in resolved["command"]:
+                    die(f"{fragment_path} : placeholder non substitué dans command de l'entrée "
+                        f"{entry_label} : {resolved['command']!r}")
+                # Forme exec (contrat PR #29 §5) : le chemin de scripts vit dans `args`, pas dans
+                # `command` — même substitution, chaîne par chaîne, éléments non-chaîne ignorés
+                # sans planter (spec §3.2 point 2).
+                if "args" in h:
+                    new_args = []
+                    for a in h.get("args", []) or []:
+                        if isinstance(a, str):
+                            a2 = a.replace(VF_SCRIPTS_TOKEN, prefix)
+                            if "{{" in a2:
+                                die(f"{fragment_path} : placeholder non substitué dans args de "
+                                    f"l'entrée {entry_label} : {a2!r}")
+                            new_args.append(a2)
+                        else:
+                            new_args.append(a)
+                    resolved["args"] = new_args
                 own = set(SCRIPT_RE.findall(resolved["command"]))
+                for a in resolved.get("args", []) or []:
+                    if isinstance(a, str):
+                        own.update(SCRIPT_RE.findall(a))
                 # Idempotence : retirer toute entrée référençant les mêmes scripts dans TOUS
                 # les groupes de l'événement (pas seulement le groupe cible) — sinon un
                 # changement de matcher entre deux versions du fragment (ex. "Edit|Write" →
