@@ -629,10 +629,26 @@ jobs:
           LAB="$(mktemp -d)"
           echo "LAB=$LAB" >> "$GITHUB_ENV"
           cd "$LAB" && git init -q
-          # fermeture transitive de conductor = la baseline mandatory réelle
-          closure=$(cd "$GITHUB_WORKSPACE" && bash plugin/_internal/resolve-deps.sh conductor)
-          echo "== baseline : $closure =="
-          for m in $closure; do
+          # La baseline = la fermeture transitive de TOUS les modules `role=mandatory`, dérivée du
+          # catalogue. Surtout PAS un nom de module en dur : ce job codait `conductor`, et il n'a
+          # tenu que par chance — `consolidator` est devenu mandatory en v1.9.0 et n'arrivait dans
+          # ce lab que par l'arête indirecte conductor → validator → consolidator. Le jour où cette
+          # arête bouge, la CI testerait une baseline qui n'est plus celle des utilisateurs.
+          mandatory=$(cd "$GITHUB_WORKSPACE" \
+            && bash plugin/installer/scripts/build-module-catalog.sh 2>/dev/null \
+            | awk -F'\t' '$3 == "mandatory" { print $1 }')
+          [ -n "$mandatory" ] || { echo "::error::aucun module mandatory au catalogue — baseline vide"; exit 1; }
+          echo "== modules mandatory : $(printf '%s' "$mandatory" | tr '\n' ' ') =="
+          # xargs, PAS l'expansion non quotée `resolve-deps.sh $mandatory` : le word-splitting sur
+          # saut de ligne dépend d'IFS et s'est révélé non fiable à la vérification locale (les deux
+          # noms passaient collés en un seul argument, et resolve-deps échouait sur un module
+          # inconnu). Idem pour la boucle : `while read`, jamais `for m in $closure`.
+          closure=$(cd "$GITHUB_WORKSPACE" \
+            && printf '%s\n' "$mandatory" | xargs bash plugin/_internal/resolve-deps.sh | sort -u)
+          [ -n "$closure" ] || { echo "::error::fermeture transitive vide"; exit 1; }
+          echo "== baseline : $(printf '%s' "$closure" | tr '\n' ' ') =="
+          printf '%s\n' "$closure" | while IFS= read -r m; do
+            [ -n "$m" ] || continue
             VIBEFLOW_CACHE="$GITHUB_WORKSPACE/plugin" VF_SCOPE=project \
               bash "$GITHUB_WORKSPACE/plugin/_internal/vibeflow-update.sh" install "$m"
           done
@@ -644,10 +660,15 @@ jobs:
           echo "== check-agents --strict sur les agents installés =="
           bash .claude/scripts/check-agents.sh --strict
           echo "== check-registres --strict (registres canoniques posés ?) =="
-          # tolérance : un lab tout juste installé n'a pas encore de .planning ; le gate
-          # doit rendre un verdict propre (0 ou 3+message), jamais un crash
-          bash .claude/scripts/check-registres.sh --strict --allow-empty || rc=$?; rc=${rc:-0}
-          if [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ]; then echo "::error::check-registres rc=$rc inattendu"; exit 1; fi
+          # Exigence DURE, plus de tolérance. L'ancienne forme passait `--allow-empty`, qui convertit
+          # « 5 registres canon manquants » (rc=1) en « lab vierge, indéterminé » (rc=3), puis
+          # acceptait rc=3 — la CI validait donc un lab SANS mémoire en le prenant pour un lab neuf.
+          # C'est ce qui a laissé passer en production des labs où la machinerie mémoire tournait à
+          # vide (constaté chez un utilisateur, 2026-08-15). Depuis seed-registres.sh, l'install pose
+          # les registres : le seul verdict acceptable est le vert.
+          bash .claude/scripts/check-registres.sh --strict
+          echo "== les registres canon sont bien instanciés, pas seulement les gabarits =="
+          bash .claude/scripts/seed-registres.sh --check
           echo "== hooks de gouvernance présents dans settings.json =="
           grep -q "guard" .claude/settings.json
 

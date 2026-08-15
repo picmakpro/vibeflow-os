@@ -364,15 +364,38 @@ copy_module_scripts() {
 # backup ni re-copie complète. Appelée quand la version est INCHANGÉE — rend /vf-update
 # auto-réparateur si un hooks.json a dérivé (nouveau hook posé sans bump de VERSION du module).
 # Idempotent : merge-hooks dédup par basename, la copie de scripts écrase à l'identique.
+# seed_module_registres : si le module fournit seed-registres.sh, instancier les registres canon
+# manquants. Fonction plutôt qu'appel inline parce qu'elle a DEUX appelants (install_module et
+# sync_module_governance) : c'est ce qui rend la mémoire transparente à l'update, y compris quand la
+# version du module n'a pas bougé — le chemin « déjà à jour » ne repasse jamais par install_module.
+# Sans ce second appel, un lab configuré avant cette version n'aurait ses registres qu'au prochain
+# bump de consolidator, soit jamais si celui-ci n'évolue plus.
+seed_module_registres() {
+  local mod="$1"
+  local seeder="$TARGET_ROOT/scripts/seed-registres.sh"
+  [ -f "$CACHE_DIR/$mod/scripts/seed-registres.sh" ] || return 0
+  [ -f "$seeder" ] || return 0
+  if bash "$seeder" --quiet >/dev/null; then
+    log "  registres mémoire vérifiés/instanciés → seed-registres.sh"
+  else
+    log "  (registres mémoire non instanciés — best-effort, voir seed-registres.sh)"
+  fi
+}
+
 sync_module_governance() {
   local mod="$1"
   copy_module_scripts "$mod"
   merge_module_hooks "$mod"
+  # Ordre imposé : le seeder est posé par copy_module_scripts juste au-dessus. L'appeler avant
+  # rendrait le resync inerte sur un lab où le script n'a jamais été installé — exactement le cas
+  # qu'on cherche à rattraper.
+  seed_module_registres "$mod"
 }
 
 # ---------- Baseline obligatoire (INST-02a) ----------
 # Un module module.json avec "mandatory": true est un INVARIANT du lab (aujourd'hui : conductor,
-# le socle de gouvernance). Data-driven, AUCUN nom de module en dur.
+# le socle de gouvernance, et consolidator, le socle de mémoire). Data-driven, AUCUN nom de module
+# en dur — la liste sort des manifestes présents dans le cache.
 module_is_mandatory() {
   local mod="$1"
   local mj="$CACHE_DIR/$mod/module.json"
@@ -585,6 +608,22 @@ install_module() {
       log "  (chaîne d'outils design non vérifiée — best-effort, voir ensure-design-deps.sh)"
     fi
   fi
+
+  # Hook post-install (mémoire) : quatrième hook nommé, même patron que ses trois jumeaux ci-dessus
+  # — donc PAS de refactoring en boucle générique (cf. le commentaire du second hook). Instancie les
+  # registres canoniques depuis les gabarits du module. Sans lui, `consolidator` s'installait entier
+  # mais posait ses gabarits sans jamais les instancier : `.claude/memory/` n'existait pas et le lab
+  # échouait son propre gate mémoire (mesuré 2026-08-15, cf. en-tête de seed-registres.sh).
+  #
+  # Best-effort de la même façon : le code retour est IGNORÉ, une mémoire non instanciée DÉGRADE
+  # (une ligne de journal), elle n'ampute jamais l'install. Le script est non destructif et
+  # idempotent — il ne sait que créer ce qui manque —, ce qui le rend sûr à rejouer ici à chaque
+  # install ET dans sync_module_governance à chaque update.
+  #
+  # `--quiet` SANS `2>&1`, même raison que le hook design : les lignes de routine sont supprimées,
+  # mais les anomalies (gabarits introuvables, création impossible) doivent traverser jusqu'au
+  # journal — les avaler rejouerait la dégradation silencieuse que ce hook existe pour fermer.
+  seed_module_registres "$mod"
 
   # Commande d'incarnation (ADR-042) : tout agent posé devient invocable nativement via `/<mod>`
   # dans la fenêtre principale. Après la copie des scripts ci-dessus, le générateur est dispo.
@@ -829,8 +868,9 @@ case "$cmd" in
           [ -n "$mod" ] && update_module "$mod"
         done < "$INSTALLED_REGISTRY"
         # Lab initialisé : garantir la baseline obligatoire (INST-02a). Un module `mandatory`
-        # publié après la config du lab (conductor) est ainsi rattrapé au lieu d'être ignoré
-        # à vie — c'est ce qui posait ses scripts + hooks manquants (bandeau /vf-update).
+        # publié après la config du lab (conductor en v2.7.0, consolidator en v1.9.0) est ainsi
+        # rattrapé au lieu d'être ignoré à vie — c'est ce qui posait ses scripts + hooks manquants
+        # (bandeau /vf-update pour conductor ; registres + guards mémoire pour consolidator).
         ensure_mandatory_baseline
       else
         log "Aucun module installé"
