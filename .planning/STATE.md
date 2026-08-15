@@ -4,7 +4,7 @@ milestone: gsd-migration
 milestone_name: Migration package GSD
 current_phase: 18
 current_phase_name: Survie du ledger d'exigences à la clôture de jalon
-status: "Phase 28 COMPLETE - 3/3 plans, checkpoint D-04 rendu (second-job-9-modules) - branche feat/phase-28-03-as-installed non poussee, run CI reel et PR reserves a Samuel"
+status: "Phase 28 complete - 3/3 plans - PR et release reserves a Samuel"
 stopped_at: "Phase 20 complète (7/7 plans) — clôture de gouvernance (20-07) : ADR-051 révisée + ADR-060 posée, doctrine transverse alignée, 6 modules bumpés (conductor v1.17.0, dev-orchestrator v2.8.0, design-orchestrator v1.3.2, 3 bundles v2.0.3). Gates verts sauf le seul rouge attendu (compteur de suites racine, 44 réel pas 43). Release racine réservée à validation humaine post-fusion (4 éléments consignés + WINDOWS.md)."
 last_updated: "2026-08-15T00:00:00.000Z"
 last_activity: 2026-08-15
