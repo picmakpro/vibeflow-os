@@ -1,13 +1,6 @@
 # Requirements: VibeFlow Dev Orchestrator (VFDO)
 
 **Defined:** 2026-06-04
-
-> **Clôture agentique-v1.0 (2026-08-15).** Snapshot archivé :
-> `.planning/milestones/agentique-v1.0-REQUIREMENTS.md`. **Déviation assumée vs le workflow
-> `complete-milestone`** (qui prescrit de supprimer ce fichier après archivage) : le ledger
-> complet est **conservé** — c'est l'objet même de la Phase 18 (« survie du ledger d'exigences à
-> la clôture de jalon », reportée au prochain milestone) ; on ne supprime pas la chose qu'une
-> phase inscrite existe pour protéger. Le prochain milestone ajoutera ses familles à la suite.
 **Core Value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
 
 ## v1 Requirements

@@ -1,5 +1,34 @@
 # Milestones — VibeFlow Dev Orchestrator (VFDO)
 
+## ✅ agentique-v1.0 — Durcissement du moteur d'équipes agentique (clos 2026-08-15)
+
+**Statut :** SHIPPED — 13 phases livrées (15→29, **18 et 25 reportées** au prochain milestone) ·
+**Releases :** `v2.40.0` → `v2.52.0` · **Tag de clôture :** `v2.52.0` · **CI main verte** (`f50b226`)
+**Snapshots :** `.planning/milestones/agentique-v1.0-ROADMAP.md` + `-REQUIREMENTS.md`
+
+**Périmètre :** 13 phases · 76 plans complétés · familles d'exigences PAEX, GSDC, GSDA, DOCF, ARMD,
+ICMD (audit allégé de clôture : toutes vérifiées livrées sur preuves et cochées le 2026-08-15).
+
+**But et contexte :** chantier post-migration GSD, mené sous un label périmé (`gsd-migration`, clos
+le 2026-07-26 mais resté dans STATE trois semaines). Ce milestone **absorbe `gsd-alignement`**
+(ouvert le 2026-08-01 pour légitimer les phases 23-25 inscrites hors mandat — 23 et 24 livrées ici,
+25 reportée) et rattache les phases orphelines 15-22 et 29.
+
+**Livré :** collaboration inter-équipes dev ↔ design (15) · cloisonnement des dispatches (16) ·
+signaux de démarrage (17) · migration moteur par `/vf-update` (19, ADR-058) · fluidité sans perte
+de qualité (20) · alignement gsd-core 1.9.0 (21, ADR-061/062/063) · hygiène documentaire (22) ·
+couplage explicite au moteur GSD (23) · activation/mesure des capacités dormantes (24) · manuel
+utilisateur (26) · parallélisation d'exécution (27 — spike `claude_orchestration` refusé par
+écrit ; l'armement `isolation: worktree` a produit la régression #38, désarmée en v2.50.1) ·
+**gate armement ↔ précondition distribuée + job `lab-frais-arme` en *as-installed testing*** (28 —
+la réponse structurelle à #38 ; PR #42, v2.52.0) · gains ICM G1-G5 distillés (29, v2.51.0) ·
+socle de mémoire par lab (consolidator scope user, embarqué dans la PR #42).
+
+**Clos le 2026-08-15** — reste ouvert au-delà du milestone : le ré-armement `isolation: worktree`
+(verrou `open-gsd/gsd-core#3302`), les phases 18 et 25 reportées, et le durcissement du
+driver-lock (deux contournements constatés pendant le milestone : commit et checkout concurrents
+sous lock).
+
 ## ✅ vf-routing — Routage fin & verbes VibeFlow (créé 2026-07-25, clos 2026-07-26)
 
 **Statut :** SHIPPED — 3 phases livrées (12 ✅ `v2.31.0`, 14 ✅ `v2.30.0`, 13 ✅ `v2.37.0`) · **Tag git :** `v2.37.0` · **Spec :** `docs/superpowers/specs/2026-07-25-routage-fin-verbes-vf-design.md`

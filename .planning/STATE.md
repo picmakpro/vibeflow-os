@@ -1,10 +1,10 @@
 ---
 gsd_state_version: 1.0
-milestone: gsd-migration
-milestone_name: Migration package GSD
+milestone: aucun
+milestone_name: agentique-v1.0 clos le 2026-08-15 — prochain milestone à cadrer (/gsd-new-milestone)
 current_phase: 28
 current_phase_name: Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur
-status: "Phase 28 shipped - PR 42 - release v2.52.0"
+status: "Milestone agentique-v1.0 clos - phases 18 et 25 reportees - next a cadrer"
 stopped_at: "Phase 28 shippée et releasée (PR #42 → `8616224`, tag v2.52.0 + release GitHub, CI main 4/4 verte sur `f50b226`). Phase 29 shippée le même jour (PR #41, v2.51.0). Restent non planifiées : phases 18 et 25. Champs remis d'aplomb le 2026-08-15 sur mesure disque (dérive héritée signalée depuis la mission 28)."
 last_updated: "2026-08-15T17:11:29.000Z"
 last_activity: 2026-08-15

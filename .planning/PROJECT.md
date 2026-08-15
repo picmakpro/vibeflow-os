@@ -14,6 +14,22 @@ est livrée dans les labs via le module `reference`.
 > charte initiale décrivait ce périmètre mono-module — le repo distribue aujourd'hui un
 > framework multi-métier complet.
 
+## Current State (2026-08-15)
+
+**Shipped : `v2.52.0`** — milestone **agentique-v1.0** clos (phases 15→29, releases
+`v2.40.0`→`v2.52.0`) : moteur d'équipes durci de bout en bout — collaboration inter-équipes,
+cloisonnement des dispatches, alignement et couplage au moteur GSD, parallélisation, gate
+armement ↔ précondition distribuée (*as-installed testing*, job `lab-frais-arme`), gains ICM,
+socle de mémoire par lab. Détail : `.planning/MILESTONES.md` et
+`.planning/milestones/agentique-v1.0-*`.
+
+**Next Milestone Goals** — à cadrer (`/gsd-new-milestone`). Candidats hérités : **Phase 18**
+(survie du ledger d'exigences à la clôture de jalon — la dérive qu'elle ferme a été re-constatée
+à cette clôture même), **Phase 25** (budget d'instructions et étage d'alignement court),
+durcissement du **driver-lock** (2 contournements constatés), et le **ré-armement
+`isolation: worktree`** le jour où `open-gsd/gsd-core#3302` est levée (dossier prêt dans
+`.planning/research/2026-08-10-agents-paralleles-etat-de-l-art.md` §Implications 3).
+
 ## Core Value
 
 Depuis une install VibeFlow fraîche, dire « aide-moi à dev cette feature » déclenche le
