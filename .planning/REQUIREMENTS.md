@@ -855,6 +855,78 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   gains secondaires du `files_modified` des 5 plans ; D-03 est vérifiable par l'absence de
   `plugin/conductor/scripts/dag.sh` de ce même ensemble.
 
+## Milestone fiabilite-v1.0 — « ce qui survit » (démarré 2026-08-15)
+
+> Périmètre arbitré par Samuel le 2026-08-15 après audit d'utilité réelle et de faisabilité
+> (31 → 26 exigences ; chaque famille adossée à une preuve : incident documenté, demande externe,
+> ou bug récurrent par construction). Recherche : `.planning/research/SUMMARY.md` (commit
+> `5916899`). Coupes : BUDG-03 différé, SKIL réduit à un cadrage go/no-go, AGTS réduit,
+> MANI sans hash conffile, LOCK-03 en détection d'abord.
+
+### Portabilité Windows II (prioritaire — demande client)
+- [ ] **PORT-01**: Les 3 fichiers du lot PYBIN passent par la lib partagée `vf-portable.sh` (contrat PR #29 consommé, jamais réinventé)
+- [ ] **PORT-02**: `merge-hooks.sh` apprend la forme exec (`args`) AVANT toute migration de fragments — ordre (a) moteur → (b) codes de sortie → (c) hooks.json encodé en vagues dépendantes du plan (spec §1.3)
+- [ ] **PORT-03**: Contrat de codes de sortie normalisé pour les scripts de hooks, inventaire des 19 entrées réalisé
+- [ ] **PORT-04**: L'affectation §3.2 (résolution du chemin absolu de bash à l'install) est tranchée avec Willy et documentée avant le plan de la phase
+- [ ] **PORT-05**: La portabilité est prouvée en CI sur lab frais (suites windows-crlf + windows-guards + gates verts)
+
+### Manifeste d'install + dry-run (issue #20)
+- [ ] **MANI-01**: Chaque module posé écrit son manifeste de chemins (`$TARGET_ROOT/scripts/.vibeflow-manifest-<module>`, LF trié, un chemin par ligne)
+- [ ] **MANI-02**: `--dry-run` montre le plan de pose fichier-par-fichier sans rien écrire — même chemin de code que la pose (install + calibrate)
+- [ ] **MANI-03**: L'update supprime les chemins de l'ancien manifeste absents du nouveau, avec backup systématique et liste signalée à l'utilisateur
+- [ ] **MANI-04**: L'issue GitHub #20 est close par livraison, réponse postée sur l'issue
+
+### Durcissement du driver-lock
+- [ ] **LOCK-01**: Le heartbeat est séparé de la lease — un manager vivant renouvelle son battement, le TTL ne monte pas
+- [ ] **LOCK-02**: Un commit sous le lock d'autrui est bloqué à la source (guard `PreToolUse` distribué via merge-hooks ; armement prouvé par le gate règle 4)
+- [ ] **LOCK-03**: Un checkout de branche sous le lock d'autrui est détecté et signalé bruyamment (blocage seulement si le spike `reference-transaction` le prouve sûr)
+- [ ] **LOCK-04**: Le takeover d'un lock périmé est explicite et tracé — jamais d'auto-steal
+- [ ] **LOCK-05**: Jeton de fence en trailer des commits de mission (audit : quel commit sous quel mandat)
+
+### Watchdog & notifications des missions
+- [ ] **WTCH-01**: Chaque nœud du DAG de mission écrit un battement de progression (même battement que LOCK-01, deux consommateurs)
+- [ ] **WTCH-02**: Un stall est détecté par ABSENCE de battement au-delà du seuil — jamais par auto-déclaration ; le watchdog signale et suggère, ne tue jamais (ADR-031)
+- [ ] **WTCH-03**: Notification OS native aux jalons de mission (fin de nœud, halt condition) — jamais à chaque tour
+- [ ] **WTCH-04**: L'armement (hooks, notify) passe par le gate armement↔précondition — jamais un settings local (leçon #38)
+
+### Survie du ledger d'exigences (Phase 18 héritée)
+- [ ] **LEDG-01**: La clôture de jalon fait un roll-over outillé du ledger — les exigences non livrées voyagent avec trace `carried-from:`
+- [ ] **LEDG-02**: Un gate rend rouge si une exigence disparaît du ledger sans issue tracée (livrée / reportée / abandonnée)
+- [ ] **LEDG-03**: La RFC upstream est ouverte dès le jour 1 du milestone (deadline amont 2026-10-26)
+
+### Budget d'instructions (Phase 25 héritée, réduite)
+- [ ] **BUDG-01**: Le budget d'instructions par fichier d'agent distribué est mesuré et publié (métrique tranchée au cadrage de la phase)
+- [ ] **BUDG-02**: Le gate est en ratchet — avertit d'abord, bloque au merge, jamais rouge des semaines
+
+### Ré-armement worktree (phase conditionnelle — jamais bloquante)
+- [ ] **WKTR-01**: La précondition est machine-vérifiée : gsd-core > 1.10.0 RELEASÉ (sonde `npm view`, jamais le dist-tag `next`) ET installé, prouvée as-installed (`vf-requires`/`# vf-provides` porté par `ensure-deps.sh` + `lab-frais-arme`)
+- [ ] **WKTR-02**: Le ré-armement des 13 agents n'a lieu qu'après preuve du retour des commits sur un cas réel rejoué (scénario #3302)
+- [ ] **WKTR-03**: La veille de release gsd-core est active dès le jour 1
+
+### Skill-installer global (réduit à un cadrage)
+- [ ] **SKIL-01**: Un cadrage go/no-go répond à « que fait-il de plus que le natif `/plugin` ? » — abandon documenté si la réponse est creuse ; aucun code avant le go
+
+### Gaps agency-agents (réduit)
+- [ ] **AGTS-01**: Les gaps sont arbitrés en distillant la taxonomie du catalogue — jamais d'import des personas
+- [ ] **AGTS-02**: `web-test-team` est construite SI mobile-test sort du statut expérimental pendant le milestone (seule piste alignée fiabilité) ; sinon l'exigence est reportée avec trace
+
+### Transverse
+- [ ] **QUAL-01**: Tout nouveau gate du milestone naît avec ses trois issues (PASS / FAIL / imparsable BRUYANT) et sa mutation rouge prouvée
+
+### Out of Scope (audité le 2026-08-15 — chaque exclusion a son alternative dans le périmètre)
+- **Auto-steal du lock au TTL** — lock périmé ≠ mission morte (constaté 2026-08-02) → LOCK-01 + LOCK-04. *Réévaluable post-LOCK-01 : auto-takeover sur battement mort (pas sur TTL).*
+- **Notification à chaque tour / auto-kill sur stall** — spam couvert par `stop-notify`, auto-kill viole ADR-031 → WTCH-02/03
+- **Dry-run en chemin de code séparé** — dérive plan/pose garantie → contrainte encodée dans MANI-02
+- **Suppression silencieuse de fichiers modifiés** — perte de travail → MANI-03 backup + signalement
+- **Hash conffile-style par fichier** — raffinement sans besoin prouvé, le backup couvre → différé
+- **Armement via settings local** — régression #38 rejouée → gate règle 4 (WTCH-04, LOCK-02)
+- **Ré-armement worktree sur issue-close** — close ≠ releasé ≠ installé → WKTR-01
+- **Marketplace de skills maison / mirroring tiers** — duplique `/plugin` natif → input du cadrage SKIL-01
+- **Import des 230 personas agency-agents** — ADR-029 incompatible, zéro gouvernance → AGTS-01
+- **Migration des hooks.json avant merge-hooks.sh** — parc cassé sans erreur (§1.3) → ordre PORT-02
+- **Blocage CI dur immédiat du budget** — accoutumance au rouge → BUDG-02 ratchet
+- **BUDG-03 étage d'alignement court (G2)** — différé : mécanique de workflow neuve, utilité non démontrée, aucun incident lié
+
 ---
 *Requirements defined: 2026-06-04*
-*Last updated: 2026-08-15 — ajout Phase 29 (ICMD-01..12, distillation des gains ICM G1/G2/G3/G5) ; précédent : 2026-07-26 — remise à l'heure post-audit (Phase 12 annotée post-bascule v2.33.0, Phase 13 redéfinie sans verbe, Phase 14 = v2.30.0, milestones 2-3 shipped) ; précédent : 2026-07-25 — ajout Phase 14 au Milestone 6 (ALTI-01→05 : frontière d'altitude planning-core / moteur GSD, ADR-055)*
+*Last updated: 2026-08-15 — ajout milestone fiabilite-v1.0 (26 exigences en 9 familles, audit d utilite prealable, Out of Scope motive) ; precedent : ajout Phase 29 (ICMD-01..12, distillation des gains ICM G1/G2/G3/G5) ; précédent : 2026-07-26 — remise à l'heure post-audit (Phase 12 annotée post-bascule v2.33.0, Phase 13 redéfinie sans verbe, Phase 14 = v2.30.0, milestones 2-3 shipped) ; précédent : 2026-07-25 — ajout Phase 14 au Milestone 6 (ALTI-01→05 : frontière d'altitude planning-core / moteur GSD, ADR-055)*
