@@ -2,15 +2,46 @@
 phase: 29-distiller-les-gains-icm-g1-g5-investigation-dag-sh-scope-d-a
 plan: 05
 type: execute
-status: partiel — tâche 3 (checkpoint humain bloquant) EN ATTENTE du verdict de Samuel
+status: terminé — tâche 3 (checkpoint humain bloquant) RENDUE et APPROUVÉE par Samuel le 2026-08-15
 ---
 
-# 29-05 SUMMARY — Câblage du gate + clôture de distribution (tâches 1-2 seules)
+# 29-05 SUMMARY — Câblage du gate + clôture de distribution (tâches 1-2-3)
 
-**Tâche 3 (`checkpoint:human-verify`, gate=`blocking`) N'A PAS été exécutée** : c'est un
-checkpoint humain bloquant, réservé à Samuel (« le gate est-il utile ou bavard ? »). Ce mandat
-d'exécution ciblée s'arrêtait explicitement avant elle. Aucun verdict de phase n'est rendu, aucune
-case de checkpoint n'est cochée, `.planning/ROADMAP.md` et le statut de phase ne sont pas touchés.
+**Tâche 3 (`checkpoint:human-verify`, gate=`blocking`) RENDUE et APPROUVÉE.** Samuel a tranché le
+2026-08-15 (checkpoint T-29-05-3) :
+
+1. **Le gate `check-map-drift.sh` est UTILE**, à condition de resserrer 2 bornes : (a) une ligne de
+   commande citée en exemple dans un `CLAUDE.md` n'est pas un chemin déclaré (P1 sens 1) ; (b)
+   `plugin/reference/content/examples/` (cartes volontairement fictives d'un exemple pédagogique)
+   est exclu du balayage. Les deux bornes ont été appliquées (commits `8cf5198`, `423671f`) — le
+   gate rend désormais **exactement 3 findings** sur ce dépôt (`docs`, `manual`, `reports` non
+   cités par `./CLAUDE.md`), tenus pour **légitimes et assumés**, non corrigés (ADR-031).
+2. **`docs/_transverse/` supprimé** : vibeflow-os est le repo de distribution, pas un lab —
+   ADR-042 (qui régit ce dossier) ne s'y applique pas.
+3. **`.planning/config.json` → `parallelization.skip_checkpoints: false`** (commit `8cbf71b`) —
+   3e vecteur d'auto-approbation de checkpoint neutralisé.
+
+Le registre STRIDE a été enrichi de `T-29-02-08` (oracle d'existence par traversée `../` en
+`p2_sens_a`, mitigation `../` initial appliquée, résidu non-initial accepté en risque `low`).
+
+**Aucun finding du gate n'a été corrigé automatiquement à aucun moment de ce cycle — ADR-031 tenu
+de bout en bout** : les 3 findings restants sont présentés tels quels, jamais soldés en silence.
+
+Sortie finale du gate, preuve du verdict rendu :
+
+```
+$ bash plugin/conductor/scripts/check-map-drift.sh --path .
+[map-drift] 3 divergence(s) sur 2 carte(s) balayée(s).
+  - ./CLAUDE.md : élément suivi non cité — docs
+  - ./CLAUDE.md : élément suivi non cité — manual
+  - ./CLAUDE.md : élément suivi non cité — reports
+            → propose de mettre à jour la carte, ou de créer/retirer l'élément manquant.
+$ echo "code de sortie : $?"
+code de sortie : 0
+```
+
+`.planning/ROADMAP.md` et le statut de phase relèvent du manager — non touchés par ce nœud
+d'exécution.
 
 ## Ce qui a été livré
 
