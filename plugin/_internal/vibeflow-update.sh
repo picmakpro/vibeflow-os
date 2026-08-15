@@ -213,6 +213,12 @@ gitignore_add_paths() {
       [ -f "$f" ] && gitignore_add_one ".claude/scripts/$(basename "$f")"
     done
   fi
+  # Registres mémoire (SCOPE-04) : si le module fournit un seeder de registres, les fichiers qu'il
+  # crée — à l'install ET à chaque SessionStart — doivent suivre la promesse du scope local
+  # (« rien ne sera committé »). Sans cette ligne, l'engine gitignorait ses propres artefacts mais
+  # laissait les 5 registres semés apparaître en untracked dans le git status du projet. Le
+  # sélecteur est le seeder lui-même (data-driven, pas de nom de module en dur).
+  [ -f "$module_dir/scripts/seed-registres.sh" ] && gitignore_add_one ".claude/memory/"
   # Config template posé à côté d'un SKILL.md racine.
   [ -d "$module_dir/config" ] && [ -f "$module_dir/SKILL.md" ] && gitignore_add_one ".claude/skills/$mod/config/"
 }
