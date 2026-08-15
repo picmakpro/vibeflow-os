@@ -4,7 +4,7 @@ idea: vf-cockpit-local
 name: cockpit-live
 type: standard
 validates: "Given un .planning/ réel (ROADMAP checklist, STATE frontmatter, MILESTONES, MISSION-*.dag.json, DRIVER.lock), when le serveur zéro-dep les parse et sert la page Mermaid+SSE, then les vues (DAG mission live, roadmap milestone, historique) sont lisibles et se rafraîchissent < 2 s après un changement de fichier"
-verdict: PARTIAL
+verdict: VALIDATED
 related: []
 tags: [node, sse, mermaid, planning-parser]
 ---
@@ -71,9 +71,17 @@ cap 2000 événements) exporté sur `GET /api/log`.
    sans `securityLevel: loose`. Endpoint `/api/phase?num=N` validé sur 30 (8 plans, 5 ●), 18, 25.
 
 ## Results
-**PARTIAL** — toute la chaîne serveur est VALIDÉE sur données réelles (parsing 5 sources, live
-SSE déclenché par la mission réelle, < 2 s après écriture grâce au debounce 300 ms) ; le rendu
-Mermaid côté navigateur reste à juger visuellement (lisibilité du DAG 16 nœuds, timeline).
+**VALIDATED** (clos le 2026-08-16, verdict visuel de Samuel sur le module v1.0.0 issu du spike :
+« l'architecture globale est bien », rendu navigateur fonctionnel) — toute la chaîne serveur
+VALIDÉE sur données réelles (parsing 5 sources, live SSE déclenché par la mission réelle, < 2 s
+après écriture grâce au debounce 300 ms). Le spike a depuis été industrialisé par mission
+vf-dev-manager → module `plugin/vf-cockpit/` v1.0.0 sur la branche `feat/vf-cockpit-module`
+(design scoré 95/100, 38 tests, à l'écart de main et des releases sur décision de Samuel).
+**Défaut sémantique détecté au verdict et transmis à la phase d'amélioration** : le panneau
+« équipe » ne regarde que `MISSION-*.dag.json` du `.planning` ciblé (`equipe.js`) — un agent au
+travail sans DAG dans cet arbre (mission en worktree, subagent direct, manager sans plan de
+bataille écrit) affiche à tort « Personne au travail », alors que le driver-lock au heartbeat et
+d'autres signaux prouvent le contraire.
 Surprises : (a) le heartbeat du driver-lock fait un « pouls » live gratuit — le cockpit bat au
 rythme de la mission sans instrumentation ; (b) la checklist machine de ROADMAP.md rend tout
 parsing sophistiqué inutile ; (c) rtk peut corrompre une validation JSON via curl.
