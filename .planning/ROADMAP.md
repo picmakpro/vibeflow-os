@@ -457,7 +457,7 @@ Plans:
 | 26. Manuel utilisateur VibeFlow (manual/) | gsd-alignement | — | Complete (PR #28) | 2026-08-02 |
 | 27. Parallélisation d'exécution — granulaire, simple, sans collision | gsd-alignement | 6/6 | Complete (PR #35) — spike `claude_orchestration` refusé par écrit | 2026-08-10 |
 | 28. Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur | gsd-alignement | 0/0 | Inscrite — ouverte par la régression #38 (v2.49.0 → v2.50.1) ; **non cadrée**, mise à jour VibeFlow attendue avant | — |
-| 29. Distiller les gains ICM (G1-G5) — investigation dag.sh --scope d'abord | — | 0/0 | Inscrite — issue de la deep-search ICM (`reports/research/2026-08-15-icm-deep-search.md`) ; zéro régression autorisée sur `--scope` | — |
+| 29. Distiller les gains ICM (G1-G5) — investigation dag.sh --scope d'abord | — | 5/5 | Complete (PR #41) — release `v2.51.0`, D-03 tenue (`dag.sh` hors diff), checkpoint humain T-29-05-3 tranché le 2026-08-15 | 2026-08-15 |
 
 ### Phase 15: Collaboration inter-équipes dev ↔ design
 
