@@ -509,17 +509,23 @@ arrêtée à 29 → elles démarrent à 30.
 - **30 → 31 strictement séquentielles** : les deux travaillent les mêmes fichiers
   `plugin/_internal/` (`vibeflow-update.sh`, `merge-hooks.sh`) — jamais en parallèle, un seul
   propriétaire du moteur à la fois.
+
 - **30 en premier** : Windows II réécrit le contrat de sortie des hooks et la forme exec que les
   phases 32, 33 et 18 consomment — toute entrée de hook créée avant serait à re-migrer. C'est aussi
   la demande client prioritaire.
+
 - **32 → 33 adjacentes** : LOCK et WTCH partagent le même battement (un émetteur, deux
   consommateurs) — conçues ensemble, livrées séparément, WTCH après LOCK.
+
 - **18 avant la clôture du milestone** (sinon 3ᵉ dérive du ledger) ; sa latence externe (RFC
   upstream, LEDG-03) part dès le jour 1, portée par la Phase 30.
+
 - **31 avant 34** : le manifeste est la fondation de tout uninstall propre — le cadrage
   skill-installer (SKIL-01) ne se décide pas sans lui.
+
 - **25 avant-dernière** : ne jamais calibrer un seuil sur un corpus d'agents qui bouge — après la
   Phase 34 et tout ajout d'agents.
+
 - **35 flottante, jamais bloquante** : conditionnée à une release externe (gsd-core > 1.10.0
   releasé ET installé) ; sa veille (WKTR-03) est active dès le jour 1, portée par la Phase 30.
 
@@ -544,16 +550,20 @@ encart §3.2 de la spec, commentaire posté sur la PR #29.
 
   1. La portabilité est prouvée en CI sur lab frais : suites windows-crlf + windows-guards + gates
      verts (PORT-05) — par exécution, jamais par lecture.
+
   2. `merge-hooks.sh` sait poser, dédupliquer (cross-forme) et retirer une entrée en forme exec
      AVANT toute migration de fragments — ordre (a) moteur → (b) codes de sortie → (c) hooks.json
      encodé en vagues dépendantes du plan (PORT-02, spec §1.3) ; un update ne double jamais un hook
      et un module reste désinstallable.
+
   3. Les scripts de hooks respectent le contrat de codes de sortie normalisé (0 = silence à la
      frontière harness, classement advisory/bloquant explicite), inventaire des 19 entrées réalisé
      (PORT-03) — un démarrage de session sain reste silencieux, aucun exit 2 involontaire.
+
   4. Les 3 fichiers du lot PYBIN passent par la lib partagée `vf-portable.sh` (contrat PR #29
      consommé, jamais réinventé) (PORT-01) ; l'affectation §3.2 est documentée avant le plan
      (PORT-04) — `guard-file-size.sh` gaté séparément si la lib tarde (tracer 01-01 Willy).
+
   5. Jour 1 (asynchrone, hors substrat) : la RFC upstream `open-gsd/gsd-core` (suppression de
      `REQUIREMENTS.md` rendue optionnelle) est déposée et traçable depuis le repo (LEDG-03,
      deadline amont 2026-10-26) ET la veille de release gsd-core > 1.10.0 est active
@@ -564,14 +574,24 @@ avec ses trois issues (PASS / FAIL / imparsable BRUYANT) et sa mutation rouge pr
 **Plans**: 8 plans (4 vagues — l'ordre spec §2 (a) moteur → (b) codes de sortie → (c) fragments est
 encodé en vagues dépendantes ; les 2 gestes jour 1 sont parallèles à la vague 1)
 Plans:
+**Wave 1**
 
 - [ ] 30-01-PLAN.md — tracer : `merge-hooks.sh` apprend `args` + chemin absolu de bash à l'install, l'entrée `software-architecture` migre en forme exec, suite étendue (dédup cross-forme, remove exec, sonde de parc) — vague 1 (PORT-02, PORT-04)
 - [ ] 30-02-PLAN.md — geste jour 1 : RFC upstream `open-gsd/gsd-core` (brouillon, gate humain, dépôt, double traçabilité STATE/REQUIREMENTS) — vague 1 (LEDG-03)
 - [ ] 30-03-PLAN.md — geste jour 1 : veille de release gsd-core (sonde à cache quotidien, suite, armement local + trace versionnée) — vague 1 (WKTR-03)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 30-04-PLAN.md — inventaire machine des 25 entrées + contrat de sortie écrit + normalisation des 4 scripts dev + suite capturant stdout/stderr séparément — vague 2 (PORT-03)
 - [ ] 30-05-PLAN.md — lib `vf-portable.sh` (5 symboles, bloc localisateur) + `copy_engine_lib()` + les 3 consommateurs PYBIN + somme de contrôle du bloc — vague 2 (PORT-01)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 30-06-PLAN.md — normalisation du parc gouvernance (8 scripts, 4 modules) + suite de parc anti-vert-à-vide + bumps — vague 3 (PORT-03)
 - [ ] 30-07-PLAN.md — les 4 entrées `dev-orchestrator` en forme exec, classées advisory + preuve as-installed + ADR de suite + bumps dev — vague 3 (PORT-02)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 30-08-PLAN.md — preuve CI sur lab frais (forme exec telle qu'installée, conditions Windows simulées) + compteurs README + CI verte constatée — vague 4 (PORT-05)
 
 ### Phase 31: Manifeste d'install + dry-run (issue #20)
@@ -587,12 +607,15 @@ parallèles ; le `--dry-run` s'écrit une seule fois, contre le moteur de hooks 
   1. Chaque module posé écrit son manifeste de chemins
      (`$TARGET_ROOT/scripts/.vibeflow-manifest-<module>`, LF trié, un chemin relatif par ligne) —
      l'engine est le seul écrivain (MANI-01).
+
   2. `--dry-run` montre le plan de pose fichier-par-fichier (y compris le merge de hooks) sans rien
      écrire, sur le MÊME chemin de code que la pose (install + calibrate) — prouvé par un test
      « dry-run == diff disque réel », sous mutation (MANI-02).
+
   3. À l'update, les chemins de l'ancien manifeste absents du nouveau sont supprimés avec backup
      systématique et liste signalée à l'utilisateur ; un fichier tiers non manifesté reste intact
      (test dédié) (MANI-03).
+
   4. L'issue GitHub #20 est close par livraison, réponse postée sur l'issue (MANI-04).
 
 **Transverse (QUAL-01)** : la suite `test-manifest.sh` et le contrôle dry-run naissent avec leurs
@@ -616,13 +639,17 @@ réels comme cas de test AVANT de choisir le mécanisme.
   1. Un manager vivant renouvelle son battement sans que le TTL monte — heartbeat séparé de la
      lease, TTL par défaut inchangé (un lock périmé ≠ une mission morte, constat du 2026-08-02)
      (LOCK-01).
+
   2. Un commit sous le lock d'autrui est bloqué à la source (guard `PreToolUse(Bash)` distribué via
      merge-hooks, armement prouvé par le gate règle 4 — jamais un settings local ni un hook git non
      distribué) ; le contournement réel rejoué comme cas de test rougit sans le guard (LOCK-02).
+
   3. Un checkout de branche sous le lock d'autrui est détecté et signalé bruyamment — blocage
      seulement si le spike `reference-transaction` le prouve sûr (LOCK-03).
+
   4. Le takeover d'un lock périmé est explicite et tracé avec l'ID du repreneur — jamais
      d'auto-steal au TTL (LOCK-04).
+
   5. Les commits de mission portent un jeton de fence en trailer — « quel commit sous quel mandat »
      est auditable (LOCK-05).
 
@@ -645,12 +672,15 @@ est la décision de cadrage n°1.
 
   1. Chaque nœud du DAG de mission écrit un battement de progression — même battement que LOCK-01,
      deux consommateurs, aucun second mécanisme (WTCH-01).
+
   2. Un stall est détecté par ABSENCE de battement au-delà du seuil — jamais par auto-déclaration ;
      le watchdog signale et suggère, ne tue jamais (ADR-031) ; le cas « vivant mais bouclant » est
      couvert par test (WTCH-02).
+
   3. Une notification OS native part aux jalons de mission (fin de nœud, halt condition) — jamais à
      chaque tour ; `notify.sh` est posé par l'engine (best-effort, fail-open silencieux), portable
      Windows dès la v1 (WTCH-03).
+
   4. L'armement (hooks, notify) passe par le gate armement ↔ précondition — jamais un settings
      local (leçon #38 : un réglage local ne voyage pas) (WTCH-04).
 
@@ -686,16 +716,20 @@ seule, ou gate en mode avertissement), jamais un piquet planté contre notre pro
 
   1. La clôture de jalon fait un roll-over outillé du ledger : les exigences non livrées voyagent
      avec trace `carried-from:` — rejoué sur la clôture réelle d'agentique-v1.0 (LEDG-01).
+
   2. `check-requirements-survival.sh` rend ROUGE si une exigence disparaît du ledger sans issue
      tracée (livrée / reportée / abandonnée) — gate **lecteur/diff en détection d'absence
      uniquement**, jamais un régénérateur, jamais l'heuristique « n'a pas bougé » (neutralisée en
      Phase 17) (LEDG-02).
+
   3. La doctrine est écrite dans `plugin/dev-orchestrator/AGENT.md` : les archives
      `milestones/*-REQUIREMENTS.md` sont des **instantanés**, `.planning/REQUIREMENTS.md` est la
      seule source vivante.
+
   4. Aucun objet nouveau dans le socle : zéro fichier de registre créé, zéro grammaire de merge,
      zéro overlay ; gouvernance conductor tenue (`check-agents.sh` vert, densité ADR-029),
      portabilité prouvée par exécution.
+
   5. La phase est livrée **avant la clôture de ce milestone** — sinon 3ᵉ dérive du ledger.
 
 **Transverse (QUAL-01)** : `check-requirements-survival.sh` naît avec ses trois issues
@@ -721,9 +755,11 @@ conditionnée à la sortie du statut expérimental de `mobile-test` pendant le m
   1. Les gaps de couverture sont arbitrés en distillant la taxonomie du catalogue — **zéro persona
      importée** (ADR-029 incompatible, zéro gouvernance) ; tout agent retenu passe
      `check-agents.sh` (ADR-044) et la règle 4 s'il est armé (AGTS-01).
+
   2. `web-test-team` est construite SI `mobile-test` sort du statut expérimental pendant le
      milestone (seule piste alignée fiabilité, moule prouvé) ; sinon l'exigence est **reportée avec
      trace** — jamais abandonnée en silence (AGTS-02).
+
   3. Le cadrage SKIL-01 répond par écrit à « que fait-il de plus que le natif `/plugin` ? » —
      abandon documenté si la réponse est creuse ; **aucun code avant le go** ; périmètre = câblage,
      pas catalogue ; collision de nom = refus (SKIL-01).
@@ -753,9 +789,11 @@ les ajouts d'agents du milestone).
   1. Le budget d'instructions par fichier d'agent distribué est **mesuré et publié** — la métrique
      (quelles formes comptent comme instruction normative), le seuil et la portée sont tranchés au
      cadrage de la phase (BUDG-01).
+
   2. Le gate est en **ratchet** : il avertit d'abord, bloque au merge qui livre la remédiation, et
      n'est jamais rouge des semaines (précédent `workflow.windows_enforce`, spec Windows II §7)
      (BUDG-02).
+
   3. La mesure est calibrée sur le corpus **final** du milestone (post-Phase 34) — jamais sur un
      état qui bouge.
 
@@ -785,9 +823,11 @@ bloquée par rien.
      le dist-tag `next`) **ET installé**, prouvée as-installed — `vf-requires`/`# vf-provides`
      porté par `ensure-deps.sh` (le seul à pouvoir attester l'install) + validation
      `lab-frais-arme` (WKTR-01).
+
   2. Le ré-armement des 13 agents n'a lieu qu'**après** preuve du retour des commits sur un cas
      réel rejoué (scénario #3302 : commits de workers, SUMMARY, merge — les symptômes exacts du
      refus PAEX-09) (WKTR-02).
+
   3. Tant que la précondition n'est pas satisfaite, la phase reste flottante avec son déclencheur
      objectif — jamais un ré-armement sur issue-close, jamais un abandon silencieux.
 

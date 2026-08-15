@@ -557,9 +557,11 @@ factuelles de ce document est tracée à un `Read` de fichier source (`plugin/_i
 `.github/workflows/ci.yml`, `docs/ADR.md`) ou à un fetch direct de la documentation officielle
 Claude Code, jamais à de la mémoire d'entraînement seule.
 
-## Open Questions
+## Open Questions (RESOLVED au plan — 2026-08-15)
 
-1. **Le hook doctor minimal de `conductor` (D-05) — inclure ou différer ?**
+1. **Le hook doctor minimal de `conductor` (D-05) — inclure ou différer ?** **(RESOLVED :
+   différé avec reliquat tracé — plan `30-05` T3, conformément à D-05 ; le report est sûr car
+   `vf_guard_unavailable` imprime le motif sur stderr, contrat §4.)**
    - Ce qu'on sait : `VF_GUARD_HEALTH_DIR` n'existe pas encore, aucun consommateur amont
      n'existe. `vf_guard_unavailable` peut écrire le marqueur SANS que le doctor existe (les
      marqueurs « s'accumulent sans casse tant que le doctor n'existe pas », CONTEXT.md).
@@ -570,7 +572,9 @@ Claude Code, jamais à de la mémoire d'entraînement seule.
      une décision de séquencement, pas une inconnue technique.
 
 2. **Combien des 21 entrées gouvernance restantes (25 − 4 dev) ont un `exit 3` interne
-   aujourd'hui, candidat à la même translation `--hook` ?**
+   aujourd'hui, candidat à la même translation `--hook` ?** **(RESOLVED : l'inventaire machine
+   systématique des 25 entrées est le premier geste du plan `30-04` T1 — la réponse sera sur
+   pièces, pas extrapolée.)**
    - Ce qu'on sait : les 4 entrées dev-orchestrator suivent la convention 0/3/64. Aucune lecture
      complète des scripts `conductor`/`consolidator`/`planning-core`/`infrastructure-audit` n'a
      été faite dans cette session (hors périmètre direct — D-07 dit que la normalisation
