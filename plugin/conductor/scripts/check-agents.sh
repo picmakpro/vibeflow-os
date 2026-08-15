@@ -127,6 +127,22 @@ case "$RESOLVE_AGENTS" in
     ;;
 esac
 
+# --- Traduction du silence interne vers le harness (D-06/D-07, uniquement sous --hook) ----------
+# hook_exit <code> : sous --hook, le SEUL code de silence interne (3 = INDETERMINE sur cible vide
+# en --strict) devient 0 à la frontière du harness. Posée ici, au point où le SHELL rend la main
+# (pas à l'intérieur du bloc Python embarqué) — le contrat interne du bloc Python ne change pas :
+# il continue de rendre 3 pour l'INDETERMINE, avec ou sans --hook (voir plus bas, la condition
+# `and not hook` disparaît du DÉCLENCHEMENT de l'exit, jamais du choix d'imprimer ou non). 0 et 1
+# ne sont JAMAIS traduits. Sans --hook (CLI, suites de tests), le code recu ressort inchange. Voir
+# docs/HOOKS-CONTRAT-SORTIE.md §2 et l'entree #2 de l'inventaire.
+hook_exit() { # <code>
+  local code="$1"
+  if [ "$HOOK_MODE" = true ] && [ "$code" -eq 3 ]; then
+    exit 0
+  fi
+  exit "$code"
+}
+
 # ADR-054 : stub Microsoft Store — `python3` présent dans le PATH mais inerte. Détection par
 # CHEMIN (zéro spawn), repli `python` ; sinon message + exit 0 (advisory, comme avant).
 PYBIN=python3
@@ -636,8 +652,12 @@ else:
     if not files:
         # Contrat de decouverte (F13, vacuous green) : en --strict, zero cible = zero verdict.
         # exit 3 = INDETERMINE, distinct de 0 = CONFORME. --allow-empty pour les cas legitimes.
-        if strict and not allow_empty and not hook:
-            print(f\"[check-agents] ✗ INDETERMINE : aucun agent dans {agents_dir} — cible absente ou vide, aucun verdict rendu (--allow-empty pour tolerer)\")
+        # Le code de sortie (3) est desormais INCONDITIONNEL — la traduction vers 0 sous --hook
+        # est la responsabilite du shell (hook_exit, hors de ce bloc Python) : seul l'AFFICHAGE
+        # reste conditionne a 'not hook' (le silence de flux, lui, reste un contrat du shell).
+        if strict and not allow_empty:
+            if not hook:
+                print(f\"[check-agents] ✗ INDETERMINE : aucun agent dans {agents_dir} — cible absente ou vide, aucun verdict rendu (--allow-empty pour tolerer)\")
             sys.exit(3)
         if not hook:
             print(f\"[check-agents] aucun agent dans {agents_dir} — rien a verifier\")
@@ -684,3 +704,5 @@ if n_err:
 print(f\"[check-agents] ✓ agents conformes (natif + charte VibeFlow){' · ' + str(n_warn) + ' warning(s)' if n_warn else ''}\")
 sys.exit(0)
 "
+PY_RC=$?
+hook_exit "$PY_RC"

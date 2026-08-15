@@ -63,9 +63,12 @@ if [ "$rc" -eq 3 ] && [ -z "$sout" ]; then ok "1 non partitionne → exit 3, std
 else ko "1 non partitionne → exit 3, stdout vide" "rc=$rc stdout=[$sout]"; fi
 
 # === Cas 1b — meme fixture en --hook : silence TOTAL (stdout ET stderr vides) ======================
+# D-06/D-07 (plan VFDO-30-06) : sous --hook, hook_exit() traduit le code SILENCIEUX (3) vers 0 a la
+# frontiere du harness — c'est le contrat qui remplace le "--hook ne change AUCUN code de sortie"
+# d'avant ce plan. Le silence de FLUX (stdout ET stderr strictement vides), lui, est inchange.
 D="$(mk_git_root c1b)"
 both="$(env -u VF_WORKSTREAM_PLANNING_DIR -u GSD_WORKSTREAM bash "$SCRIPT" --hook --path "$D" 2>&1)"; rc=$?
-if [ "$rc" -eq 3 ] && [ -z "$both" ]; then ok "1b non partitionne en --hook → exit 3, aucune sortie du tout"
+if [ "$rc" -eq 0 ] && [ -z "$both" ]; then ok "1b non partitionne en --hook → exit 0 (traduit depuis 3, D-06/D-07), aucune sortie du tout"
 else ko "1b non partitionne en --hook → silence total" "rc=$rc sortie=[$both]"; fi
 
 # === Cas 2 — GSD_WORKSTREAM=dev + workstreams/dev/ present → exit 0, canal env =====================
@@ -193,8 +196,11 @@ printf 'sk-live-FUITE-0001.SECRET\n' > "$TMP/victime.env"
 ln -sf "$TMP/victime.env" "$D/.planning/active-workstream"
 out="$(run "" --path "$D" --hook)"; rc=$?
 fuite=$(printf '%s' "$out" | awk '/sk-live-FUITE-0001/ { print "oui" }')
-if [ "$rc" -eq 2 ] && [ -z "$fuite" ]; then
-  ok "6e pointeur = lien symbolique → exit 2 ; le contenu de la cible ne traverse PAS vers la sortie"
+# D-06/D-07 (plan VFDO-30-06) : sous --hook, hook_exit() traduit 2 (NON VERIFIABLE — jamais le code
+# 2 reserve au blocage delibere du harness) vers 0. La garde de securite testee ici (aucune fuite
+# du contenu de la cible) est INDEPENDANTE du code de sortie — inchangee par cette traduction.
+if [ "$rc" -eq 0 ] && [ -z "$fuite" ]; then
+  ok "6e pointeur = lien symbolique → exit 0 (traduit depuis 2, D-06/D-07) ; le contenu de la cible ne traverse PAS vers la sortie"
 else ko "6e fuite par lien symbolique" "rc=$rc out=[$out]"; fi
 rm -f "$D/.planning/active-workstream"
 
@@ -204,8 +210,10 @@ D="$(mk_git_root c6f)"; mkdir -p "$D/.planning/workstreams/dev"
 awk 'BEGIN { s=""; for (i=0;i<5000;i++) s=s"a"; print s }' > "$D/.planning/active-workstream"
 out="$(run "" --path "$D" --hook)"; rc=$?
 maxlen=$(printf '%s' "$out" | awk 'BEGIN{m=0} {if (length($0)>m) m=length($0)} END{print m+0}')
-if [ "$rc" -eq 2 ] && [ "$maxlen" -lt 512 ]; then
-  ok "6f pointeur de 5000 car. → exit 2, et aucune ligne de sortie ne porte la valeur (max ${maxlen} car.)"
+# D-06/D-07 (plan VFDO-30-06) : meme traduction 2 → 0 qu'au cas 6e ; la borne de longueur testee
+# ici est independante du code de sortie.
+if [ "$rc" -eq 0 ] && [ "$maxlen" -lt 512 ]; then
+  ok "6f pointeur de 5000 car. → exit 0 (traduit depuis 2, D-06/D-07), et aucune ligne de sortie ne porte la valeur (max ${maxlen} car.)"
 else ko "6f borne de lecture du pointeur" "rc=$rc ligne la plus longue=$maxlen"; fi
 
 # === Cas 7 — repertoire hors depot git → exit 2, JAMAIS 0 =========================================

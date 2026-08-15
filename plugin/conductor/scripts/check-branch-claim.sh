@@ -66,9 +66,22 @@ done
 # Diagnostic : jamais sur stdout en mode --hook (stdout y est reserve au signal, une ligne).
 diag() { [ "$QUIET" -eq 1 ] && return 0; echo "[check-branch-claim] $*" >&2; }
 
+# --- Traduction du silence interne vers le harness (D-06/D-07, uniquement sous --hook) ----------
+# hook_exit <code> : sous --hook, les codes SILENCIEUX (3 = SAIN, 4 = INDETERMINE — aucun des deux
+# n'est un signal a bloquer ou a relayer) deviennent 0 a la frontiere du harness. Le signal (0) et
+# l'erreur d'usage (64) ne sont JAMAIS traduits. Sans --hook (CLI, suites de tests), le code recu
+# ressort inchange. Voir docs/HOOKS-CONTRAT-SORTIE.md §2 et l'entree #5 de l'inventaire.
+hook_exit() { # <code>
+  local code="$1"
+  if [ "$HOOK" -eq 1 ] && { [ "$code" -eq 3 ] || [ "$code" -eq 4 ]; }; then
+    exit 0
+  fi
+  exit "$code"
+}
+
 indetermine() {
   diag "INDETERMINE, rien n'a ete verifie : $1"
-  exit 4
+  hook_exit 4
 }
 
 cd "$ROOT" 2>/dev/null || indetermine "impossible d'entrer dans $ROOT"
@@ -86,7 +99,7 @@ META="$LOCK_DIR/meta"
 # Pas de lock du tout = personne ne pilote. C'est un etat VERIFIE, donc SAIN — pas indetermine.
 if [ ! -d "$LOCK_DIR" ]; then
   diag "SAIN — aucun lock de driver actif (${LOCK_DIR} absent)."
-  exit 3
+  hook_exit 3
 fi
 [ -r "$META" ] || indetermine "lock present mais son meta est illisible ($META)"
 
@@ -107,7 +120,7 @@ if [ -n "$HB" ]; then
   AGE=$(( $(date +%s) - HB ))
   if [ "$AGE" -gt "$TTL" ]; then
     diag "SAIN — un lock existe mais il est perime (age ${AGE}s > ${TTL}s), traite comme absent."
-    exit 3
+    hook_exit 3
   fi
 else
   AGE=""
@@ -115,7 +128,7 @@ fi
 
 if [ "$CLAIM_BRANCH" != "$CUR_BRANCH" ]; then
   diag "SAIN — le lock actif pilote '${CLAIM_BRANCH}', pas la branche courante '${CUR_BRANCH}'."
-  exit 3
+  hook_exit 3
 fi
 
 # Comparaison de chemins NORMALISEE (`pwd -P`), jamais litterale : sur macOS `/tmp` est un lien
@@ -132,7 +145,7 @@ norm_path() {
 # elles se voient. Rien a signaler.
 if [ "$(norm_path "$CLAIM_WORKTREE")" = "$(norm_path "$CUR_WORKTREE")" ]; then
   diag "SAIN — la branche '${CUR_BRANCH}' est pilotee depuis CET arbre de travail."
-  exit 3
+  hook_exit 3
 fi
 
 DETAIL="owner ${CLAIM_OWNER:-?}"
