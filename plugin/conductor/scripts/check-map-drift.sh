@@ -162,6 +162,14 @@ p1_sens_a() { # <card-file> <card-label>
     [ -n "$raw" ] || continue
     tok="$(normalize_token "$raw")"
     [ -n "$tok" ] || continue
+    # Un token à '/' de tête (ex. @/etc/passwd) est un chemin ABSOLU du système de fichiers, hors
+    # domaine de cette carte (repo-relative par construction). Le concaténer tel quel à $ROOT
+    # produirait un chemin composite qui n'existe jamais, même quand la cible absolue existe
+    # réellement sur le disque — faux positif constaté (T-29-02-02 correctif). On l'ignore, sans
+    # jamais tester d'existence hors de $ROOT (ADR-031 : ce gate ne lit rien hors sa cible).
+    case "$tok" in
+      /*) continue ;;
+    esac
     if [ ! -e "$ROOT/$tok" ]; then
       DIVERGENCES=$((DIVERGENCES + 1))
       DETAILS+=("  - ${label} : entrée déclarée sans contrepartie — ${tok}")
@@ -194,7 +202,7 @@ if [ -n "$MAP_FILE" ]; then
   [ -f "$MAP_FILE" ] && p1_cards+=("$MAP_FILE")
 elif [ "$INSIDE_GIT" -eq 1 ]; then
   while IFS= read -r f; do
-    case "$(basename "$f")" in
+    case "${f##*/}" in
       CLAUDE.md) p1_cards+=("$ROOT/$f") ;;
     esac
   done < <(git_safe ls-files 2>/dev/null)
@@ -236,7 +244,7 @@ p2_sens_a() { # <card-relpath> <card-label>
 }
 
 p2_sens_b() { # <card-relpath> <card-label>
-  local card_rel="$1" label="$2" dossier f fdir base entry found
+  local card_rel="$1" label="$2" dossier f fdir entry found target_rel
   dossier="$(dirname_of "$card_rel")"
   while IFS= read -r f; do
     [ -n "$f" ] || continue
@@ -244,13 +252,18 @@ p2_sens_b() { # <card-relpath> <card-label>
     [ "$f" = "$card_rel" ] && continue
     fdir="$(dirname_of "$f")"
     [ "$fdir" = "$dossier" ] || continue
-    base="$(basename "$f")"
     found=0
+    # Comparaison sur le chemin résolu COMPLET, jamais un match de suffixe de basename : un match
+    # de suffixe fait matcher 'refs/orphan.md' par une entrée 'refs/sub/orphan.md' qui cite un
+    # fichier différent — faux négatif du gate constaté (correctif P2 sens B).
     while IFS= read -r entry; do
       [ -n "$entry" ] || continue
-      case "$entry" in
-        *"$base") found=1; break ;;
-      esac
+      if [ "$dossier" = "." ]; then
+        target_rel="$entry"
+      else
+        target_rel="$dossier/$entry"
+      fi
+      if [ "$target_rel" = "$f" ]; then found=1; break; fi
     done < <(extract_p2_entries_raw "$ROOT/$card_rel")
     if [ "$found" -eq 0 ]; then
       DIVERGENCES=$((DIVERGENCES + 1))
@@ -262,7 +275,7 @@ p2_sens_b() { # <card-relpath> <card-label>
 p2_cards=()
 if [ "$INSIDE_GIT" -eq 1 ]; then
   while IFS= read -r f; do
-    case "$(basename "$f")" in
+    case "${f##*/}" in
       _index.md|INDEX.md) p2_cards+=("$f") ;;
     esac
   done < <(git_safe ls-files 2>/dev/null)

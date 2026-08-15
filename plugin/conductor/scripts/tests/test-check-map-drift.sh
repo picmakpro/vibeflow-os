@@ -186,6 +186,52 @@ out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
 has_nv=0; case "$out" in *"NON VÉRIFIABLE"*) has_nv=1 ;; esac
 if [ "$rc" -eq 3 ] && [ "$has_nv" -eq 1 ]; then ok "P2-absent — dossier sans index n'est pas une carte"; else ko "P2-absent — dossier sans index n'est pas une carte" "rc=$rc out=[$out]"; fi
 
+# === P2-B-suffix (correctif MAJEUR) — comparaison par SUFFIXE de basename interdite : un fichier
+# top-level 'refs/orphan.md' non cité ne doit JAMAIS être confondu avec l'entrée 'sub/orphan.md'
+# citée (même basename). D'abord rouge sur le code d'avant correctif (comparaison `*"$base"`) :
+# rc attendu 3 ('0 divergence' — refs/orphan.md manqué), corrigé rc attendu 0 avec refs/orphan.md
+# nommé. Reproduit indépendamment par revue ET audit — cf. mandat de correction ciblée exec-02.
+D="$(mk_git_root p2bsuffix)"
+commit_file "$D" "refs/_index.md" "# Index" "" "[sub/orphan.md](sub/orphan.md)" ""
+commit_file "$D" "refs/orphan.md" "top-level orphan, jamais cité"
+commit_file "$D" "refs/sub/orphan.md" "cité par l'index"
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+has_toplevel=0; case "$out" in *"refs/orphan.md"*) has_toplevel=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has_toplevel" -eq 1 ]; then ok "P2-B-suffix — refs/orphan.md non cité distingué de refs/sub/orphan.md cité (pas de match par suffixe de basename)"; else ko "P2-B-suffix — refs/orphan.md non cité distingué de refs/sub/orphan.md cité (pas de match par suffixe de basename)" "rc=$rc out=[$out]"; fi
+
+# === P1-A-absolu (correctif MINEUR) — token @/chemin/absolu ignoré, jamais un faux positif =========
+# La cible absolue existe RÉELLEMENT sur le disque (hors du repo, sous $TMP) : avant correctif,
+# normalize_token laissait le '/' de tête et $ROOT/$tok formait un chemin composite qui n'existe
+# jamais → divergence signalée à tort. Après correctif, le token absolu est ignoré → 0 divergence.
+D="$(mk_git_root p1absolu)"
+ABS_DIR="$TMP/hors-repo-p1absolu"
+mkdir -p "$ABS_DIR"
+printf 'x' > "$ABS_DIR/reel.md"
+commit_file "$D" "CLAUDE.md" "# root" "" "@${ABS_DIR}/reel.md" ""
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+has_zero=0; case "$out" in *"0 divergence"*) has_zero=1 ;; esac
+if [ "$rc" -eq 3 ] && [ "$has_zero" -eq 1 ]; then ok "P1-A-absolu — token @/chemin/absolu ignoré, jamais de faux positif sur une cible pourtant réelle"; else ko "P1-A-absolu — token @/chemin/absolu ignoré, jamais de faux positif sur une cible pourtant réelle" "rc=$rc out=[$out]"; fi
+
+# === Robustesse (correctif MEDIUM) — nom de fichier à ESPACE suivi par git → détecté sans crash ====
+D="$(mk_git_root robustesse-espace)"
+commit_file "$D" "refs/_index.md" "# Index" "" "(rien de cite ici)" ""
+commit_file "$D" "refs/un nom avec espace.md" "content"
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+has_espace=0; case "$out" in *"un nom avec espace.md"*) has_espace=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has_espace" -eq 1 ]; then ok "Robustesse — nom de fichier à espace détecté sans crash"; else ko "Robustesse — nom de fichier à espace détecté sans crash" "rc=$rc out=[$out]"; fi
+
+# === Robustesse (correctif MEDIUM) — nom à TIRET INITIAL → détecté sans crash de basename ==========
+# Avant correctif, les 3 sites `basename "$f"` cassaient sur un nom commençant par '-'
+# ('basename: illegal option -- ...' en stderr) sur un dépôt cloné hostile ; le verdict final
+# restait correct mais la robustesse T-29-02-02 (mitigation) n'était pas réellement prouvée.
+D="$(mk_git_root robustesse-tiret)"
+commit_file "$D" "refs/_index.md" "# Index" "" "(rien de cite ici)" ""
+commit_file "$D" "refs/-orphelin-tiret.md" "content"
+out="$(bash "$SCRIPT" --path "$D" 2>&1)"; rc=$?
+has_tiret=0; case "$out" in *"-orphelin-tiret.md"*) has_tiret=1 ;; esac
+has_illegal=0; case "$out" in *"illegal option"*) has_illegal=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has_tiret" -eq 1 ] && [ "$has_illegal" -eq 0 ]; then ok "Robustesse — nom de fichier à tiret initial détecté sans crash de basename"; else ko "Robustesse — nom de fichier à tiret initial détecté sans crash de basename" "rc=$rc out=[$out]"; fi
+
 # === Cumul — une carte P1 et une carte P2, toutes deux propres → compteur de cartes balayées = 2 ===
 D="$(mk_git_root cumul)"
 commit_file "$D" "docs/x.md" "y"
