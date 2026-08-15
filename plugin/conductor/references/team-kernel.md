@@ -157,6 +157,15 @@ là-bas.
   fait pour les missions, pas pour le quotidien.
 - **Escalades** : tout ce que la doctrine du lab réserve à l'humain (ADR-031) court-circuite
   l'autonomie, quel que soit le métier.
+- **Édition-à-la-source (G5)** : **deux occurrences** du même verdict sur le même objet, ce n'est
+  pas un correctif de plus à dispatcher — c'est le signal que la **source** est fautive. Le
+  manager amende la source, puis relance ; il ne redispatche jamais le même patch. « Source »
+  désigne ce qui existe déjà — `CLAUDE.md` du projet, référence de doctrine, gabarit du digest, ou
+  le mandat lui-même — **jamais le worker** : reproduire une erreur, c'est appliquer correctement
+  un contrat fautif. Écriture de doctrine, bornée par **ADR-031** : en mission autonome le manager
+  **consigne** la source à amender dans son rapport typé, il ne l'amende jamais en silence — la
+  capitalisation reste l'affaire des registres de learnings, cette règle dit **quand** la
+  déclencher.
 
 ## Implémentations
 
