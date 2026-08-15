@@ -53,6 +53,39 @@ function parseRoadmapChecklist() {
   return phases;
 }
 
+function parseRoadmapSections() {
+  const raw = readIf(path.join(PLANNING, 'ROADMAP.md'));
+  if (!raw) return {};
+  const out = {};
+  const re = /^#{3,4} Phase (\d+): ([^\n]+)\n([\s\S]*?)(?=^#{2,4} |\n<details>|(?![\s\S]))/gm;
+  let m;
+  while ((m = re.exec(raw)) !== null) {
+    const body = m[3].trim();
+    const goal = (body.match(/\*\*Goal\*\*: ?([\s\S]*?)(?=\n\*\*|$)/) || [])[1]?.replace(/\n/g, ' ').trim() || null;
+    // dernière occurrence gagne : les sections du milestone courant sont en fin de fichier
+    out[Number(m[1])] = { name: m[2].trim(), goal, body };
+  }
+  return out;
+}
+
+function phaseDetail(num) {
+  const sections = parseRoadmapSections();
+  const section = sections[num] || null;
+  let dir = null, plans = [];
+  try {
+    const d = fs.readdirSync(PLANNING + '/phases').find(n => n.startsWith(`VFDO-${num}-`));
+    if (d) {
+      dir = d;
+      const files = fs.readdirSync(path.join(PLANNING, 'phases', d));
+      const ids = [...new Set(files.map(f => (f.match(/^(\d+-\d+)-(PLAN|SUMMARY)\.md$/) || [])[1]).filter(Boolean))].sort();
+      plans = ids.map(id => ({ id, plan: files.includes(`${id}-PLAN.md`), done: files.includes(`${id}-SUMMARY.md`) }));
+    }
+  } catch {}
+  logEvent('http', `détail phase ${num}`, { found: !!section, dir });
+  return { num, name: section?.name || null, goal: section?.goal || null,
+           body: section?.body?.slice(0, 4000) || null, dir, plans };
+}
+
 function parseMilestones() {
   const raw = readIf(path.join(PLANNING, 'MILESTONES.md'));
   if (!raw) return [];
@@ -130,6 +163,9 @@ const server = http.createServer((req, res) => {
   } else if (url.pathname === '/api/state') {
     res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify(snapshot()));
+  } else if (url.pathname === '/api/phase') {
+    res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify(phaseDetail(Number(url.searchParams.get('num')))));
   } else if (url.pathname === '/api/log') {
     res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ count: LOG.length, events: LOG }));

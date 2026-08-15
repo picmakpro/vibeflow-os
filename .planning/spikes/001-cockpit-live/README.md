@@ -62,6 +62,13 @@ cap 2000 événements) exporté sur `GET /api/log`.
    module — recursive n'est pas portable partout).
 5. Rendu visuel navigateur : extension Chrome muette (2 tentatives) → vérification humaine
    requise (checkpoint), verdict laissé PARTIAL en attendant.
+6. **Itération 2 (retour Samuel, checkpoint 1)** : hiérarchie visuelle stricte ① Roadmap →
+   ② Phase courante → ③ Agents en cours, légende explicative en tête, et **cases cliquables** :
+   phase → drawer avec la fiche lue depuis les fichiers système (section `### Phase N:` de
+   ROADMAP.md — la DERNIÈRE occurrence gagne, les phases héritées 18/25 ayant deux sections — +
+   paires PLAN/SUMMARY du dossier `VFDO-N-*` pour l'avancement par plan) ; nœud DAG → drawer
+   mandat/étage/statut/périmètre. Clic câblé post-rendu sur `g.node` (id `flowchart-<id>-<n>`),
+   sans `securityLevel: loose`. Endpoint `/api/phase?num=N` validé sur 30 (8 plans, 5 ●), 18, 25.
 
 ## Results
 **PARTIAL** — toute la chaîne serveur est VALIDÉE sur données réelles (parsing 5 sources, live
