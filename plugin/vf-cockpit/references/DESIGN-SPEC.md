@@ -3,7 +3,10 @@
 Spécification design complète et implémentable du module `vf-cockpit`. Périmètre : la page
 unique servie par le serveur zéro-dépendance (`node:http` + SSE + `fs.watch`), visualisation en
 lecture seule du `.planning/` du lab courant. Aucun framework, aucun build, aucun CDN — CSS écrit
-à la main en custom properties, Mermaid v11 vendorisé en ESM.
+à la main en custom properties, Mermaid v11.16.1 vendorisé en bundle UMD auto-suffisant
+(`references/vendor/mermaid.min.js`, 3,40 Mo) — chargé par `<script src>` classique puis consommé
+via le global `window.mermaid`, JAMAIS par `import` ESM : le build ESM de Mermaid v11 importe des
+chunks relatifs et casserait le hors-ligne (constaté empiriquement au nœud de vendorisation).
 
 Contrat de données de référence (spike 001, validé) : `GET /api/state` → `{generatedAt, state,
 phases[], milestones[], dags[], lock}` ; `GET /api/phase?num=N` → `{num, name, goal, body, dir,
