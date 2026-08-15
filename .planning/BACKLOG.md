@@ -1,7 +1,16 @@
 # Backlog — idées différées (hors milestone courant)
 
-## Investiguer ICM (Interpretable Context Methodology) — « folder structure as agent architecture »
-**Capturé :** 2026-08-15 · **À explorer :** lecture du papier + confrontation à l'architecture VibeFlow
+## Investiguer ICM (Interpretable Context Methodology) — « folder structure as agent architecture » — INVESTIGUÉ
+**Capturé :** 2026-08-15 · **Investigué :** 2026-08-15 (deep-search 4 agents) →
+**rapport : `reports/research/2026-08-15-icm-deep-search.md`**
+
+**Verdict** : rien à adopter tel quel (pas de benchmark, traction dans l'orbite commerciale de
+l'auteur, mono-agent linéaire — le team-kernel est structurellement au-dessus), mais **5
+mécanismes à distiller**, priorisés dans le rapport : G1 tables « Load / Do NOT Load » (anti-
+chargement déclaré), G2 CONTEXT.md par compartiment + `_index.md` de scaling, G3 sync anti-drift
+carte↔disque (frappe la plaie documentée n°1 du repo), G4 lab-starters clonables à placeholders
+pour `vf-new-lab` (recoupe les items `agency-agents` et « Template d'agent installable »), G5
+Edit-Source Principle dans la doctrine des managers. Suites à arbitrer — voir §7 du rapport.
 
 ICM remplace l'orchestration au niveau framework par la **structure du filesystem** : des dossiers
 numérotés représentent les étapes d'un workflow, des fichiers markdown portent les prompts et le
@@ -24,11 +33,9 @@ notre approche ? Le contrat par étape (CONTEXT.md à 5 couches) a-t-il quelque 
 nos plans de bataille / mandats ? Le modèle mono-agent + dossiers numérotés est-il un concurrent,
 un complément (labs non-dev simples ?), ou une source de patterns à distiller ?
 
-**Pourquoi différé :** pure investigation, aucun besoin bloquant ; commence par une lecture du
-papier, pas par du code.
-
-**Déclencheur de resurgence :** prochaine réflexion d'architecture sur le team-kernel, le format
-des digests de mission, ou la structure `.planning/`.
+**Reste ouvert :** l'arbitrage des 5 gains (G1-G5) — aucun n'est engagé ; le rapport les classe
+par levier/coût. Déclencheur naturel : prochaine évolution de `vf-new-lab`, de `scaffold-docs.sh`,
+du team-kernel ou de la chaîne validator.
 
 ## Notifications de progression des agents managers
 **Capturé :** 2026-08-11 · **À explorer :** au prochain arbitrage d'extension du team-kernel
