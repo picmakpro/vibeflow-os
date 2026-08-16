@@ -5,14 +5,14 @@ milestone_name: « ce qui survit »
 current_phase: 30
 current_phase_name: Portabilité Windows II
 status: planning
-stopped_at: "Phase 30 livrée et vérifiée — CI verte (run 31918283177, 4/4 jobs), addendum 2026-08-16 sur 30-VERIFICATION.md, hygiène documentaire de clôture posée"
-last_updated: "2026-08-16T00:00:00.000Z"
+stopped_at: Phase 30 livrée et vérifiée — CI verte (run 31918283177, 4/4 jobs), addendum 2026-08-16 sur 30-VERIFICATION.md, hygiène documentaire de clôture posée
+last_updated: "2026-08-16T03:09:16.239Z"
 last_activity: 2026-08-16
-last_activity_desc: "Phase 30 (Portabilité Windows II) livrée et vérifiée — PORT-05 prouvé en CI après cycle rouge→correctif→vert ; hygiène documentaire de clôture (30-08-SUMMARY.md, 30-RELIQUATS.md soldé, addendum 30-VERIFICATION.md, STATE/ROADMAP)"
+last_activity_desc: Phase 30 (Portabilité Windows II) livrée et vérifiée — PORT-05 prouvé en CI après cycle rouge→correctif→vert ; hygiène documentaire de clôture (30-08-SUMMARY.md, 30-RELIQUATS.md soldé, addendum 30-VERIFICATION.md, STATE/ROADMAP)
 progress:
   total_phases: 8
   completed_phases: 1
-  total_plans: 9
+  total_plans: 17
   completed_plans: 9
   percent: 13
 ---
