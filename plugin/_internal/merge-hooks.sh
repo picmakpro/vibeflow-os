@@ -440,8 +440,15 @@ elif mode == "plan":
     plan_targets = [(settings_path, project_view)]
     if settings_local_path:
         plan_targets.append((settings_local_path, local_view))
+    # Verbe selon l'existence RÉELLE de la cible (D-31-05, finding F-04) : `+` = créer, `~` =
+    # modifier. Sur un lab vierge, settings.json/settings.local.json n'existent pas encore — la
+    # pose les CRÉE, jamais ne les modifie. load_settings_dict() a déjà cette information sans
+    # travail supplémentaire (os.path.exists ci-dessous, même prédicat que load_settings_dict
+    # ligne ~183). Aucune écriture n'est déclenchée par cette lecture — le mode plan continue de
+    # ne RIEN écrire (sys.exit(0) juste après, jamais write_json en aval).
     for target_path, target_view in plan_targets:
-        sys.stdout.write(f"[plan] ~ {target_path}  {format_plan_segments(target_view)}\n")
+        verb = "~" if os.path.exists(target_path) else "+"
+        sys.stdout.write(f"[plan] {verb} {target_path}  {format_plan_segments(target_view)}\n")
 
     plan_suffix = f" (+ {settings_local_path})" if settings_local_path else ""
     sys.stderr.write(f"[merge-hooks] plan OK → {settings_path}{plan_suffix}\n")

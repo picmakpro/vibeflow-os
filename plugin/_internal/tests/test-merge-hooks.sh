@@ -93,6 +93,11 @@
 #       résolus mentirait sur ce qu'il annonce.
 # Tp5 — un mode inconnu (`preview`) reste refusé, exit 1 — l'allowlist n'a pas été ouverte
 #       au-delà de merge|remove|plan.
+# Tp6 — verbe selon l'existence réelle de la cible (D-31-05, finding F-04) : lab VIERGE (le
+#       fichier settings n'existe pas encore) → verbe `+` (créer), jamais `~` — sur les DEUX
+#       cibles (--settings et --settings-local).
+# Tp7 — même sonde, lab avec settings.json PRÉEXISTANT (contenu quelconque non-hooks, jamais lu
+#       par plan au-delà de son existence) → verbe `~` (modifier).
 #
 # ISOLATION : tout sous mktemp. Le vrai ~/.claude n'est jamais touché.
 
@@ -964,6 +969,40 @@ if [ "$TP5_EXIT" -ne 0 ]; then
   ok "Tp5 mode inconnu (preview) refusé, exit $TP5_EXIT"
 else
   ko "Tp5 mode inconnu (preview) accepté à tort"
+fi
+
+# ---------- Tp6 : lab vierge → verbe `+` (créer), pas `~` ----------
+TP6_DIR="$WORK/tp6"; mkdir -p "$TP6_DIR"
+S_TP6="$TP6_DIR/settings.json"
+L_TP6="$TP6_DIR/settings.local.json"
+[ ! -e "$S_TP6" ] && [ ! -e "$L_TP6" ] || { ko "Tp6 setup : cible déjà présente avant le plan"; }
+TP6_OUT="$(bash "$MERGER" plan "$FRAG_TP" --settings "$S_TP6" --scripts-prefix "$PREFIX" --settings-local "$L_TP6" 2>/dev/null)"
+TP6_PLUS="$(printf '%s\n' "$TP6_OUT" | awk -v s="$S_TP6" -v l="$L_TP6" '
+  index($0, "[plan] + " s)==1 {p++} index($0, "[plan] + " l)==1 {q++} END{print p+0, q+0}')"
+TP6_TILDE="$(printf '%s\n' "$TP6_OUT" | awk '/^\[plan\] ~ /{c++} END{print c+0}')"
+if [ "$TP6_PLUS" = "1 1" ] && [ "$TP6_TILDE" = "0" ] && [ ! -e "$S_TP6" ] && [ ! -e "$L_TP6" ]; then
+  ok "Tp6 lab vierge (settings absents) : verbe + sur les deux cibles, aucun ~, rien écrit"
+else
+  ko "Tp6 lab vierge → verbe attendu + (plus=$TP6_PLUS tilde=$TP6_TILDE) — sortie : $TP6_OUT"
+fi
+
+# ---------- Tp7 : settings.json préexistant → verbe `~` (modifier) ----------
+TP7_DIR="$WORK/tp7"; mkdir -p "$TP7_DIR"
+S_TP7="$TP7_DIR/settings.json"
+L_TP7="$TP7_DIR/settings.local.json"
+echo '{ "permissions": { "allow": [] } }' > "$S_TP7"
+# --settings-local reste ABSENTE du disque : sonde discriminante indépendante par cible, une
+# préexistante (+ ci-dessus a déjà prouvé le cas absent) et une absente ici pour la même cible
+# --settings, prouvant que le verbe suit CETTE cible précise et non un état global du run.
+TP7_OUT="$(bash "$MERGER" plan "$FRAG_TP" --settings "$S_TP7" --scripts-prefix "$PREFIX" --settings-local "$L_TP7" 2>/dev/null)"
+TP7_TILDE_S="$(printf '%s\n' "$TP7_OUT" | awk -v s="$S_TP7" 'index($0, "[plan] ~ " s)==1{c++} END{print c+0}')"
+TP7_PLUS_L="$(printf '%s\n' "$TP7_OUT" | awk -v l="$L_TP7" 'index($0, "[plan] + " l)==1{c++} END{print c+0}')"
+S_TP7_UNCHANGED="$(cat "$S_TP7")"
+if [ "$TP7_TILDE_S" = "1" ] && [ "$TP7_PLUS_L" = "1" ] && [ ! -e "$L_TP7" ] \
+   && [ "$S_TP7_UNCHANGED" = '{ "permissions": { "allow": [] } }' ]; then
+  ok "Tp7 settings.json préexistant → verbe ~ pour cette cible, + pour settings-local absente (même run), fichier préexistant inchangé (plan n'écrit rien)"
+else
+  ko "Tp7 verbe selon existence réelle (tilde_s=$TP7_TILDE_S plus_l=$TP7_PLUS_L) — sortie : $TP7_OUT"
 fi
 
 echo ""
