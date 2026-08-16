@@ -5,9 +5,12 @@
 #   - software-architecture (SKILL.md + rules/ + references/ + scripts/ + scripts/tests/ +
 #     hooks/hooks.json). Aucun sous-processus de régime C (pas d'AGENT.md, pas d'agents/, pas de
 #     scripts/seed-registres.sh ni scripts/ensure-design-deps.sh) — même fixture que 31-04 (MANI-02).
-#     T1-T6, T6b (fixture .txt injecté dans le CACHE de test), T9, T11-T13, T15.
-#   - skill-creator (skills imbriqués posés par cp -r, AGENT.md). T7, T7b, T9b, T9c, T10.
-#   - reference (module doc pur, content/ seul). T8.
+#     T1-T6, T6b (fixture .txt injecté dans le CACHE de test), T9, T11-T13, T15, TD1, TD3, TD8.
+#   - skill-creator (skills imbriqués posés par cp -r, AGENT.md). T7, T7b, T9b, T9c, T10, TD7.
+#   - reference (module doc pur, content/ seul). T8, TD6.
+#   - dev-orchestrator (AGENT.md + build-gsd-index.sh + build-gsd-capabilities-index.sh, régime A
+#     RÉEL, mesuré sur pièce). TD2.
+#   - consolidator (scripts/seed-registres.sh, régime C RÉEL). TD4, TD5.
 #
 # T1 — après install software-architecture (scope project, lab neuf), le manifeste
 #      .claude/scripts/.vibeflow-manifest-software-architecture existe et contient la ligne
@@ -67,6 +70,35 @@
 #      fantôme laissé pour la découverte par glob de 31-05/31-07).
 # T16 (M5, revue 31-03) — settings.json/settings.local.json dans le point UNIQUE
 #      vf_manifest_excluded (D-31-03), grain unité.
+#
+# TD1-TD8 (31-04, MANI-02, D-31-04) — preuves du flag --dry-run. NOMMAGE : le 31-04-PLAN.md
+#      désignait ces cas T10/T10b/T11/T12/T13/T13b/T13c/T14, MAIS ces noms sont déjà pris par les
+#      cas B1-B4/M2/M6 de 31-03 ci-dessus (injection de panne réelle, gel des dotfiles côté pose)
+#      — les réutiliser aurait ÉCRASÉ des cas discriminants existants sous les mêmes libellés.
+#      Renommés TD<n> (Test Dry-run) en conservant l'ordre et l'intention du plan :
+# TD1 (= T10 du plan) — ÉGALITÉ TOTALE, fixture software-architecture (aucun régime C) : dry-run
+#      install == pose réelle, ensemble de chemins identique, AUCUNE exception négociée (D-31-04).
+#      Trois mktemp -d disjoints (LAB_PLAN, LAB_REEL, CACHE — jamais le cache sous un lab).
+# TD2 (= T10b) — RÉGIME A, discriminance : dev-orchestrator (AGENT.md + les 2 générateurs
+#      d'index, mesuré sur pièce) annonce ses 3 lignes malgré l'absence de toute destination sur
+#      disque (lab vierge) — preuve du piège de garde côté SOURCE. Assertion de présence, pas
+#      d'égalité (dev-orchestrator déclenche aussi inject-mcp-tools.sh, régime C).
+# TD3 (= T11) — ARBRE INCHANGÉ : empreinte find du lab ENTIER (scope local, couvre aussi
+#      ./.gitignore) identique avant/après --dry-run (D-31-06).
+# TD4 (= T12) — RÉGIME C, discriminance : consolidator (scripts/seed-registres.sh réel) annonce
+#      une ligne mentionnant seed-registres.sh et le marqueur de non-énumération. Présence, pas
+#      égalité (prétention distincte de TD1, D-31-04).
+# TD5 (= T13) — asymétrie plan/manifeste sur régime C : après un install RÉEL de consolidator, le
+#      manifeste ne contient AUCUNE ligne memory/ (D-31-03) — le plan l'annonce (TD4), le
+#      manifeste ne le possède jamais.
+# TD6 (= T13b) — asymétrie docs/, moitié « présent au plan » (ferme la moitié manquante de
+#      31-03/T8) : module reference (content/ seul), --dry-run annonce AU MOINS une ligne
+#      docs/reference/.
+# TD7 (= T13c) — gel des dotfiles, moitié « absent du plan » (symétrique de 31-03/T7b) : fixture
+#      skill-creator + .hidden-marker injecté à la racine d'un skill_dir — AUCUNE ligne
+#      .hidden-marker au plan.
+# TD8 (= T14) — refus bruyant : --dry-run uninstall <mod> sort 1, rien supprimé (D-31-06).
+#
 # T0 — anti-vert-à-vide (contrat F13) : la suite compte ses propres assertions exécutées et
 #      échoue si le total (pass+fail) est 0.
 #
@@ -653,6 +685,202 @@ case "$T16_RESULT" in
   PASS) ok "T16 : M5 — settings.json/settings.local.json dans le point UNIQUE vf_manifest_excluded" ;;
   *) ko "T16 : M5 — $T16_RESULT" ;;
 esac
+
+# ===========================================================================
+# TD1-TD8 (31-04, MANI-02, D-31-04) — preuves du flag --dry-run. Nommage TD<n>, voir en-tête.
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# TD1 (= T10 du plan) — ÉGALITÉ TOTALE : sur software-architecture (fixture SANS aucun
+# sous-processus de régime C), l'ensemble des chemins annoncés par --dry-run install est
+# EXACTEMENT l'ensemble des chemins créés/modifiés par le MÊME install réel dans un lab jumeau.
+# Aucune liste d'exceptions négociée (D-31-04) — comparaison par `comm`, jamais `diff` ni un
+# filtre d'exclusion négatif (outillage proxifié mesuré menteur sur ce poste). Trois mktemp -d
+# DISJOINTS : le cache n'est JAMAIS sous un lab, sinon `find` le ramasse et l'égalité devient
+# impossible.
+# ---------------------------------------------------------------------------
+LAB_TD1_PLAN="$(mktemp -d)"
+LAB_TD1_REEL="$(mktemp -d)"
+CACHE_TD1="$(mktemp -d)"
+if prepare_module "$CACHE_TD1" "software-architecture"; then
+  TD1_PLAN_OUT="$(mktemp)"
+  (cd "$LAB_TD1_PLAN" && VIBEFLOW_CACHE="$CACHE_TD1" bash "$INSTALLER" --dry-run install software-architecture) >"$TD1_PLAN_OUT" 2>/dev/null
+  (cd "$LAB_TD1_REEL" && VIBEFLOW_CACHE="$CACHE_TD1" bash "$INSTALLER" install software-architecture) >/dev/null 2>&1
+
+  # Déterminisme rendu EXPLICITE plutôt qu'espéré : sur une install FRAÎCHE dans un lab vierge,
+  # ni le backup de settings ni backup_module ne se déclenchent (aucune des deux conditions n'est
+  # vraie) — donc AUCUN chemin horodaté ne doit exister. Si cette assertion tombe un jour, le test
+  # rougit en nommant la vraie cause au lieu de flaker sur une comparaison de chaînes.
+  if [ -d "$LAB_TD1_REEL/.claude/.backups" ]; then
+    ko "TD1 : .claude/.backups existe après une install FRAÎCHE — préconditions de déterminisme fausses, égalité non fiable"
+  else
+    TD1_PLAN_SORTED="$(mktemp)"
+    TD1_REEL_SORTED="$(mktemp)"
+    awk '/^\[plan\] /{print $3}' "$TD1_PLAN_OUT" | LC_ALL=C sort > "$TD1_PLAN_SORTED"
+    (cd "$LAB_TD1_REEL" && find . -type f) | LC_ALL=C sort > "$TD1_REEL_SORTED"
+    TD1_MISSING="$(comm -23 "$TD1_REEL_SORTED" "$TD1_PLAN_SORTED")"
+    TD1_EXTRA="$(comm -13 "$TD1_REEL_SORTED" "$TD1_PLAN_SORTED")"
+    if [ -z "$TD1_MISSING" ] && [ -z "$TD1_EXTRA" ]; then
+      ok "TD1 : MANI-02 — dry-run == pose réelle, égalité d'ensembles TOTALE (software-architecture, aucune exception)"
+    else
+      ko "TD1 : dry-run != pose réelle — manquants-au-plan=[$(printf '%s' "$TD1_MISSING" | tr '\n' ',')] en-trop-au-plan=[$(printf '%s' "$TD1_EXTRA" | tr '\n' ',')]"
+    fi
+    rm -f "$TD1_PLAN_SORTED" "$TD1_REEL_SORTED"
+  fi
+  rm -f "$TD1_PLAN_OUT"
+else
+  skip "TD1 : software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB_TD1_PLAN" "$LAB_TD1_REEL" "$CACHE_TD1"
+
+# ---------------------------------------------------------------------------
+# TD2 (= T10b du plan) — RÉGIME A, discriminance : dev-orchestrator (AGENT.md +
+# scripts/build-gsd-index.sh + scripts/build-gsd-capabilities-index.sh, mesuré sur pièce) —
+# --dry-run install annonce les 3 lignes régime A malgré l'ABSENCE de toute destination sur
+# disque (lab vierge) — preuve du piège de garde côté SOURCE (D-31-04). Pas d'égalité totale
+# exigée ici (dev-orchestrator déclenche aussi inject-mcp-tools.sh, régime C) : assertion de
+# PRÉSENCE, la prétention distincte que TD4 porte déjà pour un autre régime.
+# ---------------------------------------------------------------------------
+LAB_TD2="$(mktemp -d)"
+CACHE_TD2="$(mktemp -d)"
+if prepare_module "$CACHE_TD2" "dev-orchestrator"; then
+  TD2_OUT="$(cd "$LAB_TD2" && VIBEFLOW_CACHE="$CACHE_TD2" bash "$INSTALLER" --dry-run install dev-orchestrator 2>/dev/null)"
+  if printf '%s\n' "$TD2_OUT" | "$GREP" -qE '^\[plan\] \+ .*/commands/dev-orchestrator\.md' \
+     && printf '%s\n' "$TD2_OUT" | "$GREP" -qE '^\[plan\] \+ .*/gsd-skills-index\.md' \
+     && printf '%s\n' "$TD2_OUT" | "$GREP" -qE '^\[plan\] \+ .*/gsd-capabilities-index\.md'; then
+    ok "TD2 : régime A — 3 lignes annoncées (commande d'incarnation + 2 index) malgré destination absente (lab vierge, dev-orchestrator)"
+  else
+    ko "TD2 : au moins une ligne régime A absente du plan (dev-orchestrator, lab vierge) — sortie : $(printf '%s' "$TD2_OUT" | tr '\n' '|')"
+  fi
+else
+  skip "TD2 : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB_TD2" "$CACHE_TD2"
+
+# ---------------------------------------------------------------------------
+# TD3 (= T11 du plan) — ARBRE INCHANGÉ : empreinte `find` du lab ENTIER (pas seulement .claude —
+# couvre aussi ./.gitignore et docs/, D-31-11.3) identique avant/après --dry-run. Scope LOCAL :
+# seul scope où gitignore_add_paths écrit réellement — c'est la version machine de « un dry-run
+# n'écrit rien du tout » (D-31-06).
+# ---------------------------------------------------------------------------
+LAB_TD3="$(mktemp -d)"
+CACHE_TD3="$(mktemp -d)"
+if prepare_module "$CACHE_TD3" "software-architecture"; then
+  TD3_BEFORE="$(cd "$LAB_TD3" && find . | LC_ALL=C sort)"
+  (cd "$LAB_TD3" && VIBEFLOW_CACHE="$CACHE_TD3" bash "$INSTALLER" --scope local --dry-run install software-architecture >/dev/null 2>&1)
+  TD3_AFTER="$(cd "$LAB_TD3" && find . | LC_ALL=C sort)"
+  if [ "$TD3_BEFORE" = "$TD3_AFTER" ]; then
+    ok "TD3 : D-31-06 — empreinte find du lab entier (scope local) identique avant/après --dry-run"
+  else
+    ko "TD3 : le lab a changé pendant un --dry-run — before=[$(printf '%s' "$TD3_BEFORE" | tr '\n' ',')] after=[$(printf '%s' "$TD3_AFTER" | tr '\n' ',')]"
+  fi
+else
+  skip "TD3 : software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB_TD3" "$CACHE_TD3"
+
+# ---------------------------------------------------------------------------
+# TD4 (= T12 du plan) — RÉGIME C, fixture qui le déclenche RÉELLEMENT : consolidator
+# (scripts/seed-registres.sh) — --dry-run install annonce une ligne mentionnant seed-registres.sh
+# et le marqueur de non-énumération. Assertion de PRÉSENCE, pas d'égalité (D-31-04).
+# ---------------------------------------------------------------------------
+LAB_TD4="$(mktemp -d)"
+CACHE_TD4="$(mktemp -d)"
+if prepare_module "$CACHE_TD4" "consolidator"; then
+  TD4_OUT="$(cd "$LAB_TD4" && VIBEFLOW_CACHE="$CACHE_TD4" bash "$INSTALLER" --dry-run install consolidator 2>/dev/null)"
+  if printf '%s\n' "$TD4_OUT" | "$GREP" -qE '^\[plan\] ~ .*memory.*effet de seed-registres\.sh.*contenu non énuméré'; then
+    ok "TD4 : régime C — ligne d'annonce seed-registres.sh présente (consolidator, effet non énuméré)"
+  else
+    ko "TD4 : ligne d'annonce régime C absente (consolidator) — sortie : $(printf '%s' "$TD4_OUT" | tr '\n' '|')"
+  fi
+else
+  skip "TD4 : consolidator non copiable dans le cache de test"
+fi
+rm -rf "$LAB_TD4" "$CACHE_TD4"
+
+# ---------------------------------------------------------------------------
+# TD5 (= T13 du plan) — asymétrie plan/manifeste sur régime C : après un install RÉEL de
+# consolidator, le manifeste ne contient AUCUNE ligne memory/ (D-31-03) — le plan l'annonce
+# (TD4), le manifeste ne le possède jamais (contenu vivant du lab, exclu par construction).
+# ---------------------------------------------------------------------------
+LAB_TD5="$(mktemp -d)"
+CACHE_TD5="$(mktemp -d)"
+if prepare_module "$CACHE_TD5" "consolidator"; then
+  (cd "$LAB_TD5" && VIBEFLOW_CACHE="$CACHE_TD5" bash "$INSTALLER" install consolidator >/dev/null 2>&1)
+  MANIFEST_TD5="$LAB_TD5/.claude/scripts/.vibeflow-manifest-consolidator"
+  if [ -f "$MANIFEST_TD5" ] && ! "$GREP" -qE '^memory/' "$MANIFEST_TD5"; then
+    ok "TD5 : D-31-03 — aucune ligne memory/ au manifeste après install réel de consolidator (asymétrie plan/manifeste tenue)"
+  else
+    ko "TD5 : manifeste absent ou contient une ligne memory/ ($MANIFEST_TD5)"
+  fi
+else
+  skip "TD5 : consolidator non copiable dans le cache de test"
+fi
+rm -rf "$LAB_TD5" "$CACHE_TD5"
+
+# ---------------------------------------------------------------------------
+# TD6 (= T13b du plan) — asymétrie docs/, MOITIÉ « présent au plan » (31-03/T8 ne prouvait que
+# la moitié « absent du manifeste ») : module reference (content/ seul, docs/reference/ réel) —
+# le --dry-run install annonce AU MOINS une ligne ^\[plan\] \+ .*docs/reference/.
+# ---------------------------------------------------------------------------
+LAB_TD6="$(mktemp -d)"
+CACHE_TD6="$(mktemp -d)"
+if prepare_module "$CACHE_TD6" "reference"; then
+  TD6_OUT="$(cd "$LAB_TD6" && VIBEFLOW_CACHE="$CACHE_TD6" bash "$INSTALLER" --dry-run install reference 2>/dev/null)"
+  if printf '%s\n' "$TD6_OUT" | "$GREP" -qE '^\[plan\] \+ .*docs/reference/'; then
+    ok "TD6 : D-31-03 — docs/reference/ annoncé au plan (moitié « présent au plan » de l'asymétrie, ferme 31-03/T8)"
+  else
+    ko "TD6 : aucune ligne docs/reference/ au plan (reference) — sortie : $(printf '%s' "$TD6_OUT" | tr '\n' '|')"
+  fi
+else
+  skip "TD6 : reference non copiable dans le cache de test"
+fi
+rm -rf "$LAB_TD6" "$CACHE_TD6"
+
+# ---------------------------------------------------------------------------
+# TD7 (= T13c du plan) — gel des dotfiles, MOITIÉ « absent du plan » (symétrique de 31-03/T7b,
+# qui ne prouve que la moitié « absent du disque/manifeste » à la pose réelle) : fixture
+# skill-creator + .hidden-marker injecté à la racine d'un skill_dir (MÊME injection que T7b) —
+# le --dry-run install n'annonce AUCUNE ligne ^\[plan\] \+ .*\.hidden-marker.
+# ---------------------------------------------------------------------------
+LAB_TD7="$(mktemp -d)"
+CACHE_TD7="$(mktemp -d)"
+if prepare_module "$CACHE_TD7" "skill-creator"; then
+  printf 'marker\n' > "$CACHE_TD7/skill-creator/skills/skill-creator/.hidden-marker"
+  TD7_OUT="$(cd "$LAB_TD7" && VIBEFLOW_CACHE="$CACHE_TD7" bash "$INSTALLER" --dry-run install skill-creator 2>/dev/null)"
+  if ! printf '%s\n' "$TD7_OUT" | "$GREP" -qE '^\[plan\] \+ .*\.hidden-marker'; then
+    ok "TD7 : D-31-11.2 — dotfile de premier niveau JAMAIS annoncé au plan (gel tenu côté plan, symétrique de T7b)"
+  else
+    ko "TD7 : le dotfile de premier niveau est annoncé au plan à tort — sortie : $(printf '%s' "$TD7_OUT" | tr '\n' '|')"
+  fi
+else
+  skip "TD7 : skill-creator non copiable dans le cache de test"
+fi
+rm -rf "$LAB_TD7" "$CACHE_TD7"
+
+# ---------------------------------------------------------------------------
+# TD8 (= T14 du plan) — refus bruyant : --dry-run uninstall <mod> sort 1 et n'a RIEN supprimé
+# (D-31-06 — surface du flag bornée à install/update).
+# ---------------------------------------------------------------------------
+LAB_TD8="$(mktemp -d)"
+CACHE_TD8="$(mktemp -d)"
+if prepare_module "$CACHE_TD8" "software-architecture"; then
+  (cd "$LAB_TD8" && VIBEFLOW_CACHE="$CACHE_TD8" bash "$INSTALLER" install software-architecture >/dev/null 2>&1)
+  TD8_BEFORE="$(cd "$LAB_TD8" && find .claude -type f | LC_ALL=C sort)"
+  TD8_ERR="$(mktemp)"
+  (cd "$LAB_TD8" && VIBEFLOW_CACHE="$CACHE_TD8" bash "$INSTALLER" --dry-run uninstall software-architecture) >/dev/null 2>"$TD8_ERR"
+  TD8_RC=$?
+  TD8_AFTER="$(cd "$LAB_TD8" && find .claude -type f | LC_ALL=C sort)"
+  if [ "$TD8_RC" -eq 1 ] && [ "$TD8_BEFORE" = "$TD8_AFTER" ] && "$GREP" -qE 'install' "$TD8_ERR" && "$GREP" -qE 'update' "$TD8_ERR"; then
+    ok "TD8 : D-31-06 — --dry-run uninstall refusé (rc=1), rien supprimé, message nomme install et update"
+  else
+    ko "TD8 : refus non conforme (rc=$TD8_RC) — voir $TD8_ERR"
+  fi
+  rm -f "$TD8_ERR"
+else
+  skip "TD8 : software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB_TD8" "$CACHE_TD8"
 
 # ---------------------------------------------------------------------------
 # T0 — anti-vert-à-vide (contrat F13) : la suite doit compter au moins une assertion.
