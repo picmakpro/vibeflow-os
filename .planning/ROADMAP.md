@@ -620,7 +620,23 @@ parallèles ; le `--dry-run` s'écrit une seule fois, contre le moteur de hooks 
 
 **Transverse (QUAL-01)** : la suite `test-manifest.sh` et le contrôle dry-run naissent avec leurs
 trois issues (manifeste illisible = BRUYANT) et leur mutation rouge prouvée.
-**Plans**: TBD
+
+> **Note sur le critère 4** : le texte ci-dessus (« close par livraison, réponse postée ») est
+> **superseded par `31-CONTEXT.md` §4 point 8** — la réponse est un **BROUILLON sur disque**
+> (`31-ISSUE-20-REPLY.md`), jamais postée, et l'issue n'est jamais close par la phase. Poster et
+> clore sont des gestes humains (ADR-031).
+
+**Plans**: 8 plans
+
+Plans:
+- [ ] 31-01-PLAN.md — TRACER : socle manifeste (7 fonctions) + UN site câblé bout en bout + suite `test-manifest.sh` + compteurs README — vague 1 (MANI-01, QUAL-01)
+- [ ] 31-02-PLAN.md — `merge-hooks.sh` apprend le mode `plan` (régime B, D-31-04) + 5 cas de suite — vague 1 (MANI-02, QUAL-01)
+- [ ] 31-03-PLAN.md — checkpoint de ratification + migration mécanique des ~35 sites d'écriture + preuve d'exhaustivité manifeste ↔ disque — vague 2 (MANI-01, QUAL-01)
+- [ ] 31-04-PLAN.md — `--dry-run` : pré-parse, refus bruyant sur les 4 verbes destructifs, régimes A/B/C + les DEUX preuves de MANI-02 — vague 3 (MANI-02, QUAL-01)
+- [ ] 31-05-PLAN.md — convergence MANI-03 (six conditions, backup avant suppression) + manifeste imparsable BRUYANT + 2 mutations rouges — vague 4 (MANI-03, QUAL-01)
+- [ ] 31-06-PLAN.md — câblage `/vibeflow-install` étape 5 et `/vf-calibrate` étape 4 + bumps — vague 5, **ABANDONNABLE** (MANI-02)
+- [ ] 31-07-PLAN.md — `uninstall_module` lit le manifeste (D-31-09) — vague 5, **ABANDONNABLE, sacrifice désigné en premier** (MANI-01)
+- [ ] 31-08-PLAN.md — brouillon de réponse à l'issue #20 (disque seulement) + bilan suite complète sur l'arbre commité — vague 6 (MANI-04, QUAL-01)
 
 ### Phase 32: Durcissement du driver-lock
 
