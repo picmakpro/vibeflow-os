@@ -1,9 +1,12 @@
 # Phase 32: Durcissement du driver-lock - Context
 
 **Gathered:** 2026-08-16
-**Status:** Ready for planning, sauf une decision ouverte (D-32-QUAL, ne bloque qu'un sous-detail
-du Lot 2) et un reliquat de mesure non leve (F2, a lever avant de finaliser la comparaison de
-session dans le guard).
+**Amende:** 2026-08-16 (D-32-QUAL tranchee par Samuel — option B ; F2 leve par mesure ; D-32-03
+etendu par arbitrage delegue sur la liaison session-owner ; D-32-05/D-32-07 confirmes, plus de
+lecture en attente)
+**Status:** Ready for planning. Plus de decision ouverte ni de reliquat de mesure bloquant — voir
+D-32-QUAL (close, option B, extension de perimetre assumee) et D-32-03 (F2 leve, arbitrage
+session/owner tranche).
 
 <domain>
 ## Phase Boundary
@@ -40,7 +43,11 @@ d'agent uniquement**, jamais verifies ni poses par une machine.
 
 **Transverse QUAL-01** : tout gate ne de cette phase nait avec ses **quatre** issues (pas trois —
 voir §11 du terrain) — PASS / DENY / imparsable-fail-open-silencieux / indisponible-fail-open-
-bruyant — et sa mutation rouge prouvee par sa trace.
+bruyant — et sa mutation rouge prouvee par sa trace. **Tranche 2026-08-16 (D-32-QUAL, option B)** :
+le « bruyant » de l'issue 4 est realise par fail-open silencieux + marqueur de sante ECRIT, **plus**
+un livrable neuf de cette meme phase — un hook doctor `SessionStart` generique (tout le parc, pas
+seulement le driver-lock) qui agrege ces marqueurs. Voir D-32-QUAL pour le detail, son motif et son
+statut d'extension de perimetre assumee, abandonnable en dernier recours.
 
 **Hors scope, explicitement** :
 - Rouvrir le protocole d'acquisition symlink-generation (mesure, cf. `driver-lock.sh` L8-20).
@@ -133,19 +140,20 @@ L113).
 doit **rougir** desormais (aujourd'hui il reussit — c'est le comportement expres a inverser) ;
 seul `takeover` doit reussir dans ce cas.
 
-### D-32-03 — Champ additif `session_id`, + `generation` expose en JSON : prealables partages de LOCK-02/03/05
+### D-32-03 — Champ additif `session_id` (liste), + `generation` expose en JSON : prealables partages de LOCK-02/03/05
 
-**Decision** : reprend integralement le mecanisme recommande et mesure par `32-TERRAIN.md` §9 —
-`new_generation()`/`rewrite_meta()` ecrivent/preservent un champ **additif**
-`session_id=<$CLAUDE_CODE_SESSION_ID a l'acquire, vide si absent>`, meme patron que
-`branch`/`worktree` (ADR-064, L98-104, L118-119). `acquire`/`status`/`takeover` exposent aussi la
-**generation** courante (`lock_gen()`, L96 — deja calculee, jamais rendue en JSON) : c'est le
-candidat le plus proche d'un jeton de fence au sens strict (numero monotone qui invalide l'ancien
-tenant), et LOCK-05 en a besoin.
+**Decision** : reprend le mecanisme recommande par `32-TERRAIN.md` §9, **amende par F2 leve** (voir
+ci-dessous) — `new_generation()`/`rewrite_meta()` ecrivent/preservent un champ **additif**
+`session_ids=[...]` (liste, pas un scalaire — motif au point (a) ci-dessous), amorce a l'acquire
+avec `$CLAUDE_CODE_SESSION_ID` (vide si absent), meme patron d'additivite que `branch`/`worktree`
+(ADR-064, L98-104, L118-119). `acquire`/`status`/`takeover` exposent aussi la **generation**
+courante (`lock_gen()`, L96 — deja calculee, jamais rendue en JSON) : c'est le candidat le plus
+proche d'un jeton de fence au sens strict (numero monotone qui invalide l'ancien tenant), et
+LOCK-05 en a besoin.
 
 **MESURE, pas suppose** (`32-TERRAIN.md` §9, trois observations concordantes) : un sous-agent
 **partage** le `session_id` de sa session parente — le guard qui compare `payload.session_id` a
-`meta.session_id` **ne bloquera pas les workers de la mission detentrice**. C'est ce fait mesure
+`meta.session_ids` **ne bloquera pas les workers de la mission detentrice**. C'est ce fait mesure
 qui rend le mecanisme viable ; comparer sur `agent_id` (absent hors sous-agent, jamais partage)
 aurait bloque le manager lui-meme.
 
@@ -153,25 +161,104 @@ aurait bloque le manager lui-meme.
 **session**, pas la mission. Le guard garantit « aucune AUTRE session ne commite sous mon lock »,
 jamais « aucun autre acteur DE MA session ». Les incidents documentes (I1-I4) sont tous
 inter-sessions — la granularite session les couvre tous — mais ce n'est pas une garantie plus
-fine, et le dire autrement serait mentir sur la portee de la garde.
+fine, et le dire autrement serait mentir sur la portee de la garde. `agent_id` serait le champ
+d'une granularite plus fine, mais il n'existe que dans le payload du hook (un manager ne peut pas
+connaitre le sien a l'acquisition) et **sa stabilite n'est pas mesuree** — non retenu.
 
-**Ordre de decision du guard** (repris tel quel de `32-TERRAIN.md` §9, deja argumente et
-sourced) :
+**Ordre de decision du guard** (amende par (a)-(f) ci-dessous — la regle 4 devient un DENY avec
+porte de sortie, plus un fail-open) :
 1. Non-applicable (pas de lock, lock perime, commande non concernee) → allow silencieux.
-2. `meta.session_id` vide (lock pre-phase-32, ou CLI hors session) → allow, repli sur comparaison
+2. `meta.session_ids` vide (lock pre-phase-32, ou CLI hors session) → allow, repli sur comparaison
    `worktree` (retrocompatibilite obligatoire).
-3. `payload.session_id == meta.session_id` → allow (couvre manager et ses workers).
-4. Sinon → deny, motif portant owner/step/branch/age + marche a suivre.
+3. `payload.session_id` present dans `meta.session_ids` → allow (couvre manager et ses workers,
+   et toute session deja re-rattachee par `reclaim`).
+4. Sinon → **deny** (jamais fail-open — voir (b)), motif portant owner/step/branch/age **et la
+   commande exacte de reclaim** (voir (c)).
 5. Meme arbre, session differente : `check-branch-claim.sh:16-20` tranche deja doctrinalement
    (deux sessions du meme worktree partagent de fait leur arbre).
 
-**Reliquat de mesure NON LEVE, a lever avant de figer ce mecanisme (F2)** : `claude --resume` /
-`/clear` conservent-ils le `session_id` ? **Non mesure**, potentiellement bloquant — un resume qui
-mint un nouvel UUID verrouillerait le detenteur legitime hors de son propre lock a la reprise ; le
-repli `worktree` (regle 2) ne l'absorbe que si `session_id` redevient vide, pas s'il change vers
-une autre valeur non vide. **Ce n'est pas un des deux research flags du ROADMAP** (deja leves,
-spike + rejeu) — c'est un troisieme flag, decouvert par le terrain, non leve. A mesurer au debut
-de l'execution du Lot 2, avant d'ecrire la comparaison en dur.
+---
+
+**F2 — LEVE par mesure** (projet jetable, hook `PreToolUse` + `SessionStart`, log brut conserve).
+Dans **tous** les cas mesures, `payload.session_id` == `$CLAUDE_CODE_SESSION_ID` == le
+`session_id` de `--output-format json` == le nom du fichier `.jsonl` — ces quatre vues ne
+divergent **jamais**.
+
+| Geste | `session_id` conserve ? |
+|---|---|
+| `claude --continue -p` | **OUI** |
+| `claude --resume <id> -p` | **OUI** |
+| `--resume <id>` depuis un **autre cwd** | **OUI** |
+| `/compact` manuel (57 992 pre-tokens, `compact_boundary` en transcript) | **OUI** |
+| **`/clear`** (mesure deux fois) | **NON — nouvel identifiant** |
+| `--resume --fork-session` | NON (par conception, documente) |
+| **`--continue` alors qu'une session plus recente existe dans le dossier** | **NON — raccroche a la plus recente, piege** |
+| controle : deux `claude -p` neufs, meme dossier | identifiants differents ✓ |
+
+Transcripts : 9 fichiers `.jsonl` / 9 identifiants, un seul `sessionId` par fichier.
+`--continue`/`--resume` reecrivent dans le **meme** fichier ; `--fork-session` copie ; `/clear`
+ouvre un nouveau fichier et abandonne l'ancien. Mesure bonus : sur `/clear`, un hook `SessionStart`
+recoit `{"session_id": "<le NOUVEL id>", "cwd": "…", "source": "clear"}` — il porte le nouvel
+identifiant et le cwd, **mais pas l'ancien**. **Non mesure, ecrit comme tel** : auto-compaction
+(`trigger: "auto"`), `/clear` en TTY interactif, stabilite de `agent_id`, `--worktree`, agents
+`--bg`, crash/redemarrage.
+
+**Ce que ca change** : la peur principale — « un `--resume` invaliderait le lock » — est
+**infirmee**. La compaction, vrai risque d'une mission de plusieurs heures, ne casse rien. Restent
+deux trous, de consequence identique : le detenteur legitime pris pour un intrus (`/clear`,
+`--continue` sur session perimee).
+
+**Arbitrage sur la liaison session↔owner — delegue par Samuel, tranche ici, sur mesure** :
+
+**(a) Le `meta` porte une LISTE, pas un champ unique** : `session_ids=` en **append**, amorcee a
+l'acquisition avec `$CLAUDE_CODE_SESSION_ID` (vide si absent). Motif : `/clear` et `--continue`
+ambigu produisent un identifiant neuf pour un detenteur legitime ; un champ unique le
+condamnerait, une liste le laisse se re-rattacher. `rewrite_meta()` doit **preserver** la liste
+comme elle preserve deja `acquired_epoch`/`branch`/`worktree`.
+
+**(b) Sur mismatch, on DENY — pas de fail-open.** Le fail-open sur mismatch d'id est ecarte :
+il reproduirait exactement le lock declaratif qu'on est en train de reparer (incident I4 : 8
+commits sous un lock **vivant**). Le fail-open reste reserve aux cas d'**indetermination** (pas
+de lock, lock perime, `meta` illisible, guard indisponible), jamais au cas ou l'on sait que
+l'appelant n'est pas le detenteur.
+
+**(c) La recuperabilite vient du MOTIF, pas de la permissivite.** Point de conception central,
+appuye sur une mesure : `permissionDecisionReason` est **rendu au modele mot pour mot**
+(`32-TERRAIN.md` §8, DIV-1 — contrairement a la doc officielle). Donc le motif de refus **nomme la
+commande exacte de reprise** (verbe explicite `driver-lock.sh reclaim --owner=<owner>`), qui
+verifie que l'`owner` declare correspond et **ajoute** l'identifiant courant a la liste.
+L'asymetrie relevee par la mesure (un proprietaire bloque coute plus cher qu'un intrus passe) est
+donc traitee **in-band** : la session bloquee recoit sa porte de sortie dans le message meme qui la
+bloque, au lieu d'etre gelee sans recours.
+
+**(d) `worktree` reste un garde-fou secondaire, jamais l'identite primaire** — la collision
+redoutee se produit precisement dans le **meme** arbre.
+
+**(e) Limite structurelle, deja ecrite ci-dessus, renforcee** : un sous-agent partage le
+`session_id` de son parent, donc le mecanisme discrimine des **fenetres/sessions differentes**,
+jamais deux acteurs d'une **meme** fenetre. Les incidents documentes (I2 du 2026-07-31, I3 du
+2026-08-01) sont **inter-sessions** — la granularite couvre les cas reels, et c'est tout ce qu'elle
+promet.
+
+**(f) `reclaim` est un geste explicite et trace**, a rapprocher du `takeover` de D-32-02 : meme
+journal append-only, meme exigence de tracabilite (« qui a repris, quand, depuis quel
+identifiant »).
+
+**Reserves consignees, non tranchees ici, a lever au plan** (auto-critique demandee par le mandat
+— pas ecrite par simple obeissance) :
+- **Course sur `reclaim`** : rien dans (a)-(f) ne protege `reclaim` d'une double invocation
+  concurrente (deux sessions qui pretendent toutes deux etre le detenteur legitime au meme
+  instant). D-32-02 resout ce probleme pour `takeover` par un mutex nomme + double revalidation
+  post-mutex (generation **et** age) — `reclaim` modifie le meme etat (`meta.session_ids`) et doit
+  **reutiliser exactement ce patron**, pas en inventer un autre. A traiter comme un prealable du
+  plan, pas une extension separee.
+- **Croissance non bornee de `session_ids[]`** : rien ne purge la liste. Une mission tres longue
+  avec de nombreux `/clear` (chacun genere un identifiant neuf pour le meme detenteur qui
+  `reclaim`) fait grossir le `meta` sans fin. Deux options a trancher au plan, pas ici : (i) purge
+  a chaque `takeover`/`reclaim` reussi (garder seulement l'identifiant courant + celui qui vient
+  d'etre ajoute), ou (ii) plafond LRU (N derniers identifiants). Ne pas laisser cette croissance
+  non traitee en sortie de phase — un fichier meta qui grossit sans borne est le genre de dette
+  silencieuse que QUAL-01 est cense empecher ailleurs dans cette meme phase.
 
 ### D-32-04 — LOCK-05 : jeton = generation exposee, trailer par convention, aucune verification machine construite ici
 
@@ -208,14 +295,14 @@ script**, qui lit `tool_name` dans le payload pour choisir sa voie d'extraction 
 restreint a `.planning/` (patron d'enregistrement de `guard-agent-write.sh`, mais **pas sa
 logique de validation** — un point a clarifier explicitement, voir ci-dessous).
 
-**Clarification necessaire sur la formulation du mandat** (« en reutilisant
-`guard-agent-write.sh` ») : lu comme **reutilisation du patron d'architecture** (prefiltre
-pur-bash a zero-spawn, resolution `PYBIN` via `vf-portable.sh`, un seul spawn python, sortie
-`permissionDecision: deny` + `exit 0`) — **pas** un appel au script lui-meme, dont la logique
-metier (validation de frontmatter d'agent via `check-agents.sh --file --strict`) n'a aucun
-rapport avec la comparaison de session d'un lock. Une lecture litterale (appeler
-`guard-agent-write.sh` pour un Write dans `.planning/`) produirait un deni sur un mauvais motif
-ou un faux-negatif systematique. A confirmer au plan, sans bloquer le cadrage.
+**Clarification sur la formulation du mandat** (« en reutilisant `guard-agent-write.sh` ») —
+**CONFIRME, ambiguite levee dans ce sens, plus a confirmer au plan** : lue comme **reutilisation
+du patron d'architecture** (prefiltre pur-bash a zero-spawn, resolution `PYBIN` via
+`vf-portable.sh`, un seul spawn python, sortie `permissionDecision: deny` + `exit 0`, fail-open) —
+**pas** un appel au script lui-meme, ni sa logique metier (validation de frontmatter d'agent via
+`check-agents.sh --file --strict`), qui n'a aucun rapport avec la comparaison de session d'un
+lock. Une lecture litterale (appeler `guard-agent-write.sh` pour un Write dans `.planning/`)
+aurait produit un deni sur un mauvais motif ou un faux-negatif systematique.
 
 **Cohabitation matcher `Bash`** avec `guard-bash-registres.sh` (consolidator, meme matcher) :
 `merge-hooks.sh` ne reutilise un groupe de meme matcher que s'il est **entierement possede par
@@ -270,45 +357,47 @@ ecriture hors `conductor` (dans `dev-orchestrator`) et une extension manuelle ex
 comme telle par le code lui-meme. PORT-05, lui, rougit deja mecaniquement sur toute entree de hook
 mal formee, sans modification. **Amendement de lecture du critere n°2** (le mot « regle 4 » du
 ROADMAP est une imprecision de redaction — la garantie visee existe, sous un autre nom) —
-consigne, remonte en §Remontees pour confirmation, non bloquant pour le plan.
+**confirme** : lecture reglee (voir §Remontees, point 3, mis a jour), plus de confirmation en
+attente.
+
+### D-32-QUAL — QUAL-01 : « BRUYANT » — TRANCHE par Samuel (2026-08-16), option B retenue
+
+**Decision arretee, non rouverte** : **Retenu : fail-open silencieux + ecriture du marqueur de
+sante, ET livraison DANS CETTE PHASE d'un « hook doctor » `SessionStart` qui lit les marqueurs.**
+
+**Motif consigne** (mesure, `32-TERRAIN.md` §11, aucun des trois canaux existants ne realise
+« bruyant non bloquant ») :
+- `exit 17` (`vf_guard_unavailable`) + stderr → **MESURE : n'atteint ni le modele ni l'humain** en
+  non-interactif (« No error received »).
+- `systemMessage` sur `allow` → **MESURE : n'atteint pas le modele**.
+- Le marqueur de sante (`$VF_GUARD_HEALTH_DIR`) → **aucun consommateur** dans tout `plugin/`
+  (verifie).
+- Le hook doctor est **specifie depuis le 2026-08-02**
+  (`docs/superpowers/specs/2026-08-02-portabilite-windows-ii-design.md:205-207`) et **n'a jamais
+  ete ecrit** — le document constate lui-meme « hook doctor → 0 occurrence ».
+- QUAL-01 interdit le vert de complaisance : ecrire « bruyant » en sachant que personne ne lit le
+  signal aurait ete exactement cela — l'option (C) qualifiee au premier jet de ce cadrage est
+  donc definitivement ecartee, et l'option (A) (`ask`) n'a pas ete retenue non plus (Samuel a
+  tranche direct sur B, sans passer par la reserve de mesure `ask`-en-sous-agent prevue au premier
+  jet).
+
+**Extension de perimetre — declaree ouvertement, pas glissee en douce.** Contraintes de
+conception du hook doctor :
+- **generique, pas special-lock** : un lecteur des marqueurs de **toutes** les entrees du parc
+  (les 26), pas un lecteur du seul guard du driver-lock — le benefice va a tout le parc, c'est ce
+  qui justifie l'extension ;
+- livre avec **sa suite de tests** et **sa preuve sous mutation** (vert sur code sain, rouge sous
+  mutation, trace du rouge), au meme standard que le reste de la phase ;
+- son entree `SessionStart` nait de `merge-hooks` comme les autres (D-32-C s'applique) ;
+- il **signale**, il ne corrige ni ne bloque jamais (ADR-031).
+
+**Statut de lot** : ajoute au decoupage en lots comme lot identifie (voir §Specific Ideas, nouveau
+**Lot 4**). **Abandonnable** en cas de debordement de la phase — c'est le sacrifice designe en
+premier si la phase deborde. Si coupe, **QUAL-01 retombe sur son trou** : le chemin « guard
+indisponible » redevient fail-open silencieux SANS lecteur, a retracer explicitement comme dette
+en fin de phase (pas a laisser croire couvert).
 
 </decisions>
-
-<open_decision>
-## D-32-QUAL — QUAL-01 : le mot « BRUYANT » n'a pas de mecanisme existant — a trancher par Samuel
-
-**Ne pas repondre a la place de Samuel.** Le ROADMAP exige « fail-open BRUYANT si le lock est
-illisible — jamais un vert ». **Aucun canal existant ne le realise** (`32-TERRAIN.md` §11,
-mesure) :
-
-1. `exit 17` (`vf_guard_unavailable`) + stderr → **MESURE : n'atteint ni le modele ni l'humain**
-   en non-interactif (l'outil s'execute, « No error received »).
-2. `systemMessage` sur `allow` → **MESURE : n'atteint pas le modele** (non teste en TUI).
-3. Le marqueur de sante (`$VF_GUARD_HEALTH_DIR`) → **aucun consommateur** dans `plugin/` ; le
-   « hook doctor » qui devait l'agreger est decrit mais **n'existe pas** (0 occurrence, verifie).
-
-**Trois issues honnetes, deja qualifiees au terrain** :
-
-- **(A) `permissionDecision: "ask"`** — bruyant et non-permissif, mais interrompt le flux et
-  **peut ne pas etre disponible a un sous-agent backgrounde** (non mesure pour `ask`
-  specifiquement ; a rapprocher de la memoire « AskUserQuestion absent en subagent »).
-- **(B) fail-open silencieux + marqueur de sante, ET livrer dans la meme phase le hook doctor
-  `SessionStart`** qui l'agrege — seule voie qui respecte ADR-031 sans mentir sur « bruyant »,
-  mais **ajoute un livrable non prevu au perimetre** (extension assumee).
-- **(C) assumer par ecrit que « bruyant » = « trace sur disque + stderr »**, en sachant que
-  personne ne le lit aujourd'hui — **vert de complaisance, deconseille**.
-
-**Ma recommandation** : **(A)**, avec la reserve mesuree ci-dessus a lever en premier geste du
-Lot 2 (mesurer si `ask` atteint un sous-agent backgrounde avant de l'adopter definitivement). Si
-la mesure infirme `ask` en sous-agent, replier sur **(B)** plutot que (C) — (C) fait mentir le mot
-du ROADMAP, ce que ni ce cadrage ni l'execution ne devraient assumer seuls. **(C) n'est acceptable
-que si Samuel le valide explicitement en connaissance de cause.**
-
-Cette decision ne bloque que le detail du chemin d'echec « guard indisponible » du Lot 2 — le
-reste du guard (PASS/DENY/imparsable-silencieux) est independant et peut etre construit et prouve
-sans attendre la reponse.
-
-</open_decision>
 
 <canonical_refs>
 ## Canonical References
@@ -422,8 +511,14 @@ sans attendre la reponse.
     1(b)/1(c) ne soient finis. Premiere tache du lot : lever F2 (mesure `--resume`/`/clear`).
   - **Lot 3** (LOCK-05) : depend de Lot 1(a) seulement (generation exposee) — convention +
     documentation, independant du Lot 2.
-  - **QUAL-01/D-32-QUAL** : ne bloque qu'un sous-detail de Lot 2 (le chemin « guard
-    indisponible ») — le reste de Lot 2 n'attend pas la reponse de Samuel.
+  - **Lot 4** (D-32-QUAL, hook doctor `SessionStart`, generique tout le parc) : nouveau lot issu
+    de la tranche 2026-08-16. Depend du marqueur de sante deja ecrit par les guards existants
+    (`$VF_GUARD_HEALTH_DIR`) — **pas** de Lot 1/2/3 specifiquement, peut se construire en
+    parallele. **Abandonnable en priorite** si la phase deborde (voir D-32-QUAL) — a tracer comme
+    dette explicite si coupe, pas a passer sous silence.
+  - **Reclaim** (D-32-03, arbitrage session/owner) : reutilise le mutex/double-revalidation de
+    `takeover` (D-32-02) — a construire dans le meme geste que Lot 1(c), pas separement (meme
+    fichier, meme protection de concurrence).
 - Les suites de tests neuves/etendues vivent dans `plugin/conductor/scripts/tests/` a la
   convention du dossier (patron copie, pas de harness partage) — `test-driver-lock.sh` etendu pour
   Lot 1, une suite neuve `test-guard-driver-lock.sh` (nom indicatif) pour Lot 2, alimentee par les
@@ -443,7 +538,7 @@ sans attendre la reponse.
    D-32-04.
 3. **Elargir `check-capability-activation.sh` (regle 4) aux hooks** — ecriture hors `conductor`
    (dans `dev-orchestrator`), et le gate PORT-05 couvre deja la garantie visee. Voir D-32-07 —
-   demande confirmation de lecture, pas une extension necessaire.
+   **lecture confirmee 2026-08-16, pas une extension necessaire, plus de confirmation en attente.**
 4. **Auto-takeover sur battement MORT (pas sur TTL)** — explicitement note « reevaluable
    post-LOCK-01 » par `REQUIREMENTS.md` §Out of Scope. Pas dans cette phase.
 5. **Nom exact du script du guard et du journal de takeover** — indicatifs seulement (§Specific
