@@ -238,6 +238,29 @@ jamais copiés. Les deux moitiés sont vraies ; c'est la répartition qui manqua
    pose. **La pose n'échoue pas** — D-31-01 exige un refactor sans changement de comportement
    observable, et transformer une copie partielle en install avortée en serait un.
 
+   > **Précisé le 2026-08-16 — arbitrage de Samuel (option A).** La rédaction initiale de ce point
+   > laissait la granularité du journal **indéterminée**, et la mise en œuvre en a déduit **deux
+   > émetteurs** : un message au grain **répertoire** sur échec du `cp`, un message au grain
+   > **fichier** sur la vérification de présence, avec déduplication. Conséquence : la mutation
+   > rouge censée prouver que cette journalisation existe devenait **contournable** — on coupe un
+   > émetteur, l'autre parle, le test reste vert. Un mutant mort, pour la cinquième fois sur ce
+   > même helper.
+   >
+   > **Un seul émetteur, au grain FICHIER.** Le message au grain répertoire sur échec du `cp` est
+   > **supprimé** : la vérification de présence après copie porte **seule** la journalisation, et
+   > émet **une ligne par fichier manquant, avec son chemin**.
+   >
+   > **Motifs** : (1) un seul site d'émission rend la mutation **réellement discriminante** — c'est
+   > la seule forme qui se prouve ; (2) l'assertion devient satisfiable, le message contenant enfin
+   > le chemin du fichier en cause ; (3) le journal devient plus utile — « ce fichier-là manque »
+   > est actionnable, « ce répertoire s'est mal passé » ne l'est pas. **Coût assumé** : sur un échec
+   > massif (répertoire entier illisible), N lignes au lieu d'une — cas rare, et le bruit y est
+   > informatif.
+   >
+   > Leçon de méthode : ce n'était pas une maladresse de rédaction des plans mais une **ambiguïté du
+   > cadrage**. Un point de doctrine qui laisse deux granularités possibles produit deux chemins de
+   > code, et tout test de discriminance sur ces deux chemins est contournable par construction.
+
 **Ce que cela règle mécaniquement** : les deux critères d'acceptation de `31-03` tâche 2, jusqu'ici
 mutuellement exclusifs, redeviennent satisfiables ensemble. « Plus aucun `cp` direct vers
 `$TARGET_ROOT` dans `install_module` » et « aucun `|| true` dans les nouveaux helpers » ne se
