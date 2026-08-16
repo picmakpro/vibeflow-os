@@ -389,6 +389,42 @@ information** relève du même contrat, à un grain qui reste lisible.
 > version inchangée. La fenêtre est **bornée et auto-cicatrisante** (le prochain vrai bump recapture
 > le fichier), mais `31-05` ne doit **pas** supposer le manifeste exhaustif au sortir d'un `update`.
 
+### D-31-15 — Le chemin de suppression résout **physiquement**, pas textuellement (arbitrage de Samuel)
+
+> **Ajouté le 2026-08-16**, après qu'une revue eut **reproduit une suppression HORS `TARGET_ROOT`**.
+
+**Le fait** : `.claude/rules` remplacé par un lien symbolique vers `/tmp/…` — un répertoire **ANCÊTRE**,
+pas le fichier final. La convergence annonce « 1 chemin retiré » et **supprime réellement** le fichier
+externe.
+
+**Pourquoi les six conditions n'ont pas tenu** : `vf_rel_to_target` normalise **purement
+textuellement**. La condition « pas un lien symbolique » ne regarde que la **feuille**, qui n'en est
+pas un ; la condition « résout sous `TARGET_ROOT` » est vraie **textuellement**, sans jamais
+consulter le disque. Deux gardes, le même angle mort : **aucune ne touche le système de fichiers**.
+
+**Décision (Samuel)** : le chemin de suppression **résout physiquement** avant de supprimer —
+comparer `cd -P "$(dirname "$full")" && pwd -P` à `cd -P "$TARGET_ROOT" && pwd -P`, et **refuser**
+si le parent résolu n'est pas sous la racine résolue.
+
+**Lecture d'ADR-054, explicitement retenue** : l'ADR interdit le **binaire `realpath`** (portabilité —
+absent ou divergent selon les plateformes), **pas la résolution physique en soi**. `cd -P` et `pwd -P`
+sont des **builtins POSIX** : ils donnent la résolution physique **sans dépendance externe**. La
+contrainte est donc respectée dans sa lettre **et** dans son intention.
+
+**Preuve exigée** : le scénario reproduit (ancêtre symlinké vers `/tmp`) devient un test
+**rouge-puis-vert**, et la nouvelle garde **ne doit pas être un mutant mort** — la retirer doit faire
+rougir ce test.
+
+> **Portée assumée** : le `cp -r` de la **pose** suit déjà ce lien aujourd'hui (il pollue le répertoire
+> externe). Le point aveugle est **structurel et pré-existant** ; ce qui est corrigé ici est le seul
+> geste **destructif** du moteur. Le volet « pose » reste ouvert — consigné en §7.
+
+> **Leçon de méthode** : quatre des six conditions de suppression étaient des **mutants morts**, et
+> les deux qui gardaient précisément ce cas étaient parmi elles. Une garde qu'aucun test ne peut
+> faire rougir n'est pas une garde : c'est une **ligne de code qui ressemble à une garde**. Le
+> scénario hostile n'a pas été trouvé en relisant le code — il a été trouvé en **fabriquant
+> l'attaque**.
+
 ## 4. Contraintes d'exécution non négociables
 
 1. **Branche de phase avant tout commit.** Jamais un commit sur `main`.
