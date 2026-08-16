@@ -58,9 +58,7 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 Phase: 30 (Portabilité Windows II) — livrée et vérifiée
 Plan: 30-09 (dernier plan exécuté) ; nœud `docs` de clôture de phase posé le 2026-08-16
-Status: Phase 30 shippée localement (branche `feat/phase-30-portabilite-windows-ii`, 49+ commits,
-poussée) ; CI verte constatée (run `31918283177`, 4/4 jobs) ; PR et release racine restent des
-gestes humains gatés, non faits ici
+Status: Phase 30 shipped - PR 43 merged - release v2.53.0 (2026-08-16)
 Last activity: 2026-08-16 — hygiène documentaire de clôture de Phase 30 (30-08-SUMMARY.md créé,
 30-RELIQUATS.md soldé de 4 mineurs, addendum daté sur 30-VERIFICATION.md levant le BLOCKER PORT-05,
 STATE.md/ROADMAP.md mis à jour)
