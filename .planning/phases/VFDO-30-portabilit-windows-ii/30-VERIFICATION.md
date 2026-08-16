@@ -244,7 +244,7 @@ gate d'âge retiré). `30-VEILLE-GSD-CORE.md` documente honnêtement le caractè
 ```
 $ cat .claude/settings.json
 {"hooks":{"SessionStart":[{"matcher":"startup","hooks":[{"type":"command",
-"command":"/bin/bash","args":["/Users/samuel/.../scripts/check-gsd-core-update.sh","--hook"]}]}]}}
+"command":"/bin/bash","args":["/Users/<user>/.../scripts/check-gsd-core-update.sh","--hook"]}]}]}}
 ```
 
 ---
