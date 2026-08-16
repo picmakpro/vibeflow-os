@@ -60,7 +60,7 @@ Les 8 sites appelant `vf_declare_write ~ "$dest" "note"` (verbe `~` non quoté) 
 l'expansion tilde de bash : `~` seul, non quoté, en position d'argument, s'étend en `$HOME` AVANT
 que la fonction ne soit appelée. En mode réel, ce bug était **inoffensif par hasard** (le `case`
 de `vf_declare_write` ne fait rien ni pour `~` ni pour toute autre valeur non `+`/`-`) — mais en
-`--dry-run`, il faisait imprimer `[plan] /Users/samuel <chemin> …` au lieu de `[plan] ~ <chemin>
+`--dry-run`, il faisait imprimer `[plan] /Users/<user> <chemin> …` au lieu de `[plan] ~ <chemin>
 …`. Corrigé en quotant les 8 sites (`"~"`). Trouvé par test manuel AVANT l'écriture de la suite —
 sans ce test manuel, `TD4`/`TD5` auraient pu passer à tort sur un format cassé (le texte cherché
 ne dépend pas du caractère `~`).
