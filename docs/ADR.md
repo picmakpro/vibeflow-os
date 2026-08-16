@@ -2250,3 +2250,109 @@ lui-même, qui n'appartenait pas à son périmètre.
 Rouvrir si une future revue de registre de menaces constate qu'une disposition `accept` bornée selon
 cette règle a quand même laissé passer un vecteur voisin non nommé — signe que la règle elle-même
 est insuffisante, pas seulement mal appliquée.
+
+---
+
+## ADR-071 : La forme exec devient la forme des hooks du périmètre dev — chemin absolu figé à l'install, contrat de sortie normalisé dans chaque script
+
+**Date** : 2026-08-16 · **Statut** : Validée · **Décideur** : Samuel · **Voisines** : ADR-054
+(second temps de la même doctrine de portabilité Windows — pas une révision : CRLF, préflight et
+gate de synchro y restent tels quels), ADR-031 (advisory par défaut), ADR-043 (gouvernance posée
+par la machine) · **Contexte** : `.planning/phases/VFDO-30-portabilit-windows-ii/30-07-PLAN.md`
+(PORT-02), `docs/superpowers/specs/2026-08-02-portabilite-windows-ii-design.md` §2 et §5,
+`docs/HOOKS-CONTRAT-SORTIE.md` (contrat de sortie et inventaire recompté du parc, produit par le
+plan `30-04`)
+
+### Contexte / Problème
+
+Une entrée de hook en **forme shell** (`command: "bash {{VF_SCRIPTS}}/x.sh --hook || true"`) porte
+deux dépendances à un interpréteur de commandes que Windows ne garantit pas de la même façon que
+macOS/Linux : la construction `bash … || true` elle-même, et le nom nu `bash` résolu sur le `PATH`
+au moment de l'exécution du hook — exactement le bug que `merge-hooks.sh` corrige déjà à l'install
+pour `guard-file-size.sh` (`software-architecture`, migré au plan `30-01`). Les 4 entrées
+`SessionStart` de `dev-orchestrator` restaient en forme shell tant que deux préalables n'étaient pas
+livrés : le moteur (`merge-hooks.sh`) devait savoir lire, dédupliquer et retirer la forme exec
+(`args`) — fait au plan `30-01` — et chacun des 4 scripts devait traduire lui-même son silence
+interne (exit 3, contrat Phase 17) en exit 0 à la frontière du harness, puisque l'opérateur
+`|| true` qui faisait ce travail en forme shell n'est **pas exprimable** en forme exec — fait au
+plan `30-04`. Migrer la forme AVANT ces deux préalables aurait transformé chaque démarrage de
+session sain en erreur affichée (silence non traduit) ou reproduit le bug ADR-054 (nom nu résolu
+sur le `PATH`) — c'est cet ordre, pas une consigne de prudence, que ce plan devait tenir.
+
+### Décision
+
+Trois décisions, chacune avec sa raison et sa conséquence assumée :
+
+1. **La forme exec devient la forme des entrées de hook du périmètre dev.** C'est la présence du
+   champ `args` qui bascule — le `type` de l'entrée (`command`) ne change pas. L'opérateur
+   d'absorption shell (`|| true`) disparaît **par construction** : il n'a plus de raison d'être,
+   puisque chaque script traduit désormais lui-même son silence (décision 3). Gabarit répliqué
+   depuis `software-architecture` (déjà migré au plan `30-01`) : `command` porte le jeton
+   d'interpréteur, `args` porte le chemin du script puis chaque drapeau en élément **séparé**
+   (jamais concaténé — un drapeau à valeur accolée reste un seul élément).
+2. **Le champ `command` porte un chemin absolu d'interpréteur résolu ET VÉRIFIÉ à l'install.**
+   `merge-hooks.sh` résout `{{VF_BASH}}` en un chemin absolu de `bash`, existant et exécutable sur
+   la machine d'install — jamais un nom nu (qui reproduirait le bug corrigé par ADR-054). Conséquence
+   assumée : le `settings.json` produit devient **spécifique à la machine** qui l'a installé (D-01
+   de `30-CONTEXT.md`, décision **one-way**, ratifiée au checkpoint du plan `30-01`). Un chemin de
+   bash résolu à une install donnée ne prétend plus être portable tel quel d'une machine à l'autre —
+   c'est le prix accepté de sa vérification réelle à l'install, plutôt qu'une résolution PATH
+   optimiste et non vérifiée à chaque exécution de hook.
+3. **Le contrat de sortie vers le harness est normalisé DANS chaque script, sous son drapeau de
+   mode hook (`--hook`), sans lanceur intermédiaire** (D-06 de `30-CONTEXT.md`). Un lanceur
+   `run-hook.sh <script>` réintroduirait exactement l'indirection shell que la forme exec cherche à
+   éliminer sous Windows — la normalisation devait donc vivre à la frontière de chaque script, pas
+   dans une couche partagée. Le contrat de signaux **interne** posé par la Phase 17 (exit 3 =
+   silence volontaire, exit 0 = signal émis, exit 64 = erreur d'argument) **reste valide À
+   L'INTÉRIEUR des scripts** — cette décision ne le touche pas, elle change seulement sa traduction
+   vers le harness, et uniquement quand `--hook` est posé (jamais un renommage global — la CLI et
+   les suites de tests testent ces codes directement, cf. `docs/HOOKS-CONTRAT-SORTIE.md` §2).
+
+Les 4 entrées migrées restent **advisory** (ADR-031, classement inchangé) : ce sont les 25 entrées
+du parc, recomptées par `docs/HOOKS-CONTRAT-SORTIE.md`, qui font foi sur le classement advisory/
+bloquant de chacune — cette ADR ne rouvre aucun classement, elle grave la forme et le contrat de
+sortie des 5 entrées désormais en forme exec (4 dev-orchestrator + 1 software-architecture).
+
+### Ce que cette ADR ne tranche pas
+
+**La polarité gouvernance** (`conductor`, `consolidator`, `infrastructure-audit`,
+`planning-core` — 20 entrées) reste hors périmètre : sa migration effective en forme exec, et
+l'ajout du drapeau `--hook` aux scripts qui ne le portent pas encore, sont hérités par Willy (§7 du
+contrat PR #29, §6 de `docs/HOOKS-CONTRAT-SORTIE.md`). Cette ADR documente la doctrine que cette
+migration à venir devra suivre — elle ne l'exécute pas.
+
+### Addendum — dérogation de `check-hook-paths.sh` à sa propre règle (approbation humaine du 2026-08-15)
+
+**Ajouté le 2026-08-15, en solde du plan `30-09`** (`plugin/dev-orchestrator/scripts/check-hook-paths.sh`,
+26e entrée du parc, posée par ce plan) — **cet ajout n'est pas une décision de l'ADR d'origine** : il
+grave, après coup, une dérogation déjà appliquée dans le code et déjà motivée dans trois endroits
+(le script lui-même, `docs/HOOKS-CONTRAT-SORTIE.md`, et le cas de test T9 de
+`test-check-hook-paths.sh`), sans que l'ADR ne le documente jusqu'ici — un manque signalé comme
+reliquat au SUMMARY du plan `30-09` et soldé par cette entrée.
+
+`check-hook-paths.sh` est le script qui **constate** la péremption d'un chemin d'interpréteur figé
+à l'install (Décision 2 ci-dessus). Son ENTRÉE DE HOOK à lui (`plugin/dev-orchestrator/hooks/hooks.json`,
+26e entrée) porte un `command` **NOM NU littéral** (`bash`), et non un chemin absolu résolu à
+l'install — en apparente contradiction avec la Décision 2, qui n'admet aucune clause d'exception.
+
+**Raison du paradoxe d'amorçage** : si l'entrée de ce script portait elle-même un chemin absolu
+résolu à l'install, elle mourrait exactement dans le seul cas où ce filet sert — un détecteur
+d'incendie alimenté par le feu qu'il surveille. La dérogation est donc **structurelle à ce cas
+précis** (un script qui diagnostique la péremption d'un mécanisme ne peut pas dépendre de ce même
+mécanisme), pas une exception de confort.
+
+**Portée strictement bornée** : cette dérogation ne concerne QUE l'entrée n°26 (`check-hook-paths.sh`).
+Elle ne rouvre le classement d'aucune autre entrée du parc, et n'établit aucun précédent général —
+un futur script qui voudrait s'y soustraire pour une autre raison doit obtenir sa propre dérogation
+documentée, pas invoquer celle-ci par analogie. **Gardée à la machine** par le cas T9 de
+`test-check-hook-paths.sh` (discriminance prouvée par mutation m3) : un futur relecteur qui
+« aligne » cette entrée sur les 4 autres, croyant réparer une incohérence, la fait rougir
+immédiatement.
+
+### Déclencheur de réexamen
+
+Rouvrir si la migration de la polarité gouvernance découvre un cas où le gabarit exec (chemin
+absolu figé à l'install + traduction dans chaque script, sans lanceur) ne suffit pas — par exemple
+une entrée dont le classement bloquant repose sur un code de sortie non nul plutôt que sur une
+décision JSON (`guard-planning-updated.sh`, explicitement exclue de toute normalisation par
+`docs/HOOKS-CONTRAT-SORTIE.md` §6, car son blocage par code de sortie est voulu).

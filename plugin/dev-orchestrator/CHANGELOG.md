@@ -1,5 +1,114 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.17.2] — 2026-08-16 (hotfix escalade des gates humains)
+
+**Patch** (fiabilité des missions, aucune nouvelle capacité).
+
+- `vf-dev-manager` : `SendMessage` ajouté au `tools:` — le manager dispatché en sous-agent a
+  désormais un canal vivant vers la session principale.
+- Repli D-09 réécrit en cascade « escalade vivante » : (1) `SendMessage(to: "main")` avec
+  contexte/options/recommandation, nœud du DAG bloqué en attendant le relais ; (2) sinon
+  `human_needed` et relance par la session principale. Un gate humain n'est plus jamais franchi
+  par fallback ni ne gèle la mission entière (incident du 2026-08-15 : `AskUserQuestion` non
+  fournie aux sous-agents backgroundés).
+
+## [v2.17.1] — 2026-08-16 (Phase 30, solde de revue du plan 30-09)
+
+**Patch** (correctif + durcissement, aucune nouvelle capacité).
+
+### Corrigé
+- **`check-hook-paths.sh`** — BOM UTF-8 en tête d'un `settings.json` (écrit par défaut par
+  `Set-Content`/`Out-File` PowerShell et Notepad « Enregistrer en UTF-8 » sur Windows, la plateforme
+  ciblée par cette phase) faisait échouer le parsing JSON (`json.loads` lève `Unexpected UTF-8 BOM`)
+  et transformait un `settings.json` parfaitement valide en `PARSE_ERROR` à chaque `SessionStart`.
+  Lecture désormais en `encoding='utf-8-sig'` (absorbe le BOM s'il existe, comportement identique en
+  son absence). Cas de test T13 ajouté (discriminance prouvée par mutation :
+  `utf-8-sig` → `utf-8` fait rougir le cas exactement sur cette régression).
+- **`check-hook-paths.sh`** — `--path ""` (valeur vide explicite) passait la garde d'argument et
+  faisait pointer les candidats de balayage vers la racine du filesystem au lieu d'échouer en 64 ;
+  la valeur vide est désormais rejetée au même titre que l'absence de valeur.
+
+### Durci
+- Commentaire de portée du `try/except` du bloc Python de `check-hook-paths.sh` resserré : il ne
+  couvre que l'ouverture + le parsing d'un fichier, jamais la boucle de constat qui suit (protégée
+  seulement par des gardes `isinstance`).
+- `test-check-hook-paths.sh` — T9 aligné sur la garde de portabilité déjà appliquée par T12 dans le
+  même fichier (SKIP nommé si `python3` est indisponible, plutôt qu'un échec par absence de
+  commande). T3 (« code 2 jamais émis ») étend son agrégation aux codes de retour de T6/T6H, omis
+  jusqu'ici.
+- `test-vf-portable.sh` — T12 (identité du bloc localisateur `vf-portable:locator`) couvre désormais
+  4 consommateurs réels (ajout de `check-hook-paths.sh`, jusqu'ici absent du décompte en dur).
+
+### Documentation
+- `docs/ADR.md` §ADR-071 — addendum daté et attribué (approbation humaine du 2026-08-15) documentant
+  la dérogation de `check-hook-paths.sh` à sa propre règle (`command` en nom nu littéral, paradoxe
+  d'amorçage), jusqu'ici motivée dans le code et le contrat de sortie mais absente de l'ADR elle-même.
+- `docs/HOOKS-CONTRAT-SORTIE.md` — en-tête et pied de document corrigés pour créditer la mise à jour
+  de l'inventaire par le plan 30-09 (26e entrée), en plus du plan 30-04 d'origine.
+- Deux `SUMMARY.md` manquants comblés (`30-02`, `30-07`) — reliquat de reprise du moteur (DAG `done`
+  sans `SUMMARY.md`), contenu dérivé des commits réels de chaque plan.
+
+## [v2.17.0] — 2026-08-16 (Phase 30 plan 30-09 — le filet de péremption des chemins de hook, addendum)
+
+**Minor** (nouvelle capacité : un 5e signal SessionStart, pas un simple correctif). Addendum
+approuvé le 2026-08-15, hors périmètre du cadrage d'origine de la Phase 30 : D-01 fait écrire, à
+l'install, un chemin absolu d'interpréteur `bash` dans le `command` des 4 entrées `SessionStart`
+existantes (décision **one-way**, assumée) — un angle mort silencieux que rien ne surveillait :
+quand ce chemin devient périmé (interpréteur mis à jour, Git Bash réinstallé, machine changée), le
+hook cesse simplement de tourner, sans erreur ni message.
+
+### Ajouté
+- **`check-hook-paths.sh`** — 5e signal `SessionStart` advisory (ADR-031) : relit les réglages
+  réellement posés (`.claude/settings.json` et `.claude/settings.local.json`, scope projet et scope
+  utilisateur), vérifie que chaque chemin absolu d'une entrée en forme exec existe et est
+  exécutable, et le dit — brièvement (7 lignes maximum) sur constat, **strictement rien** (zéro
+  octet stdout) sur le chemin nominal. Trois issues (silence, constat, « verdict non rendu » —
+  jamais un faux PASS sur réglages illisibles), jamais le code 2.
+- **Entrée de hook n°26**, `SessionStart` · `startup` : seule entrée du parc dont le `command` est
+  un **nom nu littéral** (`bash`), jamais le jeton d'interpréteur substitué à l'install — paradoxe
+  d'amorçage assumé (un filet qui dépendrait du chemin figé mourrait dans le cas qu'il détecte).
+  **Dérogation à ADR-071 §Décision 2** (qui exige l'inverse, sans clause d'exception), **autorisée
+  par l'approbation humaine de l'addendum du 2026-08-15 — pas par ADR-071 elle-même**, qui ne
+  documente pas encore ce cas (reliquat : un amendement d'ADR-071, ou une ADR dédiée, est dû).
+  Gardée à la machine par le cas T9 de `test-check-hook-paths.sh` (discriminance prouvée par
+  mutation).
+- **`docs/HOOKS-CONTRAT-SORTIE.md`** — inventaire durable porté à 26 entrées (5 dev-orchestrator,
+  21 advisory au total), avec le paragraphe de dérogation de l'entrée n°26.
+- **`plugin/dev-orchestrator/scripts/tests/test-check-hook-paths.sh`** — 61e suite du dépôt, 12 cas
+  (silence, constat sur `command`/`args`, illisible bruyant, les deux fichiers de réglages projet
+  lus indépendamment, absence totale de réglages, parité d'interface, garde anti-« réparation » de
+  l'entrée n°26, identité du bloc localisateur, aller-retour dans `merge-hooks.sh`, accord
+  doc/parc), 4 mutations tracées.
+
+## [v2.16.0] — 2026-08-16 (Phase 30 tâche 07 — les 4 hooks SessionStart passent en forme exec, PORT-02)
+
+**Minor** (changement de forme des hooks + contrat de sortie, pas un simple correctif). Les 4
+entrées `SessionStart` du fragment (`check-dev-bootstrap.sh`, `discover-unintegrated-docs.sh`,
+`check-doc-drift.sh`, `check-gsd-config.sh`) passent de la forme shell (`bash … || true`) à la
+forme exec (`command` = jeton d'interpréteur résolu en chemin absolu à l'install, `args` = chemin
+du script + `--hook` en élément séparé) — même gabarit que `software-architecture` (migré au plan
+`30-01`). L'opérateur d'absorption shell disparaît **par construction** : les 4 scripts traduisent
+désormais eux-mêmes leur silence interne (contrat posé au plan `30-04`, voir
+`docs/HOOKS-CONTRAT-SORTIE.md`) — plus jamais un `|| true` aveugle.
+
+### Ajouté
+- **Forme exec** sur les 4 entrées `SessionStart`, classées explicitement advisory (ADR-031) dans
+  la description du fragment, avec renvoi au document de contrat de sortie.
+- **ADR-071** (`docs/ADR.md`) : la doctrine de la forme exec pour le périmètre dev — chemin absolu
+  résolu et vérifié à l'install (conséquence assumée : `settings.json` devient spécifique à la
+  machine), contrat de sortie normalisé dans chaque script sans lanceur intermédiaire.
+- **Preuve d'install réelle** (`plugin/_internal/tests/test-vibeflow-update.sh`) : les 5 entrées du
+  périmètre dev sont exec TELLES QU'INSTALLÉES dans un lab temporaire (command absolu, exécutable,
+  aucun placeholder résiduel), et un lab qui portait l'ancienne forme shell converge sans doublon à
+  l'update.
+
+### Compatibilité
+- Un lab qui ne relance pas l'engine garde ses hooks en forme shell et ses anciens scripts :
+  comportement attendu, pas une régression — la migration n'a d'effet qu'au prochain
+  install/update.
+
+Référence : `.planning/phases/VFDO-30-portabilit-windows-ii/30-07-PLAN.md`, PORT-02.
+
 ## [v2.15.0] — 2026-08-15 (Phase 28 — le gate d'activation ferme #38 et se prouve chez l'utilisateur)
 
 **Minor** (nouvelle capacité, pas un simple correctif) : `check-capability-activation.sh` sait

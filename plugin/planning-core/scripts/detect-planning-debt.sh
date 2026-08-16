@@ -21,12 +21,23 @@
 #   0 = aucune dette détectée
 #   1 = au moins un compartiment en dette de planning (advisory)
 #   3 = racine des compartiments absente (lab probablement mono-objectif → rien à faire)
+#
+# --hook (D-06/D-07, Portabilité Windows II) — PARITÉ D'INTERFACE avec les autres scripts de hook
+# du dépôt : accepté par le parsing, mais PAS ENCORE passé par la ligne d'invocation du fragment
+# `hooks.json` — ce câblage appartient à la migration en forme exec de la polarité gouvernance,
+# hors périmètre de ce plan (D-07). Sous --hook, les DEUX codes advisory (1 = dette détectée,
+# 3 = racine absente) deviennent 0 à la frontière du harness : même raison qu'à
+# check-planning-state.sh — ce script n'a jamais eu de code « signal » à 0 hors du cas nominal
+# « aucune dette », ses deux diagnostics vivent hors de 0. --hook et --quiet ensemble → exit 64
+# (même code d'erreur d'argument que le reste du script). Sans --hook (CLI, suites de tests),
+# tous les codes documentés ci-dessus restent inchangés.
 set -uo pipefail
 
 ROOT="projects"
 ACTIVE_WINDOW=14
 MIN_TASKS=5
 QUIET=0
+HOOK=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -34,16 +45,39 @@ while [ "$#" -gt 0 ]; do
     --active-window) ACTIVE_WINDOW="${2:?--active-window nécessite une valeur}"; shift 2 ;;
     --min-tasks) MIN_TASKS="${2:?--min-tasks nécessite une valeur}"; shift 2 ;;
     --quiet) QUIET=1; shift ;;
+    --hook) HOOK=1; shift ;;
     -h|--help) grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *) echo "[detect-planning-debt] argument inconnu : $1" >&2; exit 64 ;;
   esac
 done
 
+if [ "$HOOK" -eq 1 ] && [ "$QUIET" -eq 1 ]; then
+  echo "[detect-planning-debt] --hook et --quiet sont mutuellement exclusifs" >&2
+  exit 64
+fi
+
 say() { [ "$QUIET" -eq 1 ] || echo "[planning-debt] $*"; }
+# say_diag : MÊME contenu que say(), mais sur STDERR — réservé au cas nominal « rien à signaler »
+# (aucune dette détectée). D-06/D-07 : le chemin nominal silencieux doit avoir un stdout
+# STRICTEMENT VIDE (docs/HOOKS-CONTRAT-SORTIE.md §3) ; ce message fuyait sur stdout même dans ce
+# cas-là — défaut de flux corrigé ici. Le diagnostic « dette détectée » (signal réel) reste sur
+# stdout via say(), inchangé.
+say_diag() { [ "$QUIET" -eq 1 ] || echo "[planning-debt] $*" >&2; }
+
+# --- Traduction du silence interne vers le harness (D-06/D-07, uniquement sous --hook) ----------
+# hook_exit <code> : sous --hook, les DEUX codes advisory (1, 3) deviennent 0 à la frontière du
+# harness. Sans --hook, le code recu ressort inchange. Voir docs/HOOKS-CONTRAT-SORTIE.md §2.
+hook_exit() { # <code>
+  local code="$1"
+  if [ "$HOOK" -eq 1 ] && { [ "$code" -eq 1 ] || [ "$code" -eq 3 ]; }; then
+    exit 0
+  fi
+  exit "$code"
+}
 
 if [ ! -d "$ROOT" ]; then
   say "Racine '$ROOT/' absente — lab mono-objectif ou compartiments ailleurs. Rien à signaler."
-  exit 3
+  hook_exit 3
 fi
 
 # --- find borné : élaguer les dossiers vendorés/générés AVANT la descente (-prune, pas filtre post).
@@ -88,8 +122,8 @@ done
 if [ "$debt_found" -eq 1 ]; then
   say "Compartiments en dette de planning (actifs, au-dessus du seuil, sans plan) :"
   [ "$QUIET" -eq 1 ] || printf '%s' "$debt_list"
-  exit 1
+  hook_exit 1
 fi
 
-say "OK — aucun compartiment en dette de planning (racine '$ROOT/', seuil ${MIN_TASKS} fichiers, fenêtre ${ACTIVE_WINDOW}j)."
+say_diag "OK — aucun compartiment en dette de planning (racine '$ROOT/', seuil ${MIN_TASKS} fichiers, fenêtre ${ACTIVE_WINDOW}j)."
 exit 0

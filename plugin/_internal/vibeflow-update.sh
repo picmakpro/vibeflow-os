@@ -221,6 +221,26 @@ gitignore_add_paths() {
   [ -f "$module_dir/scripts/seed-registres.sh" ] && gitignore_add_one ".claude/memory/"
   # Config template posé à côté d'un SKILL.md racine.
   [ -d "$module_dir/config" ] && [ -f "$module_dir/SKILL.md" ] && gitignore_add_one ".claude/skills/$mod/config/"
+  # settings.json + settings.local.json (SCOPE-04, Phase 30 tâche 4, corrigé en revue) : en scope
+  # LOCAL, `merge_module_hooks()` écrit dans $TARGET_ROOT/settings.json ET, depuis le routage
+  # --settings-local (tâche 4), dans $TARGET_ROOT/settings.local.json pour toute entrée portant le
+  # chemin absolu machine {{VF_BASH}}. La même promesse « rien ne sera committé » que le reste de
+  # cette fonction s'applique aux DEUX fichiers : le premier vérifié initialement par lecture du
+  # code (pas par convention supposée), le second ajouté après que la revue a testé — et invalidé —
+  # l'hypothèse qu'une convention hors-dépôt (gitignore global du mainteneur) suffisait à couvrir un
+  # lab cible frais. Sélecteur data-driven identique aux deux lignes (même style que
+  # seed-registres.sh ci-dessus) : seul un module qui PORTE un fragment hooks/hooks.json (donc qui
+  # écrit réellement dans ces fichiers à cette install) déclenche l'ajout.
+  [ -f "$module_dir/hooks/hooks.json" ] && gitignore_add_one ".claude/settings.json"
+  [ -f "$module_dir/hooks/hooks.json" ] && gitignore_add_one ".claude/settings.local.json"
+  # Lib partagée de portabilité (Phase 30 tâche 2, copy_engine_lib()) : posée par l'ENGINE, pas
+  # par un module — donc jamais vue par la boucle scripts/ plus haut (elle vient du cache
+  # _internal, jamais de $module_dir/scripts). Gap constaté en tâche 4 lors de la vérification
+  # manuelle de ce plan (Rule 2, deviation documentée au SUMMARY) : sans cette ligne,
+  # .claude/scripts/vf-portable.sh échappait à la promesse « rien ne sera committé » du scope
+  # local. Inconditionnel : copy_engine_lib() la pose à CHAQUE exécution de l'engine en scope
+  # local, quel que soit le module installé — gitignore_add_one() reste idempotent.
+  gitignore_add_one ".claude/scripts/vf-portable.sh"
 }
 
 # ---------- Commande d'incarnation (ADR-042) ----------
@@ -277,6 +297,52 @@ inject_lab_mcp_into_agents() {
   fi
 }
 
+# ---------- Lib partagée de portabilité (contrat PR #29, D-04, Phase 30) ----------
+# vf-portable.sh (résolution Python centralisée, jqx, vf_guard_unavailable) est possédée par
+# l'ENGINE — jamais par un module, sans quoi elle disparaîtrait à la désinstallation du module qui
+# l'aurait portée (contrat §2). Posée par copy_engine_lib(), même patron de cascade que
+# find_hooks_merger()/find_mcp_injector() ci-dessous : cache du plugin d'abord, lib voisine du
+# script ensuite (aucun candidat relatif au répertoire courant).
+find_engine_lib() {
+  local c
+  c="$CACHE_DIR/_internal/lib/vf-portable.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  c="$(dirname "$0")/lib/vf-portable.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  echo ""
+}
+
+# Idempotence INTRA-PROCESSUS (Phase 30, RESEARCH.md §copy_engine_lib) : appelée depuis DEUX
+# chemins qui posent des fichiers chez l'utilisateur — install_module() et sync_module_governance()
+# (le chemin « version inchangée » de update_module()) — sans ce garde-fou elle recopierait la lib
+# à chaque module d'une boucle --all. Un seul appel a un effet ; les suivants sont des no-op.
+VF_ENGINE_LIB_COPIED="0"
+
+copy_engine_lib() {
+  [ "$VF_ENGINE_LIB_COPIED" = "1" ] && return 0
+  local src dest tmp
+  src="$(find_engine_lib)"
+  if [ -z "$src" ]; then
+    # VG-3 (même discipline que merge_module_hooks) : jamais un retour neutre silencieux. Un lab
+    # sans la lib casse le `source` des 3 consommateurs PYBIN au premier appel (Runtime State
+    # Inventory, RESEARCH.md) — l'absence de lib est un échec d'install, pas un détail dégradé.
+    log "  ERROR: vf-portable.sh introuvable dans le cache — lib de portabilité NON posée (installer/mettre à jour l'engine)"
+    return 1
+  fi
+  mkdir -p "$TARGET_ROOT/scripts"
+  dest="$TARGET_ROOT/scripts/vf-portable.sh"
+  tmp="$dest.tmp.$$"
+  # Écriture ATOMIQUE (copie vers un temporaire du MÊME répertoire, puis renommage) : une install
+  # interrompue laisse soit l'ancienne lib, soit la nouvelle, jamais un fichier tronqué qu'un
+  # consommateur sourcerait à moitié. SANS chmod +x : la lib est sourcée, jamais lancée seule.
+  if cp "$src" "$tmp" 2>/dev/null && mv -f "$tmp" "$dest" 2>/dev/null; then
+    VF_ENGINE_LIB_COPIED="1"
+    log "  lib vf-portable.sh posée → $dest"
+    return 0
+  fi
+  rm -f "$tmp" 2>/dev/null || true
+  log "  ERROR: pose de vf-portable.sh ÉCHOUÉE → $dest"
+  return 1
+}
+
 # ---------- Hooks de gouvernance (ADR-043) ----------
 # Un module peut déclarer hooks/hooks.json (format Claude Code, placeholder {{VF_SCRIPTS}}).
 # L'install MERGE le fragment dans le settings.json du scope ; l'uninstall le retire.
@@ -314,7 +380,26 @@ merge_module_hooks() {
     mkdir -p "$BACKUP_DIR"
     cp "$TARGET_ROOT/settings.json" "$BACKUP_DIR/settings-$(date +%Y%m%d-%H%M%S).json"
   fi
-  if bash "$merger" merge "$fragment" --settings "$TARGET_ROOT/settings.json" --scripts-prefix "$(scripts_prefix_for_scope)"; then
+  # Routage --settings-local (Phase 30 tâche 4, D-01) : en scope project/local, merge-hooks.sh
+  # bascule vers CE fichier les seules entrées portant {{VF_BASH}} — un chemin absolu de bash
+  # résolu à CETTE install, donc machine-spécifique. Sans ce routage, un tel chemin atterrirait
+  # dans settings.json de PROJET, qui voyage via git. Scope user : no-op assumé, $HOME/.claude est
+  # déjà par-machine. Tableau vide sous `set -u` (bash 3.2 : ne JAMAIS expanser "${arr[@]}" d'un
+  # tableau vide sans le garder derrière un test de longueur — même garde que `_positional` plus
+  # haut dans ce fichier), jamais une variable non définie.
+  local -a settings_local_args=()
+  case "$VF_SCOPE" in
+    project|local) settings_local_args=(--settings-local "$TARGET_ROOT/settings.local.json") ;;
+  esac
+  local merge_rc=0
+  if [ "${#settings_local_args[@]}" -gt 0 ]; then
+    bash "$merger" merge "$fragment" --settings "$TARGET_ROOT/settings.json" \
+      --scripts-prefix "$(scripts_prefix_for_scope)" "${settings_local_args[@]}" || merge_rc=$?
+  else
+    bash "$merger" merge "$fragment" --settings "$TARGET_ROOT/settings.json" \
+      --scripts-prefix "$(scripts_prefix_for_scope)" || merge_rc=$?
+  fi
+  if [ "$merge_rc" -eq 0 ]; then
     log "  hooks mergés → $TARGET_ROOT/settings.json"
   else
     log "  ERROR: merge hooks ÉCHOUÉ pour $mod — gouvernance NON câblée (corriger settings.json puis réinstaller)"
@@ -330,7 +415,20 @@ remove_module_hooks() {
   local merger
   merger="$(find_hooks_merger)"
   [ -n "$merger" ] || { log "  (retrait hooks impossible — merge-hooks.sh absent)"; return 0; }
-  if bash "$merger" remove "$fragment" --settings "$TARGET_ROOT/settings.json"; then
+  # Même routage --settings-local que merge_module_hooks (Phase 30 tâche 4) : en mode remove,
+  # merge-hooks.sh balaie les DEUX cibles quand --settings-local est fournie — sans ce miroir, une
+  # désinstallation deviendrait partielle et laisserait un hook orphelin dans le settings local.
+  local -a settings_local_args=()
+  case "$VF_SCOPE" in
+    project|local) settings_local_args=(--settings-local "$TARGET_ROOT/settings.local.json") ;;
+  esac
+  local remove_rc=0
+  if [ "${#settings_local_args[@]}" -gt 0 ]; then
+    bash "$merger" remove "$fragment" --settings "$TARGET_ROOT/settings.json" "${settings_local_args[@]}" || remove_rc=$?
+  else
+    bash "$merger" remove "$fragment" --settings "$TARGET_ROOT/settings.json" || remove_rc=$?
+  fi
+  if [ "$remove_rc" -eq 0 ]; then
     log "  hooks retirés de $TARGET_ROOT/settings.json"
   else
     log "  (retrait hooks échoué pour $mod — best-effort, nettoyer settings.json à la main)"
@@ -390,6 +488,9 @@ seed_module_registres() {
 
 sync_module_governance() {
   local mod="$1"
+  # Chemin « version inchangée » (D-04) : sans cet appel, un lab déjà à jour n'obtiendrait JAMAIS
+  # la lib de portabilité — idempotent au sein du même processus (VF_ENGINE_LIB_COPIED).
+  copy_engine_lib
   copy_module_scripts "$mod"
   merge_module_hooks "$mod"
   # Ordre imposé : le seeder est posé par copy_module_scripts juste au-dessus. L'appeler avant
@@ -475,6 +576,11 @@ install_module() {
   local version
   version=$(module_version_available "$mod")
   log "Installation $mod $version (scope=$VF_SCOPE → $TARGET_ROOT)..."
+
+  # Lib de portabilité (contrat PR #29, D-04) : posée une fois par exécution, avant le traitement
+  # du module — idempotent au sein du même processus (VF_ENGINE_LIB_COPIED), donc sans coût
+  # supplémentaire réel sur une boucle `install --all`/`--with-deps`.
+  copy_engine_lib
 
   # Backup if existing install
   local installed

@@ -146,11 +146,52 @@ done
 [ -n "$TARGET" ] || { err "--target requis (fichier agent .md ou dossier d'agents)"; exit 1; }
 [ -e "$TARGET" ] || { err "cible introuvable : $TARGET"; exit 1; }
 
-# python3 est le cœur (parsing JSON + réécriture précise). Absent → best-effort no-op (exit 0)
-# dans les modes normaux, comme check-agents.sh : jamais faire échouer une install sur une
-# machine sans python3. En --verify UNIQUEMENT : ce repli deviendrait un faux vert (D-09) — le
-# verdict doit rester INDÉTERMINÉ (exit 3), jamais un succès muet.
-if ! command -v python3 >/dev/null 2>&1; then
+# >>> vf-portable:locator (bloc canonique, contrat PR #29 §3 / D-04 — Phase 30 plan 30-05. Ne
+# pas retaper à la main : copier depuis plugin/_internal/lib/vf-portable.sh entre ces deux
+# marqueurs — seul le préfixe de message varie d'un consommateur à l'autre (identité vérifiée
+# par somme de contrôle dans test-vf-portable.sh).
+# Préfixe de ce consommateur : [inject-mcp-tools]
+#   1. $(dirname "$0")/vf-portable.sh              → install à plat (TARGET_ROOT/scripts)
+#   2. $(dirname "$0")/lib/vf-portable.sh           → engine dans le cache du plugin
+#   3. remontée bornée (<= 4 niveaux) depuis $(dirname "$0") vers _internal/lib/vf-portable.sh
+#      → module/installeur exécuté depuis le dépôt, quelle que soit sa profondeur réelle
+#   4. $(dirname "$0")/../../scripts/vf-portable.sh → extracteur kpi copié
+# Aucun candidat trouvé → message préfixé en stderr + sortie non-zéro. Jamais un `source` muet.
+_vf_portable_lib=""
+_vf_portable_dir="$(dirname "$0")"
+for _vf_portable_cand in "$_vf_portable_dir/vf-portable.sh" "$_vf_portable_dir/lib/vf-portable.sh"; do
+  [ -f "$_vf_portable_cand" ] && { _vf_portable_lib="$_vf_portable_cand"; break; }
+done
+if [ -z "$_vf_portable_lib" ]; then
+  _vf_portable_walk="$_vf_portable_dir"
+  for _vf_portable_i in 1 2 3 4; do
+    _vf_portable_walk="$_vf_portable_walk/.."
+    if [ -f "$_vf_portable_walk/_internal/lib/vf-portable.sh" ]; then
+      _vf_portable_lib="$_vf_portable_walk/_internal/lib/vf-portable.sh"
+      break
+    fi
+  done
+fi
+if [ -z "$_vf_portable_lib" ] && [ -f "$_vf_portable_dir/../../scripts/vf-portable.sh" ]; then
+  _vf_portable_lib="$_vf_portable_dir/../../scripts/vf-portable.sh"
+fi
+if [ -z "$_vf_portable_lib" ]; then
+  echo "[inject-mcp-tools] vf-portable.sh introuvable (candidats épuisés — installer/mettre à jour vibeflow)" >&2
+  exit 1
+fi
+# shellcheck source=/dev/null
+. "$_vf_portable_lib"
+unset _vf_portable_lib _vf_portable_dir _vf_portable_cand _vf_portable_walk _vf_portable_i
+# <<< vf-portable:locator
+
+# Script d'install (pas de contrainte de latence, contrat §2) : profil COMPLET de la sonde
+# (sonde d'exécution réelle, gardée par `timeout` là où il existe). Absent → best-effort no-op
+# (exit 0) dans les modes normaux, comme check-agents.sh : jamais faire échouer une install sur
+# une machine sans python3 utilisable. En --verify UNIQUEMENT : ce repli deviendrait un faux vert
+# (D-09) — le verdict doit rester INDÉTERMINÉ (exit 3), jamais un succès muet. Contrat de codes
+# INCHANGÉ par cette migration : elle change QUI résout l'interpréteur, pas ce que best-effort et
+# --verify décident chacun de son absence.
+if ! vf_resolve_python; then
   if [ "$VERIFY" = "true" ]; then
     err "python3 requis pour --verify — verdict INDÉTERMINÉ (jamais un faux vert)."
     exit 3
@@ -160,7 +201,7 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 VF_TARGET="$TARGET" VF_MCP_JSON="$MCP_JSON" VF_CLAUDE_JSON="$CLAUDE_JSON" VF_SERVERS="$SERVERS" \
-VF_FORCE="$FORCE" VF_DRY_RUN="$DRY_RUN" VF_STRICT="$STRICT" VF_VERIFY="$VERIFY" python3 -c '
+VF_FORCE="$FORCE" VF_DRY_RUN="$DRY_RUN" VF_STRICT="$STRICT" VF_VERIFY="$VERIFY" vf_python -c '
 import json, os, re, sys, glob
 
 target      = os.environ["VF_TARGET"]

@@ -132,7 +132,9 @@
 #   en séquentiel avec message — `worktree.baseRef` a bien glissé de PRÉCONDITION DURE vers TUNING
 #   À DÉFAUT SÛR ; (b) et cela ne désarme rien, parce que poser `baseRef: "head"` TAIT LA
 #   VÉRIFICATION SANS RÉSOUDRE LA BASE (le moteur le dit lui-même, `worktree-base-ref.cjs`), et
-#   parce que le second verrou (`open-gsd/gsd-core#3302`) est intact. Un armement dont le réglage
+#   parce que le second verrou (`open-gsd/gsd-core#3302`) tient toujours côté installé : l'issue
+#   est close COMPLETED (2026-08-14, fix mergé amont) mais aucune release > 1.10.0 ne le porte —
+#   close ≠ releasé ≠ installé, le gate Phase 35 reste fermé. Un armement dont le réglage
 #   « sûr » consiste à ÉTEINDRE le contrôle n'est pas un armement sûr. La ligne reste, avec ce
 #   motif — voir la table des armements plus bas.
 #
@@ -484,7 +486,9 @@ report="$(
     #   avec message -- worktree.baseRef a bien glisse de PRECONDITION DURE vers TUNING A DEFAUT
     #   SUR ; (b) et cela ne desarme rien : poser baseRef: head TAIT LA VERIFICATION SANS RESOUDRE
     #   LA BASE (le moteur le dit lui-meme, worktree-base-ref.cjs), et le second verrou
-    #   open-gsd/gsd-core#3302 (retour des commits dun worker isole) reste intact. Un armement dont
+    #   open-gsd/gsd-core#3302 (retour des commits dun worker isole) tient toujours cote installe :
+    #   issue close COMPLETED 2026-08-14 (fix merge amont) mais aucune release > 1.10.0 ne le
+    #   porte -- close != release != installe, gate Phase 35 ferme. Un armement dont
     #   le reglage sur consiste a ETEINDRE le controle nest pas un armement sur. La ligne reste.
     # Ces deux tables ne recoivent AUCUNE variable de surcharge.
     ARM["isolation"] = "worktree-baseref"

@@ -127,6 +127,22 @@ case "$RESOLVE_AGENTS" in
     ;;
 esac
 
+# --- Traduction du silence interne vers le harness (D-06/D-07, uniquement sous --hook) ----------
+# hook_exit <code> : sous --hook, le SEUL code de silence interne (3 = INDETERMINE sur cible vide
+# en --strict) devient 0 à la frontière du harness. Posée ici, au point où le SHELL rend la main
+# (pas à l'intérieur du bloc Python embarqué) — le contrat interne du bloc Python ne change pas :
+# il continue de rendre 3 pour l'INDETERMINE, avec ou sans --hook (voir plus bas, la condition
+# `and not hook` disparaît du DÉCLENCHEMENT de l'exit, jamais du choix d'imprimer ou non). 0 et 1
+# ne sont JAMAIS traduits. Sans --hook (CLI, suites de tests), le code recu ressort inchange. Voir
+# docs/HOOKS-CONTRAT-SORTIE.md §2 et l'entree #2 de l'inventaire.
+hook_exit() { # <code>
+  local code="$1"
+  if [ "$HOOK_MODE" = true ] && [ "$code" -eq 3 ]; then
+    exit 0
+  fi
+  exit "$code"
+}
+
 # ADR-054 : stub Microsoft Store — `python3` présent dans le PATH mais inerte. Détection par
 # CHEMIN (zéro spawn), repli `python` ; sinon message + exit 0 (advisory, comme avant).
 PYBIN=python3
@@ -539,8 +555,11 @@ def check_file(path):
     #      elle : le worker atterrit sur une branche technique repartant de la branche par defaut,
     #      sans aucun fichier du mandat.
     #   2. Meme avec baseRef corrige, rien ne ramene les commits du worker vers la branche de la
-    #      mission — le merge affirme n'est implemente nulle part en amont (open-gsd/gsd-core#3302,
-    #      deja le motif du refus ecrit de claude_orchestration en Phase 27).
+    #      mission sur un moteur installe (<= 1.10.0). Le merge-back est desormais implemente en
+    #      amont (open-gsd/gsd-core#3302, close COMPLETED 2026-08-14 — deja le motif du refus
+    #      ecrit de claude_orchestration en Phase 27) mais PAS release : close != release !=
+    #      installe. Le re-armement reste gate par la Phase 35 (release > 1.10.0 installee ET
+    #      preuve du retour des commits rejouee, WKTR-02).
     # L'isolation reste une decision de DISPATCH du manager (team-kernel.md §Parallelisme), jamais
     # une propriete du worker : portee par le frontmatter elle devient inconditionnelle et retire au
     # manager l'arbitrage que sa propre doctrine lui confie.
@@ -633,8 +652,12 @@ else:
     if not files:
         # Contrat de decouverte (F13, vacuous green) : en --strict, zero cible = zero verdict.
         # exit 3 = INDETERMINE, distinct de 0 = CONFORME. --allow-empty pour les cas legitimes.
-        if strict and not allow_empty and not hook:
-            print(f\"[check-agents] ✗ INDETERMINE : aucun agent dans {agents_dir} — cible absente ou vide, aucun verdict rendu (--allow-empty pour tolerer)\")
+        # Le code de sortie (3) est desormais INCONDITIONNEL — la traduction vers 0 sous --hook
+        # est la responsabilite du shell (hook_exit, hors de ce bloc Python) : seul l'AFFICHAGE
+        # reste conditionne a 'not hook' (le silence de flux, lui, reste un contrat du shell).
+        if strict and not allow_empty:
+            if not hook:
+                print(f\"[check-agents] ✗ INDETERMINE : aucun agent dans {agents_dir} — cible absente ou vide, aucun verdict rendu (--allow-empty pour tolerer)\")
             sys.exit(3)
         if not hook:
             print(f\"[check-agents] aucun agent dans {agents_dir} — rien a verifier\")
@@ -681,3 +704,5 @@ if n_err:
 print(f\"[check-agents] ✓ agents conformes (natif + charte VibeFlow){' · ' + str(n_warn) + ' warning(s)' if n_warn else ''}\")
 sys.exit(0)
 "
+PY_RC=$?
+hook_exit "$PY_RC"

@@ -29,6 +29,13 @@
 #
 # Codes de sortie : 0 = conforme · 1 = non conforme (ou registre canon manquant en --strict)
 #                 · 3 = lab vierge sous --strict --allow-empty (verdict INDÉTERMINÉ ≠ vert, doctrine F13)
+#
+# --hook (D-06/D-07, Portabilité Windows II) arme la TRADUCTION du code de silence interne (3)
+# vers 0 à la frontière du harness, via hook_exit() — SEUL ce code est traduit ; 1 reste inchangé.
+# Correctif au passage (30-06) : le chemin `--strict --allow-empty` sur cible vide sortait
+# INCONDITIONNELLEMENT en 3 avec un message sur STDOUT, même sous --hook — un vrai défaut de FLUX
+# (le même type que celui corrigé au plan 30-04), pas seulement de code : ce chemin n'était encore
+# jamais passé par la garde `--hook` du tout. Il l'est désormais.
 
 set -uo pipefail
 
@@ -51,6 +58,18 @@ done
 REINDEX="$(dirname "$0")/reindex.sh"
 PROBLEMS=()
 WARNINGS=()
+
+# --- Traduction du silence interne vers le harness (D-06/D-07, uniquement sous --hook) ----------
+# hook_exit <code> : sous --hook, le SEUL code de silence interne (3 = lab vierge, INDETERMINE)
+# devient 0 à la frontière du harness. 1 n'est jamais traduit. Sans --hook (CLI, suites de tests),
+# le code recu ressort inchange. Voir docs/HOOKS-CONTRAT-SORTIE.md §2.
+hook_exit() { # <code>
+  local code="$1"
+  if [ "$HOOK_MODE" = true ] && [ "$code" -eq 3 ]; then
+    exit 0
+  fi
+  exit "$code"
+}
 
 # Profil de rigueur du lab : VF_LAB_PROFILE prime, sinon .planning/config.json (clé "profile").
 LAB_PROFILE="${VF_LAB_PROFILE:-}"
@@ -128,8 +147,8 @@ done
 # --allow-empty (Gate C lab frais) : AUCUN registre = lab jamais initialisé → verdict
 # INDÉTERMINÉ (exit 3), pas une non-conformité. Présence PARTIELLE = vrai lab incomplet → 1.
 if [ "$STRICT" = true ] && [ "$ALLOW_EMPTY" = true ] && [ "$found_any" = false ]; then
-  echo "[check-registres] ∅ aucun registre dans $MEMORY_DIR — lab vierge, verdict indéterminé (--allow-empty)"
-  exit 3
+  [ "$HOOK_MODE" = true ] || echo "[check-registres] ∅ aucun registre dans $MEMORY_DIR — lab vierge, verdict indéterminé (--allow-empty)"
+  hook_exit 3
 fi
 if [ "$STRICT" = true ]; then
   declare_missing() { PROBLEMS+=("registre canon manquant : $MEMORY_DIR/$1.md"); }

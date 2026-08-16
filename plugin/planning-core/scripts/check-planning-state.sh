@@ -24,12 +24,28 @@
 # Exit codes (pour un hook qui veut router) :
 #   0 = OK (frais)        1 = STATE périmé        2 = STATE absent
 #   3 = .planning/ absent (lab non amorcé)
+#
+# --hook (D-06/D-07, Portabilité Windows II) — PARITÉ D'INTERFACE avec les autres scripts de hook
+# du dépôt : accepté par le parsing, mais PAS ENCORE passé par la ligne d'invocation du fragment
+# `hooks.json` (qui reste `--defer-to-gsd`, sans --hook) — ce câblage appartient à la migration en
+# forme exec de la polarité gouvernance, hors périmètre de ce plan (D-07). Sous --hook, les TROIS
+# codes advisory (1 = STATE périmé, 2 = STATE absent, 3 = .planning/ absent) deviennent 0 à la
+# frontière du harness : contrairement aux autres scripts du parc, le silence n'est PAS porté par
+# 0 seul ici — ce script n'a jamais eu de code « signal » à 0, ses trois diagnostics vivent tous
+# hors de 0. Sous le nouveau contrat (0 = rien à signaler OU signal émis normalement,
+# docs/HOOKS-CONTRAT-SORTIE.md §1), les trois doivent donc migrer vers 0 pour continuer à injecter
+# leur message de rappel dans le contexte de session (comportement voulu par ADR-043/055,
+# inchangé : ce script n'est jamais silencieux sur un rappel utile, --quiet mis à part). --hook et
+# --quiet ensemble → exit 64 (même code d'erreur d'argument que le reste du script) : les deux
+# sont contradictoires (l'un veut le rendu advisory, l'autre le silence total). Sans --hook (CLI,
+# suites de tests), tous les codes documentés ci-dessus restent inchangés.
 set -uo pipefail
 
 PLANNING_DIR=".planning"
 MAX_AGE_DAYS=7
 QUIET=0
 DEFER_TO_GSD=0
+HOOK=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -37,12 +53,37 @@ while [ "$#" -gt 0 ]; do
     --max-age-days) MAX_AGE_DAYS="${2:?--max-age-days nécessite une valeur}"; shift 2 ;;
     --quiet) QUIET=1; shift ;;
     --defer-to-gsd) DEFER_TO_GSD=1; shift ;;
+    --hook) HOOK=1; shift ;;
     -h|--help) grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *) echo "[check-planning-state] argument inconnu : $1" >&2; exit 64 ;;
   esac
 done
 
+if [ "$HOOK" -eq 1 ] && [ "$QUIET" -eq 1 ]; then
+  echo "[check-planning-state] --hook et --quiet sont mutuellement exclusifs" >&2
+  exit 64
+fi
+
 say() { [ "$QUIET" -eq 1 ] || echo "[planning-state] $*"; }
+# say_diag : MÊME contenu que say(), mais sur STDERR — réservé au cas nominal « rien à signaler »
+# (STATE.md frais). D-06/D-07 : le chemin nominal silencieux doit avoir un stdout STRICTEMENT
+# VIDE (docs/HOOKS-CONTRAT-SORTIE.md §3) ; ce message existait déjà, mais fuyait sur stdout même
+# dans ce cas-là — défaut de flux corrigé ici, au même titre que ceux du plan 30-04. Les TROIS
+# autres diagnostics (STATE périmé/absent, .planning/ absent) sont de véritables signaux et
+# restent sur stdout via say(), inchangés.
+say_diag() { [ "$QUIET" -eq 1 ] || echo "[planning-state] $*" >&2; }
+
+# --- Traduction du silence interne vers le harness (D-06/D-07, uniquement sous --hook) ----------
+# hook_exit <code> : sous --hook, les TROIS codes advisory (1, 2, 3) deviennent 0 à la frontière
+# du harness — voir la note ci-dessus sur pourquoi ce script s'écarte du patron « silence = 3
+# seul ». Sans --hook, le code recu ressort inchange. Voir docs/HOOKS-CONTRAT-SORTIE.md §2.
+hook_exit() { # <code>
+  local code="$1"
+  if [ "$HOOK" -eq 1 ] && { [ "$code" -eq 1 ] || [ "$code" -eq 2 ] || [ "$code" -eq 3 ]; }; then
+    exit 0
+  fi
+  exit "$code"
+}
 
 # --- ADR-055 : ne pas doubler le digest de GSD ---
 # Si le moteur GSD est actif, gsd-session-state.sh porte déjà le signal de fraîcheur de ce
@@ -65,14 +106,14 @@ today_epoch() { date +%s; }
 # 1. Socle présent ?
 if [ ! -d "$PLANNING_DIR" ]; then
   say "Aucun socle $PLANNING_DIR/ — lab non amorcé. Invoquer /vf-planning pour le mettre en place."
-  exit 3
+  hook_exit 3
 fi
 
 STATE_FILE="$PLANNING_DIR/STATE.md"
 # 2. STATE présent ? (clé de voûte)
 if [ ! -f "$STATE_FILE" ]; then
   say "$PLANNING_DIR/ existe mais STATE.md (clé de voûte) est ABSENT. Le recréer via /vf-planning."
-  exit 2
+  hook_exit 2
 fi
 
 # 3. Fraîcheur : lire last_updated dans le frontmatter YAML.
@@ -83,7 +124,7 @@ raw_date=$(grep -m1 '^last_updated:' "$STATE_FILE" | grep -oE '[0-9]{4}-[0-9]{1,
 
 if [ -z "$raw_date" ]; then
   say "STATE.md présent mais sans 'last_updated' lisible (YYYY-MM-DD). Ajouter le champ au frontmatter."
-  exit 1
+  hook_exit 1
 fi
 
 # Normaliser en YYYY-MM-DD (zéro-padding mois/jour) — 10# force la base 10 (piège octal de 08/09).
@@ -94,14 +135,14 @@ ep_then=$(date_to_epoch "$last_updated")
 ep_now=$(today_epoch)
 if [ -z "$ep_then" ]; then
   say "Impossible de parser last_updated='$last_updated' (valeur extraite : '$raw_date'). Vérifier le format YYYY-MM-DD."
-  exit 1
+  hook_exit 1
 fi
 
 age_days=$(( (ep_now - ep_then) / 86400 ))
 if [ "$age_days" -gt "$MAX_AGE_DAYS" ]; then
   say "STATE.md périmé : $age_days j depuis la dernière maj ($last_updated, seuil ${MAX_AGE_DAYS}j). Le rafraîchir."
-  exit 1
+  hook_exit 1
 fi
 
-say "OK — STATE.md frais ($age_days j ≤ ${MAX_AGE_DAYS}j, maj $last_updated)."
+say_diag "OK — STATE.md frais ($age_days j ≤ ${MAX_AGE_DAYS}j, maj $last_updated)."
 exit 0

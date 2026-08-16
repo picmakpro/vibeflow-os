@@ -8,6 +8,9 @@
 #                  du lab ; rétro-compat dev-orchestrator (agent + references D7 présents).
 #   T3 (local)   — VF_SCOPE=local install → ./.gitignore du lab contient les chemins ;
 #                  2e run = pas de doublon (idempotent, grep -c == 1).
+#   T3c (local)  — Phase 30 tâche 4 : .claude/settings.json (écrit par merge_module_hooks sur un
+#                  module à hooks) est gitignoré exactement une fois, idempotent ; en scope
+#                  project le même module ne crée/ne touche PAS .gitignore (SCOPE-04 borné).
 #   T4 (no clone)— aucun `git clone`/`git pull` dans le source de l'engine (assert statique).
 #   T5 (résolveur RÉELLEMENT exercé) — resolve-deps.sh copié dans $CACHE/_internal/, puis
 #                  install --with-deps validator → fermeture {consolidator, infrastructure-audit,
@@ -163,6 +166,58 @@ if prepare_module "$CACHE" "consolidator"; then
   [ "$miss" -eq 0 ] && ok "T3b local : registres semés ET gitignorés (SCOPE-04 tenu jusqu'aux registres)"
 else
   skip "T3b local : consolidator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T3c (local → .claude/settings.json + .claude/settings.local.json gitignorés, Phase 30 tâche 4 +
+# correction ciblée post-revue) — un module qui PORTE un fragment hooks/hooks.json écrit dans
+# $TARGET_ROOT/settings.json (merge_module_hooks) ET, depuis le routage --settings-local, dans
+# $TARGET_ROOT/settings.local.json pour toute entrée portant {{VF_BASH}} ; en scope local, la
+# promesse « rien ne sera committé » doit couvrir les DEUX fichiers. Avant ce plan, aucune ligne de
+# gitignore_add_paths() ne couvrait settings.json — mesuré à la lecture réelle du fichier, pas
+# supposé (voir SUMMARY, écart de comptage ~12 vs réel). settings.local.json est resté NON couvert
+# une itération de plus : la revue a testé — et invalidé — l'hypothèse que la convention de nommage
+# suffisait sans une entrée .gitignore explicite du DÉPÔT CIBLE (elle ne tenait que via le
+# ~/.config/git/ignore personnel du mainteneur, absent sur un lab frais).
+# Cas négatif : le même module en scope PROJECT ⇒ .gitignore n'est ni créé ni modifié (SCOPE-04
+# reste borné au scope local, gitignore_add_paths() retourne tôt sur tout autre scope).
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  (cd "$LAB" && git init -q && VF_SCOPE=local VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" install dev-orchestrator >/dev/null 2>&1)
+  # 2e run sur le même lab : idempotence, pas de doublon.
+  (cd "$LAB" && VF_SCOPE=local VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" install dev-orchestrator >/dev/null 2>&1)
+  miss=0
+  n=$("$GREP" -cxF ".claude/settings.json" "$LAB/.gitignore" 2>/dev/null || true)
+  [ "${n:-0}" -eq 1 ] \
+    || { ko "T3c local : .claude/settings.json apparaît $n fois dans .gitignore (attendu 1)"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T3c local : .claude/settings.json gitignoré exactement une fois, idempotent après 2 runs"
+  miss=0
+  n=$("$GREP" -cxF ".claude/settings.local.json" "$LAB/.gitignore" 2>/dev/null || true)
+  [ "${n:-0}" -eq 1 ] \
+    || { ko "T3c local : .claude/settings.local.json apparaît $n fois dans .gitignore (attendu 1)"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T3c local : .claude/settings.local.json gitignoré exactement une fois, idempotent après 2 runs (correction post-revue)"
+else
+  skip "T3c local : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  (cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" install dev-orchestrator >/dev/null 2>&1)
+  if [ -f "$LAB/.gitignore" ]; then
+    ko "T3c (négatif) project : .gitignore créé alors que le scope n'est pas local (SCOPE-04 violé)"
+  else
+    ok "T3c (négatif) project : .gitignore absent/inchangé — SCOPE-04 reste borné au scope local"
+  fi
+else
+  skip "T3c (négatif) project : dev-orchestrator non copiable dans le cache de test"
 fi
 rm -rf "$LAB"
 
@@ -355,6 +410,228 @@ miss=0
   || { ko "T9 : known-versions.txt marqué exécutable — c'est une donnée, pas un script"; miss=1; }
 [ "$miss" -eq 0 ] \
   && ok "T9 (DISCRIMINANT) : *.txt posé non exécutable, résidu .bak écarté"
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# Helper (Phase 30 tâche 07, PORT-02) — vérifie la forme exec TELLE QU'INSTALLÉE dans un
+# settings*.json : chaque entrée VF (clé `args` présente) porte un `command` ABSOLU, EXISTANT,
+# EXÉCUTABLE sur cette machine, et aucun placeholder {{...}} ne subsiste dans le fichier entier.
+# `expect_n`, si fourni, doit égaler EXACTEMENT le nombre d'entrées exec trouvées — sinon KO en
+# nommant les scripts présents (c'est ce qui fait rougir le cas sous mutation, tâche 2).
+# Garde anti-vert-à-vide : 0 entrée est TOUJOURS un échec, `expect_n` fourni ou non.
+# ---------------------------------------------------------------------------
+check_exec_settings() {
+  local settings="$1" expect_n="${2:-}"
+  python3 - "$settings" "$expect_n" <<'PYEOF'
+import json, os, sys
+path, expect = sys.argv[1], (sys.argv[2] if len(sys.argv) > 2 else "")
+if not os.path.isfile(path):
+    print(f"{path} : fichier absent (0 entrée VF posée — garde anti-vert-à-vide)")
+    sys.exit(1)
+raw = open(path, encoding="utf-8").read()
+if "{{" in raw:
+    print(f"{path} : placeholder littéral résiduel")
+    sys.exit(1)
+try:
+    d = json.loads(raw) if raw.strip() else {}
+except Exception as e:
+    print(f"{path} : JSON invalide ({e})")
+    sys.exit(1)
+entries = []
+for ev, groups in d.get("hooks", {}).items():
+    for g in groups or []:
+        for h in g.get("hooks", []) or []:
+            if "args" in h:
+                entries.append(h)
+if not entries:
+    print(f"{path} : 0 entrée VF (args) posée — garde anti-vert-à-vide")
+    sys.exit(1)
+if expect and str(len(entries)) != str(expect):
+    names = []
+    for h in entries:
+        for a in h.get("args", []) or []:
+            if isinstance(a, str) and (a.endswith(".sh") or a.endswith(".py")):
+                names.append(a.rsplit("/", 1)[-1])
+    print(f"{path} : {len(entries)} entrée(s) exec (attendu {expect}) — présentes : {sorted(names)}")
+    sys.exit(1)
+for h in entries:
+    cmd = h.get("command", "")
+    if not cmd.startswith("/") or not (os.path.isfile(cmd) and os.access(cmd, os.X_OK)):
+        print(f"{path} : command non absolu/exécutable sur cette machine : {cmd!r}")
+        sys.exit(1)
+print(f"{path} : {len(entries)} entrée(s) exec, command absolu+exécutable, aucun placeholder")
+sys.exit(0)
+PYEOF
+}
+
+# ---------------------------------------------------------------------------
+# T10 (forme exec TELLE QU'INSTALLÉE, PORT-02) — install réelle des deux modules du périmètre
+# dev, assertions sur le settings.local.json PRODUIT (pas sur les fragments source — régression
+# #38 : un gate qui n'exerce que l'arbre source ne prouve rien sur ce que l'install pose chez
+# l'utilisateur). Les 5 entrées ({{VF_BASH}} dans les deux fragments) routent vers
+# settings.local.json en scope project (défaut) — jamais settings.json.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+if prepare_module "$CACHE" "dev-orchestrator" && prepare_module "$CACHE" "software-architecture"; then
+  (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install dev-orchestrator >/dev/null 2>&1)
+  (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install software-architecture >/dev/null 2>&1)
+  MSG=$(check_exec_settings "$LAB/.claude/settings.local.json" 5 2>&1); RC=$?
+  if [ "$RC" -eq 0 ]; then
+    ok "T10 exec install (as-installed) : $MSG"
+  else
+    ko "T10 exec install (as-installed) : $MSG"
+  fi
+
+  # T10-uninstall : désinstaller les deux modules laisse ZÉRO entrée VF résiduelle, settings
+  # valides. Vérifié sur les DEUX fichiers (settings.json ET settings.local.json).
+  (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" uninstall dev-orchestrator >/dev/null 2>&1)
+  (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" uninstall software-architecture >/dev/null 2>&1)
+  miss=0
+  for f in "$LAB/.claude/settings.json" "$LAB/.claude/settings.local.json"; do
+    if [ -f "$f" ]; then
+      n=$(python3 -c "
+import json
+d = json.load(open('$f', encoding='utf-8'))
+print(sum(len(h.get('hooks', [])) for gs in d.get('hooks', {}).values() for h in gs))
+")
+      [ "$n" -eq 0 ] || { ko "T10 uninstall : $f porte encore $n entrée(s) de hooks résiduelle(s)"; miss=1; }
+      python3 -m json.tool "$f" >/dev/null 2>&1 || { ko "T10 uninstall : $f n'est plus un JSON valide"; miss=1; }
+    fi
+  done
+  [ "$miss" -eq 0 ] && ok "T10 uninstall : dev-orchestrator + software-architecture retirés, zéro entrée VF résiduelle, settings valides"
+else
+  skip "T10 exec install : dev-orchestrator/software-architecture non copiables dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T10b (garde anti-vert-à-vide, prouvée) — check_exec_settings() échoue si le fichier n'a AUCUNE
+# entrée VF, plutôt que de passer silencieusement sur un settings.local.json vide/inexistant.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+mkdir -p "$LAB/.claude"
+printf '{"hooks":{}}\n' > "$LAB/.claude/settings.local.json"
+MSG=$(check_exec_settings "$LAB/.claude/settings.local.json" 2>&1); RC=$?
+if [ "$RC" -ne 0 ]; then
+  ok "T10b garde anti-vert-à-vide : settings.local.json sans entrée VF fait échouer le cas ($MSG)"
+else
+  ko "T10b garde anti-vert-à-vide : settings.local.json vide a été accepté à tort"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T11 (compatibilité descendante à l'update, le scénario qui compte réellement — A-30-07-1) :
+# un lab qui a installé dev-orchestrator AVANT cette phase porte ses 4 hooks en ANCIENNE forme
+# shell dans settings.json (fragment shell + prefix littéral déjà résolu, comme le posait
+# merge-hooks.sh avant la migration). On lance l'installeur ACTUEL (fragment migré, tâche 1) et on
+# attend : les 4 anciennes entrées shell ont disparu de settings.json, remplacées par 4 entrées
+# exec dans settings.local.json — une seule par script, aucun doublon nulle part.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  mkdir -p "$LAB/.claude"
+  OLD_FRAGMENT="$LAB/old-dev-orchestrator-hooks.json"
+  cat > "$OLD_FRAGMENT" <<'EOF'
+{
+  "description": "Signaux de démarrage du moteur de dev (forme shell — état du parc AVANT la Phase 30 tâche 07).",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-dev-bootstrap.sh --hook || true" },
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/discover-unintegrated-docs.sh --hook || true" },
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-doc-drift.sh --hook || true" },
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-gsd-config.sh --hook || true" }
+        ]
+      }
+    ]
+  }
+}
+EOF
+  # Simule le settings.json d'un lab déjà installé, EN DEHORS de l'installeur (le vécu d'un lab
+  # existant, jamais réinstallé depuis) : merge direct de l'ancien fragment shell.
+  bash "$INTERNAL_DIR/merge-hooks.sh" merge "$OLD_FRAGMENT" \
+    --settings "$LAB/.claude/settings.json" \
+    --scripts-prefix '"$CLAUDE_PROJECT_DIR"/.claude/scripts' >/dev/null 2>&1
+  BEFORE_N=$(python3 -c "
+import json
+d = json.load(open('$LAB/.claude/settings.json', encoding='utf-8'))
+print(sum(len(h.get('hooks', [])) for gs in d.get('hooks', {}).values() for h in gs))
+" 2>/dev/null || echo 0)
+
+  # Update réel : cache = état ACTUEL du repo (fragment migré par la tâche 1).
+  (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install dev-orchestrator >/dev/null 2>&1)
+
+  miss=0
+  [ "$BEFORE_N" -eq 4 ] || { ko "T11 compat descendante : pré-seed shell invalide ($BEFORE_N entrées avant update, attendu 4)"; miss=1; }
+  OLD_RESIDUAL=$(python3 -c "
+import json
+d = json.load(open('$LAB/.claude/settings.json', encoding='utf-8'))
+names = set()
+import re
+pat = re.compile(r'([A-Za-z0-9._-]+\.(?:sh|py))')
+for gs in d.get('hooks', {}).values():
+    for g in gs:
+        for h in g.get('hooks', []):
+            names.update(pat.findall(h.get('command', '')))
+            for a in h.get('args', []) or []:
+                if isinstance(a, str):
+                    names.update(pat.findall(a))
+expected = {'check-dev-bootstrap.sh', 'discover-unintegrated-docs.sh', 'check-doc-drift.sh', 'check-gsd-config.sh'}
+print(len(names & expected))
+")
+  [ "$OLD_RESIDUAL" -eq 0 ] || { ko "T11 compat descendante : $OLD_RESIDUAL ancienne(s) entrée(s) shell encore dans settings.json (attendu 0, purge cross-cible en échec)"; miss=1; }
+  MSG=$(check_exec_settings "$LAB/.claude/settings.local.json" 4 2>&1) || { ko "T11 compat descendante : $MSG"; miss=1; }
+  [ "$miss" -eq 0 ] \
+    && ok "T11 compat descendante : lab shell pré-existant → update réel → 4 anciennes entrées purgées de settings.json, 4 entrées exec dans settings.local.json (une seule par script)"
+else
+  skip "T11 compat descendante : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T12 (mutation, discriminance de T10 prouvée) — remettre UNE entrée en forme shell dans le
+# fragment dev-orchestrator (check-doc-drift.sh) doit faire rougir check_exec_settings(), en
+# nommant l'entrée fautive absente du décompte exec. La régression jouée ici serait invisible à
+# un test qui ne compterait que "au moins 1 entrée exec".
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  # Mutation : un seul hook repasse en forme shell (perte du champ `args`), les 3 autres restent
+  # en forme exec — reproduit exactement une régression partielle, pas un retour en bloc.
+  python3 -c "
+import json
+p = '$CACHE/dev-orchestrator/hooks/hooks.json'
+d = json.load(open(p, encoding='utf-8'))
+group = d['hooks']['SessionStart'][0]
+for h in group['hooks']:
+    if 'check-doc-drift.sh' in ' '.join(h.get('args', [])):
+        h.pop('args', None)
+        h['command'] = 'bash {{VF_SCRIPTS}}/check-doc-drift.sh --hook || true'
+json.dump(d, open(p, 'w', encoding='utf-8'), indent=2, ensure_ascii=False)
+"
+  (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install dev-orchestrator >/dev/null 2>&1)
+  MSG=$(check_exec_settings "$LAB/.claude/settings.local.json" 4 2>&1); RC=$?
+  # L'entrée fautive est celle des 4 scripts attendus ABSENTE du décompte exec — calculée par
+  # différence d'ensemble, pour la nommer explicitement plutôt que de se contenter de "3 ≠ 4".
+  FAUTIVE=$(python3 -c "
+expected = {'check-dev-bootstrap.sh', 'discover-unintegrated-docs.sh', 'check-doc-drift.sh', 'check-gsd-config.sh'}
+msg = '''$MSG'''
+present = {n.strip(\"' \") for n in msg.split('[', 1)[-1].split(']', 1)[0].split(',')} if '[' in msg else set()
+print(', '.join(sorted(expected - present)) or 'aucune (décompte inattendu)')
+" 2>/dev/null)
+  if [ "$RC" -ne 0 ] && [ "$FAUTIVE" = "check-doc-drift.sh" ]; then
+    ok "T12 mutation (trace du rouge) : entrée fautive nommée = $FAUTIVE (remise en forme shell) → cas rouge ($MSG)"
+  else
+    ko "T12 mutation : la mutation shell aurait dû faire rougir le cas exec-count en nommant check-doc-drift.sh, obtenu rc=$RC entrée-fautive='$FAUTIVE' (msg=$MSG)"
+  fi
+else
+  skip "T12 mutation : dev-orchestrator non copiable dans le cache de test"
+fi
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------

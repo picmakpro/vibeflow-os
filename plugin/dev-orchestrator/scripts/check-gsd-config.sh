@@ -225,10 +225,11 @@
 # où l'on ferme un vecteur d'exécution de code (voir « Sécurité »). Un poste qui installe le moteur
 # par npm reste servi par la branche $HOME, celle que pose l'installeur officiel.
 #
-# --hook change UNIQUEMENT le format d'affichage (parité d'interface avec les trois autres gates du
-# module) ; ce script n'a qu'un seul gabarit de signal, donc --hook n'altère aucun rendu — il ne
-# sert qu'à la cohérence d'interface et au gate de mutuelle exclusion avec --quiet. Les 3 exits
-# (0/3/64) restent identiques avec ou sans --hook.
+# --hook ne change pas le rendu (parité d'interface avec les trois autres gates du module ; ce
+# script n'a qu'un seul gabarit de signal) — il sert à la cohérence d'interface, au gate de
+# mutuelle exclusion avec --quiet, ET (D-06, Portabilité Windows II) arme la traduction du code de
+# silence interne (3) vers 0 à la frontière du harness via hook_exit(). Sans --hook (CLI, suites de
+# tests), les 3 codes ci-dessous restent INCHANGÉS. Voir docs/HOOKS-CONTRAT-SORTIE.md.
 #
 # Interdit dans ce script (critères machine du plan) : aucun appel à eval, aucun bash -c sur une
 # valeur lue depuis le fichier audité ou depuis la sortie node (T-23-02-01) ; et, dans le programme
@@ -237,6 +238,7 @@
 # (T-23-02-07). Les deux sont vérifiés par la suite dédiée.
 #
 # Exit codes:
+#   Contrat interne, ci-dessous — s'applique SANS --hook.
 #   0  = au moins un signal [gsd-config] émis — clés inconnues, toggles non écrits, OU moteur lu
 #        mais illisible (« gate périmé », arbitrage A-9 : ce cas PARLE, il ne se tait plus en 3)
 #   3  = rien à signaler (fichier audité absent ou illisible, JSON invalide, moteur introuvable,
@@ -246,7 +248,8 @@
 # CONTRAT FERMÉ : {0, 3, 64} et RIEN D'AUTRE. Aucun chemin d'échec ne doit en sortir — HOME non
 # défini inclus (référence guardée `${HOME:-}` dans la cascade : sous set -u une référence nue y
 # sortait en 1 avec un message sur stderr MALGRÉ --quiet). La suite dédiée porte un balayage final
-# qui rejoue toutes les fixtures et échoue sur tout rc hors de cet ensemble.
+# qui rejoue toutes les fixtures et échoue sur tout rc hors de cet ensemble. Sous --hook, ce même
+# contrat fermé devient {0, 64} à la frontière du harness — hook_exit() ne touche jamais 0 ni 64.
 set -uo pipefail
 
 ROOT="."
@@ -282,12 +285,25 @@ fi
 
 say() { [ "$QUIET" -eq 1 ] || echo "[check-gsd-config] $*" >&2; }
 
+# --- Traduction du silence interne vers le harness (D-06, uniquement sous --hook) ---------------
+# hook_exit <code> : sous --hook, le SEUL code de silence interne (3) devient 0 à la frontière du
+# harness — une TRADUCTION, jamais un masquage : elle ne touche ni le code d'erreur d'argument
+# (64), ni 0, ni aucun autre code. Sans --hook (CLI, suites de tests), le code reçu ressort
+# inchangé. Voir docs/HOOKS-CONTRAT-SORTIE.md §2.
+hook_exit() { # <code>
+  local code="$1"
+  if [ "$HOOK" -eq 1 ] && [ "$code" -eq 3 ]; then
+    exit 0
+  fi
+  exit "$code"
+}
+
 # --- Fichier audité -----------------------------------------------------------------------------
 CONFIG_PATH="${VF_CONFIG_PATH:-$ROOT/.planning/config.json}"
 
 if [ ! -f "$CONFIG_PATH" ]; then
   say "$CONFIG_PATH introuvable — rien à constater."
-  exit 3
+  hook_exit 3
 fi
 
 # --- Résolution du moteur -----------------------------------------------------------------------
@@ -307,12 +323,12 @@ fi
 
 if [ -z "$LIB" ]; then
   say "moteur gsd-core introuvable — un gate qui ne peut rien constater ne prétend rien."
-  exit 3
+  hook_exit 3
 fi
 
 if ! command -v node >/dev/null 2>&1; then
   say "node introuvable — rien à constater."
-  exit 3
+  hook_exit 3
 fi
 
 # --- Liste arbitrée des toggles de cycle (D-19) -------------------------------------------------
@@ -602,7 +618,7 @@ NODE_RC=$?
 
 if [ "$NODE_RC" -ne 0 ]; then
   say "clés connues illisibles depuis $LIB ou $CONFIG_PATH illisible — rien à constater."
-  exit 3
+  hook_exit 3
 fi
 
 # --- Comparaison et mise en forme (côté bash) ---------------------------------------------------
@@ -709,4 +725,4 @@ if [ "$SIGNAL" -eq 1 ]; then
 fi
 
 say "$CONFIG_PATH est aligné sur le moteur ($LIB) — rien à signaler."
-exit 3
+hook_exit 3

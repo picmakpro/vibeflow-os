@@ -43,9 +43,14 @@
 #
 # Defaults: --path .   (le `.planning/` inspecté est `<--path>/.planning`)
 #
-# `--hook` ne change QUE le rendu (une ligne de signal sur stdout pour les seuls états 3 et 4,
-# silence total sinon — stdout ET stderr). Il ne change AUCUN code de sortie : parité stricte avec
-# les autres gates de ce dépôt.
+# `--hook` (D-06/D-07, Portabilité Windows II) arme désormais la TRADUCTION des codes SILENCIEUX
+# vers 0 à la frontière du harness : code 3 (SILENCE — rien à vérifier) ET code 2 (NON VÉRIFIABLE —
+# fail-open advisory, jamais le code 2 RÉSERVÉ au blocage délibéré du harness, cf.
+# docs/HOOKS-CONTRAT-SORTIE.md §1). Code 1 (échec constaté, signal) et 64 (usage) restent
+# INCHANGÉS. Le rendu, lui, ne bouge pas : une ligne de signal sur stdout pour les seuls états 3 et
+# 4 du docstring ci-dessus, silence total (stdout ET stderr) sinon — avec ou sans --hook. Sans
+# --hook (CLI, suites de tests), tous les codes documentés ci-dessous restent inchangés. Voir
+# docs/HOOKS-CONTRAT-SORTIE.md pour le contrat complet.
 #
 # Env:
 #   GSD_WORKSTREAM              — canal de premier rang du moteur ; vide ou absent = non résolu.
@@ -58,9 +63,13 @@
 #   2  = NON VÉRIFIABLE — hors dépôt git, `.planning/` illisible, `workstreams/` illisible ou non
 #        répertoire, pointeur partagé non lisible SANS RISQUE (lien symbolique refusé, non
 #        régulier, au-delà de la borne d'octets), ou nom hors de la politique du moteur.
-#        Jamais un 0 de complaisance : « je n'ai pas pu regarder » ne vaut pas « conforme ».
-#   3  = SILENCE — dépôt non partitionné, vérifié : il n'y a rien à dire.
-#   64 = erreur d'usage (argument inconnu, option sans valeur).
+#        Jamais un 0 de complaisance : « je n'ai pas pu regarder » ne vaut pas « conforme ». Ceci
+#        est le contrat SANS --hook (CLI, suites de tests) ; sous --hook ce code est advisory
+#        fail-open, jamais le code 2 réservé au blocage délibéré du harness — hook_exit le traduit
+#        vers 0 (D-06/D-07).
+#   3  = SILENCE — dépôt non partitionné, vérifié : il n'y a rien à dire. Sous --hook, hook_exit
+#        traduit ce code vers 0 (D-06/D-07).
+#   64 = erreur d'usage (argument inconnu, option sans valeur) — jamais traduit.
 set -uo pipefail
 
 ROOT="."
@@ -91,9 +100,22 @@ signal() {
   else echo "[check-workstream-pointer] $*" >&2; fi
 }
 
+# --- Traduction du silence interne vers le harness (D-06/D-07, uniquement sous --hook) ----------
+# hook_exit <code> : sous --hook, les codes SILENCIEUX (3 = SILENCE, 2 = NON VÉRIFIABLE — advisory
+# fail-open, jamais le code 2 réservé au blocage délibéré du harness, docs/HOOKS-CONTRAT-SORTIE.md
+# §1) deviennent 0 à la frontière du harness. Le signal (1) et l'erreur d'usage (64) ne sont
+# JAMAIS traduits. Sans --hook, le code reçu ressort inchangé.
+hook_exit() { # <code>
+  local code="$1"
+  if [ "$HOOK" -eq 1 ] && { [ "$code" -eq 2 ] || [ "$code" -eq 3 ]; }; then
+    exit 0
+  fi
+  exit "$code"
+}
+
 non_verifiable() {
   diag "NON VÉRIFIABLE, rien n'a pu être constaté : $1"
-  exit 2
+  hook_exit 2
 }
 
 export GIT_CONFIG_NOSYSTEM=1
@@ -117,7 +139,7 @@ POINTER="$PLANNING/active-workstream"
 # --- État 0 : dépôt non partitionné ---------------------------------------------------------------
 if [ ! -e "$WS_ROOT" ]; then
   diag "SILENCE — dépôt non partitionné ($WS_ROOT absent) : rien à vérifier."
-  exit 3
+  hook_exit 3
 fi
 { [ -d "$WS_ROOT" ] && [ -r "$WS_ROOT" ] && [ -x "$WS_ROOT" ]; } \
   || non_verifiable "$WS_ROOT existe mais n'est pas un répertoire lisible"
