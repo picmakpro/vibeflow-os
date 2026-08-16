@@ -117,6 +117,11 @@ bug d'install vécu sur le terrain, ADR-054) :
 5. **Install scopée (INST-04 — déléguée, scope unique partout).** Résoudre la fermeture transitive
    des `requires` via le résolveur (invocation exacte dans la table ci-dessus) et **récapituler** ce qui
    sera posé **AVANT** d'installer (ex. « conductor entraîne planning-core + validator + skill-creator »).
+   - **Plan avant pose (MANI-02, issue #20)** → même invocation, préfixée `--dry-run` :
+     `VIBEFLOW_CACHE="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/vibeflow-update.sh" --scope <s> --dry-run install --with-deps <module>`.
+     Afficher la sortie TELLE QUELLE (c'est du stdout, capturable sans les diagnostics stderr) : le
+     plan fichier-par-fichier qui enrichit le récapitulatif ci-dessus. `--dry-run` n'écrit rien et
+     est refusé sur `uninstall` — il ne protège pas ce verbe-là.
    - **Modules VibeFlow** → `VIBEFLOW_CACHE="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/vibeflow-update.sh" --scope <s> install --with-deps <module>`
      (conductor d'office, puis `dev-orchestrator` si branche dev).
      `--with-deps` recâble lui-même le résolveur côté engine.

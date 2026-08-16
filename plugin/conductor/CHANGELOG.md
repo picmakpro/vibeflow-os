@@ -1,5 +1,14 @@
 # Changelog — conductor
 
+## [v1.25.0] — 2026-08-16 (Câblage `--dry-run` dans `/vf-calibrate`, MANI-02/D-31-10)
+
+**Minor** (nouvelle capacité présentée à l'utilisateur) : l'étape 4 point 2 de
+`skills/vf-calibrate/SKILL.md` présente désormais le plan `--dry-run` de l'engine
+(`vibeflow-update.sh --dry-run update <module>`) **avant** de rafraîchir réellement un module —
+la sortie fichier-par-fichier est montrée à l'utilisateur, en contenu du plan de migration déjà
+soumis au feu vert de l'étape 3 (ADR-031), sans nouveau point de décision. Édition minimale,
+répondant à la demande terrain de l'issue #20.
+
 ## [v1.24.0] — 2026-08-16 (Portabilité Windows II — codes de sortie, PORT-03/D-07)
 
 **Minor** (nouveau contrat de sortie) : `check-agents.sh`, `check-branch-claim.sh` et
