@@ -3,6 +3,11 @@
 # scripts/traffic-snapshot.sh corrige aussi le biais CI : chaque job Actions avec `actions/checkout`
 # compte comme un clone (~42 % du volume mesuré le 2026-08-15) — `clones_adjusted` retire ce bruit.
 #
+# ÉTAT : NON ACTIVÉ (2026-08-15) — le secret TRAFFIC_PAT n'a pas encore été posé. Tant qu'il
+# manque, les runs planifiés sortent en vert avec un avertissement « non activé » et ne font rien ;
+# un lancement manuel (workflow_dispatch) échoue, lui, explicitement pour rappeler la marche à
+# suivre. Poser le secret suffit à activer le snapshot — aucun autre changement à faire ici.
+#
 # GESTE HUMAIN REQUIS — le seul que ce workflow ne peut pas faire lui-même :
 #   1. Créer un PAT *fine-grained* limité au seul dépôt picmakpro/vibeflow-os, avec les permissions
 #      "Administration: read" et "Metadata: read" (rien de plus — pas de "Contents", pas de token
@@ -41,13 +46,20 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Garde du secret TRAFFIC_PAT
+        id: garde
         run: |
-          if [ -z "${{ secrets.TRAFFIC_PAT }}" ]; then
+          if [ -n "${{ secrets.TRAFFIC_PAT }}" ]; then
+            echo "actif=true" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "::error::Secret TRAFFIC_PAT manquant — voir l'en-tête de ce fichier (.github/workflows/traffic-snapshot.yml) pour la marche à suivre (PAT fine-grained, permission Administration: read, dépôt picmakpro/vibeflow-os seul)."
             exit 1
+          else
+            echo "::warning::Snapshot NON ACTIVÉ — secret TRAFFIC_PAT absent. Run planifié ignoré sans erreur ; poser le secret (voir l'en-tête du fichier) pour activer le snapshot hebdomadaire."
+            echo "actif=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Préparer le dossier de données (branche traffic-data)
+        if: steps.garde.outputs.actif == 'true'
         run: |
           set -euo pipefail
           git config --global user.name "github-actions[bot]"
@@ -66,12 +78,14 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
 
       - name: Snapshot
+        if: steps.garde.outputs.actif == 'true'
         run: bash scripts/traffic-snapshot.sh --out data/traffic.json
         env:
           TRAFFIC_PAT: ${{ secrets.TRAFFIC_PAT }}
           GH_TOKEN: ${{ github.token }}
 
       - name: Commit + push (seulement si le contenu a changé)
+        if: steps.garde.outputs.actif == 'true'
         working-directory: data
         run: |
           set -euo pipefail

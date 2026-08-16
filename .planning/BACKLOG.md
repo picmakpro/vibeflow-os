@@ -1,5 +1,26 @@
 # Backlog — idées différées (hors milestone courant)
 
+## Alignement « AI Agents in Depth » (Bojie Li) — milestone candidat — INVESTIGUÉ
+**Capturé :** 2026-08-15 · **Investigué :** 2026-08-15 (5 agents : 4 lecteurs couvrant les 10
+chapitres + 1 inventaire VibeFlow) → **rapport : `reports/research/2026-08-15-ai-agent-book-alignement.md`**
+
+**Verdict** : livre sérieux (retour Pine AI, ablations chiffrées) ; VibeFlow convergent sur ≥ 8
+mécanismes majeurs (manager pattern, digest/handoff, veto de rubric, isolation worktree, knowledge
+as code, seuil de proportionnalité multi-agents…) — le livre **valide** plusieurs refus (MemPalace,
+compaction). **4 gaps actionnables**, par impact : (1) **juges à vision** — aucun juge ne voit un
+rendu, le livre chiffre le feedback visuel à +17/+48 pts et 26→52 % ; (2) **calibration des juges**
+(gold set, kappa > 0,7, Pass^k) ; (3) juge hétérogène cross-famille (anti-Goodhart, spike d'abord) ;
+(4) lentille KV-cache dans le validator. Plus un volet doctrine : distiller la théorie nommée
+(Constrain/Verify/Correct, échecs byzantins, MAST, evidence ≠ instructions) dans `plugin/reference/`.
+
+**But exprimé (Samuel)** : améliorer les pratiques similaires au livre, ajouter théorie + pratique,
+combler les gaps — **priorité aux juges design** (gap 1).
+
+**Structure candidate** : milestone « alignement agent-book » en 3 phases + 1 spike (juges à
+vision → calibration → doctrine augmentée ; spike juge hétérogène) — détail §5 du rapport.
+
+**Déclencheur de resurgence :** clôture ou jalon de fiabilite-v1.0, ou décision explicite.
+
 ## Investiguer ICM (Interpretable Context Methodology) — « folder structure as agent architecture » — INVESTIGUÉ
 **Capturé :** 2026-08-15 · **Investigué :** 2026-08-15 (deep-search 4 agents) →
 **rapport : `reports/research/2026-08-15-icm-deep-search.md`**

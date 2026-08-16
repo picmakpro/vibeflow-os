@@ -757,12 +757,14 @@ Recent decisions affecting current work:
 | 260804-ki4 | Invalider et re-régénérer le cache du bandeau update après /vf-update (vf-update-run.sh) — conductor v1.19.2 | 2026-08-04 | `e4a6138` | [260804-ki4-invalider-et-re-r-g-n-rer-le-cache-du-ba](./quick/260804-ki4-invalider-et-re-r-g-n-rer-le-cache-du-ba/) |
 | 260810-fh3 | ensure-design-deps.sh : présence ET activation des 4 plugins de la chaîne design, auto-install non-interactif, câblage engine + agent — design-orchestrator v1.5.0 | 2026-08-10 | `e9b3650` | [260810-fh3-doter-design-orchestrator-d-un-ensure-de](./quick/260810-fh3-doter-design-orchestrator-d-un-ensure-de/) |
 | 260815-tl6 | Snapshot hebdo traffic/clones GitHub (script + workflow cron + branche traffic-data) avec clones ajustés hors jobs CI | 2026-08-15 | `73363c1` | [260815-tl6-snapshot-hebdo-traffic-clones-github-ave](./quick/260815-tl6-snapshot-hebdo-traffic-clones-github-ave/) |
+| 260815-wnk | Capture étude « AI Agents in Depth » × VibeFlow (rapport recherche + entrée backlog milestone candidat) | 2026-08-15 | `f920b09` | [260815-wnk-capture-etude-ai-agent-book](./quick/260815-wnk-capture-etude-ai-agent-book/) |
 
 ## Deferred Items
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
 | Recette humaine | **WINDOWS #3** — valider `test_sim` / `build_sim` / `clean` (clé `vf-mcp-tools`) contre un serveur **XcodeBuildMCP vivant** sur un lab iOS équipé. Reste `open` : **infaisable dans ce dépôt** (aucun `.mcp.json`, serveur non connecté) — toute preuve produite ici serait fabriquée. Se recette sur `RoastMyRoom` ou `FreelanceMoneyCalc`, pas sur `vibeflow-os`. | open | 2026-07-31 |
+| Geste humain | **Snapshot traffic NON ACTIVÉ** (quick 260815-tl6) — le workflow `.github/workflows/traffic-snapshot.yml` est livré mais dormant : il manque le secret dépôt `TRAFFIC_PAT` (PAT fine-grained limité à picmakpro/vibeflow-os, permissions Administration: read + Metadata: read). Tant qu'il manque, les runs cron sortent en vert « non activé » sans rien faire. Activation = poser le secret (marche à suivre dans l'en-tête du workflow) + un `workflow_dispatch` pour amorcer la branche `traffic-data`. | open | 2026-08-15 |
 | Dette outillage | **WINDOWS #4** — `inject-mcp-tools.sh` ne valide pas qu'un nom de serveur cité dans un token `vf-mcp-tools`/`mcp__` **existe réellement**. **Repris au périmètre de la Phase 21, changement 1** : la phase rouvre déjà ce script pour lui donner la découverte des serveurs en scope global (`~/.claude.json`) — une fois la source des noms de serveurs connue du script, valider un nom cité devient possible, alors que c'était structurellement hors de portée tant que la seule source était `./.mcp.json`. | repris en Phase 21 | 2026-07-31 |
 
 ## Session Continuity
