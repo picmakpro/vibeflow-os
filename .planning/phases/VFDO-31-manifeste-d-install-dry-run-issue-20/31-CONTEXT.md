@@ -260,6 +260,17 @@ jamais copiés. Les deux moitiés sont vraies ; c'est la répartition qui manqua
    > Leçon de méthode : ce n'était pas une maladresse de rédaction des plans mais une **ambiguïté du
    > cadrage**. Un point de doctrine qui laisse deux granularités possibles produit deux chemins de
    > code, et tout test de discriminance sur ces deux chemins est contournable par construction.
+   >
+   > **Trou de silence rattrapé (même jour).** L'option A, telle qu'écrite ci-dessus, en a ouvert un :
+   > si `<src_dir>` est **illisible**, l'énumération rend zéro paire, la boucle de vérification
+   > n'itère **jamais**, et **rien n'est dit** — alors que l'émetteur au grain répertoire qu'on
+   > vient de supprimer, lui, parlait. Supprimer un émetteur supprime aussi les cas qu'il était
+   > **seul** à couvrir : c'est le prix de toute unification, et il se paie en cherchant ces cas,
+   > pas en espérant qu'il n'y en ait pas.
+   > **Complément** : le rc du `cp` est **capturé** (`|| cp_rc=$?`, jamais `|| true` — le token
+   > littéral disparaît, la fonction n'avorte pas sous `set -e`, et l'information survit) ; si
+   > `cp_rc != 0` **et** que la boucle n'a détecté **aucun** fichier manquant, une ligne de compte
+   > rendu est émise malgré tout. Le contrat « rien n'échoue en silence » redevient total.
 
 **Ce que cela règle mécaniquement** : les deux critères d'acceptation de `31-03` tâche 2, jusqu'ici
 mutuellement exclusifs, redeviennent satisfiables ensemble. « Plus aucun `cp` direct vers
