@@ -821,10 +821,10 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | PORT-03 | Phase 30 | Pending |
 | PORT-04 | Phase 30 | Tranché 2026-08-15 (Samuel, sans Willy — tracer 01-01 jamais livré) : la Phase 30 porte tout le volet merge-hooks.sh et écrit vf-portable.sh — plan dégaté, spec §3.2 amendée |
 | PORT-05 | Phase 30 | Pending |
-| MANI-01 | Phase 31 | Pending |
-| MANI-02 | Phase 31 | Pending |
-| MANI-03 | Phase 31 | Pending |
-| MANI-04 | Phase 31 | Pending |
+| MANI-01 | Phase 31 | Done — plans 31-01, 31-03 (socle manifeste + migration des ~35 sites d'écriture) |
+| MANI-02 | Phase 31 | Done — plans 31-02, 31-04, 31-06 (mode `plan` de `merge-hooks.sh`, `--dry-run`, câblage skills) |
+| MANI-03 | Phase 31 | Done — plan 31-05 (convergence à l'update, backup avant suppression) |
+| MANI-04 | Phase 31 | Superseded par `31-CONTEXT.md` §4 point 8 — brouillon `31-ISSUE-20-REPLY.md` écrit (plan 31-08), **jamais posté, issue jamais close** (geste humain, ADR-031) |
 | LOCK-01 | Phase 32 | Pending |
 | LOCK-02 | Phase 32 | Pending |
 | LOCK-03 | Phase 32 | Pending — blocage conditionné au spike `reference-transaction` |
@@ -845,7 +845,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | SKIL-01 | Phase 34 | Pending — cadrage go/no-go, aucun code avant le go |
 | AGTS-01 | Phase 34 | Pending |
 | AGTS-02 | Phase 34 | Pending — conditionnée à la sortie d'expérimental de mobile-test |
-| QUAL-01 | Transverse — Phases 30, 31, 32, 33, 18, 25, 35 | Pending — reporté en critère sur chaque phase livrant un gate |
+| QUAL-01 | Transverse — Phases 30, 31, 32, 33, 18, 25, 35 | Pending — satisfait sur les phases 30 et 31 livrées (gates nés avec leurs 3 issues + mutation rouge prouvée) ; reste à tenir sur 32, 33, 18, 25, 35 |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -910,10 +910,10 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [ ] **PORT-05**: La portabilité est prouvée en CI sur lab frais (suites windows-crlf + windows-guards + gates verts)
 
 ### Manifeste d'install + dry-run (issue #20)
-- [ ] **MANI-01**: Chaque module posé écrit son manifeste de chemins (`$TARGET_ROOT/scripts/.vibeflow-manifest-<module>`, LF trié, un chemin par ligne)
-- [ ] **MANI-02**: `--dry-run` montre le plan de pose fichier-par-fichier sans rien écrire — même chemin de code que la pose (install + calibrate)
-- [ ] **MANI-03**: L'update supprime les chemins de l'ancien manifeste absents du nouveau, avec backup systématique et liste signalée à l'utilisateur
-- [ ] **MANI-04**: L'issue GitHub #20 est close par livraison, réponse postée sur l'issue
+- [x] **MANI-01**: Chaque module posé écrit son manifeste de chemins (`$TARGET_ROOT/scripts/.vibeflow-manifest-<module>`, LF trié, un chemin par ligne)
+- [x] **MANI-02**: `--dry-run` montre le plan de pose fichier-par-fichier sans rien écrire — même chemin de code que la pose (install + calibrate)
+- [x] **MANI-03**: L'update supprime les chemins de l'ancien manifeste absents du nouveau, avec backup systématique et liste signalée à l'utilisateur
+- [ ] **MANI-04**: L'issue GitHub #20 est close par livraison, réponse postée sur l'issue — **superseded par `31-CONTEXT.md` §4 point 8** : brouillon écrit (`31-ISSUE-20-REPLY.md`), poster et clore sont des gestes humains (ADR-031), non faits en mission
 
 ### Durcissement du driver-lock
 - [ ] **LOCK-01**: Le heartbeat est séparé de la lease — un manager vivant renouvelle son battement, le TTL ne monte pas

@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: fiabilite-v1.0
 milestone_name: « ce qui survit »
-current_phase: 30
-current_phase_name: Portabilité Windows II
+current_phase: 31
+current_phase_name: Manifeste d'install + dry-run (issue #20)
 status: planning
-stopped_at: Phase 30 livrée et vérifiée — CI verte (run 31918283177, 4/4 jobs), addendum 2026-08-16 sur 30-VERIFICATION.md, hygiène documentaire de clôture posée
-last_updated: "2026-08-16T03:09:16.239Z"
+stopped_at: Phase 31 livrée — 8 plans exécutés sur 6 vagues (branche feat/phase-31-manifeste-dry-run, non mergée), brouillon de réponse issue #20 sur disque (jamais posté), hygiène documentaire de clôture en cours
+last_updated: "2026-08-16T00:00:00.000Z"
 last_activity: 2026-08-16
-last_activity_desc: Phase 30 (Portabilité Windows II) livrée et vérifiée — PORT-05 prouvé en CI après cycle rouge→correctif→vert ; hygiène documentaire de clôture (30-08-SUMMARY.md, 30-RELIQUATS.md soldé, addendum 30-VERIFICATION.md, STATE/ROADMAP)
+last_activity_desc: Phase 31 (Manifeste d'install + dry-run, issue #20) livrée — MANI-01/02/03 tenus (socle manifeste, `--dry-run`, convergence à l'update), MANI-04 superseded (réponse #20 en DRAFT sur disque, jamais postée, issue jamais close — geste humain ADR-031) ; module `conductor` bumpé v1.25.0 ; hygiène documentaire de clôture (STATE/ROADMAP/REQUIREMENTS)
 progress:
   total_phases: 8
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 17
-  completed_plans: 9
-  percent: 13
+  completed_plans: 16
+  percent: 25
 ---
 
 # Project State
@@ -24,7 +24,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26 — charte rouverte : 17 modules, D2/D6 renversées)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Milestone fiabilite-v1.0 — Phase 30 (Portabilité Windows II) à cadrer ; gestes jour 1 : RFC upstream (LEDG-03) + veille gsd-core (WKTR-03)
+**Current focus:** Milestone fiabilite-v1.0 — Phase 30 (Portabilité Windows II) et Phase 31 (Manifeste d'install + dry-run, issue #20) livrées ; Phase 32 (Durcissement du driver-lock) à cadrer
 `get-shit-done-cc` → `@opengsd/gsd-core` livrée en v2.39.0 atteint enfin les **postes déjà équipés** :
 `/vf-update` dit l'état du moteur avant tout stop et propose la bascule sous confirmation ADR-031.
 Modules `dev-orchestrator` v2.7.0 + `conductor` v1.16.0. Verdict `19-VERIFICATION.md` : **PASS 6/7**.
@@ -56,12 +56,15 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 ## Current Position
 
-Phase: 30 (Portabilité Windows II) — livrée et vérifiée
-Plan: 30-09 (dernier plan exécuté) ; nœud `docs` de clôture de phase posé le 2026-08-16
-Status: Phase 30 shipped - PR 43 merged - release v2.53.0 (2026-08-16)
-Last activity: 2026-08-16 — hygiène documentaire de clôture de Phase 30 (30-08-SUMMARY.md créé,
-30-RELIQUATS.md soldé de 4 mineurs, addendum daté sur 30-VERIFICATION.md levant le BLOCKER PORT-05,
-STATE.md/ROADMAP.md mis à jour)
+Phase: 31 (Manifeste d'install + dry-run, issue #20) — livrée, branche non mergée
+Plan: 31-08 (dernier plan exécuté, vague 6) ; nœud `docs` de clôture de phase en cours (2026-08-16)
+Status: Phase 31 shipped - branch feat/phase-31-manifeste-dry-run - not merged (2026-08-16)
+Last activity: 2026-08-16 — hygiène documentaire de clôture de Phase 31 (STATE.md/ROADMAP.md/
+REQUIREMENTS.md mis à jour : MANI-01/02/03 Done, MANI-04 superseded réponse #20 en DRAFT non postée,
+QUAL-01 noté satisfait sur les phases 30 et 31)
+
+Précédent : Phase 30 (Portabilité Windows II) — livrée, vérifiée, **mergée dans `main`** (PR #43,
+release `v2.53.0`, hotfix `v2.53.1` sur les hooks exec).
 
 ## Performance Metrics
 
@@ -329,6 +332,45 @@ STATE.md/ROADMAP.md mis à jour)
 
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
+
+- **2026-08-16 — Phase 31 (Manifeste d'install + dry-run, issue #20) livrée — six arbitrages
+  D-31-11 à D-31-16, tous nés de re-validations trouvant des défauts qu'une suite verte n'avait pas
+  vus.** Détail complet : `31-CONTEXT.md`.
+
+  1. **D-31-11 — `vf_place_tree` : le plan prédit depuis la source, le manifeste consigne la
+     destination.** Quatre point-fixes d'affilée sur la même normalisation (copie de répertoire, le
+     seul site où « même chemin de code » ne peut pas signifier « même source de données ») ont
+     signalé une classe non fermée, fermée par cette distinction explicite.
+
+  2. **D-31-12 — Une garde s'arme au grain unité, pas en attendant que le bout-en-bout l'atteigne.**
+     Constat par mutation : la vague 1 ne câblait qu'un site de pose produisant un manifeste d'une
+     ligne — remplacer le tri par un `cat`, ou neutraliser les exclusions, laissait la suite verte.
+
+  3. **D-31-13 — Déplacer un appel change sa sémantique d'échec : la tolérance se restaure
+     explicitement.** La migration des ~35 sites a réduit des chaînes `a && b && c` (où seule la
+     dernière commande déclenche `errexit`) à un appel unique de helper, durcissant des `cp` qui
+     toléraient l'échec — quatre régressions bloquantes qu'aucune des trois suites vertes n'avait vues.
+
+  4. **D-31-14 — Le no-op hors cycle est sûr, mais il se dit — une ligne par module, pas par
+     chemin.** `vf_manifest_flush` écrase (`mv`) au lieu de fusionner ; `sync` n'ouvre jamais de
+     cycle, donc le fichier dérivé n'est candidat à aucune suppression — mais un no-op qui perd une
+     information doit rester lisible.
+
+  5. **D-31-15 — Le chemin de suppression résout physiquement, pas textuellement** (arbitrage de
+     Samuel), après qu'une revue eut reproduit une suppression HORS `TARGET_ROOT` : `.claude/rules`
+     remplacé par un symlink vers un répertoire ANCÊTRE externe, que la résolution textuelle ne
+     détectait pas — `vf_rel_to_target` durci en résolution physique (`cd -P`/`pwd -P`).
+
+  6. **D-31-16 — À la désinstallation, ne jamais désenregistrer ce qu'on n'a pas su retirer.** Un
+     manifeste imparsable laissait `uninstall` retirer l'entrée du registre en `rc=0` tout en
+     laissant les fichiers sur disque (17 → 24, l'écart étant les backups) — désinstallation
+     amputée, orphelins sans moyen de les retirer puisque le module n'est plus enregistré.
+
+  **Reste à Samuel, gestes humains gatés** : push de la branche `feat/phase-31-manifeste-dry-run`,
+  PR, et release racine (VERSION / plugin.json / marketplace.json intouchés par la phase — module
+  `conductor` bumpé v1.25.0, en attente de distribution). MANI-04 n'est pas tenu au sens littéral du
+  ROADMAP — `31-ISSUE-20-REPLY.md` est un brouillon sur disque, jamais posté, l'issue #20 jamais
+  close (poster/clore sont des gestes humains, ADR-031).
 
 - **2026-08-16 — Phase 30 (Portabilité Windows II) livrée et vérifiée ; branche isolée d'un
   contenu tiers par chirurgie d'historique.** Quatre faits :
@@ -767,12 +809,10 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-**Resume file:** .planning/phases/VFDO-30-portabilit-windows-ii/30-CONTEXT.md
+**Resume file:** .planning/phases/VFDO-31-manifeste-d-install-dry-run-issue-20/31-CONTEXT.md
 
-Last session: 2026-08-15T18:34:45.705Z
-Stopped at: Phase 30 context gathered
-ubuntu:24.04) — 3 jobs verts au run 30257419335. Modules bumpés : conductor v1.14.5,
-consolidator v1.8.1, dev-orchestrator v2.3.2. Leçon durable : tout bash développé sur macOS/BSD
-doit être reproduit sous `docker run ubuntu:24.04` avant push (stat/-f, TMPDIR, outillage hôte).
-Reprendre par : **release patch v2.39.1** (décision humaine — distribue les fixes aux labs, dont
-le vol de lock ABA), et l'arbitrage engine sur les templates-memoire jamais posés à l'install.
+Last session: 2026-08-16T00:00:00.000Z
+Stopped at: Phase 31 livrée (8 plans, 6 vagues) — hygiène documentaire de clôture posée
+Reprendre par : gestes humains gatés — push de la branche `feat/phase-31-manifeste-dry-run`, PR,
+puis cadrage de la Phase 32 (Durcissement du driver-lock), qui dépend de la forme exec des hooks
+livrée en Phase 30 et ne touche que `conductor`.

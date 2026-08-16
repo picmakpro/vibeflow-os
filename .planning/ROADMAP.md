@@ -71,7 +71,7 @@
 - [x] Phase 28: Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur (completed 2026-08-15)
 - [x] Phase 29: Distiller les gains ICM (G1-G5) — investigation dag.sh --scope d'abord (completed 2026-08-15)
 - [x] Phase 30: Portabilité Windows II (completed 2026-08-16)
-- [ ] Phase 31: Manifeste d'install + dry-run (issue #20)
+- [x] Phase 31: Manifeste d'install + dry-run (issue #20) (completed 2026-08-16)
 - [ ] Phase 32: Durcissement du driver-lock
 - [ ] Phase 33: Watchdog & notifications des missions
 - [ ] Phase 34: Gaps agency-agents & cadrage skill-installer
@@ -473,8 +473,8 @@ Plans:
 | 27. Parallélisation d'exécution — granulaire, simple, sans collision | gsd-alignement | 6/6 | Complete (PR #35) — spike `claude_orchestration` refusé par écrit | 2026-08-10 |
 | 28. Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur | agentique-v1.0 | 3/3 | Complete — PR #42, release `v2.52.0`, CI main verte, gate + `lab-frais-arme` livrés | 2026-08-15 |
 | 29. Distiller les gains ICM (G1-G5) — investigation dag.sh --scope d'abord | — | 5/5 | Complete (PR #41) — release `v2.51.0`, D-03 tenue (`dag.sh` hors diff), checkpoint humain T-29-05-3 tranché le 2026-08-15 | 2026-08-15 |
-| 30. Portabilité Windows II | fiabilite-v1.0 | 0/8 | Planned — 8 plans sur 4 vagues ; pré-requis PORT-04 LEVÉ le 2026-08-15 (tranché sans Willy, D-01/D-02/D-04) ; porte les gestes jour 1 (LEDG-03, WKTR-03) | — |
-| 31. Manifeste d'install + dry-run (issue #20) | fiabilite-v1.0 | 0/0 | Not started — strictement après la 30 (mêmes fichiers `_internal/`, jamais en parallèle) | — |
+| 30. Portabilité Windows II | fiabilite-v1.0 | 8/8 | Complete — PR #43, release `v2.53.0`, CI verte (run 31918283177, 4/4 jobs) | 2026-08-16 |
+| 31. Manifeste d'install + dry-run (issue #20) | fiabilite-v1.0 | 8/8 | Complete — 8 SUMMARYs sur disque, module `conductor` v1.25.0, MANI-04 superseded (réponse #20 en DRAFT, jamais postée) | 2026-08-16 |
 | 32. Durcissement du driver-lock | fiabilite-v1.0 | 0/0 | Not started — son hook naît en forme exec (après 30) ; spike `reference-transaction` avant LOCK-03 | — |
 | 33. Watchdog & notifications des missions | fiabilite-v1.0 | 0/0 | Not started — heartbeat partagé avec la 32 (conçues ensemble, WTCH après LOCK) | — |
 | 34. Gaps agency-agents & cadrage skill-installer | fiabilite-v1.0 | 0/0 | Not started — après la 31 (MANI avant SKIL) ; SKIL-01 = cadrage go/no-go rattaché | — |
