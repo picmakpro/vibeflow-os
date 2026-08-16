@@ -1,143 +1,127 @@
 # Mission — Phase 31 (manifeste d'install + dry-run, issue #20)
 
-**Date** : 2026-08-16 · **Manager** : `vf-dev-manager`, owner de lock `mission-31-reprise`
+**Date** : 2026-08-16 · **Manager** : `vf-dev-manager` (locks `mission-31-reprise`, puis `-2`)
 **Branche** : `feat/phase-31-manifeste-dry-run` · **Base** : `2a2f0ef` (main)
-**Statut de sortie** : **halt sur arbitrage humain** — plans validés à une décision près, aucune
-exécution démarrée, aucun gate humain consommé.
+**Statut de sortie** : **halt sur checkpoint bloquant** (`31-03` tâche 1) — vague 1 livrée, revue,
+corrigée et re-vérifiée ; migration des ~35 sites en attente de ratification humaine.
 
 ---
 
-## 1. Ce que la mission a produit
+## 1. État des nœuds
 
-Une **reprise** de la mission nocturne mise en pause, menée du cadrage jusqu'à la validation des
-plans. Aucun code applicatif n'a été écrit : la mission s'arrête volontairement au seuil de
-l'exécution, sur une décision de cadrage qui appartient à l'humain.
-
-| Nœud du DAG | État de sortie |
+| Nœud | État |
 |---|---|
-| `rech-moteur` | done (livré avant la pause) |
-| `discuss` | **done** — `31-CONTEXT.md`, 11 arbitrages |
-| `plan` | **done au fond, bloqué sur 1 arbitrage** — 8 PLAN.md, 6 vagues, 20 tâches |
-| `plancheck` | **done** — 2 angles externes + 2 rondes de contrôle |
-| `exec`, `revue`, `verif`, `issue20-draft`, `docs` | non démarrés |
+| `rech-moteur`, `discuss`, `plan`, `plancheck` | **done** |
+| `exec-01` (socle manifeste + suite + compteurs README) | **done**, revu, corrigé, re-vérifié |
+| `exec-02` (mode `plan` de `merge-hooks.sh`) | **done**, revu, corrigé, re-vérifié |
+| `exec-03` (migration ~35 sites) | **arrêté au checkpoint bloquant** — décision humaine |
+| `exec-04..08`, `revue`, `verif`, `issue20-draft`, `docs` | bloqués |
 
-**11 commits** sur la branche. Les deux gates repo (`check-machine-paths.sh`,
-`check-version-sync.sh`) sont **verts** sur l'arbre commité.
+**Suites sur l'arbre commité** (mesuré par le manager, bash 3.2 système) :
+`test-manifest.sh` **8/8** · `test-merge-hooks.sh` **32/32** · `test-vibeflow-update.sh` **19/19**.
+`check-machine-paths.sh` et `check-version-sync.sh` : **exit 0**. **62 suites** découvertes.
 
-## 2. Le fait marquant : le vert amont était faux
+## 2. Le fil rouge de la mission : aucun vert auto-déclaré n'a tenu
 
-Le `gsd-plan-checker` **interne** du pipeline a rendu **PASSED, 0 blocker** sur les 8 plans. Deux
-re-validations **externes** indépendantes ont ensuite trouvé **11 bloquants**. La passe de
-correction en a fermé 9 et en a **créé 2 nouveaux**. Une troisième ronde a fermé ces 2 et en a
-laissé **1**, sur le même mécanisme.
+| Étage | Auto-déclaré | Trouvé par un tiers |
+|---|---|---|
+| Plans (checker **interne** du pipeline) | `PASSED, 0 blocker` | **11 bloquants** (2 relectures externes) |
+| 1re passe de correction | 11 corrigés | 9 fermés, **2 créés** |
+| 2e passe | 2 fermés | **1 laissé** (mutant mort) |
+| Vague 1 de code (2 workers) | suites vertes 5/5 et 32/32 | **2 bloquants + 1 majeur** (revue + vérif) |
 
-C'est la leçon de la Phase 30 (5 faux verts) qui se rejoue à l'identique. Le nœud `plancheck`,
-posé par doctrine, a payé son coût plusieurs fois :
+Sans les étages de contrôle, la phase aurait migré ~35 sites d'écriture sur un socle dont **quatre
+assertions ne pouvaient pas rougir**, avec un crash bash 3.2 dormant et un manifeste dont la
+relativisation n'était protégée par rien.
 
-- **L'install aurait avorté pour presque tous les modules.** Le plan retirait les gardes
-  `[ -f "$f" ]` aux sites de copie pendant que le helper devait propager le rc de `cp`, dans un
-  fichier portant `set -euo pipefail`. Ces gardes existent parce que les globs `*.mjs`, `*.js`,
-  `*.txt` ne matchent presque jamais et s'expandent en littéral. Aucun des 8 plans ne mentionnait
-  l'interaction `set -e` × rc.
-- **Un manifeste menteur, relu ensuite pour supprimer.** `vf_place_tree` consignait depuis la
-  source alors que la copie réelle est un glob suffixé `|| true` : dotfiles écartés, échec partiel
-  avalé. Le manifeste aurait affirmé des fichiers jamais écrits — et `31-05` s'en sert comme vérité
-  pour **supprimer**.
-- **Un gate repo-wide déjà rouge**, servant de critère d'acceptation à 8 tâches (cf. §4).
-- **Une mutation rouge sur un site jamais atteint** (mutant mort) : les fixtures retenus ne
-  déclenchaient aucun site du régime A.
+## 3. Ce que les juges ont réellement attrapé
 
-## 3. Les arbitrages du cadrage (11)
+- **Install avortée pour presque tous les modules** — gardes `[ -f "$f" ]` retirées pendant que le
+  helper propage le rc de `cp`, sous `set -euo pipefail`. Les globs `*.mjs`/`*.js`/`*.txt` ne
+  matchent presque jamais et s'expandent en littéral.
+- **Manifeste menteur relu pour supprimer** — `vf_place_tree` consignait depuis la source alors que
+  la copie est un glob suffixé `|| true` : dotfiles écartés, échec partiel avalé. `31-05` s'en sert
+  comme vérité pour **supprimer**.
+- **Crash macOS-only** — `parts=($path)` sur chaîne vide laisse `parts` **unbound** en bash 3.2 ;
+  `"${parts[@]}"` avorte tout. **CI Linux (bash ≥5) serait restée verte.**
+- **Quatre assertions incapables de rougir**, prouvées par mutation : `sort -u` → `cat` (5 OK),
+  liste d'exclusions neutralisée (manifeste inchangé au **byte** près), relativisation supprimée
+  (manifeste **faux**, suite verte — `grep -qF` est un test de **sous-chaîne** et le chemin fautif
+  **contient** le correct), diagnostic déplacé sur stdout (32 OK).
+- **Trois critères de plan verts à vide** — ils scannaient des fonctions **pas encore écrites** :
+  `0` se lit « conforme ». Ils passaient **avant** que le travail soit fait.
 
-D-31-01 à D-31-10 sont posés dans `31-CONTEXT.md` au premier tour. Les quatre structurants :
-manifeste **enregistré à l'écriture** par un helper unique (jamais pré-énuméré) ; chemins
-**relatifs à TARGET_ROOT, grain fichier**, jamais de ligne répertoire ; écritures indirectes
-classées en **trois régimes** avec une preuve d'égalité **totale** sur un fixture sans régime C ;
-compteurs README à la main.
+## 4. Prémisses fausses corrigées (dont deux à moi)
 
-**D-31-11** a été ajouté en cours de mission pour fermer une classe (§5).
+1. **Le compteur de suites EST gaté** (`check-version-sync.sh` §9). La recherche avait énuméré les
+   contrôles 1 à 8 et manqué le 9e. D-31-08 survit, son motif s'inverse, et gagne une contrainte
+   d'atomicité de commit.
+2. **Le premier commit de cadrage a rendu `check-machine-paths.sh` ROUGE** — gate qui sert de
+   critère d'acceptation à 8 tâches planifiées.
+3. Deux valeurs de mes propres mandats étaient fausses (`split_fragment_hooks` 405→**404**,
+   `show_status` 902-920→**902-918**) : les workers les ont corrigées parce que je leur avais
+   demandé de me corriger plutôt que de m'obéir. **Garder cette formule.**
 
-## 4. Deux prémisses fausses corrigées en cours de mission
+## 5. Arbitrages ajoutés en cours de mission
 
-**(a) Le compteur de suites EST gaté.** `31-CONTEXT.md` D-31-08 affirmait, d'après
-`31-RECHERCHE-moteur.md` §4, qu'aucun gate ne contrôle le compteur « N suites » des README.
-**Faux** : `scripts/check-version-sync.sh` **§9** le gate depuis toujours. La recherche avait
-énuméré les contrôles 1 à 8 et manqué le 9e — une énumération juste mais incomplète est
-indiscernable d'une énumération exhaustive tant qu'on ne relit pas la source.
-*La décision survit, son motif s'inverse* : « aucun gate neuf » reste vrai parce que le gate
-**existe déjà**. Et elle gagne une contrainte : création de la suite et mise à jour des compteurs
-dans **le même commit**, sinon le dépôt est rouge entre deux commits du protocole GSD.
+- **D-31-11** — ferme la couture `vf_place_tree` après **cinq** défauts d'affilée : le plan **prédit
+  depuis la source** (sémantique du glob), le manifeste **consigne la destination**, la divergence
+  est journalisée sans faire échouer la pose. Quatre point-fixes n'avaient pas fermé la classe ;
+  c'était une **ambiguïté du cadrage**, pas une maladresse des plans.
+- **D-31-11.4** (tranché par Samuel, option A) — **un seul émetteur, au grain fichier**. Deux
+  émetteurs + dédup rendaient la mutation contournable. **Complément** : l'option A avait ouvert un
+  **trou de silence** (source illisible ⇒ zéro paire ⇒ rien n'est dit) ; comblé par capture de rc.
+- **D-31-12** — **une garde s'arme au grain unité** dès que le bout-en-bout ne l'exerce pas. Le
+  moment le moins cher pour armer un filet est celui où le code est prouvé bon ; la vague suivante
+  multiplie les sites par ~35. Corollaire : tout critère scannant une fonction absente porte une
+  **garde d'existence** et se déclare **non évaluable**, jamais vert.
 
-**(b) Un gate cassé par la mission elle-même.** Le premier commit de cadrage (`1981586`) portait le
-handoff de pause, qui cite un chemin absolu de machine. `check-machine-paths.sh` est passé
-**rouge** — et ce gate est critère d'acceptation de 8 tâches planifiées, qui auraient donc échoué
-pour un fichier hors de leur périmètre. Corrigé, les deux gates sont verts.
+## 6. Décision en attente (bloquante)
 
-**Leçon consignée** : un fait de recherche formulé en négatif (« aucun gate ne fait X ») est une
-affirmation d'absence — la plus coûteuse à vérifier, la plus facile à produire par omission. Un
-arbitrage qui repose sur une absence doit citer la ligne qui la prouve.
+**Ratifier la couture d'écriture avant de la router sur les ~35 sites ?** Options `ratifier` /
+`ajuster` / `reduire`. **Recommandation : ratifier** — la forme est *mesurée*, pas supposée
+(exécution réelle aux trois scopes, chemin à espace, chemin profond, destination peuplée, 3 poses
+idempotentes) ; `reduire` produirait un manifeste **faux** (`copy_module_scripts` pose des scripts
+qu'`uninstall` doit retrouver) et `ajuster` rouvrirait la dérive plan/pose que D-31-01 ferme.
 
-## 5. La classe qui a résisté — `vf_place_tree`
+## 7. Remontées non bloquantes
 
-**Cinq défauts d'affilée** sur le même mécanisme (BL-4, BL-5, puis deux régressions de correction,
-puis T9b). Quatre point-fixes n'ont pas fermé la classe.
+1. `--dry-run` sur `uninstall` — le verbe le plus dangereux est celui où une prévisualisation
+   vaudrait le plus. Hors périmètre v1.
+2. `docs/<module>/` écrit relativement au **cwd**, pas au scope : en scope user, la doc atterrit où
+   l'utilisateur se trouvait.
+3. **Dotfiles d'un sous-dossier de module jamais copiés** (le glob les écarte) — **gelé par test**,
+   pas corrigé.
+4. **Manifeste non gitignoré en scope local** — même famille que `.vibeflow-installed`, préexistant.
+   La phase qui *introduit* le fichier est le bon moment pour l'ajouter.
 
-**Cause réelle** : le cadrage avait laissé une couture. La copie de répertoire est le **seul** site
-où « même chemin de code » ne peut pas signifier « même source de données » — en dry-run la
-destination n'existe pas. **D-31-11** l'a fermée : le plan **prédit depuis la source** (sémantique
-du glob, pas de `find`, donc dotfiles de premier niveau exclus comme aujourd'hui) ; le manifeste
-**consigne la destination** après copie ; une divergence est une copie dégradée **journalisée**, et
-la pose n'échoue pas. Effet mécanique : deux critères d'acceptation jusque-là mutuellement
-exclusifs redeviennent satisfiables — le `|| true` n'est ni gardé ni supprimé, il est **déplacé
-dans le helper et rendu observable**.
+## 8. Pièges d'outillage mesurés (à porter en mémoire d'équipe)
 
-**Ce qui reste ouvert** (§6) : D-31-11 point 4 demande la journalisation à **deux granularités**
-sans dire laquelle porte la preuve. D'où deux émetteurs, une dédup, et une mutation rouge (T9b)
-**contournable**. Le juge a vérifié empiriquement que le site est atteint : ce n'est pas la
-fixture, c'est l'architecture à deux émetteurs.
-
-## 6. Décision remontée à l'humain (bloquante)
-
-**Granularité du journal de copie dégradée.** Recommandation portée : **un seul émetteur, au grain
-FICHIER** — la vérification de présence après copie rattrape chaque fichier manquant avec son
-chemin, ce qui rend la mutation discriminante et l'assertion T9b(a) satisfiable, et produit un
-journal plus utile (« ce fichier manque » plutôt que « ce répertoire s'est mal passé »). Coût
-assumé : N lignes au lieu d'1 sur un échec massif, cas rare où le bruit est informatif.
-Alternative B : garder les deux émetteurs, la preuve ne portant que sur le grain fichier.
-
-Deux warnings à corriger dans la même passe : le contrôle « zéro `|| true` » ne scanne pas le
-helper neuf qu'il était censé couvrir ; justification périmée en `31-03:199`.
-
-## 7. Remontées non bloquantes (§7 de `31-CONTEXT.md`)
-
-1. ~~Gater le compteur de suites~~ — **sans objet**, le gate existe (§4a).
-2. **`--dry-run` sur `uninstall`** : le verbe le plus dangereux est celui où une prévisualisation
-   vaudrait le plus. Refusé en v1 par discipline de périmètre.
-3. **`docs/<module>/` écrit relativement au cwd** et non au scope : en scope `user`, la doc d'un
-   module atterrit dans le répertoire courant de l'utilisateur. Incohérence pré-existante.
-4. **Les dotfiles d'un sous-dossier de module ne sont pas copiés** (le glob les écarte). Découvert
-   en fermant D-31-11, qui **gèle** ce comportement par un test au lieu de le corriger.
-
-## 8. Gates humains — aucun consommé
-
-PR, merge, release racine : **non touchés**. Commentaire et close de l'issue #20 : **draft sur
-disque uniquement**, jamais posté — les 8 plans ont été vérifiés à ce titre (zéro `gh issue
-comment`, `gh issue close`, `gh pr create`, `git push`, `git merge`, zéro bump de `VERSION`
-racine ; les seules occurrences sont les interdictions elles-mêmes). Branche de phase créée avant
-le premier commit. Les untracked étrangers (`.gsd/`, `MISSION-30.dag.json`, `VFDO-36…`) n'ont pas
-été commités.
+- **`grep` proxifié tronque silencieusement** : 31 lignes rendues sur 102. Tout décompte passe par
+  `awk 'END{print NR}'`.
+- **`wc` piped a rendu des valeurs fausses** : `wc -c < M` → `0` sur un fichier de 38 octets
+  (`od -c` et `stat -f %z` concordants). Non reproductible à la demande, même classe que `grep`.
+- **`gsd-execute-phase` filtre par vague, jamais par plan** : deux workers sur une même vague n'ont
+  aucun support natif — l'un redispatcherait le plan de l'autre. Exécution **inline** via
+  `execute-plan.md`, au prix des `SUMMARY` et des `verdicts` (à autoriser nommément).
 
 ## 9. Next step
 
-Trancher §6 (un mot suffit), puis appliquer + re-vérifier, puis démarrer l'exécution vague 1
-(`31-01` + `31-02`, fichiers disjoints, parallélisables). L'ordre d'exécution est celui du DAG de
-mission, pas celui déclaré par les plans : `exec-08` doit dépendre de **tous** les autres nœuds
-d'exécution, ses must-haves exigeant la suite verte sur l'arbre commité et des compteurs README
-alignés sur la mesure **finale**.
+Trancher §6. Sur `ratifier` : reprise à la tâche 2 de `31-03`, puis revue + vérif de la migration
+(c'est le lot le plus risqué de la phase), puis `exec-04`. **`exec-08` doit dépendre de TOUS les
+autres nœuds d'exécution** — ses must-haves exigent la suite verte sur l'arbre commité et des
+compteurs README alignés sur la mesure finale.
 
-## 10. Calibration
+## 10. Gates humains — aucun consommé
 
-`estimate` par plan (tokens / tâches / confiance), relayés verbatim depuis les frontmatters :
-31-01 55000/3→2/low · 31-02 40000/2/low · 31-03 70000/3/low · 31-04 75000/3/low ·
-31-05 70000/3/low · 31-06 35000/2/low · 31-07 45000/2/low · 31-08 35000/2/low.
-Aucun `actuals` — aucune exécution n'a eu lieu.
+PR, merge, release racine : **non touchés**. Réponse et close de l'issue #20 : **draft disque
+uniquement**, jamais posté (vérifié sur les 8 plans : les seules occurrences de `gh issue` sont les
+interdictions elles-mêmes). Branche de phase créée avant le premier commit. Untracked étrangers
+(`.gsd/`, `MISSION-30.dag.json`, `VFDO-36…`, `DRIVER.lock*`) jamais commités.
+
+## 11. Calibration
+
+`estimate` par plan (relayés verbatim) : 31-01 55000/3→2 · 31-02 40000/2 · 31-03 70000/3 ·
+31-04 75000/3 · 31-05 70000/3 · 31-06 35000/2 · 31-07 45000/2 · 31-08 35000/2, tous `confidence: low`.
+**Aucun `actuals`** : l'exécution inline (§8) court-circuite `state.record-metric`. Aucun `verdicts`
+non plus — les hooks `execute:post` n'ont jamais tourné. Rien de fabriqué pour combler.
