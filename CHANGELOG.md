@@ -5,6 +5,57 @@ extrait récent et pointent ici). Chaque module a par ailleurs son propre `CHANG
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.54.0] — 2026-08-16
+
+**L'engine d'install devient prévisible : chaque pose est tracée fichier par fichier dans un
+manifeste, et `--dry-run` montre exactement ce qui sera écrit avant d'écrire quoi que ce soit.**
+Phase 31 (8 plans, issue #20), PR #45.
+
+### Livré
+
+- **Manifeste de pose** : chaque install réelle écrit `$TARGET_ROOT/scripts/.vibeflow-manifest-<module>`
+  (un chemin par ligne, relatif à la racine du scope, trié). `uninstall` et la convergence
+  d'update lisent ce manifeste au lieu de reconstruire la liste depuis le cache — le trou
+  historique que `retired-modules.txt` rattrapait en dur est fermé à la source (MANI-01/03).
+- **`--dry-run`** sur `install` et `update` : plan fichier-par-fichier sur `stdout`
+  (`[plan] + / ~ / -`, le format proposé par l'auteur de l'issue #20, repris tel quel),
+  diagnostics sur `stderr`, **zéro écriture disque** — prouvé au grain du contenu disque (T10).
+  Le plan et la pose sortent du **même chemin de code** : la dérive plan/pose est
+  structurellement impossible, pas seulement testée après coup. Refus **bruyant** (`exit 1`)
+  sur `uninstall`/`rollback`/`status`/`sync` — jamais un flag avalé en silence (T14).
+- **`merge-hooks.sh` mode `plan`** : la prévisualisation du merge de hooks est rendue par le
+  code du merge réel — pas de second chemin capable de dire autre chose que ce que la fusion
+  fera (Tp1–Tp7, dont Tp3 : cible bit-à-bit inchangée après un `plan`).
+- **Convergence d'update** : les fichiers disparus d'une nouvelle version sont retirés **avec
+  sauvegarde préalable** et liste affichée (T17–T22) ; abstention totale et bruyante sur
+  manifeste douteux (ligne vide, chemin absolu, `..`, illisible — T19) ; garde **physique**
+  (`cd -P`/`pwd -P`, builtins POSIX — ADR-054 interdit le binaire `realpath`, pas la
+  résolution physique, D-31-15) contre toute suppression résolvant hors de la racine du scope,
+  y compris via un répertoire ancêtre symlinké (T18, testée sous mutation). `uninstall`
+  applique les mêmes garde-fous et **ne désenregistre jamais un module dont il n'a pas su
+  retirer les fichiers** (D-31-16, T29–T35).
+- **Câblage skills** : `/vibeflow-install` (étape 5) et `/vf-calibrate` (étape 4) montrent le
+  plan `--dry-run` avant le feu vert de pose — la demande exacte de l'issue #20.
+- **Limites nommées** : trois sous-processus écrivains annoncent leur effet sans énumérer un
+  contenu qui dépend de l'état vivant du lab (T12/T13) ; `docs/<module>/` apparaît au plan
+  mais n'entre pas au manifeste (incohérence cwd pré-existante, figée par un cas de suite) ;
+  dotfiles de sous-dossiers jamais copiés (comportement pré-existant gelé, pas corrigé).
+
+### La méthode
+
+Aucun vert auto-déclaré n'a tenu de toute la mission : le plan-checker interne rendait
+« 0 bloquant » où deux relectures externes en trouvaient 11 ; la vérification md5 (262 fichiers
+identiques) prouvait le chemin nominal pendant que la revue prouvait 4 régressions du chemin
+d'échec — sous `set -e`, déplacer un appel en fin de `a && b` change sa sémantique d'échec
+(D-31-13 : la tolérance se restaure explicitement et se prouve par injection de panne). Le
+filet de non-régression est passé des 3 suites touchées à la découverte **complète** (le
+pattern CI fait foi : 62 suites ; un `find` plus large comptait double via
+`.claude/worktrees/`). 6 décisions consignées (D-31-11 → D-31-16), rapport de mission :
+`.planning/missions/2026-08-16-phase-31-manifeste-dry-run.md`.
+
+**Suites** : `test-manifest.sh` né (62 cas), `test-merge-hooks.sh` 34/34, `test-vibeflow-update.sh`
+19/19 — **62 suites** vertes en local (bash 3.2 macOS) **et** CI verte (Linux/bash ≥5).
+
 ## [v2.53.1] — 2026-08-16
 
 **Hotfix : les hooks en forme exec livrés en v2.53.0 étaient morts sur toute install en scope
