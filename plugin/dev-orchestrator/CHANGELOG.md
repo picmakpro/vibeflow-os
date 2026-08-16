@@ -1,5 +1,41 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.17.1] — 2026-08-16 (Phase 30, solde de revue du plan 30-09)
+
+**Patch** (correctif + durcissement, aucune nouvelle capacité).
+
+### Corrigé
+- **`check-hook-paths.sh`** — BOM UTF-8 en tête d'un `settings.json` (écrit par défaut par
+  `Set-Content`/`Out-File` PowerShell et Notepad « Enregistrer en UTF-8 » sur Windows, la plateforme
+  ciblée par cette phase) faisait échouer le parsing JSON (`json.loads` lève `Unexpected UTF-8 BOM`)
+  et transformait un `settings.json` parfaitement valide en `PARSE_ERROR` à chaque `SessionStart`.
+  Lecture désormais en `encoding='utf-8-sig'` (absorbe le BOM s'il existe, comportement identique en
+  son absence). Cas de test T13 ajouté (discriminance prouvée par mutation :
+  `utf-8-sig` → `utf-8` fait rougir le cas exactement sur cette régression).
+- **`check-hook-paths.sh`** — `--path ""` (valeur vide explicite) passait la garde d'argument et
+  faisait pointer les candidats de balayage vers la racine du filesystem au lieu d'échouer en 64 ;
+  la valeur vide est désormais rejetée au même titre que l'absence de valeur.
+
+### Durci
+- Commentaire de portée du `try/except` du bloc Python de `check-hook-paths.sh` resserré : il ne
+  couvre que l'ouverture + le parsing d'un fichier, jamais la boucle de constat qui suit (protégée
+  seulement par des gardes `isinstance`).
+- `test-check-hook-paths.sh` — T9 aligné sur la garde de portabilité déjà appliquée par T12 dans le
+  même fichier (SKIP nommé si `python3` est indisponible, plutôt qu'un échec par absence de
+  commande). T3 (« code 2 jamais émis ») étend son agrégation aux codes de retour de T6/T6H, omis
+  jusqu'ici.
+- `test-vf-portable.sh` — T12 (identité du bloc localisateur `vf-portable:locator`) couvre désormais
+  4 consommateurs réels (ajout de `check-hook-paths.sh`, jusqu'ici absent du décompte en dur).
+
+### Documentation
+- `docs/ADR.md` §ADR-071 — addendum daté et attribué (approbation humaine du 2026-08-15) documentant
+  la dérogation de `check-hook-paths.sh` à sa propre règle (`command` en nom nu littéral, paradoxe
+  d'amorçage), jusqu'ici motivée dans le code et le contrat de sortie mais absente de l'ADR elle-même.
+- `docs/HOOKS-CONTRAT-SORTIE.md` — en-tête et pied de document corrigés pour créditer la mise à jour
+  de l'inventaire par le plan 30-09 (26e entrée), en plus du plan 30-04 d'origine.
+- Deux `SUMMARY.md` manquants comblés (`30-02`, `30-07`) — reliquat de reprise du moteur (DAG `done`
+  sans `SUMMARY.md`), contenu dérivé des commits réels de chaque plan.
+
 ## [v2.17.0] — 2026-08-16 (Phase 30 plan 30-09 — le filet de péremption des chemins de hook, addendum)
 
 **Minor** (nouvelle capacité : un 5e signal SessionStart, pas un simple correctif). Addendum

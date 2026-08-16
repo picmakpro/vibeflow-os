@@ -7,7 +7,7 @@
 #         rc 3 sans --hook.
 #   T2  — constat sur `command` : chemin absolu inexistant PAR CONSTRUCTION → signal, rc 0.
 #   T2b — constat sur `args` : même famille, branche `args` prouvée INDÉPENDAMMENT de `command`.
-#   T3  — code 2 jamais émis : agrégé sur les rc de T1/T2/T2b/T4.
+#   T3  — code 2 jamais émis : agrégé sur les rc de T1/T2/T2b/T4/T5/T6 (avec et sans --hook).
 #   T4  — illisible et BRUYANT : JSON invalide → stdout vide, stderr nommant le fichier, rc 1,
 #         INCHANGÉ sous --hook (la traduction ne touche que le silence, jamais l'erreur).
 #   T5  — les deux fichiers de réglages de PROJET sont lus, chacun indépendamment (deux sous-cas).
@@ -25,6 +25,8 @@
 #         jeton {{VF_BASH}}), substitution du préfixe de scripts, idempotence, retrait.
 #   T12 — l'inventaire durable (docs/HOOKS-CONTRAT-SORTIE.md §4) et le parc réel s'accordent — avec
 #         un écart TRANSITOIRE explicitement toléré (voir note ci-dessous).
+#   T13 — settings.json avec BOM UTF-8 (Set-Content/Out-File PowerShell, Windows) : silence nominal,
+#         jamais un PARSE_ERROR (mutation discriminante : `utf-8-sig` → `utf-8`).
 #
 # NOTE SUR T12 (écart transitoire attendu, pas un défaut du test) : ce plan (30-09) pose la 26e
 # entrée de hooks.json à la tâche 1, mais ne met à jour l'inventaire durable
@@ -208,17 +210,6 @@ else
   ko "T5 sous-cas b : rc=$T5B_RC contenu=[$(cat "$T5B_OUT")]"
 fi
 
-# ---------- T3 : code 2 jamais émis (agrégé sur T1/T2/T2b/T4) ----------
-T3_OK=1
-for rc in "$T1_RC" "$T1H_RC" "$T2_RC" "$T2B_RC" "$T4_RC" "$T4H_RC" "$T5A_RC" "$T5B_RC"; do
-  [ "$rc" != "2" ] || T3_OK=0
-done
-if [ "$T3_OK" = "1" ]; then
-  ok "T3 code 2 jamais émis (T1/T2/T2b/T4/T5, avec et sans --hook)"
-else
-  ko "T3 code 2 observé sur au moins une fixture"
-fi
-
 # ---------- T6 : absence totale de réglages ----------
 mkdir -p "$WORK/t6"
 T6_OUT="$WORK/t6.out"; T6_ERR="$WORK/t6.err"
@@ -232,13 +223,25 @@ else
   ko "T6 absence de réglages : sans-hook(rc=$T6_RC) hook(rc=$T6H_RC)"
 fi
 
+# ---------- T3 : code 2 jamais émis (agrégé sur T1/T2/T2b/T4/T5/T6, avec et sans --hook) ----------
+T3_OK=1
+for rc in "$T1_RC" "$T1H_RC" "$T2_RC" "$T2B_RC" "$T4_RC" "$T4H_RC" "$T5A_RC" "$T5B_RC" "$T6_RC" "$T6H_RC"; do
+  [ "$rc" != "2" ] || T3_OK=0
+done
+if [ "$T3_OK" = "1" ]; then
+  ok "T3 code 2 jamais émis (T1/T2/T2b/T4/T5/T6, avec et sans --hook)"
+else
+  ko "T3 code 2 observé sur au moins une fixture"
+fi
+
 # ---------- T7 : parité d'interface ----------
 T7_OK=1
 bash "$SCRIPT" --hook --quiet >/dev/null 2>/dev/null; [ "$?" = "64" ] || T7_OK=0
 bash "$SCRIPT" --argument-bidon >/dev/null 2>/dev/null; [ "$?" = "64" ] || T7_OK=0
 bash "$SCRIPT" --path >/dev/null 2>/dev/null; [ "$?" = "64" ] || T7_OK=0
+bash "$SCRIPT" --path "" >/dev/null 2>/dev/null; [ "$?" = "64" ] || T7_OK=0
 if [ "$T7_OK" = "1" ]; then
-  ok "T7 parité d'interface : --hook+--quiet, argument inconnu, --path sans valeur → 64"
+  ok "T7 parité d'interface : --hook+--quiet, argument inconnu, --path sans valeur, --path \"\" → 64"
 else
   ko "T7 parité d'interface : au moins un cas ne rend pas 64"
 fi
@@ -252,7 +255,15 @@ else
 fi
 
 # ---------- T9 : garde anti-« réparation » de l'entrée n°26 ----------
-T9_RESULT="$(python3 - "$HOOKS_JSON" <<'PYEOF'
+# Guard de portabilité aligné sur T12 (même fichier) : ce cas dépend d'un interpréteur Python pour
+# parser hooks.json, pas de la cascade complète de vf_resolve_python (le script sous test n'a rien
+# à voir avec cette invocation-ci, purement outillage de la SUITE). Sur une machine où seul `py -3`
+# existe — le cas même que vf_resolve_python couvre en production — cette suite doit rendre un
+# verdict propre (SKIP nommé), pas échouer par absence de commande.
+if ! command -v python3 >/dev/null 2>&1; then
+  skip "T9 garde anti-« réparation » de l'entrée n°26 : python3 indisponible"
+else
+  T9_RESULT="$(python3 - "$HOOKS_JSON" <<'PYEOF'
 import json, sys
 d = json.load(open(sys.argv[1]))
 hs = [h for gs in d["hooks"].values() for g in gs for h in g["hooks"]]
@@ -268,10 +279,11 @@ else:
         print("COMMAND %r" % cmd)
 PYEOF
 )"
-if [ "$T9_RESULT" = "OK" ]; then
-  ok "T9 entrée n°26 : command reste le nom nu littéral 'bash', jamais le jeton {{VF_BASH}}"
-else
-  ko "T9 entrée n°26 altérée ($T9_RESULT) — ce filet diagnostique la péremption du chemin absolu ; s'y soumettre le tuerait dans le seul cas où il sert (dérogation à ADR-071 §Décision 2, autorisée par l'approbation humaine de l'addendum du 2026-08-15, pas par l'ADR elle-même)"
+  if [ "$T9_RESULT" = "OK" ]; then
+    ok "T9 entrée n°26 : command reste le nom nu littéral 'bash', jamais le jeton {{VF_BASH}}"
+  else
+    ko "T9 entrée n°26 altérée ($T9_RESULT) — ce filet diagnostique la péremption du chemin absolu ; s'y soumettre le tuerait dans le seul cas où il sert (dérogation à ADR-071 §Décision 2, autorisée par l'approbation humaine de l'addendum du 2026-08-15, pas par l'ADR elle-même)"
+  fi
 fi
 
 # ---------- T10 : identité du bloc localisateur (contre inject-mcp-tools.sh) ----------
@@ -400,6 +412,27 @@ print(n)
   else
     ko "T12 écart NON attendu — $DOC déclare $DOC_DECLARED, le recompte réel du parc rend $ACTUAL"
   fi
+fi
+
+# ---------- T13 : settings.json avec BOM UTF-8 (Set-Content/Out-File PowerShell, Windows) ----------
+# `Set-Content`/`Out-File` PowerShell et Notepad « Enregistrer en UTF-8 » écrivent ce BOM PAR DÉFAUT
+# sur la plateforme même que cette phase cible. Un settings.json valide portant ce BOM doit produire
+# le silence nominal (rien à signaler), pas un PARSE_ERROR — sinon le filet censé détecter les
+# pannes déclenche lui-même une fausse alerte à CHAQUE SessionStart sur toute machine Windows.
+# Discriminance prouvée par mutation (`encoding='utf-8-sig'` → `encoding='utf-8'` dans
+# check-hook-paths.sh) : attendu ROUGE = rc 1, stdout vide, stderr nommant le fichier ET portant
+# « Unexpected UTF-8 BOM » ; obtenu ROUGE identique à l'attendu (rejoué manuellement, script restauré
+# ensuite, revérifié vert).
+mkdir -p "$WORK/t13/.claude"
+T13_TARGET="$WORK/t13/target.sh"; touch "$T13_TARGET"
+printf '\xef\xbb\xbf{"hooks":{"SessionStart":[{"matcher":"startup","hooks":[{"type":"command","command":"%s","args":["%s","--hook"]}]}]}}\n' \
+  "$REAL_ABS_BIN" "$T13_TARGET" > "$WORK/t13/.claude/settings.json"
+T13_OUT="$WORK/t13.out"; T13_ERR="$WORK/t13.err"
+bash "$SCRIPT" --path "$WORK/t13" >"$T13_OUT" 2>"$T13_ERR"; T13_RC=$?
+if [ "$(bytes_of "$T13_OUT")" = "0" ] && [ "$T13_RC" = "3" ] && ! grep -qF "BOM" "$T13_ERR"; then
+  ok "T13 settings.json avec BOM UTF-8 : silence nominal (rc 3, stdout vide) — pas de PARSE_ERROR"
+else
+  ko "T13 BOM UTF-8 : rc=$T13_RC bytes=$(bytes_of "$T13_OUT") stderr=[$(cat "$T13_ERR")]"
 fi
 
 echo ""

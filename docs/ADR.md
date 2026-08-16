@@ -2321,6 +2321,34 @@ l'ajout du drapeau `--hook` aux scripts qui ne le portent pas encore, sont héri
 contrat PR #29, §6 de `docs/HOOKS-CONTRAT-SORTIE.md`). Cette ADR documente la doctrine que cette
 migration à venir devra suivre — elle ne l'exécute pas.
 
+### Addendum — dérogation de `check-hook-paths.sh` à sa propre règle (approbation humaine du 2026-08-15)
+
+**Ajouté le 2026-08-15, en solde du plan `30-09`** (`plugin/dev-orchestrator/scripts/check-hook-paths.sh`,
+26e entrée du parc, posée par ce plan) — **cet ajout n'est pas une décision de l'ADR d'origine** : il
+grave, après coup, une dérogation déjà appliquée dans le code et déjà motivée dans trois endroits
+(le script lui-même, `docs/HOOKS-CONTRAT-SORTIE.md`, et le cas de test T9 de
+`test-check-hook-paths.sh`), sans que l'ADR ne le documente jusqu'ici — un manque signalé comme
+reliquat au SUMMARY du plan `30-09` et soldé par cette entrée.
+
+`check-hook-paths.sh` est le script qui **constate** la péremption d'un chemin d'interpréteur figé
+à l'install (Décision 2 ci-dessus). Son ENTRÉE DE HOOK à lui (`plugin/dev-orchestrator/hooks/hooks.json`,
+26e entrée) porte un `command` **NOM NU littéral** (`bash`), et non un chemin absolu résolu à
+l'install — en apparente contradiction avec la Décision 2, qui n'admet aucune clause d'exception.
+
+**Raison du paradoxe d'amorçage** : si l'entrée de ce script portait elle-même un chemin absolu
+résolu à l'install, elle mourrait exactement dans le seul cas où ce filet sert — un détecteur
+d'incendie alimenté par le feu qu'il surveille. La dérogation est donc **structurelle à ce cas
+précis** (un script qui diagnostique la péremption d'un mécanisme ne peut pas dépendre de ce même
+mécanisme), pas une exception de confort.
+
+**Portée strictement bornée** : cette dérogation ne concerne QUE l'entrée n°26 (`check-hook-paths.sh`).
+Elle ne rouvre le classement d'aucune autre entrée du parc, et n'établit aucun précédent général —
+un futur script qui voudrait s'y soustraire pour une autre raison doit obtenir sa propre dérogation
+documentée, pas invoquer celle-ci par analogie. **Gardée à la machine** par le cas T9 de
+`test-check-hook-paths.sh` (discriminance prouvée par mutation m3) : un futur relecteur qui
+« aligne » cette entrée sur les 4 autres, croyant réparer une incohérence, la fait rougir
+immédiatement.
+
 ### Déclencheur de réexamen
 
 Rouvrir si la migration de la polarité gouvernance découvre un cas où le gabarit exec (chemin

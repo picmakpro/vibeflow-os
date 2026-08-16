@@ -2,7 +2,8 @@
 
 **Document DURABLE** (pas un artefact de phase) : la polarité gouvernance (Willy) en hérite pour sa
 propre migration en forme exec des 20 entrées qui lui restent (§7 du contrat PR #29). Produit par
-le plan `VFDO-30-04` (Portabilité Windows II, PORT-03), le 2026-08-15.
+le plan `VFDO-30-04` (Portabilité Windows II, PORT-03), le 2026-08-15 ; l'inventaire est mis à jour
+par le plan `VFDO-30-09` (ajout de la 26e entrée, `check-hook-paths.sh`), le même jour.
 
 ---
 
@@ -189,4 +190,5 @@ blocage par code de sortie est voulu et ne doit jamais être traduit.
 
 ---
 
-*Produit par le plan VFDO-30-04 (Portabilité Windows II — codes de sortie), 2026-08-15.*
+*Produit par le plan VFDO-30-04 (Portabilité Windows II — codes de sortie), 2026-08-15. Inventaire
+mis à jour par le plan VFDO-30-09 (26e entrée, `check-hook-paths.sh`), le 2026-08-15.*

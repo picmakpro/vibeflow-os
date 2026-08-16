@@ -20,9 +20,9 @@
 #       le message nomme la lib, le lab n'est PAS marqué installé (VG-3).
 #
 # Identité du bloc localisateur (tâche 3, contrat §3/§6) :
-# T12 — les 3 consommateurs PYBIN (guard-file-size.sh, inject-mcp-tools.sh,
-#       test-dev-orchestrator.sh) reproduisent le MÊME bloc (une seule somme de contrôle après
-#       normalisation du préfixe de message, le seul jeton autorisé à varier).
+# T12 — les 4 consommateurs PYBIN (guard-file-size.sh, inject-mcp-tools.sh,
+#       test-dev-orchestrator.sh, check-hook-paths.sh) reproduisent le MÊME bloc (une seule somme
+#       de contrôle après normalisation du préfixe de message, le seul jeton autorisé à varier).
 # T13 — l'extraction ne rend JAMAIS une somme sur un fichier sans les deux marqueurs appariés
 #       (échec BRUYANT, jamais un vert par défaut sur « aucun bloc trouvé »).
 #
@@ -245,13 +245,14 @@ checksum_locator_block() {
   printf '%s\n' "$block" | sed -E 's/\[[A-Za-z0-9_-]+\]/[PREFIX]/g' | sha256_of_stdin
 }
 
-# ---------- T12 : une SEULE somme de contrôle pour les 3 consommateurs réels ----------
+# ---------- T12 : une SEULE somme de contrôle pour les 4 consommateurs réels ----------
 T12_GFS="$REPO/software-architecture/scripts/guard-file-size.sh"
 T12_IMT="$REPO/dev-orchestrator/scripts/inject-mcp-tools.sh"
 T12_TDO="$REPO/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+T12_CHP="$REPO/dev-orchestrator/scripts/check-hook-paths.sh"
 T12_OK=1
 T12_REPORT=""
-for T12_ENTRY in "guard-file-size.sh|$T12_GFS" "inject-mcp-tools.sh|$T12_IMT" "test-dev-orchestrator.sh|$T12_TDO"; do
+for T12_ENTRY in "guard-file-size.sh|$T12_GFS" "inject-mcp-tools.sh|$T12_IMT" "test-dev-orchestrator.sh|$T12_TDO" "check-hook-paths.sh|$T12_CHP"; do
   T12_LABEL="${T12_ENTRY%%|*}"
   T12_PATH="${T12_ENTRY#*|}"
   if [ ! -f "$T12_PATH" ]; then
@@ -271,7 +272,7 @@ if [ "$T12_OK" = "1" ]; then
   T12_UNIQ="$(printf '%s' "$T12_REPORT" | awk -F= '{print $2}' | sort -u)"
   T12_UNIQ_COUNT="$(printf '%s\n' "$T12_UNIQ" | grep -c .)"
   if [ "$T12_UNIQ_COUNT" = "1" ]; then
-    ok "T12 identité du bloc localisateur : une seule somme de contrôle pour les 3 consommateurs ($T12_UNIQ)"
+    ok "T12 identité du bloc localisateur : une seule somme de contrôle pour les 4 consommateurs ($T12_UNIQ)"
   else
     ko "T12 identité du bloc : sommes DIVERGENTES —
 $T12_REPORT"

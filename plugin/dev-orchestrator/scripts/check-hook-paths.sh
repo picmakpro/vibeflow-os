@@ -101,7 +101,7 @@ QUIET=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --path)
-      if [ "$#" -lt 2 ]; then
+      if [ "$#" -lt 2 ] || [ -z "$2" ]; then
         echo "[check-hook-paths] --path nécessite une valeur" >&2
         exit 64
       fi
@@ -209,11 +209,14 @@ CANDIDATES=("$PROJ_SETTINGS" "$PROJ_LOCAL")
 # `fichier|événement/matcher|champ|chemin` de la doc de plan ; la tabulation est le séparateur
 # réel, plus robuste qu'un `|` littéral qui pourrait apparaître dans un chemin Windows). Ce bloc
 # sort TOUJOURS 0 : c'est un rapporteur, la décision de code de sortie appartient au shell — un
-# seul point de décision, pas deux. Toute exception inattendue pendant la lecture d'UN fichier est
-# convertie en PARSE_ERROR pour CE fichier (jamais une exception non rattrapée qui ferait sortir le
-# bloc en dehors de {0}) ; la boucle d'ouverture/parsing de chaque candidat est la SEULE portion
-# protégée, précisément parce que c'est la seule qui touche une entrée non maîtrisée (le fichier de
-# réglages).
+# seul point de décision, pas deux. Toute exception inattendue pendant l'OUVERTURE et le PARSING
+# d'UN fichier (open() + json.loads(), lignes ~244-253) est convertie en PARSE_ERROR pour CE fichier
+# (jamais une exception non rattrapée qui ferait sortir le bloc en dehors de {0}) — c'est la SEULE
+# portion protégée par un try/except, précisément parce que c'est la seule qui touche une entrée non
+# maîtrisée (le fichier de réglages). La boucle de constat qui suit (extraction des `hooks`/`args`,
+# ci-dessous) N'EST PAS dans ce try/except : elle ne touche que la structure JSON déjà validée, sous
+# des gardes `isinstance` systématiques à chaque niveau — aucune exception n'y est attendue, et
+# aucune n'y est convertie en PARSE_ERROR si elle survenait quand même.
 IFS= read -r -d '' PYPROG <<'PYEOF' || true
 import json, os, re, sys
 
@@ -242,7 +245,7 @@ for chemin in candidats:
         # jamais un PARSE_ERROR. Seul un fichier PRÉSENT mais illisible/invalide en est un.
         continue
     try:
-        with open(chemin, encoding='utf-8') as f:
+        with open(chemin, encoding='utf-8-sig') as f:
             brut = f.read()
         data = json.loads(brut)
         if not isinstance(data, dict):
