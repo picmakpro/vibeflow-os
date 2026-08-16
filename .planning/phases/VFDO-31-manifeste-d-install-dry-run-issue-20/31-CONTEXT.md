@@ -309,6 +309,40 @@ des README de modules est gaté par `check-version-sync.sh`).
 
 ---
 
+### D-31-12 — Une garde s'arme **au grain unité**, pas en attendant que le bout-en-bout l'atteigne
+
+> **Ajouté le 2026-08-16**, après que la revue et la vérification de la vague 1 eurent trouvé
+> **quatre assertions incapables de rougir** dans une suite déclarée verte à 5/5.
+
+**Le constat, prouvé par mutation** : la vague 1 ne câble **qu'un seul** site de pose, qui produit un
+manifeste d'**une ligne**. Conséquence mécanique — remplacer `LC_ALL=C sort -u` par un `cat` laisse
+la suite à 5 OK (sur une ligne, le tri est l'identité) ; neutraliser entièrement la liste
+d'exclusions ne change **pas un octet** du manifeste (aucun chemin atteignant `vf_record` ne
+rencontre la liste) ; et supprimer la relativisation produit un manifeste **faux** que la suite
+accepte, parce qu'un test de sous-chaîne voit `skills/…` à l'intérieur de `.claude/skills/…`.
+
+**Décision** : une garde s'arme **au grain unité — en sourçant la fonction et en l'appelant
+directement** — dès que le chemin de bout en bout ne l'exerce pas. On **n'attend pas** qu'une vague
+ultérieure rende l'assertion significative.
+
+**Motifs** :
+1. **Le moment le moins cher pour armer un filet est celui où le code est prouvé bon.** La
+   vérification a établi par exécution réelle que le socle est conforme aux trois scopes. Armer
+   maintenant, c'est calibrer contre un comportement connu correct ; armer plus tard, c'est
+   calibrer contre du code déjà suspect.
+2. **La vague suivante multiplie les sites par ~35.** Arriver à `31-03` avec un filet non armé,
+   c'est faire la migration la plus risquée de la phase sans rien qui puisse rougir.
+3. **Une assertion qui ne peut pas échouer est pire qu'une assertion absente** : elle occupe la
+   place, elle compte dans un « 5/5 », et elle fait croire que la propriété est tenue. QUAL-01
+   exige une mutation rouge **prouvée** — sur ces quatre-là, la preuve était impossible.
+
+**Corollaire pour les critères de plan** : un critère qui scanne une fonction **pas encore écrite**
+rend `0` et se lit comme « conforme ». Tout critère de ce type porte une **garde d'existence**
+préalable (la fonction est-elle définie ?) et se déclare **non évaluable** sinon — jamais vert.
+
+> Leçon transférable : un test de **sous-chaîne** (`grep -qF`) sur un chemin est presque toujours un
+> faux ami — le chemin fautif contient le chemin correct. Comparer des **lignes entières**.
+
 ## 4. Contraintes d'exécution non négociables
 
 1. **Branche de phase avant tout commit.** Jamais un commit sur `main`.
