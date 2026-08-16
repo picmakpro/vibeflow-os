@@ -121,8 +121,9 @@ module's README is its full documentation — same structure everywhere.
 ## 🔒 Trust
 
 - **Source-available**: public code and history — see [LICENSE](./LICENSE).
-- **Auditable**: bash + `jq`, every script covered by its suite (55 suites in CI),
-  **idempotent** install with backup before overwrite.
+- **Auditable**: bash + `jq`, every script covered by its suite (61 suites in CI — the newest
+  ones prove the dev-scope hooks' exec form as actually installed, their exit-code contract, and
+  the shared Python resolution), **idempotent** install with backup before overwrite.
 - **The repo applies its own doctrine**: CI on push/PR (tests + strict gates) + a
   "**fresh lab**" job — the baseline is installed into a blank lab and must pass its own
   gates with zero intervention.

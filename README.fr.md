@@ -125,8 +125,10 @@ chaque module est sa documentation complète — même structure partout.
 ## 🔒 Confiance
 
 - **Source-available** : code et historique publics — voir [LICENSE](./LICENSE).
-- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`55 suites` en CI), install
-  **idempotente** avec backup avant écrasement.
+- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`61 suites` en CI — les
+  nouvelles prouvent la forme exec des hooks du périmètre dev telle qu'installée, leur contrat de
+  sortie, et la résolution Python partagée), install **idempotente** avec backup avant
+  écrasement.
 - **Le repo s'applique sa propre doctrine** : CI sur push/PR (tests + gates stricts) + job
   « **lab frais** » — la baseline est installée dans un lab vierge et doit passer ses propres
   gates sans intervention.
