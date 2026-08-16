@@ -38,8 +38,9 @@ headers verbatim — it is structured as ten numbered arbitrages (D-31-01..10, a
 - **D-31-04** — Three regimes for indirect writes via 7 sub-processes: **A. Predicted exactly**
   (`generate-agent-commands.sh` → `commands/<mod>.md` @264, `build-gsd-index.sh` via `VF_INDEX_OUT`
   @680, `build-gsd-capabilities-index.sh` via `VF_CAPS_INDEX_OUT` @695) → exact `[plan] + <path>`
-  line, sub-process NOT invoked, enters manifest. **B. Delegated preview** (`merge-hooks.sh` @396-400)
-  → `merge-hooks.sh` learns a plan mode and renders its own `~ settings.json hooks.X += …` line;
+  line, sub-process NOT invoked, enters manifest. **B. Delegated preview** (`vibeflow-update.sh`
+  @398-405, the delegated call inside `merge_module_hooks`) → `merge-hooks.sh` learns a plan mode
+  and renders its own `~ settings.json hooks.X += …` line;
   forbidden to reimplement merge logic engine-side. **C. Announced, not enumerated**
   (`seed-registres.sh` @482, `inject-mcp-tools.sh` @293, `ensure-design-deps.sh` @717) →
   `[plan] ~ <target> (effect of <script>, content not enumerated)` line; out of manifest scope.
@@ -125,7 +126,7 @@ companion plan-mode flag so its own preview line (regime B) is not reimplemented
 | Manifest write (MANI-01) | Engine (`vibeflow-update.sh`) | — | sole writer of module artifacts, must be the sole writer of the manifest |
 | Dry-run plan rendering (MANI-02) | Engine (same call sites, gated by the write helper) | `merge-hooks.sh` (regime B delegation) | dry-run must share the write path, not a parallel one (D-31-01, `REQUIREMENTS.md:959`) |
 | Convergence delete (MANI-03) | Engine `update_module` (573-765 pose + 921-944 orchestration) | — | already owns the pose; convergence is its natural extension |
-| Hooks preview line (regime B) | `merge-hooks.sh` (351-408 delegation boundary already exists post-Phase-30) | — | engine already delegates hook writes here; delegating the preview keeps the single-writer invariant |
+| Hooks preview line (regime B) | `vibeflow-update.sh` (350-412 delegation boundary already exists post-Phase-30) | — | engine already delegates hook writes here; delegating the preview keeps the single-writer invariant |
 | Test suite (QUAL-01) | `plugin/_internal/tests/test-manifest.sh` (new) | CI discovery (`ci.yml:210-237`, pattern `find plugin scripts -type f -path '*/tests/test-*.sh'`) | matches the existing per-target suite convention, zero new runner infra needed |
 
 ## Engine Anatomy (full detail in `31-RECHERCHE-moteur.md`, this section is the load-bearing excerpt)
@@ -142,7 +143,7 @@ after that point by +4 vs. the numbers this table originally carried]**
 |---|---|---|
 | 115-124 | `mark_installed` | writes the module registry (tmp+mv) — the atomic-write pattern the manifest helper must copy (unchanged, before the shift point) |
 | 175-244 | `gitignore_add_paths` | one of the three parallel enumerations; covers 2 paths install's enumeration misses: `.claude/memory/` (221) and `scripts/vf-portable.sh` (243) (unchanged, before the shift point) |
-| 350-386 | `find_hooks_merger` (350-355) + `merge_module_hooks` (369-386) | delegation boundary to `merge-hooks.sh` — regime B's insertion point |
+| 350-412 | `find_hooks_merger` (350-355) + `merge_module_hooks` (369-412) | delegation boundary to `merge-hooks.sh` — regime B's insertion point |
 | 445-469 | `copy_module_scripts` | globs `*.sh/.mjs/.js` (chmod +x) and `*.txt` flat into `scripts/`, plus `scripts/tests/*` |
 | 573-765 | `install_module` | full pose of a module — every write site inside this function must route through the new helper |
 | 789-809 | `rollback_module` | `rm -rf` + `cp` from last backup — out of this phase's manifest scope but must remain green (non-regression) |
@@ -154,7 +155,7 @@ after that point by +4 vs. the numbers this table originally carried]**
 
 **Direct writes** [RE-VERIFIED post-hotfix, plugin/_internal/vibeflow-update.sh:118-899, exact line numbers in
 `31-RECHERCHE-moteur.md` §1.2] — registry (118-130), `.gitignore` (168, 170, scope `local` only),
-engine lib (330, 336, 341), settings backup (380-381), module scripts (445-462), retired cleanup
+engine lib (330, 336, 341), settings backup (383-386), module scripts (445-462), retired cleanup
 (563), `install_module`'s 9 `mkdir -p`/`cp[-r]` pairs (595-668, including the `docs/<mod>/` cwd-relative
 case at 634-635 that stays out-of-manifest per D-31-03), `backup_module` (769-779), `rollback_module`
 (794-800), `uninstall_module`'s 10 removal statements (815-886).

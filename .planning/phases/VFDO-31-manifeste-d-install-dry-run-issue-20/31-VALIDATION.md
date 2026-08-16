@@ -3,7 +3,7 @@ phase: 31
 slug: manifeste-d-install-dry-run-issue-20
 status: reviewed
 nyquist_compliant: true
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-08-16
 updated: 2026-08-16
 ---
