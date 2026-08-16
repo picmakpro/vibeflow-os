@@ -501,6 +501,18 @@ vf_declare_write() {
     else
       printf '[plan] %s %s\n' "$verb" "$path"
     fi
+    # Capture MIROIR de vf_record (31-05, D-31-07) : en dry-run, install_module ne flushe RIEN —
+    # vf_converge_apply (appelé juste après, dans update_module) a besoin du manifeste que la pose
+    # RÉELLE aurait produit pour le comparer à l'ancien. Même chemin de code que le verbe + réel
+    # (D-31-01), jamais un second calcul séparé : relativisation + exclusion identiques à
+    # vf_record, dans un contexte `if` (jamais un `&&` nu — vf_manifest_excluded rend 0 pour le
+    # cas COURANT « exclu », qui romprait `set -e` en position finale d'un `&&`, D-31-13).
+    if [ "$verb" = "+" ] && [ -n "$VF_CONVERGE_DRYSET" ]; then
+      local dryrel
+      if dryrel="$(vf_rel_to_target "$path")" && ! vf_manifest_excluded "$dryrel"; then
+        printf '%s\n' "$dryrel" >> "$VF_CONVERGE_DRYSET"
+      fi
+    fi
     return 0
   fi
   case "$verb" in
@@ -1690,6 +1702,157 @@ show_status() {
   done
 }
 
+# ---------- Convergence à l'update (MANI-03, D-31-07) ----------
+# Le doute ne supprime jamais. Séquence imposée dans update_module : snapshot de l'ANCIEN
+# manifeste AVANT install_module (qui flushe le NOUVEAU à sa dernière étape et écrase donc
+# l'ancien), puis apply APRÈS. Si install_module échoue en cours de route, `set -e` interrompt
+# avant vf_converge_apply : l'ancien manifeste reste en place (jamais flushé), l'update suivant
+# reconverge — propriété obtenue par l'ORDRE des gestes, pas par une transaction.
+#
+# sync_module_governance (chemin « version inchangée ») N'APPELLE JAMAIS ces deux fonctions : voir
+# le commentaire sur place dans sync_module_governance (D-31-14) pour le motif.
+VF_CONVERGE_MOD=""
+VF_CONVERGE_VERDICT=""
+VF_OLD_MANIFEST=""
+# Accumulateur MIROIR du nouveau manifeste en dry-run (voir vf_declare_write) — install_module ne
+# flushe RIEN en dry-run (D-31-06) : relire $(vf_manifest_path "$mod") après coup rendrait
+# l'ANCIEN, pas le nouveau (même fichier, jamais touché). Peuplé par le MÊME chemin de code que la
+# pose réelle (verbe +, D-31-01), jamais un second calcul séparé.
+VF_CONVERGE_DRYSET=""
+
+# vf_converge_snapshot <mod> — capture le verdict de l'ANCIEN manifeste (0 valide / 1 imparsable /
+# 2 absent) via vf_manifest_read, qui logge déjà lui-même le motif d'un refus. En pose RÉELLE, si
+# le verdict est valide, le fichier manifeste est COPIÉ tel quel (cp, jamais reconstruit depuis du
+# texte capturé — un manifeste valide mais VIDE existe, D-31-01, et une reconstruction par
+# printf/command-substitution le corromprait en une ligne vide unique) vers un temporaire dont le
+# chemin est mémorisé dans VF_OLD_MANIFEST. En dry-run, RIEN n'est copié (D-31-06) : install_module
+# ne flushera rien, le manifeste sur disque reste l'ANCIEN jusqu'à vf_converge_apply — seul le
+# verdict est mémorisé ici, et l'accumulateur MIROIR du nouveau (VF_CONVERGE_DRYSET) est ouvert :
+# install_module (appelé juste après, dans update_module) le peuple via vf_declare_write pendant
+# son propre passage dry-run.
+vf_converge_snapshot() {
+  local mod="$1"
+  local rc=0 file
+  VF_CONVERGE_MOD="$mod"
+  VF_OLD_MANIFEST=""
+  VF_CONVERGE_DRYSET=""
+  file="$(vf_manifest_path "$mod")"
+  vf_manifest_read "$mod" >/dev/null || rc=$?
+  VF_CONVERGE_VERDICT="$rc"
+  if vf_dry_run; then
+    VF_CONVERGE_DRYSET="$(mktemp)"
+    : > "$VF_CONVERGE_DRYSET"
+    return 0
+  fi
+  if [ "$rc" -eq 0 ]; then
+    VF_OLD_MANIFEST="$(mktemp)"
+    cp "$file" "$VF_OLD_MANIFEST"
+  fi
+}
+
+# vf_converge_apply <mod> — diff ancien/nouveau, SIX conditions cumulatives (D-31-07), backup
+# AVANT suppression, `rm -f` + `rmdir` d'élagage non récursif, liste rendue à l'utilisateur.
+# Ne fait RIEN (return 0) si le verdict du snapshot n'était pas valide : « absent » (2, repli
+# gracieux) et « imparsable » (1, abstention) ont DÉJÀ été loggués par vf_manifest_read côté
+# snapshot — une seconde ligne redirait la même chose.
+vf_converge_apply() {
+  local mod="$1"
+  if [ "$VF_CONVERGE_MOD" != "$mod" ] || [ "$VF_CONVERGE_VERDICT" != "0" ]; then
+    [ -n "$VF_OLD_MANIFEST" ] && rm -f "$VF_OLD_MANIFEST"
+    [ -n "$VF_CONVERGE_DRYSET" ] && rm -f "$VF_CONVERGE_DRYSET"
+    VF_CONVERGE_MOD=""; VF_CONVERGE_VERDICT=""; VF_OLD_MANIFEST=""; VF_CONVERGE_DRYSET=""
+    return 0
+  fi
+
+  local new_sorted old_source
+  new_sorted="$(mktemp)"
+
+  if vf_dry_run; then
+    # Dry-run (D-31-06) : install_module n'a rien flushé — le NOUVEAU manifeste qu'aurait produit
+    # la pose réelle vient de l'accumulateur MIROIR (VF_CONVERGE_DRYSET, peuplé par
+    # vf_declare_write pendant l'appel d'install_module qui précède immédiatement dans
+    # update_module), jamais d'une relecture de $(vf_manifest_path "$mod") — ce fichier n'a pas
+    # bougé, ce serait relire l'ANCIEN sous le nom du nouveau. L'ANCIEN, lui, EST lu EN PLACE :
+    # install_module n'a rien flushé, le fichier sur disque reste l'ancien.
+    LC_ALL=C sort -u "$VF_CONVERGE_DRYSET" > "$new_sorted"
+    old_source="$(vf_manifest_path "$mod")"
+  else
+    # NOUVEAU manifeste, relu MAINTENANT (après install_module, pose réelle) — un référentiel
+    # douteux ne sert jamais de base à une suppression, dans un sens comme dans l'autre.
+    local new_rc=0 new_content
+    new_content="$(vf_manifest_read "$mod")" || new_rc=$?
+    if [ "$new_rc" -ne 0 ]; then
+      log "  convergence de $mod : nouveau manifeste inutilisable — abstention (aucune suppression)"
+      rm -f "$new_sorted"
+      [ -n "$VF_OLD_MANIFEST" ] && rm -f "$VF_OLD_MANIFEST"
+      VF_CONVERGE_MOD=""; VF_CONVERGE_VERDICT=""; VF_OLD_MANIFEST=""; VF_CONVERGE_DRYSET=""
+      return 0
+    fi
+    printf '%s\n' "$new_content" | LC_ALL=C sort -u > "$new_sorted"
+    old_source="$VF_OLD_MANIFEST"
+  fi
+
+  local ts bdir
+  if ! vf_dry_run; then
+    ts=$(date +%Y%m%d-%H%M%S)
+    bdir="$BACKUP_DIR/$mod-$ts-removed"
+  fi
+
+  local rel full backup_dest
+  local -a removed=()
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    # (a) présent dans l'ancien manifeste — par construction : on itère ses lignes.
+    # (b) absent du nouveau manifeste — comparaison de LIGNE EXACTE, LC_ALL=C.
+    LC_ALL=C grep -qxF "$rel" "$new_sorted" && continue
+    full="$TARGET_ROOT/$rel"
+    # (c) existe sur disque.
+    [ -e "$full" ] || continue
+    # (d) fichier RÉGULIER — jamais un répertoire, jamais un lien (défense en profondeur du grain
+    #     fichier D-31-02 : une ligne répertoire autoriserait une suppression de masse).
+    { [ -f "$full" ] && [ ! -L "$full" ]; } || continue
+    # (e) résout SOUS TARGET_ROOT après normalisation — pas de `..` échappatoire (vf_rel_to_target
+    #     échoue hors périmètre ; défense en profondeur, chaque ligne a déjà passé vf_manifest_valid).
+    vf_rel_to_target "$full" >/dev/null 2>&1 || continue
+    # (f) hors liste close d'exclusions D-31-03 — un artefact partagé n'est jamais candidat.
+    vf_manifest_excluded "$rel" && continue
+
+    if vf_dry_run; then
+      vf_declare_write - "$full"
+      continue
+    fi
+
+    backup_dest="$bdir/$rel"
+    mkdir -p "$(dirname "$backup_dest")"
+    if cp "$full" "$backup_dest" 2>/dev/null; then
+      rm -f "$full"
+      # Élagage NON récursif, patron uninstall_module (rmdir sans -r sur un dossier PARTAGÉ) :
+      # échec attendu (répertoire non vide) capturé EXPLICITEMENT (jamais `|| true`, D-31-13) —
+      # rien à en faire, c'est le cas ordinaire, pas une anomalie à journaliser (D-31-14 : un
+      # signal qui spamme cesse d'être lu).
+      local prune_rc=0
+      rmdir "$(dirname "$full")" 2>/dev/null || prune_rc=$?
+      removed+=("$rel")
+    else
+      log "  convergence de $mod : backup en échec pour $rel — NON supprimé (pas de suppression sans filet)"
+    fi
+  done < "$old_source"
+
+  if ! vf_dry_run; then
+    log "  convergence de $mod : ${#removed[@]} chemin(s) retiré(s) (disparus du module, sauvegardés → $bdir)"
+    if [ "${#removed[@]}" -gt 0 ]; then
+      for rel in "${removed[@]}"; do
+        log "    - $rel"
+      done
+    fi
+  fi
+
+  rm -f "$new_sorted"
+  [ -n "$VF_OLD_MANIFEST" ] && rm -f "$VF_OLD_MANIFEST"
+  [ -n "$VF_CONVERGE_DRYSET" ] && rm -f "$VF_CONVERGE_DRYSET"
+  VF_CONVERGE_MOD=""; VF_CONVERGE_VERDICT=""; VF_OLD_MANIFEST=""; VF_CONVERGE_DRYSET=""
+}
+
 # ---------- Update ----------
 update_module() {
   local mod="$1"
@@ -1713,7 +1876,12 @@ update_module() {
   fi
 
   log "Update $mod : $installed → $available"
+  # Convergence MANI-03 (D-31-07) : snapshot AVANT install_module (qui flushe le NOUVEAU manifeste
+  # et écrase donc l'ancien), apply APRÈS. Si install_module échoue, `set -e` interrompt avant
+  # vf_converge_apply : l'ancien manifeste reste en place, l'update suivant reconverge.
+  vf_converge_snapshot "$mod"
   install_module "$mod"
+  vf_converge_apply "$mod"
 }
 
 # ---------- Main ----------
