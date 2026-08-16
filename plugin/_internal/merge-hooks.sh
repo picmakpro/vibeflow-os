@@ -10,8 +10,15 @@
 # Fragment = hooks/hooks.json d'un module, au format Claude Code :
 #   { "hooks": { "PreToolUse": [ { "matcher": "Read", "hooks": [ {"type":"command","command":"bash {{VF_SCRIPTS}}/x.sh"} ] } ] } }
 # Le placeholder {{VF_SCRIPTS}} est résolu par --scripts-prefix :
-#   scope project/local → "$CLAUDE_PROJECT_DIR"/.claude/scripts  (littéral, expansé par le harness)
+#   scope project/local → "$CLAUDE_PROJECT_DIR"/.claude/scripts  (littéral, expansé par le shell
+#                         qui exécute la commande — forme SHELL uniquement)
 #   scope user          → "$HOME"/.claude/scripts
+# ATTENTION forme exec (hotfix v2.53.1) : dans `args`, AUCUN shell n'intervient à l'exécution —
+# le harness ne substitue que ses propres placeholders (${CLAUDE_PROJECT_DIR}, ${CLAUDE_PLUGIN_*},
+# doc hooks officielle), jamais "$HOME" ni "$CLAUDE_PROJECT_DIR", qui y resteraient LITTÉRAUX
+# (bug v2.53.0 : les 6 hooks exec morts à chaque session en scope user). Le préfixe reçu est donc
+# DÉRIVÉ en variante exec-safe avant substitution dans `args` (voir exec_safe_prefix ci-dessous) ;
+# la forme shell (`command` string) garde le préfixe tel quel.
 #
 # --settings-local (optionnel, Phase 30 manque 1) : seconde cible pour les entrées dont le
 # `command` a reçu la substitution du jeton {{VF_BASH}} — un chemin absolu de bash résolu à
@@ -125,6 +132,31 @@ bash_abs = os.environ.get("BASH_ABS", "")
 
 VF_SCRIPTS_TOKEN = "{{VF_SCRIPTS}}"
 VF_BASH_TOKEN = "{{VF_BASH}}"
+
+
+def exec_safe_prefix(p):
+    """Variante exec-safe du préfixe scripts, pour substitution dans `args` (forme exec).
+
+    En forme exec il n'y a pas de shell : "$HOME"/"$CLAUDE_PROJECT_DIR" ne seraient jamais
+    expansés (bug v2.53.0). Dérivation :
+      "$HOME"/…               → chemin absolu résolu ICI, à l'install — légitime : le scope
+                                user cible ~/.claude, fichier par-machine, aucune fuite git ;
+      "$CLAUDE_PROJECT_DIR"/… → ${CLAUDE_PROJECT_DIR}/… — l'UNIQUE mécanisme de substitution
+                                que le harness applique aux args (doc hooks, path placeholders),
+                                portable et committable ;
+      autre                   → inchangé (déjà absolu ou déjà un placeholder harness).
+    """
+    for head in ('"$HOME"', "$HOME"):
+        if p.startswith(head):
+            home = os.environ.get("HOME") or os.path.expanduser("~")
+            return home + p[len(head):]
+    for head in ('"$CLAUDE_PROJECT_DIR"', "$CLAUDE_PROJECT_DIR"):
+        if p.startswith(head):
+            return "${CLAUDE_PROJECT_DIR}" + p[len(head):]
+    return p
+
+
+prefix_exec = exec_safe_prefix(prefix)
 
 def die(msg):
     sys.stderr.write(f"[merge-hooks] ERROR: {msg}\n")
@@ -316,10 +348,16 @@ def apply_merge(hooks, view_frag_hooks, other_hooks=None):
                     new_args = []
                     for a in h.get("args", []) or []:
                         if isinstance(a, str):
-                            a2 = a.replace(VF_SCRIPTS_TOKEN, prefix)
+                            # prefix_exec, PAS prefix : un arg exec n'est jamais lu par un
+                            # shell — un littéral "$HOME"/"$CLAUDE_PROJECT_DIR" y serait un
+                            # chemin mort (bug v2.53.0, hooks morts à chaque SessionStart).
+                            a2 = a.replace(VF_SCRIPTS_TOKEN, prefix_exec)
                             if "{{" in a2:
                                 die(f"{fragment_path} : placeholder non substitué dans args de "
                                     f"l'entrée {entry_label} : {a2!r}")
+                            if '"$HOME"' in a2 or '"$CLAUDE_PROJECT_DIR"' in a2:
+                                die(f"{fragment_path} : littéral shell-quoté dans args de "
+                                    f"l'entrée {entry_label} (jamais expansé en forme exec) : {a2!r}")
                             new_args.append(a2)
                         else:
                             new_args.append(a)

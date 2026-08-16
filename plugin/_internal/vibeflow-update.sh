@@ -355,7 +355,11 @@ find_hooks_merger() {
 }
 
 scripts_prefix_for_scope() {
-  # Chemins LITTÉRAUX dans settings.json (expansés par le harness à l'exécution du hook).
+  # Chemins LITTÉRAUX dans settings.json, valables pour la forme SHELL uniquement (c'est le
+  # shell qui exécute la commande qui les expanse). Pour la forme exec (`args`), merge-hooks.sh
+  # dérive lui-même la variante exec-safe (hotfix v2.53.1) : "$HOME" → chemin absolu résolu à
+  # l'install, "$CLAUDE_PROJECT_DIR" → placeholder harness ${CLAUDE_PROJECT_DIR} — car en forme
+  # exec aucun shell n'intervient et le harness ne substitue que ses propres placeholders.
   case "$VF_SCOPE" in
     user) printf '%s' '"$HOME"/.claude/scripts' ;;
     *)    printf '%s' '"$CLAUDE_PROJECT_DIR"/.claude/scripts' ;;
