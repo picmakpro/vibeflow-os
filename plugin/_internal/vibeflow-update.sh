@@ -90,6 +90,10 @@ BACKUP_DIR="$TARGET_ROOT/.backups"
 # incorrect visible avec un message précis, au lieu de dépendre du seul message bash générique.
 VF_MANIFEST_MOD=""
 VF_MANIFEST_TMP=""
+# Compteur de copies dégradées (D-31-11 point 4) de la pose EN COURS — remis à 0 par
+# vf_manifest_reset (appelée en tête d'install_module), lu en fin d'install_module pour le
+# compte rendu. Jamais unbound (même discipline que les deux variables ci-dessus).
+VF_DEGRADED_COPIES_COUNT=0
 
 # ---------- Cache (SCOPE-02 : plus de clone/pull, le cache doit exister) ----------
 require_cache() {
@@ -241,9 +245,17 @@ vf_rel_to_target() {
 vf_record() {
   local dest="$1"
   local rel
-  # W-2 (revue vague 1) : cycle non ouvert → message explicite plutôt qu'un « unbound variable »
-  # opaque (VF_MANIFEST_TMP est désormais initialisée globalement à "", jamais unbound en soi).
-  [ -n "$VF_MANIFEST_TMP" ] || { log "  ERROR: vf_record appelé hors cycle vf_manifest_reset (accumulateur manifeste non ouvert)"; return 1; }
+  # Cycle non ouvert → no-op SILENCIEUX (révisé en 31-03, cf. SUMMARY) : depuis la migration des
+  # ~35 sites, vf_place_file/vf_place_tree/vf_declare_write sont appelés depuis des fonctions
+  # PARTAGÉES entre un contexte à cycle ouvert (install_module) et des contextes SANS cycle
+  # (sync_module_governance côté update « version inchangée », uninstall_module côté
+  # backup_module) — copy_engine_lib, copy_module_scripts, merge_module_hooks (backup settings)
+  # et backup_module y sont légitimement appelées sans vf_manifest_reset. Avant cette migration,
+  # ces chemins n'avaient JAMAIS touché le manifeste (cp brut) : un ERROR+return 1 ici ferait
+  # avorter `update`/`uninstall` sous `set -e` — un changement de comportement observable que
+  # D-31-01 interdit. `vf_manifest_reset`/`vf_record`/`vf_manifest_flush` restent sourcés
+  # directement par T4b/T5b DANS un cycle ouvert : ce chemin n'est pas affecté.
+  [ -n "$VF_MANIFEST_TMP" ] || return 0
   rel="$(vf_rel_to_target "$dest")" || return 0
   vf_manifest_excluded "$rel" && return 0
   printf '%s\n' "$rel" >> "$VF_MANIFEST_TMP"
@@ -266,6 +278,7 @@ vf_manifest_reset() {
   # d'un `trap` correctement posé à chaque appelant.
   VF_MANIFEST_TMP="$manifest_dir/.vibeflow-acc-${mod}.$$"
   : > "$VF_MANIFEST_TMP"
+  VF_DEGRADED_COPIES_COUNT=0
 }
 
 # Trie l'accumulateur (LC_ALL=C sort -u), l'écrit atomiquement (tmp + mv, patron
@@ -285,6 +298,35 @@ vf_manifest_flush() {
   VF_MANIFEST_MOD=""
 }
 
+# vf_declare_write <verbe> <chemin> [note] — LA couture unique (D-31-01). Verbe parmi + (créer)
+# / ~ (modifier/merger) / - (supprimer). Aujourd'hui elle n'a qu'un effet : consigner <chemin>
+# via vf_record quand le verbe est +. Les verbes ~ et - ne consignent rien (le manifeste ne
+# trace que des créations, D-31-02). 31-04 y ajoutera la branche du mode plan --dry-run ; aucun
+# autre point du fichier ne devra être touché à ce moment-là. [note] est ignorée pour l'instant
+# (réservée à l'affichage `[plan] ~ <chemin>  (note)` de D-31-05, branché en 31-04).
+vf_declare_write() {
+  local verb="$1" path="$2"
+  case "$verb" in
+    +) vf_record "$path" ;;
+    ~|-) : ;;
+  esac
+}
+
+# vf_note_degraded_copy <dest_file> — journalise sur stderr une copie cp -r dégradée : un
+# fichier annoncé par l'énumération source de vf_place_tree mais ABSENT en destination après
+# copie (D-31-11 point 4, option A du 2026-08-16 : un seul émetteur, au grain FICHIER, aucune
+# déduplication par répertoire). Accumule dans VF_DEGRADED_COPIES_COUNT pour le compte rendu de
+# fin de pose. Retourne TOUJOURS 0 — fonction d'observation, jamais de contrôle : si elle
+# retournait non nul, `set -e` avorterait l'install sur l'événement précis qu'elle sert à ne PAS
+# faire avorter. Un seul site d'appel dans tout le fichier : la boucle de vérification de
+# présence de vf_place_tree, une fois par fichier manquant — jamais depuis le `cp` lui-même.
+vf_note_degraded_copy() {
+  local dest_file="$1"
+  log "  copie dégradée : $dest_file"
+  VF_DEGRADED_COPIES_COUNT=$((VF_DEGRADED_COPIES_COUNT + 1))
+  return 0
+}
+
 # LE helper de pose fichier (D-31-01) : pose <src> vers <dest> (exécutable si [exec] fourni)
 # ET consigne <dest> dans le même appel — le manifeste est un sous-produit, jamais une
 # énumération séparée. Le rc de cp est capturé explicitement et propagé (échec de copie =
@@ -302,7 +344,83 @@ vf_place_file() {
   if [ "$mode" = "exec" ]; then
     chmod +x "$dest"
   fi
-  vf_record "$dest"
+  vf_declare_write + "$dest"
+}
+
+# vf_place_tree <src_dir> <dest_dir> [exec] — pose d'un répertoire réel (cp -r) au grain fichier
+# (D-31-02), réservée aux sites qui posent un <src_dir> complet via
+# cp -r "$src_dir/"* "$dest_dir/". UNE SEULE énumération interne à DEUX usages (D-31-11) :
+#   1. Annonce depuis la SOURCE, sémantique du glob (entrées de premier niveau commençant par
+#      "." EXCLUES — exactement ce que "$src_dir"/* écarte déjà, comportement gelé D-31-11
+#      point 2, PAS corrigé). C'est cette énumération que 31-04 branchera pour --dry-run.
+#   2. Consignation par vérification de PRÉSENCE en DESTINATION après copie — jamais un `find`
+#      aveugle sur la source, qui affirmerait au manifeste des fichiers jamais réellement écrits
+#      (D-31-11 point 3).
+# Le rc du `cp -r` est CAPTURÉ (`|| cp_rc=$?`, jamais `|| true` — W-1) : la fonction n'avorte pas
+# sous `set -e` (contrat Phase 30 : copie best-effort, tolérance déjà en place avant ce lot) mais
+# l'information survit pour les gardes ci-dessous. Chaque paire annoncée-mais-absente après copie
+# est une copie DÉGRADÉE : journalisée via vf_note_degraded_copy (jamais consignée au manifeste),
+# la pose n'échoue pas pour autant (D-31-11 point 4).
+# Trou de silence rattrapé (D-31-11 point 4 §Complément, W-2) : si `cp_rc` a été affecté ET que la
+# boucle de vérification n'a signalé AUCUN fichier manquant (énumération vide — $src_dir
+# illisible, le cp échoue globalement sans qu'aucune paire ne pointe vers un fichier manquant),
+# une ligne de compte rendu est émise malgré tout, au grain RÉPERTOIRE, SANS passer par
+# vf_note_degraded_copy (qui reste réservée à son unique site d'appel, le grain fichier).
+vf_place_tree() {
+  local src_dir="${1%/}" dest_dir="${2%/}" mode="${3:-}"
+  mkdir -p "$dest_dir"
+  local cp_rc=""
+  cp -r "$src_dir"/* "$dest_dir"/ 2>/dev/null || cp_rc=$?
+
+  # Énumération SOURCE (D-31-11 points 1/2), en DEUX passes distinctes pour garder UNE SEULE
+  # boucle de vérification ensuite — c'est ce qui rend le site d'appel à vf_note_degraded_copy
+  # UNIQUE dans tout le fichier (D-31-11 point 4 option A) : une passe qui listait les fichiers
+  # dans deux branches (entrée fichier / entrée répertoire) obligeait deux sites d'appel, exactement
+  # le défaut payé cinq fois sur ce helper. Ici, la passe 1 aplatit tout en une seule liste de
+  # fichiers ; la passe 2 (plus bas) est l'UNIQUE boucle de vérification/consignation.
+  local list_tmp entry name
+  list_tmp="$(mktemp)"
+  for entry in "$src_dir"/*; do
+    [ -e "$entry" ] || continue
+    name="$(basename "$entry")"
+    case "$name" in
+      .*) continue ;;  # dotfile de premier niveau : jamais annoncé ni posé (D-31-11 point 2, gelé)
+    esac
+    if [ -d "$entry" ]; then
+      find "$entry" -type f >> "$list_tmp"
+    else
+      printf '%s\n' "$entry" >> "$list_tmp"
+    fi
+  done
+
+  # Passe 2 — L'UNIQUE boucle de vérification de présence : pour chaque fichier de l'énumération
+  # SOURCE, teste sa présence en DESTINATION après copie (D-31-11 point 3). Présent → consigné
+  # (vf_declare_write) ; absent → copie dégradée, journalisée au SEUL site d'appel de
+  # vf_note_degraded_copy dans tout le fichier.
+  local f rel dest_file missing_count=0
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    rel="${f#"$src_dir"/}"
+    dest_file="$dest_dir/$rel"
+    if [ -f "$dest_file" ]; then
+      [ "$mode" = "exec" ] && chmod +x "$dest_file"
+      vf_declare_write + "$dest_file"
+    else
+      vf_note_degraded_copy "$dest_file"
+      missing_count=$((missing_count + 1))
+    fi
+  done < "$list_tmp"
+  rm -f "$list_tmp"
+
+  # Trou de silence rattrapé (D-31-11 point 4 §Complément, W-2) : $src_dir illisible → l'énumération
+  # ci-dessus rend zéro paire, la boucle n'itère jamais, missing_count reste à 0 — SANS ce garde,
+  # rien ne serait dit. Émis au grain RÉPERTOIRE, SANS passer par vf_note_degraded_copy (qui reste
+  # réservée à son unique site d'appel ci-dessus, le grain fichier).
+  if [ -n "$cp_rc" ] && [ "$missing_count" -eq 0 ]; then
+    log "  copie dégradée : $src_dir (source illisible ou cp en échec, aucun fichier énuméré)"
+    VF_DEGRADED_COPIES_COUNT=$((VF_DEGRADED_COPIES_COUNT + 1))
+  fi
+  return 0
 }
 
 # ---------- Résolveur de fermeture transitive (intégration Phase 2) ----------
@@ -437,6 +555,8 @@ generate_agent_command_for() {
   fi
   if VF_TARGET_ROOT="$TARGET_ROOT" bash "$gen" --agent "$mod" >/dev/null 2>&1; then
     log "  commande d'incarnation → $TARGET_ROOT/commands/${mod}.md"
+    # Site #16 (31-03) : régime A (D-31-04) — sortie prédite exactement, annoncée au succès.
+    vf_declare_write + "$TARGET_ROOT/commands/${mod}.md"
   else
     log "  (commande d'incarnation non générée pour $mod — best-effort)"
   fi
@@ -466,6 +586,8 @@ inject_lab_mcp_into_agents() {
   # vivent, pas dans TARGET_ROOT). Absent → le script no-op de lui-même.
   if bash "$injector" --target "$TARGET_ROOT/agents" --mcp-json "./.mcp.json" >/dev/null 2>&1; then
     log "  serveurs MCP du lab injectés dans les agents exécutants flaggés (vf-mcp-consumer, ADR-051)"
+    # Site #19 (31-03) : régime C (D-31-04). Verbe ~ : no-op sur le manifeste.
+    vf_declare_write ~ "$TARGET_ROOT/agents" "effet de inject-mcp-tools.sh, contenu non énuméré"
   else
     log "  (injection MCP best-effort — voir inject-mcp-tools.sh)"
   fi
@@ -510,6 +632,10 @@ copy_engine_lib() {
   if cp "$src" "$tmp" 2>/dev/null && mv -f "$tmp" "$dest" 2>/dev/null; then
     VF_ENGINE_LIB_COPIED="1"
     log "  lib vf-portable.sh posée → $dest"
+    # Annoncé (D-31-01) mais exclu du manifeste par D-31-03 (scripts/vf-portable.sh, propriété
+    # de l'engine, partagée entre modules) — vf_record s'en abstiendra lui-même via
+    # vf_manifest_excluded. No-op silencieux si appelée hors cycle (sync_module_governance).
+    vf_declare_write + "$dest"
     return 0
   fi
   rm -f "$tmp" 2>/dev/null || true
@@ -554,9 +680,14 @@ merge_module_hooks() {
     return 1
   fi
   # Backup du settings avant toute écriture.
+  # Site #21 (31-03) : annonce en tête (verbe +), puis le cp existant reste INTENTIONNELLEMENT
+  # brut — copie de sauvegarde vers un nom horodaté, exclue du manifeste par D-31-03. No-op
+  # silencieux si appelée hors cycle (sync_module_governance côté update « version inchangée »).
   if [ -f "$TARGET_ROOT/settings.json" ]; then
     mkdir -p "$BACKUP_DIR"
-    cp "$TARGET_ROOT/settings.json" "$BACKUP_DIR/settings-$(date +%Y%m%d-%H%M%S).json"
+    local settings_backup="$BACKUP_DIR/settings-$(date +%Y%m%d-%H%M%S).json"
+    vf_declare_write + "$settings_backup"
+    cp "$TARGET_ROOT/settings.json" "$settings_backup"
   fi
   # Routage --settings-local (Phase 30 tâche 4, D-01) : en scope project/local, merge-hooks.sh
   # bascule vers CE fichier les seules entrées portant {{VF_BASH}} — un chemin absolu de bash
@@ -621,23 +752,39 @@ copy_module_scripts() {
   local module_dir="$CACHE_DIR/$mod"
   [ -d "$module_dir/scripts" ] || return 0
   mkdir -p "$TARGET_ROOT/scripts"
+  # Site #2 (31-03) : GARDE D'EXISTENCE CONSERVÉE — le glob triple s'expand presque toujours en
+  # littéral (rares modules ayant les trois extensions), et sous `set -euo pipefail` un
+  # `vf_place_file` nu dans ce corps de boucle propagerait un échec de copie improbable en abort
+  # de toute l'install (cf. règle set -e × rc, 31-03-PLAN.md). La garde `[ -f "$f" ] &&` neutralise
+  # le cas non-satisfait AVANT que `set -e` le voie — jamais retirée au prétexte que le helper
+  # « gère déjà » l'échec : il le propage, il ne l'absorbe pas.
   for f in "$module_dir/scripts/"*.sh "$module_dir/scripts/"*.mjs "$module_dir/scripts/"*.js; do
-    [ -f "$f" ] && cp "$f" "$TARGET_ROOT/scripts/" && chmod +x "$TARGET_ROOT/scripts/$(basename "$f")"
+    [ -f "$f" ] && vf_place_file "$f" "$TARGET_ROOT/scripts/$(basename "$f")" exec
   done
-  # Fichiers de DONNEES accompagnant les scripts (*.txt). Sans cette boucle, un module pouvait
-  # referencer un fichier que l'engine ne posait JAMAIS chez l'utilisateur : c'est exactement ce
-  # qui est arrive a `known-versions.txt` (infrastructure-audit), lu par audit-infra.sh en
-  # $SCRIPTS_DIR/known-versions.txt et absent de toute install. Glob volontairement borne a *.txt
-  # — assez large pour la whitelist, assez etroit pour ne pas ramasser les residus (*.bak) ni les
-  # manifestes de config. Pas de chmod +x : ce sont des donnees, pas des executables.
+  # Site #3 (31-03), même motif de garde que #2. Fichiers de DONNEES accompagnant les scripts
+  # (*.txt). Sans cette boucle, un module pouvait referencer un fichier que l'engine ne posait
+  # JAMAIS chez l'utilisateur : c'est exactement ce qui est arrive a `known-versions.txt`
+  # (infrastructure-audit), lu par audit-infra.sh en $SCRIPTS_DIR/known-versions.txt et absent de
+  # toute install. Glob volontairement borne a *.txt — assez large pour la whitelist, assez etroit
+  # pour ne pas ramasser les residus (*.bak) ni les manifestes de config. Pas de mode exec : ce
+  # sont des donnees, pas des executables.
   for f in "$module_dir/scripts/"*.txt; do
-    [ -f "$f" ] && cp "$f" "$TARGET_ROOT/scripts/"
+    [ -f "$f" ] && vf_place_file "$f" "$TARGET_ROOT/scripts/$(basename "$f")"
   done
+  # Site #4 (31-03) : globs de FICHIERS restreints (tests/*.sh, tests/fixtures/*), PAS la pose
+  # d'un répertoire entier — vf_place_tree ne s'applique pas ici (elle reproduirait la sémantique
+  # de `cp -r "$src_dir/"*`, càd TOUT `$src_dir`, ce que ces deux globs précis n'atteignent
+  # jamais). Grain fichier via vf_place_file, garde d'existence obligatoire (même motif que #2/#3).
   if [ -d "$module_dir/scripts/tests" ]; then
     mkdir -p "$TARGET_ROOT/scripts/tests/fixtures"
-    cp -r "$module_dir/scripts/tests/"*.sh "$TARGET_ROOT/scripts/tests/" 2>/dev/null || true
-    cp -r "$module_dir/scripts/tests/fixtures/"* "$TARGET_ROOT/scripts/tests/fixtures/" 2>/dev/null || true
-    chmod +x "$TARGET_ROOT"/scripts/tests/*.sh 2>/dev/null || true
+    for f in "$module_dir/scripts/tests/"*.sh; do
+      [ -f "$f" ] || continue
+      vf_place_file "$f" "$TARGET_ROOT/scripts/tests/$(basename "$f")" exec
+    done
+    for f in "$module_dir/scripts/tests/fixtures/"*; do
+      [ -f "$f" ] || continue
+      vf_place_file "$f" "$TARGET_ROOT/scripts/tests/fixtures/$(basename "$f")"
+    done
   fi
   log "  copied scripts/ → $TARGET_ROOT/scripts/"
 }
@@ -659,6 +806,10 @@ seed_module_registres() {
   [ -f "$seeder" ] || return 0
   if bash "$seeder" --quiet >/dev/null; then
     log "  registres mémoire vérifiés/instanciés → seed-registres.sh"
+    # Site #18 (31-03) : régime C (D-31-04). Verbe ~ : no-op sur le manifeste (D-31-03, contenu
+    # vivant du lab), no-op aussi hors cycle (appelée depuis install_module ET
+    # sync_module_governance).
+    vf_declare_write ~ "$TARGET_ROOT/memory" "effet de seed-registres.sh, contenu non énuméré"
   else
     log "  (registres mémoire non instanciés — best-effort, voir seed-registres.sh)"
   fi
@@ -738,6 +889,9 @@ cleanup_retired_modules() {
       continue
     fi
     log "Module retiré '$mod' détecté dans ce lab → nettoyage (convergence)"
+    # Site #5 (31-03) : annonce AVANT le rm -rf existant (verbe -, no-op sur le manifeste
+    # aujourd'hui — vf_declare_write ne consigne que le verbe +, D-31-02).
+    vf_declare_write - "$target"
     [ -e "$target" ] && rm -rf "$target" && log "  removed $target"
     [ "$in_registry" = "yes" ] && mark_uninstalled "$mod"
   done < "$manifest"
@@ -777,30 +931,30 @@ install_module() {
   fi
 
   # Type 2 — Multi-skills module : skills/<name>/SKILL.md (e.g., skill-creator with 2 nested skills)
+  # Site #6 (31-03) : cp -r d'un répertoire réel → vf_place_tree (grain fichier, D-31-02).
   if [ -d "$module_dir/skills" ]; then
     for skill_dir in "$module_dir/skills/"*/; do
       [ -d "$skill_dir" ] || continue
       skill_name=$(basename "$skill_dir")
-      mkdir -p "$TARGET_ROOT/skills/$skill_name"
-      cp -r "$skill_dir"* "$TARGET_ROOT/skills/$skill_name/" 2>/dev/null || true
+      vf_place_tree "$skill_dir" "$TARGET_ROOT/skills/$skill_name"
       log "  copied nested skill → $TARGET_ROOT/skills/$skill_name/"
     done
   fi
 
   # Type 3 — Agent module : AGENT.md → $TARGET_ROOT/agents/<mod>.md
+  # Site #7 (31-03) : cp fichier unique → vf_place_file.
   if [ -f "$module_dir/AGENT.md" ]; then
-    mkdir -p "$TARGET_ROOT/agents"
-    cp "$module_dir/AGENT.md" "$TARGET_ROOT/agents/${mod}.md"
+    vf_place_file "$module_dir/AGENT.md" "$TARGET_ROOT/agents/${mod}.md"
     log "  copied AGENT.md → $TARGET_ROOT/agents/${mod}.md"
   fi
 
   # Type 3b — Multi-agents module : agents/<name>.md → $TARGET_ROOT/agents/<name>.md (chacun)
   # Symétrique du multi-skills (skills/<name>/). Un module peut livrer plusieurs agents.
+  # Site #8 (31-03) : cp par fichier dans la boucle existante → vf_place_file.
   if [ -d "$module_dir/agents" ]; then
-    mkdir -p "$TARGET_ROOT/agents"
     for agent_md in "$module_dir/agents/"*.md; do
       [ -f "$agent_md" ] || continue
-      cp "$agent_md" "$TARGET_ROOT/agents/$(basename "$agent_md")"
+      vf_place_file "$agent_md" "$TARGET_ROOT/agents/$(basename "$agent_md")"
       log "  copied agent → $TARGET_ROOT/agents/$(basename "$agent_md")"
     done
   fi
@@ -808,10 +962,12 @@ install_module() {
   # Type 4 — Doc-only module : content/ → docs/<mod>/
   # EXCEPTION scope : la doc reste relative au cwd PROJET (ce n'est pas du .claude),
   # donc PAS rebasée sur TARGET_ROOT même en scope user.
+  # Site #9 (31-03) : vf_place_tree ANNONCÉ mais `vf_rel_to_target` échoue (hors TARGET_ROOT) —
+  # vf_record s'abstient donc lui-même de toute consignation. C'est l'asymétrie VOULUE de
+  # D-31-03 : présent au plan --dry-run (31-04), absent du manifeste — jamais un oubli.
   if [ -d "$module_dir/content" ]; then
     local doc_target="docs/$mod"
-    mkdir -p "$doc_target"
-    cp -r "$module_dir/content/"* "$doc_target/" 2>/dev/null || true
+    vf_place_tree "$module_dir/content" "$doc_target"
     log "  copied content/ → $doc_target/ (doc module, hors TARGET_ROOT)"
   fi
 
@@ -819,32 +975,37 @@ install_module() {
   # Deux régimes selon le frontmatter : AVEC `paths:` → chargée à la lecture d'un fichier
   # correspondant (auto-scopée, Tier 2) ; SANS `paths:` → chargée inconditionnellement au
   # lancement, à la priorité de CLAUDE.md (globale, Tier 1). Voir patterns/05-regles.md.
+  # Site #10 (31-03) : glob de fichiers, pas un répertoire entier — grain fichier exigé par
+  # D-31-02, boucle avec garde d'existence (le module peut n'avoir aucun rules/*.md).
   if [ -d "$module_dir/rules" ]; then
     mkdir -p "$TARGET_ROOT/rules"
-    cp "$module_dir/rules/"*.md "$TARGET_ROOT/rules/" 2>/dev/null || true
+    for f in "$module_dir/rules/"*.md; do
+      [ -f "$f" ] || continue
+      vf_place_file "$f" "$TARGET_ROOT/rules/$(basename "$f")"
+    done
     log "  copied rules/ → $TARGET_ROOT/rules/"
   fi
 
   # References folder at module root (companion to root SKILL.md)
+  # Site #11 (31-03) : cp -r d'un répertoire réel → vf_place_tree.
   if [ -d "$module_dir/references" ] && [ -f "$module_dir/SKILL.md" ]; then
-    mkdir -p "$TARGET_ROOT/skills/$mod/references"
-    cp -r "$module_dir/references/"* "$TARGET_ROOT/skills/$mod/references/" 2>/dev/null || true
+    vf_place_tree "$module_dir/references" "$TARGET_ROOT/skills/$mod/references"
     log "  copied references/ → $TARGET_ROOT/skills/$mod/references/"
   fi
 
   # References folder for AGENT modules (D7) : un module agent (AGENT.md ou agents/ sans SKILL.md
   # racine) embarque ses references sous $TARGET_ROOT/agents/<mod>-references/ (chargées on-demand).
+  # Site #12 (31-03) : cp -r d'un répertoire réel → vf_place_tree.
   if [ -d "$module_dir/references" ] && { [ -f "$module_dir/AGENT.md" ] || [ -d "$module_dir/agents" ]; } && [ ! -f "$module_dir/SKILL.md" ]; then
-    mkdir -p "$TARGET_ROOT/agents/${mod}-references"
-    cp -r "$module_dir/references/"* "$TARGET_ROOT/agents/${mod}-references/" 2>/dev/null || true
+    vf_place_tree "$module_dir/references" "$TARGET_ROOT/agents/${mod}-references"
     log "  copied references/ → $TARGET_ROOT/agents/${mod}-references/"
   fi
 
   # Config folder at module root (companion to root SKILL.md) : templates de config projet.
   # Posé sous le dossier skill du module ; l'utilisateur copie le .example.json vers son projet.
+  # Site #13 (31-03) : cp -r d'un répertoire réel → vf_place_tree.
   if [ -d "$module_dir/config" ] && [ -f "$module_dir/SKILL.md" ]; then
-    mkdir -p "$TARGET_ROOT/skills/$mod/config"
-    cp -r "$module_dir/config/"* "$TARGET_ROOT/skills/$mod/config/" 2>/dev/null || true
+    vf_place_tree "$module_dir/config" "$TARGET_ROOT/skills/$mod/config"
     log "  copied config/ → $TARGET_ROOT/skills/$mod/config/"
   fi
 
@@ -858,6 +1019,9 @@ install_module() {
     if VF_INDEX_OUT="$TARGET_ROOT/agents/${mod}-references/gsd-skills-index.md" \
        bash "$TARGET_ROOT/scripts/build-gsd-index.sh" >/dev/null 2>&1; then
       log "  index régénéré → $TARGET_ROOT/agents/${mod}-references/gsd-skills-index.md"
+      # Site #14 (31-03) : régime A (D-31-04) — sortie prédite exactement, sous-processus non
+      # appelé en mode plan (31-04). Annoncée seulement au SUCCÈS (le fichier existe réellement).
+      vf_declare_write + "$TARGET_ROOT/agents/${mod}-references/gsd-skills-index.md"
     else
       log "  (index non régénéré — GSD absent, best-effort)"
     fi
@@ -873,6 +1037,8 @@ install_module() {
     if VF_CAPS_INDEX_OUT="$TARGET_ROOT/agents/${mod}-references/gsd-capabilities-index.md" \
        bash "$TARGET_ROOT/scripts/build-gsd-capabilities-index.sh" >/dev/null 2>&1; then
       log "  index capabilities régénéré → $TARGET_ROOT/agents/${mod}-references/gsd-capabilities-index.md"
+      # Site #15 (31-03), symétrique du #14 — régime A (D-31-04).
+      vf_declare_write + "$TARGET_ROOT/agents/${mod}-references/gsd-capabilities-index.md"
     else
       log "  (index capabilities non régénéré — moteur GSD absent, best-effort)"
     fi
@@ -895,6 +1061,9 @@ install_module() {
   if [ -f "$module_dir/scripts/ensure-design-deps.sh" ] && [ -f "$TARGET_ROOT/scripts/ensure-design-deps.sh" ]; then
     if bash "$TARGET_ROOT/scripts/ensure-design-deps.sh" --quiet >/dev/null; then
       log "  chaîne d'outils design vérifiée/corrigée → ensure-design-deps.sh"
+      # Site #17 (31-03) : régime C (D-31-04) — effet annoncé, non énuméré. Honnête sur sa propre
+      # limite (le script peut avoir touché divers fichiers sous scripts/, non listés ici).
+      vf_declare_write ~ "$TARGET_ROOT/scripts" "effet de ensure-design-deps.sh, contenu non énuméré"
     else
       log "  (chaîne d'outils design non vérifiée — best-effort, voir ensure-design-deps.sh)"
     fi
@@ -938,6 +1107,12 @@ install_module() {
   vf_manifest_flush
 
   mark_installed "$mod" "$version"
+  # Compte rendu de fin de pose (D-31-11 point 4) : accumulé par vf_note_degraded_copy et par le
+  # garde du trou de silence de vf_place_tree pendant la pose ci-dessus — aux côtés de la ligne de
+  # succès existante, jamais à sa place (la pose n'échoue pas sur une copie dégradée).
+  if [ "$VF_DEGRADED_COPIES_COUNT" -gt 0 ]; then
+    log "  ⚠ $VF_DEGRADED_COPIES_COUNT copie(s) dégradée(s) détectée(s) pendant la pose (voir ci-dessus)"
+  fi
   log "✓ $mod $version installé"
 }
 
@@ -948,6 +1123,11 @@ backup_module() {
   ts=$(date +%Y%m%d-%H%M%S)
   local bdir="$BACKUP_DIR/$mod-$ts"
   mkdir -p "$bdir"
+  # Site #20 (31-03) : annonce en tête, puis les cp/cp -r existants restent INTENTIONNELLEMENT
+  # bruts — copies de sauvegarde vers .backups/**, exclues du manifeste par D-31-03 (le contenu
+  # d'un backup n'est pas un artefact de pose). No-op silencieux si appelée hors cycle
+  # (uninstall_module n'ouvre pas de cycle manifeste).
+  vf_declare_write + "$bdir"
   [ -d "$TARGET_ROOT/skills/$mod" ] && cp -r "$TARGET_ROOT/skills/$mod" "$bdir/skills"
   # Agent module : AGENT.md installé + son dossier references (D7)
   [ -f "$TARGET_ROOT/agents/${mod}.md" ] && { mkdir -p "$bdir/agents"; cp "$TARGET_ROOT/agents/${mod}.md" "$bdir/agents/"; }
@@ -964,6 +1144,9 @@ backup_module() {
 }
 
 rollback_module() {
+  # 31-03 (D-31-09) : non migré vers le socle manifeste — restaure DEPUIS un backup, ce n'est
+  # pas une pose de module (rien à consigner) ; --dry-run y est refusé (D-31-06) ; hors des
+  # 4 critères de succès de la phase.
   local mod="$1"
   # Find latest backup
   local latest
@@ -987,6 +1170,9 @@ rollback_module() {
 
 # ---------- Uninstall ----------
 uninstall_module() {
+  # 31-03 (D-31-09) : non migré vers le socle manifeste — le passage au manifeste est planifié
+  # comme dernière vague EXPLICITEMENT ABANDONNABLE (31-08) si le plan de la phase enfle. Le
+  # migrer ici en ferait un lot non abandonnable par accident.
   local mod="$1"
   log "Désinstallation $mod (scope=$VF_SCOPE → $TARGET_ROOT)..."
   backup_module "$mod"
