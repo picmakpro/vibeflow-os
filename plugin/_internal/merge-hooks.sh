@@ -6,6 +6,10 @@
 # Usage:
 #   merge-hooks.sh merge  <fragment.json> --settings <settings.json> --scripts-prefix <prefix> [--settings-local <settings-local.json>]
 #   merge-hooks.sh remove <fragment.json> --settings <settings.json> [--settings-local <settings-local.json>]
+#   merge-hooks.sh plan   <fragment.json> --settings <settings.json> --scripts-prefix <prefix> [--settings-local <settings-local.json>]
+#     plan n'écrit RIEN sur disque : il rend sur stdout une ligne de prévisualisation par
+#     fichier settings qu'un merge réel écrirait (D-31-04 régime B), en réutilisant la MÊME
+#     répartition project/local que merge.
 #
 # Fragment = hooks/hooks.json d'un module, au format Claude Code :
 #   { "hooks": { "PreToolUse": [ { "matcher": "Read", "hooks": [ {"type":"command","command":"bash {{VF_SCRIPTS}}/x.sh"} ] } ] } }
@@ -50,7 +54,7 @@ PREFIX=""
 SETTINGS_LOCAL=""
 
 [ -n "$MODE" ] && [ -n "$FRAGMENT" ] || { grep '^# ' "$0" | sed 's/^# //'; exit 1; }
-case "$MODE" in merge|remove) : ;; *) err "mode inconnu : $MODE (attendu merge|remove)" ;; esac
+case "$MODE" in merge|remove|plan) : ;; *) err "mode inconnu : $MODE (attendu merge|remove|plan)" ;; esac
 [ -f "$FRAGMENT" ] || err "fragment introuvable : $FRAGMENT"
 
 shift 2
@@ -67,8 +71,8 @@ while [ "$#" -gt 0 ]; do
 done
 
 [ -n "$SETTINGS" ] || err "--settings requis"
-if [ "$MODE" = "merge" ] && [ -z "$PREFIX" ]; then
-  err "--scripts-prefix requis en mode merge"
+if { [ "$MODE" = "merge" ] || [ "$MODE" = "plan" ]; } && [ -z "$PREFIX" ]; then
+  err "--scripts-prefix requis en mode merge|plan"
 fi
 
 # Résolution d'interpréteur Python (ADR-054) : sous Windows, le `python3` du PATH peut être le
@@ -409,6 +413,39 @@ if mode == "merge":
     apply_merge(hooks_project, project_view, other_hooks=hooks_local)
     if settings_local_path:
         apply_merge(hooks_local, local_view, other_hooks=hooks_project)
+elif mode == "plan":
+    # D-31-04 régime B : le seul mode qui n'écrit RIEN. Réutilise split_fragment_hooks() —
+    # la MÊME répartition project/local que le merge réel — jamais une seconde implémentation
+    # qui pourrait diverger et présenter un plan faux à l'utilisateur (T-31-09).
+    local_view, project_view = split_fragment_hooks(frag_hooks)
+
+    def format_plan_segments(view):
+        segments = []
+        for event, groups in view.items():
+            for g in groups or []:
+                matcher = g.get("matcher")
+                names = set()
+                for h in g.get("hooks", []) or []:
+                    names.update(SCRIPT_RE.findall(h.get("command", "")))
+                    for a in h.get("args", []) or []:
+                        if isinstance(a, str):
+                            names.update(SCRIPT_RE.findall(a))
+                segments.append(
+                    f"hooks.{event} += {','.join(sorted(names))} (matcher: {matcher})"
+                )
+        return "  ".join(segments) if segments else "(aucune entrée)"
+
+    # settings_path est TOUJOURS annoncé ; settings_local_path seulement s'il est fourni —
+    # write_json l'écrit inconditionnellement dans ce cas (lignes 444-446 en mode merge).
+    plan_targets = [(settings_path, project_view)]
+    if settings_local_path:
+        plan_targets.append((settings_local_path, local_view))
+    for target_path, target_view in plan_targets:
+        sys.stdout.write(f"[plan] ~ {target_path}  {format_plan_segments(target_view)}\n")
+
+    plan_suffix = f" (+ {settings_local_path})" if settings_local_path else ""
+    sys.stderr.write(f"[merge-hooks] plan OK → {settings_path}{plan_suffix}\n")
+    sys.exit(0)  # ne JAMAIS atteindre write_json — aucun fichier créé, modifié ou supprimé.
 else:  # remove
     basenames = frag_basenames()
     if not basenames:
