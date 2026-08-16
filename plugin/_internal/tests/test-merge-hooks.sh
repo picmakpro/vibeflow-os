@@ -82,6 +82,23 @@
 #       sont les 4 seules à passer de 1 à 2 entrées sous le code muté ; les 10 autres (contrôle,
 #       même cible aux deux appels) et les 2 exclues restent inchangées sous la mutation.
 #
+# Mode `plan` (D-31-04 régime B, plan 31-02) — prévisualisation sans écriture :
+# Tp1 — `plan` avec --settings seul → exactement 1 ligne stdout préfixée `[plan] ~ `, exit 0,
+#       settings.json absent du disque après coup.
+# Tp2 — `plan` avec --settings + --settings-local → exactement 2 lignes stdout, les deux
+#       fichiers absents du disque après coup.
+# Tp3 — le répertoire cible entier est inchangé : empreinte `find <dir> | sort` identique avant
+#       et après l'appel `plan` (garantie « n'écrit rien du tout », forme locale de D-31-06).
+# Tp4 — `plan` sans --scripts-prefix échoue (exit 1) — un plan dont les chemins ne sont pas
+#       résolus mentirait sur ce qu'il annonce.
+# Tp5 — un mode inconnu (`preview`) reste refusé, exit 1 — l'allowlist n'a pas été ouverte
+#       au-delà de merge|remove|plan.
+# Tp6 — verbe selon l'existence réelle de la cible (D-31-05, finding F-04) : lab VIERGE (le
+#       fichier settings n'existe pas encore) → verbe `+` (créer), jamais `~` — sur les DEUX
+#       cibles (--settings et --settings-local).
+# Tp7 — même sonde, lab avec settings.json PRÉEXISTANT (contenu quelconque non-hooks, jamais lu
+#       par plan au-delà de son existence) → verbe `~` (modifier).
+#
 # ISOLATION : tout sous mktemp. Le vrai ~/.claude n'est jamais touché.
 
 set -uo pipefail
@@ -882,6 +899,110 @@ assert chr(34) + "$CLAUDE_PROJECT_DIR" + chr(34) + "/.claude/scripts/t23-shell.s
   ok "T23 préfixe exec-safe scope projet : \${CLAUDE_PROJECT_DIR} (placeholder harness) dans args, préfixe shell-quoté conservé en forme shell"
 else
   ko "T23 préfixe exec-safe scope projet"
+fi
+
+# ---------- Mode `plan` (D-31-04 régime B) — Tp1..Tp5 ----------
+FRAG_TP="$REPO/software-architecture/hooks/hooks.json"
+
+# ---------- Tp1 : plan avec --settings seul → 1 ligne stdout, rien écrit ----------
+TP1_DIR="$WORK/tp1"; mkdir -p "$TP1_DIR"
+S_TP1="$TP1_DIR/settings.json"
+# D-31-12 corollaire M-1 : compter le stdout BRUT (awk 'END{print NR}'), pas un filtre par
+# préfixe — un filtre par préfixe laisserait passer une fuite de diagnostic vers stdout (le
+# diagnostic "[merge-hooks] plan OK → …" DOIT rester sur stderr, D-31-05). On assert les deux :
+# le total de lignes stdout == nombre de cibles attendu, ET l'absence explicite de toute ligne
+# "[merge-hooks] " sur stdout (la fuite précise que la mutation de revue a exercée).
+TP1_OUT="$(bash "$MERGER" plan "$FRAG_TP" --settings "$S_TP1" --scripts-prefix "$PREFIX" 2>/dev/null)"
+TP1_EXIT=$?
+TP1_LINES="$(printf '%s\n' "$TP1_OUT" | awk 'END{print NR}')"
+TP1_LEAK="$(printf '%s\n' "$TP1_OUT" | awk '/^\[merge-hooks\] /{c++} END{print c+0}')"
+if [ "$TP1_EXIT" -eq 0 ] && [ "$TP1_LINES" -eq 1 ] && [ "$TP1_LEAK" -eq 0 ] && [ ! -e "$S_TP1" ]; then
+  ok "Tp1 plan --settings seul : 1 ligne stdout brute, aucune fuite [merge-hooks], settings.json absent du disque après coup"
+else
+  ko "Tp1 plan --settings seul (exit=$TP1_EXIT lignes=$TP1_LINES fuite=$TP1_LEAK fichier=$([ -e "$S_TP1" ] && echo présent || echo absent))"
+fi
+
+# ---------- Tp2 : plan avec --settings + --settings-local → 2 lignes stdout, rien écrit ----------
+TP2_DIR="$WORK/tp2"; mkdir -p "$TP2_DIR"
+S_TP2="$TP2_DIR/settings.json"
+L_TP2="$TP2_DIR/settings.local.json"
+# Même corollaire M-1 qu'en Tp1 : stdout brut, pas un filtre par préfixe, + garde de fuite.
+TP2_OUT="$(bash "$MERGER" plan "$FRAG_TP" --settings "$S_TP2" --scripts-prefix "$PREFIX" --settings-local "$L_TP2" 2>/dev/null)"
+TP2_EXIT=$?
+TP2_LINES="$(printf '%s\n' "$TP2_OUT" | awk 'END{print NR}')"
+TP2_LEAK="$(printf '%s\n' "$TP2_OUT" | awk '/^\[merge-hooks\] /{c++} END{print c+0}')"
+if [ "$TP2_EXIT" -eq 0 ] && [ "$TP2_LINES" -eq 2 ] && [ "$TP2_LEAK" -eq 0 ] && [ ! -e "$S_TP2" ] && [ ! -e "$L_TP2" ]; then
+  ok "Tp2 plan --settings + --settings-local : 2 lignes stdout brutes, aucune fuite [merge-hooks], aucun des deux fichiers créé"
+else
+  ko "Tp2 plan --settings + --settings-local (exit=$TP2_EXIT lignes=$TP2_LINES fuite=$TP2_LEAK)"
+fi
+
+# ---------- Tp3 : le répertoire cible entier est inchangé (forme locale de D-31-06) ----------
+TP3_DIR="$WORK/tp3"; mkdir -p "$TP3_DIR"
+S_TP3="$TP3_DIR/settings.json"
+BEFORE_TP3="$(find "$TP3_DIR" | LC_ALL=C sort)"
+bash "$MERGER" plan "$FRAG_TP" --settings "$S_TP3" --scripts-prefix "$PREFIX" >/dev/null 2>/dev/null
+AFTER_TP3="$(find "$TP3_DIR" | LC_ALL=C sort)"
+if [ "$BEFORE_TP3" = "$AFTER_TP3" ]; then
+  ok "Tp3 empreinte find du répertoire cible identique avant/après plan"
+else
+  ko "Tp3 empreinte modifiée par plan (avant: $BEFORE_TP3 / après: $AFTER_TP3)"
+fi
+
+# ---------- Tp4 : plan sans --scripts-prefix échoue — un plan non résolu mentirait ----------
+TP4_DIR="$WORK/tp4"; mkdir -p "$TP4_DIR"
+S_TP4="$TP4_DIR/settings.json"
+TP4_ERR="$(bash "$MERGER" plan "$FRAG_TP" --settings "$S_TP4" 2>&1 1>/dev/null)"
+TP4_EXIT=$?
+if [ "$TP4_EXIT" -ne 0 ] && printf '%s' "$TP4_ERR" | grep -q -- '--scripts-prefix'; then
+  ok "Tp4 plan sans --scripts-prefix refusé (exit $TP4_EXIT, message d'exigence présent)"
+else
+  ko "Tp4 plan sans --scripts-prefix (exit=$TP4_EXIT stderr=$TP4_ERR)"
+fi
+
+# ---------- Tp5 : mode inconnu (preview) reste refusé — allowlist non ouverte ----------
+TP5_DIR="$WORK/tp5"; mkdir -p "$TP5_DIR"
+S_TP5="$TP5_DIR/settings.json"
+bash "$MERGER" preview "$FRAG_TP" --settings "$S_TP5" --scripts-prefix "$PREFIX" >/dev/null 2>/dev/null
+TP5_EXIT=$?
+if [ "$TP5_EXIT" -ne 0 ]; then
+  ok "Tp5 mode inconnu (preview) refusé, exit $TP5_EXIT"
+else
+  ko "Tp5 mode inconnu (preview) accepté à tort"
+fi
+
+# ---------- Tp6 : lab vierge → verbe `+` (créer), pas `~` ----------
+TP6_DIR="$WORK/tp6"; mkdir -p "$TP6_DIR"
+S_TP6="$TP6_DIR/settings.json"
+L_TP6="$TP6_DIR/settings.local.json"
+[ ! -e "$S_TP6" ] && [ ! -e "$L_TP6" ] || { ko "Tp6 setup : cible déjà présente avant le plan"; }
+TP6_OUT="$(bash "$MERGER" plan "$FRAG_TP" --settings "$S_TP6" --scripts-prefix "$PREFIX" --settings-local "$L_TP6" 2>/dev/null)"
+TP6_PLUS="$(printf '%s\n' "$TP6_OUT" | awk -v s="$S_TP6" -v l="$L_TP6" '
+  index($0, "[plan] + " s)==1 {p++} index($0, "[plan] + " l)==1 {q++} END{print p+0, q+0}')"
+TP6_TILDE="$(printf '%s\n' "$TP6_OUT" | awk '/^\[plan\] ~ /{c++} END{print c+0}')"
+if [ "$TP6_PLUS" = "1 1" ] && [ "$TP6_TILDE" = "0" ] && [ ! -e "$S_TP6" ] && [ ! -e "$L_TP6" ]; then
+  ok "Tp6 lab vierge (settings absents) : verbe + sur les deux cibles, aucun ~, rien écrit"
+else
+  ko "Tp6 lab vierge → verbe attendu + (plus=$TP6_PLUS tilde=$TP6_TILDE) — sortie : $TP6_OUT"
+fi
+
+# ---------- Tp7 : settings.json préexistant → verbe `~` (modifier) ----------
+TP7_DIR="$WORK/tp7"; mkdir -p "$TP7_DIR"
+S_TP7="$TP7_DIR/settings.json"
+L_TP7="$TP7_DIR/settings.local.json"
+echo '{ "permissions": { "allow": [] } }' > "$S_TP7"
+# --settings-local reste ABSENTE du disque : sonde discriminante indépendante par cible, une
+# préexistante (+ ci-dessus a déjà prouvé le cas absent) et une absente ici pour la même cible
+# --settings, prouvant que le verbe suit CETTE cible précise et non un état global du run.
+TP7_OUT="$(bash "$MERGER" plan "$FRAG_TP" --settings "$S_TP7" --scripts-prefix "$PREFIX" --settings-local "$L_TP7" 2>/dev/null)"
+TP7_TILDE_S="$(printf '%s\n' "$TP7_OUT" | awk -v s="$S_TP7" 'index($0, "[plan] ~ " s)==1{c++} END{print c+0}')"
+TP7_PLUS_L="$(printf '%s\n' "$TP7_OUT" | awk -v l="$L_TP7" 'index($0, "[plan] + " l)==1{c++} END{print c+0}')"
+S_TP7_UNCHANGED="$(cat "$S_TP7")"
+if [ "$TP7_TILDE_S" = "1" ] && [ "$TP7_PLUS_L" = "1" ] && [ ! -e "$L_TP7" ] \
+   && [ "$S_TP7_UNCHANGED" = '{ "permissions": { "allow": [] } }' ]; then
+  ok "Tp7 settings.json préexistant → verbe ~ pour cette cible, + pour settings-local absente (même run), fichier préexistant inchangé (plan n'écrit rien)"
+else
+  ko "Tp7 verbe selon existence réelle (tilde_s=$TP7_TILDE_S plus_l=$TP7_PLUS_L) — sortie : $TP7_OUT"
 fi
 
 echo ""

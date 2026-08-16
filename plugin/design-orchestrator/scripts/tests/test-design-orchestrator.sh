@@ -432,8 +432,27 @@ SH
     t9f_ok=1
     "$GREP" -qF '$module_dir/scripts/ensure-design-deps.sh' "$VU" || { ko "T9f câblage : garde -f source (\$module_dir) absente"; t9f_ok=0; }
     "$GREP" -qF '$TARGET_ROOT/scripts/ensure-design-deps.sh' "$VU" || { ko "T9f câblage : garde -f cible (\$TARGET_ROOT) absente"; t9f_ok=0; }
-    hook_block="$("$GREP" -A8 -m1 'ensure-design-deps.sh' "$VU")"
-    echo "$hook_block" | "$GREP" -q 'else' || { ko "T9f câblage : branche else best-effort absente autour du hook"; t9f_ok=0; }
+    # Extraction structurelle du bloc du hook (de son "if" d'amorce jusqu'au "fi" qui le referme,
+    # profondeur comptée par mots — pas de \b/\< portable en awk BSD), plutôt qu'une fenêtre
+    # positionnelle fixe (`grep -A8`) : toute insertion de ligne DANS le bloc (ex: 31-04, branche
+    # `elif vf_dry_run`) ne doit jamais repousser le `else` hors de portée de la sonde.
+    hook_start_line="$("$GREP" -n -m1 -F '$module_dir/scripts/ensure-design-deps.sh' "$VU" | cut -d: -f1)"
+    if [ -z "$hook_start_line" ]; then
+      ko "T9f câblage : ligne d'amorce du hook introuvable pour l'extraction du bloc"; t9f_ok=0
+    else
+      hook_block="$(awk -v start="$hook_start_line" '
+        NR < start { next }
+        {
+          n = split($0, words, /[^A-Za-z_]+/)
+          for (i = 1; i <= n; i++) {
+            if (words[i] == "if") depth++
+            else if (words[i] == "fi") depth--
+          }
+          print
+          if (depth <= 0) exit
+        }' "$VU")"
+      echo "$hook_block" | "$GREP" -q 'else' || { ko "T9f câblage : branche else best-effort absente du bloc du hook"; t9f_ok=0; }
+    fi
     [ "$t9f_ok" -eq 1 ] && ok "T9f câblage double (engine) : hook nommé, double garde -f (source+cible), branche else best-effort"
   fi
 

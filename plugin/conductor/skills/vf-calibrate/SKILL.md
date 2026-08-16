@@ -69,7 +69,12 @@ Pour les changements **structure/doctrine**, produire un plan explicite :
 ### 4. Appliquer sous contrôle
 
 1. **Snapshot avant** (le lab est sauvegardé).
-2. Rafraîchir les modules : `VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT}" bash "${CLAUDE_PLUGIN_ROOT}/_internal/vibeflow-update.sh" update <module>` (manuel, par module).
+2. Rafraîchir les modules — **plan avant pose (MANI-02, issue #20)** : d'abord
+   `VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT}" bash "${CLAUDE_PLUGIN_ROOT}/_internal/vibeflow-update.sh" --dry-run update <module>`,
+   dont la sortie (stdout, le plan fichier-par-fichier) est montrée à l'utilisateur — c'est le
+   contenu du plan de migration déjà présenté à l'étape 3, pas un second feu vert. `--dry-run`
+   n'écrit rien et est refusé sur `uninstall`. Puis rafraîchir réellement, inchangé :
+   `VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT}" bash "${CLAUDE_PLUGIN_ROOT}/_internal/vibeflow-update.sh" update <module>` (manuel, par module).
 3. **Ré-affirmer l'allowlist MCP des agents exécutants** (ADR-051) : si le lab a gagné (ou perdu)
    un serveur MCP — dans son `./.mcp.json` (scope projet) **ou** en scope global `~/.claude.json`
    (union des deux sources depuis Phase 21, ADR-051-B — un serveur déclaré seulement en scope
