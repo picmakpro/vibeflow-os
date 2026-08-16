@@ -63,11 +63,17 @@ headers verbatim — it is structured as ten numbered arbitrages (D-31-01..10, a
   line, absolute path, `..`, residual `\r` → refuse to use manifest for deletion, refuse loudly,
   delete nothing). **Missing manifest = graceful fallback**, not an error (pre-Phase-31 install
   base) — no convergence deletion this update, manifest written this run, next update converges.
-- **D-31-08** — README "N suites" counter (`README.md:124`, `README.fr.md:128`): manual update in
-  the commit that creates the new suites, no new gate (`check-version-sync.sh` never gated this
-  counter — premise correction, see §4 below). Re-measure via
+- **D-31-08 (RÉVISÉ, commit `1baf63a`)** — README "N suites" counter (`README.md:124`,
+  `README.fr.md:128`): manual update in the commit that creates the new suites, no NEW gate to
+  create. **CORRECTION of the original research premise**: the claim "no gate controls this
+  counter" was FALSE — `scripts/check-version-sync.sh` §9 already compares
+  `find plugin scripts -path '*/tests/test-*.sh' | grep -c .` against both README's first
+  `[0-9]+ suites` match and fails on mismatch. The gate exists; this phase must keep it green, not
+  avoid creating a duplicate. Re-measure via
   `find plugin scripts -type f -path '*/tests/test-*.sh' | wc -l` (61 at cadrage time, so 62+ after
-  the phase).
+  the phase). Both README also carry a SECOND, historical "61 suites" mention each (README.md:145,
+  README.fr.md:150, inside the v2.53.0 changelog narrative) that the gate does not read (`head -1`
+  on first match) — those are a record of that past release and must NOT be touched by this phase.
 - **D-31-09** — Manifest readers: `update_module` is THE deliverable (MANI-03). Passing
   `uninstall_module` to the manifest (same graceful fallback if absent) is planned as an explicitly
   **abandonable last wave** if the plan grows too large. Validator/vf-audit reader is out of scope
@@ -86,8 +92,8 @@ planner's job per the mandate — see `<downstream_consumer>` in the plan-phase 
 
 ### Deferred Ideas (OUT OF SCOPE — §7 of 31-CONTEXT.md, do not plan these)
 
-1. Gating the "N suites" README counter inside `check-version-sync.sh` — refused here (D-31-08),
-   candidate for a future phase that already creates a gate.
+1. Adding a SECOND, dedicated gate for the "N suites" README counter — moot: `check-version-sync.sh`
+   §9 already gates it (D-31-08 revised, commit `1baf63a`). Nothing left to defer on this point.
 2. `--dry-run` on `uninstall` — refused in v1 by scope discipline (D-31-06).
 3. `docs/<module>/` being written relative to cwd instead of scope — pre-existing engine
    inconsistency, NOT corrected here (D-31-03) — deserves its own decision later.
@@ -95,11 +101,11 @@ planner's job per the mandate — see `<downstream_consumer>` in the plan-phase 
 
 ## Summary
 
-The engine (`plugin/_internal/vibeflow-update.sh`, 1036 lines) has **no manifest of what a module's
-pose actually wrote** — `uninstall_module` (808-895) reconstructs the file list by re-reading the
+The engine (`plugin/_internal/vibeflow-update.sh`, 1040 lines [re-verified post-hotfix `a396e88`, was 1036 at cadrage time]) has **no manifest of what a module's
+pose actually wrote** — `uninstall_module` (812-899) reconstructs the file list by re-reading the
 **cache** at uninstall time, which is wrong the moment a module has left the cache (patched over today
 by a hardcoded `retired-modules.txt`, 7 lines, 1 active entry). Three functions — `install_module`
-(569-761), `gitignore_add_paths` (175-244), `uninstall_module` (808-895) — each reimplement their own
+(573-765), `gitignore_add_paths` (175-244), `uninstall_module` (812-899) — each reimplement their own
 enumeration of "which files belong to module X" by re-deriving it from convention-detection over the
 cache directory. Phase VFDO-31 replaces these three parallel enumerations with **one manifest, written
 as a side-effect of the actual pose**, consumed by `update_module` for convergence (MANI-03) and shown
@@ -118,7 +124,7 @@ companion plan-mode flag so its own preview line (regime B) is not reimplemented
 |------------|-------------|----------------|-----------|
 | Manifest write (MANI-01) | Engine (`vibeflow-update.sh`) | — | sole writer of module artifacts, must be the sole writer of the manifest |
 | Dry-run plan rendering (MANI-02) | Engine (same call sites, gated by the write helper) | `merge-hooks.sh` (regime B delegation) | dry-run must share the write path, not a parallel one (D-31-01, `REQUIREMENTS.md:959`) |
-| Convergence delete (MANI-03) | Engine `update_module` (569-761 pose + 917-940 orchestration) | — | already owns the pose; convergence is its natural extension |
+| Convergence delete (MANI-03) | Engine `update_module` (573-765 pose + 921-944 orchestration) | — | already owns the pose; convergence is its natural extension |
 | Hooks preview line (regime B) | `merge-hooks.sh` (351-408 delegation boundary already exists post-Phase-30) | — | engine already delegates hook writes here; delegating the preview keeps the single-writer invariant |
 | Test suite (QUAL-01) | `plugin/_internal/tests/test-manifest.sh` (new) | CI discovery (`ci.yml:210-237`, pattern `find plugin scripts -type f -path '*/tests/test-*.sh'`) | matches the existing per-target suite convention, zero new runner infra needed |
 
@@ -128,25 +134,32 @@ companion plan-mode flag so its own preview line (regime B) is not reimplemented
 
 | Lines | Function | Role |
 |---|---|---|
-| 115-124 | `mark_installed` | writes the module registry (tmp+mv) — the atomic-write pattern the manifest helper must copy |
-| 175-244 | `gitignore_add_paths` | one of the three parallel enumerations; covers 2 paths install's enumeration misses: `.claude/memory/` (221) and `scripts/vf-portable.sh` (243) |
-| 351-408 | `merge_module_hooks` + `find_hooks_merger` | delegation boundary to `merge-hooks.sh` — regime B's insertion point |
-| 441-465 | `copy_module_scripts` | globs `*.sh/.mjs/.js` (chmod +x) and `*.txt` flat into `scripts/`, plus `scripts/tests/*` |
-| 569-761 | `install_module` | full pose of a module — every write site inside this function must route through the new helper |
-| 785-805 | `rollback_module` | `rm -rf` + `cp` from last backup — out of this phase's manifest scope but must remain green (non-regression) |
-| 808-895 | `uninstall_module` | second parallel enumeration; D-31-09's optional last-wave target |
-| 917-940 | `update_module` | orchestrates delta-version → `install_module`, else `sync_module_governance`; convergence (MANI-03) inserts here |
+**[RE-VERIFIED post-hotfix `a396e88`, v2.53.1 — the engine grew by exactly 4 lines (a comment
+expansion inside `scripts_prefix_for_scope`, around line 356), shifting every range that starts
+after that point by +4 vs. the numbers this table originally carried]**
+
+| Lines | Function | Role |
+|---|---|---|
+| 115-124 | `mark_installed` | writes the module registry (tmp+mv) — the atomic-write pattern the manifest helper must copy (unchanged, before the shift point) |
+| 175-244 | `gitignore_add_paths` | one of the three parallel enumerations; covers 2 paths install's enumeration misses: `.claude/memory/` (221) and `scripts/vf-portable.sh` (243) (unchanged, before the shift point) |
+| 350-386 | `find_hooks_merger` (350-355) + `merge_module_hooks` (369-386) | delegation boundary to `merge-hooks.sh` — regime B's insertion point |
+| 445-469 | `copy_module_scripts` | globs `*.sh/.mjs/.js` (chmod +x) and `*.txt` flat into `scripts/`, plus `scripts/tests/*` |
+| 573-765 | `install_module` | full pose of a module — every write site inside this function must route through the new helper |
+| 789-809 | `rollback_module` | `rm -rf` + `cp` from last backup — out of this phase's manifest scope but must remain green (non-regression) |
+| 812-899 | `uninstall_module` | second parallel enumeration; D-31-09's optional last-wave target |
+| 902-918 | `show_status` | not manifest-relevant, cited only because `update_module` follows it immediately |
+| 921-944 | `update_module` | orchestrates delta-version → `install_module`, else `sync_module_governance`; convergence (MANI-03) inserts here |
 
 ### Full write-site inventory (the raw material for MANI-02's dry-run coverage)
 
-**Direct writes** [VERIFIED: plugin/_internal/vibeflow-update.sh:118-895, exact line numbers in
+**Direct writes** [RE-VERIFIED post-hotfix, plugin/_internal/vibeflow-update.sh:118-899, exact line numbers in
 `31-RECHERCHE-moteur.md` §1.2] — registry (118-130), `.gitignore` (168, 170, scope `local` only),
 engine lib (330, 336, 341), settings backup (380-381), module scripts (445-462), retired cleanup
 (563), `install_module`'s 9 `mkdir -p`/`cp[-r]` pairs (595-668, including the `docs/<mod>/` cwd-relative
 case at 634-635 that stays out-of-manifest per D-31-03), `backup_module` (769-779), `rollback_module`
 (794-800), `uninstall_module`'s 10 removal statements (815-886).
 
-**Indirect writes via sub-process** [VERIFIED: plugin/_internal/vibeflow-update.sh:264-738] — this is
+**Indirect writes via sub-process** [RE-VERIFIED post-hotfix, plugin/_internal/vibeflow-update.sh:257-742 — exact per-callsite numbers shift +4 vs. the figures below, verify on pieces before editing] — this is
 the D-31-04 three-regime table's source: `generate-agent-commands.sh` (264, regime A),
 `inject-mcp-tools.sh` (293, regime C), `merge-hooks.sh` (396-400/427-429, regime B, writes BOTH
 `settings.json` and `settings.local.json`), `build-gsd-index.sh` (680, regime A),
@@ -161,7 +174,7 @@ must be neutralized for the "dry-run == disk diff" equality test to be stable.
 and the `--settings-local` routing (391-393, 422-424) which is active for both `project` and `local`.
 `BACKUP_DIR="$TARGET_ROOT/.backups"` (83) — the destination for MANI-03's pre-deletion backups.
 
-### Command surface [VERIFIED: plugin/_internal/vibeflow-update.sh:951-1036]
+### Command surface [RE-VERIFIED post-hotfix, plugin/_internal/vibeflow-update.sh:952-1040]
 
 `case` on `cmd="$1"`: `install` (952-970, `--all`/`--with-deps <mod>`/`<mod>`) · `update` (971-995,
 `--all` runs `cleanup_retired_modules` then loops the registry then `ensure_mandatory_baseline`;
@@ -171,7 +184,7 @@ and the `--settings-local` routing (391-393, 422-424) which is active for both `
 **No `--dry-run`, `--plan`, or `--verbose` flag exists anywhere today** — this phase creates the flag
 from nothing, there is no prior art to extend.
 
-### Logging conventions [VERIFIED: plugin/_internal/vibeflow-update.sh:30-31, 900-912]
+### Logging conventions [RE-VERIFIED post-hotfix, plugin/_internal/vibeflow-update.sh:30-31 (unchanged, before the shift point) — the 900-912 range no longer isolates a logging-specific block post-shift; see `show_status`/`uninstall_module` tail instead]
 
 Single helper `log()` → **stderr**, fixed prefix `[vibeflow-update] `. No level system, no `[ok]`/
 `[plan]` prefixes exist today (D-31-05's format is new, not reused). `show_status` (898-914) is the
@@ -187,7 +200,7 @@ engine persists today. Read-only, never written: `retired-modules.txt` (format `
 below), `<mod>/VERSION`. `known-versions.txt` belongs to the `infrastructure-audit` module's own data,
 not an install manifest — do not confuse the two in the plan.
 
-### How a module's files are decided at pose time [VERIFIED: plugin/_internal/vibeflow-update.sh:569-761]
+### How a module's files are decided at pose time [RE-VERIFIED post-hotfix, plugin/_internal/vibeflow-update.sh:573-765]
 
 **The engine does NOT read `module.json` to decide what to pose.** `install_module()` uses
 convention-detection (`if [ -f ]`/`if [ -d ]` tests) over the cache directory:
@@ -316,7 +329,7 @@ lines.
 ## Sources
 
 ### Primary (HIGH confidence, all `[VERIFIED: file:line]`)
-- `plugin/_internal/vibeflow-update.sh` (1036 lines) — full read, functions/line-ranges/write-sites
+- `plugin/_internal/vibeflow-update.sh` (1040 lines, re-verified post-hotfix `a396e88`) — full read, functions/line-ranges/write-sites
   per `31-RECHERCHE-moteur.md` §1
 - `plugin/_internal/merge-hooks.sh` (412 lines) — full read, contract per `31-RECHERCHE-moteur.md` §2
 - `plugin/_internal/resolve-deps.sh`, `.github/workflows/ci.yml`, `scripts/check-version-sync.sh`,
