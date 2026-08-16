@@ -82,6 +82,18 @@
 #       sont les 4 seules à passer de 1 à 2 entrées sous le code muté ; les 10 autres (contrôle,
 #       même cible aux deux appels) et les 2 exclues restent inchangées sous la mutation.
 #
+# Mode `plan` (D-31-04 régime B, plan 31-02) — prévisualisation sans écriture :
+# Tp1 — `plan` avec --settings seul → exactement 1 ligne stdout préfixée `[plan] ~ `, exit 0,
+#       settings.json absent du disque après coup.
+# Tp2 — `plan` avec --settings + --settings-local → exactement 2 lignes stdout, les deux
+#       fichiers absents du disque après coup.
+# Tp3 — le répertoire cible entier est inchangé : empreinte `find <dir> | sort` identique avant
+#       et après l'appel `plan` (garantie « n'écrit rien du tout », forme locale de D-31-06).
+# Tp4 — `plan` sans --scripts-prefix échoue (exit 1) — un plan dont les chemins ne sont pas
+#       résolus mentirait sur ce qu'il annonce.
+# Tp5 — un mode inconnu (`preview`) reste refusé, exit 1 — l'allowlist n'a pas été ouverte
+#       au-delà de merge|remove|plan.
+#
 # ISOLATION : tout sous mktemp. Le vrai ~/.claude n'est jamais touché.
 
 set -uo pipefail
@@ -882,6 +894,68 @@ assert chr(34) + "$CLAUDE_PROJECT_DIR" + chr(34) + "/.claude/scripts/t23-shell.s
   ok "T23 préfixe exec-safe scope projet : \${CLAUDE_PROJECT_DIR} (placeholder harness) dans args, préfixe shell-quoté conservé en forme shell"
 else
   ko "T23 préfixe exec-safe scope projet"
+fi
+
+# ---------- Mode `plan` (D-31-04 régime B) — Tp1..Tp5 ----------
+FRAG_TP="$REPO/software-architecture/hooks/hooks.json"
+
+# ---------- Tp1 : plan avec --settings seul → 1 ligne stdout, rien écrit ----------
+TP1_DIR="$WORK/tp1"; mkdir -p "$TP1_DIR"
+S_TP1="$TP1_DIR/settings.json"
+TP1_OUT="$(bash "$MERGER" plan "$FRAG_TP" --settings "$S_TP1" --scripts-prefix "$PREFIX" 2>/dev/null)"
+TP1_EXIT=$?
+TP1_LINES="$(printf '%s\n' "$TP1_OUT" | awk '/^\[plan\] ~ /{c++} END{print c+0}')"
+if [ "$TP1_EXIT" -eq 0 ] && [ "$TP1_LINES" -eq 1 ] && [ ! -e "$S_TP1" ]; then
+  ok "Tp1 plan --settings seul : 1 ligne [plan] ~, settings.json absent du disque après coup"
+else
+  ko "Tp1 plan --settings seul (exit=$TP1_EXIT lignes=$TP1_LINES fichier=$([ -e "$S_TP1" ] && echo présent || echo absent))"
+fi
+
+# ---------- Tp2 : plan avec --settings + --settings-local → 2 lignes stdout, rien écrit ----------
+TP2_DIR="$WORK/tp2"; mkdir -p "$TP2_DIR"
+S_TP2="$TP2_DIR/settings.json"
+L_TP2="$TP2_DIR/settings.local.json"
+TP2_OUT="$(bash "$MERGER" plan "$FRAG_TP" --settings "$S_TP2" --scripts-prefix "$PREFIX" --settings-local "$L_TP2" 2>/dev/null)"
+TP2_EXIT=$?
+TP2_LINES="$(printf '%s\n' "$TP2_OUT" | awk '/^\[plan\] ~ /{c++} END{print c+0}')"
+if [ "$TP2_EXIT" -eq 0 ] && [ "$TP2_LINES" -eq 2 ] && [ ! -e "$S_TP2" ] && [ ! -e "$L_TP2" ]; then
+  ok "Tp2 plan --settings + --settings-local : 2 lignes [plan] ~, aucun des deux fichiers créé"
+else
+  ko "Tp2 plan --settings + --settings-local (exit=$TP2_EXIT lignes=$TP2_LINES)"
+fi
+
+# ---------- Tp3 : le répertoire cible entier est inchangé (forme locale de D-31-06) ----------
+TP3_DIR="$WORK/tp3"; mkdir -p "$TP3_DIR"
+S_TP3="$TP3_DIR/settings.json"
+BEFORE_TP3="$(find "$TP3_DIR" | LC_ALL=C sort)"
+bash "$MERGER" plan "$FRAG_TP" --settings "$S_TP3" --scripts-prefix "$PREFIX" >/dev/null 2>/dev/null
+AFTER_TP3="$(find "$TP3_DIR" | LC_ALL=C sort)"
+if [ "$BEFORE_TP3" = "$AFTER_TP3" ]; then
+  ok "Tp3 empreinte find du répertoire cible identique avant/après plan"
+else
+  ko "Tp3 empreinte modifiée par plan (avant: $BEFORE_TP3 / après: $AFTER_TP3)"
+fi
+
+# ---------- Tp4 : plan sans --scripts-prefix échoue — un plan non résolu mentirait ----------
+TP4_DIR="$WORK/tp4"; mkdir -p "$TP4_DIR"
+S_TP4="$TP4_DIR/settings.json"
+TP4_ERR="$(bash "$MERGER" plan "$FRAG_TP" --settings "$S_TP4" 2>&1 1>/dev/null)"
+TP4_EXIT=$?
+if [ "$TP4_EXIT" -ne 0 ] && printf '%s' "$TP4_ERR" | grep -q -- '--scripts-prefix'; then
+  ok "Tp4 plan sans --scripts-prefix refusé (exit $TP4_EXIT, message d'exigence présent)"
+else
+  ko "Tp4 plan sans --scripts-prefix (exit=$TP4_EXIT stderr=$TP4_ERR)"
+fi
+
+# ---------- Tp5 : mode inconnu (preview) reste refusé — allowlist non ouverte ----------
+TP5_DIR="$WORK/tp5"; mkdir -p "$TP5_DIR"
+S_TP5="$TP5_DIR/settings.json"
+bash "$MERGER" preview "$FRAG_TP" --settings "$S_TP5" --scripts-prefix "$PREFIX" >/dev/null 2>/dev/null
+TP5_EXIT=$?
+if [ "$TP5_EXIT" -ne 0 ]; then
+  ok "Tp5 mode inconnu (preview) refusé, exit $TP5_EXIT"
+else
+  ko "Tp5 mode inconnu (preview) accepté à tort"
 fi
 
 echo ""
