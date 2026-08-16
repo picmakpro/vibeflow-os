@@ -179,3 +179,39 @@ conformément à l'exigence de non-régression du plan).
 
 `rollback_module`, `uninstall_module` (non migrés, motif écrit sur place), câblage skills
 `/vibeflow-install`/`/vf-calibrate` (dernière vague, 31 plans suivants), `--dry-run` (31-04).
+
+## Correction ciblée (revue + vérification du lot, 2026-08-16)
+
+Commit `263c177` a ajouté D-31-13/D-31-14 à `31-CONTEXT.md` mais n'avait **pas encore** appliqué
+le correctif de code — fait dans ce mandat, sur `plugin/_internal/vibeflow-update.sh` et
+`plugin/_internal/tests/test-manifest.sh` uniquement.
+
+**Bloquant corrigé (B1-B4, D-31-13)** : quatre sites où la migration avait réduit une chaîne
+tolérante (`cp` médian + `&&`, ou `|| true`) à un appel nu de helper en position FINALE de boucle
+— sous `set -e`, l'échec d'UN SEUL fichier illisible avortait tout `install`/`update --all`.
+Tolérance restaurée explicitement (jamais un `|| true` muet) : `vf_place_tree` énumération SOURCE
+(B1, `find` sur sous-répertoire niché), `install_module` boucle `rules/*.md` (B2),
+`copy_module_scripts` boucles `tests/*.sh` + `fixtures/*` (B3) et `scripts/*.sh|*.mjs|*.js` (B4).
+Preuve par injection de panne réelle (`chmod 000`) sur l'engine tel que committé en `263c177` :
+rc=1 avant sur les 4 sites, rc=0 après — quatre tests permanents (T10-T13 de `test-manifest.sh`).
+
+**Majeur corrigé** : M2 (faux positif « copie dégradée » sur un `$src_dir` vide mais lisible —
+garde `[ ! -r "$src_dir" ]` ajoutée, T14/T14b) ; M3 (site `scripts/*.txt` jamais exercé par aucune
+suite — fixture `.txt` ajoutée à T6 + test T6b dédié, discriminance prouvée par mutation du
+routage) ; M5 (`settings.json`/`settings.local.json` ajoutés au point UNIQUE
+`vf_manifest_excluded`, filtre privé de T6 retiré, test T16) ; M6 (`uninstall_module` retire
+désormais `.vibeflow-manifest-<mod>`, test T15).
+
+**D-31-14** : `sync_module_governance` rapporte désormais une ligne de compte rendu PAR MODULE
+(« N chemins posés hors cycle manifeste, non consignés »), jamais par chemin.
+
+**Mineurs corrigés** : Mi1 (ordre déclaration/écriture dans `merge_module_hooks` et
+`backup_module`) ; Mi2 (stderr brut de `cp` supprimé, `vf_place_file`) ; Mi3 (référence `31-08`
+corrigée en `31-07` dans le commentaire de `uninstall_module` — **note** : la ligne 46 de ce
+fichier citée par la vérification ne contenait en réalité **pas** de littéral `31-08`, elle
+disait déjà `D-31-09` ; seule la référence dans le code source était fautive) ; Mi4 (résidus
+`.vibeflow-acc-<mod>.<pid>` nettoyés au `vf_manifest_reset` suivant du même module).
+
+Suites après correction : `test-manifest.sh` **24 OK / 0 KO / 0 SKIP** (15 → 24, +9 cas),
+`test-vibeflow-update.sh` **19 OK / 0 KO**, `test-merge-hooks.sh` **32 OK · 0 KO** — les trois sur
+l'arbre committé.

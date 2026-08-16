@@ -5,8 +5,8 @@
 #   - software-architecture (SKILL.md + rules/ + references/ + scripts/ + scripts/tests/ +
 #     hooks/hooks.json). Aucun sous-processus de régime C (pas d'AGENT.md, pas d'agents/, pas de
 #     scripts/seed-registres.sh ni scripts/ensure-design-deps.sh) — même fixture que 31-04 (MANI-02).
-#     T1-T6, T9.
-#   - skill-creator (skills imbriqués posés par cp -r, AGENT.md). T7, T7b, T9b, T9c.
+#     T1-T6, T6b (fixture .txt injecté dans le CACHE de test), T9, T11-T13, T15.
+#   - skill-creator (skills imbriqués posés par cp -r, AGENT.md). T7, T7b, T9b, T9c, T10.
 #   - reference (module doc pur, content/ seul). T8.
 #
 # T1 — après install software-architecture (scope project, lab neuf), le manifeste
@@ -51,6 +51,22 @@
 # T9c (31-03) — trou de silence rattrapé (D-31-11 point 4 §Complément, W-2) : un skill_dir source
 #      entièrement illisible fait échouer le cp -r sans qu'aucun dest_file ne soit détecté manquant
 #      (énumération vide) — une ligne de compte rendu apparaît malgré tout.
+# T6b (M3, revue 31-03) — fixture .txt injecté dans le CACHE de test (jamais dans le module réel)
+#      pour exercer le site #3 (copy_module_scripts, boucle scripts/*.txt), jamais atteint par T6
+#      seul (T6 est AVEUGLE à un site cassé des DEUX côtés — rien à comparer). Existence positive
+#      sur disque ET ligne exacte au manifeste. Discriminance prouvée par mutation du routage.
+# T10-T13 (B1-B4, D-31-13, revue 31-03) — injection de panne RÉELLE (chmod 000) sur les quatre
+#      sites où la migration avait réduit une chaîne tolérante à un appel nu de helper en position
+#      finale de boucle : `install` s'avortait (rc=1) sur UN SEUL fichier illisible avant correctif.
+#      T10 = vf_place_tree (sous-répertoire niché) ; T11 = rules/*.md ; T12 = scripts/tests/*.sh ;
+#      T13 = scripts/*.sh. Chacun assure rc=0 + trace « copie dégradée ».
+# T14/T14b (M2, revue 31-03) — vf_place_tree ne crie plus À TORT sur un répertoire source vide
+#      mais lisible (T14), tout en continuant de crier sur un répertoire réellement illisible
+#      (T14b, contre-épreuve anti-sur-correction).
+# T15 (M6, revue 31-03) — uninstall retire le manifeste .vibeflow-manifest-<mod> (pas de module
+#      fantôme laissé pour la découverte par glob de 31-05/31-07).
+# T16 (M5, revue 31-03) — settings.json/settings.local.json dans le point UNIQUE
+#      vf_manifest_excluded (D-31-03), grain unité.
 # T0 — anti-vert-à-vide (contrat F13) : la suite compte ses propres assertions exécutées et
 #      échoue si le total (pass+fail) est 0.
 #
@@ -95,6 +111,11 @@ prepare_module() {
 LAB="$(mktemp -d)"
 CACHE="$LAB/cache"
 if prepare_module "$CACHE" "software-architecture"; then
+  # M3 (revue 31-03) : le module réel software-architecture n'a AUCUN scripts/*.txt — sans ce
+  # fixture, T6 (exhaustivité disque==manifeste) ne pouvait jamais rougir sur une régression du
+  # site #3 (copy_module_scripts, boucle scripts/*.txt). Fichier injecté dans la copie de CACHE
+  # uniquement — jamais dans le module réel du dépôt.
+  printf 'known-versions fixture\n' > "$CACHE/software-architecture/scripts/known-versions.txt"
   (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install software-architecture >/dev/null 2>&1)
   MANIFEST="$LAB/.claude/scripts/.vibeflow-manifest-software-architecture"
 
@@ -172,6 +193,19 @@ if prepare_module "$CACHE" "software-architecture"; then
   fi
   rm -f "$T6_MANI_SORTED" "$T6_DISK_SORTED"
 
+  # T6b (M3, revue 31-03) — existence POSITIVE du fichier injecté par le fixture .txt (site #3,
+  # copy_module_scripts). T6 seul est AVEUGLE à ce site : si le site #3 est cassé, le fichier
+  # n'atterrit NI sur disque NI au manifeste — les deux côtés restent d'accord (rien à comparer),
+  # T6 reste vert par construction. T6b vérifie l'existence sur DISQUE ET la ligne EXACTE au
+  # manifeste, indépendamment de T6. Discriminance prouvée par mutation (revue 31-03, cf. rapport) :
+  # glob de la boucle `scripts/*.txt` neutré → T6 reste vert, T6b rougit.
+  DISK_TXT="$LAB/.claude/scripts/known-versions.txt"
+  if [ -f "$DISK_TXT" ] && [ -f "$MANIFEST" ] && awk '$0=="scripts/known-versions.txt"{f=1} END{exit !f}' "$MANIFEST"; then
+    ok "T6b : M3 — scripts/known-versions.txt (site #3, fixture .txt) posé sur disque ET consigné au manifeste"
+  else
+    ko "T6b : M3 — scripts/known-versions.txt absent du disque et/ou du manifeste (site #3 cassé)"
+  fi
+
   # T9 (31-03) — même liste close d'exclusions D-31-03 que T5, sur ce fixture plus riche (même
   # manifeste que T6). Cas distinct de T5 (fixture historique 31-01) : la couverture ne dépend
   # plus d'un seul site câblé.
@@ -185,6 +219,7 @@ if prepare_module "$CACHE" "software-architecture"; then
 else
   skip "T1-T5 : software-architecture non copiable dans le cache de test"
   skip "T6 : software-architecture non copiable dans le cache de test"
+  skip "T6b : software-architecture non copiable dans le cache de test"
   skip "T9 : software-architecture non copiable dans le cache de test"
 fi
 rm -rf "$LAB"
@@ -413,6 +448,211 @@ else
   skip "T9c : skill-creator non copiable dans le cache de test"
 fi
 rm -rf "$LAB9C"
+
+# ---------------------------------------------------------------------------
+# T10-T13 (B1-B4, revue 31-03, D-31-13) — injection de panne RÉELLE (chmod 000) sur les quatre
+# sites où la migration 31-03 avait réduit une chaîne tolérante (`cp` médian + `&&`, ou `|| true`)
+# à un appel nu de helper en POSITION FINALE de boucle : avant correctif, l'échec d'UN SEUL fichier
+# illisible avortait `install` entier (rc=1, message `cp:`/`find:` brut). Chaque cas ci-dessous
+# assure rc=0 (install non avortée) ET la présence d'une trace « copie dégradée » — ce qui aurait
+# rougi tel quel sur l'engine tel que commité en 263c177 (vérifié manuellement en revue, cf.
+# rapport de la correction ciblée : rc=1 sur les 4 sites avant, rc=0 après).
+# ---------------------------------------------------------------------------
+
+# T10 (B1) : vf_place_tree — sous-répertoire NICHÉ illisible dans un cp -r (skill-creator/skills/
+# skill-creator/references), au-delà du grain « skill_dir entier » déjà couvert par T9c.
+LAB10="$(mktemp -d)"
+CACHE10="$LAB10/cache"
+if prepare_module "$CACHE10" "skill-creator"; then
+  SRC10="$CACHE10/skill-creator/skills/skill-creator/references"
+  if [ -d "$SRC10" ]; then
+    chmod 000 "$SRC10"
+    OUT10="$(mktemp)"
+    (cd "$LAB10" && VIBEFLOW_CACHE="$CACHE10" bash "$INSTALLER" install skill-creator) >"$OUT10" 2>&1
+    RC10=$?
+    chmod 755 "$SRC10"   # restauré AVANT tout retour du cas
+    if [ "$RC10" -eq 0 ] && "$GREP" -qE 'copie dégradée : .*references.*(illisible|échec)' "$OUT10"; then
+      ok "T10 : B1 — sous-répertoire niché illisible (vf_place_tree), install non avortée (rc=0), tracée"
+    else
+      ko "T10 : B1 non corrigé (rc=$RC10) — voir $OUT10"
+    fi
+    rm -f "$OUT10"
+  else
+    skip "T10 : skills/skill-creator/references absent du fixture"
+  fi
+else
+  chmod 755 "$SRC10" 2>/dev/null || true
+  skip "T10 : skill-creator non copiable dans le cache de test"
+fi
+rm -rf "$LAB10"
+
+# T11 (B2) : install_module — rules/*.md illisible (avant : `cp … 2>/dev/null || true`).
+LAB11="$(mktemp -d)"
+CACHE11="$LAB11/cache"
+if prepare_module "$CACHE11" "software-architecture"; then
+  SRC11="$CACHE11/software-architecture/rules/production-code-architecture.md"
+  chmod 000 "$SRC11"
+  OUT11="$(mktemp)"
+  (cd "$LAB11" && VIBEFLOW_CACHE="$CACHE11" bash "$INSTALLER" install software-architecture) >"$OUT11" 2>&1
+  RC11=$?
+  chmod 644 "$SRC11"
+  if [ "$RC11" -eq 0 ] && "$GREP" -qE 'copie dégradée : .*production-code-architecture\.md' "$OUT11"; then
+    ok "T11 : B2 — rules/*.md illisible, install non avortée (rc=0), tracée"
+  else
+    ko "T11 : B2 non corrigé (rc=$RC11) — voir $OUT11"
+  fi
+  rm -f "$OUT11"
+else
+  chmod 644 "$SRC11" 2>/dev/null || true
+  skip "T11 : software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB11"
+
+# T12 (B3) : copy_module_scripts — scripts/tests/*.sh illisible (avant : `|| true` indépendant).
+LAB12="$(mktemp -d)"
+CACHE12="$LAB12/cache"
+if prepare_module "$CACHE12" "software-architecture"; then
+  SRC12="$CACHE12/software-architecture/scripts/tests/test-check-file-size.sh"
+  chmod 000 "$SRC12"
+  OUT12="$(mktemp)"
+  (cd "$LAB12" && VIBEFLOW_CACHE="$CACHE12" bash "$INSTALLER" install software-architecture) >"$OUT12" 2>&1
+  RC12=$?
+  chmod 755 "$SRC12"
+  if [ "$RC12" -eq 0 ] && "$GREP" -qE 'copie dégradée : .*test-check-file-size\.sh' "$OUT12"; then
+    ok "T12 : B3 — scripts/tests/*.sh illisible, install non avortée (rc=0), tracée"
+  else
+    ko "T12 : B3 non corrigé (rc=$RC12) — voir $OUT12"
+  fi
+  rm -f "$OUT12"
+else
+  chmod 755 "$SRC12" 2>/dev/null || true
+  skip "T12 : software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB12"
+
+# T13 (B4) : copy_module_scripts — scripts/*.sh illisible (avant : `[ -f ] && cp && chmod +x`,
+# cp médian exempté).
+LAB13="$(mktemp -d)"
+CACHE13="$LAB13/cache"
+if prepare_module "$CACHE13" "software-architecture"; then
+  SRC13="$CACHE13/software-architecture/scripts/check-file-size.sh"
+  chmod 000 "$SRC13"
+  OUT13="$(mktemp)"
+  (cd "$LAB13" && VIBEFLOW_CACHE="$CACHE13" bash "$INSTALLER" install software-architecture) >"$OUT13" 2>&1
+  RC13=$?
+  chmod 755 "$SRC13"
+  if [ "$RC13" -eq 0 ] && "$GREP" -qE 'copie dégradée : .*check-file-size\.sh' "$OUT13"; then
+    ok "T13 : B4 — scripts/*.sh illisible, install non avortée (rc=0), tracée"
+  else
+    ko "T13 : B4 non corrigé (rc=$RC13) — voir $OUT13"
+  fi
+  rm -f "$OUT13"
+else
+  chmod 755 "$SRC13" 2>/dev/null || true
+  skip "T13 : software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB13"
+
+# ---------------------------------------------------------------------------
+# T14/T14b (M2, revue 31-03) — `vf_place_tree` ne crie plus À TORT sur un `$src_dir` légitimement
+# VIDE mais LISIBLE (`cp_rc` seul était un faux positif, même couple de symptômes qu'un répertoire
+# illisible). T14b est la contre-épreuve : un répertoire RÉELLEMENT illisible continue de crier —
+# le garde ne doit pas avoir supprimé le signal légitime. Unité : source les fonctions (même
+# convention que T4b/T5b).
+# ---------------------------------------------------------------------------
+T14_LAB="$(mktemp -d)"
+T14_RESULT="$(
+  cd "$T14_LAB" 2>/dev/null || exit 1
+  set -- sync
+  # shellcheck disable=SC1090
+  source "$INSTALLER" >/dev/null 2>&1
+  mkdir -p empty_src dest
+  vf_place_tree "$PWD/empty_src" "$PWD/dest" >/dev/null 2>&1
+  echo "$VF_DEGRADED_COPIES_COUNT"
+)"
+rm -rf "$T14_LAB"
+if [ "$T14_RESULT" = "0" ]; then
+  ok "T14 : M2 — répertoire source vide mais lisible, aucun cri de copie dégradée (faux positif corrigé)"
+else
+  ko "T14 : M2 — faux positif persistant sur répertoire vide lisible (VF_DEGRADED_COPIES_COUNT=$T14_RESULT, attendu 0)"
+fi
+
+T14B_LAB="$(mktemp -d)"
+mkdir -p "$T14B_LAB/unreadable_src/sub" "$T14B_LAB/dest2"
+printf 'x\n' > "$T14B_LAB/unreadable_src/sub/f.txt"
+chmod 000 "$T14B_LAB/unreadable_src"
+T14B_RESULT="$(
+  cd "$T14B_LAB" 2>/dev/null || exit 1
+  set -- sync
+  # shellcheck disable=SC1090
+  source "$INSTALLER" >/dev/null 2>&1
+  vf_place_tree "$T14B_LAB/unreadable_src" "$T14B_LAB/dest2" >/dev/null 2>&1
+  echo "$VF_DEGRADED_COPIES_COUNT"
+)"
+chmod 755 "$T14B_LAB/unreadable_src"
+rm -rf "$T14B_LAB"
+if [ -n "$T14B_RESULT" ] && [ "$T14B_RESULT" -gt 0 ] 2>/dev/null; then
+  ok "T14b : M2 contre-épreuve — répertoire source réellement illisible crie toujours (VF_DEGRADED_COPIES_COUNT=$T14B_RESULT)"
+else
+  ko "T14b : M2 contre-épreuve — signal légitime perdu (VF_DEGRADED_COPIES_COUNT=${T14B_RESULT:-<vide>})"
+fi
+
+# ---------------------------------------------------------------------------
+# T15 (M6, revue 31-03) — `uninstall` retire le manifeste .vibeflow-manifest-<mod> : sans ce
+# retrait, il survit à la désinstallation et devient un module FANTÔME pour la découverte par
+# glob (.vibeflow-manifest-*) annoncée en 31-05/31-07.
+# ---------------------------------------------------------------------------
+LAB15="$(mktemp -d)"
+CACHE15="$LAB15/cache"
+if prepare_module "$CACHE15" "software-architecture"; then
+  (cd "$LAB15" && VIBEFLOW_CACHE="$CACHE15" bash "$INSTALLER" install software-architecture >/dev/null 2>&1)
+  MANIFEST15="$LAB15/.claude/scripts/.vibeflow-manifest-software-architecture"
+  if [ -f "$MANIFEST15" ]; then
+    (cd "$LAB15" && VIBEFLOW_CACHE="$CACHE15" bash "$INSTALLER" uninstall software-architecture >/dev/null 2>&1)
+    if [ ! -f "$MANIFEST15" ]; then
+      ok "T15 : M6 — manifeste retiré à la désinstallation (aucun module fantôme)"
+    else
+      ko "T15 : M6 — manifeste survit à uninstall ($MANIFEST15 toujours présent)"
+    fi
+  else
+    ko "T15 : M6 — manifeste jamais créé à l'install, cas non vérifiable"
+  fi
+else
+  skip "T15 : software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB15"
+
+# ---------------------------------------------------------------------------
+# T16 (M5, revue 31-03) — settings.json/settings.local.json sont désormais dans le POINT UNIQUE
+# de définition (vf_manifest_excluded, D-31-03), pas neutralisés par un second filtre privé sous
+# T6 (le doublon que D-31-03 interdit explicitement). Grain unité, même convention que T5b.
+# ---------------------------------------------------------------------------
+T16_LAB="$(mktemp -d)"
+T16_RESULT="$(
+  cd "$T16_LAB" 2>/dev/null || exit 1
+  set -- sync
+  # shellcheck disable=SC1090
+  source "$INSTALLER" >/dev/null 2>&1
+  fail_list=""
+  check_excluded() {
+    local path="$1" want="$2" got
+    if vf_manifest_excluded "$path"; then got=0; else got=1; fi
+    [ "$got" = "$want" ] || fail_list="$fail_list|$path(want=$want,got=$got)"
+  }
+  check_excluded "settings.json" 0
+  check_excluded "settings.local.json" 0
+  check_excluded "skills/settings.json/SKILL.md" 1
+  if [ -z "$fail_list" ]; then
+    echo "PASS"
+  else
+    echo "FAIL:$fail_list"
+  fi
+)"
+rm -rf "$T16_LAB"
+case "$T16_RESULT" in
+  PASS) ok "T16 : M5 — settings.json/settings.local.json dans le point UNIQUE vf_manifest_excluded" ;;
+  *) ko "T16 : M5 — $T16_RESULT" ;;
+esac
 
 # ---------------------------------------------------------------------------
 # T0 — anti-vert-à-vide (contrat F13) : la suite doit compter au moins une assertion.

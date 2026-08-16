@@ -94,6 +94,10 @@ VF_MANIFEST_TMP=""
 # vf_manifest_reset (appelée en tête d'install_module), lu en fin d'install_module pour le
 # compte rendu. Jamais unbound (même discipline que les deux variables ci-dessus).
 VF_DEGRADED_COPIES_COUNT=0
+# D-31-14 : compteur des poses hors cycle manifeste (vf_record no-op silencieux faute de cycle
+# ouvert, cf. commentaire de vf_record) — remis à 0 par sync_module_governance, lu en fin de
+# fonction pour UNE ligne de compte rendu PAR MODULE (jamais une ligne par chemin, cf. décision).
+VF_NOCYCLE_COUNT=0
 
 # ---------- Cache (SCOPE-02 : plus de clone/pull, le cache doit exister) ----------
 require_cache() {
@@ -164,6 +168,9 @@ vf_manifest_excluded() {
     scripts/.vibeflow-installed)  return 0 ;;  # état du moteur, pas contenu de module
     scripts/.vibeflow-manifest-*) return 0 ;;  # le manifeste ne se consigne jamais lui-même (boucle de convergence)
     .backups/*)                   return 0 ;;  # filet de sécurité, jamais candidat à suppression automatique
+    settings.json)                return 0 ;;  # M5 (revue 31-03) : fichier MERGÉ par merge_module_hooks, pas posé — était
+                                                 # neutralisé par un second filtre privé sous T6, hors du point UNIQUE D-31-03
+    settings.local.json)          return 0 ;;  # idem, miroir --settings-local (scope project|local)
   esac
   return 1
 }
@@ -255,7 +262,10 @@ vf_record() {
   # avorter `update`/`uninstall` sous `set -e` — un changement de comportement observable que
   # D-31-01 interdit. `vf_manifest_reset`/`vf_record`/`vf_manifest_flush` restent sourcés
   # directement par T4b/T5b DANS un cycle ouvert : ce chemin n'est pas affecté.
-  [ -n "$VF_MANIFEST_TMP" ] || return 0
+  if [ -z "$VF_MANIFEST_TMP" ]; then
+    VF_NOCYCLE_COUNT=$((VF_NOCYCLE_COUNT + 1))
+    return 0
+  fi
   rel="$(vf_rel_to_target "$dest")" || return 0
   vf_manifest_excluded "$rel" && return 0
   printf '%s\n' "$rel" >> "$VF_MANIFEST_TMP"
@@ -276,6 +286,16 @@ vf_manifest_reset() {
   # plusieurs points d'entrée, plusieurs oublis possibles. Sortir l'accumulateur du motif que
   # 31-05/31-07 vont découvrir par glob supprime la classe d'erreur à la racine, sans dépendre
   # d'un `trap` correctement posé à chaque appelant.
+  # Mi4 (revue 31-03) : résidu d'une pose AVORTÉE (le PID d'un run précédent, jamais atteint par
+  # vf_manifest_flush) nettoyé au cycle suivant du MÊME module — le nom `.vibeflow-acc-<mod>.<pid>`
+  # est daté au PID, jamais réutilisé par la ré-install qui suit, donc jamais confondu avec
+  # l'accumulateur créé juste après. Boucle avec garde d'existence (jamais un glob nu sous `set -e`
+  # — non-satisfait romprait le script).
+  local stale
+  for stale in "$manifest_dir/.vibeflow-acc-${mod}."*; do
+    [ -e "$stale" ] || continue
+    rm -f "$stale"
+  done
   VF_MANIFEST_TMP="$manifest_dir/.vibeflow-acc-${mod}.$$"
   : > "$VF_MANIFEST_TMP"
   VF_DEGRADED_COPIES_COUNT=0
@@ -337,7 +357,12 @@ vf_place_file() {
   local src="$1" dest="$2" mode="${3:-}"
   local rc=0
   mkdir -p "$(dirname "$dest")"
-  cp "$src" "$dest" || rc=$?
+  # Mi2 (revue 31-03) : stderr du `cp` brut supprimé — sur le chemin dégradé (B2-B4), l'appelant
+  # trace déjà l'échec via son propre `log` préfixé `[vibeflow-update]` ; sans ce garde, le
+  # message `cp: …` brut de la commande système apparaissait en double, sans préfixe. Le chemin
+  # nominal (succès, comportement inchangé, preuve md5) ne produit aucun stderr, donc rien à
+  # perdre côté observable.
+  cp "$src" "$dest" 2>/dev/null || rc=$?
   if [ "$rc" -ne 0 ]; then
     return "$rc"
   fi
@@ -387,7 +412,18 @@ vf_place_tree() {
       .*) continue ;;  # dotfile de premier niveau : jamais annoncé ni posé (D-31-11 point 2, gelé)
     esac
     if [ -d "$entry" ]; then
-      find "$entry" -type f >> "$list_tmp"
+      # B1 (revue 31-03, D-31-13) : ce `find` est la DERNIÈRE commande du corps de `if` — sous
+      # `set -e`, son échec (sous-répertoire NICHÉ illisible en descendant) avorterait tout le
+      # script et défierait depuis l'intérieur la garantie même de vf_place_tree (jamais avorter
+      # sur copie dégradée, D-31-11 point 4). Tolérance restaurée EXPLICITEMENT : rc capturé,
+      # jamais un `|| true` muet (contrat Phase 30, 0 = silence) — comptée dans le même compte
+      # rendu de fin de pose que les autres copies dégradées (VF_DEGRADED_COPIES_COUNT). Les
+      # fichiers que `find` a pu lire AVANT de heurter le sous-répertoire illisible restent dans
+      # `$list_tmp` (la redirection `>>` s'applique quel que soit le code retour).
+      find "$entry" -type f >> "$list_tmp" 2>/dev/null || {
+        log "  copie dégradée : $entry (sous-répertoire illisible, énumération find en échec)"
+        VF_DEGRADED_COPIES_COUNT=$((VF_DEGRADED_COPIES_COUNT + 1))
+      }
     else
       printf '%s\n' "$entry" >> "$list_tmp"
     fi
@@ -416,7 +452,13 @@ vf_place_tree() {
   # ci-dessus rend zéro paire, la boucle n'itère jamais, missing_count reste à 0 — SANS ce garde,
   # rien ne serait dit. Émis au grain RÉPERTOIRE, SANS passer par vf_note_degraded_copy (qui reste
   # réservée à son unique site d'appel ci-dessus, le grain fichier).
-  if [ -n "$cp_rc" ] && [ "$missing_count" -eq 0 ]; then
+  # M2 (revue 31-03) : `cp_rc` seul est un FAUX POSITIF sur un `$src_dir` légitimement VIDE mais
+  # lisible — le glob `"$src_dir"/*` ne s'expand sur rien, `cp` échoue (« no such file »),
+  # `cp_rc` est affecté ET `missing_count` reste à 0, exactement le même couple de symptômes
+  # qu'un `$src_dir` illisible. Le troisième garde (`[ ! -r "$src_dir" ]`) distingue les deux :
+  # un répertoire vide reste LISIBLE (`-r` vrai), seul un répertoire réellement illisible
+  # (permission refusée, ou disparu) fait échouer ce test. Un dossier vide lisible ne crie plus.
+  if [ -n "$cp_rc" ] && [ "$missing_count" -eq 0 ] && [ ! -r "$src_dir" ]; then
     log "  copie dégradée : $src_dir (source illisible ou cp en échec, aucun fichier énuméré)"
     VF_DEGRADED_COPIES_COUNT=$((VF_DEGRADED_COPIES_COUNT + 1))
   fi
@@ -686,8 +728,11 @@ merge_module_hooks() {
   if [ -f "$TARGET_ROOT/settings.json" ]; then
     mkdir -p "$BACKUP_DIR"
     local settings_backup="$BACKUP_DIR/settings-$(date +%Y%m%d-%H%M%S).json"
-    vf_declare_write + "$settings_backup"
+    # Mi1 (revue 31-03) : annonce APRÈS l'écriture réelle, jamais avant — patron `vf_place_file`
+    # (D-31-01). Sans conséquence ici (.backups/** est dans la liste close d'exclusions, D-31-03),
+    # mais un mauvais précédent à ne pas reconduire.
     cp "$TARGET_ROOT/settings.json" "$settings_backup"
+    vf_declare_write + "$settings_backup"
   fi
   # Routage --settings-local (Phase 30 tâche 4, D-01) : en scope project/local, merge-hooks.sh
   # bascule vers CE fichier les seules entrées portant {{VF_BASH}} — un chemin absolu de bash
@@ -758,8 +803,17 @@ copy_module_scripts() {
   # de toute l'install (cf. règle set -e × rc, 31-03-PLAN.md). La garde `[ -f "$f" ] &&` neutralise
   # le cas non-satisfait AVANT que `set -e` le voie — jamais retirée au prétexte que le helper
   # « gère déjà » l'échec : il le propage, il ne l'absorbe pas.
+  # B4 (revue 31-03, D-31-13) : avant migration, `[ -f "$f" ] && cp … && chmod +x` (3 commandes,
+  # `cp` MÉDIANE — exemptée d'errexit). L'appel nu au helper, réduit à 2 commandes, met désormais
+  # `vf_place_file` en position FINALE : son échec avorterait tout le script sur un seul fichier
+  # illisible. Tolérance restaurée EXPLICITEMENT (jamais un `|| true` muet, contrat Phase 30).
   for f in "$module_dir/scripts/"*.sh "$module_dir/scripts/"*.mjs "$module_dir/scripts/"*.js; do
-    [ -f "$f" ] && vf_place_file "$f" "$TARGET_ROOT/scripts/$(basename "$f")" exec
+    if [ -f "$f" ]; then
+      vf_place_file "$f" "$TARGET_ROOT/scripts/$(basename "$f")" exec || {
+        log "  copie dégradée : $TARGET_ROOT/scripts/$(basename "$f") (pose en échec)"
+        VF_DEGRADED_COPIES_COUNT=$((VF_DEGRADED_COPIES_COUNT + 1))
+      }
+    fi
   done
   # Site #3 (31-03), même motif de garde que #2. Fichiers de DONNEES accompagnant les scripts
   # (*.txt). Sans cette boucle, un module pouvait referencer un fichier que l'engine ne posait
@@ -774,16 +828,27 @@ copy_module_scripts() {
   # Site #4 (31-03) : globs de FICHIERS restreints (tests/*.sh, tests/fixtures/*), PAS la pose
   # d'un répertoire entier — vf_place_tree ne s'applique pas ici (elle reproduirait la sémantique
   # de `cp -r "$src_dir/"*`, càd TOUT `$src_dir`, ce que ces deux globs précis n'atteignent
-  # jamais). Grain fichier via vf_place_file, garde d'existence obligatoire (même motif que #2/#3).
+  # jamais). Grain fichier via vf_place_file, garde d'existence obligatoire (même motif que #2/#3
+  # pour la garde d'EXISTENCE seulement). Correction (revue 31-03) : cette phrase était FACTUELLEMENT
+  # FAUSSE au-delà de la garde d'existence — #2/#3 n'ont JAMAIS porté de `|| true`, alors que CE
+  # site en portait TROIS, indépendants, avant migration (B3, D-31-13). L'appel nu au helper, en
+  # position finale de chacune des deux boucles, avorterait désormais tout le script sur un seul
+  # fichier illisible ; tolérance restaurée EXPLICITEMENT (jamais un `|| true` muet).
   if [ -d "$module_dir/scripts/tests" ]; then
     mkdir -p "$TARGET_ROOT/scripts/tests/fixtures"
     for f in "$module_dir/scripts/tests/"*.sh; do
       [ -f "$f" ] || continue
-      vf_place_file "$f" "$TARGET_ROOT/scripts/tests/$(basename "$f")" exec
+      vf_place_file "$f" "$TARGET_ROOT/scripts/tests/$(basename "$f")" exec || {
+        log "  copie dégradée : $TARGET_ROOT/scripts/tests/$(basename "$f") (pose en échec)"
+        VF_DEGRADED_COPIES_COUNT=$((VF_DEGRADED_COPIES_COUNT + 1))
+      }
     done
     for f in "$module_dir/scripts/tests/fixtures/"*; do
       [ -f "$f" ] || continue
-      vf_place_file "$f" "$TARGET_ROOT/scripts/tests/fixtures/$(basename "$f")"
+      vf_place_file "$f" "$TARGET_ROOT/scripts/tests/fixtures/$(basename "$f")" || {
+        log "  copie dégradée : $TARGET_ROOT/scripts/tests/fixtures/$(basename "$f") (pose en échec)"
+        VF_DEGRADED_COPIES_COUNT=$((VF_DEGRADED_COPIES_COUNT + 1))
+      }
     done
   fi
   log "  copied scripts/ → $TARGET_ROOT/scripts/"
@@ -817,6 +882,13 @@ seed_module_registres() {
 
 sync_module_governance() {
   local mod="$1"
+  # D-31-14 : cette fonction n'ouvre JAMAIS de cycle manifeste (pas de vf_manifest_reset) — sûr
+  # par construction (vf_manifest_flush ÉCRASE au lieu de fusionner, un cycle ici TRONQUERAIT le
+  # manifeste complet au sous-ensemble que ce resync touche), mais chaque pose qui en résulte est
+  # un no-op SILENCIEUX côté manifeste (vf_record, cf. commentaire). Compteur remis à 0 ICI,
+  # rapporté en UNE ligne par module en fin de fonction — jamais une ligne par chemin (sur 17
+  # modules, `update --all` en produirait des dizaines, un signal qui spamme cesse d'être lu).
+  VF_NOCYCLE_COUNT=0
   # Chemin « version inchangée » (D-04) : sans cet appel, un lab déjà à jour n'obtiendrait JAMAIS
   # la lib de portabilité — idempotent au sein du même processus (VF_ENGINE_LIB_COPIED).
   copy_engine_lib
@@ -826,6 +898,9 @@ sync_module_governance() {
   # rendrait le resync inerte sur un lab où le script n'a jamais été installé — exactement le cas
   # qu'on cherche à rattraper.
   seed_module_registres "$mod"
+  if [ "$VF_NOCYCLE_COUNT" -gt 0 ]; then
+    log "  $VF_NOCYCLE_COUNT chemin(s) posé(s) hors cycle manifeste, non consigné(s)"
+  fi
 }
 
 # ---------- Baseline obligatoire (INST-02a) ----------
@@ -979,9 +1054,16 @@ install_module() {
   # D-31-02, boucle avec garde d'existence (le module peut n'avoir aucun rules/*.md).
   if [ -d "$module_dir/rules" ]; then
     mkdir -p "$TARGET_ROOT/rules"
+    # B2 (revue 31-03, D-31-13) : avant migration, `cp … 2>/dev/null || true`. L'appel nu au
+    # helper, dernière commande de la boucle, avorterait désormais tout le script sur un seul
+    # fichier illisible sous `set -e`. Tolérance restaurée EXPLICITEMENT (jamais un `|| true`
+    # muet, contrat Phase 30 : 0 = silence).
     for f in "$module_dir/rules/"*.md; do
       [ -f "$f" ] || continue
-      vf_place_file "$f" "$TARGET_ROOT/rules/$(basename "$f")"
+      vf_place_file "$f" "$TARGET_ROOT/rules/$(basename "$f")" || {
+        log "  copie dégradée : $TARGET_ROOT/rules/$(basename "$f") (pose en échec)"
+        VF_DEGRADED_COPIES_COUNT=$((VF_DEGRADED_COPIES_COUNT + 1))
+      }
     done
     log "  copied rules/ → $TARGET_ROOT/rules/"
   fi
@@ -1123,11 +1205,11 @@ backup_module() {
   ts=$(date +%Y%m%d-%H%M%S)
   local bdir="$BACKUP_DIR/$mod-$ts"
   mkdir -p "$bdir"
-  # Site #20 (31-03) : annonce en tête, puis les cp/cp -r existants restent INTENTIONNELLEMENT
-  # bruts — copies de sauvegarde vers .backups/**, exclues du manifeste par D-31-03 (le contenu
-  # d'un backup n'est pas un artefact de pose). No-op silencieux si appelée hors cycle
-  # (uninstall_module n'ouvre pas de cycle manifeste).
-  vf_declare_write + "$bdir"
+  # Site #20 (31-03) : les cp/cp -r existants restent INTENTIONNELLEMENT bruts — copies de
+  # sauvegarde vers .backups/**, exclues du manifeste par D-31-03 (le contenu d'un backup n'est
+  # pas un artefact de pose). No-op silencieux si appelée hors cycle (uninstall_module n'ouvre
+  # pas de cycle manifeste). Mi1 (revue 31-03) : annonce déplacée en FIN de fonction, après les
+  # copies réelles — patron `vf_place_file` (D-31-01), jamais avant l'écriture.
   [ -d "$TARGET_ROOT/skills/$mod" ] && cp -r "$TARGET_ROOT/skills/$mod" "$bdir/skills"
   # Agent module : AGENT.md installé + son dossier references (D7)
   [ -f "$TARGET_ROOT/agents/${mod}.md" ] && { mkdir -p "$bdir/agents"; cp "$TARGET_ROOT/agents/${mod}.md" "$bdir/agents/"; }
@@ -1140,6 +1222,7 @@ backup_module() {
       [ -f "$TARGET_ROOT/scripts/$name" ] && cp "$TARGET_ROOT/scripts/$name" "$bdir/scripts/"
     done
   fi
+  vf_declare_write + "$bdir"
   log "  backup → $bdir"
 }
 
@@ -1171,7 +1254,8 @@ rollback_module() {
 # ---------- Uninstall ----------
 uninstall_module() {
   # 31-03 (D-31-09) : non migré vers le socle manifeste — le passage au manifeste est planifié
-  # comme dernière vague EXPLICITEMENT ABANDONNABLE (31-08) si le plan de la phase enfle. Le
+  # comme dernière vague EXPLICITEMENT ABANDONNABLE (31-07 — Mi3, revue 31-03 : ce commentaire
+  # citait à tort 31-08, qui est la réponse à l'issue #20) si le plan de la phase enfle. Le
   # migrer ici en ferait un lot non abandonnable par accident.
   local mod="$1"
   log "Désinstallation $mod (scope=$VF_SCOPE → $TARGET_ROOT)..."
@@ -1256,6 +1340,14 @@ uninstall_module() {
 
   # Hooks de gouvernance (ADR-043) : retirer les entrées du module de settings.json.
   remove_module_hooks "$mod"
+
+  # M6 (revue 31-03) : sans ce retrait, le manifeste .vibeflow-manifest-<mod> survit à la
+  # désinstallation — un module FANTÔME que le commentaire de vf_manifest_reset (~276-278)
+  # annonce comme découvert PAR GLOB en 31-05/31-07. rm -f, jamais fatal (uninstall_module
+  # n'ouvre pas de cycle manifeste, D-31-09 — rien à consigner sur son propre retrait).
+  local manifest_file
+  manifest_file="$(vf_manifest_path "$mod")"
+  [ -f "$manifest_file" ] && rm -f "$manifest_file" && log "  removed $manifest_file"
 
   mark_uninstalled "$mod"
   log "✓ $mod désinstallé"
