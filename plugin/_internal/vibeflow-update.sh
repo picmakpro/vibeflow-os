@@ -82,6 +82,15 @@ CACHE_DIR="${VIBEFLOW_CACHE:-.vibeflow-cache}"   # SEULE source (plus de clone)
 INSTALLED_REGISTRY="$TARGET_ROOT/scripts/.vibeflow-installed"
 BACKUP_DIR="$TARGET_ROOT/.backups"
 
+# ---------- État global de l'accumulateur manifeste (W-2, revue vague 1) ----------
+# Initialisées ici — jamais laissées unbound. Sans ce garde, tout appel futur à vf_record ou
+# vf_manifest_flush hors de la séquence vf_manifest_reset → … → vf_manifest_flush planterait sous
+# `set -u` en « unbound variable », sans message clair sur la cause réelle (cycle non ouvert).
+# Les guards explicites dans vf_record/vf_manifest_flush (plus bas) rendent ce cas d'usage
+# incorrect visible avec un message précis, au lieu de dépendre du seul message bash générique.
+VF_MANIFEST_MOD=""
+VF_MANIFEST_TMP=""
+
 # ---------- Cache (SCOPE-02 : plus de clone/pull, le cache doit exister) ----------
 require_cache() {
   [ -d "$CACHE_DIR" ] || err "Cache introuvable : $CACHE_DIR (fournir VIBEFLOW_CACHE)"
@@ -159,6 +168,14 @@ vf_manifest_excluded() {
 # Implémentation privée de vf_rel_to_target, pas un des 7 points d'API du socle manifeste.
 _vf_normalize_path() {
   local path="$1"
+  # B-1 (revue vague 1, D-31-12) : sous bash 3.2 (le /bin/bash de macOS, plancher réel du repo),
+  # `parts=($path)` avec $path VIDE laisse `parts` UNBOUND (pas un tableau à 0 élément, cf.
+  # reproduction en revue) — le `"${parts[@]}"` du for qui suit avorte tout le script appelant
+  # sous `set -u` (message : `parts[@]: unbound variable`). Court-circuit AVANT le split : un
+  # chemin vide normalise en chemin relatif vide, exactement ce que produirait la boucle si
+  # `parts` était bien un tableau à 0 élément (n=0, boucle de reconstruction jamais exécutée,
+  # result="", sortie finale = ligne vide) — même sémantique, zéro risque de crash.
+  [ -n "$path" ] || { printf '\n'; return 0; }
   local abs=0
   case "$path" in
     /*) abs=1 ;;
@@ -224,6 +241,9 @@ vf_rel_to_target() {
 vf_record() {
   local dest="$1"
   local rel
+  # W-2 (revue vague 1) : cycle non ouvert → message explicite plutôt qu'un « unbound variable »
+  # opaque (VF_MANIFEST_TMP est désormais initialisée globalement à "", jamais unbound en soi).
+  [ -n "$VF_MANIFEST_TMP" ] || { log "  ERROR: vf_record appelé hors cycle vf_manifest_reset (accumulateur manifeste non ouvert)"; return 1; }
   rel="$(vf_rel_to_target "$dest")" || return 0
   vf_manifest_excluded "$rel" && return 0
   printf '%s\n' "$rel" >> "$VF_MANIFEST_TMP"
@@ -236,7 +256,15 @@ vf_manifest_reset() {
   manifest_dir="$(dirname "$(vf_manifest_path "$mod")")"
   mkdir -p "$manifest_dir"
   VF_MANIFEST_MOD="$mod"
-  VF_MANIFEST_TMP="$manifest_dir/.vibeflow-manifest-${mod}.tmp.$$"
+  # W-1 (revue vague 1) : nommé HORS du motif `.vibeflow-manifest-*` (`.vibeflow-acc-…`, pas
+  # `.vibeflow-manifest-….tmp.$$`) plutôt qu'un trap de nettoyage — un `cp`/étape qui échoue plus
+  # loin dans install_module avorte le script (`set -euo pipefail`) AVANT vf_manifest_flush et
+  # laisse ce fichier orphelin sur disque (atomicité de l'ancien manifeste préservée, lui). Un
+  # trap aurait dû être pistée à travers install_module/update_module/sync_module_governance —
+  # plusieurs points d'entrée, plusieurs oublis possibles. Sortir l'accumulateur du motif que
+  # 31-05/31-07 vont découvrir par glob supprime la classe d'erreur à la racine, sans dépendre
+  # d'un `trap` correctement posé à chaque appelant.
+  VF_MANIFEST_TMP="$manifest_dir/.vibeflow-acc-${mod}.$$"
   : > "$VF_MANIFEST_TMP"
 }
 
@@ -246,6 +274,8 @@ vf_manifest_reset() {
 # pré-Phase-31, D-31-07).
 vf_manifest_flush() {
   local target sorted_tmp
+  # W-2 (revue vague 1) : même garde explicite que vf_record — cycle non ouvert = message clair.
+  [ -n "$VF_MANIFEST_MOD" ] && [ -n "$VF_MANIFEST_TMP" ] || { log "  ERROR: vf_manifest_flush appelé hors cycle vf_manifest_reset (accumulateur manifeste non ouvert)"; return 1; }
   target="$(vf_manifest_path "$VF_MANIFEST_MOD")"
   sorted_tmp="${VF_MANIFEST_TMP}.sorted"
   LC_ALL=C sort -u "$VF_MANIFEST_TMP" > "$sorted_tmp"
