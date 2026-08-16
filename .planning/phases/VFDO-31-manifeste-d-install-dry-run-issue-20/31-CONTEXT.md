@@ -425,6 +425,37 @@ rougir ce test.
 > scénario hostile n'a pas été trouvé en relisant le code — il a été trouvé en **fabriquant
 > l'attaque**.
 
+### D-31-16 — À la désinstallation, ne jamais **désenregistrer** ce qu'on n'a pas su **retirer**
+
+> **Ajouté le 2026-08-16**, après reproduction par le manager d'un état **irrécupérable**.
+
+**Le fait mesuré** : `uninstall` sur un manifeste **imparsable** laisse les fichiers du module **sur
+disque** (17 → 24 fichiers, l'écart étant les copies de backup), **retire l'entrée du registre**, et
+rend **rc=0** avec trois messages bruyants. L'utilisateur se retrouve donc avec des **orphelins** *et*
+**aucun moyen de les retirer** : le module n'étant plus enregistré, `uninstall` ne peut plus être
+rejoué contre lui. C'est la **« désinstallation amputée »** que D-31-09 interdit **explicitement**,
+doublée d'une **impasse**.
+
+**Décision, en une invariante** : le registre n'est **désenregistré** que si les fichiers ont
+**réellement** été retirés. On ne déclare pas désinstallé ce qu'on n'a pas su désinstaller.
+
+**Conduite par source de vérité** :
+1. Manifeste **valide** ⇒ il fait foi.
+2. Manifeste **absent OU imparsable** ⇒ **bruyant**, puis **repli sur l'énumération de cache** —
+   exactement le repli déjà prévu pour l'absence. La désinstallation **aboutit**.
+3. Cache **également indisponible** (module retiré du parc) ⇒ **refus explicite**, l'entrée de
+   registre est **CONSERVÉE**, et on le dit. L'utilisateur peut réessayer après avoir restauré une
+   source. Mieux vaut un module « toujours installé » qu'un module fantôme irrécupérable.
+
+**Motif** : la règle « le doute ne supprime jamais » (D-31-07) protège contre la suppression de ce que
+le manifeste **désigne à tort**. Le repli sur le cache **ne consulte pas le manifeste** — le risque
+qu'elle vise n'existe donc pas sur ce chemin. Traiter « imparsable » plus sévèrement qu'« absent »
+n'achetait aucune sûreté et coûtait la récupérabilité.
+
+> **Leçon** : une garde de sûreté qui s'arrête à **« ne pas détruire »** peut laisser un système dans
+> un état **dont l'utilisateur ne peut plus sortir**. L'abstention doit être **réversible**, sinon
+> elle n'est qu'une autre forme de dommage — plus discrète.
+
 ## 4. Contraintes d'exécution non négociables
 
 1. **Branche de phase avant tout commit.** Jamais un commit sur `main`.
