@@ -54,6 +54,31 @@ now() { date +%s; }
 iso() { date +%Y-%m-%dT%H:%M:%S; }
 meta_get() { [ -f "$META" ] && grep "^$1=" "$META" 2>/dev/null | head -1 | cut -d= -f2- || true; }
 
+# Assainit un identifiant de session (D-32-03(a)) : le champ meta est une liste separee par des
+# virgules, un identifiant qui en porterait une casserait la lecture. On SUPPRIME les caracteres
+# hors classe (tr -dc), pas de substitution — une substitution (comme le "_" du mutex L200)
+# laisserait un caractere a la place, une virgule injectee resterait un separateur potentiel.
+sanitize_session_id() { printf '%s' "$1" | tr -dc 'A-Za-z0-9._-'; }
+
+# Valeur brute (CSV) du champ additif session_ids. Vide si la cle est absente du meta — meta_get
+# rend deja le vide sans echouer, donc un lock pose par une version anterieure du script (sans
+# cette ligne) reste lisible (retrocompatibilite, T18).
+lock_session_ids() { meta_get session_ids; }
+
+# Emet un tableau JSON depuis la chaine CSV de session_ids. CSV vide -> "[]". `sanitize_session_id`
+# garantit qu'aucun caractere a echapper (guillemet, backslash...) n'entre jamais dans le champ :
+# aucun echappement n'est donc requis ni ecrit ici.
+json_session_ids() {
+  local csv="$1" out="" first=true id
+  [ -z "$csv" ] && { echo '[]'; return; }
+  local IFS=','
+  for id in $csv; do
+    [ -z "$id" ] && continue
+    if $first; then out="\"$id\""; first=false; else out="${out}, \"$id\""; fi
+  done
+  echo "[$out]"
+}
+
 LOCK_PARENT="$(dirname "$LOCK_DIR")"
 LOCK_BASE="$(basename "$LOCK_DIR")"
 
@@ -117,6 +142,7 @@ new_generation() {
     printf 'step=%s\n'            "$(printf '%s' "$STEP"  | tr -d '\n')"
     printf 'branch=%s\n'          "$(printf '%s' "$(git_branch)"   | tr -d '\n')"
     printf 'worktree=%s\n'        "$(printf '%s' "$(git_worktree)" | tr -d '\n')"
+    printf 'session_ids=%s\n'     "$(sanitize_session_id "${CLAUDE_CODE_SESSION_ID:-}")"
     printf 'acquired_epoch=%s\n'  "$ts"
     printf 'acquired_iso=%s\n'    "$iso_ts"
     printf 'heartbeat_epoch=%s\n' "$ts"
@@ -127,14 +153,19 @@ new_generation() {
 # Reecrit le meta de la generation COURANTE en place (heartbeat, re-acquisition du meme owner).
 # Le lien ne bouge pas : rien a serialiser, l'owner est deja etabli.
 rewrite_meta() {
-  local ap ai br wt
+  local ap ai br wt si
   ap="$(meta_get acquired_epoch)"; ai="$(meta_get acquired_iso)"
   br="$(meta_get branch)"; wt="$(meta_get worktree)"
+  # session_ids est LU depuis le meta courant, JAMAIS depuis l'environnement de la session qui
+  # appelle rewrite_meta — c'est ce qui fait qu'un heartbeat emis d'un autre contexte (ADR-064,
+  # meme patron que branch/worktree ci-dessus) ne peut jamais reecrire l'identite du detenteur.
+  si="$(lock_session_ids)"
   {
     printf 'owner=%s\n'           "$(printf '%s' "$OWNER" | tr -d '\n')"
     printf 'step=%s\n'            "$(printf '%s' "$STEP"  | tr -d '\n')"
     printf 'branch=%s\n'          "$br"
     printf 'worktree=%s\n'        "$wt"
+    printf 'session_ids=%s\n'     "$si"
     printf 'acquired_epoch=%s\n'  "$ap"
     printf 'acquired_iso=%s\n'    "$ai"
     printf 'heartbeat_epoch=%s\n' "$1"
@@ -156,11 +187,12 @@ json_status() {
   if [ "$1" = false ]; then
     printf '{"present": false, "lock": "%s"}\n' "$LOCK_DIR"; return
   fi
-  local o s age stale
+  local o s age stale gen sids
   o="$(meta_get owner)"; s="$(meta_get step)"; age="$(lock_age)"
   [ "$age" -gt "$TTL" ] && stale=true || stale=false
-  printf '{"present": true, "owner": "%s", "step": "%s", "age_seconds": %s, "ttl": %s, "stale": %s}\n' \
-    "$o" "$s" "$age" "$TTL" "$stale"
+  gen="$(lock_gen)"; sids="$(json_session_ids "$(lock_session_ids)")"
+  printf '{"present": true, "owner": "%s", "step": "%s", "age_seconds": %s, "ttl": %s, "stale": %s, "generation": "%s", "session_ids": %s}\n' \
+    "$o" "$s" "$age" "$TTL" "$stale" "$gen" "$sids"
 }
 
 require_owner() {
@@ -175,7 +207,8 @@ case "$ACTION" in
     #    deja complet.
     gen="$(new_generation)" || { echo '{"acquired": false, "reason": "generation-failed"}'; exit 1; }
     if ln_atomic "$gen" "$LOCK_DIR"; then
-      printf '{"acquired": true, "owner": "%s", "step": "%s", "recovered": false}\n' "$OWNER" "$STEP"
+      printf '{"acquired": true, "owner": "%s", "step": "%s", "recovered": false, "generation": "%s", "session_ids": %s}\n' \
+        "$OWNER" "$STEP" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")"
       exit 0
     fi
     # 2. OCCUPE — notre generation ne sert pas encore ; on la garde pour une eventuelle
@@ -187,7 +220,8 @@ case "$ACTION" in
         # meme owner : ré-acquisition idempotente (rafraichit heartbeat, maj etape si fournie)
         [ -z "$STEP" ] && STEP="$(meta_get step)"
         rewrite_meta "$(now)"
-        printf '{"acquired": true, "owner": "%s", "step": "%s", "reentrant": true}\n' "$OWNER" "$STEP"
+        printf '{"acquired": true, "owner": "%s", "step": "%s", "reentrant": true, "generation": "%s", "session_ids": %s}\n' \
+          "$OWNER" "$STEP" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")"
         exit 0
       fi
       printf '{"acquired": false, "reason": "held", "held_by": "%s", "age_seconds": %s}\n' "$held" "$age"
