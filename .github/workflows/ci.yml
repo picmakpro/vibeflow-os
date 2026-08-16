@@ -790,14 +790,50 @@ jobs:
         # docs/HOOKS-CONTRAT-SORTIE.md §4, gardée par ailleurs par le cas T9 de
         # test-check-hook-paths.sh). Les DEUX fichiers sont donc regardés ici ; l'exception est
         # nommée explicitement, pas silencieuse.
+        #
+        # L'ATTENDU N'EST PLUS UN LITTÉRAL. Un chiffre codé en dur décrivait un univers
+        # (dev-orchestrator + software-architecture) que CE job n'installe jamais : sa fermeture
+        # ($closure) ne contient QUE dev-orchestrator, `software-architecture` n'y arrive par
+        # aucune arête — l'attendu doit donc se dériver de la fermeture RÉELLEMENT installée, pas
+        # d'une install locale d'un univers différent (leçon vécue : run CI 31917741411, « attendu
+        # 6, présentes 5 »). Les deux sources restent INDÉPENDANTES : l'attendu vient des
+        # `hooks.json` sources des modules de la fermeture (arbre $GITHUB_WORKSPACE), le constat
+        # vient de ce que l'install a POSÉ dans $LAB_ARME — ni l'un ni l'autre n'est recalculé à
+        # partir du même code, donc aucun des deux ne peut se satisfaire lui-même à vide.
         run: |
           set -eu
+          closure=$(bash plugin/_internal/resolve-deps.sh dev-orchestrator)
+          if ! printf '%s\n' "$closure" | awk '$0=="dev-orchestrator"{f=1} END{exit !f}'; then
+            echo "::error::fermeture résolue sans dev-orchestrator — attendu non fiable, refus de continuer"
+            exit 1
+          fi
+          echo "== fermeture (source de l'attendu, indépendante du posé) : $closure =="
+          expect_total=$(python3 - <<PYEOF
+          import json, glob
+          closure = """$closure""".split()
+          n = 0
+          for m in closure:
+              for f in glob.glob(f"plugin/{m}/hooks/hooks.json"):
+                  d = json.load(open(f, encoding="utf-8"))
+                  for ev, groups in d.get("hooks", {}).items():
+                      for g in groups or []:
+                          for h in g.get("hooks", []) or []:
+                              if "args" in h:
+                                  n += 1
+          print(n)
+          PYEOF
+          )
+          if [ -z "$expect_total" ] || [ "$expect_total" -le 0 ]; then
+            echo "::error::attendu dérivé de la fermeture <= 0 ($expect_total) — refus de comparer contre une cible source vide"
+            exit 1
+          fi
+          echo "== attendu dérivé des hooks.json de la fermeture : $expect_total entrée(s) VF =="
+
           cd "$LAB_ARME"
-          python3 - <<'PYEOF'
+          python3 - "$expect_total" <<'PYEOF'
           import json, os, re, sys
 
-          # 5 dev-orchestrator (dont check-hook-paths.sh) + 1 software-architecture — docs/HOOKS-CONTRAT-SORTIE.md §4/§5
-          EXPECT_TOTAL = 6
+          EXPECT_TOTAL = int(sys.argv[1])
           BARE_COMMAND_EXCEPTION = "check-hook-paths.sh"
           SHELL_METACHARS = ("&&", "||", ";", "|", "`", "$(")
           SCRIPT_RE = re.compile(r"([A-Za-z0-9_-]+\.(?:sh|py))")
@@ -840,7 +876,7 @@ jobs:
 
           if len(entries) != EXPECT_TOTAL:
               names = [find_script_name(h.get("args", []) or []) or "?" for _, h in entries]
-              fail.append(f"{len(entries)} entrée(s) VF posée(s), attendu {EXPECT_TOTAL} — présentes : {sorted(names)}")
+              fail.append(f"{len(entries)} entrée(s) VF posée(s), attendu {EXPECT_TOTAL} (dérivé de la fermeture) — présentes : {sorted(names)}")
 
           for path, h in entries:
               cmd = h.get("command", "")
