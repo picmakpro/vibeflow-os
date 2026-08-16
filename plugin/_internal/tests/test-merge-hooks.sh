@@ -902,26 +902,34 @@ FRAG_TP="$REPO/software-architecture/hooks/hooks.json"
 # ---------- Tp1 : plan avec --settings seul → 1 ligne stdout, rien écrit ----------
 TP1_DIR="$WORK/tp1"; mkdir -p "$TP1_DIR"
 S_TP1="$TP1_DIR/settings.json"
+# D-31-12 corollaire M-1 : compter le stdout BRUT (awk 'END{print NR}'), pas un filtre par
+# préfixe — un filtre par préfixe laisserait passer une fuite de diagnostic vers stdout (le
+# diagnostic "[merge-hooks] plan OK → …" DOIT rester sur stderr, D-31-05). On assert les deux :
+# le total de lignes stdout == nombre de cibles attendu, ET l'absence explicite de toute ligne
+# "[merge-hooks] " sur stdout (la fuite précise que la mutation de revue a exercée).
 TP1_OUT="$(bash "$MERGER" plan "$FRAG_TP" --settings "$S_TP1" --scripts-prefix "$PREFIX" 2>/dev/null)"
 TP1_EXIT=$?
-TP1_LINES="$(printf '%s\n' "$TP1_OUT" | awk '/^\[plan\] ~ /{c++} END{print c+0}')"
-if [ "$TP1_EXIT" -eq 0 ] && [ "$TP1_LINES" -eq 1 ] && [ ! -e "$S_TP1" ]; then
-  ok "Tp1 plan --settings seul : 1 ligne [plan] ~, settings.json absent du disque après coup"
+TP1_LINES="$(printf '%s\n' "$TP1_OUT" | awk 'END{print NR}')"
+TP1_LEAK="$(printf '%s\n' "$TP1_OUT" | awk '/^\[merge-hooks\] /{c++} END{print c+0}')"
+if [ "$TP1_EXIT" -eq 0 ] && [ "$TP1_LINES" -eq 1 ] && [ "$TP1_LEAK" -eq 0 ] && [ ! -e "$S_TP1" ]; then
+  ok "Tp1 plan --settings seul : 1 ligne stdout brute, aucune fuite [merge-hooks], settings.json absent du disque après coup"
 else
-  ko "Tp1 plan --settings seul (exit=$TP1_EXIT lignes=$TP1_LINES fichier=$([ -e "$S_TP1" ] && echo présent || echo absent))"
+  ko "Tp1 plan --settings seul (exit=$TP1_EXIT lignes=$TP1_LINES fuite=$TP1_LEAK fichier=$([ -e "$S_TP1" ] && echo présent || echo absent))"
 fi
 
 # ---------- Tp2 : plan avec --settings + --settings-local → 2 lignes stdout, rien écrit ----------
 TP2_DIR="$WORK/tp2"; mkdir -p "$TP2_DIR"
 S_TP2="$TP2_DIR/settings.json"
 L_TP2="$TP2_DIR/settings.local.json"
+# Même corollaire M-1 qu'en Tp1 : stdout brut, pas un filtre par préfixe, + garde de fuite.
 TP2_OUT="$(bash "$MERGER" plan "$FRAG_TP" --settings "$S_TP2" --scripts-prefix "$PREFIX" --settings-local "$L_TP2" 2>/dev/null)"
 TP2_EXIT=$?
-TP2_LINES="$(printf '%s\n' "$TP2_OUT" | awk '/^\[plan\] ~ /{c++} END{print c+0}')"
-if [ "$TP2_EXIT" -eq 0 ] && [ "$TP2_LINES" -eq 2 ] && [ ! -e "$S_TP2" ] && [ ! -e "$L_TP2" ]; then
-  ok "Tp2 plan --settings + --settings-local : 2 lignes [plan] ~, aucun des deux fichiers créé"
+TP2_LINES="$(printf '%s\n' "$TP2_OUT" | awk 'END{print NR}')"
+TP2_LEAK="$(printf '%s\n' "$TP2_OUT" | awk '/^\[merge-hooks\] /{c++} END{print c+0}')"
+if [ "$TP2_EXIT" -eq 0 ] && [ "$TP2_LINES" -eq 2 ] && [ "$TP2_LEAK" -eq 0 ] && [ ! -e "$S_TP2" ] && [ ! -e "$L_TP2" ]; then
+  ok "Tp2 plan --settings + --settings-local : 2 lignes stdout brutes, aucune fuite [merge-hooks], aucun des deux fichiers créé"
 else
-  ko "Tp2 plan --settings + --settings-local (exit=$TP2_EXIT lignes=$TP2_LINES)"
+  ko "Tp2 plan --settings + --settings-local (exit=$TP2_EXIT lignes=$TP2_LINES fuite=$TP2_LEAK)"
 fi
 
 # ---------- Tp3 : le répertoire cible entier est inchangé (forme locale de D-31-06) ----------
