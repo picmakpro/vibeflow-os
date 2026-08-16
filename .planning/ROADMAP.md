@@ -692,8 +692,21 @@ réels comme cas de test AVANT de choisir le mécanisme.
      est auditable (LOCK-05).
 
 **Transverse (QUAL-01)** : le guard naît bloquant déclaré, avec ses trois issues (dont fail-open
-BRUYANT si le lock est illisible — jamais un vert) et sa mutation rouge prouvée.
-**Plans**: TBD
+BRUYANT si le lock est illisible — jamais un vert) et sa mutation rouge prouvée. *Amendé au plan
+(D-32-QUAL, tranché par Samuel le 2026-08-16) : **quatre** issues, pas trois — PASS · DENY ·
+imparsable → fail-open silencieux · indisponible → fail-open bruyant ; le « bruyant » est réalisé
+par le marqueur de santé PLUS un hook doctor `SessionStart` générique livré dans la phase
+(plan 32-05, **abandonnable**).*
+
+**Plans**: 6 plans, 5 vagues
+
+Plans:
+- [ ] 32-01-PLAN.md — champs additifs `session_ids`/`generation` en JSON + observabilité de lease — vague 1 (LOCK-01, QUAL-01)
+- [ ] 32-02-PLAN.md — `takeover` + `reclaim` + journal append-only, retrait de l'auto-steal — vague 2 (LOCK-04, QUAL-01)
+- [ ] 32-03-PLAN.md — guard `PreToolUse` (Bash + Write|Edit) + deux entrées hooks armées — vague 3, **checkpoint humain** (LOCK-02, LOCK-03, QUAL-01)
+- [ ] 32-04-PLAN.md — convention de jeton de fence `Fence:` dans le contrat invariant du kernel — vague 3 (LOCK-05)
+- [ ] 32-05-PLAN.md — hook doctor `SessionStart` générique (lecteur des marqueurs de santé) — vague 4, **ABANDONNABLE, sacrifice désigné en premier** (QUAL-01)
+- [ ] 32-06-PLAN.md — bilan parc complet, version/journal du module, état réel de QUAL-01 — vague 5 (LOCK-01..05, QUAL-01)
 
 ### Phase 33: Watchdog & notifications des missions
 
