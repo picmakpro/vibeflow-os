@@ -1839,31 +1839,52 @@ _vf_uninstall_from_cache() {
   fi
 }
 
-# uninstall_module <mod> — routage sur le manifeste (D-31-09, 31-07) : le verbe le plus destructif
-# du moteur lit désormais ce qui a RÉELLEMENT été posé, au lieu de reconstruire depuis le cache
-# (faux dès que le module en a disparu). Trois issues, EXACTEMENT celles de vf_manifest_read —
-# aucune logique de suppression dupliquée ici, tout passe par _vf_uninstall_from_manifest /
-# _vf_uninstall_from_cache / vf_removable :
-#   0 (valide)    → chemin manifeste.
-#   1 (imparsable)→ ABSTENTION TOTALE sur les artefacts (D-31-07 : le doute ne supprime jamais).
-#                   vf_manifest_read a déjà loggué le motif ET l'abstention.
-#   2 (absent)    → repli gracieux : chemin cache INCHANGÉ (parc pré-Phase-31 toujours
-#                   désinstallable, jamais amputé).
-# Dans les TROIS cas : backup_module (déjà fait plus haut), remove_module_hooks, le retrait du
-# manifeste lui-même et mark_uninstalled restent au même endroit — ce ne sont pas des artefacts de
-# pose, la garde D-31-07 ne les concerne pas.
+# uninstall_module <mod> — routage sur le manifeste (D-31-09, 31-07, D-31-16) : le verbe le plus
+# destructif du moteur lit désormais ce qui a RÉELLEMENT été posé, au lieu de reconstruire depuis
+# le cache (faux dès que le module en a disparu). Trois issues côté vf_manifest_read, MAIS l'issue
+# 1 (imparsable) se subdivise à son tour (D-31-16, cf. 31-CONTEXT.md) :
+#   0 (valide)     → chemin manifeste (_vf_uninstall_from_manifest).
+#   2 (absent)     → repli gracieux historique : énumération de cache INCHANGÉE (parc pré-Phase-31
+#                    toujours désinstallable, jamais amputé).
+#   1 (imparsable) → le repli sur le cache NE CONSULTE PAS le manifeste : le risque que D-31-07
+#                    vise (supprimer sur la foi d'un manifeste qui désigne À TORT) n'existe pas sur
+#                    ce chemin. Donc SI le cache du module existe encore : même repli que 2, la
+#                    désinstallation ABOUTIT. SI le cache est ÉGALEMENT indisponible (aucune source
+#                    pour savoir quoi retirer) : REFUS explicite, aucun artefact touché, ET
+#                    l'entrée de registre est CONSERVÉE — jamais désenregistrer ce qu'on n'a pas su
+#                    retirer (invariante D-31-16). Sans ce refus, le module devient un fantôme
+#                    irrécupérable : plus dans le registre, mais encore sur disque, et plus aucun
+#                    moyen de relancer une désinstallation contre lui.
+# Dans les trois issues qui ABOUTISSENT (0, 2, et 1-avec-cache) : backup_module (déjà fait plus
+# haut), remove_module_hooks, le retrait du manifeste lui-même et mark_uninstalled restent au même
+# endroit — ce ne sont pas des artefacts de pose, la garde D-31-07 ne les concerne pas. Dans le cas
+# REFUSÉ (1-sans-cache), aucun de ces gestes n'a lieu : un module refusé reste un module installé à
+# tous égards (hooks, manifeste, registre), rejouable tel quel.
 uninstall_module() {
   local mod="$1"
   log "Désinstallation $mod (scope=$VF_SCOPE → $TARGET_ROOT)..."
   backup_module "$mod"
 
-  local manifest_rc=0 manifest_content=""
+  local manifest_rc=0 manifest_content="" refused=0
   manifest_content="$(vf_manifest_read "$mod")" || manifest_rc=$?
   case "$manifest_rc" in
     0) _vf_uninstall_from_manifest "$mod" "$manifest_content" ;;
     2) _vf_uninstall_from_cache "$mod" ;;
-    *) log "  désinstallation de $mod : manifeste imparsable — AUCUN artefact retiré (abstention, le doute ne supprime jamais)" ;;
+    *)
+      if [ -d "$CACHE_DIR/$mod" ]; then
+        log "  désinstallation de $mod : manifeste imparsable — repli sur l'énumération de cache (D-31-16), la désinstallation aboutit"
+        _vf_uninstall_from_cache "$mod"
+      else
+        log "  désinstallation de $mod : manifeste imparsable ET module absent du cache — AUCUNE source pour retirer les artefacts, REFUS (D-31-16), entrée de registre CONSERVÉE. Réessayez après avoir restauré une source (manifeste ou cache)."
+        refused=1
+      fi
+      ;;
   esac
+
+  if [ "$refused" -eq 1 ]; then
+    log "✗ $mod NON désinstallé (refus de sûreté — aucune source disponible pour retirer les artefacts)"
+    return 0
+  fi
 
   # Hooks de gouvernance (ADR-043) : retirer les entrées du module de settings.json.
   remove_module_hooks "$mod"

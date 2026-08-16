@@ -1472,8 +1472,19 @@ rm -rf "$LAB28" "$ATTACKER28"
 # T30 (= T22 du plan) — fichier tiers intact ET vf-portable.sh (lib partagée, condition (f))
 #      intact — cible de la mutation rouge de ce lot (condition (f) neutralisée dans vf_removable).
 # T31 (= T23 du plan) — manifeste absent : repli gracieux, chemin cache inchangé, pas d'amputation.
-# T32 (= T24 du plan) — manifeste imparsable : AUCUN artefact retiré, bruyant.
+# T32 (RÉÉCRIT, D-31-16, correction ciblée post-31-08) — manifeste imparsable + cache PRÉSENT : la
+#      désinstallation ABOUTIT via repli sur l'énumération de cache (le repli ne consulte pas le
+#      manifeste, le risque de D-31-07 n'existe pas sur ce chemin). L'énoncé original de ce test
+#      affirmait « AUCUN artefact retiré » comme comportement voulu — c'était la « désinstallation
+#      amputée » que D-31-09 interdit, doublée d'une impasse (module désenregistré mais fichiers
+#      encore sur disque, plus rejouable). Cf. 31-CONTEXT.md D-31-16.
 # T33 (= T25 du plan) — trace nettoyée : .vibeflow-manifest-<mod> absent après uninstall.
+# T34 (D-31-16, correction ciblée post-31-08) — manifeste imparsable + cache ÉGALEMENT indisponible :
+#      aucune source pour savoir quoi retirer ⇒ REFUS explicite, aucune suppression, entrée de
+#      registre CONSERVÉE (assertion de ligne EXACTE, grep -qxF, pas une sous-chaîne).
+# T35 (D-31-16, correction ciblée post-31-08) — invariante générale assertée DIRECTEMENT sur les
+#      deux sous-cas imparsables : jamais la conjonction « registre désenregistré ET fichiers du
+#      module encore présents ».
 # ===========================================================================
 
 # ---------------------------------------------------------------------------
@@ -1576,31 +1587,71 @@ fi
 rm -rf "$LAB31"
 
 # ---------------------------------------------------------------------------
-# T32 — manifeste IMPARSABLE (ligne corrompue injectée) : AUCUN artefact retiré (les deux moitiés
-# du contrat — bruyant ET non destructif — comme à la convergence, 31-CONTEXT.md §4 point 3).
+# T32 (RÉÉCRIT, D-31-16) — manifeste IMPARSABLE + cache PRÉSENT (scénario (i) du mandat de
+# correction) : repli sur l'énumération de cache, la désinstallation ABOUTIT — fichiers retirés,
+# registre désenregistré, message bruyant expliquant le repli. Le repli ne consulte PAS le
+# manifeste : le risque de D-31-07 (suppression sur la foi d'un manifeste qui désigne À TORT)
+# n'existe pas sur ce chemin.
 # ---------------------------------------------------------------------------
 LAB32="$(mktemp -d)"
 CACHE32="$LAB32/cache"
 if prepare_module "$CACHE32" "software-architecture"; then
   (cd "$LAB32" && VIBEFLOW_CACHE="$CACHE32" bash "$INSTALLER" install software-architecture >/dev/null 2>&1)
+  T32_REGISTRY="$LAB32/.claude/scripts/.vibeflow-installed"
   T32_MANIFEST="$LAB32/.claude/scripts/.vibeflow-manifest-software-architecture"
   printf '/etc/passwd\n' >> "$T32_MANIFEST"
   T32_OUT="$(mktemp)"
   (cd "$LAB32" && VIBEFLOW_CACHE="$CACHE32" bash "$INSTALLER" uninstall software-architecture) >"$T32_OUT" 2>&1
   T32_RC=$?
   if [ "$T32_RC" -eq 0 ] \
-     && [ -f "$LAB32/.claude/skills/software-architecture/SKILL.md" ] \
+     && [ ! -f "$LAB32/.claude/skills/software-architecture/SKILL.md" ] \
      && "$GREP" -q "inutilisable" "$T32_OUT" \
-     && "$GREP" -qF "AUCUN artefact retiré" "$T32_OUT"; then
-    ok "T32 : manifeste imparsable — AUCUN artefact retiré (bruyant ET non destructif)"
+     && "$GREP" -qF "repli sur l'énumération de cache" "$T32_OUT" \
+     && ! "$GREP" -qE "^software-architecture=" "$T32_REGISTRY" 2>/dev/null; then
+    ok "T32 : manifeste imparsable + cache présent — désinstallation ABOUTIT (fichiers retirés, registre désenregistré, repli bruyant) — D-31-16 scénario (i)"
   else
-    ko "T32 : manifeste imparsable non conforme (rc=$T32_RC) — voir $T32_OUT"
+    ko "T32 : scénario (i) D-31-16 non conforme (rc=$T32_RC) — voir $T32_OUT"
   fi
   rm -f "$T32_OUT"
 else
   skip "T32 : software-architecture non copiable dans le cache de test"
 fi
 rm -rf "$LAB32"
+
+# ---------------------------------------------------------------------------
+# T34 (D-31-16) — manifeste IMPARSABLE + cache ÉGALEMENT indisponible (scénario (ii) du mandat) :
+# aucune source pour savoir quoi retirer ⇒ REFUS explicite, AUCUNE suppression, entrée de registre
+# CONSERVÉE. L'assertion qui compte : ligne EXACTE (grep -qxF sur la ligne "mod=version" capturée
+# AVANT l'uninstall), pas une sous-chaîne. Mieux vaut un module « toujours installé » qu'un module
+# fantôme irrécupérable (D-31-16, 31-CONTEXT.md).
+# ---------------------------------------------------------------------------
+LAB34="$(mktemp -d)"
+CACHE34="$LAB34/cache"
+if prepare_module "$CACHE34" "software-architecture"; then
+  (cd "$LAB34" && VIBEFLOW_CACHE="$CACHE34" bash "$INSTALLER" install software-architecture >/dev/null 2>&1)
+  T34_REGISTRY="$LAB34/.claude/scripts/.vibeflow-installed"
+  T34_LINE="$("$GREP" -E '^software-architecture=' "$T34_REGISTRY" 2>/dev/null)"
+  T34_MANIFEST="$LAB34/.claude/scripts/.vibeflow-manifest-software-architecture"
+  printf '/etc/passwd\n' >> "$T34_MANIFEST"
+  rm -rf "$CACHE34/software-architecture"
+  T34_OUT="$(mktemp)"
+  (cd "$LAB34" && VIBEFLOW_CACHE="$CACHE34" bash "$INSTALLER" uninstall software-architecture) >"$T34_OUT" 2>&1
+  T34_RC=$?
+  if [ -n "$T34_LINE" ] \
+     && [ "$T34_RC" -eq 0 ] \
+     && [ -f "$LAB34/.claude/skills/software-architecture/SKILL.md" ] \
+     && "$GREP" -qF "REFUS" "$T34_OUT" \
+     && "$GREP" -qF "CONSERVÉE" "$T34_OUT" \
+     && "$GREP" -qxF "$T34_LINE" "$T34_REGISTRY"; then
+    ok "T34 : manifeste imparsable + cache absent — REFUS explicite, AUCUNE suppression, entrée de registre CONSERVÉE (D-31-16 scénario (ii))"
+  else
+    ko "T34 : scénario (ii) D-31-16 non conforme (rc=$T34_RC, ligne registre attendue=[$T34_LINE]) — voir $T34_OUT"
+  fi
+  rm -f "$T34_OUT"
+else
+  skip "T34 : software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB34"
 
 # ---------------------------------------------------------------------------
 # T33 — trace nettoyée : .vibeflow-manifest-software-architecture n'existe plus après un
@@ -1620,6 +1671,41 @@ else
   skip "T33 : software-architecture non copiable dans le cache de test"
 fi
 rm -rf "$LAB33"
+
+# ---------------------------------------------------------------------------
+# T35 (D-31-16) — invariante GÉNÉRALE, assertion DIRECTE (scénario (iv) du mandat) : sur les deux
+# sous-cas imparsables (cache présent / cache absent), on n'observe JAMAIS la conjonction
+# « registre désenregistré ET fichiers du module encore présents » — la désinstallation amputée
+# que D-31-09 interdit.
+# ---------------------------------------------------------------------------
+t35_invariant() {
+  local label="$1" drop_cache="$2"
+  local lab cache manifest registry file_present registry_present
+  lab="$(mktemp -d)"; cache="$lab/cache"
+  if ! prepare_module "$cache" "software-architecture"; then
+    skip "T35 ($label) : software-architecture non copiable dans le cache de test"
+    rm -rf "$lab"
+    return 0
+  fi
+  (cd "$lab" && VIBEFLOW_CACHE="$cache" bash "$INSTALLER" install software-architecture >/dev/null 2>&1)
+  manifest="$lab/.claude/scripts/.vibeflow-manifest-software-architecture"
+  registry="$lab/.claude/scripts/.vibeflow-installed"
+  printf '/etc/passwd\n' >> "$manifest"
+  [ "$drop_cache" = "1" ] && rm -rf "$cache/software-architecture"
+  (cd "$lab" && VIBEFLOW_CACHE="$cache" bash "$INSTALLER" uninstall software-architecture) >/dev/null 2>&1
+  file_present=0; registry_present=0
+  [ -f "$lab/.claude/skills/software-architecture/SKILL.md" ] && file_present=1
+  "$GREP" -qE "^software-architecture=" "$registry" 2>/dev/null && registry_present=1
+  # Invariante : JAMAIS (registry_present == 0 ET file_present == 1).
+  if [ "$registry_present" -eq 1 ] || [ "$file_present" -eq 0 ]; then
+    ok "T35 ($label) : invariante D-31-16 respectée — jamais désenregistré avec fichiers du module encore présents"
+  else
+    ko "T35 ($label) : VIOLATION — registre désenregistré ALORS QUE les fichiers du module sont encore présents"
+  fi
+  rm -rf "$lab"
+}
+t35_invariant "cache présent" 0
+t35_invariant "cache absent" 1
 
 # ---------------------------------------------------------------------------
 # T0 — anti-vert-à-vide (contrat F13) : la suite doit compter au moins une assertion.

@@ -188,3 +188,83 @@ concerne pas. Si cette lecture est fausse et qu'un manifeste imparsable doit int
 « installé »), c'est un correctif ciblé d'une ligne (`return` après le `case`) — signalé plutôt
 que tranché seul, car cela change si un module au manifeste corrompu reste ou non « installé » au
 sens du registre.
+
+## Addendum — correction ciblée D-31-16 (post-31-08, arbitrage tranché par Samuel)
+
+La zone grise ci-dessus s'est révélée être un vrai défaut, reproduit par le manager sur un lab
+réel : `uninstall` sur un manifeste imparsable laissait les fichiers du module sur disque (17 → 24
+fichiers, l'écart étant les copies de backup), retirait l'entrée du registre, et rendait rc=0.
+L'utilisateur gardait des orphelins et perdait tout moyen de les retirer — le module n'étant plus
+enregistré, `uninstall` ne pouvait plus être rejoué contre lui. C'est la « désinstallation
+amputée » que D-31-09 interdit, doublée d'une impasse.
+
+**D-31-16** (tranchée par Samuel, substance dans `31-CONTEXT.md`) : le registre n'est
+désenregistré que si les fichiers ont réellement été retirés.
+
+- manifeste valide ⇒ il fait foi (inchangé) ;
+- manifeste absent OU imparsable ⇒ bruyant, puis repli sur l'énumération de cache — exactement le
+  repli déjà en place pour l'absence. La désinstallation ABOUTIT ;
+- cache également indisponible ⇒ refus explicite, l'entrée de registre est CONSERVÉE.
+
+Motif : le repli sur le cache ne consulte pas le manifeste — le risque que D-31-07 vise (supprimer
+sur la foi d'un manifeste qui désigne à tort) n'existe pas sur ce chemin. Traiter « imparsable »
+plus sévèrement qu'« absent » n'achetait aucune sûreté et coûtait la récupérabilité.
+
+### Changement de code
+
+`uninstall_module` (`plugin/_internal/vibeflow-update.sh`) : l'issue 1 (imparsable) de
+`vf_manifest_read` se subdivise désormais en deux sous-cas :
+- `[ -d "$CACHE_DIR/$mod" ]` vrai → repli sur `_vf_uninstall_from_cache` (même chemin que l'issue
+  2, désinstallation aboutit) ;
+- sinon → `refused=1`, la fonction retourne avant `remove_module_hooks`, le retrait du fichier
+  manifeste et `mark_uninstalled` : un module refusé reste installé à tous égards (hooks,
+  manifeste, registre), rejouable tel quel après restauration d'une source.
+
+Ceci répond explicitement à la zone grise de la section précédente : le mandat original disait
+« retourner » sur manifeste imparsable — l'interprétation initiale (les 3 gestes finaux
+inconditionnels) est remplacée par un retour véritable, mais seulement dans le sous-cas où aucune
+source de repli n'existe. Quand le cache existe encore, les 3 gestes restent inconditionnels
+(même logique qu'avant, alignée sur les issues 0/2).
+
+### Scénarios mesurés avant/après
+
+| Scénario | Avant (défaut) | Après (D-31-16) |
+|---|---|---|
+| (i) imparsable + cache présent | rc=0, fichiers SUR DISQUE, registre désenregistré, message "AUCUN artefact retiré" | rc=0, fichiers RETIRÉS, registre désenregistré, message "repli sur l'énumération de cache" |
+| (ii) imparsable + cache absent | rc=0, fichiers SUR DISQUE, registre désenregistré (fantôme irrécupérable) | rc=0, fichiers intacts, registre CONSERVÉ (`grep -qxF` sur la ligne exacte), message "REFUS" + "CONSERVÉE" |
+| (iii) absent + cache présent | inchangé (T31) | inchangé (T31, non-régression vérifiée) |
+| (iv) invariante générale | violée sur (i) ET (ii) (mesuré, voir mutation ci-dessous) | jamais violée (T35, assertion directe) |
+
+### Tests neufs / réécrits — trace du rouge
+
+`test-manifest.sh` : T32 réécrit (l'ancien énoncé affirmait à tort « AUCUN artefact retiré » comme
+comportement voulu pour imparsable+cache-présent — c'était précisément le défaut), + T34 (scénario
+(ii)), + T35 (invariante générale, 2 sous-cas).
+
+Rouge sans le correctif (code AVANT ce lot, tests APRÈS — mesuré en isolant `vibeflow-update.sh`
+via `git stash` puis en le restaurant) :
+```
+✗ T32 : scénario (i) D-31-16 non conforme (rc=0)
+✗ T34 : scénario (ii) D-31-16 non conforme (rc=0, ligne registre attendue=[software-architecture=v1.6.0])
+✗ T35 (cache présent) : VIOLATION — registre désenregistré ALORS QUE les fichiers du module sont encore présents
+✗ T35 (cache absent) : VIOLATION — registre désenregistré ALORS QUE les fichiers du module sont encore présents
+== résultat : 58 OK / 4 KO / 0 SKIP ==
+```
+Restauré (`git stash pop`) : `== résultat : 62 OK / 0 KO / 0 SKIP ==` (59 → 62, +3 nets : T32
+réécrit ne change pas le compte, T34 et T35×2 ajoutent 3 assertions).
+
+### Non-régression
+
+- `test-manifest.sh` : 62 OK / 0 KO / 0 SKIP.
+- `test-vibeflow-update.sh` : 19 OK / 0 KO / 0 SKIP (inchangé).
+- `test-merge-hooks.sh` : 34 OK · 0 KO (inchangé).
+- Gates nus : `scripts/check-machine-paths.sh` → 0, `scripts/check-version-sync.sh` → 0.
+
+### Ce que je n'ai PAS fait
+
+Je n'ai pas touché aux hooks de gouvernance ni au retrait du fichier manifeste dans le sous-cas
+refusé : les deux restent en place (module toujours installé à tous égards). Si le manager
+souhaite un signal différent (ex. rc≠0 propagé jusqu'à l'appelant `uninstall --all`), c'est un
+arbitrage distinct — `uninstall_module` rend `0` dans tous les cas pour ne pas faire avorter la
+boucle `--all` sous `set -e` sur un refus isolé (un seul module refusé ne doit pas empêcher la
+désinstallation des autres). Signalé, pas tranché seul.
