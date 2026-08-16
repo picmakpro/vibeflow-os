@@ -16,7 +16,12 @@ humain consommé hors les trois arbitrages explicitement demandés à Samuel.
 | `issue20-draft` | **done** — `31-ISSUE-20-REPLY.md`, 146 lignes, **DRAFT sur disque, jamais posté** |
 | `docs` | done — STATE/ROADMAP/REQUIREMENTS réalignés, compteurs README constatés justes |
 
-**Découverte COMPLÈTE des suites** (pattern CI) : **62 suites, 0 échec**.
+**Mesure de clôture — découverte COMPLÈTE, exécutée EN PLACE dans le dépôt** (ce que fait la CI) :
+`TERMINE executees=62 total=62 echecs=0`. Arbre suivi vérifié **identique à HEAD** avant mesure.
+**Recoupement par une seconde méthode** (`git archive` dans un extrait isolé) : 62/62 avec **1**
+échec — `scripts/tests/test-check-machine-paths.sh`, exactement la suite qui interroge **git** et
+qu'un extrait sans `.git` fait rougir à tort (**19/19 en place**). Les deux mesures ne diffèrent que
+par cet artefact connu : c'est la meilleure confirmation qu'il en est un.
 `test-manifest.sh` **62 assertions** (créée par cette phase, 5 → 62) · `test-merge-hooks.sh` 34 ·
 `test-vibeflow-update.sh` 19 · `test-design-orchestrator.sh` 24. Gates lancés **nus** : 0 / 0.
 
