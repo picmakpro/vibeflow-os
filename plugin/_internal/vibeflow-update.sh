@@ -238,6 +238,84 @@ vf_manifest_excluded() {
   return 1
 }
 
+# ---------- Lecteur validant du manifeste (D-31-07, 31-05) ----------
+# Le manifeste sur disque est une entrée NON FIABLE (éditable à la main, corruptible, CRLF-mangée
+# par un outil Windows — 31-RESEARCH.md § Security Domain, V5 Input Validation). Ces deux fonctions
+# sont le SEUL point d'entrée en lecture pour la convergence MANI-03 : un refus ici interdit toute
+# suppression en aval — jamais une confiance ligne à ligne partielle.
+
+# vf_manifest_valid <fichier> — parcourt le fichier ligne à ligne (while IFS= read -r, patron de
+# cleanup_retired_modules) et applique les 4 contrôles de D-31-07, DANS CET ORDRE, par ligne :
+#   1. ligne vide après strip du \r
+#   2. octet de retour chariot résiduel (le \r n'a pas suffi à vider la ligne — cas 1 déjà écarté)
+#   3. chemin absolu (la ligne strippée commence par une barre oblique)
+#   4. segment ".." isolé (entre deux séparateurs, en tête ou en fin — jamais une sous-chaîne :
+#      "..foo" et "foo.." ne sont PAS ce motif, seul un ".." qui est son PROPRE segment l'est ;
+#      détecté en encadrant la ligne strippée de barres obliques et en cherchant "/../")
+# Au premier échec : `log` le motif ET le numéro de ligne fautif, retourne 1 SANS continuer. Le
+# refus est GLOBAL — une ligne fautive invalide tout le fichier, jamais un filtrage ligne à ligne :
+# c'est exactement ce qu'une confiance partielle laisserait passer face à un CRLF injecté.
+#
+# Le contrôle du \r est un REJET, jamais un nettoyage silencieux : un manifeste CRLF-mangé signale
+# que quelque chose d'autre l'a réécrit (leçon Windows, Phase 30) — le nettoyer en silence
+# masquerait la cause au lieu de la signaler.
+vf_manifest_valid() {
+  local file="$1"
+  local line lineno=0 stripped
+  while IFS= read -r line || [ -n "$line" ]; do
+    lineno=$((lineno + 1))
+    stripped="${line%$'\r'}"
+    if [ -z "$stripped" ]; then
+      log "  manifeste imparsable : ligne vide (ligne $lineno)"
+      return 1
+    fi
+    case "$line" in
+      *$'\r')
+        log "  manifeste imparsable : octet de retour chariot résiduel (ligne $lineno)"
+        return 1
+        ;;
+    esac
+    case "$stripped" in
+      /*)
+        log "  manifeste imparsable : chemin absolu (ligne $lineno)"
+        return 1
+        ;;
+    esac
+    case "/$stripped/" in
+      */../*)
+        log "  manifeste imparsable : segment .. (ligne $lineno)"
+        return 1
+        ;;
+    esac
+  done < "$file"
+  return 0
+}
+
+# vf_manifest_read <mod> — résout $(vf_manifest_path "$mod") et rend 3 codes de retour distincts :
+#   0 = manifeste VALIDE : les lignes sont émises sur stdout de la fonction (comme `cat`).
+#   1 = manifeste IMPARSABLE : vf_manifest_valid a déjà loggué le motif et le numéro de ligne
+#       fautifs ci-dessus ; cette fonction ajoute une ligne d'ABSTENTION EXPLICITE. Rien sur
+#       stdout — aucune suppression ne doit pouvoir s'appuyer sur ce fichier.
+#   2 = manifeste ABSENT : repli gracieux, JAMAIS une erreur — un parc installé avant cette phase
+#       n'a aucun manifeste et ne doit pas rougir le jour d'un update (D-31-07). Rien sur stdout ;
+#       le manifeste sera écrit à l'occasion, l'update suivant converge.
+# Le refus est GLOBAL, jamais ligne à ligne : délégué entièrement à vf_manifest_valid.
+vf_manifest_read() {
+  local mod="$1"
+  local file
+  file="$(vf_manifest_path "$mod")"
+  if [ ! -f "$file" ]; then
+    log "  manifeste absent pour $mod — aucune convergence à cet update, il sera écrit à l'occasion"
+    return 2
+  fi
+  if ! vf_manifest_valid "$file"; then
+    log "  manifeste de $mod inutilisable — AUCUNE suppression ne sera faite"
+    return 1
+  fi
+  cat "$file"
+  return 0
+}
+
 # Réduction textuelle des segments "." / ".." / "//" — SANS realpath (ADR-054 l'interdit).
 # Implémentation privée de vf_rel_to_target, pas un des 7 points d'API du socle manifeste.
 _vf_normalize_path() {
