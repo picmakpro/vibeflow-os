@@ -62,6 +62,23 @@ meta_drop_key() {
   [ -f "$meta" ] && sed -i.bak "/^${key}=/d" "$meta" 2>/dev/null && rm -f "${meta}.bak"
 }
 
+# Recule acquired_epoch d'un lock existant d'un nombre de secondes donné, SANS toucher
+# heartbeat_epoch — c'est précisément la dissociation lease/battement que LOCK-01 doit rendre
+# observable (D-32-01). Aucune attente temporelle : l'epoch est FORGÉ, jamais attendu (un cas
+# sleep-dépendant est flaky en CI, et il l'est silencieusement). Même motif qu'age_stale : les cas
+# ne connaissent jamais le protocole interne, seul ce helper l'édite.
+lease_backdate() {
+  local lock="$1" secs="$2" meta old
+  if [ -L "$lock" ]; then
+    meta="$(dirname "$lock")/$(readlink "$lock")/meta"
+  else
+    meta="$lock/meta"
+  fi
+  [ -f "$meta" ] || return 1
+  old=$(( $(date +%s) - secs ))
+  sed -i.bak "s/^acquired_epoch=.*/acquired_epoch=$old/" "$meta" && rm -f "${meta}.bak"
+}
+
 echo "=== T1 — acquisition franche ==="
 out=$("$SCRIPT" acquire --owner=A --step=phase-9); rc=$?
 assert "T1.1 — acquired true" "$out" '"acquired": true'
@@ -225,6 +242,55 @@ assert_exit "T20.1 — exit 0" "$rc" 0
 assert "T20.2 — generation présente dans la sortie d'acquire" "$out" '"generation": "DRIVER.lock.gen.'
 assert "T20.3 — session_ids présent dans la sortie d'acquire" "$out" '"session_ids": ["sess-t20"]'
 json_ok "$out"; assert_exit "T20.4 — JSON acquire valide" $? 0
+"$SCRIPT" release --owner=A >/dev/null 2>&1
+
+echo "=== T21 — lease_seconds observable, dissociée du battement (D-32-01) ==="
+"$SCRIPT" release --owner=A >/dev/null 2>&1
+rm -rf "$VF_DRIVER_LOCK"
+"$SCRIPT" acquire --owner=A --step=t21 >/dev/null
+lease_backdate "$VF_DRIVER_LOCK" 5000
+st=$("$SCRIPT" status)
+_t21_lease=$(printf '%s' "$st" | python3 -c 'import json,sys; print(json.load(sys.stdin)["lease_seconds"])')
+_t21_age=$(printf '%s' "$st" | python3 -c 'import json,sys; print(json.load(sys.stdin)["age_seconds"])')
+if [ "$_t21_lease" -ge 5000 ]; then echo "  ✅ PASS — T21.1 — lease_seconds >= 5000"; PASS=$((PASS+1)); else echo "  ❌ FAIL — T21.1 — lease_seconds >= 5000"; echo "     obtenu: $_t21_lease"; FAIL=$((FAIL+1)); fi
+if [ "$_t21_age" -lt 60 ]; then echo "  ✅ PASS — T21.2 — age_seconds < 60 (heartbeat resté frais)"; PASS=$((PASS+1)); else echo "  ❌ FAIL — T21.2 — age_seconds < 60"; echo "     obtenu: $_t21_age"; FAIL=$((FAIL+1)); fi
+assert "T21.3 — stale false malgré la lease reculée" "$st" '"stale": false'
+
+echo "=== T22 — heartbeat ne remet PAS la lease à zéro ==="
+"$SCRIPT" heartbeat --owner=A >/dev/null
+st=$("$SCRIPT" status)
+_t22_lease=$(printf '%s' "$st" | python3 -c 'import json,sys; print(json.load(sys.stdin)["lease_seconds"])')
+if [ "$_t22_lease" -ge 5000 ]; then echo "  ✅ PASS — T22.1 — lease_seconds toujours >= 5000 après heartbeat"; PASS=$((PASS+1)); else echo "  ❌ FAIL — T22.1 — lease_seconds toujours >= 5000 après heartbeat"; echo "     obtenu: $_t22_lease"; FAIL=$((FAIL+1)); fi
+assert "T22.2 — stale false" "$st" '"stale": false'
+
+echo "=== T23 — contrainte dure : une lease de 999999s avec heartbeat frais n'est JAMAIS périmée ==="
+"$SCRIPT" release --owner=A >/dev/null 2>&1
+rm -rf "$VF_DRIVER_LOCK"
+"$SCRIPT" acquire --owner=A --step=t23 >/dev/null
+lease_backdate "$VF_DRIVER_LOCK" 999999
+"$SCRIPT" heartbeat --owner=A >/dev/null
+st=$("$SCRIPT" status)
+assert "T23.1 — stale false malgré une lease de 999999s" "$st" '"stale": false'
+out=$("$SCRIPT" acquire --owner=OTHER --step=steal); rc=$?
+assert "T23.2 — acquire d'un AUTRE owner refusé (held), pas volé pour ancienneté" "$out" '"reason": "held"'
+assert_exit "T23.3 — exit 1" "$rc" 1
+
+echo "=== T24 — TTL par défaut inchangé (1800) ==="
+st=$("$SCRIPT" status)
+assert "T24.1 — ttl 1800 sur lock frais, sans surcharge d'environnement" "$st" '"ttl": 1800'
+"$SCRIPT" release --owner=A >/dev/null 2>&1
+
+echo "=== T25 — rétrocompatibilité : meta sans acquired_epoch → lease_seconds null ==="
+rm -rf "$VF_DRIVER_LOCK"
+"$SCRIPT" acquire --owner=A --step=t25 >/dev/null
+meta_drop_key "$VF_DRIVER_LOCK" acquired_epoch
+_t25_gen="$(readlink "$VF_DRIVER_LOCK")"
+_t25_n=$(grep -c '^acquired_epoch=' "$(dirname "$VF_DRIVER_LOCK")/$_t25_gen/meta")
+num_eq "T25.0 — (SE-7) fixture: la ligne acquired_epoch= est réellement absente" "$_t25_n" 0
+st=$("$SCRIPT" status); rc=$?
+assert_exit "T25.1 — status exit 0 sur lock sans acquired_epoch" "$rc" 0
+assert "T25.2 — lease_seconds null (jamais un 0 trompeur)" "$st" '"lease_seconds": null'
+assert "T25.3 — stale reste calculé normalement (heartbeat frais)" "$st" '"stale": false'
 "$SCRIPT" release --owner=A >/dev/null 2>&1
 
 echo ""

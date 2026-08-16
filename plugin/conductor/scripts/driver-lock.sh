@@ -112,6 +112,20 @@ lock_age() {
   echo "$(( $(now) - hb ))"
 }
 
+# Age de la LEASE (D-32-01) : depuis combien de temps CETTE mission tient le lock, independamment
+# de son dernier battement. INFORMATIONNEL SEUL — n'entre dans AUCUN calcul de peremption ni dans
+# AUCUN refus. Une borne de duree totale sur la lease contredirait frontalement « lock perime !=
+# mission morte » : ce serait ouvrir le mode de defaillance symetrique de celui que cette phase
+# existe pour fermer (une mission longue mais vivante ne doit jamais etre volee au motif de son
+# anciennete — lock_age()/TTL/stale restent adosses au SEUL heartbeat_epoch, sans changement ici).
+# Absente/non numerique -> la fonction n'emet RIEN et rend non nul, l'appelant rend alors `null`
+# en JSON — jamais un 0, qui se lirait faussement « lease posee a l'instant ».
+lease_age() {
+  local ap; ap="$(meta_get acquired_epoch)"
+  case "$ap" in ''|*[!0-9]*) return 1 ;; esac
+  echo "$(( $(now) - ap ))"
+}
+
 # Presence du lock, quelle que soit sa forme : lien (nominal) ou dossier reel (lock legacy pose
 # par une version anterieure, ou dossier nu cree a la main). Les deux doivent rester gerables,
 # sinon une mise a jour du script gelerait les sessions en cours.
@@ -187,12 +201,13 @@ json_status() {
   if [ "$1" = false ]; then
     printf '{"present": false, "lock": "%s"}\n' "$LOCK_DIR"; return
   fi
-  local o s age stale gen sids
+  local o s age stale gen sids lease
   o="$(meta_get owner)"; s="$(meta_get step)"; age="$(lock_age)"
   [ "$age" -gt "$TTL" ] && stale=true || stale=false
   gen="$(lock_gen)"; sids="$(json_session_ids "$(lock_session_ids)")"
-  printf '{"present": true, "owner": "%s", "step": "%s", "age_seconds": %s, "ttl": %s, "stale": %s, "generation": "%s", "session_ids": %s}\n' \
-    "$o" "$s" "$age" "$TTL" "$stale" "$gen" "$sids"
+  lease="$(lease_age)" && : || lease="null"  # lease_age() echoue -> null JSON, jamais un 0 trompeur
+  printf '{"present": true, "owner": "%s", "step": "%s", "age_seconds": %s, "ttl": %s, "stale": %s, "generation": "%s", "session_ids": %s, "lease_seconds": %s}\n' \
+    "$o" "$s" "$age" "$TTL" "$stale" "$gen" "$sids" "$lease"
 }
 
 require_owner() {
@@ -207,8 +222,9 @@ case "$ACTION" in
     #    deja complet.
     gen="$(new_generation)" || { echo '{"acquired": false, "reason": "generation-failed"}'; exit 1; }
     if ln_atomic "$gen" "$LOCK_DIR"; then
-      printf '{"acquired": true, "owner": "%s", "step": "%s", "recovered": false, "generation": "%s", "session_ids": %s}\n' \
-        "$OWNER" "$STEP" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")"
+      _lease="$(lease_age)" && : || _lease="null"
+      printf '{"acquired": true, "owner": "%s", "step": "%s", "recovered": false, "generation": "%s", "session_ids": %s, "lease_seconds": %s}\n' \
+        "$OWNER" "$STEP" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")" "$_lease"
       exit 0
     fi
     # 2. OCCUPE — notre generation ne sert pas encore ; on la garde pour une eventuelle
@@ -220,8 +236,9 @@ case "$ACTION" in
         # meme owner : ré-acquisition idempotente (rafraichit heartbeat, maj etape si fournie)
         [ -z "$STEP" ] && STEP="$(meta_get step)"
         rewrite_meta "$(now)"
-        printf '{"acquired": true, "owner": "%s", "step": "%s", "reentrant": true, "generation": "%s", "session_ids": %s}\n' \
-          "$OWNER" "$STEP" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")"
+        _lease="$(lease_age)" && : || _lease="null"
+        printf '{"acquired": true, "owner": "%s", "step": "%s", "reentrant": true, "generation": "%s", "session_ids": %s, "lease_seconds": %s}\n' \
+          "$OWNER" "$STEP" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")" "$_lease"
         exit 0
       fi
       printf '{"acquired": false, "reason": "held", "held_by": "%s", "age_seconds": %s}\n' "$held" "$age"
