@@ -131,6 +131,150 @@ mark_uninstalled() {
   fi
 }
 
+# ---------- Manifeste de pose (D-31-01/02/03, Phase 31 vague TRACER) ----------
+# Le manifeste est le SOUS-PRODUIT de la pose : vf_place_file écrit ET consigne dans le même
+# appel (via vf_record), jamais une énumération séparée du cache (Pitfall 1, 31-RESEARCH.md).
+# Format : un chemin par ligne, relatif à TARGET_ROOT, LF, trié LC_ALL=C, jamais de répertoire.
+
+vf_manifest_path() {
+  local mod="$1"
+  echo "$TARGET_ROOT/scripts/.vibeflow-manifest-$mod"
+}
+
+# Liste close des artefacts qu'un module NE possède PAS exclusivement (D-31-03). Point UNIQUE
+# de définition — ne jamais dupliquer ces motifs ailleurs dans le fichier.
+vf_manifest_excluded() {
+  local relpath="$1"
+  case "$relpath" in
+    scripts/vf-portable.sh)       return 0 ;;  # propriété exclusive de l'engine (copy_engine_lib), partagée entre modules
+    memory/*)                     return 0 ;;  # contenu vivant du lab semé par seed-registres.sh, pas un artefact de pose
+    scripts/.vibeflow-installed)  return 0 ;;  # état du moteur, pas contenu de module
+    scripts/.vibeflow-manifest-*) return 0 ;;  # le manifeste ne se consigne jamais lui-même (boucle de convergence)
+    .backups/*)                   return 0 ;;  # filet de sécurité, jamais candidat à suppression automatique
+  esac
+  return 1
+}
+
+# Réduction textuelle des segments "." / ".." / "//" — SANS realpath (ADR-054 l'interdit).
+# Implémentation privée de vf_rel_to_target, pas un des 7 points d'API du socle manifeste.
+_vf_normalize_path() {
+  local path="$1"
+  local abs=0
+  case "$path" in
+    /*) abs=1 ;;
+  esac
+  local seg result i n=0
+  local -a out=()
+  local IFS=/
+  set -f
+  local -a parts
+  parts=($path)
+  set +f
+  unset IFS
+  for seg in "${parts[@]}"; do
+    case "$seg" in
+      ""|".") continue ;;
+      "..")
+        if [ "$n" -gt 0 ]; then
+          n=$((n - 1))
+        fi
+        ;;
+      *)
+        out[$n]="$seg"
+        n=$((n + 1))
+        ;;
+    esac
+  done
+  result=""
+  i=0
+  while [ "$i" -lt "$n" ]; do
+    result="$result/${out[$i]}"
+    i=$((i + 1))
+  done
+  if [ "$abs" -eq 1 ]; then
+    [ -n "$result" ] || result="/"
+    printf '%s\n' "$result"
+  else
+    printf '%s\n' "${result#/}"
+  fi
+}
+
+# Normalise <chemin_dest> et émet sa forme relative à TARGET_ROOT sur stdout ; rc=1 si le
+# chemin ne résout PAS sous TARGET_ROOT (cas docs/<mod>/, 636-641, hors manifeste par D-31-03 —
+# ce n'est pas une erreur, ce chemin sort du manifeste, pas de la pose).
+vf_rel_to_target() {
+  local dest="$1"
+  local norm_dest norm_target
+  norm_dest="$(_vf_normalize_path "$dest")"
+  norm_target="$(_vf_normalize_path "$TARGET_ROOT")"
+  case "$norm_dest" in
+    "$norm_target"/*)
+      printf '%s\n' "${norm_dest#$norm_target/}"
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+# Consigne <chemin_dest> dans l'accumulateur courant si (a) il résout sous TARGET_ROOT et
+# (b) il n'est pas dans la liste close d'exclusions. Silencieux dans les deux autres cas —
+# ce n'est jamais une erreur, seulement une exclusion volontaire du manifeste.
+vf_record() {
+  local dest="$1"
+  local rel
+  rel="$(vf_rel_to_target "$dest")" || return 0
+  vf_manifest_excluded "$rel" && return 0
+  printf '%s\n' "$rel" >> "$VF_MANIFEST_TMP"
+}
+
+# Ouvre un accumulateur neuf pour <mod>. Appelé au début d'install_module.
+vf_manifest_reset() {
+  local mod="$1"
+  local manifest_dir
+  manifest_dir="$(dirname "$(vf_manifest_path "$mod")")"
+  mkdir -p "$manifest_dir"
+  VF_MANIFEST_MOD="$mod"
+  VF_MANIFEST_TMP="$manifest_dir/.vibeflow-manifest-${mod}.tmp.$$"
+  : > "$VF_MANIFEST_TMP"
+}
+
+# Trie l'accumulateur (LC_ALL=C sort -u), l'écrit atomiquement (tmp + mv, patron
+# mark_installed:115-124) vers $(vf_manifest_path "$VF_MANIFEST_MOD"), puis referme le cycle.
+# Un accumulateur vide produit un manifeste vide (pas de manifeste ABSENT — réservé au parc
+# pré-Phase-31, D-31-07).
+vf_manifest_flush() {
+  local target sorted_tmp
+  target="$(vf_manifest_path "$VF_MANIFEST_MOD")"
+  sorted_tmp="${VF_MANIFEST_TMP}.sorted"
+  LC_ALL=C sort -u "$VF_MANIFEST_TMP" > "$sorted_tmp"
+  mv "$sorted_tmp" "$target"
+  rm -f "$VF_MANIFEST_TMP"
+  VF_MANIFEST_TMP=""
+  VF_MANIFEST_MOD=""
+}
+
+# LE helper de pose fichier (D-31-01) : pose <src> vers <dest> (exécutable si [exec] fourni)
+# ET consigne <dest> dans le même appel — le manifeste est un sous-produit, jamais une
+# énumération séparée. Le rc de cp est capturé explicitement et propagé (échec de copie =
+# échec de pose), y compris quand l'appelant place cet appel dans un contexte qui neutralise
+# `set -e` (if/&&/||) — capturer et retourner le rc à la main est ce qui rend l'échec visible
+# dans ce cas aussi.
+vf_place_file() {
+  local src="$1" dest="$2" mode="${3:-}"
+  local rc=0
+  mkdir -p "$(dirname "$dest")"
+  cp "$src" "$dest" || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    return "$rc"
+  fi
+  if [ "$mode" = "exec" ]; then
+    chmod +x "$dest"
+  fi
+  vf_record "$dest"
+}
+
 # ---------- Résolveur de fermeture transitive (intégration Phase 2) ----------
 # Localise resolve-deps.sh : d'abord dans le cache (prod, bundlé par Phase 5/PLUG-02),
 # sinon à côté de l'engine (dev/source). Renvoie le chemin du résolveur, ou vide si absent.
@@ -577,6 +721,8 @@ install_module() {
   local module_dir="$CACHE_DIR/$mod"
   [ -d "$module_dir" ] || err "Module $mod introuvable dans $CACHE_DIR"
 
+  vf_manifest_reset "$mod"
+
   local version
   version=$(module_version_available "$mod")
   log "Installation $mod $version (scope=$VF_SCOPE → $TARGET_ROOT)..."
@@ -596,8 +742,7 @@ install_module() {
 
   # Type 1 — Single-skill module : SKILL.md at module root
   if [ -f "$module_dir/SKILL.md" ]; then
-    mkdir -p "$TARGET_ROOT/skills/$mod"
-    cp "$module_dir/SKILL.md" "$TARGET_ROOT/skills/$mod/SKILL.md"
+    vf_place_file "$module_dir/SKILL.md" "$TARGET_ROOT/skills/$mod/SKILL.md"
     log "  copied SKILL.md → $TARGET_ROOT/skills/$mod/"
   fi
 
@@ -759,6 +904,8 @@ install_module() {
 
   # SCOPE-04 : en scope local seulement, ajouter les chemins installés au ./.gitignore.
   gitignore_add_paths "$mod"
+
+  vf_manifest_flush
 
   mark_installed "$mod" "$version"
   log "✓ $mod $version installé"
