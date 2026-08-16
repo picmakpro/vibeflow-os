@@ -117,6 +117,41 @@
 # TD13 (couverture manquante) — --scope user : chemin du plan absolu et résolu (fakehome),
 #      aucune écriture (D-31-06).
 #
+# T17-T22 (31-05, MANI-03/QUAL-01) — convergence à l'update. NOMMAGE : le 31-05-PLAN.md désignait
+#      ces cas T15-T20, MAIS ces noms sont déjà pris par les cas M6/M5 de 31-03 (uninstall retire le
+#      manifeste / exclusion settings.json au grain unité, ci-dessus) — même piège de collision que
+#      la série TD, déjà rencontré et déjà consigné en tête de la section TD1-TD8. Renommés T17-T22
+#      en conservant l'ordre et l'intention du plan.
+# T17 (= T15 du plan, PASS) — scénario commun (LAB17) : software-architecture installé, VERSION
+#      bumpée dans le CACHE et un fichier de rules/ supprimé DU CACHE, `update` réel lancé. Le
+#      fichier de rule disparaît du lab, sa copie apparaît sous
+#      .claude/.backups/software-architecture-*-removed/rules/<fichier>, et stderr nomme le chemin
+#      retiré.
+# T18 (= T16 du plan, FAIL — critère de succès 3) — MÊME run que T17 (LAB17) : un fichier tiers
+#      z-tiers.md déposé À LA MAIN dans .claude/rules/ AVANT l'update, absent des DEUX manifestes,
+#      reste INTACT après l'update. Assertion de PRÉSENCE, pas seulement d'absence du fichier de
+#      rule légitimement retiré — c'est ce qui rend T18 discriminant (une convergence qui déborde
+#      sur tout .claude/rules/ resterait invisible à une assertion de seule absence).
+# T19 (= T17 du plan, IMPARSABLE — 3e issue QUAL-01) — 4 sous-cas (LAB19_1..4), un par forme
+#      d'illisibilité D-31-07 (ligne vide, chemin absolu, segment .., octet \r résiduel), chacun sur
+#      SON PROPRE montage (le manifeste corrompu ne doit PAS être celui qui a servi à T17/T18, qui a
+#      réellement convergé). Pour chacun : `update` sort 0, stderr contient LE MOTIF nommé ET
+#      l'abstention (« inutilisable »), et le fichier candidat à la suppression est TOUJOURS LÀ —
+#      les deux moitiés du contrat (bruyant ET non destructif), jamais une seule.
+# T20 (= T18 du plan, manifeste absent) — un lab dont le manifeste a été supprimé APRÈS l'install
+#      voit son `update` réussir sans erreur, sans aucune suppression, et se retrouve avec un
+#      manifeste RÉÉCRIT à l'issue (repli gracieux D-31-07, l'update suivant convergera).
+# T21 (= T19 du plan, resync à version inchangée) — après un `update <mod>` SANS changement de
+#      version (chemin sync_module_governance), le manifeste est BYTE-IDENTIQUE à ce qu'il était
+#      avant (D-31-14 : sync ne touche jamais au manifeste).
+# T22 (= T20 du plan, dry-run de convergence) — même scénario que T17 (LAB22, montage disjoint) mais
+#      `--dry-run update <mod>` : une ligne `[plan] - ` porte le chemin condamné, et rien n'est
+#      supprimé (D-31-06).
+#
+# Mutations rouges tracées dans 31-05-SUMMARY.md (QUAL-01) : (1) condition (b) de vf_converge_apply
+# retirée → T18 rougit sur z-tiers.md supprimé à tort ; (2) contrôle du segment .. retiré de
+# vf_manifest_valid → le sous-cas ".." de T19 rougit.
+#
 # T0 — anti-vert-à-vide (contrat F13) : la suite compte ses propres assertions exécutées et
 #      échoue si le total (pass+fail) est 0.
 #
@@ -1025,6 +1060,191 @@ else
   skip "TD13 : software-architecture non copiable dans le cache de test"
 fi
 rm -rf "$LAB_TD13" "$CACHE_TD13"
+
+# ===========================================================================
+# T17-T22 (31-05, MANI-03/QUAL-01) — convergence à l'update. Voir en-tête pour le renommage
+# (collision avec T15/T16 de 31-03) et le détail des cas.
+# ===========================================================================
+
+# Helper (31-05) : monte le scénario commun — installe software-architecture, bumpe VERSION dans
+# le CACHE (suffixe -conv, robuste à un futur bump du module réel — seule l'inégalité compte pour
+# emprunter le chemin « version changée » d'update_module), retire un fichier de rules/ DU CACHE.
+# Émet DEUX lignes sur stdout : (1) le basename RETIRÉ (candidat à la suppression, présent dans
+# l'ancien manifeste, absent du nouveau) ; (2) le basename SURVIVANT — un AUTRE fichier de rules/
+# resté dans le cache, donc présent dans l'ancien ET le nouveau manifeste. C'est CE second fichier,
+# pas un fichier tiers jamais manifesté, que la condition (b) protège : un fichier tiers est déjà
+# hors-jeu par la seule condition (a) (jamais dans l'ancien manifeste), donc AUCUNE mutation de (b)
+# ne peut jamais le mettre en danger — seul un fichier encore légitimement possédé par le module
+# (présent des deux côtés) est le candidat qui rougit si (b) saute. rc=1 si le fixture n'est pas
+# copiable ou n'a pas au moins deux fichiers rules/*.md.
+prepare_convergence_scenario() {
+  local lab="$1" cache="$2"
+  mkdir -p "$cache/software-architecture"
+  cp -r "$REPO/software-architecture/." "$cache/software-architecture/" 2>/dev/null || return 1
+  [ -f "$cache/software-architecture/VERSION" ] || return 1
+  (cd "$lab" && VIBEFLOW_CACHE="$cache" bash "$INSTALLER" install software-architecture >/dev/null 2>&1)
+  local removed_rule basename_rule survivor_rule survivor_basename orig_version
+  removed_rule="$(ls "$cache/software-architecture/rules/"*.md 2>/dev/null | head -1)"
+  survivor_rule="$(ls "$cache/software-architecture/rules/"*.md 2>/dev/null | sed -n '2p')"
+  [ -n "$removed_rule" ] && [ -n "$survivor_rule" ] || return 1
+  basename_rule="$(basename "$removed_rule")"
+  survivor_basename="$(basename "$survivor_rule")"
+  rm -f "$removed_rule"
+  orig_version="$(cat "$cache/software-architecture/VERSION")"
+  printf '%s-conv\n' "$orig_version" > "$cache/software-architecture/VERSION"
+  printf '%s\n%s\n' "$basename_rule" "$survivor_basename"
+}
+
+# ---------------------------------------------------------------------------
+# T17 (PASS) + T18 (FAIL — critère de succès 3, ET discriminant de la condition (b)) : MÊME run
+# (LAB17) — un fichier tiers z-tiers.md, absent des DEUX manifestes, est déposé À LA MAIN avant
+# l'update.
+# ---------------------------------------------------------------------------
+LAB17="$(mktemp -d)"
+CACHE17="$LAB17/cache"
+T17_SCENARIO="$(prepare_convergence_scenario "$LAB17" "$CACHE17")"
+T17_BASENAME="$(printf '%s\n' "$T17_SCENARIO" | sed -n '1p')"
+T17_SURVIVOR="$(printf '%s\n' "$T17_SCENARIO" | sed -n '2p')"
+if [ -n "$T17_BASENAME" ] && [ -n "$T17_SURVIVOR" ]; then
+  mkdir -p "$LAB17/.claude/rules"
+  printf 'fichier tiers, jamais manifesté\n' > "$LAB17/.claude/rules/z-tiers.md"
+  T17_OUT="$(mktemp)"
+  (cd "$LAB17" && VIBEFLOW_CACHE="$CACHE17" bash "$INSTALLER" update software-architecture) >"$T17_OUT" 2>&1
+  T17_RC=$?
+  T17_BACKUP_HIT="$(find "$LAB17/.claude/.backups" -path "*-removed/rules/$T17_BASENAME" 2>/dev/null | head -1)"
+  if [ "$T17_RC" -eq 0 ] \
+     && [ ! -f "$LAB17/.claude/rules/$T17_BASENAME" ] \
+     && [ -n "$T17_BACKUP_HIT" ] \
+     && "$GREP" -qF "$T17_BASENAME" "$T17_OUT"; then
+    ok "T17 : PASS — chemin disparu du module sauvegardé PUIS supprimé, liste rendue (stderr nomme $T17_BASENAME)"
+  else
+    ko "T17 : PASS non conforme (rc=$T17_RC, backup=${T17_BACKUP_HIT:-<absent>}) — voir $T17_OUT"
+  fi
+
+  # T18 — DEUX assertions de PRÉSENCE (discriminantes), pas seulement l'absence du fichier
+  # légitimement retiré : (i) le fichier TIERS z-tiers.md, jamais manifesté — critère de succès 3,
+  # protégé par la seule condition (a) ; (ii) le fichier SURVIVANT (présent des deux côtés du
+  # diff) — c'est LUI que la condition (b) protège spécifiquement : sans (b), (a) resterait vraie
+  # pour lui (il ÉTAIT dans l'ancien manifeste) et il deviendrait un candidat à la suppression au
+  # même titre que le fichier réellement disparu.
+  if [ "$T17_RC" -eq 0 ] \
+     && [ -f "$LAB17/.claude/rules/z-tiers.md" ] \
+     && [ "$(cat "$LAB17/.claude/rules/z-tiers.md")" = "fichier tiers, jamais manifesté" ] \
+     && [ -f "$LAB17/.claude/rules/$T17_SURVIVOR" ]; then
+    ok "T18 : FAIL (critère de succès 3 + condition (b)) — z-tiers.md ET $T17_SURVIVOR (encore possédé par le module) INTACTS"
+  else
+    ko "T18 : FAIL — fichier tiers ou fichier survivant absent/altéré (débordement de la convergence) — voir $T17_OUT"
+  fi
+  rm -f "$T17_OUT"
+else
+  skip "T17 : scénario de convergence non montable (software-architecture non copiable ou < 2 rules/*.md)"
+  skip "T18 : scénario de convergence non montable (software-architecture non copiable ou < 2 rules/*.md)"
+fi
+rm -rf "$LAB17"
+
+# ---------------------------------------------------------------------------
+# T19 (IMPARSABLE — 3e issue QUAL-01) — 4 sous-cas, un montage DISJOINT par sous-cas (le manifeste
+# corrompu ne doit jamais être celui, déjà consommé, de T17/T18). Chaque sous-cas assère les DEUX
+# moitiés du contrat : BRUYANT (motif nommé sur stderr) ET NON destructif (fichier candidat
+# toujours présent) — l'une sans l'autre ne suffit pas (31-CONTEXT.md §4 point 3).
+# ---------------------------------------------------------------------------
+t19_subcase() {
+  local label="$1" corrupt_line="$2" motif_pattern="$3"
+  local lab cache basename_rule out rc
+  lab="$(mktemp -d)"; cache="$lab/cache"
+  basename_rule="$(prepare_convergence_scenario "$lab" "$cache" | sed -n '1p')"
+  if [ -z "$basename_rule" ]; then
+    skip "T19 ($label) : scénario de convergence non montable"
+    rm -rf "$lab"
+    return 0
+  fi
+  local manifest="$lab/.claude/scripts/.vibeflow-manifest-software-architecture"
+  printf '%b' "$corrupt_line" >> "$manifest"
+  out="$(mktemp)"
+  (cd "$lab" && VIBEFLOW_CACHE="$cache" bash "$INSTALLER" update software-architecture) >"$out" 2>&1
+  rc=$?
+  if [ "$rc" -eq 0 ] \
+     && "$GREP" -qE "$motif_pattern" "$out" \
+     && "$GREP" -q "inutilisable" "$out" \
+     && [ -f "$lab/.claude/rules/$basename_rule" ]; then
+    ok "T19 ($label) : IMPARSABLE — bruyant (motif nommé) ET non destructif (fichier candidat toujours là)"
+  else
+    ko "T19 ($label) : contrat imparsable non conforme (rc=$rc) — voir $out"
+  fi
+  rm -f "$out"
+  rm -rf "$lab"
+}
+t19_subcase "ligne vide" '\n' 'ligne vide'
+t19_subcase "chemin absolu" '/etc/passwd\n' 'chemin absolu'
+t19_subcase ".." 'rules/../evil\n' 'segment \.\.'
+t19_subcase "retour chariot résiduel" 'rules/some-crlf-marker.md\r\n' 'retour chariot'
+
+# ---------------------------------------------------------------------------
+# T20 (manifeste absent, parc pré-Phase-31) — le manifeste est supprimé APRÈS l'install : l'update
+# réussit sans erreur, sans AUCUNE suppression, et se retrouve avec un manifeste RÉÉCRIT (repli
+# gracieux D-31-07 — l'update suivant convergera).
+# ---------------------------------------------------------------------------
+LAB20="$(mktemp -d)"
+CACHE20="$LAB20/cache"
+T20_BASENAME="$(prepare_convergence_scenario "$LAB20" "$CACHE20" | sed -n '1p')"
+if [ -n "$T20_BASENAME" ]; then
+  T20_MANIFEST="$LAB20/.claude/scripts/.vibeflow-manifest-software-architecture"
+  rm -f "$T20_MANIFEST"
+  T20_OUT="$(mktemp)"
+  (cd "$LAB20" && VIBEFLOW_CACHE="$CACHE20" bash "$INSTALLER" update software-architecture) >"$T20_OUT" 2>&1
+  T20_RC=$?
+  if [ "$T20_RC" -eq 0 ] && "$GREP" -q "absent" "$T20_OUT" && [ -f "$T20_MANIFEST" ]; then
+    ok "T20 : manifeste absent — repli gracieux (rc=0), aucune erreur, manifeste réécrit (auto-cicatrisant)"
+  else
+    ko "T20 : manifeste absent non conforme (rc=$T20_RC, manifeste réécrit=$([ -f "$T20_MANIFEST" ] && echo oui || echo non)) — voir $T20_OUT"
+  fi
+  rm -f "$T20_OUT"
+else
+  skip "T20 : scénario de convergence non montable"
+fi
+rm -rf "$LAB20"
+
+# ---------------------------------------------------------------------------
+# T21 (resync à version inchangée, D-31-14) — après un `update <mod>` SANS changement de version
+# (chemin sync_module_governance), le manifeste est BYTE-IDENTIQUE à ce qu'il était avant.
+# ---------------------------------------------------------------------------
+LAB21="$(mktemp -d)"
+CACHE21="$LAB21/cache"
+if prepare_module "$CACHE21" "software-architecture"; then
+  (cd "$LAB21" && VIBEFLOW_CACHE="$CACHE21" bash "$INSTALLER" install software-architecture >/dev/null 2>&1)
+  T21_MANIFEST="$LAB21/.claude/scripts/.vibeflow-manifest-software-architecture"
+  T21_BEFORE="$(cat "$T21_MANIFEST" 2>/dev/null)"
+  (cd "$LAB21" && VIBEFLOW_CACHE="$CACHE21" bash "$INSTALLER" update software-architecture >/dev/null 2>&1)   # VERSION inchangée -> sync
+  T21_AFTER="$(cat "$T21_MANIFEST" 2>/dev/null)"
+  if [ -n "$T21_BEFORE" ] && [ "$T21_BEFORE" = "$T21_AFTER" ]; then
+    ok "T21 : resync version inchangée — manifeste byte-identique (D-31-14, sync ne touche jamais au manifeste)"
+  else
+    ko "T21 : resync version inchangée — manifeste modifié par sync_module_governance"
+  fi
+else
+  skip "T21 : software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB21"
+
+# ---------------------------------------------------------------------------
+# T22 (dry-run de convergence) — même scénario que T17 (LAB22, montage disjoint) mais
+# `--dry-run update <mod>` : une ligne `[plan] - ` porte le chemin condamné, et rien n'est supprimé.
+# ---------------------------------------------------------------------------
+LAB22="$(mktemp -d)"
+CACHE22="$LAB22/cache"
+T22_BASENAME="$(prepare_convergence_scenario "$LAB22" "$CACHE22" | sed -n '1p')"
+if [ -n "$T22_BASENAME" ]; then
+  T22_OUT="$(cd "$LAB22" && VIBEFLOW_CACHE="$CACHE22" bash "$INSTALLER" --dry-run update software-architecture 2>/dev/null)"
+  if printf '%s\n' "$T22_OUT" | "$GREP" -qE "^\[plan\] - .*rules/$T22_BASENAME\$" \
+     && [ -f "$LAB22/.claude/rules/$T22_BASENAME" ]; then
+    ok "T22 : dry-run de convergence — [plan] - annoncé pour $T22_BASENAME, rien supprimé"
+  else
+    ko "T22 : dry-run de convergence non conforme — sortie : $(printf '%s' "$T22_OUT" | "$GREP" -E '\[plan\] -')"
+  fi
+else
+  skip "T22 : scénario de convergence non montable"
+fi
+rm -rf "$LAB22"
 
 # ---------------------------------------------------------------------------
 # T0 — anti-vert-à-vide (contrat F13) : la suite doit compter au moins une assertion.
