@@ -156,6 +156,144 @@ e. **D-31-14 (fichier posé hors cycle)** : un script injecté dans le CACHE pui
   rouges` (`plugin/_internal/tests/test-manifest.sh`).
 - ce SUMMARY.
 
+## Correction ciblée (2026-08-16) — findings A-F fusionnés revue + vérification
+
+Mandat de correction ciblée sur `plugin/_internal/vibeflow-update.sh`,
+`plugin/_internal/tests/test-manifest.sh`, ce SUMMARY. Périmètre strict, pas un nouveau cycle.
+
+### A (BLOQUANT, arbitrage de Samuel, D-31-15) — résolution physique du chemin de suppression
+
+Scénario reproduit par la revue : `.claude/rules` remplacé par un lien symbolique vers un
+répertoire ANCÊTRE externe (`/tmp/…`) — pas le fichier final. Les six conditions existantes ne
+touchent jamais le disque (`vf_rel_to_target` normalise purement TEXTUELLEMENT), donc le fichier
+externe se faisait réellement supprimer.
+
+**Fix** : nouvelle fonction `vf_physical_parent_under_target` (builtins POSIX `cd -P`/`pwd -P` —
+ADR-054 interdit le binaire `realpath`, pas la résolution physique) comparant le PARENT résolu
+physiquement du chemin candidat au `TARGET_ROOT` résolu physiquement. Nouvelle condition (g) dans
+`vf_converge_apply`, évaluée AVANT le branchement dry-run/pose réelle (les deux restent honnêtes
+l'une envers l'autre).
+
+**Test T23** : reproduit le scénario exact (rules/ → symlink vers un dossier externe portant un
+fichier de même basename qu'un candidat légitime à la suppression). Rouge-puis-vert prouvé par
+mutation : neutraliser l'appel à `vf_physical_parent_under_target` (remplacé par `: `) fait
+rougir T23 seul (`52 OK / 1 KO`), tous les autres tests restent verts — la garde n'est pas un
+mutant mort. Restauration vérifiée (`bash -n` + suite complète repassée à `53 OK / 0 KO`).
+
+### B (BLOQUANT) — les six conditions de `vf_converge_apply`, tuabilité réelle mesurée par mutation
+
+Contrairement à l'affirmation initiale de la revue (« (e)/(f) structurellement inatteignables »),
+la vérification a mesuré que (d) et (f) sont RÉELLEMENT tuables, et une analyse plus poussée a
+révélé que (c) est réellement inatteignable — mais pas pour la raison supposée, et démontrable
+mécaniquement plutôt qu'affirmée.
+
+- **T24 — condition (d)** (fichier régulier, ni lien ni répertoire) : le fichier candidat à la
+  suppression est remplacé par un lien symbolique pointant vers un autre fichier SOUS
+  `TARGET_ROOT` (donc (e)/(g) ne l'arrêtent pas). Mutation de (d) seule (remplacement par un test
+  `-e` nu) → **rouge** (`52 OK / 1 KO`, le lien est supprimé). Restauré, revérifié vert.
+- **T25 — condition (f)** (exclusion D-31-03) : `scripts/vf-portable.sh` (propriété exclusive de
+  l'engine, partagée entre modules) inséré À LA MAIN dans l'ANCIEN manifeste — simule un manifeste
+  antérieur à D-31-03 ou corrompu. Mutation de (f) seule (`vf_manifest_excluded` neutralisé côté
+  appel, `false && continue`) → **rouge** (`52 OK / 1 KO`, la lib partagée disparaît). Restauré,
+  revérifié vert. Confirme le risque décrit par le mandat : sans (f), un module qui désinstalle
+  purge une lib utilisée par TOUS les autres modules installés.
+- **T26 et la PREUVE D'INATTEIGNABILITÉ de (c)** : `[ -e "$full" ]` (c) est STRUCTURELLEMENT
+  redondante avec `[ -f "$full" ]` (d) juste en dessous — un test POSIX `-f` échoue TOUJOURS sur
+  un chemin absent au même titre que `-e`. Mesuré par mutation dans les DEUX sens : neutraliser
+  (c) seule laisse la suite entière au vert (y compris T26, cas dédié « chemin déjà absent du
+  disque ») ; neutraliser (d) seule laisse AUSSI T26 au vert, parce que (c) rattrape le même cas
+  EN PREMIER. La redondance est BIDIRECTIONNELLE — seule la suppression des DEUX conditions
+  ferait rougir ce cas précis. Documenté en commentaire sur place (`vibeflow-update.sh`,
+  `vf_converge_apply`), et le commentaire de T26 corrigé pour ne PAS prétendre discriminer une
+  condition isolée : c'est un test de COMPORTEMENT (défense en profondeur intacte), la tuabilité
+  réelle de (d) est portée par T24 seule.
+
+### C (HAUT) — copie dégradée qui supprimait un fichier ENCORE possédé
+
+`vf_place_file` : quand `cp` échoue (source illisible dans le cache), le fichier destination
+EXISTANT (pose antérieure, contenu valide, inchangé) disparaissait du NOUVEAU manifeste (jamais
+consigné puisque la pose a échoué) — MANI-03 le voyait alors comme « disparu du module » et le
+supprimait à la convergence suivante, alors qu'il était toujours possédé, juste pas re-copié
+cette fois.
+
+**Fix** : sur échec de `cp`, si la destination existe déjà (et n'est pas un lien), elle est
+journalisée via `vf_note_degraded_copy` (même mécanisme que D-31-11 point 4) et RE-consignée au
+manifeste malgré l'échec — la convergence la voit des deux côtés du diff et ne la touche jamais.
+
+**Test T27** : install réel, puis update avec la source cache d'un fichier `rules/*.md` rendue
+illisible (`chmod 000`) pendant que le module bump de version force une re-copie. Mutation (le
+`vf_declare_write + "$dest"` du bloc de tolérance neutralisé) → **rouge** (`52 OK / 1 KO`, fichier
+possédé perdu). Restauré, revérifié vert.
+
+### D (MOYEN) — 5e forme d'illisibilité : l'octet NUL
+
+`read -r` tronque silencieusement une ligne au premier octet NUL — un contrôle À L'INTÉRIEUR de la
+boucle ne peut jamais le voir (l'octet a déjà disparu de `$line`). Mesuré comme décrit par le
+mandat : `rules/bin\0ary.md` se lisait `lu=[rules/bin] len=9`, verdict VALIDE, et le VOISIN
+`rules/bin` (jamais désigné par le manifeste) supprimé.
+
+**Fix** : détection AVANT la boucle, sur le FICHIER ENTIER, par différence de taille avant/après
+`tr -d '\000'` (POSIX `tr`/`wc`, zéro dépendance externe, même contrainte qu'ADR-054). Réutilise le
+sous-cas existant `t19_subcase` (5e appel, `"octet NUL"`) — contre-épreuve implicite : les 4
+sous-cas existants (ligne vide, absolu, `..`, `\r`) restent verts, seul le nouveau motif change.
+
+### E (MOYEN) — trois commandes non gardées faisaient avorter (ou pire) tout l'update
+
+Les trois sites cités par le mandat, chacun vérifié par injection de panne réelle (`chmod 000`
+et/ou binaires `date`/`cat`/`cp` shadowés en PATH pour isoler précisément le site visé, hors
+suite — la découverte a révélé un mécanisme plus riche que prévu, documenté ci-dessous) :
+
+1. **`mkdir -p` du dossier de backup convergence** (`vf_converge_apply`) — appel nu en position
+   médiane. Mesuré : bloquer le mkdir cible (fichier collision au nom prévisible via `date`
+   shadowé) → **rc=1, abort brut, AUCUN message de convergence** (pire : c'est APRÈS le flush du
+   NOUVEAU manifeste par `install_module`, donc un `update` suivant rendrait « 0 chemin retiré »
+   avec le fichier resté sur disque — orphelin définitif). Avec le fix (`if ! mkdir -p … ; then
+   log … ; continue; fi`) : **rc=0**, message « impossible de créer le dossier de backup … NON
+   supprimé », fichier candidat préservé.
+2. **`cat` dans `vf_manifest_read`** — la découverte la plus significative de cette correction :
+   ce N'EST PAS un site d'abort. `vf_manifest_read` est appelée dans les deux cas via `||`
+   (`vf_manifest_read … || rc=$?` et `new_content="$(vf_manifest_read …)" || new_rc=$?`), et sous
+   bash, un échec À L'INTÉRIEUR d'une fonction appelée en contexte exempté (`||`, `if`) n'aborte
+   PAS le script — **mais l'échec de `cat` était avalé en silence**, et le `return 0` qui suivait
+   s'exécutait quand même : `vf_manifest_read` déclarait le manifeste VALIDE avec un contenu VIDE.
+   Sur le chemin du NOUVEAU manifeste (relu après `install_module`, dans `vf_converge_apply`),
+   ceci produit un ensemble « nouveau » vide — TOUT le contenu de l'ancien manifeste devient
+   candidat à la suppression. Mesuré par un `cat` shadowé (échoue sur le 2e appel touchant le
+   fichier manifeste) : sans le fix, **`12 chemin(s) retiré(s)` — le module ENTIER supprimé** (pire
+   qu'un crash). Avec le fix (`if ! cat "$file"; then log …; return 1; fi`) : `vf_manifest_read`
+   renvoie 1 correctement, message « nouveau manifeste inutilisable — abstention », **rc=0, 0
+   chemin retiré, les deux fichiers préservés**.
+3. **`cp` dans `vf_converge_snapshot`** (capture de l'ancien manifeste) — appel nu en dernière
+   position d'un bloc `if`, et `vf_converge_snapshot` est appelée BARE (pas de `||`/`if` côté
+   appelant) : un échec ici ABORTE réellement tout le script. Mesuré par un `cp` shadowé (échoue
+   sur la copie du fichier manifeste) : sans le fix, **rc=1, script interrompu avant même
+   `install_module`** (l'update n'a jamais lieu). Avec le fix : **rc=0**, message « illisible
+   (permission) au snapshot — convergence abstenue », update complet, rien supprimé.
+
+**Correction de cadrage** : le mandat décrivait les 3 sites comme homogènes (« crash brut »). La
+mesure montre 3 mécanismes DISTINCTS — (1) et (3) sont de vrais aborts (fonction appelée bare),
+(2) est un cas plus grave et plus subtil : un échec AVALÉ SILENCIEUSEMENT qui fait mentir la
+fonction (« valide » au lieu d'« illisible »), avec un rayon de dégât potentiellement PIRE qu'un
+crash (suppression de tout le module au lieu d'un arrêt propre). Le même fix (`if ! cat …; then
+return 1; fi`) couvre les deux lectures (ancienne ET nouvelle manifeste) puisque les deux passent
+par la même fonction `vf_manifest_read`.
+
+### F (MINEUR) — le contrôle `\r` n'attrapait que le `\r` terminal
+
+`case "$line" in *$'\r')` ancré en fin de chaîne. Fix : `*$'\r'*` (n'importe où dans la ligne).
+Test : nouveau sous-cas `t19_subcase "retour chariot au milieu" 'rules/evil\rfile.md\n' 'retour
+chariot'` — vert, et les sous-cas existants (dont le `\r` terminal original) restent verts
+(contre-épreuve implicite, aucune régression sur le motif déjà couvert).
+
+### Nouveaux tests : T23-T27, plus 2 sous-cas T19 (NUL, `\r` médian) — 53 OK / 0 KO / 0 SKIP
+
+Toutes les traces de mutation ci-dessus ont été rejouées avec restauration prouvée (`bash -n` +
+suite complète repassée au vert après chaque restauration). Les trois suites, sur l'arbre tel que
+travaillé (avant ce commit) : `test-manifest.sh` 53/53, `test-vibeflow-update.sh` 19/19,
+`test-merge-hooks.sh` 34/34 — mêmes chiffres qu'avant la correction pour les deux dernières
+(non-régression), 46→53 pour `test-manifest.sh` (7 nouveaux : T23-T27, 2 sous-cas T19). Gates nus :
+`scripts/check-machine-paths.sh` → 0, `scripts/check-version-sync.sh` → 0.
+
 ## Ce que je n'ai PAS fait (hors périmètre du mandat)
 
 - Le lecteur manifeste d'`uninstall_module` (D-31-09, dernière vague explicitement abandonnable) —

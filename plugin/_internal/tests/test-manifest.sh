@@ -1178,6 +1178,16 @@ t19_subcase "ligne vide" '\n' 'ligne vide'
 t19_subcase "chemin absolu" '/etc/passwd\n' 'chemin absolu'
 t19_subcase ".." 'rules/../evil\n' 'segment \.\.'
 t19_subcase "retour chariot résiduel" 'rules/some-crlf-marker.md\r\n' 'retour chariot'
+# 5e forme (correction ciblée, finding D) : octet NUL — `read -r` le TRONQUE silencieusement,
+# donc un contrôle DANS la boucle ne le verrait jamais (l'octet a déjà disparu de $line). Mesuré :
+# sans détection dédiée AVANT la boucle, "rules/nul\0marker.md" se lit `lu=[rules/nul] len=9`,
+# verdict VALIDE, et rules/nul (jamais désigné par le manifeste) supprimé de bout en bout — le
+# VOISIN, pas la cible visée.
+t19_subcase "octet NUL" 'rules/nul\0marker.md\n' 'NUL'
+# Finding F (correction ciblée) : le contrôle du \r n'était ANCRÉ qu'en fin de chaîne
+# (`case … in *$'\r')`) — un \r AU MILIEU ("rules/evil\rfile.md") passait VALIDE. Même sous-cas
+# t19_subcase que les autres formes (bruyant ET non destructif).
+t19_subcase "retour chariot au milieu" 'rules/evil\rfile.md\n' 'retour chariot'
 
 # ---------------------------------------------------------------------------
 # T20 (manifeste absent, parc pré-Phase-31) — le manifeste est supprimé APRÈS l'install : l'update
@@ -1245,6 +1255,180 @@ else
   skip "T22 : scénario de convergence non montable"
 fi
 rm -rf "$LAB22"
+
+# ===========================================================================
+# T23-T27 (correction ciblée 31-05, findings fusionnés revue + vérification) : D-31-15 (résolution
+# physique) et les trois conditions de vf_converge_apply mesurées TUABLES (b déjà couverte par
+# T18) sur lesquelles la revue avait affirmé à tort une inatteignabilité structurelle, plus le
+# finding C (copie dégradée qui ne doit jamais faire disparaître un fichier encore possédé).
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# T23 (D-31-15, arbitrage de Samuel) — reproduction EXACTE du scénario : .claude/rules remplacé
+# par un lien symbolique vers un répertoire ANCÊTRE externe (hors TARGET_ROOT), pas le fichier
+# final. Sans résolution physique, (e) (vf_rel_to_target, PUREMENT TEXTUEL) laisse passer le
+# chemin et le fichier EXTERNE se fait supprimer — c'est le seul geste destructif du moteur
+# atteint par un ancêtre symlinké (D-31-15, portée assumée : le volet pose reste ouvert, §7).
+# ---------------------------------------------------------------------------
+LAB23="$(mktemp -d)"
+CACHE23="$LAB23/cache"
+ATTACKER23="$(mktemp -d)"
+T23_BASENAME="$(prepare_convergence_scenario "$LAB23" "$CACHE23" | sed -n '1p')"
+if [ -n "$T23_BASENAME" ]; then
+  rm -rf "$LAB23/.claude/rules"
+  ln -s "$ATTACKER23" "$LAB23/.claude/rules"
+  printf 'fichier externe légitime, hors TARGET_ROOT\n' > "$ATTACKER23/$T23_BASENAME"
+  T23_OUT="$(mktemp)"
+  (cd "$LAB23" && VIBEFLOW_CACHE="$CACHE23" bash "$INSTALLER" update software-architecture) >"$T23_OUT" 2>&1
+  T23_RC=$?
+  if [ "$T23_RC" -eq 0 ] \
+     && [ -f "$ATTACKER23/$T23_BASENAME" ] \
+     && [ "$(cat "$ATTACKER23/$T23_BASENAME")" = "fichier externe légitime, hors TARGET_ROOT" ]; then
+    ok "T23 : D-31-15 — ancêtre symlinké vers un répertoire externe, fichier EXTERNE intact (résolution physique)"
+  else
+    ko "T23 : D-31-15 — fichier externe altéré/supprimé (rc=$T23_RC) — voir $T23_OUT"
+  fi
+  rm -f "$T23_OUT"
+else
+  skip "T23 : scénario D-31-15 non montable"
+fi
+rm -rf "$LAB23" "$ATTACKER23"
+
+# ---------------------------------------------------------------------------
+# T24 (condition (d), mutant mort DÉMENTI par mesure — mandat) — le chemin candidat à la
+# suppression est remplacé par un LIEN symbolique (pointant vers un fichier encore SOUS
+# TARGET_ROOT, donc (e)/(g) ne l'arrêtent pas) avant l'update. Mesuré : commité ⇒ PRESENT/1
+# retiré · muté (condition (d) retirée) ⇒ SUPPRIMÉ/2 retirés. Assertion de PRÉSENCE du lien
+# lui-même après update (jamais transformé en fichier régulier, jamais supprimé).
+# ---------------------------------------------------------------------------
+LAB24="$(mktemp -d)"
+CACHE24="$LAB24/cache"
+T24_SCEN="$(prepare_convergence_scenario "$LAB24" "$CACHE24")"
+T24_BASENAME="$(printf '%s\n' "$T24_SCEN" | sed -n '1p')"
+T24_SURVIVOR="$(printf '%s\n' "$T24_SCEN" | sed -n '2p')"
+if [ -n "$T24_BASENAME" ] && [ -n "$T24_SURVIVOR" ]; then
+  rm -f "$LAB24/.claude/rules/$T24_BASENAME"
+  ln -s "$LAB24/.claude/rules/$T24_SURVIVOR" "$LAB24/.claude/rules/$T24_BASENAME"
+  T24_OUT="$(mktemp)"
+  (cd "$LAB24" && VIBEFLOW_CACHE="$CACHE24" bash "$INSTALLER" update software-architecture) >"$T24_OUT" 2>&1
+  T24_RC=$?
+  if [ "$T24_RC" -eq 0 ] && [ -L "$LAB24/.claude/rules/$T24_BASENAME" ]; then
+    ok "T24 : condition (d) — lien symbolique candidat à la suppression PRÉSERVÉ (jamais un lien supprimé)"
+  else
+    ko "T24 : condition (d) — lien symbolique altéré/supprimé (rc=$T24_RC) — voir $T24_OUT"
+  fi
+  rm -f "$T24_OUT"
+else
+  skip "T24 : scénario de convergence non montable"
+fi
+rm -rf "$LAB24"
+
+# ---------------------------------------------------------------------------
+# T25 (condition (f), mutant mort DÉMENTI par mesure — mandat) — scripts/vf-portable.sh (propriété
+# EXCLUSIVE de l'engine, D-31-03) inséré À LA MAIN dans l'ANCIEN manifeste (simule un manifeste
+# écrit par un moteur antérieur à D-31-03, ou corrompu) : présent dans l'ancien, absent du
+# nouveau (l'exclusion l'empêche TOUJOURS d'y entrer), donc candidat à la suppression sur (a)+(b)
+# seules. Mesuré : commité ⇒ PRESENT/1 · muté (condition (f) retirée) ⇒ SUPPRIMÉ/2 retirés — la
+# lib partagée disparaîtrait SOUS LES PIEDS DES AUTRES MODULES.
+# ---------------------------------------------------------------------------
+LAB25="$(mktemp -d)"
+CACHE25="$LAB25/cache"
+T25_BASENAME="$(prepare_convergence_scenario "$LAB25" "$CACHE25" | sed -n '1p')"
+if [ -n "$T25_BASENAME" ]; then
+  T25_MANIFEST="$LAB25/.claude/scripts/.vibeflow-manifest-software-architecture"
+  T25_PORTABLE="$LAB25/.claude/scripts/vf-portable.sh"
+  [ -f "$T25_PORTABLE" ] || printf '#!/usr/bin/env bash\n' > "$T25_PORTABLE"
+  printf 'scripts/vf-portable.sh\n' >> "$T25_MANIFEST"
+  LC_ALL=C sort -u -o "$T25_MANIFEST" "$T25_MANIFEST"
+  T25_OUT="$(mktemp)"
+  (cd "$LAB25" && VIBEFLOW_CACHE="$CACHE25" bash "$INSTALLER" update software-architecture) >"$T25_OUT" 2>&1
+  T25_RC=$?
+  if [ "$T25_RC" -eq 0 ] && [ -f "$T25_PORTABLE" ]; then
+    ok "T25 : condition (f) — scripts/vf-portable.sh (lib partagée de l'engine) PRÉSERVÉ malgré une entrée forcée à l'ancien manifeste"
+  else
+    ko "T25 : condition (f) — scripts/vf-portable.sh supprimé (rc=$T25_RC) — voir $T25_OUT"
+  fi
+  rm -f "$T25_OUT"
+else
+  skip "T25 : scénario de convergence non montable"
+fi
+rm -rf "$LAB25"
+
+# ---------------------------------------------------------------------------
+# T26 (comportement « chemin déjà absent du disque » — PAS un discriminant unitaire de (c) NI de
+# (d) : voir la preuve écrite en commentaire sur (c)/(d) dans vibeflow-update.sh, vf_converge_apply.
+# `-f` échoue TOUJOURS sur un chemin absent au même titre que `-e` : la redondance est
+# BIDIRECTIONNELLE — neutraliser (c) SEULE laisse ce test au vert (mesuré, (d) rattrape le cas) ET
+# neutraliser (d) SEULE le laisse AUSSI au vert (mesuré, (c) rattrape le cas EN PREMIER, (d)
+# n'étant même jamais atteinte). Seule la suppression des DEUX ferait rougir ce test précis — ni
+# l'une ni l'autre condition n'est individuellement discriminée ici. Gardé comme test de
+# COMPORTEMENT (défense en profondeur redondante intacte), pas comme preuve de tuabilité d'une
+# condition isolée : le fichier candidat a DÉJÀ disparu du disque avant l'update (ex. un run
+# précédent interrompu ou une suppression manuelle) → rc=0, ligne ignorée SILENCIEUSEMENT, aucun
+# faux message « backup en échec » (il n'y avait rien à sauvegarder). La tuabilité RÉELLE de (d),
+# sur le cas qu'elle protège SEULE (chemin existant mais pas un fichier régulier), est T24.
+# ---------------------------------------------------------------------------
+LAB26="$(mktemp -d)"
+CACHE26="$LAB26/cache"
+T26_BASENAME="$(prepare_convergence_scenario "$LAB26" "$CACHE26" | sed -n '1p')"
+if [ -n "$T26_BASENAME" ]; then
+  rm -f "$LAB26/.claude/rules/$T26_BASENAME"
+  T26_OUT="$(mktemp)"
+  (cd "$LAB26" && VIBEFLOW_CACHE="$CACHE26" bash "$INSTALLER" update software-architecture) >"$T26_OUT" 2>&1
+  T26_RC=$?
+  if [ "$T26_RC" -eq 0 ] && ! "$GREP" -qF "backup en échec pour rules/$T26_BASENAME" "$T26_OUT"; then
+    ok "T26 : chemin déjà absent du disque (redondance bidirectionnelle (c)/(d) intacte) — aucun faux « backup en échec »"
+  else
+    ko "T26 : message « backup en échec » à tort pour un chemin déjà absent (rc=$T26_RC) — voir $T26_OUT"
+  fi
+  rm -f "$T26_OUT"
+else
+  skip "T26 : scénario de convergence non montable"
+fi
+rm -rf "$LAB26"
+
+# ---------------------------------------------------------------------------
+# T27 (finding C) — un fichier DÉJÀ posé (pose antérieure, contenu identique à la source/cache/
+# manifeste) survit à une copie dégradée lors de l'update SUIVANT : la source du fichier dans le
+# CACHE est rendue illisible (chmod 000) juste avant l'update, `cp` échoue pour CE fichier
+# précisément, mais son ANCIEN contenu reste inchangé sur disque. Sans le correctif, ce chemin
+# disparaît du NOUVEAU manifeste (jamais consigné, la pose a échoué) → MANI-03 le voit absent du
+# nouveau, présent dans l'ancien, toujours sur disque : il est backup PUIS SUPPRIMÉ — alors qu'il
+# est toujours valide, toujours possédé, juste pas re-copié cette fois. Avec le correctif,
+# vf_place_file consigne l'ANCIEN chemin malgré l'échec (D-31-11 point 4, même philosophie de
+# tolérance) : le fichier survit à la convergence.
+# ---------------------------------------------------------------------------
+LAB27="$(mktemp -d)"
+CACHE27="$LAB27/cache"
+if prepare_module "$CACHE27" "software-architecture"; then
+  (cd "$LAB27" && VIBEFLOW_CACHE="$CACHE27" bash "$INSTALLER" install software-architecture >/dev/null 2>&1)
+  T27_TARGET_RULE="$(ls "$CACHE27/software-architecture/rules/"*.md 2>/dev/null | head -1)"
+  if [ -n "$T27_TARGET_RULE" ]; then
+    T27_BASENAME="$(basename "$T27_TARGET_RULE")"
+    T27_ORIG_CONTENT="$(cat "$LAB27/.claude/rules/$T27_BASENAME")"
+    T27_ORIG_VERSION="$(cat "$CACHE27/software-architecture/VERSION")"
+    printf '%s-degraded\n' "$T27_ORIG_VERSION" > "$CACHE27/software-architecture/VERSION"
+    chmod 000 "$T27_TARGET_RULE"
+    T27_OUT="$(mktemp)"
+    (cd "$LAB27" && VIBEFLOW_CACHE="$CACHE27" bash "$INSTALLER" update software-architecture) >"$T27_OUT" 2>&1
+    T27_RC=$?
+    chmod 644 "$T27_TARGET_RULE" 2>/dev/null || true
+    if [ "$T27_RC" -eq 0 ] \
+       && [ -f "$LAB27/.claude/rules/$T27_BASENAME" ] \
+       && [ "$(cat "$LAB27/.claude/rules/$T27_BASENAME" 2>/dev/null)" = "$T27_ORIG_CONTENT" ]; then
+      ok "T27 : finding C — fichier ENCORE POSSÉDÉ survit à une copie dégradée (source cache illisible), contenu inchangé"
+    else
+      ko "T27 : finding C — fichier possédé perdu/altéré après copie dégradée (rc=$T27_RC) — voir $T27_OUT"
+    fi
+    rm -f "$T27_OUT"
+  else
+    skip "T27 : aucun rules/*.md dans le fixture software-architecture"
+  fi
+else
+  skip "T27 : software-architecture non copiable dans le cache de test"
+fi
+chmod -R u+rwX "$LAB27" 2>/dev/null || true
+rm -rf "$LAB27"
 
 # ---------------------------------------------------------------------------
 # T0 — anti-vert-à-vide (contrat F13) : la suite doit compter au moins une assertion.

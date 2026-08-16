@@ -245,22 +245,40 @@ vf_manifest_excluded() {
 # suppression en aval — jamais une confiance ligne à ligne partielle.
 
 # vf_manifest_valid <fichier> — parcourt le fichier ligne à ligne (while IFS= read -r, patron de
-# cleanup_retired_modules) et applique les 4 contrôles de D-31-07, DANS CET ORDRE, par ligne :
+# cleanup_retired_modules) et applique les 5 contrôles de D-31-07, DANS CET ORDRE :
+#   0. octet NUL n'importe où dans le fichier (balayage ENTIER, AVANT la boucle ligne à ligne —
+#      voir motif ci-dessous)
 #   1. ligne vide après strip du \r
-#   2. octet de retour chariot résiduel (le \r n'a pas suffi à vider la ligne — cas 1 déjà écarté)
+#   2. octet de retour chariot résiduel, N'IMPORTE OÙ dans la ligne (pas seulement en fin — un
+#      \r au MILIEU, ex. "rules/evil\rfile.md", passait à tort tant que le test était ancré en fin
+#      de chaîne ; correction ciblée, 5e forme adjacente)
 #   3. chemin absolu (la ligne strippée commence par une barre oblique)
 #   4. segment ".." isolé (entre deux séparateurs, en tête ou en fin — jamais une sous-chaîne :
 #      "..foo" et "foo.." ne sont PAS ce motif, seul un ".." qui est son PROPRE segment l'est ;
 #      détecté en encadrant la ligne strippée de barres obliques et en cherchant "/../")
-# Au premier échec : `log` le motif ET le numéro de ligne fautif, retourne 1 SANS continuer. Le
+# Au premier échec : `log` le motif ET le numéro de ligne fautif (sauf le contrôle NUL, dont la
+# nature — voir plus bas — interdit un numéro de ligne fiable), retourne 1 SANS continuer. Le
 # refus est GLOBAL — une ligne fautive invalide tout le fichier, jamais un filtrage ligne à ligne :
 # c'est exactement ce qu'une confiance partielle laisserait passer face à un CRLF injecté.
 #
 # Le contrôle du \r est un REJET, jamais un nettoyage silencieux : un manifeste CRLF-mangé signale
 # que quelque chose d'autre l'a réécrit (leçon Windows, Phase 30) — le nettoyer en silence
 # masquerait la cause au lieu de la signaler.
+#
+# Le contrôle NUL (correction ciblée, finding D) tourne AVANT la boucle et sur le FICHIER ENTIER,
+# jamais dans la boucle : `read -r` TRONQUE silencieusement une ligne au premier octet NUL
+# (comportement natif du builtin bash) — l'octet a DÉJÀ disparu de $line au moment où la boucle
+# le verrait, et la ligne tronquée pointe vers un chemin DIFFÉRENT de celui écrit à l'origine (le
+# voisin, jamais la cible visée). Mesuré : `lu=[rules/bin] len=9` pour une ligne
+# "rules/bin\0ary.md", verdict VALIDE, et le VOISIN `rules/bin` (jamais désigné par le manifeste)
+# supprimé de bout en bout. Détection par différence de taille avant/après `tr -d '\000'` — POSIX
+# tr/wc, aucune dépendance externe (même contrainte que _vf_normalize_path, ADR-054).
 vf_manifest_valid() {
   local file="$1"
+  if [ "$(LC_ALL=C tr -d '\000' < "$file" | wc -c)" -ne "$(wc -c < "$file")" ]; then
+    log "  manifeste imparsable : octet NUL détecté"
+    return 1
+  fi
   local line lineno=0 stripped
   while IFS= read -r line || [ -n "$line" ]; do
     lineno=$((lineno + 1))
@@ -270,7 +288,7 @@ vf_manifest_valid() {
       return 1
     fi
     case "$line" in
-      *$'\r')
+      *$'\r'*)
         log "  manifeste imparsable : octet de retour chariot résiduel (ligne $lineno)"
         return 1
         ;;
@@ -312,7 +330,16 @@ vf_manifest_read() {
     log "  manifeste de $mod inutilisable — AUCUNE suppression ne sera faite"
     return 1
   fi
-  cat "$file"
+  # Finding E (correction ciblée) : `cat` nu ici est une commande en position finale de fonction —
+  # sous `set -euo pipefail`, une panne d'E/S réelle (permission retirée entre le test -f et cette
+  # ligne) fait avorter TOUT le script appelant (D-31-13 : seule la DERNIÈRE commande d'une liste
+  # déclenche errexit, et un appel nu EST sa propre liste). Le fichier a passé `vf_manifest_valid`
+  # (donc syntaxiquement correct) mais reste illisible : même contrat que « imparsable » — bruyant,
+  # abstention, jamais un crash du process entier.
+  if ! cat "$file"; then
+    log "  manifeste de $mod illisible (permission) — AUCUNE suppression ne sera faite"
+    return 1
+  fi
   return 0
 }
 
@@ -384,6 +411,30 @@ vf_rel_to_target() {
     *)
       return 1
       ;;
+  esac
+}
+
+# vf_physical_parent_under_target <chemin> — résolution PHYSIQUE (D-31-15, arbitrage de Samuel),
+# utilisée EXCLUSIVEMENT par le chemin de SUPPRESSION de vf_converge_apply. vf_rel_to_target
+# ci-dessus normalise PUREMENT TEXTUELLEMENT — sans jamais consulter le disque — et laisse donc
+# passer un ANCÊTRE symlinké : `.claude/rules` remplacé par un lien vers `/tmp/…` résout « sous
+# TARGET_ROOT » textuellement (le texte du chemin ne bouge pas), alors que le fichier réel se
+# trouve hors TARGET_ROOT. Cette fonction compare le PARENT résolu du chemin au TARGET_ROOT résolu :
+# `cd -P`/`pwd -P` sont des builtins POSIX — ADR-054 interdit le BINAIRE `realpath` (portabilité :
+# absent ou divergent selon les plateformes), PAS la résolution physique en soi, donc la contrainte
+# est respectée dans sa lettre et son intention.
+# Abstention (rc=1, jamais une suppression) si le parent n'est pas traversable (permission,
+# disparu entre deux appels) — le doute ne supprime jamais (D-31-07) : une panne ici doit se lire
+# comme « hors TARGET_ROOT », jamais comme « sous TARGET_ROOT par défaut ».
+vf_physical_parent_under_target() {
+  local full="$1"
+  local parent_dir phys_parent phys_target
+  parent_dir="$(dirname "$full")"
+  phys_parent="$(cd -P "$parent_dir" 2>/dev/null && pwd -P)" || return 1
+  phys_target="$(cd -P "$TARGET_ROOT" 2>/dev/null && pwd -P)" || return 1
+  case "$phys_parent" in
+    "$phys_target"|"$phys_target"/*) return 0 ;;
+    *) return 1 ;;
   esac
 }
 
@@ -557,6 +608,19 @@ vf_place_file() {
   # perdre côté observable.
   cp "$src" "$dest" 2>/dev/null || rc=$?
   if [ "$rc" -ne 0 ]; then
+    # Finding C (correction ciblée) : une copie dégradée ici ne doit PAS faire disparaître un
+    # fichier ENCORE POSSÉDÉ du NOUVEAU manifeste. Si `$dest` existait déjà sur disque (pose
+    # antérieure — le `cp` en échec n'y a rien écrit, `cp` ne touche jamais la destination quand
+    # il ne peut pas lire la source), son absence du nouveau manifeste serait interprétée par
+    # MANI-03 comme « le module ne le fournit plus » et le ferait SUPPRIMER à la convergence
+    # suivante — alors qu'il est toujours valide, toujours possédé, juste pas RE-copié cette
+    # fois-ci. On consigne l'ANCIEN chemin (inchangé sur disque) pour que la convergence le voie
+    # des deux côtés du diff et ne le touche jamais ; jamais un lien (défense en profondeur,
+    # même grain que D-31-02).
+    if [ -f "$dest" ] && [ ! -L "$dest" ]; then
+      vf_note_degraded_copy "$dest"
+      vf_declare_write + "$dest"
+    fi
     return "$rc"
   fi
   if [ "$mode" = "exec" ]; then
@@ -1746,7 +1810,18 @@ vf_converge_snapshot() {
   fi
   if [ "$rc" -eq 0 ]; then
     VF_OLD_MANIFEST="$(mktemp)"
-    cp "$file" "$VF_OLD_MANIFEST"
+    # Finding E (correction ciblée) : `cp` nu en position finale de ce bloc `if` — sous
+    # `set -euo pipefail`, une panne d'E/S (permission retirée entre le `cat` de vf_manifest_read
+    # ci-dessus et cet appel) ferait avorter TOUT le script appelant (D-31-13). Le fichier a déjà
+    # été jugé VALIDE et LISIBLE l'instant d'avant : une panne ici est une régression de la
+    # ressource, pas du contenu — même contrat qu'un manifeste imparsable : abstention de la
+    # convergence, jamais un crash du process.
+    if ! cp "$file" "$VF_OLD_MANIFEST" 2>/dev/null; then
+      log "  manifeste de $mod illisible (permission) au snapshot — convergence abstenue"
+      rm -f "$VF_OLD_MANIFEST"
+      VF_OLD_MANIFEST=""
+      VF_CONVERGE_VERDICT=1
+    fi
   fi
 }
 
@@ -1806,16 +1881,38 @@ vf_converge_apply() {
     # (b) absent du nouveau manifeste — comparaison de LIGNE EXACTE, LC_ALL=C.
     LC_ALL=C grep -qxF "$rel" "$new_sorted" && continue
     full="$TARGET_ROOT/$rel"
-    # (c) existe sur disque.
+    # (c) existe sur disque. PREUVE D'INATTEIGNABILITÉ (correction ciblée, mandat §B) : cette
+    #     condition est STRUCTURELLEMENT redondante avec (d) juste en dessous, jamais par accident
+    #     de couverture de test. `[ -f X ]` implique TOUJOURS `[ -e X ]` (un test POSIX -f échoue
+    #     sur un chemin absent au même titre que -e) — retirer (c) SEULE ne peut donc JAMAIS
+    #     changer l'issue de la boucle : un `full` absent tombe systématiquement sur le `continue`
+    #     de (d) une ligne plus bas. Vérifié par mutation (correction ciblée) : neutraliser (c)
+    #     seule laisse la suite entière au vert. Symétriquement, neutraliser (d) SEULE laisse
+    #     AUSSI la suite au vert sur ce même cas (« chemin absent »), parce que (c) le rattrape en
+    #     premier — la redondance est BIDIRECTIONNELLE, seule la suppression des DEUX ferait
+    #     rougir un test sur ce cas précis. (d) reste seule discriminante sur le cas RÉELLEMENT
+    #     distinct qu'elle couvre en propre : un chemin qui EXISTE (`-e` vrai) mais n'est PAS un
+    #     fichier régulier (lien, répertoire) — voir le test dédié sur (d) ci-dessous.
     [ -e "$full" ] || continue
     # (d) fichier RÉGULIER — jamais un répertoire, jamais un lien (défense en profondeur du grain
-    #     fichier D-31-02 : une ligne répertoire autoriserait une suppression de masse).
+    #     fichier D-31-02 : une ligne répertoire autoriserait une suppression de masse). Seule
+    #     condition qui protège, EN PROPRE, le cas « chemin existant mais pas un fichier régulier »
+    #     (lien symbolique notamment) — (c) n'y joue aucun rôle puisqu'un lien EXISTE (voir preuve
+    #     ci-dessus).
     { [ -f "$full" ] && [ ! -L "$full" ]; } || continue
     # (e) résout SOUS TARGET_ROOT après normalisation — pas de `..` échappatoire (vf_rel_to_target
     #     échoue hors périmètre ; défense en profondeur, chaque ligne a déjà passé vf_manifest_valid).
     vf_rel_to_target "$full" >/dev/null 2>&1 || continue
     # (f) hors liste close d'exclusions D-31-03 — un artefact partagé n'est jamais candidat.
     vf_manifest_excluded "$rel" && continue
+    # (g) résolution PHYSIQUE (D-31-15, arbitrage de Samuel) : (e) ci-dessus normalise
+    #     TEXTUELLEMENT — un ANCÊTRE symlinké (ex. .claude/rules -> /tmp/…) résout « sous
+    #     TARGET_ROOT » textuellement sans que le fichier réel le soit. Cette garde consulte le
+    #     disque : refuse si le PARENT résolu physiquement n'est pas sous le TARGET_ROOT résolu
+    #     physiquement. S'applique aux DEUX branches ci-dessous (dry-run et pose réelle) puisqu'elle
+    #     est évaluée AVANT le branchement — le plan et la suppression réelle restent honnêtes l'un
+    #     envers l'autre (même garantie que les six conditions précédentes).
+    vf_physical_parent_under_target "$full" || continue
 
     if vf_dry_run; then
       vf_declare_write - "$full"
@@ -1823,7 +1920,17 @@ vf_converge_apply() {
     fi
 
     backup_dest="$bdir/$rel"
-    mkdir -p "$(dirname "$backup_dest")"
+    # Finding E (correction ciblée) : `mkdir -p` nu en position médiane d'une paire — jusqu'ici
+    # SANS garde, alors que sa panne (permission sur $bdir) avorterait TOUT le script sous
+    # `set -e`. Pire que les deux autres sites : l'abort surviendrait APRÈS le flush du NOUVEAU
+    # manifeste par install_module (déjà exécuté avant cette boucle), donc un `update` suivant
+    # rendrait « 0 chemin retiré » avec ce fichier resté sur disque — un ORPHELIN DÉFINITIF
+    # (l'ancien manifeste qui le portait a déjà été écrasé). Abstention explicite, jamais un
+    # crash : même contrat que l'échec de `cp` juste en dessous.
+    if ! mkdir -p "$(dirname "$backup_dest")" 2>/dev/null; then
+      log "  convergence de $mod : impossible de créer le dossier de backup pour $rel — NON supprimé (pas de suppression sans filet)"
+      continue
+    fi
     if cp "$full" "$backup_dest" 2>/dev/null; then
       rm -f "$full"
       # Élagage NON récursif, patron uninstall_module (rmdir sans -r sur un dossier PARTAGÉ) :
