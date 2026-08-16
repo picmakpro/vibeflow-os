@@ -2,11 +2,11 @@
 # vibeflow-update.sh — Installeur/updateur scope-aware des modules vibeflow-os.
 #
 # Usage:
-#   ./vibeflow-update.sh [--scope user|project|local] install <module>      # Installe un module
-#   ./vibeflow-update.sh [--scope ...] install --with-deps <module>         # Installe la fermeture transitive
-#   ./vibeflow-update.sh [--scope ...] install --all                        # Installe tous les modules dispo
-#   ./vibeflow-update.sh [--scope ...] update <module>                      # Met à jour un module installé
-#   ./vibeflow-update.sh [--scope ...] update --all                         # Met à jour tous les modules installés
+#   ./vibeflow-update.sh [--scope user|project|local] [--dry-run] install <module>   # Installe un module
+#   ./vibeflow-update.sh [--scope ...] [--dry-run] install --with-deps <module>      # Installe la fermeture transitive
+#   ./vibeflow-update.sh [--scope ...] [--dry-run] install --all                     # Installe tous les modules dispo
+#   ./vibeflow-update.sh [--scope ...] [--dry-run] update <module>                   # Met à jour un module installé
+#   ./vibeflow-update.sh [--scope ...] [--dry-run] update --all                      # Met à jour tous les modules installés
 #   ./vibeflow-update.sh [--scope ...] uninstall <module>                   # Désinstalle un module
 #   ./vibeflow-update.sh [--scope ...] uninstall --all                      # Désinstalle TOUS les modules installés (lit le registre)
 #   ./vibeflow-update.sh [--scope ...] rollback <module>                    # Restore depuis backup
@@ -21,6 +21,8 @@
 #   --scope user            → $HOME/.claude
 #   --scope project | local → ./.claude   (local ajoute en plus les chemins au ./.gitignore)
 #   env VF_SCOPE            → idem ; --scope l'emporte sur VF_SCOPE.
+#   --dry-run                → n'écrit RIEN, rend le plan de pose fichier par fichier sur stdout.
+#                               Accepté seulement sur install/update ; refusé (exit 1) ailleurs.
 #
 # Pré-requis : $VIBEFLOW_CACHE existe (dossier des modules + leurs module.json).
 
@@ -29,6 +31,9 @@ set -euo pipefail
 # ---------- Helpers (définis tôt : utilisés dès le parsing) ----------
 log() { echo "[vibeflow-update] $*" >&2; }
 err() { echo "[vibeflow-update] ERROR: $*" >&2; exit 1; }
+# vf_dry_run — prédicat pour VF_DRY_RUN (D-31-06). Tous les sites testent CE prédicat plutôt que
+# la variable à la main.
+vf_dry_run() { [ "$VF_DRY_RUN" = "1" ]; }
 
 # ---------- Résolution du scope → TARGET_ROOT (SCOPE-01) ----------
 # Défaut LEGACY = `project` (cible historique ./.claude). C'est un fallback APPEL-DIRECT
@@ -37,8 +42,12 @@ err() { echo "[vibeflow-update] ERROR: $*" >&2; exit 1; }
 # spec §3/§8). Ce défaut engine `project` ne co-occurre donc JAMAIS en prod avec le défaut
 # LEGACY `user` de ensure-deps.sh : pas de contradiction entre 03-01 et 03-02.
 VF_SCOPE="${VF_SCOPE:-project}"
+# D-31-06 : booléen, aucune forme --dry-run=<valeur>. Détecté dans le MÊME pré-parse que
+# --scope, donc valide avant cmd="$1".
+VF_DRY_RUN="0"
 
-# Détecter `--scope <val>` AVANT cmd="$1" : on filtre les positionnels et on override VF_SCOPE.
+# Détecter `--scope <val>`/`--dry-run` AVANT cmd="$1" : on filtre les positionnels et on override
+# VF_SCOPE/VF_DRY_RUN.
 _positional=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -49,6 +58,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --scope=*)
       VF_SCOPE="${1#--scope=}"
+      shift
+      ;;
+    --dry-run)
+      VF_DRY_RUN="1"
       shift
       ;;
     *)
@@ -69,6 +82,18 @@ case "$VF_SCOPE" in
   user|project|local) : ;;
   *) err "scope invalide : $VF_SCOPE (attendu user|project|local)" ;;
 esac
+
+# Surface du flag --dry-run (D-31-06), validée AVANT cmd="$1" (952) : borné à install/update.
+# Refus BRUYANT, jamais un flag accepté-puis-ignoré — sur uninstall/rollback/status/sync ce
+# serait le pire échec possible de la phase (l'utilisateur croirait prévisualiser et le moteur
+# supprimerait). Cas $# = 0 : conserver le comportement actuel (impression d'usage, exit 0) —
+# un --dry-run seul n'est pas une commande, rien à valider ici.
+if vf_dry_run && [ "$#" -gt 0 ]; then
+  case "$1" in
+    install|update) : ;;
+    *) err "--dry-run n'est accepté que sur install/update (reçu : $1) — un --dry-run accepté-puis-ignoré sur ce verbe ferait croire à une prévisualisation alors qu'il supprimerait/agirait réellement" ;;
+  esac
+fi
 
 # Résolution TARGET_ROOT depuis le scope.
 case "$VF_SCOPE" in
@@ -132,6 +157,10 @@ module_version_installed() {
 mark_installed() {
   local mod="$1"
   local version="$2"
+  if vf_dry_run; then
+    vf_declare_write "~" "$INSTALLED_REGISTRY" "$mod=$version"
+    return 0
+  fi
   mkdir -p "$(dirname "$INSTALLED_REGISTRY")"
   touch "$INSTALLED_REGISTRY"
   # Remove old entry if exists
@@ -274,10 +303,20 @@ vf_record() {
 # Ouvre un accumulateur neuf pour <mod>. Appelé au début d'install_module.
 vf_manifest_reset() {
   local mod="$1"
+  VF_MANIFEST_MOD="$mod"
+  VF_DEGRADED_COPIES_COUNT=0
+  # 31-04 (D-31-06) : en dry-run, ne JAMAIS créer d'accumulateur ni de répertoire — seul
+  # VF_MANIFEST_MOD est mémorisé, pour que vf_declare_write puisse afficher le suffixe
+  # `(<module> <version>)` du verbe +. VF_MANIFEST_TMP reste vide : c'est ce qui garde
+  # vf_record hors du chemin dry-run si jamais il était atteint (il ne l'est pas —
+  # vf_declare_write court-circuite avant lui en dry-run).
+  if vf_dry_run; then
+    VF_MANIFEST_TMP=""
+    return 0
+  fi
   local manifest_dir
   manifest_dir="$(dirname "$(vf_manifest_path "$mod")")"
   mkdir -p "$manifest_dir"
-  VF_MANIFEST_MOD="$mod"
   # W-1 (revue vague 1) : nommé HORS du motif `.vibeflow-manifest-*` (`.vibeflow-acc-…`, pas
   # `.vibeflow-manifest-….tmp.$$`) plutôt qu'un trap de nettoyage — un `cp`/étape qui échoue plus
   # loin dans install_module avorte le script (`set -euo pipefail`) AVANT vf_manifest_flush et
@@ -298,7 +337,6 @@ vf_manifest_reset() {
   done
   VF_MANIFEST_TMP="$manifest_dir/.vibeflow-acc-${mod}.$$"
   : > "$VF_MANIFEST_TMP"
-  VF_DEGRADED_COPIES_COUNT=0
 }
 
 # Trie l'accumulateur (LC_ALL=C sort -u), l'écrit atomiquement (tmp + mv, patron
@@ -307,6 +345,16 @@ vf_manifest_reset() {
 # pré-Phase-31, D-31-07).
 vf_manifest_flush() {
   local target sorted_tmp
+  # 31-04 (D-31-06) : en dry-run, le manifeste lui-même n'est jamais écrit. Il est annoncé
+  # (verbe +, D-31-05) AVANT de vider VF_MANIFEST_MOD — vf_declare_write en a besoin pour le
+  # suffixe module/version.
+  if vf_dry_run; then
+    target="$(vf_manifest_path "$VF_MANIFEST_MOD")"
+    vf_declare_write + "$target"
+    VF_MANIFEST_TMP=""
+    VF_MANIFEST_MOD=""
+    return 0
+  fi
   # W-2 (revue vague 1) : même garde explicite que vf_record — cycle non ouvert = message clair.
   [ -n "$VF_MANIFEST_MOD" ] && [ -n "$VF_MANIFEST_TMP" ] || { log "  ERROR: vf_manifest_flush appelé hors cycle vf_manifest_reset (accumulateur manifeste non ouvert)"; return 1; }
   target="$(vf_manifest_path "$VF_MANIFEST_MOD")"
@@ -319,13 +367,30 @@ vf_manifest_flush() {
 }
 
 # vf_declare_write <verbe> <chemin> [note] — LA couture unique (D-31-01). Verbe parmi + (créer)
-# / ~ (modifier/merger) / - (supprimer). Aujourd'hui elle n'a qu'un effet : consigner <chemin>
-# via vf_record quand le verbe est +. Les verbes ~ et - ne consignent rien (le manifeste ne
-# trace que des créations, D-31-02). 31-04 y ajoutera la branche du mode plan --dry-run ; aucun
-# autre point du fichier ne devra être touché à ce moment-là. [note] est ignorée pour l'instant
-# (réservée à l'affichage `[plan] ~ <chemin>  (note)` de D-31-05, branché en 31-04).
+# / ~ (modifier/merger) / - (supprimer).
+#
+# Mode PLAN (--dry-run, D-31-05) : émet sur STDOUT `[plan] <verbe> <chemin>`, et retourne 0 SANS
+# consigner ni écrire quoi que ce soit — c'est la branche que TOUS les sites de pose traversent
+# désormais en dry-run, via ce même point unique (D-31-01 par construction). Verbe + SANS note :
+# suffixe `  (<module> <version>)` depuis le contexte courant (VF_MANIFEST_MOD, posé par
+# vf_manifest_reset — y compris en dry-run — et module_version_available). Note fournie (quel
+# que soit le verbe) : suffixe `  <note>` à la place. Ni l'un ni l'autre (verbes ~/- sans note) :
+# la ligne nue. Chemin affiché = celui REÇU, préfixe TARGET_ROOT déjà inclus par l'appelant.
+#
+# Mode POSE RÉELLE (inchangé) : consigne <chemin> via vf_record quand le verbe est +. Les verbes
+# ~ et - ne consignent rien (le manifeste ne trace que des créations, D-31-02).
 vf_declare_write() {
-  local verb="$1" path="$2"
+  local verb="$1" path="$2" note="${3:-}"
+  if vf_dry_run; then
+    if [ "$verb" = "+" ] && [ -z "$note" ]; then
+      printf '[plan] + %s  (%s %s)\n' "$path" "$VF_MANIFEST_MOD" "$(module_version_available "$VF_MANIFEST_MOD")"
+    elif [ -n "$note" ]; then
+      printf '[plan] %s %s  %s\n' "$verb" "$path" "$note"
+    else
+      printf '[plan] %s %s\n' "$verb" "$path"
+    fi
+    return 0
+  fi
   case "$verb" in
     +) vf_record "$path" ;;
     ~|-) : ;;
@@ -355,6 +420,10 @@ vf_note_degraded_copy() {
 # dans ce cas aussi.
 vf_place_file() {
   local src="$1" dest="$2" mode="${3:-}"
+  if vf_dry_run; then
+    vf_declare_write + "$dest"
+    return 0
+  fi
   local rc=0
   mkdir -p "$(dirname "$dest")"
   # Mi2 (revue 31-03) : stderr du `cp` brut supprimé — sur le chemin dégradé (B2-B4), l'appelant
@@ -393,9 +462,6 @@ vf_place_file() {
 # vf_note_degraded_copy (qui reste réservée à son unique site d'appel, le grain fichier).
 vf_place_tree() {
   local src_dir="${1%/}" dest_dir="${2%/}" mode="${3:-}"
-  mkdir -p "$dest_dir"
-  local cp_rc=""
-  cp -r "$src_dir"/* "$dest_dir"/ 2>/dev/null || cp_rc=$?
 
   # Énumération SOURCE (D-31-11 points 1/2), en DEUX passes distinctes pour garder UNE SEULE
   # boucle de vérification ensuite — c'est ce qui rend le site d'appel à vf_note_degraded_copy
@@ -403,6 +469,9 @@ vf_place_tree() {
   # dans deux branches (entrée fichier / entrée répertoire) obligeait deux sites d'appel, exactement
   # le défaut payé cinq fois sur ce helper. Ici, la passe 1 aplatit tout en une seule liste de
   # fichiers ; la passe 2 (plus bas) est l'UNIQUE boucle de vérification/consignation.
+  # 31-04 (D-31-11 point 1, R-1) : cette passe est calculée AVANT tout `cp`/`mkdir`, et c'est LA
+  # MÊME en dry-run et à la pose réelle — un seul point d'énumération, jamais un second calcul
+  # séparé sur la source, ce qui rend l'égalité plan/pose structurelle plutôt que coïncidente.
   local list_tmp entry name
   list_tmp="$(mktemp)"
   for entry in "$src_dir"/*; do
@@ -419,15 +488,39 @@ vf_place_tree() {
       # jamais un `|| true` muet (contrat Phase 30, 0 = silence) — comptée dans le même compte
       # rendu de fin de pose que les autres copies dégradées (VF_DEGRADED_COPIES_COUNT). Les
       # fichiers que `find` a pu lire AVANT de heurter le sous-répertoire illisible restent dans
-      # `$list_tmp` (la redirection `>>` s'applique quel que soit le code retour).
+      # `$list_tmp` (la redirection `>>` s'applique quel que soit le code retour). En dry-run,
+      # rien n'est en train d'être copié : ce message de copie dégradée serait un mensonge, donc
+      # tu (vf_dry_run) le tait — seule l'énumération elle-même doit rester identique.
       find "$entry" -type f >> "$list_tmp" 2>/dev/null || {
-        log "  copie dégradée : $entry (sous-répertoire illisible, énumération find en échec)"
-        VF_DEGRADED_COPIES_COUNT=$((VF_DEGRADED_COPIES_COUNT + 1))
+        if ! vf_dry_run; then
+          log "  copie dégradée : $entry (sous-répertoire illisible, énumération find en échec)"
+          VF_DEGRADED_COPIES_COUNT=$((VF_DEGRADED_COPIES_COUNT + 1))
+        fi
       }
     else
       printf '%s\n' "$entry" >> "$list_tmp"
     fi
   done
+
+  # 31-04 (D-31-11 point 1) : en dry-run, le plan s'arrête ICI — annonce directe depuis
+  # l'énumération SOURCE ci-dessus, SANS mkdir/cp ni vérification de présence en destination
+  # (elle n'existe pas encore sur un lab vierge). C'est la RÉUTILISATION de la même énumération,
+  # jamais un second `find` séparé, qui rend l'égalité de MANI-02 vraie par construction.
+  if vf_dry_run; then
+    local f rel dest_file
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      rel="${f#"$src_dir"/}"
+      dest_file="$dest_dir/$rel"
+      vf_declare_write + "$dest_file"
+    done < "$list_tmp"
+    rm -f "$list_tmp"
+    return 0
+  fi
+
+  mkdir -p "$dest_dir"
+  local cp_rc=""
+  cp -r "$src_dir"/* "$dest_dir"/ 2>/dev/null || cp_rc=$?
 
   # Passe 2 — L'UNIQUE boucle de vérification de présence : pour chaque fichier de l'énumération
   # SOURCE, teste sa présence en DESTINATION après copie (D-31-11 point 3). Présent → consigné
@@ -498,6 +591,10 @@ resolve_closure() {
 # Idempotent : pas de doublon (grep -qxF avant ajout). Crée .gitignore s'il manque.
 gitignore_add_one() {
   local path="$1"
+  if vf_dry_run; then
+    vf_declare_write "~" "./.gitignore" "$path"
+    return 0
+  fi
   # Création paresseuse du .gitignore au premier ajout.
   [ -f .gitignore ] || : > .gitignore
   if ! grep -qxF "$path" .gitignore; then
@@ -590,6 +687,16 @@ find_command_generator() {
 
 generate_agent_command_for() {
   local mod="$1" gen
+  if vf_dry_run; then
+    # 31-04 (piège de garde, D-31-04) : la CASCADE de find_command_generator regarde
+    # $TARGET_ROOT/scripts/ EN PREMIER — un candidat DESTINATION, faux sur un lab vierge en
+    # dry-run (copy_module_scripts, qui le poserait, est neutralisée). L'appelant a déjà établi
+    # la garde SOURCE (module_dir/AGENT.md existe, seule condition avant cet appel) : ne PAS
+    # invoquer find_command_generator ni exécuter le générateur — régime A, sortie prédite
+    # exactement.
+    vf_declare_write + "$TARGET_ROOT/commands/${mod}.md"
+    return 0
+  fi
   gen="$(find_command_generator)"
   if [ -z "$gen" ]; then
     log "  (commande d'incarnation non générée — generate-agent-commands.sh absent, best-effort)"
@@ -619,6 +726,17 @@ find_mcp_injector() {
 
 inject_lab_mcp_into_agents() {
   local injector
+  if vf_dry_run; then
+    # 31-04 (piège de garde, D-31-04) : find_mcp_injector regarde $TARGET_ROOT/scripts/ EN
+    # PREMIER — un candidat DESTINATION que copy_module_scripts poserait, mais qui n'existe pas
+    # encore sur un lab vierge en dry-run (copy_module_scripts est neutralisée). Sans ce
+    # court-circuit, le sous-processus s'exécuterait RÉELLEMENT via le fallback CACHE_DIR de la
+    # cascade — exactement ce qu'un dry-run interdit. L'appelant a déjà établi la garde SOURCE
+    # (AGENT.md ou agents/ présent). Régime C : effet annoncé, non énuméré, sous-processus NON
+    # appelé.
+    vf_declare_write "~" "$TARGET_ROOT/agents" "effet de inject-mcp-tools.sh, contenu non énuméré"
+    return 0
+  fi
   injector="$(find_mcp_injector)"
   if [ -z "$injector" ]; then
     log "  (injection MCP non exécutée — inject-mcp-tools.sh absent, best-effort)"
@@ -629,7 +747,7 @@ inject_lab_mcp_into_agents() {
   if bash "$injector" --target "$TARGET_ROOT/agents" --mcp-json "./.mcp.json" >/dev/null 2>&1; then
     log "  serveurs MCP du lab injectés dans les agents exécutants flaggés (vf-mcp-consumer, ADR-051)"
     # Site #19 (31-03) : régime C (D-31-04). Verbe ~ : no-op sur le manifeste.
-    vf_declare_write ~ "$TARGET_ROOT/agents" "effet de inject-mcp-tools.sh, contenu non énuméré"
+    vf_declare_write "~" "$TARGET_ROOT/agents" "effet de inject-mcp-tools.sh, contenu non énuméré"
   else
     log "  (injection MCP best-effort — voir inject-mcp-tools.sh)"
   fi
@@ -665,8 +783,13 @@ copy_engine_lib() {
     log "  ERROR: vf-portable.sh introuvable dans le cache — lib de portabilité NON posée (installer/mettre à jour l'engine)"
     return 1
   fi
-  mkdir -p "$TARGET_ROOT/scripts"
   dest="$TARGET_ROOT/scripts/vf-portable.sh"
+  if vf_dry_run; then
+    vf_declare_write + "$dest"
+    VF_ENGINE_LIB_COPIED="1"
+    return 0
+  fi
+  mkdir -p "$TARGET_ROOT/scripts"
   tmp="$dest.tmp.$$"
   # Écriture ATOMIQUE (copie vers un temporaire du MÊME répertoire, puis renommage) : une install
   # interrompue laisse soit l'ancienne lib, soit la nouvelle, jamais un fichier tronqué qu'un
@@ -720,6 +843,31 @@ merge_module_hooks() {
     # mark_installed jamais atteint : le registre ne ment pas).
     log "  ERROR: merge-hooks.sh introuvable — hooks de $mod NON câblés (gouvernance absente !)"
     return 1
+  fi
+  # 31-04 (D-31-04 régime B) : preview DÉLÉGUÉE à `merge-hooks.sh plan`, jamais réimplémentée
+  # côté engine (interdit explicite). merge-hooks.sh plan réutilise sa propre logique de merge
+  # pour rendre la MÊME répartition project/local, sur les MÊMES flags que le merge réel — la
+  # sortie stdout du sous-processus est relayée TELLE QUELLE, déjà au format `[plan] ~ …`. Le
+  # backup de settings est ANNONCÉ (même garde côté disque que le mode réel : dépend de l'état
+  # PRÉEXISTANT de settings.json, pas d'un défaut de pose de CETTE install) mais jamais copié.
+  if vf_dry_run; then
+    if [ -f "$TARGET_ROOT/settings.json" ]; then
+      local settings_backup="$BACKUP_DIR/settings-$(date +%Y%m%d-%H%M%S).json"
+      vf_declare_write + "$settings_backup"
+    fi
+    local -a plan_settings_local_args=()
+    case "$VF_SCOPE" in
+      project|local) plan_settings_local_args=(--settings-local "$TARGET_ROOT/settings.local.json") ;;
+    esac
+    local plan_rc=0
+    if [ "${#plan_settings_local_args[@]}" -gt 0 ]; then
+      bash "$merger" plan "$fragment" --settings "$TARGET_ROOT/settings.json" \
+        --scripts-prefix "$(scripts_prefix_for_scope)" "${plan_settings_local_args[@]}" || plan_rc=$?
+    else
+      bash "$merger" plan "$fragment" --settings "$TARGET_ROOT/settings.json" \
+        --scripts-prefix "$(scripts_prefix_for_scope)" || plan_rc=$?
+    fi
+    return "$plan_rc"
   fi
   # Backup du settings avant toute écriture.
   # Site #21 (31-03) : annonce en tête (verbe +), puis le cp existant reste INTENTIONNELLEMENT
@@ -796,7 +944,10 @@ copy_module_scripts() {
   local mod="$1"
   local module_dir="$CACHE_DIR/$mod"
   [ -d "$module_dir/scripts" ] || return 0
-  mkdir -p "$TARGET_ROOT/scripts"
+  # 31-04 : chaque `vf_place_file` court-circuite déjà en dry-run, mais ce `mkdir -p` est HORS du
+  # helper — sans cette garde, un dry-run créerait quand même $TARGET_ROOT/scripts sur un lab
+  # vierge (D-31-06 : « n'écrit rien du tout »).
+  vf_dry_run || mkdir -p "$TARGET_ROOT/scripts"
   # Site #2 (31-03) : GARDE D'EXISTENCE CONSERVÉE — le glob triple s'expand presque toujours en
   # littéral (rares modules ayant les trois extensions), et sous `set -euo pipefail` un
   # `vf_place_file` nu dans ce corps de boucle propagerait un échec de copie improbable en abort
@@ -835,7 +986,7 @@ copy_module_scripts() {
   # position finale de chacune des deux boucles, avorterait désormais tout le script sur un seul
   # fichier illisible ; tolérance restaurée EXPLICITEMENT (jamais un `|| true` muet).
   if [ -d "$module_dir/scripts/tests" ]; then
-    mkdir -p "$TARGET_ROOT/scripts/tests/fixtures"
+    vf_dry_run || mkdir -p "$TARGET_ROOT/scripts/tests/fixtures"
     for f in "$module_dir/scripts/tests/"*.sh; do
       [ -f "$f" ] || continue
       vf_place_file "$f" "$TARGET_ROOT/scripts/tests/$(basename "$f")" exec || {
@@ -868,13 +1019,20 @@ seed_module_registres() {
   local mod="$1"
   local seeder="$TARGET_ROOT/scripts/seed-registres.sh"
   [ -f "$CACHE_DIR/$mod/scripts/seed-registres.sh" ] || return 0
+  if vf_dry_run; then
+    # 31-04 (piège de garde, D-31-04) : [ -f "$seeder" ] est une garde DESTINATION, fausse sur
+    # un lab vierge en dry-run — la garde côté SOURCE ci-dessus a déjà tranché. Régime C : effet
+    # annoncé, non énuméré, sous-processus NON appelé.
+    vf_declare_write "~" "$TARGET_ROOT/memory" "effet de seed-registres.sh, contenu non énuméré"
+    return 0
+  fi
   [ -f "$seeder" ] || return 0
   if bash "$seeder" --quiet >/dev/null; then
     log "  registres mémoire vérifiés/instanciés → seed-registres.sh"
     # Site #18 (31-03) : régime C (D-31-04). Verbe ~ : no-op sur le manifeste (D-31-03, contenu
     # vivant du lab), no-op aussi hors cycle (appelée depuis install_module ET
     # sync_module_governance).
-    vf_declare_write ~ "$TARGET_ROOT/memory" "effet de seed-registres.sh, contenu non énuméré"
+    vf_declare_write "~" "$TARGET_ROOT/memory" "effet de seed-registres.sh, contenu non énuméré"
   else
     log "  (registres mémoire non instanciés — best-effort, voir seed-registres.sh)"
   fi
@@ -967,8 +1125,10 @@ cleanup_retired_modules() {
     # Site #5 (31-03) : annonce AVANT le rm -rf existant (verbe -, no-op sur le manifeste
     # aujourd'hui — vf_declare_write ne consigne que le verbe +, D-31-02).
     vf_declare_write - "$target"
-    [ -e "$target" ] && rm -rf "$target" && log "  removed $target"
-    [ "$in_registry" = "yes" ] && mark_uninstalled "$mod"
+    if ! vf_dry_run; then
+      [ -e "$target" ] && rm -rf "$target" && log "  removed $target"
+      [ "$in_registry" = "yes" ] && mark_uninstalled "$mod"
+    fi
   done < "$manifest"
 }
 
@@ -1053,7 +1213,7 @@ install_module() {
   # Site #10 (31-03) : glob de fichiers, pas un répertoire entier — grain fichier exigé par
   # D-31-02, boucle avec garde d'existence (le module peut n'avoir aucun rules/*.md).
   if [ -d "$module_dir/rules" ]; then
-    mkdir -p "$TARGET_ROOT/rules"
+    vf_dry_run || mkdir -p "$TARGET_ROOT/rules"
     # B2 (revue 31-03, D-31-13) : avant migration, `cp … 2>/dev/null || true`. L'appel nu au
     # helper, dernière commande de la boucle, avorterait désormais tout le script sur un seul
     # fichier illisible sous `set -e`. Tolérance restaurée EXPLICITEMENT (jamais un `|| true`
@@ -1097,15 +1257,25 @@ install_module() {
   # Hook post-install (IDX-02 / D7) : si le module fournit build-gsd-index.sh, régénérer
   # l'index factuel in-place dans le dossier references agent. Best-effort : ne JAMAIS
   # faire échouer l'install si GSD est absent (l'index sera régénéré plus tard).
-  if [ -f "$module_dir/scripts/build-gsd-index.sh" ] && [ -f "$TARGET_ROOT/scripts/build-gsd-index.sh" ]; then
-    if VF_INDEX_OUT="$TARGET_ROOT/agents/${mod}-references/gsd-skills-index.md" \
-       bash "$TARGET_ROOT/scripts/build-gsd-index.sh" >/dev/null 2>&1; then
-      log "  index régénéré → $TARGET_ROOT/agents/${mod}-references/gsd-skills-index.md"
-      # Site #14 (31-03) : régime A (D-31-04) — sortie prédite exactement, sous-processus non
-      # appelé en mode plan (31-04). Annoncée seulement au SUCCÈS (le fichier existe réellement).
+  if [ -f "$module_dir/scripts/build-gsd-index.sh" ]; then
+    if vf_dry_run; then
+      # 31-04 (piège de garde, D-31-04) : la garde DESTINATION [ -f "$TARGET_ROOT/scripts/…" ]
+      # serait FAUSSE sur un lab vierge en dry-run (copy_module_scripts, qui pose ce script,
+      # est neutralisée) alors qu'elle sera VRAIE à la pose réelle — un plan qui la garderait
+      # tairait une écriture que la pose fait. Garde basculée côté SOURCE (déjà vérifiée
+      # ci-dessus) ; la destination est considérée PLANIFIÉE, jamais lue sur disque. Régime A
+      # (D-31-04) : sortie prédite exactement, sous-processus NON appelé.
       vf_declare_write + "$TARGET_ROOT/agents/${mod}-references/gsd-skills-index.md"
-    else
-      log "  (index non régénéré — GSD absent, best-effort)"
+    elif [ -f "$TARGET_ROOT/scripts/build-gsd-index.sh" ]; then
+      if VF_INDEX_OUT="$TARGET_ROOT/agents/${mod}-references/gsd-skills-index.md" \
+         bash "$TARGET_ROOT/scripts/build-gsd-index.sh" >/dev/null 2>&1; then
+        log "  index régénéré → $TARGET_ROOT/agents/${mod}-references/gsd-skills-index.md"
+        # Site #14 (31-03) : régime A (D-31-04) — sortie prédite exactement. Annoncée seulement
+        # au SUCCÈS (le fichier existe réellement).
+        vf_declare_write + "$TARGET_ROOT/agents/${mod}-references/gsd-skills-index.md"
+      else
+        log "  (index non régénéré — GSD absent, best-effort)"
+      fi
     fi
   fi
 
@@ -1115,14 +1285,20 @@ install_module() {
   # élargirait le périmètre à un fichier d'engine partagé par tous les modules, sans bénéfice.
   # Best-effort de la même façon : un moteur GSD absent au moment de l'install DÉGRADE (une ligne
   # de journal), il n'ampute jamais l'install d'un module.
-  if [ -f "$module_dir/scripts/build-gsd-capabilities-index.sh" ] && [ -f "$TARGET_ROOT/scripts/build-gsd-capabilities-index.sh" ]; then
-    if VF_CAPS_INDEX_OUT="$TARGET_ROOT/agents/${mod}-references/gsd-capabilities-index.md" \
-       bash "$TARGET_ROOT/scripts/build-gsd-capabilities-index.sh" >/dev/null 2>&1; then
-      log "  index capabilities régénéré → $TARGET_ROOT/agents/${mod}-references/gsd-capabilities-index.md"
-      # Site #15 (31-03), symétrique du #14 — régime A (D-31-04).
+  if [ -f "$module_dir/scripts/build-gsd-capabilities-index.sh" ]; then
+    if vf_dry_run; then
+      # 31-04 : même piège de garde et même bascule côté SOURCE que le générateur d'index
+      # jumeau ci-dessus.
       vf_declare_write + "$TARGET_ROOT/agents/${mod}-references/gsd-capabilities-index.md"
-    else
-      log "  (index capabilities non régénéré — moteur GSD absent, best-effort)"
+    elif [ -f "$TARGET_ROOT/scripts/build-gsd-capabilities-index.sh" ]; then
+      if VF_CAPS_INDEX_OUT="$TARGET_ROOT/agents/${mod}-references/gsd-capabilities-index.md" \
+         bash "$TARGET_ROOT/scripts/build-gsd-capabilities-index.sh" >/dev/null 2>&1; then
+        log "  index capabilities régénéré → $TARGET_ROOT/agents/${mod}-references/gsd-capabilities-index.md"
+        # Site #15 (31-03), symétrique du #14 — régime A (D-31-04).
+        vf_declare_write + "$TARGET_ROOT/agents/${mod}-references/gsd-capabilities-index.md"
+      else
+        log "  (index capabilities non régénéré — moteur GSD absent, best-effort)"
+      fi
     fi
   fi
 
@@ -1140,14 +1316,20 @@ install_module() {
   # traverser jusqu'au journal de l'install. Avaler stderr ici rejouerait, un cran plus loin, la
   # dégradation silencieuse que ce hook existe pour fermer. Seul stdout part au trou (le script
   # n'y écrit rien — garde de forme contre une future régression).
-  if [ -f "$module_dir/scripts/ensure-design-deps.sh" ] && [ -f "$TARGET_ROOT/scripts/ensure-design-deps.sh" ]; then
-    if bash "$TARGET_ROOT/scripts/ensure-design-deps.sh" --quiet >/dev/null; then
-      log "  chaîne d'outils design vérifiée/corrigée → ensure-design-deps.sh"
-      # Site #17 (31-03) : régime C (D-31-04) — effet annoncé, non énuméré. Honnête sur sa propre
-      # limite (le script peut avoir touché divers fichiers sous scripts/, non listés ici).
-      vf_declare_write ~ "$TARGET_ROOT/scripts" "effet de ensure-design-deps.sh, contenu non énuméré"
-    else
-      log "  (chaîne d'outils design non vérifiée — best-effort, voir ensure-design-deps.sh)"
+  if [ -f "$module_dir/scripts/ensure-design-deps.sh" ]; then
+    if vf_dry_run; then
+      # 31-04 : même piège de garde que les deux générateurs d'index ci-dessus, côté régime C
+      # (D-31-04) cette fois — effet annoncé, non énuméré, sous-processus NON appelé.
+      vf_declare_write "~" "$TARGET_ROOT/scripts" "effet de ensure-design-deps.sh, contenu non énuméré"
+    elif [ -f "$TARGET_ROOT/scripts/ensure-design-deps.sh" ]; then
+      if bash "$TARGET_ROOT/scripts/ensure-design-deps.sh" --quiet >/dev/null; then
+        log "  chaîne d'outils design vérifiée/corrigée → ensure-design-deps.sh"
+        # Site #17 (31-03) : régime C (D-31-04) — effet annoncé, non énuméré. Honnête sur sa
+        # propre limite (le script peut avoir touché divers fichiers sous scripts/, non listés).
+        vf_declare_write "~" "$TARGET_ROOT/scripts" "effet de ensure-design-deps.sh, contenu non énuméré"
+      else
+        log "  (chaîne d'outils design non vérifiée — best-effort, voir ensure-design-deps.sh)"
+      fi
     fi
   fi
 
@@ -1204,6 +1386,10 @@ backup_module() {
   local ts
   ts=$(date +%Y%m%d-%H%M%S)
   local bdir="$BACKUP_DIR/$mod-$ts"
+  if vf_dry_run; then
+    vf_declare_write + "$bdir"
+    return 0
+  fi
   mkdir -p "$bdir"
   # Site #20 (31-03) : les cp/cp -r existants restent INTENTIONNELLEMENT bruts — copies de
   # sauvegarde vers .backups/**, exclues du manifeste par D-31-03 (le contenu d'un backup n'est
