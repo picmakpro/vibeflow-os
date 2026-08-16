@@ -343,6 +343,52 @@ préalable (la fonction est-elle définie ?) et se déclare **non évaluable** s
 > Leçon transférable : un test de **sous-chaîne** (`grep -qF`) sur un chemin est presque toujours un
 > faux ami — le chemin fautif contient le chemin correct. Comparer des **lignes entières**.
 
+### D-31-13 — Déplacer un appel change sa sémantique d'échec : la tolérance se **restaure explicitement**
+
+> **Ajouté le 2026-08-16**, après que la revue de `31-03` eut trouvé **quatre régressions bloquantes
+> d'une même classe**, qu'aucune des trois suites vertes (15/15, 19/19, 32/32) n'avait pu voir.
+
+**Le mécanisme, à retenir bien au-delà de cette phase.** En bash, dans une liste `a && b && c`, seule
+la **dernière** commande déclenche `errexit`. Plusieurs sites migrés portaient leur `cp` en position
+**médiane** d'une chaîne à trois commandes, ou sous un `|| true` explicite — deux formes qui
+**exemptent l'échec**. La migration a réduit chaque site à **un appel unique** de helper, qui devient
+mécaniquement la **dernière** commande de sa liste : son échec **avorte désormais tout le script**.
+
+**Rayon de souffle mesuré** : un seul fichier illisible dans le cache d'**un** module fait avorter
+`install` — et dans une boucle `install --all` / `update --all` / `ensure_mandatory_baseline`, **tous
+les modules suivants ne sont jamais installés**.
+
+**Décision** : un refactor qui déplace un appel **ne préserve pas** sa sémantique d'échec par défaut.
+La tolérance pré-existante se **restaure explicitement**, site par site, et se **prouve par injection
+de panne**. Un appel nu en **position finale de boucle** est interdit sur un chemin qui était
+tolérant avant.
+
+**Corollaire de test, qui est la vraie leçon** : les trois suites ne testaient que le cas « **glob non
+satisfait** », jamais un **échec réel** de `cp`/`find`. Une suite qui n'exerce que le chemin heureux
+ne peut pas voir une régression de tolérance — et une preuve d'équivalence par md5 (qui a bien été
+produite, fichier à fichier, sur 262 fichiers) porte elle aussi **uniquement sur le chemin heureux**.
+**Deux preuves solides du chemin nominal ne disent rien du chemin dégradé.** Toute suite couvrant un
+chemin tolérant doit porter au moins un cas d'**injection de panne réelle**.
+
+### D-31-14 — Le no-op hors cycle est **sûr**, mais il se dit — une ligne par module, pas par chemin
+
+Verdict argumenté de la revue, retenu : la consignation silencieusement no-op de
+`sync_module_governance` **n'est pas** un risque de suppression. `vf_manifest_flush` **écrase**
+(`mv`) au lieu de fusionner, et `sync` n'ouvre jamais de cycle : le fichier dérivé est donc absent
+des **deux** côtés du diff ancien↔nouveau, jamais candidat à une suppression. Ouvrir un cycle dans
+`sync` serait **pire** : le flush **tronquerait** le manifeste complet au sous-ensemble que le resync
+touche.
+
+**Décision** : garder le no-op, mais **une ligne de compte rendu par module** en fin de `sync`
+(« N chemins posés hors cycle manifeste, non consignés »), **jamais une ligne par chemin** — sur un
+parc de 17 modules, `update --all` en produirait des dizaines, et un signal qui spamme cesse d'être
+lu. Motif : D-31-11.4 a établi que ce qui échoue ne doit pas se taire ; un no-op qui **perd une
+information** relève du même contrat, à un grain qui reste lisible.
+
+> **À porter en entrée de `31-05`** : le manifeste **n'est pas garanti à jour** après un `update` à
+> version inchangée. La fenêtre est **bornée et auto-cicatrisante** (le prochain vrai bump recapture
+> le fichier), mais `31-05` ne doit **pas** supposer le manifeste exhaustif au sortir d'un `update`.
+
 ## 4. Contraintes d'exécution non négociables
 
 1. **Branche de phase avant tout commit.** Jamais un commit sur `main`.
