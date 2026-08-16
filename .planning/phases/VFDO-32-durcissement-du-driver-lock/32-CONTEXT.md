@@ -397,6 +397,57 @@ premier si la phase deborde. Si coupe, **QUAL-01 retombe sur son trou** : le che
 indisponible » redevient fail-open silencieux SANS lecteur, a retracer explicitement comme dette
 en fin de phase (pas a laisser croire couvert).
 
+### AMENDEMENT du 2026-08-17 — arbitrage humain sur les deux points geles de la re-validation externe
+
+Deux verificateurs frais (goal-backward + red team) ont ete dispatches en direct par le manager sur
+les six plans produits. Deux points ont ete geles pour arbitrage humain (Samuel) ; les deux sont
+tranches ici, et amendent les decisions ci-dessus.
+
+**Amendement a D-32-07 — le perimetre « conductor seul » ne tient plus, sur assumtion explicite.**
+D-32-07 concluait « zero ligne a ecrire hors `conductor` ». Ceci reste vrai pour le **code** (aucun
+script d'un module tiers n'est modifie), mais **cinq agents managers dans quatre modules tiers**
+(`dev-orchestrator`, `design-orchestrator`, `content-bundle`, `business-pilot-bundle`,
+`growth-bundle`) prescrivent `acquire` comme premier geste de mission et documentent l'ANCIEN
+contrat (recuperation implicite d'un lock perime). Sans correction, un manager qui rencontre un
+lock perime apres la Phase 32 ne connait pas le verbe `takeover` : la mission gele. Samuel a
+tranche l'**option B (synchronisation complete)**, plus large que l'option minimale recommandee
+(un champ `hint` in-band suffisant mais silencieux pour la doctrine ecrite) : le champ `hint` est
+conserve **en plus**, pas a la place. Sept fichiers sont a resynchroniser :
+`plugin/dev-orchestrator/agents/vf-dev-manager.md`, `plugin/design-orchestrator/agents/vf-design-manager.md`,
+`plugin/content-bundle/agents/vf-content-manager.md`, `plugin/business-pilot-bundle/agents/vf-business-manager.md`,
+`plugin/growth-bundle/agents/vf-growth-manager.md`, `plugin/dev-orchestrator/references/mission-flow.md`,
+`plugin/dev-orchestrator/README.md`. Aucune prose morte ne doit y survivre : plus aucun de ces
+fichiers ne doit decrire l'ancien contrat (« lock perime → `acquire` recupere »,
+`recovered: true` comme chemin nominal). Porte par le plan **32-07**, active (il n'est plus
+« a preparer sans activer »). Consequence assumee et planifiee : `check-agents.sh` et les gates de
+version repassent sur les quatre modules touches → chacun des quatre bumpe sa propre `VERSION`,
+`module.json`, `CHANGELOG.md` et l'en-tete `**Version**` de son README, gates par
+`check-version-sync.sh`. La 3e ecriture hors `conductor` deja identifiee par la re-validation
+(`plugin/_internal/tests/test-vf-portable.sh`, couverture checksum du 5e consommateur du bloc
+`vf-portable:locator` — `guard-file-size.sh:37-73` etant la source reelle, jamais copiee
+verbatim depuis `vf-portable.sh` qui ne porte aucun marqueur) est absorbee par ce meme
+amendement : elle n'a plus besoin d'un traitement separe.
+
+**Amendement a D-32-02 — fermeture d'un trou de la voie legacy, PAS une reouverture du protocole.**
+Mesure sur le script actuel, non modifie : un lock **legacy** (dossier reel, pas un lien) frais et
+tenu par ALICE laisse `acquire --owner=BOB` rendre `{"acquired": true}` — deux managers actifs
+simultanement. Cause : en voie libre (bloc 1 d'`acquire`, L177), `ln_atomic` echoue a departager
+quand `$LOCK_DIR` est un **vrai dossier** plutot qu'un lien — `ln -sh`/`ln -sn` ne protegent que
+si la cible est un LIEN vers un dossier ; sur un dossier reel, le lien atterrit **dedans**
+(meme piege documente pour `mv_link`, L60-62) et la commande rend 0. Consequence derivee : le cas
+T12 de `test-driver-lock.sh` passait par ce bug sans jamais traverser le chemin de recuperation.
+Samuel tranche l'**option A** : corriger le trou **dans la phase**, porte par le plan **32-02**
+(tache 1, voie libre) — une garde d'existence AVANT le lien, quelle que soit la forme de
+`$LOCK_DIR`, refuse la voie libre si le chemin existe deja sous quelque forme. La prohibition
+« ne jamais rouvrir le protocole d'acquisition symlink-generation » de D-32-01/D-32-02 ne couvre
+PAS cette fermeture : elle vise la reecriture du protocole de reprise (mutex, double
+revalidation), pas la garde d'existence de la voie libre — motif a re-ecrire dans le plan 32-02
+pour que la prohibition ne se contredise pas elle-meme. Motif de fond : nominal sur Git Bash
+Windows sans privilege de lien symbolique (le milestone est Windows-first), et la mesure du
+double-detenteur est la preuve du trou. T12 est reecrit pour asserter l'**owner effectif apres
+coup** (lecture du `meta` reel), jamais le JSON rendu par l'appel lui-meme — sinon le cas continue
+de passer par le bug sans le prouver.
+
 </decisions>
 
 <canonical_refs>
