@@ -333,6 +333,41 @@ release `v2.53.0`, hotfix `v2.53.1` sur les hooks exec).
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
 
+- **2026-08-16/17 — Phase 32 (Durcissement du driver-lock) : cadrage et plans arrêtés, quatre
+  arbitrages humains, tous nés d'une mesure qui contredisait une prémisse écrite.** Détail :
+  `32-CONTEXT.md`, preuves dans `32-SPIKE-reference-transaction.md`, `32-REJEU-contournements.md`,
+  `32-TERRAIN.md`.
+
+  1. **D-32-A (1B) — le blocage du checkout ne passe PAS par `reference-transaction`.** Le spike a
+     rendu *PAS SÛR* : le hook wedge `rebase` en refusant son propre `--abort`, casse `worktree add`
+     en fuitant la branche, se contourne par `-c core.hooksPath=/dev/null` — que quatre de nos
+     `check-*.sh` utilisent déjà — et est aveugle sur git < 2.46. Le blocage est porté par le guard
+     `PreToolUse(Bash)`, qui refuse avant que git ne tourne. Critère 3 du ROADMAP amendé.
+
+  2. **D-32-B (2B) — le guard couvre `Bash` PLUS `Write|Edit` restreint à `.planning/`.** Le rejeu
+     a montré **4 incidents / 3 gestes**, pas 2 : l'incident du 2026-07-31 est passé par les outils
+     d'écriture natifs, hors de portée d'un guard Bash seul. Critère 2 amendé.
+
+  3. **D-32-QUAL (QUAL B) — « BRUYANT » n'existait pas.** Mesuré : `exit 17` + stderr n'atteint ni
+     le modèle ni l'humain, `systemMessage` sur `allow` n'atteint pas le modèle, et les marqueurs
+     `VF_GUARD_HEALTH_DIR` n'ont **aucun consommateur** — le « hook doctor » spécifié le 2026-08-02
+     n'a jamais été écrit. Extension de périmètre assumée : la phase livre ce hook doctor
+     `SessionStart`, **générique** (lecteur des marqueurs de tout le parc), avec sa suite et sa
+     mutation. QUAL-01 passe à **quatre** issues, pas trois.
+
+  4. **3B et 4A (2026-08-17) — le périmètre « ne touche que `conductor` » est tombé, et un trou
+     préexistant du lock est corrigé.** `acquire` cessant de récupérer un lock périmé, 5 agents
+     managers de 4 modules tiers + `mission-flow.md` + un README prescrivaient un contrat mort :
+     synchronisation doctrinale complète retenue (option 3B), plus un champ `hint` in-band sur le
+     refus. Et (4A) un lock **legacy** frais tenu par autrui laissait un second `acquire` rendre
+     `acquired:true` — deux détenteurs, mesuré, avec le cas T12 qui passait *par* ce bug : corrigé
+     dans la phase, ce qui ne rouvre pas le protocole symlink-génération mais ferme sa voie legacy.
+
+  **Leçon de méthode, la même qu'en Phase 31** : le plan-checker interne a rendu « PASSED,
+  0 blocker » ; deux vérificateurs frais dispatchés en direct ont trouvé **9 bloquants et
+  15 findings**, la plupart vérifiés par exécution — dont un guard aveugle au chaînage par saut de
+  ligne, qui aurait laissé passer l'incident I4 avec tous les cas de test verts.
+
 - **2026-08-16 — Phase 31 (Manifeste d'install + dry-run, issue #20) livrée — six arbitrages
   D-31-11 à D-31-16, tous nés de re-validations trouvant des défauts qu'une suite verte n'avait pas
   vus.** Détail complet : `31-CONTEXT.md`.
