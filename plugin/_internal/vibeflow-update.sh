@@ -1351,10 +1351,18 @@ ensure_mandatory_baseline() {
 
 # ---------- Modules retirés (convergence, CONS-01) ----------
 # Un module supprimé du parc (ex. feature-dev-gates, fusionné dans software-architecture) laisse des
-# artefacts ORPHELINS dans les labs qui l'avaient installé. uninstall_module lit les artefacts DEPUIS
-# le cache — absent pour un module retiré — donc le nettoyage s'appuie sur un manifeste EN DUR :
-# _internal/retired-modules.txt (format `module:artefact` relatif à TARGET_ROOT, une ligne/artefact ;
-# `#` = commentaire). Idempotent : ne retire que ce qui existe encore. Appelé à `update --all`.
+# artefacts ORPHELINS dans les labs qui l'avaient installé. HISTORIQUEMENT, uninstall_module lisait
+# les artefacts DEPUIS le cache — absent pour un module retiré — donc le nettoyage s'appuyait sur un
+# manifeste EN DUR : _internal/retired-modules.txt (format `module:artefact` relatif à TARGET_ROOT,
+# une ligne/artefact ; `#` = commentaire).
+#
+# Depuis 31-07 (D-31-09), uninstall_module lit d'abord le manifeste DE POSE (.vibeflow-manifest-<mod>,
+# 31-05) — un module dont le manifeste est encore lisible est désinstallable même disparu du cache.
+# CE fichier-ci (retired-modules.txt) reste en place pour le parc PRÉ-Phase-31 (labs installés avant
+# que le manifeste existe, où il n'y a donc rien à lire) et POUR LA MÉMOIRE des modules déjà retirés
+# du catalogue — mais il CESSE DE GROSSIR : plus aucun nouveau module retiré n'a besoin d'y être
+# ajouté, le manifeste couvre désormais le cas général. Idempotent : ne retire que ce qui existe
+# encore. Appelé à `update --all`.
 find_retired_manifest() {
   local c
   c="$CACHE_DIR/_internal/retired-modules.txt"; [ -f "$c" ] && { echo "$c"; return 0; }
@@ -1696,15 +1704,63 @@ rollback_module() {
 }
 
 # ---------- Uninstall ----------
-uninstall_module() {
-  # 31-03 (D-31-09) : non migré vers le socle manifeste — le passage au manifeste est planifié
-  # comme dernière vague EXPLICITEMENT ABANDONNABLE (31-07 — Mi3, revue 31-03 : ce commentaire
-  # citait à tort 31-08, qui est la réponse à l'issue #20) si le plan de la phase enfle. Le
-  # migrer ici en ferait un lot non abandonnable par accident.
-  local mod="$1"
-  log "Désinstallation $mod (scope=$VF_SCOPE → $TARGET_ROOT)..."
-  backup_module "$mod"
+# vf_uninstall_from_manifest <mod> <manifest_content> — chemin MANIFESTE de la désinstallation
+# (D-31-09, 31-07) : retire EXACTEMENT ce que le manifeste dit avoir été posé, via vf_removable
+# (MÊME socle que la convergence à l'update, jamais recopié — un seul jeu de garde-fous, y
+# compris la résolution physique de D-31-15). Plus fiable que l'énumération depuis le cache
+# ci-dessous : un module disparu du cache reste désinstallable, trou que retired-modules.txt
+# rattrapait jusqu'ici en dur.
+_vf_uninstall_from_manifest() {
+  local mod="$1" manifest_content="$2"
+  local rel full prune_rc prune_dir
+  local -a removed=() refused=()
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    full="$TARGET_ROOT/$rel"
+    if ! vf_removable "$rel"; then
+      [ -n "$VF_REMOVABLE_REASON" ] && refused+=("$rel : $VF_REMOVABLE_REASON")
+      continue
+    fi
+    rm -f "$full"
+    log "  removed $full"
+    removed+=("$rel")
+    # Élagage NON récursif, en REMONTANT l'arborescence jusqu'à TARGET_ROOT (jamais rm -rf) :
+    # un fichier posé par vf_place_tree peut être niché sous plusieurs niveaux propres au module
+    # (skills/<mod>/references/<sous-dossier>/…) — un rmdir borné au SEUL dossier parent direct
+    # (patron de la convergence, où un manifeste ne diffère jamais que d'un fichier à la fois)
+    # laissait ici des dossiers intermédiaires vides. S'arrête dès qu'un rmdir échoue (dossier
+    # partagé encore non vide, ex. scripts/, skills/) — jamais un faux message, D-31-14.
+    prune_dir="$(dirname "$full")"
+    while [ "$prune_dir" != "$TARGET_ROOT" ]; do
+      prune_rc=0
+      rmdir "$prune_dir" 2>/dev/null || prune_rc=$?
+      [ "$prune_rc" -eq 0 ] || break
+      prune_dir="$(dirname "$prune_dir")"
+    done
+  done < <(printf '%s\n' "$manifest_content")
 
+  # Élagage supplémentaire des dossiers partagés connus (patron historique de l'énumération
+  # cache ci-dessous), au cas où le manifeste ne portait aucun fichier direct de ces dossiers.
+  prune_rc=0
+  rmdir "$TARGET_ROOT/scripts/tests/fixtures" 2>/dev/null || prune_rc=$?
+  rmdir "$TARGET_ROOT/scripts/tests" 2>/dev/null || prune_rc=$?
+  rmdir "$TARGET_ROOT/scripts" 2>/dev/null || prune_rc=$?
+
+  log "  désinstallation de $mod (manifeste) : ${#removed[@]} chemin(s) retiré(s)"
+  if [ "${#refused[@]}" -gt 0 ]; then
+    log "  désinstallation de $mod (manifeste) : ${#refused[@]} chemin(s) refusé(s) (garde de sûreté déclenchée, aucune suppression)"
+    for rel in "${refused[@]}"; do
+      log "    - $rel"
+    done
+  fi
+}
+
+# _vf_uninstall_from_cache <mod> — chemin de REPLI (D-31-07, repli gracieux) : l'énumération
+# HISTORIQUE depuis le cache, préservée SANS MODIFICATION pour les deux cas où le manifeste ne
+# peut pas servir de source de vérité : (2) absent — un lab installé AVANT cette phase n'a aucun
+# manifeste, et doit rester désinstallable exactement comme avant, jamais amputé.
+_vf_uninstall_from_cache() {
+  local mod="$1"
   # Remove skill dir (Type 1 — skill mono)
   if [ -d "$TARGET_ROOT/skills/$mod" ]; then
     rm -rf "$TARGET_ROOT/skills/$mod"
@@ -1781,6 +1837,33 @@ uninstall_module() {
       [ -f "$TARGET_ROOT/rules/$name" ] && rm "$TARGET_ROOT/rules/$name" && log "  removed $TARGET_ROOT/rules/$name"
     done
   fi
+}
+
+# uninstall_module <mod> — routage sur le manifeste (D-31-09, 31-07) : le verbe le plus destructif
+# du moteur lit désormais ce qui a RÉELLEMENT été posé, au lieu de reconstruire depuis le cache
+# (faux dès que le module en a disparu). Trois issues, EXACTEMENT celles de vf_manifest_read —
+# aucune logique de suppression dupliquée ici, tout passe par _vf_uninstall_from_manifest /
+# _vf_uninstall_from_cache / vf_removable :
+#   0 (valide)    → chemin manifeste.
+#   1 (imparsable)→ ABSTENTION TOTALE sur les artefacts (D-31-07 : le doute ne supprime jamais).
+#                   vf_manifest_read a déjà loggué le motif ET l'abstention.
+#   2 (absent)    → repli gracieux : chemin cache INCHANGÉ (parc pré-Phase-31 toujours
+#                   désinstallable, jamais amputé).
+# Dans les TROIS cas : backup_module (déjà fait plus haut), remove_module_hooks, le retrait du
+# manifeste lui-même et mark_uninstalled restent au même endroit — ce ne sont pas des artefacts de
+# pose, la garde D-31-07 ne les concerne pas.
+uninstall_module() {
+  local mod="$1"
+  log "Désinstallation $mod (scope=$VF_SCOPE → $TARGET_ROOT)..."
+  backup_module "$mod"
+
+  local manifest_rc=0 manifest_content=""
+  manifest_content="$(vf_manifest_read "$mod")" || manifest_rc=$?
+  case "$manifest_rc" in
+    0) _vf_uninstall_from_manifest "$mod" "$manifest_content" ;;
+    2) _vf_uninstall_from_cache "$mod" ;;
+    *) log "  désinstallation de $mod : manifeste imparsable — AUCUN artefact retiré (abstention, le doute ne supprime jamais)" ;;
+  esac
 
   # Hooks de gouvernance (ADR-043) : retirer les entrées du module de settings.json.
   remove_module_hooks "$mod"
@@ -1788,7 +1871,9 @@ uninstall_module() {
   # M6 (revue 31-03) : sans ce retrait, le manifeste .vibeflow-manifest-<mod> survit à la
   # désinstallation — un module FANTÔME que le commentaire de vf_manifest_reset (~276-278)
   # annonce comme découvert PAR GLOB en 31-05/31-07. rm -f, jamais fatal (uninstall_module
-  # n'ouvre pas de cycle manifeste, D-31-09 — rien à consigner sur son propre retrait).
+  # n'ouvre pas de cycle manifeste, D-31-09 — rien à consigner sur son propre retrait). Retiré
+  # QUELLE QUE SOIT l'issue de la lecture ci-dessus (même un manifeste imparsable est remplacé,
+  # jamais laissé en l'état — le prochain install le réécrira proprement).
   local manifest_file
   manifest_file="$(vf_manifest_path "$mod")"
   [ -f "$manifest_file" ] && rm -f "$manifest_file" && log "  removed $manifest_file"

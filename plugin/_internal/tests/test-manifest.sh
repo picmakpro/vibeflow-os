@@ -1462,6 +1462,165 @@ else
 fi
 rm -rf "$LAB28" "$ATTACKER28"
 
+# ===========================================================================
+# T29-T33 (31-07, D-31-09) — uninstall_module lit le manifeste. NOMMAGE : le 31-07-PLAN.md
+# désignait ces cas T21-T25, mais ces noms sont déjà pris par T21 (resync) et T22 (dry-run de
+# convergence) livrés en 31-05, ainsi que T23-T27 (D-31-15 et suites) livrés par la correction
+# ciblée du même lot — même piège de collision que TD1-TD8/T17-T22 avant eux (voir en-tête).
+# Renommés T29-T33 en conservant l'ordre et l'intention exacts du plan.
+# T29 (= T21 du plan) — module disparu du cache : intégralement désinstallable via le manifeste.
+# T30 (= T22 du plan) — fichier tiers intact ET vf-portable.sh (lib partagée, condition (f))
+#      intact — cible de la mutation rouge de ce lot (condition (f) neutralisée dans vf_removable).
+# T31 (= T23 du plan) — manifeste absent : repli gracieux, chemin cache inchangé, pas d'amputation.
+# T32 (= T24 du plan) — manifeste imparsable : AUCUN artefact retiré, bruyant.
+# T33 (= T25 du plan) — trace nettoyée : .vibeflow-manifest-<mod> absent après uninstall.
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# T29 — module disparu du CACHE (le trou fermé) : install réel, puis le dossier du module est
+# supprimé du cache, puis `uninstall`. La liste attendue est dérivée du MANIFESTE réel (lu AVANT
+# l'uninstall), jamais codée en dur — le test consomme la même source de vérité que l'engine.
+# ---------------------------------------------------------------------------
+LAB29="$(mktemp -d)"
+CACHE29="$LAB29/cache"
+if prepare_module "$CACHE29" "software-architecture"; then
+  (cd "$LAB29" && VIBEFLOW_CACHE="$CACHE29" bash "$INSTALLER" install software-architecture >/dev/null 2>&1)
+  T29_MANIFEST="$LAB29/.claude/scripts/.vibeflow-manifest-software-architecture"
+  if [ -s "$T29_MANIFEST" ]; then
+    T29_PATHS="$(cat "$T29_MANIFEST")"
+    rm -rf "$CACHE29/software-architecture"
+    T29_OUT="$(mktemp)"
+    (cd "$LAB29" && VIBEFLOW_CACHE="$CACHE29" bash "$INSTALLER" uninstall software-architecture) >"$T29_OUT" 2>&1
+    T29_RC=$?
+    T29_MISS=0
+    while IFS= read -r p; do
+      [ -n "$p" ] || continue
+      [ ! -e "$LAB29/.claude/$p" ] || T29_MISS=1
+    done < <(printf '%s\n' "$T29_PATHS")
+    if [ "$T29_RC" -eq 0 ] && [ "$T29_MISS" -eq 0 ]; then
+      ok "T29 : module disparu du cache — intégralement désinstallable via le manifeste (chaque chemin du manifeste absent après uninstall)"
+    else
+      ko "T29 : au moins un chemin du manifeste encore présent après uninstall (rc=$T29_RC) — voir $T29_OUT"
+    fi
+    rm -f "$T29_OUT"
+  else
+    skip "T29 : manifeste vide ou absent après install"
+  fi
+else
+  skip "T29 : software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB29"
+
+# ---------------------------------------------------------------------------
+# T30 — fichier TIERS jamais manifesté ET lib PARTAGÉE de l'engine (scripts/vf-portable.sh,
+# condition (f) de vf_removable, D-31-03) survivent tous les deux à l'uninstall.
+#
+# vf-portable.sh N'apparaît JAMAIS dans un manifeste écrit normalement (exclu DÈS l'écriture,
+# vf_record → vf_manifest_excluded) : sans le forcer à la main dans le manifeste, la mutation de
+# la condition (f) ne serait JAMAIS EXERCÉE par ce test (mutant mort mesuré — même piège que T18,
+# 31-05-SUMMARY) puisque la ligne ne serait de toute façon jamais itérée par
+# _vf_uninstall_from_manifest. Injecté À LA MAIN, comme T25 le fait côté convergence, pour que la
+# mutation ait une cible RÉELLE (31-CONTEXT.md, action de la tâche 2).
+# ---------------------------------------------------------------------------
+LAB30="$(mktemp -d)"
+CACHE30="$LAB30/cache"
+if prepare_module "$CACHE30" "software-architecture"; then
+  (cd "$LAB30" && VIBEFLOW_CACHE="$CACHE30" bash "$INSTALLER" install software-architecture >/dev/null 2>&1)
+  mkdir -p "$LAB30/.claude/rules"
+  printf 'fichier tiers, jamais manifesté\n' > "$LAB30/.claude/rules/z-tiers-uninstall.md"
+  T30_MANIFEST="$LAB30/.claude/scripts/.vibeflow-manifest-software-architecture"
+  T30_PORTABLE="$LAB30/.claude/scripts/vf-portable.sh"
+  [ -f "$T30_PORTABLE" ] || printf '#!/usr/bin/env bash\n' > "$T30_PORTABLE"
+  printf 'scripts/vf-portable.sh\n' >> "$T30_MANIFEST"
+  LC_ALL=C sort -u -o "$T30_MANIFEST" "$T30_MANIFEST"
+  T30_OUT="$(mktemp)"
+  (cd "$LAB30" && VIBEFLOW_CACHE="$CACHE30" bash "$INSTALLER" uninstall software-architecture) >"$T30_OUT" 2>&1
+  T30_RC=$?
+  if [ "$T30_RC" -eq 0 ] \
+     && [ -f "$LAB30/.claude/rules/z-tiers-uninstall.md" ] \
+     && [ "$(cat "$LAB30/.claude/rules/z-tiers-uninstall.md")" = "fichier tiers, jamais manifesté" ] \
+     && [ -f "$T30_PORTABLE" ]; then
+    ok "T30 : fichier tiers ET lib partagée de l'engine (vf-portable.sh, entrée forcée au manifeste) survivent à l'uninstall"
+  else
+    ko "T30 : fichier tiers ou lib partagée altéré/supprimé à tort (rc=$T30_RC) — voir $T30_OUT"
+  fi
+  rm -f "$T30_OUT"
+else
+  skip "T30 : software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB30"
+
+# ---------------------------------------------------------------------------
+# T31 — manifeste ABSENT (supprimé après l'install, simule un lab pré-Phase-31) : repli gracieux
+# sur l'énumération de cache actuelle, INCHANGÉE — désinstallation non amputée.
+# ---------------------------------------------------------------------------
+LAB31="$(mktemp -d)"
+CACHE31="$LAB31/cache"
+if prepare_module "$CACHE31" "software-architecture"; then
+  (cd "$LAB31" && VIBEFLOW_CACHE="$CACHE31" bash "$INSTALLER" install software-architecture >/dev/null 2>&1)
+  rm -f "$LAB31/.claude/scripts/.vibeflow-manifest-software-architecture"
+  T31_OUT="$(mktemp)"
+  (cd "$LAB31" && VIBEFLOW_CACHE="$CACHE31" bash "$INSTALLER" uninstall software-architecture) >"$T31_OUT" 2>&1
+  T31_RC=$?
+  if [ "$T31_RC" -eq 0 ] \
+     && [ ! -d "$LAB31/.claude/skills/software-architecture" ] \
+     && "$GREP" -qF "absent" "$T31_OUT"; then
+    ok "T31 : manifeste absent — repli gracieux sur l'énumération de cache, désinstallation NON amputée"
+  else
+    ko "T31 : repli gracieux non conforme (rc=$T31_RC) — voir $T31_OUT"
+  fi
+  rm -f "$T31_OUT"
+else
+  skip "T31 : software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB31"
+
+# ---------------------------------------------------------------------------
+# T32 — manifeste IMPARSABLE (ligne corrompue injectée) : AUCUN artefact retiré (les deux moitiés
+# du contrat — bruyant ET non destructif — comme à la convergence, 31-CONTEXT.md §4 point 3).
+# ---------------------------------------------------------------------------
+LAB32="$(mktemp -d)"
+CACHE32="$LAB32/cache"
+if prepare_module "$CACHE32" "software-architecture"; then
+  (cd "$LAB32" && VIBEFLOW_CACHE="$CACHE32" bash "$INSTALLER" install software-architecture >/dev/null 2>&1)
+  T32_MANIFEST="$LAB32/.claude/scripts/.vibeflow-manifest-software-architecture"
+  printf '/etc/passwd\n' >> "$T32_MANIFEST"
+  T32_OUT="$(mktemp)"
+  (cd "$LAB32" && VIBEFLOW_CACHE="$CACHE32" bash "$INSTALLER" uninstall software-architecture) >"$T32_OUT" 2>&1
+  T32_RC=$?
+  if [ "$T32_RC" -eq 0 ] \
+     && [ -f "$LAB32/.claude/skills/software-architecture/SKILL.md" ] \
+     && "$GREP" -q "inutilisable" "$T32_OUT" \
+     && "$GREP" -qF "AUCUN artefact retiré" "$T32_OUT"; then
+    ok "T32 : manifeste imparsable — AUCUN artefact retiré (bruyant ET non destructif)"
+  else
+    ko "T32 : manifeste imparsable non conforme (rc=$T32_RC) — voir $T32_OUT"
+  fi
+  rm -f "$T32_OUT"
+else
+  skip "T32 : software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB32"
+
+# ---------------------------------------------------------------------------
+# T33 — trace nettoyée : .vibeflow-manifest-software-architecture n'existe plus après un
+# uninstall réussi (chemin manifeste, cas nominal).
+# ---------------------------------------------------------------------------
+LAB33="$(mktemp -d)"
+CACHE33="$LAB33/cache"
+if prepare_module "$CACHE33" "software-architecture"; then
+  (cd "$LAB33" && VIBEFLOW_CACHE="$CACHE33" bash "$INSTALLER" install software-architecture >/dev/null 2>&1)
+  (cd "$LAB33" && VIBEFLOW_CACHE="$CACHE33" bash "$INSTALLER" uninstall software-architecture >/dev/null 2>&1)
+  if [ ! -f "$LAB33/.claude/scripts/.vibeflow-manifest-software-architecture" ]; then
+    ok "T33 : .vibeflow-manifest-software-architecture retiré à la désinstallation (pas de module fantôme)"
+  else
+    ko "T33 : manifeste survit à la désinstallation"
+  fi
+else
+  skip "T33 : software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB33"
+
 # ---------------------------------------------------------------------------
 # T0 — anti-vert-à-vide (contrat F13) : la suite doit compter au moins une assertion.
 # ---------------------------------------------------------------------------
