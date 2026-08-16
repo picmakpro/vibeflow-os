@@ -206,6 +206,52 @@ sont **une seule tâche, un seul commit**. Tout plan qui les sépare est à corr
 > indiscernable d'une énumération exhaustive tant qu'on ne relit pas la source. Un arbitrage qui
 > repose sur une absence doit citer la ligne qui la prouve — celui-ci ne le faisait pas.
 
+### D-31-11 — `vf_place_tree` : le plan **prédit depuis la source**, le manifeste **consigne la destination**
+
+> **Ajouté le 2026-08-16**, après que la re-validation eut trouvé quatre défauts d'affilée sur ce
+> seul mécanisme (BL-4, BL-5, puis deux régressions de la passe de correction). Quatre point-fixes
+> sur la même normalisation signalent une **classe non fermée**, pas une suite de maladresses : le
+> cadrage avait laissé une couture, la voici fermée.
+
+**La couture** : la copie de répertoire est le **seul** site où « même chemin de code » ne peut pas
+signifier « même source de données ». En dry-run la destination n'existe pas — un `find` sur elle
+n'annonce rien, donc les 5 sites `cp -r` (l. 610, 639, 656, 664, 672) seraient **muets au plan**.
+Mais consigner depuis la source à la pose fait affirmer au manifeste des fichiers que le glob n'a
+jamais copiés. Les deux moitiés sont vraies ; c'est la répartition qui manquait.
+
+**Décision, en quatre points** :
+
+1. **Le plan énumère depuis la SOURCE, dans les deux modes** — donc l'annonce est rigoureusement le
+   même objet en dry-run et à la pose, ce que le test d'égalité exige. Règle de mapping écrite :
+   tout fichier retenu sous `<src_dir>` est annoncé en `<dest_dir>/<chemin relatif à src_dir>`.
+2. **L'énumération reproduit exactement la sémantique de la copie**, pas celle de `find` : le helper
+   énumère ce que `cp -r "$src_dir"/*` copierait — c'est-à-dire **sans les entrées de premier niveau
+   commençant par `.`**, que le glob écarte et qu'un `find -type f` nu inclurait. Plan et pose
+   coïncident alors **par construction**, et le comportement d'aujourd'hui est conservé au fichier
+   près. Un cas de suite fige ce point (un dotfile en tête de fixture n'est **ni annoncé ni posé**),
+   pour que ce soit un choix visible et non un effet de bord.
+3. **Le manifeste consigne la DESTINATION, après copie** — seuls les chemins réellement présents y
+   entrent. Le manifeste est une **trace**, jamais une prédiction : c'est ce qui autorise `31-05` à
+   s'en servir pour supprimer.
+4. **Une divergence plan/manifeste est une copie dégradée, et elle cesse d'être silencieuse** :
+   chaque chemin annoncé mais absent après copie est **journalisé**, et le compte rendu en fin de
+   pose. **La pose n'échoue pas** — D-31-01 exige un refactor sans changement de comportement
+   observable, et transformer une copie partielle en install avortée en serait un.
+
+**Ce que cela règle mécaniquement** : les deux critères d'acceptation de `31-03` tâche 2, jusqu'ici
+mutuellement exclusifs, redeviennent satisfiables ensemble. « Plus aucun `cp` direct vers
+`$TARGET_ROOT` dans `install_module` » et « aucun `|| true` dans les nouveaux helpers » ne se
+contredisent plus, parce que le `2>/dev/null || true` n'est **ni conservé ni supprimé** : il est
+**déplacé dans le helper et rendu observable**. La tolérance survit — la copie dégradée passe
+toujours — mais elle est constatée et dite, au lieu d'être avalée. C'est la lecture stricte du
+contrat Phase 30 (« 0 = silence ») : ce qui échoue ne doit pas se taire, mais rien n'oblige à en
+mourir.
+
+> **Non tranché ici, et c'est délibéré** : les fichiers cachés placés dans un sous-dossier de module
+> ne sont **pas copiés aujourd'hui** (le glob les écarte). Le point 2 **gèle** ce comportement au
+> lieu de le corriger — le corriger serait un changement de comportement hors des quatre critères.
+> Consigné en §7.
+
 ### D-31-09 — Lecteurs du manifeste livrés : `update` **oui**, `uninstall` **en dernière vague, abandonnable**
 
 `ARCHITECTURE.md` §3.1 liste quatre lecteurs. Les critères de succès n'en imposent qu'un
@@ -277,3 +323,8 @@ des README de modules est gaté par `check-version-sync.sh`).
 3. **`docs/<module>/` écrit relativement au cwd** et non au scope (634-635) : en scope `user`, la doc
    d'un module atterrit dans le répertoire courant de l'utilisateur. Incohérence pré-existante,
    **non corrigée** ici (D-31-03) — mérite sa propre décision.
+4. **Les fichiers cachés d'un sous-dossier de module ne sont pas copiés** : les 5 sites `cp -r`
+   utilisent un glob `"$dir/"*` qui écarte les entrées commençant par `.`. Découvert en fermant
+   D-31-11, qui **gèle** ce comportement par un test au lieu de le corriger (le corriger serait un
+   changement de comportement hors des quatre critères). Si un module a besoin d'un dotfile posé,
+   il ne l'obtient pas aujourd'hui et ne le saura pas.
