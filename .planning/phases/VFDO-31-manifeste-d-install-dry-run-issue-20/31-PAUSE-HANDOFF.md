@@ -62,7 +62,7 @@ d'énumération des fichiers d'un module.
 <details>
 <summary>Mandat d'origine du nœud (archivé — ne pas re-dispatcher)</summary>
 
-> Repo `/Users/samuel/Documents/dev/vibeflow-os` (branche `main`, v2.53.0, post-Phase-30). Anatomie
+> Repo `vibeflow-os` (racine du dépôt, branche `main`, v2.53.0, post-Phase-30). Anatomie
 > précise du moteur d'install pour cadrer la Phase 31. Lire le code, rapporter des FAITS avec
 > chemins absolus + numéros de ligne. N'écrire aucun fichier. Rapport compact (~120 lignes max).
 >

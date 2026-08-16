@@ -172,21 +172,39 @@ gracieux annoncé — aucune suppression de convergence à cet update, le manife
 l'occasion, et l'update **suivant** converge. Un parc existant ne doit pas rougir le jour de la mise
 à jour.
 
-### D-31-08 — Compteur « N suites » des README : **mise à jour à la main, pas de nouveau gate**
+### D-31-08 — Compteur « N suites » des README : mise à jour à la main, **dans le commit qui crée la suite**
 
-La prémisse du brief d'origine était **fausse** (recherche §4 : `check-version-sync.sh` gate le
-compteur de **modules**, jamais celui des suites ; la valeur `61` n'est contrôlée par rien).
+> **RÉVISÉ le 2026-08-16, après re-mesure.** La version initiale de cet arbitrage reposait sur une
+> prémisse **fausse**, héritée de `31-RECHERCHE-moteur.md` §4 : « aucun gate ne contrôle le compteur
+> de suites ». **C'est l'inverse.** Mesuré sur pièce : `scripts/check-version-sync.sh` **§9**
+> (« Compte de suites de tests cité par les README racine ↔ suites réellement découvertes par la
+> CI ») compare `find plugin scripts -path '*/tests/test-*.sh' | grep -c .` aux deux README et
+> rougit sur écart. Sortie courante : `✓ README.md suites 61` / `✓ README.fr.md suites 61`.
+> Le §4 de la recherche avait énuméré les contrôles 1 à 8 du gate et manqué le 9e.
 
-**Décision** : le commit qui crée les nouvelles suites met à jour `README.md:124` et
-`README.fr.md:128` **à la main** (valeur re-mesurée par
-`find plugin scripts -type f -path '*/tests/test-*.sh' | wc -l`, **61** à ce jour, donc 62+ après la
-phase). **Aucun gate neuf.**
+**La décision ne change pas — son motif, si, et elle gagne une contrainte.**
 
-**Motif** : gater ce compteur serait un **nouveau gate**, donc soumis à QUAL-01 (trois issues +
-mutation rouge) — un budget que cette phase dépense déjà sur `test-manifest.sh` **et** sur le
-contrôle dry-run. L'ajouter ici, c'est financer un compteur de README au prix d'un gate, dans une
-phase dont les quatre critères portent sur la réversibilité de l'install. La proposition est
-**consignée en §7** pour Samuel, pas enterrée.
+**Décision** : les compteurs `README.md:124` et `README.fr.md:128` sont mis à jour **à la main**
+(valeur re-mesurée par `find plugin scripts -type f -path '*/tests/test-*.sh' | wc -l`, **61** à ce
+jour), et **aucun gate n'est ajouté**. Nouveauté imposée par la re-mesure : la mise à jour des
+compteurs et la création de la suite doivent tomber dans **le même commit**.
+
+**Motifs** :
+1. **Aucun gate neuf** reste juste, mais pour une raison plus forte que la précédente : le gate
+   **existe déjà**. Il n'y a rien à financer au titre de QUAL-01 — l'arbitrage est devenu sans objet.
+2. **L'atomicité du commit n'est plus une élégance, c'est une nécessité.** Le protocole GSD commite
+   par tâche. Créer `test-manifest.sh` dans une tâche et mettre les compteurs à jour dans la
+   suivante laisse le dépôt **rouge sur un gate repo-wide entre les deux commits** — exactement le
+   « gate rouge durable » que `ARCHITECTURE.md` §4 proscrit, et une CI rouge sur un commit intermédiaire.
+
+**Conséquence directe sur les plans** : la création de la suite et la mise à jour des deux README
+sont **une seule tâche, un seul commit**. Tout plan qui les sépare est à corriger.
+
+> Leçon de méthode, consignée parce qu'elle se rejouera : un fait de recherche formulé en négatif
+> (« aucun gate ne fait X ») est une **affirmation d'absence**, la plus coûteuse à vérifier et la
+> plus facile à produire par omission. Ici, l'énumération était juste et incomplète, ce qui est
+> indiscernable d'une énumération exhaustive tant qu'on ne relit pas la source. Un arbitrage qui
+> repose sur une absence doit citer la ligne qui la prouve — celui-ci ne le faisait pas.
 
 ### D-31-09 — Lecteurs du manifeste livrés : `update` **oui**, `uninstall` **en dernière vague, abandonnable**
 
@@ -251,9 +269,9 @@ des README de modules est gaté par `check-version-sync.sh`).
 
 ## 7. Remontées à Samuel (non tranchées ici — extensions de périmètre)
 
-1. **Gater le compteur « N suites »** dans `check-version-sync.sh` (~10 lignes, le script parse déjà
-   les deux README). Refusé ici au titre de QUAL-01 (D-31-08) ; candidat naturel pour une phase qui
-   crée déjà un gate.
+1. ~~**Gater le compteur « N suites »** dans `check-version-sync.sh`.~~ **SANS OBJET** — re-mesuré le
+   2026-08-16 : le gate **existe déjà** (`check-version-sync.sh` §9). La remontée reposait sur la
+   même prémisse fausse que D-31-08. Rien à demander.
 2. **`--dry-run` sur `uninstall`** — le verbe le plus dangereux est celui où une prévisualisation
    vaudrait le plus. Refusé en v1 par discipline de périmètre (D-31-06).
 3. **`docs/<module>/` écrit relativement au cwd** et non au scope (634-635) : en scope `user`, la doc
