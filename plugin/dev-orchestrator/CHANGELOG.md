@@ -1,5 +1,17 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.17.2] — 2026-08-16 (hotfix escalade des gates humains)
+
+**Patch** (fiabilité des missions, aucune nouvelle capacité).
+
+- `vf-dev-manager` : `SendMessage` ajouté au `tools:` — le manager dispatché en sous-agent a
+  désormais un canal vivant vers la session principale.
+- Repli D-09 réécrit en cascade « escalade vivante » : (1) `SendMessage(to: "main")` avec
+  contexte/options/recommandation, nœud du DAG bloqué en attendant le relais ; (2) sinon
+  `human_needed` et relance par la session principale. Un gate humain n'est plus jamais franchi
+  par fallback ni ne gèle la mission entière (incident du 2026-08-15 : `AskUserQuestion` non
+  fournie aux sous-agents backgroundés).
+
 ## [v2.17.1] — 2026-08-16 (Phase 30, solde de revue du plan 30-09)
 
 **Patch** (correctif + durcissement, aucune nouvelle capacité).
