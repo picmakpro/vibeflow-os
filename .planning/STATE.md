@@ -5,16 +5,16 @@ milestone_name: « ce qui survit »
 current_phase: 30
 current_phase_name: Portabilité Windows II
 status: planning
-stopped_at: Phase 30 context gathered
-last_updated: "2026-08-15T19:50:26.180Z"
-last_activity: 2026-08-15
-last_activity_desc: "ROADMAP fiabilite-v1.0 posée (8 phases : 30-35 + 18 et 25 héritées)"
+stopped_at: "Phase 30 livrée et vérifiée — CI verte (run 31918283177, 4/4 jobs), addendum 2026-08-16 sur 30-VERIFICATION.md, hygiène documentaire de clôture posée"
+last_updated: "2026-08-16T00:00:00.000Z"
+last_activity: 2026-08-16
+last_activity_desc: "Phase 30 (Portabilité Windows II) livrée et vérifiée — PORT-05 prouvé en CI après cycle rouge→correctif→vert ; hygiène documentaire de clôture (30-08-SUMMARY.md, 30-RELIQUATS.md soldé, addendum 30-VERIFICATION.md, STATE/ROADMAP)"
 progress:
   total_phases: 8
-  completed_phases: 0
-  total_plans: 8
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 9
+  completed_plans: 9
+  percent: 13
 ---
 
 # Project State
@@ -56,10 +56,14 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 ## Current Position
 
-Phase: 30 (Portabilité Windows II) — not started
-Plan: —
-Status: Roadmap defined - ready to discuss/plan Phase 30
-Last activity: 2026-08-15 — Quick task 260815-tl6 : snapshot hebdo traffic/clones GitHub avec clones ajustés hors CI
+Phase: 30 (Portabilité Windows II) — livrée et vérifiée
+Plan: 30-09 (dernier plan exécuté) ; nœud `docs` de clôture de phase posé le 2026-08-16
+Status: Phase 30 shippée localement (branche `feat/phase-30-portabilite-windows-ii`, 49+ commits,
+poussée) ; CI verte constatée (run `31918283177`, 4/4 jobs) ; PR et release racine restent des
+gestes humains gatés, non faits ici
+Last activity: 2026-08-16 — hygiène documentaire de clôture de Phase 30 (30-08-SUMMARY.md créé,
+30-RELIQUATS.md soldé de 4 mineurs, addendum daté sur 30-VERIFICATION.md levant le BLOCKER PORT-05,
+STATE.md/ROADMAP.md mis à jour)
 
 ## Performance Metrics
 
@@ -327,6 +331,42 @@ Last activity: 2026-08-15 — Quick task 260815-tl6 : snapshot hebdo traffic/clo
 
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
+
+- **2026-08-16 — Phase 30 (Portabilité Windows II) livrée et vérifiée ; branche isolée d'un
+  contenu tiers par chirurgie d'historique.** Quatre faits :
+
+  1. **D-01 tranché par Samuel : option A** — chemin absolu **borné** (résolu ET vérifié à
+     l'install, `settings.json` devient spécifique à la machine) plutôt que la variante non bornée.
+     Gravé dans ADR-071 (§Décision 2) ; amendement LOCK-02 (Phase 32) qui distingue entrée
+     distribuée / commande locale posé au commit `57af915` et **toujours présent** sur la branche
+     (vérifié : `LOCK-02` cité dans `ROADMAP.md`).
+
+  2. **Cycle rouge → correctif → vert constaté en CI réelle sur PORT-05** — détail complet dans
+     `30-08-SUMMARY.md` et l'addendum 2026-08-16 de `30-VERIFICATION.md` : premier push (commit
+     `dcd9eb5`) rouge sur le run `31917741411` (attendu codé en dur ne correspondant pas à la
+     fermeture réellement installée), correctif (`4edc968`) dérivant l'attendu des `hooks.json` de
+     la fermeture résolue à chaque exécution, repoussé et re-éprouvé vert sur le run `31918283177`
+     (4 jobs sur 4).
+
+  3. **RFC upstream `open-gsd/gsd-core` déposée** (LEDG-03,
+     https://github.com/open-gsd/gsd-core/issues/3556, échéance amont 2026-10-26) — voir l'entrée
+     du 2026-08-15 ci-dessous, inchangée.
+
+  4. **8 commits d'une session tierce (spike cockpit-live, Phase 36 roadmap, 2 captures backlog)
+     isolés sur la branche `spike/cockpit-live` par chirurgie d'historique**, jamais sur cette
+     branche de phase. Preuve machine (re-dérivée, pas recopiée) : `git diff --shortstat 998a531
+     193b252 -- .planning/BACKLOG.md .planning/ROADMAP.md .planning/STATE.md .planning/spikes` →
+     `8 files changed, 679 deletions(-)`, **0 insertion** — les 4 commits isolés (`9443a56`
+     backlog prime-agent, `0952c74` backlog semantica, `218b252` spike-001 VALIDATED, `998a531`
+     roadmap Phase 36) et les commits `30-06`/`30-09` légitimes qui les encadraient ont été
+     réappliqués sans eux sur `193b252`. L'amendement LOCK-02 (point 1 ci-dessus) et la
+     traçabilité D-11 (RFC, point 3) sont **intacts** après la chirurgie — vérifié machine : les
+     deux chaînes sont toujours présentes dans `ROADMAP.md`/`STATE.md` sur cette branche.
+     **Reste en déviation assumée dans la branche** : le commit `e6c8f8f` (« docs(worktree): #3302
+     close COMPLETED — mergé amont, pas releasé, gate Phase 35 inchangé ») — commentaire seul,
+     vérifié juste (l'issue amont `open-gsd/gsd-core#3302` est bien close COMPLETED), et il
+     **renforce** le gate de la Phase 35 plutôt que de le desservir. Il n'a pas été retiré de la
+     chirurgie car il ne porte aucun contenu du spike cockpit.
 
 - 2026-08-15 : **RFC upstream `open-gsd/gsd-core` déposée** (LEDG-03) —
   https://github.com/open-gsd/gsd-core/issues/3556. Demande : rendre optionnelle la suppression

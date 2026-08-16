@@ -353,3 +353,45 @@ dans le dépôt — ni corrigés de façon visible, ni tracés comme dette.
 réel vert (les deux étapes PORT-05 du job « Lab frais armé », plus le reste du parc), écrire
 `30-08-SUMMARY.md` avec l'ID d'exécution et le verdict par job, et retrouver ou consigner les 4
 mineurs de revue portés disparus.
+
+---
+
+## Addendum — 2026-08-16
+
+Cet addendum ne modifie AUCUN constat ci-dessus : le BLOCKER PORT-05 rapporté était **vrai à sa
+date** (run `31917741411`, commit `dcd9eb5`, correctif local non poussé). Il est ajouté pour
+consigner ce qui s'est produit depuis, sans réécrire l'historique du rapport d'origine.
+
+**Le correctif nommé ci-dessus (commit `4edc9688`... — hash exact `4edc968`) a été poussé.** Un
+nouveau run CI a été déclenché et est **vert sur ses 4 jobs** : `gh run view 31918283177` →
+`Suites de tests`, `Lab frais`, `Gates de qualité (mode strict)`, `Lab frais armé` — tous en
+succès. Preuves nommées, extraites du journal de ce run :
+
+- `== attendu dérivé des hooks.json de la fermeture : 5 entrée(s) VF ==`
+- `== forme exec telle qu'installée : 5 entrée(s) VF, command absolu+exécutable (sauf dérogation
+  nommée check-hook-paths.sh), aucun placeholder, aucune construction shell ==`
+- `test-windows-crlf.sh` et `test-windows-guards.sh` nommés dans le journal, chacun étiqueté
+  « simulation — pas de poste Windows réel »
+- `== 61 suite(s) découverte(s) ==`
+
+**PORT-05 est donc PROUVÉ** : la mécanique en défaut au run rouge (un attendu codé en dur décrivant
+un univers — dev-orchestrator + software-architecture — que le job « lab frais armé » n'installe
+jamais réellement, lui qui installe la seule fermeture résolue de `dev-orchestrator`) a été
+corrigée en dérivant l'attendu, à chaque exécution, des `hooks.json` sources de la fermeture
+réellement résolue (`resolve-deps.sh`), avec deux gardes indépendantes (`dev-orchestrator ∈
+$closure`, `attendu > 0`) qui empêchent la mesure de se satisfaire elle-même à vide. Le geste
+humain de clôture du plan 30-08 (checkpoint bloquant, tâche 3) est désormais consigné dans
+`.planning/phases/VFDO-30-portabilit-windows-ii/30-08-SUMMARY.md`, avec l'identifiant d'exécution
+et le verdict par job.
+
+**Le BLOCKER PORT-05 est donc LEVÉ.**
+
+Le WARNING sur les « 4 mineurs de revue introuvables » était **juste** — ils n'étaient effectivement
+tracés nulle part sur disque au moment de cette vérification. Il est désormais **soldé** : les 4
+mineurs sont consignés dans `.planning/phases/VFDO-30-portabilit-windows-ii/30-RELIQUATS.md`
+(section « Reliquats de revue — solde de la clôture de phase, 2026-08-16 »), chacun avec son
+fichier, sa raison de non-correction et son risque résiduel — pas corrigés, mais plus « disparus ».
+
+**Verdict final de phase, à la date de cet addendum :** les 8 exigences visées par cette
+vérification (PORT-01, PORT-02, PORT-03, PORT-04, PORT-05, LEDG-03, WKTR-03, et la couverture des
+11 décisions D-01..D-11 + l'addendum humain du 2026-08-15) sont **PASS**. Aucun BLOCKER restant.

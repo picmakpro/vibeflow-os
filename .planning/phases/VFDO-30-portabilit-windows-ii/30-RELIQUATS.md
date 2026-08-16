@@ -75,3 +75,74 @@ Voir `30-05-SUMMARY.md` §Décisions / D-05 amendement pour l'écart entre le co
 occurrences de `settings.json` annoncé au mandat de la tâche 4 et les 2 occurrences réellement
 trouvées dans le garde-fou anti-pollution `snapshot_home_claude()` de
 `plugin/_internal/tests/test-vibeflow-update.sh` — consigné là plutôt que dupliqué ici.
+
+---
+
+## Reliquats de revue — solde de la clôture de phase, 2026-08-16
+
+**Écrit le :** 2026-08-16, geste d'hygiène documentaire de fin de Phase 30 (nœud `docs`).
+
+Quatre constats **mineurs**, issus d'une revue de `check-hook-paths.sh` (le filet de péremption du
+plan 30-09) et de sa suite de test, jugés et **délibérément non corrigés** — mais qui n'étaient
+tracés **nulle part sur disque** avant ce document, ce qu'un vérificateur indépendant a relevé
+comme absence le 2026-08-16 (`30-VERIFICATION.md`, WARNING). Ils sont consignés ici pour que
+« délibérément non corrigé » cesse d'être tacite.
+
+### Reliquat 3 — `check-hook-paths.sh:275-325` : séparateur `\t` non échappé dans le protocole ligne-à-ligne
+
+**Constat :** le protocole de sortie ligne-à-ligne de `check-hook-paths.sh` sépare ses champs par
+une tabulation littérale, sans l'échapper si un champ source (une valeur de `settings.json`, par
+exemple un chemin) contient lui-même une tabulation ou un saut de ligne. Une telle valeur
+désaligne le parsing shell côté consommateur du protocole.
+
+**Pourquoi non corrigé :** risque jugé **faible** — les fichiers de configuration consommés
+(`settings.json`, `settings.local.json`) sont sous le contrôle de l'utilisateur ou de l'installeur
+VibeFlow lui-même, ce n'est pas une frontière de confiance externe (pas d'entrée réseau, pas de
+donnée tierce non fiable). Corriger exigerait de définir un format d'échappement pour le protocole
+ligne-à-ligne — décision de format qui dépasse le périmètre de ce filet ponctuel.
+
+**Destinataire :** `plugin/dev-orchestrator/scripts/check-hook-paths.sh`, à traiter si/quand le
+protocole ligne-à-ligne gagne un second consommateur qui rendrait le désalignement observable.
+
+### Reliquat 4 — `check-hook-paths.sh:249,257-273` : branches défensives non couvertes par un cas dédié
+
+**Constat :** les branches défensives qui gèrent une racine JSON non-objet, un champ `hooks` non
+dictionnaire, un groupe non dictionnaire, ou une entrée non dictionnaire ne sont exercées par
+aucun cas de test dédié de `test-check-hook-paths.sh` — elles existent dans le code mais leur
+comportement (message, code de sortie) n'est pas prouvé par discrimination.
+
+**Pourquoi non corrigé :** ce sont des gardes de robustesse contre des fichiers `settings.json`
+malformés, pas des chemins nominaux. Le filet reste correct sur son cas d'usage réel (fichiers
+posés par l'installeur VibeFlow, toujours bien formés) ; l'absence de cas dédié est une dette de
+couverture, pas un défaut de comportement observé.
+
+**Destinataire :** `plugin/dev-orchestrator/scripts/tests/test-check-hook-paths.sh`, à combler par
+un prochain passage sur ce script.
+
+### Reliquat 5 — `test-check-hook-paths.sh:112-116` : `mk_settings()` interpole du JSON sans échapper `"` ni `\`
+
+**Constat :** la fixture `mk_settings()` construit du JSON par `printf %s` en interpolant ses
+arguments sans échapper les guillemets doubles ni les antislashs. Un argument de test contenant
+l'un de ces caractères produirait un JSON invalide.
+
+**Pourquoi non corrigé :** fragile en principe, **sans effet observé** — tous les appels réels de
+`mk_settings()` dans la suite utilisent des chemins produits par `mktemp`, qui ne contiennent
+jamais ni guillemet ni antislash sur les plateformes ciblées (macOS/Linux ; l'antislash Windows
+est simulé ailleurs, jamais via cette fixture).
+
+**Destinataire :** `plugin/dev-orchestrator/scripts/tests/test-check-hook-paths.sh`, à durcir si un
+futur cas de test veut exercer un chemin contenant l'un de ces caractères.
+
+### Reliquat 6 — `check-hook-paths.sh:111` : `--help` déverse 94 lignes de commentaires internes
+
+**Constat :** l'option `--help` du script imprime l'intégralité du bloc de commentaires de tête
+(rationale de conception, ADR référencés, paradoxe d'amorçage du filet lui-même) — 94 lignes — au
+lieu d'une aide courte bornée à l'usage et aux codes de sortie.
+
+**Pourquoi non corrigé :** défaut d'ergonomie, aucun impact sur le comportement du filet ni sur les
+gates de CI qui l'invoquent en mode `--hook` (jamais `--help`). Corriger exigerait de séparer la
+documentation de conception (à garder en tête de fichier) de l'aide utilisateur (à raccourcir) —
+refactor mineur mais hors du périmètre strict du nœud `docs`.
+
+**Destinataire :** `plugin/dev-orchestrator/scripts/check-hook-paths.sh`, prochain passage sur ce
+script.

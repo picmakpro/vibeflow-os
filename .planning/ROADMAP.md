@@ -70,7 +70,7 @@
 - [x] Phase 27: Parallélisation d'exécution — granulaire, simple, sans collision d'écriture (completed 2026-08-06)
 - [x] Phase 28: Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur (completed 2026-08-15)
 - [x] Phase 29: Distiller les gains ICM (G1-G5) — investigation dag.sh --scope d'abord (completed 2026-08-15)
-- [ ] Phase 30: Portabilité Windows II
+- [x] Phase 30: Portabilité Windows II (completed 2026-08-16)
 - [ ] Phase 31: Manifeste d'install + dry-run (issue #20)
 - [ ] Phase 32: Durcissement du driver-lock
 - [ ] Phase 33: Watchdog & notifications des missions
