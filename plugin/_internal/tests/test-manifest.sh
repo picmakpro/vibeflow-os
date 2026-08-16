@@ -5,12 +5,15 @@
 #   - software-architecture (SKILL.md + rules/ + references/ + scripts/ + scripts/tests/ +
 #     hooks/hooks.json). Aucun sous-processus de régime C (pas d'AGENT.md, pas d'agents/, pas de
 #     scripts/seed-registres.sh ni scripts/ensure-design-deps.sh) — même fixture que 31-04 (MANI-02).
-#     T1-T6, T6b (fixture .txt injecté dans le CACHE de test), T9, T11-T13, T15, TD1, TD3, TD8.
+#     T1-T6, T6b (fixture .txt injecté dans le CACHE de test), T9, T11-T13, T15, TD1, TD3, TD8,
+#     TD11, TD12, TD13.
 #   - skill-creator (skills imbriqués posés par cp -r, AGENT.md). T7, T7b, T9b, T9c, T10, TD7.
 #   - reference (module doc pur, content/ seul). T8, TD6.
 #   - dev-orchestrator (AGENT.md + build-gsd-index.sh + build-gsd-capabilities-index.sh, régime A
 #     RÉEL, mesuré sur pièce). TD2.
 #   - consolidator (scripts/seed-registres.sh, régime C RÉEL). TD4, TD5.
+#   - consolidator + software-architecture (cache à DEUX modules à hooks.json, ordre alphabétique).
+#     TD9 (multi-module), TD10.
 #
 # T1 — après install software-architecture (scope project, lab neuf), le manifeste
 #      .claude/scripts/.vibeflow-manifest-software-architecture existe et contient la ligne
@@ -88,9 +91,14 @@
 # TD4 (= T12) — RÉGIME C, discriminance : consolidator (scripts/seed-registres.sh réel) annonce
 #      une ligne mentionnant seed-registres.sh et le marqueur de non-énumération. Présence, pas
 #      égalité (prétention distincte de TD1, D-31-04).
-# TD5 (= T13) — asymétrie plan/manifeste sur régime C : après un install RÉEL de consolidator, le
-#      manifeste ne contient AUCUNE ligne memory/ (D-31-03) — le plan l'annonce (TD4), le
-#      manifeste ne le possède jamais.
+# TD5 (= T13) — exclusion D-31-03 côté MANIFESTE pour régime C : après un install RÉEL de
+#      consolidator, le manifeste ne contient AUCUNE ligne memory/. F-08 (correction ciblée 31-04,
+#      revue) : légende corrigée — TD5 seule NE PROUVE PAS l'asymétrie plan/manifeste complète
+#      (elle ne rougit pas sous « memory/* retiré de vf_manifest_excluded » seul, cette mutation
+#      est couverte par T5b ; TD5 rougit sous une mutation COMBINÉE memory/*+manifest_reset).
+#      L'asymétrie plan/manifeste (le plan ANNONCE memory/, le manifeste ne le CONTIENT jamais)
+#      est la conjonction TD4 (moitié « annoncé au plan ») + TD5 (moitié « absent du manifeste
+#      réel ») — TD5 seule ne porte que la seconde moitié.
 # TD6 (= T13b) — asymétrie docs/, moitié « présent au plan » (ferme la moitié manquante de
 #      31-03/T8) : module reference (content/ seul), --dry-run annonce AU MOINS une ligne
 #      docs/reference/.
@@ -98,6 +106,16 @@
 #      skill-creator + .hidden-marker injecté à la racine d'un skill_dir — AUCUNE ligne
 #      .hidden-marker au plan.
 # TD8 (= T14) — refus bruyant : --dry-run uninstall <mod> sort 1, rien supprimé (D-31-06).
+#
+# TD9-TD13 (correction ciblée 31-04, findings fusionnés revue + vérification) :
+# TD9 (F-01) — MULTI-MODULE : install --all --dry-run sur cache à 2 modules à hooks.json annonce
+#      autant de backups settings.json que la pose réelle en crée (garde disque aveugle à l'effet
+#      d'un module antérieur du MÊME run, invisible d'un fixture mono-module comme TD1).
+# TD10 (F-02) — update --all --dry-run, version inchangée : 0 ligne + porte le suffixe `( —)`.
+# TD11 (F-04) — verbe de .vibeflow-installed sur lab vierge : `+`, jamais `~`.
+# TD12 (F-06) — --dry-run=true : rc=1 nommé, message distinct du fourre-tout d'usage générique.
+# TD13 (couverture manquante) — --scope user : chemin du plan absolu et résolu (fakehome),
+#      aucune écriture (D-31-06).
 #
 # T0 — anti-vert-à-vide (contrat F13) : la suite compte ses propres assertions exécutées et
 #      échoue si le total (pass+fail) est 0.
@@ -799,9 +817,11 @@ fi
 rm -rf "$LAB_TD4" "$CACHE_TD4"
 
 # ---------------------------------------------------------------------------
-# TD5 (= T13 du plan) — asymétrie plan/manifeste sur régime C : après un install RÉEL de
-# consolidator, le manifeste ne contient AUCUNE ligne memory/ (D-31-03) — le plan l'annonce
-# (TD4), le manifeste ne le possède jamais (contenu vivant du lab, exclu par construction).
+# TD5 (= T13 du plan) — exclusion D-31-03 côté MANIFESTE pour régime C : après un install RÉEL de
+# consolidator, le manifeste ne contient AUCUNE ligne memory/ (contenu vivant du lab, exclu par
+# construction). F-08 (correction ciblée 31-04) : ce test porte SEULE la moitié « absent du
+# manifeste » — l'asymétrie plan/manifeste complète est TD4 (moitié « annoncé au plan ») + TD5
+# ensemble, jamais TD5 seule (cf. légende corrigée en tête de fichier).
 # ---------------------------------------------------------------------------
 LAB_TD5="$(mktemp -d)"
 CACHE_TD5="$(mktemp -d)"
@@ -809,7 +829,7 @@ if prepare_module "$CACHE_TD5" "consolidator"; then
   (cd "$LAB_TD5" && VIBEFLOW_CACHE="$CACHE_TD5" bash "$INSTALLER" install consolidator >/dev/null 2>&1)
   MANIFEST_TD5="$LAB_TD5/.claude/scripts/.vibeflow-manifest-consolidator"
   if [ -f "$MANIFEST_TD5" ] && ! "$GREP" -qE '^memory/' "$MANIFEST_TD5"; then
-    ok "TD5 : D-31-03 — aucune ligne memory/ au manifeste après install réel de consolidator (asymétrie plan/manifeste tenue)"
+    ok "TD5 : D-31-03 — aucune ligne memory/ au manifeste après install réel de consolidator (moitié « absent du manifeste » de l'exclusion, PAS l'asymétrie complète — voir TD4)"
   else
     ko "TD5 : manifeste absent ou contient une ligne memory/ ($MANIFEST_TD5)"
   fi
@@ -881,6 +901,130 @@ else
   skip "TD8 : software-architecture non copiable dans le cache de test"
 fi
 rm -rf "$LAB_TD8" "$CACHE_TD8"
+
+# ===========================================================================
+# TD9-TD13 — correction ciblée 31-04 (findings fusionnés revue + vérification --dry-run).
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# TD9 (F-01) — MULTI-MODULE : `install --all --dry-run` sur un cache à DEUX modules porteurs de
+# hooks/hooks.json (consolidator, software-architecture — ordre alphabétique du for de
+# list_available_modules) doit annoncer AUTANT de lignes `.backups/settings-…` que la pose RÉELLE
+# en crée. Mesuré sur pièce AVANT correctif : pose réelle = 1 backup (consolidator crée
+# settings.json, software-architecture le backupe), dry-run = 0 ligne annoncée — la garde
+# `[ -f "$TARGET_ROOT/settings.json" ]` lit le disque, qui ne bouge jamais en dry-run, donc ne voit
+# jamais l'effet du 1er module sur le 2e du MÊME run. TD1 (mono-module, software-architecture
+# seul) ne peut PAS voir ce défaut : aucun module antérieur du run n'y crée settings.json.
+# ---------------------------------------------------------------------------
+LAB_TD9_PLAN="$(mktemp -d)"
+LAB_TD9_REEL="$(mktemp -d)"
+CACHE_TD9="$(mktemp -d)"
+if prepare_module "$CACHE_TD9" "consolidator" && prepare_module "$CACHE_TD9" "software-architecture"; then
+  (cd "$LAB_TD9_REEL" && VIBEFLOW_CACHE="$CACHE_TD9" bash "$INSTALLER" install --all >/dev/null 2>&1)
+  TD9_REEL_BACKUPS="$(find "$LAB_TD9_REEL/.claude/.backups" -type f 2>/dev/null | wc -l | tr -d ' ')"
+  TD9_PLAN_OUT="$(cd "$LAB_TD9_PLAN" && VIBEFLOW_CACHE="$CACHE_TD9" bash "$INSTALLER" --dry-run install --all 2>/dev/null)"
+  TD9_PLAN_BACKUPS="$(printf '%s\n' "$TD9_PLAN_OUT" | "$GREP" -cE '^\[plan\] \+ .*\.backups/settings-')"
+  if [ "$TD9_REEL_BACKUPS" -ge 1 ] && [ "$TD9_PLAN_BACKUPS" -eq "$TD9_REEL_BACKUPS" ]; then
+    ok "TD9 : F-01 — install --all --dry-run annonce $TD9_PLAN_BACKUPS backup(s) settings.json, identique à la pose réelle ($TD9_REEL_BACKUPS)"
+  else
+    ko "TD9 : F-01 — plan=$TD9_PLAN_BACKUPS backup(s) annoncé(s), réel=$TD9_REEL_BACKUPS backup(s) créé(s) — divergence multi-module"
+  fi
+else
+  skip "TD9 : consolidator ou software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB_TD9_PLAN" "$LAB_TD9_REEL" "$CACHE_TD9"
+
+# ---------------------------------------------------------------------------
+# TD10 (F-02) — `update --all --dry-run` sur un lab où AUCUN module n'a bougé de version (chemin le
+# plus fréquent en usage réel, /vf-calibrate ou /vf-update sur un lab à jour) : chaque ligne
+# `[plan] + …` doit porter un suffixe `(<module> <version>)` CORRECT, jamais `( —)`. Avant
+# correctif : sync_module_governance n'ouvrait jamais VF_MANIFEST_MOD sur ce chemin, donc 100% des
+# lignes tombaient à `( —)`, silencieusement (aucune erreur, juste un plan malformé — ADR-031).
+# ---------------------------------------------------------------------------
+LAB_TD10="$(mktemp -d)"
+CACHE_TD10="$(mktemp -d)"
+if prepare_module "$CACHE_TD10" "consolidator" && prepare_module "$CACHE_TD10" "software-architecture"; then
+  (cd "$LAB_TD10" && VIBEFLOW_CACHE="$CACHE_TD10" bash "$INSTALLER" install --all >/dev/null 2>&1)
+  TD10_OUT="$(cd "$LAB_TD10" && VIBEFLOW_CACHE="$CACHE_TD10" bash "$INSTALLER" --dry-run update --all 2>/dev/null)"
+  TD10_PLUS="$(printf '%s\n' "$TD10_OUT" | "$GREP" -cE '^\[plan\] \+ ')"
+  TD10_DASH="$(printf '%s\n' "$TD10_OUT" | "$GREP" -cE '\( —\)')"
+  if [ "$TD10_PLUS" -gt 0 ] && [ "$TD10_DASH" -eq 0 ]; then
+    ok "TD10 : F-02 — update --all --dry-run (version inchangée) : $TD10_PLUS ligne(s) +, 0 avec suffixe (—)"
+  else
+    ko "TD10 : F-02 — update --all --dry-run : $TD10_DASH ligne(s) sur $TD10_PLUS portent le suffixe (—) — module/version non résolu"
+  fi
+else
+  skip "TD10 : consolidator ou software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB_TD10" "$CACHE_TD10"
+
+# ---------------------------------------------------------------------------
+# TD11 (F-04) — verbe de `.vibeflow-installed` sur lab VIERGE : la cible n'existe pas encore →
+# verbe `+` (créer, D-31-05), jamais `~` (modifier) — une fausse déclaration de modification pour
+# une création, sur le fichier qui EST le registre d'install, contredit le but même du dry-run
+# (consentement éclairé, ADR-031).
+# ---------------------------------------------------------------------------
+LAB_TD11="$(mktemp -d)"
+CACHE_TD11="$(mktemp -d)"
+if prepare_module "$CACHE_TD11" "software-architecture"; then
+  TD11_OUT="$(cd "$LAB_TD11" && VIBEFLOW_CACHE="$CACHE_TD11" bash "$INSTALLER" --dry-run install software-architecture 2>/dev/null)"
+  if printf '%s\n' "$TD11_OUT" | "$GREP" -qE '^\[plan\] \+ .*\.vibeflow-installed' \
+     && ! printf '%s\n' "$TD11_OUT" | "$GREP" -qE '^\[plan\] ~ .*\.vibeflow-installed'; then
+    ok "TD11 : F-04 — .vibeflow-installed annoncé au verbe + (création) sur lab vierge, jamais ~"
+  else
+    ko "TD11 : F-04 — verbe .vibeflow-installed incorrect sur lab vierge — sortie : $(printf '%s' "$TD11_OUT" | "$GREP" -E 'vibeflow-installed')"
+  fi
+else
+  skip "TD11 : software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB_TD11" "$CACHE_TD11"
+
+# ---------------------------------------------------------------------------
+# TD12 (F-06) — `--dry-run=true` (forme refusée par D-31-06) sort en erreur NOMMÉE (message
+# distinct du fourre-tout d'usage générique), jamais un rc=1 muet indiscernable d'un usage invalide
+# quelconque.
+# ---------------------------------------------------------------------------
+LAB_TD12="$(mktemp -d)"
+CACHE_TD12="$(mktemp -d)"
+if prepare_module "$CACHE_TD12" "software-architecture"; then
+  TD12_ERR="$(mktemp)"
+  (cd "$LAB_TD12" && VIBEFLOW_CACHE="$CACHE_TD12" bash "$INSTALLER" --dry-run=true install software-architecture) >/dev/null 2>"$TD12_ERR"
+  TD12_RC=$?
+  if [ "$TD12_RC" -eq 1 ] && "$GREP" -qE 'dry-run' "$TD12_ERR" && "$GREP" -qiE 'valeur' "$TD12_ERR"; then
+    ok "TD12 : F-06 — --dry-run=true refusé (rc=1) avec message nommant la forme invalide"
+  else
+    ko "TD12 : F-06 — --dry-run=true : rc=$TD12_RC, message non conforme — voir $TD12_ERR"
+  fi
+  rm -f "$TD12_ERR"
+else
+  skip "TD12 : software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB_TD12" "$CACHE_TD12"
+
+# ---------------------------------------------------------------------------
+# TD13 (couverture manquante, mandat) — `--scope user` : chemin du plan ABSOLU et RÉSOLU (jamais
+# une variable non expansée type "$HOME", jamais un chemin relatif) — seul scope où TARGET_ROOT est
+# absolu (D-31-05 le nomme comme le plus grave en cas d'ambiguïté). HOME isolé (fakehome) : le
+# --dry-run ne doit RIEN écrire, ni sous fakehome ni sous le vrai $HOME (jamais touché ici).
+# ---------------------------------------------------------------------------
+LAB_TD13="$(mktemp -d)"
+FAKEHOME_TD13="$LAB_TD13/fakehome"
+CACHE_TD13="$(mktemp -d)"
+mkdir -p "$FAKEHOME_TD13"
+if prepare_module "$CACHE_TD13" "software-architecture"; then
+  TD13_OUT="$(cd "$LAB_TD13" && HOME="$FAKEHOME_TD13" VIBEFLOW_CACHE="$CACHE_TD13" bash "$INSTALLER" --scope user --dry-run install software-architecture 2>/dev/null)"
+  TD13_EXPECT="[plan] + $FAKEHOME_TD13/.claude/skills/software-architecture/SKILL.md"
+  if printf '%s\n' "$TD13_OUT" | "$GREP" -qF "$TD13_EXPECT" \
+     && ! printf '%s\n' "$TD13_OUT" | "$GREP" -qE '\$HOME' \
+     && [ ! -d "$FAKEHOME_TD13/.claude" ]; then
+    ok "TD13 : --scope user — chemin du plan absolu et résolu (fakehome), aucune écriture (D-31-06)"
+  else
+    ko "TD13 : --scope user — chemin du plan incorrect ou écriture détectée — sortie : $(printf '%s' "$TD13_OUT" | "$GREP" -E 'SKILL\.md')"
+  fi
+else
+  skip "TD13 : software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB_TD13" "$CACHE_TD13"
 
 # ---------------------------------------------------------------------------
 # T0 — anti-vert-à-vide (contrat F13) : la suite doit compter au moins une assertion.

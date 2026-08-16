@@ -172,3 +172,43 @@ absolu.
   de ce mandat n'exerce ce chemin (T10-TD8 passent tous par `install`, jamais par un `update` à
   version inchangée) — signalé en zone grise, pas corrigé faute de test qui le couvre et pour ne
   pas étendre le périmètre du mandat sans mandat.
+
+## Addendum — correction ciblée (findings fusionnés revue + vérification `--dry-run`)
+
+Mandat de correction ciblée sur les findings F-01/F-02/F-04/F-06/F-08 + durcissement
+`mark_uninstalled`. Résumé (détail : `git log`, commit qui suit ce SUMMARY) :
+
+- **F-01 corrigé** : la garde du backup `settings.json` dans `merge_module_hooks` testait le
+  DISQUE, aveugle à l'effet d'un module antérieur du MÊME run en multi-module (`--all`/
+  `--with-deps`) — `install --all --dry-run` sur 2 modules à `hooks.json` annonçait 0 backup là où
+  la pose réelle en crée 1. Nouveau drapeau run-scoped `VF_SETTINGS_JSON_WILL_EXIST` (miroir de
+  `VF_ENGINE_LIB_COPIED`), initialisé sur l'état réel du disque puis mis à jour au fil du run.
+  Mesuré : 0/1 → 1/1 (plan == réel). Test `TD9`.
+- **F-02 corrigé** — exactement la zone grise signalée ci-dessus : `sync_module_governance` pose
+  désormais `VF_MANIFEST_MOD` (sans ouvrir de cycle, D-31-14 intact — même garde que la branche
+  dry-run de `vf_manifest_reset`) au lieu de laisser le suffixe tomber à `( —)`. Mesuré sur
+  `update --all --dry-run` (2 modules, version inchangée) : 27/27 lignes `( —)` → 0/27. Test
+  `TD10`.
+- **F-04 partiellement corrigé** : `.vibeflow-installed` annonce désormais `+` sur lab vierge
+  (était `~`, fausse déclaration de modification pour une création) — `mark_installed`, test
+  `TD11`. `settings.json`/`settings.local.json` (même défaut) sortent du périmètre STRICT de ce
+  mandat : leur verbe est câblé en dur (`[plan] ~ …`) dans `merge-hooks.sh` ligne 444, un fichier
+  hors des deux chemins autorisés — **non corrigé**, remonté pour un mandat séparé.
+- **F-06 corrigé** : `--dry-run=<valeur>` sort désormais avec un message dédié nommant la forme
+  refusée, au lieu de retomber dans le fourre-tout d'usage générique. Test `TD12`.
+- **F-08 corrigé** : légende de `TD5` réécrite (tête de fichier + bloc de test) — elle ne prouve
+  que la moitié « absent du manifeste » de l'exclusion D-31-03 sur régime C, pas l'asymétrie
+  plan/manifeste complète (portée par TD4+TD5 ensemble). Le test lui-même n'a pas changé.
+- **`mark_uninstalled` durci** : garde interne `vf_dry_run && return 0` ajoutée, symétrique de
+  `mark_installed` — les 2 appelants existants gataient déjà correctement, durcissement préventif
+  contre un futur appelant (D-31-09) sans garde externe propre.
+- **Couverture manquante comblée** : `TD13` — `--scope user`, chemin du plan absolu et résolu
+  (HOME isolé sous `fakehome`, jamais le vrai `$HOME`), aucune écriture.
+- **F-03, F-05 : non corrigés, documentés** (par mandat explicite — comportement fidèle au réel,
+  amélioration de lisibilité seulement demandée). Pas de note ajoutée sur `.backups/<mod>-<TS>`
+  dans cette passe (F-03) : laissé pour un mandat de forme dédié, aucun risque de sûreté identifié.
+
+**Les 5 nouveaux cas (`TD9`-`TD13`) sont prouvés discriminants par mutation** (chacun rougit sur
+le revert de son correctif, restauration `cmp` identique après revert). Trois suites vertes
+(`test-manifest.sh` 37 OK/0 KO, `test-vibeflow-update.sh` 19 OK/0 KO,
+`test-merge-hooks.sh` 32 OK/0 KO), les deux gates repo à 0 lancés nus.

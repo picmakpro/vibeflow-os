@@ -64,6 +64,13 @@ while [ "$#" -gt 0 ]; do
       VF_DRY_RUN="1"
       shift
       ;;
+    --dry-run=*)
+      # F-06 (correction ciblée 31-04) : refus EXPLICITE de la forme --dry-run=<valeur> (D-31-06,
+      # booléen only) — sans ce cas dédié, `--dry-run=true` retombait dans le bucket positionnel
+      # générique (`*`) puis heurtait le fourre-tout d'usage en fin de script (rc=1 non nommé,
+      # l'utilisateur ne sait pas pourquoi). Message qui NOMME la forme refusée et la forme valide.
+      err "--dry-run n'accepte pas de valeur (reçu : $1) — utiliser --dry-run seul, jamais --dry-run=<valeur>"
+      ;;
     *)
       _positional+=("$1")
       shift
@@ -115,6 +122,18 @@ BACKUP_DIR="$TARGET_ROOT/.backups"
 # incorrect visible avec un message précis, au lieu de dépendre du seul message bash générique.
 VF_MANIFEST_MOD=""
 VF_MANIFEST_TMP=""
+# F-01 (correction ciblée 31-04, mandat revue+vérif) : miroir run-scoped de VF_ENGINE_LIB_COPIED
+# (770-773) pour la garde de backup de settings.json dans merge_module_hooks. La garde DISQUE
+# `[ -f "$TARGET_ROOT/settings.json" ]` est vraie côté PRÉEXISTANT du lab, mais en multi-module
+# (`--all`/`--with-deps`) settings.json est aussi créé par un module ANTÉRIEUR du MÊME run — en
+# pose réelle le disque reflète ce fait au fil de la boucle (chaque install_module voit le fichier
+# posé par le précédent), mais un --dry-run n'écrit RIEN : le disque ne bouge jamais et la garde
+# reste fausse à partir du 2e module alors que la pose réelle backuperait bien. Ce drapeau simule
+# côté PLAN ce que le disque ferait côté RÉEL : initialisé sur l'état réel du disque (couvre le cas
+# préexistant, mono-module inclus), puis mis à 1 dès qu'un module du run a mergé ses hooks — qu'il
+# ait trouvé le fichier déjà là ou que ce merge soit celui qui le crée pour le run.
+VF_SETTINGS_JSON_WILL_EXIST="0"
+[ -f "$TARGET_ROOT/settings.json" ] && VF_SETTINGS_JSON_WILL_EXIST="1"
 # Compteur de copies dégradées (D-31-11 point 4) de la pose EN COURS — remis à 0 par
 # vf_manifest_reset (appelée en tête d'install_module), lu en fin d'install_module pour le
 # compte rendu. Jamais unbound (même discipline que les deux variables ci-dessus).
@@ -158,7 +177,14 @@ mark_installed() {
   local mod="$1"
   local version="$2"
   if vf_dry_run; then
-    vf_declare_write "~" "$INSTALLED_REGISTRY" "$mod=$version"
+    # F-04 (correction ciblée 31-04) : verbe selon l'existence RÉELLE de la cible (D-31-05, + crée
+    # / ~ modifie) — sur un lab vierge, $INSTALLED_REGISTRY n'existe pas encore : c'est une
+    # création, pas une modification. Sans conséquence sur le manifeste (scripts/.vibeflow-installed
+    # est dans la liste close d'exclusions D-31-03, jamais consigné quel que soit le verbe) —
+    # correction de LECTURE du plan uniquement (ADR-031, consentement éclairé).
+    local verb="~"
+    [ -f "$INSTALLED_REGISTRY" ] || verb="+"
+    vf_declare_write "$verb" "$INSTALLED_REGISTRY" "$mod=$version"
     return 0
   fi
   mkdir -p "$(dirname "$INSTALLED_REGISTRY")"
@@ -171,6 +197,14 @@ mark_installed() {
 
 mark_uninstalled() {
   local mod="$1"
+  # Durcissement (correction ciblée 31-04) : garde INTERNE, symétrique de mark_installed —
+  # jusqu'ici sûre uniquement parce que les 2 appelants actuels (cleanup_retired_modules,
+  # uninstall_module) gatent DÉJÀ à l'appel. D-31-01 veut UN SEUL point de bascule par site : sans
+  # cette garde, un futur appelant (D-31-09, dernière vague) qui oublierait sa propre garde externe
+  # ferait muter $INSTALLED_REGISTRY sur disque pendant un --dry-run. `return 0` : pas d'annonce
+  # ici — les deux appelants annoncent déjà eux-mêmes (verbe -, no-op manifeste par construction,
+  # D-31-02), une 2e annonce depuis ce site dupliquerait la ligne.
+  vf_dry_run && return 0
   if [ -f "$INSTALLED_REGISTRY" ]; then
     grep -v "^$mod=" "$INSTALLED_REGISTRY" > "${INSTALLED_REGISTRY}.tmp" || true
     mv "${INSTALLED_REGISTRY}.tmp" "$INSTALLED_REGISTRY"
@@ -848,13 +882,18 @@ merge_module_hooks() {
   # côté engine (interdit explicite). merge-hooks.sh plan réutilise sa propre logique de merge
   # pour rendre la MÊME répartition project/local, sur les MÊMES flags que le merge réel — la
   # sortie stdout du sous-processus est relayée TELLE QUELLE, déjà au format `[plan] ~ …`. Le
-  # backup de settings est ANNONCÉ (même garde côté disque que le mode réel : dépend de l'état
-  # PRÉEXISTANT de settings.json, pas d'un défaut de pose de CETTE install) mais jamais copié.
+  # backup de settings est ANNONCÉ (F-01, correction ciblée 31-04 : garde sur VF_SETTINGS_JSON_
+  # WILL_EXIST, PAS le disque — en multi-module settings.json est aussi créé par un module
+  # ANTÉRIEUR du MÊME run, que le dry-run, qui n'écrit rien, ne peut pas voir sur disque) mais
+  # jamais copié.
   if vf_dry_run; then
-    if [ -f "$TARGET_ROOT/settings.json" ]; then
+    if [ "$VF_SETTINGS_JSON_WILL_EXIST" = "1" ]; then
       local settings_backup="$BACKUP_DIR/settings-$(date +%Y%m%d-%H%M%S).json"
       vf_declare_write + "$settings_backup"
     fi
+    # Après CE module, settings.json existe pour la suite du run (déjà là, ou créé par le merge
+    # que ce plan prévisualise) — miroir de VF_ENGINE_LIB_COPIED, posé qu'importe l'état de départ.
+    VF_SETTINGS_JSON_WILL_EXIST="1"
     local -a plan_settings_local_args=()
     case "$VF_SCOPE" in
       project|local) plan_settings_local_args=(--settings-local "$TARGET_ROOT/settings.local.json") ;;
@@ -1046,6 +1085,16 @@ sync_module_governance() {
   # un no-op SILENCIEUX côté manifeste (vf_record, cf. commentaire). Compteur remis à 0 ICI,
   # rapporté en UNE ligne par module en fin de fonction — jamais une ligne par chemin (sur 17
   # modules, `update --all` en produirait des dizaines, un signal qui spamme cesse d'être lu).
+  #
+  # F-02 (correction ciblée 31-04) : poser VF_MANIFEST_MOD SANS ouvrir de cycle — exactement ce
+  # que fait déjà la branche dry-run de vf_manifest_reset elle-même (VF_MANIFEST_TMP y reste
+  # vide, donc AUCUN accumulateur/répertoire créé, D-31-14 intact). Sans ce set, vf_declare_write
+  # ignore le module courant sur ce chemin et le suffixe `(<module> <version>)` du verbe + tombe à
+  # `( —)` sur TOUTES les lignes de `update --dry-run` version inchangée (défaut de FORMAT, aucune
+  # écriture en jeu) — remis à vide en sortie pour ne rien laisser fuiter vers un appelant suivant.
+  if vf_dry_run; then
+    VF_MANIFEST_MOD="$mod"
+  fi
   VF_NOCYCLE_COUNT=0
   # Chemin « version inchangée » (D-04) : sans cet appel, un lab déjà à jour n'obtiendrait JAMAIS
   # la lib de portabilité — idempotent au sein du même processus (VF_ENGINE_LIB_COPIED).
@@ -1058,6 +1107,11 @@ sync_module_governance() {
   seed_module_registres "$mod"
   if [ "$VF_NOCYCLE_COUNT" -gt 0 ]; then
     log "  $VF_NOCYCLE_COUNT chemin(s) posé(s) hors cycle manifeste, non consigné(s)"
+  fi
+  # F-02 : referme le contexte de dry-run posé en tête, jamais laissé fuiter vers l'appel suivant
+  # (update --all itère sync_module_governance module par module, chacun avec son propre mod).
+  if vf_dry_run; then
+    VF_MANIFEST_MOD=""
   fi
 }
 
