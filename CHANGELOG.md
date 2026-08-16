@@ -5,6 +5,67 @@ extrait récent et pointent ici). Chaque module a par ailleurs son propre `CHANG
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.53.1] — 2026-08-16
+
+**Hotfix : les hooks en forme exec livrés en v2.53.0 étaient morts sur toute install en scope
+user — `"$HOME"` littéral dans `args`, jamais expansé puisque la forme exec s'exécute sans
+shell.** Signalé sur pièce dès la première session post-update : 6 `SessionStart:startup hook
+error … No such file or directory` (les 5 signaux dev-orchestrator), plus l'entrée PreToolUse
+`guard-file-size.sh` de software-architecture — la porte Iron Law 300L — morte **silencieusement**
+de la même cause.
+
+### Cause racine
+
+`scripts_prefix_for_scope()` (vibeflow-update.sh) émet des préfixes shell-quotés (`"$HOME"`,
+`"$CLAUDE_PROJECT_DIR"`) conçus pour la forme shell, où le shell qui exécute la commande les
+expanse. La forme exec (`command` + `args`, contrat PR #29 §5) s'exécute **sans shell** : le
+harness ne substitue dans `args` que ses propres placeholders (`${CLAUDE_PROJECT_DIR}`,
+`${CLAUDE_PLUGIN_*}` — doc hooks officielle, vérifiée avant le correctif), et `$HOME` n'en fait
+pas partie — le littéral restait donc tel quel dans le chemin passé à bash. Le trou de
+couverture qui l'a laissé passer : toutes les suites exerçaient la forme exec en scope
+**projet** (settings.local.json, T10-T12 de test-vibeflow-update.sh), jamais en scope user avec
+`"$HOME"`.
+
+### Livré
+
+- **`merge-hooks.sh`** : dérivation d'un préfixe exec-safe pour `args` (`exec_safe_prefix`) —
+  `"$HOME"` → chemin absolu résolu à l'install (légitime : la cible user `~/.claude` est
+  par-machine, aucune fuite via git possible) ; `"$CLAUDE_PROJECT_DIR"` → placeholder harness
+  `${CLAUDE_PROJECT_DIR}` (l'unique mécanisme de substitution que le harness applique aux args,
+  portable et committable). La forme shell garde le préfixe tel quel.
+- **Garde-fou** : un littéral shell-quoté résiduel (`"$HOME"` ou `"$CLAUDE_PROJECT_DIR"`) dans
+  des `args` fait désormais échouer le merge — le bug ne peut plus se reproduire en silence.
+- **Tests** : T22 (scope user → chemin absolu, aucun littéral résiduel) et T23 (scope projet →
+  placeholder harness dans args, forme shell inchangée sur fragment mixte) ; T8 mis à jour.
+  `test-merge-hooks.sh` 27/27, `test-vibeflow-update.sh` 19/19.
+
+### Réparation du parc
+
+Relancer `/vf-update` avec cette version re-merge les fragments et **remplace** les entrées
+mortes (dédup par basename) — aucune intervention manuelle dans les settings.
+
+## [v2.53.0] — 2026-08-16
+
+*(Entrée rétro-remplie le 2026-08-16 avec la release v2.53.1 : la v2.53.0 était sortie avec les
+deux README à jour mais sans son entrée dans ce canon.)*
+
+**Une install VibeFlow sous Windows pose désormais des hooks qui fonctionnent — le substrat des
+hooks est réécrit une fois pour toutes, et les deux latences externes du milestone sont parties
+au jour 1.** Phase 30 (9 plans, 4 vagues + chirurgie), PR #43. **Livré** : `merge-hooks.sh`
+apprend la **forme exec** (`args`) — substitution, dédup cross-forme ET cross-cible, `remove`
+balayant les deux cibles, compat descendante intégrale avec la forme shell que porte le parc
+installé ; **routage borné par scope** : seules les entrées portant un chemin machine
+(`{{VF_BASH}}`) vont dans `settings.local.json` ; lib partagée `plugin/_internal/lib/vf-portable.sh`
+conforme au contrat d'interface de la PR #29 ; codes de sortie normalisés sur tout le parc
+(12 scripts, 0 = silence à la frontière harness, traduction conditionnée à `--hook`), 26 entrées
+de hooks inventoriées et classées advisory/bloquante (`docs/HOOKS-CONTRAT-SORTIE.md`) ; les 5
+entrées de la polarité dev migrées en forme exec (ADR-071) ; `check-hook-paths.sh` en `bash` nu,
+tolérant au BOM ; le scope local gitignore `.claude/settings*.json`. **Gestes jour 1** : RFC
+upstream `open-gsd/gsd-core#3556` et veille de release gsd-core >1.10.0 active. Aussi :
+`vf-dev-manager` v2.17.2 — les gates humains escaladent en vivant vers la session principale
+(`SendMessage`). Modules : 7 bumpés. **61 suites** vertes. Détail complet : ligne `v2.53.0` des
+deux README et rapport de mission Phase 30.
+
 ## [v2.52.0] — 2026-08-15
 
 **La mémoire du framework cesse de tourner à vide : les registres sont instanciés, cloisonnés
