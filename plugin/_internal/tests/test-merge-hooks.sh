@@ -23,6 +23,10 @@
 # T13 — sonde de parc (spec §4) : settings réaliste, merge exec puis remove, zéro résidu VF,
 #       entrées tierce/gsd-core intactes octet pour octet
 # T14 — frontière de mot préservée sur args (régression lookaround, transposée depuis command)
+# T22 — préfixe exec-safe scope user : "$HOME" résolu en absolu dans args (régression v2.53.0,
+#       hooks morts à chaque SessionStart — hotfix v2.53.1)
+# T23 — préfixe exec-safe scope projet : ${CLAUDE_PROJECT_DIR} (placeholder harness) dans args,
+#       forme shell inchangée sur fragment mixte
 #
 # Routage borné --settings-local (contrat manque 1, correction exec-30-01) :
 # T15 — entrée {{VF_BASH}} + --settings-local fournie → atterrit dans le fichier local, absente
@@ -282,7 +286,9 @@ import json
 d = json.load(open('$S8'))
 h = d['hooks']['PreToolUse'][0]['hooks'][0]
 assert h['command'] == '$BASH_ABS_TEST', h['command']
-assert h['args'][0] == '$PREFIX/exec-guard.sh', h['args']
+# Hotfix v2.53.1 : dans args (forme exec), le prefixe est derive en variante exec-safe —
+# \${CLAUDE_PROJECT_DIR} (placeholder harness), jamais le litteral shell-quote.
+assert h['args'][0] == '\${CLAUDE_PROJECT_DIR}/.claude/scripts/exec-guard.sh', h['args']
 assert h['args'][1] == '--hook', h['args']
 raw = open('$S8').read()
 assert '{{' not in raw, 'accolade double residuelle : ' + raw
@@ -831,6 +837,51 @@ if cmp -s "$MERGER" "$MERGER_PRISTINE_COPY"; then
   ok "T21c restauration : merge-hooks.sh identique à avant la manipulation de mutation (cmp)"
 else
   ko "T21c restauration : merge-hooks.sh a été altéré par la manipulation de mutation"
+fi
+
+# ---------- T22 : préfixe exec-safe, scope user — "$HOME" résolu en absolu dans args ----------
+# Régression v2.53.0 : le préfixe shell-quoté '"$HOME"/.claude/scripts' était substitué TEL QUEL
+# dans args (forme exec) → aucun shell pour l'expanser → 6 hooks morts à chaque SessionStart.
+S22="$WORK/t22/settings.json"
+PREFIX_USER='"$HOME"/.claude/scripts'
+if VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_EXEC" --settings "$S22" --scripts-prefix "$PREFIX_USER" 2>/dev/null \
+   && S22="$S22" python3 -c '
+import json, os
+d = json.load(open(os.environ["S22"]))
+h = d["hooks"]["PreToolUse"][0]["hooks"][0]
+home = os.environ.get("HOME") or os.path.expanduser("~")
+assert h["args"][0] == home + "/.claude/scripts/exec-guard.sh", h["args"]
+raw = open(os.environ["S22"]).read()
+assert chr(34) + "$HOME" + chr(34) not in raw, "litteral shell-quote residuel : " + raw
+' 2>/dev/null; then
+  ok "T22 préfixe exec-safe scope user : \"\$HOME\" résolu en chemin absolu dans args, aucun littéral résiduel"
+else
+  ko "T22 préfixe exec-safe scope user"
+fi
+
+# ---------- T23 : préfixe exec-safe, scope projet — placeholder harness dans args, forme
+#            shell inchangée (fragment mixte) ----------
+FRAG_T23="$WORK/frag-t23.json"
+cat > "$FRAG_T23" <<'EOF'
+{ "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": [
+  { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/t23-exec.sh"] },
+  { "type": "command", "command": "bash {{VF_SCRIPTS}}/t23-shell.sh || true" }
+] } ] } }
+EOF
+S23="$WORK/t23/settings.json"
+if VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_T23" --settings "$S23" --scripts-prefix "$PREFIX" 2>/dev/null \
+   && S23="$S23" python3 -c '
+import json, os
+d = json.load(open(os.environ["S23"]))
+entries = [h for g in d["hooks"]["PreToolUse"] for h in g["hooks"]]
+ex = [h for h in entries if "args" in h][0]
+sh = [h for h in entries if "args" not in h][0]
+assert ex["args"][0] == "${CLAUDE_PROJECT_DIR}/.claude/scripts/t23-exec.sh", ex["args"]
+assert chr(34) + "$CLAUDE_PROJECT_DIR" + chr(34) + "/.claude/scripts/t23-shell.sh" in sh["command"], sh["command"]
+' 2>/dev/null; then
+  ok "T23 préfixe exec-safe scope projet : \${CLAUDE_PROJECT_DIR} (placeholder harness) dans args, préfixe shell-quoté conservé en forme shell"
+else
+  ko "T23 préfixe exec-safe scope projet"
 fi
 
 echo ""
