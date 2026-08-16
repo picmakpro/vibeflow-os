@@ -1430,6 +1430,38 @@ fi
 chmod -R u+rwX "$LAB27" 2>/dev/null || true
 rm -rf "$LAB27"
 
+# ===========================================================================
+# T28 (31-07, correctif de transparence) — un chemin REFUSÉ par une condition de sûreté de
+# vf_removable (d/e/g) est désormais NOMMÉ dans le compte rendu, distinct de « retiré ». Avant ce
+# lot, le même scénario D-31-15 (T23) n'émettait QUE « 0 chemin(s) retiré(s) » : rien ne
+# distinguait « rien à faire » de « refusé pour cause de sûreté » — un lab dont un ancêtre est
+# symlinké ne pouvait jamais savoir que la convergence y était partiellement inopérante.
+# ---------------------------------------------------------------------------
+LAB28="$(mktemp -d)"
+CACHE28="$LAB28/cache"
+ATTACKER28="$(mktemp -d)"
+T28_BASENAME="$(prepare_convergence_scenario "$LAB28" "$CACHE28" | sed -n '1p')"
+if [ -n "$T28_BASENAME" ]; then
+  rm -rf "$LAB28/.claude/rules"
+  ln -s "$ATTACKER28" "$LAB28/.claude/rules"
+  printf 'fichier externe légitime, hors TARGET_ROOT\n' > "$ATTACKER28/$T28_BASENAME"
+  T28_OUT="$(mktemp)"
+  (cd "$LAB28" && VIBEFLOW_CACHE="$CACHE28" bash "$INSTALLER" update software-architecture) >"$T28_OUT" 2>&1
+  T28_RC=$?
+  if [ "$T28_RC" -eq 0 ] \
+     && "$GREP" -qF "1 chemin(s) refusé(s)" "$T28_OUT" \
+     && "$GREP" -qF "rules/$T28_BASENAME : résolution physique hors TARGET_ROOT" "$T28_OUT" \
+     && "$GREP" -qF "0 chemin(s) retiré(s)" "$T28_OUT"; then
+    ok "T28 : correctif de transparence — refus nommé (résolution physique) ET distinct de « retiré »"
+  else
+    ko "T28 : refus de sûreté non journalisé ou non distingué de « retiré » (rc=$T28_RC) — voir $T28_OUT"
+  fi
+  rm -f "$T28_OUT"
+else
+  skip "T28 : scénario D-31-15 non montable"
+fi
+rm -rf "$LAB28" "$ATTACKER28"
+
 # ---------------------------------------------------------------------------
 # T0 — anti-vert-à-vide (contrat F13) : la suite doit compter au moins une assertion.
 # ---------------------------------------------------------------------------

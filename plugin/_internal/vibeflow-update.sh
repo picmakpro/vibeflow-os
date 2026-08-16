@@ -438,6 +438,56 @@ vf_physical_parent_under_target() {
   esac
 }
 
+# vf_removable <rel> — factorisation des conditions (c) à (g) de vf_converge_apply (D-31-07,
+# D-31-15), UN SEUL jeu de garde-fous partagé par les DEUX verbes destructeurs du moteur : la
+# convergence à l'update (vf_converge_apply, qui y ajoute ses conditions (a)/(b) propres — la
+# comparaison ancien/nouveau manifeste, hors sujet ici) ET la désinstallation directe depuis un
+# manifeste (uninstall_module, 31-07, D-31-09). <rel> est relatif à TARGET_ROOT (patron du
+# manifeste, D-31-02) ; la résolution en chemin absolu se fait ICI, une seule fois.
+#
+# rc=0 = supprimable. rc=1 = refusé — VF_REMOVABLE_REASON porte le motif à journaliser SI le
+# refus vient d'une condition de SÛRETÉ (d, e, g : lien/répertoire, hors TARGET_ROOT, ancêtre
+# symlinké — des refus rares et anormaux). Laissé VIDE pour (c) (chemin déjà absent — cas
+# ROUTINE, (d) le rattrape de toute façon, cf. preuve d'inatteignabilité historique) et (f)
+# (exclusion D-31-03 — routine elle aussi : settings.json, memory/*, etc. y passent à CHAQUE
+# module). Journaliser (c)/(f) inonderait le compte rendu d'un signal qui cesserait d'être lu
+# (même motif que D-31-14) ; c'est exactement le correctif de transparence de ce lot pour (d)/(e)/
+# (g), qui eux étaient MUETS alors qu'un refus y est le signe d'une attaque ou d'une anomalie.
+VF_REMOVABLE_REASON=""
+vf_removable() {
+  local rel="$1"
+  local full="$TARGET_ROOT/$rel"
+  VF_REMOVABLE_REASON=""
+  # (c) existe sur disque — redondant avec (d) (preuve d'inatteignabilité conservée en commentaire
+  #     historique sur l'ancien site d'appel, cf. vf_converge_apply). Aucun motif journalisé : cas
+  #     ordinaire, pas un refus de sûreté.
+  [ -e "$full" ] || return 1
+  # (d) fichier RÉGULIER — jamais un lien, jamais un répertoire (défense en profondeur du grain
+  #     fichier D-31-02 : une ligne répertoire autoriserait une suppression de masse).
+  if ! { [ -f "$full" ] && [ ! -L "$full" ]; }; then
+    VF_REMOVABLE_REASON="pas un fichier régulier (lien ou répertoire)"
+    return 1
+  fi
+  # (e) résout SOUS TARGET_ROOT après normalisation textuelle — pas de `..` échappatoire.
+  if ! vf_rel_to_target "$full" >/dev/null 2>&1; then
+    VF_REMOVABLE_REASON="hors TARGET_ROOT après normalisation"
+    return 1
+  fi
+  # (f) hors liste close d'exclusions D-31-03 — un artefact partagé n'est jamais candidat. Aucun
+  #     motif journalisé : routine (chaque module y rencontre settings.json/memory/* etc.).
+  if vf_manifest_excluded "$rel"; then
+    return 1
+  fi
+  # (g) résolution PHYSIQUE (D-31-15, arbitrage de Samuel) : (e) ci-dessus normalise
+  #     TEXTUELLEMENT — un ANCÊTRE symlinké (ex. .claude/rules -> /tmp/…) résout « sous
+  #     TARGET_ROOT » textuellement sans que le fichier réel le soit.
+  if ! vf_physical_parent_under_target "$full"; then
+    VF_REMOVABLE_REASON="résolution physique hors TARGET_ROOT (ancêtre symlinké)"
+    return 1
+  fi
+  return 0
+}
+
 # Consigne <chemin_dest> dans l'accumulateur courant si (a) il résout sous TARGET_ROOT et
 # (b) il n'est pas dans la liste close d'exclusions. Silencieux dans les deux autres cas —
 # ce n'est jamais une erreur, seulement une exclusion volontaire du manifeste.
@@ -1874,45 +1924,22 @@ vf_converge_apply() {
   fi
 
   local rel full backup_dest
-  local -a removed=()
+  local -a removed=() refused=()
   while IFS= read -r rel; do
     [ -n "$rel" ] || continue
     # (a) présent dans l'ancien manifeste — par construction : on itère ses lignes.
     # (b) absent du nouveau manifeste — comparaison de LIGNE EXACTE, LC_ALL=C.
     LC_ALL=C grep -qxF "$rel" "$new_sorted" && continue
     full="$TARGET_ROOT/$rel"
-    # (c) existe sur disque. PREUVE D'INATTEIGNABILITÉ (correction ciblée, mandat §B) : cette
-    #     condition est STRUCTURELLEMENT redondante avec (d) juste en dessous, jamais par accident
-    #     de couverture de test. `[ -f X ]` implique TOUJOURS `[ -e X ]` (un test POSIX -f échoue
-    #     sur un chemin absent au même titre que -e) — retirer (c) SEULE ne peut donc JAMAIS
-    #     changer l'issue de la boucle : un `full` absent tombe systématiquement sur le `continue`
-    #     de (d) une ligne plus bas. Vérifié par mutation (correction ciblée) : neutraliser (c)
-    #     seule laisse la suite entière au vert. Symétriquement, neutraliser (d) SEULE laisse
-    #     AUSSI la suite au vert sur ce même cas (« chemin absent »), parce que (c) le rattrape en
-    #     premier — la redondance est BIDIRECTIONNELLE, seule la suppression des DEUX ferait
-    #     rougir un test sur ce cas précis. (d) reste seule discriminante sur le cas RÉELLEMENT
-    #     distinct qu'elle couvre en propre : un chemin qui EXISTE (`-e` vrai) mais n'est PAS un
-    #     fichier régulier (lien, répertoire) — voir le test dédié sur (d) ci-dessous.
-    [ -e "$full" ] || continue
-    # (d) fichier RÉGULIER — jamais un répertoire, jamais un lien (défense en profondeur du grain
-    #     fichier D-31-02 : une ligne répertoire autoriserait une suppression de masse). Seule
-    #     condition qui protège, EN PROPRE, le cas « chemin existant mais pas un fichier régulier »
-    #     (lien symbolique notamment) — (c) n'y joue aucun rôle puisqu'un lien EXISTE (voir preuve
-    #     ci-dessus).
-    { [ -f "$full" ] && [ ! -L "$full" ]; } || continue
-    # (e) résout SOUS TARGET_ROOT après normalisation — pas de `..` échappatoire (vf_rel_to_target
-    #     échoue hors périmètre ; défense en profondeur, chaque ligne a déjà passé vf_manifest_valid).
-    vf_rel_to_target "$full" >/dev/null 2>&1 || continue
-    # (f) hors liste close d'exclusions D-31-03 — un artefact partagé n'est jamais candidat.
-    vf_manifest_excluded "$rel" && continue
-    # (g) résolution PHYSIQUE (D-31-15, arbitrage de Samuel) : (e) ci-dessus normalise
-    #     TEXTUELLEMENT — un ANCÊTRE symlinké (ex. .claude/rules -> /tmp/…) résout « sous
-    #     TARGET_ROOT » textuellement sans que le fichier réel le soit. Cette garde consulte le
-    #     disque : refuse si le PARENT résolu physiquement n'est pas sous le TARGET_ROOT résolu
-    #     physiquement. S'applique aux DEUX branches ci-dessous (dry-run et pose réelle) puisqu'elle
-    #     est évaluée AVANT le branchement — le plan et la suppression réelle restent honnêtes l'un
-    #     envers l'autre (même garantie que les six conditions précédentes).
-    vf_physical_parent_under_target "$full" || continue
+    # (c) à (g) : socle FACTORISÉ dans vf_removable (31-07, D-31-09) — un seul jeu de garde-fous,
+    # partagé avec uninstall_module, jamais recopié. Correctif de transparence (31-07) : un refus
+    # d'une condition de SÛRETÉ (d/e/g — rare et anormal) est désormais NOMMÉ dans le compte rendu
+    # de fin, au lieu d'être MUET comme avant ce lot (D-31-15 était corrigé mais invisible : rien
+    # ne distinguait « rien à faire » de « refusé pour cause de sûreté »).
+    if ! vf_removable "$rel"; then
+      [ -n "$VF_REMOVABLE_REASON" ] && refused+=("$rel : $VF_REMOVABLE_REASON")
+      continue
+    fi
 
     if vf_dry_run; then
       vf_declare_write - "$full"
@@ -1949,6 +1976,17 @@ vf_converge_apply() {
     log "  convergence de $mod : ${#removed[@]} chemin(s) retiré(s) (disparus du module, sauvegardés → $bdir)"
     if [ "${#removed[@]}" -gt 0 ]; then
       for rel in "${removed[@]}"; do
+        log "    - $rel"
+      done
+    fi
+    # Correctif de transparence (31-07) : distinct de « retiré » — un chemin REFUSÉ par une
+    # condition de sûreté (d/e/g de vf_removable) ne l'a PAS été. Avant ce lot, ce cas était
+    # MUET : un lab dont un ancêtre est symlinké voyait « 0 chemin(s) retiré(s) » sans jamais
+    # savoir que la convergence y était partiellement inopérante (D-31-11/D-31-07 : ce qui refuse
+    # doit le dire).
+    log "  convergence de $mod : ${#refused[@]} chemin(s) refusé(s) (garde de sûreté déclenchée, aucune suppression)"
+    if [ "${#refused[@]}" -gt 0 ]; then
+      for rel in "${refused[@]}"; do
         log "    - $rel"
       done
     fi
