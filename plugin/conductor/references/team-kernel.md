@@ -15,7 +15,7 @@
 
 | Brique | Script / contrat | Garantie |
 |---|---|---|
-| **Verrou de driver** | `driver-lock.sh` (acquire / heartbeat / release, TTL + recovery) | une seule mission pilote à la fois ; reprise propre d'un lock périmé |
+| **Verrou de driver** | `driver-lock.sh` (acquire / heartbeat / release / status / recover / takeover / reclaim, TTL) | une seule mission pilote à la fois ; la reprise d'un lock périmé est un geste EXPLICITE et tracé (`takeover`), jamais un effet de bord d'une acquisition ordinaire (`acquire` refuse et nomme la marche à suivre) ; `reclaim` re-rattache une session légitime sans jamais prolonger la fraîcheur du lock (Phase 32) |
 | **Plan de bataille** | `dag.sh` (init / add --deps **--scope** / ready / mark / reopen / status) | contrôle de flux déterministe ; la frontière `ready` est une **liste à dispatcher en parallèle** quand les périmètres sont disjoints ; `reopen` force `review_regime=full` sur tout nœud de revue/jointure rouvert — aucun allègement ne s'applique jamais à un diff de comblement (D-14, Phase 20) |
 | **Rapports typés** (Pattern C) | `{ statut: passed\|gaps_found\|human_needed\|blocked, findings[{severity, action: auto-fix\|no-op\|ask-user, ref}], noeuds_debloques[] }` | fin de l'interprétation de prose ; escalade humaine impérative sur `ask-user` |
 | **Halt conditions** | 5 codes (P11) : boucle sans progrès · action destructive · ressource manquante · budget épuisé · drift de scope | l'humain arbitre en 30 s sur un message structuré |
@@ -193,9 +193,66 @@ inclus ; (2) le **verrou de driver** est donc le SEUL garant machine réel de l'
 circonstances, y compris par chemin **indirect** (`manager → worker → manager`) : un second manager
 tentant `acquire` se le voit refusé tant que le premier pilote (T1 ; couvert en continu par
 `test-driver-lock.sh` T2). Le lock, le DAG et le rapport restent uniques, portés par le seul manager
-de la mission.
+de la mission. Le garant machine s'étend désormais au-delà de la seule acquisition : le guard
+`PreToolUse` du plan 32-03 (`guard-driver-lock.sh`) porte l'invariant jusqu'aux gestes git (et aux
+écritures directes sous `.planning/`) émis par une session TIERCE pendant qu'un lock est vivant.
+Portée écrite honnêtement, avec sa limite de granularité : le guard garantit qu'aucune AUTRE
+session ne commite sous le lock, JAMAIS qu'aucun autre acteur de la MÊME session ne le fait — ce
+n'est pas une sandbox, c'est un garde-fou déterministe contre le chemin de moindre résistance.
 
 Doctrine détaillée côté dev (le protocole complet de mission) :
 `dev-orchestrator-references/mission-flow.md` — c'est la référence d'usage du kernel. Doctrine
 des étages croisés (quand les insérer, forme DAG, budgets, invariants) :
 `dev-orchestrator-references/mission-cross-team.md`.
+
+## Jeton de fence — quel commit sous quel mandat (LOCK-05)
+
+**Le jeton.** La *génération* du lock — `${LOCK_BASE}.gen.<epoch>.<pid>`, cible du lien
+symbolique publié par `driver-lock.sh` (`new_generation()`), unique et monotone par acquisition,
+déjà relue en interne pour la reprise (`lock_gen()`). C'est le seul candidat qui soit un fence au
+sens strict : un numéro qui INVALIDE l'ancien tenant après une reprise. Trois autres candidats,
+écartés : l'`owner` du lock est une chaîne libre, jamais validée par le script ; les identifiants
+de nœuds du DAG (`dag.sh`) ont une portée nœud, pas mandat ; `session_ids`/`Claude-Session:`
+désigne une session, pas un mandat — et elle change sur certains gestes du harness (`/clear`,
+motif d'être du verbe `reclaim`).
+
+**Comment l'obtenir.** `driver-lock.sh status` rend un JSON une ligne portant la clé
+`generation` (Phase 32). Lecture recommandée par un interprète JSON (`jq -r .generation`), jamais
+par découpage de texte — la forme de la ligne n'est pas garantie stable colonne par colonne. Un
+lock absent (`"present": false`) ne porte pas de `generation` : un commit hors mandat n'a alors
+pas de trailer à poser, c'est un cas normal, pas une omission.
+
+**La convention.** Le manager, ou le worker qui commite pour son propre compte, ajoute au message
+de commit un trailer `Fence: <generation>` — dans le bloc de trailers, aux côtés de ceux déjà en
+usage. Un commit peut porter plusieurs trailers.
+
+**Le tier de cette convention, écrit noir sur blanc.** Elle est exactement au même niveau que les
+deux trailers déjà en usage dans ce dépôt — sur les 300 derniers commits (`git log -300
+--pretty=%B`), on compte 397 OCCURRENCES de ligne `Co-Authored-By:` (casse haute et basse
+confondues) et 291 de `Claude-Session:` — mesuré le 2026-08-17, remesurable à tout moment par la
+même commande (le nombre DÉRIVE avec la fenêtre glissante des 300 derniers commits, ce n'est pas
+une constante figée). Ce sont des occurrences de LIGNE, pas des commits distincts : un
+squash-merge concatène les corps de plusieurs commits dans un seul message, donc UN SEUL commit
+peut porter PLUSIEURS occurrences du même trailer — 397 > 300 est donc numériquement normal, pas
+une anomalie. Posée par convention d'agent, **jamais posée ni vérifiée par une machine**. Aucun
+outil de ce dépôt ne pose ni ne vérifie un trailer (`.git/hooks/` ne contient que des `.sample`,
+aucun `commit-msg`/`prepare-commit-msg`).
+
+**Ce qui n'est PAS construit, et pourquoi.** Aucun hook git de message de commit : ce dépôt arme
+déjà un chemin de hooks git pour son garde-fou de push (`scripts/hooks/pre-push`, opt-in), et tout
+hook supplémentaire non versionné y entrerait en conflit, sans être distribuable aux labs qui
+installent le module. Aucun gate CI qui parse les trailers : le moteur de merge de hooks du dépôt
+ne connaît que les hooks du harness (`hooks.json`), jamais les hooks git natifs — en construire un
+serait une extension de capacité du moteur, hors du périmètre de cette phase, et LOCK-05 exige
+littéralement « auditable », pas « bloqué à la source ». Deux extensions considérées et
+DIFFÉRÉES, pas oubliées : un audit outillé non bloquant (script qui recoupe trailers et journal en
+un rapport), et un hook de message de commit distribué aux labs.
+
+**La recette d'audit.** Répondre à « quel commit sous quel mandat » recoupe deux sources : les
+commits portant le trailer — `git log --grep='^Fence: ' -E --format='%H %s'` (zéro résultat est un
+résultat valide tant qu'aucun commit ne pose encore le trailer) — et le journal append-only des
+reprises posé par le plan 32-02, `${LOCK_BASE}.events.log` (frère du lock, jamais dedans : la
+reprise détruit le dossier de génération), une ligne JSON par événement avec son champ
+`generation`. Le recoupement dit quand une génération a changé de main et au profit de qui ; il ne
+dit PAS qu'un commit sans trailer est hors mandat — seulement qu'aucune preuve n'a été posée,
+puisque rien ne pose le trailer à la place de l'agent.

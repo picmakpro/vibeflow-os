@@ -47,8 +47,12 @@ gestes **non négociables** :
 
 1. **Verrou de driver (avant TOUT dispatch)** :
    `"$S"/driver-lock.sh acquire --owner=<session|task_id> --step=<mission design>`.
-   `acquired:false` (`held_by`) → une autre mission pilote déjà : ne dispatche pas, remonte à
-   l'humain. `recovered:true` → lock périmé élagué : consigne la reprise (STATE `### Decisions`).
+   `acquired:false` avec `reason: held` (`held_by`) → une autre mission pilote déjà : ne dispatche
+   pas, remonte à l'humain. `reason: stale-requires-takeover` → PAS une remontée systématique :
+   exécute `"$S"/driver-lock.sh takeover --owner=<id> --step=<mission design>` (commande nommée par
+   le champ `hint` du refus), consigne la reprise (STATE `### Decisions`). `reclaim --owner=<id>` si
+   ton identité de session a changé (`/clear`, reprise) sur un lock que tu tiens encore — jamais
+   traité comme périmé. Doctrine complète et convention `Fence:` : `conductor-references/team-kernel.md`.
    **Heartbeat** entre les écrans (`driver-lock.sh heartbeat --owner=…`) ; **release** garanti
    à la clôture (succès/échec/abandon) — dernière action avant le rapport, jamais oubliée.
 2. **Plan de bataille = DAG** (`"$S"/dag.sh` : `init`, `add --deps=…`) dans

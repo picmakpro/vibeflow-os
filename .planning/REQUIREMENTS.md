@@ -825,11 +825,11 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | MANI-02 | Phase 31 | Done — plans 31-02, 31-04, 31-06 (mode `plan` de `merge-hooks.sh`, `--dry-run`, câblage skills) |
 | MANI-03 | Phase 31 | Done — plan 31-05 (convergence à l'update, backup avant suppression) |
 | MANI-04 | Phase 31 | Superseded par `31-CONTEXT.md` §4 point 8 — brouillon `31-ISSUE-20-REPLY.md` écrit (plan 31-08), **jamais posté, issue jamais close** (geste humain, ADR-031) |
-| LOCK-01 | Phase 32 | Pending |
-| LOCK-02 | Phase 32 | Pending |
-| LOCK-03 | Phase 32 | Pending — blocage conditionné au spike `reference-transaction` |
-| LOCK-04 | Phase 32 | Pending |
-| LOCK-05 | Phase 32 | Pending |
+| LOCK-01 | Phase 32 | Done — plan 32-01, vérifié goal-backward, 2 mutations rouges restaurées |
+| LOCK-02 | Phase 32 | Done — plan 32-03 (+32-07 pour la resynchro doctrinale), armement prouvé en lab jetable, contournement réel rejoué en cas de test |
+| LOCK-03 | Phase 32 | Done — amendé (D-32-A) : porté par le même guard `PreToolUse(Bash)` que LOCK-02, `reference-transaction` écarté (spike PAS SÛR) |
+| LOCK-04 | Phase 32 | Done — plans 32-02 et 32-07 (verbes `takeover`/`reclaim` + fermeture du trou de la voie legacy, 4A) |
+| LOCK-05 | Phase 32 | Livré en tant que **convention**, pas encore observée — jeton (`generation`) exposé, convention `Fence:` écrite et exécutable (`mission-flow.md`, `team-kernel.md`), recette d'audit existe ; **aucun commit, y compris ceux de cette phase, ne porte encore le trailer** — entre en vigueur au prochain mandat |
 | WTCH-01 | Phase 33 | Pending |
 | WTCH-02 | Phase 33 | Pending |
 | WTCH-03 | Phase 33 | Pending — canal Windows à valider au cadrage |
@@ -845,7 +845,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | SKIL-01 | Phase 34 | Pending — cadrage go/no-go, aucun code avant le go |
 | AGTS-01 | Phase 34 | Pending |
 | AGTS-02 | Phase 34 | Pending — conditionnée à la sortie d'expérimental de mobile-test |
-| QUAL-01 | Transverse — Phases 30, 31, 32, 33, 18, 25, 35 | Pending — satisfait sur les phases 30 et 31 livrées (gates nés avec leurs 3 issues + mutation rouge prouvée) ; reste à tenir sur 32, 33, 18, 25, 35 |
+| QUAL-01 | Transverse — Phases 30, 31, 32, 33, 18, 25, 35 | Pending — satisfait sur les phases 30, 31 et 32 livrées (30/31 : 3 issues + mutation rouge prouvée ; 32 : amendé à **4** issues par D-32-QUAL — PASS/DENY/imparsable-silencieux/indisponible-BRUYANT — les 4 couvertes, cf. `32-RELIQUATS.md` §5) ; reste à tenir sur 33, 18, 25, 35 |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -915,12 +915,12 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [x] **MANI-03**: L'update supprime les chemins de l'ancien manifeste absents du nouveau, avec backup systématique et liste signalée à l'utilisateur
 - [ ] **MANI-04**: L'issue GitHub #20 est close par livraison, réponse postée sur l'issue — **superseded par `31-CONTEXT.md` §4 point 8** : brouillon écrit (`31-ISSUE-20-REPLY.md`), poster et clore sont des gestes humains (ADR-031), non faits en mission
 
-### Durcissement du driver-lock
-- [ ] **LOCK-01**: Le heartbeat est séparé de la lease — un manager vivant renouvelle son battement, le TTL ne monte pas
-- [ ] **LOCK-02**: Un commit sous le lock d'autrui est bloqué à la source (guard `PreToolUse` distribué via merge-hooks ; armement prouvé par le gate règle 4)
-- [ ] **LOCK-03**: Un checkout de branche sous le lock d'autrui est détecté et signalé bruyamment (blocage seulement si le spike `reference-transaction` le prouve sûr)
-- [ ] **LOCK-04**: Le takeover d'un lock périmé est explicite et tracé — jamais d'auto-steal
-- [ ] **LOCK-05**: Jeton de fence en trailer des commits de mission (audit : quel commit sous quel mandat)
+### Durcissement du driver-lock (Phase 32 livrée le 2026-08-17 — 64 suites / 0 échec)
+- [x] **LOCK-01**: Le heartbeat est séparé de la lease — un manager vivant renouvelle son battement, le TTL ne monte pas
+- [x] **LOCK-02**: Un commit sous le lock d'autrui est bloqué à la source (guard `PreToolUse` distribué via merge-hooks ; armement prouvé par le gate règle 4)
+- [x] **LOCK-03**: Un checkout de branche sous le lock d'autrui est détecté et signalé bruyamment — amendé (D-32-A) : porté par le même guard `PreToolUse(Bash)` que LOCK-02, pas par `reference-transaction` (spike PAS SÛR : wedge rebase, casse worktree add, contournable)
+- [x] **LOCK-04**: Le takeover d'un lock périmé est explicite et tracé — jamais d'auto-steal
+- [~] **LOCK-05** *(livré en tant que convention, pas encore observée)*: Jeton de fence en trailer des commits de mission — le jeton (`generation`) est exposé, la convention `Fence:` est écrite et exécutable dans `mission-flow.md`/`team-kernel.md`, une recette d'audit existe ; **aucun commit ne porte encore le trailer à ce jour**, y compris ceux de cette phase — entre en vigueur au prochain mandat qui commite sous cette doctrine
 
 ### Watchdog & notifications des missions
 - [ ] **WTCH-01**: Chaque nœud du DAG de mission écrit un battement de progression (même battement que LOCK-01, deux consommateurs)

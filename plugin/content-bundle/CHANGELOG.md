@@ -1,5 +1,16 @@
 # CHANGELOG — content-bundle
 
+## [v2.0.7] — 2026-08-17 (Phase 32, doctrine du verrou resynchronisée)
+
+**Patch** (doctrine d'agent corrigée pour rester exacte, aucune nouvelle capacité).
+
+- `vf-content-manager.md` : la doctrine du verrou s'arrêtait à `acquired:false → ne dispatche
+  pas, remonte à l'humain` sans jamais nommer de marche à suivre sur un lock périmé. Ajout d'une
+  distinction courte : `reason: held` (remontée inchangée) vs `reason: stale-requires-takeover`
+  (exécuter `takeover --owner=<id> --step=<mission>` plutôt que de remonter). Renvoi à
+  `conductor-references/team-kernel.md` pour la doctrine complète et la convention `Fence:`
+  (LOCK-05).
+
 ## [v2.0.6] — 2026-08-10 (correctif #38 — `isolation: worktree` retiré du frontmatter)
 
 **Retrait d'`isolation: worktree` du frontmatter des 3 agents du bundle.** Livrée en v2.49.0

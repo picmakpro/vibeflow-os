@@ -1,11 +1,17 @@
 {
-  "description": "Conformité native des agents machine-enforced (ADR-044) : écriture d'un agent non natif bloquée, lint au démarrage de session. + Recherche documentaire avant debug (ADR-045) : advisory au démarrage. + Bandeau de mise à jour du plugin (signale une nouvelle version publiée, invite à /vf-update). + Revendication de branche (ADR-064) : advisory au démarrage quand la branche courante est déjà pilotée depuis un autre arbre de travail. + Résolution du workstream (GSDA-16) : advisory au démarrage quand un `.planning/` partitionné n'a aucun workstream résolu par un canal composable avec ADR-064.",
+  "description": "Conformité native des agents machine-enforced (ADR-044) : écriture d'un agent non natif bloquée, lint au démarrage de session. + Recherche documentaire avant debug (ADR-045) : advisory au démarrage. + Bandeau de mise à jour du plugin (signale une nouvelle version publiée, invite à /vf-update). + Revendication de branche (ADR-064) : advisory au démarrage quand la branche courante est déjà pilotée depuis un autre arbre de travail. + Résolution du workstream (GSDA-16) : advisory au démarrage quand un `.planning/` partitionné n'a aucun workstream résolu par un canal composable avec ADR-064. + Durcissement du driver-lock (LOCK-02/03/05, D-32-05) : un commit/checkout/switch Bash ou une écriture Write/Edit sous `.planning/`, émis par une session absente de `meta.session_ids` d'un lock VIVANT, est REFUSÉ. Forme exec (D-32-C) — entrées BLOQUANTES : c'est leur décision JSON `permissionDecision: deny` qui bloque l'appel d'outil, jamais leur code de sortie. + Hook doctor (QUAL-01) : advisory au démarrage, agrège les marqueurs de santé de TOUS les gardes du parc écrits par vf_guard_unavailable (pas seulement ceux de conductor) — ne bloque rien, ne corrige rien, signale seulement (ADR-031).",
   "hooks": {
     "PreToolUse": [
       {
         "matcher": "Write",
         "hooks": [
           { "type": "command", "command": "bash {{VF_SCRIPTS}}/guard-agent-write.sh" }
+        ]
+      },
+      {
+        "matcher": "Bash|Write|Edit",
+        "hooks": [
+          { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/guard-driver-lock.sh"] }
         ]
       }
     ],
@@ -17,7 +23,8 @@
           { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-debug-research.sh --hook --agents-dir={{VF_SCRIPTS}}/../agents --skills-dir={{VF_SCRIPTS}}/../skills || true" },
           { "type": "command", "command": "bash {{VF_SCRIPTS}}/update-banner.sh || true" },
           { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-branch-claim.sh --hook || true" },
-          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-workstream-pointer.sh --hook || true" }
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-workstream-pointer.sh --hook || true" },
+          { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/check-guard-health.sh", "--hook"] }
         ]
       }
     ]

@@ -43,9 +43,11 @@ ADR-048/049). Acquisition **atomique** (`mkdir`). Le manager est l'unique porteu
    ```bash
    "$S"/driver-lock.sh acquire --owner="<session_id|task_id>" --step="<étape ou 'mission'>"
    ```
-   - `acquired: true` → piloter. `acquired: false` (`held_by`) → **une autre mission pilote déjà** :
-     ne pas dispatcher, remonter à l'humain (ou attendre). `recovered: true` → un lock périmé a été
-     élagué (le porteur précédent est mort) ; consigner la reprise dans `STATE.md ### Decisions`.
+   - `acquired: true` → piloter. `acquired: false` avec `reason: held` (`held_by`) → **une autre
+     mission pilote déjà** : ne pas dispatcher, remonter à l'humain (ou attendre). `acquired: false`
+     avec `reason: stale-requires-takeover` (+ champ `hint`) → lock périmé : PAS un vol implicite,
+     `acquire` ne récupère plus rien lui-même (D-32-02) — exécuter `takeover` (ci-dessous), jamais
+     réinterprété comme un refus terminal.
 2. **Heartbeat ENTRE les étapes** — à chaque relecture ROADMAP/STATE entre deux étapes :
    ```bash
    "$S"/driver-lock.sh heartbeat --owner="<id>"
@@ -58,10 +60,36 @@ ADR-048/049). Acquisition **atomique** (`mkdir`). Le manager est l'unique porteu
    Le release est un **geste de sortie garanti**, jamais conditionnel. C'est la dernière action avant le
    rapport de mission.
 
-**Récupération de claim périmé (filet obligatoire)** : un agent LLM peut mourir sans release. Le TTL +
-heartbeat est le seul filet — d'où `acquire` qui **élague et ré-acquiert** un lock dont le heartbeat
-dépasse le TTL. Ne jamais forcer un `release` d'un owner tiers ; utiliser `recover` (qui refuse si le lock
-est encore frais).
+**Récupération de claim périmé (`takeover`, geste EXPLICITE — LOCK-04)** : un agent LLM peut mourir
+sans release. Le TTL + heartbeat reste le seul filet, mais `acquire` ne récupère plus JAMAIS un lock
+périmé lui-même (D-32-02) — il REFUSE (`reason: stale-requires-takeover`) et nomme la commande dans
+son champ `hint`. Sur ce refus :
+```bash
+"$S"/driver-lock.sh takeover --owner="<id>" --step="<étape>"
+```
+Succès → `acquired: true` avec l'ancien tenant nommé (`previous_owner: "<ancien owner>"`) et la
+génération neuve publiée : consigner la reprise dans `STATE.md ### Decisions`. `reason: still-fresh`
+en retour → le lock n'était pas réellement périmé (course), ne pas insister. Ne jamais forcer un
+`release` d'un owner tiers.
+
+**Reprise de session sur un lock VIVANT (`reclaim`)** : `/clear` ou une reprise de session change
+`CLAUDE_CODE_SESSION_ID` sans changer l'`owner` — le lock est toujours frais, encore tenu par le même
+mandat. `takeover` refuserait ce cas (`still-fresh`) : ce n'est pas son usage. Utiliser :
+```bash
+"$S"/driver-lock.sh reclaim --owner="<id>"
+```
+qui rattache la nouvelle session au lock sans prolonger sa fraîcheur (`heartbeat_epoch` n'est PAS
+réécrit — un `reclaim` n'est pas un battement). `reason: stale-requires-takeover` en retour → le
+lock a expiré entre-temps, basculer sur `takeover`.
+
+**Jeton de fence (LOCK-05)** : après un `takeover`/`reclaim` réussi, la réponse porte une clé
+`generation` — le seul candidat qui INVALIDE l'ancien tenant après une reprise (source canonique et
+détail complet : `conductor-references/team-kernel.md` §Jeton de fence, plan 32-04). Le manager, ou
+le worker qui commite pour son propre compte, ajoute au message du PREMIER commit qui suit un
+trailer `Fence: <generation>` (bloc de trailers, aux côtés de `Co-Authored-By:`/`Claude-Session:`).
+Convention d'agent, jamais posée ni vérifiée par une machine (comme les deux autres trailers du
+dépôt). Audit : `git log --grep='^Fence: ' -E --format='%H %s'` (zéro résultat est valide tant
+qu'aucun commit n'a encore posé le trailer).
 
 ---
 

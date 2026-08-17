@@ -1,5 +1,17 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.5.2] — 2026-08-17 (Phase 32, doctrine du verrou resynchronisée)
+
+**Patch** (doctrine d'agent corrigée pour rester exacte, aucune nouvelle capacité).
+
+- `vf-design-manager.md` : le couple `acquired:false`/`recovered:true` décrit comme chemin
+  nominal d'`acquire` sur un lock périmé — obsolète depuis les plans 32-01/32-02 — est remplacé
+  par la doctrine réelle post-Phase 32 : `acquire` REFUSE (`reason: stale-requires-takeover`,
+  champ `hint`) et nomme les verbes explicites `takeover --owner=<id> --step=<mission design>`
+  (reprise d'un lock périmé) et `reclaim --owner=<id>` (rattachement de session sur un lock encore
+  vivant). Renvoi à `conductor-references/team-kernel.md` pour la doctrine complète et la
+  convention `Fence:` (LOCK-05).
+
 ## [v1.5.1] — 2026-08-10 (correctif #38 — `isolation: worktree` retiré du frontmatter)
 
 **Retrait d'`isolation: worktree` du frontmatter de `vf-crafter`.** Livrée en v2.49.0

@@ -72,7 +72,7 @@
 - [x] Phase 29: Distiller les gains ICM (G1-G5) — investigation dag.sh --scope d'abord (completed 2026-08-15)
 - [x] Phase 30: Portabilité Windows II (completed 2026-08-16)
 - [x] Phase 31: Manifeste d'install + dry-run (issue #20) (completed 2026-08-16)
-- [ ] Phase 32: Durcissement du driver-lock
+- [x] Phase 32: Durcissement du driver-lock (completed 2026-08-17)
 - [ ] Phase 33: Watchdog & notifications des missions
 - [ ] Phase 34: Gaps agency-agents & cadrage skill-installer
 - [ ] Phase 35: Ré-armement worktree (conditionnelle)
@@ -666,6 +666,24 @@ autour.
 après la Phase 31 ; ne touche que `conductor`. **Research flag** : spike `reference-transaction`
 git AVANT d'en dépendre pour LOCK-03 (couverture checkout incertaine) ; rejouer les 2 contournements
 réels comme cas de test AVANT de choisir le mécanisme.
+*Amendements de périmètre (tranchés par Samuel le 2026-08-17, après re-validation externe des plans) :*
+*(a) « ne touche que `conductor` » est **faux à l'épreuve du plan**. `acquire` cessant de récupérer un*
+*lock périmé (LOCK-04), **5 agents managers dans 4 modules tiers** plus `mission-flow.md` et le README*
+*de `dev-orchestrator` continueraient de prescrire l'ancien contrat : un manager sur lock périmé ne*
+*connaîtrait pas le verbe `takeover` et la mission gèlerait — critère 4 vert dans le code, faux en*
+*production. Option **3B** retenue : synchronisation doctrinale COMPLÈTE des 7 fichiers (+ bumps des*
+*modules touchés), plus un champ `hint` in-band sur le refus. S'y ajoutent trois écritures transverses*
+*imposées par des gates existants : `docs/HOOKS-CONTRAT-SORTIE.md` (assertion de recomptage,*
+*tolérance +1), les deux README racine (compteurs gatés par `check-version-sync.sh`), et*
+*`plugin/_internal/tests/test-vf-portable.sh` (couverture checksum du bloc localisateur). Formulation*
+*exacte : « aucun module tiers n'est refondu ; leur doctrine du verrou est resynchronisée, et les*
+*gates machine du dépôt sont honorés ».*
+*(b) **Option 4A** : le trou de la voie **legacy** du protocole d'acquisition est corrigé dans la phase.*
+*Mesuré sur le script non modifié : un lock `legacy` (vrai dossier) frais et tenu par ALICE laisse*
+*`acquire --owner=BOB` rendre `acquired:true` — deux détenteurs, et le cas T12 censé être le filet*
+*anti-deadlock passe **par ce bug**. Nominal sur Git Bash Windows sans privilège de lien symbolique,*
+*sur un milestone Windows-first. Ce n'est **pas** une réouverture du protocole symlink-génération :*
+*c'est la fermeture d'un trou de sa voie legacy.*
 **Requirements**: LOCK-01, LOCK-02, LOCK-03, LOCK-04, LOCK-05
 **Success Criteria** (what must be TRUE):
 
@@ -683,7 +701,14 @@ réels comme cas de test AVANT de choisir le mécanisme.
      rejoué comme cas de test rougit sans le guard (LOCK-02).
 
   3. Un checkout de branche sous le lock d'autrui est détecté et signalé bruyamment — blocage
-     seulement si le spike `reference-transaction` le prouve sûr (LOCK-03).
+     seulement si le spike `reference-transaction` le prouve sûr (LOCK-03). *Amendé au cadrage
+     (D-32-A, tranché par Samuel le 2026-08-16) : le spike a rendu **PAS SÛR** — `reference-transaction`
+     wedge `rebase` (son propre `--abort` est refusé), casse `worktree add` en fuitant la branche,
+     se contourne par `-c core.hooksPath=/dev/null` (que nos propres `check-*.sh` utilisent déjà),
+     est aveugle sur git < 2.46 et ne voyage pas avec le plugin. Le blocage du seul
+     `git checkout|switch` de branche est donc porté par le guard `PreToolUse(Bash)` du critère 2,
+     qui refuse **avant** que git ne tourne et n'a aucun de ces défauts ; échappatoire nommée
+     (worktree), le détenteur du lock passe toujours. Preuve : `32-SPIKE-reference-transaction.md`.*
 
   4. Le takeover d'un lock périmé est explicite et tracé avec l'ID du repreneur — jamais
      d'auto-steal au TTL (LOCK-04).
@@ -692,8 +717,25 @@ réels comme cas de test AVANT de choisir le mécanisme.
      est auditable (LOCK-05).
 
 **Transverse (QUAL-01)** : le guard naît bloquant déclaré, avec ses trois issues (dont fail-open
-BRUYANT si le lock est illisible — jamais un vert) et sa mutation rouge prouvée.
-**Plans**: TBD
+BRUYANT si le lock est illisible — jamais un vert) et sa mutation rouge prouvée. *Amendé au plan
+(D-32-QUAL, tranché par Samuel le 2026-08-16) : **quatre** issues, pas trois — PASS · DENY ·
+imparsable → fail-open silencieux · indisponible → fail-open bruyant ; le « bruyant » est réalisé
+par le marqueur de santé PLUS un hook doctor `SessionStart` générique livré dans la phase
+(plan 32-05, **abandonnable**).*
+
+**Plans**: 6 plans livrés (32-01 → 32-05, 32-07), 4 vagues — le plan de bilan initialement prévu en
+32-06 a été rendu directement en `32-RELIQUATS.md` (pas de PLAN/SUMMARY numérotés séparés) ; 32-07
+s'est ajouté au plan pour porter les amendements 3B/4A tranchés par Samuel le 2026-08-17.
+
+Plans:
+- [x] 32-01-PLAN.md — champs additifs `session_ids`/`generation` en JSON + heartbeat séparé de la lease, TTL inchangé — vague 1 (LOCK-01, QUAL-01)
+- [x] 32-02-PLAN.md — `takeover` + `reclaim` + journal append-only, retrait de l'auto-steal — vague 2 (LOCK-04, QUAL-01)
+- [x] 32-03-PLAN.md — guard `PreToolUse` (Bash + Write|Edit) + entrée hooks armée (une seule, contournement du bug d'idempotence cross-matcher de `merge-hooks.sh`) — vague 3, **checkpoint humain** (LOCK-02, LOCK-03, QUAL-01)
+- [x] 32-04-PLAN.md — convention de jeton de fence `Fence:` dans le contrat invariant du kernel — vague 3 (LOCK-05)
+- [x] 32-05-PLAN.md — `check-guard-health.sh`, hook doctor `SessionStart` générique (lecteur des marqueurs de santé du parc) — vague 4 (QUAL-01)
+- [x] 32-07-PLAN.md — synchronisation doctrinale complète (option 3B : 5 agents managers de 4 modules tiers + `mission-flow.md` + README) et fermeture du trou de la voie legacy du protocole d'acquisition (option 4A) — vague 4 (LOCK-04 amendé)
+- [x] 32-06-PLAN.md — clôture : bilan du parc complet sur l'arbre commité, gates transverses, `CHANGELOG`/`README` de `conductor` et bump du module en v1.26.0 — vague 5 (LOCK-01..05, QUAL-01). *Ce plan ne produit pas de `SUMMARY` : son livrable est `32-RELIQUATS.md`.*
+- [x] bilan de clôture rendu en `32-RELIQUATS.md` — parc complet (64 suites / 0 échec), gates transverses, état réel des 5 critères et de QUAL-01, reliquats consignés (LOCK-01..05, QUAL-01)
 
 ### Phase 33: Watchdog & notifications des missions
 

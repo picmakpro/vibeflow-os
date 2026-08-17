@@ -51,18 +51,28 @@ Les diagnostics humains (`say()` et équivalents) vont systématiquement sur **s
 stdout — c'est déjà la convention en place dans les 4 scripts du périmètre dev (task 2 de ce plan
 le vérifie et le corrige si besoin).
 
-## 4. L'inventaire — 26 entrées, recompte machine
+## 4. L'inventaire — 28 entrées, recompte machine
 
 Commande de recomptage (fait foi, D-08) :
 
 ```bash
-python3 -c "import json,glob; n=sum(len(h.get('hooks',[])) for f in sorted(glob.glob('plugin/*/hooks/hooks.json')) for gs in json.load(open(f))['hooks'].values() for h in gs); print(n); assert n==26, n"
+python3 -c "import json,glob; n=sum(len(h.get('hooks',[])) for f in sorted(glob.glob('plugin/*/hooks/hooks.json')) for gs in json.load(open(f))['hooks'].values() for h in gs); print(n); assert n==28, n"
 ```
 
-Rendue le 2026-08-16 : `26` (25 recomptées le 2026-08-15, plus 1 : l'entrée n°26,
-`check-hook-paths.sh`, posée par le plan `30-09`). Toute dérive future (une 27e entrée apparue, une
-entrée disparue) fait échouer cette assertion — bruyamment, jamais en silence — et impose de mettre
-à jour l'inventaire et l'assertion **ensemble**, jamais l'un sans l'autre.
+Rendue le 2026-08-17 : `28` (27 recomptées plus tôt le même jour par le plan `32-03`, plus 1 :
+l'entrée n°28, `check-guard-health.sh`, `SessionStart · startup`, posée par le plan `32-05`
+(QUAL-01, le « hook doctor » spécifié depuis le 2026-08-02 et jamais écrit). Née en forme exec
+(D-32-C), **une seule entrée** (pas de piège d'idempotence cross-matcher ici : `SessionStart` du
+module `conductor` n'a qu'un seul groupe `startup`, cette entrée s'y ajoute simplement). L'entrée
+n°27 (`guard-driver-lock.sh`, matcher `Bash|Write|Edit`, plan `32-03`) est inchangée : **une seule
+entrée, pas deux** — D-32-05 envisageait deux entrées séparées (matcher `Bash`, matcher
+`Write|Edit`) mais cette forme s'est avérée EMPIRIQUEMENT incompatible avec la purge d'idempotence
+cross-matcher de `merge-hooks.sh` (elle retire toute entrée référençant les mêmes scripts dans
+TOUS les groupes de l'événement de la cible — la seconde entrée installée supprimait
+systématiquement la première). Voir `32-03-SUMMARY.md` pour la reproduction complète. Toute dérive
+future (une 29e entrée apparue, une entrée disparue) fait échouer cette assertion — bruyamment,
+jamais en silence — et impose de mettre à jour l'inventaire et l'assertion **ensemble**, jamais
+l'un sans l'autre.
 
 **Colonnes** : module · événement · matcher · script · arguments d'invocation (au-delà du chemin du
 script lui-même) · `--hook` accepté (oui/non — et s'il change le CODE de sortie ou seulement le
@@ -70,7 +80,7 @@ rendu, quand c'est pertinent) · codes de sortie atteignables **aujourd'hui**, a
 exacte · classement **advisory** ou **bloquante**, avec le mécanisme · forme actuelle
 (shell/exec) · action requise par la Phase 30 (normalisation, migration, ou rien).
 
-### conductor — 6 entrées
+### conductor — 8 entrées
 
 | # | Événement · matcher | Script | Invocation (hors chemin script) | `--hook` | Codes atteignables aujourd'hui | Classement | Forme | Action (Phase 30) |
 |---|---|---|---|---|---|---|---|---|
@@ -80,6 +90,8 @@ exacte · classement **advisory** ou **bloquante**, avec le mécanisme · forme 
 | 4 | SessionStart · startup | `update-banner.sh` | (aucun — pas de flag `--hook` dans ce script) | n/a | 0 (systématique, « Toujours exit 0 » documenté) | advisory (ADR-031) | shell + `\|\| true` | rien |
 | 5 | SessionStart · startup | `check-branch-claim.sh` | `--hook` | oui — **ne change QUE le rendu**, jamais le code de sortie (documenté explicitement dans le script) | 0 (signal), 3 (SAIN/silence), 4 (INDÉTERMINÉ — 3e état hors du contrat 0/3/64, cf. contrat amont §4 « n'a pas pu tourner »), 64 (usage, jamais atteint via ce fragment) | advisory — « ne bloque rien, ne relâche aucun lock » (en-tête explicite, ADR-031) | shell + `\|\| true` | normalisation (30-06) — silence porté par 3/4, pas par 0 ; sans `\|\| true` ces deux codes fuiraient comme erreur harness |
 | 6 | SessionStart · startup | `check-workstream-pointer.sh` | `--hook` | oui — documenté explicitement : « ne change AUCUN code de sortie », rendu seul | 0 (conforme), 1 (échec constaté, advisory), 2 (NON VÉRIFIABLE), 3 (silence, non partitionné), 64 (usage) | advisory — « il ne corrige rien, ne bloque rien » (en-tête explicite) | shell + `\|\| true` | normalisation (30-06) |
+| 27 | PreToolUse · Bash\|Write\|Edit | `guard-driver-lock.sh` | `args: ["{{VF_SCRIPTS}}/guard-driver-lock.sh"]`, `command: {{VF_BASH}}` | n/a (pas de flag) | 0 (toujours, fail-open à quatre issues — QUAL-01) ; **17** atteignable si aucun interprète n'est joignable (fail-open BRUYANT, `vf_guard_unavailable`) | **bloquante** — décision JSON `permissionDecision: deny` (LOCK-02/03 : commit/checkout/switch/merge/rebase/… Bash, ou écriture Write/Edit sous `.planning/`, D-32-B, d'une session tierce sous lock vivant), jamais par le code de sortie | **exec** (né conforme, D-32-C, contrat PR #29 §5) | née à l'état cible (plan 32-03) — **une SEULE entrée à matcher combiné, pas deux** : voir la note du §4 (purge d'idempotence cross-matcher de `merge-hooks.sh`, découverte empirique du plan 32-03) |
+| 28 | SessionStart · startup | `check-guard-health.sh` | `args: ["{{VF_SCRIPTS}}/check-guard-health.sh", "--hook"]`, `command: {{VF_BASH}}` | oui — `--hook` traduit SAIN (3) et INDÉTERMINÉ (4) vers 0 ; le signal (déjà 0) et l'usage (64) ne sont jamais traduits | 0 (silence STRICT si aucun marqueur récent, OU signal — une seule ligne — si au moins un garde du parc a écrit un marqueur récent), 64 (usage, jamais atteint via ce fragment) | **advisory** — le « hook doctor » de QUAL-01 : constate, ne corrige rien, ne bloque rien (ADR-031) ; lecture seule STRICTE du répertoire de santé | **exec** (né conforme, D-32-C, contrat PR #29 §5) | née à l'état cible (plan 32-05) — GÉNÉRIQUE : agrège les marqueurs de TOUS les gardes du parc écrits par `vf_guard_unavailable`, pas seulement ceux de `conductor` |
 
 ### consolidator — 7 entrées
 
@@ -145,13 +157,13 @@ humain).
 
 | Module | Total | Reproduit par |
 |---|---|---|
-| conductor | 6 | `python3 -c "import json; d=json.load(open('plugin/conductor/hooks/hooks.json')); print(sum(len(h.get('hooks',[])) for gs in d['hooks'].values() for h in gs))"` |
+| conductor | 8 | `python3 -c "import json; d=json.load(open('plugin/conductor/hooks/hooks.json')); print(sum(len(h.get('hooks',[])) for gs in d['hooks'].values() for h in gs))"` |
 | consolidator | 7 | idem, `plugin/consolidator/hooks/hooks.json` |
 | dev-orchestrator | 5 | idem, `plugin/dev-orchestrator/hooks/hooks.json` |
 | infrastructure-audit | 1 | idem, `plugin/infrastructure-audit/hooks/hooks.json` |
 | planning-core | 6 | idem, `plugin/planning-core/hooks/hooks.json` |
 | software-architecture | 1 | idem, `plugin/software-architecture/hooks/hooks.json` |
-| **Total** | **26** | commande de recomptage globale, §4 ci-dessus |
+| **Total** | **28** | commande de recomptage globale, §4 ci-dessus |
 
 **Les deux entrées bloquantes mises en avant par le plan comme points de vigilance** (le
 classement n'est PAS déductible mécaniquement du type d'événement, RESEARCH.md Pitfall 4) :
@@ -162,11 +174,13 @@ classement n'est PAS déductible mécaniquement du type d'événement, RESEARCH.
   et c'est le comportement voulu : la seule entrée de tout le parc où « bloquante par code de
   sortie » est une garantie à préserver, jamais un défaut de normalisation à corriger.
 
-**L'inventaire machine complet fait apparaître trois bloquantes supplémentaires**, du même
-mécanisme JSON que #25 : `guard-agent-write.sh` (#1), `guard-read-registres.sh` (#7) et
-`guard-bash-registres.sh` (#8) — chacune sort toujours 0 et bloque via `permissionDecision: deny`.
-Soit **5 entrées bloquantes au total sur les 26** (4 via décision JSON + 1 via code de sortie), et
-**21 entrées advisory** (dont la nouvelle entrée n°26, `check-hook-paths.sh`, plan `30-09`).
+**L'inventaire machine complet fait apparaître quatre bloquantes supplémentaires**, du même
+mécanisme JSON que #25 : `guard-agent-write.sh` (#1), `guard-read-registres.sh` (#7),
+`guard-bash-registres.sh` (#8) et **`guard-driver-lock.sh` (#27 PreToolUse·Bash\|Write\|Edit,
+plan `32-03`, LOCK-02/03/05)** — chacune sort toujours 0 et bloque via `permissionDecision: deny`.
+Soit **6 entrées bloquantes au total sur les 28** (5 via décision JSON + 1 via code de sortie), et
+**22 entrées advisory** (+1 : l'entrée #28, `check-guard-health.sh`, plan `32-05`, est advisory —
+elle ne bloque rien, ADR-031).
 
 ## 6. Ce qui reste à la polarité gouvernance
 
@@ -191,4 +205,7 @@ blocage par code de sortie est voulu et ne doit jamais être traduit.
 ---
 
 *Produit par le plan VFDO-30-04 (Portabilité Windows II — codes de sortie), 2026-08-15. Inventaire
-mis à jour par le plan VFDO-30-09 (26e entrée, `check-hook-paths.sh`), le 2026-08-15.*
+mis à jour par le plan VFDO-30-09 (26e entrée, `check-hook-paths.sh`), le 2026-08-15, puis par le
+plan VFDO-32-03 (27e entrée, `guard-driver-lock.sh`, matcher combiné, LOCK-02/03/05), puis par le
+plan VFDO-32-05 (28e entrée, `check-guard-health.sh`, le « hook doctor » générique du parc,
+QUAL-01), le 2026-08-17.*
