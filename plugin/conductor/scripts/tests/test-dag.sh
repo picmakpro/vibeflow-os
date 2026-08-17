@@ -494,8 +494,161 @@ assert "T30.1 — frontiere vide : ready=[] et count=0"                         
 # pas seulement produire un resultat different sans verification (cas discriminant).
 assert "T30.2 — stages=[] (jamais null) : preuve que compute_stages() n'a pas ete appelee"          "$out30" '"stages": []'
 
+DRIVER_LOCK_SCRIPT="$(pwd)/scripts/driver-lock.sh"
+
+echo "=== T34 — lock acquis : dag.sh mark avance progress_epoch sur le lock courant (WTCH-01) ==="
+export VF_DRIVER_LOCK="$WORK_DIR/t34.lock"
+rm -rf "$VF_DRIVER_LOCK"
+"$DRIVER_LOCK_SCRIPT" acquire --owner=tester --step=s1 >/dev/null
+F34="$WORK_DIR/t34.dag.json"
+"$SCRIPT" init --file="$F34" >/dev/null
+"$SCRIPT" add --file="$F34" --id=n1 --step=n1 >/dev/null
+"$SCRIPT" mark --file="$F34" --id=n1 --status=running >/dev/null
+st34="$("$DRIVER_LOCK_SCRIPT" status)"
+page34="$(printf '%s' "$st34" | grep -o '"progress_age_seconds": [0-9]*' | grep -o '[0-9]*$')"
+if [ -n "$page34" ] && [ "$page34" -le 2 ]; then
+  echo "  ✅ PASS — T34.1 — progress_age_seconds proche de 0 après mark (${page34}s)"; PASS=$((PASS+1))
+else
+  echo "  ❌ FAIL — T34.1 — progress_age_seconds proche de 0 après mark"; echo "     attendu: <=2"; echo "     obtenu:  ${page34:-vide}"; FAIL=$((FAIL+1))
+fi
+"$DRIVER_LOCK_SCRIPT" release --owner=tester >/dev/null 2>&1
+rm -rf "$VF_DRIVER_LOCK"
+
+echo "=== T35 — aucun lock present : dag.sh mark inchange (sortie identique a avant ce plan) ==="
+export VF_DRIVER_LOCK="$WORK_DIR/t35.lock-absent"
+rm -rf "$VF_DRIVER_LOCK"
+F35="$WORK_DIR/t35.dag.json"
+"$SCRIPT" init --file="$F35" >/dev/null
+"$SCRIPT" add --file="$F35" --id=n1 --step=n1 >/dev/null
+out35="$("$SCRIPT" mark --file="$F35" --id=n1 --status=running)"; rc35=$?
+assert_exit "T35.1 — exit 0 sans lock present"                      "$rc35" 0
+assert      "T35.2 — sortie JSON porte toujours id/status/ready"    "$out35" '"id": "n1"'
+assert      "T35.3 — status running toujours present"               "$out35" '"status": "running"'
+assert      "T35.4 — cle ready toujours presente"                   "$out35" '"ready":'
+unset VF_DRIVER_LOCK
+
+echo "=== T36 — sibling driver-lock.sh ISOLE en panne (exit 1, pas de JSON) : mark reste vert, DAG mis a jour sur disque ==="
+ISO36="$WORK_DIR/iso36"; mkdir -p "$ISO36"
+cp "$SCRIPT" "$ISO36/dag.sh"
+cat > "$ISO36/driver-lock.sh" <<'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+chmod +x "$ISO36/driver-lock.sh"
+# Controle positif de la fixture (T36.0) : le faux script echoue reellement quand invoque seul.
+"$ISO36/driver-lock.sh" >/dev/null 2>&1; rc360=$?
+assert_exit "T36.0 — controle positif : la fixture panne echoue bien seule (exit 1)" "$rc360" 1
+F36="$WORK_DIR/t36.dag.json"
+"$ISO36/dag.sh" init --file="$F36" >/dev/null
+"$ISO36/dag.sh" add --file="$F36" --id=n1 --step=n1 >/dev/null
+out36="$("$ISO36/dag.sh" mark --file="$F36" --id=n1 --status=running)"; rc36=$?
+assert_exit "T36.1 — exit 0 malgre driver-lock.sh en panne (exit 1 sans JSON)" "$rc36" 0
+assert      "T36.2 — sortie mark reflete bien le nouveau statut"               "$out36" '"status": "running"'
+assert      "T36.3 — le fichier DAG SUR DISQUE porte le nouveau statut (preuve que save(dag) a eu lieu avant l'appel driver-lock defaillant)" "$(cat "$F36")" '"status": "running"'
+
+echo "=== T37 — sibling driver-lock.sh ISOLE qui rend du JSON illisible : mark reste vert, DAG mis a jour normalement ==="
+ISO37="$WORK_DIR/iso37"; mkdir -p "$ISO37"
+cp "$SCRIPT" "$ISO37/dag.sh"
+cat > "$ISO37/driver-lock.sh" <<'EOF'
+#!/usr/bin/env bash
+echo "not-json"
+exit 0
+EOF
+chmod +x "$ISO37/driver-lock.sh"
+# Controle positif de la fixture (T37.0) : la sortie n'est vraiment pas du JSON valide.
+out370="$("$ISO37/driver-lock.sh" status)"
+assert_not "T37.0 — controle positif : la fixture rend bien une sortie non-JSON" "$out370" '{'
+F37="$WORK_DIR/t37.dag.json"
+"$ISO37/dag.sh" init --file="$F37" >/dev/null
+"$ISO37/dag.sh" add --file="$F37" --id=n1 --step=n1 >/dev/null
+out37="$("$ISO37/dag.sh" mark --file="$F37" --id=n1 --status=running)"; rc37=$?
+assert_exit "T37.1 — exit 0 malgre un JSON illisible cote driver-lock.sh" "$rc37" 0
+assert      "T37.2 — DAG SUR DISQUE mis a jour normalement"              "$(cat "$F37")" '"status": "running"'
+
+echo "=== T38 — sibling driver-lock.sh ISOLE qui PEND (sleep 30) : mark revient en MOINS DE 5s, DAG deja sauve avant l'appel pendant ==="
+ISO38="$WORK_DIR/iso38"; mkdir -p "$ISO38"
+cp "$SCRIPT" "$ISO38/dag.sh"
+cat > "$ISO38/driver-lock.sh" <<'EOF'
+#!/usr/bin/env bash
+sleep 30
+EOF
+chmod +x "$ISO38/driver-lock.sh"
+# Controle positif de la fixture (T38.0) : le processus est encore vivant apres 1s (borne, jamais
+# un sleep non borne dans le test lui-meme) — preuve qu'il pend reellement plutot que de sortir vite.
+"$ISO38/driver-lock.sh" >/dev/null 2>&1 &
+p38=$!
+sleep 1
+if kill -0 "$p38" 2>/dev/null; then
+  echo "  ✅ PASS — T38.0 — controle positif : la fixture pend bien (processus vivant après 1s)"; PASS=$((PASS+1))
+else
+  echo "  ❌ FAIL — T38.0 — controle positif : la fixture pend bien"; FAIL=$((FAIL+1))
+fi
+kill -9 "$p38" 2>/dev/null; wait "$p38" 2>/dev/null
+F38="$WORK_DIR/t38.dag.json"
+"$ISO38/dag.sh" init --file="$F38" >/dev/null
+"$ISO38/dag.sh" add --file="$F38" --id=n1 --step=n1 >/dev/null
+t0_38=$(date +%s)
+# NE PAS capturer run_bounded via $(...) ici : le watcher interne de run_bounded
+# (`( sleep 5; kill -9 "$pid" ) &`) n'a pas son propre stdout redirige et herite donc du pipe de
+# la substitution de commande englobante — meme apres que `wait "$pid"` rende la main et que le
+# watcher soit tue, `$(...)` peut rester bloque jusqu'a ce que CE descripteur herite se ferme,
+# soit jusqu'au kill -9 du watcher lui-meme a 5s (fausse alerte reproduite et mesuree : 5.0-5.03s
+# systematique avec capture directe, 2.0-2.1s sans — piege classique de bash, pas un defaut de
+# record_progress). Rediriger vers un fichier evite le pipe et cette dependance.
+OUT38FILE="$WORK_DIR/t38.out"
+run_bounded "$ISO38/dag.sh" mark --file="$F38" --id=n1 --status=running >"$OUT38FILE"; rc38=$?
+out38="$(cat "$OUT38FILE" 2>/dev/null)"
+t1_38=$(date +%s)
+elapsed38=$((t1_38 - t0_38))
+assert_exit "T38.1 — exit 0 malgre un driver-lock.sh qui pend"                          "$rc38" 0
+if [ "$elapsed38" -lt 5 ]; then
+  echo "  ✅ PASS — T38.2 — retour en moins de 5s (mesure : ${elapsed38}s, timeout=2 interne)"; PASS=$((PASS+1))
+else
+  echo "  ❌ FAIL — T38.2 — retour en moins de 5s"; echo "     attendu: <5"; echo "     obtenu:  ${elapsed38}s"; FAIL=$((FAIL+1))
+fi
+assert "T38.3 — DAG SUR DISQUE porte deja le nouveau statut (save(dag) a eu lieu avant l'appel pendant)" "$(cat "$F38")" '"status": "running"'
+
+echo "=== T39 — non-regression statique : aucun subprocess.run vers les siblings ne passe par une chaine shell ==="
+assert_exit "T39.1 — grep positif sur l'appel status en LISTE"       "$(grep -c '\[driver_lock_sh, "status"\]' "$SCRIPT" >/dev/null; echo $?)" 0
+assert_exit "T39.2 — grep positif sur l'appel mark-progress en LISTE" "$(grep -c '\[driver_lock_sh, "mark-progress"' "$SCRIPT" >/dev/null; echo $?)" 0
+assert_exit "T39.3 — aucun shell=True dans dag.sh"                    "$([ "$(grep -c 'shell=True' "$SCRIPT")" -eq 0 ]; echo $?)" 0
+
+echo "=== T40 — lock present+detenu mais mark-progress ECHOUE (exit 1) : mark reste vert, DAG mis a jour, avertissement BRUYANT sur stderr (4e issue QUAL-01) ==="
+ISO40="$WORK_DIR/iso40"; mkdir -p "$ISO40"
+cp "$SCRIPT" "$ISO40/dag.sh"
+cat > "$ISO40/driver-lock.sh" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = "status" ]; then
+  echo '{"present": true, "owner": "tester", "step": "s", "age_seconds": 1}'
+  exit 0
+fi
+if [ "$1" = "mark-progress" ]; then
+  exit 1
+fi
+exit 1
+EOF
+chmod +x "$ISO40/driver-lock.sh"
+# Controle positif de la fixture (T40.0) : status confirme present+owner, mark-progress echoue reellement.
+st400="$("$ISO40/driver-lock.sh" status)"
+assert     "T40.0a — controle positif : la fixture rend bien present+owner=tester" "$st400" '"owner": "tester"'
+"$ISO40/driver-lock.sh" mark-progress --owner=tester >/dev/null 2>&1; rc400=$?
+assert_exit "T40.0b — controle positif : la fixture echoue bien sur mark-progress" "$rc400" 1
+F40="$WORK_DIR/t40.dag.json"
+"$ISO40/dag.sh" init --file="$F40" >/dev/null
+"$ISO40/dag.sh" add --file="$F40" --id=n1 --step=n1 >/dev/null
+ERR40="$WORK_DIR/t40.stderr"
+out40="$("$ISO40/dag.sh" mark --file="$F40" --id=n1 --status=running 2>"$ERR40")"; rc40=$?
+assert_exit "T40.1 — exit 0 malgre l'echec de mark-progress sur lock sain"           "$rc40" 0
+assert      "T40.2 — DAG SUR DISQUE mis a jour"                                     "$(cat "$F40")" '"status": "running"'
+assert      "T40.3 — avertissement BRUYANT sur stderr (lock present+detenu, ecriture refusee)" "$(cat "$ERR40")" 'mark-progress'
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
 echo "=================================="
+TOTAL=$((PASS+FAIL))
+if [ "$TOTAL" -eq 0 ]; then
+  echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE — zéro assertion exécutée, résultat non fiable"
+  exit 1
+fi
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

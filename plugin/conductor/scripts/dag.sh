@@ -40,6 +40,12 @@
 #
 # Glyphes de statut (rendu `tree`) : ● done · ◐ running · ○ ready · · blocked · ✗ failed.
 #
+# progress_epoch (D-33-A, WTCH-01, plan 33-02) : `mark` avance `progress_epoch` sur le driver-lock
+# COURANT s'il existe, en best-effort APRES save(dag), sans jamais bloquer ni faire echouer le DAG
+# (ADR-031 — degradation silencieuse, sauf le seul cas ou le lock est confirme present+detenu mais
+# refuse l'ecriture, signale bruyamment sur stderr). Le relais du verdict `check-guard-health.sh
+# --hook` (WTCH-02, D-33-F) et la notification de jalon (WTCH-03) sont poses par 33-05, pas ici.
+#
 # Reference : ADR-053 + .planning/phases/VFDO-09-*/09-CADRAGE-swarm.md §3.
 
 set -uo pipefail
@@ -63,10 +69,20 @@ done
 [ -n "$FILE" ] || { echo '{"error": "file-required"}' >&2; exit 1; }
 [ -n "$ACTION" ] || { echo "Usage: $0 {init|add|ready|mark|reopen|status|tree} --file=F [...]" >&2; exit 1; }
 
-python3 - "$ACTION" "$FILE" "$ID" "$STEP" "$STAGE" "$DEPS" "$STATUS" "$SCOPE" <<'PYEOF'
+# Sibling driver-lock.sh (WTCH-01, 33-02) : resolu par le REPERTOIRE DU SCRIPT dag.sh lui-meme,
+# jamais par le cwd — les scripts de conductor/scripts/ sont poses par le meme glob d'installation
+# (vibeflow-update.sh), leur coexistence dans ce repertoire est une garantie de l'installeur, pas
+# une supposition de ce script (distinct du vecteur RCE ferme en D-07/T33 : ici la cible est un
+# sibling connu, jamais une valeur derivee d'un cwd non fiable). Reutilise tel quel par 33-05 pour
+# CHECK_GUARD_HEALTH_SH/NOTIFY_SH — ne pas dupliquer ni renommer.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd 2>/dev/null || dirname "$0")"
+DRIVER_LOCK_SH="$SCRIPT_DIR/driver-lock.sh"
+
+python3 - "$ACTION" "$FILE" "$ID" "$STEP" "$STAGE" "$DEPS" "$STATUS" "$SCOPE" "$DRIVER_LOCK_SH" <<'PYEOF'
 import sys, os, json, subprocess, tempfile, shutil
 
 action, file, nid, step, stage, deps_raw, status, scope_raw = sys.argv[1:9]
+driver_lock_sh = sys.argv[9]
 VALID = {"blocked", "ready", "running", "done", "failed"}
 
 def load():
@@ -146,6 +162,37 @@ def resolve_gsd_tools_cmd():
         node_bin = shutil.which("node")
         return [node_bin, resolved] if node_bin else None
     return [resolved]
+
+def record_progress(driver_lock_sh):
+    """Cable `driver-lock.sh mark-progress` (plan 33-01, WTCH-01) au point `mark` de dag.sh, APRES
+    save(dag) (jamais avant). Best-effort pur, patron identique a compute_stages() : degrade en
+    no-op silencieux sur TOUTE panne cote driver-lock.sh (absent, non executable, JSON illisible,
+    exit non nul, timeout, exception quelconque) — ADR-031, ne bloque jamais le coeur du DAG.
+    SEULE exception au silence (4e issue QUAL-01) : lock CONFIRME present + detenu (owner non vide)
+    mais l'appel mark-progress lui-meme echoue -> ligne bruyante sur stderr, best-effort, jamais un
+    exit non nul, car ce cas gelerait progress_epoch sur une mission SAINE sans qu'aucun signal ne
+    le montre (33-03 lirait un faux stall en silence)."""
+    try:
+        if not os.path.isfile(driver_lock_sh):
+            return
+        st = subprocess.run([driver_lock_sh, "status"], capture_output=True, text=True,
+                             timeout=2, check=False)
+        if st.returncode != 0:
+            return
+        payload = json.loads(st.stdout)
+        if not payload.get("present"):
+            return
+        owner = payload.get("owner", "")
+        if not owner:
+            return
+        mp = subprocess.run([driver_lock_sh, "mark-progress", f"--owner={owner}"],
+                             capture_output=True, text=True, timeout=2, check=False)
+        if mp.returncode != 0:
+            print(f"[dag.sh mark] avertissement : mark-progress a échoué (owner={owner}) — "
+                  f"progress_epoch n'a pas avancé, un stall pourrait être signalé à tort par 33-03",
+                  file=sys.stderr)
+    except Exception:
+        return
 
 def build_ready_manifest(ready_nodes):
     """Manifeste attendu par `emit-workflow` (27-RESEARCH.md Livrable 3 Q1) : une seule vague
@@ -246,6 +293,10 @@ if action == "mark":
     idx[nid]["status"] = status
     recompute(nodes)  # une completion (done) peut promouvoir des blocked -> ready
     save(dag)
+    # WTCH-01 (33-02) : best-effort, APRES save(dag) — le DAG est deja sur disque avant tout appel
+    # externe. UN SEUL appel ici ; check_stall_signal()/record_milestone() sont poses par 33-05,
+    # APRES celui-ci dans ce meme bloc.
+    record_progress(driver_lock_sh)
     emit({"id": nid, "status": status,
           "ready": [n["id"] for n in nodes if n["status"] == "ready"]})
     sys.exit(0)
