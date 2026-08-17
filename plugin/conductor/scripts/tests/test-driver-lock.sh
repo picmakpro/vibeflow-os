@@ -278,7 +278,10 @@ out=$(CLAUDE_CODE_SESSION_ID="$INJECT" "$SCRIPT" acquire --owner=A --step=t19)
 _t19_gen="$(readlink "$VF_DRIVER_LOCK")"
 _t19_meta="$(dirname "$VF_DRIVER_LOCK")/$_t19_gen/meta"
 _t19_total=$(wc -l < "$_t19_meta" | tr -d ' ')
-num_eq "T19.1 — le meta garde exactement 8 lignes (une par clé, aucune injectée)" "$_t19_total" 8
+# 9 lignes depuis 33-01 (D-33-A) : le champ additif progress_epoch porte le total de 8 à 9 — même
+# évolution que 32-01 avait fait passer de 7 à 8 avec session_ids. Aucune ligne injectée, le
+# compte suit seulement la croissance légitime du schéma du meta.
+num_eq "T19.1 — le meta garde exactement 9 lignes (une par clé, aucune injectée)" "$_t19_total" 9
 _t19_nsid=$(grep -c '^session_ids=' "$_t19_meta")
 num_eq "T19.2 — exactement une ligne session_ids=" "$_t19_nsid" 1
 _t19_val=$(grep '^session_ids=' "$_t19_meta" | cut -d= -f2-)
