@@ -86,6 +86,12 @@ auto-validé contre le vert à vide (faux échec et pendaison tous deux détect�
 - **Barrière de commit entre vagues** et **un worktree par plan** au sein d'une vague : le
   protocole de mutation rouge (`commit → mutation → git checkout --`) partage l'index git.
 - **Recette humaine Windows** (D-33-C), condition de clôture.
+- **Bump `CHANGELOG.md` / `VERSION` du module `conductor` et mise à jour de `vf-dev-manager.md`** :
+  explicitement **reporté à la clôture de phase** (consigné dans 33-05, commit `d04db1d`), sur le
+  précédent de la Phase 32 qui l'a fait au moment de la release et non plan par plan. Seul
+  `mission-flow.md` est pris en charge par un plan (33-02). À ne pas oublier à la clôture : sans
+  ce geste, le verbe public `mark-progress` et `notify.sh` n'existeraient dans aucune doctrine lue
+  par les managers.
 - La chaîne Windows reste non prouvée terrain, l'AUMID arbitraire vs AUMID PowerShell non tranché,
   la latence `powershell.exe` non mesurée — **à ne jamais présenter comme prouvés**.
 
