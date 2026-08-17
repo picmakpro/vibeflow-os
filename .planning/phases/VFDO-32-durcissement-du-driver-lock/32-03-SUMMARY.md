@@ -300,7 +300,29 @@ l'accompagne n'est qu'un affichage informatif, pas le mécanisme de protection.
 
 ## Statut du checkpoint final
 
-**NON répondu.** Le `<task type="checkpoint:human-verify" gate="blocking">` du plan exige une
+> ## ✅ FERMÉ — approuvé par Samuel le 2026-08-17
+>
+> Le `checkpoint:human-verify gate="blocking"` du plan 32-03 est **répondu et levé**. Samuel a
+> validé **sur pièces**, pas sur résumé — les trois éléments listés ci-dessous ont été lus :
+>
+> 1. le **motif de refus complet**, reproduit mot pour mot (§Motif de refus complet) ;
+> 2. le **`.claude/settings.local.json` du lab jetable**, portant l'**unique** entrée à matcher
+>    combiné `"Bash|Write|Edit"`, en **forme exec**, avec le placeholder `${CLAUDE_PROJECT_DIR}` ;
+> 3. la confirmation que **ce dépôt n'est PAS armé** (`git status --porcelain -- .claude/` vide).
+>
+> La **déviation D-32-05** (une entrée au lieu de deux, imposée par le bug d'idempotence
+> cross-matcher de `merge-hooks.sh`) était explicitement soumise à cette validation et est donc
+> **approuvée avec elle** — c'était un changement de conception découvert en exécution, pas une
+> correction cosmétique, et il a été présenté comme tel.
+>
+> **Ce qui reste gaté** : l'armement RÉEL des labs passe par la **release du module `conductor`**
+> (bump, tag, publication), geste humain distinct, gaté séparément par `CLAUDE.md` §Discipline de
+> release. Le bump de module `v1.26.0` livré par la phase **n'arme personne** en lui-même.
+>
+> *Le texte d'origine est conservé ci-dessous tel qu'il a été soumis — c'est la pièce sur laquelle
+> la décision a été prise, on ne réécrit pas une demande après sa réponse.*
+
+**NON répondu** *(état au moment de la soumission — voir l'encadré ci-dessus pour la réponse)*. Le `<task type="checkpoint:human-verify" gate="blocking">` du plan exige une
 décision humaine explicite avant que le geste d'armement réel (la RELEASE du module `conductor`,
 pas ce commit local) ne puisse avoir lieu. Ce qui reste à valider par un humain :
 

@@ -111,15 +111,21 @@ commit. `check-version-sync`, `check-machine-paths`, `check-release-tag` → 0.
    mais **aucun commit ne porte encore le trailer** — y compris ceux de cette phase. Elle entre en
    vigueur au prochain mandat.
 
-## 7. Gates humains en attente
+## 7. Gates humains — les deux ouverts ont été fermés le 2026-08-17
 
-- **Checkpoint du plan 32-03** (armement du guard) — non répondu. Tout est préparé dans
-  `32-03-SUMMARY.md`. Aucun geste irréversible n'en dépend : ce dépôt **n'est pas armé**
-  (`git status --porcelain -- .claude/` vide).
-- **Arbitrage `merge-hooks`** (tracer en dette vs corriger) — recommandation : **tracer**, corriger
-  hors phase ; ce fichier distribue les hooks de tout le parc.
-- **PR, merge, release racine, tag, publication GitHub** : aucun de ces gestes n'a été fait. La
-  branche n'a **pas** été poussée.
+- **Checkpoint du plan 32-03** (armement du guard) — ✅ **APPROUVÉ par Samuel**, sur pièces : motif
+  de refus mot pour mot, `.claude/settings.local.json` du lab jetable (unique entrée matcher
+  `"Bash|Write|Edit"`, forme exec, placeholder `${CLAUDE_PROJECT_DIR}`), et confirmation que ce
+  dépôt n'est pas armé. La **déviation D-32-05** (une entrée au lieu de deux) était explicitement
+  soumise avec, donc approuvée avec. Trace : `32-03-SUMMARY.md` §Statut du checkpoint final.
+- **Arbitrage `merge-hooks`** — ✅ **option 1A retenue** : dette tracée en `CONCERNS.md` + cas de
+  régression documenté, **correction hors Phase 32**. C'était la recommandation, et elle avait été
+  exécutée telle quelle : **rien à modifier**.
+- **Restent gatés, non faits, réservés à Samuel** : PR, merge, **release racine**, tag, publication
+  GitHub. L'**armement réel des labs** passe par la release du module `conductor` — le bump
+  `v1.26.0` livré ici n'arme personne en lui-même.
+- **Push de la branche** pour preuve CI : autorisé par le brief, **effectué par la session
+  principale**, pas par la mission.
 
 ## 8. Calibration (verbatim, par plan, sans recalcul)
 
