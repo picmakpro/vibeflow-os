@@ -300,5 +300,51 @@ for T13_F in "$T13_NONE" "$T13_OPEN_ONLY"; do
 done
 [ "$T13_OK" = "1" ] && ok "T13 extraction bruyante : marqueurs absents/dépareillés → jamais une somme silencieuse (2 fixtures, échec explicite)"
 
+# ---------- T14/T15/T16 : détecteur IS_WSL (additif, Phase 33, WTCH-03) ----------
+T14_OK=1
+for T14_MARK in Microsoft microsoft WSL2; do
+  T14_PROC="$WORK/proc-version-$T14_MARK"
+  printf 'Linux version 5.15.0 (%s fictif)\n' "$T14_MARK" > "$T14_PROC"
+  T14_OUT=$(env -i PATH="$PATH" VF_PROC_VERSION_PATH="$T14_PROC" bash -c "
+    uname() { echo Linux; }
+    . '$LIB'
+    echo \"\$IS_WSL\"
+  ")
+  [ "$T14_OUT" = "1" ] || { ko "T14 IS_WSL casse '$T14_MARK' : attendu 1, obtenu [$T14_OUT]"; T14_OK=0; }
+done
+[ "$T14_OK" = "1" ] && ok "T14 IS_WSL=1 sur /proc/version fictif contenant Microsoft/microsoft/WSL2 (uname Linux)"
+
+T15_PROC="$WORK/proc-version-generic"
+printf 'Linux version 5.15.0-generic (Ubuntu)\n' > "$T15_PROC"
+T15_OUT=$(env -i PATH="$PATH" VF_PROC_VERSION_PATH="$T15_PROC" bash -c "
+  uname() { echo Linux; }
+  . '$LIB'
+  echo \"\$IS_WSL\"
+")
+if [ "$T15_OUT" = "0" ]; then
+  ok "T15 IS_WSL=0 sur /proc/version Linux générique sans microsoft/wsl (uname Linux)"
+else
+  ko "T15 IS_WSL attendu 0, obtenu [$T15_OUT]"
+fi
+
+T16_PROC="$WORK/proc-version-windows-native"
+printf 'Linux version fictif contenant microsoft quand meme\n' > "$T16_PROC"
+T16_OUT=$(env -i PATH="$PATH" VF_PROC_VERSION_PATH="$T16_PROC" bash -c "
+  uname() { echo 'MINGW64_NT-10.0'; }
+  . '$LIB'
+  echo \"\$IS_WINDOWS:\$IS_WSL\"
+")
+if [ "$T16_OUT" = "1:0" ]; then
+  ok "T16 IS_WINDOWS=1 => IS_WSL=0 inconditionnellement, même si VF_PROC_VERSION_PATH contient microsoft (mutuelle exclusion)"
+else
+  ko "T16 attendu '1:0', obtenu [$T16_OUT]"
+fi
+
+# ---------- Garde anti-vert-à-vide (épilogue) — jamais un succès sur zéro assertion exécutée ----------
+if [ "$((pass+fail))" -eq 0 ]; then
+  echo "== ÉCHEC ANTI-VERT-À-VIDE — zéro cas exécuté, résultat non fiable =="
+  exit 1
+fi
+
 echo "== $pass ok · $fail ko · $skipped skip =="
 [ "$fail" -eq 0 ]
