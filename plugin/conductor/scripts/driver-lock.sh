@@ -84,6 +84,43 @@ json_session_ids() {
   echo "[$out]"
 }
 
+# Ajoute un identifiant a la liste CSV de session_ids (D-32-03, reserve "croissance non bornee"
+# levee au plan) : dedup — l'identifiant deja present est retire de sa position puis reecrit en
+# queue — puis plafond LRU : au-dela de SESSION_MAX (garde de numericite ci-dessus), les entrees
+# les plus ANCIENNES sont evincees par la tete, le nouvel identifiant restant en queue.
+#
+# Arbitrage : le plafond LRU est retenu contre la purge agressive ("garder seulement l'identifiant
+# courant plus celui qui vient d'etre ajoute") parce qu'une mission qui alterne entre deux fenetres
+# verrait la purge evincer une identite deja re-rattachee, et re-declencherait un refus pour un
+# detenteur legitime — exactement le mode de defaillance que reclaim existe pour fermer. Huit
+# entrees bornent le champ sous ~350 octets ; au-dela de huit identites distinctes pour un meme
+# mandat, le probleme n'est plus la taille du fichier.
+#
+# `takeover` n'a besoin d'AUCUNE purge : il passe par new_generation(), son meta est ecrit a neuf,
+# la liste est structurellement reduite au seul repreneur (cas T31) — cette fonction n'est donc
+# appelee QUE par `reclaim`.
+session_ids_append() {
+  local csv="$1" id="$2" out="" existing e n=0 excess trimmed k
+  local IFS=','
+  for existing in $csv; do
+    [ -z "$existing" ] && continue
+    [ "$existing" = "$id" ] && continue
+    if [ -z "$out" ]; then out="$existing"; else out="${out},${existing}"; fi
+  done
+  if [ -z "$out" ]; then out="$id"; else out="${out},${id}"; fi
+  for e in $out; do n=$((n+1)); done
+  if [ "$n" -gt "$SESSION_MAX" ]; then
+    excess=$((n - SESSION_MAX)); trimmed=""; k=0
+    for e in $out; do
+      k=$((k+1))
+      [ "$k" -le "$excess" ] && continue
+      if [ -z "$trimmed" ]; then trimmed="$e"; else trimmed="${trimmed},${e}"; fi
+    done
+    out="$trimmed"
+  fi
+  printf '%s' "$out"
+}
+
 LOCK_PARENT="$(dirname "$LOCK_DIR")"
 LOCK_BASE="$(basename "$LOCK_DIR")"
 
@@ -169,16 +206,25 @@ new_generation() {
   echo "$gen"
 }
 
-# Reecrit le meta de la generation COURANTE en place (heartbeat, re-acquisition du meme owner).
-# Le lien ne bouge pas : rien a serialiser, l'owner est deja etabli.
+# Reecrit le meta de la generation COURANTE en place (heartbeat, re-acquisition du meme owner,
+# reclaim). Le lien ne bouge pas : rien a serialiser, l'owner est deja etabli.
+#
+# (SE-3) Second parametre POSITIONNEL optionnel pour session_ids : "${2-$(lock_session_ids)}" —
+# PAS "${2:-...}" (une chaine vide EST une valeur valide, ne doit jamais retomber sur le fichier).
+# Absent -> lecture du fichier courant, le comportement EXACT des deux appelants historiques a un
+# seul argument : la ré-acquisition idempotente dans `acquire` (voie occupee/meme owner) et le
+# battement dans `heartbeat`. SEUL `reclaim` passe ce second argument explicitement — c'est la
+# valeur decidee SOUS MUTEX, jamais relue du fichier apres coup, sinon l'ecriture ne serait pas
+# celle qui a ete arbitree pendant la fenetre de serialisation.
 rewrite_meta() {
   local ap ai br wt si
   ap="$(meta_get acquired_epoch)"; ai="$(meta_get acquired_iso)"
   br="$(meta_get branch)"; wt="$(meta_get worktree)"
-  # session_ids est LU depuis le meta courant, JAMAIS depuis l'environnement de la session qui
-  # appelle rewrite_meta — c'est ce qui fait qu'un heartbeat emis d'un autre contexte (ADR-064,
-  # meme patron que branch/worktree ci-dessus) ne peut jamais reecrire l'identite du detenteur.
-  si="$(lock_session_ids)"
+  # session_ids est LU depuis le meta courant par defaut, JAMAIS depuis l'environnement de la
+  # session qui appelle rewrite_meta — c'est ce qui fait qu'un heartbeat emis d'un autre contexte
+  # (ADR-064, meme patron que branch/worktree ci-dessus) ne peut jamais reecrire l'identite du
+  # detenteur, sauf appel explicite (reclaim) qui passe la valeur decidee sous mutex.
+  si="${2-$(lock_session_ids)}"
   {
     printf 'owner=%s\n'           "$(printf '%s' "$OWNER" | tr -d '\n')"
     printf 'step=%s\n'            "$(printf '%s' "$STEP"  | tr -d '\n')"
@@ -335,6 +381,59 @@ case "$ACTION" in
     rm -f "${LOCK_DIR}.new.$$"; rm -rf "${LOCK_PARENT:?}/$gen"
     rm -f "$mutex"; trap - EXIT INT TERM
     printf '{"acquired": false, "reason": "race-during-recovery"}\n'; exit 1
+    ;;
+
+  reclaim)
+    require_owner
+    lock_present || { echo '{"reclaimed": false, "reason": "no-lock"}'; exit 1; }
+    sid="$(sanitize_session_id "${CLAUDE_CODE_SESSION_ID:-}")"
+    [ -n "$sid" ] || { echo '{"reclaimed": false, "reason": "no-session-id"}'; exit 1; }
+    age="$(lock_age)"; held="$(meta_get owner)"; observed_gen="$(lock_gen)"
+    if [ "$age" -gt "$TTL" ]; then
+      echo '{"reclaimed": false, "reason": "stale-requires-takeover"}'; exit 1
+    fi
+    if [ "$held" != "$OWNER" ]; then
+      printf '{"reclaimed": false, "reason": "not-owner", "held_by": "%s"}\n' "$held"; exit 1
+    fi
+    # (D-32-03(f)) MEME mutex, MEME construction de nom que `takeover` — `reclaim` ne reinvente
+    # PAS un patron de concurrence separe, il reutilise mot pour mot celui mesure correct.
+    mutex="${LOCK_DIR}.rec.$(printf '%s' "$observed_gen" | tr -c 'A-Za-z0-9._-' '_')"
+    if ! ln_atomic "$$" "$mutex"; then
+      echo '{"reclaimed": false, "reason": "race-during-reclaim"}'; exit 1
+    fi
+    # BL-3 : MEME trap que `takeover`. C'est ICI, sur `reclaim`, que la fuite mesuree est la plus
+    # grave — ce mutex se prend sur une generation VIVANTE et DURABLE (a chaque `/clear`), jamais
+    # sur une generation qui va etre detruite par la reprise elle-meme. Sans ce `trap`, un
+    # `reclaim` tue entre la prise du mutex et sa liberation laisse le lock DEFINITIVEMENT
+    # non-reprenable (T41b) — c'est le cas NOMINAL de reclaim, pas un cas rare.
+    trap 'rm -f "$mutex"' EXIT INT TERM
+    # Seam de test UNIQUEMENT (QUAL-01, T41b) : un SIGTERM/SIGINT reel n'est PAS un moyen fiable
+    # de prouver ce trap — bash, une fois qu'il trappe un signal, ne termine PAS le process apres
+    # avoir execute le handler (verifie empiriquement : le script REPREND son execution normale
+    # apres le trap, sauf si le handler appelle `exit`). Seul un veritable `exit` (ou un SIGKILL,
+    # jamais trappable par construction — aucun trap ne peut jamais s'en proteger) simule "le
+    # process meurt ici". Ce point d'injection, INERTE par defaut (aucun effet en usage reel), est
+    # le seul moyen deterministe de prouver BL-3 sans loterie de timing sur un busy-poll.
+    [ -n "${VF_DRIVER_TEST_DIE_AFTER_MUTEX:-}" ] && exit 137
+    # Revalidation post-mutex sur les TROIS faits qui ont fonde la decision : generation
+    # inchangee, age toujours sous le TTL, owner toujours le meme. Le controle d'owner s'ajoute a
+    # la transposition exacte de la revalidation de `takeover` parce que reclaim s'applique a un
+    # lock VIVANT, dont l'owner peut changer par release puis acquire pendant la fenetre.
+    if [ "$(lock_gen)" != "$observed_gen" ] || [ "$(lock_age)" -gt "$TTL" ] || [ "$(meta_get owner)" != "$OWNER" ]; then
+      rm -f "$mutex"; trap - EXIT INT TERM
+      echo '{"reclaimed": false, "reason": "race-during-reclaim"}'; exit 1
+    fi
+    new_sids="$(session_ids_append "$(lock_session_ids)" "$sid")"
+    hb="$(meta_get heartbeat_epoch)"
+    # step preserve s'il n'est pas fourni ; heartbeat_epoch REECRIT A SA VALEUR EXISTANTE — un
+    # reclaim n'est pas un battement, il ne doit pas prolonger la fraicheur du lock (T41).
+    [ -z "$STEP" ] && STEP="$(meta_get step)"
+    rewrite_meta "$hb" "$new_sids"
+    rm -f "$mutex"; trap - EXIT INT TERM
+    _lease="$(lease_age)" && : || _lease="null"
+    printf '{"reclaimed": true, "owner": "%s", "session_id": "%s", "session_ids": %s, "generation": "%s", "lease_seconds": %s}\n' \
+      "$OWNER" "$sid" "$(json_session_ids "$(lock_session_ids)")" "$(lock_gen)" "$_lease"
+    exit 0
     ;;
 
   heartbeat)

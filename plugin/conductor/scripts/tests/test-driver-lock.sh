@@ -408,6 +408,143 @@ assert_exit "T33L.2 — exit 0" "$rc" 0
 assert "T33L.3 — status owner B33 après coup" "$("$SCRIPT" status)" '"owner": "B33"'
 "$SCRIPT" release --owner=B33 >/dev/null 2>&1
 
+echo "=== T33 — reclaim ré-attache une session neuve à un lock VIVANT (D-32-03(f)) ==="
+rm -rf "$VF_DRIVER_LOCK"
+CLAUDE_CODE_SESSION_ID=sess-alpha "$SCRIPT" acquire --owner=A33 --step=x >/dev/null
+out=$(CLAUDE_CODE_SESSION_ID=sess-beta "$SCRIPT" reclaim --owner=A33); rc=$?
+assert "T33.1 — reclaimed true" "$out" '"reclaimed": true'
+assert_exit "T33.2 — exit 0" "$rc" 0
+st=$("$SCRIPT" status)
+assert "T33.3 — session_ids = [sess-alpha, sess-beta] (append, jamais remplacement)" "$st" '"session_ids": ["sess-alpha", "sess-beta"]'
+
+echo "=== T34 — reclaim owner mismatch refusé (not-owner) ==="
+out=$(CLAUDE_CODE_SESSION_ID=sess-gamma "$SCRIPT" reclaim --owner=B34); rc=$?
+assert "T34.1 — reason not-owner" "$out" '"reason": "not-owner"'
+assert_exit "T34.2 — exit 1" "$rc" 1
+assert "T34.3 — session_ids inchangé" "$("$SCRIPT" status)" '"session_ids": ["sess-alpha", "sess-beta"]'
+"$SCRIPT" release --owner=A33 >/dev/null 2>&1
+
+echo "=== T35 — reclaim sur lock périmé refusé (frontière avec takeover) ==="
+rm -rf "$VF_DRIVER_LOCK"
+"$SCRIPT" acquire --owner=A35 --step=x >/dev/null
+age_stale "$VF_DRIVER_LOCK"
+out=$(CLAUDE_CODE_SESSION_ID=sess35 "$SCRIPT" reclaim --owner=A35); rc=$?
+assert "T35.1 — reason stale-requires-takeover" "$out" '"reason": "stale-requires-takeover"'
+assert_exit "T35.2 — exit 1" "$rc" 1
+rm -rf "$VF_DRIVER_LOCK"
+
+echo "=== T36 — reclaim sans identifiant de session : refus honnête ==="
+rm -rf "$VF_DRIVER_LOCK"
+CLAUDE_CODE_SESSION_ID=sess-orig36 "$SCRIPT" acquire --owner=A36 --step=x >/dev/null
+out=$(env -u CLAUDE_CODE_SESSION_ID "$SCRIPT" reclaim --owner=A36); rc=$?
+assert "T36.1 — reason no-session-id" "$out" '"reason": "no-session-id"'
+assert_exit "T36.2 — exit 1" "$rc" 1
+assert "T36.3 — session_ids inchangé" "$("$SCRIPT" status)" '"session_ids": ["sess-orig36"]'
+"$SCRIPT" release --owner=A36 >/dev/null 2>&1
+
+echo "=== T37 — reclaim sans --owner / sans lock ==="
+out=$("$SCRIPT" reclaim); rc=$?
+assert "T37.1 — error owner-required" "$out" '"error": "owner-required"'
+assert_exit "T37.2 — exit 1" "$rc" 1
+rm -rf "$VF_DRIVER_LOCK"
+out2=$(CLAUDE_CODE_SESSION_ID=sess37 "$SCRIPT" reclaim --owner=X37); rc2=$?
+assert "T37.3 — reason no-lock" "$out2" '"reason": "no-lock"'
+assert_exit "T37.4 — exit 1" "$rc2" 1
+
+echo "=== T38 — idempotence : deux reclaim du MÊME identifiant, une seule occurrence ==="
+rm -rf "$VF_DRIVER_LOCK"
+CLAUDE_CODE_SESSION_ID=sess-init38 "$SCRIPT" acquire --owner=A38 --step=x >/dev/null
+CLAUDE_CODE_SESSION_ID=sess-dup38 "$SCRIPT" reclaim --owner=A38 >/dev/null
+CLAUDE_CODE_SESSION_ID=sess-dup38 "$SCRIPT" reclaim --owner=A38 >/dev/null
+st=$("$SCRIPT" status)
+assert "T38.1 — session_ids ne contient sess-dup38 qu'UNE fois" "$st" '"session_ids": ["sess-init38", "sess-dup38"]'
+"$SCRIPT" release --owner=A38 >/dev/null 2>&1
+
+echo "=== T39 — plafond LRU : 10 identifiants distincts → exactement 8 entrées ==="
+rm -rf "$VF_DRIVER_LOCK"
+CLAUDE_CODE_SESSION_ID=sess-t39-00 "$SCRIPT" acquire --owner=A39 --step=x >/dev/null
+for i in $(seq 1 10); do
+  n=$(printf '%02d' "$i")
+  CLAUDE_CODE_SESSION_ID="sess-t39-$n" "$SCRIPT" reclaim --owner=A39 >/dev/null
+done
+_t39_gen="$(readlink "$VF_DRIVER_LOCK")"
+_t39_meta="$(dirname "$VF_DRIVER_LOCK")/$_t39_gen/meta"
+_t39_val=$(grep '^session_ids=' "$_t39_meta" | cut -d= -f2-)
+_t39_n=$(printf '%s' "$_t39_val" | tr ',' '\n' | grep -c .)
+num_eq "T39.1 — exactement 8 entrées après le plafond" "$_t39_n" 8
+case "$_t39_val" in
+  *sess-t39-10*) echo "  ✅ PASS — T39.2 — le plus récent (sess-t39-10) est présent"; PASS=$((PASS+1)) ;;
+  *) echo "  ❌ FAIL — T39.2 — le plus récent (sess-t39-10) est présent"; FAIL=$((FAIL+1)) ;;
+esac
+case "$_t39_val" in
+  *sess-t39-00*) echo "  ❌ FAIL — T39.3 — le plus ancien (sess-t39-00) a été évincé"; FAIL=$((FAIL+1)) ;;
+  *) echo "  ✅ PASS — T39.3 — le plus ancien (sess-t39-00) a été évincé"; PASS=$((PASS+1)) ;;
+esac
+"$SCRIPT" release --owner=A39 >/dev/null 2>&1
+
+echo "=== T40 — reclaim concurrent : 12 identifiants distincts, aucune écriture perdue ==="
+rm -rf "$VF_DRIVER_LOCK" "$WORK_DIR"/t40.*
+CLAUDE_CODE_SESSION_ID=sess-t40-init "$SCRIPT" acquire --owner=A40 --step=x >/dev/null
+for i in $(seq 1 12); do
+  n=$(printf '%02d' "$i")
+  ( CLAUDE_CODE_SESSION_ID="sess-t40-$n" "$SCRIPT" reclaim --owner=A40 >"$WORK_DIR/t40.$i" 2>/dev/null ) &
+done
+wait
+_t40_gen="$(readlink "$VF_DRIVER_LOCK")"
+_t40_meta="$(dirname "$VF_DRIVER_LOCK")/$_t40_gen/meta"
+_t40_nlines=$(grep -c '^session_ids=' "$_t40_meta")
+if [ "$_t40_nlines" -ne 1 ]; then
+  echo "  ❌ FAIL — T40.0 — fixture cassé : meta mal formé ($_t40_nlines lignes session_ids=)"
+  FAIL=$((FAIL+1))
+else
+  echo "  ✅ PASS — T40.0 — meta bien formé (une seule ligne session_ids=)"
+  PASS=$((PASS+1))
+  st=$("$SCRIPT" status)
+  json_ok "$st"; assert_exit "T40.1 — status JSON parsable après la course" $? 0
+  _t40_succ=$(grep -l '"reclaimed": true' "$WORK_DIR"/t40.* 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$_t40_succ" -ge 1 ]; then echo "  ✅ PASS — T40.2 — au moins 1 succès sur 12 (=$_t40_succ)"; PASS=$((PASS+1)); else echo "  ❌ FAIL — T40.2 — au moins 1 succès sur 12"; FAIL=$((FAIL+1)); fi
+  _t40_val=$(grep '^session_ids=' "$_t40_meta" | cut -d= -f2-)
+  _t40_lost=0
+  for f in "$WORK_DIR"/t40.*; do
+    if grep -q '"reclaimed": true' "$f" 2>/dev/null; then
+      _t40_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["session_id"])' "$f" 2>/dev/null)
+      case ",$_t40_val," in *",$_t40_id,"*) ;; *) _t40_lost=$((_t40_lost+1)) ;; esac
+    fi
+  done
+  num_eq "T40.3 — aucun identifiant rapporté en succès n'est absent de la liste finale" "$_t40_lost" 0
+fi
+rm -rf "$WORK_DIR"/t40.*
+"$SCRIPT" release --owner=A40 >/dev/null 2>&1
+
+echo "=== T41 — reclaim ne prolonge PAS la fraîcheur du lock ==="
+rm -rf "$VF_DRIVER_LOCK"
+CLAUDE_CODE_SESSION_ID=sess-t41-a "$SCRIPT" acquire --owner=A41 --step=x >/dev/null
+_t41_gen="$(readlink "$VF_DRIVER_LOCK")"
+_t41_meta="$(dirname "$VF_DRIVER_LOCK")/$_t41_gen/meta"
+_t41_old=$(( $(date +%s) - 900 ))  # à l'intérieur du TTL (900 < 1800) — le lock reste frais
+sed -i.bak "s/^heartbeat_epoch=.*/heartbeat_epoch=$_t41_old/" "$_t41_meta" && rm -f "${_t41_meta}.bak"
+CLAUDE_CODE_SESSION_ID=sess-t41-b "$SCRIPT" reclaim --owner=A41 >/dev/null
+_t41_age_after=$(printf '%s' "$("$SCRIPT" status)" | python3 -c 'import json,sys; print(json.load(sys.stdin)["age_seconds"])')
+if [ "$_t41_age_after" -ge 890 ]; then echo "  ✅ PASS — T41.1 — age_seconds reste ~900s après reclaim (battement non remis à zéro)"; PASS=$((PASS+1)); else echo "  ❌ FAIL — T41.1 — age_seconds reste ~900s après reclaim"; echo "     obtenu: $_t41_age_after"; FAIL=$((FAIL+1)); fi
+"$SCRIPT" release --owner=A41 >/dev/null 2>&1
+
+echo "=== T41b — BL-3 : mutex de reclaim libéré même si le process meurt juste après l'avoir pris ==="
+rm -rf "$VF_DRIVER_LOCK"
+CLAUDE_CODE_SESSION_ID=sess-t41b-init "$SCRIPT" acquire --owner=A41B --step=x >/dev/null
+# Point d'injection déterministe (VF_DRIVER_TEST_DIE_AFTER_MUTEX, seam de test inerte par défaut) :
+# un SIGTERM/SIGINT réel n'est PAS fiable ici — bash, une fois qu'il trappe un signal, REPREND son
+# exécution après le handler au lieu de terminer (vérifié empiriquement), donc seul un `exit` réel
+# simule fidèlement "le process meurt entre la prise du mutex et sa libération normale".
+out=$(CLAUDE_CODE_SESSION_ID=sess-t41b-victim VF_DRIVER_TEST_DIE_AFTER_MUTEX=1 "$SCRIPT" reclaim --owner=A41B); rc=$?
+assert_exit "T41b.1 — le process 'meurt' juste après avoir pris le mutex (exit 137)" "$rc" 137
+_t41b_gen="$(readlink "$VF_DRIVER_LOCK")"
+_t41b_mutex="${VF_DRIVER_LOCK}.rec.$(printf '%s' "$_t41b_gen" | tr -c 'A-Za-z0-9._-' '_')"
+if [ -e "$_t41b_mutex" ]; then echo "  ❌ FAIL — T41b.2 — le mutex a été libéré (trap)"; FAIL=$((FAIL+1)); else echo "  ✅ PASS — T41b.2 — le mutex a été libéré (trap)"; PASS=$((PASS+1)); fi
+out2=$(CLAUDE_CODE_SESSION_ID=sess-t41b-next "$SCRIPT" reclaim --owner=A41B); rc2=$?
+assert "T41b.3 — un reclaim ULTÉRIEUR normal réussit (lock toujours reprenable)" "$out2" '"reclaimed": true'
+assert_exit "T41b.4 — exit 0" "$rc2" 0
+"$SCRIPT" release --owner=A41B >/dev/null 2>&1
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
