@@ -12,6 +12,9 @@
 # T31 CLI resolue qui ECHOUE (returncode != 0) -> stages:null, jamais [] · T32 node absent mais
 # gsd-tools .cjs resolu -> stages:null (branche node, distincte de T29) · T33 non-regression :
 # gsd-tools.cjs TRACKE au CWD jamais resolu ni execute (vecteur RCE retire, dag.sh D-07)
+# T41-T47 relais watchdog (WTCH-02/WTCH-03) · T48 relais stall/marqueur REEL bout-en-bout (stub)
+# T49 (33-05-correctif, D-33-G) : VRAI STALL bout-en-bout a travers `dag.sh mark` (lock backdate
+# reel) — cas de discriminance, NE JAMAIS RETIRER · T49 sous-cas : relais ABANDON non regresse.
 #
 # Exit 0 si tout passe, 1 sinon.
 
@@ -901,6 +904,93 @@ F48="$WORK_DIR/t48.dag.json"
 ERR48="$WORK_DIR/t48.stderr"
 "$ISO48/dag.sh" mark --file="$F48" --id=n1 --status=running 2>"$ERR48" >/dev/null
 assert "T48.1 — le signal REEL est relaye TEL QUEL sur stderr de dag.sh mark (relais bout-en-bout contre les vrais binaires, pas un stub)" "$(cat "$ERR48")" "garde(s) du parc indisponible"
+unset VF_DRIVER_LOCK VF_GUARD_HEALTH_DIR
+
+# --------------------------------------------------------------------------------------------
+# T49 (33-05-correctif, D-33-G) : UN VRAI STALL de bout en bout A TRAVERS `dag.sh mark`. T41
+# exerce le relais contre un STUB (logique de relais isolee du verdict) ; T48 exerce le relais
+# via check-guard-health.sh REEL mais un marqueur de garde forge (jamais VF_DRIVER_LOCK=nolock,
+# jamais un vrai lock backdate). NI L'UN NI L'AUTRE n'aurait attrape la regression corrigee ici :
+# `record_progress()` rafraichissait `progress_epoch` du lock courant AVANT que
+# `check_stall_signal()` ne relise ce meme lock, ramenant systematiquement
+# `progress_age_seconds` a 0 et rendant le verdict STALL structurellement inatteignable au geste
+# `mark`. T49 est le SEUL cas qui exerce : vrai driver-lock.sh acquire + progress_epoch REELLEMENT
+# backdate au-dela du seuil de stall + vrai check-guard-health.sh + `dag.sh mark` — cas de
+# discriminance, NE JAMAIS RETIRER.
+# --------------------------------------------------------------------------------------------
+
+echo ""
+echo "=== T49 — dag.sh mark relaie un VRAI stall (lock backdate, verdict lu AVANT le rafraichissement de progress_epoch), NE JAMAIS RETIRER ==="
+ISO49="$WORK_DIR/iso49"; mkdir -p "$ISO49/health"
+cp "$SCRIPT" "$ISO49/dag.sh"
+cp "$(pwd)/scripts/check-guard-health.sh" "$ISO49/check-guard-health.sh"
+cp "$(pwd)/scripts/driver-lock.sh" "$ISO49/driver-lock.sh"
+chmod +x "$ISO49/dag.sh" "$ISO49/check-guard-health.sh" "$ISO49/driver-lock.sh"
+
+# Meme helper que test-check-guard-health.sh:114 (recule progress_epoch, JAMAIS heartbeat_epoch),
+# reproduit LOCALEMENT plutot que de sourcer cette autre suite (patron deja etabli en T41-T48).
+t49_lock_meta_path() { # <lock>
+  if [ -L "$1" ]; then
+    echo "$(dirname "$1")/$(readlink "$1")/meta"
+  else
+    echo "$1/meta"
+  fi
+}
+t49_progress_backdate() { # <lock> <secs>
+  local meta secs now old
+  meta="$(t49_lock_meta_path "$1")"
+  secs="$2"
+  [ -f "$meta" ] || return 1
+  now="$(date +%s)"
+  old=$(( now - secs ))
+  sed -i.bak "s/^progress_epoch=.*/progress_epoch=$old/" "$meta" && rm -f "${meta}.bak"
+}
+
+L49="$ISO49/lock"
+export VF_DRIVER_LOCK="$L49"
+export VF_GUARD_HEALTH_DIR="$ISO49/health"   # vide : isole le signal a la seule voie stall (pas de marqueur de garde)
+"$ISO49/driver-lock.sh" acquire --owner=t49-owner --step=t49-step >/dev/null 2>&1
+t49_progress_backdate "$L49" 1303   # > 900 (STALL_WINDOW defaut, meme grandeur que la mesure du mandat), heartbeat_epoch INCHANGE (reste frais)
+# Controle positif (T49.0) : le VRAI check-guard-health.sh, invoque seul hors dag.sh, produit bien
+# le verdict stall sur ce lock backdate.
+fx49="$("$ISO49/check-guard-health.sh" --hook)"
+assert "T49.0 — controle positif : le vrai check-guard-health.sh --hook signale bien le stall (lock backdate)" "$fx49" "[mission-watchdog] stall detecte"
+
+F49="$WORK_DIR/t49.dag.json"
+"$ISO49/dag.sh" init --file="$F49" >/dev/null
+"$ISO49/dag.sh" add --file="$F49" --id=n1 --step=n1 >/dev/null
+ERR49="$WORK_DIR/t49.stderr"
+out49="$("$ISO49/dag.sh" mark --file="$F49" --id=n1 --status=running 2>"$ERR49")"; rc49=$?
+assert_exit "T49.1 — dag.sh mark rend rc=0 malgre le stall relaye (best-effort, jamais bloquant)" "$rc49" 0
+assert      "T49.2 — la ligne '[mission-watchdog] stall detecte' arrive bien SUR STDERR de dag.sh mark (le bloquant corrige)" "$(cat "$ERR49")" "[mission-watchdog] stall detecte"
+
+echo "--- T49 sous-cas : le relais ABANDON (heartbeat mort) continue de fonctionner APRES la meme correction ---"
+ISO49B="$WORK_DIR/iso49b"; mkdir -p "$ISO49B/health"
+cp "$SCRIPT" "$ISO49B/dag.sh"
+cp "$(pwd)/scripts/check-guard-health.sh" "$ISO49B/check-guard-health.sh"
+cp "$(pwd)/scripts/driver-lock.sh" "$ISO49B/driver-lock.sh"
+chmod +x "$ISO49B/dag.sh" "$ISO49B/check-guard-health.sh" "$ISO49B/driver-lock.sh"
+t49_heartbeat_backdate() { # <lock> <secs>
+  local meta secs now old
+  meta="$(t49_lock_meta_path "$1")"
+  secs="$2"
+  [ -f "$meta" ] || return 1
+  now="$(date +%s)"
+  old=$(( now - secs ))
+  sed -i.bak "s/^heartbeat_epoch=.*/heartbeat_epoch=$old/" "$meta" && rm -f "${meta}.bak"
+}
+L49B="$ISO49B/lock"
+export VF_DRIVER_LOCK="$L49B"
+export VF_GUARD_HEALTH_DIR="$ISO49B/health"
+"$ISO49B/driver-lock.sh" acquire --owner=t49b-owner --step=t49b-step >/dev/null 2>&1
+t49_heartbeat_backdate "$L49B" 2000   # > 1800 (VF_DRIVER_TTL defaut) -> stale=true, JAMAIS confondu avec le stall
+F49B="$WORK_DIR/t49b.dag.json"
+"$ISO49B/dag.sh" init --file="$F49B" >/dev/null
+"$ISO49B/dag.sh" add --file="$F49B" --id=n1 --step=n1 >/dev/null
+ERR49B="$WORK_DIR/t49b.stderr"
+"$ISO49B/dag.sh" mark --file="$F49B" --id=n1 --status=running 2>"$ERR49B" >/dev/null
+assert "T49.3 — le relais ABANDON (heartbeat mort) est toujours relaye, non regresse par cette correction" "$(cat "$ERR49B")" "[mission-watchdog] abandon detecte"
+assert_not "T49.4 — l'abandon n'est jamais confondu avec la ligne de stall" "$(cat "$ERR49B")" "stall detecte"
 unset VF_DRIVER_LOCK VF_GUARD_HEALTH_DIR
 
 echo ""
