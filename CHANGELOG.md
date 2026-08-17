@@ -5,63 +5,6 @@ extrait récent et pointent ici). Chaque module a par ailleurs son propre `CHANG
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
-## [v2.56.0] — 2026-08-17
-
-**Un stall de mission ne survit plus au prochain geste d'une session vivante : chaque nœud du
-DAG bat, l'absence de battement se voit et se signale, et les jalons notifient nativement sur
-l'OS — sans jamais tuer ni spammer.** Phase 33 (5 plans), PR #49. `conductor` v1.27.0.
-
-### Livré
-
-- **WTCH-01 — deux horloges sur le même battement** (D-33-A) : le meta du lock porte
-  `heartbeat_epoch` (vivacité) ET `progress_epoch`, écrit par `dag.sh mark`. Un seul mécanisme,
-  un seul fichier, deux consommateurs — aucun second canal.
-- **WTCH-02 — stall par ABSENCE de battement** : vivant mais progrès figé au-delà de
-  `STALL_WINDOW` (900 s, strictement sous le TTL de 1800 s — D-33-E) = STALL ; deux horloges
-  mortes = abandon. La preuve du cas « vivant mais bouclant » est la boucle RÉELLE (D25 :
-  `heartbeat` répété sans `mark`, verdict constaté sans toucher au meta — exception documentée
-  à la prohibition sleep). Et elle s'est validée toute seule : **le watchdog a détecté en
-  production le stall de sa propre mission** pendant l'intégration (heartbeat frais à 135 s,
-  progrès figé à 1303 s) — signature observée, non forgée. Le watchdog signale et suggère, ne
-  tue jamais (ADR-031).
-- **WTCH-03 — `notify.sh`** posé par l'engine, best-effort fail-open silencieux, notifications
-  aux jalons seulement (fin de nœud, halt condition). Windows dès la v1 : WinRT sous
-  `powershell.exe` 5.1 — jamais `pwsh` (pas d'assemblies WinRT dans Core), jamais `osascript`
-  en dur ; `osascript` sort d'ailleurs 0 en jetant la notification quand la permission manque —
-  un `exit 0` n'est jamais une preuve de délivrance. Chaîne testée par shims d'argv en CI ;
-  recette humaine Win10/11 en condition de clôture (`33-CLOTURE-WINDOWS.md`).
-- **WTCH-04 — armement gaté** : hooks et notify passent par le gate armement↔précondition
-  (PORT-05 en CI) — jamais un settings local (leçon #38).
-- **Point de contrôle au geste `mark`** (D-33-F) : lecture + signal stderr best-effort, jamais
-  bloquant — une session ouverte 8 h voit le stall sans redémarrer. Doctrine amendée : cadence
-  de heartbeat indépendante des transitions de nœud (D-33-E, `mission-flow.md` +
-  `vf-dev-manager.md`).
-
-### La recherche avant le plan
-
-Les hooks Claude Code sont strictement événementiels — `asyncRewake` ne réveille qu'une session
-déjà active, aucune horloge plateforme n'existe : le goal « jamais silencieux 18 h » a été
-amendé en « un stall ne survit pas au prochain geste d'une session VF vivante » (décision datée,
-limite assumée : machine sans session = silence possible). Aucun démon système — le bon choix
-sur un milestone Windows-first.
-
-### La méthode
-
-Deux tours de plancheck externe (23 puis 10 bloquants là où l'interne rendait 0 — quatrième
-phase d'affilée), dont deux défauts REPRODUITS PAR EXÉCUTION : `mark-progress` effaçait `step`
-du meta, et le sous-contrôle de stall placé après trois sorties anticipées ne tournait jamais
-sur machine saine (fixtures `mkdir -p` — le vert à vide). Deux bloquants trouvés par MESURE et
-pas par les tests : `notify.sh` puis `check-guard-health.sh` commités en 644, leur échec avalé
-par un `try/except` — le mode de défaillance exact que la phase combat, fermé avec des cas de
-discriminance qui exercent les VRAIS scripts. Flakiness de `test-notify.sh` fermée avec preuve
-multi-runs avant toute PR. Note de terrain versée au dossier : **huit workers arrêtés en
-silence pendant la mission même** — l'argument empirique du watchdog. Reliquats tracés :
-`save()` de `dag.sh` sans verrou ni écriture atomique (BACKLOG), gate d'observance de la
-doctrine (BACKLOG).
-
-**Suites** : `dag.sh` 99 → 156 cas, `driver-lock` 183, `notify.sh` né (48), `check-guard-health`
-78 — **65 suites** vertes en local **et** CI verte ×2.
-
 ## [v2.55.1] — 2026-08-17
 
 **Hotfix : sous Windows, l'engine écrivait des hooks à chemin mort — et `|| true` avalait
