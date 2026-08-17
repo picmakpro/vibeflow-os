@@ -10,7 +10,7 @@ d'émission de `notify.sh` change de comportement observable) :
   **Correction pré-distribution, aucune migration de parc due** : v2.56.0 (qui aurait porté ce
   défaut ON) a été retirée de la distribution (tag supprimé, revert `07ff554`) avant qu'aucun lab
   ne la reçoive. Sentinel scope machine, patron `stop-notify` strict (touch/rm -f), résolu via
-  `${XDG_CONFIG_HOME:-$HOME/.config}/vibeflow/notify-optin`. Mutation rouge prouvée (retirer le
+  `${XDG_CONFIG_HOME:-${HOME:-}/.config}/vibeflow/notify-optin`. Mutation rouge prouvée (retirer le
   gate fait rougir le cas dédié N17, sur son compteur d'invocations de canal). Le signal de stall
   (D-33-F) reste structurellement non gaté — `dag.sh` inchangé par ce volet.
 - **Toggle `/vf-notify` (neuf)** : verbes `on`/`off`/`status`/`test`, patron `stop-notify` (zéro
