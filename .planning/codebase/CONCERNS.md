@@ -25,6 +25,33 @@
   (`.claude/scripts/.vibeflow-manifest-<module>`) ; `update` supprime les chemins de l'ancien
   manifeste absents du nouveau (avec backup). Test : update d'un module dont une skill a disparu.
 
+**`merge-hooks.sh` — défaut d'idempotence cross-matcher, purge silencieuse** — Sévérité : **HIGH**
+- Issue: deux entrées `hooks.json` référençant le **même script** sous le **même événement**, même
+  avec des matchers différents, se purgent l'une l'autre à l'installation — seule la **dernière
+  traitée survit, sans erreur ni avertissement**. Découvert empiriquement pendant le plan 32-03
+  (D-32-05 amendé) : la forme prescrite à deux entrées (`Bash` puis `Write|Edit`) pour
+  `guard-driver-lock.sh` faisait disparaître l'entrée `Bash` du fragment installé, désarmant
+  silencieusement une moitié de la couverture d'un garde de sécurité.
+- Files: `plugin/_internal/merge-hooks.sh` (fonction de fusion des fragments) ;
+  `plugin/_internal/tests/test-merge-hooks.sh` (couverture existante insuffisante)
+- Impact: le script distribue les hooks de **tout le parc de modules** — un défaut ici désarme
+  silencieusement n'importe quel garde posé en deux entrées combinées sur un même script/événement,
+  pas seulement `guard-driver-lock.sh`. Aujourd'hui aucun autre module n'est exposé (les 6
+  `hooks.json` du dépôt ont été scannés au bilan de la Phase 32) — mais rien n'empêche un futur
+  garde de retomber dans le même piège sans le savoir, puisque le comportement est silencieux.
+- Contournement retenu en Phase 32, **pas une correction** : une seule entrée `PreToolUse` à
+  matcher combiné `"Bash|Write|Edit"` (fonctionnellement équivalente, le script dispatchant déjà sur
+  `tool_name` du payload). `merge-hooks.sh` lui-même n'a pas été touché — hors périmètre de fichiers
+  du plan 32-03.
+- Trou de couverture : `test-merge-hooks.sh` ne couvre que le scénario d'**upgrade en deux appels
+  séparés** (une version du fragment puis une autre) — jamais le **même-run** (deux entrées neuves
+  posées dans le même appel de merge, sous le même événement, pour le même script), qui est le
+  scénario qui a réellement mordu.
+- Fix approach: ajouter un cas de test même-run reproduisant le scénario mordant (deux entrées, même
+  script + même événement, un seul appel de merge) ; corriger la fusion pour additionner les
+  matchers d'un même script/événement au lieu de faire gagner le dernier traité. Non corrigé à ce
+  jour — arbitrage humain en cours.
+
 **Divergence de doctrine distribuée — lexique vs VIBEFLOW_CORE** — Sévérité : **HIGH**
 - Issue: les intitulés des principes P3–P8 divergent entre les deux documents canoniques livrés aux
   labs. `lexique.md` : P3 Specialiser, P4 Orchestrer, P5 Verifier, P6 Iterer, P7 Transposer,
@@ -215,20 +242,31 @@ capturées au backlog — voir Tech Debt.
 - Current mitigation: source contrôlée (cache = contenu du repo publié).
 - Recommendations: garde ceinture-bretelles excluant `*.env*` / `*secret*` des copies.
 
-**Le verrou de driver est déclaratif, pas contraignant** — Sévérité : **HIGH**
-- Risk: `driver-lock.sh` n'empêche techniquement rien : aucun hook ni garde en écriture ne refuse un
-  commit à une session sans verrou. Constaté le 2026-07-27 : le lock de `mission-phase16` a été élagué
-  par TTL, `mission-phase17` l'a acquis, et la Phase 16 a **continué à commiter** pendant que la
-  Phase 17 tenait le verrou — horodatages entrelacés 22:37 P16 · 22:38 P17 · 22:42 P16 · 22:46 P16 ·
-  22:48 P17 · 22:50 P16. Conséquence concrète : collision de version, la Phase 17 ayant planifié le
-  `v2.5.0` que la Phase 16 venait de prendre (résolu en `v2.6.0`, commit `5a8b6a8`). Deux drivers
-  concurrents sur le même `.planning/` peuvent écraser silencieusement les arbitrages l'un de l'autre.
-- Files: `plugin/conductor/scripts/driver-lock.sh`
-- Current mitigation: aucune — le lock est un fichier de coordination consulté par convention, pas un
-  garde-fou machine ; le TTL réduit la fenêtre d'expiration mais ne l'élimine pas.
-- Recommendations: instrumenter un hook d'écriture (`PreToolUse` sur `Write`/`Edit` de `.planning/`)
-  qui refuse si le lock actif n'appartient pas à la session courante ; ou heartbeat pendant l'attente
-  d'un worker pour empêcher l'expiration TTL en cours de mission (déjà tracé dans `STATE.md` §Phase 16).
+**Le verrou de driver est déclaratif, pas contraignant** — Sévérité : **HIGH** — **RÉSOLU le 2026-08-17 (Phase 32)**
+- Risk (état au constat, 2026-07-27) : `driver-lock.sh` n'empêchait techniquement rien : aucun hook ni
+  garde en écriture ne refusait un commit à une session sans verrou. Constaté le 2026-07-27 : le lock
+  de `mission-phase16` a été élagué par TTL, `mission-phase17` l'a acquis, et la Phase 16 a **continué
+  à commiter** pendant que la Phase 17 tenait le verrou — horodatages entrelacés 22:37 P16 · 22:38 P17 ·
+  22:42 P16 · 22:46 P16 · 22:48 P17 · 22:50 P16. Conséquence concrète : collision de version, la
+  Phase 17 ayant planifié le `v2.5.0` que la Phase 16 venait de prendre (résolu en `v2.6.0`, commit
+  `5a8b6a8`). Deux drivers concurrents sur le même `.planning/` pouvaient écraser silencieusement les
+  arbitrages l'un de l'autre.
+- Files: `plugin/conductor/scripts/driver-lock.sh`, `plugin/conductor/scripts/guard-driver-lock.sh`,
+  `plugin/conductor/scripts/check-guard-health.sh`
+- Fermeture (Phase 32, `.planning/phases/VFDO-32-durcissement-du-driver-lock/32-RELIQUATS.md`) :
+  `acquire` refuse désormais un lock périmé (`stale-requires-takeover`, jamais de récupération
+  implicite) ; guard `PreToolUse(Bash|Write|Edit)` distribué via `merge-hooks`, qui refuse un commit
+  ou une écriture `.planning/` sous le lock d'autrui, armé et vérifié en lab jetable ; le
+  contournement réel de 2026-07-27 a été rejoué comme cas de test et rougit sans le guard. 64 suites
+  / 0 échec, `conductor` v1.26.0.
+- **Ce qui reste vrai — le guard est anti-accident, pas anti-adversaire** (`32-RELIQUATS.md` §6.2) :
+  restent structurellement hors de sa portée une session **non armée**, un **terminal humain** direct
+  hors Claude Code, un **IDE ou client git tiers**, un **processus en arrière-plan**, un appel **MCP**,
+  une **autre machine**, et `bash -c`/`eval` (passoires du matching par sous-chaîne de commande, nommées
+  explicitement). Une entrée qui se déclarerait entièrement close mentirait — catégorie C non traitée,
+  hors du périmètre livré.
+- Recommendations (résiduel) : si la catégorie C devient un risque mesuré (pas seulement théorique),
+  ré-ouvrir sur un mécanisme distinct (ex. hook git natif côté dépôt, hors du seul chemin Claude Code).
 
 **Le gate ADR-044 est un faux vert dans son invocation nue** — Sévérité : **MEDIUM**
 - Risk: `bash plugin/conductor/scripts/check-agents.sh` **sans argument** sort **exit 0** avec
