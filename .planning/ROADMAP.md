@@ -72,7 +72,7 @@
 - [x] Phase 29: Distiller les gains ICM (G1-G5) — investigation dag.sh --scope d'abord (completed 2026-08-15)
 - [x] Phase 30: Portabilité Windows II (completed 2026-08-16)
 - [x] Phase 31: Manifeste d'install + dry-run (issue #20) (completed 2026-08-16)
-- [ ] Phase 32: Durcissement du driver-lock
+- [x] Phase 32: Durcissement du driver-lock (completed 2026-08-17)
 - [ ] Phase 33: Watchdog & notifications des missions
 - [ ] Phase 34: Gaps agency-agents & cadrage skill-installer
 - [ ] Phase 35: Ré-armement worktree (conditionnelle)
@@ -723,15 +723,18 @@ imparsable → fail-open silencieux · indisponible → fail-open bruyant ; le �
 par le marqueur de santé PLUS un hook doctor `SessionStart` générique livré dans la phase
 (plan 32-05, **abandonnable**).*
 
-**Plans**: 6 plans, 5 vagues
+**Plans**: 6 plans livrés (32-01 → 32-05, 32-07), 4 vagues — le plan de bilan initialement prévu en
+32-06 a été rendu directement en `32-RELIQUATS.md` (pas de PLAN/SUMMARY numérotés séparés) ; 32-07
+s'est ajouté au plan pour porter les amendements 3B/4A tranchés par Samuel le 2026-08-17.
 
 Plans:
-- [ ] 32-01-PLAN.md — champs additifs `session_ids`/`generation` en JSON + observabilité de lease — vague 1 (LOCK-01, QUAL-01)
-- [ ] 32-02-PLAN.md — `takeover` + `reclaim` + journal append-only, retrait de l'auto-steal — vague 2 (LOCK-04, QUAL-01)
-- [ ] 32-03-PLAN.md — guard `PreToolUse` (Bash + Write|Edit) + deux entrées hooks armées — vague 3, **checkpoint humain** (LOCK-02, LOCK-03, QUAL-01)
-- [ ] 32-04-PLAN.md — convention de jeton de fence `Fence:` dans le contrat invariant du kernel — vague 3 (LOCK-05)
-- [ ] 32-05-PLAN.md — hook doctor `SessionStart` générique (lecteur des marqueurs de santé) — vague 4, **ABANDONNABLE, sacrifice désigné en premier** (QUAL-01)
-- [ ] 32-06-PLAN.md — bilan parc complet, version/journal du module, état réel de QUAL-01 — vague 5 (LOCK-01..05, QUAL-01)
+- [x] 32-01-PLAN.md — champs additifs `session_ids`/`generation` en JSON + heartbeat séparé de la lease, TTL inchangé — vague 1 (LOCK-01, QUAL-01)
+- [x] 32-02-PLAN.md — `takeover` + `reclaim` + journal append-only, retrait de l'auto-steal — vague 2 (LOCK-04, QUAL-01)
+- [x] 32-03-PLAN.md — guard `PreToolUse` (Bash + Write|Edit) + entrée hooks armée (une seule, contournement du bug d'idempotence cross-matcher de `merge-hooks.sh`) — vague 3, **checkpoint humain** (LOCK-02, LOCK-03, QUAL-01)
+- [x] 32-04-PLAN.md — convention de jeton de fence `Fence:` dans le contrat invariant du kernel — vague 3 (LOCK-05)
+- [x] 32-05-PLAN.md — `check-guard-health.sh`, hook doctor `SessionStart` générique (lecteur des marqueurs de santé du parc) — vague 4 (QUAL-01)
+- [x] 32-07-PLAN.md — synchronisation doctrinale complète (option 3B : 5 agents managers de 4 modules tiers + `mission-flow.md` + README) et fermeture du trou de la voie legacy du protocole d'acquisition (option 4A) — vague 4 (LOCK-04 amendé)
+- [x] bilan de clôture rendu en `32-RELIQUATS.md` — parc complet (64 suites / 0 échec), gates transverses, état réel des 5 critères et de QUAL-01, reliquats consignés (LOCK-01..05, QUAL-01)
 
 ### Phase 33: Watchdog & notifications des missions
 
