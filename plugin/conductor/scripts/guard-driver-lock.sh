@@ -20,19 +20,33 @@
 #   4. Sinon → deny (JAMAIS fail-open sur un mismatch CONNU), motif portant owner/step/branche/âge
 #      ET la commande exacte de re-rattachement (`driver-lock.sh reclaim --owner=<owner>`).
 # Le blocage passe TOUJOURS par la décision JSON (permissionDecision: deny), jamais par le code de
-# sortie — ce script sort 0 sur CHAQUE chemin (docs/HOOKS-CONTRAT-SORTIE.md, mesure DIV-2 : exit 2
-# fuit en plus le chemin absolu du script).
+# sortie — ce script rend TOUJOURS 0 sauf sur le chemin QUAL-01 issue 4 (interprète indisponible,
+# code de garde 17 — docs/HOOKS-CONTRAT-SORTIE.md, mesure DIV-2 : exit 2 fuit en plus le chemin
+# absolu du script).
 #
-# CLAUSE DE LIMITE ASSUMÉE (garde-fou déterministe contre le chemin de moindre résistance, PAS une
-# sandbox) : contournements CONNUS et NON couverts — interprétation indirecte (eval, interprète
-# inline python -c/node -e), alias shell, substitution de commande, un script DU DÉPÔT qui commite
-# en interne (`bash release.sh`), toute commande dont le verbe git n'apparaît pas LITTÉRALEMENT en
-# position de commande. Les écritures DIRECTES sous `.planning/` par un outil autre que Write/Edit
-# (`sed -i .planning/STATE.md`, `cat > .planning/x`, `rm .planning/x`) ne sont JAMAIS détectées par
-# la voie Bash de ce guard — la voie Write/Edit ci-dessous est le SEUL mécanisme réel de protection
-# du dossier de planification contre les écritures d'outil, pas une sous-chaîne dans le préfiltre.
+# CLAUSE DE LIMITE ASSUMÉE — garde-fou ANTI-ACCIDENT contre le chemin de moindre résistance, PAS
+# une garde ANTI-ADVERSAIRE (même formule que guard-agent-write.sh, même statut de garantie).
+# DEUX catégories de contournement CONNUES et NON couvertes :
+#   Catégorie A (pattern-matching, l'analyse syntaxique ne peut pas les voir) — interprétation
+#   indirecte (eval, interprète inline python -c/node -e, `bash -c "…"`), alias shell, substitution
+#   de commande, un script DU DÉPÔT qui commite en interne (`bash release.sh`), toute commande dont
+#   le verbe git n'apparaît pas LITTÉRALEMENT en position de commande, et — mesurées en revue,
+#   32-JUGE-* — les formes composites non normalisées : `(`/`)` et `{`/`}` non séparés par un
+#   espace de leur contenu (`(git`), et tout autre opérateur de contrôle bash non couvert par la
+#   segmentation ci-dessous. Les écritures DIRECTES sous `.planning/` par un outil autre que
+#   Write/Edit (`sed -i .planning/STATE.md`, `cat > .planning/x`, `rm .planning/x`) ne sont JAMAIS
+#   détectées par la voie Bash de ce guard — la voie Write/Edit ci-dessous est le SEUL mécanisme
+#   réel de protection du dossier de planification contre les écritures d'outil, pas une
+#   sous-chaîne dans le préfiltre.
+#   Catégorie C (hors de portée par NATURE, aucune analyse de payload ne peut y remédier —
+#   32-REJEU-contournements.md §Catégorie C) — une session Claude Code NON ARMÉE de ce hook (lab
+#   non installé/désarmé), un terminal humain, un IDE ou un client git tiers, un process lancé en
+#   arrière-plan hors du harness, un serveur MCP, ou toute autre machine. C'est cette catégorie qui
+#   borne la promesse réelle du lock : « une seule mission PILOTÉE PAR CE HARNESS à la fois », pas
+#   une exclusion mutuelle au sens système.
 # GRANULARITÉ (D-32-03(e)) : le guard garantit qu'aucune AUTRE SESSION ne commite sous le lock,
 # JAMAIS qu'aucun autre acteur DE LA MÊME session ne le fait — ce n'est pas une garantie plus fine.
+# Un lecteur pressé ne doit lire NI l'une NI l'autre catégorie ci-dessus comme une liste exhaustive.
 #
 # DEUX EXEMPTIONS NOMMÉES (D-32-06, BL-7 — jamais retirées, jamais élargies à la sous-commande
 # entière) :
@@ -164,17 +178,29 @@ def journal_override(lock_parent, lock_base, session_id, cmd_or_content):
     except Exception:
         pass  # best-effort : un journal indisponible ne bloque jamais l echappatoire
 
+# Jetons structurels (correction juge #4, angles morts mesurés) : mots-clés/parenthèses/accolades
+# qui INTRODUISENT une commande sans être eux-mêmes une commande — `( git commit )`, `{ git commit;
+# }`, `if …; then git commit; fi`, `for …; do git commit; done`. Sans les sauter, le token en
+# position 0 du segment est le jeton structurel lui-même (jamais "git"), et command_positions()
+# rate le verbe qui suit. `)` et `}` sont inclus pour ne jamais lever une exception d index sur un
+# segment qui ne contient QU un jeton de fermeture (ex. le second segment de `{ … ; }`).
+STRUCTURAL_SKIP = {"(", ")", "{", "}", "then", "do", "else"}
+
 def command_positions(toks):
     """CSL-04 (repris de guard-bash-registres.sh, non modifié à la source) : indices des tokens
-    en position de COMMANDE — début de segment, ou après un wrapper (sudo/env/nohup/xargs...) en
-    sautant ses options et les affectations VAR=val. Un verbe git en position ARGUMENT (motif
-    grep, nom de fichier cité) ne déclenche jamais le deny (S3)."""
+    en position de COMMANDE — début de segment, après un jeton structurel (STRUCTURAL_SKIP), ou
+    après un wrapper (sudo/env/nohup/xargs...) en sautant ses options et les affectations VAR=val.
+    Un verbe git en position ARGUMENT (motif grep, nom de fichier cité) ne déclenche jamais le deny
+    (S3)."""
     out = []
     i = 0
     n = len(toks)
     while i < n:
         t = toks[i]
         if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", t):
+            i += 1
+            continue
+        if t in STRUCTURAL_SKIP:
             i += 1
             continue
         out.append(i)
@@ -215,6 +241,39 @@ def tokens(seg):
     except ValueError:
         return seg.split()
 
+def strip_heredocs(cmd):
+    """CSL-05 (durci -- correction juge #1) : ne tronque QUE le CORPS de chaque heredoc, jamais ce
+    qui SUIT sa ligne de fermeture. La forme precedente (cmd.split de << ) jetait tout ce qui
+    suivait le PREMIER heredoc -- y compris une commande entierement distincte placee APRES la fin
+    du heredoc (heredoc de placeholder suivi, sur une ligne separee, d un git commit), pattern
+    d usage COURANT et involontaire (ecrire un fichier via heredoc puis committer dans le meme
+    appel Bash), pas un contournement exotique -- reproduit en direct, allow silencieux (I1/I4
+    rouvert). Repere le delimiteur (operateur heredoc, guillemet optionnel, nom, meme guillemet) et
+    saute les lignes jusqu a son marqueur de fermeture EXACT, en conservant tout le reste de la
+    commande (avant l ouverture, apres la fermeture)."""
+    heredoc_re = re.compile("<<(-?~?)\\s*([\"" + chr(39) + "]?)([A-Za-z_][A-Za-z0-9_]*)\\2")
+    lines = cmd.split("\n")
+    out = []
+    i = 0
+    n = len(lines)
+    while i < n:
+        m = heredoc_re.search(lines[i])
+        if not m:
+            out.append(lines[i])
+            i += 1
+            continue
+        out.append(lines[i][:m.start()])  # texte AVANT l ouverture du heredoc, préservé
+        delim = m.group(3)
+        strip_leading_tabs = m.group(1) == "-"
+        i += 1
+        while i < n:
+            probe = lines[i].lstrip("\t") if strip_leading_tabs else lines[i]
+            i += 1
+            if probe == delim:
+                break  # corps consommé, la ligne de fermeture n est PAS réinjectée (c est du texte)
+        # tout ce qui suit (i inchangé après le break) reste dans `lines` et sera traité normalement
+    return "\n".join(out)
+
 def bash_command_concerned(cmd):
     """True si `cmd` porte, EN POSITION DE COMMANDE, un geste concerné (surface A du rejeu, verbes
     git mutants + outil de PR). (BL-1) Le payload est d abord découpé sur \\n et \\r AVANT la
@@ -227,10 +286,9 @@ def bash_command_concerned(cmd):
     cherry-pick/revert/stash (issue de secours d une session démarrée AVANT la pose du lock
     d autrui — sans cette exemption le guard recréerait le wedge que 32-SPIKE a fait rejeter pour
     `reference-transaction` ; la sous-commande SANS une de ces options reste, elle, refusée)."""
-    # CSL-05 : troncature au premier marqueur de document en ligne — son contenu est du TEXTE.
-    cmd = cmd.split("<<", 1)[0]
+    cmd = strip_heredocs(cmd)
     for line in re.split(r"[\n\r]+", cmd):
-        for seg in re.split(r"\|\||&&|;|\|", line):
+        for seg in re.split(r"\|\||&&|;|\||&", line):
             toks = tokens(seg)
             for idx in command_positions(toks):
                 name = os.path.basename(toks[idx])

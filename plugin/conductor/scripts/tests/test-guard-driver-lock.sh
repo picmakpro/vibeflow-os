@@ -242,6 +242,19 @@ OUT_S4="$(run_guard "$(mk_bash "$HEREDOC_CMD" sess-intrus .)")"
 assert_empty "S4 — heredoc citant 'git commit' → allow (contenu = texte)" "$OUT_S4"
 
 echo ""
+echo "=== S4b (correction juge #1, CSL-05 durci) — commande RÉELLE après la fermeture d'un heredoc ==="
+# Reproduction du bypass mesuré : 'cmd.split("<<", 1)[0]' jetait TOUT ce qui suit le premier '<<',
+# y compris un git commit placé sur une ligne SÉPARÉE après la fin du heredoc — pattern d'usage
+# courant (écrire un fichier via heredoc puis committer dans le même appel Bash), pas exotique.
+HEREDOC_THEN_COMMIT=$(printf "cat <<'EOF' > /tmp/x\nplaceholder\nEOF\ngit commit -am 'sneaky'")
+OUT_S4B="$(run_guard "$(mk_bash "$HEREDOC_THEN_COMMIT" sess-intrus .)")"
+assert "S4b — heredoc PUIS git commit sur ligne séparée → deny (le commit après la fermeture n'est plus invisible)" "$OUT_S4B" '"permissionDecision": "deny"'
+# Contre-épreuve : le corps du heredoc reste bien du TEXTE (S4 ne doit pas régresser dans l'autre sens).
+HEREDOC_BODY_ONLY=$(printf 'cat <<EOF\ngit commit -m x\nEOF\necho fin')
+OUT_S4B2="$(run_guard "$(mk_bash "$HEREDOC_BODY_ONLY" sess-intrus .)")"
+assert_empty "S4b2 — heredoc citant 'git commit' DANS son corps, suivi d'une commande NON concernée → allow" "$OUT_S4B2"
+
+echo ""
 echo "=== S5 — wrappers transparents (sudo, env) ==="
 OUT_S5a="$(run_guard "$(mk_bash 'sudo git commit -m x' sess-intrus .)")"
 assert "S5a — 'sudo git commit' → deny (wrapper transparent)" "$OUT_S5a" '"permissionDecision": "deny"'
@@ -271,6 +284,32 @@ echo ""
 echo "=== S10 (contrepoint de S9, ne jamais retirer) — rebase SANS option de sortie reste refusé ==="
 OUT_S10="$(run_guard "$(mk_bash 'git rebase -i main' sess-intrus .)")"
 assert "S10 — 'git rebase -i main' → deny (seule l'OPTION de sortie est exemptée)" "$OUT_S10" '"permissionDecision": "deny"'
+
+echo ""
+echo "=== S11 (correction juge #4) — angles morts de segmentation, formes naturelles d'un agent ==="
+# Sondées en revue (session tierce, lock vivant) : toutes rendaient ALLOW avant correction.
+declare -a S11_CASES=(
+  "foo & git commit -m x"
+  "( git commit -m x )"
+  "{ git commit -m x; }"
+  "if true; then git commit -m x; fi"
+  "for i in 1; do git commit -m x; done"
+)
+for c in "${S11_CASES[@]}"; do
+  OUT="$(run_guard "$(mk_bash "$c" sess-intrus .)")"
+  assert "S11 — '$c' → deny (angle mort de segmentation fermé)" "$OUT" '"permissionDecision": "deny"'
+done
+echo "  (hors de portée, NOMMÉ, pas couvert : 'bash -c \"…\"' et 'eval …' — interprétation indirecte,"
+echo "   catégorie A de la clause de limite assumée, jamais un pattern-matching syntaxique.)"
+OUT_S11_BASHC="$(run_guard "$(mk_bash 'bash -c "git commit -m x"' sess-intrus .)")"
+assert_empty "S11 — 'bash -c \"git commit -m x\"' → allow (HORS DE PORTÉE ASSUMÉE, nommé, pas corrigé)" "$OUT_S11_BASHC"
+
+echo ""
+echo "=== S12 (contrepoints de S11, discriminance des exemptions préservée) ==="
+OUT_S12A="$(run_guard "$(mk_bash 'if true; then git worktree add ../ailleurs -b b; fi' sess-intrus .)")"
+assert_empty "S12a — worktree add derrière 'then' reste exempté" "$OUT_S12A"
+OUT_S12B="$(run_guard "$(mk_bash 'foo & git rebase -i main' sess-intrus .)")"
+assert "S12b — 'git rebase -i main' derrière '&' reste refusé (S10 tient sous la nouvelle segmentation)" "$OUT_S12B" '"permissionDecision": "deny"'
 
 echo ""
 echo "=== C1/C2/C3 — Write|Edit sous .planning/, session tierce vs détenteur ==="
