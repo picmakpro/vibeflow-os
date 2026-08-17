@@ -5,10 +5,10 @@ milestone_name: « ce qui survit »
 current_phase: 33
 current_phase_name: Watchdog & notifications des missions
 status: gaps_found
-stopped_at: Phase 33 — 5 plans exécutés sur 3 vagues (branche feat/phase-33-watchdog-notifications, non mergée), vérifiée goal-backward le 2026-08-17 (`33-VERIFICATION.md`) — 4/4 critères ATTEINTS (WTCH-03 en limite assumée : preuve Windows réelle non exécutée). Le gap WTCH-02 relevé par la vérification (relais stall inatteignable au geste `dag.sh mark`) est fermé par D-33-G (`88975dc`), cas de discriminance T49, mesure A/B re-jouée par le manager ; hygiène documentaire + bump module `conductor` v1.27.0 faits
+stopped_at: Phase 33 — 5 plans exécutés sur 3 vagues (branche feat/phase-33-watchdog-notifications, depuis mergée dans main — vérifié machine le 2026-08-17), vérifiée goal-backward le 2026-08-17 (`33-VERIFICATION.md`) — 4/4 critères ATTEINTS (WTCH-03 en limite assumée : preuve Windows réelle non exécutée). Le gap WTCH-02 relevé par la vérification (relais stall inatteignable au geste `dag.sh mark`) est fermé par D-33-G (`88975dc`), cas de discriminance T49, mesure A/B re-jouée par le manager ; hygiène documentaire + bump module `conductor` v1.27.0 faits. **ROUVERTE le 2026-08-17 par son annexe D-33-H** (notifications OS en opt-in, défaut OFF) puis **re-livrée** — plans 33-06 (gate d'opt-in + toggle `/vf-notify`) et 33-07 (Pattern H, relais des jalons GSD) exécutés sur la branche `feat/phase-33-annexe-notifications-opt-in`, modules `conductor` v1.28.0 et `dev-orchestrator` v2.18.0 ; vérification goal-backward de l'annexe (`33-VERIFICATION-ANNEXE.md`) 5/6 critères, critère 1 PARTIEL fermé par `401c903` (garde `${HOME:-}` + cas N19). 66 suites / 0 KO, `check-version-sync.sh` exit 0. **Branche non mergée, non poussée — aucune PR, aucun tag, aucune release**, en attente d'un geste humain
 last_updated: "2026-08-17T00:00:00.000Z"
 last_activity: 2026-08-17
-last_activity_desc: Phase 33 (Watchdog & notifications des missions) — 5 plans livrés (progress_epoch/mark-progress WTCH-01, sous-contrôle stall/abandon check-guard-health.sh WTCH-02, notify.sh portable WTCH-03, armement par gate PORT-05 WTCH-04) ; vérification goal-backward `gaps_found` (1 gap sur le relais D-33-F au geste `mark`) puis gap FERMÉ par D-33-G (`88975dc`, cas T49) ; hygiène documentaire de clôture (STATE/ROADMAP/REQUIREMENTS) + bump module `conductor` v1.27.0
+last_activity_desc: Phase 33 (Watchdog & notifications des missions) — 5 plans livrés (progress_epoch/mark-progress WTCH-01, sous-contrôle stall/abandon check-guard-health.sh WTCH-02, notify.sh portable WTCH-03, armement par gate PORT-05 WTCH-04) ; vérification goal-backward `gaps_found` (1 gap sur le relais D-33-F au geste `mark`) puis gap FERMÉ par D-33-G (`88975dc`, cas T49) ; hygiène documentaire de clôture (STATE/ROADMAP/REQUIREMENTS) + bump module `conductor` v1.27.0. Puis ANNEXE D-33-H (2026-08-17) — notifications OS passées en opt-in défaut OFF (33-06) + jalons GSD relayés vers l'app Claude par Pattern H (33-07), `conductor` v1.28.0 + `dev-orchestrator` v2.18.0, branche d'annexe non mergée
 progress:
   total_phases: 8
   completed_phases: 2
@@ -24,7 +24,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26 — charte rouverte : 17 modules, D2/D6 renversées)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Milestone fiabilite-v1.0 — Phase 30 (Portabilité Windows II), Phase 31 (Manifeste d'install + dry-run, issue #20) et Phase 32 (Durcissement du driver-lock) livrées ; Phase 33 (Watchdog & notifications des missions) exécutée, vérifiée le 2026-08-17 — `gaps_found` puis gap fermé (D-33-G) : 4/4 critères atteints, WTCH-03 en limite assumée (preuve Windows réelle non exécutée)
+**Current focus:** Milestone fiabilite-v1.0 — Phase 30 (Portabilité Windows II), Phase 31 (Manifeste d'install + dry-run, issue #20) et Phase 32 (Durcissement du driver-lock) livrées ; Phase 33 (Watchdog & notifications des missions) exécutée, vérifiée le 2026-08-17 — `gaps_found` puis gap fermé (D-33-G) : 4/4 critères atteints, WTCH-03 en limite assumée (preuve Windows réelle non exécutée) ; **rouverte le même jour par son annexe D-33-H** (opt-in défaut OFF + jalons vers l'app Claude) et re-livrée sur `feat/phase-33-annexe-notifications-opt-in`, non mergée
 `get-shit-done-cc` → `@opengsd/gsd-core` livrée en v2.39.0 atteint enfin les **postes déjà équipés** :
 `/vf-update` dit l'état du moteur avant tout stop et propose la bascule sous confirmation ADR-031.
 Modules `dev-orchestrator` v2.7.0 + `conductor` v1.16.0. Verdict `19-VERIFICATION.md` : **PASS 6/7**.
@@ -56,15 +56,30 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 ## Current Position
 
-Phase: 31 (Manifeste d'install + dry-run, issue #20) — livrée, branche non mergée
-Plan: 31-08 (dernier plan exécuté, vague 6) ; nœud `docs` de clôture de phase en cours (2026-08-16)
-Status: Phase 31 shipped - branch feat/phase-31-manifeste-dry-run - not merged (2026-08-16)
-Last activity: 2026-08-16 — hygiène documentaire de clôture de Phase 31 (STATE.md/ROADMAP.md/
-REQUIREMENTS.md mis à jour : MANI-01/02/03 Done, MANI-04 superseded réponse #20 en DRAFT non postée,
-QUAL-01 noté satisfait sur les phases 30 et 31)
+Phase: 33 (Watchdog & notifications des missions) — **rouverte puis re-livrée par son annexe
+D-33-H**, branche `feat/phase-33-annexe-notifications-opt-in`, non mergée et **non poussée**
+Plan: 33-07 (dernier plan exécuté de l'annexe) ; hygiène documentaire de clôture faite (2026-08-17)
+Status: Phase 33 annexe D-33-H livree - branch feat/phase-33-annexe-notifications-opt-in - not
+merged, not pushed (2026-08-17)
+Last activity: 2026-08-17 — annexe D-33-H : notifications OS en **opt-in (défaut OFF)** derrière un
+fichier-sentinelle scope machine + toggle `/vf-notify` (33-06, `conductor` v1.28.0), et jalons GSD
+(fin de phase, fin de milestone) relayés vers l'app Claude par **Pattern H** / `SendMessage(main)`
+(33-07, `dev-orchestrator` v2.18.0). Vérification goal-backward de l'annexe : 5/6 critères, le
+critère 1 (fail-open inconditionnel) fermé après coup par `401c903`. Mesures : 66 suites / 0 KO,
+`check-version-sync.sh` exit 0, `check-agents.sh --agents-dir=plugin/dev-orchestrator/agents`
+exit 0.
 
-Précédent : Phase 30 (Portabilité Windows II) — livrée, vérifiée, **mergée dans `main`** (PR #43,
-release `v2.53.0`, hotfix `v2.53.1` sur les hooks exec).
+**En attente d'un geste humain** (ADR-031) : push de la branche, PR, merge, puis release racine —
+`VERSION` / `plugin.json` / `marketplace.json` sont sciemment intacts, et `plugin/commands/vf-notify.md`
+vit au niveau plugin : il n'atteindra un lab qu'au bump du triplet racine, pas au seul bump de
+`conductor`.
+
+Précédent (vérifié machine le 2026-08-17, `git merge-base --is-ancestor <branche> main`) : les
+branches des Phases 30, 31, 32 **et** du tronc de la Phase 33 sont toutes **mergées dans `main`**.
+Releases correspondantes : `v2.53.0` + hotfix `v2.53.1` (Phase 30, PR #43), `v2.54.0`, `v2.55.0`,
+`v2.55.1` — dernier tag posé, `VERSION` courante. La `v2.56.0` a été **retirée** avant toute
+distribution (revert `07ff554`), ce qui est précisément la fenêtre qui a rendu l'annexe D-33-H
+gratuite : aucun lab n'a jamais reçu le défaut d'émission.
 
 ## Performance Metrics
 

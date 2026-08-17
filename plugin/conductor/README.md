@@ -6,7 +6,7 @@
 > et de migration. Module **mandatory** : posé d'office à chaque install, c'est lui qui porte les
 > gates machine (hooks) et le noyau d'orchestration d'équipe réutilisé par tous les autres modules.
 
-**Type** : `agent + skills + scripts + references` · **Version** : v1.27.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
+**Type** : `agent + skills + scripts + references` · **Version** : v1.28.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
 
 > `skill-creator` est une dépendance **dure** depuis ADR-047 : c'est le canal unique de création de
 > skills, invoqué par `vf-new-lab` en fan-out (Phase 5) et exigé par le Gate C. Le conductor étant
@@ -50,7 +50,7 @@ branchent aujourd'hui : **dev-orchestrator** (implémentation de référence, `v
 **mobile-test-team** (`vf-test-orchestrator`), **design-orchestrator** (`vf-design-manager`,
 première instanciation non-dev) et les **bundles métier** (business-pilot, content, growth).
 
-## Les 3 skills
+## Les 4 skills
 
 - **`vf-new-lab`** — Lab Factory clarification-first : cadrage à gates machine (Gate A brief,
   Gate B capacités, Gate C conformité), manifeste de capacités, fan-out `skill-creator`, ficelage
@@ -63,6 +63,9 @@ première instanciation non-dev) et les **bundles métier** (business-pilot, con
   (`claude plugin update vibeflow@vibeflow-os`) puis les modules installés (engine `update --all`
   via `vf-update-run.sh`). Frontière : `vf-update` **installe** la nouvelle version,
   `vf-calibrate` **réaligne la structure** une fois celle-ci posée.
+- **`vf-notify`** — toggle des notifications OS natives de mission (`on`/`off`/`status`/`test`),
+  patron `stop-notify` (touch/rm -f, zéro JSON). Opt-in **OFF par défaut** (D-33-H) : le sentinel
+  scope machine arme/désarme l'émission de `notify.sh` aux jalons `done`/`failed` du DAG.
 
 ## Hooks (posés automatiquement à l'install)
 
@@ -125,10 +128,10 @@ SessionStart), `vf-update-run.sh` (re-matérialise les modules depuis le cache p
 ADR-042) et `generate-agent-commands.sh` (une commande slash d'incarnation par agent posé — saute
 les workers `vf-internal: true`, Pattern 12).
 
-**Tests** : 19 suites sous `scripts/tests/` (une par script critique + `test-conductor.sh`,
+**Tests** : 21 suites sous `scripts/tests/` (une par script critique + `test-conductor.sh`,
 `test-vf-new-lab.sh`, `test-vf-update.sh`, `test-doc-and-commands.sh`). *(Compte re-dérivé :
-`find plugin/conductor/scripts/tests -type f -name 'test-*.sh' | wc -l` ; « 12 suites » était déjà
-faux avant la Phase 32.)*
+`find plugin/conductor/scripts/tests -type f -name 'test-*.sh' | wc -l` ; « 19 suites » était déjà
+faux avant cette annexe notifications.)*
 
 ## Contenu du module
 
@@ -140,7 +143,8 @@ conductor/
     vf-new-lab/                    # Lab Factory (SKILL.md + 7 references + script + test)
     vf-calibrate/SKILL.md          # propagation update + migration
     vf-update/SKILL.md             # mise à jour plugin + modules
-  scripts/                         # 20 scripts (familles ci-dessus) + tests/ (19 suites)
+    vf-notify/SKILL.md             # toggle notifications OS (opt-in, D-33-H)
+  scripts/                         # 20 scripts (familles ci-dessus) + tests/ (21 suites)
   references/
     team-kernel.md                 # contrat du noyau d'équipe (manager/workers/juges)
     contracts.md                   # escalade sous-agents → conductor

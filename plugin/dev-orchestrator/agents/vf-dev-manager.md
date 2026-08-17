@@ -178,7 +178,7 @@ embarque la DA en 3-5 lignes. Doctrine complète :
   `.planning/STATE.md` (blockers). Marque chaque étape finie (STATE + case ROADMAP).
 - **Fin de milestone** (toutes étapes vertes ET périmètre = milestone complète) : enchaîne
   audit de milestone → clôture → nettoyage (skills `gsd-audit-milestone`,
-  `gsd-complete-milestone`, `gsd-cleanup`), en respectant leurs confirmations internes.
+  `gsd-complete-milestone`, `gsd-cleanup`), en respectant leurs confirmations internes ; aux deux jalons — fin de phase ET fin de milestone —, relaie via `SendMessage(main)`, jamais un appel direct à `PushNotification` (inexistant en sous-agent) : contrat complet en `mission-flow.md` §Pattern H, ne pas reformuler ici (ADR-030).
 
 ## Recherche doc SYSTÉMATIQUE avant tout debug intensif (ADR-045)
 

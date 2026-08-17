@@ -107,8 +107,10 @@ un complément (labs non-dev simples ?), ou une source de patterns à distiller 
 par levier/coût. Déclencheur naturel : prochaine évolution de `vf-new-lab`, de `scaffold-docs.sh`,
 du team-kernel ou de la chaîne validator.
 
-## Notifications de progression des agents managers
-**Capturé :** 2026-08-11 · **À explorer :** au prochain arbitrage d'extension du team-kernel
+## Notifications de progression des agents managers — CLOS
+**Capturé :** 2026-08-11 · **Clos :** 2026-08-17 (Phase 33 puis son **annexe D-33-H**) ·
+**Origine de la résurgence :** le déclencheur inscrit ci-dessous — « demande récurrente de suivi de
+mission longue distance » — s'est produit tel quel
 
 Les missions pilotées par les managers (`vf-dev-manager`, `vf-design-manager`,
 `vf-test-orchestrator`) sont longues et l'utilisateur n'est pas devant l'écran. Idée : **envoyer
@@ -131,6 +133,30 @@ distribution, granularité, portabilité macOS/Linux) avant tout code.
 
 **Déclencheur de resurgence :** prochaine évolution du team-kernel ou des protocoles managers,
 ou demande récurrente de suivi de mission longue distance.
+
+**Ce qui a fermé l'item (2026-08-17).** La **Phase 33** a livré le canal OS portable
+(`notify.sh`, macOS / Linux / Windows / WSL, WTCH-03) émis aux fins de nœud du DAG ; son
+**annexe D-33-H** a tranché les trois questions que cet item laissait ouvertes, et qui étaient
+précisément le motif du report :
+
+- **Granularité** — hiérarchie à deux étages : jalons GSD (fin de phase, fin de milestone) →
+  push dans l'app Claude ; fins de nœud de DAG (`done`/`failed`) → toast OS. Jamais à chaque tour,
+  jamais sur `running`.
+- **Portabilité** — les 4 canaux couverts par `notify.sh`, avec détecteur WSL dans `vf-portable.sh`.
+- **Vecteur de distribution, et la mise en garde « un réglage settings ne voyage pas, cf.
+  régression #38 » écrite dans cet item** — elle a été *confirmée* et a dicté la solution :
+  fichier-sentinelle **scope machine** (patron `stop-notify`), zéro clé de settings, zéro hook neuf,
+  parce qu'aucun vecteur d'engine n'existe pour écrire une clé non-hook dans un settings. Défaut
+  **OFF** (opt-in), toggle `/vf-notify` (`on`/`off`/`status`/`test`).
+- **Le push « émis par le manager lui-même »** que cet item imaginait est **structurellement
+  impossible** : `PushNotification` n'existe pas en sous-agent (erreur littérale mesurée). D'où le
+  **Pattern H** — le manager émet un `SendMessage(main)`, la session principale pousse.
+
+Modules : `conductor` v1.28.0, `dev-orchestrator` v2.18.0. Renvoi :
+`.planning/phases/VFDO-33-watchdog-notifications-des-missions/33-CONTEXT.md` § **D-33-H**.
+**Réserve** : livré sur la branche `feat/phase-33-annexe-notifications-opt-in`, **non mergée et non
+poussée** au moment de cette clôture — l'item est traité au sens du travail fait, pas encore
+distribué.
 
 ## Convergence de contenu à l'update de module (manifeste par module)
 **Capturé :** 2026-07-26 · **Origine :** update réel de la machine 2.23.0 → 2.36.0

@@ -1,5 +1,27 @@
 # Changelog — conductor
 
+## [v1.28.0] — 2026-08-17 (annexe notifications — D-33-H, WTCH-03 amendé)
+
+**Minor** (nouvelle capacité publique : le verbe `/vf-notify` n'existait pas, et le défaut
+d'émission de `notify.sh` change de comportement observable) :
+
+- **Gate d'opt-in OFF par défaut dans `notify.sh`** : l'émission OS native de mission passait
+  d'ON-par-détection à opt-in explicite — jugé trop agressif après coup (Samuel, 2026-08-17).
+  **Correction pré-distribution, aucune migration de parc due** : v2.56.0 (qui aurait porté ce
+  défaut ON) a été retirée de la distribution (tag supprimé, revert `07ff554`) avant qu'aucun lab
+  ne la reçoive. Sentinel scope machine, patron `stop-notify` strict (touch/rm -f), résolu via
+  `${XDG_CONFIG_HOME:-${HOME:-}/.config}/vibeflow/notify-optin`. Mutation rouge prouvée (retirer le
+  gate fait rougir le cas dédié N17, sur son compteur d'invocations de canal). Le signal de stall
+  (D-33-F) reste structurellement non gaté — `dag.sh` inchangé par ce volet.
+- **Toggle `/vf-notify` (neuf)** : verbes `on`/`off`/`status`/`test`, patron `stop-notify` (zéro
+  JSON, zéro entrée `hooks.json`). `test` envoie une notification réelle via un armement JETABLE
+  (`mktemp`), sans jamais muter l'état persistant du toggle, et documente le piège `user_present`
+  (le harness ne notifie rien quand l'utilisateur est actif au terminal).
+- **Hors de ce volet, non livré ici** : le relais `SendMessage(main)` -> `PushNotification` des
+  jalons GSD fin de phase/milestone vers l'app Claude — second volet de D-33-H, plan frère `33-07`.
+  Le triplet racine (`VERSION`, `plugin.json`, `marketplace.json`) reste sciemment intact — laissé
+  au manager qui shippera l'annexe complète des deux volets.
+
 ## [v1.27.0] — 2026-08-17 (Watchdog & notifications des missions — Phase 33, WTCH-01..04)
 
 **Minor** (deux nouvelles capacités publiques, consommant sans y toucher le battement posé par la

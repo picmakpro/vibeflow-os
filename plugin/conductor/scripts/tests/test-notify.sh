@@ -55,6 +55,13 @@ bash -n "$NOTIFY" || { echo "FATAL: notify.sh syntaxiquement invalide" >&2; exit
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "$WORK_DIR"' EXIT
 
+# Sentinel d'opt-in ARMÉ (D-33-H) : notify.sh sort désormais 0 avant tout `command -v` de canal
+# si ce fichier est absent. Réutilisé par TOUS les sites d'invocation N1-N16 pour que la cascade
+# de détection existante reste exercée (sinon ces cas redeviendraient vacueux dès que le gate
+# existe). N17/N18 (plus bas) testent l'état ABSENT/ARMÉ eux-mêmes.
+OPTIN_ARMED="$WORK_DIR/notify-optin.armed"
+touch "$OPTIN_ARMED"
+
 # ---------- Jeu de binaires curés (jamais /usr/bin:/bin réel dans les PATH de test) ----------
 # bash/python3 y figurent aussi : ce sont des utilitaires d'exécution du harnais de test, jamais
 # des candidats de canal de notification (osascript/notify-send/powershell.exe/terminal-notifier
@@ -120,7 +127,7 @@ echo "=== N1 — darwin, terminal-notifier absent : osascript invoqué, argv exa
 N1_DIR="$WORK_DIR/n1"; mkdir -p "$N1_DIR"
 write_shim "$N1_DIR" osascript
 N1_RC=0
-env PATH="$N1_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin bash "$NOTIFY" "Titre N1" "Corps N1" >/dev/null 2>&1 || N1_RC=$?
+env PATH="$N1_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" bash "$NOTIFY" "Titre N1" "Corps N1" >/dev/null 2>&1 || N1_RC=$?
 wait_for_file "$N1_DIR/osascript.count" 10
 assert_exit "N1 — notify.sh sort 0" "$N1_RC" 0
 N1_ARGV="$(cat "$N1_DIR/osascript.argv" 2>/dev/null || true)"
@@ -135,7 +142,7 @@ echo "=== N2 — darwin, terminal-notifier présent : lui seul invoqué ==="
 N2_DIR="$WORK_DIR/n2"; mkdir -p "$N2_DIR"
 write_shim "$N2_DIR" osascript
 write_shim "$N2_DIR" terminal-notifier
-env PATH="$N2_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin bash "$NOTIFY" "Titre N2" "Corps N2" >/dev/null 2>&1
+env PATH="$N2_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" bash "$NOTIFY" "Titre N2" "Corps N2" >/dev/null 2>&1
 wait_for_file "$N2_DIR/terminal-notifier.count" 10
 N2_TN="$(call_count "$N2_DIR" terminal-notifier)"
 N2_OS="$(call_count "$N2_DIR" osascript)"
@@ -149,7 +156,7 @@ echo ""
 echo "=== N3 — linux : notify-send invoqué, -a VibeFlow + les deux valeurs ==="
 N3_DIR="$WORK_DIR/n3"; mkdir -p "$N3_DIR"
 write_shim "$N3_DIR" notify-send
-env PATH="$N3_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=linux bash "$NOTIFY" "Titre N3" "Corps N3" >/dev/null 2>&1
+env PATH="$N3_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=linux VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" bash "$NOTIFY" "Titre N3" "Corps N3" >/dev/null 2>&1
 wait_for_file "$N3_DIR/notify-send.count" 10
 N3_ARGV="$(cat "$N3_DIR/notify-send.argv" 2>/dev/null || true)"
 assert "N3 — argv contient -a" "$N3_ARGV" "-a"
@@ -161,7 +168,7 @@ echo ""
 echo "=== N4 — windows : powershell.exe (jamais pwsh) par stdin, AUMID + ToastNotificationManager ==="
 N4_DIR="$WORK_DIR/n4"; mkdir -p "$N4_DIR"
 write_shim "$N4_DIR" powershell.exe
-env PATH="$N4_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=windows bash "$NOTIFY" "Titre N4" "Corps N4" >/dev/null 2>&1
+env PATH="$N4_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=windows VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" bash "$NOTIFY" "Titre N4" "Corps N4" >/dev/null 2>&1
 wait_for_file "$N4_DIR/powershell.exe.count" 10
 N4_ARGV="$(cat "$N4_DIR/powershell.exe.argv" 2>/dev/null || true)"
 N4_STDIN="$(cat "$N4_DIR/powershell.exe.stdin" 2>/dev/null || true)"
@@ -186,7 +193,7 @@ SH
 chmod +x "$N5_DIR/uname"
 N5_PROC="$WORK_DIR/n5-proc-version"
 printf 'Linux version 5.15.0-microsoft-standard-WSL2\n' > "$N5_PROC"
-env PATH="$N5_DIR:$UTIL_DIR" VF_PROC_VERSION_PATH="$N5_PROC" bash "$NOTIFY" "Titre N5" "Corps N5" >/dev/null 2>&1
+env PATH="$N5_DIR:$UTIL_DIR" VF_PROC_VERSION_PATH="$N5_PROC" VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" bash "$NOTIFY" "Titre N5" "Corps N5" >/dev/null 2>&1
 wait_for_file "$N5_DIR/powershell.exe.count" 10
 N5_PS="$(call_count "$N5_DIR" powershell.exe)"
 N5_NS="$(call_count "$N5_DIR" notify-send)"
@@ -197,7 +204,7 @@ echo ""
 echo "=== N6 — aucun canal disponible : exit 0, zéro invocation, stdout/stderr vides ==="
 N6_OUT_FILE="$WORK_DIR/n6.out"; N6_ERR_FILE="$WORK_DIR/n6.err"
 N6_RC=0
-env PATH="$UTIL_DIR" bash "$NOTIFY" "Titre N6" "Corps N6" >"$N6_OUT_FILE" 2>"$N6_ERR_FILE" || N6_RC=$?
+env PATH="$UTIL_DIR" VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" bash "$NOTIFY" "Titre N6" "Corps N6" >"$N6_OUT_FILE" 2>"$N6_ERR_FILE" || N6_RC=$?
 assert_exit "N6 — exit 0 même sans aucun canal" "$N6_RC" 0
 assert_empty "N6 — stdout vide" "$(cat "$N6_OUT_FILE")"
 assert_empty "N6 — stderr vide" "$(cat "$N6_ERR_FILE")"
@@ -208,7 +215,7 @@ HOSTILE_TITLE='titre " backtick ` $(cmd) <a&b>'
 HOSTILE_BODY='corps " backtick ` $(cmd) <a&b>'
 N7D_DIR="$WORK_DIR/n7d"; mkdir -p "$N7D_DIR"
 write_shim "$N7D_DIR" osascript
-env PATH="$N7D_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin bash "$NOTIFY" "$HOSTILE_TITLE" "$HOSTILE_BODY" >/dev/null 2>&1
+env PATH="$N7D_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" bash "$NOTIFY" "$HOSTILE_TITLE" "$HOSTILE_BODY" >/dev/null 2>&1
 wait_for_file "$N7D_DIR/osascript.count" 10
 N7D_LAST2="$(tail -n2 "$N7D_DIR/osascript.argv" 2>/dev/null)"
 N7D_EXPECTED="$(printf '%s\n%s' "$HOSTILE_TITLE" "$HOSTILE_BODY")"
@@ -216,14 +223,14 @@ assert_eq "N7 — darwin : les deux derniers tokens argv = TITLE/BODY hostiles b
 
 N7L_DIR="$WORK_DIR/n7l"; mkdir -p "$N7L_DIR"
 write_shim "$N7L_DIR" notify-send
-env PATH="$N7L_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=linux bash "$NOTIFY" "$HOSTILE_TITLE" "$HOSTILE_BODY" >/dev/null 2>&1
+env PATH="$N7L_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=linux VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" bash "$NOTIFY" "$HOSTILE_TITLE" "$HOSTILE_BODY" >/dev/null 2>&1
 wait_for_file "$N7L_DIR/notify-send.count" 10
 N7L_LAST2="$(tail -n2 "$N7L_DIR/notify-send.argv" 2>/dev/null)"
 assert_eq "N7 — linux : les deux derniers tokens argv = TITLE/BODY hostiles bit à bit" "$N7L_LAST2" "$N7D_EXPECTED"
 
 N7W_DIR="$WORK_DIR/n7w"; mkdir -p "$N7W_DIR"
 write_shim "$N7W_DIR" powershell.exe
-env PATH="$N7W_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=windows bash "$NOTIFY" "$HOSTILE_TITLE" "$HOSTILE_BODY" >/dev/null 2>&1
+env PATH="$N7W_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=windows VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" bash "$NOTIFY" "$HOSTILE_TITLE" "$HOSTILE_BODY" >/dev/null 2>&1
 wait_for_file "$N7W_DIR/powershell.exe.count" 10
 N7W_ENV="$(cat "$N7W_DIR/powershell.exe.env" 2>/dev/null || true)"
 assert "N7 — windows : env VF_NOTIFY_TITLE hostile identique bit à bit" "$N7W_ENV" "VF_NOTIFY_TITLE=$HOSTILE_TITLE"
@@ -234,7 +241,7 @@ echo "=== N8 — détachement (mesure côté process bash) : retour avant écrit
 N8_DIR="$WORK_DIR/n8"; mkdir -p "$N8_DIR"
 write_shim "$N8_DIR" osascript 2
 N8_RC=0
-env PATH="$N8_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin bash "$NOTIFY" "Titre N8" "Corps N8" >/dev/null 2>&1 || N8_RC=$?
+env PATH="$N8_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" bash "$NOTIFY" "Titre N8" "Corps N8" >/dev/null 2>&1 || N8_RC=$?
 assert_exit "N8 — notify.sh rend la main (process bash), exit 0" "$N8_RC" 0
 if [ -f "$N8_DIR/osascript.done" ]; then
   echo "  ❌ FAIL — N8 le fichier .done existe déjà juste après le retour de notify.sh (pas détaché)"; FAIL=$((FAIL+1))
@@ -247,17 +254,27 @@ assert "N8 — le shim a fini par tourner en arrière-plan (.done finit par appa
 
 echo ""
 echo "=== N9 — arguments manquants : exit 0, zéro invocation ==="
+# ATTENTE SUR L'ABSENCE (même patron que N17, cf. sa note) : dans l'implémentation correcte,
+# notify.sh sort AVANT même le gate d'opt-in (aucun fork n'est jamais tenté), donc rien n'apparaît
+# ici quel que soit le budget d'attente. Mais une mutation qui retire/affaiblit la validation
+# d'arguments laisse le flux continuer jusqu'au gate (armé, VF_NOTIFY_OPTIN_FILE=OPTIN_ARMED) puis
+# jusqu'au channel forcé darwin, qui FORK réellement en arrière-plan (( osascript … & )) — sans
+# wait_for_file, un `call_count` lu immédiatement après le retour de `env … bash "$NOTIFY"` peut
+# lire .count avant que ce fork n'ait eu le temps d'écrire dessus, laissant N9 vert même sous cette
+# mutation (mesuré : 0/30 détection sans l'attente). Budget 2s, identique à N17.
 N9A_DIR="$WORK_DIR/n9a"; mkdir -p "$N9A_DIR"
 write_shim "$N9A_DIR" osascript
 N9A_RC=0
-env PATH="$N9A_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin bash "$NOTIFY" >/dev/null 2>&1 || N9A_RC=$?
+env PATH="$N9A_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" bash "$NOTIFY" >/dev/null 2>&1 || N9A_RC=$?
+wait_for_file "$N9A_DIR/osascript.count" 2
 assert_exit "N9 — sans aucun argument : exit 0" "$N9A_RC" 0
 assert_eq "N9 — sans aucun argument : zéro invocation osascript" "$(call_count "$N9A_DIR" osascript)" "0"
 
 N9B_DIR="$WORK_DIR/n9b"; mkdir -p "$N9B_DIR"
 write_shim "$N9B_DIR" osascript
 N9B_RC=0
-env PATH="$N9B_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin bash "$NOTIFY" "Titre seul" >/dev/null 2>&1 || N9B_RC=$?
+env PATH="$N9B_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" bash "$NOTIFY" "Titre seul" >/dev/null 2>&1 || N9B_RC=$?
+wait_for_file "$N9B_DIR/osascript.count" 2
 assert_exit "N9 — TITLE seul (BODY absent) : exit 0" "$N9B_RC" 0
 assert_eq "N9 — TITLE seul : zéro invocation osascript" "$(call_count "$N9B_DIR" osascript)" "0"
 
@@ -272,11 +289,11 @@ N11_ISO="$WORK_DIR/n11-isolated"
 mkdir -p "$N11_ISO"
 cp "$NOTIFY" "$N11_ISO/notify.sh"
 N11_RC=0
-env PATH="$UTIL_DIR" bash "$N11_ISO/notify.sh" "Titre N11" "Corps N11" >/dev/null 2>&1 || N11_RC=$?
+env PATH="$UTIL_DIR" VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" bash "$N11_ISO/notify.sh" "Titre N11" "Corps N11" >/dev/null 2>&1 || N11_RC=$?
 assert_exit "N11 — aucun candidat vf-portable.sh trouvable : exit 0 quand même (jamais 1)" "$N11_RC" 0
 N11W_DIR="$WORK_DIR/n11w"; mkdir -p "$N11W_DIR"
 write_shim "$N11W_DIR" powershell.exe
-env PATH="$N11W_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=windows bash "$N11_ISO/notify.sh" "Titre N11f" "Corps N11f" >/dev/null 2>&1
+env PATH="$N11W_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=windows VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" bash "$N11_ISO/notify.sh" "Titre N11f" "Corps N11f" >/dev/null 2>&1
 wait_for_file "$N11W_DIR/powershell.exe.count" 10
 assert "N11 — canal forcé reste atteignable malgré la lib absente (powershell.exe invoqué)" "$([ "$(call_count "$N11W_DIR" powershell.exe)" != "0" ] && echo yes || echo no)" "yes"
 
@@ -287,8 +304,13 @@ write_shim "$N12_DIR" osascript
 chmod -x "$N12_DIR/osascript"
 N12_OUT="$WORK_DIR/n12.out"; N12_ERR="$WORK_DIR/n12.err"
 N12_RC=0
-env PATH="$N12_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin bash "$NOTIFY" "Titre N12" "Corps N12" >"$N12_OUT" 2>"$N12_ERR" || N12_RC=$?
-sleep 0.3
+env PATH="$N12_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" bash "$NOTIFY" "Titre N12" "Corps N12" >"$N12_OUT" 2>"$N12_ERR" || N12_RC=$?
+# ATTENTE SUR L'ABSENCE (même patron que N17/N9) : un `sleep 0.3` fixe manque le fork dans le pire
+# cas mesuré (cf. note N17 ci-dessus, ~0.32-0.42s) — sous une mutation qui retire le `command -v`
+# et invoque le candidat sans le tester, le shim (chmod -x) échoue à l'exec mais le comportement
+# exact dépend du shell forké ; wait_for_file ferme la fenêtre plutôt que de la garder ouverte au
+# jugé (mesuré : 25/30 détection avec sleep 0.3 fixe). Budget 2s, identique à N9/N17.
+wait_for_file "$N12_DIR/osascript.count" 2
 assert_exit "N12 — shim non exécutable : exit 0 quand même" "$N12_RC" 0
 assert_empty "N12 — stdout vide" "$(cat "$N12_OUT")"
 assert_empty "N12 — stderr vide (pas de 'permission denied' qui fuit)" "$(cat "$N12_ERR")"
@@ -311,7 +333,7 @@ echo "=== N15 (DISCRIMINANCE CLÉ, NE JAMAIS RETIRER) — appelant capturant rep
 if command -v python3 >/dev/null 2>&1; then
   N15_DIR="$WORK_DIR/n15"; mkdir -p "$N15_DIR"
   write_shim "$N15_DIR" osascript 3
-  N15_ELAPSED=$(PATH="$N15_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin python3 -c "
+  N15_ELAPSED=$(PATH="$N15_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" python3 -c "
 import subprocess, time, os, sys
 env = dict(os.environ)
 t0 = time.time()
@@ -355,13 +377,66 @@ if [ -n "$N16_REL" ]; then
   N16_DIR="$WORK_DIR/n16"; mkdir -p "$N16_DIR"
   write_shim "$N16_DIR" powershell.exe
   N16_RC=0
-  ( cd "$N16_CWD" && env PATH="$N16_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=windows bash "$N16_REL" "Titre N16" "Corps N16" >/dev/null 2>&1 ) || N16_RC=$?
+  ( cd "$N16_CWD" && env PATH="$N16_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=windows VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" bash "$N16_REL" "Titre N16" "Corps N16" >/dev/null 2>&1 ) || N16_RC=$?
   wait_for_file "$N16_DIR/powershell.exe.count" 10
   assert_exit "N16 — invocation par chemin relatif depuis un cwd différent : exit 0" "$N16_RC" 0
   assert "N16 — canal forcé atteignable via chemin relatif (powershell.exe invoqué)" "$([ "$(call_count "$N16_DIR" powershell.exe)" != "0" ] && echo yes || echo no)" "yes"
 else
   skip "N16 — python3 indisponible, chemin relatif non calculable"
 fi
+
+echo ""
+echo "=== N17 — DÉFAUT OFF (D-33-H) : sentinel ABSENT + canal forcé + shim présent => exit 0, ZÉRO invocation ==="
+N17_DIR="$WORK_DIR/n17"; mkdir -p "$N17_DIR"
+write_shim "$N17_DIR" osascript
+N17_ABSENT="$WORK_DIR/notify-optin.never-touched"
+N17_OUT="$WORK_DIR/n17.out"; N17_ERR="$WORK_DIR/n17.err"
+N17_RC=0
+env PATH="$N17_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin VF_NOTIFY_OPTIN_FILE="$N17_ABSENT" bash "$NOTIFY" "Titre N17" "Corps N17" >"$N17_OUT" 2>"$N17_ERR" || N17_RC=$?
+# ATTENTE SUR L'ABSENCE, PAS SUR LA PRÉSENCE : le canal réel est détaché en arrière-plan
+# (( … & ) &, cf. note wait_for_file ci-dessus) — un `sleep 0.3` fixe lisait le compteur AVANT
+# que le fork n'ait eu le temps d'écrire .count si le gate laissait passer l'appel (mesuré : le
+# fork met ~0.32-0.42s à écrire .count sur cette machine, 15 runs consécutifs, cf. correction
+# ciblée mission-notif — un sleep de 0.3s manque le fork dans le pire cas mesuré). Sous mutation
+# du gate par inversion (`[ ! -f ... ] || exit 0`), notify.sh laisse filer l'appel : la fenêtre
+# doit être assez large pour que .count apparaisse si le canal a réellement été invoqué, sans
+# quoi N17 reste vert à vide. On réutilise wait_for_file (attend l'apparition, jamais un sleep
+# fixe) avec un budget de 2s — ~5x la borne haute mesurée du fork, marge suffisante sans aligner
+# sur le budget 10s des cas qui, eux, attendent une invocation réelle (celui-ci attend une
+# non-invocation : le budget est payé en entier à chaque run sain, donc gardé modeste).
+wait_for_file "$N17_DIR/osascript.count" 2
+assert_exit "N17 — sentinel absent : exit 0" "$N17_RC" 0
+assert_empty "N17 — stdout vide" "$(cat "$N17_OUT")"
+assert_empty "N17 — stderr vide" "$(cat "$N17_ERR")"
+assert_eq "N17 — ZÉRO invocation journalisée (gate coupe avant tout command -v)" "$(call_count "$N17_DIR" osascript)" "0"
+
+echo ""
+echo "=== N18 — miroir de N17, sentinel ARMÉ : le même canal invoque bien le shim (contraste direct) ==="
+N18_DIR="$WORK_DIR/n18"; mkdir -p "$N18_DIR"
+write_shim "$N18_DIR" osascript
+env PATH="$N18_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" bash "$NOTIFY" "Titre N18" "Corps N18" >/dev/null 2>&1
+wait_for_file "$N18_DIR/osascript.count" 10
+assert "N18 — sentinel armé : shim invoqué (compteur > 0)" "$([ "$(call_count "$N18_DIR" osascript)" != "0" ] && echo yes || echo no)" "yes"
+
+echo ""
+echo "=== N19 — HOME/XDG_CONFIG_HOME/VF_NOTIFY_OPTIN_FILE tous absents : exit 0, stderr vide, zéro invocation ==="
+# Correction ciblée mission-notif (B1) : $HOME déréférencé sans garde dans
+# ${XDG_CONFIG_HOME:-$HOME/.config} sous `set -uo pipefail` faisait mourir le script si HOME,
+# XDG_CONFIG_HOME et VF_NOTIFY_OPTIN_FILE étaient tous absents — falsifiant le fail-open
+# inconditionnel promis en tête de fichier. `env -u` retire réellement la variable de
+# l'environnement (contrairement à `VAR= bash …`, qui la redéfinirait vide plutôt que de
+# l'absenter) — seule forme qui reproduit fidèlement "unbound variable" sous `set -u`.
+N19_DIR="$WORK_DIR/n19"; mkdir -p "$N19_DIR"
+write_shim "$N19_DIR" osascript
+N19_OUT="$WORK_DIR/n19.out"; N19_ERR="$WORK_DIR/n19.err"
+N19_RC=0
+env -u HOME -u XDG_CONFIG_HOME -u VF_NOTIFY_OPTIN_FILE PATH="$N19_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin \
+  bash "$NOTIFY" "Titre N19" "Corps N19" >"$N19_OUT" 2>"$N19_ERR" || N19_RC=$?
+wait_for_file "$N19_DIR/osascript.count" 2
+assert_exit "N19 — HOME/XDG_CONFIG_HOME/VF_NOTIFY_OPTIN_FILE absents : exit 0" "$N19_RC" 0
+assert_empty "N19 — stdout vide" "$(cat "$N19_OUT")"
+assert_empty "N19 — stderr vide (pas de 'unbound variable' qui fuit)" "$(cat "$N19_ERR")"
+assert_eq "N19 — zéro invocation journalisée (gate sur chemin dérivé sans HOME coupe avant tout command -v)" "$(call_count "$N19_DIR" osascript)" "0"
 
 echo ""
 echo "=================================="

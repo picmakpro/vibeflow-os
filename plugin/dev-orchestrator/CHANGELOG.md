@@ -1,5 +1,26 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.18.0] — 2026-08-17 (annexe notifications — D-33-H Q6, Pattern H)
+
+**Minor** (nouvelle capacité publique : doctrine des jalons GSD vers l'app Claude).
+
+- `references/mission-flow.md` : nouveau `Pattern H — Jalons GSD vers l'app Claude : relais
+  SendMessage(main) (D-33-H)`. Documente le seul vecteur possible pour un manager de mission (fin
+  de phase ET fin de milestone) : `PushNotification` n'existe pas en sous-agent (erreur littérale
+  mesurée), le manager relaie via `SendMessage(main)` et c'est la session principale qui pousse.
+  Contrat de la ligne préparée (`message` unique, < 200 caractères, sans markdown, pas de `title`,
+  `disabledReason` ∈ `config_off`/`user_present`/`no_transport`, aucun accusé de réception),
+  exclusion motivée de `gsd-ship`/`gsd-complete-milestone` comme porteurs, limite dégradée
+  acceptable sans session principale pilote, distinction explicite avec le canal
+  `notify.sh`/WTCH-03 (toggle `/vf-notify`, périmètre disjoint, module `conductor`).
+- `agents/vf-dev-manager.md` : renvoi d'une clause vers `mission-flow.md` §Pattern H, ajouté à la
+  dernière ligne physique existante de la bullet `Fin de milestone` — aucune ligne neuve, plafond
+  ADR-029 (250 lignes) inchangé.
+
+Ce volet est **strictement disjoint** du toggle `/vf-notify` (canal `notify.sh`/WTCH-03, périmètre
+33-06, module `conductor`) : zéro code de production ici, doctrine markdown + triplet de version
+par module uniquement.
+
 ## [v2.17.3] — 2026-08-17 (Phase 32, doctrine du verrou resynchronisée)
 
 **Patch** (doctrine d'agent corrigée pour rester exacte, aucune nouvelle capacité).

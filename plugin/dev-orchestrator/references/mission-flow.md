@@ -450,6 +450,55 @@ d'échec ne mentionnait pas.
 **Ne pas s'arrêter pour signaler la coupure** tant que l'arbre reste cohérent : la coupure est un fait
 d'infrastructure, pas une décision à remonter. Elle entre au rapport de mission, pas dans un checkpoint.
 
+---
+
+## Pattern H — Jalons GSD vers l'app Claude : relais SendMessage(main) (D-33-H)
+
+**Le fait mesuré, pas une supposition.** `PushNotification` n'existe pas côté sous-agent — erreur
+littérale obtenue à l'appel réel : « No such tool available: PushNotification. PushNotification is
+disabled for this session, in subagents as well as here. » Tous les managers et workers du
+team-kernel sont des sous-agents : **aucun ne peut jamais pousser directement**, quel que soit son
+mandat ou son mode. Ce n'est **pas** un problème de réglage — la configuration utilisateur est déjà
+activée ; c'est une limite structurelle du runtime.
+
+**Le vecteur unique : le relais.** Au jalon, le manager fait `SendMessage(to: "main")` avec une
+ligne déjà prête à pousser. C'est **la session principale**, jamais un sous-agent, qui appelle
+`PushNotification`. Le manager ne pousse jamais lui-même — il propose une chaîne de caractères, la
+session principale décide et exécute.
+
+**Le contrat de la ligne préparée.** Un seul champ `message`, strictement inférieur à
+200 caractères, **sans markdown**, **pas de `title`** séparé — titre et corps aplatis en une seule
+phrase courte (gabarit : `"Phase <N> terminée — <verdict court>."` ou `"Milestone <nom> clos — next
+step : <étape>."`). L'outil **ne lève jamais d'erreur** : il rend toujours un succès porteur d'un
+`disabledReason` parmi trois valeurs exactes — `config_off`, `user_present`, `no_transport`.
+« requested » n'est jamais « delivered » : **aucun accusé de réception n'existe**. Le manager et la
+session principale qui relaie ne doivent **jamais** attendre de confirmation de livraison.
+
+**Les deux jalons, portés par la doctrine du manager, jamais par un hook amont.** Fin de **phase** :
+au moment où le manager marque une étape finie (§Contrôle de flux, `vf-dev-manager.md`). Fin de
+**milestone** : au moment où la séquence de clôture — audit, `gsd-complete-milestone`, nettoyage —
+est complète (même bullet). Les deux jalons déclenchent le même relais, sans dupliquer ici la
+discipline de marquage déjà écrite ailleurs.
+
+**Pourquoi ni `gsd-ship` ni `gsd-complete-milestone` ne portent ce geste.** `ship:post` dispatche
+lui-même un sous-agent — même limite structurelle que le fait mesuré ci-dessus, il ne peut pas
+pousser davantage que n'importe quel autre sous-agent. `gsd-complete-milestone` n'offre **aucun**
+point d'extension : 0 `render-hooks` sur 815 lignes, aucun `milestone:*` parmi les 12 points de hook
+de `@opengsd/gsd-core`. Conséquence non négociable : **aucun wrapper des skills amont, aucune
+dépendance à un hook inexistant côté `@opengsd/gsd-core`** — la doctrine vit entièrement côté
+managers VibeFlow (`conductor`/`dev-orchestrator`), jamais dans le paquet amont.
+
+**Limite dégradée acceptable, pas une panne.** Le relais exige une session principale pilote. Une
+mission lancée sans elle (cloud agent détaché, run headless) ne poussera jamais — fail-open
+silencieux, symétrique au traitement déjà réservé à `disabledReason` : ni le manager ni la session
+principale ne remontent cela comme un échec à corriger.
+
+**Distinction avec le canal `notify.sh`/WTCH-03.** Ce relais des jalons GSD (fin de phase, fin de milestone)
+n'est **pas** gouverné par le toggle d'opt-in `/vf-notify`, qui gate uniquement le toast
+OS de fin de nœud DAG (`done`/`failed`) émis par `notify.sh`. Le harness fait déjà sa propre gestion
+via `config_off`/`user_present` : VibeFlow n'ajoute aucun toggle superposé sur ce vecteur-ci — les
+deux canaux restent disjoints en code, en doctrine et en gate.
+
 ## Lignes rouges (rappel ADR-053)
 
 Pas de bus UDS / channels / `dm` temps réel (modèle `Task` = dispatch-and-join). Pas de RAII machine : le
