@@ -4,7 +4,7 @@ milestone: fiabilite-v1.0
 milestone_name: « ce qui survit »
 current_phase: 18
 current_phase_name: Survie du ledger d'exigences à la clôture de jalon
-status: not_started
+status: context_gathered
 stopped_at: Phase 33 CLOSE ET RELEASÉE — `v2.56.0`. Tronc (WTCH-01..04, 5 plans sur 3 vagues) vérifié goal-backward le 2026-08-17 (`33-VERIFICATION.md`) — 4/4 critères ATTEINTS (WTCH-03 en limite assumée : preuve Windows réelle non exécutée) ; gap WTCH-02 fermé par D-33-G (`88975dc`, cas T49). Annexe D-33-H (notifications OS en opt-in, défaut OFF) livrée par les plans 33-06 (gate d'opt-in + toggle `/vf-notify`) et 33-07 (Pattern H, relais des jalons GSD) ; `33-VERIFICATION-ANNEXE.md` 5/6 critères, critère 1 PARTIEL fermé par `401c903`. **Mergée et publiée** (vérifié machine le 2026-08-17) : PR #50 mergée dans `main` (`f639108`), commit de release `4431ed1`, tag annoté `v2.56.0` poussé, release GitHub publiée le 2026-08-17T18:40Z, `check-release-tag.sh --remote` ✓. Modules `conductor` v1.28.0 et `dev-orchestrator` v2.18.0. Reliquat porté hors phase : la recette Windows (`33-CLOTURE-WINDOWS.md`) n'a PAS été exécutée — laissée en suspens sur décision de Samuel (2026-08-17), retour attendu des testeurs (issue #20) ou recette jouée par Samuel après installation d'un poste Windows ; à ne jamais compter comme vert à la clôture du milestone
 last_updated: "2026-08-17T00:00:00.000Z"
 last_activity: 2026-08-17
@@ -56,11 +56,42 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 ## Current Position
 
-Phase: **18** (Survie du ledger d'exigences à la clôture de jalon) — non démarrée, choisie par
-Samuel le 2026-08-17 comme suite du milestone. Aucun plan, aucun CONTEXT — prochain geste :
-`/gsd-discuss-phase 18`.
+Phase: **18** (Survie du ledger d'exigences à la clôture de jalon) — **cadrée le 2026-08-17**
+(`18-CONTEXT.md`, `18-DISCUSSION-LOG.md`, commit `bf2d3a0`). Aucun plan — prochain geste :
+`/gsd-plan-phase 18`.
 Plan: —
-Status: not_started
+Status: context_gathered
+
+**Ce que le cadrage a tranché** (détail en `18-CONTEXT.md`) :
+
+- **Roll-forward, pas keep-file.** Le `STUDY.md` §7.2 décrivait la variante comme « le fichier
+  reste » ; le prototype amont attaché à la RFC #3556 mesure cette forme à **4 conflits sur 5** et
+  ne sort que le roll-forward (`carried-from: v[X.Y]`) à **0/5**. Le STUDY a reçu un encadré
+  d'amendement daté — sans lui, un agent qui le lit en premier repart sur la variante à 4 conflits.
+- **Les livrées restent visibles** dans une section `## Garanties` (H2 propre, hors table de
+  traçabilité) — c'est ce qui capte la motivation d'origine du §7.1. Réserve levée sur pièce :
+  `milestone.cjs:70` scope l'écriture au heading `## Traceability`, `audit-milestone.md:68,153`
+  scope la détection d'orphelins à la même table. Le *readiness count* reste à localiser (recherche
+  de phase).
+- **Rattrapage post-clôture**, pas gate seul. VibeFlow pose un geste qui s'exécute **après** le
+  `git rm` de gsd-core et reconstitue depuis l'archive, ancré sur un hook `SessionStart` en forme
+  exec, sous validation humaine. Il **suit** le moteur au lieu de s'y opposer (Iron Law 2) — donc
+  il ne dépend pas de la RFC pour fonctionner. **Effet de bord majeur : le risque porteur du §7.2
+  et le ré-arbitrage D3 sont désamorcés** ; un refus amont rend le rattrapage permanent.
+- **Gate en ratchet**, et **ce repo est armé** (gate vert ici immédiatement, répond à la condition
+  C1 du STUDY). Périmètre : détection d'absence seule ; une trace malformée est BRUYANTE, jamais
+  FAIL.
+
+**Vérifications conduites avant le cadrage** — deux conditions d'invalidation du STUDY §8, jouées
+par commande parce que l'une pouvait supprimer la phase :
+- **D1 non satisfaite** — `complete-milestone.md:433,501` supprime toujours sans condition en
+  gsd-core **1.10.0**. La phase garde sa raison d'être.
+- **D3 non satisfaite** — RFC `open-gsd/gsd-core#3556` **OPEN**, réponse amont du 2026-08-15 avec
+  prototype chiffré. Deadline de ré-arbitrage **2026-10-26**, 70 jours de marge.
+
+**Correction au chiffrage du STUDY §7.3** : l'analogue `check-doc-drift.sh` fait aujourd'hui
+**167 l.** (et non 153) et son test **278 l.** (et non 232) — ratio **1,66×**, pas 1,5×. Un gate de
+100-150 l. demande donc ~170-250 l. de tests.
 Last activity: 2026-08-17 — clôture réelle de la Phase 33 (release `v2.56.0`) puis hygiène d'état.
 
 **Phase 33 CLOSE ET PUBLIÉE** — vérifié machine le 2026-08-17 :
