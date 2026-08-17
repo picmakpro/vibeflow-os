@@ -1,5 +1,30 @@
 # Backlog — idées différées (hors milestone courant)
 
+## Gate machine sur l'observance de `mission-flow.md` (Phase 33, S1 option (c)) — DIFFÉRÉ
+
+**Capturé :** 2026-08-17, pendant la correction de coordination de la Phase 33 (mandat vf-coder,
+2ᵉ plancheck externe). Décision Samuel : l'option (b) — financer une preuve de protocole réel
+(`driver-lock.sh heartbeat` réel, D25 en 33-03) — a été retenue et livrée pour fermer S1. L'option
+(c) ci-dessous a été explicitement écartée pour la Phase 33, mais versée en reliquat plutôt que
+laissée tomber.
+
+**Ce qu'elle proposait :** armer une contrainte MACHINE sur la doctrine de `mission-flow.md`, à
+l'image de `check-agents.sh` (module `conductor`) — un gate qui vérifierait que le protocole de
+heartbeat amendé (D-33-E, cadence indépendante des transitions de nœud) est réellement OBSERVÉ par
+les managers en usage réel, pas seulement écrit dans la doctrine.
+
+**Motivation exacte pour la différer (pas juste « pas le temps ») :** un critère `grep -c 'D-33-E'
+mission-flow.md >= 1` prouve qu'un paragraphe existe dans la doctrine, JAMAIS qu'il est observé —
+l'émetteur du heartbeat est un agent LLM obéissant à un paragraphe de prose, pas un mécanisme
+machine-vérifiable au sens où `check-agents.sh` vérifie une structure de fichier. Construire un
+vrai gate d'observance demanderait d'instrumenter le comportement réel des managers en session (pas
+seulement leur doctrine écrite) — un chantier distinct de la correction de coordination en cours,
+qui mérite son propre cadrage plutôt qu'un geste improvisé en fin de mandat.
+
+**Déclencheur de resurgence :** une régression constatée où le protocole D-33-E amendé n'est PAS
+suivi en pratique (heartbeat toujours émis au même tour que `mark`, malgré la doctrine), ou une
+décision explicite d'investir dans l'observabilité comportementale des managers.
+
 ## Alignement « AI Agents in Depth » (Bojie Li) — milestone candidat — INVESTIGUÉ
 **Capturé :** 2026-08-15 · **Investigué :** 2026-08-15 (5 agents : 4 lecteurs couvrant les 10
 chapitres + 1 inventaire VibeFlow) → **rapport : `reports/research/2026-08-15-ai-agent-book-alignement.md`**
@@ -82,6 +107,36 @@ distribution, granularité, portabilité macOS/Linux) avant tout code.
 
 **Déclencheur de resurgence :** prochaine évolution du team-kernel ou des protocoles managers,
 ou demande récurrente de suivi de mission longue distance.
+
+## Gate machine sur l'observance de `mission-flow.md` (doctrine amendée par la Phase 33)
+**Capturé :** 2026-08-17 · **Origine :** 2ᵉ plancheck externe de la Phase 33 (watchdog-notifications
+des missions), option (c) versée au backlog par décision de Samuel
+
+La Phase 33 amende `plugin/dev-orchestrator/references/mission-flow.md` (D-33-E, Pattern A) pour
+que le heartbeat des managers batte sur une cadence propre, distincte des transitions de nœud —
+condition sans laquelle le verdict STALL (critère de succès n°2) ne serait jamais atteignable en
+production. Le seul critère machine posé par le plan qui porte cet amendement (`33-02-PLAN.md`)
+est `grep -c 'D-33-E' mission-flow.md >= 1` : cela prouve que **le paragraphe a été écrit**, jamais
+qu'il est **observé** en pratique par les managers qui pilotent des missions réelles.
+
+**Motivation exacte (verdict du plancheck) :** *« un critère `grep -c` prouve qu'un paragraphe
+existe, jamais qu'il est observé. »* Une doctrine amendée sans mécanisme d'observance machine reste
+une consigne de prose — le même écart que celui documenté par `feedback_gate-jamais-de-repli.md` et
+`project_human-check-en-verify-ne-gate-rien.md` (mémoire `vf-coder`) : un texte qui décrit un
+comportement attendu n'est pas une garde qui le fait respecter.
+
+**Piste** : un gate machine à l'image de `check-agents.sh` (ADR-044) — par exemple, un script qui
+échantillonne les logs/transcripts des missions récentes (ou les artefacts DAG produits) et vérifie
+que la cadence de `heartbeat` observée diverge bien de celle des transitions `mark`, plutôt que de
+se contenter de vérifier la présence du paragraphe dans `mission-flow.md`.
+
+**Pourquoi différé :** hors du périmètre resserré de la correction ciblée du 2ᵉ plancheck externe
+(qui a traité S1 par la preuve de protocole réel, D25 dans `33-03-PLAN.md` — option (b), pas cette
+option (c)) ; construire un tel gate exige de définir d'abord ce qu'observer (logs de session ?
+artefacts DAG horodatés ?) et où l'armer (CI ? hook local ?), un cadrage à part entière.
+
+**Déclencheur de resurgence :** clôture de la Phase 33 (watchdog-notifications), ou tout futur
+amendement de doctrine des managers dont la seule preuve resterait un `grep` sur le texte.
 
 ## Convergence de contenu à l'update de module (manifeste par module)
 **Capturé :** 2026-07-26 · **Origine :** update réel de la machine 2.23.0 → 2.36.0
