@@ -227,11 +227,16 @@ de commit un trailer `Fence: <generation>` — dans le bloc de trailers, aux cô
 usage. Un commit peut porter plusieurs trailers.
 
 **Le tier de cette convention, écrit noir sur blanc.** Elle est exactement au même niveau que les
-deux trailers déjà en usage dans ce dépôt — `Co-Authored-By:` (371 des 300 derniers commits, casse
-haute et basse confondues) et `Claude-Session:` (297) — mesurés le 2026-08-17 : posée par
-convention d'agent, **jamais posée ni vérifiée par une machine**. Aucun outil de ce dépôt ne pose
-ni ne vérifie un trailer (`.git/hooks/` ne contient que des `.sample`, aucun
-`commit-msg`/`prepare-commit-msg`).
+deux trailers déjà en usage dans ce dépôt — sur les 300 derniers commits (`git log -300
+--pretty=%B`), on compte 397 OCCURRENCES de ligne `Co-Authored-By:` (casse haute et basse
+confondues) et 291 de `Claude-Session:` — mesuré le 2026-08-17, remesurable à tout moment par la
+même commande (le nombre DÉRIVE avec la fenêtre glissante des 300 derniers commits, ce n'est pas
+une constante figée). Ce sont des occurrences de LIGNE, pas des commits distincts : un
+squash-merge concatène les corps de plusieurs commits dans un seul message, donc UN SEUL commit
+peut porter PLUSIEURS occurrences du même trailer — 397 > 300 est donc numériquement normal, pas
+une anomalie. Posée par convention d'agent, **jamais posée ni vérifiée par une machine**. Aucun
+outil de ce dépôt ne pose ni ne vérifie un trailer (`.git/hooks/` ne contient que des `.sample`,
+aucun `commit-msg`/`prepare-commit-msg`).
 
 **Ce qui n'est PAS construit, et pourquoi.** Aucun hook git de message de commit : ce dépôt arme
 déjà un chemin de hooks git pour son garde-fou de push (`scripts/hooks/pre-push`, opt-in), et tout
