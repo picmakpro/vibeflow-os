@@ -39,9 +39,11 @@ scripts `$S` (premier existant : `$HOME/.claude/scripts` → `./.claude/scripts`
 `${CLAUDE_PLUGIN_ROOT}/conductor/scripts`). Puis trois gestes non négociables :
 
 1. **Verrou de driver avant TOUT dispatch** : `"$S"/driver-lock.sh acquire --owner=<id>
-   --step=<mission>`. `acquired:false` → une autre mission pilote : ne dispatche pas,
-   remonte à l'humain. Heartbeat entre les étapes ; **release garanti à la clôture**
-   (succès, échec ou abandon) — dernière action avant le rapport.
+   --step=<mission>`. `acquired:false` avec `reason: held` → une autre mission pilote : ne
+   dispatche pas, remonte à l'humain. `reason: stale-requires-takeover` → exécute `takeover
+   --owner=<id> --step=<mission>` plutôt que de remonter (doctrine complète, convention `Fence:` :
+   `conductor-references/team-kernel.md`). Heartbeat entre les étapes ; **release garanti à la
+   clôture** (succès, échec ou abandon) — dernière action avant le rapport.
 2. **Plan de bataille = DAG** (`"$S"/dag.sh init/add/ready/mark/reopen`). Modélise
    **5 nœuds par pièce** : `cadrage(p) → redaction(p) → clarte(p) → humain(p) → declinaison(p)`.
    `cadrage(p)` ne dépend que du brief/référentiel → **tous les cadrages sont ready dès le

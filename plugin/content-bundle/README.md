@@ -4,7 +4,7 @@
 > chiffre inventé et sans jamais publier tout seul** : ce module installe le studio éditorial
 > complet qui tient cette promesse.
 
-**Type** : `agents + skill + scripts` · **Version** : v2.0.6 · **Dépend de** : `conductor`,
+**Type** : `agents + skill + scripts` · **Version** : v2.0.7 · **Dépend de** : `conductor`,
 `planning-core`, `consolidator`, `audit-architecture`, `validator`.
 
 ---
