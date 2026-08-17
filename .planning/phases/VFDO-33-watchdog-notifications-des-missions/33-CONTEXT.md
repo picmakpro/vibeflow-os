@@ -160,6 +160,73 @@ sa suite de 60) — mais ce cadrage ne le prévoit pas comme nécessaire.
 (chemin machine-spécifique, D-32-C), mais son **entrée** dans `hooks.json` doit toujours naître
 de `merge-hooks`, jamais posée à la main.
 
+### D-33-H — Notifications opt-in par défaut + jalons via l'app Claude (amendement daté 2026-08-17, tranché par Samuel)
+
+**Amendement, pas réécriture.** La Phase 33 a livré WTCH-03 avec un défaut d'émission dès qu'un
+canal OS est détecté. Ce défaut devient **opt-in — OFF par défaut**. Fenêtre décisive : la release
+**v2.56.0 a été retirée de la distribution** (tag supprimé, `VERSION` revertée à v2.55.1, revert
+`07ff554`, le code Phase 33 restant mergé sur `main`) — **aucun lab n'a donc jamais reçu le
+comportement d'émission par défaut**. Le flip est une **correction pré-distribution**, sans aucune
+migration de parc à financer.
+
+**Q1 — Vecteur du push : le relais, parce que l'outil n'existe pas en sous-agent.** Au jalon, le
+manager émet un `SendMessage(main)` portant la ligne prête à pousser ; c'est **la session
+principale** qui appelle `PushNotification`. Mesure, pas supposition — erreur littérale obtenue à
+l'appel réel : « No such tool available: PushNotification. PushNotification is disabled for this
+session, in subagents as well as here. » Ce n'est **pas** un réglage (la config est déjà ON). Tous
+les managers et workers étant des sous-agents, **aucun ne peut pousser directement**.
+**Limite à documenter explicitement** : le relais exige une session principale pilote — une mission
+lancée sans session principale ne poussera pas.
+
+**Q2 — On s'appuie sur le harness, on ne le contourne pas.** `user_present` (aucune émission quand
+l'humain est actif au terminal) est un comportement **assumé et documenté du design**, pas un
+défaut : ne pousser que lorsque l'utilisateur est absent EST précisément l'intention d'un jalon de
+mission longue. VibeFlow n'ajoute donc que ce que le harness ne fait pas : **le défaut opt-in et le
+toggle**.
+
+**Q4 — Contrat du push.** Un seul champ `message`, **< 200 caractères, sans markdown**, pas de
+`title` — l'aplatissement `TITLE` + `BODY` en une seule ligne est un point de conception, pas un
+oubli. L'outil **ne lève jamais d'erreur** : il rend toujours un succès porteur d'un
+`disabledReason` (`config_off` / `user_present` / `no_transport`). « requested » n'est jamais
+« delivered » : **aucun accusé de réception n'existe**, donc aucun contrôle de flux ne doit
+l'attendre.
+
+**Q5 — Persistance : fichier-sentinelle, patron `stop-notify`** (`touch` / `rm -f`). Zéro JSON,
+zéro hook neuf, donc **exposition nulle** au bug d'idempotence cross-matcher de `merge-hooks.sh`
+(toujours ouvert, cf. contrainte transverse ci-dessous). **Contradiction du brief levée** : la
+préférence est **PAR MACHINE** (scope user) — ce que le fichier-sentinelle incarne exactement — et
+non « settings local » (per-lab), formule écartée. Motif supplémentaire, décisif : **aucun vecteur
+d'engine n'existe pour écrire une clé non-hook dans un settings**.
+
+**Q6 — Les DEUX jalons, portés par la doctrine du manager** (fin de phase ET fin de milestone).
+Raison : c'est le **seul vecteur symétrique** disponible. `gsd-ship` offre `ship:pre`/`ship:post`,
+mais `gsd-complete-milestone` n'offre **aucun** point d'extension (0 `render-hooks` sur 815 lignes,
+aucun `milestone:*` parmi les 12 points de hook de gsd-core) ; et `ship:post` dispatche lui-même un
+**sous-agent**, donc structurellement incapable d'émettre le push. Conséquence : **pas de wrapper
+des skills amont, pas de dépendance à un hook inexistant**.
+
+**Hiérarchie retenue** :
+- jalons GSD (fin de phase, fin de milestone) → **push app Claude** via le relais `SendMessage(main)` ;
+- fins de nœud de DAG (`done` / `failed`) → **toast OS** via `notify.sh`, comme aujourd'hui, mais
+  **seulement si l'opt-in est actif**.
+
+Aucun spam : la doctrine WTCH-03 sur la granularité (jamais à chaque tour, `running` jamais) reste
+inchangée.
+
+**Ligne rouge nommée — le signal de stall (D-33-F) n'est PAS une notification de confort.** Il
+reste actif **quel que soit le toggle** et ne doit **JAMAIS** être gaté. Fait vérifié qui le
+protège structurellement : il ne passe pas par `notify.sh` — `dag.sh:223-246` écrit sur stderr,
+`record_milestone()` (`:248-268`) est une fonction disjointe, et les deux sont appelées séparément
+(`:377` et `:380`). **Interdiction explicite** : ne jamais placer le gate d'opt-in dans `dag.sh` en
+amont de ce bloc.
+
+**Correction d'une prémisse du brief, à consigner** : `VF_NOTIFY_FORCE_CHANNEL=none` **n'est pas un
+kill-switch**. Aucune valeur `none` n'existe dans le code — le `case` (`notify.sh:155-160`) ne
+connaît que `windows|darwin|linux`, toute autre valeur tombant sur `*) : ;;`. `none`, `off` et
+`xyzzy` silencient donc **identiquement, par accident**, sans aucun test qui l'atteste. Le nouveau
+gate d'opt-in n'a par conséquent **rien avec quoi « composer »** : il est le **premier** mécanisme
+d'extinction délibéré du canal.
+
 ### Contrainte transverse — merge-hooks, jamais deux entrées pour le même script sur le même événement
 
 Bug d'idempotence cross-matcher NON CORRIGÉ (`CONCERNS.md`, sévérité HIGH, confirmé par

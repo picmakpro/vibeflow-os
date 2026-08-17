@@ -803,6 +803,7 @@ vf-portable.sh), 33-05 (jalons de notification + recette de clôture Windows) �
 - [x] 33-04-PLAN.md — `notify.sh` portable (macOS/Linux/Windows/WSL), détecteur WSL dans `vf-portable.sh`, T12 mis à jour — vague 1, indépendant (WTCH-03)
 - [x] 33-05-PLAN.md — `check_stall_signal()` (D-33-F) + `record_milestone()` câblés au point `mark`, recette de clôture Windows (D-33-C) — vague 3 (WTCH-02/03/04)
 - **Vérification goal-backward (`33-VERIFICATION.md`, 2026-08-17)** : `gaps_found`, 3/4 critères ATTEINTS (WTCH-01, WTCH-03 limite assumée, WTCH-04), WTCH-02 **PARTIEL** — le relais du verdict stall au geste `mark` (D-33-F) est structurellement inatteignable pour un STALL du lock courant (`record_progress()` avant `check_stall_signal()` dans le même bloc). Correctif en cours par un autre worker sur `dag.sh`/`test-dag.sh` au moment où cette ligne est écrite — état non préjugé ici.
+- **ANNEXE — Phase 33 ROUVERTE le 2026-08-17 pour son annexe notifications (D-33-H)** : l'émission de WTCH-03 passe en **opt-in (défaut OFF, toggle `/vf-notify`)** et les jalons GSD (fin de phase, fin de milestone) sont relayés vers l'**app Claude** via la session principale — `PushNotification` n'existant pas en sous-agent. Correction **pré-distribution** : la release **v2.56.0 a été retirée** (revert `07ff554`, `VERSION` revenue à v2.55.1), aucun lab n'a donc jamais reçu le défaut d'émission. **Plans `33-06`+ à venir** — non encore écrits à la date de cette ligne. Cadrage complet en `33-CONTEXT.md` § D-33-H.
 
 ### Phase 18: Survie du ledger d'exigences à la clôture de jalon
 
