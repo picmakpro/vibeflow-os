@@ -160,7 +160,7 @@
         "plugin/conductor/scripts/notify.sh",
         "plugin/_internal/lib/vf-portable.sh"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "exec-vague-2",
@@ -173,7 +173,7 @@
         "plugin/conductor/scripts/dag.sh",
         "plugin/conductor/scripts/check-guard-health.sh"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "exec-vague-3",
@@ -185,7 +185,7 @@
       "scope": [
         "plugin/conductor/scripts/dag.sh"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "revue",
@@ -195,7 +195,7 @@
         "exec-vague-3"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "docs",
@@ -206,6 +206,57 @@
       ],
       "scope": [],
       "status": "blocked"
+    },
+    {
+      "id": "revue-lot-1",
+      "step": "Revue vf-reviewer du lot 33-01..33-04 + verif mutations 33-03",
+      "stage": "",
+      "deps": [
+        "exec-vague-2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-integration",
+      "step": "Correctifs bloquants : chmod check-guard-health, isolation VF_DRIVER_LOCK des cas D1-D7",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/conductor/scripts/check-guard-health.sh",
+        "plugin/conductor/scripts/tests/test-check-guard-health.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-revue",
+      "step": "Correctifs revue : MJ-1 cwd notify, MJ-3 invariant seuil, flakiness wait_for_file",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/conductor/scripts/notify.sh",
+        "plugin/conductor/scripts/check-guard-health.sh",
+        "plugin/conductor/scripts/tests/test-notify.sh"
+      ],
+      "status": "failed"
+    },
+    {
+      "id": "verif-goal",
+      "step": "Verification goal-backward des 4 criteres de succes",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "failed"
+    },
+    {
+      "id": "fix-flakiness",
+      "step": "BLOQUANT OUVERT : test-notify.sh flaky (46-48 PASS selon run) — wait_for_file budget 3s",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/conductor/scripts/tests/test-notify.sh"
+      ],
+      "status": "ready"
     }
   ]
 }

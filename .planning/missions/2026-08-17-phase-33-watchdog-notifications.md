@@ -95,6 +95,88 @@ auto-validé contre le vert à vide (faux échec et pendaison tous deux détect�
 - La chaîne Windows reste non prouvée terrain, l'AUMID arbitraire vs AUMID PowerShell non tranché,
   la latence `powershell.exe` non mesurée — **à ne jamais présenter comme prouvés**.
 
+---
+
+# Exécution (seconde partie de mission)
+
+Les 5 plans ont été exécutés en 3 vagues, **un worktree git par plan** au sein d'une vague — le
+protocole de mutation rouge (`commit` → mutation → `git checkout --`) partage sinon l'index git.
+
+| Vague | Plans | Résultat |
+|---|---|---|
+| 1 | 33-01 ∥ 33-04 | `driver-lock.sh` 151 → **183** · `notify.sh` neuf + **48** · `vf-portable` **16** |
+| 2 | 33-02 ∥ 33-03 | `dag.sh` 99 → **123** · `check-guard-health.sh` → **78** |
+| 3 | 33-05 | `dag.sh` 123 → **156** · `33-CLOTURE-WINDOWS.md` |
+
+Découverte du parc : **64 → 65 suites** (33-04 est le seul plan qui en ajoute une).
+
+## Le fait marquant : le watchdog a détecté un vrai stall, le nôtre
+
+Pendant l'intégration, `test-check-guard-health.sh` est passé de 75/0 à **66 PASS / 9 FAIL** sans
+qu'aucun de ses fichiers n'ait changé. Cause : le sous-contrôle lisait le **vrai** verrou de la
+mission en cours, qui était réellement en stall —
+```
+[mission-watchdog] stall detecte — owner=mission-33 step=vague-3
+(progres fige depuis 1296s, heartbeat frais, seuil=900s) — ne JAMAIS tuer (ADR-031)
+```
+`progress_age 1303 s > 900 s` avec un heartbeat frais à 135 s : **la signature « vivant mais
+bouclant », observée en production et non forgée.** C'est la validation la plus forte possible de
+D-33-A et de l'arbitrage S1 — et elle est arrivée par accident, contre la mission qui la
+construisait.
+
+Le signal était **juste** ; le défaut était l'**isolation des cas de test** hérités (D1-D7 ne
+définissaient pas `VF_DRIVER_LOCK` et lisaient `.planning/DRIVER.lock`). Corrigé sans jamais
+toucher au détecteur — faire taire ce signal aurait supprimé la capacité même que la phase livre.
+
+## Deux bloquants d'intégration trouvés par le manager, pas par les tests
+
+1. **`notify.sh` en mode 644** — non exécutable, alors que 33-05 l'invoque en exec direct :
+   `permission denied, exit=126`, avalé par le `try/except` → notification **jamais émise, en
+   silence**. Corrigé en 755 par 33-05.
+2. **`check-guard-health.sh` en 644, le jumeau manqué** — même exec direct, même
+   `PermissionError` avalée : **D-33-F ne relayait rien**, la détection « au prochain geste »
+   (arbitrage S2) était morte. Corrigé, plus **deux cas de discriminance** « ne JAMAIS retirer »
+   (D8 et T48) qui exercent les **vrais** scripts, pas des stubs — sans eux la suite restait verte
+   sur un mécanisme mort.
+
+## Revue de code (lot 33-01..33-04)
+
+0 bloquant dans le périmètre du diff. **3 majeurs** : `dirname` non canonicalisé dans `notify.sh`
+(MJ-1), invariant `STALL_WINDOW < VF_DRIVER_TTL` jamais vérifié au runtime (MJ-3), et flakiness de
+`test-notify.sh`. **MJ-1 et MJ-3 sont corrigés** (commit `19f4616`).
+
+Findings **pré-existants**, hors périmètre, dont la provenance a été vérifiée commit par commit :
+`save()` de `dag.sh` sans verrou ni écriture atomique (**lost update silencieux** sur un script
+conçu pour le dispatch parallèle — le plus sérieux), `sanitize_field()` incomplet sur les
+caractères de contrôle, `vf_guard_unavailable()` sans validation d'argument, TOCTOU sur le
+`takeover` legacy. **À tracer, non corrigés.**
+
+## BLOQUANT OUVERT — `test-notify.sh` est flaky
+
+Mesuré par le manager, 5 exécutions consécutives sur le même code :
+`47/1 · 46/2 · 47/1 · 48/0 · 48/0`. Le budget de `wait_for_file` (3 s) est trop court sur N4/N5/N11.
+Une suite instable en CI installe l'accoutumance au rouge et finit par masquer une vraie régression.
+**Le correctif n'a pas pu être livré** : le worker a été coupé par une limite de session externe.
+Son travail partiel est préservé (`scratchpad/33-flakiness-partiel.diff`) et la suite a été
+restaurée à son état commité.
+
+**Rien ne doit partir en PR tant que ce point n'est pas fermé.**
+
+## État des suites à la clôture
+
+`test-dag.sh` **156/0** · `test-driver-lock.sh` **183/0** · `test-check-guard-health.sh` **78/0** ·
+`test-vf-portable.sh` **16 ok** · `test-guard-driver-lock.sh` **80/0** · `test-notify.sh` **flaky
+46-48/0-2** · découverte **65**.
+
+## Reste à faire
+
+1. **Fermer la flakiness** de `test-notify.sh` (nœud `fix-flakiness`), avec preuve de stabilité sur
+   ≥ 10 runs consécutifs.
+2. **Vérification goal-backward** des 4 critères (interrompue par la même limite).
+3. **Hygiène documentaire** + bump `CHANGELOG`/`VERSION` du module `conductor` et
+   `vf-dev-manager.md` à la clôture (tracé `d04db1d`).
+4. **Push de branche** pour preuve CI (autorisé), puis PR **sur demande explicite seulement**.
+
 ## Note de conduite
 
 Trois workers se sont arrêtés **en silence**, travail non commité, sans rapport — mode de
