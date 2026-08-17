@@ -27,6 +27,10 @@ PASS=0; FAIL=0
 assert()     { if [[ "$2" == *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: $3"; echo "     obtenu:  $2"; FAIL=$((FAIL+1)); fi; }
 assert_not() { if [[ "$2" != *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1 (a trouvé « $3 »)"; FAIL=$((FAIL+1)); fi; }
 assert_exit(){ if [ "$2" -eq "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1 (exit $2 ≠ $3)"; FAIL=$((FAIL+1)); fi; }
+# assert_eq — égalité STRICTE (contrairement à `assert`, sous-chaîne) : ajoutée par le plan 33-05
+# pour les cas T41/T42/T43/T44/T47 qui exigent une valeur EXACTE (ex. chaîne vide), une simple
+# sous-chaîne serait trivialement vraie sur un résultat vide comparé à n'importe quoi.
+assert_eq()  { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
 # run_bounded — exécute une commande sous une limite de temps portable (macOS n'a pas `timeout`).
 # stdout est renvoyé ; le code retour est celui de la commande, ou ≠0 si un watchdog a dû la tuer
 # (⇒ un `tree` qui bouclerait à l'infini ferait échouer le test au lieu de figer la suite).
@@ -641,6 +645,228 @@ out40="$("$ISO40/dag.sh" mark --file="$F40" --id=n1 --status=running 2>"$ERR40")
 assert_exit "T40.1 — exit 0 malgre l'echec de mark-progress sur lock sain"           "$rc40" 0
 assert      "T40.2 — DAG SUR DISQUE mis a jour"                                     "$(cat "$F40")" '"status": "running"'
 assert      "T40.3 — avertissement BRUYANT sur stderr (lock present+detenu, ecriture refusee)" "$(cat "$ERR40")" 'mark-progress'
+
+# --------------------------------------------------------------------------------------------
+# T41-T47 (plan 33-05, WTCH-02/WTCH-03) : check_stall_signal() (D-33-F, relais du verdict
+# check-guard-health.sh --hook, sans filtre de statut) et record_milestone() (notification via
+# notify.sh, filtree done/failed uniquement). Patron d'isolation identique a T36-T38 (copie de
+# dag.sh + sibling exécutable ISOLE dans un repertoire dedie du WORK_DIR).
+# --------------------------------------------------------------------------------------------
+
+echo ""
+echo "=== T41 — check_stall_signal() relaie le verdict check-guard-health.sh --hook (D-33-F, WTCH-02) ==="
+ISO41="$WORK_DIR/iso41"; mkdir -p "$ISO41"
+cp "$SCRIPT" "$ISO41/dag.sh"
+cat > "$ISO41/check-guard-health.sh" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = "--hook" ]; then
+  echo "[mission-watchdog] stall detecte (fixture T41)"
+fi
+exit 0
+EOF
+chmod +x "$ISO41/check-guard-health.sh"
+# Controle positif (T41.0) : la fixture rend bien la ligne attendue quand invoquee seule, hors dag.sh.
+fx41="$("$ISO41/check-guard-health.sh" --hook)"
+assert "T41.0 — controle positif : la fixture --hook rend bien la ligne stall" "$fx41" "[mission-watchdog] stall detecte (fixture T41)"
+F41="$WORK_DIR/t41.dag.json"
+"$ISO41/dag.sh" init --file="$F41" >/dev/null
+"$ISO41/dag.sh" add --file="$F41" --id=n1 --step=n1 >/dev/null
+ERR41="$WORK_DIR/t41.stderr"
+out41="$("$ISO41/dag.sh" mark --file="$F41" --id=n1 --status=done 2>"$ERR41")"; rc41=$?
+assert_exit "T41.1 — exit 0 (status=done)"                                          "$rc41" 0
+assert      "T41.2 — la ligne stall EXACTE apparait sur stderr (relais fidele, aucune reformulation)" "$(cat "$ERR41")" "[mission-watchdog] stall detecte (fixture T41)"
+
+echo "--- T41 sous-cas 2 : check-guard-health.sh absent -> degradation silencieuse, aucune ligne stall ---"
+ISO41B="$WORK_DIR/iso41b"; mkdir -p "$ISO41B"
+cp "$SCRIPT" "$ISO41B/dag.sh"
+# Aucun check-guard-health.sh depose : absent au sens os.path.isfile — pas de fichier a chmod 000,
+# le cas "absent" et le cas "non executable" degradent tous deux par la meme garde isfile()/try-except.
+F41B="$WORK_DIR/t41b.dag.json"
+"$ISO41B/dag.sh" init --file="$F41B" >/dev/null
+"$ISO41B/dag.sh" add --file="$F41B" --id=n1 --step=n1 >/dev/null
+ERR41B="$WORK_DIR/t41b.stderr"
+out41b="$("$ISO41B/dag.sh" mark --file="$F41B" --id=n1 --status=running 2>"$ERR41B")"; rc41b=$?
+assert_exit "T41.3 — exit 0 malgre check-guard-health.sh absent"                    "$rc41b" 0
+assert_eq   "T41.4 — aucune ligne sur stderr (degradation silencieuse, meme patron que record_progress())" "$(cat "$ERR41B")" ""
+
+echo "--- T41 sous-cas 3 : status=running -> check_stall_signal() s'execute QUAND MEME (pas de filtre de statut) ---"
+F41C="$WORK_DIR/t41c.dag.json"
+"$ISO41/dag.sh" init --file="$F41C" >/dev/null
+"$ISO41/dag.sh" add --file="$F41C" --id=n1 --step=n1 >/dev/null
+ERR41C="$WORK_DIR/t41c.stderr"
+"$ISO41/dag.sh" mark --file="$F41C" --id=n1 --status=running 2>"$ERR41C" >/dev/null
+assert "T41.5 — status=running : le relais stall s'execute quand meme (contrairement a record_milestone(), cas de discriminance)" "$(cat "$ERR41C")" "[mission-watchdog] stall detecte (fixture T41)"
+
+# ---------- Jeu de binaires curés pour T42/T43/T46 (jamais /usr/bin:/bin réel dans le PATH) ----
+# Meme patron que test-notify.sh (33-04) : PATH restreint a un jeu de binaires curés, AUCUN
+# osascript/notify-send/terminal-notifier/powershell.exe réel n'y figure — un canal réel ne peut
+# donc jamais être trouvé, meme si VF_NOTIFY_FORCE_CHANNEL retombait sur "darwin" par accident.
+UTIL_DIR_NOTIFY="$WORK_DIR/utils-notify"; mkdir -p "$UTIL_DIR_NOTIFY"
+for t in uname dirname grep cat bash python3 env sleep touch; do
+  p="$(command -v "$t" 2>/dev/null)" && ln -sf "$p" "$UTIL_DIR_NOTIFY/$t" 2>/dev/null
+done
+
+# instrument_notify_copy <copie-de-notify.sh> <fichier-journal> — insere UNE ligne de
+# journalisation synchrone de TITLE/BODY, juste APRES la validation d'arguments de notify.sh et
+# AVANT le dispatch de canal (deterministe, independante du detachement asynchrone du canal
+# lui-meme) — modifie UNIQUEMENT la copie passee en argument, jamais le fichier de production.
+instrument_notify_copy() {
+  local copy="$1" logfile="$2"
+  python3 - "$copy" "$logfile" <<'PYEOF'
+import sys
+path, log = sys.argv[1], sys.argv[2]
+with open(path, encoding="utf-8") as fh:
+    content = fh.read()
+marker = 'if [ "$#" -lt 2 ] || [ -z "$TITLE" ] || [ -z "$BODY" ]; then\n  exit 0\nfi\n'
+assert marker in content, "marqueur d'insertion introuvable dans la copie de notify.sh"
+inject = marker + "printf '%s\\t%s\\n' \"$TITLE\" \"$BODY\" >> " + repr(log) + "\n"
+content = content.replace(marker, inject, 1)
+with open(path, "w", encoding="utf-8") as fh:
+    fh.write(content)
+PYEOF
+}
+
+echo ""
+echo "=== T42 — record_milestone() notifie via notify.sh sur status=done (WTCH-03) ==="
+ISO42="$WORK_DIR/iso42"; mkdir -p "$ISO42"
+cp "$SCRIPT" "$ISO42/dag.sh"
+cp "$(pwd)/scripts/notify.sh" "$ISO42/notify.sh"
+chmod +x "$ISO42/notify.sh"
+N42_LOG="$WORK_DIR/n42.notify.log"
+instrument_notify_copy "$ISO42/notify.sh" "$N42_LOG"
+export VF_NOTIFY_FORCE_CHANNEL=linux
+export VF_NOTIFY_BIN_DIR="$UTIL_DIR_NOTIFY"
+# Controle positif (T42.0) : la copie instrumentee journalise bien TITLE/BODY quand invoquee seule.
+rm -f "$N42_LOG"
+PATH="$UTIL_DIR_NOTIFY" "$ISO42/notify.sh" "TitreCtrl" "CorpsCtrl" >/dev/null 2>&1
+assert "T42.0 — controle positif : la copie instrumentee journalise bien argv1/argv2" "$(cat "$N42_LOG" 2>/dev/null || true)" "TitreCtrl	CorpsCtrl"
+rm -f "$N42_LOG"
+F42="$WORK_DIR/t42.dag.json"
+PATH="$UTIL_DIR_NOTIFY" "$ISO42/dag.sh" init --file="$F42" >/dev/null
+PATH="$UTIL_DIR_NOTIFY" "$ISO42/dag.sh" add --file="$F42" --id=n1 --step=n1 >/dev/null
+out42="$(PATH="$UTIL_DIR_NOTIFY" "$ISO42/dag.sh" mark --file="$F42" --id=n1 --status=done)"; rc42=$?
+assert_exit "T42.1 — exit 0"                                                    "$rc42" 0
+assert      "T42.2 — le journal notify.sh existe (invoque)"                     "$([ -f "$N42_LOG" ] && echo present || echo absent)" "present"
+N42_CONTENT="$(cat "$N42_LOG" 2>/dev/null || true)"
+N42_FIELDS="$(printf '%s' "$N42_CONTENT" | awk -F'\t' '{print NF}')"
+assert_eq   "T42.3 — le journal contient exactement 2 champs (TITLE, BODY)"      "$N42_FIELDS" "2"
+assert      "T42.4 — TITLE mentionne l'idee de fin/completion"                  "$(printf '%s' "$N42_CONTENT" | awk -F'\t' '{print $1}')" "termine"
+assert      "T42.5 — BODY porte l'id du noeud"                                  "$(printf '%s' "$N42_CONTENT" | awk -F'\t' '{print $2}')" "n1"
+unset VF_NOTIFY_FORCE_CHANNEL VF_NOTIFY_BIN_DIR
+
+echo ""
+echo "=== T43 — record_milestone() notifie via notify.sh sur status=failed (halt condition, WTCH-03) ==="
+ISO43="$WORK_DIR/iso43"; mkdir -p "$ISO43"
+cp "$SCRIPT" "$ISO43/dag.sh"
+cp "$(pwd)/scripts/notify.sh" "$ISO43/notify.sh"
+chmod +x "$ISO43/notify.sh"
+N43_LOG="$WORK_DIR/n43.notify.log"
+instrument_notify_copy "$ISO43/notify.sh" "$N43_LOG"
+export VF_NOTIFY_FORCE_CHANNEL=linux
+export VF_NOTIFY_BIN_DIR="$UTIL_DIR_NOTIFY"
+# Controle positif (T43.0)
+rm -f "$N43_LOG"
+PATH="$UTIL_DIR_NOTIFY" "$ISO43/notify.sh" "TitreCtrl" "CorpsCtrl" >/dev/null 2>&1
+assert "T43.0 — controle positif : la copie instrumentee journalise bien argv1/argv2" "$(cat "$N43_LOG" 2>/dev/null || true)" "TitreCtrl	CorpsCtrl"
+rm -f "$N43_LOG"
+F43="$WORK_DIR/t43.dag.json"
+PATH="$UTIL_DIR_NOTIFY" "$ISO43/dag.sh" init --file="$F43" >/dev/null
+PATH="$UTIL_DIR_NOTIFY" "$ISO43/dag.sh" add --file="$F43" --id=n1 --step=n1 >/dev/null
+out43="$(PATH="$UTIL_DIR_NOTIFY" "$ISO43/dag.sh" mark --file="$F43" --id=n1 --status=failed)"; rc43=$?
+assert_exit "T43.1 — exit 0"                                                    "$rc43" 0
+N43_CONTENT="$(cat "$N43_LOG" 2>/dev/null || true)"
+N43_FIELDS="$(printf '%s' "$N43_CONTENT" | awk -F'\t' '{print NF}')"
+assert_eq   "T43.2 — le journal contient exactement 2 champs (TITLE, BODY)"      "$N43_FIELDS" "2"
+assert      "T43.3 — TITLE mentionne l'idee de halte/echec"                     "$(printf '%s' "$N43_CONTENT" | awk -F'\t' '{print $1}')" "halte"
+assert      "T43.4 — BODY porte l'id du noeud"                                  "$(printf '%s' "$N43_CONTENT" | awk -F'\t' '{print $2}')" "n1"
+unset VF_NOTIFY_FORCE_CHANNEL VF_NOTIFY_BIN_DIR
+
+echo ""
+echo "=== T44 — status=running : notify.sh JAMAIS invoque (WTCH-03 critere n°3, cas de discriminance, NE JAMAIS RETIRER) ==="
+ISO44="$WORK_DIR/iso44"; mkdir -p "$ISO44"
+cp "$SCRIPT" "$ISO44/dag.sh"
+N44_LOG="$WORK_DIR/n44.notify.log"
+cat > "$ISO44/notify.sh" <<EOF
+#!/usr/bin/env bash
+printf '%s\t%s\n' "\$1" "\$2" >> "$N44_LOG"
+exit 0
+EOF
+chmod +x "$ISO44/notify.sh"
+# Controle positif (T44.0) : la fixture journalise bien quand invoquee directement.
+rm -f "$N44_LOG"
+"$ISO44/notify.sh" "TitreCtrl" "CorpsCtrl" >/dev/null 2>&1
+assert "T44.0 — controle positif : la fixture journalise bien quand invoquee seule" "$(cat "$N44_LOG" 2>/dev/null || true)" "TitreCtrl	CorpsCtrl"
+rm -f "$N44_LOG"
+F44="$WORK_DIR/t44.dag.json"
+"$ISO44/dag.sh" init --file="$F44" >/dev/null
+"$ISO44/dag.sh" add --file="$F44" --id=n1 --step=n1 >/dev/null
+"$ISO44/dag.sh" mark --file="$F44" --id=n1 --status=running >/dev/null 2>&1
+assert_eq "T44.1 — journal notify.sh absent/vide : notify.sh n'a jamais ete invoque sur status=running" "$([ -f "$N44_LOG" ] && cat "$N44_LOG" || echo "")" ""
+
+echo ""
+echo "=== T45 — notify.sh ABSENT : mark --status=done reste vert, DAG mis a jour normalement ==="
+ISO45="$WORK_DIR/iso45"; mkdir -p "$ISO45"
+cp "$SCRIPT" "$ISO45/dag.sh"
+# Aucun notify.sh depose.
+F45="$WORK_DIR/t45.dag.json"
+"$ISO45/dag.sh" init --file="$F45" >/dev/null
+"$ISO45/dag.sh" add --file="$F45" --id=n1 --step=n1 >/dev/null
+out45="$("$ISO45/dag.sh" mark --file="$F45" --id=n1 --status=done)"; rc45=$?
+assert_exit "T45.1 — exit 0 malgre notify.sh absent"                             "$rc45" 0
+assert      "T45.2 — DAG SUR DISQUE mis a jour (status=done)"                    "$(cat "$F45")" '"status": "done"'
+assert_not  "T45.3 — aucune erreur affichee sur stdout"                          "$out45" '"error"'
+
+echo ""
+echo "=== T46 — notify.sh ISOLE qui PEND (sleep 30) : mark --status=failed revient en MOINS DE 5s, DAG deja sauve ==="
+ISO46="$WORK_DIR/iso46"; mkdir -p "$ISO46"
+cp "$SCRIPT" "$ISO46/dag.sh"
+cat > "$ISO46/notify.sh" <<'EOF'
+#!/usr/bin/env bash
+sleep 30
+EOF
+chmod +x "$ISO46/notify.sh"
+# Controle positif (T46.0) : le shim pend reellement (processus vivant apres 1s, jamais un sleep
+# non borne dans le test lui-meme).
+"$ISO46/notify.sh" >/dev/null 2>&1 &
+p46=$!
+sleep 1
+if kill -0 "$p46" 2>/dev/null; then
+  echo "  ✅ PASS — T46.0 — controle positif : le shim notify.sh pend bien (processus vivant après 1s)"; PASS=$((PASS+1))
+else
+  echo "  ❌ FAIL — T46.0 — controle positif : le shim notify.sh pend bien"; FAIL=$((FAIL+1))
+fi
+kill -9 "$p46" 2>/dev/null; wait "$p46" 2>/dev/null
+F46="$WORK_DIR/t46.dag.json"
+"$ISO46/dag.sh" init --file="$F46" >/dev/null
+"$ISO46/dag.sh" add --file="$F46" --id=n1 --step=n1 >/dev/null
+# VF_NOTIFY_FORCE_CHANNEL/VF_NOTIFY_BIN_DIR positionnes par coherence avec T42/T43 — sans effet
+# ici puisque le shim PEND avant de lire quoi que ce soit, mais un shim qui pend ne doit pas non
+# plus pouvoir declencher un vrai canal : positionnes quand meme, jamais presumes inoffensifs.
+export VF_NOTIFY_FORCE_CHANNEL=linux
+export VF_NOTIFY_BIN_DIR="$UTIL_DIR_NOTIFY"
+t0_46=$(date +%s)
+OUT46FILE="$WORK_DIR/t46.out"
+# meme piege que T38 (voir commentaire ci-dessus) : rediriger vers un fichier, jamais capturer
+# run_bounded via $(...) directement.
+run_bounded "$ISO46/dag.sh" mark --file="$F46" --id=n1 --status=failed >"$OUT46FILE"; rc46=$?
+t1_46=$(date +%s)
+elapsed46=$((t1_46 - t0_46))
+unset VF_NOTIFY_FORCE_CHANNEL VF_NOTIFY_BIN_DIR
+assert_exit "T46.1 — exit 0 malgre un notify.sh qui pend"                        "$rc46" 0
+if [ "$elapsed46" -lt 5 ]; then
+  echo "  ✅ PASS — T46.2 — retour en moins de 5s (mesure : ${elapsed46}s, timeout=2 interne)"; PASS=$((PASS+1))
+else
+  echo "  ❌ FAIL — T46.2 — retour en moins de 5s"; echo "     attendu: <5"; echo "     obtenu:  ${elapsed46}s"; FAIL=$((FAIL+1))
+fi
+assert "T46.3 — DAG SUR DISQUE porte deja le nouveau statut (save(dag) a eu lieu avant l'appel pendant)" "$(cat "$F46")" '"status": "failed"'
+
+echo ""
+echo "=== T47 — non-regression statique : listes d'arguments, ordre, aucun hooks.json touche ==="
+assert_exit "T47.1 — aucun shell=True (compte inchange depuis 33-02)"            "$([ "$(grep -c 'shell=True' "$SCRIPT")" -eq 0 ]; echo $?)" 0
+assert_exit "T47.2 — appel notify.sh en LISTE [notify_sh, title, body]"          "$(grep -c '\[notify_sh, title, body\]' "$SCRIPT" >/dev/null; echo $?)" 0
+assert_exit "T47.3 — appel check-guard-health.sh en LISTE [check_guard_health_sh, \"--hook\"]" "$(grep -c '\[check_guard_health_sh, "--hook"\]' "$SCRIPT" >/dev/null; echo $?)" 0
+assert_eq   "T47.4 — hooks.json n'apparait dans aucun diff de ce plan (grep statique sur dag.sh)" "$(grep -c 'hooks.json' "$SCRIPT")" "0"
+assert_eq   "T47.5 — check-capability-activation.sh jamais mentionne dans dag.sh"                  "$(grep -c 'check-capability-activation.sh' "$SCRIPT")" "0"
 
 echo ""
 echo "=================================="
