@@ -6,7 +6,7 @@
 > et de migration. Module **mandatory** : posé d'office à chaque install, c'est lui qui porte les
 > gates machine (hooks) et le noyau d'orchestration d'équipe réutilisé par tous les autres modules.
 
-**Type** : `agent + skills + scripts + references` · **Version** : v1.25.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
+**Type** : `agent + skills + scripts + references` · **Version** : v1.26.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
 
 > `skill-creator` est une dépendance **dure** depuis ADR-047 : c'est le canal unique de création de
 > skills, invoqué par `vf-new-lab` en fan-out (Phase 5) et exigé par le Gate C. Le conductor étant
@@ -36,7 +36,9 @@ Ce que le kernel fournit (invariant) :
 
 | Brique | Support | Garantie |
 |---|---|---|
-| **Lock de driver** | `scripts/driver-lock.sh` (acquire / heartbeat / release, TTL + recovery) | une seule mission pilote à la fois ; reprise propre d'un lock périmé |
+| **Lock de driver** | `scripts/driver-lock.sh` (acquire / heartbeat / release / **takeover** / **reclaim**, TTL séparé de la lease) | une seule mission pilote à la fois ; `acquire` ne récupère plus jamais un lock périmé (rupture de contrat, Phase 32) — reprise **toujours explicite** via `takeover` (lock périmé) ou `reclaim` (lock sans identité de session), toutes deux tracées dans un journal append-only avec l'identité du repreneur |
+| **Guard du verrou** | `scripts/guard-driver-lock.sh` (hook `PreToolUse(Bash\|Write\|Edit)`, **bloquant**) | refuse par décision JSON les gestes mutants (commit, checkout, switch, push, écriture sous `.planning/`, etc.) d'une session tierce sous un lock vivant ; motif nommant owner/étape/branche/âge et la commande de reprise ; garde anti-accident, pas anti-adversaire (Phase 32, LOCK-02/03) |
+| **Hook doctor du parc** | `scripts/check-guard-health.sh` (hook `SessionStart`, **advisory**) | lecteur générique des marqueurs de santé de TOUS les gardes du parc — ferme l'issue « garde indisponible → fail-open bruyant » de QUAL-01 (Phase 32) |
 | **Plan de bataille en DAG** | `scripts/dag.sh` (init / add --deps **--scope** / ready / mark / reopen / status) | contrôle de flux déterministe ; la frontière `ready` se dispatche **en parallèle** sur périmètres disjoints ; `reopen` force `review_regime=full` sur tout nœud de revue/jointure rouvert (D-14, Phase 20) |
 | **Rapports typés** (Pattern C) | `{ statut: passed\|gaps_found\|human_needed\|blocked, findings[], noeuds_debloques[] }` | fin du pilotage à la prose ; escalade humaine impérative sur `ask-user` |
 | **Halt conditions** | 5 codes (boucle sans progrès, action destructive, ressource manquante, budget épuisé, drift de scope) | l'humain arbitre sur un message structuré |
@@ -68,11 +70,22 @@ première instanciation non-dev) et les **bundles métier** (business-pilot, con
 
 - **PreToolUse(Write)** → `guard-agent-write.sh` : un agent non conforme ADR-044 ne peut pas être
   **écrit** dans `.claude/agents/` (deny avec erreurs précises + squelette canonique).
+- **PreToolUse(Bash|Write|Edit)** → `guard-driver-lock.sh` (**bloquant**, Phase 32) : refuse les
+  gestes mutants d'une session tierce sous le lock d'autrui (commit, checkout, switch, push,
+  écriture sous `.planning/`, etc.), matcher combiné (contournement du bug d'idempotence
+  cross-matcher de `merge-hooks.sh`, une seule entrée référence le script).
 - **SessionStart** → `check-agents.sh --hook` (lint des agents posés), `check-debug-research.sh
   --hook` (advisory ADR-045 : recherche documentaire avant debug), `update-banner.sh` (bandeau
-  « mise à jour disponible X → Y, lance /vf-update » + nudge de méthode legacy).
+  « mise à jour disponible X → Y, lance /vf-update » + nudge de méthode legacy), `check-guard-health.sh
+  --hook` (**advisory**, Phase 32 : lecteur générique des marqueurs de santé du parc, silence
+  nominal à 0 octet, une ligne si un garde s'est dégradé récemment).
 
-## Scripts (15) — par famille
+## Scripts (20) — par famille
+
+*(Compte re-dérivé au 2026-08-17 : `find plugin/conductor/scripts -maxdepth 1 -type f -name
+'*.sh' | wc -l`. Ce compte était déjà faux avant la Phase 32 — mesuré « 14 scripts » à la
+re-validation externe du 2026-08-17 pour 18 réels ; la phase ajoute encore `guard-driver-lock.sh`
+et `check-guard-health.sh` (+2) au-dessus de cet écart préexistant.)*
 
 **Gates machine (`check-*`)** :
 - `check-agents.sh` — lint de conformité native des agents (ADR-044) : frontmatter, champs requis,
@@ -92,9 +105,17 @@ première instanciation non-dev) et les **bundles métier** (business-pilot, con
 - `check-state-integrity.sh` — gate anti-régression (Phase 21) : `completed_phases`,
   `completed_plans`, `total_plans` et `current_phase` de `.planning/STATE.md` ne décroissent jamais
   au sein d'un même jalon, et le corps ne porte jamais plus d'une ligne `^Phase:` (ADR-063).
+- `check-branch-claim.sh` — santé de la revendication de branche par mission (portabilité, PORT-03).
+- `check-workstream-pointer.sh` — santé du pointeur de workstream (portabilité, PORT-03).
+- `check-map-drift.sh` — gate anti-drift carte↔disque (contrat de routage par dossier).
+- `check-guard-health.sh` — lecteur générique `SessionStart` des marqueurs de santé écrits par
+  `vf_guard_unavailable` (tout le parc de gardes, pas seulement le lock) : fail-open bruyant plutôt
+  que silencieux (Phase 32, QUAL-01).
 
-**Team-kernel** : `dag.sh` (plan de bataille persistant, frontière `ready`) et `driver-lock.sh`
-(verrou de mission atomique par `mkdir`, heartbeat + TTL).
+**Team-kernel** : `dag.sh` (plan de bataille persistant, frontière `ready`), `driver-lock.sh`
+(verrou de mission atomique par `mkdir`, battement séparé de la lease, verbes `takeover`/`reclaim`
+explicites, Phase 32) et `guard-driver-lock.sh` (hook `PreToolUse` **bloquant** qui refuse les
+gestes mutants d'une session tierce sous lock, Phase 32).
 
 **Update** : `framework-version.sh` (current / recorded / stamp / drift, sémver portable),
 `check-plugin-update.sh` (compare au dernier tag GitHub, cache local), `update-banner.sh` (hook
@@ -104,8 +125,10 @@ SessionStart), `vf-update-run.sh` (re-matérialise les modules depuis le cache p
 ADR-042) et `generate-agent-commands.sh` (une commande slash d'incarnation par agent posé — saute
 les workers `vf-internal: true`, Pattern 12).
 
-**Tests** : 12 suites sous `scripts/tests/` (une par script critique + `test-conductor.sh`,
-`test-vf-new-lab.sh`, `test-vf-update.sh`, `test-doc-and-commands.sh`).
+**Tests** : 19 suites sous `scripts/tests/` (une par script critique + `test-conductor.sh`,
+`test-vf-new-lab.sh`, `test-vf-update.sh`, `test-doc-and-commands.sh`). *(Compte re-dérivé :
+`find plugin/conductor/scripts/tests -type f -name 'test-*.sh' | wc -l` ; « 12 suites » était déjà
+faux avant la Phase 32.)*
 
 ## Contenu du module
 
@@ -117,7 +140,7 @@ conductor/
     vf-new-lab/                    # Lab Factory (SKILL.md + 7 references + script + test)
     vf-calibrate/SKILL.md          # propagation update + migration
     vf-update/SKILL.md             # mise à jour plugin + modules
-  scripts/                         # 14 scripts (familles ci-dessus) + tests/ (12 suites)
+  scripts/                         # 20 scripts (familles ci-dessus) + tests/ (19 suites)
   references/
     team-kernel.md                 # contrat du noyau d'équipe (manager/workers/juges)
     contracts.md                   # escalade sous-agents → conductor

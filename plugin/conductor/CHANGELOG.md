@@ -1,5 +1,50 @@
 # Changelog — conductor
 
+## [v1.26.0] — 2026-08-17 (Durcissement du driver-lock — Phase 32, LOCK-01..05/QUAL-01)
+
+**Minor** (nouvelles capacités présentées à l'utilisateur, avec deux **ruptures de contrat**
+explicites) :
+
+- **Battement séparé de la lease.** `driver-lock.sh` expose désormais `session_ids` (liste
+  préservée au heartbeat) et `generation` (jeton de fence) en JSON, plus `lease_seconds`
+  (observabilité pure, calculée depuis `acquired_epoch`) — **jamais un facteur de péremption** :
+  `lock_age()`/TTL/`stale` restent adossés au seul `heartbeat_epoch`. **Le TTL par défaut est
+  inchangé (1800 s)** — un lock périmé n'a jamais été et n'est toujours pas une mission morte.
+- **Rupture de contrat — `acquire` ne récupère plus JAMAIS un lock périmé.** L'auto-steal
+  implicite au TTL est retiré : `acquire` sur un lock périmé refuse désormais en
+  `stale-requires-takeover` (avec un champ `hint` nommant la commande de reprise). Deux verbes
+  explicites le remplacent, tous deux tracés dans un journal append-only avec l'identité du
+  repreneur : **`takeover`** (reprise déclarée d'un lock périmé) et **`reclaim`** (reprise d'un
+  lock sans identité de session, seul geste qui la repeuple). Toute doctrine externe qui
+  prescrivait l'ancien contrat implicite est désormais **fausse** — resynchronisée dans 5 agents
+  managers de 4 modules tiers plus `mission-flow.md` (dev-orchestrator) et `team-kernel.md`.
+- **Rupture de contrat — un guard `PreToolUse` qui REFUSE des commandes.**
+  `scripts/guard-driver-lock.sh` (neuf) intercepte `Bash`/`Write`/`Edit` (matcher combiné) et
+  refuse, par décision JSON (`permissionDecision: deny`), les gestes mutants (commit, checkout,
+  switch, merge, rebase, cherry-pick, revert, reset, clean, push, tag, branch, stash, worktree
+  remove, `gh pr`, `gh release`, ou une écriture sous `.planning/`) tentés par une session tierce
+  sous un lock vivant — le détenteur (et ses sous-agents, même `session_id` parent) passe
+  toujours. Le motif de refus nomme l'owner, l'étape, la branche, l'âge du lock, **et la commande
+  de reprise**. **Limite de granularité connue** : le matching de commande est par sous-chaîne —
+  passoire devant `eval`, `bash -c`, un alias, ou un wrapper indirect ; garde anti-accident, pas
+  anti-adversaire. **Limite de matching connue** : un lock sans identité de session
+  (`session_ids` vide, héritage pré-Phase-32) reste **non opposable** à ce guard jusqu'à un
+  `reclaim` explicite — `heartbeat` ne le repeuple jamais.
+- **Convention de jeton de fence** (`Fence: <generation>` en trailer de commit) posée dans
+  `team-kernel.md` — **convention d'agent, jamais vérifiée par machine**, même tier que
+  `Co-Authored-By:`/`Claude-Session:`. Aucun commit ne porte encore ce trailer à ce jour ; la
+  convention entre en vigueur au prochain mandat qui commite sous cette doctrine.
+- **Lecteur de marqueurs de santé** (`scripts/check-guard-health.sh`, neuf, `SessionStart`
+  générique) — ferme la quatrième issue de QUAL-01 (garde indisponible → fail-open **bruyant**,
+  jamais silencieux) pour `guard-driver-lock.sh` et pour tout autre garde du parc qui écrit un
+  marqueur au même format.
+- **Limite connue, non résolue par cette phase** : sans privilège de lien symbolique (Git Bash
+  Windows par défaut), `ln -s` copie au lieu de lier — `[ -L ]` rend faux, `[ -d ]` rend vrai, et
+  le protocole d'acquisition retombe sur son chemin **legacy**, où le trou de double-détenteur est
+  désormais fermé (garde d'existence), mais sans le durcissement neuf de cette phase. Le milestone
+  est Windows-first et aucun runner Windows n'existe dans la CI de ce dépôt : fait écrit comme
+  limite connue, pas résolu ici.
+
 ## [v1.25.0] — 2026-08-16 (Câblage `--dry-run` dans `/vf-calibrate`, MANI-02/D-31-10)
 
 **Minor** (nouvelle capacité présentée à l'utilisateur) : l'étape 4 point 2 de
