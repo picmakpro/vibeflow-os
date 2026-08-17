@@ -81,16 +81,22 @@ fi
 
 # ---------------------------------------------------------------------------------------------
 # Canaux — chaque fonction teste elle-même `command -v` et ne fait RIEN (return silencieux) si
-# absente. AUCUNE fonction n'écrit sur stdout/stderr en dehors de la commande détachée elle-même
-# (déjà >/dev/null 2>&1). Disponibilité testée UNIQUEMENT par `command -v`, jamais un `uname` seul.
+# absente. La détection (`command -v`) est SYNCHRONE (rapide, jamais d'E/S bloquante) ; seul
+# l'appel réel au binaire de canal est DÉTACHÉ (`( … & )`, un seul niveau de fork au point
+# d'invocation) — un appelant ne doit JAMAIS attendre les 0,3-7s de démarrage .NET de
+# powershell.exe ni un notify-send qui pend sur un D-Bus mort, mais une détection synchrone laisse
+# une commande qui échoue réellement mourir le script AVANT le fork si `set -e` était présent
+# (il ne l'est pas — règle 4 du spike — mais la structure ne le masque pas non plus). AUCUNE
+# fonction n'écrit sur stdout/stderr en dehors de la commande détachée elle-même (déjà
+# >/dev/null 2>&1). Disponibilité testée UNIQUEMENT par `command -v`, jamais un `uname` seul.
 # ---------------------------------------------------------------------------------------------
 _notify_darwin() {
   if command -v terminal-notifier >/dev/null 2>&1; then
-    terminal-notifier -title "$TITLE" -message "$BODY" >/dev/null 2>&1
+    ( terminal-notifier -title "$TITLE" -message "$BODY" >/dev/null 2>&1 & )
   elif command -v osascript >/dev/null 2>&1; then
-    osascript -e 'on run argv' \
+    ( osascript -e 'on run argv' \
               -e 'display notification (item 2 of argv) with title (item 1 of argv)' \
-              -e 'end run' -- "$TITLE" "$BODY" >/dev/null 2>&1
+              -e 'end run' -- "$TITLE" "$BODY" >/dev/null 2>&1 & )
   fi
 }
 
@@ -99,7 +105,7 @@ _notify_linux() {
   # d'un test $?) — c'est cette forme qui rend la mutation rouge n°3 reproductible et son point
   # d'injection nommable.
   if command -v notify-send >/dev/null 2>&1; then
-    notify-send -a VibeFlow -- "$TITLE" "$BODY" >/dev/null 2>&1
+    ( notify-send -a VibeFlow -- "$TITLE" "$BODY" >/dev/null 2>&1 & )
   fi
 }
 
@@ -110,8 +116,8 @@ _notify_windows() {
   # passées par variables d'environnement, échappées côté PS par
   # [Security.SecurityElement]::Escape() — jamais de concaténation de chaîne dans le script.
   command -v powershell.exe >/dev/null 2>&1 || return 0
-  env VF_NOTIFY_TITLE="$TITLE" VF_NOTIFY_BODY="$BODY" \
-    powershell.exe -NoProfile -NonInteractive -Command - <<'PS' >/dev/null 2>&1
+  ( env VF_NOTIFY_TITLE="$TITLE" VF_NOTIFY_BODY="$BODY" \
+    powershell.exe -NoProfile -NonInteractive -Command - <<'PS' >/dev/null 2>&1 & )
 [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null
 [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] > $null
 
@@ -138,15 +144,14 @@ PS
 }
 
 # ---------------------------------------------------------------------------------------------
-# Dispatch + détachement — englobé dans un double arrière-plan `( … & ) &` : un appelant (dag.sh
-# en 33-05) ne doit JAMAIS attendre le démarrage .NET de powershell.exe (0,3-7s) ni un
-# notify-send qui pend sur un D-Bus mort. Le fork+redirection se fait AVANT tout exec du binaire
-# de canal, pour qu'un descendant n'hérite jamais du pipe stdout/stderr de l'appelant.
+# Dispatch — SYNCHRONE (le détachement vit dans chaque fonction, autour du seul appel qui peut
+# être lent) : un appelant (dag.sh en 33-05) ne doit JAMAIS attendre le canal lui-même, mais la
+# détection de disponibilité reste dans le flux principal du script.
 # ---------------------------------------------------------------------------------------------
 case "$channel" in
-  windows) ( _notify_windows >/dev/null 2>&1 & ) & ;;
-  darwin)  ( _notify_darwin  >/dev/null 2>&1 & ) & ;;
-  linux)   ( _notify_linux   >/dev/null 2>&1 & ) & ;;
+  windows) _notify_windows ;;
+  darwin)  _notify_darwin ;;
+  linux)   _notify_linux ;;
   *) : ;;
 esac
 
