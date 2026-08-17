@@ -124,15 +124,55 @@ resolve_bash_abs() {
 
 BASH_ABS="$(resolve_bash_abs)" || exit 1
 
-MODE="$MODE" FRAGMENT="$FRAGMENT" SETTINGS="$SETTINGS" SETTINGS_LOCAL="$SETTINGS_LOCAL" PREFIX="$PREFIX" BASH_ABS="$BASH_ABS" "$PYBIN" - <<'PYEOF'
+# Transport du préfixe par FICHIER, jamais par variable d'environnement (WIN-PATHCONV).
+#
+# Sous Git Bash, le runtime MSYS2 réécrit les variables d'environnement dont la valeur ressemble
+# à un chemin POSIX quand il lance un binaire Windows NATIF — et `$PYBIN` en est un dès que
+# Python vient de python.org (exactement ce que le message d'erreur ci-dessus recommande
+# d'installer). Le segment `/.claude/scripts` de la valeur était converti en racine MSYS :
+#   "$CLAUDE_PROJECT_DIR"/.claude/scripts  →  "$CLAUDE_PROJECT_DIR"C:/Program Files/Git/.claude/scripts
+# et ce chemin mort partait tel quel dans settings.json. Les hooks en forme shell se terminant
+# par `|| true`, bash râlait et `|| true` avalait l'erreur : garde muet, aucun signal (20 hooks
+# touchés sur le lab testeur Windows, 2026-08-17).
+#
+# Le contenu d'un fichier n'est jamais réécrit par le runtime — seuls argv et l'environnement le
+# sont. Le CHEMIN du fichier, lui, transite par l'environnement et PEUT être converti : c'est
+# voulu, un python.exe natif a besoin de la forme Windows pour l'ouvrir. Même raison pour
+# FRAGMENT / SETTINGS / SETTINGS_LOCAL, qui restent des variables : la conversion y est
+# bénéfique. PREFIX était le seul passager à n'être pas un chemin à ouvrir mais un LITTÉRAL à
+# injecter dans du JSON — d'où le traitement à part.
+#
+# BASH_ABS reste lui aussi une variable, délibérément : c'est un vrai chemin d'exécutable, et la
+# forme Windows y est utile puisque le harness l'exécute hors MSYS en forme exec.
+PREFIX_FILE=""
+cleanup_tmp() { [ -n "${PREFIX_FILE:-}" ] && rm -f "$PREFIX_FILE"; }
+trap cleanup_tmp EXIT INT TERM
+PREFIX_FILE="$(mktemp "${TMPDIR:-/tmp}/vf-merge-hooks-prefix.XXXXXX")" \
+  || err "impossible de créer le fichier temporaire de transport du préfixe"
+printf '%s' "$PREFIX" > "$PREFIX_FILE" \
+  || err "écriture du fichier temporaire de transport du préfixe impossible : $PREFIX_FILE"
+
+MODE="$MODE" FRAGMENT="$FRAGMENT" SETTINGS="$SETTINGS" SETTINGS_LOCAL="$SETTINGS_LOCAL" PREFIX_FILE="$PREFIX_FILE" BASH_ABS="$BASH_ABS" "$PYBIN" - <<'PYEOF'
 import json, os, re, sys, tempfile
 
 mode = os.environ["MODE"]
 fragment_path = os.environ["FRAGMENT"]
 settings_path = os.environ["SETTINGS"]
 settings_local_path = os.environ.get("SETTINGS_LOCAL", "") or None
-prefix = os.environ.get("PREFIX", "")
 bash_abs = os.environ.get("BASH_ABS", "")
+
+# WIN-PATHCONV : le préfixe arrive par fichier, jamais par variable d'environnement (voir le
+# commentaire côté bash). `os.environ["PREFIX"]` n'est volontairement plus lu — une variable
+# PREFIX polluée dans l'environnement de l'appelant ne doit avoir AUCUN effet ici.
+prefix = ""
+_prefix_file = os.environ.get("PREFIX_FILE", "")
+if _prefix_file:
+    try:
+        with open(_prefix_file, encoding="utf-8") as f:
+            prefix = f.read()
+    except OSError as e:
+        sys.stderr.write(f"[merge-hooks] ERROR: fichier de préfixe illisible ({_prefix_file}) : {e}\n")
+        sys.exit(1)
 
 VF_SCRIPTS_TOKEN = "{{VF_SCRIPTS}}"
 VF_BASH_TOKEN = "{{VF_BASH}}"
@@ -165,6 +205,47 @@ prefix_exec = exec_safe_prefix(prefix)
 def die(msg):
     sys.stderr.write(f"[merge-hooks] ERROR: {msg}\n")
     sys.exit(1)
+
+
+# WIN-PATHCONV — seconde ceinture, sur la valeur EFFECTIVEMENT vue ici.
+#
+# Le transport par fichier ferme le vecteur connu (conversion d'environnement par le runtime
+# MSYS2). Ce garde-fou couvre les variantes non connues : quelle qu'en soit la provenance, un
+# préfixe portant la marque d'une conversion de chemin ARRÊTE le merge au lieu d'écrire des
+# hooks morts. Doctrine du lab : un garde-fou en panne est pire qu'un garde-fou absent — donc
+# ici on échoue BRUYAMMENT, jamais en silence, et rien n'est écrit sur disque (l'écriture est
+# atomique et n'a pas encore eu lieu à ce stade).
+#
+# Deux marques, complémentaires :
+#   1. un littéral shell-quoté suivi d'autre chose que "/" — la signature exacte du bug
+#      2026-08-17 : "$CLAUDE_PROJECT_DIR"C:/Program Files/Git/.claude/scripts ;
+#   2. une lettre de lecteur Windows en MILIEU de chaîne — la racine MSYS greffée là où un
+#      chemin relatif était attendu. En tête, c'est légitime (scope user résolu sur une machine
+#      Windows donne C:/Users/…/.claude/scripts), d'où le `.` qui exige une position > 0.
+MSYS_DRIVE_MIDSTRING_RE = re.compile(r".[A-Za-z]:[\\/]")
+
+def assert_prefix_uncorrupted(p, label):
+    if not p:
+        return
+    for head in ('"$HOME"', '"$CLAUDE_PROJECT_DIR"', "$HOME", "$CLAUDE_PROJECT_DIR"):
+        if p.startswith(head):
+            rest = p[len(head):]
+            if rest and not rest.startswith("/"):
+                die(f"préfixe de scripts corrompu ({label}) : {p!r}\n"
+                    f"         Le séparateur '/' attendu après {head} a été remplacé par "
+                    f"{rest.split('/')[0]!r}.\n"
+                    f"         Signature d'une conversion de chemin MSYS2 (Git Bash + binaire "
+                    f"Windows natif).\n"
+                    f"         Rien n'a été écrit. Voir docs/WINDOWS-HOOKS-PATHCONV.md.")
+            break
+    if MSYS_DRIVE_MIDSTRING_RE.search(p):
+        die(f"préfixe de scripts corrompu ({label}) : {p!r}\n"
+            f"         Lettre de lecteur Windows en milieu de chaîne — racine MSYS2 greffée sur "
+            f"un chemin relatif.\n"
+            f"         Rien n'a été écrit. Voir docs/WINDOWS-HOOKS-PATHCONV.md.")
+
+assert_prefix_uncorrupted(prefix, "forme shell")
+assert_prefix_uncorrupted(prefix_exec, "forme exec")
 
 try:
     with open(fragment_path, encoding="utf-8") as f:

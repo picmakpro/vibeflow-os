@@ -5,6 +5,71 @@ extrait récent et pointent ici). Chaque module a par ailleurs son propre `CHANG
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.55.1] — 2026-08-17
+
+**Hotfix : sous Windows, l'engine écrivait des hooks à chemin mort — et `|| true` avalait
+l'erreur, donc les gardes ne tournaient plus sans que rien ne le dise.** Signalé par un testeur
+Windows le 2026-08-17, mesure faite sur le même `.claude/settings.json` avant et après update :
+26 entrées en forme shell / 0 chemin corrompu → 21 entrées / **20 corrompues**.
+
+### La cause
+
+Le préfixe de scripts transitait vers Python par **variable d'environnement**. Sous Git Bash, le
+runtime MSYS2 réécrit les variables dont la valeur ressemble à un chemin POSIX quand la cible est
+un binaire Windows **natif** — précisément le Python que notre propre message d'erreur recommande
+d'installer depuis python.org. Le séparateur était remplacé par la racine MSYS :
+
+```
+"$CLAUDE_PROJECT_DIR"/.claude/scripts  →  "$CLAUDE_PROJECT_DIR"C:/Program Files/Git/.claude/scripts
+```
+
+Ce chemin partait tel quel dans `settings.json`. Les entrées finissant par `|| true`, `bash`
+signalait l'erreur et `|| true` l'avalait : garde muet — le mode de panne que la doctrine de ce
+repo nomme depuis LOCK/QUAL-01, un garde-fou en panne étant pire qu'un garde-fou absent.
+
+Ce n'est **pas** une régression de v2.55.0 : la ligne fautive date de v2.14.0. Ce que les Phases
+30→32 ont changé, c'est le nombre d'entrées qui empruntent ce chemin.
+
+### Livré
+
+- **Transport par fichier** (`WIN-PATHCONV`) : le préfixe passe par un fichier temporaire, dont le
+  contenu n'est jamais réécrit par le runtime — seuls `argv` et l'environnement le sont.
+  `FRAGMENT`, `SETTINGS`, `SETTINGS_LOCAL` et `BASH_ABS` restent **délibérément** des variables :
+  ce sont de vrais chemins à ouvrir ou à exécuter, la conversion y est utile. `PREFIX` était le
+  seul passager à n'être pas un chemin mais un littéral à injecter dans du JSON.
+- **Garde-fou** : un préfixe portant la marque d'une conversion — littéral shell-quoté suivi
+  d'autre chose que `/`, ou lettre de lecteur greffée en milieu de chaîne — arrête le merge avec
+  un diagnostic nommant MSYS2, et **rien n'est écrit**. Écrire vingt hooks morts en silence n'est
+  plus un comportement atteignable.
+- **`docs/WINDOWS-HOOKS-PATHCONV.md`** : protocole opératoire adressé à l'assistant de la machine
+  touchée — mesure avant toute écriture, marqueur `WIN-PATHCONV` pour situer sa version,
+  réparation locale (simulation par défaut, `APPLY=1` pour écrire, sauvegarde), vérification par
+  exécution réelle, escalade en issue GitHub sinon.
+
+### Ce qui n'est PAS prouvé
+
+La cause racine est **inférée**, pas constatée : aucune machine Windows n'était disponible, ici
+comme pendant la Phase 33. Le motif du screen la recoupe exactement, racine MSYS comprise, mais la
+confirmation tient à une mesure que seul le testeur peut produire (`sys.executable` pointant un
+Python hors MSYS — étape 1 du doc). Le correctif est sûr indépendamment de ce verdict : le
+transport par fichier ferme le vecteur, le garde-fou couvre les variantes non identifiées.
+
+### Le chiffre de la méthode
+
+**Deux faux verts, tous deux dans le travail de ce hotfix, tous deux attrapés en exerçant ce qu'on
+venait d'écrire plutôt qu'en le relisant.** Le premier T25 polluait la variable `PREFIX` depuis
+l'appelant et passait — sans le correctif aussi : `merge-hooks.sh` réinitialise cette variable en
+interne, le test n'exerçait rien. Refait avec un shim `python3` qui réécrit l'environnement à la
+manière de MSYS2, la seule couche où le bug vit. Le second était dans le doc de réparation : ses
+deux motifs ignoraient l'échappement JSON (`\"$HOME\"C:`) et rendaient un « 0 à réparer »
+faussement rassurant — rattrapé en rejouant le protocole entier sur un `settings.json` corrompu
+reproduit, comptage et `APPLY=1` compris.
+
+Tests de régression T24 (garde-fou : refus, exit 1, aucune écriture) et T25 (transport par
+fichier). Matrice de mutation : garde-fou neutralisé → T24 mord ; transport annulé → T25 mord ;
+les deux ensemble — le cas réel du testeur — les deux mordent. Suites : 36/36 `merge-hooks`,
+19/19 `vibeflow-update`, 8/8 `gsd-cohabitation`.
+
 ## [v2.55.0] — 2026-08-17
 
 **Le driver-lock cesse d'être déclaratif : les contournements constatés pendant agentique-v1.0
