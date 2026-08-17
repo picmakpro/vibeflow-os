@@ -15,7 +15,7 @@ conductor v1.26.0 · **DAG** : `.planning/MISSION-33.dag.json` (20 nœuds, 15 do
 | Spike canal de notification (research flag b) | `33-SPIKE-canal-notification.md` |
 | Sonde exécutée des capacités de hooks | `33-SONDE-hooks.md` |
 | Plans exécutables | `33-01` à `33-05-PLAN.md` |
-| Verdicts de plancheck externe | `33-PLANCHECK-EXTERNE.md`, `33-PLANCHECK-EXTERNE-2.md` |
+| Verdicts de plancheck externe | `33-REVUE-EXTERNE.md`, `33-REVUE-EXTERNE-2.md` |
 
 ## Les deux research flags, levés avant tout engagement
 
