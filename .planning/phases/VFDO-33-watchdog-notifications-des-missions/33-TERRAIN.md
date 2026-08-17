@@ -144,7 +144,7 @@ ${VF_GUARD_HEALTH_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/vibeflow/guard-health}/<s
 ```
 Le marqueur est **RÉÉCRIT** (jamais append) — c'est ce qui donne un sens à la fenêtre de fraîcheur.
 
-**Consommateur** : `plugin/conductor/scripts/check-guard-health.sh` (185 l.), **`SessionStart`
+**Consommateur** : `plugin/conductor/scripts/check-guard-health.sh` (184 l.), **`SessionStart`
 matcher `startup`**, forme exec, `--hook`. Flags : `--hook`, `--quiet`, `--dir=`, `--window=`
 (défaut 86400 s). Contrat à **4 codes** : `0` signal · `3` SAIN vérifié · `4` INDÉTERMINÉ
 (répertoire illisible — jamais confondu avec sain) · `64` usage ; `hook_exit()` traduit 3 et 4 → 0
