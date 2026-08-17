@@ -130,6 +130,12 @@ case "$D7_RC" in
 esac
 D7_LINES="$(printf '%s\n' "$D7_OUT" | grep -c . 2>/dev/null || echo 0)"
 [ "$D7_LINES" -le 1 ] && ok "D7 : au plus une ligne sur stdout" || ko "D7 nb lignes" "=$D7_LINES attendu <=1"
+# D7 DURCI — ts malformé/absent → repli sur mtime_epoch(). Ces 3 marqueurs viennent d'être écrits
+# (mtime = maintenant) : le repli DOIT retomber dans la fenêtre et signaler (exit 0), jamais être
+# classé périmé (exit 3) faute de quoi un marqueur frais serait tu (cf. mtime_epoch() du script :
+# ordre GNU (-c) avant BSD (-f) obligatoire — un ordre inversé fait échouer silencieusement le
+# repli mtime sous Linux et classe à tort ces marqueurs frais comme périmés).
+[ "$D7_RC" -eq 0 ] && ok "D7 durci : ts malformé + mtime fraîche → SIGNALÉ (jamais classé périmé)" || ko "D7 durci exit" "rc=$D7_RC attendu 0 (repli mtime doit rester dans la fenêtre)"
 
 # === D10 — argument inconnu : erreur d'usage (64), stdout vide ====================================
 D10_OUT="$(bash "$SCRIPT" --argument-inconnu 2>/dev/null)"; D10_RC=$?
@@ -150,7 +156,10 @@ case "$D11_OUT" in *"guard-file-size.sh"*) ok "D11 : nomme le garde d'un module 
 # === D9 — LECTURE SEULE STRICTE : le contenu du répertoire est IDENTIQUE avant/après ==============
 D9_DIR="$WORK_DIR/d9-readonly"
 write_marker "$D9_DIR" "guard-x.sh" "$(now_iso)" "guard-x.sh" "motif x"
-snapshot() { ( cd "$1" && find . -type f -exec sh -c 'printf "%s %s %s\n" "$1" "$(wc -c < "$1" | tr -d " ")" "$(stat -f %m "$1" 2>/dev/null || stat -c %Y "$1")"' _ {} \; | sort ); }
+# GNU (-c) AVANT BSD (-f) : meme anti-motif que mtime_epoch() du script teste — ici sans
+# consequence (snapshot() est appele symetriquement avant/apres), mais ne pas laisser ce sens-la
+# comme modele a recopier (deja corrige 2 fois dans ce depot).
+snapshot() { ( cd "$1" && find . -type f -exec sh -c 'printf "%s %s %s\n" "$1" "$(wc -c < "$1" | tr -d " ")" "$(stat -c %Y "$1" 2>/dev/null || stat -f %m "$1")"' _ {} \; | sort ); }
 D9_BEFORE="$(snapshot "$D9_DIR")"
 bash "$SCRIPT" --dir="$D9_DIR" >/dev/null 2>&1
 D9_AFTER="$(snapshot "$D9_DIR")"
