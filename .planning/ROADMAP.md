@@ -739,34 +739,63 @@ Plans:
 
 ### Phase 33: Watchdog & notifications des missions
 
-**Goal**: Un stall de mission ne reste plus jamais silencieux 18 h — chaque nœud du DAG bat,
-l'absence de battement se voit et se signale, et les jalons de mission notifient nativement sur
-l'OS, sans jamais tuer ni spammer.
+**Goal**: Un stall de mission ne survit pas au prochain geste d'une session VF vivante — chaque
+nœud du DAG écrit un progrès, l'absence de progrès se voit et se signale, et les jalons de mission
+notifient nativement sur l'OS, sans jamais tuer ni spammer.
+**Amendement du 2026-08-17 (D-33-B, approuvé par Samuel)** : la promesse initiale (« ne reste plus
+jamais silencieux 18 h ») est remplacée par cette formulation — aucune horloge n'existe côté
+plateforme (spike hooks async, verdict PAS SÛR : les hooks Claude Code ne sont jamais périodiques,
+ils ne réveillent qu'une session déjà active), la détection ne peut donc se faire qu'aux moments
+d'activité d'une session VF vivante, jamais par un démon. **Limite assumée, écrite noir sur
+blanc** : une machine laissée sans aucune session VF ouverte peut connaître un silence prolongé —
+cette phase ne le ferme pas, elle l'accepte comme contrepartie de « zéro démon, portable d'un seul
+geste ». L'option observateur externe (cron/launchd/Tâche planifiée Windows) est explicitement
+**écartée** : installation système par OS, non portable d'un seul geste, contraire à la sobriété
+d'install du milestone Windows-first.
 **Depends on**: Phase 32 (même battement — conçues ensemble, WTCH consomme le heartbeat de LOCK).
-**Research flags** : hooks async / `asyncRewake` (feature jeune) à spiker avant engagement ; canal
-de notification Windows à valider au cadrage (`powershell.exe -Command` proposé, non prouvé
-terrain — le milestone est Windows-first, pas d'`osascript` en dur) ; la définition de « progrès »
-est la décision de cadrage n°1.
+**Recherche menée en ouverture de mission (2026-08-17), verdicts actés (cadrage complet :
+`.planning/phases/VFDO-33-watchdog-notifications-des-missions/33-CONTEXT.md`)** :
+- Hooks async / `asyncRewake` — **PAS SÛR** pour bâtir une horloge de watchdog
+  (`33-SPIKE-hooks-async.md`) : jamais périodiques, ne réveillent qu'une session déjà active.
+- Canal de notification Windows — **retenu : WinRT `ToastNotificationManager` sous
+  `powershell.exe` 5.1** (PAS `pwsh` — les assemblies WinRT n'y sont pas incluses), AUMID emprunté
+  à PowerShell, testé par shims d'argv en CI Linux (`33-SPIKE-canal-notification.md`). Preuve
+  réelle sur Win10/11 non exécutée pendant le cadrage (aucune machine disponible) — recette de
+  validation humaine en **condition de clôture de phase**, rattachée au fil testeurs Windows de
+  l'issue #20 (§7, existence vérifiée).
+- La définition de « progrès » (décision de cadrage n°1) — **tranchée : D-33-A**, deux horloges
+  sur le même `meta` du lock (`heartbeat_epoch` existant + `progress_epoch` additif), stall =
+  vivant mais progrès figé, abandon = les deux horloges mortes.
 **Requirements**: WTCH-01, WTCH-02, WTCH-03, WTCH-04
 **Success Criteria** (what must be TRUE):
 
-  1. Chaque nœud du DAG de mission écrit un battement de progression — même battement que LOCK-01,
-     deux consommateurs, aucun second mécanisme (WTCH-01).
+  1. Chaque nœud du DAG de mission écrit un battement de progression — même battement que LOCK-01
+     (même `meta`, même mécanisme d'écriture additive ADR-064), deux consommateurs
+     (`heartbeat_epoch` pour la vivacité, `progress_epoch` pour le progrès), aucun second
+     mécanisme (WTCH-01).
 
-  2. Un stall est détecté par ABSENCE de battement au-delà du seuil — jamais par auto-déclaration ;
-     le watchdog signale et suggère, ne tue jamais (ADR-031) ; le cas « vivant mais bouclant » est
-     couvert par test (WTCH-02).
+  2. Un stall est détecté par ABSENCE de progrès au-delà du seuil, lock vivant par ailleurs —
+     jamais par auto-déclaration ; le watchdog signale et suggère, ne tue jamais (ADR-031) ; le cas
+     « vivant mais bouclant » (heartbeat frais, progrès figé) est couvert par test (WTCH-02).
 
   3. Une notification OS native part aux jalons de mission (fin de nœud, halt condition) — jamais à
      chaque tour ; `notify.sh` est posé par l'engine (best-effort, fail-open silencieux), portable
-     Windows dès la v1 (WTCH-03).
+     Windows dès la v1, prouvé par shims CI ; validation humaine réelle sur Win10/11 en condition
+     de clôture de phase (WTCH-03).
 
-  4. L'armement (hooks, notify) passe par le gate armement ↔ précondition — jamais un settings
-     local (leçon #38 : un réglage local ne voyage pas) (WTCH-04).
+  4. L'armement (hooks, notify) passe par le gate qui le vérifie réellement — pour les entrées
+     `hooks.json`, c'est le gate CI PORT-05 (établi Phase 32, D-32-07 corollaire), jamais un
+     settings local (leçon #38 : un réglage local ne voyage pas) ; `check-capability-activation.sh`
+     (règle 4) ne s'applique que si un nouvel armement de frontmatter agent/skill est introduit —
+     non requis par le périmètre actuel (WTCH-04).
 
-**Transverse (QUAL-01)** : le signal de stall naît avec ses trois issues (heartbeat illisible =
-BRUYANT, jamais un vert) et sa mutation rouge prouvée.
-**Plans**: TBD
+**Transverse (QUAL-01)** : le signal de stall naît avec ses quatre issues (PASS / stall détecté /
+imparsable-fail-open-silencieux / progrès illisible-fail-open-BRUYANT, réutilisant le canal
+`vf_guard_unavailable` + le hook doctor `check-guard-health.sh` déjà posé en Phase 32) et sa
+mutation rouge prouvée.
+**Plans**: 33-01 (progress_epoch dans driver-lock.sh), 33-02 (wiring dag.sh au point `mark`),
+33-03 (détection de stall, canal BRUYANT), 33-04 (notify.sh portable + détecteur WSL dans
+vf-portable.sh), 33-05 (jalons de notification + recette de clôture Windows) — affinage au plan.
 
 ### Phase 18: Survie du ledger d'exigences à la clôture de jalon
 
