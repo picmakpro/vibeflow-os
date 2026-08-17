@@ -67,6 +67,21 @@ if [ "$#" -lt 2 ] || [ -z "$TITLE" ] || [ -z "$BODY" ]; then
 fi
 
 # ---------------------------------------------------------------------------------------------
+# Gate d'opt-in (D-33-H, amendement Phase 33 tranché par Samuel le 2026-08-17) : l'émission OS
+# native passe d'ON-par-détection à OPT-IN, OFF PAR DÉFAUT. Aucune migration de parc n'est due —
+# v2.56.0 (qui aurait porté le défaut ON) a été retirée de la distribution avant qu'aucun lab ne
+# la reçoive. Fichier-sentinelle scope MACHINE, patron `stop-notify` strict (touch/rm -f, jamais
+# un settings local, leçon #38) : géré par le toggle `/vf-notify` (on/off/status/test).
+# `VF_NOTIFY_OPTIN_FILE` est un point d'injection de TEST UNIQUEMENT (jamais positionné en usage
+# normal — même statut que `VF_PROC_VERSION_PATH` dans vf-portable.sh). Ce gate coupe AVANT tout
+# `command -v` de canal : sentinel absent => sortie immédiate, aucun binaire même sondé. Le signal
+# de stall (D-33-F) ne passe JAMAIS par ce fichier ni par ce script — il est émis séparément par
+# `dag.sh` (`check_stall_signal()`, dag.sh:223-246) et n'appelle jamais notify.sh
+# (`record_milestone()`, dag.sh:248-268, est la seule fonction qui invoque ce script).
+VF_NOTIFY_OPTIN_FILE="${VF_NOTIFY_OPTIN_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/vibeflow/notify-optin}"
+[ -f "$VF_NOTIFY_OPTIN_FILE" ] || exit 0
+
+# ---------------------------------------------------------------------------------------------
 # Cascade de détection — ordre figé : VF_NOTIFY_FORCE_CHANNEL -> WSL -> Windows natif -> Darwin ->
 # Linux -> aucun canal. Le cas WSL+notify-send-présent DOIT choisir powershell.exe, JAMAIS
 # notify-send (spike §WSL, piège nommé — cas N5, anti-régression clé, ne jamais retirer).
@@ -156,6 +171,11 @@ case "$channel" in
   windows) _notify_windows ;;
   darwin)  _notify_darwin ;;
   linux)   _notify_linux ;;
+  # Branche résiduelle laissée telle quelle (décision explicite, pas un oubli) : elle reste
+  # atteignable quand l'opt-in est ARMÉ et que VF_NOTIFY_FORCE_CHANNEL porte une valeur hors
+  # windows/darwin/linux (`none`, `off`, une faute de frappe). Le gate ci-dessus ne couvre QUE le
+  # défaut d'émission (D-33-H), il ne valide pas la valeur de VF_NOTIFY_FORCE_CHANNEL — durcir
+  # cette branche est un chantier de robustesse distinct, hors périmètre littéral ici.
   *) : ;;
 esac
 
