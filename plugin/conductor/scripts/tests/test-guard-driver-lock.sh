@@ -39,6 +39,26 @@ print(json.dumps({"tool_name": "Bash", "tool_input": {"command": sys.argv[1]},
                    "session_id": sys.argv[2], "cwd": sys.argv[3]}))' "$1" "$2" "$3"
 }
 
+mk_write() { # file_path content session_id
+  python3 -c '
+import json, sys
+print(json.dumps({"tool_name": "Write", "tool_input": {"file_path": sys.argv[1], "content": sys.argv[2]},
+                   "session_id": sys.argv[3]}))' "$1" "$2" "$3"
+}
+
+mk_edit() { # file_path old new session_id
+  python3 -c '
+import json, sys
+print(json.dumps({"tool_name": "Edit", "tool_input": {"file_path": sys.argv[1], "old_string": sys.argv[2], "new_string": sys.argv[3]},
+                   "session_id": sys.argv[4]}))' "$1" "$2" "$3" "$4"
+}
+
+mk_other() { # tool_name session_id
+  python3 -c '
+import json, sys
+print(json.dumps({"tool_name": sys.argv[1], "tool_input": {"file_path": "x"}, "session_id": sys.argv[2]}))' "$1" "$2"
+}
+
 run_guard() { # payload
   printf '%s' "$1" | VF_DRIVER_LOCK="$LOCK" "$BASH_BIN" "$GUARD" 2>/dev/null
 }
@@ -166,6 +186,107 @@ PAY_P1=$(mk_bash 'ls -la' sess-intrus .)
 OUT_P1="$(printf '%s' "$PAY_P1" | VF_DRIVER_LOCK="$LOCK" PATH="$P0_BIN" "$BASH_BIN" "$GUARD" 2>/dev/null)"; RC_P1=$?
 assert_exit "P1 — exit 0, commande sans verbe concerné" "$RC_P1" 0
 assert_empty "P1 — sortie vide, commande sans verbe concerné" "$OUT_P1"
+
+"$DRIVER" release --owner=mission-X >/dev/null 2>&1
+
+echo ""
+echo "=== S1 — chaque famille de la surface A, session tierce, lock vivant : deny ==="
+rm -rf "$LOCK"
+CLAUDE_CODE_SESSION_ID=sess-holder "$DRIVER" acquire --owner=mission-X --step=s1 >/dev/null
+s1_cmds=(
+  "git merge autre-branche"
+  "git rebase main"
+  "git cherry-pick abc123"
+  "git revert abc123"
+  "git reset --hard HEAD~1"
+  "git clean -fd"
+  "git push origin main"
+  "git tag v9.9.9"
+  "git branch -D autre-branche"
+  "git stash pop"
+  "git worktree remove ../ailleurs"
+  "gh pr create --title x"
+  "gh release create v1.0.0"
+)
+for c in "${s1_cmds[@]}"; do
+  OUT="$(run_guard "$(mk_bash "$c" sess-intrus .)")"
+  assert "S1 — '$c' → deny" "$OUT" '"permissionDecision": "deny"'
+done
+
+echo ""
+echo "=== S2 (EXEMPTION NOMMÉE) — 'git worktree add' reste ouvert, même sous lock tiers ==="
+OUT_S2="$(run_guard "$(mk_bash 'git worktree add ../ailleurs -b b' sess-intrus .)")"
+assert_empty "S2 — worktree add jamais bloqué (porte de sortie du lock)" "$OUT_S2"
+
+echo ""
+echo "=== S3 — position de commande : un motif de recherche n'est pas une commande ==="
+OUT_S3="$(run_guard "$(mk_bash 'grep -n "git commit" fichier.md' sess-intrus .)")"
+assert_empty "S3 — 'grep -n \"git commit\" …' → allow (verbe en position ARGUMENT, quoté)" "$OUT_S3"
+OUT_S3B="$(run_guard "$(mk_bash 'echo git commit -m x' sess-intrus .)")"
+assert_empty "S3b — 'echo git commit -m x' → allow (git en position ARGUMENT d'echo, pas en position de commande)" "$OUT_S3B"
+
+echo ""
+echo "=== S4 — document en ligne citant un commit : texte, pas une commande ==="
+HEREDOC_CMD=$(printf 'cat <<EOF\ngit commit -m x\nEOF')
+OUT_S4="$(run_guard "$(mk_bash "$HEREDOC_CMD" sess-intrus .)")"
+assert_empty "S4 — heredoc citant 'git commit' → allow (contenu = texte)" "$OUT_S4"
+
+echo ""
+echo "=== S5 — wrappers transparents (sudo, env) ==="
+OUT_S5a="$(run_guard "$(mk_bash 'sudo git commit -m x' sess-intrus .)")"
+assert "S5a — 'sudo git commit' → deny (wrapper transparent)" "$OUT_S5a" '"permissionDecision": "deny"'
+OUT_S5b="$(run_guard "$(mk_bash 'env FOO=1 git commit -m x' sess-intrus .)")"
+assert "S5b — 'env FOO=1 git commit' → deny (wrapper transparent)" "$OUT_S5b" '"permissionDecision": "deny"'
+
+echo ""
+echo "=== S6 — chaînage classique (&&) ==="
+OUT_S6="$(run_guard "$(mk_bash 'ls && git commit -m x' sess-intrus .)")"
+assert "S6 — 'ls && git commit' → deny" "$OUT_S6" '"permissionDecision": "deny"'
+
+echo ""
+echo "=== S7/S8 — ÉCHAPPATOIRE (marqueur littéral / variable d'environnement) ==="
+OUT_S7="$(run_guard "$(mk_bash 'git commit -m x  # vibeflow:allow-lock-override' sess-intrus .)")"
+assert_empty "S7 — marqueur littéral dans la commande → allow" "$OUT_S7"
+OUT_S8="$(printf '%s' "$(mk_bash 'git commit -m x' sess-intrus .)" | VF_DRIVER_LOCK="$LOCK" VF_DRIVER_LOCK_OVERRIDE=1 "$BASH_BIN" "$GUARD" 2>/dev/null)"
+assert_empty "S8 — variable d'environnement d'exception → allow" "$OUT_S8"
+
+echo ""
+echo "=== S9 (BL-7, EXEMPTION NOMMÉE) — issue de secours rebase/merge/cherry-pick ==="
+for c in "git rebase --abort" "git rebase --continue" "git merge --abort" "git cherry-pick --abort"; do
+  OUT="$(run_guard "$(mk_bash "$c" sess-intrus .)")"
+  assert_empty "S9 — '$c' → allow (issue de secours, jamais fermée)" "$OUT"
+done
+
+echo ""
+echo "=== S10 (contrepoint de S9, ne jamais retirer) — rebase SANS option de sortie reste refusé ==="
+OUT_S10="$(run_guard "$(mk_bash 'git rebase -i main' sess-intrus .)")"
+assert "S10 — 'git rebase -i main' → deny (seule l'OPTION de sortie est exemptée)" "$OUT_S10" '"permissionDecision": "deny"'
+
+echo ""
+echo "=== C1/C2/C3 — Write|Edit sous .planning/, session tierce vs détenteur ==="
+OUT_C1="$(run_guard "$(mk_write .planning/STATE.md 'contenu' sess-intrus)")"
+assert "C1 — Write sous .planning/ (session tierce) → deny" "$OUT_C1" '"permissionDecision": "deny"'
+OUT_C2="$(run_guard "$(mk_edit .planning/STATE.md 'ancien' 'nouveau' sess-intrus)")"
+assert "C2 — Edit sous .planning/ (session tierce) → deny" "$OUT_C2" '"permissionDecision": "deny"'
+OUT_C3W="$(run_guard "$(mk_write .planning/STATE.md 'contenu' sess-holder)")"
+assert_empty "C3 — Write sous .planning/ (détenteur) → allow (discriminance)" "$OUT_C3W"
+OUT_C3E="$(run_guard "$(mk_edit .planning/STATE.md 'ancien' 'nouveau' sess-holder)")"
+assert_empty "C3 — Edit sous .planning/ (détenteur) → allow (discriminance)" "$OUT_C3E"
+
+echo ""
+echo "=== C4 — Write HORS .planning/ : jamais bloqué, même sous lock tiers ==="
+OUT_C4="$(run_guard "$(mk_write src/foo.ts 'contenu' sess-intrus)")"
+assert_empty "C4 — Write hors .planning/ → allow (D-32-B borne le périmètre)" "$OUT_C4"
+
+echo ""
+echo "=== C5 — outil hors périmètre (ni Bash, ni Write, ni Edit) ==="
+OUT_C5="$(run_guard "$(mk_other Read sess-intrus)")"
+assert_empty "C5 — outil 'Read' → allow (hors périmètre du guard)" "$OUT_C5"
+
+echo ""
+echo "=== L1 (LIMITE ASSUMÉE, HORS DE PORTÉE ASSUMÉE — rouge documenté, non corrigé) ==="
+OUT_L1="$(run_guard "$(mk_bash 'bash ./scripts/release.sh' sess-intrus .)")"
+assert_empty "L1 — script du dépôt qui commite en interne → allow (HORS DE PORTÉE ASSUMÉE, documenté en en-tête, pas corrigé)" "$OUT_L1"
 
 "$DRIVER" release --owner=mission-X >/dev/null 2>&1
 

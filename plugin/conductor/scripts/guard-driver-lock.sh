@@ -30,6 +30,19 @@
 # GRANULARITÉ (D-32-03(e)) : le guard garantit qu'aucune AUTRE SESSION ne commite sous le lock,
 # JAMAIS qu'aucun autre acteur DE LA MÊME session ne le fait — ce n'est pas une garantie plus fine.
 #
+# DEUX EXEMPTIONS NOMMÉES (D-32-06, BL-7 — jamais retirées, jamais élargies à la sous-commande
+# entière) :
+#   - `git worktree add` : épargné parce que c'est la PORTE DE SORTIE que le lock lui-même
+#     prescrit à une session tierce (« travaille dans un arbre séparé »). Le RETRAIT de worktree
+#     (`git worktree remove`) N'EST PAS épargné — ne pas « simplifier » en portant l'exemption sur
+#     `worktree` entier.
+#   - Les options `--abort`/`--continue`/`--skip`/`--quit` de `rebase`/`merge`/`cherry-pick`/
+#     `revert`/`stash` : épargnées parce qu'elles sont l'ISSUE DE SECOURS d'une session démarrée
+#     AVANT la pose du lock d'autrui — sans cette exemption le guard recréerait le wedge que
+#     32-SPIKE-reference-transaction.md a fait rejeter pour `reference-transaction` (`git rebase
+#     --abort` bloqué par la garde elle-même). Seule l'OPTION de sortie est exemptée, jamais la
+#     sous-commande entière : `git rebase -i main` (sans une de ces options) reste refusé.
+#
 # Fail-open à QUATRE issues (QUAL-01, jamais trois) : PASS (silence) / DENY (JSON) / payload
 # imparsable → fail-open SILENCIEUX (exit 0, stdout vide) / interprète indisponible → fail-open
 # BRUYANT (vf_guard_unavailable : marqueur de santé + stderr + code de garde, JAMAIS écrasé par 0).
@@ -56,7 +69,7 @@ INPUT="$(cat 2>/dev/null || true)"
 # ci-dessus ; ajouter '.planning' ferait payer un spawn à `sed -i .planning/STATE.md` pour un
 # guard qui, au bout du spawn, laisse TOUJOURS passer ce cas — régression de latence pure).
 case "$INPUT" in
-  *commit*|*checkout*|*switch*|*'"Write"'*|*'"Edit"'*) : ;;
+  *commit*|*checkout*|*switch*|*restore*|*merge*|*rebase*|*'cherry-pick'*|*revert*|*reset*|*clean*|*push*|*tag*|*branch*|*stash*|*worktree*|*'gh '*|*'"Write"'*|*'"Edit"'*) : ;;
   *) exit 0 ;;
 esac
 
@@ -113,11 +126,15 @@ import json, os, re, sys, time
 
 MARKER = "vibeflow:allow-lock-override"
 WRAPPERS = {"sudo", "env", "command", "nohup", "time", "xargs", "nice", "stdbuf", "caffeinate"}
-# Tâche 1 (tracer) : surface réduite au strict nécessaire pour A/B — commit, checkout, switch.
-# La surface complète (merge/rebase/cherry-pick/revert/reset/clean/push/tag/branch/stash/worktree,
-# gh pr|release) et les DEUX exemptions nommées (worktree add, options de sortie rebase/merge/
-# cherry-pick/revert/stash) arrivent tâche 2 (D-32-06, BL-7) — pas de sous-analyse anticipée ici.
-MUTATING_GIT_VERBS = {"commit", "checkout", "switch"}
+# Surface A du rejeu (D-32-06) — verbes git mutants dont on ne cherche PAS à sous-analyser
+# davantage (checkout de branche vs de fichier, branch -D vs autre usage…) : les deux mutent
+# l arbre partagé sous le lock d autrui, sous-analyser n ajouterait que de la surface de
+# contournement pour aucun gain de sûreté. `worktree` (add/remove) et les sous-commandes de
+# reprise (rebase/merge/cherry-pick/revert/stash) sont traitées À PART ci-dessous : elles portent
+# chacune une exemption NOMMÉE (D-32-06, BL-7).
+MUTATING_GIT_VERBS = {"commit", "checkout", "switch", "restore", "reset", "clean", "push", "tag", "branch"}
+RESUMABLE_SUBVERBS = {"rebase", "merge", "cherry-pick", "revert", "stash"}
+RESUME_EXIT_OPTIONS = {"--abort", "--continue", "--skip", "--quit"}
 
 def sanitize(s):
     return "".join(c for c in (s or "") if c.isalnum() or c in "._-")
@@ -195,11 +212,17 @@ def tokens(seg):
         return seg.split()
 
 def bash_command_concerned(cmd):
-    """True si `cmd` porte, EN POSITION DE COMMANDE, un geste git mutant de la surface (tâche 1 :
-    commit/checkout/switch seulement). (BL-1) Le payload est d abord découpé sur \\n et \\r AVANT
-    la segmentation sur les opérateurs de chaînage — un `git commit` qui n est pas le premier
-    segment de la commande (payload Bash multi-lignes, forme normale d un agent qui enchaîne
-    plusieurs commandes) ne doit jamais rester invisible (A5)."""
+    """True si `cmd` porte, EN POSITION DE COMMANDE, un geste concerné (surface A du rejeu, verbes
+    git mutants + outil de PR). (BL-1) Le payload est d abord découpé sur \\n et \\r AVANT la
+    segmentation sur les opérateurs de chaînage — un `git commit` qui n est pas le premier segment
+    de la commande (payload Bash multi-lignes, forme normale d un agent qui enchaîne plusieurs
+    commandes) ne doit jamais rester invisible (A5). Deux exemptions NOMMÉES (D-32-06, BL-7),
+    jamais retirées : `git worktree add` (porte de sortie prescrite par le lock lui-même — le
+    RETRAIT de worktree n est PAS épargné, ne pas "simplifier" en portant l exemption sur la
+    sous-commande entière) et les options `--abort/--continue/--skip/--quit` de rebase/merge/
+    cherry-pick/revert/stash (issue de secours d une session démarrée AVANT la pose du lock
+    d autrui — sans cette exemption le guard recréerait le wedge que 32-SPIKE a fait rejeter pour
+    `reference-transaction` ; la sous-commande SANS une de ces options reste, elle, refusée)."""
     # CSL-05 : troncature au premier marqueur de document en ligne — son contenu est du TEXTE.
     cmd = cmd.split("<<", 1)[0]
     for line in re.split(r"[\n\r]+", cmd):
@@ -209,7 +232,27 @@ def bash_command_concerned(cmd):
                 name = os.path.basename(toks[idx])
                 if name == "git":
                     j = skip_git_globals(toks, idx + 1)
-                    if j < len(toks) and toks[j] in MUTATING_GIT_VERBS:
+                    if j >= len(toks):
+                        continue
+                    subverb = toks[j]
+                    rest = toks[j + 1:]
+                    if subverb == "worktree":
+                        sub2 = rest[0] if rest else ""
+                        if sub2 == "add":
+                            continue  # exemption nommée : porte de sortie prescrite par le lock
+                        if sub2 == "remove":
+                            return True
+                        continue  # autres sous-commandes worktree (list, prune…) : hors surface
+                    if subverb in RESUMABLE_SUBVERBS:
+                        if any(o in rest for o in RESUME_EXIT_OPTIONS):
+                            continue  # exemption nommée (BL-7) : issue de secours, pas la
+                            # sous-commande entière — S10 reste refusé sans une de ces options
+                        return True
+                    if subverb in MUTATING_GIT_VERBS:
+                        return True
+                elif name == "gh":
+                    sub = toks[idx + 1] if idx + 1 < len(toks) else ""
+                    if sub in ("pr", "release"):
                         return True
     return False
 
@@ -224,15 +267,33 @@ if not isinstance(ti, dict):
     sys.exit(0)
 
 sid = payload.get("session_id") or ""
-
-if tool != "Bash":
-    sys.exit(0)  # voie Write/Edit : tâche 2
-
-cmd = ti.get("command")
-if not isinstance(cmd, str) or not cmd:
-    sys.exit(0)
-
 cwd = payload.get("cwd") or "."
+
+# Deux voies (D-32-05) : Bash (verbes git mutants + outil de PR) et Write|Edit, restreinte au
+# dossier de planification (D-32-B, I2). `text_for_marker` porte le texte dans lequel chercher
+# l échappatoire (commande pour Bash, contenu ENTRANT pour Write/Edit).
+if tool == "Bash":
+    cmd = ti.get("command")
+    if not isinstance(cmd, str) or not cmd:
+        sys.exit(0)
+    text_for_marker = cmd
+elif tool in ("Write", "Edit"):
+    fp = ti.get("file_path")
+    if not isinstance(fp, str) or not fp:
+        sys.exit(0)
+    # Chemins Windows : antislashs simples OU doublés par l échappement JSON (ADR-054,
+    # guard-bash-registres.sh:40-42) — sans ces deux formes la garde est inerte sous Windows en
+    # PARAISSANT installée. Frontière EXACTE (jamais un suffixe, guard-agent-write.sh:64-67).
+    norm = fp.replace("\\\\", "/").replace("\\", "/")
+    if not re.search(r"(^|/)\.planning/", norm):
+        sys.exit(0)  # C4 : hors du dossier de planification -> allow, quel que soit le lock
+    if tool == "Write":
+        content = ti.get("content")
+    else:
+        content = ti.get("new_string")
+    text_for_marker = content if isinstance(content, str) else ""
+else:
+    sys.exit(0)  # C5 : outil hors périmètre (ni Bash, ni Write, ni Edit) -> allow
 
 # Résolution du chemin du lock, relativement au cwd du payload s il est relatif.
 lock_raw = os.environ.get("VF_DRIVER_LOCK", ".planning/DRIVER.lock")
@@ -240,11 +301,11 @@ lock_dir = lock_raw if os.path.isabs(lock_raw) else os.path.join(cwd, lock_raw)
 lock_parent = os.path.dirname(lock_dir) or "."
 lock_base = os.path.basename(lock_dir)
 
-# ÉCHAPPATOIRE (D-32-06) : marqueur littéral dans la commande, OU variable d environnement
-# d exception — journalisée BEST-EFFORT (SE-2, T-32-37) avant de sortir, sans jamais bloquer sur
-# un échec d écriture du journal.
-if os.environ.get("VF_DRIVER_LOCK_OVERRIDE") == "1" or MARKER in cmd:
-    journal_override(lock_parent, lock_base, sid, cmd)
+# ÉCHAPPATOIRE (D-32-06) : marqueur littéral dans le texte (commande OU contenu entrant), OU
+# variable d environnement d exception — journalisée BEST-EFFORT (SE-2, T-32-37) avant de sortir,
+# sans jamais bloquer sur un échec d écriture du journal.
+if os.environ.get("VF_DRIVER_LOCK_OVERRIDE") == "1" or MARKER in text_for_marker:
+    journal_override(lock_parent, lock_base, sid, text_for_marker)
     sys.exit(0)
 
 meta_path = os.path.join(lock_dir, "meta")
@@ -286,8 +347,11 @@ session_ids = [s for s in session_ids_raw.split(",") if s]
 if not session_ids:
     sys.exit(0)  # règle 2 : lock pré-Phase-32 / CLI hors session -> allow (rétrocompat)
 
-if not bash_command_concerned(cmd):
-    sys.exit(0)  # aucun geste concerné en position de commande -> allow
+if tool == "Bash":
+    if not bash_command_concerned(cmd):
+        sys.exit(0)  # aucun geste concerné en position de commande -> allow
+# Write/Edit : déjà restreint au dossier de planification ci-dessus (C4) -> toujours concerné,
+# aucune analyse de verbe supplémentaire (D-32-B protège le CHEMIN, pas un sous-ensemble de gestes).
 
 if sid and sid in session_ids:
     sys.exit(0)  # règle 3 : détenteur (manager OU sous-agent, session_id partagé) -> allow
