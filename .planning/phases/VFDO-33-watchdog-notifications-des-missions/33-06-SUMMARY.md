@@ -67,6 +67,28 @@ opposée : notifie quand le sentinel est présent au lieu d'absent). Aucun hook 
 entre-temps). **État final livré et committé : correct, vérifié.** Signalé pour investigation —
 pas une action de ce plan, pas corrigé silencieusement.
 
+> **Note d'explication ajoutée le 2026-08-17 (hygiène documentaire de fin de mission) — rien à
+> investiguer.** La cause est connue et bénigne : **deux workers avaient été dispatchés en parallèle
+> par erreur du manager** sur le même fichier `notify.sh`, chacun y appliquant sa propre mutation
+> pour produire sa preuve de discriminance. Le passage ci-dessus est conservé tel quel — c'est un
+> constat honnête écrit sans cette information —, mais ce n'était **pas** une anomalie
+> d'environnement, ni un hook fantôme, ni une mutation d'origine inconnue. Aucun ticket, aucune
+> investigation ouverte. La leçon utile est de coordination, pas d'outillage : deux mandats
+> concurrents mutant le même fichier rendent toute mesure de mutation non attribuable — et l'état
+> final n'était sain que parce que `HEAD` a été revérifié à chaque fois.
+>
+> **Le phénomène a été re-observé en direct pendant cette hygiène documentaire** (2026-08-17), ce
+> qui confirme l'explication plutôt que l'infirme : `notify.sh` était identique à `HEAD`
+> (sha256 `363dfab8…`) au début du mandat, puis portait vingt minutes plus tard une mutation non
+> commitée — retrait du `>/dev/null 2>&1` sur la branche `osascript` de `_notify_darwin()`
+> (sha256 `b4ca0fb1…`) —, une revue de code tournant en parallèle sur `plugin/`. **`HEAD` est resté
+> correct** et cette mutation n'a **pas** été emportée dans le commit d'hygiène (forme pathspec,
+> `plugin/` hors périmètre). Conséquence pratique à retenir : **ne jamais conclure « arbre propre »
+> sur un `git status` seul pendant qu'un autre agent travaille** — ici `git status` a d'abord
+> affiché le fichier propre, puis modifié, alors que seule la comparaison de sha256 contre le blob
+> `HEAD` a tranché. À restaurer par qui l'a produite (`git checkout -- plugin/conductor/scripts/notify.sh`)
+> avant tout push.
+
 ## Commit hors de mon contrôle direct
 
 Un commit `288725c` ("fix(docs): compte de suites 65 -> 66 dans les README racine (déviation
@@ -90,3 +112,72 @@ mission (manager ou worker parallèle) réagissant au même gate. **Signalé, pa
   `conductor` que porte ce plan (v1.28.0). Le triplet racine reste sciemment intact
   (`git diff -- VERSION plugin/.claude-plugin/plugin.json .claude-plugin/marketplace.json` vide),
   décision motivée dans le plan, pas un oubli.
+
+---
+
+## Addendum — ce qui a changé APRÈS la rédaction de ce SUMMARY
+
+> Ce SUMMARY a été écrit au commit `d269bfa`. Deux vagues de correction ont suivi ; les chiffres des
+> sections ci-dessus (notamment « 55 PASS » pour `test-notify.sh`) sont donc **datés de leur
+> rédaction** et ne sont pas repris ici — ils sont remplacés par les mesures finales.
+
+### 1. Durcissement de N17 — l'assertion centrale ne discriminait pas (commit `60dc763`)
+
+N17 lisait le compteur d'invocations après un **`sleep 0.3` fixe**, plus court que le délai réel du
+**fork détaché** de `notify.sh` (`( … & ) &`) — mesuré à **0,32–0,42 s** avant écriture du `.count`
+(15 runs). Conséquence directe : **sous mutation du gate par inversion, N17 restait VERT alors que
+le canal émettait réellement**. La preuve centrale du défaut OFF ne discriminait donc pas contre
+cette classe de régression — la mutation rouge documentée plus haut ne couvrait que la **suppression**
+du gate, pas son **inversion**.
+
+Correctif : `sleep 0.3` → **`wait_for_file … 2`** (le patron déjà employé par N2/N3/N18), budget
+calibré ≈ 5× la borne haute mesurée du fork. Vérifié vert sur code sain, **rouge sous mutation par
+inversion** (la régression que la version précédente manquait) **et** rouge sous mutation par
+suppression (non-régression).
+
+Chiffrage indépendant du vérificateur de l'annexe (`33-VERIFICATION-ANNEXE.md`, rejeu en bac à sable
+hors dépôt, 30 itérations par configuration) : `notify.sh` réel **0/30** faux positif · mutant +
+assertion actuelle **30/30** détectés (latence max 610 ms) · mutant + ancienne assertion `sleep 0.3`
+**25/30** (5 ratés, soit ~17 % d'aveuglement) · mutant sans aucune attente **0/30**, totalement
+aveugle. Le correctif est **mesuré, pas cosmétique**.
+
+### 2. Correctifs post-revue (commit `401c903`)
+
+- **B1, bloquant — le fail-open n'était plus inconditionnel.** `${XDG_CONFIG_HOME:-$HOME/.config}`
+  déréférençait `$HOME` **sans garde sous `set -uo pipefail`** : `HOME`, `XDG_CONFIG_HOME` et
+  `VF_NOTIFY_OPTIN_FILE` tous absents ⇒ `notify.sh` meurt en `exit 1` avec fuite sur stderr,
+  falsifiant la garantie « FAIL-OPEN SILENCIEUX INCONDITIONNEL » capitalisée en tête de fichier.
+  Le **défaut OFF n'était pas falsifié** pour autant (mort avant tout `command -v`). Garde
+  **`${HOME:-}`** appliquée à l'identique aux emplacements qui doivent rester littéralement égaux :
+  `notify.sh`, `SKILL.md` (4 occurrences) et le `SENTINEL_SUBSTRING` du test d'identité. Nouveau
+  cas **N19** (`env -u HOME -u XDG_CONFIG_HOME -u VF_NOTIFY_OPTIN_FILE` → exit 0, stderr vide,
+  zéro invocation), prouvé rouge sous mutation puis restauré vert.
+- **B2, majeur — la classe « assertion de zéro invocation sans attendre un fork potentiellement
+  détaché » survivait ailleurs.** **N9** durci avec `wait_for_file` (même patron, budget 2 s) —
+  il était mesuré **aveugle à 100 %** (0/30). Mutation de l'aiguillage d'arguments prouvée rouge
+  puis restaurée. **N12** durci par précaution, avec la réserve mesurée : `chmod -x` bloque
+  l'exécution au niveau noyau indépendamment de toute mutation de `notify.sh`, donc aucune mutation
+  crédible n'y produit de fork réel (cas structurellement déterministe, comme N16). N2/N5/N10/N14
+  vérifiés déterministes par construction (`if`/`elif`, `case`, `grep` statique) — hors classe.
+- **B3, majeur — piège `user_present` mal attribué.** `SKILL.md` imputait au **toast OS** de
+  `/vf-notify test` le piège `user_present` du harness (`PushNotification`), alors que `notify.sh`
+  n'a **aucune** détection de présence. Reformulé pour scoper le piège au **push relayé** (Pattern H,
+  `mission-flow.md`) uniquement.
+- **Mineurs** — `README.md` du module recompté à **21 suites** (`find` re-exécuté ; « 19 » était
+  déjà faux **avant** cette annexe, aux deux emplacements : ligne « Tests » et arbre « Contenu du
+  module ») ; `wc -l <` remis en forme non redirigée dans `test-vf-notify.sh` (garde
+  anti-vert-à-vide).
+
+### 3. Chiffres finaux (re-dérivés le 2026-08-17, après `401c903`)
+
+| Mesure | Valeur |
+|---|---|
+| `test-notify.sh` | **59 PASS / 0 FAIL / 0 SKIP** (N1-N19) — 55 au moment de la rédaction initiale |
+| `test-vf-notify.sh` | **18 PASS / 0 FAIL** (inchangé) |
+| Parc complet | **66 suites découvertes / 66 OK / 0 KO** |
+| `check-version-sync.sh` | exit 0 |
+| `check-agents.sh --agents-dir=plugin/dev-orchestrator/agents` | exit 0 |
+
+Verdict de l'annexe : `33-VERIFICATION-ANNEXE.md` — **5/6 critères D-33-H ATTEINTS**, critère 1
+`PARTIEL` au moment de la vérification, **fermé ensuite par `401c903`** (les deux `missing` qu'il
+nommait — garde aux deux emplacements, cas N19 — sont livrés).
