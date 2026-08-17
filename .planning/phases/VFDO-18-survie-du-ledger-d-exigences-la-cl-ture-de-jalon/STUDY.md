@@ -467,6 +467,38 @@ grammaire, un overlay et un skill de merge agentique : il se comble avec **un ge
 
 ### 7.2 La variante — description précise
 
+> ## ⚠ AMENDEMENT DU 2026-08-17 — CE §7.2 EST PÉRIMÉ SUR SON POINT CENTRAL
+>
+> **Ne pas implémenter la variante telle qu'elle est décrite ci-dessous.** La forme retenue est
+> le **roll-forward**, pas le keep-file. Décisions à jour : `18-CONTEXT.md` (D-18-01 à D-18-04).
+>
+> **Ce qui a changé.** La RFC upstream annoncée ici comme dépendance a été déposée le 2026-08-15
+> (`open-gsd/gsd-core#3556`, LEDG-03, portée par la Phase 30). Un collaborateur amont y a répondu
+> avec un **prototype chiffré** — 4 variantes de frontière de jalon × 5 checks de conflit :
+>
+> | Variante | Conflits | Verdict amont |
+> |---|---|---|
+> | Baseline (archive + `git rm` + régénération) — l'existant | 0/5 | sans conflit, mais rien ne survit |
+> | Keep-file via flag de config | **4/5** | readiness count pollué, findings fantômes, intention brisée, chevauchement d'IDs |
+> | Flag CLI `--keep-requirements` | **4/5** | même état — et **no-op** : le CLI ne supprime pas, c'est le workflow |
+> | **Roll-forward** (archiver les livrées ; porter les non-livrées avec `carried-from: v[X.Y]`) | **0/5** | **seule variante sans conflit qui garde les exigences actionnables** |
+>
+> **La ligne « le fichier **reste** » du tableau ci-dessous est exactement la variante keep-file
+> mesurée à 4/5 conflits.** Le reste du §7.2 — le refus du merge agent-driven, l'échappement au
+> double état, l'encadré sur la RFC comme dépendance — **tient toujours**.
+>
+> **Le risque porteur décrit dans l'encadré ci-dessous est par ailleurs désamorcé** (D-18-05,
+> D-18-07) : VibeFlow ne pose plus un gate seul qui combattrait le moteur, mais un **rattrapage
+> qui s'exécute APRÈS la clôture** et reconstitue le ledger depuis l'archive. Il suit le moteur au
+> lieu de s'y opposer, donc il ne dépend pas de la RFC pour fonctionner — un refus amont le rend
+> permanent au lieu de déclencher le ré-arbitrage intégral prévu en **D3**.
+>
+> Restent valides et directement exploitables : le **§7.1** (le trou, inchangé — vérifié le
+> 2026-08-17, `complete-milestone.md:433,501` en gsd-core 1.10.0 supprime toujours sans condition,
+> donc **D1 non satisfaite**), le **§7.3** (chiffrage, à corriger d'un point : l'analogue
+> `check-doc-drift.sh` fait aujourd'hui **167 l.** et son test **278 l.**, soit un ratio **1,66×**
+> et non 1,5×), et le **§8** (conditions d'invalidation).
+
 > **Faire survivre les exigences à la clôture de jalon. Un fichier qui existe déjà, aucun nouveau
 > registre, aucune nouvelle grammaire, aucun overlay.**
 
