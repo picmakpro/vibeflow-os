@@ -128,10 +128,10 @@ SessionStart), `vf-update-run.sh` (re-matérialise les modules depuis le cache p
 ADR-042) et `generate-agent-commands.sh` (une commande slash d'incarnation par agent posé — saute
 les workers `vf-internal: true`, Pattern 12).
 
-**Tests** : 19 suites sous `scripts/tests/` (une par script critique + `test-conductor.sh`,
+**Tests** : 21 suites sous `scripts/tests/` (une par script critique + `test-conductor.sh`,
 `test-vf-new-lab.sh`, `test-vf-update.sh`, `test-doc-and-commands.sh`). *(Compte re-dérivé :
-`find plugin/conductor/scripts/tests -type f -name 'test-*.sh' | wc -l` ; « 12 suites » était déjà
-faux avant la Phase 32.)*
+`find plugin/conductor/scripts/tests -type f -name 'test-*.sh' | wc -l` ; « 19 suites » était déjà
+faux avant cette annexe notifications.)*
 
 ## Contenu du module
 
@@ -144,7 +144,7 @@ conductor/
     vf-calibrate/SKILL.md          # propagation update + migration
     vf-update/SKILL.md             # mise à jour plugin + modules
     vf-notify/SKILL.md             # toggle notifications OS (opt-in, D-33-H)
-  scripts/                         # 20 scripts (familles ci-dessus) + tests/ (19 suites)
+  scripts/                         # 20 scripts (familles ci-dessus) + tests/ (21 suites)
   references/
     team-kernel.md                 # contrat du noyau d'équipe (manager/workers/juges)
     contracts.md                   # escalade sous-agents → conductor

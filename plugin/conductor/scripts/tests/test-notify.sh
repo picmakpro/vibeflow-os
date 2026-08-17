@@ -254,10 +254,19 @@ assert "N8 — le shim a fini par tourner en arrière-plan (.done finit par appa
 
 echo ""
 echo "=== N9 — arguments manquants : exit 0, zéro invocation ==="
+# ATTENTE SUR L'ABSENCE (même patron que N17, cf. sa note) : dans l'implémentation correcte,
+# notify.sh sort AVANT même le gate d'opt-in (aucun fork n'est jamais tenté), donc rien n'apparaît
+# ici quel que soit le budget d'attente. Mais une mutation qui retire/affaiblit la validation
+# d'arguments laisse le flux continuer jusqu'au gate (armé, VF_NOTIFY_OPTIN_FILE=OPTIN_ARMED) puis
+# jusqu'au channel forcé darwin, qui FORK réellement en arrière-plan (( osascript … & )) — sans
+# wait_for_file, un `call_count` lu immédiatement après le retour de `env … bash "$NOTIFY"` peut
+# lire .count avant que ce fork n'ait eu le temps d'écrire dessus, laissant N9 vert même sous cette
+# mutation (mesuré : 0/30 détection sans l'attente). Budget 2s, identique à N17.
 N9A_DIR="$WORK_DIR/n9a"; mkdir -p "$N9A_DIR"
 write_shim "$N9A_DIR" osascript
 N9A_RC=0
 env PATH="$N9A_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" bash "$NOTIFY" >/dev/null 2>&1 || N9A_RC=$?
+wait_for_file "$N9A_DIR/osascript.count" 2
 assert_exit "N9 — sans aucun argument : exit 0" "$N9A_RC" 0
 assert_eq "N9 — sans aucun argument : zéro invocation osascript" "$(call_count "$N9A_DIR" osascript)" "0"
 
@@ -265,6 +274,7 @@ N9B_DIR="$WORK_DIR/n9b"; mkdir -p "$N9B_DIR"
 write_shim "$N9B_DIR" osascript
 N9B_RC=0
 env PATH="$N9B_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" bash "$NOTIFY" "Titre seul" >/dev/null 2>&1 || N9B_RC=$?
+wait_for_file "$N9B_DIR/osascript.count" 2
 assert_exit "N9 — TITLE seul (BODY absent) : exit 0" "$N9B_RC" 0
 assert_eq "N9 — TITLE seul : zéro invocation osascript" "$(call_count "$N9B_DIR" osascript)" "0"
 
@@ -295,7 +305,12 @@ chmod -x "$N12_DIR/osascript"
 N12_OUT="$WORK_DIR/n12.out"; N12_ERR="$WORK_DIR/n12.err"
 N12_RC=0
 env PATH="$N12_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" bash "$NOTIFY" "Titre N12" "Corps N12" >"$N12_OUT" 2>"$N12_ERR" || N12_RC=$?
-sleep 0.3
+# ATTENTE SUR L'ABSENCE (même patron que N17/N9) : un `sleep 0.3` fixe manque le fork dans le pire
+# cas mesuré (cf. note N17 ci-dessus, ~0.32-0.42s) — sous une mutation qui retire le `command -v`
+# et invoque le candidat sans le tester, le shim (chmod -x) échoue à l'exec mais le comportement
+# exact dépend du shell forké ; wait_for_file ferme la fenêtre plutôt que de la garder ouverte au
+# jugé (mesuré : 25/30 détection avec sleep 0.3 fixe). Budget 2s, identique à N9/N17.
+wait_for_file "$N12_DIR/osascript.count" 2
 assert_exit "N12 — shim non exécutable : exit 0 quand même" "$N12_RC" 0
 assert_empty "N12 — stdout vide" "$(cat "$N12_OUT")"
 assert_empty "N12 — stderr vide (pas de 'permission denied' qui fuit)" "$(cat "$N12_ERR")"
@@ -402,6 +417,26 @@ write_shim "$N18_DIR" osascript
 env PATH="$N18_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin VF_NOTIFY_OPTIN_FILE="$OPTIN_ARMED" bash "$NOTIFY" "Titre N18" "Corps N18" >/dev/null 2>&1
 wait_for_file "$N18_DIR/osascript.count" 10
 assert "N18 — sentinel armé : shim invoqué (compteur > 0)" "$([ "$(call_count "$N18_DIR" osascript)" != "0" ] && echo yes || echo no)" "yes"
+
+echo ""
+echo "=== N19 — HOME/XDG_CONFIG_HOME/VF_NOTIFY_OPTIN_FILE tous absents : exit 0, stderr vide, zéro invocation ==="
+# Correction ciblée mission-notif (B1) : $HOME déréférencé sans garde dans
+# ${XDG_CONFIG_HOME:-$HOME/.config} sous `set -uo pipefail` faisait mourir le script si HOME,
+# XDG_CONFIG_HOME et VF_NOTIFY_OPTIN_FILE étaient tous absents — falsifiant le fail-open
+# inconditionnel promis en tête de fichier. `env -u` retire réellement la variable de
+# l'environnement (contrairement à `VAR= bash …`, qui la redéfinirait vide plutôt que de
+# l'absenter) — seule forme qui reproduit fidèlement "unbound variable" sous `set -u`.
+N19_DIR="$WORK_DIR/n19"; mkdir -p "$N19_DIR"
+write_shim "$N19_DIR" osascript
+N19_OUT="$WORK_DIR/n19.out"; N19_ERR="$WORK_DIR/n19.err"
+N19_RC=0
+env -u HOME -u XDG_CONFIG_HOME -u VF_NOTIFY_OPTIN_FILE PATH="$N19_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin \
+  bash "$NOTIFY" "Titre N19" "Corps N19" >"$N19_OUT" 2>"$N19_ERR" || N19_RC=$?
+wait_for_file "$N19_DIR/osascript.count" 2
+assert_exit "N19 — HOME/XDG_CONFIG_HOME/VF_NOTIFY_OPTIN_FILE absents : exit 0" "$N19_RC" 0
+assert_empty "N19 — stdout vide" "$(cat "$N19_OUT")"
+assert_empty "N19 — stderr vide (pas de 'unbound variable' qui fuit)" "$(cat "$N19_ERR")"
+assert_eq "N19 — zéro invocation journalisée (gate sur chemin dérivé sans HOME coupe avant tout command -v)" "$(call_count "$N19_DIR" osascript)" "0"
 
 echo ""
 echo "=================================="

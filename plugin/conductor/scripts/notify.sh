@@ -78,7 +78,7 @@ fi
 # de stall (D-33-F) ne passe JAMAIS par ce fichier ni par ce script — il est émis séparément par
 # `dag.sh` (`check_stall_signal()`, dag.sh:223-246) et n'appelle jamais notify.sh
 # (`record_milestone()`, dag.sh:248-268, est la seule fonction qui invoque ce script).
-VF_NOTIFY_OPTIN_FILE="${VF_NOTIFY_OPTIN_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/vibeflow/notify-optin}"
+VF_NOTIFY_OPTIN_FILE="${VF_NOTIFY_OPTIN_FILE:-${XDG_CONFIG_HOME:-${HOME:-}/.config}/vibeflow/notify-optin}"
 [ -f "$VF_NOTIFY_OPTIN_FILE" ] || exit 0
 
 # ---------------------------------------------------------------------------------------------

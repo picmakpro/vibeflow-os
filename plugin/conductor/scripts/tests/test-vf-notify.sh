@@ -34,13 +34,13 @@ ok "VF_NOTIFY_OPTIN_FILE documenté"             "$(has 'VF_NOTIFY_OPTIN_FILE')"
 ok "piège user_present documenté"               "$(grep -qi 'user_present' "$SKILL" 2>/dev/null && echo true || echo false)"
 
 # Identité de chemin : la MÊME sous-chaîne littérale doit exister dans les deux fichiers.
-SENTINEL_SUBSTRING='${XDG_CONFIG_HOME:-$HOME/.config}/vibeflow/notify-optin'
+SENTINEL_SUBSTRING='${XDG_CONFIG_HOME:-${HOME:-}/.config}/vibeflow/notify-optin'
 SKILL_HAS_PATH=$(grep -qF "$SENTINEL_SUBSTRING" "$SKILL" 2>/dev/null && echo true || echo false)
 NOTIFY_HAS_PATH=$(grep -qF "$SENTINEL_SUBSTRING" "$NOTIFY" 2>/dev/null && echo true || echo false)
 ok "chemin sentinel présent dans SKILL.md"      "$SKILL_HAS_PATH"
 ok "chemin sentinel présent dans notify.sh (identité)" "$NOTIFY_HAS_PATH"
 
-LINES=$(wc -l < "$SKILL" | tr -d ' ')
+LINES=$(wc -l "$SKILL" | awk '{print $1}')
 ok "densité SKILL.md ≤ 500 lignes ($LINES)"     "$([ "$LINES" -le 500 ] && echo true || echo false)"
 
 # ---------- Asserts COMPORTEMENTAUX ----------

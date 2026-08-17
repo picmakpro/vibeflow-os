@@ -37,7 +37,7 @@ Scope **machine** (pas un settings local de lab — leçon #38), patron `stop-no
 (touch/rm -f, zéro JSON, zéro entrée `hooks.json` neuve) :
 
 ```
-${VF_NOTIFY_OPTIN_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/vibeflow/notify-optin}
+${VF_NOTIFY_OPTIN_FILE:-${XDG_CONFIG_HOME:-${HOME:-}/.config}/vibeflow/notify-optin}
 ```
 
 Cette expression est identique caractère pour caractère à celle posée dans `notify.sh`.
@@ -51,16 +51,16 @@ que `vf-calibrate.md`), et le chemin du sentinel via l'expression ci-dessus.
 
 - **`on`** : créer le répertoire parent puis `touch` le fichier résolu.
   ```sh
-  mkdir -p "$(dirname "${XDG_CONFIG_HOME:-$HOME/.config}/vibeflow/notify-optin")" && touch "${XDG_CONFIG_HOME:-$HOME/.config}/vibeflow/notify-optin"
+  mkdir -p "$(dirname "${XDG_CONFIG_HOME:-${HOME:-}/.config}/vibeflow/notify-optin")" && touch "${XDG_CONFIG_HOME:-${HOME:-}/.config}/vibeflow/notify-optin"
   ```
 - **`off`** : `rm -f` sur ce même chemin — idempotent, jamais d'erreur si déjà absent.
   ```sh
-  rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/vibeflow/notify-optin"
+  rm -f "${XDG_CONFIG_HOME:-${HOME:-}/.config}/vibeflow/notify-optin"
   ```
 - **`status`** (défaut si aucun argument) : tester `-f` sur ce chemin, afficher « actif » ou
   « inactif ».
   ```sh
-  [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/vibeflow/notify-optin" ] && echo actif || echo inactif
+  [ -f "${XDG_CONFIG_HOME:-${HOME:-}/.config}/vibeflow/notify-optin" ] && echo actif || echo inactif
   ```
 - **`test`** : créer un fichier `mktemp` **jetable**, invoquer `notify.sh` avec
   `VF_NOTIFY_OPTIN_FILE` pointé sur ce fichier jetable **pour ce seul appel**, titre `VibeFlow`,
@@ -73,12 +73,15 @@ que `vf-calibrate.md`), et le chemin du sentinel via l'expression ci-dessus.
   rm -f "$TMP_OPTIN"
   ```
 
-> **Piège `user_present`** : le harness Claude Code n'émet rien côté `PushNotification` quand
-> l'utilisateur est actif au terminal (comportement assumé du produit, pas un bug VibeFlow,
-> D-33-H Q2) — le toast OS de `notify.sh` partage la même réalité pratique observée. **Avant de
-> lancer `test`, prévenir l'utilisateur qu'il doit s'éloigner du terminal ou mettre l'app en
-> arrière-plan** : sinon le test « réussit » silencieusement (exit 0 best-effort) sans qu'aucun
-> toast ne soit visible et sans rien prouver.
+> **Piège `user_present`, scopé au push relayé uniquement** : le harness Claude Code n'émet rien
+> côté `PushNotification` quand l'utilisateur est actif au terminal (comportement assumé du
+> produit, pas un bug VibeFlow, D-33-H Q2 / `33-CONTEXT.md`). Ce piège concerne **le canal push
+> relayé** (`SendMessage(main)` -> `PushNotification`, cf. « Ce que ce toggle ne couvre pas »
+> ci-dessous) — **pas** le verbe `test` de ce toggle : `notify.sh` n'a aucune détection de
+> présence (Pattern H, `mission-flow.md`, les deux canaux restent disjoints en code, en doctrine
+> et en gate). Le toast OS déclenché par `/vf-notify test` s'affiche donc que l'utilisateur soit
+> actif au terminal ou non — seuls les réglages natifs de l'OS (Ne pas déranger, focus mode,
+> permissions de notification) peuvent le masquer, indépendamment de la présence au terminal.
 
 Après l'action, confirmer l'état en une ligne (armé / désarmé / test envoyé) — même consigne
 finale que le hook `stop-notify`.
