@@ -28,11 +28,15 @@ Phase 32) :
 - **Point de contrôle en lecture au geste `dag.sh mark`** (D-33-F) : après `record_progress()`,
   `mark` relaie best-effort le verdict `check-guard-health.sh --hook` sur stderr — un stall ne
   survit pas au prochain geste `mark` d'une session VF vivante (au lieu du seul `SessionStart`).
-  **Limite mesurée, non corrigée à ce jour** : dans le même bloc, `record_progress()` avance
-  `progress_epoch` **avant** que ce relais ne relise le statut du lock — le verdict STALL du lock
-  courant est donc structurellement inatteignable par ce chemin (fonctionne pour ABANDON et pour
-  les marqueurs de garde tiers). Vérifié `gaps_found` (`33-VERIFICATION.md`, 2026-08-17) : 3/4
-  critères de succès ATTEINTS (WTCH-01, WTCH-03 en limite assumée, WTCH-04), WTCH-02 **PARTIEL**.
+  **Défaut trouvé par la vérification, puis corrigé (D-33-G)** : dans le même bloc,
+  `record_progress()` avançait `progress_epoch` **avant** que ce relais ne relise le statut du
+  lock — le verdict STALL du lock courant était donc structurellement inatteignable par ce chemin,
+  qui ne fonctionnait que pour ABANDON et les marqueurs de garde tiers. L'ordre est inversé : la
+  lecture précède le rafraîchissement, les deux restent après `save(dag)`, `record_milestone()`
+  reste dernier. Couvert par le cas de discriminance **T49** — sous l'ordre fautif T49.2 rougit
+  alors que T41 et T48 restent verts, donc seul T49 mord. Vérifié `gaps_found`
+  (`33-VERIFICATION.md`, 2026-08-17) puis **refermé** : les 4 critères de succès sont ATTEINTS
+  (WTCH-03 en limite assumée sur la preuve Windows réelle).
 - **Armement — aucune entrée `hooks.json` neuve, aucun settings local.** L'armement de `notify.sh`
   et du sous-contrôle de stall est prouvé par le gate CI **PORT-05** (établi Phase 32), pas par une
   édition de `check-capability-activation.sh` (règle 4, `ARM[]`/`OKID[]`) — ces tables ne
