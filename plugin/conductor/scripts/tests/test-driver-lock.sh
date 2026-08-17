@@ -18,6 +18,8 @@
 # T33-legacy takeover sur dossier legacy périmé avec meta complet (SE-6)
 # T33-T41b verbe reclaim (D-32-03(f)) — mutex partagé avec takeover, plafond LRU, trap BL-3
 # T42-T45 journal append-only des évènements de reprise (D-32-02)
+# T46 takeover : revalidation post-mutex sur l'ÂGE (pas seulement la génération) — fenêtre où le
+#     détenteur périmé redevient vivant (heartbeat réel) pendant la reprise
 #
 # Exit 0 si tout passe, 1 sinon.
 
@@ -613,6 +615,40 @@ assert_exit "T45.2 — exit 0" "$rc" 0
 if grep -q 'journal indisponible' "$WORK_DIR/t45.stderr"; then echo "  ✅ PASS — T45.3 — diagnostic émis sur stderr"; PASS=$((PASS+1)); else echo "  ❌ FAIL — T45.3 — diagnostic émis sur stderr"; FAIL=$((FAIL+1)); fi
 chmod 644 "$_t45_log" 2>/dev/null
 rm -f "$_t45_log" "$WORK_DIR/t45.stderr"
+
+echo "=== T46 — takeover : la revalidation post-mutex sur l'ÂGE (pas seulement la génération) referme la fenêtre où le détenteur périmé redevient vivant pendant la reprise ==="
+# Mécanisme provoqué (dérivé du code, pas deviné) : `takeover` lit âge + génération AVANT de poser
+# son mutex de reprise, puis prépare `new_generation()` (2× git rev-parse, mkdir, écritures disque)
+# — une fenêtre de plusieurs millisecondes s'ouvre entre cette première lecture et la
+# re-vérification post-mutex. Si le détenteur PÉRIMÉ émet un heartbeat RÉEL pendant cette fenêtre,
+# `heartbeat` réécrit `heartbeat_epoch` EN PLACE (rewrite_meta) SANS changer le nom de génération :
+# la génération reste identique (le contrôle de génération seul NE VOIT RIEN passer), mais l'âge
+# redevient frais. Seule la revalidation sur l'ÂGE ferme cette fenêtre — c'est elle, et seulement
+# elle, qui doit refuser ici.
+#
+# Ce n'est PAS le patron T32 (24 concurrents sur le MÊME mutex, indépendant de l'âge) : il faut ici
+# DEUX étages séquencés — un takeover en vol, puis un heartbeat réel du détenteur pendant sa
+# fenêtre — pour provoquer la course précise que ce contrôle ferme.
+#
+# Déterminisme SANS sleep : le takeover est lancé en arrière-plan (&) ; l'appel heartbeat qui suit
+# immédiatement, lui, est SYNCHRONE dans le process parent. Le coût de fork+exec d'un job
+# d'arrière-plan (et le travail de new_generation avant le mutex) est structurellement plus lent
+# qu'un appel synchrone unique — mesuré 55/55 sans un seul échec sur ce poste (deux harnais
+# indépendants, 40 puis 15 essais, avant d'écrire ce cas). Aucune synchronisation temporelle n'est
+# requise : c'est un ordonnancement de coût de travail, pas une chance de timing.
+rm -rf "$VF_DRIVER_LOCK"
+"$SCRIPT" acquire --owner=DEAD46 --step=x >/dev/null
+age_stale "$VF_DRIVER_LOCK"
+( "$SCRIPT" takeover --owner=C46 --step=y >"$WORK_DIR/t46.out" 2>/dev/null ) &
+_t46_pid=$!
+"$SCRIPT" heartbeat --owner=DEAD46 --step=x >/dev/null 2>&1
+wait "$_t46_pid"
+_t46_out="$(cat "$WORK_DIR/t46.out" 2>/dev/null)"
+assert "T46.1 — takeover refusé (le détenteur a prouvé sa vie pendant la fenêtre)" "$_t46_out" '"acquired": false'
+assert "T46.2 — refus nommé race-during-recovery, pas un autre motif" "$_t46_out" '"reason": "race-during-recovery"'
+assert "T46.3 — le détenteur périmé reste EFFECTIVEMENT owner (aucun vol)" "$("$SCRIPT" status)" '"owner": "DEAD46"'
+rm -f "$WORK_DIR/t46.out"
+"$SCRIPT" release --owner=DEAD46 >/dev/null 2>&1
 
 echo ""
 echo "=================================="
