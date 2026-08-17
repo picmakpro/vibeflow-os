@@ -65,6 +65,22 @@ meta_get() { [ -f "$META" ] && grep "^$1=" "$META" 2>/dev/null | head -1 | cut -
 # laisserait un caractere a la place, une virgule injectee resterait un separateur potentiel.
 sanitize_session_id() { printf '%s' "$1" | tr -dc 'A-Za-z0-9._-'; }
 
+# Assainit un champ LIBRE (owner/step, correction juge #3) destine a l'ecriture meta ET a chaque
+# printf JSON direct de ce script (acquire/takeover/reclaim/heartbeat emettent owner/step SANS
+# repasser par le meta relu). Repro mesuree : `acquire --owner='mission"X'` rendait un JSON
+# INVALIDE (guillemet non echappe casse le parsing en aval — driver-lock.sh status | jq -r
+# .generation, prescrit par team-kernel.md, casse a la source). BEAUCOUP moins restrictif que
+# sanitize_session_id() (allowliste stricte, adaptee a un identifiant technique) : owner/step
+# restent du texte libre pour un humain (espaces, accents, slashes, '=' preserves — aucun des deux
+# ne sert de separateur dans le meta, qui coupe sur le PREMIER '=' seulement, cote bash ET cote
+# python du guard) — SEULS les caracteres qui rendent un printf JSON direct invalide disparaissent :
+# guillemet double et antislash. Assaini UNE SEULE FOIS a l'entree (juste apres le parsing des
+# arguments ci-dessous), jamais recalcule ailleurs : toute lecture ulterieure de $OWNER/$STEP,
+# qu'elle aille au meta ou a un printf JSON immediat, voit deja la forme assainie.
+sanitize_field() { printf '%s' "$1" | tr -d '"\\\n'; }
+OWNER="$(sanitize_field "$OWNER")"
+STEP="$(sanitize_field "$STEP")"
+
 # Valeur brute (CSV) du champ additif session_ids. Vide si la cle est absente du meta — meta_get
 # rend deja le vide sans echouer, donc un lock pose par une version anterieure du script (sans
 # cette ligne) reste lisible (retrocompatibilite, T18).
@@ -285,13 +301,20 @@ json_status() {
   if [ "$1" = false ]; then
     printf '{"present": false, "lock": "%s"}\n' "$LOCK_DIR"; return
   fi
-  local o s age stale gen sids lease
+  local o s age stale gen sids lease guard_eff
   o="$(meta_get owner)"; s="$(meta_get step)"; age="$(lock_age)"
   [ "$age" -gt "$TTL" ] && stale=true || stale=false
   gen="$(lock_gen)"; sids="$(json_session_ids "$(lock_session_ids)")"
   lease="$(lease_age)" && : || lease="null"  # lease_age() echoue -> null JSON, jamais un 0 trompeur
-  printf '{"present": true, "owner": "%s", "step": "%s", "age_seconds": %s, "ttl": %s, "stale": %s, "generation": "%s", "session_ids": %s, "lease_seconds": %s}\n' \
-    "$o" "$s" "$age" "$TTL" "$stale" "$gen" "$sids" "$lease"
+  # guard_effective (correction juge #6) : rend OBSERVABLE ce que la regle 2 de
+  # guard-driver-lock.sh (retrocompat, D-32-03) decide en silence. Un lock ne AVEC session_ids=[]
+  # rend le guard INERTE sur TOUTE sa duree de vie (heartbeat ne repeuple jamais session_ids, seul
+  # reclaim le fait) sans qu'aucune trace ne le signale ailleurs — mesure en revue : une session
+  # tierce commite, rc=0, sous le lock meme de CETTE mission. La regle 2 elle-meme n'est PAS
+  # touchee ici (choix assume et teste, R3/T18) : ce champ EXPOSE l'etat, il ne le change pas.
+  [ "$sids" = "[]" ] && guard_eff=false || guard_eff=true
+  printf '{"present": true, "owner": "%s", "step": "%s", "age_seconds": %s, "ttl": %s, "stale": %s, "generation": "%s", "session_ids": %s, "lease_seconds": %s, "guard_effective": %s}\n' \
+    "$o" "$s" "$age" "$TTL" "$stale" "$gen" "$sids" "$lease" "$guard_eff"
 }
 
 require_owner() {
@@ -510,12 +533,29 @@ case "$ACTION" in
       if ! ln_atomic "$$" "$mutex"; then
         printf '{"recovered": false, "reason": "race-during-recovery"}\n'; exit 1
       fi
+      # BL-3 (correction juge #2, meme patron EXACT que takeover et reclaim) : `recover` prend le
+      # MEME mutex, sur la MEME construction de nom, dans le MEME espace de noms que les deux
+      # autres verbes de reprise — sans ce trap, un `recover` tue entre la prise du mutex et sa
+      # liberation normale laisse un mutex PERMANENT, et tout `takeover`/`reclaim` ULTERIEUR sur ce
+      # lock refuse pour toujours en race-during-recovery : le lock devient DEFINITIVEMENT non
+      # reprenable par les verbes du script — precisement le mode de defaillance que ce lot dit
+      # avoir ferme, laisse ouvert sur ce troisieme verbe. Meme seam de test que reclaim
+      # (VF_DRIVER_TEST_DIE_AFTER_MUTEX, T41b) et meme raison : un signal reel n'est pas fiable ici
+      # (bash REPREND son execution apres un trap de signal, seul un `exit` reel simule la mort).
+      trap 'rm -f "$mutex"' EXIT INT TERM
+      [ -n "${VF_DRIVER_TEST_DIE_AFTER_MUTEX:-}" ] && exit 137
       if [ "$(lock_gen)" != "$observed_gen" ] || [ "$(lock_age)" -le "$TTL" ]; then
-        rm -f "$mutex"
+        rm -f "$mutex"; trap - EXIT INT TERM
         printf '{"recovered": false, "reason": "race-during-recovery"}\n'; exit 1
       fi
-      drop_lock; rm -f "$mutex"
-      journal_event recover "$held" "" "" "$age" "$observed_gen"
+      drop_lock; rm -f "$mutex"; trap - EXIT INT TERM
+      # (correction juge #7) new_owner/session_id journalises quand CONNUS : `recover` n'exige pas
+      # --owner (elagage anonyme reste possible, comportement inchange) mais si l'appelant en passe
+      # un, la chaine "perime -> elague -> repris" ne perd plus l'identite du repreneur. L'`acquire`
+      # qui suit reste un evenement SEPARE, non journalise ici par construction (le journal ne
+      # couvre QUE les TROIS natures de reprise — takeover/reclaim/recover — jamais l'acquisition
+      # ordinaire, meme apres un takeover : voir le docstring de journal_event ci-dessus).
+      journal_event recover "$held" "$OWNER" "$(sanitize_session_id "${CLAUDE_CODE_SESSION_ID:-}")" "$age" "$observed_gen"
       printf '{"recovered": true, "previous_owner": "%s", "age_seconds": %s}\n' "$held" "$age"; exit 0
     fi
     printf '{"recovered": false, "reason": "still-fresh", "age_seconds": %s, "ttl": %s}\n' "$age" "$TTL"

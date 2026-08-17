@@ -20,6 +20,11 @@
 # T42-T45 journal append-only des évènements de reprise (D-32-02)
 # T46 takeover : revalidation post-mutex sur l'ÂGE (pas seulement la génération) — fenêtre où le
 #     détenteur périmé redevient vivant (heartbeat réel) pendant la reprise
+# T47-T50 correction ciblée post-revue (juges code-review/audit/goal-backward, Phase 32) :
+#     T47 BL-3 sur `recover` (mutex libéré même si le process meurt juste après l'avoir pris,
+#         même patron que T41b) · T48 owner/step assainis à l'écriture, JSON reste parsable ·
+#     T49 guard_effective observable (session_ids vide vs peuplé) · T50 recover journalise
+#         new_owner/session_id quand connus, sans exiger --owner
 #
 # Exit 0 si tout passe, 1 sinon.
 
@@ -649,6 +654,64 @@ assert "T46.2 — refus nommé race-during-recovery, pas un autre motif" "$_t46_
 assert "T46.3 — le détenteur périmé reste EFFECTIVEMENT owner (aucun vol)" "$("$SCRIPT" status)" '"owner": "DEAD46"'
 rm -f "$WORK_DIR/t46.out"
 "$SCRIPT" release --owner=DEAD46 >/dev/null 2>&1
+
+echo "=== T47 — BL-3 (correction juge #2) : mutex de recover libéré même si le process meurt juste après l'avoir pris (même patron que T41b) ==="
+rm -rf "$VF_DRIVER_LOCK"
+"$SCRIPT" acquire --owner=DEAD47 --step=x >/dev/null
+age_stale "$VF_DRIVER_LOCK"
+_t47_gen="$(readlink "$VF_DRIVER_LOCK")"
+out=$(VF_DRIVER_TEST_DIE_AFTER_MUTEX=1 "$SCRIPT" recover); rc=$?
+assert_exit "T47.1 — le process 'meurt' juste après avoir pris le mutex (exit 137)" "$rc" 137
+_t47_mutex="${VF_DRIVER_LOCK}.rec.$(printf '%s' "$_t47_gen" | tr -c 'A-Za-z0-9._-' '_')"
+if [ -L "$_t47_mutex" ]; then echo "  ❌ FAIL — T47.2 — le mutex a été libéré (trap)"; FAIL=$((FAIL+1)); else echo "  ✅ PASS — T47.2 — le mutex a été libéré (trap)"; PASS=$((PASS+1)); fi
+# La mort injectée coupe AVANT drop_lock : le lock stale existe toujours, donc un takeover
+# ULTÉRIEUR normal doit réussir (lock toujours reprenable, jamais bloqué en race-during-recovery
+# pour toujours — c'est exactement le mode de défaillance que ce cas ferme).
+out2=$("$SCRIPT" takeover --owner=B47 --step=y); rc2=$?
+assert "T47.3 — un takeover ULTÉRIEUR normal réussit (lock toujours reprenable)" "$out2" '"acquired": true'
+assert_exit "T47.4 — exit 0" "$rc2" 0
+"$SCRIPT" release --owner=B47 >/dev/null 2>&1
+
+echo "=== T48 — correction juge #3 : owner/step assainis À L'ÉCRITURE, le JSON reste PARSABLE avec guillemet/antislash/'=' injectés ==="
+rm -rf "$VF_DRIVER_LOCK"
+out=$("$SCRIPT" acquire --owner='mission"X\path=v' --step='etape"Y\z'); rc=$?
+json_ok "$out"; assert_exit "T48.1 — la réponse JSON IMMÉDIATE de acquire reste parsable" $? 0
+assert "T48.2 — owner assaini dans la réponse immédiate (guillemet/antislash retirés, '=' préservé)" "$out" '"owner": "missionXpath=v"'
+_t48_status="$("$SCRIPT" status)"
+json_ok "$_t48_status"; assert_exit "T48.3 — status reste parsable après relecture du meta sur disque" $? 0
+assert "T48.4 — owner assaini AUSSI côté meta (relu par status, pas juste la réponse immédiate)" "$_t48_status" '"owner": "missionXpath=v"'
+"$SCRIPT" release --owner='missionXpath=v' >/dev/null 2>&1
+
+echo "=== T49 — correction juge #6 : guard_effective OBSERVABLE (session_ids vide vs peuplé, sans changer la règle 2) ==="
+rm -rf "$VF_DRIVER_LOCK"
+env -u CLAUDE_CODE_SESSION_ID "$SCRIPT" acquire --owner=A49 --step=x >/dev/null   # session_ids vide (T17)
+_t49_status="$("$SCRIPT" status)"
+assert "T49.1 — guard_effective:false quand session_ids est vide (lock INERTE pour le guard, jamais signalé ailleurs avant ce champ)" "$_t49_status" '"guard_effective": false'
+"$SCRIPT" release --owner=A49 >/dev/null 2>&1
+rm -rf "$VF_DRIVER_LOCK"
+CLAUDE_CODE_SESSION_ID=sess49 "$SCRIPT" acquire --owner=A49b --step=x >/dev/null
+_t49b_status="$("$SCRIPT" status)"
+assert "T49.2 — guard_effective:true quand session_ids est peuplé (comportement nominal)" "$_t49b_status" '"guard_effective": true'
+"$SCRIPT" release --owner=A49b >/dev/null 2>&1
+
+echo "=== T50 — correction juge #7 : recover journalise new_owner/session_id QUAND ils sont connus, sans les EXIGER ==="
+rm -rf "$VF_DRIVER_LOCK" "$WORK_DIR"/DRIVER.lock.events.log
+"$SCRIPT" acquire --owner=DEAD50 --step=x >/dev/null
+age_stale "$VF_DRIVER_LOCK"
+CLAUDE_CODE_SESSION_ID=sess50 "$SCRIPT" recover --owner=B50 >/dev/null
+_t50_line=$(tail -1 "$WORK_DIR/DRIVER.lock.events.log")
+assert "T50.1 — event recover" "$_t50_line" '"event": "recover"'
+assert "T50.2 — previous_owner DEAD50 (élagué)" "$_t50_line" '"previous_owner": "DEAD50"'
+assert "T50.3 — new_owner B50 journalisé (connu, plus jamais perdu)" "$_t50_line" '"new_owner": "B50"'
+assert "T50.4 — session_id sess50 journalisé (connu, plus jamais perdu)" "$_t50_line" '"session_id": "sess50"'
+# Contre-épreuve : recover SANS --owner reste possible (élagage anonyme, comportement INCHANGÉ,
+# T8/T44 ne doivent jamais rougir — l'exigence n'est PAS forcée, seulement journalisée si connue).
+rm -rf "$VF_DRIVER_LOCK" "$WORK_DIR"/DRIVER.lock.events.log
+"$SCRIPT" acquire --owner=DEAD50b --step=x >/dev/null
+age_stale "$VF_DRIVER_LOCK"
+out=$("$SCRIPT" recover); rc=$?
+assert "T50.5 — recover SANS --owner réussit toujours (jamais forcé)" "$out" '"recovered": true'
+assert_exit "T50.6 — exit 0" "$rc" 0
 
 echo ""
 echo "=================================="
