@@ -734,6 +734,7 @@ Plans:
 - [x] 32-04-PLAN.md — convention de jeton de fence `Fence:` dans le contrat invariant du kernel — vague 3 (LOCK-05)
 - [x] 32-05-PLAN.md — `check-guard-health.sh`, hook doctor `SessionStart` générique (lecteur des marqueurs de santé du parc) — vague 4 (QUAL-01)
 - [x] 32-07-PLAN.md — synchronisation doctrinale complète (option 3B : 5 agents managers de 4 modules tiers + `mission-flow.md` + README) et fermeture du trou de la voie legacy du protocole d'acquisition (option 4A) — vague 4 (LOCK-04 amendé)
+- [x] 32-06-PLAN.md — clôture : bilan du parc complet sur l'arbre commité, gates transverses, `CHANGELOG`/`README` de `conductor` et bump du module en v1.26.0 — vague 5 (LOCK-01..05, QUAL-01). *Ce plan ne produit pas de `SUMMARY` : son livrable est `32-RELIQUATS.md`.*
 - [x] bilan de clôture rendu en `32-RELIQUATS.md` — parc complet (64 suites / 0 échec), gates transverses, état réel des 5 critères et de QUAL-01, reliquats consignés (LOCK-01..05, QUAL-01)
 
 ### Phase 33: Watchdog & notifications des missions
