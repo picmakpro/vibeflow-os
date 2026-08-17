@@ -901,6 +901,79 @@ else
   ko "T23 préfixe exec-safe scope projet"
 fi
 
+# ---------- T24 : WIN-PATHCONV — un préfixe portant la marque d'une conversion MSYS2 arrête
+#            le merge, bruyamment, sans rien écrire ----------
+# Régression 2026-08-17 (lab testeur Windows) : le runtime MSYS2 réécrivait la variable
+# d'environnement qui portait le préfixe vers python.exe natif, greffant la racine MSYS à la
+# place du séparateur. 20 entrées de settings.json pointaient un chemin mort ; les hooks en
+# forme shell finissant par `|| true`, l'erreur était avalée — garde muet, aucun signal.
+# Ce test exerce la SECONDE ceinture : quelle que soit la provenance de la corruption, elle
+# doit produire un échec visible et zéro écriture. On rejoue la chaîne EXACTE du screen.
+S24="$WORK/t24/settings.json"
+PREFIX_CORROMPU='"$CLAUDE_PROJECT_DIR"C:/Program Files/Git/.claude/scripts'
+T24_ERR="$WORK/t24-stderr.txt"
+mkdir -p "$WORK/t24"
+if VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_EXEC" --settings "$S24" \
+     --scripts-prefix "$PREFIX_CORROMPU" >/dev/null 2>"$T24_ERR"; then
+  T24_EXIT=0
+else
+  T24_EXIT=1
+fi
+T24_DIT_CORROMPU=0; grep -q 'corrompu' "$T24_ERR" 2>/dev/null && T24_DIT_CORROMPU=1
+T24_DIT_MSYS=0;     grep -q 'MSYS2'    "$T24_ERR" 2>/dev/null && T24_DIT_MSYS=1
+if [ "$T24_EXIT" -eq 1 ] && [ ! -e "$S24" ] && [ "$T24_DIT_CORROMPU" -eq 1 ] && [ "$T24_DIT_MSYS" -eq 1 ]; then
+  ok "T24 WIN-PATHCONV : préfixe corrompu refusé (exit 1), settings.json jamais créé, diagnostic nommant la conversion MSYS2"
+else
+  ko "T24 WIN-PATHCONV préfixe corrompu (exit=$T24_EXIT fichier=$([ -e "$S24" ] && echo créé || echo absent) dit-corrompu=$T24_DIT_CORROMPU dit-MSYS2=$T24_DIT_MSYS)"
+fi
+
+# ---------- T25 : WIN-PATHCONV — le préfixe ne transite plus par l'environnement ----------
+# Test de TRANSPORT, discriminant et exécutable hors Windows.
+#
+# Polluer la variable PREFIX depuis l'appelant ne prouverait RIEN : merge-hooks.sh fait
+# `PREFIX=""` puis la remplit depuis --scripts-prefix, donc l'environnement de l'appelant est
+# écrasé de toute façon (vérifié : un tel test passe même sans le correctif). Le vrai vecteur
+# se situe UN CRAN PLUS LOIN — au moment où bash lance l'interpréteur Python : c'est le runtime
+# MSYS2 qui réécrit l'environnement transmis à un binaire Windows natif.
+#
+# On simule donc exactement cette couche : un shim `python3` en tête de PATH corrompt PREFIX
+# dans son propre environnement — comme le ferait MSYS2 — puis exec le vrai Python. Avant le
+# correctif, le bloc lisait os.environ["PREFIX"] et le chemin mort partait dans settings.json ;
+# après, la valeur vient d'un fichier temporaire (contenu jamais réécrit par le runtime) et le
+# shim n'a plus de prise, PREFIX n'étant même plus transmis.
+SHIM_DIR="$WORK/t25-shim"; mkdir -p "$SHIM_DIR"
+REAL_PY="$(command -v python3)"
+cat > "$SHIM_DIR/python3" <<SHIMEOF
+#!/bin/sh
+# Simulacre du runtime MSYS2 : greffe la racine MSYS là où un séparateur POSIX suit un littéral.
+if [ -n "\${PREFIX:-}" ]; then
+  PREFIX="\$(printf '%s' "\$PREFIX" | sed 's#"/#"C:/Program Files/Git/#')"
+  export PREFIX
+fi
+exec "$REAL_PY" "\$@"
+SHIMEOF
+chmod +x "$SHIM_DIR/python3"
+S25="$WORK/t25/settings.json"
+PREFIX_LEGITIME='"$CLAUDE_PROJECT_DIR"/.claude/scripts'
+if PATH="$SHIM_DIR:$PATH" \
+   VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_T23" --settings "$S25" \
+     --scripts-prefix "$PREFIX_LEGITIME" 2>/dev/null \
+   && S25="$S25" python3 -c '
+import json, os
+raw = open(os.environ["S25"]).read()
+assert "Program Files" not in raw, "la reecriture d environnement a atteint le disque : " + raw
+d = json.load(open(os.environ["S25"]))
+entries = [h for g in d["hooks"]["PreToolUse"] for h in g["hooks"]]
+ex = [h for h in entries if "args" in h][0]
+sh = [h for h in entries if "args" not in h][0]
+assert ex["args"][0] == "${CLAUDE_PROJECT_DIR}/.claude/scripts/t23-exec.sh", ex["args"]
+assert chr(34) + "$CLAUDE_PROJECT_DIR" + chr(34) + "/.claude/scripts/t23-shell.sh" in sh["command"], sh["command"]
+' 2>/dev/null; then
+  ok "T25 WIN-PATHCONV : sous un interpréteur qui réécrit l'environnement à la manière de MSYS2, le préfixe transporté par fichier fait foi (formes exec et shell)"
+else
+  ko "T25 WIN-PATHCONV transport par fichier (la réécriture d'environnement a repris la main)"
+fi
+
 # ---------- Mode `plan` (D-31-04 régime B) — Tp1..Tp5 ----------
 FRAG_TP="$REPO/software-architecture/hooks/hooks.json"
 
