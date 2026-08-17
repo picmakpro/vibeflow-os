@@ -9,7 +9,7 @@ status: complete
 
 ## Worktree / branche / commits
 
-- **Worktree** : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/agent-a85447cb97da62b8a`
+- **Worktree** : `.claude/worktrees/agent-a85447cb97da62b8a` (relatif à la racine du dépôt)
 - **Branche** : `worktree-agent-a85447cb97da62b8a` (base : `29b7571`, feat/phase-33-watchdog-notifications)
 - **Commits** :
   - `be942ee` — `feat(33-02): record_progress() cable dag.sh mark a driver-lock.sh mark-progress (WTCH-01)` (`dag.sh` + `test-dag.sh`)

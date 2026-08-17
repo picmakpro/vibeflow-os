@@ -10,7 +10,7 @@ requirements: [WTCH-02, WTCH-03, WTCH-04]
 
 ## Worktree / branche / commits
 
-- **Worktree** : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/agent-a2a0fb99a3365a95f`
+- **Worktree** : `.claude/worktrees/agent-a2a0fb99a3365a95f` (relatif à la racine du dépôt)
 - **Branche** : `worktree-agent-a2a0fb99a3365a95f` (base : `ce4454f`, `feat/phase-33-watchdog-notifications`)
 - **Commits** :
   - `80c4e22` — `feat(33-05): check_stall_signal() + record_milestone() cablés à dag.sh mark (WTCH-02/WTCH-03)` (`dag.sh` + `notify.sh` mode)
