@@ -4,9 +4,13 @@
 # I3 (checkout/switch sous lock d'autrui) et I2 (Write/Edit dans .planning/ sous lock d'autrui).
 #
 # Câblage (posé par l'install du module conductor, forme exec, D-32-C) :
-#   PreToolUse · matcher "Bash"       · command: {{VF_BASH}} args: [".../guard-driver-lock.sh"]
-#   PreToolUse · matcher "Write|Edit" · command: {{VF_BASH}} args: [".../guard-driver-lock.sh"]
-# Un seul script, deux entrées : il lit tool_name dans le payload pour choisir sa voie.
+#   PreToolUse · matcher "Bash|Write|Edit" · command: {{VF_BASH}} args: [".../guard-driver-lock.sh"]
+# Une SEULE entrée hooks.json (déviation documentée de D-32-05, voir 32-03-SUMMARY.md — deux
+# entrées séparées référençant le MÊME script dans le MÊME événement PreToolUse se sont avérées
+# EMPIRIQUEMENT incompatibles avec la purge d'idempotence cross-matcher de merge-hooks.sh, qui
+# retire toute entrée référençant les mêmes scripts dans TOUS les groupes de l'événement de la
+# cible : la seconde entrée installée supprimait systématiquement la première, quel que soit
+# l'ordre. Le script lit tool_name dans le payload pour choisir sa voie — inchangé.
 #
 # RÈGLE DE DÉCISION (D-32-03, ordre exact) :
 #   1. Pas de lock, lock PÉRIMÉ (heartbeat > TTL), ou commande non concernée → allow silencieux.
