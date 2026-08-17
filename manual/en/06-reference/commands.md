@@ -6,16 +6,16 @@
 
 A command typed with a `/` isn't the product's front door. VibeFlow is built end-to-end so you can
 just talk to it in plain language — "make this look better," "create a content lab," "check my
-lab" — and whichever agent is listening routes itself to the right piece. The six commands on this
+lab" — and whichever agent is listening routes itself to the right piece. The seven commands on this
 page are **shortcuts**: they skip the step of phrasing a sentence when you already know exactly
 which action you want to trigger. You can ignore this page entirely and never type a `/` — nothing
 works worse for it.
 
-This list was built by enumerating `plugin/commands/*.md` on disk on 2026-08-01: six files, none
-anywhere else in the repo. That's the complete list by construction — there can't be a seventh one
-missing from here.
+This list was built by enumerating `plugin/commands/*.md` on disk (2026-08-01, re-checked on
+2026-08-17 when `/vf-notify` was added): seven files, none anywhere else in the repo. That's the
+complete list by construction — there can't be an eighth one missing from here.
 
-## The six commands
+## The seven commands
 
 ### `/vibeflow`
 
@@ -80,6 +80,22 @@ rather than replacing one another.
 *Example*: `/vf-update --check` shows the version gap and the changelog without changing anything;
 `/vf-update --modules-only` updates the modules without touching the plugin itself.
 
+### `/vf-notify`
+
+Decides whether VibeFlow is allowed to send you system notifications during a long mission. **By
+default it isn't**: nothing is emitted until you type `/vf-notify on`. Once enabled, notifications
+stay rare by construction — a toast when a mission node finishes (never on every turn), and the
+real milestones, end of phase and end of milestone, which land on your Claude app rather than on
+the desktop. The setting belongs to the machine, not to a lab: enable it once and every lab honours
+it. One thing worth knowing: while you're active at the terminal the Claude app shows nothing —
+that's deliberate, it only reaches you once you've stepped away.
+
+*Example*: `/vf-notify on` to be told about an overnight mission, `/vf-notify status` to see where
+the setting stands, `/vf-notify test` to send a verification notification without changing state.
+
+One thing it never mutes: the stalled-mission alert. If an agent freezes, the signal shows up in
+your session whatever this setting says — the toggle turns off the comfort, never the alarm.
+
 ## The boundary with skills
 
 A command and a skill are not the same thing, even though nearly every command on this page does
@@ -93,10 +109,10 @@ command — `/vf-design` and `/vf-sketch`, in particular, are skills and have no
 ## Where this list comes from
 
 Every command above corresponds to a real file under `plugin/commands/`, enumerated at the time
-this page was written (2026-08-01) rather than copied from an existing document — that's the rule
-that applies across this whole reference theme. If you want to check for yourself, the command is
-`ls plugin/commands/*.md` from the repo root: the count should stay at six unless one has been
-added or removed since.
+this page was written (2026-08-01, re-checked on 2026-08-17) rather than copied from an existing
+document — that's the rule that applies across this whole reference theme. If you want to check for
+yourself, the command is `ls plugin/commands/*.md` from the repo root: the count should stay at
+seven unless one has been added or removed since.
 
 <!-- vf-manual:nav -->
 [← Previous](../05-agent-team/specialized-teams.md) · [↑ Contents](../README.md) · [Next →](../06-reference/skills.md)

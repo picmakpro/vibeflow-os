@@ -6,16 +6,16 @@
 
 Une commande tapée avec un `/` n'est pas la porte d'entrée du produit. VibeFlow entier est conçu
 pour qu'on lui parle en langage naturel — « améliore le design », « crée un lab de contenu »,
-« vérifie mon lab » — et que l'agent qui t'écoute route lui-même vers la bonne brique. Les six
+« vérifie mon lab » — et que l'agent qui t'écoute route lui-même vers la bonne brique. Les sept
 commandes de cette page sont des **raccourcis** : elles évitent de reformuler une phrase quand tu
 sais déjà exactement quel geste tu veux déclencher. Tu peux ignorer cette page entièrement et ne
 jamais taper de `/` — rien ne fonctionne moins bien pour autant.
 
-Cette liste a été établie en énumérant `plugin/commands/*.md` sur le disque le 2026-08-01 : six
-fichiers, aucun ailleurs dans le dépôt. C'est la liste complète, par construction — il ne peut pas
-en exister une septième non répertoriée ici.
+Cette liste a été établie en énumérant `plugin/commands/*.md` sur le disque (2026-08-01, revérifié
+le 2026-08-17 lors de l'ajout de `/vf-notify`) : sept fichiers, aucun ailleurs dans le dépôt. C'est
+la liste complète, par construction — il ne peut pas en exister une huitième non répertoriée ici.
 
-## Les six commandes
+## Les sept commandes
 
 ### `/vibeflow`
 
@@ -81,6 +81,24 @@ que de se substituer l'une à l'autre.
 *Exemple* : `/vf-update --check` affiche l'écart de version et le changelog sans rien modifier ;
 `/vf-update --modules-only` met à jour les modules sans toucher au plugin lui-même.
 
+### `/vf-notify`
+
+Décide si VibeFlow a le droit de t'envoyer des notifications système pendant une mission longue.
+**Par défaut, il ne l'a pas** : rien n'est émis tant que tu n'as pas tapé `/vf-notify on`. Une fois
+activées, les notifications restent rares par construction — un toast à la fin d'un nœud de mission
+(jamais à chaque tour), et les vrais jalons, fin de phase et fin de milestone, qui remontent sur ton
+application Claude plutôt que sur le bureau. Le réglage vaut pour la machine, pas pour un lab : tu
+l'actives une fois et tous tes labs le respectent. Un point à connaître : tant que tu es actif au
+terminal, l'application Claude n'affiche rien — c'est voulu, elle ne te prévient que quand tu es
+parti.
+
+*Exemple* : `/vf-notify on` pour être prévenu d'une mission nocturne, `/vf-notify status` pour
+savoir où en est le réglage, `/vf-notify test` pour envoyer une notification de vérification sans
+changer l'état.
+
+Une chose qu'il ne coupe jamais : l'alerte de mission bloquée. Si un agent cale, le signal
+apparaît dans ta session quel que soit ce réglage — le toggle éteint le confort, jamais l'alarme.
+
 ## La frontière avec les skills
 
 Une commande et un skill ne sont pas la même chose, même si presque toutes les commandes de cette
@@ -96,10 +114,10 @@ ressemblent en surface.
 ## D'où vient cette liste
 
 Chaque commande ci-dessus correspond à un fichier réel sous `plugin/commands/`, énuméré au moment
-de l'écriture de cette page (2026-08-01) plutôt que recopié d'une documentation existante — c'est la
-règle qui s'applique à tout ce thème de référence. Si tu veux revérifier toi-même, la commande est
-`ls plugin/commands/*.md` depuis la racine du dépôt : le compte doit rester à six tant qu'aucune
-n'a été ajoutée ou retirée.
+de l'écriture de cette page (2026-08-01, revérifié le 2026-08-17) plutôt que recopié d'une
+documentation existante — c'est la règle qui s'applique à tout ce thème de référence. Si tu veux
+revérifier toi-même, la commande est `ls plugin/commands/*.md` depuis la racine du dépôt : le compte
+doit rester à sept tant qu'aucune n'a été ajoutée ou retirée.
 
 <!-- vf-manual:nav -->
 [← Précédent](../05-equipe-agents/equipes-specialisees.md) · [↑ Sommaire](../README.md) · [Suivant →](../06-reference/skills.md)

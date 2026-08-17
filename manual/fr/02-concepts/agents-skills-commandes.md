@@ -10,7 +10,7 @@ tu **invoques** et ce qui **travaille pour toi en coulisse**. Cette page pose le
 listes exhaustives (quelle commande, quel skill, quel agent existe précisément) vivent dans
 `06-reference/`, pas ici.
 
-Retiens l'ordre de grandeur : six commandes contre plus d'une quinzaine de skills livrés et
+Retiens l'ordre de grandeur : sept commandes contre plus d'une quinzaine de skills livrés et
 vingt-deux agents. Ce déséquilibre volontaire est la clé de lecture de toute cette page — la
 plupart de ce que VibeFlow fait pour toi n'est **jamais** tapé, il se déclenche.
 

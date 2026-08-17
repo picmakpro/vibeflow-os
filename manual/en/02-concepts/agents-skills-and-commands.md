@@ -10,7 +10,7 @@ matching command. That's not an oversight: it's a deliberate distinction between
 exhaustive lists (exactly which command, which skill, which agent exists) live in
 `06-reference/`, not here.
 
-Keep the order of magnitude in mind: six commands against more than fifteen shipped skills and
+Keep the order of magnitude in mind: seven commands against more than fifteen shipped skills and
 twenty-two agents. That deliberate imbalance is the key to reading this whole page — most of what
 VibeFlow does for you is **never** typed, it triggers.
 
