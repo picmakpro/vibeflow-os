@@ -548,6 +548,72 @@ assert "T41b.3 — un reclaim ULTÉRIEUR normal réussit (lock toujours reprenab
 assert_exit "T41b.4 — exit 0" "$rc2" 0
 "$SCRIPT" release --owner=A41B >/dev/null 2>&1
 
+echo "=== T42 — journal_event : une ligne JSON par takeover réussi ==="
+rm -rf "$VF_DRIVER_LOCK" "$WORK_DIR"/DRIVER.lock.events.log
+"$SCRIPT" acquire --owner=DEAD42 --step=x >/dev/null
+age_stale "$VF_DRIVER_LOCK"
+"$SCRIPT" takeover --owner=B42 --step=y >/dev/null
+_t42_log="$WORK_DIR/DRIVER.lock.events.log"
+if [ -f "$_t42_log" ]; then echo "  ✅ PASS — T42.1 — le journal existe"; PASS=$((PASS+1)); else echo "  ❌ FAIL — T42.1 — le journal existe"; FAIL=$((FAIL+1)); fi
+_t42_n=$(wc -l < "$_t42_log" | tr -d ' ')
+num_eq "T42.2 — exactement 1 ligne" "$_t42_n" 1
+_t42_line=$(cat "$_t42_log")
+json_ok "$_t42_line"; assert_exit "T42.3 — la ligne parse comme JSON" $? 0
+assert "T42.4 — event takeover" "$_t42_line" '"event": "takeover"'
+assert "T42.5 — previous_owner DEAD42" "$_t42_line" '"previous_owner": "DEAD42"'
+assert "T42.6 — new_owner B42" "$_t42_line" '"new_owner": "B42"'
+_t42_age=$(printf '%s' "$_t42_line" | python3 -c 'import json,sys; print(json.load(sys.stdin)["age_seconds"])')
+case "$_t42_age" in ''|*[!0-9]*) echo "  ❌ FAIL — T42.7 — age_seconds numérique"; FAIL=$((FAIL+1)) ;; *) echo "  ✅ PASS — T42.7 — age_seconds numérique"; PASS=$((PASS+1)) ;; esac
+"$SCRIPT" release --owner=B42 >/dev/null 2>&1
+
+echo "=== T43 — le journal survit à la destruction de la génération (rm -rf) ET à un release ==="
+rm -rf "$VF_DRIVER_LOCK" "$WORK_DIR"/DRIVER.lock.events.log
+"$SCRIPT" acquire --owner=DEAD43 --step=x >/dev/null
+age_stale "$VF_DRIVER_LOCK"
+"$SCRIPT" takeover --owner=B43 --step=y >/dev/null   # rm -rf l'ancienne génération DEAD43
+"$SCRIPT" release --owner=B43 >/dev/null 2>&1          # détruit aussi la génération courante
+_t43_log="$WORK_DIR/DRIVER.lock.events.log"
+if [ -f "$_t43_log" ]; then echo "  ✅ PASS — T43.1 — le journal existe encore (survit à rm -rf + release)"; PASS=$((PASS+1)); else echo "  ❌ FAIL — T43.1 — le journal existe encore"; FAIL=$((FAIL+1)); fi
+_t43_n=$(wc -l < "$_t43_log" | tr -d ' ')
+if [ "$_t43_n" -ge 1 ]; then echo "  ✅ PASS — T43.2 — le journal garde sa ligne (=$_t43_n)"; PASS=$((PASS+1)); else echo "  ❌ FAIL — T43.2 — le journal garde sa ligne"; FAIL=$((FAIL+1)); fi
+
+echo "=== T44 — trois natures d'événement, trois lignes, jamais tronqué (append-only) ==="
+rm -rf "$VF_DRIVER_LOCK" "$WORK_DIR"/DRIVER.lock.events.log
+"$SCRIPT" acquire --owner=DEAD44 --step=x >/dev/null
+age_stale "$VF_DRIVER_LOCK"
+"$SCRIPT" takeover --owner=B44 --step=y >/dev/null
+CLAUDE_CODE_SESSION_ID=sess44 "$SCRIPT" reclaim --owner=B44 >/dev/null
+age_stale "$VF_DRIVER_LOCK"
+"$SCRIPT" recover >/dev/null
+_t44_log="$WORK_DIR/DRIVER.lock.events.log"
+_t44_n=$(wc -l < "$_t44_log" | tr -d ' ')
+num_eq "T44.1 — exactement 3 lignes" "$_t44_n" 3
+_t44_l1=$(sed -n '1p' "$_t44_log"); _t44_l2=$(sed -n '2p' "$_t44_log"); _t44_l3=$(sed -n '3p' "$_t44_log")
+assert "T44.2 — ligne 1 : takeover" "$_t44_l1" '"event": "takeover"'
+assert "T44.3 — ligne 2 : reclaim" "$_t44_l2" '"event": "reclaim"'
+assert "T44.4 — ligne 3 : recover" "$_t44_l3" '"event": "recover"'
+
+echo "=== T45 — dégradation injectée : journal indisponible ne bloque JAMAIS le verrou ==="
+rm -rf "$VF_DRIVER_LOCK"
+_t45_log="$WORK_DIR/DRIVER.lock.events.log"
+rm -f "$_t45_log"
+"$SCRIPT" acquire --owner=DEAD45 --step=x >/dev/null
+age_stale "$VF_DRIVER_LOCK"
+# Panne injectée SUR LE FICHIER JOURNAL, pas sur le répertoire parent — vérifié empiriquement :
+# rendre $LOCK_PARENT non inscriptible bloquerait AUSSI l'unlink du lock par drop_lock lui-même
+# (supprimer une entrée de répertoire exige le droit d'écriture sur CE répertoire, quels que
+# soient les droits de l'entrée elle-même), rendant "recover réussit quand même" structurellement
+# impossible sous POSIX. Pré-créer le journal en lecture seule isole la panne au SEUL canal de
+# journalisation, sans toucher à la capacité de drop_lock à élaguer le lock.
+: > "$_t45_log"
+chmod 444 "$_t45_log"
+out=$("$SCRIPT" recover 2>"$WORK_DIR/t45.stderr"); rc=$?
+assert "T45.1 — recovered true malgré le journal indisponible" "$out" '"recovered": true'
+assert_exit "T45.2 — exit 0" "$rc" 0
+if grep -q 'journal indisponible' "$WORK_DIR/t45.stderr"; then echo "  ✅ PASS — T45.3 — diagnostic émis sur stderr"; PASS=$((PASS+1)); else echo "  ❌ FAIL — T45.3 — diagnostic émis sur stderr"; FAIL=$((FAIL+1)); fi
+chmod 644 "$_t45_log" 2>/dev/null
+rm -f "$_t45_log" "$WORK_DIR/t45.stderr"
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"

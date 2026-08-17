@@ -248,6 +248,39 @@ drop_lock() {
   fi
 }
 
+# Journal append-only des evenements de reprise (D-32-02) : takeover, reclaim, recover. FRERE du
+# lock, JAMAIS dedans — `drop_lock` et la reprise (takeover/reclaim) detruisent le dossier de
+# generation, donc toute trace ecrite dedans mourrait avec ce qu'elle documente. Le nom s'ecarte du
+# "$LOCK_BASE.takeovers.log" indicatif du cadrage parce que le fichier journalise TROIS natures
+# d'evenement (reprise, re-rattachement, elagage), pas une seule — un nom qui n'en nomme qu'une
+# induirait en erreur son futur lecteur.
+#
+# BEST-EFFORT : un echec d'ecriture n'echoue JAMAIS l'operation appelante — seulement diagnostique
+# sur stderr par `log`. Un journal indisponible ne bloque jamais le verrou (T45) ; un echappement
+# SILENCIEUX serait exactement la dette que cette phase ferme ailleurs.
+#
+# `owner` est une chaine LIBRE, jamais validee par ce script (32-TERRAIN.md §1) : les champs de
+# type chaine passent par `sanitize_session_id` (meme assainissement par classe de caracteres,
+# reutilise plutot que reinvente) pour qu'une entree non fiable ne puisse jamais casser le JSON du
+# journal.
+#
+# (MI-4) Pas de rotation ni de plafond de taille : une ligne courte par evenement de reprise, un
+# evenement RARE par construction (le fichier ne croit qu'au rythme des reprises, pas des commits).
+# Choix assume, pas un oubli — une rotation ajouterait de la complexite pour un gain non mesure. A
+# revisiter si le volume observe le justifie un jour, pas dans cette phase.
+journal_event() {
+  local event="$1" prev="$2" new="$3" sid="$4" age="$5" gen="$6"
+  local log_path="$LOCK_PARENT/${LOCK_BASE}.events.log"
+  local p n s
+  p="$(sanitize_session_id "$prev")"; n="$(sanitize_session_id "$new")"; s="$(sanitize_session_id "$sid")"
+  gen="$(printf '%s' "$gen" | tr -dc 'A-Za-z0-9._-')"
+  case "$age" in ''|*[!0-9]*) age=0 ;; esac
+  if ! printf '{"ts": "%s", "epoch": %s, "event": "%s", "previous_owner": "%s", "new_owner": "%s", "session_id": "%s", "age_seconds": %s, "generation": "%s"}\n' \
+    "$(iso)" "$(now)" "$event" "$p" "$n" "$s" "$age" "$gen" >> "$log_path" 2>/dev/null; then
+    log "journal indisponible ($log_path) — reprise non tracee mais non bloquee"
+  fi
+}
+
 json_status() {
   if [ "$1" = false ]; then
     printf '{"present": false, "lock": "%s"}\n' "$LOCK_DIR"; return
@@ -374,6 +407,7 @@ case "$ACTION" in
       case "$old_gen" in */*|''|legacy) ;; *) rm -rf "${LOCK_PARENT:?}/$old_gen" ;; esac
       rm -f "$mutex"; trap - EXIT INT TERM
       _lease="$(lease_age)" && : || _lease="null"
+      journal_event takeover "$held" "$OWNER" "" "$age" "$(lock_gen)"
       printf '{"acquired": true, "owner": "%s", "step": "%s", "recovered": true, "previous_owner": "%s", "generation": "%s", "session_ids": %s, "lease_seconds": %s}\n' \
         "$OWNER" "$STEP" "$held" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")" "$_lease"
       exit 0
@@ -431,6 +465,7 @@ case "$ACTION" in
     rewrite_meta "$hb" "$new_sids"
     rm -f "$mutex"; trap - EXIT INT TERM
     _lease="$(lease_age)" && : || _lease="null"
+    journal_event reclaim "" "$OWNER" "$sid" "$age" "$observed_gen"
     printf '{"reclaimed": true, "owner": "%s", "session_id": "%s", "session_ids": %s, "generation": "%s", "lease_seconds": %s}\n' \
       "$OWNER" "$sid" "$(json_session_ids "$(lock_session_ids)")" "$(lock_gen)" "$_lease"
     exit 0
@@ -480,6 +515,7 @@ case "$ACTION" in
         printf '{"recovered": false, "reason": "race-during-recovery"}\n'; exit 1
       fi
       drop_lock; rm -f "$mutex"
+      journal_event recover "$held" "" "" "$age" "$observed_gen"
       printf '{"recovered": true, "previous_owner": "%s", "age_seconds": %s}\n' "$held" "$age"; exit 0
     fi
     printf '{"recovered": false, "reason": "still-fresh", "age_seconds": %s, "ttl": %s}\n' "$age" "$TTL"
