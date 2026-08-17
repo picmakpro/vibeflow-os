@@ -23,7 +23,11 @@ set -uo pipefail
 # volontairement pas cité ici — grep -c sur ce fichier doit rendre 0, preuve machine du non-copié.)
 # ---------------------------------------------------------------------------------------------
 _vf_notify_lib=""
-_vf_notify_dir="$(dirname "$0")"
+# Canonicalisation cd+pwd (motif D-07, deja applique 5x dans ce depot — dag.sh, check-guard-health.sh,
+# ...) : un `dirname "$0"` brut resout de facon dependante du cwd de l'appelant quand $0 est un
+# chemin relatif. Repli sur le brut UNIQUEMENT si le `cd` echoue (chemin deja absent) — jamais un
+# `exit`, coherent avec le fail-open inconditionnel de tout ce script.
+_vf_notify_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd)" || _vf_notify_dir="$(dirname "$0")"
 for _vf_notify_cand in "$_vf_notify_dir/vf-portable.sh" "$_vf_notify_dir/lib/vf-portable.sh"; do
   [ -f "$_vf_notify_cand" ] && { _vf_notify_lib="$_vf_notify_cand"; break; }
 done

@@ -233,11 +233,13 @@ stale = data.get("stale")
 owner = data.get("owner")
 step = data.get("step")
 progress_age = data.get("progress_age_seconds")
+ttl = data.get("ttl")
 print("present=%s" % ("true" if present else "false"))
 print("stale=%s" % ("true" if stale else "false"))
 print("owner=%s" % (owner if owner is not None else ""))
 print("step=%s" % (step if step is not None else ""))
 print("progress_age_seconds=%s" % ("" if progress_age is None else progress_age))
+print("ttl=%s" % ("" if ttl is None else ttl))
 PYEOF
 )"
   rc_py=$?
@@ -245,7 +247,7 @@ PYEOF
     return 0
   fi
 
-  local d_present="" d_stale="" d_owner="" d_step="" d_progress_age=""
+  local d_present="" d_stale="" d_owner="" d_step="" d_progress_age="" d_ttl=""
   while IFS='=' read -r k v; do
     case "$k" in
       present) d_present="$v" ;;
@@ -253,12 +255,28 @@ PYEOF
       owner) d_owner="$v" ;;
       step) d_step="$v" ;;
       progress_age_seconds) d_progress_age="$v" ;;
+      ttl) d_ttl="$v" ;;
     esac
   done <<STATUS_PARSED
 $parsed
 STATUS_PARSED
 
   [ "$d_present" = "true" ] || return 0
+
+  # D-33-E (correction ciblee revue, MAJEUR 2) : verification CROISEE de l'invariant documente
+  # en tete de fichier — STALL_WINDOW DOIT rester STRICTEMENT SOUS le ttl reellement en vigueur
+  # (VF_DRIVER_TTL au moment ou driver-lock.sh a pose CE lock, pas au moment ou ce script tourne).
+  # `driver-lock.sh status` expose deja ce ttl : c'est le SEUL canal disponible pour croiser les
+  # deux valeurs a l'execution (STALL_WINDOW et VF_DRIVER_TTL sont deux variables d'environnement
+  # INDEPENDANTES, jamais lues par le meme processus sinon). AVERTIT SEULEMENT (stderr, jamais
+  # stdout — pas un signal de la famille --hook), n'echoue JAMAIS, ne bloque JAMAIS (ADR-031) :
+  # relever VF_STALL_WINDOW au niveau de VF_DRIVER_TTL reintroduit silencieusement la regression
+  # deja mesuree (les deux a 1800 rendait le verdict STALL inatteignable), donc merite un signal,
+  # mais l'arbitrage reste humain.
+  case "$d_ttl" in
+    ''|*[!0-9]*) : ;;
+    *) [ "$STALL_WINDOW" -ge "$d_ttl" ] && echo "[check-guard-health] AVERTISSEMENT invariant : STALL_WINDOW (${STALL_WINDOW}s) >= ttl du lock (${d_ttl}s) — le verdict STALL redevient inatteignable (regression deja mesuree), baissez VF_STALL_WINDOW sous VF_DRIVER_TTL" >&2 ;;
+  esac
 
   if [ "$d_stale" = "true" ]; then
     STALL_LINE="[mission-watchdog] abandon detecte — owner=$d_owner step=$d_step (heartbeat mort, lock perime) — ne JAMAIS tuer (ADR-031), takeover disponible si legitime"
