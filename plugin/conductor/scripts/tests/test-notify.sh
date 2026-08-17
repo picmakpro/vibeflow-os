@@ -378,7 +378,18 @@ N17_ABSENT="$WORK_DIR/notify-optin.never-touched"
 N17_OUT="$WORK_DIR/n17.out"; N17_ERR="$WORK_DIR/n17.err"
 N17_RC=0
 env PATH="$N17_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin VF_NOTIFY_OPTIN_FILE="$N17_ABSENT" bash "$NOTIFY" "Titre N17" "Corps N17" >"$N17_OUT" 2>"$N17_ERR" || N17_RC=$?
-sleep 0.3
+# ATTENTE SUR L'ABSENCE, PAS SUR LA PRÉSENCE : le canal réel est détaché en arrière-plan
+# (( … & ) &, cf. note wait_for_file ci-dessus) — un `sleep 0.3` fixe lisait le compteur AVANT
+# que le fork n'ait eu le temps d'écrire .count si le gate laissait passer l'appel (mesuré : le
+# fork met ~0.32-0.42s à écrire .count sur cette machine, 15 runs consécutifs, cf. correction
+# ciblée mission-notif — un sleep de 0.3s manque le fork dans le pire cas mesuré). Sous mutation
+# du gate par inversion (`[ ! -f ... ] || exit 0`), notify.sh laisse filer l'appel : la fenêtre
+# doit être assez large pour que .count apparaisse si le canal a réellement été invoqué, sans
+# quoi N17 reste vert à vide. On réutilise wait_for_file (attend l'apparition, jamais un sleep
+# fixe) avec un budget de 2s — ~5x la borne haute mesurée du fork, marge suffisante sans aligner
+# sur le budget 10s des cas qui, eux, attendent une invocation réelle (celui-ci attend une
+# non-invocation : le budget est payé en entier à chaque run sain, donc gardé modeste).
+wait_for_file "$N17_DIR/osascript.count" 2
 assert_exit "N17 — sentinel absent : exit 0" "$N17_RC" 0
 assert_empty "N17 — stdout vide" "$(cat "$N17_OUT")"
 assert_empty "N17 — stderr vide" "$(cat "$N17_ERR")"
