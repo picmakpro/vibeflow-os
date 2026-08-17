@@ -63,8 +63,13 @@ capté ») et la parsabilité machine des exigences (§4 : aucun consommateur). 
 
 - **D-18-04 :** L'archive `milestones/v[X.Y]-REQUIREMENTS.md` reste un **instantané verbatim
   intégral** — le fichier entier au moment de la clôture, livrées comprises. Le CLI archive déjà
-  verbatim avec en-tête SHIPPED : **zéro code à écrire**, la doctrine dit simplement que c'est un
-  instantané, pas un déménagement.
+  verbatim : **zéro code à écrire**, la doctrine dit simplement que c'est un instantané, pas un
+  déménagement.
+
+  *Précision vérifiée le 2026-08-17* — l'archive `REQUIREMENTS.md` ne porte **aucun** bandeau
+  SHIPPED (`grep -c SHIPPED .planning/milestones/agentique-v1.0-REQUIREMENTS.md` → `0`) ; le bandeau
+  SHIPPED existe côté archive de la **ROADMAP**, pas de REQUIREMENTS. La conclusion (verbatim
+  intégral, zéro code) reste inchangée.
 
 ### B. Qui exécute le geste
 
@@ -78,8 +83,9 @@ capté ») et la parsabilité machine des exigences (§4 : aucun consommateur). 
   **maintenant** sans dépendre d'un tiers, et il **ne combat pas le moteur** — il s'exécute après
   lui, il ne le bloque pas.
 
-  **Contrainte de qualification, non négociable (Iron Law 2, `plugin/conductor/AGENT.md:114`
-  « Router, jamais réimplémenter ») :** le rattrapage est un **post-traitement**. Il ne
+  **Contrainte de qualification, non négociable (Iron Law 2, `plugin/conductor/AGENT.md:115`
+  « Router, jamais forker — une capacité amont partiellement couverte se câble en écrivant ses
+  limites, elle ne se réimplémente pas », ADR-069) :** le rattrapage est un **post-traitement**. Il ne
   réimplémente ni `complete-milestone`, ni l'archivage, ni la génération. Tout plan qui le ferait
   dériver vers une copie du workflow amont est hors périmètre.
 
@@ -115,8 +121,12 @@ capté ») et la parsabilité machine des exigences (§4 : aucun consommateur). 
 
 - **D-18-09 :** **Ce repo (`vibeflow-os`) est armé** avec son propre gate. Il a un
   `REQUIREMENTS.md` vivant et des jalons clos dans `MILESTONES.md` : le gate y est vert
-  immédiatement, l'armement ne coûte rien et prouve le geste sur pièce. Répond aussi à la
-  condition **C1** du STUDY (« ce repo prouve qu'il consomme son propre outillage »).
+  immédiatement, l'armement ne coûte rien et prouve le geste sur pièce **par exécution manuelle**.
+
+  *Précision (vérifiée le 2026-08-17)* : la condition **C1** du STUDY visait une auto-consommation
+  outillée **en continu** via `SessionStart` — ce dépôt n'a pas de `.claude/` versionné (« source
+  des modules, PAS un lab »), le hook n'y tourne donc jamais automatiquement. Seule l'exécution
+  manuelle du gate est prouvée ici ; C1 n'est pas revendiquée.
 
   *Écart assumé avec le précédent de la Phase 32*, où `vibeflow-os` a été laissé volontairement non
   armé pour le driver-lock : là le risque était réel, ici il est nul.
@@ -156,6 +166,16 @@ capté ») et la parsabilité machine des exigences (§4 : aucun consommateur). 
   *Enjeu concret :* si la RFC passe, gsd-core produira **exactement** cette forme et notre
   rattrapage devient un no-op propre. Toute divergence, même cosmétique, nous condamne à une
   migration.
+
+  **Glose, vérifiée sur pièces le 2026-08-17 (issue amont #3556 + gabarits gsd-core) :** `v[X.Y]`
+  n'est **pas** un format de valeur — c'est le **placeholder de gabarit** que gsd-core utilise pour
+  « l'identifiant du jalon » (le même que `milestones/v[X.Y]-REQUIREMENTS.md`, déjà instancié dans
+  ce dépôt en nom de jalon, pas en version : `agentique-v1.0-REQUIREMENTS.md`). L'amont ne se
+  prononce jamais sur la **forme** de la valeur ; sa seule contrainte réelle est
+  d'**emplacement** (« the `carried-from` marker must live in a dedicated table column »). La
+  décision retenue ici, et verrouillée au caractère près, porte donc sur le jeton `carried-from:`,
+  l'espace unique et la colonne dédiée — **l'étiquette est le libellé du jalon tel qu'il est**
+  (`carried-from: agentique-v1.0`), jamais un `v` fabriqué devant un nom qui n'en porte pas.
 
 - **D-18-13 :** Le roll-forward **préserve les statuts verbatim** et se contente d'accoler
   `carried-from:`. **Aucune normalisation** vers un vocabulaire fermé.
@@ -223,8 +243,9 @@ capté ») et la parsabilité machine des exigences (§4 : aucun consommateur). 
   — moule du hook `SessionStart` en forme exec (D-18-06).
 
 ### Doctrine
-- `plugin/conductor/AGENT.md:114` — Iron Law 2, « Router, jamais réimplémenter » — contrainte de
-  qualification de D-18-05.
+- `plugin/conductor/AGENT.md:115` — Iron Law 2, « Router, jamais forker — une capacité amont
+  partiellement couverte se câble en écrivant ses limites, elle ne se réimplémente pas » (ADR-069)
+  — contrainte de qualification de D-18-05.
 - `plugin/dev-orchestrator/AGENT.md` — cible de la ligne de doctrine (D-18-14).
 
 </canonical_refs>
