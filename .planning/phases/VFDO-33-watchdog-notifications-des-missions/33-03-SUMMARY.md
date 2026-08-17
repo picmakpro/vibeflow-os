@@ -181,3 +181,17 @@ du dépôt, à cause d'un autre agent gsd-executor actif en tâche de fond sur c
 même worktree (écritures concurrentes constatées à plusieurs reprises). Le fichier livré dans les
 deux commits reste, lui, strictement celui écrit par ce worker — vérifié `git diff --stat` vide
 contre HEAD avant la rédaction de ce SUMMARY.
+
+**Ordre TDD (`tdd="true"`) non observé au caractère près** : la tâche 1 de ce plan est un tracer
+`tdd="true"`, qui prescrit un commit RED (tests committés en échec) strictement AVANT le commit
+GREEN (implémentation). L'ordre effectif des deux commits livrés est `d78e3be` (feat/GREEN) PUIS
+`2daf827` (test) — la collision d'agents documentée ci-dessus (deux workers gsd-executor actifs sur
+le même plan, dans le même worktree) explique la divergence : le worker dont l'implémentation a
+atterri en premier sur le disque partagé a été committée avant que les tests D14-D25 correspondants
+ne le soient par l'un ou l'autre worker. Aucune réécriture d'historique n'a été tentée pour corriger
+cet ordre après coup (interdit par le protocole — jamais d'amend, jamais de commit destructif). En
+compensation, chaque cas D14-D25 a été vérifié manuellement un par un contre le comportement réel du
+script AVANT la rédaction finale de la suite, et les trois mutations rouges exigées par le plan
+apportent la preuve de discriminance (un test qui ne peut jamais rougir sous mutation ciblée est le
+même défaut qu'un RED qui ne s'est jamais produit) — une rigueur équivalente en substance, mais pas
+au sens littéral de la séquence de commits prescrite par `tdd="true"`.
