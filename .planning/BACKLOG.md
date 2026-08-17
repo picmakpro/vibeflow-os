@@ -1,5 +1,54 @@
 # Backlog — idées différées (hors milestone courant)
 
+## `save()` de `dag.sh` sans verrou ni écriture atomique — lost update silencieux — DIFFÉRÉ
+
+**Capturé :** 2026-08-17, demande explicite de Samuel après le rapport d'exécution de la
+Phase 33 (finding pré-existant remonté par la revue de mission, provenance vérifiée commit
+par commit — hors périmètre 33, non corrigé).
+
+**Le défaut :** `save()` dans `dag.sh` réécrit le fichier de DAG sans verrou ni écriture
+atomique (pas de write-to-temp + rename, pas de lock). Deux writers concurrents produisent un
+**lost update silencieux** : le dernier écrase le premier sans erreur ni trace. C'est le
+finding pré-existant le plus sérieux de la revue Phase 33, précisément parce que `dag.sh` est
+conçu pour le **dispatch parallèle** — les managers marquent des nœuds pendant que des vagues
+tournent, et depuis la Phase 33 `mark` écrit aussi `progress_epoch` (D-33-A), ce qui multiplie
+les écritures concurrentes sur le même fichier.
+
+**Piste de fix :** écriture atomique (temp + `mv` sur le même filesystem) au minimum ;
+verrouillage type mutex du driver-lock (mécanisme déjà éprouvé en Phase 32, `ln_atomic`) si la
+mesure montre des collisions réelles. La preuve devra être un cas de concurrence réel rouge
+sous mutation, pas un test d'API — même exigence que T46 (Phase 32).
+
+**Findings voisins de la même revue, à considérer dans le même lot :** `sanitize_field()`
+incomplet sur les caractères de contrôle · `vf_guard_unavailable()` sans validation d'argument
+· TOCTOU sur le `takeover` legacy (tous tracés au rapport
+`.planning/missions/2026-08-17-phase-33-watchdog-notifications.md`, §findings pré-existants).
+
+## Gate machine sur l'observance de `mission-flow.md` (Phase 33, S1 option (c)) — DIFFÉRÉ
+
+**Capturé :** 2026-08-17, pendant la correction de coordination de la Phase 33 (mandat vf-coder,
+2ᵉ plancheck externe). Décision Samuel : l'option (b) — financer une preuve de protocole réel
+(`driver-lock.sh heartbeat` réel, D25 en 33-03) — a été retenue et livrée pour fermer S1. L'option
+(c) ci-dessous a été explicitement écartée pour la Phase 33, mais versée en reliquat plutôt que
+laissée tomber.
+
+**Ce qu'elle proposait :** armer une contrainte MACHINE sur la doctrine de `mission-flow.md`, à
+l'image de `check-agents.sh` (module `conductor`) — un gate qui vérifierait que le protocole de
+heartbeat amendé (D-33-E, cadence indépendante des transitions de nœud) est réellement OBSERVÉ par
+les managers en usage réel, pas seulement écrit dans la doctrine.
+
+**Motivation exacte pour la différer (pas juste « pas le temps ») :** un critère `grep -c 'D-33-E'
+mission-flow.md >= 1` prouve qu'un paragraphe existe dans la doctrine, JAMAIS qu'il est observé —
+l'émetteur du heartbeat est un agent LLM obéissant à un paragraphe de prose, pas un mécanisme
+machine-vérifiable au sens où `check-agents.sh` vérifie une structure de fichier. Construire un
+vrai gate d'observance demanderait d'instrumenter le comportement réel des managers en session (pas
+seulement leur doctrine écrite) — un chantier distinct de la correction de coordination en cours,
+qui mérite son propre cadrage plutôt qu'un geste improvisé en fin de mandat.
+
+**Déclencheur de resurgence :** une régression constatée où le protocole D-33-E amendé n'est PAS
+suivi en pratique (heartbeat toujours émis au même tour que `mark`, malgré la doctrine), ou une
+décision explicite d'investir dans l'observabilité comportementale des managers.
+
 ## Alignement « AI Agents in Depth » (Bojie Li) — milestone candidat — INVESTIGUÉ
 **Capturé :** 2026-08-15 · **Investigué :** 2026-08-15 (5 agents : 4 lecteurs couvrant les 10
 chapitres + 1 inventaire VibeFlow) → **rapport : `reports/research/2026-08-15-ai-agent-book-alignement.md`**

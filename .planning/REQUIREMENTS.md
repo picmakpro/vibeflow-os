@@ -830,10 +830,10 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | LOCK-03 | Phase 32 | Done — amendé (D-32-A) : porté par le même guard `PreToolUse(Bash)` que LOCK-02, `reference-transaction` écarté (spike PAS SÛR) |
 | LOCK-04 | Phase 32 | Done — plans 32-02 et 32-07 (verbes `takeover`/`reclaim` + fermeture du trou de la voie legacy, 4A) |
 | LOCK-05 | Phase 32 | Livré en tant que **convention**, pas encore observée — jeton (`generation`) exposé, convention `Fence:` écrite et exécutable (`mission-flow.md`, `team-kernel.md`), recette d'audit existe ; **aucun commit, y compris ceux de cette phase, ne porte encore le trailer** — entre en vigueur au prochain mandat |
-| WTCH-01 | Phase 33 | Pending |
-| WTCH-02 | Phase 33 | Pending |
-| WTCH-03 | Phase 33 | Pending — canal Windows à valider au cadrage |
-| WTCH-04 | Phase 33 | Pending |
+| WTCH-01 | Phase 33 | Done — plans 33-01/33-02, vérifié goal-backward (`33-VERIFICATION.md`, ATTEINT), suite `test-driver-lock.sh` 183 PASS / 0 FAIL |
+| WTCH-02 | Phase 33 | Done — détection par `check-guard-health.sh` ATTEINTE (78 PASS/0 FAIL, mutation rouge prouvée). Le gap relevé par `33-VERIFICATION.md` (le relais au geste `dag.sh mark` ne pouvait structurellement jamais remonter un STALL, `record_progress()` avançant `progress_epoch` avant que `check_stall_signal()` ne relise le statut) est **fermé par D-33-G** (commit `88975dc`) : l'ordre est inversé, la lecture précède le rafraîchissement, les deux restent après `save(dag)`. Couvert par le cas de discriminance **T49** (`test-dag.sh` 161 PASS) — mutation prouvée : sous l'ordre fautif T49.2 rougit tandis que T41 et T48 restent verts, donc seul T49 mord. Mesure A/B re-jouée par le manager : les deux chemins convergent sur le même signal, `rc=0` |
+| WTCH-03 | Phase 33 | Done (limite assumée) — plans 33-04/33-05, `notify.sh` posé, jalons `done`/`failed` notifiés, `running` jamais ; canal Windows prouvé par shims CI seulement — validation réelle Win10/11 en recette de clôture (`33-CLOTURE-WINDOWS.md`, jamais exécutée, aucune machine disponible) |
+| WTCH-04 | Phase 33 | Done — plan 33-05, armement vérifié par le gate PORT-05 (aucune entrée `hooks.json` neuve, aucun settings local, `check-capability-activation.sh` intact — `33-VERIFICATION.md`, ATTEINT) |
 | LEDG-01 | Phase 18 | Pending |
 | LEDG-02 | Phase 18 | Pending |
 | LEDG-03 | Phase 30 | Ouverte le 2026-08-15 — https://github.com/open-gsd/gsd-core/issues/3556 — deadline amont 2026-10-26 |
@@ -922,11 +922,11 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [x] **LOCK-04**: Le takeover d'un lock périmé est explicite et tracé — jamais d'auto-steal
 - [~] **LOCK-05** *(livré en tant que convention, pas encore observée)*: Jeton de fence en trailer des commits de mission — le jeton (`generation`) est exposé, la convention `Fence:` est écrite et exécutable dans `mission-flow.md`/`team-kernel.md`, une recette d'audit existe ; **aucun commit ne porte encore le trailer à ce jour**, y compris ceux de cette phase — entre en vigueur au prochain mandat qui commite sous cette doctrine
 
-### Watchdog & notifications des missions
-- [ ] **WTCH-01**: Chaque nœud du DAG de mission écrit un battement de progression (même battement que LOCK-01, deux consommateurs)
-- [ ] **WTCH-02**: Un stall est détecté par ABSENCE de battement au-delà du seuil — jamais par auto-déclaration ; le watchdog signale et suggère, ne tue jamais (ADR-031)
-- [ ] **WTCH-03**: Notification OS native aux jalons de mission (fin de nœud, halt condition) — jamais à chaque tour
-- [ ] **WTCH-04**: L'armement (hooks, notify) passe par le gate armement↔précondition — jamais un settings local (leçon #38)
+### Watchdog & notifications des missions (Phase 33 vérifiée `gaps_found` le 2026-08-17 — 3 critères atteints, 1 partiel, `33-VERIFICATION.md`)
+- [x] **WTCH-01**: Chaque nœud du DAG de mission écrit un battement de progression (même battement que LOCK-01, deux consommateurs)
+- [x] **WTCH-02**: Un stall est détecté par ABSENCE de battement au-delà du seuil — jamais par auto-déclaration ; le watchdog signale et suggère, ne tue jamais (ADR-031). Gap du relais au geste `mark` fermé par D-33-G (`88975dc`), cas de discriminance T49, mesure A/B re-jouée par le manager.
+- [x] **WTCH-03** *(limite assumée : preuve Windows réelle non exécutée)*: Notification OS native aux jalons de mission (fin de nœud, halt condition) — jamais à chaque tour
+- [x] **WTCH-04**: L'armement (hooks, notify) passe par le gate armement↔précondition — jamais un settings local (leçon #38)
 
 ### Survie du ledger d'exigences (Phase 18 héritée)
 - [ ] **LEDG-01**: La clôture de jalon fait un roll-over outillé du ledger — les exigences non livrées voyagent avec trace `carried-from:`

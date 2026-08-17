@@ -1,0 +1,273 @@
+{
+  "nodes": [
+    {
+      "id": "spike-hooks",
+      "step": "Spike hooks async / asyncRewake (research flag a)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "spike-notify",
+      "step": "Spike canal notification Windows (research flag b)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "recon",
+      "step": "Recon surfaces heartbeat/DAG/gate armement/engine",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "discuss",
+      "step": "Cadrage Phase 33 (definition de progres = decision n1, escalade Samuel)",
+      "stage": "",
+      "deps": [
+        "spike-hooks",
+        "spike-notify",
+        "recon"
+      ],
+      "scope": [
+        ".planning/phases/*33*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plan",
+      "step": "Plan de phase 33 + plan-checker interne",
+      "stage": "",
+      "deps": [
+        "discuss"
+      ],
+      "scope": [
+        ".planning/phases/*33*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-ext",
+      "step": "Plancheck EXTERNE (lecon x3 phases : 9-11 bloquants reels vs 0 interne)",
+      "stage": "",
+      "deps": [
+        "plan"
+      ],
+      "scope": [
+        ".planning/phases/*33*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "baseline",
+      "step": "Baseline verte des 64 suites AVANT toute modification",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "probe-hooks",
+      "step": "Sonde executee : evenements de hooks reellement supportes (doc -> fait)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-33-01",
+      "step": "Correctifs plancheck 33-01 (step efface, renumerotation T51-58, criteres vacuux)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/phases/*33*/33-01-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-33-04",
+      "step": "Correctifs plancheck 33-04 (N8 non discriminant, 4e candidat, mutation 3)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/phases/*33*/33-04-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-S1-S2",
+      "step": "Arbitrage humain S1 (stall inatteignable) + S2 (au prochain geste)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-33-02-03",
+      "step": "Correctifs S1+S2 et plancheck sur 33-02 et 33-03 (coherence jointe)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/phases/*33*/33-02-PLAN.md",
+        ".planning/phases/*33*/33-03-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-33-05",
+      "step": "Correctifs plancheck 33-05 (toasts reels, premisse blocked, DEVNULL)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/phases/*33*/33-05-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-ext-2",
+      "step": "Second plancheck EXTERNE sur les plans corriges (verificateurs frais)",
+      "stage": "",
+      "deps": [
+        "fix-33-02-03",
+        "fix-33-05"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-coordination",
+      "step": "Passe de coordination : numerotation, argv, deps, IDs menace, C5 mal ferme",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/phases/*33*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-vague-1",
+      "step": "Execution vague 1 : 33-01 + 33-04 (perimetres disjoints)",
+      "stage": "",
+      "deps": [
+        "fix-coordination"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/driver-lock.sh",
+        "plugin/conductor/scripts/notify.sh",
+        "plugin/_internal/lib/vf-portable.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-vague-2",
+      "step": "Execution vague 2 : 33-02 + 33-03",
+      "stage": "",
+      "deps": [
+        "exec-vague-1"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/dag.sh",
+        "plugin/conductor/scripts/check-guard-health.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-vague-3",
+      "step": "Execution vague 3 : 33-05",
+      "stage": "",
+      "deps": [
+        "exec-vague-2"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/dag.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue",
+      "step": "Revue vf-reviewer + verification, par lot",
+      "stage": "",
+      "deps": [
+        "exec-vague-3"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "Hygiene documentaire, un seul noeud en fin de mission",
+      "stage": "",
+      "deps": [
+        "revue"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-lot-1",
+      "step": "Revue vf-reviewer du lot 33-01..33-04 + verif mutations 33-03",
+      "stage": "",
+      "deps": [
+        "exec-vague-2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-integration",
+      "step": "Correctifs bloquants : chmod check-guard-health, isolation VF_DRIVER_LOCK des cas D1-D7",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/conductor/scripts/check-guard-health.sh",
+        "plugin/conductor/scripts/tests/test-check-guard-health.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-revue",
+      "step": "Correctifs revue : MJ-1 cwd notify, MJ-3 invariant seuil, flakiness wait_for_file",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/conductor/scripts/notify.sh",
+        "plugin/conductor/scripts/check-guard-health.sh",
+        "plugin/conductor/scripts/tests/test-notify.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "verif-goal",
+      "step": "Verification goal-backward des 4 criteres de succes",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-flakiness",
+      "step": "BLOQUANT OUVERT : test-notify.sh flaky (46-48 PASS selon run) — wait_for_file budget 3s",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/conductor/scripts/tests/test-notify.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-stall-relais",
+      "step": "BLOQUANT : le relais D-33-F ne peut jamais signaler un stall (progress rafraichi avant lecture)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/conductor/scripts/dag.sh",
+        "plugin/conductor/scripts/tests/test-dag.sh"
+      ],
+      "status": "done"
+    }
+  ]
+}

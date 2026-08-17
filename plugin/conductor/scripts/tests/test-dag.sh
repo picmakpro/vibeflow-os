@@ -12,6 +12,9 @@
 # T31 CLI resolue qui ECHOUE (returncode != 0) -> stages:null, jamais [] · T32 node absent mais
 # gsd-tools .cjs resolu -> stages:null (branche node, distincte de T29) · T33 non-regression :
 # gsd-tools.cjs TRACKE au CWD jamais resolu ni execute (vecteur RCE retire, dag.sh D-07)
+# T41-T47 relais watchdog (WTCH-02/WTCH-03) · T48 relais stall/marqueur REEL bout-en-bout (stub)
+# T49 (33-05-correctif, D-33-G) : VRAI STALL bout-en-bout a travers `dag.sh mark` (lock backdate
+# reel) — cas de discriminance, NE JAMAIS RETIRER · T49 sous-cas : relais ABANDON non regresse.
 #
 # Exit 0 si tout passe, 1 sinon.
 
@@ -27,6 +30,10 @@ PASS=0; FAIL=0
 assert()     { if [[ "$2" == *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: $3"; echo "     obtenu:  $2"; FAIL=$((FAIL+1)); fi; }
 assert_not() { if [[ "$2" != *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1 (a trouvé « $3 »)"; FAIL=$((FAIL+1)); fi; }
 assert_exit(){ if [ "$2" -eq "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1 (exit $2 ≠ $3)"; FAIL=$((FAIL+1)); fi; }
+# assert_eq — égalité STRICTE (contrairement à `assert`, sous-chaîne) : ajoutée par le plan 33-05
+# pour les cas T41/T42/T43/T44/T47 qui exigent une valeur EXACTE (ex. chaîne vide), une simple
+# sous-chaîne serait trivialement vraie sur un résultat vide comparé à n'importe quoi.
+assert_eq()  { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
 # run_bounded — exécute une commande sous une limite de temps portable (macOS n'a pas `timeout`).
 # stdout est renvoyé ; le code retour est celui de la commande, ou ≠0 si un watchdog a dû la tuer
 # (⇒ un `tree` qui bouclerait à l'infini ferait échouer le test au lieu de figer la suite).
@@ -494,8 +501,505 @@ assert "T30.1 — frontiere vide : ready=[] et count=0"                         
 # pas seulement produire un resultat different sans verification (cas discriminant).
 assert "T30.2 — stages=[] (jamais null) : preuve que compute_stages() n'a pas ete appelee"          "$out30" '"stages": []'
 
+DRIVER_LOCK_SCRIPT="$(pwd)/scripts/driver-lock.sh"
+
+echo "=== T34 — lock acquis : dag.sh mark avance progress_epoch sur le lock courant (WTCH-01) ==="
+export VF_DRIVER_LOCK="$WORK_DIR/t34.lock"
+rm -rf "$VF_DRIVER_LOCK"
+"$DRIVER_LOCK_SCRIPT" acquire --owner=tester --step=s1 >/dev/null
+F34="$WORK_DIR/t34.dag.json"
+"$SCRIPT" init --file="$F34" >/dev/null
+"$SCRIPT" add --file="$F34" --id=n1 --step=n1 >/dev/null
+"$SCRIPT" mark --file="$F34" --id=n1 --status=running >/dev/null
+st34="$("$DRIVER_LOCK_SCRIPT" status)"
+page34="$(printf '%s' "$st34" | grep -o '"progress_age_seconds": [0-9]*' | grep -o '[0-9]*$')"
+if [ -n "$page34" ] && [ "$page34" -le 2 ]; then
+  echo "  ✅ PASS — T34.1 — progress_age_seconds proche de 0 après mark (${page34}s)"; PASS=$((PASS+1))
+else
+  echo "  ❌ FAIL — T34.1 — progress_age_seconds proche de 0 après mark"; echo "     attendu: <=2"; echo "     obtenu:  ${page34:-vide}"; FAIL=$((FAIL+1))
+fi
+"$DRIVER_LOCK_SCRIPT" release --owner=tester >/dev/null 2>&1
+rm -rf "$VF_DRIVER_LOCK"
+
+echo "=== T35 — aucun lock present : dag.sh mark inchange (sortie identique a avant ce plan) ==="
+export VF_DRIVER_LOCK="$WORK_DIR/t35.lock-absent"
+rm -rf "$VF_DRIVER_LOCK"
+F35="$WORK_DIR/t35.dag.json"
+"$SCRIPT" init --file="$F35" >/dev/null
+"$SCRIPT" add --file="$F35" --id=n1 --step=n1 >/dev/null
+out35="$("$SCRIPT" mark --file="$F35" --id=n1 --status=running)"; rc35=$?
+assert_exit "T35.1 — exit 0 sans lock present"                      "$rc35" 0
+assert      "T35.2 — sortie JSON porte toujours id/status/ready"    "$out35" '"id": "n1"'
+assert      "T35.3 — status running toujours present"               "$out35" '"status": "running"'
+assert      "T35.4 — cle ready toujours presente"                   "$out35" '"ready":'
+unset VF_DRIVER_LOCK
+
+echo "=== T36 — sibling driver-lock.sh ISOLE en panne (exit 1, pas de JSON) : mark reste vert, DAG mis a jour sur disque ==="
+ISO36="$WORK_DIR/iso36"; mkdir -p "$ISO36"
+cp "$SCRIPT" "$ISO36/dag.sh"
+cat > "$ISO36/driver-lock.sh" <<'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+chmod +x "$ISO36/driver-lock.sh"
+# Controle positif de la fixture (T36.0) : le faux script echoue reellement quand invoque seul.
+"$ISO36/driver-lock.sh" >/dev/null 2>&1; rc360=$?
+assert_exit "T36.0 — controle positif : la fixture panne echoue bien seule (exit 1)" "$rc360" 1
+F36="$WORK_DIR/t36.dag.json"
+"$ISO36/dag.sh" init --file="$F36" >/dev/null
+"$ISO36/dag.sh" add --file="$F36" --id=n1 --step=n1 >/dev/null
+out36="$("$ISO36/dag.sh" mark --file="$F36" --id=n1 --status=running)"; rc36=$?
+assert_exit "T36.1 — exit 0 malgre driver-lock.sh en panne (exit 1 sans JSON)" "$rc36" 0
+assert      "T36.2 — sortie mark reflete bien le nouveau statut"               "$out36" '"status": "running"'
+assert      "T36.3 — le fichier DAG SUR DISQUE porte le nouveau statut (preuve que save(dag) a eu lieu avant l'appel driver-lock defaillant)" "$(cat "$F36")" '"status": "running"'
+
+echo "=== T37 — sibling driver-lock.sh ISOLE qui rend du JSON illisible : mark reste vert, DAG mis a jour normalement ==="
+ISO37="$WORK_DIR/iso37"; mkdir -p "$ISO37"
+cp "$SCRIPT" "$ISO37/dag.sh"
+cat > "$ISO37/driver-lock.sh" <<'EOF'
+#!/usr/bin/env bash
+echo "not-json"
+exit 0
+EOF
+chmod +x "$ISO37/driver-lock.sh"
+# Controle positif de la fixture (T37.0) : la sortie n'est vraiment pas du JSON valide.
+out370="$("$ISO37/driver-lock.sh" status)"
+assert_not "T37.0 — controle positif : la fixture rend bien une sortie non-JSON" "$out370" '{'
+F37="$WORK_DIR/t37.dag.json"
+"$ISO37/dag.sh" init --file="$F37" >/dev/null
+"$ISO37/dag.sh" add --file="$F37" --id=n1 --step=n1 >/dev/null
+out37="$("$ISO37/dag.sh" mark --file="$F37" --id=n1 --status=running)"; rc37=$?
+assert_exit "T37.1 — exit 0 malgre un JSON illisible cote driver-lock.sh" "$rc37" 0
+assert      "T37.2 — DAG SUR DISQUE mis a jour normalement"              "$(cat "$F37")" '"status": "running"'
+
+echo "=== T38 — sibling driver-lock.sh ISOLE qui PEND (sleep 30) : mark revient en MOINS DE 5s, DAG deja sauve avant l'appel pendant ==="
+ISO38="$WORK_DIR/iso38"; mkdir -p "$ISO38"
+cp "$SCRIPT" "$ISO38/dag.sh"
+cat > "$ISO38/driver-lock.sh" <<'EOF'
+#!/usr/bin/env bash
+sleep 30
+EOF
+chmod +x "$ISO38/driver-lock.sh"
+# Controle positif de la fixture (T38.0) : le processus est encore vivant apres 1s (borne, jamais
+# un sleep non borne dans le test lui-meme) — preuve qu'il pend reellement plutot que de sortir vite.
+"$ISO38/driver-lock.sh" >/dev/null 2>&1 &
+p38=$!
+sleep 1
+if kill -0 "$p38" 2>/dev/null; then
+  echo "  ✅ PASS — T38.0 — controle positif : la fixture pend bien (processus vivant après 1s)"; PASS=$((PASS+1))
+else
+  echo "  ❌ FAIL — T38.0 — controle positif : la fixture pend bien"; FAIL=$((FAIL+1))
+fi
+kill -9 "$p38" 2>/dev/null; wait "$p38" 2>/dev/null
+F38="$WORK_DIR/t38.dag.json"
+"$ISO38/dag.sh" init --file="$F38" >/dev/null
+"$ISO38/dag.sh" add --file="$F38" --id=n1 --step=n1 >/dev/null
+t0_38=$(date +%s)
+# NE PAS capturer run_bounded via $(...) ici : le watcher interne de run_bounded
+# (`( sleep 5; kill -9 "$pid" ) &`) n'a pas son propre stdout redirige et herite donc du pipe de
+# la substitution de commande englobante — meme apres que `wait "$pid"` rende la main et que le
+# watcher soit tue, `$(...)` peut rester bloque jusqu'a ce que CE descripteur herite se ferme,
+# soit jusqu'au kill -9 du watcher lui-meme a 5s (fausse alerte reproduite et mesuree : 5.0-5.03s
+# systematique avec capture directe, 2.0-2.1s sans — piege classique de bash, pas un defaut de
+# record_progress). Rediriger vers un fichier evite le pipe et cette dependance.
+OUT38FILE="$WORK_DIR/t38.out"
+run_bounded "$ISO38/dag.sh" mark --file="$F38" --id=n1 --status=running >"$OUT38FILE"; rc38=$?
+out38="$(cat "$OUT38FILE" 2>/dev/null)"
+t1_38=$(date +%s)
+elapsed38=$((t1_38 - t0_38))
+assert_exit "T38.1 — exit 0 malgre un driver-lock.sh qui pend"                          "$rc38" 0
+if [ "$elapsed38" -lt 5 ]; then
+  echo "  ✅ PASS — T38.2 — retour en moins de 5s (mesure : ${elapsed38}s, timeout=2 interne)"; PASS=$((PASS+1))
+else
+  echo "  ❌ FAIL — T38.2 — retour en moins de 5s"; echo "     attendu: <5"; echo "     obtenu:  ${elapsed38}s"; FAIL=$((FAIL+1))
+fi
+assert "T38.3 — DAG SUR DISQUE porte deja le nouveau statut (save(dag) a eu lieu avant l'appel pendant)" "$(cat "$F38")" '"status": "running"'
+
+echo "=== T39 — non-regression statique : aucun subprocess.run vers les siblings ne passe par une chaine shell ==="
+assert_exit "T39.1 — grep positif sur l'appel status en LISTE"       "$(grep -c '\[driver_lock_sh, "status"\]' "$SCRIPT" >/dev/null; echo $?)" 0
+assert_exit "T39.2 — grep positif sur l'appel mark-progress en LISTE" "$(grep -c '\[driver_lock_sh, "mark-progress"' "$SCRIPT" >/dev/null; echo $?)" 0
+assert_exit "T39.3 — aucun shell=True dans dag.sh"                    "$([ "$(grep -c 'shell=True' "$SCRIPT")" -eq 0 ]; echo $?)" 0
+
+echo "=== T40 — lock present+detenu mais mark-progress ECHOUE (exit 1) : mark reste vert, DAG mis a jour, avertissement BRUYANT sur stderr (4e issue QUAL-01) ==="
+ISO40="$WORK_DIR/iso40"; mkdir -p "$ISO40"
+cp "$SCRIPT" "$ISO40/dag.sh"
+cat > "$ISO40/driver-lock.sh" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = "status" ]; then
+  echo '{"present": true, "owner": "tester", "step": "s", "age_seconds": 1}'
+  exit 0
+fi
+if [ "$1" = "mark-progress" ]; then
+  exit 1
+fi
+exit 1
+EOF
+chmod +x "$ISO40/driver-lock.sh"
+# Controle positif de la fixture (T40.0) : status confirme present+owner, mark-progress echoue reellement.
+st400="$("$ISO40/driver-lock.sh" status)"
+assert     "T40.0a — controle positif : la fixture rend bien present+owner=tester" "$st400" '"owner": "tester"'
+"$ISO40/driver-lock.sh" mark-progress --owner=tester >/dev/null 2>&1; rc400=$?
+assert_exit "T40.0b — controle positif : la fixture echoue bien sur mark-progress" "$rc400" 1
+F40="$WORK_DIR/t40.dag.json"
+"$ISO40/dag.sh" init --file="$F40" >/dev/null
+"$ISO40/dag.sh" add --file="$F40" --id=n1 --step=n1 >/dev/null
+ERR40="$WORK_DIR/t40.stderr"
+out40="$("$ISO40/dag.sh" mark --file="$F40" --id=n1 --status=running 2>"$ERR40")"; rc40=$?
+assert_exit "T40.1 — exit 0 malgre l'echec de mark-progress sur lock sain"           "$rc40" 0
+assert      "T40.2 — DAG SUR DISQUE mis a jour"                                     "$(cat "$F40")" '"status": "running"'
+assert      "T40.3 — avertissement BRUYANT sur stderr (lock present+detenu, ecriture refusee)" "$(cat "$ERR40")" 'mark-progress'
+
+# --------------------------------------------------------------------------------------------
+# T41-T47 (plan 33-05, WTCH-02/WTCH-03) : check_stall_signal() (D-33-F, relais du verdict
+# check-guard-health.sh --hook, sans filtre de statut) et record_milestone() (notification via
+# notify.sh, filtree done/failed uniquement). Patron d'isolation identique a T36-T38 (copie de
+# dag.sh + sibling exécutable ISOLE dans un repertoire dedie du WORK_DIR).
+# --------------------------------------------------------------------------------------------
+
+echo ""
+echo "=== T41 — check_stall_signal() relaie le verdict check-guard-health.sh --hook (D-33-F, WTCH-02) ==="
+ISO41="$WORK_DIR/iso41"; mkdir -p "$ISO41"
+cp "$SCRIPT" "$ISO41/dag.sh"
+cat > "$ISO41/check-guard-health.sh" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = "--hook" ]; then
+  echo "[mission-watchdog] stall detecte (fixture T41)"
+fi
+exit 0
+EOF
+chmod +x "$ISO41/check-guard-health.sh"
+# Controle positif (T41.0) : la fixture rend bien la ligne attendue quand invoquee seule, hors dag.sh.
+fx41="$("$ISO41/check-guard-health.sh" --hook)"
+assert "T41.0 — controle positif : la fixture --hook rend bien la ligne stall" "$fx41" "[mission-watchdog] stall detecte (fixture T41)"
+F41="$WORK_DIR/t41.dag.json"
+"$ISO41/dag.sh" init --file="$F41" >/dev/null
+"$ISO41/dag.sh" add --file="$F41" --id=n1 --step=n1 >/dev/null
+ERR41="$WORK_DIR/t41.stderr"
+out41="$("$ISO41/dag.sh" mark --file="$F41" --id=n1 --status=done 2>"$ERR41")"; rc41=$?
+assert_exit "T41.1 — exit 0 (status=done)"                                          "$rc41" 0
+assert      "T41.2 — la ligne stall EXACTE apparait sur stderr (relais fidele, aucune reformulation)" "$(cat "$ERR41")" "[mission-watchdog] stall detecte (fixture T41)"
+
+echo "--- T41 sous-cas 2 : check-guard-health.sh absent -> degradation silencieuse, aucune ligne stall ---"
+ISO41B="$WORK_DIR/iso41b"; mkdir -p "$ISO41B"
+cp "$SCRIPT" "$ISO41B/dag.sh"
+# Aucun check-guard-health.sh depose : absent au sens os.path.isfile — pas de fichier a chmod 000,
+# le cas "absent" et le cas "non executable" degradent tous deux par la meme garde isfile()/try-except.
+F41B="$WORK_DIR/t41b.dag.json"
+"$ISO41B/dag.sh" init --file="$F41B" >/dev/null
+"$ISO41B/dag.sh" add --file="$F41B" --id=n1 --step=n1 >/dev/null
+ERR41B="$WORK_DIR/t41b.stderr"
+out41b="$("$ISO41B/dag.sh" mark --file="$F41B" --id=n1 --status=running 2>"$ERR41B")"; rc41b=$?
+assert_exit "T41.3 — exit 0 malgre check-guard-health.sh absent"                    "$rc41b" 0
+assert_eq   "T41.4 — aucune ligne sur stderr (degradation silencieuse, meme patron que record_progress())" "$(cat "$ERR41B")" ""
+
+echo "--- T41 sous-cas 3 : status=running -> check_stall_signal() s'execute QUAND MEME (pas de filtre de statut) ---"
+F41C="$WORK_DIR/t41c.dag.json"
+"$ISO41/dag.sh" init --file="$F41C" >/dev/null
+"$ISO41/dag.sh" add --file="$F41C" --id=n1 --step=n1 >/dev/null
+ERR41C="$WORK_DIR/t41c.stderr"
+"$ISO41/dag.sh" mark --file="$F41C" --id=n1 --status=running 2>"$ERR41C" >/dev/null
+assert "T41.5 — status=running : le relais stall s'execute quand meme (contrairement a record_milestone(), cas de discriminance)" "$(cat "$ERR41C")" "[mission-watchdog] stall detecte (fixture T41)"
+
+# ---------- Jeu de binaires curés pour T42/T43/T46 (jamais /usr/bin:/bin réel dans le PATH) ----
+# Meme patron que test-notify.sh (33-04) : PATH restreint a un jeu de binaires curés, AUCUN
+# osascript/notify-send/terminal-notifier/powershell.exe réel n'y figure — un canal réel ne peut
+# donc jamais être trouvé, meme si VF_NOTIFY_FORCE_CHANNEL retombait sur "darwin" par accident.
+UTIL_DIR_NOTIFY="$WORK_DIR/utils-notify"; mkdir -p "$UTIL_DIR_NOTIFY"
+for t in uname dirname grep cat bash python3 env sleep touch; do
+  p="$(command -v "$t" 2>/dev/null)" && ln -sf "$p" "$UTIL_DIR_NOTIFY/$t" 2>/dev/null
+done
+
+# instrument_notify_copy <copie-de-notify.sh> <fichier-journal> — insere UNE ligne de
+# journalisation synchrone de TITLE/BODY, juste APRES la validation d'arguments de notify.sh et
+# AVANT le dispatch de canal (deterministe, independante du detachement asynchrone du canal
+# lui-meme) — modifie UNIQUEMENT la copie passee en argument, jamais le fichier de production.
+instrument_notify_copy() {
+  local copy="$1" logfile="$2"
+  python3 - "$copy" "$logfile" <<'PYEOF'
+import sys
+path, log = sys.argv[1], sys.argv[2]
+with open(path, encoding="utf-8") as fh:
+    content = fh.read()
+marker = 'if [ "$#" -lt 2 ] || [ -z "$TITLE" ] || [ -z "$BODY" ]; then\n  exit 0\nfi\n'
+assert marker in content, "marqueur d'insertion introuvable dans la copie de notify.sh"
+inject = marker + "printf '%s\\t%s\\n' \"$TITLE\" \"$BODY\" >> " + repr(log) + "\n"
+content = content.replace(marker, inject, 1)
+with open(path, "w", encoding="utf-8") as fh:
+    fh.write(content)
+PYEOF
+}
+
+echo ""
+echo "=== T42 — record_milestone() notifie via notify.sh sur status=done (WTCH-03) ==="
+ISO42="$WORK_DIR/iso42"; mkdir -p "$ISO42"
+cp "$SCRIPT" "$ISO42/dag.sh"
+cp "$(pwd)/scripts/notify.sh" "$ISO42/notify.sh"
+chmod +x "$ISO42/notify.sh"
+N42_LOG="$WORK_DIR/n42.notify.log"
+instrument_notify_copy "$ISO42/notify.sh" "$N42_LOG"
+export VF_NOTIFY_FORCE_CHANNEL=linux
+export VF_NOTIFY_BIN_DIR="$UTIL_DIR_NOTIFY"
+# Controle positif (T42.0) : la copie instrumentee journalise bien TITLE/BODY quand invoquee seule.
+rm -f "$N42_LOG"
+PATH="$UTIL_DIR_NOTIFY" "$ISO42/notify.sh" "TitreCtrl" "CorpsCtrl" >/dev/null 2>&1
+assert "T42.0 — controle positif : la copie instrumentee journalise bien argv1/argv2" "$(cat "$N42_LOG" 2>/dev/null || true)" "TitreCtrl	CorpsCtrl"
+rm -f "$N42_LOG"
+F42="$WORK_DIR/t42.dag.json"
+PATH="$UTIL_DIR_NOTIFY" "$ISO42/dag.sh" init --file="$F42" >/dev/null
+PATH="$UTIL_DIR_NOTIFY" "$ISO42/dag.sh" add --file="$F42" --id=n1 --step=n1 >/dev/null
+out42="$(PATH="$UTIL_DIR_NOTIFY" "$ISO42/dag.sh" mark --file="$F42" --id=n1 --status=done)"; rc42=$?
+assert_exit "T42.1 — exit 0"                                                    "$rc42" 0
+assert      "T42.2 — le journal notify.sh existe (invoque)"                     "$([ -f "$N42_LOG" ] && echo present || echo absent)" "present"
+N42_CONTENT="$(cat "$N42_LOG" 2>/dev/null || true)"
+N42_FIELDS="$(printf '%s' "$N42_CONTENT" | awk -F'\t' '{print NF}')"
+assert_eq   "T42.3 — le journal contient exactement 2 champs (TITLE, BODY)"      "$N42_FIELDS" "2"
+assert      "T42.4 — TITLE mentionne l'idee de fin/completion"                  "$(printf '%s' "$N42_CONTENT" | awk -F'\t' '{print $1}')" "termine"
+assert      "T42.5 — BODY porte l'id du noeud"                                  "$(printf '%s' "$N42_CONTENT" | awk -F'\t' '{print $2}')" "n1"
+unset VF_NOTIFY_FORCE_CHANNEL VF_NOTIFY_BIN_DIR
+
+echo ""
+echo "=== T43 — record_milestone() notifie via notify.sh sur status=failed (halt condition, WTCH-03) ==="
+ISO43="$WORK_DIR/iso43"; mkdir -p "$ISO43"
+cp "$SCRIPT" "$ISO43/dag.sh"
+cp "$(pwd)/scripts/notify.sh" "$ISO43/notify.sh"
+chmod +x "$ISO43/notify.sh"
+N43_LOG="$WORK_DIR/n43.notify.log"
+instrument_notify_copy "$ISO43/notify.sh" "$N43_LOG"
+export VF_NOTIFY_FORCE_CHANNEL=linux
+export VF_NOTIFY_BIN_DIR="$UTIL_DIR_NOTIFY"
+# Controle positif (T43.0)
+rm -f "$N43_LOG"
+PATH="$UTIL_DIR_NOTIFY" "$ISO43/notify.sh" "TitreCtrl" "CorpsCtrl" >/dev/null 2>&1
+assert "T43.0 — controle positif : la copie instrumentee journalise bien argv1/argv2" "$(cat "$N43_LOG" 2>/dev/null || true)" "TitreCtrl	CorpsCtrl"
+rm -f "$N43_LOG"
+F43="$WORK_DIR/t43.dag.json"
+PATH="$UTIL_DIR_NOTIFY" "$ISO43/dag.sh" init --file="$F43" >/dev/null
+PATH="$UTIL_DIR_NOTIFY" "$ISO43/dag.sh" add --file="$F43" --id=n1 --step=n1 >/dev/null
+out43="$(PATH="$UTIL_DIR_NOTIFY" "$ISO43/dag.sh" mark --file="$F43" --id=n1 --status=failed)"; rc43=$?
+assert_exit "T43.1 — exit 0"                                                    "$rc43" 0
+N43_CONTENT="$(cat "$N43_LOG" 2>/dev/null || true)"
+N43_FIELDS="$(printf '%s' "$N43_CONTENT" | awk -F'\t' '{print NF}')"
+assert_eq   "T43.2 — le journal contient exactement 2 champs (TITLE, BODY)"      "$N43_FIELDS" "2"
+assert      "T43.3 — TITLE mentionne l'idee de halte/echec"                     "$(printf '%s' "$N43_CONTENT" | awk -F'\t' '{print $1}')" "halte"
+assert      "T43.4 — BODY porte l'id du noeud"                                  "$(printf '%s' "$N43_CONTENT" | awk -F'\t' '{print $2}')" "n1"
+unset VF_NOTIFY_FORCE_CHANNEL VF_NOTIFY_BIN_DIR
+
+echo ""
+echo "=== T44 — status=running : notify.sh JAMAIS invoque (WTCH-03 critere n°3, cas de discriminance, NE JAMAIS RETIRER) ==="
+ISO44="$WORK_DIR/iso44"; mkdir -p "$ISO44"
+cp "$SCRIPT" "$ISO44/dag.sh"
+N44_LOG="$WORK_DIR/n44.notify.log"
+cat > "$ISO44/notify.sh" <<EOF
+#!/usr/bin/env bash
+printf '%s\t%s\n' "\$1" "\$2" >> "$N44_LOG"
+exit 0
+EOF
+chmod +x "$ISO44/notify.sh"
+# Controle positif (T44.0) : la fixture journalise bien quand invoquee directement.
+rm -f "$N44_LOG"
+"$ISO44/notify.sh" "TitreCtrl" "CorpsCtrl" >/dev/null 2>&1
+assert "T44.0 — controle positif : la fixture journalise bien quand invoquee seule" "$(cat "$N44_LOG" 2>/dev/null || true)" "TitreCtrl	CorpsCtrl"
+rm -f "$N44_LOG"
+F44="$WORK_DIR/t44.dag.json"
+"$ISO44/dag.sh" init --file="$F44" >/dev/null
+"$ISO44/dag.sh" add --file="$F44" --id=n1 --step=n1 >/dev/null
+"$ISO44/dag.sh" mark --file="$F44" --id=n1 --status=running >/dev/null 2>&1
+assert_eq "T44.1 — journal notify.sh absent/vide : notify.sh n'a jamais ete invoque sur status=running" "$([ -f "$N44_LOG" ] && cat "$N44_LOG" || echo "")" ""
+
+echo ""
+echo "=== T45 — notify.sh ABSENT : mark --status=done reste vert, DAG mis a jour normalement ==="
+ISO45="$WORK_DIR/iso45"; mkdir -p "$ISO45"
+cp "$SCRIPT" "$ISO45/dag.sh"
+# Aucun notify.sh depose.
+F45="$WORK_DIR/t45.dag.json"
+"$ISO45/dag.sh" init --file="$F45" >/dev/null
+"$ISO45/dag.sh" add --file="$F45" --id=n1 --step=n1 >/dev/null
+out45="$("$ISO45/dag.sh" mark --file="$F45" --id=n1 --status=done)"; rc45=$?
+assert_exit "T45.1 — exit 0 malgre notify.sh absent"                             "$rc45" 0
+assert      "T45.2 — DAG SUR DISQUE mis a jour (status=done)"                    "$(cat "$F45")" '"status": "done"'
+assert_not  "T45.3 — aucune erreur affichee sur stdout"                          "$out45" '"error"'
+
+echo ""
+echo "=== T46 — notify.sh ISOLE qui PEND (sleep 30) : mark --status=failed revient en MOINS DE 5s, DAG deja sauve ==="
+ISO46="$WORK_DIR/iso46"; mkdir -p "$ISO46"
+cp "$SCRIPT" "$ISO46/dag.sh"
+cat > "$ISO46/notify.sh" <<'EOF'
+#!/usr/bin/env bash
+sleep 30
+EOF
+chmod +x "$ISO46/notify.sh"
+# Controle positif (T46.0) : le shim pend reellement (processus vivant apres 1s, jamais un sleep
+# non borne dans le test lui-meme).
+"$ISO46/notify.sh" >/dev/null 2>&1 &
+p46=$!
+sleep 1
+if kill -0 "$p46" 2>/dev/null; then
+  echo "  ✅ PASS — T46.0 — controle positif : le shim notify.sh pend bien (processus vivant après 1s)"; PASS=$((PASS+1))
+else
+  echo "  ❌ FAIL — T46.0 — controle positif : le shim notify.sh pend bien"; FAIL=$((FAIL+1))
+fi
+kill -9 "$p46" 2>/dev/null; wait "$p46" 2>/dev/null
+F46="$WORK_DIR/t46.dag.json"
+"$ISO46/dag.sh" init --file="$F46" >/dev/null
+"$ISO46/dag.sh" add --file="$F46" --id=n1 --step=n1 >/dev/null
+# VF_NOTIFY_FORCE_CHANNEL/VF_NOTIFY_BIN_DIR positionnes par coherence avec T42/T43 — sans effet
+# ici puisque le shim PEND avant de lire quoi que ce soit, mais un shim qui pend ne doit pas non
+# plus pouvoir declencher un vrai canal : positionnes quand meme, jamais presumes inoffensifs.
+export VF_NOTIFY_FORCE_CHANNEL=linux
+export VF_NOTIFY_BIN_DIR="$UTIL_DIR_NOTIFY"
+t0_46=$(date +%s)
+OUT46FILE="$WORK_DIR/t46.out"
+# meme piege que T38 (voir commentaire ci-dessus) : rediriger vers un fichier, jamais capturer
+# run_bounded via $(...) directement.
+run_bounded "$ISO46/dag.sh" mark --file="$F46" --id=n1 --status=failed >"$OUT46FILE"; rc46=$?
+t1_46=$(date +%s)
+elapsed46=$((t1_46 - t0_46))
+unset VF_NOTIFY_FORCE_CHANNEL VF_NOTIFY_BIN_DIR
+assert_exit "T46.1 — exit 0 malgre un notify.sh qui pend"                        "$rc46" 0
+if [ "$elapsed46" -lt 5 ]; then
+  echo "  ✅ PASS — T46.2 — retour en moins de 5s (mesure : ${elapsed46}s, timeout=2 interne)"; PASS=$((PASS+1))
+else
+  echo "  ❌ FAIL — T46.2 — retour en moins de 5s"; echo "     attendu: <5"; echo "     obtenu:  ${elapsed46}s"; FAIL=$((FAIL+1))
+fi
+assert "T46.3 — DAG SUR DISQUE porte deja le nouveau statut (save(dag) a eu lieu avant l'appel pendant)" "$(cat "$F46")" '"status": "failed"'
+
+echo ""
+echo "=== T47 — non-regression statique : listes d'arguments, ordre, aucun hooks.json touche ==="
+assert_exit "T47.1 — aucun shell=True (compte inchange depuis 33-02)"            "$([ "$(grep -c 'shell=True' "$SCRIPT")" -eq 0 ]; echo $?)" 0
+assert_exit "T47.2 — appel notify.sh en LISTE [notify_sh, title, body]"          "$(grep -c '\[notify_sh, title, body\]' "$SCRIPT" >/dev/null; echo $?)" 0
+assert_exit "T47.3 — appel check-guard-health.sh en LISTE [check_guard_health_sh, \"--hook\"]" "$(grep -c '\[check_guard_health_sh, "--hook"\]' "$SCRIPT" >/dev/null; echo $?)" 0
+assert_eq   "T47.4 — hooks.json n'apparait dans aucun diff de ce plan (grep statique sur dag.sh)" "$(grep -c 'hooks.json' "$SCRIPT")" "0"
+assert_eq   "T47.5 — check-capability-activation.sh jamais mentionne dans dag.sh"                  "$(grep -c 'check-capability-activation.sh' "$SCRIPT")" "0"
+
+echo ""
+echo "=== T48 — check_stall_signal() relaie un signal REEL emis par le VRAI check-guard-health.sh + VRAI driver-lock.sh (discriminance, NE JAMAIS RETIRER) ==="
+# T41 exerce le relais contre un STUB de check-guard-health.sh (logique de relais isolee de la
+# logique de verdict). T48 est un cas DIFFERENT et complementaire : il exerce le relais contre les
+# VRAIS binaires du depot (check-guard-health.sh + driver-lock.sh, copies + chmod +x), sur un signal
+# REEL genere par un marqueur de garde frais — c'est le SEUL cas qui aurait attrape la regression
+# ou check-guard-health.sh reste commite en 644 : avec un vrai sibling non executable, l'appel
+# subprocess.run() leve PermissionError, absorbee par le try/except englobant -> relais VIDE, sans
+# qu'aucun signal ne le montre. Sans ce cas, la suite resterait verte sur un mecanisme mort.
+ISO48="$WORK_DIR/iso48"; mkdir -p "$ISO48/health"
+cp "$SCRIPT" "$ISO48/dag.sh"
+cp "$(pwd)/scripts/check-guard-health.sh" "$ISO48/check-guard-health.sh"
+cp "$(pwd)/scripts/driver-lock.sh" "$ISO48/driver-lock.sh"
+# `cp` preserve le mode de la SOURCE (verifie) : NE JAMAIS forcer chmod +x sur check-guard-health.sh
+# ici — c'est precisement le mode DU DEPOT TEL QUE COMMIT qui doit etre exerce (discriminance :
+# si ce fichier redevenait 644 dans le depot, ce cas doit rougir, pas etre maquille en vert par un
+# chmod local). dag.sh doit rester executable pour etre invocable comme commande — sa propre
+# executabilite n'est pas ce que ce cas verifie.
+chmod +x "$ISO48/dag.sh"
+TS48="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+printf '%s\tfake-guard.sh\tinterprete manquant\n' "$TS48" > "$ISO48/health/fake-guard.sh.marker"
+export VF_DRIVER_LOCK="$ISO48/nolock"
+export VF_GUARD_HEALTH_DIR="$ISO48/health"
+# Controle positif (T48.0) : le VRAI check-guard-health.sh (chmod +x, driver-lock.sh sibling
+# present et sain) produit reellement un signal non vide sous --hook, invoque seul, hors dag.sh.
+fx48="$("$ISO48/check-guard-health.sh" --hook)"
+assert "T48.0 — controle positif : le vrai check-guard-health.sh produit bien un signal reel (marqueur de garde frais)" "$fx48" "garde(s) du parc indisponible"
+F48="$WORK_DIR/t48.dag.json"
+"$ISO48/dag.sh" init --file="$F48" >/dev/null
+"$ISO48/dag.sh" add --file="$F48" --id=n1 --step=n1 >/dev/null
+ERR48="$WORK_DIR/t48.stderr"
+"$ISO48/dag.sh" mark --file="$F48" --id=n1 --status=running 2>"$ERR48" >/dev/null
+assert "T48.1 — le signal REEL est relaye TEL QUEL sur stderr de dag.sh mark (relais bout-en-bout contre les vrais binaires, pas un stub)" "$(cat "$ERR48")" "garde(s) du parc indisponible"
+unset VF_DRIVER_LOCK VF_GUARD_HEALTH_DIR
+
+# --------------------------------------------------------------------------------------------
+# T49 (33-05-correctif, D-33-G) : UN VRAI STALL de bout en bout A TRAVERS `dag.sh mark`. T41
+# exerce le relais contre un STUB (logique de relais isolee du verdict) ; T48 exerce le relais
+# via check-guard-health.sh REEL mais un marqueur de garde forge (jamais VF_DRIVER_LOCK=nolock,
+# jamais un vrai lock backdate). NI L'UN NI L'AUTRE n'aurait attrape la regression corrigee ici :
+# `record_progress()` rafraichissait `progress_epoch` du lock courant AVANT que
+# `check_stall_signal()` ne relise ce meme lock, ramenant systematiquement
+# `progress_age_seconds` a 0 et rendant le verdict STALL structurellement inatteignable au geste
+# `mark`. T49 est le SEUL cas qui exerce : vrai driver-lock.sh acquire + progress_epoch REELLEMENT
+# backdate au-dela du seuil de stall + vrai check-guard-health.sh + `dag.sh mark` — cas de
+# discriminance, NE JAMAIS RETIRER.
+# --------------------------------------------------------------------------------------------
+
+echo ""
+echo "=== T49 — dag.sh mark relaie un VRAI stall (lock backdate, verdict lu AVANT le rafraichissement de progress_epoch), NE JAMAIS RETIRER ==="
+ISO49="$WORK_DIR/iso49"; mkdir -p "$ISO49/health"
+cp "$SCRIPT" "$ISO49/dag.sh"
+cp "$(pwd)/scripts/check-guard-health.sh" "$ISO49/check-guard-health.sh"
+cp "$(pwd)/scripts/driver-lock.sh" "$ISO49/driver-lock.sh"
+chmod +x "$ISO49/dag.sh" "$ISO49/check-guard-health.sh" "$ISO49/driver-lock.sh"
+
+# Meme helper que test-check-guard-health.sh:114 (recule progress_epoch, JAMAIS heartbeat_epoch),
+# reproduit LOCALEMENT plutot que de sourcer cette autre suite (patron deja etabli en T41-T48).
+t49_lock_meta_path() { # <lock>
+  if [ -L "$1" ]; then
+    echo "$(dirname "$1")/$(readlink "$1")/meta"
+  else
+    echo "$1/meta"
+  fi
+}
+t49_progress_backdate() { # <lock> <secs>
+  local meta secs now old
+  meta="$(t49_lock_meta_path "$1")"
+  secs="$2"
+  [ -f "$meta" ] || return 1
+  now="$(date +%s)"
+  old=$(( now - secs ))
+  sed -i.bak "s/^progress_epoch=.*/progress_epoch=$old/" "$meta" && rm -f "${meta}.bak"
+}
+
+L49="$ISO49/lock"
+export VF_DRIVER_LOCK="$L49"
+export VF_GUARD_HEALTH_DIR="$ISO49/health"   # vide : isole le signal a la seule voie stall (pas de marqueur de garde)
+"$ISO49/driver-lock.sh" acquire --owner=t49-owner --step=t49-step >/dev/null 2>&1
+t49_progress_backdate "$L49" 1303   # > 900 (STALL_WINDOW defaut, meme grandeur que la mesure du mandat), heartbeat_epoch INCHANGE (reste frais)
+# Controle positif (T49.0) : le VRAI check-guard-health.sh, invoque seul hors dag.sh, produit bien
+# le verdict stall sur ce lock backdate.
+fx49="$("$ISO49/check-guard-health.sh" --hook)"
+assert "T49.0 — controle positif : le vrai check-guard-health.sh --hook signale bien le stall (lock backdate)" "$fx49" "[mission-watchdog] stall detecte"
+
+F49="$WORK_DIR/t49.dag.json"
+"$ISO49/dag.sh" init --file="$F49" >/dev/null
+"$ISO49/dag.sh" add --file="$F49" --id=n1 --step=n1 >/dev/null
+ERR49="$WORK_DIR/t49.stderr"
+out49="$("$ISO49/dag.sh" mark --file="$F49" --id=n1 --status=running 2>"$ERR49")"; rc49=$?
+assert_exit "T49.1 — dag.sh mark rend rc=0 malgre le stall relaye (best-effort, jamais bloquant)" "$rc49" 0
+assert      "T49.2 — la ligne '[mission-watchdog] stall detecte' arrive bien SUR STDERR de dag.sh mark (le bloquant corrige)" "$(cat "$ERR49")" "[mission-watchdog] stall detecte"
+
+echo "--- T49 sous-cas : le relais ABANDON (heartbeat mort) continue de fonctionner APRES la meme correction ---"
+ISO49B="$WORK_DIR/iso49b"; mkdir -p "$ISO49B/health"
+cp "$SCRIPT" "$ISO49B/dag.sh"
+cp "$(pwd)/scripts/check-guard-health.sh" "$ISO49B/check-guard-health.sh"
+cp "$(pwd)/scripts/driver-lock.sh" "$ISO49B/driver-lock.sh"
+chmod +x "$ISO49B/dag.sh" "$ISO49B/check-guard-health.sh" "$ISO49B/driver-lock.sh"
+t49_heartbeat_backdate() { # <lock> <secs>
+  local meta secs now old
+  meta="$(t49_lock_meta_path "$1")"
+  secs="$2"
+  [ -f "$meta" ] || return 1
+  now="$(date +%s)"
+  old=$(( now - secs ))
+  sed -i.bak "s/^heartbeat_epoch=.*/heartbeat_epoch=$old/" "$meta" && rm -f "${meta}.bak"
+}
+L49B="$ISO49B/lock"
+export VF_DRIVER_LOCK="$L49B"
+export VF_GUARD_HEALTH_DIR="$ISO49B/health"
+"$ISO49B/driver-lock.sh" acquire --owner=t49b-owner --step=t49b-step >/dev/null 2>&1
+t49_heartbeat_backdate "$L49B" 2000   # > 1800 (VF_DRIVER_TTL defaut) -> stale=true, JAMAIS confondu avec le stall
+F49B="$WORK_DIR/t49b.dag.json"
+"$ISO49B/dag.sh" init --file="$F49B" >/dev/null
+"$ISO49B/dag.sh" add --file="$F49B" --id=n1 --step=n1 >/dev/null
+ERR49B="$WORK_DIR/t49b.stderr"
+"$ISO49B/dag.sh" mark --file="$F49B" --id=n1 --status=running 2>"$ERR49B" >/dev/null
+assert "T49.3 — le relais ABANDON (heartbeat mort) est toujours relaye, non regresse par cette correction" "$(cat "$ERR49B")" "[mission-watchdog] abandon detecte"
+assert_not "T49.4 — l'abandon n'est jamais confondu avec la ligne de stall" "$(cat "$ERR49B")" "stall detecte"
+unset VF_DRIVER_LOCK VF_GUARD_HEALTH_DIR
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
 echo "=================================="
+TOTAL=$((PASS+FAIL))
+if [ "$TOTAL" -eq 0 ]; then
+  echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE — zéro assertion exécutée, résultat non fiable"
+  exit 1
+fi
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

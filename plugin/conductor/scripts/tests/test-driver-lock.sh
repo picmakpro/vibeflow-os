@@ -93,6 +93,23 @@ lease_backdate() {
   sed -i.bak "s/^acquired_epoch=.*/acquired_epoch=$old/" "$meta" && rm -f "${meta}.bak"
 }
 
+# Recule progress_epoch d'un lock existant d'un nombre de secondes donné, SANS toucher
+# heartbeat_epoch ni acquired_epoch — c'est la seconde horloge additive (D-33-A) que le cas
+# « vivant mais bouclant » (T57) doit pouvoir désynchroniser du battement. Même motif que
+# age_stale/lease_backdate : les cas ne connaissent jamais le protocole interne du meta, seul ce
+# helper l'édite.
+progress_backdate() {
+  local lock="$1" secs="$2" meta old
+  if [ -L "$lock" ]; then
+    meta="$(dirname "$lock")/$(readlink "$lock")/meta"
+  else
+    meta="$lock/meta"
+  fi
+  [ -f "$meta" ] || return 1
+  old=$(( $(date +%s) - secs ))
+  sed -i.bak "s/^progress_epoch=.*/progress_epoch=$old/" "$meta" && rm -f "${meta}.bak"
+}
+
 echo "=== T0 — GEL-2 : voie libre refuse un lock LEGACY frais déjà tenu (double-détenteur fermé) ==="
 rm -rf "$VF_DRIVER_LOCK"
 mkdir -p "$VF_DRIVER_LOCK"
@@ -261,7 +278,10 @@ out=$(CLAUDE_CODE_SESSION_ID="$INJECT" "$SCRIPT" acquire --owner=A --step=t19)
 _t19_gen="$(readlink "$VF_DRIVER_LOCK")"
 _t19_meta="$(dirname "$VF_DRIVER_LOCK")/$_t19_gen/meta"
 _t19_total=$(wc -l < "$_t19_meta" | tr -d ' ')
-num_eq "T19.1 — le meta garde exactement 8 lignes (une par clé, aucune injectée)" "$_t19_total" 8
+# 9 lignes depuis 33-01 (D-33-A) : le champ additif progress_epoch porte le total de 8 à 9 — même
+# évolution que 32-01 avait fait passer de 7 à 8 avec session_ids. Aucune ligne injectée, le
+# compte suit seulement la croissance légitime du schéma du meta.
+num_eq "T19.1 — le meta garde exactement 9 lignes (une par clé, aucune injectée)" "$_t19_total" 9
 _t19_nsid=$(grep -c '^session_ids=' "$_t19_meta")
 num_eq "T19.2 — exactement une ligne session_ids=" "$_t19_nsid" 1
 _t19_val=$(grep '^session_ids=' "$_t19_meta" | cut -d= -f2-)
@@ -713,8 +733,132 @@ out=$("$SCRIPT" recover); rc=$?
 assert "T50.5 — recover SANS --owner réussit toujours (jamais forcé)" "$out" '"recovered": true'
 assert_exit "T50.6 — exit 0" "$rc" 0
 
+echo "=== T51 — acquire pose progress_epoch (symétrie de départ avec heartbeat_epoch, D-33-A) ==="
+rm -rf "$VF_DRIVER_LOCK"
+"$SCRIPT" acquire --owner=A51 --step=t51 >/dev/null
+st=$("$SCRIPT" status)
+_t51_pe=$(printf '%s' "$st" | python3 -c 'import json,sys; print(json.load(sys.stdin)["progress_epoch"])')
+case "$_t51_pe" in
+  ''|*[!0-9]*) echo "  ❌ FAIL — T51.1 — progress_epoch numérique non nul"; echo "     obtenu: $_t51_pe"; FAIL=$((FAIL+1)) ;;
+  *) echo "  ✅ PASS — T51.1 — progress_epoch numérique non nul (=$_t51_pe)"; PASS=$((PASS+1)) ;;
+esac
+_t51_page=$(printf '%s' "$st" | python3 -c 'import json,sys; print(json.load(sys.stdin)["progress_age_seconds"])')
+if [ "$_t51_page" -lt 60 ] 2>/dev/null; then echo "  ✅ PASS — T51.2 — progress_age_seconds proche de 0 (<60)"; PASS=$((PASS+1)); else echo "  ❌ FAIL — T51.2 — progress_age_seconds proche de 0"; echo "     obtenu: $_t51_page"; FAIL=$((FAIL+1)); fi
+
+echo "=== T52 — mark-progress avance progress_epoch, JSON ok/owner/progress_epoch ==="
+out=$("$SCRIPT" mark-progress --owner=A51); rc=$?
+assert "T52.1 — ok true" "$out" '"ok": true'
+assert "T52.2 — owner A51" "$out" '"owner": "A51"'
+assert_exit "T52.3 — exit 0" "$rc" 0
+json_ok "$out"; assert_exit "T52.4 — JSON parsable" $? 0
+st=$("$SCRIPT" status)
+_t52_page=$(printf '%s' "$st" | python3 -c 'import json,sys; print(json.load(sys.stdin)["progress_age_seconds"])')
+if [ "$_t52_page" -lt 60 ] 2>/dev/null; then echo "  ✅ PASS — T52.5 — progress_age_seconds proche de 0 après mark-progress"; PASS=$((PASS+1)); else echo "  ❌ FAIL — T52.5 — progress_age_seconds proche de 0"; echo "     obtenu: $_t52_page"; FAIL=$((FAIL+1)); fi
+"$SCRIPT" release --owner=A51 >/dev/null 2>&1
+
+echo "=== T53 — mark-progress préserve heartbeat_epoch/step/branch/worktree/acquired_epoch AU CARACTÈRE PRÈS (garde step obligatoire) ==="
+rm -rf "$VF_DRIVER_LOCK"
+"$SCRIPT" acquire --owner=A53 --step=etape-42 >/dev/null
+_t53_gen="$(readlink "$VF_DRIVER_LOCK")"
+_t53_meta="$(dirname "$VF_DRIVER_LOCK")/$_t53_gen/meta"
+_t53_hb_before=$(grep '^heartbeat_epoch=' "$_t53_meta" | cut -d= -f2-)
+_t53_step_before=$(grep '^step=' "$_t53_meta" | cut -d= -f2-)
+_t53_branch_before=$(grep '^branch=' "$_t53_meta" | cut -d= -f2-)
+_t53_worktree_before=$(grep '^worktree=' "$_t53_meta" | cut -d= -f2-)
+_t53_acq_before=$(grep '^acquired_epoch=' "$_t53_meta" | cut -d= -f2-)
+"$SCRIPT" mark-progress --owner=A53 >/dev/null
+_t53_hb_after=$(grep '^heartbeat_epoch=' "$_t53_meta" | cut -d= -f2-)
+_t53_step_after=$(grep '^step=' "$_t53_meta" | cut -d= -f2-)
+_t53_branch_after=$(grep '^branch=' "$_t53_meta" | cut -d= -f2-)
+_t53_worktree_after=$(grep '^worktree=' "$_t53_meta" | cut -d= -f2-)
+_t53_acq_after=$(grep '^acquired_epoch=' "$_t53_meta" | cut -d= -f2-)
+assert "T53.1 — heartbeat_epoch inchangé au caractère près" "$_t53_hb_after" "$_t53_hb_before"
+assert "T53.2 — step préservé (=etape-42, garde meta_get step)" "$_t53_step_after" "etape-42"
+assert "T53.3 — step inchangé au caractère près" "$_t53_step_after" "$_t53_step_before"
+assert "T53.4 — branch inchangé au caractère près" "$_t53_branch_after" "$_t53_branch_before"
+assert "T53.5 — worktree inchangé au caractère près" "$_t53_worktree_after" "$_t53_worktree_before"
+assert "T53.6 — acquired_epoch inchangé au caractère près" "$_t53_acq_after" "$_t53_acq_before"
+"$SCRIPT" release --owner=A53 >/dev/null 2>&1
+
+echo "=== T54 — mark-progress owner mismatch refusé (not-owner), rien ne bouge ==="
+rm -rf "$VF_DRIVER_LOCK"
+"$SCRIPT" acquire --owner=A54 --step=t54 >/dev/null
+_t54_gen="$(readlink "$VF_DRIVER_LOCK")"
+_t54_meta="$(dirname "$VF_DRIVER_LOCK")/$_t54_gen/meta"
+_t54_hb_before=$(grep '^heartbeat_epoch=' "$_t54_meta" | cut -d= -f2-)
+_t54_pe_before=$(grep '^progress_epoch=' "$_t54_meta" | cut -d= -f2-)
+_t54_step_before=$(grep '^step=' "$_t54_meta" | cut -d= -f2-)
+out=$("$SCRIPT" mark-progress --owner=B54); rc=$?
+assert "T54.1 — ok false" "$out" '"ok": false'
+assert "T54.2 — reason not-owner" "$out" '"reason": "not-owner"'
+assert "T54.3 — held_by A54" "$out" '"held_by": "A54"'
+assert_exit "T54.4 — exit 1" "$rc" 1
+_t54_hb_after=$(grep '^heartbeat_epoch=' "$_t54_meta" | cut -d= -f2-)
+_t54_pe_after=$(grep '^progress_epoch=' "$_t54_meta" | cut -d= -f2-)
+_t54_step_after=$(grep '^step=' "$_t54_meta" | cut -d= -f2-)
+assert "T54.5 — heartbeat_epoch inchangé" "$_t54_hb_after" "$_t54_hb_before"
+assert "T54.6 — progress_epoch inchangé" "$_t54_pe_after" "$_t54_pe_before"
+assert "T54.7 — step inchangé" "$_t54_step_after" "$_t54_step_before"
+"$SCRIPT" release --owner=A54 >/dev/null 2>&1
+
+echo "=== T55 — mark-progress sans lock présent ==="
+rm -rf "$VF_DRIVER_LOCK"
+out=$("$SCRIPT" mark-progress --owner=X55); rc=$?
+assert "T55.1 — ok false" "$out" '"ok": false'
+assert "T55.2 — reason no-lock" "$out" '"reason": "no-lock"'
+assert_exit "T55.3 — exit 1" "$rc" 1
+
+echo "=== T56 — rétrocompatibilité : lock sans progress_epoch (lock d'un ancien script), aucun verbe ne plante ==="
+rm -rf "$VF_DRIVER_LOCK"
+"$SCRIPT" acquire --owner=A56 --step=t56 >/dev/null
+meta_drop_key "$VF_DRIVER_LOCK" progress_epoch
+_t56_gen="$(readlink "$VF_DRIVER_LOCK")"
+_t56_meta="$(dirname "$VF_DRIVER_LOCK")/$_t56_gen/meta"
+_t56_n=$(grep -c '^progress_epoch=' "$_t56_meta")
+num_eq "T56.0 — contrôle positif : la ligne progress_epoch= est réellement absente" "$_t56_n" 0
+st=$("$SCRIPT" status); rc_status=$?
+assert_exit "T56.1 — status exit 0 sur lock rétrocompat" "$rc_status" 0
+assert "T56.2 — progress_epoch null" "$st" '"progress_epoch": null'
+assert "T56.3 — progress_age_seconds null" "$st" '"progress_age_seconds": null'
+out_hb=$("$SCRIPT" heartbeat --owner=A56); rc_hb=$?
+assert_exit "T56.4 — heartbeat exit 0 sur lock rétrocompat" "$rc_hb" 0
+out_mp=$("$SCRIPT" mark-progress --owner=A56); rc_mp=$?
+assert_exit "T56.5 — mark-progress exit 0 sur lock rétrocompat" "$rc_mp" 0
+"$SCRIPT" release --owner=A56 >/dev/null 2>&1
+
+echo "=== T57 — cas « vivant mais bouclant » : heartbeat frais, progrès figé, observable en un seul appel status (critère de succès n°2) ==="
+rm -rf "$VF_DRIVER_LOCK"
+"$SCRIPT" acquire --owner=A57 --step=t57 >/dev/null
+progress_backdate "$VF_DRIVER_LOCK" 9000
+"$SCRIPT" heartbeat --owner=A57 >/dev/null
+st=$("$SCRIPT" status)
+_t57_age=$(printf '%s' "$st" | python3 -c 'import json,sys; print(json.load(sys.stdin)["age_seconds"])')
+_t57_page=$(printf '%s' "$st" | python3 -c 'import json,sys; print(json.load(sys.stdin)["progress_age_seconds"])')
+if [ "$_t57_age" -lt 60 ]; then echo "  ✅ PASS — T57.1 — age_seconds < 60 (heartbeat frais)"; PASS=$((PASS+1)); else echo "  ❌ FAIL — T57.1 — age_seconds < 60"; echo "     obtenu: $_t57_age"; FAIL=$((FAIL+1)); fi
+if [ "$_t57_page" -ge 9000 ] 2>/dev/null; then echo "  ✅ PASS — T57.2 — progress_age_seconds >= 9000 (progrès figé)"; PASS=$((PASS+1)); else echo "  ❌ FAIL — T57.2 — progress_age_seconds >= 9000"; echo "     obtenu: $_t57_page"; FAIL=$((FAIL+1)); fi
+"$SCRIPT" release --owner=A57 >/dev/null 2>&1
+
+echo "=== T58 — heartbeat préserve progress_epoch inchangé (même propriété que T16 pour session_ids) ==="
+rm -rf "$VF_DRIVER_LOCK"
+"$SCRIPT" acquire --owner=A58 --step=t58 >/dev/null
+_t58_gen="$(readlink "$VF_DRIVER_LOCK")"
+_t58_meta="$(dirname "$VF_DRIVER_LOCK")/$_t58_gen/meta"
+_t58_pe_before=$(grep '^progress_epoch=' "$_t58_meta" | cut -d= -f2-)
+"$SCRIPT" heartbeat --owner=A58 >/dev/null
+_t58_pe_after=$(grep '^progress_epoch=' "$_t58_meta" | cut -d= -f2-)
+assert "T58.1 — progress_epoch inchangé après heartbeat" "$_t58_pe_after" "$_t58_pe_before"
+"$SCRIPT" release --owner=A58 >/dev/null 2>&1
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
 echo "=================================="
+# Garde anti-vert-à-vide STRUCTURELLE, dans l'épilogue lui-même (même patron que
+# test-guard-driver-lock.sh §Q5) — pas seulement un cas de test mid-suite qui pourrait être
+# neutralisé en même temps que le reste : si AUCUNE assertion n'a tourné (PASS+FAIL == 0), le
+# résultat n'est jamais un succès, quel que soit FAIL.
+if [ "$((PASS+FAIL))" -eq 0 ]; then
+  echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE — zéro assertion exécutée, résultat non fiable"
+  exit 1
+fi
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

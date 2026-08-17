@@ -53,6 +53,18 @@ ADR-048/049). Acquisition **atomique** (`mkdir`). Le manager est l'unique porteu
    "$S"/driver-lock.sh heartbeat --owner="<id>"
    ```
    Sans heartbeat frais, le lock est considéré périmé après `VF_DRIVER_TTL` (défaut 1800 s).
+
+   **Amendement Phase 33 (D-33-E, 2026-08-17)** — le heartbeat doit battre sur une cadence
+   INDÉPENDANTE des transitions de nœud, et PLUS FRÉQUENTE qu'elles. Motif mesuré : émis au même
+   tour qu'un `dag.sh mark` (qui écrit désormais aussi `progress_epoch`, plan 33-02), les deux
+   horloges ne divergent JAMAIS — une mission gelée voit les deux s'arrêter ensemble (verdict
+   abandon, jamais stall détecté à temps), une mission vivante les voit avancer ensemble (jamais de
+   stall à signaler alors qu'elle boucle). Concrètement : émettre le heartbeat aussi À CHAQUE
+   itération d'une boucle d'attente/poll du manager (attente d'un worker, relecture d'état), pas
+   SEULEMENT entre deux étapes explicites — un manager qui surveille un worker unique pendant
+   plusieurs minutes sans jamais rappeler `heartbeat` dans l'intervalle reproduit exactement le
+   couplage de cadence que cet amendement ferme.
+
 3. **Relâcher À LA CLÔTURE — succès, échec OU abandon** (release « RAII » porté par le prompt) :
    ```bash
    "$S"/driver-lock.sh release --owner="<id>"

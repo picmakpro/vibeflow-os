@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: fiabilite-v1.0
 milestone_name: « ce qui survit »
-current_phase: 31
-current_phase_name: Manifeste d'install + dry-run (issue #20)
-status: planning
-stopped_at: Phase 31 livrée — 8 plans exécutés sur 6 vagues (branche feat/phase-31-manifeste-dry-run, non mergée), brouillon de réponse issue #20 sur disque (jamais posté), hygiène documentaire de clôture en cours
-last_updated: "2026-08-16T00:00:00.000Z"
-last_activity: 2026-08-16
-last_activity_desc: Phase 31 (Manifeste d'install + dry-run, issue #20) livrée — MANI-01/02/03 tenus (socle manifeste, `--dry-run`, convergence à l'update), MANI-04 superseded (réponse #20 en DRAFT sur disque, jamais postée, issue jamais close — geste humain ADR-031) ; module `conductor` bumpé v1.25.0 ; hygiène documentaire de clôture (STATE/ROADMAP/REQUIREMENTS)
+current_phase: 33
+current_phase_name: Watchdog & notifications des missions
+status: gaps_found
+stopped_at: Phase 33 — 5 plans exécutés sur 3 vagues (branche feat/phase-33-watchdog-notifications, non mergée), vérifiée goal-backward le 2026-08-17 (`33-VERIFICATION.md`) — 4/4 critères ATTEINTS (WTCH-03 en limite assumée : preuve Windows réelle non exécutée). Le gap WTCH-02 relevé par la vérification (relais stall inatteignable au geste `dag.sh mark`) est fermé par D-33-G (`88975dc`), cas de discriminance T49, mesure A/B re-jouée par le manager ; hygiène documentaire + bump module `conductor` v1.27.0 faits
+last_updated: "2026-08-17T00:00:00.000Z"
+last_activity: 2026-08-17
+last_activity_desc: Phase 33 (Watchdog & notifications des missions) — 5 plans livrés (progress_epoch/mark-progress WTCH-01, sous-contrôle stall/abandon check-guard-health.sh WTCH-02, notify.sh portable WTCH-03, armement par gate PORT-05 WTCH-04) ; vérification goal-backward `gaps_found` (1 gap sur le relais D-33-F au geste `mark`) puis gap FERMÉ par D-33-G (`88975dc`, cas T49) ; hygiène documentaire de clôture (STATE/ROADMAP/REQUIREMENTS) + bump module `conductor` v1.27.0
 progress:
   total_phases: 8
   completed_phases: 2
@@ -24,7 +24,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26 — charte rouverte : 17 modules, D2/D6 renversées)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Milestone fiabilite-v1.0 — Phase 30 (Portabilité Windows II), Phase 31 (Manifeste d'install + dry-run, issue #20) et Phase 32 (Durcissement du driver-lock) livrées ; Phase 33 (Watchdog & notifications des missions) à cadrer
+**Current focus:** Milestone fiabilite-v1.0 — Phase 30 (Portabilité Windows II), Phase 31 (Manifeste d'install + dry-run, issue #20) et Phase 32 (Durcissement du driver-lock) livrées ; Phase 33 (Watchdog & notifications des missions) exécutée, vérifiée le 2026-08-17 — `gaps_found` puis gap fermé (D-33-G) : 4/4 critères atteints, WTCH-03 en limite assumée (preuve Windows réelle non exécutée)
 `get-shit-done-cc` → `@opengsd/gsd-core` livrée en v2.39.0 atteint enfin les **postes déjà équipés** :
 `/vf-update` dit l'état du moteur avant tout stop et propose la bascule sous confirmation ADR-031.
 Modules `dev-orchestrator` v2.7.0 + `conductor` v1.16.0. Verdict `19-VERIFICATION.md` : **PASS 6/7**.

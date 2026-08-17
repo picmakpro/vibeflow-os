@@ -40,6 +40,30 @@
 #
 # Glyphes de statut (rendu `tree`) : ● done · ◐ running · ○ ready · · blocked · ✗ failed.
 #
+# progress_epoch (D-33-A, WTCH-01, plan 33-02) : `mark` avance `progress_epoch` sur le driver-lock
+# COURANT s'il existe, en best-effort APRES save(dag), sans jamais bloquer ni faire echouer le DAG
+# (ADR-031 — degradation silencieuse, sauf le seul cas ou le lock est confirme present+detenu mais
+# refuse l'ecriture, signale bruyamment sur stderr).
+#
+# Watchdog (WTCH-02/WTCH-03, plan 33-05, ordre corrige en 33-05-correctif D-33-G) : `mark` shelle
+# TROIS appels best-effort, tous APRES save(dag), jamais avant :
+#   1. check_stall_signal() LIT le verdict `check-guard-health.sh --hook` (33-03) EN PREMIER, sur
+#      la base du `progress_epoch` ENCORE NON RAFRAICHI par ce `mark` — A CHAQUE mark quel que soit
+#      `status`, aucun seuil ni logique de verdict duplique ici.
+#   2. record_progress() avance ENSUITE `progress_epoch` sur le driver-lock (33-01, WTCH-01).
+#   3. record_milestone() notifie via `notify.sh` (33-04), UNIQUEMENT sur `status` `done`/`failed`
+#      — jamais sur `running`, le geste le plus frequent du DAG. TOUJOURS le dernier appel.
+# Ordre STRICT et NON NEGOCIABLE : check_stall_signal() AVANT record_progress(). record_progress()
+# rafraichit `progress_epoch` du lock COURANT — si on l'appelle avant, check_stall_signal() relit
+# ce meme lock juste apres son propre rafraichissement et voit systematiquement
+# `progress_age_seconds` retombe a 0 : le verdict STALL devient structurellement inatteignable au
+# geste `mark`, alors que c'est justement le seul point de lecture disponible entre deux
+# SessionStart pour une session vivante qui boucle sur `mark` (D-33-F). Inverser cet ordre a ete
+# MESURE regresser ce cas — cf. test dedie (mark_detecte_un_vrai_stall_bout_en_bout) qui DOIT
+# rester vert : ne JAMAIS le retirer, c'est le cas de discriminance qui prouve cet ordre.
+# Les trois degradent en silence sur toute panne du sibling (absent, non executable, timeout,
+# exception) — meme garantie ADR-031 que record_progress().
+#
 # Reference : ADR-053 + .planning/phases/VFDO-09-*/09-CADRAGE-swarm.md §3.
 
 set -uo pipefail
@@ -63,10 +87,25 @@ done
 [ -n "$FILE" ] || { echo '{"error": "file-required"}' >&2; exit 1; }
 [ -n "$ACTION" ] || { echo "Usage: $0 {init|add|ready|mark|reopen|status|tree} --file=F [...]" >&2; exit 1; }
 
-python3 - "$ACTION" "$FILE" "$ID" "$STEP" "$STAGE" "$DEPS" "$STATUS" "$SCOPE" <<'PYEOF'
+# Sibling driver-lock.sh (WTCH-01, 33-02) : resolu par le REPERTOIRE DU SCRIPT dag.sh lui-meme,
+# jamais par le cwd — les scripts de conductor/scripts/ sont poses par le meme glob d'installation
+# (vibeflow-update.sh), leur coexistence dans ce repertoire est une garantie de l'installeur, pas
+# une supposition de ce script (distinct du vecteur RCE ferme en D-07/T33 : ici la cible est un
+# sibling connu, jamais une valeur derivee d'un cwd non fiable). Reutilise tel quel par 33-05 pour
+# CHECK_GUARD_HEALTH_SH/NOTIFY_SH — ne pas dupliquer ni renommer.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd 2>/dev/null || dirname "$0")"
+DRIVER_LOCK_SH="$SCRIPT_DIR/driver-lock.sh"
+# Siblings ajoutes par 33-05 (WTCH-02/WTCH-03) : meme resolution par repertoire de script que
+# DRIVER_LOCK_SH ci-dessus, jamais par cwd — reutilise tel quel, ne pas dupliquer ni renommer.
+CHECK_GUARD_HEALTH_SH="$SCRIPT_DIR/check-guard-health.sh"
+NOTIFY_SH="$SCRIPT_DIR/notify.sh"
+
+python3 - "$ACTION" "$FILE" "$ID" "$STEP" "$STAGE" "$DEPS" "$STATUS" "$SCOPE" "$DRIVER_LOCK_SH" "$CHECK_GUARD_HEALTH_SH" "$NOTIFY_SH" <<'PYEOF'
 import sys, os, json, subprocess, tempfile, shutil
 
 action, file, nid, step, stage, deps_raw, status, scope_raw = sys.argv[1:9]
+driver_lock_sh = sys.argv[9]
+check_guard_health_sh, notify_sh = sys.argv[10:12]
 VALID = {"blocked", "ready", "running", "done", "failed"}
 
 def load():
@@ -146,6 +185,87 @@ def resolve_gsd_tools_cmd():
         node_bin = shutil.which("node")
         return [node_bin, resolved] if node_bin else None
     return [resolved]
+
+def record_progress(driver_lock_sh):
+    """Cable `driver-lock.sh mark-progress` (plan 33-01, WTCH-01) au point `mark` de dag.sh, APRES
+    save(dag) (jamais avant) ET APRES check_stall_signal() (33-05-correctif D-33-G) — cet appel
+    rafraichit `progress_epoch` du lock courant, donc doit lire APRES que le verdict de stall ait
+    ete tranche sur le progres encore fige, jamais avant (sinon le stall devient inateignable, cf.
+    commentaire de bloc plus haut). Best-effort pur, patron identique a compute_stages() : degrade
+    en no-op silencieux sur TOUTE panne cote driver-lock.sh (absent, non executable, JSON illisible,
+    exit non nul, timeout, exception quelconque) — ADR-031, ne bloque jamais le coeur du DAG.
+    SEULE exception au silence (4e issue QUAL-01) : lock CONFIRME present + detenu (owner non vide)
+    mais l'appel mark-progress lui-meme echoue -> ligne bruyante sur stderr, best-effort, jamais un
+    exit non nul, car ce cas gelerait progress_epoch sur une mission SAINE sans qu'aucun signal ne
+    le montre (33-03 lirait un faux stall en silence)."""
+    try:
+        if not os.path.isfile(driver_lock_sh):
+            return
+        st = subprocess.run([driver_lock_sh, "status"], capture_output=True, text=True,
+                             timeout=2, check=False)
+        if st.returncode != 0:
+            return
+        payload = json.loads(st.stdout)
+        if not payload.get("present"):
+            return
+        owner = payload.get("owner", "")
+        if not owner:
+            return
+        mp = subprocess.run([driver_lock_sh, "mark-progress", f"--owner={owner}"],
+                             capture_output=True, text=True, timeout=2, check=False)
+        if mp.returncode != 0:
+            print(f"[dag.sh mark] avertissement : mark-progress a échoué (owner={owner}) — "
+                  f"progress_epoch n'a pas avancé, un stall pourrait être signalé à tort par 33-03",
+                  file=sys.stderr)
+    except Exception:
+        return
+
+def check_stall_signal(check_guard_health_sh):
+    """D-33-F (deplace de 33-02 vers 33-05) : relaie best-effort, sur stderr, le verdict deja
+    tranche par `check-guard-health.sh --hook` (33-03) — AUCUN seuil ni logique de verdict n'est
+    duplique ici, dag.sh ne fait qu'un print fidele de la ligne rendue par le sibling. Appelee a
+    CHAQUE mark, quel que soit `status` (contrairement a record_milestone()) : c'est le point de
+    lecture qui manquait entre deux SessionStart (33-03) — un stall ne survit pas au prochain
+    geste `mark` d'une session deja vivante. Appelee AVANT record_progress() (33-05-correctif
+    D-33-G) : record_progress() rafraichit `progress_epoch` du lock courant, donc lire le verdict
+    apres lui le voit systematiquement retombe a 0 — le stall serait alors structurellement
+    inatteignable au geste `mark`. Meme patron de degradation que record_progress() : absent, non
+    executable, exit non nul, timeout, exception quelconque -> silence total, jamais un echec de
+    `mark` (ADR-031)."""
+    try:
+        if not os.path.isfile(check_guard_health_sh):
+            return
+        hook = subprocess.run([check_guard_health_sh, "--hook"], capture_output=True, text=True,
+                               timeout=2, check=False)
+        if hook.returncode != 0:
+            return
+        line = hook.stdout.strip()
+        if line:
+            print(line, file=sys.stderr)
+    except Exception:
+        return
+
+def record_milestone(notify_sh, nid, status, mission_file):
+    """WTCH-03 : notifie via `notify.sh` (33-04) UNIQUEMENT sur `done`/`failed` — jamais sur
+    `running`, le geste le plus frequent du DAG (« jamais a chaque tour »). Placee APRES
+    check_stall_signal() dans le bloc `mark`, TOUJOURS le dernier appel : une notification de fin
+    de noeud doit refleter un etat deja persiste (save(dag)) ET deja diagnostique
+    (check_stall_signal()). Meme garantie de degradation que record_progress()/
+    check_stall_signal() : best-effort pur, ne bloque et ne fait jamais echouer `mark`."""
+    try:
+        if status not in ("done", "failed"):
+            return
+        if not os.path.isfile(notify_sh):
+            return
+        if status == "done":
+            title = "VibeFlow - noeud termine"
+        else:
+            title = "VibeFlow - halte"
+        body = f"{nid} ({status}) - {os.path.basename(mission_file)}"
+        subprocess.run([notify_sh, title, body], stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL, timeout=2, check=False)
+    except Exception:
+        return
 
 def build_ready_manifest(ready_nodes):
     """Manifeste attendu par `emit-workflow` (27-RESEARCH.md Livrable 3 Q1) : une seule vague
@@ -246,6 +366,18 @@ if action == "mark":
     idx[nid]["status"] = status
     recompute(nodes)  # une completion (done) peut promouvoir des blocked -> ready
     save(dag)
+    # WTCH-01/02/03 (33-02/33-05, ordre corrige en 33-05-correctif D-33-G) : best-effort, APRES
+    # save(dag) — le DAG est deja sur disque avant tout appel externe. ORDRE STRICT :
+    # check_stall_signal() -> record_progress() -> record_milestone(), ce dernier TOUJOURS en
+    # dernier. check_stall_signal() DOIT lire le verdict AVANT que record_progress() ne rafraichisse
+    # progress_epoch, sinon le stall est structurellement inatteignable (cf. commentaire de bloc en
+    # tete de fichier) — ne JAMAIS reintervertir ces deux premiers appels.
+    # WTCH-02 (33-05, D-33-F) : relais best-effort du verdict check-guard-health.sh --hook, a
+    # CHAQUE mark, sans filtre de statut, LU AVANT tout rafraichissement de progress_epoch.
+    check_stall_signal(check_guard_health_sh)
+    record_progress(driver_lock_sh)
+    # WTCH-03 (33-05) : notification best-effort via notify.sh, UNIQUEMENT sur done/failed.
+    record_milestone(notify_sh, nid, status, file)
     emit({"id": nid, "status": status,
           "ready": [n["id"] for n in nodes if n["status"] == "ready"]})
     sys.exit(0)

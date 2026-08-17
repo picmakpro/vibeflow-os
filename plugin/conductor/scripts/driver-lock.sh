@@ -24,6 +24,7 @@
 #   driver-lock.sh takeover  --owner=<id> [--step=<etape>] # reprend un lock PERIME (geste explicite)
 #   driver-lock.sh reclaim   --owner=<id>                  # re-rattache la session courante a un lock VIVANT dont on est deja owner
 #   driver-lock.sh heartbeat --owner=<id> [--step=<etape>] # rafraichit le heartbeat entre etapes
+#   driver-lock.sh mark-progress --owner=<id>              # avance progress_epoch (D-33-A), JAMAIS heartbeat_epoch
 #   driver-lock.sh release   --owner=<id>                  # relache (clôture RAII : succes/echec/abandon)
 #   driver-lock.sh status                                  # etat courant (JSON)
 #   driver-lock.sh recover                                 # elague un lock perime (sinon refuse)
@@ -46,7 +47,7 @@ case "$SESSION_MAX" in ''|*[!0-9]*) SESSION_MAX=8 ;; esac  # meme garde que TTL 
 ACTION=""; OWNER=""; STEP=""
 for arg in "$@"; do
   case "$arg" in
-    acquire|heartbeat|release|status|recover|takeover|reclaim) ACTION="$arg" ;;
+    acquire|heartbeat|release|status|recover|takeover|reclaim|mark-progress) ACTION="$arg" ;;
     --owner=*) OWNER="${arg#*=}" ;;
     --step=*)  STEP="${arg#*=}" ;;
     -h|--help) grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
@@ -184,6 +185,18 @@ lease_age() {
   echo "$(( $(now) - ap ))"
 }
 
+# Age du PROGRES (D-33-A, WTCH-01) : depuis combien de temps le dernier `mark-progress` a ete
+# emis, INDEPENDAMMENT du heartbeat. DONNEE BRUTE exposee pour un consommateur externe (plan
+# 33-03, le detecteur de stall) — ce fichier ne decide JAMAIS "stall" ou "abandon" a partir de
+# cette valeur, il ne fait qu'exposer. Meme garde de numericite que lease_age(). Absente/non
+# numerique -> la fonction n'emet RIEN et rend non nul, l'appelant rend alors `null` en JSON —
+# jamais un 0, qui se lirait faussement "progres a l'instant".
+progress_age() {
+  local pe; pe="$(meta_get progress_epoch)"
+  case "$pe" in ''|*[!0-9]*) return 1 ;; esac
+  echo "$(( $(now) - pe ))"
+}
+
 # Presence du lock, quelle que soit sa forme : lien (nominal) ou dossier reel (lock legacy pose
 # par une version anterieure, ou dossier nu cree a la main). Les deux doivent rester gerables,
 # sinon une mise a jour du script gelerait les sessions en cours.
@@ -218,6 +231,7 @@ new_generation() {
     printf 'acquired_epoch=%s\n'  "$ts"
     printf 'acquired_iso=%s\n'    "$iso_ts"
     printf 'heartbeat_epoch=%s\n' "$ts"
+    printf 'progress_epoch=%s\n'  "$ts"
   } > "$LOCK_PARENT/$gen/meta" || { rm -rf "$LOCK_PARENT/$gen"; return 1; }
   echo "$gen"
 }
@@ -232,8 +246,14 @@ new_generation() {
 # battement dans `heartbeat`. SEUL `reclaim` passe ce second argument explicitement — c'est la
 # valeur decidee SOUS MUTEX, jamais relue du fichier apres coup, sinon l'ecriture ne serait pas
 # celle qui a ete arbitree pendant la fenetre de serialisation.
+#
+# (D-33-A) 3e parametre POSITIONNEL optionnel pour progress_epoch, MEME patron EXACT que le 2e
+# (session_ids) : "${3-$(meta_get progress_epoch)}" — PAS "${3:-...}", une chaine vide EST une
+# valeur valide. Absent -> lecture du fichier courant, donc `heartbeat` (1 argument) et `reclaim`
+# (2 arguments) PRESERVENT progress_epoch sans le savoir. SEUL `mark-progress` passe ce 3e
+# argument explicitement, et seulement lui.
 rewrite_meta() {
-  local ap ai br wt si
+  local ap ai br wt si pe
   ap="$(meta_get acquired_epoch)"; ai="$(meta_get acquired_iso)"
   br="$(meta_get branch)"; wt="$(meta_get worktree)"
   # session_ids est LU depuis le meta courant par defaut, JAMAIS depuis l'environnement de la
@@ -241,6 +261,7 @@ rewrite_meta() {
   # (ADR-064, meme patron que branch/worktree ci-dessus) ne peut jamais reecrire l'identite du
   # detenteur, sauf appel explicite (reclaim) qui passe la valeur decidee sous mutex.
   si="${2-$(lock_session_ids)}"
+  pe="${3-$(meta_get progress_epoch)}"
   {
     printf 'owner=%s\n'           "$(printf '%s' "$OWNER" | tr -d '\n')"
     printf 'step=%s\n'            "$(printf '%s' "$STEP"  | tr -d '\n')"
@@ -250,6 +271,7 @@ rewrite_meta() {
     printf 'acquired_epoch=%s\n'  "$ap"
     printf 'acquired_iso=%s\n'    "$ai"
     printf 'heartbeat_epoch=%s\n' "$1"
+    printf 'progress_epoch=%s\n'  "$pe"
   } > "$META"
 }
 
@@ -301,7 +323,7 @@ json_status() {
   if [ "$1" = false ]; then
     printf '{"present": false, "lock": "%s"}\n' "$LOCK_DIR"; return
   fi
-  local o s age stale gen sids lease guard_eff
+  local o s age stale gen sids lease guard_eff pe page
   o="$(meta_get owner)"; s="$(meta_get step)"; age="$(lock_age)"
   [ "$age" -gt "$TTL" ] && stale=true || stale=false
   gen="$(lock_gen)"; sids="$(json_session_ids "$(lock_session_ids)")"
@@ -313,8 +335,15 @@ json_status() {
   # tierce commite, rc=0, sous le lock meme de CETTE mission. La regle 2 elle-meme n'est PAS
   # touchee ici (choix assume et teste, R3/T18) : ce champ EXPOSE l'etat, il ne le change pas.
   [ "$sids" = "[]" ] && guard_eff=false || guard_eff=true
-  printf '{"present": true, "owner": "%s", "step": "%s", "age_seconds": %s, "ttl": %s, "stale": %s, "generation": "%s", "session_ids": %s, "lease_seconds": %s, "guard_effective": %s}\n' \
-    "$o" "$s" "$age" "$TTL" "$stale" "$gen" "$sids" "$lease" "$guard_eff"
+  # progress_epoch/progress_age_seconds (D-33-A, WTCH-01) : meme patron que generation/lease —
+  # nombre brut si numerique, sinon `null` litteral (jamais entre guillemets, jamais un 0
+  # trompeur). Un lock pose par l'ancien script (pas de ligne progress_epoch=) rend `null` sur les
+  # deux champs, aucun verbe ne plante (T56).
+  pe="$(meta_get progress_epoch)"
+  case "$pe" in ''|*[!0-9]*) pe="null" ;; esac
+  page="$(progress_age)" && : || page="null"
+  printf '{"present": true, "owner": "%s", "step": "%s", "age_seconds": %s, "ttl": %s, "stale": %s, "generation": "%s", "session_ids": %s, "lease_seconds": %s, "guard_effective": %s, "progress_epoch": %s, "progress_age_seconds": %s}\n' \
+    "$o" "$s" "$age" "$TTL" "$stale" "$gen" "$sids" "$lease" "$guard_eff" "$pe" "$page"
 }
 
 require_owner() {
@@ -508,6 +537,27 @@ case "$ACTION" in
     printf '{"ok": false, "reason": "not-owner", "held_by": "%s"}\n' "$(meta_get owner)"; exit 1
     ;;
 
+  mark-progress)
+    require_owner
+    lock_present || { echo '{"ok": false, "reason": "no-lock"}'; exit 1; }
+    if [ "$(meta_get owner)" = "$OWNER" ]; then
+      # (D-33-A) Garde OBLIGATOIRE, EXACTEMENT le meme patron que heartbeat/reclaim ci-dessus :
+      # mark-progress n'a PAS de flag --step=, donc $STEP est TOUJOURS vide a ce point. Sans cette
+      # ligne, rewrite_meta() reemettrait 'step=' VIDE (elle reecrit step depuis la globale $STEP,
+      # jamais depuis le fichier — le seul champ de rewrite_meta() sans repli sur meta_get) et
+      # effacerait le step au premier appel.
+      [ -z "$STEP" ] && STEP="$(meta_get step)"
+      ts="$(now)"
+      # Les deux premiers arguments sont RELUS du fichier, INCHANGES — c'est cette ligne, et elle
+      # seule, qui garantit que heartbeat_epoch ne bouge JAMAIS sous mark-progress. Le 3e argument
+      # ($ts) est le SEUL champ que ce verbe avance.
+      rewrite_meta "$(meta_get heartbeat_epoch)" "$(lock_session_ids)" "$ts"
+      printf '{"ok": true, "owner": "%s", "progress_epoch": %s}\n' "$OWNER" "$ts"
+      exit 0
+    fi
+    printf '{"ok": false, "reason": "not-owner", "held_by": "%s"}\n' "$(meta_get owner)"; exit 1
+    ;;
+
   release)
     require_owner
     lock_present || { echo '{"released": false, "reason": "no-lock"}'; exit 0; }
@@ -563,7 +613,7 @@ case "$ACTION" in
     ;;
 
   *)
-    echo "Usage: $0 {acquire|takeover|reclaim|heartbeat|release|status|recover} [--owner=ID] [--step=X]" >&2
+    echo "Usage: $0 {acquire|takeover|reclaim|heartbeat|mark-progress|release|status|recover} [--owner=ID] [--step=X]" >&2
     exit 1
     ;;
 esac
