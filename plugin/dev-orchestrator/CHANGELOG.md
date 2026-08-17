@@ -1,5 +1,21 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.17.3] — 2026-08-17 (Phase 32, doctrine du verrou resynchronisée)
+
+**Patch** (doctrine d'agent corrigée pour rester exacte, aucune nouvelle capacité).
+
+- `vf-dev-manager.md` et `references/mission-flow.md` (le fichier réellement lu par le manager,
+  pas `team-kernel.md`, BL-5) : le couple `acquired:false`/`recovered:true` décrit comme chemin
+  nominal d'`acquire` sur un lock périmé — obsolète depuis les plans 32-01/32-02 — est remplacé
+  par la doctrine réelle post-Phase 32 : `acquire` REFUSE (`reason: stale-requires-takeover`,
+  champ `hint`) et nomme les verbes explicites `takeover --owner=<id> --step=<étape>` (reprise
+  d'un lock périmé) et `reclaim --owner=<id>` (rattachement de session sur un lock encore vivant,
+  cas `/clear`/reprise de session).
+- `mission-flow.md` écrit désormais la convention `Fence: <generation>` elle-même (LOCK-05) — le
+  trailer de commit qui trace sous quelle génération du lock un commit est né, et sa commande
+  d'audit — puisque c'est le seul fichier que `vf-dev-manager` lit réellement pour cette doctrine
+  (`team-kernel.md`, plan 32-04, en reste la source canonique).
+
 ## [v2.17.2] — 2026-08-16 (hotfix escalade des gates humains)
 
 **Patch** (fiabilité des missions, aucune nouvelle capacité).

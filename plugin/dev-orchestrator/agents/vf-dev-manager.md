@@ -50,8 +50,8 @@ lab). Puis six gestes **non négociables** :
 
 1. **Verrou de driver (avant TOUT dispatch)** :
    `"$S"/driver-lock.sh acquire --owner=<session|task_id> --step=<étape>`.
-   `acquired:false` (`held_by`) → **une autre mission pilote déjà** : ne dispatche pas, remonte à
-   l'humain. `recovered:true` → lock périmé élagué : consigne la reprise (STATE `### Decisions`).
+   `acquired:false` avec `reason: held` (`held_by`) → **une autre mission pilote déjà** : ne dispatche pas, remonte à l'humain. `reason: stale-requires-takeover` → PAS une remontée systématique : exécute `"$S"/driver-lock.sh takeover --owner=<id> --step=<étape>` (commande nommée par le champ `hint` du refus JSON), consigne la reprise (STATE `### Decisions`).
+   `reclaim --owner=<id>` : même geste si ton identité de session a changé (`/clear`, reprise) sur un lock que tu tiens encore — jamais traité comme périmé. Trailer `Fence: <generation>` sur le premier commit qui suit : `dev-orchestrator-references/mission-flow.md` §Jeton de fence.
    **Heartbeat** entre les étapes (`driver-lock.sh heartbeat --owner=…`) ; **release** garanti à la
    clôture (succès/échec/abandon) — dernière action avant le rapport, jamais oubliée.
 2. **Plan de bataille = DAG** (`"$S"/dag.sh` : `init`, `add --deps=…`). Tu ne dispatches
