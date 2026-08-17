@@ -284,6 +284,65 @@ concerné, pas seulement du premier trouvé en défaut — l'audit du point 3 de
 `subprocess.run([...])` de `dag.sh`, cf. section dédiée) a été fait a posteriori et aurait dû
 l'être dès la première passe.
 
+## Limite assumée — `blocked` hors du filtre de notification (WTCH-03)
+
+`record_milestone()` filtre `status in ("done", "failed")` : un `mark --status=blocked` (le geste
+de gel documenté par `mission-flow.md:245`, « le laisser `blocked`/`failed` ») **ne déclenche
+aucune notification** par ce plan. Ce n'est **pas un oubli** — c'est une limite écrite noir sur
+blanc, pour deux raisons distinctes :
+
+1. **Portée resserrée** : couvrir aussi `blocked` exigerait un cas de test dédié, hors du
+   périmètre ciblé de ce plan.
+2. **Instabilité de `recompute()`** : `recompute(nodes)`, appelé juste après l'écriture du statut
+   dans le bloc `mark`, peut **re-basculer un `blocked` fraîchement écrit vers `ready`** si toutes
+   ses `deps` sont déjà `done` — le geste « geler en `blocked` » n'a donc pas la stabilité d'un
+   `failed` (jamais retouché par `recompute()`). Notifier sur un `blocked` qui peut être annulé au
+   même appel serait un signal potentiellement mensonger.
+
+**Deux options déférées**, à trancher séparément (au manager) : soit étendre le filtre de
+`record_milestone()` à `blocked` dans une correction ultérieure avec son propre cas de test, soit
+resserrer noir sur blanc `mission-flow.md` pour que la doctrine de gel dise explicitement « halte
+⇒ `failed`, jamais `blocked` » et faire disparaître l'ambiguïté à la source. Argumentaire complet :
+`33-05-PLAN.md` (`must_haves.truths`, bullets 18-19).
+
+## Correctif post-vérification goal-backward — ordre `check_stall_signal()`/`record_progress()` (D-33-G)
+
+La vérification goal-backward de la Phase 33 (`520b791`) a mesuré que le bloquant D-33-F était
+**structurellement inatteignable** au geste `mark` : `record_progress()` (33-02) rafraîchit
+`progress_epoch` du lock courant **avant** que `check_stall_signal()` (ce plan) ne relise ce même
+lock — `progress_age_seconds` retombait donc systématiquement à 0, et le verdict STALL de
+`check-guard-health.sh --hook` (33-03) ne pouvait jamais être relayé sur `stderr` par `mark`, alors
+que c'est précisément le seul point de lecture disponible entre deux `SessionStart` pour une
+session vivante qui boucle. `T41`/`T48` (fixtures/marqueurs) ne l'attrapaient pas — aucun des deux
+n'exerçait un stall réel de `progress_epoch` de bout en bout.
+
+**Corrigé** : inversion de l'ordre des deux appels — `check_stall_signal()` lit désormais le
+verdict **avant** que `record_progress()` ne rafraîchisse `progress_epoch`, tous deux restant
+**après** `save(dag)` (contrainte préservée : le DAG doit être persisté avant tout appel externe,
+`save()` n'est pas atomique, `run_bounded` tue à 5 s). `record_milestone()` reste le dernier appel.
+Aucun seuil ni logique de verdict n'est dupliqué côté `dag.sh` — seul l'ordre de lecture change.
+
+**T49 ajouté** (`test-dag.sh`, cas de discriminance marqué « NE JAMAIS RETIRER ») : stall RÉEL de
+bout en bout à travers `dag.sh mark` — vrai `driver-lock.sh acquire`, `progress_epoch` réellement
+backdaté (1303 s, > 900 s seuil défaut), vrai `check-guard-health.sh`, assertion que la ligne
+`[mission-watchdog] stall detecte` arrive bien sur `stderr` de `dag.sh mark` avec `rc=0`. Sous-cas
+T49.3/T49.4 : le relais ABANDON (heartbeat mort) n'est pas régressé par cette correction. Mutation
+prouvée : en réintroduisant l'ordre fautif (`record_progress()` avant `check_stall_signal()`),
+T49.2 rougit exactement (`obtenu: ` vide) pendant que T41/T48 restent verts — preuve que T49 est le
+seul cas qui aurait attrapé cette régression.
+
+**Mesure A/B après correction** (même lock backdaté, même grandeur que la mesure du mandat) :
+```
+A) check-guard-health.sh --hook seul   → "[mission-watchdog] stall detecte — owner=... (progres fige depuis 1303s...)"  exit=0
+B) dag.sh mark (chemin corrigé)        → rc=0  stderr=["[mission-watchdog] stall detecte — owner=... (progres fige depuis 1304s...)"]
+```
+Les deux chemins convergent désormais sur le même signal — le décalage de 1 s entre A et B est le
+temps écoulé entre les deux invocations, pas un artefact du bug.
+
+**Non-régression re-vérifiée après cette correction** : `test-dag.sh` 161 PASS / 0 FAIL (+5
+assertions T49), `test-driver-lock.sh` 183, `test-check-guard-health.sh` 78, `test-notify.sh` 50,
+`test-vf-portable.sh` 16 ok, `test-guard-driver-lock.sh` 80 — tous inchangés hors `test-dag.sh`.
+
 ## Prochaine étape
 
 Dernier plan de la Phase 33 (33-05, wave 3). Les trois dépendances (33-02, 33-03, 33-04) et ce
