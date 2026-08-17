@@ -20,9 +20,11 @@
 #       le message nomme la lib, le lab n'est PAS marqué installé (VG-3).
 #
 # Identité du bloc localisateur (tâche 3, contrat §3/§6) :
-# T12 — les 4 consommateurs PYBIN (guard-file-size.sh, inject-mcp-tools.sh,
-#       test-dev-orchestrator.sh, check-hook-paths.sh) reproduisent le MÊME bloc (une seule somme
-#       de contrôle après normalisation du préfixe de message, le seul jeton autorisé à varier).
+# T12 — les 5 consommateurs PYBIN (guard-file-size.sh, inject-mcp-tools.sh,
+#       test-dev-orchestrator.sh, check-hook-paths.sh, guard-driver-lock.sh — 5e consommateur,
+#       Phase 32/BL-5, ÉCRITURE DÉLIBÉRÉE hors conductor amendée le 2026-08-17) reproduisent le
+#       MÊME bloc (une seule somme de contrôle après normalisation du préfixe de message, le seul
+#       jeton autorisé à varier).
 # T13 — l'extraction ne rend JAMAIS une somme sur un fichier sans les deux marqueurs appariés
 #       (échec BRUYANT, jamais un vert par défaut sur « aucun bloc trouvé »).
 #
@@ -245,14 +247,18 @@ checksum_locator_block() {
   printf '%s\n' "$block" | sed -E 's/\[[A-Za-z0-9_-]+\]/[PREFIX]/g' | sha256_of_stdin
 }
 
-# ---------- T12 : une SEULE somme de contrôle pour les 4 consommateurs réels ----------
+# ---------- T12 : une SEULE somme de contrôle pour les 5 consommateurs réels ----------
 T12_GFS="$REPO/software-architecture/scripts/guard-file-size.sh"
 T12_IMT="$REPO/dev-orchestrator/scripts/inject-mcp-tools.sh"
 T12_TDO="$REPO/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
 T12_CHP="$REPO/dev-orchestrator/scripts/check-hook-paths.sh"
+# 5e consommateur (Phase 32/BL-5) : guard-driver-lock.sh, hors conductor** — écriture DÉLIBÉRÉE
+# amendée le 2026-08-17 (voir 32-CONTEXT.md, amendement à D-32-07) : sans cet ajout, un 5e
+# consommateur du bloc canonique pourrait dériver en silence — un vert de complaisance.
+T12_GDL="$REPO/conductor/scripts/guard-driver-lock.sh"
 T12_OK=1
 T12_REPORT=""
-for T12_ENTRY in "guard-file-size.sh|$T12_GFS" "inject-mcp-tools.sh|$T12_IMT" "test-dev-orchestrator.sh|$T12_TDO" "check-hook-paths.sh|$T12_CHP"; do
+for T12_ENTRY in "guard-file-size.sh|$T12_GFS" "inject-mcp-tools.sh|$T12_IMT" "test-dev-orchestrator.sh|$T12_TDO" "check-hook-paths.sh|$T12_CHP" "guard-driver-lock.sh|$T12_GDL"; do
   T12_LABEL="${T12_ENTRY%%|*}"
   T12_PATH="${T12_ENTRY#*|}"
   if [ ! -f "$T12_PATH" ]; then
@@ -272,7 +278,7 @@ if [ "$T12_OK" = "1" ]; then
   T12_UNIQ="$(printf '%s' "$T12_REPORT" | awk -F= '{print $2}' | sort -u)"
   T12_UNIQ_COUNT="$(printf '%s\n' "$T12_UNIQ" | grep -c .)"
   if [ "$T12_UNIQ_COUNT" = "1" ]; then
-    ok "T12 identité du bloc localisateur : une seule somme de contrôle pour les 4 consommateurs ($T12_UNIQ)"
+    ok "T12 identité du bloc localisateur : une seule somme de contrôle pour les 5 consommateurs ($T12_UNIQ)"
   else
     ko "T12 identité du bloc : sommes DIVERGENTES —
 $T12_REPORT"
