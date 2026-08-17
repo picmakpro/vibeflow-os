@@ -830,10 +830,10 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | LOCK-03 | Phase 32 | Done — amendé (D-32-A) : porté par le même guard `PreToolUse(Bash)` que LOCK-02, `reference-transaction` écarté (spike PAS SÛR) |
 | LOCK-04 | Phase 32 | Done — plans 32-02 et 32-07 (verbes `takeover`/`reclaim` + fermeture du trou de la voie legacy, 4A) |
 | LOCK-05 | Phase 32 | Livré en tant que **convention**, pas encore observée — jeton (`generation`) exposé, convention `Fence:` écrite et exécutable (`mission-flow.md`, `team-kernel.md`), recette d'audit existe ; **aucun commit, y compris ceux de cette phase, ne porte encore le trailer** — entre en vigueur au prochain mandat |
-| WTCH-01 | Phase 33 | Pending |
-| WTCH-02 | Phase 33 | Pending |
-| WTCH-03 | Phase 33 | Pending — canal Windows à valider au cadrage |
-| WTCH-04 | Phase 33 | Pending |
+| WTCH-01 | Phase 33 | Done — plans 33-01/33-02, vérifié goal-backward (`33-VERIFICATION.md`, ATTEINT), suite `test-driver-lock.sh` 183 PASS / 0 FAIL |
+| WTCH-02 | Phase 33 | Partiel — vérifié `gaps_found` (`33-VERIFICATION.md`, 2026-08-17) : la détection par `check-guard-health.sh` est ATTEINTE (78 PASS/0 FAIL, mutation rouge prouvée), mais le relais au geste `dag.sh mark` (D-33-F) ne peut structurellement jamais remonter un STALL du lock courant (`record_progress()` avance `progress_epoch` AVANT que `check_stall_signal()` ne relise le statut) — correctif en cours (autre worker, `dag.sh`/`test-dag.sh`), état non tranché au moment où ceci est écrit |
+| WTCH-03 | Phase 33 | Done (limite assumée) — plans 33-04/33-05, `notify.sh` posé, jalons `done`/`failed` notifiés, `running` jamais ; canal Windows prouvé par shims CI seulement — validation réelle Win10/11 en recette de clôture (`33-CLOTURE-WINDOWS.md`, jamais exécutée, aucune machine disponible) |
+| WTCH-04 | Phase 33 | Done — plan 33-05, armement vérifié par le gate PORT-05 (aucune entrée `hooks.json` neuve, aucun settings local, `check-capability-activation.sh` intact — `33-VERIFICATION.md`, ATTEINT) |
 | LEDG-01 | Phase 18 | Pending |
 | LEDG-02 | Phase 18 | Pending |
 | LEDG-03 | Phase 30 | Ouverte le 2026-08-15 — https://github.com/open-gsd/gsd-core/issues/3556 — deadline amont 2026-10-26 |
@@ -922,11 +922,11 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [x] **LOCK-04**: Le takeover d'un lock périmé est explicite et tracé — jamais d'auto-steal
 - [~] **LOCK-05** *(livré en tant que convention, pas encore observée)*: Jeton de fence en trailer des commits de mission — le jeton (`generation`) est exposé, la convention `Fence:` est écrite et exécutable dans `mission-flow.md`/`team-kernel.md`, une recette d'audit existe ; **aucun commit ne porte encore le trailer à ce jour**, y compris ceux de cette phase — entre en vigueur au prochain mandat qui commite sous cette doctrine
 
-### Watchdog & notifications des missions
-- [ ] **WTCH-01**: Chaque nœud du DAG de mission écrit un battement de progression (même battement que LOCK-01, deux consommateurs)
-- [ ] **WTCH-02**: Un stall est détecté par ABSENCE de battement au-delà du seuil — jamais par auto-déclaration ; le watchdog signale et suggère, ne tue jamais (ADR-031)
-- [ ] **WTCH-03**: Notification OS native aux jalons de mission (fin de nœud, halt condition) — jamais à chaque tour
-- [ ] **WTCH-04**: L'armement (hooks, notify) passe par le gate armement↔précondition — jamais un settings local (leçon #38)
+### Watchdog & notifications des missions (Phase 33 vérifiée `gaps_found` le 2026-08-17 — 3 critères atteints, 1 partiel, `33-VERIFICATION.md`)
+- [x] **WTCH-01**: Chaque nœud du DAG de mission écrit un battement de progression (même battement que LOCK-01, deux consommateurs)
+- [~] **WTCH-02** *(partiel — détection atteinte, relais au geste `mark` cassé pour STALL)*: Un stall est détecté par ABSENCE de battement au-delà du seuil — jamais par auto-déclaration ; le watchdog signale et suggère, ne tue jamais (ADR-031). Correctif en cours au moment où ceci est écrit (autre worker) — voir table ci-dessus pour le détail du gap.
+- [x] **WTCH-03** *(limite assumée : preuve Windows réelle non exécutée)*: Notification OS native aux jalons de mission (fin de nœud, halt condition) — jamais à chaque tour
+- [x] **WTCH-04**: L'armement (hooks, notify) passe par le gate armement↔précondition — jamais un settings local (leçon #38)
 
 ### Survie du ledger d'exigences (Phase 18 héritée)
 - [ ] **LEDG-01**: La clôture de jalon fait un roll-over outillé du ledger — les exigences non livrées voyagent avec trace `carried-from:`

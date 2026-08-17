@@ -73,7 +73,7 @@
 - [x] Phase 30: Portabilité Windows II (completed 2026-08-16)
 - [x] Phase 31: Manifeste d'install + dry-run (issue #20) (completed 2026-08-16)
 - [x] Phase 32: Durcissement du driver-lock (completed 2026-08-17)
-- [ ] Phase 33: Watchdog & notifications des missions
+- [~] Phase 33: Watchdog & notifications des missions (5 plans exécutés, vérifiée `gaps_found` le 2026-08-17 — 3/4 critères atteints, WTCH-02 partiel, correctif en cours)
 - [ ] Phase 34: Gaps agency-agents & cadrage skill-installer
 - [ ] Phase 35: Ré-armement worktree (conditionnelle)
 
@@ -796,6 +796,13 @@ mutation rouge prouvée.
 **Plans**: 33-01 (progress_epoch dans driver-lock.sh), 33-02 (wiring dag.sh au point `mark`),
 33-03 (détection de stall, canal BRUYANT), 33-04 (notify.sh portable + détecteur WSL dans
 vf-portable.sh), 33-05 (jalons de notification + recette de clôture Windows) — affinage au plan.
+
+- [x] 33-01-PLAN.md — `progress_epoch` additif au `meta` du lock (D-33-A), verbe `mark-progress` — vague 1 (WTCH-01)
+- [x] 33-02-PLAN.md — `record_progress()` câblé à `dag.sh mark`, APRÈS `save(dag)` — vague 2 (WTCH-01)
+- [x] 33-03-PLAN.md — sous-contrôle stall/abandon dans `check-guard-health.sh`, canal BRUYANT, mutation rouge — vague 2 (WTCH-02, QUAL-01)
+- [x] 33-04-PLAN.md — `notify.sh` portable (macOS/Linux/Windows/WSL), détecteur WSL dans `vf-portable.sh`, T12 mis à jour — vague 1, indépendant (WTCH-03)
+- [x] 33-05-PLAN.md — `check_stall_signal()` (D-33-F) + `record_milestone()` câblés au point `mark`, recette de clôture Windows (D-33-C) — vague 3 (WTCH-02/03/04)
+- **Vérification goal-backward (`33-VERIFICATION.md`, 2026-08-17)** : `gaps_found`, 3/4 critères ATTEINTS (WTCH-01, WTCH-03 limite assumée, WTCH-04), WTCH-02 **PARTIEL** — le relais du verdict stall au geste `mark` (D-33-F) est structurellement inatteignable pour un STALL du lock courant (`record_progress()` avant `check_stall_signal()` dans le même bloc). Correctif en cours par un autre worker sur `dag.sh`/`test-dag.sh` au moment où cette ligne est écrite — état non préjugé ici.
 
 ### Phase 18: Survie du ledger d'exigences à la clôture de jalon
 
