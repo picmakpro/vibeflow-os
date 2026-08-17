@@ -24,7 +24,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26 — charte rouverte : 17 modules, D2/D6 renversées)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Milestone fiabilite-v1.0 — Phase 30 (Portabilité Windows II) et Phase 31 (Manifeste d'install + dry-run, issue #20) livrées ; Phase 32 (Durcissement du driver-lock) à cadrer
+**Current focus:** Milestone fiabilite-v1.0 — Phase 30 (Portabilité Windows II), Phase 31 (Manifeste d'install + dry-run, issue #20) et Phase 32 (Durcissement du driver-lock) livrées ; Phase 33 (Watchdog & notifications des missions) à cadrer
 `get-shit-done-cc` → `@opengsd/gsd-core` livrée en v2.39.0 atteint enfin les **postes déjà équipés** :
 `/vf-update` dit l'état du moteur avant tout stop et propose la bascule sous confirmation ADR-031.
 Modules `dev-orchestrator` v2.7.0 + `conductor` v1.16.0. Verdict `19-VERIFICATION.md` : **PASS 6/7**.
@@ -367,6 +367,22 @@ Recent decisions affecting current work:
   0 blocker » ; deux vérificateurs frais dispatchés en direct ont trouvé **9 bloquants et
   15 findings**, la plupart vérifiés par exécution — dont un guard aveugle au chaînage par saut de
   ligne, qui aurait laissé passer l'incident I4 avec tous les cas de test verts.
+
+  **Complément de livraison (2026-08-17) — Phase 32 exécutée, 64 suites / 0 échec, `conductor`
+  bumpé v1.26.0.** Les deux arbitrages du 2026-08-17 (points 4 ci-dessus) sont **exécutés** : 3B
+  (synchronisation doctrinale complète des 7 fichiers dans 4 modules tiers) et 4A (fermeture du
+  trou de la voie legacy du protocole d'acquisition) sont livrés et vérifiés. Fait marquant
+  supplémentaire, même leçon de méthode répétée une fois de plus : après les 9 bloquants trouvés au
+  **plan** par les vérificateurs externes (ci-dessus), les **trois juges de code** dispatchés sur
+  l'implémentation ont trouvé **un bloquant de plus** — le guard tronquait la commande au premier
+  `<<`, si bien qu'un heredoc suivi d'un `git commit` passait en silence (motif d'usage courant,
+  reproduit). Corrigé au plan 32-03 (troncature heredoc retirée, `32-03-SUMMARY.md` §Traces des
+  mutations, tâche 3). Le guard reste **anti-accident, pas anti-adversaire** : `guard-driver-lock.sh`
+  couvre les gestes accidentels via Claude Code, jamais un terminal humain direct, un IDE/client git
+  tiers, un processus en arrière-plan, un appel MCP, une autre machine, `bash -c`/`eval`, ni une
+  session non armée (catégorie C, `32-RELIQUATS.md` §6.2). LOCK-05 est livré comme **convention**,
+  pas comme fait observable : aucun commit — y compris ceux de cette phase — ne porte encore le
+  trailer `Fence:` à ce jour (`32-RELIQUATS.md` §4 critère 5, §6.4).
 
 - **2026-08-16 — Phase 31 (Manifeste d'install + dry-run, issue #20) livrée — six arbitrages
   D-31-11 à D-31-16, tous nés de re-validations trouvant des défauts qu'une suite verte n'avait pas
