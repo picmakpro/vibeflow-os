@@ -34,7 +34,56 @@ case "$WORK_DIR" in
 esac
 [ -d "$WORK_DIR" ] || { echo "PRÉFLIGHT FIXTURE CASSÉ — WORK_DIR introuvable : $WORK_DIR" >&2; exit 2; }
 
+# --- Isolation VF_DRIVER_LOCK, PAR DÉFAUT, pour TOUTE la suite (correctif ciblé, mandat 2026-08-17,
+# Bloquant 2) : check_driver_stall() dans check-guard-health.sh lit TOUJOURS `driver-lock.sh
+# status`, y compris pour les cas hérités D1-D7/D9-D11 qui ne le savent pas. Sans cet export, ces
+# cas hériteraient du VRAI verrou de pilotage du dépôt (.planning/DRIVER.lock, defaut de
+# driver-lock.sh en l'absence de VF_DRIVER_LOCK) — vert en CI (pas de lock), rouge sur le poste
+# d'un développeur pendant une mission réelle. Chemin JAMAIS acquis (`driver-lock.sh acquire` n'est
+# jamais appelé dessus) : `status` y rend systématiquement present=false -> SAIN, exactement le
+# comportement neutre qu'attendaient déjà D1-D11 avant l'introduction du sous-contrôle stall (33-03).
+# Les cas D14-D25 gardent leur propre surcharge inline (`VF_DRIVER_LOCK="$D1x_LOCK" bash "$SCRIPT"
+# ...`) : une surcharge inline ne modifie que l'environnement de CETTE commande, jamais la variable
+# de ce shell — donc $VF_DRIVER_LOCK redevient ce défaut juste après, sans discontinuité pour les
+# cas suivants.
+export VF_DRIVER_LOCK="$WORK_DIR/default-unacquired-lock"
+
+# Garde structurelle (Bloquant 2) : rend l'oubli futur IMPOSSIBLE plutôt que documenté seul. Un
+# `trap ... DEBUG` s'exécute avant CHAQUE commande simple du corps du script (pas dans les traps
+# eux-mêmes, pas de récursion) et fait échouer la suite (exit 2, fixture cassée — jamais un verdict
+# métier) si la variable de CE shell a été réassignée hors de $WORK_DIR. Une surcharge inline
+# (`VF_DRIVER_LOCK=... bash "$SCRIPT"`) n'affecte jamais cette variable de shell — seule une
+# réassignation durable (`VF_DRIVER_LOCK=/vrai/chemin` sans préfixe de commande, l'erreur qu'un
+# futur cas pourrait introduire par inadvertance) la déclenche.
+assert_lock_isolated() {
+  case "$VF_DRIVER_LOCK" in
+    "$WORK_DIR"/*) : ;;
+    *)
+      echo "GARDE STRUCTURELLE — VF_DRIVER_LOCK hors de \$WORK_DIR : [$VF_DRIVER_LOCK] (aurait pu lire le vrai verrou du dépôt)" >&2
+      exit 2
+      ;;
+  esac
+}
+trap 'assert_lock_isolated' DEBUG
+
 echo "== test-check-guard-health =="
+
+# === D8 — CAS DISCRIMINANT, NE JAMAIS RETIRER (Bloquant 1, mandat 2026-08-17) : exécution DIRECTE
+# du VRAI $SCRIPT sur disque (PAS `bash "$SCRIPT"`, qui contourne le bit exécutable en forçant un
+# interprète). Le plan 33-05 invoque le relais par exec direct (`subprocess.run([check_guard_health_sh,
+# "--hook"], ...)`) — c'est CE chemin que toute la suite, jusqu'ici, ne testait jamais : elle passait
+# systématiquement par `bash "$SCRIPT" ...`, qui reste vert même si le fichier est commité en 100644
+# (non exécutable). Mesuré avant correctif : `./check-guard-health.sh --hook` -> permission denied,
+# exit 126, et l'exception Python correspondante (`PermissionError [Errno 13]`) est avalée par le
+# try/except englobant de check_stall_signal() -> D-33-F ne relaie jamais rien, en silence. Si ce
+# cas est un jour retiré ou réécrit pour repasser par `bash "$SCRIPT"`, cette régression redevient
+# invisible à la suite tout en la laissant verte.
+D8_DIR="$WORK_DIR/d8-exec-direct"
+D8_OUT="$("$SCRIPT" --dir="$D8_DIR" 2>/dev/null)"; D8_RC=$?
+[ "$D8_RC" -eq 3 ] && ok "D8 : exécution DIRECTE (bit +x, pas de \`bash\` explicite) → exit 3 (SAIN)" || ko "D8 exit" "rc=$D8_RC attendu 3 (126 = script non exécutable, régression Bloquant 1)"
+[ -z "$D8_OUT" ] && ok "D8 : stdout strictement vide" || ko "D8 stdout" "out=[$D8_OUT]"
+D8H_OUT="$("$SCRIPT" --dir="$WORK_DIR/d8-hook" --hook 2>/dev/null)"; D8H_RC=$?
+[ "$D8H_RC" -eq 0 ] && ok "D8/--hook : exécution DIRECTE sous --hook → exit 0 (relais fonctionnel, pas 126)" || ko "D8/--hook exit" "rc=$D8H_RC attendu 0"
 
 # Écrit un marqueur au FORMAT RÉEL de vf_guard_unavailable (plugin/_internal/lib/vf-portable.sh:152) :
 # une ligne "horodatage-ISO8601-UTC\tscript\tmotif\n". Fixture consignée mot pour mot dans le
