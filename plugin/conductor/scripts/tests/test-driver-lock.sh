@@ -1,16 +1,23 @@
 #!/usr/bin/env bash
 # test-driver-lock.sh — Suite de tests pour driver-lock.sh (ADR-053, Pattern A)
 #
+# T0 GEL-2 : voie libre refuse un lock legacy frais deja tenu (double-detenteur ferme)
 # T1 acquisition franche · T2 double-acquisition refusée · T3 ré-acquisition idempotente (reentrant)
 # T4 heartbeat préserve le step · T5 release owner mismatch refusé · T6 release owner correct
-# T7 récupération de claim périmé (heartbeat antidaté > TTL) · T8 recover sur lock frais refusé
-# T9 status présent/absent · T10 heartbeat sans lock → erreur
+# T7 acquire ordinaire sur lock périmé REFUSE (D-32-02, LOCK-04, auto-steal fermé)
+# T8 recover sur fixture propre (BL-4, découplé de T7) · T9 status présent/absent
+# T10 heartbeat sans lock → erreur
 # T15 acquire pose session_ids + expose generation · T16 heartbeat préserve l'identité (ADR-064)
 # T17 acquire sans CLAUDE_CODE_SESSION_ID → session_ids vide · T18 rétrocompat meta sans session_ids
 # T19 assainissement (virgule/espace/saut de ligne injectés) · T20 acquire (voie libre) expose lui aussi generation+session_ids
 # T21 lease_seconds observable, distincte du battement · T22 heartbeat ne remet pas la lease à zéro
 # T23 lease longue jamais périmée (refus à un AUTRE owner) · T24 TTL par défaut inchangé (1800)
 # T25 rétrocompat meta sans acquired_epoch → lease_seconds null
+# T26 refus stale-requires-takeover nomme la marche à suivre · T27-T31 verbe takeover
+# T32 takeover concurrent 24x5 (patron T13) · T13 acquire concurrent sur lock périmé = ZERO gagnant
+# T33-legacy takeover sur dossier legacy périmé avec meta complet (SE-6)
+# T33-T41b verbe reclaim (D-32-03(f)) — mutex partagé avec takeover, plafond LRU, trap BL-3
+# T42-T45 journal append-only des évènements de reprise (D-32-02)
 #
 # Exit 0 si tout passe, 1 sinon.
 
@@ -79,6 +86,18 @@ lease_backdate() {
   sed -i.bak "s/^acquired_epoch=.*/acquired_epoch=$old/" "$meta" && rm -f "${meta}.bak"
 }
 
+echo "=== T0 — GEL-2 : voie libre refuse un lock LEGACY frais déjà tenu (double-détenteur fermé) ==="
+rm -rf "$VF_DRIVER_LOCK"
+mkdir -p "$VF_DRIVER_LOCK"
+printf 'owner=alice\nstep=x\nheartbeat_epoch=%s\n' "$(date +%s)" > "$VF_DRIVER_LOCK/meta"
+out=$("$SCRIPT" acquire --owner=bob --step=y); rc=$?
+assert "T0.1 — acquired false" "$out" '"acquired": false'
+assert "T0.2 — refus held, comme un lock nominal occupé" "$out" '"reason": "held"'
+assert_exit "T0.3 — exit 1" "$rc" 1
+_t0_owner=$(grep '^owner=' "$VF_DRIVER_LOCK/meta" | cut -d= -f2-)
+assert "T0.4 — owner EFFECTIF (meta sur disque) inchangé (alice)" "$_t0_owner" "alice"
+rm -rf "$VF_DRIVER_LOCK"
+
 echo "=== T1 — acquisition franche ==="
 out=$("$SCRIPT" acquire --owner=A --step=phase-9); rc=$?
 assert "T1.1 — acquired true" "$out" '"acquired": true'
@@ -109,21 +128,27 @@ out=$("$SCRIPT" release --owner=A)
 assert "T6.1 — released true" "$out" '"released": true'
 assert "T6.2 — lock absent après release" "$("$SCRIPT" status)" '"present": false'
 
-echo "=== T7 — récupération de claim périmé (heartbeat antidaté) ==="
+echo "=== T7 — acquire ORDINAIRE sur lock périmé REFUSE (D-32-02, LOCK-04 — auto-steal fermé) ==="
+rm -rf "$VF_DRIVER_LOCK"
 "$SCRIPT" acquire --owner=DEAD --step=x >/dev/null
 # antidate le heartbeat bien au-delà du TTL par défaut (1800 s)
 age_stale "$VF_DRIVER_LOCK"
 out=$("$SCRIPT" acquire --owner=B --step=y); rc=$?
-assert "T7.1 — recovered true" "$out" '"recovered": true'
-assert "T7.2 — previous_owner DEAD" "$out" '"previous_owner": "DEAD"'
-assert "T7.3 — nouvel owner B" "$("$SCRIPT" status)" '"owner": "B"'
-assert_exit "T7.4 — exit 0" "$rc" 0
+assert "T7.1 — acquired false" "$out" '"acquired": false'
+assert "T7.2 — reason stale-requires-takeover" "$out" '"reason": "stale-requires-takeover"'
+assert "T7.3 — owner reste DEAD (jamais volé)" "$("$SCRIPT" status)" '"owner": "DEAD"'
+assert_exit "T7.4 — exit 1 (refus)" "$rc" 1
 
-echo "=== T8 — recover sur lock frais refusé ==="
+echo "=== T8 — recover sur fixture PROPRE (BL-4 : découplé de T7, jamais son état résiduel) ==="
+rm -rf "$VF_DRIVER_LOCK"
+"$SCRIPT" acquire --owner=DEAD8 --step=x >/dev/null
+age_stale "$VF_DRIVER_LOCK"
 out=$("$SCRIPT" recover); rc=$?
-assert "T8.1 — still-fresh" "$out" '"reason": "still-fresh"'
-assert_exit "T8.2 — exit 1" "$rc" 1
-"$SCRIPT" release --owner=B >/dev/null
+assert "T8.1 — recovered true (élagage anonyme)" "$out" '"recovered": true'
+assert_exit "T8.2 — exit 0" "$rc" 0
+out2=$("$SCRIPT" release --owner=B); rc2=$?
+assert "T8.3 — release ultérieur sur lock élagué : no-lock" "$out2" '"reason": "no-lock"'
+assert_exit "T8.4 — exit 0" "$rc2" 0
 
 echo "=== T9 — status absent ==="
 assert "T9.1 — present false" "$("$SCRIPT" status)" '"present": false'
@@ -142,21 +167,27 @@ wait
 won=$(grep -l '"acquired": true' "$WORK_DIR"/out.* 2>/dev/null | wc -l | tr -d ' ')
 num_eq "T11.1 — exactement 1 gagnant sur 8 acquire simultanés" "$won" 1
 
-echo "=== T12 — meta absent/partiel récupérable via mtime (H2, anti-deadlock) ==="
+echo "=== T12 — meta absent/partiel : stale via mtime, récupérable SEULEMENT par takeover (GEL-2) ==="
 rm -rf "$VF_DRIVER_LOCK"; mkdir -p "$(dirname "$VF_DRIVER_LOCK")"; mkdir "$VF_DRIVER_LOCK"  # dossier SANS meta
 touch -t 202001010000 "$VF_DRIVER_LOCK"  # mtime très ancien → au-delà du TTL
 assert "T12.1 — lock sans meta → stale (mtime, pas 'frais éternel')" "$("$SCRIPT" status)" '"stale": true'
-assert "T12.2 — récupérable par un nouvel owner" "$("$SCRIPT" acquire --owner=NEW --step=z)" '"acquired": true'
+out=$("$SCRIPT" acquire --owner=NEW --step=z); rc=$?
+assert "T12.2a — acquire ordinaire REFUSE (GEL-2 : voie libre fermée sur dossier legacy stale)" "$out" '"reason": "stale-requires-takeover"'
+assert_exit "T12.2b — exit 1" "$rc" 1
+out2=$("$SCRIPT" takeover --owner=NEW --step=z); rc2=$?
+assert "T12.2c — takeover RÉUSSIT (récupérabilité réelle préservée)" "$out2" '"acquired": true'
+assert_exit "T12.2d — exit 0" "$rc2" 0
+_t12_gen="$(readlink "$VF_DRIVER_LOCK")"
+_t12_owner=$(grep '^owner=' "$(dirname "$VF_DRIVER_LOCK")/$_t12_gen/meta" 2>/dev/null | cut -d= -f2-)
+assert "T12.2e — owner EFFECTIF (meta sur disque, jamais le seul JSON rendu) = NEW" "$_t12_owner" "NEW"
+"$SCRIPT" release --owner=NEW >/dev/null 2>&1
 
-echo "=== T13 — récupération concurrente : un SEUL récupère (H1) ==="
-# CONCURRENCE ÉLEVÉE ET RÉPÉTÉE, à dessein. La forme précédente (6 concurrents, 1 round) ne
-# révélait le défaut qu'en loterie : verte sur macOS, rouge sur runner Linux — 24 concurrents la
-# rendaient rouge des deux côtés, avec jusqu'à 5 acquéreurs simultanés observés. Un contrat
-# d'exclusion mutuelle ne se mesure pas sur un tirage : on répète, et on exige l'égalité stricte
-# à CHAQUE round. Les deux bornes comptent — 0 gagnant est un échec au même titre que 2, sinon
-# un lock qui refuse tout le monde passerait pour correct.
+echo "=== T13 — acquire concurrent sur lock périmé : ZÉRO gagnant (auto-steal fermé côté concurrent) ==="
+# CONCURRENCE ÉLEVÉE ET RÉPÉTÉE, à dessein — même patron que T32 (takeover), mais l'attendu est
+# inversé : depuis D-32-02, un `acquire` ordinaire ne recupère plus jamais un lock périmé, donc
+# aucun round ne doit produire le moindre gagnant, et chaque refus doit nommer takeover.
 T13_N=24; T13_ROUNDS=5
-t13_bad=0; t13_worst=0; t13_zero=0
+t13_bad=0
 for round in $(seq 1 "$T13_ROUNDS"); do
   rm -rf "$VF_DRIVER_LOCK" "$WORK_DIR"/rec.*
   "$SCRIPT" acquire --owner=DEAD --step=x >/dev/null 2>&1
@@ -164,12 +195,11 @@ for round in $(seq 1 "$T13_ROUNDS"); do
   for i in $(seq 1 "$T13_N"); do ( "$SCRIPT" acquire --owner="R$i" --step=y >"$WORK_DIR/rec.$i" 2>/dev/null ) & done
   wait
   won=$(grep -l '"acquired": true' "$WORK_DIR"/rec.* 2>/dev/null | wc -l | tr -d ' ')
-  [ "$won" -gt "$t13_worst" ] && t13_worst="$won"
-  [ "$won" -eq 0 ] && t13_zero=$((t13_zero+1))
-  [ "$won" -ne 1 ] && t13_bad=$((t13_bad+1))
+  refused=$(grep -l 'stale-requires-takeover' "$WORK_DIR"/rec.* 2>/dev/null | wc -l | tr -d ' ')
+  [ "$won" -ne 0 ] && t13_bad=$((t13_bad+1))
+  [ "$refused" -ne "$T13_N" ] && t13_bad=$((t13_bad+1))
 done
-num_eq "T13.1 — $T13_ROUNDS rounds × $T13_N concurrents : aucun round hors contrat (pire=$t13_worst)" "$t13_bad" 0
-num_eq "T13.2 — jamais 0 gagnant (un lock périmé reste récupérable)" "$t13_zero" 0
+num_eq "T13.1 — $T13_ROUNDS rounds × $T13_N concurrents : jamais un seul gagnant, tous refusés stale-requires-takeover" "$t13_bad" 0
 rm -rf "$VF_DRIVER_LOCK" "$WORK_DIR"/rec.*
 
 echo "=== T14 — TTL non numérique → défaut 1800 (L3, anti-injection) ==="
@@ -292,6 +322,91 @@ assert_exit "T25.1 — status exit 0 sur lock sans acquired_epoch" "$rc" 0
 assert "T25.2 — lease_seconds null (jamais un 0 trompeur)" "$st" '"lease_seconds": null'
 assert "T25.3 — stale reste calculé normalement (heartbeat frais)" "$st" '"stale": false'
 "$SCRIPT" release --owner=A >/dev/null 2>&1
+
+echo "=== T26 — le refus stale-requires-takeover nomme la marche à suivre ==="
+rm -rf "$VF_DRIVER_LOCK"
+"$SCRIPT" acquire --owner=DEAD26 --step=x >/dev/null
+age_stale "$VF_DRIVER_LOCK"
+out=$("$SCRIPT" acquire --owner=B26 --step=y)
+assert "T26.1 — le refus nomme 'takeover'" "$out" 'takeover'
+rm -rf "$VF_DRIVER_LOCK"
+
+echo "=== T27 — takeover reprend explicitement un lock périmé ==="
+rm -rf "$VF_DRIVER_LOCK"
+"$SCRIPT" acquire --owner=DEAD27 --step=x >/dev/null
+age_stale "$VF_DRIVER_LOCK"
+out=$("$SCRIPT" takeover --owner=B27 --step=y); rc=$?
+assert "T27.1 — acquired true" "$out" '"acquired": true'
+assert "T27.2 — previous_owner DEAD27" "$out" '"previous_owner": "DEAD27"'
+assert_exit "T27.3 — exit 0" "$rc" 0
+assert "T27.4 — status owner B27" "$("$SCRIPT" status)" '"owner": "B27"'
+"$SCRIPT" release --owner=B27 >/dev/null 2>&1
+
+echo "=== T28 — takeover sur lock FRAIS refusé (still-fresh) ==="
+rm -rf "$VF_DRIVER_LOCK"
+"$SCRIPT" acquire --owner=A28 --step=x >/dev/null
+out=$("$SCRIPT" takeover --owner=B28); rc=$?
+assert "T28.1 — reason still-fresh" "$out" '"reason": "still-fresh"'
+assert_exit "T28.2 — exit 1" "$rc" 1
+assert "T28.3 — owner inchangé A28" "$("$SCRIPT" status)" '"owner": "A28"'
+"$SCRIPT" release --owner=A28 >/dev/null 2>&1
+
+echo "=== T29 — takeover sans --owner ==="
+out=$("$SCRIPT" takeover); rc=$?
+assert "T29.1 — error owner-required" "$out" '"error": "owner-required"'
+assert_exit "T29.2 — exit 1" "$rc" 1
+
+echo "=== T30 — takeover sans lock du tout ==="
+rm -rf "$VF_DRIVER_LOCK"
+out=$("$SCRIPT" takeover --owner=X30); rc=$?
+assert "T30.1 — reason no-lock" "$out" '"reason": "no-lock"'
+assert_exit "T30.2 — exit 1" "$rc" 1
+
+echo "=== T31 — takeover réinitialise session_ids au seul repreneur ==="
+rm -rf "$VF_DRIVER_LOCK"
+CLAUDE_CODE_SESSION_ID=sess-old31 "$SCRIPT" acquire --owner=DEAD31 --step=x >/dev/null
+age_stale "$VF_DRIVER_LOCK"
+CLAUDE_CODE_SESSION_ID=sess-new31 "$SCRIPT" takeover --owner=B31 >/dev/null
+st=$("$SCRIPT" status)
+assert "T31.1 — session_ids == [sess-new31] seul (identifiant évincé disparu)" "$st" '"session_ids": ["sess-new31"]'
+"$SCRIPT" release --owner=B31 >/dev/null 2>&1
+
+echo "=== T32 — takeover concurrent : un SEUL récupère (24 × 5, patron T13) ==="
+T32_N=24; T32_ROUNDS=5
+t32_bad=0; t32_worst=0; t32_zero=0
+for round in $(seq 1 "$T32_ROUNDS"); do
+  rm -rf "$VF_DRIVER_LOCK" "$WORK_DIR"/t32.*
+  "$SCRIPT" acquire --owner=DEAD32 --step=x >/dev/null 2>&1
+  age_stale "$VF_DRIVER_LOCK"
+  for i in $(seq 1 "$T32_N"); do ( "$SCRIPT" takeover --owner="T32R$i" --step=y >"$WORK_DIR/t32.$i" 2>/dev/null ) & done
+  wait
+  won=$(grep -l '"acquired": true' "$WORK_DIR"/t32.* 2>/dev/null | wc -l | tr -d ' ')
+  [ "$won" -gt "$t32_worst" ] && t32_worst="$won"
+  [ "$won" -eq 0 ] && t32_zero=$((t32_zero+1))
+  [ "$won" -ne 1 ] && t32_bad=$((t32_bad+1))
+done
+num_eq "T32.1 — $T32_ROUNDS rounds × $T32_N concurrents : aucun round hors contrat (pire=$t32_worst)" "$t32_bad" 0
+num_eq "T32.2 — jamais 0 gagnant (un lock périmé reste récupérable via takeover)" "$t32_zero" 0
+rm -rf "$VF_DRIVER_LOCK" "$WORK_DIR"/t32.*
+
+echo "=== T33-legacy — takeover sur lock LEGACY (dossier réel) périmé AVEC meta complet (SE-6) ==="
+rm -rf "$VF_DRIVER_LOCK"
+mkdir -p "$(dirname "$VF_DRIVER_LOCK")"; mkdir "$VF_DRIVER_LOCK"
+{
+  echo 'owner=ALICE33'
+  echo 'step=x'
+  echo 'branch='
+  echo 'worktree='
+  echo 'session_ids='
+  echo 'acquired_epoch=1'
+  echo 'acquired_iso=2020-01-01T00:00:00'
+  echo 'heartbeat_epoch=1'
+} > "$VF_DRIVER_LOCK/meta"
+out=$("$SCRIPT" takeover --owner=B33 --step=y); rc=$?
+assert "T33L.1 — acquired true (reprise réussie, comme sur un lock nominal)" "$out" '"acquired": true'
+assert_exit "T33L.2 — exit 0" "$rc" 0
+assert "T33L.3 — status owner B33 après coup" "$("$SCRIPT" status)" '"owner": "B33"'
+"$SCRIPT" release --owner=B33 >/dev/null 2>&1
 
 echo ""
 echo "=================================="
