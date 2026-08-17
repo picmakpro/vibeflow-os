@@ -5,6 +5,70 @@ extrait récent et pointent ici). Chaque module a par ailleurs son propre `CHANG
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.55.0] — 2026-08-17
+
+**Le driver-lock cesse d'être déclaratif : les contournements constatés pendant agentique-v1.0
+(commit et checkout concurrents sous lock) sont désormais bloqués à la source, et un lock
+périmé ne se vole plus jamais en silence.** Phase 32 (7 plans), PR #46. `conductor` v1.26.0 +
+5 bumps doctrine (dev-orchestrator, design-orchestrator, content-bundle, business-pilot-bundle,
+growth-bundle).
+
+### Livré
+
+- **LOCK-01 — heartbeat séparé de la lease** : un manager vivant renouvelle son battement sans
+  que le TTL monte ; `session_ids` et `generation` exposés, `lease_seconds` observable — un
+  lock périmé ≠ une mission morte (constat du 2026-08-02, enfin fermé).
+- **LOCK-02/03 — `guard-driver-lock.sh`** (neuf, 80 cas) sur `PreToolUse` matcher
+  `"Bash|Write|Edit"` : commit ET checkout/switch de branche sous le lock d'autrui refusés
+  AVANT que git ne tourne ; la voie `Write|Edit` bornée à `.planning/` (l'incident I2 réel
+  passait par les outils natifs, pas par Bash) ; le motif de refus est rendu au modèle mot
+  pour mot avec la commande exacte de reprise (`reclaim`/`takeover`) et les échappatoires
+  nommées (worktree, marqueur d'override explicite) ; le détenteur passe toujours. Résistant
+  au chaînage par saut de ligne, aux heredocs suivis d'une commande, aux options globales
+  `git -C`/`-c`, au quoting — chaque garde prouvée rouge sous mutation. L'entrée naît de
+  `merge-hooks`, la commande vit en `--settings-local` : un chemin machine ne voyage jamais.
+- **LOCK-04 — takeover explicite** : `acquire` ne récupère plus jamais un lock périmé — refus
+  `stale-requires-takeover` avec hint in-band ; verbes `takeover`/`reclaim` distincts, journal
+  append-only, mutex sous `trap` ; le trou legacy du double-détenteur (nominal sur Git Bash
+  Windows sans privilège symlink) fermé par garde d'existence, T12 assertant l'owner
+  **effectif** sur disque et non le JSON rendu.
+- **LOCK-05 — trailer `Fence:`** sur les commits de mission — « quel commit sous quel mandat »
+  auditable ; convention écrite dans `mission-flow.md`, le chemin que les managers lisent
+  réellement.
+- **QUAL-01 — hook doctor `SessionStart` générique** (extension de périmètre assumée, arbitrée) :
+  les 26+ entrées du parc écrivaient des marqueurs de santé qu'AUCUN consommateur ne lisait —
+  le « bruyant non bloquant » n'existait pas. Le doctor lit les marqueurs de tout le parc,
+  silence nominal 0 octet, signal injecté en contexte de session — mesuré réellement bruyant.
+- **Doctrine resynchronisée** (arbitrage Samuel : synchronisation complète, pas seulement le
+  hint) : 7 fichiers dans 4 modules tiers — aucun agent manager ne documente plus l'ancien
+  contrat d'acquisition.
+
+### La recherche avant le plan
+
+Les deux research flags du roadmap ont contredit deux prémisses écrites, consigné sur disque
+(`32-SPIKE-reference-transaction.md`, `32-REJEU-contournements.md`) : le hook git
+`reference-transaction` est **inutilisable pour bloquer** (aveugle avant git 2.46, wedge
+`rebase` en refusant son propre `--abort`, casse `worktree add` — l'échappatoire prescrite —,
+contournement `hooksPath` que quatre de nos propres scripts utilisent) — le blocage est porté
+par le guard PreToolUse à la place ; et il n'y avait pas 2 contournements mais **4 incidents
+réels sur 3 gestes**, dont un passé par Write/Edit — tous rejoués en cas de test rouges sous
+mutation dans les deux sens.
+
+### La méthode
+
+Troisième phase d'affilée : deux vérificateurs internes ont rendu « PASSED, 0 blocker », les
+juges frais ont trouvé **9 bloquants au plan** puis **1 au code** (le guard tronquait au
+premier `<<` — un heredoc suivi d'un `git commit` passait en silence : l'incident I4 rouvert
+avec tous les tests verts). Dette tracée plutôt que corrigée à chaud : idempotence
+cross-matcher de `merge-hooks.sh` (`CONCERNS.md`, deux entrées même script/même événement se
+purgent l'une l'autre — contourné par le matcher combiné, précédent existant). Checkpoint
+humain 32-03 validé sur pièces ; **ce dépôt n'est pas armé — l'armement réel des labs passe
+par la release du module `conductor` posée par `/vf-update`.**
+
+**Suites** : `test-driver-lock.sh` 151 assertions, `test-guard-driver-lock.sh` né (80 cas),
+`test-check-guard-health.sh` né (le doctor) — **64 suites** vertes en local **et** CI verte
+(`71b6cfd`).
+
 ## [v2.54.0] — 2026-08-16
 
 **L'engine d'install devient prévisible : chaque pose est tracée fichier par fichier dans un
