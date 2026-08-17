@@ -9,6 +9,16 @@
 #   R1/R2/R3  — lock absent/périmé/pré-Phase-32 (sans session_ids) : allow inconditionnel
 #   P0/P1     — préfiltre pur-bash : zéro spawn d'interprète sur payload non concerné
 #
+# Tâche 2 — surface complète (S1-S10), voie Write/Edit (C1-C5), limite assumée (L1).
+#
+# Tâche 3 — QUAL-01, les QUATRE issues distinctes (jamais trois) :
+#   Q1 PASS (déjà couvert par A4/B4/C3) · Q2 DENY (déjà couvert par A1/B1/C1)
+#   Q3/Q3b/Q3c — payload IMPARSABLE ou atypique, ou meta illisible → fail-open SILENCIEUX
+#     (code 0 ET stdout STRICTEMENT VIDE, les deux assertés — jamais un allow qui parle)
+#   Q4 — interprète INDISPONIBLE → fail-open BRUYANT (code 17, stdout vide, stderr préfixé,
+#     marqueur de santé écrit) — DISTINCT du silencieux, jamais confondu avec lui
+#   Q5 — anti-vert-à-vide : le compteur d'assertions exécutées est vérifié non nul
+#
 # Convention du dossier : set -uo pipefail sans -e, mktemp -d + trap EXIT, VF_* pour rediriger le
 # système sous test, préflights séparés des assertions métier.
 
@@ -164,7 +174,7 @@ echo "=== P0 — SE-1 : sonde d'existence AVANT tout spawn (lock absent, PATH sa
 rm -rf "$LOCK"
 P0_BIN="$WORK_DIR/p0-bin"
 mkdir -p "$P0_BIN"
-for t in cat dirname basename sed grep mkdir rm date readlink stat; do
+for t in cat dirname basename sed grep mkdir rm mv date readlink stat; do
   p="$(command -v "$t" 2>/dev/null)" && ln -sf "$p" "$P0_BIN/$t" 2>/dev/null
 done
 _p0_py=0
@@ -288,10 +298,77 @@ echo "=== L1 (LIMITE ASSUMÉE, HORS DE PORTÉE ASSUMÉE — rouge documenté, no
 OUT_L1="$(run_guard "$(mk_bash 'bash ./scripts/release.sh' sess-intrus .)")"
 assert_empty "L1 — script du dépôt qui commite en interne → allow (HORS DE PORTÉE ASSUMÉE, documenté en en-tête, pas corrigé)" "$OUT_L1"
 
+echo ""
+echo "=== Q3/Q3b/Q3c — fail-open SILENCIEUX (rc 0 ET stdout STRICTEMENT VIDE, les deux assertés) ==="
+# Q3 : entrée qui n'est pas du JSON, mais qui contient une sous-chaîne du préfiltre (sinon le
+# préfiltre sort avant d'atteindre le chemin testé, et le cas ne mesurerait rien).
+Q3_RAW='ceci n est pas du json mais ca contient le mot commit quelque part'
+Q3_OUT="$(printf '%s' "$Q3_RAW" | VF_DRIVER_LOCK="$LOCK" "$BASH_BIN" "$GUARD" 2>/dev/null)"; Q3_RC=$?
+assert_exit "Q3 — payload imparsable → exit 0" "$Q3_RC" 0
+assert_empty "Q3 — payload imparsable → stdout STRICTEMENT VIDE (silence = contrat de FLUX)" "$Q3_OUT"
+
+# Q3b : JSON valide mais structurellement atypique (command absent).
+Q3B_RAW='{"tool_name": "Bash", "tool_input": {}, "session_id": "sess-intrus"}'
+Q3B_OUT="$(printf '%s' "$Q3B_RAW" | VF_DRIVER_LOCK="$LOCK" "$BASH_BIN" "$GUARD" 2>/dev/null)"; Q3B_RC=$?
+assert_exit "Q3b — command absent → exit 0" "$Q3B_RC" 0
+assert_empty "Q3b — command absent → stdout vide" "$Q3B_OUT"
+# Variante : command d'un autre type (nombre au lieu d'une chaîne).
+Q3B2_RAW='{"tool_name": "Bash", "tool_input": {"command": 42}, "session_id": "sess-intrus"}'
+Q3B2_OUT="$(printf '%s' "$Q3B2_RAW" | VF_DRIVER_LOCK="$LOCK" "$BASH_BIN" "$GUARD" 2>/dev/null)"; Q3B2_RC=$?
+assert_exit "Q3b2 — command d'un autre type → exit 0" "$Q3B2_RC" 0
+assert_empty "Q3b2 — command d'un autre type → stdout vide" "$Q3B2_OUT"
+
+# Q3c : meta du lock présent MAIS illisible (permissions retirées) — allow silencieux, jamais un
+# refus sur erreur interne.
+rm -rf "$LOCK"
+CLAUDE_CODE_SESSION_ID=sess-holder "$DRIVER" acquire --owner=mission-X --step=q3c >/dev/null
+Q3C_META="$(meta_of)"
+chmod 000 "$Q3C_META" 2>/dev/null
+Q3C_OUT="$(run_guard "$(mk_bash 'git commit -m x' sess-intrus .)")"; Q3C_RC=$?
+chmod 644 "$Q3C_META" 2>/dev/null
+assert_exit "Q3c — meta illisible → exit 0" "$Q3C_RC" 0
+assert_empty "Q3c — meta illisible → stdout vide (jamais un deny sur erreur interne)" "$Q3C_OUT"
 "$DRIVER" release --owner=mission-X >/dev/null 2>&1
+
+echo ""
+echo "=== Q4 — fail-open BRUYANT (issue DISTINCTE du silencieux) : interprète INDISPONIBLE ==="
+rm -rf "$LOCK"
+CLAUDE_CODE_SESSION_ID=sess-holder "$DRIVER" acquire --owner=mission-X --step=q4 >/dev/null
+Q4_BIN="$WORK_DIR/q4-bin"
+mkdir -p "$Q4_BIN"
+for t in cat dirname basename sed grep mkdir rm mv date readlink stat; do
+  p="$(command -v "$t" 2>/dev/null)" && ln -sf "$p" "$Q4_BIN/$t" 2>/dev/null
+done
+Q4_PREFLIGHT_OK=1
+for t in cat dirname mkdir mv rm date; do [ -x "$Q4_BIN/$t" ] || Q4_PREFLIGHT_OK=0; done
+if PATH="$Q4_BIN" command -v python3 >/dev/null 2>&1 || PATH="$Q4_BIN" command -v python >/dev/null 2>&1; then Q4_PREFLIGHT_OK=0; fi
+if [ "$Q4_PREFLIGHT_OK" -eq 1 ]; then preflight "Q4 fixture: outils présents, aucun interprète joignable" 0; else preflight "Q4 fixture: outils présents, aucun interprète joignable" 1; fi
+if [ "$Q4_PREFLIGHT_OK" -eq 1 ]; then
+  Q4_HEALTH="$WORK_DIR/q4-health"
+  PAY_Q4=$(mk_bash 'git commit -m x' sess-intrus .)
+  Q4_OUT="$(printf '%s' "$PAY_Q4" | VF_DRIVER_LOCK="$LOCK" VF_GUARD_HEALTH_DIR="$Q4_HEALTH" PATH="$Q4_BIN" "$BASH_BIN" "$GUARD" 2>"$WORK_DIR/q4.err")"; Q4_RC=$?
+  assert_exit "Q4 — interprète indisponible → code de garde 17" "$Q4_RC" 17
+  assert_empty "Q4 — interprète indisponible → stdout vide" "$Q4_OUT"
+  assert "Q4 — diagnostic préfixé sur stderr" "$(cat "$WORK_DIR/q4.err" 2>/dev/null)" "guard-driver-lock.sh"
+  [ -f "$Q4_HEALTH/guard-driver-lock.sh.marker" ] && Q4_MARKER=present || Q4_MARKER=absent
+  assert "Q4 — marqueur de santé écrit ($Q4_HEALTH/guard-driver-lock.sh.marker)" "$Q4_MARKER" "present"
+fi
+"$DRIVER" release --owner=mission-X >/dev/null 2>&1
+
+echo ""
+echo "=== Q5 — anti-vert-à-vide : le compteur d'assertions exécutées n'est jamais zéro ==="
+Q5_TOTAL=$((PASS+FAIL))
+num_eq "Q5 — au moins une assertion exécutée avant l'épilogue (=$Q5_TOTAL, jamais 0)" "$([ "$Q5_TOTAL" -gt 0 ] && echo 1 || echo 0)" 1
 
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
 echo "=================================="
+# (Q5) Garde anti-vert-à-vide STRUCTURELLE, dans l'épilogue lui-même — pas seulement un cas de
+# test mid-suite qui pourrait être neutralisé en même temps que le reste : si AUCUNE assertion
+# n'a tourné (PASS+FAIL == 0), le résultat n'est jamais un succès, quel que soit FAIL.
+if [ "$((PASS+FAIL))" -eq 0 ]; then
+  echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE — zéro assertion exécutée, résultat non fiable"
+  exit 1
+fi
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1
