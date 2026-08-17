@@ -36,7 +36,7 @@
       "scope": [
         ".planning/phases/*33*"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "plan",
@@ -48,7 +48,7 @@
       "scope": [
         ".planning/phases/*33*"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "plancheck-ext",
@@ -60,6 +60,151 @@
       "scope": [
         ".planning/phases/*33*"
       ],
+      "status": "done"
+    },
+    {
+      "id": "baseline",
+      "step": "Baseline verte des 64 suites AVANT toute modification",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "probe-hooks",
+      "step": "Sonde executee : evenements de hooks reellement supportes (doc -> fait)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-33-01",
+      "step": "Correctifs plancheck 33-01 (step efface, renumerotation T51-58, criteres vacuux)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/phases/*33*/33-01-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-33-04",
+      "step": "Correctifs plancheck 33-04 (N8 non discriminant, 4e candidat, mutation 3)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/phases/*33*/33-04-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-S1-S2",
+      "step": "Arbitrage humain S1 (stall inatteignable) + S2 (au prochain geste)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-33-02-03",
+      "step": "Correctifs S1+S2 et plancheck sur 33-02 et 33-03 (coherence jointe)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/phases/*33*/33-02-PLAN.md",
+        ".planning/phases/*33*/33-03-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-33-05",
+      "step": "Correctifs plancheck 33-05 (toasts reels, premisse blocked, DEVNULL)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/phases/*33*/33-05-PLAN.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-ext-2",
+      "step": "Second plancheck EXTERNE sur les plans corriges (verificateurs frais)",
+      "stage": "",
+      "deps": [
+        "fix-33-02-03",
+        "fix-33-05"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-coordination",
+      "step": "Passe de coordination : numerotation, argv, deps, IDs menace, C5 mal ferme",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/phases/*33*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-vague-1",
+      "step": "Execution vague 1 : 33-01 + 33-04 (perimetres disjoints)",
+      "stage": "",
+      "deps": [
+        "fix-coordination"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/driver-lock.sh",
+        "plugin/conductor/scripts/notify.sh",
+        "plugin/_internal/lib/vf-portable.sh"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "exec-vague-2",
+      "step": "Execution vague 2 : 33-02 + 33-03",
+      "stage": "",
+      "deps": [
+        "exec-vague-1"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/dag.sh",
+        "plugin/conductor/scripts/check-guard-health.sh"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-vague-3",
+      "step": "Execution vague 3 : 33-05",
+      "stage": "",
+      "deps": [
+        "exec-vague-2"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/dag.sh"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "revue",
+      "step": "Revue vf-reviewer + verification, par lot",
+      "stage": "",
+      "deps": [
+        "exec-vague-3"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "docs",
+      "step": "Hygiene documentaire, un seul noeud en fin de mission",
+      "stage": "",
+      "deps": [
+        "revue"
+      ],
+      "scope": [],
       "status": "blocked"
     }
   ]
