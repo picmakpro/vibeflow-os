@@ -126,8 +126,12 @@ iso_to_epoch() {
   date -j -f "%Y-%m-%dT%H:%M:%SZ" "$1" +%s 2>/dev/null || date -d "$1" +%s 2>/dev/null || true
 }
 
+# GNU (-c) AVANT BSD (-f) : sur GNU, `stat -f` = mode filesystem — il imprime un bloc
+# multi-lignes sur stdout PUIS échoue, et la substitution capturait bloc + fallback
+# (epoch non numérique → marqueur frais classé perime). BSD echoue proprement sur -c.
+# Meme patron que driver-lock.sh:lock_age() — ne pas re-inverser (deja corrige 2 fois).
 mtime_epoch() {
-  stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0
+  stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0
 }
 
 if [ -n "$LIST_OUT" ]; then
