@@ -16,6 +16,8 @@ requirements: [WTCH-02, WTCH-03, WTCH-04]
   - `80c4e22` — `feat(33-05): check_stall_signal() + record_milestone() cablés à dag.sh mark (WTCH-02/WTCH-03)` (`dag.sh` + `notify.sh` mode)
   - `47ad0b7` — `test(33-05): T41-T47 pour check_stall_signal()/record_milestone() (WTCH-02/WTCH-03)` (`test-dag.sh`)
   - `f1b93ea` — `docs(33-05): recette de clôture Windows, rattachée au fil testeurs issue #20 (D-33-C)` (`33-CLOTURE-WINDOWS.md`)
+  - `0540a9a` — `docs(33-05): SUMMARY — décision notify.sh chmod+x, mutations rouges, parc complet 154/154` (première version de ce SUMMARY, complétée ci-dessous)
+  - `b5727e6` — `fix(33-05): check-guard-health.sh chmod+x (même jumeau que notify.sh) + T48 discriminant réel` (`check-guard-health.sh` mode + `test-dag.sh`, cf. section dédiée)
 
 ## Décision argumentée — mode d'exécution de `notify.sh` (défaut d'intégration signalé par le mandat)
 
@@ -65,6 +67,61 @@ Vérifié aussi de bout en bout via les cas T42/T43 (copie réelle de `notify.sh
 direct par une copie isolée de `dag.sh` via `subprocess.run([notify_sh, title, body], ...)`) :
 les deux passent au vert avec la copie en mode exécutable — preuve intégrée à la suite, pas
 seulement une vérification manuelle ponctuelle.
+
+## Correction post-revue — même jumeau manqué sur `check-guard-health.sh` (bloquant, corrigé)
+
+`vf-dev-manager` a repéré, en revue de branche, que j'avais corrigé le mode de `notify.sh` mais
+**pas celui de son jumeau `check-guard-health.sh`**, invoqué lui aussi en exec direct par
+`check_stall_signal()` (`[check_guard_health_sh, "--hook"]`). Vérification indépendante avant
+d'agir : `check-guard-health.sh` restait bien en `644` — même mesure que le manager
+(`./check-guard-health.sh --hook` → `permission denied`, `exit=126`), même mécanisme
+(`PermissionError` absorbée par le `try/except Exception: return` englobant de
+`check_stall_signal()`). Conséquence réelle : dans ce dépôt tel que livré par ma première passe,
+`check_stall_signal()` était un **no-op silencieux** — D-33-F ne relayait jamais rien, alors que
+T41 (fixture stub, toujours chmod +x par construction) restait vert sans jamais l'exercer.
+
+**Corrigé** : `git update-index --chmod=+x plugin/conductor/scripts/check-guard-health.sh` +
+`chmod +x` du fichier de travail — même déviation déclarée que pour `notify.sh` (le fichier
+appartient au territoire du plan 33-03, livré ; c'est mon invocation en exec direct qui crée
+l'exigence d'exécutabilité, pas une faute de 33-03). Le plan interdit d'ÉDITER
+`check-guard-health.sh` (territoire 33-03) — un changement de mode de fichier n'en modifie ni la
+logique ni le contenu, seule sa condition d'exécutabilité change, dans la même logique que
+`notify.sh` plus haut.
+
+**T48 ajouté** (`test-dag.sh`, cas de discriminance marqué « NE JAMAIS RETIRER ») : exerce le
+relais contre les VRAIS `check-guard-health.sh` **et** `driver-lock.sh` du dépôt — copiés SANS
+`chmod +x` forcé sur `check-guard-health.sh` (seul `dag.sh` copié est rendu exécutable, pour être
+invocable comme commande ; `driver-lock.sh` hérite du mode source via `cp`, déjà `755`) — avec un
+signal réel produit par un marqueur de garde frais déposé sous `VF_GUARD_HEALTH_DIR` et
+`VF_DRIVER_LOCK` pointé vers un lock absent (`driver-lock.sh status` rend `present: false`, ce qui
+évite le verdict INDETERMINE qui primerait sinon sur le signal de marqueurs).
+
+**Preuve de discriminance, mesurée explicitement avant de considérer le cas fiable** :
+1. `chmod 644` temporaire sur le VRAI `plugin/conductor/scripts/check-guard-health.sh` (celui du
+   dépôt, pas une copie) → réexécution de `test-dag.sh` → **T48.0/T48.1 rougissent** (`2 FAIL`,
+   message `obtenu: ` vide, ligne `Permission denied` visible dans la sortie du test) — la suite
+   entière serait passée de 156 à **154 PASS / 2 FAIL** avec la régression réintroduite.
+2. Restauration (`git update-index --chmod=+x` + `chmod +x`) → suite repassée à **156 PASS / 0
+   FAIL**.
+
+Ce cycle rouge → vert confirme que T48 est un cas réellement discriminant (pas un vert-à-vide) :
+contrairement à T41 (qui exerce la LOGIQUE de relais contre un stub systématiquement rendu
+exécutable par le test, donc aveugle à une régression de mode sur le fichier réel du dépôt), T48
+copie le fichier réel SANS toucher à son mode et échoue si ce mode n'est pas déjà correct sur
+disque — c'est le seul cas qui aurait attrapé cette régression avant un run CI/production réel.
+
+**Non-régression re-vérifiée après cette correction** : `test-driver-lock.sh` 183,
+`test-check-guard-health.sh` 75, `test-notify.sh` 48, `test-vf-portable.sh` 16 ok,
+`test-guard-driver-lock.sh` 80 — tous inchangés. `find plugin scripts -type f -path
+'*/tests/test-*.sh' | wc -l` → 65, inchangé.
+
+**Autre appel direct audité (point 3 de la demande de revue)** : les quatre `subprocess.run([...
+])` de `dag.sh` sont `[driver_lock_sh, "status"]`, `[driver_lock_sh, "mark-progress", ...]`
+(33-02, `driver-lock.sh` déjà `755` — vérifié, aucun défaut), `[check_guard_health_sh, "--hook"]`
+(corrigé ci-dessus), `[notify_sh, title, body]` (corrigé en première passe). Aucun autre appel
+exec-direct de sibling n'existe dans ce fichier — `compute_stages()` invoque `cmd + [...]` où
+`cmd` est résolu via `resolve_gsd_tools_cmd()` (un binaire `node`/PATH, jamais un script sibling
+du répertoire `conductor/scripts/`), hors du périmètre de ce défaut de mode.
 
 ## Interface réelle de `notify.sh` — assomption du spike CONFIRMÉE
 
@@ -173,9 +230,9 @@ chaque mesure — `git status --porcelain` vérifié vide avant de poursuivre.
 
 | Suite | Avant ce plan | Après ce plan |
 |---|---|---|
-| `test-dag.sh` | 123 PASS / 0 FAIL | **154 PASS / 0 FAIL** (31 assertions neuves : T41×6, T42×6, T43×5, T44×2, T45×3, T46×4, T47×5) |
+| `test-dag.sh` | 123 PASS / 0 FAIL | **156 PASS / 0 FAIL** (33 assertions neuves : T41×6, T42×6, T43×5, T44×2, T45×3, T46×4, T47×5, T48×2) |
 | `test-driver-lock.sh` (non-régression) | 183 PASS / 0 FAIL | 183 PASS / 0 FAIL (inchangé) |
-| `test-check-guard-health.sh` (non-régression) | 75 PASS / 0 FAIL | 75 PASS / 0 FAIL (inchangé) |
+| `test-check-guard-health.sh` (non-régression) | 75 PASS / 0 FAIL | 75 PASS / 0 FAIL (inchangé — le `chmod +x` de `check-guard-health.sh` ne change rien à cette suite : elle l'invoque déjà via des patrons qui tolèrent les deux modes) |
 | `test-notify.sh` (informationnel, posé par 33-04) | 48 PASS / 0 FAIL / 0 SKIP | 48 PASS / 0 FAIL / 0 SKIP (inchangé — le `chmod +x` de `notify.sh` ne change rien : ce fichier l'invoque via `bash "$NOTIFY"`, jamais en exec direct) |
 | `test-vf-portable.sh` (non-régression) | 16 ok | 16 ok (inchangé) |
 | `test-guard-driver-lock.sh` (non-régression) | 80 PASS / 0 FAIL | 80 PASS / 0 FAIL (inchangé) |
@@ -184,10 +241,11 @@ Découverte complète : `find plugin scripts -type f -path '*/tests/test-*.sh' |
 inchangé avant/après ce plan (aucune suite neuve ajoutée, `test-dag.sh` était déjà découvert).
 
 **Portée-plan exacte** : `git diff --name-only ce4454f..HEAD` rend exactement
-`{plugin/conductor/scripts/dag.sh, plugin/conductor/scripts/notify.sh, plugin/conductor/scripts/tests/test-dag.sh, .planning/phases/VFDO-33-watchdog-notifications-des-missions/33-CLOTURE-WINDOWS.md}`
-— sur-ensemble strict du `files_modified` déclaré, l'unique fichier en plus étant `notify.sh`
-(déviation documentée ci-dessus). `hooks.json` et `check-capability-activation.sh` : 0 occurrence
-dans ce diff, vérifié par grep.
+`{plugin/conductor/scripts/check-guard-health.sh, plugin/conductor/scripts/dag.sh, plugin/conductor/scripts/notify.sh, plugin/conductor/scripts/tests/test-dag.sh, .planning/phases/VFDO-33-watchdog-notifications-des-missions/33-05-SUMMARY.md, .planning/phases/VFDO-33-watchdog-notifications-des-missions/33-CLOTURE-WINDOWS.md}`
+— sur-ensemble strict du `files_modified` déclaré, les deux fichiers en plus étant `notify.sh` et
+`check-guard-health.sh` (déviations de mode documentées ci-dessus, la seconde ajoutée après revue
+du manager). `hooks.json` et `check-capability-activation.sh` : 0 occurrence dans ce diff,
+vérifié par grep.
 
 ## Aucun toast réel observé
 
@@ -205,17 +263,26 @@ déclencher aucun canal réel. Aucun toast système n'est apparu pendant l'exéc
 1. **[Déviation déclarée] `notify.sh` rendu exécutable (755, était 644)** — cf. section « Décision
    argumentée » ci-dessus. Fichier hors du `files_modified` strict de ce plan, ajouté au diff en
    toute transparence, justifié par une mesure (126 → 0) plutôt qu'une supposition.
-2. Aucune autre déviation. L'interface de `notify.sh` (positionnels `<TITLE> <BODY>`, deux
+2. **[Déviation déclarée, ajoutée après revue du manager] `check-guard-health.sh` rendu
+   exécutable (755, était 644)** — même jumeau que la déviation 1, manqué dans ma première passe,
+   signalé par `vf-dev-manager` et vérifié indépendamment avant correction. Cf. section
+   « Correction post-revue » ci-dessus pour la preuve de discriminance (cycle rouge/vert mesuré).
+3. Aucune autre déviation. L'interface de `notify.sh` (positionnels `<TITLE> <BODY>`, deux
    arguments) correspondait exactement à l'assomption du plan — aucun ajustement de forme d'appel
    nécessaire côté `dag.sh`.
-3. L'ordre des appels dans le bloc `mark` (`save(dag)` → `record_progress()` (33-02) →
+4. L'ordre des appels dans le bloc `mark` (`save(dag)` → `record_progress()` (33-02) →
    `check_stall_signal()` → `record_milestone()`) était déjà conforme côté 33-02 au moment de la
    relecture — aucun réordonnancement nécessaire, seulement l'insertion des deux nouveaux appels
    à la suite.
 
-**Total déviations :** 1 auto-déclarée (permission de fichier, hors périmètre strict mais
-justifiée et documentée). **Impact :** aucun sur le comportement fonctionnel prescrit par le
-plan — seule la condition d'exécutabilité de `notify.sh` était en cause, pas sa logique.
+**Total déviations :** 2 auto-déclarées (permissions de fichier, hors périmètre strict mais
+justifiées et documentées — la seconde n'a été trouvée qu'en revue, pas à l'exécution initiale).
+**Impact :** aucun sur le comportement fonctionnel prescrit par le plan — seule la condition
+d'exécutabilité des deux siblings était en cause, pas leur logique. **Leçon retenue** : un appel
+exec-direct nouvellement introduit ($N$ siblings) exige de vérifier le mode de CHAQUE sibling
+concerné, pas seulement du premier trouvé en défaut — l'audit du point 3 de la revue (tous les
+`subprocess.run([...])` de `dag.sh`, cf. section dédiée) a été fait a posteriori et aurait dû
+l'être dès la première passe.
 
 ## Prochaine étape
 

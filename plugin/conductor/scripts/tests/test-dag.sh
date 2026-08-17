@@ -869,6 +869,41 @@ assert_eq   "T47.4 — hooks.json n'apparait dans aucun diff de ce plan (grep st
 assert_eq   "T47.5 — check-capability-activation.sh jamais mentionne dans dag.sh"                  "$(grep -c 'check-capability-activation.sh' "$SCRIPT")" "0"
 
 echo ""
+echo "=== T48 — check_stall_signal() relaie un signal REEL emis par le VRAI check-guard-health.sh + VRAI driver-lock.sh (discriminance, NE JAMAIS RETIRER) ==="
+# T41 exerce le relais contre un STUB de check-guard-health.sh (logique de relais isolee de la
+# logique de verdict). T48 est un cas DIFFERENT et complementaire : il exerce le relais contre les
+# VRAIS binaires du depot (check-guard-health.sh + driver-lock.sh, copies + chmod +x), sur un signal
+# REEL genere par un marqueur de garde frais — c'est le SEUL cas qui aurait attrape la regression
+# ou check-guard-health.sh reste commite en 644 : avec un vrai sibling non executable, l'appel
+# subprocess.run() leve PermissionError, absorbee par le try/except englobant -> relais VIDE, sans
+# qu'aucun signal ne le montre. Sans ce cas, la suite resterait verte sur un mecanisme mort.
+ISO48="$WORK_DIR/iso48"; mkdir -p "$ISO48/health"
+cp "$SCRIPT" "$ISO48/dag.sh"
+cp "$(pwd)/scripts/check-guard-health.sh" "$ISO48/check-guard-health.sh"
+cp "$(pwd)/scripts/driver-lock.sh" "$ISO48/driver-lock.sh"
+# `cp` preserve le mode de la SOURCE (verifie) : NE JAMAIS forcer chmod +x sur check-guard-health.sh
+# ici — c'est precisement le mode DU DEPOT TEL QUE COMMIT qui doit etre exerce (discriminance :
+# si ce fichier redevenait 644 dans le depot, ce cas doit rougir, pas etre maquille en vert par un
+# chmod local). dag.sh doit rester executable pour etre invocable comme commande — sa propre
+# executabilite n'est pas ce que ce cas verifie.
+chmod +x "$ISO48/dag.sh"
+TS48="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+printf '%s\tfake-guard.sh\tinterprete manquant\n' "$TS48" > "$ISO48/health/fake-guard.sh.marker"
+export VF_DRIVER_LOCK="$ISO48/nolock"
+export VF_GUARD_HEALTH_DIR="$ISO48/health"
+# Controle positif (T48.0) : le VRAI check-guard-health.sh (chmod +x, driver-lock.sh sibling
+# present et sain) produit reellement un signal non vide sous --hook, invoque seul, hors dag.sh.
+fx48="$("$ISO48/check-guard-health.sh" --hook)"
+assert "T48.0 — controle positif : le vrai check-guard-health.sh produit bien un signal reel (marqueur de garde frais)" "$fx48" "garde(s) du parc indisponible"
+F48="$WORK_DIR/t48.dag.json"
+"$ISO48/dag.sh" init --file="$F48" >/dev/null
+"$ISO48/dag.sh" add --file="$F48" --id=n1 --step=n1 >/dev/null
+ERR48="$WORK_DIR/t48.stderr"
+"$ISO48/dag.sh" mark --file="$F48" --id=n1 --status=running 2>"$ERR48" >/dev/null
+assert "T48.1 — le signal REEL est relaye TEL QUEL sur stderr de dag.sh mark (relais bout-en-bout contre les vrais binaires, pas un stub)" "$(cat "$ERR48")" "garde(s) du parc indisponible"
+unset VF_DRIVER_LOCK VF_GUARD_HEALTH_DIR
+
+echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
 echo "=================================="
