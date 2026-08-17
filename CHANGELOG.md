@@ -5,6 +5,79 @@ extrait récent et pointent ici). Chaque module a par ailleurs son propre `CHANG
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.56.0] — 2026-08-17
+
+**Un stall de mission ne survit plus au prochain geste d'une session vivante — et les
+notifications, désormais éteintes par défaut, ne partent que quand elles comptent : fin de phase
+et fin de milestone, sur l'app Claude.** Phase 33 (5 plans) + son annexe notifications (2 plans),
+PR #49 et #50. `conductor` v1.28.0, `dev-orchestrator` v2.18.0.
+
+### Le watchdog (WTCH-01..04)
+
+- **Deux horloges sur le même battement** (D-33-A) : le meta du lock porte `heartbeat_epoch`
+  (vivacité) ET `progress_epoch`, écrit par `dag.sh mark`. Un seul mécanisme, un seul fichier,
+  deux consommateurs — jamais un second canal.
+- **Stall par ABSENCE de battement** : vivant mais progrès figé au-delà de `STALL_WINDOW`
+  (900 s, strictement sous le TTL de 1800 s — D-33-E) = STALL ; deux horloges mortes = abandon.
+  La preuve du cas « vivant mais bouclant » est la boucle RÉELLE (D25 : `heartbeat` répété sans
+  `mark`, verdict constaté sans toucher au meta). Et elle s'est validée toute seule : **le
+  watchdog a détecté en production le stall de sa propre mission** pendant l'intégration
+  (heartbeat frais à 135 s, progrès figé à 1303 s) — signature observée, non forgée. Le watchdog
+  signale et suggère, **ne tue jamais** (ADR-031).
+- **Point de contrôle au geste `mark`** (D-33-F) : lecture + signal stderr best-effort, jamais
+  bloquant — une session ouverte 8 h voit le stall sans redémarrer. Ce signal **n'est jamais
+  gaté** par le toggle de notifications : couper le confort, jamais l'alerte.
+- **Armement gaté** : hooks et notify passent par le gate armement↔précondition (PORT-05 en CI),
+  jamais un settings local (leçon #38). Doctrine amendée : cadence de heartbeat indépendante des
+  transitions de nœud (`mission-flow.md`, `vf-dev-manager.md`).
+- Le goal a été **amendé sur mesure** : les hooks Claude Code sont strictement événementiels
+  (`asyncRewake` ne réveille qu'une session déjà active, aucune horloge plateforme) — « un stall
+  ne survit pas au prochain geste d'une session VF vivante », limite assumée par écrit (machine
+  sans session = silence possible). Zéro démon système, sur un milestone Windows-first.
+
+### Les notifications (WTCH-03 amendé, D-33-H)
+
+- **Défaut OFF** : aucune notification tant qu'elle n'est pas activée. Préférence par
+  **fichier-sentinelle** (patron `stop-notify`) sous `XDG_CONFIG_HOME`, scope **machine** — zéro
+  JSON, zéro hook neuf, donc zéro exposition au bug d'idempotence de `merge-hooks`.
+- **Skill `/vf-notify`** (`on` / `off` / `status` / `test`), installé avec `conductor`.
+- **Jalons via l'app Claude** — `Pattern H` : `PushNotification` **n'est pas fourni aux
+  sous-agents** (mesuré par appel réel, pas lu : managers et workers ne peuvent structurellement
+  pas pousser — décalque du précédent `AskUserQuestion`). Les jalons remontent donc par relais
+  `SendMessage(main)`, la session principale émettant le push. Couvre **les deux** jalons (fin de
+  phase ET fin de milestone), seul vecteur symétrique : `ship:post` dispatche lui-même un
+  sous-agent et `gsd-complete-milestone` n'offre aucun point d'extension amont.
+- **Fins de nœud de DAG** → toast OS via `notify.sh` quand activé, jamais sur `running` — le
+  geste le plus fréquent. Le harness ne sert d'ailleurs rien quand l'utilisateur est présent
+  (`user_present`) : comportement assumé et documenté plutôt que dupliqué.
+- `notify.sh` reste best-effort fail-open silencieux ; Windows dès la v1 : WinRT sous
+  `powershell.exe` 5.1 — jamais `pwsh` (pas d'assemblies WinRT dans Core), jamais `osascript` en
+  dur (il sort 0 en jetant la notification quand la permission manque — un `exit 0` n'est jamais
+  une preuve de délivrance). Chaîne testée par shims d'argv en CI ; recette humaine Win10/11 en
+  condition de clôture.
+
+### La méthode
+
+**Quatre prémisses de brief invalidées par la mesure**, dont deux structurantes :
+`PushNotification` absent des sous-agents, et `VF_NOTIFY_FORCE_CHANNEL=none` qui **n'était pas un
+kill-switch** (il silenciait par accident de la branche `*)`, sans aucun test). Deux tours de
+plancheck externe sur le watchdog (23 puis 10 bloquants là où le checker interne rendait 0 —
+quatrième phase d'affilée), deux défauts **reproduits par exécution** (`mark-progress` effaçait
+`step` ; le sous-contrôle de stall, placé après trois sorties anticipées, ne tournait jamais sur
+machine saine — vert-à-vide par fixtures `mkdir -p`), et deux bloquants trouvés **par mesure et
+pas par les tests** : `notify.sh` puis `check-guard-health.sh` commités en 644, leur échec avalé
+par un `try/except` — le mode de défaillance exact que la phase combat. Sur l'annexe : un module
+non bumpé aurait laissé la doctrine **n'atteindre jamais un lab**, deux bloquants ont été
+**introduits par les corrections elles-mêmes**, un `$HOME` non gardé sous `set -u` **falsifiait
+la garantie de fail-open** qu'on venait d'introduire, et le cas N17 — celui qui prouve le défaut
+OFF — était **aveugle 17 % du temps** (25/30 → 30/30 après durcissement). Note de terrain versée
+au dossier : **huit workers arrêtés en silence pendant la mission même** — l'argument empirique
+du watchdog. Reliquats tracés au BACKLOG : `save()` de `dag.sh` sans verrou ni écriture atomique,
+gate d'observance de la doctrine.
+
+**Suites** : `dag.sh` 99 → 156 cas, `driver-lock` 183, `notify.sh` né, `check-guard-health` 78,
+`vf-notify` né — **66 suites** vertes en local **et** CI verte.
+
 ## [v2.55.1] — 2026-08-17
 
 **Hotfix : sous Windows, l'engine écrivait des hooks à chemin mort — et `|| true` avalait
