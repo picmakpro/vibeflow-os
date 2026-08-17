@@ -1,0 +1,66 @@
+{
+  "nodes": [
+    {
+      "id": "spike-hooks",
+      "step": "Spike hooks async / asyncRewake (research flag a)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "spike-notify",
+      "step": "Spike canal notification Windows (research flag b)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "recon",
+      "step": "Recon surfaces heartbeat/DAG/gate armement/engine",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "discuss",
+      "step": "Cadrage Phase 33 (definition de progres = decision n1, escalade Samuel)",
+      "stage": "",
+      "deps": [
+        "spike-hooks",
+        "spike-notify",
+        "recon"
+      ],
+      "scope": [
+        ".planning/phases/*33*"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "plan",
+      "step": "Plan de phase 33 + plan-checker interne",
+      "stage": "",
+      "deps": [
+        "discuss"
+      ],
+      "scope": [
+        ".planning/phases/*33*"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "plancheck-ext",
+      "step": "Plancheck EXTERNE (lecon x3 phases : 9-11 bloquants reels vs 0 interne)",
+      "stage": "",
+      "deps": [
+        "plan"
+      ],
+      "scope": [
+        ".planning/phases/*33*"
+      ],
+      "status": "blocked"
+    }
+  ]
+}
