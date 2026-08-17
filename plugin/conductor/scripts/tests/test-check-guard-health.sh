@@ -7,12 +7,16 @@
 # verdict). Chaque assertion capture stdout ET le code de retour dans deux variables distinctes,
 # assertées séparément — jamais l'une déduite de l'autre.
 #
-# D13 (boucle producteur -> marqueur -> lecteur, bout en bout avec guard-driver-lock.sh réel) est
-# AJOUTÉ par la tâche 2 de ce plan — pas dans ce fichier au moment de la tâche 1.
+# D13 (tâche 2) : boucle producteur -> marqueur -> lecteur, bout en bout avec le VRAI
+# guard-driver-lock.sh (plan 32-03) — reprend le montage du cas Q4 de sa propre suite
+# (test-guard-driver-lock.sh), pas de marqueur fabriqué à la main.
 
 set -uo pipefail
 
 SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/check-guard-health.sh"
+GUARD_LOCK="$(cd "$(dirname "$0")/.." && pwd)/guard-driver-lock.sh"
+DRIVER_LOCK="$(cd "$(dirname "$0")/.." && pwd)/driver-lock.sh"
+BASH_BIN="${BASH:-bash}"
 
 PASS=0; FAIL=0
 ok() { echo "  ✓ $1"; PASS=$((PASS+1)); }
@@ -151,6 +155,69 @@ D9_BEFORE="$(snapshot "$D9_DIR")"
 bash "$SCRIPT" --dir="$D9_DIR" >/dev/null 2>&1
 D9_AFTER="$(snapshot "$D9_DIR")"
 [ "$D9_BEFORE" = "$D9_AFTER" ] && ok "D9 : répertoire de santé INCHANGÉ après exécution (liste, tailles, mtimes)" || ko "D9 lecture seule" "avant=[$D9_BEFORE] après=[$D9_AFTER]"
+
+# === D13 — BOUCLE COMPLÈTE, bout en bout : le VRAI guard-driver-lock.sh écrit le marqueur, ce
+# script le lit. Aucun marqueur n'est fabriqué à la main dans ce cas. =============================
+echo ""
+echo "=== D13 — boucle producteur -> marqueur -> lecteur (guard-driver-lock.sh réel) ==="
+
+D13_GUARD_OK=1
+[ -x "$GUARD_LOCK" ] || D13_GUARD_OK=0
+[ -x "$DRIVER_LOCK" ] || D13_GUARD_OK=0
+
+if [ "$D13_GUARD_OK" -eq 0 ]; then
+  echo "  ⏭  D13 SAUTÉ EXPLICITEMENT — guard-driver-lock.sh/driver-lock.sh absents (plan 32-03 non exécuté sur cet arbre)"
+else
+  D13_HEALTH="$WORK_DIR/d13-health"
+  D13_LOCK="$WORK_DIR/d13-DRIVER.lock"
+
+  # PRÉFLIGHT SÉPARÉ, obligatoire : le répertoire de santé redirigé doit être VIDE avant
+  # l'invocation — un marqueur résiduel d'un autre cas ferait passer D13 sans qu'aucune boucle
+  # n'ait été réellement prouvée (le faux vert exact que ce cas existe pour interdire). Une
+  # contamination ici est un bug de FIXTURE, pas un verdict métier : sortie 2 immédiate.
+  if [ -e "$D13_HEALTH" ] && [ -n "$(ls -A "$D13_HEALTH" 2>/dev/null)" ]; then
+    echo "PRÉFLIGHT FIXTURE CASSÉ — D13_HEALTH non vide AVANT l'invocation : $D13_HEALTH" >&2
+    exit 2
+  fi
+
+  CLAUDE_CODE_SESSION_ID=sess-holder-d13 VF_DRIVER_LOCK="$D13_LOCK" "$DRIVER_LOCK" acquire --owner=mission-d13 --step=d13 >/dev/null 2>&1
+
+  # Environnement SANS interprète joignable — même montage que Q4 de test-guard-driver-lock.sh :
+  # un dossier de binaires ne contenant que les outils nécessaires, aucun python3/python.
+  D13_BIN="$WORK_DIR/d13-bin"
+  mkdir -p "$D13_BIN"
+  for t in cat dirname basename sed grep mkdir rm mv date readlink stat ls; do
+    p="$(command -v "$t" 2>/dev/null)" && ln -sf "$p" "$D13_BIN/$t" 2>/dev/null
+  done
+  D13_TOOLS_OK=1
+  for t in cat dirname mkdir mv rm date ls; do [ -x "$D13_BIN/$t" ] || D13_TOOLS_OK=0; done
+  if PATH="$D13_BIN" command -v python3 >/dev/null 2>&1 || PATH="$D13_BIN" command -v python >/dev/null 2>&1; then D13_TOOLS_OK=0; fi
+
+  if [ "$D13_TOOLS_OK" -eq 0 ]; then
+    ko "D13 préflight" "fixture cassée : outils manquants ou interprète encore joignable"
+  else
+    # Payload construit AVANT la restriction de PATH (l'échappement JSON a besoin de python3).
+    D13_PAYLOAD="$(python3 -c '
+import json
+print(json.dumps({"tool_name": "Bash", "tool_input": {"command": "git commit -m x"},
+                   "session_id": "sess-intrus-d13", "cwd": "."}))')"
+
+    D13_RC=0
+    D13_OUT="$(printf '%s' "$D13_PAYLOAD" | VF_DRIVER_LOCK="$D13_LOCK" VF_GUARD_HEALTH_DIR="$D13_HEALTH" PATH="$D13_BIN" "$BASH_BIN" "$GUARD_LOCK" 2>/dev/null)" || D13_RC=$?
+
+    [ "$D13_RC" -eq 17 ] && ok "D13 : guard-driver-lock.sh réel, interprète absent → code de garde 17" || ko "D13 producteur exit" "rc=$D13_RC attendu 17"
+    [ -z "$D13_OUT" ] && ok "D13 : guard-driver-lock.sh réel → stdout vide" || ko "D13 producteur stdout" "out=[$D13_OUT]"
+
+    D13_READER_OUT="$(bash "$SCRIPT" --dir="$D13_HEALTH" 2>/dev/null)"; D13_READER_RC=$?
+    [ "$D13_READER_RC" -eq 0 ] && ok "D13 : le doctor lit le marqueur RÉEL → exit 0 (signal)" || ko "D13 lecteur exit" "rc=$D13_READER_RC attendu 0"
+    case "$D13_READER_OUT" in
+      *"guard-driver-lock.sh"*) ok "D13 : la ligne du doctor nomme guard-driver-lock.sh" ;;
+      *) ko "D13 lecteur contenu" "out=[$D13_READER_OUT]" ;;
+    esac
+  fi
+
+  VF_DRIVER_LOCK="$D13_LOCK" "$DRIVER_LOCK" release --owner=mission-d13 >/dev/null 2>&1
+fi
 
 echo ""
 echo "=== D12 — anti-vert-à-vide : le compteur d'assertions exécutées n'est jamais zéro ==="
