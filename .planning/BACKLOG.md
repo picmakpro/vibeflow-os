@@ -108,36 +108,6 @@ distribution, granularité, portabilité macOS/Linux) avant tout code.
 **Déclencheur de resurgence :** prochaine évolution du team-kernel ou des protocoles managers,
 ou demande récurrente de suivi de mission longue distance.
 
-## Gate machine sur l'observance de `mission-flow.md` (doctrine amendée par la Phase 33)
-**Capturé :** 2026-08-17 · **Origine :** 2ᵉ plancheck externe de la Phase 33 (watchdog-notifications
-des missions), option (c) versée au backlog par décision de Samuel
-
-La Phase 33 amende `plugin/dev-orchestrator/references/mission-flow.md` (D-33-E, Pattern A) pour
-que le heartbeat des managers batte sur une cadence propre, distincte des transitions de nœud —
-condition sans laquelle le verdict STALL (critère de succès n°2) ne serait jamais atteignable en
-production. Le seul critère machine posé par le plan qui porte cet amendement (`33-02-PLAN.md`)
-est `grep -c 'D-33-E' mission-flow.md >= 1` : cela prouve que **le paragraphe a été écrit**, jamais
-qu'il est **observé** en pratique par les managers qui pilotent des missions réelles.
-
-**Motivation exacte (verdict du plancheck) :** *« un critère `grep -c` prouve qu'un paragraphe
-existe, jamais qu'il est observé. »* Une doctrine amendée sans mécanisme d'observance machine reste
-une consigne de prose — le même écart que celui documenté par `feedback_gate-jamais-de-repli.md` et
-`project_human-check-en-verify-ne-gate-rien.md` (mémoire `vf-coder`) : un texte qui décrit un
-comportement attendu n'est pas une garde qui le fait respecter.
-
-**Piste** : un gate machine à l'image de `check-agents.sh` (ADR-044) — par exemple, un script qui
-échantillonne les logs/transcripts des missions récentes (ou les artefacts DAG produits) et vérifie
-que la cadence de `heartbeat` observée diverge bien de celle des transitions `mark`, plutôt que de
-se contenter de vérifier la présence du paragraphe dans `mission-flow.md`.
-
-**Pourquoi différé :** hors du périmètre resserré de la correction ciblée du 2ᵉ plancheck externe
-(qui a traité S1 par la preuve de protocole réel, D25 dans `33-03-PLAN.md` — option (b), pas cette
-option (c)) ; construire un tel gate exige de définir d'abord ce qu'observer (logs de session ?
-artefacts DAG horodatés ?) et où l'armer (CI ? hook local ?), un cadrage à part entière.
-
-**Déclencheur de resurgence :** clôture de la Phase 33 (watchdog-notifications), ou tout futur
-amendement de doctrine des managers dont la seule preuve resterait un `grep` sur le texte.
-
 ## Convergence de contenu à l'update de module (manifeste par module)
 **Capturé :** 2026-07-26 · **Origine :** update réel de la machine 2.23.0 → 2.36.0
 
