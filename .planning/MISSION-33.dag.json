@@ -195,7 +195,7 @@
         "exec-vague-3"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "docs",
@@ -205,7 +205,7 @@
         "revue"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "revue-lot-1",
@@ -238,7 +238,7 @@
         "plugin/conductor/scripts/check-guard-health.sh",
         "plugin/conductor/scripts/tests/test-notify.sh"
       ],
-      "status": "failed"
+      "status": "done"
     },
     {
       "id": "verif-goal",
@@ -246,7 +246,7 @@
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "failed"
+      "status": "done"
     },
     {
       "id": "fix-flakiness",
@@ -256,7 +256,18 @@
       "scope": [
         "plugin/conductor/scripts/tests/test-notify.sh"
       ],
-      "status": "ready"
+      "status": "done"
+    },
+    {
+      "id": "fix-stall-relais",
+      "step": "BLOQUANT : le relais D-33-F ne peut jamais signaler un stall (progress rafraichi avant lecture)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/conductor/scripts/dag.sh",
+        "plugin/conductor/scripts/tests/test-dag.sh"
+      ],
+      "status": "done"
     }
   ]
 }

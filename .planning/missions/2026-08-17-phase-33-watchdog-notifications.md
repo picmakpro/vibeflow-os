@@ -151,7 +151,38 @@ conçu pour le dispatch parallèle — le plus sérieux), `sanitize_field()` inc
 caractères de contrôle, `vf_guard_unavailable()` sans validation d'argument, TOCTOU sur le
 `takeover` legacy. **À tracer, non corrigés.**
 
-## BLOQUANT OUVERT — `test-notify.sh` est flaky
+## Clôture — CI verte, plus aucun bloquant ouvert
+
+**CI verte de bout en bout** (run `32036349041`) : les 4 jobs passent, dont les **65 suites sur
+Linux**. Deux gates avaient d'abord rougi, tous deux justes et imputables à la phase :
+`check-machine-paths` (deux SUMMARY portaient le chemin absolu du worktree de leur worker, donc le
+nom du compte) et `check-version-sync` (les README annonçaient « 64 suites » alors que la phase en
+ajoute une 65ᵉ). Corrigés en `f69e6c9`.
+
+**Le gap trouvé par la vérification est fermé (D-33-G, `88975dc`).** `record_progress()` avançait
+`progress_epoch` **avant** que `check_stall_signal()` ne relise le lock : le verdict STALL était
+structurellement inatteignable au geste `mark`, précisément le point que l'arbitrage S2 avait fait
+naître. L'ordre est inversé, la lecture précède le rafraîchissement, les deux restent après
+`save(dag)`. Couvert par le cas de discriminance **T49** — mutation prouvée : sous l'ordre fautif
+T49.2 rougit alors que T41 et T48 restent verts, donc **seul T49 mord**, ce qui confirme que c'est
+bien son absence qui avait laissé passer le trou. Mesure A/B re-jouée par le manager : les deux
+chemins convergent sur le même signal, `rc=0`.
+
+**La flakiness est fermée**, et la vraie cause n'était pas celle qu'on croyait : le budget de
+`wait_for_file` (3 s → 10 s) était nécessaire mais insuffisant — le poll visait `.argv`, **premier**
+fichier écrit par le shim, au lieu de `.count`, le **dernier**, celui que lit l'assertion. Vérifié
+par le manager : **15 runs consécutifs verts** sur le code final (contre 2 échecs sur 12 avant).
+
+État final des suites : `test-dag.sh` **161** · `test-driver-lock.sh` **183** ·
+`test-check-guard-health.sh` **78** · `test-notify.sh` **50** · `test-guard-driver-lock.sh` **80** ·
+`test-vf-portable.sh` **16 ok** · découverte **65**. Module `conductor` bumpé en **v1.27.0**
+(minor : deux capacités publiques neuves).
+
+**Verdict des 4 critères : ATTEINTS**, avec une seule limite assumée — la chaîne Windows n'a jamais
+été exécutée, faute de machine : c'est une recette de clôture (`33-CLOTURE-WINDOWS.md`), pas une
+preuve.
+
+## Historique — le bloquant qui a été ouvert : `test-notify.sh` flaky
 
 Mesuré par le manager, 5 exécutions consécutives sur le même code :
 `47/1 · 46/2 · 47/1 · 48/0 · 48/0`. Le budget de `wait_for_file` (3 s) est trop court sur N4/N5/N11.
@@ -168,14 +199,19 @@ restaurée à son état commité.
 `test-vf-portable.sh` **16 ok** · `test-guard-driver-lock.sh` **80/0** · `test-notify.sh` **flaky
 46-48/0-2** · découverte **65**.
 
-## Reste à faire
+## Reste à faire — gates humains uniquement
 
-1. **Fermer la flakiness** de `test-notify.sh` (nœud `fix-flakiness`), avec preuve de stabilité sur
-   ≥ 10 runs consécutifs.
-2. **Vérification goal-backward** des 4 critères (interrompue par la même limite).
-3. **Hygiène documentaire** + bump `CHANGELOG`/`VERSION` du module `conductor` et
-   `vf-dev-manager.md` à la clôture (tracé `d04db1d`).
-4. **Push de branche** pour preuve CI (autorisé), puis PR **sur demande explicite seulement**.
+1. **PR / merge / release racine** : sur demande explicite de Samuel seulement. La branche est
+   poussée et verte, rien n'a été ouvert sur GitHub.
+2. **Recette humaine Windows** (`33-CLOTURE-WINDOWS.md`), rattachée au fil des testeurs de
+   l'issue #20 — condition de clôture, pas gate dur.
+3. **Trois zones à ne jamais présenter comme prouvées** : chaîne Windows jamais exécutée, AUMID
+   arbitraire vs AUMID PowerShell non tranché, latence `powershell.exe` non mesurée.
+
+**Attention à la cohabitation** : une session parallèle prépare une **release racine v2.55.1**
+(hotfix WIN-PATHCONV) dans le même arbre de travail. Aucun de ses fichiers n'a été commité par
+cette mission — l'index du dernier correctif a été construit depuis `HEAD` plutôt que depuis
+l'arbre, précisément pour ne pas emporter son travail en vol.
 
 ## Note de conduite
 
