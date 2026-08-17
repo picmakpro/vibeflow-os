@@ -539,7 +539,10 @@ out=$(CLAUDE_CODE_SESSION_ID=sess-t41b-victim VF_DRIVER_TEST_DIE_AFTER_MUTEX=1 "
 assert_exit "T41b.1 — le process 'meurt' juste après avoir pris le mutex (exit 137)" "$rc" 137
 _t41b_gen="$(readlink "$VF_DRIVER_LOCK")"
 _t41b_mutex="${VF_DRIVER_LOCK}.rec.$(printf '%s' "$_t41b_gen" | tr -c 'A-Za-z0-9._-' '_')"
-if [ -e "$_t41b_mutex" ]; then echo "  ❌ FAIL — T41b.2 — le mutex a été libéré (trap)"; FAIL=$((FAIL+1)); else echo "  ✅ PASS — T41b.2 — le mutex a été libéré (trap)"; PASS=$((PASS+1)); fi
+# -L (pas -e) : ln_atomic pointe le mutex vers "$$" (un PID nu, jamais un chemin existant) — -e
+# SUIT le lien et le trouverait toujours "cassé" (faux négatif garanti), -L teste la présence du
+# lien LUI-MÊME, ce qui est la propriété qui compte ici (le mutex existe-t-il encore, oui/non).
+if [ -L "$_t41b_mutex" ]; then echo "  ❌ FAIL — T41b.2 — le mutex a été libéré (trap)"; FAIL=$((FAIL+1)); else echo "  ✅ PASS — T41b.2 — le mutex a été libéré (trap)"; PASS=$((PASS+1)); fi
 out2=$(CLAUDE_CODE_SESSION_ID=sess-t41b-next "$SCRIPT" reclaim --owner=A41B); rc2=$?
 assert "T41b.3 — un reclaim ULTÉRIEUR normal réussit (lock toujours reprenable)" "$out2" '"reclaimed": true'
 assert_exit "T41b.4 — exit 0" "$rc2" 0
