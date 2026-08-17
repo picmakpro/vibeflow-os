@@ -1,5 +1,48 @@
 # Changelog — conductor
 
+## [v1.27.0] — 2026-08-17 (Watchdog & notifications des missions — Phase 33, WTCH-01..04)
+
+**Minor** (deux nouvelles capacités publiques, consommant sans y toucher le battement posé par la
+Phase 32) :
+
+- **`progress_epoch`, second champ additif au `meta` du lock** (même mécanisme que
+  `heartbeat_epoch`/`session_ids`, ADR-064 — écrit à la création, préservé sauf appel explicite).
+  `driver-lock.sh` expose le verbe **`mark-progress`**, qui avance `progress_epoch` **sans**
+  toucher `heartbeat_epoch` — deux horloges sur le même battement : `heartbeat_epoch` pour la
+  vivacité, `progress_epoch` pour le progrès. `dag.sh mark` l'appelle désormais à chaque
+  transition (`record_progress()`). (WTCH-01, plans 33-01/33-02, `test-driver-lock.sh` 183 PASS.)
+- **Sous-contrôle stall/abandon dans `check-guard-health.sh`** : détection par ABSENCE de progrès
+  au-delà d'un seuil (lock vivant par ailleurs) — jamais par auto-déclaration, ne tue jamais
+  (ADR-031). Canal **BRUYANT** (`vf_guard_unavailable`) sur dépendance indisponible, fail-open
+  **silencieux** sur sortie imparsable — quatre issues, mutation rouge prouvée (QUAL-01). (WTCH-02,
+  plan 33-03, `test-check-guard-health.sh` 78 PASS.)
+- **`plugin/conductor/scripts/notify.sh` (neuf)** : notification OS native aux jalons de mission
+  (`dag.sh mark --status=done|failed` uniquement — jamais à `running`, jamais à chaque tour),
+  cascade macOS/Linux/Windows/WSL, **fail-open silencieux inconditionnel** (`exit 0`, jamais
+  `vf_guard_unavailable` — une notification muette est le comportement nominal), détaché en
+  arrière-plan. Canal Windows (WinRT `ToastNotificationManager` sous `powershell.exe` 5.1, AUMID
+  PowerShell) **prouvé par shims d'argv en CI Linux uniquement** — **la chaîne réelle n'a jamais
+  tourné sur un poste Windows** ; une recette de validation humaine existe
+  (`33-CLOTURE-WINDOWS.md`, rattachée au fil testeurs Windows de l'issue #20) mais reste une
+  condition de clôture de phase, pas une preuve. (WTCH-03, plans 33-04/33-05.)
+- **Point de contrôle en lecture au geste `dag.sh mark`** (D-33-F) : après `record_progress()`,
+  `mark` relaie best-effort le verdict `check-guard-health.sh --hook` sur stderr — un stall ne
+  survit pas au prochain geste `mark` d'une session VF vivante (au lieu du seul `SessionStart`).
+  **Limite mesurée, non corrigée à ce jour** : dans le même bloc, `record_progress()` avance
+  `progress_epoch` **avant** que ce relais ne relise le statut du lock — le verdict STALL du lock
+  courant est donc structurellement inatteignable par ce chemin (fonctionne pour ABANDON et pour
+  les marqueurs de garde tiers). Vérifié `gaps_found` (`33-VERIFICATION.md`, 2026-08-17) : 3/4
+  critères de succès ATTEINTS (WTCH-01, WTCH-03 en limite assumée, WTCH-04), WTCH-02 **PARTIEL**.
+- **Armement — aucune entrée `hooks.json` neuve, aucun settings local.** L'armement de `notify.sh`
+  et du sous-contrôle de stall est prouvé par le gate CI **PORT-05** (établi Phase 32), pas par une
+  édition de `check-capability-activation.sh` (règle 4, `ARM[]`/`OKID[]`) — ces tables ne
+  modélisent pas les hooks et n'avaient pas à être touchées ici (D-33-D). (WTCH-04, plan 33-05.)
+- **Zéro démon, détection aux moments d'activité seulement** (D-33-B, amendement ROADMAP
+  approuvé) : aucune horloge de plateforme n'existe (spike hooks async, verdict PAS SÛR — les
+  hooks Claude Code ne sont jamais périodiques). Limite assumée : une machine sans aucune session
+  VF ouverte peut connaître un silence prolongé — non fermé par cette phase, contrepartie du
+  « zéro démon, portable d'un seul geste ».
+
 ## [v1.26.0] — 2026-08-17 (Durcissement du driver-lock — Phase 32, LOCK-01..05/QUAL-01)
 
 **Minor** (nouvelles capacités présentées à l'utilisateur, avec deux **ruptures de contrat**
