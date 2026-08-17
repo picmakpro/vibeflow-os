@@ -47,6 +47,27 @@ case "$(uname -s 2>/dev/null)" in
     ;;
 esac
 
+# IS_WSL — détection ADDITIVE, jamais une redéfinition de IS_WINDOWS (Phase 33, WTCH-03). WSL
+# tourne sous noyau LINUX : `uname -s` y rend `Linux`, donc IS_WINDOWS ci-dessus reste 0 sous WSL
+# par construction — ce fichier existe précisément pour porter l'information manquante que
+# IS_WINDOWS seul ne peut pas voir. Mutuellement exclusifs par calcul : si IS_WINDOWS=1, IS_WSL
+# vaut 0 sans même lire /proc/version (court-circuit). Sinon, lecture de
+# ${VF_PROC_VERSION_PATH:-/proc/version} : fichier absent/illisible = non-WSL, jamais une erreur
+# (cohérent avec le chargement inconditionnel de cette lib, sans écriture ni `exit`).
+# VF_PROC_VERSION_PATH est un point d'injection de TEST uniquement — jamais positionné en usage
+# normal, réservé aux shims CI (test-vf-portable.sh T14-T16).
+if [ "$IS_WINDOWS" = "1" ]; then
+  IS_WSL=0
+else
+  _vf_proc_version="${VF_PROC_VERSION_PATH:-/proc/version}"
+  if [ -r "$_vf_proc_version" ] && grep -qiE 'microsoft|wsl' "$_vf_proc_version" 2>/dev/null; then
+    IS_WSL=1
+  else
+    IS_WSL=0
+  fi
+  unset _vf_proc_version
+fi
+
 # vf_py_probe <candidat> [--fast]
 # <candidat> est un token d'invocation complet (mot-séparé volontairement non quoté à l'usage) :
 # "python3", "python", ou "py -3" (le lanceur Windows exige TOUJOURS -3, jamais probé sans).
