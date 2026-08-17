@@ -21,6 +21,11 @@
 # N15 — DISCRIMINANCE CLÉ, NE JAMAIS RETIRER : appelant qui capture stdout/stderr façon
 #       subprocess.run(capture_output=True) reprend la main bien avant la fin du canal détaché —
 #       seule mesure qui distingue un détachement réel d'un détachement de façade (cf. N8).
+# N16 — invocation par CHEMIN RELATIF depuis un cwd différent : la résolution de vf-portable.sh
+#       (donc le canal forcé) reste atteignable. COUVERTURE, PAS DISCRIMINANCE : voir la note
+#       en tête du test — notify.sh ne fait jamais de `cd` interne après résolution, donc un
+#       dirname "$0" brut et sa forme canonicalisée pointent vers le même fichier ici ; ce cas ne
+#       rougit pas si on retire la canonicalisation (vérifié empiriquement, cf. correction ciblée).
 #
 # Convention du dossier (test-guard-driver-lock.sh) : set -uo pipefail sans -e, mktemp -d + trap
 # EXIT, helpers assert/assert_empty/assert_exit, préflights séparés des assertions métier, garde
@@ -86,10 +91,13 @@ call_count() { # dir name -> nombre d'appels (0 si jamais appelé)
 
 # Attente ACTIVE (jamais un sleep fixe fragile) : le canal réel est détaché en arrière-plan
 # (( … & ) &), le délai de scheduling du fork n'est pas garanti sous une borne fixe — surtout au
-# tout premier appel du process de test. Poll jusqu'à ce que le fichier existe ou que le budget
-# (par défaut 3s, pas de 0.1s) soit épuisé.
+# tout premier appel du process de test, et encore moins sur un poste chargé (flakiness mesurée :
+# 3s trop court sur N4/N5/N11, cf. correction ciblée revue — 5 runs consécutifs, 1 à 2 FAIL par
+# run avant durcissement). Poll jusqu'à ce que le fichier existe ou que le budget (par défaut 10s,
+# gonflé en dur — jamais un sleep fixe rallongé, le pas de 0.1s garde la suite rapide dans le cas
+# nominal) soit épuisé.
 wait_for_file() { # path [timeout_seconds]
-  local f="$1" budget="${2:-3}" waited=0
+  local f="$1" budget="${2:-10}" waited=0
   while [ ! -f "$f" ]; do
     "$UTIL_DIR/sleep" 0.1 2>/dev/null || sleep 0.1
     waited=$(( waited + 1 ))
@@ -103,7 +111,7 @@ N1_DIR="$WORK_DIR/n1"; mkdir -p "$N1_DIR"
 write_shim "$N1_DIR" osascript
 N1_RC=0
 env PATH="$N1_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin bash "$NOTIFY" "Titre N1" "Corps N1" >/dev/null 2>&1 || N1_RC=$?
-wait_for_file "$N1_DIR/osascript.argv" 3
+wait_for_file "$N1_DIR/osascript.argv" 10
 assert_exit "N1 — notify.sh sort 0" "$N1_RC" 0
 N1_ARGV="$(cat "$N1_DIR/osascript.argv" 2>/dev/null || true)"
 assert "N1 — argv contient 'on run argv'" "$N1_ARGV" "on run argv"
@@ -118,7 +126,7 @@ N2_DIR="$WORK_DIR/n2"; mkdir -p "$N2_DIR"
 write_shim "$N2_DIR" osascript
 write_shim "$N2_DIR" terminal-notifier
 env PATH="$N2_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin bash "$NOTIFY" "Titre N2" "Corps N2" >/dev/null 2>&1
-wait_for_file "$N2_DIR/terminal-notifier.argv" 3
+wait_for_file "$N2_DIR/terminal-notifier.argv" 10
 N2_TN="$(call_count "$N2_DIR" terminal-notifier)"
 N2_OS="$(call_count "$N2_DIR" osascript)"
 assert "N2 — terminal-notifier invoqué (compteur > 0)" "$([ "$N2_TN" != "0" ] && echo yes || echo no)" "yes"
@@ -132,7 +140,7 @@ echo "=== N3 — linux : notify-send invoqué, -a VibeFlow + les deux valeurs ==
 N3_DIR="$WORK_DIR/n3"; mkdir -p "$N3_DIR"
 write_shim "$N3_DIR" notify-send
 env PATH="$N3_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=linux bash "$NOTIFY" "Titre N3" "Corps N3" >/dev/null 2>&1
-wait_for_file "$N3_DIR/notify-send.argv" 3
+wait_for_file "$N3_DIR/notify-send.argv" 10
 N3_ARGV="$(cat "$N3_DIR/notify-send.argv" 2>/dev/null || true)"
 assert "N3 — argv contient -a" "$N3_ARGV" "-a"
 assert "N3 — argv contient VibeFlow" "$N3_ARGV" "VibeFlow"
@@ -144,7 +152,7 @@ echo "=== N4 — windows : powershell.exe (jamais pwsh) par stdin, AUMID + Toast
 N4_DIR="$WORK_DIR/n4"; mkdir -p "$N4_DIR"
 write_shim "$N4_DIR" powershell.exe
 env PATH="$N4_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=windows bash "$NOTIFY" "Titre N4" "Corps N4" >/dev/null 2>&1
-wait_for_file "$N4_DIR/powershell.exe.argv" 3
+wait_for_file "$N4_DIR/powershell.exe.argv" 10
 N4_ARGV="$(cat "$N4_DIR/powershell.exe.argv" 2>/dev/null || true)"
 N4_STDIN="$(cat "$N4_DIR/powershell.exe.stdin" 2>/dev/null || true)"
 N4_ENV="$(cat "$N4_DIR/powershell.exe.env" 2>/dev/null || true)"
@@ -169,7 +177,7 @@ chmod +x "$N5_DIR/uname"
 N5_PROC="$WORK_DIR/n5-proc-version"
 printf 'Linux version 5.15.0-microsoft-standard-WSL2\n' > "$N5_PROC"
 env PATH="$N5_DIR:$UTIL_DIR" VF_PROC_VERSION_PATH="$N5_PROC" bash "$NOTIFY" "Titre N5" "Corps N5" >/dev/null 2>&1
-wait_for_file "$N5_DIR/powershell.exe.argv" 3
+wait_for_file "$N5_DIR/powershell.exe.argv" 10
 N5_PS="$(call_count "$N5_DIR" powershell.exe)"
 N5_NS="$(call_count "$N5_DIR" notify-send)"
 assert "N5 — powershell.exe invoqué (compteur > 0), détection RÉELLE via IS_WSL" "$([ "$N5_PS" != "0" ] && echo yes || echo no)" "yes"
@@ -191,7 +199,7 @@ HOSTILE_BODY='corps " backtick ` $(cmd) <a&b>'
 N7D_DIR="$WORK_DIR/n7d"; mkdir -p "$N7D_DIR"
 write_shim "$N7D_DIR" osascript
 env PATH="$N7D_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin bash "$NOTIFY" "$HOSTILE_TITLE" "$HOSTILE_BODY" >/dev/null 2>&1
-wait_for_file "$N7D_DIR/osascript.argv" 3
+wait_for_file "$N7D_DIR/osascript.argv" 10
 N7D_LAST2="$(tail -n2 "$N7D_DIR/osascript.argv" 2>/dev/null)"
 N7D_EXPECTED="$(printf '%s\n%s' "$HOSTILE_TITLE" "$HOSTILE_BODY")"
 assert_eq "N7 — darwin : les deux derniers tokens argv = TITLE/BODY hostiles bit à bit" "$N7D_LAST2" "$N7D_EXPECTED"
@@ -199,14 +207,14 @@ assert_eq "N7 — darwin : les deux derniers tokens argv = TITLE/BODY hostiles b
 N7L_DIR="$WORK_DIR/n7l"; mkdir -p "$N7L_DIR"
 write_shim "$N7L_DIR" notify-send
 env PATH="$N7L_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=linux bash "$NOTIFY" "$HOSTILE_TITLE" "$HOSTILE_BODY" >/dev/null 2>&1
-wait_for_file "$N7L_DIR/notify-send.argv" 3
+wait_for_file "$N7L_DIR/notify-send.argv" 10
 N7L_LAST2="$(tail -n2 "$N7L_DIR/notify-send.argv" 2>/dev/null)"
 assert_eq "N7 — linux : les deux derniers tokens argv = TITLE/BODY hostiles bit à bit" "$N7L_LAST2" "$N7D_EXPECTED"
 
 N7W_DIR="$WORK_DIR/n7w"; mkdir -p "$N7W_DIR"
 write_shim "$N7W_DIR" powershell.exe
 env PATH="$N7W_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=windows bash "$NOTIFY" "$HOSTILE_TITLE" "$HOSTILE_BODY" >/dev/null 2>&1
-wait_for_file "$N7W_DIR/powershell.exe.env" 3
+wait_for_file "$N7W_DIR/powershell.exe.env" 10
 N7W_ENV="$(cat "$N7W_DIR/powershell.exe.env" 2>/dev/null || true)"
 assert "N7 — windows : env VF_NOTIFY_TITLE hostile identique bit à bit" "$N7W_ENV" "VF_NOTIFY_TITLE=$HOSTILE_TITLE"
 assert "N7 — windows : env VF_NOTIFY_BODY hostile identique bit à bit" "$N7W_ENV" "VF_NOTIFY_BODY=$HOSTILE_BODY"
@@ -223,7 +231,7 @@ if [ -f "$N8_DIR/osascript.done" ]; then
 else
   echo "  ✅ PASS — N8 le fichier .done n'existe pas encore juste après le retour (détachement)"; PASS=$((PASS+1))
 fi
-wait_for_file "$N8_DIR/osascript.done" 5
+wait_for_file "$N8_DIR/osascript.done" 10
 [ -f "$N8_DIR/osascript.done" ] && N8_EVENTUAL=yes || N8_EVENTUAL=no
 assert "N8 — le shim a fini par tourner en arrière-plan (.done finit par apparaître)" "$N8_EVENTUAL" "yes"
 
@@ -259,7 +267,7 @@ assert_exit "N11 — aucun candidat vf-portable.sh trouvable : exit 0 quand mêm
 N11W_DIR="$WORK_DIR/n11w"; mkdir -p "$N11W_DIR"
 write_shim "$N11W_DIR" powershell.exe
 env PATH="$N11W_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=windows bash "$N11_ISO/notify.sh" "Titre N11f" "Corps N11f" >/dev/null 2>&1
-wait_for_file "$N11W_DIR/powershell.exe.argv" 3
+wait_for_file "$N11W_DIR/powershell.exe.argv" 10
 assert "N11 — canal forcé reste atteignable malgré la lib absente (powershell.exe invoqué)" "$([ "$(call_count "$N11W_DIR" powershell.exe)" != "0" ] && echo yes || echo no)" "yes"
 
 echo ""
@@ -311,6 +319,38 @@ print(time.time() - t0)
   fi
 else
   skip "N15 — python3 indisponible, appelant capturant non mesurable"
+fi
+
+echo ""
+echo "=== N16 — invocation par chemin RELATIF depuis un cwd différent : canal forcé atteignable ==="
+# NOTE HONNÊTETÉ (correction ciblée revue, MAJEUR 1) : ce cas est une couverture, PAS un cas
+# discriminant par mutation. notify.sh ne fait jamais lui-même de `cd` après avoir résolu
+# _vf_notify_dir — la résolution de vf-portable.sh se fait par simple concaténation de chaîne,
+# jamais par `cd` dans le répertoire résolu. Tant qu'aucun `cd` interne n'existe, un dirname "$0"
+# brut et un `cd "$(dirname "$0")" && pwd` canonicalisé pointent vers EXACTEMENT le même fichier
+# pour toute invocation par chemin relatif où le cwd ne change pas en cours de script — y compris
+# celle exercée ici. Revert de la canonicalisation (mutation) laisse donc CE cas vert : ce test
+# documente la non-régression (chemin relatif reste atteignable) et referme le trou de couverture
+# signalé par la revue ("non couvert par test-notify.sh"), sans prétendre prouver un rouge sous
+# mutation que le code ne permet pas de produire ici (vérifié empiriquement en correction ciblée :
+# `cd`/`pwd` sans -P suit la même résolution logique que la concaténation brute tant qu'aucun `cd`
+# n'intervient entre-temps — aucun scénario ne fait rougir ce test précis sous cette mutation).
+N16_CWD="$WORK_DIR/n16-cwd"; mkdir -p "$N16_CWD"
+# realpath() des deux côtés, PAS le chemin logique brut : sur macOS, $WORK_DIR (mktemp -d) vit
+# sous /var/folders/... qui est lui-même un symlink vers /private/var/folders/... — un relpath
+# calculé sur la forme logique compte un niveau de moins que ce que le kernel résout après un `cd`
+# réel, et le "../../..." obtenu pointe à côté (127, "No such file or directory" mesuré ici même).
+N16_REL="$(python3 -c "import os,sys; print(os.path.relpath(os.path.realpath(sys.argv[1]), os.path.realpath(sys.argv[2])))" "$NOTIFY" "$N16_CWD" 2>/dev/null || true)"
+if [ -n "$N16_REL" ]; then
+  N16_DIR="$WORK_DIR/n16"; mkdir -p "$N16_DIR"
+  write_shim "$N16_DIR" powershell.exe
+  N16_RC=0
+  ( cd "$N16_CWD" && env PATH="$N16_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=windows bash "$N16_REL" "Titre N16" "Corps N16" >/dev/null 2>&1 ) || N16_RC=$?
+  wait_for_file "$N16_DIR/powershell.exe.argv" 10
+  assert_exit "N16 — invocation par chemin relatif depuis un cwd différent : exit 0" "$N16_RC" 0
+  assert "N16 — canal forcé atteignable via chemin relatif (powershell.exe invoqué)" "$([ "$(call_count "$N16_DIR" powershell.exe)" != "0" ] && echo yes || echo no)" "yes"
+else
+  skip "N16 — python3 indisponible, chemin relatif non calculable"
 fi
 
 echo ""
