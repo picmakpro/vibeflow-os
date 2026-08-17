@@ -96,6 +96,16 @@ call_count() { # dir name -> nombre d'appels (0 si jamais appelé)
 # run avant durcissement). Poll jusqu'à ce que le fichier existe ou que le budget (par défaut 10s,
 # gonflé en dur — jamais un sleep fixe rallongé, le pas de 0.1s garde la suite rapide dans le cas
 # nominal) soit épuisé.
+#
+# CAUSE RÉELLE DE LA FLAKINESS RÉSIDUELLE (mesurée après le premier durcissement à 10s, toujours
+# 4/10 runs en échec — grep_c/call_count sur .count restait à 0 malgré un .argv déjà présent) :
+# write_shim() écrit .argv PUIS .stdin PUIS .env PUIS .count, séquentiellement, DANS LE MÊME
+# PROCESS shim. Attendre .argv (premier fichier écrit) ne garantit PAS que .count (dernier fichier
+# écrit, celui que call_count() lit réellement) soit déjà là — sous charge, la fenêtre entre les
+# deux écritures suffit à faire lire un compteur encore vide. Le vrai correctif n'est pas la taille
+# du budget mais la CIBLE du poll : attendre le DERNIER fichier écrit par le shim (.count, ou
+# .done quand un sleep_s est fourni), jamais le premier — alors l'existence du marqueur garantit
+# que tous les fichiers précédents (argv/stdin/env) sont déjà complets.
 wait_for_file() { # path [timeout_seconds]
   local f="$1" budget="${2:-10}" waited=0
   while [ ! -f "$f" ]; do
@@ -111,7 +121,7 @@ N1_DIR="$WORK_DIR/n1"; mkdir -p "$N1_DIR"
 write_shim "$N1_DIR" osascript
 N1_RC=0
 env PATH="$N1_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin bash "$NOTIFY" "Titre N1" "Corps N1" >/dev/null 2>&1 || N1_RC=$?
-wait_for_file "$N1_DIR/osascript.argv" 10
+wait_for_file "$N1_DIR/osascript.count" 10
 assert_exit "N1 — notify.sh sort 0" "$N1_RC" 0
 N1_ARGV="$(cat "$N1_DIR/osascript.argv" 2>/dev/null || true)"
 assert "N1 — argv contient 'on run argv'" "$N1_ARGV" "on run argv"
@@ -126,7 +136,7 @@ N2_DIR="$WORK_DIR/n2"; mkdir -p "$N2_DIR"
 write_shim "$N2_DIR" osascript
 write_shim "$N2_DIR" terminal-notifier
 env PATH="$N2_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin bash "$NOTIFY" "Titre N2" "Corps N2" >/dev/null 2>&1
-wait_for_file "$N2_DIR/terminal-notifier.argv" 10
+wait_for_file "$N2_DIR/terminal-notifier.count" 10
 N2_TN="$(call_count "$N2_DIR" terminal-notifier)"
 N2_OS="$(call_count "$N2_DIR" osascript)"
 assert "N2 — terminal-notifier invoqué (compteur > 0)" "$([ "$N2_TN" != "0" ] && echo yes || echo no)" "yes"
@@ -140,7 +150,7 @@ echo "=== N3 — linux : notify-send invoqué, -a VibeFlow + les deux valeurs ==
 N3_DIR="$WORK_DIR/n3"; mkdir -p "$N3_DIR"
 write_shim "$N3_DIR" notify-send
 env PATH="$N3_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=linux bash "$NOTIFY" "Titre N3" "Corps N3" >/dev/null 2>&1
-wait_for_file "$N3_DIR/notify-send.argv" 10
+wait_for_file "$N3_DIR/notify-send.count" 10
 N3_ARGV="$(cat "$N3_DIR/notify-send.argv" 2>/dev/null || true)"
 assert "N3 — argv contient -a" "$N3_ARGV" "-a"
 assert "N3 — argv contient VibeFlow" "$N3_ARGV" "VibeFlow"
@@ -152,7 +162,7 @@ echo "=== N4 — windows : powershell.exe (jamais pwsh) par stdin, AUMID + Toast
 N4_DIR="$WORK_DIR/n4"; mkdir -p "$N4_DIR"
 write_shim "$N4_DIR" powershell.exe
 env PATH="$N4_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=windows bash "$NOTIFY" "Titre N4" "Corps N4" >/dev/null 2>&1
-wait_for_file "$N4_DIR/powershell.exe.argv" 10
+wait_for_file "$N4_DIR/powershell.exe.count" 10
 N4_ARGV="$(cat "$N4_DIR/powershell.exe.argv" 2>/dev/null || true)"
 N4_STDIN="$(cat "$N4_DIR/powershell.exe.stdin" 2>/dev/null || true)"
 N4_ENV="$(cat "$N4_DIR/powershell.exe.env" 2>/dev/null || true)"
@@ -177,7 +187,7 @@ chmod +x "$N5_DIR/uname"
 N5_PROC="$WORK_DIR/n5-proc-version"
 printf 'Linux version 5.15.0-microsoft-standard-WSL2\n' > "$N5_PROC"
 env PATH="$N5_DIR:$UTIL_DIR" VF_PROC_VERSION_PATH="$N5_PROC" bash "$NOTIFY" "Titre N5" "Corps N5" >/dev/null 2>&1
-wait_for_file "$N5_DIR/powershell.exe.argv" 10
+wait_for_file "$N5_DIR/powershell.exe.count" 10
 N5_PS="$(call_count "$N5_DIR" powershell.exe)"
 N5_NS="$(call_count "$N5_DIR" notify-send)"
 assert "N5 — powershell.exe invoqué (compteur > 0), détection RÉELLE via IS_WSL" "$([ "$N5_PS" != "0" ] && echo yes || echo no)" "yes"
@@ -199,7 +209,7 @@ HOSTILE_BODY='corps " backtick ` $(cmd) <a&b>'
 N7D_DIR="$WORK_DIR/n7d"; mkdir -p "$N7D_DIR"
 write_shim "$N7D_DIR" osascript
 env PATH="$N7D_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=darwin bash "$NOTIFY" "$HOSTILE_TITLE" "$HOSTILE_BODY" >/dev/null 2>&1
-wait_for_file "$N7D_DIR/osascript.argv" 10
+wait_for_file "$N7D_DIR/osascript.count" 10
 N7D_LAST2="$(tail -n2 "$N7D_DIR/osascript.argv" 2>/dev/null)"
 N7D_EXPECTED="$(printf '%s\n%s' "$HOSTILE_TITLE" "$HOSTILE_BODY")"
 assert_eq "N7 — darwin : les deux derniers tokens argv = TITLE/BODY hostiles bit à bit" "$N7D_LAST2" "$N7D_EXPECTED"
@@ -207,14 +217,14 @@ assert_eq "N7 — darwin : les deux derniers tokens argv = TITLE/BODY hostiles b
 N7L_DIR="$WORK_DIR/n7l"; mkdir -p "$N7L_DIR"
 write_shim "$N7L_DIR" notify-send
 env PATH="$N7L_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=linux bash "$NOTIFY" "$HOSTILE_TITLE" "$HOSTILE_BODY" >/dev/null 2>&1
-wait_for_file "$N7L_DIR/notify-send.argv" 10
+wait_for_file "$N7L_DIR/notify-send.count" 10
 N7L_LAST2="$(tail -n2 "$N7L_DIR/notify-send.argv" 2>/dev/null)"
 assert_eq "N7 — linux : les deux derniers tokens argv = TITLE/BODY hostiles bit à bit" "$N7L_LAST2" "$N7D_EXPECTED"
 
 N7W_DIR="$WORK_DIR/n7w"; mkdir -p "$N7W_DIR"
 write_shim "$N7W_DIR" powershell.exe
 env PATH="$N7W_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=windows bash "$NOTIFY" "$HOSTILE_TITLE" "$HOSTILE_BODY" >/dev/null 2>&1
-wait_for_file "$N7W_DIR/powershell.exe.env" 10
+wait_for_file "$N7W_DIR/powershell.exe.count" 10
 N7W_ENV="$(cat "$N7W_DIR/powershell.exe.env" 2>/dev/null || true)"
 assert "N7 — windows : env VF_NOTIFY_TITLE hostile identique bit à bit" "$N7W_ENV" "VF_NOTIFY_TITLE=$HOSTILE_TITLE"
 assert "N7 — windows : env VF_NOTIFY_BODY hostile identique bit à bit" "$N7W_ENV" "VF_NOTIFY_BODY=$HOSTILE_BODY"
@@ -267,7 +277,7 @@ assert_exit "N11 — aucun candidat vf-portable.sh trouvable : exit 0 quand mêm
 N11W_DIR="$WORK_DIR/n11w"; mkdir -p "$N11W_DIR"
 write_shim "$N11W_DIR" powershell.exe
 env PATH="$N11W_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=windows bash "$N11_ISO/notify.sh" "Titre N11f" "Corps N11f" >/dev/null 2>&1
-wait_for_file "$N11W_DIR/powershell.exe.argv" 10
+wait_for_file "$N11W_DIR/powershell.exe.count" 10
 assert "N11 — canal forcé reste atteignable malgré la lib absente (powershell.exe invoqué)" "$([ "$(call_count "$N11W_DIR" powershell.exe)" != "0" ] && echo yes || echo no)" "yes"
 
 echo ""
@@ -346,7 +356,7 @@ if [ -n "$N16_REL" ]; then
   write_shim "$N16_DIR" powershell.exe
   N16_RC=0
   ( cd "$N16_CWD" && env PATH="$N16_DIR:$UTIL_DIR" VF_NOTIFY_FORCE_CHANNEL=windows bash "$N16_REL" "Titre N16" "Corps N16" >/dev/null 2>&1 ) || N16_RC=$?
-  wait_for_file "$N16_DIR/powershell.exe.argv" 10
+  wait_for_file "$N16_DIR/powershell.exe.count" 10
   assert_exit "N16 — invocation par chemin relatif depuis un cwd différent : exit 0" "$N16_RC" 0
   assert "N16 — canal forcé atteignable via chemin relatif (powershell.exe invoqué)" "$([ "$(call_count "$N16_DIR" powershell.exe)" != "0" ] && echo yes || echo no)" "yes"
 else
