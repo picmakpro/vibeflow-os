@@ -249,6 +249,59 @@ if [ "$rc1" -eq "$rc2" ] && [ "$out1" = "$out2" ]; then ok "22 déterminisme —
 # === Cas 23 — bash -n passe sur les deux scripts neufs ==============================================
 if bash -n "$GATE" 2>/dev/null && bash -n "$PRIMITIVE" 2>/dev/null; then ok "23 bash -n passe sur check-requirements-survival.sh et requirements-survival-detect.sh"; else ko "23 bash -n passe sur check-requirements-survival.sh et requirements-survival-detect.sh" "bash -n OK sur les deux" "au moins un des deux échoue"; fi
 
+# === Cas 24 — mention NUE du jeton carried-from: en prose (cas réel .planning/REQUIREMENTS.md:932) ===
+# n'est PAS une tentative de trace : silence, jamais illisible. Couvre le correctif appliqué en
+# cours de rédaction de la primitive (regex de bare-mention), jusque-là non testé explicitement.
+D="$(mk_root c24)"
+w_milestones "$D" "$CLOSED_H2"
+w_live "$D" $'# Requirements\n- [ ] **LEDG-01**: convention décrite en prose, trace `carried-from:`\n'
+out="$(bash "$GATE" --path "$D" 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 3 ] && [ -z "$out" ]; then ok "24 mention nue de carried-from: en prose (backtick, sans valeur) → silence, jamais illisible"; else ko "24 mention nue de carried-from: en prose (backtick, sans valeur) → silence, jamais illisible" "rc=3 out=[]" "rc=$rc out=[$out]"; fi
+
+# === Cas 25 — le diff d'IDs tourne INDÉPENDAMMENT de VF_LEDGER_ARMED (A-18-08) : marqueur présent ===
+# ET ID disparu → le signal [ledger-exigences-disparues] sort quand même (jamais absorbé par le cran
+# d'armement, qui ne régit QUE le cas « archive absente », pas le diff d'IDs).
+D="$(mk_root c25)"
+w_milestones "$D" "$CLOSED_H2"
+w_armed "$D"
+w_archive "$D" "demo-v1" "$(archive_one_id XXXX-05)"
+w_live "$D" $'# Requirements\n- [x] **YYYY-99**: sans rapport\n'
+out="$(bash "$GATE" --path "$D" 2>/dev/null)"; rc=$?
+has=0; case "$out" in "[ledger-exigences-disparues]"*"XXXX-05"*) has=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then ok "25 diff d'IDs indépendant de VF_LEDGER_ARMED — signal émis même marqueur présent"; else ko "25 diff d'IDs indépendant de VF_LEDGER_ARMED — signal émis même marqueur présent" "rc=0 out contient [ledger-exigences-disparues] et XXXX-05" "rc=$rc out=[$out]"; fi
+
+# === Cas 26 — plusieurs IDs disparus : compte exact + jusqu'à 5 IDs listés, jamais tronqué en dessous
+D="$(mk_root c26)"
+w_milestones "$D" "$CLOSED_H2"
+w_archive "$D" "demo-v1" $'- [x] **MMMM-01**: un\n- [x] **MMMM-02**: deux\n- [x] **MMMM-03**: trois\n\n## Traceability\n\n| Requirement | Phase | Status |\n|---|---|---|\n| MMMM-01 | Phase 1 | Done |\n| MMMM-02 | Phase 1 | Done |\n| MMMM-03 | Phase 1 | Done |\n'
+w_live "$D" $'# Requirements\n- [x] **YYYY-99**: sans rapport\n'
+out="$(bash "$GATE" --path "$D" 2>/dev/null)"; rc=$?
+has_count=0; case "$out" in "[ledger-exigences-disparues] 3 "*) has_count=1 ;; esac
+has_ids=0; case "$out" in *"MMMM-01"*"MMMM-02"*"MMMM-03"*) has_ids=1 ;; *"MMMM-01"*|*"MMMM-02"*|*"MMMM-03"*) has_ids=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has_count" -eq 1 ] && [ "$has_ids" -eq 1 ]; then ok "26 plusieurs IDs disparus → compte exact (3), IDs listés"; else ko "26 plusieurs IDs disparus → compte exact (3), IDs listés" "rc=0 out commence par [ledger-exigences-disparues] 3 et cite les IDs" "rc=$rc out=[$out]"; fi
+
+# === Cas 27 — jalon OUVERT listé AVANT le jalon clos : le premier CLOS (pas le premier H2) est retenu
+D="$(mk_root c27)"
+printf '# Milestones\n\n## en cours — Jalon pas fini\n\n%s\n' "$CLOSED_H2" > "$D/.planning/MILESTONES.md"
+w_archive "$D" "demo-v1" "$(archive_one_id AAAA-01)"
+out="$(bash "$GATE" --path "$D" 2>/dev/null)"; rc=$?
+has=0; case "$out" in "[ledger-absent]"*"demo-v1"*) has=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then ok "27 H2 ouvert avant le H2 clos → le premier CLOS est retenu (demo-v1), pas le premier H2"; else ko "27 H2 ouvert avant le H2 clos → le premier CLOS est retenu (demo-v1), pas le premier H2" "rc=0 out contient [ledger-absent] et demo-v1" "rc=$rc out=[$out]"; fi
+
+# === Cas 28 (T-18-02) — archive-cible en lien symbolique : traitée comme ABSENTE, jamais suivie =====
+# Le chemin d'archive n'est retenu que s'il est un fichier RÉGULIER ([ -f ] ET [ ! -L ]) — un lien
+# symbolique vers une cible arbitraire ne doit jamais être lu ni compté comme une archive présente.
+D="$(mk_root c28)"
+w_milestones "$D" "$CLOSED_H2"
+OUTSIDE="$TMP/c28-outside-target.md"
+printf -- '- [x] **OOOO-01**: cible hors périmètre, ne doit jamais être lue\n' > "$OUTSIDE"
+mkdir -p "$D/.planning/milestones"
+ln -s "$OUTSIDE" "$D/.planning/milestones/demo-v1-REQUIREMENTS.md"
+out="$(bash "$GATE" --path "$D" 2>/dev/null)"; rc=$?
+# Archive symlinkée → traitée comme absente : cran avertissement par défaut (marqueur non posé),
+# donc silence — jamais un [ledger-absent] portant un chemin résolu via le lien.
+if [ "$rc" -eq 3 ] && [ -z "$out" ]; then ok "28 (T-18-02) archive en lien symbolique → traitée comme absente, jamais suivie"; else ko "28 (T-18-02) archive en lien symbolique → traitée comme absente, jamais suivie" "rc=3 out=[]" "rc=$rc out=[$out]"; fi
+
 # ==================================================================================================
 # Bloc de mutations — une par issue QUAL-01, jouée sur une COPIE sous mktemp -d, jamais sur le
 # fichier vivant. Chaque mutation doit faire ROUGIR le cas visé et laisser VERTS les cas des autres
