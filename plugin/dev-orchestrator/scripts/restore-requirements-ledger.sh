@@ -136,6 +136,15 @@ awk '
       line = $0
       if (match(line, /[A-Z]+-[0-9]+/)) {
         id = substr(line, RSTART, RLENGTH)
+        # Duplication signalee (correctif 2026-08-18, revue de code) : deux lignes de tracabilite
+        # pour un meme ID s ecrasaient silencieusement, sans jamais annoncer le choix retenu
+        # (D-18-06/D-18-10). Le dernier gagne toujours (comportement deterministe, inchange), mais
+        # la duplication est desormais annoncee sur stderr avec les DEUX lignes en conflit. Note
+        # d hygiene shell : ce commentaire evite toute apostrophe francaise car il vit DANS un
+        # script awk lui-meme entre quotes simples bash — une apostrophe y romprait la citation.
+        if (id in traceline && traceline[id] != line) {
+          printf "[restore-requirements-ledger] traçabilité dupliquée pour %s — ancienne ligne écrasée : %s -> %s\n", id, traceline[id], line > "/dev/stderr"
+        }
         traceline[id] = line
       }
     }
@@ -265,7 +274,18 @@ if [ "$WRITE" -eq 0 ]; then
   # --label donne un nom STABLE aux deux côtés du diff — jamais le chemin volatil sous mktemp
   # (déterminisme du stdout entre deux exécutions successives, T-18-tests).
   DIFF_SRC="/dev/null"; [ -f "$LIVE" ] && DIFF_SRC="$LIVE"
-  diff -u --label "REQUIREMENTS.md (actuel)" "$DIFF_SRC" --label "REQUIREMENTS.md (proposé)" "$TMPD/proposed.md"
+  # Neutralisation d'injection de terminal (correctif 2026-08-18, revue de code + audit sécurité,
+  # sévérité élevée) : le contenu de l'ARCHIVE (potentiellement hostile) est réimprimé verbatim dans
+  # ce diff — tout le gate ADR-031 repose dessus, l'humain valide sur ce qu'il voit. Une archive
+  # portant des séquences ANSI (déplacement de curseur, effacement de ligne) ou `BEL` pourrait
+  # masquer des lignes que l'humain croit lire intégralement, défaisant la validation humaine
+  # elle-même. La neutralisation porte UNIQUEMENT sur cet AFFICHAGE terminal : `tr` retire les
+  # octets de contrôle C0 (0x00-0x08, 0x0B-0x1F, 0x7F — donc ESC 0x1B et BEL 0x07) tout en préservant
+  # tabulation/saut de ligne (0x09/0x0A) et tous les octets UTF-8 (>=0x80, hors de cette plage) —
+  # aucun accent ni caractère multi-octets n'est touché. Le FICHIER écrit sous --write (cp plus bas)
+  # reste, lui, verbatim à l'octet près : D-18-13 gouverne le contenu écrit, pas le rendu terminal.
+  diff -u --label "REQUIREMENTS.md (actuel)" "$DIFF_SRC" --label "REQUIREMENTS.md (proposé)" "$TMPD/proposed.md" \
+    | tr -d '\000-\010\013-\037\177'
   exit 0
 fi
 
@@ -290,8 +310,24 @@ fi
 
 mkdir -p "$PLANNING_DIR"
 WRITE_TMP="$(mktemp "${PLANNING_DIR}/.REQUIREMENTS.md.XXXXXX")" || { echo "[restore-requirements-ledger] mktemp d'écriture a échoué" >&2; exit 1; }
-cp "$TMPD/proposed.md" "$WRITE_TMP"
-mv "$WRITE_TMP" "$LIVE"
+# `cp` et `mv` sont désormais GARDÉS explicitement (correctif 2026-08-18, revue de code, bloquant
+# #2) : sous `set -uo pipefail` (SANS `-e`), un `cp` en échec (disque plein, quota, permission) ne
+# stoppait rien — le `mv` suivant déplaçait alors un fichier vide/tronqué PAR-DESSUS le ledger
+# vivant, et le script sortait en exit 0 avec un message de succès. La sauvegarde (ligne au-dessus)
+# était déjà gardée par `||` ; cette asymétrie est corrigée ici.
+if ! cp "$TMPD/proposed.md" "$WRITE_TMP"; then
+  echo "[restore-requirements-ledger] copie vers le fichier temporaire d'écriture a échoué — $LIVE non touché" >&2
+  rm -f "$WRITE_TMP"
+  exit 1
+fi
+# 0644 explicite (correctif, mineur) : `mktemp` crée le temporaire en 0600, alors qu'un
+# REQUIREMENTS.md tracké par git attend des permissions de fichier ordinaire (0644).
+chmod 0644 "$WRITE_TMP" 2>/dev/null || true
+if ! mv "$WRITE_TMP" "$LIVE"; then
+  echo "[restore-requirements-ledger] déplacement atomique vers $LIVE a échoué — $LIVE non touché" >&2
+  rm -f "$WRITE_TMP"
+  exit 1
+fi
 
 if [ -n "$BACKUP_PATH" ]; then
   printf '[restore-requirements-ledger] écrit %s (sauvegarde : %s) — Garanties: %s, Voyage: %s, Caduques laissées en archive: %s, Forme non reconnue (stderr): %s\n' \
