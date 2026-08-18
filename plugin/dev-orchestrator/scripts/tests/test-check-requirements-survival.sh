@@ -277,7 +277,11 @@ w_archive "$D" "demo-v1" $'- [x] **MMMM-01**: un\n- [x] **MMMM-02**: deux\n- [x]
 w_live "$D" $'# Requirements\n- [x] **YYYY-99**: sans rapport\n'
 out="$(bash "$GATE" --path "$D" 2>/dev/null)"; rc=$?
 has_count=0; case "$out" in "[ledger-exigences-disparues] 3 "*) has_count=1 ;; esac
-has_ids=0; case "$out" in *"MMMM-01"*"MMMM-02"*"MMMM-03"*) has_ids=1 ;; *"MMMM-01"*|*"MMMM-02"*|*"MMMM-03"*) has_ids=1 ;; esac
+# Correctif MOYEN (2026-08-18, revue de code) : la branche tautologique `*MMMM-01*|*MMMM-02*|*MMMM-03*`
+# mettait has_ids=1 dès qu'UN SEUL des trois IDs était présent, neutralisant l'intention « jamais
+# tronqué » — un mutant tronquant à 1 ID ne rougissait pas sous cette assertion. Seule la branche
+# exigeant les TROIS IDs subsiste désormais.
+has_ids=0; case "$out" in *"MMMM-01"*"MMMM-02"*"MMMM-03"*) has_ids=1 ;; esac
 if [ "$rc" -eq 0 ] && [ "$has_count" -eq 1 ] && [ "$has_ids" -eq 1 ]; then ok "26 plusieurs IDs disparus → compte exact (3), IDs listés"; else ko "26 plusieurs IDs disparus → compte exact (3), IDs listés" "rc=0 out commence par [ledger-exigences-disparues] 3 et cite les IDs" "rc=$rc out=[$out]"; fi
 
 # === Cas 27 — jalon OUVERT listé AVANT le jalon clos : le premier CLOS (pas le premier H2) est retenu
@@ -301,6 +305,135 @@ out="$(bash "$GATE" --path "$D" 2>/dev/null)"; rc=$?
 # Archive symlinkée → traitée comme absente : cran avertissement par défaut (marqueur non posé),
 # donc silence — jamais un [ledger-absent] portant un chemin résolu via le lien.
 if [ "$rc" -eq 3 ] && [ -z "$out" ]; then ok "28 (T-18-02) archive en lien symbolique → traitée comme absente, jamais suivie"; else ko "28 (T-18-02) archive en lien symbolique → traitée comme absente, jamais suivie" "rc=3 out=[]" "rc=$rc out=[$out]"; fi
+
+# ==================================================================================================
+# Cas 29-31 (BLOQUANT #1, correctif 2026-08-18 — revue de code + audit sécurité) : traversée de
+# répertoire par le libellé de jalon. La classe de caractères d'origine `^[0-9A-Za-z._ /-]{1,80}$`
+# admettait `.` ET `/` SIMULTANÉMENT — une traversée `../` intégrale passait la liste blanche,
+# prouvée par exécution réelle avant correctif (`agentique-v1.0-phases/../../../../outside/pwn`,
+# répertoire ancre qui existe RÉELLEMENT dans ce dépôt). `/` est désormais exclu de la classe.
+# ==================================================================================================
+
+# === Cas 29 — libellé contenant `/` (forme minimale) : label_rejected, jamais réimprimé ============
+D="$(mk_root c29)"
+printf '## \xe2\x9c\x85 evil/segment \xe2\x80\x94 clos\n' > "$D/.planning/MILESTONES.md"
+out="$(bash "$GATE" --path "$D" 2>/dev/null)"; rc=$?
+has=0; case "$out" in "[ledger-illisible]"*"label_rejected"*) has=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then ok "29 (BLOQUANT #1) libellé contenant / → label_rejected"; else ko "29 (BLOQUANT #1) libellé contenant / → label_rejected" "rc=0 out contient label_rejected" "rc=$rc out=[$out]"; fi
+
+# === Cas 30 — libellé portant une séquence de traversée `..` COMBINÉE à `/` : label_rejected =======
+D="$(mk_root c30)"
+printf '## \xe2\x9c\x85 a/../b \xe2\x80\x94 clos\n' > "$D/.planning/MILESTONES.md"
+out="$(bash "$GATE" --path "$D" 2>/dev/null)"; rc=$?
+has=0; case "$out" in "[ledger-illisible]"*"label_rejected"*) has=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then ok "30 (BLOQUANT #1) libellé contenant .. avec / → label_rejected"; else ko "30 (BLOQUANT #1) libellé contenant .. avec / → label_rejected" "rc=0 out contient label_rejected" "rc=$rc out=[$out]"; fi
+
+# === Cas 31 — PoC COMPLET, ancre réelle `agentique-v1.0-phases/` : rejeté, RIEN hors périmètre lu ===
+# Reproduit exactement le PoC de la revue : le libellé remonte de .planning/milestones/<ancre>/
+# jusqu'au parent de la fixture (4 niveaux) puis vise outside/pwn-REQUIREMENTS.md, HORS de $D.
+D="$(mk_root c31)"
+w_milestones "$D" '## ✅ agentique-v1.0-phases/../../../../outside/pwn — clos (PoC traversée)'
+mkdir -p "$D/.planning/milestones/agentique-v1.0-phases"
+mkdir -p "$TMP/outside"
+printf -- '- [x] **SECRET-01**: contenu hors perimetre, ne doit JAMAIS etre lu ni ecrit dans le ledger\n' > "$TMP/outside/pwn-REQUIREMENTS.md"
+sum_before="$(cat "$TMP/outside/pwn-REQUIREMENTS.md")"
+out="$(bash "$GATE" --path "$D" 2>/dev/null)"; rc=$?
+has=0; case "$out" in "[ledger-illisible]"*"label_rejected"*) has=1 ;; esac
+leaked=0; printf '%s' "$out" | grep -q 'SECRET-01' && leaked=1
+sum_after="$(cat "$TMP/outside/pwn-REQUIREMENTS.md")"
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ] && [ "$leaked" -eq 0 ] && [ "$sum_before" = "$sum_after" ]; then ok "31 (BLOQUANT #1, PoC complet) traversée via agentique-v1.0-phases/../../../../outside/pwn → label_rejected, fichier hors périmètre jamais lu ni modifié"; else ko "31 (BLOQUANT #1, PoC complet) traversée via agentique-v1.0-phases/../../../../outside/pwn → label_rejected, fichier hors périmètre jamais lu ni modifié" "rc=0 label_rejected, aucune fuite, fichier hors périmètre inchangé" "rc=$rc out=[$out] leaked=$leaked inchangé=$([ "$sum_before" = "$sum_after" ] && echo oui || echo non)"; fi
+
+# --- MUTATION BLOQUANT #1 : rétablir `/` dans la classe de caractères du libellé (régression de
+# l'état d'origine) — doit faire ROUGIR les cas 29/31 (la traversée redevient acceptée) et laisser
+# VERT un cas de libellé légitime SANS `/` (cas 5, demo-v1).
+MTRAV_DIR="$TMP/mut-traversal"; mkdir -p "$MTRAV_DIR"
+cp "$GATE" "$MTRAV_DIR/"
+sed "s/\[0-9A-Za-z\._ -\]{1,80}\\\$'; then/[0-9A-Za-z._ \/-]{1,80}\$'; then/" "$PRIMITIVE" > "$MTRAV_DIR/requirements-survival-detect.sh"
+chmod +x "$MTRAV_DIR/check-requirements-survival.sh" "$MTRAV_DIR/requirements-survival-detect.sh"
+# Contrôle : la mutation a bien réintroduit `/` dans le fichier muté (sinon le test suivant ne
+# prouverait rien) — assertion sur le texte du mutant lui-même.
+if grep -q "\[0-9A-Za-z\._ /-\]{1,80}\\\$" "$MTRAV_DIR/requirements-survival-detect.sh"; then
+  D="$(mk_root cm-trav)"
+  w_milestones "$D" '## ✅ agentique-v1.0-phases/../../../../outside/pwn-mut — clos (PoC traversée)'
+  mkdir -p "$D/.planning/milestones/agentique-v1.0-phases"
+  printf -- '- [x] **SECRET-02**: contenu hors perimetre\n' > "$TMP/outside/pwn-mut-REQUIREMENTS.md"
+  out_mut="$(bash "$MTRAV_DIR/check-requirements-survival.sh" --path "$D" 2>/dev/null)"; rc_mut=$?
+  rejected_mut=0; case "$out_mut" in "[ledger-illisible]"*"label_rejected"*) rejected_mut=1 ;; esac
+  if [ "$rejected_mut" -eq 0 ]; then ok "MUTATION BLOQUANT #1 (/ réintroduit) rougit le cas 31 comme attendu : le libellé de traversée n'est plus rejeté"; else ko "MUTATION BLOQUANT #1 — N'A PAS ROUGI" "le libellé de traversée devient accepté sous la mutation" "toujours rejeté (label_rejected)"; fi
+  # Contrôle de discriminance : un libellé légitime sans `/` (demo-v1) reste inchangé sous la mutation.
+  D2="$(mk_root cm-trav-controle)"
+  w_milestones "$D2" "$CLOSED_H2"
+  w_archive "$D2" "demo-v1" "$(archive_one_id AAAA-01)"
+  out_ctrl="$(bash "$MTRAV_DIR/check-requirements-survival.sh" --path "$D2" 2>/dev/null)"; rc_ctrl=$?
+  has_ctrl=0; case "$out_ctrl" in "[ledger-absent]"*"demo-v1"*) has_ctrl=1 ;; esac
+  if [ "$rc_ctrl" -eq 0 ] && [ "$has_ctrl" -eq 1 ]; then ok "MUTATION BLOQUANT #1 — le cas 5 (libellé légitime demo-v1) reste VERT sous cette mutation (discriminance)"; else ko "MUTATION BLOQUANT #1 — discriminance rompue, demo-v1 affecté aussi" "cas 5 inchangé" "rc=$rc_ctrl out=[$out_ctrl]"; fi
+else
+  ko "MUTATION BLOQUANT #1 — construction du mutant a échoué" "le fichier muté réintroduit / dans la classe" "sed n'a pas produit la forme attendue"
+fi
+
+# ==================================================================================================
+# Cas 32 (MOYEN, correctif 2026-08-18) : trace carried-from: bien formée en PRÉFIXE, suffixe garbage
+# — l'ancienne regex non ancrée `carried-from: [0-9A-Za-z._-]{1,80}` matchait comme SOUS-CHAÎNE,
+# laissant passer un suffixe garbage pour bien formé au lieu de tomber en illisible (D-18-10).
+# ==================================================================================================
+D="$(mk_root c32)"
+w_milestones "$D" "$CLOSED_H2"
+w_live "$D" $'# Requirements\n- [ ] **GARB-01**: exigence voyageuse carried-from: v1.2!!!GARBAGE\n'
+out="$(bash "$GATE" --path "$D" 2>/dev/null)"; rc=$?
+has=0; case "$out" in "[ledger-illisible]"*"trace_malformed"*) has=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then ok "32 (MOYEN) préfixe valide + suffixe garbage sur carried-from: → illisible trace_malformed (ancrage \$)"; else ko "32 (MOYEN) préfixe valide + suffixe garbage sur carried-from: → illisible trace_malformed (ancrage \$)" "rc=0 out contient trace_malformed" "rc=$rc out=[$out]"; fi
+
+# ==================================================================================================
+# Cas 34 (MOYEN, correctif 2026-08-18) : ordre DÉTERMINISTE de la liste d'IDs disparus tronquée à 5.
+# `for (id in bodyseen)` en awk n'a jamais d'ordre garanti — sur CET awk (BWK/nawk macOS), l'ordre
+# d'itération est un ordre de hachage, PROUVÉ différent de l'ordre alphabétique ET de l'ordre
+# d'insertion par une sonde directe. Sans tri explicite, quels 5 IDs (sur 6 disparus) apparaissent
+# dans stdout varie selon la plateforme d'exécution (gawk en CI Linux vs awk BSD en local macOS).
+# ==================================================================================================
+D="$(mk_root c34)"
+w_milestones "$D" "$CLOSED_H2"
+w_archive "$D" "demo-v1" $'- [x] **ZZZZ-01**: un\n- [x] **AAAA-02**: deux\n- [x] **MMMM-03**: trois\n- [x] **BBBB-04**: quatre\n- [x] **YYYY-05**: cinq\n- [x] **KKKK-06**: six\n\n## Traceability\n\n| Requirement | Phase | Status |\n|---|---|---|\n| ZZZZ-01 | Phase 1 | Done |\n| AAAA-02 | Phase 1 | Done |\n| MMMM-03 | Phase 1 | Done |\n| BBBB-04 | Phase 1 | Done |\n| YYYY-05 | Phase 1 | Done |\n| KKKK-06 | Phase 1 | Done |\n'
+w_live "$D" $'# Requirements\n- [x] **WWWW-99**: sans rapport\n'
+out="$(bash "$GATE" --path "$D" 2>/dev/null)"
+sorted_5="AAAA-02 BBBB-04 KKKK-06 MMMM-03 YYYY-05"
+has_sorted=0; case "$out" in *"$sorted_5"*) has_sorted=1 ;; esac
+if [ "$has_sorted" -eq 1 ]; then ok "34 (MOYEN) 6 IDs disparus → les 5 premiers listés sont TRIÉS alphabétiquement (ordre déterministe), ZZZZ-01 tronqué"; else ko "34 (MOYEN) 6 IDs disparus → les 5 premiers listés sont TRIÉS alphabétiquement (ordre déterministe), ZZZZ-01 tronqué" "sortie contient [$sorted_5]" "out=[$out]"; fi
+
+# --- MUTATION MOYEN (tri) : retirer le tri explicite (LC_ALL=C sort) dans une COPIE de la primitive
+# — sur CET awk (ordre de hachage, sondé plus haut, prouvé non alphabétique), la liste tronquée
+# n'est plus triée : doit ROUGIR le cas 34, en laissant VERT le cas 26 (3 IDs seulement, aucune
+# troncature en jeu, l'ordre alphabétique n'y est pas assertionné).
+MUT34_DIR="$TMP/mut-sort"; mkdir -p "$MUT34_DIR"
+sed "s/missing_list=\"\$(printf '%s\\\\n' \"\$missing_list\" | tr ' ' '\\\\n' | LC_ALL=C sort | tr '\\\\n' ' ' | sed 's\/ \*\$\/\/')\"/missing_list=\"\$missing_list\"/" "$PRIMITIVE" > "$MUT34_DIR/requirements-survival-detect.sh"
+cp "$GATE" "$MUT34_DIR/"
+chmod +x "$MUT34_DIR"/*.sh
+guard34_removed=0
+grep -q "LC_ALL=C sort" "$MUT34_DIR/requirements-survival-detect.sh" || guard34_removed=1
+if [ "$guard34_removed" -eq 1 ]; then
+  D="$(mk_root cm34)"
+  w_milestones "$D" "$CLOSED_H2"
+  w_archive "$D" "demo-v1" $'- [x] **ZZZZ-01**: un\n- [x] **AAAA-02**: deux\n- [x] **MMMM-03**: trois\n- [x] **BBBB-04**: quatre\n- [x] **YYYY-05**: cinq\n- [x] **KKKK-06**: six\n\n## Traceability\n\n| Requirement | Phase | Status |\n|---|---|---|\n| ZZZZ-01 | Phase 1 | Done |\n| AAAA-02 | Phase 1 | Done |\n| MMMM-03 | Phase 1 | Done |\n| BBBB-04 | Phase 1 | Done |\n| YYYY-05 | Phase 1 | Done |\n| KKKK-06 | Phase 1 | Done |\n'
+  w_live "$D" $'# Requirements\n- [x] **WWWW-99**: sans rapport\n'
+  out_mut="$(bash "$MUT34_DIR/check-requirements-survival.sh" --path "$D" 2>/dev/null)"
+  mut_sorted=0; case "$out_mut" in *"$sorted_5"*) mut_sorted=1 ;; esac
+  if [ "$mut_sorted" -eq 0 ]; then ok "MUTATION MOYEN (tri retiré) rougit le cas 34 comme attendu : la liste tronquée n'est plus triée alphabétiquement"; else ko "MUTATION MOYEN — N'A PAS ROUGI" "la liste diverge de l'ordre alphabétique sous la mutation" "toujours triée — mutation sans effet observable"; fi
+  # Contrôle de discriminance : le cas 26 (3 IDs, jamais tronqué) reste inchangé sous la mutation.
+  D2="$(mk_root cm34-controle)"
+  w_milestones "$D2" "$CLOSED_H2"
+  w_archive "$D2" "demo-v1" $'- [x] **MMMM-01**: un\n- [x] **MMMM-02**: deux\n- [x] **MMMM-03**: trois\n\n## Traceability\n\n| Requirement | Phase | Status |\n|---|---|---|\n| MMMM-01 | Phase 1 | Done |\n| MMMM-02 | Phase 1 | Done |\n| MMMM-03 | Phase 1 | Done |\n'
+  w_live "$D2" $'# Requirements\n- [x] **YYYY-99**: sans rapport\n'
+  out_ctrl="$(bash "$MUT34_DIR/check-requirements-survival.sh" --path "$D2" 2>/dev/null)"
+  has_ctrl=0; case "$out_ctrl" in *"MMMM-01"*"MMMM-02"*"MMMM-03"*) has_ctrl=1 ;; esac
+  if [ "$has_ctrl" -eq 1 ]; then ok "MUTATION MOYEN — le cas 26 (3 IDs, sans troncature) reste VERT sous cette mutation (discriminance)"; else ko "MUTATION MOYEN — discriminance rompue, cas 26 affecté aussi" "3 IDs toujours listés" "out=[$out_ctrl]"; fi
+else
+  ko "MUTATION MOYEN — construction du mutant a échoué" "le fichier muté ne porte plus LC_ALL=C sort" "grep trouve encore LC_ALL=C sort"
+fi
+
+# Note : le cas « statut Incomplete ne matche pas complete/done en sous-chaîne » (MOYEN) NE teste
+# PAS ce script — `vf_ledger_state` (utilisé ici par check-requirements-survival.sh) ne consulte
+# jamais le vocabulaire `complete`/`done`, seulement la présence d'ID (D-18-10). Ce vocabulaire
+# n'appartient qu'à `vf_ledger_classify` (LEDG-01, consommée par restore-requirements-ledger.sh) —
+# le cas correctement discriminant vit dans test-restore-requirements-ledger.sh.
 
 # ==================================================================================================
 # Bloc de mutations — une par issue QUAL-01, jouée sur une COPIE sous mktemp -d, jamais sur le

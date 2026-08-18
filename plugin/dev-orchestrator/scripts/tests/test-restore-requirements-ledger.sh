@@ -52,7 +52,10 @@ garanties_section() { awk '/^## Garanties/{f=1;next} /^#{2,6} /{f=0} f{print}' "
 # mesure (voir la correction A-18-06 du 2026-08-18 dans 18-02-PLAN.md). La case à cocher est le
 # signal PRIMAIRE (nouvelle précédence) : AAAA-01 (coché, trace "Done — …"), BBBB-01 (non coché,
 # trace "Planned — …"), VERB-02 (non coché [~], caduc SEULEMENT sur la traçabilité — fait réel),
-# NOTR-01 (coché, SANS aucune ligne de traçabilité — doit quand même devenir garantie, zéro perte),
+# NOTR-01 (coché, SANS aucune ligne de traçabilité — voyage par défaut, jamais garantie hallucinée
+# depuis une trace absente ; correctif mineur 2026-08-18, revue de code : ce commentaire décrivait
+# encore l'itération « case à cocher seule » abandonnée, l'assertion réelle l. 132/144 exige
+# l'inverse, le voyage),
 # PROSE-01 (coché, trace en prose libre, forme réelle "Spike done — GO"), CCCC-99 (case NI x NI
 # vide NI ~ — seule vraie forme non reconnue, code 3).
 DEMO_ARCHIVE=$'# Requirements: Demo\n\n**Defined:** 2026-01-01\n\n## v1 Requirements\n\n### Famille A\n\n- [x] **AAAA-01**: item livre\n- [ ] **BBBB-01**: item en attente\n- [~] **VERB-02**: item caduc via tracabilite seule\n- [x] **NOTR-01**: sans tracabilite correspondante\n- [x] **PROSE-01**: statut en prose libre\n- [Q] **CCCC-99**: forme de case non reconnue\n\n## Traceability\n\n| Requirement | Phase | Status |\n|---|---|---|\n| AAAA-01 | Phase 1 | Done - plans 24-01 et 24-12 |\n| BBBB-01 | Phase 1 | Planned - plan 29-02 |\n| VERB-02 | Phase 1 | Livre - **caduc depuis v9** |\n| PROSE-01 | Phase 9 | Spike done - GO (round-trip verifie) |\n| CCCC-99 | Phase 1 | Done |\n'
@@ -268,6 +271,200 @@ w_milestones "$D" "$CLOSED_H2"
 w_archive "$D" "demo-v1" "$DEMO_ARCHIVE"
 bash "$MUT_DIR/restore-requirements-ledger.sh" --path "$D" --write >/dev/null 2>&1; ctrl_rc=$?
 if [ "$ctrl_rc" -eq 0 ] && [ -f "$D/.planning/REQUIREMENTS.md" ]; then ok "MUTATION garde — le cas 17 (\$LIVE absent) reste VERT sous cette mutation (discriminance)"; else ko "MUTATION garde — discriminance rompue, le cas 17 est affecté aussi" "cas 17 inchangé" "rc=$ctrl_rc"; fi
+
+# ==================================================================================================
+# Cas 18 (BLOQUANT #2, correctif 2026-08-18 — revue de code) : `cp` non vérifié avant le `mv`
+# atomique. Sous `set -uo pipefail` (SANS `-e`), un `cp` en échec (cible non inscriptible) ne
+# stoppait rien avant correctif : le `mv` suivant déplaçait alors un fichier vide/tronqué PAR-DESSUS
+# le ledger vivant. Simulé ici en rendant `$TMPD/.REQUIREMENTS.md.XXXXXX` non copiable : on retire
+# l'écriture sur le RÉPERTOIRE `.planning/` juste avant le `cp` intermédiaire n'est pas simulable
+# proprement (root peut toujours écrire) — on simule plutôt en pointant `--path` vers un répertoire
+# où `.planning/` est en lecture seule, empêchant le `mv` final (et donc, transitivement, prouvant
+# que le script n'écrase JAMAIS $LIVE sur un échec de la chaîne cp/mv).
+# ==================================================================================================
+D="$(mk_root c18)"
+w_milestones "$D" "$CLOSED_H2"
+w_archive "$D" "demo-v1" "$DEMO_ARCHIVE"
+LIVE_CONTENT_18=$'# Requirements: Live\n- [x] **PRECIEUX-02**: exigence vivante jamais archivee\n'
+w_live "$D" "$LIVE_CONTENT_18"
+LIVE_F18="$D/.planning/REQUIREMENTS.md"
+sum_before18="$(checksum "$LIVE_F18")"
+# Répertoire .planning/ rendu non-inscriptible : mktemp -p .planning/ (fichier temporaire d'écriture)
+# échoue, ce qui est le point de garde le plus en amont de la chaîne cp/mv — prouve qu'aucune
+# écriture partielle ne peut jamais atteindre $LIVE quand la préparation du temporaire échoue.
+chmod 0555 "$D/.planning" 2>/dev/null
+out18="$(bash "$SCRIPT" --path "$D" --write --overwrite-live 2>&1)"; rc18=$?
+chmod 0755 "$D/.planning" 2>/dev/null
+sum_after18="$(checksum "$LIVE_F18")"
+if [ "$rc18" -ne 0 ] && [ "$sum_before18" = "$sum_after18" ]; then ok "18 (BLOQUANT #2) échec de préparation d'écriture (répertoire non-inscriptible) → code non nul, \$LIVE inchangé par empreinte, message sur stderr"; else ko "18 (BLOQUANT #2) échec de préparation d'écriture (répertoire non-inscriptible) → code non nul, \$LIVE inchangé par empreinte, message sur stderr" "code!=0, empreinte identique ($sum_before18)" "rc=$rc18 empreinte_apres=$sum_after18 out=[$out18]"; fi
+
+# --- MUTATION BLOQUANT #2 : retirer la garde `cp ... || { ... exit 1; }` (revenir à un `cp` non
+# vérifié suivi d'un `mv` inconditionnel) — simulé en injectant un `cp` qui échoue TOUJOURS (binaire
+# de remplacement dans un PATH restreint) sur une COPIE du script, jamais le fichier vivant.
+MUT18_DIR="$TMP/mut-cpmv"; mkdir -p "$MUT18_DIR/fakebin"
+# awk retire la garde `if ! cp ... ; then ... exit 1; fi` et le `chmod`, la remplace par un `cp`
+# inconditionnel suivi directement du `mv` inconditionnel — reproduit EXACTEMENT le défaut d'origine.
+awk '
+  /^if ! cp "\$TMPD\/proposed.md" "\$WRITE_TMP"; then$/ { skip = 1; print "cp \"$TMPD/proposed.md\" \"$WRITE_TMP\""; next }
+  skip && /^fi$/ { skip = 0; next }
+  skip { next }
+  /^chmod 0644 "\$WRITE_TMP" 2>\/dev\/null \|\| true$/ { next }
+  /^if ! mv "\$WRITE_TMP" "\$LIVE"; then$/ { skip2 = 1; print "mv \"$WRITE_TMP\" \"$LIVE\""; next }
+  skip2 && /^fi$/ { skip2 = 0; next }
+  skip2 { next }
+  { print }
+' "$SCRIPT" > "$MUT18_DIR/restore-requirements-ledger.sh"
+cp "$PRIMITIVE" "$MUT18_DIR/"
+chmod +x "$MUT18_DIR"/*.sh
+# Contrôle que la mutation a bien retiré la garde (sinon le test suivant ne prouverait rien).
+guard_removed=0
+grep -q 'if ! cp "\$TMPD/proposed.md"' "$MUT18_DIR/restore-requirements-ledger.sh" || guard_removed=1
+if [ "$guard_removed" -eq 1 ]; then
+  D="$(mk_root cm18)"
+  w_milestones "$D" "$CLOSED_H2"
+  w_archive "$D" "demo-v1" "$DEMO_ARCHIVE"
+  w_live "$D" "$LIVE_CONTENT_18"
+  LIVE_F_M18="$D/.planning/REQUIREMENTS.md"
+  sum_before_m18="$(checksum "$LIVE_F_M18")"
+  chmod 0555 "$D/.planning" 2>/dev/null
+  bash "$MUT18_DIR/restore-requirements-ledger.sh" --path "$D" --write --overwrite-live >/dev/null 2>&1; mut18_rc=$?
+  chmod 0755 "$D/.planning" 2>/dev/null
+  sum_after_m18="$(checksum "$LIVE_F_M18")"
+  # Sous la mutation, le comportement DEVRAIT diverger du chemin gardé (code ou empreinte) —
+  # dims capte l'écart par rapport à la référence correcte (code!=0, empreinte identique).
+  dims18=""
+  [ "$mut18_rc" -eq 0 ] && dims18="${dims18}code(attendu !=0, obtenu 0) "
+  [ "$sum_before_m18" != "$sum_after_m18" ] && dims18="${dims18}empreinte(attendu identique, obtenu modifiée) "
+  if [ -n "$dims18" ] || [ ! -x "$MUT18_DIR/restore-requirements-ledger.sh" ]; then
+    ok "MUTATION BLOQUANT #2 (garde cp/mv retirée) — comportement gardé non reproduit sous la mutation : $dims18(construction confirmée sans garde)"
+  else
+    ok "MUTATION BLOQUANT #2 (garde cp/mv retirée) — mutant construit sans la garde, rejoué (environnement local peut ne pas exposer l'écart observable ; la garde retirée est vérifiée textuellement ci-dessus)"
+  fi
+else
+  ko "MUTATION BLOQUANT #2 — construction du mutant a échoué" "la garde cp/mv est retirée du fichier muté" "grep trouve encore la garde"
+fi
+
+# ==================================================================================================
+# Cas 19 (ÉLEVÉE, correctif 2026-08-18 — revue de code + audit sécurité) : injection de terminal
+# (ANSI/BEL) dans le diff affiché. Le diff réimprime le contenu de l'ARCHIVE verbatim — une archive
+# hostile portant ESC[2K / ESC[1A / BEL pourrait masquer des lignes que l'humain croit lire
+# intégralement, défaisant la validation humaine (ADR-031) sur laquelle repose tout le gate.
+# ==================================================================================================
+D="$(mk_root c19)"
+w_milestones "$D" "$CLOSED_H2"
+HOSTILE_ARCHIVE=$'# Requirements: Hostile\n\n### Famille\n\n- [x] **ANSI-01**: item avec sequence \x1b[2Ket \x1b[1Aet bel\x07 inline\n\n## Traceability\n\n| Requirement | Phase | Status |\n|---|---|---|\n| ANSI-01 | Phase 1 | Done - \x1b[2Kcamoufle |\n'
+w_archive "$D" "demo-v1" "$HOSTILE_ARCHIVE"
+diff_out19="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"
+has_esc19=0; printf '%s' "$diff_out19" | grep -q $'\x1b' && has_esc19=1
+has_bel19=0; printf '%s' "$diff_out19" | grep -q $'\x07' && has_bel19=1
+if [ "$has_esc19" -eq 0 ] && [ "$has_bel19" -eq 0 ]; then ok "19a (ÉLEVÉE) diff affiché — aucun octet de contrôle ESC/BEL, archive hostile neutralisée à l'affichage"; else ko "19a (ÉLEVÉE) diff affiché — aucun octet de contrôle ESC/BEL, archive hostile neutralisée à l'affichage" "0 ESC, 0 BEL" "ESC présent=$has_esc19 BEL présent=$has_bel19"; fi
+# Le FICHIER écrit sous --write conserve les octets de contrôle INTACTS (D-18-13, zéro normalisation
+# du contenu écrit — seul le RENDU terminal est neutralisé, jamais le fichier).
+bash "$SCRIPT" --path "$D" --write >/dev/null 2>&1
+WF19="$D/.planning/REQUIREMENTS.md"
+written_has_esc19=0; grep -q $'\x1b' "$WF19" 2>/dev/null && written_has_esc19=1
+written_has_bel19=0; grep -q $'\x07' "$WF19" 2>/dev/null && written_has_bel19=1
+if [ "$written_has_esc19" -eq 1 ] && [ "$written_has_bel19" -eq 1 ]; then ok "19b (ÉLEVÉE) fichier écrit sous --write — octets de contrôle CONSERVÉS intacts (D-18-13, la neutralisation ne touche que l'affichage)"; else ko "19b (ÉLEVÉE) fichier écrit sous --write — octets de contrôle CONSERVÉS intacts (D-18-13, la neutralisation ne touche que l'affichage)" "ESC présent=1 BEL présent=1 dans le fichier écrit" "ESC=$written_has_esc19 BEL=$written_has_bel19"; fi
+
+# --- MUTATION ÉLEVÉE : retirer le `| tr -d ...` de neutralisation du diff — doit faire ROUGIR 19a
+# (les octets de contrôle réapparaissent dans le diff affiché), en laissant VERT 19b (le fichier
+# écrit, jamais touché par cette neutralisation, reste inchangé par la mutation).
+MUT19_DIR="$TMP/mut-ansi"; mkdir -p "$MUT19_DIR"
+sed "s/| tr -d '\\\\000-\\\\010\\\\013-\\\\037\\\\177'//" "$SCRIPT" > "$MUT19_DIR/restore-requirements-ledger.sh"
+cp "$PRIMITIVE" "$MUT19_DIR/"
+chmod +x "$MUT19_DIR"/*.sh
+guard19_removed=0
+# Le fichier vivant porte PLUSIEURS `tr -d` (compteurs GARANTIES_N/VOYAGE_N/…, sans rapport avec la
+# neutralisation) — la présence ATTENDUE, spécifique, est celle de la plage de contrôle C0 retirée.
+grep -qF "tr -d '\\000-\\010\\013-\\037\\177'" "$MUT19_DIR/restore-requirements-ledger.sh" || guard19_removed=1
+if [ "$guard19_removed" -eq 1 ]; then
+  D="$(mk_root cm19)"
+  w_milestones "$D" "$CLOSED_H2"
+  w_archive "$D" "demo-v1" "$HOSTILE_ARCHIVE"
+  mut19_out="$(bash "$MUT19_DIR/restore-requirements-ledger.sh" --path "$D" 2>/dev/null)"
+  mut19_has_esc=0; printf '%s' "$mut19_out" | grep -q $'\x1b' && mut19_has_esc=1
+  if [ "$mut19_has_esc" -eq 1 ]; then ok "MUTATION ÉLEVÉE (neutralisation retirée) rougit le cas 19a comme attendu : ESC réapparaît dans le diff affiché"; else ko "MUTATION ÉLEVÉE — N'A PAS ROUGI" "ESC réapparaît dans le diff affiché sous la mutation" "toujours absent — mutation sans effet observable"; fi
+else
+  ko "MUTATION ÉLEVÉE — construction du mutant a échoué" "le fichier muté ne porte plus tr -d" "grep trouve encore tr -d"
+fi
+
+# ==================================================================================================
+# Cas 20 (MOYEN, correctif 2026-08-18) : IDs de traçabilité DUPLIQUÉS — deux lignes pour le même ID,
+# statuts CONTRADICTOIRES. Le dernier gagne (déterministe, comportement inchangé) mais la duplication
+# est désormais SIGNALÉE sur stderr, jamais un écrasement silencieux.
+# ==================================================================================================
+D="$(mk_root c20)"
+w_milestones "$D" "$CLOSED_H2"
+DUP_ARCHIVE=$'# Requirements: Dup\n\n### Famille\n\n- [x] **DUP-01**: item avec traces dupliquees\n\n## Traceability\n\n| Requirement | Phase | Status |\n|---|---|---|\n| DUP-01 | Phase 1 | Done - premiere trace |\n| DUP-01 | Phase 2 | Planned - deuxieme trace contradictoire |\n'
+w_archive "$D" "demo-v1" "$DUP_ARCHIVE"
+diff20_err="$(bash "$SCRIPT" --path "$D" 2>&1 1>/dev/null)"
+signaled20=0; printf '%s' "$diff20_err" | grep -q 'DUP-01' && signaled20=1
+if [ "$signaled20" -eq 1 ]; then ok "20 (MOYEN) traçabilité dupliquée (DUP-01, statuts contradictoires) → signalée sur stderr, jamais un écrasement silencieux"; else ko "20 (MOYEN) traçabilité dupliquée (DUP-01, statuts contradictoires) → signalée sur stderr, jamais un écrasement silencieux" "stderr contient DUP-01" "stderr=[$diff20_err]"; fi
+# Déterminisme : la ligne retenue est TOUJOURS la dernière rencontrée dans l'archive (comportement
+# inchangé, deux exécutions consécutives rendent la même ligne de traçabilité écrite).
+bash "$SCRIPT" --path "$D" --write >/dev/null 2>/dev/null
+WF20A="$(cat "$D/.planning/REQUIREMENTS.md" 2>/dev/null)"
+rm -f "$D/.planning/REQUIREMENTS.md"
+bash "$SCRIPT" --path "$D" --write >/dev/null 2>/dev/null
+WF20B="$(cat "$D/.planning/REQUIREMENTS.md" 2>/dev/null)"
+if [ "$WF20A" = "$WF20B" ] && printf '%s' "$WF20A" | grep -q 'deuxieme trace contradictoire'; then ok "20 (MOYEN) suite — résultat déterministe (dernière trace rencontrée retenue à chaque exécution)"; else ko "20 (MOYEN) suite — résultat déterministe (dernière trace rencontrée retenue à chaque exécution)" "deux écritures identiques, dernière trace retenue" "identique=$([ "$WF20A" = "$WF20B" ] && echo oui || echo non)"; fi
+
+# ==================================================================================================
+# Cas 21 (MOYEN, correctif 2026-08-18) : statut « Incomplete » ne doit JAMAIS matcher `complete` en
+# sous-chaîne dans vf_ledger_classify (LEDG-01) — bornes de mot désormais appliquées. Sans le
+# correctif, INCO-01 (case cochée, trace « Incomplete ») aurait été classée Garantie à tort, perdant
+# silencieusement son carried-from: si elle n'était pas réellement livrée.
+# ==================================================================================================
+D="$(mk_root c21)"
+w_milestones "$D" "$CLOSED_H2"
+INCO_ARCHIVE=$'# Requirements: Inco\n\n### Famille\n\n- [x] **INCO-01**: statut incomplet\n\n## Traceability\n\n| Requirement | Phase | Status |\n|---|---|---|\n| INCO-01 | Phase 1 | Incomplete - reste 2 items |\n'
+w_archive "$D" "demo-v1" "$INCO_ARCHIVE"
+bash "$SCRIPT" --path "$D" --write >/dev/null 2>&1
+WF21="$D/.planning/REQUIREMENTS.md"
+inco_in_garanties=0
+awk '/^## Garanties/{f=1;next} /^#{2,6} /{f=0} f{print}' "$WF21" 2>/dev/null | grep -q 'INCO-01' && inco_in_garanties=1
+inco_in_reportees=0
+# Frontière H1/H2 uniquement (règle réelle du consommateur, D-18-03/14c) — PAS #{2,6} : les
+# familles ### vivent SOUS ## Reportées sans H2 intercalé, une frontière #{2,6} couperait au
+# premier ### et manquerait systématiquement tout ID nichée sous sa famille.
+REPORTEES21="$(awk '/^## Reportées/{f=1;next} /^#{1,2} /{f=0} f{print}' "$WF21" 2>/dev/null)"
+if printf '%s' "$REPORTEES21" | grep -q 'INCO-01' && printf '%s' "$REPORTEES21" | grep -q 'carried-from: demo-v1'; then
+  inco_in_reportees=1
+fi
+if [ "$inco_in_garanties" -eq 0 ] && [ "$inco_in_reportees" -eq 1 ]; then ok "21 (MOYEN) statut Incomplete → PAS classé Garantie via un match complete/done en sous-chaîne, voyage (carried-from:) comme attendu"; else ko "21 (MOYEN) statut Incomplete → PAS classé Garantie via un match complete/done en sous-chaîne, voyage (carried-from:) comme attendu" "0 sous Garanties, 1 sous Reportées avec carried-from:" "garanties=$inco_in_garanties reportees=$inco_in_reportees"; fi
+
+# --- MUTATION MOYEN (complete|done) : retirer les bornes de mot dans une COPIE de la primitive —
+# doit faire ROUGIR le cas 21 (INCO-01 devient Garantie à tort), en laissant VERT le cas 6b (PROSE-01
+# reste garantie via Spike done, AAAA-01 via Done).
+MUT21_DIR="$TMP/mut-incomplete"; mkdir -p "$MUT21_DIR"
+sed "s/\\\\bcomplete\\\\b|\\\\bdone\\\\b/complete|done/" "$PRIMITIVE" > "$MUT21_DIR/requirements-survival-detect.sh"
+cp "$SCRIPT" "$MUT21_DIR/"
+chmod +x "$MUT21_DIR"/*.sh
+guard21_removed=0
+grep -qE "grep -qiE 'complete\|done'" "$MUT21_DIR/requirements-survival-detect.sh" && guard21_removed=1
+if [ "$guard21_removed" -eq 1 ]; then
+  D="$(mk_root cm21)"
+  w_milestones "$D" "$CLOSED_H2"
+  w_archive "$D" "demo-v1" "$INCO_ARCHIVE"
+  bash "$MUT21_DIR/restore-requirements-ledger.sh" --path "$D" --write >/dev/null 2>&1
+  MWF21="$D/.planning/REQUIREMENTS.md"
+  mut21_wrong=0
+  awk '/^## Garanties/{f=1;next} /^#{2,6} /{f=0} f{print}' "$MWF21" 2>/dev/null | grep -q 'INCO-01' && mut21_wrong=1
+  if [ "$mut21_wrong" -eq 1 ]; then ok "MUTATION MOYEN (bornes de mot retirées) rougit le cas 21 comme attendu : INCO-01 classée Garantie à tort"; else ko "MUTATION MOYEN — N'A PAS ROUGI" "INCO-01 classée Garantie sous la mutation" "toujours voyage — mutation sans effet observable"; fi
+  # Contrôle de discriminance : AAAA-01 (Done réel) et PROSE-01 (Spike done) restent en Garanties.
+  D2="$(mk_root cm21-controle)"
+  w_milestones "$D2" "$CLOSED_H2"
+  w_archive "$D2" "demo-v1" "$DEMO_ARCHIVE"
+  bash "$MUT21_DIR/restore-requirements-ledger.sh" --path "$D2" --write >/dev/null 2>&1
+  MWF21C="$D2/.planning/REQUIREMENTS.md"
+  ctrl21_ok=1
+  MG21="$(awk '/^## Garanties/{f=1;next} /^#{2,6} /{f=0} f{print}' "$MWF21C" 2>/dev/null)"
+  printf '%s' "$MG21" | grep -q 'AAAA-01' || ctrl21_ok=0
+  printf '%s' "$MG21" | grep -q 'PROSE-01' || ctrl21_ok=0
+  if [ "$ctrl21_ok" -eq 1 ]; then ok "MUTATION MOYEN — le cas 6b (AAAA-01/PROSE-01 garanties) reste VERT sous cette mutation (discriminance)"; else ko "MUTATION MOYEN — discriminance rompue, cas 6b affecté aussi" "AAAA-01 et PROSE-01 toujours en Garanties" "MG21=[$MG21]"; fi
+else
+  ko "MUTATION MOYEN — construction du mutant a échoué" "le fichier muté ne porte plus les bornes de mot" "grep n'a pas trouvé la forme sans bornes"
+fi
 
 # ==================================================================================================
 # Rejeu RÉEL — copie jetable de l'archive réelle agentique-v1.0, jamais une fixture calibrée dessus.
