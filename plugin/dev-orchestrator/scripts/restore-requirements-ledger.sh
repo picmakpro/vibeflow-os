@@ -221,7 +221,16 @@ RECON_DATE="$(date -u +%Y-%m-%d)"
   echo ""
   cat "$TMPD/garanties.txt"
   echo ""
+  # Les voyageuses portent leur PROPRE H2 (## Reportées), jamais nichées sous ## Garanties : la
+  # même règle « jusqu'au prochain H1/H2 » qui borne updateTraceabilityCell() (gsd-core, invoquée
+  # pour justifier l'innocuité de ## Garanties, D-18-03) ramasserait sinon les familles ### qui
+  # suivent SANS H2 intercalé — un lecteur qui applique cette règle recevrait des exigences
+  # explicitement carried-from: (donc non livrées) comme des garanties. ## Garanties, ## Reportées,
+  # ## Out of Scope et ## Traceability sont quatre sections H2 SŒURS, chacune bornée par la même
+  # règle sans ambiguïté.
   if [ -s "$TMPD/families.md" ]; then
+    echo "## Reportées"
+    echo ""
     cat "$TMPD/families.md"
   fi
   if [ -s "$TMPD/outofscope.md" ]; then

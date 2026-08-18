@@ -321,8 +321,9 @@ else
   real_after="$(cat "$REAL_ARCHIVE")"
   if [ "$real_before" = "$real_after" ]; then ok "13 rejeu réel — l'archive RÉELLE du dépôt reste bit-à-bit identique avant/après"; else ko "13 rejeu réel — l'archive RÉELLE du dépôt reste bit-à-bit identique avant/après" "identique" "MODIFIÉE — INCIDENT"; fi
 
-  # Rejeu --write sur la COPIE jetable (jamais le dépôt réel).
-  bash "$SCRIPT" --path "$D" --write >/dev/null 2>"$TMP/c12-write.err"
+  # Rejeu --write sur la COPIE jetable (jamais le dépôt réel). stdout capturé aussi (le résumé
+  # "Garanties: N …" y est imprimé, pas sur stderr) — nécessaire au cas 14c ci-dessous.
+  bash "$SCRIPT" --path "$D" --write >"$TMP/c12-write.out" 2>"$TMP/c12-write.err"
   WF="$D/.planning/REQUIREMENTS.md"
 
   # --- 14a PRÉSENCE : IDs écrits = IDs d'archive − caduques, écart NOMMÉ ID par ID (pas une somme).
@@ -346,6 +347,22 @@ else
   done <<< "$ORACLE_PLANNED_IDS"
   planned_n="$(printf '%s\n' "$ORACLE_PLANNED_IDS" | grep -c .)"
   if [ -z "$wrong_planned" ]; then ok "14b rejeu réel — DESTINATION : les $planned_n IDs \"Planned\" de l'archive réelle voyagent, AUCUN sous ## Garanties"; else ko "14b rejeu réel — DESTINATION : les $planned_n IDs \"Planned\" de l'archive réelle voyagent, AUCUN sous ## Garanties" "0 Planned sous Garanties" "sous Garanties à tort : [$wrong_planned]"; fi
+
+  # --- 14c FRONTIÈRE DE SECTION vue par un CONSOMMATEUR RÉEL (correction structurelle du
+  # 2026-08-18) : `updateTraceabilityCell()` (gsd-core, cité par D-18-03) borne sa portée au
+  # PROCHAIN H1/H2 — jamais au prochain H3. Un lecteur qui applique CETTE règle exacte sur
+  # ## Garanties doit ramasser EXACTEMENT le compte annoncé (93) et ZÉRO ligne carried-from: — pas
+  # 135 IDs dont 42 voyageuses nichées sous des ### de famille sans H2 intercalé (défaut réel
+  # constaté : les familles ### suivaient directement ## Garanties, aucun H2 entre les deux).
+  awk '/^## Garanties/{f=1;next} /^#{1,2} /{f=0} f{print}' "$WF" > "$TMP/c12-garanties-h1h2.txt"
+  h1h2_ids="$(grep -oE '\*\*[A-Z]+-[0-9]+\*\*' "$TMP/c12-garanties-h1h2.txt" | tr -d '*' | sort -u | wc -l | tr -d ' ')"
+  h1h2_carried="$(grep -c 'carried-from:' "$TMP/c12-garanties-h1h2.txt")"
+  written_g_count="$(grep -oE 'Garanties: [0-9]+' "$TMP/c12-write.out" | grep -oE '[0-9]+' | head -1)"
+  if [ "$h1h2_ids" -eq "$written_g_count" ] && [ "$h1h2_carried" -eq 0 ]; then
+    ok "14c frontière H1/H2 (règle du consommateur réel) — ## Garanties contient exactement $written_g_count IDs, 0 carried-from:"
+  else
+    ko "14c frontière H1/H2 (règle du consommateur réel) — ## Garanties contient exactement $written_g_count IDs, 0 carried-from:" "IDs=$written_g_count carried-from=0" "IDs=$h1h2_ids carried-from=$h1h2_carried"
+  fi
 
   # ================================================================================================
   # MUTATIONS A/B — les deux routes de précédence ESSAYÉES ET REJETÉES pendant la rédaction de ce
@@ -430,6 +447,25 @@ EOF4
     grep -q "$pid" "$TMP/mutb-garanties.txt" 2>/dev/null && mutb_wrong="${mutb_wrong:+$mutb_wrong }$pid"
   done <<< "$ORACLE_PLANNED_IDS"
   if [ -n "$mutb_wrong" ]; then ok "MUTATION B (case seule) rougit la DESTINATION comme attendu : $(printf '%s' "$mutb_wrong" | wc -w | tr -d ' ') ID(s) \"Planned\" classé(s) garantie à tort"; else ko "MUTATION B — N'A PAS ROUGI la destination" "au moins un ID \"Planned\" sous ## Garanties sous la mutation" "0 — mutation sans effet observable"; fi
+  rm -f "$D/.planning/REQUIREMENTS.md"
+
+  # --- MUTATION C : rétrograder le H2 des voyageuses (## Reportées) en H3 (### Reportées) — le
+  # défaut structurel réel constaté et corrigé le 2026-08-18. Doit faire ROUGIR 14c (règle du
+  # consommateur réel, H1/H2 seulement), en laissant 14a/14b VERTS (présence et destination à la
+  # SOURCE restent correctes — seule la structure du fichier écrit change).
+  MUTC_DIR="$TMP/mut-h2"; mkdir -p "$MUTC_DIR"
+  sed 's/echo "## Reportées"/echo "### Reportées"/' "$SCRIPT" > "$MUTC_DIR/restore-requirements-ledger.sh"
+  cp "$PRIMITIVE" "$MUTC_DIR/"
+  chmod +x "$MUTC_DIR"/*.sh
+  bash "$MUTC_DIR/restore-requirements-ledger.sh" --path "$D" --write >"$TMP/mutc.out" 2>"$TMP/mutc.err"
+  MUTC_WF="$D/.planning/REQUIREMENTS.md"
+  awk '/^## Garanties/{f=1;next} /^#{1,2} /{f=0} f{print}' "$MUTC_WF" > "$TMP/mutc-garanties-h1h2.txt" 2>/dev/null
+  mutc_carried="$(grep -c 'carried-from:' "$TMP/mutc-garanties-h1h2.txt" 2>/dev/null || echo 0)"
+  if [ "$mutc_carried" -gt 0 ]; then
+    ok "MUTATION C (H2 des voyageuses rétrogradé en H3) rougit 14c comme attendu : $mutc_carried ligne(s) carried-from: nichée(s) sous ## Garanties (règle du consommateur réel)"
+  else
+    ko "MUTATION C — N'A PAS ROUGI 14c" "au moins une ligne carried-from: nichée sous ## Garanties par la règle H1/H2" "0 — mutation sans effet observable"
+  fi
   rm -f "$D/.planning/REQUIREMENTS.md"
 fi
 
