@@ -139,5 +139,48 @@ else
   ko "T9 resolve-deps sans jq : message d'install absent [$nout]"
 fi
 
+# ---------- T10-T12 : dev-orchestrator, ledger d'exigences (LEDG-01/02) sous CRLF ----------
+# Symptôme distinct de T1-T9 (jamais un jq CRLF) : sous `core.autocrlf=true` (défaut Git for
+# Windows, cité par l'en-tête ADR-054 de `.gitattributes`), un `.md` de LAB — que ce dépôt ne
+# contrôle pas — peut porter des fins de ligne CRLF. Correctif ciblé 2026-08-18 (correction
+# post-vérification, BLOQUANT G1) : normalisation `tr -d '\r'` au point de lecture dans les trois
+# scripts, jamais une réécriture des fichiers du lab. Trois symptômes reproduits par exécution
+# AVANT correctif, rejoués ici rouge-avant/vert-après.
+CHECK_SURV="$PLUGIN_ROOT/dev-orchestrator/scripts/check-requirements-survival.sh"
+RESTORE_LEDGER="$PLUGIN_ROOT/dev-orchestrator/scripts/restore-requirements-ledger.sh"
+LEDGWORK="$WORK/ledger-crlf"; mkdir -p "$LEDGWORK/.planning/milestones"
+printf '# Milestones\r\n\r\n## \xe2\x9c\x85 demo-v1\r\n' > "$LEDGWORK/.planning/MILESTONES.md"
+printf -- '- [x] **AAAA-01**: item livre\r\n- [ ] **BBBB-01**: item en attente\r\n\r\n## Traceability\r\n\r\n| Requirement | Phase | Status |\r\n|---|---|---|\r\n| AAAA-01 | Phase 1 | Done - plan 1 |\r\n| BBBB-01 | Phase 1 | Planned - plan 2 |\r\n' > "$LEDGWORK/.planning/milestones/demo-v1-REQUIREMENTS.md"
+
+t10_out="$("$BASH_BIN" "$CHECK_SURV" --path "$LEDGWORK" 2>/dev/null)"; t10_rc=$?
+t10_has=0; case "$t10_out" in "[ledger-absent]"*"demo-v1"*) t10_has=1 ;; esac
+t10_leaked=0; printf '%s' "$t10_out" | command grep -q 'label_rejected' && t10_leaked=1
+if [ "$t10_rc" -eq 0 ] && [ "$t10_has" -eq 1 ] && [ "$t10_leaked" -eq 0 ]; then
+  ok "T10 check-requirements-survival CRLF : titre H2 clos sans description → [ledger-absent] normal, jamais label_rejected"
+else
+  ko "T10 check-requirements-survival CRLF : rc=$t10_rc out=[$t10_out]"
+fi
+
+t11_out="$("$BASH_BIN" "$RESTORE_LEDGER" --path "$LEDGWORK" --write 2>/dev/null)"; t11_rc=$?
+t11_counts=0; case "$t11_out" in *"Garanties: 1, Voyage: 1"*) t11_counts=1 ;; esac
+T11_F="$LEDGWORK/.planning/REQUIREMENTS.md"
+t11_no_cr=0; if [ -f "$T11_F" ] && ! command grep -q "$CR" "$T11_F"; then t11_no_cr=1; fi
+if [ "$t11_rc" -eq 0 ] && [ "$t11_counts" -eq 1 ] && [ "$t11_no_cr" -eq 1 ]; then
+  ok "T11 restore-requirements-ledger CRLF : Garanties: 1, Voyage: 1 (baseline LF), fichier écrit sans \\r résiduel"
+else
+  ko "T11 restore-requirements-ledger CRLF : rc=$t11_rc out=[$t11_out] cr_absent=$t11_no_cr"
+fi
+rm -f "$T11_F"
+
+LEDGWORK2="$WORK/ledger-crlf-trace"; mkdir -p "$LEDGWORK2/.planning"
+printf '# Milestones\n\n## \xe2\x9c\x85 demo-v1 \xe2\x80\x94 Un jalon clos\n' > "$LEDGWORK2/.planning/MILESTONES.md"
+printf '# Requirements\r\n- [ ] **SSSS-01**: exigence voyageuse carried-from: v1.2\r\n' > "$LEDGWORK2/.planning/REQUIREMENTS.md"
+t12_out="$("$BASH_BIN" "$CHECK_SURV" --path "$LEDGWORK2" 2>/dev/null)"; t12_rc=$?
+if [ "$t12_rc" -eq 3 ] && [ -z "$t12_out" ]; then
+  ok "T12 check-requirements-survival CRLF : trace carried-from: bien formée en CRLF → silence, jamais trace_malformed"
+else
+  ko "T12 check-requirements-survival CRLF : rc=$t12_rc out=[$t12_out] (attendu rc=3, silence)"
+fi
+
 echo "== $pass ok · $fail ko =="
 [ "$fail" -eq 0 ]
