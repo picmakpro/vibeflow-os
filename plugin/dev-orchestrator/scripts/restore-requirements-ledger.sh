@@ -138,6 +138,16 @@ trap 'rm -rf "$TMPD"; [ -n "${WRITE_TMP:-}" ] && rm -f "$WRITE_TMP"' EXIT
 
 # --- Extraction structurée (famille, ID, ligne de corps, ligne de traçabilité), UNE passe pour la
 # table de traçabilité (premier arg) + UNE passe pour le corps (second arg, même fichier) ----------
+#
+# Normalisation CRLF (correctif 2026-08-18, correction ciblée post-vérification, BLOQUANT G1) : les
+# DEUX lectures de l'archive passent par `tr -d '\r'` en substitution de processus — l'archive sur
+# disque n'est JAMAIS réécrite (lecture seule stricte, doctrine du script). Sans ça, un `\r`
+# résiduel en fin de ligne de corps ou de traçabilité déplaçait le compte d'octets utilisé par
+# `substr(line, RSTART, RLENGTH)` pour extraire l'ID, faisait échouer la jonction body/trace sur la
+# DERNIÈRE ligne d'une archive CRLF, et laissait le `\r` s'accrocher au bout de la ligne source —
+# réimprimée ensuite avec le suffixe ` — carried-from: <jalon>` collé APRÈS ce `\r` (visuellement
+# hors ligne dans un terminal) : reproduit par exécution avant ce correctif (`Garanties: 0, Voyage: 2`
+# au lieu de `1/1` sur une archive à un seul item).
 awk -v dupfile="$TMPD/dupwarn.txt" '
   FNR == NR {
     if ($0 ~ /^## Traceability[ \t]*$/) { intrace = 1; next }
@@ -178,7 +188,7 @@ awk -v dupfile="$TMPD/dupwarn.txt" '
       }
     }
   }
-' "$ARCHIVE" "$ARCHIVE" > "$TMPD/tuples.tsv"
+' <(tr -d '\r' < "$ARCHIVE") <(tr -d '\r' < "$ARCHIVE") > "$TMPD/tuples.tsv"
 
 # Réimpression sanitisée des avertissements de traçabilité dupliquée (voir commentaire awk
 # ci-dessus, MAJEUR #1) : MÊME filtre `tr -d` que le diff plus bas, sur CE canal aussi — jamais
@@ -235,10 +245,12 @@ fi
 # Arrêt au premier titre de N'IMPORTE QUEL niveau ≥2 (## à ######), jamais seulement ## : une
 # archive dont la première famille (###) suit directement le titre sans conteneur ## intercalé ne
 # doit jamais laisser fuiter du contenu classé (garanti/voyageur/caduc) dans le bloc de titre.
-if [ -f "$LIVE" ] && head -n 1 "$LIVE" 2>/dev/null | grep -q '^# Requirements:'; then
-  awk '/^#{2,6} /{exit} {print}' "$LIVE" > "$TMPD/title.md"
+# Normalisation CRLF (correctif 2026-08-18, correction ciblée post-vérification, BLOQUANT G1) :
+# lecture par substitution de processus, ni `$LIVE` ni `$ARCHIVE` jamais réécrits sur disque.
+if [ -f "$LIVE" ] && head -n 1 "$LIVE" 2>/dev/null | tr -d '\r' | grep -q '^# Requirements:'; then
+  awk '/^#{2,6} /{exit} {print}' <(tr -d '\r' < "$LIVE") > "$TMPD/title.md"
 else
-  awk '/^#{2,6} /{exit} {print}' "$ARCHIVE" > "$TMPD/title.md"
+  awk '/^#{2,6} /{exit} {print}' <(tr -d '\r' < "$ARCHIVE") > "$TMPD/title.md"
 fi
 
 # --- Out of Scope, repris verbatim de l'archive SI présent, sinon omis -----------------------------
@@ -246,7 +258,7 @@ awk '
   /^## Out of Scope[ \t]*$/ { grab = 1 }
   grab == 1 && /^## / && !/^## Out of Scope[ \t]*$/ { exit }
   grab == 1 { print }
-' "$ARCHIVE" > "$TMPD/outofscope.md"
+' <(tr -d '\r' < "$ARCHIVE") > "$TMPD/outofscope.md"
 
 RECON_DATE="$(date -u +%Y-%m-%d)"
 

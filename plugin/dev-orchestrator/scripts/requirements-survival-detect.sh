@@ -86,15 +86,23 @@ vf_ledger_state() { # <planning_dir>
 
   # Premier titre H2 CLOS rencontré de haut en bas (le fichier est anté-chronologique par
   # convention) ; aucune date de prose n'est jamais lue — dater serait juger du contenu (D-18-10).
+  #
+  # Normalisation CRLF (correctif 2026-08-18, correction ciblée post-vérification, BLOQUANT G1) :
+  # `tr -d '\r'` sur le SEUL flux lu par cet awk, jamais une réécriture du fichier sur disque
+  # (le lab reste intact — ce script est un lecteur, D-18-10). Sous `core.autocrlf=true` (défaut
+  # Git for Windows, cité par l'en-tête ADR-054 de `.gitattributes`), un titre H2 clos en CRLF
+  # portait un `\r` résiduel en fin de `$0` : invisible à l'oeil, il ne cassait pas la détection
+  # de l'emoji ✅ (le `\r` suit le motif recherché) mais atteignait tel quel `label_rejected` deux
+  # lignes plus bas — reproduit par exécution avant ce correctif.
   local heading
-  heading="$(awk '
+  heading="$(tr -d '\r' < "$milestones" | awk '
     NR > 400 { exit }
     /^## / {
       any_h2 = 1
       if (index($0, "\xe2\x9c\x85") > 0 && !found) { print $0; found = 1; exit }
     }
     END { if (!found) print (any_h2 ? "__NOCLOSE__" : "__NOHEADING__") }
-  ' "$milestones")"
+  ')"
 
   case "$heading" in
     __NOHEADING__) VF_LEDGER_STATE="unreadable"; VF_LEDGER_REASON="no_heading"; return 2 ;;
@@ -137,18 +145,39 @@ vf_ledger_state() { # <planning_dir>
     # revue de code : les deux classes étaient incohérentes), ancrée en FIN de ligne (`$`) — sans
     # cette ancre, un suffixe garbage (`carried-from: v1.2!!!GARBAGE`) matchait comme préfixe bien
     # formé au lieu de tomber en illisible, l'inverse exact de D-18-10. Toute ligne portant le jeton
-    # hors de cette forme → illisible — SAUF une mention NUE du jeton (ex. prose documentant la
-    # convention entre backticks, sans valeur après les deux-points : cas réel de
+    # hors de cette forme → illisible — SAUF une mention NUE du jeton **entre backticks** (ex. prose
+    # documentant la convention, sans valeur après les deux-points : cas réel de
     # .planning/REQUIREMENTS.md:932, "trace `carried-from:`") : ce n'est pas une tentative de trace,
     # donc pas un motif d'illisibilité (D-18-10 : lire une absence, jamais juger la prose qui la
     # décrit).
-    if grep -n 'carried-from:' "$live" 2>/dev/null \
-        | grep -vE 'carried-from:`|carried-from:[[:space:]]*$' \
+    #
+    # Correction 2026-08-18 (correction ciblée post-vérification, G3) : l'exclusion ne porte plus
+    # QUE sur le motif backtick-fermant (`carried-from:\``) — le second bras retiré ici
+    # (`carried-from:[[:space:]]*$`, sans exigence de backtick) excluait AUSSI une trace RÉELLEMENT
+    # tronquée sur une vraie ligne d'exigence (ex. `— carried-from:` sans valeur, sans backtick) :
+    # plus large que son motif documenté, qui ne vise QUE la mention nue entre backticks (le seul
+    # cas réel de ce dépôt, .planning/REQUIREMENTS.md:932). Une trace tronquée hors backtick tombe
+    # désormais, à raison, dans `trace_malformed` — impact faible en pratique (le diff d'IDs est
+    # indépendant de la trace, D-18-10) mais la déviation ne dépasse plus son motif déclaré.
+    #
+    # Normalisation CRLF (correctif 2026-08-18, correction ciblée post-vérification, BLOQUANT G1) :
+    # même principe que l'extraction du titre plus haut — `tr -d '\r'` sur le flux lu, jamais une
+    # réécriture de `$live` sur disque. Sans elle, une trace bien formée en CRLF (`carried-from:
+    # v1.2\r`) ne matchait ni le bras d'exclusion « bien formée » (`\r` avant `$`) ni aucun des deux
+    # bras d'exclusion de prose ci-dessus : elle atteignait `trace_malformed` à tort — reproduit par
+    # exécution avant ce correctif.
+    if tr -d '\r' < "$live" 2>/dev/null | grep -n 'carried-from:' \
+        | grep -vE 'carried-from:`' \
         | grep -vE 'carried-from: [0-9A-Za-z._ -]{1,80}$' | grep -q .; then
       VF_LEDGER_STATE="unreadable"; VF_LEDGER_REASON="trace_malformed"; return 2
     fi
     if [ -f "$archive" ] && [ ! -L "$archive" ] && ! vf_ancestor_symlink_found "$archive" "$planning_dir"; then
       local diff_out missing_count missing_list
+      # Normalisation CRLF (correctif 2026-08-18, correction ciblée post-vérification, BLOQUANT G1) :
+      # les DEUX fichiers lus par ce diff (archive et vivant) passent par `tr -d '\r'` en
+      # substitution de processus — ni l'un ni l'autre n'est réécrit sur disque. Sans ça, un `\r`
+      # résiduel en fin de ligne de corps/traçabilité change l'ID extrait par `substr`/`match` d'un
+      # seul octet en trop et rompt l'égalité `id in livepresent` attendue entre les deux fichiers.
       diff_out="$(awk '
         FNR == NR {
           if ($0 ~ /^## Traceability[ \t]*$/) { intrace = 1; next }
@@ -191,7 +220,7 @@ vf_ledger_state() { # <planning_dir>
           }
           printf "%d\t%s\n", mc, ml
         }
-      ' "$archive" "$live")"
+      ' <(tr -d '\r' < "$archive") <(tr -d '\r' < "$live"))"
       missing_count="${diff_out%%$'\t'*}"
       missing_list="${diff_out#*$'\t'}"
       case "$missing_count" in ''|*[!0-9]*) missing_count=0 ;; esac
