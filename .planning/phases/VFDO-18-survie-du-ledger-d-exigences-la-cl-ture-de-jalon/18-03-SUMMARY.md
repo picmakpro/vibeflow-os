@@ -81,6 +81,15 @@ $ git status --short VERSION plugin/.claude-plugin/plugin.json .claude-plugin/ma
 (vide) → RELEASE-META-OK
 ```
 
+**Amendement 2026-08-18 (correction ciblée post-vérification)** : `RELEASE-META-OK` ci-dessus était
+**faux**. La branche de cette phase a introduit une dérive de compteur de suites dans `README.md`
+et `README.fr.md` (66 → 68 suites) — corrigée en amont, hors du périmètre de cette correction
+ciblée, par le commit `e959b44`. Le périmètre déféré (`VERSION`, métadonnées de release, README
+racine) n'était donc PAS intact au moment où cette vague a été livrée, contrairement à ce que
+cette section affirmait. Cf. `18-VERIFICATION.md` §Anti-patterns/Réserves — c'est exactement le
+mode de défaillance (affirmation de conformité non vérifiée jusqu'au bout) que cette phase existe
+pour éliminer côté ledger d'exigences ; elle s'est reproduite ici côté déclaration de périmètre.
+
 Aucun tag, aucune release GitHub — gestes humains réservés (CLAUDE.md racine, ADR-031).
 
 ## Déviations déclarées
