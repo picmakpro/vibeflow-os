@@ -468,15 +468,18 @@ PYEOF
 # T10 (forme exec TELLE QU'INSTALLÉE, PORT-02) — install réelle des deux modules du périmètre
 # dev, assertions sur le settings.local.json PRODUIT (pas sur les fragments source — régression
 # #38 : un gate qui n'exerce que l'arbre source ne prouve rien sur ce que l'install pose chez
-# l'utilisateur). Les 5 entrées ({{VF_BASH}} dans les deux fragments) routent vers
-# settings.local.json en scope project (défaut) — jamais settings.json.
+# l'utilisateur). Les 6 entrées portant {{VF_BASH}} (5 de dev-orchestrator + 1 de
+# software-architecture) routent vers settings.local.json en scope project (défaut) — jamais
+# settings.json. check-hook-paths.sh (6e script dev-orchestrator) garde un command littéral
+# 'bash' non substitué (dérogation ADR-071 documentée dans hooks.json) : il reste en
+# settings.json, hors du décompte exec ci-dessous.
 # ---------------------------------------------------------------------------
 LAB="$(mktemp -d)"
 CACHE="$LAB/cache"
 if prepare_module "$CACHE" "dev-orchestrator" && prepare_module "$CACHE" "software-architecture"; then
   (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install dev-orchestrator >/dev/null 2>&1)
   (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install software-architecture >/dev/null 2>&1)
-  MSG=$(check_exec_settings "$LAB/.claude/settings.local.json" 5 2>&1); RC=$?
+  MSG=$(check_exec_settings "$LAB/.claude/settings.local.json" 6 2>&1); RC=$?
   if [ "$RC" -eq 0 ]; then
     ok "T10 exec install (as-installed) : $MSG"
   else
@@ -524,9 +527,12 @@ rm -rf "$LAB"
 # T11 (compatibilité descendante à l'update, le scénario qui compte réellement — A-30-07-1) :
 # un lab qui a installé dev-orchestrator AVANT cette phase porte ses 4 hooks en ANCIENNE forme
 # shell dans settings.json (fragment shell + prefix littéral déjà résolu, comme le posait
-# merge-hooks.sh avant la migration). On lance l'installeur ACTUEL (fragment migré, tâche 1) et on
-# attend : les 4 anciennes entrées shell ont disparu de settings.json, remplacées par 4 entrées
-# exec dans settings.local.json — une seule par script, aucun doublon nulle part.
+# merge-hooks.sh avant la migration). On lance l'installeur ACTUEL (fragment migré, tâche 1 +
+# 5e script check-requirements-survival.sh ajouté par la Phase 18) et on attend : les 4 anciennes
+# entrées shell ont disparu de settings.json, remplacées par 5 entrées exec dans
+# settings.local.json — une seule par script, aucun doublon nulle part (check-hook-paths.sh, 6e
+# script du fragment actuel, reste hors décompte : command littéral non substitué, routé vers
+# settings.json).
 # ---------------------------------------------------------------------------
 LAB="$(mktemp -d)"
 CACHE="$LAB/cache"
@@ -584,9 +590,9 @@ expected = {'check-dev-bootstrap.sh', 'discover-unintegrated-docs.sh', 'check-do
 print(len(names & expected))
 ")
   [ "$OLD_RESIDUAL" -eq 0 ] || { ko "T11 compat descendante : $OLD_RESIDUAL ancienne(s) entrée(s) shell encore dans settings.json (attendu 0, purge cross-cible en échec)"; miss=1; }
-  MSG=$(check_exec_settings "$LAB/.claude/settings.local.json" 4 2>&1) || { ko "T11 compat descendante : $MSG"; miss=1; }
+  MSG=$(check_exec_settings "$LAB/.claude/settings.local.json" 5 2>&1) || { ko "T11 compat descendante : $MSG"; miss=1; }
   [ "$miss" -eq 0 ] \
-    && ok "T11 compat descendante : lab shell pré-existant → update réel → 4 anciennes entrées purgées de settings.json, 4 entrées exec dans settings.local.json (une seule par script)"
+    && ok "T11 compat descendante : lab shell pré-existant → update réel → 4 anciennes entrées purgées de settings.json, 5 entrées exec dans settings.local.json (une seule par script)"
 else
   skip "T11 compat descendante : dev-orchestrator non copiable dans le cache de test"
 fi
@@ -601,8 +607,10 @@ rm -rf "$LAB"
 LAB="$(mktemp -d)"
 CACHE="$LAB/cache"
 if prepare_module "$CACHE" "dev-orchestrator"; then
-  # Mutation : un seul hook repasse en forme shell (perte du champ `args`), les 3 autres restent
+  # Mutation : un seul hook repasse en forme shell (perte du champ `args`), les 4 autres restent
   # en forme exec — reproduit exactement une régression partielle, pas un retour en bloc.
+  # (check-hook-paths.sh, le 6e script du fragment, reste hors décompte : command littéral non
+  # substitué, routé vers settings.json — jamais dans settings.local.json.)
   python3 -c "
 import json
 p = '$CACHE/dev-orchestrator/hooks/hooks.json'
@@ -615,11 +623,11 @@ for h in group['hooks']:
 json.dump(d, open(p, 'w', encoding='utf-8'), indent=2, ensure_ascii=False)
 "
   (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install dev-orchestrator >/dev/null 2>&1)
-  MSG=$(check_exec_settings "$LAB/.claude/settings.local.json" 4 2>&1); RC=$?
-  # L'entrée fautive est celle des 4 scripts attendus ABSENTE du décompte exec — calculée par
-  # différence d'ensemble, pour la nommer explicitement plutôt que de se contenter de "3 ≠ 4".
+  MSG=$(check_exec_settings "$LAB/.claude/settings.local.json" 5 2>&1); RC=$?
+  # L'entrée fautive est celle des 5 scripts attendus ABSENTE du décompte exec — calculée par
+  # différence d'ensemble, pour la nommer explicitement plutôt que de se contenter de "4 ≠ 5".
   FAUTIVE=$(python3 -c "
-expected = {'check-dev-bootstrap.sh', 'discover-unintegrated-docs.sh', 'check-doc-drift.sh', 'check-gsd-config.sh'}
+expected = {'check-dev-bootstrap.sh', 'discover-unintegrated-docs.sh', 'check-doc-drift.sh', 'check-gsd-config.sh', 'check-requirements-survival.sh'}
 msg = '''$MSG'''
 present = {n.strip(\"' \") for n in msg.split('[', 1)[-1].split(']', 1)[0].split(',')} if '[' in msg else set()
 print(', '.join(sorted(expected - present)) or 'aucune (décompte inattendu)')
