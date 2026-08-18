@@ -474,22 +474,34 @@ if [ "$guard21_removed" -eq 1 ]; then
   D="$(mk_root cm21)"
   w_milestones "$D" "$CLOSED_H2"
   w_archive "$D" "demo-v1" "$INCO_ARCHIVE"
-  bash "$MUT21_DIR/restore-requirements-ledger.sh" --path "$D" --write >/dev/null 2>&1
-  MWF21="$D/.planning/REQUIREMENTS.md"
-  mut21_wrong=0
-  awk '/^## Garanties/{f=1;next} /^#{2,6} /{f=0} f{print}' "$MWF21" 2>/dev/null | grep -q 'INCO-01' && mut21_wrong=1
-  if [ "$mut21_wrong" -eq 1 ]; then ok "MUTATION MOYEN (bornes de mot retirées) rougit le cas 21 comme attendu : INCO-01 classée Garantie à tort"; else ko "MUTATION MOYEN — N'A PAS ROUGI" "INCO-01 classée Garantie sous la mutation" "toujours voyage — mutation sans effet observable"; fi
+  bash "$MUT21_DIR/restore-requirements-ledger.sh" --path "$D" --write >/dev/null 2>&1; rc21_mut=$?
+  if [ "$rc21_mut" -eq 126 ] || [ "$rc21_mut" -eq 127 ]; then
+    # Assertion d'absence hors mut_run (ce fichier n'a pas de sentinel HARNESS_BROKEN) : sans cette
+    # garde, un mutant introuvable/non exécutable laisserait $MWF21 non écrit, mut21_wrong resterait
+    # à 0 et tomberait dans la branche ko "N'A PAS ROUGI" — un KO, mais pour la mauvaise raison
+    # (masque un harnais cassé sous un message de non-discriminance). Rendu explicite.
+    ko "MUTATION MOYEN (bornes de mot retirées) — harnais cassé (rc=$rc21_mut)" "exécution normale du mutant (rc ni 126 ni 127)" "rc=$rc21_mut — pas une preuve de non-morsure"
+  else
+    MWF21="$D/.planning/REQUIREMENTS.md"
+    mut21_wrong=0
+    awk '/^## Garanties/{f=1;next} /^#{2,6} /{f=0} f{print}' "$MWF21" 2>/dev/null | grep -q 'INCO-01' && mut21_wrong=1
+    if [ "$mut21_wrong" -eq 1 ]; then ok "MUTATION MOYEN (bornes de mot retirées) rougit le cas 21 comme attendu : INCO-01 classée Garantie à tort"; else ko "MUTATION MOYEN — N'A PAS ROUGI" "INCO-01 classée Garantie sous la mutation" "toujours voyage — mutation sans effet observable"; fi
+  fi
   # Contrôle de discriminance : AAAA-01 (Done réel) et PROSE-01 (Spike done) restent en Garanties.
   D2="$(mk_root cm21-controle)"
   w_milestones "$D2" "$CLOSED_H2"
   w_archive "$D2" "demo-v1" "$DEMO_ARCHIVE"
-  bash "$MUT21_DIR/restore-requirements-ledger.sh" --path "$D2" --write >/dev/null 2>&1
-  MWF21C="$D2/.planning/REQUIREMENTS.md"
-  ctrl21_ok=1
-  MG21="$(awk '/^## Garanties/{f=1;next} /^#{2,6} /{f=0} f{print}' "$MWF21C" 2>/dev/null)"
-  printf '%s' "$MG21" | grep -q 'AAAA-01' || ctrl21_ok=0
-  printf '%s' "$MG21" | grep -q 'PROSE-01' || ctrl21_ok=0
-  if [ "$ctrl21_ok" -eq 1 ]; then ok "MUTATION MOYEN — le cas 6b (AAAA-01/PROSE-01 garanties) reste VERT sous cette mutation (discriminance)"; else ko "MUTATION MOYEN — discriminance rompue, cas 6b affecté aussi" "AAAA-01 et PROSE-01 toujours en Garanties" "MG21=[$MG21]"; fi
+  bash "$MUT21_DIR/restore-requirements-ledger.sh" --path "$D2" --write >/dev/null 2>&1; rc21_ctrl=$?
+  if [ "$rc21_ctrl" -eq 126 ] || [ "$rc21_ctrl" -eq 127 ]; then
+    ko "MUTATION MOYEN — discriminance (cas 6b) — harnais cassé (rc=$rc21_ctrl)" "exécution normale du mutant (rc ni 126 ni 127)" "rc=$rc21_ctrl — pas une preuve de discriminance"
+  else
+    MWF21C="$D2/.planning/REQUIREMENTS.md"
+    ctrl21_ok=1
+    MG21="$(awk '/^## Garanties/{f=1;next} /^#{2,6} /{f=0} f{print}' "$MWF21C" 2>/dev/null)"
+    printf '%s' "$MG21" | grep -q 'AAAA-01' || ctrl21_ok=0
+    printf '%s' "$MG21" | grep -q 'PROSE-01' || ctrl21_ok=0
+    if [ "$ctrl21_ok" -eq 1 ]; then ok "MUTATION MOYEN — le cas 6b (AAAA-01/PROSE-01 garanties) reste VERT sous cette mutation (discriminance)"; else ko "MUTATION MOYEN — discriminance rompue, cas 6b affecté aussi" "AAAA-01 et PROSE-01 toujours en Garanties" "MG21=[$MG21]"; fi
+  fi
 else
   ko "MUTATION MOYEN — construction du mutant a échoué" "le fichier muté ne porte plus les bornes de mot" "grep n'a pas trouvé la forme sans bornes"
 fi

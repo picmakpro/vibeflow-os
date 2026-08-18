@@ -421,17 +421,28 @@ if [ "$guard34_removed" -eq 1 ]; then
   w_milestones "$D" "$CLOSED_H2"
   w_archive "$D" "demo-v1" $'- [x] **ZZZZ-01**: un\n- [x] **AAAA-02**: deux\n- [x] **MMMM-03**: trois\n- [x] **BBBB-04**: quatre\n- [x] **YYYY-05**: cinq\n- [x] **KKKK-06**: six\n\n## Traceability\n\n| Requirement | Phase | Status |\n|---|---|---|\n| ZZZZ-01 | Phase 1 | Done |\n| AAAA-02 | Phase 1 | Done |\n| MMMM-03 | Phase 1 | Done |\n| BBBB-04 | Phase 1 | Done |\n| YYYY-05 | Phase 1 | Done |\n| KKKK-06 | Phase 1 | Done |\n'
   w_live "$D" $'# Requirements\n- [x] **WWWW-99**: sans rapport\n'
-  out_mut="$(bash "$MUT34_DIR/check-requirements-survival.sh" --path "$D" 2>/dev/null)"
-  mut_sorted=0; case "$out_mut" in *"$sorted_5"*) mut_sorted=1 ;; esac
-  if [ "$mut_sorted" -eq 0 ]; then ok "MUTATION MOYEN (tri retiré) rougit le cas 34 comme attendu : la liste tronquée n'est plus triée alphabétiquement"; else ko "MUTATION MOYEN — N'A PAS ROUGI" "la liste diverge de l'ordre alphabétique sous la mutation" "toujours triée — mutation sans effet observable"; fi
+  out_mut="$(bash "$MUT34_DIR/check-requirements-survival.sh" --path "$D" 2>/dev/null)"; rc_mut=$?
+  if [ "$rc_mut" -eq 126 ] || [ "$rc_mut" -eq 127 ]; then
+    # Assertion d'absence (pas de passage par mut_run) : sans cette garde, un harnais cassé
+    # (mutant introuvable/non exécutable) produirait un out_mut vide, matchant silencieusement
+    # "pas triée" et rendant un ✓ pour la mauvaise raison — même classe que le sentinel HARNESS_BROKEN.
+    ko "MUTATION MOYEN (tri retiré) — harnais cassé (rc=$rc_mut)" "exécution normale du mutant (rc ni 126 ni 127)" "rc=$rc_mut — pas une preuve de morsure"
+  else
+    mut_sorted=0; case "$out_mut" in *"$sorted_5"*) mut_sorted=1 ;; esac
+    if [ "$mut_sorted" -eq 0 ]; then ok "MUTATION MOYEN (tri retiré) rougit le cas 34 comme attendu : la liste tronquée n'est plus triée alphabétiquement"; else ko "MUTATION MOYEN — N'A PAS ROUGI" "la liste diverge de l'ordre alphabétique sous la mutation" "toujours triée — mutation sans effet observable"; fi
+  fi
   # Contrôle de discriminance : le cas 26 (3 IDs, jamais tronqué) reste inchangé sous la mutation.
   D2="$(mk_root cm34-controle)"
   w_milestones "$D2" "$CLOSED_H2"
   w_archive "$D2" "demo-v1" $'- [x] **MMMM-01**: un\n- [x] **MMMM-02**: deux\n- [x] **MMMM-03**: trois\n\n## Traceability\n\n| Requirement | Phase | Status |\n|---|---|---|\n| MMMM-01 | Phase 1 | Done |\n| MMMM-02 | Phase 1 | Done |\n| MMMM-03 | Phase 1 | Done |\n'
   w_live "$D2" $'# Requirements\n- [x] **YYYY-99**: sans rapport\n'
-  out_ctrl="$(bash "$MUT34_DIR/check-requirements-survival.sh" --path "$D2" 2>/dev/null)"
-  has_ctrl=0; case "$out_ctrl" in *"MMMM-01"*"MMMM-02"*"MMMM-03"*) has_ctrl=1 ;; esac
-  if [ "$has_ctrl" -eq 1 ]; then ok "MUTATION MOYEN — le cas 26 (3 IDs, sans troncature) reste VERT sous cette mutation (discriminance)"; else ko "MUTATION MOYEN — discriminance rompue, cas 26 affecté aussi" "3 IDs toujours listés" "out=[$out_ctrl]"; fi
+  out_ctrl="$(bash "$MUT34_DIR/check-requirements-survival.sh" --path "$D2" 2>/dev/null)"; rc_ctrl=$?
+  if [ "$rc_ctrl" -eq 126 ] || [ "$rc_ctrl" -eq 127 ]; then
+    ko "MUTATION MOYEN — discriminance (cas 26) — harnais cassé (rc=$rc_ctrl)" "exécution normale du mutant (rc ni 126 ni 127)" "rc=$rc_ctrl — pas une preuve de discriminance"
+  else
+    has_ctrl=0; case "$out_ctrl" in *"MMMM-01"*"MMMM-02"*"MMMM-03"*) has_ctrl=1 ;; esac
+    if [ "$has_ctrl" -eq 1 ]; then ok "MUTATION MOYEN — le cas 26 (3 IDs, sans troncature) reste VERT sous cette mutation (discriminance)"; else ko "MUTATION MOYEN — discriminance rompue, cas 26 affecté aussi" "3 IDs toujours listés" "out=[$out_ctrl]"; fi
+  fi
 else
   ko "MUTATION MOYEN — construction du mutant a échoué" "le fichier muté ne porte plus LC_ALL=C sort" "grep trouve encore LC_ALL=C sort"
 fi
@@ -537,9 +548,15 @@ awk '
 ' "$PRIMITIVE" > "$M1_DIR/requirements-survival-detect.sh"
 chmod +x "$M1_DIR/check-requirements-survival.sh" "$M1_DIR/requirements-survival-detect.sh"
 # Garde — l'awk ne mute QUE la 3e occurrence : vérifier que la substitution a bien eu lieu (et pas
-# seulement que le fichier diffère), sans quoi un écart de dims ne prouverait rien.
+# seulement que le fichier diffère), sans quoi un écart de dims ne prouverait rien. PIÈGE ÉCARTÉ :
+# la chaîne 'VF_LEDGER_STATE="absent_after_close"; return 0' existe DÉJÀ une fois dans la source
+# (branche réelle de retour absent) — un simple `grep -qF` réussit donc TOUJOURS, mutation ou pas
+# (garde vacante). On compte les occurrences : la source en porte 1, la mutation doit en ajouter
+# une 2e (le nominal muté) — un mutant non porteur reste à 1.
+ABSENT_COUNT_SRC=$(grep -c 'VF_LEDGER_STATE="absent_after_close"; return 0' "$PRIMITIVE")
+ABSENT_COUNT_MUT=$(grep -c 'VF_LEDGER_STATE="absent_after_close"; return 0' "$M1_DIR/requirements-survival-detect.sh")
 guardissue1_removed=0
-grep -qF 'VF_LEDGER_STATE="absent_after_close"; return 0' "$M1_DIR/requirements-survival-detect.sh" && guardissue1_removed=1
+[ "$ABSENT_COUNT_MUT" -eq "$((ABSENT_COUNT_SRC + 1))" ] && guardissue1_removed=1
 if [ "$guardissue1_removed" -eq 1 ]; then
   # mut_run reçoit le comportement CORRECT (non muté) en référence — dims s'accumule quand l'ACTUEL
   # (sous mutation) s'en écarte. DM_SILENT non muté : code 3, stdout vide (silence, D-18-10). La
