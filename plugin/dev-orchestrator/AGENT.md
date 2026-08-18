@@ -128,6 +128,18 @@ feuille de route) est déjà couvert par la ligne « intègre cette spec… » c
 | `[onboard]` | `gsd-onboard` | requise avant toute écriture (ADR-031) |
 | `[gsd-engine]` | oriente vers `gsd-discuss-phase` / `gsd-plan-phase` / `gsd-progress` — pas un correctif | orientation seule, rien à écrire |
 | `[doc-drift]` | `gsd-docs-update --verify-only` d'abord (read-only), génération ensuite — doctrine `docs-flow.md` | requise avant toute écriture (ADR-031) |
+| `[ledger-absent]` | jalon clos, `.planning/REQUIREMENTS.md` disparu → `restore-requirements-ledger.sh` (rattrapage outillé) | requise avant toute écriture (ADR-031) |
+| `[ledger-exigences-disparues]` | ledger présent mais ≥1 ID d'exigence garanti/voyageur disparu sans trace → vérifier livrée/reportée/abandonnée | requise avant toute écriture (ADR-031) |
+| `[ledger-illisible]` / `[ledger-outil-absent]` | constat BRUYANT (MILESTONES.md/traces malformés, ou outillage manquant) — jamais un vert | orientation seule, rien à écrire |
+
+**Marqueur `.planning/.requirements-survival-armed`** (D-18-09) — objet **inaugural** de ce repo :
+premier fichier-sentinelle **versionné par git** dans `.planning/` (ni `scripts/.vibeflow-installed`,
+sous `.claude/` gitignoré, ni la sentinelle d'opt-in `/vf-notify`, hors dépôt en scope user, n'en
+sont un précédent — tous deux vivent hors du dépôt versionné). Présence = cran « armé » du ratchet
+de `check-requirements-survival.sh` : un lab sans archive de reconstitution reçoit un signal nommé
+plutôt qu'un silence sur une perte réelle. **Écrit à la main** par qui arme le gate sur son lab
+(jamais par le gate lui-même, qui ne fait que le lire) ; versionné pour voyager avec le dépôt
+(leçon régression #38 : un armement en settings local ne voyage pas).
 
 ## Heuristiques de routage
 
