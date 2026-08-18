@@ -251,7 +251,7 @@ sur les deux branches.
 
 | # | Constat | Portée |
 |---|---|---|
-| W-A | Le harnais `mut_run` de `test-check-requirements-survival.sh` conclut « la mutation a mordu » dès qu'il observe **un écart quelconque** — y compris un écart dû à une panne du harnais lui-même. Reproduit : en exécutant une COPIE de la suite hors de son arbre, `$GATE` ne résout plus, le mutant sort `rc=127`, et l'assertion primaire imprime `✓` pour une raison fausse. En place, les 5 mutations issue1-4/2bis produisent les codes ATTENDUS (3 vs 0), donc QUAL-01 tient ; mais les mutations `issue*` n'ont pas le garde-fou « le fichier muté porte bien la mutation » que les mutations `BLOQUANT #1` et `MOYEN` possèdent, elles. Durcissement à faible coût, à verser au backlog. |
+| W-A | **RÉSOLU (correction ciblée, 2026-08-18, voir `18-01-SUMMARY.md`).** `mut_run` distingue désormais une panne de harnais (`rc` 126/127 → sentinel `HARNESS_BROKEN`, traité en `ko` bruyant par `mut_check`, jamais un `✓`) d'une vraie morsure. Les 5 mutations `issue1`-`issue4`/`issue2bis` portent maintenant le garde-fou « le fichier muté porte bien la mutation », sur le patron de `guard34_removed`/`guard35_removed`/`guardg3_removed`/`guardcrlf_removed`. Preuve par relocalisation volontaire ajoutée comme cas de test (mutant sans script copié → `rc=127` reproduit, harnais crie). Suite à 63 ok / 0 ko. |
 | W-B | La case de **LEDG-03** (portée par la **Phase 30**, pas par celle-ci) est cochée par cette branche. Factuellement exact — la RFC #3556 est ouverte depuis le 2026-08-15, et sa ligne de traçabilité le dit — mais c'est un geste hors périmètre déclaré de la phase. |
 | W-C | `vf-dev-manager.md` est à **exactement 250 lignes**, la borne ADR-029. Non touché par la phase ; toute ligne ajoutée par une phase future le fera basculer. |
 
@@ -259,11 +259,14 @@ sur les deux branches.
 
 - **Indexation par capability** : non captée (STUDY §7.3). Un `REQUIREMENTS.md` qui survit reste
   indexé par jalon ; cette part du besoin reste ouverte sous les conditions E1/E2 du STUDY §8.
-- **Condition C1 du STUDY (« ce repo consomme son propre outillage »)** : **non tenue, non
-  revendiquée**. Vérifié : `.claude/scripts` **n'existe pas** ici, `.gitignore:20` exclut `.claude/`,
-  et aucun `.claude/settings*.json` de ce dépôt ne câble `check-requirements-survival.sh`. Le hook
-  `SessionStart` ne tourne donc **jamais** dans ce dépôt — seule une exécution **manuelle** est
-  prouvée, et c'est tout ce que ce rapport affirme.
+- **Condition C1 du STUDY (« ce repo consomme son propre outillage »)** : toujours **non tenue sur
+  CE dépôt** (`.claude/scripts` n'existe pas ici, `.gitignore:20` exclut `.claude/`, le hook
+  `SessionStart` ne tourne donc jamais dans ce dépôt même). Mais **fermée en tant que condition
+  d'outillage** (correction ciblée du 2026-08-18, voir `18-01-SUMMARY.md`) : une recette sur lab de
+  démo réaliste hors dépôt (11 scénarios) a invoqué les scripts copiés dans `.claude/scripts/` du
+  lab comme l'entrée `SessionStart` réelle (`{{VF_BASH}}` + `--hook`) — stdout 0 octet en nominal,
+  179 octets sur perte, exit 0 dans les deux cas. Ce n'est donc plus « seule une exécution manuelle
+  est prouvée » : le déclenchement en hook réel l'est aussi, ailleurs que sur ce dépôt lui-même.
 - **Windows réel** : la portabilité est prouvée par **simulation CRLF** et sous **bash 3.2 macOS**,
   jamais sur un poste Windows.
 

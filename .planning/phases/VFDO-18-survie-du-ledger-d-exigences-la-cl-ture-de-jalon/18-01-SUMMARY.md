@@ -66,7 +66,71 @@ silence confirmé par exécution réelle sur ce dépôt.
    lien symbolique T-18-02) — ratio 1,30× → 1,48×, dans la bande de convention du module par
    complétude de couverture, jamais par ajout de lignes pour atteindre un chiffre.
 
+## Correction ciblée post-vérification (2026-08-18) — W-A et fermeture de la condition C1
+
+### W-A — le harnais de mutation distingue désormais « ça a mordu » de « le harnais est cassé »
+
+`mut_run` (`test-check-requirements-survival.sh`) concluait « la mutation a mordu » sur **tout**
+écart entre l'attendu et l'obtenu, y compris une panne de harnais (mutant introuvable → `rc=127`,
+faussement compté `✓`). Corrigé :
+
+- `mut_run` détecte `rc` 126/127 (non exécutable / introuvable) et rend le sentinel
+  `HARNESS_BROKEN(rc=…)` au lieu d'un `dims` interprétable comme une morsure ou un silence légitime.
+- `mut_check` (nouvelle fonction) interprète ce sentinel comme un `ko` bruyant, **toujours**, quel
+  que soit le mode attendu (bit ou discriminance) — jamais un `✓` pour la mauvaise raison.
+- Les 5 mutations `issue1`/`issue2`/`issue2bis`/`issue3`/`issue4` gagnent un garde-fou « le fichier
+  muté porte bien la mutation », sur le même patron que `guard34_removed`/`guard35_removed`/
+  `guardg3_removed`/`guardcrlf_removed` déjà présents dans la suite (`grep`/comptage `hook_exit 3`
+  avant interprétation du résultat).
+- Preuve par relocalisation volontaire (cas de test, pas une vérification manuelle) : un dossier
+  mutant SANS `check-requirements-survival.sh` copié dedans reproduit le symptôme exact (`rc=127`)
+  — `mut_run` rend `HARNESS_BROKEN`, `mut_check` le traite en `ko`, jamais en `✓`.
+
+Compteur réel après correctif :
+
+```
+$ bash plugin/dev-orchestrator/scripts/tests/test-check-requirements-survival.sh
+== résultat : 63 ok, 0 ko ==
+```
+
+(41 assertions d'origine + cas 32/34/35/36-39/MOYEN/BLOQUANT ajoutés en revues antérieures + 3 cas
+neufs de cette correction ciblée, tous verts.) Aucune régression sur les 11 autres suites du module
+(`test-windows-crlf.sh` inclus, hors module, vérifié en lecture seule) — découverte par code de
+sortie, toutes à `exit=0`.
+
+### Fermeture de la condition C1 du STUDY — le hook réel est prouvé, pas seulement l'exécution manuelle
+
+`18-VERIFICATION.md` déclarait C1 (« ce repo consomme son propre outillage ») non tenue et non
+revendiquée, au motif que `.claude/scripts/` n'existe pas dans ce dépôt (`.gitignore` l'exclut) et
+qu'aucun `.claude/settings*.json` ne câble le gate — « seule une exécution manuelle est prouvée ».
+
+Une recette sur **lab de démo réaliste hors dépôt** (11 scénarios) ferme cette condition :
+
+- Lab avec jalon clos + jalon courant, archive à table `## Traceability`, vocabulaire varié
+  (`Complete` / `Done — plans …` / `Planned — plan …` / `caduc`) + un ID orphelin sans ligne de
+  traçabilité.
+- Nominal → silence, exit 3. Ledger supprimé → `[ledger-absent]`, exit 0. `--write` →
+  Garanties 4 / Voyage 3 / Caduque 1 = 8/8, zéro perte, zéro forme non reconnue. Bouclage : le gate
+  relit le fichier produit → silence.
+- Extraction naïve : `## Garanties` = 4 entrées, 0 `carried-from:` ; `## Reportées` = 3, toutes
+  estampillées ; caduque absente du vivant.
+- Exigence supprimée d'un ledger présent → `[ledger-exigences-disparues] … AUTH-02`, exit 0, jamais
+  nominal.
+- `--write` sur ledger vivant → refus, md5 inchangé ; `--overwrite-live` → écrit **avec**
+  `.bak-alpha-v1.0`.
+- **Lab Windows intégral** (3 fichiers en CRLF, `file` confirme) → nominal exit 3 sans faux positif,
+  rattrapage identique 4/3/1, fichier écrit **sans `\r` résiduel**.
+- **Hook réel prouvé** : scripts copiés dans `.claude/scripts/` du lab, invoqués comme l'entrée
+  `SessionStart` (`{{VF_BASH}}` + `--hook`) → **stdout 0 octet** en nominal, **179 octets** sur
+  perte, exit 0 dans les deux cas.
+
+**C1 n'est plus « seule l'exécution manuelle est prouvée ».** Réserves qui restent réellement
+ouvertes, sans changement : l'indexation par capability (STUDY §7.3), et Windows **réel** (la
+portabilité ci-dessus reste une simulation CRLF sur bash 3.2 macOS, jamais une machine Windows).
+
 ## Reliquat
 
-Aucun. LEDG-02 est couvert dans son périmètre complet (détection d'absence de fichier ET diff d'IDs),
-5 issues QUAL-01 discriminantes par mutation, parc de hooks à jour.
+Aucun sur LEDG-02 lui-même : couvert dans son périmètre complet (détection d'absence de fichier ET
+diff d'IDs), 5 issues QUAL-01 discriminantes par mutation avec garde-fou de construction du mutant,
+parc de hooks à jour. Réserves de portée hors LEDG-02 (indexation par capability, Windows réel)
+toujours ouvertes — voir ci-dessus.

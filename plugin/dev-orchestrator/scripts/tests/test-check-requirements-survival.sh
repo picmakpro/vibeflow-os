@@ -25,6 +25,9 @@ set -uo pipefail
 SCRIPTS_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 GATE="$SCRIPTS_DIR/check-requirements-survival.sh"
 PRIMITIVE="$SCRIPTS_DIR/requirements-survival-detect.sh"
+# Référence pour les guards de mutation issue2bis/issue3/issue4 (sed cible "exit 0" → "hook_exit 3"
+# dans une seule branche du case) : le décompte du fichier vivant sert de zéro avant mutation.
+BASE_HOOKEXIT3_COUNT="$(grep -c "hook_exit 3" "$GATE")"
 
 PASS=0; FAIL=0
 ok() { echo "  ✓ $1"; PASS=$((PASS+1)); }
@@ -478,16 +481,45 @@ w_live "$DM_MISSING" $'# Requirements\n- [x] **YYYY-99**: sans rapport\n'
 DM_UNREADABLE="$(mk_root m-unreadable)"
 printf '# Milestones\nprose seulement\n' > "$DM_UNREADABLE/.planning/MILESTONES.md"
 
-mut_run() { # <mid> <dossier-mutant> <fixture> <expect_rc> <expect_stdout_mode:empty|nonempty> [--hook]
+# mut_run <mid> <dossier-mutant> <fixture> <expect_rc> <expect_stdout_mode:empty|nonempty> [--hook]
+# Un rc 126 (non exécutable) ou 127 (introuvable — script relocalisé, chemin cassé) n'est JAMAIS une
+# preuve que la mutation a mordu : c'est une panne de harnais. dims est alors préfixé HARNESS_BROKEN,
+# un sentinel que mut_check (ci-dessous) traite TOUJOURS comme un échec bruyant, quel que soit le
+# mode attendu — jamais un "✓" pour la mauvaise raison.
+mut_run() {
   local mid="$1" mdir="$2" fixture="$3" expect_rc="$4" mode="$5"; shift 5
   local out rc dims=""
   out="$(bash "$mdir/check-requirements-survival.sh" --path "$fixture" "$@" 2>/dev/null)"; rc=$?
+  if [ "$rc" -eq 126 ] || [ "$rc" -eq 127 ]; then
+    printf 'HARNESS_BROKEN(rc=%s)' "$rc"
+    return
+  fi
   if [ "$rc" -ne "$expect_rc" ]; then dims="${dims}code(attendu ${expect_rc}, obtenu ${rc}) "; fi
   case "$mode" in
     empty)    [ -n "$out" ] && dims="${dims}stdout(attendu vide, obtenu [$out]) " ;;
     nonempty) [ -z "$out" ] && dims="${dims}stdout(attendu non vide, obtenu vide) " ;;
   esac
   printf '%s' "$dims"
+}
+
+# mut_check <dims> <expect_nonempty:0|1> <mid> <ok-label> <ko-label> — interprète mut_run en
+# distinguant "le test a mordu" (dims non vide attendu) de "le harnais est cassé" (HARNESS_BROKEN,
+# TOUJOURS un ko, jamais interprété comme une morsure ni comme une discriminance préservée).
+mut_check() {
+  local dims="$1" expect_nonempty="$2" mid="$3" ok_label="$4" ko_label="$5"
+  case "$dims" in
+    HARNESS_BROKEN*)
+      ko "$ok_label" "exécution normale du mutant (rc ni 126 ni 127)" "$dims — harnais cassé, pas une preuve de morsure"
+      return
+      ;;
+  esac
+  if [ "$expect_nonempty" -eq 1 ]; then
+    if [ -n "$dims" ]; then ok "$ok_label : $dims"; mutant_note "$mid" "$dims"
+    else ko "$ko_label" "le comportement change sous la mutation" "aucune différence détectée"; fi
+  else
+    if [ -z "$dims" ]; then ok "$ok_label"
+    else ko "$ko_label" "cas inchangé" "$dims"; fi
+  fi
 }
 
 # --- MUTATION issue1 : l'état nominal (« ledger présent sans ID disparu ») devient absent_after_close.
@@ -504,26 +536,40 @@ awk '
   }
 ' "$PRIMITIVE" > "$M1_DIR/requirements-survival-detect.sh"
 chmod +x "$M1_DIR/check-requirements-survival.sh" "$M1_DIR/requirements-survival-detect.sh"
-# mut_run reçoit le comportement CORRECT (non muté) en référence — dims s'accumule quand l'ACTUEL
-# (sous mutation) s'en écarte. DM_SILENT non muté : code 3, stdout vide (silence, D-18-10). La
-# mutation cible ce cas — il doit rougir (dims non vide). Le cas issue2bis (DM_MISSING) doit rester
-# VERT (inchangé).
-dims="$(mut_run issue1 "$M1_DIR" "$DM_SILENT" 3 empty)"
-if [ -n "$dims" ]; then ok "MUTATION issue1 (nominal→absent_after_close) rougit le cas silencieux comme attendu : $dims"; mutant_note "issue1" "$dims"; else ko "MUTATION issue1 — N'A PAS ROUGI" "le cas silencieux DM_SILENT change de comportement sous la mutation" "aucune différence détectée"; fi
-dims2="$(mut_run issue1-controle "$M1_DIR" "$DM_MISSING" 0 nonempty)"
-if [ -z "$dims2" ]; then ok "MUTATION issue1 — le cas issue2bis (DM_MISSING) reste VERT sous cette mutation (discriminance)"; else ko "MUTATION issue1 — discriminance rompue, DM_MISSING affecté aussi" "DM_MISSING inchangé" "$dims2"; fi
+# Garde — l'awk ne mute QUE la 3e occurrence : vérifier que la substitution a bien eu lieu (et pas
+# seulement que le fichier diffère), sans quoi un écart de dims ne prouverait rien.
+guardissue1_removed=0
+grep -qF 'VF_LEDGER_STATE="absent_after_close"; return 0' "$M1_DIR/requirements-survival-detect.sh" && guardissue1_removed=1
+if [ "$guardissue1_removed" -eq 1 ]; then
+  # mut_run reçoit le comportement CORRECT (non muté) en référence — dims s'accumule quand l'ACTUEL
+  # (sous mutation) s'en écarte. DM_SILENT non muté : code 3, stdout vide (silence, D-18-10). La
+  # mutation cible ce cas — il doit rougir (dims non vide). Le cas issue2bis (DM_MISSING) doit rester
+  # VERT (inchangé).
+  dims="$(mut_run issue1 "$M1_DIR" "$DM_SILENT" 3 empty)"
+  mut_check "$dims" 1 issue1 "MUTATION issue1 (nominal→absent_after_close) rougit le cas silencieux comme attendu" "MUTATION issue1 — N'A PAS ROUGI"
+  dims2="$(mut_run issue1-controle "$M1_DIR" "$DM_MISSING" 0 nonempty)"
+  mut_check "$dims2" 0 issue1-controle "MUTATION issue1 — le cas issue2bis (DM_MISSING) reste VERT sous cette mutation (discriminance)" "MUTATION issue1 — discriminance rompue, DM_MISSING affecté aussi"
+else
+  ko "MUTATION issue1 — construction du mutant a échoué" "le fichier muté porte VF_LEDGER_STATE=\"absent_after_close\"; return 0" "grep ne le trouve pas (3e occurrence non substituée)"
+fi
 
 # --- MUTATION issue2 : l'état d'absence (absent_after_close) redevient nominal.
 M2_DIR="$TMP/mut-issue2"; mkdir -p "$M2_DIR"
 cp "$GATE" "$M2_DIR/"
 sed 's/VF_LEDGER_STATE="absent_after_close"; return 0/VF_LEDGER_STATE="nominal"; return 1/' "$PRIMITIVE" > "$M2_DIR/requirements-survival-detect.sh"
 chmod +x "$M2_DIR/check-requirements-survival.sh" "$M2_DIR/requirements-survival-detect.sh"
-# DM_ABSENT non muté : code 0, stdout non vide ([ledger-absent]) — référence CORRECTE passée à
-# mut_run. Sous la mutation (absent→nominal), l'ACTUEL retombe en silence : dims doit capter l'écart.
-dims="$(mut_run issue2 "$M2_DIR" "$DM_ABSENT" 0 nonempty)"
-if [ -n "$dims" ]; then ok "MUTATION issue2 (absent→nominal) rougit le cas [ledger-absent] comme attendu : $dims"; mutant_note "issue2" "$dims"; else ko "MUTATION issue2 — N'A PAS ROUGI" "le cas DM_ABSENT change de comportement sous la mutation" "aucune différence détectée"; fi
-dims2="$(mut_run issue2-controle "$M2_DIR" "$DM_SILENT" 3 empty)"
-if [ -z "$dims2" ]; then ok "MUTATION issue2 — le cas silencieux (DM_SILENT) reste VERT sous cette mutation (discriminance)"; else ko "MUTATION issue2 — discriminance rompue, DM_SILENT affecté aussi" "DM_SILENT inchangé" "$dims2"; fi
+guardissue2_removed=0
+grep -qF 'VF_LEDGER_STATE="absent_after_close"; return 0' "$M2_DIR/requirements-survival-detect.sh" || guardissue2_removed=1
+if [ "$guardissue2_removed" -eq 1 ]; then
+  # DM_ABSENT non muté : code 0, stdout non vide ([ledger-absent]) — référence CORRECTE passée à
+  # mut_run. Sous la mutation (absent→nominal), l'ACTUEL retombe en silence : dims doit capter l'écart.
+  dims="$(mut_run issue2 "$M2_DIR" "$DM_ABSENT" 0 nonempty)"
+  mut_check "$dims" 1 issue2 "MUTATION issue2 (absent→nominal) rougit le cas [ledger-absent] comme attendu" "MUTATION issue2 — N'A PAS ROUGI"
+  dims2="$(mut_run issue2-controle "$M2_DIR" "$DM_SILENT" 3 empty)"
+  mut_check "$dims2" 0 issue2-controle "MUTATION issue2 — le cas silencieux (DM_SILENT) reste VERT sous cette mutation (discriminance)" "MUTATION issue2 — discriminance rompue, DM_SILENT affecté aussi"
+else
+  ko "MUTATION issue2 — construction du mutant a échoué" "le fichier muté ne porte plus VF_LEDGER_STATE=\"absent_after_close\"; return 0" "grep le trouve encore"
+fi
 
 # --- MUTATION issue2bis : le retour 3 (ids_missing) retombe sur la branche silencieuse (hook_exit 3).
 # C'est LA mutation qui rejoue la lettre du cas obligatoire : si elle ne fait rougir QUE ce cas, le
@@ -532,27 +578,84 @@ M2BIS_DIR="$TMP/mut-issue2bis"; mkdir -p "$M2BIS_DIR"
 cp "$PRIMITIVE" "$M2BIS_DIR/"
 sed "/^  3)\$/,/^    ;;\$/ s/exit 0/hook_exit 3/" "$GATE" > "$M2BIS_DIR/check-requirements-survival.sh"
 chmod +x "$M2BIS_DIR/check-requirements-survival.sh" "$M2BIS_DIR/requirements-survival-detect.sh"
-dims="$(mut_run issue2bis "$M2BIS_DIR" "$DM_MISSING" 0 nonempty)"
-if [ -n "$dims" ]; then ok "MUTATION issue2bis (ids_missing→silence) rougit le cas obligatoire comme attendu : $dims"; mutant_note "issue2bis" "$dims"; else ko "MUTATION issue2bis — N'A PAS ROUGI" "le cas DM_MISSING (13) change de comportement sous la mutation" "aucune différence détectée"; fi
-dims2="$(mut_run issue2bis-controle "$M2BIS_DIR" "$DM_SILENT" 3 empty)"
-if [ -z "$dims2" ]; then ok "MUTATION issue2bis — le cas silencieux (DM_SILENT) reste VERT sous cette mutation (discriminance)"; else ko "MUTATION issue2bis — discriminance rompue, DM_SILENT affecté aussi" "DM_SILENT inchangé" "$dims2"; fi
+guardissue2bis_removed=0
+[ "$(grep -c "hook_exit 3" "$M2BIS_DIR/check-requirements-survival.sh")" -eq $((BASE_HOOKEXIT3_COUNT + 1)) ] && guardissue2bis_removed=1
+if [ "$guardissue2bis_removed" -eq 1 ]; then
+  dims="$(mut_run issue2bis "$M2BIS_DIR" "$DM_MISSING" 0 nonempty)"
+  mut_check "$dims" 1 issue2bis "MUTATION issue2bis (ids_missing→silence) rougit le cas obligatoire comme attendu" "MUTATION issue2bis — N'A PAS ROUGI"
+  dims2="$(mut_run issue2bis-controle "$M2BIS_DIR" "$DM_SILENT" 3 empty)"
+  mut_check "$dims2" 0 issue2bis-controle "MUTATION issue2bis — le cas silencieux (DM_SILENT) reste VERT sous cette mutation (discriminance)" "MUTATION issue2bis — discriminance rompue, DM_SILENT affecté aussi"
+else
+  ko "MUTATION issue2bis — construction du mutant a échoué" "le fichier muté porte $((BASE_HOOKEXIT3_COUNT + 1)) occurrences de hook_exit 3" "grep en trouve $(grep -c "hook_exit 3" "$M2BIS_DIR/check-requirements-survival.sh")"
+fi
 
 # --- MUTATION issue3 : le retour 2 (illisible) retombe sur la branche silencieuse (hook_exit 3).
 M3_DIR="$TMP/mut-issue3"; mkdir -p "$M3_DIR"
 cp "$PRIMITIVE" "$M3_DIR/"
 sed "/^  2)\$/,/^    ;;\$/ s/exit 0/hook_exit 3/" "$GATE" > "$M3_DIR/check-requirements-survival.sh"
 chmod +x "$M3_DIR/check-requirements-survival.sh" "$M3_DIR/requirements-survival-detect.sh"
-dims="$(mut_run issue3 "$M3_DIR" "$DM_UNREADABLE" 0 nonempty)"
-if [ -n "$dims" ]; then ok "MUTATION issue3 (illisible→silence) rougit le cas illisible comme attendu : $dims"; mutant_note "issue3" "$dims"; else ko "MUTATION issue3 — N'A PAS ROUGI" "le cas DM_UNREADABLE change de comportement sous la mutation" "aucune différence détectée"; fi
-dims2="$(mut_run issue3-controle "$M3_DIR" "$DM_SILENT" 3 empty)"
-if [ -z "$dims2" ]; then ok "MUTATION issue3 — le cas silencieux (DM_SILENT) reste VERT sous cette mutation (discriminance)"; else ko "MUTATION issue3 — discriminance rompue, DM_SILENT affecté aussi" "DM_SILENT inchangé" "$dims2"; fi
+guardissue3_removed=0
+[ "$(grep -c "hook_exit 3" "$M3_DIR/check-requirements-survival.sh")" -eq $((BASE_HOOKEXIT3_COUNT + 1)) ] && guardissue3_removed=1
+if [ "$guardissue3_removed" -eq 1 ]; then
+  dims="$(mut_run issue3 "$M3_DIR" "$DM_UNREADABLE" 0 nonempty)"
+  mut_check "$dims" 1 issue3 "MUTATION issue3 (illisible→silence) rougit le cas illisible comme attendu" "MUTATION issue3 — N'A PAS ROUGI"
+  dims2="$(mut_run issue3-controle "$M3_DIR" "$DM_SILENT" 3 empty)"
+  mut_check "$dims2" 0 issue3-controle "MUTATION issue3 — le cas silencieux (DM_SILENT) reste VERT sous cette mutation (discriminance)" "MUTATION issue3 — discriminance rompue, DM_SILENT affecté aussi"
+else
+  ko "MUTATION issue3 — construction du mutant a échoué" "le fichier muté porte $((BASE_HOOKEXIT3_COUNT + 1)) occurrences de hook_exit 3" "grep en trouve $(grep -c "hook_exit 3" "$M3_DIR/check-requirements-survival.sh")"
+fi
 
 # --- MUTATION issue4 : la primitive introuvable retombe sur un hook_exit 3 silencieux.
 M4_DIR="$TMP/mut-issue4"; mkdir -p "$M4_DIR"
 sed '/^if \[ -z "\$PRIMITIVE"/,/^fi$/ s/exit 0/hook_exit 3/' "$GATE" > "$M4_DIR/check-requirements-survival.sh"
 chmod +x "$M4_DIR/check-requirements-survival.sh"
-dims="$(mut_run issue4 "$M4_DIR" "$DM_SILENT" 0 nonempty)"
-if [ -n "$dims" ]; then ok "MUTATION issue4 (outil-absent→silence) rougit le cas outil-absent comme attendu : $dims"; mutant_note "issue4" "$dims"; else ko "MUTATION issue4 — N'A PAS ROUGI" "le cas sans primitive change de comportement sous la mutation" "aucune différence détectée"; fi
+guardissue4_removed=0
+[ "$(grep -c "hook_exit 3" "$M4_DIR/check-requirements-survival.sh")" -eq $((BASE_HOOKEXIT3_COUNT + 1)) ] && guardissue4_removed=1
+if [ "$guardissue4_removed" -eq 1 ]; then
+  dims="$(mut_run issue4 "$M4_DIR" "$DM_SILENT" 0 nonempty)"
+  mut_check "$dims" 1 issue4 "MUTATION issue4 (outil-absent→silence) rougit le cas outil-absent comme attendu" "MUTATION issue4 — N'A PAS ROUGI"
+else
+  ko "MUTATION issue4 — construction du mutant a échoué" "le fichier muté porte $((BASE_HOOKEXIT3_COUNT + 1)) occurrences de hook_exit 3" "grep en trouve $(grep -c "hook_exit 3" "$M4_DIR/check-requirements-survival.sh")"
+fi
+
+# ==================================================================================================
+# Auto-preuve (mandat correction ciblée W-A) : le harnais doit CRIER sur une relocalisation, jamais
+# verdir. Reproduit le symptôme constaté en mission — une suite/script relocalisé rend bash rc=127,
+# faussement compté "ça a mordu" avant ce correctif. Ici : mdir SANS check-requirements-survival.sh
+# du tout (relocalisation simulée) → mut_run doit rendre HARNESS_BROKEN, jamais un dims interprété
+# comme silence légitime (mode empty) ni comme morsure (mode nonempty). Cas de test, pas une
+# vérification manuelle.
+# ==================================================================================================
+RELOC_DIR="$TMP/mut-relocated-suite"; mkdir -p "$RELOC_DIR"
+# Volontairement rien copié dedans : chemin "$RELOC_DIR/check-requirements-survival.sh" introuvable,
+# bash rend rc=127 — exactement le symptôme d'une suite relocalisée.
+dims_reloc="$(mut_run reloc-empty "$RELOC_DIR" "$DM_SILENT" 3 empty)"
+case "$dims_reloc" in
+  HARNESS_BROKEN*) ok "mut_run — script mutant introuvable (relocalisation simulée) → HARNESS_BROKEN signalé, jamais lu comme un silence légitime : $dims_reloc" ;;
+  *) ko "mut_run — script mutant introuvable (relocalisation simulée) → HARNESS_BROKEN signalé" "dims commence par HARNESS_BROKEN" "dims=[$dims_reloc]" ;;
+esac
+dims_reloc2="$(mut_run reloc-nonempty "$RELOC_DIR" "$DM_ABSENT" 0 nonempty)"
+case "$dims_reloc2" in
+  HARNESS_BROKEN*) ok "mut_run — même panne de harnais signalée HARNESS_BROKEN quel que soit le mode attendu (nonempty), jamais lue comme une morsure : $dims_reloc2" ;;
+  *) ko "mut_run — panne de harnais signalée HARNESS_BROKEN en mode nonempty" "dims commence par HARNESS_BROKEN" "dims=[$dims_reloc2]" ;;
+esac
+# mut_check doit aussi crier sur ce sentinel (jamais un ✓, jamais lu comme discriminance préservée).
+# Vérifié dans un SUBSHELL avec ok/ko locaux : mut_check("HARNESS_BROKEN") est CENSÉ produire un ko —
+# router cette assertion via le compteur PASS/FAIL réel de la suite ferait passer un résultat attendu
+# pour un vrai échec de suite, brouillant le total final.
+mc_probe_result="$(
+  PASS=0; FAIL=0
+  ok() { PASS=$((PASS+1)); }
+  ko() { FAIL=$((FAIL+1)); }
+  mut_check "$dims_reloc" 1 reloc-probe-bit "ne doit jamais s'afficher" "attendu : ko en mode bit"
+  mut_check "$dims_reloc2" 0 reloc-probe-discrim "ne doit jamais s'afficher" "attendu : ko en mode discriminance"
+  printf 'pass=%s fail=%s' "$PASS" "$FAIL"
+)"
+if [ "$mc_probe_result" = "pass=0 fail=2" ]; then
+  ok "mut_check — une panne de harnais (HARNESS_BROKEN) produit TOUJOURS un ko, jamais un ✓, quel que soit expect_nonempty (0 ou 1)"
+else
+  ko "mut_check — une panne de harnais produit toujours un ko, jamais un ✓" "pass=0 fail=2" "$mc_probe_result"
+fi
 
 echo ""
 echo "-- Trace des rougissements de mutation (à citer dans le SUMMARY) --"
