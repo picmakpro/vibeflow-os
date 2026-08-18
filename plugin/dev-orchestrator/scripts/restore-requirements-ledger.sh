@@ -98,7 +98,11 @@ OVERRIDE_ARCHIVE=""
 if [ "$state_rc" -ne 0 ] && [ "$OVERWRITE_LIVE" -eq 1 ] \
    && [ -n "${VF_LEDGER_MILESTONE:-}" ] && [ -f "$LIVE" ]; then
   _cand_archive="${PLANNING_DIR}/milestones/${VF_LEDGER_MILESTONE}-REQUIREMENTS.md"
-  if [ -f "$_cand_archive" ] && [ ! -L "$_cand_archive" ]; then
+  # Garde d'ancêtre symlinké (correctif 2026-08-18, revue tour 2, BLOQUANT) : même fonction
+  # partagée (vf_ancestor_symlink_found, requirements-survival-detect.sh) que celle appliquée dans
+  # la primitive — ce chemin de reconstruction directe de l'archive (--overwrite-live) est un second
+  # point d'entrée qui contournerait sinon la garde posée côté vf_ledger_state.
+  if [ -f "$_cand_archive" ] && [ ! -L "$_cand_archive" ] && ! vf_ancestor_symlink_found "$_cand_archive" "$PLANNING_DIR"; then
     OVERRIDE_ARCHIVE="$_cand_archive"
   fi
 fi
@@ -125,11 +129,16 @@ fi
 MILESTONE="$VF_LEDGER_MILESTONE"
 
 TMPD="$(mktemp -d)" || { echo "[restore-requirements-ledger] mktemp -d a échoué" >&2; exit 1; }
-trap 'rm -rf "$TMPD"' EXIT
+# Le trap couvre aussi WRITE_TMP (correctif 2026-08-18, revue tour 2, MINEUR) : ce fichier est créé
+# SOUS .planning/ (mktemp "${PLANNING_DIR}/.REQUIREMENTS.md.XXXXXX", plus bas, versionnable) — sans
+# ce trap, un crash entre sa création et le `mv` final (kill -9, panne) laissait un résidu
+# `.REQUIREMENTS.md.XXXXXX` que les `rm -f` explicites sur les chemins d'erreur normaux ne couvrent
+# pas. ${WRITE_TMP:-} tolère le cas où le trap se déclenche AVANT que WRITE_TMP soit défini plus bas.
+trap 'rm -rf "$TMPD"; [ -n "${WRITE_TMP:-}" ] && rm -f "$WRITE_TMP"' EXIT
 
 # --- Extraction structurée (famille, ID, ligne de corps, ligne de traçabilité), UNE passe pour la
 # table de traçabilité (premier arg) + UNE passe pour le corps (second arg, même fichier) ----------
-awk '
+awk -v dupfile="$TMPD/dupwarn.txt" '
   FNR == NR {
     if ($0 ~ /^## Traceability[ \t]*$/) { intrace = 1; next }
     if (intrace == 1 && match($0, /^\| [A-Z]+-[0-9]+ \|/)) {
@@ -142,8 +151,15 @@ awk '
         # la duplication est desormais annoncee sur stderr avec les DEUX lignes en conflit. Note
         # d hygiene shell : ce commentaire evite toute apostrophe francaise car il vit DANS un
         # script awk lui-meme entre quotes simples bash — une apostrophe y romprait la citation.
+        #
+        # Correctif 2026-08-18, revue tour 2 (MAJEUR #1) : ce message n ecrit PLUS directement sur
+        # /dev/stderr depuis awk — il reimprimait traceline[id]/line VERBATIM, hors de portee du
+        # `tr -d` qui neutralise les octets de controle ESC/BEL UNIQUEMENT sur le diff plus bas.
+        # Une archive hostile portant ANSI/BEL dans une ligne de tracabilite dupliquee atteignait
+        # donc le terminal en clair. Le message est ecrit dans un fichier intermediaire ; le shell
+        # appelant le reimprime ensuite a travers le MEME filtre que le diff.
         if (id in traceline && traceline[id] != line) {
-          printf "[restore-requirements-ledger] traçabilité dupliquée pour %s — ancienne ligne écrasée : %s -> %s\n", id, traceline[id], line > "/dev/stderr"
+          printf "%s\037%s\037%s\n", id, traceline[id], line >> dupfile
         }
         traceline[id] = line
       }
@@ -163,6 +179,17 @@ awk '
     }
   }
 ' "$ARCHIVE" "$ARCHIVE" > "$TMPD/tuples.tsv"
+
+# Réimpression sanitisée des avertissements de traçabilité dupliquée (voir commentaire awk
+# ci-dessus, MAJEUR #1) : MÊME filtre `tr -d` que le diff plus bas, sur CE canal aussi — jamais
+# gaté par --quiet, ce message existait déjà en clair avant ce correctif.
+if [ -s "$TMPD/dupwarn.txt" ]; then
+  while IFS=$'\037' read -r _dupid _dupold _dupnew; do
+    [ -n "$_dupid" ] || continue
+    printf '[restore-requirements-ledger] traçabilité dupliquée pour %s — ancienne ligne écrasée : %s -> %s\n' \
+      "$_dupid" "$_dupold" "$_dupnew" | tr -d '\000-\010\013-\037\177' >&2
+  done < "$TMPD/dupwarn.txt"
+fi
 
 : > "$TMPD/garanties.txt"
 : > "$TMPD/voyage.tsv"
@@ -264,9 +291,15 @@ VOYAGE_N="$(wc -l < "$TMPD/voyage.tsv" | tr -d ' ')"
 CADUQUE_N="$(wc -l < "$TMPD/caduque.txt" | tr -d ' ')"
 CODE3_N="$(wc -l < "$TMPD/code3.txt" | tr -d ' ')"
 
+# T-18-09 (correctif 2026-08-18, revue tour 2, MAJEUR #2) : cette trace échappe DÉLIBÉRÉMENT à
+# --quiet — echo direct, jamais say() (qui est gaté par QUIET). L'en-tête de ce fichier promet
+# « signalé sur stderr… dans les DEUX modes… jamais absorbé sans trace » : sous say(), --quiet la
+# rendait fausse (reproduit : stderr vide avec --quiet, non vide sans). Un repli conservateur
+# silencieux est exactement ce que cette phase existe pour combattre — --quiet ne doit couper que
+# le bruit de progression, jamais un signal de perte potentielle.
 if [ "$CODE3_N" -gt 0 ]; then
-  say "forme non reconnue (code 3), $CODE3_N item(s) — ni écrits ni ignorés silencieusement :"
-  while IFS= read -r cid; do [ -n "$cid" ] && say "  - $cid"; done < "$TMPD/code3.txt"
+  echo "[restore-requirements-ledger] forme non reconnue (code 3), $CODE3_N item(s) — ni écrits ni ignorés silencieusement :" >&2
+  while IFS= read -r cid; do [ -n "$cid" ] && echo "[restore-requirements-ledger]   - $cid" >&2; done < "$TMPD/code3.txt"
 fi
 
 if [ "$WRITE" -eq 0 ]; then
@@ -305,6 +338,17 @@ fi
 BACKUP_PATH=""
 if [ -f "$LIVE" ] && [ "$OVERWRITE_LIVE" -eq 1 ]; then
   BACKUP_PATH="${LIVE}.bak-${MILESTONE}"
+  # Garde symlink préexistant (correctif 2026-08-18, revue tour 2, MAJEUR #3) : $BACKUP_PATH est un
+  # chemin PRÉVISIBLE (${LIVE}.bak-${MILESTONE}) — un attaquant qui le précrée en lien symbolique
+  # vers une cible arbitraire hors du lab fait suivre le lien par `cp` (contrairement au `mv` final
+  # plus bas, sûr par rename()) : le contenu du ledger vivant s'écrit alors À TRAVERS le lien.
+  # Refus explicite avant toute copie plutôt qu'un mktemp+mv (le fichier de sauvegarde, contrairement
+  # au fichier principal, n'a pas besoin d'atomicité de remplacement — seulement de ne jamais suivre
+  # un lien préexistant).
+  if [ -L "$BACKUP_PATH" ]; then
+    echo "[restore-requirements-ledger] $BACKUP_PATH est un lien symbolique préexistant — refus d'écrire la sauvegarde à travers un lien (écriture annulée)." >&2
+    exit 1
+  fi
   cp "$LIVE" "$BACKUP_PATH" || { echo "[restore-requirements-ledger] sauvegarde de $LIVE a échoué — écriture annulée" >&2; exit 1; }
 fi
 

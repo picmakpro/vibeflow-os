@@ -41,6 +41,36 @@
 # diff d'IDs (A-18-08) parcourt l'archive et le vivant chacun UNE seule fois côté awk, sans boucle
 # imbriquée sur le contenu de dépôt.
 
+# vf_ancestor_symlink_found <path> <boundary_dir> — confinement de traversée symlink D'ANCÊTRE
+# (correctif 2026-08-18, revue tour 2, BLOQUANT). La garde `[ -f "$archive" ] && [ ! -L "$archive" ]`
+# plus bas ne teste QUE le fichier FEUILLE — jamais les répertoires intermédiaires du chemin. Un
+# ancêtre symlinké (ex. `.planning/milestones -> /chemin/hors/lab`) traversait cette garde intacte :
+# le fichier feuille pointé par la traversée n'est lui-même pas un lien, seul un composant du CHEMIN
+# l'est. Reproduit trois fois (revue, audit, exécution directe) : `.planning/milestones` symlinké
+# vers un répertoire externe, jalon déclaré clos, `restore-requirements-ledger.sh --write` lisait et
+# écrivait du contenu venu de HORS du lab dans `.planning/REQUIREMENTS.md`, fichier tracké git.
+# Vecteur aggravant : un symlink RELATIF sous `.planning/` (non ignoré par .gitignore) peut être
+# commité et déclenché par un simple `git pull` au SessionStart suivant — pas seulement un
+# scénario "l'attaquant a déjà un accès en écriture".
+#
+# Remonte les composants un par un depuis dirname(<path>) jusqu'à <boundary_dir> INCLUS et refuse
+# (return 0 = trouvé) dès qu'un composant est un lien symbolique. AUCUN `realpath` (ADR-054,
+# précédent symlink-ancestor-bypasses-target-root-check banni pour ce type de garde dans ce dépôt) :
+# cette marche manuelle composant par composant est la forme retenue ici.
+vf_ancestor_symlink_found() { # <path> <boundary_dir>
+  local target="$1" boundary="$2" dir parent
+  dir="$(dirname "$target")"
+  while :; do
+    [ -L "$dir" ] && return 0
+    if [ "$dir" = "$boundary" ] || [ "$dir" = "." ] || [ "$dir" = "/" ]; then
+      return 1
+    fi
+    parent="$(dirname "$dir")"
+    [ "$parent" = "$dir" ] && return 1
+    dir="$parent"
+  done
+}
+
 vf_ledger_state() { # <planning_dir>
   local planning_dir="$1"
   VF_LEDGER_STATE="" VF_LEDGER_MILESTONE="" VF_LEDGER_ARCHIVE="" VF_LEDGER_ARMED=""
@@ -86,9 +116,13 @@ vf_ledger_state() { # <planning_dir>
   # qui laisse passer une traversée `../` intégrale (ex. `agentique-v1.0-phases/../../../../outside/pwn`)
   # — prouvé par exécution avant ce correctif : le chemin d'archive interpolé plus bas (et
   # `restore-requirements-ledger.sh`, qui hérite de ce même libellé validé) lisait/écrivait alors
-  # hors de `.planning/`. Aucun libellé réel de `.planning/MILESTONES.md` de ce dépôt n'a jamais
-  # porté de `/` (vérifié : `agentique-v1.0`, `vf-routing`, `gsd-migration`, `install-ux-v1.0`,
-  # `vfdo-v1.0`, `fiabilite-v1.0`…) : le retirer ne restreint aucun cas réel.
+  # hors de `.planning/`. Aucun libellé de jalon CLOS de `.planning/MILESTONES.md` de ce dépôt n'a
+  # jamais porté de `/` (vérifié, les 8 titres H2 clos réellement présents au moment de ce correctif :
+  # `agentique-v1.0`, `vf-routing`, `gsd-migration`, `hors-milestone`, `memory-swarm-rnd`,
+  # `dev-doctrine`, `install-ux-v1.0`, `vfdo-v1.0`) : le retirer ne restreint aucun cas réel.
+  # Correction 2026-08-18 (revue tour 2, mineur) : `fiabilite-v1.0` retiré de cette liste — overclaim,
+  # ce jalon n'apparaît PAS dans MILESTONES.md (encore ouvert au moment de ce correctif), il n'a
+  # donc jamais été « vérifié » au sens de cette phrase (aucun titre H2 clos à examiner pour lui).
   if ! printf '%s' "$label" | grep -Eq '^[0-9A-Za-z._ -]{1,80}$'; then
     VF_LEDGER_STATE="unreadable"; VF_LEDGER_REASON="label_rejected"; return 2
   fi
@@ -113,7 +147,7 @@ vf_ledger_state() { # <planning_dir>
         | grep -vE 'carried-from: [0-9A-Za-z._ -]{1,80}$' | grep -q .; then
       VF_LEDGER_STATE="unreadable"; VF_LEDGER_REASON="trace_malformed"; return 2
     fi
-    if [ -f "$archive" ] && [ ! -L "$archive" ]; then
+    if [ -f "$archive" ] && [ ! -L "$archive" ] && ! vf_ancestor_symlink_found "$archive" "$planning_dir"; then
       local diff_out missing_count missing_list
       diff_out="$(awk '
         FNR == NR {
@@ -178,8 +212,11 @@ vf_ledger_state() { # <planning_dir>
     VF_LEDGER_STATE="nominal"; return 1
   fi
 
-  # REQUIREMENTS.md ABSENT — chemin construit à partir du libellé DÉJÀ validé (T-18-02).
-  if [ -f "$archive" ] && [ ! -L "$archive" ]; then
+  # REQUIREMENTS.md ABSENT — chemin construit à partir du libellé DÉJÀ validé (T-18-02). Garde
+  # d'ancêtre symlinké appliquée ici aussi (vf_ancestor_symlink_found) : sans elle, l'archive
+  # atteinte via un ancêtre lien serait proposée pour restauration alors même que le fichier feuille
+  # n'est pas lui-même un lien.
+  if [ -f "$archive" ] && [ ! -L "$archive" ] && ! vf_ancestor_symlink_found "$archive" "$planning_dir"; then
     VF_LEDGER_ARCHIVE="$archive"
   fi
   VF_LEDGER_STATE="absent_after_close"; return 0
@@ -229,7 +266,16 @@ vf_ledger_classify() { # <ligne_corps> <ligne_traçabilité>
   local body="$1" trace="$2" combo
   combo="$body
 $trace"
-  if printf '%s' "$combo" | grep -qi 'caduc'; then
+  # Borne de mot en tête (correctif 2026-08-18, revue tour 2, MINEUR #5) : incohérent jusqu'ici avec
+  # le `\b` déjà appliqué à `complete|done` plus bas dans ce MÊME commit — alignement de forme.
+  # Bornée en TÊTE SEULEMENT (`\bcaduc`, pas `\bcaduc\b`) : la forme plurielle `caducs` (masc. plur.,
+  # `caduc` + `s`) DOIT rester matchée — une borne de FIN l'exclurait puisque `c` et `s` sont tous
+  # deux des caractères de mot (aucune frontière entre eux), prouvé par exécution :
+  # `printf 'caducs' | grep -qE '\bcaduc\b'` échoue, `\bcaduc` seul réussit. La forme féminine
+  # `caduque` n'est PAS concernée par ce choix : elle ne contient de toute façon PAS la sous-chaîne
+  # `caduc` (alternance c→qu au féminin, comme `public`/`publique`) — bornée ou non, elle ne
+  # matchait déjà pas avant ce correctif.
+  if printf '%s' "$combo" | grep -qiE '\bcaduc'; then
     return 2
   fi
   case "$body" in
