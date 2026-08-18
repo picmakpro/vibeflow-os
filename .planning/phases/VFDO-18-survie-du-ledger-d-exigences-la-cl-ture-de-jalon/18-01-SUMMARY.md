@@ -66,7 +66,7 @@ silence confirmé par exécution réelle sur ce dépôt.
    lien symbolique T-18-02) — ratio 1,30× → 1,48×, dans la bande de convention du module par
    complétude de couverture, jamais par ajout de lignes pour atteindre un chiffre.
 
-## Correction ciblée post-vérification (2026-08-18) — W-A et fermeture de la condition C1
+## Correction ciblée post-vérification (2026-08-18) — W-A et preuve du hook réel SessionStart
 
 ### W-A — le harnais de mutation distingue désormais « ça a mordu » de « le harnais est cassé »
 
@@ -96,15 +96,33 @@ $ bash plugin/dev-orchestrator/scripts/tests/test-check-requirements-survival.sh
 (41 assertions d'origine + cas 32/34/35/36-39/MOYEN/BLOQUANT ajoutés en revues antérieures + 3 cas
 neufs de cette correction ciblée, tous verts.) Aucune régression sur les 11 autres suites du module
 (`test-windows-crlf.sh` inclus, hors module, vérifié en lecture seule) — découverte par code de
-sortie, toutes à `exit=0`.
+sortie, toutes à `exit=0`. **Portée de cette affirmation : le module seul.** Le 6ᵉ script
+`SessionStart` que ce plan ajoute (`check-requirements-survival.sh`) est un objet de **parc**, pas
+de module — il déplace le compte d'entrées exec produites à l'install (`dev-orchestrator` seul :
+6 entrées dans `hooks.json`, 5 routées vers `settings.local.json`, `check-hook-paths.sh` restant en
+`settings.json` par dérogation documentée). `plugin/_internal/tests/test-vibeflow-update.sh`
+comptait encore l'ancien total et rougissait (rc=1, CI PR #51 rouge) tant que ce plan n'était pas
+posé — corrigé en aval de cette correction ciblée (T10/T11/T12 réalignés sur 6/5/5, mutation T12
+rediscriminante), voir `plugin/_internal/tests/test-vibeflow-update.sh`. Le parc complet du dépôt
+compte **69** suites `test-*.sh` (hors `.claude/worktrees`), pas les 12 du seul module.
 
-### Fermeture de la condition C1 du STUDY — le hook réel est prouvé, pas seulement l'exécution manuelle
+### Hook réel SessionStart prouvé sur un lab de démo — C1 du STUDY reste NON fermée
 
-`18-VERIFICATION.md` déclarait C1 (« ce repo consomme son propre outillage ») non tenue et non
-revendiquée, au motif que `.claude/scripts/` n'existe pas dans ce dépôt (`.gitignore` l'exclut) et
-qu'aucun `.claude/settings*.json` ne câble le gate — « seule une exécution manuelle est prouvée ».
+Correctif post-relecture : une version antérieure de cette section titrait « fermeture de la
+condition C1 du STUDY » — **c'était faux**. C1 (`STUDY.md:599`, Bloc C — « invalide le NO-GO sur
+la discipline de tenue ») vérifie `find .planning/phases -name '*SPEC*' | wc -l` ≥ 3 sur 3 phases
+consécutives ; la mesure du jour est **0**. Rien de ce qui suit ne touche à cette condition — elle
+n'a **rien à voir** avec des hooks. Déclarer C1 close reviendrait à lever un NO-GO documenté sans
+que sa preuve prescrite existe. C1 reste **non tenue, non entamée**.
 
-Une recette sur **lab de démo réaliste hors dépôt** (11 scénarios) ferme cette condition :
+Ce qui EST prouvé, réellement et sans extrapolation : les scripts posés dans `.claude/scripts/`
+d'un lab et invoqués comme l'entrée `SessionStart` (`{{VF_BASH}}` + `--hook`) se comportent
+correctement — silence en nominal, signal non vide sur perte/absence. Le déclenchement en hook
+réel n'est plus une promesse, mais reste borné à un lab de démo réaliste **hors dépôt** : ce dépôt
+lui-même ne consomme toujours pas ce gate (`.claude/scripts` inexistant ici, `.gitignore:20`
+l'exclut), et aucune indexation par capability n'est captée.
+
+Une recette sur **lab de démo réaliste hors dépôt** (11 scénarios) établit ce comportement :
 
 - Lab avec jalon clos + jalon courant, archive à table `## Traceability`, vocabulaire varié
   (`Complete` / `Done — plans …` / `Planned — plan …` / `caduc`) + un ID orphelin sans ligne de
@@ -124,9 +142,12 @@ Une recette sur **lab de démo réaliste hors dépôt** (11 scénarios) ferme ce
   `SessionStart` (`{{VF_BASH}}` + `--hook`) → **stdout 0 octet** en nominal, **179 octets** sur
   perte, exit 0 dans les deux cas.
 
-**C1 n'est plus « seule l'exécution manuelle est prouvée ».** Réserves qui restent réellement
-ouvertes, sans changement : l'indexation par capability (STUDY §7.3), et Windows **réel** (la
-portabilité ci-dessus reste une simulation CRLF sur bash 3.2 macOS, jamais une machine Windows).
+**Ce qui a changé, ce n'est pas C1** (elle reste non tenue, non entamée — voir ci-dessus), **c'est
+qu'« exécution manuelle » n'est plus la formule exacte** : le déclenchement se fait désormais en
+hook réel `SessionStart` sur un lab de démo. Réserves qui restent réellement ouvertes, sans
+changement : C1 du STUDY (0 fichier `*SPEC*`, ce dépôt ne consomme toujours pas son propre gate),
+l'indexation par capability (STUDY §7.3), et Windows **réel** (la portabilité ci-dessus reste une
+simulation CRLF sur bash 3.2 macOS, jamais une machine Windows).
 
 ## Reliquat
 
