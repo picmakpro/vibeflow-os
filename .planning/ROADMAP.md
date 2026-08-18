@@ -58,7 +58,7 @@
 - [x] Phase 15: Collaboration inter-équipes dev ↔ design (completed 2026-07-27)
 - [x] Phase 16: Cloisonnement complet des dispatches d'agents (completed 2026-07-27)
 - [x] Phase 17: Signaux de démarrage du moteur de dev (completed 2026-07-28)
-- [ ] Phase 18: Survie du ledger d'exigences à la clôture de jalon
+- [x] Phase 18: Survie du ledger d'exigences à la clôture de jalon (completed 2026-08-18 — 3 plans exécutés, non shippée : PR/tag/release restent des gestes humains non posés)
 - [x] Phase 19: Migration du moteur GSD pilotée par /vf-update (completed 2026-07-28)
 - [x] Phase 20: Fluidité du flux de dev sans perte de qualité (completed 2026-07-31)
 - [x] Phase 21: Alignement du moteur GSD sur gsd-core 1.9.0 (completed 2026-07-31)
@@ -860,7 +860,12 @@ mutation rouge prouvée (convention du module : suite ~1,5× la taille du script
 **Bénéfice explicitement NON capté** — à ne pas revendiquer : l'indexation par capability. Un
 `REQUIREMENTS.md` qui survit reste indexé par jalon ; cette part du besoin reste ouverte sous les
 conditions E1/E2 du STUDY §8 — pas déclarée sans objet.
-**Plans**: TBD
+**Plans**: 18-01 (LEDG-02, gate `check-requirements-survival.sh` + primitive
+`requirements-survival-detect.sh`), 18-02 (LEDG-01, rattrapage `restore-requirements-ledger.sh`),
+18-03 (doctrine D-18-14 + bump module `dev-orchestrator` v2.18.0 → v2.19.0). Les 3 plans sont
+**exécutés** (`18-01-SUMMARY.md`, `18-02-SUMMARY.md`, `18-03-SUMMARY.md`) ; la phase n'est **pas
+encore shippée** — PR, tag et release restent des gestes humains non posés (CLAUDE.md racine,
+ADR-031).
 
 ### Phase 34: Gaps agency-agents & cadrage skill-installer
 

@@ -4,11 +4,16 @@ milestone: fiabilite-v1.0
 milestone_name: « ce qui survit »
 current_phase: 18
 current_phase_name: Survie du ledger d'exigences à la clôture de jalon
-status: context_gathered
-stopped_at: Phase 33 CLOSE ET RELEASÉE — `v2.56.0`. Tronc (WTCH-01..04, 5 plans sur 3 vagues) vérifié goal-backward le 2026-08-17 (`33-VERIFICATION.md`) — 4/4 critères ATTEINTS (WTCH-03 en limite assumée : preuve Windows réelle non exécutée) ; gap WTCH-02 fermé par D-33-G (`88975dc`, cas T49). Annexe D-33-H (notifications OS en opt-in, défaut OFF) livrée par les plans 33-06 (gate d'opt-in + toggle `/vf-notify`) et 33-07 (Pattern H, relais des jalons GSD) ; `33-VERIFICATION-ANNEXE.md` 5/6 critères, critère 1 PARTIEL fermé par `401c903`. **Mergée et publiée** (vérifié machine le 2026-08-17) : PR #50 mergée dans `main` (`f639108`), commit de release `4431ed1`, tag annoté `v2.56.0` poussé, release GitHub publiée le 2026-08-17T18:40Z, `check-release-tag.sh --remote` ✓. Modules `conductor` v1.28.0 et `dev-orchestrator` v2.18.0. Reliquat porté hors phase : la recette Windows (`33-CLOTURE-WINDOWS.md`) n'a PAS été exécutée — laissée en suspens sur décision de Samuel (2026-08-17), retour attendu des testeurs (issue #20) ou recette jouée par Samuel après installation d'un poste Windows ; à ne jamais compter comme vert à la clôture du milestone
-last_updated: "2026-08-17T00:00:00.000Z"
-last_activity: 2026-08-17
-last_activity_desc: Clôture réelle de la Phase 33 — release `v2.56.0` (PR #50, tag poussé, release GitHub publiée) après retrait puis re-publication consécutifs à la revue du défaut de l'annexe (notifs OFF par défaut, skill `/vf-notify`, jalons via relais Pattern H car PushNotification est absent des sous-agents). Puis hygiène d'état (2026-08-17) : STATE.md recalé sur la réalité machine — il affirmait encore « branche non mergée, non poussée, aucune PR, aucun tag, aucune release » —, et `32-06-SUMMARY.md` posé en pointeur vers `32-RELIQUATS.md` pour fermer le faux-positif de comptage qui laissait la Phase 32 en `in_progress` (7 plans / 6 summaries) et faisait router l'invariant resume-incomplete-phase vers une phase déjà releasée. Prochaine phase choisie par Samuel : **Phase 18** (ledger) — la Phase 35 reste gatée (npm latest `@opengsd/gsd-core` = 1.10.0, précondition « > 1.10.0 » non satisfaite au 2026-08-17)
+status: phase_complete
+stopped_at: Phase 18 LIVRÉE, NON SHIPPÉE — 3 plans exécutés (18-01 LEDG-02, 18-02 LEDG-01, 18-03 doctrine D-18-14 + bump module), 12/12 suites vertes, arbre propre sur `feat/phase-18-survie-ledger-exigences`. PR, tag et release restent des gestes humains non posés (CLAUDE.md racine, ADR-031). Précédent : Phase 33 CLOSE ET RELEASÉE — `v2.56.0`. Tronc (WTCH-01..04, 5 plans sur 3 vagues) vérifié goal-backward le 2026-08-17 (`33-VERIFICATION.md`) — 4/4 critères ATTEINTS (WTCH-03 en limite assumée : preuve Windows réelle non exécutée) ; gap WTCH-02 fermé par D-33-G (`88975dc`, cas T49). Annexe D-33-H (notifications OS en opt-in, défaut OFF) livrée par les plans 33-06 (gate d'opt-in + toggle `/vf-notify`) et 33-07 (Pattern H, relais des jalons GSD) ; `33-VERIFICATION-ANNEXE.md` 5/6 critères, critère 1 PARTIEL fermé par `401c903`. **Mergée et publiée** (vérifié machine le 2026-08-17) : PR #50 mergée dans `main` (`f639108`), commit de release `4431ed1`, tag annoté `v2.56.0` poussé, release GitHub publiée le 2026-08-17T18:40Z, `check-release-tag.sh --remote` ✓. Modules `conductor` v1.28.0 et `dev-orchestrator` v2.18.0. Reliquat porté hors phase : la recette Windows (`33-CLOTURE-WINDOWS.md`) n'a PAS été exécutée — laissée en suspens sur décision de Samuel (2026-08-17), retour attendu des testeurs (issue #20) ou recette jouée par Samuel après installation d'un poste Windows ; à ne jamais compter comme vert à la clôture du milestone
+last_updated: "2026-08-18T00:00:00.000Z"
+last_activity: 2026-08-18
+last_activity_desc: Phase 18 (survie du ledger d'exigences) livrée — 3 plans exécutés sur
+`feat/phase-18-survie-ledger-exigences` (LEDG-01, LEDG-02, doctrine D-18-14, module
+`dev-orchestrator` v2.18.0 → v2.19.0), 12/12 suites vertes, arbre propre. Non shippée : PR, tag et
+release restent des gestes humains non posés. Hygiène documentaire de clôture de phase (ce
+mandat) : `ROADMAP.md` (case cochée, `Plans:` réel), `REQUIREMENTS.md` (LEDG-01/LEDG-02 cochées),
+décisions structurantes consignées ci-dessous. Précédent : Clôture réelle de la Phase 33 — release `v2.56.0` (PR #50, tag poussé, release GitHub publiée) après retrait puis re-publication consécutifs à la revue du défaut de l'annexe (notifs OFF par défaut, skill `/vf-notify`, jalons via relais Pattern H car PushNotification est absent des sous-agents). Puis hygiène d'état (2026-08-17) : STATE.md recalé sur la réalité machine — il affirmait encore « branche non mergée, non poussée, aucune PR, aucun tag, aucune release » —, et `32-06-SUMMARY.md` posé en pointeur vers `32-RELIQUATS.md` pour fermer le faux-positif de comptage qui laissait la Phase 32 en `in_progress` (7 plans / 6 summaries) et faisait router l'invariant resume-incomplete-phase vers une phase déjà releasée. Prochaine phase choisie par Samuel : **Phase 18** (ledger) — la Phase 35 reste gatée (npm latest `@opengsd/gsd-core` = 1.10.0, précondition « > 1.10.0 » non satisfaite au 2026-08-17)
 progress:
   total_phases: 8
   completed_phases: 4
@@ -24,7 +29,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26 — charte rouverte : 17 modules, D2/D6 renversées)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Milestone fiabilite-v1.0 — **4 phases sur 8 livrées et releasées** : Phase 30 (Portabilité Windows II, `v2.53.0`/`v2.53.1`), Phase 31 (Manifeste d'install + dry-run, issue #20, `v2.54.0`), Phase 32 (Durcissement du driver-lock, `v2.55.0`/`v2.55.1`) et Phase 33 (Watchdog & notifications des missions, **`v2.56.0`** — tronc WTCH-01..04 4/4 critères, gap fermé par D-33-G, plus l'annexe D-33-H : notifications en opt-in défaut OFF + jalons relayés vers l'app Claude). Restent 18, 34, 25 et 35. **Prochaine phase : 18** (survie du ledger) — son socle amont est en place : la RFC `open-gsd/gsd-core#3556` est ouverte et la réponse du collaborateur amont valide par prototype la variante roll-forward `carried-from:` retenue par la phase (0 conflit sur 5, seule variante conflict-free), go/no-go formel déféré à revue mainteneur, deadline de ré-arbitrage 2026-10-26. La Phase 35 reste **gatée** : npm latest `@opengsd/gsd-core` = 1.10.0 au 2026-08-17, la précondition « > 1.10.0 » n'est pas satisfaite (fix `#3302` mergé mais non releasé) ; veille WKTR-03 active.
+**Current focus:** Milestone fiabilite-v1.0 — **4 phases sur 8 livrées et releasées** : Phase 30 (Portabilité Windows II, `v2.53.0`/`v2.53.1`), Phase 31 (Manifeste d'install + dry-run, issue #20, `v2.54.0`), Phase 32 (Durcissement du driver-lock, `v2.55.0`/`v2.55.1`) et Phase 33 (Watchdog & notifications des missions, **`v2.56.0`** — tronc WTCH-01..04 4/4 critères, gap fermé par D-33-G, plus l'annexe D-33-H : notifications en opt-in défaut OFF + jalons relayés vers l'app Claude). **Phase 18 (survie du ledger) livrée le 2026-08-18** (3 plans exécutés, LEDG-01/LEDG-02, doctrine D-18-14, module `dev-orchestrator` v2.19.0) mais **pas encore shippée** — PR/tag/release restent des gestes humains non posés. Restent 34, 25 et 35 à cadrer. La Phase 35 reste **gatée** : npm latest `@opengsd/gsd-core` = 1.10.0 au 2026-08-17, la précondition « > 1.10.0 » n'est pas satisfaite (fix `#3302` mergé mais non releasé) ; veille WKTR-03 active.
 `get-shit-done-cc` → `@opengsd/gsd-core` livrée en v2.39.0 atteint enfin les **postes déjà équipés** :
 `/vf-update` dit l'état du moteur avant tout stop et propose la bascule sous confirmation ADR-031.
 Modules `dev-orchestrator` v2.7.0 + `conductor` v1.16.0. Verdict `19-VERIFICATION.md` : **PASS 6/7**.
@@ -56,11 +61,13 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 ## Current Position
 
-Phase: **18** (Survie du ledger d'exigences à la clôture de jalon) — **cadrée le 2026-08-17**
-(`18-CONTEXT.md`, `18-DISCUSSION-LOG.md`, commit `bf2d3a0`). Aucun plan — prochain geste :
-`/gsd-plan-phase 18`.
-Plan: —
-Status: context_gathered
+Phase: **18** (Survie du ledger d'exigences à la clôture de jalon) — **LIVRÉE le 2026-08-18**,
+3 plans exécutés (`18-01-SUMMARY.md` LEDG-02, `18-02-SUMMARY.md` LEDG-01, `18-03-SUMMARY.md`
+doctrine D-18-14 + bump module `dev-orchestrator` v2.18.0 → v2.19.0), 12/12 suites vertes,
+branche `feat/phase-18-survie-ledger-exigences`. **Non shippée** — PR, tag et release restent des
+gestes humains non posés (CLAUDE.md racine, ADR-031). Prochain geste : ship (humain) ou Phase 34.
+Plan: 18-03 (dernier exécuté)
+Status: phase_complete
 
 **Ce que le cadrage a tranché** (détail en `18-CONTEXT.md`) :
 
@@ -385,6 +392,39 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
+
+- **2026-08-18 — Phase 18 (Survie du ledger d'exigences) : livrée, quatre arbitrages structurants
+  sur la reconstitution du ledger.** Détail : `18-01-SUMMARY.md`, `18-02-SUMMARY.md`,
+  `18-03-SUMMARY.md`, doctrine `AGENT.md` D-18-14.
+
+  1. **`carried-from:` porte le nom du jalon verbatim** (ex. `agentique-v1.0`), jamais un `v`
+     fabriqué — `carried-from: v[X.Y]` dans le gabarit amont est un **placeholder de forme**, pas
+     un format de valeur à reproduire littéralement.
+
+  2. **Le rattrapage refuse d'écraser un ledger vivant.** `restore-requirements-ledger.sh --write`
+     échoue si `.planning/REQUIREMENTS.md` existe déjà ; seul `--overwrite-live` (jamais impliqué
+     par `--write` seul) l'autorise, avec sauvegarde tracée `REQUIREMENTS.md.bak-<jalon>`. Ajouté
+     hors périmètre initial du plan, en défense en profondeur ; threat model complété
+     rétroactivement (T-18-12).
+
+  3. **Classification par destin, jamais par la case à cocher seule.** `vf_ledger_classify` a été
+     corrigée deux fois sur mesure (A-18-06 rouverte) : la case cochée seule est structurellement
+     non discriminante (134/136 IDs de l'archive réelle sont cochés à la clôture). Contrat retenu :
+     caduc (précédence absolue) > case explicitement non cochée = voyage > case cochée + statut
+     reconnu livré (`complete`/`done` insensible à la casse, ou `Livré v`) = garantie > repli
+     voyage par défaut > forme non reconnue = imparsable. **Aucune exigence n'est jamais écrite
+     « nulle part »** — toute forme retombe dans l'une des quatre issues.
+
+  4. **`## Garanties` et `## Reportées` sont des H2 frères**, jamais un `###` sous `## Garanties`.
+     Défaut trouvé en revue (A-18-07 amendée) : un lecteur appliquant la règle « jusqu'au prochain
+     H1/H2 » (celle d'`updateTraceabilityCell()`, gsd-core) ramassait les 42 voyageuses comme des
+     garanties quand elles vivaient en `###` directement sous `## Garanties`. Corrigé, test de
+     régression + mutation jumelle ajoutés.
+
+  **Non capté, explicitement** : l'indexation par capability (bénéfice hors périmètre, STUDY §8
+  conditions E1/E2 restent ouvertes). Aucune revendication de condition C1 du STUDY (« ce repo
+  consomme son propre outillage ») — ce dépôt n'a pas de `.claude/scripts` et gitignore `.claude/`,
+  seule une exécution manuelle du gate est prouvée sur ce repo.
 
 - **2026-08-16/17 — Phase 32 (Durcissement du driver-lock) : cadrage et plans arrêtés, quatre
   arbitrages humains, tous nés d'une mesure qui contredisait une prémisse écrite.** Détail :
