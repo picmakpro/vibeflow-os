@@ -827,11 +827,11 @@ jalon suivant régénère de zéro — aucun lab GSD conforme n'a de réponse du
 système garantit aujourd'hui ? ». La dérive a été **re-constatée à la clôture d'agentique-v1.0**
 (2026-08-15) : la conservation du ledger y est une déviation manuelle assumée, pas un comportement
 outillé — 2ᵉ occurrence ; cette phase existe pour qu'il n'y ait pas de 3ᵉ.
-**Depends on**: Phase 30 (la RFC upstream — LEDG-03 — part en jour 1 du milestone ; le hook
-`SessionStart` du gate naît en forme exec sur le moteur de la Phase 30). **La RFC conditionne le GO
-du gate, pas le code** : refusée ou sans réponse au **2026-10-26** → ré-arbitrage intégral (doctrine
-seule, ou gate en mode avertissement), jamais un piquet planté contre notre propre chaîne d'outils
-(Iron Law 2).
+**Depends on**: Phase 30 (le hook `SessionStart` du gate naît en forme exec sur le moteur de la
+Phase 30). **La clause de conditionnement à la RFC amont est sans objet (D-18-07)** : le rattrapage
+outillé devient **permanent** si la RFC #3556 (OPEN, triage COLLABORATOR « deferred — awaiting
+maintainer review ») est refusée ou sans réponse au **2026-10-26** — aucun ré-arbitrage à conduire,
+l'exécution part sans attendre l'issue amont (Iron Law 2).
 **Requirements**: LEDG-01, LEDG-02 *(LEDG-03 — dépôt de la RFC — est portée par la Phase 30)*
 **Success Criteria** (what must be TRUE):
 

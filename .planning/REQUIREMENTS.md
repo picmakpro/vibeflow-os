@@ -931,7 +931,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 ### Survie du ledger d'exigences (Phase 18 héritée)
 - [ ] **LEDG-01**: La clôture de jalon fait un roll-over outillé du ledger — les exigences non livrées voyagent avec trace `carried-from:`
 - [ ] **LEDG-02**: Un gate rend rouge si une exigence disparaît du ledger sans issue tracée (livrée / reportée / abandonnée)
-- [ ] **LEDG-03**: La RFC upstream est ouverte dès le jour 1 du milestone (deadline amont
+- [x] **LEDG-03**: La RFC upstream est ouverte dès le jour 1 du milestone (deadline amont
   2026-10-26) — https://github.com/open-gsd/gsd-core/issues/3556, ouverte le 2026-08-15.
 
 ### Budget d'instructions (Phase 25 héritée, réduite)
