@@ -1014,6 +1014,72 @@ else
   ko "MUTATION 26 — construction du mutant a échoué" "l'appel vf_ancestor_symlink_found sur _cand_archive est retiré du fichier muté" "grep le trouve encore"
 fi
 
+# ==================================================================================================
+# Cas 27 (BLOQUANT G1, correction ciblée post-vérification 2026-08-18) : portabilité CRLF (ADR-054).
+# Rejeu de la MÊME archive `$DEMO_ARCHIVE` (comptes de référence déjà établis par le cas 4 : 2
+# Garanties, 2 Voyage, 1 caduque, 1 forme non reconnue) mais en CRLF de bout en bout (MILESTONES.md
+# ET l'archive). Reproduit par exécution AVANT correctif sur cette même fixture :
+# `Garanties: 0, Voyage: 4` — chaque item classé code 1 (perdant sa classification garantie/caduque
+# réelle) parce que le `\r` résiduel en fin de ligne de corps déplaçait l'extraction d'ID côté awk et
+# cassait la jonction body/trace. Rouge avant ce correctif (reproduit ci-dessus par exécution
+# indépendante sur le code pré-correctif), vert après.
+# ==================================================================================================
+D="$(mk_root c27)"
+printf '# Milestones\r\n\r\n## \xe2\x9c\x85 demo-v1 \xe2\x80\x94 Un jalon clos (fixture de test)\r\n' > "$D/.planning/MILESTONES.md"
+mkdir -p "$D/.planning/milestones"
+CRLF_DEMO_ARCHIVE="${DEMO_ARCHIVE//$'\n'/$'\r\n'}"
+printf '%s' "$CRLF_DEMO_ARCHIVE" > "$D/.planning/milestones/demo-v1-REQUIREMENTS.md"
+out27="$(bash "$SCRIPT" --path "$D" --write 2>/dev/null)"; rc27=$?
+F27="$D/.planning/REQUIREMENTS.md"
+counts_ok=0
+case "$out27" in *"Garanties: 2, Voyage: 2, Caduques laissées en archive: 1, Forme non reconnue (stderr): 1"*) counts_ok=1 ;; esac
+no_cr_written=0
+if [ -f "$F27" ] && ! grep -q $'\r' "$F27"; then no_cr_written=1; fi
+if [ "$rc27" -eq 0 ] && [ "$counts_ok" -eq 1 ] && [ "$no_cr_written" -eq 1 ]; then
+  ok "27 (G1) archive et MILESTONES.md en CRLF → mêmes comptes que le baseline LF (2/2/1/1), fichier écrit sans \\r résiduel"
+else
+  ko "27 (G1) archive et MILESTONES.md en CRLF → mêmes comptes que le baseline LF (2/2/1/1), fichier écrit sans \\r résiduel" "rc=0, Garanties: 2, Voyage: 2, Caduques: 1, code3: 1, aucun \\r dans le fichier écrit" "rc=$rc27 out=[$out27] cr_absent=$no_cr_written"
+fi
+
+# --- MUTATION G1 (archive) : retirer la normalisation CRLF de la double lecture de l'archive dans
+# une COPIE de la primitive-consommatrice (restore-requirements-ledger.sh lui-même, la substitution
+# de processus vit dans CE script, pas dans la primitive) — doit faire ROUGIR le cas 27 (comptes
+# faux sous CRLF), en laissant VERT le cas 4 (même archive, LF, non affecté par la mutation).
+MUT27_DIR="$TMP/mut-g1-archive"; mkdir -p "$MUT27_DIR"
+cp "$PRIMITIVE" "$MUT27_DIR/"
+sed "s#' <(tr -d '\\\\r' < \"\$ARCHIVE\") <(tr -d '\\\\r' < \"\$ARCHIVE\") > \"\$TMPD/tuples.tsv\"#' \"\$ARCHIVE\" \"\$ARCHIVE\" > \"\$TMPD/tuples.tsv\"#" "$SCRIPT" > "$MUT27_DIR/restore-requirements-ledger.sh"
+chmod +x "$MUT27_DIR"/*.sh
+guard27_removed=0
+grep -qF "' \"\$ARCHIVE\" \"\$ARCHIVE\" > \"\$TMPD/tuples.tsv\"" "$MUT27_DIR/restore-requirements-ledger.sh" && guard27_removed=1
+bash -n "$MUT27_DIR/restore-requirements-ledger.sh" 2>/dev/null || guard27_removed=0
+if [ "$guard27_removed" -eq 1 ]; then
+  D27M="$(mk_root c27mut)"
+  printf '# Milestones\r\n\r\n## \xe2\x9c\x85 demo-v1 \xe2\x80\x94 Un jalon clos (fixture de test)\r\n' > "$D27M/.planning/MILESTONES.md"
+  mkdir -p "$D27M/.planning/milestones"
+  printf '%s' "$CRLF_DEMO_ARCHIVE" > "$D27M/.planning/milestones/demo-v1-REQUIREMENTS.md"
+  out27mut="$(bash "$MUT27_DIR/restore-requirements-ledger.sh" --path "$D27M" --write 2>/dev/null)"
+  counts_mut_ok=0
+  case "$out27mut" in *"Garanties: 2, Voyage: 2, Caduques laissées en archive: 1, Forme non reconnue (stderr): 1"*) counts_mut_ok=1 ;; esac
+  if [ "$counts_mut_ok" -eq 0 ]; then
+    ok "MUTATION G1 (normalisation CRLF de l'archive retirée) rougit le cas 27 comme attendu : comptes faux sous CRLF"
+  else
+    ko "MUTATION G1 — N'A PAS ROUGI" "les comptes divergent du baseline sous la mutation" "out=[$out27mut]"
+  fi
+  D27CTRL="$(mk_root c27ctrl)"
+  w_milestones "$D27CTRL" "$CLOSED_H2"
+  w_archive "$D27CTRL" "demo-v1" "$DEMO_ARCHIVE"
+  out27ctrl="$(bash "$MUT27_DIR/restore-requirements-ledger.sh" --path "$D27CTRL" --write 2>/dev/null)"
+  counts_ctrl_ok=0
+  case "$out27ctrl" in *"Garanties: 2, Voyage: 2, Caduques laissées en archive: 1, Forme non reconnue (stderr): 1"*) counts_ctrl_ok=1 ;; esac
+  if [ "$counts_ctrl_ok" -eq 1 ]; then
+    ok "MUTATION G1 — le cas 4 (même archive, LF) reste VERT sous cette mutation (discriminance)"
+  else
+    ko "MUTATION G1 — discriminance rompue, cas 4 affecté aussi" "comptes inchangés (2/2/1/1)" "out=[$out27ctrl]"
+  fi
+else
+  ko "MUTATION G1 — construction du mutant a échoué" "la double lecture normalisée est retirée du fichier muté" "grep ne la trouve pas / bash -n échoue"
+fi
+
 echo ""
 echo "== résultat : $PASS ok, $FAIL ko =="
 [ "$FAIL" -eq 0 ]

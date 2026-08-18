@@ -620,6 +620,110 @@ else
 fi
 
 # ==================================================================================================
+# Cas 36-39 (BLOQUANT G1, correction ciblée post-vérification 2026-08-18) : portabilité CRLF
+# (ADR-054). Sous `core.autocrlf=true` (défaut Git for Windows), un `.md` de lab peut porter des
+# fins de ligne CRLF sans que ce dépôt ne le contrôle (`.gitattributes` protège SES PROPRES fichiers,
+# pas ceux d'un lab tiers). Trois symptômes reproduits par exécution AVANT correctif, rejoués ici
+# rouge-avant/vert-après via `printf ... "\r"` — jamais un fichier binaire externe.
+# ==================================================================================================
+CR="$(printf '\r')"
+
+# === Cas 36 — titre H2 clos en CRLF, SANS séparateur em-dash après le libellé (forme minimale
+# `## ✅ <libellé>`) : PAS de faux label_rejected. Fixture choisie précisément : quand une
+# description suit un tiret cadratin (`CLOSED_H2` standard de cette suite), l'extraction du
+# libellé tronque tout après le tiret — le `\r` traînant y est coupé AVEC la description, la CRLF
+# ne peut donc pas y être observée. Vérifié par exécution sur le code PRÉ-correctif : SEULE la
+# forme sans description reproduit `label_rejected` sous CRLF (reproduit ici, rouge avant/vert
+# après ce correctif).
+D="$(mk_root c36)"
+printf '# Milestones\r\n\r\n## \xe2\x9c\x85 demo-v1\r\n\r\nDetail.\r\n' > "$D/.planning/MILESTONES.md"
+w_archive "$D" "demo-v1" "$(archive_one_id AAAA-01)"
+out="$(bash "$GATE" --path "$D" 2>/dev/null)"; rc=$?
+has=0; case "$out" in "[ledger-absent]"*"demo-v1"*) has=1 ;; esac
+leaked_reject=0; printf '%s' "$out" | grep -q 'label_rejected' && leaked_reject=1
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ] && [ "$leaked_reject" -eq 0 ]; then ok "36 (G1) titre H2 clos en CRLF sans description → [ledger-absent] normal, jamais label_rejected"; else ko "36 (G1) titre H2 clos en CRLF sans description → [ledger-absent] normal, jamais label_rejected" "rc=0, [ledger-absent] demo-v1, jamais label_rejected" "rc=$rc out=[$out]"; fi
+
+# === Cas 37 — trace carried-from: bien formée en CRLF : silence, jamais trace_malformed =============
+D="$(mk_root c37)"
+printf '# Milestones\r\n\r\n%s\r\n\r\nDetail.\r\n' "$CLOSED_H2" > "$D/.planning/MILESTONES.md"
+printf '# Requirements\r\n- [ ] **SSSS-01**: exigence voyageuse carried-from: v1.2\r\n' > "$D/.planning/REQUIREMENTS.md"
+out="$(bash "$GATE" --path "$D" 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 3 ] && [ -z "$out" ]; then ok "37 (G1) trace carried-from: bien formée en CRLF → silence, jamais trace_malformed"; else ko "37 (G1) trace carried-from: bien formée en CRLF → silence, jamais trace_malformed" "rc=3 out=[]" "rc=$rc out=[$out]"; fi
+
+# === Cas 38 (G3) — trace RÉELLEMENT tronquée (pas de backtick, pas de valeur) → trace_malformed =====
+# Correction du bras trop large : `carried-from:[[:space:]]*$` excluait AUSSI ce cas, indistinct
+# de la mention nue en prose (cas 24) qu'il visait seul. Contrôle de discriminance : le cas 24 reste
+# silencieux (backtick), voir plus haut dans cette suite.
+D="$(mk_root c38)"
+w_milestones "$D" "$CLOSED_H2"
+w_live "$D" $'# Requirements\n- [ ] **TTTT-01**: exigence tronquee \xe2\x80\x94 carried-from:\n'
+out="$(bash "$GATE" --path "$D" 2>/dev/null)"; rc=$?
+has=0; case "$out" in "[ledger-illisible]"*"trace_malformed"*) has=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then ok "38 (G3) trace carried-from: réellement tronquée (sans backtick, sans valeur) → illisible trace_malformed"; else ko "38 (G3) trace carried-from: réellement tronquée (sans backtick, sans valeur) → illisible trace_malformed" "rc=0 out contient trace_malformed" "rc=$rc out=[$out]"; fi
+
+# --- MUTATION G3 : réintroduire le bras trop large (`carried-from:[[:space:]]*$`, sans exigence de
+# backtick) dans une COPIE de la primitive — doit faire ROUGIR le cas 38 (la trace tronquée redevient
+# silencieusement absorbée), en laissant VERT le cas 24 (mention nue en prose, backtick, inchangée).
+MUTG3_DIR="$TMP/mut-g3"; mkdir -p "$MUTG3_DIR"
+sed "s/grep -vE 'carried-from:\`' \\\\/grep -vE 'carried-from:\`|carried-from:[[:space:]]*\$' \\\\/" "$PRIMITIVE" > "$MUTG3_DIR/requirements-survival-detect.sh"
+cp "$GATE" "$MUTG3_DIR/"
+chmod +x "$MUTG3_DIR"/*.sh
+guardg3_removed=0
+grep -qF "grep -vE 'carried-from:\`|carried-from:[[:space:]]*\$' \\" "$MUTG3_DIR/requirements-survival-detect.sh" && guardg3_removed=1
+bash -n "$MUTG3_DIR/requirements-survival-detect.sh" 2>/dev/null || guardg3_removed=0
+if [ "$guardg3_removed" -eq 1 ]; then
+  out_mut="$(bash "$MUTG3_DIR/check-requirements-survival.sh" --path "$D" 2>/dev/null)"; rc_mut=$?
+  malformed_mut=0; case "$out_mut" in "[ledger-illisible]"*"trace_malformed"*) malformed_mut=1 ;; esac
+  if [ "$malformed_mut" -eq 0 ]; then ok "MUTATION G3 (bras large réintroduit) rougit le cas 38 comme attendu : la trace tronquée redevient absorbée silencieusement"; else ko "MUTATION G3 — N'A PAS ROUGI" "la trace tronquée n'est plus flagée trace_malformed sous la mutation" "rc=$rc_mut out=[$out_mut]"; fi
+  D_G3CTRL="$(mk_root c38-controle)"
+  w_milestones "$D_G3CTRL" "$CLOSED_H2"
+  w_live "$D_G3CTRL" $'# Requirements\n- [ ] **LEDG-01**: convention décrite en prose, trace `carried-from:`\n'
+  out_ctrl="$(bash "$MUTG3_DIR/check-requirements-survival.sh" --path "$D_G3CTRL" 2>/dev/null)"; rc_ctrl=$?
+  if [ "$rc_ctrl" -eq 3 ] && [ -z "$out_ctrl" ]; then ok "MUTATION G3 — le cas 24 (mention nue en prose, backtick) reste VERT sous cette mutation (discriminance)"; else ko "MUTATION G3 — discriminance rompue, cas 24 affecté aussi" "rc=3 out=[]" "rc=$rc_ctrl out=[$out_ctrl]"; fi
+else
+  ko "MUTATION G3 — construction du mutant a échoué" "le fichier muté réintroduit le bras large" "grep ne le trouve pas / bash -n échoue"
+fi
+
+# --- MUTATION G1 (CRLF) : retirer la normalisation `tr -d '\r'` de l'extraction du titre H2 dans une
+# COPIE de la primitive — doit faire ROUGIR le cas 36 (le titre CRLF redevient rejeté), en laissant
+# VERT le cas 5 (libellé légitime demo-v1, déjà en LF, non affecté par la mutation).
+# Surgie par CONTENU exact de ligne, via ENVIRON (jamais `-v`, qui interprète `\r` comme un octet
+# de contrôle au lieu des deux caractères littéraux backslash+r présents dans la ligne source —
+# constaté par exécution : `-v` cassait la comparaison d'égalité de ligne, silencieusement).
+MUTCRLF_DIR="$TMP/mut-crlf"; mkdir -p "$MUTCRLF_DIR"
+export MUT_CRLF_OLD1 MUT_CRLF_OLD2 MUT_CRLF_NEW1 MUT_CRLF_NEW2
+MUT_CRLF_OLD1="$(sed -n '98p' "$PRIMITIVE")"
+MUT_CRLF_OLD2="$(sed -n '105p' "$PRIMITIVE")"
+MUT_CRLF_NEW1='  heading="$(awk '"'"''
+MUT_CRLF_NEW2='  '"'"' "$milestones")"'
+awk '
+  $0 == ENVIRON["MUT_CRLF_OLD1"] { print ENVIRON["MUT_CRLF_NEW1"]; next }
+  $0 == ENVIRON["MUT_CRLF_OLD2"] { print ENVIRON["MUT_CRLF_NEW2"]; next }
+  { print }
+' "$PRIMITIVE" > "$MUTCRLF_DIR/requirements-survival-detect.sh"
+unset MUT_CRLF_OLD1 MUT_CRLF_OLD2 MUT_CRLF_NEW1 MUT_CRLF_NEW2
+cp "$GATE" "$MUTCRLF_DIR/"
+chmod +x "$MUTCRLF_DIR"/*.sh
+guardcrlf_removed=0
+grep -q "tr -d '\\\\r' < \"\$milestones\"" "$MUTCRLF_DIR/requirements-survival-detect.sh" || guardcrlf_removed=1
+bash -n "$MUTCRLF_DIR/requirements-survival-detect.sh" 2>/dev/null || guardcrlf_removed=0
+if [ "$guardcrlf_removed" -eq 1 ]; then
+  D="$(mk_root cm-crlf)"
+  printf '# Milestones\r\n\r\n## \xe2\x9c\x85 demo-v1\r\n\r\nDetail.\r\n' > "$D/.planning/MILESTONES.md"
+  out_mut="$(bash "$MUTCRLF_DIR/check-requirements-survival.sh" --path "$D" 2>/dev/null)"; rc_mut=$?
+  rejected_mut=0; case "$out_mut" in "[ledger-illisible]"*"label_rejected"*) rejected_mut=1 ;; esac
+  if [ "$rejected_mut" -eq 1 ]; then ok "MUTATION G1 (normalisation CRLF retirée) rougit le cas 36 comme attendu : titre CRLF redevient label_rejected"; else ko "MUTATION G1 — N'A PAS ROUGI" "le titre CRLF redevient label_rejected sous la mutation" "rc=$rc_mut out=[$out_mut]"; fi
+  D2="$(mk_root cm-crlf-controle)"
+  w_milestones "$D2" "$CLOSED_H2"
+  w_archive "$D2" "demo-v1" "$(archive_one_id AAAA-01)"
+  out_ctrl="$(bash "$MUTCRLF_DIR/check-requirements-survival.sh" --path "$D2" 2>/dev/null)"; rc_ctrl=$?
+  has_ctrl=0; case "$out_ctrl" in "[ledger-absent]"*"demo-v1"*) has_ctrl=1 ;; esac
+  if [ "$rc_ctrl" -eq 0 ] && [ "$has_ctrl" -eq 1 ]; then ok "MUTATION G1 — le cas 5 (libellé légitime demo-v1, LF) reste VERT sous cette mutation (discriminance)"; else ko "MUTATION G1 — discriminance rompue, demo-v1 affecté aussi" "cas 5 inchangé" "rc=$rc_ctrl out=[$out_ctrl]"; fi
+else
+  ko "MUTATION G1 — construction du mutant a échoué" "le fichier muté ne porte plus la normalisation tr -d '\\r'" "grep la trouve encore"
+fi
+
+# ==================================================================================================
 # Garde finale — le fichier vivant est intact après la suite (aucune mutation n'a touché l'arbre réel).
 # ==================================================================================================
 if [ -x "$GATE" ] || [ -f "$GATE" ]; then :; fi
