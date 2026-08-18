@@ -164,3 +164,65 @@ vf_ledger_state() { # <planning_dir>
   fi
   VF_LEDGER_STATE="absent_after_close"; return 0
 }
+
+# vf_ledger_classify <ligne_de_statut_du_corps> <ligne_de_traçabilité_correspondante> — deuxième
+# consommateur de cette primitive (restore-requirements-ledger.sh, plan 18-02, LEDG-01), classe une
+# exigence archivée en un DESTIN de rattrapage. Zéro normalisation (D-18-13) : cette fonction ne
+# réécrit jamais le texte — elle rend un code, l'appelant écrit la ligne SOURCE verbatim.
+#
+#   Précédence FIGÉE, corrigée le 2026-08-18 en DEUX temps sur mesure (rejeu réel sur l'archive
+#   agentique-v1.0) — la case à cocher a été essayée comme signal primaire puis ABANDONNÉE : mesuré,
+#   134/136 IDs de cette archive sont cochés [x] (0 non coché, 2 partiels [~]) — une archive de
+#   jalon CLOS a tout coché à la clôture, la case y est donc CONSTANTE et sans pouvoir discriminant.
+#   Le signal retenu est « tout statut non reconnu comme livré VOYAGE » (route 1), avec un
+#   vocabulaire élargi de formes reconnues comme livrées :
+#     1. CADUQUE (code 2) — le jeton `caduc` (insensible à la casse) apparaît sur la ligne de CORPS
+#        OU la ligne de TRAÇABILITÉ, quel que soit l'état de la case. Cas réel : VERB-02 ne porte
+#        `caduc` QUE sur sa traçabilité — les deux lignes doivent être inspectées, jamais le corps
+#        seul. Précédence ABSOLUE : gagne toujours, même sur une case cochée.
+#     2. VOYAGE (code 1) — case EXPLICITEMENT NON cochée `[ ]` : jamais livrée, aucune ambiguïté,
+#        départage immédiat sans lire la traçabilité.
+#     3. GARANTIE (code 0) — case `[x]` ou `[~]` ET la traçabilité contient (insensible à la casse)
+#        `complete` ou `done` (couvre `Complete`, `Done — …`, `Spike done — …`), OU le corps porte
+#        le jeton littéral `Livré v` — mesuré : 48 `Complete` + 44 `Done` (dont les variantes
+#        `Done (doctrinal)`, `Spike done`) sur l'archive réelle. Sinon repli sur 4.
+#     4. VOYAGE (code 1, repli par défaut) — case cochée mais statut NI caduc NI reconnu comme
+#        livré : couvre `Planned — plan NN` (19 IDs mesurés, TOUS cochés — la route « case seule »
+#        les aurait classés garantie à tort, zéro exigence n'aurait voyagé), `Partiel` (GSDC-08),
+#        la prose non reconnue, et l'ABSENCE de ligne de traçabilité (l'appelant passe une chaîne
+#        vide, qui ne matche jamais `complete`/`done` — NOTR-01-like, zéro perte plutôt qu'un
+#        classement halluciné).
+#     5. FORME NON RECONNUE (code 3) — repli ULTIME, réservé aux lignes de corps qui ne portent
+#        AUCUNE case reconnaissable (ni `[x]`, ni `[ ]`, ni `[~]`).
+#
+#   CONTRAINTE NON NÉGOCIABLE (mesurée le 2026-08-18, DEUX fois, sur l'archive réelle) : une
+#   exigence archivée absente du fichier reconstitué est INVISIBLE (contre un ID sur-inclus dans la
+#   mauvaise section, visible et corrigible) — c'est le mode d'échec exact que cette phase existe
+#   pour empêcher. Le contrat d'origine (Complete/Livré v uniquement, jamais Done) perdait 86/136
+#   (63 %) en PRÉSENCE. Le contrat « case seule » essayé ensuite atteignait 136/136 en présence mais
+#   se trompait en DESTINATION : les 19 `Planned` (tous cochés) auraient été classées garanties,
+#   zéro exigence n'aurait voyagé — l'inverse exact de D-18-11. Deux tests distincts gardent
+#   désormais les deux axes (présence ET destination), voir test-restore-requirements-ledger.sh.
+#   D-18-13 tient : reconnaître un statut n'est pas le réécrire — la ligne imprimée par l'appelant
+#   reste la ligne SOURCE verbatim, `Done — plans 24-01 et 24-12` n'est JAMAIS réécrit `Complete`.
+vf_ledger_classify() { # <ligne_corps> <ligne_traçabilité>
+  local body="$1" trace="$2" combo
+  combo="$body
+$trace"
+  if printf '%s' "$combo" | grep -qi 'caduc'; then
+    return 2
+  fi
+  case "$body" in
+    '- [ ] '*)
+      return 1
+      ;;
+    '- [x] '*|'- [~] '*)
+      if printf '%s' "$trace" | grep -qiE 'complete|done'; then return 0; fi
+      if printf '%s' "$body" | grep -q 'Livré v'; then return 0; fi
+      return 1
+      ;;
+    *)
+      return 3
+      ;;
+  esac
+}
