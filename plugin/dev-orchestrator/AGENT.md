@@ -132,6 +132,10 @@ feuille de route) est déjà couvert par la ligne « intègre cette spec… » c
 | `[ledger-exigences-disparues]` | ledger présent mais ≥1 ID d'exigence garanti/voyageur disparu sans trace → vérifier livrée/reportée/abandonnée | requise avant toute écriture (ADR-031) |
 | `[ledger-illisible]` / `[ledger-outil-absent]` | constat BRUYANT (MILESTONES.md/traces malformés, ou outillage manquant) — jamais un vert | orientation seule, rien à écrire |
 
+**Doctrine du ledger (D-18-14, Phase 18)** : les archives `milestones/*-REQUIREMENTS.md` sont des
+instantanés — figés au jour de la clôture, jamais mis à jour. `.planning/REQUIREMENTS.md` est la
+**seule source vivante** : c'est lui qui répond à « que garantit le système aujourd'hui ? ».
+
 **Marqueur `.planning/.requirements-survival-armed`** (D-18-09) — objet **inaugural** de ce repo :
 premier fichier-sentinelle **versionné par git** dans `.planning/` (ni `scripts/.vibeflow-installed`,
 sous `.claude/` gitignoré, ni la sentinelle d'opt-in `/vf-notify`, hors dépôt en scope user, n'en
