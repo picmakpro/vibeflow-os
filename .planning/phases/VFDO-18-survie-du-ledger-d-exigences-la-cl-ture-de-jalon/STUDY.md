@@ -467,7 +467,7 @@ grammaire, un overlay et un skill de merge agentique : il se comble avec **un ge
 
 ### 7.2 La variante — description précise
 
-> ## ⚠ AMENDEMENT DU 2026-08-17 — CE §7.2 EST PÉRIMÉ SUR SON POINT CENTRAL
+> ## ⚠ Amendement du 2026-08-17 — CE §7.2 EST PÉRIMÉ SUR SON POINT CENTRAL
 >
 > **Ne pas implémenter la variante telle qu'elle est décrite ci-dessous.** La forme retenue est
 > le **roll-forward**, pas le keep-file. Décisions à jour : `18-CONTEXT.md` (D-18-01 à D-18-04).
