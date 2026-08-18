@@ -51,6 +51,9 @@ Rejeu réel (`--write` sur copie jetable d'`agentique-v1.0-REQUIREMENTS.md`) :
 2. **Garde de non-écrasement ajoutée hors périmètre initial du plan** (`--write`/`--overwrite-live`,
    sauvegarde `.bak-<jalon>`), en défense en profondeur au-delà du contrat déjà tenu par
    `vf_ledger_state` (qui ne rend `absent_after_close` que si `REQUIREMENTS.md` est absent).
+   Threat model rétroactivement complété le 2026-08-18 (revue de code + audit sécurité) : `--overwrite-live`
+   est désormais enregistrée comme T-18-12 dans `18-02-PLAN.md` (capacité neuve d'écrasement de
+   fichier existant, `BACKUP_PATH` comme point d'entrée) — absente du threat model d'origine.
 3. **STUDY.md §7.2** : l'amendement demandé par la tâche 3 existait déjà (posé au cadrage, plus
    complet que le gabarit du plan) ; un seul mot recasé plutôt qu'un second encadré redondant.
 4. **Structure du fichier reconstitué corrigée** (A-18-07 amendée) : les exigences voyageuses
