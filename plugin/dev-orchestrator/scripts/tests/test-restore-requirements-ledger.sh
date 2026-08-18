@@ -934,6 +934,86 @@ else
   ko "MUTATION 25 — construction du mutant a échoué" "la garde symlink de BACKUP_PATH est retirée du fichier muté" "grep la trouve encore"
 fi
 
+# ==================================================================================================
+# Cas 26 (correction ciblée post-revue, 2026-08-18) : la garde `vf_ancestor_symlink_found` a un
+# TROISIÈME point d'usage — restore-requirements-ledger.sh:105, sur OVERRIDE_ARCHIVE (le seul chemin
+# atteignable sous --write --overwrite-live). Les cas 22/25 couvrent les deux points d'usage internes
+# à la primitive ; celui-ci couvre l'appel direct dans le script lui-même, resté sans test dédié.
+# Même montage que le cas 22 (.planning/milestones symlinké vers l'extérieur) mais combiné à un
+# $LIVE PRÉSENT (précondition qui rend --overwrite-live atteignable, seul chemin qui peuple
+# OVERRIDE_ARCHIVE) — sans la garde, l'archive externe serait lue via l'ancêtre lien et écrite
+# PAR-DESSUS le ledger vivant.
+# ==================================================================================================
+D="$(mk_root c26)"
+w_milestones "$D" "$CLOSED_H2"
+OUTSIDE26_DIR="$TMP/outside-secret-26"
+mkdir -p "$OUTSIDE26_DIR"
+printf '# Requirements: Hostile\n\n### Famille\n\n- [x] **LEAK-26**: exigence venue de HORS du lab\n\n## Traceability\n\n| Requirement | Phase | Status |\n|---|---|---|\n| LEAK-26 | Phase 1 | Done - leak |\n' > "$OUTSIDE26_DIR/demo-v1-REQUIREMENTS.md"
+ln -s "$OUTSIDE26_DIR" "$D/.planning/milestones"
+LIVE_CONTENT_26=$'# Requirements: Live\n- [x] **PRECIEUX-26**: exigence vivante jamais archivee\n'
+w_live "$D" "$LIVE_CONTENT_26"
+LIVE_F26="$D/.planning/REQUIREMENTS.md"
+sum_live26_before="$(checksum "$LIVE_F26")"
+sum_outside26_before="$(checksum "$OUTSIDE26_DIR/demo-v1-REQUIREMENTS.md")"
+out26="$(bash "$SCRIPT" --path "$D" --write --overwrite-live 2>&1)"; rc26=$?
+sum_live26_after="$(checksum "$LIVE_F26")"
+sum_outside26_after="$(checksum "$OUTSIDE26_DIR/demo-v1-REQUIREMENTS.md")"
+leak26_in_live=0; grep -q 'LEAK-26' "$LIVE_F26" 2>/dev/null && leak26_in_live=1
+if [ "$rc26" -ne 0 ] && [ "$sum_live26_before" = "$sum_live26_after" ] && [ "$sum_outside26_before" = "$sum_outside26_after" ] && [ "$leak26_in_live" -eq 0 ]; then
+  ok "26 (3e point d'usage, --write --overwrite-live) ancêtre symlinké → refus (code!=0), \$LIVE inchangé par empreinte, cible externe intacte, LEAK-26 absent du ledger"
+else
+  ko "26 (3e point d'usage, --write --overwrite-live) ancêtre symlinké → refus (code!=0), \$LIVE inchangé par empreinte, cible externe intacte, LEAK-26 absent du ledger" "rc!=0, empreintes live/externe identiques, LEAK-26 absent" "rc=$rc26 live_egal=$([ "$sum_live26_before" = "$sum_live26_after" ] && echo oui || echo NON) externe_egal=$([ "$sum_outside26_before" = "$sum_outside26_after" ] && echo oui || echo NON) leak_present=$leak26_in_live out=[$out26]"
+fi
+
+# --- MUTATION (cas 26) : retirer l'appel à vf_ancestor_symlink_found du SCRIPT lui-même (ligne 105),
+# pas de la primitive — le mutant doit rougir : LEAK-26 apparaît dans le ledger vivant écrit.
+MUT26_DIR="$TMP/mut-override-ancestor"; mkdir -p "$MUT26_DIR"
+awk '
+{
+  line = $0
+  pat = " && ! vf_ancestor_symlink_found \"$_cand_archive\" \"$PLANNING_DIR\""
+  idx = index(line, pat)
+  if (idx > 0) { line = substr(line, 1, idx - 1) substr(line, idx + length(pat)) }
+  print line
+}
+' "$SCRIPT" > "$MUT26_DIR/restore-requirements-ledger.sh"
+cp "$PRIMITIVE" "$MUT26_DIR/"
+chmod +x "$MUT26_DIR"/*.sh
+guard26_removed=0
+grep -q '_cand_archive.*&& ! vf_ancestor_symlink_found' "$MUT26_DIR/restore-requirements-ledger.sh" || guard26_removed=1
+if [ "$guard26_removed" -eq 1 ]; then
+  D26M="$(mk_root c26mut)"
+  w_milestones "$D26M" "$CLOSED_H2"
+  OUTSIDE26M_DIR="$TMP/outside-secret-26mut"
+  mkdir -p "$OUTSIDE26M_DIR"
+  printf '# Requirements: Hostile\n\n### Famille\n\n- [x] **LEAKM-26**: exigence venue de HORS du lab\n\n## Traceability\n\n| Requirement | Phase | Status |\n|---|---|---|\n| LEAKM-26 | Phase 1 | Done - leak |\n' > "$OUTSIDE26M_DIR/demo-v1-REQUIREMENTS.md"
+  ln -s "$OUTSIDE26M_DIR" "$D26M/.planning/milestones"
+  w_live "$D26M" "$LIVE_CONTENT_26"
+  LIVE_F26M="$D26M/.planning/REQUIREMENTS.md"
+  bash "$MUT26_DIR/restore-requirements-ledger.sh" --path "$D26M" --write --overwrite-live >/dev/null 2>&1; mut26_rc=$?
+  leaked26mut=0; grep -q 'LEAKM-26' "$LIVE_F26M" 2>/dev/null && leaked26mut=1
+  if [ "$mut26_rc" -eq 0 ] && [ "$leaked26mut" -eq 1 ]; then
+    ok "MUTATION 26 (garde d'ancêtre retirée du 3e point d'usage) rougit comme attendu : LEAKM-26 écrit dans le ledger vivant via l'ancêtre symlinké"
+  else
+    ko "MUTATION 26 — N'A PAS ROUGI" "code=0 ET LEAKM-26 présent dans le ledger écrit" "rc=$mut26_rc leak_present=$leaked26mut"
+  fi
+  # Discriminance : le chemin nominal --write --overwrite-live SANS ancêtre symlinké (cas 16) reste
+  # VERT sous cette mutation.
+  D_CTRL26="$(mk_root c26ctrl)"
+  w_milestones "$D_CTRL26" "$CLOSED_H2"
+  w_archive "$D_CTRL26" "demo-v1" "$DEMO_ARCHIVE"
+  w_live "$D_CTRL26" "$LIVE_CONTENT_26"
+  bash "$MUT26_DIR/restore-requirements-ledger.sh" --path "$D_CTRL26" --write --overwrite-live >/dev/null 2>&1; ctrl26_rc=$?
+  ctrl26_written=0; grep -q 'AAAA-01' "$D_CTRL26/.planning/REQUIREMENTS.md" 2>/dev/null && ctrl26_written=1
+  if [ "$ctrl26_rc" -eq 0 ] && [ "$ctrl26_written" -eq 1 ]; then
+    ok "MUTATION 26 — le cas nominal --overwrite-live sans ancêtre lien (cas 16) reste VERT sous cette mutation (discriminance)"
+  else
+    ko "MUTATION 26 — discriminance rompue, le cas nominal est affecté aussi" "cas nominal inchangé (rc=0, AAAA-01 écrit)" "rc=$ctrl26_rc écrit=$ctrl26_written"
+  fi
+else
+  ko "MUTATION 26 — construction du mutant a échoué" "l'appel vf_ancestor_symlink_found sur _cand_archive est retiré du fichier muté" "grep le trouve encore"
+fi
+
 echo ""
 echo "== résultat : $PASS ok, $FAIL ko =="
 [ "$FAIL" -eq 0 ]
