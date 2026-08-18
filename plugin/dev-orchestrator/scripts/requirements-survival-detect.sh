@@ -31,9 +31,11 @@
 # de ce type dans ce repo (cf. plugin/dev-orchestrator/AGENT.md).
 #
 # T-18-01/T-18-02 : le libellé du jalon extrait de MILESTONES.md est validé contre la liste blanche
-# stricte ^[0-9A-Za-z._ /-]{1,80}$ (modèle sanitize_value de check-dev-bootstrap.sh) AVANT toute
+# stricte ^[0-9A-Za-z._ -]{1,80}$ (modèle sanitize_value de check-dev-bootstrap.sh) AVANT toute
 # réimpression et avant toute construction de chemin d'archive. Échec → unreadable, jamais la valeur
-# brute imprimée ou concaténée.
+# brute imprimée ou concaténée. `/` est EXCLU de cette classe (correctif 2026-08-18) : une forme
+# antérieure l'admettait aux côtés de `.`, ce qui laissait passer une traversée `../` intégrale — la
+# liste blanche ne bornait alors QUE la réimpression de métacaractères, jamais la traversée.
 #
 # T-18-03 : lecture de MILESTONES.md bornée à 400 lignes (awk, garde anti-gel SessionStart). Le
 # diff d'IDs (A-18-08) parcourt l'archive et le vivant chacun UNE seule fois côté awk, sans boucle
@@ -79,7 +81,15 @@ vf_ledger_state() { # <planning_dir>
     gsub(/[ \t]+$/, "", s)
     print s
   }')"
-  if ! printf '%s' "$label" | grep -Eq '^[0-9A-Za-z._ /-]{1,80}$'; then
+  # Correction 2026-08-18 (revue de code + audit sécurité, bloquant #1) : `/` a été RETIRÉ de cette
+  # classe. La forme précédente (`^[0-9A-Za-z._ /-]{1,80}$`) admettait `.` ET `/` SIMULTANÉMENT, ce
+  # qui laisse passer une traversée `../` intégrale (ex. `agentique-v1.0-phases/../../../../outside/pwn`)
+  # — prouvé par exécution avant ce correctif : le chemin d'archive interpolé plus bas (et
+  # `restore-requirements-ledger.sh`, qui hérite de ce même libellé validé) lisait/écrivait alors
+  # hors de `.planning/`. Aucun libellé réel de `.planning/MILESTONES.md` de ce dépôt n'a jamais
+  # porté de `/` (vérifié : `agentique-v1.0`, `vf-routing`, `gsd-migration`, `install-ux-v1.0`,
+  # `vfdo-v1.0`, `fiabilite-v1.0`…) : le retirer ne restreint aucun cas réel.
+  if ! printf '%s' "$label" | grep -Eq '^[0-9A-Za-z._ -]{1,80}$'; then
     VF_LEDGER_STATE="unreadable"; VF_LEDGER_REASON="label_rejected"; return 2
   fi
   VF_LEDGER_MILESTONE="$label"
@@ -89,14 +99,18 @@ vf_ledger_state() { # <planning_dir>
 
   if [ -f "$live" ]; then
     # Trace bien formée (D-18-12) : le jeton, exactement une espace, puis une étiquette conforme
-    # à ^[0-9A-Za-z._-]{1,80}$. Toute ligne portant le jeton hors de cette forme → illisible — SAUF
-    # une mention NUE du jeton (ex. prose documentant la convention entre backticks, sans valeur
-    # après les deux-points : cas réel de .planning/REQUIREMENTS.md:932, "trace `carried-from:`")
-    # : ce n'est pas une tentative de trace, donc pas un motif d'illisibilité (D-18-10 : lire une
-    # absence, jamais juger la prose qui la décrit).
+    # à ^[0-9A-Za-z._ -]{1,80}$ (MÊME classe que le libellé de jalon l. 92 — correctif 2026-08-18,
+    # revue de code : les deux classes étaient incohérentes), ancrée en FIN de ligne (`$`) — sans
+    # cette ancre, un suffixe garbage (`carried-from: v1.2!!!GARBAGE`) matchait comme préfixe bien
+    # formé au lieu de tomber en illisible, l'inverse exact de D-18-10. Toute ligne portant le jeton
+    # hors de cette forme → illisible — SAUF une mention NUE du jeton (ex. prose documentant la
+    # convention entre backticks, sans valeur après les deux-points : cas réel de
+    # .planning/REQUIREMENTS.md:932, "trace `carried-from:`") : ce n'est pas une tentative de trace,
+    # donc pas un motif d'illisibilité (D-18-10 : lire une absence, jamais juger la prose qui la
+    # décrit).
     if grep -n 'carried-from:' "$live" 2>/dev/null \
         | grep -vE 'carried-from:`|carried-from:[[:space:]]*$' \
-        | grep -vE 'carried-from: [0-9A-Za-z._-]{1,80}' | grep -q .; then
+        | grep -vE 'carried-from: [0-9A-Za-z._ -]{1,80}$' | grep -q .; then
       VF_LEDGER_STATE="unreadable"; VF_LEDGER_REASON="trace_malformed"; return 2
     fi
     if [ -f "$archive" ] && [ ! -L "$archive" ]; then
@@ -150,6 +164,12 @@ vf_ledger_state() { # <planning_dir>
       if [ "$missing_count" -gt 0 ]; then
         VF_LEDGER_STATE="ids_missing"
         VF_LEDGER_ARCHIVE="$archive"
+        # Ordre déterministe (correctif 2026-08-18, revue de code) : `for (id in bodyseen)` en awk
+        # n'a jamais d'ordre garanti (gawk et BSD/mawk le parcourent différemment) — le COMPTE
+        # (missing_count) restait juste mais QUELS IDs apparaissaient dans les 5 premiers variait
+        # selon la plateforme d'exécution (CI Linux/gawk vs macOS/awk). Trié ici, une seule fois,
+        # avant toute troncature en aval (check-requirements-survival.sh).
+        missing_list="$(printf '%s\n' "$missing_list" | tr ' ' '\n' | LC_ALL=C sort | tr '\n' ' ' | sed 's/ *$//')"
         VF_LEDGER_MISSING_IDS="$missing_list"
         VF_LEDGER_MISSING_COUNT="$missing_count"
         return 3
@@ -216,8 +236,14 @@ $trace"
     '- [ ] '*)
       return 1
       ;;
-    '- [x] '*|'- [~] '*)
-      if printf '%s' "$trace" | grep -qiE 'complete|done'; then return 0; fi
+    '- [x] '*|'- [X] '*|'- [~] '*)
+      # `[X]` majuscule ajouté (correctif mineur 2026-08-18, revue de code) : forme équivalente à
+      # `[x]` non reconnue jusqu'ici, repli code 3 évitable — bruit de triage.
+      # Bornes de mot (correctif 2026-08-18, revue de code) : `complete|done` sans bornes matchait
+      # aussi en sous-chaîne de `incomplete`, ce qui aurait classé un statut « Incomplete — reste 2
+      # items » en Garantie (perte silencieuse du carried-from:) — exactement le défaut que cette
+      # phase existe pour éliminer.
+      if printf '%s' "$trace" | grep -qiE '\bcomplete\b|\bdone\b'; then return 0; fi
       if printf '%s' "$body" | grep -q 'Livré v'; then return 0; fi
       return 1
       ;;
