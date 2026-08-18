@@ -7,6 +7,7 @@
 
 - `ae5fa39` — `feat(18-02): rattrapage outillé du ledger d'exigences (LEDG-01)` : `restore-requirements-ledger.sh`, extension `vf_ledger_classify` de `requirements-survival-detect.sh`, suite `test-restore-requirements-ledger.sh`.
 - `4355a3a` — `docs(18-02): aligne la casse de l'amendement §7.2 sur l'assertion de recomptage du plan`.
+- `b259784` — `fix(18-02): les exigences voyageuses portent leur propre H2 (## Reportées)` : défaut structurel trouvé par revue (voir Déviations #4).
 
 ## Ce qui a été livré
 
@@ -20,7 +21,7 @@
 
 ```
 $ bash plugin/dev-orchestrator/scripts/tests/test-restore-requirements-ledger.sh
-== résultat : 26 ok, 0 ko ==
+== résultat : 28 ok, 0 ko ==
 
 $ bash plugin/dev-orchestrator/scripts/tests/test-check-requirements-survival.sh   (re-vert amont)
 == résultat : 41 ok, 0 ko ==
@@ -52,6 +53,15 @@ Rejeu réel (`--write` sur copie jetable d'`agentique-v1.0-REQUIREMENTS.md`) :
    `vf_ledger_state` (qui ne rend `absent_after_close` que si `REQUIREMENTS.md` est absent).
 3. **STUDY.md §7.2** : l'amendement demandé par la tâche 3 existait déjà (posé au cadrage, plus
    complet que le gabarit du plan) ; un seul mot recasé plutôt qu'un second encadré redondant.
+4. **Structure du fichier reconstitué corrigée** (A-18-07 amendée) : les exigences voyageuses
+   vivaient d'abord sous des `### <famille>` placés directement après `## Garanties`, sans H2
+   intercalé — un lecteur appliquant la règle « jusqu'au prochain H1/H2 » (celle
+   d'`updateTraceabilityCell()`, gsd-core, citée par D-18-03 pour justifier l'innocuité de
+   `## Garanties`) ramassait les 42 voyageuses comme des garanties. Corrigé : `## Reportées` est
+   désormais un H2 sœur de `## Garanties`, `## Out of Scope` et `## Traceability` ; les `###
+   <famille>` restent dessous. Test 14c + mutation jumelle ajoutés, rejouant explicitement la
+   règle H1/H2 (le test 14b antérieur utilisait une frontière `#{2,6}` trop conservatrice pour
+   attraper ce défaut).
 
 ## Non-régression amont
 
