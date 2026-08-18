@@ -384,11 +384,15 @@ has=0; case "$out" in "[ledger-illisible]"*"trace_malformed"*) has=1 ;; esac
 if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then ok "32 (MOYEN) préfixe valide + suffixe garbage sur carried-from: → illisible trace_malformed (ancrage \$)"; else ko "32 (MOYEN) préfixe valide + suffixe garbage sur carried-from: → illisible trace_malformed (ancrage \$)" "rc=0 out contient trace_malformed" "rc=$rc out=[$out]"; fi
 
 # ==================================================================================================
-# Cas 34 (MOYEN, correctif 2026-08-18) : ordre DÉTERMINISTE de la liste d'IDs disparus tronquée à 5.
-# `for (id in bodyseen)` en awk n'a jamais d'ordre garanti — sur CET awk (BWK/nawk macOS), l'ordre
-# d'itération est un ordre de hachage, PROUVÉ différent de l'ordre alphabétique ET de l'ordre
-# d'insertion par une sonde directe. Sans tri explicite, quels 5 IDs (sur 6 disparus) apparaissent
-# dans stdout varie selon la plateforme d'exécution (gawk en CI Linux vs awk BSD en local macOS).
+# Cas 34 (MOYEN, correctif 2026-08-18, référence dangling corrigée en revue tour 2) : ordre
+# DÉTERMINISTE de la liste d'IDs disparus tronquée à 5. `for (id in bodyseen)` en awk n'a jamais
+# d'ordre garanti (POSIX ne le spécifie pas) — l'ordre d'itération dépend de l'implémentation awk
+# (table de hachage interne), donc PEUT diverger de l'ordre alphabétique ET de l'ordre d'insertion
+# selon la plateforme (gawk en CI Linux vs awk BSD en local macOS). requirements-survival-detect.sh
+# trie désormais explicitement (LC_ALL=C sort) avant toute troncature (voir vf_ledger_state) : ce
+# cas prouve que le tri tient, indépendamment de l'ordre d'itération natif d'un awk donné — assertion
+# vérifiable ci-dessous par exécution, pas par un résultat d'investigation antérieure non reproduit
+# ici.
 # ==================================================================================================
 D="$(mk_root c34)"
 w_milestones "$D" "$CLOSED_H2"
@@ -553,6 +557,67 @@ if [ -n "$dims" ]; then ok "MUTATION issue4 (outil-absent→silence) rougit le c
 echo ""
 echo "-- Trace des rougissements de mutation (à citer dans le SUMMARY) --"
 printf '%s' "$MUT_TRACE"
+
+# ==================================================================================================
+# Cas 35 (BLOQUANT, correctif 2026-08-18, revue tour 2) : confinement de traversée symlink
+# D'ANCÊTRE, second consommateur. La garde vit dans la primitive PARTAGÉE (vf_ledger_state) — ce
+# gate en hérite sans logique propre (D-18-06), mais la couverture doit exister aux DEUX
+# consommateurs séparément (le fait qu'un composant partagé soit corrigé une fois ne prouve pas
+# que les deux points d'appel en profitent identiquement).
+# ==================================================================================================
+D="$(mk_root c35)"
+w_milestones "$D" "$CLOSED_H2"
+OUTSIDE35_DIR="$TMP/outside-secret-35"
+mkdir -p "$OUTSIDE35_DIR"
+printf '%s' "$(archive_one_id LEAK-35)" > "$OUTSIDE35_DIR/demo-v1-REQUIREMENTS.md"
+ln -s "$OUTSIDE35_DIR" "$D/.planning/milestones"
+out35="$(bash "$GATE" --path "$D" 2>/dev/null)"; rc35=$?
+if [ "$rc35" -eq 3 ] && [ -z "$out35" ]; then
+  ok "35 (BLOQUANT) ancêtre symlinké — archive inatteignable, gate se replie sur le cran avertissement (silence, code 3)"
+else
+  ko "35 (BLOQUANT) ancêtre symlinké — archive inatteignable, gate se replie sur le cran avertissement (silence, code 3)" "rc=3 out=[]" "rc=$rc35 out=[$out35]"
+fi
+
+# --- MUTATION (BLOQUANT, cas 35) : retirer la garde d'ancêtre dans la primitive (même technique
+# index/substr que la suite restore-requirements-ledger, aucun souci d'échappement `$` en awk) — le
+# mutant doit rougir : le gate prétend qu'une archive est disponible pour un jalon dont l'archive
+# n'est atteignable QUE via un lien.
+MUT35_DIR="$TMP/mut-ancestor-gate"; mkdir -p "$MUT35_DIR"
+awk '
+{
+  line = $0
+  pat = " && ! vf_ancestor_symlink_found \"$archive\" \"$planning_dir\""
+  idx = index(line, pat)
+  if (idx > 0) { line = substr(line, 1, idx - 1) substr(line, idx + length(pat)) }
+  print line
+}
+' "$PRIMITIVE" > "$MUT35_DIR/requirements-survival-detect.sh"
+cp "$GATE" "$MUT35_DIR/"
+chmod +x "$MUT35_DIR"/*.sh
+guard35_removed=0
+grep -q '\] && ! vf_ancestor_symlink_found' "$MUT35_DIR/requirements-survival-detect.sh" || guard35_removed=1
+if [ "$guard35_removed" -eq 1 ]; then
+  out35mut="$(bash "$MUT35_DIR/check-requirements-survival.sh" --path "$D" 2>/dev/null)"; rc35mut=$?
+  leaked35mut=0; printf '%s' "$out35mut" | grep -q '\[ledger-absent\]' && leaked35mut=1
+  if [ "$rc35mut" -eq 0 ] && [ "$leaked35mut" -eq 1 ]; then
+    ok "MUTATION 35 (garde d'ancêtre retirée) rougit comme attendu : [ledger-absent] émis avec archive prétendue disponible via l'ancêtre symlinké"
+  else
+    ko "MUTATION 35 — N'A PAS ROUGI" "rc=0, [ledger-absent] émis" "rc=$rc35mut out=[$out35mut]"
+  fi
+else
+  ko "MUTATION 35 — construction du mutant a échoué" "l'appel à vf_ancestor_symlink_found est retiré du fichier muté" "grep le trouve encore"
+fi
+# Discriminance : un cas de jalon clos sans archive du tout, armé (issue 2, DÉJÀ dans cette suite)
+# reste VERT sous cette mutation.
+D_CTRL35="$(mk_root c35ctrl)"
+w_milestones "$D_CTRL35" "$CLOSED_H2"
+w_armed "$D_CTRL35"
+ctrl35_out="$(bash "$MUT35_DIR/check-requirements-survival.sh" --path "$D_CTRL35" 2>/dev/null)"; ctrl35_rc=$?
+if [ "$ctrl35_rc" -eq 0 ] && printf '%s' "$ctrl35_out" | grep -q 'aucune archive à reconstituer'; then
+  ok "MUTATION 35 — le cas jalon-clos-sans-archive reste VERT sous cette mutation (discriminance)"
+else
+  ko "MUTATION 35 — discriminance rompue, le cas sans archive est affecté aussi" "cas inchangé (rc=0, message sans archive)" "rc=$ctrl35_rc out=[$ctrl35_out]"
+fi
 
 # ==================================================================================================
 # Garde finale — le fichier vivant est intact après la suite (aucune mutation n'a touché l'arbre réel).

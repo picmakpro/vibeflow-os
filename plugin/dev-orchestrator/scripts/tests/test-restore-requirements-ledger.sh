@@ -299,9 +299,25 @@ sum_after18="$(checksum "$LIVE_F18")"
 if [ "$rc18" -ne 0 ] && [ "$sum_before18" = "$sum_after18" ]; then ok "18 (BLOQUANT #2) échec de préparation d'écriture (répertoire non-inscriptible) → code non nul, \$LIVE inchangé par empreinte, message sur stderr"; else ko "18 (BLOQUANT #2) échec de préparation d'écriture (répertoire non-inscriptible) → code non nul, \$LIVE inchangé par empreinte, message sur stderr" "code!=0, empreinte identique ($sum_before18)" "rc=$rc18 empreinte_apres=$sum_after18 out=[$out18]"; fi
 
 # --- MUTATION BLOQUANT #2 : retirer la garde `cp ... || { ... exit 1; }` (revenir à un `cp` non
-# vérifié suivi d'un `mv` inconditionnel) — simulé en injectant un `cp` qui échoue TOUJOURS (binaire
-# de remplacement dans un PATH restreint) sur une COPIE du script, jamais le fichier vivant.
+# vérifié suivi d'un `mv` inconditionnel) — simulé en shadowant `cp` lui-même via un PATH restreint
+# (correctif 2026-08-18, revue tour 2, finding #4 : l'ancienne technique `chmod 0555 .planning`
+# n'était PAS discriminante — le fichier destination `$WRITE_TMP` est créé par `mktemp` AVANT le
+# `cp`, donc `cp` n'a besoin d'aucun droit d'ÉCRITURE sur le RÉPERTOIRE pour écrire DANS un fichier
+# déjà existant : le test rendait systématiquement `ok` sur la branche de repli « écart non
+# observable », prouvé en le rejouant sans aucune modification du script réel. Un `cp` de
+# remplacement échouant UNIQUEMENT sur le gabarit mktemp de destination (`.REQUIREMENTS.md.`) laisse
+# passer la sauvegarde `BACKUP_PATH` (motif différent) vers le vrai `/bin/cp`.)
 MUT18_DIR="$TMP/mut-cpmv"; mkdir -p "$MUT18_DIR/fakebin"
+cat > "$MUT18_DIR/fakebin/cp" <<'FAKECP18'
+#!/bin/sh
+last=""
+for a in "$@"; do last="$a"; done
+case "$last" in
+  *".REQUIREMENTS.md."*) exit 1 ;;
+  *) exec /bin/cp "$@" ;;
+esac
+FAKECP18
+chmod +x "$MUT18_DIR/fakebin/cp"
 # awk retire la garde `if ! cp ... ; then ... exit 1; fi` et le `chmod`, la remplace par un `cp`
 # inconditionnel suivi directement du `mv` inconditionnel — reproduit EXACTEMENT le défaut d'origine.
 awk '
@@ -320,25 +336,37 @@ chmod +x "$MUT18_DIR"/*.sh
 guard_removed=0
 grep -q 'if ! cp "\$TMPD/proposed.md"' "$MUT18_DIR/restore-requirements-ledger.sh" || guard_removed=1
 if [ "$guard_removed" -eq 1 ]; then
+  # Référence gardée (script RÉEL, même shadow cp) : prouve que la garde tient effectivement sous
+  # exactement le même stimulus qu'utilisera la mutation ci-dessous.
+  D="$(mk_root c18b)"
+  w_milestones "$D" "$CLOSED_H2"
+  w_archive "$D" "demo-v1" "$DEMO_ARCHIVE"
+  w_live "$D" "$LIVE_CONTENT_18"
+  LIVE_F18B="$D/.planning/REQUIREMENTS.md"
+  sum_before18b="$(checksum "$LIVE_F18B")"
+  PATH="$MUT18_DIR/fakebin:$PATH" bash "$SCRIPT" --path "$D" --write --overwrite-live >/dev/null 2>"$TMP/c18b.err"; rc18b=$?
+  sum_after18b="$(checksum "$LIVE_F18B")"
+  if [ "$rc18b" -ne 0 ] && [ "$sum_before18b" = "$sum_after18b" ]; then
+    ok "18b (BLOQUANT #2) script RÉEL, cp shadowé (échoue sur WRITE_TMP) → code non nul, \$LIVE inchangé par empreinte"
+  else
+    ko "18b (BLOQUANT #2) script RÉEL, cp shadowé (échoue sur WRITE_TMP) → code non nul, \$LIVE inchangé par empreinte" "rc!=0, empreinte identique" "rc=$rc18b empreinte_apres=$sum_after18b"
+  fi
+
   D="$(mk_root cm18)"
   w_milestones "$D" "$CLOSED_H2"
   w_archive "$D" "demo-v1" "$DEMO_ARCHIVE"
   w_live "$D" "$LIVE_CONTENT_18"
   LIVE_F_M18="$D/.planning/REQUIREMENTS.md"
   sum_before_m18="$(checksum "$LIVE_F_M18")"
-  chmod 0555 "$D/.planning" 2>/dev/null
-  bash "$MUT18_DIR/restore-requirements-ledger.sh" --path "$D" --write --overwrite-live >/dev/null 2>&1; mut18_rc=$?
-  chmod 0755 "$D/.planning" 2>/dev/null
+  PATH="$MUT18_DIR/fakebin:$PATH" bash "$MUT18_DIR/restore-requirements-ledger.sh" --path "$D" --write --overwrite-live >/dev/null 2>&1; mut18_rc=$?
   sum_after_m18="$(checksum "$LIVE_F_M18")"
-  # Sous la mutation, le comportement DEVRAIT diverger du chemin gardé (code ou empreinte) —
-  # dims capte l'écart par rapport à la référence correcte (code!=0, empreinte identique).
-  dims18=""
-  [ "$mut18_rc" -eq 0 ] && dims18="${dims18}code(attendu !=0, obtenu 0) "
-  [ "$sum_before_m18" != "$sum_after_m18" ] && dims18="${dims18}empreinte(attendu identique, obtenu modifiée) "
-  if [ -n "$dims18" ] || [ ! -x "$MUT18_DIR/restore-requirements-ledger.sh" ]; then
-    ok "MUTATION BLOQUANT #2 (garde cp/mv retirée) — comportement gardé non reproduit sous la mutation : $dims18(construction confirmée sans garde)"
+  # Sous la mutation (guarde retirée), le mv déplace le fichier vide/tronqué (cp échoué) PAR-DESSUS
+  # $LIVE : code 0 ET empreinte modifiée sont TOUS DEUX attendus — c'est la corruption exacte que
+  # la garde existe pour empêcher.
+  if [ "$mut18_rc" -eq 0 ] && [ "$sum_before_m18" != "$sum_after_m18" ]; then
+    ok "MUTATION BLOQUANT #2 (garde cp/mv retirée) rougit comme attendu : cp shadowé échoue sur WRITE_TMP, mv écrase \$LIVE avec un fichier vide (code=0, empreinte modifiée)"
   else
-    ok "MUTATION BLOQUANT #2 (garde cp/mv retirée) — mutant construit sans la garde, rejoué (environnement local peut ne pas exposer l'écart observable ; la garde retirée est vérifiée textuellement ci-dessus)"
+    ko "MUTATION BLOQUANT #2 — N'A PAS ROUGI comme attendu" "code=0 ET empreinte modifiée (corruption silencieuse reproduite)" "rc=$mut18_rc empreinte_egale=$([ "$sum_before_m18" = "$sum_after_m18" ] && echo oui || echo NON)"
   fi
 else
   ko "MUTATION BLOQUANT #2 — construction du mutant a échoué" "la garde cp/mv est retirée du fichier muté" "grep trouve encore la garde"
@@ -664,6 +692,246 @@ EOF4
     ko "MUTATION C — N'A PAS ROUGI 14c" "au moins une ligne carried-from: nichée sous ## Garanties par la règle H1/H2" "0 — mutation sans effet observable"
   fi
   rm -f "$D/.planning/REQUIREMENTS.md"
+fi
+
+# ==================================================================================================
+# Cas 22 (BLOQUANT, correctif 2026-08-18, revue tour 2) : confinement de traversée symlink
+# D'ANCÊTRE. La garde `[ -f "$archive" ] && [ ! -L "$archive" ]` ne teste QUE le fichier feuille —
+# jamais les répertoires intermédiaires. Reproduit trois fois (revue, audit, exécution) :
+# `.planning/milestones` symlinké vers un répertoire HORS du lab, jalon déclaré clos, $LIVE absent
+# → sans la garde d'ancêtre, restore lisait/écrivait du contenu venu de l'EXTÉRIEUR du lab.
+# ==================================================================================================
+D="$(mk_root c22)"
+w_milestones "$D" "$CLOSED_H2"
+OUTSIDE22_DIR="$TMP/outside-secret-22"
+mkdir -p "$OUTSIDE22_DIR"
+printf '# Requirements: Hostile\n\n### Famille\n\n- [x] **LEAK-01**: exigence venue de HORS du lab\n\n## Traceability\n\n| Requirement | Phase | Status |\n|---|---|---|\n| LEAK-01 | Phase 1 | Done - leak |\n' > "$OUTSIDE22_DIR/demo-v1-REQUIREMENTS.md"
+ln -s "$OUTSIDE22_DIR" "$D/.planning/milestones"
+sum_outside22_before="$(checksum "$OUTSIDE22_DIR/demo-v1-REQUIREMENTS.md")"
+
+# Mode diff (sans --write) : aucune fuite dans stdout.
+diff22_out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc22diff=$?
+leak22diff=0; printf '%s' "$diff22_out" | grep -q 'LEAK-01' && leak22diff=1
+if [ "$leak22diff" -eq 0 ]; then ok "22a (BLOQUANT) mode diff — ancêtre symlinké, LEAK-01 absent de stdout"; else ko "22a (BLOQUANT) mode diff — ancêtre symlinké, LEAK-01 absent de stdout" "LEAK-01 absent" "diff=[$diff22_out] rc=$rc22diff"; fi
+
+# Mode --write : refus (rien à reconstituer, archive inatteignable via l'ancêtre lien), $LIVE
+# toujours absent, cible externe non touchée (empreinte).
+bash "$SCRIPT" --path "$D" --write >/dev/null 2>"$TMP/c22-write.err"; rc22write=$?
+live22_present=0; [ -f "$D/.planning/REQUIREMENTS.md" ] && live22_present=1
+sum_outside22_after="$(checksum "$OUTSIDE22_DIR/demo-v1-REQUIREMENTS.md")"
+if [ "$rc22write" -ne 0 ] && [ "$live22_present" -eq 0 ] && [ "$sum_outside22_before" = "$sum_outside22_after" ]; then
+  ok "22b (BLOQUANT) --write — refus (code!=0), \$LIVE toujours absent, cible externe intacte par empreinte"
+else
+  ko "22b (BLOQUANT) --write — refus (code!=0), \$LIVE toujours absent, cible externe intacte par empreinte" "rc!=0, LIVE absent, empreinte externe identique" "rc=$rc22write live_present=$live22_present empreinte_egale=$([ "$sum_outside22_before" = "$sum_outside22_after" ] && echo oui || echo NON)"
+fi
+
+# --- MUTATION (BLOQUANT, cas 22) : retirer la garde d'ancêtre des DEUX occurrences dans la
+# primitive partagée (index/substr, pas de regex — évite tout souci d'échappement de `$` en awk) —
+# le mutant doit rougir : LEAK-01 apparaît dans le diff.
+MUT22_DIR="$TMP/mut-ancestor"; mkdir -p "$MUT22_DIR"
+awk '
+{
+  line = $0
+  pat = " && ! vf_ancestor_symlink_found \"$archive\" \"$planning_dir\""
+  idx = index(line, pat)
+  if (idx > 0) { line = substr(line, 1, idx - 1) substr(line, idx + length(pat)) }
+  print line
+}
+' "$PRIMITIVE" > "$MUT22_DIR/requirements-survival-detect.sh"
+cp "$SCRIPT" "$MUT22_DIR/"
+chmod +x "$MUT22_DIR"/*.sh
+# La fonction elle-même (définition + commentaires) reste présente dans le fichier muté — seul
+# l'APPEL dans les deux gardes `if` est retiré. Contrôler l'absence du littéral fonction seule
+# donnerait toujours faux (grep la trouverait dans la définition) : on vérifie l'absence de l'APPEL
+# dans un contexte de condition `if`.
+guard22_removed=0
+grep -q '\] && ! vf_ancestor_symlink_found' "$MUT22_DIR/requirements-survival-detect.sh" || guard22_removed=1
+if [ "$guard22_removed" -eq 1 ]; then
+  diff22mut_out="$(bash "$MUT22_DIR/restore-requirements-ledger.sh" --path "$D" 2>/dev/null)"
+  leak22mut=0; printf '%s' "$diff22mut_out" | grep -q 'LEAK-01' && leak22mut=1
+  if [ "$leak22mut" -eq 1 ]; then
+    ok "MUTATION 22 (garde d'ancêtre retirée) rougit comme attendu : LEAK-01 réapparaît dans le diff via l'ancêtre symlinké"
+  else
+    ko "MUTATION 22 — N'A PAS ROUGI" "LEAK-01 présent dans le diff sous la mutation" "LEAK-01 absent — discriminance rompue"
+  fi
+else
+  ko "MUTATION 22 — construction du mutant a échoué" "vf_ancestor_symlink_found absent du fichier muté" "grep le trouve encore"
+fi
+# Discriminance : un cas sans ancêtre symlinké (cas 3, DEMO_ARCHIVE) reste VERT sous cette mutation.
+D_CTRL22="$(mk_root c22ctrl)"
+w_milestones "$D_CTRL22" "$CLOSED_H2"
+w_archive "$D_CTRL22" "demo-v1" "$DEMO_ARCHIVE"
+ctrl22_out="$(bash "$MUT22_DIR/restore-requirements-ledger.sh" --path "$D_CTRL22" 2>/dev/null)"; ctrl22_rc=$?
+if [ "$ctrl22_rc" -eq 0 ] && printf '%s' "$ctrl22_out" | grep -q 'AAAA-01'; then
+  ok "MUTATION 22 — le cas 3 (archive normale, aucun ancêtre lien) reste VERT sous cette mutation (discriminance)"
+else
+  ko "MUTATION 22 — discriminance rompue, le cas normal est affecté aussi" "cas normal inchangé (rc=0, AAAA-01 présent)" "rc=$ctrl22_rc out=[$ctrl22_out]"
+fi
+
+# ==================================================================================================
+# Cas 23 (MAJEUR #1, correctif 2026-08-18, revue tour 2) : neutralisation ANSI/BEL étendue au canal
+# du message de traçabilité DUPLIQUÉE (cas 20) — jusqu'ici réimprimé directement par awk vers
+# /dev/stderr, HORS de portée du `tr -d` qui ne protégeait que le diff sur stdout.
+# ==================================================================================================
+D="$(mk_root c23)"
+w_milestones "$D" "$CLOSED_H2"
+DUPHOSTILE_ARCHIVE=$'# Requirements: DupHostile\n\n### Famille\n\n- [x] **DUPH-01**: item avec traces dupliquees hostiles\n\n## Traceability\n\n| Requirement | Phase | Status |\n|---|---|---|\n| DUPH-01 | Phase 1 | Done - premiere \x1b[2Ktrace |\n| DUPH-01 | Phase 2 | Planned - deuxieme trace \x07contradictoire |\n'
+w_archive "$D" "demo-v1" "$DUPHOSTILE_ARCHIVE"
+err23="$(bash "$SCRIPT" --path "$D" 2>&1 1>/dev/null)"
+has_esc23=0; printf '%s' "$err23" | grep -q $'\x1b' && has_esc23=1
+has_bel23=0; printf '%s' "$err23" | grep -q $'\x07' && has_bel23=1
+signaled23=0; printf '%s' "$err23" | grep -q 'DUPH-01' && signaled23=1
+if [ "$has_esc23" -eq 0 ] && [ "$has_bel23" -eq 0 ] && [ "$signaled23" -eq 1 ]; then
+  ok "23 (MAJEUR #1) message de traçabilité dupliquée sur stderr — aucun ESC/BEL, DUPH-01 toujours signalé"
+else
+  ko "23 (MAJEUR #1) message de traçabilité dupliquée sur stderr — aucun ESC/BEL, DUPH-01 toujours signalé" "0 ESC, 0 BEL, DUPH-01 présent" "ESC=$has_esc23 BEL=$has_bel23 signalé=$signaled23 err=[$err23]"
+fi
+
+# --- MUTATION (MAJEUR #1, cas 23) : retirer le filtre `tr -d` sur CE canal (revenir à l'impression
+# awk directe vers /dev/stderr) — le mutant doit rougir : ESC/BEL réapparaissent.
+MUT23_DIR="$TMP/mut-dupwarn"; mkdir -p "$MUT23_DIR"
+awk '
+  /^if \[ -s "\$TMPD\/dupwarn.txt" \]; then$/ { skip = 1; next }
+  skip && /^fi$/ { skip = 0; next }
+  skip { next }
+  { print }
+' "$SCRIPT" > "$MUT23_DIR/restore-requirements-ledger.sh"
+cp "$PRIMITIVE" "$MUT23_DIR/"
+chmod +x "$MUT23_DIR"/*.sh
+# "dupwarn.txt" seul resterait toujours présent (la population du fichier, `-v dupfile=...`, est
+# HORS du bloc retiré) — on contrôle l'absence spécifique de la boucle de réimpression sanitisée.
+guard23_removed=0
+grep -q '_dupid _dupold _dupnew' "$MUT23_DIR/restore-requirements-ledger.sh" || guard23_removed=1
+if [ "$guard23_removed" -eq 1 ]; then
+  err23mut="$(bash "$MUT23_DIR/restore-requirements-ledger.sh" --path "$D" 2>&1 1>/dev/null)"
+  has_esc23mut=0; printf '%s' "$err23mut" | grep -q $'\x1b' && has_esc23mut=1
+  # Sans la boucle de réimpression sanitisée, le fichier dupwarn.txt reste écrit mais jamais
+  # réimprimé du tout (aucun autre point du script ne le lit) : la discriminance porte donc sur
+  # l'ABSENCE totale du signal DUPH-01 sous cette mutation précise (pas sur l'ESC réintroduit) —
+  # documenté ici pour éviter un faux négatif si un futur remaniement change la stratégie.
+  signaled23mut=0; printf '%s' "$err23mut" | grep -q 'DUPH-01' && signaled23mut=1
+  if [ "$signaled23mut" -eq 0 ]; then
+    ok "MUTATION 23 (bloc de réimpression sanitisée retiré) rougit comme attendu : DUPH-01 disparaît totalement du signal stderr"
+  else
+    ko "MUTATION 23 — N'A PAS ROUGI" "DUPH-01 absent sous la mutation (bloc retiré)" "signalé=$signaled23mut err=[$err23mut]"
+  fi
+else
+  ko "MUTATION 23 — construction du mutant a échoué" "le bloc dupwarn.txt est retiré du fichier muté" "grep le trouve encore"
+fi
+
+# ==================================================================================================
+# Cas 24 (MAJEUR #2, correctif 2026-08-18, revue tour 2) : la trace T-18-09 (forme non reconnue,
+# code 3) échappe à --quiet. Sans le correctif, `say()` gatait ce message : stderr vide sous
+# --quiet, contredisant l'invariant documenté en tête de fichier (« jamais absorbé sans trace »).
+# ==================================================================================================
+D="$(mk_root c24)"
+w_milestones "$D" "$CLOSED_H2"
+w_archive "$D" "demo-v1" "$DEMO_ARCHIVE"
+err24_noquiet="$(bash "$SCRIPT" --path "$D" 2>&1 1>/dev/null)"
+err24_quiet="$(bash "$SCRIPT" --path "$D" --quiet 2>&1 1>/dev/null)"
+has24_noquiet=0; printf '%s' "$err24_noquiet" | grep -q 'CCCC-99' && has24_noquiet=1
+has24_quiet=0; printf '%s' "$err24_quiet" | grep -q 'CCCC-99' && has24_quiet=1
+if [ "$has24_noquiet" -eq 1 ] && [ "$has24_quiet" -eq 1 ]; then
+  ok "24 (MAJEUR #2) trace T-18-09 (CCCC-99, code 3) présente sur stderr SANS --quiet ET AVEC --quiet"
+else
+  ko "24 (MAJEUR #2) trace T-18-09 (CCCC-99, code 3) présente sur stderr SANS --quiet ET AVEC --quiet" "présente dans les deux modes" "sans_quiet=$has24_noquiet avec_quiet=$has24_quiet"
+fi
+
+# --- MUTATION (MAJEUR #2, cas 24) : remettre `say` à la place des `echo` directs — le mutant doit
+# rougir sous --quiet uniquement (le mode normal reste vert, discriminance).
+MUT24_DIR="$TMP/mut-code3quiet"; mkdir -p "$MUT24_DIR"
+awk '
+  /^  echo "\[restore-requirements-ledger\] forme non reconnue \(code 3\)/ {
+    sub(/^  echo "\[restore-requirements-ledger\] /, "  say \"")
+    sub(/" >&2$/, "\"")
+    print; next
+  }
+  /^  while IFS= read -r cid; do \[ -n "\$cid" \] && echo "\[restore-requirements-ledger\]   - \$cid" >&2; done/ {
+    sub(/echo "\[restore-requirements-ledger\]   - \$cid" >&2/, "say \"  - $cid\"")
+    print; next
+  }
+  { print }
+' "$SCRIPT" > "$MUT24_DIR/restore-requirements-ledger.sh"
+cp "$PRIMITIVE" "$MUT24_DIR/"
+chmod +x "$MUT24_DIR"/*.sh
+# Le mutant a réussi si le `echo` direct D'ORIGINE (non gaté par --quiet) a disparu — même
+# convention que les mutations précédentes (contrôler l'ABSENCE du texte original, pas la présence
+# du remplacement).
+guard24_removed=0
+grep -q 'echo "\[restore-requirements-ledger\] forme non reconnue' "$MUT24_DIR/restore-requirements-ledger.sh" || guard24_removed=1
+if [ "$guard24_removed" -eq 1 ]; then
+  err24mut_quiet="$(bash "$MUT24_DIR/restore-requirements-ledger.sh" --path "$D" --quiet 2>&1 1>/dev/null)"
+  has24mut_quiet=0; printf '%s' "$err24mut_quiet" | grep -q 'CCCC-99' && has24mut_quiet=1
+  err24mut_noquiet="$(bash "$MUT24_DIR/restore-requirements-ledger.sh" --path "$D" 2>&1 1>/dev/null)"
+  has24mut_noquiet=0; printf '%s' "$err24mut_noquiet" | grep -q 'CCCC-99' && has24mut_noquiet=1
+  if [ "$has24mut_quiet" -eq 0 ] && [ "$has24mut_noquiet" -eq 1 ]; then
+    ok "MUTATION 24 (say() réintroduit) rougit comme attendu : CCCC-99 disparaît sous --quiet, reste sous mode normal (discriminance)"
+  else
+    ko "MUTATION 24 — N'A PAS ROUGI comme attendu" "absent sous --quiet, présent sans --quiet" "avec_quiet=$has24mut_quiet sans_quiet=$has24mut_noquiet"
+  fi
+else
+  ko "MUTATION 24 — construction du mutant a échoué" "say(...) réintroduit dans le fichier muté" "grep ne le trouve pas"
+fi
+
+# ==================================================================================================
+# Cas 25 (MAJEUR #3, correctif 2026-08-18, revue tour 2) : la sauvegarde `cp "$LIVE" "$BACKUP_PATH"`
+# suit un symlink PRÉEXISTANT à l'emplacement prévisible `${LIVE}.bak-<jalon>` — le contenu du
+# ledger vivant s'écrirait alors À TRAVERS le lien, vers une cible arbitraire hors du lab.
+# ==================================================================================================
+D="$(mk_root c25)"
+w_milestones "$D" "$CLOSED_H2"
+w_archive "$D" "demo-v1" "$DEMO_ARCHIVE"
+LIVE_CONTENT_25=$'# Requirements: Live\n- [x] **PRECIEUX-25**: exigence vivante jamais archivee\n'
+w_live "$D" "$LIVE_CONTENT_25"
+LIVE_F25="$D/.planning/REQUIREMENTS.md"
+BACKUP_F25="${LIVE_F25}.bak-demo-v1"
+OUTSIDE25="$TMP/outside-target-25.txt"
+printf 'secret-exterieur-25\n' > "$OUTSIDE25"
+ln -s "$OUTSIDE25" "$BACKUP_F25"
+sum_live25_before="$(checksum "$LIVE_F25")"
+sum_outside25_before="$(checksum "$OUTSIDE25")"
+out25="$(bash "$SCRIPT" --path "$D" --write --overwrite-live 2>&1)"; rc25=$?
+sum_live25_after="$(checksum "$LIVE_F25")"
+sum_outside25_after="$(checksum "$OUTSIDE25")"
+if [ "$rc25" -ne 0 ] && [ "$sum_live25_before" = "$sum_live25_after" ] && [ "$sum_outside25_before" = "$sum_outside25_after" ]; then
+  ok "25 (MAJEUR #3) BACKUP_PATH symlink préexistant → refus (code!=0), \$LIVE inchangé, cible externe non écrite"
+else
+  ko "25 (MAJEUR #3) BACKUP_PATH symlink préexistant → refus (code!=0), \$LIVE inchangé, cible externe non écrite" "rc!=0, LIVE inchangé, cible externe inchangée" "rc=$rc25 live_egal=$([ "$sum_live25_before" = "$sum_live25_after" ] && echo oui || echo NON) externe_egal=$([ "$sum_outside25_before" = "$sum_outside25_after" ] && echo oui || echo NON) out=[$out25]"
+fi
+
+# --- MUTATION (MAJEUR #3, cas 25) : retirer la garde `[ -L "$BACKUP_PATH" ]` — le mutant doit
+# rougir : la cible externe reçoit le contenu du ledger vivant.
+MUT25_DIR="$TMP/mut-backupsym"; mkdir -p "$MUT25_DIR"
+awk '
+  /^  if \[ -L "\$BACKUP_PATH" \]; then$/ { skip = 1; next }
+  skip && /^  fi$/ { skip = 0; next }
+  skip { next }
+  { print }
+' "$SCRIPT" > "$MUT25_DIR/restore-requirements-ledger.sh"
+cp "$PRIMITIVE" "$MUT25_DIR/"
+chmod +x "$MUT25_DIR"/*.sh
+guard25_removed=0
+grep -q 'BACKUP_PATH.*est un lien symbolique' "$MUT25_DIR/restore-requirements-ledger.sh" || guard25_removed=1
+if [ "$guard25_removed" -eq 1 ]; then
+  D25M="$(mk_root c25mut)"
+  w_milestones "$D25M" "$CLOSED_H2"
+  w_archive "$D25M" "demo-v1" "$DEMO_ARCHIVE"
+  w_live "$D25M" "$LIVE_CONTENT_25"
+  LIVE_F25M="$D25M/.planning/REQUIREMENTS.md"
+  BACKUP_F25M="${LIVE_F25M}.bak-demo-v1"
+  OUTSIDE25M="$TMP/outside-target-25mut.txt"
+  printf 'secret-exterieur-25mut\n' > "$OUTSIDE25M"
+  ln -s "$OUTSIDE25M" "$BACKUP_F25M"
+  bash "$MUT25_DIR/restore-requirements-ledger.sh" --path "$D25M" --write --overwrite-live >/dev/null 2>&1
+  leaked25mut=0
+  grep -q 'PRECIEUX-25' "$OUTSIDE25M" 2>/dev/null && leaked25mut=1
+  if [ "$leaked25mut" -eq 1 ]; then
+    ok "MUTATION 25 (garde symlink retirée) rougit comme attendu : le contenu du ledger vivant fuit vers la cible externe via le lien"
+  else
+    ko "MUTATION 25 — N'A PAS ROUGI" "PRECIEUX-25 présent dans la cible externe sous la mutation" "absent — discriminance rompue"
+  fi
+else
+  ko "MUTATION 25 — construction du mutant a échoué" "la garde symlink de BACKUP_PATH est retirée du fichier muté" "grep la trouve encore"
 fi
 
 echo ""
