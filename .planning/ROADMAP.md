@@ -73,7 +73,7 @@
 - [x] Phase 30: Portabilité Windows II (completed 2026-08-16)
 - [x] Phase 31: Manifeste d'install + dry-run (issue #20) (completed 2026-08-16)
 - [x] Phase 32: Durcissement du driver-lock (completed 2026-08-17)
-- [~] Phase 33: Watchdog & notifications des missions (5 plans exécutés, vérifiée `gaps_found` le 2026-08-17 — 3/4 critères atteints, WTCH-02 partiel, correctif en cours)
+- [x] Phase 33: Watchdog & notifications des missions (completed 2026-08-17)
 - [ ] Phase 34: Gaps agency-agents & cadrage skill-installer
 - [ ] Phase 35: Ré-armement worktree (conditionnelle)
 
