@@ -1,326 +1,300 @@
 ---
 phase: 18-survie-du-ledger-d-exigences-la-cl-ture-de-jalon
-verified: 2026-08-18T13:55:34Z
+verified: 2026-08-23T17:01:43Z
 status: human_needed
-score: 5/6 must-haves verified
+score: 6/7 must-haves verified
 behavior_unverified: 1
 overrides_applied: 0
 re_verification:
   previous_status: gaps_found
-  previous_score: 4/6
+  previous_score: 4/7
   gaps_closed:
-    - "Critère 4 — portabilité prouvée par exécution (G1, CRLF) : les 3 symptômes rejoués par le vérificateur sur ses propres fixtures sont éteints, et la mutation qui retire la normalisation les fait TOUS réapparaître (LF resté vert)."
-    - "Critère 4 — gouvernance : `scripts/check-version-sync.sh` sort en exit 0 sur cette branche (68 suites annoncées = 68 suites réelles)."
+    - "Gap 1 — CI rouge / gate du dépôt au rouge. Fermé par `d98c13f` : T10/T11/T12 de `plugin/_internal/tests/test-vibeflow-update.sh` réalignés sur le parc réel (6 entrées exec attendues en T10, 5 en T11/T12, `check-requirements-survival.sh` ajouté aux ensembles `expected`). Re-mesuré ici par code de sortie : `19 OK / 0 KO, rc=0` sur la branche — exactement le résultat que `main` rendait. Parc complet rejoué : **68 suites**, 67 vertes."
+    - "Gap 2 — clause de non-revendication. Fermé par `232c9be` : le § du `18-01-SUMMARY.md` ne titre plus « Fermeture de la condition C1 du STUDY » mais « Hook réel SessionStart prouvé sur un lab de démo — C1 du STUDY reste NON fermée », et écrit noir sur blanc « C1 reste non tenue, non entamée ». Mesure de contrôle refaite ce jour : `find .planning/phases -name '*SPEC*' | wc -l` → **0**, cohérent avec la non-revendication."
+    - "W-A′ — les deux résidus consignés au tour précédent sont comblés par `f0b0e63` (garde `issue1` rendue discriminante par comptage d'occurrences ; sentinel `rc=126|127` étendu aux assertions d'absence hors `mut_run`, dans les deux suites). Vérifié par falsification indépendante, pas par lecture du correctif — voir §W-A."
   gaps_remaining: []
   regressions: []
 gaps: []
 deferred: []
 behavior_unverified_items:
-  - truth: "Critère 5 — la phase est livrée avant la clôture de ce milestone"
-    test: "Poser les gestes humains de livraison : PR sur `main`, merge, tag annoté `vX.Y.Z`, release GitHub, puis `bash scripts/check-release-tag.sh --remote`."
-    expected: "Sortie `✓` du gate de release, et Phase 18 close avant la clôture de `fiabilite-v1.0`."
+  - truth: "Critère 5 — la phase est livrée avant la clôture de ce milestone (sinon 3e dérive du ledger)"
+    test: "Merger la PR #51 sur `main`, poser le tag annoté `vX.Y.Z` sur le commit de release, publier la release GitHub, puis `bash scripts/check-release-tag.sh --remote`."
+    expected: "`✓` du gate de release ; Phase 18 close AVANT la clôture de `fiabilite-v1.0` (Phases 25/34/35 encore non cochées à cet instant — la fenêtre est ouverte)."
     why_human: >-
-      Aucune inspection de code ne peut établir ce critère : c'est une contrainte d'ORDRE entre deux
-      événements FUTURS, et l'acte de livraison est un geste humain réservé (CLAUDE.md racine,
-      ADR-031). Ce critère est de plus structurellement gaté par CETTE vérification — il ne peut pas
-      être atteint avant elle. Constat machine à cet instant : branche
-      `feat/phase-18-survie-ledger-exigences`, 33 commits, `main..HEAD` non mergé, aucun tag sur
-      HEAD, aucune PR ouverte (`gh pr list --head … --state all` → `[]`). Non tombé — non encore
-      atteint.
+      Contrainte d'ordre sur un événement futur, et geste humain réservé (ADR-031, CLAUDE.md
+      racine : merge, tag et release GitHub ne sont jamais posés par un agent). Rien ne le bloque
+      plus techniquement — mesuré ce jour : PR #51 `state=OPEN`, `mergeable=MERGEABLE`,
+      `mergeStateStatus=CLEAN`, **10 checks sur 10 en SUCCESS** sur deux runs, tous sur
+      `headSha=f0b0e63` = HEAD local.
 human_verification:
-  - test: "Poser les gestes humains de livraison de la Phase 18 (PR, merge, tag annoté, release GitHub) puis `bash scripts/check-release-tag.sh --remote`."
-    expected: "`✓` — la phase est livrée avant la clôture de `fiabilite-v1.0`."
-    why_human: "Contrainte d'ordre sur des événements futurs + geste humain réservé (ADR-031). Aucun gap technique ne s'y oppose."
+  - test: "Merger la PR #51 sur `main`, poser le tag annoté, publier la release GitHub, puis `bash scripts/check-release-tag.sh --remote`."
+    expected: "`✓` du gate de release, Phase 18 close avant la clôture de `fiabilite-v1.0`."
+    why_human: "Geste humain réservé (ADR-031) + contrainte d'ordre sur un événement futur. Aucun blocage technique restant."
 ---
 
-# Phase 18 : Survie du ledger d'exigences à la clôture de jalon — Rapport de vérification
+# Phase 18 : Survie du ledger d'exigences à la clôture de jalon — Rapport de vérification (4ᵉ passe, post-correctifs)
 
 **Goal (ROADMAP)** : faire **survivre les exigences à la clôture de jalon** — un fichier qui existe
 déjà, aucun nouveau registre, aucune nouvelle grammaire, aucun overlay.
-**Vérifié** : 2026-08-18T13:55:34Z
-**Statut** : `human_needed` — **aucun gap technique**, un seul item humain (critère 5, la livraison).
-**Re-vérification** : Oui — après clôture des gaps du verdict `gaps_found` 4/6.
-**Branche** : `feat/phase-18-survie-ledger-exigences`, 33 commits, HEAD `0d28f06`, arbre propre
-(`git status --porcelain --untracked-files=no` → 0 ligne), non shippée.
+**Vérifié** : 2026-08-23T17:01:43Z
+**Statut** : `human_needed` — **0 gap**, un seul item restant : le geste humain de livraison.
+**Re-vérification** : Oui — 4ᵉ passe, après le verdict `gaps_found` 4/7 du 2026-08-18.
+**Branche** : `feat/phase-18-survie-ledger-exigences`, HEAD `f0b0e63`, **38 commits** d'avance sur
+`main`. Arbre propre hors ce rapport (`git status --porcelain` → seule ligne suivie :
+`M …/18-VERIFICATION.md`).
 
-> **Méthode.** Aucun vert repris d'un SUMMARY, aucune mesure du prompt recopiée. Chaque ligne est
-> adossée à une commande exécutée pendant CETTE vérification. Les verdicts de suite sont lus au
-> **code de sortie**, jamais au motif textuel (6 formats de sortie distincts sur les 12 suites du
-> module). Les assertions d'absence passent par `rtk proxy` (le hook `rtk` émet une ligne sur une
-> sortie vide et fausserait tout `| wc -l`). `check-agents.sh` est appelé **scopé**
-> (`--agents-dir=plugin/dev-orchestrator/agents`) — nu, il sort 0 sur « aucun agent dans
-> `.claude/agents` » et ne mord sur rien. Les fixtures CRLF/LF sont celles du vérificateur, jamais
-> celles de la suite livrée, et chaque correctif est soumis à une **mutation** qui doit le faire
-> réapparaître.
+> **Méthode.** Aucun vert repris d'un SUMMARY, d'un prompt ou de la passe précédente. Chaque ligne
+> ci-dessous est adossée à une commande exécutée pendant CETTE passe, lue au **code de sortie** et
+> jamais à un motif textuel. Toute assertion d'absence passe par `rtk proxy` (le hook `rtk` émet une
+> ligne sur un flux vide et fausserait tout `| wc -l`). `check-agents.sh` est appelé **scopé**
+> (`--agents-dir=` / `--file`), jamais nu. Le périmètre de mesure est celui de la CI —
+> `find plugin scripts -type f -path '*/tests/test-*.sh'` = **68 suites** — jamais le seul module :
+> c'est le rétrécissement de périmètre qui avait produit le faux vert de la 2ᵉ passe.
+
+---
 
 ## Vérités observables
 
-| # | Critère (ROADMAP §Phase 18) | Statut | Preuve d'exécution |
+| # | Must-have | Statut | Preuve d'exécution (cette passe) |
 |---|---|---|---|
-| 1 | Roll-over outillé, trace `carried-from:`, **rejoué sur la clôture réelle d'`agentique-v1.0`** (LEDG-01) | **ATTEINT** | Rejeu refait par le vérificateur sur la VRAIE archive → `Garanties: 93, Voyage: 42, Caduques laissées en archive: 1` = **136/136**, égal au compte d'IDs de corps de l'archive. `comm -23` : le seul ID non reporté est **VERB-02**, caduc par sa traçabilité. Zéro ID inventé (`comm -13` vide). 42 lignes `carried-from: agentique-v1.0`. Corps **verbatim** (diff nul hors VERB-02). Bouclage : le gate rejoué sur le ledger produit → silence, exit 3. |
-| 2 | Gate ROUGE si une exigence disparaît sans issue tracée — **lecteur/diff d'absence**, jamais régénérateur (LEDG-02) | **ATTEINT** | 4 fixtures neuves du vérificateur : absence → `[ledger-absent]` (exit 0) ; ID disparu → `[ledger-exigences-disparues]` (exit 0, **non silencé par `--hook`**) ; contrôle complet → silence (exit 3) ; ID caduc absent → silence. Zéro écriture (inventaire md5 identique avant/après), **zéro appel `git`**, **zéro heuristique de fraîcheur** (`mtime`/`stat`/`-newer` : aucune occurrence). |
-| 3 | Doctrine D-18-14 dans `plugin/dev-orchestrator/AGENT.md` | **ATTEINT** | Diff `main..HEAD` : bloc « **Doctrine du ledger (D-18-14, Phase 18)** » — « les archives `milestones/*-REQUIREMENTS.md` sont des **instantanés** … `.planning/REQUIREMENTS.md` est la **seule source vivante** ». Table des signaux `[ledger-*]` posée juste au-dessus. |
-| 4 | Aucun objet nouveau dans le socle ; gouvernance conductor ; **portabilité prouvée par exécution** | **ATTEINT** *(était NON ATTEINT)* | Quatre volets tous rejoués — détail §Critère 4 ci-dessous. CRLF : 3 symptômes éteints + mutation discriminante. `check-version-sync.sh` : **exit 0**. `check-agents.sh` scopé : **exit 0**. bash 3.2 : 3 suites exit 0. |
-| 5 | La phase est **livrée avant la clôture de ce milestone** | **NON ATTEINT — non tombé** | Jalon `fiabilite-v1.0` toujours ouvert (Phases 25, 34, 35 non cochées). Ni PR (`gh pr list` → `[]`), ni merge (`main..HEAD` = 33 commits), ni tag sur HEAD, ni release. Geste humain réservé (ADR-031) **et gaté par cette vérification même**. |
-| QUAL-01 | Gate né avec ses issues (PASS / FAIL / imparsable BRUYANT) + **mutation rouge prouvée** | **ATTEINT** | Les 5 issues émises par exécution directe. 9 mutations vertes dans la suite du gate (60 ok / 0 ko), 33 assertions de mutation dans la suite du rattrapage (55 ok / 0 ko). **Méta-mutation du vérificateur** : rendre la MUTATION issue2 no-op → la suite sort `✗ MUTATION issue2 — N'A PAS ROUGI`, exit 1. Le harnais ne peut pas passer sur une mutation sans effet. |
+| 1 | **Critère 1 (LEDG-01)** — roll-over outillé, trace `carried-from:`, rejoué sur la clôture réelle d'`agentique-v1.0` | ✓ **VERIFIED** | Bac neuf hors dépôt, archives réelles copiées, aucun ledger vivant. Mode diff par défaut : `rc=0`, **aucune écriture** (`ls REQUIREMENTS.md` → No such file). Puis `--write` : `rc=0`, `Garanties: 93, Voyage: 42, Caduques laissées en archive: 1, Forme non reconnue: 0`. Recoupement : archive = **136** IDs de corps ; ledger produit = **135** (136 − 1 caduque) ; **42** lignes `carried-from: agentique-v1.0`, aucune autre. Zéro perte hors la caduque doctrinale. |
+| 2 | **Critère 2 (LEDG-02)** — gate ROUGE si une exigence disparaît sans trace ; lecteur/diff d'absence, jamais régénérateur | ✓ **VERIFIED** | Lab de démo neuf, scripts posés dans `.claude/scripts/` et invoqués **comme l'entrée SessionStart** (`--hook`). Nominal → **stdout 0 octet, rc=0** (message nominal sur stderr, `rc=3` sans `--hook`). `ROUT-01` retiré du ledger vivant (135 → 134 IDs) → **214 octets**, `[ledger-exigences-disparues] 1 exigence(s) … : ROUT-01`, `rc=0` — **jamais silencé par `--hook`**. Ledger supprimé → **187 octets**, `[ledger-absent] Jalon « agentique-v1.0 » clos`, `rc=0`. Bouclage : gate rejoué sur le ledger reconstitué → `rc=3`, stdout 0 octet. |
+| 3 | **Critère 3** — doctrine D-18-14 dans `plugin/dev-orchestrator/AGENT.md` | ✓ **VERIFIED** | Bloc présent (l. 135) : archives = instantanés, `.planning/REQUIREMENTS.md` = seule source vivante. Le marqueur `.requirements-survival-armed` y est **déclaré explicitement** comme objet inaugural (D-18-09), pas glissé en silence. Densité ADR-029 : **205 lignes ≤ 250**. |
+| 4 | **Critère 4** — aucun objet nouveau dans le socle ; gouvernance conductor ; **aucun gate du dépôt au rouge du fait de cette phase** ; portabilité prouvée | ✓ **VERIFIED** | Détail §Critère 4. **68 suites lancées, 67 vertes**, 1 rouge **prouvée non imputable** par différentiel sur clone `main`. **CI PR #51 : 10/10 SUCCESS** sur deux runs, `headSha` = HEAD local. Tous les gates de qualité `rc=0`. |
+| 5 | **Critère 5** — la phase est **livrée avant la clôture de ce milestone** | ⚠️ **PRESENT_BEHAVIOR_UNVERIFIED** | PR #51 `OPEN`, `MERGEABLE`, `mergeStateStatus=CLEAN`, tous checks verts. Mais : non mergée (`main..HEAD` = **38** commits), **0 tag** sur HEAD (`git tag --points-at HEAD` → vide), `VERSION=v2.56.0` = dernier tag existant, jalon `fiabilite-v1.0` ouvert (Phases 25/34/35 non cochées). Le geste humain n'est pas posé — rien ne le bloque. |
+| QUAL-01 | Gate né avec ses 5 issues + mutation rouge prouvée, **harnais non faussable** | ✓ **VERIFIED** | `test-check-requirements-survival.sh` → **63 ok / 0 ko, rc=0** sous bash 5 **et** sous `/bin/bash` 3.2.57. `test-restore-requirements-ledger.sh` → **55 ok / 0 ko, rc=0**. Dix mutations distinctes inventoriées (`issue1`, `issue2`, `issue2bis`, `issue3`, `issue4`, `35`, `BLOQUANT`, `G1`, `G3`, `MOYEN`). Non-faussabilité statuée par **deux falsifications indépendantes** — §W-A. |
+| P1 | **Clause de non-revendication** (ROADMAP §Phase 18) — ne rien déclarer clos qui ne l'est pas | ✓ **VERIFIED** | §P1. |
 
-**Score : 5/6** — 0 échouée, 1 en attente du geste humain de livraison.
+**Score : 6/7 vérifiés, 1 présent-mais-comportement-non-exercé.** Aucun gap.
 
 ---
 
 ## Détail des preuves
 
-### Critère 1 — rejeu sur la clôture réelle d'`agentique-v1.0`
+### Critère 1 — roll-over rejoué sur la vraie archive
 
-Bac à sable neuf portant le VRAI `.planning/MILESTONES.md` et la VRAIE archive
-`.planning/milestones/agentique-v1.0-REQUIREMENTS.md`, `.planning/REQUIREMENTS.md` absent, puis
-`restore-requirements-ledger.sh --path <bac> --write`.
+Bac construit hors dépôt à partir des fichiers réels (`.planning/MILESTONES.md` + les trois
+`milestones/*-REQUIREMENTS.md`), sans `.planning/REQUIREMENTS.md`.
 
-```
-Garanties: 93, Voyage: 42, Caduques laissées en archive: 1, Forme non reconnue (stderr): 0
-```
-
-93 + 42 + 1 = **136** = `grep -cE '^- \[.\] \*\*[A-Z]+-[0-9]+\*\*'` sur l'archive. Contrôles
-indépendants du vérificateur :
-
-- **Zéro perte** : `comm -23 <ids_archive> <ids_reconstitué>` → **VERB-02** et rien d'autre ; sa
-  traçabilité d'archive porte `Livré v2.31.0 (17/18 verbes) — **caduc depuis v2.33.0**`, donc laissé
-  en archive conformément à D-18-11.
-- **Zéro invention** : `comm -13` → ensemble vide.
-- **Corps verbatim** : suffixe ` — carried-from: agentique-v1.0` retiré puis `diff` contre les
-  lignes de corps de l'archive → seule différence = la ligne VERB-02 absente. 135 lignes identiques
-  à l'octet.
-- **Trace** : `grep -c 'carried-from: agentique-v1.0$'` = **42**, égal au compte de voyageuses.
-- **Structure** : `## Garanties` (l. 11) · `## Reportées` (l. 107) · `## Out of Scope` (l. 157) ·
-  `## Traceability` (l. 166) — quatre H2 **sœurs**.
-- **Iron Law 2 tenue** : sans `--write`, inventaire md5 de l'arbre **identique** avant/après (aucune
-  écriture) ; **aucun appel `git`** dans le script (`grep -nE '(^|[^a-z])git '` hors commentaires →
-  vide) — donc aucun `git rm`.
-- **Bouclage bout en bout** : le gate rejoué sur le ledger que le rattrapage vient de produire →
-  `nominal — rien à signaler`, exit 3. Les deux moitiés de la phase se referment l'une sur l'autre
-  sur données réelles.
-
-### Critère 2 — gate lecteur d'absence, jamais juge de contenu (D-18-10)
-
-Fixtures construites par le vérificateur, indépendantes de la suite livrée.
-
-| Cas | Attendu | Obtenu | Exit |
-|---|---|---|---|
-| Jalon clos + ledger absent + archive présente | `[ledger-absent]` | `[ledger-absent] Jalon « demo-v1.0 » clos…` | 0 |
-| Ledger PRÉSENT, ID d'archive garanti disparu | `[ledger-exigences-disparues]` | `… 1 exigence(s) … : ABC-01` | 0 |
-| Le même, avec `--hook` | jamais traduit en silence | signal maintenu | **0** |
-| Ledger complet (aucun ID disparu) | silence | stdout vide | 3 |
-| ID **caduc** absent du vivant | silence (jamais un jugement) | stdout vide | 3 |
-| Argument inconnu / `--path` nu / `--hook`+`--quiet` | erreur d'usage | — | **64** |
-| Primitive déplacée | `[ledger-outil-absent]` BRUYANT | `[ledger-outil-absent] …` | 0 |
-
-Les **5 issues** de QUAL-01 sont donc émises par exécution directe, et le contrat de sortie
-documenté (0 signal / 3 silence / 64 usage) est respecté aux trois codes.
-
-**Non-régénérateur** : inventaire md5 identique avant/après passage du gate. **Aucun `git`**.
-**Aucune heuristique « n'a pas bougé »** : `mtime`, `stat -`, `-newer` — zéro occurrence dans le gate
-comme dans la primitive.
-
-### Critère 3 — doctrine D-18-14
-
-`plugin/dev-orchestrator/AGENT.md`, +16 lignes sur cette branche : trois lignes de table des signaux
-`[ledger-absent]` / `[ledger-exigences-disparues]` / `[ledger-illisible]`+`[ledger-outil-absent]`
-(toutes marquées « requise avant toute écriture (ADR-031) » ou « orientation seule »), puis le bloc
-de doctrine nommé D-18-14, puis la déclaration explicite du marqueur `.requirements-survival-armed`
-comme **objet inaugural** du dépôt.
-
-### Critère 4 — quatre volets, tous rejoués
-
-**(a) Zéro objet nouveau dans le socle.** `git diff --name-status main..HEAD | grep '^A'` :
-13 fichiers ajoutés = 3 scripts + 2 suites de test + 7 documents de phase + **1 marqueur**
-`.planning/.requirements-survival-armed`. **Zéro fichier de registre** (aucun des ajouts ne porte
-d'exigence), **zéro grammaire de merge**, **zéro overlay** (`.gsd/capabilities/` inexistant). Le
-marqueur est un fichier-sentinelle de 13 lignes de commentaire, sans donnée : ce n'est ni un
-registre, ni une grammaire, ni un overlay. Il est **arbitré** (D-18-09, checkpoint T1 tranché par
-Samuel le 2026-08-18, option-a) et **déclaré** comme inaugural dans `AGENT.md` — déviation assumée
-et tracée, pas silencieuse. `hooks/hooks.json` gagne **une entrée** dans le fragment SessionStart
-existant, en forme **exec** (`{{VF_BASH}}` + `args`), conforme au moteur de la Phase 30 — pas un
-objet neuf.
-
-**(b) Gouvernance conductor.**
-`bash plugin/conductor/scripts/check-agents.sh --agents-dir=plugin/dev-orchestrator/agents` →
-**exit 0**, `✓ agents conformes (natif + charte VibeFlow) · 7 warning(s)`. Les 7 warnings sont
-**préexistants** : aucun fichier d'agent n'est touché par la branche (absent de
-`git diff --name-only main..HEAD`). Densité ADR-029 : agents 49 / 108 / **250** / 69 lignes (≤ 250,
-`vf-dev-manager.md` exactement à la borne, inchangé par la phase) ; skills 74 et 18 lignes (≤ 500).
-
-**(c) Aucun gate du dépôt ne passe au rouge du fait de cette phase — G2 CLOS.**
-`bash scripts/check-version-sync.sh` → **exit 0**, `✓ sources synchronisées (v2.56.0, 17 modules)`,
-dont `✓ README.md suites 68` et `✓ README.fr.md suites 68`. Compte réel indépendant :
-`git ls-tree -r HEAD --name-only | grep -cE '(^|/)tests/test-.*\.sh$'` = **68** (contre **66** sur
-`main`) — les deux README annoncent désormais le bon chiffre (commit `e959b44`).
-`VERSION` (v2.56.0), `plugin/.claude-plugin/plugin.json` et `.claude-plugin/marketplace.json` sont
-**absents** du diff `main..HEAD` : aucun n'a été touché, aucun tag posé. Module `dev-orchestrator`
-bumpé v2.18.0 → **v2.19.0** (VERSION + module.json cohérents, confirmé par la triade du gate).
-
-**(d) Portabilité prouvée par exécution — G1 CLOS.** Fixtures LF et CRLF **du vérificateur**, la
-CRLF étant la conversion octet-à-octet de la LF (`file` confirme `with CRLF line terminators`).
-
-| Symptôme | Script courant (LF) | Script courant (CRLF) | Script MUTÉ (CRLF) | Script MUTÉ (LF) |
-|---|---|---|---|---|
-| (a) titre H2 clos sans tiret cadratin | exit 3, silence | **exit 3, silence** | `[ledger-illisible] … label_rejected`, exit 0 | exit 3, silence |
-| (b) trace `carried-from:` bien formée | exit 3, silence | **exit 3, silence** | `[ledger-illisible] … trace_malformed`, exit 0 | exit 3, silence |
-| (c) `restore --write` sur archive 1 garantie + 1 voyageuse | `Garanties: 1, Voyage: 1` | **`Garanties: 1, Voyage: 1`** | **`Garanties: 0, Voyage: 2`** | `Garanties: 1, Voyage: 1` |
-
-La mutation est la neutralisation des `tr -d '\r'` au point de lecture (`tr -d '\r' < ` → `cat `)
-dans une COPIE de la primitive et du rattrapage. Elle **mord sur les trois symptômes en CRLF et sur
-aucun en LF** : la correction est donc réellement causale, et les fixtures sont discriminantes.
-
-Preuves complémentaires sur le fichier écrit depuis une archive CRLF :
-- **zéro `\r` résiduel** (`grep -c $'\r'` = 0) ;
-- octets de la ligne voyageuse — muté : `… l i v r é e \r   —   carried-from: …` (suffixe collé
-  **après** le `\r`, ligne physiquement cassée) ; courant : `… l i v r é e   —   carried-from: …` ;
-- sortie CRLF **identique** à la sortie LF hors les 2 lignes portant le chemin du bac à sable.
-
-**Couverture par la suite du dépôt** : `plugin/_internal/tests/test-windows-crlf.sh` gagne T10-T12 →
-**13 ok · 0 ko, exit 0**. Rejouée contre un arbre `plugin/` mutant (mêmes `tr -d '\r'` neutralisés) :
-**10 ok · 3 ko, exit 1**, les 3 ko étant exactement T10, T11 et T12 — les tests neufs mordent, les
-10 autres restent verts (discriminance).
-
-**bash 3.2 (macOS, `/bin/bash` 3.2.57)** — cible la plus stricte du parc :
-`test-check-requirements-survival.sh` exit 0 (60 ok / 0 ko), `test-restore-requirements-ledger.sh`
-exit 0 (55 ok / 0 ko), `test-windows-crlf.sh` exit 0 (13 ok / 0 ko), et les scripts livrés exécutés
-directement sous `/bin/bash` rendent les mêmes verdicts qu'en bash 5.
-
-**Réserve de portée, non revendiquée** : la portabilité est prouvée **par simulation CRLF et sous
-bash 3.2 sur macOS** — aucun poste Windows réel n'a été exercé ici. C'est la convention du dépôt
-(ADR-054) et c'est ce que le prompt demandait ; ce n'est pas une mesure terrain Windows.
-
-### Critère 5 — livraison avant clôture du milestone
-
-Constat machine, sans interprétation : `gh pr list --head feat/phase-18-survie-ledger-exigences
---state all --json …` → `[]` ; `git log --oneline main..HEAD | wc -l` → **33** ; `git tag
---points-at HEAD | wc -l` → **0**. Le jalon `fiabilite-v1.0` reste ouvert (Phases 25, 34 et 35 non
-cochées dans `ROADMAP.md`).
-
-**Non tombé, non atteint.** Ce critère est une contrainte d'ORDRE sur des événements futurs, et la
-livraison est un geste humain réservé (CLAUDE.md racine, ADR-031). Il est de plus **gaté par cette
-vérification même** — il ne peut structurellement pas être vert au moment où on la rend. Aucun
-obstacle technique ne s'y oppose : c'est le seul item ouvert du rapport.
-
-### QUAL-01 — le gate naît avec ses issues et sa mutation rouge prouvée
-
-Les **5 issues** sont émises par exécution directe (tableau du critère 2), dont les deux BRUYANTES
-`[ledger-illisible]` et `[ledger-outil-absent]` — jamais un vert.
-
-Suite du gate : **60 ok / 0 ko, exit 0**, dont 9 couples de mutations, chacun structuré en deux
-assertions distinctes — « la mutation fait ROUGIR le cas visé » **et** « le cas de contrôle reste
-VERT » (discriminance) :
-
-| Mutation | Écart observé sur le cas visé | Contrôle resté vert |
+| Épreuve | Commande | Résultat |
 |---|---|---|
-| BLOQUANT #1 (`/` réintroduit dans la classe du libellé) | libellé de traversée `../` de nouveau accepté | cas 5 `demo-v1` |
-| MOYEN (tri `LC_ALL=C sort` retiré) | liste tronquée non triée | cas 26 (3 IDs) |
-| issue1 (nominal → absent_after_close) | `code(attendu 3, obtenu 0)` | DM_MISSING |
-| issue2 (absent → nominal) | `code(attendu 0, obtenu 3)` | DM_SILENT |
-| issue2bis (ids_missing → silence) | `code(attendu 0, obtenu 3)` | DM_SILENT |
-| issue3 (illisible → silence) | `code(attendu 0, obtenu 3)` | DM_SILENT |
-| issue4 (outil-absent → silence) | `code(attendu 0, obtenu 3)` | — |
-| 35 (garde d'ancêtre symlinké retirée) | `[ledger-absent]` avec archive hors lab | jalon-clos-sans-archive |
-| G3 (bras large réintroduit) | trace tronquée de nouveau absorbée | cas 24 (mention nue backtick) |
-| G1 (normalisation CRLF retirée) | titre CRLF redevient `label_rejected` | cas 5 (LF) |
+| Mode diff (défaut) | `restore-requirements-ledger.sh --path <bac>` | `rc=0`, stderr vide, **aucun fichier écrit** |
+| Rattrapage | `… --write` | `rc=0` — `Garanties: 93, Voyage: 42, Caduques laissées en archive: 1, Forme non reconnue: 0` |
+| Recoupement archive | `grep -cE '^- \[.\] \*\*[A-Z]+-[0-9]+\*\*'` sur l'archive | **136** |
+| Recoupement produit | idem sur le ledger reconstitué | **135** (= 136 − 1 caduque) |
+| Trace de voyage | `grep -c 'carried-from: agentique-v1.0'` | **42** — et `grep -c 'carried-from:'` = **42** aussi (aucune trace d'un autre jalon fabriquée) |
 
-Suite du rattrapage : **55 ok / 0 ko, exit 0**, 33 assertions de mutation (dont une `MUTATION G1`
-propre).
+93 + 42 + 1 = **136** : la partition est exhaustive, aucune exigence perdue en route.
 
-**Méta-contrôle du vérificateur** (le prompt signale qu'un tour précédent avait livré une mutation
-imprimant `ok` sur les deux branches) : dans une copie COMPLÈTE de l'arbre `plugin/` — verte telle
-quelle, 60 ok / 0 ko — la MUTATION issue2 a été rendue **no-op** (motif `sed` remplacé par un motif
-introuvable, mutant devenu identique à l'original). Résultat : `✗ MUTATION issue2 — N'A PAS ROUGI`,
-suite **exit 1**. Le harnais détecte donc bien une mutation sans effet ; il ne peut pas rendre vert
-sur les deux branches.
+**Gardes de non-écrasement rejouées** (elles font partie du critère — le rattrapage ne doit jamais
+écraser un ledger vivant en silence) :
+
+| Épreuve | Résultat |
+|---|---|
+| `--write` sur un ledger vivant présent | `rc=1`, refus explicite, **md5 identique avant/après** (`61c45834…` = `61c45834…`) |
+| `--write --overwrite-live` | `rc=0`, écrit + `REQUIREMENTS.md.bak-agentique-v1.0` créée et tracée en sortie |
+
+### Critère 2 — le gate en forme hook, sur un lab, pas en invocation manuelle
+
+Les trois scripts copiés dans `<lab>/.claude/scripts/` et invoqués depuis le lab exactement comme
+la 5ᵉ entrée `SessionStart` de `hooks/hooks.json` les invoque (`--hook`).
+
+| Scénario | `rc` | stdout | Signal |
+|---|---|---|---|
+| Nominal (ledger vivant complet) | **0** | **0 octet** | — (message nominal sur stderr uniquement) |
+| Nominal, sans `--hook` | **3** | 0 octet | contrat CLI préservé |
+| `ROUT-01` retiré du ledger vivant | **0** | **214 octets** | `[ledger-exigences-disparues] 1 exigence(s) … : ROUT-01` |
+| `.planning/REQUIREMENTS.md` supprimé | **0** | **187 octets** | `[ledger-absent] Jalon « agentique-v1.0 » clos` |
+| Bouclage sur le ledger reconstitué | **3** | 0 octet | silence — le rattrapage referme bien le gate |
+
+Point qui compte : `--hook` ne silencie **jamais** l'issue 2bis (ID disparu). C'est le contrat
+A-18-08, et il est tenu en exécution, pas seulement en commentaire.
+
+**Sur CE dépôt** : `check-requirements-survival.sh --path .` → `rc=3`, **stdout 0 octet**, stderr
+`nominal — rien à signaler.` Le marqueur `.planning/.requirements-survival-armed` est bien versionné
+et le gate reste silencieux ici — l'armement ne coûte rien à ce repo, comme le marqueur l'annonce.
+
+### Critère 4 — le volet qui avait produit le faux vert, remesuré au bon périmètre
+
+**4a. Aucun objet nouveau dans le socle.** Fichiers **ajoutés** par la branche
+(`git diff --name-status --diff-filter=A main...HEAD`), hors `.planning/phases/…` (artefacts de
+phase) :
+
+- `plugin/dev-orchestrator/scripts/{check-requirements-survival,requirements-survival-detect,restore-requirements-ledger}.sh`
+- `plugin/dev-orchestrator/scripts/tests/{test-check-requirements-survival,test-restore-requirements-ledger}.sh`
+- `.planning/.requirements-survival-armed`
+
+Zéro fichier de registre, zéro grammaire de merge, zéro overlay : `git ls-files | grep -c
+'gsd/capabilities'` → **0**. Le seul objet neuf du socle est le **marqueur d'armement** — 13 lignes
+de commentaire, aucune donnée, jamais écrit par le gate (qui ne fait que le lire) — et il est
+**déclaré en doctrine** dans `AGENT.md` comme objet inaugural assumé. Ce n'est ni un registre, ni
+une grammaire, ni un overlay : le critère tient, et il tient **sans que le rapport ait à fermer les
+yeux**, parce que la phase a nommé l'objet elle-même.
+
+**4b. Gouvernance conductor — tous les gates, scopés, par code de sortie.**
+
+| Gate | Invocation | `rc` |
+|---|---|---|
+| `check-agents.sh --strict --agents-dir=<d>` | 6 dossiers `plugin/*/agents` | **0** ×6 |
+| `check-agents.sh --strict --file <f>` | tous les `plugin/*/AGENT.md` | **0** partout |
+| `check-agents.sh --strict --resolve-agents=strict` (monde fermé) | 6 dossiers + registre complet | **0** partout |
+| `check-version-sync.sh` | — | **0** |
+| `check-state-integrity.sh --file .planning/STATE.md` | — | **0** |
+| `check-capability-activation.sh` | — | **0** |
+| `check-machine-paths.sh` | — | **0** |
+| `check-release-tag.sh` | — | **0** |
+
+**4c. Le parc complet, 68 suites, par code de sortie.**
+
+```
+== bilan: 68 suites, 1 echecs ==
+FAIL rc=1 plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh
+```
+
+L'unique rouge est `T28-F fraîcheur (ATTEINTE) : la copie versionnée a DÉRIVÉ du registre du moteur
+installé` — **183 OK / 1 KO**.
+
+**Différentiel refait à la main, pas repris du prompt.** Clone frais du dépôt sur `main`
+(`249074a`) dans un bac hors arbre, même machine, même commande :
+
+```
+main rc=1
+== résultat : 183 OK / 1 KO / 0 SKIP ==
+  ✗ T28-F fraîcheur (ATTEINTE) : la copie versionnée a DÉRIVÉ du registre du moteur installé
+```
+
+**Échec identique sur `main` → non imputable à la Phase 18.** Recoupement structurel : la branche ne
+touche **aucun** des fichiers dont T28-F dépend (`git diff --name-only main...HEAD` sur
+`test-dev-orchestrator.sh`, `build-gsd-capabilities-index.sh`, `references/` → sortie vide).
+
+**Cause nommée, pas devinée** : la machine porte `~/.claude/gsd-core/VERSION` = **1.11.0**, qui
+déclare une capability de plus que celle contre laquelle la table versionnée a été générée. Diff
+régénération vs copie versionnée :
+
+```
+> | `refactor-trigger` | step | `refactor.trigger_enabled` | — | `skip` |
+> | `refactor.trigger_enabled` | `refactor-trigger` | boolean | non |
+< 35 étage(s) … 44 déclarée(s) … 23 toggle(s)
+> 36 étage(s) … 45 déclarée(s) … 24 toggle(s)
+```
+
+C'est une dérive **locale et préexistante**, invisible en CI parce que la CI installe le moteur à
+frais. Voir §Constats hors périmètre — elle mérite un geste, mais pas dans cette phase.
+
+**4d. CI de la PR #51 — vérifiée à la source, pas dans un SUMMARY.**
+
+`gh pr view 51` → `state=OPEN`, `mergeable=MERGEABLE`, `mergeStateStatus=CLEAN`,
+`headRefOid=f0b0e63…` = HEAD local. `statusCheckRollup` : **10 CheckRun, 10 `conclusion=SUCCESS`**,
+dont les deux occurrences du job « Suites de tests (découverte non vide) » qui était rouge au tour
+précédent. Les deux runs (`32154432361` événement `pull_request`, `32154423503` événement `push`)
+portent tous deux `headSha=f0b0e63032a14380998d0213c24aeea199789bac` et `conclusion=success` :
+le vert est bien celui du code vérifié ici, pas celui d'un commit antérieur.
+
+Contrôle local de la suite qui avait cassé : `test-vibeflow-update.sh` → **19 OK / 0 KO, rc=0** —
+soit exactement le compte que `main` rendait avant la phase. Gap 1 est fermé au sens strict : la
+phase ne dégrade plus le parc, elle le remet à son niveau.
+
+**4e. Portabilité prouvée par exécution.**
+
+| Épreuve | Résultat |
+|---|---|
+| Lab **intégralement CRLF** (`MILESTONES.md` 199 CR, ledger 192 CR, archive 853 CR), nominal | `rc=3`, **stdout 0 octet** — aucun faux positif |
+| Même lab CRLF, ledger absent → `--write` | `rc=0`, `Garanties: 93, Voyage: 42, Caduques: 1, Forme non reconnue: 0` — identique au cas LF |
+| CR résiduels dans le ledger produit | **0** |
+| `test-windows-crlf.sh` | `rc=0`, **13 ok / 0 ko** |
+| Suite du gate sous `/bin/bash` **3.2.57** (bash de macOS) | `rc=0`, **63 ok / 0 ko** |
+
+### W-A — non-faussabilité du harnais, statuée par falsification
+
+Le correctif `f0b0e63` n'est pas cru sur parole. Deux falsifications volontaires conduites ici :
+
+1. **Harnais cassé (relocalisation).** La suite copiée seule hors de son arbre :
+   **`5 ok, 53 ko`, `rc=1`**, **5** occurrences de `HARNESS_BROKEN`. Le harnais **crie**, il ne
+   verdit pas.
+2. **Mutant volontairement non porteur.** Copie de la suite dont la mutation `issue1` est rendue
+   inopérante (`n == 3` → `n == 999`, la substitution n'a donc jamais lieu) :
+   **`61 ok, 1 ko`, `rc=1`**, assertion émise
+   `✗ MUTATION issue1 — construction du mutant a échoué`.
+
+Ce second point est précisément le résidu W-A′ signalé au tour précédent (garde vacante :
+`grep -qF` réussissait toujours, la chaîne existant déjà dans la source). Le comptage d'occurrences
+introduit par `f0b0e63` **discrimine réellement** — mesuré, pas lu. Le fichier temporaire créé pour
+cette épreuve a été supprimé ; l'arbre est resté propre.
+
+### P1 — clause de non-revendication : tenue
+
+| Contrôle | Mesure |
+|---|---|
+| `18-01-SUMMARY.md` déclare-t-il C1 close ? | **Non** — le § s'intitule « Hook réel SessionStart prouvé sur un lab de démo — **C1 du STUDY reste NON fermée** » et écrit « C1 reste **non tenue, non entamée** » |
+| La preuve prescrite de C1 existe-t-elle ? | `find .planning/phases -name '*SPEC*' \| wc -l` → **0** — cohérent avec la non-revendication |
+| Le bénéfice explicitement NON capté (indexation par capability) est-il revendiqué ? | **Non** — « aucune indexation par capability n'est captée », répété deux fois |
+| La consommation par CE dépôt est-elle revendiquée ? | **Non** — « ce dépôt lui-même ne consomme toujours pas ce gate (`.claude/scripts` inexistant ici, `.gitignore:20` l'exclut) » |
+| Ligne de récap ROADMAP | « completed 2026-08-18 — 3 plans exécutés, **non shippée** : PR/tag/release restent des gestes humains non posés » |
+| `RELEASE-META-OK` (18-03) | déjà corrigée par `0d28f06`, non réapparue |
+
+**Jugement demandé sur la recette de lab de démo.** J'ai rejoué cette recette moi-même et elle est
+solide : le hook réel se comporte correctement, en LF comme en CRLF. Mais **la prudence du SUMMARY
+est le bon geste**, et je la reprends à mon compte plutôt que de la lever : ce qui est prouvé, c'est
+que l'outillage fonctionne **quand un lab le câble**, pas que ce dépôt le consomme, et encore moins
+C1 — qui parle de fichiers `*SPEC*`, pas de hooks, et dont la mesure prescrite reste à **0**.
+Un lab de démo construit par le vérificateur est une preuve de mécanisme, jamais une preuve de
+discipline de tenue. La distinction est exactement celle que le Bloc C du STUDY existe pour garder.
 
 ---
 
-## Points corrigés depuis le verdict `gaps_found` 4/6 — statués sur pièces
+## Anti-patterns et constats
 
-| Item | Verdict du vérificateur |
-|---|---|
-| **G1 — CRLF (bloquant)** | **CLOS.** Les 3 symptômes rejoués sur fixtures neuves sont éteints en CRLF comme en LF, et la mutation qui retire la normalisation les fait TOUS réapparaître en CRLF sans toucher au LF. T10-T12 ajoutés et prouvés discriminants (3 ko sous mutant). |
-| **G2 — W1 (must-have 18-02)** | **L'amendement dit la vérité, il ne maquille rien.** D-18-03 (`18-CONTEXT.md:43`) prescrit littéralement que les exigences livrées « restent dans le fichier vivant, mais **hors de la table de traçabilité** ». Mesure du vérificateur sur le rejeu réel : 93 items sous `## Garanties` (verbatim, AVANT `## Traceability`), 42 sous `## Reportées`, 21 lignes de traçabilité reportées. Ces 21 sont **exactement** les voyageurs qui possédaient une ligne de traçabilité dans l'archive : `comm` entre « voyageurs ayant une trace en archive » et « traces du reconstitué » → **ensemble vide** côté perte. Les 115 → 21 ne sont donc pas une perte mais l'application de D-18-03. C'est bien la formulation d'origine qui était fausse. |
-| **G3 — déviation n°1** | **CLOS, vérifié par exécution.** Trace réellement tronquée hors backtick (`— carried-from:`) → `[ledger-illisible] … trace_malformed`, exit 0 (elle n'est plus avalée). Mention nue entre backticks en prose → silence, exit 3. Trace bien formée → silence. Le gate lancé sur le `.planning/` de CE dépôt (dont `REQUIREMENTS.md:932` porte la mention nue) → **exit 3**, aucun faux positif. |
-| **I2 — traçabilité LEDG** | **CLOS.** `LEDG-01`/`LEDG-02` passent de `Pending` à `Done — plans 18-01/18-02/18-03`, forme identique à la convention du dépôt (`MANI-01 → Done — plans 31-01, 31-03`, `LOCK-01 → Done — plan 32-01`), et les cases du corps passent à `[x]`. |
-| **Revendication fausse (`RELEASE-META-OK`)** | **CORRIGÉE et honnête.** Commit `0d28f06` : le SUMMARY porte désormais un amendement nommant l'affirmation « **faux** », citant la dérive 66 → 68 et le commit correcteur `e959b44`. Contrôle machine : `check-version-sync.sh` exit 0. |
+| Fichier | Ligne | Motif | Sévérité | Impact |
+|---|---|---|---|---|
+| fichiers modifiés par la phase (17 hors `.planning/`) | — | `TBD` / `FIXME` / `XXX` | — | **Aucun marqueur de dette** — balayage exhaustif, sortie vide |
+| `18-01-SUMMARY.md` | 107 | « le parc complet du dépôt compte **69** suites » | ⚠️ Warning | Le compte réel est **68** — mesuré deux fois, par le motif de la CI (`find plugin scripts …`) et par un balayage repo entier hors worktrees, les deux à 68. Le `README.md` (l. 124) dit 68, et le message du commit `d98c13f` dit 68 : le SUMMARY est le seul écrit à porter 69. Chiffre faux dans un artefact de phase — sans effet sur un critère, mais à corriger par cohérence avec la règle « aucun chiffre non mesuré ». |
 
-## Avertissements (non bloquants)
+### Constats hors périmètre de la Phase 18
 
-| # | Constat | Portée |
-|---|---|---|
-| W-A | **RÉSOLU (correction ciblée, 2026-08-18, voir `18-01-SUMMARY.md`).** `mut_run` distingue désormais une panne de harnais (`rc` 126/127 → sentinel `HARNESS_BROKEN`, traité en `ko` bruyant par `mut_check`, jamais un `✓`) d'une vraie morsure. Les 5 mutations `issue1`-`issue4`/`issue2bis` portent maintenant le garde-fou « le fichier muté porte bien la mutation », sur le patron de `guard34_removed`/`guard35_removed`/`guardg3_removed`/`guardcrlf_removed`. Preuve par relocalisation volontaire ajoutée comme cas de test (mutant sans script copié → `rc=127` reproduit, harnais crie). Suite à 63 ok / 0 ko. |
-| W-B | La case de **LEDG-03** (portée par la **Phase 30**, pas par celle-ci) est cochée par cette branche. Factuellement exact — la RFC #3556 est ouverte depuis le 2026-08-15, et sa ligne de traçabilité le dit — mais c'est un geste hors périmètre déclaré de la phase. |
-| W-C | `vf-dev-manager.md` est à **exactement 250 lignes**, la borne ADR-029. Non touché par la phase ; toute ligne ajoutée par une phase future le fera basculer. |
+1. **`test-dev-orchestrator.sh` T28-F est rouge en local, sur cette branche ET sur `main`.** Cause
+   établie : `gsd-core` **1.11.0** est installé sur cette machine et déclare `refactor-trigger` ;
+   `plugin/dev-orchestrator/references/gsd-capabilities-index.md` a été générée contre une version
+   antérieure. Le geste est trivial (`bash plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh`)
+   mais il **n'appartient pas à cette phase** et ne doit pas entrer dans la PR #51 — le différentiel
+   sur `main` l'établit. À traiter en commit séparé.
+2. **Corollaire pour la Phase 35.** `gsd-core` **1.11.0 > 1.10.0** est installé sur cette machine :
+   la moitié « installé » de la précondition externe de la Phase 35 est de fait tombée. Le volet
+   « RELEASÉ » (sonde `npm view`, jamais le dist-tag `next`) reste à vérifier par cette phase-là.
+   Simple signalement — aucun arbitrage posé ici.
 
-## Réserves de portée — explicitement NON revendiquées
-
-- **Indexation par capability** : non captée (STUDY §7.3). Un `REQUIREMENTS.md` qui survit reste
-  indexé par jalon ; cette part du besoin reste ouverte sous les conditions E1/E2 du STUDY §8.
-- **Condition C1 du STUDY (« ce repo consomme son propre outillage »)** : toujours **non tenue sur
-  CE dépôt** (`.claude/scripts` n'existe pas ici, `.gitignore:20` exclut `.claude/`, le hook
-  `SessionStart` ne tourne donc jamais dans ce dépôt même). Mais **fermée en tant que condition
-  d'outillage** (correction ciblée du 2026-08-18, voir `18-01-SUMMARY.md`) : une recette sur lab de
-  démo réaliste hors dépôt (11 scénarios) a invoqué les scripts copiés dans `.claude/scripts/` du
-  lab comme l'entrée `SessionStart` réelle (`{{VF_BASH}}` + `--hook`) — stdout 0 octet en nominal,
-  179 octets sur perte, exit 0 dans les deux cas. Ce n'est donc plus « seule une exécution manuelle
-  est prouvée » : le déclenchement en hook réel l'est aussi, ailleurs que sur ce dépôt lui-même.
-- **Windows réel** : la portabilité est prouvée par **simulation CRLF** et sous **bash 3.2 macOS**,
-  jamais sur un poste Windows.
-
-## Anti-patterns
-
-Scan `TBD|FIXME|XXX` sur tous les fichiers du diff `main..HEAD` : **aucun marqueur de dette
-introduit par la phase**. Toutes les occurrences sont des faux positifs ou préexistantes —
-`XXXX-01` / `XXXX-02` sont des **IDs d'exigence de fixture**, `XXXXXX` est un gabarit `mktemp`, et
-les `TBD` de `ROADMAP.md` / `REQUIREMENTS.md` / `STUDY.md` sont antérieurs à la branche
-(`git diff main..HEAD | grep '^+.*TBD'` → vide). Les 3 scripts livrés ne portent **aucun**
-`TODO`/`HACK`/`PLACEHOLDER`.
-
-## Exécution des suites — par code de sortie
-
-| Suite | Exit |
-|---|---|
-| `test-check-capability-activation.sh` · `test-check-dev-bootstrap.sh` · `test-check-doc-drift.sh` | 0 · 0 · 0 |
-| `test-check-gsd-config.sh` · `test-check-gsd-engine.sh` · `test-check-hook-paths.sh` | 0 · 0 · 0 |
-| `test-check-requirements-survival.sh` (60 ok / 0 ko) | **0** |
-| `test-dev-orchestrator.sh` · `test-discover-unintegrated-docs.sh` · `test-hook-exit-contract.sh` | 0 · 0 · 0 |
-| `test-inject-mcp-tools.sh` | 0 |
-| `test-restore-requirements-ledger.sh` (55 ok / 0 ko) | **0** |
-| `plugin/_internal/tests/test-windows-crlf.sh` (13 ok / 0 ko) | **0** |
-| **Total** | **13/13 exit 0** |
-
-Gates du dépôt : `scripts/check-version-sync.sh` → **exit 0** ;
-`plugin/conductor/scripts/check-agents.sh --agents-dir=plugin/dev-orchestrator/agents` → **exit 0**.
+---
 
 ## Vérification humaine requise
 
 ### 1. Livraison de la Phase 18 (critère 5)
 
-**Test :** poser les gestes humains de livraison — PR sur `main`, merge, tag annoté `vX.Y.Z` sur le
-commit de release, release GitHub — puis `bash scripts/check-release-tag.sh --remote`.
-**Attendu :** sortie `✓`, et Phase 18 close **avant** la clôture de `fiabilite-v1.0`.
-**Pourquoi un humain :** contrainte d'ordre entre deux événements futurs ; l'acte de livraison est un
-geste humain réservé (ADR-031, CLAUDE.md racine) ; et ce critère est gaté par la présente
-vérification.
-
-## Synthèse
-
-Les cinq gestes de correction annoncés ont été **statués sur pièces, jamais entérinés** : G1 est clos
-par rejeu indépendant des trois symptômes CRLF **plus** une mutation qui les ressuscite tous les
-trois ; G2 (W1) est un amendement **véridique**, adossé au texte de D-18-03 et à une mesure
-(21 traces reportées = 21 voyageurs tracés, zéro perte) ; G3 est clos par exécution des deux
-branches du motif ; I2 suit la convention du dépôt ; et la revendication `RELEASE-META-OK` est
-désormais nommée fausse dans le SUMMARY, avec le gate machine qui la contredisait maintenant vert.
-
-**Quatre critères sur cinq sont ATTEINTS, plus le transverse QUAL-01. Aucun gap technique ne reste
-ouvert.** Le seul item non atteint est le critère 5 — la livraison elle-même — qui ne peut pas être
-vert avant cette vérification puisqu'elle le gate. **Le ship est autorisé sur le fond** ; le statut
-`human_needed` traduit uniquement le geste humain restant, pas une réserve sur le travail.
+**Test :** merger la PR #51 sur `main`, poser le tag annoté sur le commit de release, publier la
+release GitHub, puis `bash scripts/check-release-tag.sh --remote`.
+**Attendu :** `✓` du gate de release, et Phase 18 close **avant** la clôture de `fiabilite-v1.0`.
+**Pourquoi un humain :** geste réservé (ADR-031, CLAUDE.md racine) et contrainte d'ordre sur un
+événement futur. **Aucun blocage technique ne subsiste** : PR `CLEAN`, 10 checks sur 10 verts sur
+le HEAD exact, parc local vert hors une dérive préexistante prouvée non imputable.
 
 ---
 
-_Vérifié : 2026-08-18T13:55:34Z_
-_Vérificateur : Claude (gsd-verifier), re-vérification goal-backward_
+## Synthèse
+
+Les deux gaps du 2026-08-18 sont **fermés, et fermés pour la bonne raison** — pas par
+réinterprétation du critère, mais par correctif mesurable :
+
+- La CI qui bloquait est verte, sur le bon `headSha`, deux fois, y compris le job qui rougissait.
+- La revendication de fermeture de C1 a été retirée **et remplacée par sa négation explicite**,
+  ce qui vaut mieux qu'un simple silence : le SUMMARY dit maintenant ce qui n'est pas prouvé.
+- W-A′, que la passe précédente classait « résidu non bloquant », a été comblé et je l'ai vérifié
+  par falsification — le garde-fou vacant mord désormais.
+
+**Il ne reste aucun manque.** Le seul item ouvert est le geste humain de livraison, qui ne peut pas
+être vert avant le merge — classé `behavior_unverified`, jamais `gap`. Le statut est donc
+`human_needed` par l'arbre de décision (un item de vérification humaine existe), et **pas** par
+défaut de réalisation : sur le fond, les cinq critères techniques et le transverse QUAL-01 sont
+atteints, et la clause de non-revendication est tenue.
+
+---
+
+_Vérifié : 2026-08-23T17:01:43Z_
+_Vérificateur : Claude (gsd-verifier) — 4ᵉ passe, goal-backward, mesures rejouées de bout en bout_

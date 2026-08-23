@@ -104,7 +104,7 @@ de module — il déplace le compte d'entrées exec produites à l'install (`dev
 comptait encore l'ancien total et rougissait (rc=1, CI PR #51 rouge) tant que ce plan n'était pas
 posé — corrigé en aval de cette correction ciblée (T10/T11/T12 réalignés sur 6/5/5, mutation T12
 rediscriminante), voir `plugin/_internal/tests/test-vibeflow-update.sh`. Le parc complet du dépôt
-compte **69** suites `test-*.sh` (hors `.claude/worktrees`), pas les 12 du seul module.
+compte **68** suites `test-*.sh` (hors `.claude/worktrees`), pas les 12 du seul module.
 
 ### Hook réel SessionStart prouvé sur un lab de démo — C1 du STUDY reste NON fermée
 
