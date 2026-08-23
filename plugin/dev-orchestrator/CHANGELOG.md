@@ -1,5 +1,33 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.19.0] — 2026-08-18 (Phase 18 — survie du ledger d'exigences)
+
+**Minor** (deux capacités publiques neuves : gate SessionStart + geste de rattrapage).
+
+- `check-requirements-survival.sh` (LEDG-02, plan 18-01) — 6e signal `SessionStart · startup` de
+  `hooks/hooks.json`. Lecteur d'absence, jamais juge de contenu (D-18-10) : 5 issues QUAL-01—
+  silence / `[ledger-absent]` (jalon clos, `.planning/REQUIREMENTS.md` disparu) /
+  `[ledger-exigences-disparues]` (≥1 ID d'exigence garanti/voyageur disparu sans trace, diff d'IDs
+  entre l'archive du jalon et le ledger vivant) / `[ledger-illisible]` bruyant /
+  `[ledger-outil-absent]` bruyant. Marqueur d'armement versionné
+  `.planning/.requirements-survival-armed` (D-18-09), premier fichier-sentinelle de ce type dans
+  ce repo. Primitive partagée `requirements-survival-detect.sh` (`vf_ledger_state`), suite
+  `test-check-requirements-survival.sh` (436 l., 41 assertions, 5 mutations).
+- `restore-requirements-ledger.sh` (LEDG-01, plan 18-02) — rattrapage outillé : roll-forward depuis
+  l'archive d'un jalon clos, diff par défaut, écriture uniquement sous `--write` (D-18-06). Garde
+  de non-écrasement d'un ledger vivant, `--overwrite-live` explicite avec sauvegarde
+  `.bak-<jalon>` tracée. Classification statut→destin `vf_ledger_classify` (extension de la même
+  primitive) : caduc (précédence absolue) > case non cochée = voyage > case cochée + statut
+  reconnu livré (`Complete`/`Done`, insensible à la casse, ou `Livré v`) = garantie > repli voyage
+  par défaut, jamais perdu > forme non reconnue (repli ultime). Rejoué sur l'archive réelle
+  `agentique-v1.0-REQUIREMENTS.md` : 93 garanties + 42 voyage + 1 caduque = 136/136, zéro perte.
+  Les voyageuses portent leur propre H2 `## Reportées`, sœur de `## Garanties` — jamais nichées
+  dedans (règle du prochain H1/H2, D-18-03). Suite `test-restore-requirements-ledger.sh` (474 l.,
+  28 assertions, rejeu réel + 3 familles de mutations).
+- `AGENT.md` — doctrine D-18-14 (« archives = instantanés, `.planning/REQUIREMENTS.md` = seule
+  source vivante »), table des signaux `[ledger-*]`.
+- Parc de hooks : 28 → 29 entrées (`docs/HOOKS-CONTRAT-SORTIE.md` mis à jour).
+
 ## [v2.18.0] — 2026-08-17 (annexe notifications — D-33-H Q6, Pattern H)
 
 **Minor** (nouvelle capacité publique : doctrine des jalons GSD vers l'app Claude).

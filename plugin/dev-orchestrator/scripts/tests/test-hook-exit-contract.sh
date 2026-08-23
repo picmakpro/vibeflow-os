@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# test-hook-exit-contract.sh — Suite de contrat de sortie des 4 scripts SessionStart de dev-orchestrator
+# test-hook-exit-contract.sh — Suite de contrat de sortie des 5 scripts SessionStart de dev-orchestrator
 #
 # Ferme le trou identifié par RESEARCH.md (Wave 0 Gaps, Pitfall 2) : « aucun test ne capture stdout
 # et stderr séparément ». Suite NEUVE et dédiée (plutôt qu'une extension de
@@ -7,13 +7,13 @@
 # fichiers DISTINCTS sous mktemp -d, jamais fusionnés (aucun `2>` suivi de `&1` nulle part dans ce
 # fichier) — et elle doit rester lisible comme la preuve d'un contrat, pas se diluer dans 700 lignes.
 #
-# Couvre les 4 scripts normalisés par le plan VFDO-30-04 (D-06) : check-dev-bootstrap.sh,
-# discover-unintegrated-docs.sh, check-doc-drift.sh, check-gsd-config.sh — tous partagent désormais
-# la même fonction hook_exit() (texte identique, vérifié par grep au cadrage) : sous --hook, le SEUL
-# code de silence interne (3) devient 0 à la frontière du harness ; tous les autres codes restent
-# inchangés, avec ou sans --hook.
+# Couvre les 5 scripts normalisés par le plan VFDO-30-04 (D-06) puis étendus par le plan 18-01
+# (LEDG-02) : check-dev-bootstrap.sh, discover-unintegrated-docs.sh, check-doc-drift.sh,
+# check-gsd-config.sh, check-requirements-survival.sh — tous partagent la MÊME fonction hook_exit()
+# (texte identique, vérifié par grep) : sous --hook, le SEUL code de silence interne (3) devient 0 à
+# la frontière du harness ; tous les autres codes restent inchangés, avec ou sans --hook.
 #
-# Matrice de cas, RÉPLIQUÉE À L'IDENTIQUE pour chacun des 4 scripts (5 x 4 = 20 cas de base) :
+# Matrice de cas, RÉPLIQUÉE À L'IDENTIQUE pour chacun des 5 scripts (5 x 5 = 25 cas de base) :
 #   1. silencieux, SANS --hook   → code de silence documenté (3), stdout vide (non-régression CLI)
 #   2. silencieux, AVEC --hook   → code 0 ET stdout STRICTEMENT vide (zéro octet) — critère 5 de la
 #      spec, tenu par un test et non par relecture
@@ -29,8 +29,8 @@
 #     hors du contrat {0, 3, 64} (abort)
 #
 # Discrimination par MUTATION (convention du dépôt : un test vert sous mutation ne prouve rien).
-# Les 4 scripts partagent la MÊME fonction hook_exit() (texte identique) : une seule paire de
-# patrons sed, appliquée aux 4 copies mutées, suffit à prouver la discrimination sur le parc entier
+# Les 5 scripts partagent la MÊME fonction hook_exit() (texte identique) : une seule paire de
+# patrons sed, appliquée aux 5 copies mutées, suffit à prouver la discrimination sur le parc entier
 # plutôt que sur un seul script :
 #   (m1) hook_exit ignore le mode --hook (neutralise la condition HOOK) → les cas « silencieux avec
 #        --hook » (attendu 0) rougissent : ils obtiennent 3.
@@ -40,7 +40,7 @@
 #        « silencieux avec --hook » rougit sur la dimension STDOUT (attendu vide, obtenu non vide)
 #        alors que le CODE reste bon (0) — c'est la mutation qui prouve que la suite teste le FLUX,
 #        pas seulement le code.
-# Chaque mutation est jouée contre les 4 scripts (12 cas), restaurée immédiatement après (les
+# Chaque mutation est jouée contre les 5 scripts (15 cas), restaurée immédiatement après (les
 # mutants vivent sous mktemp -d, jamais dans l'arbre réel — aucun fichier du dépôt n'est modifié par
 # cette suite).
 #
@@ -60,6 +60,7 @@ BOOTSTRAP="$SCRIPTS_DIR/check-dev-bootstrap.sh"
 DISCOVER="$SCRIPTS_DIR/discover-unintegrated-docs.sh"
 DOCDRIFT="$SCRIPTS_DIR/check-doc-drift.sh"
 GSDCONFIG="$SCRIPTS_DIR/check-gsd-config.sh"
+SURVIVAL="$SCRIPTS_DIR/check-requirements-survival.sh"
 
 pass=0; fail=0
 ok()    { echo "  ✓ $1"; pass=$((pass+1)); }
@@ -160,8 +161,17 @@ printf 'const configKeys = { "workflow.pattern_mapper": true };\n' \
 printf '{"workflow": {"code_review": true}}\n' \
   > "$GSDCONFIG_ROOT/engine/bin/shared/config-defaults.manifest.json"
 
+# Signal check-requirements-survival.sh (LEDG-02, plan 18-01) : jalon clos déclaré dans
+# MILESTONES.md, .planning/REQUIREMENTS.md absent, archive de reconstitution présente → [ledger-absent].
+SURVIVAL_SIGNAL_DIR="$(mktemp -d -p "$CASES_DIR")"
+mkdir -p "$SURVIVAL_SIGNAL_DIR/.planning/milestones"
+printf '# Milestones\n\n## \xe2\x9c\x85 demo-v1 \xe2\x80\x94 Un jalon clos (fixture de contrat de sortie)\n\nDétail.\n' \
+  > "$SURVIVAL_SIGNAL_DIR/.planning/MILESTONES.md"
+printf -- '- [x] **AAAA-01**: texte\n\n## Traceability\n\n| Requirement | Phase | Status |\n|---|---|---|\n| AAAA-01 | Phase 1 | Done |\n' \
+  > "$SURVIVAL_SIGNAL_DIR/.planning/milestones/demo-v1-REQUIREMENTS.md"
+
 # ==================================================================================================
-# Matrice de base — 5 cas x 4 scripts = 20 cas.
+# Matrice de base — 5 cas x 5 scripts = 25 cas.
 # ==================================================================================================
 
 echo "== check-dev-bootstrap.sh =="
@@ -193,19 +203,33 @@ run_case "check-gsd-config.sh — signal, avec --hook"          "$GSDCONFIG" 0  
 run_case "check-gsd-config.sh — erreur d'argument, avec --hook" "$GSDCONFIG" 64 empty  nonempty --hook --ne-existe-pas
 run_case "check-gsd-config.sh — mutuelle exclusion"           "$GSDCONFIG" 64 empty    nonempty --path "$EMPTY_DIR" --hook --quiet
 
+echo "== check-requirements-survival.sh =="
+run_case "check-requirements-survival.sh — silencieux, sans --hook"      "$SURVIVAL" 3  empty    any      --path "$EMPTY_DIR"
+run_case "check-requirements-survival.sh — silencieux, avec --hook"      "$SURVIVAL" 0  empty    any      --path "$EMPTY_DIR" --hook
+run_case "check-requirements-survival.sh — signal, avec --hook"          "$SURVIVAL" 0  nonempty any      --path "$SURVIVAL_SIGNAL_DIR" --hook
+run_case "check-requirements-survival.sh — erreur d'argument, avec --hook" "$SURVIVAL" 64 empty  nonempty --hook --ne-existe-pas
+run_case "check-requirements-survival.sh — mutuelle exclusion"           "$SURVIVAL" 64 empty    nonempty --path "$EMPTY_DIR" --hook --quiet
+
 # ==================================================================================================
-# Discrimination par MUTATION — m1/m2/m3, jouées contre les 4 scripts (12 cas). Mutants sous
+# Discrimination par MUTATION — m1/m2/m3, jouées contre les 5 scripts (15 cas). Mutants sous
 # CASES_DIR uniquement : aucun fichier du dépôt réel n'est jamais modifié par cette suite.
 # ==================================================================================================
 
-make_mutant() { # <mutation_id> <script_reel> <fichier_mutant_a_creer>
-  local mid="$1" src="$2" dst="$3"
+# make_mutant écrit le mutant dans un RÉPERTOIRE dédié (jamais un fichier nu) sous le NOM RÉEL du
+# script : check-requirements-survival.sh découvre sa primitive par dirname($0) — un fichier renommé
+# ou isolé casserait ce sourcing et ferait basculer le mutant sur l'issue « outil absent » plutôt que
+# sur la mutation testée. Le répertoire est retourné sur stdout.
+make_mutant() { # <mutation_id> <script_reel> <dstdir> -> imprime le chemin du mutant
+  local mid="$1" src="$2" dstdir="$3"
+  local dst="$dstdir/$(basename "$src")"
+  mkdir -p "$dstdir"
   case "$mid" in
     m1) sed -e '/^hook_exit()/,/^}/ s/\[ "\$HOOK" -eq 1 \]/[ "$HOOK" -eq 9 ]/' "$src" > "$dst" ;;
     m2) sed -e '/^hook_exit()/,/^}/ s/if \[ "\$HOOK" -eq 1 \] && \[ "\$code" -eq 3 \]; then/if [ "$code" -eq 3 ]; then/' "$src" > "$dst" ;;
     m3) sed -e '/^hook_exit()/,/^}/ s/^    exit 0$/    echo "mutation-m3-leak"; exit 0/' "$src" > "$dst" ;;
   esac
   chmod +x "$dst"
+  printf '%s' "$dst"
 }
 
 MUT_TRACE=""
@@ -231,13 +255,22 @@ mutant_case() { # <mutation_id> <label_script> <script_mutant> <expect_rc> <stdo
   fi
 }
 
-echo "== Mutations m1/m2/m3 (discrimination, jouées contre les 4 scripts) =="
+echo "== Mutations m1/m2/m3 (discrimination, jouées contre les 5 scripts) =="
 for pair in "$BOOTSTRAP:check-dev-bootstrap.sh" "$DISCOVER:discover-unintegrated-docs.sh" \
-            "$DOCDRIFT:check-doc-drift.sh" "$GSDCONFIG:check-gsd-config.sh"; do
+            "$DOCDRIFT:check-doc-drift.sh" "$GSDCONFIG:check-gsd-config.sh" \
+            "$SURVIVAL:check-requirements-survival.sh"; do
   SRC="${pair%%:*}"; NAME="${pair##*:}"
-  MUT_M1="$(mktemp -p "$CASES_DIR")"; make_mutant m1 "$SRC" "$MUT_M1"
-  MUT_M2="$(mktemp -p "$CASES_DIR")"; make_mutant m2 "$SRC" "$MUT_M2"
-  MUT_M3="$(mktemp -p "$CASES_DIR")"; make_mutant m3 "$SRC" "$MUT_M3"
+  DIR_M1="$(mktemp -d -p "$CASES_DIR")"; MUT_M1="$(make_mutant m1 "$SRC" "$DIR_M1")"
+  DIR_M2="$(mktemp -d -p "$CASES_DIR")"; MUT_M2="$(make_mutant m2 "$SRC" "$DIR_M2")"
+  DIR_M3="$(mktemp -d -p "$CASES_DIR")"; MUT_M3="$(make_mutant m3 "$SRC" "$DIR_M3")"
+  # check-requirements-survival.sh découvre sa primitive par dirname($0) : sans une copie NON
+  # mutée de requirements-survival-detect.sh à côté, le mutant basculerait sur [ledger-outil-absent]
+  # au lieu d'exercer réellement hook_exit() muté.
+  if [ "$NAME" = "check-requirements-survival.sh" ]; then
+    cp "$SCRIPTS_DIR/requirements-survival-detect.sh" "$DIR_M1/"
+    cp "$SCRIPTS_DIR/requirements-survival-detect.sh" "$DIR_M2/"
+    cp "$SCRIPTS_DIR/requirements-survival-detect.sh" "$DIR_M3/"
+  fi
 
   # m1 casse le cas « silencieux avec --hook » (attendu 0) → doit rougir sur le CODE.
   mutant_case "m1" "$NAME" "$MUT_M1" 0 empty --path "$EMPTY_DIR" --hook

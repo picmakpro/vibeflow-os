@@ -7,7 +7,7 @@
 > façade de verbes : GSD est l'interface directe du quotidien, l'agent est l'entrée
 > conversationnelle optionnelle.
 
-**Version** : v2.18.0
+**Version** : v2.19.0
 **Type** : agent + équipe d'agents + 2 skills + scripts
 
 ---
@@ -85,9 +85,14 @@ dev-orchestrator/
 │   ├── discover-unintegrated-docs.sh # découverte doctrine ingestion (+ mode --hook)
 │   ├── check-dev-bootstrap.sh     # signal bootstrap/onboard/orientation GSD (Phase 17)
 │   ├── check-doc-drift.sh         # signal dérive documentaire (Phase 17)
+│   ├── requirements-survival-detect.sh # primitive sourcée : vf_ledger_state + vf_ledger_classify (Phase 18)
+│   ├── check-requirements-survival.sh  # signal survie du ledger, LEDG-02 (Phase 18)
+│   ├── restore-requirements-ledger.sh  # rattrapage roll-forward, LEDG-01 (Phase 18)
 │   └── tests/                     # suites de vérification
 │       ├── test-check-dev-bootstrap.sh
-│       └── test-check-doc-drift.sh
+│       ├── test-check-doc-drift.sh
+│       ├── test-check-requirements-survival.sh
+│       └── test-restore-requirements-ledger.sh
 └── references/                    # doctrine + index chargés on-demand par les agents
     ├── intent-routing.md           # carte intention → brique (SEULE source de routage)
     ├── GSD-PIPELINE.md             # ordre canonique du cycle + model profiles
@@ -272,6 +277,12 @@ Exit 0 si tout passe (les SKIP, ex. GSD absent, ne font pas échouer la suite).
 
 ## Historique
 
+- **v2.19.0** — survie du ledger d'exigences à la clôture d'un jalon (Phase 18) : gate
+  `check-requirements-survival.sh` (LEDG-02, 6e signal `SessionStart`, diff d'IDs archive↔vivant)
+  et rattrapage `restore-requirements-ledger.sh` (LEDG-01, roll-forward sous `--write`, garde de
+  non-écrasement + `--overwrite-live`). Primitive partagée `requirements-survival-detect.sh`
+  (`vf_ledger_state` + `vf_ledger_classify`). Doctrine `AGENT.md` D-18-14. Rejoué sur l'archive
+  réelle `agentique-v1.0-REQUIREMENTS.md` : zéro perte (136/136).
 - **v2.6.0** — signaux de démarrage du moteur de dev (Phase 17) : premier fragment
   `hooks/hooks.json` du module (`SessionStart:startup`), `check-dev-bootstrap.sh` (continuum à
   4 états bootstrap/onboard/orientation GSD) et `check-doc-drift.sh` (dérive documentaire,

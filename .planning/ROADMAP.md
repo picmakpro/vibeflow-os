@@ -58,7 +58,7 @@
 - [x] Phase 15: Collaboration inter-équipes dev ↔ design (completed 2026-07-27)
 - [x] Phase 16: Cloisonnement complet des dispatches d'agents (completed 2026-07-27)
 - [x] Phase 17: Signaux de démarrage du moteur de dev (completed 2026-07-28)
-- [ ] Phase 18: Survie du ledger d'exigences à la clôture de jalon
+- [x] Phase 18: Survie du ledger d'exigences à la clôture de jalon (completed 2026-08-18 — 3 plans exécutés, non shippée : PR/tag/release restent des gestes humains non posés)
 - [x] Phase 19: Migration du moteur GSD pilotée par /vf-update (completed 2026-07-28)
 - [x] Phase 20: Fluidité du flux de dev sans perte de qualité (completed 2026-07-31)
 - [x] Phase 21: Alignement du moteur GSD sur gsd-core 1.9.0 (completed 2026-07-31)
@@ -73,7 +73,7 @@
 - [x] Phase 30: Portabilité Windows II (completed 2026-08-16)
 - [x] Phase 31: Manifeste d'install + dry-run (issue #20) (completed 2026-08-16)
 - [x] Phase 32: Durcissement du driver-lock (completed 2026-08-17)
-- [~] Phase 33: Watchdog & notifications des missions (5 plans exécutés, vérifiée `gaps_found` le 2026-08-17 — 3/4 critères atteints, WTCH-02 partiel, correctif en cours)
+- [x] Phase 33: Watchdog & notifications des missions (completed 2026-08-17)
 - [ ] Phase 34: Gaps agency-agents & cadrage skill-installer
 - [ ] Phase 35: Ré-armement worktree (conditionnelle)
 
@@ -806,7 +806,8 @@ vf-portable.sh), 33-05 (jalons de notification + recette de clôture Windows) �
 - **ANNEXE — Phase 33 ROUVERTE le 2026-08-17 pour son annexe notifications (D-33-H)** : l'émission de WTCH-03 passe en **opt-in (défaut OFF, toggle `/vf-notify`)** et les jalons GSD (fin de phase, fin de milestone) sont relayés vers l'**app Claude** via la session principale — `PushNotification` n'existant pas en sous-agent. Correction **pré-distribution** : la release **v2.56.0 a été retirée** (revert `07ff554`, `VERSION` revenue à v2.55.1), aucun lab n'a donc jamais reçu le défaut d'émission. **Les deux plans de l'annexe sont écrits ET exécutés** (2026-08-17, branche `feat/phase-33-annexe-notifications-opt-in`). Cadrage complet en `33-CONTEXT.md` § D-33-H.
 - [x] 33-06-PLAN.md — gate d'opt-in par fichier-sentinelle (`${XDG_CONFIG_HOME:-${HOME:-}/.config}/vibeflow/notify-optin`) dans `notify.sh`, AVANT toute détection de canal, + toggle `/vf-notify` (`on`/`off`/`status`/`test`) — module `conductor` v1.28.0 (D-33-H Q5, WTCH-03 amendé)
 - [x] 33-07-PLAN.md — **Pattern H** : relais `SendMessage(main)` des jalons GSD (fin de phase ET fin de milestone) vers l'app Claude via la session principale — module `dev-orchestrator` v2.18.0 (D-33-H Q1/Q6)
-- **Vérification goal-backward de l'annexe (`33-VERIFICATION-ANNEXE.md`, 2026-08-17)** : `gaps_found`, **5/6 critères D-33-H ATTEINTS**, critère 1 **PARTIEL** — `$HOME` déréférencé sans garde sous `set -u` falsifiait le fail-open *inconditionnel* promis en tête de `notify.sh` (jamais le défaut OFF, le script mourant avant tout `command -v`). Gap **fermé par la correction post-revue `401c903`** : garde `${HOME:-}` appliquée à l'identique dans `notify.sh`, `SKILL.md` et l'assertion d'identité, plus le cas **N19** (les trois variables absentes → exit 0, stderr vide, zéro invocation), prouvé rouge sous mutation. Mesures re-dérivées après correction : **66 suites découvertes / 66 OK / 0 KO**, `check-version-sync.sh` exit 0, `check-agents.sh --agents-dir=plugin/dev-orchestrator/agents` exit 0, arbre de travail propre. **Rien n'est poussé** : ni PR, ni merge, ni tag, ni release — gestes humains (ADR-031).
+- **Vérification goal-backward de l'annexe (`33-VERIFICATION-ANNEXE.md`, 2026-08-17)** : `gaps_found`, **5/6 critères D-33-H ATTEINTS**, critère 1 **PARTIEL** — `$HOME` déréférencé sans garde sous `set -u` falsifiait le fail-open *inconditionnel* promis en tête de `notify.sh` (jamais le défaut OFF, le script mourant avant tout `command -v`). Gap **fermé par la correction post-revue `401c903`** : garde `${HOME:-}` appliquée à l'identique dans `notify.sh`, `SKILL.md` et l'assertion d'identité, plus le cas **N19** (les trois variables absentes → exit 0, stderr vide, zéro invocation), prouvé rouge sous mutation. Mesures re-dérivées après correction : **66 suites découvertes / 66 OK / 0 KO**, `check-version-sync.sh` exit 0, `check-agents.sh --agents-dir=plugin/dev-orchestrator/agents` exit 0, arbre de travail propre.
+- **SHIPPÉE `v2.56.0`** (2026-08-17, vérifié machine) — les gestes humains (ADR-031) ont été posés : PR **#50** mergée dans `main` (`f639108`), commit de release `4431ed1`, tag annoté `v2.56.0` poussé sur `origin`, **release GitHub publiée** le 2026-08-17T18:40Z, `scripts/check-release-tag.sh --remote` → ✓. Suivi de `e2af6b1` (le manuel annonçait six commandes, il y en a sept — `/vf-notify` documentée). La `v2.56.0` avait été retirée avant distribution (revert `07ff554`) puis **re-publiée** après revue du défaut : aucun lab n'a jamais reçu l'émission par défaut. **Phase CLOSE**, à une réserve près — la recette Windows (`33-CLOTURE-WINDOWS.md`) n'a jamais été exécutée : laissée **en suspens** sur décision de Samuel (2026-08-17), en attente du retour des testeurs (issue #20) ou d'un poste Windows équipé ; ne jamais la compter comme verte à la clôture du milestone.
 
 ### Phase 18: Survie du ledger d'exigences à la clôture de jalon
 
@@ -826,11 +827,11 @@ jalon suivant régénère de zéro — aucun lab GSD conforme n'a de réponse du
 système garantit aujourd'hui ? ». La dérive a été **re-constatée à la clôture d'agentique-v1.0**
 (2026-08-15) : la conservation du ledger y est une déviation manuelle assumée, pas un comportement
 outillé — 2ᵉ occurrence ; cette phase existe pour qu'il n'y ait pas de 3ᵉ.
-**Depends on**: Phase 30 (la RFC upstream — LEDG-03 — part en jour 1 du milestone ; le hook
-`SessionStart` du gate naît en forme exec sur le moteur de la Phase 30). **La RFC conditionne le GO
-du gate, pas le code** : refusée ou sans réponse au **2026-10-26** → ré-arbitrage intégral (doctrine
-seule, ou gate en mode avertissement), jamais un piquet planté contre notre propre chaîne d'outils
-(Iron Law 2).
+**Depends on**: Phase 30 (le hook `SessionStart` du gate naît en forme exec sur le moteur de la
+Phase 30). **La clause de conditionnement à la RFC amont est sans objet (D-18-07)** : le rattrapage
+outillé devient **permanent** si la RFC #3556 (OPEN, triage COLLABORATOR « deferred — awaiting
+maintainer review ») est refusée ou sans réponse au **2026-10-26** — aucun ré-arbitrage à conduire,
+l'exécution part sans attendre l'issue amont (Iron Law 2).
 **Requirements**: LEDG-01, LEDG-02 *(LEDG-03 — dépôt de la RFC — est portée par la Phase 30)*
 **Success Criteria** (what must be TRUE):
 
@@ -859,7 +860,12 @@ mutation rouge prouvée (convention du module : suite ~1,5× la taille du script
 **Bénéfice explicitement NON capté** — à ne pas revendiquer : l'indexation par capability. Un
 `REQUIREMENTS.md` qui survit reste indexé par jalon ; cette part du besoin reste ouverte sous les
 conditions E1/E2 du STUDY §8 — pas déclarée sans objet.
-**Plans**: TBD
+**Plans**: 18-01 (LEDG-02, gate `check-requirements-survival.sh` + primitive
+`requirements-survival-detect.sh`), 18-02 (LEDG-01, rattrapage `restore-requirements-ledger.sh`),
+18-03 (doctrine D-18-14 + bump module `dev-orchestrator` v2.18.0 → v2.19.0). Les 3 plans sont
+**exécutés** (`18-01-SUMMARY.md`, `18-02-SUMMARY.md`, `18-03-SUMMARY.md`) ; la phase n'est **pas
+encore shippée** — PR, tag et release restent des gestes humains non posés (CLAUDE.md racine,
+ADR-031).
 
 ### Phase 34: Gaps agency-agents & cadrage skill-installer
 

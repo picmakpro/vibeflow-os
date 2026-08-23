@@ -1,5 +1,43 @@
 # Backlog — idées différées (hors milestone courant)
 
+## Formats de sortie hétérogènes entre les 12 suites de `dev-orchestrator` — DIFFÉRÉ
+
+**Capturé :** 2026-08-18, hygiène documentaire de clôture de la Phase 18 (mandat vf-coder). Hors
+périmètre de cette phase (aucun code de test n'est touché) — remonté sans corriger.
+
+**Le défaut :** chaque suite de `plugin/dev-orchestrator/scripts/tests/` imprime son bilan dans un
+format textuel différent. Mesuré en ré-exécutant les 12 suites (2026-08-18) :
+
+- `== résultat : N ok, 0 ko ==` (minuscules) — **7 suites** : `test-check-dev-bootstrap.sh`,
+  `test-check-doc-drift.sh`, `test-check-gsd-config.sh`, `test-check-gsd-engine.sh`,
+  `test-check-requirements-survival.sh`, `test-discover-unintegrated-docs.sh`,
+  `test-restore-requirements-ledger.sh`.
+- `== résultat : N OK / 0 KO ==` — **1 suite** : `test-hook-exit-contract.sh`.
+- `== résultat : N OK / 0 KO / 0 SKIP ==` — **1 suite** : `test-dev-orchestrator.sh` (sur-ensemble
+  textuel du format précédent : un collecteur qui grep la sous-chaîne `OK / 0 KO` capte les DEUX
+  formats à tort comme s'ils étaient identiques).
+- `== Résultat : N OK, 0 KO, 0 SKIP ==` (majuscule `R`, virgules) — **1 suite** :
+  `test-check-hook-paths.sh`.
+- `== bilan : N cas — N OK / 0 KO ==` — **1 suite** : `test-check-capability-activation.sh`.
+- `  Bilan : N OK, 0 KO` (indenté, majuscule `B`, sans délimiteurs `==`, virgule plutôt que `/`) —
+  **1 suite** : `test-inject-mcp-tools.sh`. Correction d'un a priori du mandat de cadrage : ce
+  script **imprime bien un compteur** (contrairement à l'hypothèse initiale « n'imprime aucun
+  compteur, ne se vérifie qu'au code de sortie ») — mais dans un 6ᵉ format textuel qui ne
+  correspond à aucun des cinq autres, donc tout aussi invisible à un collecteur calé sur l'un des
+  cinq.
+
+Soit **6 formats textuels distincts sur 12 suites**, toutes vertes à l'exécution directe
+(`bash <suite>.sh`, exit 0 partout, re-vérifié le 2026-08-18). Tout script de collecte qui filtre
+sur UN motif littéral (grep exact ou substring) classera à tort en échec — ou pire, en silence
+absent des deux côtés — les suites qui n'emploient pas ce motif précis. Le risque est bidirectionnel :
+faux KO sur une suite verte (motif absent) ET faux vert par sous-chaîne partagée (le cas `résultat :
+N OK / 0 KO` capté par erreur dans `résultat : N OK / 0 KO / 0 SKIP`).
+
+**Piste de fix :** un unique contrat de sortie machine-lisible (ex. une dernière ligne
+`RESULT: pass=N fail=N skip=N` commune aux 12 suites, imprimée en plus — jamais à la place — du
+libellé humain existant, cf. `feedback_libelles-ok-geles.md` : les libellés `ok` gelés s'ajoutent,
+ne se réécrivent jamais). Un collecteur se cale alors sur ce contrat unique, jamais sur la prose.
+
 ## `save()` de `dag.sh` sans verrou ni écriture atomique — lost update silencieux — DIFFÉRÉ
 
 **Capturé :** 2026-08-17, demande explicite de Samuel après le rapport d'exécution de la

@@ -1,0 +1,13 @@
+# Marqueur d'armement du ratchet check-requirements-survival.sh (D-18-09, A-18-02).
+#
+# Présence de ce fichier = cran « armé » : le gate signale aussi le cas où un jalon est déclaré
+# clos, le ledger est absent, ET aucune archive de reconstitution n'existe (constat distinct
+# « aucune archive à reconstituer »). Absence = cran « avertissement » par défaut : le gate reste
+# silencieux sur ce cas précis (un lab qui n'a aucun moyen de reconstituer son ledger ne reçoit
+# jamais un rouge qu'il ne peut pas fermer).
+#
+# Objet INAUGURAL de ce repo (premier fichier-sentinelle versionné par git dans .planning/, cf.
+# plugin/dev-orchestrator/AGENT.md). Écrit MANUELLEMENT ici par ce plan (18-01) — le gate ne l'écrit
+# jamais lui-même, il ne fait que le lire. Ce dépôt a un MILESTONES.md portant des jalons clos ET
+# un .planning/REQUIREMENTS.md vivant : l'armement ne coûte rien ici, le gate reste silencieux sur
+# les deux volets (fichier absent, ID disparu).

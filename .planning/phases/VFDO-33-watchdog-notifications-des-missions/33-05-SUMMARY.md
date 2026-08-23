@@ -129,7 +129,7 @@ Relue sur disque avant d'écrire le code (`plugin/conductor/scripts/notify.sh`, 
 `read_first`) : `Usage : notify.sh <TITLE> <BODY>`, deux positionnels, `exit 0` inconditionnel
 (y compris si arguments manquants/vides). Strictement conforme à l'assomption
 `[notify_sh, title, body]` documentée par `33-SPIKE-canal-notification.md` et confirmée par le
-2ᵉ plancheck externe (`33-PLANCHECK-EXTERNE.md`). Aucun écart d'interface constaté — le code
+2ᵉ plancheck externe (`33-REVUE-EXTERNE.md`). Aucun écart d'interface constaté — le code
 écrit reprend la forme exacte prescrite par le plan, sans adaptation.
 
 ## Ce qui a été fait

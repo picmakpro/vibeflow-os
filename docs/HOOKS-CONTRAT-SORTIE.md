@@ -51,12 +51,12 @@ Les diagnostics humains (`say()` et équivalents) vont systématiquement sur **s
 stdout — c'est déjà la convention en place dans les 4 scripts du périmètre dev (task 2 de ce plan
 le vérifie et le corrige si besoin).
 
-## 4. L'inventaire — 28 entrées, recompte machine
+## 4. L'inventaire — 29 entrées, recompte machine
 
 Commande de recomptage (fait foi, D-08) :
 
 ```bash
-python3 -c "import json,glob; n=sum(len(h.get('hooks',[])) for f in sorted(glob.glob('plugin/*/hooks/hooks.json')) for gs in json.load(open(f))['hooks'].values() for h in gs); print(n); assert n==28, n"
+python3 -c "import json,glob; n=sum(len(h.get('hooks',[])) for f in sorted(glob.glob('plugin/*/hooks/hooks.json')) for gs in json.load(open(f))['hooks'].values() for h in gs); print(n); assert n==29, n"
 ```
 
 Rendue le 2026-08-17 : `28` (27 recomptées plus tôt le même jour par le plan `32-03`, plus 1 :
@@ -69,10 +69,14 @@ entrée, pas deux** — D-32-05 envisageait deux entrées séparées (matcher `B
 `Write|Edit`) mais cette forme s'est avérée EMPIRIQUEMENT incompatible avec la purge d'idempotence
 cross-matcher de `merge-hooks.sh` (elle retire toute entrée référençant les mêmes scripts dans
 TOUS les groupes de l'événement de la cible — la seconde entrée installée supprimait
-systématiquement la première). Voir `32-03-SUMMARY.md` pour la reproduction complète. Toute dérive
-future (une 29e entrée apparue, une entrée disparue) fait échouer cette assertion — bruyamment,
-jamais en silence — et impose de mettre à jour l'inventaire et l'assertion **ensemble**, jamais
-l'un sans l'autre.
+systématiquement la première). Voir `32-03-SUMMARY.md` pour la reproduction complète. Rendue le
+2026-08-18 : `29` — l'entrée n°29, `check-requirements-survival.sh`, `SessionStart · startup`,
+posée par le plan `18-01` (LEDG-02, survie du ledger d'exigences à la clôture d'un jalon), ajoutée
+au même groupe `startup` UNIQUE de `dev-orchestrator` (même contournement de la dette
+d'idempotence cross-matcher que les entrées précédentes de ce module, jamais corrigée ici). Toute
+dérive future (une 30e entrée apparue, une entrée disparue) fait échouer cette assertion —
+bruyamment, jamais en silence — et impose de mettre à jour l'inventaire et l'assertion
+**ensemble**, jamais l'un sans l'autre.
 
 **Colonnes** : module · événement · matcher · script · arguments d'invocation (au-delà du chemin du
 script lui-même) · `--hook` accepté (oui/non — et s'il change le CODE de sortie ou seulement le
@@ -105,7 +109,7 @@ exacte · classement **advisory** ou **bloquante**, avec le mécanisme · forme 
 | 12 | SessionStart · startup | `probe-memory-guards.sh` | (aucun — `--strict` existe mais n'est pas passé par ce fragment) | non | 0 (systématique sans `--strict` : « Silence = tout va bien. Advisory : exit 0 ») | advisory | shell + `\|\| true` | rien |
 | 13 | SessionEnd · (aucun matcher) | `archive.sh` | `--async --apply` | non | 0 (mode async : retour immédiat, la tâche réelle se relance en arrière-plan) | advisory | shell + `\|\| true` | rien |
 
-### dev-orchestrator — 5 entrées (périmètre code des plans 30-04/30-07/30-09)
+### dev-orchestrator — 6 entrées (périmètre code des plans 30-04/30-07/30-09, 18-01)
 
 | # | Événement · matcher | Script | Invocation | `--hook` | Codes AVANT normalisation (30-04) | Codes APRÈS normalisation (30-04) | Classement | Forme | Action (Phase 30) |
 |---|---|---|---|---|---|---|---|---|
@@ -114,6 +118,7 @@ exacte · classement **advisory** ou **bloquante**, avec le mécanisme · forme 
 | 16 | SessionStart · startup | `check-doc-drift.sh` | `--hook` | oui — même profil | 0 (seuil atteint), 3 (rien à signaler), 64 (usage) | 0 (silence traduit + signaux), 64 | advisory | shell (30-07) | normalisation livrée ici ; migration à 30-07 |
 | 17 | SessionStart · startup | `check-gsd-config.sh` | `--hook` | oui — même profil | 0 (au moins un signal `[gsd-config]`), 3 (aligné/illisible), 64 (usage) | 0 (silence traduit + signaux), 64 | advisory | shell (30-07) | normalisation livrée ici ; migration à 30-07 |
 | 26 | SessionStart · startup | `check-hook-paths.sh` | `--hook` | oui — traduit le silence interne (3→0), ne change pas le rendu | sans objet — entrée **née conforme** (plan 30-09) | 0 (silence traduit, et signal `[hook-paths]` sur constat), 1 (« verdict non rendu » — réglages illisibles ou interpréteur Python absent, bruyant sur stderr, stdout vide), 64 (usage) | **advisory** (ADR-031 — constate, ne répare rien, ne bloque jamais le démarrage) | **exec à `command` littéral** (nom nu `bash`, seule entrée du parc dans ce cas) | née à l'état cible (plan 30-09) |
+| 29 | SessionStart · startup | `check-requirements-survival.sh` | `--hook` | oui — traduit le silence interne (3→0), ne change pas le rendu | sans objet — entrée **née conforme** (plan 18-01) | 0 (silence traduit, et signal `[ledger-absent]` / `[ledger-illisible]` / `[ledger-outil-absent]` / `[ledger-exigences-disparues]` selon le cas — issue 2bis JAMAIS traduite vers le silence, A-18-08), 3→0 (silence, cran avertissement A-18-02), 64 (usage) | **advisory** (ADR-031 — constate, ne corrige rien, ne bloque jamais le démarrage ; lecteur d'absence, jamais juge de contenu, D-18-10) | **exec** (né conforme, D-01, contrat PR #29 §5) | née à l'état cible (plan 18-01) |
 
 **Dérogation de l'entrée n°26 à ADR-071 §Décision 2** — cette entrée est la SEULE du parc dont le
 `command` est un nom nu (`bash`), là où ADR-071 §Décision 2 exige, pour toutes les autres, un chemin
@@ -159,11 +164,11 @@ humain).
 |---|---|---|
 | conductor | 8 | `python3 -c "import json; d=json.load(open('plugin/conductor/hooks/hooks.json')); print(sum(len(h.get('hooks',[])) for gs in d['hooks'].values() for h in gs))"` |
 | consolidator | 7 | idem, `plugin/consolidator/hooks/hooks.json` |
-| dev-orchestrator | 5 | idem, `plugin/dev-orchestrator/hooks/hooks.json` |
+| dev-orchestrator | 6 | idem, `plugin/dev-orchestrator/hooks/hooks.json` |
 | infrastructure-audit | 1 | idem, `plugin/infrastructure-audit/hooks/hooks.json` |
 | planning-core | 6 | idem, `plugin/planning-core/hooks/hooks.json` |
 | software-architecture | 1 | idem, `plugin/software-architecture/hooks/hooks.json` |
-| **Total** | **28** | commande de recomptage globale, §4 ci-dessus |
+| **Total** | **29** | commande de recomptage globale, §4 ci-dessus |
 
 **Les deux entrées bloquantes mises en avant par le plan comme points de vigilance** (le
 classement n'est PAS déductible mécaniquement du type d'événement, RESEARCH.md Pitfall 4) :
@@ -178,9 +183,10 @@ classement n'est PAS déductible mécaniquement du type d'événement, RESEARCH.
 mécanisme JSON que #25 : `guard-agent-write.sh` (#1), `guard-read-registres.sh` (#7),
 `guard-bash-registres.sh` (#8) et **`guard-driver-lock.sh` (#27 PreToolUse·Bash\|Write\|Edit,
 plan `32-03`, LOCK-02/03/05)** — chacune sort toujours 0 et bloque via `permissionDecision: deny`.
-Soit **6 entrées bloquantes au total sur les 28** (5 via décision JSON + 1 via code de sortie), et
-**22 entrées advisory** (+1 : l'entrée #28, `check-guard-health.sh`, plan `32-05`, est advisory —
-elle ne bloque rien, ADR-031).
+Soit **6 entrées bloquantes au total sur les 29** (5 via décision JSON + 1 via code de sortie), et
+**23 entrées advisory** (+1 : l'entrée #28, `check-guard-health.sh`, plan `32-05`, +1 : l'entrée
+#29, `check-requirements-survival.sh`, plan `18-01` — toutes deux advisory, elles ne bloquent rien,
+ADR-031).
 
 ## 6. Ce qui reste à la polarité gouvernance
 
@@ -208,4 +214,5 @@ blocage par code de sortie est voulu et ne doit jamais être traduit.
 mis à jour par le plan VFDO-30-09 (26e entrée, `check-hook-paths.sh`), le 2026-08-15, puis par le
 plan VFDO-32-03 (27e entrée, `guard-driver-lock.sh`, matcher combiné, LOCK-02/03/05), puis par le
 plan VFDO-32-05 (28e entrée, `check-guard-health.sh`, le « hook doctor » générique du parc,
-QUAL-01), le 2026-08-17.*
+QUAL-01), le 2026-08-17, puis par le plan VFDO-18-01 (29e entrée, `check-requirements-survival.sh`,
+survie du ledger d'exigences à la clôture d'un jalon, LEDG-02), le 2026-08-18.*
