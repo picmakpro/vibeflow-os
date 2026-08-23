@@ -5,6 +5,31 @@ extrait récent et pointent ici). Chaque module a par ailleurs son propre `CHANG
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.57.0] — 2026-08-23
+
+**Les exigences survivent désormais à la clôture d'un jalon : le ledger n'est plus effacé puis
+régénéré de zéro, et une exigence ne peut plus disparaître sans trace.** Phase 18 (3 plans),
+PR #51, module `dev-orchestrator` v2.18.0 → v2.19.0.
+
+- **LEDG-01** — `restore-requirements-ledger.sh` : post-traitement pur, lecture seule stricte sur
+  l'archive, n'écrit que sous `--write`, refuse d'écraser un ledger vivant sauf `--overwrite-live`
+  (avec sauvegarde `.bak-<jalon>` préalable). Rejeu sur la clôture réelle d'`agentique-v1.0` :
+  136 IDs → 93 garanties + 42 reportées + 1 caduque = 136/136, corps verbatim à l'octet (D-18-13).
+- **LEDG-02** — `check-requirements-survival.sh` : lecteur/diff en détection d'absence, jamais un
+  régénérateur. Quatre signaux `[ledger-*]`, trois issues QUAL-01 dont l'imparsable bruyant.
+- **D-18-14** — doctrine dans `plugin/dev-orchestrator/AGENT.md` : les archives
+  `milestones/*-REQUIREMENTS.md` sont des instantanés, `.planning/REQUIREMENTS.md` la seule source
+  vivante. Zéro objet neuf dans le socle.
+
+**Défauts trouvés par la vérification, aucun par les tests de son auteur** : 86 exigences sur 136
+perdues en silence (vocabulaire `Complete|Pending` face à une archive sans aucun `Pending`) ; une
+correction par case à cocher écartée sur mesure (sur un jalon clos tout est coché, le signal ne
+discrimine rien) ; trois défauts de sécurité prouvés par exécution puis 7 vecteurs adversariaux
+sans contournement ; portabilité CRLF falsifiée dans les deux sens ; deux verts vides (un
+`exit 0` sur répertoire inexistant, 13 suites mesurées sur 68 masquant une CI rouge).
+
+**68 suites** vertes en local et en CI.
+
 ## [v2.56.0] — 2026-08-17
 
 **Un stall de mission ne survit plus au prochain geste d'une session vivante — et les
