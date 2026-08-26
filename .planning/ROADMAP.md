@@ -75,7 +75,7 @@
 - [x] Phase 32: Durcissement du driver-lock (completed 2026-08-17)
 - [x] Phase 33: Watchdog & notifications des missions (completed 2026-08-17)
 - [ ] Phase 34: Gaps agency-agents & cadrage skill-installer
-- [ ] Phase 35: Ré-armement worktree (conditionnelle)
+- [x] Phase 35: Ré-armement worktree (conditionnelle) — CLOSE 2026-08-26, option A (pas de ré-armement)
 
 <details>
 <summary>✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04</summary>
@@ -927,36 +927,43 @@ les ajouts d'agents du milestone).
 BRUYANT, jamais compté vert) et sa mutation rouge prouvée.
 **Plans**: TBD
 
-### Phase 35: Ré-armement worktree (conditionnelle)
+### Phase 35: Ré-armement worktree (conditionnelle) — CLOSE 2026-08-26
 
-> **Phase flottante, événementielle — jamais bloquante.** Elle se déclenche quand sa précondition
-> externe tombe : `open-gsd/gsd-core#3302` est close COMPLETED (2026-08-14) mais le fix n'est PAS
-> releasé — au 2026-08-15, npm latest = **1.10.0**, la précondition « > 1.10.0 » n'est PAS
-> satisfaite. La veille (WKTR-03) est active depuis la Phase 30. La Phase 28 a livré le **gate**
-> (armement ↔ précondition distribuée) ; cette phase porte le **ré-armement**, jamais l'inverse
-> (mémoire projet). Dossier : `.planning/research/2026-08-10-agents-paralleles-etat-de-l-art.md`
-> §Implications 3.
+> **Close par la preuve, pas par abandon.** Le déclencheur externe est tombé le 2026-08-23 :
+> `open-gsd/gsd-core#3302` releasé en **1.11.0**, installé sur le poste. Les deux legs de la
+> régression #38 ont été mesurés — leg A (retour des commits) et leg B (base de fork du worktree,
+> l'axe que la preuve du 2026-08-23 laissait dégénéré). Verdict : ré-armer serait **sûr** (le
+> moteur 1.11.0 dégrade en séquentiel plutôt que de casser en silence) mais **inerte** en
+> conditions de mission (ADR-059 impose une branche dédiée, donc HEAD diverge toujours de
+> `origin/HEAD`, donc dégradation systématique — zéro parallélisme gagné). **Décision humaine
+> (Samuel, 2026-08-26) : option A, ne pas ré-armer.** Les deux gates qui l'interdisent restent en
+> place, en connaissance de cause. Dossiers : `.planning/research/2026-08-23-wktr-02-preuve-retour-commits-worktree.md`
+> (amendé) et `.planning/research/2026-08-26-wktr-02-leg-b-base-de-fork.md`.
 
-**Goal**: `isolation: worktree` est ré-armé sur les 13 agents écrivains **sous preuve machine
-distribuée** — close ≠ releasé ≠ installé — sans jamais rejouer la régression #38.
-**Depends on**: précondition externe (gsd-core > 1.10.0 releasé ET installé) ; plus simple après la
-stabilisation du parc de hooks (Phases 30-31), mais indépendante du reste — ne bloque rien et n'est
-bloquée par rien.
-**Requirements**: WKTR-01, WKTR-02 *(WKTR-03 — la veille — est portée par la Phase 30)*
-**Success Criteria** (what must be TRUE):
+**Goal (atteint autrement)** : la phase ne ré-arme pas `isolation: worktree` — elle **clôt la
+question** sous preuve machine, sans jamais rejouer la régression #38 ni laisser la phase flottante
+indéfiniment.
+**Depends on**: précondition externe (gsd-core > 1.10.0 releasé ET installé) — tombée le
+2026-08-23.
+**Requirements**: WKTR-01 *(requalifié — énoncé non satisfiable honnêtement, close sans être
+livré)*, WKTR-02 *(done, option A)* — *(WKTR-03, la veille, reste portée par la Phase 30)*
+**Success Criteria — résultat réel** :
 
-  1. La précondition est machine-vérifiée : gsd-core > 1.10.0 **RELEASÉ** (sonde `npm view`, jamais
-     le dist-tag `next`) **ET installé**, prouvée as-installed — `vf-requires`/`# vf-provides`
-     porté par `ensure-deps.sh` (le seul à pouvoir attester l'install) + validation
-     `lab-frais-arme` (WKTR-01).
+  1. La précondition a été machine-vérifiée RELEASÉE (1.11.0) ET installée. WKTR-01 est
+     **requalifié** plutôt que livré : l'attestation prévue (`# vf-provides: worktree-baseref` par
+     `ensure-deps.sh`) n'est pas satisfiable honnêtement — ce script ne doit pas écrire
+     `worktree.baseRef`, donc il ne peut pas l'attester sans produire une couverture déclarée sans
+     couverture effective (Borne 4 de `check-capability-activation.sh`).
 
-  2. Le ré-armement des 13 agents n'a lieu qu'**après** preuve du retour des commits sur un cas
-     réel rejoué (scénario #3302 : commits de workers, SUMMARY, merge — les symptômes exacts du
-     refus PAEX-09) (WKTR-02).
+  2. Le retour des commits (leg A) est **prouvé** deux fois — fast-forward, dont un rejeu sur
+     branche réellement divergente le 2026-08-26. La base de fork (leg B) est **mesurée** : sûre,
+     inerte en conditions de mission. Conséquence : **le ré-armement n'a PAS eu lieu**, par
+     décision humaine sur preuve, et non par blocage technique (WKTR-02).
 
-  3. Tant que la précondition n'est pas satisfaite, la phase reste flottante avec son déclencheur
-     objectif — jamais un ré-armement sur issue-close, jamais un abandon silencieux.
+  3. La phase ne reste pas flottante : clôturée sur ce verdict, sans attendre un événement de
+     plus.
 
-**Transverse (QUAL-01)** : le comparateur semver de la précondition naît testé sur 1.9/1.10 avec
-ses trois issues (sortie npm imparsable = BRUYANT) et sa mutation rouge prouvée.
-**Plans**: TBD
+**Transverse (QUAL-01)** : **non déclenché** — la phase ne fait naître aucun gate ni comparateur
+neuf (option A), donc rien à tester ; ce n'est pas une dette.
+**Plans**: aucun — clôture documentaire directe (mandat de clôture ciblée vf-coder, 2026-08-26),
+pas de PLAN.md d'exécution.
