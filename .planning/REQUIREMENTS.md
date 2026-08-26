@@ -939,7 +939,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [ ] **BUDG-02**: Le gate est en ratchet — avertit d'abord, bloque au merge, jamais rouge des semaines
 
 ### Ré-armement worktree (phase conditionnelle — jamais bloquante ; close 2026-08-26, option A)
-- [x] **WKTR-01** *(requalifié, pas livré)*: la précondition externe (gsd-core > 1.10.0 releasé ET installé) est bien tombée, mais l'attestation prévue (`# vf-provides: worktree-baseref` porté par `ensure-deps.sh`) n'est pas satisfiable honnêtement — `ensure-deps.sh` ne doit pas écrire `worktree.baseRef`, donc il ne peut pas l'attester sans produire une couverture déclarée sans couverture effective (Borne 4)
+- [~] **WKTR-01** *(requalifié, pas livré)*: la précondition externe (gsd-core > 1.10.0 releasé ET installé) est bien tombée, mais l'attestation prévue (`# vf-provides: worktree-baseref` porté par `ensure-deps.sh`) n'est pas satisfiable honnêtement — `ensure-deps.sh` ne doit pas écrire `worktree.baseRef`, donc il ne peut pas l'attester sans produire une couverture déclarée sans couverture effective (Borne 4)
 - [x] **WKTR-02**: leg A prouvé (retour des commits, `2026-08-23-...md` + rejeu 2026-08-26 sur branche divergente) ; leg B mesuré (`2026-08-26-wktr-02-leg-b-base-de-fork.md`) — sûr (dégradation séquentielle si HEAD diverge) mais inerte en conditions de mission (ADR-059). **Décision humaine : ne pas ré-armer** — les deux gates (`check-agents.sh`, règle 4 de `check-capability-activation.sh`) restent en place
 - [ ] **WKTR-03** *(portée par la Phase 30, hors mandat de cette clôture)*: La veille de release gsd-core est active dès le jour 1
 
