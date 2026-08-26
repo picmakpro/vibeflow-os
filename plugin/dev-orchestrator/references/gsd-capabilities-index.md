@@ -1,5 +1,5 @@
 # GSD Capabilities Index (auto-généré — NE PAS ÉDITER)
-> Généré le 2026-08-04T22:10:44+02:00 par build-gsd-capabilities-index.sh
+> Généré le 2026-08-26T17:51:51+02:00 par build-gsd-capabilities-index.sh
 > Source : registre de capabilities du moteur GSD (`capability-registry.cjs`), schéma déclaré `1`
 
 **Ce que cette table dit.** Elle énumère ce que le moteur **déclare** à la version depuis
@@ -76,6 +76,7 @@ point existe et reste vide, pas qu'il est absent._
 | Capability | Nature | Toggle gouvernant | Bloquant | Conduite sur erreur |
 |---|---|---|---|---|
 | `code-review` | step | `workflow.code_review` | — | `skip` |
+| `refactor-trigger` | step | `refactor.trigger_enabled` | — | `skip` |
 | `tdd` | gate | `workflow.tdd_mode` | non | `skip` |
 
 ## `verify:pre`
@@ -175,6 +176,7 @@ d'inactive, et `—` en colonne `Type` signale un toggle que le registre ne déc
 | `workflow.post_planning_gaps` | `gap-analysis` | boolean | oui |
 | `workflow.schema_drift_gate` | `drift` | boolean | oui |
 | `workflow.code_review` | `code-review` | boolean | oui |
+| `refactor.trigger_enabled` | `refactor-trigger` | boolean | non |
 | `workflow.nyquist_validation` | `nyquist` | boolean | oui |
 | `workflow.ui_review` | `ui` | boolean | oui |
 | `workflow.windows_enforce` | `broken-windows` | boolean | non |
@@ -218,4 +220,4 @@ rendre inerte : c'est exactement ce que `check-capability-activation.sh` confron
 
 ---
 
-> 12 point(s) de hook parcouru(s), 35 étage(s) déclaré(s) par le registre, 27 capability(ies) hors point de hook sur 44 déclarée(s), 23 toggle(s) gouvernant(s) distinct(s), 24 brique(s) routée(s).
+> 12 point(s) de hook parcouru(s), 36 étage(s) déclaré(s) par le registre, 27 capability(ies) hors point de hook sur 45 déclarée(s), 24 toggle(s) gouvernant(s) distinct(s), 24 brique(s) routée(s).
