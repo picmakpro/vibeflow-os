@@ -37,11 +37,18 @@ Résultats mesurés :
 
 ## Le vert du point 2 est CONTAMINÉ — et c'est le résultat le plus important
 
-Ce dépôt porte, dans `.claude/settings.local.json` :
+Ce dépôt portait, au moment de la mesure, dans `.claude/settings.local.json` :
 
 ```json
 "worktree": { "baseRef": "head" }
 ```
+
+> **Remédiation appliquée le 2026-08-26** — ce réglage a été **retiré**, sur décision explicite de
+> Samuel, au motif qu'il fait mentir tous les tests d'isolation joués localement. Retrait vérifié
+> par mesure : `resolveEffectiveBaseRef` rend désormais `null`, et sur un HEAD divergent le moteur
+> rend `shouldDegrade = true` / `head-diverged-from-fork`. Ce dépôt est donc réaligné sur la
+> configuration réelle d'un lab utilisateur. Le reste du fichier (bloc `permissions`) est intact.
+> Tout ce qui suit décrit la situation **telle que mesurée**, avant ce retrait.
 
 C'est **exactement le réglage repo-local qui a causé #38** : posé en Phase 27, jamais distribué par
 l'engine, donc vert chez le mainteneur et absent chez tous les utilisateurs. Le « fork depuis le
@@ -103,3 +110,9 @@ effectué.
 Worktree retiré, branches `test/wktr-02-legb` et `worktree-agent-<id>` supprimées, retour sur
 `main`, arbre propre. Le worktree d'une autre session (`feat/vf-cockpit-module`) n'a jamais été
 touché.
+
+**Et une remédiation, pas seulement un nettoyage** : `worktree.baseRef: "head"` a été retiré du
+`.claude/settings.local.json` de ce dépôt (voir l'encadré plus haut). Ce n'est pas un effet de bord
+— c'est le geste qui empêche la prochaine mesure d'isolation d'être verte pour la mauvaise raison.
+Le fichier étant gitignoré, ce retrait n'apparaît dans aucun diff : il est consigné ici, et
+seulement ici.
