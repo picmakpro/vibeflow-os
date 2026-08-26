@@ -29,8 +29,9 @@ PAEX-09).
 
 Résultats mesurés :
 
-1. **Le worktree est bien distinct** : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/agent-acd221e59d15de7f3`,
-   branche `worktree-agent-acd221e59d15de7f3`, `locked` dans `git worktree list`, base `e69631c`.
+1. **Le worktree est bien distinct** : `.claude/worktrees/agent-acd221e59d15de7f3` (relatif à la
+   racine du dépôt), branche `worktree-agent-acd221e59d15de7f3`, `locked` dans `git worktree list`,
+   base `e69631c`.
 2. **Les deux commits sont produits** : `5acf211` puis `b8511df`. C'est le geste qui échouait avant.
 3. **Ils ne remontent PAS automatiquement** : mesuré à chaud sur la branche appelante,
    `git merge-base --is-ancestor` → faux pour les deux, fichier absent du dépôt principal.
