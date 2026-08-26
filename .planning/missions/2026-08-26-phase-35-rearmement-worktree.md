@@ -2,7 +2,7 @@
 
 **Date** : 2026-08-26 · **Branche** : `feat/phase-35-rearmement-worktree` (basée sur `main` =
 `f170ee0`) · **Verrou de driver** : `mission-phase-35`, generation `1787758635.53887`
-**Issue** : PARTIELLE — le ré-armement est **gelé sur arbitrage humain**, escaladé et non tranché.
+**Issue** : COMPLÈTE — arbitrage rendu par Samuel (**option A**), appliqué et vérifié.
 
 ## Plan de bataille (DAG `.planning/MISSION-35.dag.json`, 13 nœuds)
 
@@ -48,12 +48,39 @@ WKTR-01 tel qu'écrit n'est donc pas satisfiable honnêtement : `ensure-deps.sh`
 une clé de settings qu'il ne doit pas écrire. Preuve détaillée :
 `.planning/research/2026-08-26-wktr-02-leg-b-base-de-fork.md`.
 
-## Escalade (non tranchée)
+## Escalade et arbitrage rendu
 
 Options soumises : **A** ne pas ré-armer et clore sur la preuve (recommandée) · **B** ré-armer en
 connaissance de cause (sûr mais inerte, + un avertissement par dispatch) · **C** ré-armer et
-distribuer `baseRef: head` (déconseillé formellement — anti-pattern #38). Question annexe : retirer
-ou non `baseRef: head` du `settings.local.json` de ce dépôt.
+distribuer `baseRef: head` (déconseillé formellement — anti-pattern #38).
+
+**Samuel a tranché : option A**, plus le **retrait** de `worktree.baseRef: "head"` du
+`.claude/settings.local.json` de ce dépôt, au motif qu'il fait mentir tous les tests d'isolation
+joués localement. Les deux consignes ont été appliquées.
+
+Retrait vérifié par mesure, pas par lecture : `resolveEffectiveBaseRef` rend désormais `null`, et
+sur un HEAD divergent le moteur rend `shouldDegrade = true` / `head-diverged-from-fork`. Le bloc
+`permissions` du fichier est intact ; une sauvegarde a été prise avant édition (le fichier est
+gitignoré, donc sans historique).
+
+## Clôture option A — ce qui a été écrit
+
+| Geste | Commit |
+|---|---|
+| Amendement de la preuve dégénérée du 2026-08-23 (valide leg A, dégénérée leg B) — mesures d'origine non touchées | `2cdda8c` |
+| Requalification du ledger : WKTR-01 requalifié non livré, WKTR-02 done, QUAL-01 **non déclenché**, anti-feature renforcée | `ce98647` |
+| Doctrine `team-kernel.md` : pourquoi les deux gates RESTENT + contrainte des commandes composées | `c6cddd1` |
+| ROADMAP Phase 35 close (`Plans: aucun`) + STATE recalé (Phase 18 releasée, progress 6/8) | `f9666ef` |
+
+## Vérification finale — mesurée par le manager, pas reprise du worker
+
+- Suite complète sur la découverte **exhaustive** (68 suites, périmètre CI exact) : **68 / 68 vertes**.
+- `check-machine-paths.sh` **rc 0** · `check-agents.sh` **rc 0** · `check-state-integrity.sh` **rc 0**
+  · `check-capability-activation.sh` **rc 0** (codes réels capturés hors pipe).
+- `STATE.md` **non écrasé** : 80,5 Ko → 83,4 Ko, 990 lignes, édité à la main (`gsd-tools state`
+  jamais employé). `ROADMAP.md` modifié en **2 hunks seulement** (la case + la section Phase 35).
+- Diff total : 8 fichiers. **Aucune** zone de risque de `MISSION-INVARIANTS.md` touchée (ni
+  `check-*.sh`, ni `hooks.json`, ni `dag.sh`/`driver-lock.sh`, ni un agent manager).
 
 ## Livré et mesuré vert
 
