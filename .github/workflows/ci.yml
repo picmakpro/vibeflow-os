@@ -31,12 +31,17 @@ jobs:
           jq --version
           python3 --version
 
-      # Node 22+ est un prérequis DUR de @opengsd/gsd-core (garde explicite dans
-      # plugin/dev-orchestrator/scripts/ensure-deps.sh). Épinglé ici plutôt que subi depuis l'image
-      # du runner : une image qui redescendrait sous 22 ferait échouer l'install, donc les cas 20/26.
+      # Node 24+ depuis gsd-core 1.11.0 — et ce pin décide QUELLE VERSION DU MOTEUR la CI teste.
+      # `engines` de 1.11.0 exige node >=24 (1.10.0 se contentait de >=22) : sous Node 22, la
+      # commande d'install ci-dessous ne casse PAS, elle RÉTROGRADE silencieusement en 1.10.0. La CI
+      # mesurait alors un moteur que plus personne n'installe, et T28-F (fraîcheur de
+      # references/gsd-capabilities-index.md) rougissait structurellement — la copie versionnée est
+      # régénérée contre le moteur réellement distribué (1.11.0), pas contre le repli.
+      # Mesuré le 2026-08-27 en conteneur : node:22-slim → 1.10.0 → index divergent ;
+      # node:24-slim → 1.11.0 → index identique. Épinglé plutôt que subi depuis l'image du runner.
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
 
       - name: Installer le moteur GSD (@opengsd/gsd-core@^1) — sans lui, deux cas ne peuvent rien prouver
         run: |
