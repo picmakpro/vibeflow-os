@@ -1,5 +1,13 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.19.1] — 2026-08-27 (Phase 35 — index de capabilities réaligné sur gsd-core 1.11.0)
+
+**Patch** (donnée de référence régénérée, aucune capacité nouvelle) :
+
+- **`references/gsd-capabilities-index.md` régénéré** : l'index versionné avait dérivé du moteur
+  installé depuis la montée de `@opengsd/gsd-core` en 1.11.0, ce qui laissait la suite
+  `test-dev-orchestrator` **rouge sur `main`** (cas T28-F). L'index reflète de nouveau le moteur.
+
 ## [v2.19.0] — 2026-08-18 (Phase 18 — survie du ledger d'exigences)
 
 **Minor** (deux capacités publiques neuves : gate SessionStart + geste de rattrapage).

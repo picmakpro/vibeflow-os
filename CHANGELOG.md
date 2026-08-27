@@ -5,6 +5,48 @@ extrait récent et pointent ici). Chaque module a par ailleurs son propre `CHANG
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.57.1] — 2026-08-27
+
+**Le ré-armement de l'isolation worktree a été mesuré, puis refusé en connaissance de cause — la
+Phase 35 se clôt en démontrant qu'il ne faut pas faire ce pour quoi elle avait été ouverte.**
+Modules `conductor` v1.28.0 → v1.28.1 et `dev-orchestrator` v2.19.0 → v2.19.1. Aucun comportement
+machine ne change : cette release distribue une doctrine et répare deux gardes.
+
+- **Prémisse renversée.** La phase était flottante en attente d'un fix amont ; il est arrivé
+  (`open-gsd/gsd-core#3302`, releasé en 1.11.0 et installé). La mesure a tranché **contre** le
+  ré-armement plutôt que de le déclencher mécaniquement sur la retombée de la précondition.
+- **Sûreté acquise, efficacité nulle.** Le moteur ne casse plus en silence : sur un lab sans
+  réglage, un HEAD divergent fait **dégrader en séquentiel** avec message explicite, au lieu de
+  faire atterrir le worker sur une branche sans les fichiers de son mandat. Mais une mission
+  d'équipe travaille **toujours** sur une branche dédiée (ADR-059), donc HEAD diverge **toujours**,
+  donc l'armement dégraderait **systématiquement** : zéro parallélisme gagné, un avertissement par
+  dispatch. Le seul levier qui le rendrait effectif (`worktree.baseRef: "head"`) est l'anti-pattern
+  de la régression #38 — le moteur lui-même le documente comme *« silences this check without
+  verifying the base »*.
+- **Conséquence doctrinale** (`conductor/references/team-kernel.md`) : `isolation` reste une
+  **décision de dispatch** du manager, jamais une propriété de frontmatter — déclarée, elle devient
+  inconditionnelle et retire l'arbitrage au seul agent qui a le contexte pour le rendre. Les deux
+  paliers de garde restent en place, désormais avec leur justification écrite.
+- **Contrainte opérationnelle nouvellement consignée** : la garde d'isolation refuse les commandes
+  composées (`&&`, heredocs) — *« too complex to verify that it stays inside the worktree »*. Tout
+  mandat dispatché en worktree doit prescrire Write/Edit et **un seul verbe git par appel Bash**,
+  faute de quoi l'échec sera imputé à tort au fix amont.
+- **Ledger** : WKTR-01 requalifié `[~]` — son énoncé n'était pas satisfiable honnêtement
+  (`ensure-deps.sh` ne peut pas attester une clé de settings qu'il ne doit pas écrire) ; l'attester
+  quand même aurait produit une couverture déclarée sans couverture effective. WKTR-02 acquis.
+
+**Deux gardes rouges sur `main` réparées au passage** : `check-machine-paths` (un chemin absolu de
+machine introduit dans un document de recherche par `f170ee0`) et `test-dev-orchestrator` T28-F
+(l'index de capabilities versionné avait dérivé du moteur depuis la montée en 1.11.0).
+
+**Défaut trouvé dans la preuve censée autoriser le ré-armement** : la mesure du 2026-08-23 était
+**dégénérée sur son point décisif** — branche jetable et `main` au même SHA, rendant « fork depuis
+HEAD » et « fork depuis la branche par défaut » indistinguables, alors que la base de fork est la
+cause immédiate de #38. Le document a été amendé plutôt que laissé passer pour valide. Le vert
+obtenu localement était par ailleurs **contaminé** par un `worktree.baseRef: "head"` présent dans
+le `settings.local.json` de ce dépôt — retiré depuis : il faisait mentir tout test d'isolation joué
+ici.
+
 ## [v2.57.0] — 2026-08-23
 
 **Les exigences survivent désormais à la clôture d'un jalon : le ledger n'est plus effacé puis
