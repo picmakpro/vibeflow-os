@@ -1,5 +1,16 @@
 # WKTR-02 — Preuve du retour des commits depuis un worktree
 
+> **AMENDEMENT — 2026-08-26.** Cette preuve est **valide sur leg A** (retour des commits d'un
+> worktree isolé vers la branche appelante). Elle est **dégénérée sur leg B** (la base de fork du
+> worktree) : la branche jetable de test et `main` pointaient toutes deux sur le même commit
+> `e69631c`, donc « fork depuis le HEAD courant » et « fork depuis la branche par défaut »
+> produisaient le même résultat — le test ne pouvait pas les distinguer. Ce n'est pas une erreur
+> de mesure, c'est une limite non repérée au moment de l'écrire. Laisser une preuve dégénérée
+> passer pour complète, c'est reproduire la faille de fond de la régression #38 (vert chez le
+> mainteneur, jamais éprouvé ailleurs). Leg B est couvert par
+> `2026-08-26-wktr-02-leg-b-base-de-fork.md`, à lire en complément — il ne contredit rien ici, il
+> couvre l'axe que ce document n'a pas pu couvrir.
+
 **Mesuré le 2026-08-23** sur `vibeflow-os` à `e69631c` (v2.57.0), machine de Samuel, macOS,
 `@opengsd/gsd-core` **1.11.0** installé. Document destiné au manager de la **Phase 35** : la preuve
 est faite, elle n'est pas à refaire — elle est à **rejouer** si l'environnement a bougé.
@@ -29,8 +40,9 @@ PAEX-09).
 
 Résultats mesurés :
 
-1. **Le worktree est bien distinct** : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/agent-acd221e59d15de7f3`,
-   branche `worktree-agent-acd221e59d15de7f3`, `locked` dans `git worktree list`, base `e69631c`.
+1. **Le worktree est bien distinct** : `.claude/worktrees/agent-acd221e59d15de7f3` (relatif à la
+   racine du dépôt), branche `worktree-agent-acd221e59d15de7f3`, `locked` dans `git worktree list`,
+   base `e69631c`.
 2. **Les deux commits sont produits** : `5acf211` puis `b8511df`. C'est le geste qui échouait avant.
 3. **Ils ne remontent PAS automatiquement** : mesuré à chaud sur la branche appelante,
    `git merge-base --is-ancestor` → faux pour les deux, fichier absent du dépôt principal.

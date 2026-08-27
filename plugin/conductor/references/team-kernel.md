@@ -124,24 +124,37 @@ là-bas.
   message, plusieurs Task. Périmètres douteux → **séquentiel** (voir la règle suivante avant
   d'envisager `isolation: worktree`).
 - **L'isolation est une décision de DISPATCH, jamais une propriété du worker (issue #38).**
-  Aucun agent distribué ne porte `isolation: worktree` dans son frontmatter — c'est
-  machine-enforced par `check-agents.sh`. Motif, mesuré et non théorique : le worktree du harness
-  fork depuis la **branche par défaut**, pas depuis le HEAD courant. Quand un manager a préparé
-  une branche pour la mission, le worker atterrit sur une branche technique repartant de la
-  branche par défaut, **sans aucun fichier du mandat** — il se déclare bloqué sans produire, et le
-  manager se rabat silencieusement sur un agent générique qui n'a ni la doctrine ni les allowlists
-  du worker prévu. La précondition qui corrigerait le fork (`worktree.baseRef: "head"`) vit dans
-  le settings du poste et **n'est posée nulle part par l'engine** ; et même corrigée, elle ne
-  suffirait pas — sur tout moteur installé (≤ 1.10.0), rien ne ramène les commits du worker vers
-  la branche de mission. Le merge-back est désormais **implémenté en amont**
-  (`open-gsd/gsd-core#3302`, close COMPLETED le 2026-08-14 — déjà le motif du refus écrit de
-  `claude_orchestration` en Phase 27) mais **pas releasé** : npm `latest` = `1.10.0` au
-  2026-08-15, et close ≠ releasé ≠ installé (Pitfall 11). Le ré-armement reste gaté par la
-  Phase 35 (flottante) : release **> 1.10.0** installée ET preuve du retour des commits rejouée
-  (WKTR-02) ; son seul déclencheur tracé est la sonde de veille WKTR-03
-  (`scripts/check-gsd-core-update.sh`, armement machine-local documenté dans
-  `30-VEILLE-GSD-CORE.md`). Porté par le frontmatter, `isolation` devient
-  **inconditionnel** et retire au manager l'arbitrage que cette section lui confie.
+  Aucun agent distribué ne porte `isolation: worktree` dans son frontmatter — deux paliers le
+  gardent : le **palier dur** `check-agents.sh` (aucune valeur d'`isolation:` admise dans un agent
+  distribué) et le **palier de relation** règle 4 de `check-capability-activation.sh` (une
+  capability ne s'attribue pas une couverture qu'elle ne fournit pas effectivement). **Phase 35,
+  close par la preuve le 2026-08-26 — les deux paliers restent, en connaissance de cause, pas en
+  attente d'événement.** Le déclencheur externe est tombé (`open-gsd/gsd-core#3302` releasé en
+  1.11.0 ET installé) et la mesure a **tranché contre** le ré-armement plutôt que de rester
+  flottante :
+  - **Sûreté acquise, leg A et leg B.** Leg A (retour des commits) est réparé depuis 1.11.0,
+    prouvé en fast-forward sur un cas réel (`2026-08-23-wktr-02-...md`). Leg B (base de fork) ne
+    casse plus en silence : sur un lab sans réglage, HEAD divergent → le moteur **dégrade en
+    séquentiel sur l'arbre principal** avec message explicite plutôt que de faire atterrir le
+    worker sur une branche sans les fichiers du mandat (`2026-08-26-wktr-02-leg-b-base-de-fork.md`).
+  - **Efficacité nulle en conditions de mission — c'est ce qui bloque le ré-armement.** Une mission
+    d'équipe travaille **toujours** sur une branche dédiée (ADR-059), donc HEAD diverge
+    **toujours** d'`origin/HEAD`, donc l'armement dégraderait **systématiquement** en séquentiel :
+    zéro parallélisme gagné, un avertissement à chaque dispatch. Le seul levier qui rendrait
+    l'armement effectif (`worktree.baseRef: "head"`) reste l'anti-pattern de #38 : une clé de
+    settings sans aucun vecteur de distribution par l'engine, et qui **éteint le contrôle** au lieu
+    de le satisfaire — le moteur lui-même documente qu'elle *« silences this check without
+    verifying the base »*. Un armement dont le réglage « sûr » consiste à couper la vérification
+    n'est pas un armement sûr.
+  - Porté par le frontmatter, `isolation` devient **inconditionnel** et retire au manager
+    l'arbitrage que cette section lui confie — c'est pour ça qu'il reste une décision de dispatch,
+    jamais une propriété déclarée.
+  - **Contrainte opérationnelle, tant que l'isolation reste une décision de dispatch.** La garde
+    d'isolation refuse les commandes composées : `&&`, enchaînements, heredocs rejetés avec « this
+    command is too complex to verify that it stays inside the worktree ». Tout mandat qui dispatche
+    avec `isolation: worktree` doit donc prescrire au worker d'écrire ses fichiers via Write/Edit
+    et de n'employer qu'**un seul verbe git par appel Bash** — sans cette consigne, l'échec est
+    étranger au sujet du mandat et égare le diagnostic.
 - **Le commit reste discipliné même à périmètres disjoints (Phase 27)** : la disjonction
   gouverne le *dispatch*, jamais le *commit*. Tant que N acteurs — workers **et** manager —
   partagent un même `.git/index` (pas d'`isolation: worktree`) : **jamais** `git add` (même

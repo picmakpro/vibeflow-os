@@ -1,5 +1,26 @@
 # Changelog — conductor
 
+## [v1.28.1] — 2026-08-27 (Phase 35 — les deux gates d'isolation restent, en connaissance de cause)
+
+**Patch** (doctrine consignée, aucun comportement machine modifié) :
+
+- **`references/team-kernel.md` — la section isolation passe d'« en attente d'événement » à
+  « tranchée par la mesure ».** Le déclencheur externe de la Phase 35 est tombé
+  (`open-gsd/gsd-core#3302` releasé en 1.11.0 ET installé) et la mesure a conclu **contre** le
+  ré-armement : sûreté acquise (leg A prouvé en fast-forward, leg B dégrade désormais en séquentiel
+  au lieu de casser en silence) mais **efficacité nulle en conditions de mission** — une mission
+  travaille toujours sur branche dédiée (ADR-059), donc HEAD diverge toujours, donc l'armement
+  dégraderait systématiquement. Le seul levier qui le rendrait effectif (`worktree.baseRef: "head"`)
+  reste l'anti-pattern de #38 : il éteint le contrôle au lieu de le satisfaire.
+- **Conséquence doctrinale** : `isolation` reste une **décision de dispatch** du manager, jamais une
+  propriété déclarée en frontmatter — porté par le frontmatter il devient inconditionnel et retire
+  au manager l'arbitrage que cette section lui confie. Les deux paliers (`check-agents.sh` en palier
+  dur, règle 4 de `check-capability-activation.sh` en palier de relation) restent en place.
+- **Contrainte opérationnelle nouvellement écrite** : la garde d'isolation refuse les commandes
+  composées (`&&`, heredocs) — « too complex to verify that it stays inside the worktree ». Tout
+  mandat dispatché en `isolation: worktree` doit prescrire Write/Edit et **un seul verbe git par
+  appel Bash**, sinon l'échec sera imputé à tort au fix amont.
+
 ## [v1.28.0] — 2026-08-17 (annexe notifications — D-33-H, WTCH-03 amendé)
 
 **Minor** (nouvelle capacité publique : le verbe `/vf-notify` n'existait pas, et le défaut

@@ -2,24 +2,26 @@
 gsd_state_version: 1.0
 milestone: fiabilite-v1.0
 milestone_name: « ce qui survit »
-current_phase: 18
-current_phase_name: Survie du ledger d'exigences à la clôture de jalon
+current_phase: 35
+current_phase_name: Ré-armement worktree (conditionnelle) — CLOSE
 status: phase_complete
-stopped_at: Phase 18 LIVRÉE, NON SHIPPÉE — 3 plans exécutés (18-01 LEDG-02, 18-02 LEDG-01, 18-03 doctrine D-18-14 + bump module), 12/12 suites vertes, arbre propre sur `feat/phase-18-survie-ledger-exigences`. PR, tag et release restent des gestes humains non posés (CLAUDE.md racine, ADR-031). Précédent : Phase 33 CLOSE ET RELEASÉE — `v2.56.0`. Tronc (WTCH-01..04, 5 plans sur 3 vagues) vérifié goal-backward le 2026-08-17 (`33-VERIFICATION.md`) — 4/4 critères ATTEINTS (WTCH-03 en limite assumée : preuve Windows réelle non exécutée) ; gap WTCH-02 fermé par D-33-G (`88975dc`, cas T49). Annexe D-33-H (notifications OS en opt-in, défaut OFF) livrée par les plans 33-06 (gate d'opt-in + toggle `/vf-notify`) et 33-07 (Pattern H, relais des jalons GSD) ; `33-VERIFICATION-ANNEXE.md` 5/6 critères, critère 1 PARTIEL fermé par `401c903`. **Mergée et publiée** (vérifié machine le 2026-08-17) : PR #50 mergée dans `main` (`f639108`), commit de release `4431ed1`, tag annoté `v2.56.0` poussé, release GitHub publiée le 2026-08-17T18:40Z, `check-release-tag.sh --remote` ✓. Modules `conductor` v1.28.0 et `dev-orchestrator` v2.18.0. Reliquat porté hors phase : la recette Windows (`33-CLOTURE-WINDOWS.md`) n'a PAS été exécutée — laissée en suspens sur décision de Samuel (2026-08-17), retour attendu des testeurs (issue #20) ou recette jouée par Samuel après installation d'un poste Windows ; à ne jamais compter comme vert à la clôture du milestone
-last_updated: "2026-08-18T00:00:00.000Z"
-last_activity: 2026-08-18
-last_activity_desc: Phase 18 (survie du ledger d'exigences) livrée — 3 plans exécutés sur
-`feat/phase-18-survie-ledger-exigences` (LEDG-01, LEDG-02, doctrine D-18-14, module
-`dev-orchestrator` v2.18.0 → v2.19.0), 12/12 suites vertes, arbre propre. Non shippée : PR, tag et
-release restent des gestes humains non posés. Hygiène documentaire de clôture de phase (ce
-mandat) : `ROADMAP.md` (case cochée, `Plans:` réel), `REQUIREMENTS.md` (LEDG-01/LEDG-02 cochées),
-décisions structurantes consignées ci-dessous. Précédent : Clôture réelle de la Phase 33 — release `v2.56.0` (PR #50, tag poussé, release GitHub publiée) après retrait puis re-publication consécutifs à la revue du défaut de l'annexe (notifs OFF par défaut, skill `/vf-notify`, jalons via relais Pattern H car PushNotification est absent des sous-agents). Puis hygiène d'état (2026-08-17) : STATE.md recalé sur la réalité machine — il affirmait encore « branche non mergée, non poussée, aucune PR, aucun tag, aucune release » —, et `32-06-SUMMARY.md` posé en pointeur vers `32-RELIQUATS.md` pour fermer le faux-positif de comptage qui laissait la Phase 32 en `in_progress` (7 plans / 6 summaries) et faisait router l'invariant resume-incomplete-phase vers une phase déjà releasée. Prochaine phase choisie par Samuel : **Phase 18** (ledger) — la Phase 35 reste gatée (npm latest `@opengsd/gsd-core` = 1.10.0, précondition « > 1.10.0 » non satisfaite au 2026-08-17)
+stopped_at: Phase 18 RELEASÉE en `v2.57.0` (PR #51 mergée, tag annoté poussé, release GitHub publiée, `check-release-tag.sh --remote` ✓ — ce STATE était en retard, il affirmait encore « livrée, non shippée ») — 3 plans exécutés (18-01 LEDG-02, 18-02 LEDG-01, 18-03 doctrine D-18-14 + bump module), 12/12 suites vertes. Puis Phase 35 CLOSE le 2026-08-26 par décision humaine sur preuve mesurée, **option A : pas de ré-armement d'`isolation: worktree`**. Déclencheur externe tombé (gsd-core#3302 releasé 1.11.0, installé) ; leg A (retour des commits) prouvé deux fois, leg B (base de fork) mesuré sûr mais inerte en conditions de mission (ADR-059, HEAD toujours divergent) ; seul levier effectif (`baseRef: "head"`) disqualifié — anti-pattern #38. Les deux gates (`check-agents.sh`, règle 4 de `check-capability-activation.sh`) restent en place. Aucun plan d'exécution : clôture documentaire directe (mandat vf-coder). Dossiers : `.planning/research/2026-08-23-wktr-02-preuve-retour-commits-worktree.md` (amendé), `.planning/research/2026-08-26-wktr-02-leg-b-base-de-fork.md`.
+last_updated: "2026-08-26T00:00:00.000Z"
+last_activity: 2026-08-26
+last_activity_desc: Deux clôtures recalées en une passe d'hygiène d'état. (1) Phase 18 : ce STATE
+affirmait encore « livrée, non shippée » alors que la release `v2.57.0` est publiée (tag + release
+GitHub, gate ✓) — corrigé. (2) Phase 35 : close par décision humaine sur preuve mesurée, option A
+(pas de ré-armement). Quatre gestes documentaires : amendement de la preuve WKTR-02 du 2026-08-23
+(dégénérée sur leg B), requalification du ledger (`REQUIREMENTS.md` : WKTR-01 requalifié, WKTR-02
+done, QUAL-01 non déclenché), doctrine `team-kernel.md` mise à jour (pourquoi les deux gates
+restent + contrainte opérationnelle sur les commandes composées de la garde d'isolation),
+`ROADMAP.md`/`STATE.md` recalés. Restent 34 et 25 à cadrer.
 progress:
   total_phases: 8
-  completed_phases: 4
+  completed_phases: 6
   total_plans: 31
   completed_plans: 31
-  percent: 50
+  percent: 75
 ---
 
 # Project State
@@ -29,7 +31,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26 — charte rouverte : 17 modules, D2/D6 renversées)
 
 **Core value:** Dire « aide-moi à dev » déclenche le pipeline GSD complet sans jamais connaître GSD/Superpowers.
-**Current focus:** Milestone fiabilite-v1.0 — **4 phases sur 8 livrées et releasées** : Phase 30 (Portabilité Windows II, `v2.53.0`/`v2.53.1`), Phase 31 (Manifeste d'install + dry-run, issue #20, `v2.54.0`), Phase 32 (Durcissement du driver-lock, `v2.55.0`/`v2.55.1`) et Phase 33 (Watchdog & notifications des missions, **`v2.56.0`** — tronc WTCH-01..04 4/4 critères, gap fermé par D-33-G, plus l'annexe D-33-H : notifications en opt-in défaut OFF + jalons relayés vers l'app Claude). **Phase 18 (survie du ledger) livrée le 2026-08-18** (3 plans exécutés, LEDG-01/LEDG-02, doctrine D-18-14, module `dev-orchestrator` v2.19.0) mais **pas encore shippée** — PR/tag/release restent des gestes humains non posés. Restent 34, 25 et 35 à cadrer. La Phase 35 reste **gatée** : npm latest `@opengsd/gsd-core` = 1.10.0 au 2026-08-17, la précondition « > 1.10.0 » n'est pas satisfaite (fix `#3302` mergé mais non releasé) ; veille WKTR-03 active.
+**Current focus:** Milestone fiabilite-v1.0 — **6 phases sur 8 livrées et releasées, ou closes** : Phase 30 (Portabilité Windows II, `v2.53.0`/`v2.53.1`), Phase 31 (Manifeste d'install + dry-run, issue #20, `v2.54.0`), Phase 32 (Durcissement du driver-lock, `v2.55.0`/`v2.55.1`), Phase 33 (Watchdog & notifications des missions, `v2.56.0` — tronc WTCH-01..04 4/4 critères, gap fermé par D-33-G, plus l'annexe D-33-H : notifications en opt-in défaut OFF + jalons relayés vers l'app Claude) et **Phase 18 (survie du ledger) RELEASÉE en `v2.57.0`** (PR #51 mergée, tag + release GitHub, `check-release-tag.sh --remote` ✓). **Phase 35 (ré-armement worktree) CLOSE le 2026-08-26, option A** : déclencheur externe tombé (gsd-core#3302 releasé 1.11.0, installé), leg A et leg B mesurés, **décision humaine de ne pas ré-armer** `isolation: worktree` — sûr mais inerte en conditions de mission (ADR-059) ; les deux gates (`check-agents.sh`, règle 4 de `check-capability-activation.sh`) restent en place. Restent **34** (AGTS/SKIL) et **25** (budget d'instructions) à cadrer.
 `get-shit-done-cc` → `@opengsd/gsd-core` livrée en v2.39.0 atteint enfin les **postes déjà équipés** :
 `/vf-update` dit l'état du moteur avant tout stop et propose la bascule sous confirmation ADR-031.
 Modules `dev-orchestrator` v2.7.0 + `conductor` v1.16.0. Verdict `19-VERIFICATION.md` : **PASS 6/7**.
@@ -392,6 +394,32 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
+
+- **2026-08-26 — Phase 35 (Ré-armement worktree) close, option A : pas de ré-armement.** Arbitrage
+  humain rendu par Samuel sur preuve mesurée, appliqué en mandat de clôture ciblée vf-coder.
+  Détail : `.planning/research/2026-08-26-wktr-02-leg-b-base-de-fork.md`,
+  `.planning/research/2026-08-23-wktr-02-preuve-retour-commits-worktree.md` (amendé).
+
+  1. **Sûreté acquise, efficacité nulle.** Le moteur `@opengsd/gsd-core` 1.11.0 répare le leg A
+     (retour des commits, prouvé en fast-forward deux fois) et neutralise le leg B (base de fork) :
+     sur un lab sans réglage, un HEAD divergent dégrade en séquentiel sur l'arbre principal au
+     lieu de casser en silence. Mais une mission d'équipe travaille toujours sur une branche
+     dédiée (ADR-059), donc HEAD diverge toujours d'`origin/HEAD`, donc l'armement dégraderait
+     **systématiquement** — zéro gain de parallélisme, un avertissement à chaque dispatch.
+
+  2. **Le seul levier effectif reste l'anti-pattern de #38.** `worktree.baseRef: "head"` rendrait
+     l'armement efficace, mais c'est une clé de settings sans vecteur de distribution par
+     l'engine, et qui éteint le contrôle de divergence plutôt que de le satisfaire.
+
+  3. **Les deux gates restent, en connaissance de cause, pas en attente d'un événement de plus** :
+     le palier dur `check-agents.sh` et le palier de relation (règle 4 de
+     `check-capability-activation.sh`). Doctrine mise à jour dans `team-kernel.md`.
+
+  4. **WKTR-01 requalifié, pas livré** : l'attestation prévue (`# vf-provides: worktree-baseref`
+     par `ensure-deps.sh`) n'est pas satisfiable honnêtement — ce script ne doit pas écrire
+     `worktree.baseRef`, l'attester quand même serait une couverture déclarée sans couverture
+     effective (Borne 4). QUAL-01 **non déclenché** sur cette phase : aucun gate ni comparateur
+     neuf n'y naît.
 
 - **2026-08-18 — Phase 18 (Survie du ledger d'exigences) : livrée, quatre arbitrages structurants
   sur la reconstitution du ledger.** Détail : `18-01-SUMMARY.md`, `18-02-SUMMARY.md`,

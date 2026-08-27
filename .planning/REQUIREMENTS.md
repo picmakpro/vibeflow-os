@@ -839,13 +839,13 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | LEDG-03 | Phase 30 | Ouverte le 2026-08-15 — https://github.com/open-gsd/gsd-core/issues/3556 — deadline amont 2026-10-26 |
 | BUDG-01 | Phase 25 | Pending |
 | BUDG-02 | Phase 25 | Pending |
-| WKTR-01 | Phase 35 | Pending — conditionnelle (gsd-core > 1.10.0 releasé ET installé) |
-| WKTR-02 | Phase 35 | Pending — conditionnelle |
+| WKTR-01 | Phase 35 | Requalifié 2026-08-26 — énoncé non satisfiable honnêtement : `ensure-deps.sh` ne peut pas attester une clé de settings (`worktree.baseRef`) qu'il ne doit pas écrire ; l'attester quand même serait une couverture déclarée sans couverture effective (Borne 4 de `check-capability-activation.sh`). Close sans être livré — pas une dette |
+| WKTR-02 | Phase 35 | Done (option A, 2026-08-26) — leg A **prouvé** (`2026-08-23-...md`, retour en fast-forward, dont un rejeu sur branche réellement divergente le 2026-08-26) ; leg B **mesuré** (`2026-08-26-wktr-02-leg-b-base-de-fork.md` : moteur 1.11.0, HEAD divergent sans réglage → `shouldDegrade=true`, dégradation séquentielle sûre) ; **ré-armement NON effectué, par décision humaine** (sûr mais inerte en conditions de mission — ADR-059 impose une branche dédiée, donc HEAD diverge toujours) |
 | WKTR-03 | Phase 30 | Pending — geste jour 1 (veille `npm view`, jamais le dist-tag `next`) |
 | SKIL-01 | Phase 34 | Pending — cadrage go/no-go, aucun code avant le go |
 | AGTS-01 | Phase 34 | Pending |
 | AGTS-02 | Phase 34 | Pending — conditionnée à la sortie d'expérimental de mobile-test |
-| QUAL-01 | Transverse — Phases 30, 31, 32, 33, 18, 25, 35 | Pending — satisfait sur les phases 30, 31 et 32 livrées (30/31 : 3 issues + mutation rouge prouvée ; 32 : amendé à **4** issues par D-32-QUAL — PASS/DENY/imparsable-silencieux/indisponible-BRUYANT — les 4 couvertes, cf. `32-RELIQUATS.md` §5) ; reste à tenir sur 33, 18, 25, 35 |
+| QUAL-01 | Transverse — Phases 30, 31, 32, 33, 18, 25, 35 | Pending — satisfait sur les phases 30, 31 et 32 livrées (30/31 : 3 issues + mutation rouge prouvée ; 32 : amendé à **4** issues par D-32-QUAL — PASS/DENY/imparsable-silencieux/indisponible-BRUYANT — les 4 couvertes, cf. `32-RELIQUATS.md` §5) ; **non déclenché sur la Phase 35** (2026-08-26, option A) — aucun gate ni comparateur neuf n'y naît, donc rien à satisfaire ; reste à tenir sur 33, 18, 25 |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -938,10 +938,10 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [ ] **BUDG-01**: Le budget d'instructions par fichier d'agent distribué est mesuré et publié (métrique tranchée au cadrage de la phase)
 - [ ] **BUDG-02**: Le gate est en ratchet — avertit d'abord, bloque au merge, jamais rouge des semaines
 
-### Ré-armement worktree (phase conditionnelle — jamais bloquante)
-- [ ] **WKTR-01**: La précondition est machine-vérifiée : gsd-core > 1.10.0 RELEASÉ (sonde `npm view`, jamais le dist-tag `next`) ET installé, prouvée as-installed (`vf-requires`/`# vf-provides` porté par `ensure-deps.sh` + `lab-frais-arme`)
-- [ ] **WKTR-02**: Le ré-armement des 13 agents n'a lieu qu'après preuve du retour des commits sur un cas réel rejoué (scénario #3302)
-- [ ] **WKTR-03**: La veille de release gsd-core est active dès le jour 1
+### Ré-armement worktree (phase conditionnelle — jamais bloquante ; close 2026-08-26, option A)
+- [~] **WKTR-01** *(requalifié, pas livré)*: la précondition externe (gsd-core > 1.10.0 releasé ET installé) est bien tombée, mais l'attestation prévue (`# vf-provides: worktree-baseref` porté par `ensure-deps.sh`) n'est pas satisfiable honnêtement — `ensure-deps.sh` ne doit pas écrire `worktree.baseRef`, donc il ne peut pas l'attester sans produire une couverture déclarée sans couverture effective (Borne 4)
+- [x] **WKTR-02**: leg A prouvé (retour des commits, `2026-08-23-...md` + rejeu 2026-08-26 sur branche divergente) ; leg B mesuré (`2026-08-26-wktr-02-leg-b-base-de-fork.md`) — sûr (dégradation séquentielle si HEAD diverge) mais inerte en conditions de mission (ADR-059). **Décision humaine : ne pas ré-armer** — les deux gates (`check-agents.sh`, règle 4 de `check-capability-activation.sh`) restent en place
+- [ ] **WKTR-03** *(portée par la Phase 30, hors mandat de cette clôture)*: La veille de release gsd-core est active dès le jour 1
 
 ### Skill-installer global (réduit à un cadrage)
 - [ ] **SKIL-01**: Un cadrage go/no-go répond à « que fait-il de plus que le natif `/plugin` ? » — abandon documenté si la réponse est creuse ; aucun code avant le go
@@ -960,7 +960,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - **Suppression silencieuse de fichiers modifiés** — perte de travail → MANI-03 backup + signalement
 - **Hash conffile-style par fichier** — raffinement sans besoin prouvé, le backup couvre → différé
 - **Armement via settings local** — régression #38 rejouée → gate règle 4 (WTCH-04, LOCK-02)
-- **Ré-armement worktree sur issue-close** — close ≠ releasé ≠ installé → WKTR-01
+- **Ré-armement worktree sur issue-close** — close ≠ releasé ≠ installé → WKTR-01. **Renforcé le 2026-08-26** : même précondition externe tombée (releasé ET installé), le ré-armement reste refusé — sûr mais inerte en conditions de mission (ADR-059), seul levier effectif (`baseRef: "head"`) disqualifié car il éteint le contrôle plutôt que de le satisfaire
 - **Marketplace de skills maison / mirroring tiers** — duplique `/plugin` natif → input du cadrage SKIL-01
 - **Import des 230 personas agency-agents** — ADR-029 incompatible, zéro gouvernance → AGTS-01
 - **Migration des hooks.json avant merge-hooks.sh** — parc cassé sans erreur (§1.3) → ordre PORT-02
