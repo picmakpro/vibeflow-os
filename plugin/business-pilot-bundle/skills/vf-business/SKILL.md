@@ -1,21 +1,6 @@
 ---
 name: vf-business
-description: >
-  Utiliser quand l'intention est de piloter le business — « qualifie ce lead », « prépare
-  le devis / la proposition pour X », « relance ce prospect », « où en est le pipeline »,
-  « suis le jalon du client Y », « prépare le livrable du jalon », « prépare la facture »,
-  « relance les impayés », « fais une prévision de CA », « fais tourner le business de la
-  semaine », « traite les dossiers clients en autonomie ». Point d'entrée du métier
-  business de VibeFlow : route un geste simple (un dossier/une action → chaîne courte
-  worker → gate qualité → validation humaine) ou une mission (≥ 3 dossiers/actions ou
-  signal de durée → équipe via vf-business-manager). Deux Iron Laws non négociables quel
-  que soit le mode : aucun envoi client (devis, livrable, relance, facture) sans
-  validation humaine — l'humain envoie — et aucun chiffre financier inventé — chaque
-  montant est sourcé ou marqué à confirmer.
-  ✘ pas pour poser/structurer le planning du lab → vf-planning · ✘ pas pour configurer le
-  lab ou installer des modules → vibeflow-conductor · ✘ pas pour calculer/publier les KPIs
-  → kpi-analyst (le pilier finance s'y adosse, il ne le remplace pas).
-  Invocable par l'utilisateur ET par l'agent en autonomie.
+description: "Utiliser quand l'intention est de piloter le business — « qualifie ce lead », « prépare le devis / la proposition pour X », « relance ce prospect », « où en est le pipeline », « suis le jalon du client Y », « prépare le livrable du jalon », « prépare la facture », « relance les impayés », « fais une prévision de CA », « fais tourner le business de la semaine », « traite les dossiers clients en autonomie ». Point d'entrée du métier business de VibeFlow : route un geste simple (un dossier/une action → chaîne courte worker → gate qualité → validation humaine) ou une mission (≥ 3 dossiers/actions ou signal de durée → équipe via vf-business-manager). Deux Iron Laws non négociables quel que soit le mode : aucun envoi client (devis, livrable, relance, facture) sans validation humaine — l'humain envoie — et aucun chiffre financier inventé — chaque montant est sourcé ou marqué à confirmer. ✘ pas pour poser/structurer le planning du lab → vf-planning · ✘ pas pour configurer le lab ou installer des modules → vibeflow-conductor · ✘ pas pour calculer/publier les KPIs → kpi-analyst (le pilier finance s'y adosse, il ne le remplace pas). Invocable par l'utilisateur ET par l'agent en autonomie."
 ---
 
 # vf-business — Point d'entrée du métier business

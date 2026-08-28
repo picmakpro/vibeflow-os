@@ -1,16 +1,6 @@
 ---
 name: vf-calibrate
-description: >
-  Utiliser quand le framework VibeFlow a évolué et qu'un lab doit être remis à niveau — « mets à jour
-  VibeFlow », « le framework a bougé », « recalibre mon lab », « est-ce que ma structure est à jour ? »,
-  ou quand le surfaçage d'ouverture de session signale un retard. Détecte l'écart de version framework
-  ↔ lab, lit les changements (dont structure/doctrine), propose une migration, et la pilote SOUS
-  validation humaine.
-  ✘ pas pour **installer** une version plus récente du plugin et des modules (le geste
-  « télécharge et pose la nouvelle version ») → /vf-update · ✘ pas pour créer un lab qui
-  n'existe pas encore → /vf-new-lab · ✘ pas pour auditer la conformité méthodologique d'un lab
-  déjà à niveau → /vf-audit.
-  Invocable par l'utilisateur ET par `vibeflow-conductor`.
+description: Utiliser quand le framework VibeFlow a évolué et qu'un lab doit être remis à niveau — « mets à jour VibeFlow », « le framework a bougé », « recalibre mon lab », « est-ce que ma structure est à jour ? », ou quand le surfaçage d'ouverture de session signale un retard. Détecte l'écart de version framework ↔ lab, lit les changements (dont structure/doctrine), propose une migration, et la pilote SOUS validation humaine. ✘ pas pour **installer** une version plus récente du plugin et des modules (le geste « télécharge et pose la nouvelle version ») → /vf-update · ✘ pas pour créer un lab qui n'existe pas encore → /vf-new-lab · ✘ pas pour auditer la conformité méthodologique d'un lab déjà à niveau → /vf-audit. Invocable par l'utilisateur ET par `vibeflow-conductor`.
 ---
 
 # vf-calibrate — Propagation d'update & migration de lab
