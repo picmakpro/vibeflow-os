@@ -201,6 +201,21 @@ là-bas.
   `find_hooks_merger()`) : **c'est la procédure qui manquait, pas le jugement** — d'où une règle
   qui vaut plus que l'exception qu'elle encadre.
 
+- **Sur Codex, le `task_name` se normalise en snake_case — jamais le `agent_type` (Phase 38,
+  2026-08-28).** Mesuré en session Codex réelle (`multi_agent_v2`, 7 inconnus levés,
+  38-CONTEXT.md) : les tirets **passent** au dispatch — un rôle nommé `vf-reviewer` se charge
+  sans warning et tourne réellement (`agent_type` = nom du rôle, tous scopes). La contrainte
+  `[a-z0-9_]+` porte sur le **`task_name`** du spawn, parce qu'il devient un **segment de
+  chemin** (`/root/<task_name>`) dans l'arbre d'agents — erreur mesurée verbatim :
+  `agent_name must use only lowercase letters, digits, and underscores`. **Les 31 noms d'agents
+  VibeFlow gardent leurs tirets tels quels** (aucun mapping de nommage, l'inconnu est confirmé
+  résolu). Seul le `task_name` passé à `spawn_agent` se normalise, une ligne, jamais une table
+  de correspondance : `tr 'A-Z-' 'a-z_'` (ou équivalent) avant spawn.
+  **Aucune contrainte `fork_turns` requise pour préserver le `model` du rôle** : mesuré en base
+  (`fork_turns:"none"` **et** `"all"`), le modèle enfant est réellement enregistré dans les deux
+  cas — `fork_turns` porte l'historique de conversation, pas la configuration du rôle. « Un
+  modèle par worker » tient sans contrainte de spawn ajoutée.
+
 ## Implémentations
 
 | Équipe | Module | Manager | Workers | Juges | « Vert » |

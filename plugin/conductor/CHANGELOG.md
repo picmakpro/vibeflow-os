@@ -1,5 +1,52 @@
 # Changelog — conductor
 
+## [v1.31.0] — 2026-08-29 (Phase 38 — adaptateur VibeFlow -> rôle Codex, ADPT)
+
+**Minor** (nouvelle capacité : un agent VibeFlow réel devient un rôle Codex réellement
+dispatchable) :
+
+- **`plugin/_internal/runtime-adapter/agent-to-codex.mjs`** (nouveau) — conversion PURE
+  (aucun effet de bord disque) d'un agent VibeFlow (frontmatter Claude Code + corps Markdown)
+  vers un rôle Codex 0.150.1 : `name`/`description`/corps -> `developer_instructions` (les trois
+  requis, mesurés sur le binaire — la doc dit `developer_instructions` optionnel, c'est faux),
+  `model` -> `model`, `effort` -> `model_reasoning_effort`. Mapping ALIGNÉ sur celui de
+  l'importeur natif Codex (`external-agent-migration`, `/import`), jamais inventé. `memory`
+  (LOST, schéma Codex la rejette) et `tools`/`disallowedTools` (PENDING, aucun équivalent
+  déclaratif mesuré — jamais simulés sous une clé inventée de `[tools]`, piège n°2) sont déclarés
+  champ par champ dans un digest explicite, jamais une case vide.
+- **`plugin/_internal/runtime-adapter/register-codex-agent.sh`** (nouveau) — orchestration :
+  résout `CODEX_HOME`, écrit le `.toml` sous `$CODEX_HOME/agents/vibeflow/<name>.toml` (SEULE
+  surface d'écriture, jamais `[agents.<n>]` de `config.toml`, aucune commande `codex config`
+  n'existant pour défaire une telle écriture), idempotent. `--verify` (ADPT-04) mesure — sur ce
+  poste, en session réelle — que `codex doctor --json` **n'énumère jamais les rôles valides par
+  nom** ; le seul signal observable est un `startup warning` référençant le chemin d'un rôle
+  MALFORMÉ (mesuré : un `codex doctor --json` global reste `exit 0` même avec un rôle cassé
+  présent, piège n°1 — jamais « pas de crash donc c'est bon »). Le gate vérifie donc l'ABSENCE
+  d'un tel warning référençant le fichier posé.
+- **`plugin/_internal/runtime-adapter/tests/test-agent-to-codex.sh`** (nouveau) — 6/6 vert,
+  T4 exécuté RÉELLEMENT contre le binaire `codex` de ce poste (banc isolé, `~/.codex` réel
+  intact, sha256 comparé), avec un sous-cas qui prouve que le détecteur discrimine vraiment
+  (un rôle malformé injecté à la main déclenche bien le `startup warning`, mutation tuée).
+- **`plugin/conductor/references/team-kernel.md`** — règle d'instanciation transverse : sur
+  Codex, seul le `task_name` de spawn se normalise en snake_case (`[a-z0-9_]+`, segment de
+  chemin), jamais `agent_type` (les 31 noms d'agents VibeFlow gardent leurs tirets — l'inconnu
+  #3 de la sonde réelle est confirmé, aucune table de correspondance construite). Documente
+  aussi que `fork_turns` n'a besoin d'aucune contrainte pour préserver `model` (inconnu #5
+  confirmé).
+- **`plugin/_internal/runtime-adapter/codex-judge-session-command.md`** (nouveau) — pose la
+  commande de session read-only séparée (D-38-E) et prouve, par exécution réelle du gate
+  `check-artifact-fidelity.sh --check-judge-command`, qu'elle porte les quatre éléments requis
+  (exit 0). ADPT-06 vérifié séparément (hors dépôt, banc isolé) : 0/5 marqueur d'injection sur
+  des runs réels avec la commande mitigée.
+- **Hors périmètre de ce lot, déclaré** : le wiring `install_module()`/`update_module()` de
+  `plugin/_internal/vibeflow-update.sh` (appel best-effort à `register-codex-agent.sh` sur
+  runtime `codex` détecté) N'A PAS été fait ici — un autre worker réécrit ce fichier en
+  parallèle sur la même branche (périmètre `--target`, lot distinct). À câbler dans un lot de
+  suivi une fois cette réécriture parallèle mergée.
+- **Le checkpoint de confinement des juges (option A vs B) reste hors de ce lot** : D-38-E a
+  déjà tranché en amont (option A, restreinte aux trois agents lecture seule) — ce lot livre la
+  commande et son gate, il ne rouvre pas la décision.
+
 ## [v1.30.0] — 2026-08-28 (Phase 38 — la limite de confinement des juges est déclarée, FIDE-03)
 
 **Minor** (nouvelle capacité observable au status et à l'install) :
