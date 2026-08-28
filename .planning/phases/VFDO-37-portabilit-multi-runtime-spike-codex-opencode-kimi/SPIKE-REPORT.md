@@ -1,4 +1,4 @@
-# SPIKE-REPORT — Phase 37 : portabilité multi-runtime (Codex, OpenCode, Kimi)
+# SPIKE-REPORT — Phase 37 : portabilité multi-runtime (Codex, OpenCode, kimi-code)
 
 Milestone `fiabilite-v1.0`. Base factuelle unique : `DISCUSS.md` (même dossier, version courante
 du fichier — 6 questions ROADMAP mesurées). Ce rapport n'ajoute aucune donnée absente de ce
@@ -21,7 +21,11 @@ reconstructible par convention (JSON en cwd partagé, ou `codex exec --output-sc
 install/layout/skill) est déclarée **interne** par le contrat écrit de gsd-core lui-même
 (`host-integration-sdk.cjs`, seule frontière publique documentée, 18 clés, filtre `convert|
 artifact|layout|installPlan|Skill` → 0 résultat). Le pipeline d'install n'est pas générique (résolution
-par remontée `__dirname`, pas par point d'entrée public). Cette mission a produit **3 constats de
+par remontée `__dirname`, pas par point d'entrée public). **Nuance** : le SDK public déclare
+`artifact` parmi ses 6 points d'interface, et `degradationFor('artifact', axes)` répond — la
+conclusion ci-dessus tient (les helpers de conversion, eux, ne sont pas exportés), mais l'argument
+« surface interne » est ainsi présenté plus fermé qu'il ne l'est ; cela **renforce** la voie
+« démarche amont » (voie 2) recommandée plus bas. Cette mission a produit **3 constats de
 non-fiabilité autour des descripteurs consultés**, dont un seul est une erreur du registre
 vérifiée en exécution (Q5, table dédiée ci-dessous).
 La conversion mesurée (156 cas) dégrade silencieusement — 0 exception, 0 diagnostic — sur les
@@ -70,19 +74,23 @@ lire** un descripteur qui, lui, était juste.
 
 156 conversions mesurées (31 agents + 21 skills × 3 cibles) : **0 exception, 0 retour nul, 0
 diagnostic** — et pourtant une dégradation massive et silencieuse : `model` perdu 31/31
-**sur codex et opencode** (kimi-code copie les 31 agents à l'octet près, cf. plus bas — ce champ
-n'y est pas perdu), et **par le même raisonnement** `memory` 31/31, `tools` 25/25,
-`disallowedTools` 6/6 sont eux aussi des pertes **sur codex et opencode seulement**, `vf-internal`
-19/19 sur codex, allowlist `Agent(...)` diluée en prose (codex) ou purement supprimée (opencode —
-un juge conçu pour ne pas écrire, `vf-design-judge`, y perdrait son interdiction **selon le
-descripteur, non vérifié en runtime : opencode n'est pas installé sur le poste de mesure**). Le
-bloc adaptateur couvre 21/21 skills et
+**sur codex et opencode** (la kind `agents` de kimi-code déclare `converter: null`, mais le
+pipeline d'install applique tout de même 4 étapes transverses — **6/31 fichiers modifiés** ;
+`model`, `memory`, `tools` et `disallowedTools` y sont néanmoins **conservés**, rejoué via
+`stageAgentsForRuntimeWithConverter`), et **par le même raisonnement** `memory` 31/31, `tools`
+25/25, `disallowedTools` 6/6 sont eux aussi des pertes **sur codex et opencode seulement**,
+`vf-internal` 19/19 sur codex ; **0/19 sur opencode et kimi-code (conservé)** — rejoué ; allowlist
+`Agent(...)` diluée en prose (codex) ou purement
+supprimée (opencode — un juge conçu pour ne pas écrire, `vf-design-judge`, y perdrait son
+interdiction **selon le descripteur, non vérifié en runtime : opencode n'est pas installé sur le
+poste de mesure**). Le bloc adaptateur couvre 21/21 skills et
 **0/31 agents**, alors que ce sont les agents qui portent les protocoles. Conséquence directe :
 la garantie ADR-044 (« agents natifs machine-enforced ») ne survit **ni à codex ni à opencode**
-(les deux cibles où le champ `agents` passe par un convertisseur qui la réécrit) — **elle survit
-sur kimi-code**, dont le descripteur de registre déclare `converter: null` pour la kind `agents` :
-copie à l'octet près, confirmée par lecture directe de `capability-registry.cjs`, cohérente avec
-le constat plus haut sur `model`.
+(les deux cibles où le champ `agents` passe par un convertisseur qui réécrit
+`model`/`memory`/`tools`/`disallowedTools`/allowlist — `vf-internal` étant, lui, perdu sur codex
+seulement, conservé sur opencode et kimi-code) — **aucun champ
+n'y est perdu à la conversion sur kimi-code** ; que kimi-code les **honore** n'a pas été vérifié
+en runtime (runtime non installé sur le poste de mesure).
 
 **Correction — la couverture skills n'est pas totale, et l'erreur est du même ordre que celle des
 agents.** Le bloc précédent range « 21/21 skills couverts » comme si le côté skills était sain ;
@@ -106,10 +114,11 @@ protocole interne). Le gate de fidélité recommandé plus bas doit donc couvrir
 suite, précisément parce qu'aucun signal machine n'existe aujourd'hui pour distinguer « converti »
 de « converti et mort ». Un tel gate devrait compter, au minimum : les champs perdus par
 conversion (`model`/`memory`/`tools`/`disallowedTools`/`vf-internal`/allowlist) par agent et par
-cible, les marqueurs dangling (**rejoué en exécutant les convertisseurs réels de gsd-core** —
-`runtime-artifact-conversion.cjs` — sur les 52 artefacts source, opencode et kimi-code n'étant
-toujours pas installés sur le poste de mesure) : chemins `.claude` morts dans **25/52 fichiers**
-sur opencode (**150 occurrences**) et **26/52 fichiers** sur kimi-code (**163 occurrences**) —
+cible, les marqueurs dangling (**rejoué via la séquence d'install réelle**
+(`stageAgentsForRuntimeWithConverter`), pas les convertisseurs isolés — c'est cette distinction qui
+produisait l'écart — sur les 52 artefacts source, opencode et kimi-code n'étant toujours pas
+installés sur le poste de mesure) : chemins `.claude` morts dans **25/52 fichiers**
+sur opencode (**150 occurrences**) et **25/52 fichiers** sur kimi-code (**157 occurrences**) —
 « fichiers » et « occurrences » sont deux dénominateurs distincts, à ne pas confondre ; `Task(` non
 traduit dans **3 fichiers / 5 occurrences** sur les deux cibles. Le plafond « 52/52 » est de toute
 façon arithmétiquement impossible : seuls **26 des 52 fichiers source** contiennent la chaîne
@@ -124,15 +133,20 @@ l'autre cas).
 
 C'est le seul trou structurel que le ROADMAP désignait, et il mérite sa propre section : la
 prémisse ROADMAP (« aucun équivalent hors Claude ») est **fausse** — les trois runtimes portent un
-outil de forme AskUserQuestion (Codex : `request_user_input` ; OpenCode : `question` ; Kimi :
-`AskUserQuestion`, quasi isomorphes). Le **vrai trou est le mode headless, et il est universel** :
-sur Codex, `request_user_input` est barré deux fois en dur et rejeté sous `codex exec` ;
-l'élicitation MCP y est auto-annulée (ni refus ni accord) ; sur OpenCode, l'outil `question`
+outil de forme AskUserQuestion (Codex : `request_user_input` ; OpenCode : `question` ; Kimi /
+Kimi Code : `AskUserQuestion`, quasi isomorphes) — **existence des outils, contrat fail-loud et
+comportement d'`opencode run --auto` : dérivés de la documentation et des issues amont, non
+vérifiés en runtime**. Codex mesuré (compte ChatGPT, Codex CLI 0.150.1) ; OpenCode et Kimi / Kimi
+Code documentaires, **produit non désambiguïsé** (cf. avertissement ROADMAP l. 1011-1012 : Kimi et
+Kimi Code sont deux produits distincts). Le **vrai trou est le mode headless, et il est
+universel** : sur Codex, `request_user_input` est barré deux fois en dur et rejeté sous `codex
+exec` ; l'élicitation MCP y est auto-annulée (ni refus ni accord) ; sur OpenCode, l'outil `question`
 **pendrait** en headless et le correctif en cours viserait à le faire **échouer**, pas à répondre —
 **dérivé de la documentation et des issues amont, non vérifié en runtime : OpenCode n'est pas
 installé sur le poste de mesure** (issue amont citée : OpenCode #35275, qui cite Codex en miroir —
 suspendre l'horloge plutôt qu'arbitrer un timeout ; Codex a déprécié `autoResolutionMs` au profit
-d'`isBlocking`) ; Kimi est le seul des trois à porter un contrat fail-loud écrit.
+d'`isBlocking`) ; Kimi / Kimi Code est le seul des trois à porter un contrat fail-loud écrit
+**(produit non désambiguïsé, non vérifié en runtime)**.
 
 Conséquence de design : **ne jamais autoriser une question dans un worker headless**, mais la
 relayer hors bande vers une session racine vivante — c'est le relais Pattern H / `SendMessage` que
@@ -147,8 +161,14 @@ Source : `DISCUSS.md` l. 44-46 (§Q4b).
 - Profondeur > 3 arêtes non testée.
 - Saturation des 4 slots de concurrence non provoquée.
 - Rôles custom `~/.codex/agents/*.toml` non utilisés (`agent_role` resté `null` dans les mesures).
-- Acceptation réelle des artefacts convertis par OpenCode et Kimi — aucun des deux runtimes n'est
+- Acceptation réelle des artefacts convertis par OpenCode et kimi-code — aucun des deux runtimes n'est
   installé sur le poste de mesure.
+- Que kimi-code **honore** effectivement `model`/`memory`/`tools`/`disallowedTools`, conservés à
+  la conversion (6/31 fichiers modifiés par les 4 étapes transverses, aucun champ perdu) — non
+  vérifié en runtime.
+- Q4b (AskUserQuestion, contrat fail-loud) mesure un produit non désambiguïsé entre Kimi et Kimi
+  Code — le ROADMAP (l. 1011-1012) avertit que ce sont deux produits distincts, et ce spike ne
+  tranche pas lequel des deux porte les comportements documentaires cités.
 - Support d'élicitation OpenCode annoncé sur branches dev/v2 non vérifié en release stable (cf.
   §Q4b ci-dessus pour ce que la mesure établit malgré tout sur le mode headless).
 - L'échappatoire `.gsd-source` a deux consommateurs aux sémantiques incompatibles — constaté en Q1
@@ -200,7 +220,7 @@ tout cela ne se lance sans l'arbitrage de Samuel, y compris le choix de ne pas d
       "constat": "\"VibeFlow consomme la surface gsd-core, ne la réimplémente pas\" tient pour le runtime Codex (profondeur 3 mesurée, pas 1) mais pas pour le chemin d'artefacts gsd-core (interne par contrat écrit, pipeline d'install non générique)",
       "severity": "majeur",
       "action": "ask-user",
-      "ref": "DISCUSS.md#décision-à-prendre-non-tranchée---adr-031"
+      "ref": "DISCUSS.md#décision-à-prendre-non-tranchée--adr-031"
     },
     {
       "sujet": "Fiabilité capability-registry.cjs",
@@ -221,7 +241,7 @@ tout cela ne se lance sans l'arbitrage de Samuel, y compris le choix de ne pas d
       "constat": "4 voies coûtées dans DISCUSS.md, aucune tranchée par ce spike ; recommandation formulée (adaptateur minimal + démarche amont en parallèle) sans autorité de décision",
       "severity": "bloquant",
       "action": "ask-user",
-      "ref": "DISCUSS.md#décision-à-prendre-non-tranchée---adr-031"
+      "ref": "DISCUSS.md#décision-à-prendre-non-tranchée--adr-031"
     }
   ],
   "noeuds_debloques": []

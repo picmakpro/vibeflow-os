@@ -8,7 +8,7 @@ constat, question par question, ce qu'il implique, et ce qui reste ouvert.
 
 | | |
 |---|---|
-| **Réponse mesurée** | Les convertisseurs sont purs, chargeables par `require()`, exécutés avec succès. Mais `bin/lib/host-integration-sdk.cjs` porte la seule frontière public/interne écrite de `bin/` : « the published public surface … External host-plugin authors import ONLY from this entry. It IS the contract … everything else in gsd-core is internal. » SDK gelé, `PROTOCOL_VERSION` 1, 18 clés ; filtre `/convert\|artifact\|layout\|installPlan\|Skill/i` sur ces clés → tableau vide. Les 8 modules visés sont internes par contrat écrit, sans engagement SemVer. |
+| **Réponse mesurée** | Les convertisseurs sont purs, chargeables par `require()`, exécutés avec succès. Mais `bin/lib/host-integration-sdk.cjs` porte la seule frontière public/interne écrite de `bin/` : « the published public surface … External host-plugin authors import ONLY from this entry. It IS the contract … everything else in gsd-core is internal. » SDK gelé, `PROTOCOL_VERSION` 1, 18 clés ; filtre `/convert\|artifact\|layout\|installPlan\|Skill/i` sur ces clés → tableau vide. Les 8 modules visés sont internes par contrat écrit, sans engagement SemVer. **Nuance** : le SDK public déclare `artifact` parmi ses 6 points d'interface, et `degradationFor('artifact', axes)` répond — les helpers de conversion, eux, ne sont pas exportés ; l'argument « surface interne » est donc plus fermé qu'il n'y paraît à la seule lecture du filtre de clés, ce qui renforce la voie « démarche amont » (voie 2, cf. §Décision à prendre). |
 | **Preuve** | Lecture directe de `host-integration-sdk.cjs` (commentaire de tête) + filtre exécuté sur ses clés exportées → 0 résultat. `package.json` sans champ `exports`. `createRuntimeArtifactInstallPlan` testé sur un arbre tiers : `ok: true`, 0 skill tiers staged, 49 agents ramassés dans `~/.claude/agents`. |
 | **Conséquence** | Le pipeline d'install n'est pas générique — il résout sa source par remontée `__dirname` vers `commands/gsd` de gsd-core, pas via un point d'entrée public. L'échappatoire `.gsd-source` a deux consommateurs aux sémantiques incompatibles (non résolu par ce spike). |
 
@@ -24,7 +24,7 @@ constat, question par question, ce qu'il implique, et ce qui reste ouvert.
 
 | | |
 |---|---|
-| **Réponse mesurée** | 25 fichiers dont 21 installables (4 gabarits sous `plugin/reference/content/`). 3 ont `name` ≠ dossier. 8 citent `gsd-*`. 8 portent un dispatch explicite, 13 mentionnent un agent. 3 utilisent `AskUserQuestion`. **Correction (tour 3, majeur) : 15 des 21 skills installables perdent `description:` en entier à la conversion, sur les trois cibles** — écrite verbatim comme le littéral `>` (ex. `plugin/planning-core/SKILL.md:3`). |
+| **Réponse mesurée** | 25 fichiers dont 21 installables (4 gabarits sous `plugin/reference/content/`). 3 ont `name` ≠ dossier. **8** (méthode : `grep -rlE 'gsd-[a-z-]+' --include=SKILL.md plugin/` — fichiers citant un skill `gsd-` **nommé**. Un 9ᵉ fichier, `vf-dev/SKILL.md`, mentionne la famille `gsd-*` génériquement sans nommer de skill : il compte sous un motif large, pas sous la définition « appelle »). 8 portent un dispatch explicite, 13 mentionnent un agent — **non reproductible, méthode d'origine non consignée** (cf. Q2). 3 utilisent `AskUserQuestion`. **Correction (tour 3, majeur) : 15 des 21 skills installables perdent `description:` en entier à la conversion, sur les trois cibles** — écrite verbatim comme le littéral `>` (ex. `plugin/planning-core/SKILL.md:3`). |
 | **Preuve** | Inspection frontmatter des 25 fichiers + grep sur `gsd-*`, dispatch, mention d'agent, `AskUserQuestion`. Description : `grep -lE '^description:\s*>' <21 skills>` → 15 fichiers. Cause : `extractFrontmatterField` (`runtime-artifact-conversion.cjs:924-930`) lit la frontmatter avec une regex mono-ligne `^description:\s*(.+)$`, incompatible avec le scalaire replié YAML `description: >` (texte sur les lignes suivantes). Vérifié en exécutant `convertClaudeCommandToOpencodeSkill`, `convertClaudeCommandToKimiCodeSkill` et `convertClaudeCommandToCodexSkill` sur `plugin/planning-core/SKILL.md` : les trois écrivent `description: >`. |
 | **Conséquence** | Piège structurel : `install_module()` pose le skill sous le nom du **module**, pas sous le `name` du frontmatter. Un runtime à surface `slash-file` dérive le nom depuis le **chemin** → les 3 skills à `name` ≠ dossier y seraient invoqués sous le mauvais nom. Correction requise avant toute cible dont le nommage suit le chemin. **Et** : la description est ce qui rend un skill déclenchable — sa perte silencieuse sur 15/21 skills est une dégradation au moins aussi large que celle mesurée côté agents, à couvrir par le même gate de fidélité. |
 
@@ -41,7 +41,7 @@ constat, question par question, ce qu'il implique, et ce qui reste ouvert.
 
 | | |
 |---|---|
-| **Réponse mesurée** | La prémisse ROADMAP (« aucun équivalent hors Claude ») est **fausse** : Codex a `request_user_input`, OpenCode a `question`, Kimi a `AskUserQuestion` — quasi isomorphes. Le vrai trou est le **mode headless**, universel. Codex : barré deux fois en dur (`request_user_input can only be used by the root thread`, rejeté sous `codex exec`) ; l'élicitation MCP y est auto-annulée (ni refus ni accord). OpenCode : l'outil `question` **pendrait** en headless, et le correctif en cours **viserait** à le faire **échouer**, pas à répondre — **dérivé de la documentation et de l'issue amont, non vérifié en runtime : OpenCode n'est pas installé sur le poste de mesure** (cf. Preuve : OpenCode #35275). Kimi : seul contrat fail-loud écrit (« a failure message is returned »). Danger identifié : `opencode run --auto` approuve automatiquement ce qui n'est pas explicitement refusé — à interdire formellement. |
+| **Réponse mesurée** | La prémisse ROADMAP (« aucun équivalent hors Claude ») est **fausse** : Codex a `request_user_input`, OpenCode a `question`, Kimi / Kimi Code a `AskUserQuestion` — quasi isomorphes. **Existence des outils, contrat fail-loud et comportement d'`opencode run --auto` : dérivés de la documentation et des issues amont, non vérifiés en runtime.** Codex mesuré (compte ChatGPT, Codex CLI 0.150.1) ; OpenCode et Kimi / Kimi Code documentaires, **produit non désambiguïsé** (cf. avertissement ROADMAP l. 1011-1012 : Kimi et Kimi Code sont deux produits distincts). Le vrai trou est le **mode headless**, universel. Codex : barré deux fois en dur (`request_user_input can only be used by the root thread`, rejeté sous `codex exec`) ; l'élicitation MCP y est auto-annulée (ni refus ni accord). OpenCode : l'outil `question` **pendrait** en headless, et le correctif en cours **viserait** à le faire **échouer**, pas à répondre — **dérivé de la documentation et de l'issue amont, non vérifié en runtime : OpenCode n'est pas installé sur le poste de mesure** (cf. Preuve : OpenCode #35275). Kimi / Kimi Code : seul contrat fail-loud écrit (« a failure message is returned ») **(produit non désambiguïsé, non vérifié en runtime)**. Danger identifié : `opencode run --auto` approuve automatiquement ce qui n'est pas explicitement refusé — à interdire formellement. |
 | **Preuve** | Comportements runtime cités verbatim + design amont déjà écrit (OpenCode #35275 citant Codex : suspendre l'horloge plutôt qu'arbitrer un timeout ; Codex a déprécié `autoResolutionMs` au profit d'`isBlocking`). |
 | **Conséquence** | Ne jamais autoriser une question **dans** un worker headless ; la relayer hors bande vers une session racine vivante — c'est exactement le relais `SendMessage`/Pattern H que VibeFlow possède déjà (cf. mémoire `askuserquestion-absent-en-subagent`). Pas de nouveau mécanisme à construire, un pattern existant à étendre. |
 
@@ -49,7 +49,7 @@ constat, question par question, ce qu'il implique, et ce qui reste ouvert.
 
 | | |
 |---|---|
-| **Réponse mesurée** | N'existe nulle part dans VibeFlow : les 17 `module.json` ne portent que `{name, version, type, description, requires}` (+ `mandatory`, `proposable`). `grep skills-only` et `grep unsupported` → 0 hit. `type` est un faux ami (prose libre, 12 formes pour 17 modules). gsd-core porte déjà un modèle à 9 axes, 6 points d'interface, 3 profils et `degradationFor(point, axes)`. |
+| **Réponse mesurée** | N'existe nulle part dans VibeFlow : les 17 `module.json` ne portent que `{name, version, type, description, requires}` (+ `mandatory`, `proposable`). `grep skills-only` et `grep unsupported` → 0 hit. `type` est un faux ami (prose libre, 12 formes pour 17 modules). gsd-core porte déjà un modèle à **10 axes** (`HOST_INTEGRATION_AXES` : embeddingMode, commandSurface, modelMode, hookBus, stateIO, transport, runtime, subagentToolkit, effortSurface, isolation), 6 points d'interface, 3 profils et `degradationFor(point, axes)`. |
 | **Preuve** | Grep exhaustif sur les 17 `module.json` + lecture du modèle de capacité gsd-core. |
 | **Conséquence** | Un enum maison `full\|skills-only\|unsupported` réimplémenterait, en le dégradant, ce que le moteur calcule déjà — interdit par la doctrine de la phase. **Mais** cette seule mission a produit 3 constats de non-fiabilité autour des descripteurs consultés (2 sur codex, 1 sur kimi-code), de nature différente : `maxDepth: 1` **faux, erreur du registre vérifiée en exécution** ; `backgroundDispatch` — le registre avait raison (`codex: true`), c'est la **lecture du cadrage** qui l'avait inversé ; descripteur `kimi-code` **périmé**, constat par lecture documentaire, **jamais vérifié en runtime** (kimi-code non installé). Bonne **source**, jamais une **preuve** — toute dépendance dessus doit prévoir une vérification runtime, pas une lecture statique du registre. |
 
@@ -68,30 +68,34 @@ diagnostic**. Pertes constatées :
 
 | Élément | Perte |
 |---|---|
-| `model:` | 31/31 **sur codex et opencode** (kimi-code copie les agents à l'octet près, cf. dernière ligne — le champ n'y est pas perdu) |
-| `memory:` | 31/31 **sur codex et opencode**, par le même raisonnement (byte-copy sur kimi-code) |
+| `model:` | 31/31 **sur codex et opencode** (la kind `agents` de kimi-code déclare `converter: null`, mais le pipeline d'install applique tout de même 4 étapes transverses — 6/31 fichiers modifiés ; le champ y est néanmoins conservé, rejoué via `stageAgentsForRuntimeWithConverter`) |
+| `memory:` | 31/31 **sur codex et opencode**, par le même raisonnement (conservé sur kimi-code) |
 | `tools:` | 25/25 **sur codex et opencode**, idem |
 | `disallowedTools:` | 6/6 **sur codex et opencode**, idem |
-| `vf-internal:` | 19/19 sur codex — dénominateur opencode/kimi-code non mesuré séparément |
+| `vf-internal:` | 19/19 sur codex ; **0/19 sur opencode et kimi-code (conservé)** — rejoué |
 | Allowlist `Agent(...)` | devient prose dans `<codex_agent_role>` sur codex ; purement supprimée sur opencode → un juge conçu pour ne pas écrire (`vf-design-judge`) y perdrait son interdiction — **selon le descripteur opencode, non vérifié en runtime : opencode n'est pas installé sur le poste de mesure** |
 | Bloc adaptateur | couvre 21/21 skills et **0/31 agents** — or ce sont les agents qui portent les protocoles |
 | `description:` (skills) | **perdue en entier sur 15/21 skills installables, sur les trois cibles** — `extractFrontmatterField` (regex mono-ligne) ne gère pas le scalaire replié YAML `description: >`, écrit verbatim le littéral `>` — **vérifié en exécutant les trois convertisseurs réels** sur `plugin/planning-core/SKILL.md` |
 | `Task(` | non traduit — **rejoué en exécutant les convertisseurs réels sur les 52 artefacts** : 3 fichiers / 5 occurrences, identique sur opencode et kimi-code |
-| Chemins `.claude` | morts — **rejoué en exécutant les convertisseurs réels** : 25/52 fichiers sur opencode (150 occurrences), 26/52 fichiers sur kimi-code (163 occurrences). « fichiers » ≠ « occurrences » : ne pas confondre les deux dénominateurs. Le plafond 52/52 est impossible : seuls 26/52 fichiers source contiennent `.claude` avant conversion |
+| Chemins `.claude` | morts — **rejoué via la séquence d'install réelle** (`stageAgentsForRuntimeWithConverter`), pas les convertisseurs isolés — c'est cette distinction qui produisait l'écart : 25/52 fichiers sur opencode (150 occurrences), 25/52 fichiers sur kimi-code (157 occurrences). « fichiers » ≠ « occurrences » : ne pas confondre les deux dénominateurs. Le plafond 52/52 est impossible : seuls 26/52 fichiers source contiennent `.claude` avant conversion |
 | Agents sur kimi-code | 31 copiés à l'octet près dans un runtime dont le descripteur porte `namedDispatch: false` → 52 fichiers posés, dont potentiellement 31 inertes **selon ce descripteur — que ce même document déclare par ailleurs périmé (cf. tableau de corrections ci-dessous) ; si kimi-code dispatche bien des sous-agents nommés custom comme sa doc courante le décrit, ces 31 agents ne sont pas inertes** |
 
 **Conséquence directe** : la garantie ADR-044 (« agents natifs machine-enforced ») ne survit **ni à
 codex ni à opencode** (les deux seules cibles où la kind `agents` passe par un convertisseur qui
-réécrit `model`/`memory`/`tools`/`disallowedTools`/`vf-internal`/allowlist) — **elle survit sur
-kimi-code**, dont l'entrée `agents` du registre porte `converter: null` (copie à l'octet près, cf.
-ligne « Agents sur kimi-code » ci-dessus).
+réécrit `model`/`memory`/`tools`/`disallowedTools`/allowlist — `vf-internal` étant, lui, perdu sur
+codex seulement, conservé sur opencode et kimi-code) — **aucun champ n'y est
+perdu à la conversion sur kimi-code** (dont l'entrée `agents` du registre porte `converter: null`,
+mais 6/31 fichiers sont tout de même modifiés par les 4 étapes transverses du pipeline d'install,
+sans perte de champ, cf. ligne « Agents sur kimi-code » ci-dessus). Que kimi-code **honore** ces
+champs n'a pas été vérifié — runtime non installé.
 
 **Placement manuel** : **13 règles** pour les 3 runtimes — relevé direct de
 `artifactLayout.global.length + artifactLayout.local.length` dans `capability-registry.cjs`
 (codex 4, opencode 6, kimi-code 3), pas 21. Codex a deux homes distincts pour ses 4 règles :
 `~/.agents/skills/` et `~/.codex/agents/`. Les 6 fragments de hooks n'ont aucun convertisseur
 utilisable (`buildCodexHookBlock` câblé en dur sur les scripts de gsd-core) ; opencode déclare
-`hooksSurface: 'none'` → les 6 sont perdus par construction.
+`hooksSurface: 'none'` → les 6 sont perdus par construction **(dérivé du descripteur, non vérifié
+en runtime — opencode n'est pas installé sur le poste de mesure)**.
 
 ## Corrections au cadrage ROADMAP
 
@@ -99,8 +103,8 @@ utilisable (`buildCodexHookBlock` câblé en dur sur les scripts de gsd-core) ; 
 |---|---|
 | « 50 agents » | **31** |
 | « 13 runtimes » | **19** ; et `runtime-aliases.manifest.json` n'est pas la table de capacités — c'est `capability-registry.cjs` |
-| « 9/25 gsd-* » | **8** |
-| « 9/25 sous-agents » | **8** dispatch / 13 mention |
+| « 9/25 gsd-* » | **8** (méthode : `grep -rlE 'gsd-[a-z-]+' --include=SKILL.md plugin/` — fichiers citant un skill `gsd-` **nommé**. Un 9ᵉ fichier, `vf-dev/SKILL.md`, mentionne la famille `gsd-*` génériquement sans nommer de skill : il compte sous un motif large, pas sous la définition « appelle ») |
+| « 9/25 sous-agents » | **8** dispatch / 13 mention — **non reproductible, méthode d'origine non consignée** |
 | « MultiAgentV2 v0.128.0 » | courant **0.150.1** |
 | « built-ins default/worker/explorer/monitor » | **3** (`default`, `worker`, `explorer`) — `monitor` n'existe pas, un `awaiter` est présent mais commenté |
 | « `backgroundDispatch: false` sur codex » | c'est la ligne de **claude** ; codex vaut `true`, opencode a `background: false` |
