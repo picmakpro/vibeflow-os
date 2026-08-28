@@ -1,5 +1,21 @@
 # Changelog — conductor
 
+## [v1.28.3] — 2026-08-28 (Phase 38 — joignabilité worker → sous-agent consignée au kernel)
+
+**Patch** (doctrine consignée, aucun comportement machine modifié par ce lot) :
+
+- **`references/team-kernel.md`** — nouvelle ligne de table : un worker qui dispatche des
+  sous-agents doit pouvoir les corriger en vol, faute de quoi une correction reçue en cours
+  d'exécution force un redispatch en agent frais (perte de contexte, risque d'exécution
+  concurrente sur le même fichier). Fait mesuré pendant la mission Phase 38 (2026-08-28) sur
+  `vf-coder`, fix déjà livré au commit `7c1443b` (ajout de `SendMessage` à son `tools:`).
+- Consigne aussi l'**asymétrie structurelle** du kernel, pas un défaut à corriger davantage : un
+  manager RÉVEILLE un worker en cours par `SendMessage` (contexte intact) ; un worker ne résout
+  PAS le nom de son manager depuis son étage — son retour passe par le rapport typé, jamais par
+  `SendMessage` vers le haut. Corollaire de pilotage écrit : jamais de protocole où le worker doit
+  INITIER un échange — il termine et rend en `action: ask-user`, c'est le tour de boucle qui est
+  le canal.
+
 ## [v1.28.2] — 2026-08-28 (bootstrap multi-runtime — bandeau de mise à jour dispatché par runtime, RUNT-01/02)
 
 **Patch** (durcissement, comportement observable modifié uniquement sur un poste Codex ou sans
