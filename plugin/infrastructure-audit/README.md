@@ -3,7 +3,7 @@
 > Détecte les régressions silencieuses de l'infrastructure d'un lab après une mise à jour Claude
 > Code — *« une infrastructure non auditée est une infrastructure qui dérive silencieusement »*.
 
-> **Type** : single-skill + scripts + hook · **Version** : v1.3.0 · **Dépend de** : aucun (module autonome)
+> **Type** : single-skill + scripts + hook · **Version** : v1.3.1 · **Dépend de** : aucun (module autonome)
 > **ADR** : ADR-056 (vigilance support runtime) · ADR-043 (hooks posés à l'install) · LRN-106 (audit avant fix)
 
 ---
@@ -48,7 +48,7 @@ Aucune dépendance de module (`requires: []`). L'install pose :
   "matcher": "startup",
   "hooks": [{
     "type": "command",
-    "command": "bash .claude/scripts/audit-infra.sh --quick --if-older-than=14d || true"
+    "command": "bash .claude/scripts/audit-infra.sh --quick --if-older-than=14d --hook || true"
   }]
 }]
 ```
@@ -58,7 +58,16 @@ Rien à copier — vérifier avec `grep audit-infra .claude/settings.json`.
 **Prérequis réels** : `bash`, `python3` (parsing robuste des settings JSON), `git`/`jq`
 vérifiés par l'axe 3 lui-même. ⚠️ La whitelist `scripts/known-versions.txt` doit être posée à la
 main dans `.claude/scripts/` (l'engine d'install ne copie que `.sh`/`.mjs`/`.js`) — sans elle,
-l'axe 1 rapporte `version_known: false` (voir Limites).
+l'axe 1 rapporte `version_known: false` **avec `version_ref_present: false`** (voir Limites) : il
+n'y a rien pour comparer, ce n'est donc pas un drift. Le bandeau de session se tait dans ce cas —
+sans quoi il crierait à chaque audit une alerte que rien ne permet d'actionner.
+
+**Ce que le hook affiche.** Sous `--hook`, le JSON par axe n'est pas injecté tel quel : il est
+agrégé en **un seul** `systemMessage` (encodé, jamais concaténé), émis uniquement s'il y a des
+findings — hooks en erreur ou en avertissement, scripts en erreur de syntaxe, dépendances
+absentes, tests de script en échec, runtime hors référentiel. Sans finding, **stdout est vide**.
+Le JSON par axe complet reste la sortie du mode CLI (sans `--hook`), inchangée pour les scripts
+et les suites de tests qui le consomment. Voir `docs/HOOKS-CONTRAT-SORTIE.md` §3 et §3 bis.
 
 ---
 
@@ -122,7 +131,7 @@ bash .claude/scripts/audit-infra.sh --snapshot   # → .claude/INFRASTRUCTURE_SN
 | `scripts/audit-infra.sh` | `.claude/scripts/audit-infra.sh` | Le moteur mécanique (modes ci-dessus, exit codes 0/1/3) |
 | `scripts/tests/test-audit-infra.sh` | `.claude/scripts/tests/` | Suite de 8 checks (stamp, gate, compteurs, whitelist) — 100 % PASS sous bash 3.2 |
 | `scripts/known-versions.txt` | `.claude/scripts/` (**pose manuelle**) | Whitelist des versions Claude Code validées |
-| `hooks/hooks.json` | mergé dans `.claude/settings.json` | Hook SessionStart `--quick --if-older-than=14d` (ADR-043) |
+| `hooks/hooks.json` | mergé dans `.claude/settings.json` | Hook SessionStart `--quick --if-older-than=14d --hook` (ADR-043) |
 
 ---
 

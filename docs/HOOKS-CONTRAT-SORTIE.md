@@ -51,6 +51,30 @@ Les diagnostics humains (`say()` et équivalents) vont systématiquement sur **s
 stdout — c'est déjà la convention en place dans les 4 scripts du périmètre dev (task 2 de ce plan
 le vérifie et le corrige si besoin).
 
+### 3 bis. Quand le stdout n'est PAS vide : un seul objet, encodé
+
+Le silence est le chemin nominal, mais un hook qui a quelque chose à dire est soumis à une
+seconde règle, tout aussi contraignante :
+
+- **UN SEUL** objet JSON par exécution. Le harness parse en strict : deux objets concaténés sur
+  stdout, même individuellement valides, forment un document invalide et lèvent « Hook output
+  looks like a JSON object but is not valid JSON ». Un script dont plusieurs fonctions émettent
+  chacune leur objet doit donc les agréger avant de rendre.
+- **Encodé par un encodeur**, jamais par concaténation de chaînes (`json.dumps`, `ConvertTo-Json`,
+  `jq -n`, `JSON.stringify`) — sans quoi un guillemet, un backslash ou un retour à la ligne dans
+  une valeur casse le document.
+
+⚠ **Piège de vérification** : `jq` ne suffit PAS à valider un stdout de hook. `jq` lit un *flux*
+d'objets et accepte donc sans broncher `{...}{...}`, que le harness rejette. Vérifier avec un
+parseur de **document** (`json.loads`, `JSON.parse`) :
+
+```bash
+bash <hook> | python3 -c 'import json,sys; json.loads(sys.stdin.read() or "{}")'
+```
+
+C'est exactement ce trou de vérification qui a laissé passer le défaut de l'entrée #18 : le §3
+ci-dessus n'avait été appliqué à cette entrée que sur son *code de sortie*, jamais sur son flux.
+
 ## 4. L'inventaire — 29 entrées, recompte machine
 
 Commande de recomptage (fait foi, D-08) :
@@ -139,7 +163,7 @@ humain).
 
 | # | Événement · matcher | Script | Invocation | `--hook` | Codes atteignables aujourd'hui | Classement | Forme | Action (Phase 30) |
 |---|---|---|---|---|---|---|---|---|
-| 18 | SessionStart · startup | `audit-infra.sh` | `--quick --if-older-than=14d` | non (`--strict` existe mais n'est pas passé par ce fragment) | 0 (advisory systématique sans `--strict` ; le mode `--strict`, qui rendrait 1/3, n'est jamais atteint ici) | advisory (ADR-031) | shell + `\|\| true` | rien |
+| 18 | SessionStart · startup | `audit-infra.sh` | `--quick --if-older-than=14d --hook` | **oui** — porte à la fois la traduction du silence (3→0, `hook_exit`) **et le rendu du FLUX** (`hook_render`) | 0 (advisory systématique sans `--strict` ; le mode `--strict`, qui rendrait 1/3, n'est jamais atteint ici) | advisory (ADR-031) | shell + `\|\| true` | **stdout corrigé** — les axes écrivent un objet JSON CHACUN, donc `--quick` en émettait DEUX collés : document invalide au parsing strict du harness (`jq` l'acceptait — il lit un flux —, d'où la non-détection). Sous `--hook`, le flux est capturé et rendu en UN SEUL objet encodé (`json.dumps`), émis seulement s'il y a des findings ; stdout strictement vide sinon (§3) |
 
 ### planning-core — 6 entrées
 

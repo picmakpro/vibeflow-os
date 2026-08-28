@@ -144,6 +144,57 @@ run_in "$LAB_ERR" "$BASH_BIN" "$SCRIPT" --axis=hooks >/dev/null 2>&1
 rc=$?
 [ "$rc" -eq 0 ] && ok "T9b VG-5 : défaut (advisory) inchangé → exit 0 même avec ERROR" || ko "T9b advisory devrait rester 0, obtenu rc=$rc"
 
+# T10 — CONTRAT DE FLUX sous --hook (HOOKS-CONTRAT-SORTIE.md §3 et §3 bis).
+# Régression d'origine : chaque axe émet SON objet JSON, donc --quick en émettait DEUX collés.
+# `jq` acceptait (il lit un flux), le harness non — d'où « looks like a JSON object but is not
+# valid JSON » au SessionStart. On valide donc en parseur de DOCUMENT (json.loads), pas en jq.
+# verdict_stdout : rend "VIDE", "VALIDE" ou "INVALIDE" pour un stdout de hook donné.
+verdict_stdout() {
+  python3 -c '
+import json, sys
+raw = sys.stdin.read()
+if raw.strip() == "":
+    print("VIDE")
+elif not raw.lstrip().startswith("{"):
+    print("NON-JSON")
+else:
+    try:
+        json.loads(raw)
+        print("VALIDE")
+    except ValueError:
+        print("INVALIDE")
+' 2>/dev/null
+}
+
+# T10a — findings présents (lab cassé) → UN SEUL objet JSON, valide au parseur strict.
+OUT="$(run_in "$LAB_ERR" "$BASH_BIN" "$SCRIPT" --quick --hook 2>/dev/null)"
+V="$(printf '%s' "$OUT" | verdict_stdout)"
+if [ "$V" = "VALIDE" ] && printf '%s' "$OUT" | grep -q '"systemMessage"'; then
+  ok "T10a §3bis : --quick --hook avec findings → UN document JSON valide (systemMessage)"
+else
+  ko "T10a stdout de hook non valide en parseur strict (verdict=$V), sortie : $OUT"
+fi
+
+# T10b — lab propre et version connue → stdout STRICTEMENT vide (silence du chemin nominal).
+OUT="$(run_in "$LAB" env PATH="$WORK/bin:$PATH" FAKE_CLAUDE_VERSION=2.1.215 "$BASH_BIN" "$SCRIPT" --quick --hook 2>/dev/null)"
+V="$(printf '%s' "$OUT" | verdict_stdout)"
+[ "$V" = "VIDE" ] && ok "T10b §3 : lab propre → stdout strictement vide sous --hook" \
+  || ko "T10b le chemin nominal doit être muet (verdict=$V), sortie : $OUT"
+
+# T10c — INF-05 : sans known-versions.txt, version_known=false ne signifie PAS drift (rien pour
+# comparer). Le bandeau doit se taire, sinon il crie une alerte non actionnable à chaque audit.
+NOREF="$WORK/lab-noref"; mkdir -p "$NOREF/.claude/scripts"
+OUT="$(run_in "$NOREF" env PATH="$WORK/bin:$PATH" FAKE_CLAUDE_VERSION=9.9.9 "$BASH_BIN" "$SCRIPT" --axis=runtime --hook 2>/dev/null)"
+V="$(printf '%s' "$OUT" | verdict_stdout)"
+[ "$V" = "VIDE" ] && ok "T10c INF-05 : référentiel absent → silence (pas d'alerte non actionnable)" \
+  || ko "T10c sans référentiel le hook doit se taire (verdict=$V), sortie : $OUT"
+
+# T10d — non-régression CLI : SANS --hook, la sortie par axe reste le flux d'objets historique
+# que consomment les scripts et cette suite. Le correctif ne doit vivre que sous --hook.
+N="$(run_in "$LAB_ERR" "$BASH_BIN" "$SCRIPT" --quick 2>/dev/null | grep -c '^{')"
+[ "$N" -eq 2 ] && ok "T10d non-régression : sans --hook, --quick rend toujours 2 objets (runtime+hooks)" \
+  || ko "T10d la sortie CLI a changé : $N objet(s) au lieu de 2"
+
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
 [ "$fail" -eq 0 ]
