@@ -49,7 +49,7 @@
       "scope": [
         "plugin/conductor/"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "exec-install",
@@ -130,7 +130,8 @@
       "stage": "",
       "deps": [
         "revue-gate",
-        "probe-codex"
+        "probe-codex",
+        "exec-fide03"
       ],
       "scope": [
         "plugin/_internal/runtime-adapter/",
@@ -163,7 +164,7 @@
         "plugin/_internal/vibeflow-update.sh",
         "plugin/_internal/tests/"
       ],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "revue-target",
@@ -360,6 +361,46 @@
         "plugin/_internal/tests/test-vibeflow-update.sh"
       ],
       "status": "done"
+    },
+    {
+      "id": "fix-fide-herm",
+      "step": "BLOQUANT revue FIDE — T24/T26 non hermétiques (dépendent du $HOME réel)",
+      "stage": "",
+      "deps": [
+        "exec-target"
+      ],
+      "scope": [
+        "plugin/_internal/tests/test-vibeflow-update.sh"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "fix-fide-gate",
+      "step": "revue FIDE — contrat stdout/stderr, count_markers par occurrence, code mort",
+      "stage": "",
+      "deps": [
+        "revue-gate"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/check-artifact-fidelity.sh",
+        "plugin/conductor/scripts/tests/test-check-artifact-fidelity.sh"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "exec-fide03",
+      "step": "FIDE-03 — le gate déclare la limite de confinement + vérifie les 4 éléments de la commande de juge",
+      "stage": "",
+      "deps": [
+        "fix-fide-gate"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/check-artifact-fidelity.sh",
+        "plugin/conductor/scripts/tests/test-check-artifact-fidelity.sh",
+        "plugin/conductor/VERSION",
+        "plugin/conductor/CHANGELOG.md"
+      ],
+      "status": "blocked"
     }
   ]
 }

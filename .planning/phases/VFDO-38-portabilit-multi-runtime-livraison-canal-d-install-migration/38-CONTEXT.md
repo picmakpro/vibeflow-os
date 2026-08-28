@@ -867,3 +867,38 @@ un gate de fidélité qui contredirait l'installeur serait pire que pas de gate.
   T9e. L'exemption ouverte par RUNT n'est empruntée par aucun code de ROLL.
 - **Sonde cross-module** : porte sur `check-gsd-engine.sh`/`copy_module_scripts()`, jamais touchés
   par RUNT ni ROLL. Non affectée par cette jointure.
+
+---
+
+## D-38-O — FIDE-03 : la limite de confinement est DÉCLARÉE, pas présumée (2026-08-28)
+
+**Ce n'est pas un arbitrage neuf — c'est l'EXÉCUTION de D-38-E**, déjà rendue par Samuel
+(« vecteur d'injection et limite de confinement **déclarés par le gate** »).
+
+**Le défaut trouvé par la revue du lot FIDE** : `38-05-PLAN.md` (table de menaces, `T-38-13`)
+affirmait « FIDE (38-01) déclare la perte au `status` ». **Faux** : le gate déclarait
+`multi_agent_v2` et `trust_level`, **pas** le troisième fait. Le lot 5 — celui qui **pose les rôles
+Codex** — se serait donc exécuté sur une **mitigation inexistante**, et aurait livré trois juges
+dont la garantie d'écriture est **silencieusement** absente. Exactement le mode d'échec que cette
+phase existe pour supprimer, logé dans la table censée l'empêcher.
+
+**Écarter l'option « corriger la formulation »** : elle aurait affaibli D-38-E **par omission**. La
+prémisse de 38-05 n'était pas fausse sur le fond — elle était **en avance sur la livraison**.
+
+### Ce que FIDE-03 doit faire
+1. **Déclarer, par cible, le troisième fait** : sur Codex, `sandbox_mode` / `approval_policy` /
+   `[permissions]` par rôle sont **acceptés puis inertes** — le confinement de `vf-reviewer`,
+   `vf-auditer`, `vf-design-judge` n'est garanti **que** par la **session read-only séparée**.
+   Au `status` **ET** à l'install, au même rang que les deux premiers champs.
+2. **Vérifier que la commande de juge posée par 38-05 porte les QUATRE éléments** :
+   `-s read-only` · `approval_policy="never"` · `skills.include_instructions=false` ·
+   `project_doc_max_bytes=0`. **Rouge s'il en manque UN** — c'est un **ET**, jamais un OU
+   (rappel ADPT-05 : le levier skills laisse ouvert le canal `AGENTS.md` du dépôt jugé).
+3. **Test discriminant** : muter la commande posée (retirer l'un des quatre) → le gate **rougit**.
+   Rouge avant / vert après, comme pour les autres champs.
+
+### Enforcement machine, pas une consigne
+- `38-05-PLAN.md` `T-38-13` **corrigé à la source** : pointe désormais FIDE-03 et porte
+  « la pose des rôles NE DÉMARRE PAS avant que FIDE-03 soit vert ».
+- **DAG** : `exec-adapter` **dépend** de `exec-fide03`. La dépendance est dans le graphe, pas dans
+  une phrase — une consigne se contourne par interprétation, une arête ne se contourne pas.
