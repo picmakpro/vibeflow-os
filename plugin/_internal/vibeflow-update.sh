@@ -35,6 +35,60 @@ err() { echo "[vibeflow-update] ERROR: $*" >&2; exit 1; }
 # la variable à la main.
 vf_dry_run() { [ "$VF_DRY_RUN" = "1" ]; }
 
+# vf_stat_inode <path> — imprime "device:inode" pour <path>, portable macOS(BSD)/Linux(GNU).
+# `stat -f '%d:%i'` est la forme BSD (macOS) ; `stat -c '%d:%i'` est la forme GNU (Linux — la CI de
+# ce dépôt tourne sous Linux, précédent Phase 13 : 6 correctifs de portabilité macOS→Linux). Cascade
+# des deux formes : la mauvaise échoue proprement (option inconnue, rc≠0) sous l'autre plateforme,
+# jamais un plantage. Silencieux et non nul si <path> n'existe pas (ou si aucune forme de `stat` ne
+# marche) — c'est l'appelant qui décide de la retombée (revue 38-04, bloquant 1).
+vf_stat_inode() {
+  stat -f '%d:%i' "$1" 2>/dev/null || stat -c '%d:%i' "$1" 2>/dev/null
+}
+
+# vf_same_inode <path1> <path2> — vrai si les deux chemins désignent le MÊME inode physique.
+# Comparaison PAR IDENTITÉ (device+inode), jamais par égalité de chaîne : sur une FS insensible à
+# la casse mais qui la préserve (APFS macOS, défaut de fait), deux chemins de casse différente
+# peuvent résoudre au MÊME inode tout en produisant des chaînes `pwd -P` différentes — une
+# comparaison textuelle seule laisse alors passer la garde $HOME (revue 38-04, bloquant 1 : vérifié
+# par mesure directe, $LAB/home et $LAB/HOME → même inode, casses différentes). Faux (jamais un
+# crash) si l'un des deux chemins n'existe pas encore ou si `stat` échoue des deux façons.
+vf_same_inode() {
+  local i1 i2
+  i1="$(vf_stat_inode "$1")" || return 1
+  i2="$(vf_stat_inode "$2")" || return 1
+  [ -n "$i1" ] && [ "$i1" = "$i2" ]
+}
+
+# VF_REGISTRY_RELPATH — constante partagée (mineur revue 38-04) : chemin relatif du registre
+# .vibeflow-installed sous TARGET_ROOT. Un SEUL site de vérité — avant ce lot, la garde --target
+# (ci-dessous) et INSTALLED_REGISTRY (plus bas, une fois TARGET_ROOT connu) portaient chacun le
+# même littéral en dur, divergence silencieuse possible si l'un changeait sans l'autre.
+VF_REGISTRY_RELPATH="scripts/.vibeflow-installed"
+
+# vf_registry_state <registry_path> — classifie le registre .vibeflow-installed (revue 38-04,
+# ajout manager : l'exception de ré-install ne doit plus s'ouvrir sur la SEULE existence du
+# fichier — un fichier vide planté à la main la contournait sans aucun signal). Trois états :
+#   "empty"        — absent, vide, ou aucune ligne `mod=version` reconnaissable (registre non réel).
+#   "inconsistent" — au moins une entrée `=INCONSISTENT:<étape>:<version>` (format écrit par
+#                    _vf_rollback_mark_inconsistent, cf. ROLL D-38-K plus bas) : PAS un registre
+#                    corrompu — c'est la voie de réparation légitime après un rollback en échec à
+#                    mi-course, elle doit rester ouverte pour rollback/install par-dessus.
+#   "valid"        — au moins une entrée `mod=version` normale, aucune INCONSISTENT.
+# Réutilise le MÊME format `mod=version` déjà lu par module_version_installed (grep "^mod=" |
+# cut -d= -f2, plus bas) — aucun 2e format de registre inventé ici.
+vf_registry_state() {
+  local reg="$1"
+  if [ ! -s "$reg" ] || ! grep -qE '^[^=]+=.+$' "$reg" 2>/dev/null; then
+    echo "empty"
+    return 0
+  fi
+  if grep -q '=INCONSISTENT:' "$reg" 2>/dev/null; then
+    echo "inconsistent"
+  else
+    echo "valid"
+  fi
+}
+
 # ---------- Résolution du scope → TARGET_ROOT (SCOPE-01) ----------
 # Défaut LEGACY = `project` (cible historique ./.claude). C'est un fallback APPEL-DIRECT
 # (debug, run manuel, tests). EN PROD le skill /vibeflow-install (Phase 4) passe TOUJOURS un
@@ -156,34 +210,89 @@ if [ -n "$VF_TARGET_OVERRIDE" ]; then
   if [ -n "$_vf_home_resolved" ] && [ "$TARGET_ROOT" = "$_vf_home_resolved" ]; then
     err "--target résout vers \$HOME ('$TARGET_ROOT') — refusé (T-38-09) ; viser un sous-dossier dédié, ex. --target \"\$HOME/.claude\""
   fi
+  # BLOQUANT 1 (revue 38-04, régime plein) : la comparaison de chaînes ci-dessus est
+  # CONTOURNABLE PAR LA CASSE sur une FS insensible à la casse qui préserve la casse (APFS
+  # macOS, défaut de fait) — `--target "$LAB/HOME"` avec `$HOME="$LAB/home"` désigne le MÊME
+  # inode mais produit une chaîne `pwd -P` DIFFÉRENTE, donc la garde textuelle seule ne tire pas
+  # (vérifié par mesure directe : même device:inode, casse stockée ≠ casse demandée). Comparaison
+  # PAR IDENTITÉ physique en COMPLÉMENT — jamais en remplacement : un système sans `stat`
+  # exploitable (vf_same_inode rend alors faux) retombe silencieusement sur la seule garde
+  # textuelle plutôt que de planter, HOME peut aussi ne pas exister.
+  if [ -n "$_vf_home_resolved" ] && vf_same_inode "$TARGET_ROOT" "$_vf_home_resolved"; then
+    err "--target résout vers \$HOME ('$TARGET_ROOT', même inode que '$_vf_home_resolved') — refusé (T-38-09) ; viser un sous-dossier dédié, ex. --target \"\$HOME/.claude\""
+  fi
   unset _vf_home_resolved
   # D-38-P point 3 : cible résolue affichée EN CLAIR — un `../../../../x` ne doit jamais être
   # une surprise silencieuse. Ni un refus de principe (contredirait --target /tmp/mon-lab, cas
-  # d'acceptance explicite), ni un silence : juste de la visibilité.
+  # d'acceptance explicite), ni un silence : juste de la visibilité. Sur stderr (log()) — le PLAN
+  # et le commentaire du test T41 disaient « stdout » par erreur (majeur revue 38-04) ; corrigé
+  # ici et aux deux endroits qui l'affirmaient.
   log "--target résolu vers : $TARGET_ROOT"
-  # D-38-P point 2 : cible pré-existante et NON VIDE → refus par défaut. mkdir -p ci-dessus ne
-  # vide jamais un dossier existant, donc ce test reflète fidèlement le contenu PRÉ-existant.
-  # Exception légitime SANS drapeau : un registre VibeFlow déjà posé (.vibeflow-installed) —
-  # c'est une ré-install/update, pas une dispersion. Sinon, il faut le drapeau explicite
-  # --target-nonempty-ok — AUCUN prompt ici (l'engine tourne sans humain sous la main, cf.
-  # commentaire VF_TARGET_NONEMPTY_OK ci-dessus) : c'est la skill appelante qui interroge
-  # l'utilisateur et repasse ce drapeau.
-  if [ -d "$TARGET_ROOT" ] && [ -n "$(ls -A "$TARGET_ROOT" 2>/dev/null)" ] \
-     && [ ! -f "$TARGET_ROOT/scripts/.vibeflow-installed" ] \
-     && [ "$VF_TARGET_NONEMPTY_OK" != "1" ]; then
-    err "--target '$TARGET_ROOT' existe déjà et n'est pas vide (contenu trouvé : $(ls -A "$TARGET_ROOT" | tr '\n' ' ')) — refusé par défaut pour éviter de disperser le payload dans un dossier existant. Relancer avec --target-nonempty-ok si c'est intentionnel."
-  fi
+  # BLOQUANT 2 (revue 38-04, régime plein) : ce bloc s'exécutait AVANT `cmd="$1"` (dispatch),
+  # donc pour TOUS les verbes — y compris `status` (lecture seule) et `sync` (no-op documenté),
+  # qui n'écrivent JAMAIS de payload et n'ont donc rien à « disperser ». Scoper aux verbes qui
+  # ÉCRIVENT — même patron que la garde --dry-run plus haut (l. ~122-128) : à ce point du script
+  # `$1` est déjà le verbe positionnel nettoyé (les options --scope/--dry-run/--target ont été
+  # retirées par la boucle de parsing plus haut), donc c'est le même geste, pas un nouveau
+  # mécanisme.
+  _vf_target_verb="${1:-}"
+  case "$_vf_target_verb" in
+    install|update|rollback)
+      # D-38-P point 2 : cible pré-existante et NON VIDE → refus par défaut. mkdir -p ci-dessus
+      # ne vide jamais un dossier existant, donc ce test reflète fidèlement le contenu
+      # PRÉ-existant. (Le test `[ -d "$TARGET_ROOT" ]` d'origine était mort : TARGET_ROOT sort
+      # d'un `cd -P … && pwd -P` qui `err` en cas d'échec plus haut, donc c'est forcément un
+      # répertoire ici — retiré, mineur revue 38-04.)
+      #
+      # Exception légitime SANS drapeau : un registre VibeFlow RÉEL déjà posé
+      # (scripts/.vibeflow-installed) — c'est une ré-install/update, pas une dispersion. Ajout
+      # manager (revue 38-04) : l'exception ne s'ouvre plus sur la SEULE EXISTENCE du fichier — un
+      # fichier vide planté à la main la contournait sans aucun signal. Elle exige maintenant un
+      # registre non vide et au moins une entrée `mod=version` reconnaissable (vf_registry_state),
+      # et la sortie NOMME la voie empruntée. Un registre en état `inconsistent` (écrit par
+      # _vf_rollback_mark_inconsistent quand un rollback échoue à mi-course) OUVRE aussi
+      # l'exception — c'est la voie de réparation légitime, pas un registre corrompu à rejeter —
+      # mais avec une ligne DÉDIÉE, distincte du cas nominal. Sinon, il faut le drapeau explicite
+      # --target-nonempty-ok — AUCUN prompt ici (l'engine tourne sans humain sous la main, cf.
+      # commentaire VF_TARGET_NONEMPTY_OK ci-dessus) : c'est la skill appelante qui interroge
+      # l'utilisateur et repasse ce drapeau.
+      if [ -n "$(ls -A "$TARGET_ROOT" 2>/dev/null)" ] && [ "$VF_TARGET_NONEMPTY_OK" != "1" ]; then
+        _vf_registry_path="$TARGET_ROOT/$VF_REGISTRY_RELPATH"
+        _vf_registry_state="$(vf_registry_state "$_vf_registry_path")"
+        case "$_vf_registry_state" in
+          valid)
+            log "exception de ré-install : registre VibeFlow trouvé ($(grep -cE '^[^=]+=.+$' "$_vf_registry_path" 2>/dev/null || echo 0) modules déclarés) → '$TARGET_ROOT' non vide accepté"
+            ;;
+          inconsistent)
+            log "exception de ré-install (réparation) : registre VibeFlow en état INCONSISTENT trouvé → '$TARGET_ROOT' non vide accepté pour permettre la réparation (rollback ou install par-dessus)"
+            ;;
+          empty)
+            err "--target '$TARGET_ROOT' existe déjà et n'est pas vide (contenu trouvé : $(ls -A "$TARGET_ROOT" | tr '\n' ' ')) — refusé par défaut pour éviter de disperser le payload dans un dossier existant. Relancer avec --target-nonempty-ok si c'est intentionnel."
+            ;;
+        esac
+        unset _vf_registry_path _vf_registry_state
+      fi
+      ;;
+    *) : ;;  # status/sync/uninstall/verbe vide : LECTURE SEULE ou no-op — rien à protéger ici (bloquant 2)
+  esac
+  unset _vf_target_verb
 else
   case "$VF_SCOPE" in
     user)            TARGET_ROOT="$HOME/.claude" ;;
     project|local)   TARGET_ROOT="./.claude" ;;
   esac
+  # AJOUT manager (revue 38-04) : rendre visible l'asymétrie --scope/--target — mesurée pour la
+  # MÊME cible physique, `--scope user` accepté (rc=0) et `--target "$HOME/.claude"` refusé
+  # (rc=1). On n'harmonise PAS ici (dette consignée côté ROADMAP par le manager, hors périmètre) :
+  # juste rendre les deux chemins ÉGALEMENT LISIBLES, même forme, même flux (stderr, cf. le
+  # majeur ci-dessus sur log()) que le `log "--target résolu vers : ..."` du chemin --target.
+  log "--scope $VF_SCOPE résolu vers : $TARGET_ROOT"
 fi
 export VF_SCOPE
 
 # ---------- Variables (toutes les cibles rebasées sur TARGET_ROOT) ----------
 CACHE_DIR="${VIBEFLOW_CACHE:-.vibeflow-cache}"   # SEULE source (plus de clone)
-INSTALLED_REGISTRY="$TARGET_ROOT/scripts/.vibeflow-installed"
+INSTALLED_REGISTRY="$TARGET_ROOT/$VF_REGISTRY_RELPATH"
 BACKUP_DIR="$TARGET_ROOT/.backups"
 
 # ---------- État global de l'accumulateur manifeste (W-2, revue vague 1) ----------

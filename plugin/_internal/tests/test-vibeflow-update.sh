@@ -1499,6 +1499,77 @@ fi
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
+# T39b (D-38-P, mineur revue 38-04) — la garde $HOME a DEUX gardes distinctes (littérale l.~192,
+# résolution physique l.~206-220). T39 ci-dessus n'exerce QUE la première (--target vaut $HOME
+# EXACTEMENT comme chaîne). Ce test exerce la SECONDE : une forme qui ne matche PAS $HOME
+# littéralement (segment ".." intercalé) mais RÉSOUT physiquement au même répertoire — aucun test
+# dédié n'existait avant ce lot.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME="$LAB/home"
+mkdir -p "$FAKE_HOME"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  miss=0
+  OUT=$(cd "$LAB" && HOME="$FAKE_HOME" VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --target "$FAKE_HOME/../home" install dev-orchestrator 2>&1)
+  RC=$?
+  if [ "$RC" -eq 0 ]; then
+    ko "T39b (D-38-P, résolution physique) : --target \"\$FAKE_HOME/../home\" (résout physiquement à \$HOME, forme NON littérale) ACCEPTÉ (rc=0) — la 2e garde (résolution physique) ne tire pas"
+    miss=1
+  elif ! echo "$OUT" | "$GREP" -qi 'HOME'; then
+    ko "T39b (D-38-P, résolution physique) : refusé (rc=$RC) mais message sans mention explicite de HOME — $OUT"
+    miss=1
+  fi
+  [ -f "$FAKE_HOME/agents/dev-orchestrator.md" ] \
+    && { ko "T39b (D-38-P, résolution physique) : payload posé directement dans \$HOME malgré le refus attendu"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T39b (D-38-P, résolution physique) : --target résolvant physiquement à \$HOME (forme non littérale) refusé par la 2e garde"
+else
+  skip "T39b : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T39c (D-38-P, BLOQUANT 1 revue 38-04) — la garde $HOME résolue est CONTOURNABLE PAR LA CASSE sur
+# une FS insensible à la casse qui préserve la casse (APFS macOS, défaut de fait) : `--target
+# "$LAB/HOME"` avec `$HOME="$LAB/home"` désigne le MÊME inode mais produit une chaîne `pwd -P`
+# différente, donc une comparaison textuelle seule ne suffit pas — vérifié par mesure directe
+# (même device:inode, casse stockée ≠ casse demandée). Ce test ne s'exécute QUE si le FS courant
+# est réellement insensible à la casse (sondé localement, jamais supposé) — la CI de ce dépôt
+# tourne sous Linux/ext4 (sensible à la casse) : SKIP propre là-bas, la 2e garde générique reste
+# couverte sur toute plateforme par T39b.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+FAKE_HOME="$LAB/home"
+FAKE_HOME_UPPER="$LAB/HOME"
+mkdir -p "$FAKE_HOME"
+touch "$LAB/.ci-probe-a" 2>/dev/null
+IS_CASE_INSENSITIVE_FS=0
+[ -f "$LAB/.CI-PROBE-A" ] && IS_CASE_INSENSITIVE_FS=1
+rm -f "$LAB/.ci-probe-a" "$LAB/.CI-PROBE-A" 2>/dev/null
+if [ "$IS_CASE_INSENSITIVE_FS" = "1" ]; then
+  CACHE="$LAB/cache"
+  if prepare_module "$CACHE" "dev-orchestrator"; then
+    miss=0
+    OUT=$(cd "$LAB" && HOME="$FAKE_HOME" VIBEFLOW_CACHE="$CACHE" \
+       bash "$INSTALLER" --target "$FAKE_HOME_UPPER" install dev-orchestrator 2>&1)
+    RC=$?
+    if [ "$RC" -eq 0 ]; then
+      ko "T39c (D-38-P, BLOQUANT 1) : --target \"\$LAB/HOME\" (même inode que \$HOME=\$LAB/home sur FS insensible à la casse) ACCEPTÉ (rc=0) — la garde textuelle est contournée par la casse"
+      miss=1
+    fi
+    { [ -f "$FAKE_HOME_UPPER/agents/dev-orchestrator.md" ] || [ -f "$FAKE_HOME/agents/dev-orchestrator.md" ]; } \
+      && { ko "T39c (D-38-P, BLOQUANT 1) : payload posé dans \$HOME (via la casse alternative) malgré le refus attendu"; miss=1; }
+    [ "$miss" -eq 0 ] && ok "T39c (D-38-P, BLOQUANT 1) : --target de casse différente mais MÊME inode que \$HOME refusé (FS insensible à la casse détecté et exercé)"
+  else
+    skip "T39c : dev-orchestrator non copiable dans le cache de test"
+  fi
+else
+  skip "T39c (D-38-P, BLOQUANT 1) : FS sensible à la casse détecté (probablement Linux/CI) — garde non exerçable ici par construction, couverte sur toute plateforme par T39b"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
 # T40 (D-38-P) — --target pointant hors du repo mais VIDE reste accepté (rc=0) : le danger n'est
 # pas "hors repo", c'est $HOME peuplé — ne pas confondre les deux gardes.
 # ---------------------------------------------------------------------------
@@ -1520,25 +1591,35 @@ fi
 rm -rf "$LAB" "$(dirname "$OUTSIDE_EMPTY")"
 
 # ---------------------------------------------------------------------------
-# T41 (D-38-P) — traversée `../../../../x` : PAS de refus de principe (contredirait --target
-# /tmp/mon-lab), mais la cible résolue est affichée EN CLAIR sur stdout — jamais une surprise
-# silencieuse.
+# T41 (D-38-P, corrigé revue 38-04 — majeur) — traversée `../../../../x` : PAS de refus de
+# principe (contredirait --target /tmp/mon-lab), mais la cible résolue est affichée EN CLAIR sur
+# STDERR (log() écrit sur stderr, cf. vibeflow-update.sh:32) — jamais une surprise silencieuse.
+# Le PLAN (38-04-PLAN.md:227) et ce commentaire disaient « stdout » par erreur ; corrigés. Flux
+# capturés SÉPARÉMENT (jamais `2>&1`, qui masquait l'écart — même défaut que la fixture idéalisée
+# du gate FIDE-03 : un test vert qui ne démontre pas sa propre assertion) : la ligne doit être sur
+# stderr ET absente de stdout.
 # ---------------------------------------------------------------------------
 BASE="$(mktemp -d)"
 CACHE="$BASE/cache"
 mkdir -p "$BASE/a/b/c/d"
 if prepare_module "$CACHE" "dev-orchestrator"; then
   EXPECTED_RESOLVED="$(cd -P "$BASE" && pwd -P)/traversal-escaped"
-  OUT=$(cd "$BASE/a/b/c/d" && VIBEFLOW_CACHE="$CACHE" \
-     bash "$INSTALLER" --target "../../../../traversal-escaped" install dev-orchestrator 2>&1)
+  STDOUT_FILE="$(mktemp)"
+  STDERR_FILE="$(mktemp)"
+  (cd "$BASE/a/b/c/d" && VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --target "../../../../traversal-escaped" install dev-orchestrator) \
+     >"$STDOUT_FILE" 2>"$STDERR_FILE"
   RC=$?
   miss=0
-  [ "$RC" -eq 0 ] || { ko "T41 (D-38-P) : traversée ../../../../x refusée (rc=$RC) — devrait être acceptée — $OUT"; miss=1; }
+  [ "$RC" -eq 0 ] || { ko "T41 (D-38-P) : traversée ../../../../x refusée (rc=$RC) — devrait être acceptée — stderr=$(cat "$STDERR_FILE")"; miss=1; }
   [ -f "$BASE/traversal-escaped/agents/dev-orchestrator.md" ] \
     || { ko "T41 (D-38-P) : traversée acceptée mais payload absent de la cible résolue"; miss=1; }
-  echo "$OUT" | "$GREP" -qF "$EXPECTED_RESOLVED" \
-    || { ko "T41 (D-38-P) : cible résolue absente de la sortie (attendu : $EXPECTED_RESOLVED) — $OUT"; miss=1; }
-  [ "$miss" -eq 0 ] && ok "T41 (D-38-P) : traversée ../../../../x acceptée (rc=0) ET cible résolue affichée en clair"
+  "$GREP" -qF "$EXPECTED_RESOLVED" "$STDERR_FILE" \
+    || { ko "T41 (D-38-P, majeur) : cible résolue absente de STDERR (attendu : $EXPECTED_RESOLVED) — stderr=$(cat "$STDERR_FILE")"; miss=1; }
+  "$GREP" -qF "$EXPECTED_RESOLVED" "$STDOUT_FILE" \
+    && { ko "T41 (D-38-P, majeur) : cible résolue trouvée sur STDOUT — log() doit écrire UNIQUEMENT sur stderr, fuite de flux"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T41 (D-38-P) : traversée ../../../../x acceptée (rc=0) ET cible résolue affichée en clair sur stderr (jamais stdout, flux vérifiés séparément)"
+  rm -f "$STDOUT_FILE" "$STDERR_FILE"
 else
   skip "T41 : dev-orchestrator non copiable dans le cache de test"
 fi
@@ -1581,26 +1662,132 @@ fi
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
-# T43 (D-38-P) — exception légitime SANS drapeau : une cible portant déjà un registre VibeFlow
-# (scripts/.vibeflow-installed) est une ré-install/update, pas une dispersion — acceptée même
-# non vide et sans --target-nonempty-ok.
+# T43 (D-38-P, révisé revue 38-04 ajout manager) — exception légitime SANS drapeau : DÉSORMAIS
+# CONDITIONNÉE à un registre RÉEL (non vide, au moins un `mod=version`), plus une garde-fou vert
+# à vide : un fichier .vibeflow-installed VIDE planté à la main ne doit PLUS ouvrir l'exception
+# silencieusement (défaut mesuré en régime plein). Trois sous-cas, discriminants entre eux :
+#   T43a — registre VIDE (fichier vide) -> refusé, comme n'importe quelle cible non vide sans
+#          registre réel.
+#   T43b — registre VALIDE (au moins une entrée mod=version) -> accepté ET la sortie NOMME
+#          explicitement la voie « registre VibeFlow trouvé ».
+#   T43c — registre INCONSISTENT (format écrit par _vf_rollback_mark_inconsistent) -> accepté
+#          (voie de réparation légitime, pas un registre corrompu) ET la sortie porte une ligne
+#          DÉDIÉE distincte du cas nominal T43b.
 # ---------------------------------------------------------------------------
 LAB="$(mktemp -d)"
 CACHE="$LAB/cache"
-CUSTOM_TARGET="$LAB/registered-target"
+CUSTOM_TARGET="$LAB/registered-target-empty"
 mkdir -p "$CUSTOM_TARGET/scripts"
 touch "$CUSTOM_TARGET/scripts/.vibeflow-installed"
 if prepare_module "$CACHE" "dev-orchestrator"; then
   OUT=$(cd "$LAB" && VIBEFLOW_CACHE="$CACHE" \
      bash "$INSTALLER" --target "$CUSTOM_TARGET" install dev-orchestrator 2>&1)
   RC=$?
-  if [ "$RC" -eq 0 ] && [ -f "$CUSTOM_TARGET/agents/dev-orchestrator.md" ]; then
-    ok "T43 (D-38-P) : cible non vide portant .vibeflow-installed -> acceptée SANS drapeau (ré-install légitime)"
+  if [ "$RC" -ne 0 ] && [ ! -f "$CUSTOM_TARGET/agents/dev-orchestrator.md" ]; then
+    ok "T43a (D-38-P, ajout manager) : registre .vibeflow-installed VIDE (planté à la main) -> refusé (rc=$RC), l'exception ne s'ouvre plus sur la seule existence du fichier"
   else
-    ko "T43 (D-38-P) : cible avec registre .vibeflow-installed refusée (rc=$RC) — devrait être acceptée sans drapeau — $OUT"
+    ko "T43a (D-38-P, ajout manager) : registre .vibeflow-installed VIDE ACCEPTÉ (rc=$RC) — l'exception s'ouvre encore sur la seule existence du fichier, sans validation du contenu — $OUT"
   fi
 else
-  skip "T43 : dev-orchestrator non copiable dans le cache de test"
+  skip "T43a : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+CUSTOM_TARGET="$LAB/registered-target-valid"
+mkdir -p "$CUSTOM_TARGET/scripts"
+echo "software-architecture=v1.0.0" > "$CUSTOM_TARGET/scripts/.vibeflow-installed"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  miss=0
+  OUT=$(cd "$LAB" && VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --target "$CUSTOM_TARGET" install dev-orchestrator 2>&1)
+  RC=$?
+  [ "$RC" -eq 0 ] && [ -f "$CUSTOM_TARGET/agents/dev-orchestrator.md" ] \
+    || { ko "T43b (D-38-P, ajout manager) : registre VALIDE refusé (rc=$RC) — devrait être accepté sans drapeau — $OUT"; miss=1; }
+  echo "$OUT" | "$GREP" -qi 'registre VibeFlow trouvé' \
+    || { ko "T43b (D-38-P, ajout manager) : accepté mais la sortie ne NOMME PAS la voie empruntée (attendu une ligne « registre VibeFlow trouvé ») — $OUT"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T43b (D-38-P, ajout manager) : registre VALIDE -> accepté ET voie empruntée journalisée"
+else
+  skip "T43b : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+CUSTOM_TARGET="$LAB/registered-target-inconsistent"
+mkdir -p "$CUSTOM_TARGET/scripts"
+echo "software-architecture=INCONSISTENT:hooks:v2.0.0" > "$CUSTOM_TARGET/scripts/.vibeflow-installed"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  miss=0
+  OUT=$(cd "$LAB" && VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --target "$CUSTOM_TARGET" install dev-orchestrator 2>&1)
+  RC=$?
+  [ "$RC" -eq 0 ] && [ -f "$CUSTOM_TARGET/agents/dev-orchestrator.md" ] \
+    || { ko "T43c (D-38-P, ajout manager) : registre INCONSISTENT refusé (rc=$RC) — devrait être accepté (voie de réparation légitime) — $OUT"; miss=1; }
+  echo "$OUT" | "$GREP" -qi 'réparation' \
+    || { ko "T43c (D-38-P, ajout manager) : accepté mais aucune ligne DÉDIÉE de réparation (distincte du cas nominal T43b) — $OUT"; miss=1; }
+  echo "$OUT" | "$GREP" -qi 'registre VibeFlow trouvé' \
+    && { ko "T43c (D-38-P, ajout manager) : le message NOMINAL (T43b) est apparu pour un registre INCONSISTENT — les deux voies doivent rester distinctes"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T43c (D-38-P, ajout manager) : registre INCONSISTENT -> accepté (réparation légitime) ET ligne dédiée, distincte du cas nominal"
+else
+  skip "T43c : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T44 (BLOQUANT 2, revue 38-04, DISCRIMINANT) — la garde « cible non vide » s'exécutait AVANT
+# `cmd="$1"` (dispatch), donc pour TOUS les verbes. `status` (lecture seule) et `sync` (no-op
+# documenté) doivent PASSER sur une cible non vide SANS registre ET sans --target-nonempty-ok —
+# aucun payload écrit, rien à protéger. `install`, lui, doit toujours REFUSER dans le MÊME
+# scénario — témoin qui distingue un refus de garde d'une erreur en aval (piège documenté au
+# mandat : c'est celui où la vérification précédente était tombée).
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+CUSTOM_TARGET="$LAB/nonempty-readonly-target"
+mkdir -p "$CUSTOM_TARGET"
+echo "contenu préexistant" > "$CUSTOM_TARGET/somefile.txt"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  miss=0
+  OUT_STATUS=$(cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" --target "$CUSTOM_TARGET" status 2>&1)
+  RC_STATUS=$?
+  [ "$RC_STATUS" -eq 0 ] \
+    || { ko "T44 (BLOQUANT 2) : 'status' sur cible non vide REFUSÉ (rc=$RC_STATUS) — devrait passer, verbe en lecture seule — $OUT_STATUS"; miss=1; }
+  OUT_SYNC=$(cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" --target "$CUSTOM_TARGET" sync 2>&1)
+  RC_SYNC=$?
+  [ "$RC_SYNC" -eq 0 ] \
+    || { ko "T44 (BLOQUANT 2) : 'sync' sur cible non vide REFUSÉ (rc=$RC_SYNC) — devrait passer, no-op documenté — $OUT_SYNC"; miss=1; }
+  OUT_INSTALL=$(cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" --target "$CUSTOM_TARGET" install dev-orchestrator 2>&1)
+  RC_INSTALL=$?
+  [ "$RC_INSTALL" -ne 0 ] \
+    || { ko "T44 (BLOQUANT 2) : 'install' sur cible non vide (même scénario que status/sync ci-dessus) ACCEPTÉ (rc=0) — devrait rester refusé, seule la portée du verbe a changé"; miss=1; }
+  [ -f "$CUSTOM_TARGET/agents/dev-orchestrator.md" ] \
+    && { ko "T44 (BLOQUANT 2) : payload posé par 'install' malgré le refus attendu"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T44 (BLOQUANT 2, DISCRIMINANT) : 'status'/'sync' passent sur cible non vide (lecture seule/no-op), 'install' reste refusé dans le MÊME scénario"
+else
+  skip "T44 : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T45 (ajout manager, revue 38-04) — visibilité de l'asymétrie --scope/--target : `--scope user`
+# affiche désormais la cible résolue, même forme/flux (stderr) que `--target`. On ne teste PAS
+# l'harmonisation du comportement (hors périmètre, tranché par le manager) — seulement que la
+# ligne existe et porte la cible réelle.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME="$LAB/home"
+mkdir -p "$FAKE_HOME"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  OUT=$(cd "$LAB" && HOME="$FAKE_HOME" VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --scope user install dev-orchestrator 2>&1)
+  echo "$OUT" | "$GREP" -qF "$FAKE_HOME/.claude" \
+    && ok "T45 (ajout manager) : --scope user affiche la cible résolue ($FAKE_HOME/.claude), même visibilité que --target" \
+    || ko "T45 (ajout manager) : --scope user n'affiche PAS la cible résolue — $OUT"
+else
+  skip "T45 : dev-orchestrator non copiable dans le cache de test"
 fi
 rm -rf "$LAB"
 
