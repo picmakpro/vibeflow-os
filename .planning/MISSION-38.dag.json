@@ -81,7 +81,7 @@
         "plugin/dev-orchestrator/",
         "plugin/design-orchestrator/"
       ],
-      "status": "ready",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -107,7 +107,7 @@
       "scope": [
         "plugin/_internal/"
       ],
-      "status": "ready",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -122,7 +122,7 @@
       "scope": [
         "plugin/"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "exec-adapter",
@@ -314,7 +314,7 @@
         "plugin/conductor/VERSION",
         "plugin/conductor/CHANGELOG.md"
       ],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "exec-sendmsg",
@@ -346,6 +346,19 @@
         "plugin/conductor/CHANGELOG.md"
       ],
       "status": "done"
+    },
+    {
+      "id": "fix-join-pose",
+      "step": "BLOQUANT join-1 — poser runtime-cli-dispatch.sh sous TARGET_ROOT/scripts (miroir copy_engine_lib)",
+      "stage": "",
+      "deps": [
+        "exec-gate-wire"
+      ],
+      "scope": [
+        "plugin/_internal/vibeflow-update.sh",
+        "plugin/_internal/tests/test-vibeflow-update.sh"
+      ],
+      "status": "blocked"
     }
   ]
 }

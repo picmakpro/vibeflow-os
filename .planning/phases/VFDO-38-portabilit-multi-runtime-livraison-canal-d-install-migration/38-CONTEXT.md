@@ -813,3 +813,57 @@ ratifié. **C'est la procédure qui manquait, pas le jugement.** Et c'est préci
 règle vaut plus que l'exception qu'elle encadre.
 
 Portée : toute la chaîne d'agents (`team-kernel.md`), pas seulement cette phase.
+
+---
+
+## 🔴 Revue de jointure (`join-1`) — le bloquant que nul relecteur de lot ne pouvait voir
+
+Union des 3 lots, base `4ebd700` → tête `c6e5c60`, 46 fichiers / +5307 −73.
+
+### Finding BLOQUANT — `runtime-cli-dispatch.sh` n'est JAMAIS posé sous `$TARGET_ROOT/scripts/`
+Le script neuf du lot RUNT documente sa résolution comme « cascade EXACTE de `find_hooks_merger()` ».
+**L'analogie est fausse, et c'est elle qui masque le défaut** : `find_hooks_merger()` est appelée par
+`vibeflow-update.sh` **lui-même**, dont `$0` reste toujours adjacent à `_internal/` — son repli
+résout donc systématiquement. `runtime-cli-dispatch.sh` est au contraire résolu par des scripts
+**POSÉS** (`ensure-deps.sh`, `ensure-design-deps.sh`, `check-plugin-update.sh`), dont le `$0`
+**change** entre l'install et toute ré-invocation.
+
+- À l'install initiale : `$0` = `$VIBEFLOW_CACHE/<mod>/scripts/…` → candidat 1 résout. ✅
+- À **toute ré-invocation réelle et documentée** — `/vf-update` étape 4c, `/vf-calibrate`, et surtout
+  le **hook SessionStart** via `check-plugin-update.sh` — `$0` = `$TARGET_ROOT/scripts/…` et
+  **aucun** des deux candidats ne résout. ❌
+
+**Vérifié par le manager, indépendamment** : `rtk proxy grep -n 'runtime-cli-dispatch'
+plugin/_internal/vibeflow-update.sh` → **zéro occurrence**. Le fichier n'est posé nulle part.
+Le seul précédent comparable, `vf-portable.sh`, a **sa propre fonction `copy_engine_lib()`**
+(l. 1014-1048), **son entrée `.gitignore`** (l. 913) et **son exclusion de manifeste** (l. 230) —
+rien d'équivalent n'existe pour `runtime-cli-dispatch.sh`.
+
+**Conséquence** : la capacité multi-runtime (RUNT-01/02) **ne s'active jamais en régime établi**,
+seulement dans la fenêtre étroite du tout premier run d'install. Le repli documenté comme
+« comportement claude-figé ACTUEL, jamais une régression silencieuse » est en réalité
+**systématique, pas transitoire** — c'est très exactement la régression silencieuse que le code
+affirme éviter. **Aucun test existant ne le voit** : `test-runtime-cli-dispatch.sh` n'exerce le
+script que depuis sa position **source**, et `test-vibeflow-update.sh` ne le mentionne **jamais**.
+
+**Correctif** : pas de pose dédié en miroir de `copy_engine_lib()` + entrée `.gitignore` + exclusion
+manifeste D-31-03 + miroir dry-run, **et** un test qui ré-invoque un appelant **POSÉ** (jamais
+depuis sa position source). Nœud `fix-join-pose`, sérialisé derrière `exec-gate-wire` (même fichier).
+
+### Finding mineur — deux vérités sur `trust_level`
+`runtime-cli-dispatch.sh:132` replie sur `pwd` hors dépôt git ; `check-artifact-fidelity.sh:228-230`
+ne replie pas. Deux racines potentiellement différentes sondées dans le **même** bloc
+`[projects."<racine>"]`. Cas limite, mais classe « deux vérités divergentes sur le même fait » —
+un gate de fidélité qui contredirait l'installeur serait pire que pas de gate. En correction.
+
+### Résultats négatifs — consignés, ce sont des résultats
+- **Manifeste × gate de fidélité** : aucune interaction. Le gate prend un artefact `.md` en argument
+  explicite ; aucun wrapper ne lui passe `.vibeflow-fragments/<mod>.json`, qui n'a pas de
+  délimiteurs `---` et produirait de toute façon un frontmatter vide.
+- **CHANGELOG conductor v1.28.1 → v1.28.4** : cohérent. L'absence d'entrée pour les changements
+  purement `_internal/` de ROLL suit la **convention établie** du dépôt (précédent `d94b87e`) — pas
+  une omission.
+- **Exemption T9e / D-38-M** : ROLL ne touche jamais `ensure-design-deps.sh`, seul fichier gardé par
+  T9e. L'exemption ouverte par RUNT n'est empruntée par aucun code de ROLL.
+- **Sonde cross-module** : porte sur `check-gsd-engine.sh`/`copy_module_scripts()`, jamais touchés
+  par RUNT ni ROLL. Non affectée par cette jointure.
