@@ -1,12 +1,6 @@
 ---
 name: vibeflow-install
-description: >
-  Utiliser au tout premier lancement de VibeFlow après l'installation du plugin (l'utilisateur
-  lance manuellement `/vibeflow-install`), ou quand l'utilisateur dit
-  « installe VibeFlow », « configure les modules », « ajoute un module », « change de scope »,
-  « re-configure VibeFlow », « désinstalle un module », « désinstalle VibeFlow », « retire tout »,
-  ou veut choisir où installer (compte / projet / projet sans commit).
-  Invocable par l'utilisateur ET par l'agent en autonomie.
+description: Utiliser au tout premier lancement de VibeFlow après l'installation du plugin (l'utilisateur lance manuellement `/vibeflow-install`), ou quand l'utilisateur dit « installe VibeFlow », « configure les modules », « ajoute un module », « change de scope », « re-configure VibeFlow », « désinstalle un module », « désinstalle VibeFlow », « retire tout », ou veut choisir où installer (compte / projet / projet sans commit). Invocable par l'utilisateur ET par l'agent en autonomie.
 ---
 
 # vibeflow-install — Orchestration de l'install à toggles

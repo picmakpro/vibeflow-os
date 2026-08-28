@@ -1,14 +1,6 @@
 ---
 name: kpi-analyst
-description: >
-  Méthode pour déduire, calculer et publier les VRAIS KPIs métier d'un lab. Charger quand on parle de
-  KPIs / indicateurs / CA / leads / MRR / vues / engagement / « mets à jour les chiffres » / « configure
-  les indicateurs », ou à l'activation d'un lab. Couvre : déduction du schéma depuis le brief, séparation
-  schéma stable vs valeurs, écriture d'extracteurs déterministes (anti-dérive LLM), publication du
-  registre KPIS.md — consommable en standalone ou par un « Hub » (dashboard central externe au lab,
-  optionnel : le registre reste pleinement utilisable sans), niveaux de confiance, et la frontière
-  Tier 1 (interne) / Tier 2 (acquisition externe human-gated). Iron Law : aucune valeur inventée,
-  chaque KPI porte sa source.
+description: "Méthode pour déduire, calculer et publier les VRAIS KPIs métier d'un lab. Charger quand on parle de KPIs / indicateurs / CA / leads / MRR / vues / engagement / « mets à jour les chiffres » / « configure les indicateurs », ou à l'activation d'un lab. Couvre : déduction du schéma depuis le brief, séparation schéma stable vs valeurs, écriture d'extracteurs déterministes (anti-dérive LLM), publication du registre KPIS.md — consommable en standalone ou par un « Hub » (dashboard central externe au lab, optionnel : le registre reste pleinement utilisable sans), niveaux de confiance, et la frontière Tier 1 (interne) / Tier 2 (acquisition externe human-gated). Iron Law : aucune valeur inventée, chaque KPI porte sa source."
 ---
 
 # kpi-analyst — Des KPIs métier réels, reproductibles, sourcés

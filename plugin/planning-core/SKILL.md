@@ -1,17 +1,6 @@
 ---
 name: vf-planning
-description: >
-  Utiliser pour poser ou tenir à jour le socle de planning et de documentation d'un lab NON-DEV —
-  contenu, vente, growth, design, montage de dossier, recherche : « structure la doc de ce lab »,
-  « mets en place le suivi », « on perd le fil / le contexte », « pose le cadre du lab »,
-  « initialise le .planning ». Utiliser aussi, sur TOUT lab y compris dev, pour l'altitude LAB :
-  « fais l'index de mes projets », « quel compartiment suit quoi », « ce client mérite-t-il son
-  propre plan », « remonte les décisions en mémoire », « qu'est-ce qui traîne sans plan ».
-  ✘ PAS pour le planning d'un projet de code — la charte, la trajectoire, les exigences, l'état
-  et les étapes d'un projet dev appartiennent au moteur de développement : démarrage →
-  gsd-new-project (garde-fou first-use de l'agent vibeflow-dev), état et avancement →
-  gsd-progress, cadrage d'une étape → gsd-discuss-phase puis gsd-plan-phase, comprendre
-  l'existant → gsd-map-codebase. Invocable par l'utilisateur ET par un agent en autonomie.
+description: "Utiliser pour poser ou tenir à jour le socle de planning et de documentation d'un lab NON-DEV — contenu, vente, growth, design, montage de dossier, recherche : « structure la doc de ce lab », « mets en place le suivi », « on perd le fil / le contexte », « pose le cadre du lab », « initialise le .planning ». Utiliser aussi, sur TOUT lab y compris dev, pour l'altitude LAB : « fais l'index de mes projets », « quel compartiment suit quoi », « ce client mérite-t-il son propre plan », « remonte les décisions en mémoire », « qu'est-ce qui traîne sans plan ». ✘ PAS pour le planning d'un projet de code — la charte, la trajectoire, les exigences, l'état et les étapes d'un projet dev appartiennent au moteur de développement : démarrage → gsd-new-project (garde-fou first-use de l'agent vibeflow-dev), état et avancement → gsd-progress, cadrage d'une étape → gsd-discuss-phase puis gsd-plan-phase, comprendre l'existant → gsd-map-codebase. Invocable par l'utilisateur ET par un agent en autonomie."
 ---
 
 # vf-planning — Socle de planning & documentation universel
