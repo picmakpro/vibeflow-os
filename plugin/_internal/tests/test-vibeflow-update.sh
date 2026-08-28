@@ -1115,6 +1115,254 @@ fi
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
+# T28 (TGT-01) — `--target <chemin>` pose réellement HORS de $HOME/.claude et ./.claude.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+CUSTOM_TARGET="$LAB/customtarget"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --target "$CUSTOM_TARGET" install dev-orchestrator >/dev/null 2>&1)
+  miss=0
+  [ -f "$CUSTOM_TARGET/agents/dev-orchestrator.md" ] \
+    || { ko "T28 : \$CUSTOM_TARGET/agents/dev-orchestrator.md manquant sous --target"; miss=1; }
+  [ ! -d "$LAB/.claude" ] \
+    || { ko "T28 : ./.claude a été créé alors que --target était fourni (pas de repli implicite)"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T28 (TGT-01) : --target <chemin> pose réellement hors de \$HOME/.claude et ./.claude"
+else
+  skip "T28 : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T29 (TGT-03, DISCRIMINANT) — le payload copié sous --target ne fige plus AUCUNE occurrence
+# littérale '.claude/' : le fichier réel posé pointe vers la cible réellement choisie.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+CUSTOM_TARGET="$LAB/customtarget"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --target "$CUSTOM_TARGET" install dev-orchestrator >/dev/null 2>&1)
+  POSED="$CUSTOM_TARGET/agents/dev-orchestrator.md"
+  if [ -f "$POSED" ]; then
+    residual=$("$GREP" -c '\.claude/' "$POSED" 2>/dev/null || true)
+    residual="${residual:-0}"
+    rewritten=$("$GREP" -c "$CUSTOM_TARGET" "$POSED" 2>/dev/null || true)
+    rewritten="${rewritten:-0}"
+    if [ "$residual" -eq 0 ] && [ "$rewritten" -gt 0 ]; then
+      ok "T29 (TGT-03, DISCRIMINANT) : 0 occurrence '.claude/' résiduelle sur le fichier réellement posé, $rewritten occurrence(s) réécrite(s) vers \$CUSTOM_TARGET"
+    else
+      ko "T29 (TGT-03, DISCRIMINANT) : réécriture incomplète — résiduel='.claude/'=$residual (attendu 0), réécrit vers cible=$rewritten (attendu >0)"
+    fi
+    # Balayage global : AUCUN fichier posé sous la cible ne doit garder '.claude/' en dur (198
+    # fichiers / 1130 occurrences mesurées au cadrage, périmètre hors _internal/).
+    total_residual=$(find "$CUSTOM_TARGET" -type f -print0 2>/dev/null | xargs -0 "$GREP" -o '\.claude/' 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$total_residual" -eq 0 ]; then
+      ok "T29b : balayage global sous \$CUSTOM_TARGET — 0 occurrence '.claude/' résiduelle (comptage sur le lab installé, pas lecture de code)"
+    else
+      ko "T29b : balayage global sous \$CUSTOM_TARGET — $total_residual occurrence(s) '.claude/' résiduelle(s) (attendu 0)"
+    fi
+  else
+    ko "T29 pré-condition : $POSED manquant après install --target"
+  fi
+else
+  skip "T29 : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T30 (TGT-01, non-régression) — sans --target, le comportement par défaut (scope user/project)
+# reste inchangé : les mêmes assertions structurelles que T1/T2 continuent de passer (déjà
+# couvertes ci-dessus) ; ce test vérifie en plus qu'AUCUNE réécriture n'a lieu sans --target — le
+# coût de vf_rewrite_target_refs doit être nul par construction (VF_TARGET_OVERRIDE vide).
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  (cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" install dev-orchestrator >/dev/null 2>&1)
+  POSED="$LAB/.claude/agents/dev-orchestrator.md"
+  if [ -f "$POSED" ]; then
+    ref_count=$("$GREP" -c '\.claude/agents/dev-orchestrator-references' "$POSED" 2>/dev/null || true)
+    ref_count="${ref_count:-0}"
+    if [ "$ref_count" -gt 0 ]; then
+      ok "T30 : sans --target, les références '.claude/agents/...' du payload restent INCHANGÉES ($ref_count occurrence(s), comportement legacy byte-identique)"
+    else
+      ko "T30 : sans --target, les références '.claude/agents/...' ont disparu du payload posé — régression du comportement par défaut"
+    fi
+  else
+    ko "T30 pré-condition : $POSED manquant après install sans --target"
+  fi
+else
+  skip "T30 : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T31 (TGT-02) — gitignore_add_paths() sous --target + scope local : les 16 littéraux résiduels
+# suivent la cible réellement résolue (relative au cwd), jamais le littéral '.claude/'.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+CUSTOM_TARGET="$LAB/mytgt"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --scope local --target "$CUSTOM_TARGET" install dev-orchestrator >/dev/null 2>&1)
+  miss=0
+  [ -f "$LAB/.gitignore" ] || { ko "T31 pré-condition : .gitignore absent après install --scope local --target"; miss=1; }
+  if [ "$miss" -eq 0 ]; then
+    if "$GREP" -qxF "mytgt/agents/dev-orchestrator.md" "$LAB/.gitignore" \
+       && ! "$GREP" -qF ".claude/agents/dev-orchestrator.md" "$LAB/.gitignore"; then
+      ok "T31 (TGT-02) : .gitignore sous --target contient le chemin relatif à la cible réelle (mytgt/...), jamais le littéral .claude/"
+    else
+      ko "T31 (TGT-02) : .gitignore sous --target ne suit pas la cible réelle — contenu : $(cat "$LAB/.gitignore" | tr '\n' ' ')"
+    fi
+  fi
+else
+  skip "T31 : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T32 (TGT-02, DISCRIMINANT) — --target hors de l'arbre du repo (scope local) : .gitignore n'est
+# JAMAIS modifié avec une entrée invalide (hors-arbre), le manque est journalisé.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+OUTSIDE="$(mktemp -d)"
+CACHE="$LAB/cache"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  OUT=$(cd "$LAB" && VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --scope local --target "$OUTSIDE/tgt" install dev-orchestrator 2>&1)
+  if [ ! -f "$LAB/.gitignore" ] && echo "$OUT" | "$GREP" -qi 'hors'; then
+    ok "T32 (TGT-02, DISCRIMINANT) : --target hors-arbre en scope local -> .gitignore NON modifié, manque journalisé"
+  else
+    ko "T32 (TGT-02, DISCRIMINANT) : --target hors-arbre — .gitignore existe=$([ -f "$LAB/.gitignore" ] && echo oui || echo non), avertissement absent de la sortie"
+  fi
+else
+  skip "T32 : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB" "$OUTSIDE"
+
+# ---------------------------------------------------------------------------
+# T33 (TGT-02, DISCRIMINANT) — scripts_prefix_for_scope() sous --target : preuve par la sortie
+# RÉELLE de merge_module_hooks() (settings.json d'un module à hooks, dev-orchestrator), jamais
+# une reconstitution synthétique. Le placeholder {{VF_SCRIPTS}} doit résoudre vers le chemin
+# ABSOLU de la cible réelle, jamais vers "$HOME"/.claude ni "$CLAUDE_PROJECT_DIR"/.claude — ET la
+# forme produite, une fois `eval`-ée par un shell réel, résout physiquement vers <target>/scripts.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+CUSTOM_TARGET="$LAB/prefixtgt"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --target "$CUSTOM_TARGET" install dev-orchestrator >/dev/null 2>&1)
+  SETTINGS="$CUSTOM_TARGET/settings.json"
+  if [ -f "$SETTINGS" ]; then
+    RESOLVED_TARGET="$(cd -P "$CUSTOM_TARGET" && pwd -P)"
+    has_legacy=$("$GREP" -c '"\$HOME"/\.claude\|"\$CLAUDE_PROJECT_DIR"/\.claude' "$SETTINGS" 2>/dev/null || true)
+    has_legacy="${has_legacy:-0}"
+    # Présence du chemin ABSOLU réel (JSON échappe le guillemet séparant <cible> de /scripts en
+    # "\"", donc ne PAS exiger la jointure exacte "<cible>/scripts" — le segment de chemin suffit
+    # à prouver que la cible réelle apparaît ; l'absence des formes legacy ci-dessus garantit
+    # qu'il ne s'agit pas d'une coïncidence).
+    has_target=$("$GREP" -cF "$RESOLVED_TARGET" "$SETTINGS" 2>/dev/null || true)
+    has_target="${has_target:-0}"
+    if [ "$has_legacy" -eq 0 ] && [ "$has_target" -gt 0 ]; then
+      # eval réel de la forme shell EXACTE produite en tête d'une entrée "command" de settings.json.
+      EVAL_RESULT=$(eval "printf '%s' \"$RESOLVED_TARGET\"/scripts")
+      if [ "$EVAL_RESULT" = "$RESOLVED_TARGET/scripts" ]; then
+        ok "T33 (TGT-02, DISCRIMINANT) : settings.json sous --target contient le chemin absolu réel de la cible (0 forme \$HOME/\$CLAUDE_PROJECT_DIR), eval réel confirme <target>/scripts"
+      else
+        ko "T33 (TGT-02, DISCRIMINANT) : eval de la forme produite ÉCHOUÉ — attendu '$RESOLVED_TARGET/scripts', obtenu '$EVAL_RESULT'"
+      fi
+    else
+      ko "T33 (TGT-02, DISCRIMINANT) : settings.json sous --target — formes legacy résiduelles=$has_legacy (attendu 0), forme cible=$has_target (attendu >0)"
+    fi
+  else
+    skip "T33 : settings.json non produit (module sans hooks.json dans ce cache, ou merge-hooks absent)"
+  fi
+else
+  skip "T33 : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T34 (TGT-04) — le marqueur $TARGET_ROOT/scripts/.vibeflow-target est posé sous --target,
+# contient le chemin ABSOLU réel de la cible — [ -f ] + grep réels, jamais supposé.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+CUSTOM_TARGET="$LAB/markertgt"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --target "$CUSTOM_TARGET" install dev-orchestrator >/dev/null 2>&1)
+  MARKER="$CUSTOM_TARGET/scripts/.vibeflow-target"
+  if [ -f "$MARKER" ]; then
+    RESOLVED_TARGET="$(cd -P "$CUSTOM_TARGET" && pwd -P)"
+    MARKER_CONTENT="$(cat "$MARKER")"
+    if [ "$MARKER_CONTENT" = "$RESOLVED_TARGET" ]; then
+      ok "T34 (TGT-04) : \$TARGET_ROOT/scripts/.vibeflow-target posé, contient le chemin absolu réel de la cible ($MARKER_CONTENT)"
+    else
+      ko "T34 (TGT-04) : contenu du marqueur ('$MARKER_CONTENT') ≠ cible résolue ('$RESOLVED_TARGET')"
+    fi
+  else
+    ko "T34 (TGT-04) : \$TARGET_ROOT/scripts/.vibeflow-target absent après install --target"
+  fi
+else
+  skip "T34 : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T35 (D-38-H, sonde cross-module) — check-gsd-engine.sh (dev-orchestrator, INDÉPENDANT de
+# vibeflow-update.sh) rend le MÊME code de sortie + la MÊME sortie stdout, exécuté depuis un cwd
+# après une install --target custom et depuis un cwd après une install par défaut — preuve par
+# exécution comparée que la sonde cross-module <S-moteur> reste résolue après ce changement de
+# layout, jamais supposée (garde-fou explicite hérité, safe modification déclarée).
+# ---------------------------------------------------------------------------
+GSD_ENGINE_SCRIPT="$REPO/dev-orchestrator/scripts/check-gsd-engine.sh"
+if [ -f "$GSD_ENGINE_SCRIPT" ]; then
+  LAB_DEFAULT="$(mktemp -d)"
+  LAB_TARGET="$(mktemp -d)"
+  CACHE_D="$LAB_DEFAULT/cache"
+  CACHE_T="$LAB_TARGET/cache"
+  if prepare_module "$CACHE_D" "dev-orchestrator" && prepare_module "$CACHE_T" "dev-orchestrator"; then
+    (cd "$LAB_DEFAULT" && VIBEFLOW_CACHE="$CACHE_D" bash "$INSTALLER" install dev-orchestrator >/dev/null 2>&1)
+    (cd "$LAB_TARGET" && VIBEFLOW_CACHE="$CACHE_T" bash "$INSTALLER" --target "$LAB_TARGET/custom" install dev-orchestrator >/dev/null 2>&1)
+    OUT_DEFAULT=$(cd "$LAB_DEFAULT" && bash "$GSD_ENGINE_SCRIPT" --quiet 2>/dev/null); RC_DEFAULT=$?
+    OUT_TARGET=$(cd "$LAB_TARGET" && bash "$GSD_ENGINE_SCRIPT" --quiet 2>/dev/null); RC_TARGET=$?
+    if [ "$RC_DEFAULT" = "$RC_TARGET" ] && [ "$OUT_DEFAULT" = "$OUT_TARGET" ]; then
+      ok "T35 (D-38-H) : check-gsd-engine.sh --quiet rend le MÊME rc ($RC_DEFAULT) et la MÊME sortie, install par défaut vs install --target"
+    else
+      ko "T35 (D-38-H) : check-gsd-engine.sh diverge — défaut(rc=$RC_DEFAULT,out='$OUT_DEFAULT') vs --target(rc=$RC_TARGET,out='$OUT_TARGET')"
+    fi
+  else
+    skip "T35 : dev-orchestrator non copiable dans le cache de test"
+  fi
+  rm -rf "$LAB_DEFAULT" "$LAB_TARGET"
+else
+  skip "T35 : check-gsd-engine.sh introuvable dans ce repo"
+fi
+
+# ---------------------------------------------------------------------------
+# T36 (TGT-04, documentation) — la cascade documentaire vf-update/SKILL.md mentionne le marqueur
+# .vibeflow-target, pas seulement le code.
+# ---------------------------------------------------------------------------
+SKILL_MD="$REPO/conductor/skills/vf-update/SKILL.md"
+if [ -f "$SKILL_MD" ]; then
+  occ=$("$GREP" -c '\.vibeflow-target' "$SKILL_MD" 2>/dev/null || true)
+  occ="${occ:-0}"
+  if [ "$occ" -ge 1 ]; then
+    ok "T36 (TGT-04) : vf-update/SKILL.md documente le marqueur .vibeflow-target ($occ occurrence(s))"
+  else
+    ko "T36 (TGT-04) : vf-update/SKILL.md ne mentionne pas .vibeflow-target"
+  fi
+else
+  skip "T36 : vf-update/SKILL.md introuvable"
+fi
+
+# ---------------------------------------------------------------------------
 # Garde-fou final : le vrai ~/.claude est inchangé (snapshot récursif avant=après).
 # ---------------------------------------------------------------------------
 HOME_AFTER=$(snapshot_home_claude)

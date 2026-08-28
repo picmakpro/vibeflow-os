@@ -45,9 +45,15 @@ VF_SCOPE="${VF_SCOPE:-project}"
 # D-31-06 : booléen, aucune forme --dry-run=<valeur>. Détecté dans le MÊME pré-parse que
 # --scope, donc valide avant cmd="$1".
 VF_DRY_RUN="0"
+# TGT-01 : site d'injection UNIQUE de TARGET_ROOT, en plus des deux littéraux user/project|local
+# déjà en place. Vide par défaut = comportement historique inchangé à l'octet (aucune des deux
+# branches ci-dessous n'est un remplacement, --target est un AJOUT). Repli variable d'env
+# VF_TARGET si --target n'est pas passé en CLI (ex. hook non interactif) — --target CLI l'emporte
+# toujours sur VF_TARGET (même hiérarchie que --scope/VF_SCOPE ci-dessus).
+VF_TARGET_OVERRIDE="${VF_TARGET:-}"
 
-# Détecter `--scope <val>`/`--dry-run` AVANT cmd="$1" : on filtre les positionnels et on override
-# VF_SCOPE/VF_DRY_RUN.
+# Détecter `--scope <val>`/`--dry-run`/`--target <val>` AVANT cmd="$1" : on filtre les
+# positionnels et on override VF_SCOPE/VF_DRY_RUN/VF_TARGET_OVERRIDE.
 _positional=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -58,6 +64,15 @@ while [ "$#" -gt 0 ]; do
       ;;
     --scope=*)
       VF_SCOPE="${1#--scope=}"
+      shift
+      ;;
+    --target)
+      [ "$#" -ge 2 ] || err "--target nécessite une valeur (chemin de la cible d'install)"
+      VF_TARGET_OVERRIDE="$2"
+      shift 2
+      ;;
+    --target=*)
+      VF_TARGET_OVERRIDE="${1#--target=}"
       shift
       ;;
     --dry-run)
@@ -103,11 +118,28 @@ if vf_dry_run && [ "$#" -gt 0 ]; then
   esac
 fi
 
-# Résolution TARGET_ROOT depuis le scope.
-case "$VF_SCOPE" in
-  user)            TARGET_ROOT="$HOME/.claude" ;;
-  project|local)   TARGET_ROOT="./.claude" ;;
-esac
+# Résolution TARGET_ROOT (TGT-01) : --target/VF_TARGET, injecté AVANT les deux littéraux
+# existants — PAS orthogonal au scope (gsd-core refuse --config-dir avec --local, même doctrine
+# ici), un SEUL site de résolution. VF_TARGET_OVERRIDE non-vide → il prime INCONDITIONNELLEMENT
+# sur user/project/local ; vide → comportement legacy inchangé (les deux littéraux d'origine).
+if [ -n "$VF_TARGET_OVERRIDE" ]; then
+  case "$VF_TARGET_OVERRIDE" in
+    /) err "--target refuse la racine '/' littérale (T-38-09)" ;;
+  esac
+  # Résolution PHYSIQUE (D-31-15, même doctrine que vf_physical_parent_under_target) : le
+  # dossier peut ne pas encore exister (première pose sous une cible fraîche) — création
+  # best-effort AVANT résolution, jamais une résolution textuelle qui laisserait passer un
+  # ANCÊTRE symlinké ou un `../..` non normalisé.
+  mkdir -p "$VF_TARGET_OVERRIDE" 2>/dev/null || err "--target : impossible de créer/atteindre '$VF_TARGET_OVERRIDE'"
+  TARGET_ROOT="$(cd -P "$VF_TARGET_OVERRIDE" 2>/dev/null && pwd -P)" \
+    || err "--target : résolution physique de '$VF_TARGET_OVERRIDE' échouée"
+  [ "$TARGET_ROOT" != "/" ] || err "--target résout vers la racine '/' — refusé (T-38-09)"
+else
+  case "$VF_SCOPE" in
+    user)            TARGET_ROOT="$HOME/.claude" ;;
+    project|local)   TARGET_ROOT="./.claude" ;;
+  esac
+fi
 export VF_SCOPE
 
 # ---------- Variables (toutes les cibles rebasées sur TARGET_ROOT) ----------
@@ -229,6 +261,7 @@ vf_manifest_excluded() {
   case "$relpath" in
     scripts/vf-portable.sh)       return 0 ;;  # propriété exclusive de l'engine (copy_engine_lib), partagée entre modules
     scripts/runtime-cli-dispatch.sh) return 0 ;;  # idem, miroir (copy_runtime_dispatch, correction ciblée jointure 38)
+    scripts/.vibeflow-target)     return 0 ;;  # idem, miroir (write_target_marker, TGT-04) — marqueur de cible engine-owned
     memory/*)                     return 0 ;;  # contenu vivant du lab semé par seed-registres.sh, pas un artefact de pose
     scripts/.vibeflow-installed)  return 0 ;;  # état du moteur, pas contenu de module
     scripts/.vibeflow-manifest-*) return 0 ;;  # le manifeste ne se consigne jamais lui-même (boucle de convergence)
@@ -639,6 +672,63 @@ vf_note_degraded_copy() {
   return 0
 }
 
+# ---------- Réécriture du payload à la copie (TGT-03) ----------
+# Principe repris de copyWithPathReplacement (gsd-core bin/install.js) — réécrire un motif de
+# chemin au moment MÊME de la copie, jamais en post-traitement séparé du payload déjà écrit —
+# implémenté ICI en bash pur, jamais un appel au code amont (surface interne gsd-core, doctrine
+# Phase 37). Sans --target (VF_TARGET_OVERRIDE vide) : AUCUN appel n'a d'effet, coût nul, byte-
+# identique à avant ce lot.
+#
+# Extensions considérées "texte" — jamais un binaire (aucun binaire connu dans un module
+# VibeFlow à ce jour, mais la garde reste explicite plutôt qu'un pari implicite).
+vf_target_rewrite_ext() {
+  case "$1" in
+    *.md|*.sh|*.json|*.mjs|*.js|*.txt|*.yml|*.yaml) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# vf_sed_escape_repl <texte> — échappe les caractères spéciaux d'un texte de REMPLACEMENT sed
+# (`&` réinjecte tout le match, `\` a un sens d'échappement, `#` est le délimiteur choisi
+# ci-dessous) : sans cet échappement, un TARGET_ROOT contenant l'un de ces caractères
+# corromprait silencieusement le contenu réécrit (même famille de piège que le `&` de gsub awk,
+# déjà rencontré sur ce dépôt).
+vf_sed_escape_repl() {
+  printf '%s' "$1" | sed -e 's/[&\#]/\\&/g'
+}
+
+# vf_rewrite_target_refs <dest_file> — réécrit, SEULEMENT sous --target, les occurrences
+# littérales `.claude/` du payload mesurées au cadrage (198 fichiers / 1130 occurrences,
+# périmètre hors _internal/) vers TARGET_ROOT réellement résolu. Trois formes RÉELLEMENT
+# mesurées dans le payload (bare `.claude/`, `$HOME/.claude/`, `./.claude/`) + deux formes
+# quotées observées ailleurs dans le fichier (settings.json / hooks), traitées de la plus
+# spécifique à la plus générale DANS LE MÊME appel sed (chaque -e opère sur le résultat cumulé
+# du précédent) : sans cet ordre, la règle bare détruirait le segment `.claude/` d'une forme
+# préfixée avant que sa propre règle ne s'applique. Best-effort : un échec de sed laisse le
+# fichier tel que `cp` l'a posé (jamais tronqué — écriture via temporaire + mv atomique).
+vf_rewrite_target_refs() {
+  local dest="$1"
+  [ -n "$VF_TARGET_OVERRIDE" ] || return 0
+  vf_target_rewrite_ext "$dest" || return 0
+  [ -f "$dest" ] && [ ! -L "$dest" ] || return 0
+  local repl tmp
+  repl="$(vf_sed_escape_repl "${TARGET_ROOT%/}")"
+  tmp="$dest.vftgt.$$"
+  if sed \
+      -e "s#\"\\\$HOME\"/\\.claude/#\"${repl}\"/#g" \
+      -e "s#\\\$HOME/\\.claude/#${repl}/#g" \
+      -e "s#\"\\\$CLAUDE_PROJECT_DIR\"/\\.claude/#\"${repl}\"/#g" \
+      -e "s#\\\${CLAUDE_PROJECT_DIR}/\\.claude/#${repl}/#g" \
+      -e "s#\\./\\.claude/#${repl}/#g" \
+      -e "s#\\.claude/#${repl}/#g" \
+      "$dest" > "$tmp" 2>/dev/null; then
+    mv -f "$tmp" "$dest" 2>/dev/null || rm -f "$tmp" 2>/dev/null || true
+  else
+    rm -f "$tmp" 2>/dev/null || true
+  fi
+  return 0
+}
+
 # LE helper de pose fichier (D-31-01) : pose <src> vers <dest> (exécutable si [exec] fourni)
 # ET consigne <dest> dans le même appel — le manifeste est un sous-produit, jamais une
 # énumération séparée. Le rc de cp est capturé explicitement et propagé (échec de copie =
@@ -678,6 +768,8 @@ vf_place_file() {
   if [ "$mode" = "exec" ]; then
     chmod +x "$dest"
   fi
+  # TGT-03 : no-op sans --target (VF_TARGET_OVERRIDE vide) — voir vf_rewrite_target_refs.
+  vf_rewrite_target_refs "$dest"
   vf_declare_write + "$dest"
 }
 
@@ -773,6 +865,8 @@ vf_place_tree() {
     dest_file="$dest_dir/$rel"
     if [ -f "$dest_file" ]; then
       [ "$mode" = "exec" ] && chmod +x "$dest_file"
+      # TGT-03 : no-op sans --target (VF_TARGET_OVERRIDE vide) — voir vf_rewrite_target_refs.
+      vf_rewrite_target_refs "$dest_file"
       vf_declare_write + "$dest_file"
     else
       vf_note_degraded_copy "$dest_file"
@@ -843,45 +937,71 @@ gitignore_add_one() {
   fi
 }
 
+# vf_gitignore_target_prefix — préfixe RELATIF AU CWD à écrire dans ./.gitignore (TGT-02).
+# Sans --target : legacy inchangé, TARGET_ROOT vaut déjà "./.claude" en scope local, le préfixe
+# reste le littéral ".claude". Sous --target : TARGET_ROOT est un chemin ABSOLU résolu (résolution
+# physique en amont) — un .gitignore ne peut exprimer qu'un chemin sous le cwd du repo ; rc=1 si
+# TARGET_ROOT sort de cet arbre (cible hors-repo), l'appelant journalise et n'écrit RIEN plutôt
+# qu'une entrée invalide.
+vf_gitignore_target_prefix() {
+  if [ -z "$VF_TARGET_OVERRIDE" ]; then
+    printf '%s' ".claude"
+    return 0
+  fi
+  local cwd_phys
+  cwd_phys="$(pwd -P)" || return 1
+  case "$TARGET_ROOT" in
+    "$cwd_phys"/*) printf '%s' "${TARGET_ROOT#"$cwd_phys"/}"; return 0 ;;
+    "$cwd_phys")   printf '%s' "."; return 0 ;;
+    *)             return 1 ;;
+  esac
+}
+
 gitignore_add_paths() {
   local mod="$1"
   # Scope local seulement : user/project ne touchent JAMAIS au .gitignore.
   [ "$VF_SCOPE" = "local" ] || return 0
 
+  local gi_prefix
+  if ! gi_prefix="$(vf_gitignore_target_prefix)"; then
+    log "  gitignore : --target ($TARGET_ROOT) sort de l'arbre du repo — .gitignore non modifié (ne peut pas couvrir une cible hors-arbre)"
+    return 0
+  fi
+
   local module_dir="$CACHE_DIR/$mod"
 
   # Skill racine.
-  [ -f "$module_dir/SKILL.md" ] && gitignore_add_one ".claude/skills/$mod/"
+  [ -f "$module_dir/SKILL.md" ] && gitignore_add_one "${gi_prefix}/skills/$mod/"
   # Skills imbriqués.
   if [ -d "$module_dir/skills" ]; then
     for skill_dir in "$module_dir/skills/"*/; do
       [ -d "$skill_dir" ] || continue
-      gitignore_add_one ".claude/skills/$(basename "$skill_dir")/"
+      gitignore_add_one "${gi_prefix}/skills/$(basename "$skill_dir")/"
     done
   fi
   # Agent module (D7) : AGENT.md + dossier references.
   if [ -f "$module_dir/AGENT.md" ]; then
-    gitignore_add_one ".claude/agents/${mod}.md"
-    gitignore_add_one ".claude/commands/${mod}.md"
-    [ -d "$module_dir/references" ] && gitignore_add_one ".claude/agents/${mod}-references/"
+    gitignore_add_one "${gi_prefix}/agents/${mod}.md"
+    gitignore_add_one "${gi_prefix}/commands/${mod}.md"
+    [ -d "$module_dir/references" ] && gitignore_add_one "${gi_prefix}/agents/${mod}-references/"
   fi
   # Multi-agents module : agents/<name>.md.
   if [ -d "$module_dir/agents" ]; then
     for f in "$module_dir/agents/"*.md; do
-      [ -f "$f" ] && gitignore_add_one ".claude/agents/$(basename "$f")"
+      [ -f "$f" ] && gitignore_add_one "${gi_prefix}/agents/$(basename "$f")"
     done
-    [ -d "$module_dir/references" ] && [ ! -f "$module_dir/SKILL.md" ] && gitignore_add_one ".claude/agents/${mod}-references/"
+    [ -d "$module_dir/references" ] && [ ! -f "$module_dir/SKILL.md" ] && gitignore_add_one "${gi_prefix}/agents/${mod}-references/"
   fi
   # Rules réellement posées.
   if [ -d "$module_dir/rules" ]; then
     for f in "$module_dir/rules/"*.md; do
-      [ -f "$f" ] && gitignore_add_one ".claude/rules/$(basename "$f")"
+      [ -f "$f" ] && gitignore_add_one "${gi_prefix}/rules/$(basename "$f")"
     done
   fi
   # Scripts réellement posés (shell + Node).
   if [ -d "$module_dir/scripts" ]; then
     for f in "$module_dir/scripts/"*.sh "$module_dir/scripts/"*.mjs "$module_dir/scripts/"*.js; do
-      [ -f "$f" ] && gitignore_add_one ".claude/scripts/$(basename "$f")"
+      [ -f "$f" ] && gitignore_add_one "${gi_prefix}/scripts/$(basename "$f")"
     done
   fi
   # Registres mémoire (SCOPE-04) : si le module fournit un seeder de registres, les fichiers qu'il
@@ -889,9 +1009,9 @@ gitignore_add_paths() {
   # (« rien ne sera committé »). Sans cette ligne, l'engine gitignorait ses propres artefacts mais
   # laissait les 5 registres semés apparaître en untracked dans le git status du projet. Le
   # sélecteur est le seeder lui-même (data-driven, pas de nom de module en dur).
-  [ -f "$module_dir/scripts/seed-registres.sh" ] && gitignore_add_one ".claude/memory/"
+  [ -f "$module_dir/scripts/seed-registres.sh" ] && gitignore_add_one "${gi_prefix}/memory/"
   # Config template posé à côté d'un SKILL.md racine.
-  [ -d "$module_dir/config" ] && [ -f "$module_dir/SKILL.md" ] && gitignore_add_one ".claude/skills/$mod/config/"
+  [ -d "$module_dir/config" ] && [ -f "$module_dir/SKILL.md" ] && gitignore_add_one "${gi_prefix}/skills/$mod/config/"
   # settings.json + settings.local.json (SCOPE-04, Phase 30 tâche 4, corrigé en revue) : en scope
   # LOCAL, `merge_module_hooks()` écrit dans $TARGET_ROOT/settings.json ET, depuis le routage
   # --settings-local (tâche 4), dans $TARGET_ROOT/settings.local.json pour toute entrée portant le
@@ -902,8 +1022,8 @@ gitignore_add_paths() {
   # lab cible frais. Sélecteur data-driven identique aux deux lignes (même style que
   # seed-registres.sh ci-dessus) : seul un module qui PORTE un fragment hooks/hooks.json (donc qui
   # écrit réellement dans ces fichiers à cette install) déclenche l'ajout.
-  [ -f "$module_dir/hooks/hooks.json" ] && gitignore_add_one ".claude/settings.json"
-  [ -f "$module_dir/hooks/hooks.json" ] && gitignore_add_one ".claude/settings.local.json"
+  [ -f "$module_dir/hooks/hooks.json" ] && gitignore_add_one "${gi_prefix}/settings.json"
+  [ -f "$module_dir/hooks/hooks.json" ] && gitignore_add_one "${gi_prefix}/settings.local.json"
   # Lib partagée de portabilité (Phase 30 tâche 2, copy_engine_lib()) : posée par l'ENGINE, pas
   # par un module — donc jamais vue par la boucle scripts/ plus haut (elle vient du cache
   # _internal, jamais de $module_dir/scripts). Gap constaté en tâche 4 lors de la vérification
@@ -911,10 +1031,10 @@ gitignore_add_paths() {
   # .claude/scripts/vf-portable.sh échappait à la promesse « rien ne sera committé » du scope
   # local. Inconditionnel : copy_engine_lib() la pose à CHAQUE exécution de l'engine en scope
   # local, quel que soit le module installé — gitignore_add_one() reste idempotent.
-  gitignore_add_one ".claude/scripts/vf-portable.sh"
+  gitignore_add_one "${gi_prefix}/scripts/vf-portable.sh"
   # Miroir strict (correction ciblée jointure 38) : runtime-cli-dispatch.sh, posée par
   # copy_runtime_dispatch() selon le même patron ENGINE-owned, inconditionnel, idempotent.
-  gitignore_add_one ".claude/scripts/runtime-cli-dispatch.sh"
+  gitignore_add_one "${gi_prefix}/scripts/runtime-cli-dispatch.sh"
 }
 
 # ---------- Commande d'incarnation (ADR-042) ----------
@@ -1105,6 +1225,33 @@ copy_runtime_dispatch() {
   return 1
 }
 
+# ---------- Marqueur de cible pour la cascade documentaire (TGT-04) ----------
+# vf-update/SKILL.md résout <S>/<S-moteur> par POSITION LITTÉRALE ($HOME/.claude/scripts/ puis
+# ./.claude/scripts/ puis ${CLAUDE_PLUGIN_ROOT}/…) — un `--target` custom matérialise les scripts
+# ailleurs, rendant les deux premières positions aveugles. Ce marqueur, lu par l'agent au runtime
+# (SKILL.md étendu), referme ce trou : contenu = chemin ABSOLU de TARGET_ROOT résolu à CETTE
+# install. Écrit à CHAQUE install/update (best-effort, ne bloque jamais la pose du module) — un
+# fichier par install, écrasé idempotemment, jamais accumulé. Écrit aussi SANS --target : son
+# contenu égale alors la position candidate elle-même, donc la cascade documentaire (qui ne
+# dévie QUE si le marqueur DIFFÈRE de la position candidate) reste un no-op dans ce cas.
+write_target_marker() {
+  local dest="$TARGET_ROOT/scripts/.vibeflow-target"
+  if vf_dry_run; then
+    vf_declare_write + "$dest"
+    return 0
+  fi
+  mkdir -p "$(dirname "$dest")" 2>/dev/null || return 0
+  local abs tmp
+  abs="$(cd -P "$TARGET_ROOT" 2>/dev/null && pwd -P)" || return 0
+  tmp="$dest.tmp.$$"
+  if printf '%s\n' "$abs" > "$tmp" 2>/dev/null && mv -f "$tmp" "$dest" 2>/dev/null; then
+    vf_declare_write + "$dest"
+    return 0
+  fi
+  rm -f "$tmp" 2>/dev/null || true
+  return 0
+}
+
 # ---------- Hooks de gouvernance (ADR-043) ----------
 # Un module peut déclarer hooks/hooks.json (format Claude Code, placeholder {{VF_SCRIPTS}}).
 # L'install MERGE le fragment dans le settings.json du scope ; l'uninstall le retire.
@@ -1167,6 +1314,17 @@ scripts_prefix_for_scope() {
   # dérive lui-même la variante exec-safe (hotfix v2.53.1) : "$HOME" → chemin absolu résolu à
   # l'install, "$CLAUDE_PROJECT_DIR" → placeholder harness ${CLAUDE_PROJECT_DIR} — car en forme
   # exec aucun shell n'intervient et le harness ne substitue que ses propres placeholders.
+  #
+  # TGT-02, 3e cas (--target) : ni "$HOME" ni "$CLAUDE_PROJECT_DIR" ne pointent vers une cible
+  # custom — aucune variable d'environnement standard stable pour une cible arbitraire, contrairement
+  # aux deux cas ci-dessous. Retourne donc le chemin ABSOLU déjà résolu, littéralement quoté :
+  # fonctionne SANS dérivation en forme exec aussi — exec_safe_prefix() (merge-hooks.sh) ne
+  # reconnaît que les préfixes "$HOME"/"$CLAUDE_PROJECT_DIR" et laisse tout le reste inchangé, un
+  # chemin déjà absolu n'a rien à dériver.
+  if [ -n "$VF_TARGET_OVERRIDE" ]; then
+    printf '"%s"/scripts' "$TARGET_ROOT"
+    return 0
+  fi
   case "$VF_SCOPE" in
     user) printf '%s' '"$HOME"/.claude/scripts' ;;
     *)    printf '%s' '"$CLAUDE_PROJECT_DIR"/.claude/scripts' ;;
@@ -1560,6 +1718,10 @@ install_module() {
   copy_engine_lib
   # Miroir (correction ciblée jointure 38) : table de dispatch runtime-aware (RUNT-01).
   copy_runtime_dispatch
+  # Marqueur de cible (TGT-04) : referme le trou pour la cascade documentaire vf-update/SKILL.md
+  # (<S>/<S-moteur>), qui résout par POSITION LITTÉRALE et resterait aveugle à un --target custom
+  # sans ce fichier.
+  write_target_marker
 
   # Backup if existing install
   local installed
