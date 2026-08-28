@@ -5,6 +5,28 @@ extrait récent et pointent ici). Chaque module a par ailleurs son propre `CHANG
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.58.0] — 2026-08-28
+
+**Un Node trop ancien pour le moteur courant ne bloque plus le bootstrap : il se répare.** Module
+`dev-orchestrator` v2.19.1 → v2.20.0.
+
+- **Le défaut réparé n'est pas le seuil, c'est le silence.** `engines` de `@opengsd/gsd-core` est
+  passé à `node>=24` en 1.11.0. Sous Node 22, `npx -y "@opengsd/gsd-core@^1"` **n'échoue pas** :
+  npm résout la dernière version dont les `engines` sont satisfaits et installe **1.10.0 sans le
+  dire**. Des labs tournaient donc sur un moteur antérieur sans qu'aucune sortie ne le signale —
+  le motif « close ≠ releasé ≠ installé », appliqué cette fois à la distribution.
+- **La garde répare au lieu de refuser** : sous un Node trop ancien, `ensure-deps.sh` installe
+  Node 24 **sous `$HOME`** en pilotant un gestionnaire de version déjà présent (nvm, fnm, volta,
+  mise) ou, à défaut, en posant nvm au tag **épinglé** `v0.40.7` ; puis le bootstrap **reprend**.
+- **Ce que la mécanique s'interdit** : aucun `sudo` ; aucune install par gestionnaire système
+  (brew/apt/dnf), qui remplacerait le Node dont d'autres projets du poste dépendent ; aucun
+  téléchargement depuis une branche mouvante. Sous MSYS2/Cygwin l'auto-install est **refusée**
+  plutôt que tentée à mi-course. Opt-out : `VF_ENSURE_AUTO_NODE=0`.
+- **Preuve d'usage, pas seulement de tests** : conteneur `node:22-slim` → le script monte Node
+  lui-même et pose **gsd-core 1.11.0**, là où le même conteneur recevait 1.10.0 en silence.
+- **Quatre cas neufs** (seuil, reprise du bootstrap, opt-out, échec bruyant), discriminance prouvée
+  par trois mutations rouges.
+
 ## [v2.57.1] — 2026-08-27
 
 **Le ré-armement de l'isolation worktree a été mesuré, puis refusé en connaissance de cause — la

@@ -448,11 +448,11 @@ ENS="$MOD/scripts/ensure-deps.sh"
 # il ne doit dépendre d'AUCUN outillage réel de l'hôte. Sans stub, sur une machine sans claude
 # (runner CI) ou sans node/npm, ensure-deps bascule en « étape manuelle » sans jamais loguer
 # les flags scopés → les 4 assertions échouaient à tort. Le stub node répond « 22 » à la sonde
-# de version majeure (garde Node ≥ 22 de ensure_gsd) ; npx n'est jamais exécuté en dry-run.
+# de version majeure (garde Node ≥ 24 de ensure_gsd) ; npx n'est jamais exécuté en dry-run.
 T2B_STUB="$(mktemp -d)"; vf_tmp_track "$T2B_STUB"   # partagé par toutes les assertions T2b
 printf '#!/bin/sh\nexit 0\n' > "$T2B_STUB/claude"
 printf '#!/bin/sh\nexit 0\n' > "$T2B_STUB/npm"
-printf '#!/bin/sh\necho 22\n' > "$T2B_STUB/node"
+printf '#!/bin/sh\necho 24\n' > "$T2B_STUB/node"
 chmod +x "$T2B_STUB/claude" "$T2B_STUB/npm" "$T2B_STUB/node"
 
 # (user|project|local) → flags GSD + Superpowers attendus.
@@ -488,7 +488,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# T2c/T2d/T2e/T2f — piège n°1, nettoyage legacy (ADR-031), garde Node ≥ 22, dual-layout (D1)
+# T2c/T2d/T2e/T2f — piège n°1, nettoyage legacy (ADR-031), garde Node ≥ 24, dual-layout (D1)
 # ---------------------------------------------------------------------------
 
 # T2c — detect_gsd() ne contient plus AUCUN test PATH (piège n°1 neutralisé — preuve directe).
@@ -602,7 +602,7 @@ exit 1
 SH
 cat > "$T2K_BIN/node" <<'SH'
 #!/usr/bin/env bash
-if [ "$1" = "-e" ]; then echo "22"; elif [ "$1" = "--version" ]; then echo "v22.0.0"; fi
+if [ "$1" = "-e" ]; then echo "24"; elif [ "$1" = "--version" ]; then echo "v24.0.0"; fi
 exit 0
 SH
 cat > "$T2K_BIN/npx" <<SH2
@@ -658,7 +658,7 @@ else
 fi
 rm -rf "$T2L_HOME" "$T2L_PROJ" "$T2L_BIN"
 
-# T2e — Garde Node ≥ 22 : Node 18 détecté → npx jamais tenté, message Node ≥ 22 logué.
+# T2e — Garde Node ≥ 24 : Node 18 détecté → npx jamais tenté, message Node ≥ 24 logué.
 T2E_HOME="$(mktemp -d)"
 T2E_BIN="$(mktemp -d)"
 T2E_NPX_TRACE="$(mktemp)"
@@ -678,12 +678,119 @@ exit 0
 SH
 chmod +x "$T2E_BIN/npm" "$T2E_BIN/node" "$T2E_BIN/npx"
 T2E_OUT=$(env -u VF_ENSURE_FORCE HOME="$T2E_HOME" PATH="$T2E_BIN:/usr/bin:/bin" T2E_NPX_TRACE="$T2E_NPX_TRACE" VF_ENSURE_DRY_RUN=1 bash "$ENS" 2>&1)
-if echo "$T2E_OUT" | "$GREP" -q "Node ≥ 22" && [ ! -s "$T2E_NPX_TRACE" ]; then
-  ok "T2e garde Node : Node 18 détecté → npx jamais invoqué, message Node ≥ 22 logué"
+if echo "$T2E_OUT" | "$GREP" -q "Node ≥ 24" && [ ! -s "$T2E_NPX_TRACE" ]; then
+  ok "T2e garde Node : Node 18 détecté → npx jamais invoqué, message Node ≥ 24 logué"
 else
-  ko "T2e garde Node : garde absente ou npx invoqué malgré Node <22"
+  ko "T2e garde Node : garde absente ou npx invoqué malgré Node <24"
 fi
 rm -rf "$T2E_HOME" "$T2E_BIN"; rm -f "$T2E_NPX_TRACE"
+
+# --- Garde Node auto-réparatrice (BOOT-01, 2026-08-28) -----------------------------------------
+# CE QUE CES CAS PROTÈGENT. gsd-core 1.11.0 exige node>=24 ; sous un Node plus ancien, npx ne casse
+# pas — il RÉTROGRADE en silence vers 1.10.0. Le seuil et la réparation sont donc l'un et l'autre
+# des invariants de distribution, pas du confort local.
+#
+# Harnais commun : PATH stubé (aucun outil réel de l'hôte), HOME jetable, trace npx, et NVM_DIR
+# NEUTRALISÉ — un runner CI qui l'exporte ferait sourcer le nvm RÉEL de la machine avant que le
+# gestionnaire stubé soit atteint : le cas lancerait une vraie install et n'observerait plus son
+# objet (constaté en CI le 2026-08-28, vert en local et rouge sur runner). Le stub `node`
+# lit sa version dans un fichier témoin, ce qui permet à un gestionnaire simulé de la faire changer
+# EN COURS D'EXÉCUTION — c'est le seul moyen d'observer la reprise du bootstrap après réparation.
+t2n_make_env() { # <version-initiale> → exporte T2N_BIN, T2N_HOME, T2N_TRACE, T2N_VER, T2N_BIN24
+  T2N_HOME="$(mktemp -d)"; vf_tmp_track "$T2N_HOME"
+  T2N_BIN="$(mktemp -d)";  vf_tmp_track "$T2N_BIN"
+  T2N_BIN24="$(mktemp -d)"; vf_tmp_track "$T2N_BIN24"
+  T2N_TRACE="$(mktemp)";   vf_tmp_track "$T2N_TRACE"
+  T2N_VER="$T2N_BIN/.node-major"
+  echo "$1" > "$T2N_VER"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$T2N_BIN/npm"
+  cat > "$T2N_BIN/node" <<SH
+#!/usr/bin/env bash
+m="\$(cat "$T2N_VER")"
+if [ "\$1" = "-e" ]; then printf '%s' "\$m"; elif [ "\$1" = "--version" ]; then echo "v\$m.0.0"; fi
+exit 0
+SH
+  cat > "$T2N_BIN24/node" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = "-e" ]; then printf '%s' "24"; elif [ "$1" = "--version" ]; then echo "v24.0.0"; fi
+exit 0
+SH
+  cat > "$T2N_BIN/npx" <<SH
+#!/usr/bin/env bash
+echo "npx-invoked \$*" >> "$T2N_TRACE"
+exit 0
+SH
+  chmod +x "$T2N_BIN/npm" "$T2N_BIN/node" "$T2N_BIN/npx" "$T2N_BIN24/node"
+}
+
+# T2e-A (SEUIL) — Node 22 : passait la garde AVANT gsd-core 1.11.0, doit être refusé MAINTENANT.
+# C'est le cas qui aurait attrapé la rétrogradation silencieuse en 1.10.0.
+t2n_make_env 22
+T2NA_OUT=$(env -u VF_ENSURE_FORCE -u NVM_DIR HOME="$T2N_HOME" PATH="$T2N_BIN:/usr/bin:/bin" \
+  VF_ENSURE_AUTO_NODE=0 bash "$ENS" 2>&1)
+if echo "$T2NA_OUT" | "$GREP" -q "Node ≥ 24" && [ ! -s "$T2N_TRACE" ]; then
+  ok "T2e-A seuil : Node 22 (suffisant pour 1.10.0, insuffisant pour 1.11.0) REFUSÉ, npx jamais invoqué"
+else
+  ko "T2e-A seuil : Node 22 accepté ou npx invoqué — la rétrogradation silencieuse vers 1.10.0 repasserait"
+fi
+
+# T2e-B (RÉPARATION) — un gestionnaire de version présent est PILOTÉ, et le bootstrap REPREND.
+# Le stub fnm fait basculer le témoin de version puis rend le chemin d'un node 24, exactement comme
+# `fnm exec --using=24 -- node -e process.execPath`.
+t2n_make_env 20
+cat > "$T2N_BIN/fnm" <<SH
+#!/usr/bin/env bash
+case "\$1" in
+  install) echo "24" > "$T2N_VER" ;;
+  exec)    printf '%s' "$T2N_BIN24/node" ;;
+esac
+exit 0
+SH
+chmod +x "$T2N_BIN/fnm"
+T2NB_OUT=$(env -u VF_ENSURE_FORCE -u NVM_DIR HOME="$T2N_HOME" PATH="$T2N_BIN:/usr/bin:/bin" bash "$ENS" 2>&1)
+if "$GREP" -q "npx-invoked" "$T2N_TRACE" 2>/dev/null && echo "$T2NB_OUT" | "$GREP" -q "reprise du bootstrap"; then
+  ok "T2e-B réparation : gestionnaire présent piloté → Node 24 actif, bootstrap REPRIS (npx invoqué)"
+else
+  ko "T2e-B réparation : le bootstrap n'a pas repris après mise à niveau (npx non invoqué)"
+fi
+
+# T2e-C (OPT-OUT) — VF_ENSURE_AUTO_NODE=0 : aucune install tentée, même avec un gestionnaire sous la
+# main. Un poste doit pouvoir refuser qu'on touche à son runtime.
+t2n_make_env 20
+cat > "$T2N_BIN/fnm" <<SH
+#!/usr/bin/env bash
+echo "fnm-invoked" >> "$T2N_TRACE"
+exit 0
+SH
+chmod +x "$T2N_BIN/fnm"
+T2NC_OUT=$(env -u VF_ENSURE_FORCE -u NVM_DIR HOME="$T2N_HOME" PATH="$T2N_BIN:/usr/bin:/bin" \
+  VF_ENSURE_AUTO_NODE=0 bash "$ENS" 2>&1)
+if [ ! -s "$T2N_TRACE" ] && echo "$T2NC_OUT" | "$GREP" -q "Auto-install Node désactivée" \
+   && echo "$T2NC_OUT" | "$GREP" -q "Étape manuelle Node"; then
+  ok "T2e-C opt-out : VF_ENSURE_AUTO_NODE=0 → aucun gestionnaire invoqué, étape manuelle nommée"
+else
+  ko "T2e-C opt-out : une install a été tentée malgré VF_ENSURE_AUTO_NODE=0, ou l'étape manuelle manque"
+fi
+
+# T2e-D (ÉCHEC BRUYANT — troisième issue QUAL-01) — tous les gestionnaires échouent : le script doit
+# le DIRE et s'arrêter, jamais poursuivre vers npx (ce qui poserait 1.10.0 en silence) ni mourir muet.
+t2n_make_env 20
+cat > "$T2N_BIN/fnm" <<'SH'
+#!/usr/bin/env bash
+exit 1
+SH
+cat > "$T2N_BIN/curl" <<'SH'
+#!/usr/bin/env bash
+exit 1
+SH
+chmod +x "$T2N_BIN/fnm" "$T2N_BIN/curl"
+T2ND_OUT=$(env -u VF_ENSURE_FORCE -u NVM_DIR HOME="$T2N_HOME" PATH="$T2N_BIN:/usr/bin:/bin" bash "$ENS" 2>&1)
+T2ND_RC=$?
+if echo "$T2ND_OUT" | "$GREP" -q "L'auto-install Node a échoué" && [ ! -s "$T2N_TRACE" ] && [ "$T2ND_RC" -eq 0 ]; then
+  ok "T2e-D échec bruyant : réparation impossible → dit, npx jamais invoqué, bootstrap non tué (rc=0)"
+else
+  ko "T2e-D échec bruyant : échec silencieux, npx invoqué malgré tout, ou bootstrap tué (rc=$T2ND_RC)"
+fi
 
 # T2f (DISCRIMINANT — D1) : $HOME vide, payload gsd-core posé à l'échelle PROJET (cwd) →
 # detect_gsd() doit renvoyer vrai (pas de tentative de réinstall). Doit échouer avec une
@@ -718,7 +825,7 @@ exit 1
 SH
 cat > "$T2G_BIN/node" <<'SH'
 #!/usr/bin/env bash
-if [ "$1" = "-e" ]; then echo "22"; elif [ "$1" = "--version" ]; then echo "v22.0.0"; fi
+if [ "$1" = "-e" ]; then echo "24"; elif [ "$1" = "--version" ]; then echo "v24.0.0"; fi
 exit 0
 SH
 cat > "$T2G_BIN/claude" <<'SH'
@@ -797,7 +904,7 @@ exit 1
 SH
   cat > "$T2H_BIN/node" <<'SH'
 #!/usr/bin/env bash
-if [ "$1" = "-e" ]; then echo "22"; elif [ "$1" = "--version" ]; then echo "v22.0.0"; fi
+if [ "$1" = "-e" ]; then echo "24"; elif [ "$1" = "--version" ]; then echo "v24.0.0"; fi
 exit 0
 SH
   cat > "$T2H_BIN/claude" <<'SH'

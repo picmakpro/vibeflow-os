@@ -1,5 +1,31 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.20.0] — 2026-08-28 (la garde Node répare au lieu de refuser — BOOT-01)
+
+**Minor** (capacité nouvelle : `ensure-deps.sh` installe désormais un runtime, ce qu'il n'a jamais
+fait ; comportement observable modifié sur tout poste sous Node 24) :
+
+- **Le seuil passe de Node 22 à Node 24.** `engines` de `@opengsd/gsd-core` est passé à `node>=24`
+  en 1.11.0. Le point important n'est pas le seuil, c'est ce qui se produisait en dessous :
+  `npx -y "@opengsd/gsd-core@^1"` **n'échoue pas** sous Node 22 — npm résout la dernière version
+  dont les `engines` sont satisfaits et installe **1.10.0 sans le dire**. Le poste repartait avec un
+  moteur antérieur, sans qu'aucune sortie ne le signale. C'est le motif « close ≠ releasé ≠
+  installé », cette fois appliqué à la distribution.
+- **La garde ne refuse plus, elle répare.** Sous un Node trop ancien, le script installe Node 24
+  **sous `$HOME`**, en pilotant un gestionnaire de version déjà présent (nvm, fnm, volta, mise) ou,
+  à défaut, en posant nvm au tag épinglé `v0.40.7`. Puis le bootstrap **reprend** — le `npx` qui
+  suit voit le nouveau runtime.
+- **Ce que la mécanique s'interdit** : aucun `sudo` ; aucune install par gestionnaire système
+  (brew/apt/dnf), qui remplacerait le Node dont d'autres projets du poste dépendent ; aucun
+  téléchargement depuis une branche mouvante (le tag nvm est épinglé, ce script est exécuté, pas
+  seulement lu). Sous MSYS2/Cygwin l'auto-install est **refusée** plutôt que tentée à mi-course.
+- **Opt-out** : `VF_ENSURE_AUTO_NODE=0` — le script nomme alors l'étape manuelle sans rien poser.
+- **Preuve d'usage, pas seulement de tests** : conteneur `node:22-slim` → le script monte Node
+  lui-même et pose **gsd-core 1.11.0**, là où le même conteneur recevait 1.10.0 en silence.
+- **Quatre cas neufs** (T2e-A seuil, T2e-B reprise du bootstrap, T2e-C opt-out, T2e-D échec
+  bruyant), discriminance prouvée par trois mutations : seuil abaissé → T2e/T2e-A rouges ;
+  réparation neutralisée → T2e-B rouge ; opt-out ignoré → T2e-C rouge.
+
 ## [v2.19.1] — 2026-08-27 (Phase 35 — index de capabilities réaligné sur gsd-core 1.11.0)
 
 **Patch** (donnée de référence régénérée, aucune capacité nouvelle) :

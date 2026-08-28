@@ -33,6 +33,10 @@
 #                      détection (skip) pour loguer la commande scopée QUI SERAIT émise, sans rien
 #                      installer. Sans effet hors dry-run (jamais d'install forcée). Rend le dry-run
 #                      observable sur une machine où GSD/Superpowers sont déjà présents (CI/dev).
+#   VF_ENSURE_AUTO_NODE (défaut 1) — 0 → n'installe JAMAIS Node, se contente de nommer l'étape
+#                      manuelle. Par défaut, un Node trop ancien pour gsd-core est mis à niveau
+#                      automatiquement sous $HOME via un gestionnaire de version (jamais de sudo,
+#                      jamais le Node système) — voir la section « Runtime Node » plus bas.
 #   VF_ENSURE_MIGRATE_ENGINE (défaut vide) — 1 → équivaut au flag --migrate-engine (voir Usage) :
 #                      autorise l'install npx sur un état `legacy` détecté (D-06). SANS cette
 #                      variable ni le flag, un état `legacy` est SIGNALÉ (message explicite) mais
@@ -161,6 +165,139 @@ run_cmd() {
   "$@"
 }
 
+# ---------- Runtime Node (BOOT-01) ----------
+#
+# POURQUOI CETTE SECTION EXISTE. `engines` de @opengsd/gsd-core est passé de node>=22 (1.10.0) à
+# node>=24 (1.11.0). Sous Node 22, `npx -y "@opengsd/gsd-core@^1"` n'échoue pas : npm résout la
+# dernière version dont les `engines` sont satisfaits et installe 1.10.0 SANS LE DIRE. Le poste
+# repart donc avec un moteur antérieur, et rien dans la sortie ne le signale. Mesuré le 2026-08-27
+# en conteneur : node:22-slim → 1.10.0 ; node:24-slim → 1.11.0.
+#
+# CE QUE CETTE SECTION S'INTERDIT. Aucun `sudo`. Aucune installation par gestionnaire système
+# (brew/apt/dnf) : elle remplacerait le Node dont d'autres projets du poste dépendent. Le runtime
+# n'est posé que sous $HOME, via un gestionnaire de version — jamais à l'échelle de la machine.
+NODE_MIN_MAJOR=24
+# Tag ÉPINGLÉ (jamais `master`) : ce script est exécuté, pas seulement lu. Rafraîchir consciemment.
+NVM_PINNED_TAG="v0.40.7"
+AUTO_NODE="${VF_ENSURE_AUTO_NODE:-1}"
+
+node_major_now() {
+  node -e 'process.stdout.write(String(process.versions.node.split(".")[0]))' 2>/dev/null || echo 0
+}
+
+# MSYS2/Cygwin : les gestionnaires de version Unix n'y posent pas un runtime utilisable (nvm-windows
+# est un autre produit, piloté autrement). On y refuse l'auto-install plutôt que d'échouer à mi-course.
+host_is_windows() {
+  case "$(uname -s 2>/dev/null || echo unknown)" in
+    MINGW* | MSYS* | CYGWIN*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Place en tête de PATH le répertoire d'un node fraîchement posé, pour que le `npx` qui suit dans
+# CE script l'utilise. La persistance pour les prochains shells est le travail du gestionnaire
+# (alias default / use -g), fait par chaque branche ci-dessous.
+use_node_bin_dir() {
+  local dir="$1"
+  [ -n "$dir" ] && [ -x "$dir/node" ] || return 1
+  PATH="$dir:$PATH"
+  export PATH
+}
+
+node_via_nvm() {
+  local nvm_sh="${NVM_DIR:-$HOME/.nvm}/nvm.sh" resolved
+  [ -s "$nvm_sh" ] || return 1
+  # shellcheck disable=SC1090
+  . "$nvm_sh" >/dev/null 2>&1 || return 1
+  nvm install "$NODE_MIN_MAJOR" >&2 || return 1
+  nvm alias default "$NODE_MIN_MAJOR" >/dev/null 2>&1 || true
+  resolved="$(nvm which "$NODE_MIN_MAJOR" 2>/dev/null)" || return 1
+  use_node_bin_dir "$(dirname "$resolved")"
+}
+
+node_via_fnm() {
+  local resolved
+  command -v fnm >/dev/null 2>&1 || return 1
+  fnm install "$NODE_MIN_MAJOR" >&2 || return 1
+  fnm default "$NODE_MIN_MAJOR" >/dev/null 2>&1 || true
+  resolved="$(fnm exec --using="$NODE_MIN_MAJOR" -- node -e 'process.stdout.write(process.execPath)' 2>/dev/null)" || return 1
+  use_node_bin_dir "$(dirname "$resolved")"
+}
+
+# volta pose des shims déjà présents sur le PATH : rien à repositionner, la re-sonde suffit.
+node_via_volta() {
+  command -v volta >/dev/null 2>&1 || return 1
+  volta install "node@$NODE_MIN_MAJOR" >&2 || return 1
+}
+
+node_via_mise() {
+  local resolved
+  command -v mise >/dev/null 2>&1 || return 1
+  mise use -g "node@$NODE_MIN_MAJOR" >&2 || return 1
+  resolved="$(mise which node 2>/dev/null)" || return 1
+  use_node_bin_dir "$(dirname "$resolved")"
+}
+
+# Dernier recours : poser nvm lui-même sous $HOME, puis reprendre la branche nvm. C'est le SEUL
+# endroit où ce script installe un outil tiers — décision de Samuel du 2026-08-27, prise en
+# connaissance de cause pour couvrir la machine vierge. nvm est du bash pur, confiné à $HOME/.nvm,
+# et ne demande jamais sudo.
+node_via_fresh_nvm() {
+  command -v curl >/dev/null 2>&1 || return 1
+  log "Aucun gestionnaire de version Node détecté — installation de nvm $NVM_PINNED_TAG sous \$HOME..."
+  curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/$NVM_PINNED_TAG/install.sh" | bash >&2 || return 1
+  NVM_DIR="${NVM_DIR:-$HOME/.nvm}" node_via_nvm
+}
+
+# Retourne 0 si le PATH offre un Node ≥ NODE_MIN_MAJOR — au besoin en l'installant. Retourne 1 en
+# laissant à l'appelant le soin d'abandonner proprement (jamais d'exit : ce script ne fait pas
+# échouer un bootstrap sur une dépendance qu'il a su nommer).
+ensure_node_runtime() {
+  local before after
+  before="$(node_major_now)"
+  [ "${before:-0}" -ge "$NODE_MIN_MAJOR" ] 2>/dev/null && return 0
+
+  err "Node $(node --version 2>/dev/null || echo '?') détecté — @opengsd/gsd-core requiert Node ≥ $NODE_MIN_MAJOR."
+
+  # Dry-run : on ANNONCE le geste sans le poser, et on retourne 1 — le runtime n'a pas bougé, donc
+  # npx ne doit pas être tenté derrière. C'est ce que vérifie T2e.
+  if [ -n "$DRY_RUN" ]; then
+    log "(dry-run) auto-install Node $NODE_MIN_MAJOR via gestionnaire de version sous \$HOME"
+    return 1
+  fi
+
+  if [ "$AUTO_NODE" != "1" ]; then
+    log "Auto-install Node désactivée (VF_ENSURE_AUTO_NODE=$AUTO_NODE)."
+    log_node_manual_steps
+    return 1
+  fi
+
+  if host_is_windows; then
+    log "Windows détecté — l'auto-install Node n'y est pas pilotable depuis ce script."
+    log_node_manual_steps
+    return 1
+  fi
+
+  log "Installation de Node $NODE_MIN_MAJOR (sous \$HOME, sans sudo, sans toucher au Node système)..."
+  node_via_nvm || node_via_fnm || node_via_volta || node_via_mise || node_via_fresh_nvm || true
+
+  after="$(node_major_now)"
+  if [ "${after:-0}" -ge "$NODE_MIN_MAJOR" ] 2>/dev/null; then
+    log "Node $(node --version 2>/dev/null || echo '?') actif — reprise du bootstrap."
+    return 0
+  fi
+
+  err "L'auto-install Node a échoué (version active : $(node --version 2>/dev/null || echo '?'))."
+  log_node_manual_steps
+  return 1
+}
+
+log_node_manual_steps() {
+  log "Étape manuelle Node :"
+  log "  1. Installer Node.js $NODE_MIN_MAJOR+ (https://nodejs.org) puis vérifier : node --version"
+  log "  2. Relancer ce script : ./ensure-deps.sh"
+}
+
 # ---------- GSD (BOOT-01 / BOOT-03) ----------
 
 # Détecte l'état à 3 valeurs du moteur GSD (D-03) : source UNIQUE, réutilisée par detect_gsd()
@@ -243,15 +380,12 @@ ensure_gsd() {
     return 0
   fi
 
-  # Garde Node ≥ 22 (BOOT-01) : gsd-core cible Node 22+, une install sur un Node trop ancien
-  # échouerait côté paquet — mieux vaut basculer tôt sur l'étape manuelle avec un message clair.
-  local node_major
-  node_major="$(node -e 'process.stdout.write(String(process.versions.node.split(".")[0]))' 2>/dev/null || echo 0)"
-  if [ "${node_major:-0}" -lt 22 ] 2>/dev/null; then
-    err "Node $(node --version 2>/dev/null || echo '?') détecté — @opengsd/gsd-core requiert Node ≥ 22."
-    log "Étape manuelle GSD :"
-    log "  1. Mettre à jour Node.js vers 22+ (https://nodejs.org) puis vérifier : node --version"
-    log "  2. Relancer ce script : ./ensure-deps.sh"
+  # Garde Node (BOOT-01), auto-réparatrice. gsd-core 1.11.0 exige Node ≥ 24 : sous un Node plus
+  # ancien, `npx @opengsd/gsd-core@^1` ne CASSE PAS, il RÉTROGRADE en silence vers la dernière
+  # version compatible (1.10.0) — un moteur antérieur s'installe sans que personne ne le sache.
+  # C'est précisément le motif « close ≠ releasé ≠ installé », appliqué cette fois à la
+  # distribution : la garde ne se contente donc plus de refuser, elle tente de réparer.
+  if ! ensure_node_runtime; then
     log_legacy_cleanup_if_needed
     return 0
   fi
