@@ -1,8 +1,10 @@
 # SPIKE-REPORT — Phase 37 : portabilité multi-runtime (Codex, OpenCode, Kimi)
 
-Milestone `fiabilite-v1.0`. Base factuelle unique : `DISCUSS.md` (même dossier, commit `7c69d98`,
-127 lignes, 6 questions ROADMAP mesurées). Ce rapport n'ajoute aucune donnée absente de ce
-document — tout point non couvert y est marqué « non mesuré ».
+Milestone `fiabilite-v1.0`. Base factuelle unique : `DISCUSS.md` (même dossier, version courante
+du fichier — 6 questions ROADMAP mesurées). Ce rapport n'ajoute aucune donnée absente de ce
+document — tout point non couvert y est marqué « non mesuré ». **Note de méthode (B1)** : aucun SHA
+n'est figé ici, y compris pour ce document lui-même — un commit qui introduit un fichier ne peut
+jamais désigner sa propre version future ; git porte déjà l'historique.
 
 ## Verdict — en deux morceaux, pas un go/no-go sec
 
@@ -20,7 +22,7 @@ install/layout/skill) est déclarée **interne** par le contrat écrit de gsd-co
 (`host-integration-sdk.cjs`, seule frontière publique documentée, 18 clés, filtre `convert|
 artifact|layout|installPlan|Skill` → 0 résultat). Le pipeline d'install n'est pas générique (résolution
 par remontée `__dirname`, pas par point d'entrée public). Cette mission a produit **3 constats de
-non-fiabilité autour des descripteurs du registre**, dont un seul est une erreur du registre
+non-fiabilité autour des descripteurs consultés**, dont un seul est une erreur du registre
 vérifiée en exécution (Q5, table dédiée ci-dessous).
 La conversion mesurée (156 cas) dégrade silencieusement — 0 exception, 0 diagnostic — sur les
 champs qui portent les garanties d'agent (`model`, `memory`, `tools`, allowlist).
@@ -57,11 +59,11 @@ lire** un descripteur qui, lui, était juste.
 | Item | Mesure | Implication |
 |---|---|---|
 | Mapping de noms | `agent_name` doit matcher `[a-z0-9_]+` (erreur runtime verbatim, **3 rejets mesurés verbatim**) | les 31 identifiants portent tous un tiret, donc tous concernés **par construction** — adaptateur de nommage requis |
-| Largeur de concurrence | 4 slots disponibles → 3 workers concurrents max sous un manager | à confronter au dispatch parallèle de frontière du team-kernel (ex. crafts multi-écrans, corrections multi-fichiers) |
+| Largeur de concurrence | 4 slots disponibles (mesuré) | **dérivé** (soustraction, saturation jamais provoquée) : 3 workers concurrents max sous un manager, à confronter au dispatch parallèle de frontière du team-kernel (ex. crafts multi-écrans, corrections multi-fichiers) |
 | Digest de mission | `fork_turns: "none"` (nécessaire pour choisir le modèle par worker) n'hérite d'aucun contexte | tout le digest de mission doit passer dans le task text, pas de raccourci par héritage |
 | Rapport typé | reconstructible par convention (JSON en cwd partagé + `codex exec --output-schema`) | fiable 2/2 à la mesure — pas un point bloquant |
 | Mode collaboration | `--ephemeral` casse le spawn (`collab spawn failed: no thread with id`) | le mode collaboration exige un thread persisté, contrainte d'architecture d'exécution |
-| Placement manuel | 21 règles de placement (7 pour codex seul, deux homes distincts : `~/.agents/skills/` et `~/.codex/agents/`) | 6 fragments de hooks sans convertisseur utilisable (`buildCodexHookBlock` câblé en dur sur gsd-core) ; opencode `hooksSurface: 'none'` → 6 fragments perdus par construction **(dérivé du descripteur, non vérifié en runtime — opencode non installé sur le poste de mesure)** |
+| Placement manuel | **13 règles de placement** (codex 4, opencode 6, kimi-code 3 — relevé direct de `artifactLayout.global.length + artifactLayout.local.length` dans `capability-registry.cjs` pour chacun des 3 runtimes ; codex a deux homes distincts pour ses règles : `~/.agents/skills/` et `~/.codex/agents/`) | 6 fragments de hooks sans convertisseur utilisable (`buildCodexHookBlock` câblé en dur sur gsd-core) ; opencode `hooksSurface: 'none'` → 6 fragments perdus par construction **(dérivé du descripteur, non vérifié en runtime — opencode non installé sur le poste de mesure)** |
 | Couture engine | 1 site de calcul de `TARGET_ROOT` (l. 105-109 de `vibeflow-update.sh`, jamais réassigné) + 16 sites portant un littéral `.claude` (14 dans `gitignore_add_paths`, 2 dans `scripts_prefix_for_scope`) — soit 15 littéraux distincts (`.claude/agents/${mod}-references/` apparaît deux fois) | couture minimale : rendre le site injectable + paramétrer les littéraux ; le reste hors engine via `merge-hooks.sh` (déjà externe) et `vf_place_file`/`vf_place_tree` |
 
 ## Fidélité de conversion — le chiffre le plus dur du spike
@@ -76,16 +78,42 @@ un juge conçu pour ne pas écrire, `vf-design-judge`, y perdrait son interdicti
 descripteur, non vérifié en runtime : opencode n'est pas installé sur le poste de mesure**). Le
 bloc adaptateur couvre 21/21 skills et
 **0/31 agents**, alors que ce sont les agents qui portent les protocoles. Conséquence directe :
-la garantie ADR-044 (« agents natifs machine-enforced ») ne survit à **aucune** des trois cibles
-mesurées.
+la garantie ADR-044 (« agents natifs machine-enforced ») ne survit **ni à codex ni à opencode**
+(les deux cibles où le champ `agents` passe par un convertisseur qui la réécrit) — **elle survit
+sur kimi-code**, dont le descripteur de registre déclare `converter: null` pour la kind `agents` :
+copie à l'octet près, confirmée par lecture directe de `capability-registry.cjs`, cohérente avec
+le constat plus haut sur `model`.
+
+**Correction — la couverture skills n'est pas totale, et l'erreur est du même ordre que celle des
+agents.** Le bloc précédent range « 21/21 skills couverts » comme si le côté skills était sain ;
+il ne l'est pas. `extractFrontmatterField` (`runtime-artifact-conversion.cjs:924-930`) capture la
+frontmatter par une regex mono-ligne `^description:\s*(.+)$` : sur un scalaire replié YAML
+(`description: >`, suivi du texte sur les lignes indentées suivantes — la forme que 15 des 21
+skills installables utilisent, ex. `plugin/planning-core/SKILL.md:3`), elle ne capture que le
+littéral `>` et jette tout le reste. **Vérifié en exécutant les trois convertisseurs de skill réels
+sur `plugin/planning-core/SKILL.md`** (`convertClaudeCommandToOpencodeSkill`,
+`convertClaudeCommandToKimiCodeSkill`, `convertClaudeCommandToCodexSkill`) : les trois écrivent
+`description: >` verbatim, sur **les trois cibles**, sans exception ni diagnostic — même mort
+silencieuse que celle du côté agents. La description est ce qui rend un skill déclenchable ; sa
+perte est un skill installé mais invocable par personne. Sur les 21 skills installables mesurés
+(Q3), **15 sont concernés**, pas 0 — le côté que ce rapport présentait comme intact porte en
+réalité la dégradation la plus large des deux (15/21 contre au plus 31/31 sur un sous-ensemble de
+champs agents, mais touchant un champ dont dépend le déclenchement même du skill, pas seulement un
+protocole interne). Le gate de fidélité recommandé plus bas doit donc couvrir aussi
+`description:` côté skills, pas seulement les champs agents.
 
 **Recommandation sur le gate de fidélité** : c'est le livrable le plus défendable d'une éventuelle
 suite, précisément parce qu'aucun signal machine n'existe aujourd'hui pour distinguer « converti »
 de « converti et mort ». Un tel gate devrait compter, au minimum : les champs perdus par
 conversion (`model`/`memory`/`tools`/`disallowedTools`/`vf-internal`/allowlist) par agent et par
-cible, les marqueurs dangling (chemins `.claude` morts — 46/52 sur opencode, 52/52 sur kimi-code ;
-`Task(` non traduit 4/4 partout — **non vérifié en runtime, ni opencode ni kimi-code installés sur
-le poste de mesure**), et le périmètre réellement actif déclaré à l'install (ex. sur kimi-code :
+cible, les marqueurs dangling (**rejoué en exécutant les convertisseurs réels de gsd-core** —
+`runtime-artifact-conversion.cjs` — sur les 52 artefacts source, opencode et kimi-code n'étant
+toujours pas installés sur le poste de mesure) : chemins `.claude` morts dans **25/52 fichiers**
+sur opencode (**150 occurrences**) et **26/52 fichiers** sur kimi-code (**163 occurrences**) —
+« fichiers » et « occurrences » sont deux dénominateurs distincts, à ne pas confondre ; `Task(` non
+traduit dans **3 fichiers / 5 occurrences** sur les deux cibles. Le plafond « 52/52 » est de toute
+façon arithmétiquement impossible : seuls **26 des 52 fichiers source** contiennent la chaîne
+`.claude` avant conversion. Et le périmètre réellement actif déclaré à l'install (ex. sur kimi-code :
 31 agents copiés à l'octet dans un runtime dont le descripteur porte `namedDispatch: false` → 52
 fichiers posés, dont potentiellement 31 inertes **selon ce descripteur — que ce même rapport
 déclare par ailleurs périmé ; si kimi-code dispatche bien des sous-agents nommés custom comme la
@@ -99,9 +127,12 @@ prémisse ROADMAP (« aucun équivalent hors Claude ») est **fausse** — les t
 outil de forme AskUserQuestion (Codex : `request_user_input` ; OpenCode : `question` ; Kimi :
 `AskUserQuestion`, quasi isomorphes). Le **vrai trou est le mode headless, et il est universel** :
 sur Codex, `request_user_input` est barré deux fois en dur et rejeté sous `codex exec` ;
-l'élicitation MCP y est auto-annulée (ni refus ni accord) ; sur OpenCode, l'outil `question` pend
-en headless et le correctif en cours vise à le faire **échouer**, pas à répondre ; Kimi est le seul
-des trois à porter un contrat fail-loud écrit.
+l'élicitation MCP y est auto-annulée (ni refus ni accord) ; sur OpenCode, l'outil `question`
+**pendrait** en headless et le correctif en cours viserait à le faire **échouer**, pas à répondre —
+**dérivé de la documentation et des issues amont, non vérifié en runtime : OpenCode n'est pas
+installé sur le poste de mesure** (issue amont citée : OpenCode #35275, qui cite Codex en miroir —
+suspendre l'horloge plutôt qu'arbitrer un timeout ; Codex a déprécié `autoResolutionMs` au profit
+d'`isBlocking`) ; Kimi est le seul des trois à porter un contrat fail-loud écrit.
 
 Conséquence de design : **ne jamais autoriser une question dans un worker headless**, mais la
 relayer hors bande vers une session racine vivante — c'est le relais Pattern H / `SendMessage` que
@@ -120,6 +151,9 @@ Source : `DISCUSS.md` l. 44-46 (§Q4b).
   installé sur le poste de mesure.
 - Support d'élicitation OpenCode annoncé sur branches dev/v2 non vérifié en release stable (cf.
   §Q4b ci-dessus pour ce que la mesure établit malgré tout sur le mode headless).
+- L'échappatoire `.gsd-source` a deux consommateurs aux sémantiques incompatibles — constaté en Q1
+  (`DISCUSS.md`), **non résolu par ce spike** (oubli du tour précédent : absent de ce rapport alors
+  qu'il fait partie du morceau 2 du verdict, le chemin d'artefacts non générique).
 
 ## Recommandation — argumentée, non tranchée
 
@@ -147,7 +181,7 @@ noms d'agents vers `[a-z0-9_]+` sur codex (Q4) — combinée à la démarche amo
 et sans dépendance bloquante : une requête d'élargissement du SDK public ne coûte rien à lancer
 tôt, même si son délai est hors contrôle de VibeFlow. Je ne recommande pas de dépendre de l'interne
 tel quel (voie 1) sans au minimum les tests de contrat de dérive qu'elle nécessiterait — c'est la
-voie la moins défendable après ce qui vient d'être constaté sur les descripteurs du registre :
+voie la moins défendable après ce qui vient d'être constaté sur les descripteurs consultés :
 une erreur vérifiée en exécution suffit à faire basculer un no-go structurel, et deux autres
 constats (mauvaise lecture du cadrage, obsolescence documentaire non confrontée au runtime)
 montrent qu'aucune des deux directions — croire le registre ou le corriger de mémoire — n'est
@@ -177,7 +211,7 @@ tout cela ne se lance sans l'arbitrage de Samuel, y compris le choix de ne pas d
     },
     {
       "sujet": "Fidélité de conversion",
-      "constat": "156 conversions mesurées, 0 erreur machine, dégradation massive et silencieuse (model/memory/tools/disallowedTools/vf-internal/allowlist) — aucun signal ne distingue converti de converti-et-mort",
+      "constat": "156 conversions mesurées, 0 erreur machine, dégradation massive et silencieuse côté agents (model/memory/tools/disallowedTools/vf-internal/allowlist, sur codex et opencode — kimi-code copie à l'octet près) ET côté skills (description: perdue en entier sur 15/21 skills installables, sur les trois cibles, extractFrontmatterField ne gère pas le scalaire replié YAML) — aucun signal ne distingue converti de converti-et-mort",
       "severity": "majeur",
       "action": "ask-user",
       "ref": "DISCUSS.md#fidélité-de-conversion--la-dégradation-silencieuse-chiffrée"
@@ -193,5 +227,3 @@ tout cela ne se lance sans l'arbitrage de Samuel, y compris le choix de ne pas d
   "noeuds_debloques": []
 }
 ```
-
-Commit : `8caffa8`.
