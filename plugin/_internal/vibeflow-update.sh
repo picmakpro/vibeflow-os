@@ -1280,16 +1280,13 @@ find_fidelity_gate() {
   echo ""
 }
 
-# report_artifact_fidelity <mod> <module_dir> — best-effort, appelée en fin de install_module()
-# ET en fin de update_module() (FIDE-02). N'invoque le gate QUE si ce module a réellement posé un
-# artefact agent (AGENT.md racine OU agents/*.md, même garde que l'injection MCP ligne ~1663) —
-# jamais pour un module skill-only, qui n'a rien à faire mesurer par ce gate. Cible fixée à
-# `codex` (seule cible tier-1 mesurée, cf. 38-CONTEXT.md). Sortie RELAYÉE TELLE QUELLE sur les
-# flux réels de l'install (jamais capturée puis résumée) — la ligne `[fidelity]` doit apparaître
-# verbatim dans le journal d'install, seule surface qu'un opérateur pressé lira.
-report_artifact_fidelity() {
-  local mod="$1" module_dir="$2"
-  vf_dry_run && return 0
+# resolve_posed_agent_artifact <module_dir> <mod> — chemin posé de l'agent réellement écrit par
+# ce module (AGENT.md racine OU premier agents/*.md, même garde que l'injection MCP ligne
+# ~1663), vide si le module n'a posé aucun agent. Factorisé (jointure ADPT-02/38-05) : partagé
+# par report_artifact_fidelity (FIDE-02) ET register_codex_agent_if_applicable (ADPT-02/38-05) —
+# les deux best-effort qui ne s'invoquent QUE sur un module à agent, jamais un skill-only.
+resolve_posed_agent_artifact() {
+  local module_dir="$1" mod="$2"
   local artifact=""
   if [ -f "$module_dir/AGENT.md" ]; then
     artifact="$TARGET_ROOT/agents/${mod}.md"
@@ -1301,11 +1298,71 @@ report_artifact_fidelity() {
       break
     done
   fi
-  [ -n "$artifact" ] && [ -f "$artifact" ] || return 0
+  [ -n "$artifact" ] && [ -f "$artifact" ] && { printf '%s' "$artifact"; return 0; }
+  printf ''
+  return 1
+}
+
+# report_artifact_fidelity <mod> <module_dir> — best-effort, appelée en fin de install_module()
+# ET en fin de update_module() (FIDE-02). N'invoque le gate QUE si ce module a réellement posé un
+# artefact agent — jamais pour un module skill-only, qui n'a rien à faire mesurer par ce gate.
+# Cible fixée à `codex` (seule cible tier-1 mesurée, cf. 38-CONTEXT.md). Sortie RELAYÉE TELLE
+# QUELLE sur les flux réels de l'install (jamais capturée puis résumée) — la ligne `[fidelity]`
+# doit apparaître verbatim dans le journal d'install, seule surface qu'un opérateur pressé lira.
+report_artifact_fidelity() {
+  local mod="$1" module_dir="$2"
+  vf_dry_run && return 0
+  local artifact
+  artifact="$(resolve_posed_agent_artifact "$module_dir" "$mod")" || return 0
   local gate
   gate="$(find_fidelity_gate)"
   [ -n "$gate" ] || return 0
   bash "$gate" --target codex "$artifact" || true
+}
+
+# ---------- Adaptateur Codex (ADPT-02/ADPT-03, 38-05) ----------
+# register-codex-agent.sh vit sous _internal/runtime-adapter/ (PAS directement _internal/,
+# contrairement à merge-hooks.sh/runtime-cli-dispatch.sh) — cascade à 2 positions, MÊME patron
+# que find_hooks_merger/find_runtime_dispatch_lib, sous-dossier en plus. Introuvable aux deux
+# positions → silence total (même doctrine best-effort) : ce n'est pas une dépendance obligatoire
+# de l'install, un lab sans le lot ADPT au cache ne doit jamais voir l'install échouer pour une
+# capacité Codex qu'il n'a pas encore.
+find_codex_registrar() {
+  local c
+  c="$CACHE_DIR/_internal/runtime-adapter/register-codex-agent.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  c="$(dirname "$0")/runtime-adapter/register-codex-agent.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  echo ""
+}
+
+# register_codex_agent_if_applicable <mod> <module_dir> — best-effort, symétrique de
+# report_artifact_fidelity, appelée juste après elle en fin de install_module() ET
+# update_module(). N'appelle register-codex-agent.sh QUE si (a) ce module a réellement posé un
+# agent (même garde que resolve_posed_agent_artifact) ET (b) le runtime détecté par
+# runtime-cli-dispatch.sh (lot 2, RUNT-01, `detect_agent_runtime` — VF_RUNTIME prioritaire,
+# sinon cascade command -v) est `codex`. Script/dispatch/runtime non-codex/absent → silence
+# total. Un modèle par worker tient SANS contrainte `fork_turns` — mesuré 38-CONTEXT.md #5,
+# aucune action requise ici. Sortie RELAYÉE TELLE QUELLE, préfixée `[codex-adapter]`, jamais
+# résumée — même doctrine que la bannière `[fidelity]` juste au-dessus.
+register_codex_agent_if_applicable() {
+  local mod="$1" module_dir="$2"
+  vf_dry_run && return 0
+  local artifact
+  artifact="$(resolve_posed_agent_artifact "$module_dir" "$mod")" || return 0
+
+  local dispatch runtime
+  dispatch="$(find_runtime_dispatch_lib)"
+  [ -n "$dispatch" ] || return 0
+  runtime="$(bash "$dispatch" detect 2>/dev/null || true)"
+  [ "$runtime" = "codex" ] || return 0
+
+  local registrar
+  registrar="$(find_codex_registrar)"
+  [ -n "$registrar" ] || return 0
+
+  local out
+  out="$(bash "$registrar" "$artifact" 2>&1)" || true
+  [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/[codex-adapter] /'
+  return 0
 }
 
 scripts_prefix_for_scope() {
@@ -1955,6 +2012,9 @@ install_module() {
   # terminée avant qu'on rapporte sur elle. Best-effort, silence total si le gate ou l'artefact
   # sont absents (cf. report_artifact_fidelity).
   report_artifact_fidelity "$mod" "$module_dir"
+  # Adaptateur Codex (ADPT-02/ADPT-03, 38-05) : symétrique, juste après — best-effort, silence
+  # total si runtime non-codex/adaptateur absent (cf. register_codex_agent_if_applicable).
+  register_codex_agent_if_applicable "$mod" "$module_dir"
 }
 
 # ---------- Backup / Rollback ----------
@@ -2611,6 +2671,9 @@ update_module() {
   # (backup/retrait éventuels), pas seulement l'état immédiat post-copie déjà rapporté par la 1re
   # couture à l'intérieur de install_module ci-dessus.
   report_artifact_fidelity "$mod" "$CACHE_DIR/$mod"
+  # Adaptateur Codex (ADPT-02/ADPT-03, 38-05) : 2e couture, symétrique — best-effort, cf.
+  # register_codex_agent_if_applicable.
+  register_codex_agent_if_applicable "$mod" "$CACHE_DIR/$mod"
 }
 
 # ---------- Main ----------

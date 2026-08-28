@@ -56,6 +56,13 @@ snapshot_home_claude() {
 }
 HOME_BEFORE=$(snapshot_home_claude)
 
+# Idem, pour ~/.codex/agents/vibeflow réel (T37/T38, 38-05 wiring adaptateur Codex) — les deux
+# tests isolent HOME systématiquement, ce compteur n'est qu'une ceinture+bretelles.
+snapshot_home_codex() {
+  find "$HOME/.codex/agents/vibeflow" -type f 2>/dev/null | wc -l | tr -d ' '
+}
+HOME_CODEX_BEFORE=$(snapshot_home_codex)
+
 # Helper : prépare un cache de test avec un module copié depuis le repo.
 # Usage : prepare_module <cache_dir> <module>
 prepare_module() {
@@ -1410,13 +1417,68 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Garde-fou final : le vrai ~/.claude est inchangé (snapshot récursif avant=après).
+# T37 (ADPT-02/ADPT-03, 38-05) — wiring de l'adaptateur Codex dans install_module() : sur un
+# runtime détecté `codex` (VF_RUNTIME=codex, override prioritaire de detect_agent_runtime — pas
+# besoin du binaire `codex` réel dans le PATH), install d'un module à agent (content-bundle) fait
+# apparaître la ligne `[codex-adapter]` verbatim sur stdout. HOME isolé (même garde que T24-T26,
+# register-codex-agent.sh écrit sous $CODEX_HOME/agents/vibeflow/, défaut $HOME/.codex).
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME_CODEX="$LAB/home"
+mkdir -p "$FAKE_HOME_CODEX"
+if prepare_module "$CACHE" "content-bundle"; then
+  OUT=$(cd "$LAB" && HOME="$FAKE_HOME_CODEX" VF_RUNTIME=codex VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" install content-bundle 2>&1)
+  miss=0
+  echo "$OUT" | "$GREP" -q '^\[codex-adapter\] ' \
+    || { ko "T37 (ADPT-02/03) : aucune ligne [codex-adapter] sur stdout de l'install (runtime codex détecté via VF_RUNTIME)"; miss=1; }
+  [ -n "$(find "$FAKE_HOME_CODEX/.codex/agents/vibeflow" -name '*.toml' 2>/dev/null)" ] \
+    || { ko "T37 (ADPT-02/03) : aucun .toml posé sous \$FAKE_HOME_CODEX/.codex/agents/vibeflow/"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T37 (ADPT-02/03) : bannière [codex-adapter] verbatim + rôle .toml réellement posé (runtime codex détecté, content-bundle)"
+else
+  skip "T37 (ADPT-02/03) : content-bundle non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T38 (ADPT-02/03, non-régression) — le MÊME install, runtime détecté `claude`, N'APPELLE PAS
+# register-codex-agent.sh : aucune ligne [codex-adapter], aucun $HOME/.codex créé.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME_CLAUDE="$LAB/home"
+mkdir -p "$FAKE_HOME_CLAUDE"
+if prepare_module "$CACHE" "content-bundle"; then
+  OUT=$(cd "$LAB" && HOME="$FAKE_HOME_CLAUDE" VF_RUNTIME=claude VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" install content-bundle 2>&1)
+  miss=0
+  echo "$OUT" | "$GREP" -q '^\[codex-adapter\] ' \
+    && { ko "T38 (ADPT-02/03, non-régression) : ligne [codex-adapter] présente alors que le runtime détecté est claude"; miss=1; }
+  [ -d "$FAKE_HOME_CLAUDE/.codex" ] \
+    && { ko "T38 (ADPT-02/03, non-régression) : \$FAKE_HOME_CLAUDE/.codex créé alors que le runtime détecté est claude"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T38 (ADPT-02/03, non-régression) : aucune ligne [codex-adapter], aucun \$HOME/.codex créé (runtime claude détecté)"
+else
+  skip "T38 (ADPT-02/03, non-régression) : content-bundle non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# Garde-fou final : le vrai ~/.claude ET le vrai ~/.codex/agents/vibeflow sont inchangés
+# (snapshot récursif avant=après).
 # ---------------------------------------------------------------------------
 HOME_AFTER=$(snapshot_home_claude)
 if [ "$HOME_BEFORE" = "$HOME_AFTER" ]; then
   ok "Garde-fou : ~/.claude intact ($HOME_AFTER fichiers dans les zones engine avant=après)"
 else
   ko "Garde-fou : ~/.claude POLLUÉ (avant=$HOME_BEFORE, après=$HOME_AFTER — zones agents/skills/scripts/rules/commands/settings)"
+fi
+
+HOME_CODEX_AFTER=$(snapshot_home_codex)
+if [ "$HOME_CODEX_BEFORE" = "$HOME_CODEX_AFTER" ]; then
+  ok "Garde-fou : ~/.codex/agents/vibeflow intact ($HOME_CODEX_AFTER fichiers avant=après)"
+else
+  ko "Garde-fou : ~/.codex/agents/vibeflow POLLUÉ (avant=$HOME_CODEX_BEFORE, après=$HOME_CODEX_AFTER)"
 fi
 
 # ---------------------------------------------------------------------------
