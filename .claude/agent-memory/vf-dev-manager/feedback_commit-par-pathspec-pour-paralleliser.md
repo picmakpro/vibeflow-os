@@ -50,3 +50,25 @@ manager est resté non stagé à chaque tour — vérifié à chaque retour.
 nœud y travaille EN CE MOMENT MÊME : … ») — un périmètre positif seul ne suffit pas, cf.
 [[scoper-les-workers-par-chemin]]. Le manager applique la même règle à ses propres commits de
 suivi (`HANDOFF.json`, DAG) pendant que les workers tournent.
+
+**Incident Phase 38 (2026-08-29) — la forme exacte du piège, et son issue la plus vicieuse.**
+Worker A stage ses 4 fichiers (`git add <chemins>`, correct en apparence). Worker B, sur le même
+worktree, fait un `git commit` **sans pathspec** : il emporte les 4 fichiers de A **en plus des
+siens**. B s'en aperçoit et se corrige proprement — `git reset --soft HEAD~1` +
+`git restore --staged` sur les 4 fichiers étrangers + recommit ciblé. **Résultat net : le commit
+qui portait le travail de A devient ORPHELIN (ancêtre d'aucune branche), et les 4 fichiers de A
+retombent non commités** — pendant que A, lui, avait déjà rendu la main en voyant
+« nothing to commit ». Personne n'a fauté, personne n'a rien perdu sur disque, et le travail
+n'était plus dans l'historique.
+
+**La règle qui ferme le trou : sur un worktree partagé, ne JAMAIS faire `git add`.**
+`git commit <pathspec>` **contourne l'index** et ne peut donc ni emporter le voisin ni être emporté
+par lui. Le `git add` n'est pas une étape neutre : c'est la **fenêtre** pendant laquelle un commit
+voisin peut absorber le travail.
+
+**Et côté manager** : après une correction de commit par un worker (`reset --soft`, `amend`,
+`restore --staged`), **vérifier l'ancêtreté** (`git merge-base --is-ancestor <sha> HEAD`) et
+**re-constater le contenu sur HEAD** (`git show HEAD:<fichier> | grep <marqueur>`) — un rapport
+« corrigé immédiatement » peut être sincère ET laisser du travail hors de l'historique. Ici les
+suites étaient vertes (49/0, 7/0) **parce qu'elles lisent l'arbre de travail**, pas HEAD : le vert
+ne prouvait rien sur ce qui était commité.
