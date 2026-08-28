@@ -1,5 +1,19 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.20.1] — 2026-08-28 (vf-coder peut relayer une correction au sous-agent qu'il a spawné)
+
+**Patch** (durcissement, comportement observable modifié uniquement en cours d'exécution
+concurrente) :
+
+- **Le défaut, mesuré en réel** : `vf-coder` n'avait pas `SendMessage` dans son `tools:`. Quand le
+  manager lui envoyait une correction en cours d'exécution, `vf-coder` ne pouvait pas la relayer au
+  sous-agent planner qu'il avait lui-même spawné — il devait relancer un agent **frais** (pas une
+  reprise), ce qui a produit une exécution concurrente sur le même fichier lors de cette mission.
+  Terminé sans casse grâce à une vérification en lecture seule avant commit, mais fragile.
+- **Le fix** : ajout de `SendMessage` à l'allowlist `tools:` de `plugin/dev-orchestrator/agents/vf-coder.md`
+  — rien d'autre n'a changé dans ce fichier. Le principe rétabli : un worker qui spawne un
+  sous-agent doit pouvoir corriger ce qu'il a spawné, plutôt que de le dupliquer.
+
 ## [v2.20.0] — 2026-08-28 (la garde Node répare au lieu de refuser — BOOT-01)
 
 **Minor** (capacité nouvelle : `ensure-deps.sh` installe désormais un runtime, ce qu'il n'a jamais
