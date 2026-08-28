@@ -5,6 +5,12 @@ Document d'étude. **Aucun code produit, rien sous `plugin/`.** Prolonge `SPIKE-
 et la migration d'un lab existant. Convention de sourçage : **mesuré en exécution** / **lu et
 sourcé** / **dérivé** / **inconnu**. Un inconnu se déclare, ne se comble jamais dans ce document.
 
+**Note de reproductibilité** : seules certaines sections (B7 §3, A4) font figurer la commande
+exacte à côté du compteur. Les autres compteurs mesurés de ce document (Plan 1/A2, la table B1,
+« 14 labs », « 128 lignes → 7 invocations », l'inventaire superpowers) n'ont pas été
+systématiquement re-dérivés avec leur commande ; ceux qui l'ont été se sont révélés justes — le
+défaut est de traçabilité, pas de véracité constatée.
+
 ---
 
 ## AXE A — Le canal d'install
@@ -29,7 +35,8 @@ La convention `./plugins/<nom>` est documentaire, pas normative. **La question d
 `plugin/` est close : non.**
 
 **Plan 2 — ENREGISTREMENT PAR LE MANIFESTE : absent pour agents et commandes (mesuré en exécution).**
-Union complète des clés sur les **64** manifestes curés :
+Union complète des clés sur les **64** manifestes curés (62 plugins de premier niveau + 2 fixtures
+d'eval ; l'union des clés est identique sur les deux périmètres) :
 
 | clé | occurrences /64 |
 |---|---|
@@ -45,8 +52,9 @@ Union complète des clés sur les **64** manifestes curés :
 | `agents` | **0** |
 | `commands` | **0** |
 
-VibeFlow pose **7 commandes** (`plugin/commands/*.md`) et **25 agents** (`plugin/*/agents/*.md`) :
-copiés dans le cache par le transport (Plan 1), sans surface de déclaration dans le manifeste.
+VibeFlow pose **7 commandes** (`plugin/commands/*.md`) et **31 agents** (`plugin/*/agents/*.md` =
+25 + `plugin/*/AGENT.md` = 6) : copiés dans le cache par le transport (Plan 1), sans surface de
+déclaration dans le manifeste.
 
 **Plan 3 — ENREGISTREMENT PAR UNE AUTRE VOIE : existe pour les agents, non exercée sur ce poste
 (lu et sourcé + mesuré en exécution).**
@@ -123,7 +131,7 @@ Commandes : `rtk proxy grep -rl '\.claude/' plugin [--exclude-dir=_internal]` po
 
 **Le chiffre qui porte la conclusion est celui du payload livré : 198 fichiers / 1130
 occurrences.** Note : **1050 est un décompte de LIGNES**, pas d'occurrences — origine mesurée
-d'une des quatre divergences de comptage de cette mission (cf. Findings autonomes §3).
+d'une des six divergences de comptage de cette mission (cf. Findings autonomes §3).
 
 **Conséquence** : un `--target` qui déplace les fichiers sans réécrire leur contenu produit un lab
 dont 198 fichiers pointent vers un répertoire inexistant — l'install réussit, le lab est mort.
@@ -165,10 +173,10 @@ Hypothèse « `.planning/` agnostique, `.claude/` spécifique » : **réfutée**
 
 | fuite | mesure | portée |
 |---|---|---|
-| `.planning/` → `.claude` | 392/482 PLAN.md (81 %) ouvrent sur `@$HOME/.claude/…/execute-plan.md` | contrat d'exécution ; texte inerte sous un autre runtime |
+| `.planning/` → `.claude` | 392/482 (81 %) référencent `execute-plan.md`, dont 344 via un import `@` portant un chemin `.claude` (334 en `@$HOME/.claude` + 10 en `@~/.claude`) | contrat d'exécution ; texte inerte sous un autre runtime |
 | `.planning/` → `.claude` | 37 % des fichiers `.planning/` portent une amarre `.claude` | état vivant compris |
 | hooks → `.claude` | 47/48 entrées de hook contiennent un littéral `.claude` | `CLAUDE_PROJECT_DIR` injecté par Claude Code ; `{{VF_SCRIPTS}}`/`{{VF_BASH}}` paramètrent le **scope**, pas le **runtime** |
-| `.claude` → agnostique | 116 fichiers sous `.claude/agent-memory/`, 100 % agnostiques | gitignorés (`.gitignore:20`), emplacement imposé par le harness via `memory: project` ; VibeFlow ne choisit ni ne redirige |
+| `.claude` → agnostique | 116 fichiers, dont 81 sans amarre `.claude` (70 %) — `rtk proxy grep -rl '\.claude' .claude/agent-memory \| wc -l` → 35 | gitignorés (`.gitignore:20`), emplacement imposé par le harness via `memory: project` ; VibeFlow ne choisit ni ne redirige ; même prédicat que la ligne du dessus — la frontière fuit aussi dans ce sens, atténuée |
 
 **Survit sans rien faire** : `.planning/config.json` intégralement agnostique, les imports
 `@.planning/*`, la prose, les corps de skills et d'agents, les scripts bash neutres.
@@ -276,12 +284,19 @@ chose.
    l'a produit, sur une mesure de contre-vérification. Meilleure illustration du risque que toute
    la phase décrit — l'absence n'est jamais prouvée par une seule commande.
 
-3. **Quatre divergences de comptage, toutes définitionnelles.** Aucune n'était arithmétique :
+   **Second piège de méthode mesuré, même famille** : le compteur `memory:` (B7 §3) tient sur
+   **52** occurrences uniquement via `--include='*.md'` — sans lui, `grep -r` balaie tous les
+   fichiers de `plugin/` et rend **117** au lieu de 52. Même défaut que le glob Python ci-dessus :
+   un périmètre implicite qui change silencieusement le résultat.
+
+3. **Six divergences de comptage, toutes définitionnelles.** Aucune n'était arithmétique :
    périmètre (`_internal/` inclus ou non, cf. A4), objet (fichiers / lignes / occurrences, cf. A4),
    définition (« appeler un skill » vs « mentionner la famille », cf. inventaire superpowers),
-   homonymie (`docs/superpowers/`, cf. inventaire superpowers). Un compteur sans sa définition sera
-   re-contesté ; comparer les ensembles en `comm`, pas les nombres (mémoire agent
-   `project_diff-proxifie-utiliser-comm`).
+   homonymie (`docs/superpowers/`, cf. inventaire superpowers), **extension de fichier** (le
+   compteur `memory:` ne tient que via `--include='*.md'` — sans lui, 117 au lieu de 52, cf.
+   ci-dessus), **répertoires peuplés ou non** (« 6 agents » et « 5 agents » sont tous deux vrais,
+   cf. B7 §3). Un compteur sans sa définition sera re-contesté ; comparer les ensembles en `comm`,
+   pas les nombres (mémoire agent `project_diff-proxifie-utiliser-comm`).
 
 ---
 
@@ -327,12 +342,20 @@ design, superpowers seul côté dev.
 | OpenCode | commande npm-équivalente (registre = npm, A1) | **inféré / documentaire**, non exécuté |
 | kimi-code | commande TUI, **sans `update`** documenté (A1) | **inféré / documentaire**, non exécuté |
 
-11 sites au total (5 + 6) à faire basculer sur une détection de runtime + une table de dispatch de
-commande — même famille de coût que le `TARGET_ROOT` de l'engine (A4) : peu de sites, mais chacun
-change de nature (un `if command -v claude` devient une détection multi-runtime, pas un simple
-paramètre). Pas de commande unifiée mesurée aujourd'hui : OpenCode et kimi-code restent
-documentaires tant qu'aucune session vivante ne les exerce (même statut que Codex `[agents]` en
-A2).
+**11 sites dans les deux scripts `ensure`** (motif `claude plugin install|command -v claude`,
+**restreint à ces deux fichiers**) — **6 sites exécutables + 5 sites de prose** (1 commentaire
+d'en-tête, 4 chaînes `notice` d'instruction manuelle). Le même motif passé sur `plugin/` entier,
+sans restriction de fichier, rend **18 lignes sur 6 fichiers**, dont **2 sites exécutables hors
+`ensure`** : `plugin/infrastructure-audit/scripts/audit-infra.sh:136` et
+`plugin/conductor/scripts/check-plugin-update.sh:60` (+ 4 lignes de doc dans
+`design-orchestrator/references/design-toolchain.md`, + 1 commentaire de test).
+
+Les 11 sites des deux scripts `ensure` sont à faire basculer sur une détection de runtime + une
+table de dispatch de commande — même famille de coût que le `TARGET_ROOT` de l'engine (A4) : peu
+de sites, mais chacun change de nature (un `if command -v claude` devient une détection
+multi-runtime, pas un simple paramètre). Pas de commande unifiée mesurée aujourd'hui : OpenCode et
+kimi-code restent documentaires tant qu'aucune session vivante ne les exerce (même statut que
+Codex `[agents]` en A2).
 
 ## Inventaire superpowers — plan de secours chiffré (pas une option écartée)
 
@@ -516,17 +539,19 @@ development`** (vérifié par le manager). C'est amont, pas à écrire côté VF
 1. **Amont (gsd-core)** : introduire un `kind: memory` dans `artifactLayout`. Vocabulaire actuel
    des `kind` : `agents`, `skills`, `commands`, `kimi-agents` — **aucun `kind: memory` nulle
    part**. Coût faible en lignes, **valeur quasi nulle en l'état** : 3 des 4 runtimes n'ont **pas
-   de destination**, la règle ne dirait « rien » 3 fois sur 4. Et c'est une **contribution
-   amont**, pas du code VF (doctrine : VibeFlow consomme, ne réimplémente pas).
+   de destination PAR PROJET** (Codex a un store global `~/.codex/memories/`, cf. §7 ; OpenCode et
+   kimi-code n'ont aucune mémoire d'agent), la règle ne dirait « rien » 3 fois sur 4. Et c'est une
+   **contribution amont**, pas du code VF (doctrine : VibeFlow consomme, ne réimplémente pas).
 2. **VF engine** : pour appliquer une règle par runtime, l'engine doit d'abord **acquérir une
    dimension qu'il n'a pas** — `TARGET_ROOT` est 2 branches en dur (`user → $HOME/.claude`,
    `project|local → ./.claude`), sans `--target` ni `RUNTIME`. **C'est le vrai coût, et il dépasse
    largement la mémoire : c'est le chantier de l'axe B au complet** (cf. A4, §Proposition de
    cadrage).
 3. **Mécanisme de liaison** : symlink / copie / rien, avec branche Windows obligatoire (§6), lien
-   relatif interne versionné (§4), et un inconnu bloquant non levé (§9 ci-dessous).
+   relatif interne versionné (§4), et un inconnu bloquant non levé (§Ce qui reste inconnu).
 
-**Recoupement à consigner** : les « 13 règles de placement » (A4) se re-dérivent exactement —
+**Recoupement à consigner** : les « 13 règles de placement » (SPIKE-REPORT.md, §Coût de portage
+résiduel) se re-dérivent exactement —
 codex 2+2=4, opencode 3+3=6, kimi-code 2+1=3 — et l'objet compté est nommé : une entrée
 d'`artifactLayout`.
 
@@ -582,6 +607,8 @@ Repris tel quel depuis les sections ci-dessus, sans en combler aucun :
   est inféré, pas observé : aucune migration réelle n'a été exécutée.
 - **B2** — l'ampleur réelle de la collision de glob `rollback` (`$mod-<ts>-removed`) : structurellement
   établie par lecture de code, non manifestée sur ce poste (aucun répertoire `-removed` présent).
+- **Acceptation réelle des artefacts convertis par OpenCode et kimi-code** — aucun des deux n'est
+  installé sur le poste de mesure (cf. `SPIKE-REPORT.md`).
 - **Installeur multi-runtime** — la commande exacte de sous-installation Codex après `codex plugin
   marketplace add` (le transport et le manifeste sont mesurés ce spike, pas l'enchaînement complet
   jusqu'à un agent utilisable) ; les commandes d'install OpenCode et kimi-code : documentaires,
