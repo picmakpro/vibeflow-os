@@ -168,6 +168,23 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 
 ### Roadmap Evolution
 
+- 2026-08-28 : **Phase 37 ajoutée — Portabilité multi-runtime (spike)**. Demande de Samuel :
+  rendre VibeFlow installable sur les autres runtimes (Codex, OpenCode, Kimi…). Cadrée en **spike
+  de mesure** (arbitrage humain : spike d'abord, cibles = les 3 nommées + conformité au standard
+  Agent Skills). Découverte de cadrage qui renverse l'analyse initiale : **gsd-core 1.11.0 est déjà
+  multi-runtime** (manifeste de 13 runtimes, conversion/layout/install-plan d'artefacts par cible,
+  dispatch runtime-aware) — le moteur n'est donc PAS le bloqueur, et VibeFlow doit **consommer**
+  cette surface, jamais la réimplémenter. Reste à mesurer : ce qui est spécifiquement VibeFlow
+  (50 agents, 6 fragments de hooks, packaging `.claude-plugin/`, protocole `AskUserQuestion`/
+  `SendMessage`). **Seconde correction, sur challenge de Samuel** : Codex n'est pas une cible
+  dégradée — le registre `gsd-core` le déclare `namedDispatch: true` / `tier: "full"` (tier-1),
+  `convertClaudeAgentToCodexAgent` existe, et Codex CLI porte MultiAgentV2 (rôles custom en
+  `[agents]` de `config.toml`, `spawn_agents`, `report_agent_job_result` obligatoire — équivalent
+  natif du rapport typé). Hypothèse de travail : portage **plein** de l'équipe sur codex et
+  opencode ; dégradation réservée à `kimi-code`, hermes, pi. Seul trou structurel :
+  `AskUserQuestion`/`SendMessage`. Précondition Node ≥ 24 levée le même jour (PR #54, v2.58.0).
+  Indépendante — n'est bloquée par aucune phase.
+
 - 2026-08-15 (roadmap fiabilite-v1.0) : **feuille de route du milestone posée — 8 phases**.
   Numérotation arbitrée par l'humain : les héritées gardent 18 et 25, les nouvelles continuent à
   30 (le milestone précédent s'est arrêté à 29). Ordre dicté par les fichiers (ARCHITECTURE.md

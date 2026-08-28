@@ -76,6 +76,7 @@
 - [x] Phase 33: Watchdog & notifications des missions (completed 2026-08-17)
 - [ ] Phase 34: Gaps agency-agents & cadrage skill-installer
 - [x] Phase 35: Ré-armement worktree (conditionnelle) — CLOSE 2026-08-26, option A (pas de ré-armement)
+- [ ] Phase 37: Portabilité multi-runtime — spike (Codex, OpenCode, Kimi)
 
 <details>
 <summary>✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04</summary>
@@ -728,6 +729,7 @@ par le marqueur de santé PLUS un hook doctor `SessionStart` générique livré 
 s'est ajouté au plan pour porter les amendements 3B/4A tranchés par Samuel le 2026-08-17.
 
 Plans:
+
 - [x] 32-01-PLAN.md — champs additifs `session_ids`/`generation` en JSON + heartbeat séparé de la lease, TTL inchangé — vague 1 (LOCK-01, QUAL-01)
 - [x] 32-02-PLAN.md — `takeover` + `reclaim` + journal append-only, retrait de l'auto-steal — vague 2 (LOCK-04, QUAL-01)
 - [x] 32-03-PLAN.md — guard `PreToolUse` (Bash + Write|Edit) + entrée hooks armée (une seule, contournement du bug d'idempotence cross-matcher de `merge-hooks.sh`) — vague 3, **checkpoint humain** (LOCK-02, LOCK-03, QUAL-01)
@@ -755,14 +757,17 @@ d'install du milestone Windows-first.
 **Depends on**: Phase 32 (même battement — conçues ensemble, WTCH consomme le heartbeat de LOCK).
 **Recherche menée en ouverture de mission (2026-08-17), verdicts actés (cadrage complet :
 `.planning/phases/VFDO-33-watchdog-notifications-des-missions/33-CONTEXT.md`)** :
+
 - Hooks async / `asyncRewake` — **PAS SÛR** pour bâtir une horloge de watchdog
   (`33-SPIKE-hooks-async.md`) : jamais périodiques, ne réveillent qu'une session déjà active.
+
 - Canal de notification Windows — **retenu : WinRT `ToastNotificationManager` sous
   `powershell.exe` 5.1** (PAS `pwsh` — les assemblies WinRT n'y sont pas incluses), AUMID emprunté
   à PowerShell, testé par shims d'argv en CI Linux (`33-SPIKE-canal-notification.md`). Preuve
   réelle sur Win10/11 non exécutée pendant le cadrage (aucune machine disponible) — recette de
   validation humaine en **condition de clôture de phase**, rattachée au fil testeurs Windows de
   l'issue #20 (§7, existence vérifiée).
+
 - La définition de « progrès » (décision de cadrage n°1) — **tranchée : D-33-A**, deux horloges
   sur le même `meta` du lock (`heartbeat_epoch` existant + `progress_epoch` additif), stall =
   vivant mais progrès figé, abandon = les deux horloges mortes.
@@ -967,3 +972,79 @@ livré)*, WKTR-02 *(done, option A)* — *(WKTR-03, la veille, reste portée par
 neuf (option A), donc rien à tester ; ce n'est pas une dette.
 **Plans**: aucun — clôture documentaire directe (mandat de clôture ciblée vf-coder, 2026-08-26),
 pas de PLAN.md d'exécution.
+
+### Phase 37: Portabilité multi-runtime — spike (Codex, OpenCode, Kimi)
+
+**Goal:** Mesurer ce que VibeFlow peut réellement poser sur les runtimes non-Claude (Codex CLI,
+OpenCode, Kimi Code) en s'appuyant sur la surface multi-runtime **déjà livrée par gsd-core 1.11.0**,
+et rendre un go/no-go documenté. Spike de mesure, pas de livraison : aucune cible n'est promise
+tant que la pose n'est pas constatée sur disque.
+
+**Prémisse (déclarée par Samuel, à confirmer par la mesure)** : gsd-core est portable. Constaté à
+l'œil : `bin/shared/runtime-aliases.manifest.json` déclare 13 runtimes ; `bin/lib/` porte
+`runtime-artifact-conversion.cjs`, `runtime-artifact-layout.cjs`, `runtime-artifact-install-plan.cjs`,
+`runtime-hooks-surface.cjs`, `runtime-homes.cjs`, `runtime-config-adapter-registry.cjs`,
+`runtime-slash.cjs`, `host-runtime-detection.cjs` ; `references/runtime-aware-dispatch.md` distingue
+les runtimes à dispatch nommé (claude, opencode, cursor) des runtimes built-in-only (kimi-code :
+`coder`/`explore`/`plan`), la persona passant par `AGENT_SKILLS_<ROLE>`.
+
+**Doctrine** : VibeFlow **consomme** cette surface, il ne la réimplémente pas. Aucun transpileur
+maison, aucun « skill de conversion » à l'exécution (non déterministe, non testable).
+
+**Questions à trancher par le spike :**
+1. Quelle est l'API réellement appelable de la surface runtime gsd-core (queries `gsd-tools`,
+   modules `bin/lib/`) — et est-elle stable / publique, ou interne au moteur ?
+2. Que reste-t-il de **spécifiquement VibeFlow** à porter une fois gsd-core en place ? Hypothèse à
+   vérifier : les 50 agents, les 6 fragments de hooks, le packaging `.claude-plugin/`, et le
+   protocole d'escalade `AskUserQuestion`/`SendMessage`.
+3. Les 25 SKILL.md sont-ils posables tels quels ? 22/25 sont conformes au standard Agent Skills ;
+   3 ont `name` ≠ dossier (`vf-planning`, `vf-mobile-test`, `vibeflow-install`). 9/25 appellent des
+   skills `gsd-*`, 9/25 supposent des sous-agents, 3 supposent `AskUserQuestion`.
+4. Que devient l'équipe de mission (team-kernel) hors Claude ? **Mesuré le 2026-08-28, contre une
+   première analyse erronée** : le registre `gsd-core` déclare `namedDispatch: true` pour **codex**
+   (tier-1, `tier: "full"`, `per-agent sandbox tiers`, surface de hooks `config.toml` + `hooks.json`)
+   comme pour opencode et cursor ; le convertisseur `convertClaudeAgentToCodexAgent` **existe déjà**.
+   Côté produit, Codex CLI porte **MultiAgentV2** (v0.128.0) : rôles custom en `[agents]` de
+   `config.toml` — modèle, instructions, sandbox et serveurs MCP par rôle —, built-ins
+   `default`/`worker`/`explorer`/`monitor`, fan-out `spawn_agents`, et `report_agent_job_result`
+   **obligatoire** par worker : le rapport typé du team-kernel a un équivalent natif.
+   Deux produits Kimi distincts à ne pas confondre : `kimi` (Python, `namedDispatch: true`, layout
+   kimi-agents YAML) vs `kimi-code` (Node, `namedDispatch: false`, 3 built-ins seulement).
+   → L'hypothèse de travail devient **portage plein de l'équipe sur codex et opencode**, dégradation
+   réservée à `kimi-code` et aux runtimes `namedDispatch: false` (hermes, pi).
+   Frictions à mesurer, pas des murs : openai/codex#14579 (rôles custom du `.codex/config.toml` de
+   **projet** invisibles pour `spawn_agent` → déclarer les workers au scope user), openai/codex#31814
+   (modèle par sous-agent non spécifiable sous certains modèles → le pattern manager opus / workers
+   sonnet ne tient pas), `backgroundDispatch: false` sur un des blocs du descripteur codex (à
+   confirmer — touche le watchdog et les missions longues).
+
+4b. **Le seul trou structurel identifié** : `AskUserQuestion` et `SendMessage` n'ont d'équivalent sur
+   aucun runtime non-Claude. C'est l'escalade vivante d'un manager vers l'humain. Le contournement
+   documenté côté VibeFlow (`SendMessage(main)`) s'appuie lui-même sur du Claude. Quelle forme prend
+   un arbitrage humain hors Claude — et comment garantir qu'il ne soit jamais **inféré** ?
+5. Où vit la déclaration de capacité par cible — `module.json` (`full` / `skills-only` /
+   `unsupported`) ou descripteur consommé depuis gsd-core ?
+6. `vibeflow-update.sh` : extension par `--target` (TARGET_ROOT déjà scopé) ou délégation au
+   `runtime-artifact-install-plan` du moteur ?
+
+**Risque à ne pas rater** : la dégradation silencieuse. Un lab qui croit avoir VibeFlow et n'en a
+qu'un tiers, sans que rien ne le dise. Même doctrine que « aucun vert auto-déclaré ne tient ».
+
+**Précondition — LEVÉE le 2026-08-28** : s'appuyer sur la surface runtime de 1.11.0 exige
+**Node ≥ 24**. Livré hors Phase 37 par la **PR #54** (`2226e0d`, branche `feat/node-24-auto-install`) :
+`plugin/dev-orchestrator/scripts/ensure-deps.sh` porte `NODE_MIN_MAJOR=24` et **répare au lieu de
+refuser** (`528a538`, BOOT-01) — auto-install par gestionnaire de version sous `$HOME` (nvm épinglé
+`v0.40.7`, jamais de `sudo` ni de gestionnaire système), refus explicite sous MSYS2, mesure en
+conteneur du 2026-08-27 (`node:22-slim` → 1.10.0 / `node:24-slim` → 1.11.0). Tests isolés de
+`NVM_DIR` (`efa87e2`). **Rien à re-traiter dans cette phase.**
+
+**Sortie attendue** : un rapport de spike + une décision go/no-go sur une éventuelle phase de
+livraison. Pas de code de production.
+
+**Requirements**: TBD
+**Depends on:** aucune (indépendante ; adjacente à Phase 34 — cadrage skill-installer)
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 37 to break down)
