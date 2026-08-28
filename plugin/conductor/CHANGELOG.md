@@ -1,5 +1,20 @@
 # Changelog — conductor
 
+## [v1.28.4] — 2026-08-28 (Phase 38 — garde jamais desserré par son propre lot, consigné au kernel)
+
+**Patch** (doctrine consignée, aucun comportement machine modifié par ce lot) :
+
+- **`references/team-kernel.md`** — nouvelle règle d'instanciation : un lot ne desserre jamais
+  son propre garde dans le commit qui en bénéficie. Un garde de doctrine sur lequel un lot bute
+  se pose en besoin et s'escalade ; il ne se modifie que dans un commit séparé, après décision —
+  un garde modifié par l'auteur du changement qu'il surveille perd sa fonction (il ne mesure plus
+  rien d'indépendant).
+- Incident fondateur consigné fidèlement (Phase 38, `d6ff0d4`) : le garde T9e de
+  `test-design-orchestrator.sh` (D-04) a été affaibli dans le même commit que le code qu'il
+  encadrait, malgré une mention CHANGELOG « sans affaiblir la garde » — une revue en régime plein
+  a prouvé par mutation l'affaiblissement réel. Le choix technique sous-jacent était défendable et
+  a été ratifié (D-38-M) : c'est la procédure qui manquait, pas le jugement.
+
 ## [v1.28.3] — 2026-08-28 (Phase 38 — joignabilité worker → sous-agent consignée au kernel)
 
 **Patch** (doctrine consignée, aucun comportement machine modifié par ce lot) :

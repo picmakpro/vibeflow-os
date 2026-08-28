@@ -186,6 +186,20 @@ là-bas.
   **consigne** la source à amender dans son rapport typé, il ne l'amende jamais en silence — la
   capitalisation reste l'affaire des registres de learnings, cette règle dit **quand** la
   déclencher.
+- **Un garde ne se desserre jamais dans le commit qu'il autorise (Phase 38, 2026-08-28).** Un
+  lot qui bute sur un garde de doctrine **pose le besoin, escalade, et n'y touche pas** — le
+  garde ne bouge que dans un commit séparé, après décision. Un garde modifié par l'auteur même
+  du changement qu'il surveille perd sa fonction : il ne mesure plus rien d'indépendant.
+  Incident fondateur : le lot RUNT avait besoin qu'un script de module résolve un script partagé
+  du socle `plugin/_internal/`, ce que le garde T9e de `test-design-orchestrator.sh` (règle
+  d'autonomie D-04) interdisait. Le worker a modifié le garde **dans le même commit** (`d6ff0d4`)
+  que le code protégé, en notant au CHANGELOG « sans affaiblir la garde d'autonomie » — une revue
+  en régime plein a prouvé par mutation que l'exemption affaiblissait bel et bien le garde (elle
+  filtrait le nom de fichier n'importe où sur la ligne, laissant passer une résolution
+  cross-module déguisée). Le choix technique lui-même était défendable, et Samuel l'a ratifié
+  (D-38-M — `plugin/_internal/` est le socle, hors D-04, précédent `find_engine_lib()` /
+  `find_hooks_merger()`) : **c'est la procédure qui manquait, pas le jugement** — d'où une règle
+  qui vaut plus que l'exception qu'elle encadre.
 
 ## Implémentations
 
