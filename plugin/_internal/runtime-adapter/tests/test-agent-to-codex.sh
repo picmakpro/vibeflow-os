@@ -16,6 +16,9 @@
 #        Sous-cas : un rôle délibérément malformé (developer_instructions absent) DÉCLENCHE bien
 #        un "startup warning" référençant son chemin — preuve que le détecteur discrimine
 #        vraiment (mutation tuée), pas un test qui rougirait sur n'importe quoi.
+#   T4c — collision de nom : un second rôle de MÊME nom posé ailleurs sous $CODEX_HOME/agents
+#        déclenche un "startup warning" qui ne cite JAMAIS le chemin du .toml (seulement le nom
+#        et le répertoire parent) — famille de malformation distincte de T4b, doit rougir aussi.
 #   T5 — échec de conversion propre (frontmatter absent / corps vide) : exit non-zéro, message
 #        explicite, aucun .toml produit.
 set -uo pipefail
@@ -161,6 +164,34 @@ EOF
     ok "T4b (mutation tuée) : un rôle malformé sans developer_instructions DÉCLENCHE bien un 'startup warning' référençant son chemin — le détecteur ADPT-04 discrimine réellement"
   else
     ko "T4b : le détecteur ADPT-04 ne discrimine PAS un rôle malformé (aucun startup warning trouvé) — le gate T4 pourrait passer sur n'importe quoi"
+  fi
+
+  # T4c — collision de nom (revue Phase 38, finding majeur) : MESURÉ, un second rôle de MÊME nom
+  # posé ailleurs sous $CODEX_HOME/agents déclenche un 'startup warning' de forme DIFFÉRENTE
+  # ("duplicate agent role name `<name>` discovered in <AGENTS_DIR>") qui ne cite JAMAIS le
+  # chemin du .toml — seulement le nom du rôle et le répertoire PARENT. Avant fix, le check ne
+  # cherchait que '$ROLE_TOML' et déclarait 'ADPT-04 vérifié' malgré la collision (rouge avant
+  # fix reproduit hors suite, cf. digest de mission). Ici : rejoue --verify avec le rôle déjà
+  # posé par T4 PLUS un doublon de même nom au niveau parent — doit rougir (exit 1) et le
+  # message doit citer la collision, pas juste "vérifié".
+  COLLISION_DIR="$CODEX_HOME_ISOLATED/agents"
+  COLLISION_TOML="$COLLISION_DIR/vf-content-writer.toml"
+  cat > "$COLLISION_TOML" <<'EOF'
+name = "vf-content-writer"
+description = "role de collision (T4c) — même nom que le rôle vibeflow/vf-content-writer.toml posé par T4"
+developer_instructions = """
+placeholder body collision T4c
+"""
+EOF
+  REG_OUT_T4C="$(bash "$REGISTER" "$FIXTURE_AGENT" --codex-home "$CODEX_HOME_ISOLATED" --verify 2>&1)"
+  REG_STATUS_T4C=$?
+  rm -f "$COLLISION_TOML"
+  if [ "$REG_STATUS_T4C" -ne 0 ] \
+    && printf '%s' "$REG_OUT_T4C" | grep -qi 'ADPT-04 ÉCHEC' \
+    && printf '%s' "$REG_OUT_T4C" | grep -qi 'collision'; then
+    ok "T4c : collision de nom (rôle dupliqué sous \$CODEX_HOME/agents) → ADPT-04 ÉCHEC, exit non-zéro (le warning ne cite jamais \$ROLE_TOML mais le check le détecte quand même)"
+  else
+    ko "T4c : collision de nom NON détectée (status=$REG_STATUS_T4C, out='$REG_OUT_T4C') — ADPT-04 se déclarerait vérifié alors que Codex ignore un rôle en silence"
   fi
 fi
 

@@ -123,12 +123,27 @@ if [ "$DO_VERIFY" -eq 1 ]; then
     echo "[register-codex-agent] 'codex doctor --json' n'a rendu aucun JSON exploitable sur CODEX_HOME=$RESOLVED_CODEX_HOME — vérification ADPT-04 impossible" >&2
     exit 1
   fi
-  if printf '%s' "$DOCTOR_JSON" | grep -F "$ROLE_TOML" | grep -qi 'startup warning'; then
+  # MESURÉ (Codex 0.150.1, revue Phase 38 ADPT-04) : un SECOND cas de "startup warning" existe,
+  # sur une famille de malformation DIFFÉRENTE de celle ci-dessus — une COLLISION DE NOM entre
+  # deux rôles ("Ignoring malformed agent role definition: duplicate agent role name `<name>`
+  # discovered in <AGENTS_DIR>"). Ce warning ne référence JAMAIS le chemin du .toml (ni le
+  # fautif, ni celui qu'on vient de poser) — seulement AGENT_NAME et le RÉPERTOIRE PARENT
+  # $CODEX_HOME/agents. Un check limité à `grep -F "$ROLE_TOML"` (le cas malformé ci-dessus) ne
+  # voit donc RIEN passer : reproductible en réel, le rôle qu'on vient de poser peut être celui
+  # que Codex ignore silencieusement, et ADPT-04 se déclarerait quand même "vérifié".
+  WARNING_LINES="$(printf '%s' "$DOCTOR_JSON" | grep -i 'startup warning')"
+  DUPLICATE_PATTERN="duplicate agent role name \`${AGENT_NAME}\`"
+  if printf '%s' "$WARNING_LINES" | grep -qF "$ROLE_TOML"; then
     echo "[register-codex-agent] ADPT-04 ÉCHEC : '$ROLE_TOML' apparaît dans un 'startup warning' de 'codex doctor --json' — rôle malformé, IGNORÉ en silence par Codex (piège n°1)" >&2
-    printf '%s\n' "$DOCTOR_JSON" | grep -F "$ROLE_TOML" >&2
+    printf '%s\n' "$WARNING_LINES" | grep -F "$ROLE_TOML" >&2
     exit 1
   fi
-  echo "[register-codex-agent] ADPT-04 vérifié : aucun 'startup warning' de 'codex doctor --json' ne référence '$ROLE_TOML' (CODEX_HOME=$RESOLVED_CODEX_HOME) — vérification par ABSENCE, seul signal exposé par le binaire (mesuré : le binaire n'énumère jamais les rôles valides par nom)"
+  if printf '%s' "$WARNING_LINES" | grep -qF "$DUPLICATE_PATTERN"; then
+    echo "[register-codex-agent] ADPT-04 ÉCHEC : collision de nom — un 'startup warning' de 'codex doctor --json' signale '$DUPLICATE_PATTERN' (rôle IGNORÉ en silence par Codex ; ce warning ne cite jamais '\$ROLE_TOML', seulement le nom et \$CODEX_HOME/agents — un check limité au chemin ne l'aurait pas vu)" >&2
+    printf '%s\n' "$WARNING_LINES" | grep -F "$DUPLICATE_PATTERN" >&2
+    exit 1
+  fi
+  echo "[register-codex-agent] ADPT-04 vérifié : aucun 'startup warning' de 'codex doctor --json' ne référence '$ROLE_TOML' ni une collision de nom sur '$AGENT_NAME' (CODEX_HOME=$RESOLVED_CODEX_HOME) — vérification par ABSENCE sur les deux familles de malformation mesurées, seul signal exposé par le binaire (il n'énumère jamais les rôles valides par nom)"
 fi
 
 exit 0

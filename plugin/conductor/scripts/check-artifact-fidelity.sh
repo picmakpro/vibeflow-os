@@ -103,17 +103,31 @@ if [ -n "$JUDGE_CMD_FILE" ]; then
     echo "[check-artifact-fidelity] commande de juge introuvable : $JUDGE_CMD_FILE (lot 5 — pose des rôles Codex, FIDE-03/D-38-O — pas encore livré sur ce poste)" >&2
     exit 3
   fi
-  # Flatten : la commande réelle s'écrit sur plusieurs lignes (continuations '\'), la mesure ne
-  # doit pas dépendre du découpage en lignes du fichier qui la porte.
-  FLAT="$(tr '\n' ' ' < "$JUDGE_CMD_FILE")"
+  # Scope à jamais la mesure au BLOC DE COMMANDE (premier fence ```bash … ```), JAMAIS au
+  # fichier entier. Défaut mesuré (revue Phase 38, FIDE-03) : le fichier répète chaque flag en
+  # PROSE sous le bloc (ex. titre, liste explicative « 1. `-s read-only` — … ») — muter
+  # UNIQUEMENT la ligne de commande réelle en laissant cette prose intacte laissait l'ancien
+  # gate (aplatissement `tr` du fichier entier) à COMPLET, les 4 fois, sur les 4 mutations.
+  # La commande qu'un opérateur copie-colle est CE bloc, jamais le texte autour — c'est donc lui,
+  # et lui seul, que ce gate doit vérifier.
+  CMD_BLOCK="$(awk '
+    found_done { next }
+    /^```bash[[:space:]]*$/ { c=1; next }
+    /^```[[:space:]]*$/ { if (c == 1) { c = 0; found_done = 1 }; next }
+    c { print }
+  ' "$JUDGE_CMD_FILE" | tr '\n' ' ')"
+  if [ -z "$CMD_BLOCK" ]; then
+    echo "[check-artifact-fidelity] aucun bloc de commande (\`\`\`bash ... \`\`\`) dans $JUDGE_CMD_FILE — impossible de mesurer la commande réelle (jamais un repli sur la prose)" >&2
+    exit 3
+  fi
   MISSING=""
-  printf '%s' "$FLAT" | grep -qE -- '-s[[:space:]]+read-only' \
+  printf '%s' "$CMD_BLOCK" | grep -qE -- '-s[[:space:]]+read-only' \
     || MISSING="${MISSING:+$MISSING,}sandbox_mode(-s read-only)"
-  printf '%s' "$FLAT" | grep -qE 'approval_policy[^,]*never' \
+  printf '%s' "$CMD_BLOCK" | grep -qE 'approval_policy[^,]*never' \
     || MISSING="${MISSING:+$MISSING,}approval_policy=never"
-  printf '%s' "$FLAT" | grep -qF 'skills.include_instructions=false' \
+  printf '%s' "$CMD_BLOCK" | grep -qF 'skills.include_instructions=false' \
     || MISSING="${MISSING:+$MISSING,}skills.include_instructions=false"
-  printf '%s' "$FLAT" | grep -qF 'project_doc_max_bytes=0' \
+  printf '%s' "$CMD_BLOCK" | grep -qF 'project_doc_max_bytes=0' \
     || MISSING="${MISSING:+$MISSING,}project_doc_max_bytes=0"
 
   if [ -z "$MISSING" ]; then

@@ -21,6 +21,13 @@
 #        une fois la commande complète rejouée — même fixture, même helper, seul l'élément
 #        retiré change, pour prouver que chaque rouge vient bien de CET élément (pas d'un
 #        fixture mort).
+#   T14-T18 — MÊME famille de mutation, mais ancrée sur le FICHIER RÉEL POSÉ
+#        (codex-judge-session-command.md), qui répète chaque flag en PROSE sous le bloc de
+#        commande — une fixture idéalisée (T10-T13) ne peut PAS attraper le défaut mesuré en
+#        revue (FIDE-03) : muter la ligne de commande réelle en laissant la prose intacte
+#        laissait l'ancien gate à COMPLET. T14 = sonde (prose dupliquée présente) + contrôle
+#        vert avant mutation. T15-T18 = les 4 mutations rejouées sur CE fichier, prose vérifiée
+#        intacte à chaque fois, doivent rougir.
 #
 # Convention : asserts numérotés, helpers ok()/ko()/skip(), exit 0 si tout passe (SKIP non
 # bloquant), exit 1 si au moins un KO. Calqué sur le pattern de test-vibeflow-update.sh.
@@ -273,10 +280,12 @@ fi
 # ---------------------------------------------------------------------------
 COMPLETE_JUDGE_CMD="$WORK/judge-cmd-complete.sh"
 cat > "$COMPLETE_JUDGE_CMD" <<'CMDEOF'
+```bash
 codex exec -s read-only -c approval_policy='"never"' \
   -c skills.include_instructions=false \
   -c project_doc_max_bytes=0 \
   --output-schema schema.json "mandat, chemins absolus"
+```
 CMDEOF
 
 # Contrôle : la commande complète doit être VERTE avant tout mutant (sinon un rouge ci-dessous
@@ -336,6 +345,97 @@ run_mutation_case 12 "$MUT_SKILLS" "skills.include_instructions=false"
 MUT_DOCBYTES="$WORK/mut-docbytes.sh"
 sed '/project_doc_max_bytes=0/d' "$COMPLETE_JUDGE_CMD" > "$MUT_DOCBYTES"
 run_mutation_case 13 "$MUT_DOCBYTES" "project_doc_max_bytes=0"
+
+# ---------------------------------------------------------------------------
+# T14-T18 — même famille de mutation, mais sur le FICHIER RÉEL POSÉ
+# (codex-judge-session-command.md), pas sur COMPLETE_JUDGE_CMD (fixture synthétique qui ne
+# contient QUE la ligne de commande, sans la prose dupliquée du fichier réel). Défaut mesuré
+# (revue Phase 38, FIDE-03) : ce fichier répète chaque flag en PROSE sous le bloc de commande
+# (titre, liste explicative « 1. `-s read-only` — … ») — jusqu'à 3 fois pour `read-only` et
+# `skills.include_instructions=false`. L'ancien gate aplatissait le fichier ENTIER et cherchait
+# les 4 motifs n'importe où : muter UNIQUEMENT la ligne de commande réelle en laissant la prose
+# intacte le laissait à COMPLET, les 4 fois — une fixture idéalisée NE PEUT PAS attraper ce
+# défaut par construction (c'est précisément lui qui rendait test-check-artifact-fidelity.sh
+# vert malgré le trou). D'où T14 : un test ancré sur le fichier réel, PUIS T15-T18 : les 4
+# mutations rejouées dessus, chacune retirant l'élément UNIQUEMENT du bloc de commande (jamais
+# de la prose), qui doit rougir.
+# ---------------------------------------------------------------------------
+REAL_JUDGE_CMD_FILE="$REPO/plugin/_internal/runtime-adapter/codex-judge-session-command.md"
+
+if [ ! -f "$REAL_JUDGE_CMD_FILE" ]; then
+  skip "T14-T18 : fichier réel introuvable ($REAL_JUDGE_CMD_FILE)"
+else
+  # T14 — contrôle : le fichier réel, non muté, doit être vert AVANT toute mutation (sinon un
+  # rouge ci-dessous ne prouverait rien) — ET ce fichier porte bien la prose dupliquée mesurée
+  # (sinon T15-T18 ne discrimineraient rien : sonde décisive avant le test décisif lui-même).
+  REAL_READONLY_COUNT="$(grep -c 'read-only' "$REAL_JUDGE_CMD_FILE")"
+  if [ "$REAL_READONLY_COUNT" -ge 2 ]; then
+    ok "T14.sonde : le fichier réel répète 'read-only' hors du bloc de commande ($REAL_READONLY_COUNT occurrences) — la prose dupliquée mesurée est bien présente"
+  else
+    ko "T14.sonde : le fichier réel ne répète plus 'read-only' en dehors du bloc de commande ($REAL_READONLY_COUNT occurrence) — T15-T18 ne discrimineraient plus rien, à revoir"
+  fi
+
+  T14_OUT="$(bash "$GATE" --check-judge-command "$REAL_JUDGE_CMD_FILE" 2>"$WORK/t14.err")"
+  T14_RC=$?
+  if [ "$T14_RC" -eq 0 ] && printf '%s' "$T14_OUT" | grep -q '^\[fidelity-judge-command\].*COMPLET'; then
+    ok "T14.contrôle : fichier réel posé, non muté → exit 0 COMPLET avant toute mutation"
+  else
+    ko "T14.contrôle : fichier réel attendu vert, obtenu rc=$T14_RC sortie='$T14_OUT'"
+  fi
+
+  run_real_mutation_case() {
+    # $1 = numéro de test, $2 = ligne(s) du BLOC DE COMMANDE (14-19) à muter via sed, $3 =
+    # fragment attendu dans manque=, $4 = description de la mutation, $5 = fragment de PROSE
+    # invariant attendu toujours présent après mutation (ancre par CONTENU, jamais par numéro de
+    # ligne : une suppression de ligne dans le bloc de commande décale tout ce qui suit —
+    # comparer des plages de lignes absolues donnerait un faux « prose touchée »).
+    local n="$1" sed_expr="$2" expect_missing="$3" desc="$4" prose_anchor="$5"
+    local mutated="$WORK/real-mut-$n.md"
+    sed "$sed_expr" "$REAL_JUDGE_CMD_FILE" > "$mutated"
+
+    # Sonde : la prose doit toujours porter ce fragment invariant — la mutation ne doit toucher
+    # QUE le bloc de commande, jamais la prose qui répète le même motif juste en dessous (sinon
+    # le test ne reproduirait pas le défaut réel : « éditeur qui touche la commande sans toucher
+    # la prose »).
+    if grep -qF "$prose_anchor" "$mutated"; then
+      ok "T$n.confinement : prose intacte ('$prose_anchor' toujours présent) — seul le bloc de commande a été muté"
+    else
+      ko "T$n.confinement : la prose a été touchée par la mutation ($desc) — le test ne reproduit plus le défaut réel"
+    fi
+
+    local mout mrc
+    mout="$(bash "$GATE" --check-judge-command "$mutated" 2>"$WORK/real-mut-$n.err")"
+    mrc=$?
+    if [ "$mrc" -eq 1 ]; then
+      ok "T$n.rouge : $desc retiré du bloc de commande SEUL (prose intacte) → exit 1"
+    else
+      ko "T$n.rouge : attendu exit 1 ($desc, fichier réel, prose intacte), obtenu $mrc (sortie: '$mout')"
+    fi
+    if printf '%s' "$mout" | grep -qF "$expect_missing"; then
+      ok "T$n.diagnostic : manque= cite '$expect_missing' sur le fichier réel"
+    else
+      ko "T$n.diagnostic : 'manque=' ne cite pas '$expect_missing' sur le fichier réel (sortie: '$mout')"
+    fi
+  }
+
+  # T15 — retire "-s read-only " de la ligne 15 (commande) uniquement ; la prose l.1 et l.21
+  # continue de porter "read-only".
+  run_real_mutation_case 15 '15s/-s read-only //' "sandbox_mode" "sandbox_mode (-s read-only)" \
+    "confinement d'écriture réel"
+
+  # T16 — retire "-c approval_policy='\"never\"' " de la ligne 15 uniquement.
+  run_real_mutation_case 16 "15s/-c approval_policy='\"never\"' //" "approval_policy=never" "approval_policy=never" \
+    "aucune invite d'escalade côté juge"
+
+  # T17 — supprime la ligne 16 (skills.include_instructions=false) du bloc de commande
+  # uniquement ; la prose l.10 et l.24 continue de le citer.
+  run_real_mutation_case 17 '16d' "skills.include_instructions=false" "skills.include_instructions=false" \
+    "ferme le bloc"
+
+  # T18 — supprime la ligne 17 (project_doc_max_bytes=0) du bloc de commande uniquement.
+  run_real_mutation_case 18 '17d' "project_doc_max_bytes=0" "project_doc_max_bytes=0" \
+    "ferme le canal"
+fi
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
