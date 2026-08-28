@@ -835,6 +835,48 @@ NEWER=$(find "$LAB/.claude" -newer "$TS_MARK" -type f 2>/dev/null || true)
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
+# T21 (38-CORR, DISCRIMINANT) — le glob de sélection de backup doit être ANCRÉ sur le nom EXACT
+# du module, pas seulement préfixé. Cas réel de ce dépôt : `plugin/mobile-test/` ET
+# `plugin/mobile-test-team/` coexistent. Deux backups posés CÔTE À CÔTE, celui du mauvais module
+# ("mobile-test-team-...") PLUS RÉCENT (c'est la fraîcheur qui déclenche le bug : `ls -1dt` trie
+# par mtime) — avant le fix, `rollback mobile-test` sélectionnait ce backup voisin et restaurait
+# son contenu/sa version sous le nom "mobile-test", silencieusement.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+BACKUP="$LAB/.claude/.backups"
+mkdir -p "$LAB/.claude/skills"
+mkdir -p "$BACKUP/mobile-test-20260101-000000/skills"
+echo "MARKER-MOBILETEST" > "$BACKUP/mobile-test-20260101-000000/skills/marker.md"
+printf 'v-mobile-test\n' > "$BACKUP/mobile-test-20260101-000000/.version"
+sleep 1
+mkdir -p "$BACKUP/mobile-test-team-20260228-999999/skills"
+echo "MARKER-MOBILETESTTEAM" > "$BACKUP/mobile-test-team-20260228-999999/skills/marker.md"
+printf 'v-mobile-test-team\n' > "$BACKUP/mobile-test-team-20260228-999999/.version"
+
+OUT=$(cd "$LAB" && VF_SCOPE=project bash "$INSTALLER" rollback mobile-test 2>&1)
+miss=0
+echo "$OUT" | "$GREP" -q 'depuis .*/mobile-test-team-' \
+  && { ko "T21 (38-CORR, DISCRIMINANT) : rollback mobile-test a sélectionné le backup du voisin mobile-test-team-*"; miss=1; }
+if [ -f "$LAB/.claude/skills/mobile-test/marker.md" ]; then
+  "$GREP" -q 'MARKER-MOBILETEST$' "$LAB/.claude/skills/mobile-test/marker.md" \
+    || { ko "T21 (38-CORR, DISCRIMINANT) : marker restauré n'est pas MARKER-MOBILETEST (obtenu : $(cat "$LAB/.claude/skills/mobile-test/marker.md" 2>/dev/null))"; miss=1; }
+else
+  ko "T21 (38-CORR, DISCRIMINANT) : skills/mobile-test/marker.md absent après rollback"
+  miss=1
+fi
+REG=$("$GREP" '^mobile-test=' "$LAB/.claude/scripts/.vibeflow-installed" 2>/dev/null | cut -d= -f2)
+[ "$REG" = "v-mobile-test" ] \
+  || { ko "T21 (38-CORR, DISCRIMINANT) : registre mobile-test='$REG' (attendu 'v-mobile-test', jamais 'v-mobile-test-team')"; miss=1; }
+[ "$miss" -eq 0 ] \
+  && ok "T21 (38-CORR, DISCRIMINANT) : rollback mobile-test sélectionne SON backup, jamais celui plus récent de mobile-test-team-*"
+rm -rf "$LAB"
+
+# T16 (ROLL-04) doit rester vert après ce resserrement du glob : un backup -removed-only
+# commence bien par un chiffre après le tiret ('...-removed' suit l'horodatage), donc il matche
+# toujours `[0-9]*` puis reste filtré par `grep -v -- '-removed$'` — non-régression déjà couverte
+# plus haut dans ce fichier (bloc T16), reconfirmée ici en commentaire pour la revue.
+
+# ---------------------------------------------------------------------------
 # Garde-fou final : le vrai ~/.claude est inchangé (snapshot récursif avant=après).
 # ---------------------------------------------------------------------------
 HOME_AFTER=$(snapshot_home_claude)

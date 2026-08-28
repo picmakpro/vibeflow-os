@@ -1708,16 +1708,27 @@ rollback_module() {
   # pas une pose de module (rien à consigner). --dry-run fonctionne depuis ce lot (ROLL-05,
   # 38-03) ; la non-migration vers le socle manifeste reste inchangée sur ce point précis.
   local mod="$1"
-  # Find latest backup — glob non ancré `"$BACKUP_DIR/$mod"-*` matché puis FILTRÉ (38-03,
-  # ROLL-04) : exclut les répertoires `$mod-<ts>-removed` écrits par vf_converge_apply (motif
-  # exact ligne ~2029). Sans ce filtre, `ls -1dt` triait un `-removed` récent en tête, qui ne
-  # porte aucun sous-dossier skills/agents/scripts/hooks — le `rm -rf` n'était alors jamais
-  # atteint et la fonction loggait quand même `✓ rollback OK` sur zéro action réelle (le défaut
-  # mesuré au cadrage 38-CONTEXT.md lignes 216-234).
+  # Find latest backup — glob ANCRÉ sur le format exact du suffixe horodatage écrit par
+  # backup_module (`date +%Y%m%d-%H%M%S`, ligne ~1660) : 8 chiffres, tiret, 6 chiffres, puis
+  # FILTRÉ (38-03, ROLL-04) pour exclure les répertoires `$mod-<ts>-removed` écrits par
+  # vf_converge_apply (motif exact ligne ~2029). Sans ce filtre, `ls -1dt` triait un `-removed`
+  # récent en tête, qui ne porte aucun sous-dossier skills/agents/scripts/hooks — le `rm -rf`
+  # n'était alors jamais atteint et la fonction loggait quand même `✓ rollback OK` sur zéro
+  # action réelle (le défaut mesuré au cadrage 38-CONTEXT.md lignes 216-234).
+  #
+  # 38-CORR (revue post-ROLL) : un glob `"$mod"-*` NON ancré matche aussi les backups d'un AUTRE
+  # module dont le nom commence par le même préfixe — cas réel de ce dépôt, `plugin/mobile-test/`
+  # et `plugin/mobile-test-team/` coexistent. `rollback mobile-test` sélectionnait alors (via
+  # `ls -1dt`, tri par mtime) le backup le plus récent de `mobile-test-team-*` si celui-ci était
+  # postérieur — mauvais module restauré, silencieusement. Le glob ci-dessous exige que le
+  # caractère qui suit `$mod-` soit un CHIFFRE (`[0-9]*`, début de l'horodatage `date
+  # +%Y%m%d-%H%M%S` écrit par backup_module) : un nom de module qui continue par du texte
+  # (`-team-...`) ne peut plus matcher. Le filtre `-removed$` reste nécessaire après ce
+  # resserrement — `mobile-test-20260228-999999-removed` commence bien par un chiffre.
   local -a candidates=()
   while IFS= read -r c; do
     [ -n "$c" ] && candidates+=("$c")
-  done < <(ls -1dt "$BACKUP_DIR/$mod"-* 2>/dev/null | grep -v -- '-removed$' || true)
+  done < <(ls -1dt "$BACKUP_DIR/$mod"-[0-9]* 2>/dev/null | grep -v -- '-removed$' || true)
   local latest="${candidates[0]:-}"
   [ -z "$latest" ] && err "Aucun backup restaurable pour $mod dans $BACKUP_DIR (aucun backup, ou uniquement des répertoires de convergence -removed sans contenu restaurable)"
 
