@@ -690,7 +690,10 @@ rm -rf "$T2E_HOME" "$T2E_BIN"; rm -f "$T2E_NPX_TRACE"
 # pas — il RÉTROGRADE en silence vers 1.10.0. Le seuil et la réparation sont donc l'un et l'autre
 # des invariants de distribution, pas du confort local.
 #
-# Harnais commun : PATH stubé (aucun outil réel de l'hôte), HOME jetable, trace npx. Le stub `node`
+# Harnais commun : PATH stubé (aucun outil réel de l'hôte), HOME jetable, trace npx, et NVM_DIR
+# NEUTRALISÉ — un runner CI qui l'exporte ferait sourcer le nvm RÉEL de la machine avant que le
+# gestionnaire stubé soit atteint : le cas lancerait une vraie install et n'observerait plus son
+# objet (constaté en CI le 2026-08-28, vert en local et rouge sur runner). Le stub `node`
 # lit sa version dans un fichier témoin, ce qui permet à un gestionnaire simulé de la faire changer
 # EN COURS D'EXÉCUTION — c'est le seul moyen d'observer la reprise du bootstrap après réparation.
 t2n_make_env() { # <version-initiale> → exporte T2N_BIN, T2N_HOME, T2N_TRACE, T2N_VER, T2N_BIN24
@@ -723,7 +726,7 @@ SH
 # T2e-A (SEUIL) — Node 22 : passait la garde AVANT gsd-core 1.11.0, doit être refusé MAINTENANT.
 # C'est le cas qui aurait attrapé la rétrogradation silencieuse en 1.10.0.
 t2n_make_env 22
-T2NA_OUT=$(env -u VF_ENSURE_FORCE HOME="$T2N_HOME" PATH="$T2N_BIN:/usr/bin:/bin" \
+T2NA_OUT=$(env -u VF_ENSURE_FORCE -u NVM_DIR HOME="$T2N_HOME" PATH="$T2N_BIN:/usr/bin:/bin" \
   VF_ENSURE_AUTO_NODE=0 bash "$ENS" 2>&1)
 if echo "$T2NA_OUT" | "$GREP" -q "Node ≥ 24" && [ ! -s "$T2N_TRACE" ]; then
   ok "T2e-A seuil : Node 22 (suffisant pour 1.10.0, insuffisant pour 1.11.0) REFUSÉ, npx jamais invoqué"
@@ -744,7 +747,7 @@ esac
 exit 0
 SH
 chmod +x "$T2N_BIN/fnm"
-T2NB_OUT=$(env -u VF_ENSURE_FORCE HOME="$T2N_HOME" PATH="$T2N_BIN:/usr/bin:/bin" bash "$ENS" 2>&1)
+T2NB_OUT=$(env -u VF_ENSURE_FORCE -u NVM_DIR HOME="$T2N_HOME" PATH="$T2N_BIN:/usr/bin:/bin" bash "$ENS" 2>&1)
 if "$GREP" -q "npx-invoked" "$T2N_TRACE" 2>/dev/null && echo "$T2NB_OUT" | "$GREP" -q "reprise du bootstrap"; then
   ok "T2e-B réparation : gestionnaire présent piloté → Node 24 actif, bootstrap REPRIS (npx invoqué)"
 else
@@ -760,7 +763,7 @@ echo "fnm-invoked" >> "$T2N_TRACE"
 exit 0
 SH
 chmod +x "$T2N_BIN/fnm"
-T2NC_OUT=$(env -u VF_ENSURE_FORCE HOME="$T2N_HOME" PATH="$T2N_BIN:/usr/bin:/bin" \
+T2NC_OUT=$(env -u VF_ENSURE_FORCE -u NVM_DIR HOME="$T2N_HOME" PATH="$T2N_BIN:/usr/bin:/bin" \
   VF_ENSURE_AUTO_NODE=0 bash "$ENS" 2>&1)
 if [ ! -s "$T2N_TRACE" ] && echo "$T2NC_OUT" | "$GREP" -q "Auto-install Node désactivée" \
    && echo "$T2NC_OUT" | "$GREP" -q "Étape manuelle Node"; then
@@ -781,7 +784,7 @@ cat > "$T2N_BIN/curl" <<'SH'
 exit 1
 SH
 chmod +x "$T2N_BIN/fnm" "$T2N_BIN/curl"
-T2ND_OUT=$(env -u VF_ENSURE_FORCE HOME="$T2N_HOME" PATH="$T2N_BIN:/usr/bin:/bin" bash "$ENS" 2>&1)
+T2ND_OUT=$(env -u VF_ENSURE_FORCE -u NVM_DIR HOME="$T2N_HOME" PATH="$T2N_BIN:/usr/bin:/bin" bash "$ENS" 2>&1)
 T2ND_RC=$?
 if echo "$T2ND_OUT" | "$GREP" -q "L'auto-install Node a échoué" && [ ! -s "$T2N_TRACE" ] && [ "$T2ND_RC" -eq 0 ]; then
   ok "T2e-D échec bruyant : réparation impossible → dit, npx jamais invoqué, bootstrap non tué (rc=0)"
