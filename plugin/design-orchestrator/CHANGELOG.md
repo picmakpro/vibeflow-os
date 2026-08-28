@@ -9,7 +9,8 @@ CLI `claude` détectée) :
   et `process_plugin()` (`enable`, `marketplace add`, `install`) routent désormais par
   `plugin/_internal/runtime-cli-dispatch.sh` au lieu d'un `command -v claude`/`claude plugin`
   figé. Sur `claude` ou `codex`, le geste RÉEL (activation/install/marketplace) s'exécute — même
-  grammaire d'arguments. Sur un runtime non détecté ou non supporté (OpenCode/kimi-code, non
+  grammaire d'arguments assumée par défaut (non mesurée sur le binaire réel, 38-CONTEXT.md). Sur
+  un runtime non détecté ou non supporté (OpenCode/kimi-code, non
   mesurés), dégradation DÉCLARÉE (étape manuelle par plugin, exit propre) — jamais un échec
   silencieux. La machine à états S1 JSON / S2 awk texte de `detect_all()` est INTÉGRALEMENT
   conservée : seul le sous-processus invoqué change, jamais le parsing de sa sortie.
@@ -17,8 +18,14 @@ CLI `claude` détectée) :
   inchangée.
 - Repli inchangé si le script partagé est introuvable (poste pas encore mis à jour) :
   comportement `claude`-figé ACTUEL, aucune régression (T9e mis à jour pour reconnaître cette
-  exception SANCTIONNÉE — un artefact partagé de l'engine, pas « un autre module » au sens D-04 —
-  sans affaiblir la garde d'autonomie sur toute autre résolution).
+  exception au SOCLE — `plugin/_internal/` est hors périmètre D-04 (pas de `VERSION`/`module.json`/
+  `CHANGELOG.md`, précédent `find_engine_lib()`/`find_hooks_merger()`), ratifiée le 2026-08-28,
+  pas « un autre module » au sens D-04). **Correction de véracité (revue lot 2)** : la garde T9e
+  posée initialement filtrait sur la SOUS-CHAÎNE `runtime-cli-dispatch.sh` n'importe où sur la
+  ligne — elle était donc affaiblie sur l'axe cross-module (une résolution déguisée sous le même
+  nom de fichier, invoquée sans `bash`/`source`, passait le garde). Resserrée à la ligne EXACTE
+  exemptée (ancre littérale sur la substring complète), avec les 3 cas de mutation (cross-module
+  déguisé, dirname non lié, ligne légitime) commités comme tests de régression permanents.
 
 ## [v1.5.2] — 2026-08-17 (Phase 32, doctrine du verrou resynchronisée)
 

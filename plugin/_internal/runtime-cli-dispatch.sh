@@ -19,8 +19,10 @@
 # d'environnement propriétaire d'un runtime tiers non mesurée.
 #
 # Runtimes RÉELLEMENT exécutés : `claude` (comportement actuel inchangé — `claude plugin ...`) et
-# `codex` (canal natif `codex plugin`, confirmé 38-CONTEXT.md « canal natif », MÊME forme
-# d'arguments). Tout le reste (opencode, kimi-code — non mesurés sur ce poste, ou runtime absent)
+# `codex` (canal natif `codex plugin`, assumé par défaut — MÊME forme d'arguments — mais NON
+# mesuré sur le binaire réel : 38-CONTEXT.md liste en « Inconnus déclarés » que la commande exacte
+# de sous-installation Codex après `codex plugin marketplace add` n'est pas mesurée). Tout le reste
+# (opencode, kimi-code — non mesurés sur ce poste, ou runtime absent)
 # → message d'étape manuelle + exit 0 (RUNT-02 : dégradation DÉCLARÉE, jamais un crash, jamais une
 # exécution devinée pour une cible non mesurée).
 #
@@ -81,7 +83,8 @@ manual_step_message() {
 }
 
 # ---------- Construction + exécution d'un verbe CLI sur un runtime SUPPORTÉ ----------
-# claude/codex partagent la MÊME grammaire d'arguments (confirmé 38-CONTEXT.md). Le code de
+# claude/codex partagent la MÊME grammaire d'arguments (assumé par défaut, non mesuré sur le
+# binaire réel — 38-CONTEXT.md). Le code de
 # sortie et le stderr du sous-processus réel sont relayés tels quels — jamais avalés.
 run_supported() {
   local runtime="$1" action="$2"

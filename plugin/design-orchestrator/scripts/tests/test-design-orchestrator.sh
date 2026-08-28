@@ -414,16 +414,44 @@ SH
   # find_hooks_merger()) — ce n'est PAS « un autre module » au sens où D-04 l'entend (dev-
   # orchestrator, conductor, planning-core, validator, skill-creator, consolidator — la même liste
   # que le garde-fou bash ci-dessous). La garde reste pleine pour TOUTE AUTRE résolution
-  # $(dirname "$0")/… : seule cette ligne précise est exemptée.
+  # $(dirname "$0")/… : seule la ligne dont la substring EXACTE est
+  # `$(dirname "$0")/runtime-cli-dispatch.sh` est exemptée (ancre littérale -F sur la substring
+  # complète, pas un simple test de présence de `runtime-cli-dispatch.sh` n'importe où sur la
+  # ligne — une résolution cross-module déguisée sous le même nom de fichier, ex.
+  # `$(dirname "$0")/../conductor/scripts/runtime-cli-dispatch.sh`, reste détectée).
   # ---------------------------------------------------------------------------
   t9e_ok=1
   EDD_STRIPPED="$("$GREP" -v '^[[:space:]]*#' "$EDD")"
   echo "$EDD_STRIPPED" | "$GREP" -qE '(^|[^A-Za-z0-9_])source[[:space:]]' && { ko "T9e autonomie : 'source' détecté (appel, pas une mention) dans ensure-design-deps.sh"; t9e_ok=0; }
   echo "$EDD_STRIPPED" | "$GREP" -qE '^[[:space:]]*\.[[:space:]]' && { ko "T9e autonomie : dot-source ('. ') détecté dans ensure-design-deps.sh"; t9e_ok=0; }
   echo "$EDD_STRIPPED" | "$GREP" -qE 'bash[[:space:]]+.*(dev-orchestrator|conductor|planning-core|validator|skill-creator|consolidator)/' && { ko "T9e autonomie : invocation bash d'un script d'un autre module détectée"; t9e_ok=0; }
-  DIRNAME_HITS="$(echo "$EDD_STRIPPED" | "$GREP" -F '$(dirname "$0")' | "$GREP" -v 'runtime-cli-dispatch\.sh' || true)"
+  DIRNAME_HITS="$(echo "$EDD_STRIPPED" | "$GREP" -F '$(dirname "$0")' | "$GREP" -vF '$(dirname "$0")/runtime-cli-dispatch.sh' || true)"
   [ -n "$DIRNAME_HITS" ] \
     && { ko "T9e autonomie : résolution \$(dirname \"\$0\")/ détectée hors de l'exception runtime-cli-dispatch.sh (motif croisé du bootstrap de dev)"; t9e_ok=0; }
+
+  # --- Cas de mutation en régression (RUNT-01, revue lot 2) — preuve que le garde T9e ci-dessus
+  # attrape (a) une résolution cross-module déguisée sous le même nom de fichier invoquée sans
+  # bash/source, (b) une résolution $(dirname "$0")/… non liée à runtime-cli-dispatch.sh, et
+  # laisse passer (c) la ligne légitime exemptée. Fixtures isolées, n'affectent pas EDD réel.
+  T9E_MUT_DIR="$(mktemp -d)"
+  printf '%s\n' 'c="$(dirname "$0")/../conductor/scripts/runtime-cli-dispatch.sh"; "$c" "$@"' > "$T9E_MUT_DIR/mutant_a.sh"
+  printf '%s\n' 'x="$(dirname "$0")/../other-module/foo.sh"' > "$T9E_MUT_DIR/mutant_b.sh"
+  printf '%s\n' 'c="$(dirname "$0")/runtime-cli-dispatch.sh"; [ -f "$c" ] && { echo "$c"; return 0; }' > "$T9E_MUT_DIR/legit.sh"
+  t9e_mut_ok=1
+  for _t9e_case in mutant_a mutant_b legit; do
+    _t9e_stripped="$("$GREP" -v '^[[:space:]]*#' "$T9E_MUT_DIR/$_t9e_case.sh")"
+    _t9e_hits="$(echo "$_t9e_stripped" | "$GREP" -F '$(dirname "$0")' | "$GREP" -vF '$(dirname "$0")/runtime-cli-dispatch.sh' || true)"
+    case "$_t9e_case" in
+      mutant_a|mutant_b)
+        [ -z "$_t9e_hits" ] && { ko "T9e mutation $_t9e_case : devait être détecté (hit attendu), ne l'a pas été"; t9e_mut_ok=0; }
+        ;;
+      legit)
+        [ -n "$_t9e_hits" ] && { ko "T9e mutation legit : ligne exemptée détectée à tort comme hit"; t9e_mut_ok=0; }
+        ;;
+    esac
+  done
+  rm -rf "$T9E_MUT_DIR"
+  [ "$t9e_mut_ok" -eq 1 ] && ok "T9e mutation : cross-module déguisé + dirname non lié détectés, ligne légitime exemptée reste verte"
   MJ="$MOD/module.json"
   req_list="$(sed -n '/"requires"/,/\]/p' "$MJ" 2>/dev/null | "$GREP" -o '"[A-Za-z0-9_-]*"' | "$GREP" -v '"requires"' | tr -d '"')"
   [ "$req_list" = "conductor" ] || { ko "T9e module.json : requires attendu ['conductor'] seul, obtenu: ${req_list:-<vide>}"; t9e_ok=0; }
@@ -549,6 +577,70 @@ SH
         ko "T9g non-silence (3/3) : le hook engine doit passer --quiet et NE PAS rediriger stderr (ligne: ${T9G_CALL:-<absente>})"
       fi
     fi
+  fi
+
+  # ---------------------------------------------------------------------------
+  # T9h — DISPATCH RÉEL, PAR EXÉCUTION (RUNT-01, revue lot 2, 38-02-PLAN.md tâche 2 acceptance
+  # criterion) : T9..T9g ci-dessus invoquent TOUJOURS `$EDD` à sa position réelle dans le module —
+  # `runtime-cli-dispatch.sh` n'y est JAMAIS à côté (il vit dans plugin/_internal/), donc
+  # `find_runtime_cli_dispatch()` (dirname "$0") ne le trouve jamais et seule la branche de repli
+  # `claude` figée est exercée, quel que soit VF_RUNTIME. Ce test copie les DEUX fichiers côte à
+  # côte (disposition réelle post-install, cf. copy_module_scripts()) pour prouver, par exécution
+  # réelle et non par lecture de code, que VF_RUNTIME=claude ET VF_RUNTIME=codex traversent
+  # detect_all()/process_plugin() jusqu'au sous-processus runtime RÉEL.
+  # ---------------------------------------------------------------------------
+  RCD="$REPO/_internal/runtime-cli-dispatch.sh"
+  if ! command -v python3 >/dev/null 2>&1 && ! command -v python >/dev/null 2>&1; then
+    skip "T9h dispatch réel : python3/python introuvables — parsing JSON impossible dans cette disposition"
+  elif [ ! -f "$RCD" ]; then
+    skip "T9h dispatch réel : runtime-cli-dispatch.sh introuvable dans $REPO/_internal/"
+  else
+    T9H_DIR="$(mktemp -d)"
+    cp "$EDD" "$T9H_DIR/ensure-design-deps.sh"
+    cp "$RCD" "$T9H_DIR/runtime-cli-dispatch.sh"
+    T9H_BIN="$(mktemp -d)"
+    T9H_JOURNAL="$(mktemp)"
+    for _t9h_rt in claude codex; do
+      cat >"$T9H_BIN/$_t9h_rt" <<SH
+#!/usr/bin/env bash
+if [ "\$1" = "plugin" ] && [ "\$2" = "list" ] && [ "\$3" = "--json" ]; then
+  echo "[]"
+  exit 0
+fi
+echo "$_t9h_rt \$*" >> "$T9H_JOURNAL"
+exit 0
+SH
+      chmod +x "$T9H_BIN/$_t9h_rt"
+    done
+
+    T9H_OK=1
+    for _t9h_rt in claude codex; do
+      : >"$T9H_JOURNAL"
+      PATH="$T9H_BIN:/usr/bin:/bin" VF_RUNTIME="$_t9h_rt" bash "$T9H_DIR/ensure-design-deps.sh" >/dev/null 2>&1
+      if "$GREP" -qF "$_t9h_rt plugin install superpowers@claude-plugins-official --scope user" "$T9H_JOURNAL"; then
+        ok "T9h dispatch réel : VF_RUNTIME=$_t9h_rt -> \`$_t9h_rt plugin install superpowers@claude-plugins-official --scope user\` capturé depuis une exécution réelle"
+      else
+        ko "T9h dispatch réel : VF_RUNTIME=$_t9h_rt attendu dans le journal, obtenu : $(cat "$T9H_JOURNAL")"
+        T9H_OK=0
+      fi
+    done
+
+    # Non-régression du test lui-même : SANS runtime-cli-dispatch.sh à côté, le chemin dispatch ne
+    # doit PLUS être exercé — VF_RUNTIME=codex doit retomber sur la branche de repli `claude`
+    # figée (ADR historique de ce script), jamais sur `codex`. Si ce cas échoue, T9h ci-dessus
+    # n'exerçait rien de plus que T9..T9g et le trou du finding 3 est toujours ouvert.
+    rm -f "$T9H_DIR/runtime-cli-dispatch.sh"
+    : >"$T9H_JOURNAL"
+    PATH="$T9H_BIN:/usr/bin:/bin" VF_RUNTIME=codex bash "$T9H_DIR/ensure-design-deps.sh" >/dev/null 2>&1
+    if "$GREP" -qF "codex plugin install" "$T9H_JOURNAL"; then
+      ko "T9h non-régression : sans runtime-cli-dispatch.sh à côté, 'codex' a quand même été invoqué — le test ne prouve plus le chemin dispatch"
+      T9H_OK=0
+    else
+      ok "T9h non-régression : sans runtime-cli-dispatch.sh à côté, repli sur la branche 'claude' figée (le chemin dispatch n'est PAS exercé par erreur)"
+    fi
+
+    rm -rf "$T9H_DIR" "$T9H_BIN"
+    rm -f "$T9H_JOURNAL"
   fi
 fi
 

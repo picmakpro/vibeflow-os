@@ -7,7 +7,8 @@ poste sans CLI `claude` détectée) :
 
 - **Le défaut, mesuré au cadrage Phase 38** : `detect_superpowers()`/`ensure_superpowers()` dans
   `ensure-deps.sh` appelaient `command -v claude` / `claude plugin ...` en dur. Sur un poste où le
-  runtime détecté n'est pas `claude` (Codex, canal natif `codex plugin` confirmé), les 2 checks et
+  runtime détecté n'est pas `claude` (Codex, canal natif `codex plugin` assumé par défaut — non
+  mesuré sur le binaire réel, 38-CONTEXT.md), les 2 checks et
   les 2 gestes d'install échouaient AVANT même d'atteindre l'adaptateur — aucun geste réel, aucune
   dégradation déclarée, juste un `command -v claude` silencieusement faux.
 - **Le fix** : les 2 sites (`detect_superpowers`, `ensure_superpowers`) routent désormais par
