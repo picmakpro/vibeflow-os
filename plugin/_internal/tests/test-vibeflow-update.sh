@@ -990,6 +990,69 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# T24 (FIDE-02) — install d'un module à agents/*.md avec conductor présent dans le cache : la
+# ligne `[fidelity]` doit apparaître VERBATIM sur le stdout de l'install (relayée telle quelle,
+# jamais résumée) — c'est toute la substance de FIDE-02 : le périmètre perdu à la conversion
+# est déclaré à la fin de la pose, pas dans un rapport séparé.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+if prepare_module "$CACHE" "content-bundle" && prepare_module "$CACHE" "conductor"; then
+  OUT=$(cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install content-bundle 2>&1)
+  miss=0
+  echo "$OUT" | "$GREP" -q '^\[fidelity\] ' \
+    || { ko "T24 (FIDE-02) : aucune ligne [fidelity] sur stdout de l'install (conductor présent au cache)"; miss=1; }
+  echo "$OUT" | "$GREP" -q '^\[fidelity-recette\] ' \
+    || { ko "T24 (FIDE-02) : aucune ligne [fidelity-recette] sur stdout de l'install"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T24 (FIDE-02) : bannière de fidélité verbatim sur stdout de l'install (content-bundle -> codex)"
+else
+  skip "T24 (FIDE-02) : content-bundle/conductor non copiables dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T25 (FIDE-02, best-effort) — conductor ABSENT du cache (gate introuvable aux 2 positions de
+# find_fidelity_gate) : l'install continue SANS échouer, silence total (jamais de ligne
+# [fidelity], jamais d'erreur qui dégraderait le reste du diagnostic d'install).
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+if prepare_module "$CACHE" "content-bundle"; then
+  OUT=$(cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install content-bundle 2>&1)
+  RC=$?
+  miss=0
+  [ "$RC" -eq 0 ] || { ko "T25 (FIDE-02, best-effort) : install a échoué (rc=$RC) alors que le gate est simplement absent"; miss=1; }
+  echo "$OUT" | "$GREP" -q '^\[fidelity\] ' \
+    && { ko "T25 (FIDE-02, best-effort) : ligne [fidelity] présente alors que conductor n'est PAS dans le cache (gate introuvable aux 2 positions)"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T25 (FIDE-02, best-effort) : gate absent -> install continue (rc=0), silence total, aucune ligne [fidelity]"
+else
+  skip "T25 (FIDE-02, best-effort) : content-bundle non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T26 (FIDE-02) — update réel (version bump) : la 2e couture (update_module, après
+# vf_converge_apply) produit AUSSI la ligne [fidelity] — pas seulement install_module au premier
+# install. Reproduit le couple v1 -> v2 déjà utilisé par T15 (ROLL) pour un module réel à agent.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+if prepare_module "$CACHE" "content-bundle" && prepare_module "$CACHE" "conductor"; then
+  (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install content-bundle >/dev/null 2>&1)
+  # Bump artificiel de version dans le cache pour forcer le chemin update (pas resync).
+  echo "v9.9.9" > "$CACHE/content-bundle/VERSION"
+  OUT=$(cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" update content-bundle 2>&1)
+  miss=0
+  N_FID=$(echo "$OUT" | "$GREP" -c '^\[fidelity\] ' || true)
+  [ "${N_FID:-0}" -ge 1 ] \
+    || { ko "T26 (FIDE-02) : aucune ligne [fidelity] sur stdout de l'update (2e couture non exercée)"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T26 (FIDE-02) : bannière de fidélité présente aussi sur un update réel (2e couture, après vf_converge_apply)"
+else
+  skip "T26 (FIDE-02) : content-bundle/conductor non copiables dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
 # Garde-fou final : le vrai ~/.claude est inchangé (snapshot récursif avant=après).
 # ---------------------------------------------------------------------------
 HOME_AFTER=$(snapshot_home_claude)
