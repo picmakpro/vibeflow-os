@@ -5,7 +5,7 @@
       {
         "matcher": "startup",
         "hooks": [
-          { "type": "command", "command": "bash {{VF_SCRIPTS}}/audit-infra.sh --quick --if-older-than=14d || true" }
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/audit-infra.sh --quick --if-older-than=14d --hook || true" }
         ]
       }
     ]

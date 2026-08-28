@@ -1,7 +1,7 @@
 {
   "name": "vibeflow",
   "displayName": "VibeFlow",
-  "version": "2.58.0",
+  "version": "2.58.1",
   "description": "Orchestrateur Claude Code piloté au langage naturel : dev + design aujourd'hui (modèle agentique : détection d'intention → briques GSD directes + équipe de mission), contenu, growth et pilotage business via 3 bundles métier complets (équipes sur le team-kernel), autres métiers fabriqués sur mesure via la Lab Factory (vf-new-lab + skill-creator). Modules toggables (gouvernance, audits, validator, kpi-analyst…) + engine d'install scopé, posés via une UX à toggles.",
   "author": {
     "name": "picmakpro"

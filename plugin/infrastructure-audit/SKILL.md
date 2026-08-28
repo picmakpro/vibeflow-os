@@ -203,7 +203,7 @@ Le trigger `/vf-audit` peut inclure une etape "Audit infrastructure" :
   "matcher": "startup",
   "hooks": [{
     "type": "command",
-    "command": "test -x .claude/scripts/audit-infra.sh && .claude/scripts/audit-infra.sh --quick --if-older-than=14d || true"
+    "command": "test -x .claude/scripts/audit-infra.sh && .claude/scripts/audit-infra.sh --quick --if-older-than=14d --hook || true"
   }]
 }]
 ```
