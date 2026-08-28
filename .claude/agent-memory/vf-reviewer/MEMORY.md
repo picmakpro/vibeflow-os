@@ -16,3 +16,5 @@
 - [Matrice à flag constant non discriminante](feedback_constant-flag-matrix-nondiscriminant.md) — T21/30-01 : 6/8 séquences vertes même sur code cassé, seule la mutation le révèle
 - [Garde multi-conditions : muter chacune](feedback_multicondition-guard-mutate-each.md) — 4/6 conditions D-31-07 mutant-mortes (31-05), dont la défense principale anti-suppression-de-masse
 - [Symlink ancêtre contourne le check TARGET_ROOT](project_symlink-ancestor-bypasses-target-root-check.md) — ADR-054 bannit realpath ; `.claude/rules` symlinké fait `rm` hors TARGET_ROOT (31-05, reproduit)
+- [Filtre grep par ligne vs occurrence](feedback_grep-line-vs-occurrence-guard.md) — grep -F|-vF exempte toute la ligne ; empile légitime+illégitime sur une ligne pour contourner (T9e, phase 38)
+- [Cascade jumelle, appelant au cycle de vie différent](feedback_cascade-twin-different-caller-lifecycle.md) — "cascade EXACTE de find_hooks_merger()" ment : runtime-cli-dispatch.sh n'est jamais posé sous TARGET_ROOT/scripts (join-1, phase 38, repro confirmé)

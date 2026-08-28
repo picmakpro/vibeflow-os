@@ -49,7 +49,7 @@
       "scope": [
         "plugin/conductor/"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "exec-install",
@@ -162,7 +162,7 @@
         "plugin/_internal/vibeflow-update.sh",
         "plugin/_internal/tests/"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "revue-target",
@@ -314,7 +314,7 @@
         "plugin/conductor/VERSION",
         "plugin/conductor/CHANGELOG.md"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "exec-sendmsg",
@@ -358,7 +358,7 @@
         "plugin/_internal/vibeflow-update.sh",
         "plugin/_internal/tests/test-vibeflow-update.sh"
       ],
-      "status": "blocked"
+      "status": "ready"
     }
   ]
 }
