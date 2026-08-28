@@ -71,6 +71,20 @@
 # tuer le script — c'est précisément la dégradation gracieuse attendue.
 set -uo pipefail
 
+# ---------- Résolution de runtime-cli-dispatch.sh (RUNT-01) ----------
+# Cascade EXACTE de find_hooks_merger() (plugin/_internal/vibeflow-update.sh) — DUPLICATION
+# DÉLIBÉRÉE (même précédent d'autonomie D-04 que le reste de ce fichier, cf. en-tête) : script
+# partagé posé par l'engine, jamais un `source`. Introuvable aux deux positions → repli sur le
+# comportement `claude`-figé ACTUEL (jamais une régression silencieuse sur un poste où le script
+# partagé n'est pas encore posé).
+find_runtime_cli_dispatch() {
+  local c
+  c="${VIBEFLOW_CACHE:-.vibeflow-cache}/_internal/runtime-cli-dispatch.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  c="$(dirname "$0")/runtime-cli-dispatch.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  echo ""
+}
+RUNTIME_CLI_DISPATCH="$(find_runtime_cli_dispatch)"
+
 # ---------- Variables ----------
 DRY_RUN="${VF_DESIGN_ENSURE_DRY_RUN:-}"
 FORCE="${VF_DESIGN_ENSURE_FORCE:-}"
@@ -160,14 +174,51 @@ print_manual_step() {
 }
 
 # ---------- Détection — cascade de sources, jamais un verdict sans preuve (T-Q-04) ----------
-CLAUDE_AVAILABLE=0
+RUNTIME_AVAILABLE=0
+RUNTIME_DETECTED=""
 INDETERMINE=0
 SOURCE_LINES=""
 
-detect_all() {
-  command -v claude >/dev/null 2>&1 && CLAUDE_AVAILABLE=1
+# Sortie runtime-aware d'une ligne « list » (json ou texte) : dispatch si trouvé (routé vers le
+# runtime détecté, claude ou codex), repli `claude` en dur si le script partagé est introuvable
+# (comportement ACTUEL, jamais une régression silencieuse).
+runtime_plugin_list() { # $1 = list-json|list-text
+  if [ -n "$RUNTIME_CLI_DISPATCH" ]; then
+    bash "$RUNTIME_CLI_DISPATCH" "$1" 2>/dev/null
+  elif [ "$1" = "list-json" ]; then
+    claude plugin list --json 2>/dev/null
+  else
+    claude plugin list 2>/dev/null
+  fi
+}
 
-  if [ "$CLAUDE_AVAILABLE" -eq 0 ]; then
+# Verbe ACTIONNABLE (install/enable/marketplace-add) via dispatch si trouvé, repli `claude` en
+# dur sinon (comportement ACTUEL). Le code de sortie du sous-processus réel est relayé.
+runtime_plugin_run() { # $1 = install|enable|marketplace-add ; suite = args
+  local verb="$1"
+  shift
+  if [ -n "$RUNTIME_CLI_DISPATCH" ]; then
+    run_cmd bash "$RUNTIME_CLI_DISPATCH" "$verb" "$@"
+  else
+    case "$verb" in
+      install) run_cmd claude plugin install "$@" ;;
+      enable) run_cmd claude plugin enable "$@" ;;
+      marketplace-add) run_cmd claude plugin marketplace add "$@" ;;
+    esac
+  fi
+}
+
+detect_all() {
+  if [ -n "$RUNTIME_CLI_DISPATCH" ]; then
+    RUNTIME_DETECTED="$(bash "$RUNTIME_CLI_DISPATCH" detect 2>/dev/null)"
+    case "$RUNTIME_DETECTED" in
+      claude | codex) RUNTIME_AVAILABLE=1 ;;
+    esac
+  else
+    command -v claude >/dev/null 2>&1 && { RUNTIME_AVAILABLE=1; RUNTIME_DETECTED="claude"; }
+  fi
+
+  if [ "$RUNTIME_AVAILABLE" -eq 0 ]; then
     # Aucune source exploitable. `installed_plugins.json` n'est PAS une source de repli ici :
     # il ne porte AUCUN champ d'activation (`enabled`) — c'est l'origine même du trou que ce
     # script ferme (découverte 2). Jamais un « présent » par défaut : indéterminé + manuel.
@@ -175,12 +226,12 @@ detect_all() {
     return 0
   fi
 
-  # S1 (primaire) : `claude plugin list --json`, parsé par $PYBIN. Une ligne `<id> <enabled>`
+  # S1 (primaire) : `<runtime> plugin list --json`, parsé par $PYBIN. Une ligne `<id> <enabled>`
   # par entrée. Purger le CR (ADR-054) avant tout parse.
   local json_tmp s1_usable
   json_tmp="$(mktemp 2>/dev/null)"
   [ -n "$json_tmp" ] || json_tmp="/tmp/vf-design-deps-json.$$"
-  claude plugin list --json 2>/dev/null | tr -d '\r' >"$json_tmp" 2>/dev/null
+  runtime_plugin_list list-json | tr -d '\r' >"$json_tmp" 2>/dev/null
 
   s1_usable=0
   if [ -n "$PYBIN" ] && [ -s "$json_tmp" ]; then
@@ -219,7 +270,7 @@ PY
   local plain_tmp
   plain_tmp="$(mktemp 2>/dev/null)"
   [ -n "$plain_tmp" ] || plain_tmp="/tmp/vf-design-deps-plain.$$"
-  claude plugin list 2>/dev/null | tr -d '\r' >"$plain_tmp" 2>/dev/null
+  runtime_plugin_list list-text | tr -d '\r' >"$plain_tmp" 2>/dev/null
   SOURCE_LINES="$(awk '
     {
       if (match($0, /[A-Za-z0-9._-]+@[A-Za-z0-9._-]+/) > 0) {
@@ -302,7 +353,7 @@ process_plugin() { # name marketplace mkt_add
       fi
       if valid_plugin_id "$chosen"; then
         notice "$name : installé mais DÉSACTIVÉ → réactivation scopée ($chosen, scope=$SCOPE)."
-        if run_cmd claude plugin enable "$chosen" --scope "$SCOPE"; then
+        if runtime_plugin_run enable "$chosen" --scope "$SCOPE"; then
           final="réactivé"
         else
           err "$name : échec de la réactivation ($chosen)."
@@ -321,10 +372,10 @@ process_plugin() { # name marketplace mkt_add
       # dry-run observable (FORCE), et `claude plugin marketplace add` supporte bien `--scope`.
       notice "$name : absent → installation scopée (${name}@${marketplace}, scope=$SCOPE)."
       if [ "$mkt_add" != "-" ]; then
-        run_cmd claude plugin marketplace add "$mkt_add" --scope "$SCOPE" \
+        runtime_plugin_run marketplace-add "$mkt_add" --scope "$SCOPE" \
           || notice "$name : ajout du marketplace $mkt_add en échec (peut-être déjà enregistré) — tentative d'install quand même."
       fi
-      if run_cmd claude plugin install "${name}@${marketplace}" --scope "$SCOPE"; then
+      if runtime_plugin_run install "${name}@${marketplace}" --scope "$SCOPE"; then
         final="installé"
       else
         err "$name : échec de l'installation."
@@ -344,7 +395,7 @@ main() {
   detect_all
 
   if [ "$INDETERMINE" -eq 1 ]; then
-    err "CLI 'claude' introuvable — impossible de vérifier présence/activation. Étapes manuelles :"
+    err "Aucun runtime CLI supporté détecté (claude/codex) — impossible de vérifier présence/activation. Étapes manuelles :"
   fi
 
   # TABLE DES 4 PLUGINS — littérale, jamais dérivée de l'environnement ni d'une entrée JSON

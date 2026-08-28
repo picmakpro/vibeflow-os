@@ -1,5 +1,25 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.5.3] — 2026-08-28 (bootstrap multi-runtime — chaîne d'outils design dispatchée par runtime, RUNT-01/02)
+
+**Patch** (durcissement, comportement observable modifié uniquement sur un poste Codex ou sans
+CLI `claude` détectée) :
+
+- **`ensure-design-deps.sh`** : les 5 sites CLI-couplés de `detect_all()` (S1 JSON, S2 awk texte)
+  et `process_plugin()` (`enable`, `marketplace add`, `install`) routent désormais par
+  `plugin/_internal/runtime-cli-dispatch.sh` au lieu d'un `command -v claude`/`claude plugin`
+  figé. Sur `claude` ou `codex`, le geste RÉEL (activation/install/marketplace) s'exécute — même
+  grammaire d'arguments. Sur un runtime non détecté ou non supporté (OpenCode/kimi-code, non
+  mesurés), dégradation DÉCLARÉE (étape manuelle par plugin, exit propre) — jamais un échec
+  silencieux. La machine à états S1 JSON / S2 awk texte de `detect_all()` est INTÉGRALEMENT
+  conservée : seul le sous-processus invoqué change, jamais le parsing de sa sortie.
+  `CLAUDE_AVAILABLE`/`INDETERMINE` se généralisent en `RUNTIME_AVAILABLE`/`INDETERMINE`, sémantique
+  inchangée.
+- Repli inchangé si le script partagé est introuvable (poste pas encore mis à jour) :
+  comportement `claude`-figé ACTUEL, aucune régression (T9e mis à jour pour reconnaître cette
+  exception SANCTIONNÉE — un artefact partagé de l'engine, pas « un autre module » au sens D-04 —
+  sans affaiblir la garde d'autonomie sur toute autre résolution).
+
 ## [v1.5.2] — 2026-08-17 (Phase 32, doctrine du verrou resynchronisée)
 
 **Patch** (doctrine d'agent corrigée pour rester exacte, aucune nouvelle capacité).

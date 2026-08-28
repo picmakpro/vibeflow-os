@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # vf-update-run.sh — Re-matérialise les modules installés depuis le cache plugin le PLUS RÉCENT.
 #
-# À lancer APRÈS `claude plugin update vibeflow` : ce dernier pose la nouvelle version dans un
-# nouveau dossier de cache, mais la session courante garde encore l'ancien ${CLAUDE_PLUGIN_ROOT}.
+# À lancer APRÈS la mise à jour du plugin sur le runtime actif (ex. `claude plugin update
+# vibeflow`, ou son équivalent sur un autre runtime supporté) : ce geste pose la nouvelle version
+# dans un nouveau dossier de cache, mais la session courante garde encore l'ancien
+# ${CLAUDE_PLUGIN_ROOT}.
 # Ce script localise LUI-MÊME le cache le plus récent, puis relance l'engine `update --all` pour
 # chaque scope ayant un registre d'install (.vibeflow-installed). Idempotent, best-effort.
 #
@@ -46,8 +48,9 @@ fi
 # entier. On invalide AVANT de régénérer, jamais l'inverse : check-plugin-update.sh garde
 # délibérément l'ancien cache quand le réseau est KO, donc régénérer seul laisserait le faux
 # positif intact exactement là où on ne peut pas le corriger. La relecture est synchrone et donne
-# la version POST-mise-à-jour parce que l'étape 4a du skill (claude plugin update) tourne avant ce
-# script et a déjà réécrit installed_plugins.json, source de "installed". Appelée même quand
+# la version POST-mise-à-jour parce que l'étape 4a du skill (mise à jour du plugin sur le runtime
+# actif) tourne avant ce script et a déjà réécrit installed_plugins.json, source de "installed".
+# Appelée même quand
 # updated=0 : la péremption vient de la version du plugin, pas de la présence d'un registre de
 # modules. Si un rafraîchissement de fond tient déjà .check.lock, le vérificateur sort
 # immédiatement sans rien écrire — le cache reste absent, ce qui est le bon état de repli (pas de

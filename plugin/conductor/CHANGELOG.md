@@ -1,5 +1,22 @@
 # Changelog — conductor
 
+## [v1.28.2] — 2026-08-28 (bootstrap multi-runtime — bandeau de mise à jour dispatché par runtime, RUNT-01/02)
+
+**Patch** (durcissement, comportement observable modifié uniquement sur un poste Codex ou sans
+CLI `claude` détectée) :
+
+- **`check-plugin-update.sh`** (repli `installed`, l.60-61) et **`vf-update-run.sh`** (prose
+  d'en-tête + message de flux) routent désormais par `plugin/_internal/runtime-cli-dispatch.sh`
+  au lieu d'un `command -v claude`/`claude plugin list` figé. Sur `claude` ou `codex`, le bandeau
+  SessionStart lit la version installée réellement ; sur un runtime non supporté (ou absent),
+  `installed` reste vide et la comparaison de version est simplement sautée — best-effort
+  inchangé, jamais un `exit` non-zéro qui casserait le bandeau.
+- Repli inchangé si le script partagé est introuvable (poste pas encore mis à jour) :
+  comportement `claude`-figé ACTUEL, aucune régression.
+- Rejeu complet de la découverte des suites (`find plugin scripts -type f -path
+  '*/tests/test-*.sh'`) : 70/70 vertes — synchronise `README.md`/`README.fr.md` sur ce total
+  (`scripts/check-version-sync.sh` vert).
+
 ## [v1.28.1] — 2026-08-27 (Phase 35 — les deux gates d'isolation restent, en connaissance de cause)
 
 **Patch** (doctrine consignée, aucun comportement machine modifié) :

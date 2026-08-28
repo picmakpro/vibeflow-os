@@ -405,16 +405,25 @@ SH
   rm -rf "$T9D_BIN"
 
   # ---------------------------------------------------------------------------
-  # T9e — AUTONOMIE (D-04) : aucune dépendance d'EXÉCUTION vers un autre module (mentions en
+  # T9e — AUTONOMIE (D-04) : aucune dépendance d'EXÉCUTION vers un autre MODULE (mentions en
   # commentaire tolérées — la garde vise les APPELS, pas les mentions), et module.json ne déclare
   # que `conductor`.
+  #
+  # Exception SANCTIONNÉE (RUNT-01, 38-02) : la résolution $(dirname "$0")/runtime-cli-dispatch.sh
+  # cible un artefact PARTAGÉ de l'engine (plugin/_internal/, cascade EXACTE de
+  # find_hooks_merger()) — ce n'est PAS « un autre module » au sens où D-04 l'entend (dev-
+  # orchestrator, conductor, planning-core, validator, skill-creator, consolidator — la même liste
+  # que le garde-fou bash ci-dessous). La garde reste pleine pour TOUTE AUTRE résolution
+  # $(dirname "$0")/… : seule cette ligne précise est exemptée.
   # ---------------------------------------------------------------------------
   t9e_ok=1
   EDD_STRIPPED="$("$GREP" -v '^[[:space:]]*#' "$EDD")"
   echo "$EDD_STRIPPED" | "$GREP" -qE '(^|[^A-Za-z0-9_])source[[:space:]]' && { ko "T9e autonomie : 'source' détecté (appel, pas une mention) dans ensure-design-deps.sh"; t9e_ok=0; }
   echo "$EDD_STRIPPED" | "$GREP" -qE '^[[:space:]]*\.[[:space:]]' && { ko "T9e autonomie : dot-source ('. ') détecté dans ensure-design-deps.sh"; t9e_ok=0; }
   echo "$EDD_STRIPPED" | "$GREP" -qE 'bash[[:space:]]+.*(dev-orchestrator|conductor|planning-core|validator|skill-creator|consolidator)/' && { ko "T9e autonomie : invocation bash d'un script d'un autre module détectée"; t9e_ok=0; }
-  echo "$EDD_STRIPPED" | "$GREP" -qF '$(dirname "$0")' && { ko "T9e autonomie : résolution \$(dirname \"\$0\")/ détectée (motif croisé du bootstrap de dev)"; t9e_ok=0; }
+  DIRNAME_HITS="$(echo "$EDD_STRIPPED" | "$GREP" -F '$(dirname "$0")' | "$GREP" -v 'runtime-cli-dispatch\.sh' || true)"
+  [ -n "$DIRNAME_HITS" ] \
+    && { ko "T9e autonomie : résolution \$(dirname \"\$0\")/ détectée hors de l'exception runtime-cli-dispatch.sh (motif croisé du bootstrap de dev)"; t9e_ok=0; }
   MJ="$MOD/module.json"
   req_list="$(sed -n '/"requires"/,/\]/p' "$MJ" 2>/dev/null | "$GREP" -o '"[A-Za-z0-9_-]*"' | "$GREP" -v '"requires"' | tr -d '"')"
   [ "$req_list" = "conductor" ] || { ko "T9e module.json : requires attendu ['conductor'] seul, obtenu: ${req_list:-<vide>}"; t9e_ok=0; }
