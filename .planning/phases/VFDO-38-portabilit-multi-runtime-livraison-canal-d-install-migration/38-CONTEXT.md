@@ -941,3 +941,46 @@ Le checkpoint `gate="blocking-human"` de la tâche 3 **n'a pas été re-escalad�
 porte déjà l'arbitrage **verrouillé D-38-E** de Samuel, qui tranche exactement cette question
 (session read-only séparée). Le lot ne fait qu'**implémenter une décision déjà rendue** — la
 re-poser aurait été redemander à Samuel ce qu'il a déjà tranché.
+
+---
+
+## D-38-P — Garde `--target` : refus dur, pas un avertissement (2026-08-29)
+
+**Le défaut, mesuré par la revue sur trois scénarios réels** : le code ne refuse que `/` (littérale
+ou résolue). `--target "$HOME"` → **accepté**, payload dispersé dans le vrai home ; chemin absolu
+hors dépôt → accepté ; `../../../../x` → accepté. Or `38-04-PLAN.md` promet en menace `T-38-09`
+(sévérité **high**, disposition **mitigate**) le refus de « tout chemin remontant au-dessus du repo ».
+**La clause n'existe pas dans le code.**
+
+**Nuance qui a évité une mauvaise correction** : interdire tout chemin hors dépôt **contredirait la
+feature** — `--target /tmp/mon-lab` est un cas d'acceptance explicite du plan. Le danger n'est pas
+« hors du repo », c'est **`$HOME`** : une cible réelle, déjà peuplée, à **une faute de frappe d'un
+seul segment** de l'usage correct.
+
+### La forme retenue — et pourquoi elle n'a PAS de prompt
+1. **Refus dur** de `/` **et de `$HOME`** — littéral **ET** résolu (`cd -P`/`pwd -P`, même doctrine
+   D-31-15 que le reste du lot), avec un message qui **dit la forme attendue**
+   (`--target "$HOME/.claude"` ou un dossier dédié).
+2. **Cible pré-existante et non vide** → **refus par défaut**, rc≠0, message listant ce qui a été
+   trouvé. N'accepte qu'avec un **drapeau explicite** (`--target-nonempty-ok`).
+   ⭐ **Pourquoi pas un prompt** : l'engine est appelé **par des skills**, il n'a **aucun humain sous
+   la main**. Un prompt y serait soit ignoré, soit auto-répondu — c'est-à-dire un consentement
+   fabriqué. C'est la **skill** (`/vibeflow-install`, `vf-calibrate`) qui pose la question à
+   l'humain et repasse le drapeau. Même doctrine que l'escalade headless (D-37-5).
+   **Exception légitime sans drapeau** : une cible portant déjà un registre VibeFlow
+   (`.vibeflow-installed`) — c'est une **ré-install/update**, pas une dispersion.
+3. **Traversée `../`** : **pas** de refus de principe (contredirait `/tmp/mon-lab`), mais la cible
+   **résolue est affichée en clair** à l'install et inscrite au registre — un `../../../../x` ne doit
+   jamais être une surprise silencieuse.
+4. **`T-38-09` reformulé** : la promesse « refus de tout chemin au-dessus du repo » **disparaît**,
+   remplacée par exactement ce que 1-3 font. **Un threat model qui ment est pire qu'un threat model
+   modeste** — et c'est la deuxième fois dans cette phase qu'un plan sur-promet une mitigation
+   (après `T-38-13`, fermé par FIDE-03).
+5. **Tests** : les **trois scénarios du relecteur** deviennent des cas de suite (`$HOME` → refus ;
+   hors repo vide → accepté ; traversée → acceptée **et affichée**), plus « non vide sans drapeau →
+   refus » et « registre présent → accepté ». **Rouge avant / vert après.**
+
+**Acquis du lot, à ne pas re-mesurer** : zéro `.claude/` résiduel sur 53 fichiers posés (toutes
+extensions, dotfiles et fragments JSON inclus), anti-symlink vérifié par **injection d'un lien vers
+une sentinelle** (non propagé, sentinelle intacte), résolution physique `cd -P`/`pwd -P` conforme
+D-31-15, idempotence confirmée.

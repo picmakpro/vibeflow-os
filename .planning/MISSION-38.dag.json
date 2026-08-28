@@ -149,7 +149,8 @@
       "scope": [
         "plugin/_internal/runtime-adapter/"
       ],
-      "status": "ready"
+      "status": "ready",
+      "review_regime": "full"
     },
     {
       "id": "exec-target",
@@ -164,7 +165,7 @@
         "plugin/_internal/vibeflow-update.sh",
         "plugin/_internal/tests/"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "revue-target",
@@ -176,7 +177,7 @@
       "scope": [
         "plugin/_internal/"
       ],
-      "status": "blocked",
+      "status": "ready",
       "review_regime": "full"
     },
     {
@@ -374,7 +375,7 @@
       "scope": [
         "plugin/_internal/tests/test-vibeflow-update.sh"
       ],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "fix-fide-gate",
@@ -414,6 +415,34 @@
       "scope": [
         "plugin/_internal/vibeflow-update.sh",
         "plugin/_internal/tests/test-vibeflow-update.sh"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "fix-versionsync",
+      "step": "refermer check-version-sync (en-tête README conductor v1.32.0, compteur 71 suites dans les 2 READMEs)",
+      "stage": "",
+      "deps": [
+        "exec-target"
+      ],
+      "scope": [
+        "plugin/conductor/README.md",
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-target-guard",
+      "step": "D-38-P — garde dure --target ($HOME, cible non vide, cible résolue affichée) + T-38-09 reformulé",
+      "stage": "",
+      "deps": [
+        "fix-adapter-wire"
+      ],
+      "scope": [
+        "plugin/_internal/vibeflow-update.sh",
+        "plugin/_internal/tests/test-vibeflow-update.sh",
+        ".planning/phases/VFDO-38-portabilit-multi-runtime-livraison-canal-d-install-migration/38-04-PLAN.md"
       ],
       "status": "blocked"
     }
