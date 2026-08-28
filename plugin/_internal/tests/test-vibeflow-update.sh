@@ -643,6 +643,198 @@ fi
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
+# T13 (ROLL-01) — backup_module symétrique : skills/ + agents/rollmod.md + agent-references/,
+# jamais 2 catégories sur 3 (le trou mesuré au cadrage : agents/agent-references DÉJÀ backupés
+# mais JAMAIS relus côté rollback avant ce lot).
+# T14 (ROLL-03) — .version capturé au backup = version installée AU MOMENT du backup.
+# T15 (ROLL-01..04, round-trip RÉEL) — install v1 -> install v2 (déclenche le backup auto) ->
+# rollback -> CONTENU (marqueurs distincts v1/v2, pas seulement présence) ET registre restaurés
+# à v1, jamais laissés à v2.
+# T17 (ROLL-04, régression) — rollback d'un module JAMAIS backuppé échoue toujours bruyamment
+# après le filtrage du glob (cas déjà couvert par le err existant, reconfirmé après ce lot).
+#
+# Layout du module de fixture : skills/rollmod/SKILL.md (Type 2, PAS de SKILL.md racine) +
+# AGENT.md + references/ — un module avec SKILL.md racine route ses references/ sous
+# skills/$mod/references/ (ligne ~1507), PAS agents/$mod-references/ (ligne ~1515, qui exige
+# explicitement l'ABSENCE de SKILL.md racine) : ce layout est la SEULE combinaison qui peuple les
+# 3 catégories (skills + agents + agent-references) simultanément.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+mkdir -p "$CACHE/rollmod/skills/rollmod" "$CACHE/rollmod/references"
+echo v1.0.0 > "$CACHE/rollmod/VERSION"
+printf '{"name":"rollmod","version":"v1.0.0"}\n' > "$CACHE/rollmod/module.json"
+printf '# rollmod SKILL (MARKER-V1)\n' > "$CACHE/rollmod/skills/rollmod/SKILL.md"
+printf '# rollmod AGENT (MARKER-V1)\n' > "$CACHE/rollmod/AGENT.md"
+printf 'note v1\n' > "$CACHE/rollmod/references/note.md"
+
+(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install rollmod >/dev/null 2>&1)
+V1_REGISTRY=$("$GREP" '^rollmod=' "$LAB/.claude/scripts/.vibeflow-installed" 2>/dev/null | cut -d= -f2)
+
+# Bump vers v2 dans le cache — contenu DISTINGUABLE (marqueur v2) : le round-trip (T15) doit
+# prouver une restauration de CONTENU, pas seulement de présence de fichier.
+echo v2.0.0 > "$CACHE/rollmod/VERSION"
+printf '{"name":"rollmod","version":"v2.0.0"}\n' > "$CACHE/rollmod/module.json"
+printf '# rollmod SKILL (MARKER-V2)\n' > "$CACHE/rollmod/skills/rollmod/SKILL.md"
+printf '# rollmod AGENT (MARKER-V2)\n' > "$CACHE/rollmod/AGENT.md"
+printf 'note v2\n' > "$CACHE/rollmod/references/note.md"
+(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install rollmod >/dev/null 2>&1)
+V2_REGISTRY=$("$GREP" '^rollmod=' "$LAB/.claude/scripts/.vibeflow-installed" 2>/dev/null | cut -d= -f2)
+
+BDIR=$(ls -1dt "$LAB/.claude/.backups/rollmod"-* 2>/dev/null | "$GREP" -v -- '-removed$' | head -1)
+miss=0
+[ -n "$BDIR" ] && [ -d "$BDIR/skills" ] || { ko "T13 backup symétrique : skills/ absent du backup"; miss=1; }
+[ -n "$BDIR" ] && [ -f "$BDIR/agents/rollmod.md" ] || { ko "T13 backup symétrique : agents/rollmod.md absent du backup"; miss=1; }
+[ -n "$BDIR" ] && [ -d "$BDIR/agent-references" ] || { ko "T13 backup symétrique : agent-references/ absent du backup"; miss=1; }
+[ "$miss" -eq 0 ] && ok "T13 (ROLL-01) : backup_module capture les 3 catégories (skills+agents+agent-references), jamais 2/3"
+
+if [ -n "$BDIR" ] && [ -f "$BDIR/.version" ] && [ "$(cat "$BDIR/.version")" = "$V1_REGISTRY" ]; then
+  ok "T14 (ROLL-03) : backup_module capture la version installée AU MOMENT du backup (.version=$V1_REGISTRY)"
+else
+  ko "T14 (ROLL-03) : .version du backup ne correspond pas à la version v1 capturée (attendu '$V1_REGISTRY', obtenu '$([ -n "$BDIR" ] && cat "$BDIR/.version" 2>/dev/null || echo absent)')"
+fi
+
+# Pré-condition du round-trip : le disque porte actuellement v2 (overwrite par le 2e install).
+"$GREP" -q "MARKER-V2" "$LAB/.claude/agents/rollmod.md" 2>/dev/null \
+  || ko "T15 pré-condition : contenu v2 attendu sur disque avant rollback (garde-fou du test lui-même)"
+
+(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" rollback rollmod >/dev/null 2>&1)
+miss=0
+[ -f "$LAB/.claude/skills/rollmod/SKILL.md" ] || { ko "T15 round-trip : skills/rollmod/SKILL.md absent après rollback"; miss=1; }
+[ -f "$LAB/.claude/agents/rollmod.md" ] || { ko "T15 round-trip : agents/rollmod.md absent après rollback"; miss=1; }
+[ -d "$LAB/.claude/agents/rollmod-references" ] || { ko "T15 round-trip : agents/rollmod-references/ absent après rollback"; miss=1; }
+"$GREP" -q "MARKER-V1" "$LAB/.claude/agents/rollmod.md" 2>/dev/null \
+  || { ko "T15 round-trip : contenu restauré n'est pas le contenu v1 (marqueur v1 absent)"; miss=1; }
+"$GREP" -q "MARKER-V2" "$LAB/.claude/agents/rollmod.md" 2>/dev/null \
+  && { ko "T15 round-trip : contenu v2 encore présent après rollback (pas restauré)"; miss=1; }
+POST_REGISTRY=$("$GREP" '^rollmod=' "$LAB/.claude/scripts/.vibeflow-installed" 2>/dev/null | cut -d= -f2)
+[ "$POST_REGISTRY" = "$V1_REGISTRY" ] \
+  || { ko "T15 round-trip : registre après rollback = '$POST_REGISTRY' (attendu '$V1_REGISTRY', la version v1 capturée au backup)"; miss=1; }
+[ "$POST_REGISTRY" != "$V2_REGISTRY" ] \
+  || { ko "T15 round-trip : registre encore à v2 ($V2_REGISTRY) après rollback — le registre ment"; miss=1; }
+[ "$miss" -eq 0 ] \
+  && ok "T15 (ROLL-01..04 round-trip) : install v1 -> install v2 -> rollback -> contenu ET registre restaurés à v1 (v1=$V1_REGISTRY, v2=$V2_REGISTRY)"
+
+# T17 : rollback d'un module jamais backuppé (aucun répertoire pour lui) échoue bruyamment.
+rc=0
+(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" rollback never-backed-up >/dev/null 2>&1) || rc=$?
+if [ "$rc" -ne 0 ]; then
+  ok "T17 (ROLL-04, régression) : rollback sans AUCUN backup échoue bruyamment (rc=$rc) après le filtrage du glob"
+else
+  ko "T17 (ROLL-04, régression) : rollback sans backup a exit 0 — devrait échouer"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T16 (ROLL-04, DISCRIMINANT) — backup UNIQUEMENT `-removed` (répertoire de convergence écrit par
+# vf_converge_apply, vide de tout sous-dossier skills/agents/scripts/hooks) : rollback échoue
+# BRUYAMMENT, jamais `✓ … rollback OK` — c'est le mode d'échec dominant mesuré au cadrage
+# (38-CONTEXT.md 216-234 : un `ls -1dt` non filtré triait ce répertoire en tête, `[ -d skills ]`
+# y était faux, le `rm -rf` n'était jamais atteint, et la fonction annonçait quand même le succès).
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+mkdir -p "$LAB/.claude/.backups/onlyremoved-20260101-000000-removed"
+OUT=$(cd "$LAB" && VF_SCOPE=project bash "$INSTALLER" rollback onlyremoved 2>&1)
+rc=$?
+miss=0
+[ "$rc" -ne 0 ] || { ko "T16 (DISCRIMINANT) : rollback sur backup -removed-only a exit 0 (attendu échec)"; miss=1; }
+if echo "$OUT" | "$GREP" -q '✓ onlyremoved rollback OK'; then
+  ko "T16 (DISCRIMINANT) : '✓ onlyremoved rollback OK' présent malgré zéro action réelle — le défaut mesuré au cadrage"
+  miss=1
+fi
+[ "$miss" -eq 0 ] \
+  && ok "T16 (ROLL-04, DISCRIMINANT) : backup -removed-only -> rollback échoue bruyamment (rc=$rc), jamais '✓ rollback OK'"
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T18 (ROLL-02) — rollback restaure le fragment hooks SAUVEGARDÉ au backup, jamais le fragment
+# COURANT du cache au moment du rollback (potentiellement une version différente). Scénario :
+# fragment OLD installé puis backuppé (2e install, même fragment encore en cache à cet instant) ;
+# le cache "avance" ensuite vers un fragment NEW mergé directement (merge-hooks.sh CLI, même
+# patron que T11 — évite un 3e install qui écraserait le backup OLD avec un backup NEW plus
+# récent) ; après rollback : OLD doit réapparaître, NEW doit disparaître.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+mkdir -p "$CACHE/hookflip/scripts" "$CACHE/hookflip/hooks"
+echo v1.0.0 > "$CACHE/hookflip/VERSION"
+printf '{"name":"hookflip","version":"v1.0.0"}\n' > "$CACHE/hookflip/module.json"
+printf '#!/usr/bin/env bash\necho old\n' > "$CACHE/hookflip/scripts/hookflip-old.sh"
+printf '{"hooks":{"SessionStart":[{"matcher":"startup","hooks":[{"type":"command","command":"bash {{VF_SCRIPTS}}/hookflip-old.sh || true"}]}]}}\n' > "$CACHE/hookflip/hooks/hooks.json"
+
+(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install hookflip >/dev/null 2>&1)
+"$GREP" -q "hookflip-old.sh" "$LAB/.claude/settings.json" 2>/dev/null \
+  || ko "T18 pré-condition : fragment OLD non mergé après le 1er install (garde-fou du test)"
+
+# 2e install, MÊME fragment OLD encore en cache à cet instant → backup_module capture OLD.
+echo v2.0.0 > "$CACHE/hookflip/VERSION"
+printf '{"name":"hookflip","version":"v2.0.0"}\n' > "$CACHE/hookflip/module.json"
+(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install hookflip >/dev/null 2>&1)
+BDIR=$(ls -1dt "$LAB/.claude/.backups/hookflip"-* 2>/dev/null | "$GREP" -v -- '-removed$' | head -1)
+[ -n "$BDIR" ] && "$GREP" -q "hookflip-old.sh" "$BDIR/hooks/hooks.json" 2>/dev/null \
+  || ko "T18 pré-condition : backup n'a pas capturé le fragment OLD (garde-fou du test)"
+
+printf '#!/usr/bin/env bash\necho new\n' > "$CACHE/hookflip/scripts/hookflip-new.sh"
+printf '{"hooks":{"SessionStart":[{"matcher":"startup","hooks":[{"type":"command","command":"bash {{VF_SCRIPTS}}/hookflip-new.sh || true"}]}]}}\n' > "$CACHE/hookflip/hooks/hooks.json"
+bash "$INTERNAL_DIR/merge-hooks.sh" merge "$CACHE/hookflip/hooks/hooks.json" \
+  --settings "$LAB/.claude/settings.json" \
+  --scripts-prefix '"$CLAUDE_PROJECT_DIR"/.claude/scripts' >/dev/null 2>&1
+"$GREP" -q "hookflip-new.sh" "$LAB/.claude/settings.json" 2>/dev/null \
+  || ko "T18 pré-condition : fragment NEW non mergé directement (garde-fou du test)"
+
+(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" rollback hookflip >/dev/null 2>&1)
+miss=0
+"$GREP" -q "hookflip-old.sh" "$LAB/.claude/settings.json" 2>/dev/null \
+  || { ko "T18 (ROLL-02) : fragment OLD (sauvegardé au backup) absent de settings.json après rollback"; miss=1; }
+"$GREP" -q "hookflip-new.sh" "$LAB/.claude/settings.json" 2>/dev/null \
+  && { ko "T18 (ROLL-02) : fragment NEW (cache courant au moment du rollback) encore présent après rollback"; miss=1; }
+[ "$miss" -eq 0 ] \
+  && ok "T18 (ROLL-02) : rollback restaure le fragment hooks SAUVEGARDÉ, retire le fragment courant du cache"
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T19 (ROLL-02, statique) — merge_module_hooks/remove_module_hooks portent bien le 2e paramètre
+# optionnel fragment_override (acceptance criteria 38-03 tâche 2, non-régression des ~6 appelants
+# existants : le défaut ${2:-…} retombe exactement sur le comportement d'avant ce lot).
+# ---------------------------------------------------------------------------
+N=$("$GREP" -c '\${2:-\$CACHE_DIR/\$mod/hooks/hooks\.json}' "$INSTALLER" 2>/dev/null || true)
+if [ "${N:-0}" -ge 2 ]; then
+  ok "T19 (ROLL-02, statique) : fragment_override présent sur les 2 fonctions ($N occurrence(s))"
+else
+  ko "T19 (ROLL-02, statique) : fragment_override attendu >=2 fois (merge+remove), trouvé ${N:-0}"
+fi
+
+# ---------------------------------------------------------------------------
+# T20 (ROLL-05) — --dry-run rollback n'écrit RIEN sur disque (preuve find -newer), prévisualise ce
+# qui serait restauré. Cas négatif implicite via T4/garde --dry-run déjà couvert par le nouveau
+# message d'erreur (install/update/rollback) — la case *) reste inchangée pour uninstall/status/sync.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+mkdir -p "$CACHE/dryrollmod"
+echo v1.0.0 > "$CACHE/dryrollmod/VERSION"
+printf '{"name":"dryrollmod","version":"v1.0.0"}\n' > "$CACHE/dryrollmod/module.json"
+printf '# skill v1\n' > "$CACHE/dryrollmod/SKILL.md"
+(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install dryrollmod >/dev/null 2>&1)
+echo v2.0.0 > "$CACHE/dryrollmod/VERSION"
+printf '{"name":"dryrollmod","version":"v2.0.0"}\n' > "$CACHE/dryrollmod/module.json"
+printf '# skill v2\n' > "$CACHE/dryrollmod/SKILL.md"
+(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install dryrollmod >/dev/null 2>&1)
+
+TS_MARK="$LAB/.ts-mark"; touch "$TS_MARK"; sleep 1
+OUT=$(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" --dry-run rollback dryrollmod 2>&1)
+rc=$?
+miss=0
+[ "$rc" -eq 0 ] || { ko "T20 (ROLL-05) : --dry-run rollback exit $rc (attendu 0)"; miss=1; }
+echo "$OUT" | "$GREP" -q '\[dry-run\]' || { ko "T20 (ROLL-05) : aucune ligne [dry-run] dans la sortie"; miss=1; }
+NEWER=$(find "$LAB/.claude" -newer "$TS_MARK" -type f 2>/dev/null || true)
+[ -z "$NEWER" ] \
+  || { ko "T20 (ROLL-05) : --dry-run rollback a écrit sur disque : $NEWER"; miss=1; }
+[ "$miss" -eq 0 ] \
+  && ok "T20 (ROLL-05) : --dry-run rollback n'écrit rien (preuve find -newer), prévisualise la restauration"
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
 # Garde-fou final : le vrai ~/.claude est inchangé (snapshot récursif avant=après).
 # ---------------------------------------------------------------------------
 HOME_AFTER=$(snapshot_home_claude)

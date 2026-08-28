@@ -90,15 +90,16 @@ case "$VF_SCOPE" in
   *) err "scope invalide : $VF_SCOPE (attendu user|project|local)" ;;
 esac
 
-# Surface du flag --dry-run (D-31-06), validée AVANT cmd="$1" (952) : borné à install/update.
-# Refus BRUYANT, jamais un flag accepté-puis-ignoré — sur uninstall/rollback/status/sync ce
-# serait le pire échec possible de la phase (l'utilisateur croirait prévisualiser et le moteur
-# supprimerait). Cas $# = 0 : conserver le comportement actuel (impression d'usage, exit 0) —
-# un --dry-run seul n'est pas une commande, rien à valider ici.
+# Surface du flag --dry-run (D-31-06), validée AVANT cmd="$1" (952) : borné à install/update/
+# rollback (ROLL-05, 38-03 — rollback a rejoint la liste, cf. rollback_module ci-dessous).
+# Refus BRUYANT, jamais un flag accepté-puis-ignoré — sur uninstall/status/sync ce serait le pire
+# échec possible de la phase (l'utilisateur croirait prévisualiser et le moteur supprimerait). Cas
+# $# = 0 : conserver le comportement actuel (impression d'usage, exit 0) — un --dry-run seul n'est
+# pas une commande, rien à valider ici.
 if vf_dry_run && [ "$#" -gt 0 ]; then
   case "$1" in
-    install|update) : ;;
-    *) err "--dry-run n'est accepté que sur install/update (reçu : $1) — un --dry-run accepté-puis-ignoré sur ce verbe ferait croire à une prévisualisation alors qu'il supprimerait/agirait réellement" ;;
+    install|update|rollback) : ;;
+    *) err "--dry-run n'est accepté que sur install/update/rollback (reçu : $1) — un --dry-run accepté-puis-ignoré sur ce verbe ferait croire à une prévisualisation alors qu'il supprimerait/agirait réellement" ;;
   esac
 fi
 
@@ -1071,7 +1072,11 @@ scripts_prefix_for_scope() {
 
 merge_module_hooks() {
   local mod="$1"
-  local fragment="$CACHE_DIR/$mod/hooks/hooks.json"
+  # ROLL-02 (38-03) : 2e paramètre optionnel — un chemin de fragment explicite (ex. celui
+  # sauvegardé par backup_module, restauré par rollback_module) prime sur le fragment du cache
+  # courant. Défaut inchangé : les ~6 appelants existants (1 seul argument) retombent sur EXACTEMENT
+  # le comportement d'avant ce lot — jamais une 2e implémentation du merge JSON.
+  local fragment="${2:-$CACHE_DIR/$mod/hooks/hooks.json}"
   [ -f "$fragment" ] || return 0
   local merger
   merger="$(find_hooks_merger)"
@@ -1154,7 +1159,10 @@ merge_module_hooks() {
 
 remove_module_hooks() {
   local mod="$1"
-  local fragment="$CACHE_DIR/$mod/hooks/hooks.json"
+  # ROLL-02 (38-03) : même 2e paramètre optionnel que merge_module_hooks, même défaut — retirer
+  # le fragment COURANT du cache (comportement historique) sauf chemin explicite fourni par
+  # l'appelant (rollback_module retire le fragment du cache avant de réinjecter celui du backup).
+  local fragment="${2:-$CACHE_DIR/$mod/hooks/hooks.json}"
   [ -f "$fragment" ] || return 0
   [ -f "$TARGET_ROOT/settings.json" ] || return 0
   local merger
@@ -1674,19 +1682,65 @@ backup_module() {
       [ -f "$TARGET_ROOT/scripts/$name" ] && cp "$TARGET_ROOT/scripts/$name" "$bdir/scripts/"
     done
   fi
+  # ROLL-03 (38-03) : capture de la version installée AU MOMENT du backup — jamais devinée à la
+  # restauration. Grep+cut sur l'entrée exacte du registre (même format que module_version_installed
+  # ci-dessus), jamais un format neuf. Registre absent ou entrée absente (1er install jamais
+  # backuppé avant) → .version absent, rollback_module traite ce cas sans version devinée.
+  if [ -f "$INSTALLED_REGISTRY" ]; then
+    local captured_version
+    captured_version=$(grep "^$mod=" "$INSTALLED_REGISTRY" 2>/dev/null | cut -d= -f2 || true)
+    [ -n "$captured_version" ] && printf '%s' "$captured_version" > "$bdir/.version"
+  fi
+  # ROLL-01 (38-03) : hooks — si le module porte un fragment hooks/hooks.json dans le cache
+  # courant, le copier dans le backup pour que rollback_module puisse le réinjecter (via
+  # merge_module_hooks avec le 2e paramètre, ROLL-02) plutôt que le fragment du cache au moment
+  # du rollback, potentiellement une version différente.
+  if [ -f "$CACHE_DIR/$mod/hooks/hooks.json" ]; then
+    mkdir -p "$bdir/hooks"
+    cp "$CACHE_DIR/$mod/hooks/hooks.json" "$bdir/hooks/hooks.json"
+  fi
   vf_declare_write + "$bdir"
   log "  backup → $bdir"
 }
 
 rollback_module() {
   # 31-03 (D-31-09) : non migré vers le socle manifeste — restaure DEPUIS un backup, ce n'est
-  # pas une pose de module (rien à consigner) ; --dry-run y est refusé (D-31-06) ; hors des
-  # 4 critères de succès de la phase.
+  # pas une pose de module (rien à consigner). --dry-run fonctionne depuis ce lot (ROLL-05,
+  # 38-03) ; la non-migration vers le socle manifeste reste inchangée sur ce point précis.
   local mod="$1"
-  # Find latest backup
-  local latest
-  latest=$(ls -1dt "$BACKUP_DIR/$mod"-* 2>/dev/null | head -1)
-  [ -z "$latest" ] && err "Aucun backup trouvé pour $mod dans $BACKUP_DIR"
+  # Find latest backup — glob non ancré `"$BACKUP_DIR/$mod"-*` matché puis FILTRÉ (38-03,
+  # ROLL-04) : exclut les répertoires `$mod-<ts>-removed` écrits par vf_converge_apply (motif
+  # exact ligne ~2029). Sans ce filtre, `ls -1dt` triait un `-removed` récent en tête, qui ne
+  # porte aucun sous-dossier skills/agents/scripts/hooks — le `rm -rf` n'était alors jamais
+  # atteint et la fonction loggait quand même `✓ rollback OK` sur zéro action réelle (le défaut
+  # mesuré au cadrage 38-CONTEXT.md lignes 216-234).
+  local -a candidates=()
+  while IFS= read -r c; do
+    [ -n "$c" ] && candidates+=("$c")
+  done < <(ls -1dt "$BACKUP_DIR/$mod"-* 2>/dev/null | grep -v -- '-removed$' || true)
+  local latest="${candidates[0]:-}"
+  [ -z "$latest" ] && err "Aucun backup restaurable pour $mod dans $BACKUP_DIR (aucun backup, ou uniquement des répertoires de convergence -removed sans contenu restaurable)"
+
+  # Aucun des 4 types restaurables présent → même échec bruyant, jamais un OK sur zéro action.
+  if [ ! -d "$latest/skills" ] && [ ! -d "$latest/scripts" ] && [ ! -d "$latest/agents" ] \
+     && [ ! -d "$latest/agent-references" ] && [ ! -f "$latest/hooks/hooks.json" ]; then
+    err "Backup $latest ne porte aucun sous-dossier restaurable (skills/scripts/agents/hooks) — rollback refusé plutôt qu'un OK menteur"
+  fi
+
+  if vf_dry_run; then
+    log "[dry-run] rollback $mod depuis $latest — restaurerait :"
+    [ -d "$latest/skills" ] && log "  [dry-run]   skills/$mod"
+    [ -d "$latest/scripts" ] && log "  [dry-run]   scripts (fichiers du module)"
+    [ -f "$latest/agents/${mod}.md" ] && log "  [dry-run]   agents/${mod}.md"
+    [ -d "$latest/agent-references" ] && log "  [dry-run]   agents/${mod}-references/"
+    [ -f "$latest/hooks/hooks.json" ] && log "  [dry-run]   fragment hooks (mod=$mod)"
+    if [ -f "$latest/.version" ]; then
+      log "  [dry-run]   registre → $mod=$(cat "$latest/.version")"
+    else
+      log "  [dry-run]   registre inchangé (.version absent du backup)"
+    fi
+    return 0
+  fi
 
   log "Rollback $mod depuis $latest..."
   if [ -d "$latest/skills" ]; then
@@ -1699,6 +1753,40 @@ rollback_module() {
       [ -f "$f" ] && cp "$f" "$TARGET_ROOT/scripts/" && chmod +x "$TARGET_ROOT/scripts/$(basename "$f")"
     done
     log "  restored scripts"
+  fi
+  # ROLL-01 (38-03) : agents/${mod}.md + agents/${mod}-references/ — DÉJÀ sauvegardés par
+  # backup_module (D7), jamais relus jusqu'à ce lot. Même patron rm -rf puis cp -r que skills,
+  # jamais un merge partiel.
+  if [ -f "$latest/agents/${mod}.md" ]; then
+    mkdir -p "$TARGET_ROOT/agents"
+    rm -f "$TARGET_ROOT/agents/${mod}.md"
+    cp "$latest/agents/${mod}.md" "$TARGET_ROOT/agents/${mod}.md"
+    log "  restored $TARGET_ROOT/agents/${mod}.md"
+  fi
+  if [ -d "$latest/agent-references" ]; then
+    rm -rf "$TARGET_ROOT/agents/${mod}-references"
+    cp -r "$latest/agent-references" "$TARGET_ROOT/agents/${mod}-references"
+    log "  restored $TARGET_ROOT/agents/${mod}-references"
+  fi
+  # ROLL-02 (38-03) : hooks — retire le fragment COURANT du cache (potentiellement une version
+  # différente de celle qu'on restaure), puis réinjecte le fragment SAUVEGARDÉ au moment du
+  # backup. Best-effort comme leurs appelants actuels dans install_module (échec journalisé,
+  # jamais fatal pour le reste du rollback).
+  if [ -f "$latest/hooks/hooks.json" ]; then
+    remove_module_hooks "$mod" || log "  (retrait du fragment courant échoué, best-effort)"
+    merge_module_hooks "$mod" "$latest/hooks/hooks.json" || log "  (réinjection du fragment sauvegardé échouée, best-effort)"
+    log "  restored hooks (fragment sauvegardé)"
+  fi
+  # ROLL-03 (38-03) : registre — remis à la version CAPTURÉE au backup, jamais devinée. Backup
+  # pré-ce-lot (pas de .version) → registre laissé inchangé, avertissement explicite plutôt
+  # qu'une version inventée.
+  if [ -f "$latest/.version" ]; then
+    local restored_version
+    restored_version=$(cat "$latest/.version")
+    mark_installed "$mod" "$restored_version"
+    log "  registre → $mod=$restored_version"
+  else
+    log "  ⚠ version restaurée inconnue — registre inchangé, vérifier manuellement"
   fi
   log "✓ $mod rollback OK"
 }
