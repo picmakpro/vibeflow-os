@@ -2,20 +2,28 @@
 gsd_state_version: 1.0
 milestone: fiabilite-v1.0
 milestone_name: « ce qui survit »
-current_phase: 35
-current_phase_name: Ré-armement worktree (conditionnelle) — CLOSE
-status: phase_complete
-stopped_at: Phase 18 RELEASÉE en `v2.57.0` (PR #51 mergée, tag annoté poussé, release GitHub publiée, `check-release-tag.sh --remote` ✓ — ce STATE était en retard, il affirmait encore « livrée, non shippée ») — 3 plans exécutés (18-01 LEDG-02, 18-02 LEDG-01, 18-03 doctrine D-18-14 + bump module), 12/12 suites vertes. Puis Phase 35 CLOSE le 2026-08-26 par décision humaine sur preuve mesurée, **option A : pas de ré-armement d'`isolation: worktree`**. Déclencheur externe tombé (gsd-core#3302 releasé 1.11.0, installé) ; leg A (retour des commits) prouvé deux fois, leg B (base de fork) mesuré sûr mais inerte en conditions de mission (ADR-059, HEAD toujours divergent) ; seul levier effectif (`baseRef: "head"`) disqualifié — anti-pattern #38. Les deux gates (`check-agents.sh`, règle 4 de `check-capability-activation.sh`) restent en place. Aucun plan d'exécution : clôture documentaire directe (mandat vf-coder). Dossiers : `.planning/research/2026-08-23-wktr-02-preuve-retour-commits-worktree.md` (amendé), `.planning/research/2026-08-26-wktr-02-leg-b-base-de-fork.md`.
-last_updated: "2026-08-26T00:00:00.000Z"
-last_activity: 2026-08-26
-last_activity_desc: Deux clôtures recalées en une passe d'hygiène d'état. (1) Phase 18 : ce STATE
-affirmait encore « livrée, non shippée » alors que la release `v2.57.0` est publiée (tag + release
-GitHub, gate ✓) — corrigé. (2) Phase 35 : close par décision humaine sur preuve mesurée, option A
-(pas de ré-armement). Quatre gestes documentaires : amendement de la preuve WKTR-02 du 2026-08-23
-(dégénérée sur leg B), requalification du ledger (`REQUIREMENTS.md` : WKTR-01 requalifié, WKTR-02
-done, QUAL-01 non déclenché), doctrine `team-kernel.md` mise à jour (pourquoi les deux gates
-restent + contrainte opérationnelle sur les commandes composées de la garde d'isolation),
-`ROADMAP.md`/`STATE.md` recalés. Restent 34 et 25 à cadrer.
+current_phase: 37
+current_phase_name: Portabilité multi-runtime — spike (Codex, OpenCode, Kimi)
+status: context_gathered
+stopped_at: Phase 37 (spike de mesure) — livrable rendu, aucun token de statut existant ne décrit
+exactement cet état ; `context_gathered` retenu comme le moins engageant (cadrage/mesure faits,
+pas de plan) — **mais la phase n'est PAS close** : le spike a produit `DISCUSS.md` (6 questions du
+ROADMAP mesurées) et `SPIKE-REPORT.md` (verdict en deux morceaux : runtime Codex apte sur la
+profondeur mesurée, chemin d'artefacts gsd-core non générique et déclaré interne par contrat écrit)
+avec une recommandation argumentée (adaptateur VibeFlow minimal + démarche amont en parallèle).
+**Le go/no-go sur une éventuelle phase de livraison est un arbitrage humain non rendu (ADR-031)** —
+aucun plan d'exécution, aucune suite lancée. Rapport de mission :
+`.planning/missions/2026-08-28-phase-37-spike-portabilite-multi-runtime.md`. Prochain geste :
+décision de Samuel (les 4 voies exposées dans `SPIKE-REPORT.md` §Recommandation).
+last_updated: "2026-08-28T00:00:00.000Z"
+last_activity: 2026-08-28
+last_activity_desc: Clôture documentaire du nœud `docs` de la mission Phase 37 (spike de
+portabilité multi-runtime) — mandat vf-coder, hygiène pure, aucun code sous `plugin/`. `STATE.md`
+et la section Phase 37 de `ROADMAP.md` mis à jour pour pointer vers les livrables produits
+(`DISCUSS.md`, `SPIKE-REPORT.md`) et le rapport de mission neuf. Le point contesté du cadrage
+(« 9/25 appellent des skills `gsd-*` ») **volontairement laissé intact** dans `ROADMAP.md` — sa
+correction/nuance vit dans `DISCUSS.md`, pas ici. Aucun bloc `progress` touché : ce spike n'a
+produit aucun plan d'exécution.
 progress:
   total_phases: 8
   completed_phases: 6

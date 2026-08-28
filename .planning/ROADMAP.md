@@ -1048,3 +1048,18 @@ livraison. Pas de code de production.
 Plans:
 
 - [ ] TBD (run /gsd-plan-phase 37 to break down)
+
+**Livrables produits (2026-08-28)** :
+`.planning/phases/VFDO-37-portabilit-multi-runtime-spike-codex-opencode-kimi/DISCUSS.md`
+(les 6 questions ci-dessus, mesurées) et `SPIKE-REPORT.md` (verdict + recommandation). Les
+chiffres du cadrage ci-dessus ont été **re-dérivés et corrigés** dans `DISCUSS.md` (section
+« Corrections au cadrage ROADMAP ») — renvoi sans recopie ici, sauf la ligne « 9/25 appellent des
+skills `gsd-*` » (Q3 ci-dessus, l. 1000-1002), **intentionnellement laissée intacte** : sa méthode
+de mesure est documentée avec sa nuance dans `DISCUSS.md`.
+
+**Plans**: aucun — spike de mesure, pas de plan d'exécution.
+
+**Décision go/no-go : en attente d'arbitrage humain (ADR-031)** — ni cette entrée de roadmap, ni
+aucun autre document de la phase, ne tranche la suite (adaptateur VibeFlow minimal / démarche
+amont vers gsd-core / dépendance interne telle quelle / renoncer). Voir `SPIKE-REPORT.md`
+§Recommandation pour l'argumentaire, non tranché.
