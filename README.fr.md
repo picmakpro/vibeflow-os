@@ -125,7 +125,7 @@ chaque module est sa documentation complète — même structure partout.
 ## 🔒 Confiance
 
 - **Source-available** : code et historique publics — voir [LICENSE](./LICENSE).
-- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`70 suites` en CI — les
+- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`71 suites` en CI — les
   nouvelles prouvent le dispatch CLI multi-runtime (RUNT-01/02) et la forme exec des hooks du
   périmètre dev telle qu'installée, leur contrat de sortie, et la résolution Python partagée),
   install **idempotente** avec backup avant écrasement.
