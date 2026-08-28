@@ -123,7 +123,8 @@ sur opencode (**150 occurrences**) et **25/52 fichiers** sur kimi-code (**157 oc
 traduit dans **3 fichiers / 5 occurrences** sur les deux cibles. Le plafond « 52/52 » est de toute
 façon arithmétiquement impossible : seuls **26 des 52 fichiers source** contiennent la chaîne
 `.claude` avant conversion. Et le périmètre réellement actif déclaré à l'install (ex. sur kimi-code :
-31 agents copiés à l'octet dans un runtime dont le descripteur porte `namedDispatch: false` → 52
+31 agents posés avec `converter: null` — **6/31 modifiés** par les 4 étapes transverses du pipeline
+d'install, champs conservés — dans un runtime dont le descripteur porte `namedDispatch: false` → 52
 fichiers posés, dont potentiellement 31 inertes **selon ce descripteur — que ce même rapport
 déclare par ailleurs périmé ; si kimi-code dispatche bien des sous-agents nommés custom comme la
 doc courante le décrit, ces 31 agents ne sont pas inertes** ; aucun mécanisme ne signale l'un ou
@@ -231,7 +232,7 @@ tout cela ne se lance sans l'arbitrage de Samuel, y compris le choix de ne pas d
     },
     {
       "sujet": "Fidélité de conversion",
-      "constat": "156 conversions mesurées, 0 erreur machine, dégradation massive et silencieuse côté agents (model/memory/tools/disallowedTools/vf-internal/allowlist, sur codex et opencode — kimi-code copie à l'octet près) ET côté skills (description: perdue en entier sur 15/21 skills installables, sur les trois cibles, extractFrontmatterField ne gère pas le scalaire replié YAML) — aucun signal ne distingue converti de converti-et-mort",
+      "constat": "156 conversions mesurées, 0 erreur machine, dégradation massive et silencieuse côté agents (model/memory/tools/disallowedTools/vf-internal/allowlist, sur codex et opencode — kimi-code : 31 agents posés avec `converter: null`, 6/31 modifiés par les 4 étapes transverses du pipeline d'install, champs conservés) ET côté skills (description: perdue en entier sur 15/21 skills installables, sur les trois cibles, extractFrontmatterField ne gère pas le scalaire replié YAML) — aucun signal ne distingue converti de converti-et-mort",
       "severity": "majeur",
       "action": "ask-user",
       "ref": "DISCUSS.md#fidélité-de-conversion--la-dégradation-silencieuse-chiffrée"
