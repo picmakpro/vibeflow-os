@@ -28,3 +28,14 @@ qui relance ensuite par `SendMessage`. Le tour de boucle est le canal, pas le me
 
 Voir [[transcript-fige-ne-prouve-pas-worker-mort]] (réveiller plutôt que redispatcher) et
 [[escalade-humaine-trou-headless]] (même famille : le canal d'escalade ne se devine pas).
+
+**Nuance mesurée le 2026-08-28 (Phase 38), qui explique les rapports « qui passent par main »** :
+un agent **RÉVEILLÉ par `SendMessage`** ne rend PAS son rapport par le canal de retour d'Agent —
+il le rend à **`main`**, qui le relaie. Le premier rapport (avant réveil) arrive bien par retour
+d'Agent ; le second, après reprise, part vers `main`. Ce n'est donc **pas** un défaut de mandat :
+la consigne « retour d'Agent, jamais `SendMessage` » était présente et respectée. C'est une
+propriété du réveil lui-même.
+**Conséquence pratique** : réveiller reste le bon geste (contexte intact, bien meilleur qu'un
+redispatch), mais il faut **s'attendre au relais** et ne pas le lire comme une désobéissance.
+Corollaire : après un réveil, **constater le disque** plutôt qu'attendre le rapport — trois fois
+sur quatre le travail était déjà commité quand le relais est arrivé.
