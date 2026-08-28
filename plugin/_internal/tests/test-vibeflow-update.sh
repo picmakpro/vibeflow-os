@@ -747,12 +747,17 @@ fi
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
-# T18 (ROLL-02) — rollback restaure le fragment hooks SAUVEGARDÉ au backup, jamais le fragment
-# COURANT du cache au moment du rollback (potentiellement une version différente). Scénario :
-# fragment OLD installé puis backuppé (2e install, même fragment encore en cache à cet instant) ;
-# le cache "avance" ensuite vers un fragment NEW mergé directement (merge-hooks.sh CLI, même
-# patron que T11 — évite un 3e install qui écraserait le backup OLD avec un backup NEW plus
-# récent) ; après rollback : OLD doit réapparaître, NEW doit disparaître.
+# T18 (D-38-J, REMPLACE l'ancien T18/ROLL-02) — reproduit le cas de PROD, pas le cas qui n'arrive
+# jamais : $CACHE_DIR n'est JAMAIS rafraîchi par ce script, c'est l'appelant (/vibeflow-install)
+# qui le pré-remplit AVANT install_module — donc AVANT backup_module. Au moment où backup_module
+# tourne pour le 2e install, le cache porte DÉJÀ le fragment NEW (v2), jamais plus le fragment OLD
+# (v1) réellement mergé dans settings.json. L'ancien T18 avançait le cache APRÈS le 2e install
+# (via un merge-hooks.sh CLI direct) — un scénario qui ne reproduit PAS l'ordre réel des
+# événements en prod, et qui restait vert même sur le code AVANT ce correctif (le bug D-38-J
+# n'était pas discriminé). Preuve que ce nouveau T18 est bien discriminant : `git stash` du
+# correctif backup_module (lecture $TARGET_ROOT/.vibeflow-fragments/<mod>.json au lieu de
+# $CACHE_DIR/<mod>/hooks/hooks.json) fait échouer cette assertion — le fragment OLD backuppé
+# devient NEW (le cache déjà avancé), donc le rollback restaure NEW → assertions ci-dessous rouges.
 # ---------------------------------------------------------------------------
 LAB="$(mktemp -d)"
 CACHE="$LAB/cache"
@@ -765,31 +770,63 @@ printf '{"hooks":{"SessionStart":[{"matcher":"startup","hooks":[{"type":"command
 (cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install hookflip >/dev/null 2>&1)
 "$GREP" -q "hookflip-old.sh" "$LAB/.claude/settings.json" 2>/dev/null \
   || ko "T18 pré-condition : fragment OLD non mergé après le 1er install (garde-fou du test)"
+[ -f "$LAB/.claude/.vibeflow-fragments/hookflip.json" ] \
+  || ko "T18 pré-condition : .vibeflow-fragments/hookflip.json non persisté après le 1er install (garde-fou du test)"
 
-# 2e install, MÊME fragment OLD encore en cache à cet instant → backup_module capture OLD.
+# LE CAS DE PROD (D-38-J) : le cache "avance" en v2 AVANT le 2e install, exactement comme
+# /vibeflow-install le pré-remplit avant d'invoquer install_module. Au moment où install_module
+# (donc backup_module) tourne pour v2, $CACHE_DIR/hookflip/hooks/hooks.json est DÉJÀ le fragment
+# NEW — jamais OLD.
 echo v2.0.0 > "$CACHE/hookflip/VERSION"
 printf '{"name":"hookflip","version":"v2.0.0"}\n' > "$CACHE/hookflip/module.json"
-(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install hookflip >/dev/null 2>&1)
-BDIR=$(ls -1dt "$LAB/.claude/.backups/hookflip"-* 2>/dev/null | "$GREP" -v -- '-removed$' | head -1)
-[ -n "$BDIR" ] && "$GREP" -q "hookflip-old.sh" "$BDIR/hooks/hooks.json" 2>/dev/null \
-  || ko "T18 pré-condition : backup n'a pas capturé le fragment OLD (garde-fou du test)"
-
 printf '#!/usr/bin/env bash\necho new\n' > "$CACHE/hookflip/scripts/hookflip-new.sh"
 printf '{"hooks":{"SessionStart":[{"matcher":"startup","hooks":[{"type":"command","command":"bash {{VF_SCRIPTS}}/hookflip-new.sh || true"}]}]}}\n' > "$CACHE/hookflip/hooks/hooks.json"
-bash "$INTERNAL_DIR/merge-hooks.sh" merge "$CACHE/hookflip/hooks/hooks.json" \
-  --settings "$LAB/.claude/settings.json" \
-  --scripts-prefix '"$CLAUDE_PROJECT_DIR"/.claude/scripts' >/dev/null 2>&1
+(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install hookflip >/dev/null 2>&1)
 "$GREP" -q "hookflip-new.sh" "$LAB/.claude/settings.json" 2>/dev/null \
-  || ko "T18 pré-condition : fragment NEW non mergé directement (garde-fou du test)"
+  || ko "T18 pré-condition : fragment NEW non mergé après le 2e install (garde-fou du test)"
+BDIR=$(ls -1dt "$LAB/.claude/.backups/hookflip"-* 2>/dev/null | "$GREP" -v -- '-removed$' | head -1)
+[ -n "$BDIR" ] && "$GREP" -q "hookflip-old.sh" "$BDIR/hooks/hooks.json" 2>/dev/null \
+  || ko "T18 pré-condition : backup n'a PAS capturé OLD (backup=$BDIR) — reproduit le bug si KO ici AVANT le fix"
 
 (cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" rollback hookflip >/dev/null 2>&1)
 miss=0
 "$GREP" -q "hookflip-old.sh" "$LAB/.claude/settings.json" 2>/dev/null \
-  || { ko "T18 (ROLL-02) : fragment OLD (sauvegardé au backup) absent de settings.json après rollback"; miss=1; }
+  || { ko "T18 (D-38-J) : fragment OLD absent de settings.json après rollback — le rollback des hooks était un no-op (cache déjà en v2 au moment du backup)"; miss=1; }
 "$GREP" -q "hookflip-new.sh" "$LAB/.claude/settings.json" 2>/dev/null \
-  && { ko "T18 (ROLL-02) : fragment NEW (cache courant au moment du rollback) encore présent après rollback"; miss=1; }
+  && { ko "T18 (D-38-J) : fragment NEW encore présent après rollback"; miss=1; }
 [ "$miss" -eq 0 ] \
-  && ok "T18 (ROLL-02) : rollback restaure le fragment hooks SAUVEGARDÉ, retire le fragment courant du cache"
+  && ok "T18 (D-38-J) : rollback restaure le fragment hooks PERSISTÉ PAR MODULE (.vibeflow-fragments/<mod>.json), pas le fragment courant du cache déjà avancé (cas de prod, pas le cas qui n'arrive jamais)"
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T18b (D-38-J, condition 4 — rétro-compatibilité) — un lab installé AVANT cette persistance
+# par-module n'a AUCUN .vibeflow-fragments/<mod>.json. backup_module doit le DIRE explicitement
+# (jamais un silence) quand le module utilise pourtant des hooks (fragment présent dans le cache
+# courant) : c'est le gate de fidélité appliqué à notre propre rollback — ne pas restaurer est
+# acceptable, ne pas le dire ne l'est pas.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+mkdir -p "$CACHE/hookretro/hooks" "$LAB/.claude/scripts"
+echo v1.0.0 > "$CACHE/hookretro/VERSION"
+printf '{"name":"hookretro","version":"v1.0.0"}\n' > "$CACHE/hookretro/module.json"
+printf '{"hooks":{"SessionStart":[{"matcher":"startup","hooks":[{"type":"command","command":"true"}]}]}}\n' > "$CACHE/hookretro/hooks/hooks.json"
+# Simule un lab "pré-persistance" : entrée de registre posée à la main, PAS de
+# .vibeflow-fragments/ (ce fichier n'existait pas avant ce lot) — un vrai lab pré-existant.
+printf 'hookretro=v1.0.0\n' > "$LAB/.claude/scripts/.vibeflow-installed"
+echo v2.0.0 > "$CACHE/hookretro/VERSION"
+printf '{"name":"hookretro","version":"v2.0.0"}\n' > "$CACHE/hookretro/module.json"
+OUT=$(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install hookretro 2>&1)
+miss=0
+echo "$OUT" | "$GREP" -qi "installé avant" \
+  || { ko "T18b (D-38-J, rétro-compat) : aucun message explicite sur le fragment hooks non restaurable (sortie : $OUT)"; miss=1; }
+BDIR=$(ls -1dt "$LAB/.claude/.backups/hookretro"-* 2>/dev/null | "$GREP" -v -- '-removed$' | head -1)
+if [ -n "$BDIR" ] && [ -f "$BDIR/hooks/hooks.json" ]; then
+  ko "T18b (D-38-J, rétro-compat) : hooks.json présent dans le backup alors qu'aucun fragment persisté n'existait (contenu fabriqué)"
+  miss=1
+fi
+[ "$miss" -eq 0 ] \
+  && ok "T18b (D-38-J, rétro-compat) : absence de fragment persisté DÉCLARÉE explicitement, jamais tue"
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
@@ -875,6 +912,82 @@ rm -rf "$LAB"
 # commence bien par un chiffre après le tiret ('...-removed' suit l'horodatage), donc il matche
 # toujours `[0-9]*` puis reste filtré par `grep -v -- '-removed$'` — non-régression déjà couverte
 # plus haut dans ce fichier (bloc T16), reconfirmée ici en commentaire pour la revue.
+
+# ---------------------------------------------------------------------------
+# T22 (D-38-K, condition B OBLIGATOIRE, DISCRIMINANT) — un `cp` qui échoue RÉELLEMENT à mi-
+# restauration (permission retirée sur le fichier SOURCE du backup, jamais un `cp` simulé) doit
+# faire déclarer le registre INCONSISTENT:<étape>:<version_cible>, sortir en échec, et NE JAMAIS
+# laisser le registre porter la version PRÉ-rollback. `show_status` doit afficher cet état.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+mkdir -p "$CACHE/trapmod/skills/trapmod"
+echo v1.0.0 > "$CACHE/trapmod/VERSION"
+printf '{"name":"trapmod","version":"v1.0.0"}\n' > "$CACHE/trapmod/module.json"
+printf '# trapmod v1\n' > "$CACHE/trapmod/skills/trapmod/SKILL.md"
+(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install trapmod >/dev/null 2>&1)
+echo v2.0.0 > "$CACHE/trapmod/VERSION"
+printf '{"name":"trapmod","version":"v2.0.0"}\n' > "$CACHE/trapmod/module.json"
+printf '# trapmod v2\n' > "$CACHE/trapmod/skills/trapmod/SKILL.md"
+(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install trapmod >/dev/null 2>&1)
+BDIR=$(ls -1dt "$LAB/.claude/.backups/trapmod"-* 2>/dev/null | "$GREP" -v -- '-removed$' | head -1)
+miss=0
+if [ -z "$BDIR" ] || [ ! -f "$BDIR/skills/SKILL.md" ]; then
+  ko "T22 pré-condition : backup de trapmod introuvable ou incomplet (garde-fou du test)"
+  miss=1
+else
+  # Échec RÉEL, jamais simulé : la SOURCE que rollback_module va `cp -r` perd son droit de
+  # lecture — `cp` échoue avec "Permission denied", exactement le mode de panne du digest.
+  chmod 000 "$BDIR/skills/SKILL.md"
+  OUT=$(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" rollback trapmod 2>&1)
+  rc=$?
+  chmod 644 "$BDIR/skills/SKILL.md" 2>/dev/null || true
+  [ "$rc" -ne 0 ] || { ko "T22 (D-38-K) : rollback avec cp en échec réel a exit 0 (attendu non-zéro)"; miss=1; }
+  REG=$("$GREP" '^trapmod=' "$LAB/.claude/scripts/.vibeflow-installed" 2>/dev/null | cut -d= -f2)
+  case "$REG" in
+    INCONSISTENT:*) : ;;
+    v2.0.0)
+      ko "T22 (D-38-K) : registre trapmod='$REG' — encore la version PRÉ-rollback, le mensonge que ce lot ferme"
+      miss=1
+      ;;
+    *)
+      ko "T22 (D-38-K) : registre trapmod='$REG' (attendu un préfixe INCONSISTENT:)"
+      miss=1
+      ;;
+  esac
+  echo "$OUT" | "$GREP" -qi "INCOHÉRENT\|inconsistent" \
+    || { ko "T22 (D-38-K) : aucun message explicite sur l'état incohérent dans la sortie du rollback"; miss=1; }
+  STATUS_OUT=$(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" status 2>&1)
+  echo "$STATUS_OUT" | "$GREP" -qi "trapmod.*INCONSISTENT" \
+    || { ko "T22 (D-38-K) : 'status' n'affiche pas l'état INCONSISTENT pour trapmod (sortie : $STATUS_OUT)"; miss=1; }
+fi
+[ "$miss" -eq 0 ] \
+  && ok "T22 (D-38-K, DISCRIMINANT) : cp en échec réel mi-restauration -> registre INCONSISTENT:<étape>:<cible>, rc≠0, 'status' l'affiche"
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T23 (D-38-K, piège bash 3.2) — DISCRIMINANT de la garde `set -E` elle-même : sans `set -E`, le
+# `trap ERR` posé dans rollback_module ne se propagerait PAS dans la fonction sous bash 3.2 (le
+# /bin/bash de macOS, plancher réel du repo) — la restauration échouerait bien (rc≠0, cohérent
+# avec T22) mais SANS jamais écrire l'état INCONSISTENT au registre : le vert silencieux que
+# cette phase existe pour tuer. Assertion statique bornée au VOISINAGE immédiat du `trap ERR` de
+# rollback_module (jamais un `grep -c` global sur tout le fichier, qui compterait aussi la prose
+# de ce commentaire) : `set -E` doit apparaître AVANT `trap .* ERR` dans les 10 lignes qui le
+# précèdent.
+# ---------------------------------------------------------------------------
+TRAP_LINE=$("$GREP" -n "trap '_vf_rollback_mark_inconsistent" "$INSTALLER" | head -1 | cut -d: -f1)
+if [ -z "$TRAP_LINE" ]; then
+  ko "T23 (D-38-K) : trap ERR de rollback_module introuvable dans $INSTALLER"
+else
+  START=$((TRAP_LINE - 10))
+  [ "$START" -lt 1 ] && START=1
+  WINDOW=$(sed -n "${START},${TRAP_LINE}p" "$INSTALLER")
+  if echo "$WINDOW" | "$GREP" -q '^\s*set -E\s*$'; then
+    ok "T23 (D-38-K) : 'set -E' précède le 'trap ... ERR' de rollback_module (propagation en fonction, bash 3.2)"
+  else
+    ko "T23 (D-38-K) : aucun 'set -E' dans les 10 lignes précédant le trap ERR de rollback_module — le trap serait un vert silencieux sous bash 3.2"
+  fi
+fi
 
 # ---------------------------------------------------------------------------
 # Garde-fou final : le vrai ~/.claude est inchangé (snapshot récursif avant=après).

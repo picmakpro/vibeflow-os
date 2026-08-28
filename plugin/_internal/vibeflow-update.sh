@@ -1151,6 +1151,16 @@ merge_module_hooks() {
   fi
   if [ "$merge_rc" -eq 0 ]; then
     log "  hooks mergés → $TARGET_ROOT/settings.json"
+    # D-38-J (correction ciblée post-ROLL) : persiste le fragment RÉELLEMENT mergé, PAR MODULE,
+    # sous TARGET_ROOT — raw cp intentionnel (patron du settings_backup ci-dessus, état interne
+    # du moteur, jamais un artefact de pose). C'est l'unique source de vérité de ce qui est
+    # VRAIMENT dans settings.json à cet instant : $CACHE_DIR n'est JAMAIS rafraîchi PAR CE SCRIPT
+    # — c'est l'appelant (/vibeflow-install) qui le pré-remplit AVANT chaque install_module, donc
+    # AVANT backup_module lui-même. Sans cette persistance par-module, backup_module lisait le
+    # fragment du cache COURANT (déjà en v2 au moment du backup de v1→v2) et le rollback des
+    # hooks était un no-op silencieux — le trou de rollback que ce lot ferme.
+    mkdir -p "$TARGET_ROOT/.vibeflow-fragments"
+    cp "$fragment" "$TARGET_ROOT/.vibeflow-fragments/$mod.json"
   else
     log "  ERROR: merge hooks ÉCHOUÉ pour $mod — gouvernance NON câblée (corriger settings.json puis réinstaller)"
     return 1  # VG-3 : l'échec se propage (plus de succès silencieux sans gouvernance)
@@ -1691,16 +1701,41 @@ backup_module() {
     captured_version=$(grep "^$mod=" "$INSTALLED_REGISTRY" 2>/dev/null | cut -d= -f2 || true)
     [ -n "$captured_version" ] && printf '%s' "$captured_version" > "$bdir/.version"
   fi
-  # ROLL-01 (38-03) : hooks — si le module porte un fragment hooks/hooks.json dans le cache
-  # courant, le copier dans le backup pour que rollback_module puisse le réinjecter (via
-  # merge_module_hooks avec le 2e paramètre, ROLL-02) plutôt que le fragment du cache au moment
-  # du rollback, potentiellement une version différente.
-  if [ -f "$CACHE_DIR/$mod/hooks/hooks.json" ]; then
+  # ROLL-01 (38-03), corrigé D-38-J (correction ciblée post-ROLL) : hooks — la source n'est PLUS
+  # $CACHE_DIR/$mod/hooks/hooks.json. $CACHE_DIR n'est JAMAIS rafraîchi par ce script : c'est
+  # l'appelant (/vibeflow-install) qui le pré-remplit AVANT install_module, donc AVANT CE backup —
+  # au moment où backup_module tourne, le cache porte déjà le fragment de la VERSION CIBLE (v2),
+  # jamais celui réellement mergé dans settings.json (v1). La seule source de vérité de « ce qui
+  # est VRAIMENT dans settings.json à cet instant » est le fragment persisté PAR MODULE que
+  # merge_module_hooks écrit après CHAQUE merge réussi (voir plus haut dans ce fichier).
+  if [ -f "$TARGET_ROOT/.vibeflow-fragments/$mod.json" ]; then
     mkdir -p "$bdir/hooks"
-    cp "$CACHE_DIR/$mod/hooks/hooks.json" "$bdir/hooks/hooks.json"
+    cp "$TARGET_ROOT/.vibeflow-fragments/$mod.json" "$bdir/hooks/hooks.json"
+  elif [ -f "$CACHE_DIR/$mod/hooks/hooks.json" ]; then
+    # Condition 4 (rétro-compatibilité, digest de mission D-38-J) : le module utilise des hooks
+    # (fragment présent dans le cache courant) mais AUCUN fragment persisté n'existe encore sous
+    # TARGET_ROOT — cas d'un lab installé AVANT cette persistance par-module, qui n'a jamais eu ce
+    # fichier écrit. Le rollback des hooks sera un no-op pour CE backup : DIT explicitement,
+    # jamais tu — c'est le gate de fidélité appliqué à notre propre rollback (ne pas restaurer est
+    # acceptable, ne pas le dire ne l'est pas).
+    log "  ⚠ fragment hooks non restaurable pour $mod : .vibeflow-fragments/$mod.json absent (lab installé avant la persistance par-module) — le rollback des hooks sera un no-op pour ce backup ; réinstaller régénère le fragment"
   fi
   vf_declare_write + "$bdir"
   log "  backup → $bdir"
+}
+
+# D-38-K (correction ciblée post-ROLL, condition B OBLIGATOIRE) : handler du `trap ERR` de
+# rollback_module. Réutilise `mark_installed` (pas une 2e écriture du registre) avec un format de
+# version délibérément non-numérique — `INCONSISTENT:<étape>:<version_cible>` — reconnu par
+# `show_status` (grep "^$mod=" | cut -d= -f2 rend cette chaîne telle quelle, aucun `=` interne).
+# Le doute ne se tait jamais (même doctrine que D-31-07 côté manifeste) : un état mixte qui ne le
+# DIT pas au registre est le mensonge que ce lot ferme.
+_vf_rollback_mark_inconsistent() {
+  local mod="$1" step="$2" target_version="$3"
+  log "✗ ERREUR pendant le rollback de $mod à l'étape '$step' — état INCOHÉRENT (restauration partielle)"
+  mark_installed "$mod" "INCONSISTENT:$step:$target_version"
+  log "  registre → $mod=INCONSISTENT:$step:$target_version"
+  log "  réparer : relancer 'rollback $mod' (retente la restauration complète depuis le même backup), ou 'install $mod' pour repartir d'une pose propre"
 }
 
 rollback_module() {
@@ -1753,27 +1788,55 @@ rollback_module() {
     return 0
   fi
 
+  local rollback_target_version="?"
+  [ -f "$latest/.version" ] && rollback_target_version="$(cat "$latest/.version")"
+  local rollback_step="start"
+
+  # D-38-K (correction ciblée post-ROLL, condition B OBLIGATOIRE) : `trap ERR` posé AVEC `set -E`
+  # (errtrace). Sous bash 3.2 (le /bin/bash de macOS, plancher réel de ce dépôt), un `trap ERR`
+  # NE SE PROPAGE PAS dans les fonctions sans `set -E` — et TOUTE cette restauration tourne à
+  # l'intérieur de rollback_module. Posé sans `set -E`, il aurait l'air correct en LECTURE et ne
+  # se déclencherait JAMAIS en EXÉCUTION : exactement le vert silencieux que cette phase existe
+  # pour tuer (vérifié en exécution, pas en lecture — cf. suite de tests, cas `cp` en échec réel).
+  # État shell restauré en sortie (succès ou trap) : `errtrace` ne doit pas fuiter sur l'appelant
+  # si ce script l'utilise déjà pour une autre raison plus haut dans le run.
+  local rollback_had_errtrace=0
+  case "$-" in *E*) rollback_had_errtrace=1 ;; esac
+  set -E
+  trap '_vf_rollback_mark_inconsistent "$mod" "$rollback_step" "$rollback_target_version"' ERR
+
   log "Rollback $mod depuis $latest..."
+  rollback_step="skills"
   if [ -d "$latest/skills" ]; then
     rm -rf "$TARGET_ROOT/skills/$mod"
     cp -r "$latest/skills" "$TARGET_ROOT/skills/$mod"
     log "  restored $TARGET_ROOT/skills/$mod"
   fi
+  rollback_step="scripts"
   if [ -d "$latest/scripts" ]; then
     for f in "$latest/scripts/"*; do
-      [ -f "$f" ] && cp "$f" "$TARGET_ROOT/scripts/" && chmod +x "$TARGET_ROOT/scripts/$(basename "$f")"
+      if [ -f "$f" ]; then
+        # D-38-K : `cp` et `chmod` séparés en 2 commandes AUTONOMES (jamais un `A && B` où seul B
+        # est en position finale du &&-list) — c'est ce qui rend l'échec de `cp` seul, à lui seul,
+        # observable et non-ambigu sous `set -e`/ERR trap, sans dépendre d'une subtilité de
+        # préséance &&/|| vérifiée en LECTURE plutôt qu'en EXÉCUTION (même piège que set -E ci-dessus).
+        cp "$f" "$TARGET_ROOT/scripts/"
+        chmod +x "$TARGET_ROOT/scripts/$(basename "$f")"
+      fi
     done
     log "  restored scripts"
   fi
   # ROLL-01 (38-03) : agents/${mod}.md + agents/${mod}-references/ — DÉJÀ sauvegardés par
   # backup_module (D7), jamais relus jusqu'à ce lot. Même patron rm -rf puis cp -r que skills,
   # jamais un merge partiel.
+  rollback_step="agents"
   if [ -f "$latest/agents/${mod}.md" ]; then
     mkdir -p "$TARGET_ROOT/agents"
     rm -f "$TARGET_ROOT/agents/${mod}.md"
     cp "$latest/agents/${mod}.md" "$TARGET_ROOT/agents/${mod}.md"
     log "  restored $TARGET_ROOT/agents/${mod}.md"
   fi
+  rollback_step="agent-references"
   if [ -d "$latest/agent-references" ]; then
     rm -rf "$TARGET_ROOT/agents/${mod}-references"
     cp -r "$latest/agent-references" "$TARGET_ROOT/agents/${mod}-references"
@@ -1781,8 +1844,10 @@ rollback_module() {
   fi
   # ROLL-02 (38-03) : hooks — retire le fragment COURANT du cache (potentiellement une version
   # différente de celle qu'on restaure), puis réinjecte le fragment SAUVEGARDÉ au moment du
-  # backup. Best-effort comme leurs appelants actuels dans install_module (échec journalisé,
-  # jamais fatal pour le reste du rollback).
+  # backup. Best-effort ASSUMÉ (leurs propres `||` de repli) : un échec ici ne doit PAS déclarer
+  # l'état INCONSISTENT — c'est le même contrat que leurs appelants dans install_module, jamais
+  # fatal pour le reste du rollback, donc jamais du ressort du trap ERR de cette fonction.
+  rollback_step="hooks"
   if [ -f "$latest/hooks/hooks.json" ]; then
     remove_module_hooks "$mod" || log "  (retrait du fragment courant échoué, best-effort)"
     merge_module_hooks "$mod" "$latest/hooks/hooks.json" || log "  (réinjection du fragment sauvegardé échouée, best-effort)"
@@ -1791,14 +1856,16 @@ rollback_module() {
   # ROLL-03 (38-03) : registre — remis à la version CAPTURÉE au backup, jamais devinée. Backup
   # pré-ce-lot (pas de .version) → registre laissé inchangé, avertissement explicite plutôt
   # qu'une version inventée.
+  rollback_step="registry"
   if [ -f "$latest/.version" ]; then
-    local restored_version
-    restored_version=$(cat "$latest/.version")
-    mark_installed "$mod" "$restored_version"
-    log "  registre → $mod=$restored_version"
+    mark_installed "$mod" "$rollback_target_version"
+    log "  registre → $mod=$rollback_target_version"
   else
     log "  ⚠ version restaurée inconnue — registre inchangé, vérifier manuellement"
   fi
+
+  trap - ERR
+  [ "$rollback_had_errtrace" -eq 1 ] || set +E
   log "✓ $mod rollback OK"
 }
 
@@ -2010,13 +2077,26 @@ show_status() {
   for mod in $(list_available_modules); do
     installed=$(module_version_installed "$mod")
     available=$(module_version_available "$mod")
-    if [ "$installed" = "—" ]; then
-      status="Not installed"
-    elif [ "$installed" = "$available" ]; then
-      status="Up to date"
-    else
-      status="Update available ($installed → $available)"
-    fi
+    case "$installed" in
+      INCONSISTENT:*)
+        # D-38-K : état déclaré par le trap ERR de rollback_module (jamais un « Up to date »/
+        # « Update available » calculé sur une version fabriquée) — étape + version cible portées
+        # verbatim, le doute ne se tait jamais.
+        _inc_step="${installed#INCONSISTENT:}"
+        _inc_target="${_inc_step#*:}"
+        _inc_step="${_inc_step%%:*}"
+        status="INCONSISTENT (étape=$_inc_step, cible=$_inc_target) — réparer : rollback $mod ou install $mod"
+        ;;
+      —)
+        status="Not installed"
+        ;;
+      "$available")
+        status="Up to date"
+        ;;
+      *)
+        status="Update available ($installed → $available)"
+        ;;
+    esac
     printf "%-30s %-15s %-15s %s\n" "$mod" "$installed" "$available" "$status"
   done
 }
