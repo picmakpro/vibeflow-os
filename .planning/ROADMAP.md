@@ -1124,11 +1124,17 @@ preuve (un sur trois démenti en exécution : `maxDepth`).
 branche de dégradation explicite (symlinks inapplicables sous MSYS) ; OpenCode et kimi-code **jamais
 installés** au 2026-08-28 — tout ce qui les concerne est dérivé de descripteurs jusqu'à mesure.
 
-**Requirements**: TBD (à dériver au cadrage — candidats : PORT-xx canal, MIGR-xx migration, FIDE-xx gate)
+**Requirements**: FIDE-01/02, RUNT-01/02, ROLL-01..05, TGT-01..04, ADPT-01..04, MIGR-01..05 (22 IDs,
+6 familles — `PORT-xx` évité, pris par la Phase 30 ; voir REQUIREMENTS.md §Portabilité multi-runtime)
 **Depends on:** Phase 37 (cadrage factuel) ; adjacente à Phase 34 (skill-installer) — lot 2 partage la
 surface installeur, à séquencer au cadrage.
-**Plans:** 0 plans
+**Plans:** 6 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-discuss-phase 38 puis /gsd-plan-phase 38)
+- [ ] 38-01-PLAN.md — Gate de fidélité (champs perdus + marqueurs morts par cible, bannière d'install)
+- [ ] 38-02-PLAN.md — Installeur multi-runtime (12 sites CLI-couplés sur 4 fichiers, table de dispatch à 4 verbes)
+- [ ] 38-03-PLAN.md — Trou de rollback (agents+hooks+mark_installed+glob, --dry-run)
+- [ ] 38-04-PLAN.md — `--target` injectable + réécriture du payload à la copie + sonde cross-module
+- [ ] 38-05-PLAN.md — Adaptateur Codex minimal (rôle .toml dispatchable, limite de confinement déclarée)
+- [ ] 38-06-PLAN.md — Migration de lab (runtime dans config.json, coexistence/bascule gatée, réversibilité)
