@@ -1,5 +1,28 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.20.2] — 2026-08-28 (bootstrap multi-runtime — Superpowers dispatché par runtime détecté, RUNT-01/02)
+
+**Patch** (durcissement, comportement observable modifié uniquement sur un poste Codex ou sur un
+poste sans CLI `claude` détectée) :
+
+- **Le défaut, mesuré au cadrage Phase 38** : `detect_superpowers()`/`ensure_superpowers()` dans
+  `ensure-deps.sh` appelaient `command -v claude` / `claude plugin ...` en dur. Sur un poste où le
+  runtime détecté n'est pas `claude` (Codex, canal natif `codex plugin` confirmé), les 2 checks et
+  les 2 gestes d'install échouaient AVANT même d'atteindre l'adaptateur — aucun geste réel, aucune
+  dégradation déclarée, juste un `command -v claude` silencieusement faux.
+- **Le fix** : les 2 sites (`detect_superpowers`, `ensure_superpowers`) routent désormais par
+  `plugin/_internal/runtime-cli-dispatch.sh`, une table de dispatch partagée (détection
+  `VF_RUNTIME`/cascade `command -v`, résolue par la cascade EXACTE de `find_hooks_merger()`) : sur
+  `claude` ou `codex`, le geste RÉEL est exécuté (mêmes verbes `list --json`/`install`/
+  `marketplace add`) ; sur OpenCode/kimi-code (non mesurés) ou runtime absent, dégradation
+  DÉCLARÉE (étape manuelle affichée, exit propre) — jamais un échec silencieux.
+- Ajout de `ensure_codex_preconditions_if_applicable()` : sur un poste Codex détecté, pose
+  `multi_agent_v2` si inactif (commande officielle `codex features enable`, idempotent) et
+  DÉCLARE (jamais n'auto-écrit) l'état de `trust_level` du dépôt — les deux préconditions
+  100% silencieuses mesurées en session réelle (38-CONTEXT.md), fermées côté installeur.
+- Repli inchangé : script partagé introuvable (poste pas encore mis à jour) → comportement
+  `claude`-figé ACTUEL, aucune régression.
+
 ## [v2.20.1] — 2026-08-28 (vf-coder peut relayer une correction au sous-agent qu'il a spawné)
 
 **Patch** (durcissement, comportement observable modifié uniquement en cours d'exécution
