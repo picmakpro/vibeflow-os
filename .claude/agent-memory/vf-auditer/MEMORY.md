@@ -1,0 +1,7 @@
+- [Exécuter, jamais se fier au vert](feedback-execute-dont-trust-green.md) — sur vibeflow-os, une mitigation sécu se rejoue en vrai (dépôt piégé + chaîne complète), jamais lue seule
+- [Pièges d'outillage rtk/macOS](reference-rtk-proxy-quirks-vibeflow-os.md) — git diff `..` vide, grep tronqué, diff menteur, pas de `timeout` : contournements mesurés
+- [Symlink-escape gates GSD](project-symlink-escape-gsd-scripts.md) — CLOS (recoupé 2026-08-06) : build-gsd-capabilities-index.sh porte désormais une garde de confinement réelle
+- [RCE dag.sh, 5e passage](project-symlink-escape-dag-sh-5eme-passage.md) — CLOS par retrait (2026-08-06), vérifié par exécution + régression T33 confirmée rouge ; dette doc résiduelle notée (PAEX-11/CONCERNS/ADR-070 non mis à jour post-fix)
+- [Vérifier l'arbre après mutation](feedback-verifier-arbre-apres-mutation.md) — cp -R vers scratchpad a montré une fuite vers le fichier réel du dépôt (2026-08-06), toujours cmp contre HEAD après restauration
+- [ICM w2 — basename + preuves fantômes](project-icm-w2-basename-et-preuves-fantomes.md) — basename fixé (vérifié), mais fixture tiret-initial récidive en preuve fantôme + oracle traversée p2_sens_a hors scope (2026-08-15)
+- [Traversée par libellé de jalon, Phase 18](project-traversal-libelle-jalon-phase18.md) — CLOS (code corrigé, `/` retiré de la classe l.134, recalé 2026-08-28) ; historique : restore-requirements-ledger.sh/check-requirements-survival.sh, ../ survit à la liste blanche, exploité jusqu'à l'écriture (2026-08-18)

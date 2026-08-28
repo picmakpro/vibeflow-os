@@ -1,0 +1,38 @@
+# Mémoire — vf-coder
+
+- [check-agents.sh ne couvre rien sur vibeflow-os](project_check-agents-scope.md) — il audite `.claude/agents/` du lab courant, pas `plugin/` ; vert = non testé.
+- [Le code des plans détaillés est normatif](project_plans-code-normatif.md) — un correctif de revue va dans le plan ET le fichier ; s'il contredit un `must_have`, remonter au manager.
+- [Un `grep -c` de recette compte aussi la prose](project_recette-grep-c-litteral.md) — ne pas mettre le littéral d'un flag dans une `description` visée par le compteur.
+- [En lab, `.claude/skills/` est plat et partagé](project_lab-skills-plat-partage.md) — glob en dur = faux rouge (agents voisins) ou vert à vide (refs non expansées) ; compter les fichiers ouverts.
+- [L'index GSD est régénéré à l'install](project_index-gsd-regenere.md) — cible mouvante : écrire la couverture contre le sur-ensemble, jamais contre un nombre figé.
+- [Prouver un cas discriminant par mutation](feedback_mutation-test-discriminating-cases.md) — muter pour prouver le rouge, rejouer la réécriture licite qui doit rester verte, confiner le mutant au segment mesuré, reprendre la lettre du mutant d'une revue.
+- [Fixture de perf : la forme avant la taille](feedback_fixture-de-perf-la-forme-avant-la-taille.md) — même taille, ×8 de temps selon la densité du motif ; toujours une fixture dense + un test de linéarité.
+- [Libellés d'`ok` gelés : ajouter, jamais réécrire](feedback_libelles-ok-geles.md) — un libellé qui sous-déclare ne ment pas ; le message de KO, lui, doit rester exact.
+- [Doctrine sous arbitrage ⇒ sonde par fixtures](project_sonde-ancree-sur-redaction-arbitree.md) — jamais d'ancre sur une phrase qui peut disparaître ; + compteur d'atteinte contre le vert à vide.
+- [Un gate ne se replie jamais](feedback_gate-jamais-de-repli.md) — KO « non vérifiable » plutôt qu'un vert par vérification plus faible ; « exactement X » = égalité d'ensemble, pas liste noire.
+- [Existence au lieu de relation](feedback_existence-au-lieu-de-relation.md) — test décisif : ajouter une clause inverse sans rien retirer et rester vert = assertion existentielle.
+- [Sites `ok "` statiques ≠ libellés `ok` exécutés](project_ok-statiques-vs-executes.md) — 90 vs 102 ; nommer l'objet avant de citer un nombre, et re-mesurer tout chiffre transmis.
+- [bash 3.2 casse sur `$(cat <<'EOF')`](project_bash32-heredoc-substitution.md) — une apostrophe française dans un programme embarqué ; erreur reportée très loin de sa cause.
+- [bash 3.2 avale le non-ASCII dans le nom de variable](project_bash32-multibyte-nom-de-variable.md) — `$label→` = fatal sous `set -u`, et la ligne ne tourne que quand la sonde doit rougir.
+- [gsd-core : `npm install` ne pose pas le payload](project_gsd-core-layout-npm-vs-installeur.md) — le tarball range sous `.../gsd-core/gsd-core/bin/lib` ; seul l'installeur `--claude` sert les cascades.
+- [Baseline AVANT le premier artefact](feedback_baseline-avant-le-premier-artefact.md) — un fichier généré dans un dossier globé élargit les gates larges ; normaliser le compteur avant de crier à la régression.
+- [`diff` ment sur ce poste](project_diff-proxifie-utiliser-comm.md) — comparer les ensembles avec `comm -23`/`-13`/`-12` et `cmp -s`, jamais `diff` ; méfiance sur `wc -l <` et `cat -A`.
+- [Retirer un gate rouvre les exceptions voisines](feedback_retirer-un-gate-ouvre-les-exceptions-voisines.md) — supprimer la cause ≠ garde de non-régression ; 3 familles de renvois, une seule se supprime.
+- [`<human-check>` en `<verify>` ne gate rien](project_human-check-en-verify-ne-gate-rien.md) — il s'exécute après l'`<action>` : tâche `checkpoint` en tête + `autonomous: false`, les deux ensemble.
+- [Les faits du ROADMAP périment vite](project_roadmap-faits-perissables.md) — 8/23 en 4 jours, 3 inversant leur conclusion ; re-mesurer et marquer CONFIRMÉ/PÉRIMÉ, jamais recopier.
+- [Le ROADMAP mêle `###` et `####` Phase](project_roadmap-deux-profondeurs-de-titre.md) — 13 + 13 = 26 ; une ancre sur une seule profondeur compte moitié et fait « réparer » un fichier intact.
+- [Le gras markdown casse deux consommateurs muets](project_litteral-garde-coupe-par-le-gras.md) — `grep -qF` ; et le parseur `D-NN` de GSD (`*` dans le gras, gras multi-ligne) → `could-not-parse` ≠ `uncovered`.
+- [Durcir un gate touche fixtures ET messages](feedback_durcir-un-gate-touche-fixtures-et-messages.md) — 3 ondes : fixtures, suites voisines, textes disant « optionnel » ; la 3ᵉ reste verte et fausse.
+- [L'installeur pose DEUX familles d'agents](project_installeur-deux-familles-agents.md) — 31 fichiers, pas 25 ; et tous les scripts atterrissent à plat dans `.claude/scripts/`.
+- [Une lib partagée va dans planning-core](project_placement-lib-partagee-planning-core.md) — sa fermeture est réduite à lui-même ; conductor est le socle mais le mauvais hôte.
+- [check-agents : deux options, deux formes inverses](project_check-agents-file-egal-vert-a-vide.md) — `--agents-dir=x` mais `--file x` ; forme fautive = cible vide, exit 3 uniforme = faux rouge.
+- [Ce shell ne découpe pas `$var`](project_shell-sans-word-splitting.md) — `set -- $a` passe un mot composite ; l'extracteur rend 0 ligne et `cmp -s` dit « identique » sur deux vides.
+- [Le périmètre d'un plan se re-dérive du diff](feedback_perimetre-du-plan-se-rederive-du-diff.md) — 8 modules annoncés / 10 réels ; et ses prémisses `read_first` périment aussi (bundles « sans ligne Version » : faux).
+- [Sonder gsd-tools sans se faire mentir](project_gsd-tools-sondage-sur.md) — le `--help` omet des commandes existantes ; répéter le destructif via `--cwd` ; un gate se prouve par `render-hooks` + contre-épreuve.
+- [Jamais un verdict de sous-agent non reçu](feedback_ne-jamais-affirmer-un-resultat-de-sous-agent-non-recu.md) — `sleep` en background ne bloque pas ; extraire la dernière entrée du transcript avant d'en tirer un artefact.
+- [Deux pièges awk mesurés](project_awk-pieges-mesures.md) — `RS="\0"` ne découpe pas (1 pour 868) ; `&` en remplacement `gsub` réinjecte le match. Silencieux tous les deux.
+- [Un gate qui balaie le dépôt se balaie lui-même](feedback_gate-qui-balaie-le-depot-se-balaie-lui-meme.md) — assembler le motif à l'exécution, jamais exempter sa propre suite ; l'échappatoire se prouve par mutation.
+- [Le ship n'est jamais auto-autorisé](feedback_ship-jamais-auto-autorise.md) — question directe à chaque fois, jamais noyée dans un rapport ; l'accord vaut pour CE ship seul.
+- [/gsd-ship : la verification est le preflight #1](project_ship-preflight-verification-dabord.md) — security et broken-windows sont #6/#7 et restent inatteignables sans `*-VERIFICATION.md`.
+- [pre-push : candidat RCE non corrigé](project_pre-push-candidat-rce-non-corrige.md) — `scripts/hooks/pre-push` exécute un chemin dérivé de `show-toplevel`, même motif que dag.sh, mandat séparé requis.
+- [DAG `done` ≠ SUMMARY.md](project_dag-vs-summary-safe-resume-gate.md) — un nœud DAG clos sans SUMMARY.md bloque tout plan postérieur via `safe_resume_gate`, même hors de sa vague.

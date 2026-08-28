@@ -17,7 +17,13 @@
 # matche cette ligne) ; aucune ligne `.claude/worktrees/` dédiée ajoutée, elle serait
 # inopérante. Le nom exact du dossier matérialisé par le harness reste une hypothèse
 # (A2, confiance BASSE) tant qu'aucun agent isolé n'a réellement tourné.
-.claude/
+# `.claude/*` (et non `.claude/`) : la forme répertoire rend toute ré-inclusion `!` inopérante —
+# piège git mesuré (Phase 37, B7). Tout reste ignoré SAUF la mémoire d'agent, dont les 31 agents
+# déclarent `memory: project` (sémantique « voyage avec le repo ») : le traitement rejoint la
+# déclaration. `agent-memory-local/` (régime `local`) reste ignoré par la règle générale.
+.claude/*
+!.claude/agent-memory/
+.claude/agent-memory/zz-probe-*/
 docs/reference/
 
 # Registre + temporaires de l'engine
