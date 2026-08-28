@@ -1,5 +1,29 @@
 # Changelog — conductor
 
+## [v1.29.0] — 2026-08-28 (Phase 38 — bannière de fidélité câblée dans l'engine, FIDE-02)
+
+**Minor** (nouvelle capacité observable à chaque install/update) :
+
+- **`vibeflow-update.sh`** — `install_module()` et `update_module()` invoquent désormais, en
+  best-effort, le gate `check-artifact-fidelity.sh` (posé par FIDE-01, v1.28.x) sur le premier
+  artefact agent (`AGENT.md` ou `agents/*.md`) posé par le module — cible `codex`. Sa sortie est
+  relayée VERBATIM sur le stdout de l'install (jamais capturée puis résumée) : la ligne
+  `[fidelity]` (et `[fidelity-recette]` pour `multi_agent_v2`/`trust_level`) apparaît à la fin de
+  la pose de chaque module à agent, jamais dans un rapport séparé qu'on ne relit pas.
+- Deux points de couture : fin de `install_module()` (après la ligne de succès), et fin de
+  `update_module()` (après `vf_converge_apply`, reflétant l'état post-convergence). Un module
+  skill-only ou un poste sans `conductor` posé ne voit AUCUNE ligne — silence total, l'install ne
+  dégrade jamais pour un gate qu'elle n'a pas les moyens de produire.
+- Résolution du gate : `find_fidelity_gate()`, cascade à 2 positions (`$TARGET_ROOT/scripts/` puis
+  `$CACHE_DIR/conductor/scripts/`) — même patron que les résolveurs conductor déjà en place dans
+  ce fichier (`generate_agent_command_for`, `inject_lab_mcp_into_agents`), car `check-artifact-
+  fidelity.sh` vit dans `conductor/scripts/`, pas dans `_internal/` (cascade différente de
+  `find_hooks_merger`).
+- Suite dédiée : 3 cas neufs dans `test-vibeflow-update.sh` (T24 bannière présente à l'install,
+  T25 silence best-effort quand `conductor` est absent du cache, T26 bannière aussi sur un update
+  réel) — 34/34 vertes, dont le rouge-avant-vert des 3 nouveaux cas prouvé par retrait temporaire
+  du câblage.
+
 ## [v1.28.4] — 2026-08-28 (Phase 38 — garde jamais desserré par son propre lot, consigné au kernel)
 
 **Patch** (doctrine consignée, aucun comportement machine modifié par ce lot) :

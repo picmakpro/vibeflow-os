@@ -1058,6 +1058,51 @@ find_hooks_merger() {
   echo ""
 }
 
+# ---------- Gate de fidélité de conversion (FIDE-02, 38-01) ----------
+# check-artifact-fidelity.sh vit dans le module conductor (plugin/conductor/scripts/), PAS dans
+# _internal — cascade DIFFÉRENTE de find_hooks_merger : même patron que find_generate_agent_
+# command_script (ligne ~922) et find_mcp_injector (ligne ~960), qui résolvent déjà des scripts
+# conductor/dev-orchestrator hébergés hors _internal. TARGET_ROOT/scripts/ d'abord (déjà posé sur
+# ce lab par un install conductor antérieur DANS ce même run ou un précédent), sinon
+# CACHE_DIR/conductor/scripts/ (cache courant, cas d'un premier install de conductor). Absent aux
+# deux positions → silence total (même doctrine que find_hooks_merger) : ce n'est PAS un module
+# mandatory à cet appel précis, un lab sans conductor posé ne doit jamais voir l'install échouer
+# pour un rapport de fidélité qu'il n'a pas encore les moyens de produire.
+find_fidelity_gate() {
+  local c
+  c="$TARGET_ROOT/scripts/check-artifact-fidelity.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  c="$CACHE_DIR/conductor/scripts/check-artifact-fidelity.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  echo ""
+}
+
+# report_artifact_fidelity <mod> <module_dir> — best-effort, appelée en fin de install_module()
+# ET en fin de update_module() (FIDE-02). N'invoque le gate QUE si ce module a réellement posé un
+# artefact agent (AGENT.md racine OU agents/*.md, même garde que l'injection MCP ligne ~1663) —
+# jamais pour un module skill-only, qui n'a rien à faire mesurer par ce gate. Cible fixée à
+# `codex` (seule cible tier-1 mesurée, cf. 38-CONTEXT.md). Sortie RELAYÉE TELLE QUELLE sur les
+# flux réels de l'install (jamais capturée puis résumée) — la ligne `[fidelity]` doit apparaître
+# verbatim dans le journal d'install, seule surface qu'un opérateur pressé lira.
+report_artifact_fidelity() {
+  local mod="$1" module_dir="$2"
+  vf_dry_run && return 0
+  local artifact=""
+  if [ -f "$module_dir/AGENT.md" ]; then
+    artifact="$TARGET_ROOT/agents/${mod}.md"
+  elif [ -d "$module_dir/agents" ]; then
+    local first
+    for first in "$module_dir/agents/"*.md; do
+      [ -f "$first" ] || continue
+      artifact="$TARGET_ROOT/agents/$(basename "$first")"
+      break
+    done
+  fi
+  [ -n "$artifact" ] && [ -f "$artifact" ] || return 0
+  local gate
+  gate="$(find_fidelity_gate)"
+  [ -n "$gate" ] || return 0
+  bash "$gate" --target codex "$artifact" || true
+}
+
 scripts_prefix_for_scope() {
   # Chemins LITTÉRAUX dans settings.json, valables pour la forme SHELL uniquement (c'est le
   # shell qui exécute la commande qui les expanse). Pour la forme exec (`args`), merge-hooks.sh
@@ -1680,6 +1725,11 @@ install_module() {
     log "  ⚠ $VF_DEGRADED_COPIES_COUNT copie(s) dégradée(s) détectée(s) pendant la pose (voir ci-dessus)"
   fi
   log "✓ $mod $version installé"
+
+  # Bannière de fidélité (FIDE-02, 38-01) : APRÈS la ligne de succès — la pose doit être
+  # terminée avant qu'on rapporte sur elle. Best-effort, silence total si le gate ou l'artefact
+  # sont absents (cf. report_artifact_fidelity).
+  report_artifact_fidelity "$mod" "$module_dir"
 }
 
 # ---------- Backup / Rollback ----------
@@ -2330,6 +2380,12 @@ update_module() {
   vf_converge_snapshot "$mod"
   install_module "$mod"
   vf_converge_apply "$mod"
+
+  # Bannière de fidélité (FIDE-02, 38-01) : 2e couture — point symétrique de update_module(),
+  # APRÈS vf_converge_apply, la ligne `[fidelity]` reflète ici l'état post-convergence
+  # (backup/retrait éventuels), pas seulement l'état immédiat post-copie déjà rapporté par la 1re
+  # couture à l'intérieur de install_module ci-dessus.
+  report_artifact_fidelity "$mod" "$CACHE_DIR/$mod"
 }
 
 # ---------- Main ----------
