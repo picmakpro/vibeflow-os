@@ -137,7 +137,7 @@
         "plugin/_internal/runtime-adapter/",
         "plugin/conductor/scripts/"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "revue-adapter",
@@ -149,7 +149,7 @@
       "scope": [
         "plugin/_internal/runtime-adapter/"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "exec-target",
@@ -215,7 +215,8 @@
         "revue-adapter",
         "revue-install",
         "revue-target",
-        "probe-codex"
+        "probe-codex",
+        "fix-adapter-wire"
       ],
       "scope": [
         "/tmp/lab-codex-38"
@@ -279,7 +280,8 @@
         "mesure-codex",
         "mesure-autres",
         "exec-sendmsg",
-        "exec-kernel-doc"
+        "exec-kernel-doc",
+        "fix-adapter-wire"
       ],
       "scope": [
         ".planning/",
@@ -385,7 +387,7 @@
         "plugin/conductor/scripts/check-artifact-fidelity.sh",
         "plugin/conductor/scripts/tests/test-check-artifact-fidelity.sh"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "exec-fide03",
@@ -399,6 +401,19 @@
         "plugin/conductor/scripts/tests/test-check-artifact-fidelity.sh",
         "plugin/conductor/VERSION",
         "plugin/conductor/CHANGELOG.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-adapter-wire",
+      "step": "câblage de l'adaptateur dans l'engine (tâche 2 de 38-05, différée : fichier détenu par --target)",
+      "stage": "",
+      "deps": [
+        "exec-target"
+      ],
+      "scope": [
+        "plugin/_internal/vibeflow-update.sh",
+        "plugin/_internal/tests/test-vibeflow-update.sh"
       ],
       "status": "blocked"
     }

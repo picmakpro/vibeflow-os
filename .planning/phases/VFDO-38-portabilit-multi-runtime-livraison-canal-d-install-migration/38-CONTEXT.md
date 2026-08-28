@@ -902,3 +902,42 @@ prémisse de 38-05 n'était pas fausse sur le fond — elle était **en avance s
   « la pose des rôles NE DÉMARRE PAS avant que FIDE-03 soit vert ».
 - **DAG** : `exec-adapter` **dépend** de `exec-fide03`. La dépendance est dans le graphe, pas dans
   une phrase — une consigne se contourne par interprétation, une arête ne se contourne pas.
+
+---
+
+## Lot 5 (ADPT) livré — et une 4ᵉ prémisse mesurée fausse, cette fois dans le ledger
+
+Commits `a305406`, `8c91382`, `e8d07e1`. Suite adaptateur **6/6**. Non-pollution reconfirmée
+(`~/.codex/config.toml` sha256 identique à la baseline, `~/.codex/agents/` toujours absent).
+
+### ✅ Le contrat d'intégration TIENT — vérifié par le manager
+`check-artifact-fidelity.sh --check-judge-command <commande posée>` → **exit 0**. Le lot 5 ne
+s'auto-atteste pas : il passe l'examen écrit par FIDE-03, livré avant lui et **dont il dépend dans
+le DAG**. Les quatre éléments d'isolation sont présents dans la commande posée.
+
+### 🔴 `ADPT-04` : l'énoncé du ledger était FAUX — corrigé à la source
+L'exigence disait « le gate est `codex doctor --json`, qui **COMPTE les rôles chargés** ».
+**Mesuré faux** : `doctor` **n'énumère jamais** les rôles par nom, et reste **exit 0** même avec un
+rôle cassé présent. Le seul signal réellement exposé est un `startup warning` portant le **chemin
+d'un rôle malformé**.
+→ Le gate implémenté vérifie l'**ABSENCE** de ce warning pour le fichier posé, **discriminant
+prouvé par mutation (T4b)**. **L'intention est tenue** (« jamais *pas de crash donc c'est bon* ») ;
+c'est le **mécanisme** qui change, pour celui que le binaire expose vraiment.
+**`ADPT-04` réécrit dans `REQUIREMENTS.md`** plutôt que laissé mensonger : un ledger qui décrit un
+mécanisme inexistant est exactement la dette que cette phase combat.
+
+**C'est la QUATRIÈME prémisse démentie par la mesure dans cette phase** — après `maxDepth` (37),
+la contrainte de nommage attribuée au mauvais champ, et le confinement par rôle. Aucune n'était un
+mensonge : à chaque fois, un document décrivait un mécanisme plausible que personne n'avait exercé.
+
+### Reste à câbler — différé par MON interdit, pas par le worker
+La tâche 2 de `38-05-PLAN.md` (câblage de l'adaptateur dans `vibeflow-update.sh`) **n'a pas été
+faite** : j'avais interdit ce fichier, réécrit en parallèle par le lot `--target`. Nœud
+**`fix-adapter-wire`** posé, dépendant de `exec-target`, et **`mesure-codex` en dépend** — la
+mesure réelle de bout en bout ne peut pas démarrer sur un adaptateur non câblé.
+
+### Déviation assumée et correcte
+Le checkpoint `gate="blocking-human"` de la tâche 3 **n'a pas été re-escaladé** : `38-CONTEXT.md`
+porte déjà l'arbitrage **verrouillé D-38-E** de Samuel, qui tranche exactement cette question
+(session read-only séparée). Le lot ne fait qu'**implémenter une décision déjà rendue** — la
+re-poser aurait été redemander à Samuel ce qu'il a déjà tranché.
