@@ -35,11 +35,20 @@
 # même pour OpenCode (seul mécanisme identifié qui convertit l'absence d'humain en consentement
 # automatique).
 #
-# Résolution par les appelants : cascade à 2 positions, jumelle EXACTE de `find_hooks_merger()`
-# (plugin/_internal/vibeflow-update.sh) — `${VIBEFLOW_CACHE:-.vibeflow-cache}/_internal/…` puis
-# `$(dirname "$0")/…` (position réelle une fois les scripts posés À PLAT dans
-# `$TARGET_ROOT/scripts/`, cf. `copy_module_scripts()`). Introuvable aux deux positions → repli du
-# CALLER sur son comportement `claude`-figé ACTUEL, jamais une régression silencieuse.
+# Résolution par les appelants : cascade à 2 positions, SYNTAXIQUEMENT identique à celle de
+# `find_hooks_merger()` (plugin/_internal/vibeflow-update.sh) mais PAS la même garantie — l'analogie
+# était fausse et a longtemps masqué un défaut (correction ciblée jointure, 38-CONTEXT.md). Pour
+# `find_hooks_merger()`, `$0` désigne `vibeflow-update.sh` lui-même, dont la position reste TOUJOURS
+# adjacente à `_internal/` : le candidat 2 y résout systématiquement. Pour ce fichier, `$0` désigne
+# l'APPELANT (ensure-deps.sh, ensure-design-deps.sh, check-plugin-update.sh) — un script MODULE,
+# jamais adjacent à `_internal/`. Le candidat 2 (`$(dirname "$0")/…`) ne résout QUE si ce fichier a
+# lui-même été posé À PLAT à côté de l'appelant, sous `$TARGET_ROOT/scripts/` — ce que fait
+# `copy_runtime_dispatch()` (plugin/_internal/vibeflow-update.sh, miroir de `copy_engine_lib()`
+# pour `vf-portable.sh`), inconditionnellement à chaque exécution de l'engine. Sans cette pose,
+# AUCUN des deux candidats ne résout en régime établi (ré-invocation via `/vf-update`, SessionStart,
+# `/vf-calibrate`) — seule l'install initiale (où `$0` reste dans le cache) voyait le candidat 1
+# résoudre. Introuvable aux deux positions → repli du CALLER sur son comportement `claude`-figé
+# ACTUEL, jamais une régression silencieuse.
 
 # Pas de `-e` : les détections (command -v, sous-processus CLI tiers) doivent pouvoir échouer sans
 # tuer ce script — c'est précisément la dégradation gracieuse attendue (RUNT-02).

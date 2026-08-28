@@ -1053,6 +1053,68 @@ fi
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
+# Helper T27 — reproduit EXACTEMENT ce que fait un appelant RÉEL posé (find_runtime_cli_dispatch,
+# identique dans ensure-deps.sh / ensure-design-deps.sh / check-plugin-update.sh) : extrait la
+# fonction depuis le fichier RÉELLEMENT POSÉ sur disque (pas le source du repo — l'artefact déployé
+# byte-identique), l'exécute avec $0 = ce même chemin posé (donc `dirname "$0")` = son répertoire
+# réel), VIBEFLOW_CACHE tel que fourni par l'environnement appelant. `bash -c '...' "$posed"` : le
+# 1er argument après le script devient $0 À L'INTÉRIEUR du script — c'est ce qui nous permet de
+# forcer $0 sans jamais exécuter le corps (network/npm/side-effects) du caller réel.
+# ---------------------------------------------------------------------------
+resolve_via_posed_caller() {
+  local posed="$1"
+  bash -c '
+    eval "$(sed -n "/^find_runtime_cli_dispatch()/,/^}/p" "$0")"
+    cd "$(dirname "$0")" 2>/dev/null || exit 1
+    find_runtime_cli_dispatch
+  ' "$posed"
+}
+
+# ---------------------------------------------------------------------------
+# T27 (DISCRIMINANT, correction ciblée jointure 38) — la table de dispatch runtime-aware doit
+# résoudre en RÉGIME ÉTABLI, pas seulement à l'install initiale. Avant le fix : runtime-cli-
+# dispatch.sh n'était copié NULLE PART sous $TARGET_ROOT/scripts/ (aucun `copy_runtime_dispatch`,
+# aucun appel) — le candidat 1 de find_runtime_cli_dispatch() (VIBEFLOW_CACHE, non défini hors
+# install) et le candidat 2 ($(dirname "$0")/…, fichier absent de ce répertoire) rendaient TOUS
+# LES DEUX vides sur toute ré-invocation depuis $TARGET_ROOT/scripts/ (`/vf-update` étape 4c,
+# `/vf-calibrate`, hook SessionStart). Reproduit ici via une INSTALLATION RÉELLE de conductor
+# (qui embarque check-plugin-update.sh, l'un des 3 appelants réels), puis une RÉ-INVOCATION du
+# fichier réellement posé, VIBEFLOW_CACHE **non défini** (le cas normal en régime établi) —
+# jamais depuis la position source du cache.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+if prepare_module "$CACHE" "conductor"; then
+  mkdir -p "$CACHE/_internal"
+  cp "$INTERNAL_DIR/runtime-cli-dispatch.sh" "$CACHE/_internal/runtime-cli-dispatch.sh"
+  (cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" install conductor >/dev/null 2>&1)
+  POSED_DISPATCH="$LAB/.claude/scripts/runtime-cli-dispatch.sh"
+  POSED_CALLER="$LAB/.claude/scripts/check-plugin-update.sh"
+  miss=0
+  [ -f "$POSED_DISPATCH" ] \
+    || { ko "T27 pré-condition : runtime-cli-dispatch.sh non posé sous \$TARGET_ROOT/scripts/ après install (copy_runtime_dispatch absent/en échec)"; miss=1; }
+  [ -f "$POSED_CALLER" ] \
+    || { ko "T27 pré-condition : check-plugin-update.sh non posé sous \$TARGET_ROOT/scripts/ (garde-fou du test lui-même)"; miss=1; }
+  if [ "$miss" -eq 0 ]; then
+    # RÉ-INVOCATION depuis la position posée, VIBEFLOW_CACHE explicitement NON défini (unset, pas
+    # vide) — le régime normal d'un hook SessionStart/`/vf-update` étape 4c/`/vf-calibrate`, PAS
+    # le régime de l'install initiale où VIBEFLOW_CACHE pointe encore vers le cache. Sous-shell +
+    # `unset` : la fonction resolve_via_posed_caller est déjà visible dans CE script (pas de
+    # ré-imbrication de bash -c échappée), seule la variable d'environnement change de portée.
+    RESOLVED=$(unset VIBEFLOW_CACHE; resolve_via_posed_caller "$POSED_CALLER")
+    if [ "$RESOLVED" = "$POSED_DISPATCH" ]; then
+      ok "T27 (DISCRIMINANT) : ré-invocation depuis \$TARGET_ROOT/scripts/ (VIBEFLOW_CACHE non défini) résout runtime-cli-dispatch.sh → $RESOLVED"
+    else
+      ko "T27 (DISCRIMINANT) : résolution en régime établi ÉCHOUÉE — attendu '$POSED_DISPATCH', obtenu '${RESOLVED:-<vide>}' (les deux candidats de la cascade rendent MISSING sans copy_runtime_dispatch)"
+    fi
+  fi
+else
+  skip "T27 : conductor non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
 # Garde-fou final : le vrai ~/.claude est inchangé (snapshot récursif avant=après).
 # ---------------------------------------------------------------------------
 HOME_AFTER=$(snapshot_home_claude)

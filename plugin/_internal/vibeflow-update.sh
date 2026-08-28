@@ -228,6 +228,7 @@ vf_manifest_excluded() {
   local relpath="$1"
   case "$relpath" in
     scripts/vf-portable.sh)       return 0 ;;  # propriété exclusive de l'engine (copy_engine_lib), partagée entre modules
+    scripts/runtime-cli-dispatch.sh) return 0 ;;  # idem, miroir (copy_runtime_dispatch, correction ciblée jointure 38)
     memory/*)                     return 0 ;;  # contenu vivant du lab semé par seed-registres.sh, pas un artefact de pose
     scripts/.vibeflow-installed)  return 0 ;;  # état du moteur, pas contenu de module
     scripts/.vibeflow-manifest-*) return 0 ;;  # le manifeste ne se consigne jamais lui-même (boucle de convergence)
@@ -911,6 +912,9 @@ gitignore_add_paths() {
   # local. Inconditionnel : copy_engine_lib() la pose à CHAQUE exécution de l'engine en scope
   # local, quel que soit le module installé — gitignore_add_one() reste idempotent.
   gitignore_add_one ".claude/scripts/vf-portable.sh"
+  # Miroir strict (correction ciblée jointure 38) : runtime-cli-dispatch.sh, posée par
+  # copy_runtime_dispatch() selon le même patron ENGINE-owned, inconditionnel, idempotent.
+  gitignore_add_one ".claude/scripts/runtime-cli-dispatch.sh"
 }
 
 # ---------- Commande d'incarnation (ADR-042) ----------
@@ -1044,6 +1048,60 @@ copy_engine_lib() {
   fi
   rm -f "$tmp" 2>/dev/null || true
   log "  ERROR: pose de vf-portable.sh ÉCHOUÉE → $dest"
+  return 1
+}
+
+# ---------- Table de dispatch runtime-aware (RUNT-01, correction ciblée jointure 38) ----------
+# runtime-cli-dispatch.sh est possédée par l'ENGINE, exactement comme vf-portable.sh ci-dessus —
+# jamais par un module. MIROIR STRICT de find_engine_lib()/copy_engine_lib() : sans cette pose, le
+# fichier ne résout QUE depuis sa position source dans le cache (candidat 1 des appelants), donc
+# UNIQUEMENT à l'install initiale — toute ré-invocation en régime établi (`/vf-update` étape 4c,
+# `/vf-calibrate`, hook SessionStart via check-plugin-update.sh) tourne `$0` posé à plat sous
+# `$TARGET_ROOT/scripts/`, où NI le candidat 1 (VIBEFLOW_CACHE non défini hors install) NI le
+# candidat 2 (le fichier absent de ce répertoire) ne résolvaient. Voir le commentaire d'en-tête de
+# runtime-cli-dispatch.sh pour le détail de la fausse analogie avec find_hooks_merger() qui avait
+# masqué ce défaut.
+find_runtime_dispatch_lib() {
+  local c
+  c="$CACHE_DIR/_internal/runtime-cli-dispatch.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  c="$(dirname "$0")/runtime-cli-dispatch.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  echo ""
+}
+
+# Idempotence INTRA-PROCESSUS, même patron que VF_ENGINE_LIB_COPIED.
+VF_RUNTIME_DISPATCH_COPIED="0"
+
+copy_runtime_dispatch() {
+  [ "$VF_RUNTIME_DISPATCH_COPIED" = "1" ] && return 0
+  local src dest tmp
+  src="$(find_runtime_dispatch_lib)"
+  if [ -z "$src" ]; then
+    # VG-3 (même discipline que copy_engine_lib) : jamais un retour neutre silencieux. Sans la
+    # table, les 3 consommateurs (ensure-deps.sh, ensure-design-deps.sh, check-plugin-update.sh)
+    # replient sur leur comportement claude-figé — dégradé, pas cassé, mais annoncé quand même.
+    log "  ERROR: runtime-cli-dispatch.sh introuvable dans le cache — table de dispatch runtime NON posée (installer/mettre à jour l'engine)"
+    return 1
+  fi
+  dest="$TARGET_ROOT/scripts/runtime-cli-dispatch.sh"
+  if vf_dry_run; then
+    vf_declare_write + "$dest"
+    VF_RUNTIME_DISPATCH_COPIED="1"
+    return 0
+  fi
+  mkdir -p "$TARGET_ROOT/scripts"
+  tmp="$dest.tmp.$$"
+  # Écriture ATOMIQUE, même patron que copy_engine_lib. SANS chmod +x : les 3 appelants invoquent
+  # `bash "$dispatch" …`, jamais une exécution directe du fichier.
+  if cp "$src" "$tmp" 2>/dev/null && mv -f "$tmp" "$dest" 2>/dev/null; then
+    VF_RUNTIME_DISPATCH_COPIED="1"
+    log "  table runtime-cli-dispatch.sh posée → $dest"
+    # Annoncé (D-31-01) mais exclu du manifeste par D-31-03 (scripts/runtime-cli-dispatch.sh,
+    # propriété de l'engine, partagée entre modules) — miroir exact de vf-portable.sh.
+    vf_declare_write + "$dest"
+    return 0
+  fi
+  rm -f "$tmp" 2>/dev/null || true
+  log "  ERROR: pose de runtime-cli-dispatch.sh ÉCHOUÉE → $dest"
   return 1
 }
 
@@ -1384,6 +1442,9 @@ sync_module_governance() {
   # Chemin « version inchangée » (D-04) : sans cet appel, un lab déjà à jour n'obtiendrait JAMAIS
   # la lib de portabilité — idempotent au sein du même processus (VF_ENGINE_LIB_COPIED).
   copy_engine_lib
+  # Miroir (correction ciblée jointure 38) : même nécessité que copy_engine_lib ci-dessus, pour la
+  # table de dispatch runtime-aware (RUNT-01).
+  copy_runtime_dispatch
   copy_module_scripts "$mod"
   merge_module_hooks "$mod"
   # Ordre imposé : le seeder est posé par copy_module_scripts juste au-dessus. L'appeler avant
@@ -1497,6 +1558,8 @@ install_module() {
   # du module — idempotent au sein du même processus (VF_ENGINE_LIB_COPIED), donc sans coût
   # supplémentaire réel sur une boucle `install --all`/`--with-deps`.
   copy_engine_lib
+  # Miroir (correction ciblée jointure 38) : table de dispatch runtime-aware (RUNT-01).
+  copy_runtime_dispatch
 
   # Backup if existing install
   local installed
