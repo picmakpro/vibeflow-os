@@ -90,8 +90,11 @@ sa perte silencieuse est une dégradation au moins aussi large que celle mesuré
 
 ## Gestes de mission
 
-- Verrou de driver pris et relâché.
-- Gate d'invariants à SAIN (exit 3).
+- Ce nœud `docs` n'a pas invoqué `driver-lock.sh` — mandat d'hygiène documentaire pur, un seul
+  worker sur ces trois fichiers (le dossier de phase, seul touché par un autre worker en parallèle,
+  était explicitement hors périmètre).
+- `check-mission-invariants.sh` → SAIN (exit 3) : tous les globs de
+  `.planning/MISSION-INVARIANTS.md` matchent encore au moins un fichier suivi.
 - Branche dédiée `feat/phase-37-spike-portabilite-multi-runtime` — aucun merge, aucune PR, aucun
   tag, aucune release.
 - `ROADMAP.md` intouché sur le point contesté du cadrage (« 9/25 appellent des skills `gsd-*` ») —
