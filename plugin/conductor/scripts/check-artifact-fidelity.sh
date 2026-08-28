@@ -9,28 +9,51 @@
 # (name/description/model/memory/disallowedTools/vf-internal/tools) : PRESERVED, DEGRADED ou
 # LOST. Ne modifie jamais rien — gate en lecture seule.
 #
-# Deux champs de RECETTE (jamais un détail enfoui, toujours en tête, `--target codex`
+# Trois champs de RECETTE (jamais un détail enfoui, toujours en tête, `--target codex`
 # uniquement) : `multi_agent_v2` (sans lui aucun outil de spawn n'existe sur Codex — un lab
-# VibeFlow «marche» sans le moindre sous-agent, en silence) et `trust_level` du dépôt cible
+# VibeFlow «marche» sans le moindre sous-agent, en silence), `trust_level` du dépôt cible
 # (sans `trusted`, `.codex/agents/` n'est jamais parsé — zéro rôle VibeFlow chargé, en silence,
-# alors que `codex doctor` continue de rendre `overall: ok`).
+# alors que `codex doctor` continue de rendre `overall: ok`), et `role_confinement` (FIDE-03,
+# D-38-O) : sur Codex, `sandbox_mode`/`approval_policy`/`[permissions]` déclarés PAR RÔLE sont
+# acceptés puis INERTES — mesuré en session réelle (un rôle `read-only` a réellement écrit sur
+# disque). Le confinement d'un juge (`vf-reviewer`/`vf-auditer`/`vf-design-judge`) n'est garanti
+# QUE par une session `codex exec -s read-only` séparée, jamais par le fichier de rôle. Ce
+# troisième fait est une CONSTANTE déclarée pour `--target codex` (pas une mesure par exécution,
+# comme les deux premiers) — c'est un comportement documenté du binaire, pas un état du poste.
 #
 # Usage:
 #   check-artifact-fidelity.sh [--target codex] [--json] <artefact.md>
+#   check-artifact-fidelity.sh --check-judge-command <fichier>
 #   check-artifact-fidelity.sh -h|--help
+#
+# --check-judge-command <fichier> : vérifie que le fichier contient LA COMMANDE de session
+#   read-only séparée posée par le lot 5 (FIDE-03, D-38-O), avec ses QUATRE éléments requis
+#   (ET, jamais OU — omettre `skills.include_instructions=false` laisse ouvert le canal
+#   AGENTS.md du dépôt jugé, ADPT-05) :
+#     1. `-s read-only`
+#     2. `approval_policy` = never
+#     3. `skills.include_instructions=false`
+#     4. `project_doc_max_bytes=0`
+#   Exit 0 si les quatre sont présents, 1 s'il en manque au moins un (ROUGE — jamais un OU),
+#   3 si le fichier n'existe pas (le lot 5 n'a pas encore posé la commande — INDÉTERMINÉ,
+#   JAMAIS un vert : contrat F13 appliqué à ce gate lui-même).
 #
 # Exit codes:
 #   0 = la mesure a pu s'exécuter (MÊME si des champs sont LOST, ou multi_agent_v2/trust_level
-#       défavorables — une perte déclarée n'est pas un échec du gate, c'est son objet).
+#       défavorables — une perte déclarée n'est pas un échec du gate, c'est son objet). Avec
+#       --check-judge-command : les quatre éléments sont présents.
+#   1 = --check-judge-command uniquement : au moins un des quatre éléments manque.
 #   2 = erreur d'usage (argument inconnu, artefact manquant en argument).
 #   3 = INDÉTERMINÉ — gsd-core introuvable sur ce poste, artefact source introuvable sur disque,
-#       ou cible inconnue (non mesurée sur ce poste). stdout VIDE dans les trois cas — jamais un
-#       rapport « rien perdu » qui mentirait par absence de mesure.
+#       cible inconnue (non mesurée sur ce poste), ou (--check-judge-command) commande de juge
+#       pas encore posée sur disque. stdout VIDE dans ces cas — jamais un rapport qui mentirait
+#       par absence de mesure.
 set -uo pipefail
 
 TARGET="codex"
 JSON_MODE=0
 ARTIFACT=""
+JUDGE_CMD_FILE=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -41,6 +64,10 @@ while [ "$#" -gt 0 ]; do
     --json)
       JSON_MODE=1
       shift
+      ;;
+    --check-judge-command)
+      JUDGE_CMD_FILE="${2:-}"
+      shift 2
       ;;
     -h|--help)
       grep '^# ' "$0" | sed 's/^# //'
@@ -60,6 +87,43 @@ while [ "$#" -gt 0 ]; do
       ;;
   esac
 done
+
+# --- Mode --check-judge-command : vérifie les 4 éléments de la commande de session read-only
+# séparée (FIDE-03). Mode INDÉPENDANT de l'artefact — pas besoin d'ARTIFACT ni de gsd-core.
+if [ -n "$JUDGE_CMD_FILE" ]; then
+  if [ -n "$ARTIFACT" ]; then
+    echo "[check-artifact-fidelity] --check-judge-command et un artefact ne se combinent pas (deux mesures distinctes)" >&2
+    exit 2
+  fi
+  if [ "$TARGET" != "codex" ]; then
+    echo "[check-artifact-fidelity] cible '$TARGET' : --check-judge-command n'est mesuré que pour codex" >&2
+    exit 3
+  fi
+  if [ ! -f "$JUDGE_CMD_FILE" ]; then
+    echo "[check-artifact-fidelity] commande de juge introuvable : $JUDGE_CMD_FILE (lot 5 — pose des rôles Codex, FIDE-03/D-38-O — pas encore livré sur ce poste)" >&2
+    exit 3
+  fi
+  # Flatten : la commande réelle s'écrit sur plusieurs lignes (continuations '\'), la mesure ne
+  # doit pas dépendre du découpage en lignes du fichier qui la porte.
+  FLAT="$(tr '\n' ' ' < "$JUDGE_CMD_FILE")"
+  MISSING=""
+  printf '%s' "$FLAT" | grep -qE -- '-s[[:space:]]+read-only' \
+    || MISSING="${MISSING:+$MISSING,}sandbox_mode(-s read-only)"
+  printf '%s' "$FLAT" | grep -qE 'approval_policy[^,]*never' \
+    || MISSING="${MISSING:+$MISSING,}approval_policy=never"
+  printf '%s' "$FLAT" | grep -qF 'skills.include_instructions=false' \
+    || MISSING="${MISSING:+$MISSING,}skills.include_instructions=false"
+  printf '%s' "$FLAT" | grep -qF 'project_doc_max_bytes=0' \
+    || MISSING="${MISSING:+$MISSING,}project_doc_max_bytes=0"
+
+  if [ -z "$MISSING" ]; then
+    echo "[fidelity-judge-command] $JUDGE_CMD_FILE -> $TARGET: COMPLET (les 4 éléments présents : sandbox_mode, approval_policy=never, skills.include_instructions=false, project_doc_max_bytes=0)"
+    exit 0
+  else
+    echo "[fidelity-judge-command] $JUDGE_CMD_FILE -> $TARGET: INCOMPLET — manque={$MISSING} (ET requis, pas OU — ADPT-05)"
+    exit 1
+  fi
+fi
 
 if [ -z "$ARTIFACT" ]; then
   echo "[check-artifact-fidelity] usage : check-artifact-fidelity.sh [--target codex] [--json] <artefact.md>" >&2
@@ -253,14 +317,19 @@ else
   fi
 fi
 
+# --- role_confinement (FIDE-03, D-38-O) : CONSTANTE déclarée pour --target codex — pas une
+# mesure de poste comme les deux champs précédents, un comportement documenté du binaire
+# (sandbox_mode/approval_policy/[permissions] par rôle acceptés puis inertes, session-only). ---
+ROLE_CONFINEMENT="inerte-par-role (garanti UNIQUEMENT par session -s read-only separee, jamais par le fichier de role — D-38-O)"
+
 if [ "$JSON_MODE" -eq 0 ]; then
-  echo "[fidelity-recette] multi_agent_v2=${MULTI_AGENT_V2} trust_level=${TRUST_LEVEL}"
+  echo "[fidelity-recette] multi_agent_v2=${MULTI_AGENT_V2} trust_level=${TRUST_LEVEL} role_confinement=${ROLE_CONFINEMENT}"
 fi
 
 if [ "$JSON_MODE" -eq 1 ]; then
   node -e '
 const fs = require("fs");
-const [artifact, target, preserved, degraded, lost, deadMarkers, multiAgentV2, trustLevel] = process.argv.slice(1);
+const [artifact, target, preserved, degraded, lost, deadMarkers, multiAgentV2, trustLevel, roleConfinement] = process.argv.slice(1);
 const splitCsv = (s) => (s ? s.split(",") : []);
 const out = {
   artifact,
@@ -271,9 +340,10 @@ const out = {
   dead_markers: deadMarkers,
   multi_agent_v2: multiAgentV2,
   trust_level: trustLevel,
+  role_confinement: roleConfinement,
 };
 process.stdout.write(JSON.stringify(out));
-' "$ARTIFACT" "$TARGET" "$PRESERVED" "$DEGRADED" "$LOST" "$DEAD_MARKERS_LABEL" "$MULTI_AGENT_V2" "$TRUST_LEVEL"
+' "$ARTIFACT" "$TARGET" "$PRESERVED" "$DEGRADED" "$LOST" "$DEAD_MARKERS_LABEL" "$MULTI_AGENT_V2" "$TRUST_LEVEL" "$ROLE_CONFINEMENT"
   echo
 else
   echo "[fidelity] $ARTIFACT -> $TARGET: PRESERVED={$PRESERVED} DEGRADED={$DEGRADED} LOST={$LOST} DEAD_MARKERS=$DEAD_MARKERS_LABEL"

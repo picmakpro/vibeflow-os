@@ -1,5 +1,31 @@
 # Changelog — conductor
 
+## [v1.30.0] — 2026-08-28 (Phase 38 — la limite de confinement des juges est déclarée, FIDE-03)
+
+**Minor** (nouvelle capacité observable au status et à l'install) :
+
+- **`check-artifact-fidelity.sh`** — déclare désormais un TROISIÈME fait de recette,
+  `role_confinement`, au même rang que `multi_agent_v2` et `trust_level` sur la ligne
+  `[fidelity-recette]` (relayée verbatim à l'install par FIDE-02, donc visible aux deux endroits
+  sans toucher `vibeflow-update.sh`) : sur Codex, `sandbox_mode`/`approval_policy`/
+  `[permissions]` déclarés PAR RÔLE sont acceptés puis INERTES — mesuré en session réelle (un
+  rôle `read-only` a réellement écrit sur disque). Le confinement d'un juge (`vf-reviewer`,
+  `vf-auditer`, `vf-design-judge`) n'est garanti QUE par une session `codex exec -s read-only`
+  séparée. Corrige un défaut trouvé par la revue du lot FIDE : `38-05-PLAN.md` (T-38-13)
+  affirmait cette mitigation comme déjà déclarée par FIDE-01 — elle ne l'était pas.
+- **Nouveau mode `--check-judge-command <fichier>`** : vérifie que la commande de session
+  read-only séparée (posée par le lot 5, qui pose les rôles Codex) porte les QUATRE éléments
+  requis — `-s read-only` · `approval_policy=never` · `skills.include_instructions=false` ·
+  `project_doc_max_bytes=0`. C'est un ET, jamais un OU (ADPT-05 : le seul levier `skills` laisse
+  ouvert le canal `AGENTS.md` du dépôt jugé). Exit 0 si les quatre sont présents, exit 1 (rouge)
+  s'il en manque au moins un, exit 3 (INDÉTERMINÉ, stdout vide) si le fichier n'existe pas
+  encore — le lot 5 dépend de ce gate dans le DAG, donc « pas encore posée » ne doit jamais
+  rendre le même verdict que « posée et conforme » (contrat F13 appliqué au gate lui-même).
+- Suite : 19 → 35 OK / 0 KO. Ajouts : T8 (role_confinement sur `[fidelity-recette]`), T9
+  (commande de juge absente → exit 3, stdout vide), T10-T13 (une mutation par élément retiré,
+  rouge avant / vert après pour chacun des quatre, avec contre-épreuve que la commande complète
+  non mutée reste verte à chaque cas — le mutant reste confiné à sa propre fixture).
+
 ## [v1.29.0] — 2026-08-28 (Phase 38 — bannière de fidélité câblée dans l'engine, FIDE-02)
 
 **Minor** (nouvelle capacité observable à chaque install/update) :

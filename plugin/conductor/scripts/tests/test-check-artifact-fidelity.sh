@@ -13,6 +13,14 @@
 #   T6 — --target codex avec un CODEX_HOME de sonde sans bloc [projects."…"] pour la racine
 #        testée → trust_level=absent (non trusted), et la ligne [fidelity-recette] précède la
 #        ligne [fidelity] dans le flux capturé.
+#   T7 — count_markers() compte des occurrences, pas des lignes (extraction fonction isolée).
+#   T8 — role_confinement=inerte-par-role présent sur la ligne [fidelity-recette] (FIDE-03).
+#   T9 — --check-judge-command <absent> → exit 3, stdout vide (F13 : commande non posée ≠ vert).
+#   T10-T13 — mutation, une par élément retiré (sandbox_mode / approval_policy / skills /
+#        project_doc_max_bytes) : rouge (exit 1) avec l'élément manquant seul, PUIS vert (exit 0)
+#        une fois la commande complète rejouée — même fixture, même helper, seul l'élément
+#        retiré change, pour prouver que chaque rouge vient bien de CET élément (pas d'un
+#        fixture mort).
 #
 # Convention : asserts numérotés, helpers ok()/ko()/skip(), exit 0 si tout passe (SKIP non
 # bloquant), exit 1 si au moins un KO. Calqué sur le pattern de test-vibeflow-update.sh.
@@ -210,6 +218,16 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# T8 — role_confinement (FIDE-03, D-38-O) : 3e fait de recette, MÊME rang que multi_agent_v2/
+# trust_level, sur la MÊME ligne [fidelity-recette] déjà relayée verbatim à l'install (FIDE-02).
+# ---------------------------------------------------------------------------
+if printf '%s\n' "$T6_OUT" | grep -q '^\[fidelity-recette\].*role_confinement=inerte-par-role'; then
+  ok "T8 : role_confinement=inerte-par-role présent sur [fidelity-recette] (au même rang)"
+else
+  ko "T8 : role_confinement absent ou mal formé sur [fidelity-recette] (sortie: $T6_OUT)"
+fi
+
+# ---------------------------------------------------------------------------
 # T7 — count_markers() compte des OCCURRENCES, pas des lignes : une ligne portant DEUX
 # marqueurs (deux `.claude/`) doit valoir 2, pas 1 (défaut : `grep -c` compterait la ligne
 # une seule fois). Fonction extraite du gate lui-même (jamais recopiée à la main) et exécutée
@@ -227,6 +245,97 @@ count_markers "Voir .claude/agents/foo.md et aussi .claude/skills/bar pour Task(
     ko "T7 : attendu 3 occurrences sur la ligne à marqueurs multiples, obtenu '$T7_RESULT'"
   fi
 fi
+
+# ---------------------------------------------------------------------------
+# T9 — --check-judge-command <fichier absent> → exit 3, stdout VIDE. Le lot 5 (pose des rôles
+# Codex) n'a pas encore livré la commande sur ce poste : « pas encore posée » et « posée et
+# conforme » ne doivent JAMAIS produire la même sortie (contrat F13 appliqué à ce gate lui-même).
+# ---------------------------------------------------------------------------
+ABSENT_JUDGE_CMD="$WORK/judge-cmd-absent.sh"
+T9_OUT="$(bash "$GATE" --check-judge-command "$ABSENT_JUDGE_CMD" 2>"$WORK/t9.err")"
+T9_RC=$?
+if [ "$T9_RC" -eq 3 ]; then
+  ok "T9.rc : commande de juge non posée → exit 3"
+else
+  ko "T9.rc : attendu exit 3, obtenu $T9_RC"
+fi
+if [ -z "$T9_OUT" ]; then
+  ok "T9.stdout : vide (F13 : indéterminé ≠ vert)"
+else
+  ko "T9.stdout : non vide ('$T9_OUT')"
+fi
+
+# ---------------------------------------------------------------------------
+# T10-T13 — mutation ciblée, un élément retiré à la fois. Rouge (exit 1) avec l'élément
+# manquant SEUL comme absent, PUIS vert (exit 0) en rejouant la commande complète — même
+# fichier de départ, pour prouver que chaque rouge vient bien de l'élément retiré et pas d'un
+# fixture mort (leçon feedback_mutation-test-discriminating-cases).
+# ---------------------------------------------------------------------------
+COMPLETE_JUDGE_CMD="$WORK/judge-cmd-complete.sh"
+cat > "$COMPLETE_JUDGE_CMD" <<'CMDEOF'
+codex exec -s read-only -c approval_policy='"never"' \
+  -c skills.include_instructions=false \
+  -c project_doc_max_bytes=0 \
+  --output-schema schema.json "mandat, chemins absolus"
+CMDEOF
+
+# Contrôle : la commande complète doit être VERTE avant tout mutant (sinon un rouge ci-dessous
+# ne prouverait rien — fixture potentiellement déjà cassée).
+T_COMPLETE_OUT="$(bash "$GATE" --check-judge-command "$COMPLETE_JUDGE_CMD" 2>"$WORK/tcomplete.err")"
+T_COMPLETE_RC=$?
+if [ "$T_COMPLETE_RC" -eq 0 ] && printf '%s' "$T_COMPLETE_OUT" | grep -q '^\[fidelity-judge-command\].*COMPLET'; then
+  ok "T10-13.contrôle : commande complète (4/4) → exit 0 COMPLET avant toute mutation"
+else
+  ko "T10-13.contrôle : commande complète attendue verte, obtenu rc=$T_COMPLETE_RC sortie='$T_COMPLETE_OUT'"
+fi
+
+run_mutation_case() {
+  # $1 = numéro de test, $2 = fichier muté (élément retiré), $3 = fragment attendu dans manque=
+  local n="$1" mutated="$2" expect_missing="$3"
+  local mout mrc
+  mout="$(bash "$GATE" --check-judge-command "$mutated" 2>"$WORK/mut-$n.err")"
+  mrc=$?
+  if [ "$mrc" -eq 1 ]; then
+    ok "T$n.rouge : élément '$expect_missing' retiré → exit 1"
+  else
+    ko "T$n.rouge : attendu exit 1, obtenu $mrc (sortie: '$mout')"
+  fi
+  if printf '%s' "$mout" | grep -qF "$expect_missing"; then
+    ok "T$n.diagnostic : manque= cite '$expect_missing' (rouge attribuable à CET élément)"
+  else
+    ko "T$n.diagnostic : 'manque=' ne cite pas '$expect_missing' (sortie: '$mout')"
+  fi
+  # Contre-épreuve : réinjecter l'élément complet redevient vert — le mutant est bien la cause
+  # du rouge, pas un fixture mort qui resterait rouge quoi qu'on fasse.
+  local vout vrc
+  vout="$(bash "$GATE" --check-judge-command "$COMPLETE_JUDGE_CMD" 2>/dev/null)"
+  vrc=$?
+  if [ "$vrc" -eq 0 ]; then
+    ok "T$n.vert : la commande complète (non mutée) reste verte — mutant confiné au fichier muté"
+  else
+    ko "T$n.vert : la commande complète est repassée rouge (rc=$vrc) — mutant a fui hors de sa fixture"
+  fi
+}
+
+# T10 — retire "-s read-only".
+MUT_SANDBOX="$WORK/mut-sandbox.sh"
+sed 's/-s read-only //' "$COMPLETE_JUDGE_CMD" > "$MUT_SANDBOX"
+run_mutation_case 10 "$MUT_SANDBOX" "sandbox_mode"
+
+# T11 — retire "-c approval_policy='\"never\"'".
+MUT_APPROVAL="$WORK/mut-approval.sh"
+sed "s/-c approval_policy='\"never\"' //" "$COMPLETE_JUDGE_CMD" > "$MUT_APPROVAL"
+run_mutation_case 11 "$MUT_APPROVAL" "approval_policy=never"
+
+# T12 — retire "-c skills.include_instructions=false".
+MUT_SKILLS="$WORK/mut-skills.sh"
+sed '/skills\.include_instructions=false/d' "$COMPLETE_JUDGE_CMD" > "$MUT_SKILLS"
+run_mutation_case 12 "$MUT_SKILLS" "skills.include_instructions=false"
+
+# T13 — retire "-c project_doc_max_bytes=0".
+MUT_DOCBYTES="$WORK/mut-docbytes.sh"
+sed '/project_doc_max_bytes=0/d' "$COMPLETE_JUDGE_CMD" > "$MUT_DOCBYTES"
+run_mutation_case 13 "$MUT_DOCBYTES" "project_doc_max_bytes=0"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
