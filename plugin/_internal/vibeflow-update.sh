@@ -51,6 +51,11 @@ VF_DRY_RUN="0"
 # VF_TARGET si --target n'est pas passé en CLI (ex. hook non interactif) — --target CLI l'emporte
 # toujours sur VF_TARGET (même hiérarchie que --scope/VF_SCOPE ci-dessus).
 VF_TARGET_OVERRIDE="${VF_TARGET:-}"
+# D-38-P : drapeau EXPLICITE requis pour accepter une cible --target pré-existante et non vide.
+# Défaut refus (cf. bloc de résolution ci-dessous) — ce booléen ne s'inverse que sur ce flag CLI,
+# jamais deviné. Aucun prompt ici (l'engine tourne sans humain sous la main) : c'est la skill
+# appelante qui interroge l'utilisateur et repasse ce drapeau.
+VF_TARGET_NONEMPTY_OK="0"
 
 # Détecter `--scope <val>`/`--dry-run`/`--target <val>` AVANT cmd="$1" : on filtre les
 # positionnels et on override VF_SCOPE/VF_DRY_RUN/VF_TARGET_OVERRIDE.
@@ -73,6 +78,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --target=*)
       VF_TARGET_OVERRIDE="${1#--target=}"
+      shift
+      ;;
+    --target-nonempty-ok)
+      VF_TARGET_NONEMPTY_OK="1"
       shift
       ;;
     --dry-run)
@@ -126,6 +135,12 @@ if [ -n "$VF_TARGET_OVERRIDE" ]; then
   case "$VF_TARGET_OVERRIDE" in
     /) err "--target refuse la racine '/' littérale (T-38-09)" ;;
   esac
+  # D-38-P : refus dur de $HOME littéral — AVANT toute résolution physique, sur la forme
+  # textuelle brute telle que passée. Une faute de frappe d'un seul segment (oubli du
+  # sous-dossier) ne doit jamais disperser le payload à la racine d'un home réel et peuplé.
+  if [ "$VF_TARGET_OVERRIDE" = "$HOME" ]; then
+    err "--target refuse '\$HOME' littéral (T-38-09) — dispersion dans le home réel ; viser un sous-dossier dédié, ex. --target \"\$HOME/.claude\""
+  fi
   # Résolution PHYSIQUE (D-31-15, même doctrine que vf_physical_parent_under_target) : le
   # dossier peut ne pas encore exister (première pose sous une cible fraîche) — création
   # best-effort AVANT résolution, jamais une résolution textuelle qui laisserait passer un
@@ -134,6 +149,30 @@ if [ -n "$VF_TARGET_OVERRIDE" ]; then
   TARGET_ROOT="$(cd -P "$VF_TARGET_OVERRIDE" 2>/dev/null && pwd -P)" \
     || err "--target : résolution physique de '$VF_TARGET_OVERRIDE' échouée"
   [ "$TARGET_ROOT" != "/" ] || err "--target résout vers la racine '/' — refusé (T-38-09)"
+  # D-38-P : refus dur de $HOME résolu — même doctrine D-31-15 que le reste du lot (littéral
+  # ET résolu). Couvre les formes expansées/relatives qui aboutissent physiquement au home réel
+  # sans jamais avoir écrit "$HOME" en toutes lettres.
+  _vf_home_resolved="$(cd -P "$HOME" 2>/dev/null && pwd -P)" || _vf_home_resolved=""
+  if [ -n "$_vf_home_resolved" ] && [ "$TARGET_ROOT" = "$_vf_home_resolved" ]; then
+    err "--target résout vers \$HOME ('$TARGET_ROOT') — refusé (T-38-09) ; viser un sous-dossier dédié, ex. --target \"\$HOME/.claude\""
+  fi
+  unset _vf_home_resolved
+  # D-38-P point 3 : cible résolue affichée EN CLAIR — un `../../../../x` ne doit jamais être
+  # une surprise silencieuse. Ni un refus de principe (contredirait --target /tmp/mon-lab, cas
+  # d'acceptance explicite), ni un silence : juste de la visibilité.
+  log "--target résolu vers : $TARGET_ROOT"
+  # D-38-P point 2 : cible pré-existante et NON VIDE → refus par défaut. mkdir -p ci-dessus ne
+  # vide jamais un dossier existant, donc ce test reflète fidèlement le contenu PRÉ-existant.
+  # Exception légitime SANS drapeau : un registre VibeFlow déjà posé (.vibeflow-installed) —
+  # c'est une ré-install/update, pas une dispersion. Sinon, il faut le drapeau explicite
+  # --target-nonempty-ok — AUCUN prompt ici (l'engine tourne sans humain sous la main, cf.
+  # commentaire VF_TARGET_NONEMPTY_OK ci-dessus) : c'est la skill appelante qui interroge
+  # l'utilisateur et repasse ce drapeau.
+  if [ -d "$TARGET_ROOT" ] && [ -n "$(ls -A "$TARGET_ROOT" 2>/dev/null)" ] \
+     && [ ! -f "$TARGET_ROOT/scripts/.vibeflow-installed" ] \
+     && [ "$VF_TARGET_NONEMPTY_OK" != "1" ]; then
+    err "--target '$TARGET_ROOT' existe déjà et n'est pas vide (contenu trouvé : $(ls -A "$TARGET_ROOT" | tr '\n' ' ')) — refusé par défaut pour éviter de disperser le payload dans un dossier existant. Relancer avec --target-nonempty-ok si c'est intentionnel."
+  fi
 else
   case "$VF_SCOPE" in
     user)            TARGET_ROOT="$HOME/.claude" ;;

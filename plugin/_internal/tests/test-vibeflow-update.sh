@@ -1464,6 +1464,147 @@ fi
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
+# T39 (D-38-P, DISCRIMINANT) — --target refuse $HOME littéral ET résolu (T-38-09). Contre-épreuve
+# dans le MÊME test : un sous-dossier du même $HOME reste accepté — preuve que le refus vient de
+# la garde $HOME spécifiquement, pas d'un chemin déjà existant ou d'une garde générique (un
+# fixture mort ressemblerait à un mutant tué sans cette contre-épreuve).
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME="$LAB/home"
+mkdir -p "$FAKE_HOME"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  miss=0
+  OUT=$(cd "$LAB" && HOME="$FAKE_HOME" VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --target "$FAKE_HOME" install dev-orchestrator 2>&1)
+  RC=$?
+  if [ "$RC" -eq 0 ]; then
+    ko "T39 (D-38-P, DISCRIMINANT) : --target \"\$HOME\" littéral ACCEPTÉ (rc=0) — devrait être refusé"
+    miss=1
+  elif ! echo "$OUT" | "$GREP" -qi 'HOME'; then
+    ko "T39 (D-38-P, DISCRIMINANT) : --target \"\$HOME\" refusé (rc=$RC) mais message sans mention explicite de HOME — $OUT"
+    miss=1
+  fi
+  [ -f "$FAKE_HOME/agents/dev-orchestrator.md" ] \
+    && { ko "T39 (D-38-P, DISCRIMINANT) : payload posé directement dans \$HOME malgré le refus attendu"; miss=1; }
+  # Contre-épreuve : $HOME/.claude (sous-dossier du même $HOME) reste accepté.
+  (cd "$LAB" && HOME="$FAKE_HOME" VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --target "$FAKE_HOME/.claude" install dev-orchestrator >/dev/null 2>&1)
+  [ -f "$FAKE_HOME/.claude/agents/dev-orchestrator.md" ] \
+    || { ko "T39 (D-38-P, DISCRIMINANT) : contre-épreuve — \$HOME/.claude aurait dû être accepté (refus limité à \$HOME exact)"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T39 (D-38-P, DISCRIMINANT) : --target \"\$HOME\" refusé (message explicite), \$HOME/.claude accepté en contre-épreuve"
+else
+  skip "T39 : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T40 (D-38-P) — --target pointant hors du repo mais VIDE reste accepté (rc=0) : le danger n'est
+# pas "hors repo", c'est $HOME peuplé — ne pas confondre les deux gardes.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+OUTSIDE_EMPTY="$(mktemp -d)/fresh-empty-target"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  OUT=$(cd "$LAB" && VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --target "$OUTSIDE_EMPTY" install dev-orchestrator 2>&1)
+  RC=$?
+  if [ "$RC" -eq 0 ] && [ -f "$OUTSIDE_EMPTY/agents/dev-orchestrator.md" ]; then
+    ok "T40 (D-38-P) : --target hors du repo mais vide -> accepté (rc=0), payload réellement posé"
+  else
+    ko "T40 (D-38-P) : --target hors du repo mais vide -> refusé ou payload manquant (rc=$RC) — $OUT"
+  fi
+else
+  skip "T40 : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB" "$(dirname "$OUTSIDE_EMPTY")"
+
+# ---------------------------------------------------------------------------
+# T41 (D-38-P) — traversée `../../../../x` : PAS de refus de principe (contredirait --target
+# /tmp/mon-lab), mais la cible résolue est affichée EN CLAIR sur stdout — jamais une surprise
+# silencieuse.
+# ---------------------------------------------------------------------------
+BASE="$(mktemp -d)"
+CACHE="$BASE/cache"
+mkdir -p "$BASE/a/b/c/d"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  EXPECTED_RESOLVED="$(cd -P "$BASE" && pwd -P)/traversal-escaped"
+  OUT=$(cd "$BASE/a/b/c/d" && VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --target "../../../../traversal-escaped" install dev-orchestrator 2>&1)
+  RC=$?
+  miss=0
+  [ "$RC" -eq 0 ] || { ko "T41 (D-38-P) : traversée ../../../../x refusée (rc=$RC) — devrait être acceptée — $OUT"; miss=1; }
+  [ -f "$BASE/traversal-escaped/agents/dev-orchestrator.md" ] \
+    || { ko "T41 (D-38-P) : traversée acceptée mais payload absent de la cible résolue"; miss=1; }
+  echo "$OUT" | "$GREP" -qF "$EXPECTED_RESOLVED" \
+    || { ko "T41 (D-38-P) : cible résolue absente de la sortie (attendu : $EXPECTED_RESOLVED) — $OUT"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T41 (D-38-P) : traversée ../../../../x acceptée (rc=0) ET cible résolue affichée en clair"
+else
+  skip "T41 : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$BASE"
+
+# ---------------------------------------------------------------------------
+# T42 (D-38-P, DISCRIMINANT) — cible --target pré-existante et NON VIDE refusée par défaut
+# (message listant le contenu trouvé), acceptée seulement avec --target-nonempty-ok explicite.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+CUSTOM_TARGET="$LAB/nonempty-target"
+mkdir -p "$CUSTOM_TARGET"
+echo "contenu préexistant" > "$CUSTOM_TARGET/somefile.txt"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  miss=0
+  OUT=$(cd "$LAB" && VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --target "$CUSTOM_TARGET" install dev-orchestrator 2>&1)
+  RC=$?
+  if [ "$RC" -eq 0 ]; then
+    ko "T42 (D-38-P, DISCRIMINANT) : cible non vide sans drapeau ACCEPTÉE (rc=0) — devrait être refusée"
+    miss=1
+  elif ! echo "$OUT" | "$GREP" -qi 'somefile.txt'; then
+    ko "T42 (D-38-P, DISCRIMINANT) : refus sans drapeau (rc=$RC) mais message sans le contenu trouvé — $OUT"
+    miss=1
+  fi
+  [ -f "$CUSTOM_TARGET/agents/dev-orchestrator.md" ] \
+    && { ko "T42 (D-38-P, DISCRIMINANT) : payload posé malgré le refus attendu (sans drapeau)"; miss=1; }
+  # Avec le drapeau explicite --target-nonempty-ok : accepté, le fichier préexistant survit.
+  (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --target "$CUSTOM_TARGET" --target-nonempty-ok install dev-orchestrator >/dev/null 2>&1)
+  [ -f "$CUSTOM_TARGET/agents/dev-orchestrator.md" ] \
+    || { ko "T42 (D-38-P, DISCRIMINANT) : --target-nonempty-ok fourni mais payload toujours absent"; miss=1; }
+  [ -f "$CUSTOM_TARGET/somefile.txt" ] \
+    || { ko "T42 (D-38-P, DISCRIMINANT) : fichier préexistant disparu après install --target-nonempty-ok"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T42 (D-38-P, DISCRIMINANT) : cible non vide refusée par défaut (contenu listé), acceptée avec --target-nonempty-ok"
+else
+  skip "T42 : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T43 (D-38-P) — exception légitime SANS drapeau : une cible portant déjà un registre VibeFlow
+# (scripts/.vibeflow-installed) est une ré-install/update, pas une dispersion — acceptée même
+# non vide et sans --target-nonempty-ok.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+CUSTOM_TARGET="$LAB/registered-target"
+mkdir -p "$CUSTOM_TARGET/scripts"
+touch "$CUSTOM_TARGET/scripts/.vibeflow-installed"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  OUT=$(cd "$LAB" && VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --target "$CUSTOM_TARGET" install dev-orchestrator 2>&1)
+  RC=$?
+  if [ "$RC" -eq 0 ] && [ -f "$CUSTOM_TARGET/agents/dev-orchestrator.md" ]; then
+    ok "T43 (D-38-P) : cible non vide portant .vibeflow-installed -> acceptée SANS drapeau (ré-install légitime)"
+  else
+    ko "T43 (D-38-P) : cible avec registre .vibeflow-installed refusée (rc=$RC) — devrait être acceptée sans drapeau — $OUT"
+  fi
+else
+  skip "T43 : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
 # Garde-fou final : le vrai ~/.claude ET le vrai ~/.codex/agents/vibeflow sont inchangés
 # (snapshot récursif avant=après).
 # ---------------------------------------------------------------------------
