@@ -393,6 +393,149 @@ compter avec le défaut non corrigé tant que la branche n'est pas mergée.
 
 ---
 
+## Axe B7 — La mémoire d'agent
+
+### 1. Le recadrage — la question posée par Samuel
+
+Face au choix « où sauver la mémoire d'agent », Samuel a refusé de trancher et posé une question
+différente : *« C'est possible de faire des symlinks ou autre ? Je crois que agent-memory est la
+norme pour Claude. Je veux respecter les normes de tous les providers, mais adapter en fonction de
+COMMENT VF et ses déps ont été installés. »* Cette section traite cette question telle quelle —
+elle ne referme aucun autre axe de ce document.
+
+### 2. La norme Claude — documentée, et elle contient déjà une réponse
+
+`memory:` a **trois** valeurs, pas deux : **`user`**, **`project`**, **`local`** (doc officielle
+`sub-agents.md` : « Enable persistent memory: user, project, or local »).
+
+| valeur | chemin | statut |
+|---|---|---|
+| `user` | `~/.claude/agent-memory/` | imposé, non configurable |
+| `project` | `.claude/agent-memory/` | imposé, non configurable |
+| `local` | `.claude/agent-memory-local/` | imposé, non configurable |
+
+`autoMemoryDirectory` existe mais porte sur la **mémoire de session**, pas sur l'agent-memory.
+Aucun `memoryPath` de frontmatter. Format : index `MEMORY.md` + un fichier-sujet par mémoire ;
+**seul l'index charge au démarrage**.
+
+**Le constat qui recadre tout, indépendant de toute migration** : Claude Code distingue déjà
+`project` (versionnable, voyage avec le repo) de `local` (privé, répertoire séparé exprès). **Les
+31 agents posés déclarent tous `memory: project`** — sémantique « voyage avec le repo » — **pendant
+que `.gitignore:20` (`.claude/`) leur applique le régime `local`**. Le dépôt utilise la sémantique
+`project` en appliquant le traitement `local`. Vérifié par le manager : 31 agents en
+`memory: project`, `.gitignore` ligne 20 = `.claude/`.
+
+**Conséquence à écrire** : il faut trancher ce que ces fichiers sont censés être (`project`
+versionné / `local` jetable) **avant** de traiter le « où ». Le second choix découle du premier,
+et c'est un arbitrage qui existe **aujourd'hui**, migration ou pas.
+
+### 3. Périmètre réel de la mémoire — compteurs avec leur objet
+
+| Objet | Valeur | Commande |
+|---|---|---|
+| fichiers | **116** | `find .claude/agent-memory -type f \| wc -l` |
+| répertoires d'agent hors sondes | **6** | `find … -mindepth 1 -maxdepth 1 -type d -not -name 'zz-probe*'` |
+| répertoires **peuplés** | **5** (`skill-creator/` est vide) | boucle sur les dirs |
+| répartition | dev-manager 48 · coder 37 · reviewer 19 · auditer 8 · validator 4 | idem |
+| index `MEMORY.md` | 5 | `find … -name MEMORY.md \| wc -l` |
+| volume | **512 Ko** | `du -sh .claude/agent-memory` |
+| `memory:` dans `plugin/` | **52** occurrences / **51** fichiers `.md`, valeur **toujours `project`** | `grep -rn --include='*.md' '^memory:' plugin/` |
+| dont agents **posés** | **31** | `plugin/*/agents/*.md` + `plugin/*/AGENT.md` |
+
+**Piège à noter explicitement** : « 6 agents » et « 5 agents » sont **tous deux vrais** selon
+qu'on compte les répertoires ou les répertoires peuplés. Les 3 `zz-probe-*` sont des répertoires
+**vides** — sondes, à exclure de tout périmètre.
+
+### 4. Les symlinks — mesuré, 9 tests sur répertoire jetable
+
+- **Lecture, écriture, `mkdir` à travers le lien : fonctionnent intégralement** sur POSIX ; tout
+  atterrit dans la cible, `realpath` résout.
+- **git versionne LE LIEN** (mode `120000`, blob = le texte du chemin), la cible étant versionnée
+  séparément sous son vrai chemin. Aucune duplication.
+- `.gitignore` = `.claude/` **bloque le lien**. La ré-inclusion **naïve** `.claude/` +
+  `!.claude/agent-memory` **ne marche pas** (piège git classique, mesuré, pas supposé) ; la forme
+  **correcte** est `.claude/*` + `!.claude/agent-memory`.
+- **Cible hors dépôt** : git ne versionne que le lien, avec un chemin **absolu** donc
+  machine-spécifique ; le contenu n'est pas versionné du tout. Sur une autre machine : lien
+  pendant, écriture en échec.
+- **Scénario réel mesuré** (`.gitignore` inchangé, commit, clone frais) : **le contenu voyage, le
+  lien ne voyage PAS** → `.claude/agent-memory` absent du clone. Le problème est **déplacé d'un
+  cran, pas résolu**.
+
+**Deux conditions dures** : le lien doit lui-même être versionné (`.claude/*` + `!`), et il doit
+être **relatif et interne au dépôt**.
+
+### 5. Aucune garde ne bloque ce montage — mesuré
+
+- **gsd-core** : `hasExistingSymlinkBetween` ne couvre que ses propres destinations. **gsd-core
+  ignore totalement `agent-memory` : 0 occurrence dans tout le paquet.** Un opt-in existe déjà en
+  amont pour les montages voulus (`GSD_ALLOW_SYMLINKED_DEST=1`).
+- **VF engine** : `vf_removable` refuse de supprimer ce qui n'est pas un fichier régulier et
+  refuse une résolution hors `TARGET_ROOT` — protecteur, et sans effet ici puisque l'engine ne
+  pose jamais rien sous `agent-memory`.
+- **Ne pas confondre** : l'exclusion `memory/*` du manifeste concerne les registres à la racine
+  du lab, **pas** `.claude/agent-memory/`.
+- **Précédent maison à manier avec précaution** : `.planning/research/agent-team-spec.md`
+  affirme qu'un skill et un agent symlinkés sont découverts — mais c'est un document **importé
+  d'un autre projet**, marqué « entrée de recherche, pas source de vérité », et il porte sur la
+  **lecture**, pas sur l'**écriture** d'agent-memory. Indice fort, pas une preuve.
+
+### 6. Windows — le montage y est inapplicable, et le dépôt le sait
+
+`ensure-deps.sh` détecte MSYS2/Cygwin et **refuse proprement** plutôt que d'échouer à mi-course.
+`.planning/research/STACK.md` documente déjà que **MSYS `ln -s` copie par défaut** (symlink natif
+seulement avec Developer Mode + `MSYS=winsymlinks:nativestrict`). Mesure indépendante côté git :
+`core.symlinks=false` → le lien est déposé comme **fichier régulier**, et l'écriture à travers
+échoue en `Not a directory`.
+
+→ Toute liaison par lien exige une branche de dégradation Windows (copie, ou rien), sur le modèle
+déjà retenu ailleurs dans le dépôt.
+
+### 7. Les runtimes cibles — perte de capacité franche
+
+| Runtime | Mémoire d'agent par projet | Détail | Statut |
+|---|---|---|---|
+| **Codex 0.150.1** | **partiel, topologie inverse** | feature `memories` **stable mais `false` par défaut** (vérifié par le manager) ; store **global** `~/.codex/memories/` (**absent sur ce poste**, feature désactivée) ; le scope projet est une **annotation `cwd=…`**, pas un chemin. Sous-agents à frontmatter oui, **champ `memory:` non**. | **observé** |
+| **OpenCode** | **non** | `AGENTS.md` (instructions humaines) + transcripts JSON bruts jamais consolidés. Frontmatter sans `memory:`. | **documenté** |
+| **kimi-code** | **non** | `AGENTS.md` + état de session resumable. Frontmatter sans `memory:`. | **documenté** |
+
+**À écrire tel quel** : la mémoire d'agent par projet est une **capacité spécifique à Claude
+Code**. C'est une perte de capacité à **déclarer** par le gate de fidélité, pas un trou à combler.
+
+**Réserve de méthode à consigner** : la feature request Kimi trouvée est déposée sur `kimi-cli`,
+**pas** `kimi-code` — deux produits distincts que le cadrage désignait déjà comme piège. À
+re-vérifier sur le bon repo avant d'être gravé.
+
+**Découverte non demandée, et c'est le seul chemin de portage crédible** : le binaire Codex
+contient un migrateur `external-agent-migration` reconnaissant `claude-code`, dont les types
+d'items incluent littéralement `MEMORY`. Le flag `external_agent_memory_import` est **`under
+development`** (vérifié par le manager). C'est amont, pas à écrire côté VF.
+
+### 8. « Adapter selon comment VF a été installé » — trois étages distincts, à ne pas fusionner
+
+1. **Amont (gsd-core)** : introduire un `kind: memory` dans `artifactLayout`. Vocabulaire actuel
+   des `kind` : `agents`, `skills`, `commands`, `kimi-agents` — **aucun `kind: memory` nulle
+   part**. Coût faible en lignes, **valeur quasi nulle en l'état** : 3 des 4 runtimes n'ont **pas
+   de destination**, la règle ne dirait « rien » 3 fois sur 4. Et c'est une **contribution
+   amont**, pas du code VF (doctrine : VibeFlow consomme, ne réimplémente pas).
+2. **VF engine** : pour appliquer une règle par runtime, l'engine doit d'abord **acquérir une
+   dimension qu'il n'a pas** — `TARGET_ROOT` est 2 branches en dur (`user → $HOME/.claude`,
+   `project|local → ./.claude`), sans `--target` ni `RUNTIME`. **C'est le vrai coût, et il dépasse
+   largement la mémoire : c'est le chantier de l'axe B au complet** (cf. A4, §Proposition de
+   cadrage).
+3. **Mécanisme de liaison** : symlink / copie / rien, avec branche Windows obligatoire (§6), lien
+   relatif interne versionné (§4), et un inconnu bloquant non levé (§9 ci-dessous).
+
+**Recoupement à consigner** : les « 13 règles de placement » (A4) se re-dérivent exactement —
+codex 2+2=4, opencode 3+3=6, kimi-code 2+1=3 — et l'objet compté est nommé : une entrée
+d'`artifactLayout`.
+
+**Le point dur n'est aucun des trois** : **116 fichiers non relus vivent dans un dépôt public.**
+Toute règle de placement qui les versionne **les publie**. La question de publication précède la
+question de placement, et elle n'est pas technique.
+
+---
+
 ## Proposition de cadrage
 
 Trois options pour porter ces deux axes, coûts et dépendances :
@@ -416,6 +559,15 @@ plan de secours superpowers — même s'il ne couvre que 2 des 4 runtimes avec u
 **La décision appartient à Samuel (ADR-031). Rien ne se lance sans son arbitrage** — ni le choix
 d'option ci-dessus, ni l'ouverture d'un `--target`, ni le sort de `vf-calibrate`.
 
+**Ajout B7 (mémoire d'agent)** : la mémoire d'agent n'est **pas un chantier autonome** — son étage
+2 (§8.2 ci-dessus, acquisition d'une dimension runtime par l'engine) **est** le chantier de l'axe
+B au complet, pas un ajout marginal. Ce qui est **séparable et actionnable dès maintenant, sans
+attendre l'arbitrage `--target`**, c'est le **décalage déclaratif** `memory: project` vs
+`.gitignore: .claude/` (§2) — un fait mesuré aujourd'hui, indépendant de toute migration multi-
+runtime. Cette proposition ne tranche rien : la décision — corriger la déclaration, corriger le
+`.gitignore`, ou assumer le décalage — appartient à Samuel (ADR-031), au même titre que le reste
+de ce cadrage.
+
 ---
 
 ## Ce qui reste inconnu
@@ -434,3 +586,13 @@ Repris tel quel depuis les sections ci-dessus, sans en combler aucun :
   marketplace add` (le transport et le manifeste sont mesurés ce spike, pas l'enchaînement complet
   jusqu'à un agent utilisable) ; les commandes d'install OpenCode et kimi-code : documentaires,
   jamais exécutées.
+- **B7** — le harness Claude suit-il un symlink à l'**écriture** d'agent-memory ? Non mesurable
+  sans agent vivant dans ce cwd — le comportement POSIX n'en dit rien (le harness peut `lstat` et
+  refuser, ou remplacer le lien).
+- **B7** — valeur **par défaut** de `memory:` si le champ est absent du frontmatter — non
+  documentée.
+- **B7** — quotas / compaction de l'agent-memory — non documentés.
+- **B7** — `kimi-code` vs `kimi-cli` : concordants sur l'absence de mémoire d'agent, mais
+  re-vérification ciblée requise avant d'être gravé.
+- **B7** — calendrier de `external_agent_memory_import` chez Codex — flag `under development`,
+  aucune date connue.
