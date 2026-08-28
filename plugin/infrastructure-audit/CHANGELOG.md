@@ -1,5 +1,44 @@
 # CHANGELOG — infrastructure-audit
 
+## [v1.3.1] — 2026-08-28 (Correctif — contrat de flux du hook SessionStart)
+
+### Corrigé
+- **`SessionStart` ne casse plus au parsing** — « Hook output looks like a JSON object but is not
+  valid JSON » au démarrage de Claude Code. Chaque axe écrit **son propre** objet JSON sur stdout,
+  donc `--quick` (runtime + hooks) en émettait **deux collés** : ce n'est pas un document JSON
+  valide, et le harness injecte le stdout d'un hook `SessionStart` en contexte. Symptôme
+  intermittent par construction — le gate `--if-older-than=14d` ne laisse l'audit tourner qu'une
+  session sur ~14 jours, les autres démarrages sortant à stdout vide.
+  Le défaut passait inaperçu parce que `jq` **accepte** cette sortie : il lit un *flux* d'objets,
+  là où le harness parse un *document*. Toute vérification au `jq` était donc un vert creux.
+
+### Changé
+- **`--hook` est désormais réellement câblé** dans le fragment `hooks.json`
+  (`--quick --if-older-than=14d --hook`) et porte une seconde responsabilité, le **flux** de
+  sortie (`hook_render`) en plus du code de sortie (`hook_exit`) : le flux des axes est capturé,
+  puis rendu en **un seul** objet encodé par `json.dumps` (jamais par concaténation), émis
+  uniquement s'il y a des findings — hooks en erreur/avertissement, scripts en erreur de syntaxe,
+  dépendances absentes, tests en échec, runtime hors référentiel. Sans finding, **stdout est
+  strictement vide** (contrat §3). Repli silencieux si aucun interprète Python n'est joignable
+  (ADR-054, détection par chemin du stub Microsoft Store) : le silence vaut mieux qu'un JSON cassé.
+- **La sortie CLI est inchangée** — sans `--hook`, `--quick`/`--axis` rendent toujours le flux
+  d'objets par axe que consomment les scripts et la suite de tests. Le correctif ne vit que sous
+  `--hook`.
+- **Nouveau champ `version_ref_present`** dans le JSON de l'axe runtime. Sans
+  `known-versions.txt` (jamais posé par l'engine d'install), `version_known: false` ne signifie
+  pas « drift » mais « rien pour comparer » : le bandeau se tait dans ce cas, au lieu de crier à
+  chaque audit une alerte que rien ne permet d'actionner.
+
+### Ajouté
+- **4 tests de non-régression** (T10a–T10d) : document JSON valide au parseur **strict** quand il
+  y a des findings, stdout strictement vide sur le chemin nominal, silence quand le référentiel
+  de versions est absent, et sortie CLI inchangée. Vérifiés en réintroduisant le défaut — ils
+  virent au rouge (3 KO), donc ils mordent. Suite : 16 OK · 0 KO.
+- **`docs/HOOKS-CONTRAT-SORTIE.md` §3 bis** — la règle qui manquait : quand le stdout d'un hook
+  n'est pas vide, il doit porter **un seul** objet, **encodé**. Avec le piège `jq` documenté et la
+  commande de vérification correcte. Le §3 n'avait été appliqué à l'entrée #18 que sur son code de
+  sortie, jamais sur son flux — c'est ce trou qui a laissé passer le défaut.
+
 ## [v1.3.0] — 2026-08-16 (Portabilité Windows II — codes de sortie, PORT-03/D-07)
 
 ### Changé

@@ -22,10 +22,14 @@
 # NB : --strict s'applique aux modes full/quick/axis (pas snapshot/diff, qui restent advisory).
 #
 # --hook (D-06/D-07, Portabilité Windows II) — PARITÉ D'INTERFACE avec les autres scripts de hook
-# du dépôt : accepté par le parsing, mais PAS ENCORE passé par la ligne d'invocation du fragment
-# `hooks.json` (qui reste `--quick --if-older-than=14d`, sans --strict ni --hook) — ce câblage
-# appartient à la migration en forme exec de la polarité gouvernance, hors périmètre de ce plan
-# (D-07). Avec cette invocation réelle, --strict n'est jamais atteint : le SEUL code silencieux
+# du dépôt, et depuis le correctif de flux ci-dessous, RÉELLEMENT PASSÉ par la ligne d'invocation
+# du fragment `hooks.json` (`--quick --if-older-than=14d --hook`, toujours sans --strict).
+# Il porte désormais DEUX responsabilités distinctes :
+#   1. le code de sortie (hook_exit, ci-dessous) — la traduction du silence interne ;
+#   2. le FLUX de sortie (hook_render, ci-dessous) — sans lui, les axes écrivent chacun leur objet
+#      JSON et --quick en émet DEUX collés, que le harness rejette au parsing strict
+#      (« Hook output looks like a JSON object but is not valid JSON »). Voir §3 du contrat.
+# Le fragment ne passe pas --strict, donc --strict n'est jamais atteint : le SEUL code silencieux
 # atteignable ce jour est déjà 0. hook_exit() traduit malgré tout le code 3 (INDÉTERMINÉ,
 # --strict + $CLAUDE_DIR absent) vers 0 sous --hook, par parité structurelle avec le reste du parc
 # (même statut que l'INDÉTERMINÉ de check-agents.sh) et pour rester correct si --strict et --hook
@@ -87,6 +91,76 @@ hook_exit() { # <code>
   exit "$code"
 }
 
+# --- Enveloppe de sortie sous --hook (contrat de FLUX, HOOKS-CONTRAT-SORTIE.md §3) -------------
+# Chaque axe écrit son PROPRE objet JSON sur stdout : deux axes (le cas de --quick) = deux objets
+# collés, ce qui n'est PAS un document JSON valide. `jq` l'accepte — il lit un flux —, mais le
+# harness parse en strict : injecté tel quel sur SessionStart il lève « Hook output looks like a
+# JSON object but is not valid JSON ». Sous --hook on capture donc le flux des axes et on le rend
+# en UN SEUL objet encodé par json.dumps, émis uniquement s'il y a quelque chose à dire ; stdout
+# strictement vide sinon (§3). Le rendu reste ADVISORY (ADR-031) : il constate, ne répare rien.
+hook_render() { # <buffer>
+  local buf="$1"
+  [ -s "$buf" ] || return 0
+  # ADR-054 : stub Microsoft Store — `python3` présent dans le PATH mais inerte. Détection par
+  # CHEMIN (zéro spawn), repli `python` ; sans interprète on préfère le silence à un JSON cassé.
+  local pybin=python3
+  case "$(command -v python3 2>/dev/null)" in
+    ''|*WindowsApps*) command -v python >/dev/null 2>&1 && pybin=python || pybin="" ;;
+  esac
+  [ -n "$pybin" ] || return 0
+  "$pybin" - "$buf" 2>/dev/null <<'PYEOF' || true
+import json, sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as fh:
+        raw = fh.read()
+except OSError:
+    sys.exit(0)
+
+# Le buffer est un FLUX d'objets concatenes : raw_decode les prend un par un.
+dec, objs, i, n = json.JSONDecoder(), [], 0, len(raw)
+while i < n:
+    while i < n and raw[i].isspace():
+        i += 1
+    if i >= n:
+        break
+    try:
+        obj, i = dec.raw_decode(raw, i)
+    except ValueError:
+        break
+    objs.append(obj)
+
+msgs = []
+for o in objs:
+    if not isinstance(o, dict):
+        continue
+    axis = o.get("axis")
+    if axis == "runtime":
+        # Sans referentiel, version_known=false = "rien pour comparer" : on se tait (§3).
+        if o.get("version_ref_present") and o.get("version_known") is False:
+            msgs.append("runtime Claude Code %s hors referentiel valide"
+                        % o.get("claude_version", "?"))
+    elif axis == "hooks":
+        if o.get("errors_count"):
+            msgs.append("%d erreur(s) de hooks" % o["errors_count"])
+        if o.get("warnings_count"):
+            msgs.append("%d avertissement(s) de hooks" % o["warnings_count"])
+    elif axis == "scripts":
+        if o.get("syntax_errors"):
+            msgs.append("%d script(s) en erreur de syntaxe" % o["syntax_errors"])
+        if o.get("deps_missing"):
+            msgs.append("dependance(s) absente(s) : " + ", ".join(o["deps_missing"]))
+        if o.get("tests_fail"):
+            msgs.append("%d test(s) de script en echec" % o["tests_fail"])
+
+if msgs:
+    sys.stdout.write(json.dumps(
+        {"systemMessage": "VibeFlow — audit infra : " + " ; ".join(msgs)
+                          + ". Lance /vf-audit pour le detail."},
+        ensure_ascii=False))
+PYEOF
+}
+
 # Contrat de découverte (F13, vacuous green) : sans $CLAUDE_DIR, toutes les boucles d'audit
 # sont sautées et l'exit 0 serait un vert non mérité. En --strict : exit 3 = INDÉTERMINÉ.
 if $STRICT && [ ! -d "$CLAUDE_DIR" ]; then
@@ -141,6 +215,11 @@ audit_runtime() {
 
   local version_known="false"
   local version_note=""
+  # Presence du referentiel (INF-05) : sans known-versions.txt il n'y a pas de verdict a rendre
+  # — `version_known: false` n'y signifie pas "drift" mais "rien pour comparer". Le champ evite
+  # d'en tirer une alerte permanente et non actionnable (le fichier n'est pas pose par l'engine).
+  local version_ref_present="false"
+  [ -f "$KNOWN_VERSIONS" ] && version_ref_present="true"
   if [ "$claude_version" != "unknown" ] && [ -f "$KNOWN_VERSIONS" ]; then
     if grep -q "^$claude_version$" "$KNOWN_VERSIONS" 2>/dev/null; then
       version_known="true"
@@ -162,6 +241,7 @@ audit_runtime() {
   "axis": "runtime",
   "claude_version": "$claude_version",
   "version_known": $version_known,
+  "version_ref_present": $version_ref_present,
   "version_note": "$version_note",
   "tools_natifs_hardcoded": ["Read", "Write", "Edit", "Bash", "Skill", "Task", "WebFetch"],
   "hooks_events_hardcoded": ["SessionStart", "SessionEnd", "PreCompact", "Stop", "PreToolUse", "PostToolUse", "Notification", "UserPromptSubmit"]
@@ -430,6 +510,16 @@ do_diff() {
 }
 
 # ---------- Main ----------
+# Sous --hook, stdout est deroute vers un buffer AVANT les axes. Redirection du SHELL COURANT et
+# jamais un sous-shell : STRICT_ERRORS est accumule par les axes et doit survivre au deroutage.
+# Sans mktemp utilisable, on deroute vers /dev/null — le silence vaut mieux qu'un JSON invalide.
+HOOK_BUF=""
+if [ "$HOOK" = true ]; then
+  HOOK_BUF="$(mktemp "${TMPDIR:-/tmp}/vf-audit-infra.XXXXXX" 2>/dev/null || true)"
+  exec 3>&1
+  if [ -n "$HOOK_BUF" ]; then exec 1>"$HOOK_BUF"; else exec 1>/dev/null; fi
+fi
+
 case "$MODE" in
   quick)
     log "Audit quick"
@@ -461,6 +551,15 @@ case "$MODE" in
     log "Pour generer snapshot : ./audit-infra.sh --snapshot"
     ;;
 esac
+
+# Restauration de stdout puis rendu en UN SEUL objet JSON (ou rien du tout).
+if [ "$HOOK" = true ]; then
+  exec 1>&3 3>&-
+  if [ -n "$HOOK_BUF" ]; then
+    hook_render "$HOOK_BUF"
+    rm -f "$HOOK_BUF" 2>/dev/null || true
+  fi
+fi
 
 # Verdict --strict (VG-5) : les findings ERROR portés jusque-là uniquement par le JSON
 # deviennent un exit code — un agent/CI peut enfin bloquer dessus.
