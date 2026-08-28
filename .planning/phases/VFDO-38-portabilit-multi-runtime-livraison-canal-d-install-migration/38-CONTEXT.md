@@ -984,3 +984,52 @@ seul segment** de l'usage correct.
 extensions, dotfiles et fragments JSON inclus), anti-symlink vérifié par **injection d'un lien vers
 une sentinelle** (non propagé, sentinelle intacte), résolution physique `cd -P`/`pwd -P` conforme
 D-31-15, idempotence confirmée.
+
+---
+
+## D-38-Q — Les deux portes de la garde `--target` (2026-08-29)
+
+Re-revue en régime plein du comblement `0648e13`. **Deux bloquants** (en correction) et **deux
+portes** qui demandaient un arbitrage.
+
+### 🔴 Le bloquant qui compte — contournement par la CASSE (macOS)
+La garde `$HOME` comparait des **chaînes**. Sur APFS (insensible à la casse), deux casses du même
+dossier désignent **le même inode** mais produisent des chaînes différentes. **Vérifié par le
+manager**, avec une précision que le rapport n'avait pas :
+```
+$LAB/home et $LAB/HOME       -> MÊME INODE (16777230:61298272)
+cd -P "$LAB/HOME" && pwd -P  -> .../home    (casse STOCKÉE)
+engine, « cible résolue »    -> .../HOME    (casse DEMANDÉE)
+```
+Un `cd -P && pwd -P` **direct** canonicalise la casse, mais **la valeur comparée et journalisée par
+l'engine ne l'est pas**. Rien n'a été posé au test **uniquement** parce que le cache manquait —
+erreur **en aval**, sans rapport. **Avec un cache réel, le payload partait dans le vrai `$HOME`.**
+→ Comparaison par **inode+device**, jamais par chaîne. ⚠️ **Piège de CI** : `stat -f` est
+BSD/macOS, la CI est **Linux** (`stat -c`) — un fix `stat -f` seul serait **vert en local, rouge en
+CI** (précédent : 6 correctifs de portabilité en Phase 13).
+
+### D-38-Q.1 — L'exception de ré-install valide le registre ET nomme la voie (A + C)
+La garde s'ouvrait sur la **seule existence** de `.vibeflow-installed`. Un dossier de fichiers
+personnels + un registre **vide planté à la main** la contournait, sans drapeau **et sans signal**.
+- **Validation réelle** : non vide, format valide, **au moins un module déclaré**. L'engine sait
+  déjà lire ce fichier — réutiliser le lecteur, ne pas en écrire un second.
+- **La voie est NOMMÉE** dans la sortie : « exception de ré-install : registre trouvé (N modules) ».
+  Une garde qui s'ouvre **sans le dire** est ce que cette phase traque partout ailleurs.
+- ⭐ **Le cas `inconsistent` n'est PAS hypothétique** : c'est l'état que **notre propre lot ROLL**
+  écrit quand un rollback échoue à mi-course. Il **OUVRE** l'exception — c'est une **réparation
+  légitime**, on doit pouvoir réinstaller par-dessus — **mais avec une ligne dédiée**. Le rejeter
+  aurait bloqué la sortie de secours que le lot 3 venait de créer.
+
+### D-38-Q.2 — L'asymétrie `--scope` / `--target` : visible, pas harmonisée (B + dette)
+Même cible physique, `--scope user` **rc=0** et `--target "$HOME/.claude"` **rc=1**. Harmoniser
+changerait le **chemin nominal de tous les labs existants**, en fin de mission, hors périmètre.
+→ **B** : `--scope user` **affiche sa cible résolue** comme `--target`, pour que les deux chemins
+soient **également lisibles** — pas qu'ils se comportent pareil. **A consignée en dette nommée au
+ROADMAP**, avec son déclencheur de reprise (le jour où les adaptateurs construisent majoritairement
+des `--target` explicites, le plus contraint des deux deviendra le plus fréquent).
+
+### Un test qui ne prouvait pas son propre énoncé — 3ᵉ occurrence
+`38-04-PLAN.md` et le commentaire de **T41** affirment « affiché sur **stdout** » ; le code écrit
+sur **stderr**. Et **T41 capture `2>&1`**, donc il **ne peut pas** détecter l'écart. Même famille
+que la fixture idéalisée du gate FIDE-03 et que le T4 qui encodait le bug du contrat stdout.
+**Trois fois dans cette phase**, un test vert n'a pas démontré ce qu'il affirmait.

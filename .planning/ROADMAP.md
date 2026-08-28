@@ -1148,3 +1148,15 @@ déclare l'état `INCONSISTENT:<étape>:<version_cible>` au registre plutôt que
 mentir sur la version pré-rollback (`show_status` l'affiche). Réévaluer l'option A si de
 nouveaux points de panne mi-restauration apparaissent au-delà des 5 étapes déjà couvertes
 (skills/scripts/agents/agent-references/registre).
+
+**Dette nommée — garde de cible unifiée pour les scopes littéraux et `--target`** (D-38-Q,
+2026-08-29, Phase 38). **Fait mesuré** : pour la **même cible physique**, `--scope user` est
+accepté (**rc=0**) et `--target "$HOME/.claude"` refusé (**rc=1**), sur un contenu identique — la
+garde D-38-P ne vit que dans la branche `--target`, la branche des scopes littéraux ne la traverse
+jamais. **Non traité en Phase 38, délibérément** : harmoniser changerait le comportement de
+`--scope user`, c'est-à-dire le **chemin nominal de tous les labs existants**, en fin de mission et
+hors périmètre. Retenu à la place : rendre l'asymétrie **visible** — `--scope user` affiche
+désormais sa cible résolue comme `--target` le fait. **Déclencheur de reprise** : le portage
+multi-runtime amène des adaptateurs à construire des `--target` explicites plutôt qu'à passer par
+`user`/`project`/`local` ; le jour où ce chemin devient majoritaire, le plus contraint des deux
+sera aussi le plus fréquent, et l'unification cessera d'être cosmétique.
