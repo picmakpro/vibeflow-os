@@ -1138,3 +1138,13 @@ Plans:
 - [ ] 38-04-PLAN.md — `--target` injectable + réécriture du payload à la copie + sonde cross-module
 - [ ] 38-05-PLAN.md — Adaptateur Codex minimal (rôle .toml dispatchable, limite de confinement déclarée)
 - [ ] 38-06-PLAN.md — Migration de lab (runtime dans config.json, coexistence/bascule gatée, réversibilité)
+
+**Dette nommée (D-38-K, option A non retenue — correction ciblée post-ROLL, 2026-08-28)** :
+atomicité par staging (`<TARGET_ROOT>/.vibeflow-staging/<mod>/` + `mv` sur même volume) pour
+`rollback_module`, écartée du lot de correction ciblée D-38-J/D-38-K — aurait débordé le
+périmètre (plus de 2 fonctions de l'engine touchées : `rollback_module`, `backup_module`,
+potentiellement `install_module`). Retenu à la place : option B, `trap ERR` + `set -E` qui
+déclare l'état `INCONSISTENT:<étape>:<version_cible>` au registre plutôt que de le laisser
+mentir sur la version pré-rollback (`show_status` l'affiche). Réévaluer l'option A si de
+nouveaux points de panne mi-restauration apparaissent au-delà des 5 étapes déjà couvertes
+(skills/scripts/agents/agent-references/registre).
