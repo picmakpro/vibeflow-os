@@ -725,3 +725,91 @@ exiger la purge en fin de mesure** (D-38-G), pas seulement l'autoriser.
 ⚠️ **Fuite d'isolation réelle et récurrente du CLI** : `~/.codex/tmp/arg0/` est dérivé de `$HOME`
 et **n'est PAS couvert par `CODEX_HOME`**. Scratch d'exécution, **sans identifiant** — mais toute
 mesure d'isolation doit l'exclure explicitement plutôt que la découvrir.
+
+---
+
+## ⚖️ Décisions de conception sur la réversibilité (2026-08-28) — VERROUILLÉES
+
+Fondement : **critère 5 de Samuel** — « réversibilité **prouvée**, le trou de rollback **fermé** ».
+Il rend les options « documenter la limite » **inéligibles par construction**.
+
+### D-38-J — Fragment de hooks persisté par module (option A)
+`merge_module_hooks` écrit **`<TARGET_ROOT>/.vibeflow-fragments/<mod>.json`** ; `backup_module` lit
+**celui-là**, **jamais le cache**. Motif : `$CACHE_DIR` porte déjà la version NEUVE au moment du
+backup (il est pré-rempli par `/vibeflow-install` **avant** l'appel), donc le rollback des hooks
+était un **no-op silencieux** pendant que skills/agents/scripts revenaient correctement.
+**Conditions dures :**
+1. ⛔ **NE PAS corriger le défaut cross-matcher de `merge-hooks.sh` au passage** — lot séparé.
+   Sinon on ne saura plus quel diff a cassé quoi. La zone est déclarée à risque (§1, `9bfc975`).
+2. **Preuve de la sonde cross-module `conductor` → `dev-orchestrator` avant commit.**
+3. **T18 est REMPLACÉ**, pas complété : le test actuel fabrique le cas qui **n'arrive pas** (ancien
+   fragment « encore en cache »). Le nouveau reproduit le **cas de prod** — cache déjà en v2 au
+   moment du backup — et prouve que le fragment **v1 revient**. **T19 (grep statique) ne compte pas
+   comme preuve.**
+4. **Rétro-compatibilité** : un lab installé avant cette version n'a **aucun**
+   `.vibeflow-fragments/`. Le rollback doit le **DIRE** (« fragment hooks non restaurable :
+   installé avant vX »), jamais le taire. **C'est le gate de fidélité appliqué au rollback.**
+
+### D-38-K — L'état incohérent doit se DÉCLARER (option B obligatoire, A si bon marché)
+Ce qui est grave n'est pas l'état mixte, c'est qu'il **mente**.
+- **B, NON NÉGOCIABLE** : `trap ERR` (ou équivalent **compatible bash 3.2** — macOS ; penser à
+  `set -E` pour la propagation dans les fonctions) qui, sur échec à mi-restauration, écrit au
+  registre un état **explicite `inconsistent`** portant **le module, l'étape atteinte et la version
+  cible**, sort **non-zéro**, et dit **quoi réparer**. **`status` doit afficher cet état.**
+  **Test** : simuler un `cp` qui échoue (permission retirée, ou source supprimée) et vérifier que le
+  registre **ne porte plus la version pré-rollback**.
+- **A si ≤ un lot** : reconstituer dans `<TARGET_ROOT>/.vibeflow-staging/<mod>/` puis basculer par
+  `mv` (atomique sur même volume). **Si ça déborde le lot ou touche plus de DEUX fonctions de
+  l'engine : rester sur B** et consigner **A en dette nommée dans `ROADMAP.md`**.
+
+### D-38-L — Glob de backup ancré (auto-fix, confirmé)
+`"$BACKUP_DIR/$mod"-[0-9]*` (ou équivalent exigeant un **chiffre** après `$mod-`, début
+d'horodatage — ce qu'un nom de module ne peut pas être). Le filtre `-removed` **reste nécessaire**.
+**Test discriminant** : les **deux** backups posés **côte à côte**, celui de `mobile-test-team`
+étant le **plus récent** (`ls -1dt` trie par mtime — c'est la fraîcheur qui déclenche le bug).
+Cas réel de ce dépôt : `plugin/mobile-test/` et `plugin/mobile-test-team/` coexistent.
+
+---
+
+## D-38-M — `plugin/_internal/` est hors du périmètre de D-04 (ratifié 2026-08-28, Samuel)
+
+**Décision** : `plugin/_internal/` **n'est pas « un module »** au sens de la règle d'autonomie D-04.
+C'est le **socle** : il n'a **ni `VERSION`, ni `module.json`, ni `CHANGELOG.md`** (constaté par le
+manager, deux fois indépendamment — d'abord pour trancher où devait aller le bump du lot ROLL,
+ensuite pour instruire cet arbitrage). Un script de module peut donc résoudre un script partagé du
+socle par `$(dirname "$0")`.
+
+**Précédent invoqué** : `find_engine_lib()` et `find_hooks_merger()` (`vibeflow-update.sh`) font
+déjà exactement cela, depuis avant cette phase.
+
+**⚠️ Ordre des faits, écrit pour rester lisible** : l'exception a été **posée par le lot 2 (RUNT)
+AVANT toute décision**, dans le commit `d6ff0d4` — qui modifiait **à la fois** le garde T9e **et**
+le code que ce garde protège — puis **ratifiée** ici après remontée par la revue en régime plein.
+Ce n'est **pas** une décision prise en amont ; c'est une régularisation assumée et datée. La
+distinction est conservée exprès : effacer l'ordre des faits reviendrait à faire croire que la
+procédure a été suivie.
+
+**Trois conséquences exécutoires** :
+1. Le garde T9e est **resserré à la ligne exacte** (`grep -vF '$(dirname "$0")/runtime-cli-dispatch.sh'`),
+   pas au nom de fichier n'importe où sur la ligne — la version posée par le lot 2 laissait passer
+   une résolution **cross-module** déguisée sous le même nom de fichier (prouvé par mutation).
+   Les **3 mutations de la revue sont commitées comme tests de régression**.
+2. Le **CHANGELOG public est corrigé** : « sans affaiblir la garde d'autonomie » est **faux tel
+   quel**. Il doit dire ce qui s'est passé — exception au socle, ratifiée, garde resserré. Même
+   traitement que « confirmé » sur la grammaire Codex : **le mot juste, pas le mot rassurant.**
+3. Règle de procédure qui naît de cet incident (§D-38-N).
+
+## D-38-N — Un lot ne desserre JAMAIS son propre garde dans le commit qui en bénéficie
+
+**Règle** : quand un lot bute sur un garde de doctrine, il **pose le besoin**, **escalade**, et le
+garde ne bouge que dans un **commit séparé, après décision**. Jamais dans le commit qui profite du
+desserrage.
+
+**Pourquoi** : un garde modifié par l'auteur du changement qu'il surveille perd sa fonction — il ne
+mesure plus rien d'indépendant. Ici, le même commit portait le changement, l'exemption **et** une
+affirmation non vérifiée (« sans affaiblir la garde ») qui s'est révélée fausse à la mutation. Rien
+n'était malveillant : le worker a fait un choix technique défendable, que Samuel a d'ailleurs
+ratifié. **C'est la procédure qui manquait, pas le jugement.** Et c'est précisément pour ça que la
+règle vaut plus que l'exception qu'elle encadre.
+
+Portée : toute la chaîne d'agents (`team-kernel.md`), pas seulement cette phase.

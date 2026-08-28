@@ -3,6 +3,7 @@
 - [check-agents.sh ne couvre rien sur vibeflow-os](project_check-agents-scope.md) — il audite `.claude/agents/` du lab courant, pas `plugin/` ; vert = non testé.
 - [Le code des plans détaillés est normatif](project_plans-code-normatif.md) — un correctif de revue va dans le plan ET le fichier ; s'il contredit un `must_have`, remonter au manager.
 - [Un `grep -c` de recette compte aussi la prose](project_recette-grep-c-litteral.md) — ne pas mettre le littéral d'un flag dans une `description` visée par le compteur.
+- [test-manifest.sh rouge en concurrence, hors périmètre](project_fragment-hooks-casse-test-manifest.md) — vérifier `git diff --stat` sur SES fichiers avant de traiter un rouge hors mandat.
 - [En lab, `.claude/skills/` est plat et partagé](project_lab-skills-plat-partage.md) — glob en dur = faux rouge (agents voisins) ou vert à vide (refs non expansées) ; compter les fichiers ouverts.
 - [L'index GSD est régénéré à l'install](project_index-gsd-regenere.md) — cible mouvante : écrire la couverture contre le sur-ensemble, jamais contre un nombre figé.
 - [Prouver un cas discriminant par mutation](feedback_mutation-test-discriminating-cases.md) — muter pour prouver le rouge, rejouer la réécriture licite qui doit rester verte, confiner le mutant au segment mesuré, reprendre la lettre du mutant d'une revue.
@@ -36,3 +37,4 @@
 - [/gsd-ship : la verification est le preflight #1](project_ship-preflight-verification-dabord.md) — security et broken-windows sont #6/#7 et restent inatteignables sans `*-VERIFICATION.md`.
 - [pre-push : candidat RCE non corrigé](project_pre-push-candidat-rce-non-corrige.md) — `scripts/hooks/pre-push` exécute un chemin dérivé de `show-toplevel`, même motif que dag.sh, mandat séparé requis.
 - [DAG `done` ≠ SUMMARY.md](project_dag-vs-summary-safe-resume-gate.md) — un nœud DAG clos sans SUMMARY.md bloque tout plan postérieur via `safe_resume_gate`, même hors de sa vague.
+- [Persister un fichier d'état sous TARGET_ROOT casse test-manifest.sh](project_fragment-hooks-casse-test-manifest.md) — sa liste d'exclusions D-31-03 est hardcodée en dur, PAS vf_manifest_excluded ; à vérifier ensemble.
