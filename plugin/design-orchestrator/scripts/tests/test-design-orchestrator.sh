@@ -414,18 +414,50 @@ SH
   # find_hooks_merger()) — ce n'est PAS « un autre module » au sens où D-04 l'entend (dev-
   # orchestrator, conductor, planning-core, validator, skill-creator, consolidator — la même liste
   # que le garde-fou bash ci-dessous). La garde reste pleine pour TOUTE AUTRE résolution
-  # $(dirname "$0")/… : seule la ligne dont la substring EXACTE est
-  # `$(dirname "$0")/runtime-cli-dispatch.sh` est exemptée (ancre littérale -F sur la substring
-  # complète, pas un simple test de présence de `runtime-cli-dispatch.sh` n'importe où sur la
-  # ligne — une résolution cross-module déguisée sous le même nom de fichier, ex.
-  # `$(dirname "$0")/../conductor/scripts/runtime-cli-dispatch.sh`, reste détectée).
+  # $(dirname "$0")/… : seule l'OCCURRENCE dont la substring EXACTE est
+  # `$(dirname "$0")/runtime-cli-dispatch.sh` est exemptée.
+  #
+  # Durcissement (revue lot 3, 38-04) : le filtre raisonne désormais à l'OCCURRENCE, jamais à la
+  # LIGNE PHYSIQUE. Deux trous successifs sur la même garde :
+  #   1. filtre sur la substring `runtime-cli-dispatch.sh` n'importe où sur la ligne → une
+  #      résolution cross-module déguisée sous le même basename passait (fixtures mutant_a/b
+  #      ci-dessous) ;
+  #   2. resserré à la ligne exacte via `grep -F … | grep -vF '<ligne exacte>'` → mais ce filtre
+  #      opère sur la LIGNE ENTIÈRE : une ligne portant À LA FOIS la résolution légitime ET une
+  #      illégitime (ex. `c="$(dirname "$0")/runtime-cli-dispatch.sh"; d="$(dirname "$0")/../foo"`)
+  #      contient la substring légitime quelque part → toute la ligne est retirée par `-vF`, y
+  #      compris l'occurrence illégitime qu'elle porte aussi. Zéro hit, silencieusement.
+  # Le correctif extrait chaque résolution `$(dirname "$0")/…` sur sa PROPRE ligne de sortie
+  # (`grep -oE`), puis filtre CHAQUE occurrence individuellement contre l'exemption : une ligne à
+  # N résolutions produit N décisions indépendantes, plus aucune ne peut en couvrir une autre.
   # ---------------------------------------------------------------------------
+  T9E_LEGIT='$(dirname "$0")/runtime-cli-dispatch.sh'
+  # t9e_dirname_hits_new : logique EN VIGUEUR pour la garde réelle ci-dessous ET pour la preuve
+  # générative — raisonnement à l'occurrence (grep -oE isole chaque résolution sur sa propre
+  # ligne avant le filtre d'exemption).
+  t9e_dirname_hits_new() {
+    "$GREP" -oE '\$\(dirname "\$0"\)/[^"[:space:];]*' | "$GREP" -vF "$T9E_LEGIT" || true
+  }
+  # t9e_dirname_hits_old : ancienne logique (trou #2 ci-dessus) — décision à la LIGNE PHYSIQUE
+  # entière. Conservée UNIQUEMENT pour la comparaison avant/après de la preuve générative
+  # (T9e-gen), jamais utilisée par la garde réelle.
+  t9e_dirname_hits_old() {
+    "$GREP" -F '$(dirname "$0")' | "$GREP" -vF "$T9E_LEGIT" || true
+  }
+  # t9e_count_lines : nombre de lignes non vides sur stdin (0 si vide), sans faire échouer le set -o
+  # pipefail du script quand le compte est 0 (grep -c retourne rc=1 dans ce cas).
+  t9e_count_lines() {
+    local _n
+    _n="$("$GREP" -c '.' 2>/dev/null || true)"
+    printf '%s' "${_n:-0}"
+  }
+
   t9e_ok=1
   EDD_STRIPPED="$("$GREP" -v '^[[:space:]]*#' "$EDD")"
   echo "$EDD_STRIPPED" | "$GREP" -qE '(^|[^A-Za-z0-9_])source[[:space:]]' && { ko "T9e autonomie : 'source' détecté (appel, pas une mention) dans ensure-design-deps.sh"; t9e_ok=0; }
   echo "$EDD_STRIPPED" | "$GREP" -qE '^[[:space:]]*\.[[:space:]]' && { ko "T9e autonomie : dot-source ('. ') détecté dans ensure-design-deps.sh"; t9e_ok=0; }
   echo "$EDD_STRIPPED" | "$GREP" -qE 'bash[[:space:]]+.*(dev-orchestrator|conductor|planning-core|validator|skill-creator|consolidator)/' && { ko "T9e autonomie : invocation bash d'un script d'un autre module détectée"; t9e_ok=0; }
-  DIRNAME_HITS="$(echo "$EDD_STRIPPED" | "$GREP" -F '$(dirname "$0")' | "$GREP" -vF '$(dirname "$0")/runtime-cli-dispatch.sh' || true)"
+  DIRNAME_HITS="$(echo "$EDD_STRIPPED" | t9e_dirname_hits_new)"
   [ -n "$DIRNAME_HITS" ] \
     && { ko "T9e autonomie : résolution \$(dirname \"\$0\")/ détectée hors de l'exception runtime-cli-dispatch.sh (motif croisé du bootstrap de dev)"; t9e_ok=0; }
 
@@ -440,7 +472,7 @@ SH
   t9e_mut_ok=1
   for _t9e_case in mutant_a mutant_b legit; do
     _t9e_stripped="$("$GREP" -v '^[[:space:]]*#' "$T9E_MUT_DIR/$_t9e_case.sh")"
-    _t9e_hits="$(echo "$_t9e_stripped" | "$GREP" -F '$(dirname "$0")' | "$GREP" -vF '$(dirname "$0")/runtime-cli-dispatch.sh' || true)"
+    _t9e_hits="$(echo "$_t9e_stripped" | t9e_dirname_hits_new)"
     case "$_t9e_case" in
       mutant_a|mutant_b)
         [ -z "$_t9e_hits" ] && { ko "T9e mutation $_t9e_case : devait être détecté (hit attendu), ne l'a pas été"; t9e_mut_ok=0; }
@@ -452,6 +484,129 @@ SH
   done
   rm -rf "$T9E_MUT_DIR"
   [ "$t9e_mut_ok" -eq 1 ] && ok "T9e mutation : cross-module déguisé + dirname non lié détectés, ligne légitime exemptée reste verte"
+
+  # ---------------------------------------------------------------------------
+  # T9e-gen — PREUVE GÉNÉRATIVE (revue lot 3, 38-04) : les 3 mutants ci-dessus ferment chacun EXACTEMENT
+  # le cas nommé par une revue précédente et laissent vivre son voisin immédiat — c'est le motif du
+  # point-fix. Cette preuve ne nomme aucun cas : elle construit le PRODUIT CARTÉSIEN des axes de
+  # variation identifiés (nature légitime/illégitime, nombre d'occurrences par ligne physique et leur
+  # ordre, mot-clé d'invocation avec/sans, occurrences sur la même ligne vs des lignes distinctes,
+  # présence de commentaires) et vérifie que t9e_dirname_hits_new retombe EXACTEMENT sur le compte
+  # d'occurrences illégitimes attendu — pour CHAQUE combinaison, sans exception nommée.
+  #
+  # Groupe 1 — une occurrence par ligne : nature(2) × forme d'invocation(5) × commentaire(2) = 20.
+  # Groupe 2 — deux occurrences sur la MÊME ligne, les deux ordres : paire de natures(4) × paire de
+  #            formes(2×2) × commentaire(2) = 32. C'est ce groupe qui reproduit le trou #2 : sous
+  #            l'ancienne logique (t9e_dirname_hits_old), une ligne "légitime ; illégitime" ou
+  #            "illégitime ; légitime" est retirée EN ENTIER parce qu'elle contient la substring
+  #            légitime quelque part — l'occurrence illégitime qu'elle porte aussi disparaît avec.
+  # Groupe 3 — les deux occurrences sur des lignes DISTINCTES (contrôle : aucune divergence attendue
+  #            entre ancienne et nouvelle logique) : paire de natures(4) × bruit de commentaire
+  #            interposé(2) = 8.
+  # Total = 60 combinaisons générées.
+  # ---------------------------------------------------------------------------
+  T9E_GEN_LEGIT_TOK="$T9E_LEGIT"
+  T9E_GEN_ILLEGIT_TOK='$(dirname "$0")/../conductor/scripts/runtime-cli-dispatch.sh'
+
+  t9e_gen_render() {
+    # $1=forme, $2=token de résolution $(dirname "$0")/...
+    case "$1" in
+      bare_quoted)   printf 'c="%s"' "$2" ;;
+      bare_unquoted) printf 'c=%s' "$2" ;;
+      bash)          printf 'bash %s "$@"' "$2" ;;
+      source)        printf 'source %s' "$2" ;;
+      direct_quote)  printf '"%s"' "$2" ;;
+    esac
+  }
+
+  t9e_gen_total=0
+  t9e_gen_red_before=0
+  t9e_gen_red_after=0
+
+  # $1=texte brut (une ou plusieurs lignes, AVANT filtrage des commentaires) $2=occurrences illégitimes attendues
+  t9e_gen_run_case() {
+    t9e_gen_total=$((t9e_gen_total + 1))
+    local _raw="$1" _expected="$2" _stripped _new_n _old_n _should_flag _old_flag
+    _stripped="$("$GREP" -v '^[[:space:]]*#' <<EOF2 || true
+$_raw
+EOF2
+)"
+    _new_n="$(printf '%s\n' "$_stripped" | t9e_dirname_hits_new | t9e_count_lines)"
+    _old_n="$(printf '%s\n' "$_stripped" | t9e_dirname_hits_old | t9e_count_lines)"
+    if [ "$_new_n" -ne "$_expected" ]; then
+      t9e_gen_red_after=$((t9e_gen_red_after + 1))
+      ko "T9e-gen cas #$t9e_gen_total : occurrences attendues=$_expected, obtenues=$_new_n (logique CORRIGÉE) — texte: $_raw"
+    fi
+    _should_flag=0; [ "$_expected" -gt 0 ] && _should_flag=1
+    _old_flag=0; [ "$_old_n" -gt 0 ] && _old_flag=1
+    [ "$_should_flag" -eq 1 ] && [ "$_old_flag" -eq 0 ] && t9e_gen_red_before=$((t9e_gen_red_before + 1))
+  }
+
+  # --- Groupe 1 : une occurrence par ligne ---
+  for _t9e_kind in legit illegit; do
+    if [ "$_t9e_kind" = legit ]; then _t9e_tok="$T9E_GEN_LEGIT_TOK"; _t9e_exp1=0; else _t9e_tok="$T9E_GEN_ILLEGIT_TOK"; _t9e_exp1=1; fi
+    for _t9e_form in bare_quoted bare_unquoted bash source direct_quote; do
+      _t9e_line="$(t9e_gen_render "$_t9e_form" "$_t9e_tok")"
+      for _t9e_comment in no yes; do
+        if [ "$_t9e_comment" = yes ]; then
+          t9e_gen_run_case "# $_t9e_line" 0
+        else
+          t9e_gen_run_case "$_t9e_line" "$_t9e_exp1"
+        fi
+      done
+    done
+  done
+
+  # --- Groupe 2 : deux occurrences sur la même ligne, les deux ordres ---
+  for _t9e_k1 in legit illegit; do
+    for _t9e_k2 in legit illegit; do
+      if [ "$_t9e_k1" = legit ]; then _t9e_tok1="$T9E_GEN_LEGIT_TOK"; _t9e_e1=0; else _t9e_tok1="$T9E_GEN_ILLEGIT_TOK"; _t9e_e1=1; fi
+      if [ "$_t9e_k2" = legit ]; then _t9e_tok2="$T9E_GEN_LEGIT_TOK"; _t9e_e2=0; else _t9e_tok2="$T9E_GEN_ILLEGIT_TOK"; _t9e_e2=1; fi
+      _t9e_exp2=$((_t9e_e1 + _t9e_e2))
+      for _t9e_form1 in bare_quoted bash; do
+        for _t9e_form2 in bare_quoted bash; do
+          _t9e_seg1="$(t9e_gen_render "$_t9e_form1" "$_t9e_tok1")"
+          _t9e_seg2="$(t9e_gen_render "$_t9e_form2" "$_t9e_tok2")"
+          _t9e_line="$_t9e_seg1; $_t9e_seg2"
+          for _t9e_comment in no yes; do
+            if [ "$_t9e_comment" = yes ]; then
+              t9e_gen_run_case "# $_t9e_line" 0
+            else
+              t9e_gen_run_case "$_t9e_line" "$_t9e_exp2"
+            fi
+          done
+        done
+      done
+    done
+  done
+
+  # --- Groupe 3 : occurrences sur deux lignes distinctes (contrôle, pas de divergence attendue) ---
+  for _t9e_k1 in legit illegit; do
+    for _t9e_k2 in legit illegit; do
+      if [ "$_t9e_k1" = legit ]; then _t9e_tok1="$T9E_GEN_LEGIT_TOK"; _t9e_e1=0; else _t9e_tok1="$T9E_GEN_ILLEGIT_TOK"; _t9e_e1=1; fi
+      if [ "$_t9e_k2" = legit ]; then _t9e_tok2="$T9E_GEN_LEGIT_TOK"; _t9e_e2=0; else _t9e_tok2="$T9E_GEN_ILLEGIT_TOK"; _t9e_e2=1; fi
+      _t9e_exp3=$((_t9e_e1 + _t9e_e2))
+      _t9e_line1="$(t9e_gen_render bare_quoted "$_t9e_tok1")"
+      _t9e_line2="$(t9e_gen_render bare_quoted "$_t9e_tok2")"
+      for _t9e_comment in no yes; do
+        if [ "$_t9e_comment" = yes ]; then
+          _t9e_block="$_t9e_line1"$'\n''# bruit '"$T9E_GEN_ILLEGIT_TOK"$'\n'"$_t9e_line2"
+        else
+          _t9e_block="$_t9e_line1"$'\n'"$_t9e_line2"
+        fi
+        t9e_gen_run_case "$_t9e_block" "$_t9e_exp3"
+      done
+    done
+  done
+
+  if [ "$t9e_gen_red_after" -eq 0 ]; then
+    ok "T9e-gen preuve générative : $t9e_gen_total combinaisons (produit cartésien nature×occurrences×ordre×invocation×lignes×commentaires), $t9e_gen_red_before rouge(s) sous l'ancienne logique ligne-à-ligne, 0 rouge sous la logique corrigée occurrence-à-occurrence"
+  else
+    ko "T9e-gen preuve générative : $t9e_gen_red_after/$t9e_gen_total combinaison(s) encore rouge(s) sous la logique corrigée"
+  fi
+
+  unset -f t9e_dirname_hits_new t9e_dirname_hits_old t9e_count_lines t9e_gen_render t9e_gen_run_case
+
   MJ="$MOD/module.json"
   req_list="$(sed -n '/"requires"/,/\]/p' "$MJ" 2>/dev/null | "$GREP" -o '"[A-Za-z0-9_-]*"' | "$GREP" -v '"requires"' | tr -d '"')"
   [ "$req_list" = "conductor" ] || { ko "T9e module.json : requires attendu ['conductor'] seul, obtenu: ${req_list:-<vide>}"; t9e_ok=0; }
@@ -613,7 +768,6 @@ SH
       chmod +x "$T9H_BIN/$_t9h_rt"
     done
 
-    T9H_OK=1
     for _t9h_rt in claude codex; do
       : >"$T9H_JOURNAL"
       PATH="$T9H_BIN:/usr/bin:/bin" VF_RUNTIME="$_t9h_rt" bash "$T9H_DIR/ensure-design-deps.sh" >/dev/null 2>&1
@@ -621,7 +775,6 @@ SH
         ok "T9h dispatch réel : VF_RUNTIME=$_t9h_rt -> \`$_t9h_rt plugin install superpowers@claude-plugins-official --scope user\` capturé depuis une exécution réelle"
       else
         ko "T9h dispatch réel : VF_RUNTIME=$_t9h_rt attendu dans le journal, obtenu : $(cat "$T9H_JOURNAL")"
-        T9H_OK=0
       fi
     done
 
@@ -634,7 +787,6 @@ SH
     PATH="$T9H_BIN:/usr/bin:/bin" VF_RUNTIME=codex bash "$T9H_DIR/ensure-design-deps.sh" >/dev/null 2>&1
     if "$GREP" -qF "codex plugin install" "$T9H_JOURNAL"; then
       ko "T9h non-régression : sans runtime-cli-dispatch.sh à côté, 'codex' a quand même été invoqué — le test ne prouve plus le chemin dispatch"
-      T9H_OK=0
     else
       ok "T9h non-régression : sans runtime-cli-dispatch.sh à côté, repli sur la branche 'claude' figée (le chemin dispatch n'est PAS exercé par erreur)"
     fi
