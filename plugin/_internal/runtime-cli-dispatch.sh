@@ -128,8 +128,16 @@ ensure_codex_preconditions() {
 
   # 2) trust_level — DÉCLARÉ, jamais auto-écrit (ADR-031). Aucune commande `codex trust`/`codex
   #    config set` n'existe sur ce binaire (mesuré) — la seule opération licite ici est la LECTURE.
+  #    Résolution de racine ALIGNÉE avec plugin/conductor/scripts/check-artifact-fidelity.sh
+  #    (TARGET_ROOT) : jamais de repli sur `pwd` hors dépôt git — un repli plus permissif ferait
+  #    sonder aux deux gardes deux racines différentes pour le même fait (revue de jointure
+  #    Phase 38, join-1). Si l'autre fichier change sa résolution, réplique ici.
   local repo_root codex_home cfg
-  repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+  repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  if [ -z "$repo_root" ]; then
+    echo "[runtime-cli-dispatch] Codex : trust_level non mesurable (racine du dépôt cible introuvable — hors dépôt git)." >&2
+    return 0
+  fi
   codex_home="${CODEX_HOME:-$HOME/.codex}"
   cfg="$codex_home/config.toml"
   if [ -f "$cfg" ] && grep -qF "[projects.\"$repo_root\"]" "$cfg" 2>/dev/null; then

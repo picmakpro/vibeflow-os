@@ -14,6 +14,12 @@
 #        que T3 (dégradation déclarée, pas un crash).
 #   T5..T7 — précondition Codex (RUNT-01 étendu, tâche 3) : multi_agent_v2 posé si inactif,
 #        idempotent si déjà actif, trust_level jamais auto-écrit (config.toml byte-identique).
+#   T8 — ALIGNEMENT avec check-artifact-fidelity.sh (revue de jointure Phase 38, join-1) : hors
+#        dépôt git, repo_root ne doit JAMAIS retomber sur `pwd` — sinon un bloc [projects."<pwd>"]
+#        de sonde serait lu comme légitime alors qu'il ne décrit RIEN de réel. Discriminant : si un
+#        futur repli sur `pwd` était réintroduit, ce test resterait silencieusement vert-par-erreur
+#        (bloc trouvé, trust_level=trusted, aucun message) — on vérifie donc l'ABSENCE de repli en
+#        exigeant le message "non mesurable", jamais un succès silencieux.
 #
 # Convention : asserts numérotés, helpers ok()/ko()/skip(), isolation mktemp -d + trap, exit 0
 # si tout passe (SKIP non bloquant), exit 1 si au moins un KO.
@@ -196,6 +202,44 @@ if [ "$SUM_BEFORE" = "$SUM_AFTER" ] && printf '%s' "$OUT7" | grep -qi 'trust_lev
   ok "T7 : trust_level absent → config.toml byte-identique (sha256 avant=après) + message de déclaration"
 else
   ko "T7 : écriture suspectée ou message absent (before=$SUM_BEFORE after=$SUM_AFTER out='$OUT7')"
+fi
+
+# ---------------------------------------------------------------------------
+# T8 — ALIGNEMENT check-artifact-fidelity.sh : hors dépôt git, repo_root ne retombe JAMAIS sur
+# `pwd`. Sonde piégée : bloc [projects."<pwd du NONGIT>"] trusted — si le code retombait sur
+# `pwd`, ce bloc matcherait et le script resterait silencieux (aucun message). Le code aligné
+# doit court-circuiter AVANT la lecture de config.toml et annoncer "non mesurable".
+# ---------------------------------------------------------------------------
+NONGIT="$WORKDIR/nongit-probe"
+mkdir -p "$NONGIT"
+if (cd "$NONGIT" && git rev-parse --show-toplevel >/dev/null 2>&1); then
+  skip "T8 : $NONGIT se trouve être sous contrôle git sur ce poste — impossible de sonder le cas hors dépôt"
+else
+  FIX8="$WORKDIR/fix8"
+  mkdir -p "$FIX8"
+  cat > "$FIX8/codex" <<EOF
+#!/usr/bin/env bash
+if [ "\$1" = "features" ] && [ "\$2" = "list" ]; then
+  echo "multi_agent_v2                           stable             true"
+  exit 0
+fi
+exit 0
+EOF
+  chmod +x "$FIX8/codex"
+  CODEX_HOME8="$WORKDIR/codex-home-8"
+  mkdir -p "$CODEX_HOME8"
+  {
+    echo "[projects.\"$NONGIT\"]"
+    echo 'trust_level = "trusted"'
+  } > "$CODEX_HOME8/config.toml"
+
+  OUT8="$(cd "$NONGIT" && PATH="$FIX8:$PATH" VF_RUNTIME=codex CODEX_HOME="$CODEX_HOME8" bash "$DISPATCH" ensure-codex-preconditions 2>&1)"
+  EXIT8=$?
+  if [ "$EXIT8" -eq 0 ] && printf '%s' "$OUT8" | grep -qi 'non mesurable'; then
+    ok "T8 : hors dépôt git → 'non mesurable' déclaré (jamais un repli sur pwd qui matcherait un bloc de sonde piégé)"
+  else
+    ko "T8 : repli sur pwd suspecté — attendu message 'non mesurable', obtenu exit=$EXIT8 sortie='$OUT8' (bloc de sonde [projects.\"$NONGIT\"] trusted aurait matché silencieusement)"
+  fi
 fi
 
 # ---------------------------------------------------------------------------

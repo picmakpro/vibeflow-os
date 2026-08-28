@@ -225,6 +225,10 @@ if command -v codex >/dev/null 2>&1; then
 fi
 
 TRUST_LEVEL="absent (non trusted)"
+# Résolution de racine ALIGNÉE avec plugin/_internal/runtime-cli-dispatch.sh
+# (ensure_codex_preconditions, repo_root) : même absence de repli sur `pwd` hors dépôt git — un
+# repli divergent ferait sonder aux deux gardes deux racines différentes pour le même fait
+# (revue de jointure Phase 38, join-1). Si l'autre fichier change sa résolution, réplique ici.
 TARGET_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 if [ -z "$TARGET_ROOT" ]; then
   TRUST_LEVEL="non mesurable (racine du dépôt cible introuvable)"
