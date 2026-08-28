@@ -67,7 +67,7 @@ if [ -z "$ARTIFACT" ]; then
 fi
 
 if [ "$TARGET" != "codex" ]; then
-  echo "[check-artifact-fidelity] cible '$TARGET' : non mesuré sur ce poste (seule --target codex est mesurée au 2026-08-28)"
+  echo "[check-artifact-fidelity] cible '$TARGET' : non mesuré sur ce poste (seule --target codex est mesurée au 2026-08-28)" >&2
   exit 3
 fi
 
@@ -199,10 +199,12 @@ fi
 
 # --- Marqueurs morts : comptés sur le CORPS (hors frontmatter) des deux versions. ---
 count_markers() {
+  # grep -o compte les OCCURRENCES (une ligne peut porter deux marqueurs) — grep -c compterait
+  # cette ligne une seule fois et sous-déclarerait DEAD_MARKERS.
   local body="$1"
   local n_claude n_task
-  n_claude=$(printf '%s' "$body" | grep -c '\.claude/' || true)
-  n_task=$(printf '%s' "$body" | grep -c 'Task(' || true)
+  n_claude=$(printf '%s' "$body" | grep -o '\.claude/' | wc -l | tr -d ' ')
+  n_task=$(printf '%s' "$body" | grep -o 'Task(' | wc -l | tr -d ' ')
   echo $((n_claude + n_task))
 }
 SRC_MARKERS=$(count_markers "$SRC_BODY")
@@ -256,7 +258,6 @@ if [ "$JSON_MODE" -eq 0 ]; then
 fi
 
 if [ "$JSON_MODE" -eq 1 ]; then
-  JSON_ARGS_FILE="$TMPDIR_GATE/json-args.json"
   node -e '
 const fs = require("fs");
 const [artifact, target, preserved, degraded, lost, deadMarkers, multiAgentV2, trustLevel] = process.argv.slice(1);

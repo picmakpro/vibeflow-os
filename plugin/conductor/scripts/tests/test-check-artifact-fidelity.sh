@@ -140,19 +140,26 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# T4 — cible inconnue → exit 3, message "non mesuré".
+# T4 — cible inconnue → exit 3, stdout VIDE (contrat de l'en-tête, l. 22-28), message
+# "non mesuré" sur stderr (jamais stdout : un consommateur de stdout ne doit rien voir).
 # ---------------------------------------------------------------------------
-T4_OUT="$(cd "$REPO" && bash "$GATE" --target opencode "$FIXTURE" 2>/dev/null)"
+T4_OUT="$(cd "$REPO" && bash "$GATE" --target opencode "$FIXTURE" 2>"$WORK/t4.err")"
 T4_RC=$?
+T4_ERR="$(cat "$WORK/t4.err" 2>/dev/null)"
 if [ "$T4_RC" -eq 3 ]; then
   ok "T4.rc : cible inconnue → exit 3"
 else
   ko "T4.rc : attendu exit 3, obtenu $T4_RC"
 fi
-if printf '%s' "$T4_OUT" | grep -q "non mesuré"; then
-  ok "T4.message : 'non mesuré' présent"
+if [ -z "$T4_OUT" ]; then
+  ok "T4.stdout : vide (contrat de l'en-tête)"
 else
-  ko "T4.message : 'non mesuré' absent ('$T4_OUT')"
+  ko "T4.stdout : non vide ('$T4_OUT')"
+fi
+if printf '%s' "$T4_ERR" | grep -q "non mesuré"; then
+  ok "T4.stderr : 'non mesuré' présent sur stderr"
+else
+  ko "T4.stderr : 'non mesuré' absent ('$T4_ERR')"
 fi
 
 # ---------------------------------------------------------------------------
@@ -200,6 +207,25 @@ if [ -n "$RECETTE_LINE_NO" ] && [ -n "$FIDELITY_LINE_NO" ] && [ "$RECETTE_LINE_N
   ok "T6.ordre : [fidelity-recette] précède [fidelity] dans le flux capturé"
 else
   ko "T6.ordre : ordre inattendu (recette=$RECETTE_LINE_NO, fidelity=$FIDELITY_LINE_NO, sortie='$T6_OUT')"
+fi
+
+# ---------------------------------------------------------------------------
+# T7 — count_markers() compte des OCCURRENCES, pas des lignes : une ligne portant DEUX
+# marqueurs (deux `.claude/`) doit valoir 2, pas 1 (défaut : `grep -c` compterait la ligne
+# une seule fois). Fonction extraite du gate lui-même (jamais recopiée à la main) et exécutée
+# isolément — la sonde décisive est la ligne à deux occurrences.
+# ---------------------------------------------------------------------------
+COUNT_MARKERS_SRC="$(sed -n '/^count_markers() {/,/^}/p' "$GATE")"
+if [ -z "$COUNT_MARKERS_SRC" ]; then
+  ko "T7 : count_markers() introuvable dans $GATE (extraction vide)"
+else
+  T7_RESULT="$(bash -c "$COUNT_MARKERS_SRC"'
+count_markers "Voir .claude/agents/foo.md et aussi .claude/skills/bar pour Task( details"')"
+  if [ "$T7_RESULT" -eq 3 ]; then
+    ok "T7 : ligne à 2x '.claude/' + 1x 'Task(' → 3 occurrences (pas 2 lignes)"
+  else
+    ko "T7 : attendu 3 occurrences sur la ligne à marqueurs multiples, obtenu '$T7_RESULT'"
+  fi
 fi
 
 # ---------------------------------------------------------------------------
