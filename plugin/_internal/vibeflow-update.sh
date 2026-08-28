@@ -1115,6 +1115,14 @@ merge_module_hooks() {
       bash "$merger" plan "$fragment" --settings "$TARGET_ROOT/settings.json" \
         --scripts-prefix "$(scripts_prefix_for_scope)" || plan_rc=$?
     fi
+    # Correction ciblée (Phase 38, T6/TD1) : miroir dry-run de la persistance du fragment
+    # ci-dessous (verbe +, D-31-01) — sans cette annonce, TD1 (égalité dry-run == pose réelle)
+    # rougissait sur ce chemin, jamais prédit par le plan alors que la pose réelle le crée dès
+    # que le merge réussit. Même garde que la pose réelle : seulement si le plan de merge
+    # réussirait (plan_rc=0), jamais un chemin annoncé pour un merge qui échouerait.
+    if [ "$plan_rc" -eq 0 ]; then
+      vf_declare_write + "$TARGET_ROOT/.vibeflow-fragments/$mod.json"
+    fi
     return "$plan_rc"
   fi
   # Backup du settings avant toute écriture.
@@ -1151,16 +1159,26 @@ merge_module_hooks() {
   fi
   if [ "$merge_rc" -eq 0 ]; then
     log "  hooks mergés → $TARGET_ROOT/settings.json"
-    # D-38-J (correction ciblée post-ROLL) : persiste le fragment RÉELLEMENT mergé, PAR MODULE,
-    # sous TARGET_ROOT — raw cp intentionnel (patron du settings_backup ci-dessus, état interne
-    # du moteur, jamais un artefact de pose). C'est l'unique source de vérité de ce qui est
-    # VRAIMENT dans settings.json à cet instant : $CACHE_DIR n'est JAMAIS rafraîchi PAR CE SCRIPT
-    # — c'est l'appelant (/vibeflow-install) qui le pré-remplit AVANT chaque install_module, donc
-    # AVANT backup_module lui-même. Sans cette persistance par-module, backup_module lisait le
-    # fragment du cache COURANT (déjà en v2 au moment du backup de v1→v2) et le rollback des
-    # hooks était un no-op silencieux — le trou de rollback que ce lot ferme.
-    mkdir -p "$TARGET_ROOT/.vibeflow-fragments"
-    cp "$fragment" "$TARGET_ROOT/.vibeflow-fragments/$mod.json"
+    # D-38-J (correction ciblée post-ROLL), révisé Phase 38 (T6/TD1 + D-31-16) : persiste le
+    # fragment RÉELLEMENT mergé, PAR MODULE, sous TARGET_ROOT. C'est l'unique source de vérité de
+    # ce qui est VRAIMENT dans settings.json à cet instant : $CACHE_DIR n'est JAMAIS rafraîchi PAR
+    # CE SCRIPT — c'est l'appelant (/vibeflow-install) qui le pré-remplit AVANT chaque
+    # install_module, donc AVANT backup_module lui-même. Sans cette persistance par-module,
+    # backup_module lisait le fragment du cache COURANT (déjà en v2 au moment du backup de v1→v2)
+    # et le rollback des hooks était un no-op silencieux — le trou de rollback que ce lot ferme.
+    #
+    # `vf_place_file` remplace le `cp` brut d'origine (revue Phase 38) : CE fragment n'a PAS la
+    # même nature que le backup de settings.json ci-dessus (état interne du moteur, filet de
+    # sécurité qui ne doit jamais être supprimé automatiquement, D-31-03 l'exclut à dessein) — il
+    # est un état PAR MODULE qui doit mourir AVEC le module. Le poser en `cp` brut le rendait
+    # invisible au manifeste (T6 rougissait : présent sur disque, absent du manifeste) et donc
+    # ORPHELIN à `uninstall` (aucun site de désinstallation ne le retirait, D-31-16 violé en
+    # silence). Router par `vf_place_file` en fait un artefact de pose comme un autre : consigné
+    # dans le manifeste PAR le même appel qui écrit (D-31-01), donc retiré naturellement par
+    # `_vf_uninstall_from_manifest` à la désinstallation, et prédit par le dry-run (miroir
+    # ci-dessus) — sans toucher à la liste close d'exclusions D-31-03, qui n'a pas vocation à
+    # couvrir cet artefact.
+    vf_place_file "$fragment" "$TARGET_ROOT/.vibeflow-fragments/$mod.json"
   else
     log "  ERROR: merge hooks ÉCHOUÉ pour $mod — gouvernance NON câblée (corriger settings.json puis réinstaller)"
     return 1  # VG-3 : l'échec se propage (plus de succès silencieux sans gouvernance)
