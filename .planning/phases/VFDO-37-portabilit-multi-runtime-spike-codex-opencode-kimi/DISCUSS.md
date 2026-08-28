@@ -16,7 +16,7 @@ constat, question par question, ce qu'il implique, et ce qui reste ouvert.
 
 | | |
 |---|---|
-| **Réponse mesurée** | 31 agents posés (25 `plugin/*/agents/*.md` + 6 `AGENT.md`), 3 619 lignes, dont 19 `vf-internal: true` et 8 avec allowlist `Agent(...)`. 6 fragments `hooks.json`. 3 fichiers de packaging. 8 scripts sur 65 couplés au bus de hooks. |
+| **Réponse mesurée** | 31 agents posés (25 `plugin/*/agents/*.md` + 6 `AGENT.md`), 3 619 lignes, dont 19 `vf-internal: true` et **9** avec allowlist `Agent(...)`. 6 fragments `hooks.json`. 3 fichiers de packaging. 8 scripts sur 65 couplés au bus de hooks. |
 | **Preuve** | Comptage direct sur l'arbre `plugin/`. |
 | **Conséquence** | Le périmètre spécifique VibeFlow est petit et localisé (agents + hooks + packaging) — 57 scripts, 8 748 lignes de references et 24 blueprints sont neutres, donc portables sans adaptation. |
 
@@ -51,7 +51,7 @@ constat, question par question, ce qu'il implique, et ce qui reste ouvert.
 |---|---|
 | **Réponse mesurée** | N'existe nulle part dans VibeFlow : les 17 `module.json` ne portent que `{name, version, type, description, requires}` (+ `mandatory`, `proposable`). `grep skills-only` et `grep unsupported` → 0 hit. `type` est un faux ami (prose libre, 12 formes pour 17 modules). gsd-core porte déjà un modèle à 9 axes, 6 points d'interface, 3 profils et `degradationFor(point, axes)`. |
 | **Preuve** | Grep exhaustif sur les 17 `module.json` + lecture du modèle de capacité gsd-core. |
-| **Conséquence** | Un enum maison `full\|skills-only\|unsupported` réimplémenterait, en le dégradant, ce que le moteur calcule déjà — interdit par la doctrine de la phase. **Mais** le registre gsd-core a été pris en défaut 3 fois sur Codex dans cette seule mission (`backgroundDispatch` inversé, descripteur `kimi-code` périmé, `maxDepth: 1` faux) : bonne **source**, jamais une **preuve** — toute dépendance dessus doit prévoir une vérification runtime, pas une lecture statique du registre. |
+| **Conséquence** | Un enum maison `full\|skills-only\|unsupported` réimplémenterait, en le dégradant, ce que le moteur calcule déjà — interdit par la doctrine de la phase. **Mais** cette seule mission a produit 3 constats de non-fiabilité autour des descripteurs Codex, de nature différente : `maxDepth: 1` **faux, erreur du registre vérifiée en exécution** ; `backgroundDispatch` — le registre avait raison (`codex: true`), c'est la **lecture du cadrage** qui l'avait inversé ; descripteur `kimi-code` **périmé**, constat par lecture documentaire, **jamais vérifié en runtime** (kimi-code non installé). Bonne **source**, jamais une **preuve** — toute dépendance dessus doit prévoir une vérification runtime, pas une lecture statique du registre. |
 
 ## Q6 — `vibeflow-update.sh`
 
@@ -59,7 +59,7 @@ constat, question par question, ce qu'il implique, et ce qui reste ouvert.
 |---|---|
 | **Réponse mesurée** | 2 232 lignes. `TARGET_ROOT` a un seul site de calcul (l. 105-109), jamais réassigné. `VF_TARGET_ROOT` est déjà la convention côté `generate-agent-commands.sh` (l. 23) mais l'engine ne la lit pas. |
 | **Preuve** | Lecture directe des deux scripts, grep des littéraux `.claude`. |
-| **Conséquence** | Couture minimale : rendre le site de calcul injectable + paramétrer 15 littéraux `.claude` (13 dans `gitignore_add_paths`, 2 dans `scripts_prefix_for_scope`). Le reste se fait hors engine, via `merge-hooks.sh` (déjà externe, CLI stable) et les 2 helpers `vf_place_file`/`vf_place_tree`. **Ne pas** ajouter un `--target` orthogonal à `--scope` : recouvrement fonctionnel, réécriture d'`install_module` à la clé — hors budget du spike. |
+| **Conséquence** | Couture minimale : rendre le site de calcul injectable + paramétrer les littéraux `.claude` — **16 sites, 15 littéraux distincts** (14 dans `gitignore_add_paths`, 2 dans `scripts_prefix_for_scope` ; `.claude/agents/${mod}-references/` apparaît deux fois, d'où l'écart site/littéral). Le reste se fait hors engine, via `merge-hooks.sh` (déjà externe, CLI stable) et les 2 helpers `vf_place_file`/`vf_place_tree`. **Ne pas** ajouter un `--target` orthogonal à `--scope` : recouvrement fonctionnel, réécriture d'`install_module` à la clé — hors budget du spike. |
 
 ## Fidélité de conversion — la dégradation silencieuse, chiffrée
 
@@ -68,16 +68,16 @@ diagnostic**. Pertes constatées :
 
 | Élément | Perte |
 |---|---|
-| `model:` | 31/31 sur codex et opencode |
-| `memory:` | 31/31 |
-| `tools:` | 25/25 |
-| `disallowedTools:` | 6/6 |
-| `vf-internal:` | 19/19 sur codex |
-| Allowlist `Agent(...)` | devient prose dans `<codex_agent_role>` sur codex ; purement supprimée sur opencode → un juge conçu pour ne pas écrire (`vf-design-judge`) y perd son interdiction |
+| `model:` | 31/31 **sur codex et opencode** (kimi-code copie les agents à l'octet près, cf. dernière ligne — le champ n'y est pas perdu) |
+| `memory:` | 31/31 **sur codex et opencode**, par le même raisonnement (byte-copy sur kimi-code) |
+| `tools:` | 25/25 **sur codex et opencode**, idem |
+| `disallowedTools:` | 6/6 **sur codex et opencode**, idem |
+| `vf-internal:` | 19/19 sur codex — dénominateur opencode/kimi-code non mesuré séparément |
+| Allowlist `Agent(...)` | devient prose dans `<codex_agent_role>` sur codex ; purement supprimée sur opencode → un juge conçu pour ne pas écrire (`vf-design-judge`) y perdrait son interdiction — **selon le descripteur opencode, non vérifié en runtime : opencode n'est pas installé sur le poste de mesure** |
 | Bloc adaptateur | couvre 21/21 skills et **0/31 agents** — or ce sont les agents qui portent les protocoles |
-| `Task(` | non traduit 4/4 partout |
-| Chemins `.claude` | morts : 46/52 sur opencode, 52/52 sur kimi-code |
-| Agents sur kimi-code | 31 copiés à l'octet près dans un runtime `namedDispatch: false` → 52 fichiers posés dont 31 inertes |
+| `Task(` | non traduit 4/4 partout — **non vérifié en runtime sur opencode/kimi-code, aucun des deux installé** |
+| Chemins `.claude` | morts : 46/52 sur opencode, 52/52 sur kimi-code — **dérivé du descripteur, non vérifié en runtime** |
+| Agents sur kimi-code | 31 copiés à l'octet près dans un runtime dont le descripteur porte `namedDispatch: false` → 52 fichiers posés, dont potentiellement 31 inertes **selon ce descripteur — que ce même document déclare par ailleurs périmé (cf. tableau de corrections ci-dessous) ; si kimi-code dispatche bien des sous-agents nommés custom comme sa doc courante le décrit, ces 31 agents ne sont pas inertes** |
 
 **Conséquence directe** : la garantie ADR-044 (« agents natifs machine-enforced ») ne survit à
 **aucune** des trois cibles mesurées.
@@ -105,9 +105,11 @@ utilisable (`buildCodexHookBlock` câblé en dur sur les scripts de gsd-core) ; 
 
 La doctrine de la phase (« VibeFlow consomme la surface gsd-core, il ne la réimplémente pas »)
 se heurte à trois faits mesurés : la surface visée est **déclarée interne** (Q1), son pipeline
-d'install **n'est pas générique** (Q1), et son registre de capacités s'est trompé **3 fois sur 3
-vérifications** dans cette seule mission (Q5). Pendant ce temps le runtime Codex, lui, est
-**plus capable que son descripteur** ne le dit (Q4 : profondeur réelle 3, pas 1).
+d'install **n'est pas générique** (Q1), et son registre de capacités s'est montré, sur cette seule
+mission, une source à vérifier avant usage — une erreur avérée en exécution (`maxDepth`), une
+mauvaise lecture du cadrage qui l'accusait à tort (`backgroundDispatch`), et une obsolescence
+documentaire jamais confrontée au runtime (`kimi-code`) (Q5). Pendant ce temps le runtime Codex,
+lui, est **plus capable que son descripteur** ne le dit (Q4 : profondeur réelle 3, pas 1).
 
 Voies possibles, coûts exposés, aucune tranchée ici :
 
