@@ -990,67 +990,114 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Garde REAL_GSD_HOME (T24/T25/T26, FIDE-02, hermétisme) — T24/T26 exercent
+# check-artifact-fidelity.sh via un install/update réel. Ce gate résout gsd-core par
+# default_gsd_home() : `git rev-parse --show-toplevel` depuis $LAB (un mktemp -d, jamais un
+# repo git) échoue puis retombe sur `pwd` ($LAB lui-même) — donc "$root/.claude/gsd-core"
+# n'existe jamais ici, et la cascade retombe TOUJOURS sur `${CLAUDE_CONFIG_DIR:-$HOME/.claude}
+# /gsd-core`. Contrairement à T1-T3 (plus haut dans ce fichier), T24/T26 ne posaient PAS
+# HOME="$FAKE_HOME" : le $HOME de l'appelant du test — le VRAI $HOME/.claude/gsd-core de la
+# machine — s'y glissait donc en silence. Ça passe ici et en CI (gsd-core y est posé), mais sur
+# un poste neuf sans gsd-core, T24/T26 rendraient un faux KO sans rapport avec une régression.
+# Repris du garde REAL_GSD_HOME de test-check-artifact-fidelity.sh (l. 37-44, même module) :
+# skip propre si gsd-core est introuvable, jamais un rouge de circonstance.
+# ---------------------------------------------------------------------------
+ACTUAL_REPO_ROOT="$(cd "$REPO/.." && pwd)"
+REAL_GSD_HOME=""
+if [ -d "$ACTUAL_REPO_ROOT/.claude/gsd-core" ]; then
+  REAL_GSD_HOME="$ACTUAL_REPO_ROOT/.claude/gsd-core"
+elif [ -f "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/gsd-core/VERSION" ]; then
+  REAL_GSD_HOME="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/gsd-core"
+fi
+
+# Prépare un HOME isolé sous $LAB avec gsd-core symlinké depuis REAL_GSD_HOME — jamais le vrai
+# $HOME de la machine. L'install lui-même reste project-scope (VF_SCOPE par défaut), donc rien
+# n'atterrit sous ce HOME isolé hormis la résolution de la cascade default_gsd_home().
+fide_isolated_home() {
+  local lab="$1" home
+  home="$lab/home_fide"
+  mkdir -p "$home/.claude"
+  ln -s "$REAL_GSD_HOME" "$home/.claude/gsd-core"
+  echo "$home"
+}
+
+# ---------------------------------------------------------------------------
 # T24 (FIDE-02) — install d'un module à agents/*.md avec conductor présent dans le cache : la
 # ligne `[fidelity]` doit apparaître VERBATIM sur le stdout de l'install (relayée telle quelle,
 # jamais résumée) — c'est toute la substance de FIDE-02 : le périmètre perdu à la conversion
 # est déclaré à la fin de la pose, pas dans un rapport séparé.
 # ---------------------------------------------------------------------------
-LAB="$(mktemp -d)"
-CACHE="$LAB/cache"
-if prepare_module "$CACHE" "content-bundle" && prepare_module "$CACHE" "conductor"; then
-  OUT=$(cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install content-bundle 2>&1)
-  miss=0
-  echo "$OUT" | "$GREP" -q '^\[fidelity\] ' \
-    || { ko "T24 (FIDE-02) : aucune ligne [fidelity] sur stdout de l'install (conductor présent au cache)"; miss=1; }
-  echo "$OUT" | "$GREP" -q '^\[fidelity-recette\] ' \
-    || { ko "T24 (FIDE-02) : aucune ligne [fidelity-recette] sur stdout de l'install"; miss=1; }
-  [ "$miss" -eq 0 ] && ok "T24 (FIDE-02) : bannière de fidélité verbatim sur stdout de l'install (content-bundle -> codex)"
+if [ -z "$REAL_GSD_HOME" ]; then
+  skip "T24 (FIDE-02) : gsd-core introuvable sur ce poste (hermétique — jamais un faux KO)"
 else
-  skip "T24 (FIDE-02) : content-bundle/conductor non copiables dans le cache de test"
+  LAB="$(mktemp -d)"
+  CACHE="$LAB/cache"
+  HOME_FIDE="$(fide_isolated_home "$LAB")"
+  if prepare_module "$CACHE" "content-bundle" && prepare_module "$CACHE" "conductor"; then
+    OUT=$(cd "$LAB" && HOME="$HOME_FIDE" VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install content-bundle 2>&1)
+    miss=0
+    echo "$OUT" | "$GREP" -q '^\[fidelity\] ' \
+      || { ko "T24 (FIDE-02) : aucune ligne [fidelity] sur stdout de l'install (conductor présent au cache)"; miss=1; }
+    echo "$OUT" | "$GREP" -q '^\[fidelity-recette\] ' \
+      || { ko "T24 (FIDE-02) : aucune ligne [fidelity-recette] sur stdout de l'install"; miss=1; }
+    [ "$miss" -eq 0 ] && ok "T24 (FIDE-02) : bannière de fidélité verbatim sur stdout de l'install (content-bundle -> codex)"
+  else
+    skip "T24 (FIDE-02) : content-bundle/conductor non copiables dans le cache de test"
+  fi
+  rm -rf "$LAB"
 fi
-rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
 # T25 (FIDE-02, best-effort) — conductor ABSENT du cache (gate introuvable aux 2 positions de
 # find_fidelity_gate) : l'install continue SANS échouer, silence total (jamais de ligne
 # [fidelity], jamais d'erreur qui dégraderait le reste du diagnostic d'install).
 # ---------------------------------------------------------------------------
-LAB="$(mktemp -d)"
-CACHE="$LAB/cache"
-if prepare_module "$CACHE" "content-bundle"; then
-  OUT=$(cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install content-bundle 2>&1)
-  RC=$?
-  miss=0
-  [ "$RC" -eq 0 ] || { ko "T25 (FIDE-02, best-effort) : install a échoué (rc=$RC) alors que le gate est simplement absent"; miss=1; }
-  echo "$OUT" | "$GREP" -q '^\[fidelity\] ' \
-    && { ko "T25 (FIDE-02, best-effort) : ligne [fidelity] présente alors que conductor n'est PAS dans le cache (gate introuvable aux 2 positions)"; miss=1; }
-  [ "$miss" -eq 0 ] && ok "T25 (FIDE-02, best-effort) : gate absent -> install continue (rc=0), silence total, aucune ligne [fidelity]"
+if [ -z "$REAL_GSD_HOME" ]; then
+  skip "T25 (FIDE-02, best-effort) : gsd-core introuvable sur ce poste (hermétique — jamais un faux KO)"
 else
-  skip "T25 (FIDE-02, best-effort) : content-bundle non copiable dans le cache de test"
+  LAB="$(mktemp -d)"
+  CACHE="$LAB/cache"
+  HOME_FIDE="$(fide_isolated_home "$LAB")"
+  if prepare_module "$CACHE" "content-bundle"; then
+    OUT=$(cd "$LAB" && HOME="$HOME_FIDE" VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install content-bundle 2>&1)
+    RC=$?
+    miss=0
+    [ "$RC" -eq 0 ] || { ko "T25 (FIDE-02, best-effort) : install a échoué (rc=$RC) alors que le gate est simplement absent"; miss=1; }
+    echo "$OUT" | "$GREP" -q '^\[fidelity\] ' \
+      && { ko "T25 (FIDE-02, best-effort) : ligne [fidelity] présente alors que conductor n'est PAS dans le cache (gate introuvable aux 2 positions)"; miss=1; }
+    [ "$miss" -eq 0 ] && ok "T25 (FIDE-02, best-effort) : gate absent -> install continue (rc=0), silence total, aucune ligne [fidelity]"
+  else
+    skip "T25 (FIDE-02, best-effort) : content-bundle non copiable dans le cache de test"
+  fi
+  rm -rf "$LAB"
 fi
-rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
 # T26 (FIDE-02) — update réel (version bump) : la 2e couture (update_module, après
 # vf_converge_apply) produit AUSSI la ligne [fidelity] — pas seulement install_module au premier
 # install. Reproduit le couple v1 -> v2 déjà utilisé par T15 (ROLL) pour un module réel à agent.
 # ---------------------------------------------------------------------------
-LAB="$(mktemp -d)"
-CACHE="$LAB/cache"
-if prepare_module "$CACHE" "content-bundle" && prepare_module "$CACHE" "conductor"; then
-  (cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install content-bundle >/dev/null 2>&1)
-  # Bump artificiel de version dans le cache pour forcer le chemin update (pas resync).
-  echo "v9.9.9" > "$CACHE/content-bundle/VERSION"
-  OUT=$(cd "$LAB" && VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" update content-bundle 2>&1)
-  miss=0
-  N_FID=$(echo "$OUT" | "$GREP" -c '^\[fidelity\] ' || true)
-  [ "${N_FID:-0}" -ge 1 ] \
-    || { ko "T26 (FIDE-02) : aucune ligne [fidelity] sur stdout de l'update (2e couture non exercée)"; miss=1; }
-  [ "$miss" -eq 0 ] && ok "T26 (FIDE-02) : bannière de fidélité présente aussi sur un update réel (2e couture, après vf_converge_apply)"
+if [ -z "$REAL_GSD_HOME" ]; then
+  skip "T26 (FIDE-02) : gsd-core introuvable sur ce poste (hermétique — jamais un faux KO)"
 else
-  skip "T26 (FIDE-02) : content-bundle/conductor non copiables dans le cache de test"
+  LAB="$(mktemp -d)"
+  CACHE="$LAB/cache"
+  HOME_FIDE="$(fide_isolated_home "$LAB")"
+  if prepare_module "$CACHE" "content-bundle" && prepare_module "$CACHE" "conductor"; then
+    (cd "$LAB" && HOME="$HOME_FIDE" VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install content-bundle >/dev/null 2>&1)
+    # Bump artificiel de version dans le cache pour forcer le chemin update (pas resync).
+    echo "v9.9.9" > "$CACHE/content-bundle/VERSION"
+    OUT=$(cd "$LAB" && HOME="$HOME_FIDE" VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" update content-bundle 2>&1)
+    miss=0
+    N_FID=$(echo "$OUT" | "$GREP" -c '^\[fidelity\] ' || true)
+    [ "${N_FID:-0}" -ge 1 ] \
+      || { ko "T26 (FIDE-02) : aucune ligne [fidelity] sur stdout de l'update (2e couture non exercée)"; miss=1; }
+    [ "$miss" -eq 0 ] && ok "T26 (FIDE-02) : bannière de fidélité présente aussi sur un update réel (2e couture, après vf_converge_apply)"
+  else
+    skip "T26 (FIDE-02) : content-bundle/conductor non copiables dans le cache de test"
+  fi
+  rm -rf "$LAB"
 fi
-rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
 # Helper T27 — reproduit EXACTEMENT ce que fait un appelant RÉEL posé (find_runtime_cli_dispatch,
