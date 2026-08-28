@@ -1,5 +1,32 @@
 # Changelog — conductor
 
+## [v1.32.0] — 2026-08-29 (Phase 38 — `--target` injectable + réécriture du payload, TGT)
+
+**Minor** (nouvelle capacité observable à l'install/update) :
+
+- **`vibeflow-update.sh`** — `TARGET_ROOT` devient injectable via `--target <chemin>` (ou la
+  variable d'env `VF_TARGET`), en AJOUT des deux littéraux `user`/`project|local` existants —
+  jamais un remplacement, comportement par défaut byte-identique sans `--target` (preuve `diff -r`
+  hors timestamps volatils). Résolution PHYSIQUE (`cd -P`/`pwd -P`, D-31-15), refus de la racine
+  `/` littérale ou résolue.
+- **Réécriture du payload à la copie (TGT-03)** — `vf_place_file`/`vf_place_tree` réécrivent,
+  UNIQUEMENT sous `--target`, les occurrences littérales `.claude/` du payload (198 fichiers /
+  1130 occurrences mesurées, périmètre hors `_internal/`) vers la cible réellement résolue.
+  Principe repris de `copyWithPathReplacement` (gsd-core `bin/install.js`), implémentation bash
+  propre — jamais le code amont. Sans `--target` : aucune réécriture, coût nul.
+- Les 16 littéraux résiduels de `gitignore_add_paths()`/`scripts_prefix_for_scope()` suivent
+  désormais `TARGET_ROOT` : le `.gitignore` local exprime un chemin relatif à la cible réelle (ou
+  se tait, en journalisant, si la cible sort de l'arbre du repo — jamais une entrée invalide) ; le
+  placeholder `{{VF_SCRIPTS}}` de `settings.json` résout vers le chemin absolu de la cible, jamais
+  vers `$HOME`/`$CLAUDE_PROJECT_DIR` qui ne pointent vers aucune cible custom.
+- **Marqueur `$TARGET_ROOT/scripts/.vibeflow-target`** (TGT-04) — posé best-effort à chaque
+  install/update (idempotent, engine-owned, exclu du manifeste D-31-03), referme le trou de la
+  cascade documentaire `vf-update/SKILL.md` (`<S>`/`<S-moteur>`, résolution par position
+  littérale) : une 0e étape lit ce marqueur pour retrouver la cible réelle sous `--target`.
+- Sonde cross-module `<S-moteur>` (`check-gsd-engine.sh`, D-38-H) vérifiée par exécution comparée
+  (install par défaut vs install `--target`) — indépendante de `TARGET_ROOT` par construction,
+  confirmé jamais supposé.
+
 ## [v1.31.0] — 2026-08-29 (Phase 38 — adaptateur VibeFlow -> rôle Codex, ADPT)
 
 **Minor** (nouvelle capacité : un agent VibeFlow réel devient un rôle Codex réellement
