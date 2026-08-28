@@ -28,10 +28,21 @@ appliqué à **mon propre instrument** : « les suites des fichiers édités pas
    complète, rapporte le nombre de suites en échec **avant** et **après** ». Un chiffre, pas une
    impression.
 2. **Le bon pattern est celui de la CI**, pas un `find` plus large :
-   `find plugin scripts -type f -path '*/tests/test-*.sh'` → **62**. Un `find . -name 'test-*.sh'`
+   `find plugin scripts -type f -path '*/tests/test-*.sh'` → **68 au 2026-08-28** (62 en Phase 31 :
+   ce nombre BOUGE, le re-dériver à chaque mission, jamais le recopier). Un `find . -name 'test-*.sh'`
    rend **124** parce qu'il ramasse `.claude/worktrees/<module>/`, qui est un **second checkout du
    même dépôt** (doublons), et `.planning/milestones/` (archives). C'est ce qui a produit un faux
    comptage de « 76 suites » — et failli faire « corriger » un compteur de README qui était juste.
+2bis. ⚠️ **« N suites vertes » dans un brief est presque toujours un AUTRE compteur.** Mesuré
+   Phase 38 (2026-08-28) : le brief annonçait « suites 4/4 vertes », la réalité est **68 suites**.
+   Quatre nombres coexistent dans ce dépôt et se font passer l'un pour l'autre :
+   **4** = jobs CI (`tests`, `gates`, `lab-frais`, `lab-frais-arme`) · **4** = suites sous
+   `scripts/tests/` seulement · **37** = chiffre PÉRIMÉ que `.planning/codebase/TESTING.md` et
+   `CONCERNS.md:6` affirment encore (daté 2026-07-26) · **68** = la découverte réelle de la CI.
+   Aucun n'est faux — ils comptent des objets différents (mémoire
+   [[ecart-de-chiffre-comparer-les-ensembles]]). **Ne jamais accepter le compteur du brief ni celui
+   de TESTING.md** : re-dériver avec le `find` de `ci.yml`, et dire quel objet on compte.
+
 3. **Suspecter en priorité les suites qui sondent du TEXTE SOURCE** d'un autre module (`grep -A<n>`
    sur un fichier voisin) : elles cassent sur une **insertion de ligne**, sans que le comportement
    change. Elles sont fragiles par construction — voir [[artefacts-descriptifs-non-testes]].

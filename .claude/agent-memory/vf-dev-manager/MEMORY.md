@@ -46,3 +46,7 @@
 - [`description: >` casse les convertisseurs](project_description-repliee-casse-les-convertisseurs.md) — 16 SKILL.md en scalaire replié : description détruite sur les 3 cibles, 0 diagnostic
 - [Écart de chiffre : comparer les ensembles](feedback_ecart-de-chiffre-comparer-les-ensembles.md) — `comm` puis lire l'élément de l'écart ; 3 parties/3 réponses tranchées par la définition, pas l'autorité
 - [Coût de portage : payload ≫ engine](project_cout-portage-payload-vs-engine.md) — 1050 réfs `.claude/` sur 198 fichiers livrés ; un `--target` sans réécriture de contenu est inerte
+- [Préfixe d'exigences suggéré par le ROADMAP déjà pris](project_prefixe-exigences-suggere-par-roadmap-deja-pris.md) — PORT-xx proposé pour la 38 collisionne avec PORT-01..05 vivant ; dériver l'espace de noms, 36 préfixes occupés
+- [Mesure juste, attribution fausse](feedback_mesure-juste-attribution-fausse.md) — le rejet `[a-z0-9_]+` visait le task_name, pas le nom de rôle : 31 correspondances évitées, « par construction » = marqueur du défaut
+- [Joignabilité asymétrique manager↔worker](project_joignabilite-asymetrique-manager-worker.md) — je peux réveiller un worker (contexte intact), il ne peut PAS me joindre : exiger le retour d'Agent dans chaque mandat
+- [`timeout` absent : faux zéro silencieux](project_timeout-absent-faux-zero.md) — `timeout`/`gtimeout` absents du poste ; une boucle qui les utilise rend 0/N sans erreur. Un `0/N` est un artefact jusqu'à preuve du contraire
