@@ -12,6 +12,15 @@ confirmation (ADR-031).
 
 ## Résolution des scripts (conductor)
 
+**0e étape (TGT-04, cible custom `--target`)** : avant de tester les trois positions littérales
+ci-dessous, vérifie si `./.claude/scripts/.vibeflow-target` **ou** `$HOME/.claude/scripts/.vibeflow-target`
+existe. Si l'un des deux existe ET que son contenu (un chemin absolu, une seule ligne) **diffère**
+de la position candidate elle-même (`./.claude` ou `$HOME/.claude`), c'est que ce lab a été posé
+sous `--target` : lis ce contenu et utilise-le comme `<S>`/`<S-moteur>` réel (`<contenu>/scripts/`)
+au lieu de la position littérale. Si le marqueur est absent, ou présent mais identique à la
+position candidate (cas normal, sans `--target`), continue directement à la cascade suivante —
+aucune déviation.
+
 Les scripts vivent dans le dossier `scripts/` de conductor. Localise-les dans cet ordre (prends le
 premier existant) : `$HOME/.claude/scripts/` → `./.claude/scripts/` → `${CLAUDE_PLUGIN_ROOT}/conductor/scripts/`.
 Note ce dossier `<S>` pour les étapes suivantes.
