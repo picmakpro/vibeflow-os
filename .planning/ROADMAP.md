@@ -76,7 +76,8 @@
 - [x] Phase 33: Watchdog & notifications des missions (completed 2026-08-17)
 - [ ] Phase 34: Gaps agency-agents & cadrage skill-installer
 - [x] Phase 35: Ré-armement worktree (conditionnelle) — CLOSE 2026-08-26, option A (pas de ré-armement)
-- [ ] Phase 37: Portabilité multi-runtime — spike (Codex, OpenCode, Kimi)
+- [x] Phase 37: Portabilité multi-runtime — spike (Codex, OpenCode, Kimi) (completed 2026-08-28 — spike + étude livrés, décisions rendues ; suite → Phase 38)
+- [ ] Phase 38: Portabilité multi-runtime — livraison (canal d'install, migration de lab, adaptateur)
 
 <details>
 <summary>✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04</summary>
@@ -480,6 +481,8 @@ Plans:
 | 33. Watchdog & notifications des missions | fiabilite-v1.0 | 0/0 | Not started — heartbeat partagé avec la 32 (conçues ensemble, WTCH après LOCK) | — |
 | 34. Gaps agency-agents & cadrage skill-installer | fiabilite-v1.0 | 0/0 | Not started — après la 31 (MANI avant SKIL) ; SKIL-01 = cadrage go/no-go rattaché | — |
 | 35. Ré-armement worktree (conditionnelle) | fiabilite-v1.0 | 0/0 | Flottante — précondition externe NON satisfaite au 2026-08-15 (npm latest = 1.10.0) ; jamais bloquante | — |
+| 37. Portabilité multi-runtime — spike | fiabilite-v1.0 | — | Complete — spike de mesure sans plan : DISCUSS + SPIKE-REPORT + ETUDE-CANAL-ET-MIGRATION (3 tours de revue adversariale), décisions rendues le 2026-08-28, branche `feat/phase-37-spike-portabilite-multi-runtime` non mergée | 2026-08-28 |
+| 38. Portabilité multi-runtime — livraison | fiabilite-v1.0 | 0/0 | Not started — cadrage factuel = livrables de la 37 ; 6 lots candidats, go/no-go adaptateur à trancher au cadrage | — |
 
 <details>
 <summary>✅ agentique-v1.0 — Durcissement du moteur d'équipes agentique (Phases 15→29, 18 et 25 reportées) — SHIPPED 2026-08-15</summary>
@@ -992,14 +995,18 @@ les runtimes à dispatch nommé (claude, opencode, cursor) des runtimes built-in
 maison, aucun « skill de conversion » à l'exécution (non déterministe, non testable).
 
 **Questions à trancher par le spike :**
+
 1. Quelle est l'API réellement appelable de la surface runtime gsd-core (queries `gsd-tools`,
    modules `bin/lib/`) — et est-elle stable / publique, ou interne au moteur ?
+
 2. Que reste-t-il de **spécifiquement VibeFlow** à porter une fois gsd-core en place ? Hypothèse à
    vérifier : les 50 agents, les 6 fragments de hooks, le packaging `.claude-plugin/`, et le
    protocole d'escalade `AskUserQuestion`/`SendMessage`.
+
 3. Les 25 SKILL.md sont-ils posables tels quels ? 22/25 sont conformes au standard Agent Skills ;
    3 ont `name` ≠ dossier (`vf-planning`, `vf-mobile-test`, `vibeflow-install`). 9/25 appellent des
    skills `gsd-*`, 9/25 supposent des sous-agents, 3 supposent `AskUserQuestion`.
+
 4. Que devient l'équipe de mission (team-kernel) hors Claude ? **Mesuré le 2026-08-28, contre une
    première analyse erronée** : le registre `gsd-core` déclare `namedDispatch: true` pour **codex**
    (tier-1, `tier: "full"`, `per-agent sandbox tiers`, surface de hooks `config.toml` + `hooks.json`)
@@ -1022,8 +1029,10 @@ maison, aucun « skill de conversion » à l'exécution (non déterministe, non 
    aucun runtime non-Claude. C'est l'escalade vivante d'un manager vers l'humain. Le contournement
    documenté côté VibeFlow (`SendMessage(main)`) s'appuie lui-même sur du Claude. Quelle forme prend
    un arbitrage humain hors Claude — et comment garantir qu'il ne soit jamais **inféré** ?
+
 5. Où vit la déclaration de capacité par cible — `module.json` (`full` / `skills-only` /
    `unsupported`) ou descripteur consommé depuis gsd-core ?
+
 6. `vibeflow-update.sh` : extension par `--target` (TARGET_ROOT déjà scopé) ou délégation au
    `runtime-artifact-install-plan` du moteur ?
 
@@ -1051,7 +1060,9 @@ Plans:
 
 **Livrables produits (2026-08-28)** :
 `.planning/phases/VFDO-37-portabilit-multi-runtime-spike-codex-opencode-kimi/DISCUSS.md`
-(les 6 questions ci-dessus, mesurées) et `SPIKE-REPORT.md` (verdict + recommandation). Les
+(les 6 questions ci-dessus, mesurées), `SPIKE-REPORT.md` (verdict + recommandation) et
+`ETUDE-CANAL-ET-MIGRATION.md` (second mandat, à la demande de Samuel : canal d'install hors
+marketplace Claude, migration d'un lab existant, mémoire d'agent — axes A, B, B7). Les
 chiffres du cadrage ci-dessus ont été **re-dérivés et corrigés** dans `DISCUSS.md` (section
 « Corrections au cadrage ROADMAP ») — renvoi sans recopie ici, sauf la ligne « 9/25 appellent des
 skills `gsd-*` » (Q3 ci-dessus, l. 1000-1002), **intentionnellement laissée intacte** : sa méthode
@@ -1059,7 +1070,65 @@ de mesure est documentée avec sa nuance dans `DISCUSS.md`.
 
 **Plans**: aucun — spike de mesure, pas de plan d'exécution.
 
-**Décision go/no-go : en attente d'arbitrage humain (ADR-031)** — ni cette entrée de roadmap, ni
-aucun autre document de la phase, ne tranche la suite (adaptateur VibeFlow minimal / démarche
-amont vers gsd-core / dépendance interne telle quelle / renoncer). Voir `SPIKE-REPORT.md`
-§Recommandation pour l'argumentaire, non tranché.
+**Décisions humaines rendues le 2026-08-28** (à la lecture des livrables) :
+- **Phase 38 à part** pour le canal d'install et la migration de lab (option recommandée par
+  l'étude, §Proposition de cadrage) — voir la section Phase 38 ci-dessous.
+- **Superpowers** : révisé sur prémisse démentie (le catalogue est déjà multi-runtime, 8 manifestes) —
+  **rendre l'installeur VibeFlow multi-runtime**, rapatriement conservé en plan de secours chiffré.
+- **Mémoire d'agent** : le traitement rejoint la déclaration `memory: project` — `.gitignore`
+  corrigé (`.claude/*` + `!.claude/agent-memory/`), 116 fichiers versionnés après revue.
+- **`description: >`** (15/21 skills détruits à la conversion) : corrigé, branche
+  `fix/skill-description-monoline`.
+
+**Reste non tranché** : le go/no-go sur l'**adaptateur VibeFlow minimal** (préservation de
+`model`/`memory`/`tools`/allowlist, mapping des noms `[a-z0-9_]+`, digest explicite) et la
+**démarche amont** vers gsd-core (élargissement du SDK public). Les deux sont **à trancher au cadrage
+de la Phase 38**, où ils forment des lots candidats — pas ici. Argumentaire : `SPIKE-REPORT.md`
+§Recommandation.
+
+### Phase 38: Portabilité multi-runtime — livraison (canal d'install, migration de lab, adaptateur)
+
+**Goal:** Rendre VibeFlow **installable et migrable** sur un runtime non-Claude — Codex en cible tier-1
+mesurée, OpenCode et kimi-code sous réserve de mesure réelle — **sans dégradation silencieuse** : tout
+ce qui est perdu sur une cible est **déclaré** à l'install, jamais subi. Prolonge la Phase 37, dont les
+trois livrables (`DISCUSS.md`, `SPIKE-REPORT.md`, `ETUDE-CANAL-ET-MIGRATION.md`) sont le cadrage
+factuel de cette phase — aucun chiffre n'est à re-mesurer, mais aucun descripteur gsd-core n'est une
+preuve (un sur trois démenti en exécution : `maxDepth`).
+
+**Lots candidats** (issus de l'étude, à confirmer au cadrage — `gsd-discuss-phase 38`) :
+1. **Gate de fidélité** — compter par cible les champs perdus (`model`/`memory`/`tools`/
+   `disallowedTools`/`vf-internal`/allowlist, `description`) et les marqueurs morts (`.claude`, `Task(`) ;
+   bannière d'install qui déclare le périmètre réellement actif. Première brique : sans elle, toute
+   install multi-runtime est la dégradation que la 37 a chiffrée (156 conversions, 0 diagnostic).
+2. **Installeur multi-runtime** — les 11 sites `claude plugin install` / `command -v claude` des deux
+   scripts `ensure` (superpowers et gsd-core se posent par leurs propres manifestes ailleurs). Décidé,
+   ne dépend d'aucun autre arbitrage.
+3. **Trou de `rollback`** — ne restaure que skills et scripts, jamais agents ni hooks, n'appelle jamais
+   `mark_installed`, `rm -rf` avant copie (étude B2). Défaut de l'engine **actuel**, indépendant du
+   multi-runtime — lot nommé même si le reste tarde.
+4. **`--target`** — 1 site `TARGET_ROOT` + 15 littéraux côté engine, mais **198 fichiers / 1130
+   occurrences `.claude/`** côté payload à réécrire à la copie (précédent amont :
+   `copyWithPathReplacement`). Enregistrement Codex à alimenter en second geste (`~/.codex/agents/`,
+   `[agents]`) : le canal plugin transporte (470/470 byte-identique) mais n'enregistre ni agents ni
+   commandes.
+5. **Adaptateur VibeFlow minimal + démarche amont** — go/no-go **non rendu** (voir Phase 37) ; à trancher
+   au cadrage. Doctrine : VibeFlow consomme gsd-core, mais la surface d'artefacts visée est **interne**
+   par contrat écrit — dépendre de l'interne tel quel est la voie la moins défendable.
+6. **Migration d'un lab** — frontière `.planning/` fuyante (81 % des PLAN.md ouvrent sur un
+   `@$HOME/.claude/…`), runtime à **inscrire** dans `.planning/config.json` plutôt que détecté, sort de
+   `vf-calibrate` (nom déjà pris pour « migration de lab ») à décider avant tout verbe neuf, bascule
+   vs coexistence non tranché. Escalade humaine : **jamais de question dans un worker headless**, relais
+   Pattern H/`SendMessage` (actif portable) ; `opencode run --auto` formellement interdit.
+
+**Contraintes** : aucun vert auto-déclaré (pose constatée sur disque, exécution réelle) ; Windows en
+branche de dégradation explicite (symlinks inapplicables sous MSYS) ; OpenCode et kimi-code **jamais
+installés** au 2026-08-28 — tout ce qui les concerne est dérivé de descripteurs jusqu'à mesure.
+
+**Requirements**: TBD (à dériver au cadrage — candidats : PORT-xx canal, MIGR-xx migration, FIDE-xx gate)
+**Depends on:** Phase 37 (cadrage factuel) ; adjacente à Phase 34 (skill-installer) — lot 2 partage la
+surface installeur, à séquencer au cadrage.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-discuss-phase 38 puis /gsd-plan-phase 38)

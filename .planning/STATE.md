@@ -2,34 +2,33 @@
 gsd_state_version: 1.0
 milestone: fiabilite-v1.0
 milestone_name: « ce qui survit »
-current_phase: 37
-current_phase_name: Portabilité multi-runtime — spike (Codex, OpenCode, Kimi)
-status: context_gathered
-stopped_at: Phase 37 (spike de mesure) — livrable rendu, aucun token de statut existant ne décrit
-exactement cet état ; `context_gathered` retenu comme le moins engageant (cadrage/mesure faits,
-pas de plan) — **mais la phase n'est PAS close** : le spike a produit `DISCUSS.md` (6 questions du
-ROADMAP mesurées) et `SPIKE-REPORT.md` (verdict en deux morceaux : runtime Codex apte sur la
-profondeur mesurée, chemin d'artefacts gsd-core non générique et déclaré interne par contrat écrit)
-avec une recommandation argumentée (adaptateur VibeFlow minimal + démarche amont en parallèle).
-**Le go/no-go sur une éventuelle phase de livraison est un arbitrage humain non rendu (ADR-031)** —
-aucun plan d'exécution, aucune suite lancée. Rapport de mission :
-`.planning/missions/2026-08-28-phase-37-spike-portabilite-multi-runtime.md`. Prochain geste :
-décision de Samuel (les 4 voies exposées dans `SPIKE-REPORT.md` §Recommandation).
+current_phase: 38
+current_phase_name: Portabilité multi-runtime — livraison (canal d'install, migration de lab, adaptateur)
+status: not_started
+stopped_at: >-
+  Phase 37 (spike) CLOSE le 2026-08-28 sur trois livrables (`DISCUSS.md`, `SPIKE-REPORT.md`,
+  `ETUDE-CANAL-ET-MIGRATION.md`) et quatre décisions humaines — Phase 38 à part (canal + migration),
+  installeur multi-runtime plutôt que rapatriement superpowers (prémisse démentie : le catalogue est
+  déjà multi-runtime), mémoire d'agent versionnée après revue (`.gitignore` : `.claude/*` +
+  `!.claude/agent-memory/`, commit `dd8adb0`), fix `description: >` sur `fix/skill-description-monoline`
+  (`450d357`). **Reste non tranché** : go/no-go sur l'adaptateur VibeFlow minimal + démarche amont — à
+  trancher au cadrage de la 38. Phase 38 créée (`gsd-tools phase.add`), 6 lots candidats posés dans
+  ROADMAP, aucun plan. Rien de mergé, aucune PR, aucun tag : deux branches en attente du geste humain.
+  Session concurrente constatée : v2.58.1 releasée par une autre session pendant la mission (branche
+  `fix/hook-sessionstart-json-invalide`) — vérifier `main` avant tout merge.
 last_updated: "2026-08-28T00:00:00.000Z"
 last_activity: 2026-08-28
-last_activity_desc: Clôture documentaire du nœud `docs` de la mission Phase 37 (spike de
-portabilité multi-runtime) — mandat vf-coder, hygiène pure, aucun code sous `plugin/`. `STATE.md`
-et la section Phase 37 de `ROADMAP.md` mis à jour pour pointer vers les livrables produits
-(`DISCUSS.md`, `SPIKE-REPORT.md`) et le rapport de mission neuf. Le point contesté du cadrage
-(« 9/25 appellent des skills `gsd-*` ») **volontairement laissé intact** dans `ROADMAP.md` — sa
-correction/nuance vit dans `DISCUSS.md`, pas ici. Aucun bloc `progress` touché : ce spike n'a
-produit aucun plan d'exécution.
+last_activity_desc: >-
+  Clôture de la Phase 37 et création de la Phase 38 depuis un worktree isolé (une
+  autre session travaillait dans l'arbre principal). ROADMAP : Phase 37 cochée, bloc de décisions
+  remplaçant « go/no-go en attente », section Phase 38 rédigée (goal, 6 lots candidats, contraintes,
+  dépendances), table Progress complétée. Lignes d'index mémoire corrigées (prémisses périmées).
 progress:
-  total_phases: 8
-  completed_phases: 6
+  total_phases: 10
+  completed_phases: 7
   total_plans: 31
   completed_plans: 31
-  percent: 75
+  percent: 70
 ---
 
 # Project State
@@ -176,6 +175,13 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 
 ### Roadmap Evolution
 
+- 2026-08-28 : **Phase 38 ajoutée — Portabilité multi-runtime, livraison** (décision de Samuel, option
+  « phase à part » recommandée par `ETUDE-CANAL-ET-MIGRATION.md`). Six lots candidats : gate de fidélité,
+  installeur multi-runtime, trou de `rollback`, `--target` (payload 198 fichiers / 1130 occurrences),
+  adaptateur + démarche amont (go/no-go non rendu), migration de lab. **Phase 37 close** le même jour :
+  verdict en deux morceaux (runtime Codex apte — profondeur 3 mesurée contre `maxDepth: 1` déclaré —,
+  chemin d'artefacts gsd-core interne et silencieusement dégradant). Leçon gravée : un descripteur
+  gsd-core est une source, jamais une preuve — pour les rouges comme pour les verts.
 - 2026-08-28 : **Phase 37 ajoutée — Portabilité multi-runtime (spike)**. Demande de Samuel :
   rendre VibeFlow installable sur les autres runtimes (Codex, OpenCode, Kimi…). Cadrée en **spike
   de mesure** (arbitrage humain : spike d'abord, cibles = les 3 nommées + conformité au standard
@@ -1006,10 +1012,11 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-**Resume file:** .planning/phases/VFDO-31-manifeste-d-install-dry-run-issue-20/31-CONTEXT.md
+**Resume file:** .planning/phases/VFDO-37-portabilit-multi-runtime-spike-codex-opencode-kimi/SPIKE-REPORT.md
 
-Last session: 2026-08-16T00:00:00.000Z
-Stopped at: Phase 31 livrée (8 plans, 6 vagues) — hygiène documentaire de clôture posée
-Reprendre par : gestes humains gatés — push de la branche `feat/phase-31-manifeste-dry-run`, PR,
-puis cadrage de la Phase 32 (Durcissement du driver-lock), qui dépend de la forme exec des hooks
-livrée en Phase 30 et ne touche que `conductor`.
+Last session: 2026-08-28T00:00:00.000Z
+Stopped at: Phase 37 close, Phase 38 créée (non cadrée, non planifiée)
+Reprendre par : gestes humains gatés — revue puis PR des deux branches
+(`feat/phase-37-spike-portabilite-multi-runtime` : docs + mémoire d'agent ; `fix/skill-description-monoline` :
+16 SKILL.md), en vérifiant d'abord que `main` a intégré la v2.58.1 posée par l'autre session. Puis
+`/gsd-discuss-phase 38` pour trancher le go/no-go adaptateur et confirmer les 6 lots.
