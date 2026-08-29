@@ -127,7 +127,7 @@ dans `settings.json` (respect du principe « zéro hook imposé »).
 ### 1. Détecter l'opportunité
 
 ```sh
-plugin/conductor/scripts/runtime-registry.sh list-installed
+.claude/scripts/runtime-registry.sh list-installed
 ```
 
 vs le runtime réellement détecté sur CE poste (`runtime-cli-dispatch.sh`, lot 2 RUNT-01). Si le
@@ -138,7 +138,7 @@ poste porte un runtime ABSENT de `installed`, c'est une opportunité de coexiste
 
 ```sh
 VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT}" bash "${CLAUDE_PLUGIN_ROOT}/_internal/vibeflow-update.sh" --target <chemin dédié> install --all
-plugin/conductor/scripts/runtime-registry.sh set-active <nouveau> --confirmed
+.claude/scripts/runtime-registry.sh set-active <nouveau> --confirmed
 ```
 
 `--target` pose le lab sous une cible **séparée** pour le nouveau runtime (réutilise l'injection de
@@ -151,7 +151,7 @@ Trois étapes dans cet ordre, **jamais une seule sautée** :
 
 1. **Dry-run** — montré à l'utilisateur avant toute écriture :
    ```sh
-   plugin/conductor/scripts/runtime-registry.sh set-active <nouveau> --dry-run
+   .claude/scripts/runtime-registry.sh set-active <nouveau> --dry-run
    VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT}" bash "${CLAUDE_PLUGIN_ROOT}/_internal/vibeflow-update.sh" --target <cible> --dry-run update --all
    ```
 2. **Confirmation** — attendre le feu vert explicite de l'utilisateur (ADR-031, comme l'étape 3 de
@@ -159,13 +159,13 @@ Trois étapes dans cet ordre, **jamais une seule sautée** :
 3. **Écriture réelle** :
    ```sh
    VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT}" bash "${CLAUDE_PLUGIN_ROOT}/_internal/vibeflow-update.sh" --target <cible> update --all
-   plugin/conductor/scripts/runtime-registry.sh set-active <nouveau> --confirmed
+   .claude/scripts/runtime-registry.sh set-active <nouveau> --confirmed
    ```
 
 ### 4. Réversibilité — AVANT toute bascule réelle
 
 ```sh
-plugin/conductor/scripts/verify-runtime-reversibility.sh --target <cible> --cache "${CLAUDE_PLUGIN_ROOT}"
+.claude/scripts/verify-runtime-reversibility.sh --target <cible> --cache "${CLAUDE_PLUGIN_ROOT}"
 ```
 
 Si la preuve échoue (exit non-zéro), **ARRÊTER** — ne jamais basculer sur une réversibilité non
@@ -176,7 +176,7 @@ prouvée. Le verdict compare des ENSEMBLES de fichiers (`comm -3`), jamais un co
 Un runtime coexistant sans gouvernance de hooks est déclaré par le gate de fidélité :
 
 ```sh
-plugin/conductor/scripts/check-artifact-fidelity.sh --coexistence-report
+.claude/scripts/check-artifact-fidelity.sh --coexistence-report
 ```
 
 C'est la source de vérité de ce qui manque au runtime coexistant. **Relayer sa sortie telle

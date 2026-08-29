@@ -1,5 +1,18 @@
 # Changelog — conductor
 
+## [v1.33.2] — 2026-08-29 (Phase 38 — correction ciblée revue, vf-calibrate/SKILL.md)
+
+**Patch** (correctif documentaire + garde-fou) :
+
+- **`skills/vf-calibrate/SKILL.md`** — la section « Migration de runtime » (lot 6) invoquait 6
+  commandes documentées par leur chemin de **dépôt de dev** (`plugin/conductor/scripts/…`),
+  inexécutable dans un lab installé (l'installeur pose les scripts sous `.claude/scripts/`).
+  Corrigé aux 6 occurrences (l. 130, 141, 154, 162, 168, 179), alignées sur la convention déjà
+  correcte dans le reste du fichier.
+- Nouveau garde-fou **`scripts/tests/test-skill-doc-paths.sh`** : vérifie qu'aucun SKILL.md de
+  conductor ne référence un chemin `plugin/*/scripts/` — aucune des suites existantes ne pouvait
+  détecter ce défaut (elles exercent les scripts directement, jamais le texte des SKILL.md).
+
 ## [v1.33.1] — 2026-08-29 (Phase 38 — team-kernel.md, correctif documentaire)
 
 **Patch** (correctif documentaire, aucune capacité) :
