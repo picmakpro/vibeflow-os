@@ -1225,7 +1225,24 @@ Le credential **lui appartient** — la mesure tourne dessus **sans copie**, san
 $ kimi -p "Reponds exactement: PONG"
 error: failed to run prompt: No model configured. Run `kimi` and use /login to sign in, …
 ```
-⇒ **credential présent mais INEXPLOITABLE**. Les trois inconnus (I-1, I-2, I-3) restent **ouverts**.
+⇒ **credential présent mais INEXPLOITABLE**.
+
+**VERDICT DÉFINITIF (2026-08-29, après 3 tentatives)** — l'échec est **côté serveur kimi.ai**, à
+l'échange de jeton :
+1. navigateur autorisé sans code → `Login failed: The server had an error…`, credential incomplet écrit ;
+2. relance immédiate → même erreur, **sans** device-code (le credential incomplet est réutilisé) ;
+3. credential incomplet **mis de côté** (renommé, jamais supprimé), device-code **réémis**, autorisé
+   au navigateur → **même erreur serveur**.
+`kimi -p` répond invariablement `No model configured`. `kimi-code.log` ne porte **aucune** ligne
+d'erreur exploitable. **Aucune sonde, ni humaine ni agent, n'est en cause.**
+
+> **À écrire tel quel dans tout livrable** : « kimi-code — pose mesurée ; enregistrement des agents
+> posés, `disallowedTools` en session et firing des `[[hooks]]` **non vérifiés** — login OAuth en
+> **échec serveur** le 2026-08-29, **3 tentatives**. »
+
+**Voie restante, non tentée** : `kimi provider add|catalog` avec une **clé API Moonshot** — chemin
+documenté « non-interactively », qui contourne l'OAuth. ⛔ **Geste de Samuel uniquement**, jamais
+d'un agent.
 ℹ️ Deux voies pour la reprise, **toutes deux gestes humains** : relancer `/login`, ou renseigner
 `default_model` dans `config.toml` via `kimi provider add|list` — documenté « non-interactively »,
 donc probablement plus robuste si l'OAuth reste capricieux. ⛔ Aucun agent ne relance de login.
