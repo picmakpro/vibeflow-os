@@ -41,6 +41,44 @@ commandes exactes, banc, **5 critères 0/N sans moyenne possible**, et les **neu
 
 ---
 
+## Les sept lots livrés
+
+| Lot | Objet | Sortie constatée |
+|---|---|---|
+| `38-01` | Gate de fidélité | mesure le **TOML posé** (`MODE=adapter`), 4 verdicts, marqueurs morts comptés |
+| `38-02` | **Installeur multi-runtime** | table de dispatch à 4 verbes, **12 sites** CLI-couplés désaccouplés |
+| `38-03` | Rollback | agents + hooks + `mark_installed` + glob ancré, `--dry-run` |
+| `38-04` | `--target` injectable | site d'injection unique + **réécriture du payload à la copie** + sonde cross-module |
+| `38-05` | Adaptateur Codex minimal | rôle `.toml` dispatchable, limite de confinement **déclarée** |
+| `38-06` | Migration de lab | runtime dans `config.json`, coexistence gatée, réversibilité prouvée |
+| `38-07` | 3 bloquants de la mesure | 12 agents enregistrés, uninstall symétrique, perte hooks déclarée |
+
+### Lot 2 (`38-02`, RUNT-01/02) — le lot qui manquait au rapport
+
+Le seul plan de la phase resté **sans SUMMARY** jusqu'à la clôture : livré, puis corrigé par des
+mandats ciblés successifs (revue, revue de jointure, mesure OpenCode/kimi), si bien que le cycle
+plan→exécution ne s'est jamais refermé sur lui. Régularisé sur pièces en `9dda4b8`, écriture tardive
+**déclarée en tête** plutôt que maquillée.
+
+- **Périmètre réel plus large que le cadrage** : **12 sites exécutables sur 4 fichiers**, 4 verbes —
+  contre 11 sites sur 2 fichiers annoncés. L'écart est venu de la mesure, pas d'une extension de scope.
+- **Fichiers** : `plugin/_internal/runtime-cli-dispatch.sh` (créé, + sa suite), `ensure-deps.sh`,
+  `ensure-design-deps.sh` (**5 sites**), `check-plugin-update.sh`, `vf-update-run.sh` (+ garde T9e).
+- **Commits** : `2d392a7` (dispatch + test) · `877a97d` (`ensure-deps`) · `d6ff0d4` (`ensure-design-deps`
+  5 sites + `check-plugin-update` + `vf-update-run` + garde T9e) · `f9f7dc4` (compteur README, à part).
+  Correctifs post-revue : `40c8f0f`, `c6e5c60`, **`c8dea13`** (bloquant de jointure), `45cb868`, `f0973f1`.
+- **Décisions** : sonde kimi-code **par capacité** (`--output-format`) et non par nom de binaire —
+  validée contre le vrai binaire avec un PATH isolé ; `trust_level` **déclaré, jamais écrit** ; aucune
+  grammaire d'install Codex inventée.
+- **Le défaut le plus cher** est né ici : `runtime-cli-dispatch.sh` **n'était posé nulle part** — la
+  capacité n'existait qu'à la première install. Trouvé par la **revue de jointure**, pas par les suites,
+  qui étaient vertes. Origine : une fausse analogie (« cascade EXACTE de `find_hooks_merger()` »).
+  D-38-M et D-38-N en sont sortis.
+- **Garde T9e** : trois trous successifs, refermés seulement après avoir **refusé un troisième
+  point-fix** et exigé une preuve générative — 60 combinaisons, 8 rouges, 0 après.
+
+---
+
 ## Ce que la mesure a démenti — 8 prémisses documentaires tombées
 Aucun descripteur consulté n'a survécu intact. Par ordre de coût évité :
 
