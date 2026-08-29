@@ -20,6 +20,17 @@
 #        futur repli sur `pwd` était réintroduit, ce test resterait silencieusement vert-par-erreur
 #        (bloc trouvé, trust_level=trusted, aucun message) — on vérifie donc l'ABSENCE de repli en
 #        exigeant le message "non mesurable", jamais un succès silencieux.
+#   T9  — kimi-code EST détecté via son binaire réel `kimi` (Node, Moonshot) exposant
+#        `--output-format` dans `--help` — sonde par CAPACITÉ, alignée sur gsd-core
+#        capability-registry.cjs (kimi-code.reviewer.probe). AVANT ce correctif, la cascade
+#        sondait `command -v kimi-code` (nom de binaire qui n'existe pas) → détection vide sur un
+#        poste kimi-code réel (piège RUNT-02→silencieux, 38-CONTEXT.md).
+#   T10 — CAS DISCRIMINANT : un faux binaire `kimi` SANS `--output-format` (kimi-cli Python,
+#        produit DISTINCT qui partage le même nom de binaire que kimi-code) ne doit PAS être
+#        détecté comme kimi-code — sinon la sonde confondrait les deux produits au lieu de les
+#        distinguer, déplaçant le piège plutôt que de le fermer.
+#   T11 — NON-RÉGRESSION : opencode reste détecté via `command -v opencode` (sans VF_RUNTIME),
+#        priorité inchangée devant kimi-code dans la cascade.
 #
 # Convention : asserts numérotés, helpers ok()/ko()/skip(), isolation mktemp -d + trap, exit 0
 # si tout passe (SKIP non bloquant), exit 1 si au moins un KO.
@@ -240,6 +251,72 @@ EOF
   else
     ko "T8 : repli sur pwd suspecté — attendu message 'non mesurable', obtenu exit=$EXIT8 sortie='$OUT8' (bloc de sonde [projects.\"$NONGIT\"] trusted aurait matché silencieusement)"
   fi
+fi
+
+# ---------------------------------------------------------------------------
+# T9 — kimi-code détecté via le binaire réel `kimi` exposant `--output-format` (sonde par
+# capacité, PAS `command -v kimi-code` — ce nom de binaire n'existe pas dans la réalité mesurée).
+# ---------------------------------------------------------------------------
+FIX9="$WORKDIR/fix9"
+mkdir -p "$FIX9"
+cat > "$FIX9/kimi" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = "--help" ]; then
+  printf 'usage: kimi [options]\n  --output-format <fmt>   output format\n'
+  exit 0
+fi
+exit 0
+EOF
+chmod +x "$FIX9/kimi"
+DETECT9=$(env -i PATH="$FIX9:/usr/bin:/bin" bash "$DISPATCH" detect 2>&1)
+EXIT9=$?
+if [ "$EXIT9" -eq 0 ] && [ "$DETECT9" = "kimi-code" ]; then
+  ok "T9 : binaire 'kimi' exposant --output-format → détecté comme 'kimi-code' (sonde par capacité, jamais 'command -v kimi-code')"
+else
+  ko "T9 : kimi-code non détecté (exit=$EXIT9, sortie='$DETECT9')"
+fi
+
+# ---------------------------------------------------------------------------
+# T10 — CAS DISCRIMINANT : faux binaire 'kimi' SANS --output-format (kimi-cli Python, produit
+# distinct qui partage le même nom de binaire) → PAS détecté comme kimi-code. Sans ce cas, la
+# sonde par nom de binaire seul confondrait les deux produits au lieu de les distinguer.
+# ---------------------------------------------------------------------------
+FIX10="$WORKDIR/fix10"
+mkdir -p "$FIX10"
+cat > "$FIX10/kimi" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = "--help" ]; then
+  printf 'usage: kimi [options]\n  --model <m>   model to use\n'
+  exit 0
+fi
+exit 0
+EOF
+chmod +x "$FIX10/kimi"
+DETECT10=$(env -i PATH="$FIX10:/usr/bin:/bin" bash "$DISPATCH" detect 2>&1)
+EXIT10=$?
+if [ "$EXIT10" -eq 0 ] && [ "$DETECT10" != "kimi-code" ]; then
+  ok "T10 : CAS DISCRIMINANT — 'kimi' SANS --output-format (kimi-cli Python) → jamais confondu avec kimi-code (détection='$DETECT10')"
+else
+  ko "T10 : faux positif — 'kimi' sans --output-format détecté comme '$DETECT10' (exit=$EXIT10), la sonde confond les deux produits"
+fi
+
+# ---------------------------------------------------------------------------
+# T11 — NON-RÉGRESSION : opencode reste détecté via 'command -v opencode' (sans VF_RUNTIME),
+# priorité inchangée devant kimi-code dans la cascade.
+# ---------------------------------------------------------------------------
+FIX11="$WORKDIR/fix11"
+mkdir -p "$FIX11"
+cat > "$FIX11/opencode" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$FIX11/opencode"
+DETECT11=$(env -i PATH="$FIX11:/usr/bin:/bin" bash "$DISPATCH" detect 2>&1)
+EXIT11=$?
+if [ "$EXIT11" -eq 0 ] && [ "$DETECT11" = "opencode" ]; then
+  ok "T11 : NON-RÉGRESSION — opencode toujours détecté via 'command -v opencode' (mesuré présent sur poste réel)"
+else
+  ko "T11 : régression détection opencode (exit=$EXIT11, sortie='$DETECT11')"
 fi
 
 # ---------------------------------------------------------------------------

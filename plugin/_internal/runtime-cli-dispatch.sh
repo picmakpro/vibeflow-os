@@ -14,9 +14,16 @@
 #   runtime-cli-dispatch.sh ensure-codex-preconditions
 #
 # Détection (`detect_agent_runtime`) : `VF_RUNTIME` (override explicite, prioritaire) sinon
-# cascade de présence `command -v` dans l'ordre claude, codex, opencode, kimi-code — premier
-# trouvé gagne, aucun trouvé → chaîne vide (« absent »). Jamais de détection via une variable
-# d'environnement propriétaire d'un runtime tiers non mesurée.
+# cascade de présence `command -v` dans l'ordre claude, codex, opencode — premier trouvé gagne.
+# kimi-code est sondé À PART, par CAPACITÉ (`detect_kimi_code`, alignée sur gsd-core
+# capability-registry.cjs, descripteur kimi-code.reviewer.probe : command-capability, binaire
+# `kimi`, needle `--output-format`) — jamais `command -v kimi-code` : le binaire réel de
+# kimi-code (Node, Moonshot) s'appelle `kimi`, PAS `kimi-code` (mesuré sur poste kimi-code réel,
+# 38-CONTEXT.md). `kimi` (Python kimi-cli, Moonshot, produit DISTINCT) PARTAGE ce même nom de
+# binaire — sonder `command -v kimi` seul confondrait les deux produits ; la capacité
+# `--output-format` dans `kimi --help` est ce qui discrimine kimi-code du kimi-cli Python.
+# Aucun trouvé (claude/codex/opencode/kimi-code) → chaîne vide (« absent »). Jamais de détection
+# via une variable d'environnement propriétaire d'un runtime tiers non mesurée.
 #
 # Runtimes RÉELLEMENT exécutés : `claude` (comportement actuel inchangé — `claude plugin ...`) et
 # `codex` (canal natif `codex plugin`, assumé par défaut — MÊME forme d'arguments — mais NON
@@ -54,6 +61,16 @@
 # tuer ce script — c'est précisément la dégradation gracieuse attendue (RUNT-02).
 set -uo pipefail
 
+# ---------- Détection kimi-code (par CAPACITÉ, jamais par nom de binaire) ----------
+# `kimi` (Python kimi-cli) et `kimi-code` (Node) partagent le binaire `kimi` sur le PATH. On ne
+# retient kimi-code que si `kimi --help` expose bien `--output-format` — la même sonde que
+# gsd-core capability-registry.cjs (kimi-code.reviewer.probe). Absence du binaire, ou binaire
+# sans cette capacité (kimi-cli Python) → non détecté, jamais un faux positif.
+detect_kimi_code() {
+  command -v kimi >/dev/null 2>&1 || return 1
+  kimi --help 2>/dev/null | grep -qF -- '--output-format'
+}
+
 # ---------- Détection du runtime ----------
 detect_agent_runtime() {
   if [ -n "${VF_RUNTIME:-}" ]; then
@@ -61,9 +78,10 @@ detect_agent_runtime() {
     return 0
   fi
   local rt
-  for rt in claude codex opencode kimi-code; do
+  for rt in claude codex opencode; do
     command -v "$rt" >/dev/null 2>&1 && { printf '%s' "$rt"; return 0; }
   done
+  detect_kimi_code && { printf '%s' "kimi-code"; return 0; }
   printf '%s' ""
 }
 
