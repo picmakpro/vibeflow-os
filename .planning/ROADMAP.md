@@ -1160,3 +1160,27 @@ désormais sa cible résolue comme `--target` le fait. **Déclencheur de reprise
 multi-runtime amène des adaptateurs à construire des `--target` explicites plutôt qu'à passer par
 `user`/`project`/`local` ; le jour où ce chemin devient majoritaire, le plus contraint des deux
 sera aussi le plus fréquent, et l'unification cessera d'être cosmétique.
+
+**Dette nommée — texte faux du gate de coexistence hors périmètre** (D-38-R, 2026-08-29,
+Phase 38, plan 38-07, CODEX-B6 second volet). **Fait mesuré** :
+`plugin/conductor/scripts/check-artifact-fidelity.sh:175` affirme qu'un runtime coexistant
+« opère SANS gouvernance de hooks (aucun mécanisme équivalent mesuré à ce jour) » —
+affirmation **démentie** par la mesure de bout en bout du 2026-08-29 (38-CONTEXT.md
+lignes 1156-1164) : Codex 0.150.1 porte une surface de hooks **prouvée exécutante** (un
+`$CODEX_HOME/hooks.json` en forme strictement Claude Code a réellement déclenché un hook sous
+`--dangerously-bypass-hook-trust`), un **sur-ensemble** des événements Claude Code
+(`SubagentStart`, `Interrupt`, `PostCompact`…), les mêmes clés (`matcher`/`timeoutSec`/`async`/
+`permissionDecision`), et même un **importeur natif** `settings.json -> hooks.json`. Le vrai
+trou : l'install VibeFlow merge dans `settings.json`, jamais lu par Codex, au lieu de
+`hooks.json`. **Non traité en Phase 38, délibérément** : le fichier porteur du texte vit sous
+`plugin/conductor/**`, hors périmètre strict du plan 38-07 (`plugin/_internal/vibeflow-update.sh`,
+`plugin/_internal/tests/`, `plugin/_internal/runtime-adapter/register-codex-agent.sh` uniquement) —
+un autre worker corrige en parallèle, sur ce même worktree partagé, un défaut différent du même
+gate (commit `9af7a4b`). Le plan 38-07 traite le PREMIER volet de CODEX-B6 (la déclaration de
+coexistence, jusque-là inerte faute d'écriture dans le registre de runtime au moment de
+l'install/status — désormais câblée via `record_codex_runtime_if_applicable()`). **Déclencheur de
+reprise** : corriger le texte de la ligne 175 dès que ce worker parallèle livre sa propre
+correction du même fichier (remplacer la négation par : Codex expose une surface de hooks prouvée
+exécutante, non ENCORE ciblée par l'install VibeFlow qui merge dans `settings.json` au lieu de
+`hooks.json`) ; et/ou planifier une conversion réelle `settings.json -> hooks.json` comme geste
+dédié, jamais promise avant d'être livrée.
