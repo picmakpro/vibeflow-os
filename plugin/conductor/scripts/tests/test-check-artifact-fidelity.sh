@@ -159,6 +159,71 @@ else
   ok "T24.vert : le gate réel (non muté) reste sans l'ancien texte faux — mutant confiné à sa copie"
 fi
 
+# T25-T27 — role_confinement au SECOND point d'observation, D-38-O (correction ciblée) : le fait
+# doit sortir sur --coexistence-report (le mode que show_status() invoque, vibeflow-update.sh),
+# pas seulement sur --target codex <artefact> (l'install). Réutilise coex.json/solo.json posés par
+# T19-T22 — mais recréés ici, la suite les a supprimés juste au-dessus (rm -rf "$COEX_WORK").
+COEX_WORK2="$(mktemp -d)"
+cat > "$COEX_WORK2/coex.json" <<'EOF'
+{"vf_runtimes": {"installed": ["claude", "codex"], "active": "codex"}}
+EOF
+cat > "$COEX_WORK2/solo.json" <<'EOF'
+{"vf_runtimes": {"installed": ["claude"], "active": "claude"}}
+EOF
+cp "$SCRIPTS_DIR/runtime-registry.sh" "$COEX_WORK2/runtime-registry.sh"
+
+T25_OUT="$(bash "$GATE" --coexistence-report --config "$COEX_WORK2/coex.json")"
+T25_RC=$?
+if [ "$T25_RC" -eq 0 ] && printf '%s\n' "$T25_OUT" | grep -q '^\[fidelity-recette\].*role_confinement=inerte-par-role'; then
+  ok "T25 : --coexistence-report avec codex installé -> role_confinement=inerte-par-role présent sur [fidelity-recette] (D-38-O, second point d'observation)"
+else
+  ko "T25 : attendu la ligne [fidelity-recette] avec role_confinement=inerte-par-role + exit 0, obtenu rc=$T25_RC, sortie='$T25_OUT'"
+fi
+
+# T26 — témoin de silence : lab SANS codex installé -> --coexistence-report ne dit RIEN de codex
+# (ni la ligne [fidelity-coexistence] codex, ni role_confinement). Sans ce témoin, T25 ne prouve
+# que la déclaration sort, jamais qu'elle est ciblée sur le cas réel.
+T26_OUT="$(bash "$GATE" --coexistence-report --config "$COEX_WORK2/solo.json")"
+T26_RC=$?
+if [ "$T26_RC" -eq 0 ] && ! printf '%s' "$T26_OUT" | grep -q 'codex'; then
+  ok "T26 : installed=[claude] seul -> silence total sur codex (ni hooks, ni role_confinement), exit 0"
+else
+  ko "T26 : attendu silence total sur codex + exit 0, obtenu rc=$T26_RC, sortie='$T26_OUT'"
+fi
+
+# T27 — preuve rouge/vert par mutation : un gate qui aurait gardé la sortie anticipée d'avant
+# correction (D-38-O) ne rend PAS le fait sur --coexistence-report, même avec codex installé —
+# c'est exactement le défaut mesuré par l'audit. Le mutant neutralise SEUL l'appel
+# print_fidelity_recette dans la branche `_has_codex` (jamais l'appel du mode --target codex, ni la
+# fonction partagée elle-même — muter la fonction rendrait le mutant inerte des DEUX côtés à la
+# fois), le gate réel (non muté) doit rester vert juste après (mutant confiné à sa copie).
+T27_MUTANT_GATE="$WORK/mutant-no-role-confinement-status.sh"
+awk '
+  /if \[ "\$_has_codex" -eq 1 \]; then/ { print; getline; print "    :"; next }
+  { print }
+' "$GATE" > "$T27_MUTANT_GATE"
+GATE_CALL_COUNT="$(grep -c '^\s*print_fidelity_recette\s*$' "$GATE")"
+MUTANT_CALL_COUNT="$(grep -c '^\s*print_fidelity_recette\s*$' "$T27_MUTANT_GATE")"
+if [ "$GATE_CALL_COUNT" -eq 2 ] && [ "$MUTANT_CALL_COUNT" -eq 1 ]; then
+  ok "T27.mutant.sonde : le mutant retire UN SEUL des deux appels print_fidelity_recette (gate réel=$GATE_CALL_COUNT, mutant=$MUTANT_CALL_COUNT)"
+else
+  ko "T27.mutant.sonde : nombre d'appels inattendu (gate réel=$GATE_CALL_COUNT, mutant=$MUTANT_CALL_COUNT) — T27 non probant"
+fi
+T27_MUT_OUT="$(bash "$T27_MUTANT_GATE" --coexistence-report --config "$COEX_WORK2/coex.json" 2>/dev/null)"
+if printf '%s' "$T27_MUT_OUT" | grep -qF 'role_confinement'; then
+  ko "T27.mutant : le mutant (émission neutralisée) affiche encore role_confinement — mutant inerte, non discriminant"
+else
+  ok "T27.mutant : le mutant (émission neutralisée) reproduit bien le défaut D-38-O (silence, même avec codex installé)"
+fi
+T27_RECHECK_OUT="$(bash "$GATE" --coexistence-report --config "$COEX_WORK2/coex.json" 2>/dev/null)"
+if printf '%s' "$T27_RECHECK_OUT" | grep -qF 'role_confinement=inerte-par-role'; then
+  ok "T27.vert : le gate réel (non muté) rend bien role_confinement — mutant confiné à sa copie"
+else
+  ko "T27.vert : le gate réel (non muté) ne rend plus role_confinement — le mutant a fui hors de sa copie"
+fi
+
+rm -rf "$COEX_WORK2"
+
 rm -rf "$COEX_WORK"
 
 if [ -z "$REAL_GSD_HOME" ] || [ ! -f "$FIXTURE_SRC" ]; then
@@ -359,6 +424,70 @@ if printf '%s\n' "$T6_OUT" | grep -q '^\[fidelity-recette\].*role_confinement=in
 else
   ko "T8 : role_confinement absent ou mal formé sur [fidelity-recette] (sortie: $T6_OUT)"
 fi
+
+# ---------------------------------------------------------------------------
+# T28 — assertion STRUCTURELLE (mandat manager, correction de la récidive T-38-13/D-38-O) : tout
+# fait déclaré à l'install ([fidelity-recette] du mode --target codex, capturé ci-dessus en
+# T6_OUT) est aussi déclaré au status (--coexistence-report, codex installé) — comparaison
+# D'ENSEMBLES de noms de clés, jamais une liste de champs énumérée à la main. Un champ ajouté
+# demain à l'un des deux sites sans l'autre doit rougir tout seul.
+# ---------------------------------------------------------------------------
+extract_recette_keys() {
+  # $1 = sortie du gate (une ou plusieurs lignes). N'attrape QUE les tokens "clé=" contigus sur la
+  # ligne [fidelity-recette] — les valeurs (ex. "non trusted)") ne portent jamais de '=' collé à un
+  # mot, donc aucun faux positif. Classe [a-zA-Z0-9_] (PAS [a-zA-Z_] seul) : multi_agent_v2 porte un
+  # chiffre — un défaut mesuré ici même a sous-déclaré cette clé en son absence (le "2" cassait la
+  # contiguïté juste avant le '=', un faux négatif qui aurait rendu ce garde structurellement
+  # aveugle à sa propre régression cible).
+  printf '%s\n' "$1" | grep '^\[fidelity-recette\]' | grep -oE '[a-zA-Z0-9_]+=' | sed 's/=$//' | sort -u
+}
+
+T28_COEX_WORK="$(mktemp -d)"
+cat > "$T28_COEX_WORK/coex.json" <<'EOF'
+{"vf_runtimes": {"installed": ["claude", "codex"], "active": "codex"}}
+EOF
+cp "$SCRIPTS_DIR/runtime-registry.sh" "$T28_COEX_WORK/runtime-registry.sh"
+T28_STATUS_OUT="$(bash "$GATE" --coexistence-report --config "$T28_COEX_WORK/coex.json")"
+
+T28_INSTALL_KEYS="$(extract_recette_keys "$T6_OUT")"
+T28_STATUS_KEYS="$(extract_recette_keys "$T28_STATUS_OUT")"
+
+if [ -n "$T28_INSTALL_KEYS" ] && [ "$T28_INSTALL_KEYS" = "$T28_STATUS_KEYS" ]; then
+  ok "T28 : ensemble des clés [fidelity-recette] IDENTIQUE install vs status ($(printf '%s' "$T28_INSTALL_KEYS" | tr '\n' ',' | sed 's/,$//'))"
+else
+  ko "T28 : écart d'ensembles install vs status — install={$(printf '%s' "$T28_INSTALL_KEYS" | tr '\n' ',')} status={$(printf '%s' "$T28_STATUS_KEYS" | tr '\n' ',')}"
+fi
+
+# T28.mutant — preuve mordante, SITE-SPÉCIFIQUE (jamais la fonction partagée elle-même, qui
+# rendrait le mutant inerte des deux côtés à la fois) : reproduit exactement le défaut D-38-O — le
+# site --coexistence-report perd un champ (trust_level, multi_agent_v2) que l'install garde. Cible
+# UNIQUEMENT l'appel dans la branche `_has_codex`, jamais l'appel du mode --target codex.
+T28_MUTANT_GATE="$WORK/mutant-status-drops-fields.sh"
+awk '
+  /if \[ "\$_has_codex" -eq 1 \]; then/ { print; getline; print "    echo \"[fidelity-recette] role_confinement=${ROLE_CONFINEMENT}\""; next }
+  { print }
+' "$GATE" > "$T28_MUTANT_GATE"
+if grep -qF 'echo "[fidelity-recette] role_confinement=${ROLE_CONFINEMENT}"' "$T28_MUTANT_GATE" \
+  && grep -qF 'print_fidelity_recette' "$T28_MUTANT_GATE"; then
+  ok "T28.mutant.sonde : le site status a bien été réduit (mutant vivant), l'appel du mode install (print_fidelity_recette) reste présent ailleurs dans le mutant"
+else
+  ko "T28.mutant.sonde : la substitution n'a pas pris (mutant absent, T28.mutant non probant)"
+fi
+T28_MUT_STATUS_OUT="$(bash "$T28_MUTANT_GATE" --coexistence-report --config "$T28_COEX_WORK/coex.json" 2>/dev/null)"
+T28_MUT_STATUS_KEYS="$(extract_recette_keys "$T28_MUT_STATUS_OUT")"
+if [ "$T28_INSTALL_KEYS" != "$T28_MUT_STATUS_KEYS" ]; then
+  ok "T28.mutant : le mutant (status réduit à role_confinement seul) rougit bien l'assertion d'ensembles (install={$(printf '%s' "$T28_INSTALL_KEYS" | tr '\n' ',')} != status={$(printf '%s' "$T28_MUT_STATUS_KEYS" | tr '\n' ',')})"
+else
+  ko "T28.mutant : le mutant n'a pas produit d'écart d'ensembles — mutant inerte, non discriminant"
+fi
+T28_RECHECK_STATUS_OUT="$(bash "$GATE" --coexistence-report --config "$T28_COEX_WORK/coex.json" 2>/dev/null)"
+T28_RECHECK_STATUS_KEYS="$(extract_recette_keys "$T28_RECHECK_STATUS_OUT")"
+if [ "$T28_INSTALL_KEYS" = "$T28_RECHECK_STATUS_KEYS" ]; then
+  ok "T28.vert : le gate réel (non muté) retrouve l'égalité d'ensembles — mutant confiné à sa copie"
+else
+  ko "T28.vert : le gate réel (non muté) diverge encore — le mutant a fui hors de sa copie"
+fi
+rm -rf "$T28_COEX_WORK"
 
 # ---------------------------------------------------------------------------
 # T7 — count_markers() compte des OCCURRENCES, pas des lignes : une ligne portant DEUX

@@ -69,6 +69,68 @@ JUDGE_CMD_FILE=""
 COEXISTENCE_MODE=0
 COEXISTENCE_CONFIG=".planning/config.json"
 
+# --- role_confinement (FIDE-03, D-38-O) : CONSTANTE déclarée pour la cible codex — pas une
+# mesure de poste, un comportement documenté du binaire (sandbox_mode/approval_policy/
+# [permissions] par rôle acceptés puis inertes, session-only). Déclarée ICI (avant le dispatch de
+# mode) pour rester une SEULE source de vérité : le mode --target codex (ligne [fidelity-recette]
+# historique) ET le mode --coexistence-report (D-38-O, correction ciblée) relaient tous deux CETTE
+# même variable, jamais un second texte recopié.
+ROLE_CONFINEMENT="inerte-par-role (garanti UNIQUEMENT par session -s read-only separee, jamais par le fichier de role — D-38-O)"
+
+# --- Recette d'environnement Codex (multi_agent_v2, trust_level) + role_confinement : fonctions
+# PARTAGÉES entre les deux points d'observation (--target codex <artefact>, à l'install ; et
+# --coexistence-report, au status — D-38-O, correction ciblée). compute_fidelity_recette() peuple
+# les trois variables globales (MULTI_AGENT_V2, TRUST_LEVEL, ROLE_CONFINEMENT — cette dernière déjà
+# une constante) ; print_fidelity_recette() calcule PUIS émet la ligne [fidelity-recette] au format
+# UNIQUE des deux côtés. Aucun site d'appel ne recopie ce format à la main : un fait ajouté demain
+# à cette ligne apparaît AUTOMATIQUEMENT aux deux points d'observation, structurellement — c'est
+# la garantie que réclame D-38-O, pas une liste de champs synchronisée à la main.
+compute_fidelity_recette() {
+  MULTI_AGENT_V2="non mesurable (CLI codex introuvable)"
+  if command -v codex >/dev/null 2>&1; then
+    local features_line
+    features_line=$(codex features list 2>/dev/null | grep -E '^multi_agent_v2[[:space:]]' | head -1)
+    if [ -n "$features_line" ]; then
+      MULTI_AGENT_V2=$(printf '%s\n' "$features_line" | awk '{print $NF}')
+    else
+      MULTI_AGENT_V2="non mesurable (flag multi_agent_v2 absent de 'codex features list')"
+    fi
+  fi
+
+  TRUST_LEVEL="absent (non trusted)"
+  # Résolution de racine ALIGNÉE avec plugin/_internal/runtime-cli-dispatch.sh
+  # (ensure_codex_preconditions, repo_root) : même absence de repli sur `pwd` hors dépôt git — un
+  # repli divergent ferait sonder aux deux gardes deux racines différentes pour le même fait
+  # (revue de jointure Phase 38, join-1). Si l'autre fichier change sa résolution, réplique ici.
+  local target_root codex_config
+  target_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  if [ -z "$target_root" ]; then
+    TRUST_LEVEL="non mesurable (racine du dépôt cible introuvable)"
+  else
+    codex_config="${CODEX_HOME:-$HOME/.codex}/config.toml"
+    if [ -f "$codex_config" ]; then
+      # Bloc [projects."<racine>"] portant trust_level = "trusted" — lecture seule.
+      if awk -v root="$target_root" '
+        BEGIN { in_block = 0 }
+        /^\[projects\./ {
+          in_block = ($0 == "[projects.\"" root "\"]")
+          next
+        }
+        /^\[/ { in_block = 0 }
+        in_block && /trust_level[[:space:]]*=[[:space:]]*"trusted"/ { found = 1 }
+        END { exit found ? 0 : 1 }
+      ' "$codex_config"; then
+        TRUST_LEVEL="trusted"
+      fi
+    fi
+  fi
+}
+
+print_fidelity_recette() {
+  compute_fidelity_recette
+  echo "[fidelity-recette] multi_agent_v2=${MULTI_AGENT_V2} trust_level=${TRUST_LEVEL} role_confinement=${ROLE_CONFINEMENT}"
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --target)
@@ -185,10 +247,23 @@ if [ "$COEXISTENCE_MODE" -eq 1 ]; then
     exit 0
   fi
   INSTALLED_RUNTIMES="$(bash "$REGISTRY_SCRIPT" list-installed --config "$COEXISTENCE_CONFIG" 2>/dev/null)" || exit 0
+  _has_codex=0
   for _rt in $INSTALLED_RUNTIMES; do
     [ "$_rt" = "claude" ] && continue
     echo "[fidelity-coexistence] $_rt : opère SANS gouvernance de hooks — VibeFlow pose ses hooks dans settings.json, que $_rt n'exécute pas (surface hooks.json existante, non visée — cf. 38-CONTEXT.md)"
+    [ "$_rt" = "codex" ] && _has_codex=1
   done
+  # [fidelity-recette] (FIDE-03, D-38-O) : DEUXIÈME point d'observation de la MÊME ligne que
+  # l'install (print_fidelity_recette, définie en tête de script) — corrige la sortie anticipée
+  # ci-dessus, qui laissait `status` muet sur ces faits longtemps après l'install (revue Phase 38).
+  # print_fidelity_recette() est le SEUL endroit qui formate cette ligne : un fait ajouté demain
+  # (à côté de multi_agent_v2/trust_level/role_confinement) apparaît ici automatiquement, jamais
+  # par une synchronisation manuelle entre les deux sites d'appel. Silence légitime : rien ici si
+  # codex n'est pas un runtime installé — la déclaration vise le cas réel, jamais un avertissement
+  # universel.
+  if [ "$_has_codex" -eq 1 ]; then
+    print_fidelity_recette
+  fi
   exit 0
 fi
 
@@ -460,51 +535,15 @@ fs.writeFileSync(outFile, converted);
   fi
 fi
 
-# --- Recette d'environnement Codex : deux mesures INDÉPENDANTES de la conversion d'artefact. ---
-MULTI_AGENT_V2="non mesurable (CLI codex introuvable)"
-if command -v codex >/dev/null 2>&1; then
-  FEATURES_LINE=$(codex features list 2>/dev/null | grep -E '^multi_agent_v2[[:space:]]' | head -1)
-  if [ -n "$FEATURES_LINE" ]; then
-    MULTI_AGENT_V2=$(printf '%s\n' "$FEATURES_LINE" | awk '{print $NF}')
-  else
-    MULTI_AGENT_V2="non mesurable (flag multi_agent_v2 absent de 'codex features list')"
-  fi
-fi
-
-TRUST_LEVEL="absent (non trusted)"
-# Résolution de racine ALIGNÉE avec plugin/_internal/runtime-cli-dispatch.sh
-# (ensure_codex_preconditions, repo_root) : même absence de repli sur `pwd` hors dépôt git — un
-# repli divergent ferait sonder aux deux gardes deux racines différentes pour le même fait
-# (revue de jointure Phase 38, join-1). Si l'autre fichier change sa résolution, réplique ici.
-TARGET_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
-if [ -z "$TARGET_ROOT" ]; then
-  TRUST_LEVEL="non mesurable (racine du dépôt cible introuvable)"
-else
-  CODEX_CONFIG="${CODEX_HOME:-$HOME/.codex}/config.toml"
-  if [ -f "$CODEX_CONFIG" ]; then
-    # Bloc [projects."<racine>"] portant trust_level = "trusted" — lecture seule.
-    if awk -v root="$TARGET_ROOT" '
-      BEGIN { in_block = 0 }
-      /^\[projects\./ {
-        in_block = ($0 == "[projects.\"" root "\"]")
-        next
-      }
-      /^\[/ { in_block = 0 }
-      in_block && /trust_level[[:space:]]*=[[:space:]]*"trusted"/ { found = 1 }
-      END { exit found ? 0 : 1 }
-    ' "$CODEX_CONFIG"; then
-      TRUST_LEVEL="trusted"
-    fi
-  fi
-fi
-
-# --- role_confinement (FIDE-03, D-38-O) : CONSTANTE déclarée pour --target codex — pas une
-# mesure de poste comme les deux champs précédents, un comportement documenté du binaire
-# (sandbox_mode/approval_policy/[permissions] par rôle acceptés puis inertes, session-only). ---
-ROLE_CONFINEMENT="inerte-par-role (garanti UNIQUEMENT par session -s read-only separee, jamais par le fichier de role — D-38-O)"
-
+# --- Recette d'environnement Codex (multi_agent_v2, trust_level, role_confinement) : calculée et
+# émise par les fonctions partagées définies en tête de script (compute_fidelity_recette /
+# print_fidelity_recette) — MÊME code que le point d'observation --coexistence-report ci-dessus,
+# jamais un second calcul recopié à la main (D-38-O). Texte : print_fidelity_recette calcule PUIS
+# émet. JSON : compute seul (émission déléguée au bloc node ci-dessous, format JSON distinct).
 if [ "$JSON_MODE" -eq 0 ]; then
-  echo "[fidelity-recette] multi_agent_v2=${MULTI_AGENT_V2} trust_level=${TRUST_LEVEL} role_confinement=${ROLE_CONFINEMENT}"
+  print_fidelity_recette
+else
+  compute_fidelity_recette
 fi
 
 if [ "$JSON_MODE" -eq 1 ]; then

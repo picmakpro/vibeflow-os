@@ -1,5 +1,34 @@
 # Changelog — conductor
 
+## [v1.34.3] — 2026-08-29 (Phase 38 — correction ciblée, D-38-O tenue au status ET à l'install)
+
+**Patch** (mitigation déjà tranchée en doctrine, câblée à son second point d'observation — aucun
+nouveau comportement, aucune nouvelle décision) :
+
+- **`scripts/check-artifact-fidelity.sh`** — le fait `role_confinement` (FIDE-03, D-38-O : sur
+  Codex, `sandbox_mode`/`approval_policy`/`[permissions]` par rôle sont acceptés puis INERTES, le
+  confinement d'un juge n'est garanti QUE par une session `-s read-only` séparée) sortait à
+  l'install (`--target codex <artefact>`) mais PAS au `status` (`--coexistence-report`, invoqué
+  par `show_status()` de `vibeflow-update.sh`) — ce dernier mode `exit 0` avant d'atteindre le
+  bloc concerné. Deuxième récidive du même motif que `T-38-13` (une mitigation déclarée à un seul
+  point d'observation). Corrigé par une refactorisation, pas un patch local : `multi_agent_v2`,
+  `trust_level` et `role_confinement` sont désormais calculés et émis par deux fonctions PARTAGÉES
+  (`compute_fidelity_recette` / `print_fidelity_recette`, définies en tête de script), appelées
+  IDENTIQUEMENT par les deux points d'observation — un fait ajouté demain à cette ligne apparaît
+  automatiquement aux deux endroits, structurellement, jamais par une synchronisation manuelle.
+  Silence légitime préservé : `--coexistence-report` ne dit rien de `role_confinement` si `codex`
+  n'est pas un runtime installé.
+- **`scripts/tests/test-check-artifact-fidelity.sh`** — 9 nouvelles assertions (T25-T28) :
+  T25 (le fait sort au status avec codex installé), T26 (témoin de silence légitime, lab sans
+  codex), T27 (rouge/vert par mutation ciblée sur le SEUL appel du site status, jamais la fonction
+  partagée), et T28 — le durcissement demandé après revue : une comparaison D'ENSEMBLES (jamais
+  une liste de champs énumérée à la main) entre les clés `[fidelity-recette]` déclarées à
+  l'install et au status, prouvée mordante par mutation (le mutant fait perdre `trust_level`/
+  `multi_agent_v2` côté status, l'assertion rougit, le gate réel non muté reste vert). Défaut
+  trouvé en écrivant ce garde lui-même : `extract_recette_keys()` utilisait `[a-zA-Z_]+=` (sans
+  chiffres) — `multi_agent_v2` porte un `2`, cassant la contiguïté juste avant le `=` et rendant
+  la clé invisible aux DEUX côtés (faux négatif structurel). Corrigé en `[a-zA-Z0-9_]+=`.
+
 ## [v1.34.2] — 2026-08-29 (Phase 38 — correction ciblée, le texte de coexistence redevient vrai)
 
 **Patch** (correction d'une affirmation factuellement fausse, aucun comportement changé) :
