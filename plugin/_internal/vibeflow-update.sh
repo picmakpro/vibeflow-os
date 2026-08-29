@@ -1477,26 +1477,39 @@ find_fidelity_gate() {
   echo ""
 }
 
-# resolve_posed_agent_artifact <module_dir> <mod> — chemin posé de l'agent réellement écrit par
-# ce module (AGENT.md racine OU premier agents/*.md, même garde que l'injection MCP ligne
-# ~1663), vide si le module n'a posé aucun agent. Factorisé (jointure ADPT-02/38-05) : partagé
-# par report_artifact_fidelity (FIDE-02) ET register_codex_agent_if_applicable (ADPT-02/38-05) —
-# les deux best-effort qui ne s'invoquent QUE sur un module à agent, jamais un skill-only.
+# resolve_posed_agent_artifact <module_dir> <mod> — TOUS les chemins posés des agents réellement
+# écrits par ce module (AGENT.md racine ET/OU CHAQUE agents/*.md — les deux sources sont
+# CUMULATIVES, jamais mutuellement exclusives), un chemin par ligne sur stdout, vide si le module
+# n'a posé aucun agent. CODEX-B4 (38-CONTEXT.md:1149-1152, mesure du 2026-08-29) : l'ancien
+# contrat "un seul artefact par module" (AGENT.md racine OU premier agents/*.md trouvé) faisait
+# qu'un module posant les DEUX (dev-orchestrator, design-orchestrator) ne voyait jamais son
+# répertoire agents/ traité — le team-kernel entier (7 agents) n'était jamais enregistré côté
+# Codex. Factorisé (jointure ADPT-02/38-05) : partagé par report_artifact_fidelity (FIDE-02) ET
+# register_codex_agent_if_applicable (ADPT-02/38-05) — les deux best-effort qui ne s'invoquent
+# QUE sur un module à agent, jamais un skill-only. Contrat de sortie : retour 1 (stdout vide) si
+# la liste est vide, retour 0 sinon — inchangé, les deux appelants gardent leur garde `|| return 0`.
 resolve_posed_agent_artifact() {
   local module_dir="$1" mod="$2"
-  local artifact=""
+  local found=0
   if [ -f "$module_dir/AGENT.md" ]; then
-    artifact="$TARGET_ROOT/agents/${mod}.md"
-  elif [ -d "$module_dir/agents" ]; then
-    local first
-    for first in "$module_dir/agents/"*.md; do
-      [ -f "$first" ] || continue
-      artifact="$TARGET_ROOT/agents/$(basename "$first")"
-      break
+    local artifact="$TARGET_ROOT/agents/${mod}.md"
+    if [ -f "$artifact" ]; then
+      printf '%s\n' "$artifact"
+      found=1
+    fi
+  fi
+  if [ -d "$module_dir/agents" ]; then
+    local file
+    for file in "$module_dir/agents/"*.md; do
+      [ -f "$file" ] || continue
+      local artifact="$TARGET_ROOT/agents/$(basename "$file")"
+      if [ -f "$artifact" ]; then
+        printf '%s\n' "$artifact"
+        found=1
+      fi
     done
   fi
-  [ -n "$artifact" ] && [ -f "$artifact" ] && { printf '%s' "$artifact"; return 0; }
-  printf ''
+  [ "$found" -eq 1 ] && return 0
   return 1
 }
 
@@ -1509,12 +1522,16 @@ resolve_posed_agent_artifact() {
 report_artifact_fidelity() {
   local mod="$1" module_dir="$2"
   vf_dry_run && return 0
-  local artifact
-  artifact="$(resolve_posed_agent_artifact "$module_dir" "$mod")" || return 0
+  local artifacts
+  artifacts="$(resolve_posed_agent_artifact "$module_dir" "$mod")" || return 0
   local gate
   gate="$(find_fidelity_gate)"
   [ -n "$gate" ] || return 0
-  bash "$gate" --target codex "$artifact" || true
+  local artifact
+  while IFS= read -r artifact; do
+    [ -n "$artifact" ] || continue
+    bash "$gate" --target codex "$artifact" || true
+  done <<< "$artifacts"
 }
 
 # ---------- Adaptateur Codex (ADPT-02/ADPT-03, 38-05) ----------
@@ -1543,8 +1560,8 @@ find_codex_registrar() {
 register_codex_agent_if_applicable() {
   local mod="$1" module_dir="$2"
   vf_dry_run && return 0
-  local artifact
-  artifact="$(resolve_posed_agent_artifact "$module_dir" "$mod")" || return 0
+  local artifacts
+  artifacts="$(resolve_posed_agent_artifact "$module_dir" "$mod")" || return 0
 
   local dispatch runtime
   dispatch="$(find_runtime_dispatch_lib)"
@@ -1556,9 +1573,89 @@ register_codex_agent_if_applicable() {
   registrar="$(find_codex_registrar)"
   [ -n "$registrar" ] || return 0
 
+  local artifact out
+  while IFS= read -r artifact; do
+    [ -n "$artifact" ] || continue
+    out="$(bash "$registrar" "$artifact" 2>&1)" || true
+    [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/[codex-adapter] /'
+  done <<< "$artifacts"
+  return 0
+}
+
+# unregister_codex_agent_if_applicable <mod> <module_dir> — best-effort, symétrique inverse de
+# register_codex_agent_if_applicable, appelée depuis uninstall_module() AVANT que le manifeste ne
+# supprime les artefacts source (resolve_posed_agent_artifact a besoin des .md source ENCORE
+# présents sous $TARGET_ROOT/agents/ pour dériver quels .toml retirer). CODEX-B5
+# (38-CONTEXT.md:1153-1155, mesure du 2026-08-29) : uninstall/uninstall --all ne retirait
+# JAMAIS les rôles .toml posés côté Codex, laissant Codex charger des rôles orphelins pointant
+# sur des agents supprimés. CONTRAIREMENT à register_codex_agent_if_applicable, ne filtre PAS
+# sur le runtime détecté au moment de l'appel — un .toml orphelin d'un install Codex passé doit
+# être nettoyé même si le runtime résolu maintenant est `claude` : gater sur le runtime courant
+# laisserait survivre exactement les orphelins mesurés par CODEX-B5.
+unregister_codex_agent_if_applicable() {
+  local mod="$1" module_dir="$2"
+  vf_dry_run && return 0
+  local artifacts
+  artifacts="$(resolve_posed_agent_artifact "$module_dir" "$mod")" || return 0
+
+  local registrar
+  registrar="$(find_codex_registrar)"
+  [ -n "$registrar" ] || return 0
+
+  local artifact out
+  while IFS= read -r artifact; do
+    [ -n "$artifact" ] || continue
+    out="$(bash "$registrar" "$artifact" --remove 2>&1)" || true
+    [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/[codex-adapter] /'
+  done <<< "$artifacts"
+  return 0
+}
+
+# find_runtime_registry — cascade à 2 positions identique à find_fidelity_gate
+# (runtime-registry.sh est co-localisé avec check-artifact-fidelity.sh sous
+# plugin/conductor/scripts/) — silence total si absent aux deux positions, même doctrine
+# best-effort que toutes les cascades voisines de ce fichier.
+find_runtime_registry() {
+  local c
+  c="$TARGET_ROOT/scripts/runtime-registry.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  c="$CACHE_DIR/conductor/scripts/runtime-registry.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  echo ""
+}
+
+# record_codex_runtime_if_applicable <mod> <module_dir> — best-effort, appelée juste après
+# register_codex_agent_if_applicable en fin de install_module() ET update_module(), AVANT le
+# bloc coexistence-report déjà câblé (38-06) pour que ce dernier lise l'état fraîchement écrit.
+# CODEX-B6 (38-CONTEXT.md:1156-1164, mesure du 2026-08-29) : la déclaration de coexistence sans
+# hooks (MIGR-05) ne se déclenchait JAMAIS en conditions réelles faute d'écriture dans le
+# registre de runtime au moment de l'install/status — `grep -c 'coexistence'` = 0 à l'install et
+# au status sans pré-semage manuel de .planning/config.json. Gate IDENTIQUE à
+# register_codex_agent_if_applicable sur runtime = codex (zéro effet sur le chemin claude
+# majoritaire, seule raison pour laquelle cette écriture est sûre à automatiser). Invoque
+# `runtime-registry.sh set-active codex --confirmed`, qui modifie DÉLIBÉRÉMENT vf_runtimes.active
+# (pas seulement installed[]) — runtime-registry.sh n'expose aucun verbe plus étroit et ce fichier
+# est hors périmètre (plugin/conductor/**), aucun verbe plus étroit ne peut lui être ajouté ici.
+# Sortie relayée verbatim, préfixée [runtime-registry], jamais capturée en silence.
+record_codex_runtime_if_applicable() {
+  local mod="$1" module_dir="$2"
+  vf_dry_run && return 0
+  local artifacts
+  artifacts="$(resolve_posed_agent_artifact "$module_dir" "$mod")" || return 0
+
+  local dispatch runtime
+  dispatch="$(find_runtime_dispatch_lib)"
+  [ -n "$dispatch" ] || return 0
+  runtime="$(bash "$dispatch" detect 2>/dev/null || true)"
+  [ "$runtime" = "codex" ] || return 0
+
+  [ -f ".planning/config.json" ] || return 0
+
+  local registry
+  registry="$(find_runtime_registry)"
+  [ -n "$registry" ] || return 0
+
   local out
-  out="$(bash "$registrar" "$artifact" 2>&1)" || true
-  [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/[codex-adapter] /'
+  out="$(bash "$registry" set-active codex --confirmed 2>&1)" || true
+  [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/[runtime-registry] /'
   return 0
 }
 
@@ -2212,6 +2309,11 @@ install_module() {
   # Adaptateur Codex (ADPT-02/ADPT-03, 38-05) : symétrique, juste après — best-effort, silence
   # total si runtime non-codex/adaptateur absent (cf. register_codex_agent_if_applicable).
   register_codex_agent_if_applicable "$mod" "$module_dir"
+  # Écriture du registre de runtime (CODEX-B6, 38-07) : DOIT précéder le bloc coexistence-report
+  # ci-dessous — sans cette écriture, `--coexistence-report` lit un registre jamais alimenté par
+  # le chemin d'install réel (grep -c 'coexistence' = 0 mesuré le 2026-08-29). Best-effort,
+  # silence total si runtime non-codex/registre absent (cf. record_codex_runtime_if_applicable).
+  record_codex_runtime_if_applicable "$mod" "$module_dir"
   # Coexistence sans hooks (MIGR-05, 38-06) : MÊME gate, AU MÊME endroit qu'au `status` (juste
   # après la bannière [fidelity]) — un opérateur qui installe voit la coexistence déclarée sans
   # second rapport séparé. Best-effort, silence si le gate/registre sont absents.
@@ -2591,6 +2693,12 @@ uninstall_module() {
   log "Désinstallation $mod (scope=$VF_SCOPE → $TARGET_ROOT)..."
   backup_module "$mod"
 
+  # Retrait des rôles Codex (CODEX-B5, 38-07) : IMPÉRATIVEMENT ici, entre backup_module et la
+  # lecture du manifeste qui suit — resolve_posed_agent_artifact a besoin des .md source ENCORE
+  # présents sous $TARGET_ROOT/agents/ pour dériver quels .toml retirer. Best-effort, silence
+  # total si adaptateur absent (cf. unregister_codex_agent_if_applicable).
+  unregister_codex_agent_if_applicable "$mod" "$CACHE_DIR/$mod"
+
   local manifest_rc=0 manifest_content="" refused=0
   manifest_content="$(vf_manifest_read "$mod")" || manifest_rc=$?
   case "$manifest_rc" in
@@ -2893,6 +3001,9 @@ update_module() {
   # Adaptateur Codex (ADPT-02/ADPT-03, 38-05) : 2e couture, symétrique — best-effort, cf.
   # register_codex_agent_if_applicable.
   register_codex_agent_if_applicable "$mod" "$CACHE_DIR/$mod"
+  # Écriture du registre de runtime (CODEX-B6, 38-07) : 2e couture, symétrique — cf.
+  # record_codex_runtime_if_applicable, DOIT précéder toute relecture de coexistence-report.
+  record_codex_runtime_if_applicable "$mod" "$CACHE_DIR/$mod"
 }
 
 # ---------- Main ----------

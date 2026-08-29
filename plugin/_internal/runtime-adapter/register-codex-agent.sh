@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# register-codex-agent.sh — Orchestration de pose d'un rôle Codex depuis un agent VibeFlow
-# (Phase 38, lot 5, ADPT-01/ADPT-04).
+# register-codex-agent.sh — Orchestration de pose (et retrait) d'un rôle Codex depuis un agent
+# VibeFlow (Phase 38, lot 5, ADPT-01/ADPT-04 ; --remove ajouté en 38-07, CODEX-B5).
 #
 # Usage:
 #   register-codex-agent.sh <agent.md> [--codex-home <chemin>] [--verify]
+#   register-codex-agent.sh <agent.md> [--codex-home <chemin>] --remove
 #
 # Résout CODEX_HOME (--codex-home sinon ${CODEX_HOME:-$HOME/.codex}), appelle le convertisseur
 # pur agent-to-codex.mjs, écrit le .toml résultant sous $CODEX_HOME/agents/vibeflow/<name>.toml
@@ -18,6 +19,15 @@
 # invisible en usage normal). Sort non-zéro si le rôle posé n'apparaît pas dans le compte, ou si
 # `codex` est introuvable dans le PATH (message explicite, jamais un succès supposé).
 #
+# --remove : retrait symétrique, idempotent, SANS dépendance à node (le retrait ne doit jamais
+# dépendre d'un binaire dont l'absence ne devrait pourtant jamais bloquer un uninstall).
+# Incompatible avec --verify (rejeté avec un message d'usage explicite). Dérive AGENT_NAME
+# exactement comme la pose (même ligne sed), `rm -f` le .toml s'il existe, sinon no-op — jamais
+# fatal, jamais de création de $AGENTS_DIR s'il est absent (rien à retirer d'un répertoire qui
+# n'a jamais existé). Doctrine "atomique, sans parsing" (38-CONTEXT.md:363), appliquée par rôle
+# plutôt qu'en `rm -rf` global du répertoire — un uninstall_module() d'un SEUL module ne doit
+# jamais supprimer les rôles d'un AUTRE module encore installé en coexistence.
+#
 # Imprime le digest (une ligne par champ, LOST/PENDING/PRESERVED/PRESERVED_BY_OMISSION/ABSENT)
 # sur stdout, TEL QUEL — jamais résumé.
 set -uo pipefail
@@ -27,11 +37,13 @@ CONVERTER="$SCRIPT_DIR/agent-to-codex.mjs"
 
 usage() {
   echo "usage: register-codex-agent.sh <agent.md> [--codex-home <chemin>] [--verify]" >&2
+  echo "       register-codex-agent.sh <agent.md> [--codex-home <chemin>] --remove" >&2
 }
 
 AGENT_MD=""
 CODEX_HOME_ARG=""
 DO_VERIFY=0
+DO_REMOVE=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -41,6 +53,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --verify)
       DO_VERIFY=1
+      shift
+      ;;
+    --remove)
+      DO_REMOVE=1
       shift
       ;;
     -h|--help)
@@ -71,18 +87,19 @@ if [ ! -f "$AGENT_MD" ]; then
   echo "[register-codex-agent] agent introuvable : $AGENT_MD" >&2
   exit 2
 fi
-if ! command -v node >/dev/null 2>&1; then
-  echo "[register-codex-agent] node introuvable dans le PATH — pose impossible" >&2
-  exit 3
+if [ "$DO_REMOVE" -eq 1 ] && [ "$DO_VERIFY" -eq 1 ]; then
+  echo "[register-codex-agent] --remove et --verify sont incompatibles (rien à vérifier sur un rôle qu'on vient de retirer)" >&2
+  usage
+  exit 2
 fi
 
 RESOLVED_CODEX_HOME="${CODEX_HOME_ARG:-${CODEX_HOME:-$HOME/.codex}}"
 AGENTS_DIR="$RESOLVED_CODEX_HOME/agents/vibeflow"
-mkdir -p "$AGENTS_DIR"
 
 # Nom du rôle : dérivé du frontmatter `name`, pas du nom de fichier (le convertisseur lui-même
 # ne l'expose pas côté CLI — on le relit ici, une ligne, cohérent avec la doctrine "name ne
-# vient pas du nom de fichier").
+# vient pas du nom de fichier"). Dérivation partagée à l'identique par la pose ET le retrait —
+# UNIQUE source de vérité pour ce calcul (jamais dupliquée dans vibeflow-update.sh).
 AGENT_NAME="$(sed -n 's/^name:[[:space:]]*//p' "$AGENT_MD" | head -1 | tr -d '[:space:]')"
 if [ -z "$AGENT_NAME" ]; then
   echo "[register-codex-agent] impossible de dériver le nom du rôle depuis $AGENT_MD (champ 'name' absent du frontmatter)" >&2
@@ -90,6 +107,23 @@ if [ -z "$AGENT_NAME" ]; then
 fi
 
 ROLE_TOML="$AGENTS_DIR/${AGENT_NAME}.toml"
+
+if [ "$DO_REMOVE" -eq 1 ]; then
+  if [ -f "$ROLE_TOML" ]; then
+    rm -f "$ROLE_TOML"
+    echo "[register-codex-agent] rôle retiré : $ROLE_TOML"
+  else
+    echo "[register-codex-agent] rôle déjà absent (rien à retirer) : $ROLE_TOML"
+  fi
+  exit 0
+fi
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "[register-codex-agent] node introuvable dans le PATH — pose impossible" >&2
+  exit 3
+fi
+
+mkdir -p "$AGENTS_DIR"
 
 DIGEST_OUTPUT="$(node "$CONVERTER" "$AGENT_MD" --out "$ROLE_TOML" 2>&1 1>/dev/null)"
 CONVERT_STATUS=$?

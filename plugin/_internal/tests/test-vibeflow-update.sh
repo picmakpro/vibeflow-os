@@ -1938,6 +1938,160 @@ fi
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
+# T49 (CODEX-B4, 38-07) — resolve_posed_agent_artifact() rend TOUS les agents d'un module (root
+# AGENT.md ET agents/*.md, cumulés), pas seulement le premier trouvé. Install de dev-orchestrator
+# + design-orchestrator (root + agents/) + validator (root SEUL, témoin de non-régression
+# mono-agent) sous runtime codex détecté (isolation HOME) — l'ensemble TRIÉ des noms `.toml`
+# posés est identique (comm -3 vide) à l'ensemble TRIÉ des `name:` frontmatter des 10 fichiers
+# source. Preuve par comparaison d'ENSEMBLE, jamais par comptage (D-38 prohibition).
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME_CODEX="$LAB/home"
+mkdir -p "$FAKE_HOME_CODEX"
+if prepare_module "$CACHE" "dev-orchestrator" && prepare_module "$CACHE" "design-orchestrator" && prepare_module "$CACHE" "validator"; then
+  miss=0
+  for mod in dev-orchestrator design-orchestrator validator; do
+    (cd "$LAB" && HOME="$FAKE_HOME_CODEX" VF_RUNTIME=codex VIBEFLOW_CACHE="$CACHE" \
+      bash "$INSTALLER" install "$mod" >/dev/null 2>&1)
+  done
+  SOURCE_NAMES="$LAB/source_names.txt"
+  : > "$SOURCE_NAMES"
+  for f in "$REPO/dev-orchestrator/AGENT.md" "$REPO/dev-orchestrator/agents/"*.md \
+           "$REPO/design-orchestrator/AGENT.md" "$REPO/design-orchestrator/agents/"*.md \
+           "$REPO/validator/AGENT.md"; do
+    [ -f "$f" ] || continue
+    _name="$(sed -n 's/^name:[[:space:]]*//p' "$f" | head -1 | tr -d '[:space:]')"
+    printf '%s\n' "$_name" >> "$SOURCE_NAMES"
+  done
+  sort -o "$SOURCE_NAMES" "$SOURCE_NAMES"
+  POSED_NAMES="$LAB/posed_names.txt"
+  find "$FAKE_HOME_CODEX/.codex/agents/vibeflow" -name '*.toml' 2>/dev/null \
+    | xargs -n1 basename 2>/dev/null | sed 's/\.toml$//' | sort > "$POSED_NAMES"
+  DIFF="$(comm -3 "$SOURCE_NAMES" "$POSED_NAMES")"
+  [ -z "$DIFF" ] \
+    || { ko "T49 (CODEX-B4) : comm -3 non vide entre agents source (10) et rôles .toml posés — écart : $(printf '%s' "$DIFF" | tr '\n' ' ')"; miss=1; }
+  "$GREP" -qx 'vibeflow-validator' "$POSED_NAMES" \
+    || { ko "T49 (CODEX-B4, témoin mono-agent) : vibeflow-validator (module à agent unique) absent des rôles posés — le fix multi-agents aurait régressé le cas simple"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T49 (CODEX-B4) : comm -3 vide entre les 10 agents source et les rôles .toml posés (team-kernel complet + module mono-agent non régressé)"
+else
+  skip "T49 : dev-orchestrator/design-orchestrator/validator non copiables dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T50 (CODEX-B5, 38-07) — uninstall_module() (et donc uninstall --all) retire réellement chaque
+# rôle Codex posé, sans toucher aux résidus runtime légitimes de Codex. Install de
+# dev-orchestrator + design-orchestrator (9 .toml attendus) sous runtime codex, seedage de
+# résidus légitimes AVANT install, puis `uninstall --all` — preuve par comm sur ensembles de noms
+# (jamais un compte), et contenu des résidus inchangé (comparaison de contenu).
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME_CODEX="$LAB/home"
+mkdir -p "$FAKE_HOME_CODEX/.codex/sessions" "$FAKE_HOME_CODEX/.codex/cache" \
+  "$FAKE_HOME_CODEX/.codex/log" "$FAKE_HOME_CODEX/.codex/tmp/arg0"
+echo "residu-session" > "$FAKE_HOME_CODEX/.codex/sessions/probe.json"
+echo "residu-cache" > "$FAKE_HOME_CODEX/.codex/cache/probe"
+echo "residu-log" > "$FAKE_HOME_CODEX/.codex/log/probe.log"
+echo "residu-tmp" > "$FAKE_HOME_CODEX/.codex/tmp/arg0/probe"
+echo "residu-models" > "$FAKE_HOME_CODEX/.codex/models_cache.json"
+echo "residu-sqlite" > "$FAKE_HOME_CODEX/.codex/memories_1.sqlite"
+if prepare_module "$CACHE" "dev-orchestrator" && prepare_module "$CACHE" "design-orchestrator"; then
+  miss=0
+  for mod in dev-orchestrator design-orchestrator; do
+    (cd "$LAB" && HOME="$FAKE_HOME_CODEX" VF_RUNTIME=codex VIBEFLOW_CACHE="$CACHE" \
+      bash "$INSTALLER" install "$mod" >/dev/null 2>&1)
+  done
+  BEFORE_NAMES="$LAB/before_names.txt"
+  find "$FAKE_HOME_CODEX/.codex/agents/vibeflow" -name '*.toml' 2>/dev/null \
+    | xargs -n1 basename 2>/dev/null | sed 's/\.toml$//' | sort > "$BEFORE_NAMES"
+  [ "$(wc -l < "$BEFORE_NAMES" | tr -d ' ')" = "9" ] \
+    || { ko "T50 (CODEX-B5, précondition) : 9 rôles .toml attendus avant uninstall, trouvé $(wc -l < "$BEFORE_NAMES" | tr -d ' ') — $(cat "$BEFORE_NAMES" | tr '\n' ' ')"; miss=1; }
+
+  (cd "$LAB" && HOME="$FAKE_HOME_CODEX" VF_RUNTIME=codex VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" uninstall --all >/dev/null 2>&1)
+
+  AFTER_NAMES="$LAB/after_names.txt"
+  find "$FAKE_HOME_CODEX/.codex/agents/vibeflow" -name '*.toml' 2>/dev/null \
+    | xargs -n1 basename 2>/dev/null | sed 's/\.toml$//' | sort > "$AFTER_NAMES"
+  [ -s "$AFTER_NAMES" ] \
+    && { ko "T50 (CODEX-B5) : rôles .toml survivants après uninstall --all — comm : $(comm -3 "$BEFORE_NAMES" "$AFTER_NAMES" | tr '\n' ' ')"; miss=1; }
+
+  [ "$(cat "$FAKE_HOME_CODEX/.codex/sessions/probe.json" 2>/dev/null)" = "residu-session" ] \
+    || { ko "T50 (CODEX-B5, résidu légitime) : sessions/probe.json altéré ou disparu après uninstall"; miss=1; }
+  [ "$(cat "$FAKE_HOME_CODEX/.codex/cache/probe" 2>/dev/null)" = "residu-cache" ] \
+    || { ko "T50 (CODEX-B5, résidu légitime) : cache/probe altéré ou disparu après uninstall"; miss=1; }
+  [ "$(cat "$FAKE_HOME_CODEX/.codex/log/probe.log" 2>/dev/null)" = "residu-log" ] \
+    || { ko "T50 (CODEX-B5, résidu légitime) : log/probe.log altéré ou disparu après uninstall"; miss=1; }
+  [ "$(cat "$FAKE_HOME_CODEX/.codex/tmp/arg0/probe" 2>/dev/null)" = "residu-tmp" ] \
+    || { ko "T50 (CODEX-B5, résidu légitime) : tmp/arg0/probe altéré ou disparu après uninstall"; miss=1; }
+  [ "$(cat "$FAKE_HOME_CODEX/.codex/models_cache.json" 2>/dev/null)" = "residu-models" ] \
+    || { ko "T50 (CODEX-B5, résidu légitime) : models_cache.json altéré ou disparu après uninstall"; miss=1; }
+  [ "$(cat "$FAKE_HOME_CODEX/.codex/memories_1.sqlite" 2>/dev/null)" = "residu-sqlite" ] \
+    || { ko "T50 (CODEX-B5, résidu légitime) : memories_1.sqlite altéré ou disparu après uninstall"; miss=1; }
+
+  [ "$miss" -eq 0 ] && ok "T50 (CODEX-B5) : uninstall --all retire les 9 rôles .toml (comm vide), résidus runtime Codex légitimes intacts"
+else
+  skip "T50 : dev-orchestrator/design-orchestrator non copiables dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T51 (CODEX-B6, 38-07) — la coexistence sans hooks se déclare depuis le chemin RÉEL
+# d'install/status, SANS pré-semage manuel de .planning/config.json (contrairement à T48, qui
+# pré-sème le registre). Install d'un module à agent sous runtime codex détecté sur un lab
+# .planning/config.json minimal ({}) -> install ET status contiennent la ligne
+# [fidelity-coexistence]. Témoin anti-parasite : même scénario sous runtime claude -> AUCUNE
+# ligne coexistence, ni à l'install ni au status.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME_CODEX="$LAB/home"
+mkdir -p "$FAKE_HOME_CODEX"
+if prepare_module "$CACHE" "conductor" && prepare_module "$CACHE" "validator"; then
+  mkdir -p "$LAB/.planning"
+  echo '{}' > "$LAB/.planning/config.json"
+  miss=0
+  INSTALL_OUT=$(cd "$LAB" && HOME="$FAKE_HOME_CODEX" VF_SCOPE=project VF_RUNTIME=codex VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" install validator 2>&1)
+  echo "$INSTALL_OUT" | "$GREP" -qF '[fidelity-coexistence] codex : opère SANS gouvernance de hooks' \
+    || { ko "T51 (CODEX-B6) install : ligne [fidelity-coexistence] absente sans pré-semage — $INSTALL_OUT"; miss=1; }
+  STATUS_OUT=$(cd "$LAB" && HOME="$FAKE_HOME_CODEX" VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" status 2>&1)
+  echo "$STATUS_OUT" | "$GREP" -qF '[fidelity-coexistence] codex : opère SANS gouvernance de hooks' \
+    || { ko "T51 (CODEX-B6) status : ligne [fidelity-coexistence] absente sans pré-semage — $STATUS_OUT"; miss=1; }
+  "$GREP" -qF '"codex"' "$LAB/.planning/config.json" \
+    || { ko "T51 (CODEX-B6) : .planning/config.json ne contient pas \"codex\" après l'install — $(cat "$LAB/.planning/config.json")"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T51 (CODEX-B6) : coexistence déclarée à l'install ET au status sans pré-semage manuel du registre"
+else
+  skip "T51 : conductor/validator non copiables dans le cache de test"
+fi
+rm -rf "$LAB"
+
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME_CLAUDE="$LAB/home"
+mkdir -p "$FAKE_HOME_CLAUDE"
+if prepare_module "$CACHE" "conductor" && prepare_module "$CACHE" "validator"; then
+  mkdir -p "$LAB/.planning"
+  echo '{}' > "$LAB/.planning/config.json"
+  miss=0
+  INSTALL_OUT=$(cd "$LAB" && HOME="$FAKE_HOME_CLAUDE" VF_SCOPE=project VF_RUNTIME=claude VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" install validator 2>&1)
+  [ "$(echo "$INSTALL_OUT" | "$GREP" -c 'coexistence')" -eq 0 ] \
+    || { ko "T51 (CODEX-B6, témoin anti-parasite) install : ligne coexistence présente sous runtime claude — $INSTALL_OUT"; miss=1; }
+  STATUS_OUT=$(cd "$LAB" && HOME="$FAKE_HOME_CLAUDE" VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" status 2>&1)
+  [ "$(echo "$STATUS_OUT" | "$GREP" -c 'coexistence')" -eq 0 ] \
+    || { ko "T51 (CODEX-B6, témoin anti-parasite) status : ligne coexistence présente sous runtime claude — $STATUS_OUT"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T51 (CODEX-B6, témoin anti-parasite) : aucune ligne coexistence sous runtime claude seul, à l'install ET au status"
+else
+  skip "T51 (témoin anti-parasite) : conductor/validator non copiables dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
 # Garde-fou final : le vrai ~/.claude ET le vrai ~/.codex/agents/vibeflow sont inchangés
 # (snapshot récursif avant=après).
 # ---------------------------------------------------------------------------
