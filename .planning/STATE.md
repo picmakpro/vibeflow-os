@@ -7,7 +7,8 @@ current_phase_name: Portabilité multi-runtime — livraison (canal d'install, m
 status: in_progress
 stopped_at: >-
   Phase 38 **exécutée, critère 2 non prouvé (quota Codex), critère 1 partiel (hooks non portés,
-  déclarés)** — 7 plans exécutés sur 7, 88 commits sur `feat/phase-38-portabilite-multi-runtime`
+  déclarés)** — 7 plans exécutés sur 7, 90 commits sur `feat/phase-38-portabilite-multi-runtime` (relevé
+  `git rev-list --count 4ebd700..HEAD` avant le commit de clôture documentaire)
   (worktree `.claude/worktrees/phase-38`), 75 suites / 0 échec, gates verts, `VERSION` racine
   **inchangée v2.58.1**. Livré : gate de fidélité mesurant le TOML *posé* (`MODE=adapter`),
   installeur multi-runtime (12 sites CLI-couplés, 4 verbes), `--target` avec réécriture du payload,
@@ -1036,4 +1037,4 @@ pièges déjà payés. Sans quota, le critère 2 reste **inconnu déclaré** —
    OpenCode et kimi-code). Tout envoi externe est validé par Samuel — le fichier attend, il ne part pas seul.
 
 Puis, quand Samuel a vu la chose marcher : revue de branche, PR, bump racine, tag et release
-(`feat/phase-38-portabilite-multi-runtime`, 88 commits, `VERSION` racine encore v2.58.1).
+(`feat/phase-38-portabilite-multi-runtime`, ~90 commits, `VERSION` racine encore v2.58.1).
