@@ -267,12 +267,14 @@ SRC_MARKERS=$(count_markers "$SRC_BODY")
 PRESERVED=""
 DEGRADED=""
 LOST=""
+MAPPED=""
 add_verdict() {
   # $1 = liste (nom de variable), $2 = champ
   case "$1" in
     PRESERVED) PRESERVED="${PRESERVED:+$PRESERVED,}$2" ;;
     DEGRADED)  DEGRADED="${DEGRADED:+$DEGRADED,}$2" ;;
     LOST)      LOST="${LOST:+$LOST,}$2" ;;
+    MAPPED)    MAPPED="${MAPPED:+$MAPPED,}$2" ;;
   esac
 }
 
@@ -304,14 +306,33 @@ if [ -n "$ADAPTER_MJS" ] && command -v node >/dev/null 2>&1; then
     # $1 = nom de champ digest (identique au frontmatter, cf. agent-to-codex.mjs formatDigest).
     printf '%s\n' "$DIGEST_TEXT" | grep -E "^${1}: " | head -1 | sed -E 's/^[^:]+: ([A-Z_]+).*/\1/'
   }
+  digest_note() {
+    # $1 = nom de champ digest. Rend le texte après « — » (vide si le digest n'en porte pas).
+    printf '%s\n' "$DIGEST_TEXT" | grep -E "^${1}: " | head -1 | sed -E 's/^[^:]+: [A-Z_]+( — )?//'
+  }
   map_and_add() {
     # $1 = champ [fidelity], $2 = nom de champ côté digest, $3 = valeur SRC_* (gate n'émet un
     # verdict QUE si la source portait le champ — même doctrine que l'ancien mode).
-    local field="$1" digest_field="$2" src_value="$3" status
+    #
+    # MAPPED (4e verdict, à côté de PRESERVED/DEGRADED/LOST) : la valeur source a été TRADUITE
+    # vers une valeur cible différente mais VALIDE pour Codex (ex. model `opus` -> Codex
+    # `gpt-5.6-terra`, table CLAUDE_TO_CODEX_MODEL) — ce n'est ni une conservation littérale
+    # (PRESERVED, qui suppose la MÊME valeur des deux côtés) ni une perte (LOST). agent-to-codex.mjs
+    # n'émet JAMAIS `MAPPED` pour une cible invalide : une cible absente de la table de mapping
+    # fait échouer la conversion (node exit != 0, capté plus haut), donc `MAPPED` ici signifie
+    # toujours une valeur posée et valide côté Codex — jamais un LOST déguisé sous une étiquette
+    # neutre (défaut corrigé : avant, `MAPPED` tombait dans le `*)` ci-dessous et ressortait LOST).
+    local field="$1" digest_field="$2" src_value="$3" status note src_v tgt_v
     [ -n "$src_value" ] || return 0
     status="$(digest_status "$digest_field")"
     case "$status" in
       PRESERVED|PRESERVED_BY_OMISSION) add_verdict PRESERVED "$field" ;;
+      MAPPED)
+        note="$(digest_note "$digest_field")"
+        src_v="$(printf '%s' "$note" | sed -nE 's/.*source "([^"]*)".*/\1/p')"
+        tgt_v="$(printf '%s' "$note" | sed -nE 's/.*cible [A-Za-z]+ "([^"]*)".*/\1/p')"
+        add_verdict MAPPED "${field}(${src_v:-?}->${tgt_v:-?})"
+        ;;
       PENDING) add_verdict DEGRADED "$field" ;;
       *) add_verdict LOST "$field" ;;
     esac
@@ -486,7 +507,7 @@ fi
 if [ "$JSON_MODE" -eq 1 ]; then
   node -e '
 const fs = require("fs");
-const [artifact, target, preserved, degraded, lost, deadMarkers, multiAgentV2, trustLevel, roleConfinement, mode] = process.argv.slice(1);
+const [artifact, target, preserved, degraded, lost, mapped, deadMarkers, multiAgentV2, trustLevel, roleConfinement, mode] = process.argv.slice(1);
 const splitCsv = (s) => (s ? s.split(",") : []);
 const out = {
   artifact,
@@ -494,6 +515,7 @@ const out = {
   preserved: splitCsv(preserved),
   degraded: splitCsv(degraded),
   lost: splitCsv(lost),
+  mapped: splitCsv(mapped),
   dead_markers: deadMarkers,
   multi_agent_v2: multiAgentV2,
   trust_level: trustLevel,
@@ -501,10 +523,10 @@ const out = {
   mode,
 };
 process.stdout.write(JSON.stringify(out));
-' "$ARTIFACT" "$TARGET" "$PRESERVED" "$DEGRADED" "$LOST" "$DEAD_MARKERS_LABEL" "$MULTI_AGENT_V2" "$TRUST_LEVEL" "$ROLE_CONFINEMENT" "$MEASURE_MODE"
+' "$ARTIFACT" "$TARGET" "$PRESERVED" "$DEGRADED" "$LOST" "$MAPPED" "$DEAD_MARKERS_LABEL" "$MULTI_AGENT_V2" "$TRUST_LEVEL" "$ROLE_CONFINEMENT" "$MEASURE_MODE"
   echo
 else
-  echo "[fidelity] $ARTIFACT -> $TARGET: PRESERVED={$PRESERVED} DEGRADED={$DEGRADED} LOST={$LOST} DEAD_MARKERS=$DEAD_MARKERS_LABEL MODE=$MEASURE_MODE"
+  echo "[fidelity] $ARTIFACT -> $TARGET: PRESERVED={$PRESERVED} DEGRADED={$DEGRADED} LOST={$LOST} MAPPED={$MAPPED} DEAD_MARKERS=$DEAD_MARKERS_LABEL MODE=$MEASURE_MODE"
 fi
 
 exit 0

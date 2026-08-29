@@ -1,5 +1,23 @@
 # Changelog — conductor
 
+## [v1.34.1] — 2026-08-29 (Phase 38 — correction ciblée, le gate apprend le verdict MAPPED)
+
+**Patch** (durcissement du vocabulaire de `check-artifact-fidelity.sh`, pas de nouvelle capacité) :
+
+- **`scripts/check-artifact-fidelity.sh`** — le gate ne connaissait que trois verdicts
+  (`PRESERVED`/`DEGRADED`/`LOST`). Depuis que `agent-to-codex.mjs` traduit `model` (Claude ->
+  Codex, table `CLAUDE_TO_CODEX_MODEL`) et émet `MAPPED` pour le dire, ce statut tombait dans le
+  `*)` du gate et ressortait **`LOST`** — un champ correctement traduit et **valide côté Codex**
+  déclaré perdu. `[fidelity]` gagne un **4e verdict `MAPPED`**, avec la valeur **source** et
+  **cible** dans le log (`model(opus->gpt-5.6-terra)`) — `PRESERVED` reste réservé à une valeur
+  **littéralement identique** des deux côtés. `memory` reste `LOST` (capacité Claude-only, pas de
+  traduction possible) : seul le champ effectivement traduit change de verdict.
+- **`scripts/tests/test-check-artifact-fidelity.sh`** — T1 attendait `model` dans `PRESERVED=`
+  (assertion périmée par le mapping introduit en v1.34.0) ; T23 (`digest_bucket`) ne connaissait
+  pas non plus `MAPPED` et aurait fait rougir l'accord `[fidelity]`/digest réel pour la mauvaise
+  raison. Les deux sont mis à jour pour refléter le vocabulaire réel — suite verte pour l'accord
+  entre les deux outils, jamais par relâchement de l'assertion T23.
+
 ## [v1.34.0] — 2026-08-29 (Phase 38 — correction ciblée, gate de fidélité mesure l'artefact réel)
 
 **Minor** (le gate change de nature — il mesure désormais l'artefact réellement posé sur disque,

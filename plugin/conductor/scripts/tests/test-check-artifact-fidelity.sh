@@ -170,16 +170,25 @@ for champ in disallowedTools tools; do
   fi
 done
 
-# name/description/model/vf-internal : présents avec valeur truthy dans le TOML réel ->
-# PRESERVED (model n'est PLUS LOST : c'était précisément le défaut corrigé — l'ancienne mesure
-# gsd-core le déclarait LOST alors que le TOML réellement installé le porte).
-for champ in name description model vf-internal; do
+# name/description/vf-internal : présents avec valeur truthy dans le TOML réel -> PRESERVED
+# (valeur littéralement identique des deux côtés).
+for champ in name description vf-internal; do
   if printf '%s\n' "$FIDELITY_LINE" | grep -q "PRESERVED={[^}]*\b${champ}\b"; then
     ok "T1.PRESERVED : $champ dans PRESERVED="
   else
     ko "T1.PRESERVED : $champ absent de PRESERVED= (ligne: $FIDELITY_LINE)"
   fi
 done
+
+# model : TRADUIT (Claude "sonnet" -> Codex "gpt-5.5", table CLAUDE_TO_CODEX_MODEL) -> MAPPED,
+# jamais LOST (défaut corrigé : l'ancienne mesure gsd-core le déclarait LOST alors que le TOML
+# réellement installé le porte) ni PRESERVED (la valeur n'est pas littéralement identique — une
+# traduction valide vers la cible n'est pas une conservation).
+if printf '%s\n' "$FIDELITY_LINE" | grep -q 'MAPPED={[^}]*\bmodel('; then
+  ok "T1.MAPPED : model dans MAPPED= avec source et cible"
+else
+  ko "T1.MAPPED : model absent de MAPPED= (ligne: $FIDELITY_LINE)"
+fi
 
 if printf '%s\n' "$FIDELITY_LINE" | grep -q 'MODE=adapter'; then
   ok "T1.MODE : MODE=adapter (mesure de l'artefact réellement installé, pas la conversion gsd-core)"
@@ -530,11 +539,12 @@ else
   T23_DIGEST="$(node "$ADAPTER_MJS_REAL" "$FIXTURE" --out "$T23_TOML" 2>&1 1>/dev/null)"
 
   digest_bucket() {
-    # $1 = champ digest -> PRESERVED/DEGRADED/LOST, MÊME mapping que map_and_add côté gate.
+    # $1 = champ digest -> PRESERVED/DEGRADED/LOST/MAPPED, MÊME mapping que map_and_add côté gate.
     local status
     status="$(printf '%s\n' "$T23_DIGEST" | grep -E "^${1}: " | head -1 | sed -E 's/^[^:]+: ([A-Z_]+).*/\1/')"
     case "$status" in
       PRESERVED|PRESERVED_BY_OMISSION) echo PRESERVED ;;
+      MAPPED) echo MAPPED ;;
       PENDING) echo DEGRADED ;;
       *) echo LOST ;;
     esac
