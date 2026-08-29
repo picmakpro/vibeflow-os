@@ -1909,6 +1909,35 @@ fi
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
+# T48 (MIGR-05, 38-06) — coexistence sans hooks déclarée AU MÊME endroit à l'install ET au
+# `status` : gate check-artifact-fidelity.sh --coexistence-report résolu depuis le cache
+# (conductor/scripts/), .planning/config.json de fixture avec un runtime coexistant.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+if prepare_module "$CACHE" "conductor" && prepare_module "$CACHE" "validator"; then
+  mkdir -p "$LAB/.planning"
+  cat > "$LAB/.planning/config.json" <<'EOF'
+{"vf_runtimes": {"installed": ["claude", "codex"], "active": "codex"}}
+EOF
+  miss=0
+  INSTALL_OUT=$(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" install validator 2>&1)
+  echo "$INSTALL_OUT" | "$GREP" -qF '[fidelity-coexistence] codex : opère SANS gouvernance de hooks' \
+    || { ko "T48 install : ligne [fidelity-coexistence] absente de la sortie d'install — $INSTALL_OUT"; miss=1; }
+
+  STATUS_OUT=$(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" status 2>&1)
+  echo "$STATUS_OUT" | "$GREP" -qF '[fidelity-coexistence] codex : opère SANS gouvernance de hooks' \
+    || { ko "T48 status : ligne [fidelity-coexistence] absente de la sortie de status — $STATUS_OUT"; miss=1; }
+
+  [ "$miss" -eq 0 ] && ok "T48 (MIGR-05) : coexistence sans hooks déclarée au même endroit à l'install ET au status"
+else
+  skip "T48 : conductor/validator non copiables dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
 # Garde-fou final : le vrai ~/.claude ET le vrai ~/.codex/agents/vibeflow sont inchangés
 # (snapshot récursif avant=après).
 # ---------------------------------------------------------------------------

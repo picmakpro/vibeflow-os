@@ -54,6 +54,8 @@ TARGET="codex"
 JSON_MODE=0
 ARTIFACT=""
 JUDGE_CMD_FILE=""
+COEXISTENCE_MODE=0
+COEXISTENCE_CONFIG=".planning/config.json"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -67,6 +69,14 @@ while [ "$#" -gt 0 ]; do
       ;;
     --check-judge-command)
       JUDGE_CMD_FILE="${2:-}"
+      shift 2
+      ;;
+    --coexistence-report)
+      COEXISTENCE_MODE=1
+      shift
+      ;;
+    --config)
+      COEXISTENCE_CONFIG="${2:-}"
       shift 2
       ;;
     -h|--help)
@@ -137,6 +147,34 @@ if [ -n "$JUDGE_CMD_FILE" ]; then
     echo "[fidelity-judge-command] $JUDGE_CMD_FILE -> $TARGET: INCOMPLET — manque={$MISSING} (ET requis, pas OU — ADPT-05)"
     exit 1
   fi
+fi
+
+# --- Mode --coexistence-report (MIGR-05, Phase 38) : mode GLOBAL, pas par-fichier — déclare, pour
+# CHAQUE runtime installé AUTRE que `claude`, qu'il opère SANS gouvernance de hooks (aucun
+# mécanisme équivalent mesuré à ce jour). `installed` réduit à ["claude"] seul (ou registre
+# absent/vide) -> silence total, rien à déclarer. Exit 0 dans tous les cas où la lecture a pu
+# s'exécuter — une coexistence sans hooks n'est pas un échec du gate, c'est son objet (même
+# doctrine que le reste de ce gate).
+if [ "$COEXISTENCE_MODE" -eq 1 ]; then
+  if [ -n "$ARTIFACT" ]; then
+    echo "[check-artifact-fidelity] --coexistence-report et un artefact ne se combinent pas (deux mesures distinctes)" >&2
+    exit 2
+  fi
+  # Même dossier que ce gate (conductor/scripts/) aux DEUX positions posées (TARGET_ROOT/scripts/
+  # ou CACHE_DIR/conductor/scripts/, cf. find_fidelity_gate côté vibeflow-update.sh) — jamais une
+  # 2e résolution divergente de runtime-registry.sh (lot 6, tâche 1, MIGR-01), toujours co-posé.
+  COEX_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  REGISTRY_SCRIPT="$COEX_SCRIPT_DIR/runtime-registry.sh"
+  if [ ! -f "$REGISTRY_SCRIPT" ] || [ ! -f "$COEXISTENCE_CONFIG" ]; then
+    # Registre ou config absents -> rien à mesurer, silence total (best-effort, jamais un échec).
+    exit 0
+  fi
+  INSTALLED_RUNTIMES="$(bash "$REGISTRY_SCRIPT" list-installed --config "$COEXISTENCE_CONFIG" 2>/dev/null)" || exit 0
+  for _rt in $INSTALLED_RUNTIMES; do
+    [ "$_rt" = "claude" ] && continue
+    echo "[fidelity-coexistence] $_rt : opère SANS gouvernance de hooks (aucun mécanisme équivalent mesuré à ce jour — cf. 38-CONTEXT.md)"
+  done
+  exit 0
 fi
 
 if [ -z "$ARTIFACT" ]; then

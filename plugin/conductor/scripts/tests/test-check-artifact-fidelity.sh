@@ -69,6 +69,46 @@ else
   ok "T0 : gate présent et exécutable"
 fi
 
+# T19-T22 — --coexistence-report (MIGR-05, Phase 38) : mode GLOBAL, indépendant de gsd-core/
+# l'artefact — placé AVANT le SKIP conditionnel ci-dessous (jamais sauté même si gsd-core/la
+# fixture de conversion sont absents de ce poste).
+COEX_WORK="$(mktemp -d)"
+cat > "$COEX_WORK/coex.json" <<'EOF'
+{"vf_runtimes": {"installed": ["claude", "codex"], "active": "codex"}}
+EOF
+cat > "$COEX_WORK/solo.json" <<'EOF'
+{"vf_runtimes": {"installed": ["claude"], "active": "claude"}}
+EOF
+
+OUT19="$(bash "$GATE" --coexistence-report --config "$COEX_WORK/coex.json")"
+RC19=$?
+if [ "$RC19" -eq 0 ] && printf '%s' "$OUT19" | grep -qF '[fidelity-coexistence] codex : opère SANS gouvernance de hooks'; then
+  ok "T19 : coexistence claude+codex -> ligne [fidelity-coexistence] codex, exit 0"
+else
+  ko "T19 : attendu la ligne codex + exit 0, obtenu rc=$RC19, sortie='$OUT19'"
+fi
+
+OUT20="$(bash "$GATE" --coexistence-report --config "$COEX_WORK/solo.json")"
+RC20=$?
+N20="$(printf '%s' "$OUT20" | grep -c '\[fidelity-coexistence\]')"
+if [ "$RC20" -eq 0 ] && [ "$N20" -eq 0 ]; then
+  ok "T20 : installed=[claude] seul -> silence total (grep -c = 0), exit 0"
+else
+  ko "T20 : attendu silence + exit 0, obtenu rc=$RC20, N=$N20, sortie='$OUT20'"
+fi
+
+bash "$GATE" --coexistence-report foo.md >/dev/null 2>&1
+RC21=$?
+[ "$RC21" -eq 2 ] && ok "T21 : --coexistence-report + artefact combinés -> exit 2" \
+  || ko "T21 : attendu exit 2, obtenu $RC21"
+
+bash "$GATE" --coexistence-report --config "$COEX_WORK/does-not-exist.json" >/dev/null 2>&1
+RC22=$?
+[ "$RC22" -eq 0 ] && ok "T22 : config introuvable -> silence, exit 0 (best-effort)" \
+  || ko "T22 : attendu exit 0, obtenu $RC22"
+
+rm -rf "$COEX_WORK"
+
 if [ -z "$REAL_GSD_HOME" ] || [ ! -f "$FIXTURE_SRC" ]; then
   skip "T1-T6 : gsd-core ou fixture introuvables sur ce poste (REAL_GSD_HOME='$REAL_GSD_HOME', fixture='$FIXTURE_SRC')"
   echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="

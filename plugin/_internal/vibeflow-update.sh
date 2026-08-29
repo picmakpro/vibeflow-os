@@ -2212,6 +2212,16 @@ install_module() {
   # Adaptateur Codex (ADPT-02/ADPT-03, 38-05) : symétrique, juste après — best-effort, silence
   # total si runtime non-codex/adaptateur absent (cf. register_codex_agent_if_applicable).
   register_codex_agent_if_applicable "$mod" "$module_dir"
+  # Coexistence sans hooks (MIGR-05, 38-06) : MÊME gate, AU MÊME endroit qu'au `status` (juste
+  # après la bannière [fidelity]) — un opérateur qui installe voit la coexistence déclarée sans
+  # second rapport séparé. Best-effort, silence si le gate/registre sont absents.
+  if ! vf_dry_run; then
+    local coex_gate_install
+    coex_gate_install="$(find_fidelity_gate)"
+    if [ -n "$coex_gate_install" ]; then
+      bash "$coex_gate_install" --coexistence-report 2>/dev/null || true
+    fi
+  fi
 }
 
 # ---------- Backup / Rollback ----------
@@ -2649,6 +2659,18 @@ show_status() {
     esac
     printf "%-30s %-15s %-15s %s\n" "$mod" "$installed" "$available" "$status"
   done
+
+  # Coexistence sans hooks (MIGR-05, 38-06) : MÊME gate que la bannière d'install
+  # (find_fidelity_gate, report_artifact_fidelity), MÊME endroit qu'un opérateur regarderait —
+  # jamais un second rapport séparé. `.planning/config.json` vit à la racine du LAB (le cwd
+  # depuis lequel `status` est invoqué), pas sous TARGET_ROOT (qui pointe vers .claude/ ou une
+  # cible custom) — défaut cwd-relatif du gate/runtime-registry.sh, aucun --config forcé ici.
+  # Sortie RELAYÉE TELLE QUELLE, best-effort (silence si le gate ou le registre sont absents).
+  local coex_gate
+  coex_gate="$(find_fidelity_gate)"
+  if [ -n "$coex_gate" ]; then
+    bash "$coex_gate" --coexistence-report 2>/dev/null || true
+  fi
 }
 
 # ---------- Convergence à l'update (MANI-03, D-31-07) ----------
