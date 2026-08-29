@@ -21,6 +21,13 @@
 #        et le répertoire parent) — famille de malformation distincte de T4b, doit rougir aussi.
 #   T5 — échec de conversion propre (frontmatter absent / corps vide) : exit non-zéro, message
 #        explicite, aucun .toml produit.
+#   T6 — Bloquant 1 (D-38) : mapping modèle Claude -> Codex, jamais une recopie littérale.
+#        T6a : model opus -> valeur Codex valide mesurée (gpt-5.6-terra), digest 'model:
+#        MAPPED' cite source ET cible. T6b : modèle source hors table -> ROUGE, aucun repli
+#        silencieux, aucun .toml produit.
+#   T7 — Bloquant 2 (D-38) : parseur YAML frontmatter réel. T7a : description: > (scalaire
+#        replié, cas réel plugin/conductor/AGENT.md) -> texte complet, jamais '">"' littéral.
+#        T7b : styles |, >-, |- tous parsés (littéral vs replié, clip vs strip).
 set -uo pipefail
 
 TESTS_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -213,6 +220,91 @@ if [ "$STATUS_BROKEN" -ne 0 ] && [ ! -s "$OUT_BROKEN" ] 2>/dev/null && printf '%
 else
   ko "T5 : échec de conversion non conforme (status=$STATUS_BROKEN, err='$ERR_BROKEN')"
 fi
+
+
+# ---------------------------------------------------------------------------
+# T6 — mapping modèle Claude -> Codex (Bloquant 1) : jamais de recopie littérale, jamais de
+# repli silencieux sur un modèle source inconnu.
+# ---------------------------------------------------------------------------
+CONDUCTOR_AGENT="$REPO/plugin/conductor/AGENT.md"
+if [ ! -f "$CONDUCTOR_AGENT" ]; then
+  ko "T6/T7a : fixture conductor/AGENT.md introuvable : $CONDUCTOR_AGENT"
+else
+  OUT_CONDUCTOR="$WORKDIR/conductor.toml"
+  DIGEST_CONDUCTOR="$(node "$CONVERTER" "$CONDUCTOR_AGENT" --out "$OUT_CONDUCTOR" 2>&1 1>/dev/null)"
+  if [ -f "$OUT_CONDUCTOR" ] \
+    && ! grep -qF 'model = "opus"' "$OUT_CONDUCTOR" \
+    && grep -qE '^model = "gpt-5\.6-terra"$' "$OUT_CONDUCTOR" \
+    && printf '%s' "$DIGEST_CONDUCTOR" | grep -qE '^model: MAPPED.*opus.*gpt-5\.6-terra'; then
+    ok "T6a : model opus -> valeur Codex valide mesurée (gpt-5.6-terra), digest 'model: MAPPED' cite source ET cible"
+  else
+    ko "T6a : mapping opus non conforme (digest='$DIGEST_CONDUCTOR')"
+  fi
+
+  # ---------------------------------------------------------------------------
+  # T7a — description: > (cas réel conductor/AGENT.md) -> texte complet, jamais '">"' littéral.
+  # ---------------------------------------------------------------------------
+  if grep -qE '^description = ">"$' "$OUT_CONDUCTOR"; then
+    ko "T7a : description repliée réduite au seul indicateur '\">\"' (piège n°2 non corrigé)"
+  elif grep -qF 'Orchestrateur méta et gardien' "$OUT_CONDUCTOR" && grep -qF 'migrateur' "$OUT_CONDUCTOR"; then
+    ok "T7a : description: > (scalaire replié) -> texte complet dans le .toml, jamais '\">\"' littéral"
+  else
+    ko "T7a : description repliée mal parsée (contenu de $OUT_CONDUCTOR manquant/tronqué)"
+  fi
+fi
+
+UNKNOWN_MODEL_AGENT="$WORKDIR/unknown-model-agent.md"
+cat > "$UNKNOWN_MODEL_AGENT" <<'EOF'
+---
+name: unknown-model-agent
+description: agent avec un modèle source hors table de correspondance
+model: mistral-large
+---
+
+Corps minimal non vide.
+EOF
+ERR_UNKNOWN_MODEL="$(node "$CONVERTER" "$UNKNOWN_MODEL_AGENT" --out "$WORKDIR/unknown-model.toml" 2>&1 1>/dev/null)"
+STATUS_UNKNOWN_MODEL=$?
+if [ "$STATUS_UNKNOWN_MODEL" -ne 0 ] && [ ! -f "$WORKDIR/unknown-model.toml" ] \
+  && printf '%s' "$ERR_UNKNOWN_MODEL" | grep -qi 'mistral-large' \
+  && printf '%s' "$ERR_UNKNOWN_MODEL" | grep -qi 'CLAUDE_TO_CODEX_MODEL'; then
+  ok "T6b : modèle source inconnu (mistral-large) -> ROUGE, aucun repli silencieux, message explicite, aucun .toml produit"
+else
+  ko "T6b : modèle inconnu non rejeté (status=$STATUS_UNKNOWN_MODEL, err='$ERR_UNKNOWN_MODEL')"
+fi
+
+# ---------------------------------------------------------------------------
+# T7b — styles YAML |, >-, |- (Bloquant 2) : tous parsés, jamais réduits à l'indicateur seul.
+# ---------------------------------------------------------------------------
+run_style_case() {
+  local style_label="$1" indicator="$2"
+  local f="$WORKDIR/style-$style_label.md"
+  cat > "$f" <<EOF
+---
+name: style-agent
+description: $indicator
+  Première ligne de la description.
+  Deuxième ligne de la description.
+model: sonnet
+---
+
+Corps minimal non vide.
+EOF
+  local out="$WORKDIR/out-$style_label.toml"
+  local err
+  err="$(node "$CONVERTER" "$f" --out "$out" 2>&1 1>/dev/null)"
+  if [ -f "$out" ] \
+    && grep -qF 'Première ligne de la description.' "$out" \
+    && grep -qF 'Deuxième ligne de la description.' "$out" \
+    && ! grep -qxF "description = \"$indicator\"" "$out"; then
+    ok "T7b : style '$indicator' -> description complète, jamais réduite au seul indicateur"
+  else
+    ko "T7b : style '$indicator' mal parsé (out='$(cat "$out" 2>/dev/null)', err='$err')"
+  fi
+}
+run_style_case 'literal' '|'
+run_style_case 'folded-strip' '>-'
+run_style_case 'literal-strip' '|-'
 
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
 [ "$fail" -eq 0 ] && exit 0 || exit 1
