@@ -1215,3 +1215,17 @@ ultérieure est **sans effet de bord**.
 **Régime pour la reprise (option 2, choisie par Samuel)** : login **persistant dans son vrai home**.
 Le credential **lui appartient** — la mesure tourne dessus **sans copie**, sans lecture, sans
 écrasement, sans suppression. ⛔ Aucun agent ne relance de `login`.
+
+### Tentative d'auth kimi du 2026-08-29 — credential écrit, serveur en échec
+`kimi login --region global` (lancé par un humain, home réel, option 2) a écrit
+`~/.kimi-code/credentials/kimi-code-env-<id>.json` (**1556 octets**) **puis** échoué :
+`Login failed: The server had an error while processing your request`, rc=1.
+**Validation par le binaire** (commande la plus légère, aucun contenu de credential lu) :
+```
+$ kimi -p "Reponds exactement: PONG"
+error: failed to run prompt: No model configured. Run `kimi` and use /login to sign in, …
+```
+⇒ **credential présent mais INEXPLOITABLE**. Les trois inconnus (I-1, I-2, I-3) restent **ouverts**.
+ℹ️ Deux voies pour la reprise, **toutes deux gestes humains** : relancer `/login`, ou renseigner
+`default_model` dans `config.toml` via `kimi provider add|list` — documenté « non-interactively »,
+donc probablement plus robuste si l'OAuth reste capricieux. ⛔ Aucun agent ne relance de login.
