@@ -1186,3 +1186,32 @@ second spawn — la profondeur ≥ 2 n'est donc **ni confirmée ni infirmée**.
 `~/.codex/config.toml` sha256 **identique à la baseline**. `~/.codex/agents/` absent (**4 sondes**).
 `~/.codex/hooks.json` absent. Copie d'`auth.json` **déclarée**, écrasée (3 passes, vérif 0 octet non
 nul) puis supprimée ; `CODEX_HOME` isolé → `Not logged in`.
+
+---
+
+## État kimi-code au 2026-08-29 — auth NON posée
+
+**À consigner tel quel, sans arrondi** :
+> **kimi-code : pose mesurée ; enregistrement des agents posés, `disallowedTools` en session réelle
+> et firing des `[[hooks]]` NON VÉRIFIÉS — auth non posée au 2026-08-29.**
+
+**Ce qui EST mesuré** (voir §Mesure réelle OpenCode + kimi-code) : install réelle du **vrai**
+`@moonshot-ai/kimi-code@0.39.1`, surface d'artefacts, `disallowedTools` **honoré dans le code** du
+parseur de profil, sous-agents nommés custom **présents dans le schéma**, `[[hooks]]` **reconnu**
+par `doctor`, et les agents VibeFlow bruts **syntaxiquement acceptés**.
+
+**Ce qui ne l'est PAS**, et pourquoi : la résolution d'agent par répertoire est **paresseuse et
+postérieure** au contrôle du modèle — `--agent <nom>` bute sur `/login` **avant** toute découverte.
+Les trois inconnus (I-1 enregistrement, I-2 `disallowedTools` en session, I-3 firing des hooks)
+**exigent une auth**, qui est un **geste humain de Samuel** (D-38-G) — jamais posé par un agent.
+
+**Où vit le credential**, pour la reprise : **`~/.kimi-code/credentials`** (chemin extrait du
+binaire). Vérifié le 2026-08-29 : `~/.kimi-code` **absent**, `~/.kimi` absent, `~/.config/kimi`
+absent, `~/.moonshot` absent, et **aucune** trace de Keychain macOS (0 correspondance en contexte
+dans le bundle). ⇒ **non authentifié**, sans ambiguïté.
+ℹ️ Mesuré au passage : `kimi doctor` **n'écrit rien** dans le home — une vérification d'état
+ultérieure est **sans effet de bord**.
+
+**Régime pour la reprise (option 2, choisie par Samuel)** : login **persistant dans son vrai home**.
+Le credential **lui appartient** — la mesure tourne dessus **sans copie**, sans lecture, sans
+écrasement, sans suppression. ⛔ Aucun agent ne relance de `login`.
