@@ -1110,3 +1110,79 @@ l'a fermé** : le `kimi` installé par le mesureur était conservé au scratchpa
 Avec un PATH isolé (ni `claude`, ni `codex`, ni `opencode`) : **nouveau code → `kimi-code`
 détecté** · **ancien code, même fixture → vide** (bloquant confirmé) · **faux `kimi` sans la
 needle → vide** (`kimi-cli` non confondu). La sonde par capacité tient sur le binaire réel.
+
+---
+
+## 🔴 MESURE CODEX DE BOUT EN BOUT (2026-08-29) — les deux critères NE SONT PAS ATTEINTS
+
+Install réelle depuis la branche vers un `CODEX_HOME` isolé, `rc=0`, 9 modules, **309 chemins
+posés** (14 skills en `<nom>/SKILL.md`, 12 agents `.md`, 5 rôles `.toml`).
+⚠️ `VF_RUNTIME=codex` est **indispensable** : la cascade `detect_agent_runtime()` trouve
+`/opt/homebrew/bin/claude` d'abord, donc **sans l'override l'adaptateur Codex ne se déclenche
+jamais**.
+
+### Ce qui est PROUVÉ ✅
+- **Skills déclenchables** — témoin découvert **par sa description** (Codex a lu le fichier de
+  lui-même et rendu le jeton), puis skill VibeFlow réelle (`vf-update`) proposée sans être nommée.
+- **Rôle chargé et spawnable par NOM** — `threads.agent_role='vf-dev-manager'`,
+  `thread_spawn_edges` root→manager (lu en base, jamais dans le JSONL).
+- **Modèle par worker honoré** — `threads.model` reprend la valeur du `.toml`, **2 valeurs
+  distinctes mesurées sur 2 runs**. Le mécanisme Codex fonctionne.
+- **Rapport typé `--output-schema` conforme 2/2.**
+- **Le gate ADPT-04 mord** — témoin de non-vacuité : rôle sans `developer_instructions` → warning
+  citant le chemin ; collision de nom → `--verify` rc=1.
+
+### 🔴 Les six bloquants
+1. **`model = "opus"` / `"sonnet"` recopié littéralement** dans les rôles Codex. Aucun n'existe côté
+   Codex : `The 'opus' model is not supported when using Codex with a ChatGPT account.` **Tout spawn
+   de rôle VibeFlow échoue.** Le digest annonce pourtant `model: PRESERVED` — préservation
+   **nominale**, échec **fonctionnel**.
+2. **`description: >` non géré** → le `.toml` du rôle socle contient `description = ">"`. Sur Codex
+   la description **est** la surface de sélection : le rôle est inutilisable. **Les deux gates
+   annoncent `PRESERVED`.** 2 `AGENT.md` du dépôt concernés (`conductor`, `kpi-analyst`) + 9
+   blueprints + 2 templates. gsd-core reproduit le même défaut.
+3. **Le gate de fidélité mesure un artefact qui n'est JAMAIS posé** — vérifié par le manager :
+   `check-artifact-fidelity.sh:254` appelle `convertClaudeAgentToCodexAgent` et écrit
+   `converted.md` (**Markdown**), alors que l'install pose du **TOML** via `agent-to-codex.mjs`.
+   Résultat dans **le même log** : `[fidelity] model=LOST` vs `[codex-adapter] model=PRESERVED`, et
+   accord des deux sur une erreur pour `description`. **Gate structurellement aveugle.**
+4. **7 agents sur 12 jamais enregistrés** — `resolve_posed_agent_artifact()` ne rend **qu'un**
+   artefact par module. Les absents sont **exactement le team-kernel** (`vf-dev-manager`,
+   `vf-coder`, `vf-reviewer`, `vf-auditer`, `vf-crafter`, `vf-design-manager`, `vf-design-judge`) —
+   la population dont le critère 2 a besoin.
+5. **`uninstall` ne retire AUCUN rôle Codex** — les 5 `.toml` survivent, Codex continue de charger
+   des rôles pointant sur des agents supprimés. L'adaptateur est câblé dans `install_module()` et
+   `update_module()`, **jamais** dans `uninstall_module()`.
+6. **Hooks — surface EXISTANTE et prouvée exécutante, non visée.** ⭐ Démenti majeur : un
+   `$CODEX_HOME/hooks.json` en forme **strictement Claude Code** a réellement **exécuté** un hook
+   (`--dangerously-bypass-hook-trust`). Codex porte un **sur-ensemble** des événements Claude
+   (+ `SubagentStart`, `Interrupt`, `PostCompact`…) et même un **importeur** `settings.json →
+   hooks.json`. L'install merge dans `settings.json`, **que Codex n'exécute pas**. Et la
+   déclaration de perte **ne sort jamais** (`grep -c 'coexistence'` = **0** à l'install et au
+   `status`) — MIGR-05 est **inerte en conditions réelles**, et son texte prévu (« aucun mécanisme
+   équivalent mesuré ») est **factuellement faux**.
+
+### 🟠 Trois défauts de second rang
+- `codex plugin install` et `marketplace add --scope` **n'existent pas** → l'hypothèse « même
+  grammaire que claude » est **démentie**, 4 dépendances design manquantes, et l'étape manuelle
+  proposée est une commande `claude` sur un poste Codex.
+- **Budget de contexte skills dépassé dès l'install nue** (~66 skills cumulées) → descriptions
+  **tronquées**, or c'est la seule surface de sélection.
+- L'install **n'appelle jamais** `register-codex-agent.sh --verify` : le gate ADPT-04 n'est câblé
+  nulle part dans le chemin d'install.
+
+### ✅ Une prémisse de ce document corrigée
+Un skill malformé n'est **pas** droppé en silence : Codex 0.150.1 émet sur **stderr**
+`failed to load skill <chemin>: missing YAML frontmatter` — chemin cité. Un détecteur existe, il
+n'est simplement pas dans `doctor`.
+
+### 🔴 BLOCAGE EXTERNE — quota ChatGPT épuisé
+`You've hit your usage limit… try again at Sep 27th, 2026`. Sonde de contrôle indépendante
+(`codex exec -m gpt-5.4-mini "Dis OK."`) → **même erreur**. **Aucune exécution Codex n'est plus
+possible sur ce compte.** Le run témoin de réparation (modèles corrigés) a été coupé **avant** le
+second spawn — la profondeur ≥ 2 n'est donc **ni confirmée ni infirmée**.
+
+### Non-pollution — tenue
+`~/.codex/config.toml` sha256 **identique à la baseline**. `~/.codex/agents/` absent (**4 sondes**).
+`~/.codex/hooks.json` absent. Copie d'`auth.json` **déclarée**, écrasée (3 passes, vérif 0 octet non
+nul) puis supprimée ; `CODEX_HOME` isolé → `Not logged in`.
