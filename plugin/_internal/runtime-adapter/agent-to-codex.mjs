@@ -2,26 +2,83 @@
 // agent-to-codex.mjs — Adaptateur VibeFlow -> rôle Codex (Phase 38, lot 5, ADPT-01).
 //
 // Conversion PURE (aucun effet de bord disque) : frontmatter + corps Markdown d'un agent
-// VibeFlow -> { toml, digest }. Le mapping est ALIGNÉ sur celui mesuré dans l'importeur natif
-// Codex 0.150.1 (`external-agent-migration`, commande `/import`) — jamais un mapping inventé :
-//   permissionMode -> sandbox_mode (non porté ici, aucun champ source équivalent chez VibeFlow)
-//   corps markdown  -> developer_instructions
-//   effort          -> model_reasoning_effort
-// AUCUNE trace de tools/disallowedTools dans ce mapping — ils sont déclarés PENDING, jamais
-// simulés sous une clé inventée de [tools] (piège n°2 mesuré, 38-CONTEXT.md).
-//
-// Champs requis par le binaire Codex 0.150.1 (mesuré, pas la doc) : name, description,
-// developer_instructions. Le reste est un override optionnel.
-//
-// Zéro dépendance npm — Node built-in uniquement (T-38-SC : accepté, aucun paquet externe).
+// VibeFlow -> { toml, digest }. Mapping ALIGNÉ sur celui mesuré dans l'importeur natif Codex
+// 0.150.1 (`external-agent-migration`, `/import`) — jamais un mapping inventé :
+//   corps markdown -> developer_instructions · effort -> model_reasoning_effort
+//   model Claude   -> table CLAUDE_TO_CODEX_MODEL (mesurée, RIEN d'inventé, voir plus bas)
+// AUCUNE trace de tools/disallowedTools : déclarés PENDING, jamais une clé [tools] inventée
+// (piège n°2 mesuré, 38-CONTEXT.md). Champs requis par Codex 0.150.1 (mesuré, pas la doc) :
+// name, description, developer_instructions. Zéro dépendance npm (T-38-SC).
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 /**
- * Découpe un agent VibeFlow en frontmatter (objet clé -> valeur brute, chaînes) + corps.
- * Motif `---` identique à celui déjà utilisé côté bash dans ce dépôt (délimiteur de bloc en
- * tête de fichier, sur sa propre ligne).
+ * Décode un scalaire replié/littéral YAML (`>`, `|`, `>-`, `|-`, `>+`, `|+`) depuis les lignes
+ * qui suivent `clé: <indicateur>`. Corrige le piège n°2 (38-CONTEXT.md) : l'ancienne regex
+ * mono-ligne capturait l'indicateur seul (`description = ">"`), jamais le texte replié.
+ */
+function parseBlockScalar(fmLines, startIndex, chomp, style) {
+  let i = startIndex;
+  const blockLines = [];
+  let blockIndent = null;
+  while (i < fmLines.length) {
+    const l = fmLines[i];
+    if (l.trim() === '') {
+      blockLines.push('');
+      i++;
+      continue;
+    }
+    const indentMatch = l.match(/^(\s+)/);
+    if (!indentMatch) break; // dédent : fin du bloc
+    const indent = indentMatch[1].length;
+    if (blockIndent === null) blockIndent = indent;
+    if (indent < blockIndent) break;
+    blockLines.push(l.slice(blockIndent));
+    i++;
+  }
+
+  let trailingEmpty = 0;
+  while (blockLines.length && blockLines[blockLines.length - 1] === '') {
+    blockLines.pop();
+    trailingEmpty++;
+  }
+
+  let value;
+  if (style === '|') {
+    value = blockLines.join('\n'); // littéral : sauts de ligne préservés tels quels
+  } else {
+    // replié (>) : lignes non vides consécutives jointes par un espace, ligne vide -> \n
+    let out = '';
+    let prevBlank = true;
+    for (const bl of blockLines) {
+      if (bl === '') {
+        out += '\n';
+        prevBlank = true;
+      } else {
+        if (!prevBlank && out.length) out += ' ';
+        out += bl;
+        prevBlank = false;
+      }
+    }
+    value = out;
+  }
+
+  if (chomp === '+') {
+    value += '\n'.repeat(trailingEmpty); // keep
+  } else if (chomp !== '-' && value.length) {
+    value += '\n'; // clip (défaut) : exactement un \n final si le bloc n'est pas vide
+  }
+
+  return { value, nextIndex: i };
+}
+
+/**
+ * Découpe un agent VibeFlow en frontmatter (objet clé -> valeur) + corps. Parseur YAML
+ * frontmatter MINIMAL mais RÉEL — pas une regex mono-ligne (piège n°2, corrigé Phase 38) :
+ * gère les scalaires simples ET repliés/littéraux. Les listes YAML (`- item`) restent hors
+ * périmètre — aucun champ consommé ici (name/description/model/effort/memory/tools/
+ * disallowedTools/vf-internal) n'en est une ; une ligne de liste reste ignorée, comme avant.
  */
 function splitFrontmatter(sourceMarkdown) {
   const lines = sourceMarkdown.split('\n');
@@ -42,11 +99,33 @@ function splitFrontmatter(sourceMarkdown) {
   const body = lines.slice(end + 1).join('\n').replace(/^\n+/, '');
 
   const frontmatter = {};
-  for (const line of fmLines) {
-    const m = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
-    if (m) {
-      frontmatter[m[1]] = m[2].trim();
+  let i = 0;
+  while (i < fmLines.length) {
+    const line = fmLines[i];
+    if (!line.trim()) {
+      i++;
+      continue;
     }
+    const m = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+    if (!m) {
+      i++;
+      continue;
+    }
+    const key = m[1];
+    const rest = m[2].trim();
+    const blockMatch = rest.match(/^([>|])([+-]?)\d*\s*$/);
+    if (blockMatch) {
+      const { value, nextIndex } = parseBlockScalar(fmLines, i + 1, blockMatch[2], blockMatch[1]);
+      frontmatter[key] = value;
+      i = nextIndex;
+      continue;
+    }
+    let val = rest;
+    if (val.length >= 2 && ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'")))) {
+      val = val.slice(1, -1);
+    }
+    frontmatter[key] = val;
+    i++;
   }
   return { frontmatter, body };
 }
@@ -58,16 +137,29 @@ function escapeTomlBasic(str) {
 
 /**
  * Échappe une chaîne pour un TOML multi-line basic string ("""...""").
- * Deux passes, dans cet ordre : backslashes d'abord (sinon la seconde passe introduirait des
- * backslashes non échappés), puis toute séquence de trois guillemets ou plus — jamais tronquer
- * le corps, jamais perdre un caractère : chaque `"""` devient `""\"` (le contenu reste lisible,
- * le TOML reste valide — cf. spec TOML : un guillemet échappé casse la séquence de fermeture).
+ * Backslashes d'abord (sinon la seconde passe en introduirait de non échappés), puis toute
+ * séquence de 3+ guillemets -> `""\"` : jamais tronquer le corps, jamais perdre un caractère.
  */
 function escapeTomlMultiline(str) {
   let s = str.replace(/\\/g, '\\\\');
   s = s.replace(/"""/g, '""\\"');
   return s;
 }
+
+/**
+ * Table de correspondance modèle Claude -> Codex, MESURÉE (jamais inventée) sur Codex 0.150.1,
+ * 2026-08-28, compte ChatGPT de ce poste. Un rôle recopiant `opus`/`sonnet`/`haiku` tel quel
+ * échoue au spawn — mesuré : "The 'opus' model is not supported when using Codex with a
+ * ChatGPT account." Cibles OBSERVÉES disponibles ici (PAS une liste officielle exhaustive
+ * Codex) : gpt-5.6-terra, gpt-5.5, gpt-5.4-mini — par capacité décroissante côté Claude ->
+ * décroissante côté Codex mesuré. Modèle source absent d'ici = ROUGE (voir plus bas), AUCUN
+ * repli silencieux.
+ */
+const CLAUDE_TO_CODEX_MODEL = Object.freeze({
+  opus: 'gpt-5.6-terra',
+  sonnet: 'gpt-5.5',
+  haiku: 'gpt-5.4-mini',
+});
 
 /**
  * Conversion pure : agent VibeFlow (Markdown + frontmatter Claude Code) -> rôle Codex.
@@ -91,18 +183,25 @@ export function convertAgentToCodexRole(sourceMarkdown) {
   const tomlLines = [];
   const digest = [];
 
-  tomlLines.push(`name = "${escapeTomlBasic(frontmatter.name)}"`);
+  tomlLines.push(`name = "${escapeTomlBasic(frontmatter.name.trim())}"`);
   digest.push({ field: 'name', status: 'PRESERVED' });
 
-  tomlLines.push(`description = "${escapeTomlBasic(frontmatter.description)}"`);
+  tomlLines.push(`description = "${escapeTomlBasic(frontmatter.description.trim())}"`);
   digest.push({ field: 'description', status: 'PRESERVED' });
 
   tomlLines.push(`developer_instructions = """\n${escapeTomlMultiline(body)}\n"""`);
   digest.push({ field: 'developer_instructions', status: 'PRESERVED', note: 'corps Markdown source, intégral' });
 
+  // model : jamais une recopie littérale Claude -> Codex (piège mesuré, cf. CLAUDE_TO_CODEX_MODEL
+  // ci-dessus). Source inconnue -> ROUGE explicite, aucun repli silencieux (D-38 bloquant 1).
   if (frontmatter.model) {
-    tomlLines.push(`model = "${escapeTomlBasic(frontmatter.model)}"`);
-    digest.push({ field: 'model', status: 'PRESERVED' });
+    const sourceModel = frontmatter.model.trim();
+    const targetModel = CLAUDE_TO_CODEX_MODEL[sourceModel];
+    if (!targetModel) {
+      throw new Error(`agent-to-codex: modèle source "${sourceModel}" absent de CLAUDE_TO_CODEX_MODEL — aucun repli silencieux, ajouter le mapping avant de convertir ce rôle`);
+    }
+    tomlLines.push(`model = "${escapeTomlBasic(targetModel)}"`);
+    digest.push({ field: 'model', status: 'MAPPED', note: `source "${sourceModel}" -> cible Codex "${targetModel}" (table CLAUDE_TO_CODEX_MODEL, mesurée sur Codex 0.150.1)` });
   } else {
     digest.push({ field: 'model', status: 'ABSENT', note: 'aucun model en frontmatter source' });
   }
