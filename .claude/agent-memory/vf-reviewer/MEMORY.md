@@ -18,3 +18,6 @@
 - [Symlink ancêtre contourne le check TARGET_ROOT](project_symlink-ancestor-bypasses-target-root-check.md) — ADR-054 bannit realpath ; `.claude/rules` symlinké fait `rm` hors TARGET_ROOT (31-05, reproduit)
 - [Filtre grep par ligne vs occurrence](feedback_grep-line-vs-occurrence-guard.md) — grep -F|-vF exempte toute la ligne ; empile légitime+illégitime sur une ligne pour contourner (T9e, phase 38)
 - [Cascade jumelle, appelant au cycle de vie différent](feedback_cascade-twin-different-caller-lifecycle.md) — "cascade EXACTE de find_hooks_merger()" ment : runtime-cli-dispatch.sh n'est jamais posé sous TARGET_ROOT/scripts (join-1, phase 38, repro confirmé)
+- [Casse défait une garde de chemin par string](feedback_case-insensitive-fs-defeats-path-string-guard.md) — cd -P/pwd -P ne canonicalise pas la casse : $HOME bypass confirmé par inode identique (38-04, revue phase 38)
+- [2>&1 masque une affirmation de flux](feedback_2to1-merge-hides-stream-claim.md) — un test qui fusionne stdout+stderr ne peut jamais prouver "sur stdout" ; T41/38-04 le confond avec log() >&2
+- [Garde précoce mord tous les verbes](feedback_flag-guard-scoped-to-all-verbs.md) — cmd="$1" arrive tard (l.2724) ; une garde --target non scopée bloque aussi status/sync/no-op (D-38-P, phase 38)
