@@ -1033,3 +1033,72 @@ des `--target` explicites, le plus contraint des deux deviendra le plus fréquen
 sur **stderr**. Et **T41 capture `2>&1`**, donc il **ne peut pas** détecter l'écart. Même famille
 que la fixture idéalisée du gate FIDE-03 et que le T4 qui encodait le bug du contrat stdout.
 **Trois fois dans cette phase**, un test vert n'a pas démontré ce qu'il affirmait.
+
+---
+
+## 🔬 Mesure réelle OpenCode + kimi-code (2026-08-29) — 4 prémisses sur 4 démenties
+
+**Hygiène** : aucune install globale (deux préfixes npm isolés au scratchpad, `npm ls -g` inchangé,
+`which opencode kimi kimi-code` → tous absents). Une bavure réparée : un `~/.config/opencode` vide
+créé au tout premier run, vérifié vide par deux commandes puis `rmdir`. `~/.codex` **jamais touché**.
+⛔ **Aucun `login` sur aucun runtime** — les deux murs d'auth sont déclarés, non contournés.
+
+### ⚠️ Piège d'identité de paquet — le npm `kimi-code` n'est PAS le produit Moonshot
+`npm view kimi-code` → *« CLI that starts anthropic-proxy with Kimi model and runs claude-code »*,
+tiers, **mort depuis ~1 an**. Le vrai est **`@moonshot-ai/kimi-code@0.39.1`** (`bin: {kimi: …}`,
+publié la veille). Et `kimi-cli` sur npm est **encore un troisième objet** sans rapport. Le
+descripteur gsd-core est **juste** sur ce point ; c'est la Phase 37 qui s'était piégée.
+
+### 🔴 BLOQUANT transverse — kimi-code est INVISIBLE pour VibeFlow
+`runtime-cli-dispatch.sh` sonde `kimi-code` (l. 64) ; **le binaire réel s'appelle `kimi`**. Avec
+kimi-code installé et sur le PATH, `detect` rend **vide** — VibeFlow ne tombe même pas dans la
+branche « runtime non supporté », mais dans « aucun runtime détecté ».
+⚠️ **Le correctif n'est PAS de sonder `kimi`** : `kimi` (Python) et `kimi-code` (Node) **partagent
+le nom de binaire**. gsd-core définit déjà la sonde par **capacité** —
+`{kind: "command-capability", binary: "kimi", needle: "--output-format"}` — **vérifiée sur le
+binaire réel** (`kimi --help` contient bien `--output-format`).
+
+### Les quatre prémisses
+| # | prémisse `[documentaire]` | verdict |
+|---|---|---|
+| 1 | OpenCode `hooksSurface:'none'` → 6 fragments perdus **par construction** | ⭐ **DÉMENTIE** — bus de hooks JS **vivant et mesuré** (`plugin/` ET `plugins/` chargés, factory exécutée, marqueurs écrits). 5/6 événements ont un analogue ; seul `SessionEnd` sans analogue trouvé. → « perdus **par le canal choisi** », pas par construction. Coût réel : réécrire les hooks en **JS**, pas en JSON. |
+| 2 | OpenCode : allowlist `Agent(...)` **purement supprimée** | ⭐ **DÉMENTIE, en pire** — conservée puis **DÉCHIQUETÉE** : le `split(",")` produit `agent(vf-coder: true`, `vf-reviewer: true`, … `vf-design-judge): true` — **16 clés bidon acceptées en silence** (RC=0). Fabrique une allowlist **d'apparence** sur un runtime où `tools` est **additif** et ne restreint rien (`*:allow`). |
+| 3 | kimi-code : `model`/`memory`/`tools`/`disallowedTools` **conservés** | ⚠️ **PARTIELLEMENT DÉMENTIE** — `disallowedTools` **RÉELLEMENT HONORÉ** (vrai denylist, évalué par le tool manager : **meilleur que Codex ET OpenCode**) · `tools` honoré **mais en ALLOWLIST**, donc `Agent(gsd-code-reviewer)` est un `unknown-tool` ⇒ **dispatch perdu** · `model` et `memory` : **clés inconnues, ignorées**. Échec **symétriquement inverse** d'OpenCode : là trop permissif, ici trop restrictif. |
+| 4 | kimi-code `namedDispatch: false` | ⭐ **DÉMENTIE** — schéma `subagents: array(string())`, `delegatableSubagents()`, fusion des agent-files disque avec priorités `plugin:5 < user:10 < extra:20 < project:30 < explicit:40`. **Les sous-agents nommés custom existent.** Descripteur gsd-core **ET** `team-kernel.md` l. 25 **périmés**. |
+
+**Bonus démenti** : kimi-code **a** `upgrade|update` (+ `doctor`, `provider add|remove|list`
+non-interactif, `acp`, `migrate`, `export`) — la phase le croyait « TUI-only, sans `update` ».
+
+### Ce que la mesure établit d'autre
+- **OpenCode** : `disallowedTools` **INERTE** (le juge peut écrire) — mais **réparable dans
+  l'artefact** : `tools: {write: false}` produit un vrai `edit:deny` (**mesuré**). `mode` absent →
+  l'agent devient `(all)`, donc primaire **et** sous-agent : **`vf-internal` perdu**, réparable par
+  `mode: subagent` (**mesuré**). `name` supprimé (dérivé du **nom de fichier**), `model` supprimé.
+  Une skill DOIT être `<dir>/SKILL.md` — un `.md` à plat n'est **jamais** découvert.
+- **kimi-code** : nom d'agent = **frontmatter**, pas nom de fichier (**divergence de convention**
+  avec OpenCode). `name` **kebab-case obligatoire**, corps non vide. Les agents VibeFlow **bruts**
+  sont syntaxiquement acceptés. `[[hooks]]` est une **clé reconnue** (`doctor` dénonce une section
+  bidon mais pas `hooks`) et les **10 événements de style Claude** sont dans le binaire → **canal
+  natif direct, meilleure situation que Codex et OpenCode**.
+- **Le gate se comporte correctement** : `--target opencode|kimi-code|kimi` → **exit 3
+  (INDÉTERMINÉ)**, `--target codex` → exit 0. La pose d'artefacts n'existe pour aucun des deux
+  (`vibeflow-update.sh` n'a **aucune** occurrence de `opencode`/`kimi`/`.agents/`) — et le gate le
+  **dit** au lieu de le taire. **C'est le comportement voulu, à conserver tant que I-1 n'est pas levé.**
+
+### Honnêteté de méthode du mesureur
+Il a failli rapporter un défaut du convertisseur (`name: undefined`) avant de constater que
+**c'était son erreur de test** — `convertClaudeCommandToOpencodeSkill` a une **arité de 2**. Il l'a
+déclaré plutôt que de le taire. Signalé ici parce que quiconque re-mesure tombera dessus.
+
+### Inconnus déclarés — non comblés
+**I-1 (le seul vrai trou de kimi-code)** : les agents posés **en répertoire** sont-ils réellement
+enregistrés ? Mesuré via `--agent-file` (parse) et le bundle ; `--agent <nom>` bute sur le mur du
+modèle **avant** toute résolution. **Exige une auth kimi.**
+Aussi : `disallowedTools` bloque-t-il en session réelle (I-2) · les `[[hooks]]` se déclenchent-ils
+(I-3) · schéma exact d'un `[[hooks]]` (I-4, **levable sans auth**) · firing des hooks OpenCode
+(I-5) · analogue de `SessionEnd` (I-6) · sémantique de `agent(x): true` (I-8) · divergence de
+convention de nommage (I-9).
+
+### Bug amont à remonter à gsd-core (D-38-D, préparé — pas envoyé)
+Le **`split(",")`** qui déchiquette `Agent(a, b, c)` frappe **OpenCode ET kimi-code**, sur deux
+sémantiques **opposées** (permissif / restrictif). Un seul défaut, deux dégâts contraires.
