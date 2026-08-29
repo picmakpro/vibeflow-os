@@ -35,50 +35,90 @@ err() { echo "[vibeflow-update] ERROR: $*" >&2; exit 1; }
 # la variable à la main.
 vf_dry_run() { [ "$VF_DRY_RUN" = "1" ]; }
 
-# vf_stat_inode <path> — imprime "device:inode" pour <path>, portable macOS(BSD)/Linux(GNU).
-# `stat -f '%d:%i'` est la forme BSD (macOS) ; `stat -c '%d:%i'` est la forme GNU (Linux — la CI de
-# ce dépôt tourne sous Linux, précédent Phase 13 : 6 correctifs de portabilité macOS→Linux). Cascade
-# des deux formes : la mauvaise échoue proprement (option inconnue, rc≠0) sous l'autre plateforme,
-# jamais un plantage. Silencieux et non nul si <path> n'existe pas (ou si aucune forme de `stat` ne
-# marche) — c'est l'appelant qui décide de la retombée (revue 38-04, bloquant 1).
-vf_stat_inode() {
-  stat -f '%d:%i' "$1" 2>/dev/null || stat -c '%d:%i' "$1" 2>/dev/null
-}
-
 # vf_same_inode <path1> <path2> — vrai si les deux chemins désignent le MÊME inode physique.
 # Comparaison PAR IDENTITÉ (device+inode), jamais par égalité de chaîne : sur une FS insensible à
 # la casse mais qui la préserve (APFS macOS, défaut de fait), deux chemins de casse différente
 # peuvent résoudre au MÊME inode tout en produisant des chaînes `pwd -P` différentes — une
 # comparaison textuelle seule laisse alors passer la garde $HOME (revue 38-04, bloquant 1 : vérifié
-# par mesure directe, $LAB/home et $LAB/HOME → même inode, casses différentes). Faux (jamais un
-# crash) si l'un des deux chemins n'existe pas encore ou si `stat` échoue des deux façons.
+# par mesure directe, $LAB/home et $LAB/HOME → même inode, casses différentes).
+#
+# Implémentation : opérateur bash natif `-ef`, ZÉRO appel à `stat` (revue 38-04 correction 3/3,
+# BLOQUANT 1 persistant). L'ancienne implémentation cascadait `stat -f '%d:%i' || stat -c
+# '%d:%i'` en supposant que la mauvaise forme "échoue proprement" sous l'autre plateforme — FAUX
+# sous GNU coreutils : `-f` y est l'alias de `--file-system`, donc `'%d:%i'` ET `"$1"` deviennent
+# DEUX arguments FILE distincts. Le premier échoue mais le SECOND RÉUSSIT et imprime un bloc
+# `stat -f` multi-lignes (File:/ID:/Block size:…) sur stdout ; le rc global reste non nul, le
+# `||` déclenche `stat -c` dont la ligne correcte s'AJOUTE au blob déjà pollué. Comme ce blob
+# contient le chemin demandé en toutes lettres, deux chemins vers le MÊME inode produisaient des
+# chaînes DIFFÉRENTES → comparaison silencieusement fausse. Vérifié en conteneur ubuntu:22.04
+# (coreutils 8.32) avec un hardlink : `stat -c "%d:%i"` confirme le même inode sur les deux
+# chemins, mais l'ancienne vf_same_inode rendait faux. `-ef` est POSIX/bash natif, se comporte
+# identiquement sur toute plateforme (macOS, Linux, WSL2/NTFS insensible à la casse) — aucune
+# cascade de forme externe à maintenir. Faux (jamais un crash) si l'un des deux chemins n'existe
+# pas encore.
 vf_same_inode() {
-  local i1 i2
-  i1="$(vf_stat_inode "$1")" || return 1
-  i2="$(vf_stat_inode "$2")" || return 1
-  [ -n "$i1" ] && [ "$i1" = "$i2" ]
+  [ -e "$1" ] && [ -e "$2" ] && [ "$1" -ef "$2" ]
 }
 
 # VF_REGISTRY_RELPATH — constante partagée (mineur revue 38-04) : chemin relatif du registre
-# .vibeflow-installed sous TARGET_ROOT. Un SEUL site de vérité — avant ce lot, la garde --target
-# (ci-dessous) et INSTALLED_REGISTRY (plus bas, une fois TARGET_ROOT connu) portaient chacun le
-# même littéral en dur, divergence silencieuse possible si l'un changeait sans l'autre.
+# .vibeflow-installed sous TARGET_ROOT. Site de vérité pour la garde --target (ci-dessous) et
+# INSTALLED_REGISTRY (plus bas, une fois TARGET_ROOT connu) — avant ce lot, ces deux sites
+# portaient chacun le même littéral en dur, divergence silencieuse possible si l'un changeait sans
+# l'autre. ⚠️ PAS le SEUL site : vf_manifest_excluded() (plus bas, liste close D-31-03) porte
+# volontairement un 3e littéral `scripts/.vibeflow-installed` EN DUR, dans un contexte différent
+# (exclusion de manifeste de module, pas résolution de chemin de registre) — consolider les deux
+# forcerait un couplage entre deux préoccupations distinctes ; ce commentaire se contente de ne
+# plus prétendre à tort qu'il n'y a qu'un site (mineur m-01, revue 38-04).
 VF_REGISTRY_RELPATH="scripts/.vibeflow-installed"
 
 # vf_registry_state <registry_path> — classifie le registre .vibeflow-installed (revue 38-04,
 # ajout manager : l'exception de ré-install ne doit plus s'ouvrir sur la SEULE existence du
 # fichier — un fichier vide planté à la main la contournait sans aucun signal). Trois états :
-#   "empty"        — absent, vide, ou aucune ligne `mod=version` reconnaissable (registre non réel).
+#   "empty"        — absent, vide, contient un octet NUL (payload binaire — jamais un registre
+#                    réel), ou au moins UNE ligne non vide qui ne matche PAS `mod=version`
+#                    (registre non réel).
 #   "inconsistent" — au moins une entrée `=INCONSISTENT:<étape>:<version>` (format écrit par
 #                    _vf_rollback_mark_inconsistent, cf. ROLL D-38-K plus bas) : PAS un registre
 #                    corrompu — c'est la voie de réparation légitime après un rollback en échec à
 #                    mi-course, elle doit rester ouverte pour rollback/install par-dessus.
-#   "valid"        — au moins une entrée `mod=version` normale, aucune INCONSISTENT.
+#   "valid"        — CHAQUE ligne non vide matche `mod=version`, aucune INCONSISTENT.
 # Réutilise le MÊME format `mod=version` déjà lu par module_version_installed (grep "^mod=" |
 # cut -d= -f2, plus bas) — aucun 2e format de registre inventé ici.
+#
+# Durcissement 38-04 correction B-02 (BLOQUANT persistant) : l'ancien test `grep -qE ... "au
+# MOINS une ligne matche"` classait `valid` quasi n'importe quel binaire — n'importe quelle
+# "ligne" contenant un octet `=` (0x3D) avec du contenu autour suffisait. Mesuré : 5/5 essais de
+# 3000 octets `/dev/urandom` classés `valid` par l'ancienne forme, et rejoué end-to-end via le
+# vrai installeur (`install dev-orchestrator` sur une cible dont le registre était 3000 octets de
+# garbage → exception de ré-install accordée, payload posé sans drapeau). Exactement le bypass
+# que ce lot venait fermer, déplacé de "fichier vide planté" à "fichier garbage planté".
+# Fix en deux temps :
+#   1. Rejet binaire : `grep -Iq` traite tout fichier contenant un octet NUL comme "binaire" et
+#      ne matche jamais (comportement standard GNU ET BSD/macOS grep, aucune dépendance externe
+#      type perl/od) — un registre réel `mod=version` est du texte, jamais de NUL.
+#   2. Exigence EXHAUSTIVE : CHAQUE ligne non vide (pas "au moins une") doit matcher
+#      `^[^=]+=.+$` — un seul octet binaire survivant au filtre NUL (donc pas de NUL dans ces
+#      3000 octets, statistiquement rare mais possible) casse presque toujours cette exigence sur
+#      l'ensemble des lignes, alors qu'il suffisait de la satisfaire une seule fois avant.
 vf_registry_state() {
   local reg="$1"
-  if [ ! -s "$reg" ] || ! grep -qE '^[^=]+=.+$' "$reg" 2>/dev/null; then
+  if [ ! -s "$reg" ]; then
+    echo "empty"
+    return 0
+  fi
+  if ! LC_ALL=C grep -Iq . "$reg" 2>/dev/null; then
+    echo "empty"
+    return 0
+  fi
+  # PAS de `|| echo 0` : `grep -c` imprime déjà "0" sur stdout quand aucune ligne ne matche,
+  # tout en sortant en rc=1 (« aucun match » ≠ erreur) — un `||` ici DOUBLE la sortie en "0\n0"
+  # (piège vérifié en cours de durcissement B-02) et casse la comparaison `-eq` qui suit.
+  local nonempty_lines matching_lines
+  nonempty_lines="$(grep -cE '.' "$reg" 2>/dev/null)"
+  matching_lines="$(grep -cE '^[^=]+=.+$' "$reg" 2>/dev/null)"
+  nonempty_lines="${nonempty_lines:-0}"
+  matching_lines="${matching_lines:-0}"
+  if [ "$nonempty_lines" -eq 0 ] || [ "$matching_lines" -ne "$nonempty_lines" ]; then
     echo "empty"
     return 0
   fi
@@ -268,6 +308,15 @@ if [ -n "$VF_TARGET_OVERRIDE" ]; then
             ;;
           empty)
             err "--target '$TARGET_ROOT' existe déjà et n'est pas vide (contenu trouvé : $(ls -A "$TARGET_ROOT" | tr '\n' ' ')) — refusé par défaut pour éviter de disperser le payload dans un dossier existant. Relancer avec --target-nonempty-ok si c'est intentionnel."
+            ;;
+          *)
+            # Filet machine (majeur revue 38-04, M-01) : le trio valid|inconsistent|empty est
+            # exhaustif AUJOURD'HUI par construction (seules valeurs renvoyées par
+            # vf_registry_state), mais rien ne le garantit dans le temps — une 4e valeur future ou
+            # une chaîne vide par bug traversait avant ce filet SANS `err` ni `log`, le script
+            # continuant avec une cible non vide acceptée sans preuve de registre (fail-open dans
+            # une garde de sécurité). Le doute se refuse, il ne se tait pas.
+            err "--target '$TARGET_ROOT' : état de registre '$_vf_registry_state' non reconnu — refus par défaut (garde de sécurité, aucune valeur inattendue n'ouvre l'exception)."
             ;;
         esac
         unset _vf_registry_path _vf_registry_state

@@ -1570,6 +1570,44 @@ fi
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
+# T39d (BLOQUANT 1 persistant, revue 38-04 correction 3/3) — unité DIRECTE de vf_same_inode() via
+# un HARDLINK, pas la casse. T39c ci-dessus ne s'exécute que sur une FS insensible à la casse
+# (SKIP inconditionnel sous Linux/CI, cf. commentaire ci-dessus) — le défaut réel (`stat -f`
+# GNU coreutils = alias de `--file-system`, deux arguments FILE au lieu d'une option + un
+# argument, le 2e réussit et pollue la comparaison avec un blob contenant le nom du fichier) est
+# donc STRUCTURELLEMENT INDÉTECTABLE par la suite telle qu'écrite avant ce test : le seul test qui
+# exerce une collision d'inode ne tournait jamais là où le bug vit. Un hardlink donne le MÊME
+# inode SUR TOUTE PLATEFORME sans dépendre de la sensibilité à la casse du FS — il tourne donc
+# PARTOUT, y compris en CI Linux. Extrait vf_same_inode() du fichier RÉELLEMENT posé sur disque
+# via `sed`+`eval` (même pattern que resolve_via_posed_caller plus haut) pour exercer
+# l'implémentation COURANTE, jamais une copie qui pourrait diverger silencieusement.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+mkdir -p "$LAB/dir1"
+echo "contenu" > "$LAB/dir1/realfile"
+ln "$LAB/dir1/realfile" "$LAB/dir1/hardlinked_alias" 2>/dev/null
+echo "autre contenu" > "$LAB/dir1/otherfile"
+if [ -f "$LAB/dir1/hardlinked_alias" ]; then
+  miss=0
+  RESULT=$(bash -c '
+    eval "$(sed -n "/^vf_same_inode()/,/^}/p" "$0")"
+    if vf_same_inode "$1" "$2"; then echo "same=true"; else echo "same=false"; fi
+    if vf_same_inode "$1" "$3"; then echo "different=true"; else echo "different=false"; fi
+    if vf_same_inode "$1" "$1.nonexistent"; then echo "nonexistent=true"; else echo "nonexistent=false"; fi
+  ' "$INSTALLER" "$LAB/dir1/realfile" "$LAB/dir1/hardlinked_alias" "$LAB/dir1/otherfile")
+  echo "$RESULT" | "$GREP" -q '^same=true$' \
+    || { ko "T39d (BLOQUANT 1 persistant) : vf_same_inode(realfile, hardlinked_alias) = false — le MÊME inode (hardlink, toute plateforme) n'est pas détecté — $RESULT"; miss=1; }
+  echo "$RESULT" | "$GREP" -q '^different=false$' \
+    || { ko "T39d (BLOQUANT 1 persistant) : contre-épreuve — vf_same_inode(realfile, otherfile) = true — deux fichiers DIFFÉRENTS classés même inode (garde non discriminante)"; miss=1; }
+  echo "$RESULT" | "$GREP" -q '^nonexistent=false$' \
+    || { ko "T39d (BLOQUANT 1 persistant) : vf_same_inode sur une cible INEXISTANTE ne rend pas false proprement (devrait échouer sans crash)"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T39d (BLOQUANT 1 persistant, HARDLINK, toute plateforme y compris CI Linux) : vf_same_inode détecte le même inode, discrimine deux fichiers différents, gère la cible absente"
+else
+  skip "T39d : hardlink non créable sur ce FS (ln a échoué) — probablement un FS réseau/overlay restrictif"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
 # T40 (D-38-P) — --target pointant hors du repo mais VIDE reste accepté (rc=0) : le danger n'est
 # pas "hors repo", c'est $HOME peuplé — ne pas confondre les deux gardes.
 # ---------------------------------------------------------------------------
@@ -1788,6 +1826,85 @@ if prepare_module "$CACHE" "dev-orchestrator"; then
     || ko "T45 (ajout manager) : --scope user n'affiche PAS la cible résolue — $OUT"
 else
   skip "T45 : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T46 (BLOQUANT 2 persistant, revue 38-04 correction B-02) — vf_registry_state classait DU
+# BINAIRE comme "valid" : `grep -qE '^[^=]+=.+$'` matche quasi systématiquement des octets
+# aléatoires (n'importe quelle "ligne" binaire contenant un `=` 0x3D avec du contenu autour
+# suffit) — mesuré 5/5 sur des essais /dev/urandom de 3000 octets AVANT ce durcissement, et
+# rejoué end-to-end via le vrai installeur (exception de ré-install accordée sur un registre
+# garbage, payload posé sans drapeau). EXACTEMENT le bypass que T43 venait fermer, déplacé de
+# "fichier vide planté" à "fichier garbage planté". Discriminant DANS LE MÊME test (mutation
+# memory) : le registre BINAIRE doit être refusé ET un registre RÉEL (`mod=version`) doit rester
+# accepté dans le MÊME scénario — sinon on durcit trop et on casse le cas nominal T43b.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+GARBAGE_TARGET="$LAB/registered-target-garbage"
+mkdir -p "$GARBAGE_TARGET/scripts"
+head -c 3000 /dev/urandom > "$GARBAGE_TARGET/scripts/.vibeflow-installed"
+REAL_TARGET="$LAB/registered-target-real"
+mkdir -p "$REAL_TARGET/scripts"
+echo "software-architecture=v1.0.0" > "$REAL_TARGET/scripts/.vibeflow-installed"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  miss=0
+  OUT_GARBAGE=$(cd "$LAB" && VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --target "$GARBAGE_TARGET" install dev-orchestrator 2>&1)
+  RC_GARBAGE=$?
+  { [ "$RC_GARBAGE" -eq 0 ] || [ -f "$GARBAGE_TARGET/agents/dev-orchestrator.md" ]; } \
+    && { ko "T46 (BLOQUANT 2 persistant, B-02) : registre BINAIRE (3000 octets /dev/urandom) ACCEPTÉ (rc=$RC_GARBAGE) — la classification 'au moins une ligne matche' laisse encore passer du garbage — $OUT_GARBAGE"; miss=1; }
+  OUT_REAL=$(cd "$LAB" && VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --target "$REAL_TARGET" install dev-orchestrator 2>&1)
+  RC_REAL=$?
+  { [ "$RC_REAL" -eq 0 ] && [ -f "$REAL_TARGET/agents/dev-orchestrator.md" ]; } \
+    || { ko "T46 (BLOQUANT 2 persistant, B-02) : contre-épreuve — registre RÉEL (mod=version) refusé (rc=$RC_REAL) — le durcissement casse le cas nominal — $OUT_REAL"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T46 (BLOQUANT 2 persistant, B-02, DISCRIMINANT) : registre BINAIRE refusé, registre RÉEL toujours accepté dans le MÊME scénario"
+else
+  skip "T46 : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T47 (MAJEUR, revue 38-04, M-01) — le `case "$_vf_registry_state" in valid|inconsistent|empty`
+# est exhaustif AUJOURD'HUI par construction (seules valeurs rendues par vf_registry_state), mais
+# rien ne le garantissait : une 4e valeur (ou une chaîne vide par bug) traversait AVANT ce lot sans
+# `err` ni `log`, et le script CONTINUAIT — cible non vide acceptée sans preuve de registre
+# (fail-open dans une garde de sécurité). Ce test PATCHE une copie de l'installeur RÉELLEMENT posé
+# pour forcer vf_registry_state() à rendre une valeur inconnue (redéfinition de la fonction après
+# sa définition d'origine — bash retient la DERNIÈRE définition rencontrée à l'exécution — le
+# reste du fichier, y compris le `case`/`err` sous test, est inchangé) : preuve directe du filet
+# `*)`  sans dépendre d'un état de registre qui n'existe pas encore en pratique.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+UNKNOWN_TARGET="$LAB/registered-target-unknown-state"
+mkdir -p "$UNKNOWN_TARGET/scripts"
+echo "software-architecture=v1.0.0" > "$UNKNOWN_TARGET/scripts/.vibeflow-installed"
+PATCHED_INSTALLER="$LAB/patched-installer.sh"
+cp "$INSTALLER" "$PATCHED_INSTALLER"
+# Insère le override juste après la définition d'origine (avant tout point d'appel réel) : la
+# DERNIÈRE définition rencontrée à l'exécution gagne, le `case` en aval voit la valeur bidon.
+END_LINE=$("$GREP" -n '^vf_registry_state()' "$PATCHED_INSTALLER" | head -1 | cut -d: -f1)
+END_LINE=$(awk -v start="$END_LINE" 'NR>=start && /^}/{print NR; exit}' "$PATCHED_INSTALLER")
+{
+  head -n "$END_LINE" "$PATCHED_INSTALLER"
+  echo 'vf_registry_state() { echo "bogus-state-non-reconnu"; }'
+  tail -n "+$((END_LINE + 1))" "$PATCHED_INSTALLER"
+} > "$PATCHED_INSTALLER.tmp" && mv "$PATCHED_INSTALLER.tmp" "$PATCHED_INSTALLER"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  miss=0
+  OUT=$(cd "$LAB" && VIBEFLOW_CACHE="$CACHE" \
+     bash "$PATCHED_INSTALLER" --target "$UNKNOWN_TARGET" install dev-orchestrator 2>&1)
+  RC=$?
+  { [ "$RC" -eq 0 ] || [ -f "$UNKNOWN_TARGET/agents/dev-orchestrator.md" ]; } \
+    && { ko "T47 (MAJEUR, M-01) : état de registre INCONNU ('bogus-state-non-reconnu') ACCEPTÉ (rc=$RC) — le case sans branche */ laisse traverser une valeur inattendue (fail-open) — $OUT"; miss=1; }
+  echo "$OUT" | "$GREP" -qi 'non reconnu' \
+    || { ko "T47 (MAJEUR, M-01) : refusé (rc=$RC) mais aucun message explicite 'non reconnu' — $OUT"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T47 (MAJEUR, M-01) : état de registre INCONNU refusé par le filet */ (rc≠0), aucun payload posé"
+else
+  skip "T47 : dev-orchestrator non copiable dans le cache de test"
 fi
 rm -rf "$LAB"
 
