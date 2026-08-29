@@ -149,7 +149,7 @@
       "scope": [
         "plugin/_internal/runtime-adapter/"
       ],
-      "status": "ready",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -177,7 +177,7 @@
       "scope": [
         "plugin/_internal/"
       ],
-      "status": "ready",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -192,7 +192,7 @@
         "plugin/_internal/vibeflow-update.sh",
         "plugin/conductor/skills/"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "revue-migration",
@@ -205,7 +205,7 @@
         "plugin/_internal/",
         "plugin/conductor/"
       ],
-      "status": "blocked",
+      "status": "running",
       "review_regime": "full"
     },
     {
@@ -222,7 +222,7 @@
       "scope": [
         "/tmp/lab-codex-38"
       ],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "mesure-autres",
@@ -236,7 +236,7 @@
         "/tmp/lab-opencode-38",
         "/tmp/lab-kimi-38"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "audit",
@@ -375,7 +375,7 @@
       "scope": [
         "plugin/_internal/tests/test-vibeflow-update.sh"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "fix-fide-gate",
@@ -416,7 +416,7 @@
         "plugin/_internal/vibeflow-update.sh",
         "plugin/_internal/tests/test-vibeflow-update.sh"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "fix-versionsync",
@@ -444,7 +444,7 @@
         "plugin/_internal/tests/test-vibeflow-update.sh",
         ".planning/phases/VFDO-38-portabilit-multi-runtime-livraison-canal-d-install-migration/38-04-PLAN.md"
       ],
-      "status": "blocked"
+      "status": "done"
     }
   ]
 }
