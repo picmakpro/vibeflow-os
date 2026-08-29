@@ -1,5 +1,19 @@
 # Changelog — conductor
 
+## [v1.33.1] — 2026-08-29 (Phase 38 — team-kernel.md, correctif documentaire)
+
+**Patch** (correctif documentaire, aucune capacité) :
+
+- **`team-kernel.md`** — la ligne « Dispatch nommé » affirmait kimi-code **built-in-only**
+  (`namedDispatch: false`, aucun enregistrement custom) : mesuré FAUX sur
+  `@moonshot-ai/kimi-code@0.39.1` réellement installé (`subagents: array(string())`,
+  `delegatableSubagents()` résout par nom, `load()` fusionne les agent-files du disque dans une
+  Map clé=nom). Ligne corrigée, datée, périmé signalé sans effacer la nuance utile : VibeFlow ne
+  cible toujours qu'un runtime, aucun mécanisme de repli construit.
+- Nouvelle ligne **piège d'identité de paquet npm** : `kimi-code` (npm nu) N'EST PAS le produit
+  Moonshot (tiers, non modifié depuis ~1 an) — le vrai est `@moonshot-ai/kimi-code` ; `kimi-cli`
+  est un troisième objet distinct.
+
 ## [v1.33.0] — 2026-08-29 (Phase 38 — migration/coexistence de runtime, MIGR)
 
 **Minor** (nouvelles capacités observables) :
