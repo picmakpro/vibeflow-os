@@ -39,3 +39,23 @@ l'environnement** (`PATH`, `HOME`, `CLAUDE_CONFIG_DIR`, `cwd`) : ce sont ceux do
 mourir avant d'exercer ce qu'il teste. Corollaire pour les tests de non-régression d'un vecteur de
 sécurité : exiger que le rouge vienne de la **réintroduction du comportement**, jamais de la présence
 d'une chaîne de caractères dans le source — un renommage contournerait le second.
+
+**Le manager n'y échappe pas — 3 fois en une mission (Phase 38, 2026-08-29).**
+Vérifier un correctif est un test, donc soumis à la même règle. Mes trois ratés, tous « rouge pour
+la mauvaise raison », tous démasqués par un TÉMOIN et non par relecture :
+1. Garde `--target` : `status` sur cible non vide rendait `exit 1` — j'ai lu « refus de garde »,
+   c'était `Cache introuvable` **en aval**. Le témoin (cible **vide**) rendait le MÊME code : c'est
+   lui qui a montré que la garde laissait passer.
+2. Sonde `kimi-code` : `detect` rendait vide — j'ai failli conclure « fix inopérant ». En réalité
+   `env -i` avait **retiré `node` du PATH**, et `kimi` est un script Node (`env: node: No such
+   file`).
+3. Même sonde, 2ᵉ essai : j'ai rajouté `/opt/homebrew/bin` pour `node`… qui contient aussi
+   `claude`, détecté **en premier** par la cascade. Le résultat (`claude`) était juste, ma fixture
+   était fausse.
+
+**How to apply (manager) :** quand une vérification rend un rouge, ne PAS le rapporter avant
+d'avoir (a) lu le **message**, pas seulement le code de sortie — un refus attendu et un échec
+fortuit sortent tous deux en `1` ; (b) fait tourner un **témoin** qui devrait passer ; (c) vérifié
+que la fixture fournit **toutes** les dépendances du chemin testé (`env -i` est un piège :
+il retire `node`, `python3`, tout). Et pour une cascade de détection, isoler à **un seul**
+candidat — sinon on mesure la priorité, pas la détection.

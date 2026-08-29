@@ -1102,3 +1102,11 @@ convention de nommage (I-9).
 ### Bug amont à remonter à gsd-core (D-38-D, préparé — pas envoyé)
 Le **`split(",")`** qui déchiquette `Agent(a, b, c)` frappe **OpenCode ET kimi-code**, sur deux
 sémantiques **opposées** (permissif / restrictif). Un seul défaut, deux dégâts contraires.
+
+### ✅ Sonde `kimi-code` — validée contre le BINAIRE RÉEL (ce que le worker n'avait pas pu faire)
+Le correcteur a déclaré honnêtement s'appuyer sur la mesure amont, faute de binaire. **Le manager
+l'a fermé** : le `kimi` installé par le mesureur était conservé au scratchpad.
+`kimi --version` → **0.39.1** · `kimi --help` contient bien **`--output-format`** (1 occurrence).
+Avec un PATH isolé (ni `claude`, ni `codex`, ni `opencode`) : **nouveau code → `kimi-code`
+détecté** · **ancien code, même fixture → vide** (bloquant confirmé) · **faux `kimi` sans la
+needle → vide** (`kimi-cli` non confondu). La sonde par capacité tient sur le binaire réel.
