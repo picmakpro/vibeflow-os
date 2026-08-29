@@ -106,6 +106,20 @@ if [ -z "$AGENT_NAME" ]; then
   exit 1
 fi
 
+# Validation de charset AU POINT D'USAGE, avant toute construction de chemin dérivé de
+# AGENT_NAME (écriture à la pose, suppression au --remove). Même règle que le gate ADR-044
+# (plugin/conductor/scripts/check-agents.sh:510 : re.fullmatch(r"[a-z0-9-]+", name)) — ce gate
+# ne protège que les agents DE CE DÉPÔT en CI, jamais un module tiers ni un lab modifié après
+# coup, et vibeflow-update.sh ne l'invoque jamais. Un name hors charset (traversée de chemin,
+# absolu, vide après nettoyage, slash, majuscules, espaces internes, point initial...) est un
+# REFUS bruyant — jamais une normalisation "best effort", jamais un repli silencieux.
+case "$AGENT_NAME" in
+  *[!a-z0-9-]*|"")
+    echo "[register-codex-agent] name invalide ('$AGENT_NAME') dans $AGENT_MD — seuls [a-z0-9-]+ sont acceptés (même règle que check-agents.sh ADR-044) ; refus, aucune normalisation" >&2
+    exit 1
+    ;;
+esac
+
 ROLE_TOML="$AGENTS_DIR/${AGENT_NAME}.toml"
 
 if [ "$DO_REMOVE" -eq 1 ]; then
