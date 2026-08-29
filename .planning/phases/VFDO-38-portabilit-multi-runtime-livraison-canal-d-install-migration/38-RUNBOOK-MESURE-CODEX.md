@@ -145,3 +145,36 @@ l'auth est un geste humain (D-38-G). Consigner la tentative, la date, et laisser
 7 sessions (gonflées par le budget de contexte skills) et le quota s'est épuisé pendant. Savoir si
 elle en est la **cause** ou si la fenêtre était **déjà largement entamée** n'a pas pu être établi.
 La date de réarmement annoncée (27 septembre) suggère une fenêtre longue déjà bien avancée.
+
+---
+
+## 7. Canal hooks/plugins du dépôt jugé — inconnu déclaré + levier statique TROUVÉ
+
+**L'inconnu** (audit sécurité, 2026-08-29) : la mitigation d'injection des juges ferme les canaux
+**skills** et **`AGENTS.md`** (prouvé, marqueur 0/3). Mais les **hooks, plugins et `.rules`
+d'execpolicy fournis par le dépôt JUGÉ** ne sont pas énumérés — et la même campagne a prouvé que
+les hooks Codex **s'exécutent réellement**. Un dépôt jugé peut-il fournir un équivalent
+**scope-projet** (`<repo>/.codex/hooks.json`) que la session `-s read-only` chargerait malgré elle ?
+**Non tranché.**
+
+**Le levier statique existe, et il est vérifié à coût nul** (aucune session modèle) :
+```bash
+codex debug prompt-input -c features.hooks=false -c features.plugins=false     # accepté, rc=0
+codex features list      -c features.hooks=false | grep '^hooks'               # -> hooks  stable  false
+#   témoin dans le même relevé : plugins reste « true » quand on ne passe que hooks
+```
+⇒ **`-c features.hooks=false` et `-c features.plugins=false` sont acceptés EN LIGNE**, par
+invocation, **sans muter `config.toml`**. Les deux fonctionnalités sont `stable true` par défaut.
+
+**À ajouter à la commande de juge**, portant le total à **six** éléments d'isolation :
+```
+-s read-only · approval_policy="never" · skills.include_instructions=false
+· project_doc_max_bytes=0 · features.hooks=false · features.plugins=false
+```
+
+⚠️ **Distinction à tenir, ne pas la perdre** : ce qui est **mesuré**, c'est que le levier **agit
+sur le flag**. Ce qui **n'est PAS mesuré**, c'est que le canal soit **réellement fermé** — il faut
+pour cela un `<repo>/.codex/hooks.json` témoin et une session qui prouve qu'il **ne se déclenche
+pas**. Même protocole qu'ADPT-06 : **≥ 3 répétitions, marqueur 0/N**, parce que l'injection mesurée
+est **non déterministe (2/3)**.
+→ **À exécuter dans la même séance que le critère 2**, dès qu'un quota existe.
