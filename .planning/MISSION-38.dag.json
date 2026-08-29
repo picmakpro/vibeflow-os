@@ -205,7 +205,7 @@
         "plugin/_internal/",
         "plugin/conductor/"
       ],
-      "status": "running",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -222,7 +222,7 @@
       "scope": [
         "/tmp/lab-codex-38"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "mesure-autres",
@@ -249,7 +249,7 @@
       "scope": [
         "plugin/_internal/"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "nonreg",
@@ -265,7 +265,7 @@
         "plugin/",
         "scripts/"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "docs",
@@ -289,7 +289,7 @@
         "plugin/*/README.md",
         "README.md"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "probe-codex",
