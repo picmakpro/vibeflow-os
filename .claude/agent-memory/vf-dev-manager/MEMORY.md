@@ -52,3 +52,4 @@
 - [`timeout` absent : faux zéro silencieux](project_timeout-absent-faux-zero.md) — `timeout`/`gtimeout` absents du poste ; une boucle qui les utilise rend 0/N sans erreur. Un `0/N` est un artefact jusqu'à preuve du contraire
 - [Non-régression complète = geste de manager](feedback_non-regression-complete-est-un-geste-de-manager.md) — 4 workers enlisés en une mission ; le worker rejoue les siennes, le manager la découverte complète
 - [Cascade de résolution par fausse analogie](project_cascade-de-resolution-par-fausse-analogie.md) — « cascade identique à X » = signal d'alarme ; 2 cas en une phase, dont un qui désactivait toute la capacité livrée
+- [Édition trop large : vérifier le stat](feedback_edit-trop-large-verifier-le-stat.md) — `count=0` a réécrit 34 lignes d'historique pour 2 attendues, et le gate est resté VERT ; `git diff --stat` avant commit
