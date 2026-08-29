@@ -77,7 +77,7 @@
 - [ ] Phase 34: Gaps agency-agents & cadrage skill-installer
 - [x] Phase 35: Ré-armement worktree (conditionnelle) — CLOSE 2026-08-26, option A (pas de ré-armement)
 - [x] Phase 37: Portabilité multi-runtime — spike (Codex, OpenCode, Kimi) (completed 2026-08-28 — spike + étude livrés, décisions rendues ; suite → Phase 38)
-- [ ] Phase 38: Portabilité multi-runtime — livraison (canal d'install, migration de lab, adaptateur)
+- [~] Phase 38: Portabilité multi-runtime — livraison (canal d'install, migration de lab, adaptateur) (exécutée 2026-08-29 — **critère 2 NON PROUVÉ** : aller-retour manager→worker à profondeur 1/2, quota Codex épuisé jusqu'au 2026-09-27 ; **critère 1 partiel** : hooks non portés, perte déclarée ; non shippée, runbook de mesure finale posé)
 
 <details>
 <summary>✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04</summary>
@@ -1128,16 +1128,17 @@ installés** au 2026-08-28 — tout ce qui les concerne est dérivé de descript
 6 familles — `PORT-xx` évité, pris par la Phase 30 ; voir REQUIREMENTS.md §Portabilité multi-runtime)
 **Depends on:** Phase 37 (cadrage factuel) ; adjacente à Phase 34 (skill-installer) — lot 2 partage la
 surface installeur, à séquencer au cadrage.
-**Plans:** 6 plans
+**Plans:** 7 plans
 
 Plans:
 
-- [ ] 38-01-PLAN.md — Gate de fidélité (champs perdus + marqueurs morts par cible, bannière d'install)
-- [ ] 38-02-PLAN.md — Installeur multi-runtime (12 sites CLI-couplés sur 4 fichiers, table de dispatch à 4 verbes)
-- [ ] 38-03-PLAN.md — Trou de rollback (agents+hooks+mark_installed+glob, --dry-run)
-- [ ] 38-04-PLAN.md — `--target` injectable + réécriture du payload à la copie + sonde cross-module
-- [ ] 38-05-PLAN.md — Adaptateur Codex minimal (rôle .toml dispatchable, limite de confinement déclarée)
-- [ ] 38-06-PLAN.md — Migration de lab (runtime dans config.json, coexistence/bascule gatée, réversibilité)
+- [x] 38-01-PLAN.md — Gate de fidélité (champs perdus + marqueurs morts par cible, bannière d'install)
+- [x] 38-02-PLAN.md — Installeur multi-runtime (12 sites CLI-couplés sur 4 fichiers, table de dispatch à 4 verbes)
+- [x] 38-03-PLAN.md — Trou de rollback (agents+hooks+mark_installed+glob, --dry-run)
+- [x] 38-04-PLAN.md — `--target` injectable + réécriture du payload à la copie + sonde cross-module
+- [x] 38-05-PLAN.md — Adaptateur Codex minimal (rôle .toml dispatchable, limite de confinement déclarée)
+- [x] 38-06-PLAN.md — Migration de lab (runtime dans config.json, coexistence/bascule gatée, réversibilité)
+- [x] 38-07-PLAN.md — Correction des 3 bloquants de la mesure Codex (enregistrement des 12 agents, uninstall symétrique, déclaration des hooks)
 
 **Dette nommée (D-38-K, option A non retenue — correction ciblée post-ROLL, 2026-08-28)** :
 atomicité par staging (`<TARGET_ROOT>/.vibeflow-staging/<mod>/` + `mv` sur même volume) pour

@@ -4,30 +4,32 @@ milestone: fiabilite-v1.0
 milestone_name: « ce qui survit »
 current_phase: 38
 current_phase_name: Portabilité multi-runtime — livraison (canal d'install, migration de lab, adaptateur)
-status: not_started
+status: in_progress
 stopped_at: >-
-  Phase 37 (spike) CLOSE le 2026-08-28 sur trois livrables (`DISCUSS.md`, `SPIKE-REPORT.md`,
-  `ETUDE-CANAL-ET-MIGRATION.md`) et quatre décisions humaines — Phase 38 à part (canal + migration),
-  installeur multi-runtime plutôt que rapatriement superpowers (prémisse démentie : le catalogue est
-  déjà multi-runtime), mémoire d'agent versionnée après revue (`.gitignore` : `.claude/*` +
-  `!.claude/agent-memory/`, commit `dd8adb0`), fix `description: >` sur `fix/skill-description-monoline`
-  (`450d357`). **Reste non tranché** : go/no-go sur l'adaptateur VibeFlow minimal + démarche amont — à
-  trancher au cadrage de la 38. Phase 38 créée (`gsd-tools phase.add`), 6 lots candidats posés dans
-  ROADMAP, aucun plan. Rien de mergé, aucune PR, aucun tag : deux branches en attente du geste humain.
-  Session concurrente constatée : v2.58.1 releasée par une autre session pendant la mission (branche
-  `fix/hook-sessionstart-json-invalide`) — vérifier `main` avant tout merge.
-last_updated: "2026-08-28T00:00:00.000Z"
-last_activity: 2026-08-28
+  Phase 38 **exécutée, critère 2 non prouvé (quota Codex), critère 1 partiel (hooks non portés,
+  déclarés)** — 7 plans exécutés sur 7, 88 commits sur `feat/phase-38-portabilite-multi-runtime`
+  (worktree `.claude/worktrees/phase-38`), 75 suites / 0 échec, gates verts, `VERSION` racine
+  **inchangée v2.58.1**. Livré : gate de fidélité mesurant le TOML *posé* (`MODE=adapter`),
+  installeur multi-runtime (12 sites CLI-couplés, 4 verbes), `--target` avec réécriture du payload,
+  adaptateur Codex minimal + enregistrement/désenregistrement des 12 agents, migration de lab
+  (runtime dans `config.json`, réversibilité prouvée), rollback symétrique. **Non prouvé** :
+  l'aller-retour manager→worker à profondeur ≥ 2 sur Codex — quota ChatGPT épuisé jusqu'au
+  2026-09-27 (sonde de contrôle indépendante) ; kimi-code reste **inconnu déclaré** (OAuth en échec
+  côté serveur, 3 tentatives). **Rien de shippé** : aucune PR, aucun tag, aucun bump racine — geste
+  humain après que Samuel ait vu la chose marcher.
+last_updated: "2026-08-29T00:00:00.000Z"
+last_activity: 2026-08-29
 last_activity_desc: >-
-  Clôture de la Phase 37 et création de la Phase 38 depuis un worktree isolé (une
-  autre session travaillait dans l'arbre principal). ROADMAP : Phase 37 cochée, bloc de décisions
-  remplaçant « go/no-go en attente », section Phase 38 rédigée (goal, 6 lots candidats, contraintes,
-  dépendances), table Progress complétée. Lignes d'index mémoire corrigées (prémisses périmées).
+  Clôture documentaire de la Phase 38 (mission d'équipe, worktree isolé — une autre session
+  travaillait dans l'arbre principal). `38-02-SUMMARY.md` écrit sur pièces et déclaré comme
+  rédigé après coup ; ROADMAP : 7 plans cochés, `38-07` ajouté, statut de phase écrit sans
+  arrondi (`[~]`, pas « complete ») ; STATE : compteurs +7 plans, Session Continuity pointant le
+  runbook de mesure et les deux gestes humains en attente. Aucune modification de code.
 progress:
   total_phases: 10
   completed_phases: 7
-  total_plans: 31
-  completed_plans: 31
+  total_plans: 38
+  completed_plans: 38
   percent: 70
 ---
 
@@ -1012,11 +1014,26 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-**Resume file:** .planning/phases/VFDO-37-portabilit-multi-runtime-spike-codex-opencode-kimi/SPIKE-REPORT.md
+**Resume file:** .planning/phases/VFDO-38-portabilit-multi-runtime-livraison-canal-d-install-migration/38-RUNBOOK-MESURE-CODEX.md
 
-Last session: 2026-08-28T00:00:00.000Z
-Stopped at: Phase 37 close, Phase 38 créée (non cadrée, non planifiée)
-Reprendre par : gestes humains gatés — revue puis PR des deux branches
-(`feat/phase-37-spike-portabilite-multi-runtime` : docs + mémoire d'agent ; `fix/skill-description-monoline` :
-16 SKILL.md), en vérifiant d'abord que `main` a intégré la v2.58.1 posée par l'autre session. Puis
-`/gsd-discuss-phase 38` pour trancher le go/no-go adaptateur et confirmer les 6 lots.
+Last session: 2026-08-29T00:00:00.000Z
+Stopped at: Phase 38 exécutée (7/7 plans), critère 2 non prouvé — quota Codex épuisé jusqu'au 2026-09-27
+Reprendre par : **le runbook** ci-dessus (`38-RUNBOOK-MESURE-CODEX.md`) dès qu'un quota Codex existe —
+il tient en une session la preuve du critère 2 (aller-retour manager→worker à profondeur ≥ 2) : sonde de
+contrôle obligatoire avant toute conclusion, banc isolé, `VF_RUNTIME=codex` indispensable, verdict lu
+**dans la base** (`state_5.sqlite`) et jamais dans le JSONL, 5 critères en 0/N sans moyenne, et neuf
+pièges déjà payés. Sans quota, le critère 2 reste **inconnu déclaré** — ne pas l'écrire « vérifié ».
+
+**Deux gestes humains en attente** (ni l'un ni l'autre n'est automatisable côté agent) :
+
+1. **Auth kimi-code par clé API** — l'OAuth (`kimi login --region global`) échoue **côté serveur**,
+   3 tentatives. La voie `kimi provider add` / `catalog` reste ouverte mais c'est un geste de Samuel :
+   aucun agent ne lit, ne copie ni ne stocke d'identifiant. Tant qu'elle n'est pas faite, kimi-code
+   reste **inconnu déclaré** — la pose est mesurée, l'exécution ne l'est pas.
+2. **Issue amont gsd-core NON ENVOYÉE** — rédigée dans
+   `.planning/phases/VFDO-38-portabilit-multi-runtime-livraison-canal-d-install-migration/38-UPSTREAM-GSD-CORE-ISSUE.md`
+   (5 points mesurés, dont le `split(",")` qui déchire `Agent(a, b, c)` avec des dégâts **opposés** sur
+   OpenCode et kimi-code). Tout envoi externe est validé par Samuel — le fichier attend, il ne part pas seul.
+
+Puis, quand Samuel a vu la chose marcher : revue de branche, PR, bump racine, tag et release
+(`feat/phase-38-portabilite-multi-runtime`, 88 commits, `VERSION` racine encore v2.58.1).
