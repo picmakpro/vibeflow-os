@@ -1,25 +1,36 @@
 #!/usr/bin/env bash
 # check-artifact-fidelity.sh — Que perd RÉELLEMENT une install multi-runtime, mesuré par
-# exécution réelle de la conversion gsd-core (jamais une table recopiée à la main, Phase 38
-# FIDE-01).
+# exécution réelle de la conversion qui écrit l'artefact SUR DISQUE (Phase 38, FIDE-01 ; corrigé
+# en correction ciblée post-mesure-codex, cf. CHANGELOG conductor).
 #
 # Rôle : prend UN artefact VibeFlow source (frontmatter Claude Code) et UNE cible runtime,
-# invoque la VRAIE fonction de conversion de gsd-core (convertClaudeAgentToCodexAgent pour
-# --target codex, seule cible tier-1 mesurée au 2026-08-28), et rend un verdict PAR CHAMP
-# (name/description/model/memory/disallowedTools/vf-internal/tools) : PRESERVED, DEGRADED ou
-# LOST. Ne modifie jamais rien — gate en lecture seule.
+# invoque la conversion qui produit RÉELLEMENT l'artefact posé par une install (`--target codex`
+# -> agent-to-codex.mjs, la MÊME fonction que register-codex-agent.sh utilise pour écrire le
+# TOML sous $CODEX_HOME/agents/vibeflow/*.toml — jamais une conversion parallèle qui n'atterrit
+# jamais sur disque), et rend un verdict PAR CHAMP (name/description/model/memory/
+# disallowedTools/vf-internal/tools) : PRESERVED, DEGRADED ou LOST. Ne modifie jamais rien — gate
+# en lecture seule (mktemp -d pour la conversion, jamais une écriture sous $CODEX_HOME).
 #
-# Trois champs de RECETTE (jamais un détail enfoui, toujours en tête, `--target codex`
-# uniquement) : `multi_agent_v2` (sans lui aucun outil de spawn n'existe sur Codex — un lab
-# VibeFlow «marche» sans le moindre sous-agent, en silence), `trust_level` du dépôt cible
-# (sans `trusted`, `.codex/agents/` n'est jamais parsé — zéro rôle VibeFlow chargé, en silence,
-# alors que `codex doctor` continue de rendre `overall: ok`), et `role_confinement` (FIDE-03,
-# D-38-O) : sur Codex, `sandbox_mode`/`approval_policy`/`[permissions]` déclarés PAR RÔLE sont
-# acceptés puis INERTES — mesuré en session réelle (un rôle `read-only` a réellement écrit sur
-# disque). Le confinement d'un juge (`vf-reviewer`/`vf-auditer`/`vf-design-judge`) n'est garanti
-# QUE par une session `codex exec -s read-only` séparée, jamais par le fichier de rôle. Ce
-# troisième fait est une CONSTANTE déclarée pour `--target codex` (pas une mesure par exécution,
-# comme les deux premiers) — c'est un comportement documenté du binaire, pas un état du poste.
+# ⚠️ Historique du défaut corrigé ici : avant cette version, ce gate invoquait la fonction de
+# conversion de gsd-core (`convertClaudeAgentToCodexAgent`), qui rend un Markdown QUI N'EST
+# JAMAIS ÉCRIT PAR AUCUNE INSTALL — deux mesures divergeaient donc sous la MÊME étiquette
+# [fidelity] (ex. `model` LOST côté gsd-core / PRESERVED côté TOML réel), sans qu'aucun opérateur
+# lisant le log d'install ne puisse savoir laquelle décrivait l'artefact réellement sur son
+# disque. La mesure gsd-core reste disponible en MODE DE REPLI UNIQUEMENT (adaptateur Codex
+# introuvable sur ce poste — cf. find_codex_adapter ci-dessous), et la ligne rendue porte alors
+# `MODE=gsdcore-fallback`, JAMAIS confondue avec `MODE=adapter` (mesure de l'artefact réel).
+#
+# Ligne de recette (jamais un détail enfoui, toujours en tête, `--target codex` uniquement) :
+# `multi_agent_v2` (sans lui aucun outil de spawn n'existe sur Codex — un lab VibeFlow «marche»
+# sans le moindre sous-agent, en silence), `trust_level` du dépôt cible (sans `trusted`,
+# `.codex/agents/` n'est jamais parsé — zéro rôle VibeFlow chargé, en silence, alors que
+# `codex doctor` continue de rendre `overall: ok`), et `role_confinement` (FIDE-03, D-38-O) : sur
+# Codex, `sandbox_mode`/`approval_policy`/`[permissions]` déclarés PAR RÔLE sont acceptés puis
+# INERTES — mesuré en session réelle (un rôle `read-only` a réellement écrit sur disque). Le
+# confinement d'un juge (`vf-reviewer`/`vf-auditer`/`vf-design-judge`) n'est garanti QUE par une
+# session `codex exec -s read-only` séparée, jamais par le fichier de rôle. Ce troisième fait est
+# une CONSTANTE déclarée pour `--target codex` (pas une mesure par exécution, comme les deux
+# premiers) — c'est un comportement documenté du binaire, pas un état du poste.
 #
 # Usage:
 #   check-artifact-fidelity.sh [--target codex] [--json] <artefact.md>
@@ -44,10 +55,11 @@
 #       --check-judge-command : les quatre éléments sont présents.
 #   1 = --check-judge-command uniquement : au moins un des quatre éléments manque.
 #   2 = erreur d'usage (argument inconnu, artefact manquant en argument).
-#   3 = INDÉTERMINÉ — gsd-core introuvable sur ce poste, artefact source introuvable sur disque,
-#       cible inconnue (non mesurée sur ce poste), ou (--check-judge-command) commande de juge
-#       pas encore posée sur disque. stdout VIDE dans ces cas — jamais un rapport qui mentirait
-#       par absence de mesure.
+#   3 = INDÉTERMINÉ — ni l'adaptateur Codex (agent-to-codex.mjs) ni gsd-core (mode de repli) ne
+#       sont disponibles sur ce poste, artefact source introuvable sur disque, cible inconnue
+#       (non mesurée sur ce poste), ou (--check-judge-command) commande de juge pas encore posée
+#       sur disque. stdout VIDE dans ces cas — jamais un rapport qui mentirait par absence de
+#       mesure.
 set -uo pipefail
 
 TARGET="codex"
@@ -192,32 +204,31 @@ if [ ! -f "$ARTIFACT" ]; then
   exit 3
 fi
 
-# --- Cascade de dérivation du home gsd-core (duplication DÉLIBÉRÉE de
-# check-gsd-engine.sh:default_gsd_home_new(), motivée par le même D-01 : ce gate doit rester
-# testable en boîte noire sans sourcer un script à effets de bord). ---
-default_gsd_home() {
-  local root claude_home
-  root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-  claude_home="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-  if [ -d "$root/.claude/gsd-core" ]; then
-    echo "$root/.claude/gsd-core"
-  else
-    echo "$claude_home/gsd-core"
+# --- Résolution de l'adaptateur Codex réel (agent-to-codex.mjs) : SEULE conversion qui produit
+# l'artefact RÉELLEMENT posé par une install (le TOML sous $CODEX_HOME/agents/vibeflow/*.toml,
+# écrit par register-codex-agent.sh, lot 5/ADPT-01). Cascade à 1 candidat, MÊME patron relatif que
+# find_fidelity_gate()/find_codex_registrar() côté vibeflow-update.sh : ce gate vit sous
+# <racine>/<module>/scripts/check-artifact-fidelity.sh, agent-to-codex.mjs sous
+# <racine>/_internal/runtime-adapter/ — la remontée `../../_internal/...` résout identiquement
+# que <racine> soit le dépôt source (dev/tests) ou un CACHE_DIR d'install réel (module et
+# _internal sont TOUS DEUX des enfants directs de <racine>, même structure des deux côtés).
+# INTROUVABLE (ex. gate posé À PLAT sous TARGET_ROOT/scripts/, où _internal n'est JAMAIS mirroré
+# — cf. find_codex_registrar) -> repli sur l'ancienne mesure gsd-core, TOUJOURS marquée
+# MODE=gsdcore-fallback sur la ligne rendue (jamais confondue avec la mesure de l'artefact réel).
+find_codex_adapter() {
+  local here c
+  here="$(cd "$(dirname "$0")" && pwd)"
+  c="$here/../../_internal/runtime-adapter/agent-to-codex.mjs"
+  if [ -f "$c" ]; then
+    printf '%s/agent-to-codex.mjs' "$(cd "$(dirname "$c")" && pwd)"
+    return 0
   fi
+  echo ""
 }
-GSD_HOME="$(default_gsd_home)"
-CONVERSION_LIB="$GSD_HOME/bin/lib/runtime-artifact-conversion.cjs"
+ADAPTER_MJS="$(find_codex_adapter)"
 
-if [ ! -f "$GSD_HOME/VERSION" ] || [ ! -f "$CONVERSION_LIB" ]; then
-  echo "[check-artifact-fidelity] gsd-core introuvable sous '$GSD_HOME' — impossible de mesurer la conversion" >&2
-  exit 3
-fi
-
-TMPDIR_GATE="$(mktemp -d)"
-trap 'rm -rf "$TMPDIR_GATE"' EXIT
-
-# --- Extraction de frontmatter (bash pur, indépendante de gsd-core : le DIFF reste auditable
-# sans dépendre de la boîte noire qu'il mesure). ---
+# --- Extraction de frontmatter (bash pur, indépendante de la boîte noire qu'elle mesure — le
+# DIFF reste auditable sans dépendre de l'adaptateur ni de gsd-core). ---
 extract_frontmatter() {
   # Lignes strictement entre le 1er et le 2e délimiteur '---'.
   awk '/^---[[:space:]]*$/{c++; next} c==1' "$1"
@@ -240,80 +251,8 @@ for f in $FIELDS; do
   eval "$var=\"\$(get_field \"\$SRC_FM\" \"$f\")\""
 done
 
-# --- Conversion RÉELLE : invoque la seule source de vérité (jamais une table recopiée). ---
-CONVERTED_FILE="$TMPDIR_GATE/converted.md"
-NODE_ERR="$TMPDIR_GATE/node-err.log"
-node -e '
-const fs = require("fs");
-const path = require("path");
-const gsdHome = process.argv[1];
-const srcFile = process.argv[2];
-const outFile = process.argv[3];
-const lib = require(path.join(gsdHome, "bin/lib/runtime-artifact-conversion.cjs"));
-const content = fs.readFileSync(srcFile, "utf8");
-const converted = lib.convertClaudeAgentToCodexAgent(content);
-fs.writeFileSync(outFile, converted);
-' "$GSD_HOME" "$ARTIFACT" "$CONVERTED_FILE" 2>"$NODE_ERR"
-NODE_RC=$?
-if [ "$NODE_RC" -ne 0 ]; then
-  echo "[check-artifact-fidelity] échec de la conversion gsd-core réelle (node exit $NODE_RC) : $(cat "$NODE_ERR")" >&2
-  exit 3
-fi
-
-CONV_FM="$(extract_frontmatter "$CONVERTED_FILE")"
-CONV_BODY="$(extract_body "$CONVERTED_FILE")"
-
-for f in name description model memory disallowedTools vf-internal; do
-  var="CONV_$(echo "$f" | tr '[:lower:]-' '[:upper:]_')"
-  eval "$var=\"\$(get_field \"\$CONV_FM\" \"$f\")\""
-done
-
-PRESERVED=""
-DEGRADED=""
-LOST=""
-
-add_verdict() {
-  # $1 = liste (nom de variable), $2 = champ
-  case "$1" in
-    PRESERVED) PRESERVED="${PRESERVED:+$PRESERVED,}$2" ;;
-    DEGRADED)  DEGRADED="${DEGRADED:+$DEGRADED,}$2" ;;
-    LOST)      LOST="${LOST:+$LOST,}$2" ;;
-  esac
-}
-
-# name / description : présents des deux côtés -> PRESERVED.
-if [ -n "$SRC_NAME" ]; then
-  if [ -n "$CONV_NAME" ]; then add_verdict PRESERVED name; else add_verdict LOST name; fi
-fi
-if [ -n "$SRC_DESCRIPTION" ]; then
-  if [ -n "$CONV_DESCRIPTION" ]; then add_verdict PRESERVED description; else add_verdict LOST description; fi
-fi
-
-# model / memory / disallowedTools / vf-internal : présents source, absents converti -> LOST.
-if [ -n "$SRC_MODEL" ]; then
-  if [ -n "$CONV_MODEL" ]; then add_verdict PRESERVED model; else add_verdict LOST model; fi
-fi
-if [ -n "$SRC_MEMORY" ]; then
-  if [ -n "$CONV_MEMORY" ]; then add_verdict PRESERVED memory; else add_verdict LOST memory; fi
-fi
-if [ -n "$SRC_DISALLOWEDTOOLS" ]; then
-  if [ -n "$CONV_DISALLOWEDTOOLS" ]; then add_verdict PRESERVED disallowedTools; else add_verdict LOST disallowedTools; fi
-fi
-if [ -n "$SRC_VF_INTERNAL" ]; then
-  if [ -n "$CONV_VF_INTERNAL" ]; then add_verdict PRESERVED vf-internal; else add_verdict LOST vf-internal; fi
-fi
-
-# tools : traité à part — cherché en PROSE dans le corps <codex_agent_role> de la sortie
-# convertie, jamais dans le frontmatter (le convertisseur l'embarque en prose non-enforçable).
-if [ -n "$SRC_TOOLS" ]; then
-  if printf '%s' "$CONV_BODY" | grep -qF -- "$SRC_TOOLS"; then
-    add_verdict DEGRADED tools
-  else
-    add_verdict LOST tools
-  fi
-fi
-
-# --- Marqueurs morts : comptés sur le CORPS (hors frontmatter) des deux versions. ---
+# --- Marqueurs morts : comptés sur le CORPS (hors frontmatter). Fonction partagée par les deux
+# modes de mesure (adapter / gsdcore-fallback), et extraite isolément par T7. ---
 count_markers() {
   # grep -o compte les OCCURRENCES (une ligne peut porter deux marqueurs) — grep -c compterait
   # cette ligne une seule fois et sous-déclarerait DEAD_MARKERS.
@@ -324,11 +263,177 @@ count_markers() {
   echo $((n_claude + n_task))
 }
 SRC_MARKERS=$(count_markers "$SRC_BODY")
-CONV_MARKERS=$(count_markers "$CONV_BODY")
-if [ "$SRC_MARKERS" -eq "$CONV_MARKERS" ]; then
-  DEAD_MARKERS_LABEL="$CONV_MARKERS (non réécrits)"
+
+PRESERVED=""
+DEGRADED=""
+LOST=""
+add_verdict() {
+  # $1 = liste (nom de variable), $2 = champ
+  case "$1" in
+    PRESERVED) PRESERVED="${PRESERVED:+$PRESERVED,}$2" ;;
+    DEGRADED)  DEGRADED="${DEGRADED:+$DEGRADED,}$2" ;;
+    LOST)      LOST="${LOST:+$LOST,}$2" ;;
+  esac
+}
+
+TMPDIR_GATE="$(mktemp -d)"
+trap 'rm -rf "$TMPDIR_GATE"' EXIT
+
+MEASURE_MODE=""
+DEAD_MARKERS_LABEL=""
+
+if [ -n "$ADAPTER_MJS" ] && command -v node >/dev/null 2>&1; then
+  # --- MODE RÉEL (MODE=adapter) : invoque la MÊME conversion que register-codex-agent.sh (lot
+  # 5) — celle qui écrit réellement le .toml posé sur disque à l'install. Le digest per-champ
+  # (name/description/model/effort/memory/tools/disallowedTools/vf-internal) sort sur stderr, un
+  # champ par ligne (`field: STATUS[ — note]`) — SEULE source de vérité, jamais recalculée à la
+  # main ici : c'est ce qui rend structurellement impossible la divergence corrigée par ce
+  # correctif (le gate lit le MÊME digest que celui relayé [codex-adapter] à l'install).
+  MEASURE_MODE="adapter"
+  CONVERTED_FILE="$TMPDIR_GATE/converted.toml"
+  NODE_ERR="$TMPDIR_GATE/node-err.log"
+  node "$ADAPTER_MJS" "$ARTIFACT" --out "$CONVERTED_FILE" 2>"$NODE_ERR" >/dev/null
+  NODE_RC=$?
+  if [ "$NODE_RC" -ne 0 ]; then
+    echo "[check-artifact-fidelity] échec de la conversion Codex réelle (agent-to-codex.mjs, node exit $NODE_RC) : $(cat "$NODE_ERR")" >&2
+    exit 3
+  fi
+  DIGEST_TEXT="$(cat "$NODE_ERR")"
+
+  digest_status() {
+    # $1 = nom de champ digest (identique au frontmatter, cf. agent-to-codex.mjs formatDigest).
+    printf '%s\n' "$DIGEST_TEXT" | grep -E "^${1}: " | head -1 | sed -E 's/^[^:]+: ([A-Z_]+).*/\1/'
+  }
+  map_and_add() {
+    # $1 = champ [fidelity], $2 = nom de champ côté digest, $3 = valeur SRC_* (gate n'émet un
+    # verdict QUE si la source portait le champ — même doctrine que l'ancien mode).
+    local field="$1" digest_field="$2" src_value="$3" status
+    [ -n "$src_value" ] || return 0
+    status="$(digest_status "$digest_field")"
+    case "$status" in
+      PRESERVED|PRESERVED_BY_OMISSION) add_verdict PRESERVED "$field" ;;
+      PENDING) add_verdict DEGRADED "$field" ;;
+      *) add_verdict LOST "$field" ;;
+    esac
+  }
+  map_and_add name name "$SRC_NAME"
+  map_and_add description description "$SRC_DESCRIPTION"
+  map_and_add model model "$SRC_MODEL"
+  map_and_add memory memory "$SRC_MEMORY"
+  map_and_add disallowedTools disallowedTools "$SRC_DISALLOWEDTOOLS"
+  map_and_add vf-internal vf-internal "$SRC_VF_INTERNAL"
+  map_and_add tools tools "$SRC_TOOLS"
+
+  extract_toml_multiline() {
+    # $1 = fichier, $2 = clé TOML. Ancré sur le gabarit EXACT émis par agent-to-codex.mjs
+    # (`key = """` seule en tête de ligne, corps, `"""` seule sur sa ligne de fermeture — cf.
+    # escapeTomlMultiline/convertAgentToCodexRole).
+    awk -v key="$2" '
+      $0 == key " = \"\"\"" { c=1; next }
+      c && $0 == "\"\"\"" { c=0; next }
+      c { print }
+    ' "$1"
+  }
+  CONV_BODY="$(extract_toml_multiline "$CONVERTED_FILE" "developer_instructions")"
+  CONV_MARKERS=$(count_markers "$CONV_BODY")
+  if [ "$SRC_MARKERS" -eq "$CONV_MARKERS" ]; then
+    DEAD_MARKERS_LABEL="$CONV_MARKERS (non réécrits)"
+  else
+    DEAD_MARKERS_LABEL="$CONV_MARKERS (source=$SRC_MARKERS, réécriture partielle mesurée)"
+  fi
 else
-  DEAD_MARKERS_LABEL="$CONV_MARKERS (source=$SRC_MARKERS, réécriture partielle mesurée)"
+  # --- MODE DE REPLI (MODE=gsdcore-fallback) : adaptateur Codex introuvable sur ce poste (ex.
+  # gate posé À PLAT sous TARGET_ROOT/scripts/, _internal jamais mirroré à cette position — cf.
+  # commentaire de find_codex_adapter ci-dessus). Bascule sur la conversion gsd-core
+  # (duplication DÉLIBÉRÉE de check-gsd-engine.sh:default_gsd_home_new(), motivée par le même
+  # D-01 : ce gate doit rester testable en boîte noire sans sourcer un script à effets de bord).
+  # Mesure un Markdown de conversion QUI N'EST PAS L'ARTEFACT INSTALLÉ — jamais confondue avec la
+  # mesure réelle ci-dessus sous la même étiquette (MODE le distingue toujours).
+  MEASURE_MODE="gsdcore-fallback"
+
+  default_gsd_home() {
+    local root claude_home
+    root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+    claude_home="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+    if [ -d "$root/.claude/gsd-core" ]; then
+      echo "$root/.claude/gsd-core"
+    else
+      echo "$claude_home/gsd-core"
+    fi
+  }
+  GSD_HOME="$(default_gsd_home)"
+  CONVERSION_LIB="$GSD_HOME/bin/lib/runtime-artifact-conversion.cjs"
+
+  if [ ! -f "$GSD_HOME/VERSION" ] || [ ! -f "$CONVERSION_LIB" ]; then
+    echo "[check-artifact-fidelity] ni l'adaptateur Codex (agent-to-codex.mjs) ni gsd-core ('$GSD_HOME') ne sont disponibles sur ce poste — impossible de mesurer la conversion" >&2
+    exit 3
+  fi
+
+  CONVERTED_FILE="$TMPDIR_GATE/converted.md"
+  NODE_ERR="$TMPDIR_GATE/node-err.log"
+  node -e '
+const fs = require("fs");
+const path = require("path");
+const gsdHome = process.argv[1];
+const srcFile = process.argv[2];
+const outFile = process.argv[3];
+const lib = require(path.join(gsdHome, "bin/lib/runtime-artifact-conversion.cjs"));
+const content = fs.readFileSync(srcFile, "utf8");
+const converted = lib.convertClaudeAgentToCodexAgent(content);
+fs.writeFileSync(outFile, converted);
+' "$GSD_HOME" "$ARTIFACT" "$CONVERTED_FILE" 2>"$NODE_ERR"
+  NODE_RC=$?
+  if [ "$NODE_RC" -ne 0 ]; then
+    echo "[check-artifact-fidelity] échec de la conversion gsd-core de repli (node exit $NODE_RC) : $(cat "$NODE_ERR")" >&2
+    exit 3
+  fi
+
+  CONV_FM="$(extract_frontmatter "$CONVERTED_FILE")"
+  CONV_BODY="$(extract_body "$CONVERTED_FILE")"
+
+  for f in name description model memory disallowedTools vf-internal; do
+    var="CONV_$(echo "$f" | tr '[:lower:]-' '[:upper:]_')"
+    eval "$var=\"\$(get_field \"\$CONV_FM\" \"$f\")\""
+  done
+
+  # name / description : présents des deux côtés -> PRESERVED.
+  if [ -n "$SRC_NAME" ]; then
+    if [ -n "$CONV_NAME" ]; then add_verdict PRESERVED name; else add_verdict LOST name; fi
+  fi
+  if [ -n "$SRC_DESCRIPTION" ]; then
+    if [ -n "$CONV_DESCRIPTION" ]; then add_verdict PRESERVED description; else add_verdict LOST description; fi
+  fi
+
+  # model / memory / disallowedTools / vf-internal : présents source, absents converti -> LOST.
+  if [ -n "$SRC_MODEL" ]; then
+    if [ -n "$CONV_MODEL" ]; then add_verdict PRESERVED model; else add_verdict LOST model; fi
+  fi
+  if [ -n "$SRC_MEMORY" ]; then
+    if [ -n "$CONV_MEMORY" ]; then add_verdict PRESERVED memory; else add_verdict LOST memory; fi
+  fi
+  if [ -n "$SRC_DISALLOWEDTOOLS" ]; then
+    if [ -n "$CONV_DISALLOWEDTOOLS" ]; then add_verdict PRESERVED disallowedTools; else add_verdict LOST disallowedTools; fi
+  fi
+  if [ -n "$SRC_VF_INTERNAL" ]; then
+    if [ -n "$CONV_VF_INTERNAL" ]; then add_verdict PRESERVED vf-internal; else add_verdict LOST vf-internal; fi
+  fi
+
+  # tools : traité à part — cherché en PROSE dans le corps <codex_agent_role> de la sortie
+  # convertie, jamais dans le frontmatter (le convertisseur l'embarque en prose non-enforçable).
+  if [ -n "$SRC_TOOLS" ]; then
+    if printf '%s' "$CONV_BODY" | grep -qF -- "$SRC_TOOLS"; then
+      add_verdict DEGRADED tools
+    else
+      add_verdict LOST tools
+    fi
+  fi
+
+  CONV_MARKERS=$(count_markers "$CONV_BODY")
+  if [ "$SRC_MARKERS" -eq "$CONV_MARKERS" ]; then
+    DEAD_MARKERS_LABEL="$CONV_MARKERS (non réécrits)"
+  else
+    DEAD_MARKERS_LABEL="$CONV_MARKERS (source=$SRC_MARKERS, réécriture partielle mesurée)"
+  fi
 fi
 
 # --- Recette d'environnement Codex : deux mesures INDÉPENDANTES de la conversion d'artefact. ---
@@ -381,7 +486,7 @@ fi
 if [ "$JSON_MODE" -eq 1 ]; then
   node -e '
 const fs = require("fs");
-const [artifact, target, preserved, degraded, lost, deadMarkers, multiAgentV2, trustLevel, roleConfinement] = process.argv.slice(1);
+const [artifact, target, preserved, degraded, lost, deadMarkers, multiAgentV2, trustLevel, roleConfinement, mode] = process.argv.slice(1);
 const splitCsv = (s) => (s ? s.split(",") : []);
 const out = {
   artifact,
@@ -393,12 +498,13 @@ const out = {
   multi_agent_v2: multiAgentV2,
   trust_level: trustLevel,
   role_confinement: roleConfinement,
+  mode,
 };
 process.stdout.write(JSON.stringify(out));
-' "$ARTIFACT" "$TARGET" "$PRESERVED" "$DEGRADED" "$LOST" "$DEAD_MARKERS_LABEL" "$MULTI_AGENT_V2" "$TRUST_LEVEL" "$ROLE_CONFINEMENT"
+' "$ARTIFACT" "$TARGET" "$PRESERVED" "$DEGRADED" "$LOST" "$DEAD_MARKERS_LABEL" "$MULTI_AGENT_V2" "$TRUST_LEVEL" "$ROLE_CONFINEMENT" "$MEASURE_MODE"
   echo
 else
-  echo "[fidelity] $ARTIFACT -> $TARGET: PRESERVED={$PRESERVED} DEGRADED={$DEGRADED} LOST={$LOST} DEAD_MARKERS=$DEAD_MARKERS_LABEL"
+  echo "[fidelity] $ARTIFACT -> $TARGET: PRESERVED={$PRESERVED} DEGRADED={$DEGRADED} LOST={$LOST} DEAD_MARKERS=$DEAD_MARKERS_LABEL MODE=$MEASURE_MODE"
 fi
 
 exit 0

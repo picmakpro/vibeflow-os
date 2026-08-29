@@ -2,10 +2,16 @@
 # test-check-artifact-fidelity.sh — Suite du gate de fidélité de conversion (Phase 38, FIDE-01).
 #
 # check-artifact-fidelity.sh :
-#   T1 — content-clarity-judge.md (fixture copiée, isolée) --target codex → les 4 pertes réelles
-#        (model/memory/disallowedTools/vf-internal) + 1 dégradation (tools) mesurées par
-#        exécution réelle de la conversion gsd-core.
-#   T2 — gsd-core absent (HOME/CLAUDE_CONFIG_DIR de sonde sans gsd-core) → exit 3, stdout vide.
+#   T1 — content-clarity-judge.md (fixture copiée, isolée) --target codex → mesure RÉELLE via
+#        l'adaptateur Codex (agent-to-codex.mjs, le même que register-codex-agent.sh écrit sur
+#        disque) : name/description/model/vf-internal PRESERVED, disallowedTools/tools DEGRADED,
+#        memory LOST — MODE=adapter sur la ligne [fidelity] (correction ciblée post-mesure-codex :
+#        avant cette version, ce gate mesurait la conversion Markdown de gsd-core, jamais écrite
+#        par aucune install, et rendait model/disallowedTools/vf-internal LOST à tort).
+#   T2 — adaptateur ET gsd-core absents (gate copié hors du dépôt, HOME de sonde sans gsd-core)
+#        → exit 3, stdout vide (les deux sources de mesure sont indisponibles).
+#   T2b — gsd-core absent MAIS adaptateur présent → la mesure réussit quand même (MODE=adapter),
+#        preuve que le mode réel ne dépend plus de gsd-core.
 #   T3 — --json produit un JSON valide (node -e JSON.parse).
 #   T4 — cible inconnue (--target opencode) → exit 3, message "non mesuré".
 #   T5 — --target codex sans binaire `codex` sur un PATH de sonde restreint →
@@ -28,6 +34,13 @@
 #        laissait l'ancien gate à COMPLET. T14 = sonde (prose dupliquée présente) + contrôle
 #        vert avant mutation. T15-T18 = les 4 mutations rejouées sur CE fichier, prose vérifiée
 #        intacte à chaque fois, doivent rougir.
+#   T23 — accord [fidelity] / digest réel de agent-to-codex.mjs (le même digest que
+#        register-codex-agent.sh relaie [codex-adapter] à l'install) : les 7 champs mesurés
+#        doivent tomber dans le MÊME bucket PRESERVED/DEGRADED/LOST des deux côtés — jamais deux
+#        verdicts contradictoires sous des étiquettes différentes pour le même champ réel.
+#        Mutation : une copie du gate qui force `model` en LOST doit rougir la comparaison, puis
+#        le gate réel (non muté) doit repasser vert — preuve que le test mord (feedback
+#        feedback_mutation-test-discriminating-cases).
 #
 # Convention : asserts numérotés, helpers ok()/ko()/skip(), exit 0 si tout passe (SKIP non
 # bloquant), exit 1 si au moins un KO. Calqué sur le pattern de test-vibeflow-update.sh.
@@ -140,41 +153,54 @@ else
   ko "T1.ligne : [fidelity] absente de la sortie ($T1_OUT)"
 fi
 
-for champ in model disallowedTools vf-internal; do
-  if printf '%s\n' "$FIDELITY_LINE" | grep -q "LOST={[^}]*\b${champ}\b"; then
-    ok "T1.LOST : $champ dans LOST="
-  else
-    ko "T1.LOST : $champ absent de LOST= (ligne: $FIDELITY_LINE)"
-  fi
-done
+# memory : toujours LOST (schéma Codex rejette le champ, D-37-2).
 if printf '%s\n' "$FIDELITY_LINE" | grep -q "LOST={[^}]*\bmemory\b"; then
   ok "T1.LOST : memory dans LOST="
 else
   ko "T1.LOST : memory absent de LOST= (ligne: $FIDELITY_LINE)"
 fi
 
-if printf '%s\n' "$FIDELITY_LINE" | grep -q "DEGRADED={[^}]*\btools\b"; then
-  ok "T1.DEGRADED : tools dans DEGRADED="
-else
-  ko "T1.DEGRADED : tools absent de DEGRADED= (ligne: $FIDELITY_LINE)"
-fi
+# disallowedTools/tools : PENDING côté digest réel -> DEGRADED (aucun mécanisme [tools] confirmé
+# fonctionnel par rôle, jamais un LOST — cf. agent-to-codex.mjs commentaire piège n°2).
+for champ in disallowedTools tools; do
+  if printf '%s\n' "$FIDELITY_LINE" | grep -q "DEGRADED={[^}]*\b${champ}\b"; then
+    ok "T1.DEGRADED : $champ dans DEGRADED="
+  else
+    ko "T1.DEGRADED : $champ absent de DEGRADED= (ligne: $FIDELITY_LINE)"
+  fi
+done
 
-if printf '%s\n' "$FIDELITY_LINE" | grep -q "PRESERVED={[^}]*\bname\b" \
-  && printf '%s\n' "$FIDELITY_LINE" | grep -q "PRESERVED={[^}]*\bdescription\b"; then
-  ok "T1.PRESERVED : name et description préservés (model étant LOST, sur la MÊME exécution)"
+# name/description/model/vf-internal : présents avec valeur truthy dans le TOML réel ->
+# PRESERVED (model n'est PLUS LOST : c'était précisément le défaut corrigé — l'ancienne mesure
+# gsd-core le déclarait LOST alors que le TOML réellement installé le porte).
+for champ in name description model vf-internal; do
+  if printf '%s\n' "$FIDELITY_LINE" | grep -q "PRESERVED={[^}]*\b${champ}\b"; then
+    ok "T1.PRESERVED : $champ dans PRESERVED="
+  else
+    ko "T1.PRESERVED : $champ absent de PRESERVED= (ligne: $FIDELITY_LINE)"
+  fi
+done
+
+if printf '%s\n' "$FIDELITY_LINE" | grep -q 'MODE=adapter'; then
+  ok "T1.MODE : MODE=adapter (mesure de l'artefact réellement installé, pas la conversion gsd-core)"
 else
-  ko "T1.PRESERVED : name/description absents de PRESERVED= (ligne: $FIDELITY_LINE)"
+  ko "T1.MODE : MODE=adapter absent de la ligne (ligne: $FIDELITY_LINE)"
 fi
 
 # ---------------------------------------------------------------------------
-# T2 — gsd-core absent : exit 3, stdout vide.
+# T2 — adaptateur ET gsd-core absents : exit 3, stdout vide. Gate copié dans un répertoire isolé
+# (aucun _internal/runtime-adapter en sibling) + HOME de sonde sans gsd-core -> aucune des deux
+# sources de mesure n'est disponible, l'indétermination doit rester silencieuse (F13).
 # ---------------------------------------------------------------------------
+ISOLATED_GATE_DIR="$WORK/isolated-gate"
+mkdir -p "$ISOLATED_GATE_DIR"
+cp "$GATE" "$ISOLATED_GATE_DIR/check-artifact-fidelity.sh"
 SONDE_HOME="$WORK/sonde-no-gsd-core"
 mkdir -p "$SONDE_HOME"
-T2_OUT="$(HOME="$SONDE_HOME" CLAUDE_CONFIG_DIR="$SONDE_HOME/.claude" bash "$GATE" --target codex "$FIXTURE" 2>/dev/null)"
+T2_OUT="$(HOME="$SONDE_HOME" CLAUDE_CONFIG_DIR="$SONDE_HOME/.claude" bash "$ISOLATED_GATE_DIR/check-artifact-fidelity.sh" --target codex "$FIXTURE" 2>/dev/null)"
 T2_RC=$?
 if [ "$T2_RC" -eq 3 ]; then
-  ok "T2.rc : gsd-core absent → exit 3"
+  ok "T2.rc : adaptateur + gsd-core absents → exit 3"
 else
   ko "T2.rc : attendu exit 3, obtenu $T2_RC"
 fi
@@ -182,6 +208,18 @@ if [ -z "$T2_OUT" ]; then
   ok "T2.stdout : vide"
 else
   ko "T2.stdout : non vide ('$T2_OUT')"
+fi
+
+# ---------------------------------------------------------------------------
+# T2b — gsd-core absent MAIS adaptateur présent (gate exécuté depuis sa position réelle dans le
+# dépôt) : la mesure réussit quand même, MODE=adapter — le mode réel ne dépend plus de gsd-core.
+# ---------------------------------------------------------------------------
+T2B_OUT="$(cd "$REPO" && HOME="$SONDE_HOME" CLAUDE_CONFIG_DIR="$SONDE_HOME/.claude" bash "$GATE" --target codex "$FIXTURE" 2>"$WORK/t2b.err")"
+T2B_RC=$?
+if [ "$T2B_RC" -eq 0 ] && printf '%s\n' "$T2B_OUT" | grep -q '^\[fidelity\].*MODE=adapter'; then
+  ok "T2b : gsd-core absent, adaptateur présent → mesure réussie (MODE=adapter, indépendant de gsd-core)"
+else
+  ko "T2b : attendu exit 0 + MODE=adapter, obtenu rc=$T2B_RC sortie='$T2B_OUT' (stderr: $(cat "$WORK/t2b.err" 2>/dev/null))"
 fi
 
 # ---------------------------------------------------------------------------
@@ -475,6 +513,80 @@ else
   # T18 — supprime la ligne 17 (project_doc_max_bytes=0) du bloc de commande uniquement.
   run_real_mutation_case 18 '17d' "project_doc_max_bytes=0" "project_doc_max_bytes=0" \
     "ferme le canal"
+fi
+
+# ---------------------------------------------------------------------------
+# T23 — accord [fidelity] / digest réel de agent-to-codex.mjs, PROUVÉ par mutation (jamais un
+# test qui se contente de constater que deux copies du même code s'accordent trivialement —
+# feedback_mutation-test-discriminating-cases). Le digest réel (celui-là même que
+# register-codex-agent.sh relaie [codex-adapter] à l'install) est recalculé ICI,
+# indépendamment du gate, sur la même fixture.
+# ---------------------------------------------------------------------------
+ADAPTER_MJS_REAL="$REPO/plugin/_internal/runtime-adapter/agent-to-codex.mjs"
+if [ ! -f "$ADAPTER_MJS_REAL" ] || [ -z "$NODE_BIN" ]; then
+  skip "T23 : agent-to-codex.mjs ou node introuvables sur ce poste"
+else
+  T23_TOML="$WORK/t23-converted.toml"
+  T23_DIGEST="$(node "$ADAPTER_MJS_REAL" "$FIXTURE" --out "$T23_TOML" 2>&1 1>/dev/null)"
+
+  digest_bucket() {
+    # $1 = champ digest -> PRESERVED/DEGRADED/LOST, MÊME mapping que map_and_add côté gate.
+    local status
+    status="$(printf '%s\n' "$T23_DIGEST" | grep -E "^${1}: " | head -1 | sed -E 's/^[^:]+: ([A-Z_]+).*/\1/')"
+    case "$status" in
+      PRESERVED|PRESERVED_BY_OMISSION) echo PRESERVED ;;
+      PENDING) echo DEGRADED ;;
+      *) echo LOST ;;
+    esac
+  }
+
+  compare_gate_vs_digest() {
+    # $1 = ligne [fidelity] à comparer au digest réel. Exit 0 si accord total sur les 7 champs.
+    local fid_line="$1" champ bucket mismatch=0
+    for champ in name description model memory disallowedTools vf-internal tools; do
+      bucket="$(digest_bucket "$champ")"
+      if ! printf '%s\n' "$fid_line" | grep -q "${bucket}={[^}]*\b${champ}\b"; then
+        mismatch=1
+      fi
+    done
+    return $mismatch
+  }
+
+  T23_FID_OUT="$(cd "$REPO" && bash "$GATE" --target codex "$FIXTURE" 2>/dev/null)"
+  T23_FID_LINE="$(printf '%s\n' "$T23_FID_OUT" | grep '^\[fidelity\]')"
+  if compare_gate_vs_digest "$T23_FID_LINE"; then
+    ok "T23.accord : [fidelity] s'accorde avec le digest réel de agent-to-codex.mjs sur les 7 champs"
+  else
+    ko "T23.accord : divergence [fidelity] vs digest réel (ligne: $T23_FID_LINE, digest: $T23_DIGEST)"
+  fi
+
+  # Preuve par mutation : gate MUTÉ (copie, jamais le fichier réel) qui force 'model' en LOST quel
+  # que soit le digest — reproduit exactement le défaut d'origine (model LOST côté [fidelity],
+  # PRESERVED côté [codex-adapter]) — doit rougir la comparaison ci-dessus.
+  MUTANT_GATE="$WORK/mutant-check-artifact-fidelity.sh"
+  sed 's/map_and_add model model "\$SRC_MODEL"/add_verdict LOST model/' "$GATE" > "$MUTANT_GATE"
+  if grep -qF 'add_verdict LOST model' "$MUTANT_GATE" \
+    && ! grep -qF 'map_and_add model model "$SRC_MODEL"' "$MUTANT_GATE"; then
+    ok "T23.mutant.sonde : la substitution a bien remplacé la ligne 'model' (mutant confirmé posé)"
+  else
+    ko "T23.mutant.sonde : la substitution n'a pas pris (mutant absent, T23.mutant ne prouverait rien)"
+  fi
+  T23_MUT_OUT="$(cd "$REPO" && bash "$MUTANT_GATE" --target codex "$FIXTURE" 2>/dev/null)"
+  T23_MUT_LINE="$(printf '%s\n' "$T23_MUT_OUT" | grep '^\[fidelity\]')"
+  if compare_gate_vs_digest "$T23_MUT_LINE"; then
+    ko "T23.mutant : le mutant (model forcé LOST) n'a PAS fait rougir la comparaison — le test ne mord pas"
+  else
+    ok "T23.mutant : le mutant (model forcé LOST, désaccord avec digest réel PRESERVED) fait bien rougir la comparaison"
+  fi
+
+  # Contre-épreuve : le gate RÉEL (non muté) reste en accord après le test du mutant — confiné.
+  T23_RECHECK_OUT="$(cd "$REPO" && bash "$GATE" --target codex "$FIXTURE" 2>/dev/null)"
+  T23_RECHECK_LINE="$(printf '%s\n' "$T23_RECHECK_OUT" | grep '^\[fidelity\]')"
+  if compare_gate_vs_digest "$T23_RECHECK_LINE"; then
+    ok "T23.vert : le gate réel (non muté) reste en accord — mutant confiné à sa copie"
+  else
+    ko "T23.vert : le gate réel est repassé en désaccord — le mutant a fui hors de sa copie"
+  fi
 fi
 
 # ---------------------------------------------------------------------------

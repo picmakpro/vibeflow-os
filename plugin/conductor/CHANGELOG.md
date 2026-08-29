@@ -1,5 +1,35 @@
 # Changelog — conductor
 
+## [v1.34.0] — 2026-08-29 (Phase 38 — correction ciblée, gate de fidélité mesure l'artefact réel)
+
+**Minor** (le gate change de nature — il mesure désormais l'artefact réellement posé sur disque,
+et non plus une conversion parallèle qui n'atterrissait jamais) :
+
+- **`scripts/check-artifact-fidelity.sh`** — `--target codex` invoquait la fonction de
+  conversion de gsd-core (`convertClaudeAgentToCodexAgent`), qui rend un Markdown **jamais écrit
+  par aucune install**. L'artefact réellement posé (`$CODEX_HOME/agents/vibeflow/*.toml`) est
+  produit par `agent-to-codex.mjs` (lot 5, ADPT-01), une conversion **différente** — mesuré en
+  session réelle : les deux mesures divergeaient sous la MÊME étiquette `[fidelity]` (ex.
+  `model` LOST côté gsd-core, PRESERVED côté TOML réel), sans qu'aucun opérateur lisant le log
+  d'install ne puisse savoir laquelle décrivait son disque.
+  Le gate invoque désormais **la même conversion que register-codex-agent.sh écrit sur disque**
+  (agent-to-codex.mjs, digest per-champ relayé `[codex-adapter]` à l'install) comme mesure
+  primaire (`MODE=adapter`). La mesure gsd-core reste disponible en **mode de repli uniquement**
+  (adaptateur introuvable sur ce poste — ex. gate posé à plat sous `TARGET_ROOT/scripts/`, où
+  `_internal/` n'est jamais mirroré), toujours marquée `MODE=gsdcore-fallback` sur la ligne
+  rendue — jamais confondue avec la mesure réelle sous la même étiquette.
+  Conséquence mesurée sur la fixture `content-clarity-judge.md` : `model` et `vf-internal`
+  passent de LOST à PRESERVED, `disallowedTools` de LOST à DEGRADED (aucun mécanisme `[tools]`
+  par rôle confirmé fonctionnel, jamais une perte totale) — le gate rend désormais un verdict
+  fidèle à l'artefact sur disque, pas à une conversion fantôme.
+- **`scripts/tests/test-check-artifact-fidelity.sh`** — T1 réécrit sur les verdicts réels
+  (MODE=adapter). T2 repurposé sur la double-absence (adaptateur ET gsd-core indisponibles) ;
+  nouveau T2b prouvant que la mesure réelle ne dépend plus de gsd-core. Nouveau **T23**, test
+  décisif : accord `[fidelity]` / digest réel de `agent-to-codex.mjs` sur les 7 champs, **prouvé
+  par mutation** (une copie du gate qui force `model` en LOST doit rougir la comparaison, puis le
+  gate réel non muté doit repasser vert) — rend structurellement impossible la régression du
+  défaut corrigé ici (feedback `feedback_mutation-test-discriminating-cases`).
+
 ## [v1.33.2] — 2026-08-29 (Phase 38 — correction ciblée revue, vf-calibrate/SKILL.md)
 
 **Patch** (correctif documentaire + garde-fou) :
