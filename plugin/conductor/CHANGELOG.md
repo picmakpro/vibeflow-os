@@ -1,5 +1,29 @@
 # Changelog — conductor
 
+## [v1.33.0] — 2026-08-29 (Phase 38 — migration/coexistence de runtime, MIGR)
+
+**Minor** (nouvelles capacités observables) :
+
+- **`runtime-registry.sh`** (MIGR-01) — lecture/écriture de la clé racine `runtime` de
+  `.planning/config.json`, rétro-compatible sur les 3 formes réelles d'un lab (absente, scalaire,
+  objet `vf_runtimes`). La clé racine reste TOUJOURS une chaîne (contrat gsd-core
+  `canonicalizeRuntimeName`, jamais un objet). `set-active` gate toute écriture derrière
+  `--confirmed` explicite (`--dry-run` prévisualise sans jamais toucher au disque, ADR-031) —
+  écriture atomique (temp + mv), `vf_runtimes.installed` toujours étendu, jamais remplacé
+  (coexistence par défaut).
+- **`vf-calibrate`** (MIGR-02) — expose désormais DEUX natures distinctes, jamais mélangées :
+  propagation additive de version framework (inchangée) et migration soustractive de runtime
+  (nouvelle section « Migration de runtime »). La première ligne de sortie du skill annonce
+  toujours laquelle est en cours (`[vf-calibrate:propagation]` / `[vf-calibrate:migration-runtime]`).
+- **`verify-runtime-reversibility.sh`** (MIGR-04) — preuve fichier à fichier (`comm -3` sur des
+  listes triées, jamais un compte) qu'un cycle bascule → retour restaure l'ensemble EXACT de
+  fichiers d'avant bascule. Réutilise `vibeflow-update.sh --target` (lot 4) et le `rollback` du
+  lot 3, jamais une 2e implémentation de pose.
+- **`check-artifact-fidelity.sh --coexistence-report`** (MIGR-05) — déclare, au même endroit à
+  l'install ET au `status` (`vibeflow-update.sh`), qu'un runtime coexistant avec `claude` opère
+  sans gouvernance de hooks (aucun mécanisme équivalent mesuré à ce jour). Silence total si aucun
+  runtime non-`claude` n'est installé.
+
 ## [v1.32.0] — 2026-08-29 (Phase 38 — `--target` injectable + réécriture du payload, TGT)
 
 **Minor** (nouvelle capacité observable à l'install/update) :
