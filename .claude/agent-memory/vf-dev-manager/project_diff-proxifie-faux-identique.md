@@ -57,3 +57,19 @@ que de se fier à un verdict résumé. Ne jamais accepter « identiques » sans 
 des deux ensembles. Tout `git diff` qui sert de **preuve** se lance `rtk proxy git diff …` — et on
 vérifie que la sortie porte bien des `@@` : zéro hunk sur un fichier annoncé modifié par `--numstat`
 est le signe du résumé, pas d'une absence de changement.
+
+**`git log` aussi — 5ᵉ outil pris en défaut (Phase 38, 2026-08-29).**
+`git log --oneline <base>..HEAD | awk 'END{print NR}'` a rendu **54, puis 56, puis 50** sur un
+historique qui n'a fait que **croître** — la sortie est tronquée par le proxy, et le compteur
+compte la troncature. J'ai failli remonter « des commits ont disparu », ce qui aurait déclenché une
+chasse au fantôme sur une réécriture d'historique inexistante.
+
+**Compteurs fiables pour l'historique** :
+- `git rev-list --count <base>..HEAD` — **le bon outil**, un seul entier, rien à tronquer ;
+- pour prouver qu'un commit n'est pas perdu : `git merge-base --is-ancestor <sha> HEAD` sur chaque
+  SHA clé (c'est ce qui a démenti l'alerte), **jamais** une lecture de `git log`.
+
+Récapitulatif des cinq outils menteurs de ce poste : `grep` **tronque** · `ls` rend **vide** ·
+`diff`/`git diff` disent **identique** à tort · `timeout`/`gtimeout` **n'existent pas** (`0/N`
+silencieux) · `git log` **tronque son compte**. Aucun n'échoue bruyamment. Voir
+[[grep-proxifie-tronque]], [[ls-proxifie-rend-vide]], [[timeout-absent-faux-zero]].
