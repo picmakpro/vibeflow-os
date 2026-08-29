@@ -227,6 +227,24 @@ capturées au backlog — voir Tech Debt.
 
 ## Security Considerations
 
+**Codex importe de lui-même une 5e racine de skills, non choisie par l'utilisateur** — Sévérité : **MEDIUM**
+- Risk: Codex télécharge de lui-même un cache de skills distant
+  (`plugins/cache/openai-curated-remote`) qui apparaît comme une **5e racine de skills** au fil des
+  sessions. Un lab sous Codex hérite donc de skills que l'utilisateur n'a ni posées ni choisies —
+  VibeFlow ne les liste ni ne les contrôle. Mesuré pendant la Phase 38 (multi-runtime) ; l'audit de
+  clôture a constaté que le fait n'était consigné dans **aucun document livré**, seulement dans les
+  notes internes de la phase.
+- Files: comportement du binaire `codex` (hors dépôt) ; déclaré côté gate en constante
+  `REMOTE_SKILLS_CACHE` dans `plugin/conductor/scripts/check-artifact-fidelity.sh`
+  (`compute_fidelity_recette`/`print_fidelity_recette`, champ `remote_skills_cache` de la ligne
+  `[fidelity-recette]`, aux deux points d'observation — install `--target codex` et status
+  `--coexistence-report`).
+- Current mitigation: déclaration seule (pas d'enforcement) — même doctrine que
+  `role_confinement`/`multi_agent_v2`/`trust_level` sur la même ligne : un opérateur qui lit la
+  recette voit le fait, VibeFlow ne le désarme pas.
+- Recommendations: si un contrôle de contenu de skills devient nécessaire un jour (allowlist,
+  revue), le cache distant est un site à couvrir explicitement — hors périmètre de cette phase.
+
 **Nom de module non assaini dans l'engine** — Sévérité : **LOW**
 - Risk: `install_module` valide seulement `[ -d "$CACHE_DIR/$mod" ]` — un nom contenant `../`
   résoudrait hors cache. Exposition faible : l'appelant prod est le skill `/vibeflow-install` qui

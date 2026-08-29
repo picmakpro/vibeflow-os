@@ -77,6 +77,14 @@ COEXISTENCE_CONFIG=".planning/config.json"
 # même variable, jamais un second texte recopié.
 ROLE_CONFINEMENT="inerte-par-role (garanti UNIQUEMENT par session -s read-only separee, jamais par le fichier de role — D-38-O)"
 
+# --- remote_skills_cache (audit doc Phase 38) : CONSTANTE déclarée pour la cible codex — pas une
+# mesure de poste, un comportement documenté du binaire. Codex télécharge de lui-même un cache de
+# skills distant (`plugins/cache/openai-curated-remote`) qui apparaît comme une **5e racine de
+# skills** au fil des sessions : un lab sous Codex hérite donc de skills que l'utilisateur n'a pas
+# choisies, sans que VibeFlow les ait posées ni listées. Déclarée ici pour rester sur la même
+# source de vérité que MULTI_AGENT_V2/TRUST_LEVEL/ROLE_CONFINEMENT (compute/print_fidelity_recette).
+REMOTE_SKILLS_CACHE="5e racine non choisie (plugins/cache/openai-curated-remote, telechargee par codex lui-meme, hors control VibeFlow)"
+
 # --- Recette d'environnement Codex (multi_agent_v2, trust_level) + role_confinement : fonctions
 # PARTAGÉES entre les deux points d'observation (--target codex <artefact>, à l'install ; et
 # --coexistence-report, au status — D-38-O, correction ciblée). compute_fidelity_recette() peuple
@@ -128,7 +136,7 @@ compute_fidelity_recette() {
 
 print_fidelity_recette() {
   compute_fidelity_recette
-  echo "[fidelity-recette] multi_agent_v2=${MULTI_AGENT_V2} trust_level=${TRUST_LEVEL} role_confinement=${ROLE_CONFINEMENT}"
+  echo "[fidelity-recette] multi_agent_v2=${MULTI_AGENT_V2} trust_level=${TRUST_LEVEL} role_confinement=${ROLE_CONFINEMENT} remote_skills_cache=${REMOTE_SKILLS_CACHE}"
 }
 
 while [ "$#" -gt 0 ]; do
