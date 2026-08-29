@@ -120,6 +120,45 @@ RC22=$?
 [ "$RC22" -eq 0 ] && ok "T22 : config introuvable -> silence, exit 0 (best-effort)" \
   || ko "T22 : attendu exit 0, obtenu $RC22"
 
+# T24 — garde contre la régression du texte de déclaration (mesure du 2026-08-29 : la mesure a
+# démenti « aucun mécanisme équivalent » — Codex exécute réellement un hooks.json en forme Claude
+# Code). La ligne réelle doit dire POURQUOI c'est perdu (settings.json non exécuté), jamais que
+# rien n'existerait. Preuve par mutation : réintroduire l'ancien texte faux fait rougir CE garde
+# sur une copie, PUIS le gate réel (non muté) reste vert — le garde mord bien sur la formulation,
+# pas sur un fixture mort (feedback_mutation-test-discriminating-cases).
+if printf '%s' "$OUT19" | grep -qF 'aucun mécanisme équivalent mesuré à ce jour'; then
+  ko "T24.sonde : la ligne réelle contient encore l'ancienne affirmation fausse — régression"
+elif printf '%s' "$OUT19" | grep -qF 'settings.json'; then
+  ok "T24.sonde : la ligne réelle cite settings.json comme cause réelle, jamais l'ancienne fausse affirmation"
+else
+  ko "T24.sonde : la ligne réelle ne cite ni settings.json ni l'ancienne fausse affirmation — sortie='$OUT19'"
+fi
+
+T24_MUTANT_GATE="$WORK/mutant-coexistence-fausse-affirmation.sh"
+# runtime-registry.sh doit être co-posé : le gate le résout via dirname "$0" (même patron que
+# find_fidelity_gate côté vibeflow-update.sh), pas via le dossier du gate réel.
+cp "$SCRIPTS_DIR/runtime-registry.sh" "$WORK/runtime-registry.sh"
+sed "s/opère SANS gouvernance de hooks — VibeFlow pose ses hooks dans settings.json, que \$_rt n'exécute pas (surface hooks.json existante, non visée — cf. 38-CONTEXT.md)/opère SANS gouvernance de hooks (aucun mécanisme équivalent mesuré à ce jour — cf. 38-CONTEXT.md)/" \
+  "$GATE" > "$T24_MUTANT_GATE"
+if grep -qF 'aucun mécanisme équivalent mesuré à ce jour' "$T24_MUTANT_GATE" \
+  && ! grep -qF "surface hooks.json existante, non visée" "$T24_MUTANT_GATE"; then
+  ok "T24.mutant.sonde : la substitution a bien réintroduit l'ancien texte faux (mutant vivant)"
+else
+  ko "T24.mutant.sonde : la substitution n'a pas pris (mutant absent, T24.mutant non probant)"
+fi
+T24_MUT_OUT="$(bash "$T24_MUTANT_GATE" --coexistence-report --config "$COEX_WORK/coex.json" 2>/dev/null)"
+if printf '%s' "$T24_MUT_OUT" | grep -qF 'aucun mécanisme équivalent mesuré à ce jour'; then
+  ok "T24.mutant : le mutant (ancien texte faux réintroduit) rougirait bien la sonde T24.sonde"
+else
+  ko "T24.mutant : le mutant n'a pas produit l'ancien texte faux — mutant confiné/inerte, attendu='aucun mécanisme équivalent mesuré à ce jour', obtenu='$T24_MUT_OUT'"
+fi
+T24_RECHECK_OUT="$(bash "$GATE" --coexistence-report --config "$COEX_WORK/coex.json" 2>/dev/null)"
+if printf '%s' "$T24_RECHECK_OUT" | grep -qF 'aucun mécanisme équivalent mesuré à ce jour'; then
+  ko "T24.vert : le gate réel (non muté) contient l'ancien texte faux — le mutant a fui hors de sa copie"
+else
+  ok "T24.vert : le gate réel (non muté) reste sans l'ancien texte faux — mutant confiné à sa copie"
+fi
+
 rm -rf "$COEX_WORK"
 
 if [ -z "$REAL_GSD_HOME" ] || [ ! -f "$FIXTURE_SRC" ]; then

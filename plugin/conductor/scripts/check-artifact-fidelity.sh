@@ -162,11 +162,14 @@ if [ -n "$JUDGE_CMD_FILE" ]; then
 fi
 
 # --- Mode --coexistence-report (MIGR-05, Phase 38) : mode GLOBAL, pas par-fichier — déclare, pour
-# CHAQUE runtime installé AUTRE que `claude`, qu'il opère SANS gouvernance de hooks (aucun
-# mécanisme équivalent mesuré à ce jour). `installed` réduit à ["claude"] seul (ou registre
-# absent/vide) -> silence total, rien à déclarer. Exit 0 dans tous les cas où la lecture a pu
-# s'exécuter — une coexistence sans hooks n'est pas un échec du gate, c'est son objet (même
-# doctrine que le reste de ce gate).
+# CHAQUE runtime installé AUTRE que `claude`, qu'il opère SANS gouvernance de hooks — PAS parce
+# qu'aucun mécanisme équivalent n'existerait (mesure du 2026-08-29 : Codex 0.150.1 exécute
+# RÉELLEMENT un hooks.json en forme Claude Code, sur-ensemble d'événements inclus), mais parce que
+# VibeFlow pose ses fragments dans settings.json, que ces runtimes n'exécutent pas. Surface
+# atteignable, non visée à ce jour (D-38-R, cf. 38-CONTEXT.md). `installed` réduit à ["claude"]
+# seul (ou registre absent/vide) -> silence total, rien à déclarer. Exit 0 dans tous les cas où la
+# lecture a pu s'exécuter — une coexistence sans hooks n'est pas un échec du gate, c'est son objet
+# (même doctrine que le reste de ce gate).
 if [ "$COEXISTENCE_MODE" -eq 1 ]; then
   if [ -n "$ARTIFACT" ]; then
     echo "[check-artifact-fidelity] --coexistence-report et un artefact ne se combinent pas (deux mesures distinctes)" >&2
@@ -184,7 +187,7 @@ if [ "$COEXISTENCE_MODE" -eq 1 ]; then
   INSTALLED_RUNTIMES="$(bash "$REGISTRY_SCRIPT" list-installed --config "$COEXISTENCE_CONFIG" 2>/dev/null)" || exit 0
   for _rt in $INSTALLED_RUNTIMES; do
     [ "$_rt" = "claude" ] && continue
-    echo "[fidelity-coexistence] $_rt : opère SANS gouvernance de hooks (aucun mécanisme équivalent mesuré à ce jour — cf. 38-CONTEXT.md)"
+    echo "[fidelity-coexistence] $_rt : opère SANS gouvernance de hooks — VibeFlow pose ses hooks dans settings.json, que $_rt n'exécute pas (surface hooks.json existante, non visée — cf. 38-CONTEXT.md)"
   done
   exit 0
 fi

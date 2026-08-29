@@ -1,5 +1,23 @@
 # Changelog — conductor
 
+## [v1.34.2] — 2026-08-29 (Phase 38 — correction ciblée, le texte de coexistence redevient vrai)
+
+**Patch** (correction d'une affirmation factuellement fausse, aucun comportement changé) :
+
+- **`scripts/check-artifact-fidelity.sh --coexistence-report`** — la ligne déclarait « aucun
+  mécanisme équivalent mesuré à ce jour » pour tout runtime non-`claude` coexistant. Démenti par
+  la mesure du 2026-08-29 en exécution réelle : Codex 0.150.1 exécute RÉELLEMENT un `hooks.json`
+  en forme Claude Code (sur-ensemble d'événements et de clés, flag activé par défaut). Ce qui est
+  réellement perdu, et que la ligne dit maintenant : VibeFlow pose ses fragments dans
+  `settings.json`, que ces runtimes n'exécutent pas — la surface `hooks.json` existe et reste
+  atteignable, mais n'est pas visée à ce jour (dette **D-38-R**, déjà consignée dans
+  `.planning/ROADMAP.md`, non touchée par ce patch). Même correction dans ce CHANGELOG
+  (entrée v1.32.0 ci-dessous) et dans le commentaire du gate.
+- **`scripts/tests/test-check-artifact-fidelity.sh`** — 4 nouvelles assertions (T24) : la ligne
+  réelle ne doit plus jamais contenir l'ancienne affirmation fausse, et doit citer `settings.json`
+  comme cause réelle. Prouvé par mutation : réintroduire l'ancien texte sur une copie du gate le
+  fait rougir, puis le gate réel (non muté) reste vert — mutant confiné à sa copie.
+
 ## [v1.34.1] — 2026-08-29 (Phase 38 — correction ciblée, le gate apprend le verdict MAPPED)
 
 **Patch** (durcissement du vocabulaire de `check-artifact-fidelity.sh`, pas de nouvelle capacité) :
@@ -96,8 +114,9 @@ et non plus une conversion parallèle qui n'atterrissait jamais) :
   lot 3, jamais une 2e implémentation de pose.
 - **`check-artifact-fidelity.sh --coexistence-report`** (MIGR-05) — déclare, au même endroit à
   l'install ET au `status` (`vibeflow-update.sh`), qu'un runtime coexistant avec `claude` opère
-  sans gouvernance de hooks (aucun mécanisme équivalent mesuré à ce jour). Silence total si aucun
-  runtime non-`claude` n'est installé.
+  sans gouvernance de hooks — parce que VibeFlow pose ses fragments dans `settings.json`, que ce
+  runtime n'exécute pas, pas parce qu'aucun mécanisme équivalent n'existerait (la surface existe
+  et reste atteignable, cf. D-38-R). Silence total si aucun runtime non-`claude` n'est installé.
 
 ## [v1.32.0] — 2026-08-29 (Phase 38 — `--target` injectable + réécriture du payload, TGT)
 
