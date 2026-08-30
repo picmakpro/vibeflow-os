@@ -1,6 +1,6 @@
 ---
 name: infrastructure-audit
-description: Audit automatique de l'infrastructure technique d'un lab VibeFlow (Claude Code runtime, hooks lifecycle, scripts, drift Anthropic). Detecte les regressions apres mise a jour Claude Code ou conventions Anthropic. Genere un INFRASTRUCTURE_SNAPSHOT.md date pour comparaison delta. Utiliser ce skill au /vf-audit, apres mise a jour Claude Code, ou via hook SessionStart periodique (>14j depuis dernier audit). Reference ADR-056 + ADR-032 + LRN-106.
+description: "Audit automatique de l'infrastructure technique d'un lab VibeFlow (Claude Code runtime, hooks lifecycle, scripts, drift Anthropic). Detecte les regressions apres mise a jour Claude Code ou conventions Anthropic. Genere un INFRASTRUCTURE_SNAPSHOT.md date pour comparaison delta. Utiliser ce skill au /vf-audit, apres mise a jour Claude Code, ou via hook SessionStart periodique (>14j depuis dernier audit). Reference ADR-056 + ADR-032 + LRN-106."
 ---
 
 # Skill : Infrastructure Audit — Garde-fou technique des labs

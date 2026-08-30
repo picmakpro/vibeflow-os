@@ -1,5 +1,5 @@
 ---
-description: Point d'entrée VibeFlow — configurer, vérifier, mettre à jour ou migrer le lab via l'orchestrateur méta (vibeflow-conductor). Tape /vibeflow puis ta demande.
+description: "Point d'entrée VibeFlow — configurer, vérifier, mettre à jour ou migrer le lab via l'orchestrateur méta (vibeflow-conductor). Tape /vibeflow puis ta demande."
 argument-hint: "[ce que tu veux faire — ex. crée un lab d'acquisition, vérifie le lab, mets à jour]"
 ---
 

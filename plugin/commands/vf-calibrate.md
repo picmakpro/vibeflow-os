@@ -1,5 +1,5 @@
 ---
-description: Vérifie si le framework VibeFlow a évolué et recalibre/migre le lab (mise à jour structure/doctrine) sous validation humaine.
+description: "Vérifie si le framework VibeFlow a évolué et recalibre/migre le lab (mise à jour structure/doctrine) sous validation humaine."
 argument-hint: "[optionnel : précision sur ce qu'on recalibre]"
 ---
 

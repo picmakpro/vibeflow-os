@@ -1,5 +1,5 @@
 ---
-description: Met en place ou tient à jour le socle de planning d'un lab non-dev, et l'altitude lab (index des projets, compartiments, pont mémoire) sur tous les labs.
+description: "Met en place ou tient à jour le socle de planning d'un lab non-dev, et l'altitude lab (index des projets, compartiments, pont mémoire) sur tous les labs."
 argument-hint: "[optionnel : mets en place le planning / fais l'index de mes projets / qu'est-ce qui traîne sans plan]"
 ---
 

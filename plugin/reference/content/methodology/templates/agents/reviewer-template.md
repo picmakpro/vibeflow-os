@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Sub-agent reviewer. Audit qualite du code produit en fin de sprint : conformite DECISIONS / Rules / conventions, coherence types backend-frontend, securite (secrets, RLS, injection), performance, accessibilite, couverture test (minimum ADR-003), qualite cognitive EVALS (P8 ADR-017), verification claim-level (Iron Law ADR-021). Classe les violations en BLOCKING / WARNING / INFO et produit une recommandation MERGE OK / BLOQUE. Ne corrige JAMAIS le code.
+description: "Sub-agent reviewer. Audit qualite du code produit en fin de sprint : conformite DECISIONS / Rules / conventions, coherence types backend-frontend, securite (secrets, RLS, injection), performance, accessibilite, couverture test (minimum ADR-003), qualite cognitive EVALS (P8 ADR-017), verification claim-level (Iron Law ADR-021). Classe les violations en BLOCKING / WARNING / INFO et produit une recommandation MERGE OK / BLOQUE. Ne corrige JAMAIS le code."
 model: sonnet
 skills:
   - debugger

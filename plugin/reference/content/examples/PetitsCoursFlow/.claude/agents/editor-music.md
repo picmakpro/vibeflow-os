@@ -1,6 +1,6 @@
 ---
 name: editor-music
-description: Valide la conformite d'un brouillon de newsletter aux 3 piliers editoriaux et a la regle de confidentialite des eleves.
+description: "Valide la conformite d'un brouillon de newsletter aux 3 piliers editoriaux et a la regle de confidentialite des eleves."
 model: sonnet
 memory: project
 ---

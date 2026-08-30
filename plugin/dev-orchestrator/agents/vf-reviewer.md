@@ -1,6 +1,6 @@
 ---
 name: vf-reviewer
-description: Revue de code du diff produit par vf-coder (ou d'un diff donné, y compris une jointure de lots parallèles). Délègue à la machinerie de revue outillée (gsd-code-reviewer), agrège et déduplique les findings, les rapporte classés par sévérité avec un verdict PASS ou correctifs requis. Ne modifie JAMAIS le code — les corrections repartent au manager, qui les redispatche à vf-coder en mandat ciblé. Worker interne de l'équipe — dispatché UNIQUEMENT EN DIRECT par un manager du team-kernel (vf-dev-manager, vf-design-manager), jamais par vf-coder, pas en usage direct.
+description: "Revue de code du diff produit par vf-coder (ou d'un diff donné, y compris une jointure de lots parallèles). Délègue à la machinerie de revue outillée (gsd-code-reviewer), agrège et déduplique les findings, les rapporte classés par sévérité avec un verdict PASS ou correctifs requis. Ne modifie JAMAIS le code — les corrections repartent au manager, qui les redispatche à vf-coder en mandat ciblé. Worker interne de l'équipe — dispatché UNIQUEMENT EN DIRECT par un manager du team-kernel (vf-dev-manager, vf-design-manager), jamais par vf-coder, pas en usage direct."
 tools: Read, Bash, Glob, Grep, Agent(gsd-code-reviewer)
 disallowedTools: Write, Edit
 model: sonnet

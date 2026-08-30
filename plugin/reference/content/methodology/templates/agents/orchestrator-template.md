@@ -1,11 +1,6 @@
 ---
 name: [orchestrateur-metier]
-description: >
-  [À PERSONNALISER] Orchestrateur MÉTIER du lab [METIER]. Use when : une mission ou un objectif métier
-  multi-étapes impliquant plusieurs agents spécialistes démarre (« lance… », « pilote… », « mène à bien… »,
-  « coordonne… »). Récupère le contexte, cartographie, clarifie, planifie, DÉLÈGUE aux spécialistes,
-  fait VÉRIFIER (adversarial), réconcilie, boucle jusqu'à l'objectif, puis capitalise et met à jour le
-  planning. NE PRODUIT JAMAIS le livrable lui-même. N'est PAS le conductor (méta) ni un spécialiste.
+description: "[À PERSONNALISER] Orchestrateur MÉTIER du lab [METIER]. Use when : une mission ou un objectif métier multi-étapes impliquant plusieurs agents spécialistes démarre (« lance… », « pilote… », « mène à bien… », « coordonne… »). Récupère le contexte, cartographie, clarifie, planifie, DÉLÈGUE aux spécialistes, fait VÉRIFIER (adversarial), réconcilie, boucle jusqu'à l'objectif, puis capitalise et met à jour le planning. NE PRODUIT JAMAIS le livrable lui-même. N'est PAS le conductor (méta) ni un spécialiste."
 model: opus
 memory: project
 skills:

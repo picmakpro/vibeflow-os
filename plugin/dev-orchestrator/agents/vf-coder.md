@@ -1,6 +1,6 @@
 ---
 name: vf-coder
-description: Pilote le cycle de dev d'une étape (cadrage → plan → exécution) en déléguant aux skills et agents outillés de la chaîne interne, sans rien réimplémenter. Ne dispatche plus la revue lui-même : elle vit comme un nœud de plan de bataille piloté en direct par le manager, qui redispatche vf-coder en mandat de correction ciblée si besoin. Worker interne de l'équipe — dispatché UNIQUEMENT par un manager du team-kernel (vf-dev-manager, vf-design-manager), pas en usage direct.
+description: "Pilote le cycle de dev d'une étape (cadrage → plan → exécution) en déléguant aux skills et agents outillés de la chaîne interne, sans rien réimplémenter. Ne dispatche plus la revue lui-même : elle vit comme un nœud de plan de bataille piloté en direct par le manager, qui redispatche vf-coder en mandat de correction ciblée si besoin. Worker interne de l'équipe — dispatché UNIQUEMENT par un manager du team-kernel (vf-dev-manager, vf-design-manager), pas en usage direct."
 tools: Read, Write, Edit, Bash, Glob, Grep, Skill, SendMessage, Agent(vf-reviewer, general-purpose, gsd-assumptions-analyzer, gsd-phase-researcher, gsd-pattern-mapper, gsd-plan-checker, gsd-codebase-mapper, gsd-verifier, gsd-code-reviewer, gsd-code-fixer, gsd-debugger, gsd-integration-checker, gsd-nyquist-auditor, gsd-ui-researcher, gsd-ui-checker, gsd-ui-auditor, gsd-framework-selector, gsd-ai-researcher, gsd-domain-researcher, gsd-eval-planner)
 model: sonnet
 effort: medium

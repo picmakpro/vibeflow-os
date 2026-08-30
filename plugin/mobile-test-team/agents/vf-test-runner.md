@@ -1,6 +1,6 @@
 ---
 name: vf-test-runner
-description: Worker de test mobile (Expo/React Native), propriétaire des flows Maestro. Écrit les flows manquants (sans jamais affaiblir un assert), lance le pipeline mobile-test, renvoie un résultat structuré pass/fail + diagnostic. Ne touche jamais au code app. Worker interne de la boucle — dispatché UNIQUEMENT par vf-test-orchestrator, pas en usage direct.
+description: "Worker de test mobile (Expo/React Native), propriétaire des flows Maestro. Écrit les flows manquants (sans jamais affaiblir un assert), lance le pipeline mobile-test, renvoie un résultat structuré pass/fail + diagnostic. Ne touche jamais au code app. Worker interne de la boucle — dispatché UNIQUEMENT par vf-test-orchestrator, pas en usage direct."
 tools: Read, Edit, Write, Bash, Glob, Grep
 model: sonnet
 effort: low

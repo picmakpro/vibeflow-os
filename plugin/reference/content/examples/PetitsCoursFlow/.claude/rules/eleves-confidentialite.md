@@ -2,7 +2,7 @@
 name: eleves-confidentialite
 paths:
   - "content/**"
-description: Regle auto-scopee qui interdit toute mention nominative d'un eleve dans les contenus publics
+description: "Regle auto-scopee qui interdit toute mention nominative d'un eleve dans les contenus publics"
 ---
 
 # Rule - eleves-confidentialite

@@ -1,6 +1,6 @@
 ---
 name: metier-orchestration
-description: Boucle de mission de l'orchestrateur MÉTIER d'un lab VibeFlow. À charger dès qu'une mission/objectif métier multi-étapes impliquant plusieurs agents spécialistes démarre. Déroule 8 phases — récupération de contexte → cartographie → clarification → planification → exécution (délégation) → vérification (adversariale) → navette exec↔vérif jusqu'à l'objectif → capitalisation + mise à jour du planning. L'orchestrateur PLANIFIE, DÉLÈGUE, RÉCONCILIE ; il ne produit JAMAIS le livrable métier.
+description: "Boucle de mission de l'orchestrateur MÉTIER d'un lab VibeFlow. À charger dès qu'une mission/objectif métier multi-étapes impliquant plusieurs agents spécialistes démarre. Déroule 8 phases — récupération de contexte → cartographie → clarification → planification → exécution (délégation) → vérification (adversariale) → navette exec↔vérif jusqu'à l'objectif → capitalisation + mise à jour du planning. L'orchestrateur PLANIFIE, DÉLÈGUE, RÉCONCILIE ; il ne produit JAMAIS le livrable métier."
 ---
 
 # metier-orchestration — Boucle de mission de l'orchestrateur métier
