@@ -124,7 +124,7 @@
       "scope": [
         "plugin/**/*.md (description uniquement) + suites"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "kimi-i2i3",
@@ -135,7 +135,7 @@
         "banc scratchpad",
         "AUCUNE ecriture depot"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "revue-desc",
@@ -147,7 +147,7 @@
       "scope": [
         "diff du lot"
       ],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "kimi-i1-remesure",
@@ -159,7 +159,7 @@
       "scope": [
         "banc kimi"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "gate-vf-internal",
@@ -171,7 +171,7 @@
       "scope": [
         "check-artifact-fidelity.sh + son test"
       ],
-      "status": "blocked"
+      "status": "done"
     }
   ]
 }

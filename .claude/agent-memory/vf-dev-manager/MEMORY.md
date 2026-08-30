@@ -55,3 +55,4 @@
 - [Édition trop large : vérifier le stat](feedback_edit-trop-large-verifier-le-stat.md) — `count=0` a réécrit 34 lignes d'historique pour 2 attendues, et le gate est resté VERT ; `git diff --stat` avant commit
 - [Filtre de vérification = angle mort](feedback_filtre-de-verification-fabrique-l-angle-mort.md) — `git status | grep -v` maison : « arbre propre » rapporté, 3 fichiers non commités
 - [Description frontmatter : contrainte en ciseaux](project_description-frontmatter-contrainte-en-ciseaux.md) — mono-ligne pour gsd-core, YAML valide pour kimi : seul le scalaire GUILLEMETÉ satisfait les deux ; replier en `>` rouvre le défaut d'en face
+- [Exception de gate = exemption](feedback_exception-de-gate-devient-exemption.md) — `PASS 0 violation, 3 exceptions` pendant qu'un rôle est injoignable : l'exception doit porter sur la forme, jamais sur la propriété
