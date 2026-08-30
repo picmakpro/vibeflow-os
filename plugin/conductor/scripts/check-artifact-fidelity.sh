@@ -388,7 +388,49 @@ extract_body() {
 }
 get_field() {
   # $1 = bloc frontmatter (variable, pas fichier), $2 = clé.
-  printf '%s\n' "$1" | grep -E "^${2}:" | head -1 | sed -E "s/^${2}:[[:space:]]*//"
+  #
+  # ⚠️ Correction ciblée (Phase 38, second tour post-mesure-kimi) : la forme originale ne lisait
+  # QUE la valeur EN LIGNE (`key: value`). Sur une clé YAML écrite en SÉQUENCE À BLOCS
+  # (`key:` suivi de lignes indentées `  - item`) ou en SCALAIRE À BLOCS (`key: |`/`key: >` suivi
+  # de texte indenté), la ligne d'en-tête ne porte AUCUNE valeur -> chaîne vide -> le champ était
+  # déclaré ABSENT à tort (défaut mesuré : `skills:` en séquence à blocs dans 7 AGENT.md réels,
+  # jamais dans LOST=). Traite la CLASSE, pas le cas : toute clé de FIELDS peut prendre l'une des
+  # deux formes, la détection est structurelle (ligne d'en-tête vide/scalaire + ligne suivante
+  # indentée), jamais un test nommé sur `skills` en particulier.
+  local block="$1" key="$2"
+  local line_num
+  line_num="$(printf '%s\n' "$block" | grep -nE "^${key}:" | head -1 | cut -d: -f1)"
+  if [ -z "$line_num" ]; then
+    printf ''
+    return
+  fi
+  local raw val
+  raw="$(printf '%s\n' "$block" | sed -n "${line_num}p")"
+  val="$(printf '%s' "$raw" | sed -E "s/^${key}:[[:space:]]*//")"
+  # Indicateur de scalaire à blocs seul sur la ligne d'en-tête (|, >, avec chomping/indentation
+  # optionnels : |-, |+, >-, >+, |2, etc.) -> la valeur réelle est sur les lignes SUIVANTES,
+  # jamais sur celle-ci.
+  if printf '%s' "$val" | grep -qE '^[|>][0-9+-]*[[:space:]]*$'; then
+    val=""
+  fi
+  if [ -n "$val" ]; then
+    printf '%s' "$val"
+    return
+  fi
+  # Ligne d'en-tête sans valeur en ligne : présente si la ligne suivante est un CONTINUATION
+  # INDENTÉE (séquence à blocs `  - item`, ou corps d'un scalaire à blocs) — sinon le champ est
+  # réellement absent (comportement identique à avant pour ce cas).
+  local next
+  next="$(printf '%s\n' "$block" | sed -n "$((line_num + 1))p")"
+  if printf '%s' "$next" | grep -qE '^[[:space:]]+\S'; then
+    printf '%s\n' "$block" | awk -v start="$((line_num + 1))" '
+      NR < start { next }
+      /^[[:space:]]/ { print; next }
+      { exit }
+    '
+    return
+  fi
+  printf ''
 }
 
 SRC_FM="$(extract_frontmatter "$ARTIFACT")"

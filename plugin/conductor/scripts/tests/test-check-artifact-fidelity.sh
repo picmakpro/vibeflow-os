@@ -553,6 +553,123 @@ EOF
     rm -rf "$T40_COEX_WORK"
   fi
 
+  # =========================================================================================
+  # T41-T44 — get_field() doit reconnaître un champ écrit en SÉQUENCE À BLOCS YAML
+  # (`key:` suivi de lignes indentées `  - item`) ou en SCALAIRE À BLOCS (`key: >`/`key: |`
+  # suivi de texte indenté), pas seulement en ligne (correction ciblée, second tour post-revue :
+  # `skills:` en séquence à blocs n'était JAMAIS déclaré dans LOST=, alors qu'il l'est réellement
+  # dans 7 AGENT.md du dépôt — plugin/validator/AGENT.md entre autres). Fixture DISCRIMINANTE :
+  # ni skills ni description ne sont en ligne ici, contrairement à FIVE_FIELDS_FIXTURE (T35) qui
+  # les écrit déjà en ligne et ne peut donc PAS attraper cette classe de défaut
+  # (feedback_mutation-test-discriminating-cases : un fixture inline ne prouve rien sur la forme
+  # à blocs).
+  # =========================================================================================
+  BLOCK_FORM_FIXTURE="$KIMI_WORK/block-form.md"
+  cat > "$BLOCK_FORM_FIXTURE" <<'EOF'
+---
+name: fixture-block-form
+description: >
+  Une description
+  ecrite en scalaire a blocs YAML.
+model: sonnet
+memory: project
+skills:
+  - skill-a
+  - skill-b
+tools: Read, Write
+disallowedTools: Bash
+vf-internal: true
+---
+Corps.
+EOF
+
+  T41_OUT="$(cd "$REPO" && bash "$GATE" --target kimi "$BLOCK_FORM_FIXTURE" 2>"$KIMI_WORK/t41.err")"
+  T41_RC=$?
+  T41_FID_LINE="$(printf '%s\n' "$T41_OUT" | grep '^\[fidelity\]')"
+  echo "  [T41] asserté : fixture avec skills en SÉQUENCE À BLOCS et description en SCALAIRE À BLOCS — attendu : description dans PRESERVED=, skills dans LOST= — obtenu : $T41_FID_LINE"
+  if [ "$T41_RC" -eq 0 ]; then
+    ok "T41.rc : exit 0 (mesure exécutée sur fixture à formes blocs)"
+  else
+    ko "T41.rc : attendu exit 0, obtenu $T41_RC (stderr: $(cat "$KIMI_WORK/t41.err" 2>/dev/null))"
+  fi
+  # T42 — description (scalaire à blocs) reconnue et PRESERVED sur kimi (même patron que la forme
+  # en ligne, T30).
+  if printf '%s\n' "$T41_FID_LINE" | grep -q "PRESERVED={[^}]*\bdescription\b"; then
+    ok "T42 : description (scalaire à blocs YAML, \`>\`) dans PRESERVED= — get_field lit le corps indenté, pas seulement la ligne d'en-tête"
+  else
+    ko "T42 : description (scalaire à blocs) absente de PRESERVED= — la lecture de bloc ne fonctionne pas (ligne: $T41_FID_LINE)"
+  fi
+  # T43 — skills (séquence à blocs) reconnue et LOST sur kimi. C'EST le défaut corrigé : avant ce
+  # correctif, get_field() rendait une chaîne vide pour `skills:` en séquence à blocs -> le champ
+  # n'apparaissait JAMAIS dans LOST=, quelle que soit la source.
+  if printf '%s\n' "$T41_FID_LINE" | grep -q "LOST={[^}]*\bskills\b"; then
+    ok "T43 : skills (séquence à blocs YAML, \`  - item\`) dans LOST= — défaut corrigé (get_field lit désormais le bloc indenté)"
+  else
+    ko "T43 : skills (séquence à blocs) absente de LOST= — le défaut persiste (ligne: $T41_FID_LINE)"
+  fi
+
+  # T44 — témoin discriminant : retirer `skills:` de la source fait disparaître skills de LOST=
+  # (présence CONDITIONNÉE à la source, jamais une déclaration fantôme ajoutée en dur).
+  BLOCK_FORM_NO_SKILLS="$KIMI_WORK/block-form-no-skills.md"
+  cat > "$BLOCK_FORM_NO_SKILLS" <<'EOF'
+---
+name: fixture-block-form-no-skills
+description: >
+  Une description
+  ecrite en scalaire a blocs YAML.
+model: sonnet
+memory: project
+tools: Read, Write
+disallowedTools: Bash
+vf-internal: true
+---
+Corps.
+EOF
+  T44_OUT="$(cd "$REPO" && bash "$GATE" --target kimi "$BLOCK_FORM_NO_SKILLS" 2>/dev/null)"
+  T44_FID_LINE="$(printf '%s\n' "$T44_OUT" | grep '^\[fidelity\]')"
+  if ! printf '%s\n' "$T44_FID_LINE" | grep -q "LOST={[^}]*\bskills\b"; then
+    ok "T44 : skills retiré de la source → skills absent de LOST= (présence conditionnée, pas de déclaration fantôme, ligne: $T44_FID_LINE)"
+  else
+    ko "T44 : skills absent de la source mais toujours dans LOST= — déclaration fantôme (ligne: $T44_FID_LINE)"
+  fi
+
+  # T45 — preuve par mutation (feedback_mutation-test-discriminating-cases) : un gate qui rejoue
+  # l'ANCIENNE forme de get_field (extraction en ligne uniquement, `sed` direct sans lecture de
+  # bloc) reproduit le défaut — skills disparaît de LOST= sur CETTE MÊME fixture à blocs — puis le
+  # gate réel (non muté) le retrouve juste après (mutant confiné à sa copie).
+  T45_MUTANT_GATE="$KIMI_WORK/mutant-get-field-inline-only.sh"
+  # Range de la fonction get_field() dans le gate réel, résolue par grep -n (jamais un numéro de
+  # ligne recopié en dur — la fonction peut bouger). Remplace tout son corps par L'ANCIENNE forme
+  # (une seule ligne, extraction en ligne uniquement), avant/après recopiés tels quels.
+  GF_START="$(grep -n '^get_field() {' "$GATE" | head -1 | cut -d: -f1)"
+  GF_END="$(awk -v start="$GF_START" 'NR > start && /^}$/ { print NR; exit }' "$GATE")"
+  {
+    sed -n "1,$((GF_START - 1))p" "$GATE"
+    echo 'get_field() {'
+    echo '  printf "%s\n" "$1" | grep -E "^${2}:" | head -1 | sed -E "s/^${2}:[[:space:]]*//"'
+    echo '}'
+    sed -n "$((GF_END + 1)),\$p" "$GATE"
+  } > "$T45_MUTANT_GATE"
+  if grep -qF 'grep -E "^${2}:" | head -1 | sed -E "s/^${2}:[[:space:]]*//"' "$T45_MUTANT_GATE"; then
+    ok "T45.mutant.sonde : le mutant rejoue bien l'ancienne extraction en ligne uniquement (mutant vivant)"
+  else
+    ko "T45.mutant.sonde : la substitution n'a pas pris (mutant absent, T45 non probant)"
+  fi
+  T45_MUT_OUT="$(cd "$REPO" && bash "$T45_MUTANT_GATE" --target kimi "$BLOCK_FORM_FIXTURE" 2>/dev/null)"
+  T45_MUT_FID_LINE="$(printf '%s\n' "$T45_MUT_OUT" | grep '^\[fidelity\]')"
+  if ! printf '%s\n' "$T45_MUT_FID_LINE" | grep -q "LOST={[^}]*\bskills\b"; then
+    ok "T45.rouge : le mutant (extraction en ligne uniquement) reproduit le défaut — skills absent de LOST= (ligne: $T45_MUT_FID_LINE)"
+  else
+    ko "T45.rouge : le mutant devrait reproduire le défaut (skills absent de LOST=), mais skills y est encore (ligne: $T45_MUT_FID_LINE)"
+  fi
+  T45_RECHECK_OUT="$(cd "$REPO" && bash "$GATE" --target kimi "$BLOCK_FORM_FIXTURE" 2>/dev/null)"
+  T45_RECHECK_FID_LINE="$(printf '%s\n' "$T45_RECHECK_OUT" | grep '^\[fidelity\]')"
+  if printf '%s\n' "$T45_RECHECK_FID_LINE" | grep -q "LOST={[^}]*\bskills\b"; then
+    ok "T45.vert : le gate réel (non muté) retrouve skills dans LOST= — mutant confiné à sa copie"
+  else
+    ko "T45.vert : le gate réel (non muté) a perdu skills de LOST= — le mutant a fui hors de sa copie"
+  fi
+
   rm -rf "$KIMI_WORK"
 fi
 

@@ -1,5 +1,28 @@
 # Changelog — conductor
 
+## [v1.34.7] — 2026-08-30 (Phase 38 — correction ciblée, second tour : classe de champs à blocs YAML)
+
+**Patch** :
+
+- **`scripts/check-artifact-fidelity.sh`** : `get_field()` ne lisait que la valeur EN LIGNE
+  (`key: value`). Sur une clé YAML écrite en **séquence à blocs** (`key:` suivi de lignes
+  indentées `  - item`) ou en **scalaire à blocs** (`key: |`/`key: >` suivi de texte indenté), la
+  ligne d'en-tête ne porte aucune valeur → chaîne vide → le champ était déclaré absent à tort.
+  Mesuré concrètement sur `skills:` (séquence à blocs) : jamais déclaré dans `LOST=`, alors qu'il
+  l'est réellement dans 7 `AGENT.md` du dépôt (`validator`, `skill-creator`, `kpi-analyst`,
+  `conductor`, entre autres). `get_field()` détecte désormais structurellement les deux formes
+  (ligne d'en-tête vide/indicateur de bloc + ligne suivante indentée) et reconstruit la valeur —
+  sans rien changer à la lecture en ligne, majoritaire et déjà correcte. Classe balayée sous
+  `plugin/` : `skills` (séquence à blocs, réel) et `description` (scalaire à blocs, dans des
+  blueprints de bundle) — les deux désormais couvertes par le même mécanisme structurel, pas un
+  correctif nommé sur `skills` seul.
+- **`scripts/tests/test-check-artifact-fidelity.sh`** : T41-T45 — fixture dédiée portant
+  `skills` en séquence à blocs et `description` en scalaire à blocs (discriminante : les fixtures
+  existantes écrivaient déjà ces champs en ligne, incapables d'attraper ce défaut) ; témoin négatif
+  (retirer `skills` de la source le retire de `LOST=`, présence conditionnée) ; preuve par
+  mutation (un gate rejouant l'ancienne extraction en ligne uniquement reproduit le défaut sur la
+  même fixture, le gate réel non muté le retrouve juste après).
+
 ## [v1.34.6] — 2026-08-30 (Phase 38 — correction ciblée groupée, quatre findings post-mesure-kimi)
 
 **Patch** :
