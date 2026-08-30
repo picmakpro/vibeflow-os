@@ -2092,6 +2092,63 @@ fi
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
+# T52 (fuite cwd vs TARGET_ROOT, mesurée 2026-08-30 par campagne réelle sur Codex avec
+# `--target "$CODEX_HOME"`) — record_codex_runtime_if_applicable ne doit JAMAIS muter le
+# `.planning/config.json` du cwd quand `--target` résout HORS de l'arbre du repo courant (autre
+# lab, sans lien avec le cwd). Install runtime=codex vers une cible totalement étrangère au LAB
+# (OUTSIDE_TARGET, `mktemp -d` indépendant, aucun ancêtre commun avec $LAB) : le
+# `.planning/config.json` du LAB doit rester EXACTEMENT `{}` — c'était la mutation observée
+# avant correctif (clés `runtime`/`vf_runtimes` injectées en silence). Second bloc = contre-
+# épreuve (témoin, requis par le mandat de correction ciblée) : le MÊME scénario SANS --target
+# (TARGET_ROOT reste dans l'arbre, cas T51) doit continuer à écrire "codex" — sinon « plus de
+# mutation » et « registre cassé » sont indiscernables.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME_CODEX="$LAB/home"
+OUTSIDE_TARGET="$(mktemp -d)"
+mkdir -p "$FAKE_HOME_CODEX"
+if prepare_module "$CACHE" "conductor" && prepare_module "$CACHE" "validator"; then
+  mkdir -p "$LAB/.planning"
+  echo '{}' > "$LAB/.planning/config.json"
+  miss=0
+  INSTALL_OUT=$(cd "$LAB" && HOME="$FAKE_HOME_CODEX" VF_RUNTIME=codex VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" --target "$OUTSIDE_TARGET" install validator 2>&1)
+  RC=$?
+  { [ "$RC" -eq 0 ] && [ -f "$OUTSIDE_TARGET/agents/validator.md" ]; } \
+    || { ko "T52 pré-condition : install --target \$OUTSIDE_TARGET a échoué (rc=$RC) — $INSTALL_OUT"; miss=1; }
+  [ "$(cat "$LAB/.planning/config.json")" = "{}" ] \
+    || { ko "T52 (BUG cwd-vs-TARGET_ROOT) : .planning/config.json du LAB MUTÉ par un install --target hors-arbre — obtenu : $(cat "$LAB/.planning/config.json")"; miss=1; }
+  [ ! -f "$OUTSIDE_TARGET/.planning/config.json" ] \
+    || { ko "T52 : un .planning/config.json a été créé sous OUTSIDE_TARGET — destination alternative non attendue (aucun choix de conception tranché ici)"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T52 (fuite cwd vs TARGET_ROOT, DISCRIMINANT) : --target hors-arbre n'écrit PAS dans .planning/config.json du cwd"
+else
+  skip "T52 : conductor/validator non copiables dans le cache de test"
+fi
+rm -rf "$LAB" "$OUTSIDE_TARGET"
+
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME_CODEX="$LAB/home"
+mkdir -p "$FAKE_HOME_CODEX"
+if prepare_module "$CACHE" "conductor" && prepare_module "$CACHE" "validator"; then
+  mkdir -p "$LAB/.planning"
+  echo '{}' > "$LAB/.planning/config.json"
+  miss=0
+  INSTALL_OUT=$(cd "$LAB" && HOME="$FAKE_HOME_CODEX" VF_SCOPE=project VF_RUNTIME=codex VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" install validator 2>&1)
+  RC=$?
+  [ "$RC" -eq 0 ] \
+    || { ko "T52 (témoin) pré-condition : install SANS --target a échoué (rc=$RC) — $INSTALL_OUT"; miss=1; }
+  "$GREP" -qF '"codex"' "$LAB/.planning/config.json" \
+    || { ko "T52 (témoin) : SANS --target (TARGET_ROOT dans l'arbre), .planning/config.json ne contient pas \"codex\" — l'écriture légitime a disparu, pas seulement la fuite — $(cat "$LAB/.planning/config.json")"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T52 (témoin, contre-épreuve) : SANS --target, l'écriture codex dans .planning/config.json a toujours lieu"
+else
+  skip "T52 (témoin) : conductor/validator non copiables dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
 # Garde-fou final : le vrai ~/.claude ET le vrai ~/.codex/agents/vibeflow sont inchangés
 # (snapshot récursif avant=après).
 # ---------------------------------------------------------------------------

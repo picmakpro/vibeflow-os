@@ -1638,6 +1638,29 @@ find_runtime_registry() {
 record_codex_runtime_if_applicable() {
   local mod="$1" module_dir="$2"
   vf_dry_run && return 0
+
+  # TGT-0X (fuite cwd vs TARGET_ROOT, mesurée 2026-08-30 sur un `--target "$CODEX_HOME"`) : la
+  # même garde que `vf_gitignore_target_prefix` (TGT-02, ligne ~1143) s'applique ici. Le
+  # `.planning/config.json` visé plus bas est TOUJOURS résolu au cwd (racine du lab courant,
+  # jamais sous TARGET_ROOT — cf. commentaire du rapport de coexistence, ligne ~2773) : c'est
+  # correct tant que TARGET_ROOT reste dans l'arbre du repo courant (cas normal, avec ou sans
+  # --target relatif). Mais sous --target vers une cible HORS de cet arbre (autre lab, ex.
+  # $CODEX_HOME), écrire dans le `.planning/config.json` du cwd muterait en silence le projet de
+  # l'opérateur alors qu'il visait ailleurs — refusé, exactement comme `gitignore_add_paths` le
+  # refuse déjà pour la même raison. Aucune destination alternative n'est inventée : simple
+  # extension du même refus déjà établi à ce site.
+  if [ -n "$VF_TARGET_OVERRIDE" ]; then
+    local _rcr_cwd_phys
+    _rcr_cwd_phys="$(pwd -P)" || return 0
+    case "$TARGET_ROOT" in
+      "$_rcr_cwd_phys"/*|"$_rcr_cwd_phys") ;;
+      *)
+        log "  runtime-registry : --target ($TARGET_ROOT) sort de l'arbre du repo — .planning/config.json (cwd) non modifié"
+        return 0
+        ;;
+    esac
+  fi
+
   local artifacts
   artifacts="$(resolve_posed_agent_artifact "$module_dir" "$mod")" || return 0
 
