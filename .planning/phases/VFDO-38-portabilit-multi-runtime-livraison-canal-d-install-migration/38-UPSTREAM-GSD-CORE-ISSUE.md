@@ -47,8 +47,23 @@ Un seul défaut de parsing produit donc **trop permissif** d'un côté et **trop
 l'autre. C'est ce qui rend ce bug coûteux à diagnostiquer côté aval : le symptôme n'a pas la même
 forme selon la cible.
 
+**Confirmé en session réelle sur kimi-code (2026-08-30)** — le mécanisme est localisé dans la
+source : `parseStringList` découpe sur `,` **sans conscience des parenthèses**, si bien que
+`Agent(vf-reviewer, general-purpose)` devient les deux jetons `Agent(vf-reviewer` et
+`general-purpose)`, tous deux **noms d'outils inexistants, ignorés SANS le moindre diagnostic**.
+La perte est donc **silencieuse** : l'agent charge, il a l'air sain, et sa capacité de dispatch de
+sous-agents n'existe plus.
+
+⚠️ **Précision mesurée, pour éviter un contresens** : ce découpage n'affecte **pas**
+`disallowedTools` (qui ne contient pas de parenthèses) — vérifié, le garde-fou d'écriture reste
+appliqué (0/4 écritures contre 3/3 pour le contrôle positif). Le dégât porte **uniquement** sur la
+capacité de dispatch. Nous l'avions d'abord soupçonné d'affaiblir les permissions : c'est faux, et
+c'est précisément le genre de contresens que le caractère silencieux du défaut encourage.
+
 **Correctif suggéré** : découper en respectant l'appariement des parenthèses, ou traiter
-`Agent(...)` comme un jeton unique avant le `split`.
+`Agent(...)` comme un jeton unique avant le `split`. **Et, indépendamment du découpage : émettre un
+diagnostic sur tout nom d'outil inconnu** — c'est l'absence de signal, plus que le découpage
+lui-même, qui rend ce défaut coûteux en aval.
 
 ---
 

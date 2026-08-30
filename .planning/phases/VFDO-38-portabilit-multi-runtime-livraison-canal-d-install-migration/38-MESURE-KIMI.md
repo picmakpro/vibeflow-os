@@ -4,8 +4,8 @@
 **Tokens consommés : ZÉRO**
 
 > kimi-code passait pour un **inconnu déclaré** (OAuth en échec côté serveur). Une clé API a été
-> posée par Samuel. Ce document consigne **I-1 uniquement**. **I-2 et I-3 restent NON MESURÉES** —
-> voir « Ce qui bloque » en fin de document.
+> posée par Samuel. Ce document consigne **I-1, I-2 et I-3**, toutes mesurées.
+> Coût total : **~0,018 $** (I-1 à coût nul, I-2/I-3 sur 19 appels).
 
 ## Régime credential — respecté intégralement
 
@@ -125,25 +125,110 @@ lui-même **tronqué nativement à 233 octets** (vérifié à l'`od -c`, la rais
 ⇒ **Seul `--agent-file <chemin>` rend le message complet.** Toute recette de vérification
 post-install doit passer par lui, jamais par `doctor` ni par le log.
 
-## Ce qui bloque I-2 et I-3
+## I-2 — `disallowedTools` bloque réellement l'écriture : **0/4 vs 3/3**
 
-`KIMI_CODE_HOME` isole intégralement — **pas besoin de rediriger `HOME`**. Mais :
+**Mesuré le 2026-08-30, coût ~0,018 $** (19 appels), régime credential option B (voir plus bas).
 
-- **`KIMI_REGISTRY_API_KEY` n'est PAS la clé d'inférence** (elle ne sert qu'au registre de
-  providers). La clé d'inférence est **inline dans `config.toml`** (`[providers.moonshotai].api_key`).
-- **Aucune variable d'environnement de processus n'est lue** : zéro interpolation `${ENV}` dans le
-  bundle, vérifié par mesure (`OPENAI_API_KEY` injecté → `no credential configured`).
+| sonde | N | témoin écrit ? |
+|---|---|---|
+| agent avec `disallowedTools: Write, Edit` | 4 | **0/4** — jamais |
+| **contrôle positif** : mêmes `tools`, SANS `disallowedTools` | 3 | **3/3** — toujours |
 
-⇒ La voie « clé par variable d'environnement, jamais par copie de fichier » **n'existe pas**.
-I-2 (`disallowedTools` bloque-t-il une écriture réelle) et I-3 (firing des `[[hooks]]`) exigent des
-sessions réelles, donc la clé. **Trois options, décision de Samuel** :
+Écart net et reproductible. **Le verdict est lu sur le fichier témoin, au `ls`/`cat`** — jamais dans
+la prose du modèle.
 
-- **A** — mesurer dans le home réel, sans copier aucune clé ; pollution limitée aux agents posés et
-  aux sessions, réversible avec preuve arbre-à-arbre. Écrit dans l'environnement de Samuel.
-- **B** — banc isolé avec copie de `config.toml` (qui **porte la clé en clair**), sous le régime
-  exact déjà validé pour `auth.json` : scratchpad seul, jamais lue ni journalisée, écrasée puis
-  supprimée, déclarée. N'écrit rien chez Samuel. **Recommandée.**
-- **C** — s'arrêter à I-1 ; I-2 et I-3 restent **inconnus déclarés**.
+**Mécanisme identifié en source** (`dist/main.mjs:163078`) :
+`this.tools.setActiveTools(profile.tools, profile.disallowedTools)` — l'outil est **retiré du
+toolset**, il n'est pas refusé à l'appel. Le modèle le formule lui-même : « L'outil Write n'est pas
+disponible dans mon environnement actuel. »
+
+⇒ **`disallowedTools` est portable sur kimi.** C'est mieux que Codex, où tout ce qui est restrictif
+dans un rôle s'est révélé décoratif.
+
+### ⚠️ Réserve — le trou Bash reste ouvert, comme sur Claude
+
+`vf-reviewer` verbatim (Bash autorisé, `Write`/`Edit` interdits) **n'a pas écrit** (0/1) — mais **par
+refus de rôle**, sans jamais tenter Bash. Et sur un autre run, le modèle a **spontanément suggéré**
+`echo "MARQUEUR-OK" > temoin.txt`.
+
+⇒ **Ne pas traiter `disallowedTools` comme une barrière d'écriture tant que `Bash` est dans `tools`.**
+La garantie reste ce qu'elle a toujours été : **« pas d'outil d'édition directe »**, pas
+« ne peut pas écrire ». C'est la doctrine déjà arbitrée pour Claude ; elle vaut identiquement ici.
+1 run seulement ⇒ conformité **comportementale observée, pas garantie**.
+
+## I-3 — les `[[hooks]]` se déclenchent : **3/3, positif**
+
+Contrairement à Codex (où l'exécution est restée un inconnu déclaré faute de contrôle positif
+montable), **la mesure kimi est intrinsèquement positive** : marqueur fichier appendé par la commande
+du hook, remis à zéro avant chaque run.
+
+`SessionStart`, `UserPromptSubmit` et `PreToolUse` déclenchés **à chaque run** ; `Stop` 2/3 (run 3
+interrompu) ; `PreToolUse` ×2 au run 2 = deux appels d'outil.
+
+**Schéma source** : `HookDefSchema = {event, matcher?, command, timeout?}` en `.strict()`, **20
+événements** supportés — `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`,
+`PermissionResult`, `UserPromptSubmit`, `UserPromptQueued`, `TurnStarted`, `Stop`, `StopFailure`,
+`Interrupt`, `SessionStart`, `SessionEnd`, `SessionHeartbeat`, `SubagentStart`, `SubagentStop`,
+`TaskStarted`, `PreCompact`, `PostCompact`, `Notification`.
+
+⇒ **Canal hooks OUVERT sur kimi**, via `[[hooks]]` dans `config.toml`. Vocabulaire d'événements
+**plus riche que Claude Code**.
+
+## `vf-internal` — aucun équivalent, et le Pattern 12 tombe
+
+**Absence établie sur quatre sources convergentes**, jamais sur une seule commande :
+
+1. le parser de frontmatter agent-core (`dist/main.mjs:117540-117585`) n'accepte que `name`,
+   `description`, `whenToUse`, `override`, `tools`, `disallowedTools`, `subagents`,
+   `model_preference` — **aucun champ de mode ou de visibilité** ;
+2. `vf-internal` : **0 occurrence** dans les 23 Mo du bundle (`hidden`/`visibility`/`isInternal`
+   existent, mais sur la state-machine et le filtrage de messages, jamais sur les agents) ;
+3. `buildSubagentDescriptions()` (`dist/main.mjs:151905`) énumère **tous** les subagents sans filtre ;
+4. **MESURE** : `vf-reviewer`, qui porte `vf-internal: true`, a été **invoqué directement** en session
+   réelle et **a répondu** — 1/1.
+
+⇒ **Les 19 workers internes sont publiquement invocables sur kimi.** Le cloisonnement du Pattern 12
+est une garantie **de frontmatter**, pas de runtime : elle ne survit pas à la conversion.
+
+**Palliatif partiel, à ne pas confondre avec une solution** : le champ `subagents` de kimi (liste
+blanche de qui un parent peut dispatcher) restreint **le dispatch**, mais **PAS l'invocation directe
+par l'utilisateur**.
+
+## Requalification d'une note connue — le découpage CSV
+
+Le `split(",")` de `parseStringList` (sans conscience des parenthèses) **n'affecte PAS**
+`disallowedTools`, qui ne contient pas de parenthèses : le garde-fou reste appliqué (sonde dédiée,
+**0/2** écritures). Ce qu'il casse, c'est `Agent(vf-reviewer, general-purpose)` → deux noms d'outils
+inexistants, **ignorés sans le moindre diagnostic**.
+
+⇒ **La capacité de dispatch de sous-agents est perdue en silence — pas le garde-fou.** Nous avions
+d'abord soupçonné l'inverse ; c'est faux, et `38-UPSTREAM-GSD-CORE-ISSUE.md` §1 porte la correction.
+
+## Régime credential — option B, exécutée et vérifiée
+
+Copie de `~/.kimi-code/config.toml` **uniquement** vers le `KIMI_CODE_HOME` de banc, **jamais
+ouverte, jamais affichée, jamais journalisée, jamais commitée**. Écrasée `dd if=/dev/zero` **3
+passes** puis `rm -f`. Les 17 `wire.jsonl` de session (qui portaient des en-têtes d'autorisation) ont
+été shreddés après extraction des seuls compteurs d'usage.
+
+**Vérifications finales** : `kimi doctor` du banc → `SKIP config.toml — File does not exist` ·
+`find $BENCH -name config.toml` → **0** · home réel de Samuel **intact** (2730 octets, mtime
+inchangé).
+
+**Portée du snapshot** : mesure prise sur `plugin/` au HEAD `0f510f62` (SHA256 en
+`00-snapshot-sha256.txt`). Le dépôt a bougé pendant la campagne (`c05edc01`), mais les quatre agents
+mesurés sont **byte-identiques** entre snapshot et état courant — le verdict vaut pour les deux.
+
+## Trois pièges de poste rencontrés
+
+1. `-p` refuse de se combiner avec `--auto` comme avec `-y` (le mode prompt gère sa propre
+   approbation et auto-approuve).
+2. **Le compte est plafonné à 3 RPM.** Une première boucle en rafale a produit deux `429`, **écartés
+   au lieu d'être comptés** — dont un `control-3` qui serait sorti en faux « n'a pas écrit ».
+   Espacer de 25-30 s. *Un `429` compté comme un résultat est exactement le faux rouge que cette
+   phase passe son temps à éviter.*
+3. `stream-json` ne remonte **aucune** donnée d'usage : les tokens se lisent dans
+   `home/sessions/*/agents/main/wire.jsonl`, où chaque entrée est **dupliquée** (diviser par 2).
 
 ## Autres notes de portabilité
 
