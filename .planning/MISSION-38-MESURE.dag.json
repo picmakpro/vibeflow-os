@@ -115,6 +115,63 @@
         "hors depot"
       ],
       "status": "done"
+    },
+    {
+      "id": "desc-fix",
+      "step": "descriptions mono-ligne guillemetees + gate double-parseur",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/**/*.md (description uniquement) + suites"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "kimi-i2i3",
+      "step": "kimi I-2 disallowedTools / I-3 hooks, banc isole, copie config.toml (regime D-38-G)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "banc scratchpad",
+        "AUCUNE ecriture depot"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "revue-desc",
+      "step": "revue du lot descriptions",
+      "stage": "",
+      "deps": [
+        "desc-fix"
+      ],
+      "scope": [
+        "diff du lot"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "kimi-i1-remesure",
+      "step": "re-mesure I-1, attendu 31/31 par comm",
+      "stage": "",
+      "deps": [
+        "desc-fix"
+      ],
+      "scope": [
+        "banc kimi"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "gate-vf-internal",
+      "step": "gate de fidelite declare la perte vf-internal sur cible kimi",
+      "stage": "",
+      "deps": [
+        "kimi-i2i3"
+      ],
+      "scope": [
+        "check-artifact-fidelity.sh + son test"
+      ],
+      "status": "blocked"
     }
   ]
 }

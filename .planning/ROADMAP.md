@@ -1162,6 +1162,15 @@ multi-runtime amène des adaptateurs à construire des `--target` explicites plu
 `user`/`project`/`local` ; le jour où ce chemin devient majoritaire, le plus contraint des deux
 sera aussi le plus fréquent, et l'unification cessera d'être cosmétique.
 
+**Dette nommée — rapport typé des workers Codex par instruction, non par schéma** (D-38-S,
+2026-08-30, mesurée) : `codex exec --output-schema` contraint **la seule session root** et ne se
+propage **pas** aux sous-agents. Mesuré sur 3 runs : clés racine conformes 3/3, mais **trois formes
+de `findings` différentes** (`{action}` · `{action,message}` · `{severity,action,ref,message}`). Le
+contrat de worker du team-kernel tient donc, sur Codex, par l'**instruction** — pas structurellement.
+Un manager qui piloterait sur la forme des `findings` lirait une structure non garantie. Voies de
+propagation non cherchées ; sur kimi-code la question est close d'avance (aucun équivalent de
+`--output-schema`). Constat en `38-NOTE-ARCHI-RAPPORT-TYPE-CODEX.md`. **Aucun code en Phase 38.**
+
 **Dette nommée — texte faux du gate de coexistence hors périmètre** (D-38-R, 2026-08-29,
 Phase 38, plan 38-07, CODEX-B6 second volet). **Fait mesuré** :
 `plugin/conductor/scripts/check-artifact-fidelity.sh:175` affirme qu'un runtime coexistant

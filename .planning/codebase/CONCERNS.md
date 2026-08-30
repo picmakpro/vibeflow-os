@@ -391,6 +391,35 @@ vrais dans le code mais sans impact observé — sévérité **LOW**, ne pas pri
 
 ## Fragile Areas
 
+**`kimi doctor` est un VERT À VIDE sur les agents — il ne les regarde pas** — Sévérité : **HIGH**
+- Files: toute recette d'install/vérification ciblant kimi-code ; constat en
+  `.planning/phases/VFDO-38-*/38-MESURE-KIMI.md` (artefact `71-doctor-populated.txt`)
+- Why fragile: mesuré le 2026-08-30 — sur un banc peuplé de **11 agents cassés sur 31**, `kimi
+  doctor` rend **« All checked config files are valid »**. Il valide les fichiers de configuration
+  et **jamais les agents**. Le seul signal est un WARN dans `<KIMI_CODE_HOME>/logs/kimi-code.log`,
+  lui-même **tronqué nativement à 233 octets** (vérifié à l'`od -c` : la raison du rejet est coupée)
+  et **plafonné à 5 lignes** (« Suppressed 6 further agent-discovery skip warnings »). Une recette
+  qui conclurait « install saine » sur `doctor` déclarerait vert un lab dont un tiers des rôles ne
+  charge pas — et les managers, eux, chargeraient et **dispatcheraient dans le vide**.
+- Safe modification: **toute recette d'install kimi vérifie par `kimi --agent-file <chemin>`, fichier
+  par fichier — jamais par `doctor`, jamais par le log.** `--agent-file` rend le message d'erreur
+  **complet** et échoue **avant** tout appel de modèle (donc à coût nul). L'écrire dans la recette
+  elle-même, pas seulement ici : une consigne qui ne vit que dans CONCERNS ne protège personne.
+- Test coverage: le gate double-parseur posé en Phase 38 couvre la **forme** du frontmatter ; il ne
+  remplace pas la vérification `--agent-file` sur cible kimi réelle.
+
+**`vf-internal` est perdu en silence sur kimi — le Pattern 12 ne tient plus** — Sévérité : **MEDIUM**
+- Files: 19 agents portant `vf-internal: true` ; `plugin/conductor/scripts/check-artifact-fidelity.sh`
+- Why fragile: mesuré le 2026-08-30 — kimi **tolère et ignore** `vf-internal`, comme `model`,
+  `effort`, `memory`, `skills`, `vf-requires`, `vf-mcp-*`. Aucun de ces champs n'empêche le
+  chargement (bonne nouvelle pour l'adaptateur), mais `vf-internal: true` perdu signifie qu'un
+  **worker interne devient publiquement invocable** (`kimi --agent vf-coder`). Le cloisonnement du
+  Pattern 12 est une garantie **de frontmatter**, pas de runtime : elle ne survit pas à la
+  conversion.
+- Safe modification: la perte doit être **déclarée par le gate de fidélité** à l'install ET au
+  `status` sur cible kimi, avec un texte vrai — jamais un texte qui promet un confinement inexistant.
+- Test coverage: à câbler avec la déclaration du gate.
+
 **Modules `mobile-test` / `mobile-test-team` expérimentaux — « run réel vert » jamais tracé** — Sévérité : **HIGH**
 - Files: `plugin/mobile-test/module.json:5` et `plugin/mobile-test-team/module.json:5` (« Statut
   expérimental jusqu'au premier run réel vert ») ; `plugin/mobile-test/README.md:10`,
