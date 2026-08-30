@@ -1,5 +1,29 @@
 # Changelog — conductor
 
+## [v1.34.8] — 2026-08-30 (Phase 38 — correction ciblée : preuve générative des six angles morts du prédicat description:)
+
+**Patch** :
+
+- **`scripts/tests/test-check-description-fidelity.sh`** (T26-T41) : constat mesuré avant toute
+  écriture — le mandat de durcissement décrivait le gate comme un prédicat de caractères
+  (« scalaire simple non quoté contenant `': '` »), mais `check-description-fidelity.sh` n'est
+  plus ce prédicat depuis les corrections précédentes (a4975cd/5e01ab5/b7ba7eb/99fa7dc) : c'est une
+  double vérification structurelle (passe A = PyYAML strict, passe B = reproduction verbatim de la
+  regex gsd-core). Vérifié empiriquement sur fixtures isolées AVANT toute modification : les six
+  angles morts nommés au mandat (scalaire nu commençant par `[ * @ { %`, ou finissant par `:`) font
+  DÉJÀ échouer la passe A (YAML invalide), et les deux cas voisins mesurés « acceptés » sous
+  l'ancien prédicat (`&` en tête, ` #` avec troncature silencieuse) font DÉJÀ diverger passe A et
+  passe B (ancre YAML résolue par l'une, gardée en clair par l'autre ; commentaire YAML implicite
+  qui tronque l'une, pas l'autre) — sans aucune modification du gate. `check-description-fidelity.sh`
+  n'a donc **pas été modifié** : rien à durcir dans un prédicat qui n'existe plus. Seize tests
+  ajoutés (T26-T41, huit paires mutant rouge + contrôle sain vert) verrouillent cette preuve en
+  non-régression, un cas par angle mort explicitement nommé par le mandat, plus les deux cas
+  voisins.
+- Non-régression vérifiée : `check-description-fidelity.sh` sur le dépôt réel reste `rc=0`, PASS,
+  74 fichiers, 2 exceptions (inchangé) ; `check-agents.sh --strict` sur les 6 dossiers
+  `plugin/*/agents` reste `rc=0` ; `check-version-sync.sh` reste `rc=0` ;
+  `check-mission-invariants.sh` reste `rc=3` (contrat inversé : SAIN).
+
 ## [v1.34.7] — 2026-08-30 (Phase 38 — correction ciblée, second tour : classe de champs à blocs YAML)
 
 **Patch** :

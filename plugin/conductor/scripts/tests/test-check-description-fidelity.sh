@@ -43,6 +43,25 @@
 #         resté byte-identique avant/après (empreinte sha256 comparée) — la mutation ne touche
 #         jamais l'arbre du dépôt, seulement les copies sous mktemp -d.
 #
+# T26-T41 — preuve générative des six angles morts nommés au mandat de durcissement
+# (indicateur YAML en tête de scalaire nu : `[ { * @ % ` et deux-points final) PLUS les deux cas
+# voisins mesurés comme « acceptés » sous l'ANCIEN prédicat simple (`&` en tête, ` #` — troncature
+# silencieuse). CONSTAT (vérifié empiriquement avant d'écrire cette suite, cf. SUMMARY) : le gate
+# n'est PLUS un prédicat de caractères depuis a4975cd/5e01ab5/b7ba7eb/99fa7dc — c'est une double
+# vérification structurelle (passe A = PyYAML strict, passe B = reproduction verbatim de la regex
+# gsd-core). Un scalaire nu commençant par un indicateur YAML fait soit ÉCHOUER la passe A (YAML
+# invalide), soit DIVERGER entre A et B (cas `&` ancre YAML résolue par A, gardée en clair par B ;
+# cas `#` commentaire YAML implicite qui tronque A). Dans les deux cas la règle d'égalité existante
+# (§ Règle de verdict, lignes 17-20 de check-description-fidelity.sh) rougit DÉJÀ SANS AUCUNE
+# MODIFICATION DU GATE — aucune liste de caractères à maintenir, la propriété structurelle couvre
+# le motif par construction. Ces tests verrouillent cette preuve en non-régression (rien à
+# « durcir » dans le prédicat : il n'y a plus de prédicat de caractères à durcir) :
+#   T26-T33 — par angle mort, paire mutant rouge + contrôle sain vert, sur fixture isolée :
+#     T26/27 commence par `[` · T28/29 commence par `*` · T30/31 commence par `@` ·
+#     T32/33 commence par `{` · T34/35 commence par `%` · T36/37 finit par `:` ·
+#     T38/39 commence par `&` (accepté sous l'ancien prédicat, mesuré) ·
+#     T40/41 contient ` #` (accepté + troncature silencieuse sous l'ancien prédicat, mesuré).
+#
 # Convention : asserts numérotés, helpers ok()/ko()/skip(), exit 0 si tout passe, exit 1 dès un
 # KO. Calqué sur le pattern de test-check-artifact-fidelity.sh.
 set -uo pipefail
@@ -578,6 +597,76 @@ fs.writeFileSync(filePath, lines.join("\n"));
     ko "T$n.byte-identique : fichier source réel ($rel) MODIFIÉ par la mutation — avant=$src_sha_before après=$src_sha_after"
   fi
 done
+
+# =====================================================================================
+# T26-T41 — preuve générative des six angles morts du mandat + les deux cas voisins mesurés
+# « acceptés » sous l'ancien prédicat. Un cas par paire (mutant rouge, contrôle sain vert), sur
+# fixture isolée (mktemp -d, jamais l'arbre du dépôt). Chaque assertion imprime CE QUI EST
+# ASSERTÉ, ATTENDU, OBTENU.
+# =====================================================================================
+blindspot_case() {
+  # $1 = numéro de test (mutant), $2 = numéro de test (contrôle), $3 = label,
+  # $4 = description fautive (scalaire nu), $5 = motif attendu dans le rapport (grep -F)
+  local n_mut="$1" n_ctrl="$2" label="$3" bad_desc="$4" expect_grep="$5"
+  local dir="$WORK/bs$n_mut"
+  mkdir -p "$dir"
+  local f="$dir/case.md"
+  make_fixture_file "$f" "description: $bad_desc"
+  local out rc
+  out="$(CDF_EXCEPTIONS_FILE="$EMPTY_EXC" bash "$GATE" --root "$dir" 2>&1)"
+  rc=$?
+  echo "  [T$n_mut] asserté : $label — attendu : exit 1, rapport contenant \"$expect_grep\" — obtenu : exit $rc"
+  if [ "$rc" -eq 1 ] && printf '%s' "$out" | grep -qF "$expect_grep"; then
+    ok "T$n_mut : $label rougit ($expect_grep présent dans le rapport)"
+  else
+    ko "T$n_mut : $label attendu exit 1 + \"$expect_grep\", obtenu exit $rc ($out)"
+  fi
+
+  local ctrl_dir="$WORK/bs${n_mut}_ctrl"
+  mkdir -p "$ctrl_dir"
+  local ctrl_f="$ctrl_dir/case.md"
+  make_fixture_file "$ctrl_f" 'description: "Description saine, sans indicateur YAML en tete ni deux-points final."'
+  local ctrl_out ctrl_rc
+  ctrl_out="$(CDF_EXCEPTIONS_FILE="$EMPTY_EXC" bash "$GATE" --root "$ctrl_dir" 2>&1)"
+  ctrl_rc=$?
+  echo "  [T$n_ctrl] asserté : contrôle sain ($label) — attendu : exit 0 — obtenu : exit $ctrl_rc"
+  if [ "$ctrl_rc" -eq 0 ]; then
+    ok "T$n_ctrl : contrôle sain à côté de $label reste vert"
+  else
+    ko "T$n_ctrl : contrôle sain à côté de $label attendu exit 0, obtenu exit $ctrl_rc ($ctrl_out)"
+  fi
+}
+
+# T26/27 — commence par `[` (passe A échoue : bloc mapping cassé par le flow-sequence implicite).
+blindspot_case 26 27 'commence par [' '[beta] fait ceci' 'passe A ÉCHOUE'
+
+# T28/29 — commence par `*` (passe A échoue : scan d'alias YAML).
+blindspot_case 28 29 'commence par *' '*important* fait ceci' 'passe A ÉCHOUE'
+
+# T30/31 — commence par `@` (passe A échoue : caractère réservé YAML).
+blindspot_case 30 31 'commence par @' '@mention fait ceci' 'passe A ÉCHOUE'
+
+# T32/33 — commence par `{` (passe A échoue : bloc mapping cassé par le flow-mapping implicite).
+blindspot_case 32 33 'commence par {' '{draft} fait ceci' 'passe A ÉCHOUE'
+
+# T34/35 — commence par `%` (passe A échoue : caractère réservé YAML, directive).
+blindspot_case 34 35 'commence par %' '%50 de couverture' 'passe A ÉCHOUE'
+
+# T36/37 — finit par `:` (passe A échoue : "mapping values are not allowed here").
+blindspot_case 36 37 'finit par :' 'fait ceci, notamment:' 'passe A ÉCHOUE'
+
+# T38/39 — commence par `&` (mesuré « accepté » sous l'ancien prédicat simple). Le gate actuel
+# rougit par DIVERGENCE (pas par échec de passe A) : `&ref` est une ancre YAML valide que la
+# passe A résout et consomme, tandis que la passe B (regex gsd-core) la garde en clair dans la
+# valeur — les deux passes désaccordent, donc violation.
+blindspot_case 38 39 'commence par & (ancre YAML)' '&ref fait ceci' 'divergence'
+
+# T40/41 — contient ` #` (mesuré « accepté + troncature silencieuse » sous l'ancien prédicat
+# simple). Le gate actuel rougit par DIVERGENCE : le `#` précédé d'espace ouvre un commentaire
+# YAML implicite en scalaire plain, tronquant la valeur côté passe A, tandis que la passe B
+# (regex gsd-core) garde tout le texte — les deux passes désaccordent, donc violation (et non un
+# vert silencieux sur une valeur tronquée).
+blindspot_case 40 41 'contient un # precede d espace' 'texte avant # apres le croisillon' 'divergence'
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
