@@ -1195,3 +1195,49 @@ correction du même fichier (remplacer la négation par : Codex expose une surfa
 exécutante, non ENCORE ciblée par l'install VibeFlow qui merge dans `settings.json` au lieu de
 `hooks.json`) ; et/ou planifier une conversion réelle `settings.json -> hooks.json` comme geste
 dédié, jamais promise avant d'être livrée.
+
+**Dette nommée — les non-convertibles nommés un par un, et le vecteur de propagation des
+blueprints** (D-38-T, 2026-08-30, Phase 38, plan 38-08). Deux volets.
+
+**(a) Cas non convertibles** — les trois seuls fichiers du périmètre dont la description contient
+à la fois un guillemet double ET une apostrophe : aucune forme quotée (guillemets doubles OU
+simples) ne traverse les deux consommateurs (parseur YAML strict, reproduction `gsd-core`) à
+l'identique. Non touchés par ce lot (le mandat interdit de modifier le texte), déclarés en
+exception nommée dans `plugin/conductor/scripts/check-description-fidelity.sh`, avec pour chacun
+l'état réel mesuré :
+  - `plugin/consolidator/SKILL.md` — **tronqué par un commentaire YAML** : la description contient
+    ` #Ligne`, que PyYAML interprète comme le début d'un commentaire sur un scalaire plain (valeur
+    désérialisée tronquée à `... colonne`), alors que la regex `gsd-core` garde la ligne entière.
+    Deux lecteurs, deux textes différents pour ce fichier — c'est le cas nommé « tronquée par le
+    commentaire YAML » de l'objectif de ce plan.
+  - `plugin/design-orchestrator/AGENT.md` — **refusé par le parseur YAML strict** : deux-points
+    suivi d'espace dans le scalaire plain (`mapping values are not allowed here`). L'un des 13
+    fichiers strictement invalides mesurés au cadrage.
+  - `plugin/reference/content/methodology/templates/skills/safe-execute/SKILL.md` — **diverge côté
+    reproduction** : déjà en scalaire double-guillemets avec guillemets internes échappés
+    (`\"safe-execute\"`) ; PyYAML désérialise correctement l'échappement, la regex `gsd-core` ne
+    déséchappe jamais et garde le backslash littéral — deux textes différents dès le premier
+    guillemet interne.
+  Les trois échoueraient l'audit s'ils n'étaient pas exemptés (mesuré, en excluant temporairement
+  chacun de la liste d'exceptions). **Déclencheur de reprise** : le jour où l'un de ces textes est
+  réécrit pour une raison propre (clarté, densité), retirer son exception — le cliquet du gate le
+  signalera de lui-même dès que le fichier redeviendra conforme aux deux règles.
+
+**(b) Vecteur de propagation des blueprints** — 9 fichiers `content/agents/*.blueprint.md` portent
+un bloc « frontmatter cible (à recopier) » dont la description est écrite en scalaire replié
+(`description: >`) : `plugin/business-pilot-bundle/content/agents/business-pilot-commercial.blueprint.md`,
+`plugin/business-pilot-bundle/content/agents/business-pilot-delivery.blueprint.md`,
+`plugin/business-pilot-bundle/content/agents/business-pilot-finance.blueprint.md`,
+`plugin/content-bundle/content/agents/repurposer.blueprint.md`,
+`plugin/content-bundle/content/agents/scriptwriter.blueprint.md`,
+`plugin/content-bundle/content/agents/strategist.blueprint.md`,
+`plugin/growth-bundle/content/agents/campaign-analyst.blueprint.md`,
+`plugin/growth-bundle/content/agents/channel-strategist.blueprint.md`,
+`plugin/growth-bundle/content/agents/copywriter-sequences.blueprint.md`. Ces blocs sont de la
+PROSE (un exemple à recopier), pas du frontmatter d'artefact installable : hors du périmètre
+mécanique de ce lot (la découverte du gate exige une première ligne `---`, jamais vérifiée dans le
+corps d'un `.blueprint.md`) et hors de portée du gate. Mais un lab instancié à partir d'eux
+hériterait exactement le piège en ciseaux que ce lot ferme (scalaire replié -> perte totale côté
+`gsd-core`). **Déclencheur de reprise** : le prochain geste touchant l'instanciation de labs
+(`vf-new-lab`), qui devra d'abord mesurer ce que ce workflow fait réellement de ce bloc — copie
+machine ou lecture agentique — avant de décider de la forme à lui donner.
