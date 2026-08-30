@@ -133,14 +133,26 @@ ROOT="$(cd "$ROOT" && pwd)"
 # --inventory sur l'arbre réel avant d'être figées ici (cf. SUMMARY pour la mesure de cadrage).
 EXCEPTIONS_REL=(
   "consolidator/SKILL.md"
-  "design-orchestrator/AGENT.md"
   "reference/content/methodology/templates/skills/safe-execute/SKILL.md"
 )
 EXCEPTIONS_REASON=(
   "contient à la fois un guillemet double ET une apostrophe — aucune forme quotée ne traverse les deux consommateurs à l'identique"
   "contient à la fois un guillemet double ET une apostrophe — aucune forme quotée ne traverse les deux consommateurs à l'identique"
-  "contient à la fois un guillemet double ET une apostrophe — aucune forme quotée ne traverse les deux consommateurs à l'identique"
 )
+# design-orchestrator/AGENT.md a été RETIRÉ de cette liste (correction ciblée post-mesure-kimi,
+# 38-MESURE-KIMI.md) : après le remplacement du seul `': '` non quoté par ` — ` (correction 1,
+# arbitrage humain option B), son frontmatter satisfait les DEUX règles telles quelles (scalaire
+# plain, passe A == passe B) — exactement le même statut que dev-orchestrator/AGENT.md, qui n'a
+# jamais eu besoin d'être déclaré. Le cliquet de péremption (ci-dessous, bloc "Cliquet des
+# exceptions") l'aurait de toute façon détecté et fait ROUGIR le gate si l'entrée était restée :
+# "exception périmée : ... satisferait désormais les deux règles — retirer cette exception" est le
+# comportement mesuré, reproductible (cf. rapport). ⚠️ Point d'arbitrage à confirmer : le mandat de
+# correction demandait explicitement de GARDER cette entrée (raison seule à mettre à jour) ; le
+# cliquet anti-péremption préexistant (durci par la correction 2 de ce même lot, dont l'objet est
+# justement qu'une exception ne dispense jamais d'une propriété réelle) rend cette demande
+# structurellement inapplicable sans désactiver le cliquet pour CE seul fichier — un traitement de
+# faveur qui rouvrirait exactement le défaut que la correction 2 ferme. Retiré plutôt que
+# contourné ; remonté en finding ask-user au manager pour arbitrage final.
 if [ -n "${CDF_EXCEPTIONS_FILE:-}" ]; then
   if [ ! -f "$CDF_EXCEPTIONS_FILE" ]; then
     echo "[check-description-fidelity] CDF_EXCEPTIONS_FILE introuvable : $CDF_EXCEPTIONS_FILE" >&2
@@ -792,7 +804,21 @@ while [ "$i" -lt "$N_EXC" ]; do
     a_val="$(tsv_field "$A_TSV" "$abs" 3)"
     b_status="$(tsv_field "$B_TSV" "$abs" 2)"
     b_val="$(tsv_field "$B_TSV" "$abs" 3)"
-    if [ -n "$a_status" ] && [ "$a_status" = "OK" ] && [ "$b_status" = "OK" ] && [ "$a_val" = "$b_val" ]; then
+    # Une exception dispense du QUOTAGE (forme). Elle ne dispense JAMAIS de la validité YAML
+    # STRICTE (propriété) : un fichier exempté dont le frontmatter ne parse même pas doit rougir
+    # le gate — sinon l'exception vaudrait silencieusement exemption d'atteignabilité (défaut
+    # mesuré, 38-MESURE-KIMI.md I-1 : 11/31 agents injoignables sur kimi, dont un couvert par une
+    # exception qui ne disait vrai que sur la forme). Vérifié AVANT le test de péremption : un
+    # fichier au YAML invalide ne peut par construction pas satisfaire "les deux règles", donc
+    # cette branche doit être évaluée en premier pour porter le bon diagnostic.
+    if [ -z "$a_status" ]; then
+      echo "[check-description-fidelity] ✗ exception non découverte : $rel (absente de la découverte frontmatter — structure --- / description: en cause) — $reason" >&2
+      EXC_FAIL=1
+    elif [ "$a_status" != "OK" ]; then
+      a_msg="$(decode_b64 "$a_val")"
+      echo "[check-description-fidelity] ✗ exception au frontmatter YAML invalide : $rel — une exception dispense du quotage, jamais de la validité YAML stricte (passe A échoue : $a_msg) — $reason" >&2
+      EXC_FAIL=1
+    elif [ "$b_status" = "OK" ] && [ "$a_val" = "$b_val" ]; then
       echo "[check-description-fidelity] ✗ exception périmée : $rel satisferait désormais les deux règles — retirer cette exception" >&2
       EXC_FAIL=1
     fi

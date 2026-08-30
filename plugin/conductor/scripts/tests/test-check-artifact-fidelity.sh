@@ -393,6 +393,166 @@ EOF
     fi
   fi
 
+  # =========================================================================================
+  # T35-T40 — cinq champs perdus supplémentaires sur kimi (correction ciblée post-mesure-kimi,
+  # 38-MESURE-KIMI.md : effort/skills/vf-requires/vf-mcp-consumer/vf-mcp-tools — tolérés et
+  # ignorés par le même parser agent-core, absents du LOST déclaré avant cette correction).
+  # =========================================================================================
+  FIVE_FIELDS_FIXTURE="$KIMI_WORK/five-fields.md"
+  cat > "$FIVE_FIELDS_FIXTURE" <<'EOF'
+---
+name: fixture-five-fields
+description: "Fixture de test portant les cinq champs perdus supplementaires sur kimi."
+model: sonnet
+effort: medium
+memory: project
+skills: skill-a, skill-b
+tools: Read, Write
+disallowedTools: Bash
+vf-internal: true
+vf-requires: mcp-servers
+vf-mcp-consumer: true
+vf-mcp-tools: mcp__foo__bar
+---
+Corps.
+EOF
+
+  # --- T35 : les 5 champs sont TOUS dans LOST= quand ils sont présents dans la source. ---
+  T35_OUT="$(cd "$REPO" && bash "$GATE" --target kimi "$FIVE_FIELDS_FIXTURE" 2>"$KIMI_WORK/t35.err")"
+  T35_RC=$?
+  T35_FID_LINE="$(printf '%s\n' "$T35_OUT" | grep '^\[fidelity\]')"
+  echo "  [T35] asserté : fixture portant les 5 champs neufs — attendu : LOST= contient effort,skills,vf-requires,vf-mcp-consumer,vf-mcp-tools (en plus de model,memory,vf-internal) — obtenu : $T35_FID_LINE"
+  if [ "$T35_RC" -eq 0 ]; then
+    for champ in model memory vf-internal effort skills vf-requires vf-mcp-consumer vf-mcp-tools; do
+      if printf '%s\n' "$T35_FID_LINE" | grep -q "LOST={[^}]*\b${champ}\b"; then
+        ok "T35.LOST : $champ dans LOST= (fixture 5-champs, cible kimi)"
+      else
+        ko "T35.LOST : $champ absent de LOST= (ligne: $T35_FID_LINE)"
+      fi
+    done
+  else
+    ko "T35 : attendu exit 0, obtenu $T35_RC (stderr: $(cat "$KIMI_WORK/t35.err" 2>/dev/null))"
+  fi
+
+  # --- T36 : témoin négatif — content-clarity-judge.md porte `effort` (donc effort dans LOST=,
+  # déjà couvert par T30) mais NE porte PAS skills/vf-requires/vf-mcp-consumer/vf-mcp-tools : ces
+  # 4 doivent être ABSENTS de LOST= — preuve que la présence est conditionnée à la source (get_field
+  # rend vide -> pas de add_verdict), jamais une liste figée ajoutée en dur pour tout artefact.
+  T36_FID_LINE="$T30_FID_LINE"
+  T36_ABSENT_OK=1
+  for champ in skills vf-requires vf-mcp-consumer vf-mcp-tools; do
+    if printf '%s\n' "$T36_FID_LINE" | grep -q "LOST={[^}]*\b${champ}\b"; then
+      T36_ABSENT_OK=0
+    fi
+  done
+  if [ "$T36_ABSENT_OK" -eq 1 ]; then
+    ok "T36 : témoin négatif — content-clarity-judge.md (skills/vf-requires/vf-mcp-consumer/vf-mcp-tools absents de sa source) ne les déclare PAS dans LOST= (ligne: $T36_FID_LINE)"
+  else
+    ko "T36 : LOST= déclare un champ absent de la source — présence non conditionnée (ligne: $T36_FID_LINE)"
+  fi
+
+  # --- T37 : [fidelity-lost-fields] au point d'observation INSTALL, portant les 5 noms de champs.
+  T37_NOTE_LINE="$(printf '%s\n' "$T35_OUT" | grep '^\[fidelity-lost-fields\] kimi')"
+  T37_OK=1
+  for champ in effort skills vf-requires vf-mcp-consumer vf-mcp-tools; do
+    printf '%s' "$T37_NOTE_LINE" | grep -qF "$champ" || T37_OK=0
+  done
+  if [ -n "$T37_NOTE_LINE" ] && [ "$T37_OK" -eq 1 ]; then
+    ok "T37 : [fidelity-lost-fields] présente à l'install, cite les 5 champs (effort, skills, vf-requires, vf-mcp-consumer, vf-mcp-tools)"
+  else
+    ko "T37 : ligne [fidelity-lost-fields] absente ou incomplète à l'install (sortie: '$T37_NOTE_LINE')"
+  fi
+
+  # --- T38 : [fidelity-lost-fields] au point d'observation STATUS, + témoin de silence. ---
+  T38_COEX_WORK="$(mktemp -d)"
+  cat > "$T38_COEX_WORK/kimi.json" <<'EOF'
+{"vf_runtimes": {"installed": ["claude", "kimi"], "active": "kimi"}}
+EOF
+  cat > "$T38_COEX_WORK/solo.json" <<'EOF'
+{"vf_runtimes": {"installed": ["claude"], "active": "claude"}}
+EOF
+  cp "$SCRIPTS_DIR/runtime-registry.sh" "$T38_COEX_WORK/runtime-registry.sh"
+
+  T38_STATUS_OUT="$(bash "$GATE" --coexistence-report --config "$T38_COEX_WORK/kimi.json")"
+  T38_STATUS_NOTE_LINE="$(printf '%s\n' "$T38_STATUS_OUT" | grep '^\[fidelity-lost-fields\] kimi')"
+  if [ -n "$T38_STATUS_NOTE_LINE" ]; then
+    ok "T38.présence : [fidelity-lost-fields] présente au status (kimi installé)"
+  else
+    ko "T38.présence : ligne [fidelity-lost-fields] absente au status (sortie: '$T38_STATUS_OUT')"
+  fi
+  T38_SOLO_OUT="$(bash "$GATE" --coexistence-report --config "$T38_COEX_WORK/solo.json")"
+  if ! printf '%s' "$T38_SOLO_OUT" | grep -q 'fidelity-lost-fields'; then
+    ok "T38.silence : installed=[claude] seul → rien sur [fidelity-lost-fields]"
+  else
+    ko "T38.silence : attendu silence total, obtenu '$T38_SOLO_OUT'"
+  fi
+
+  # --- T39 : cohérence structurelle install vs status (source unique) + mutant SITE-SPÉCIFIQUE. ---
+  if [ "$T37_NOTE_LINE" = "$T38_STATUS_NOTE_LINE" ]; then
+    ok "T39 : texte [fidelity-lost-fields] IDENTIQUE install vs status (source unique KIMI_LOST_FIELDS_NOTE)"
+  else
+    ko "T39 : divergence install vs status — install='$T37_NOTE_LINE' status='$T38_STATUS_NOTE_LINE'"
+  fi
+
+  T39_MUTANT_GATE="$KIMI_WORK/mutant-lost-fields-status-tronque.sh"
+  awk '
+    /print_kimi_lost_fields_note$/ && !done { print "    echo \"[fidelity-lost-fields] kimi : tronque (mutant)\""; done=1; next }
+    { print }
+  ' "$GATE" > "$T39_MUTANT_GATE"
+  if grep -qF 'tronque (mutant)' "$T39_MUTANT_GATE"; then
+    ok "T39.mutant.sonde : UN site d'appel de print_kimi_lost_fields_note a bien été réduit (mutant vivant)"
+  else
+    ko "T39.mutant.sonde : la substitution n'a pas pris (mutant absent, T39.mutant non probant)"
+  fi
+  T39_MUT_STATUS_OUT="$(bash "$T39_MUTANT_GATE" --coexistence-report --config "$T38_COEX_WORK/kimi.json" 2>/dev/null)"
+  T39_MUT_STATUS_NOTE_LINE="$(printf '%s\n' "$T39_MUT_STATUS_OUT" | grep '^\[fidelity-lost-fields\] kimi')"
+  if [ "$T37_NOTE_LINE" != "$T39_MUT_STATUS_NOTE_LINE" ]; then
+    ok "T39.mutant : le mutant (site status tronqué) fait bien diverger install vs status"
+  else
+    ko "T39.mutant : le mutant n'a pas produit de divergence — mutant inerte, non discriminant (obtenu status='$T39_MUT_STATUS_NOTE_LINE')"
+  fi
+  T39_RECHECK_STATUS_OUT="$(bash "$GATE" --coexistence-report --config "$T38_COEX_WORK/kimi.json" 2>/dev/null)"
+  T39_RECHECK_NOTE_LINE="$(printf '%s\n' "$T39_RECHECK_STATUS_OUT" | grep '^\[fidelity-lost-fields\] kimi')"
+  if [ "$T37_NOTE_LINE" = "$T39_RECHECK_NOTE_LINE" ]; then
+    ok "T39.vert : le gate réel (non muté) retrouve l'identité install/status — mutant confiné à sa copie"
+  else
+    ko "T39.vert : le gate réel (non muté) diverge encore — le mutant a fui hors de sa copie"
+  fi
+  rm -rf "$T38_COEX_WORK"
+
+  # --- T40 : non-régression codex — [fidelity-lost-fields] ne fuit JAMAIS vers codex (ni en
+  # mode texte install, ni au status), et le LOST= JSON codex reste EXACTEMENT {memory} (aucun
+  # des 5 nouveaux champs n'a été ajouté au chemin codex). ---
+  if [ -z "$REAL_GSD_HOME" ]; then
+    skip "T40 : gsd-core/adaptateur introuvables sur ce poste, non-régression codex non vérifiable ici"
+  else
+    T40_CODEX_TEXT="$(cd "$REPO" && bash "$GATE" --target codex "$KIMI_FIXTURE" 2>/dev/null)"
+    if printf '%s' "$T40_CODEX_TEXT" | grep -q 'fidelity-lost-fields'; then
+      ko "T40.texte : [fidelity-lost-fields] a fuité vers --target codex (sortie: '$T40_CODEX_TEXT')"
+    else
+      ok "T40.texte : [fidelity-lost-fields] absente de --target codex (la déclaration kimi ne fuit pas)"
+    fi
+    T40_CODEX_JSON="$(cd "$REPO" && bash "$GATE" --target codex --json "$KIMI_FIXTURE" 2>/dev/null)"
+    T40_LOST_SET="$(printf '%s' "$T40_CODEX_JSON" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync(0,'utf8')).lost.join(','))" 2>/dev/null)"
+    if [ "$T40_LOST_SET" = "memory" ]; then
+      ok "T40.json : --target codex --json → lost=[\"memory\"] exactement (aucun des 5 nouveaux champs n'a fuité côté codex)"
+    else
+      ko "T40.json : lost attendu ['memory'] exactement sur codex, obtenu '$T40_LOST_SET'"
+    fi
+    T40_COEX_WORK="$(mktemp -d)"
+    cat > "$T40_COEX_WORK/codex.json" <<'EOF'
+{"vf_runtimes": {"installed": ["claude", "codex"], "active": "codex"}}
+EOF
+    cp "$SCRIPTS_DIR/runtime-registry.sh" "$T40_COEX_WORK/runtime-registry.sh"
+    T40_STATUS_OUT="$(bash "$GATE" --coexistence-report --config "$T40_COEX_WORK/codex.json")"
+    if printf '%s' "$T40_STATUS_OUT" | grep -q 'fidelity-lost-fields'; then
+      ko "T40.status : [fidelity-lost-fields] a fuité vers --coexistence-report avec codex seul installé (sortie: '$T40_STATUS_OUT')"
+    else
+      ok "T40.status : [fidelity-lost-fields] absente du status avec codex seul installé (silence légitime, kimi absent de installed[])"
+    fi
+    rm -rf "$T40_COEX_WORK"
+  fi
+
   rm -rf "$KIMI_WORK"
 fi
 

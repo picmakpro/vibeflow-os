@@ -231,18 +231,29 @@ fi
 
 # =====================================================================================
 # T7 — les exceptions sont imprimées à chaque exécution (régime nominal, PASS global).
+#
+# Fixture : YAML VALIDE (passe A réussit) mais DIVERGENTE de la reproduction gsd-core (scalaire
+# replié, même motif que T4) — une exception légitime au sens du gate ("le quotage/la forme
+# actuelle empêche l'égalité, mais le frontmatter reste un YAML strict valide"). Volontairement
+# PAS une fixture au frontmatter invalide (ex. ': ' non quoté) : depuis la correction ciblée
+# post-mesure-kimi (38-MESURE-KIMI.md), une exception dispense du quotage, JAMAIS de la validité
+# YAML stricte — ce cas-là rougit désormais (couvert séparément par T16-T19), il ne peut plus
+# servir de fixture « excusée » ici sans contredire le contrat que ce lot vient de durcir.
 # =====================================================================================
 mkdir -p "$WORK/t7"
-# Fixture qui VIOLE réellement une règle (plain invalide en YAML strict, comme T3b) déclarée
-# exception : la violation est excusée (verdict global PASS), et la ligne d'exception doit
-# s'imprimer TOUT DE MÊME — preuve que l'impression n'est jamais conditionnée, jamais un
-# silence toléré même quand l'exception fait tout le travail.
-make_fixture_file "$WORK/t7/exempt.md" 'description: Texte casse: avec un deux-points, invalide en YAML strict.'
-printf 'exempt.md\traison de test (violation reelle, excusee par cette exception)\n' > "$WORK/t7-exceptions.tsv"
+{
+  echo "---"
+  echo "name: fixture"
+  echo "description: >"
+  echo "  Texte replie valide en YAML strict mais que la regex gsd-core ne capture pas."
+  echo "---"
+  echo "Corps."
+} > "$WORK/t7/exempt.md"
+printf 'exempt.md\traison de test (divergence A/B legitime, YAML valide, excusee par cette exception)\n' > "$WORK/t7-exceptions.tsv"
 CDF_EXCEPTIONS_FILE="$WORK/t7-exceptions.tsv" bash "$GATE" --root "$WORK/t7" > "$WORK/t7.out" 2>&1
 T7_RC=$?
 if [ "$T7_RC" -eq 0 ] && grep -qi 'exception :' "$WORK/t7.out"; then
-  ok "T7 : violation excusée par exception -> exit 0, ligne d'exception imprimée quand même"
+  ok "T7 : violation (YAML valide, divergente) excusée par exception -> exit 0, ligne d'exception imprimée quand même"
 else
   ko "T7 : attendu exit 0 + ligne d'exception imprimée, obtenu exit $T7_RC ($(cat "$WORK/t7.out"))"
 fi
@@ -381,6 +392,192 @@ if [ "$SRC_SHA_BEFORE" = "$SRC_SHA_AFTER" ]; then
 else
   ko "T15 : fichier source réel MODIFIÉ par la mutation — avant=$SRC_SHA_BEFORE après=$SRC_SHA_AFTER"
 fi
+
+# =====================================================================================
+# T16-T19 — cliquet (c), correction ciblée post-mesure-kimi (38-MESURE-KIMI.md I-1) : une
+# exception dispense du QUOTAGE, jamais de la validité YAML STRICTE. Défaut mesuré : avant cette
+# correction, un fichier déclaré en exception dont le frontmatter ne parsait MÊME PAS (passe A en
+# échec) passait le cliquet en silence — c'est exactement ce qui a laissé design-orchestrator/
+# AGENT.md invalide et injoignable sur kimi (11/31 agents, cf. rapport) pendant que le gate
+# affichait PASS. Fixture : COPIE de plugin/consolidator/SKILL.md (une des deux exceptions
+# légitimes restantes — YAML valide aujourd'hui, jamais l'arbre du dépôt).
+# =====================================================================================
+SRC_EXC_REAL="$REPO/plugin/consolidator/SKILL.md"
+SRC_EXC_SHA_BEFORE="$(sha256_file "$SRC_EXC_REAL")"
+
+# --- T16 : contrôle vert AVANT mutation — copie pristine déclarée exception -> exit 0. ---
+mkdir -p "$WORK/t16/consolidator"
+cp "$SRC_EXC_REAL" "$WORK/t16/consolidator/SKILL.md"
+printf 'consolidator/SKILL.md\traison de test (exception legitime, copie pristine)\n' > "$WORK/t16-exceptions.tsv"
+T16_OUT="$(CDF_EXCEPTIONS_FILE="$WORK/t16-exceptions.tsv" bash "$GATE" --root "$WORK/t16" 2>&1)"
+T16_RC=$?
+echo "  [T16] asserté : contrôle vert AVANT mutation (exception légitime, copie pristine) — attendu : exit 0 — obtenu : exit $T16_RC"
+if [ "$T16_RC" -eq 0 ]; then
+  ok "T16 : contrôle vert de l'exception (avant mutation) -> exit 0"
+else
+  ko "T16 : contrôle vert de l'exception aurait dû rendre 0, a rendu $T16_RC ($T16_OUT)"
+fi
+
+# --- T17 : mutant — injection d'un ' : ' non quoté dans la description du fichier EXEMPTÉ.
+# Le fichier reste déclaré exception (MÊME TSV), seul son contenu change -> le cliquet doit
+# rougir sur LA VALIDITÉ, pas sur la présence/péremption de l'exception (déjà couvertes par T5/T6).
+# Injection en TÊTE de la valeur (juste après "description:"), jamais en queue : la description
+# source contient un "#" précédé d'espace plus loin dans le texte (comment YAML implicite en
+# scalaire plain — piège distinct, hors périmètre de cette correction), qui aurait sinon absorbé
+# tout texte ajouté après lui et rendu le mutant inerte (constaté en sonde : append silencieux,
+# aucune erreur levée).
+# ---
+node -e '
+const fs = require("fs");
+const [, filePath] = process.argv;
+const content = fs.readFileSync(filePath, "utf8");
+const lines = content.split("\n");
+const idx = lines.findIndex((l) => /^description:/.test(l));
+if (idx === -1) { console.error("description: line not found"); process.exit(1); }
+lines[idx] = lines[idx].replace(/^description:\s*/, "description: Note : marqueur de mutation, deux-points non quote en tete. ");
+fs.writeFileSync(filePath, lines.join("\n"));
+' "$WORK/t16/consolidator/SKILL.md"
+T17_OUT="$(CDF_EXCEPTIONS_FILE="$WORK/t16-exceptions.tsv" bash "$GATE" --root "$WORK/t16" 2>&1)"
+T17_RC=$?
+echo "  [T17] asserté : exception dont le frontmatter ne parse plus (': ' non quoté injecté) — attendu : exit 1, message 'exception au frontmatter YAML invalide' + erreur du parseur strict — obtenu : exit $T17_RC : $T17_OUT"
+if [ "$T17_RC" -eq 1 ] \
+  && printf '%s' "$T17_OUT" | grep -qF 'exception au frontmatter YAML invalide' \
+  && printf '%s' "$T17_OUT" | grep -qi 'mapping values are not allowed here'; then
+  ok "T17 : exception au YAML invalide (': ' non quoté injecté) rougit — une exception dispense du quotage, jamais de la validité YAML stricte"
+else
+  ko "T17 : attendu exit 1 + 'exception au frontmatter YAML invalide' + erreur parseur strict, obtenu exit $T17_RC ($T17_OUT)"
+fi
+
+# --- T18 : contre-épreuve — même TSV d'exception, copie FRAÎCHE (non mutée) -> redevient vert.
+# Preuve que le rouge de T17 vient bien de LA MUTATION, pas d'un fixture mort ou d'un défaut de
+# résolution du TSV/racine (feedback_mutation-test-discriminating-cases).
+# ---
+rm -rf "$WORK/t18"
+mkdir -p "$WORK/t18/consolidator"
+cp "$SRC_EXC_REAL" "$WORK/t18/consolidator/SKILL.md"
+T18_OUT="$(CDF_EXCEPTIONS_FILE="$WORK/t16-exceptions.tsv" bash "$GATE" --root "$WORK/t18" 2>&1)"
+T18_RC=$?
+echo "  [T18] asserté : contre-épreuve, copie fraîche non mutée, même déclaration d'exception — attendu : exit 0 — obtenu : exit $T18_RC"
+if [ "$T18_RC" -eq 0 ]; then
+  ok "T18 : contre-épreuve (copie fraîche, non mutée) redevient verte — le rouge de T17 est bien attribuable à la mutation"
+else
+  ko "T18 : contre-épreuve attendue verte, obtenu exit $T18_RC ($T18_OUT) — T17 non probant (peut-être un fixture mort)"
+fi
+
+# --- T19 : le fichier SOURCE réel du dépôt (consolidator/SKILL.md) reste byte-identique. ---
+SRC_EXC_SHA_AFTER="$(sha256_file "$SRC_EXC_REAL")"
+if [ "$SRC_EXC_SHA_BEFORE" = "$SRC_EXC_SHA_AFTER" ]; then
+  ok "T19 : fichier source réel de l'exception ($SRC_EXC_REAL) byte-identique avant/après (sha256 $SRC_EXC_SHA_BEFORE)"
+else
+  ko "T19 : fichier source réel de l'exception MODIFIÉ par la mutation — avant=$SRC_EXC_SHA_BEFORE après=$SRC_EXC_SHA_AFTER"
+fi
+
+# =====================================================================================
+# T20-T25 — couverture de la CLASSE « description en clair contenant à la fois un guillemet
+# double ET une apostrophe, actuellement YAML valide, jamais déclarée en exception » (correction
+# ciblée post-mesure-kimi, 38-MESURE-KIMI.md). Recensée sur l'arbre réel via --inventory : 4
+# fichiers dans la catégorie "conservé tel quel" ("plain deja conforme aux deux regles, non
+# requotable sans perte") — plugin/audit-architecture/SKILL.md, plugin/dev-orchestrator/AGENT.md
+# (nommé au mandat), plugin/reference/.../templates/skills/agent-density-auditor/SKILL.md,
+# plugin/reference/.../templates/skills/debugger/SKILL.md. AUCUN des 4 n'est dans EXCEPTIONS_REL
+# — le mandat demande explicitement de NE PAS les y ajouter. Preuve requise : le gate les couvre
+# DÉJÀ par construction (le mode audit par défaut checke TOUT fichier découvert non exempté) —
+# une injection de ' : ' non quoté sur une COPIE de CHACUN doit rougir, jamais rester muette.
+# =====================================================================================
+CLASS_FILES=(
+  "plugin/audit-architecture/SKILL.md"
+  "plugin/dev-orchestrator/AGENT.md"
+  "plugin/reference/content/methodology/templates/skills/agent-density-auditor/SKILL.md"
+  "plugin/reference/content/methodology/templates/skills/debugger/SKILL.md"
+)
+
+# --- T20 : aucun des 4 n'est présent dans EXCEPTIONS_REL du gate réel (mandat : "ne l'ajoute pas
+# comme exception"). Lu directement dans le SOURCE du gate, jamais recopié à la main. ---
+T20_LEAK=0
+for cf in "${CLASS_FILES[@]}"; do
+  rel="${cf#plugin/}"
+  if sed -n '/^EXCEPTIONS_REL=(/,/^)/p' "$GATE" | grep -qF "\"$rel\""; then
+    T20_LEAK=1
+    echo "  [T20] $rel est présent dans EXCEPTIONS_REL — ne devrait pas l'être (mandat)"
+  fi
+done
+if [ "$T20_LEAK" -eq 0 ]; then
+  ok "T20 : aucun des 4 fichiers de la classe n'est déclaré en exception (couverture par le mode audit par défaut, pas par dispense)"
+else
+  ko "T20 : au moins un fichier de la classe est déclaré en exception à tort"
+fi
+
+# --- T21-T24 : par fichier, contrôle vert (copie pristine dans une racine isolée reproduisant le
+# chemin relatif réel, EXCEPTIONS_REL réel du gate — pas un override vide, pour prouver que
+# l'absence d'exception est bien ce qui les couvre) PUIS mutant rouge (injection ' : ' en tête de
+# description) PUIS contre-épreuve verte (copie fraîche). ---
+CLASS_IDX=0
+for cf in "${CLASS_FILES[@]}"; do
+  CLASS_IDX=$((CLASS_IDX + 1))
+  n="2$CLASS_IDX"
+  src_real="$REPO/$cf"
+  if [ ! -f "$src_real" ]; then
+    skip "T$n : fichier de classe introuvable sur ce poste ('$src_real')"
+    continue
+  fi
+  rel="${cf#plugin/}"
+  fixroot="$WORK/class$CLASS_IDX/plugin"
+  mkdir -p "$(dirname "$fixroot/$rel")"
+  cp "$src_real" "$fixroot/$rel"
+  src_sha_before="$(sha256_file "$src_real")"
+
+  # Contrôle vert (copie pristine, EXCEPTIONS_REL réel — le gate résout ROOT="$fixroot", les
+  # chemins d'exceptions réels ne matchent RIEN sous cette racine isolée : c'est voulu, seul le
+  # fichier de classe existe sous $fixroot).
+  ctrl_out="$(CDF_EXCEPTIONS_FILE="$EMPTY_EXC" bash "$GATE" --root "$fixroot" 2>&1)"
+  ctrl_rc=$?
+  echo "  [T$n.contrôle] $rel — attendu : exit 0 — obtenu : exit $ctrl_rc"
+  if [ "$ctrl_rc" -ne 0 ]; then
+    ko "T$n.contrôle : $rel aurait dû être vert avant mutation, obtenu exit $ctrl_rc ($ctrl_out)"
+    continue
+  fi
+  ok "T$n.contrôle : $rel vert avant mutation (couverture confirmée, non exempté)"
+
+  # Mutant : injection ' : ' en TÊTE de la valeur de description (jamais en queue — un '#' précédé
+  # d'espace plus loin dans certaines de ces descriptions absorberait le texte ajouté en commentaire
+  # YAML implicite, cf. piège rencontré et documenté à T16-T19 ci-dessus).
+  node -e '
+const fs = require("fs");
+const [, filePath] = process.argv;
+const content = fs.readFileSync(filePath, "utf8");
+const lines = content.split("\n");
+const idx = lines.findIndex((l) => /^description:/.test(l));
+if (idx === -1) { console.error("description: line not found"); process.exit(1); }
+lines[idx] = lines[idx].replace(/^description:\s*/, "description: Note : marqueur de mutation, deux-points non quote en tete. ");
+fs.writeFileSync(filePath, lines.join("\n"));
+' "$fixroot/$rel"
+  mut_out="$(CDF_EXCEPTIONS_FILE="$EMPTY_EXC" bash "$GATE" --root "$fixroot" 2>&1)"
+  mut_rc=$?
+  echo "  [T$n.mutant] $rel (': ' injecté en tête) — attendu : exit 1, $rel nommé dans le rapport — obtenu : exit $mut_rc : $mut_out"
+  if [ "$mut_rc" -eq 1 ] && printf '%s' "$mut_out" | grep -qF "$rel"; then
+    ok "T$n.mutant : $rel rougit dès l'injection d'un ' : ' non quoté — la classe est bien surveillée par défaut"
+  else
+    ko "T$n.mutant : attendu exit 1 + '$rel' nommé, obtenu exit $mut_rc ($mut_out)"
+  fi
+
+  # Contre-épreuve : copie fraîche (non mutée) -> redevient verte.
+  rm -f "$fixroot/$rel"
+  cp "$src_real" "$fixroot/$rel"
+  recheck_out="$(CDF_EXCEPTIONS_FILE="$EMPTY_EXC" bash "$GATE" --root "$fixroot" 2>&1)"
+  recheck_rc=$?
+  if [ "$recheck_rc" -eq 0 ]; then
+    ok "T$n.contre-épreuve : $rel redevient vert (copie fraîche) — le rouge venait bien de la mutation"
+  else
+    ko "T$n.contre-épreuve : attendu exit 0, obtenu exit $recheck_rc ($recheck_out) — mutant potentiellement non confiné"
+  fi
+
+  src_sha_after="$(sha256_file "$src_real")"
+  if [ "$src_sha_before" = "$src_sha_after" ]; then
+    ok "T$n.byte-identique : fichier source réel ($rel) inchangé (sha256 $src_sha_before)"
+  else
+    ko "T$n.byte-identique : fichier source réel ($rel) MODIFIÉ par la mutation — avant=$src_sha_before après=$src_sha_after"
+  fi
+done
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="

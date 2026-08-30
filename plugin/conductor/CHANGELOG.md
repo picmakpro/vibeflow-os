@@ -1,5 +1,37 @@
 # Changelog — conductor
 
+## [v1.34.6] — 2026-08-30 (Phase 38 — correction ciblée groupée, quatre findings post-mesure-kimi)
+
+**Patch** :
+
+- **`design-orchestrator/AGENT.md`** : le seul deux-points-espace non quoté restant dans une
+  `description:` en clair (le dernier des 11 agents rejetés par kimi, `38-MESURE-KIMI.md`) est
+  remplacé par un tiret cadratin. Frontmatter YAML valide, texte inchangé sur un seul caractère.
+- **`scripts/check-description-fidelity.sh`** : le cliquet des exceptions vérifie désormais AUSSI
+  que le frontmatter du fichier exempté **parse** (passe A) avant de statuer sur sa péremption —
+  une exception dispense du quotage, jamais de la validité YAML stricte. Un fichier déclaré en
+  exception dont le frontmatter ne parse pas fait maintenant ROUGIR le gate (`exception au
+  frontmatter YAML invalide`), là où il passait silencieusement avant ce correctif. Conséquence
+  directe et vérifiée : `design-orchestrator/AGENT.md`, désormais YAML valide en clair par le
+  point ci-dessus, ne satisfait plus les conditions d'une exception nécessaire (même statut que
+  `dev-orchestrator/AGENT.md`, jamais déclaré) — retiré de `EXCEPTIONS_REL` pour éviter que le
+  cliquet anti-péremption préexistant ne fasse rougir le gate sur une entrée devenue redondante.
+- **`scripts/check-artifact-fidelity.sh`** : cinq champs de frontmatter supplémentaires
+  (`effort`, `skills`, `vf-requires`, `vf-mcp-consumer`, `vf-mcp-tools`) rejoignent `model`/
+  `memory`/`vf-internal` dans le `LOST=` déclaré pour `--target kimi` — tolérés et ignorés par le
+  même parser agent-core, trouvés en revue fichier par fichier (34/21/5/4/1 fichiers concernés).
+  Relayés aux DEUX points d'observation (`--target kimi <artefact>` à l'install,
+  `--coexistence-report` au status), source unique (`KIMI_LOST_FIELDS_NOTE`/
+  `print_kimi_lost_fields_note()`, même patron D-38-O que `vf-internal`). Non-régression codex
+  vérifiée : `vf-internal` reste `PRESERVED`, `lost=["memory"]` inchangé, aucune fuite de la
+  déclaration kimi vers la cible codex.
+- **Couverture vérifiée (pas de code neuf requis)** : la classe « description en clair contenant
+  à la fois un guillemet double et une apostrophe, jamais déclarée en exception » (4 fichiers —
+  `audit-architecture/SKILL.md`, `dev-orchestrator/AGENT.md`, `templates/skills/
+  agent-density-auditor/SKILL.md`, `templates/skills/debugger/SKILL.md`) est déjà surveillée par
+  le mode audit par défaut du gate — prouvé par mutation (injection d'un `': '` sur une copie de
+  chacun → rouge) plutôt que par ajout d'exception.
+
 ## [v1.34.5] — 2026-08-30 (Phase 38 — correction ciblée, gate de fidélité déclare vf-internal perdu sur kimi)
 
 **Patch** :

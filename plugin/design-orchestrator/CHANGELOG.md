@@ -1,5 +1,20 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.5.5] — 2026-08-30 (Phase 38 — correction ciblée, dernier agent rejeté par kimi)
+
+**Patch** :
+
+- **`AGENT.md`** : l'unique deux-points-espace non quoté restant dans la `description:` (le
+  dernier des 11 agents rejetés par kimi, `38-MESURE-KIMI.md` — YAML authentiquement invalide en
+  scalaire simple) est remplacé par un tiret cadratin (` — `). La description reste **en clair,
+  non quotée** (10 guillemets doubles + 5 apostrophes, aucune forme quotée ne traverse gsd-core à
+  l'identique) : c'était le seul geste possible sans perdre de texte. Gate :
+  `plugin/conductor/scripts/check-description-fidelity.sh`. Conséquence côté gate (conductor
+  v1.34.6) : ce fichier satisfait désormais les deux règles telles quelles (comme
+  `dev-orchestrator/AGENT.md`, jamais exempté) — son entrée dans la liste d'exceptions nommées a
+  été RETIRÉE (le cliquet anti-péremption l'aurait de toute façon fait rougir si elle était
+  restée) ; point remonté en arbitrage humain (`ask-user`) au manager.
+
 ## [v1.5.4] — 2026-08-30 (Phase 38 — description de frontmatter YAML strict, plan 38-08)
 
 **Patch** :

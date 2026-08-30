@@ -116,6 +116,22 @@ print_kimi_vf_internal_note() {
   echo "[fidelity-vf-internal] kimi : vf-internal ${KIMI_VF_INTERNAL_NOTE}"
 }
 
+# --- Cinq champs perdus supplémentaires (kimi, correction ciblée post-mesure-kimi,
+# 38-MESURE-KIMI.md) : trouvés en revue fichier par fichier — effort (34 fichiers), skills (21),
+# vf-requires (5), vf-mcp-consumer (4), vf-mcp-tools (1). Tolérés et ignorés par le MÊME parser de
+# frontmatter agent-core que KIMI_VF_INTERNAL_NOTE ci-dessus (name/description/whenToUse/override/
+# tools/disallowedTools/subagents/model_preference — rien d'autre). CONSTANTE déclarée, jamais
+# recalculée par artefact — le fait ("ces champs sont ignorés sur kimi quand ils sont présents")
+# ne dépend pas du fichier mesuré. Même patron D-38-O que KIMI_VF_INTERNAL_NOTE : SEULE source de
+# vérité entre les deux points d'observation (--target kimi <artefact> en mode texte, à l'install ;
+# --coexistence-report, au status), via print_kimi_lost_fields_note(), jamais un second texte
+# recopié à la main.
+KIMI_LOST_FIELDS_NOTE="effort, skills, vf-requires, vf-mcp-consumer, vf-mcp-tools — tolérés et ignorés par le parser de frontmatter agent-core de kimi (accepte uniquement name/description/whenToUse/override/tools/disallowedTools/subagents/model_preference), en plus de model/memory/vf-internal déjà déclarés — perte SILENCIEUSE (aucun diagnostic au chargement), pas un échec"
+
+print_kimi_lost_fields_note() {
+  echo "[fidelity-lost-fields] kimi : ${KIMI_LOST_FIELDS_NOTE}"
+}
+
 # --- Recette d'environnement Codex (multi_agent_v2, trust_level) + role_confinement : fonctions
 # PARTAGÉES entre les deux points d'observation (--target codex <artefact>, à l'install ; et
 # --coexistence-report, au status — D-38-O, correction ciblée). compute_fidelity_recette() peuple
@@ -299,6 +315,11 @@ if [ "$COEXISTENCE_MODE" -eq 1 ]; then
   # — même patron D-38-O que role_confinement pour codex. Silence si kimi n'est pas installé.
   if [ "$_has_kimi" -eq 1 ]; then
     print_kimi_vf_internal_note
+    # [fidelity-lost-fields] (kimi, correction ciblée post-mesure-kimi) : DEUXIÈME point
+    # d'observation de LA MÊME constante que l'install (--target kimi <artefact> ci-dessous), via
+    # print_kimi_lost_fields_note() — même patron D-38-O que role_confinement pour codex et que
+    # print_kimi_vf_internal_note() juste au-dessus.
+    print_kimi_lost_fields_note
   fi
   # [fidelity-recette] (FIDE-03, D-38-O) : DEUXIÈME point d'observation de la MÊME ligne que
   # l'install (print_fidelity_recette, définie en tête de script) — corrige la sortie anticipée
@@ -373,7 +394,7 @@ get_field() {
 SRC_FM="$(extract_frontmatter "$ARTIFACT")"
 SRC_BODY="$(extract_body "$ARTIFACT")"
 
-FIELDS="name description model memory disallowedTools vf-internal tools"
+FIELDS="name description model memory disallowedTools vf-internal tools effort skills vf-requires vf-mcp-consumer vf-mcp-tools"
 for f in $FIELDS; do
   var="SRC_$(echo "$f" | tr '[:lower:]-' '[:upper:]_')"
   eval "$var=\"\$(get_field \"\$SRC_FM\" \"$f\")\""
@@ -422,9 +443,11 @@ if [ "$TARGET" = "kimi" ]; then
   # invoquer. PRESERVED : les 4 clés que le parser agent-core accepte ET applique (name/
   # description/tools/disallowedTools — mêmes clés, même comportement observé : disallowedTools
   # RETIRE réellement l'outil du toolset, cf. dist/main.mjs:163078). LOST : model/memory/
-  # vf-internal — tolérés au chargement, SANS EFFET (le parser agent-core n'a aucun champ de
-  # mode/visibilité : name, description, whenToUse, override, tools, disallowedTools, subagents,
-  # model_preference, rien d'autre — cf. KIMI_VF_INTERNAL_NOTE en tête de script).
+  # vf-internal, PLUS CINQ CHAMPS supplémentaires trouvés en revue fichier par fichier (correction
+  # ciblée post-mesure-kimi, 38-MESURE-KIMI.md) — effort/skills/vf-requires/vf-mcp-consumer/
+  # vf-mcp-tools — tolérés et ignorés par le MÊME parser agent-core (accepte uniquement name/
+  # description/whenToUse/override/tools/disallowedTools/subagents/model_preference ; cf.
+  # KIMI_VF_INTERNAL_NOTE/KIMI_LOST_FIELDS_NOTE en tête de script pour la source unique du fait).
   MEASURE_MODE="kimi-declared"
 
   [ -n "$SRC_NAME" ] && add_verdict PRESERVED name
@@ -434,6 +457,11 @@ if [ "$TARGET" = "kimi" ]; then
   [ -n "$SRC_MODEL" ] && add_verdict LOST model
   [ -n "$SRC_MEMORY" ] && add_verdict LOST memory
   [ -n "$SRC_VF_INTERNAL" ] && add_verdict LOST vf-internal
+  [ -n "$SRC_EFFORT" ] && add_verdict LOST effort
+  [ -n "$SRC_SKILLS" ] && add_verdict LOST skills
+  [ -n "$SRC_VF_REQUIRES" ] && add_verdict LOST vf-requires
+  [ -n "$SRC_VF_MCP_CONSUMER" ] && add_verdict LOST vf-mcp-consumer
+  [ -n "$SRC_VF_MCP_TOOLS" ] && add_verdict LOST vf-mcp-tools
 
   # Aucune conversion n'est écrite sur disque pour kimi (le corps markdown est chargé verbatim)
   # -> les marqueurs morts ne sont, PAR CONSTRUCTION, jamais réécrits : CONV_MARKERS = SRC_MARKERS.
@@ -632,7 +660,13 @@ else
   TRUST_LEVEL="n/a (fait codex, non mesuré pour target=kimi)"
   ROLE_CONFINEMENT="n/a (fait codex, non mesuré pour target=kimi)"
   VF_INTERNAL_NOTE="$KIMI_VF_INTERNAL_NOTE"
-  [ "$JSON_MODE" -eq 0 ] && print_kimi_vf_internal_note
+  if [ "$JSON_MODE" -eq 0 ]; then
+    print_kimi_vf_internal_note
+    # [fidelity-lost-fields] : PREMIER point d'observation (install), même constante que le
+    # status (--coexistence-report ci-dessus) — via print_kimi_lost_fields_note(), jamais un
+    # second texte recopié à la main (D-38-O).
+    print_kimi_lost_fields_note
+  fi
 fi
 
 if [ "$JSON_MODE" -eq 1 ]; then
