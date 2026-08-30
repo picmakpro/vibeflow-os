@@ -1639,16 +1639,28 @@ record_codex_runtime_if_applicable() {
   local mod="$1" module_dir="$2"
   vf_dry_run && return 0
 
-  # TGT-0X (fuite cwd vs TARGET_ROOT, mesurée 2026-08-30 sur un `--target "$CODEX_HOME"`) : la
-  # même garde que `vf_gitignore_target_prefix` (TGT-02, ligne ~1143) s'applique ici. Le
-  # `.planning/config.json` visé plus bas est TOUJOURS résolu au cwd (racine du lab courant,
-  # jamais sous TARGET_ROOT — cf. commentaire du rapport de coexistence, ligne ~2773) : c'est
-  # correct tant que TARGET_ROOT reste dans l'arbre du repo courant (cas normal, avec ou sans
-  # --target relatif). Mais sous --target vers une cible HORS de cet arbre (autre lab, ex.
-  # $CODEX_HOME), écrire dans le `.planning/config.json` du cwd muterait en silence le projet de
-  # l'opérateur alors qu'il visait ailleurs — refusé, exactement comme `gitignore_add_paths` le
-  # refuse déjà pour la même raison. Aucune destination alternative n'est inventée : simple
-  # extension du même refus déjà établi à ce site.
+  local artifacts
+  artifacts="$(resolve_posed_agent_artifact "$module_dir" "$mod")" || return 0
+
+  local dispatch runtime
+  dispatch="$(find_runtime_dispatch_lib)"
+  [ -n "$dispatch" ] || return 0
+  runtime="$(bash "$dispatch" detect 2>/dev/null || true)"
+  [ "$runtime" = "codex" ] || return 0
+
+  [ -f ".planning/config.json" ] || return 0
+
+  # TGT-05 (fuite cwd vs TARGET_ROOT, mesurée 2026-08-30 sur un `--target "$CODEX_HOME"`). Le
+  # `.planning/config.json` ciblé ci-dessus est TOUJOURS résolu au cwd (racine du lab courant,
+  # jamais sous TARGET_ROOT) : c'est le comportement voulu PAR CONSTRUCTION, sans condition sur
+  # où pointe TARGET_ROOT — cf. la doctrine cwd-relative du rapport de coexistence (~ligne 2796,
+  # même défaut que runtime-registry.sh). Mais sous --target vers une cible HORS de l'arbre du
+  # repo courant (autre lab, ex. $CODEX_HOME), écrire dans ce `.planning/config.json` muterait en
+  # silence le projet de l'opérateur alors qu'il visait ailleurs — refusé pour cette seule raison
+  # (pas une impossibilité sémantique comme pour `.gitignore` : ici la portée cwd elle-même est un
+  # choix de conception délibéré, seul l'effet de bord silencieux est visé). Placé APRÈS le gate
+  # codex et la présence de `.planning/config.json` : ne journalise que quand une écriture aurait
+  # réellement été tentée, jamais pour un runtime non-codex ou un lab sans registre.
   if [ -n "$VF_TARGET_OVERRIDE" ]; then
     local _rcr_cwd_phys
     _rcr_cwd_phys="$(pwd -P)" || return 0
@@ -1660,17 +1672,6 @@ record_codex_runtime_if_applicable() {
         ;;
     esac
   fi
-
-  local artifacts
-  artifacts="$(resolve_posed_agent_artifact "$module_dir" "$mod")" || return 0
-
-  local dispatch runtime
-  dispatch="$(find_runtime_dispatch_lib)"
-  [ -n "$dispatch" ] || return 0
-  runtime="$(bash "$dispatch" detect 2>/dev/null || true)"
-  [ "$runtime" = "codex" ] || return 0
-
-  [ -f ".planning/config.json" ] || return 0
 
   local registry
   registry="$(find_runtime_registry)"

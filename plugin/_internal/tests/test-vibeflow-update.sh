@@ -2149,6 +2149,67 @@ fi
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
+# T52bis-a (TGT-05, revue correction ciblée) — --target INTRA-arbre (sous-dossier du LAB,
+# comme T28) avec VF_RUNTIME=codex : la branche vide du `case` de la garde doit laisser PASSER
+# l'écriture. Sans ce test, "fuite fermée" et "registre cassé" (garde qui bloquerait aussi le
+# bon côté) sont indiscernables — c'est le seul test qui exerce le côté laissé-passant de la
+# garde ajoutée pour T52.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME_CODEX="$LAB/home"
+CUSTOM_TARGET="$LAB/customtarget"
+mkdir -p "$FAKE_HOME_CODEX"
+if prepare_module "$CACHE" "conductor" && prepare_module "$CACHE" "validator"; then
+  mkdir -p "$LAB/.planning"
+  echo '{}' > "$LAB/.planning/config.json"
+  miss=0
+  INSTALL_OUT=$(cd "$LAB" && HOME="$FAKE_HOME_CODEX" VF_RUNTIME=codex VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" --target "$CUSTOM_TARGET" install validator 2>&1)
+  RC=$?
+  { [ "$RC" -eq 0 ] && [ -f "$CUSTOM_TARGET/agents/validator.md" ]; } \
+    || { ko "T52bis-a pré-condition : install --target \$CUSTOM_TARGET (intra-arbre) a échoué (rc=$RC) — $INSTALL_OUT"; miss=1; }
+  "$GREP" -qF '"codex"' "$LAB/.planning/config.json" \
+    || { ko "T52bis-a (TGT-05, intra-arbre) : .planning/config.json ne contient pas \"codex\" sous --target intra-arbre — la garde bloque aussi le bon côté — $(cat "$LAB/.planning/config.json")"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T52bis-a (TGT-05, intra-arbre) : --target sous le LAB (dans l'arbre) laisse passer l'écriture codex dans .planning/config.json"
+else
+  skip "T52bis-a : conductor/validator non copiables dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T52bis-b (TGT-05, revue correction ciblée, DISCRIMINANT) — VF_RUNTIME=claude + --target
+# hors-arbre : AUCUNE ligne `runtime-registry` ne doit apparaître (silence total pour tout
+# runtime non-codex, contrat documenté aux deux sites d'appel de
+# record_codex_runtime_if_applicable). Avant correction, la garde s'exécutait AVANT le test
+# `[ "$runtime" = "codex" ]` et journalisait quand même la ligne "sort de l'arbre du repo" —
+# ce test mord sur le code non corrigé.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME_CLAUDE="$LAB/home"
+OUTSIDE_TARGET="$(mktemp -d)"
+mkdir -p "$FAKE_HOME_CLAUDE"
+if prepare_module "$CACHE" "conductor" && prepare_module "$CACHE" "validator"; then
+  mkdir -p "$LAB/.planning"
+  echo '{}' > "$LAB/.planning/config.json"
+  miss=0
+  INSTALL_OUT=$(cd "$LAB" && HOME="$FAKE_HOME_CLAUDE" VF_RUNTIME=claude VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" --target "$OUTSIDE_TARGET" install validator 2>&1)
+  RC=$?
+  [ "$RC" -eq 0 ] \
+    || { ko "T52bis-b pré-condition : install --target \$OUTSIDE_TARGET (runtime claude) a échoué (rc=$RC) — $INSTALL_OUT"; miss=1; }
+  [ "$(echo "$INSTALL_OUT" | "$GREP" -c 'runtime-registry')" -eq 0 ] \
+    || { ko "T52bis-b (TGT-05, DISCRIMINANT) : ligne runtime-registry présente sous runtime claude + --target hors-arbre — silence total attendu — $INSTALL_OUT"; miss=1; }
+  [ "$(cat "$LAB/.planning/config.json")" = "{}" ] \
+    || { ko "T52bis-b : .planning/config.json du LAB MUTÉ alors que VF_RUNTIME=claude — $(cat "$LAB/.planning/config.json")"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T52bis-b (TGT-05, DISCRIMINANT) : runtime claude + --target hors-arbre -> silence total (aucune ligne runtime-registry)"
+else
+  skip "T52bis-b : conductor/validator non copiables dans le cache de test"
+fi
+rm -rf "$LAB" "$OUTSIDE_TARGET"
+
+# ---------------------------------------------------------------------------
 # Garde-fou final : le vrai ~/.claude ET le vrai ~/.codex/agents/vibeflow sont inchangés
 # (snapshot récursif avant=après).
 # ---------------------------------------------------------------------------
