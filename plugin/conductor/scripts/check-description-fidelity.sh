@@ -342,11 +342,6 @@ tsv_field() {
   awk -F'\t' -v p="$2" -v idx="$3" '$1==p{print $idx; exit}' "$1"
 }
 
-if [ "$MODE" = "fix" ]; then
-  echo "[check-description-fidelity] --fix pas encore câblé à ce stade du lot (Tâche 5) — réservé, non implémenté" >&2
-  exit 2
-fi
-
 # =====================================================================================
 # Bâtisseur de candidats (node) — RÉUTILISE la même fonction d'égalité que le mode audit :
 # pour chaque fichier réel, calcule le texte de référence (règle des cas limites : bloc
@@ -498,6 +493,7 @@ for (const line of manifest) {
 
   let category;
   let detail;
+  let winningRawB64 = '';
   if (exceptions.has(p)) {
     category = 'non_convertible_exception';
     detail = 'exception declaree';
@@ -508,10 +504,12 @@ for (const line of manifest) {
     const candDoubleRaw = db64(candDoubleB64);
     category = (style === 'LINE' && currentRawTrimmed === candDoubleRaw) ? 'deja_conforme' : 'a_convertir_double';
     detail = 'guillemets doubles';
+    if (category === 'a_convertir_double') winningRawB64 = candDoubleB64;
   } else if (candidateValid(sSynth, refText)) {
     const candSingleRaw = db64(candSingleB64);
     category = (style === 'LINE' && currentRawTrimmed === candSingleRaw) ? 'deja_conforme' : 'a_convertir_simple';
     detail = 'guillemets simples';
+    if (category === 'a_convertir_simple') winningRawB64 = candSingleB64;
   } else {
     const ra = realA.get(p);
     const rb = realB.get(p);
@@ -525,7 +523,7 @@ for (const line of manifest) {
     }
   }
   counts[category] = (counts[category] || 0) + 1;
-  rows.push(`${p}\t${category}\t${detail}`);
+  rows.push(`${p}\t${category}\t${detail}\t${winningRawB64}`);
 }
 
 process.stdout.write(rows.join('\n') + (rows.length ? '\n' : ''));
@@ -567,7 +565,7 @@ run_inventory() {
 if [ "$MODE" = "inventory" ]; then
   CLASSIFICATION="$(run_inventory "$TMPDIR_GATE")"
   DBL=0; SGL=0; SAME=0; CONS=0; NONC=0
-  while IFS=$'\t' read -r p cat detail; do
+  while IFS=$'\t' read -r p cat detail _winraw; do
     [ -n "$p" ] || continue
     case "$cat" in
       a_convertir_double) DBL=$((DBL + 1)); label="à convertir en guillemets doubles" ;;
@@ -580,6 +578,171 @@ if [ "$MODE" = "inventory" ]; then
     echo "$p	$label	$detail"
   done <<< "$CLASSIFICATION"
   echo "[check-description-fidelity] inventaire — $FILE_COUNT découvert(s) : ${DBL} à convertir (guillemets doubles), ${SGL} à convertir (guillemets simples), ${SAME} déjà conforme(s), ${CONS} conservé(s) tel quel, ${NONC} non convertible(s)"
+  exit 0
+fi
+
+# =====================================================================================
+# Mode --fix — RÉUTILISE la classification de --inventory (MÊME fonction d'égalité, aucune
+# seconde implémentation). Pour chaque fichier « à convertir » : construit la forme complète
+# du fichier réel avec la description remplacée (span exact : une ligne pour plain/quoté, la
+# clé + toutes les lignes de continuation plus indentées pour un scalaire replié/littéral),
+# la STAGE dans un fichier temporaire (jamais une écriture directe), VALIDE la forme stagée par
+# les deux passes AVANT toute écriture réelle — un seul échec ABANDONNE tout le lot, aucune
+# écriture n'a lieu (jamais une conversion partielle silencieuse) — puis, seulement si TOUT
+# valide, commit (copie) sur les fichiers réels, et RELIT chaque fichier réellement posé pour
+# revalider sur le contenu tel qu'il est désormais sur disque (pas seulement sur la forme
+# stagée avant écriture).
+# =====================================================================================
+if [ "$MODE" = "fix" ]; then
+  CLASSIFICATION="$(run_inventory "$TMPDIR_GATE")"
+
+  APPLY_SPAN_JS="$TMPDIR_GATE/apply_span.js"
+  cat > "$APPLY_SPAN_JS" << 'JSEOF'
+// apply_span.js <inputPath> <outputPath> <newDescriptionLine>
+// Localise la clé description: en tête de frontmatter (colonne 0), détermine son span exact
+// (une ligne pour plain/quoté ; la ligne de clé + toutes les lignes de continuation plus
+// indentées pour un scalaire replié/littéral) et remplace CE span par newDescriptionLine dans
+// une COPIE écrite à outputPath — jamais une écriture directe de inputPath.
+const fs = require('fs');
+
+const [, , inputPath, outputPath, newLine] = process.argv;
+const content = fs.readFileSync(inputPath, 'utf8');
+const lines = content.split('\n');
+if (lines[0].trim() !== '---') {
+  console.error('no frontmatter');
+  process.exit(1);
+}
+let closeIdx = -1;
+for (let i = 1; i < lines.length; i++) {
+  if (lines[i].trim() === '---') { closeIdx = i; break; }
+}
+if (closeIdx === -1) {
+  console.error('no closing ---');
+  process.exit(1);
+}
+let descIdx = -1;
+for (let i = 1; i < closeIdx; i++) {
+  if (/^description:/.test(lines[i])) { descIdx = i; break; }
+}
+if (descIdx === -1) {
+  console.error('no description line');
+  process.exit(1);
+}
+const afterColon = lines[descIdx].slice('description:'.length).trim();
+const isBlock = afterColon.startsWith('>') || afterColon.startsWith('|');
+let spanEnd = descIdx;
+if (isBlock) {
+  let j = descIdx + 1;
+  while (j < closeIdx) {
+    const l = lines[j];
+    if (l.trim() === '') { j += 1; continue; }
+    if (/^[ \t]/.test(l)) { spanEnd = j; j += 1; continue; }
+    break;
+  }
+}
+const before = lines.slice(0, descIdx);
+const after = lines.slice(spanEnd + 1);
+const result = [...before, newLine, ...after].join('\n');
+fs.writeFileSync(outputPath, result);
+JSEOF
+
+  FIX_STAGE_DIR="$TMPDIR_GATE/fix_stage"
+  mkdir -p "$FIX_STAGE_DIR"
+  FIX_MANIFEST="$TMPDIR_GATE/fix_manifest.txt"
+  : > "$FIX_MANIFEST"
+  IDX=0
+  CONVERT_DBL=0
+  CONVERT_SGL=0
+  BUILD_ERR=0
+  while IFS=$'\t' read -r p cat detail winraw; do
+    [ -n "$p" ] || continue
+    case "$cat" in
+      a_convertir_double|a_convertir_simple) ;;
+      *) continue ;;
+    esac
+    IDX=$((IDX + 1))
+    NEWTEXT="$(decode_b64 "$winraw")"
+    STAGED="$FIX_STAGE_DIR/f_$IDX.md"
+    if ! node "$APPLY_SPAN_JS" "$p" "$STAGED" "description: $NEWTEXT" 2>"$TMPDIR_GATE/fix_apply_$IDX.err"; then
+      echo "[check-description-fidelity] ✗ --fix : échec de construction du span pour $p : $(cat "$TMPDIR_GATE/fix_apply_$IDX.err")" >&2
+      BUILD_ERR=1
+      continue
+    fi
+    printf '%s\t%s\n' "$p" "$STAGED" >> "$FIX_MANIFEST"
+    if [ "$cat" = "a_convertir_double" ]; then CONVERT_DBL=$((CONVERT_DBL + 1)); else CONVERT_SGL=$((CONVERT_SGL + 1)); fi
+  done <<< "$CLASSIFICATION"
+
+  if [ "$BUILD_ERR" -eq 1 ]; then
+    echo "[check-description-fidelity] ✗ --fix ABANDONNÉ — construction du span en échec sur au moins un fichier ; AUCUNE écriture appliquée" >&2
+    exit 1
+  fi
+
+  # --- Validation AVANT écriture, sur les formes stagées (jamais directement sur les fichiers réels). ---
+  STAGE_LIST="$TMPDIR_GATE/fix_stage_list.txt"
+  cut -f2 "$FIX_MANIFEST" > "$STAGE_LIST"
+  STAGE_A="$TMPDIR_GATE/fix_stage_a.tsv"
+  STAGE_B="$TMPDIR_GATE/fix_stage_b.tsv"
+  if [ -s "$STAGE_LIST" ]; then
+    python3 "$PASS_A_PY" < "$STAGE_LIST" > "$STAGE_A" 2>"$TMPDIR_GATE/fix_stage_a.err"
+    node "$PASS_B_JS" < "$STAGE_LIST" > "$STAGE_B" 2>"$TMPDIR_GATE/fix_stage_b.err"
+  else
+    : > "$STAGE_A"
+    : > "$STAGE_B"
+  fi
+
+  FIX_BAD=0
+  while IFS=$'\t' read -r realp stagedp; do
+    [ -n "$realp" ] || continue
+    sa_status="$(tsv_field "$STAGE_A" "$stagedp" 2)"
+    sa_val="$(tsv_field "$STAGE_A" "$stagedp" 3)"
+    sb_status="$(tsv_field "$STAGE_B" "$stagedp" 2)"
+    sb_val="$(tsv_field "$STAGE_B" "$stagedp" 3)"
+    if [ "$sa_status" != "OK" ] || [ "$sb_status" != "OK" ] || [ "$sa_val" != "$sb_val" ]; then
+      echo "[check-description-fidelity] ✗ --fix : la forme construite pour $realp NE satisfait PAS les deux règles avant écriture (A=$sa_status B=$sb_status) — fichier NON écrit" >&2
+      FIX_BAD=1
+    fi
+  done < "$FIX_MANIFEST"
+
+  if [ "$FIX_BAD" -eq 1 ]; then
+    echo "[check-description-fidelity] ✗ --fix ABANDONNÉ — au moins une forme construite ne valide pas avant écriture ; AUCUNE écriture appliquée" >&2
+    exit 1
+  fi
+
+  # --- Tout valide : commit réel (copie du contenu validé sur chaque fichier réel). ---
+  while IFS=$'\t' read -r realp stagedp; do
+    [ -n "$realp" ] || continue
+    cp "$stagedp" "$realp"
+  done < "$FIX_MANIFEST"
+
+  # --- Post-écriture : RELIT chaque fichier réellement posé et revalide sur le contenu tel
+  # qu'il est désormais sur disque — pas seulement sur la forme stagée avant écriture. ---
+  REAL_CONVERTED_LIST="$TMPDIR_GATE/fix_real_converted.txt"
+  cut -f1 "$FIX_MANIFEST" > "$REAL_CONVERTED_LIST"
+  POSTCHECK_BAD=0
+  if [ -s "$REAL_CONVERTED_LIST" ]; then
+    POST_A="$TMPDIR_GATE/fix_post_a.tsv"
+    POST_B="$TMPDIR_GATE/fix_post_b.tsv"
+    python3 "$PASS_A_PY" < "$REAL_CONVERTED_LIST" > "$POST_A" 2>"$TMPDIR_GATE/fix_post_a.err"
+    node "$PASS_B_JS" < "$REAL_CONVERTED_LIST" > "$POST_B" 2>"$TMPDIR_GATE/fix_post_b.err"
+    while IFS= read -r realp; do
+      [ -n "$realp" ] || continue
+      pa_status="$(tsv_field "$POST_A" "$realp" 2)"
+      pa_val="$(tsv_field "$POST_A" "$realp" 3)"
+      pb_status="$(tsv_field "$POST_B" "$realp" 2)"
+      pb_val="$(tsv_field "$POST_B" "$realp" 3)"
+      if [ "$pa_status" != "OK" ] || [ "$pb_status" != "OK" ] || [ "$pa_val" != "$pb_val" ]; then
+        echo "[check-description-fidelity] ✗ --fix : le fichier réellement posé $realp NE satisfait PLUS les deux règles après écriture (A=$pa_status B=$pb_status) — INCOHÉRENCE, à investiguer manuellement" >&2
+        POSTCHECK_BAD=1
+      fi
+    done < "$REAL_CONVERTED_LIST"
+  fi
+
+  if [ "$POSTCHECK_BAD" -eq 1 ]; then
+    echo "[check-description-fidelity] ✗ --fix : incohérence post-écriture détectée (voir ci-dessus) — fichiers déjà écrits, divergence à la relecture" >&2
+    exit 1
+  fi
+
+  echo "[check-description-fidelity] --fix : $IDX fichier(s) converti(s) (${CONVERT_DBL} guillemets doubles, ${CONVERT_SGL} guillemets simples), validés AVANT ET APRÈS écriture"
   exit 0
 fi
 
