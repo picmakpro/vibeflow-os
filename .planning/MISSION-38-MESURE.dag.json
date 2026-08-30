@@ -172,6 +172,28 @@
         "check-artifact-fidelity.sh + son test"
       ],
       "status": "done"
+    },
+    {
+      "id": "fix-option-b",
+      "step": "option B + 3 corrections mecaniques du gate",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "design-orchestrator/AGENT.md + check-description-fidelity.sh + check-artifact-fidelity.sh + leurs tests"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "remesure-finale",
+      "step": "re-mesure I-1 apres fix, comm deux sens, 31/31 ou ecart exact",
+      "stage": "",
+      "deps": [
+        "fix-option-b"
+      ],
+      "scope": [
+        "banc kimi"
+      ],
+      "status": "blocked"
     }
   ]
 }
