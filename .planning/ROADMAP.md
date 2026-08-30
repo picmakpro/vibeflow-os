@@ -1128,7 +1128,7 @@ installés** au 2026-08-28 — tout ce qui les concerne est dérivé de descript
 6 familles — `PORT-xx` évité, pris par la Phase 30 ; voir REQUIREMENTS.md §Portabilité multi-runtime)
 **Depends on:** Phase 37 (cadrage factuel) ; adjacente à Phase 34 (skill-installer) — lot 2 partage la
 surface installeur, à séquencer au cadrage.
-**Plans:** 7 plans
+**Plans:** 8 plans
 
 Plans:
 
@@ -1139,6 +1139,7 @@ Plans:
 - [x] 38-05-PLAN.md — Adaptateur Codex minimal (rôle .toml dispatchable, limite de confinement déclarée)
 - [x] 38-06-PLAN.md — Migration de lab (runtime dans config.json, coexistence/bascule gatée, réversibilité)
 - [x] 38-07-PLAN.md — Correction des 3 bloquants de la mesure Codex (enregistrement des 12 agents, uninstall symétrique, déclaration des hooks)
+- [ ] 38-08-PLAN.md — Fidélité des `description:` de frontmatter (forme YAML traversant les deux consommateurs sans perte) + gate `check-description-fidelity.sh`
 
 **Dette nommée (D-38-K, option A non retenue — correction ciblée post-ROLL, 2026-08-28)** :
 atomicité par staging (`<TARGET_ROOT>/.vibeflow-staging/<mod>/` + `mv` sur même volume) pour
