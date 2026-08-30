@@ -42,6 +42,25 @@
 # CHAQUE exécution, jamais un skip muet. Override de test : CDF_EXCEPTIONS_FILE (TSV
 # chemin-relatif-a-ROOT<TAB>raison), utilisé par la suite de tests sur fixtures isolées.
 #
+# Sonde runtime (Tâche 2, mandat point c) — conclusion MESURÉE le 2026-08-30, sans le moindre
+# appel modèle (`kimi --version`, `kimi --help`, `kimi doctor --help`, `kimi provider --help`,
+# `kimi migrate --help` — cinq invocations locales, aucune ne charge de session ni ne consomme de
+# jeton) : le binaire `kimi` (@moonshot-ai/kimi-code 0.39.1) est présent sur ce poste. Candidats
+# examinés et motif de rejet de CHACUN :
+#   - `--agent-file <path>` (aide racine) : charge réellement un fichier d'agent, mais OUVRE UNE
+#     SESSION (exige une authentification, un appel modèle potentiel) — rejeté, pas sans coût.
+#   - `kimi doctor` : sous-commandes `config` et `tui` UNIQUEMENT — valide config.toml/tui.toml,
+#     jamais un fichier d'agent — rejeté, hors-cible.
+#   - `kimi provider`, `kimi migrate`, `kimi export`, `kimi acp`, `kimi web`, `kimi vis` : aucun
+#     rapport, par leur description propre, à la validation d'un fichier d'agent — rejetés,
+#     hors-cible (examinés par lecture de leur aide, `provider`/`migrate` vérifiés en détail).
+# CONCLUSION : aucune sonde sans coût n'existe côté kimi-code pour valider un frontmatter d'agent.
+# Rien n'est donc câblé ici. La passe A (PyYAML strict) tient lieu de substitut FONCTIONNELLEMENT
+# ÉQUIVALENT POUR LA PROPRIÉTÉ TESTÉE (un frontmatter que PyYAML refuse est un frontmatter que
+# tout désérialiseur YAML strict refuse) — ce n'est PAS une preuve d'acceptation par kimi-code
+# lui-même. Aucune formulation de ce gate ne doit se lire comme « testé sur kimi ». Détail complet
+# de l'examen (trace commande par commande) dans 38-08-SUMMARY.md.
+#
 # Exit codes:
 #   0 = PASS (audit) — tous les fichiers non exemptés satisfont les deux règles, aucune exception
 #       périmée. --inventory et --fix rendent aussi 0 en régime nominal.
