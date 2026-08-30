@@ -27,11 +27,21 @@
 #         comparaison par comm sur listes triées de chemins ET par empreinte de contenu.
 #   T9  — garde-fou : aucun répertoire temporaire du gate ne fuit hors de mktemp -d.
 #   T10 — garde-fou : l'arbre du dépôt est resté byte-identique pendant toute la suite
-#         (git status --short sur plugin/ vide après exécution).
+#         (git diff --stat sur plugin/, fichiers suivis, vide après exécution).
 #
-# Les deux mutants discriminants (scalaire replié / plain deux-points-espace) sont le sujet
-# EXCLUSIF de la Tâche 4 — ajoutés APRÈS T10 par une édition séparée et tracée, jamais fusionnés
-# avec l'écriture de ce fichier.
+# Tâche 4 — les DEUX mutants discriminants OBLIGATOIRES, sur une COPIE d'un fichier RÉEL du
+# dépôt (jamais le fichier posé), ajoutés séparément de T0-T10 pour que leur preuve reste isolée
+# et lisible d'un bloc dans le SUMMARY :
+#   T11 — contrôle vert du mutant A (AVANT mutation, sur la copie pristine) -> exit 0.
+#   T12 — Mutant A (scalaire replié) : le gate DOIT rendre 1, rapport nommant le fichier, le
+#         texte attendu (A) et le littéral de repli seul obtenu (B) — le piège en ciseaux du
+#         mandat (38-UPSTREAM-GSD-CORE-ISSUE.md §5).
+#   T13 — contrôle vert du mutant B (AVANT mutation, sur une copie pristine séparée) -> exit 0.
+#   T14 — Mutant B (plain, deux-points suivi d'espace) : le gate DOIT rendre 1, rapport portant
+#         le message d'erreur du parseur strict (« mapping values are not allowed here »).
+#   T15 — le fichier SOURCE réel du dépôt (utilisé comme source de copie des deux mutants) est
+#         resté byte-identique avant/après (empreinte sha256 comparée) — la mutation ne touche
+#         jamais l'arbre du dépôt, seulement les copies sous mktemp -d.
 #
 # Convention : asserts numérotés, helpers ok()/ko()/skip(), exit 0 si tout passe, exit 1 dès un
 # KO. Calqué sur le pattern de test-check-artifact-fidelity.sh.
@@ -282,11 +292,94 @@ fi
 # de suite lui-même (encore non suivi au moment où il s'exécute la première fois) comme un faux
 # positif ; la garde porte sur une MODIFICATION d'un fichier existant, pas sur un ajout légitime.
 # =====================================================================================
-T10_STATUS="$(cd "$REPO" && git diff --stat -- plugin 2>/dev/null)"
+T10_SELF="plugin/conductor/scripts/tests/test-check-description-fidelity.sh"
+T10_STATUS="$(cd "$REPO" && git diff --stat -- plugin ":(exclude)$T10_SELF" 2>/dev/null)"
 if [ -z "$T10_STATUS" ]; then
   ok "T10 : arbre du dépôt (plugin/, fichiers suivis) resté byte-identique pendant la suite"
 else
   ko "T10 : l'arbre du dépôt a été modifié pendant la suite : $T10_STATUS"
+fi
+
+# =====================================================================================
+# Tâche 4 — les DEUX mutants discriminants OBLIGATOIRES (T11-T15). Copie d'un fichier RÉEL du
+# dépôt actuellement CONFORME (plugin/validator/AGENT.md — audit=0 mesuré au cadrage de cette
+# tâche), jamais le fichier posé. Chaque assertion imprime CE QUI EST ASSERTÉ, CE QUI EST
+# ATTENDU, CE QUI EST OBTENU (code de sortie + extrait de rapport).
+# =====================================================================================
+sha256_file() {
+  node -e "const c=require('crypto');const fs=require('fs');process.stdout.write(c.createHash('sha256').update(fs.readFileSync(process.argv[1])).digest('hex'))" "$1"
+}
+mutate_description() {
+  # $1 = fichier, $2 = mode (fold|plain), $3 = nouveau texte.
+  node -e '
+const fs = require("fs");
+const [, filePath, mode, newText] = process.argv;
+const content = fs.readFileSync(filePath, "utf8");
+const lines = content.split("\n");
+const idx = lines.findIndex((l) => /^description:/.test(l));
+if (idx === -1) { console.error("description: line not found"); process.exit(1); }
+const replacement = mode === "fold" ? [`description: >`, `  ${newText}`] : [`description: ${newText}`];
+lines.splice(idx, 1, ...replacement);
+fs.writeFileSync(filePath, lines.join("\n"));
+' "$1" "$2" "$3"
+}
+
+SRC_REAL="$REPO/plugin/validator/AGENT.md"
+SRC_SHA_BEFORE="$(sha256_file "$SRC_REAL")"
+
+MUT_A_TEXT="Texte de test avec: un deux-points, pour le mutant scalaire replie."
+MUT_B_TEXT="Texte de test: contient un deux-points suivi d'espace, invalide en YAML strict."
+
+# --- Mutant A (scalaire replié) : T11 contrôle vert AVANT mutation, T12 mutation rouge. ---
+mkdir -p "$WORK/mutA"
+cp "$SRC_REAL" "$WORK/mutA/target.md"
+T11_OUT="$(CDF_EXCEPTIONS_FILE="$EMPTY_EXC" bash "$GATE" --root "$WORK/mutA" 2>&1)"
+T11_RC=$?
+echo "  [T11] asserté : contrôle vert AVANT mutation (copie pristine) — attendu : exit 0 — obtenu : exit $T11_RC"
+if [ "$T11_RC" -eq 0 ]; then
+  ok "T11 : contrôle vert du mutant A (avant mutation) -> exit 0"
+else
+  ko "T11 : contrôle vert du mutant A aurait dû rendre 0, a rendu $T11_RC ($T11_OUT)"
+fi
+
+mutate_description "$WORK/mutA/target.md" fold "$MUT_A_TEXT"
+T12_OUT="$(CDF_EXCEPTIONS_FILE="$EMPTY_EXC" bash "$GATE" --root "$WORK/mutA" 2>&1)"
+T12_RC=$?
+echo "  [T12] asserté : mutant A (scalaire replié) — attendu : exit 1, rapport nommant \"$MUT_A_TEXT\" (A) et \">\" seul (B) — obtenu : exit $T12_RC : $T12_OUT"
+if [ "$T12_RC" -eq 1 ] && printf '%s' "$T12_OUT" | grep -qF "$MUT_A_TEXT" && printf '%s' "$T12_OUT" | grep -qF 'obtenu(B)=">"'; then
+  ok "T12 : mutant A (scalaire replié) rougit — piège en ciseaux capturé (attendu=texte complet, obtenu=littéral > seul)"
+else
+  ko "T12 : mutant A attendu exit 1 + attendu/obtenu nommés, obtenu exit $T12_RC ($T12_OUT)"
+fi
+
+# --- Mutant B (plain, deux-points-espace) : T13 contrôle vert AVANT mutation, T14 mutation rouge. ---
+mkdir -p "$WORK/mutB"
+cp "$SRC_REAL" "$WORK/mutB/target.md"
+T13_OUT="$(CDF_EXCEPTIONS_FILE="$EMPTY_EXC" bash "$GATE" --root "$WORK/mutB" 2>&1)"
+T13_RC=$?
+echo "  [T13] asserté : contrôle vert AVANT mutation (copie pristine) — attendu : exit 0 — obtenu : exit $T13_RC"
+if [ "$T13_RC" -eq 0 ]; then
+  ok "T13 : contrôle vert du mutant B (avant mutation) -> exit 0"
+else
+  ko "T13 : contrôle vert du mutant B aurait dû rendre 0, a rendu $T13_RC ($T13_OUT)"
+fi
+
+mutate_description "$WORK/mutB/target.md" plain "$MUT_B_TEXT"
+T14_OUT="$(CDF_EXCEPTIONS_FILE="$EMPTY_EXC" bash "$GATE" --root "$WORK/mutB" 2>&1)"
+T14_RC=$?
+echo "  [T14] asserté : mutant B (plain, deux-points-espace) — attendu : exit 1, rapport portant le message du parseur strict — obtenu : exit $T14_RC : $T14_OUT"
+if [ "$T14_RC" -eq 1 ] && printf '%s' "$T14_OUT" | grep -qi 'mapping values are not allowed here'; then
+  ok "T14 : mutant B (plain, deux-points-espace) rougit — message du parseur strict présent (mapping values are not allowed here)"
+else
+  ko "T14 : mutant B attendu exit 1 + message parseur strict, obtenu exit $T14_RC ($T14_OUT)"
+fi
+
+# --- T15 : le fichier SOURCE réel du dépôt reste byte-identique. ---
+SRC_SHA_AFTER="$(sha256_file "$SRC_REAL")"
+if [ "$SRC_SHA_BEFORE" = "$SRC_SHA_AFTER" ]; then
+  ok "T15 : fichier source réel ($SRC_REAL) byte-identique avant/après (sha256 $SRC_SHA_BEFORE)"
+else
+  ko "T15 : fichier source réel MODIFIÉ par la mutation — avant=$SRC_SHA_BEFORE après=$SRC_SHA_AFTER"
 fi
 
 # ---------------------------------------------------------------------------
