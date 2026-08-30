@@ -181,7 +181,7 @@
       "scope": [
         "design-orchestrator/AGENT.md + check-description-fidelity.sh + check-artifact-fidelity.sh + leurs tests"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "remesure-finale",
@@ -193,7 +193,17 @@
       "scope": [
         "banc kimi"
       ],
-      "status": "blocked"
+      "status": "done"
+    },
+    {
+      "id": "durcir-predicat",
+      "step": "predicat du gate: 6 angles morts mesures (indicateurs YAML en tete, ':' final)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "check-description-fidelity.sh + son test"
+      ],
+      "status": "running"
     }
   ]
 }
