@@ -90,7 +90,7 @@
       "scope": [
         "plugin/_internal/vibeflow-update.sh + suites d'install"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "revue-fuite",
@@ -102,7 +102,7 @@
       "scope": [
         "diff du correctif"
       ],
-      "status": "blocked",
+      "status": "done",
       "review_regime": "full"
     },
     {
