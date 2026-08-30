@@ -181,7 +181,7 @@
       "scope": [
         "design-orchestrator/AGENT.md + check-description-fidelity.sh + check-artifact-fidelity.sh + leurs tests"
       ],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "remesure-finale",
