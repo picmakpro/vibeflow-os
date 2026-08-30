@@ -54,3 +54,4 @@
 - [Cascade de résolution par fausse analogie](project_cascade-de-resolution-par-fausse-analogie.md) — « cascade identique à X » = signal d'alarme ; 2 cas en une phase, dont un qui désactivait toute la capacité livrée
 - [Édition trop large : vérifier le stat](feedback_edit-trop-large-verifier-le-stat.md) — `count=0` a réécrit 34 lignes d'historique pour 2 attendues, et le gate est resté VERT ; `git diff --stat` avant commit
 - [Filtre de vérification = angle mort](feedback_filtre-de-verification-fabrique-l-angle-mort.md) — `git status | grep -v` maison : « arbre propre » rapporté, 3 fichiers non commités
+- [Description frontmatter : contrainte en ciseaux](project_description-frontmatter-contrainte-en-ciseaux.md) — mono-ligne pour gsd-core, YAML valide pour kimi : seul le scalaire GUILLEMETÉ satisfait les deux ; replier en `>` rouvre le défaut d'en face
