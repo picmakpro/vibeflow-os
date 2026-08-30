@@ -1,5 +1,27 @@
 # Changelog — conductor
 
+## [v1.34.5] — 2026-08-30 (Phase 38 — correction ciblée, gate de fidélité déclare vf-internal perdu sur kimi)
+
+**Patch** :
+
+- **`scripts/check-artifact-fidelity.sh`** accepte désormais `--target kimi`, en plus de `--target
+  codex`. Kimi n'a aucun adaptateur d'artefact posé par une install (le parser agent-core charge
+  le frontmatter markdown source tel quel) : le mode `kimi-declared` déclare les verdicts PAR
+  CHAMP mesurés en session réelle le 2026-08-30 (`38-MESURE-KIMI.md`) — PRESERVED pour
+  `name`/`description`/`tools`/`disallowedTools` (mêmes clés, `disallowedTools` retire réellement
+  l'outil du toolset), LOST pour `model`/`memory`/`vf-internal`.
+- **`vf-internal` LOST** porte une déclaration dédiée, `[fidelity-vf-internal] kimi : …` : le
+  parser de frontmatter agent-core de kimi n'a aucun champ de mode/visibilité (établi sur quatre
+  sources convergentes, dont la mesure directe — `vf-reviewer`, `vf-internal: true`, invoqué
+  directement en session réelle a répondu, 1/1) — le cloisonnement Pattern 12 ne tient plus sur
+  cette cible, l'agent devient invocable DIRECTEMENT par l'utilisateur. Relayée verbatim aux DEUX
+  points d'observation (`--target kimi <artefact>` à l'install, `--coexistence-report` au status —
+  même patron D-38-O que `role_confinement` pour codex), source unique
+  (`KIMI_VF_INTERNAL_NOTE`/`print_kimi_vf_internal_note()`).
+- **Aucune régression codex** : les faits `multi_agent_v2`/`trust_level`/`role_confinement` restent
+  scopés à `--target codex` exclusivement (placeholders explicites pour kimi, jamais une valeur
+  codex par défaut) ; `vf_internal_note` sort vide en JSON sur cible codex.
+
 ## [v1.34.4] — 2026-08-30 (Phase 38 — description de frontmatter YAML strict, plan 38-08)
 
 **Patch** :

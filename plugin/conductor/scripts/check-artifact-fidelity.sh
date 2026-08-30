@@ -32,8 +32,19 @@
 # une CONSTANTE déclarée pour `--target codex` (pas une mesure par exécution, comme les deux
 # premiers) — c'est un comportement documenté du binaire, pas un état du poste.
 #
+# `--target kimi` (correction ciblée post-mesure-kimi, 38-MESURE-KIMI.md, 2026-08-30) : PAS un
+# adaptateur exécuté — kimi n'a aucun convertisseur d'artefact posé par une install, le parser
+# agent-core charge le frontmatter markdown SOURCE tel quel. Verdict PAR CHAMP déclaré (MODE=
+# kimi-declared) : PRESERVED pour name/description/tools/disallowedTools (mêmes clés, même
+# comportement observé — disallowedTools retire réellement l'outil du toolset), LOST pour model/
+# memory/vf-internal (tolérés au chargement, sans effet). `vf-internal` LOST porte une ligne
+# dédiée, `[fidelity-vf-internal] kimi : …` (KIMI_VF_INTERNAL_NOTE, tête de script) : le
+# cloisonnement Pattern 12 ne tient plus sur cette cible, l'agent devient invocable DIRECTEMENT
+# par l'utilisateur — relayée verbatim au DEUXIÈME point d'observation, `--coexistence-report`
+# (même patron D-38-O que role_confinement pour codex).
+#
 # Usage:
-#   check-artifact-fidelity.sh [--target codex] [--json] <artefact.md>
+#   check-artifact-fidelity.sh [--target codex|kimi] [--json] <artefact.md>
 #   check-artifact-fidelity.sh --check-judge-command <fichier>
 #   check-artifact-fidelity.sh -h|--help
 #
@@ -84,6 +95,26 @@ ROLE_CONFINEMENT="inerte-par-role (garanti UNIQUEMENT par session -s read-only s
 # choisies, sans que VibeFlow les ait posées ni listées. Déclarée ici pour rester sur la même
 # source de vérité que MULTI_AGENT_V2/TRUST_LEVEL/ROLE_CONFINEMENT (compute/print_fidelity_recette).
 REMOTE_SKILLS_CACHE="5e racine non choisie (plugins/cache/openai-curated-remote, telechargee par codex lui-meme, hors control VibeFlow)"
+
+# --- vf_internal (kimi, correction ciblée post-mesure-kimi, 38-MESURE-KIMI.md) : CONSTANTE
+# déclarée pour la cible kimi — pas une mesure recalculée à chaque appel (aucune conversion à
+# exécuter : kimi n'a pas d'adaptateur d'artefact, son parser agent-core charge le frontmatter
+# markdown SOURCE tel quel). Établie sur QUATRE sources convergentes (2026-08-30) : (1) le parser
+# de frontmatter agent-core (dist/main.mjs:117540-117585) n'accepte que name/description/
+# whenToUse/override/tools/disallowedTools/subagents/model_preference — aucun champ de mode ou de
+# visibilité ; (2) `vf-internal` : 0 occurrence dans le bundle ; (3) buildSubagentDescriptions()
+# énumère TOUS les subagents sans filtre ; (4) MESURE : vf-reviewer (vf-internal:true) invoqué
+# DIRECTEMENT en session réelle -> a répondu, 1/1. Le champ `subagents` de kimi restreint le
+# DISPATCH par un parent, jamais l'invocation directe par l'utilisateur — un palliatif partiel, pas
+# une solution. Déclarée ICI pour rester une SEULE source de vérité entre les deux points
+# d'observation (--target kimi <artefact>, à l'install ; --coexistence-report, au status — même
+# patron que ROLE_CONFINEMENT/REMOTE_SKILLS_CACHE ci-dessus pour codex), via
+# print_kimi_vf_internal_note(), jamais un second texte recopié à la main.
+KIMI_VF_INTERNAL_NOTE="perdu a la conversion (le parser de frontmatter agent-core de kimi n'a aucun champ de mode/visibilite — name/description/whenToUse/override/tools/disallowedTools/subagents/model_preference uniquement) -> l'agent devient invocable DIRECTEMENT par l'utilisateur (kimi --agent <nom>), le cloisonnement Pattern 12 ne tient plus sur cette cible (mesure 2026-08-30 : vf-reviewer, vf-internal:true, invoque directement en session reelle -> a repondu, 1/1 ; le champ subagents de kimi restreint le DISPATCH, jamais l'invocation directe)"
+
+print_kimi_vf_internal_note() {
+  echo "[fidelity-vf-internal] kimi : vf-internal ${KIMI_VF_INTERNAL_NOTE}"
+}
 
 # --- Recette d'environnement Codex (multi_agent_v2, trust_level) + role_confinement : fonctions
 # PARTAGÉES entre les deux points d'observation (--target codex <artefact>, à l'install ; et
@@ -256,11 +287,19 @@ if [ "$COEXISTENCE_MODE" -eq 1 ]; then
   fi
   INSTALLED_RUNTIMES="$(bash "$REGISTRY_SCRIPT" list-installed --config "$COEXISTENCE_CONFIG" 2>/dev/null)" || exit 0
   _has_codex=0
+  _has_kimi=0
   for _rt in $INSTALLED_RUNTIMES; do
     [ "$_rt" = "claude" ] && continue
     echo "[fidelity-coexistence] $_rt : opère SANS gouvernance de hooks — VibeFlow pose ses hooks dans settings.json, que $_rt n'exécute pas (surface hooks.json existante, non visée — cf. 38-CONTEXT.md)"
     [ "$_rt" = "codex" ] && _has_codex=1
+    [ "$_rt" = "kimi" ] && _has_kimi=1
   done
+  # [fidelity-vf-internal] (kimi, correction ciblée) : DEUXIÈME point d'observation de LA MÊME
+  # constante que l'install (--target kimi <artefact> ci-dessous), via print_kimi_vf_internal_note()
+  # — même patron D-38-O que role_confinement pour codex. Silence si kimi n'est pas installé.
+  if [ "$_has_kimi" -eq 1 ]; then
+    print_kimi_vf_internal_note
+  fi
   # [fidelity-recette] (FIDE-03, D-38-O) : DEUXIÈME point d'observation de la MÊME ligne que
   # l'install (print_fidelity_recette, définie en tête de script) — corrige la sortie anticipée
   # ci-dessus, qui laissait `status` muet sur ces faits longtemps après l'install (revue Phase 38).
@@ -280,10 +319,13 @@ if [ -z "$ARTIFACT" ]; then
   exit 2
 fi
 
-if [ "$TARGET" != "codex" ]; then
-  echo "[check-artifact-fidelity] cible '$TARGET' : non mesuré sur ce poste (seule --target codex est mesurée au 2026-08-28)" >&2
-  exit 3
-fi
+case "$TARGET" in
+  codex|kimi) ;;
+  *)
+    echo "[check-artifact-fidelity] cible '$TARGET' : non mesuré sur ce poste (seules --target codex et --target kimi sont mesurées au 2026-08-30)" >&2
+    exit 3
+    ;;
+esac
 
 if [ ! -f "$ARTIFACT" ]; then
   echo "[check-artifact-fidelity] artefact source introuvable : $ARTIFACT" >&2
@@ -370,7 +412,33 @@ trap 'rm -rf "$TMPDIR_GATE"' EXIT
 MEASURE_MODE=""
 DEAD_MARKERS_LABEL=""
 
-if [ -n "$ADAPTER_MJS" ] && command -v node >/dev/null 2>&1; then
+if [ "$TARGET" = "kimi" ]; then
+  # --- MODE kimi (MODE=kimi-declared) : PAS un adaptateur exécuté — kimi n'a aucun convertisseur
+  # d'artefact posé par une install (aucun agent-to-kimi.mjs/register-kimi-agent.sh dans ce dépôt) :
+  # son parser agent-core charge le frontmatter markdown SOURCE tel quel, rien n'est réécrit sur
+  # disque. Verdict PAR CHAMP déclaré à partir de la mesure en session réelle du 2026-08-30
+  # (38-MESURE-KIMI.md, quatre sources convergentes pour vf-internal, sonde --disallowedTools
+  # 0/4 vs témoin 3/3 pour disallowedTools) — rien à exécuter ici, aucune conversion n'existe à
+  # invoquer. PRESERVED : les 4 clés que le parser agent-core accepte ET applique (name/
+  # description/tools/disallowedTools — mêmes clés, même comportement observé : disallowedTools
+  # RETIRE réellement l'outil du toolset, cf. dist/main.mjs:163078). LOST : model/memory/
+  # vf-internal — tolérés au chargement, SANS EFFET (le parser agent-core n'a aucun champ de
+  # mode/visibilité : name, description, whenToUse, override, tools, disallowedTools, subagents,
+  # model_preference, rien d'autre — cf. KIMI_VF_INTERNAL_NOTE en tête de script).
+  MEASURE_MODE="kimi-declared"
+
+  [ -n "$SRC_NAME" ] && add_verdict PRESERVED name
+  [ -n "$SRC_DESCRIPTION" ] && add_verdict PRESERVED description
+  [ -n "$SRC_TOOLS" ] && add_verdict PRESERVED tools
+  [ -n "$SRC_DISALLOWEDTOOLS" ] && add_verdict PRESERVED disallowedTools
+  [ -n "$SRC_MODEL" ] && add_verdict LOST model
+  [ -n "$SRC_MEMORY" ] && add_verdict LOST memory
+  [ -n "$SRC_VF_INTERNAL" ] && add_verdict LOST vf-internal
+
+  # Aucune conversion n'est écrite sur disque pour kimi (le corps markdown est chargé verbatim)
+  # -> les marqueurs morts ne sont, PAR CONSTRUCTION, jamais réécrits : CONV_MARKERS = SRC_MARKERS.
+  DEAD_MARKERS_LABEL="$SRC_MARKERS (non réécrits — kimi charge le corps markdown verbatim, aucune conversion n'est écrite sur disque)"
+elif [ -n "$ADAPTER_MJS" ] && command -v node >/dev/null 2>&1; then
   # --- MODE RÉEL (MODE=adapter) : invoque la MÊME conversion que register-codex-agent.sh (lot
   # 5) — celle qui écrit réellement le .toml posé sur disque à l'install. Le digest per-champ
   # (name/description/model/effort/memory/tools/disallowedTools/vf-internal) sort sur stderr, un
@@ -548,16 +616,29 @@ fi
 # print_fidelity_recette) — MÊME code que le point d'observation --coexistence-report ci-dessus,
 # jamais un second calcul recopié à la main (D-38-O). Texte : print_fidelity_recette calcule PUIS
 # émet. JSON : compute seul (émission déléguée au bloc node ci-dessous, format JSON distinct).
-if [ "$JSON_MODE" -eq 0 ]; then
-  print_fidelity_recette
+# UNIQUEMENT pour --target codex : ces trois faits (multi_agent_v2/trust_level/role_confinement)
+# sont des comportements Codex, jamais mesurés côté kimi — les émettre pour kimi affirmerait un
+# fait non établi. Pour kimi, placeholders explicites (jamais une valeur codex par défaut, jamais
+# une variable non initialisée sous `set -u`).
+VF_INTERNAL_NOTE=""
+if [ "$TARGET" = "codex" ]; then
+  if [ "$JSON_MODE" -eq 0 ]; then
+    print_fidelity_recette
+  else
+    compute_fidelity_recette
+  fi
 else
-  compute_fidelity_recette
+  MULTI_AGENT_V2="n/a (fait codex, non mesuré pour target=kimi)"
+  TRUST_LEVEL="n/a (fait codex, non mesuré pour target=kimi)"
+  ROLE_CONFINEMENT="n/a (fait codex, non mesuré pour target=kimi)"
+  VF_INTERNAL_NOTE="$KIMI_VF_INTERNAL_NOTE"
+  [ "$JSON_MODE" -eq 0 ] && print_kimi_vf_internal_note
 fi
 
 if [ "$JSON_MODE" -eq 1 ]; then
   node -e '
 const fs = require("fs");
-const [artifact, target, preserved, degraded, lost, mapped, deadMarkers, multiAgentV2, trustLevel, roleConfinement, mode] = process.argv.slice(1);
+const [artifact, target, preserved, degraded, lost, mapped, deadMarkers, multiAgentV2, trustLevel, roleConfinement, mode, vfInternalNote] = process.argv.slice(1);
 const splitCsv = (s) => (s ? s.split(",") : []);
 const out = {
   artifact,
@@ -571,9 +652,10 @@ const out = {
   trust_level: trustLevel,
   role_confinement: roleConfinement,
   mode,
+  vf_internal_note: vfInternalNote,
 };
 process.stdout.write(JSON.stringify(out));
-' "$ARTIFACT" "$TARGET" "$PRESERVED" "$DEGRADED" "$LOST" "$MAPPED" "$DEAD_MARKERS_LABEL" "$MULTI_AGENT_V2" "$TRUST_LEVEL" "$ROLE_CONFINEMENT" "$MEASURE_MODE"
+' "$ARTIFACT" "$TARGET" "$PRESERVED" "$DEGRADED" "$LOST" "$MAPPED" "$DEAD_MARKERS_LABEL" "$MULTI_AGENT_V2" "$TRUST_LEVEL" "$ROLE_CONFINEMENT" "$MEASURE_MODE" "$VF_INTERNAL_NOTE"
   echo
 else
   echo "[fidelity] $ARTIFACT -> $TARGET: PRESERVED={$PRESERVED} DEGRADED={$DEGRADED} LOST={$LOST} MAPPED={$MAPPED} DEAD_MARKERS=$DEAD_MARKERS_LABEL MODE=$MEASURE_MODE"

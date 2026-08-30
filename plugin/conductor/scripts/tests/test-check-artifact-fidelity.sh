@@ -41,6 +41,21 @@
 #        Mutation : une copie du gate qui force `model` en LOST doit rougir la comparaison, puis
 #        le gate réel (non muté) doit repasser vert — preuve que le test mord (feedback
 #        feedback_mutation-test-discriminating-cases).
+#   T29 — kimi rouge/vert par mutation : un mutant qui rejoue l'ANCIEN garde (`--target` limité à
+#        codex, correction ciblée post-mesure-kimi) rend exit 3 sur --target kimi (ROUGE,
+#        reproduit l'état pré-correctif) ; le gate réel (non muté) rend exit 0 (VERT).
+#   T30 — --target kimi <fixture> : verdicts PAR CHAMP déclarés (38-MESURE-KIMI.md) —
+#        PRESERVED={name,description,tools,disallowedTools}, LOST={model,memory,vf-internal},
+#        MODE=kimi-declared.
+#   T31 — [fidelity-vf-internal] présente au point d'observation INSTALL (--target kimi), portant
+#        les trois faits non négociables (perte, invocation directe, Pattern 12).
+#   T32 — [fidelity-vf-internal] présente au point d'observation STATUS (--coexistence-report,
+#        kimi installé) + témoin de silence (kimi absent de installed[] → rien sur kimi).
+#   T33 — cohérence structurelle install vs status : MÊME texte exact des deux côtés (source
+#        unique KIMI_VF_INTERNAL_NOTE) — mutation SITE-SPÉCIFIQUE (jamais la constante partagée)
+#        fait diverger les deux textes, puis le gate réel (non muté) redevient identique.
+#   T34 — non-régression codex : le JSON --target codex porte vf_internal_note="" (la déclaration
+#        kimi ne fuit jamais vers la cible codex).
 #
 # Convention : asserts numérotés, helpers ok()/ko()/skip(), exit 0 si tout passe (SKIP non
 # bloquant), exit 1 si au moins un KO. Calqué sur le pattern de test-vibeflow-update.sh.
@@ -225,6 +240,161 @@ fi
 rm -rf "$COEX_WORK2"
 
 rm -rf "$COEX_WORK"
+
+# ---------------------------------------------------------------------------
+# T29-T34 — cible kimi (correction ciblée post-mesure-kimi, 38-MESURE-KIMI.md, 2026-08-30).
+# INDÉPENDANT de gsd-core/l'adaptateur Codex (mode kimi-declared n'invoque ni l'un ni l'autre) —
+# placé AVANT le SKIP conditionnel T1-T6 ci-dessous, jamais sauté même sur un poste sans gsd-core.
+# Seule la fixture (FIXTURE_SRC) est requise.
+# ---------------------------------------------------------------------------
+if [ ! -f "$FIXTURE_SRC" ]; then
+  skip "T29-T34 : fixture introuvable sur ce poste ('$FIXTURE_SRC')"
+else
+  KIMI_WORK="$(mktemp -d)"
+  KIMI_FIXTURE="$KIMI_WORK/content-clarity-judge.md"
+  cp "$FIXTURE_SRC" "$KIMI_FIXTURE"
+
+  # T29 — rouge/vert par mutation : un mutant qui rejoue l'ANCIEN garde (case codex uniquement,
+  # état pré-correctif) rend exit 3 sur --target kimi ; le gate réel (non muté) rend exit 0.
+  T29_MUTANT_GATE="$KIMI_WORK/mutant-pre-correctif.sh"
+  # Cible exactement la ligne "codex|kimi) ;;" -> "codex) ;;" (ancien comportement, kimi rejeté) —
+  # perl plutôt qu'un sed multi-ligne, motif à une seule ligne donc portable BSD/GNU.
+  perl -pe 's/codex\|kimi\) ;;/codex) ;;/' "$GATE" > "$T29_MUTANT_GATE"
+  if grep -qF 'codex) ;;' "$T29_MUTANT_GATE" && ! grep -qF 'codex|kimi) ;;' "$T29_MUTANT_GATE"; then
+    ok "T29.mutant.sonde : le mutant rejoue bien l'ancien garde (kimi retiré de la case, mutant vivant)"
+  else
+    ko "T29.mutant.sonde : la substitution n'a pas pris (mutant absent, T29 non probant)"
+  fi
+  T29_MUT_OUT="$(cd "$REPO" && bash "$T29_MUTANT_GATE" --target kimi "$KIMI_FIXTURE" 2>/dev/null)"
+  T29_MUT_RC=$?
+  if [ "$T29_MUT_RC" -eq 3 ] && [ -z "$T29_MUT_OUT" ]; then
+    ok "T29.rouge : le mutant (ancien garde) rejette --target kimi → exit 3, stdout vide (état pré-correctif reproduit)"
+  else
+    ko "T29.rouge : attendu exit 3 + stdout vide sur le mutant, obtenu rc=$T29_MUT_RC sortie='$T29_MUT_OUT'"
+  fi
+  T29_REAL_OUT="$(cd "$REPO" && bash "$GATE" --target kimi "$KIMI_FIXTURE" 2>"$KIMI_WORK/t29.err")"
+  T29_REAL_RC=$?
+  if [ "$T29_REAL_RC" -eq 0 ]; then
+    ok "T29.vert : le gate réel (non muté) accepte --target kimi → exit 0"
+  else
+    ko "T29.vert : attendu exit 0, obtenu $T29_REAL_RC (stderr: $(cat "$KIMI_WORK/t29.err" 2>/dev/null))"
+  fi
+
+  # T30 — verdicts PAR CHAMP déclarés pour kimi (38-MESURE-KIMI.md).
+  T30_FID_LINE="$(printf '%s\n' "$T29_REAL_OUT" | grep '^\[fidelity\]')"
+  for champ in name description tools disallowedTools; do
+    if printf '%s\n' "$T30_FID_LINE" | grep -q "PRESERVED={[^}]*\b${champ}\b"; then
+      ok "T30.PRESERVED : $champ dans PRESERVED= (cible kimi)"
+    else
+      ko "T30.PRESERVED : $champ absent de PRESERVED= (ligne: $T30_FID_LINE)"
+    fi
+  done
+  for champ in model memory vf-internal; do
+    if printf '%s\n' "$T30_FID_LINE" | grep -q "LOST={[^}]*\b${champ}\b"; then
+      ok "T30.LOST : $champ dans LOST= (cible kimi)"
+    else
+      ko "T30.LOST : $champ absent de LOST= (ligne: $T30_FID_LINE)"
+    fi
+  done
+  if printf '%s\n' "$T30_FID_LINE" | grep -q 'MODE=kimi-declared'; then
+    ok "T30.MODE : MODE=kimi-declared (aucun adaptateur exécuté, comportement documenté)"
+  else
+    ko "T30.MODE : MODE=kimi-declared absent (ligne: $T30_FID_LINE)"
+  fi
+
+  # T31 — [fidelity-vf-internal] au point d'observation INSTALL, portant les trois faits non
+  # négociables : perte du marqueur, invocation directe, Pattern 12 qui ne tient plus.
+  T31_NOTE_LINE="$(printf '%s\n' "$T29_REAL_OUT" | grep '^\[fidelity-vf-internal\] kimi')"
+  if [ -n "$T31_NOTE_LINE" ] \
+    && printf '%s' "$T31_NOTE_LINE" | grep -qF 'perdu' \
+    && printf '%s' "$T31_NOTE_LINE" | grep -qF 'invocable DIRECTEMENT' \
+    && printf '%s' "$T31_NOTE_LINE" | grep -qF 'Pattern 12'; then
+    ok "T31 : [fidelity-vf-internal] présente à l'install, texte vrai (perte + invocation directe + Pattern 12)"
+  else
+    ko "T31 : ligne [fidelity-vf-internal] absente ou incomplète à l'install (sortie: '$T31_NOTE_LINE')"
+  fi
+
+  # T32 — [fidelity-vf-internal] au point d'observation STATUS (--coexistence-report), + témoin
+  # de silence (kimi absent de installed[] → rien sur kimi).
+  KIMI_COEX_WORK="$(mktemp -d)"
+  cat > "$KIMI_COEX_WORK/kimi.json" <<'EOF'
+{"vf_runtimes": {"installed": ["claude", "kimi"], "active": "kimi"}}
+EOF
+  cat > "$KIMI_COEX_WORK/solo.json" <<'EOF'
+{"vf_runtimes": {"installed": ["claude"], "active": "claude"}}
+EOF
+  cp "$SCRIPTS_DIR/runtime-registry.sh" "$KIMI_COEX_WORK/runtime-registry.sh"
+
+  T32_STATUS_OUT="$(bash "$GATE" --coexistence-report --config "$KIMI_COEX_WORK/kimi.json")"
+  T32_STATUS_NOTE_LINE="$(printf '%s\n' "$T32_STATUS_OUT" | grep '^\[fidelity-vf-internal\] kimi')"
+  if [ -n "$T32_STATUS_NOTE_LINE" ]; then
+    ok "T32.présence : [fidelity-vf-internal] présente au status (kimi installé)"
+  else
+    ko "T32.présence : ligne [fidelity-vf-internal] absente au status (sortie: '$T32_STATUS_OUT')"
+  fi
+
+  T32_SOLO_OUT="$(bash "$GATE" --coexistence-report --config "$KIMI_COEX_WORK/solo.json")"
+  if ! printf '%s' "$T32_SOLO_OUT" | grep -q 'kimi'; then
+    ok "T32.silence : installed=[claude] seul → rien sur kimi (ni hooks, ni vf-internal)"
+  else
+    ko "T32.silence : attendu silence total sur kimi, obtenu '$T32_SOLO_OUT'"
+  fi
+
+  # T33 — cohérence structurelle install vs status : MÊME texte exact des deux côtés (source
+  # unique KIMI_VF_INTERNAL_NOTE, print_kimi_vf_internal_note() appelée aux deux points).
+  if [ "$T31_NOTE_LINE" = "$T32_STATUS_NOTE_LINE" ]; then
+    ok "T33 : texte [fidelity-vf-internal] IDENTIQUE install vs status (source unique)"
+  else
+    ko "T33 : divergence install vs status — install='$T31_NOTE_LINE' status='$T32_STATUS_NOTE_LINE'"
+  fi
+
+  # T33.mutant — preuve mordante, SITE-SPÉCIFIQUE (jamais la constante partagée, qui rendrait le
+  # mutant inerte des deux côtés à la fois) : le site --coexistence-report affiche un texte tronqué
+  # pour kimi, l'install garde le texte complet.
+  T33_MUTANT_GATE="$KIMI_WORK/mutant-status-texte-tronque.sh"
+  awk '
+    /if \[ "\$_has_kimi" -eq 1 \]; then/ { print; getline; print "    echo \"[fidelity-vf-internal] kimi : vf-internal perdu (texte tronque)\""; next }
+    { print }
+  ' "$GATE" > "$T33_MUTANT_GATE"
+  if grep -qF 'vf-internal perdu (texte tronque)' "$T33_MUTANT_GATE" \
+    && grep -qF 'print_kimi_vf_internal_note' "$T33_MUTANT_GATE"; then
+    ok "T33.mutant.sonde : le site status a bien été réduit (mutant vivant), l'appel du mode install reste présent ailleurs dans le mutant"
+  else
+    ko "T33.mutant.sonde : la substitution n'a pas pris (mutant absent, T33.mutant non probant)"
+  fi
+  T33_MUT_STATUS_OUT="$(bash "$T33_MUTANT_GATE" --coexistence-report --config "$KIMI_COEX_WORK/kimi.json" 2>/dev/null)"
+  T33_MUT_STATUS_NOTE_LINE="$(printf '%s\n' "$T33_MUT_STATUS_OUT" | grep '^\[fidelity-vf-internal\] kimi')"
+  if [ "$T31_NOTE_LINE" != "$T33_MUT_STATUS_NOTE_LINE" ]; then
+    ok "T33.mutant : le mutant (texte status tronqué) fait bien diverger install vs status"
+  else
+    ko "T33.mutant : le mutant n'a pas produit de divergence — mutant inerte, non discriminant"
+  fi
+  T33_RECHECK_STATUS_OUT="$(bash "$GATE" --coexistence-report --config "$KIMI_COEX_WORK/kimi.json" 2>/dev/null)"
+  T33_RECHECK_NOTE_LINE="$(printf '%s\n' "$T33_RECHECK_STATUS_OUT" | grep '^\[fidelity-vf-internal\] kimi')"
+  if [ "$T31_NOTE_LINE" = "$T33_RECHECK_NOTE_LINE" ]; then
+    ok "T33.vert : le gate réel (non muté) retrouve l'identité install/status — mutant confiné à sa copie"
+  else
+    ko "T33.vert : le gate réel (non muté) diverge encore — le mutant a fui hors de sa copie"
+  fi
+  rm -rf "$KIMI_COEX_WORK"
+
+  # T34 — non-régression codex : le JSON --target codex porte vf_internal_note="" (la déclaration
+  # kimi ne fuit jamais vers la cible codex). Dépend de gsd-core/adaptateur (comme T1-T23) — sauté
+  # séparément si absents, sans bloquer T29-T33 ci-dessus.
+  if [ -z "$REAL_GSD_HOME" ]; then
+    skip "T34 : gsd-core/adaptateur introuvables sur ce poste, non-régression codex non vérifiable ici (couverte par T1/T23 si présents)"
+  else
+    T34_CODEX_JSON="$(cd "$REPO" && bash "$GATE" --target codex --json "$KIMI_FIXTURE" 2>/dev/null)"
+    T34_NOTE="$(printf '%s' "$T34_CODEX_JSON" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync(0,'utf8')).vf_internal_note)" 2>/dev/null)"
+    if [ "$T34_NOTE" = "" ]; then
+      ok "T34 : --target codex --json → vf_internal_note=\"\" (la déclaration kimi ne fuit pas vers codex)"
+    else
+      ko "T34 : vf_internal_note attendu vide sur codex, obtenu '$T34_NOTE'"
+    fi
+  fi
+
+  rm -rf "$KIMI_WORK"
+fi
 
 if [ -z "$REAL_GSD_HOME" ] || [ ! -f "$FIXTURE_SRC" ]; then
   skip "T1-T6 : gsd-core ou fixture introuvables sur ce poste (REAL_GSD_HOME='$REAL_GSD_HOME', fixture='$FIXTURE_SRC')"
