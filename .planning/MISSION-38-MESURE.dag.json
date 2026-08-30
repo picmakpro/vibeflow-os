@@ -80,7 +80,7 @@
       "scope": [
         "banc kimi + depot temoin jetable"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "fix-fuite-cwd",
@@ -147,7 +147,7 @@
       "scope": [
         "diff du lot"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "kimi-i1-remesure",
