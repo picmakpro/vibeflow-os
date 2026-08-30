@@ -6,20 +6,25 @@ current_phase: 38
 current_phase_name: Portabilité multi-runtime — livraison (canal d'install, migration de lab, adaptateur)
 status: in_progress
 stopped_at: >-
-  Phase 38 **exécutée, critère 2 non prouvé (quota Codex), critère 1 partiel (hooks non portés,
-  déclarés)** — 7 plans exécutés sur 7, 90 commits sur `feat/phase-38-portabilite-multi-runtime` (relevé
-  `git rev-list --count 4ebd700..HEAD` avant le commit de clôture documentaire)
-  (worktree `.claude/worktrees/phase-38`), 75 suites / 0 échec, gates verts, `VERSION` racine
-  **inchangée v2.58.1**. Livré : gate de fidélité mesurant le TOML *posé* (`MODE=adapter`),
-  installeur multi-runtime (12 sites CLI-couplés, 4 verbes), `--target` avec réécriture du payload,
-  adaptateur Codex minimal + enregistrement/désenregistrement des 12 agents, migration de lab
-  (runtime dans `config.json`, réversibilité prouvée), rollback symétrique. **Non prouvé** :
-  l'aller-retour manager→worker à profondeur ≥ 2 sur Codex — quota ChatGPT épuisé jusqu'au
-  2026-09-27 (sonde de contrôle indépendante) ; kimi-code reste **inconnu déclaré** (OAuth en échec
-  côté serveur, 3 tentatives). **Rien de shippé** : aucune PR, aucun tag, aucun bump racine — geste
-  humain après que Samuel ait vu la chose marcher.
-last_updated: "2026-08-29T00:00:00.000Z"
-last_activity: 2026-08-29
+  Phase 38 **exécutée puis MESURÉE** (2026-08-30, clé API posée par Samuel). **Critère 2 PROUVÉ sur
+  Codex** : profondeur ≥ 2 constatée EN BASE (`thread_spawn_edges`, chaînes
+  `root→vf-dev-manager→vf-coder`), 3/3 sur les **4 critères réels** — le **critère 5 est SANS OBJET
+  sous clé API** (le mode d'échec cherché ne peut structurellement pas survenir : vert à vide, jamais
+  « atteint ») et le **critère 4 est plus faible que son libellé** (`--output-schema` ne se propage
+  pas aux sous-agents, dette D-38-S). **kimi-code n'est plus un inconnu déclaré** : I-1 **31/31**
+  (deux sondes indépendantes, `comm` vide dans les deux sens, contrôle négatif prouvant que la sonde
+  sait dire non), I-2 `disallowedTools` **bloque réellement** (0/4 contre 3/3 au contrôle positif,
+  réserve : le trou Bash reste ouvert), I-3 hooks **déclenchés 3/3**, et `vf-internal` **sans
+  équivalent** — les 19 workers internes sont publiquement invocables, le Pattern 12 est une garantie
+  de frontmatter et non de runtime, désormais **déclarée par le gate de fidélité**. **Critère 1
+  toujours partiel** : hooks non portés, perte déclarée. §7 Codex : la **lecture** du canal hooks
+  projet est tranchée (gatée par le trust du PROJET), l'**exécution** reste un **inconnu déclaré**
+  (0/3 sans contrôle positif montable = artefact, pas preuve de fermeture). Coûts : Codex **1,01 $**
+  sur 9,50, kimi **~0,018 $**. Non-régression : **77 suites, 76 vertes** (la rouge est préexistante,
+  rouge aussi au commit de base, hors périmètre CI). **Rien de shippé** : aucune PR, aucun tag,
+  `VERSION` racine **intacte v2.58.1** — le statut « vérifié » reste à écrire par Samuel.
+last_updated: "2026-08-30T00:00:00.000Z"
+last_activity: 2026-08-30
 last_activity_desc: >-
   Clôture documentaire de la Phase 38 (mission d'équipe, worktree isolé — une autre session
   travaillait dans l'arbre principal). `38-02-SUMMARY.md` écrit sur pièces et déclaré comme
@@ -1018,19 +1023,22 @@ Recent decisions affecting current work:
 **Resume file:** .planning/phases/VFDO-38-portabilit-multi-runtime-livraison-canal-d-install-migration/38-RUNBOOK-MESURE-CODEX.md
 
 Last session: 2026-08-29T00:00:00.000Z
-Stopped at: Phase 38 exécutée (7/7 plans), critère 2 non prouvé — quota Codex épuisé jusqu'au 2026-09-27
-Reprendre par : **le runbook** ci-dessus (`38-RUNBOOK-MESURE-CODEX.md`) dès qu'un quota Codex existe —
-il tient en une session la preuve du critère 2 (aller-retour manager→worker à profondeur ≥ 2) : sonde de
-contrôle obligatoire avant toute conclusion, banc isolé, `VF_RUNTIME=codex` indispensable, verdict lu
-**dans la base** (`state_5.sqlite`) et jamais dans le JSONL, 5 critères en 0/N sans moyenne, et neuf
-pièges déjà payés. Sans quota, le critère 2 reste **inconnu déclaré** — ne pas l'écrire « vérifié ».
+Stopped at: Phase 38 exécutée ET mesurée — critère 2 prouvé, kimi mesuré, rien de shippé
+Reprendre par : **la revue de branche par Samuel, puis les gestes de livraison**. Le runbook
+`38-RUNBOOK-MESURE-CODEX.md` a été **exécuté le 2026-08-30** et son objet est atteint — il reste utile
+comme protocole de re-mesure, plus comme tâche en attente. Les preuves sont dans
+`38-MESURE-CODEX-CRITERE-2.md` et `38-MESURE-KIMI.md` ; le rapport de mission
+`.planning/missions/2026-08-29-phase-38-portabilite-multi-runtime.md` porte la séance complète.
+
+**Ne pas écrire « vérifié » à la place de Samuel** — les documents écrivent les preuves, il écrit le
+statut.
 
 **Deux gestes humains en attente** (ni l'un ni l'autre n'est automatisable côté agent) :
 
-1. **Auth kimi-code par clé API** — l'OAuth (`kimi login --region global`) échoue **côté serveur**,
-   3 tentatives. La voie `kimi provider add` / `catalog` reste ouverte mais c'est un geste de Samuel :
-   aucun agent ne lit, ne copie ni ne stocke d'identifiant. Tant qu'elle n'est pas faite, kimi-code
-   reste **inconnu déclaré** — la pose est mesurée, l'exécution ne l'est pas.
+1. ~~**Auth kimi-code**~~ — **FAIT** (clé API posée par Samuel le 2026-08-30). kimi-code est
+   désormais **mesuré**, plus un inconnu déclaré : I-1 31/31, I-2 et I-3 verts. Le credential a été
+   manipulé sous le régime option B (copie vers un banc sous scratchpad, jamais ouverte, écrasée
+   3 passes puis supprimée, home réel vérifié intact) et **rien n'a été écrit chez Samuel**.
 2. **Issue amont gsd-core NON ENVOYÉE** — rédigée dans
    `.planning/phases/VFDO-38-portabilit-multi-runtime-livraison-canal-d-install-migration/38-UPSTREAM-GSD-CORE-ISSUE.md`
    (5 points mesurés, dont le `split(",")` qui déchire `Agent(a, b, c)` avec des dégâts **opposés** sur

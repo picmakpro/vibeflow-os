@@ -157,3 +157,105 @@ unifiée `--scope`/`--target` · **aucune primitive partagée de confinement de 
 `check-release-tag` **0** · `check-mission-invariants` **SAIN** · `check-agents` sur **lab
 réellement installé** rc=0, **falsifiable** (témoin `model:` retiré → rc=1, dossier vide → rc=3).
 **Aucune fuite Codex** dans un lab Claude : 0 `.toml`, 0 artefact `codex`, aucun registre écrit.
+
+---
+
+# Séance de mesure — 2026-08-30
+
+Le critère 2 était un **inconnu déclaré** faute de quota. Une clé API a été posée par Samuel ; les
+mesures ont pu tourner. Cette section consigne ce qu'elles établissent — **les preuves, pas le
+statut** : l'écriture du verdict « vérifié » revient à Samuel.
+
+## Codex — critère 2 **atteint**
+
+Profondeur ≥ 2 **prouvée en base** (`thread_spawn_edges`), 3/3 : chaînes
+`root → vf-dev-manager → vf-coder`, `agent_path = /root/mission_manager/mission_coder`. Rôle worker
+spawné 3/3, modèle distinct par worker 3/3. `gpt-5.6-terra` servi sur la clé API ⇒ parent du
+protocole respecté, la flakiness de `spawn_agent` n'est **pas** une explication concurrente.
+**Coût : 1,01 $ / 9,50 $**, 45 sessions.
+
+Deux réserves qui ne doivent pas être arrondies :
+
+- **Critère 5 SANS OBJET sous clé API** — le mode d'échec cherché (`is not supported when using
+  Codex with a ChatGPT account`) ne peut structurellement pas survenir. Un `0/N` n'y prouve rien.
+  ⇒ **le critère 2 se joue sur 4 critères réels, pas 5.**
+- **Critère 4 plus faible que son libellé** — `--output-schema` ne se propage **pas** aux
+  sous-agents : 3 formes de `findings` en 3 runs. Le typage repose sur l'instruction. Dette D-38-S.
+
+**§7 hooks** : la **lecture** est tranchée (canal projet réel, gaté par le **trust du PROJET** et non
+par la session ; le levier `features.hooks=false` ferme mesurablement la lecture). L'**exécution**
+reste un **inconnu déclaré** — 0/3 sans qu'aucun contrôle positif ait pu être monté, donc un
+artefact, pas une preuve de fermeture.
+
+## kimi-code — de « inconnu déclaré » à mesuré
+
+- **I-1 : 31/31** après correction, par deux sondes indépendantes, `comm` vide dans les deux sens,
+  contrôle négatif prouvant que la sonde sait dire non. Trajet 20/31 → 30/31 → 31/31.
+- **I-2 : `disallowedTools` bloque réellement** — 0/4 écritures contre **3/3** pour le contrôle
+  positif. Verdict lu sur le fichier témoin, jamais dans la prose. Réserve : **le trou Bash reste
+  ouvert** — la garantie est « pas d'outil d'édition directe », jamais « ne peut pas écrire ».
+- **I-3 : hooks déclenchés 3/3** — mesure intrinsèquement positive, 20 événements supportés.
+- **`vf-internal` sans équivalent** — 4 sources convergentes dont une invocation directe réussie.
+  Les 19 workers internes sont publiquement invocables : le Pattern 12 est une garantie **de
+  frontmatter**, pas de runtime.
+
+**Coût kimi : ~0,018 $.** Régime credential option B exécuté et **revérifié par le manager** : copie
+jamais ouverte, écrasée 3 passes puis supprimée, home réel intact (hash et taille inchangés).
+
+## Ce que les mesures ont fait corriger
+
+1. **Fuite `cwd` vs `TARGET_ROOT`** — une install `--target` mutait le `.planning/config.json` du
+   dépôt courant. Corrigée en deux tours avec revue intercalée.
+2. **11 agents rejetés en silence par kimi** — 58 descriptions converties, puis le dernier `': '`
+   d'un agent remplacé par un tiret cadratin. 10 puis 11 sur 11.
+3. **Gate vert pendant qu'un rôle était cassé** — une exception de **forme** valait exemption
+   d'**atteignabilité**. Refermé.
+4. **`vf-internal` et 5 champs perdus non déclarés** — le gate de fidélité les déclare désormais,
+   texte vrai, install **et** `status`, non-régression Codex préservée.
+5. **`get_field` aveugle aux séquences YAML** — `skills:` en liste à blocs rendait une chaîne vide,
+   donc « champ absent ». Classe traitée (séquences **et** scalaires à blocs), pas le seul cas.
+
+## Leçons de pilotage — trois erreurs de manager, déclarées
+
+**1. « Périmètre de mesure ≠ périmètre de fichiers » — 3ᵉ occurrence de la phase.** J'ai lancé une
+revue en parallèle d'un worker qui écrivait dans un **autre** fichier, en les jugeant disjoints. Mais
+le test `T10` de la revue **asserte la propreté de l'arbre entier** : le commit du voisin l'a fait
+rougir, et la revue a rapporté un « flake CI non reproductible ». Attribution : commit `2b2eb5f`,
+20:25:44. **Un nœud qui observe tout le dépôt n'est jamais disjoint d'un nœud qui écrit quelque
+part**, même quand leurs fichiers ne se recoupent pas. Correctif de pilotage appliqué ensuite :
+commiter mes propres fichiers de suivi **immédiatement**, jamais en fin de séance.
+
+**2. Un mandat interne contradictoire.** J'ai demandé de conserver l'exception de
+`design-orchestrator` tout en écrivant de `dev-orchestrator` qu'« elle n'a pas besoin de dispense » —
+alors qu'après correction les deux fichiers sont dans la **catégorie identique**. Le worker a refusé
+de contourner le cliquet anti-péremption pour obéir : il a eu raison, et c'est le comportement
+attendu d'un worker face à une consigne fausse.
+
+**3. Une prémisse périmée dans un mandat.** J'ai commandé le durcissement d'un « prédicat de
+caractères » qui n'existait plus : le gate avait été refondu en double vérification structurelle. Le
+worker l'a mesuré avant d'écrire et a refusé de toucher un mécanisme déjà plus robuste que ma
+consigne. **Vérifié moi-même : 8 violations sur 9 fixtures**, les six angles morts déjà couverts.
+
+## Verts auto-déclarés qui n'ont pas tenu
+
+- Un worker a rapporté `check-agents.sh --strict` à `rc=3 INDÉTERMINÉ` comme acceptable. Un
+  indéterminé n'est pas un succès : réinvoqué avec `--agents-dir=`, **6 OK / 0 échec**.
+- Un worker a déclaré `check-version-sync` vert ; il sortait `rc=1` (en-tête README de `conductor`
+  laissé en v1.34.7 pour une `VERSION` v1.34.8). Corrigé, `rc=0`.
+- Le lot de descriptions a déclaré 5 champs ajoutés au `LOST` ; **4 l'étaient**. Trouvé en
+  re-mesurant fichier par fichier.
+
+## Non-régression finale — découverte COMPLÈTE
+
+**77 suites découvertes**, **76 vertes**. La rouge —
+`.planning/milestones/agentique-v1.0-phases/VFDO-15-.../test-collab-orchestrateurs.sh` — est
+**préexistante et hors périmètre** : intacte sur la branche, rouge **aussi au commit de base**,
+jalon archivé, et **hors du périmètre de découverte CI** (`find plugin scripts`). Déclarée, non
+corrigée.
+
+Gates : `check-description-fidelity` rc=0 · `check-version-sync` rc=0 ·
+`check-mission-invariants` **rc=3 = SAIN** (contrat inversé).
+
+## Rien de shippé
+
+Aucune PR, aucun tag, **`VERSION` racine intacte à v2.58.1**. Le geste de release reste humain.

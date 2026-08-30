@@ -203,7 +203,7 @@
       "scope": [
         "check-description-fidelity.sh + son test"
       ],
-      "status": "running"
+      "status": "done"
     }
   ]
 }

@@ -20,7 +20,52 @@ l'appel modèle — d'où le coût nul.
 Pose manuelle par `cp`. ⇒ **Cette mesure ne valide PAS le canal d'install** — elle mesure la
 découverte côté kimi. Ne pas la lire autrement.
 
-## I-1 — atteignabilité des agents posés : **20/31**
+## ÉTAT FINAL — I-1 fermée à **31/31**
+
+> Les sections qui suivent conservent l'**historique de mesure** (20/31 → 30/31 → 31/31), parce que
+> c'est lui qui montre ce qui a été corrigé et pourquoi. Le chiffre qui fait foi aujourd'hui est
+> **31/31**.
+
+**Trois campagnes successives**, toutes à coût nul :
+
+| campagne | résultat | ce qui a changé entre-temps |
+|---|---|---|
+| 1re | **20/31** | — (état initial) |
+| 2e | **30/31** | 58 descriptions converties en scalaire mono-ligne double-quoté |
+| **finale** | **31/31** | le dernier ` : ` de `design-orchestrator/AGENT.md` remplacé par ` — ` (1 caractère) |
+
+**Preuve de la mesure finale** — deux sondes **indépendantes** :
+1. les 31 agents dans un même home → `comm` rend le **vide dans les deux sens** (fichiers de 0 octet :
+   aucun manquant, aucun profil fantôme), 4 runs `cmp`-identiques ;
+2. **chaque agent SEUL dans son propre `KIMI_CODE_HOME`** — ce qui exclut tout masquage par la règle
+   « premier nom gagne » → **31 découverts / 0 absent**, 3 répétitions identiques.
+
+**Contrôle négatif** : un témoin fabriqué avec un `': '` est **absent** de la liste pendant qu'un
+témoin positif est **découvert dans le même run**. ⇒ le 31/31 n'est pas l'artefact d'une sonde qui
+dit toujours oui — c'était le risque principal après deux mesures à 20 et 30.
+
+**Répartition finale des 31** : 29 descriptions en scalaire mono-ligne **double-quoté**, 2 restées
+**nues** (`design-orchestrator/AGENT.md`, `dev-orchestrator/AGENT.md` — non quotables car elles
+contiennent à la fois `"` et `'`), toutes deux sans `': '`.
+
+### Ce que garde réellement le dépôt — correction d'une formulation
+
+La campagne décrit le garde-fou comme « le prédicat *description en scalaire simple contenant
+`': '`* ». **Ce n'est pas ce que le gate implémente**, et la distinction compte.
+
+`check-description-fidelity.sh` fait une **double vérification structurelle** : passe A = parseur
+YAML strict, passe B = reproduction verbatim de la regex `extractFrontmatterField` de gsd-core. Un
+fichier rougit si A échoue **ou** si A et B divergent.
+
+⇒ Les six « angles morts » relevés en fin de campagne (description nue commençant par `[`, `*`, `@`,
+`{`, `%`, ou finissant par `:`) sont **déjà couverts** : vérifié sur 9 fixtures, **8 violations sur
+9**, les six par échec de la passe A, les deux cas voisins (`&` en tête, ` #`) par divergence A/B,
+et le seul cas sain reste vert. Aucun durcissement n'était nécessaire ; 16 tests génératifs (T26-T41)
+ont été ajoutés pour **verrouiller** ce comportement.
+
+---
+
+## Historique — I-1, 1re campagne : **20/31**
 
 | mesure | N | résultat |
 |---|---|---|
