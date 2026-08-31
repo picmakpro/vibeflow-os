@@ -22,8 +22,17 @@
 | **Digest de mission** | ≤ 30 lignes injectées dans chaque mandat (le disque fait foi) | amortit les relectures de contexte par étage |
 | **Cloisonnement par tools** (P12) | juges via `disallowedTools: Write, Edit` (contrainte runtime, Phase 20 — pas une simple absence dans `tools:`) ; la plupart des workers sans Task ; allowlist `Agent(...)` sur les managers ; `vf-internal: true` | anti-triche vérifié par un gate transverse, PAS par les suites de test de chaque module (aucune n'y touche) : `check-agents.sh --strict`, qui linte le contenu de `tools:` (syntaxe des allowlists `Agent(...)`/`Task(...)`) en plus du frontmatter (ADR-044, Phase 16) et exige `disallowedTools: Write, Edit` sur tout agent `memory:` sans Write/Edit déclaré — passé par la CI sur les 6 dossiers `plugin/*/agents` (découverte non vide, monde clos) et à l'écriture par le hook `guard-agent-write.sh` ; les deux mécanismes sont eux-mêmes testés par la suite **conductor** (`test-check-agents.sh`, `test-guard-agent-write.sh`). C'est un CONTRAT documenté, pas un cloisonnement runtime : le runtime n'applique la liste de noms entre parenthèses qu'en incarnation fenêtre principale (`claude --agent`), jamais pour un agent dispatché en sous-agent (doc officielle sub-agents). Le garant machine réel de « un seul manager actif » est le verrou de driver, pas l'allowlist (cf. « Étages croisés » ci-dessous) |
 | **Écart déclaré ↔ runtime** (sens fermeture) | un outil **PRÉSENT** dans le champ `tools:` déclaré peut être **ABSENT** au runtime une fois l'agent dispatché en sous-agent | cas établi et daté : un agent déclarait `AskUserQuestion` mais ne le recevait pas en dispatch sous-agent, ce qui a gelé une mission — filet de repli : le besoin humain remonte dans le rapport typé, il n'est **jamais** auto-répondu en silence (patron `vf-coder.md`) |
-| **Dispatch nommé** (hypothèse datée, jamais construite en mécanisme) | `Agent(...)`/`Task` natif Claude Code, allowlists des managers | tient tant que VibeFlow reste Claude-Code-exclusif (`mission-contracts.md` §Seuil de bascule D5(a)) : chaque rôle nommé (`vf-coder`, `vf-reviewer`…) est résolu par un runtime à dispatch nommé. L'amont (`gsd-core/references/runtime-aware-dispatch.md`, 1.9.0) distingue désormais ces runtimes (Claude Code, OpenCode, Cursor, Cline — `hostIntegration.dispatch.namedDispatch: true`) des runtimes **built-in-only** (kimi-code : `coder`/`explore`/`plan` seulement, aucun enregistrement custom), où un nom de rôle est INCONNU et retombe sur le built-in le plus proche. Vérifié 2026-07-31 : `~/.claude/gsd-core/.gsd-runtime` = `claude` sur les postes actuels. **Aucun mécanisme de repli construit** — VibeFlow ne cible qu'un runtime à ce jour, en bâtir un pour un runtime non ciblé serait de la sur-ingénierie ; le jour où un lab tourne sous un runtime built-in-only, cette ligne est le premier endroit à vérifier |
+| **Dispatch nommé** (hypothèse datée, jamais construite en mécanisme) | `Agent(...)`/`Task` natif Claude Code, allowlists des managers | tient tant que VibeFlow reste Claude-Code-exclusif (`mission-contracts.md` §Seuil de bascule D5(a)) : chaque rôle nommé (`vf-coder`, `vf-reviewer`…) est résolu par un runtime à dispatch nommé. **Mesuré le 2026-08-29 (Phase 38) sur `@moonshot-ai/kimi-code@0.39.1` réellement installé, le descripteur `namedDispatch: false` de kimi-code — et donc la ligne précédente de cette référence — est PÉRIMÉ** : le schéma de profil d'agent porte `subagents: array(string())`, `delegatableSubagents(callerProfileName)` résout par nom, et `load()` fusionne les agent-files du disque (`userRoots`/`extraRoots`/`projectRoots`/`pluginRoots`, priorités `plugin:5 < user:10 < extra:20 < project:30 < explicit:40`) dans une Map clé=nom — kimi-code enregistre bien des sous-agents nommés custom, via `Agent` et `AgentSwarm`. **Périmé par la suite de la même Phase 38** : l'installeur cible désormais aussi Codex
+(`--target`, `plugin/_internal/runtime-cli-dispatch.sh`) — install fonctionnelle, agents
+enregistrés, skills déclenchables (cible tier-1). Ce qui RESTE non constaté : l'aller-retour
+manager→worker par dispatch nommé sur Codex — profondeur 1 sur 2 seulement mesurée (quota
+ChatGPT épuisé jusqu'au 2026-09-27), un inconnu déclaré, pas une capacité prouvée. Sur kimi-code
+et OpenCode, la pose est mesurée mais **aucun mécanisme de repli n'est construit** — `disallowedTools`
+en session et le firing des hooks restent non vérifiés sur kimi-code (login OAuth en échec serveur),
+et `disallowedTools` est inerte / l'allowlist `Agent(...)` déchiquetée sur OpenCode. |
+| **Piège d'identité de paquet npm `kimi-code`** (mesuré 2026-08-29, Phase 38) | `npm view kimi-code` vs `npm view @moonshot-ai/kimi-code` | le paquet npm nu `kimi-code` N'EST PAS le produit Moonshot — description amont : *« CLI that starts anthropic-proxy with Kimi model and runs claude-code »*, tiers, non modifié depuis ~1 an. Le vrai produit est **`@moonshot-ai/kimi-code`** (binaire `kimi`, publié activement — c'est la version mesurée ci-dessus). `kimi-cli` sur npm est un TROISIÈME objet sans rapport. Un installeur naïf qui ferait `npm i -g kimi-code` poserait le mauvais logiciel — toujours nommer le scope complet `@moonshot-ai/kimi-code` dans toute doc ou script d'install VibeFlow qui en parle |
 | **Namespace de branche des worktrees d'exécuteur** (recoupement vérifié conforme, Phase 21) | `gsd-worktree-path-guard.js` (hook `PreToolUse`, `~/.claude/hooks/`) | l'amont 1.9.0 a élargi son motif d'allow-list à `^(worktree-)?agent-[A-Za-z0-9._/-]+$` (#1995 — accepte `agent-<id>` **et** l'ancien `worktree-agent-<id>`) : vérifié sur pièce le 2026-07-31, déjà présent dans le hook installé, aucun défaut. Le nouveau cas d'échec `{committed: false, reason: 'staging_failed' \| 'staging_timeout'}` (#2608) est entièrement interne à `gsd-executor` amont — aucune logique de retry VibeFlow ne l'enveloppe, le seul retry documenté porte sur l'étage entier (`vf-dev-manager.md` §Contrôle de flux), jamais sur un `git add` individuel. Rien à câbler, constat écrit ici pour survivre au prochain delta amont (détail : `21-02-SUMMARY.md` §Constat changement 4) |
+| **Joignabilité worker → sous-agent** (mesuré Phase 38, 2026-08-28) | `SendMessage` dans le `tools:` d'un worker qui dispatche lui-même des sous-agents | un worker qui spawne un sous-agent doit pouvoir le CORRIGER en cours d'exécution — sinon une correction reçue en vol force un redispatch en agent frais (perte de contexte) plutôt qu'une reprise, et deux exécutions concurrentes peuvent atterrir sur le même fichier. Fix appliqué à `vf-coder` (commit `7c1443b`). **L'asymétrie reste structurelle, pas un bug à corriger davantage** : un manager RÉVEILLE un worker par `SendMessage` (contexte intact) ; un worker, lui, ne résout PAS le nom de son manager depuis son étage — son retour passe par le rapport typé (bloc `Agent`), jamais par `SendMessage` vers le haut. Corollaire de pilotage : ne jamais concevoir un protocole où le worker DOIT initier un échange — une question sans réponse dans les hypothèses documentées se **termine** et se rend en `action: ask-user` ; c'est le tour de boucle qui est le canal, pas un message spontané |
 
 ### Marge de profondeur de dispatch (mesuré le 2026-08-04, `@opengsd/gsd-core` 1.9.1)
 
@@ -185,6 +194,35 @@ là-bas.
   **consigne** la source à amender dans son rapport typé, il ne l'amende jamais en silence — la
   capitalisation reste l'affaire des registres de learnings, cette règle dit **quand** la
   déclencher.
+- **Un garde ne se desserre jamais dans le commit qu'il autorise (Phase 38, 2026-08-28).** Un
+  lot qui bute sur un garde de doctrine **pose le besoin, escalade, et n'y touche pas** — le
+  garde ne bouge que dans un commit séparé, après décision. Un garde modifié par l'auteur même
+  du changement qu'il surveille perd sa fonction : il ne mesure plus rien d'indépendant.
+  Incident fondateur : le lot RUNT avait besoin qu'un script de module résolve un script partagé
+  du socle `plugin/_internal/`, ce que le garde T9e de `test-design-orchestrator.sh` (règle
+  d'autonomie D-04) interdisait. Le worker a modifié le garde **dans le même commit** (`d6ff0d4`)
+  que le code protégé, en notant au CHANGELOG « sans affaiblir la garde d'autonomie » — une revue
+  en régime plein a prouvé par mutation que l'exemption affaiblissait bel et bien le garde (elle
+  filtrait le nom de fichier n'importe où sur la ligne, laissant passer une résolution
+  cross-module déguisée). Le choix technique lui-même était défendable, et Samuel l'a ratifié
+  (D-38-M — `plugin/_internal/` est le socle, hors D-04, précédent `find_engine_lib()` /
+  `find_hooks_merger()`) : **c'est la procédure qui manquait, pas le jugement** — d'où une règle
+  qui vaut plus que l'exception qu'elle encadre.
+
+- **Sur Codex, le `task_name` se normalise en snake_case — jamais le `agent_type` (Phase 38,
+  2026-08-28).** Mesuré en session Codex réelle (`multi_agent_v2`, 7 inconnus levés,
+  38-CONTEXT.md) : les tirets **passent** au dispatch — un rôle nommé `vf-reviewer` se charge
+  sans warning et tourne réellement (`agent_type` = nom du rôle, tous scopes). La contrainte
+  `[a-z0-9_]+` porte sur le **`task_name`** du spawn, parce qu'il devient un **segment de
+  chemin** (`/root/<task_name>`) dans l'arbre d'agents — erreur mesurée verbatim :
+  `agent_name must use only lowercase letters, digits, and underscores`. **Les 31 noms d'agents
+  VibeFlow gardent leurs tirets tels quels** (aucun mapping de nommage, l'inconnu est confirmé
+  résolu). Seul le `task_name` passé à `spawn_agent` se normalise, une ligne, jamais une table
+  de correspondance : `tr 'A-Z-' 'a-z_'` (ou équivalent) avant spawn.
+  **Aucune contrainte `fork_turns` requise pour préserver le `model` du rôle** : mesuré en base
+  (`fork_turns:"none"` **et** `"all"`), le modèle enfant est réellement enregistré dans les deux
+  cas — `fork_turns` porte l'historique de conversation, pas la configuration du rôle. « Un
+  modèle par worker » tient sans contrainte de spawn ajoutée.
 
 ## Implémentations
 

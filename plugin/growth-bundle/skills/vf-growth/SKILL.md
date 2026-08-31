@@ -1,20 +1,6 @@
 ---
 name: vf-growth
-description: >
-  Utiliser quand l'intention est d'acquérir des clients via des campagnes par canal —
-  « lance une campagne cold email », « prépare les séquences LinkedIn », « écris la
-  séquence de relance », « active un nouveau canal », « analyse les résultats de la
-  campagne », « arbitre mes canaux », « lance la vague du mois en autonomie ». Point
-  d'entrée du métier growth de VibeFlow : route un geste simple (une campagne → chaîne
-  courte stratégie → production → gate qualité → validation humaine → lancement humain →
-  analyse) ou une mission (≥ 3 campagnes/séquences ou signal de durée → équipe via
-  vf-growth-manager). L'envoi réel (email, publication, dépense publicitaire, outreach)
-  est HUMAN-GATED — jamais exécuté en autonomie, quel que soit le mode.
-  ✘ pas pour poser/structurer le planning du lab → vf-planning · ✘ pas pour configurer le
-  lab ou installer des modules → vibeflow-conductor · ✘ pas pour du contenu éditorial
-  (posts, threads, newsletters) → vf-content · ✘ pas pour de la copy de page web
-  (landing, pricing) → skills copywriting dédiés.
-  Invocable par l'utilisateur ET par l'agent en autonomie.
+description: "Utiliser quand l'intention est d'acquérir des clients via des campagnes par canal — « lance une campagne cold email », « prépare les séquences LinkedIn », « écris la séquence de relance », « active un nouveau canal », « analyse les résultats de la campagne », « arbitre mes canaux », « lance la vague du mois en autonomie ». Point d'entrée du métier growth de VibeFlow : route un geste simple (une campagne → chaîne courte stratégie → production → gate qualité → validation humaine → lancement humain → analyse) ou une mission (≥ 3 campagnes/séquences ou signal de durée → équipe via vf-growth-manager). L'envoi réel (email, publication, dépense publicitaire, outreach) est HUMAN-GATED — jamais exécuté en autonomie, quel que soit le mode. ✘ pas pour poser/structurer le planning du lab → vf-planning · ✘ pas pour configurer le lab ou installer des modules → vibeflow-conductor · ✘ pas pour du contenu éditorial (posts, threads, newsletters) → vf-content · ✘ pas pour de la copy de page web (landing, pricing) → skills copywriting dédiés. Invocable par l'utilisateur ET par l'agent en autonomie."
 ---
 
 # vf-growth — Point d'entrée du métier growth

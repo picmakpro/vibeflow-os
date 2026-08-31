@@ -1,16 +1,6 @@
 ---
 name: vf-calibrate
-description: >
-  Utiliser quand le framework VibeFlow a évolué et qu'un lab doit être remis à niveau — « mets à jour
-  VibeFlow », « le framework a bougé », « recalibre mon lab », « est-ce que ma structure est à jour ? »,
-  ou quand le surfaçage d'ouverture de session signale un retard. Détecte l'écart de version framework
-  ↔ lab, lit les changements (dont structure/doctrine), propose une migration, et la pilote SOUS
-  validation humaine.
-  ✘ pas pour **installer** une version plus récente du plugin et des modules (le geste
-  « télécharge et pose la nouvelle version ») → /vf-update · ✘ pas pour créer un lab qui
-  n'existe pas encore → /vf-new-lab · ✘ pas pour auditer la conformité méthodologique d'un lab
-  déjà à niveau → /vf-audit.
-  Invocable par l'utilisateur ET par `vibeflow-conductor`.
+description: "Utiliser quand le framework VibeFlow a évolué et qu'un lab doit être remis à niveau — « mets à jour VibeFlow », « le framework a bougé », « recalibre mon lab », « est-ce que ma structure est à jour ? », ou quand le surfaçage d'ouverture de session signale un retard. Détecte l'écart de version framework ↔ lab, lit les changements (dont structure/doctrine), propose une migration, et la pilote SOUS validation humaine. Détecte aussi une divergence de RUNTIME (Claude vs Codex/OpenCode/kimi-code) et propose soit une bascule (migration soustractive) soit une coexistence — TOUJOURS annoncée comme distincte de la propagation de version. ✘ pas pour **installer** une version plus récente du plugin et des modules (le geste « télécharge et pose la nouvelle version ») → /vf-update · ✘ pas pour créer un lab qui n'existe pas encore → /vf-new-lab · ✘ pas pour auditer la conformité méthodologique d'un lab déjà à niveau → /vf-audit. Invocable par l'utilisateur ET par `vibeflow-conductor`."
 ---
 
 # vf-calibrate — Propagation d'update & migration de lab
@@ -21,6 +11,25 @@ description: >
 >
 > **Iron Law** : *« Détecter et proposer la migration ; jamais l'appliquer sans validation humaine. »*
 > (ADR-031 — une migration de doctrine peut casser des rules contextuelles.)
+
+---
+
+## Deux natures — à annoncer AVANT toute action
+
+Ce skill porte **deux natures distinctes**, jamais mélangées dans une seule sortie sans étiquette
+(D-38-A, Phase 38, MIGR-02) :
+
+1. **Propagation ADDITIVE de version framework** — la séquence 1-5 ci-dessous (inchangée) : le
+   framework a bougé, le lab doit rattraper des fichiers de module, éventuellement une
+   restructuration/doctrine. Rien n'est retiré du lab, tout est ajouté/rafraîchi.
+2. **Migration SOUSTRACTIVE de runtime** — le lab bascule (ou coexiste) entre `claude` et un autre
+   runtime (Codex/OpenCode/kimi-code…). Décrit dans « Migration de runtime » ci-dessous.
+
+**La toute première ligne de sortie de ce skill, quel que soit le déclencheur, ANNONCE
+explicitement dans laquelle des deux l'utilisateur se trouve** — `[vf-calibrate:propagation]` ou
+`[vf-calibrate:migration-runtime]` — jamais un texte qui laisse deviner. Un utilisateur qui lit la
+sortie doit savoir, avant toute écriture, s'il regarde un rattrapage de version ou une bascule de
+runtime.
 
 ---
 
@@ -107,6 +116,71 @@ Rapport court : ce qui a été migré, ce qui reste, prochain audit conseillé.
 signale *« le framework a pris de l'avance, lance /vf-calibrate »* sans rien forcer (`|| true`,
 jamais bloquant). Wiring documenté dans `references/migration-playbook.md` — **jamais auto-injecté**
 dans `settings.json` (respect du principe « zéro hook imposé »).
+
+---
+
+## Migration de runtime (coexistence ou bascule)
+
+> `[vf-calibrate:migration-runtime]` — annoncer cette étiquette en première ligne de sortie dès
+> que ce chemin est emprunté (voir « Deux natures » ci-dessus).
+
+### 1. Détecter l'opportunité
+
+```sh
+.claude/scripts/runtime-registry.sh list-installed
+```
+
+vs le runtime réellement détecté sur CE poste (`runtime-cli-dispatch.sh`, lot 2 RUNT-01). Si le
+poste porte un runtime ABSENT de `installed`, c'est une opportunité de coexistence/bascule à
+**proposer**, jamais imposer.
+
+### 2. Coexistence (comportement PAR DÉFAUT, D-38-B)
+
+```sh
+VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT}" bash "${CLAUDE_PLUGIN_ROOT}/_internal/vibeflow-update.sh" --target <chemin dédié> install --all
+.claude/scripts/runtime-registry.sh set-active <nouveau> --confirmed
+```
+
+`--target` pose le lab sous une cible **séparée** pour le nouveau runtime (réutilise l'injection de
+cible du lot 4, jamais une 2e implémentation de pose). `set-active --confirmed` **étend**
+`vf_runtimes.installed` sans jamais retirer l'ancien.
+
+### 3. Bascule (soustractive, explicite — jamais par défaut, ADR-031)
+
+Trois étapes dans cet ordre, **jamais une seule sautée** :
+
+1. **Dry-run** — montré à l'utilisateur avant toute écriture :
+   ```sh
+   .claude/scripts/runtime-registry.sh set-active <nouveau> --dry-run
+   VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT}" bash "${CLAUDE_PLUGIN_ROOT}/_internal/vibeflow-update.sh" --target <cible> --dry-run update --all
+   ```
+2. **Confirmation** — attendre le feu vert explicite de l'utilisateur (ADR-031, comme l'étape 3 de
+   la propagation).
+3. **Écriture réelle** :
+   ```sh
+   VIBEFLOW_CACHE="${CLAUDE_PLUGIN_ROOT}" bash "${CLAUDE_PLUGIN_ROOT}/_internal/vibeflow-update.sh" --target <cible> update --all
+   .claude/scripts/runtime-registry.sh set-active <nouveau> --confirmed
+   ```
+
+### 4. Réversibilité — AVANT toute bascule réelle
+
+```sh
+.claude/scripts/verify-runtime-reversibility.sh --target <cible> --cache "${CLAUDE_PLUGIN_ROOT}"
+```
+
+Si la preuve échoue (exit non-zéro), **ARRÊTER** — ne jamais basculer sur une réversibilité non
+prouvée. Le verdict compare des ENSEMBLES de fichiers (`comm -3`), jamais un compte.
+
+### 5. Coexistence sans hooks — relayer, jamais reformuler
+
+Un runtime coexistant sans gouvernance de hooks est déclaré par le gate de fidélité :
+
+```sh
+.claude/scripts/check-artifact-fidelity.sh --coexistence-report
+```
+
+C'est la source de vérité de ce qui manque au runtime coexistant. **Relayer sa sortie telle
+quelle** — jamais reformuler ce diagnostic dans ce skill.
 
 ---
 

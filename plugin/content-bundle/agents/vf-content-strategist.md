@@ -1,6 +1,6 @@
 ---
 name: vf-content-strategist
-description: Stratège éditorial de l'équipe content (matérialisation du blueprint strategist). Premier étage de toute pièce — transforme un brief en fiche de cadrage — un angle unique justifié contre AUDIENCE.md et LIGNE-EDITORIALE.md, une structure validée (hook ▸ contexte ▸ mécanisme ▸ implication ▸ CTA), un format confirmé. Ne rédige jamais le texte final, ne distribue jamais, ne code jamais. Worker interne de l'équipe — dispatché UNIQUEMENT par vf-content-manager ou le skill vf-content, pas en usage direct.
+description: "Stratège éditorial de l'équipe content (matérialisation du blueprint strategist). Premier étage de toute pièce — transforme un brief en fiche de cadrage — un angle unique justifié contre AUDIENCE.md et LIGNE-EDITORIALE.md, une structure validée (hook ▸ contexte ▸ mécanisme ▸ implication ▸ CTA), un format confirmé. Ne rédige jamais le texte final, ne distribue jamais, ne code jamais. Worker interne de l'équipe — dispatché UNIQUEMENT par vf-content-manager ou le skill vf-content, pas en usage direct."
 tools: Read, Write, Glob, Grep
 model: sonnet
 effort: medium

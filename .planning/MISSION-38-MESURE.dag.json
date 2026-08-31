@@ -1,0 +1,209 @@
+{
+  "nodes": [
+    {
+      "id": "sonde-terra",
+      "step": "sonde de controle: gpt-5.6-terra servi sur cle API",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "aucun fichier repo"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "banc-install",
+      "step": "banc isole + install depuis la branche (VF_RUNTIME=codex)",
+      "stage": "",
+      "deps": [
+        "sonde-terra"
+      ],
+      "scope": [
+        "CODEX_HOME de banc",
+        "hors repo"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "critere-2",
+      "step": "profondeur >=2 root->manager->worker, 3 runs, 5 criteres 0/N",
+      "stage": "",
+      "deps": [
+        "banc-install"
+      ],
+      "scope": [
+        "banc + artefacts scratchpad"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "sonde-hooks",
+      "step": "canal hooks scope-projet: temoin .codex/hooks.json, 3 reps, marqueur 0/N",
+      "stage": "",
+      "deps": [
+        "critere-2"
+      ],
+      "scope": [
+        "banc + depot temoin jetable"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "hygiene",
+      "step": "non-pollution reprouvee + auth.json ecrase puis supprime (GARANTI)",
+      "stage": "",
+      "deps": [
+        "sonde-hooks"
+      ],
+      "scope": [
+        "banc + ~/.codex en lecture seule"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "kimi-preconditions",
+      "step": "kimi: reconnaissance LECTURE SEULE de l'override de config-dir (aucun appel modele, disjoint de Codex)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "banc kimi sous scratchpad",
+        "~/.kimi-code en LECTURE seule"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "kimi-mesures",
+      "step": "kimi I-1 agents poses / I-2 disallowedTools / I-3 hooks, 3 reps, 0/N",
+      "stage": "",
+      "deps": [
+        "kimi-preconditions"
+      ],
+      "scope": [
+        "banc kimi + depot temoin jetable"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-fuite-cwd",
+      "step": "FUITE cwd vs TARGET_ROOT: le runtime-registry ecrit dans .planning/config.json du cwd malgre --target",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/_internal/vibeflow-update.sh + suites d'install"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-fuite",
+      "step": "revue du correctif de fuite cwd",
+      "stage": "",
+      "deps": [
+        "fix-fuite-cwd"
+      ],
+      "scope": [
+        "diff du correctif"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "kimi-i1",
+      "step": "kimi I-1 atteignabilite des agents poses (coût nul, sans credential)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "banc kimi-bench-i1",
+        "hors depot"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "desc-fix",
+      "step": "descriptions mono-ligne guillemetees + gate double-parseur",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/**/*.md (description uniquement) + suites"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "kimi-i2i3",
+      "step": "kimi I-2 disallowedTools / I-3 hooks, banc isole, copie config.toml (regime D-38-G)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "banc scratchpad",
+        "AUCUNE ecriture depot"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-desc",
+      "step": "revue du lot descriptions",
+      "stage": "",
+      "deps": [
+        "desc-fix"
+      ],
+      "scope": [
+        "diff du lot"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "kimi-i1-remesure",
+      "step": "re-mesure I-1, attendu 31/31 par comm",
+      "stage": "",
+      "deps": [
+        "desc-fix"
+      ],
+      "scope": [
+        "banc kimi"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "gate-vf-internal",
+      "step": "gate de fidelite declare la perte vf-internal sur cible kimi",
+      "stage": "",
+      "deps": [
+        "kimi-i2i3"
+      ],
+      "scope": [
+        "check-artifact-fidelity.sh + son test"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-option-b",
+      "step": "option B + 3 corrections mecaniques du gate",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "design-orchestrator/AGENT.md + check-description-fidelity.sh + check-artifact-fidelity.sh + leurs tests"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "remesure-finale",
+      "step": "re-mesure I-1 apres fix, comm deux sens, 31/31 ou ecart exact",
+      "stage": "",
+      "deps": [
+        "fix-option-b"
+      ],
+      "scope": [
+        "banc kimi"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "durcir-predicat",
+      "step": "predicat du gate: 6 angles morts mesures (indicateurs YAML en tete, ':' final)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "check-description-fidelity.sh + son test"
+      ],
+      "status": "done"
+    }
+  ]
+}

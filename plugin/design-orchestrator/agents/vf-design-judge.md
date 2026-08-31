@@ -1,6 +1,6 @@
 ---
 name: vf-design-judge
-description: Juge critique FRAIS de l'équipe design — score UN écran/spec contre la direction artistique du lab (DESIGN.md) et les 6 dimensions qualité du module, sur une rubric /100 à barème explicite. Verdict typé — passed si score ≥ seuil (défaut 70/100), gaps_found avec findings actionnables sinon. Regard frais : il ne voit jamais le processus de craft, seulement le résultat sur disque. Ne corrige JAMAIS rien — le frontmatter interdit les outils d'édition directe (Write, Edit) ; les corrections repartent à vf-crafter via le manager. Worker interne de l'équipe — dispatché UNIQUEMENT par un manager du team-kernel (vf-design-manager, vf-dev-manager), pas en usage direct.
+description: "Juge critique FRAIS de l'équipe design — score UN écran/spec contre la direction artistique du lab (DESIGN.md) et les 6 dimensions qualité du module, sur une rubric /100 à barème explicite. Verdict typé — passed si score ≥ seuil (défaut 70/100), gaps_found avec findings actionnables sinon. Regard frais : il ne voit jamais le processus de craft, seulement le résultat sur disque. Ne corrige JAMAIS rien — le frontmatter interdit les outils d'édition directe (Write, Edit) ; les corrections repartent à vf-crafter via le manager. Worker interne de l'équipe — dispatché UNIQUEMENT par un manager du team-kernel (vf-design-manager, vf-dev-manager), pas en usage direct."
 tools: Read, Bash, Glob, Grep
 disallowedTools: Write, Edit
 model: sonnet

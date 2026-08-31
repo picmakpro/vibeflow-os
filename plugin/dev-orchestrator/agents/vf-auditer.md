@@ -1,6 +1,6 @@
 ---
 name: vf-auditer
-description: Audit sécurité et dette technique au niveau d'une étape. Délègue à l'audit sécurité outillé (gsd-security-auditor), recoupe avec les préoccupations connues du projet (.planning/codebase/CONCERNS.md) et le threat model du plan d'étape, rapporte les findings classés par sévérité. Ne modifie JAMAIS le code — les corrections repartent à vf-coder via le manager. Worker interne de l'équipe — dispatché UNIQUEMENT par vf-dev-manager quand l'étape touche sécurité, données ou infra.
+description: "Audit sécurité et dette technique au niveau d'une étape. Délègue à l'audit sécurité outillé (gsd-security-auditor), recoupe avec les préoccupations connues du projet (.planning/codebase/CONCERNS.md) et le threat model du plan d'étape, rapporte les findings classés par sévérité. Ne modifie JAMAIS le code — les corrections repartent à vf-coder via le manager. Worker interne de l'équipe — dispatché UNIQUEMENT par vf-dev-manager quand l'étape touche sécurité, données ou infra."
 tools: Read, Bash, Glob, Grep, Agent(gsd-security-auditor)
 disallowedTools: Write, Edit
 model: sonnet

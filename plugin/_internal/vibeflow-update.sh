@@ -35,6 +35,100 @@ err() { echo "[vibeflow-update] ERROR: $*" >&2; exit 1; }
 # la variable à la main.
 vf_dry_run() { [ "$VF_DRY_RUN" = "1" ]; }
 
+# vf_same_inode <path1> <path2> — vrai si les deux chemins désignent le MÊME inode physique.
+# Comparaison PAR IDENTITÉ (device+inode), jamais par égalité de chaîne : sur une FS insensible à
+# la casse mais qui la préserve (APFS macOS, défaut de fait), deux chemins de casse différente
+# peuvent résoudre au MÊME inode tout en produisant des chaînes `pwd -P` différentes — une
+# comparaison textuelle seule laisse alors passer la garde $HOME (revue 38-04, bloquant 1 : vérifié
+# par mesure directe, $LAB/home et $LAB/HOME → même inode, casses différentes).
+#
+# Implémentation : opérateur bash natif `-ef`, ZÉRO appel à `stat` (revue 38-04 correction 3/3,
+# BLOQUANT 1 persistant). L'ancienne implémentation cascadait `stat -f '%d:%i' || stat -c
+# '%d:%i'` en supposant que la mauvaise forme "échoue proprement" sous l'autre plateforme — FAUX
+# sous GNU coreutils : `-f` y est l'alias de `--file-system`, donc `'%d:%i'` ET `"$1"` deviennent
+# DEUX arguments FILE distincts. Le premier échoue mais le SECOND RÉUSSIT et imprime un bloc
+# `stat -f` multi-lignes (File:/ID:/Block size:…) sur stdout ; le rc global reste non nul, le
+# `||` déclenche `stat -c` dont la ligne correcte s'AJOUTE au blob déjà pollué. Comme ce blob
+# contient le chemin demandé en toutes lettres, deux chemins vers le MÊME inode produisaient des
+# chaînes DIFFÉRENTES → comparaison silencieusement fausse. Vérifié en conteneur ubuntu:22.04
+# (coreutils 8.32) avec un hardlink : `stat -c "%d:%i"` confirme le même inode sur les deux
+# chemins, mais l'ancienne vf_same_inode rendait faux. `-ef` est POSIX/bash natif, se comporte
+# identiquement sur toute plateforme (macOS, Linux, WSL2/NTFS insensible à la casse) — aucune
+# cascade de forme externe à maintenir. Faux (jamais un crash) si l'un des deux chemins n'existe
+# pas encore.
+vf_same_inode() {
+  [ -e "$1" ] && [ -e "$2" ] && [ "$1" -ef "$2" ]
+}
+
+# VF_REGISTRY_RELPATH — constante partagée (mineur revue 38-04) : chemin relatif du registre
+# .vibeflow-installed sous TARGET_ROOT. Site de vérité pour la garde --target (ci-dessous) et
+# INSTALLED_REGISTRY (plus bas, une fois TARGET_ROOT connu) — avant ce lot, ces deux sites
+# portaient chacun le même littéral en dur, divergence silencieuse possible si l'un changeait sans
+# l'autre. ⚠️ PAS le SEUL site : vf_manifest_excluded() (plus bas, liste close D-31-03) porte
+# volontairement un 3e littéral `scripts/.vibeflow-installed` EN DUR, dans un contexte différent
+# (exclusion de manifeste de module, pas résolution de chemin de registre) — consolider les deux
+# forcerait un couplage entre deux préoccupations distinctes ; ce commentaire se contente de ne
+# plus prétendre à tort qu'il n'y a qu'un site (mineur m-01, revue 38-04).
+VF_REGISTRY_RELPATH="scripts/.vibeflow-installed"
+
+# vf_registry_state <registry_path> — classifie le registre .vibeflow-installed (revue 38-04,
+# ajout manager : l'exception de ré-install ne doit plus s'ouvrir sur la SEULE existence du
+# fichier — un fichier vide planté à la main la contournait sans aucun signal). Trois états :
+#   "empty"        — absent, vide, contient un octet NUL (payload binaire — jamais un registre
+#                    réel), ou au moins UNE ligne non vide qui ne matche PAS `mod=version`
+#                    (registre non réel).
+#   "inconsistent" — au moins une entrée `=INCONSISTENT:<étape>:<version>` (format écrit par
+#                    _vf_rollback_mark_inconsistent, cf. ROLL D-38-K plus bas) : PAS un registre
+#                    corrompu — c'est la voie de réparation légitime après un rollback en échec à
+#                    mi-course, elle doit rester ouverte pour rollback/install par-dessus.
+#   "valid"        — CHAQUE ligne non vide matche `mod=version`, aucune INCONSISTENT.
+# Réutilise le MÊME format `mod=version` déjà lu par module_version_installed (grep "^mod=" |
+# cut -d= -f2, plus bas) — aucun 2e format de registre inventé ici.
+#
+# Durcissement 38-04 correction B-02 (BLOQUANT persistant) : l'ancien test `grep -qE ... "au
+# MOINS une ligne matche"` classait `valid` quasi n'importe quel binaire — n'importe quelle
+# "ligne" contenant un octet `=` (0x3D) avec du contenu autour suffisait. Mesuré : 5/5 essais de
+# 3000 octets `/dev/urandom` classés `valid` par l'ancienne forme, et rejoué end-to-end via le
+# vrai installeur (`install dev-orchestrator` sur une cible dont le registre était 3000 octets de
+# garbage → exception de ré-install accordée, payload posé sans drapeau). Exactement le bypass
+# que ce lot venait fermer, déplacé de "fichier vide planté" à "fichier garbage planté".
+# Fix en deux temps :
+#   1. Rejet binaire : `grep -Iq` traite tout fichier contenant un octet NUL comme "binaire" et
+#      ne matche jamais (comportement standard GNU ET BSD/macOS grep, aucune dépendance externe
+#      type perl/od) — un registre réel `mod=version` est du texte, jamais de NUL.
+#   2. Exigence EXHAUSTIVE : CHAQUE ligne non vide (pas "au moins une") doit matcher
+#      `^[^=]+=.+$` — un seul octet binaire survivant au filtre NUL (donc pas de NUL dans ces
+#      3000 octets, statistiquement rare mais possible) casse presque toujours cette exigence sur
+#      l'ensemble des lignes, alors qu'il suffisait de la satisfaire une seule fois avant.
+vf_registry_state() {
+  local reg="$1"
+  if [ ! -s "$reg" ]; then
+    echo "empty"
+    return 0
+  fi
+  if ! LC_ALL=C grep -Iq . "$reg" 2>/dev/null; then
+    echo "empty"
+    return 0
+  fi
+  # PAS de `|| echo 0` : `grep -c` imprime déjà "0" sur stdout quand aucune ligne ne matche,
+  # tout en sortant en rc=1 (« aucun match » ≠ erreur) — un `||` ici DOUBLE la sortie en "0\n0"
+  # (piège vérifié en cours de durcissement B-02) et casse la comparaison `-eq` qui suit.
+  local nonempty_lines matching_lines
+  nonempty_lines="$(grep -cE '.' "$reg" 2>/dev/null)"
+  matching_lines="$(grep -cE '^[^=]+=.+$' "$reg" 2>/dev/null)"
+  nonempty_lines="${nonempty_lines:-0}"
+  matching_lines="${matching_lines:-0}"
+  if [ "$nonempty_lines" -eq 0 ] || [ "$matching_lines" -ne "$nonempty_lines" ]; then
+    echo "empty"
+    return 0
+  fi
+  if grep -q '=INCONSISTENT:' "$reg" 2>/dev/null; then
+    echo "inconsistent"
+  else
+    echo "valid"
+  fi
+}
+
 # ---------- Résolution du scope → TARGET_ROOT (SCOPE-01) ----------
 # Défaut LEGACY = `project` (cible historique ./.claude). C'est un fallback APPEL-DIRECT
 # (debug, run manuel, tests). EN PROD le skill /vibeflow-install (Phase 4) passe TOUJOURS un
@@ -45,9 +139,20 @@ VF_SCOPE="${VF_SCOPE:-project}"
 # D-31-06 : booléen, aucune forme --dry-run=<valeur>. Détecté dans le MÊME pré-parse que
 # --scope, donc valide avant cmd="$1".
 VF_DRY_RUN="0"
+# TGT-01 : site d'injection UNIQUE de TARGET_ROOT, en plus des deux littéraux user/project|local
+# déjà en place. Vide par défaut = comportement historique inchangé à l'octet (aucune des deux
+# branches ci-dessous n'est un remplacement, --target est un AJOUT). Repli variable d'env
+# VF_TARGET si --target n'est pas passé en CLI (ex. hook non interactif) — --target CLI l'emporte
+# toujours sur VF_TARGET (même hiérarchie que --scope/VF_SCOPE ci-dessus).
+VF_TARGET_OVERRIDE="${VF_TARGET:-}"
+# D-38-P : drapeau EXPLICITE requis pour accepter une cible --target pré-existante et non vide.
+# Défaut refus (cf. bloc de résolution ci-dessous) — ce booléen ne s'inverse que sur ce flag CLI,
+# jamais deviné. Aucun prompt ici (l'engine tourne sans humain sous la main) : c'est la skill
+# appelante qui interroge l'utilisateur et repasse ce drapeau.
+VF_TARGET_NONEMPTY_OK="0"
 
-# Détecter `--scope <val>`/`--dry-run` AVANT cmd="$1" : on filtre les positionnels et on override
-# VF_SCOPE/VF_DRY_RUN.
+# Détecter `--scope <val>`/`--dry-run`/`--target <val>` AVANT cmd="$1" : on filtre les
+# positionnels et on override VF_SCOPE/VF_DRY_RUN/VF_TARGET_OVERRIDE.
 _positional=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -58,6 +163,19 @@ while [ "$#" -gt 0 ]; do
       ;;
     --scope=*)
       VF_SCOPE="${1#--scope=}"
+      shift
+      ;;
+    --target)
+      [ "$#" -ge 2 ] || err "--target nécessite une valeur (chemin de la cible d'install)"
+      VF_TARGET_OVERRIDE="$2"
+      shift 2
+      ;;
+    --target=*)
+      VF_TARGET_OVERRIDE="${1#--target=}"
+      shift
+      ;;
+    --target-nonempty-ok)
+      VF_TARGET_NONEMPTY_OK="1"
       shift
       ;;
     --dry-run)
@@ -90,28 +208,140 @@ case "$VF_SCOPE" in
   *) err "scope invalide : $VF_SCOPE (attendu user|project|local)" ;;
 esac
 
-# Surface du flag --dry-run (D-31-06), validée AVANT cmd="$1" (952) : borné à install/update.
-# Refus BRUYANT, jamais un flag accepté-puis-ignoré — sur uninstall/rollback/status/sync ce
-# serait le pire échec possible de la phase (l'utilisateur croirait prévisualiser et le moteur
-# supprimerait). Cas $# = 0 : conserver le comportement actuel (impression d'usage, exit 0) —
-# un --dry-run seul n'est pas une commande, rien à valider ici.
+# Surface du flag --dry-run (D-31-06), validée AVANT cmd="$1" (952) : borné à install/update/
+# rollback (ROLL-05, 38-03 — rollback a rejoint la liste, cf. rollback_module ci-dessous).
+# Refus BRUYANT, jamais un flag accepté-puis-ignoré — sur uninstall/status/sync ce serait le pire
+# échec possible de la phase (l'utilisateur croirait prévisualiser et le moteur supprimerait). Cas
+# $# = 0 : conserver le comportement actuel (impression d'usage, exit 0) — un --dry-run seul n'est
+# pas une commande, rien à valider ici.
 if vf_dry_run && [ "$#" -gt 0 ]; then
   case "$1" in
-    install|update) : ;;
-    *) err "--dry-run n'est accepté que sur install/update (reçu : $1) — un --dry-run accepté-puis-ignoré sur ce verbe ferait croire à une prévisualisation alors qu'il supprimerait/agirait réellement" ;;
+    install|update|rollback) : ;;
+    *) err "--dry-run n'est accepté que sur install/update/rollback (reçu : $1) — un --dry-run accepté-puis-ignoré sur ce verbe ferait croire à une prévisualisation alors qu'il supprimerait/agirait réellement" ;;
   esac
 fi
 
-# Résolution TARGET_ROOT depuis le scope.
-case "$VF_SCOPE" in
-  user)            TARGET_ROOT="$HOME/.claude" ;;
-  project|local)   TARGET_ROOT="./.claude" ;;
-esac
+# Résolution TARGET_ROOT (TGT-01) : --target/VF_TARGET, injecté AVANT les deux littéraux
+# existants — PAS orthogonal au scope (gsd-core refuse --config-dir avec --local, même doctrine
+# ici), un SEUL site de résolution. VF_TARGET_OVERRIDE non-vide → il prime INCONDITIONNELLEMENT
+# sur user/project/local ; vide → comportement legacy inchangé (les deux littéraux d'origine).
+if [ -n "$VF_TARGET_OVERRIDE" ]; then
+  case "$VF_TARGET_OVERRIDE" in
+    /) err "--target refuse la racine '/' littérale (T-38-09)" ;;
+  esac
+  # D-38-P : refus dur de $HOME littéral — AVANT toute résolution physique, sur la forme
+  # textuelle brute telle que passée. Une faute de frappe d'un seul segment (oubli du
+  # sous-dossier) ne doit jamais disperser le payload à la racine d'un home réel et peuplé.
+  if [ "$VF_TARGET_OVERRIDE" = "$HOME" ]; then
+    err "--target refuse '\$HOME' littéral (T-38-09) — dispersion dans le home réel ; viser un sous-dossier dédié, ex. --target \"\$HOME/.claude\""
+  fi
+  # Résolution PHYSIQUE (D-31-15, même doctrine que vf_physical_parent_under_target) : le
+  # dossier peut ne pas encore exister (première pose sous une cible fraîche) — création
+  # best-effort AVANT résolution, jamais une résolution textuelle qui laisserait passer un
+  # ANCÊTRE symlinké ou un `../..` non normalisé.
+  mkdir -p "$VF_TARGET_OVERRIDE" 2>/dev/null || err "--target : impossible de créer/atteindre '$VF_TARGET_OVERRIDE'"
+  TARGET_ROOT="$(cd -P "$VF_TARGET_OVERRIDE" 2>/dev/null && pwd -P)" \
+    || err "--target : résolution physique de '$VF_TARGET_OVERRIDE' échouée"
+  [ "$TARGET_ROOT" != "/" ] || err "--target résout vers la racine '/' — refusé (T-38-09)"
+  # D-38-P : refus dur de $HOME résolu — même doctrine D-31-15 que le reste du lot (littéral
+  # ET résolu). Couvre les formes expansées/relatives qui aboutissent physiquement au home réel
+  # sans jamais avoir écrit "$HOME" en toutes lettres.
+  _vf_home_resolved="$(cd -P "$HOME" 2>/dev/null && pwd -P)" || _vf_home_resolved=""
+  if [ -n "$_vf_home_resolved" ] && [ "$TARGET_ROOT" = "$_vf_home_resolved" ]; then
+    err "--target résout vers \$HOME ('$TARGET_ROOT') — refusé (T-38-09) ; viser un sous-dossier dédié, ex. --target \"\$HOME/.claude\""
+  fi
+  # BLOQUANT 1 (revue 38-04, régime plein) : la comparaison de chaînes ci-dessus est
+  # CONTOURNABLE PAR LA CASSE sur une FS insensible à la casse qui préserve la casse (APFS
+  # macOS, défaut de fait) — `--target "$LAB/HOME"` avec `$HOME="$LAB/home"` désigne le MÊME
+  # inode mais produit une chaîne `pwd -P` DIFFÉRENTE, donc la garde textuelle seule ne tire pas
+  # (vérifié par mesure directe : même device:inode, casse stockée ≠ casse demandée). Comparaison
+  # PAR IDENTITÉ physique en COMPLÉMENT — jamais en remplacement : un système sans `stat`
+  # exploitable (vf_same_inode rend alors faux) retombe silencieusement sur la seule garde
+  # textuelle plutôt que de planter, HOME peut aussi ne pas exister.
+  if [ -n "$_vf_home_resolved" ] && vf_same_inode "$TARGET_ROOT" "$_vf_home_resolved"; then
+    err "--target résout vers \$HOME ('$TARGET_ROOT', même inode que '$_vf_home_resolved') — refusé (T-38-09) ; viser un sous-dossier dédié, ex. --target \"\$HOME/.claude\""
+  fi
+  unset _vf_home_resolved
+  # D-38-P point 3 : cible résolue affichée EN CLAIR — un `../../../../x` ne doit jamais être
+  # une surprise silencieuse. Ni un refus de principe (contredirait --target /tmp/mon-lab, cas
+  # d'acceptance explicite), ni un silence : juste de la visibilité. Sur stderr (log()) — le PLAN
+  # et le commentaire du test T41 disaient « stdout » par erreur (majeur revue 38-04) ; corrigé
+  # ici et aux deux endroits qui l'affirmaient.
+  log "--target résolu vers : $TARGET_ROOT"
+  # BLOQUANT 2 (revue 38-04, régime plein) : ce bloc s'exécutait AVANT `cmd="$1"` (dispatch),
+  # donc pour TOUS les verbes — y compris `status` (lecture seule) et `sync` (no-op documenté),
+  # qui n'écrivent JAMAIS de payload et n'ont donc rien à « disperser ». Scoper aux verbes qui
+  # ÉCRIVENT — même patron que la garde --dry-run plus haut (l. ~122-128) : à ce point du script
+  # `$1` est déjà le verbe positionnel nettoyé (les options --scope/--dry-run/--target ont été
+  # retirées par la boucle de parsing plus haut), donc c'est le même geste, pas un nouveau
+  # mécanisme.
+  _vf_target_verb="${1:-}"
+  case "$_vf_target_verb" in
+    install|update|rollback)
+      # D-38-P point 2 : cible pré-existante et NON VIDE → refus par défaut. mkdir -p ci-dessus
+      # ne vide jamais un dossier existant, donc ce test reflète fidèlement le contenu
+      # PRÉ-existant. (Le test `[ -d "$TARGET_ROOT" ]` d'origine était mort : TARGET_ROOT sort
+      # d'un `cd -P … && pwd -P` qui `err` en cas d'échec plus haut, donc c'est forcément un
+      # répertoire ici — retiré, mineur revue 38-04.)
+      #
+      # Exception légitime SANS drapeau : un registre VibeFlow RÉEL déjà posé
+      # (scripts/.vibeflow-installed) — c'est une ré-install/update, pas une dispersion. Ajout
+      # manager (revue 38-04) : l'exception ne s'ouvre plus sur la SEULE EXISTENCE du fichier — un
+      # fichier vide planté à la main la contournait sans aucun signal. Elle exige maintenant un
+      # registre non vide et au moins une entrée `mod=version` reconnaissable (vf_registry_state),
+      # et la sortie NOMME la voie empruntée. Un registre en état `inconsistent` (écrit par
+      # _vf_rollback_mark_inconsistent quand un rollback échoue à mi-course) OUVRE aussi
+      # l'exception — c'est la voie de réparation légitime, pas un registre corrompu à rejeter —
+      # mais avec une ligne DÉDIÉE, distincte du cas nominal. Sinon, il faut le drapeau explicite
+      # --target-nonempty-ok — AUCUN prompt ici (l'engine tourne sans humain sous la main, cf.
+      # commentaire VF_TARGET_NONEMPTY_OK ci-dessus) : c'est la skill appelante qui interroge
+      # l'utilisateur et repasse ce drapeau.
+      if [ -n "$(ls -A "$TARGET_ROOT" 2>/dev/null)" ] && [ "$VF_TARGET_NONEMPTY_OK" != "1" ]; then
+        _vf_registry_path="$TARGET_ROOT/$VF_REGISTRY_RELPATH"
+        _vf_registry_state="$(vf_registry_state "$_vf_registry_path")"
+        case "$_vf_registry_state" in
+          valid)
+            log "exception de ré-install : registre VibeFlow trouvé ($(grep -cE '^[^=]+=.+$' "$_vf_registry_path" 2>/dev/null || echo 0) modules déclarés) → '$TARGET_ROOT' non vide accepté"
+            ;;
+          inconsistent)
+            log "exception de ré-install (réparation) : registre VibeFlow en état INCONSISTENT trouvé → '$TARGET_ROOT' non vide accepté pour permettre la réparation (rollback ou install par-dessus)"
+            ;;
+          empty)
+            err "--target '$TARGET_ROOT' existe déjà et n'est pas vide (contenu trouvé : $(ls -A "$TARGET_ROOT" | tr '\n' ' ')) — refusé par défaut pour éviter de disperser le payload dans un dossier existant. Relancer avec --target-nonempty-ok si c'est intentionnel."
+            ;;
+          *)
+            # Filet machine (majeur revue 38-04, M-01) : le trio valid|inconsistent|empty est
+            # exhaustif AUJOURD'HUI par construction (seules valeurs renvoyées par
+            # vf_registry_state), mais rien ne le garantit dans le temps — une 4e valeur future ou
+            # une chaîne vide par bug traversait avant ce filet SANS `err` ni `log`, le script
+            # continuant avec une cible non vide acceptée sans preuve de registre (fail-open dans
+            # une garde de sécurité). Le doute se refuse, il ne se tait pas.
+            err "--target '$TARGET_ROOT' : état de registre '$_vf_registry_state' non reconnu — refus par défaut (garde de sécurité, aucune valeur inattendue n'ouvre l'exception)."
+            ;;
+        esac
+        unset _vf_registry_path _vf_registry_state
+      fi
+      ;;
+    *) : ;;  # status/sync/uninstall/verbe vide : LECTURE SEULE ou no-op — rien à protéger ici (bloquant 2)
+  esac
+  unset _vf_target_verb
+else
+  case "$VF_SCOPE" in
+    user)            TARGET_ROOT="$HOME/.claude" ;;
+    project|local)   TARGET_ROOT="./.claude" ;;
+  esac
+  # AJOUT manager (revue 38-04) : rendre visible l'asymétrie --scope/--target — mesurée pour la
+  # MÊME cible physique, `--scope user` accepté (rc=0) et `--target "$HOME/.claude"` refusé
+  # (rc=1). On n'harmonise PAS ici (dette consignée côté ROADMAP par le manager, hors périmètre) :
+  # juste rendre les deux chemins ÉGALEMENT LISIBLES, même forme, même flux (stderr, cf. le
+  # majeur ci-dessus sur log()) que le `log "--target résolu vers : ..."` du chemin --target.
+  log "--scope $VF_SCOPE résolu vers : $TARGET_ROOT"
+fi
 export VF_SCOPE
 
 # ---------- Variables (toutes les cibles rebasées sur TARGET_ROOT) ----------
 CACHE_DIR="${VIBEFLOW_CACHE:-.vibeflow-cache}"   # SEULE source (plus de clone)
-INSTALLED_REGISTRY="$TARGET_ROOT/scripts/.vibeflow-installed"
+INSTALLED_REGISTRY="$TARGET_ROOT/$VF_REGISTRY_RELPATH"
 BACKUP_DIR="$TARGET_ROOT/.backups"
 
 # ---------- État global de l'accumulateur manifeste (W-2, revue vague 1) ----------
@@ -227,6 +457,8 @@ vf_manifest_excluded() {
   local relpath="$1"
   case "$relpath" in
     scripts/vf-portable.sh)       return 0 ;;  # propriété exclusive de l'engine (copy_engine_lib), partagée entre modules
+    scripts/runtime-cli-dispatch.sh) return 0 ;;  # idem, miroir (copy_runtime_dispatch, correction ciblée jointure 38)
+    scripts/.vibeflow-target)     return 0 ;;  # idem, miroir (write_target_marker, TGT-04) — marqueur de cible engine-owned
     memory/*)                     return 0 ;;  # contenu vivant du lab semé par seed-registres.sh, pas un artefact de pose
     scripts/.vibeflow-installed)  return 0 ;;  # état du moteur, pas contenu de module
     scripts/.vibeflow-manifest-*) return 0 ;;  # le manifeste ne se consigne jamais lui-même (boucle de convergence)
@@ -637,6 +869,63 @@ vf_note_degraded_copy() {
   return 0
 }
 
+# ---------- Réécriture du payload à la copie (TGT-03) ----------
+# Principe repris de copyWithPathReplacement (gsd-core bin/install.js) — réécrire un motif de
+# chemin au moment MÊME de la copie, jamais en post-traitement séparé du payload déjà écrit —
+# implémenté ICI en bash pur, jamais un appel au code amont (surface interne gsd-core, doctrine
+# Phase 37). Sans --target (VF_TARGET_OVERRIDE vide) : AUCUN appel n'a d'effet, coût nul, byte-
+# identique à avant ce lot.
+#
+# Extensions considérées "texte" — jamais un binaire (aucun binaire connu dans un module
+# VibeFlow à ce jour, mais la garde reste explicite plutôt qu'un pari implicite).
+vf_target_rewrite_ext() {
+  case "$1" in
+    *.md|*.sh|*.json|*.mjs|*.js|*.txt|*.yml|*.yaml) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# vf_sed_escape_repl <texte> — échappe les caractères spéciaux d'un texte de REMPLACEMENT sed
+# (`&` réinjecte tout le match, `\` a un sens d'échappement, `#` est le délimiteur choisi
+# ci-dessous) : sans cet échappement, un TARGET_ROOT contenant l'un de ces caractères
+# corromprait silencieusement le contenu réécrit (même famille de piège que le `&` de gsub awk,
+# déjà rencontré sur ce dépôt).
+vf_sed_escape_repl() {
+  printf '%s' "$1" | sed -e 's/[&\#]/\\&/g'
+}
+
+# vf_rewrite_target_refs <dest_file> — réécrit, SEULEMENT sous --target, les occurrences
+# littérales `.claude/` du payload mesurées au cadrage (198 fichiers / 1130 occurrences,
+# périmètre hors _internal/) vers TARGET_ROOT réellement résolu. Trois formes RÉELLEMENT
+# mesurées dans le payload (bare `.claude/`, `$HOME/.claude/`, `./.claude/`) + deux formes
+# quotées observées ailleurs dans le fichier (settings.json / hooks), traitées de la plus
+# spécifique à la plus générale DANS LE MÊME appel sed (chaque -e opère sur le résultat cumulé
+# du précédent) : sans cet ordre, la règle bare détruirait le segment `.claude/` d'une forme
+# préfixée avant que sa propre règle ne s'applique. Best-effort : un échec de sed laisse le
+# fichier tel que `cp` l'a posé (jamais tronqué — écriture via temporaire + mv atomique).
+vf_rewrite_target_refs() {
+  local dest="$1"
+  [ -n "$VF_TARGET_OVERRIDE" ] || return 0
+  vf_target_rewrite_ext "$dest" || return 0
+  [ -f "$dest" ] && [ ! -L "$dest" ] || return 0
+  local repl tmp
+  repl="$(vf_sed_escape_repl "${TARGET_ROOT%/}")"
+  tmp="$dest.vftgt.$$"
+  if sed \
+      -e "s#\"\\\$HOME\"/\\.claude/#\"${repl}\"/#g" \
+      -e "s#\\\$HOME/\\.claude/#${repl}/#g" \
+      -e "s#\"\\\$CLAUDE_PROJECT_DIR\"/\\.claude/#\"${repl}\"/#g" \
+      -e "s#\\\${CLAUDE_PROJECT_DIR}/\\.claude/#${repl}/#g" \
+      -e "s#\\./\\.claude/#${repl}/#g" \
+      -e "s#\\.claude/#${repl}/#g" \
+      "$dest" > "$tmp" 2>/dev/null; then
+    mv -f "$tmp" "$dest" 2>/dev/null || rm -f "$tmp" 2>/dev/null || true
+  else
+    rm -f "$tmp" 2>/dev/null || true
+  fi
+  return 0
+}
+
 # LE helper de pose fichier (D-31-01) : pose <src> vers <dest> (exécutable si [exec] fourni)
 # ET consigne <dest> dans le même appel — le manifeste est un sous-produit, jamais une
 # énumération séparée. Le rc de cp est capturé explicitement et propagé (échec de copie =
@@ -676,6 +965,8 @@ vf_place_file() {
   if [ "$mode" = "exec" ]; then
     chmod +x "$dest"
   fi
+  # TGT-03 : no-op sans --target (VF_TARGET_OVERRIDE vide) — voir vf_rewrite_target_refs.
+  vf_rewrite_target_refs "$dest"
   vf_declare_write + "$dest"
 }
 
@@ -771,6 +1062,8 @@ vf_place_tree() {
     dest_file="$dest_dir/$rel"
     if [ -f "$dest_file" ]; then
       [ "$mode" = "exec" ] && chmod +x "$dest_file"
+      # TGT-03 : no-op sans --target (VF_TARGET_OVERRIDE vide) — voir vf_rewrite_target_refs.
+      vf_rewrite_target_refs "$dest_file"
       vf_declare_write + "$dest_file"
     else
       vf_note_degraded_copy "$dest_file"
@@ -841,45 +1134,71 @@ gitignore_add_one() {
   fi
 }
 
+# vf_gitignore_target_prefix — préfixe RELATIF AU CWD à écrire dans ./.gitignore (TGT-02).
+# Sans --target : legacy inchangé, TARGET_ROOT vaut déjà "./.claude" en scope local, le préfixe
+# reste le littéral ".claude". Sous --target : TARGET_ROOT est un chemin ABSOLU résolu (résolution
+# physique en amont) — un .gitignore ne peut exprimer qu'un chemin sous le cwd du repo ; rc=1 si
+# TARGET_ROOT sort de cet arbre (cible hors-repo), l'appelant journalise et n'écrit RIEN plutôt
+# qu'une entrée invalide.
+vf_gitignore_target_prefix() {
+  if [ -z "$VF_TARGET_OVERRIDE" ]; then
+    printf '%s' ".claude"
+    return 0
+  fi
+  local cwd_phys
+  cwd_phys="$(pwd -P)" || return 1
+  case "$TARGET_ROOT" in
+    "$cwd_phys"/*) printf '%s' "${TARGET_ROOT#"$cwd_phys"/}"; return 0 ;;
+    "$cwd_phys")   printf '%s' "."; return 0 ;;
+    *)             return 1 ;;
+  esac
+}
+
 gitignore_add_paths() {
   local mod="$1"
   # Scope local seulement : user/project ne touchent JAMAIS au .gitignore.
   [ "$VF_SCOPE" = "local" ] || return 0
 
+  local gi_prefix
+  if ! gi_prefix="$(vf_gitignore_target_prefix)"; then
+    log "  gitignore : --target ($TARGET_ROOT) sort de l'arbre du repo — .gitignore non modifié (ne peut pas couvrir une cible hors-arbre)"
+    return 0
+  fi
+
   local module_dir="$CACHE_DIR/$mod"
 
   # Skill racine.
-  [ -f "$module_dir/SKILL.md" ] && gitignore_add_one ".claude/skills/$mod/"
+  [ -f "$module_dir/SKILL.md" ] && gitignore_add_one "${gi_prefix}/skills/$mod/"
   # Skills imbriqués.
   if [ -d "$module_dir/skills" ]; then
     for skill_dir in "$module_dir/skills/"*/; do
       [ -d "$skill_dir" ] || continue
-      gitignore_add_one ".claude/skills/$(basename "$skill_dir")/"
+      gitignore_add_one "${gi_prefix}/skills/$(basename "$skill_dir")/"
     done
   fi
   # Agent module (D7) : AGENT.md + dossier references.
   if [ -f "$module_dir/AGENT.md" ]; then
-    gitignore_add_one ".claude/agents/${mod}.md"
-    gitignore_add_one ".claude/commands/${mod}.md"
-    [ -d "$module_dir/references" ] && gitignore_add_one ".claude/agents/${mod}-references/"
+    gitignore_add_one "${gi_prefix}/agents/${mod}.md"
+    gitignore_add_one "${gi_prefix}/commands/${mod}.md"
+    [ -d "$module_dir/references" ] && gitignore_add_one "${gi_prefix}/agents/${mod}-references/"
   fi
   # Multi-agents module : agents/<name>.md.
   if [ -d "$module_dir/agents" ]; then
     for f in "$module_dir/agents/"*.md; do
-      [ -f "$f" ] && gitignore_add_one ".claude/agents/$(basename "$f")"
+      [ -f "$f" ] && gitignore_add_one "${gi_prefix}/agents/$(basename "$f")"
     done
-    [ -d "$module_dir/references" ] && [ ! -f "$module_dir/SKILL.md" ] && gitignore_add_one ".claude/agents/${mod}-references/"
+    [ -d "$module_dir/references" ] && [ ! -f "$module_dir/SKILL.md" ] && gitignore_add_one "${gi_prefix}/agents/${mod}-references/"
   fi
   # Rules réellement posées.
   if [ -d "$module_dir/rules" ]; then
     for f in "$module_dir/rules/"*.md; do
-      [ -f "$f" ] && gitignore_add_one ".claude/rules/$(basename "$f")"
+      [ -f "$f" ] && gitignore_add_one "${gi_prefix}/rules/$(basename "$f")"
     done
   fi
   # Scripts réellement posés (shell + Node).
   if [ -d "$module_dir/scripts" ]; then
     for f in "$module_dir/scripts/"*.sh "$module_dir/scripts/"*.mjs "$module_dir/scripts/"*.js; do
-      [ -f "$f" ] && gitignore_add_one ".claude/scripts/$(basename "$f")"
+      [ -f "$f" ] && gitignore_add_one "${gi_prefix}/scripts/$(basename "$f")"
     done
   fi
   # Registres mémoire (SCOPE-04) : si le module fournit un seeder de registres, les fichiers qu'il
@@ -887,9 +1206,9 @@ gitignore_add_paths() {
   # (« rien ne sera committé »). Sans cette ligne, l'engine gitignorait ses propres artefacts mais
   # laissait les 5 registres semés apparaître en untracked dans le git status du projet. Le
   # sélecteur est le seeder lui-même (data-driven, pas de nom de module en dur).
-  [ -f "$module_dir/scripts/seed-registres.sh" ] && gitignore_add_one ".claude/memory/"
+  [ -f "$module_dir/scripts/seed-registres.sh" ] && gitignore_add_one "${gi_prefix}/memory/"
   # Config template posé à côté d'un SKILL.md racine.
-  [ -d "$module_dir/config" ] && [ -f "$module_dir/SKILL.md" ] && gitignore_add_one ".claude/skills/$mod/config/"
+  [ -d "$module_dir/config" ] && [ -f "$module_dir/SKILL.md" ] && gitignore_add_one "${gi_prefix}/skills/$mod/config/"
   # settings.json + settings.local.json (SCOPE-04, Phase 30 tâche 4, corrigé en revue) : en scope
   # LOCAL, `merge_module_hooks()` écrit dans $TARGET_ROOT/settings.json ET, depuis le routage
   # --settings-local (tâche 4), dans $TARGET_ROOT/settings.local.json pour toute entrée portant le
@@ -900,8 +1219,8 @@ gitignore_add_paths() {
   # lab cible frais. Sélecteur data-driven identique aux deux lignes (même style que
   # seed-registres.sh ci-dessus) : seul un module qui PORTE un fragment hooks/hooks.json (donc qui
   # écrit réellement dans ces fichiers à cette install) déclenche l'ajout.
-  [ -f "$module_dir/hooks/hooks.json" ] && gitignore_add_one ".claude/settings.json"
-  [ -f "$module_dir/hooks/hooks.json" ] && gitignore_add_one ".claude/settings.local.json"
+  [ -f "$module_dir/hooks/hooks.json" ] && gitignore_add_one "${gi_prefix}/settings.json"
+  [ -f "$module_dir/hooks/hooks.json" ] && gitignore_add_one "${gi_prefix}/settings.local.json"
   # Lib partagée de portabilité (Phase 30 tâche 2, copy_engine_lib()) : posée par l'ENGINE, pas
   # par un module — donc jamais vue par la boucle scripts/ plus haut (elle vient du cache
   # _internal, jamais de $module_dir/scripts). Gap constaté en tâche 4 lors de la vérification
@@ -909,7 +1228,10 @@ gitignore_add_paths() {
   # .claude/scripts/vf-portable.sh échappait à la promesse « rien ne sera committé » du scope
   # local. Inconditionnel : copy_engine_lib() la pose à CHAQUE exécution de l'engine en scope
   # local, quel que soit le module installé — gitignore_add_one() reste idempotent.
-  gitignore_add_one ".claude/scripts/vf-portable.sh"
+  gitignore_add_one "${gi_prefix}/scripts/vf-portable.sh"
+  # Miroir strict (correction ciblée jointure 38) : runtime-cli-dispatch.sh, posée par
+  # copy_runtime_dispatch() selon le même patron ENGINE-owned, inconditionnel, idempotent.
+  gitignore_add_one "${gi_prefix}/scripts/runtime-cli-dispatch.sh"
 }
 
 # ---------- Commande d'incarnation (ADR-042) ----------
@@ -1046,6 +1368,87 @@ copy_engine_lib() {
   return 1
 }
 
+# ---------- Table de dispatch runtime-aware (RUNT-01, correction ciblée jointure 38) ----------
+# runtime-cli-dispatch.sh est possédée par l'ENGINE, exactement comme vf-portable.sh ci-dessus —
+# jamais par un module. MIROIR STRICT de find_engine_lib()/copy_engine_lib() : sans cette pose, le
+# fichier ne résout QUE depuis sa position source dans le cache (candidat 1 des appelants), donc
+# UNIQUEMENT à l'install initiale — toute ré-invocation en régime établi (`/vf-update` étape 4c,
+# `/vf-calibrate`, hook SessionStart via check-plugin-update.sh) tourne `$0` posé à plat sous
+# `$TARGET_ROOT/scripts/`, où NI le candidat 1 (VIBEFLOW_CACHE non défini hors install) NI le
+# candidat 2 (le fichier absent de ce répertoire) ne résolvaient. Voir le commentaire d'en-tête de
+# runtime-cli-dispatch.sh pour le détail de la fausse analogie avec find_hooks_merger() qui avait
+# masqué ce défaut.
+find_runtime_dispatch_lib() {
+  local c
+  c="$CACHE_DIR/_internal/runtime-cli-dispatch.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  c="$(dirname "$0")/runtime-cli-dispatch.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  echo ""
+}
+
+# Idempotence INTRA-PROCESSUS, même patron que VF_ENGINE_LIB_COPIED.
+VF_RUNTIME_DISPATCH_COPIED="0"
+
+copy_runtime_dispatch() {
+  [ "$VF_RUNTIME_DISPATCH_COPIED" = "1" ] && return 0
+  local src dest tmp
+  src="$(find_runtime_dispatch_lib)"
+  if [ -z "$src" ]; then
+    # VG-3 (même discipline que copy_engine_lib) : jamais un retour neutre silencieux. Sans la
+    # table, les 3 consommateurs (ensure-deps.sh, ensure-design-deps.sh, check-plugin-update.sh)
+    # replient sur leur comportement claude-figé — dégradé, pas cassé, mais annoncé quand même.
+    log "  ERROR: runtime-cli-dispatch.sh introuvable dans le cache — table de dispatch runtime NON posée (installer/mettre à jour l'engine)"
+    return 1
+  fi
+  dest="$TARGET_ROOT/scripts/runtime-cli-dispatch.sh"
+  if vf_dry_run; then
+    vf_declare_write + "$dest"
+    VF_RUNTIME_DISPATCH_COPIED="1"
+    return 0
+  fi
+  mkdir -p "$TARGET_ROOT/scripts"
+  tmp="$dest.tmp.$$"
+  # Écriture ATOMIQUE, même patron que copy_engine_lib. SANS chmod +x : les 3 appelants invoquent
+  # `bash "$dispatch" …`, jamais une exécution directe du fichier.
+  if cp "$src" "$tmp" 2>/dev/null && mv -f "$tmp" "$dest" 2>/dev/null; then
+    VF_RUNTIME_DISPATCH_COPIED="1"
+    log "  table runtime-cli-dispatch.sh posée → $dest"
+    # Annoncé (D-31-01) mais exclu du manifeste par D-31-03 (scripts/runtime-cli-dispatch.sh,
+    # propriété de l'engine, partagée entre modules) — miroir exact de vf-portable.sh.
+    vf_declare_write + "$dest"
+    return 0
+  fi
+  rm -f "$tmp" 2>/dev/null || true
+  log "  ERROR: pose de runtime-cli-dispatch.sh ÉCHOUÉE → $dest"
+  return 1
+}
+
+# ---------- Marqueur de cible pour la cascade documentaire (TGT-04) ----------
+# vf-update/SKILL.md résout <S>/<S-moteur> par POSITION LITTÉRALE ($HOME/.claude/scripts/ puis
+# ./.claude/scripts/ puis ${CLAUDE_PLUGIN_ROOT}/…) — un `--target` custom matérialise les scripts
+# ailleurs, rendant les deux premières positions aveugles. Ce marqueur, lu par l'agent au runtime
+# (SKILL.md étendu), referme ce trou : contenu = chemin ABSOLU de TARGET_ROOT résolu à CETTE
+# install. Écrit à CHAQUE install/update (best-effort, ne bloque jamais la pose du module) — un
+# fichier par install, écrasé idempotemment, jamais accumulé. Écrit aussi SANS --target : son
+# contenu égale alors la position candidate elle-même, donc la cascade documentaire (qui ne
+# dévie QUE si le marqueur DIFFÈRE de la position candidate) reste un no-op dans ce cas.
+write_target_marker() {
+  local dest="$TARGET_ROOT/scripts/.vibeflow-target"
+  if vf_dry_run; then
+    vf_declare_write + "$dest"
+    return 0
+  fi
+  mkdir -p "$(dirname "$dest")" 2>/dev/null || return 0
+  local abs tmp
+  abs="$(cd -P "$TARGET_ROOT" 2>/dev/null && pwd -P)" || return 0
+  tmp="$dest.tmp.$$"
+  if printf '%s\n' "$abs" > "$tmp" 2>/dev/null && mv -f "$tmp" "$dest" 2>/dev/null; then
+    vf_declare_write + "$dest"
+    return 0
+  fi
+  rm -f "$tmp" 2>/dev/null || true
+  return 0
+}
+
 # ---------- Hooks de gouvernance (ADR-043) ----------
 # Un module peut déclarer hooks/hooks.json (format Claude Code, placeholder {{VF_SCRIPTS}}).
 # L'install MERGE le fragment dans le settings.json du scope ; l'uninstall le retire.
@@ -1057,12 +1460,246 @@ find_hooks_merger() {
   echo ""
 }
 
+# ---------- Gate de fidélité de conversion (FIDE-02, 38-01) ----------
+# check-artifact-fidelity.sh vit dans le module conductor (plugin/conductor/scripts/), PAS dans
+# _internal — cascade DIFFÉRENTE de find_hooks_merger : même patron que find_generate_agent_
+# command_script (ligne ~922) et find_mcp_injector (ligne ~960), qui résolvent déjà des scripts
+# conductor/dev-orchestrator hébergés hors _internal. TARGET_ROOT/scripts/ d'abord (déjà posé sur
+# ce lab par un install conductor antérieur DANS ce même run ou un précédent), sinon
+# CACHE_DIR/conductor/scripts/ (cache courant, cas d'un premier install de conductor). Absent aux
+# deux positions → silence total (même doctrine que find_hooks_merger) : ce n'est PAS un module
+# mandatory à cet appel précis, un lab sans conductor posé ne doit jamais voir l'install échouer
+# pour un rapport de fidélité qu'il n'a pas encore les moyens de produire.
+find_fidelity_gate() {
+  local c
+  c="$TARGET_ROOT/scripts/check-artifact-fidelity.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  c="$CACHE_DIR/conductor/scripts/check-artifact-fidelity.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  echo ""
+}
+
+# resolve_posed_agent_artifact <module_dir> <mod> — TOUS les chemins posés des agents réellement
+# écrits par ce module (AGENT.md racine ET/OU CHAQUE agents/*.md — les deux sources sont
+# CUMULATIVES, jamais mutuellement exclusives), un chemin par ligne sur stdout, vide si le module
+# n'a posé aucun agent. CODEX-B4 (38-CONTEXT.md:1149-1152, mesure du 2026-08-29) : l'ancien
+# contrat "un seul artefact par module" (AGENT.md racine OU premier agents/*.md trouvé) faisait
+# qu'un module posant les DEUX (dev-orchestrator, design-orchestrator) ne voyait jamais son
+# répertoire agents/ traité — le team-kernel entier (7 agents) n'était jamais enregistré côté
+# Codex. Factorisé (jointure ADPT-02/38-05) : partagé par report_artifact_fidelity (FIDE-02) ET
+# register_codex_agent_if_applicable (ADPT-02/38-05) — les deux best-effort qui ne s'invoquent
+# QUE sur un module à agent, jamais un skill-only. Contrat de sortie : retour 1 (stdout vide) si
+# la liste est vide, retour 0 sinon — inchangé, les deux appelants gardent leur garde `|| return 0`.
+resolve_posed_agent_artifact() {
+  local module_dir="$1" mod="$2"
+  local found=0
+  if [ -f "$module_dir/AGENT.md" ]; then
+    local artifact="$TARGET_ROOT/agents/${mod}.md"
+    if [ -f "$artifact" ]; then
+      printf '%s\n' "$artifact"
+      found=1
+    fi
+  fi
+  if [ -d "$module_dir/agents" ]; then
+    local file
+    for file in "$module_dir/agents/"*.md; do
+      [ -f "$file" ] || continue
+      local artifact="$TARGET_ROOT/agents/$(basename "$file")"
+      if [ -f "$artifact" ]; then
+        printf '%s\n' "$artifact"
+        found=1
+      fi
+    done
+  fi
+  [ "$found" -eq 1 ] && return 0
+  return 1
+}
+
+# report_artifact_fidelity <mod> <module_dir> — best-effort, appelée en fin de install_module()
+# ET en fin de update_module() (FIDE-02). N'invoque le gate QUE si ce module a réellement posé un
+# artefact agent — jamais pour un module skill-only, qui n'a rien à faire mesurer par ce gate.
+# Cible fixée à `codex` (seule cible tier-1 mesurée, cf. 38-CONTEXT.md). Sortie RELAYÉE TELLE
+# QUELLE sur les flux réels de l'install (jamais capturée puis résumée) — la ligne `[fidelity]`
+# doit apparaître verbatim dans le journal d'install, seule surface qu'un opérateur pressé lira.
+report_artifact_fidelity() {
+  local mod="$1" module_dir="$2"
+  vf_dry_run && return 0
+  local artifacts
+  artifacts="$(resolve_posed_agent_artifact "$module_dir" "$mod")" || return 0
+  local gate
+  gate="$(find_fidelity_gate)"
+  [ -n "$gate" ] || return 0
+  local artifact
+  while IFS= read -r artifact; do
+    [ -n "$artifact" ] || continue
+    bash "$gate" --target codex "$artifact" || true
+  done <<< "$artifacts"
+}
+
+# ---------- Adaptateur Codex (ADPT-02/ADPT-03, 38-05) ----------
+# register-codex-agent.sh vit sous _internal/runtime-adapter/ (PAS directement _internal/,
+# contrairement à merge-hooks.sh/runtime-cli-dispatch.sh) — cascade à 2 positions, MÊME patron
+# que find_hooks_merger/find_runtime_dispatch_lib, sous-dossier en plus. Introuvable aux deux
+# positions → silence total (même doctrine best-effort) : ce n'est pas une dépendance obligatoire
+# de l'install, un lab sans le lot ADPT au cache ne doit jamais voir l'install échouer pour une
+# capacité Codex qu'il n'a pas encore.
+find_codex_registrar() {
+  local c
+  c="$CACHE_DIR/_internal/runtime-adapter/register-codex-agent.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  c="$(dirname "$0")/runtime-adapter/register-codex-agent.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  echo ""
+}
+
+# register_codex_agent_if_applicable <mod> <module_dir> — best-effort, symétrique de
+# report_artifact_fidelity, appelée juste après elle en fin de install_module() ET
+# update_module(). N'appelle register-codex-agent.sh QUE si (a) ce module a réellement posé un
+# agent (même garde que resolve_posed_agent_artifact) ET (b) le runtime détecté par
+# runtime-cli-dispatch.sh (lot 2, RUNT-01, `detect_agent_runtime` — VF_RUNTIME prioritaire,
+# sinon cascade command -v) est `codex`. Script/dispatch/runtime non-codex/absent → silence
+# total. Un modèle par worker tient SANS contrainte `fork_turns` — mesuré 38-CONTEXT.md #5,
+# aucune action requise ici. Sortie RELAYÉE TELLE QUELLE, préfixée `[codex-adapter]`, jamais
+# résumée — même doctrine que la bannière `[fidelity]` juste au-dessus.
+register_codex_agent_if_applicable() {
+  local mod="$1" module_dir="$2"
+  vf_dry_run && return 0
+  local artifacts
+  artifacts="$(resolve_posed_agent_artifact "$module_dir" "$mod")" || return 0
+
+  local dispatch runtime
+  dispatch="$(find_runtime_dispatch_lib)"
+  [ -n "$dispatch" ] || return 0
+  runtime="$(bash "$dispatch" detect 2>/dev/null || true)"
+  [ "$runtime" = "codex" ] || return 0
+
+  local registrar
+  registrar="$(find_codex_registrar)"
+  [ -n "$registrar" ] || return 0
+
+  local artifact out
+  while IFS= read -r artifact; do
+    [ -n "$artifact" ] || continue
+    out="$(bash "$registrar" "$artifact" 2>&1)" || true
+    [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/[codex-adapter] /'
+  done <<< "$artifacts"
+  return 0
+}
+
+# unregister_codex_agent_if_applicable <mod> <module_dir> — best-effort, symétrique inverse de
+# register_codex_agent_if_applicable, appelée depuis uninstall_module() AVANT que le manifeste ne
+# supprime les artefacts source (resolve_posed_agent_artifact a besoin des .md source ENCORE
+# présents sous $TARGET_ROOT/agents/ pour dériver quels .toml retirer). CODEX-B5
+# (38-CONTEXT.md:1153-1155, mesure du 2026-08-29) : uninstall/uninstall --all ne retirait
+# JAMAIS les rôles .toml posés côté Codex, laissant Codex charger des rôles orphelins pointant
+# sur des agents supprimés. CONTRAIREMENT à register_codex_agent_if_applicable, ne filtre PAS
+# sur le runtime détecté au moment de l'appel — un .toml orphelin d'un install Codex passé doit
+# être nettoyé même si le runtime résolu maintenant est `claude` : gater sur le runtime courant
+# laisserait survivre exactement les orphelins mesurés par CODEX-B5.
+unregister_codex_agent_if_applicable() {
+  local mod="$1" module_dir="$2"
+  vf_dry_run && return 0
+  local artifacts
+  artifacts="$(resolve_posed_agent_artifact "$module_dir" "$mod")" || return 0
+
+  local registrar
+  registrar="$(find_codex_registrar)"
+  [ -n "$registrar" ] || return 0
+
+  local artifact out
+  while IFS= read -r artifact; do
+    [ -n "$artifact" ] || continue
+    out="$(bash "$registrar" "$artifact" --remove 2>&1)" || true
+    [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/[codex-adapter] /'
+  done <<< "$artifacts"
+  return 0
+}
+
+# find_runtime_registry — cascade à 2 positions identique à find_fidelity_gate
+# (runtime-registry.sh est co-localisé avec check-artifact-fidelity.sh sous
+# plugin/conductor/scripts/) — silence total si absent aux deux positions, même doctrine
+# best-effort que toutes les cascades voisines de ce fichier.
+find_runtime_registry() {
+  local c
+  c="$TARGET_ROOT/scripts/runtime-registry.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  c="$CACHE_DIR/conductor/scripts/runtime-registry.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  echo ""
+}
+
+# record_codex_runtime_if_applicable <mod> <module_dir> — best-effort, appelée juste après
+# register_codex_agent_if_applicable en fin de install_module() ET update_module(), AVANT le
+# bloc coexistence-report déjà câblé (38-06) pour que ce dernier lise l'état fraîchement écrit.
+# CODEX-B6 (38-CONTEXT.md:1156-1164, mesure du 2026-08-29) : la déclaration de coexistence sans
+# hooks (MIGR-05) ne se déclenchait JAMAIS en conditions réelles faute d'écriture dans le
+# registre de runtime au moment de l'install/status — `grep -c 'coexistence'` = 0 à l'install et
+# au status sans pré-semage manuel de .planning/config.json. Gate IDENTIQUE à
+# register_codex_agent_if_applicable sur runtime = codex (zéro effet sur le chemin claude
+# majoritaire, seule raison pour laquelle cette écriture est sûre à automatiser). Invoque
+# `runtime-registry.sh set-active codex --confirmed`, qui modifie DÉLIBÉRÉMENT vf_runtimes.active
+# (pas seulement installed[]) — runtime-registry.sh n'expose aucun verbe plus étroit et ce fichier
+# est hors périmètre (plugin/conductor/**), aucun verbe plus étroit ne peut lui être ajouté ici.
+# Sortie relayée verbatim, préfixée [runtime-registry], jamais capturée en silence.
+record_codex_runtime_if_applicable() {
+  local mod="$1" module_dir="$2"
+  vf_dry_run && return 0
+
+  local artifacts
+  artifacts="$(resolve_posed_agent_artifact "$module_dir" "$mod")" || return 0
+
+  local dispatch runtime
+  dispatch="$(find_runtime_dispatch_lib)"
+  [ -n "$dispatch" ] || return 0
+  runtime="$(bash "$dispatch" detect 2>/dev/null || true)"
+  [ "$runtime" = "codex" ] || return 0
+
+  [ -f ".planning/config.json" ] || return 0
+
+  # TGT-05 (fuite cwd vs TARGET_ROOT, mesurée 2026-08-30 sur un `--target "$CODEX_HOME"`). Le
+  # `.planning/config.json` ciblé ci-dessus est TOUJOURS résolu au cwd (racine du lab courant,
+  # jamais sous TARGET_ROOT) : c'est le comportement voulu PAR CONSTRUCTION, sans condition sur
+  # où pointe TARGET_ROOT — cf. la doctrine cwd-relative du rapport de coexistence (~ligne 2796,
+  # même défaut que runtime-registry.sh). Mais sous --target vers une cible HORS de l'arbre du
+  # repo courant (autre lab, ex. $CODEX_HOME), écrire dans ce `.planning/config.json` muterait en
+  # silence le projet de l'opérateur alors qu'il visait ailleurs — refusé pour cette seule raison
+  # (pas une impossibilité sémantique comme pour `.gitignore` : ici la portée cwd elle-même est un
+  # choix de conception délibéré, seul l'effet de bord silencieux est visé). Placé APRÈS le gate
+  # codex et la présence de `.planning/config.json` : ne journalise que quand une écriture aurait
+  # réellement été tentée, jamais pour un runtime non-codex ou un lab sans registre.
+  if [ -n "$VF_TARGET_OVERRIDE" ]; then
+    local _rcr_cwd_phys
+    _rcr_cwd_phys="$(pwd -P)" || return 0
+    case "$TARGET_ROOT" in
+      "$_rcr_cwd_phys"/*|"$_rcr_cwd_phys") ;;
+      *)
+        log "  runtime-registry : --target ($TARGET_ROOT) sort de l'arbre du repo — .planning/config.json (cwd) non modifié"
+        return 0
+        ;;
+    esac
+  fi
+
+  local registry
+  registry="$(find_runtime_registry)"
+  [ -n "$registry" ] || return 0
+
+  local out
+  out="$(bash "$registry" set-active codex --confirmed 2>&1)" || true
+  [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/[runtime-registry] /'
+  return 0
+}
+
 scripts_prefix_for_scope() {
   # Chemins LITTÉRAUX dans settings.json, valables pour la forme SHELL uniquement (c'est le
   # shell qui exécute la commande qui les expanse). Pour la forme exec (`args`), merge-hooks.sh
   # dérive lui-même la variante exec-safe (hotfix v2.53.1) : "$HOME" → chemin absolu résolu à
   # l'install, "$CLAUDE_PROJECT_DIR" → placeholder harness ${CLAUDE_PROJECT_DIR} — car en forme
   # exec aucun shell n'intervient et le harness ne substitue que ses propres placeholders.
+  #
+  # TGT-02, 3e cas (--target) : ni "$HOME" ni "$CLAUDE_PROJECT_DIR" ne pointent vers une cible
+  # custom — aucune variable d'environnement standard stable pour une cible arbitraire, contrairement
+  # aux deux cas ci-dessous. Retourne donc le chemin ABSOLU déjà résolu, littéralement quoté :
+  # fonctionne SANS dérivation en forme exec aussi — exec_safe_prefix() (merge-hooks.sh) ne
+  # reconnaît que les préfixes "$HOME"/"$CLAUDE_PROJECT_DIR" et laisse tout le reste inchangé, un
+  # chemin déjà absolu n'a rien à dériver.
+  if [ -n "$VF_TARGET_OVERRIDE" ]; then
+    printf '"%s"/scripts' "$TARGET_ROOT"
+    return 0
+  fi
   case "$VF_SCOPE" in
     user) printf '%s' '"$HOME"/.claude/scripts' ;;
     *)    printf '%s' '"$CLAUDE_PROJECT_DIR"/.claude/scripts' ;;
@@ -1071,7 +1708,11 @@ scripts_prefix_for_scope() {
 
 merge_module_hooks() {
   local mod="$1"
-  local fragment="$CACHE_DIR/$mod/hooks/hooks.json"
+  # ROLL-02 (38-03) : 2e paramètre optionnel — un chemin de fragment explicite (ex. celui
+  # sauvegardé par backup_module, restauré par rollback_module) prime sur le fragment du cache
+  # courant. Défaut inchangé : les ~6 appelants existants (1 seul argument) retombent sur EXACTEMENT
+  # le comportement d'avant ce lot — jamais une 2e implémentation du merge JSON.
+  local fragment="${2:-$CACHE_DIR/$mod/hooks/hooks.json}"
   [ -f "$fragment" ] || return 0
   local merger
   merger="$(find_hooks_merger)"
@@ -1110,6 +1751,14 @@ merge_module_hooks() {
       bash "$merger" plan "$fragment" --settings "$TARGET_ROOT/settings.json" \
         --scripts-prefix "$(scripts_prefix_for_scope)" || plan_rc=$?
     fi
+    # Correction ciblée (Phase 38, T6/TD1) : miroir dry-run de la persistance du fragment
+    # ci-dessous (verbe +, D-31-01) — sans cette annonce, TD1 (égalité dry-run == pose réelle)
+    # rougissait sur ce chemin, jamais prédit par le plan alors que la pose réelle le crée dès
+    # que le merge réussit. Même garde que la pose réelle : seulement si le plan de merge
+    # réussirait (plan_rc=0), jamais un chemin annoncé pour un merge qui échouerait.
+    if [ "$plan_rc" -eq 0 ]; then
+      vf_declare_write + "$TARGET_ROOT/.vibeflow-fragments/$mod.json"
+    fi
     return "$plan_rc"
   fi
   # Backup du settings avant toute écriture.
@@ -1146,6 +1795,26 @@ merge_module_hooks() {
   fi
   if [ "$merge_rc" -eq 0 ]; then
     log "  hooks mergés → $TARGET_ROOT/settings.json"
+    # D-38-J (correction ciblée post-ROLL), révisé Phase 38 (T6/TD1 + D-31-16) : persiste le
+    # fragment RÉELLEMENT mergé, PAR MODULE, sous TARGET_ROOT. C'est l'unique source de vérité de
+    # ce qui est VRAIMENT dans settings.json à cet instant : $CACHE_DIR n'est JAMAIS rafraîchi PAR
+    # CE SCRIPT — c'est l'appelant (/vibeflow-install) qui le pré-remplit AVANT chaque
+    # install_module, donc AVANT backup_module lui-même. Sans cette persistance par-module,
+    # backup_module lisait le fragment du cache COURANT (déjà en v2 au moment du backup de v1→v2)
+    # et le rollback des hooks était un no-op silencieux — le trou de rollback que ce lot ferme.
+    #
+    # `vf_place_file` remplace le `cp` brut d'origine (revue Phase 38) : CE fragment n'a PAS la
+    # même nature que le backup de settings.json ci-dessus (état interne du moteur, filet de
+    # sécurité qui ne doit jamais être supprimé automatiquement, D-31-03 l'exclut à dessein) — il
+    # est un état PAR MODULE qui doit mourir AVEC le module. Le poser en `cp` brut le rendait
+    # invisible au manifeste (T6 rougissait : présent sur disque, absent du manifeste) et donc
+    # ORPHELIN à `uninstall` (aucun site de désinstallation ne le retirait, D-31-16 violé en
+    # silence). Router par `vf_place_file` en fait un artefact de pose comme un autre : consigné
+    # dans le manifeste PAR le même appel qui écrit (D-31-01), donc retiré naturellement par
+    # `_vf_uninstall_from_manifest` à la désinstallation, et prédit par le dry-run (miroir
+    # ci-dessus) — sans toucher à la liste close d'exclusions D-31-03, qui n'a pas vocation à
+    # couvrir cet artefact.
+    vf_place_file "$fragment" "$TARGET_ROOT/.vibeflow-fragments/$mod.json"
   else
     log "  ERROR: merge hooks ÉCHOUÉ pour $mod — gouvernance NON câblée (corriger settings.json puis réinstaller)"
     return 1  # VG-3 : l'échec se propage (plus de succès silencieux sans gouvernance)
@@ -1154,7 +1823,10 @@ merge_module_hooks() {
 
 remove_module_hooks() {
   local mod="$1"
-  local fragment="$CACHE_DIR/$mod/hooks/hooks.json"
+  # ROLL-02 (38-03) : même 2e paramètre optionnel que merge_module_hooks, même défaut — retirer
+  # le fragment COURANT du cache (comportement historique) sauf chemin explicite fourni par
+  # l'appelant (rollback_module retire le fragment du cache avant de réinjecter celui du backup).
+  local fragment="${2:-$CACHE_DIR/$mod/hooks/hooks.json}"
   [ -f "$fragment" ] || return 0
   [ -f "$TARGET_ROOT/settings.json" ] || return 0
   local merger
@@ -1303,6 +1975,9 @@ sync_module_governance() {
   # Chemin « version inchangée » (D-04) : sans cet appel, un lab déjà à jour n'obtiendrait JAMAIS
   # la lib de portabilité — idempotent au sein du même processus (VF_ENGINE_LIB_COPIED).
   copy_engine_lib
+  # Miroir (correction ciblée jointure 38) : même nécessité que copy_engine_lib ci-dessus, pour la
+  # table de dispatch runtime-aware (RUNT-01).
+  copy_runtime_dispatch
   copy_module_scripts "$mod"
   merge_module_hooks "$mod"
   # Ordre imposé : le seeder est posé par copy_module_scripts juste au-dessus. L'appeler avant
@@ -1416,6 +2091,12 @@ install_module() {
   # du module — idempotent au sein du même processus (VF_ENGINE_LIB_COPIED), donc sans coût
   # supplémentaire réel sur une boucle `install --all`/`--with-deps`.
   copy_engine_lib
+  # Miroir (correction ciblée jointure 38) : table de dispatch runtime-aware (RUNT-01).
+  copy_runtime_dispatch
+  # Marqueur de cible (TGT-04) : referme le trou pour la cascade documentaire vf-update/SKILL.md
+  # (<S>/<S-moteur>), qui résout par POSITION LITTÉRALE et resterait aveugle à un --target custom
+  # sans ce fichier.
+  write_target_marker
 
   # Backup if existing install
   local installed
@@ -1644,6 +2325,29 @@ install_module() {
     log "  ⚠ $VF_DEGRADED_COPIES_COUNT copie(s) dégradée(s) détectée(s) pendant la pose (voir ci-dessus)"
   fi
   log "✓ $mod $version installé"
+
+  # Bannière de fidélité (FIDE-02, 38-01) : APRÈS la ligne de succès — la pose doit être
+  # terminée avant qu'on rapporte sur elle. Best-effort, silence total si le gate ou l'artefact
+  # sont absents (cf. report_artifact_fidelity).
+  report_artifact_fidelity "$mod" "$module_dir"
+  # Adaptateur Codex (ADPT-02/ADPT-03, 38-05) : symétrique, juste après — best-effort, silence
+  # total si runtime non-codex/adaptateur absent (cf. register_codex_agent_if_applicable).
+  register_codex_agent_if_applicable "$mod" "$module_dir"
+  # Écriture du registre de runtime (CODEX-B6, 38-07) : DOIT précéder le bloc coexistence-report
+  # ci-dessous — sans cette écriture, `--coexistence-report` lit un registre jamais alimenté par
+  # le chemin d'install réel (grep -c 'coexistence' = 0 mesuré le 2026-08-29). Best-effort,
+  # silence total si runtime non-codex/registre absent (cf. record_codex_runtime_if_applicable).
+  record_codex_runtime_if_applicable "$mod" "$module_dir"
+  # Coexistence sans hooks (MIGR-05, 38-06) : MÊME gate, AU MÊME endroit qu'au `status` (juste
+  # après la bannière [fidelity]) — un opérateur qui installe voit la coexistence déclarée sans
+  # second rapport séparé. Best-effort, silence si le gate/registre sont absents.
+  if ! vf_dry_run; then
+    local coex_gate_install
+    coex_gate_install="$(find_fidelity_gate)"
+    if [ -n "$coex_gate_install" ]; then
+      bash "$coex_gate_install" --coexistence-report 2>/dev/null || true
+    fi
+  fi
 }
 
 # ---------- Backup / Rollback ----------
@@ -1674,32 +2378,180 @@ backup_module() {
       [ -f "$TARGET_ROOT/scripts/$name" ] && cp "$TARGET_ROOT/scripts/$name" "$bdir/scripts/"
     done
   fi
+  # ROLL-03 (38-03) : capture de la version installée AU MOMENT du backup — jamais devinée à la
+  # restauration. Grep+cut sur l'entrée exacte du registre (même format que module_version_installed
+  # ci-dessus), jamais un format neuf. Registre absent ou entrée absente (1er install jamais
+  # backuppé avant) → .version absent, rollback_module traite ce cas sans version devinée.
+  if [ -f "$INSTALLED_REGISTRY" ]; then
+    local captured_version
+    captured_version=$(grep "^$mod=" "$INSTALLED_REGISTRY" 2>/dev/null | cut -d= -f2 || true)
+    [ -n "$captured_version" ] && printf '%s' "$captured_version" > "$bdir/.version"
+  fi
+  # ROLL-01 (38-03), corrigé D-38-J (correction ciblée post-ROLL) : hooks — la source n'est PLUS
+  # $CACHE_DIR/$mod/hooks/hooks.json. $CACHE_DIR n'est JAMAIS rafraîchi par ce script : c'est
+  # l'appelant (/vibeflow-install) qui le pré-remplit AVANT install_module, donc AVANT CE backup —
+  # au moment où backup_module tourne, le cache porte déjà le fragment de la VERSION CIBLE (v2),
+  # jamais celui réellement mergé dans settings.json (v1). La seule source de vérité de « ce qui
+  # est VRAIMENT dans settings.json à cet instant » est le fragment persisté PAR MODULE que
+  # merge_module_hooks écrit après CHAQUE merge réussi (voir plus haut dans ce fichier).
+  if [ -f "$TARGET_ROOT/.vibeflow-fragments/$mod.json" ]; then
+    mkdir -p "$bdir/hooks"
+    cp "$TARGET_ROOT/.vibeflow-fragments/$mod.json" "$bdir/hooks/hooks.json"
+  elif [ -f "$CACHE_DIR/$mod/hooks/hooks.json" ]; then
+    # Condition 4 (rétro-compatibilité, digest de mission D-38-J) : le module utilise des hooks
+    # (fragment présent dans le cache courant) mais AUCUN fragment persisté n'existe encore sous
+    # TARGET_ROOT — cas d'un lab installé AVANT cette persistance par-module, qui n'a jamais eu ce
+    # fichier écrit. Le rollback des hooks sera un no-op pour CE backup : DIT explicitement,
+    # jamais tu — c'est le gate de fidélité appliqué à notre propre rollback (ne pas restaurer est
+    # acceptable, ne pas le dire ne l'est pas).
+    log "  ⚠ fragment hooks non restaurable pour $mod : .vibeflow-fragments/$mod.json absent (lab installé avant la persistance par-module) — le rollback des hooks sera un no-op pour ce backup ; réinstaller régénère le fragment"
+  fi
   vf_declare_write + "$bdir"
   log "  backup → $bdir"
 }
 
+# D-38-K (correction ciblée post-ROLL, condition B OBLIGATOIRE) : handler du `trap ERR` de
+# rollback_module. Réutilise `mark_installed` (pas une 2e écriture du registre) avec un format de
+# version délibérément non-numérique — `INCONSISTENT:<étape>:<version_cible>` — reconnu par
+# `show_status` (grep "^$mod=" | cut -d= -f2 rend cette chaîne telle quelle, aucun `=` interne).
+# Le doute ne se tait jamais (même doctrine que D-31-07 côté manifeste) : un état mixte qui ne le
+# DIT pas au registre est le mensonge que ce lot ferme.
+_vf_rollback_mark_inconsistent() {
+  local mod="$1" step="$2" target_version="$3"
+  log "✗ ERREUR pendant le rollback de $mod à l'étape '$step' — état INCOHÉRENT (restauration partielle)"
+  mark_installed "$mod" "INCONSISTENT:$step:$target_version"
+  log "  registre → $mod=INCONSISTENT:$step:$target_version"
+  log "  réparer : relancer 'rollback $mod' (retente la restauration complète depuis le même backup), ou 'install $mod' pour repartir d'une pose propre"
+}
+
 rollback_module() {
   # 31-03 (D-31-09) : non migré vers le socle manifeste — restaure DEPUIS un backup, ce n'est
-  # pas une pose de module (rien à consigner) ; --dry-run y est refusé (D-31-06) ; hors des
-  # 4 critères de succès de la phase.
+  # pas une pose de module (rien à consigner). --dry-run fonctionne depuis ce lot (ROLL-05,
+  # 38-03) ; la non-migration vers le socle manifeste reste inchangée sur ce point précis.
   local mod="$1"
-  # Find latest backup
-  local latest
-  latest=$(ls -1dt "$BACKUP_DIR/$mod"-* 2>/dev/null | head -1)
-  [ -z "$latest" ] && err "Aucun backup trouvé pour $mod dans $BACKUP_DIR"
+  # Find latest backup — glob ANCRÉ sur le format exact du suffixe horodatage écrit par
+  # backup_module (`date +%Y%m%d-%H%M%S`, ligne ~1660) : 8 chiffres, tiret, 6 chiffres, puis
+  # FILTRÉ (38-03, ROLL-04) pour exclure les répertoires `$mod-<ts>-removed` écrits par
+  # vf_converge_apply (motif exact ligne ~2029). Sans ce filtre, `ls -1dt` triait un `-removed`
+  # récent en tête, qui ne porte aucun sous-dossier skills/agents/scripts/hooks — le `rm -rf`
+  # n'était alors jamais atteint et la fonction loggait quand même `✓ rollback OK` sur zéro
+  # action réelle (le défaut mesuré au cadrage 38-CONTEXT.md lignes 216-234).
+  #
+  # 38-CORR (revue post-ROLL) : un glob `"$mod"-*` NON ancré matche aussi les backups d'un AUTRE
+  # module dont le nom commence par le même préfixe — cas réel de ce dépôt, `plugin/mobile-test/`
+  # et `plugin/mobile-test-team/` coexistent. `rollback mobile-test` sélectionnait alors (via
+  # `ls -1dt`, tri par mtime) le backup le plus récent de `mobile-test-team-*` si celui-ci était
+  # postérieur — mauvais module restauré, silencieusement. Le glob ci-dessous exige que le
+  # caractère qui suit `$mod-` soit un CHIFFRE (`[0-9]*`, début de l'horodatage `date
+  # +%Y%m%d-%H%M%S` écrit par backup_module) : un nom de module qui continue par du texte
+  # (`-team-...`) ne peut plus matcher. Le filtre `-removed$` reste nécessaire après ce
+  # resserrement — `mobile-test-20260228-999999-removed` commence bien par un chiffre.
+  local -a candidates=()
+  while IFS= read -r c; do
+    [ -n "$c" ] && candidates+=("$c")
+  done < <(ls -1dt "$BACKUP_DIR/$mod"-[0-9]* 2>/dev/null | grep -v -- '-removed$' || true)
+  local latest="${candidates[0]:-}"
+  [ -z "$latest" ] && err "Aucun backup restaurable pour $mod dans $BACKUP_DIR (aucun backup, ou uniquement des répertoires de convergence -removed sans contenu restaurable)"
+
+  # Aucun des 4 types restaurables présent → même échec bruyant, jamais un OK sur zéro action.
+  if [ ! -d "$latest/skills" ] && [ ! -d "$latest/scripts" ] && [ ! -d "$latest/agents" ] \
+     && [ ! -d "$latest/agent-references" ] && [ ! -f "$latest/hooks/hooks.json" ]; then
+    err "Backup $latest ne porte aucun sous-dossier restaurable (skills/scripts/agents/hooks) — rollback refusé plutôt qu'un OK menteur"
+  fi
+
+  if vf_dry_run; then
+    log "[dry-run] rollback $mod depuis $latest — restaurerait :"
+    [ -d "$latest/skills" ] && log "  [dry-run]   skills/$mod"
+    [ -d "$latest/scripts" ] && log "  [dry-run]   scripts (fichiers du module)"
+    [ -f "$latest/agents/${mod}.md" ] && log "  [dry-run]   agents/${mod}.md"
+    [ -d "$latest/agent-references" ] && log "  [dry-run]   agents/${mod}-references/"
+    [ -f "$latest/hooks/hooks.json" ] && log "  [dry-run]   fragment hooks (mod=$mod)"
+    if [ -f "$latest/.version" ]; then
+      log "  [dry-run]   registre → $mod=$(cat "$latest/.version")"
+    else
+      log "  [dry-run]   registre inchangé (.version absent du backup)"
+    fi
+    return 0
+  fi
+
+  local rollback_target_version="?"
+  [ -f "$latest/.version" ] && rollback_target_version="$(cat "$latest/.version")"
+  local rollback_step="start"
+
+  # D-38-K (correction ciblée post-ROLL, condition B OBLIGATOIRE) : `trap ERR` posé AVEC `set -E`
+  # (errtrace). Sous bash 3.2 (le /bin/bash de macOS, plancher réel de ce dépôt), un `trap ERR`
+  # NE SE PROPAGE PAS dans les fonctions sans `set -E` — et TOUTE cette restauration tourne à
+  # l'intérieur de rollback_module. Posé sans `set -E`, il aurait l'air correct en LECTURE et ne
+  # se déclencherait JAMAIS en EXÉCUTION : exactement le vert silencieux que cette phase existe
+  # pour tuer (vérifié en exécution, pas en lecture — cf. suite de tests, cas `cp` en échec réel).
+  # État shell restauré en sortie (succès ou trap) : `errtrace` ne doit pas fuiter sur l'appelant
+  # si ce script l'utilise déjà pour une autre raison plus haut dans le run.
+  local rollback_had_errtrace=0
+  case "$-" in *E*) rollback_had_errtrace=1 ;; esac
+  set -E
+  trap '_vf_rollback_mark_inconsistent "$mod" "$rollback_step" "$rollback_target_version"' ERR
 
   log "Rollback $mod depuis $latest..."
+  rollback_step="skills"
   if [ -d "$latest/skills" ]; then
     rm -rf "$TARGET_ROOT/skills/$mod"
     cp -r "$latest/skills" "$TARGET_ROOT/skills/$mod"
     log "  restored $TARGET_ROOT/skills/$mod"
   fi
+  rollback_step="scripts"
   if [ -d "$latest/scripts" ]; then
     for f in "$latest/scripts/"*; do
-      [ -f "$f" ] && cp "$f" "$TARGET_ROOT/scripts/" && chmod +x "$TARGET_ROOT/scripts/$(basename "$f")"
+      if [ -f "$f" ]; then
+        # D-38-K : `cp` et `chmod` séparés en 2 commandes AUTONOMES (jamais un `A && B` où seul B
+        # est en position finale du &&-list) — c'est ce qui rend l'échec de `cp` seul, à lui seul,
+        # observable et non-ambigu sous `set -e`/ERR trap, sans dépendre d'une subtilité de
+        # préséance &&/|| vérifiée en LECTURE plutôt qu'en EXÉCUTION (même piège que set -E ci-dessus).
+        cp "$f" "$TARGET_ROOT/scripts/"
+        chmod +x "$TARGET_ROOT/scripts/$(basename "$f")"
+      fi
     done
     log "  restored scripts"
   fi
+  # ROLL-01 (38-03) : agents/${mod}.md + agents/${mod}-references/ — DÉJÀ sauvegardés par
+  # backup_module (D7), jamais relus jusqu'à ce lot. Même patron rm -rf puis cp -r que skills,
+  # jamais un merge partiel.
+  rollback_step="agents"
+  if [ -f "$latest/agents/${mod}.md" ]; then
+    mkdir -p "$TARGET_ROOT/agents"
+    rm -f "$TARGET_ROOT/agents/${mod}.md"
+    cp "$latest/agents/${mod}.md" "$TARGET_ROOT/agents/${mod}.md"
+    log "  restored $TARGET_ROOT/agents/${mod}.md"
+  fi
+  rollback_step="agent-references"
+  if [ -d "$latest/agent-references" ]; then
+    rm -rf "$TARGET_ROOT/agents/${mod}-references"
+    cp -r "$latest/agent-references" "$TARGET_ROOT/agents/${mod}-references"
+    log "  restored $TARGET_ROOT/agents/${mod}-references"
+  fi
+  # ROLL-02 (38-03) : hooks — retire le fragment COURANT du cache (potentiellement une version
+  # différente de celle qu'on restaure), puis réinjecte le fragment SAUVEGARDÉ au moment du
+  # backup. Best-effort ASSUMÉ (leurs propres `||` de repli) : un échec ici ne doit PAS déclarer
+  # l'état INCONSISTENT — c'est le même contrat que leurs appelants dans install_module, jamais
+  # fatal pour le reste du rollback, donc jamais du ressort du trap ERR de cette fonction.
+  rollback_step="hooks"
+  if [ -f "$latest/hooks/hooks.json" ]; then
+    remove_module_hooks "$mod" || log "  (retrait du fragment courant échoué, best-effort)"
+    merge_module_hooks "$mod" "$latest/hooks/hooks.json" || log "  (réinjection du fragment sauvegardé échouée, best-effort)"
+    log "  restored hooks (fragment sauvegardé)"
+  fi
+  # ROLL-03 (38-03) : registre — remis à la version CAPTURÉE au backup, jamais devinée. Backup
+  # pré-ce-lot (pas de .version) → registre laissé inchangé, avertissement explicite plutôt
+  # qu'une version inventée.
+  rollback_step="registry"
+  if [ -f "$latest/.version" ]; then
+    mark_installed "$mod" "$rollback_target_version"
+    log "  registre → $mod=$rollback_target_version"
+  else
+    log "  ⚠ version restaurée inconnue — registre inchangé, vérifier manuellement"
+  fi
+
+  trap - ERR
+  [ "$rollback_had_errtrace" -eq 1 ] || set +E
   log "✓ $mod rollback OK"
 }
 
@@ -1865,6 +2717,12 @@ uninstall_module() {
   log "Désinstallation $mod (scope=$VF_SCOPE → $TARGET_ROOT)..."
   backup_module "$mod"
 
+  # Retrait des rôles Codex (CODEX-B5, 38-07) : IMPÉRATIVEMENT ici, entre backup_module et la
+  # lecture du manifeste qui suit — resolve_posed_agent_artifact a besoin des .md source ENCORE
+  # présents sous $TARGET_ROOT/agents/ pour dériver quels .toml retirer. Best-effort, silence
+  # total si adaptateur absent (cf. unregister_codex_agent_if_applicable).
+  unregister_codex_agent_if_applicable "$mod" "$CACHE_DIR/$mod"
+
   local manifest_rc=0 manifest_content="" refused=0
   manifest_content="$(vf_manifest_read "$mod")" || manifest_rc=$?
   case "$manifest_rc" in
@@ -1911,15 +2769,40 @@ show_status() {
   for mod in $(list_available_modules); do
     installed=$(module_version_installed "$mod")
     available=$(module_version_available "$mod")
-    if [ "$installed" = "—" ]; then
-      status="Not installed"
-    elif [ "$installed" = "$available" ]; then
-      status="Up to date"
-    else
-      status="Update available ($installed → $available)"
-    fi
+    case "$installed" in
+      INCONSISTENT:*)
+        # D-38-K : état déclaré par le trap ERR de rollback_module (jamais un « Up to date »/
+        # « Update available » calculé sur une version fabriquée) — étape + version cible portées
+        # verbatim, le doute ne se tait jamais.
+        _inc_step="${installed#INCONSISTENT:}"
+        _inc_target="${_inc_step#*:}"
+        _inc_step="${_inc_step%%:*}"
+        status="INCONSISTENT (étape=$_inc_step, cible=$_inc_target) — réparer : rollback $mod ou install $mod"
+        ;;
+      —)
+        status="Not installed"
+        ;;
+      "$available")
+        status="Up to date"
+        ;;
+      *)
+        status="Update available ($installed → $available)"
+        ;;
+    esac
     printf "%-30s %-15s %-15s %s\n" "$mod" "$installed" "$available" "$status"
   done
+
+  # Coexistence sans hooks (MIGR-05, 38-06) : MÊME gate que la bannière d'install
+  # (find_fidelity_gate, report_artifact_fidelity), MÊME endroit qu'un opérateur regarderait —
+  # jamais un second rapport séparé. `.planning/config.json` vit à la racine du LAB (le cwd
+  # depuis lequel `status` est invoqué), pas sous TARGET_ROOT (qui pointe vers .claude/ ou une
+  # cible custom) — défaut cwd-relatif du gate/runtime-registry.sh, aucun --config forcé ici.
+  # Sortie RELAYÉE TELLE QUELLE, best-effort (silence si le gate ou le registre sont absents).
+  local coex_gate
+  coex_gate="$(find_fidelity_gate)"
+  if [ -n "$coex_gate" ]; then
+    bash "$coex_gate" --coexistence-report 2>/dev/null || true
+  fi
 }
 
 # ---------- Convergence à l'update (MANI-03, D-31-07) ----------
@@ -2133,6 +3016,18 @@ update_module() {
   vf_converge_snapshot "$mod"
   install_module "$mod"
   vf_converge_apply "$mod"
+
+  # Bannière de fidélité (FIDE-02, 38-01) : 2e couture — point symétrique de update_module(),
+  # APRÈS vf_converge_apply, la ligne `[fidelity]` reflète ici l'état post-convergence
+  # (backup/retrait éventuels), pas seulement l'état immédiat post-copie déjà rapporté par la 1re
+  # couture à l'intérieur de install_module ci-dessus.
+  report_artifact_fidelity "$mod" "$CACHE_DIR/$mod"
+  # Adaptateur Codex (ADPT-02/ADPT-03, 38-05) : 2e couture, symétrique — best-effort, cf.
+  # register_codex_agent_if_applicable.
+  register_codex_agent_if_applicable "$mod" "$CACHE_DIR/$mod"
+  # Écriture du registre de runtime (CODEX-B6, 38-07) : 2e couture, symétrique — cf.
+  # record_codex_runtime_if_applicable, DOIT précéder toute relecture de coexistence-report.
+  record_codex_runtime_if_applicable "$mod" "$CACHE_DIR/$mod"
 }
 
 # ---------- Main ----------

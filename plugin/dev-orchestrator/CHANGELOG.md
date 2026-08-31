@@ -1,5 +1,49 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.20.3] — 2026-08-30 (Phase 38 — description de frontmatter YAML strict, plan 38-08)
+
+**Patch** :
+
+- **Description de frontmatter passée en scalaire mono-ligne quoté** — la description est désormais un scalaire guillemets doubles mono-ligne (texte strictement inchangé), pour traverser sans perte un parseur YAML strict ET la logique d'extraction de gsd-core (`extractFrontmatterField`). 5 fichiers du module concernés. Gate : `plugin/conductor/scripts/check-description-fidelity.sh` (Phase 38, plan 38-08, FIDE-01/FIDE-02).
+
+## [v2.20.2] — 2026-08-28 (bootstrap multi-runtime — Superpowers dispatché par runtime détecté, RUNT-01/02)
+
+**Patch** (durcissement, comportement observable modifié uniquement sur un poste Codex ou sur un
+poste sans CLI `claude` détectée) :
+
+- **Le défaut, mesuré au cadrage Phase 38** : `detect_superpowers()`/`ensure_superpowers()` dans
+  `ensure-deps.sh` appelaient `command -v claude` / `claude plugin ...` en dur. Sur un poste où le
+  runtime détecté n'est pas `claude` (Codex, canal natif `codex plugin` assumé par défaut — non
+  mesuré sur le binaire réel, 38-CONTEXT.md), les 2 checks et
+  les 2 gestes d'install échouaient AVANT même d'atteindre l'adaptateur — aucun geste réel, aucune
+  dégradation déclarée, juste un `command -v claude` silencieusement faux.
+- **Le fix** : les 2 sites (`detect_superpowers`, `ensure_superpowers`) routent désormais par
+  `plugin/_internal/runtime-cli-dispatch.sh`, une table de dispatch partagée (détection
+  `VF_RUNTIME`/cascade `command -v`, résolue par la cascade EXACTE de `find_hooks_merger()`) : sur
+  `claude` ou `codex`, le geste RÉEL est exécuté (mêmes verbes `list --json`/`install`/
+  `marketplace add`) ; sur OpenCode/kimi-code (non mesurés) ou runtime absent, dégradation
+  DÉCLARÉE (étape manuelle affichée, exit propre) — jamais un échec silencieux.
+- Ajout de `ensure_codex_preconditions_if_applicable()` : sur un poste Codex détecté, pose
+  `multi_agent_v2` si inactif (commande officielle `codex features enable`, idempotent) et
+  DÉCLARE (jamais n'auto-écrit) l'état de `trust_level` du dépôt — les deux préconditions
+  100% silencieuses mesurées en session réelle (38-CONTEXT.md), fermées côté installeur.
+- Repli inchangé : script partagé introuvable (poste pas encore mis à jour) → comportement
+  `claude`-figé ACTUEL, aucune régression.
+
+## [v2.20.1] — 2026-08-28 (vf-coder peut relayer une correction au sous-agent qu'il a spawné)
+
+**Patch** (durcissement, comportement observable modifié uniquement en cours d'exécution
+concurrente) :
+
+- **Le défaut, mesuré en réel** : `vf-coder` n'avait pas `SendMessage` dans son `tools:`. Quand le
+  manager lui envoyait une correction en cours d'exécution, `vf-coder` ne pouvait pas la relayer au
+  sous-agent planner qu'il avait lui-même spawné — il devait relancer un agent **frais** (pas une
+  reprise), ce qui a produit une exécution concurrente sur le même fichier lors de cette mission.
+  Terminé sans casse grâce à une vérification en lecture seule avant commit, mais fragile.
+- **Le fix** : ajout de `SendMessage` à l'allowlist `tools:` de `plugin/dev-orchestrator/agents/vf-coder.md`
+  — rien d'autre n'a changé dans ce fichier. Le principe rétabli : un worker qui spawne un
+  sous-agent doit pouvoir corriger ce qu'il a spawné, plutôt que de le dupliquer.
+
 ## [v2.20.0] — 2026-08-28 (la garde Node répare au lieu de refuser — BOOT-01)
 
 **Minor** (capacité nouvelle : `ensure-deps.sh` installe désormais un runtime, ce qu'il n'a jamais

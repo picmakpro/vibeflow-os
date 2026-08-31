@@ -1,0 +1,58 @@
+# Memory Index
+
+- [check-agents.sh vert à vide](project_check-agents-vacuous-green.md) — vert à vide toujours vrai ; le lint de `tools:` existe depuis la Phase 16, ne pas durcir son design gradué
+- [Sessions concurrentes sur le repo](project_sessions-concurrentes-sur-le-repo.md) — le verrou de driver n'empêche pas une autre session de committer : `HEAD~n` ment, relever `git status` avant tout nœud d'hygiène : allowlist bidon = exit 0
+- [Dispatches via skills non forkées](project_dispatches-via-skills-non-forkees.md) — aucune skill n'a `context:` : l'agent qui l'invoque dispatche lui-même les agents qu'elle nomme
+- [Recette d'un test de module](project_recette-test-module-lab-standard.md) — seule la disposition « lab standard » qualifie ; source + index vide laissent passer les régressions
+- [Citation d'une spec dans .planning](project_citation-lifecycle-planning.md) — « absent de ROADMAP.md » ≠ « non intégré » : la citation migre puis disparaît à l'archivage du jalon
+- [Relire le disque avant tout rapport](feedback_relire-le-disque-avant-tout-rapport.md) — une interruption d'outil ne prouve pas qu'un worker n'a rien écrit : re-constater `git log`/`ls` avant de marquer ou de rédiger
+- [Verrou de driver non contraignant](project_verrou-driver-non-contraignant.md) — déclaratif, pas contraignant : une mission élaguée par TTL continue à commiter ; battre le cœur pendant les dispatches longs
+- [Vérifier contre le commit de base](feedback_verifier-contre-le-commit-de-base.md) — « X existe » d'un worker peut avoir été fabriqué par du travail concurrent hors périmètre
+- [Scoper les workers par chemin](feedback_scoper-les-workers-par-chemin.md) — interdire nommément les modules voisins, « aucun autre fichier touché » ne tient pas
+- [Revue obligatoire si coût d'erreur asymétrique](feedback_revue-obligatoire-cout-erreur-asymetrique.md) — une suite verte peut être tautologique ; commander la revue même quand le worker la juge superflue
+- [Tarball gsd-core à double segment](project_gsd-core-tarball-double-segment.md) — le payload npm vit sous `gsd-core/gsd-core/bin/lib` ; résoudre sans ce segment = branche morte depuis toujours
+- [Résoudre $S sur le repo source](project_resolution-scripts-sur-le-repo-source.md) — `plugin/conductor/scripts`, jamais `~/.claude/scripts` qui héberge une version antérieure des mêmes scripts
+- [Artefacts descriptifs non testés](project_artefacts-descriptifs-non-testes.md) — recettes de plan, sondes grep et en-têtes : c'est là que les phases cassent, et un `ask-user` de worker vient presque toujours de là
+- [gsd-tools écrase STATE.md](project_gsd-tools-ecrase-state.md) — `state.*` fait régresser les compteurs `progress` sans rien signaler ; inscrire la baseline dans chaque mandat, interdire l'outil aux juges
+- [REQUIREMENTS.md supprimé à la clôture](project_requirements-supprime-a-la-cloture.md) — aucun lab conforme n'a de ledger d'exigences durable ; nommer le fichier remplacé avant d'en ajouter un
+- [Mandat cumulatif, jamais exclusif](feedback_mandat-cumulatif-jamais-exclusif.md) — « jamais X, fais Y » fait supprimer une garantie vivante ; exiger Y en plus de X
+- [Périmètre de mesure ≠ périmètre de fichiers](feedback_perimetre-de-mesure-vs-perimetre-de-fichiers.md) — un nœud qui compte et un nœud qui crée dans le même dossier ne sont pas disjoints, même sans toucher le repo
+- [`grep` proxifié tronque](project_grep-proxifie-tronque.md) — 31 lignes rendues sur 102, sans avertissement ; extraire en `awk`, comparer en `comm`, jamais compter via un `grep` piped
+- [`diff` et `git diff` proxifiés mentent](project_diff-proxifie-faux-identique.md) — « Files are identical » à tort, et `git diff` nu rend un résumé sans hunks : préfixer `rtk proxy`, comparer en `comm`/`cmp`
+- [Commit par pathspec pour paralléliser](feedback_commit-par-pathspec-pour-paralleliser.md) — `git commit <chemins>` ignore l'index, mais un `git add` ciblé + un `commit` nu chez le voisin suffisent à tout emporter
+- [Re-mesurer la prémisse d'un arbitrage](feedback_re-mesurer-la-premisse-d-un-arbitrage.md) — un arbitrage humain peut reprendre un fait que la mission a déjà démenti : scinder, exécuter la moitié vraie, geler l'autre
+- [Propager une requalification de frontière](feedback_propager-une-requalification-de-frontiere.md) — un plan écrit avant l'arbitrage garde la rédaction fautive : la RCE fermée en 23-02 est revenue par un script neuf de 23-04
+- [Re-valider les plans écrits avant les faits](feedback_revalider-les-plans-ecrits-avant-les-faits.md) — un plancheck lecture seule (~75k) a trouvé 3 bloquants par plan ; sans lui, 3 tours d'exécution
+- [Base de diff dérivée du parent](feedback_base-de-diff-derivee-du-parent.md) — `git rev-parse <sha>^`, jamais l'adjacence dans `git log` ; et un worker dispatché n'est pas rattrapable (pas de SendMessage)
+- [Labels D-NN à portée de phase](project_labels-decision-portee-phase.md) — une « collision » entre phases est la convention ; renuméroter corrompt le registre de cadrage
+- [Re-dériver les listes d'une revue](feedback_re-deriver-les-listes-d-une-revue.md) — 21 annoncées, 31 réelles, chemins morts après un renommage : exiger la re-dérivation, donner l'ancien relevé à recouper
+- [Mutation qui échoue pour la mauvaise raison](feedback_mutation-qui-echoue-pour-la-mauvaise-raison.md) — exiger la trace du rouge (assertion, attendu, obtenu) : un fixture mort ressemble à un mutant tué
+- [Mesurer le moteur GSD](project_mesurer-le-moteur-gsd-corpus-hors-depot.md) — corpus hors dépôt, non épinglable : exiger profondeur + motif + version, sinon 45 et 73 se contredisent sans se tromper
+- [Gate repo-wide en acceptance criteria](feedback_gate-repo-wide-en-acceptance-criteria.md) — rouge à cause d'un fichier hors `<files>` : déviation déclarée minimale en commit séparé, jamais un HALT
+- [Halt tardif : cherry-pick, pas stash](feedback_halt-tardif-cherry-pick-pas-stash.md) — le worker a déjà commité quand l'ordre arrive ; arbre principal sale = worktree, jamais checkout
+- [Une liste de cas ne ferme pas une classe](feedback_liste-de-cas-ne-ferme-pas-une-classe.md) — 4 défauts d'affilée sur la même normalisation : exiger point fixe + preuve générative, pas un Nième point-fix
+- [`gsd_run` absent, flags déjà désarmés](project_gsd-run-absent-flags-deja-desarmes.md) — le reset d'enchaînement échoue toujours ici ; vérifier les deux flags par lecture de `.planning/config.json`, ne pas escalader
+- [Attestation sur SHA figé](feedback_attestation-sur-sha-fige.md) — `git show HEAD:` se sabote au commit ; « 57/57 » rapporté, 56/1 réel : rejouer APRÈS le commit
+- [Preuve du chemin heureux ≠ chemin d'échec](feedback_preuve-du-chemin-heureux-ne-couvre-pas-l-echec.md) — md5 sur 262 fichiers + 3 suites vertes, et 4 bloquants quand même : exiger une injection de panne
+- [Non-régression sur la découverte COMPLÈTE](feedback_non-regression-sur-la-decouverte-complete.md) — 3 suites vérifiées sur 62 : une régression d'un autre module a traversé 6 revues sans être vue
+- [execute-phase filtre par vague, pas par plan](project_execute-phase-filtre-par-vague-pas-par-plan.md) — deux workers sur une même vague : le skill redispatche le plan du voisin, exécuter inline
+- [PushNotification absent en sous-agent](project_pushnotification-absent-en-sous-agent.md) — aucun manager ni `dag.sh` ne peut pousser ; relais `SendMessage(main)`, contrat `message` < 200 car. sans `title`
+- [Trace figée ≠ worker mort](feedback_transcript-fige-ne-prouve-pas-worker-mort.md) — réveiller par SendMessage, jamais dispatcher un remplaçant : deux workers concurrents s'inventent des anomalies fantômes
+- [baseRef head contamine les mesures d'isolation](project_baseref-head-contamine-les-mesures-isolation.md) — ce dépôt porte le réglage de #38 : tout dispatch worktree y est vert pour la mauvaise raison
+- [`ls` proxifié rend vide](project_ls-proxifie-rend-vide.md) — 3ᵉ commande prise en défaut : un dossier peuplé listé VIDE sans erreur ; l'absence n'est jamais prouvée par une seule commande
+- [gsd-core porte le modèle de capacité](project_gsd-core-porte-le-modele-de-capacite.md) — 9 axes + `degradationFor` par point d'interface : un enum maison full/skills-only/unsupported le réimplémente en le dégradant
+- [Escalade humaine : le trou est le mode headless](project_escalade-humaine-trou-headless.md) — les 3 runtimes ont l'outil et le perdent tous en headless ; relayer hors bande, jamais chercher un canal par runtime
+- [Un descripteur gsd-core ne prouve pas un rouge](feedback_descripteur-gsd-core-non-probant.md) — un no-go rédigé reposait sur un champ faux ; la règle « aucun vert auto-déclaré » vaut aussi pour les rouges
+- [`description: >` casse les convertisseurs](project_description-repliee-casse-les-convertisseurs.md) — 16 SKILL.md en scalaire replié : description détruite sur les 3 cibles, 0 diagnostic
+- [Écart de chiffre : comparer les ensembles](feedback_ecart-de-chiffre-comparer-les-ensembles.md) — `comm` puis lire l'élément de l'écart ; 3 parties/3 réponses tranchées par la définition, pas l'autorité
+- [Coût de portage : payload ≫ engine](project_cout-portage-payload-vs-engine.md) — 1050 réfs `.claude/` sur 198 fichiers livrés ; un `--target` sans réécriture de contenu est inerte
+- [Préfixe d'exigences suggéré par le ROADMAP déjà pris](project_prefixe-exigences-suggere-par-roadmap-deja-pris.md) — PORT-xx proposé pour la 38 collisionne avec PORT-01..05 vivant ; dériver l'espace de noms, 36 préfixes occupés
+- [Mesure juste, attribution fausse](feedback_mesure-juste-attribution-fausse.md) — le rejet `[a-z0-9_]+` visait le task_name, pas le nom de rôle : 31 correspondances évitées, « par construction » = marqueur du défaut
+- [Joignabilité asymétrique manager↔worker](project_joignabilite-asymetrique-manager-worker.md) — je peux réveiller un worker (contexte intact), il ne peut PAS me joindre : exiger le retour d'Agent dans chaque mandat
+- [`timeout` absent : faux zéro silencieux](project_timeout-absent-faux-zero.md) — `timeout`/`gtimeout` absents du poste ; une boucle qui les utilise rend 0/N sans erreur. Un `0/N` est un artefact jusqu'à preuve du contraire
+- [Non-régression complète = geste de manager](feedback_non-regression-complete-est-un-geste-de-manager.md) — 4 workers enlisés en une mission ; le worker rejoue les siennes, le manager la découverte complète
+- [Cascade de résolution par fausse analogie](project_cascade-de-resolution-par-fausse-analogie.md) — « cascade identique à X » = signal d'alarme ; 2 cas en une phase, dont un qui désactivait toute la capacité livrée
+- [Édition trop large : vérifier le stat](feedback_edit-trop-large-verifier-le-stat.md) — `count=0` a réécrit 34 lignes d'historique pour 2 attendues, et le gate est resté VERT ; `git diff --stat` avant commit
+- [Filtre de vérification = angle mort](feedback_filtre-de-verification-fabrique-l-angle-mort.md) — `git status | grep -v` maison : « arbre propre » rapporté, 3 fichiers non commités
+- [Description frontmatter : contrainte en ciseaux](project_description-frontmatter-contrainte-en-ciseaux.md) — mono-ligne pour gsd-core, YAML valide pour kimi : seul le scalaire GUILLEMETÉ satisfait les deux ; replier en `>` rouvre le défaut d'en face
+- [Exception de gate = exemption](feedback_exception-de-gate-devient-exemption.md) — `PASS 0 violation, 3 exceptions` pendant qu'un rôle est injoignable : l'exception doit porter sur la forme, jamais sur la propriété

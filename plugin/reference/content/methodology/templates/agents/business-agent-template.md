@@ -1,6 +1,6 @@
 ---
 name: business-agent-[DOMAINE]
-description: Agent metier specialise sur un domaine business non-tech (ex: finance, sales, operations, legal, customer-success). NE CODE JAMAIS — produit des analyses, audits, recommandations chiffrees, livrables business. Spawn par le lead quand une decision technique a un impact metier non trivial, ou quand le sprint touche un domaine specialise.
+description: "Agent metier specialise sur un domaine business non-tech (ex: finance, sales, operations, legal, customer-success). NE CODE JAMAIS — produit des analyses, audits, recommandations chiffrees, livrables business. Spawn par le lead quand une decision technique a un impact metier non trivial, ou quand le sprint touche un domaine specialise."
 model: sonnet
 effort: medium
 skills:

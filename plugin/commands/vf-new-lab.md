@@ -1,5 +1,5 @@
 ---
-description: Crée/initialise un nouveau lab VibeFlow dans n'importe quel métier (acquisition, contenu, business, dev…). Cadrage court puis le lab se construit autour de ce que tu sais déjà.
+description: "Crée/initialise un nouveau lab VibeFlow dans n'importe quel métier (acquisition, contenu, business, dev…). Cadrage court puis le lab se construit autour de ce que tu sais déjà."
 argument-hint: "[métier du lab — ex. acquisition, contenu, business]"
 ---
 

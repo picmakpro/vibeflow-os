@@ -1,5 +1,431 @@
 # Changelog — conductor
 
+## [v1.34.8] — 2026-08-30 (Phase 38 — correction ciblée : preuve générative des six angles morts du prédicat description:)
+
+**Patch** :
+
+- **`scripts/tests/test-check-description-fidelity.sh`** (T26-T41) : constat mesuré avant toute
+  écriture — le mandat de durcissement décrivait le gate comme un prédicat de caractères
+  (« scalaire simple non quoté contenant `': '` »), mais `check-description-fidelity.sh` n'est
+  plus ce prédicat depuis les corrections précédentes (a4975cd/5e01ab5/b7ba7eb/99fa7dc) : c'est une
+  double vérification structurelle (passe A = PyYAML strict, passe B = reproduction verbatim de la
+  regex gsd-core). Vérifié empiriquement sur fixtures isolées AVANT toute modification : les six
+  angles morts nommés au mandat (scalaire nu commençant par `[ * @ { %`, ou finissant par `:`) font
+  DÉJÀ échouer la passe A (YAML invalide), et les deux cas voisins mesurés « acceptés » sous
+  l'ancien prédicat (`&` en tête, ` #` avec troncature silencieuse) font DÉJÀ diverger passe A et
+  passe B (ancre YAML résolue par l'une, gardée en clair par l'autre ; commentaire YAML implicite
+  qui tronque l'une, pas l'autre) — sans aucune modification du gate. `check-description-fidelity.sh`
+  n'a donc **pas été modifié** : rien à durcir dans un prédicat qui n'existe plus. Seize tests
+  ajoutés (T26-T41, huit paires mutant rouge + contrôle sain vert) verrouillent cette preuve en
+  non-régression, un cas par angle mort explicitement nommé par le mandat, plus les deux cas
+  voisins.
+- Non-régression vérifiée : `check-description-fidelity.sh` sur le dépôt réel reste `rc=0`, PASS,
+  74 fichiers, 2 exceptions (inchangé) ; `check-agents.sh --strict` sur les 6 dossiers
+  `plugin/*/agents` reste `rc=0` ; `check-version-sync.sh` reste `rc=0` ;
+  `check-mission-invariants.sh` reste `rc=3` (contrat inversé : SAIN).
+
+## [v1.34.7] — 2026-08-30 (Phase 38 — correction ciblée, second tour : classe de champs à blocs YAML)
+
+**Patch** :
+
+- **`scripts/check-artifact-fidelity.sh`** : `get_field()` ne lisait que la valeur EN LIGNE
+  (`key: value`). Sur une clé YAML écrite en **séquence à blocs** (`key:` suivi de lignes
+  indentées `  - item`) ou en **scalaire à blocs** (`key: |`/`key: >` suivi de texte indenté), la
+  ligne d'en-tête ne porte aucune valeur → chaîne vide → le champ était déclaré absent à tort.
+  Mesuré concrètement sur `skills:` (séquence à blocs) : jamais déclaré dans `LOST=`, alors qu'il
+  l'est réellement dans 7 `AGENT.md` du dépôt (`validator`, `skill-creator`, `kpi-analyst`,
+  `conductor`, entre autres). `get_field()` détecte désormais structurellement les deux formes
+  (ligne d'en-tête vide/indicateur de bloc + ligne suivante indentée) et reconstruit la valeur —
+  sans rien changer à la lecture en ligne, majoritaire et déjà correcte. Classe balayée sous
+  `plugin/` : `skills` (séquence à blocs, réel) et `description` (scalaire à blocs, dans des
+  blueprints de bundle) — les deux désormais couvertes par le même mécanisme structurel, pas un
+  correctif nommé sur `skills` seul.
+- **`scripts/tests/test-check-artifact-fidelity.sh`** : T41-T45 — fixture dédiée portant
+  `skills` en séquence à blocs et `description` en scalaire à blocs (discriminante : les fixtures
+  existantes écrivaient déjà ces champs en ligne, incapables d'attraper ce défaut) ; témoin négatif
+  (retirer `skills` de la source le retire de `LOST=`, présence conditionnée) ; preuve par
+  mutation (un gate rejouant l'ancienne extraction en ligne uniquement reproduit le défaut sur la
+  même fixture, le gate réel non muté le retrouve juste après).
+
+## [v1.34.6] — 2026-08-30 (Phase 38 — correction ciblée groupée, quatre findings post-mesure-kimi)
+
+**Patch** :
+
+- **`design-orchestrator/AGENT.md`** : le seul deux-points-espace non quoté restant dans une
+  `description:` en clair (le dernier des 11 agents rejetés par kimi, `38-MESURE-KIMI.md`) est
+  remplacé par un tiret cadratin. Frontmatter YAML valide, texte inchangé sur un seul caractère.
+- **`scripts/check-description-fidelity.sh`** : le cliquet des exceptions vérifie désormais AUSSI
+  que le frontmatter du fichier exempté **parse** (passe A) avant de statuer sur sa péremption —
+  une exception dispense du quotage, jamais de la validité YAML stricte. Un fichier déclaré en
+  exception dont le frontmatter ne parse pas fait maintenant ROUGIR le gate (`exception au
+  frontmatter YAML invalide`), là où il passait silencieusement avant ce correctif. Conséquence
+  directe et vérifiée : `design-orchestrator/AGENT.md`, désormais YAML valide en clair par le
+  point ci-dessus, ne satisfait plus les conditions d'une exception nécessaire (même statut que
+  `dev-orchestrator/AGENT.md`, jamais déclaré) — retiré de `EXCEPTIONS_REL` pour éviter que le
+  cliquet anti-péremption préexistant ne fasse rougir le gate sur une entrée devenue redondante.
+- **`scripts/check-artifact-fidelity.sh`** : cinq champs de frontmatter supplémentaires
+  (`effort`, `skills`, `vf-requires`, `vf-mcp-consumer`, `vf-mcp-tools`) rejoignent `model`/
+  `memory`/`vf-internal` dans le `LOST=` déclaré pour `--target kimi` — tolérés et ignorés par le
+  même parser agent-core, trouvés en revue fichier par fichier (34/21/5/4/1 fichiers concernés).
+  Relayés aux DEUX points d'observation (`--target kimi <artefact>` à l'install,
+  `--coexistence-report` au status), source unique (`KIMI_LOST_FIELDS_NOTE`/
+  `print_kimi_lost_fields_note()`, même patron D-38-O que `vf-internal`). Non-régression codex
+  vérifiée : `vf-internal` reste `PRESERVED`, `lost=["memory"]` inchangé, aucune fuite de la
+  déclaration kimi vers la cible codex.
+- **Couverture vérifiée (pas de code neuf requis)** : la classe « description en clair contenant
+  à la fois un guillemet double et une apostrophe, jamais déclarée en exception » (4 fichiers —
+  `audit-architecture/SKILL.md`, `dev-orchestrator/AGENT.md`, `templates/skills/
+  agent-density-auditor/SKILL.md`, `templates/skills/debugger/SKILL.md`) est déjà surveillée par
+  le mode audit par défaut du gate — prouvé par mutation (injection d'un `': '` sur une copie de
+  chacun → rouge) plutôt que par ajout d'exception.
+
+## [v1.34.5] — 2026-08-30 (Phase 38 — correction ciblée, gate de fidélité déclare vf-internal perdu sur kimi)
+
+**Patch** :
+
+- **`scripts/check-artifact-fidelity.sh`** accepte désormais `--target kimi`, en plus de `--target
+  codex`. Kimi n'a aucun adaptateur d'artefact posé par une install (le parser agent-core charge
+  le frontmatter markdown source tel quel) : le mode `kimi-declared` déclare les verdicts PAR
+  CHAMP mesurés en session réelle le 2026-08-30 (`38-MESURE-KIMI.md`) — PRESERVED pour
+  `name`/`description`/`tools`/`disallowedTools` (mêmes clés, `disallowedTools` retire réellement
+  l'outil du toolset), LOST pour `model`/`memory`/`vf-internal`.
+- **`vf-internal` LOST** porte une déclaration dédiée, `[fidelity-vf-internal] kimi : …` : le
+  parser de frontmatter agent-core de kimi n'a aucun champ de mode/visibilité (établi sur quatre
+  sources convergentes, dont la mesure directe — `vf-reviewer`, `vf-internal: true`, invoqué
+  directement en session réelle a répondu, 1/1) — le cloisonnement Pattern 12 ne tient plus sur
+  cette cible, l'agent devient invocable DIRECTEMENT par l'utilisateur. Relayée verbatim aux DEUX
+  points d'observation (`--target kimi <artefact>` à l'install, `--coexistence-report` au status —
+  même patron D-38-O que `role_confinement` pour codex), source unique
+  (`KIMI_VF_INTERNAL_NOTE`/`print_kimi_vf_internal_note()`).
+- **Aucune régression codex** : les faits `multi_agent_v2`/`trust_level`/`role_confinement` restent
+  scopés à `--target codex` exclusivement (placeholders explicites pour kimi, jamais une valeur
+  codex par défaut) ; `vf_internal_note` sort vide en JSON sur cible codex.
+
+## [v1.34.4] — 2026-08-30 (Phase 38 — description de frontmatter YAML strict, plan 38-08)
+
+**Patch** :
+
+- **Description de frontmatter passée en scalaire mono-ligne quoté** — la description est désormais un scalaire guillemets doubles mono-ligne (texte strictement inchangé), pour traverser sans perte un parseur YAML strict ET la logique d'extraction de gsd-core (`extractFrontmatterField`). 4 fichiers du module concernés. Gate : `plugin/conductor/scripts/check-description-fidelity.sh` (Phase 38, plan 38-08, FIDE-01/FIDE-02).
+
+## [v1.34.3] — 2026-08-29 (Phase 38 — correction ciblée, D-38-O tenue au status ET à l'install)
+
+**Patch** (mitigation déjà tranchée en doctrine, câblée à son second point d'observation — aucun
+nouveau comportement, aucune nouvelle décision) :
+
+- **`scripts/check-artifact-fidelity.sh`** — le fait `role_confinement` (FIDE-03, D-38-O : sur
+  Codex, `sandbox_mode`/`approval_policy`/`[permissions]` par rôle sont acceptés puis INERTES, le
+  confinement d'un juge n'est garanti QUE par une session `-s read-only` séparée) sortait à
+  l'install (`--target codex <artefact>`) mais PAS au `status` (`--coexistence-report`, invoqué
+  par `show_status()` de `vibeflow-update.sh`) — ce dernier mode `exit 0` avant d'atteindre le
+  bloc concerné. Deuxième récidive du même motif que `T-38-13` (une mitigation déclarée à un seul
+  point d'observation). Corrigé par une refactorisation, pas un patch local : `multi_agent_v2`,
+  `trust_level` et `role_confinement` sont désormais calculés et émis par deux fonctions PARTAGÉES
+  (`compute_fidelity_recette` / `print_fidelity_recette`, définies en tête de script), appelées
+  IDENTIQUEMENT par les deux points d'observation — un fait ajouté demain à cette ligne apparaît
+  automatiquement aux deux endroits, structurellement, jamais par une synchronisation manuelle.
+  Silence légitime préservé : `--coexistence-report` ne dit rien de `role_confinement` si `codex`
+  n'est pas un runtime installé.
+- **`scripts/tests/test-check-artifact-fidelity.sh`** — 9 nouvelles assertions (T25-T28) :
+  T25 (le fait sort au status avec codex installé), T26 (témoin de silence légitime, lab sans
+  codex), T27 (rouge/vert par mutation ciblée sur le SEUL appel du site status, jamais la fonction
+  partagée), et T28 — le durcissement demandé après revue : une comparaison D'ENSEMBLES (jamais
+  une liste de champs énumérée à la main) entre les clés `[fidelity-recette]` déclarées à
+  l'install et au status, prouvée mordante par mutation (le mutant fait perdre `trust_level`/
+  `multi_agent_v2` côté status, l'assertion rougit, le gate réel non muté reste vert). Défaut
+  trouvé en écrivant ce garde lui-même : `extract_recette_keys()` utilisait `[a-zA-Z_]+=` (sans
+  chiffres) — `multi_agent_v2` porte un `2`, cassant la contiguïté juste avant le `=` et rendant
+  la clé invisible aux DEUX côtés (faux négatif structurel). Corrigé en `[a-zA-Z0-9_]+=`.
+
+## [v1.34.2] — 2026-08-29 (Phase 38 — correction ciblée, le texte de coexistence redevient vrai)
+
+**Patch** (correction d'une affirmation factuellement fausse, aucun comportement changé) :
+
+- **`scripts/check-artifact-fidelity.sh --coexistence-report`** — la ligne déclarait « aucun
+  mécanisme équivalent mesuré à ce jour » pour tout runtime non-`claude` coexistant. Démenti par
+  la mesure du 2026-08-29 en exécution réelle : Codex 0.150.1 exécute RÉELLEMENT un `hooks.json`
+  en forme Claude Code (sur-ensemble d'événements et de clés, flag activé par défaut). Ce qui est
+  réellement perdu, et que la ligne dit maintenant : VibeFlow pose ses fragments dans
+  `settings.json`, que ces runtimes n'exécutent pas — la surface `hooks.json` existe et reste
+  atteignable, mais n'est pas visée à ce jour (dette **D-38-R**, déjà consignée dans
+  `.planning/ROADMAP.md`, non touchée par ce patch). Même correction dans ce CHANGELOG
+  (entrée v1.32.0 ci-dessous) et dans le commentaire du gate.
+- **`scripts/tests/test-check-artifact-fidelity.sh`** — 4 nouvelles assertions (T24) : la ligne
+  réelle ne doit plus jamais contenir l'ancienne affirmation fausse, et doit citer `settings.json`
+  comme cause réelle. Prouvé par mutation : réintroduire l'ancien texte sur une copie du gate le
+  fait rougir, puis le gate réel (non muté) reste vert — mutant confiné à sa copie.
+
+## [v1.34.1] — 2026-08-29 (Phase 38 — correction ciblée, le gate apprend le verdict MAPPED)
+
+**Patch** (durcissement du vocabulaire de `check-artifact-fidelity.sh`, pas de nouvelle capacité) :
+
+- **`scripts/check-artifact-fidelity.sh`** — le gate ne connaissait que trois verdicts
+  (`PRESERVED`/`DEGRADED`/`LOST`). Depuis que `agent-to-codex.mjs` traduit `model` (Claude ->
+  Codex, table `CLAUDE_TO_CODEX_MODEL`) et émet `MAPPED` pour le dire, ce statut tombait dans le
+  `*)` du gate et ressortait **`LOST`** — un champ correctement traduit et **valide côté Codex**
+  déclaré perdu. `[fidelity]` gagne un **4e verdict `MAPPED`**, avec la valeur **source** et
+  **cible** dans le log (`model(opus->gpt-5.6-terra)`) — `PRESERVED` reste réservé à une valeur
+  **littéralement identique** des deux côtés. `memory` reste `LOST` (capacité Claude-only, pas de
+  traduction possible) : seul le champ effectivement traduit change de verdict.
+- **`scripts/tests/test-check-artifact-fidelity.sh`** — T1 attendait `model` dans `PRESERVED=`
+  (assertion périmée par le mapping introduit en v1.34.0) ; T23 (`digest_bucket`) ne connaissait
+  pas non plus `MAPPED` et aurait fait rougir l'accord `[fidelity]`/digest réel pour la mauvaise
+  raison. Les deux sont mis à jour pour refléter le vocabulaire réel — suite verte pour l'accord
+  entre les deux outils, jamais par relâchement de l'assertion T23.
+
+## [v1.34.0] — 2026-08-29 (Phase 38 — correction ciblée, gate de fidélité mesure l'artefact réel)
+
+**Minor** (le gate change de nature — il mesure désormais l'artefact réellement posé sur disque,
+et non plus une conversion parallèle qui n'atterrissait jamais) :
+
+- **`scripts/check-artifact-fidelity.sh`** — `--target codex` invoquait la fonction de
+  conversion de gsd-core (`convertClaudeAgentToCodexAgent`), qui rend un Markdown **jamais écrit
+  par aucune install**. L'artefact réellement posé (`$CODEX_HOME/agents/vibeflow/*.toml`) est
+  produit par `agent-to-codex.mjs` (lot 5, ADPT-01), une conversion **différente** — mesuré en
+  session réelle : les deux mesures divergeaient sous la MÊME étiquette `[fidelity]` (ex.
+  `model` LOST côté gsd-core, PRESERVED côté TOML réel), sans qu'aucun opérateur lisant le log
+  d'install ne puisse savoir laquelle décrivait son disque.
+  Le gate invoque désormais **la même conversion que register-codex-agent.sh écrit sur disque**
+  (agent-to-codex.mjs, digest per-champ relayé `[codex-adapter]` à l'install) comme mesure
+  primaire (`MODE=adapter`). La mesure gsd-core reste disponible en **mode de repli uniquement**
+  (adaptateur introuvable sur ce poste — ex. gate posé à plat sous `TARGET_ROOT/scripts/`, où
+  `_internal/` n'est jamais mirroré), toujours marquée `MODE=gsdcore-fallback` sur la ligne
+  rendue — jamais confondue avec la mesure réelle sous la même étiquette.
+  Conséquence mesurée sur la fixture `content-clarity-judge.md` : `model` et `vf-internal`
+  passent de LOST à PRESERVED, `disallowedTools` de LOST à DEGRADED (aucun mécanisme `[tools]`
+  par rôle confirmé fonctionnel, jamais une perte totale) — le gate rend désormais un verdict
+  fidèle à l'artefact sur disque, pas à une conversion fantôme.
+- **`scripts/tests/test-check-artifact-fidelity.sh`** — T1 réécrit sur les verdicts réels
+  (MODE=adapter). T2 repurposé sur la double-absence (adaptateur ET gsd-core indisponibles) ;
+  nouveau T2b prouvant que la mesure réelle ne dépend plus de gsd-core. Nouveau **T23**, test
+  décisif : accord `[fidelity]` / digest réel de `agent-to-codex.mjs` sur les 7 champs, **prouvé
+  par mutation** (une copie du gate qui force `model` en LOST doit rougir la comparaison, puis le
+  gate réel non muté doit repasser vert) — rend structurellement impossible la régression du
+  défaut corrigé ici (feedback `feedback_mutation-test-discriminating-cases`).
+
+## [v1.33.2] — 2026-08-29 (Phase 38 — correction ciblée revue, vf-calibrate/SKILL.md)
+
+**Patch** (correctif documentaire + garde-fou) :
+
+- **`skills/vf-calibrate/SKILL.md`** — la section « Migration de runtime » (lot 6) invoquait 6
+  commandes documentées par leur chemin de **dépôt de dev** (`plugin/conductor/scripts/…`),
+  inexécutable dans un lab installé (l'installeur pose les scripts sous `.claude/scripts/`).
+  Corrigé aux 6 occurrences (l. 130, 141, 154, 162, 168, 179), alignées sur la convention déjà
+  correcte dans le reste du fichier.
+- Nouveau garde-fou **`scripts/tests/test-skill-doc-paths.sh`** : vérifie qu'aucun SKILL.md de
+  conductor ne référence un chemin `plugin/*/scripts/` — aucune des suites existantes ne pouvait
+  détecter ce défaut (elles exercent les scripts directement, jamais le texte des SKILL.md).
+
+## [v1.33.1] — 2026-08-29 (Phase 38 — team-kernel.md, correctif documentaire)
+
+**Patch** (correctif documentaire, aucune capacité) :
+
+- **`team-kernel.md`** — la ligne « Dispatch nommé » affirmait kimi-code **built-in-only**
+  (`namedDispatch: false`, aucun enregistrement custom) : mesuré FAUX sur
+  `@moonshot-ai/kimi-code@0.39.1` réellement installé (`subagents: array(string())`,
+  `delegatableSubagents()` résout par nom, `load()` fusionne les agent-files du disque dans une
+  Map clé=nom). Ligne corrigée, datée, périmé signalé sans effacer la nuance utile : VibeFlow ne
+  cible toujours qu'un runtime, aucun mécanisme de repli construit.
+- Nouvelle ligne **piège d'identité de paquet npm** : `kimi-code` (npm nu) N'EST PAS le produit
+  Moonshot (tiers, non modifié depuis ~1 an) — le vrai est `@moonshot-ai/kimi-code` ; `kimi-cli`
+  est un troisième objet distinct.
+
+## [v1.33.0] — 2026-08-29 (Phase 38 — migration/coexistence de runtime, MIGR)
+
+**Minor** (nouvelles capacités observables) :
+
+- **`runtime-registry.sh`** (MIGR-01) — lecture/écriture de la clé racine `runtime` de
+  `.planning/config.json`, rétro-compatible sur les 3 formes réelles d'un lab (absente, scalaire,
+  objet `vf_runtimes`). La clé racine reste TOUJOURS une chaîne (contrat gsd-core
+  `canonicalizeRuntimeName`, jamais un objet). `set-active` gate toute écriture derrière
+  `--confirmed` explicite (`--dry-run` prévisualise sans jamais toucher au disque, ADR-031) —
+  écriture atomique (temp + mv), `vf_runtimes.installed` toujours étendu, jamais remplacé
+  (coexistence par défaut).
+- **`vf-calibrate`** (MIGR-02) — expose désormais DEUX natures distinctes, jamais mélangées :
+  propagation additive de version framework (inchangée) et migration soustractive de runtime
+  (nouvelle section « Migration de runtime »). La première ligne de sortie du skill annonce
+  toujours laquelle est en cours (`[vf-calibrate:propagation]` / `[vf-calibrate:migration-runtime]`).
+- **`verify-runtime-reversibility.sh`** (MIGR-04) — preuve fichier à fichier (`comm -3` sur des
+  listes triées, jamais un compte) qu'un cycle bascule → retour restaure l'ensemble EXACT de
+  fichiers d'avant bascule. Réutilise `vibeflow-update.sh --target` (lot 4) et le `rollback` du
+  lot 3, jamais une 2e implémentation de pose.
+- **`check-artifact-fidelity.sh --coexistence-report`** (MIGR-05) — déclare, au même endroit à
+  l'install ET au `status` (`vibeflow-update.sh`), qu'un runtime coexistant avec `claude` opère
+  sans gouvernance de hooks — parce que VibeFlow pose ses fragments dans `settings.json`, que ce
+  runtime n'exécute pas, pas parce qu'aucun mécanisme équivalent n'existerait (la surface existe
+  et reste atteignable, cf. D-38-R). Silence total si aucun runtime non-`claude` n'est installé.
+
+## [v1.32.0] — 2026-08-29 (Phase 38 — `--target` injectable + réécriture du payload, TGT)
+
+**Minor** (nouvelle capacité observable à l'install/update) :
+
+- **`vibeflow-update.sh`** — `TARGET_ROOT` devient injectable via `--target <chemin>` (ou la
+  variable d'env `VF_TARGET`), en AJOUT des deux littéraux `user`/`project|local` existants —
+  jamais un remplacement, comportement par défaut byte-identique sans `--target` (preuve `diff -r`
+  hors timestamps volatils). Résolution PHYSIQUE (`cd -P`/`pwd -P`, D-31-15), refus de la racine
+  `/` littérale ou résolue.
+- **Réécriture du payload à la copie (TGT-03)** — `vf_place_file`/`vf_place_tree` réécrivent,
+  UNIQUEMENT sous `--target`, les occurrences littérales `.claude/` du payload (198 fichiers /
+  1130 occurrences mesurées, périmètre hors `_internal/`) vers la cible réellement résolue.
+  Principe repris de `copyWithPathReplacement` (gsd-core `bin/install.js`), implémentation bash
+  propre — jamais le code amont. Sans `--target` : aucune réécriture, coût nul.
+- Les 16 littéraux résiduels de `gitignore_add_paths()`/`scripts_prefix_for_scope()` suivent
+  désormais `TARGET_ROOT` : le `.gitignore` local exprime un chemin relatif à la cible réelle (ou
+  se tait, en journalisant, si la cible sort de l'arbre du repo — jamais une entrée invalide) ; le
+  placeholder `{{VF_SCRIPTS}}` de `settings.json` résout vers le chemin absolu de la cible, jamais
+  vers `$HOME`/`$CLAUDE_PROJECT_DIR` qui ne pointent vers aucune cible custom.
+- **Marqueur `$TARGET_ROOT/scripts/.vibeflow-target`** (TGT-04) — posé best-effort à chaque
+  install/update (idempotent, engine-owned, exclu du manifeste D-31-03), referme le trou de la
+  cascade documentaire `vf-update/SKILL.md` (`<S>`/`<S-moteur>`, résolution par position
+  littérale) : une 0e étape lit ce marqueur pour retrouver la cible réelle sous `--target`.
+- Sonde cross-module `<S-moteur>` (`check-gsd-engine.sh`, D-38-H) vérifiée par exécution comparée
+  (install par défaut vs install `--target`) — indépendante de `TARGET_ROOT` par construction,
+  confirmé jamais supposé.
+
+## [v1.31.0] — 2026-08-29 (Phase 38 — adaptateur VibeFlow -> rôle Codex, ADPT)
+
+**Minor** (nouvelle capacité : un agent VibeFlow réel devient un rôle Codex réellement
+dispatchable) :
+
+- **`plugin/_internal/runtime-adapter/agent-to-codex.mjs`** (nouveau) — conversion PURE
+  (aucun effet de bord disque) d'un agent VibeFlow (frontmatter Claude Code + corps Markdown)
+  vers un rôle Codex 0.150.1 : `name`/`description`/corps -> `developer_instructions` (les trois
+  requis, mesurés sur le binaire — la doc dit `developer_instructions` optionnel, c'est faux),
+  `model` -> `model`, `effort` -> `model_reasoning_effort`. Mapping ALIGNÉ sur celui de
+  l'importeur natif Codex (`external-agent-migration`, `/import`), jamais inventé. `memory`
+  (LOST, schéma Codex la rejette) et `tools`/`disallowedTools` (PENDING, aucun équivalent
+  déclaratif mesuré — jamais simulés sous une clé inventée de `[tools]`, piège n°2) sont déclarés
+  champ par champ dans un digest explicite, jamais une case vide.
+- **`plugin/_internal/runtime-adapter/register-codex-agent.sh`** (nouveau) — orchestration :
+  résout `CODEX_HOME`, écrit le `.toml` sous `$CODEX_HOME/agents/vibeflow/<name>.toml` (SEULE
+  surface d'écriture, jamais `[agents.<n>]` de `config.toml`, aucune commande `codex config`
+  n'existant pour défaire une telle écriture), idempotent. `--verify` (ADPT-04) mesure — sur ce
+  poste, en session réelle — que `codex doctor --json` **n'énumère jamais les rôles valides par
+  nom** ; le seul signal observable est un `startup warning` référençant le chemin d'un rôle
+  MALFORMÉ (mesuré : un `codex doctor --json` global reste `exit 0` même avec un rôle cassé
+  présent, piège n°1 — jamais « pas de crash donc c'est bon »). Le gate vérifie donc l'ABSENCE
+  d'un tel warning référençant le fichier posé.
+- **`plugin/_internal/runtime-adapter/tests/test-agent-to-codex.sh`** (nouveau) — 6/6 vert,
+  T4 exécuté RÉELLEMENT contre le binaire `codex` de ce poste (banc isolé, `~/.codex` réel
+  intact, sha256 comparé), avec un sous-cas qui prouve que le détecteur discrimine vraiment
+  (un rôle malformé injecté à la main déclenche bien le `startup warning`, mutation tuée).
+- **`plugin/conductor/references/team-kernel.md`** — règle d'instanciation transverse : sur
+  Codex, seul le `task_name` de spawn se normalise en snake_case (`[a-z0-9_]+`, segment de
+  chemin), jamais `agent_type` (les 31 noms d'agents VibeFlow gardent leurs tirets — l'inconnu
+  #3 de la sonde réelle est confirmé, aucune table de correspondance construite). Documente
+  aussi que `fork_turns` n'a besoin d'aucune contrainte pour préserver `model` (inconnu #5
+  confirmé).
+- **`plugin/_internal/runtime-adapter/codex-judge-session-command.md`** (nouveau) — pose la
+  commande de session read-only séparée (D-38-E) et prouve, par exécution réelle du gate
+  `check-artifact-fidelity.sh --check-judge-command`, qu'elle porte les quatre éléments requis
+  (exit 0). ADPT-06 vérifié séparément (hors dépôt, banc isolé) : 0/5 marqueur d'injection sur
+  des runs réels avec la commande mitigée.
+- **Hors périmètre de ce lot, déclaré** : le wiring `install_module()`/`update_module()` de
+  `plugin/_internal/vibeflow-update.sh` (appel best-effort à `register-codex-agent.sh` sur
+  runtime `codex` détecté) N'A PAS été fait ici — un autre worker réécrit ce fichier en
+  parallèle sur la même branche (périmètre `--target`, lot distinct). À câbler dans un lot de
+  suivi une fois cette réécriture parallèle mergée.
+- **Le checkpoint de confinement des juges (option A vs B) reste hors de ce lot** : D-38-E a
+  déjà tranché en amont (option A, restreinte aux trois agents lecture seule) — ce lot livre la
+  commande et son gate, il ne rouvre pas la décision.
+
+## [v1.30.0] — 2026-08-28 (Phase 38 — la limite de confinement des juges est déclarée, FIDE-03)
+
+**Minor** (nouvelle capacité observable au status et à l'install) :
+
+- **`check-artifact-fidelity.sh`** — déclare désormais un TROISIÈME fait de recette,
+  `role_confinement`, au même rang que `multi_agent_v2` et `trust_level` sur la ligne
+  `[fidelity-recette]` (relayée verbatim à l'install par FIDE-02, donc visible aux deux endroits
+  sans toucher `vibeflow-update.sh`) : sur Codex, `sandbox_mode`/`approval_policy`/
+  `[permissions]` déclarés PAR RÔLE sont acceptés puis INERTES — mesuré en session réelle (un
+  rôle `read-only` a réellement écrit sur disque). Le confinement d'un juge (`vf-reviewer`,
+  `vf-auditer`, `vf-design-judge`) n'est garanti QUE par une session `codex exec -s read-only`
+  séparée. Corrige un défaut trouvé par la revue du lot FIDE : `38-05-PLAN.md` (T-38-13)
+  affirmait cette mitigation comme déjà déclarée par FIDE-01 — elle ne l'était pas.
+- **Nouveau mode `--check-judge-command <fichier>`** : vérifie que la commande de session
+  read-only séparée (posée par le lot 5, qui pose les rôles Codex) porte les QUATRE éléments
+  requis — `-s read-only` · `approval_policy=never` · `skills.include_instructions=false` ·
+  `project_doc_max_bytes=0`. C'est un ET, jamais un OU (ADPT-05 : le seul levier `skills` laisse
+  ouvert le canal `AGENTS.md` du dépôt jugé). Exit 0 si les quatre sont présents, exit 1 (rouge)
+  s'il en manque au moins un, exit 3 (INDÉTERMINÉ, stdout vide) si le fichier n'existe pas
+  encore — le lot 5 dépend de ce gate dans le DAG, donc « pas encore posée » ne doit jamais
+  rendre le même verdict que « posée et conforme » (contrat F13 appliqué au gate lui-même).
+- Suite : 19 → 35 OK / 0 KO. Ajouts : T8 (role_confinement sur `[fidelity-recette]`), T9
+  (commande de juge absente → exit 3, stdout vide), T10-T13 (une mutation par élément retiré,
+  rouge avant / vert après pour chacun des quatre, avec contre-épreuve que la commande complète
+  non mutée reste verte à chaque cas — le mutant reste confiné à sa propre fixture).
+
+## [v1.29.0] — 2026-08-28 (Phase 38 — bannière de fidélité câblée dans l'engine, FIDE-02)
+
+**Minor** (nouvelle capacité observable à chaque install/update) :
+
+- **`vibeflow-update.sh`** — `install_module()` et `update_module()` invoquent désormais, en
+  best-effort, le gate `check-artifact-fidelity.sh` (posé par FIDE-01, v1.28.x) sur le premier
+  artefact agent (`AGENT.md` ou `agents/*.md`) posé par le module — cible `codex`. Sa sortie est
+  relayée VERBATIM sur le stdout de l'install (jamais capturée puis résumée) : la ligne
+  `[fidelity]` (et `[fidelity-recette]` pour `multi_agent_v2`/`trust_level`) apparaît à la fin de
+  la pose de chaque module à agent, jamais dans un rapport séparé qu'on ne relit pas.
+- Deux points de couture : fin de `install_module()` (après la ligne de succès), et fin de
+  `update_module()` (après `vf_converge_apply`, reflétant l'état post-convergence). Un module
+  skill-only ou un poste sans `conductor` posé ne voit AUCUNE ligne — silence total, l'install ne
+  dégrade jamais pour un gate qu'elle n'a pas les moyens de produire.
+- Résolution du gate : `find_fidelity_gate()`, cascade à 2 positions (`$TARGET_ROOT/scripts/` puis
+  `$CACHE_DIR/conductor/scripts/`) — même patron que les résolveurs conductor déjà en place dans
+  ce fichier (`generate_agent_command_for`, `inject_lab_mcp_into_agents`), car `check-artifact-
+  fidelity.sh` vit dans `conductor/scripts/`, pas dans `_internal/` (cascade différente de
+  `find_hooks_merger`).
+- Suite dédiée : 3 cas neufs dans `test-vibeflow-update.sh` (T24 bannière présente à l'install,
+  T25 silence best-effort quand `conductor` est absent du cache, T26 bannière aussi sur un update
+  réel) — 34/34 vertes, dont le rouge-avant-vert des 3 nouveaux cas prouvé par retrait temporaire
+  du câblage.
+
+## [v1.28.4] — 2026-08-28 (Phase 38 — garde jamais desserré par son propre lot, consigné au kernel)
+
+**Patch** (doctrine consignée, aucun comportement machine modifié par ce lot) :
+
+- **`references/team-kernel.md`** — nouvelle règle d'instanciation : un lot ne desserre jamais
+  son propre garde dans le commit qui en bénéficie. Un garde de doctrine sur lequel un lot bute
+  se pose en besoin et s'escalade ; il ne se modifie que dans un commit séparé, après décision —
+  un garde modifié par l'auteur du changement qu'il surveille perd sa fonction (il ne mesure plus
+  rien d'indépendant).
+- Incident fondateur consigné fidèlement (Phase 38, `d6ff0d4`) : le garde T9e de
+  `test-design-orchestrator.sh` (D-04) a été affaibli dans le même commit que le code qu'il
+  encadrait, malgré une mention CHANGELOG « sans affaiblir la garde » — une revue en régime plein
+  a prouvé par mutation l'affaiblissement réel. Le choix technique sous-jacent était défendable et
+  a été ratifié (D-38-M) : c'est la procédure qui manquait, pas le jugement.
+
+## [v1.28.3] — 2026-08-28 (Phase 38 — joignabilité worker → sous-agent consignée au kernel)
+
+**Patch** (doctrine consignée, aucun comportement machine modifié par ce lot) :
+
+- **`references/team-kernel.md`** — nouvelle ligne de table : un worker qui dispatche des
+  sous-agents doit pouvoir les corriger en vol, faute de quoi une correction reçue en cours
+  d'exécution force un redispatch en agent frais (perte de contexte, risque d'exécution
+  concurrente sur le même fichier). Fait mesuré pendant la mission Phase 38 (2026-08-28) sur
+  `vf-coder`, fix déjà livré au commit `7c1443b` (ajout de `SendMessage` à son `tools:`).
+- Consigne aussi l'**asymétrie structurelle** du kernel, pas un défaut à corriger davantage : un
+  manager RÉVEILLE un worker en cours par `SendMessage` (contexte intact) ; un worker ne résout
+  PAS le nom de son manager depuis son étage — son retour passe par le rapport typé, jamais par
+  `SendMessage` vers le haut. Corollaire de pilotage écrit : jamais de protocole où le worker doit
+  INITIER un échange — il termine et rend en `action: ask-user`, c'est le tour de boucle qui est
+  le canal.
+
+## [v1.28.2] — 2026-08-28 (bootstrap multi-runtime — bandeau de mise à jour dispatché par runtime, RUNT-01/02)
+
+**Patch** (durcissement, comportement observable modifié uniquement sur un poste Codex ou sans
+CLI `claude` détectée) :
+
+- **`check-plugin-update.sh`** (repli `installed`, l.60-61) et **`vf-update-run.sh`** (prose
+  d'en-tête + message de flux) routent désormais par `plugin/_internal/runtime-cli-dispatch.sh`
+  au lieu d'un `command -v claude`/`claude plugin list` figé. Sur `claude` ou `codex`, le bandeau
+  SessionStart lit la version installée réellement ; sur un runtime non supporté (ou absent),
+  `installed` reste vide et la comparaison de version est simplement sautée — best-effort
+  inchangé, jamais un `exit` non-zéro qui casserait le bandeau.
+- Repli inchangé si le script partagé est introuvable (poste pas encore mis à jour) :
+  comportement `claude`-figé ACTUEL, aucune régression.
+- Rejeu complet de la découverte des suites (`find plugin scripts -type f -path
+  '*/tests/test-*.sh'`) : 70/70 vertes — synchronise `README.md`/`README.fr.md` sur ce total
+  (`scripts/check-version-sync.sh` vert).
+
 ## [v1.28.1] — 2026-08-27 (Phase 35 — les deux gates d'isolation restent, en connaissance de cause)
 
 **Patch** (doctrine consignée, aucun comportement machine modifié) :

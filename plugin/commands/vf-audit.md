@@ -1,5 +1,5 @@
 ---
-description: Lance l'audit de conformité complet du lab (densité agents, dette mémoire, infrastructure, architecture des process) via l'agent vibeflow-validator.
+description: "Lance l'audit de conformité complet du lab (densité agents, dette mémoire, infrastructure, architecture des process) via l'agent vibeflow-validator."
 argument-hint: "[optionnel : focus de l'audit]"
 ---
 

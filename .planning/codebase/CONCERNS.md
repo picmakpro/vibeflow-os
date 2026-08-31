@@ -227,6 +227,24 @@ capturées au backlog — voir Tech Debt.
 
 ## Security Considerations
 
+**Codex importe de lui-même une 5e racine de skills, non choisie par l'utilisateur** — Sévérité : **MEDIUM**
+- Risk: Codex télécharge de lui-même un cache de skills distant
+  (`plugins/cache/openai-curated-remote`) qui apparaît comme une **5e racine de skills** au fil des
+  sessions. Un lab sous Codex hérite donc de skills que l'utilisateur n'a ni posées ni choisies —
+  VibeFlow ne les liste ni ne les contrôle. Mesuré pendant la Phase 38 (multi-runtime) ; l'audit de
+  clôture a constaté que le fait n'était consigné dans **aucun document livré**, seulement dans les
+  notes internes de la phase.
+- Files: comportement du binaire `codex` (hors dépôt) ; déclaré côté gate en constante
+  `REMOTE_SKILLS_CACHE` dans `plugin/conductor/scripts/check-artifact-fidelity.sh`
+  (`compute_fidelity_recette`/`print_fidelity_recette`, champ `remote_skills_cache` de la ligne
+  `[fidelity-recette]`, aux deux points d'observation — install `--target codex` et status
+  `--coexistence-report`).
+- Current mitigation: déclaration seule (pas d'enforcement) — même doctrine que
+  `role_confinement`/`multi_agent_v2`/`trust_level` sur la même ligne : un opérateur qui lit la
+  recette voit le fait, VibeFlow ne le désarme pas.
+- Recommendations: si un contrôle de contenu de skills devient nécessaire un jour (allowlist,
+  revue), le cache distant est un site à couvrir explicitement — hors périmètre de cette phase.
+
 **Nom de module non assaini dans l'engine** — Sévérité : **LOW**
 - Risk: `install_module` valide seulement `[ -d "$CACHE_DIR/$mod" ]` — un nom contenant `../`
   résoudrait hors cache. Exposition faible : l'appelant prod est le skill `/vibeflow-install` qui
@@ -372,6 +390,35 @@ d'entrées ; scripts bash + python3 stdlib). Les anciens points (O(n²) de
 vrais dans le code mais sans impact observé — sévérité **LOW**, ne pas prioriser.
 
 ## Fragile Areas
+
+**`kimi doctor` est un VERT À VIDE sur les agents — il ne les regarde pas** — Sévérité : **HIGH**
+- Files: toute recette d'install/vérification ciblant kimi-code ; constat en
+  `.planning/phases/VFDO-38-*/38-MESURE-KIMI.md` (artefact `71-doctor-populated.txt`)
+- Why fragile: mesuré le 2026-08-30 — sur un banc peuplé de **11 agents cassés sur 31**, `kimi
+  doctor` rend **« All checked config files are valid »**. Il valide les fichiers de configuration
+  et **jamais les agents**. Le seul signal est un WARN dans `<KIMI_CODE_HOME>/logs/kimi-code.log`,
+  lui-même **tronqué nativement à 233 octets** (vérifié à l'`od -c` : la raison du rejet est coupée)
+  et **plafonné à 5 lignes** (« Suppressed 6 further agent-discovery skip warnings »). Une recette
+  qui conclurait « install saine » sur `doctor` déclarerait vert un lab dont un tiers des rôles ne
+  charge pas — et les managers, eux, chargeraient et **dispatcheraient dans le vide**.
+- Safe modification: **toute recette d'install kimi vérifie par `kimi --agent-file <chemin>`, fichier
+  par fichier — jamais par `doctor`, jamais par le log.** `--agent-file` rend le message d'erreur
+  **complet** et échoue **avant** tout appel de modèle (donc à coût nul). L'écrire dans la recette
+  elle-même, pas seulement ici : une consigne qui ne vit que dans CONCERNS ne protège personne.
+- Test coverage: le gate double-parseur posé en Phase 38 couvre la **forme** du frontmatter ; il ne
+  remplace pas la vérification `--agent-file` sur cible kimi réelle.
+
+**`vf-internal` est perdu en silence sur kimi — le Pattern 12 ne tient plus** — Sévérité : **MEDIUM**
+- Files: 19 agents portant `vf-internal: true` ; `plugin/conductor/scripts/check-artifact-fidelity.sh`
+- Why fragile: mesuré le 2026-08-30 — kimi **tolère et ignore** `vf-internal`, comme `model`,
+  `effort`, `memory`, `skills`, `vf-requires`, `vf-mcp-*`. Aucun de ces champs n'empêche le
+  chargement (bonne nouvelle pour l'adaptateur), mais `vf-internal: true` perdu signifie qu'un
+  **worker interne devient publiquement invocable** (`kimi --agent vf-coder`). Le cloisonnement du
+  Pattern 12 est une garantie **de frontmatter**, pas de runtime : elle ne survit pas à la
+  conversion.
+- Safe modification: la perte doit être **déclarée par le gate de fidélité** à l'install ET au
+  `status` sur cible kimi, avec un texte vrai — jamais un texte qui promet un confinement inexistant.
+- Test coverage: à câbler avec la déclaration du gate.
 
 **Modules `mobile-test` / `mobile-test-team` expérimentaux — « run réel vert » jamais tracé** — Sévérité : **HIGH**
 - Files: `plugin/mobile-test/module.json:5` et `plugin/mobile-test-team/module.json:5` (« Statut
@@ -537,8 +584,38 @@ vrais dans le code mais sans impact observé — sévérité **LOW**, ne pas pri
   le contraire du réel et que personne ne re-mesure. Non corrigé ici : le mandat d'audit
   autorisait à *enregistrer un verdict* dans les SUMMARY, pas à les réécrire.
 
+**Aucune primitive partagée de confinement de chemin — l'engine porte sa propre validation, à
+chaque site, ou aucune** — Priority: **HIGH**
+- What's not tested: `check-agents.sh:510-511` valide bien `name` contre `[a-z0-9-]+`
+  (`re.fullmatch`), mais ce gate ne protège que les agents **de ce dépôt**, en **CI**.
+  `vibeflow-update.sh` ne l'invoque JAMAIS — zéro occurrence dans le fichier. Un module tiers du
+  marketplace, ou un module de lab modifié après coup, échappe donc entièrement à cette règle :
+  rien côté engine ne revalide un `name:` de frontmatter avant de s'en servir pour construire un
+  chemin. C'est le 5ᵉ passage mesuré sur ce sous-motif (« aucune primitive partagée de
+  confinement de chemin », déjà 4 occurrences côté symlink) — chaque site qui a besoin de la
+  garde la réimplémente localement (ou l'oublie), il n'existe aucune fonction unique
+  `sanitize_component()`/`assert_safe_name()` à laquelle un nouveau site pourrait simplement
+  faire appel.
+  Corrigé au point d'usage pour le seul site trouvé porteur du défaut (`register-codex-agent.sh`,
+  pose ET `--remove` d'un rôle Codex depuis le `name:` du frontmatter d'un agent) — recherche
+  élargie à tout le dépôt (`grep -rnE "jq (-r )?'\.name'|sed -n .s/\^name:|frontmatter\.get\(.name.\)|fm\.get\(.name.\)" plugin --include="*.sh" --include="*.mjs" --include="*.js" --include="*.py"`,
+  hors `tests/`) : **aucun autre site** ne dérive un nom de chemin depuis un contenu de fichier
+  (frontmatter/JSON/TOML) dans `plugin/`. Les autres candidats inspectés (`_vf_uninstall_from_cache`
+  dans `vibeflow-update.sh`, `plugin/conductor/scripts/runtime-registry.sh`,
+  `plugin/_internal/merge-hooks.sh`) dérivent tous leurs noms via `basename` d'un listing
+  filesystem ou d'une correspondance sur un basename déjà référencé — jamais depuis un contenu
+  de fichier — donc hors de la classe de vulnérabilité visée.
+- Files: `plugin/_internal/runtime-adapter/register-codex-agent.sh` (corrigé),
+  `plugin/conductor/scripts/check-agents.sh:510-511` (gate CI, non porté par l'engine)
+- Risk: le prochain site qui dérive un nom depuis un contenu de fichier (nouveau runtime tier-1,
+  nouveau format de registre) reproduira le même défaut par défaut, faute d'une primitive
+  partagée à appeler — dette de conception, pas seulement le bug ponctuel déjà fermé.
+
 ---
 
 *Concerns audit: 2026-07-26 — v2.36.1, 17 modules, 37 suites CI*
 *Complété 2026-08-04 par `/gsd-secure-phase 24` : 4 entrées (1 dette d'architecture HIGH,
 2 sécurité HIGH, 2 lacunes de couverture) issues de l'audit des 34 menaces ouvertes.*
+*Complété 2026-08-29 — correction ciblée Phase 38 (register-codex-agent.sh, traversée de
+chemin sur `name:`) : 1 entrée dette de conception (primitive de confinement de chemin absente
+côté engine).*

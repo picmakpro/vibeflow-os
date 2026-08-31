@@ -1,5 +1,53 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.5.5] — 2026-08-30 (Phase 38 — correction ciblée, dernier agent rejeté par kimi)
+
+**Patch** :
+
+- **`AGENT.md`** : l'unique deux-points-espace non quoté restant dans la `description:` (le
+  dernier des 11 agents rejetés par kimi, `38-MESURE-KIMI.md` — YAML authentiquement invalide en
+  scalaire simple) est remplacé par un tiret cadratin (` — `). La description reste **en clair,
+  non quotée** (10 guillemets doubles + 5 apostrophes, aucune forme quotée ne traverse gsd-core à
+  l'identique) : c'était le seul geste possible sans perdre de texte. Gate :
+  `plugin/conductor/scripts/check-description-fidelity.sh`. Conséquence côté gate (conductor
+  v1.34.6) : ce fichier satisfait désormais les deux règles telles quelles (comme
+  `dev-orchestrator/AGENT.md`, jamais exempté) — son entrée dans la liste d'exceptions nommées a
+  été RETIRÉE (le cliquet anti-péremption l'aurait de toute façon fait rougir si elle était
+  restée) ; point remonté en arbitrage humain (`ask-user`) au manager.
+
+## [v1.5.4] — 2026-08-30 (Phase 38 — description de frontmatter YAML strict, plan 38-08)
+
+**Patch** :
+
+- **Description de frontmatter passée en scalaire mono-ligne quoté** — la description est désormais un scalaire guillemets doubles mono-ligne (texte strictement inchangé), pour traverser sans perte un parseur YAML strict ET la logique d'extraction de gsd-core (`extractFrontmatterField`). 4 fichiers du module concernés. Gate : `plugin/conductor/scripts/check-description-fidelity.sh` (Phase 38, plan 38-08, FIDE-01/FIDE-02).
+
+## [v1.5.3] — 2026-08-28 (bootstrap multi-runtime — chaîne d'outils design dispatchée par runtime, RUNT-01/02)
+
+**Patch** (durcissement, comportement observable modifié uniquement sur un poste Codex ou sans
+CLI `claude` détectée) :
+
+- **`ensure-design-deps.sh`** : les 5 sites CLI-couplés de `detect_all()` (S1 JSON, S2 awk texte)
+  et `process_plugin()` (`enable`, `marketplace add`, `install`) routent désormais par
+  `plugin/_internal/runtime-cli-dispatch.sh` au lieu d'un `command -v claude`/`claude plugin`
+  figé. Sur `claude` ou `codex`, le geste RÉEL (activation/install/marketplace) s'exécute — même
+  grammaire d'arguments assumée par défaut (non mesurée sur le binaire réel, 38-CONTEXT.md). Sur
+  un runtime non détecté ou non supporté (OpenCode/kimi-code, non
+  mesurés), dégradation DÉCLARÉE (étape manuelle par plugin, exit propre) — jamais un échec
+  silencieux. La machine à états S1 JSON / S2 awk texte de `detect_all()` est INTÉGRALEMENT
+  conservée : seul le sous-processus invoqué change, jamais le parsing de sa sortie.
+  `CLAUDE_AVAILABLE`/`INDETERMINE` se généralisent en `RUNTIME_AVAILABLE`/`INDETERMINE`, sémantique
+  inchangée.
+- Repli inchangé si le script partagé est introuvable (poste pas encore mis à jour) :
+  comportement `claude`-figé ACTUEL, aucune régression (T9e mis à jour pour reconnaître cette
+  exception au SOCLE — `plugin/_internal/` est hors périmètre D-04 (pas de `VERSION`/`module.json`/
+  `CHANGELOG.md`, précédent `find_engine_lib()`/`find_hooks_merger()`), ratifiée le 2026-08-28,
+  pas « un autre module » au sens D-04). **Correction de véracité (revue lot 2)** : la garde T9e
+  posée initialement filtrait sur la SOUS-CHAÎNE `runtime-cli-dispatch.sh` n'importe où sur la
+  ligne — elle était donc affaiblie sur l'axe cross-module (une résolution déguisée sous le même
+  nom de fichier, invoquée sans `bash`/`source`, passait le garde). Resserrée à la ligne EXACTE
+  exemptée (ancre littérale sur la substring complète), avec les 3 cas de mutation (cross-module
+  déguisé, dirname non lié, ligne légitime) commités comme tests de régression permanents.
+
 ## [v1.5.2] — 2026-08-17 (Phase 32, doctrine du verrou resynchronisée)
 
 **Patch** (doctrine d'agent corrigée pour rester exacte, aucune nouvelle capacité).

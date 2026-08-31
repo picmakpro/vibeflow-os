@@ -1,19 +1,6 @@
 ---
 name: vf-design
-description: >
-  Utiliser dès que l'intention touche au design ou à l'UI/UX, sous toutes ses formulations —
-  « améliore le design », « rends ça plus beau », « c'est moche », « modernise l'interface »,
-  « refais cette page », « la typo / le spacing / le contraste / les couleurs ne vont pas »,
-  « ajoute une animation », « c'est trop fade / trop chargé », « audite / critique cet écran »,
-  « on part sur quel style », « définis l'identité visuelle / la direction artistique »,
-  « extrais un design system », « responsive cassé ». Point d'entrée design de VibeFlow : détecte
-  l'intention (définir la DA / modifier l'UI / critiquer / craft ciblé), détecte la stack, puis
-  route. Générique multi-stack (web, mobile, desktop).
-  ✘ pas pour une maquette jetable d'exploration (« montre-moi à quoi ça ressemblerait ») →
-  /vf-sketch · ✘ pas pour un prototype de code jetable qui répond à une question technique →
-  gsd-spike · ✘ pas pour construire l'écran une fois la direction validée → gsd-execute-phase.
-  Invocable par l'utilisateur ET par l'agent en autonomie ET par le routeur de développement sur
-  une phase de design.
+description: "Utiliser dès que l'intention touche au design ou à l'UI/UX, sous toutes ses formulations — « améliore le design », « rends ça plus beau », « c'est moche », « modernise l'interface », « refais cette page », « la typo / le spacing / le contraste / les couleurs ne vont pas », « ajoute une animation », « c'est trop fade / trop chargé », « audite / critique cet écran », « on part sur quel style », « définis l'identité visuelle / la direction artistique », « extrais un design system », « responsive cassé ». Point d'entrée design de VibeFlow : détecte l'intention (définir la DA / modifier l'UI / critiquer / craft ciblé), détecte la stack, puis route. Générique multi-stack (web, mobile, desktop). ✘ pas pour une maquette jetable d'exploration (« montre-moi à quoi ça ressemblerait ») → /vf-sketch · ✘ pas pour un prototype de code jetable qui répond à une question technique → gsd-spike · ✘ pas pour construire l'écran une fois la direction validée → gsd-execute-phase. Invocable par l'utilisateur ET par l'agent en autonomie ET par le routeur de développement sur une phase de design."
 ---
 
 # vf-design — Point d'entrée design

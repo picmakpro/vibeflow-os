@@ -1,5 +1,5 @@
 # GSD Capabilities Index (auto-généré — NE PAS ÉDITER)
-> Généré le 2026-08-26T17:51:51+02:00 par build-gsd-capabilities-index.sh
+> Généré le 2026-08-31T14:48:50+02:00 par build-gsd-capabilities-index.sh
 > Source : registre de capabilities du moteur GSD (`capability-registry.cjs`), schéma déclaré `1`
 
 **Ce que cette table dit.** Elle énumère ce que le moteur **déclare** à la version depuis
@@ -65,6 +65,7 @@ point existe et reste vide, pas qu'il est absent._
 
 | Capability | Nature | Toggle gouvernant | Bloquant | Conduite sur erreur |
 |---|---|---|---|---|
+| `live-dom-uat` | step | `workflow.live_dom_uat` | — | `skip` |
 | `external-job` | contribution | `external_job.enabled` | — | `skip` |
 | `mempalace` | contribution | `mempalace.enabled` | — | `skip` |
 | `drift` | gate | `workflow.schema_drift_gate` | oui | `skip` |
@@ -174,6 +175,7 @@ d'inactive, et `—` en colonne `Type` signale un toggle que le registre ne déc
 | `claude_orchestration.enabled` | `claude-orchestration` | boolean | non |
 | `external_job.enabled` | `external-job` | boolean | non |
 | `workflow.post_planning_gaps` | `gap-analysis` | boolean | oui |
+| `workflow.live_dom_uat` | `live-dom-uat` | boolean | non |
 | `workflow.schema_drift_gate` | `drift` | boolean | oui |
 | `workflow.code_review` | `code-review` | boolean | oui |
 | `refactor.trigger_enabled` | `refactor-trigger` | boolean | non |
@@ -209,6 +211,7 @@ rendre inerte : c'est exactement ce que `check-capability-activation.sh` confron
 | `gsd-eval-planner` | `ai-integration` | — |
 | `gsd-code-reviewer` | `code-review` | — |
 | `gsd-code-fixer` | `code-review` | — |
+| `gsd-dom-verifier` | `live-dom-uat` | `workflow.live_dom_uat` |
 | `gsd-mempalace-curator` | `mempalace` | `mempalace.enabled` |
 | `gsd-nyquist-auditor` | `nyquist` | `workflow.nyquist_validation` |
 | `gsd-pattern-mapper` | `pattern-mapper` | `workflow.pattern_mapper` |
@@ -220,4 +223,4 @@ rendre inerte : c'est exactement ce que `check-capability-activation.sh` confron
 
 ---
 
-> 12 point(s) de hook parcouru(s), 36 étage(s) déclaré(s) par le registre, 27 capability(ies) hors point de hook sur 45 déclarée(s), 24 toggle(s) gouvernant(s) distinct(s), 24 brique(s) routée(s).
+> 12 point(s) de hook parcouru(s), 37 étage(s) déclaré(s) par le registre, 27 capability(ies) hors point de hook sur 46 déclarée(s), 25 toggle(s) gouvernant(s) distinct(s), 25 brique(s) routée(s).

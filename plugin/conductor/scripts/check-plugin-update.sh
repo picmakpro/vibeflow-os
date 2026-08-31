@@ -57,8 +57,23 @@ except Exception:
 PY
 )"
 fi
-if [ -z "$installed" ] && command -v claude >/dev/null 2>&1; then
-  installed="$(claude plugin list 2>/dev/null | awk '/vibeflow@vibeflow-os/{f=1} f&&/Version:/{print $2; exit}')"
+# Résolution runtime-aware (RUNT-01) : cascade EXACTE de find_hooks_merger()
+# (plugin/_internal/vibeflow-update.sh) — introuvable aux deux positions → repli `claude`-figé
+# ACTUEL (jamais une régression silencieuse). Best-effort : un dispatch en échec laisse
+# `installed=""`, la comparaison de version est simplement sautée plus bas.
+find_runtime_cli_dispatch() {
+  local c
+  c="${VIBEFLOW_CACHE:-.vibeflow-cache}/_internal/runtime-cli-dispatch.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  c="$(dirname "$0")/runtime-cli-dispatch.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  echo ""
+}
+if [ -z "$installed" ]; then
+  RUNTIME_CLI_DISPATCH="$(find_runtime_cli_dispatch)"
+  if [ -n "$RUNTIME_CLI_DISPATCH" ]; then
+    installed="$(bash "$RUNTIME_CLI_DISPATCH" list-text 2>/dev/null | awk '/vibeflow@vibeflow-os/{f=1} f&&/Version:/{print $2; exit}')"
+  elif command -v claude >/dev/null 2>&1; then
+    installed="$(claude plugin list 2>/dev/null | awk '/vibeflow@vibeflow-os/{f=1} f&&/Version:/{print $2; exit}')"
+  fi
 fi
 installed="${installed%$'\r'}"   # ADR-054 : python/claude natifs Windows émettent du CRLF ; un CR brut casserait le JSON du cache
 installed="${installed#v}"

@@ -76,7 +76,8 @@
 - [x] Phase 33: Watchdog & notifications des missions (completed 2026-08-17)
 - [ ] Phase 34: Gaps agency-agents & cadrage skill-installer
 - [x] Phase 35: Ré-armement worktree (conditionnelle) — CLOSE 2026-08-26, option A (pas de ré-armement)
-- [ ] Phase 37: Portabilité multi-runtime — spike (Codex, OpenCode, Kimi)
+- [x] Phase 37: Portabilité multi-runtime — spike (Codex, OpenCode, Kimi) (completed 2026-08-28 — spike + étude livrés, décisions rendues ; suite → Phase 38)
+- [x] Phase 38: Portabilité multi-runtime — livraison (canal d'install, migration de lab, adaptateur) (exécutée 2026-08-29, **mesurée 2026-08-30** sur clé API — **critère 2 PROUVÉ sur Codex** : profondeur ≥ 2 constatée EN BASE (`thread_spawn_edges`, `root→vf-dev-manager→vf-coder`), 3/3 sur les **4 critères réels** ; le **critère 5 est SANS OBJET sous clé API** (vert à vide, jamais « atteint ») et le **critère 4 est plus faible que son libellé** (`--output-schema` non propagé aux sous-agents, dette D-38-S). **kimi-code n'est plus un inconnu déclaré** : I-1 **31/31**, I-2 `disallowedTools` bloque (0/4 contre 3/3 au contrôle positif), I-3 hooks déclenchés 3/3, `vf-internal` **sans équivalent** (Pattern 12 non tenu, déclaré par le gate de fidélité). **Critère 1 toujours partiel** : hooks non portés, perte déclarée. Coûts : Codex 1,01 $, kimi ~0,018 $. **SHIPPÉE v2.59.0 le 2026-08-31** (Samuel a autorisé le ship après revue ; PR + tag + release GitHub) — test bout-en-bout install **et** usage refait sur Codex (délégation de rôle → code réel) ET Kimi (`--agent-file` → code + rapport typé) le 2026-08-31, manifeste `.codex-plugin/` natif ajouté. Preuves : `38-MESURE-CODEX-CRITERE-2.md`, `38-MESURE-KIMI.md`)
 
 <details>
 <summary>✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04</summary>
@@ -480,6 +481,8 @@ Plans:
 | 33. Watchdog & notifications des missions | fiabilite-v1.0 | 0/0 | Not started — heartbeat partagé avec la 32 (conçues ensemble, WTCH après LOCK) | — |
 | 34. Gaps agency-agents & cadrage skill-installer | fiabilite-v1.0 | 0/0 | Not started — après la 31 (MANI avant SKIL) ; SKIL-01 = cadrage go/no-go rattaché | — |
 | 35. Ré-armement worktree (conditionnelle) | fiabilite-v1.0 | 0/0 | Flottante — précondition externe NON satisfaite au 2026-08-15 (npm latest = 1.10.0) ; jamais bloquante | — |
+| 37. Portabilité multi-runtime — spike | fiabilite-v1.0 | — | Complete — spike de mesure sans plan : DISCUSS + SPIKE-REPORT + ETUDE-CANAL-ET-MIGRATION (3 tours de revue adversariale), décisions rendues le 2026-08-28, branche `feat/phase-37-spike-portabilite-multi-runtime` non mergée | 2026-08-28 |
+| 38. Portabilité multi-runtime — livraison | fiabilite-v1.0 | 0/0 | Not started — cadrage factuel = livrables de la 37 ; 6 lots candidats, go/no-go adaptateur à trancher au cadrage | — |
 
 <details>
 <summary>✅ agentique-v1.0 — Durcissement du moteur d'équipes agentique (Phases 15→29, 18 et 25 reportées) — SHIPPED 2026-08-15</summary>
@@ -992,14 +995,18 @@ les runtimes à dispatch nommé (claude, opencode, cursor) des runtimes built-in
 maison, aucun « skill de conversion » à l'exécution (non déterministe, non testable).
 
 **Questions à trancher par le spike :**
+
 1. Quelle est l'API réellement appelable de la surface runtime gsd-core (queries `gsd-tools`,
    modules `bin/lib/`) — et est-elle stable / publique, ou interne au moteur ?
+
 2. Que reste-t-il de **spécifiquement VibeFlow** à porter une fois gsd-core en place ? Hypothèse à
    vérifier : les 50 agents, les 6 fragments de hooks, le packaging `.claude-plugin/`, et le
    protocole d'escalade `AskUserQuestion`/`SendMessage`.
+
 3. Les 25 SKILL.md sont-ils posables tels quels ? 22/25 sont conformes au standard Agent Skills ;
    3 ont `name` ≠ dossier (`vf-planning`, `vf-mobile-test`, `vibeflow-install`). 9/25 appellent des
    skills `gsd-*`, 9/25 supposent des sous-agents, 3 supposent `AskUserQuestion`.
+
 4. Que devient l'équipe de mission (team-kernel) hors Claude ? **Mesuré le 2026-08-28, contre une
    première analyse erronée** : le registre `gsd-core` déclare `namedDispatch: true` pour **codex**
    (tier-1, `tier: "full"`, `per-agent sandbox tiers`, surface de hooks `config.toml` + `hooks.json`)
@@ -1022,8 +1029,10 @@ maison, aucun « skill de conversion » à l'exécution (non déterministe, non 
    aucun runtime non-Claude. C'est l'escalade vivante d'un manager vers l'humain. Le contournement
    documenté côté VibeFlow (`SendMessage(main)`) s'appuie lui-même sur du Claude. Quelle forme prend
    un arbitrage humain hors Claude — et comment garantir qu'il ne soit jamais **inféré** ?
+
 5. Où vit la déclaration de capacité par cible — `module.json` (`full` / `skills-only` /
    `unsupported`) ou descripteur consommé depuis gsd-core ?
+
 6. `vibeflow-update.sh` : extension par `--target` (TARGET_ROOT déjà scopé) ou délégation au
    `runtime-artifact-install-plan` du moteur ?
 
@@ -1048,3 +1057,187 @@ livraison. Pas de code de production.
 Plans:
 
 - [ ] TBD (run /gsd-plan-phase 37 to break down)
+
+**Livrables produits (2026-08-28)** :
+`.planning/phases/VFDO-37-portabilit-multi-runtime-spike-codex-opencode-kimi/DISCUSS.md`
+(les 6 questions ci-dessus, mesurées), `SPIKE-REPORT.md` (verdict + recommandation) et
+`ETUDE-CANAL-ET-MIGRATION.md` (second mandat, à la demande de Samuel : canal d'install hors
+marketplace Claude, migration d'un lab existant, mémoire d'agent — axes A, B, B7). Les
+chiffres du cadrage ci-dessus ont été **re-dérivés et corrigés** dans `DISCUSS.md` (section
+« Corrections au cadrage ROADMAP ») — renvoi sans recopie ici, sauf la ligne « 9/25 appellent des
+skills `gsd-*` » (Q3 ci-dessus, l. 1000-1002), **intentionnellement laissée intacte** : sa méthode
+de mesure est documentée avec sa nuance dans `DISCUSS.md`.
+
+**Plans**: aucun — spike de mesure, pas de plan d'exécution.
+
+**Décisions humaines rendues le 2026-08-28** (à la lecture des livrables) :
+- **Phase 38 à part** pour le canal d'install et la migration de lab (option recommandée par
+  l'étude, §Proposition de cadrage) — voir la section Phase 38 ci-dessous.
+- **Superpowers** : révisé sur prémisse démentie (le catalogue est déjà multi-runtime, 8 manifestes) —
+  **rendre l'installeur VibeFlow multi-runtime**, rapatriement conservé en plan de secours chiffré.
+- **Mémoire d'agent** : le traitement rejoint la déclaration `memory: project` — `.gitignore`
+  corrigé (`.claude/*` + `!.claude/agent-memory/`), 116 fichiers versionnés après revue.
+- **`description: >`** (15/21 skills détruits à la conversion) : corrigé, branche
+  `fix/skill-description-monoline`.
+
+**Reste non tranché** : le go/no-go sur l'**adaptateur VibeFlow minimal** (préservation de
+`model`/`memory`/`tools`/allowlist, mapping des noms `[a-z0-9_]+`, digest explicite) et la
+**démarche amont** vers gsd-core (élargissement du SDK public). Les deux sont **à trancher au cadrage
+de la Phase 38**, où ils forment des lots candidats — pas ici. Argumentaire : `SPIKE-REPORT.md`
+§Recommandation.
+
+### Phase 38: Portabilité multi-runtime — livraison (canal d'install, migration de lab, adaptateur)
+
+**Goal:** Rendre VibeFlow **installable et migrable** sur un runtime non-Claude — Codex en cible tier-1
+mesurée, OpenCode et kimi-code sous réserve de mesure réelle — **sans dégradation silencieuse** : tout
+ce qui est perdu sur une cible est **déclaré** à l'install, jamais subi. Prolonge la Phase 37, dont les
+trois livrables (`DISCUSS.md`, `SPIKE-REPORT.md`, `ETUDE-CANAL-ET-MIGRATION.md`) sont le cadrage
+factuel de cette phase — aucun chiffre n'est à re-mesurer, mais aucun descripteur gsd-core n'est une
+preuve (un sur trois démenti en exécution : `maxDepth`).
+
+**Lots candidats** (issus de l'étude, à confirmer au cadrage — `gsd-discuss-phase 38`) :
+1. **Gate de fidélité** — compter par cible les champs perdus (`model`/`memory`/`tools`/
+   `disallowedTools`/`vf-internal`/allowlist, `description`) et les marqueurs morts (`.claude`, `Task(`) ;
+   bannière d'install qui déclare le périmètre réellement actif. Première brique : sans elle, toute
+   install multi-runtime est la dégradation que la 37 a chiffrée (156 conversions, 0 diagnostic).
+2. **Installeur multi-runtime** — les 11 sites `claude plugin install` / `command -v claude` des deux
+   scripts `ensure` (superpowers et gsd-core se posent par leurs propres manifestes ailleurs). Décidé,
+   ne dépend d'aucun autre arbitrage.
+3. **Trou de `rollback`** — ne restaure que skills et scripts, jamais agents ni hooks, n'appelle jamais
+   `mark_installed`, `rm -rf` avant copie (étude B2). Défaut de l'engine **actuel**, indépendant du
+   multi-runtime — lot nommé même si le reste tarde.
+4. **`--target`** — 1 site `TARGET_ROOT` + 15 littéraux côté engine, mais **198 fichiers / 1130
+   occurrences `.claude/`** côté payload à réécrire à la copie (précédent amont :
+   `copyWithPathReplacement`). Enregistrement Codex à alimenter en second geste (`~/.codex/agents/`,
+   `[agents]`) : le canal plugin transporte (470/470 byte-identique) mais n'enregistre ni agents ni
+   commandes.
+5. **Adaptateur VibeFlow minimal + démarche amont** — go/no-go **non rendu** (voir Phase 37) ; à trancher
+   au cadrage. Doctrine : VibeFlow consomme gsd-core, mais la surface d'artefacts visée est **interne**
+   par contrat écrit — dépendre de l'interne tel quel est la voie la moins défendable.
+6. **Migration d'un lab** — frontière `.planning/` fuyante (81 % des PLAN.md ouvrent sur un
+   `@$HOME/.claude/…`), runtime à **inscrire** dans `.planning/config.json` plutôt que détecté, sort de
+   `vf-calibrate` (nom déjà pris pour « migration de lab ») à décider avant tout verbe neuf, bascule
+   vs coexistence non tranché. Escalade humaine : **jamais de question dans un worker headless**, relais
+   Pattern H/`SendMessage` (actif portable) ; `opencode run --auto` formellement interdit.
+
+**Contraintes** : aucun vert auto-déclaré (pose constatée sur disque, exécution réelle) ; Windows en
+branche de dégradation explicite (symlinks inapplicables sous MSYS) ; OpenCode et kimi-code **jamais
+installés** au 2026-08-28 — tout ce qui les concerne est dérivé de descripteurs jusqu'à mesure.
+
+**Requirements**: FIDE-01/02, RUNT-01/02, ROLL-01..05, TGT-01..04, ADPT-01..04, MIGR-01..05 (22 IDs,
+6 familles — `PORT-xx` évité, pris par la Phase 30 ; voir REQUIREMENTS.md §Portabilité multi-runtime)
+**Depends on:** Phase 37 (cadrage factuel) ; adjacente à Phase 34 (skill-installer) — lot 2 partage la
+surface installeur, à séquencer au cadrage.
+**Plans:** 8 plans
+
+Plans:
+
+- [x] 38-01-PLAN.md — Gate de fidélité (champs perdus + marqueurs morts par cible, bannière d'install)
+- [x] 38-02-PLAN.md — Installeur multi-runtime (12 sites CLI-couplés sur 4 fichiers, table de dispatch à 4 verbes)
+- [x] 38-03-PLAN.md — Trou de rollback (agents+hooks+mark_installed+glob, --dry-run)
+- [x] 38-04-PLAN.md — `--target` injectable + réécriture du payload à la copie + sonde cross-module
+- [x] 38-05-PLAN.md — Adaptateur Codex minimal (rôle .toml dispatchable, limite de confinement déclarée)
+- [x] 38-06-PLAN.md — Migration de lab (runtime dans config.json, coexistence/bascule gatée, réversibilité)
+- [x] 38-07-PLAN.md — Correction des 3 bloquants de la mesure Codex (enregistrement des 12 agents, uninstall symétrique, déclaration des hooks)
+- [ ] 38-08-PLAN.md — Fidélité des `description:` de frontmatter (forme YAML traversant les deux consommateurs sans perte) + gate `check-description-fidelity.sh`
+
+**Dette nommée (D-38-K, option A non retenue — correction ciblée post-ROLL, 2026-08-28)** :
+atomicité par staging (`<TARGET_ROOT>/.vibeflow-staging/<mod>/` + `mv` sur même volume) pour
+`rollback_module`, écartée du lot de correction ciblée D-38-J/D-38-K — aurait débordé le
+périmètre (plus de 2 fonctions de l'engine touchées : `rollback_module`, `backup_module`,
+potentiellement `install_module`). Retenu à la place : option B, `trap ERR` + `set -E` qui
+déclare l'état `INCONSISTENT:<étape>:<version_cible>` au registre plutôt que de le laisser
+mentir sur la version pré-rollback (`show_status` l'affiche). Réévaluer l'option A si de
+nouveaux points de panne mi-restauration apparaissent au-delà des 5 étapes déjà couvertes
+(skills/scripts/agents/agent-references/registre).
+
+**Dette nommée — garde de cible unifiée pour les scopes littéraux et `--target`** (D-38-Q,
+2026-08-29, Phase 38). **Fait mesuré** : pour la **même cible physique**, `--scope user` est
+accepté (**rc=0**) et `--target "$HOME/.claude"` refusé (**rc=1**), sur un contenu identique — la
+garde D-38-P ne vit que dans la branche `--target`, la branche des scopes littéraux ne la traverse
+jamais. **Non traité en Phase 38, délibérément** : harmoniser changerait le comportement de
+`--scope user`, c'est-à-dire le **chemin nominal de tous les labs existants**, en fin de mission et
+hors périmètre. Retenu à la place : rendre l'asymétrie **visible** — `--scope user` affiche
+désormais sa cible résolue comme `--target` le fait. **Déclencheur de reprise** : le portage
+multi-runtime amène des adaptateurs à construire des `--target` explicites plutôt qu'à passer par
+`user`/`project`/`local` ; le jour où ce chemin devient majoritaire, le plus contraint des deux
+sera aussi le plus fréquent, et l'unification cessera d'être cosmétique.
+
+**Dette nommée — rapport typé des workers Codex par instruction, non par schéma** (D-38-S,
+2026-08-30, mesurée) : `codex exec --output-schema` contraint **la seule session root** et ne se
+propage **pas** aux sous-agents. Mesuré sur 3 runs : clés racine conformes 3/3, mais **trois formes
+de `findings` différentes** (`{action}` · `{action,message}` · `{severity,action,ref,message}`). Le
+contrat de worker du team-kernel tient donc, sur Codex, par l'**instruction** — pas structurellement.
+Un manager qui piloterait sur la forme des `findings` lirait une structure non garantie. Voies de
+propagation non cherchées ; sur kimi-code la question est close d'avance (aucun équivalent de
+`--output-schema`). Constat en `38-NOTE-ARCHI-RAPPORT-TYPE-CODEX.md`. **Aucun code en Phase 38.**
+
+**Dette nommée — texte faux du gate de coexistence hors périmètre** (D-38-R, 2026-08-29,
+Phase 38, plan 38-07, CODEX-B6 second volet). **Fait mesuré** :
+`plugin/conductor/scripts/check-artifact-fidelity.sh:175` affirme qu'un runtime coexistant
+« opère SANS gouvernance de hooks (aucun mécanisme équivalent mesuré à ce jour) » —
+affirmation **démentie** par la mesure de bout en bout du 2026-08-29 (38-CONTEXT.md
+lignes 1156-1164) : Codex 0.150.1 porte une surface de hooks **prouvée exécutante** (un
+`$CODEX_HOME/hooks.json` en forme strictement Claude Code a réellement déclenché un hook sous
+`--dangerously-bypass-hook-trust`), un **sur-ensemble** des événements Claude Code
+(`SubagentStart`, `Interrupt`, `PostCompact`…), les mêmes clés (`matcher`/`timeoutSec`/`async`/
+`permissionDecision`), et même un **importeur natif** `settings.json -> hooks.json`. Le vrai
+trou : l'install VibeFlow merge dans `settings.json`, jamais lu par Codex, au lieu de
+`hooks.json`. **Non traité en Phase 38, délibérément** : le fichier porteur du texte vit sous
+`plugin/conductor/**`, hors périmètre strict du plan 38-07 (`plugin/_internal/vibeflow-update.sh`,
+`plugin/_internal/tests/`, `plugin/_internal/runtime-adapter/register-codex-agent.sh` uniquement) —
+un autre worker corrige en parallèle, sur ce même worktree partagé, un défaut différent du même
+gate (commit `9af7a4b`). Le plan 38-07 traite le PREMIER volet de CODEX-B6 (la déclaration de
+coexistence, jusque-là inerte faute d'écriture dans le registre de runtime au moment de
+l'install/status — désormais câblée via `record_codex_runtime_if_applicable()`). **Déclencheur de
+reprise** : corriger le texte de la ligne 175 dès que ce worker parallèle livre sa propre
+correction du même fichier (remplacer la négation par : Codex expose une surface de hooks prouvée
+exécutante, non ENCORE ciblée par l'install VibeFlow qui merge dans `settings.json` au lieu de
+`hooks.json`) ; et/ou planifier une conversion réelle `settings.json -> hooks.json` comme geste
+dédié, jamais promise avant d'être livrée.
+
+**Dette nommée — les non-convertibles nommés un par un, et le vecteur de propagation des
+blueprints** (D-38-T, 2026-08-30, Phase 38, plan 38-08). Deux volets.
+
+**(a) Cas non convertibles** — les trois seuls fichiers du périmètre dont la description contient
+à la fois un guillemet double ET une apostrophe : aucune forme quotée (guillemets doubles OU
+simples) ne traverse les deux consommateurs (parseur YAML strict, reproduction `gsd-core`) à
+l'identique. Non touchés par ce lot (le mandat interdit de modifier le texte), déclarés en
+exception nommée dans `plugin/conductor/scripts/check-description-fidelity.sh`, avec pour chacun
+l'état réel mesuré :
+  - `plugin/consolidator/SKILL.md` — **tronqué par un commentaire YAML** : la description contient
+    ` #Ligne`, que PyYAML interprète comme le début d'un commentaire sur un scalaire plain (valeur
+    désérialisée tronquée à `... colonne`), alors que la regex `gsd-core` garde la ligne entière.
+    Deux lecteurs, deux textes différents pour ce fichier — c'est le cas nommé « tronquée par le
+    commentaire YAML » de l'objectif de ce plan.
+  - `plugin/design-orchestrator/AGENT.md` — **refusé par le parseur YAML strict** : deux-points
+    suivi d'espace dans le scalaire plain (`mapping values are not allowed here`). L'un des 13
+    fichiers strictement invalides mesurés au cadrage.
+  - `plugin/reference/content/methodology/templates/skills/safe-execute/SKILL.md` — **diverge côté
+    reproduction** : déjà en scalaire double-guillemets avec guillemets internes échappés
+    (`\"safe-execute\"`) ; PyYAML désérialise correctement l'échappement, la regex `gsd-core` ne
+    déséchappe jamais et garde le backslash littéral — deux textes différents dès le premier
+    guillemet interne.
+  Les trois échoueraient l'audit s'ils n'étaient pas exemptés (mesuré, en excluant temporairement
+  chacun de la liste d'exceptions). **Déclencheur de reprise** : le jour où l'un de ces textes est
+  réécrit pour une raison propre (clarté, densité), retirer son exception — le cliquet du gate le
+  signalera de lui-même dès que le fichier redeviendra conforme aux deux règles.
+
+**(b) Vecteur de propagation des blueprints** — 9 fichiers `content/agents/*.blueprint.md` portent
+un bloc « frontmatter cible (à recopier) » dont la description est écrite en scalaire replié
+(`description: >`) : `plugin/business-pilot-bundle/content/agents/business-pilot-commercial.blueprint.md`,
+`plugin/business-pilot-bundle/content/agents/business-pilot-delivery.blueprint.md`,
+`plugin/business-pilot-bundle/content/agents/business-pilot-finance.blueprint.md`,
+`plugin/content-bundle/content/agents/repurposer.blueprint.md`,
+`plugin/content-bundle/content/agents/scriptwriter.blueprint.md`,
+`plugin/content-bundle/content/agents/strategist.blueprint.md`,
+`plugin/growth-bundle/content/agents/campaign-analyst.blueprint.md`,
+`plugin/growth-bundle/content/agents/channel-strategist.blueprint.md`,
+`plugin/growth-bundle/content/agents/copywriter-sequences.blueprint.md`. Ces blocs sont de la
+PROSE (un exemple à recopier), pas du frontmatter d'artefact installable : hors du périmètre
+mécanique de ce lot (la découverte du gate exige une première ligne `---`, jamais vérifiée dans le
+corps d'un `.blueprint.md`) et hors de portée du gate. Mais un lab instancié à partir d'eux
+hériterait exactement le piège en ciseaux que ce lot ferme (scalaire replié -> perte totale côté
+`gsd-core`). **Déclencheur de reprise** : le prochain geste touchant l'instanciation de labs
+(`vf-new-lab`), qui devra d'abord mesurer ce que ce workflow fait réellement de ce bloc — copie
+machine ou lecture agentique — avant de décider de la forme à lui donner.

@@ -29,6 +29,8 @@ ci-dessous aurait pu l'être si elle n'avait pas reçu sa propre étiquette (§3
 - `plugin/conductor/scripts/dag.sh`         # kernel de mission (plan de bataille en DAG, ADR-053)
 - `plugin/conductor/scripts/driver-lock.sh` # kernel de mission (verrou de driver, un seul manager actif)
 - `plugin/*/agents/vf-*-manager.md`         # fichiers d'agents des managers d'équipe (team-kernel)
+- `plugin/_internal/vibeflow-update.sh`     # engine d'install — le layout qu'il pose est sondé par PRÉSENCE DE FICHIER par d'autres modules (sonde conductor → dev-orchestrator), jamais par `requires` : un changement de layout casse un consommateur absent du diff (ajouté 2026-08-28, arbitrage Samuel, Phase 38)
+- `plugin/_internal/merge-hooks.sh`         # fusion des fragments de hooks — défaut d'idempotence cross-matcher OUVERT (CONCERNS HIGH) : deux entrées visant le même script sous le même événement se purgent SANS erreur (ajouté 2026-08-28, arbitrage Samuel, Phase 38)
 
 ## Table des fichiers gelés — lue à la demande, jamais recopiée
 

@@ -1,0 +1,43 @@
+{
+  "name": "vibeflow",
+  "displayName": "VibeFlow",
+  "version": "2.59.0",
+  "description": "Orchestrateur agentique spec-driven pour agents de code : détection d'intention en langage naturel → pipeline cadrage → plan → exécution → preuve, vérifié par des gates machine. Dev + design, 3 bundles métier (contenu, growth, business), Lab Factory pour tout autre métier.",
+  "author": {
+    "name": "picmakpro"
+  },
+  "homepage": "https://github.com/picmakpro/vibeflow-os",
+  "repository": "https://github.com/picmakpro/vibeflow-os",
+  "license": "UNLICENSED",
+  "keywords": [
+    "vibeflow",
+    "gsd",
+    "orchestrator",
+    "spec-driven",
+    "modules",
+    "codex"
+  ],
+  "hooks": {},
+  "skills": "./installer",
+  "interface": {
+    "displayName": "VibeFlow",
+    "developerName": "picmakpro",
+    "category": "Developer Tools",
+    "brandColor": "#2563eb",
+    "brandColorDark": "#3b82f6",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "composerIcon": "./.codex-plugin/assets/composer-icon.svg",
+    "logo": "./.codex-plugin/assets/logo.svg",
+    "shortDescription": "Orchestration agentique spec-driven, frugale et gouvernée",
+    "longDescription": "Parle en langage naturel : un agent détecte l'intention et déroule le pipeline cadrage → plan → exécution → preuve, que des gates machine vérifient au lieu de promesses. Dev et design au quotidien, missions longues pilotées par une équipe d'agents (team-kernel), 3 bundles métier (contenu, growth, business) et une Lab Factory pour fabriquer un lab sur mesure dans n'importe quel métier.",
+    "defaultPrompt": [
+      "On est où sur le projet ?",
+      "Cadre et code la prochaine étape depuis la feuille de route."
+    ],
+    "websiteURL": "https://github.com/picmakpro/vibeflow-os"
+  }
+}

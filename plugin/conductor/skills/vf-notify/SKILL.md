@@ -1,16 +1,6 @@
 ---
 name: vf-notify
-description: >
-  Utiliser quand l'utilisateur veut activer, désactiver, vérifier ou tester les notifications OS
-  natives (toast macOS/Windows/Linux) émises par `notify.sh` aux jalons d'une mission — « active
-  les notifications », « désactive les notifs », « /vf-notify », « /vf-notify on », « /vf-notify
-  off », « /vf-notify status », « /vf-notify test », « est-ce que les notifications sont
-  activées ? ».
-  ✘ pas le hook `stop-notify` (relances de fin de réflexion Claude Code — mécanisme distinct,
-  hors VibeFlow, vit dans `~/.claude/hooks/`) · ✘ pas les jalons GSD fin de phase/milestone
-  (relayés séparément vers l'app Claude via `SendMessage(main)` -> `PushNotification`, hors de ce
-  toggle).
-  Invocable par l'utilisateur ET par `vibeflow-conductor`.
+description: "Utiliser quand l'utilisateur veut activer, désactiver, vérifier ou tester les notifications OS natives (toast macOS/Windows/Linux) émises par `notify.sh` aux jalons d'une mission — « active les notifications », « désactive les notifs », « /vf-notify », « /vf-notify on », « /vf-notify off », « /vf-notify status », « /vf-notify test », « est-ce que les notifications sont activées ? ». ✘ pas le hook `stop-notify` (relances de fin de réflexion Claude Code — mécanisme distinct, hors VibeFlow, vit dans `~/.claude/hooks/`) · ✘ pas les jalons GSD fin de phase/milestone (relayés séparément vers l'app Claude via `SendMessage(main)` -> `PushNotification`, hors de ce toggle). Invocable par l'utilisateur ET par `vibeflow-conductor`."
 ---
 
 # vf-notify — Toggle des notifications OS de mission

@@ -1,0 +1,23 @@
+- [Phase 14 autonome de la phase 12](project_phase-14-autonomie.md) — interdiction de `vf-milestone` dans les livrables de la phase 14, et pourquoi
+- [Recette en lab standard](feedback_recette-lab-standard.md) — un lab contient toujours conductor : les boucles `vf-*` d'une suite de tests auditent aussi les modules tiers
+- [Muter les tests anti-régression](feedback_mutation-test-regression-claims.md) — revert la correction visée et relancer, sinon un test peut être tautologique (T4c/dev-orchestrator)
+- [Phase 11 gotcha recette cascade gsd-tools](project_phase-11-gsd-migration-recette-gotcha.md) — un grep littéral `.claude/gsd-core/...` échoue sur le candidat `CLAUDE_CONFIG_DIR`, pas un bug de cascade
+- [Index régénéré via chemin scratchpad éphémère](project_index-regen-ephemeral-path.md) — build-gsd-index.sh committe le chemin de provenance tel quel, non reproductible si régénéré en sandbox
+- [Phase 15 allowlist pas encore enforced](project_phase-15-allowlist-not-yet-enforced.md) — doctrine "contracts" (fc91cf3) affirme un cloisonnement Agent(...) déjà machine-enforced, vérifier au nœud suivant qu'il l'est vraiment
+- [Recompter les totaux agrégés d'un SUMMARY](feedback_summary-aggregate-counts-verify.md) — un chiffre de suites/tests cité peut être faux même quand le 0 FAIL est vrai (20-02, 42 vs 37 cité)
+- [Sonde stricte vs repli permissif](feedback_strict-branch-fallback-audit.md) — mesurer sur chaque cible quelle branche est prise : le repli peut être la branche par défaut partout (T24/phase 23)
+- [Suppression de contenu doc → citations pendantes](feedback_content-removal-dangling-citations.md) — grep le titre de chaque section supprimée sur tout le repo, pas juste le diff (Phase 26 README, 6 pages manuel cassées)
+- [Mutant ancré hors du segment mesuré](feedback_mutant-anchor-outside-measured-scope.md) — `cmp -s` au niveau fichier ne prouve pas la morsure ; rejouer une réécriture licite avant de conclure (M1/T27, phase 23)
+- [Gap schéma fédéré GSDC-07](project_gsdc-07-federated-schema-gap.md) — check-gsd-config.sh dérive un KNOWN_TOP plus large que le moteur : faux négatif prouvé (`_comment`) malgré l'en-tête qui l'exclut
+- [Négation FR qui bat une regex d'affirmation](feedback_french-negation-defeats-affirmation-regex.md) — muter avec « aucun/nul … n'est » : préserve l'adjacence là où « ne … pas » la casse (T33/23-03)
+- [Gate-mirroir : dérive par sur-ensemble](feedback_mirror-gate-superset-drift.md) — le moteur factice d'une fixture masque la divergence qu'il devrait attraper ; comparer les ensembles par calcul, pas par échantillon
+- [IDs de décision D-NN phase-locaux, pas globaux](project_decision-ids-phase-local-not-global.md) — D-09 signifie 3 choses différentes selon la phase ; pas un bug tant que le contexte immédiat désambiguïse
+- [D-22/T19 : gate qui exige la violation gelée](project_d22-t19-frozen-violation-gate.md) — T19 exige gsd-debugger dans vf-coder.md:tools:, prouvé par mutation ; à recoupler à l'arbitrage humain D-22
+- [Matrice à flag constant non discriminante](feedback_constant-flag-matrix-nondiscriminant.md) — T21/30-01 : 6/8 séquences vertes même sur code cassé, seule la mutation le révèle
+- [Garde multi-conditions : muter chacune](feedback_multicondition-guard-mutate-each.md) — 4/6 conditions D-31-07 mutant-mortes (31-05), dont la défense principale anti-suppression-de-masse
+- [Symlink ancêtre contourne le check TARGET_ROOT](project_symlink-ancestor-bypasses-target-root-check.md) — ADR-054 bannit realpath ; `.claude/rules` symlinké fait `rm` hors TARGET_ROOT (31-05, reproduit)
+- [Filtre grep par ligne vs occurrence](feedback_grep-line-vs-occurrence-guard.md) — grep -F|-vF exempte toute la ligne ; empile légitime+illégitime sur une ligne pour contourner (T9e, phase 38)
+- [Cascade jumelle, appelant au cycle de vie différent](feedback_cascade-twin-different-caller-lifecycle.md) — "cascade EXACTE de find_hooks_merger()" ment : runtime-cli-dispatch.sh n'est jamais posé sous TARGET_ROOT/scripts (join-1, phase 38, repro confirmé)
+- [Casse défait une garde de chemin par string](feedback_case-insensitive-fs-defeats-path-string-guard.md) — cd -P/pwd -P ne canonicalise pas la casse : $HOME bypass confirmé par inode identique (38-04, revue phase 38)
+- [2>&1 masque une affirmation de flux](feedback_2to1-merge-hides-stream-claim.md) — un test qui fusionne stdout+stderr ne peut jamais prouver "sur stdout" ; T41/38-04 le confond avec log() >&2
+- [Garde précoce mord tous les verbes](feedback_flag-guard-scoped-to-all-verbs.md) — cmd="$1" arrive tard (l.2724) ; une garde --target non scopée bloque aussi status/sync/no-op (D-38-P, phase 38)

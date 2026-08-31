@@ -1,11 +1,6 @@
 ---
 name: vf-dev
-description: >
-  Utiliser quand la demande de dev ne désigne aucun geste précis — « aide-moi à avancer »,
-  « pilote-moi ça », « fais ce qu'il faut », « occupe-toi de ce projet », « démêle cette
-  histoire ». Incarne l'agent vibeflow-dev, qui détecte l'intention et invoque directement
-  la brique outillée (skills gsd-*, équipe de mission). Invocable par l'utilisateur ET par
-  l'agent en autonomie.
+description: "Utiliser quand la demande de dev ne désigne aucun geste précis — « aide-moi à avancer », « pilote-moi ça », « fais ce qu'il faut », « occupe-toi de ce projet », « démêle cette histoire ». Incarne l'agent vibeflow-dev, qui détecte l'intention et invoque directement la brique outillée (skills gsd-*, équipe de mission). Invocable par l'utilisateur ET par l'agent en autonomie."
 ---
 
 # vf-dev — Point d'entrée générique

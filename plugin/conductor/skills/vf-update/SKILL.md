@@ -1,17 +1,6 @@
 ---
 name: vf-update
-description: >
-  Utiliser quand l'utilisateur veut mettre à jour VibeFlow — « mets à jour vibeflow »,
-  « /vf-update », ou en réaction au bandeau « mise à jour disponible » au démarrage de session.
-  Compare la version installée au dernier tag publié, montre le changelog, puis met à jour le
-  plugin (cache marketplace) et les modules installés, sous validation humaine. Détecte aussi
-  l'état du moteur GSD (legacy vs `@opengsd/gsd-core`) et le propose en migration, sous
-  confirmation indépendante.
-  ✘ pas pour réaligner la **structure** d'un lab sur une doctrine qui a évolué, une fois la
-  nouvelle version posée → /vf-calibrate · ✘ pas pour ajouter, retirer ou re-choisir des
-  modules → /vibeflow-install · ✘ pas pour mettre à jour la documentation d'un projet →
-  gsd-docs-update.
-  Invocable par l'utilisateur ET par `vibeflow-conductor`.
+description: "Utiliser quand l'utilisateur veut mettre à jour VibeFlow — « mets à jour vibeflow », « /vf-update », ou en réaction au bandeau « mise à jour disponible » au démarrage de session. Compare la version installée au dernier tag publié, montre le changelog, puis met à jour le plugin (cache marketplace) et les modules installés, sous validation humaine. Détecte aussi l'état du moteur GSD (legacy vs `@opengsd/gsd-core`) et le propose en migration, sous confirmation indépendante. ✘ pas pour réaligner la **structure** d'un lab sur une doctrine qui a évolué, une fois la nouvelle version posée → /vf-calibrate · ✘ pas pour ajouter, retirer ou re-choisir des modules → /vibeflow-install · ✘ pas pour mettre à jour la documentation d'un projet → gsd-docs-update. Invocable par l'utilisateur ET par `vibeflow-conductor`."
 ---
 
 # vf-update — Mise à jour du plugin & des modules
@@ -22,6 +11,15 @@ via l'engine `update --all` (re-matérialise `.claude/skills|agents|rules|script
 confirmation (ADR-031).
 
 ## Résolution des scripts (conductor)
+
+**0e étape (TGT-04, cible custom `--target`)** : avant de tester les trois positions littérales
+ci-dessous, vérifie si `./.claude/scripts/.vibeflow-target` **ou** `$HOME/.claude/scripts/.vibeflow-target`
+existe. Si l'un des deux existe ET que son contenu (un chemin absolu, une seule ligne) **diffère**
+de la position candidate elle-même (`./.claude` ou `$HOME/.claude`), c'est que ce lab a été posé
+sous `--target` : lis ce contenu et utilise-le comme `<S>`/`<S-moteur>` réel (`<contenu>/scripts/`)
+au lieu de la position littérale. Si le marqueur est absent, ou présent mais identique à la
+position candidate (cas normal, sans `--target`), continue directement à la cascade suivante —
+aucune déviation.
 
 Les scripts vivent dans le dossier `scripts/` de conductor. Localise-les dans cet ordre (prends le
 premier existant) : `$HOME/.claude/scripts/` → `./.claude/scripts/` → `${CLAUDE_PLUGIN_ROOT}/conductor/scripts/`.

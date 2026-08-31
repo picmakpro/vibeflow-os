@@ -10,7 +10,7 @@ Orchestration agentique **spec-driven** pour Claude Code : tu parles normalement
 détecte l'intention, déroule le pipeline (cadrage → plan → exécution → preuve), et des **gates
 machine** vérifient — pas des promesses.
 
-[![Version](https://img.shields.io/badge/version-2.58.1-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.59.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -125,10 +125,10 @@ chaque module est sa documentation complète — même structure partout.
 ## 🔒 Confiance
 
 - **Source-available** : code et historique publics — voir [LICENSE](./LICENSE).
-- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`68 suites` en CI — les
-  nouvelles prouvent la forme exec des hooks du périmètre dev telle qu'installée, leur contrat de
-  sortie, et la résolution Python partagée), install **idempotente** avec backup avant
-  écrasement.
+- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`76 suites` en CI — les
+  nouvelles prouvent le dispatch CLI multi-runtime (RUNT-01/02) et la forme exec des hooks du
+  périmètre dev telle qu'installée, leur contrat de sortie, et la résolution Python partagée),
+  install **idempotente** avec backup avant écrasement.
 - **Le repo s'applique sa propre doctrine** : CI sur push/PR (tests + gates stricts) + job
   « **lab frais** » — la baseline est installée dans un lab vierge et doit passer ses propres
   gates sans intervention.
@@ -146,6 +146,7 @@ Historique complet : **[CHANGELOG.md](./CHANGELOG.md)**, canon unique — la tab
 
 | Version | Date | Changement |
 |---------|------|------------|
+| `v2.59.0` | 2026-08-31 | **VibeFlow s'installe et tourne désormais hors de Claude Code — mesuré de bout en bout sur Codex et Kimi, pas déclaré.** Codex avale le descripteur marketplace de Claude tel quel (`codex plugin marketplace add` puis `codex plugin add`), et un adaptateur de rôle enregistre chaque agent VF comme rôle Codex avec un digest honnête champ par champ (modèle mappé, `memory` perdu, `tools` en attente) ; une session réelle a délégué manager→worker en base (profondeur ≥ 2 via `thread_spawn_edges`) et produit du code fonctionnel pour 1,01 $. Kimi charge un agent VF par `--agent-file` et l'exécute — fichiers réels plus le rapport typé du team-kernel — après le correctif de description qu'un gate double-parseur impose désormais : la seule forme mono-ligne que `gsd-core` ET Kimi acceptent est celle entre guillemets. Un manifeste `.codex-plugin/` natif a été ajouté pour la robustesse (ne plus dépendre du repli non documenté sur `.claude-plugin`) et une identité desktop. Les pertes sont déclarées, jamais silencieuses : les hooks Codex ne sont pas portés, et une prétendue « saturation du budget skills » a été démentie par la mesure — VF n'injecte qu'une seule skill, la pression venait de l'hôte. Durcissement : le gate de fidélité mesure maintenant le TOML réellement posé et non une conversion parallèle, et une écriture par traversal plus un vecteur d'injection par dépôt jugé ont été fermés. Samuel a autorisé le ship après revue de la branche. |
 | `v2.58.1` | 2026-08-28 | **Un contrôle de démarrage pouvait casser le démarrage qu'il devait éclairer.** L'audit d'infrastructure écrit un objet JSON par axe : son passage à deux axes en émettait donc deux collés — pas un document JSON valide — et Claude Code rejetait la sortie injectée. Le symptôme n'apparaissait que tous les ~14 jours, l'intervalle réel de l'audit, et `jq` acceptait cette sortie depuis toujours puisqu'il lit un *flux* là où le harness parse un *document*. Le hook rend désormais un seul objet encodé, et se tait s'il n'a rien à signaler. |
 | `v2.58.0` | 2026-08-28 | **Un Node trop ancien pour le moteur courant se répare désormais tout seul.** `gsd-core` 1.11.0 exige Node 24 ; en dessous, npm n'échoue pas — il installe 1.10.0 en silence, et des labs tournaient donc sur un moteur antérieur sans le savoir. Le bootstrap installe maintenant Node 24 sous `$HOME` via le gestionnaire de version présent (ou nvm, épinglé), jamais avec sudo ni sur le Node système, puis reprend. Désactivable par `VF_ENSURE_AUTO_NODE=0`. |
 | `v2.57.1` | 2026-08-27 | **Le ré-armement worktree a été mesuré, puis refusé en connaissance de cause.** Le fix amont est bien arrivé (gsd-core 1.11.0), mais une mission d'équipe travaille toujours sur une branche dédiée : HEAD diverge donc toujours de la base de fork et l'isolation dégraderait en séquentiel à chaque dispatch — zéro parallélisme gagné. Le seul levier qui la rendrait effective éteint le contrôle même dont elle dépend. L'isolation reste une décision de dispatch, les deux gardes restent, et la doctrine dit désormais pourquoi. |

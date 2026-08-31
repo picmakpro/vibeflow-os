@@ -1,5 +1,5 @@
 ---
-description: Active/désactive/vérifie/teste les notifications OS natives de mission (toast macOS/Windows/Linux, opt-in OFF par défaut).
+description: "Active/désactive/vérifie/teste les notifications OS natives de mission (toast macOS/Windows/Linux, opt-in OFF par défaut)."
 argument-hint: "[on|off|status|test]"
 ---
 

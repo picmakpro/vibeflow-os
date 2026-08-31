@@ -1,5 +1,11 @@
 # CHANGELOG — infrastructure-audit
 
+## [v1.3.2] — 2026-08-30 (Phase 38 — description de frontmatter YAML strict, plan 38-08)
+
+**Patch** :
+
+- **Description de frontmatter passée en scalaire mono-ligne quoté** — la description est désormais un scalaire guillemets doubles mono-ligne (texte strictement inchangé), pour traverser sans perte un parseur YAML strict ET la logique d'extraction de gsd-core (`extractFrontmatterField`). 1 fichier du module concerné. Gate : `plugin/conductor/scripts/check-description-fidelity.sh` (Phase 38, plan 38-08, FIDE-01/FIDE-02).
+
 ## [v1.3.1] — 2026-08-28 (Correctif — contrat de flux du hook SessionStart)
 
 ### Corrigé

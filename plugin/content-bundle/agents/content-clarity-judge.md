@@ -1,6 +1,6 @@
 ---
 name: content-clarity-judge
-description: Juge de clarté de l'équipe content — le gate de clarté des blueprints matérialisé en juge frais read-only (team-kernel). Score une pièce (ou une variante) sur une rubric explicite /100 — chiffres sourcés, jargon expliqué, take-away actionnable, ton, CTA unique, fidélité à la fiche de cadrage, gabarit du format — et rend un verdict typé avec findings actionnables. Un chiffre non sourcé est éliminatoire quel que soit le score. Ne modifie JAMAIS rien (aucun outil d'écriture) — les corrections repartent à vf-content-writer via le manager. Worker interne — dispatché UNIQUEMENT par vf-content-manager ou le skill vf-content, toujours frais, pas en usage direct.
+description: "Juge de clarté de l'équipe content — le gate de clarté des blueprints matérialisé en juge frais read-only (team-kernel). Score une pièce (ou une variante) sur une rubric explicite /100 — chiffres sourcés, jargon expliqué, take-away actionnable, ton, CTA unique, fidélité à la fiche de cadrage, gabarit du format — et rend un verdict typé avec findings actionnables. Un chiffre non sourcé est éliminatoire quel que soit le score. Ne modifie JAMAIS rien (aucun outil d'écriture) — les corrections repartent à vf-content-writer via le manager. Worker interne — dispatché UNIQUEMENT par vf-content-manager ou le skill vf-content, toujours frais, pas en usage direct."
 tools: Read, Glob, Grep
 disallowedTools: Write, Edit
 model: sonnet

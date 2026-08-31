@@ -2,26 +2,43 @@
 gsd_state_version: 1.0
 milestone: fiabilite-v1.0
 milestone_name: « ce qui survit »
-current_phase: 35
-current_phase_name: Ré-armement worktree (conditionnelle) — CLOSE
-status: phase_complete
-stopped_at: Phase 18 RELEASÉE en `v2.57.0` (PR #51 mergée, tag annoté poussé, release GitHub publiée, `check-release-tag.sh --remote` ✓ — ce STATE était en retard, il affirmait encore « livrée, non shippée ») — 3 plans exécutés (18-01 LEDG-02, 18-02 LEDG-01, 18-03 doctrine D-18-14 + bump module), 12/12 suites vertes. Puis Phase 35 CLOSE le 2026-08-26 par décision humaine sur preuve mesurée, **option A : pas de ré-armement d'`isolation: worktree`**. Déclencheur externe tombé (gsd-core#3302 releasé 1.11.0, installé) ; leg A (retour des commits) prouvé deux fois, leg B (base de fork) mesuré sûr mais inerte en conditions de mission (ADR-059, HEAD toujours divergent) ; seul levier effectif (`baseRef: "head"`) disqualifié — anti-pattern #38. Les deux gates (`check-agents.sh`, règle 4 de `check-capability-activation.sh`) restent en place. Aucun plan d'exécution : clôture documentaire directe (mandat vf-coder). Dossiers : `.planning/research/2026-08-23-wktr-02-preuve-retour-commits-worktree.md` (amendé), `.planning/research/2026-08-26-wktr-02-leg-b-base-de-fork.md`.
-last_updated: "2026-08-26T00:00:00.000Z"
-last_activity: 2026-08-26
-last_activity_desc: Deux clôtures recalées en une passe d'hygiène d'état. (1) Phase 18 : ce STATE
-affirmait encore « livrée, non shippée » alors que la release `v2.57.0` est publiée (tag + release
-GitHub, gate ✓) — corrigé. (2) Phase 35 : close par décision humaine sur preuve mesurée, option A
-(pas de ré-armement). Quatre gestes documentaires : amendement de la preuve WKTR-02 du 2026-08-23
-(dégénérée sur leg B), requalification du ledger (`REQUIREMENTS.md` : WKTR-01 requalifié, WKTR-02
-done, QUAL-01 non déclenché), doctrine `team-kernel.md` mise à jour (pourquoi les deux gates
-restent + contrainte opérationnelle sur les commandes composées de la garde d'isolation),
-`ROADMAP.md`/`STATE.md` recalés. Restent 34 et 25 à cadrer.
+current_phase: 38
+current_phase_name: Portabilité multi-runtime — livraison (canal d'install, migration de lab, adaptateur)
+status: completed
+stopped_at: >-
+  Phase 38 **exécutée puis MESURÉE** (2026-08-30, clé API posée par Samuel). **Critère 2 PROUVÉ sur
+  Codex** : profondeur ≥ 2 constatée EN BASE (`thread_spawn_edges`, chaînes
+  `root→vf-dev-manager→vf-coder`), 3/3 sur les **4 critères réels** — le **critère 5 est SANS OBJET
+  sous clé API** (le mode d'échec cherché ne peut structurellement pas survenir : vert à vide, jamais
+  « atteint ») et le **critère 4 est plus faible que son libellé** (`--output-schema` ne se propage
+  pas aux sous-agents, dette D-38-S). **kimi-code n'est plus un inconnu déclaré** : I-1 **31/31**
+  (deux sondes indépendantes, `comm` vide dans les deux sens, contrôle négatif prouvant que la sonde
+  sait dire non), I-2 `disallowedTools` **bloque réellement** (0/4 contre 3/3 au contrôle positif,
+  réserve : le trou Bash reste ouvert), I-3 hooks **déclenchés 3/3**, et `vf-internal` **sans
+  équivalent** — les 19 workers internes sont publiquement invocables, le Pattern 12 est une garantie
+  de frontmatter et non de runtime, désormais **déclarée par le gate de fidélité**. **Critère 1
+  toujours partiel** : hooks non portés, perte déclarée. §7 Codex : la **lecture** du canal hooks
+  projet est tranchée (gatée par le trust du PROJET), l'**exécution** reste un **inconnu déclaré**
+  (0/3 sans contrôle positif montable = artefact, pas preuve de fermeture). Coûts : Codex **1,01 $**
+  sur 9,50, kimi **~0,018 $**. Non-régression : **77 suites, 76 vertes** (la rouge est préexistante,
+  rouge aussi au commit de base, hors périmètre CI). **SHIPPÉE v2.59.0 le 2026-08-31** — Samuel a
+  autorisé le ship après revue ; bump racine, PR, tag annoté et release GitHub. Test bout-en-bout
+  install+usage refait le 2026-08-31 sur Codex (délégation de rôle → code réel) et Kimi
+  (`--agent-file` → code + rapport typé), manifeste `.codex-plugin/` natif ajouté.
+last_updated: "2026-08-30T00:00:00.000Z"
+last_activity: 2026-08-30
+last_activity_desc: >-
+  Clôture documentaire de la Phase 38 (mission d'équipe, worktree isolé — une autre session
+  travaillait dans l'arbre principal). `38-02-SUMMARY.md` écrit sur pièces et déclaré comme
+  rédigé après coup ; ROADMAP : 7 plans cochés, `38-07` ajouté, statut de phase écrit sans
+  arrondi (`[~]`, pas « complete ») ; STATE : compteurs +7 plans, Session Continuity pointant le
+  runbook de mesure et les deux gestes humains en attente. Aucune modification de code.
 progress:
-  total_phases: 8
-  completed_phases: 6
-  total_plans: 31
-  completed_plans: 31
-  percent: 75
+  total_phases: 10
+  completed_phases: 7
+  total_plans: 38
+  completed_plans: 38
+  percent: 70
 ---
 
 # Project State
@@ -168,6 +185,13 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 
 ### Roadmap Evolution
 
+- 2026-08-28 : **Phase 38 ajoutée — Portabilité multi-runtime, livraison** (décision de Samuel, option
+  « phase à part » recommandée par `ETUDE-CANAL-ET-MIGRATION.md`). Six lots candidats : gate de fidélité,
+  installeur multi-runtime, trou de `rollback`, `--target` (payload 198 fichiers / 1130 occurrences),
+  adaptateur + démarche amont (go/no-go non rendu), migration de lab. **Phase 37 close** le même jour :
+  verdict en deux morceaux (runtime Codex apte — profondeur 3 mesurée contre `maxDepth: 1` déclaré —,
+  chemin d'artefacts gsd-core interne et silencieusement dégradant). Leçon gravée : un descripteur
+  gsd-core est une source, jamais une preuve — pour les rouges comme pour les verts.
 - 2026-08-28 : **Phase 37 ajoutée — Portabilité multi-runtime (spike)**. Demande de Samuel :
   rendre VibeFlow installable sur les autres runtimes (Codex, OpenCode, Kimi…). Cadrée en **spike
   de mesure** (arbitrage humain : spike d'abord, cibles = les 3 nommées + conformité au standard
@@ -998,10 +1022,29 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-**Resume file:** .planning/phases/VFDO-31-manifeste-d-install-dry-run-issue-20/31-CONTEXT.md
+**Resume file:** .planning/phases/VFDO-38-portabilit-multi-runtime-livraison-canal-d-install-migration/38-RUNBOOK-MESURE-CODEX.md
 
-Last session: 2026-08-16T00:00:00.000Z
-Stopped at: Phase 31 livrée (8 plans, 6 vagues) — hygiène documentaire de clôture posée
-Reprendre par : gestes humains gatés — push de la branche `feat/phase-31-manifeste-dry-run`, PR,
-puis cadrage de la Phase 32 (Durcissement du driver-lock), qui dépend de la forme exec des hooks
-livrée en Phase 30 et ne touche que `conductor`.
+Last session: 2026-08-29T00:00:00.000Z
+Stopped at: Phase 38 exécutée ET mesurée — critère 2 prouvé, kimi mesuré, rien de shippé
+Reprendre par : **la revue de branche par Samuel, puis les gestes de livraison**. Le runbook
+`38-RUNBOOK-MESURE-CODEX.md` a été **exécuté le 2026-08-30** et son objet est atteint — il reste utile
+comme protocole de re-mesure, plus comme tâche en attente. Les preuves sont dans
+`38-MESURE-CODEX-CRITERE-2.md` et `38-MESURE-KIMI.md` ; le rapport de mission
+`.planning/missions/2026-08-29-phase-38-portabilite-multi-runtime.md` porte la séance complète.
+
+**Ne pas écrire « vérifié » à la place de Samuel** — les documents écrivent les preuves, il écrit le
+statut.
+
+**Deux gestes humains en attente** (ni l'un ni l'autre n'est automatisable côté agent) :
+
+1. ~~**Auth kimi-code**~~ — **FAIT** (clé API posée par Samuel le 2026-08-30). kimi-code est
+   désormais **mesuré**, plus un inconnu déclaré : I-1 31/31, I-2 et I-3 verts. Le credential a été
+   manipulé sous le régime option B (copie vers un banc sous scratchpad, jamais ouverte, écrasée
+   3 passes puis supprimée, home réel vérifié intact) et **rien n'a été écrit chez Samuel**.
+2. **Issue amont gsd-core NON ENVOYÉE** — rédigée dans
+   `.planning/phases/VFDO-38-portabilit-multi-runtime-livraison-canal-d-install-migration/38-UPSTREAM-GSD-CORE-ISSUE.md`
+   (5 points mesurés, dont le `split(",")` qui déchire `Agent(a, b, c)` avec des dégâts **opposés** sur
+   OpenCode et kimi-code). Tout envoi externe est validé par Samuel — le fichier attend, il ne part pas seul.
+
+Puis, quand Samuel a vu la chose marcher : revue de branche, PR, bump racine, tag et release
+(`feat/phase-38-portabilite-multi-runtime`, ~90 commits, `VERSION` racine encore v2.58.1).

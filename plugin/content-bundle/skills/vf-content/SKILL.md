@@ -1,18 +1,6 @@
 ---
 name: vf-content
-description: >
-  Utiliser quand l'intention est de produire ou décliner du contenu éditorial —
-  « écris un post », « rédige la newsletter », « fais-moi un thread sur… », « décline cet
-  article », « adapte cette pièce pour LinkedIn », « cadre l'angle de… », « prépare le
-  calendrier de la semaine », « produis les pièces de la semaine », « lance la prod en
-  autonomie ». Point d'entrée du métier content de VibeFlow : route un geste simple
-  (une pièce → chaîne courte cadrage → rédaction → gate de clarté → validation humaine)
-  ou une mission (≥ 3 pièces ou signal de durée → équipe via vf-content-manager).
-  La validation humaine avant toute distribution est non négociable, quel que soit le mode.
-  ✘ pas pour poser/structurer le planning du lab → vf-planning · ✘ pas pour configurer le
-  lab ou installer des modules → vibeflow-conductor · ✘ pas pour de la copy marketing de
-  page web (landing, pricing) → skills copywriting dédiés.
-  Invocable par l'utilisateur ET par l'agent en autonomie.
+description: "Utiliser quand l'intention est de produire ou décliner du contenu éditorial — « écris un post », « rédige la newsletter », « fais-moi un thread sur… », « décline cet article », « adapte cette pièce pour LinkedIn », « cadre l'angle de… », « prépare le calendrier de la semaine », « produis les pièces de la semaine », « lance la prod en autonomie ». Point d'entrée du métier content de VibeFlow : route un geste simple (une pièce → chaîne courte cadrage → rédaction → gate de clarté → validation humaine) ou une mission (≥ 3 pièces ou signal de durée → équipe via vf-content-manager). La validation humaine avant toute distribution est non négociable, quel que soit le mode. ✘ pas pour poser/structurer le planning du lab → vf-planning · ✘ pas pour configurer le lab ou installer des modules → vibeflow-conductor · ✘ pas pour de la copy marketing de page web (landing, pricing) → skills copywriting dédiés. Invocable par l'utilisateur ET par l'agent en autonomie."
 ---
 
 # vf-content — Point d'entrée du métier content

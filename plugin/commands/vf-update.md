@@ -1,5 +1,5 @@
 ---
-description: Met à jour VibeFlow — le plugin (cache marketplace) puis tous les modules installés — vers la dernière version publiée, avec changelog et confirmation.
+description: "Met à jour VibeFlow — le plugin (cache marketplace) puis tous les modules installés — vers la dernière version publiée, avec changelog et confirmation."
 argument-hint: "[--check | --modules-only]"
 ---
 

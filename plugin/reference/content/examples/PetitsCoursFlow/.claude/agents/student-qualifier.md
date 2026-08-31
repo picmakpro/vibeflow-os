@@ -1,6 +1,6 @@
 ---
 name: student-qualifier
-description: Qualifie un nouvel eleve potentiel selon le perimetre, le format et les regles pedagogiques de Sophie K.
+description: "Qualifie un nouvel eleve potentiel selon le perimetre, le format et les regles pedagogiques de Sophie K."
 model: sonnet
 memory: project
 ---

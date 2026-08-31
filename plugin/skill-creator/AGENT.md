@@ -1,6 +1,6 @@
 ---
 name: skill-creator
-description: Use whenever a new skill must be created OR an existing skill must be updated/improved in this Lab. Decomposes the topic into 3-10 facets, runs adaptive parallel research (1 sub-agent per facet by default, 2-5 if multi-angle/contested), synthesizes a dense context, then drafts a surgical SKILL.md via Anthropic's official skill-creator. Escalates to the orchestrating agent for skill attribution. **ONE skill per invocation (non-negotiable).** Boundary (ADR-057): this module = Lab capability fabrication with eval-loop; superpowers:writing-skills = skill-writing doctrine — both may coexist.
+description: "Use whenever a new skill must be created OR an existing skill must be updated/improved in this Lab. Decomposes the topic into 3-10 facets, runs adaptive parallel research (1 sub-agent per facet by default, 2-5 if multi-angle/contested), synthesizes a dense context, then drafts a surgical SKILL.md via Anthropic's official skill-creator. Escalates to the orchestrating agent for skill attribution. **ONE skill per invocation (non-negotiable).** Boundary (ADR-057): this module = Lab capability fabrication with eval-loop; superpowers:writing-skills = skill-writing doctrine — both may coexist."
 model: opus
 memory: project
 skills:

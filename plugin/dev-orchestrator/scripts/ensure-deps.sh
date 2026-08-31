@@ -98,6 +98,18 @@ GSD_LEGACY_DETECTED=""
 GSD_LEGACY_VERSION=""
 PLUGINS_CACHE_DIR="$HOME/.claude/plugins/cache"
 
+# ---------- Résolution de runtime-cli-dispatch.sh (RUNT-01) ----------
+# Cascade EXACTE de find_hooks_merger() (plugin/_internal/vibeflow-update.sh) : script partagé
+# posé par l'engine, jamais un `source` (D-01). Introuvable aux deux positions → repli sur le
+# comportement `claude`-figé ACTUEL (jamais une régression silencieuse sur un poste où le script
+# partagé n'est pas encore posé — cas d'un `update` partiel).
+find_runtime_cli_dispatch() {
+  local c
+  c="${VIBEFLOW_CACHE:-.vibeflow-cache}/_internal/runtime-cli-dispatch.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  c="$(dirname "$0")/runtime-cli-dispatch.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  echo ""
+}
+
 # ---------- Helpers ----------
 log() {
   echo "[ensure-deps] $*" >&2
@@ -444,9 +456,17 @@ log_legacy_cleanup_if_needed() {
 
 # ---------- Superpowers (BOOT-02 / BOOT-03) ----------
 
-# Détecte Superpowers : présent dans la liste des plugins OU dossier en cache.
+# Détecte Superpowers : présent dans la liste des plugins (runtime-aware, RUNT-01) OU dossier en
+# cache. Repli claude-figé si le dispatch partagé est introuvable (script pas encore posé).
 detect_superpowers() {
-  if command -v claude >/dev/null 2>&1 && claude plugin list 2>/dev/null | grep -q superpowers; then
+  local dispatch out
+  dispatch="$(find_runtime_cli_dispatch)"
+  if [ -n "$dispatch" ]; then
+    out="$(bash "$dispatch" list-json 2>/dev/null)"
+    if [ -n "$out" ] && printf '%s' "$out" | grep -q superpowers; then
+      return 0
+    fi
+  elif command -v claude >/dev/null 2>&1 && claude plugin list 2>/dev/null | grep -q superpowers; then
     return 0
   fi
   [ -d "$PLUGINS_CACHE_DIR" ] && find "$PLUGINS_CACHE_DIR" -type d -name 'superpowers*' 2>/dev/null | grep -q .
@@ -460,33 +480,84 @@ ensure_superpowers() {
     return 0
   fi
 
-  # Prérequis : CLI claude sur le PATH. Absent → étape manuelle TUI, jamais d'échec silencieux.
-  if ! command -v claude >/dev/null 2>&1; then
-    err "CLI claude introuvable — Superpowers ne peut pas être auto-installé."
-    log "Étape manuelle Superpowers (dans la TUI Claude Code) :"
+  local dispatch runtime
+  dispatch="$(find_runtime_cli_dispatch)"
+
+  # Repli : script partagé introuvable → comportement `claude`-figé ACTUEL, inchangé (jamais une
+  # régression silencieuse sur un poste où le dispatch n'est pas encore posé).
+  if [ -z "$dispatch" ]; then
+    if ! command -v claude >/dev/null 2>&1; then
+      err "CLI claude introuvable — Superpowers ne peut pas être auto-installé."
+      log "Étape manuelle Superpowers (dans la TUI Claude Code) :"
+      log "  /plugin install superpowers@claude-plugins-official"
+      return 0
+    fi
+
+    log "Superpowers absent — installation via plugin (non-interactif, --scope $SUPERPOWERS_SCOPE)..."
+    if run_cmd claude plugin install superpowers@claude-plugins-official --scope "$SUPERPOWERS_SCOPE"; then
+      log "Superpowers installé via plugin."
+      return 0
+    fi
+
+    log "Install directe KO — tentative via marketplace..."
+    if run_cmd claude plugin marketplace add anthropics/claude-plugins-official &&
+      run_cmd claude plugin install superpowers@claude-plugins-official --scope "$SUPERPOWERS_SCOPE"; then
+      log "Superpowers installé via marketplace + plugin."
+      return 0
+    fi
+
+    err "L'auto-install Superpowers a échoué (directe + marketplace)."
+    log "Étape manuelle Superpowers (dans la TUI Claude Code, scope visé : $SUPERPOWERS_SCOPE) :"
     log "  /plugin install superpowers@claude-plugins-official"
     return 0
   fi
 
+  # Dispatch runtime-aware (RUNT-01) : détecter EN AMONT le runtime supporté, pour garder la
+  # même sémantique de message que le repli ci-dessus (« aucun runtime détecté → étape manuelle »,
+  # jamais nommer `claude` spécifiquement quand la détection a échoué pour tous les runtimes).
+  runtime="$(bash "$dispatch" detect 2>/dev/null)"
+  case "$runtime" in
+    claude | codex) ;;
+    *)
+      err "Aucun runtime CLI détecté — Superpowers ne peut pas être auto-installé."
+      log "Étape manuelle Superpowers (dans la TUI Claude Code) :"
+      log "  /plugin install superpowers@claude-plugins-official"
+      return 0
+      ;;
+  esac
+
   log "Superpowers absent — installation via plugin (non-interactif, --scope $SUPERPOWERS_SCOPE)..."
-  if run_cmd claude plugin install superpowers@claude-plugins-official --scope "$SUPERPOWERS_SCOPE"; then
+  if run_cmd bash "$dispatch" install superpowers@claude-plugins-official --scope "$SUPERPOWERS_SCOPE"; then
     log "Superpowers installé via plugin."
     return 0
   fi
 
   # Fallback : ajouter le marketplace puis re-tenter l'install.
   log "Install directe KO — tentative via marketplace..."
-  if run_cmd claude plugin marketplace add anthropics/claude-plugins-official &&
-    run_cmd claude plugin install superpowers@claude-plugins-official --scope "$SUPERPOWERS_SCOPE"; then
+  if run_cmd bash "$dispatch" marketplace-add anthropics/claude-plugins-official --scope "$SUPERPOWERS_SCOPE" &&
+    run_cmd bash "$dispatch" install superpowers@claude-plugins-official --scope "$SUPERPOWERS_SCOPE"; then
     log "Superpowers installé via marketplace + plugin."
     return 0
   fi
 
   # Toujours KO → étape manuelle (jamais d'échec silencieux).
-  # La TUI Claude Code n'expose pas de flag de scope : on indique le scope visé en commentaire.
   err "L'auto-install Superpowers a échoué (directe + marketplace)."
   log "Étape manuelle Superpowers (dans la TUI Claude Code, scope visé : $SUPERPOWERS_SCOPE) :"
   log "  /plugin install superpowers@claude-plugins-official"
+  return 0
+}
+
+# ---------- Précondition Codex (RUNT-01 étendu, tâche 3) ----------
+# multi_agent_v2 posé (idempotent, commande officielle) + trust_level DÉCLARÉ jamais auto-écrit.
+# Best-effort — un échec ne doit JAMAIS faire échouer le reste du bootstrap. Gaté sur runtime
+# codex uniquement, aucun effet sur un poste claude/opencode/kimi-code.
+ensure_codex_preconditions_if_applicable() {
+  local dispatch runtime
+  dispatch="$(find_runtime_cli_dispatch)"
+  [ -n "$dispatch" ] || return 0
+  runtime="$(bash "$dispatch" detect 2>/dev/null)"
+  [ "$runtime" = "codex" ] || return 0
+  bash "$dispatch" ensure-codex-preconditions 2>&1 | while IFS= read -r line; do log "$line"; done
   return 0
 }
 
@@ -583,6 +654,7 @@ main() {
   log "Bootstrap dépendances (mode=$([ -n "$DRY_RUN" ] && echo dry-run || echo apply))"
   ensure_gsd
   ensure_superpowers
+  ensure_codex_preconditions_if_applicable
   # ADR-051 : après l'install GSD, patcher le tools: de gsd-executor avec les serveurs MCP du lab.
   patch_gsd_executor_mcp
   guard_init

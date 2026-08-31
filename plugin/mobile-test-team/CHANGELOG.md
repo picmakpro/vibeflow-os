@@ -1,5 +1,11 @@
 # Changelog — mobile-test-team
 
+## [v1.4.5] — 2026-08-30 (Phase 38 — description de frontmatter YAML strict, plan 38-08)
+
+**Patch** :
+
+- **Description de frontmatter passée en scalaire mono-ligne quoté** — la description est désormais un scalaire guillemets doubles mono-ligne (texte strictement inchangé), pour traverser sans perte un parseur YAML strict ET la logique d'extraction de gsd-core (`extractFrontmatterField`). 3 fichiers du module concernés. Gate : `plugin/conductor/scripts/check-description-fidelity.sh` (Phase 38, plan 38-08, FIDE-01/FIDE-02).
+
 ## [v1.4.4] — 2026-08-10 (correctif #38 — `isolation: worktree` retiré du frontmatter)
 
 **Retrait d'`isolation: worktree` du frontmatter de `vf-test-runner` et `vf-app-fixer`.** Livrée en v2.49.0

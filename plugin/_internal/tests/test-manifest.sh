@@ -248,7 +248,7 @@ if prepare_module "$CACHE" "software-architecture"; then
   # T5 — aucune entrée de la liste close d'exclusions D-31-03
   if [ ! -f "$MANIFEST" ]; then
     ko "T5 : manifeste absent, exclusions D-31-03 non vérifiables"
-  elif "$GREP" -qE '^(scripts/vf-portable\.sh|scripts/\.vibeflow-installed|scripts/\.vibeflow-manifest-)' "$MANIFEST"; then
+  elif "$GREP" -qE '^(scripts/vf-portable\.sh|scripts/runtime-cli-dispatch\.sh|scripts/\.vibeflow-target|scripts/\.vibeflow-installed|scripts/\.vibeflow-manifest-)' "$MANIFEST"; then
     ko "T5 : le manifeste contient une entrée de la liste close d'exclusions D-31-03"
   else
     ok "T5 : aucune entrée de la liste close d'exclusions D-31-03 dans le manifeste"
@@ -267,7 +267,7 @@ if prepare_module "$CACHE" "software-architecture"; then
   T6_DISK_SORTED="$(mktemp)"
   LC_ALL=C sort "$MANIFEST" > "$T6_MANI_SORTED" 2>/dev/null || : > "$T6_MANI_SORTED"
   find "$LAB/.claude" -type f | sed "s#^$LAB/\.claude/##" \
-    | "$GREP" -vE '^scripts/vf-portable\.sh$|^scripts/\.vibeflow-installed$|^scripts/\.vibeflow-manifest-|^settings\.json$|^settings\.local\.json$|^memory/|^\.backups/' \
+    | "$GREP" -vE '^scripts/vf-portable\.sh$|^scripts/runtime-cli-dispatch\.sh$|^scripts/\.vibeflow-target$|^scripts/\.vibeflow-installed$|^scripts/\.vibeflow-manifest-|^settings\.json$|^settings\.local\.json$|^memory/|^\.backups/' \
     | LC_ALL=C sort > "$T6_DISK_SORTED"
   T6_MISSING="$(comm -23 "$T6_DISK_SORTED" "$T6_MANI_SORTED")"
   T6_EXTRA="$(comm -13 "$T6_DISK_SORTED" "$T6_MANI_SORTED")"
@@ -296,7 +296,7 @@ if prepare_module "$CACHE" "software-architecture"; then
   # plus d'un seul site câblé.
   if [ ! -f "$MANIFEST" ]; then
     ko "T9 : manifeste absent, exclusions D-31-03 non vérifiables"
-  elif "$GREP" -qE '^(scripts/vf-portable\.sh|scripts/\.vibeflow-installed|scripts/\.vibeflow-manifest-)' "$MANIFEST"; then
+  elif "$GREP" -qE '^(scripts/vf-portable\.sh|scripts/runtime-cli-dispatch\.sh|scripts/\.vibeflow-target|scripts/\.vibeflow-installed|scripts/\.vibeflow-manifest-)' "$MANIFEST"; then
     ko "T9 : le manifeste contient une entrée de la liste close d'exclusions D-31-03"
   else
     ok "T9 : aucune entrée de la liste close d'exclusions D-31-03 dans le manifeste (fixture 31-03)"

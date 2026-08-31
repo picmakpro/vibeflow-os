@@ -10,7 +10,7 @@
 intent, runs the pipeline (scoping → plan → execution → proof), and **machine gates** verify —
 not promises.
 
-[![Version](https://img.shields.io/badge/version-2.58.1-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.59.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -121,9 +121,10 @@ module's README is its full documentation — same structure everywhere.
 ## 🔒 Trust
 
 - **Source-available**: public code and history — see [LICENSE](./LICENSE).
-- **Auditable**: bash + `jq`, every script covered by its suite (68 suites in CI — the newest
-  ones prove the dev-scope hooks' exec form as actually installed, their exit-code contract, and
-  the shared Python resolution), **idempotent** install with backup before overwrite.
+- **Auditable**: bash + `jq`, every script covered by its suite (76 suites in CI — the newest
+  ones prove the multi-runtime CLI dispatch (RUNT-01/02) and the dev-scope hooks' exec form as
+  actually installed, their exit-code contract, and the shared Python resolution), **idempotent**
+  install with backup before overwrite.
 - **The repo applies its own doctrine**: CI on push/PR (tests + strict gates) + a
   "**fresh lab**" job — the baseline is installed into a blank lab and must pass its own
   gates with zero intervention.
@@ -141,6 +142,7 @@ Full history: **[CHANGELOG.md](./CHANGELOG.md)**, the single canon — the table
 
 | Version | Date | Change |
 |---------|------|--------|
+| `v2.59.0` | 2026-08-31 | **VibeFlow now installs and runs outside Claude Code — measured end-to-end on Codex and Kimi, not declared.** Codex consumes the Claude marketplace descriptor unchanged (`codex plugin marketplace add` then `codex plugin add`), and a role adapter registers each VF agent as a Codex role with an honest per-field digest (model mapped, `memory` lost, `tools` pending); a live session delegated manager→worker in-base (depth ≥ 2 via `thread_spawn_edges`) and produced working code for $1.01. Kimi loads a VF agent through `--agent-file` and runs it — real files plus the team-kernel typed report — after the description fix a cross-parser gate now enforces: the only single-line form both `gsd-core` and Kimi accept is the quoted one. A native `.codex-plugin/` manifest was added for robustness (no longer leaning on the undocumented `.claude-plugin` fallback) and a desktop identity. Losses are declared, never silent: Codex hooks are not ported, and a claimed "skills-budget saturation" was disproven by measurement — VF injects exactly one skill, the pressure was the host's own. Hardening: the fidelity gate now measures the TOML actually posted rather than a parallel conversion, and a path-traversal write plus a judged-repo injection vector were closed. Samuel authorised the ship after reviewing the branch. |
 | `v2.58.1` | 2026-08-28 | **A session-start check could break the start of the session it was meant to inform.** The infrastructure audit prints one JSON object per axis, so its two-axis run emitted two objects back to back — not a valid JSON document — and Claude Code rejected the injected output. It surfaced only every ~14 days, the interval the audit actually runs on, and `jq` had always accepted the output because it reads a *stream* where the harness parses a *document*. The hook now emits a single encoded object, and stays silent unless there is a finding. |
 | `v2.58.0` | 2026-08-28 | **A Node too old to run the current engine now repairs itself.** `gsd-core` 1.11.0 requires Node 24, and below it npm silently installs 1.10.0 instead of failing — labs were quietly running an older engine. The bootstrap now installs Node 24 under `$HOME` through whichever version manager is present (or nvm, pinned), never with sudo and never touching the system Node, then resumes. Opt out with `VF_ENSURE_AUTO_NODE=0`. |
 | `v2.57.1` | 2026-08-27 | **The worktree re-arming was measured and deliberately turned down.** The upstream fix landed (gsd-core 1.11.0), but a team mission always runs on a dedicated branch, so HEAD always diverges from the fork base and isolation would degrade to sequential on every dispatch — zero parallelism gained. The only knob that would make it effective silences the very check it needs. Isolation stays a dispatch decision, both guards stay in place, and the doctrine now says why. |

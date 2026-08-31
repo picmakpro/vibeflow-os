@@ -1,0 +1,450 @@
+{
+  "nodes": [
+    {
+      "id": "discuss",
+      "step": "cadrage Phase 38 (manager)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-38-*/DISCUSS.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plan",
+      "step": "plan de phase 38",
+      "stage": "",
+      "deps": [
+        "discuss"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-38-*/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-gate",
+      "step": "lot 1 / FIDE-01 — gate de fidélité (script autonome + suite)",
+      "stage": "",
+      "deps": [
+        "plan"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/check-artifact-fidelity.sh",
+        "plugin/conductor/scripts/tests/",
+        "plugin/conductor/VERSION",
+        "plugin/conductor/CHANGELOG.md",
+        "plugin/conductor/module.json"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-gate",
+      "step": "revue lot 1",
+      "stage": "",
+      "deps": [
+        "exec-gate",
+        "exec-gate-wire"
+      ],
+      "scope": [
+        "plugin/conductor/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-install",
+      "step": "lot 2 — installeur multi-runtime (11 sites ensure)",
+      "stage": "",
+      "deps": [
+        "plan",
+        "exec-gate"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/ensure-deps.sh",
+        "plugin/design-orchestrator/scripts/ensure-design-deps.sh",
+        "plugin/conductor/scripts/check-plugin-update.sh",
+        "plugin/conductor/scripts/vf-update-run.sh",
+        "plugin/*/scripts/tests/",
+        "plugin/*/VERSION",
+        "plugin/*/CHANGELOG.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-install",
+      "step": "revue lot 2",
+      "stage": "",
+      "deps": [
+        "exec-install"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/",
+        "plugin/design-orchestrator/"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "exec-rollback",
+      "step": "lot 3 — trou de rollback (agents+hooks+mark_installed+glob)",
+      "stage": "",
+      "deps": [
+        "plan"
+      ],
+      "scope": [
+        "plugin/_internal/vibeflow-update.sh",
+        "plugin/_internal/tests/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-rollback",
+      "step": "revue lot 3",
+      "stage": "",
+      "deps": [
+        "exec-rollback"
+      ],
+      "scope": [
+        "plugin/_internal/"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "join-1",
+      "step": "revue de jointure lots 1+2+3",
+      "stage": "",
+      "deps": [
+        "exec-gate",
+        "exec-install",
+        "exec-rollback"
+      ],
+      "scope": [
+        "plugin/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-adapter",
+      "step": "lot 5 — adaptateur VF minimal + enregistrement Codex (~/.codex/agents)",
+      "stage": "",
+      "deps": [
+        "revue-gate",
+        "probe-codex",
+        "exec-fide03"
+      ],
+      "scope": [
+        "plugin/_internal/runtime-adapter/",
+        "plugin/conductor/scripts/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-adapter",
+      "step": "revue lot 5",
+      "stage": "",
+      "deps": [
+        "exec-adapter"
+      ],
+      "scope": [
+        "plugin/_internal/runtime-adapter/"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "exec-target",
+      "step": "lot 4 — --target + réécriture du payload (198 fichiers)",
+      "stage": "",
+      "deps": [
+        "revue-rollback",
+        "exec-gate-wire",
+        "fix-join-pose"
+      ],
+      "scope": [
+        "plugin/_internal/vibeflow-update.sh",
+        "plugin/_internal/tests/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-target",
+      "step": "revue lot 4",
+      "stage": "",
+      "deps": [
+        "exec-target"
+      ],
+      "scope": [
+        "plugin/_internal/"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "exec-migration",
+      "step": "lot 6 — migration de lab (runtime dans config.json, réversibilité)",
+      "stage": "",
+      "deps": [
+        "revue-target",
+        "revue-adapter"
+      ],
+      "scope": [
+        "plugin/_internal/vibeflow-update.sh",
+        "plugin/conductor/skills/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-migration",
+      "step": "revue lot 6",
+      "stage": "",
+      "deps": [
+        "exec-migration"
+      ],
+      "scope": [
+        "plugin/_internal/",
+        "plugin/conductor/"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "mesure-codex",
+      "step": "mesure réelle Codex : pose + skills déclenchables + agents enregistrés + aller-retour manager→worker",
+      "stage": "",
+      "deps": [
+        "revue-adapter",
+        "revue-install",
+        "revue-target",
+        "probe-codex",
+        "fix-adapter-wire"
+      ],
+      "scope": [
+        "/tmp/lab-codex-38"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "mesure-autres",
+      "step": "OpenCode + kimi-code : install réelle + mesure de pose",
+      "stage": "",
+      "deps": [
+        "revue-install",
+        "revue-target"
+      ],
+      "scope": [
+        "/tmp/lab-opencode-38",
+        "/tmp/lab-kimi-38"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "audit",
+      "step": "audit sécurité/infra (écritures hors TARGET_ROOT, rm -rf, symlinks)",
+      "stage": "",
+      "deps": [
+        "revue-target",
+        "revue-migration"
+      ],
+      "scope": [
+        "plugin/_internal/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "nonreg",
+      "step": "non-régression Claude (découverte COMPLÈTE des suites — 70 au 2026-08-28, à re-dériver ; gates ; check-agents sur lab installé)",
+      "stage": "",
+      "deps": [
+        "join-1",
+        "revue-adapter",
+        "revue-target",
+        "revue-migration"
+      ],
+      "scope": [
+        "plugin/",
+        "scripts/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "hygiène documentaire (fin de mission)",
+      "stage": "",
+      "deps": [
+        "exec-gate",
+        "exec-install",
+        "exec-rollback",
+        "exec-adapter",
+        "exec-target",
+        "exec-migration",
+        "mesure-codex",
+        "mesure-autres",
+        "exec-sendmsg",
+        "exec-kernel-doc",
+        "fix-adapter-wire"
+      ],
+      "scope": [
+        ".planning/",
+        "plugin/*/README.md",
+        "README.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "probe-codex",
+      "step": "lever les 7 inconnus Codex en session RÉELLE (scope projet, dispatch nommé, tirets, agent_type, fork_turns/model, racines skills, approval_policy)",
+      "stage": "",
+      "deps": [
+        "discuss"
+      ],
+      "scope": [
+        "/private/tmp/claude-501/-Users-samuel-Documents-dev-vibeflow-os/0891db3f-ba80-4f3e-8352-03957bdea334/scratchpad/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-gate-wire",
+      "step": "FIDE-02 — bannière de fidélité dans l'engine + bump conductor (porte AUSSI l'entrée CHANGELOG du lot ROLL)",
+      "stage": "",
+      "deps": [
+        "exec-gate",
+        "exec-rollback",
+        "exec-install",
+        "revue-rollback"
+      ],
+      "scope": [
+        "plugin/_internal/vibeflow-update.sh",
+        "plugin/_internal/tests/",
+        "plugin/conductor/VERSION",
+        "plugin/conductor/CHANGELOG.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-sendmsg",
+      "step": "D-38-I — SendMessage au tools: de vf-coder (hors périmètre 38, sur la branche)",
+      "stage": "",
+      "deps": [
+        "plan"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/agents/vf-coder.md",
+        "plugin/dev-orchestrator/VERSION",
+        "plugin/dev-orchestrator/CHANGELOG.md",
+        "plugin/dev-orchestrator/module.json"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-kernel-doc",
+      "step": "D-38-I (suite) — consigne l'asymétrie spawn/correction dans team-kernel.md",
+      "stage": "",
+      "deps": [
+        "exec-gate",
+        "exec-sendmsg",
+        "exec-install"
+      ],
+      "scope": [
+        "plugin/conductor/references/team-kernel.md",
+        "plugin/conductor/VERSION",
+        "plugin/conductor/CHANGELOG.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-join-pose",
+      "step": "BLOQUANT join-1 — poser runtime-cli-dispatch.sh sous TARGET_ROOT/scripts (miroir copy_engine_lib)",
+      "stage": "",
+      "deps": [
+        "exec-gate-wire"
+      ],
+      "scope": [
+        "plugin/_internal/vibeflow-update.sh",
+        "plugin/_internal/tests/test-vibeflow-update.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-fide-herm",
+      "step": "BLOQUANT revue FIDE — T24/T26 non hermétiques (dépendent du $HOME réel)",
+      "stage": "",
+      "deps": [
+        "exec-target"
+      ],
+      "scope": [
+        "plugin/_internal/tests/test-vibeflow-update.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-fide-gate",
+      "step": "revue FIDE — contrat stdout/stderr, count_markers par occurrence, code mort",
+      "stage": "",
+      "deps": [
+        "revue-gate"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/check-artifact-fidelity.sh",
+        "plugin/conductor/scripts/tests/test-check-artifact-fidelity.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-fide03",
+      "step": "FIDE-03 — le gate déclare la limite de confinement + vérifie les 4 éléments de la commande de juge",
+      "stage": "",
+      "deps": [
+        "fix-fide-gate"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/check-artifact-fidelity.sh",
+        "plugin/conductor/scripts/tests/test-check-artifact-fidelity.sh",
+        "plugin/conductor/VERSION",
+        "plugin/conductor/CHANGELOG.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-adapter-wire",
+      "step": "câblage de l'adaptateur dans l'engine (tâche 2 de 38-05, différée : fichier détenu par --target)",
+      "stage": "",
+      "deps": [
+        "exec-target"
+      ],
+      "scope": [
+        "plugin/_internal/vibeflow-update.sh",
+        "plugin/_internal/tests/test-vibeflow-update.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-versionsync",
+      "step": "refermer check-version-sync (en-tête README conductor v1.32.0, compteur 71 suites dans les 2 READMEs)",
+      "stage": "",
+      "deps": [
+        "exec-target"
+      ],
+      "scope": [
+        "plugin/conductor/README.md",
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-target-guard",
+      "step": "D-38-P — garde dure --target ($HOME, cible non vide, cible résolue affichée) + T-38-09 reformulé",
+      "stage": "",
+      "deps": [
+        "fix-adapter-wire"
+      ],
+      "scope": [
+        "plugin/_internal/vibeflow-update.sh",
+        "plugin/_internal/tests/test-vibeflow-update.sh",
+        ".planning/phases/VFDO-38-portabilit-multi-runtime-livraison-canal-d-install-migration/38-04-PLAN.md"
+      ],
+      "status": "done"
+    }
+  ]
+}

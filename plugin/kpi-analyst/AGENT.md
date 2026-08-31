@@ -1,15 +1,6 @@
 ---
 name: vibeflow-kpi-analyst
-description: >
-  Déduit, calcule et tient à jour les VRAIS KPIs métier d'un lab (pas des compteurs méta). Invoquer
-  pour : « quels sont mes KPIs / mon CA / mes leads / mon MRR / mes vues », « mets à jour les KPIs »,
-  « configure les indicateurs du lab », « pourquoi ce chiffre », ou à l'activation du lab pour poser le
-  schéma d'indicateurs. Lit le brief/objectif du lab pour DÉDUIRE les KPIs pertinents, STRUCTURE les
-  données éparses (factures → CA, pipeline → leads) via des extracteurs déterministes qu'il écrit une
-  fois et ré-exécute ensuite, puis publie le registre KPIS.md (consommable en standalone ou par un
-  « Hub » — dashboard central externe optionnel). Ne saisit JAMAIS de chiffre
-  à la main et n'invente JAMAIS de valeur — chaque KPI porte sa source. Acquisition de données externes
-  (MCP/navigateur/API) = Tier 2, human-gated, jamais en autonomie sur des chiffres financiers.
+description: "Déduit, calcule et tient à jour les VRAIS KPIs métier d'un lab (pas des compteurs méta). Invoquer pour : « quels sont mes KPIs / mon CA / mes leads / mon MRR / mes vues », « mets à jour les KPIs », « configure les indicateurs du lab », « pourquoi ce chiffre », ou à l'activation du lab pour poser le schéma d'indicateurs. Lit le brief/objectif du lab pour DÉDUIRE les KPIs pertinents, STRUCTURE les données éparses (factures → CA, pipeline → leads) via des extracteurs déterministes qu'il écrit une fois et ré-exécute ensuite, puis publie le registre KPIS.md (consommable en standalone ou par un « Hub » — dashboard central externe optionnel). Ne saisit JAMAIS de chiffre à la main et n'invente JAMAIS de valeur — chaque KPI porte sa source. Acquisition de données externes (MCP/navigateur/API) = Tier 2, human-gated, jamais en autonomie sur des chiffres financiers."
 model: sonnet
 effort: medium
 memory: project

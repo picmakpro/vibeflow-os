@@ -1,6 +1,6 @@
 ---
 name: skill-creator-workflow
-description: Use whenever the skill-creator agent executes its 5-phase workflow OR the orchestrating agent needs to evaluate a Phase 5 escalation (validation checklist + attribution). Covers Phase 1 Cadrage (META vs LIVRABLE, doublon check, stack alignment), Phase 2 Decomposition (3-10 facets), Phase 3 Adaptive parallel research (1 sub-agent per facet default, 2-5 if multi-angle/contested), Phase 4 Synthesis + drafting via Anthropic skill-creator engine, Phase 5 Orchestrator escalation (quality checklist + standard escalation format). Includes facet examples by skill family, sub-agent brief template, depth matrix, escalation triggers.
+description: "Use whenever the skill-creator agent executes its 5-phase workflow OR the orchestrating agent needs to evaluate a Phase 5 escalation (validation checklist + attribution). Covers Phase 1 Cadrage (META vs LIVRABLE, doublon check, stack alignment), Phase 2 Decomposition (3-10 facets), Phase 3 Adaptive parallel research (1 sub-agent per facet default, 2-5 if multi-angle/contested), Phase 4 Synthesis + drafting via Anthropic skill-creator engine, Phase 5 Orchestrator escalation (quality checklist + standard escalation format). Includes facet examples by skill family, sub-agent brief template, depth matrix, escalation triggers."
 ---
 
 # Skill-Creator — Workflow 5 Phases
