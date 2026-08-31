@@ -4,7 +4,7 @@ milestone: fiabilite-v1.0
 milestone_name: « ce qui survit »
 current_phase: 38
 current_phase_name: Portabilité multi-runtime — livraison (canal d'install, migration de lab, adaptateur)
-status: in_progress
+status: completed
 stopped_at: >-
   Phase 38 **exécutée puis MESURÉE** (2026-08-30, clé API posée par Samuel). **Critère 2 PROUVÉ sur
   Codex** : profondeur ≥ 2 constatée EN BASE (`thread_spawn_edges`, chaînes
@@ -21,8 +21,10 @@ stopped_at: >-
   projet est tranchée (gatée par le trust du PROJET), l'**exécution** reste un **inconnu déclaré**
   (0/3 sans contrôle positif montable = artefact, pas preuve de fermeture). Coûts : Codex **1,01 $**
   sur 9,50, kimi **~0,018 $**. Non-régression : **77 suites, 76 vertes** (la rouge est préexistante,
-  rouge aussi au commit de base, hors périmètre CI). **Rien de shippé** : aucune PR, aucun tag,
-  `VERSION` racine **intacte v2.58.1** — le statut « vérifié » reste à écrire par Samuel.
+  rouge aussi au commit de base, hors périmètre CI). **SHIPPÉE v2.59.0 le 2026-08-31** — Samuel a
+  autorisé le ship après revue ; bump racine, PR, tag annoté et release GitHub. Test bout-en-bout
+  install+usage refait le 2026-08-31 sur Codex (délégation de rôle → code réel) et Kimi
+  (`--agent-file` → code + rapport typé), manifeste `.codex-plugin/` natif ajouté.
 last_updated: "2026-08-30T00:00:00.000Z"
 last_activity: 2026-08-30
 last_activity_desc: >-
