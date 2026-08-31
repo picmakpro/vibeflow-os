@@ -1,7 +1,7 @@
 {
   "name": "vibeflow",
   "displayName": "VibeFlow",
-  "version": "2.58.1",
+  "version": "2.59.0",
   "description": "Orchestrateur agentique spec-driven pour agents de code : détection d'intention en langage naturel → pipeline cadrage → plan → exécution → preuve, vérifié par des gates machine. Dev + design, 3 bundles métier (contenu, growth, business), Lab Factory pour tout autre métier.",
   "author": {
     "name": "picmakpro"
