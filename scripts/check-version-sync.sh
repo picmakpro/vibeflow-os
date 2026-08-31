@@ -39,6 +39,14 @@ badge_modules() { grep -o 'badge/modules-[0-9][0-9]*' "$1" | head -1 | sed 's|ba
 v="$(json_version "$ROOT/plugin/.claude-plugin/plugin.json")"
 if [ "$v" = "$canon" ]; then ok "plugin.json $v"; else ko "plugin/.claude-plugin/plugin.json version='$v' ≠ VERSION='$canon'"; fi
 
+# Manifeste codex-natif (Phase 38) : sibling de .claude-plugin, porte aussi un champ .version que
+# codex desktop affiche → 4e point de synchro à ne pas laisser dériver. Gardé sur présence : le
+# fichier n'existe que là où le canal codex est porté, jamais un échec sur son absence.
+if [ -f "$ROOT/plugin/.codex-plugin/plugin.json" ]; then
+  v="$(json_version "$ROOT/plugin/.codex-plugin/plugin.json")"
+  if [ "$v" = "$canon" ]; then ok "codex-plugin.json $v"; else ko "plugin/.codex-plugin/plugin.json version='$v' ≠ VERSION='$canon'"; fi
+fi
+
 v="$(json_version "$ROOT/.claude-plugin/marketplace.json")"
 if [ "$v" = "$canon" ]; then ok "marketplace.json $v"; else ko ".claude-plugin/marketplace.json version='$v' ≠ VERSION='$canon' (c'est la FICHE vue à l'install)"; fi
 
