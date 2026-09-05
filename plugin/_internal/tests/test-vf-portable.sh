@@ -346,5 +346,59 @@ if [ "$((pass+fail))" -eq 0 ]; then
   exit 1
 fi
 
+# ---------- T17 : vf_guard_unavailable normalise son argument (dette BACKLOG) ----------
+# Repro mesurée sur la version d'avant ce correctif : appelée avec un CHEMIN — ce que fait
+# `check-hook-paths.sh:182` en passant `"$0"` — la fonction visait
+# `$health_dir/chemin/absolu/x.sh.marker`, un sous-répertoire jamais créé ; la redirection
+# échouait et, toute l'écriture étant `2>/dev/null || true`, AUCUN marqueur n'était écrit, en
+# silence. Le hook doctor ne pouvait donc jamais voir la panne de ce garde-là.
+T17_HEALTH="$WORK/health-path"
+T17_ERR="$WORK/t17.err"
+T17_RC=0
+env VF_GUARD_HEALTH_DIR="$T17_HEALTH" \
+  bash -c ". '$LIB'; vf_guard_unavailable '/chemin/absolu/check-hook-paths.sh' 'motif T17'" \
+  2>"$T17_ERR" || T17_RC=$?
+T17_OK=1
+[ -f "$T17_HEALTH/check-hook-paths.sh.marker" ] \
+  || { ko "T17 marqueur non écrit quand l'argument est un chemin (contenu de $T17_HEALTH : $(ls -a "$T17_HEALTH" 2>/dev/null | tr '\n' ' '))"; T17_OK=0; }
+# Le champ `script` du marqueur est relu ET AFFICHÉ par le doctor : un chemin absolu y inscrirait
+# le nom du compte de la machine.
+grep -qF '/chemin/absolu' "$T17_HEALTH/check-hook-paths.sh.marker" 2>/dev/null \
+  && { ko "T17 le chemin absolu a fuité dans le contenu du marqueur"; T17_OK=0; }
+grep -qF '[check-hook-paths.sh] motif T17' "$T17_ERR" \
+  || { ko "T17 stderr porte encore le chemin au lieu du nom de base (contenu=[$(cat "$T17_ERR")])"; T17_OK=0; }
+[ "$T17_RC" -ne 0 ] || { ko "T17 code rendu = 0 (attendu non nul)"; T17_OK=0; }
+if [ "$T17_OK" = "1" ]; then
+  ok "T17 argument-chemin normalisé en nom de base : marqueur écrit, aucun chemin machine dedans"
+fi
+
+# ---------- T18 : séparateur Windows et argument vide ----------
+T18_HEALTH="$WORK/health-win"
+T18_OK=1
+env VF_GUARD_HEALTH_DIR="$T18_HEALTH" \
+  bash -c ". '$LIB'; vf_guard_unavailable 'C:\\Users\\x\\guard-file-size.sh' 'motif T18'" 2>/dev/null
+[ -f "$T18_HEALTH/guard-file-size.sh.marker" ] \
+  || { ko "T18 séparateur Windows non normalisé (famille PORT)"; T18_OK=0; }
+# Argument vide : jamais un `.marker` caché que le doctor ne rattacherait à aucun garde.
+env VF_GUARD_HEALTH_DIR="$T18_HEALTH" \
+  bash -c ". '$LIB'; vf_guard_unavailable '' 'motif T18 vide'" 2>/dev/null
+[ -f "$T18_HEALTH/garde-inconnu.marker" ] \
+  || { ko "T18 argument vide : pas de repli explicite (attendu garde-inconnu.marker)"; T18_OK=0; }
+[ ! -f "$T18_HEALTH/.marker" ] \
+  || { ko "T18 argument vide : un marqueur CACHÉ a été écrit"; T18_OK=0; }
+# Motif multi-lignes : le marqueur est une ligne à trois champs séparés par des tabulations, relue
+# par `IFS=$'\t' read` — un saut de ligne ou une tabulation dans le motif décalerait les champs.
+env VF_GUARD_HEALTH_DIR="$T18_HEALTH" \
+  bash -c ". '$LIB'; vf_guard_unavailable 'g18.sh' \"$(printf 'a\tb\nc')\"" 2>/dev/null
+T18_LINES="$(wc -l < "$T18_HEALTH/g18.sh.marker" 2>/dev/null | tr -d ' ')"
+[ "$T18_LINES" = "1" ] \
+  || { ko "T18 motif multi-lignes : marqueur sur $T18_LINES ligne(s) au lieu d'une"; T18_OK=0; }
+T18_FIELDS="$(awk -F'\t' 'NR==1{print NF}' "$T18_HEALTH/g18.sh.marker" 2>/dev/null)"
+[ "$T18_FIELDS" = "3" ] \
+  || { ko "T18 motif à tabulations : $T18_FIELDS champs au lieu de 3 (format du doctor cassé)"; T18_OK=0; }
+if [ "$T18_OK" = "1" ]; then
+  ok "T18 séparateur Windows, argument vide et motif multi-lignes : format du marqueur préservé"
+fi
+
 echo "== $pass ok · $fail ko · $skipped skip =="
 [ "$fail" -eq 0 ]

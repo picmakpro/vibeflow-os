@@ -1,5 +1,48 @@
 # Changelog — conductor
 
+## [v1.35.1] — 2026-09-05 (dette technique : les trois findings voisins de la revue Phase 33)
+
+**Patch** — les trois findings pré-existants tracés le 2026-08-17 à côté de `save()`, chacun mesuré
+avant correction, chacun rouge sous mutation.
+
+- **`scripts/driver-lock.sh` — `sanitize_field()` retire désormais TOUS les caractères de
+  contrôle**, pas seulement le saut de ligne. JSON en interdit les 32 ; la fonction n'en retirait
+  qu'un. Repro mesurée : `acquire --owner=$'mission\tX'` rendait
+  `{"owner": "mission<TAB>X", ...}`, refusé par tout parseur (« Invalid control character ») —
+  **exactement le symptôme que cette fonction avait été écrite pour fermer côté guillemet**, et la
+  même casse en aval (`driver-lock.sh status | jq -r .generation`, prescrit par `team-kernel.md`).
+  `LC_ALL=C` borne la classe aux octets `0x00-0x1F` et `0x7F` : les accents UTF-8 multi-octets
+  passent intacts, vérifié (T59.3 échoue si le filtre devient un rouleau compresseur).
+- **`_internal/lib/vf-portable.sh` — `vf_guard_unavailable()` normalise son argument.** Ce n'était
+  pas cosmétique : les appelants ne s'accordent pas — `guard-file-size.sh` et `guard-driver-lock.sh`
+  passent un nom nu, **`check-hook-paths.sh:182` passe `"$0"`, donc un chemin**. Avec un chemin, le
+  marqueur visait un sous-répertoire jamais créé, la redirection échouait et, toute l'écriture étant
+  `2>/dev/null || true`, **aucun marqueur n'était écrit, en silence** : le hook doctor (agrégation
+  de tout le parc, QUAL-01) ne pouvait donc jamais voir la panne de ce garde-là. Second motif : le
+  champ `script` est relu et affiché par le doctor — un `"$0"` absolu y aurait inscrit le chemin de
+  la machine, donc le nom du compte. Normalisation sur les deux séparateurs (POSIX et Windows,
+  famille PORT), repli explicite `garde-inconnu` sur argument vide plutôt qu'un `.marker` caché, et
+  assainissement du motif (tabulations et sauts de ligne → espaces) parce que le marqueur est une
+  ligne à trois champs relue par `IFS=$'\t' read`.
+- **`scripts/driver-lock.sh` — TOCTOU du `takeover` legacy.** L'ancienne forme
+  `rm -rf "$LOCK_DIR" && ln_atomic …` **détruisait avant de savoir si elle pouvait publier** (un
+  `ln_atomic` en échec laissait le chemin vide, donc un lock évaporé alors que la reprise avait
+  échoué), et sa fenêtre d'absence couvrait un `rm -rf` **récursif** — un `acquire` ordinaire y
+  tombant gagne, ce qui contourne LOCK-04 (la reprise d'un lock périmé est un geste explicite,
+  jamais l'effet de bord d'une acquisition). Forme retenue : **exactement le patron de la branche
+  symlink** — préparer le lien sous un autre nom, écarter le dossier par un `mv` (rename, atomique,
+  à coût constant), publier par `mv_link`, puis éliminer l'écarté. **Ce qui reste ouvert, dit
+  franchement** : la fenêtre entre l'écartement et la publication ne peut pas être supprimée — un
+  `rename` refuse de remplacer un dossier par un lien symbolique, aucune primitive ne bascule l'un
+  en l'autre d'un seul pas. Elle est ramenée d'un `rm -rf` récursif à **un seul rename**, et la
+  destruction ne précède plus la préparation.
+- **Tests** : `test-driver-lock.sh` 187 → **190 PASS / 0 FAIL** (T59 caractères de contrôle sur les
+  deux chemins d'émission — printf direct et JSON relu du meta ; T60 forme du chemin legacy, absence
+  de résidu, bascule effective en lien) · `test-vf-portable.sh` 16 → **18 ok / 0 ko** (T17 argument
+  chemin, T18 séparateur Windows, argument vide et motif multi-lignes). Mutations vérifiées : filtre
+  d'origine restauré → T59.1/2/3 rouges · normalisation retirée → T17/T18 rouges, répertoire de
+  marqueurs littéralement vide · forme legacy d'origine restaurée → T60.1/T60.3 rouges.
+
 ## [v1.35.0] — 2026-09-05 (dette technique : `save()` de `dag.sh` sans verrou ni écriture atomique)
 
 **Minor** — la dette la plus sérieuse du backlog (capturée le 2026-08-17 à la revue de la Phase 33,

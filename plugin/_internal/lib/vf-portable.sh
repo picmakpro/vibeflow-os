@@ -165,6 +165,27 @@ VF_GUARD_UNAVAILABLE_EXIT_CODE=17
 # dans un fichier que personne ne lit.
 vf_guard_unavailable() {
   local script="$1" motif="$2"
+  # Normalisation de l'ARGUMENT (dette BACKLOG « vf_guard_unavailable() sans validation
+  # d'argument », capturée le 2026-08-17). Les appelants ne s'accordent pas : `guard-file-size.sh`
+  # et `guard-driver-lock.sh` passent un nom nu, `check-hook-paths.sh` passe `"$0"` — donc un
+  # CHEMIN. Mesure sur la version d'avant ce correctif : avec un chemin, `marker` désignait un
+  # sous-répertoire que `mkdir -p "$health_dir"` n'avait pas créé, la redirection échouait, et
+  # comme toute l'écriture est `2>/dev/null || true`, AUCUN marqueur n'était écrit — en silence.
+  # Le hook doctor de `conductor` (agrégation de tout le parc, QUAL-01) ne pouvait donc jamais
+  # voir la panne de `check-hook-paths.sh`. Second motif, aussi sérieux : le champ `script` du
+  # marqueur est relu et affiché par le doctor — un `"$0"` absolu y aurait inscrit le chemin de la
+  # machine, donc le nom du compte (le défaut que `check-machine-paths` traque ailleurs).
+  #
+  # `##*/` puis `##*\\` couvrent les deux séparateurs (POSIX et Windows, famille PORT). Un
+  # argument vide ou réduit à des séparateurs retombe sur un nom explicite plutôt que d'écrire un
+  # fichier caché `.marker` que le doctor ne rattacherait à rien.
+  script="${script##*/}"
+  script="${script##*\\}"
+  [ -n "$script" ] || script="garde-inconnu"
+  # Le marqueur est une ligne à TROIS champs séparés par des tabulations, relue par `IFS=$'\t'
+  # read` : une tabulation ou un saut de ligne dans le motif décalerait les champs du doctor.
+  # Ils deviennent des espaces — le motif reste lisible, le format reste vrai.
+  motif="$(printf '%s' "$motif" | tr '\t\n\r' '   ')"
   local health_dir="${VF_GUARD_HEALTH_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/vibeflow/guard-health}"
   local marker="$health_dir/${script}.marker"
   local ts

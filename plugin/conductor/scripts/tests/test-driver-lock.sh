@@ -849,6 +849,61 @@ _t58_pe_after=$(grep '^progress_epoch=' "$_t58_meta" | cut -d= -f2-)
 assert "T58.1 — progress_epoch inchangé après heartbeat" "$_t58_pe_after" "$_t58_pe_before"
 "$SCRIPT" release --owner=A58 >/dev/null 2>&1
 
+echo "=== T59 — sanitize_field() retire TOUS les caractères de contrôle (dette BACKLOG, pas seulement \n) ==="
+# Repro mesurée sur le script d'avant ce correctif : une TABULATION dans --owner traversait
+# `sanitize_field` (qui ne retirait que le saut de ligne parmi les 32 caractères de contrôle) et
+# produisait un JSON refusé par tout parseur — « Invalid control character ». C'est le symptôme
+# exact que cette fonction était censée fermer pour le guillemet, et la même casse en aval :
+# `driver-lock.sh status | jq -r .generation`, prescrit par team-kernel.md.
+rm -rf "$VF_DRIVER_LOCK"
+_t59_owner_raw="$(printf 'A59\tavec\rcontrôle')"
+_t59_out="$("$SCRIPT" acquire --owner="$_t59_owner_raw" --step="$(printf 'étape\tX')")"
+json_ok "$_t59_out"
+assert_exit "T59.1 — acquire avec TAB et CR dans owner/step rend un JSON PARSABLE" "$?" 0
+# Le `status` relit le meta et ré-émet : la casse doit être fermée sur les DEUX chemins — le printf
+# JSON direct de l'acquisition, et le JSON reconstruit depuis le fichier meta.
+_t59_st="$("$SCRIPT" status)"
+json_ok "$_t59_st"
+assert_exit "T59.2 — status relu depuis le meta reste PARSABLE" "$?" 0
+# Discriminance : le filtre ne doit pas devenir un rouleau compresseur. Les accents sont de
+# l'UTF-8 multi-octets (0x80-0xFF) ; `LC_ALL=C` borne [:cntrl:] à 0x00-0x1F et 0x7F, donc ils
+# passent. Sans ce contrôle, un `tr` trop large resterait vert sur T59.1 tout en mutilant le texte.
+_t59_owner="$(printf '%s' "$_t59_st" | python3 -c 'import json,sys; print(json.load(sys.stdin)["owner"])')"
+assert "T59.3 — les accents UTF-8 sont PRÉSERVÉS (le filtre ne mutile pas le texte)" "$_t59_owner" "contrôle"
+case "$_t59_owner" in
+  *"$(printf '\t')"*) echo "  ❌ FAIL — T59.4 — la tabulation survit dans l'owner"; FAIL=$((FAIL+1)) ;;
+  *) echo "  ✅ PASS — T59.4 — la tabulation a bien disparu de l'owner"; PASS=$((PASS+1)) ;;
+esac
+"$SCRIPT" release --owner="$_t59_owner_raw" >/dev/null 2>&1
+
+echo "=== T60 — takeover legacy : la destruction ne précède plus la publication (dette BACKLOG TOCTOU) ==="
+# T60.1 — assertion STATIQUE ciblée sur le motif exact de la dette : `rm -rf "$LOCK_DIR"` SUIVI
+# d'une publication. La destruction ne doit plus précéder la préparation, et elle doit passer par
+# un `mv` — un rename, atomique et à coût constant — plutôt qu'un parcours récursif. Le `rm -rf`
+# de `drop_lock()` est délibérément hors de portée : là, détruire EST l'intention, il n'y a rien à
+# publier après. Les lignes de COMMENTAIRE sont écartées, sans quoi la citation de l'ancienne forme
+# dans son propre correctif ferait échouer le contrôle.
+_t60_bad="$(grep -vE '^[[:space:]]*#' "$SCRIPT" | grep -cE 'rm -rf "\$LOCK_DIR" && ln_atomic' || true)"
+assert_exit "T60.1 — la destruction ne précède plus la publication (motif d'origine absent)" "$_t60_bad" 0
+# T60.2 — après une reprise legacy réussie, ni le dossier écarté ni le lien candidat ne survivent.
+rm -rf "$VF_DRIVER_LOCK"
+mkdir -p "$(dirname "$VF_DRIVER_LOCK")"; mkdir "$VF_DRIVER_LOCK"
+{
+  echo 'owner=ALICE60'; echo 'step=x'; echo 'branch='; echo 'worktree='
+  echo 'session_ids='; echo 'acquired_epoch=1'; echo 'acquired_iso=2020-01-01T00:00:00'
+  echo 'heartbeat_epoch=1'
+} > "$VF_DRIVER_LOCK/meta"
+"$SCRIPT" takeover --owner=B60 --step=y >/dev/null
+_t60_resid="$(find "$(dirname "$VF_DRIVER_LOCK")" -maxdepth 1 \( -name '*.legacy.*' -o -name '*.new.*' \) | wc -l | tr -d ' ')"
+assert_exit "T60.2 — aucun résidu (.legacy.PID / .new.PID) après la bascule" "$_t60_resid" 0
+# T60.3 — le lock publié est bien un LIEN (la forme moderne), pas un dossier resté en place.
+if [ -L "$VF_DRIVER_LOCK" ]; then
+  echo "  ✅ PASS — T60.3 — le lock legacy a bien basculé en lien symbolique"; PASS=$((PASS+1))
+else
+  echo "  ❌ FAIL — T60.3 — le lock n'est pas un lien après la reprise legacy"; FAIL=$((FAIL+1))
+fi
+"$SCRIPT" release --owner=B60 >/dev/null 2>&1
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"

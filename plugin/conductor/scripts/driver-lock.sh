@@ -74,11 +74,22 @@ sanitize_session_id() { printf '%s' "$1" | tr -dc 'A-Za-z0-9._-'; }
 # sanitize_session_id() (allowliste stricte, adaptee a un identifiant technique) : owner/step
 # restent du texte libre pour un humain (espaces, accents, slashes, '=' preserves — aucun des deux
 # ne sert de separateur dans le meta, qui coupe sur le PREMIER '=' seulement, cote bash ET cote
-# python du guard) — SEULS les caracteres qui rendent un printf JSON direct invalide disparaissent :
-# guillemet double et antislash. Assaini UNE SEULE FOIS a l'entree (juste apres le parsing des
-# arguments ci-dessous), jamais recalcule ailleurs : toute lecture ulterieure de $OWNER/$STEP,
-# qu'elle aille au meta ou a un printf JSON immediat, voit deja la forme assainie.
-sanitize_field() { printf '%s' "$1" | tr -d '"\\\n'; }
+# python du guard) — SEULS les caracteres qui rendent un printf JSON direct invalide disparaissent.
+# Assaini UNE SEULE FOIS a l'entree (juste apres le parsing des arguments ci-dessous), jamais
+# recalcule ailleurs : toute lecture ulterieure de $OWNER/$STEP, qu'elle aille au meta ou a un
+# printf JSON immediat, voit deja la forme assainie.
+#
+# TROIS familles retirees, pas deux (dette BACKLOG « sanitize_field() incomplet sur les caracteres
+# de controle », capturee le 2026-08-17) : guillemet double, antislash, ET TOUT caractere de
+# controle. La version d'origine ne retirait que le saut de ligne parmi les controles — or JSON
+# interdit LES 32, pas seulement celui-la. Repro mesuree sur le script d'avant ce correctif :
+# `acquire --owner=$'mission\tX'` rendait `{"owner": "mission<TAB>X", ...}`, refuse par tout
+# parseur (« Invalid control character ») — donc EXACTEMENT le meme symptome que le guillemet que
+# cette fonction etait censee fermer, et la meme casse en aval (`driver-lock.sh status | jq -r
+# .generation`, prescrit par team-kernel.md). `LC_ALL=C` borne la classe aux octets 0x00-0x1F et
+# 0x7F : les octets de continuation UTF-8 des accents (0x80-0xFF) ne sont JAMAIS touches — verifie
+# sur `é/à=ô`, integralement preserves.
+sanitize_field() { printf '%s' "$1" | LC_ALL=C tr -d '"\\[:cntrl:]'; }
 OWNER="$(sanitize_field "$OWNER")"
 STEP="$(sanitize_field "$STEP")"
 
@@ -451,8 +462,41 @@ case "$ACTION" in
     if [ -L "$LOCK_DIR" ]; then
       ln_atomic "$gen" "${LOCK_DIR}.new.$$" && mv_link "${LOCK_DIR}.new.$$" "$LOCK_DIR"
     else
-      # lock legacy (dossier reel) : pas de lien a remplacer, on elague puis on publie.
-      rm -rf "$LOCK_DIR" && ln_atomic "$gen" "$LOCK_DIR"
+      # Lock LEGACY (dossier reel, pose par une version anterieure a la bascule symlink) : il n'y a
+      # pas de lien a remplacer, il faut liberer le chemin avant de publier.
+      #
+      # Dette BACKLOG « TOCTOU sur le takeover legacy » (capturee le 2026-08-17). L'ancienne forme
+      # `rm -rf "$LOCK_DIR" && ln_atomic "$gen" "$LOCK_DIR"` avait DEUX defauts distincts :
+      #   1. Elle DETRUISAIT avant de savoir si elle pouvait publier — un `ln_atomic` en echec
+      #      (disque plein, permissions) laissait le chemin VIDE, donc un lock evapore alors que
+      #      la reprise avait echoue.
+      #   2. La fenetre pendant laquelle le chemin n'existe pas couvrait un `rm -rf` RECURSIF
+      #      (parcours du dossier + unlink du meta + rmdir). Un `acquire` ordinaire tombant dans
+      #      cette fenetre voit la voie libre et gagne — ce qui contourne LOCK-04, pour qui la
+      #      reprise d'un lock perime est un geste EXPLICITE, jamais l'effet de bord d'une
+      #      acquisition ordinaire.
+      # Forme retenue — EXACTEMENT le patron de la branche symlink ci-dessus, les deux branches ne
+      # different plus que par la liberation du chemin :
+      #   a. preparer le lien candidat SOUS UN AUTRE NOM (aucun effet sur $LOCK_DIR : un echec ici
+      #      ne detruit plus rien) ;
+      #   b. ECARTER le dossier legacy par un `mv`, un rename donc ATOMIQUE et a cout constant,
+      #      au lieu d'un `rm -rf` recursif ;
+      #   c. publier le lien par `mv_link`, atomique lui aussi ;
+      #   d. eliminer le dossier ecarte, qui n'est plus sur le chemin de personne.
+      # CE QUI RESTE OUVERT, dit franchement : la fenetre (b)->(c) ne peut pas etre supprimee — un
+      # `rename` refuse de remplacer un DOSSIER existant par un lien symbolique, il n'existe donc
+      # aucune primitive qui bascule l'un en l'autre d'un seul pas. Elle est ramenee d'un `rm -rf`
+      # recursif a UN SEUL rename, et la destruction ne precede plus la preparation. Ce chemin ne
+      # sert qu'a un lock pose avant la bascule symlink : sur un lab a jour, `acquire` ne cree plus
+      # jamais de dossier reel.
+      legacy_evicted="${LOCK_DIR}.legacy.$$"
+      rm -rf "$legacy_evicted"
+      if ln_atomic "$gen" "${LOCK_DIR}.new.$$" && mv "$LOCK_DIR" "$legacy_evicted" 2>/dev/null; then
+        mv_link "${LOCK_DIR}.new.$$" "$LOCK_DIR"
+        rm -rf "$legacy_evicted"
+      else
+        rm -f "${LOCK_DIR}.new.$$"
+      fi
     fi
     if [ "$(lock_gen)" = "$gen" ]; then
       rm -f "${LOCK_DIR}.new.$$"
