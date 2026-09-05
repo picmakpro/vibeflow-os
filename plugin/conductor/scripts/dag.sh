@@ -101,7 +101,7 @@ CHECK_GUARD_HEALTH_SH="$SCRIPT_DIR/check-guard-health.sh"
 NOTIFY_SH="$SCRIPT_DIR/notify.sh"
 
 python3 - "$ACTION" "$FILE" "$ID" "$STEP" "$STAGE" "$DEPS" "$STATUS" "$SCOPE" "$DRIVER_LOCK_SH" "$CHECK_GUARD_HEALTH_SH" "$NOTIFY_SH" <<'PYEOF'
-import sys, os, json, subprocess, tempfile, shutil
+import sys, os, json, subprocess, tempfile, shutil, time, atexit
 
 action, file, nid, step, stage, deps_raw, status, scope_raw = sys.argv[1:9]
 driver_lock_sh = sys.argv[9]
@@ -114,11 +114,112 @@ def load():
     with open(file, encoding="utf-8") as fh:
         return json.load(fh)
 
+_UMASK = os.umask(0); os.umask(_UMASK)   # lecture non destructive de l'umask courant
+
+# Ecriture ATOMIQUE du DAG (dette BACKLOG « save() sans verrou ni ecriture atomique »).
+# Avant : `open(file, "w")` tronquait le fichier AVANT de reecrire — un process tue pendant le
+# json.dump laissait un DAG tronque, donc illisible, donc une mission sans plan de bataille.
+# Maintenant : ecriture dans un temporaire du MEME repertoire (donc du meme filesystem, condition
+# de l'atomicite de rename) puis `os.replace`, qui remplace en un seul pas indivisible. Un lecteur
+# concurrent (`ready`, `status`, `tree`) voit TOUJOURS un fichier complet — l'ancien ou le nouveau,
+# jamais un entre-deux. C'est ce qui dispense les actions de LECTURE de prendre le verrou.
 def save(dag):
-    os.makedirs(os.path.dirname(file) or ".", exist_ok=True)
-    with open(file, "w", encoding="utf-8") as fh:
-        json.dump(dag, fh, indent=2, ensure_ascii=False)
-        fh.write("\n")
+    d = os.path.dirname(file) or "."
+    os.makedirs(d, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=".dag-", suffix=".tmp", dir=d)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(dag, fh, indent=2, ensure_ascii=False)
+            fh.write("\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        # mkstemp cree en 0600 ; le DAG est un artefact de mission lisible par les outils du lab,
+        # on lui rend le mode qu'avait le fichier ouvert en "w" (0644 moins l'umask).
+        os.chmod(tmp, 0o644 & ~_UMASK)
+        os.replace(tmp, file)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+# ---- Verrou d'ecriture du DAG (meme dette) --------------------------------------------------
+# L'atomicite seule ne suffit PAS : le cycle est un read-modify-write (`load()` -> mutation ->
+# `save()`). Deux `mark` concurrents lisent le meme etat, muent chacun leur copie, et le dernier
+# ecrit ECRASE le premier — un LOST UPDATE silencieux, sans erreur ni trace. Le defaut porte
+# precisement sur le script CONCU pour le dispatch parallele, et depuis D-33-A `mark` ecrit aussi
+# `progress_epoch`, ce qui multiplie les ecritures concurrentes.
+#
+# Primitif : `os.mkdir`, qui ECHOUE si le nom existe — le meme choix que `ln_atomic` de
+# driver-lock.sh, et pour la meme raison : la PORTABILITE. `fcntl.flock` n'existe pas sur le
+# Python natif de Windows, que le depot doit servir (famille PORT).
+# Les deux bornes sont surchargeables par environnement — non pour le confort, mais parce qu'un
+# test de concurrence ne peut prouver le refus BRUYANT qu'en raccourcissant l'attente, et
+# l'eviction d'un mutex abandonne qu'en raccourcissant la peremption. Toute valeur non numerique
+# ou negative retombe sur le defaut : une variable mal saisie ne desarme jamais le verrou.
+def _lock_seconds(name, default):
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        v = float(raw)
+    except (TypeError, ValueError):
+        return default
+    return v if v >= 0 else default
+
+DAG_LOCK_WAIT = _lock_seconds("VF_DAG_LOCK_WAIT", 15.0)    # attente max avant refus BRUYANT
+DAG_LOCK_STALE = _lock_seconds("VF_DAG_LOCK_STALE", 60.0)  # au-dela, mutex abandonne -> evince
+_dag_lock_path = None
+
+def release_dag_lock():
+    global _dag_lock_path
+    if _dag_lock_path:
+        shutil.rmtree(_dag_lock_path, ignore_errors=True)
+        _dag_lock_path = None
+
+def acquire_dag_lock():
+    """Prend le mutex du DAG pour la duree du read-modify-write. Trois issues, jamais un vert par
+    defaut (QUAL-01) : (1) obtenu -> libere par atexit ; (2) mutex abandonne au-dela de
+    DAG_LOCK_STALE -> evince puis obtenu ; (3) toujours tenu au bout de DAG_LOCK_WAIT -> erreur
+    BRUYANTE et exit 1, jamais une ecriture qui ecrase en silence. Un filesystem qui refuse mkdir
+    (lecture seule, permissions) degrade sans bloquer : on n'a jamais rendu un DAG non ecrivable."""
+    global _dag_lock_path
+    path = file + ".lock"
+    parent = os.path.dirname(path) or "."
+    try:
+        os.makedirs(parent, exist_ok=True)
+    except OSError:
+        return
+    deadline = time.time() + DAG_LOCK_WAIT
+    while True:
+        try:
+            os.mkdir(path)
+        except FileExistsError:
+            stale = False
+            try:
+                stale = (time.time() - os.stat(path).st_mtime) > DAG_LOCK_STALE
+            except OSError:
+                pass
+            if stale:
+                shutil.rmtree(path, ignore_errors=True)
+                continue
+            if time.time() >= deadline:
+                emit({"error": "dag-lock-timeout", "lock": path,
+                      "waited_seconds": DAG_LOCK_WAIT})
+                sys.exit(1)
+            time.sleep(0.05)
+            continue
+        except OSError:
+            return
+        _dag_lock_path = path
+        atexit.register(release_dag_lock)
+        try:
+            with open(os.path.join(path, "pid"), "w", encoding="utf-8") as fh:
+                fh.write(str(os.getpid()))
+        except OSError:
+            pass
+        return
 
 def by_id(nodes):
     return {n["id"]: n for n in nodes}
@@ -314,6 +415,13 @@ def compute_stages(ready_nodes):
         return stages if isinstance(stages, list) else None
     except Exception:
         return None
+
+# Le verrou couvre le read-modify-write ENTIER, donc il est pris AVANT `load()` — le prendre
+# juste avant `save()` laisserait intacte la fenetre ou l'etat a deja ete lu par un concurrent.
+# Les actions de LECTURE (ready/status/tree) n'en prennent aucun : l'ecriture atomique ci-dessus
+# leur garantit deja de ne jamais voir un fichier a moitie ecrit.
+if action in ("init", "add", "mark", "reopen"):
+    acquire_dag_lock()
 
 if action == "init":
     save({"nodes": []})

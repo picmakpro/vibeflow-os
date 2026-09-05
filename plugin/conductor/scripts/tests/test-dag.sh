@@ -15,6 +15,10 @@
 # T41-T47 relais watchdog (WTCH-02/WTCH-03) · T48 relais stall/marqueur REEL bout-en-bout (stub)
 # T49 (33-05-correctif, D-33-G) : VRAI STALL bout-en-bout a travers `dag.sh mark` (lock backdate
 # reel) — cas de discriminance, NE JAMAIS RETIRER · T49 sous-cas : relais ABANDON non regresse.
+# T50 CONCURRENCE REELLE — 12 `mark` simultanes, zero lost update (cas de discriminance de la
+# dette BACKLOG « save() sans verrou ni ecriture atomique », NE JAMAIS REMPLACER par un test
+# d'API) · T51 mutex tenu -> refus BRUYANT, rien d'ecrit · T52 mutex abandonne evince, borne
+# illisible -> defaut.
 #
 # Exit 0 si tout passe, 1 sinon.
 
@@ -992,6 +996,79 @@ ERR49B="$WORK_DIR/t49b.stderr"
 assert "T49.3 — le relais ABANDON (heartbeat mort) est toujours relaye, non regresse par cette correction" "$(cat "$ERR49B")" "[mission-watchdog] abandon detecte"
 assert_not "T49.4 — l'abandon n'est jamais confondu avec la ligne de stall" "$(cat "$ERR49B")" "stall detecte"
 unset VF_DRIVER_LOCK VF_GUARD_HEALTH_DIR
+
+echo "=== T50/T51/T52 — verrou et écriture atomique du DAG (dette BACKLOG « save() sans verrou ») ==="
+# Siblings NEUTRES : le point mesuré ici est la concurrence sur le fichier, pas le relais watchdog.
+# Des no-op rapides évitent que 12 marks sérialisés ne durent des secondes pour des raisons
+# étrangères au verrou.
+ISO50="$WORK_DIR/iso50"; mkdir -p "$ISO50"
+cp "$SCRIPT" "$ISO50/dag.sh"
+for _sib in driver-lock.sh check-guard-health.sh notify.sh; do
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$ISO50/$_sib"; chmod +x "$ISO50/$_sib"
+done
+
+# T50 — CONCURRENCE RÉELLE, pas un test d'API : 12 `mark` lancés VRAIMENT en parallèle sur le même
+# fichier. Sans verrou, chacun lit le même état initial, mute sa copie et réécrit : le dernier
+# écrase les onze autres — le lost update est silencieux, aucun n'échoue. C'est le cas de
+# discriminance de cette dette : NE JAMAIS le remplacer par un test qui n'exerce qu'une fonction.
+F50="$WORK_DIR/t50.dag.json"
+"$ISO50/dag.sh" init --file="$F50" >/dev/null
+for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  "$ISO50/dag.sh" add --file="$F50" --id="n$i" --step="s$i" >/dev/null
+done
+for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  "$ISO50/dag.sh" mark --file="$F50" --id="n$i" --status=done >/dev/null 2>&1 &
+done
+wait
+DONE50="$(python3 -c 'import json,sys
+try:
+    d = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    print("JSON-INVALIDE"); raise SystemExit(0)
+print(sum(1 for n in d["nodes"] if n["status"] == "done"))' "$F50")"
+assert_eq "T50.1 — les 12 marks concurrents sont TOUS sur disque (aucun lost update)" "$DONE50" "12"
+# Le DAG reste un JSON complet : `os.replace` publie un fichier déjà entièrement écrit, jamais un
+# tronçon. Un « JSON-INVALIDE » ci-dessus ferait échouer T50.1 ; ce cas-ci le nomme explicitement.
+assert_not "T50.2 — le fichier n'est jamais tronqué sous concurrence" "$DONE50" "JSON-INVALIDE"
+# Ni mutex ni temporaire ne survivent à une exécution normale.
+assert_exit "T50.3 — le mutex est libéré en fin d'exécution" "$([ -e "$F50.lock" ] && echo 1 || echo 0)" 0
+assert_eq "T50.4 — aucun temporaire d'écriture atomique abandonné" \
+  "$(find "$WORK_DIR" -maxdepth 1 -name '.dag-*.tmp' | wc -l | tr -d ' ')" "0"
+
+# T51 — troisième issue (QUAL-01) : mutex tenu par un tiers VIVANT → refus BRUYANT et exit non nul,
+# JAMAIS une écriture qui écrase en silence. L'attente est raccourcie par environnement, sans quoi
+# le cas coûterait les 15 s du défaut.
+F51="$WORK_DIR/t51.dag.json"
+"$ISO50/dag.sh" init --file="$F51" >/dev/null
+"$ISO50/dag.sh" add --file="$F51" --id=n1 --step=s1 >/dev/null
+mkdir -p "$F51.lock"
+OUT51="$(env VF_DAG_LOCK_WAIT=1 VF_DAG_LOCK_STALE=3600 "$ISO50/dag.sh" mark --file="$F51" --id=n1 --status=done 2>/dev/null)"
+RC51=$?
+assert      "T51.1 — mutex tenu → erreur BRUYANTE nommée"        "$OUT51" '"error": "dag-lock-timeout"'
+assert_exit "T51.2 — mutex tenu → exit non nul (jamais un vert)" "$RC51" 1
+assert_eq   "T51.3 — le refus n'a RIEN écrit (n1 reste ready)" \
+  "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["nodes"][0]["status"])' "$F51")" "ready"
+rmdir "$F51.lock"
+
+# T52 — mutex ABANDONNÉ (process tué avant de le rendre) : il ne doit pas geler la mission pour
+# toujours. Au-delà de VF_DAG_LOCK_STALE il est évincé et l'écriture reprend.
+F52="$WORK_DIR/t52.dag.json"
+"$ISO50/dag.sh" init --file="$F52" >/dev/null
+"$ISO50/dag.sh" add --file="$F52" --id=n1 --step=s1 >/dev/null
+mkdir -p "$F52.lock"
+env VF_DAG_LOCK_WAIT=2 VF_DAG_LOCK_STALE=0 "$ISO50/dag.sh" mark --file="$F52" --id=n1 --status=done >/dev/null 2>&1
+assert_eq "T52.1 — un mutex abandonné est évincé, l'écriture reprend" \
+  "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["nodes"][0]["status"])' "$F52")" "done"
+# Une borne illisible ne doit JAMAIS désarmer le verrou : elle retombe sur le défaut. Ici la
+# PÉREMPTION est illisible (donc 60 s de défaut), l'attente reste courte et valide — le mutex frais
+# tient donc toujours, et le refus est le même qu'en T51.
+F53="$WORK_DIR/t53.dag.json"
+"$ISO50/dag.sh" init --file="$F53" >/dev/null
+"$ISO50/dag.sh" add --file="$F53" --id=n1 --step=s1 >/dev/null
+mkdir -p "$F53.lock"
+OUT53="$(env VF_DAG_LOCK_WAIT=1 VF_DAG_LOCK_STALE=pas-un-nombre "$ISO50/dag.sh" mark --file="$F53" --id=n1 --status=done 2>/dev/null)"
+assert "T52.2 — péremption illisible → défaut (60 s), le mutex frais tient toujours" "$OUT53" '"error": "dag-lock-timeout"'
+rmdir "$F53.lock"
 
 echo ""
 echo "=================================="

@@ -1,5 +1,38 @@
 # Changelog — conductor
 
+## [v1.35.0] — 2026-09-05 (dette technique : `save()` de `dag.sh` sans verrou ni écriture atomique)
+
+**Minor** — la dette la plus sérieuse du backlog (capturée le 2026-08-17 à la revue de la Phase 33,
+finding pré-existant hors périmètre) est fermée sur le script même qui est **conçu pour le dispatch
+parallèle**.
+
+- **`scripts/dag.sh` — écriture atomique.** `save()` faisait `open(file, "w")`, qui **tronque avant
+  de réécrire** : un process tué pendant le `json.dump` laissait un DAG tronqué, donc illisible,
+  donc une mission sans plan de bataille. Désormais : temporaire dans le **même répertoire** (donc
+  le même filesystem, condition de l'atomicité de `rename`), `fsync`, puis `os.replace`. Un lecteur
+  concurrent (`ready`, `status`, `tree`) voit toujours un fichier complet — l'ancien ou le nouveau,
+  jamais un entre-deux. C'est ce qui dispense les actions de lecture de prendre le verrou.
+- **`scripts/dag.sh` — verrou du read-modify-write.** L'atomicité seule ne fermait PAS le **lost
+  update** : le cycle est `load()` → mutation → `save()`, et deux `mark` concurrents lisent le même
+  état puis s'écrasent l'un l'autre, sans erreur ni trace. Mesure sur le script d'avant ce
+  correctif : **12 `mark` simultanés, 6 survivants — la moitié des marks disparaissaient en
+  silence.** Le verrou est pris **avant `load()`** (le prendre avant `save()` laisserait la fenêtre
+  intacte) et couvre `init`/`add`/`mark`/`reopen`.
+- **Primitif retenu : `os.mkdir`**, qui échoue si le nom existe — le même choix que `ln_atomic` de
+  `driver-lock.sh`, et pour la même raison : la **portabilité**. `fcntl.flock` n'existe pas sur le
+  Python natif de Windows, que le dépôt doit servir (famille PORT).
+- **Trois issues, jamais un vert par défaut (QUAL-01)** : obtenu → libéré par `atexit` · mutex
+  abandonné au-delà de `VF_DAG_LOCK_STALE` (60 s) → évincé, une mission n'est jamais gelée pour
+  toujours par un process tué · toujours tenu au bout de `VF_DAG_LOCK_WAIT` (15 s) → **erreur
+  BRUYANTE `dag-lock-timeout` et exit 1**, jamais une écriture qui écrase en silence. Une borne
+  d'environnement non numérique retombe sur le défaut : une variable mal saisie ne désarme pas le
+  verrou.
+- **`scripts/tests/test-dag.sh` (T50-T52, 9 cas)** — la preuve exigée par le backlog est un **cas de
+  concurrence réel**, pas un test d'API : 12 `mark` lancés vraiment en parallèle sur le même
+  fichier. **Rouge sous mutation** (verrou neutralisé → 6/12 nœuds sur disque, T50.1 échoue).
+  T50 discriminance · T51 refus bruyant sans rien écrire · T52 éviction d'un mutex abandonné et
+  borne illisible → défaut. Suite : 161 → **170 PASS / 0 FAIL**.
+
 ## [v1.34.8] — 2026-08-30 (Phase 38 — correction ciblée : preuve générative des six angles morts du prédicat description:)
 
 **Patch** :
