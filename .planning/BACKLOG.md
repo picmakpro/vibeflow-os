@@ -1,6 +1,6 @@
 # Backlog — idées différées (hors milestone courant)
 
-## Formats de sortie hétérogènes entre les 12 suites de `dev-orchestrator` — DIFFÉRÉ
+## Formats de sortie hétérogènes entre les 12 suites de `dev-orchestrator` — CLOS
 
 **Capturé :** 2026-08-18, hygiène documentaire de clôture de la Phase 18 (mandat vf-coder). Hors
 périmètre de cette phase (aucun code de test n'est touché) — remonté sans corriger.
@@ -38,7 +38,47 @@ N OK / 0 KO` capté par erreur dans `résultat : N OK / 0 KO / 0 SKIP`).
 libellé humain existant, cf. `feedback_libelles-ok-geles.md` : les libellés `ok` gelés s'ajoutent,
 ne se réécrivent jamais). Un collecteur se cale alors sur ce contrat unique, jamais sur la prose.
 
-## `save()` de `dag.sh` sans verrou ni écriture atomique — lost update silencieux — DIFFÉRÉ
+**CLOS le 2026-09-05** — la piste ci-dessus a été suivie telle quelle, y compris sa réserve : le
+contrat est **imprimé en plus**, jamais à la place, et les six formats textuels sont intacts.
+
+- **Les 12 suites émettent `RESULT: pass=<N> fail=<N> skip=<N>`** — mesure après conversion :
+  12/12, **579 cas** déclarés.
+- **Le collecteur a quitté le YAML inline** pour `scripts/run-test-suites.sh`, donc exécutable en
+  local et **testable** (`scripts/tests/test-run-test-suites.sh`, 8 cas) : un gate qui prétend
+  supprimer les verts à vide sans se vérifier lui-même serait exactement le défaut qu'il traque.
+- **Le gain a dépassé la dette écrite.** L'audit de clôture a montré que le collecteur CI ne lisait
+  **que le code de sortie** — donc immunisé contre le faux KO décrit ici, mais **aveugle au défaut
+  n°1 du dépôt** : une suite qui sort 0 sans avoir exercé un seul cas passait pour verte. Le
+  contrat rend ce cas visible et le fait rougir (T3 de la suite du collecteur).
+- Quatre issues, jamais un vert par défaut (QUAL-01) : vert · rouge · contrat illisible **ou**
+  contredisant le code de sortie → rouge BRUYANT · suite hors contrat → tolérée et comptée à part.
+- **Ratchet** : plancher `VF_MIN_UNDER_CONTRACT=13`. Une suite qui cesserait d'émettre fait rougir
+  la CI au lieu de disparaître des radars.
+
+Module `dev-orchestrator` v2.21.0. Parc : 76 → 77 suites, **13/77 sous contrat, 587 cas**.
+
+## Étendre le contrat de sortie aux 64 suites restantes — DIFFÉRÉ
+
+**Capturé :** 2026-09-05, à la clôture de l'item ci-dessus.
+
+Le contrat couvre les 13 suites converties sur 77. Les 64 autres restent tolérées par le collecteur
+(issue 4) et gardent leurs formats propres — au moins trois de plus ont été relevés au passage :
+`Résultats : N PASS / N FAIL` (`test-dag.sh`, `test-driver-lock.sh`),
+`== N ok · N ko · N skip ==` (`test-vf-portable.sh`), et les variantes de `conductor`. **Tant qu'une
+suite est hors contrat, son vert à vide reste invisible** — c'est le seul motif qui justifie
+d'étendre, pas l'uniformité pour elle-même.
+
+**Coût mesuré :** une ligne par suite, insérée après le bilan humain, avec les noms de variables
+propres à chacune (le parc mélange `PASS/FAIL` et `pass/fail`, avec ou sans `skipped`). Mécanique,
+mais 64 éditions ciblées — d'où le report plutôt qu'un big bang dans le même lot.
+
+**Comment procéder :** par paquets, en montant `VF_MIN_UNDER_CONTRACT` **dans le même commit** que
+chaque paquet. Le plancher ne descend jamais.
+
+**Déclencheur de resurgence :** un vert à vide constaté sur une suite hors contrat, ou la prochaine
+phase qui touche largement au parc de tests.
+
+## `save()` de `dag.sh` sans verrou ni écriture atomique — lost update silencieux — CLOS
 
 **Capturé :** 2026-08-17, demande explicite de Samuel après le rapport d'exécution de la
 Phase 33 (finding pré-existant remonté par la revue de mission, provenance vérifiée commit
@@ -61,6 +101,33 @@ sous mutation, pas un test d'API — même exigence que T46 (Phase 32).
 incomplet sur les caractères de contrôle · `vf_guard_unavailable()` sans validation d'argument
 · TOCTOU sur le `takeover` legacy (tous tracés au rapport
 `.planning/missions/2026-08-17-phase-33-watchdog-notifications.md`, §findings pré-existants).
+
+**CLOS le 2026-09-05** — l'item ET ses quatre findings voisins, dans le même lot comme prévu.
+
+- **Écriture atomique** : temporaire du même répertoire, `fsync`, `os.replace`. Un lecteur
+  (`ready`, `status`, `tree`) voit toujours un fichier complet — ce qui les dispense du verrou.
+- **Verrou du read-modify-write**, pris **avant `load()`** (le prendre avant `save()` laisserait la
+  fenêtre intacte). Primitif `os.mkdir` — le même choix que `ln_atomic`, et pour la même raison :
+  `fcntl.flock` n'existe pas sur le Python natif de Windows (famille PORT).
+- **La preuve exigée ici a été rendue telle quelle** : cas de concurrence **réel** (12 `mark`
+  lancés vraiment en parallèle), **rouge sous mutation** — verrou neutralisé, **6 nœuds sur 12**
+  survivent. La moitié des marks disparaissaient sans erreur ni trace.
+- **Trois issues (QUAL-01)** : obtenu → libéré par `atexit` · abandonné > 60 s → évincé, aucune
+  mission gelée pour toujours · tenu au-delà de 15 s → `dag-lock-timeout` BRUYANT et exit 1.
+- **`sanitize_field()`** : les 32 caractères de contrôle, plus seulement le saut de ligne. Repro —
+  `acquire --owner=$'mission\tX'` rendait un JSON refusé par tout parseur, **le symptôme exact que
+  cette fonction avait été écrite pour fermer côté guillemet**. `LC_ALL=C` préserve les accents.
+- **`vf_guard_unavailable()`** : ce n'était pas cosmétique. Avec un chemin — ce que passe
+  `check-hook-paths.sh:182` via `"$0"` — **aucun marqueur n'était écrit, en silence** : le hook
+  doctor ne pouvait jamais voir la panne de ce garde-là.
+- **TOCTOU du `takeover` legacy** : le chemin legacy adopte le patron exact de la branche symlink
+  (préparer sous un autre nom, écarter par `mv`, publier par `mv_link`). **Ce qui reste ouvert, dit
+  franchement** : la fenêtre ne peut pas être supprimée — un `rename` refuse de remplacer un
+  dossier par un lien symbolique. Elle passe d'un `rm -rf` récursif à **un seul rename**, et la
+  destruction ne précède plus la préparation.
+
+Modules `conductor` v1.35.0 puis v1.35.1. Tests : `test-dag.sh` 161 → 170, `test-driver-lock.sh`
+187 → 190, `test-vf-portable.sh` 16 → 18 — chaque ajout vérifié rouge sous mutation.
 
 ## Gate machine sur l'observance de `mission-flow.md` (Phase 33, S1 option (c)) — DIFFÉRÉ
 
