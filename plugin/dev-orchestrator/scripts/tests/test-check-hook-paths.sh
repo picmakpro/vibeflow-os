@@ -437,4 +437,11 @@ fi
 
 echo ""
 echo "== Résultat : $pass OK, $fail KO, $skipped SKIP =="
+# Contrat de sortie machine-lisible, commun aux suites du parc (dette BACKLOG « formats de sortie
+# hétérogènes »). Il s'AJOUTE au libellé humain ci-dessus, il ne le remplace jamais — les libellés
+# `ok` gelés s'ajoutent, ne se réécrivent pas. Un collecteur se cale sur CETTE ligne, jamais sur la
+# prose : six formats textuels coexistaient sur douze suites, et le piège n'était pas seulement le
+# faux KO (motif absent) mais le faux VERT par sous-chaîne — « résultat : N OK / 0 KO » est un
+# préfixe littéral de « résultat : N OK / 0 KO / 0 SKIP ».
+printf 'RESULT: pass=%s fail=%s skip=%s\n' "${pass}" "${fail}" "${skipped}"
 [ "$fail" -eq 0 ] && exit 0 || exit 1

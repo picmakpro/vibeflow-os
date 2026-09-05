@@ -1,5 +1,24 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.21.0] — 2026-09-05 (dette technique : contrat de sortie machine-lisible des suites)
+
+**Minor** — la dette « formats de sortie hétérogènes entre les 12 suites » (capturée le 2026-08-18 à
+la clôture de la Phase 18) est fermée par un contrat, pas par une uniformisation de la prose.
+
+- **Les 12 suites émettent `RESULT: pass=<N> fail=<N> skip=<N>`**, une ligne **ajoutée** au libellé
+  humain existant — jamais substituée : les libellés `ok` gelés s'ajoutent, ne se réécrivent pas
+  (`feedback_libelles-ok-geles.md`). Les six formats textuels restent donc intacts, et plus personne
+  n'a besoin de les lire. Mesure après conversion : 12/12 suites sous contrat, **579 cas** déclarés.
+- **Pourquoi un contrat plutôt qu'un format unique** : le piège documenté n'était pas seulement le
+  faux KO (motif absent) mais le **faux vert par sous-chaîne** — « résultat : N OK / 0 KO » est un
+  préfixe littéral de « résultat : N OK / 0 KO / 0 SKIP ». Un collecteur calé sur la prose se trompe
+  dans les deux sens ; calé sur une ligne machine, il ne se trompe pas.
+- **Gain réel, au-delà de la dette écrite** : le collecteur CI ne regardait que le **code de
+  sortie**. Il était donc immunisé contre le faux KO — mais aveugle sur le défaut n°1 du dépôt :
+  une suite qui sort 0 **sans avoir exercé un seul cas** passait pour verte. Le contrat rend ce cas
+  visible et le fait rougir.
+
+
 ## [v2.20.3] — 2026-08-30 (Phase 38 — description de frontmatter YAML strict, plan 38-08)
 
 **Patch** :

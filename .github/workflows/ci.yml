@@ -214,32 +214,18 @@ jobs:
 
       - name: Découvrir et lancer toutes les suites
         run: |
-          set -u
-          suites=$(find plugin scripts -type f -path '*/tests/test-*.sh' | sort)
-          count=$(printf '%s\n' "$suites" | grep -c . || true)
-          echo "== $count suite(s) découverte(s) =="
-          # Assertion de découverte non vide (F13) : 0 suite = échec, pas un vert.
-          if [ "$count" -eq 0 ]; then
-            echo "::error::aucune suite de tests découverte (pattern */tests/test-*.sh) — la CI refuse de rendre un verdict vide"
-            exit 1
-          fi
-          fail=0
-          while IFS= read -r t; do
-            [ -n "$t" ] || continue
-            echo "::group::$t"
-            if bash "$t"; then
-              echo "PASS $t"
-            else
-              rc=$?
-              echo "::error::FAIL(rc=$rc) $t"
-              fail=$((fail + 1))
-            fi
-            echo "::endgroup::"
-          done <<EOF
-          $suites
-          EOF
-          echo "== bilan : $count suite(s), $fail échec(s) =="
-          [ "$fail" -eq 0 ]
+          # Le collecteur vit dans `scripts/run-test-suites.sh`, pas ici. Motif : la logique de
+          # collecte est elle-même testée (`scripts/tests/test-run-test-suites.sh`, 8 cas) — un
+          # gate qui prétend supprimer les verts à vide et ne se vérifie pas lui-même serait
+          # exactement le défaut qu'il traque. Inline en YAML, il n'était pas exécutable en local
+          # ni testable.
+          #
+          # Ce qu'il ajoute au « lance et regarde le code de sortie » d'avant : il lit le contrat
+          # machine `RESULT: pass=N fail=N skip=N` que les suites émettent EN PLUS de leur libellé
+          # humain, et rougit sur un vert à vide (rc=0 mais zéro cas exercé), un contrat illisible,
+          # ou un contrat qui contredit le code de sortie. Les suites qui ne l'émettent pas encore
+          # restent tolérées — la conversion du parc est un ratchet, gardé par un plancher.
+          bash scripts/run-test-suites.sh
 
   gates:
     name: Gates de qualité (mode strict)
