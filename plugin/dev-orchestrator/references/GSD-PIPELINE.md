@@ -70,6 +70,7 @@ Pour le trivial, ne pas payer le coût du pipeline complet :
 |-------|-------|-----------|
 | `gsd-quick` | Petite tâche bien définie | Commits atomiques + suivi d'état, sans agents optionnels |
 | `gsd-fast` | Tâche triviale (typo, renommage) | Exécution inline, aucun subagent, zéro overhead de planification |
+| `gsd-quick-batch` | Plusieurs tâches de taille `gsd-quick` (≥ 2) | Un coordinateur unique planifie, dispatche et fusionne le lot ; lui seul écrit l'état partagé |
 
 Heuristique : si la tâche tient en un commit et ne touche pas l'architecture → `gsd-fast`/`gsd-quick`.
 Sinon → pipeline complet (au minimum `gsd-plan-phase → gsd-execute-phase → gsd-verify-work`).
