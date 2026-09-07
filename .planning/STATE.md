@@ -1011,6 +1011,7 @@ Recent decisions affecting current work:
 | 260810-fh3 | ensure-design-deps.sh : présence ET activation des 4 plugins de la chaîne design, auto-install non-interactif, câblage engine + agent — design-orchestrator v1.5.0 | 2026-08-10 | `e9b3650` | [260810-fh3-doter-design-orchestrator-d-un-ensure-de](./quick/260810-fh3-doter-design-orchestrator-d-un-ensure-de/) |
 | 260815-tl6 | Snapshot hebdo traffic/clones GitHub (script + workflow cron + branche traffic-data) avec clones ajustés hors jobs CI | 2026-08-15 | `73363c1` | [260815-tl6-snapshot-hebdo-traffic-clones-github-ave](./quick/260815-tl6-snapshot-hebdo-traffic-clones-github-ave/) |
 | 260815-wnk | Capture étude « AI Agents in Depth » × VibeFlow (rapport recherche + entrée backlog milestone candidat) | 2026-08-15 | `f920b09` | [260815-wnk-capture-etude-ai-agent-book](./quick/260815-wnk-capture-etude-ai-agent-book/) |
+| 20260907-win | WIN-PATHCONV II — `$HOME` en forme Windows native écrivait des chemins de hooks mixtes (`C:\Users\x/.claude/scripts`) : normalisation POSIX à l'install + 3e marque du garde-fou + T26/T26b/T26c — release v2.59.1 | 2026-09-07 | `6ed1f76` | [20260907-win-pathconv-ii-home-backslash](./quick/20260907-win-pathconv-ii-home-backslash/) |
 
 ## Deferred Items
 

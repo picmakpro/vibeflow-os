@@ -178,6 +178,26 @@ VF_SCRIPTS_TOKEN = "{{VF_SCRIPTS}}"
 VF_BASH_TOKEN = "{{VF_BASH}}"
 
 
+def to_posix(p):
+    """Sépare en `/` un chemin de scripts, quelle que soit la forme rendue par la machine.
+
+    WIN-PATHCONV II (2026-09-07, second vecteur). Sous Git Bash lancé avec un `HOME` hérité de
+    l'environnement Windows, `os.environ["HOME"]` vaut `C:\\Users\\winuser` — forme native, pas
+    POSIX. Concaténé tel quel, il produisait `C:\\Users\\winuser/.claude/scripts` : un chemin
+    MIXTE, écrit tel quel dans settings.json. En forme exec bash ne l'ouvre pas ; en forme shell,
+    une couche d'expansion mange en plus les backslashes (`C:Userswinuser`) et `|| true` avale
+    l'erreur — le garde ne tourne plus, et rien ne le dit (lab testeur Windows, v2.59.0).
+
+    `C:/Users/…/.claude/scripts` est la forme que le reste de ce fichier attend déjà — le
+    commentaire de `assert_prefix_uncorrupted` la nomme explicitement comme légitime. Git Bash
+    l'ouvre ; JSON n'a aucun échappement à y faire.
+
+    Ne s'applique JAMAIS à BASH_ABS : sa forme Windows est une décision explicite (le harness
+    l'exécute hors MSYS en forme exec) — voir le commentaire de transport, plus haut.
+    """
+    return p.replace("\\", "/")
+
+
 def exec_safe_prefix(p):
     """Variante exec-safe du préfixe scripts, pour substitution dans `args` (forme exec).
 
@@ -189,16 +209,27 @@ def exec_safe_prefix(p):
                                 que le harness applique aux args (doc hooks, path placeholders),
                                 portable et committable ;
       autre                   → inchangé (déjà absolu ou déjà un placeholder harness).
+
+    Toute branche qui résout un chemin de MACHINE passe par `to_posix` (WIN-PATHCONV II) ; la
+    branche placeholder, elle, n'a rien à normaliser — sa valeur est un littéral de ce fichier.
     """
     for head in ('"$HOME"', "$HOME"):
         if p.startswith(head):
             home = os.environ.get("HOME") or os.path.expanduser("~")
-            return home + p[len(head):]
+            return to_posix(home) + p[len(head):]
     for head in ('"$CLAUDE_PROJECT_DIR"', "$CLAUDE_PROJECT_DIR"):
         if p.startswith(head):
             return "${CLAUDE_PROJECT_DIR}" + p[len(head):]
-    return p
+    return to_posix(p)
 
+
+# WIN-PATHCONV II — la forme SHELL subit la même normalisation, à une exception près : un
+# littéral shell ("$HOME"/…, "$CLAUDE_PROJECT_DIR"/…) reste INTACT, c'est le shell qui
+# l'expansera au moment d'exécuter le hook. Tout le reste est un chemin de machine, et un chemin
+# de machine s'écrit en `/` dans settings.json — les deux formes ne peuvent pas diverger sur ce
+# point sans rouvrir le trou d'un côté.
+if not prefix.startswith(('"$', "$")):
+    prefix = to_posix(prefix)
 
 prefix_exec = exec_safe_prefix(prefix)
 
@@ -242,6 +273,19 @@ def assert_prefix_uncorrupted(p, label):
         die(f"préfixe de scripts corrompu ({label}) : {p!r}\n"
             f"         Lettre de lecteur Windows en milieu de chaîne — racine MSYS2 greffée sur "
             f"un chemin relatif.\n"
+            f"         Rien n'a été écrit. Voir docs/WINDOWS-HOOKS-PATHCONV.md.")
+    # 3e marque (WIN-PATHCONV II) — aucun backslash ne survit à `to_posix`, appliqué aux deux
+    # formes juste au-dessus. S'il en reste un ici, c'est que la normalisation a été contournée
+    # ou retirée : le trou du 2026-09-07 se rouvre, et il se rouvrirait EN SILENCE puisque la
+    # marge #2 exempte délibérément la lettre de lecteur en tête. Cette ceinture existe pour
+    # que cette régression-là échoue à l'install, pas six semaines plus tard sur la machine
+    # d'un testeur.
+    if "\\" in p:
+        die(f"préfixe de scripts corrompu ({label}) : {p!r}\n"
+            f"         Backslash dans un chemin de scripts — la normalisation POSIX "
+            f"(WIN-PATHCONV II) n'a pas été appliquée.\n"
+            f"         Un tel chemin meurt en forme exec, et se fait manger ses séparateurs en "
+            f"forme shell.\n"
             f"         Rien n'a été écrit. Voir docs/WINDOWS-HOOKS-PATHCONV.md.")
 
 assert_prefix_uncorrupted(prefix, "forme shell")

@@ -59,6 +59,7 @@ l'inverse : on n'édite pas l'index pour faire tomber une couverture juste.
 |---|---|
 | code / implémente / ajoute / construis / développe cette feature | `gsd-execute-phase` |
 | petite tâche / vite fait / typo / renomme / juste un petit truc | `gsd-quick` (variante : `gsd-fast`) |
+| plusieurs petites tâches d'un coup / une liste de correctifs / un lot de petits trucs | `gsd-quick-batch` (≥ 2 items ; en dessous, `gsd-quick`) |
 | fais tout / en autonomie / la nuit / débrouille-toi / enchaîne les étapes | skill `vf-auto` (aiguillage seuil : inline vs équipe) |
 | crée une PR / livre / ship / mets en prod / pousse | `gsd-ship`, `gsd-pr-branch` |
 

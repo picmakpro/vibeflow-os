@@ -272,3 +272,81 @@ Pour référence, si tu dois comprendre ce que tu observes.
 Couverture de test : `plugin/_internal/tests/test-merge-hooks.sh`, cas T24 (le garde-fou refuse et
 n'écrit rien) et T25 (sous un interpréteur qui réécrit l'environnement à la manière de MSYS2, le
 préfixe transporté par fichier fait foi).
+
+---
+
+## 7. WIN-PATHCONV **II** — le second vecteur : la valeur de `$HOME` (v2.59.1)
+
+Ce que la §6 décrit ferme le vecteur **transport** : la valeur du préfixe réécrite en vol par le
+runtime, entre bash et Python. Ce vecteur reste fermé.
+
+Un second vecteur, entièrement distinct, est resté ouvert jusqu'en v2.59.1 : **la valeur de `$HOME`
+elle-même**.
+
+### Le symptôme
+
+Sur le lab testeur Windows, en **v2.59.0** confirmée à jour :
+
+```
+SessionStart:startup hook error … C:\Users\winuser/.claude/scripts/discover-unin…
+SessionStart:startup hook error … /bin/bash: C:Userswinuser/.claude/scripts/chec…
+```
+
+Le chemin est **mixte** — tête `C:\Users\winuser` en forme Windows native, queue `/.claude/scripts`
+en POSIX. Sur la seconde ligne, une couche d'expansion shell a en plus mangé les backslashes
+(`\U` et `\b` disparus) : `C:Userswinuser`. Le chemin ne désigne plus rien.
+
+### La cause
+
+`merge-hooks.sh`, `exec_safe_prefix()`, concaténait `HOME` **tel quel** :
+
+```python
+home = os.environ.get("HOME") or os.path.expanduser("~")
+return home + p[len(head):]        # ← C:\Users\winuser + /.claude/scripts
+```
+
+Sous Git Bash lancé avec un `HOME` hérité de l'environnement Windows, `HOME=C:\Users\winuser`. Rien
+dans la chaîne n'avait été réécrit par MSYS2 : la valeur était déjà comme ça au départ. C'est
+pourquoi le garde-fou de la §6 ne l'attrapait pas — et c'était **délibéré** : sa seconde marque
+exige une lettre de lecteur en position `> 0`, parce qu'en **tête** elle est parfaitement légitime
+en scope user sur une machine Windows. Ici, c'est la **queue** du chemin qui était corrompue, pas
+sa tête.
+
+Signe distinctif utile pour trancher entre I et II :
+
+| | WIN-PATHCONV I (v2.55.1) | WIN-PATHCONV II (v2.59.1) |
+|---|---|---|
+| Forme observée | `"$CLAUDE_PROJECT_DIR"C:/Program Files/Git/.claude/scripts` | `C:\Users\<user>/.claude/scripts` |
+| Greffe | racine MSYS **insérée** au milieu | aucune insertion — `$HOME` était déjà en forme native |
+| Le littéral `$…` survit-il ? | oui, suivi de la greffe | non, il a été résolu |
+
+### Le correctif
+
+1. **Normalisation POSIX.** Tout chemin de machine résolu à l'install passe par `to_posix()` —
+   `\` → `/`. `C:/Users/…/.claude/scripts` est la forme que le reste du fichier attendait déjà :
+   Git Bash l'ouvre, et JSON n'a aucun échappement à y faire. La forme **shell** subit la même
+   normalisation, à une exception près : un littéral shell (`"$HOME"/…`) reste **intact**, c'est le
+   shell qui l'expansera au moment d'exécuter le hook.
+2. **`BASH_ABS` n'est pas touché.** Sa forme Windows est une décision explicite, antérieure : le
+   harness l'exécute hors MSYS en forme exec.
+3. **Troisième marque du garde-fou.** Un backslash résiduel dans un préfixe arrête le merge, sans
+   rien écrire. Après normalisation il ne peut plus s'en produire — cette ceinture existe pour que
+   le **retrait** de la normalisation échoue à l'install, et non six semaines plus tard sur la
+   machine d'un testeur, avalé par un `|| true`.
+
+Couverture de test : `test-merge-hooks.sh`, cas **T26** (comportement : `HOME=C:\Users\winuser` →
+chemin POSIX en forme exec, littéral shell intact en forme shell, zéro backslash dans les valeurs
+écrites), **T26b** (preuve par mutation : normalisation retirée → le garde-fou mord) et **T26c**
+(le fichier réel n'est jamais altéré par la mutation).
+
+### Ce que ce correctif ne fait PAS
+
+Il ne supprime pas la couche d'expansion shell qui a mangé les backslashes de la seconde ligne
+d'erreur. Cette couche disparaîtra avec la **migration des 20 entrées de la polarité gouvernance
+en forme exec** (`docs/HOOKS-CONTRAT-SORTIE.md` §6) — chantier décidé le 2026-08-15, jamais
+exécuté. Tant qu'il reste ouvert, un `$HOME` exotique sur Windows garde une surface d'exposition :
+la normalisation ci-dessus rend le chemin correct, mais c'est le shell qui le relit.
+
+**Conséquence pratique pour un lab déjà installé :** la normalisation agit **à la pose**. Un
+`settings.json` écrit par une version antérieure garde ses chemins mixtes — il faut re-poser les
+hooks (`/vf-update`, ou la réparation de la §4) pour que le correctif prenne effet.

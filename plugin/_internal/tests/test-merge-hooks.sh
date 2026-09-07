@@ -28,6 +28,18 @@
 # T23 — préfixe exec-safe scope projet : ${CLAUDE_PROJECT_DIR} (placeholder harness) dans args,
 #       forme shell inchangée sur fragment mixte
 #
+# Portabilité Windows — chemins de hooks (WIN-PATHCONV I et II) :
+# T24 — I : un préfixe portant la marque d'une conversion MSYS2 arrête le merge, bruyamment,
+#       sans rien écrire (seconde ceinture, quelle que soit la provenance de la corruption)
+# T25 — I : sous un interpréteur qui réécrit l'environnement à la manière de MSYS2, le préfixe
+#       transporté par FICHIER fait foi — le vecteur « variable d'environnement » est fermé
+# T26 — II : $HOME en forme Windows native (C:\Users\winuser) → chemin POSIX en forme exec,
+#       littéral shell-quoté intact en forme shell, zéro backslash sur disque (second vecteur,
+#       relevé sur le lab testeur Windows en v2.59.0 — hotfix v2.59.1)
+# T26b — II, preuve par mutation : normalisation POSIX retirée → la 3e marque du garde-fou mord
+#        (exit 1, rien écrit), au lieu de laisser partir des hooks morts en silence
+# T26c — II : merge-hooks.sh réel jamais altéré par la mutation T26b (cmp)
+#
 # Routage borné --settings-local (contrat manque 1, correction exec-30-01) :
 # T15 — entrée {{VF_BASH}} + --settings-local fournie → atterrit dans le fichier local, absente
 #       du fichier projet (aucune clé hooks n'y apparaît pour cette entrée)
@@ -972,6 +984,92 @@ assert chr(34) + "$CLAUDE_PROJECT_DIR" + chr(34) + "/.claude/scripts/t23-shell.s
   ok "T25 WIN-PATHCONV : sous un interpréteur qui réécrit l'environnement à la manière de MSYS2, le préfixe transporté par fichier fait foi (formes exec et shell)"
 else
   ko "T25 WIN-PATHCONV transport par fichier (la réécriture d'environnement a repris la main)"
+fi
+
+# ---------- T26 : WIN-PATHCONV II — un $HOME en forme Windows native ne contamine plus
+#            settings.json (second vecteur, 2026-09-07) ----------
+# Le hotfix v2.55.1 (T25) a fermé le transport du préfixe par variable d'environnement. Il
+# restait un second vecteur, entièrement distinct : la VALEUR de $HOME elle-même. Sous Git Bash
+# lancé avec un HOME hérité de l'environnement Windows, os.environ["HOME"] vaut C:\Users\winuser —
+# et exec_safe_prefix le concaténait tel quel, produisant C:\Users\winuser/.claude/scripts.
+#
+# Ce chemin mixte est exactement celui relevé sur le lab testeur Windows en v2.59.0 :
+#   SessionStart:startup hook error … C:\Users\winuser/.claude/scripts/discover-unin…
+#   SessionStart:startup hook error … /bin/bash: C:Userswinuser/.claude/scripts/chec…
+# (sur la seconde ligne, une couche d'expansion shell a en plus mangé les backslashes).
+#
+# Le garde-fou de T24 ne pouvait pas l'attraper : sa marque #2 exige la lettre de lecteur en
+# position > 0, parce qu'en TÊTE elle est légitime en scope user sur Windows. C'est la queue du
+# chemin, pas sa tête, qui était corrompue.
+T26_HOME_WIN='C:\Users\winuser'
+S26="$WORK/t26/settings.json"
+if HOME="$T26_HOME_WIN" VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_T23" \
+     --settings "$S26" --scripts-prefix "$PREFIX_USER" 2>/dev/null \
+   && S26="$S26" python3 -c '
+import json, os
+d = json.load(open(os.environ["S26"]))
+entries = [h for g in d["hooks"]["PreToolUse"] for h in g["hooks"]]
+# Zero backslash dans les VALEURS decodees. Pas dans le texte brut : le JSON y echappe
+# legitimement les guillemets du litteral shell-quote ("$HOME" -> \"$HOME\"), et cet
+# echappement-la n est pas un separateur de chemin.
+for h in entries:
+    for v in [h.get("command", "")] + list(h.get("args", [])):
+        assert chr(92) not in v, "backslash survivant dans une valeur : " + repr(v)
+ex = [h for h in entries if "args" in h][0]
+sh = [h for h in entries if "args" not in h][0]
+# Forme exec : HOME resolu ICI, normalise en POSIX, lettre de lecteur conservee en tete.
+assert ex["args"][0] == "C:/Users/winuser/.claude/scripts/t23-exec.sh", ex["args"]  # vf-allow-machine-path : chemin WINDOWS de fixture, le litteral EST le sujet du test
+# Forme shell : le litteral shell-quote reste INTACT — c est le shell qui l expansera.
+assert chr(34) + "$HOME" + chr(34) + "/.claude/scripts/t23-shell.sh" in sh["command"], sh["command"]
+' 2>/dev/null; then
+  ok "T26 WIN-PATHCONV II : \$HOME=C:\\Users\\winuser → chemin POSIX en forme exec, littéral shell intact en forme shell, zéro backslash sur disque"
+else
+  ko "T26 WIN-PATHCONV II : \$HOME en forme Windows native contamine encore settings.json"
+fi
+
+# ---------- T26b : preuve par mutation — retirer la normalisation POSIX fait MORDRE le
+#            garde-fou (3e marque), au lieu d'écrire des hooks morts en silence ----------
+# Sans cette moitié-là, T26 prouverait seulement que la normalisation existe aujourd'hui. Ce
+# qu'on veut garantir, c'est que sa DISPARITION échoue à l'install — bruyamment, rien écrit —
+# et non six semaines plus tard sur la machine d'un testeur, avalée par un `|| true`.
+MERGER_MUT26="$WORK/merge-hooks-mut26.sh"
+cp "$MERGER" "$MERGER_MUT26"
+if MUT26="$MERGER_MUT26" python3 <<'PYEOF'
+import os, sys
+path = os.environ["MUT26"]
+with open(path, encoding="utf-8") as f:
+    content = f.read()
+needle = "return to_posix(home) + p[len(head):]"
+if needle not in content:
+    sys.exit(1)
+with open(path, "w", encoding="utf-8") as f:
+    f.write(content.replace(needle, "return home + p[len(head):]", 1))
+PYEOF
+then
+  S26B="$WORK/t26b/settings.json"
+  T26B_ERR="$WORK/t26b-stderr.txt"
+  mkdir -p "$WORK/t26b"
+  if HOME="$T26_HOME_WIN" VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER_MUT26" merge "$FRAG_T23" \
+       --settings "$S26B" --scripts-prefix "$PREFIX_USER" >/dev/null 2>"$T26B_ERR"; then
+    T26B_EXIT=0
+  else
+    T26B_EXIT=1
+  fi
+  T26B_DIT_BACKSLASH=0; grep -q 'Backslash' "$T26B_ERR" 2>/dev/null && T26B_DIT_BACKSLASH=1
+  if [ "$T26B_EXIT" -eq 1 ] && [ ! -e "$S26B" ] && [ "$T26B_DIT_BACKSLASH" -eq 1 ]; then
+    ok "T26b preuve par mutation : normalisation retirée → le garde-fou mord (exit 1), settings.json jamais créé, diagnostic nommant le backslash"
+  else
+    ko "T26b preuve par mutation : la régression passe en silence (exit=$T26B_EXIT fichier=$([ -e "$S26B" ] && echo créé || echo absent) dit-backslash=$T26B_DIT_BACKSLASH)"
+  fi
+else
+  ko "T26b mutation : patch de retrait de la normalisation échoué (motif introuvable dans merge-hooks.sh)"
+fi
+
+# ---------- T26c : restauration — merge-hooks.sh réel jamais touché par T26b ----------
+if cmp -s "$MERGER" "$MERGER_PRISTINE_COPY"; then
+  ok "T26c restauration : merge-hooks.sh identique à avant la mutation T26b (cmp)"
+else
+  ko "T26c restauration : merge-hooks.sh a été altéré par la mutation T26b"
 fi
 
 # ---------- Mode `plan` (D-31-04 régime B) — Tp1..Tp5 ----------

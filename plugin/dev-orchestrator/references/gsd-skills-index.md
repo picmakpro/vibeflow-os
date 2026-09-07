@@ -1,5 +1,5 @@
 # GSD Skills Index (auto-généré — NE PAS ÉDITER)
-> Généré le 2026-08-04T14:25:51+02:00 par build-gsd-index.sh depuis @opengsd/gsd-core@1.9.1
+> Généré le 2026-09-07T23:01:50+02:00 par build-gsd-index.sh depuis @opengsd/gsd-core@1.13.0
 
 | Skill | Description |
 |-------|-------------|
@@ -18,7 +18,7 @@
 | gsd-discuss-phase | Gather phase context through adaptive questioning before planning. |
 | gsd-docs-update | Generate or update project documentation verified against the codebase |
 | gsd-eval-review | Audit an executed AI phase's evaluation coverage and produce an EVAL-REVIEW.md remediation plan. |
-| gsd-execute-phase | Execute all plans in a phase with wave-based parallelization |
+| gsd-execute-phase | SDD phase execution — execute all plans in a phase with dependency-aware wave parallelization |
 | gsd-explore | Socratic ideation and idea routing — think through ideas before committing to plans |
 | gsd-extract-learnings | Extract decisions, lessons, patterns, and surprises from completed phase artifacts |
 | gsd-fast | Execute a trivial task inline — no subagents, no planning overhead |
@@ -46,13 +46,14 @@
 | gsd-ns-workflow | workflow \| discuss plan execute verify phase progress |
 | gsd-onboard | Guide existing codebase onboarding through mapping, doc ingest, and planning setup |
 | gsd-pause-work | Create context handoff when pausing work mid-phase |
-| gsd-phase | CRUD for phases in ROADMAP.md — add, insert, remove, or edit phases |
+| gsd-phase | Multi-phase management — add, insert, remove, or edit phases in ROADMAP.md (roadmap phase CRUD) |
 | gsd-plan-phase | Create detailed phase plan (PLAN.md) with verification loop |
 | gsd-plan-review-convergence | Cross-AI plan convergence - replan until review concerns are resolved. |
 | gsd-pr-branch | Create a clean PR branch by filtering out .planning/ commits — ready for code review |
 | gsd-profile-user | Generate developer behavioral profile and create Claude-discoverable artifacts |
 | gsd-progress | Check progress, advance workflow, or dispatch freeform intent — the unified GSD situational command |
 | gsd-quick | Execute a quick task with GSD guarantees (atomic commits, state tracking) but skip optional agents |
+| gsd-quick-batch | Batch several /gsd:quick-shaped tasks together — planned, dispatched, and merged as one run |
 | gsd-resume-work | Resume work from previous session with full context restoration |
 | gsd-review | Request cross-AI peer review of phase plans from external AI CLIs |
 | gsd-review-backlog | Review and promote backlog items to active milestone |
@@ -94,7 +95,6 @@
 - complete-milestone
 - debug
 - diagnose-issues
-- discovery-phase
 - discuss-phase
 - discuss-phase-assumptions
 - discuss-phase-power
@@ -130,7 +130,6 @@
 - note
 - onboard
 - pause-work
-- plan-milestone-gaps
 - plan-phase
 - plan-review-convergence
 - plant-seed
@@ -138,6 +137,7 @@
 - profile-user
 - progress
 - quick
+- quick-batch
 - reapply-patches
 - remove-phase
 - remove-workspace
@@ -166,5 +166,4 @@
 - undo
 - update
 - validate-phase
-- verify-phase
 - verify-work
