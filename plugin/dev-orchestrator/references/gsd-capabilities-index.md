@@ -1,5 +1,5 @@
 # GSD Capabilities Index (auto-généré — NE PAS ÉDITER)
-> Généré le 2026-08-31T14:48:50+02:00 par build-gsd-capabilities-index.sh
+> Généré le 2026-09-07T17:43:14+02:00 par build-gsd-capabilities-index.sh
 > Source : registre de capabilities du moteur GSD (`capability-registry.cjs`), schéma déclaré `1`
 
 **Ce que cette table dit.** Elle énumère ce que le moteur **déclare** à la version depuis
@@ -39,6 +39,7 @@ fichier.
 | `security` | contribution | `workflow.security_enforcement` | — | — |
 | `tdd` | contribution | `workflow.tdd_mode` | — | `skip` |
 | `drift` | gate | `workflow.plan_drift_precheck` | non | `skip` |
+| `drift` | gate | `workflow.context_drift_precheck` | non | `skip` |
 | `ui` | gate | `workflow.ui_safety_gate` | oui | `halt` |
 
 ## `plan:post`
@@ -65,6 +66,7 @@ point existe et reste vide, pas qu'il est absent._
 
 | Capability | Nature | Toggle gouvernant | Bloquant | Conduite sur erreur |
 |---|---|---|---|---|
+| `code-review` | step | `workflow.code_review` | — | `skip` |
 | `live-dom-uat` | step | `workflow.live_dom_uat` | — | `skip` |
 | `external-job` | contribution | `external_job.enabled` | — | `skip` |
 | `mempalace` | contribution | `mempalace.enabled` | — | `skip` |
@@ -171,13 +173,14 @@ d'inactive, et `—` en colonne `Type` signale un toggle que le registre ne déc
 | `workflow.security_enforcement` | `security` | boolean | oui |
 | `workflow.tdd_mode` | `tdd` | boolean | non |
 | `workflow.plan_drift_precheck` | `drift` | boolean | oui |
+| `workflow.context_drift_precheck` | `drift` | boolean | oui |
 | `workflow.ui_safety_gate` | `ui` | boolean | oui |
 | `claude_orchestration.enabled` | `claude-orchestration` | boolean | non |
 | `external_job.enabled` | `external-job` | boolean | non |
 | `workflow.post_planning_gaps` | `gap-analysis` | boolean | oui |
+| `workflow.code_review` | `code-review` | boolean | oui |
 | `workflow.live_dom_uat` | `live-dom-uat` | boolean | non |
 | `workflow.schema_drift_gate` | `drift` | boolean | oui |
-| `workflow.code_review` | `code-review` | boolean | oui |
 | `refactor.trigger_enabled` | `refactor-trigger` | boolean | non |
 | `workflow.nyquist_validation` | `nyquist` | boolean | oui |
 | `workflow.ui_review` | `ui` | boolean | oui |
@@ -223,4 +226,4 @@ rendre inerte : c'est exactement ce que `check-capability-activation.sh` confron
 
 ---
 
-> 12 point(s) de hook parcouru(s), 37 étage(s) déclaré(s) par le registre, 27 capability(ies) hors point de hook sur 46 déclarée(s), 25 toggle(s) gouvernant(s) distinct(s), 25 brique(s) routée(s).
+> 12 point(s) de hook parcouru(s), 39 étage(s) déclaré(s) par le registre, 27 capability(ies) hors point de hook sur 46 déclarée(s), 26 toggle(s) gouvernant(s) distinct(s), 25 brique(s) routée(s).
