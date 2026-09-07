@@ -1,6 +1,27 @@
 #!/usr/bin/env bash
 # check-gsd-core-update.sh — Veille de release de `@opengsd/gsd-core` (WKTR-03, D-10).
 #
+# ############################################################################################
+# # SONDE DÉSARMÉE LE 2026-09-07 — accomplie, pas abandonnée. NE PAS LA RÉ-ARMER SUR UNE      #
+# # SIMPLE MONTÉE DE VERSION.                                                                 #
+# #                                                                                           #
+# # Son signal a été CONSOMMÉ : gsd-core 1.11.0 (2026-08-23) a ouvert la Phase 35, close le    #
+# # 2026-08-26 sur décision humaine (option A — ne pas ré-armer `isolation: worktree`, le      #
+# # ré-armement serait sûr mais INERTE sous ADR-059). Le seuil ci-dessous est figé à 1.10.0 et #
+# # n'a aucune notion de « déjà consommé » : toute version publiée le dépasse désormais, donc  #
+# # la sonde annoncerait une précondition satisfaite pour une phase CLOSE, à chaque session.   #
+# # L'entrée SessionStart a été retirée du .claude/settings.json de ce dépôt.                  #
+# #                                                                                           #
+# # Le script et sa suite (scripts/tests/test-check-gsd-core-update.sh, 13 cas) sont CONSERVÉS #
+# # intacts et restent invocables à la main (--status). Ce qui rouvrirait la question : un     #
+# # NOUVEL arbitrage humain, ou la chute d'un des deux termes du verdict (révision d'ADR-059,  #
+# # ou un moteur sachant forker ailleurs que sur origin/HEAD) — jamais un `npm view` plus      #
+# # élevé qu'hier. Dossier complet et motifs de réarmement :                                   #
+# # .planning/phases/VFDO-30-portabilit-windows-ii/30-VEILLE-GSD-CORE.md                       #
+# ############################################################################################
+#
+# CE QUI SUIT DÉCRIT LE DISPOSITIF TEL QU'ARMÉ — conservé pour lecture, plus actif nulle part.
+#
 # La Phase 35 (ré-armement worktree) est flottante : elle ne se déclenche QUE si une version de
 # `@opengsd/gsd-core` strictement supérieure à 1.10.0 est publiée. Sans cette sonde, personne ne
 # constate la sortie de cette release. Outillage de CE dépôt uniquement (pas un script de module) :
