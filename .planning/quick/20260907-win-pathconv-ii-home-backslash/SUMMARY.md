@@ -4,7 +4,7 @@ slug: win-pathconv-ii-home-backslash
 date: 2026-09-07
 status: complete
 version: v2.59.1
-commits: [e7ba4c7, 7ed683a, 660b327]
+commits: [6ed1f76, 68d9ed7, 7897a74, ba649b7]
 ---
 
 # SUMMARY — WIN-PATHCONV II
@@ -13,9 +13,10 @@ commits: [e7ba4c7, 7ed683a, 660b327]
 
 | Commit | Contenu |
 |---|---|
-| `e7ba4c7` | `to_posix()` + normalisation des deux formes + 3e marque du garde-fou + T26/T26b/T26c |
-| `7ed683a` | `docs/WINDOWS-HOOKS-PATHCONV.md` §7 — le second vecteur et son signe distinctif |
-| `660b327` | Release v2.59.1 — 3 fichiers de version + historique des 2 README |
+| `6ed1f76` | `to_posix()` + normalisation des deux formes + 3e marque du garde-fou + T26/T26b/T26c |
+| `68d9ed7` | `docs/WINDOWS-HOOKS-PATHCONV.md` §7 — le second vecteur et son signe distinctif |
+| `7897a74` | Release v2.59.1 — versions + historique des 2 README |
+| `ba649b7` | Rattrapage CI : 4e fichier de version (`.codex-plugin`), anonymisation du compte testeur, marqueur `vf-allow-machine-path` |
 
 ## Vert mesuré, pas déclaré
 
