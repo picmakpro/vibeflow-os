@@ -33,7 +33,7 @@
 #       sans rien écrire (seconde ceinture, quelle que soit la provenance de la corruption)
 # T25 — I : sous un interpréteur qui réécrit l'environnement à la manière de MSYS2, le préfixe
 #       transporté par FICHIER fait foi — le vecteur « variable d'environnement » est fermé
-# T26 — II : $HOME en forme Windows native (C:\Users\bapti) → chemin POSIX en forme exec,
+# T26 — II : $HOME en forme Windows native (C:\Users\winuser) → chemin POSIX en forme exec,
 #       littéral shell-quoté intact en forme shell, zéro backslash sur disque (second vecteur,
 #       relevé sur le lab testeur Windows en v2.59.0 — hotfix v2.59.1)
 # T26b — II, preuve par mutation : normalisation POSIX retirée → la 3e marque du garde-fou mord
@@ -990,18 +990,18 @@ fi
 #            settings.json (second vecteur, 2026-09-07) ----------
 # Le hotfix v2.55.1 (T25) a fermé le transport du préfixe par variable d'environnement. Il
 # restait un second vecteur, entièrement distinct : la VALEUR de $HOME elle-même. Sous Git Bash
-# lancé avec un HOME hérité de l'environnement Windows, os.environ["HOME"] vaut C:\Users\bapti —
-# et exec_safe_prefix le concaténait tel quel, produisant C:\Users\bapti/.claude/scripts.
+# lancé avec un HOME hérité de l'environnement Windows, os.environ["HOME"] vaut C:\Users\winuser —
+# et exec_safe_prefix le concaténait tel quel, produisant C:\Users\winuser/.claude/scripts.
 #
 # Ce chemin mixte est exactement celui relevé sur le lab testeur Windows en v2.59.0 :
-#   SessionStart:startup hook error … C:\Users\bapti/.claude/scripts/discover-unin…
-#   SessionStart:startup hook error … /bin/bash: C:Usersbapti/.claude/scripts/chec…
+#   SessionStart:startup hook error … C:\Users\winuser/.claude/scripts/discover-unin…
+#   SessionStart:startup hook error … /bin/bash: C:Userswinuser/.claude/scripts/chec…
 # (sur la seconde ligne, une couche d'expansion shell a en plus mangé les backslashes).
 #
 # Le garde-fou de T24 ne pouvait pas l'attraper : sa marque #2 exige la lettre de lecteur en
 # position > 0, parce qu'en TÊTE elle est légitime en scope user sur Windows. C'est la queue du
 # chemin, pas sa tête, qui était corrompue.
-T26_HOME_WIN='C:\Users\bapti'
+T26_HOME_WIN='C:\Users\winuser'
 S26="$WORK/t26/settings.json"
 if HOME="$T26_HOME_WIN" VF_BASH_BIN="$BASH_ABS_TEST" bash "$MERGER" merge "$FRAG_T23" \
      --settings "$S26" --scripts-prefix "$PREFIX_USER" 2>/dev/null \
@@ -1018,11 +1018,11 @@ for h in entries:
 ex = [h for h in entries if "args" in h][0]
 sh = [h for h in entries if "args" not in h][0]
 # Forme exec : HOME resolu ICI, normalise en POSIX, lettre de lecteur conservee en tete.
-assert ex["args"][0] == "C:/Users/bapti/.claude/scripts/t23-exec.sh", ex["args"]
+assert ex["args"][0] == "C:/Users/winuser/.claude/scripts/t23-exec.sh", ex["args"]  # vf-allow-machine-path : chemin WINDOWS de fixture, le litteral EST le sujet du test
 # Forme shell : le litteral shell-quote reste INTACT — c est le shell qui l expansera.
 assert chr(34) + "$HOME" + chr(34) + "/.claude/scripts/t23-shell.sh" in sh["command"], sh["command"]
 ' 2>/dev/null; then
-  ok "T26 WIN-PATHCONV II : \$HOME=C:\\Users\\bapti → chemin POSIX en forme exec, littéral shell intact en forme shell, zéro backslash sur disque"
+  ok "T26 WIN-PATHCONV II : \$HOME=C:\\Users\\winuser → chemin POSIX en forme exec, littéral shell intact en forme shell, zéro backslash sur disque"
 else
   ko "T26 WIN-PATHCONV II : \$HOME en forme Windows native contamine encore settings.json"
 fi

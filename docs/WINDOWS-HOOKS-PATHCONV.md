@@ -288,13 +288,13 @@ elle-même**.
 Sur le lab testeur Windows, en **v2.59.0** confirmée à jour :
 
 ```
-SessionStart:startup hook error … C:\Users\bapti/.claude/scripts/discover-unin…
-SessionStart:startup hook error … /bin/bash: C:Usersbapti/.claude/scripts/chec…
+SessionStart:startup hook error … C:\Users\winuser/.claude/scripts/discover-unin…
+SessionStart:startup hook error … /bin/bash: C:Userswinuser/.claude/scripts/chec…
 ```
 
-Le chemin est **mixte** — tête `C:\Users\bapti` en forme Windows native, queue `/.claude/scripts`
+Le chemin est **mixte** — tête `C:\Users\winuser` en forme Windows native, queue `/.claude/scripts`
 en POSIX. Sur la seconde ligne, une couche d'expansion shell a en plus mangé les backslashes
-(`\U` et `\b` disparus) : `C:Usersbapti`. Le chemin ne désigne plus rien.
+(`\U` et `\b` disparus) : `C:Userswinuser`. Le chemin ne désigne plus rien.
 
 ### La cause
 
@@ -302,10 +302,10 @@ en POSIX. Sur la seconde ligne, une couche d'expansion shell a en plus mangé le
 
 ```python
 home = os.environ.get("HOME") or os.path.expanduser("~")
-return home + p[len(head):]        # ← C:\Users\bapti + /.claude/scripts
+return home + p[len(head):]        # ← C:\Users\winuser + /.claude/scripts
 ```
 
-Sous Git Bash lancé avec un `HOME` hérité de l'environnement Windows, `HOME=C:\Users\bapti`. Rien
+Sous Git Bash lancé avec un `HOME` hérité de l'environnement Windows, `HOME=C:\Users\winuser`. Rien
 dans la chaîne n'avait été réécrit par MSYS2 : la valeur était déjà comme ça au départ. C'est
 pourquoi le garde-fou de la §6 ne l'attrapait pas — et c'était **délibéré** : sa seconde marque
 exige une lettre de lecteur en position `> 0`, parce qu'en **tête** elle est parfaitement légitime
@@ -334,7 +334,7 @@ Signe distinctif utile pour trancher entre I et II :
    le **retrait** de la normalisation échoue à l'install, et non six semaines plus tard sur la
    machine d'un testeur, avalé par un `|| true`.
 
-Couverture de test : `test-merge-hooks.sh`, cas **T26** (comportement : `HOME=C:\Users\bapti` →
+Couverture de test : `test-merge-hooks.sh`, cas **T26** (comportement : `HOME=C:\Users\winuser` →
 chemin POSIX en forme exec, littéral shell intact en forme shell, zéro backslash dans les valeurs
 écrites), **T26b** (preuve par mutation : normalisation retirée → le garde-fou mord) et **T26c**
 (le fichier réel n'est jamais altéré par la mutation).

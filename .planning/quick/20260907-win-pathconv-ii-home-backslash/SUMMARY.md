@@ -38,7 +38,7 @@ dans les deux cas). Régression antérieure à cette branche, hors périmètre. 
 
 **Migration des 20 entrées gouvernance en forme exec** (`docs/HOOKS-CONTRAT-SORTIE.md` §6) —
 décidée le 2026-08-15, jamais exécutée. C'est elle qui supprimera la couche d'expansion shell
-responsable de la seconde ligne d'erreur du testeur (`C:Usersbapti`, backslashes mangés). Ce
+responsable de la seconde ligne d'erreur du testeur (`C:Userswinuser`, backslashes mangés). Ce
 hotfix rend le chemin correct ; il ne supprime pas le shell qui le relit. Chantier réel :
 20 conversions, chacune exigeant que le script porte sa propre traduction de code de sortie.
 

@@ -13,12 +13,12 @@ Lab testeur Windows (`Dossier-engine-V3`), VibeFlow **v2.59.0** confirmée à jo
 `/vf-update --check`. Trois erreurs au `SessionStart`, dont deux VibeFlow :
 
 ```
-SessionStart:startup hook error … C:\Users\bapti/.claude/scripts/discover-unin…
-SessionStart:startup hook error … /bin/bash: C:Usersbapti/.claude/scripts/chec…
+SessionStart:startup hook error … C:\Users\winuser/.claude/scripts/discover-unin…
+SessionStart:startup hook error … /bin/bash: C:Userswinuser/.claude/scripts/chec…
 ```
 
-Le chemin est **mixte** : tête `C:\Users\bapti` en forme Windows, queue `/.claude/scripts` en
-POSIX. Sur la seconde ligne, les backslashes ont en plus été mangés (`C:Usersbapti`) — le
+Le chemin est **mixte** : tête `C:\Users\winuser` en forme Windows, queue `/.claude/scripts` en
+POSIX. Sur la seconde ligne, les backslashes ont en plus été mangés (`C:Userswinuser`) — le
 chemin ne désigne plus rien, et le hook est mort.
 
 ## La cause — dans le code, prouvée sans mesure supplémentaire
@@ -31,7 +31,7 @@ return home + p[len(head):]
 ```
 
 `HOME` est concaténé **tel quel**. Sous Git Bash lancé avec un `HOME` hérité de l'environnement
-Windows, `HOME=C:\Users\bapti` — d'où `C:\Users\bapti/.claude/scripts`, exactement la chaîne de
+Windows, `HOME=C:\Users\winuser` — d'où `C:\Users\winuser/.claude/scripts`, exactement la chaîne de
 la capture.
 
 Le garde-fou `assert_prefix_uncorrupted()` ne l'attrape pas, et c'est **par construction** :
@@ -59,7 +59,7 @@ ouvert : la valeur de `HOME` elle-même.
 2. Ajouter au garde-fou une troisième marque — un backslash résiduel dans le préfixe arrête le
    merge, bruyamment, sans rien écrire. Doctrine du lab : un garde-fou en panne est pire qu'un
    garde-fou absent.
-3. Test T26 : `HOME=C:\Users\bapti` → `args[0]` en POSIX, zéro backslash dans le settings écrit.
+3. Test T26 : `HOME=C:\Users\winuser` → `args[0]` en POSIX, zéro backslash dans le settings écrit.
 
 **Ne fait pas** (et le dit) : la migration des **20 entrées de la polarité gouvernance en forme
 exec** (`docs/HOOKS-CONTRAT-SORTIE.md` §6, chantier décidé jamais exécuté). C'est elle qui

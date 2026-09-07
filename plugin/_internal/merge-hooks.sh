@@ -182,10 +182,10 @@ def to_posix(p):
     """Sépare en `/` un chemin de scripts, quelle que soit la forme rendue par la machine.
 
     WIN-PATHCONV II (2026-09-07, second vecteur). Sous Git Bash lancé avec un `HOME` hérité de
-    l'environnement Windows, `os.environ["HOME"]` vaut `C:\\Users\\bapti` — forme native, pas
-    POSIX. Concaténé tel quel, il produisait `C:\\Users\\bapti/.claude/scripts` : un chemin
+    l'environnement Windows, `os.environ["HOME"]` vaut `C:\\Users\\winuser` — forme native, pas
+    POSIX. Concaténé tel quel, il produisait `C:\\Users\\winuser/.claude/scripts` : un chemin
     MIXTE, écrit tel quel dans settings.json. En forme exec bash ne l'ouvre pas ; en forme shell,
-    une couche d'expansion mange en plus les backslashes (`C:Usersbapti`) et `|| true` avale
+    une couche d'expansion mange en plus les backslashes (`C:Userswinuser`) et `|| true` avale
     l'erreur — le garde ne tourne plus, et rien ne le dit (lab testeur Windows, v2.59.0).
 
     `C:/Users/…/.claude/scripts` est la forme que le reste de ce fichier attend déjà — le
