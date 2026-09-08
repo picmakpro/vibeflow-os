@@ -77,6 +77,11 @@ pages:
     path_en: 01-get-started/installation.md
     fr: Installation
     en: Installation
+  - id: other-runtimes
+    path_fr: 01-demarrer/autres-runtimes.md
+    path_en: 01-get-started/other-runtimes.md
+    fr: Installer hors Claude Code
+    en: Installing outside Claude Code
   - id: choosing-your-scope
     path_fr: 01-demarrer/choisir-son-scope.md
     path_en: 01-get-started/choosing-your-scope.md

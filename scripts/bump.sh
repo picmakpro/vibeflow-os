@@ -6,10 +6,11 @@
 # du CHANGELOG.md racine :
 #   1. VERSION                               (canon, format vX.Y.Z)
 #   2. plugin/.claude-plugin/plugin.json     .version
-#   3. .claude-plugin/marketplace.json       .plugins[0].version (la FICHE d'install)
-#   4. badge version README.md               (img.shields.io/badge/version-X.Y.Z-…)
-#   5. badge version README.fr.md
-#   6. CHANGELOG.md                          squelette « ## [vX.Y.Z] — <date> » en tête
+#   3. plugin/.codex-plugin/plugin.json      .version (manifeste Codex natif, v2.59.0)
+#   4. .claude-plugin/marketplace.json       .plugins[0].version (la FICHE d'install)
+#   5. badge version README.md               (img.shields.io/badge/version-X.Y.Z-…)
+#   6. badge version README.fr.md
+#   7. CHANGELOG.md                          squelette « ## [vX.Y.Z] — <date> » en tête
 #
 # Ne crée PAS le tag git : c'est l'étape post-merge (cf. CLAUDE.md + check-release-tag.sh).
 #
@@ -91,8 +92,15 @@ $DRY || printf '%s\n' "$TAG" > "$ROOT/VERSION"
 # ── 2+3. Manifestes JSON (première clé "version" de chaque fichier) ────────────────────────
 # Lecture sed (même contrainte no-jq que check-version-sync.sh) ; écriture python3
 # (prérequis du repo, cf. INSTALL.md) — l'adresse sed `0,/re/` n'existe pas en sed BSD.
-for rel in "plugin/.claude-plugin/plugin.json" ".claude-plugin/marketplace.json"; do
+# `plugin/.codex-plugin/plugin.json` est traité SUR PRÉSENCE (et non dans FILES) : il n'existe
+# que depuis v2.59.0, et check-version-sync.sh le garde lui aussi sur présence — les deux scripts
+# doivent voir le même monde, sinon un bump vert produirait un gate rouge (constaté en v2.59.2).
+for rel in "plugin/.claude-plugin/plugin.json" "plugin/.codex-plugin/plugin.json" ".claude-plugin/marketplace.json"; do
   f="$ROOT/$rel"
+  if [ ! -f "$f" ]; then
+    echo "[bump] = $rel absent (manifeste optionnel) — ignoré"
+    continue
+  fi
   old="$(json_version "$f")"
   [ -n "$old" ] || { echo "[bump] ✗ aucune clé \"version\" trouvée dans $rel" >&2; exit 1; }
   apply "$rel" "$old" "$NEW"

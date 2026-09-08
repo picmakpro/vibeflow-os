@@ -100,5 +100,5 @@ des situations différentes, et celle qui te convient dépend entièrement de ta
 pas d'une bonne pratique universelle.
 
 <!-- vf-manual:nav -->
-[← Précédent](../01-demarrer/installation.md) · [↑ Sommaire](../README.md) · [Suivant →](../01-demarrer/premiere-session.md)
+[← Précédent](../01-demarrer/autres-runtimes.md) · [↑ Sommaire](../README.md) · [Suivant →](../01-demarrer/premiere-session.md)
 <!-- /vf-manual:nav -->

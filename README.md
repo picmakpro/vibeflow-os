@@ -6,12 +6,14 @@
 
 **Claude Code is powerful. VibeFlow makes it reliable, frugal and governed.**
 
-**Spec-driven** agentic orchestration for Claude Code: you speak plainly, an agent detects the
-intent, runs the pipeline (scoping → plan → execution → proof), and **machine gates** verify —
-not promises.
+**Spec-driven** agentic orchestration: you speak plainly, an agent detects the intent, runs the
+pipeline (scoping → plan → execution → proof), and **machine gates** verify — not promises.
+Claude Code is the reference runtime; install and usage are also measured end to end on **Codex**
+and **kimi-code**.
 
-[![Version](https://img.shields.io/badge/version-2.59.1-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.59.2-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
+[![Runtimes](https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex%20%7C%20kimi--code-7c3aed)](#-install)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
@@ -103,6 +105,20 @@ Then inside Claude Code: `/vibeflow-install` — pre-detected scope (one-tap con
 module picker, dependencies resolved and recapped before anything is written. Update:
 `/vf-update`. Details: [INSTALL.md](./INSTALL.md).
 
+**Not on Claude Code?** Install **and** usage are measured end to end on **Codex** (native
+channel, plus a `.codex-plugin/` manifest) and on **kimi-code**:
+
+```bash
+codex plugin marketplace add picmakpro/vibeflow-os
+codex plugin add vibeflow@vibeflow-os
+```
+
+Codex needs `multi_agent_v2` enabled and the repository trusted — both fail silently otherwise;
+on a machine that also has `claude`, force the target with `VF_RUNTIME=codex`. kimi-code has no
+install channel: load an agent with `kimi --agent-file <path>`. Hooks are **not** ported outside
+Claude Code, and every loss is declared at install time rather than hidden. Commands and full
+loss list: [Installing outside Claude Code](./manual/en/01-get-started/other-runtimes.md).
+
 ---
 
 ## 📦 Modules
@@ -142,6 +158,7 @@ Full history: **[CHANGELOG.md](./CHANGELOG.md)**, the single canon — the table
 
 | Version | Date | Change |
 |---------|------|--------|
+| `v2.59.2` | 2026-09-08 | **Codex's CLI grammar was assumed, not measured — automatic install could not succeed on a Codex machine.** Three facts, all re-measured against the real binary (`codex plugin --help`, `codex plugin add --help`, `codex plugin marketplace add --help`): `codex plugin install` **does not exist** (the CLI only exposes `add`, `list`, `marketplace`, `remove`), **no** `codex plugin` verb accepts `--scope`, and `enable` has **no equivalent**. Yet the dispatcher built `codex plugin install <id> --scope <s>` — and its manual-step fallback suggested a `claude` command to someone who, by definition, doesn't have `claude`. The fact had **already been written down** on 2026-08-29 ("no Codex install grammar invented"): it never reached the code, which kept the refuted assumption both in its comments **and** in its behavior — the "measured ≠ recorded ≠ applied" pattern. Shipped: a **per-runtime** grammar table, `--scope` stripped **and announced** on stderr (a silently ignored scope is the failure mode this repo has named since QUAL-01), `enable` on Codex degraded to a declared manual step **without invoking any binary**, and a runtime-aware manual-step message. Discrimination proven both ways: the 5 new assertions are red when replayed against the pre-fix code and green after, while the `claude` non-regression stays green on both sides. **Documentation side**: a new manual page "Installing outside Claude Code" (FR + EN), plus both READMEs and `INSTALL.md` — real commands for Codex and kimi-code, the two Codex preconditions that fail **silently** (`multi_agent_v2`, a trusted repository), the detection-cascade pitfall, and what gets lost per target. **History debt settled**: `v2.58.1`, `v2.59.0` and `v2.59.1` had been tagged and released without ever getting their entry in the root CHANGELOG, its declared single canon — all three are restored. |
 | `v2.59.1` | 2026-09-07 | **A Windows `$HOME` in native form was writing dead hook paths, silently.** Under Git Bash started with a `HOME` inherited from the Windows environment, `HOME=C:\Users\<user>` — and the installer concatenated it as-is, producing `C:\Users\<user>/.claude/scripts` in `settings.json`. Mixed paths like that die twice over: `bash` will not open them in exec form, and in shell form a layer of expansion eats the backslashes outright (`C:Users<user>`). Since those entries end in `|| true`, the error was swallowed — the guard simply stopped running, and nothing said so. This is not a regression of the v2.55.1 hotfix, which closed the *transport* vector and still does; it is a second, independent one — the value of `$HOME` itself — that the existing guard could not see, its check deliberately allowing a drive letter in leading position (legitimate for a user-scope install on Windows). Machine paths resolved at install are now normalised to POSIX; a shell literal stays untouched, since the shell is what expands it. A third guard mark makes the *removal* of that normalisation fail at install time rather than six weeks later on a tester's machine. Found on a tester's lab running v2.59.0, confirmed up to date. **This release also brings the realignment onto `@opengsd/gsd-core` 1.13.0.** The engine's skills index still dated from 1.9.1: it described a smaller world than the installed engine, and because the exhaustiveness gate reads that versioned index, it was validating incomplete routing **silently**. `gsd-quick-batch`, new in 1.13.0, was reachable from no intent at all. Index regenerated, brick routed, gap proven red before being closed. The rest of the surface exposed to the engine was verified clear: new configuration keys, upstream hooks, multi-runtime descriptors, Node floor. Finally, the gsd-core release watch is now **off**: its signal had been consumed by Phase 35, closed on 2026-08-26, and its frozen threshold had turned it into a false positive on every session start. |
 | `v2.59.0` | 2026-08-31 | **VibeFlow now installs and runs outside Claude Code — measured end-to-end on Codex and Kimi, not declared.** Codex consumes the Claude marketplace descriptor unchanged (`codex plugin marketplace add` then `codex plugin add`), and a role adapter registers each VF agent as a Codex role with an honest per-field digest (model mapped, `memory` lost, `tools` pending); a live session delegated manager→worker in-base (depth ≥ 2 via `thread_spawn_edges`) and produced working code for $1.01. Kimi loads a VF agent through `--agent-file` and runs it — real files plus the team-kernel typed report — after the description fix a cross-parser gate now enforces: the only single-line form both `gsd-core` and Kimi accept is the quoted one. A native `.codex-plugin/` manifest was added for robustness (no longer leaning on the undocumented `.claude-plugin` fallback) and a desktop identity. Losses are declared, never silent: Codex hooks are not ported, and a claimed "skills-budget saturation" was disproven by measurement — VF injects exactly one skill, the pressure was the host's own. Hardening: the fidelity gate now measures the TOML actually posted rather than a parallel conversion, and a path-traversal write plus a judged-repo injection vector were closed. Samuel authorised the ship after reviewing the branch. |
 | `v2.58.1` | 2026-08-28 | **A session-start check could break the start of the session it was meant to inform.** The infrastructure audit prints one JSON object per axis, so its two-axis run emitted two objects back to back — not a valid JSON document — and Claude Code rejected the injected output. It surfaced only every ~14 days, the interval the audit actually runs on, and `jq` had always accepted the output because it reads a *stream* where the harness parses a *document*. The hook now emits a single encoded object, and stays silent unless there is a finding. |

@@ -5,6 +5,108 @@ extrait récent et pointent ici). Chaque module a par ailleurs son propre `CHANG
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## [v2.59.2] — 2026-09-08
+
+**La grammaire CLI de Codex était supposée, pas mesurée — l'install automatique ne pouvait pas
+aboutir sur un poste Codex, et le repli proposait une commande `claude` à qui n'a pas `claude`.**
+Correctif du dispatch `plugin/_internal/runtime-cli-dispatch.sh` + documentation d'install
+multi-runtime.
+
+- **Trois faits mesurés que le code violait** (re-mesurés sur `codex-cli 0.150.1` via
+  `codex plugin --help`, `codex plugin add --help`, `codex plugin marketplace add --help`, jamais
+  déduits) : `codex plugin install` **n'existe pas** — la CLI n'expose que `add`, `list`,
+  `marketplace`, `remove` ; **aucun** verbe `codex plugin` n'accepte `--scope` ; `enable` n'a
+  **aucun équivalent** (ni `enable`, ni `disable`). Le dispatch construisait pourtant
+  `codex plugin install <id> --scope <s>` et `codex plugin enable <id> --scope <s>`.
+- **Le fait était déjà écrit, il n'avait jamais atteint le code.** `38-02-SUMMARY.md` consigne dès
+  le 2026-08-29 : *« Aucune grammaire d'install Codex inventée. La mesure de bout en bout a démenti
+  l'hypothèse "même grammaire que `claude`" »*. La table de dispatch gardait l'hypothèse démentie
+  **en commentaire ET en comportement** — le motif « mesuré ≠ consigné ≠ appliqué ».
+- **Livré** : table de grammaire **par runtime** en tête de fichier ; `--scope` retiré **et
+  annoncé sur stderr** (un scope silencieusement ignoré est le mode de panne que ce dépôt nomme
+  depuis QUAL-01) ; `enable` sur codex dégradé en **étape manuelle déclarée sans invoquer aucun
+  binaire** (RUNT-02 : jamais une commande devinée) ; message d'étape manuelle **runtime-aware** —
+  proposer `claude plugin …` sur un poste Codex était le second volet du même défaut.
+- **Discriminance prouvée dans les deux sens** : les 5 assertions neuves (`T2`, `T2c`, `T2d`,
+  `T2e`, `T2f`) sont **rouges** rejouées contre le code d'avant correctif, vertes après ; `T2b`
+  (non-régression `claude`) reste vert des deux côtés — le contrôle qui prouve que la suite ne
+  rougit pas partout. `test-runtime-cli-dispatch.sh` 15 → **18 cas**,
+  `test-design-orchestrator.sh` **29** (attente Codex réécrite pour sa propre grammaire, jamais
+  dérivée de celle de `claude` par substitution de nom).
+- **Documentation d'install multi-runtime** : nouvelle page de manuel **« Installer hors Claude
+  Code »** (FR + EN, inscrite au `toc.yml`), plus `README.md`, `README.fr.md` et `INSTALL.md`. Elle
+  donne les commandes réelles (`codex plugin marketplace add` puis `codex plugin add
+  vibeflow@vibeflow-os` ; `kimi --agent-file` côté kimi-code, qui n'a **aucun** canal d'install),
+  les deux préconditions Codex qui échouent **en silence** (`multi_agent_v2` inactif = aucun outil
+  de spawn ; dépôt non « trusted » = `.codex/agents/` jamais parsé pendant que `codex doctor`
+  annonce que tout va bien), le piège de la cascade de détection (`VF_RUNTIME`), et **ce qui se
+  perd par cible** — hooks non portés hors Claude Code, confinement par rôle inerte sur Codex,
+  `vf-internal` perdu sur kimi-code.
+- **Dette d'historique soldée** : `v2.58.1`, `v2.59.0` et `v2.59.1` avaient été taggées et
+  publiées **sans jamais recevoir leur entrée** à ce CHANGELOG, pourtant déclaré canon unique —
+  même classe de défaut que la page Releases bloquée de v2.29.0 à v2.39.0, et que la v2.47.0. Les
+  trois entrées sont rétablies ci-dessous.
+
+## [v2.59.1] — 2026-09-07
+
+**Un `$HOME` Windows en forme native écrivait des chemins de hooks morts, en silence.**
+
+- Sous Git Bash lancé avec un `HOME` hérité de l'environnement Windows, `HOME=C:\Users\<user>` — et
+  l'installeur le concaténait tel quel, produisant `C:\Users\<user>/.claude/scripts` dans
+  `settings.json`. Un chemin mixte meurt deux fois : `bash` ne l'ouvre pas en forme exec, et en
+  forme shell une couche d'expansion lui mange ses backslashes. Ces entrées finissant par
+  `|| true`, l'erreur était avalée — le garde ne tournait plus, et rien ne le disait.
+- **Ce n'est pas une régression du hotfix v2.55.1**, qui a fermé le vecteur *transport* et le ferme
+  toujours : c'est un **second vecteur indépendant** — la valeur de `$HOME` elle-même — que le
+  garde-fou en place ne pouvait pas voir, sa marque tolérant délibérément une lettre de lecteur en
+  tête (légitime pour une install en scope user sur Windows).
+- Tout chemin de machine résolu à l'install est désormais **normalisé en POSIX** ; un littéral
+  shell reste intact, puisque c'est le shell qui l'expanse. Une **troisième marque** du garde-fou
+  fait échouer le *retrait* de cette normalisation à l'install, plutôt que six semaines plus tard
+  sur la machine d'un testeur. Relevé sur le lab d'un testeur en v2.59.0.
+- **Remise à niveau sur `@opengsd/gsd-core` 1.13.0.** L'index des skills du moteur datait encore de
+  1.9.1 : il décrivait un monde plus petit que le moteur installé, et comme le gate d'exhaustivité
+  lit cet **index versionné**, il validait un routage incomplet **en silence**. `gsd-quick-batch`,
+  nouveau en 1.13.0, n'était joignable par aucune intention. Index régénéré, brique routée, gap
+  prouvé rouge avant d'être fermé. Le reste de la surface exposée au moteur a été vérifié sans
+  écart.
+- **Veille de release gsd-core éteinte** : son signal avait été consommé par la Phase 35, close le
+  2026-08-26, et son seuil figé en faisait un faux positif à chaque démarrage de session.
+
+## [v2.59.0] — 2026-08-31
+
+**VibeFlow s'installe et tourne désormais hors de Claude Code — mesuré de bout en bout sur Codex
+et Kimi, pas déclaré.** Phase 38 (8 plans), PR #56.
+
+- **Codex** avale le descripteur marketplace de Claude tel quel (`codex plugin marketplace add`
+  puis `codex plugin add`), et un adaptateur de rôle enregistre chaque agent VF comme rôle Codex
+  avec un **digest honnête champ par champ** (modèle mappé, `memory` perdu, `tools` en attente).
+  Une session réelle a délégué manager → worker **en base** (profondeur ≥ 2 via
+  `thread_spawn_edges`) et produit du code fonctionnel pour 1,01 $.
+- **Kimi** charge un agent VF par `--agent-file` et l'exécute — fichiers réels plus le rapport typé
+  du team-kernel — après le correctif de description qu'un gate **double-parseur** impose
+  désormais : la seule forme mono-ligne que `gsd-core` **et** Kimi acceptent est celle entre
+  guillemets.
+- Un **manifeste `.codex-plugin/` natif** a été ajouté pour la robustesse (ne plus dépendre du
+  repli non documenté sur `.claude-plugin`) et une identité desktop.
+- **Les pertes sont déclarées, jamais silencieuses** : les hooks Codex ne sont pas portés, et une
+  prétendue « saturation du budget skills » a été **démentie par la mesure** — VF n'injecte qu'une
+  seule skill, la pression venait de l'hôte.
+- **Durcissement** : le gate de fidélité mesure maintenant le TOML **réellement posé** et non une
+  conversion parallèle ; une écriture par traversal et un vecteur d'injection par dépôt jugé ont
+  été fermés.
+
+## [v2.58.1] — 2026-08-28
+
+**Un contrôle de démarrage pouvait casser le démarrage qu'il devait éclairer.**
+
+- L'audit d'infrastructure écrit **un objet JSON par axe** : son passage à deux axes en émettait
+  donc deux collés — pas un document JSON valide — et Claude Code rejetait la sortie injectée.
+- Le symptôme n'apparaissait que tous les **~14 jours**, l'intervalle réel de l'audit, et `jq`
+  acceptait cette sortie depuis toujours puisqu'il lit un **flux** là où le harness parse un
+  **document**.
+- Le hook rend désormais **un seul objet encodé**, et **se tait** s'il n'a rien à signaler.
+
 ## [v2.58.0] — 2026-08-28
 
 **Un Node trop ancien pour le moteur courant ne bloque plus le bootstrap : il se répare.** Module

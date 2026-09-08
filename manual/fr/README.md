@@ -54,6 +54,7 @@ flowchart LR
 ### Démarrer
 - [Prérequis](./01-demarrer/prerequis.md)
 - [Installation](./01-demarrer/installation.md)
+- [Installer hors Claude Code](./01-demarrer/autres-runtimes.md)
 - [Choisir son scope](./01-demarrer/choisir-son-scope.md)
 - [Première session](./01-demarrer/premiere-session.md)
 - [Premier lab](./01-demarrer/premier-lab.md)

@@ -9,13 +9,20 @@ ce sont des outils courants, et l'installateur les vérifie lui-même au premier
 
 ## Ce qu'il te faut
 
-### 1. Claude Code, à jour
+### 1. Un runtime d'agent — Claude Code par défaut
 
-VibeFlow est un **plugin Claude Code** — il ne fonctionne pas sans. Tu dois avoir Claude Code
-installé et suffisamment récent pour que la commande `claude plugin` existe. Si tu tapes
-`claude plugin` dans un terminal et que la commande n'est pas reconnue, mets Claude Code à jour
-avant de continuer : c'est la cause la plus fréquente de blocage à l'installation (un guide de
-dépannage dédié à ces blocages viendra compléter ce thème).
+Claude Code est le **runtime de référence** de VibeFlow : c'est celui sur lequel tout le périmètre
+est couvert, hooks de gouvernance compris. Tu dois l'avoir installé et suffisamment récent pour
+que la commande `claude plugin` existe. Si tu tapes `claude plugin` dans un terminal et que la
+commande n'est pas reconnue, mets Claude Code à jour avant de continuer : c'est la cause la plus
+fréquente de blocage à l'installation (un guide de dépannage dédié à ces blocages viendra
+compléter ce thème).
+
+VibeFlow n'y est cependant **plus enfermé** : l'install et l'usage ont été mesurés de bout en bout
+sur **Codex** (canal `codex plugin` natif) et sur **kimi-code** (chargement d'un agent par
+fichier). Les commandes, les préconditions d'environnement et ce qui se perd sur chaque cible sont
+détaillés dans [autres-runtimes.md](./autres-runtimes.md). Les trois outils ci-dessous, eux, sont
+requis quel que soit le runtime.
 
 ### 2. Trois outils en ligne de commande
 
@@ -47,7 +54,8 @@ ci-dessous : c'est le seul cas qui demande une installation supplémentaire.
 
 Tu n'as besoin d'aucun compte privé, d'aucun clone de dépôt à la main, d'aucune authentification
 `gh` (l'outil en ligne de commande GitHub). L'installation se fait entièrement via les commandes
-`claude plugin` — voir [installation.md](./installation.md).
+`claude plugin` — voir [installation.md](./installation.md) — ou leur équivalent sur un autre
+runtime, voir [autres-runtimes.md](./autres-runtimes.md).
 
 ## Le cas Windows
 
