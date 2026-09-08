@@ -6,8 +6,12 @@
 #   T1 — VF_RUNTIME=claude + faux binaire claude en fixture PATH → la commande construite/
 #        exécutée contient EXACTEMENT `plugin install foo@bar --scope user` (capturée par
 #        exécution réelle, jamais recopiée en dur).
-#   T2 — VF_RUNTIME=codex + faux binaire codex → commande équivalente construite pour
-#        `codex plugin install ...` (même forme d'arguments).
+#   T2 — VF_RUNTIME=codex + faux binaire codex → grammaire codex RÉELLE : `codex plugin add
+#        <id>` SANS `--scope` (mesuré sur codex-cli 0.150.1 : le verbe `install` n'existe pas et
+#        aucun verbe `codex plugin` n'accepte `--scope`). T2b/T2c/T2d/T2e/T2f couvrent le reste de
+#        la table : `enable` inexistant côté codex → étape manuelle SANS invoquer de binaire,
+#        `marketplace-add` sans `--scope`, retrait de scope ANNONCÉ, et message d'étape manuelle
+#        qui ne propose JAMAIS une commande `claude` sur un poste codex.
 #   T3 — VF_RUNTIME=opencode, AUCUN binaire réel requis → message d'étape manuelle sur stderr,
 #        exit 0, AUCUNE tentative d'exécution d'un binaire absent.
 #   T4 — aucun VF_RUNTIME, PATH de sonde vide → détection rend « absent », même comportement
@@ -90,24 +94,58 @@ chmod +x "$FIX2/codex"
 : > "$LOG2"
 OUT2=$(PATH="$FIX2:$PATH" VF_RUNTIME=codex bash "$DISPATCH" install foo@bar --scope user 2>&1)
 EXIT2=$?
-if [ "$EXIT2" -eq 0 ] && grep -qF 'plugin install foo@bar --scope user' "$LOG2"; then
-  ok "T2 : VF_RUNTIME=codex → 'plugin install foo@bar --scope user' exécuté réellement sur codex (journal grep)"
+# DISCRIMINANT : `plugin install` et `--scope` doivent être ABSENTS du journal. Un test qui se
+# contenterait de chercher `foo@bar` resterait vert sur la grammaire fautive d'avant le correctif.
+if [ "$EXIT2" -eq 0 ] && grep -qF 'plugin add foo@bar' "$LOG2" \
+   && ! grep -qF 'plugin install' "$LOG2" && ! grep -qF -- '--scope' "$LOG2"; then
+  ok "T2 : VF_RUNTIME=codex → 'plugin add foo@bar' exécuté réellement, SANS 'install' ni '--scope' (journal grep)"
 else
-  ko "T2 : commande codex non conforme (exit=$EXIT2, journal='$(cat "$LOG2" 2>/dev/null)', out='$OUT2')"
+  ko "T2 : grammaire codex non conforme (exit=$EXIT2, journal='$(cat "$LOG2" 2>/dev/null)', out='$OUT2')"
 fi
 
-# enable, sur les deux runtimes — non-régression de la grammaire pour le 2e verbe actionnable.
+# T2e — le retrait de `--scope` est ANNONCÉ, jamais silencieux (mode de panne QUAL-01).
+if printf '%s' "$OUT2" | grep -qF -- "'--scope user' RETIRÉ"; then
+  ok "T2e : retrait de '--scope' annoncé sur stderr (jamais un scope silencieusement ignoré)"
+else
+  ko "T2e : retrait de '--scope' non annoncé (out='$OUT2')"
+fi
+
+# enable — non-régression claude, PUIS absence d'équivalent codex.
 : > "$LOG1"
 PATH="$FIX1:$PATH" VF_RUNTIME=claude bash "$DISPATCH" enable foo@bar --scope user >/dev/null 2>&1
 grep -qF 'plugin enable foo@bar --scope user' "$LOG1" \
-  && ok "T2b : verbe 'enable' routé identiquement sur claude" \
+  && ok "T2b : verbe 'enable' inchangé sur claude" \
   || ko "T2b : verbe 'enable' non routé sur claude (journal='$(cat "$LOG1" 2>/dev/null)')"
 
 : > "$LOG2"
-PATH="$FIX2:$PATH" VF_RUNTIME=codex bash "$DISPATCH" enable foo@bar --scope user >/dev/null 2>&1
-grep -qF 'plugin enable foo@bar --scope user' "$LOG2" \
-  && ok "T2c : verbe 'enable' routé identiquement sur codex" \
-  || ko "T2c : verbe 'enable' non routé sur codex (journal='$(cat "$LOG2" 2>/dev/null)')"
+OUT2C=$(PATH="$FIX2:$PATH" VF_RUNTIME=codex bash "$DISPATCH" enable foo@bar --scope user 2>&1)
+EXIT2C=$?
+# DISCRIMINANT double : exit 0 + étape manuelle ET journal VIDE — avant le correctif, `codex plugin
+# enable` était réellement invoqué (journal non vide) sur un verbe qui n'existe pas.
+if [ "$EXIT2C" -eq 0 ] && printf '%s' "$OUT2C" | grep -qi 'étape manuelle' \
+   && [ ! -s "$LOG2" ]; then
+  ok "T2c : verbe 'enable' sans équivalent codex → étape manuelle + exit 0, AUCUN binaire invoqué"
+else
+  ko "T2c : dégradation 'enable' codex non conforme (exit=$EXIT2C, journal='$(cat "$LOG2" 2>/dev/null)', out='$OUT2C')"
+fi
+
+# T2f — le message d'étape manuelle d'un poste codex ne propose JAMAIS une commande `claude`.
+if printf '%s' "$OUT2C" | grep -qF 'codex plugin' && ! printf '%s' "$OUT2C" | grep -qF 'claude plugin'; then
+  ok "T2f : étape manuelle codex formulée en commandes 'codex plugin', jamais 'claude plugin'"
+else
+  ko "T2f : étape manuelle codex non conforme (out='$OUT2C')"
+fi
+
+# T2d — marketplace-add : verbe identique côté codex, mais `--scope` retiré.
+: > "$LOG2"
+OUT2D=$(PATH="$FIX2:$PATH" VF_RUNTIME=codex bash "$DISPATCH" marketplace-add owner/repo --scope user 2>&1)
+EXIT2D=$?
+if [ "$EXIT2D" -eq 0 ] && grep -qF 'plugin marketplace add owner/repo' "$LOG2" \
+   && ! grep -qF -- '--scope' "$LOG2"; then
+  ok "T2d : verbe 'marketplace-add' routé sur codex SANS '--scope' (journal grep)"
+else
+  ko "T2d : 'marketplace-add' codex non conforme (exit=$EXIT2D, journal='$(cat "$LOG2" 2>/dev/null)', out='$OUT2D')"
+fi
 
 # ---------------------------------------------------------------------------
 # T3 — VF_RUNTIME=opencode, AUCUN binaire réel requis (PATH de sonde vide).
