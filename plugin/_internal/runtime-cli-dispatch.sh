@@ -26,12 +26,33 @@
 # via une variable d'environnement propriétaire d'un runtime tiers non mesurée.
 #
 # Runtimes RÉELLEMENT exécutés : `claude` (comportement actuel inchangé — `claude plugin ...`) et
-# `codex` (canal natif `codex plugin`, assumé par défaut — MÊME forme d'arguments — mais NON
-# mesuré sur le binaire réel : 38-CONTEXT.md liste en « Inconnus déclarés » que la commande exacte
-# de sous-installation Codex après `codex plugin marketplace add` n'est pas mesurée). Tout le reste
-# (opencode, kimi-code — non mesurés sur ce poste, ou runtime absent)
+# `codex` (canal natif `codex plugin`), avec DEUX GRAMMAIRES DISTINCTES — l'hypothèse « même forme
+# d'arguments » a été DÉMENTIE par la mesure (38-02-SUMMARY.md « Aucune grammaire d'install Codex
+# inventée » ; re-mesurée sur codex-cli 0.150.1 via `codex plugin --help`, `codex plugin add
+# --help`, `codex plugin marketplace add --help`) :
+#
+#   verbe VF          | claude                              | codex (MESURÉ)
+#   ------------------|-------------------------------------|--------------------------------------
+#   list-json         | claude plugin list --json           | codex plugin list --json
+#   list-text         | claude plugin list                  | codex plugin list
+#   install           | claude plugin install <id> --scope  | codex plugin add <PLUGIN[@MARKETPLACE]>
+#   marketplace-add   | claude plugin marketplace add …     | codex plugin marketplace add <SOURCE>
+#   enable            | claude plugin enable <id> --scope   | AUCUN ÉQUIVALENT
+#
+# Trois faits que cette table encode, et qu'un dispatch « même grammaire » violait :
+#   1. `codex plugin install` N'EXISTE PAS — la CLI codex n'expose que `add`, `list`,
+#      `marketplace` et `remove`. Le verbe d'install est `add`.
+#   2. `--scope` n'existe sur AUCUN verbe `codex plugin` — il est RETIRÉ de la ligne de commande,
+#      et le retrait est DIT sur stderr (un scope silencieusement ignoré est précisément le mode
+#      de panne que ce dépôt nomme depuis QUAL-01).
+#   3. `enable` n'a AUCUN équivalent côté codex (ni `enable`, ni `disable`) — on ne devine pas :
+#      étape manuelle déclarée, exactement comme pour un runtime non mesuré (RUNT-02).
+#
+# Tout le reste (opencode, kimi-code — non mesurés sur ce poste, ou runtime absent)
 # → message d'étape manuelle + exit 0 (RUNT-02 : dégradation DÉCLARÉE, jamais un crash, jamais une
-# exécution devinée pour une cible non mesurée).
+# exécution devinée pour une cible non mesurée). Le message d'étape manuelle est lui aussi
+# runtime-aware : proposer une commande `claude` sur un poste codex était le second volet du même
+# défaut.
 #
 # Contrat de sortie des verbes ACTIONNABLES (install/enable/marketplace-add) : sur runtime
 # claude/codex, le code de sortie ET le stderr du sous-processus RÉEL sont RELAYÉS tels quels —
@@ -85,37 +106,100 @@ detect_agent_runtime() {
   printf '%s' ""
 }
 
-# ---------- Message d'étape manuelle (runtime non supporté ou absent) ----------
+# ---------- Message d'étape manuelle (verbe sans équivalent, runtime non supporté ou absent) ----
+# Runtime-aware : sur un poste codex, suggérer une commande `claude` était le second volet du
+# défaut « grammaire supposée » — le lecteur du message ne l'a pas, et la copier échoue.
 manual_step_message() {
   local action="$1" arg="$2" scope="$3" detected="$4"
   local name="${arg%%@*}"
   {
-    if [ -n "$detected" ]; then
-      echo "[runtime-cli-dispatch] runtime détecté ('$detected') non supporté pour le dispatch CLI automatique (OpenCode/kimi-code : non mesurés sur ce poste, RUNT-02) — geste manuel requis."
-    else
-      echo "[runtime-cli-dispatch] aucun runtime CLI détecté — geste manuel requis."
-    fi
-    case "$action" in
-      install)
-        echo "  Étape manuelle ($name) : claude plugin install $arg${scope:+ --scope $scope} (ou l'équivalent CLI de votre runtime)"
+    case "$detected" in
+      codex)
+        echo "[runtime-cli-dispatch] runtime 'codex' : ce verbe n'a AUCUN équivalent dans la CLI codex (verbes réels : add, list, marketplace, remove) — geste manuel requis."
         ;;
-      enable)
-        echo "  Étape manuelle ($name) : claude plugin enable $arg${scope:+ --scope $scope} (ou l'équivalent CLI de votre runtime)"
+      "")
+        echo "[runtime-cli-dispatch] aucun runtime CLI détecté — geste manuel requis."
         ;;
-      marketplace-add)
-        echo "  Étape manuelle (marketplace $arg) : claude plugin marketplace add $arg${scope:+ --scope $scope} (ou l'équivalent CLI de votre runtime)"
+      *)
+        echo "[runtime-cli-dispatch] runtime détecté ('$detected') non supporté pour le dispatch CLI automatique (OpenCode/kimi-code : non mesurés sur ce poste, RUNT-02) — geste manuel requis."
         ;;
     esac
+    if [ "$detected" = "codex" ]; then
+      case "$action" in
+        install)
+          echo "  Étape manuelle ($name) : codex plugin add $arg"
+          ;;
+        enable)
+          echo "  Étape manuelle ($name) : codex n'expose aucun verbe d'activation. Vérifier la présence du plugin (codex plugin list --json), puis l'ajouter s'il est absent (codex plugin add $arg)."
+          ;;
+        marketplace-add)
+          echo "  Étape manuelle (marketplace $arg) : codex plugin marketplace add $arg"
+          ;;
+      esac
+    else
+      case "$action" in
+        install)
+          echo "  Étape manuelle ($name) : claude plugin install $arg${scope:+ --scope $scope} (ou l'équivalent CLI de votre runtime)"
+          ;;
+        enable)
+          echo "  Étape manuelle ($name) : claude plugin enable $arg${scope:+ --scope $scope} (ou l'équivalent CLI de votre runtime)"
+          ;;
+        marketplace-add)
+          echo "  Étape manuelle (marketplace $arg) : claude plugin marketplace add $arg${scope:+ --scope $scope} (ou l'équivalent CLI de votre runtime)"
+          ;;
+      esac
+    fi
   } >&2
 }
 
+# ---------- Grammaire par runtime : quels verbes existent RÉELLEMENT ----------
+# runtime_supports_verb <runtime> <verbe> — 0 si le runtime porte ce verbe, 1 sinon (l'appelant
+# bascule alors sur l'étape manuelle DÉCLARÉE, jamais sur une commande devinée).
+# Seul cas à 1 aujourd'hui : `enable` sur codex — la CLI codex n'expose ni `enable` ni `disable`
+# (mesuré : `codex plugin --help` liste add / list / marketplace / remove, et rien d'autre).
+runtime_supports_verb() {
+  local runtime="$1" verb="$2"
+  if [ "$runtime" = "codex" ] && [ "$verb" = "enable" ]; then
+    return 1
+  fi
+  return 0
+}
+
+# strip_scope <args...> — réécrit argv SANS la paire `--scope <valeur>`, résultat dans
+# STRIPPED_ARGS[]. Aucun verbe `codex plugin` n'accepte `--scope` (mesuré) : le passer ferait
+# échouer la commande sur un argument inconnu.
+STRIPPED_ARGS=()
+strip_scope() {
+  STRIPPED_ARGS=()
+  while [ "$#" -gt 0 ]; do
+    if [ "$1" = "--scope" ]; then
+      shift
+      [ "$#" -gt 0 ] && shift
+      continue
+    fi
+    STRIPPED_ARGS+=("$1")
+    shift
+  done
+}
+
+# announce_scope_dropped <scope> <commande-codex> — un scope RETIRÉ se DIT. Un scope silencieusement
+# ignoré ferait croire à une install scopée qui n'a pas eu lieu (mode de panne QUAL-01).
+announce_scope_dropped() {
+  local scope="$1" cmd="$2"
+  [ -n "$scope" ] || return 0
+  echo "[runtime-cli-dispatch] codex : '--scope $scope' RETIRÉ — aucun verbe 'codex plugin' n'accepte --scope (mesuré). Commande exécutée : $cmd" >&2
+}
+
 # ---------- Construction + exécution d'un verbe CLI sur un runtime SUPPORTÉ ----------
-# claude/codex partagent la MÊME grammaire d'arguments (assumé par défaut, non mesuré sur le
-# binaire réel — 38-CONTEXT.md). Le code de
-# sortie et le stderr du sous-processus réel sont relayés tels quels — jamais avalés.
+# DEUX grammaires distinctes (cf. table en tête de fichier) — jamais une forme supposée commune.
+# Le code de sortie et le stderr du sous-processus réel sont relayés tels quels — jamais avalés.
 run_supported() {
   local runtime="$1" action="$2"
   shift 2
+  if [ "$runtime" = "codex" ]; then
+    run_codex "$action" "$@"
+    return $?
+  fi
   case "$action" in
     list-json)      "$runtime" plugin list --json ;;
     list-text)      "$runtime" plugin list ;;
@@ -124,6 +208,39 @@ run_supported() {
     marketplace-add) "$runtime" plugin marketplace add "$@" ;;
     *)
       echo "[runtime-cli-dispatch] verbe inconnu : $action" >&2
+      return 2
+      ;;
+  esac
+}
+
+# run_codex <verbe> <args...> — grammaire MESURÉE sur codex-cli 0.150.1. `enable` n'arrive jamais
+# ici (filtré en amont par runtime_supports_verb).
+run_codex() {
+  local action="$1" scope=""
+  shift
+  # Scope relevé AVANT retrait, pour pouvoir annoncer ce qui est perdu.
+  local i args=("$@")
+  for ((i = 0; i < ${#args[@]}; i++)); do
+    if [ "${args[$i]}" = "--scope" ] && [ $((i + 1)) -lt ${#args[@]} ]; then
+      scope="${args[$((i + 1))]}"
+      break
+    fi
+  done
+  case "$action" in
+    list-json) codex plugin list --json ;;
+    list-text) codex plugin list ;;
+    install)
+      strip_scope "$@"
+      announce_scope_dropped "$scope" "codex plugin add ${STRIPPED_ARGS[*]-}"
+      codex plugin add ${STRIPPED_ARGS[@]+"${STRIPPED_ARGS[@]}"}
+      ;;
+    marketplace-add)
+      strip_scope "$@"
+      announce_scope_dropped "$scope" "codex plugin marketplace add ${STRIPPED_ARGS[*]-}"
+      codex plugin marketplace add ${STRIPPED_ARGS[@]+"${STRIPPED_ARGS[@]}"}
+      ;;
+    *)
+      echo "[runtime-cli-dispatch] verbe inconnu (codex) : $action" >&2
       return 2
       ;;
   esac
@@ -228,6 +345,12 @@ case "$VERB" in
     done
     case "$RUNTIME" in
       claude | codex)
+        # Un runtime supporté peut malgré tout ne PAS porter ce verbe (codex n'a aucun `enable`) :
+        # étape manuelle déclarée + exit 0, jamais une commande devinée ni un faux succès.
+        if ! runtime_supports_verb "$RUNTIME" "$VERB"; then
+          manual_step_message "$VERB" "$ARG" "$SCOPE" "$RUNTIME"
+          exit 0
+        fi
         run_supported "$RUNTIME" "$VERB" "$@"
         exit $?
         ;;

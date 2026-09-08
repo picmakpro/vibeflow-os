@@ -8,6 +8,11 @@ Cette page est la **source unique** de la procédure d'installation dans le manu
 regroupe en un seul endroit tout ce qu'il faut savoir pour poser VibeFlow, du premier caractère
 tapé jusqu'à l'écran qui confirme que ça a marché.
 
+Elle décrit le chemin **Claude Code**, le runtime de référence. VibeFlow s'installe et tourne
+aussi sur **Codex** et **kimi-code** : commandes, préconditions et pertes déclarées sur
+[autres-runtimes.md](./autres-runtimes.md). Tout ce qui suit la pose du plugin — configuration,
+scopes, modules — y est identique.
+
 ## Les deux commandes
 
 Ouvre un terminal (ou la fenêtre de commande de Claude Code) et tape, dans l'ordre :
@@ -95,10 +100,11 @@ dev » pour démarrer.
 Tu n'as besoin de rien retenir par cœur : chaque étape se termine par une indication claire de ce
 qu'il faut faire ensuite.
 
-**Étape suivante.** Une page dédiée de ce thème détaille l'arbitrage entre les trois scopes si tu
-hésites encore avant de lancer `/vibeflow-install`. Sinon, une fois l'installation terminée, la
-suite de ce thème t'attend pour savoir quoi faire dans le quart d'heure qui suit.
+**Étape suivante.** Si tu n'es pas sous Claude Code, [autres-runtimes.md](./autres-runtimes.md)
+donne les commandes équivalentes. Sinon, une page dédiée de ce thème détaille l'arbitrage entre
+les trois scopes si tu hésites encore avant de lancer `/vibeflow-install`, puis la suite du thème
+t'attend pour savoir quoi faire dans le quart d'heure qui suit.
 
 <!-- vf-manual:nav -->
-[← Précédent](../01-demarrer/prerequis.md) · [↑ Sommaire](../README.md) · [Suivant →](../01-demarrer/choisir-son-scope.md)
+[← Précédent](../01-demarrer/prerequis.md) · [↑ Sommaire](../README.md) · [Suivant →](../01-demarrer/autres-runtimes.md)
 <!-- /vf-manual:nav -->

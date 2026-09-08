@@ -768,15 +768,25 @@ SH
       chmod +x "$T9H_BIN/$_t9h_rt"
     done
 
-    for _t9h_rt in claude codex; do
-      : >"$T9H_JOURNAL"
-      PATH="$T9H_BIN:/usr/bin:/bin" VF_RUNTIME="$_t9h_rt" bash "$T9H_DIR/ensure-design-deps.sh" >/dev/null 2>&1
-      if "$GREP" -qF "$_t9h_rt plugin install superpowers@claude-plugins-official --scope user" "$T9H_JOURNAL"; then
-        ok "T9h dispatch réel : VF_RUNTIME=$_t9h_rt -> \`$_t9h_rt plugin install superpowers@claude-plugins-official --scope user\` capturé depuis une exécution réelle"
-      else
-        ko "T9h dispatch réel : VF_RUNTIME=$_t9h_rt attendu dans le journal, obtenu : $(cat "$T9H_JOURNAL")"
-      fi
-    done
+    # Les deux runtimes ont des GRAMMAIRES DISTINCTES (mesuré : `codex plugin install` n'existe
+    # pas, aucun verbe `codex plugin` n'accepte `--scope`) — chaque attente est donc écrite pour
+    # son runtime, jamais dérivée de l'autre par substitution de nom.
+    : >"$T9H_JOURNAL"
+    PATH="$T9H_BIN:/usr/bin:/bin" VF_RUNTIME=claude bash "$T9H_DIR/ensure-design-deps.sh" >/dev/null 2>&1
+    if "$GREP" -qF "claude plugin install superpowers@claude-plugins-official --scope user" "$T9H_JOURNAL"; then
+      ok "T9h dispatch réel : VF_RUNTIME=claude -> \`claude plugin install superpowers@claude-plugins-official --scope user\` capturé depuis une exécution réelle"
+    else
+      ko "T9h dispatch réel : VF_RUNTIME=claude attendu dans le journal, obtenu : $(cat "$T9H_JOURNAL")"
+    fi
+
+    : >"$T9H_JOURNAL"
+    PATH="$T9H_BIN:/usr/bin:/bin" VF_RUNTIME=codex bash "$T9H_DIR/ensure-design-deps.sh" >/dev/null 2>&1
+    if "$GREP" -qF "codex plugin add superpowers@claude-plugins-official" "$T9H_JOURNAL" \
+       && ! "$GREP" -qF "codex plugin install" "$T9H_JOURNAL"; then
+      ok "T9h dispatch réel : VF_RUNTIME=codex -> \`codex plugin add superpowers@claude-plugins-official\` capturé depuis une exécution réelle (verbe \`install\` absent, grammaire codex mesurée)"
+    else
+      ko "T9h dispatch réel : VF_RUNTIME=codex attendu dans le journal, obtenu : $(cat "$T9H_JOURNAL")"
+    fi
 
     # Non-régression du test lui-même : SANS runtime-cli-dispatch.sh à côté, le chemin dispatch ne
     # doit PLUS être exercé — VF_RUNTIME=codex doit retomber sur la branche de repli `claude`
@@ -785,7 +795,7 @@ SH
     rm -f "$T9H_DIR/runtime-cli-dispatch.sh"
     : >"$T9H_JOURNAL"
     PATH="$T9H_BIN:/usr/bin:/bin" VF_RUNTIME=codex bash "$T9H_DIR/ensure-design-deps.sh" >/dev/null 2>&1
-    if "$GREP" -qF "codex plugin install" "$T9H_JOURNAL"; then
+    if "$GREP" -qF "codex plugin" "$T9H_JOURNAL"; then
       ko "T9h non-régression : sans runtime-cli-dispatch.sh à côté, 'codex' a quand même été invoqué — le test ne prouve plus le chemin dispatch"
     else
       ok "T9h non-régression : sans runtime-cli-dispatch.sh à côté, repli sur la branche 'claude' figée (le chemin dispatch n'est PAS exercé par erreur)"

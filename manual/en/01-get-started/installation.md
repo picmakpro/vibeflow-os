@@ -8,6 +8,11 @@ This page is the manual's **single source of truth** for the installation proced
 in one place everything you need to know to set up VibeFlow, from the first character you type to
 the screen that confirms it worked.
 
+It describes the **Claude Code** path, the reference runtime. VibeFlow also installs and runs on
+**Codex** and **kimi-code**: commands, preconditions and stated losses live in
+[other-runtimes.md](./other-runtimes.md). Everything after the plugin is in place — configuration,
+scopes, modules — is identical there.
+
 ## The two commands
 
 Open a terminal (or Claude Code's command window) and type, in order:
@@ -91,11 +96,11 @@ chose a development lab, you're invited to simply say "help me dev" to get start
 
 You don't need to memorize anything: each step ends with a clear pointer to what comes next.
 
-**Next step.** A dedicated page later in this theme details the trade-off between the three
-scopes if you're still unsure before running `/vibeflow-install`. Otherwise, once setup is
-complete, the rest of this theme is waiting to tell you what to do in the fifteen minutes that
-follow.
+**Next step.** If you are not on Claude Code, [other-runtimes.md](./other-runtimes.md) gives the
+equivalent commands. Otherwise, a dedicated page later in this theme details the trade-off between
+the three scopes if you're still unsure before running `/vibeflow-install`, and then the rest of
+this theme is waiting to tell you what to do in the fifteen minutes that follow.
 
 <!-- vf-manual:nav -->
-[← Previous](../01-get-started/prerequisites.md) · [↑ Contents](../README.md) · [Next →](../01-get-started/choosing-your-scope.md)
+[← Previous](../01-get-started/prerequisites.md) · [↑ Contents](../README.md) · [Next →](../01-get-started/other-runtimes.md)
 <!-- /vf-manual:nav -->

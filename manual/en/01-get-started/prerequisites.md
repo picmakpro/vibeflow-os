@@ -9,13 +9,19 @@ exotic: these are common tools, and the installer checks them itself the first t
 
 ## What you need
 
-### 1. Claude Code, up to date
+### 1. An agent runtime — Claude Code by default
 
-VibeFlow is a **Claude Code plugin** — it doesn't work without it. You need Claude Code installed
-and recent enough that the `claude plugin` command exists. If you type `claude plugin` in a
-terminal and the command isn't recognized, update Claude Code before continuing: this is the most
-common cause of installation issues (a dedicated troubleshooting guide for these blockers will
-round out this theme).
+Claude Code is VibeFlow's **reference runtime**: the one where the whole surface is covered,
+governance hooks included. You need it installed and recent enough that the `claude plugin`
+command exists. If you type `claude plugin` in a terminal and the command isn't recognized, update
+Claude Code before continuing: this is the most common cause of installation issues (a dedicated
+troubleshooting guide for these blockers will round out this theme).
+
+VibeFlow is no longer **locked to it**, though: install and usage have been measured end to end on
+**Codex** (native `codex plugin` channel) and on **kimi-code** (per-file agent loading). The
+commands, the environment preconditions and what gets lost on each target are covered in
+[other-runtimes.md](./other-runtimes.md). The three tools below are required whatever the runtime
+is.
 
 ### 2. Three command-line tools
 
@@ -46,7 +52,8 @@ it's the only case that requires an extra install step.
 
 You don't need any private account, any manual repository clone, or any `gh` (the GitHub
 command-line tool) authentication. Installation happens entirely through the `claude plugin`
-commands — see [installation.md](./installation.md).
+commands — see [installation.md](./installation.md) — or their equivalent on another runtime,
+see [other-runtimes.md](./other-runtimes.md).
 
 ## The Windows case
 

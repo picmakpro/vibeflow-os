@@ -54,6 +54,7 @@ flowchart LR
 ### Getting Started
 - [Prerequisites](./01-get-started/prerequisites.md)
 - [Installation](./01-get-started/installation.md)
+- [Installing outside Claude Code](./01-get-started/other-runtimes.md)
 - [Choosing your scope](./01-get-started/choosing-your-scope.md)
 - [Your first session](./01-get-started/your-first-session.md)
 - [Your first lab](./01-get-started/your-first-lab.md)

@@ -96,5 +96,5 @@ situations, and the right one for you depends entirely on how you work, not on s
 best practice.
 
 <!-- vf-manual:nav -->
-[← Previous](../01-get-started/installation.md) · [↑ Contents](../README.md) · [Next →](../01-get-started/your-first-session.md)
+[← Previous](../01-get-started/other-runtimes.md) · [↑ Contents](../README.md) · [Next →](../01-get-started/your-first-session.md)
 <!-- /vf-manual:nav -->

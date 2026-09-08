@@ -1,5 +1,21 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.5.6] — 2026-09-08 (grammaire Codex mesurée — attente de test réécrite)
+
+**Patch** — aucune logique du module ne change ; seule l'attente de `T9h` est corrigée.
+
+- **`scripts/tests/test-design-orchestrator.sh`** : `T9h` dérivait l'attente Codex de celle de
+  `claude` par simple substitution de nom (`$_t9h_rt plugin install … --scope user` pour les deux
+  runtimes). Cette forme est **fausse côté Codex** — mesuré : `codex plugin install` n'existe pas
+  et aucun verbe `codex plugin` n'accepte `--scope`. Le test **verrouillait donc le défaut** que
+  `plugin/_internal/runtime-cli-dispatch.sh` vient de corriger (racine v2.59.2). Les deux runtimes
+  ont désormais chacun leur attente écrite pour leur propre grammaire, et l'assertion Codex exige
+  en plus l'**absence** du verbe `install` — sans quoi elle resterait verte sur la grammaire
+  fautive. La non-régression « sans `runtime-cli-dispatch.sh` à côté, le chemin dispatch n'est pas
+  exercé » cherche maintenant `codex plugin` plutôt que `codex plugin install`, qui ne pouvait
+  plus apparaître et rendait donc ce garde vert sans rien prouver.
+- Suite inchangée en volume : **29 cas**, 29 OK.
+
 ## [v1.5.5] — 2026-08-30 (Phase 38 — correction ciblée, dernier agent rejeté par kimi)
 
 **Patch** :
