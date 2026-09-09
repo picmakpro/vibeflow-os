@@ -1267,8 +1267,9 @@ humains travaillent en parallèle sur des feuilles de route disjointes — et to
 du milestone reste à trancher. **Condition dure conservée d'ADR-069 : aucune partition tant qu'une
 phase est en vol** — c'est une condition d'exécution, pas une dépendance de phase.
 
-**Requirements**: **à ledgeriser au cadrage** — famille `WSTR-xx` proposée, **préfixe libre
-(re-dérivé le 2026-09-09)**. **Correction de la dérivation** : les préfixes occupés de
+**Requirements**: **Famille `PART-01`→`PART-09`** (ledgerisée au plan le 2026-09-09,
+`39-02-PLAN.md`) — **`PART`, pas `WSTR`** (arbitrage de lisibilité, `39-CONTEXT.md` D-07 : voisinage
+avec `WKTR`/`WTCH`). **Correction de la dérivation** qui a précédé ce choix : les préfixes occupés de
 `REQUIREMENTS.md` sont **40**, pas 42 — le « 42 » comptait deux faux positifs, `STATUT-BLOC-3` lu
 comme un `BLOC-3` et les chemins de dossier de phase `VFDO-xx`. Le même biais explique le « 36 »
 d'une date antérieure (34 réels + les deux mêmes). **Et le ledger ne suffit pas à dériver l'espace
