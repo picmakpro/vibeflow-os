@@ -464,6 +464,33 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
 
+- **2026-09-09 — Phase 39 (Workstreams), quatre arbitrages de cadrage.** Rendus par Samuel après
+  escalade du manager de mission, sur mesures de première main (détail :
+  `.planning/research/2026-09-09-phase-39-workstreams-mesures-de-cadrage.md`).
+
+  1. **`GSDA-19` : re-rédiger en BUG DE COMPORTEMENT**, sur le défaut mesuré — `PROJECT.md` n'est
+     jamais résolu sous un workstream (`init.progress --ws default` rend `project_exists: false` en
+     pointant `.planning/workstreams/default/PROJECT.md`, alors que le fichier est là où la
+     migration officielle l'a laissé). L'angle « descripteur non descriptif » est **abandonné** : il
+     est court-circuité par `#4455`/`#4456`/`#4225`, bugs de comportement acceptés en amont les 7-8
+     septembre. **Le dépôt de l'issue reste le geste de Samuel** — la phase rédige, elle ne poste pas.
+
+  2. **Compensation VF : MINIMALE.** VF passe `--ws` explicitement sur chacun de ses propres appels
+     `gsd_run` ; **aucun workflow amont n'est réécrit** (une couche de réparation deviendrait dette
+     morte à chaque correctif publié en face). Plus une **veille datée sur un ÉVÉNEMENT** — la
+     publication de la prochaine version de `gsd-core`, qui distribuera les trois correctifs — et
+     **jamais sur un seuil chiffré** (précédent : une veille à seuil figé devenue faux positif
+     permanent). **« Couverture amont figée » est FAUX comme propriété stable.**
+
+  3. **Préfixe d'exigences : `PART`** (`PART-01…`), pas `WSTR`. Motif : voisinage visuel avec `WKTR`
+     (worktree, vivant) et `WTCH`, dans la phase même qui fera cohabiter workstream et worktree à
+     répétition. `WSTR` était techniquement libre — c'est un arbitrage de lisibilité, pris avant que
+     treize identifiants soient gravés.
+
+  4. **Critère de succès 3 : TOUS les agents** dispatchés dans le run de preuve passent `--ws`, sans
+     exception — jamais « au moins un par étage ». Motif : `GSDA-15` (le câblage) est **close** avec
+     une observance mesurée **nulle** ; l'énoncé doit être **insatisfaisable à vide**.
+
 - **2026-09-09 — Phase 39 (Workstreams), paradoxe d'auto-application : option A′.** Arbitrage
   humain rendu par Samuel au cadrage, escaladé par le manager de mission (le paradoxe : ADR-069
   interdit toute partition « tant qu'une phase est en vol », or la Phase 39 est en vol pendant
