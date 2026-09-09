@@ -1267,10 +1267,15 @@ humains travaillent en parallèle sur des feuilles de route disjointes — et to
 du milestone reste à trancher. **Condition dure conservée d'ADR-069 : aucune partition tant qu'une
 phase est en vol** — c'est une condition d'exécution, pas une dépendance de phase.
 
-**Requirements**: **à ledgeriser au cadrage** — famille `WSTR-xx` proposée, **préfixe vérifié libre
-le 2026-09-09** contre les 42 préfixes occupés de `REQUIREMENTS.md` — un préfixe suggéré par un
-document de cadrage n'est **jamais** un préfixe libre tant que l'espace de noms n'a pas été dérivé
-(précédent `PORT-xx`, Phase 38). `GSDA-13`→`GSDA-19` sont **closes** : elles portent les gardes, **pas** l'adoption — ne pas
+**Requirements**: **à ledgeriser au cadrage** — famille `WSTR-xx` proposée, **préfixe libre
+(re-dérivé le 2026-09-09)**. **Correction de la dérivation** : les préfixes occupés de
+`REQUIREMENTS.md` sont **40**, pas 42 — le « 42 » comptait deux faux positifs, `STATUT-BLOC-3` lu
+comme un `BLOC-3` et les chemins de dossier de phase `VFDO-xx`. Le même biais explique le « 36 »
+d'une date antérieure (34 réels + les deux mêmes). **Et le ledger ne suffit pas à dériver l'espace
+de noms** : la famille `SIG-01`→`SIG-06` (Phase 17) est livrée, citée dans les PLAN/SUMMARY et
+gravée dans des en-têtes de scripts, mais **absente des deux ledgers** — vivant et archivé. Espace
+réellement occupé : **41 familles**. Un préfixe suggéré par un document de cadrage n'est **jamais**
+un préfixe libre tant que l'espace de noms n'a pas été dérivé (précédent `PORT-xx`, Phase 38). `GSDA-13`→`GSDA-19` sont **closes** : elles portent les gardes, **pas** l'adoption — ne pas
 les rouvrir.
 
 **Success Criteria** (what must be TRUE):
@@ -1300,21 +1305,48 @@ les rouvrir.
      ancrées à la racine (`FORBIDDEN_RE="^\.planning/(phases|quick|research|…)/"`,
      `STRUCTURAL_RE="^\.planning/(STATE|ROADMAP|…)\.md$"`, `pr-branch.md:250-270`), et le mode par
      défaut **préserve et signale** explicitement ce qui est sous `.planning/workstreams/` (bloc
-     `$OTHER`). Conséquences à trancher : (i) la disparition silencieuse n'est plus le mode d'échec
-     — le silence est levé ; (ii) en revanche le **filtre transient ne voit plus rien** sous
-     `workstreams/` (`.planning/workstreams/<nom>/phases/**` n'est plus filtré), donc les artefacts
-     de bruit **entreraient** dans les branches de PR d'un dépôt partitionné ; (iii) en mode
-     `pr_strict`, tout `.planning/` est exclu, workstreams compris. *(risque (b) d'ADR-069,
-     re-mesuré et inversé — ne pas replanifier contre l'ancien libellé)*
+     `$OTHER`). **Les trois conséquences ont été mesurées au cadrage, workflow EXÉCUTÉ sur un dépôt
+     partitionné jetable — verdict : deux vraies, une fausse à moitié.**
+     **(i) FAUSSE À MOITIÉ, et c'est le fait le plus important de la phase.** Le silence est levé au
+     niveau **chemin** (bloc `$OTHER`), mais il **subsiste au niveau COMMIT** :
+     `.planning/workstreams/<nom>/ROADMAP.md` **ne matche pas** `STRUCTURAL_RE` (ancré
+     `^\.planning/ROADMAP\.md$`), donc un commit qui ne touche **que** la feuille de route d'un
+     workstream sort à `NON_PLANNING=0, STRUCTURAL=0` → classé « transient planning commit » →
+     **EXCLU DANS LES DEUX MODES**, et il n'apparaît dans aucun rapport (il n'est jamais dans le
+     diff, seulement dans un compteur anonyme). **Le commit de feuille de route d'un workstream
+     disparaît donc toujours silencieusement** : le risque (b) n'a pas disparu, il a **migré** du
+     filtre de chemin vers la **classification de commit**.
+     **(ii) VRAIE**, mesurée — mais uniquement via les **commits mixtes** (code + planning de
+     workstream), qui sont le cas nominal du travail réel.
+     **(iii) VRAIE**, mesurée. *(risque (b) d'ADR-069 — re-mesuré deux fois : ne replanifier ni
+     contre le libellé de 2026-08-04, ni contre celui de l'inscription au ROADMAP)*
 
   6. La **couverture amont** est **re-mesurée à la date du cadrage** et la remontée `GSDA-19` est
      **postée ou explicitement abandonnée avec trace**. *(risque (a) d'ADR-069)*
 
-**Mesure de première main du 2026-09-09** (`@opengsd/gsd-core` **1.13.0** installé, 89 workflows
-racine) : **7 conscients** des workstreams (7,9 %), **43** à chemins `.planning/` en dur, **40
-aveugles** (en dur **et** sans aucune conscience). Comparé au 2026-08-30 (1.11.0 : 6/88, 43 en dur,
-41 aveugles) et au 2026-08-04 (1.9.1 : 7/91) : **la couverture amont n'a pas bougé en cinq
-semaines**. Ce chiffre est le fait qui commande le périmètre — c'est le lab qui devra combler, pas
-l'amont.
+**Mesure de première main du 2026-09-09, RE-MESURÉE ET CORRIGÉE au cadrage**
+(`@opengsd/gsd-core` **1.13.0** installé, **89** workflows racine — `*.md` à profondeur 1 sous
+`workflows/`) :
+
+- Le relevé « **7 conscients** » est un comptage **lexical** (le mot `workstream` présent). Au
+  critère dont se réclame `GSDA-19` — « sait résoudre un scope », donc `--ws` compris — c'est
+  **9 / 89**. L'écart est nominatif : `plan-review-convergence.md` et `verify-work.md` parsent et
+  assignent `--ws` **sans jamais écrire le mot** ; à l'inverse `health.md` et `pr-branch.md` ne
+  comptent que par de la **prose**. **43** chemins `.planning/` en dur (stable), **39** aveugles au
+  critère `--ws`.
+- **« La couverture amont n'a pas bougé en cinq semaines » est vraie par accident** : la phrase
+  compare un comptage lexical de 2026-09-09 à un autre critère de 2026-08-04. Les ensembles, eux,
+  ont bougé. **Ne pas graver « couverture figée » comme une propriété stable.**
+- **L'amont n'est pas immobile** : trois correctifs de workstream **fermés les 7-8 septembre 2026**
+  (`#4455` chemins racine lus/écrits après résolution du workstream, `#4456` `--ws` non propagé par
+  `new-milestone`, `#4225` `phase.add` ignore `--ws`) — mais **non distribués** : 1.13.0 est publiée
+  le 2026-09-06. La couverture bougera mécaniquement à la prochaine release.
+
+**Le fait qui commande réellement le périmètre n'est pas le comptage** : huit workflows du cœur de
+chaîne (`discuss-phase`, `plan-phase`, `execute-phase`, `progress`, `ship`, `quick`,
+`resume-project`, `validate-phase`) **interpolent `${GSD_WS}` dans leur texte de routage sans jamais
+l'assigner** — la « propagation de routage » amont est une convention de **prompt**, pas un câblage
+machine : elle tient si l'agent substitue, elle casse **en silence** sinon. C'est cela que le lab
+doit combler, pour la version installée.
 
 **Plans**: TBD

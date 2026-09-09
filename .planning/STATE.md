@@ -193,15 +193,23 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
   aucun agent `vf-*` ne passe `--ws`. Périmètre du 2026-08-30 reporté tel quel : adoption + filet de
   détection, recherche préalable sur le fonctionnement réel de GSD, cible multi-sessions **et**
   multi-humains, shim de redirection écarté. Exigences **non gravées** — famille `WSTR-xx` proposée,
-  préfixe vérifié libre contre les 42 préfixes occupés du ledger ; à ledgeriser au cadrage.
+  préfixe libre ; à ledgeriser au cadrage. **Dérivation corrigée au cadrage** : **40** préfixes
+  occupés, pas 42 (le « 42 » comptait `STATUT-BLOC-3` et les chemins de phase `VFDO-xx`), et le
+  ledger ne suffit pas — `SIG-01`→`SIG-06` est livrée mais absente des **deux** ledgers, donc
+  **41 familles** réellement occupées.
   **Deux mesures de première main faites à l'inscription** (`@opengsd/gsd-core` **1.13.0**
-  installé) : (1) couverture amont **7 conscients / 89 workflows** (7,9 %), 43 chemins en dur, **40
-  aveugles** — inchangée depuis cinq semaines (1.11.0 : 6/88 ; 1.9.1 : 7/91) ; (2) le **risque (b)
-  d'ADR-069 a muté** — les regex de `pr-branch.md:250-270` sont ancrées à la racine et le mode par
-  défaut **préserve et signale** `.planning/workstreams/`, donc la disparition *silencieuse* des
-  commits de feuille de route n'est plus le mode d'échec ; le mode d'échec est désormais l'inverse
-  (le filtre transient ne voit plus rien sous `workstreams/`). Ne pas replanifier contre l'ancien
-  libellé. **Note d'outillage** : `gsd-tools query phase.add` a proposé le numéro **40** (il compte
+  installé), **toutes deux re-mesurées et CORRIGÉES au cadrage du 2026-09-09** : (1) « 7 conscients
+  / 89 » est un comptage **lexical** — au critère « sait résoudre un scope » (`--ws` compris) c'est
+  **9/89**, 43 en dur, **39** aveugles ; et « inchangée depuis cinq semaines » **compare deux
+  critères différents**, donc n'est vraie que par accident. L'amont n'est d'ailleurs pas immobile
+  (trois correctifs de workstream fermés les 7-8 sept., **non distribués** — 1.13.0 date du 6). Le
+  vrai trou est ailleurs : **huit workflows du cœur de chaîne interpolent `${GSD_WS}` sans jamais
+  l'assigner** — la propagation amont est une convention de **prompt**, pas un câblage.
+  (2) le **risque (b) d'ADR-069 a muté**, mais pas comme écrit : le silence est levé au niveau
+  **chemin** (bloc `$OTHER`) et **subsiste au niveau COMMIT** — un commit ne touchant que
+  `.planning/workstreams/<nom>/ROADMAP.md` est **exclu dans les DEUX modes** sans apparaître dans
+  aucun rapport. Le risque a **migré**, il n'a pas disparu. Ne replanifier ni contre le libellé de
+  2026-08-04, ni contre celui de l'inscription. **Note d'outillage** : `gsd-tools query phase.add` a proposé le numéro **40** (il compte
   le dossier 39 vide comme une phase existante) et reformaté trois listes du ROADMAP au passage —
   l'appel a été annulé, le dossier 40 supprimé, l'entrée écrite à la main sur le gabarit du repo.
   Rang dans la file (avant ou après les Phases 34 et 25) **non tranché**.
