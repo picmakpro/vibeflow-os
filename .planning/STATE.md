@@ -185,6 +185,26 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 
 ### Roadmap Evolution
 
+- 2026-09-09 : **Phase 39 inscrite au ROADMAP — Workstreams : partition du planning et
+  collaboration concurrente** (demande de Samuel). La phase existait depuis le 2026-08-30 comme
+  **dossier vide non commité** (`.planning/phases/VFDO-39-workstreams-.../.gitkeep`), absente du
+  ROADMAP, sans cadrage ni plan. Rappel du fond : l'**adoption** est tranchée depuis le 2026-08-04
+  (arbitrage Phase 24, zone 5) mais la Phase 24 n'a livré que les **gardes** — aucun lab partitionné,
+  aucun agent `vf-*` ne passe `--ws`. Périmètre du 2026-08-30 reporté tel quel : adoption + filet de
+  détection, recherche préalable sur le fonctionnement réel de GSD, cible multi-sessions **et**
+  multi-humains, shim de redirection écarté. Exigences **non gravées** — famille `WSTR-xx` proposée,
+  préfixe vérifié libre contre les 42 préfixes occupés du ledger ; à ledgeriser au cadrage.
+  **Deux mesures de première main faites à l'inscription** (`@opengsd/gsd-core` **1.13.0**
+  installé) : (1) couverture amont **7 conscients / 89 workflows** (7,9 %), 43 chemins en dur, **40
+  aveugles** — inchangée depuis cinq semaines (1.11.0 : 6/88 ; 1.9.1 : 7/91) ; (2) le **risque (b)
+  d'ADR-069 a muté** — les regex de `pr-branch.md:250-270` sont ancrées à la racine et le mode par
+  défaut **préserve et signale** `.planning/workstreams/`, donc la disparition *silencieuse* des
+  commits de feuille de route n'est plus le mode d'échec ; le mode d'échec est désormais l'inverse
+  (le filtre transient ne voit plus rien sous `workstreams/`). Ne pas replanifier contre l'ancien
+  libellé. **Note d'outillage** : `gsd-tools query phase.add` a proposé le numéro **40** (il compte
+  le dossier 39 vide comme une phase existante) et reformaté trois listes du ROADMAP au passage —
+  l'appel a été annulé, le dossier 40 supprimé, l'entrée écrite à la main sur le gabarit du repo.
+  Rang dans la file (avant ou après les Phases 34 et 25) **non tranché**.
 - 2026-08-28 : **Phase 38 ajoutée — Portabilité multi-runtime, livraison** (décision de Samuel, option
   « phase à part » recommandée par `ETUDE-CANAL-ET-MIGRATION.md`). Six lots candidats : gate de fidélité,
   installeur multi-runtime, trou de `rollback`, `--target` (payload 198 fichiers / 1130 occurrences),
