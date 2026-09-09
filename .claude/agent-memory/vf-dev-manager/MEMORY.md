@@ -56,3 +56,4 @@
 - [Filtre de vérification = angle mort](feedback_filtre-de-verification-fabrique-l-angle-mort.md) — `git status | grep -v` maison : « arbre propre » rapporté, 3 fichiers non commités
 - [Description frontmatter : contrainte en ciseaux](project_description-frontmatter-contrainte-en-ciseaux.md) — mono-ligne pour gsd-core, YAML valide pour kimi : seul le scalaire GUILLEMETÉ satisfait les deux ; replier en `>` rouvre le défaut d'en face
 - [Exception de gate = exemption](feedback_exception-de-gate-devient-exemption.md) — `PASS 0 violation, 3 exceptions` pendant qu'un rôle est injoignable : l'exception doit porter sur la forme, jamais sur la propriété
+- [Pointeur workstream partagé par les sous-agents](project_pointeur-workstream-partage-par-les-sous-agents.md) — même session id que le parent : un seul pointeur pour l'équipe, le dernier `set` gagne ; scoper par `--ws` explicite
