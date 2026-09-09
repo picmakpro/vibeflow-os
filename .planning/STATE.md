@@ -456,6 +456,35 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
 
+- **2026-09-09 — Phase 39 (Workstreams), paradoxe d'auto-application : option A′.** Arbitrage
+  humain rendu par Samuel au cadrage, escaladé par le manager de mission (le paradoxe : ADR-069
+  interdit toute partition « tant qu'une phase est en vol », or la Phase 39 est en vol pendant
+  qu'elle adopte les workstreams).
+
+  1. **La partition est prouvée sur un clone jetable de vibeflow-os**, hors de l'arbre de travail,
+     avec l'histoire réelle du dépôt. Les agents `vf-*` y tournent avec `--ws`, les gates y passent.
+     **L'arbre principal n'est jamais partitionné pendant la phase.**
+
+  2. **La condition dure d'ADR-069 n'est PAS révisée** — elle est respectée à la lettre. Aucun lot
+     de révision de garde n'est ouvert par cette phase.
+
+  3. **Aucun dépôt tiers n'est touché** (option B écartée : ni Reviz/WillHosting, ni Scroll-Off, ni
+     autre lab). Si la mesure montre que le volet **multi-humains** du périmètre du 2026-08-30 n'est
+     pas prouvable sur un clone seul, c'est un **arbitrage distinct à remonter**, jamais une
+     compensation décidée en mission.
+
+  4. **Écartées** : vérification après clôture (C) et partition en cours de phase sur l'arbre de
+     travail (D).
+
+  5. **Conséquence portée au plan** : la **partition réelle de vibeflow-os** est un **geste séparé,
+     gaté humain, postérieur à la clôture de la Phase 39** — pas un livrable de cette phase. Elle
+     est inscrite avec un déclencheur de reprise daté, précisément pour ne pas se reperdre comme
+     s'est perdue l'adoption entre le 2026-08-04 et le 2026-08-30.
+
+  6. **Nuance de preuve, à ne pas arrondir** : ce qu'un clone établit est une preuve **de
+     mécanisme**, pas d'usage concurrent réel. Un vert sur clone n'est pas un vert sur le dépôt
+     vivant — les livrables doivent le dire.
+
 - **2026-08-26 — Phase 35 (Ré-armement worktree) close, option A : pas de ré-armement.** Arbitrage
   humain rendu par Samuel sur preuve mesurée, appliqué en mandat de clôture ciblée vf-coder.
   Détail : `.planning/research/2026-08-26-wktr-02-leg-b-base-de-fork.md`,
