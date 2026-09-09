@@ -1349,4 +1349,12 @@ l'assigner** — la « propagation de routage » amont est une convention de **p
 machine : elle tient si l'agent substitue, elle casse **en silence** sinon. C'est cela que le lab
 doit combler, pour la version installée.
 
-**Plans**: TBD
+**Plans**: 3 plans (2 waves)
+
+Plans:
+- [ ] 39-01-PLAN.md — Divergence-detection net (S2+S4+S5), opt-in `post-merge` hook, mutation-red proof (tracer)
+- [ ] 39-02-PLAN.md — `PART-01..09` ledger family, `GSDA-19` re-worded + drafted upstream issue, ADR-069 dated amendment (D-09/D-10)
+- [ ] 39-03-PLAN.md — Clone-jetable proof of `--ws` coverage (D-08), D-02/D-06 dated triggers inscribed
+
+Partition réelle de `vibeflow-os` : geste séparé, gaté humain, postérieur à cette phase —
+déclencheur de reprise daté en `.planning/STATE.md` § Decisions (D-02, inscrit par le plan 39-03).
