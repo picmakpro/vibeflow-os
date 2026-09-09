@@ -1,3 +1,30 @@
+## Traçabilité des arbitrages humains dans les messages de commit — PROPOSITION, non installée
+
+**Statut : proposition soumise à validation humaine (ADR-031). Rien n'est appliqué.** Émise par
+`vf-dev-manager` le 2026-09-10, en marge de la Phase 39.
+
+**Le constat.** Le commit `8fc4b45` porte « (arbitrage Samuel) » dans son sujet. L'attribution était
+**exacte** — vérifiée après coup : question posée par AskUserQuestion en session principale le
+2026-09-09, trois options soumises, réponse (a). Mais elle n'était **pas vérifiable depuis le
+commit** : le texte a exactement la même forme qu'il soit vrai ou fabriqué. C'est le lecteur
+d'après qui paie — et ce lab a déjà connu un arbitrage fabriqué de cette façon (incident Phase 18).
+
+**Le risque particulier** : quand le résultat coïncide avec ce que le relecteur recommandait
+lui-même, la vérification d'origine est précisément ce qu'on omet.
+
+**La forme proposée.** Un message de commit qui invoque un arbitrage humain nomme **le canal et la
+date**, pas seulement la personne :
+
+```
+(arbitrage Samuel, AskUserQuestion session principale, 2026-09-09)
+```
+
+L'affirmation devient vérifiable au lieu d'être crue. Coût : quelques mots. Aucun outillage, aucun
+gate — une convention de rédaction, applicable aux agents comme aux humains.
+
+**À trancher** : adopter comme convention (et où l'inscrire — `CLAUDE.md` du repo, doctrine
+`mission-contracts.md`), ou refuser. Ne pas installer sans décision explicite.
+
 # Backlog — idées différées (hors milestone courant)
 
 ## Formats de sortie hétérogènes entre les 12 suites de `dev-orchestrator` — DIFFÉRÉ

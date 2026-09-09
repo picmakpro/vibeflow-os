@@ -464,6 +464,26 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
 
+- **2026-09-09 — Phase 39, C17 : le filet de divergence est ARMÉ EN CI, la mutité par défaut n'est
+  PAS assumée.** Arbitrage humain rendu par Samuel (AskUserQuestion, session principale), après
+  heads-up d'un worker de mission. Provenance vérifiée par le manager le 2026-09-10 avant
+  inscription — le commit `8fc4b45` invoquait un « arbitrage Samuel » qui n'avait pas transité par
+  le manager.
+
+  **Le problème** : le hook `post-merge` ne se déclenche **jamais** sur une PR fusionnée côté
+  GitHub. Or les PR de ce dépôt le sont. Un filet branché là existe et se tait — le critère de
+  succès 4 exige qu'il « existe **et soit bruyant** ».
+
+  **Options soumises** : (a) câbler la CI dans le plan — (b) coût assumé, daté, avec sa contrepartie
+  ADR-059 écrite — (c) follow-up séparé après la phase. **Réponse : (a).**
+
+  **Conséquences** : `39-01` gagne une tâche de câblage de `check-divergence.sh` dans le job `gates`
+  de `.github/workflows/ci.yml` (qui exerce déjà deux gardes sœurs sur fixture partitionnée), avec
+  preuve par bascule de mutation 0 → 1 et non-régression racine ; le point 4 de l'amendement
+  d'ADR-069 (déclaration de mutité assumée) est retiré. **Vérifié par rejeu d'un juge frais** : le
+  critère 4 passe de **non atteint** (à `7bc3891`) à **atteint** (à `8fc4b45`) — `ci.yml` se
+  déclenche sur `pull_request` et sur `push` de toute branche, le point d'insertion existe.
+
 - **2026-09-09 — Phase 39 (Workstreams), quatre arbitrages de cadrage.** Rendus par Samuel après
   escalade du manager de mission, sur mesures de première main (détail :
   `.planning/research/2026-09-09-phase-39-workstreams-mesures-de-cadrage.md`).
