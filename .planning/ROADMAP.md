@@ -1267,8 +1267,10 @@ humains travaillent en parallèle sur des feuilles de route disjointes — et to
 du milestone reste à trancher. **Condition dure conservée d'ADR-069 : aucune partition tant qu'une
 phase est en vol** — c'est une condition d'exécution, pas une dépendance de phase.
 
-**Requirements**: **Famille `PART-01`→`PART-09`** (ledgerisée au plan le 2026-09-09,
-`39-02-PLAN.md`) — **`PART`, pas `WSTR`** (arbitrage de lisibilité, `39-CONTEXT.md` D-07 : voisinage
+**Requirements**: **Famille `PART-01`→`PART-09`** (**définie** au cadrage le 2026-09-09 ; **gravure
+au ledger `REQUIREMENTS.md` = livrable non encore exécuté du plan `39-02-PLAN.md`, tâche 1** — au
+2026-09-10, `REQUIREMENTS.md` ne contient **aucune** entrée `PART-` : vérifié par trois méthodes
+indépendantes, `grep -c`, `awk`, comptage de fichiers ouverts) — **`PART`, pas `WSTR`** (arbitrage de lisibilité, `39-CONTEXT.md` D-07 : voisinage
 avec `WKTR`/`WTCH`). **Correction de la dérivation** qui a précédé ce choix : les préfixes occupés de
 `REQUIREMENTS.md` sont **40**, pas 42 — le « 42 » comptait deux faux positifs, `STATUT-BLOC-3` lu
 comme un `BLOC-3` et les chemins de dossier de phase `VFDO-xx`. Le même biais explique le « 36 »
@@ -1324,6 +1326,10 @@ les rouvrir.
 
   6. La **couverture amont** est **re-mesurée à la date du cadrage** et la remontée `GSDA-19` est
      **postée ou explicitement abandonnée avec trace**. *(risque (a) d'ADR-069)*
+     **Libellé superseded par D-04 le 2026-09-09** (`39-CONTEXT.md`) : ni « postée » ni « abandonnée »
+     ne décrit l'état visé — le geste attendu est **rédigée, prête à poster, avec trace explicite
+     qu'elle n'est PAS postée** (dépôt réservé au geste humain de Samuel, ADR-031). L'angle porte
+     désormais sur `PART-06`, `GSDA-19` elle-même est superseded en place (corps préservé).
 
 **Mesure de première main du 2026-09-09, RE-MESURÉE ET CORRIGÉE au cadrage**
 (`@opengsd/gsd-core` **1.13.0** installé, **89** workflows racine — `*.md` à profondeur 1 sous
@@ -1350,7 +1356,7 @@ l'assigner** — la « propagation de routage » amont est une convention de **p
 machine : elle tient si l'agent substitue, elle casse **en silence** sinon. C'est cela que le lab
 doit combler, pour la version installée.
 
-**Plans**: 3 plans (2 waves)
+**Plans**: 3 plans (3 waves — 39-02 dépend de 39-01, 39-03 dépend de 39-01 et 39-02, corrigé 2026-09-10 : coupling C12/C13)
 
 Plans:
 - [ ] 39-01-PLAN.md — Divergence-detection net (S2+S4+S5), opt-in `post-merge` hook, mutation-red proof (tracer)
