@@ -1,4 +1,4 @@
-## Traçabilité des arbitrages humains dans les messages de commit — PROPOSITION, non installée
+## Traçabilité des arbitrages humains dans les messages de commit — ADOPTÉE 2026-09-10
 
 **Statut : proposition soumise à validation humaine (ADR-031). Rien n'est appliqué.** Émise par
 `vf-dev-manager` le 2026-09-10, en marge de la Phase 39.
@@ -22,8 +22,14 @@ date**, pas seulement la personne :
 L'affirmation devient vérifiable au lieu d'être crue. Coût : quelques mots. Aucun outillage, aucun
 gate — une convention de rédaction, applicable aux agents comme aux humains.
 
-**À trancher** : adopter comme convention (et où l'inscrire — `CLAUDE.md` du repo, doctrine
-`mission-contracts.md`), ou refuser. Ne pas installer sans décision explicite.
+**TRANCHÉ le 2026-09-10** (arbitrage Samuel, AskUserQuestion session principale, 2026-09-10) :
+**adoptée**, sans gate machine — la variante outillée est explicitement écartée, la forme écrite
+suffit. Inscrite dans `plugin/dev-orchestrator/references/mission-contracts.md`.
+
+**Reliquat, geste humain** : l'inscription d'une ligne dans le `CLAUDE.md` du dépôt (là où vivent les
+conventions de commit) reste à faire **par Samuel**. Un agent ne modifie pas le `CLAUDE.md` d'un
+dépôt sur instruction relayée par un autre agent — la décision est authentique, c'est le canal qui ne
+convient pas pour ce fichier-là.
 
 # Backlog — idées différées (hors milestone courant)
 

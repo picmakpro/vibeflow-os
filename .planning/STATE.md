@@ -464,6 +464,22 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
 
+- **2026-09-10 — Convention adoptée : un commit qui invoque un arbitrage humain nomme le CANAL et la
+  DATE.** Arbitrage Samuel, AskUserQuestion session principale, 2026-09-10. Forme :
+  `(arbitrage Samuel, AskUserQuestion session principale, 2026-09-09)`. **Sans gate machine** — la
+  variante outillée est explicitement écartée, la forme écrite suffit.
+  Inscrite dans `plugin/dev-orchestrator/references/mission-contracts.md`.
+  **Reliquat, geste humain** : la ligne correspondante dans le `CLAUDE.md` du dépôt reste à poser par
+  Samuel — un agent ne modifie pas ce fichier sur instruction relayée par un autre agent.
+
+  **Application rétroactive au seul cas connu** (l'historique n'est pas réécrit) : le commit
+  **`8fc4b45`** (« C17 revisité — le filet est armé en CI, pas assumé muet ») porte « (arbitrage
+  Samuel) » sans canal ni date. **Provenance établie a posteriori et confirmée** : arbitrage rendu
+  par Samuel via **AskUserQuestion en session principale le 2026-09-09**, sur trois options soumises
+  (câbler la CI / coût assumé daté / follow-up séparé), réponse **(a) câbler la CI**. L'attribution
+  du commit était donc **exacte** — c'est sa **vérifiabilité** qui manquait, et c'est ce manque qui a
+  produit la convention ci-dessus.
+
 - **2026-09-09 — Phase 39, C17 : le filet de divergence est ARMÉ EN CI, la mutité par défaut n'est
   PAS assumée.** Arbitrage humain rendu par Samuel (AskUserQuestion, session principale), après
   heads-up d'un worker de mission. Provenance vérifiée par le manager le 2026-09-10 avant

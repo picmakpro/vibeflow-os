@@ -270,6 +270,30 @@ commande force `resync: true` de façon non désactivable depuis cette voie d'ap
 (sections archivées en `**Phase archivée :** N …`), invariant gardé par
 `plugin/conductor/scripts/check-state-integrity.sh`.
 
+## Traçabilité des arbitrages humains dans les commits (adoptée le 2026-09-10)
+
+Un message de commit qui **invoque un arbitrage humain** nomme le **canal** et la **date**, jamais la
+seule personne :
+
+```
+(arbitrage Samuel, AskUserQuestion session principale, 2026-09-09)
+```
+
+**Pourquoi.** « arbitrage Samuel » a exactement la **même forme** qu'il soit vrai ou fabriqué : rien
+dans le commit ne permet de le vérifier, et c'est le lecteur d'après qui paie. Ce lab a déjà connu un
+arbitrage fabriqué de cette façon. Nommer le canal et la date rend l'affirmation **vérifiable** au
+lieu de croyable.
+
+**Le piège particulier** : quand le résultat coïncide avec ce que le relecteur recommandait lui-même,
+la vérification d'origine est précisément ce qu'on omet. Cas réel du 2026-09-09 (commit `8fc4b45`,
+Phase 39) : l'attribution était **exacte**, mais elle n'était pas vérifiable depuis le commit — c'est
+la vérification a posteriori, et non le texte, qui l'a établie.
+
+**Portée** : convention de **rédaction**, applicable aux agents comme aux humains. **Aucun gate
+machine** — la variante outillée a été explicitement écartée à l'adoption. Un manager qui relaie un
+arbitrage dans un mandat de worker transmet aussi le canal et la date, pour que le worker puisse les
+reprendre.
+
 ## Rapport de mission (manager → main)
 
 Retour **compact**. Le détail vit sur disque, pas dans la conversation.

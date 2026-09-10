@@ -90,6 +90,9 @@ un signal de cardinalité qui rougissait sur un arbre **sain**, une fixture qui 
    cadence des transitions de DAG alors qu'un worker travaillait 20 minutes d'affilée — faux positif
    structurel de la mission longue. Et `gsd-planner` est absent de l'allowlist déclarée de `vf-coder`
    mais accepté à l'exécution.
-5. **`rtk` a menti trois fois pendant cette mission** — un `cat` rendant 343 lignes pour un fichier de
-   440 en masquant une tâche entière, un `sed -n` servant le contenu de `HEAD` au lieu du disque, et
-   les pièges déjà connus. Toute conclusion importante a été recoupée par une seconde méthode.
+5. **`rtk`** : les pièges **établis** (sortie vide rendue comme 1 ligne, `grep` piped qui tronque,
+   `ls` rendant vide un dossier peuplé) ont joué. Un juge a **rapporté** en plus un `cat` tronquant un
+   fichier long et un `sed -n` servant `HEAD` au lieu du disque — **non reproduits** depuis
+   (`rtk cat` sur un fichier de 497 lignes n'a pas tronqué) : à traiter comme **rapporté, pas
+   établi**. Le réflexe de recouper toute conclusion importante par une seconde méthode reste bon
+   indépendamment de la cause.
