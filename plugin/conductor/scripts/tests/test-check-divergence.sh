@@ -10,10 +10,14 @@
 #     ROADMAP.md du compartiment : le gate doit passer de rouge (1) à vert (0). L'effectivité de la
 #     mutation est prouvée par une empreinte de contenu (cksum par fichier), pas seulement par une
 #     liste de chemins — éditer un fichier existant ne change AUCUN chemin.
-#   - MUT-2 mute le SCRIPT lui-même dans une copie temporaire, en neutralisant la branche S2 (le
-#     signal primaire) : la fixture orphan doit rougir sur l'original et rester verte (à tort) sur
-#     le mutant. Un mutant qui ne change rien au comportement observé est NON OPPOSABLE et fait
-#     échouer la suite — jamais « mutant satisfait ».
+#   - MUT-2 mute le SCRIPT lui-même dans une copie temporaire, en neutralisant la DÉTECTION S2
+#     (l'awk de comptage de doublons, pas la valeur de retour de check_s2 — celle-ci est jetée par
+#     l'appelant via `|| true`, la neutraliser ne mute donc rien d'observable). La copie du mutant
+#     embarque sa dépendance sœur `workstream-policy.sh` : check-divergence.sh la résout par chemin
+#     relatif à `$(dirname "$0")` et sort en 2 (non vérifiable) sans elle — un mutant isolé
+#     n'atteindrait jamais le signal qu'il prétend neutraliser. La fixture orphan doit rougir sur
+#     l'original et rester verte (à tort) sur le mutant. Un mutant qui ne change rien au
+#     comportement observé est NON OPPOSABLE et fait échouer la suite — jamais « mutant satisfait ».
 
 set -uo pipefail
 
@@ -159,16 +163,16 @@ else
   fi
 fi
 
-# === MUT-2 — mutation du SCRIPT : neutraliser la branche S2 (signal primaire) ======================
+# === MUT-2 — mutation du SCRIPT : neutraliser la DÉTECTION S2 (l'awk de comptage de doublons) ======
 MUTD="$TMP/mutants"; mkdir -p "$MUTD"
+# Dépendance sœur OBLIGATOIRE à côté du mutant : sans elle, check-divergence.sh sort en 2 (non
+# vérifiable) avant même d'atteindre check_s2 — le mutant n'atteindrait jamais le signal.
+cp "$(dirname "$SCRIPT")/../../planning-core/scripts/workstream-policy.sh" "$MUTD/workstream-policy.sh"
 cat > "$MUTD/neutralise-s2.awk" <<'AWKEOF'
-BEGIN { infn = 0 }
 {
-  if (!fait && index($0, "check_s2() {") > 0) { infn = 1 }
-  if (infn && !fait && index($0, "return 1") > 0) {
-    sub(/return 1/, "return 0")
+  if (!fait && index($0, "cnt[k] > 1) print") > 0) {
+    sub(/cnt\[k\] > 1\) print/, "cnt[k] > 999999) print")
     fait = 1
-    infn = 0
   }
   print
 }
@@ -179,18 +183,18 @@ awk -f "$MUTD/neutralise-s2.awk" "$SCRIPT" > "$MUTANT"
 D="$(mk_git_root mut2)"
 mkdir -p "$D/.planning/workstreams/beta/phases/01-x" "$D/.planning/workstreams/beta/phases/01-y"
 if cmp -s "$MUTANT" "$SCRIPT"; then
-  ko "MUT-2 branche S2 neutralisée" "la mutation n'a RIEN changé (motif introuvable) — mutant NON OPPOSABLE, pas mutant satisfait"
+  ko "MUT-2 détection S2 neutralisée" "la mutation n'a RIEN changé (motif introuvable) — mutant NON OPPOSABLE, pas mutant satisfait"
 elif ! bash -n "$MUTANT" 2>/dev/null; then
-  ko "MUT-2 branche S2 neutralisée" "le mutant n'est pas un script valide : il rougirait pour la mauvaise raison"
+  ko "MUT-2 détection S2 neutralisée" "le mutant n'est pas un script valide : il rougirait pour la mauvaise raison"
 else
   TARGET="$MUTANT"
   run "$D" >/dev/null 2>&1; rc_mut=$?
   TARGET="$SCRIPT"
   run "$D" >/dev/null 2>&1; rc_orig=$?
-  if [ "$rc_mut" -ne 1 ] && [ "$rc_orig" -eq 1 ]; then
-    ok "MUT-2 branche S2 neutralisée (cmp : script bien muté) : la fixture orphan reste (à tort) VERTE sur le mutant (rc=$rc_mut au lieu de 1), et ROUGIT sur l'original (rc=$rc_orig)"
+  if [ "$rc_mut" -eq 0 ] && [ "$rc_orig" -eq 1 ]; then
+    ok "MUT-2 détection S2 neutralisée (cmp : script bien muté) : la fixture orphan reste (à tort) VERTE sur le mutant (rc=$rc_mut), et ROUGIT sur l'original (rc=$rc_orig)"
   else
-    ko "MUT-2 la fixture orphan doit rougir sur l'original et rester verte sur le mutant" "rc_mutant=$rc_mut (devait differer de 1) rc_original=$rc_orig (attendu 1)"
+    ko "MUT-2 la fixture orphan doit rougir sur l'original et rester verte (à tort) sur le mutant" "rc_mutant=$rc_mut (attendu 0) rc_original=$rc_orig (attendu 1)"
   fi
 fi
 

@@ -119,7 +119,8 @@ et hors mode superviser étape-par-étape.
 §Digest) : étape, périmètre du nœud, décisions actives, verdicts amont, conventions cibles.
 Le disque fait foi ; le digest amortit les relectures intégrales de `.planning/` par étage.
 
-Sur un dépôt partitionné (`.planning/workstreams/` présent), chaque mandat nomme EXPLICITEMENT le compartiment — jamais l'inférence d'un `GSD_WORKSTREAM` déjà exporté dans TON shell, qui n'isole rien entre workers que tu dispatches toi-même (même `CLAUDE_CODE_SESSION_ID`, D-10 OPEN) ; embarque
+Deux résolutions distinctes, jamais confondues : **toi**, tu exportes `GSD_WORKSTREAM` et passes `--ws` pour TA PROPRE résolution (ci-dessus) ; **chaque worker que tu dispatches** reçoit son compartiment autrement — jamais par héritage de cet export, qui n'isole rien entre workers lancés dans TON shell (même `CLAUDE_CODE_SESSION_ID`, D-10 OPEN).
+Sur un dépôt partitionné (`.planning/workstreams/` présent), chaque mandat nomme EXPLICITEMENT le compartiment en passant `--ws <nom>` dans sa propre commande ; embarque
 aussi un `GSD_SESSION_KEY` distinct par mandat dès que ≥ 2 workers concurrents visent des compartiments différents. Discipline VF-side seule (D-05).
 
 Pour chaque étape retenue, choisis les étages pertinents (une étape UI saute l'audit sécurité ;

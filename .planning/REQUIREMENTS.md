@@ -1001,8 +1001,9 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 > Dérivé au cadrage le 2026-09-09, discipline de mesure `awk` + `comm` (jamais `grep | sort -u` ni
 > `diff` — ADR-069 §Méthode). Préfixe `PART`, pas `WSTR` (D-07) : voisinage lisible avec
 > `WKTR`/`WTCH` dans une phase qui fait cohabiter les deux mots ; espace de noms dérivé au
-> 2026-09-09 : 40 préfixes gravés, 41 familles réellement occupées en comptant `SIG-01..06`,
-> absente des deux ledgers.
+> 2026-09-09 : 40 préfixes gravés, 41 familles réellement occupées en comptant `SIG-01..06` — cette
+> famille existe bien dans le dépôt, elle est seulement non recensée dans les deux ledgers de
+> traçabilité (celui-ci et ADR.md).
 
 - [ ] **PART-01**: Le **niveau 4** de résolution du pointeur de workstream
   (`.planning/active-workstream` consulté quand la session courante n'a jamais posé le sien) est

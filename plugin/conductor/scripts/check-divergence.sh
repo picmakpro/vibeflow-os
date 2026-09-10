@@ -110,7 +110,10 @@ if [ "$_rc" -eq 1 ] || [ ! -d "$WS_ROOT" ]; then
   exit 3
 fi
 
-TMPD="$(mktemp -d)"
+TMPD="$(mktemp -d)" \
+  || { echo "[check-divergence] mktemp -d a échoué — dossier temporaire injoignable, non vérifiable" >&2; exit 2; }
+[ -n "$TMPD" ] && [ -d "$TMPD" ] \
+  || { echo "[check-divergence] dossier temporaire introuvable après mktemp — non vérifiable" >&2; exit 2; }
 trap 'rm -rf "$TMPD"' EXIT
 
 FAIL_MSGS=()
@@ -317,9 +320,13 @@ if [ "${#FAIL_MSGS[@]}" -gt 0 ]; then
 fi
 
 if [ "$CHECKED" -eq 1 ]; then
-  # Le mot « divergence » n'apparaît JAMAIS sur le chemin conforme : un test qui cherche la
-  # sous-chaîne « divergence » sur la sortie doit pouvoir discriminer conforme (0) de signalé (1)
-  # rien qu'à sa présence — cf. must_have « output does not contain the word "divergence" ».
+  # Le préfixe de log « [check-divergence] » contient lui-même le mot « divergence » sur CHAQUE
+  # ligne, y compris ce chemin conforme (mesuré : `grep -c divergence` rend 1 sur cette sortie) —
+  # ce n'est donc PAS ce mot qui distingue conforme de signalé. Ce que ce chemin garantit
+  # réellement : l'ABSENCE des étiquettes de signaux (« S2 », « S4(a) », « S4(b) », « S5 »), qui
+  # elles n'apparaissent que sur le chemin signalé (exit 1). Déviation du critère d'acceptation
+  # d'origine du plan 39-01 (« la sortie ne contient pas le mot divergence ») — consignée dans le
+  # SUMMARY de 39-01.
   echo "[check-divergence] conforme — compartiment(s) inspecté(s), aucun signal S2/S4/S5" >&2
 else
   echo "[check-divergence] $WS_ROOT présent mais vide — rien à inspecter" >&2

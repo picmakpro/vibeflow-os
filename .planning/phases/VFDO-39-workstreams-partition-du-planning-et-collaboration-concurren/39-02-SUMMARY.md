@@ -22,7 +22,7 @@ key-decisions:
   - "GSDA-19 superseded en place par PART-06 sur le précédent MANI-04 : corps et ligne de traçabilité préservés byte-for-byte (statut Done, mapping plan 24-10 intacts), annotation ajoutée. Le nouvel angle bug de comportement (D-04) vit dans un brouillon d'issue amont neuf, rédigé et jamais posté (ADR-031)."
   - "ADR-069 amendée par une sous-section datée 2026-09-09 (jamais réécrite en place) : couverture re-dérivée en direct (atteinte=89, K2=9/89=10,1%, 39 aveugles — mouvement du corpus 1.9.1→1.13.0, pas correction de la mesure d'origine) ; D-09 résolu (risque (b) migré au niveau commit, coût assumé daté) ; D-10 résolu (composabilité ADR-064 close entre sessions, OUVERTE au sein du modèle d'équipe VF) ; C17 arbitré Samuel 2026-09-10 : check-divergence.sh câblé sur le job CI gates (post-merge seul serait inerte sur le chemin de merge GitHub dominant, ADR-059)."
   - "vf-dev-manager.md ferme le volet OPEN de D-10 pour VF : nouveau paragraphe exigeant un compartiment nommé explicitement par mandat + un GSD_SESSION_KEY distinct par mandat concurrent. Édition net line-neutral (paragraphe Filet de repli D-09 condensé en compensation) — fichier à 249 lignes, sous le plafond ADR-029 (250) que check-agents.sh ne vérifie pas."
-requirements-completed: [PART-01, PART-02, PART-05, PART-06, PART-09]
+requirements-completed: [PART-01, PART-02, PART-05, PART-06]
 duration: "non tracé"
 completed: "2026-09-10"
 coverage:

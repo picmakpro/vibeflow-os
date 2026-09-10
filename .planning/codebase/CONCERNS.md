@@ -260,6 +260,33 @@ capturées au backlog — voir Tech Debt.
 - Current mitigation: source contrôlée (cache = contenu du repo publié).
 - Recommendations: garde ceinture-bretelles excluant `*.env*` / `*secret*` des copies.
 
+**Candidat RCE par `git worktree` hostile — ouvert sur `pre-push`, mitigé sur `post-merge`** — Sévérité : **MEDIUM**
+- Risk: un hook git qui résout le script qu'il exécute via `git rev-parse --show-toplevel` fait
+  résoudre ce chemin sur l'arbre du **worktree courant** — un `git worktree add` sur une branche
+  hostile peut donc faire exécuter au hook une copie du script entièrement contrôlée par
+  l'attaquant. Une dette de sécurité qui n'existe que dans la mémoire d'un agent n'est pas une
+  dette suivie, c'est une dette oubliée avec un délai : ce constat était noté côté mémoire d'agent
+  seulement (`.claude/agent-memory/vf-coder/project_pre-push-candidat-rce-non-corrige.md`), jamais
+  ici. Deux occurrences, deux états distincts :
+  - `scripts/hooks/pre-push` : **OUVERT, non corrigé** — résout toujours
+    `scripts/check-release-tag.sh` via `root="$(git rev-parse --show-toplevel)"`. Hors périmètre du
+    correctif du 2026-09-10 (arbitrage explicite : aucun élargissement, la dette y reste ouverte et
+    c'est voulu) — mandat séparé requis.
+  - `scripts/hooks/post-merge` : **MITIGÉ le 2026-09-10** (arbitrage Samuel, AskUserQuestion
+    session principale) — résout `plugin/conductor/scripts/check-divergence.sh` via
+    `git rev-parse --git-common-dir` (ancré sur le dépôt principal, stable à travers
+    `git worktree add`), plus jamais via `--show-toplevel`. Prouvé par exécution réelle : une copie
+    malveillante de `check-divergence.sh` posée dans un worktree hostile ne s'exécute plus au merge
+    — seule la copie du dépôt principal s'exécute. Le raisonnement retenu : hériter une dette
+    catalogée et l'écrire volontairement dans du code neuf ne sont pas le même geste — le vecteur
+    est connu au moment où la ligne s'écrit.
+- Files: `scripts/hooks/pre-push` (ouvert), `scripts/hooks/post-merge` (mitigé) ;
+  `.planning/phases/VFDO-39-workstreams-partition-du-planning-et-collaboration-concurren/39-01-PLAN.md`
+  (registre STRIDE, T-39-01)
+- Current mitigation: `post-merge` seul — voir ci-dessus. `pre-push` reste sans mitigation.
+- Recommendations: un mandat dédié pour `pre-push`, sur le même modèle (`--git-common-dir` plutôt
+  que `--show-toplevel`), prouvé par exécution réelle dans un worktree hostile avant clôture.
+
 **Le verrou de driver est déclaratif, pas contraignant** — Sévérité : **HIGH** — **RÉSOLU le 2026-08-17 (Phase 32)**
 - Risk (état au constat, 2026-07-27) : `driver-lock.sh` n'empêchait techniquement rien : aucun hook ni
   garde en écriture ne refusait un commit à une session sans verrou. Constaté le 2026-07-27 : le lock

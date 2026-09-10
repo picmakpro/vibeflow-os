@@ -2179,9 +2179,9 @@ une mise à jour datée de cette entrée, sans réviser ni la décision d'adopti
 **(1) Couverture re-dérivée** : re-exécution live, à l'écriture de cet amendement, de la commande
 `awk`+`comm` ci-dessus contre `$HOME/.claude/gsd-core/workflows` (`@opengsd/gsd-core` **1.13.0**) —
 `atteinte=89` (pas 91 : le dossier de workflows a bougé entre 1.9.1 et 1.13.0, fait à reporter tel
-quel, pas une correction de la mesure d'origine), `K2=9` (**10,1 %**), `aveugles=39`. Contrastée avec
-le `7/91 = 7,7 %` original : les deux chiffres restent corrects **pour leur propre date** — c'est le
-corpus qui a bougé, pas la mesure.
+quel, pas une correction de la mesure d'origine), `K2=9` (**10,1 %**), `en dur=43`, `aveugles=39`.
+Contrastée avec le `7/91 = 7,7 %` original : les deux chiffres restent corrects **pour leur propre
+date** — c'est le corpus qui a bougé, pas la mesure.
 
 **(2) D-09 — le risque (b) a MIGRÉ, il n'a pas disparu.** Le silence relevé au 2026-08-04 sur les
 regex ancrées de `pr-branch.md` est **levé au niveau chemin** (bloc `$OTHER`, `pr-branch.md:410`)
