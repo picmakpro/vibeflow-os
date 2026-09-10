@@ -462,7 +462,10 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   poster, au **gabarit de forme déjà accepté en amont** (issue **#2598** : « descripteur non
   descriptif du runtime », jamais « bug de comportement »), avec la méthode de mesure reproductible
   (`awk` + `comm` sur les 91 workflows racine, **jamais** `grep` piped qui tronque). Elle est
-  **compatible avec l'adoption** — les deux ne s'excluent pas. *(A9, verdict zone 5, point 4)*
+  **compatible avec l'adoption** — les deux ne s'excluent pas. **— superseded par `PART-06`
+  (Phase 39, 2026-09-09)** : l'angle « descripteur non descriptif » (#2598) est abandonné (D-04) ;
+  le nouvel angle bug de comportement vit désormais sous `PART-06`, pas ici — ce bullet reste
+  l'historique exact de ce que le plan 24-10 a réellement produit. *(A9, verdict zone 5, point 4)*
 - [x] **GSDA-20**: La **marge de profondeur de dispatch** est écrite en doctrine : le descripteur
   du runtime `claude` porte `maxDepth: 5`, la chaîne `vf-dev-manager → vf-coder → agent gsd-*` en
   consomme **3**, il reste **deux niveaux de marge** — et ce que cette marge **autorise** est dit
@@ -800,7 +803,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | GSDA-16 | Phase 24 | Done — plans 24-05 et 24-12 |
 | GSDA-17 | Phase 24 | Done — plan 24-09 |
 | GSDA-18 | Phase 24 | Done — plan 24-10 (ADR-069) |
-| GSDA-19 | Phase 24 | Done — plan 24-10 |
+| GSDA-19 | Phase 24 | Done — plan 24-10 — superseded par `PART-06` (Phase 39, 2026-09-09) |
 | GSDA-20 | Phase 24 | Done — plans 24-01 et 24-12 |
 | GSDA-21 | Phase 24 | Done — plans 24-01 et 24-12 |
 | GSDA-22 | Phase 24 | Done — plans 24-01 et 24-12 |
