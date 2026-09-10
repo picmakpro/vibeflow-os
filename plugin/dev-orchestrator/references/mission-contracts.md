@@ -272,8 +272,11 @@ commande force `resync: true` de façon non désactivable depuis cette voie d'ap
 
 ## Traçabilité des arbitrages humains dans les commits (adoptée le 2026-09-10)
 
-Un message de commit qui **invoque un arbitrage humain** nomme le **canal** et la **date**, jamais la
-seule personne :
+> **La règle canonique vit dans le `CLAUDE.md` du dépôt, § Conventions transverses.** Cette section
+> n'en est pas une seconde énonciation : elle porte le **motif** et l'**obligation de relais** propre
+> aux missions d'équipe. En cas d'écart, `CLAUDE.md` fait foi.
+
+Forme attendue :
 
 ```
 (arbitrage Samuel, AskUserQuestion session principale, 2026-09-09)
