@@ -51,3 +51,25 @@ Deux pièges de diagnostic mesurés au même endroit, qui feront perdre du temps
 Voir [[mesurer-le-moteur-gsd-corpus-hors-depot]] (le corpus se mesure hors dépôt) et
 [[descripteur-gsd-core-non-probant]] (un descripteur amont n'est jamais une preuve — ici le niveau 4
 du pointeur, lui, a bien été confirmé par exécution).
+
+**Troisième piège, mesuré le 2026-09-10 : `workstream.create` fait du nouveau compartiment l'AMBIENT
+DEFAULT.** `workstream.cjs:186` — `create <nom>` appelle `setActiveWorkstream(cwd, <nom>)`. Donc, sans
+clé de session résoluble (pas de TTY, pas de `GSD_SESSION_KEY`), **omettre `--ws` et passer
+`--ws <le dernier créé>` désignent le même compartiment**, et les sorties sont identiques à l'octet
+près.
+
+Conséquence pour toute preuve d'observance du scope : un test qui vérifie qu'un agent « passe bien
+`--ws X` » en comparant sa sortie à l'attendu de `X` est **structurellement incapable de rendre
+rouge** si `X` est le dernier compartiment créé. Mesuré, md5 à l'appui :
+`--ws legacy` → `e122873a…` · sans drapeau → `926ec824…` · `--ws scratch` → `926ec824…` (identique).
+
+Et **peupler le compartiment ne suffit pas** : le pointeur ambiant reste dessus, « peuplé » et « par
+défaut » deviennent simplement identiques-et-non-vides. **Créer un compartiment poubelle en dernier
+ne suffit pas non plus** : deux compartiments vides rendent un JSON strictement identique
+(`"phase_scope": "unreadable"`). Seule la **combinaison** des deux sépare les trois sorties.
+
+**How to apply:** pour prouver l'observance de `--ws`, ne jamais se contenter d'un compartiment vide
+comme cible — rendre chaque cible **distinguable du défaut ambiant**, et vérifier par **empreinte**
+que les sorties « avec drapeau » et « sans drapeau » diffèrent **pour chaque** agent observé. Sinon
+on obtient un vert qui ne peut pas devenir rouge. Voir
+[[preuve-du-chemin-heureux-ne-couvre-pas-l-echec]] et [[mutation-qui-echoue-pour-la-mauvaise-raison]].

@@ -58,10 +58,25 @@ arborescence imaginaire** — une clé d'extraction qui ne matchait **aucun** de
 un signal de cardinalité qui rougissait sur un arbre **sain**, une fixture qui commitait des dossiers
 **vides** que git ne versionne pas.
 
-**Trois tours, puis arrêt** (budget respecté) :
+**Quatre tours** — le quatrième demandé par Samuel le 2026-09-10 (AskUserQuestion, session
+principale) sur la foi de la réserve n°2 de ce rapport :
 1. Plans initiaux → 5 bloquants + 6 warnings (2 juges frais, findings fusionnés, **un seul** `reopen`)
 2. Correction C1→C17 → rejeu **par exécution** : 5 points tiennent, 3 prises restent, dont **une neuve**
 3. Correction D1→D5 → preuves des **deux** directions (vert nominal **et** rouge fautif)
+4. **4ᵉ passe, juge frais et exécutant** → tout tient **sauf un bloquant** : la preuve d'observance de
+   `--ws` était **structurellement vide pour un worker sur deux**. Racine mesurée dans le moteur :
+   `workstream.cjs:186` — `workstream.create <nom>` fait du nouveau compartiment l'**ambient
+   default**, donc « sans drapeau » et « `--ws <ce compartiment>` » rendent la **même sortie à
+   l'octet près**. Corrigé en séparant les trois sorties (peupler la cible **et** créer un
+   compartiment poubelle en dernier — mesuré : ni l'un ni l'autre ne suffit seul), et en faisant
+   remonter la preuve à deux workers dans le bloc **machine** au lieu de la prose.
+
+**Le motif de la mission** : les trois défauts bloquants successifs sont le **même** — un mécanisme
+qui a l'air correct et **ne peut pas rendre rouge**. Une clé d'extraction qui ne matche rien, un shim
+de `PATH` qui ne capture rien, une empreinte indiscernable. Chaque correctif était une vraie
+amélioration ; l'inertie se déplaçait d'un cran au lieu de disparaître. **Tous les trois sont
+invisibles à la relecture et évidents à l'exécution** — c'est l'argument le plus net de cette mission
+en faveur des juges exécutants.
 
 ## 5. Livrables
 
@@ -81,9 +96,11 @@ un signal de cardinalité qui rougissait sur un arbre **sain**, une fixture qui 
 
 1. **Le ledger ne porte pas encore `PART-xx`** — la gravure dans `REQUIREMENTS.md` est un livrable de
    `39-02` T1, non exécuté. Le libellé du ROADMAP a été reformulé pour ne pas le laisser croire.
-2. **Les preuves du 3ᵉ tour sont déclarées par le correcteur**, avec traces d'exécution des deux
-   directions, mais **sans 4ᵉ passe de juge frais** (budget). Vu le précédent de cette mission, c'est
-   la réserve la plus honnête à formuler.
+2. **Les preuves du 4ᵉ tour sont déclarées par le correcteur** — avec empreintes md5 des deux
+   directions pour les deux workers, et un jeton machine désormais câblé dans le bloc `<automated>`
+   (vérifié : troisième condition du test) — mais **sans 5ᵉ passe de juge frais**. Samuel avait
+   demandé la 4ᵉ et posé la règle « s'il trouve des bloquants, corrige puis reviens ». C'est fait ;
+   la décision d'une 5ᵉ passe lui revient.
 3. **`vf-dev-manager.md` est à 250 lignes pile** — plafond ADR-029 au ras, et `check-agents.sh` ne
    compte pas les lignes. Le plan porte sa propre garde `wc -l ≤ 250`.
 4. **Dette d'outillage constatée** (backlog) : le watchdog a signalé deux fois un « stall » sur la
