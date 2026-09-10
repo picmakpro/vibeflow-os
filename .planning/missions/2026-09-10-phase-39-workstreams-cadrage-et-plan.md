@@ -134,3 +134,80 @@ en faveur des juges exécutants.
 7. **Incohérence interne mineure de `39-03` T1** : le bloc `<automated>` lance le gate de divergence
    **avant** `sink` + peuplement, alors que l'`<action>` prescrit de le lancer **après** les workers.
    La preuve machine et le critère d'acceptation n'exercent pas le même état.
+
+
+---
+
+# PARTIE II — EXÉCUTION (2026-09-10)
+
+Feu vert d'exécution rendu par Samuel (AskUserQuestion, session principale, 2026-09-10), après
+correction préalable des deux réserves de la 5ᵉ passe. **33 commits** sur `feat/phase-39-workstreams`.
+
+## Déroulé
+
+| Vague | Contenu | Juges |
+|---|---|---|
+| Correction pré-exécution | 4 points de `39-03` T1 (gardes préfixées, mécanisme, attribution de preuve, ordre du bloc machine) | — |
+| **Vague 1**, deux exécutants **parallèles** sur périmètres disjoints | `39-01` filet + hook + CI · `39-02` ledger + ADR + doctrine | **3** : revue ×2 + **audit infra** |
+| Correction fusionnée | 2 bloquants + 4 majeurs + 1 mineur, **un seul reopen** | — |
+| **Vague 2** | `39-03` preuve sur clone jetable + déclencheurs | revue ×1 |
+| Compléments | `39-01-SUMMARY` manquant · ancrage D-02 · hygiène documentaire | — |
+
+## Ce qui a été livré
+
+- **Filet de détection de divergence** : `check-divergence.sh` (S2+S4a+S4b+S5), suite de **10 cas dont
+  2 mutants**, hook `post-merge` **opt-in**, étape CI avec **bascule de mutation prouvée**.
+- **Famille `PART-01`→`PART-09`** gravée, `GSDA-19` **superseded** (identifiant neuf, statut d'origine
+  intact), **amendement daté** d'ADR-069, doctrine `workstreams.md` §4 étendue, gabarit de dispatch
+  du manager amendé (chaque worker reçoit `--ws`, jamais par héritage).
+- **Preuve d'adoption** sur clone jetable : trois empreintes mutuellement distinctes, deux workers
+  concurrents, gates verts dans le clone partitionné et **non-régression** sur l'arbre réel.
+- **Issue amont rédigée, jamais postée.** **Arbre de travail jamais partitionné.**
+
+## Les sept occurrences du même défaut
+
+Le fil rouge de cette phase, du cadrage à l'exécution : **un mécanisme qui a l'air correct et ne peut
+pas rendre rouge**. Tous invisibles à la relecture, tous trouvés par exécution.
+
+1. Clé d'extraction ne matchant **aucun** dossier de phase du dépôt.
+2. Signal de cardinalité rougissant sur un arbre **sain** (convention d'archivage).
+3. Fixture commitant des dossiers **vides** — git ne les versionne pas, le merge devient un no-op.
+4. Shim de `PATH` incapable de capturer (l'environnement ne survit pas d'un appel Bash au suivant).
+5. Empreinte **indiscernable** de son témoin (`workstream.create` fait du compartiment créé le défaut ambiant).
+6. **Mutant échouant pour la mauvaise raison** — dépendance sœur absente, `rc=2` accepté par une
+   assertion trop permissive. *Le manager avait lui-même validé ce vert.*
+7. **Le gate lui-même** rendant « conforme » sur un dépôt divergé si `mktemp` échoue (pas de `set -e`).
+
+## Sécurité — une RCE démontrée, pas soupçonnée
+
+L'audit infra a trouvé que le hook neuf dupliquait un candidat RCE déjà catalogué. En le mitigeant,
+le correcteur l'a **démontré** : worktree hostile, copie malveillante, **vrai `git merge`** → exécution
+de la copie hostile, fichier témoin créé. Hook corrigé, même scénario → plus rien.
+
+**Arbitrage Samuel (AskUserQuestion, session principale, 2026-09-10)** : mitiger le hook **neuf**
+seulement, `pre-push` non touché — « assumer une dette héritée et l'écrire à neuf ne sont pas le même
+geste ». Le mécanisme prescrit (résoudre depuis l'emplacement du hook) s'est révélé **insuffisant à la
+mesure** — sous `core.hooksPath` relatif, git résout aussi le hook depuis le worktree courant ; le
+correcteur a ancré sur le dépôt principal. **Intention tenue, moyen substitué — signalé.**
+Finding consolidé dans `.planning/codebase/CONCERNS.md` : **ouvert** sur `pre-push`, **mitigé** sur
+`post-merge`. Pas d'issue publique (écarté à l'arbitrage).
+
+## État final vérifié par le manager
+
+`check-agents` **0** · invariants **3 (SAIN)** · suite divergence **10/10** · `check-state-integrity`
+**0** · `check-divergence --path .` **3** (silence, dépôt non partitionné) · `.planning/workstreams/`
+**absent** · arbre **propre** · `vf-dev-manager.md` **250/250** lignes.
+
+## Réserves à la clôture
+
+1. **Le diff de correction post-revue n'a pas été vu par un juge indépendant.** Il inclut la
+   **mitigation de sécurité**. Le manager l'a vérifié **par exécution** (suite 10/10 avec mutant
+   devenu opposable, garde `mktemp` rendant 2, hook ancré, `pre-push` intact), mais aucun regard frais
+   n'a jugé ce diff. C'est la seule vérification manquante.
+2. **Aucun run CI réel observé** — l'étape a été prouvée localement, rien n'a été poussé.
+3. **`CHANGELOG` du module `conductor` sans entrée** : sa convention lie une entrée à un bump de
+   version, or le bump est un geste de release. À faire **au moment du ship**.
+4. **Cochage des exigences différé** : `PART-01..09` restent `[ ]` au ledger, cohérent avec le patron
+   de phase du dépôt, à traiter à la clôture.
+5. **Preuve de mécanisme ≠ preuve d'usage** : le clone établit que le mécanisme marche, pas qu'un
+   usage concurrent réel tient. Écrit tel quel dans les livrables.
