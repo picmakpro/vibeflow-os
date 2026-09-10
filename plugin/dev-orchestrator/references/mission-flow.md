@@ -311,6 +311,11 @@ déterministe que le reste du contrôle de flux (Pattern C), une seule règle : 
 + frontière suivante · `gaps_found` → la boucle ci-dessus · `human_needed`/finding `ask-user` →
 escalade.
 
+**Rappel de partition, si ≥ 2 `vf-*` concurrents sur scopes disjoints.** Dès que ce dispatch met
+réellement en jeu deux workers `vf-*` ou plus, en parallèle, sur des périmètres disjoints de CE
+dépôt (`vibeflow-os`), la question de sa partition réelle en `.planning/workstreams/` se repose —
+pointeur : `.planning/STATE.md` § Decisions, D-02.
+
 ### 3. Gradation par risque, jamais par volume
 
 Déclencheurs de revue **renforcée**, non négociables — chacun un FAIT constatable sur le diff ou le
