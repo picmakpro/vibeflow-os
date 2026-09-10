@@ -464,6 +464,27 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
 
+- **2026-09-10 — Déclencheur de reprise — partition réelle de vibeflow-os (D-02, condition de RAPPEL
+  corrigée le 2026-09-10).** L'**acte** de partitionner reste gaté humain, SUR DEMANDE EXPLICITE de
+  Samuel — jamais auto-déclenché, jamais exécuté sans lui. Mais un déclencheur qui ne se rappelle
+  « que si quelqu'un y repense » est précisément le mode de perte déjà constaté entre le 2026-08-04
+  et le 2026-08-30 (l'adoption s'est perdue faute de rappel) — corrigé ici par une **condition de
+  RAPPEL objective et datée**, qui ne fait que resurfacer la question, jamais déclencher la
+  partition elle-même : à la prochaine clôture de jalon (`gsd-complete-milestone` de
+  `fiabilite-v1.0`) OU dès qu'un manager de mission dispatche réellement ≥ 2 workers `vf-*`
+  concurrents sur des scopes disjoints du même dépôt (le besoin mesuré qui justifierait la
+  partition — cf. la preuve à 2 workers de ce même plan, Tâche 1) — le premier des deux événements
+  qui survient fait remonter explicitement la question à Samuel ; ni l'un ni l'autre ne déclenche
+  quoi que ce soit par lui-même (même patron que `WKTR-03` et le déclencheur objectif d'ADR-069 :
+  objectif, sans échéance calendaire — mais désormais avec un événement concret qui le rend
+  vérifiable, pas seulement mémorisable).
+
+- **2026-09-10 — Veille datée sur ÉVÉNEMENT (D-06).** La prochaine publication de `gsd-core`
+  au-delà de 1.13.0, qui distribuera `#4455`/`#4456`/`#4225` (fermés le 7-8 septembre 2026, non
+  distribués) — à cette publication, re-mesurer K2 en ré-exécutant le script de
+  `docs/ADR.md:1992-2002`, jamais sur un seuil chiffré figé (précédent explicite à ne pas
+  reproduire : `WKTR-03` désarmée le 2026-09-07, devenue faux positif permanent).
+
 - **2026-09-10 — Convention adoptée : un commit qui invoque un arbitrage humain nomme le CANAL et la
   DATE.** Arbitrage Samuel, AskUserQuestion session principale, 2026-09-10. Forme :
   `(arbitrage Samuel, AskUserQuestion session principale, 2026-09-09)`. **Sans gate machine** — la

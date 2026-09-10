@@ -1365,3 +1365,4 @@ Plans:
 
 Partition réelle de `vibeflow-os` : geste séparé, gaté humain, postérieur à cette phase —
 déclencheur de reprise daté en `.planning/STATE.md` § Decisions (D-02, inscrit par le plan 39-03).
+Confirmé par le plan 39-03 (§Task 2, 2026-09-10) — présence non dupliquée vérifiée.
