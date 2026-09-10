@@ -130,7 +130,13 @@ extract_num() { # <basename> -> imprime le préfixe numérique brut, 1 si aucune
 }
 
 normalize_num() { # <brut, ex "01" ou "05.2"> -> forme décimale canonique ("1", "5.2")
-  local raw="$1" int="$raw" frac="" n
+  local raw="$1" int frac="" n
+  # `int` est affecté en instruction SÉPARÉE de sa déclaration `local` : dans `local a=$1 b=$a`,
+  # bash expand TOUS les mots (dont `$a`) AVANT que `local` n'exécute la première affectation —
+  # `$a` référerait alors la variable `a` de la portée ENGLOBANTE (souvent non liée sous `set -u`),
+  # jamais la valeur qu'on croit venir de fixer sur la même ligne. Mesuré ici : "raw: unbound
+  # variable" sur la toute première normalisation de la suite de tests.
+  int="$raw"
   case "$raw" in
     *.*) int="${raw%%.*}"; frac="${raw#*.}" ;;
   esac
@@ -311,7 +317,10 @@ if [ "${#FAIL_MSGS[@]}" -gt 0 ]; then
 fi
 
 if [ "$CHECKED" -eq 1 ]; then
-  echo "[check-divergence] conforme — compartiment(s) inspecté(s), aucune divergence S2/S4/S5" >&2
+  # Le mot « divergence » n'apparaît JAMAIS sur le chemin conforme : un test qui cherche la
+  # sous-chaîne « divergence » sur la sortie doit pouvoir discriminer conforme (0) de signalé (1)
+  # rien qu'à sa présence — cf. must_have « output does not contain the word "divergence" ».
+  echo "[check-divergence] conforme — compartiment(s) inspecté(s), aucun signal S2/S4/S5" >&2
 else
   echo "[check-divergence] $WS_ROOT présent mais vide — rien à inspecter" >&2
 fi
