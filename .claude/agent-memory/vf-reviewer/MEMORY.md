@@ -21,3 +21,4 @@
 - [Casse défait une garde de chemin par string](feedback_case-insensitive-fs-defeats-path-string-guard.md) — cd -P/pwd -P ne canonicalise pas la casse : $HOME bypass confirmé par inode identique (38-04, revue phase 38)
 - [2>&1 masque une affirmation de flux](feedback_2to1-merge-hides-stream-claim.md) — un test qui fusionne stdout+stderr ne peut jamais prouver "sur stdout" ; T41/38-04 le confond avec log() >&2
 - [Garde précoce mord tous les verbes](feedback_flag-guard-scoped-to-all-verbs.md) — cmd="$1" arrive tard (l.2724) ; une garde --target non scopée bloque aussi status/sync/no-op (D-38-P, phase 38)
+- [Mutant sans dépendance sœur = échec précoce masqué](feedback_mutant-sibling-dependency-masks-vacuity.md) — MUT-2/39-01 : rc=2 identique avec/sans mutation ciblée, `|| true` avale aussi le return
