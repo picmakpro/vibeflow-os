@@ -37,7 +37,7 @@
 | ADR-066 | 2026-08-04 | La zone 2 est activée, pas différée : un prérequis de version insatisfiable ne gate pas, et le risque mesuré est inexistant | Validée |
 | ADR-067 | 2026-08-04 | `hooks.community` refusé : c'est une mesure de style, pas de conformité — 6 types maison hors liste amont, 68 % des sujets > 72 caractères | Validée |
 | ADR-068 | 2026-08-04 | Profils de contexte du moteur refusés (rien à activer, notre contrat typé est per-rôle et plus strict) — et `workflow.inline_plan_threshold` inchangé à 2, la mesure étant le livrable | Validée |
-| ADR-069 | 2026-08-04 | Les workstreams GSD sont adoptés, avec leurs quatre limites datées, la condition dure « aucune partition tant qu'une phase est en vol », la révision de l'Iron Law 2 et l'amendement d'ADR-064 | Validée |
+| ADR-069 | 2026-08-04 | Les workstreams GSD sont adoptés, avec leurs quatre limites datées, la condition dure « aucune partition tant qu'une phase est en vol », la révision de l'Iron Law 2 et l'amendement d'ADR-064 | Validée — amendée le 2026-09-09 (risque (b) migré au niveau commit, D-10 rouverte en équipe, couverture re-mesurée) |
 | ADR-070 | 2026-08-06 | Une disposition `accept` de registre de menaces borne le vecteur qu'elle couvre, jamais le risque en bloc — RCE CWD dans `dag.sh`, 5ᵉ passage du motif de confinement de chemin | Validée |
 
 > **`ADR-065` : numéro non attribué** — constaté le 2026-08-04. Le registre saute de `ADR-064` à
@@ -2170,6 +2170,52 @@ Rouvrir **ssi** l'un de ces faits change, chacun re-dérivable par la commande c
 Ce déclencheur est **objectif et sans échéance** : une date de revue rouvrirait un dossier vide,
 alors que chacune des trois conditions ci-dessus ne se déclenche que s'il s'est réellement passé
 quelque chose en amont.
+
+### Amendement 2026-09-09 — risque (b) migré au niveau commit, collision ADR-064 rouverte en équipe, couverture re-mesurée
+
+**Constat terrain (Phase 39, cadrage `39-CONTEXT.md`)** : trois faits mesurés au 2026-09-09 imposent
+une mise à jour datée de cette entrée, sans réviser ni la décision d'adoption ni la condition dure.
+
+**(1) Couverture re-dérivée** : re-exécution live, à l'écriture de cet amendement, de la commande
+`awk`+`comm` ci-dessus contre `$HOME/.claude/gsd-core/workflows` (`@opengsd/gsd-core` **1.13.0**) —
+`atteinte=89` (pas 91 : le dossier de workflows a bougé entre 1.9.1 et 1.13.0, fait à reporter tel
+quel, pas une correction de la mesure d'origine), `K2=9` (**10,1 %**), `aveugles=39`. Contrastée avec
+le `7/91 = 7,7 %` original : les deux chiffres restent corrects **pour leur propre date** — c'est le
+corpus qui a bougé, pas la mesure.
+
+**(2) D-09 — le risque (b) a MIGRÉ, il n'a pas disparu.** Le silence relevé au 2026-08-04 sur les
+regex ancrées de `pr-branch.md` est **levé au niveau chemin** (bloc `$OTHER`, `pr-branch.md:410`)
+mais **subsiste au niveau COMMIT** : `.planning/workstreams/<nom>/ROADMAP.md` ne matche pas
+`STRUCTURAL_RE` (ancré `^\.planning/ROADMAP\.md$`, `pr-branch.md:255`) et tombe dans
+`TRANSIENT_ONLY` — un commit qui ne touche QUE la feuille de route d'un workstream est **EXCLU dans
+les deux modes** `pr_strict`, invisible dans tout rapport. Choix explicite, écrit ici, jamais
+implicite : **coût assumé, daté**. Pas de correctif local de `pr-branch.md` — la révision de l'Iron
+Law 2 ci-dessus interdit toujours le fork d'une capacité du moteur. Mitigation : le geste §4(b) de
+`workstreams.md` (lister les commits de roadmap attendus avant d'ouvrir une PR) est étendu pour
+nommer explicitement ce trou de niveau commit.
+
+**(3) D-10 — la composabilité avec ADR-064 est CLOSE d'un côté, OUVERTE de l'autre.** Entre deux
+sessions Claude Code distinctes (deux worktrees, deux process), l'isolation mesurée est intacte —
+fermée, comme l'amendement d'ADR-064 ci-dessus le décrit. Mais **au sein du modèle d'équipe VibeFlow
+lui-même**, c'est **ouvert** : tous les sous-agents d'une même session héritent du même
+`CLAUDE_CODE_SESSION_ID` (`CLAUDE_CODE_CHILD_SESSION=1`) — un manager qui dispatche plusieurs workers
+sur des worktrees différents leur fait partager un seul pointeur, dernier `set` gagnant. C'est une
+limite **datée et nommée** du 2026-09-09, distincte du risque (c) d'origine (qui n'adressait que le
+cas pointeur-vs-worktree, jamais le cas dispatch-en-équipe).
+
+**(4) C17, ARBITRÉ PAR SAMUEL le 2026-09-10 (revu depuis la première passe de correction, qui l'avait
+déclaré coût assumé) : le filet est ARMÉ EN CI, la mutité par défaut n'est PAS assumée.** Le hook
+`scripts/hooks/post-merge` (plan `39-01`) reste — il sert les merges locaux — mais ce dépôt fusionne
+ses PR côté GitHub, où `post-merge` ne s'exécute JAMAIS : un filet correct qui ne se déclenche jamais
+sur le cas d'usage dominant est très exactement le mode de défaillance nommé par **ADR-059** (« sûr
+mais inerte en conditions de mission »), le même constat qui avait fait renoncer au ré-armement
+d'`isolation: worktree` en Phase 35 — ce lab a déjà payé une fois pour un dispositif juste et inerte,
+il ne paie pas deux fois. `plan 39-01` Tâche 3 câble donc `check-divergence.sh` sur le job `gates`
+existant (celui qui exécute déjà `check-workstream-pointer.sh` et `check-state-integrity.sh`), avec
+une **preuve de déclenchement réel par mutation** (une fixture divergée qui bascule effectivement de
+exit 0 à exit 1 EN CI), pas seulement la présence du gate — même leçon gravée ×4 phases dans ce lab :
+aucun vert auto-déclaré ne tient. Le Critère de succès 4 (« existe et est bruyant ») est donc vrai à
+la fois localement (hook) et sur le chemin dominant de ce dépôt (CI).
 
 ---
 

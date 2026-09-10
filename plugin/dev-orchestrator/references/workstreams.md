@@ -143,6 +143,9 @@ disparaissent **silencieusement** de la branche de PR — silencieusement, c'est
 avertissement, sans compteur, sans trace.
 → **Geste** : avant d'ouvrir une PR depuis un compartiment, liste explicitement les commits de
 feuille de route attendus et vérifie qu'ils y figurent ; rattache-les à la main sinon.
+Précision datée (ADR-069, amendement 2026-09-09) : `.planning/workstreams/<nom>/ROADMAP.md` n'est
+**pas structurel au niveau commit non plus** — exclu silencieusement dans les deux modes de
+`pr_strict`, pas seulement au niveau chemin (`$OTHER`) déjà couvert ci-dessus.
 
 **(c) Le pointeur de session ne se compose pas avec ADR-064.** Il est indexé sur le chemin absolu
 du `.planning`, donc chaque worktree ouvre sans compartiment résolu, et rien ne le dit.
@@ -155,6 +158,10 @@ racine, pendant que le `STATE.md` du compartiment déclare cette phase courante.
 rien** : il n'y a pas de conflit à signaler, il y a deux vérités qui ne se rencontrent jamais.
 → **Geste** : ne prends jamais le silence de Git pour une validation après une partition ; compare
 à la main les dossiers de phase des deux côtés avant de fusionner.
+Complément mécanique (D-11/D-12, plan `39-01`) : `scripts/hooks/post-merge` + `check-divergence.sh`
+détectent cette signature automatiquement — opt-in (`git config core.hooksPath scripts/hooks`) et
+câblé sur le job CI `gates`, jamais armé par défaut. Le geste manuel ci-dessus reste le repli sur un
+dépôt non armé.
 
 ## 5. La condition dure
 
