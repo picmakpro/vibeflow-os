@@ -58,7 +58,7 @@ arborescence imaginaire** — une clé d'extraction qui ne matchait **aucun** de
 un signal de cardinalité qui rougissait sur un arbre **sain**, une fixture qui commitait des dossiers
 **vides** que git ne versionne pas.
 
-**Quatre tours** — le quatrième demandé par Samuel le 2026-09-10 (AskUserQuestion, session
+**Cinq tours** — les quatrième et cinquième demandés par Samuel le 2026-09-10 (AskUserQuestion, session
 principale) sur la foi de la réserve n°2 de ce rapport :
 1. Plans initiaux → 5 bloquants + 6 warnings (2 juges frais, findings fusionnés, **un seul** `reopen`)
 2. Correction C1→C17 → rejeu **par exécution** : 5 points tiennent, 3 prises restent, dont **une neuve**
@@ -70,6 +70,14 @@ principale) sur la foi de la réserve n°2 de ce rapport :
    l'octet près**. Corrigé en séparant les trois sorties (peupler la cible **et** créer un
    compartiment poubelle en dernier — mesuré : ni l'un ni l'autre ne suffit seul), et en faisant
    remonter la preuve à deux workers dans le bloc **machine** au lieu de la prose.
+
+5. **5ᵉ passe, ciblée et exécutante** (demandée par Samuel le 2026-09-10, avec règle d'arrêt posée
+   d'avance) → **ZÉRO BLOQUANT**. Le correctif du 4ᵉ tour est confirmé de bout en bout par des
+   mesures indépendantes : trois empreintes mutuellement distinctes, contrôleur **rouge sur
+   l'omission de chacun des deux workers**, jeton machine qui **peut** valoir 0, et les deux volets
+   prouvés **chacun insuffisant seul, suffisants combinés**. Restent un **majeur** (deux critères
+   d'acceptation de `39-03` T1 mesurés faux — voir réserve 6) et un **mineur** (l'explication du plan
+   se trompe de mécanisme, sa conclusion reste juste).
 
 **Le motif de la mission** : les trois défauts bloquants successifs sont le **même** — un mécanisme
 qui a l'air correct et **ne peut pas rendre rouge**. Une clé d'extraction qui ne matche rien, un shim
@@ -113,3 +121,16 @@ en faveur des juges exécutants.
    (`rtk cat` sur un fichier de 497 lignes n'a pas tronqué) : à traiter comme **rapporté, pas
    établi**. Le réflexe de recouper toute conclusion importante par une seconde méthode reste bon
    indépendamment de la cause.
+
+6. **Deux critères d'acceptation de `39-03` T1 sont mesurés FAUX** sur la séquence exacte qu'il
+   prescrit, sans `GSD_WORKSTREAM` exporté (ce que le plan interdit) :
+   `check-workstream-pointer.sh --path <clone>` rend **exit 1** (le critère attend 0) et
+   `check-state-integrity.sh --path <clone>` rend **exit 2** (l'action attend 0). Cause **structurelle
+   sous Claude Code** : une clé de session résout toujours, donc le marqueur partagé n'est jamais
+   écrit, et la garde refuse explicitement le pointeur de session comme canal composable. Avec
+   `GSD_WORKSTREAM=legacy` **inline**, les deux passent à 0. Aucun des plans ne modifie ces scripts.
+   **Non-régression sur le dépôt réel intacte** (pointer → 3, state-integrity → 0).
+   *Classé `majeur`, pas bloquant, par le juge — donc non corrigé, conformément à la règle d'arrêt.*
+7. **Incohérence interne mineure de `39-03` T1** : le bloc `<automated>` lance le gate de divergence
+   **avant** `sink` + peuplement, alors que l'`<action>` prescrit de le lancer **après** les workers.
+   La preuve machine et le critère d'acceptation n'exercent pas le même état.

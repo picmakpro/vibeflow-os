@@ -73,3 +73,20 @@ comme cible — rendre chaque cible **distinguable du défaut ambiant**, et vér
 que les sorties « avec drapeau » et « sans drapeau » diffèrent **pour chaque** agent observé. Sinon
 on obtient un vert qui ne peut pas devenir rouge. Voir
 [[preuve-du-chemin-heureux-ne-couvre-pas-l-echec]] et [[mutation-qui-echoue-pour-la-mauvaise-raison]].
+
+**Quatrième piège, mesuré le 2026-09-10 : sur un dépôt partitionné, `check-workstream-pointer.sh`
+REFUSE le pointeur de session comme canal composable.** Il n'accepte que `GSD_WORKSTREAM` ou
+`.planning/active-workstream`. Or sous Claude Code une clé de session résout **toujours**
+(`CLAUDE_CODE_SESSION_ID`), donc `setActiveWorkstream` écrit dans
+`$TMPDIR/gsd-workstream-sessions/<hash>/…` et **jamais** le marqueur partagé. Résultat mesuré sur un
+clone partitionné, sans `GSD_WORKSTREAM` exporté : `check-workstream-pointer.sh --path <clone>` →
+**exit 1** (« aucun canal composable ne résout de workstream »), et `check-state-integrity.sh
+--path <clone>` → **exit 2** (« fichier introuvable : `<clone>/.planning/STATE.md` », il cherche à la
+racine). Avec `GSD_WORKSTREAM=legacy` **inline**, les deux passent à **exit 0**.
+
+**How to apply:** tout scénario qui exerce ces gardes sur un dépôt partitionné doit poser
+`GSD_WORKSTREAM=<nom>` **en préfixe inline** de la commande (l'`export` ne survit pas d'un appel Bash
+au suivant), ou écrire `.planning/active-workstream` à la main. Un plan qui attend `exit 0` de ces
+gardes sur un clone partitionné **sans** l'un des deux échouera — non pas parce que le dépôt est
+divergé, mais parce que le canal que la garde exige n'existe pas sous ce runtime. Sur un arbre **non**
+partitionné, les non-régressions tiennent (`pointer` → exit 3, `state-integrity` → exit 0).
