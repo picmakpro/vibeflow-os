@@ -19,12 +19,8 @@ tout le travail se fait dans tes sous-agents, chacun avec un contexte minimal sc
 Format canonique : `.claude/agents/dev-orchestrator-references/mission-contracts.md` (section
 « Brief de mission »). Un brief en **langage naturel brut** est accepté : mappe-le toi-même
 vers périmètre/mode/contraintes via la carte d'intention (`intent-routing.md`, on-demand).
-Si le périmètre reste inexploitable après mapping, demande-le (AskUserQuestion) AVANT tout dispatch. **Filet de repli (D-09, escalade vivante — révisé 2026-08-16)** : en
-sous-agent, le runtime peut ne pas fournir `AskUserQuestion` malgré sa déclaration. Cascade :
-**(1)** `SendMessage(to: "main")` (contexte + options + recommandation) — la session principale
-interroge l'humain et te relaie la réponse ; tu bloques le nœud concerné du DAG, les indépendants
-continuent. **(2)** Sinon `human_needed` dans ton rapport typé — la session principale te relance
-avec la réponse. Jamais d'auto-réponse, jamais un gate humain franchi par fallback ou timeout.
+Si le périmètre reste inexploitable après mapping, demande-le (AskUserQuestion) AVANT tout dispatch.
+**Filet de repli (D-09, escalade vivante — révisé 2026-08-16)** : en sous-agent, `AskUserQuestion` peut manquer malgré sa déclaration — cascade **(1)** `SendMessage(to: "main")` (contexte + options + recommandation), la session principale interroge l'humain et relaie la réponse (tu bloques le nœud concerné, les indépendants continuent) ; **(2)** sinon `human_needed` au rapport typé, relance à la réponse. Jamais d'auto-réponse, jamais un gate humain franchi par fallback ou timeout.
 
 ## Sources de connaissance (à lire au démarrage)
 
@@ -122,6 +118,9 @@ et hors mode superviser étape-par-étape.
 **Chaque mandat embarque le digest de mission** (≤ 30 lignes, format : `mission-contracts.md`
 §Digest) : étape, périmètre du nœud, décisions actives, verdicts amont, conventions cibles.
 Le disque fait foi ; le digest amortit les relectures intégrales de `.planning/` par étage.
+
+Sur un dépôt partitionné (`.planning/workstreams/` présent), chaque mandat nomme EXPLICITEMENT le compartiment — jamais l'inférence d'un `GSD_WORKSTREAM` déjà exporté dans TON shell, qui n'isole rien entre workers que tu dispatches toi-même (même `CLAUDE_CODE_SESSION_ID`, D-10 OPEN) ; embarque
+aussi un `GSD_SESSION_KEY` distinct par mandat dès que ≥ 2 workers concurrents visent des compartiments différents. Discipline VF-side seule (D-05).
 
 Pour chaque étape retenue, choisis les étages pertinents (une étape UI saute l'audit sécurité ;
 une étape sécurité le garde) :
