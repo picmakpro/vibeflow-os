@@ -1,5 +1,20 @@
 # Changelog — conductor
 
+## [v1.36.0] — 2026-09-15 (/vf-update propose la mise à jour d'un moteur gsd-core périmé)
+
+**Minor** (nouvelle branche du skill `vf-update`, aucun script conductor modifié) :
+
+- **`skills/vf-update/SKILL.md`** — volet moteur complété d'une **sonde de fraîcheur** : après le
+  gate de présence (`check-gsd-engine.sh`, inchangé), sur un état gsd-core le skill lance
+  `ensure-deps.sh --check-engine-update` (dev-orchestrator v2.21.0, lecture seule) ; exit 0 →
+  ligne moteur « `@opengsd/gsd-core` A.B.C → X.Y.Z (dernier `^1` publié) à mettre à jour »,
+  composée depuis les numéros réels ; exit 3 → silence. La ligne est confirmée **indépendamment**
+  du plugin et des modules (ADR-031), puis exécutée par `ensure-deps.sh --upgrade-engine`. Un
+  état legacy garde la priorité (migration), `--modules-only` ne propose ni l'un ni l'autre.
+  Garde-fou « ne jamais downgrader » étendu au moteur (strictement inférieur, semver).
+- **`commands/vf-update.md`** — description alignée (moteur legacy → migration, périmé → mise à
+  jour, confirmations indépendantes).
+
 ## [v1.35.0] — 2026-09-14 (Phase 39 — filet de détection de divergence de workstream, PART-04)
 
 **Minor** (nouveau script, nouvelle suite, nouveau signal observable) :

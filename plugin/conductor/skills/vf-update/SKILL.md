@@ -1,6 +1,6 @@
 ---
 name: vf-update
-description: "Utiliser quand l'utilisateur veut mettre à jour VibeFlow — « mets à jour vibeflow », « /vf-update », ou en réaction au bandeau « mise à jour disponible » au démarrage de session. Compare la version installée au dernier tag publié, montre le changelog, puis met à jour le plugin (cache marketplace) et les modules installés, sous validation humaine. Détecte aussi l'état du moteur GSD (legacy vs `@opengsd/gsd-core`) et le propose en migration, sous confirmation indépendante. ✘ pas pour réaligner la **structure** d'un lab sur une doctrine qui a évolué, une fois la nouvelle version posée → /vf-calibrate · ✘ pas pour ajouter, retirer ou re-choisir des modules → /vibeflow-install · ✘ pas pour mettre à jour la documentation d'un projet → gsd-docs-update. Invocable par l'utilisateur ET par `vibeflow-conductor`."
+description: "Utiliser quand l'utilisateur veut mettre à jour VibeFlow — « mets à jour vibeflow », « /vf-update », ou en réaction au bandeau « mise à jour disponible » au démarrage de session. Compare la version installée au dernier tag publié, montre le changelog, puis met à jour le plugin (cache marketplace) et les modules installés, sous validation humaine. Détecte aussi l'état du moteur GSD (legacy vs `@opengsd/gsd-core`, ou gsd-core périmé face au dernier `^1` publié) et le propose en migration ou en mise à jour, sous confirmation indépendante. ✘ pas pour réaligner la **structure** d'un lab sur une doctrine qui a évolué, une fois la nouvelle version posée → /vf-calibrate · ✘ pas pour ajouter, retirer ou re-choisir des modules → /vibeflow-install · ✘ pas pour mettre à jour la documentation d'un projet → gsd-docs-update. Invocable par l'utilisateur ET par `vibeflow-conductor`."
 ---
 
 # vf-update — Mise à jour du plugin & des modules
@@ -58,13 +58,27 @@ mise à jour du plugin (c'est le point de couture de la phase, D-07) : lance
   gsd-core à jour + reliquat legacy détecté), l'affiche dans le diagnostic **sans jamais proposer
   de migration** ; s'il n'a rien imprimé (état absent, ou gsd-core propre), ne dit rien.
 
+**Fraîcheur du moteur** — seulement si le gate de présence est sorti en `3` sur un état gsd-core
+(propre ou avec reliquat ; un état legacy ne passe jamais par cette sonde, la migration prime) :
+lance `bash <S-moteur>/ensure-deps.sh --check-engine-update` (lecture seule, sonde réseau
+best-effort — `npm view`, jamais `npx`). Deux branches, exactement :
+
+- **Exit `0`** (périmé, seul cas actionnable) → stdout porte une ligne
+  `[gsd-outdated] … A.B.C installé → X.Y.Z publié (plafond ^1)` ; compose la ligne moteur à partir
+  des numéros réels de cette sortie : « moteur GSD `@opengsd/gsd-core` A.B.C → X.Y.Z (dernier `^1`
+  publié) à mettre à jour ».
+- **Exit `3`** (à jour, réseau ou npm KO, VERSION illisible) → silence : ne dit rien, ne propose
+  rien. Une détection impossible n'est jamais une erreur.
+
 **Arrêt combiné** : « VibeFlow est à jour (v<installed>) » ne peut sortir seul, suivi du **stop**,
 que si le volet moteur n'a produit aucune ligne (silence ou signal non actionnable) **et** que
-`update_available = false`. Dès que le volet moteur a produit la ligne legacy, le message combine
-les deux volets et le flux **continue** — même si le plugin est déjà à jour : « plugin à jour
-(v<installed>), moteur GSD legacy A.B.C → `@opengsd/gsd-core` à migrer ». Les numéros viennent
-toujours des sorties réelles de `check-plugin-update.sh --print` et de `check-gsd-engine.sh`,
-jamais de valeurs recopiées depuis la doctrine. Sinon (mise à jour plugin disponible, avec ou sans
+`update_available = false`. Dès que le volet moteur a produit la ligne legacy **ou** la ligne
+périmé, le message combine les deux volets et le flux **continue** — même si le plugin est déjà à
+jour : « plugin à jour (v<installed>), moteur GSD legacy A.B.C → `@opengsd/gsd-core` à migrer »,
+ou « plugin à jour (v<installed>), moteur GSD `@opengsd/gsd-core` A.B.C → X.Y.Z à mettre à
+jour ». Les numéros viennent toujours des sorties réelles de `check-plugin-update.sh --print`, de
+`check-gsd-engine.sh` et de `ensure-deps.sh --check-engine-update`, jamais de valeurs recopiées
+depuis la doctrine. Sinon (mise à jour plugin disponible, avec ou sans
 ligne moteur), continue vers l'étape 2.
 
 ### 2 — Changelog (ce qui a changé)
@@ -80,7 +94,8 @@ modules. Reste factuel, pas de survente.
 Récapitule via **AskUserQuestion** : « Plugin v<installed> → v<latest> + les modules installés
 seront mis à jour. Continuer ? ». Si le volet moteur (étape 1) a produit une ligne, ajoute **une
 ligne de plus** au récapitulatif : « Moteur GSD legacy A.B.C → `@opengsd/gsd-core` à migrer.
-Continuer ? ». Cette ligne moteur est acceptable ou refusable **indépendamment** de la ligne plugin
+Continuer ? » (ligne legacy) ou « Moteur GSD `@opengsd/gsd-core` A.B.C → X.Y.Z à mettre à jour.
+Continuer ? » (ligne périmé). Cette ligne moteur est acceptable ou refusable **indépendamment** de la ligne plugin
 et de la ligne modules — un refus n'a **aucun effet de bord**, et elle n'est **jamais** ni relancée
 ni reformulée dans la même session (ADR-031, P-07).
 
@@ -88,8 +103,8 @@ Gère les flags **existants** de `$ARGUMENTS` (aucun flag nouveau créé — den
 
 - `--check` → affiche seulement les étapes 1–2, **y compris l'état du moteur GSD** comme le reste
   du diagnostic, **ne demande rien**, **stop**.
-- `--modules-only` → saute l'étape 4a (ne touche pas au plugin) et **ne propose pas** la migration
-  du moteur — son nom borne son périmètre aux modules.
+- `--modules-only` → saute l'étape 4a (ne touche pas au plugin) et **ne propose ni** la migration
+  **ni** la mise à jour du moteur — son nom borne son périmètre aux modules.
 
 ### 4 — Exécution (après OK)
 
@@ -108,7 +123,10 @@ b. **Couche modules** : `bash <S>/vf-update-run.sh`. Le script localise **lui-m�
    faite. Relaie son résumé.
 
 c. **Couche moteur** (seulement si la ligne moteur de l'étape 3 a été acceptée) : invoque
-   `bash <S-moteur>/ensure-deps.sh --migrate-engine` et relaie son résumé. S'exécute **même si** la
+   `bash <S-moteur>/ensure-deps.sh --migrate-engine` (ligne legacy) **ou**
+   `bash <S-moteur>/ensure-deps.sh --upgrade-engine` (ligne périmé) et relaie son résumé — le
+   script re-sonde lui-même le registre et ne relance `npx` que si le VERSION installé est
+   toujours strictement inférieur au dernier `^1` publié. S'exécute **même si** la
    couche plugin (4a) a échoué — les confirmations sont indépendantes. Le skill n'invoque **jamais**
    l'installeur amont directement : il route vers `ensure-deps.sh`, point de vérité unique du scope
    et du plafond de version (Iron Law 2, `plugin/conductor/AGENT.md:114`).
@@ -117,15 +135,18 @@ c. **Couche moteur** (seulement si la ligne moteur de l'étape 3 a été accept�
 
 Termine par : « Modules à jour sur disque. **Redémarre Claude Code** pour recharger le plugin
 (commandes, agents) dans sa nouvelle version. » Le plugin lui-même n'est pris en compte qu'au
-prochain démarrage de session. Si la couche moteur (4c) a tourné, ajoute : une migration du moteur
-pose de nouveaux agents et skills, eux aussi pris en compte seulement au prochain démarrage.
+prochain démarrage de session. Si la couche moteur (4c) a tourné, ajoute : une migration ou une
+mise à jour du moteur pose de nouveaux agents et skills, eux aussi pris en compte seulement au
+prochain démarrage.
 
 ## Garde-fous
 
 - **Aucune mise à jour sans confirmation explicite** (sauf `--modules-only`/`--check` qui restent
   cadrés). ADR-031.
 - **Best-effort réseau** : une détection impossible n'est jamais une erreur bloquante.
-- **Ne jamais downgrader** : l'engine saute les modules déjà à jour (comparaison de version).
+- **Ne jamais downgrader** : l'engine saute les modules déjà à jour (comparaison de version) ; la
+  couche moteur ne réinstalle qu'un gsd-core **strictement inférieur** au dernier `^1` publié
+  (semver, jamais lexical), et ne touche jamais à un moteur dont la version est indécidable.
 - Périmètre : le **plugin VibeFlow**, ses modules, **et l'état du moteur GSD** — détecté et
   proposé dans ce périmètre, **jamais installé sans accord explicite** (ADR-031, ADR-058).
   Superpowers reste hors périmètre : la phase qui a posé cette capacité ne touche qu'au moteur GSD.

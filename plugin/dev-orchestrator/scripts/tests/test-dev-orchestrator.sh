@@ -658,6 +658,170 @@ else
 fi
 rm -rf "$T2L_HOME" "$T2L_PROJ" "$T2L_BIN"
 
+# --- Fraîcheur du moteur gsd-core face au plafond ^1 (2026-09-15) ------------------------------
+# CE QUE CES CAS PROTÈGENT. Un poste avec gsd-core 1.13.0 alors que 1.14.0 est publié restait
+# « GSD déjà présent (skip) » pour toujours : ensure_gsd() ne lisait jamais le VERSION installé et
+# check-gsd-engine.sh ne compare AUCUN numéro par doctrine (D-05, piège legacy 1.42.3). La
+# fraîcheur se décide ICI, dans le script qui porte déjà le plafond `^1` : la référence est la
+# dernière version PUBLIÉE satisfaisant ^1 — exactement ce qu'une install neuve poserait.
+# Harnais : HOME jetable avec gsd-core/VERSION, npm stubé (« view » rejoue une réponse fixée,
+# « ls » échoue), node 24, npx tracé. stdout et rc capturés séparément, jamais l'un déduit de
+# l'autre (piège D-14).
+t2u_make_env() { # <version-installée|""> <stdout-npm-view> <rc-npm-view> [legacy-version]
+  T2U_HOME="$(mktemp -d)"; vf_tmp_track "$T2U_HOME"
+  T2U_BIN="$(mktemp -d)";  vf_tmp_track "$T2U_BIN"
+  T2U_TRACE="$(mktemp)";   vf_tmp_track "$T2U_TRACE"
+  T2U_NPM_TRACE="$(mktemp)"; vf_tmp_track "$T2U_NPM_TRACE"
+  T2U_VIEW="$T2U_BIN/.view-stdout"
+  printf '%s' "$2" > "$T2U_VIEW"
+  if [ -n "$1" ]; then
+    mkdir -p "$T2U_HOME/.claude/gsd-core"; printf '%s' "$1" > "$T2U_HOME/.claude/gsd-core/VERSION"
+  fi
+  if [ -n "${4:-}" ]; then
+    mkdir -p "$T2U_HOME/.claude/get-shit-done"; printf '%s' "$4" > "$T2U_HOME/.claude/get-shit-done/VERSION"
+  fi
+  cat > "$T2U_BIN/npm" <<SH
+#!/usr/bin/env bash
+echo "npm \$*" >> "$T2U_NPM_TRACE"
+if [ "\$1" = "view" ]; then cat "$T2U_VIEW"; exit $3; fi
+exit 1
+SH
+  cat > "$T2U_BIN/node" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = "-e" ]; then printf '%s' "24"; elif [ "$1" = "--version" ]; then echo "v24.0.0"; fi
+exit 0
+SH
+  cat > "$T2U_BIN/npx" <<SH
+#!/usr/bin/env bash
+echo "npx-invoked \$*" >> "$T2U_TRACE"
+exit 0
+SH
+  chmod +x "$T2U_BIN/npm" "$T2U_BIN/node" "$T2U_BIN/npx"
+}
+t2u_run() { # [args...] → T2U_OUT (stdout), T2U_ERR (stderr), T2U_RC
+  local errf; errf="$(mktemp)"; vf_tmp_track "$errf"
+  T2U_OUT="$(env -u VF_ENSURE_DRY_RUN -u VF_ENSURE_FORCE -u VF_ENSURE_UPGRADE_ENGINE -u NVM_DIR -u CLAUDE_CONFIG_DIR \
+    HOME="$T2U_HOME" PATH="$T2U_BIN:/usr/bin:/bin" bash "$ENS" "$@" 2>"$errf")"; T2U_RC=$?
+  T2U_ERR="$(cat "$errf")"
+}
+T2U_ARRAY=$'[\n  "1.12.0",\n  "1.13.0",\n  "1.14.0"\n]'
+
+# T2u-A (SIGNAL) — 1.13.0 installé, ^1 publié jusqu'à 1.14.0 → --check-engine-update imprime
+# [gsd-outdated] avec LES DEUX numéros sur stdout, exit 0, npx jamais invoqué (lecture seule).
+t2u_make_env "1.13.0" "$T2U_ARRAY" 0
+t2u_run --check-engine-update
+if [ "$T2U_RC" -eq 0 ] && echo "$T2U_OUT" | "$GREP" -q '^\[gsd-outdated\].*1\.13\.0.*1\.14\.0' && [ ! -s "$T2U_TRACE" ]; then
+  ok "T2u-A signal : gsd-core 1.13.0 < 1.14.0 publié (^1) → [gsd-outdated] sur stdout, exit 0, npx jamais invoqué"
+else
+  ko "T2u-A signal : rc=$T2U_RC out=[$T2U_OUT] trace=[$(cat "$T2U_TRACE")]"
+fi
+
+# T2u-B (À JOUR) — 1.14.0 installé = dernier ^1 (réponse npm en chaîne nue, pas en tableau) →
+# stdout vide, exit 3, npx jamais invoqué.
+t2u_make_env "1.14.0" '"1.14.0"' 0
+t2u_run --check-engine-update
+if [ "$T2U_RC" -eq 3 ] && [ -z "$T2U_OUT" ] && [ ! -s "$T2U_TRACE" ]; then
+  ok "T2u-B à jour : 1.14.0 = dernier ^1 (chaîne nue) → stdout vide, exit 3"
+else
+  ko "T2u-B à jour : rc=$T2U_RC out=[$T2U_OUT]"
+fi
+
+# T2u-C (RÉSEAU KO) — npm view échoue → best-effort : stdout vide, exit 3, jamais d'erreur ni de
+# faux signal.
+t2u_make_env "1.13.0" "" 1
+t2u_run --check-engine-update
+if [ "$T2U_RC" -eq 3 ] && [ -z "$T2U_OUT" ] && [ ! -s "$T2U_TRACE" ]; then
+  ok "T2u-C réseau KO : npm view en échec → stdout vide, exit 3, aucun faux signal"
+else
+  ko "T2u-C réseau KO : rc=$T2U_RC out=[$T2U_OUT]"
+fi
+
+# T2u-D (PAS D'AUTORISATION) — 1.13.0 périmé, run PAR DÉFAUT (sans flag) : skip historique conservé
+# (« GSD déjà présent », version installée nommée), AUCUNE sonde réseau, npx jamais invoqué, exit 0.
+# La mise à jour est un geste autorisé par l'appelant (ADR-031), jamais un effet de bord du bootstrap.
+t2u_make_env "1.13.0" "$T2U_ARRAY" 0
+t2u_run
+if [ "$T2U_RC" -eq 0 ] && echo "$T2U_ERR" | "$GREP" -q "GSD déjà présent.*1\.13\.0" && [ ! -s "$T2U_TRACE" ] \
+   && ! "$GREP" -q "npm view" "$T2U_NPM_TRACE" 2>/dev/null; then
+  ok "T2u-D sans autorisation : périmé mais run par défaut → skip nommant 1.13.0, aucun npm view, npx jamais invoqué"
+else
+  ko "T2u-D sans autorisation : rc=$T2U_RC err=[$T2U_ERR] npm=[$(cat "$T2U_NPM_TRACE")] trace=[$(cat "$T2U_TRACE")]"
+fi
+
+# T2u-E (MISE À JOUR AUTORISÉE) — 1.13.0 périmé + --upgrade-engine → npx invoqué avec le plafond ^1
+# et le scope dérivé (user → --global), log nommant l'écart 1.13.0 → 1.14.0.
+t2u_make_env "1.13.0" "$T2U_ARRAY" 0
+t2u_run --upgrade-engine
+if [ "$T2U_RC" -eq 0 ] && "$GREP" -q 'npx-invoked -y @opengsd/gsd-core@^1 --claude --global' "$T2U_TRACE" \
+   && echo "$T2U_ERR" | "$GREP" -q "1\.13\.0 → 1\.14\.0"; then
+  ok "T2u-E --upgrade-engine : 1.13.0 → 1.14.0 → npx -y @opengsd/gsd-core@^1 --claude --global invoqué"
+else
+  ko "T2u-E --upgrade-engine : rc=$T2U_RC err=[$T2U_ERR] trace=[$(cat "$T2U_TRACE")]"
+fi
+
+# T2u-F (JAMAIS DE NO-OP BRUYANT) — 1.14.0 à jour + --upgrade-engine → npx jamais invoqué, log « à jour ».
+t2u_make_env "1.14.0" "$T2U_ARRAY" 0
+t2u_run --upgrade-engine
+if [ "$T2U_RC" -eq 0 ] && [ ! -s "$T2U_TRACE" ] && echo "$T2U_ERR" | "$GREP" -q "à jour"; then
+  ok "T2u-F --upgrade-engine à jour : npx jamais invoqué, log « à jour »"
+else
+  ko "T2u-F --upgrade-engine à jour : rc=$T2U_RC err=[$T2U_ERR] trace=[$(cat "$T2U_TRACE")]"
+fi
+
+# T2u-G (DRY-RUN) — périmé + --upgrade-engine en dry-run → la commande npx est LOGUÉE, jamais exécutée.
+t2u_make_env "1.13.0" "$T2U_ARRAY" 0
+T2U_ERR="$(env -u VF_ENSURE_FORCE -u NVM_DIR -u CLAUDE_CONFIG_DIR HOME="$T2U_HOME" PATH="$T2U_BIN:/usr/bin:/bin" \
+  VF_ENSURE_DRY_RUN=1 bash "$ENS" --upgrade-engine 2>&1 >/dev/null)"; T2U_RC=$?
+if [ "$T2U_RC" -eq 0 ] && echo "$T2U_ERR" | "$GREP" -q '(dry-run) npx -y @opengsd/gsd-core@^1' && [ ! -s "$T2U_TRACE" ]; then
+  ok "T2u-G dry-run + --upgrade-engine : commande npx loguée, jamais exécutée"
+else
+  ko "T2u-G dry-run : rc=$T2U_RC err=[$T2U_ERR] trace=[$(cat "$T2U_TRACE")]"
+fi
+
+# T2u-H (HORS PÉRIMÈTRE) — état legacy seul, puis état absent : --check-engine-update se tait
+# (exit 3, stdout vide) — la fraîcheur ne parle QUE de gsd-core ; legacy et absent appartiennent au
+# gate de présence (check-gsd-engine.sh) et au bootstrap.
+t2u_make_env "" "$T2U_ARRAY" 0 "1.42.3"
+t2u_run --check-engine-update; rc_legacy=$T2U_RC; out_legacy="$T2U_OUT"
+t2u_make_env "" "$T2U_ARRAY" 0
+t2u_run --check-engine-update
+if [ "$rc_legacy" -eq 3 ] && [ -z "$out_legacy" ] && [ "$T2U_RC" -eq 3 ] && [ -z "$T2U_OUT" ]; then
+  ok "T2u-H hors périmètre : legacy seul et absent → stdout vide, exit 3 (jamais de signal fraîcheur)"
+else
+  ko "T2u-H hors périmètre : legacy rc=$rc_legacy out=[$out_legacy] ; absent rc=$T2U_RC out=[$T2U_OUT]"
+fi
+
+# T2u-I (ENV ≡ FLAG) — VF_ENSURE_UPGRADE_ENGINE=1 équivaut à --upgrade-engine.
+t2u_make_env "1.13.0" "$T2U_ARRAY" 0
+T2U_RC=0; env -u VF_ENSURE_DRY_RUN -u VF_ENSURE_FORCE -u NVM_DIR -u CLAUDE_CONFIG_DIR HOME="$T2U_HOME" PATH="$T2U_BIN:/usr/bin:/bin" \
+  VF_ENSURE_UPGRADE_ENGINE=1 bash "$ENS" >/dev/null 2>&1 || T2U_RC=$?
+if [ "$T2U_RC" -eq 0 ] && "$GREP" -q 'npx-invoked -y @opengsd/gsd-core@^1' "$T2U_TRACE"; then
+  ok "T2u-I VF_ENSURE_UPGRADE_ENGINE=1 ≡ --upgrade-engine (npx invoqué)"
+else
+  ko "T2u-I VF_ENSURE_UPGRADE_ENGINE=1 : rc=$T2U_RC trace=[$(cat "$T2U_TRACE")]"
+fi
+
+# T2u-J (SEMVER, PAS LEXICAL) — 1.9.0 installé vs 1.14.0 publié : lexicalement « 1.9.0 » > « 1.14.0 »,
+# en semver c'est l'inverse. Un tri lexical rendrait ce poste « à jour » pour toujours.
+t2u_make_env "1.9.0" "$T2U_ARRAY" 0
+t2u_run --check-engine-update
+if [ "$T2U_RC" -eq 0 ] && echo "$T2U_OUT" | "$GREP" -q '^\[gsd-outdated\].*1\.9\.0.*1\.14\.0'; then
+  ok "T2u-J semver : 1.9.0 < 1.14.0 vu comme périmé (sort -V, jamais lexical)"
+else
+  ko "T2u-J semver : rc=$T2U_RC out=[$T2U_OUT]"
+fi
+
+# T2u-K (VERSION HOSTILE) — VERSION installé illisible (substitution de commande) : jamais réinjecté,
+# jamais comparé, --upgrade-engine n'installe PAS (indécidable ≠ périmé), exit 0.
+t2u_make_env '$(touch /tmp/t2m-pwned)' "$T2U_ARRAY" 0
+t2u_run --upgrade-engine
+if [ "$T2U_RC" -eq 0 ] && [ ! -s "$T2U_TRACE" ] && [ ! -e /tmp/t2m-pwned ] && echo "$T2U_ERR" | "$GREP" -q "illisible"; then
+  ok "T2u-K VERSION hostile : ni exécuté, ni comparé, ni mis à jour — « illisible » logué"
+else
+  ko "T2u-K VERSION hostile : rc=$T2U_RC err=[$T2U_ERR] trace=[$(cat "$T2U_TRACE")]"
+fi
+rm -f /tmp/t2m-pwned
+
 # T2e — Garde Node ≥ 24 : Node 18 détecté → npx jamais tenté, message Node ≥ 24 logué.
 T2E_HOME="$(mktemp -d)"
 T2E_BIN="$(mktemp -d)"
@@ -946,9 +1110,9 @@ fi
 if ! vf_resolve_python >/dev/null 2>&1; then
   skip "T2m vérification réelle (--force sur --verify) : python3 absent — cas non applicable"
 else
-  T2M_HOME="$(mktemp -d)"
-  mkdir -p "$T2M_HOME/.claude/agents"
-  cat > "$T2M_HOME/.claude/agents/gsd-executor.md" <<'EOF'
+  T2U_HOME="$(mktemp -d)"
+  mkdir -p "$T2U_HOME/.claude/agents"
+  cat > "$T2U_HOME/.claude/agents/gsd-executor.md" <<'EOF'
 ---
 name: gsd-executor
 description: exécute les plans GSD avec commits atomiques
@@ -959,43 +1123,43 @@ memory: project
 corps
 EOF
 
-  T2M_PROJ="$(mktemp -d)"
-  mkdir -p "$T2M_PROJ/.claude/gsd-core"
-  echo "1.8.0" > "$T2M_PROJ/.claude/gsd-core/VERSION"
-  printf '%s\n' '{ "mcpServers": { "test-lab-mcp": {} } }' > "$T2M_PROJ/.mcp.json"
+  T2U_PROJ="$(mktemp -d)"
+  mkdir -p "$T2U_PROJ/.claude/gsd-core"
+  echo "1.8.0" > "$T2U_PROJ/.claude/gsd-core/VERSION"
+  printf '%s\n' '{ "mcpServers": { "test-lab-mcp": {} } }' > "$T2U_PROJ/.mcp.json"
 
-  T2M_BIN="$(mktemp -d)"
-  cat > "$T2M_BIN/claude" <<'SH'
+  T2U_BIN="$(mktemp -d)"
+  cat > "$T2U_BIN/claude" <<'SH'
 #!/usr/bin/env bash
 if [ "$1" = "plugin" ] && [ "$2" = "list" ]; then echo superpowers; fi
 exit 0
 SH
-  chmod +x "$T2M_BIN/claude"
+  chmod +x "$T2U_BIN/claude"
 
   # Copie de ensure-deps.sh à côté d'un stub inject-mcp-tools.sh (résolution par dirname "$0") :
   # no-op silencieux hors --verify, VRAI injecteur en --verify.
-  T2M_SCRIPTS="$(mktemp -d)"
-  cp "$ENS" "$T2M_SCRIPTS/ensure-deps.sh"
-  T2M_REAL_INJECTOR="$MOD/scripts/inject-mcp-tools.sh"
-  cat > "$T2M_SCRIPTS/inject-mcp-tools.sh" <<EOF2
+  T2U_SCRIPTS="$(mktemp -d)"
+  cp "$ENS" "$T2U_SCRIPTS/ensure-deps.sh"
+  T2U_REAL_INJECTOR="$MOD/scripts/inject-mcp-tools.sh"
+  cat > "$T2U_SCRIPTS/inject-mcp-tools.sh" <<EOF2
 #!/usr/bin/env bash
 for a in "\$@"; do
-  if [ "\$a" = "--verify" ]; then exec bash "$T2M_REAL_INJECTOR" "\$@"; fi
+  if [ "\$a" = "--verify" ]; then exec bash "$T2U_REAL_INJECTOR" "\$@"; fi
 done
 exit 0
 EOF2
-  chmod +x "$T2M_SCRIPTS/inject-mcp-tools.sh"
+  chmod +x "$T2U_SCRIPTS/inject-mcp-tools.sh"
 
-  T2M_OUT=$(cd "$T2M_PROJ" && env -u VF_ENSURE_DRY_RUN -u VF_ENSURE_FORCE -u CLAUDE_CONFIG_DIR \
-    HOME="$T2M_HOME" PATH="$T2M_BIN:/usr/bin:/bin" bash "$T2M_SCRIPTS/ensure-deps.sh" 2>&1)
+  T2U_OUT=$(cd "$T2U_PROJ" && env -u VF_ENSURE_DRY_RUN -u VF_ENSURE_FORCE -u CLAUDE_CONFIG_DIR \
+    HOME="$T2U_HOME" PATH="$T2U_BIN:/usr/bin:/bin" bash "$T2U_SCRIPTS/ensure-deps.sh" 2>&1)
 
-  if echo "$T2M_OUT" | "$GREP" -qF "vérification MCP (--verify) signale un écart réel" \
-     && echo "$T2M_OUT" | "$GREP" -qF "mcp__test-lab-mcp__*"; then
+  if echo "$T2U_OUT" | "$GREP" -qF "vérification MCP (--verify) signale un écart réel" \
+     && echo "$T2U_OUT" | "$GREP" -qF "mcp__test-lab-mcp__*"; then
     ok "T2m vérification réelle : écart réel (injection silencieusement en échec) détecté et relayé fort dans le chaînage réel de patch_gsd_executor_mcp()"
   else
-    ko "T2m vérification réelle : écart non détecté/relayé (verify pas atteint avec --force sur la même cible que l'injection ?) [out=$T2M_OUT]"
+    ko "T2m vérification réelle : écart non détecté/relayé (verify pas atteint avec --force sur la même cible que l'injection ?) [out=$T2U_OUT]"
   fi
-  rm -rf "$T2M_HOME" "$T2M_PROJ" "$T2M_BIN" "$T2M_SCRIPTS"
+  rm -rf "$T2U_HOME" "$T2U_PROJ" "$T2U_BIN" "$T2U_SCRIPTS"
 fi
 
 # ---------------------------------------------------------------------------
