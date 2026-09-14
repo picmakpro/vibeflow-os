@@ -65,7 +65,7 @@ il filtre par vague et aurait redispatché d'autres plans de cette phase déjà 
 ## Tâche 1 — Clone, partition, deux workers concurrents, trois gates
 
 1. Clone jetable créé sous `mktemp -d` (`git clone -q --local --no-hardlinks
-   /Users/samuel/Documents/dev/vibeflow-os "$CLONE"`), jamais le dépôt de travail réel.
+   "$(git rev-parse --show-toplevel)" "$CLONE"`), jamais le dépôt de travail réel.
 2. `workstream create scratch --migrate-name legacy` — migration confirmée : `files_moved`
    contient `ROADMAP.md`, `STATE.md`, `REQUIREMENTS.md`, `phases` (4/4, conforme à la recherche
    de cadrage §5).

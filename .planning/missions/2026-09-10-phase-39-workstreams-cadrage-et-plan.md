@@ -343,3 +343,29 @@ rendre rouge —, et elle vivait dans ma propre liste de gates depuis le début.
   comblé** : la note de release se produit au **bump**, geste humain. À traiter au ship.
 - Réserves inchangées : aucun run CI distant observé ; le clone prouve un **mécanisme**, pas un usage
   concurrent réel.
+
+
+---
+
+# PARTIE V — SHIP (2026-09-14)
+
+Ship autorisé par Samuel (AskUserQuestion session principale, 2026-09-14) après reprise de session
+(poste éteint, 41 + 9 commits locaux intacts, aucun fichier suivi modifié). Huit gates rejoués au vert
+avant tout geste, bump racine **v2.60.0** (`4255c49`), conductor v1.35.0, dev-orchestrator v2.20.4,
+clôture ROADMAP / ledger / STATE (`658f831`), PR **#62**.
+
+## Premier run CI distant : ROUGE — et pas sur la réserve annoncée
+
+La réserve n°1 (« aucun run CI distant observé ») visait l'étape `check-divergence`. Elle est
+**verte** au premier run. Ce qui a rougi, c'est **`check-machine-paths.sh`** — un gate présent en CI
+depuis la Phase 24, exercé aussi par sa propre suite `test-check-machine-paths.sh` (d'où **deux** jobs
+rouges pour **une** cause) : sept chemins absolus `/Users/<user>/…` dans `39-03-PLAN.md` (6) et
+`39-03-SUMMARY.md` (1), écrits par le clone jetable.
+
+**Ce gate ne figurait pas dans la liste des huit de la checklist de reprise** (Partie III), alors
+que le hotfix fusionné la veille avait rougi dessus pour la même raison (`b7d17d5`). La checklist
+disait « rejouer TOUS les gates » et en énumérait huit : la liste, pas la consigne, a été rejouée.
+Correction : chemins remplacés par `"$(git rev-parse --show-toplevel)"` dans les commandes et par
+une formulation neutre dans la prose ; gate `0` et suite verte en local avant re-push. Leçon à garder :
+**la liste de gates d'un rapport n'est jamais exhaustive — la référence est le job CI `gates`
+lui-même** (`.github/workflows/ci.yml`), à lire avant de pousser.
