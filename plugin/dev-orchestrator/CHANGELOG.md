@@ -1,5 +1,34 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.21.0] — 2026-09-15 (moteur gsd-core périmé : détecté et mis à jour sous autorisation)
+
+**Minor** (nouvelle capacité de `scripts/ensure-deps.sh`, aucun changement du chemin par défaut) :
+
+- **Le bug** : un poste avec `@opengsd/gsd-core` 1.13.0 alors que 1.14.0 était publié restait
+  « GSD déjà présent (skip) » pour toujours — `ensure_gsd()` ne lisait jamais le `VERSION`
+  installé, et `check-gsd-engine.sh` ne compare aucun numéro par doctrine (D-05, piège legacy
+  1.42.3). `/vf-update` ne voyait donc que l'état legacy, jamais un gsd-core périmé.
+- **La référence** : « la plus récente pour VibeFlow » = la dernière version **publiée** qui
+  satisfait le plafond `^1` (`npm view @opengsd/gsd-core@^1 version`), exactement ce qu'une install
+  neuve résoudrait. `GSD_PACKAGE`/`GSD_RANGE` définis une seule fois, partagés par l'install, la
+  mise à jour et la sonde.
+- **`--check-engine-update`** (lecture seule, `npm view` borné par `fetch-timeout`/`fetch-retries=0`,
+  jamais `npx`) : périmé → `[gsd-outdated] … A.B.C installé → X.Y.Z publié` sur stdout, exit 0 ;
+  à jour, état absent/legacy, réseau KO ou VERSION illisible → stdout vide, exit 3. Même contrat
+  de sortie que `check-gsd-engine.sh`.
+- **`--upgrade-engine`** / `VF_ENSURE_UPGRADE_ENGINE=1` : autorise la relance de
+  `npx -y @opengsd/gsd-core@^1` sur un gsd-core lisible et **strictement inférieur** au dernier
+  `^1` publié (`sort -V`, jamais lexical). Indécidable ≠ périmé : VERSION illisible ou registre
+  injoignable → skip explicite, jamais d'install à l'aveugle. Dry-run respecté.
+- **Chemin par défaut inchangé** : sans autorisation, l'état gsd-core garde son skip historique,
+  **sans aucune sonde réseau** — la mise à jour est un geste autorisé par l'appelant (`/vf-update`,
+  ADR-031), jamais un effet de bord du bootstrap. Le skip nomme désormais la version installée.
+- **Suite** `tests/test-dev-orchestrator.sh` : 11 cas `T2u-A..K` (signal, à jour, réseau KO,
+  absence d'autorisation, mise à jour, no-op, dry-run, hors périmètre, env ≡ flag, semver vs
+  lexical, VERSION hostile) — tous rouges avant le fix, exécutés, 199/199 après.
+- Preuve sur poste réel le 2026-09-15 : `--check-engine-update` → 1.13.0 installé → 1.14.0 publié,
+  exit 0.
+
 ## [v2.20.4] — 2026-09-14 (Phase 39 — doctrine workstreams : dispatch explicite par compartiment, traçabilité des arbitrages)
 
 **Patch** (doctrine et gabarit de dispatch, aucun script modifié) :

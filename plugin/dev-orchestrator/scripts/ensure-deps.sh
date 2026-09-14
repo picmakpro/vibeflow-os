@@ -42,11 +42,26 @@
 #                      variable ni le flag, un état `legacy` est SIGNALÉ (message explicite) mais
 #                      JAMAIS migré (P-07) — la confirmation humaine appartient à l'appelant
 #                      (/vf-update, ADR-031), jamais à ce script.
+#   VF_ENSURE_UPGRADE_ENGINE (défaut vide) — 1 → équivaut au flag --upgrade-engine (voir Usage) :
+#                      autorise la MISE À JOUR d'un gsd-core déjà présent mais PÉRIMÉ face à la
+#                      dernière version publiée sous le plafond `^1` (même résolution qu'une install
+#                      neuve). SANS cette variable ni le flag, un gsd-core périmé est SKIPPÉ comme
+#                      avant, sans aucune sonde réseau — la mise à jour est un geste autorisé par
+#                      l'appelant (/vf-update, ADR-031), jamais un effet de bord du bootstrap.
 #
 # Flags CLI (rétro-compat : historiquement "$@" n'était jamais lu, les arguments inconnus sont
 # donc IGNORÉS avec une ligne log plutôt que rejetés — un rejet strict casserait un appelant
 # non recensé) :
 #   --migrate-engine   Équivalent à VF_ENSURE_MIGRATE_ENGINE=1 (voir ci-dessus).
+#   --upgrade-engine   Équivalent à VF_ENSURE_UPGRADE_ENGINE=1 (voir ci-dessus).
+#   --check-engine-update
+#                      Mode LECTURE SEULE, sonde réseau best-effort (npm view, jamais npx) : sur un
+#                      état gsd-core, compare le VERSION installé à la dernière version publiée
+#                      sous `^1`. Périmé → UNE ligne `[gsd-outdated] … A.B.C installé → X.Y.Z
+#                      publié` sur stdout, exit 0 (seul cas actionnable). À jour, état non
+#                      gsd-core (absent/legacy : affaire de check-gsd-engine.sh), réseau ou npm
+#                      KO, VERSION illisible → stdout vide, exit 3 (INDÉTERMINÉ, jamais une erreur
+#                      ni un faux signal). Même contrat de sortie que check-gsd-engine.sh.
 #   -h | --help        Affiche cet en-tête (grep '^# ') et exit 0.
 #
 # Comportement : idempotent (2e run consécutif = no-op, mode normal non forcé). Jamais d'échec silencieux :
@@ -72,6 +87,16 @@ FORCE="${VF_ENSURE_FORCE:-}"
 # JAMAIS migré (P-07, ADR-031) — la confirmation humaine vit dans l'appelant (/vf-update), jamais
 # dans ce script.
 MIGRATE_ENGINE="${VF_ENSURE_MIGRATE_ENGINE:-}"
+# 1 → autorise la mise à jour d'un gsd-core présent mais périmé face au dernier `^1` publié. Sans
+# elle (ni le flag --upgrade-engine), l'état gsd-core garde son skip historique, SANS sonde réseau.
+UPGRADE_ENGINE="${VF_ENSURE_UPGRADE_ENGINE:-}"
+# 1 (flag --check-engine-update uniquement) → mode lecture seule : signal de fraîcheur puis exit.
+CHECK_ENGINE_UPDATE=""
+# Paquet et plafond du moteur — UNE seule définition, partagée par l'install, la mise à jour et la
+# sonde de fraîcheur : « la plus récente pour VibeFlow » = la dernière version publiée qui satisfait
+# ce plafond, exactement ce que `npx -y "$GSD_PACKAGE@$GSD_RANGE"` résoudrait sur une install neuve.
+GSD_PACKAGE="@opengsd/gsd-core"
+GSD_RANGE="^1"
 # Fenêtre de compat dual-layout (D-01/D3, 11-CONTEXT.md) : le VERSION file du nouveau layout est
 # DÉRIVÉ de la même cascade que GSD_HOME (detect-gsd-engine.sh/build-gsd-index.sh), jamais une
 # constante $HOME figée — un chemin $HOME-only raterait le scope --local de gsd-core 1.9.0, qui
@@ -340,6 +365,68 @@ detect_gsd_legacy() {
   [ -f "$GSD_VERSION_FILE_LEGACY" ]
 }
 
+# ---------- Fraîcheur du moteur gsd-core (plafond ^1) ----------
+# POURQUOI ICI ET PAS DANS check-gsd-engine.sh. Ce gate classe sur la PRÉSENCE des fichiers VERSION
+# et ne compare AUCUN numéro, par doctrine (D-05) : le paquet legacy est figé à 1.42.3, donc tout
+# comparateur y classerait un poste legacy « à jour » pour toujours. La fraîcheur, elle, ne compare
+# que gsd-core à gsd-core — même paquet, même ligne de versions — et vit dans le script qui porte
+# déjà le plafond `^1` (point de vérité unique du scope et du plafond, Iron Law 2). Avant ce bloc,
+# un poste en 1.13.0 restait « GSD déjà présent (skip) » alors que 1.14.0 était publié : personne
+# ne lisait le VERSION installé, personne n'interrogeait le registre.
+
+# Version installée du moteur gsd-core (nouveau layout) — lecture bornée (200 octets) puis
+# assainie (sanitize_version), jamais réinjectée telle quelle. Vide + rc 1 si absente ou illisible.
+gsd_installed_version() {
+  local raw v
+  [ -f "$GSD_VERSION_FILE_NEW" ] || return 1
+  raw="$(head -c 200 "$GSD_VERSION_FILE_NEW" 2>/dev/null)"
+  v="$(sanitize_version "$raw")" || return 1
+  printf '%s' "$v"
+}
+
+# Dernière version PUBLIÉE satisfaisant le plafond (dist-tags exclus par construction : `npm view
+# <pkg>@^1 version` ne rend que des versions stables du range). Sortie npm en --json : un tableau
+# de chaînes s'il y a plusieurs candidates, une chaîne nue s'il n'y en a qu'une — les deux formes
+# sont réduites à une version par ligne, filtrées en semver strict, triées par sort -V. Réseau ou
+# npm KO → vide (rc du pipeline non significatif : l'appelant teste la vacuité). Bornes réseau
+# explicites (fetch-timeout / fetch-retries=0) : un registre injoignable ne doit jamais pendre
+# une session /vf-update.
+gsd_latest_published() {
+  command -v npm >/dev/null 2>&1 || return 1
+  npm view "${GSD_PACKAGE}@${GSD_RANGE}" version --json --fetch-timeout=10000 --fetch-retries=0 2>/dev/null \
+    | tr -d '",[] \r' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1
+}
+
+# Comparaison semver : vrai si $1 > $2 (sort -V, jamais lexical — 1.9.0 < 1.14.0).
+newer() { [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1)" = "$1" ]; }
+
+# Mode --check-engine-update (lecture seule, contrat de sortie de check-gsd-engine.sh) : imprime
+# le signal [gsd-outdated] et sort en 0 si — et seulement si — un gsd-core lisible est strictement
+# inférieur au dernier ^1 publié. Tout autre cas sort en 3, stdout vide (diagnostics sur stderr).
+check_engine_update() {
+  local installed latest
+  if [ "$(detect_gsd_state)" != "gsd-core" ]; then
+    log "fraîcheur : état $(detect_gsd_state) — hors périmètre (voir check-gsd-engine.sh)."
+    exit 3
+  fi
+  if ! installed="$(gsd_installed_version)"; then
+    log "fraîcheur : VERSION installé illisible — indécidable."
+    exit 3
+  fi
+  latest="$(gsd_latest_published)"
+  if [ -z "$latest" ]; then
+    log "fraîcheur : dernière version ${GSD_PACKAGE}@${GSD_RANGE} indéterminable (réseau ou npm KO) — silence."
+    exit 3
+  fi
+  if newer "$latest" "$installed"; then
+    printf '%s\n' "[gsd-outdated] moteur ${GSD_PACKAGE} ${installed} installé → ${latest} publié (plafond ${GSD_RANGE}) — mise à jour disponible."
+    printf '%s\n' "              → propose la mise à jour (confirmation requise via /vf-update)."
+    exit 0
+  fi
+  log "fraîcheur : ${GSD_PACKAGE} ${installed} = dernier ${GSD_RANGE} publié — à jour."
+  exit 3
+}
+
 ensure_gsd() {
   # D-08.3 : capturer l'état legacy UNE SEULE FOIS, tout en haut, avant toute garde et tout
   # run_cmd — l'installeur amont supprime lui-même le VERSION legacy à l'install réussie ; une
@@ -361,12 +448,37 @@ ensure_gsd() {
   dry_run_forced=0
   { [ -n "$DRY_RUN" ] && [ -n "$FORCE" ]; } && dry_run_forced=1
 
-  # État gsd-core : skip historique mot pour mot, y compris son exception dry-run forcé —
-  # comportement strictement inchangé (D-03).
+  # État gsd-core : skip historique (y compris son exception dry-run forcé, D-03) — SAUF si
+  # l'appelant a autorisé la mise à jour (--upgrade-engine / VF_ENSURE_UPGRADE_ENGINE=1) : la
+  # sonde réseau ne tourne QUE sous cette autorisation, et n'aboutit à npx que si le VERSION
+  # installé est lisible ET strictement inférieur au dernier ^1 publié. Indécidable (VERSION
+  # illisible, registre injoignable) ≠ périmé : on skippe en le disant, jamais d'install à l'aveugle.
   if [ "$state" = "gsd-core" ] && [ "$dry_run_forced" -eq 0 ]; then
-    log "GSD déjà présent (skip)."
-    log_legacy_cleanup_if_needed
-    return 0
+    local installed latest
+    installed="$(gsd_installed_version)" || installed=""
+    if [ -z "$UPGRADE_ENGINE" ]; then
+      log "GSD déjà présent (${GSD_PACKAGE} ${installed:-version illisible}, skip)."
+      log_legacy_cleanup_if_needed
+      return 0
+    fi
+    if [ -z "$installed" ]; then
+      log "GSD déjà présent mais VERSION illisible — mise à jour indécidable, skip (jamais d'install à l'aveugle)."
+      log_legacy_cleanup_if_needed
+      return 0
+    fi
+    latest="$(gsd_latest_published)"
+    if [ -z "$latest" ]; then
+      log "GSD déjà présent (${installed}) — dernier ${GSD_RANGE} publié indéterminable (réseau ou npm KO), skip."
+      log_legacy_cleanup_if_needed
+      return 0
+    fi
+    if ! newer "$latest" "$installed"; then
+      log "GSD à jour (${GSD_PACKAGE} ${installed} = dernier ${GSD_RANGE} publié), skip."
+      log_legacy_cleanup_if_needed
+      return 0
+    fi
+    log "GSD ${installed} → ${latest} (dernier ${GSD_RANGE} publié) — mise à jour autorisée (--upgrade-engine), poursuite vers npx."
+    GSD_UPGRADE_FROM="$installed"
   fi
 
   # État legacy SANS autorisation de migration (ni --migrate-engine, ni VF_ENSURE_MIGRATE_ENGINE,
@@ -402,7 +514,11 @@ ensure_gsd() {
     return 0
   fi
 
-  log "GSD absent — installation via npx (non-interactif, scope=$SCOPE → $GSD_SCOPE_FLAG)..."
+  if [ -n "${GSD_UPGRADE_FROM:-}" ]; then
+    log "GSD ${GSD_UPGRADE_FROM} périmé — mise à jour via npx (non-interactif, scope=$SCOPE → $GSD_SCOPE_FLAG)..."
+  else
+    log "GSD absent — installation via npx (non-interactif, scope=$SCOPE → $GSD_SCOPE_FLAG)..."
+  fi
   # Plafond semver "^1" (arbitrage 2026-07-26, audit Phase 11) : toujours le dernier 1.x —
 # fraîcheur sans pin figé — mais un saut de MAJEURE (breaking ou compromission d'un fork
 # jeune) ne s'installe jamais seul : il redevient une décision humaine.
@@ -674,6 +790,8 @@ main() {
 for arg in "$@"; do
   case "$arg" in
     --migrate-engine) MIGRATE_ENGINE=1 ;;
+    --upgrade-engine) UPGRADE_ENGINE=1 ;;
+    --check-engine-update) CHECK_ENGINE_UPDATE=1 ;;
     -h | --help)
       grep '^# ' "$0" | sed 's/^# //'
       exit 0
@@ -681,5 +799,8 @@ for arg in "$@"; do
     *) log "argument ignoré (rétro-compat, non reconnu) : $arg" ;;
   esac
 done
+
+# Mode lecture seule : sonde de fraîcheur puis exit (0 = périmé, 3 = rien à signaler) — jamais main.
+[ -n "$CHECK_ENGINE_UPDATE" ] && check_engine_update
 
 main "$@"

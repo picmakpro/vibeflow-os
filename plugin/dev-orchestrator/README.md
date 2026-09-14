@@ -7,7 +7,7 @@
 > façade de verbes : GSD est l'interface directe du quotidien, l'agent est l'entrée
 > conversationnelle optionnelle.
 
-**Version** : v2.20.4
+**Version** : v2.21.0
 **Type** : agent + équipe d'agents + 2 skills + scripts
 
 ---
@@ -45,6 +45,10 @@ S'y ajoutent :
 - **Scripts** (`scripts/`) — bootstrap, indexation et kernel d'orchestration :
   - `ensure-deps.sh` : auto-install non-interactif et **idempotent** de GSD + Superpowers
     (fallback manuel si Node/npm ou CLI `claude` manquent — jamais d'échec silencieux).
+    Fraîcheur du moteur sous autorisation explicite : `--check-engine-update` (lecture seule,
+    `[gsd-outdated]` + exit 0 si le gsd-core installé est strictement inférieur au dernier `^1`
+    publié, silence sinon) et `--upgrade-engine` (relance `npx` dans ce seul cas). Le chemin par
+    défaut reste sans sonde réseau.
   - `build-gsd-index.sh` : génère un **index factuel** des skills GSD installés
     (100 % auto-généré depuis le frontmatter sur disque — D4, anti-hallucination).
   - `inject-mcp-tools.sh` : injection des serveurs MCP du lab dans les agents flaggés.
