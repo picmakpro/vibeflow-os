@@ -17,7 +17,7 @@ stopped_at: >-
   ADR-069 amendé. **Dépôt volontairement NON partitionné** (D-02 = déclencheur de reprise, § Decisions).
   Réserves inchangées : premier run CI distant observé sur la PR #62 seulement ; le clone jetable
   prouve un mécanisme, pas un usage concurrent réel. Issue amont `init-progress` rédigée, jamais postée.
-last_updated: "2026-09-14T00:00:00.000Z"
+last_updated: "2026-09-15T00:00:00.000Z"
 last_activity: 2026-09-14
 last_activity_desc: >-
   Ship de la Phase 39 en v2.60.0 (PR #62) : bump racine + conductor v1.35.0 + dev-orchestrator
@@ -176,6 +176,19 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 
 ### Roadmap Evolution
 
+- 2026-09-15 : **Phase 40 inscrite au ROADMAP — `vibeflow-head`, head of minds du
+  dev-orchestrator** (demande de Samuel, session principale). Conception cadrée le même jour, spec
+  d'entrée `docs/superpowers/specs/2026-09-15-vibeflow-head-design.md` ; quatre arbitrages
+  (AskUserQuestion session principale, 2026-09-15) : head **dev** dans `dev-orchestrator`, missions
+  **sérialisées** (kernel intact, workstreams = extension désignée), gate de sortie sur **témoin
+  machine** (`check-mission-exit.sh`, rejouer seulement l'absent), nom **`vibeflow-head`**.
+  Numéro **40 vérifié à la main** avant `phase.add` (qui l'a rendu juste cette fois). Séquencée
+  après la 34 et **avant la 25** (dépendance de la 25 amendée : calibration sur le corpus post-40).
+  Zéro agent neuf. Deux évaluations rendues au passage : les workstreams de la 39 visent des
+  **sessions/humains** en parallèle, pas des managers d'une même session (verrou de driver unique
+  et relatif au checkout) ; la phrase « plus de 2-3 agents d'un coup » du Pitfall 12 vise le
+  **catalogue** (ajout de fichiers d'agents), pas le fan-out runtime — à préciser dans le livrable
+  AGTS-01 de la 34, sans rouvrir D-03.
 - 2026-09-09 : **Phase 39 inscrite au ROADMAP — Workstreams : partition du planning et
   collaboration concurrente** (demande de Samuel). La phase existait depuis le 2026-08-30 comme
   **dossier vide non commité** (`.planning/phases/VFDO-39-workstreams-.../.gitkeep`), absente du
@@ -1156,12 +1169,12 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-**Resume file:** .planning/phases/VFDO-34-gaps-agency-agents-cadrage-skill-installer/34-CONTEXT.md (et `.planning/phases/VFDO-25-budget-d-instructions-et-tage-d-alignement-court/25-CONTEXT.md`)
+**Resume file:** .planning/phases/VFDO-34-gaps-agency-agents-cadrage-skill-installer/34-CONTEXT.md (et `.planning/phases/VFDO-40-vibeflow-head-head-of-minds-du-dev-orchestrator/40-CONTEXT.md`, `.planning/phases/VFDO-25-budget-d-instructions-et-tage-d-alignement-court/25-CONTEXT.md`)
 
-Last session: 2026-09-14
-Stopped at: Phases 34 et 25 cadrées (CONTEXT.md + DISCUSSION-LOG.md commités sur `feat/cadrage-phases-34-25`), aucune planifiée. Phase 39 shipped - PR 62 - v2.60.0 plus tôt le même jour.
+Last session: 2026-09-15
+Stopped at: Phase 40 (`vibeflow-head`, head of minds) inscrite ET cadrée (spec d'entrée + CONTEXT.md + DISCUSSION-LOG.md sur `feat/cadrage-phase-40`, 16 arbitrages Samuel du 2026-09-15). Phases 34 et 25 cadrées la veille, aucune des trois planifiée. v2.61.0 releasée plus tôt le même jour (PR #64).
 
-**Reprendre par** : `/gsd-plan-phase 34` (run mobile de sortie d'expérimental sur Scroll-Off en première vague, spike SKIL en parallèle, audit AGTS-01). La Phase 25 peut être planifiée dès maintenant, mais sa **calibration** (baselines, armement) est un **checkpoint bloquant** jusqu'à la clôture de la 34 (25-CONTEXT D-06). `current_phase` du frontmatter reste 39 : le gate `check-state-integrity` interdit toute décroissance, et aucune des deux phases n'est démarrée.
+**Reprendre par** : `/gsd-plan-phase 34` — puis `/gsd-plan-phase 40` (dépend de la 34 : zéro agent neuf, et la 25 se calibre sur le corpus post-40 — dépendance de la 25 amendée le 2026-09-15) (run mobile de sortie d'expérimental sur Scroll-Off en première vague, spike SKIL en parallèle, audit AGTS-01). La Phase 25 peut être planifiée dès maintenant, mais sa **calibration** (baselines, armement) est un **checkpoint bloquant** jusqu'à la clôture de la 34 (25-CONTEXT D-06). `current_phase` du frontmatter reste 39 : le gate `check-state-integrity` interdit toute décroissance, et aucune des deux phases n'est démarrée.
 
 **Ce qui reste fermé, quoi qu'il arrive** :
 - **Aucune partition réelle de `vibeflow-os`** sans geste humain explicite — déclencheur D-02 (§ Decisions, 2026-09-10).

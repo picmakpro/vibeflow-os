@@ -79,6 +79,7 @@
 - [x] Phase 37: Portabilité multi-runtime — spike (Codex, OpenCode, Kimi) (completed 2026-08-28 — spike + étude livrés, décisions rendues ; suite → Phase 38)
 - [x] Phase 38: Portabilité multi-runtime — livraison (canal d'install, migration de lab, adaptateur) (exécutée 2026-08-29, **mesurée 2026-08-30** sur clé API — **critère 2 PROUVÉ sur Codex** : profondeur ≥ 2 constatée EN BASE (`thread_spawn_edges`, `root→vf-dev-manager→vf-coder`), 3/3 sur les **4 critères réels** ; le **critère 5 est SANS OBJET sous clé API** (vert à vide, jamais « atteint ») et le **critère 4 est plus faible que son libellé** (`--output-schema` non propagé aux sous-agents, dette D-38-S). **kimi-code n'est plus un inconnu déclaré** : I-1 **31/31**, I-2 `disallowedTools` bloque (0/4 contre 3/3 au contrôle positif), I-3 hooks déclenchés 3/3, `vf-internal` **sans équivalent** (Pattern 12 non tenu, déclaré par le gate de fidélité). **Critère 1 toujours partiel** : hooks non portés, perte déclarée. Coûts : Codex 1,01 $, kimi ~0,018 $. **SHIPPÉE v2.59.0 le 2026-08-31** (Samuel a autorisé le ship après revue ; PR + tag + release GitHub) — test bout-en-bout install **et** usage refait sur Codex (délégation de rôle → code réel) ET Kimi (`--agent-file` → code + rapport typé) le 2026-08-31, manifeste `.codex-plugin/` natif ajouté. Preuves : `38-MESURE-CODEX-CRITERE-2.md`, `38-MESURE-KIMI.md`)
 - [x] Phase 39: Workstreams — partition du planning et collaboration concurrente (cadrée 2026-09-09, exécutée 2026-09-10, 3 plans clos avec SUMMARY, revue ×3 + audit infra + juge frais sur le diff de correction ; **SHIPPÉE v2.60.0 le 2026-09-14 — PR #62** (conductor v1.35.0 : `check-divergence.sh` S2/S4/S5 + suite 17 cas dont 3 mutants, hook `post-merge` opt-in ancré sur `--git-common-dir` après RCE démontrée, étape CI ; dev-orchestrator v2.20.4 : dispatch `--ws` explicite ; `PART-01..09` gravées, `GSDA-19` superseded, ADR-069 amendé). Hotfix PR #61 regroupé dans la même release (arbitrage Samuel, AskUserQuestion session principale, 2026-09-14). **Dépôt volontairement NON partitionné** — partition réelle = geste humain séparé, déclencheur D-02 en STATE § Decisions. Réserves : premier run CI distant observé sur la PR #62 seulement ; le clone jetable prouve un mécanisme, pas un usage concurrent réel)
+- [ ] Phase 40: vibeflow-head — head of minds du dev-orchestrator (inscrite 2026-09-15, spec `docs/superpowers/specs/2026-09-15-vibeflow-head-design.md` ; séquencée après la 34, AVANT la 25)
 
 <details>
 <summary>✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04</summary>
@@ -917,8 +918,9 @@ conditionnée à la sortie du statut expérimental de `mobile-test` pendant le m
 **Goal**: La densité des agents distribués est bornée par une métrique qui prédit l'adhérence — la
 charge d'instructions est mesurée et publiée, et son gate monte en ratchet, jamais rouge des
 semaines.
-**Depends on**: Phase 34 (ne jamais calibrer un seuil sur un corpus d'agents qui bouge — après tous
-les ajouts d'agents du milestone).
+**Depends on**: Phase 34 **et Phase 40** (ne jamais calibrer un seuil sur un corpus d'agents qui
+bouge — après tous les ajouts d'agents du milestone, et après le renommage/extension du head,
+inscrit le 2026-09-15).
 **Requirements**: BUDG-01, BUDG-02
 **Success Criteria** (what must be TRUE):
 
@@ -1367,3 +1369,47 @@ Plans:
 Partition réelle de `vibeflow-os` : geste séparé, gaté humain, postérieur à cette phase —
 déclencheur de reprise daté en `.planning/STATE.md` § Decisions (D-02, inscrit par le plan 39-03).
 Confirmé par le plan 39-03 (§Task 2, 2026-09-10) — présence non dupliquée vérifiée.
+
+### Phase 40: vibeflow-head — head of minds du dev-orchestrator
+
+> **Spec d'entrée** : `docs/superpowers/specs/2026-09-15-vibeflow-head-design.md` — conception
+> cadrée le 2026-09-15, quatre arbitrages (Samuel, AskUserQuestion session principale,
+> 2026-09-15) : head **dev** dans `dev-orchestrator` (pas cross-métier) ; missions
+> **sérialisées** (zéro changement kernel, workstreams = extension désignée, §6 de la spec) ;
+> gate de sortie sur **témoin machine** (rejouer seulement le gate sans preuve) ; nom
+> **`vibeflow-head`**. Hypothèses à confirmer au cadrage : H-01 (propose en conversation, lance
+> d'office sous `vf-auto`), H-02 (séquencement après la 34, avant la 25).
+
+**Goal**: `vibeflow-dev` devient `vibeflow-head`, le head of minds du dev-orchestrator — il alloue
+le bon niveau d'équipe (quick / debug / execute / manager) sur une échelle à sens unique, séquence
+les missions selon les dépendances de la feuille de route, contrôle l'état du repo à la sortie de
+chaque manager sur témoin machine **sans rejouer ce que ses équipes ont déjà prouvé**, et compte ce
+que ses équipes coûtent.
+**Depends on**: Phase 34 (zéro agent neuf — renommage + extension ; le head est le dernier
+mouvement du corpus d'agents avant la calibration du budget d'instructions : la Phase 25 se
+calibre sur le corpus **post-40**).
+**Requirements**: TBD — candidates à poser au cadrage : HEAD-01 (échelle d'allocation), HEAD-02
+(gate de sortie `check-mission-exit.sh`), HEAD-03 (économie : décompte par mission, interdits de
+re-travail), HEAD-04 (renommage sans alias survivant).
+**Success Criteria** (what must be TRUE):
+
+  1. Aucun alias `vibeflow-dev` ne survit dans `plugin/` hors CHANGELOG — vérifié par un test du
+     module qui **peut rendre rouge** (surface mesurée le 2026-09-15 : 20 fichiers + 2 README).
+
+  2. `check-mission-exit.sh` existe avec ses codes de sortie (3 sain · 0 manque nommé · 4
+     indéterminé · 64 outillage), sa suite de tests et sa **mutation rouge prouvée** (QUAL-01) ;
+     le head ne rejoue qu'un gate dont la preuve (commande + exit code + SHA) manque au rapport,
+     jamais un étage, jamais la revue.
+
+  3. L'agent reste ≤ 250 lignes (ADR-029) ; règle d'échelle, séquencement, contrat de sortie et
+     économie vivent dans `dev-orchestrator/references/head-governance.md` (on-demand, une seule
+     voix ADR-030).
+
+  4. Le kernel est intact — `team-kernel.md`, `driver-lock.sh`, `dag.sh`, `guard-driver-lock.sh`,
+     ADR-053, `SEUIL_EQUIPE` inchangés ; la voie workstreams reste **documentée comme extension**
+     (verrou par compartiment, amendement d'ADR-053), jamais livrée ici.
+
+  5. Release taggée : bump **minor** du module `dev-orchestrator` et de la racine, gate
+     `check-release-tag.sh --remote` ✓.
+
+**Plans**: TBD
