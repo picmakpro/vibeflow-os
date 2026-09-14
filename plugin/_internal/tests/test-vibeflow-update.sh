@@ -2210,6 +2210,228 @@ fi
 rm -rf "$LAB" "$OUTSIDE_TARGET"
 
 # ---------------------------------------------------------------------------
+# T53a-T53g (#4734 amont) — disable_worktrees_if_root_not_git (tâche 1). Garde de dépendance
+# douce : la fonction est best-effort et silencieuse si `node` est absent (cf. tâche 1) ; sans
+# node, les sept cas SKIP plutôt que d'échouer sur une dépendance que l'engine lui-même traite en
+# best-effort.
+# ---------------------------------------------------------------------------
+if command -v node >/dev/null 2>&1; then
+
+# ---------------------------------------------------------------------------
+# T53a (#4734, racine non-git) — install sur un LAB non-git (mktemp -d, sans git init) pose
+# workflow.use_worktrees=false ET laisse intact le reste du JSON de config (profile, runtime).
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME="$LAB/home"
+mkdir -p "$FAKE_HOME"
+if prepare_module "$CACHE" "conductor" && prepare_module "$CACHE" "validator"; then
+  mkdir -p "$LAB/.planning"
+  echo '{"profile":"leger","runtime":"claude"}' > "$LAB/.planning/config.json"
+  miss=0
+  INSTALL_OUT=$(cd "$LAB" && HOME="$FAKE_HOME" VF_RUNTIME=claude VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" install validator 2>&1)
+  RC=$?
+  [ "$RC" -eq 0 ] \
+    || { ko "T53a pré-condition : install validator a échoué (rc=$RC) — $INSTALL_OUT"; miss=1; }
+  node -e '
+const fs = require("fs");
+const cfg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+process.exit(cfg.workflow && cfg.workflow.use_worktrees === false ? 0 : 1);
+' "$LAB/.planning/config.json" \
+    || { ko "T53a : workflow.use_worktrees n'est pas exactement le booléen false — $(cat "$LAB/.planning/config.json")"; miss=1; }
+  node -e '
+const fs = require("fs");
+const cfg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+process.exit(cfg.profile === "leger" && cfg.runtime === "claude" ? 0 : 1);
+' "$LAB/.planning/config.json" \
+    || { ko "T53a : profile/runtime préexistants n'ont pas survécu — $(cat "$LAB/.planning/config.json")"; miss=1; }
+  echo "$INSTALL_OUT" | "$GREP" -qF '[use-worktrees]' \
+    || { ko "T53a : marqueur [use-worktrees] absent de la sortie d'install — $INSTALL_OUT"; miss=1; }
+  echo "$INSTALL_OUT" | "$GREP" -qF 'use_worktrees=false posé' \
+    || { ko "T53a : fragment 'use_worktrees=false posé' absent de la sortie d'install — $INSTALL_OUT"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T53a (#4734, racine non-git) : workflow.use_worktrees=false posé, profile/runtime intacts"
+else
+  skip "T53a : conductor/validator non copiables dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T53b (#4734, DISCRIMINANT) — racine GIT (git init -q, processus enfant du test) :
+# .planning/config.json reste EXACTEMENT {} et aucune ligne [use-worktrees] n'apparaît. Seul ce
+# cas mord sur une implémentation qui testerait `rc -ne 0` au lieu de `rc -eq 128`, ou qui ne
+# testerait rien du tout.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME="$LAB/home"
+mkdir -p "$FAKE_HOME"
+if prepare_module "$CACHE" "conductor" && prepare_module "$CACHE" "validator"; then
+  git init -q "$LAB"
+  mkdir -p "$LAB/.planning"
+  echo '{}' > "$LAB/.planning/config.json"
+  miss=0
+  INSTALL_OUT=$(cd "$LAB" && HOME="$FAKE_HOME" VF_RUNTIME=claude VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" install validator 2>&1)
+  RC=$?
+  [ "$RC" -eq 0 ] \
+    || { ko "T53b pré-condition : install validator a échoué (rc=$RC) — $INSTALL_OUT"; miss=1; }
+  [ "$(cat "$LAB/.planning/config.json")" = "{}" ] \
+    || { ko "T53b (DISCRIMINANT) : .planning/config.json MUTÉ sur une racine git — obtenu : $(cat "$LAB/.planning/config.json")"; miss=1; }
+  [ "$(echo "$INSTALL_OUT" | "$GREP" -cF '[use-worktrees]')" -eq 0 ] \
+    || { ko "T53b (DISCRIMINANT) : ligne [use-worktrees] présente sur une racine git — $INSTALL_OUT"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T53b (#4734, DISCRIMINANT) : racine git -> .planning/config.json non touché, aucune ligne de journal"
+else
+  skip "T53b : conductor/validator non copiables dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T53c (#4734, idempotence stricte) — la clé est déjà présente et à false, écrite sur une seule
+# ligne. Une implémentation qui réécrirait « à l'identique » en re-sérialisant changerait le
+# formatage (JSON.stringify(...,null,2) est multi-lignes) : ce test rougirait.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME="$LAB/home"
+mkdir -p "$FAKE_HOME"
+if prepare_module "$CACHE" "conductor" && prepare_module "$CACHE" "validator"; then
+  mkdir -p "$LAB/.planning"
+  printf '%s' '{"workflow":{"use_worktrees":false}}' > "$LAB/.planning/config.json"
+  BEFORE_CONTENT="$(cat "$LAB/.planning/config.json")"
+  miss=0
+  INSTALL_OUT=$(cd "$LAB" && HOME="$FAKE_HOME" VF_RUNTIME=claude VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" install validator 2>&1)
+  RC=$?
+  [ "$RC" -eq 0 ] \
+    || { ko "T53c pré-condition : install validator a échoué (rc=$RC) — $INSTALL_OUT"; miss=1; }
+  AFTER_CONTENT="$(cat "$LAB/.planning/config.json")"
+  [ "$BEFORE_CONTENT" = "$AFTER_CONTENT" ] \
+    || { ko "T53c (idempotence stricte) : .planning/config.json re-sérialisé alors que la clé était déjà à false — avant=$BEFORE_CONTENT après=$AFTER_CONTENT"; miss=1; }
+  [ "$(echo "$INSTALL_OUT" | "$GREP" -cF '[use-worktrees]')" -eq 0 ] \
+    || { ko "T53c : ligne [use-worktrees] présente alors que la clé était déjà conforme — $INSTALL_OUT"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T53c (#4734, idempotence stricte) : clé déjà à false -> fichier byte-pour-byte identique, aucune ligne de journal"
+else
+  skip "T53c : conductor/validator non copiables dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T53d (#4734, dry-run) — sous --dry-run, aucune écriture n'a lieu, quel que soit l'état du lab.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME="$LAB/home"
+mkdir -p "$FAKE_HOME"
+if prepare_module "$CACHE" "conductor" && prepare_module "$CACHE" "validator"; then
+  mkdir -p "$LAB/.planning"
+  echo '{}' > "$LAB/.planning/config.json"
+  miss=0
+  (cd "$LAB" && HOME="$FAKE_HOME" VF_RUNTIME=claude VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" --dry-run install validator >/dev/null 2>&1)
+  [ "$(cat "$LAB/.planning/config.json")" = "{}" ] \
+    || { ko "T53d (dry-run) : .planning/config.json MUTÉ sous --dry-run — obtenu : $(cat "$LAB/.planning/config.json")"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T53d (#4734, dry-run) : --dry-run n'écrit jamais workflow.use_worktrees"
+else
+  skip "T53d : conductor/validator non copiables dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T53e (#4734, section workflow préexistante) — la section est étendue, jamais remplacée. Ce cas
+# mord sur une implémentation qui écraserait l'objet workflow au lieu de l'étendre.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME="$LAB/home"
+mkdir -p "$FAKE_HOME"
+if prepare_module "$CACHE" "conductor" && prepare_module "$CACHE" "validator"; then
+  mkdir -p "$LAB/.planning"
+  echo '{"workflow":{"tdd_mode":true}}' > "$LAB/.planning/config.json"
+  miss=0
+  INSTALL_OUT=$(cd "$LAB" && HOME="$FAKE_HOME" VF_RUNTIME=claude VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" install validator 2>&1)
+  RC=$?
+  [ "$RC" -eq 0 ] \
+    || { ko "T53e pré-condition : install validator a échoué (rc=$RC) — $INSTALL_OUT"; miss=1; }
+  node -e '
+const fs = require("fs");
+const cfg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+process.exit(cfg.workflow && cfg.workflow.tdd_mode === true && cfg.workflow.use_worktrees === false ? 0 : 1);
+' "$LAB/.planning/config.json" \
+    || { ko "T53e (section workflow étendue, pas remplacée) : tdd_mode et/ou use_worktrees absents/incorrects — $(cat "$LAB/.planning/config.json")"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T53e (#4734, section workflow préexistante) : workflow étendu (tdd_mode survit, use_worktrees ajouté)"
+else
+  skip "T53e : conductor/validator non copiables dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T53f (#4734, garde TGT-05, DISCRIMINANT) — --target hors de l'arbre du cwd : aucune écriture,
+# refus journalisé. Précondition vérifiée (artefact posé sous OUTSIDE_TARGET) sinon le test est
+# vert pour la mauvaise raison.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME="$LAB/home"
+OUTSIDE_TARGET="$(mktemp -d)"
+mkdir -p "$FAKE_HOME"
+if prepare_module "$CACHE" "conductor" && prepare_module "$CACHE" "validator"; then
+  mkdir -p "$LAB/.planning"
+  echo '{}' > "$LAB/.planning/config.json"
+  miss=0
+  INSTALL_OUT=$(cd "$LAB" && HOME="$FAKE_HOME" VF_RUNTIME=claude VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" --target "$OUTSIDE_TARGET" install validator 2>&1)
+  RC=$?
+  { [ "$RC" -eq 0 ] && [ -f "$OUTSIDE_TARGET/agents/validator.md" ]; } \
+    || { ko "T53f pré-condition : install --target \$OUTSIDE_TARGET a échoué (rc=$RC) — $INSTALL_OUT"; miss=1; }
+  [ "$(cat "$LAB/.planning/config.json")" = "{}" ] \
+    || { ko "T53f (garde TGT-05, DISCRIMINANT) : .planning/config.json du LAB MUTÉ par un install --target hors-arbre — obtenu : $(cat "$LAB/.planning/config.json")"; miss=1; }
+  [ ! -f "$OUTSIDE_TARGET/.planning/config.json" ] \
+    || { ko "T53f : un .planning/config.json a été créé sous OUTSIDE_TARGET — destination alternative non attendue"; miss=1; }
+  echo "$INSTALL_OUT" | "$GREP" -qF "sort de l'arbre du repo" \
+    || { ko "T53f (garde TGT-05, DISCRIMINANT) : refus non journalisé (fragment absent) — $INSTALL_OUT"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T53f (#4734, garde TGT-05, DISCRIMINANT) : --target hors-arbre refusé et journalisé, .planning/config.json (cwd) intact"
+else
+  skip "T53f : conductor/validator non copiables dans le cache de test"
+fi
+rm -rf "$LAB" "$OUTSIDE_TARGET"
+
+# ---------------------------------------------------------------------------
+# T53g (#4734, contre-épreuve TGT-05) — --target INTRA-arbre laisse passer l'écriture. Sans ce
+# cas, « fuite fermée » et « garde qui bloque aussi le bon côté » sont indiscernables.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME="$LAB/home"
+CUSTOM_TARGET="$LAB/customtarget"
+mkdir -p "$FAKE_HOME"
+if prepare_module "$CACHE" "conductor" && prepare_module "$CACHE" "validator"; then
+  mkdir -p "$LAB/.planning"
+  echo '{}' > "$LAB/.planning/config.json"
+  miss=0
+  INSTALL_OUT=$(cd "$LAB" && HOME="$FAKE_HOME" VF_RUNTIME=claude VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" --target "$CUSTOM_TARGET" install validator 2>&1)
+  RC=$?
+  { [ "$RC" -eq 0 ] && [ -f "$CUSTOM_TARGET/agents/validator.md" ]; } \
+    || { ko "T53g pré-condition : install --target \$CUSTOM_TARGET (intra-arbre) a échoué (rc=$RC) — $INSTALL_OUT"; miss=1; }
+  node -e '
+const fs = require("fs");
+const cfg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+process.exit(cfg.workflow && cfg.workflow.use_worktrees === false ? 0 : 1);
+' "$LAB/.planning/config.json" \
+    || { ko "T53g (contre-épreuve TGT-05) : workflow.use_worktrees pas posé sous --target intra-arbre — $(cat "$LAB/.planning/config.json")"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T53g (#4734, contre-épreuve TGT-05) : --target intra-arbre laisse passer l'écriture"
+else
+  skip "T53g : conductor/validator non copiables dans le cache de test"
+fi
+rm -rf "$LAB"
+
+else
+  skip "T53a-T53g : node absent, disable_worktrees_if_root_not_git est best-effort silencieux sans lui"
+fi
+
+# ---------------------------------------------------------------------------
 # Garde-fou final : le vrai ~/.claude ET le vrai ~/.codex/agents/vibeflow sont inchangés
 # (snapshot récursif avant=après).
 # ---------------------------------------------------------------------------
