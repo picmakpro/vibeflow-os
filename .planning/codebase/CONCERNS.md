@@ -435,6 +435,39 @@ capturées au backlog — voir Tech Debt.
   / `vf_path_confine`), appliquée **au point où la racine est résolue**. À traiter avec elle, pas
   avant : deux correctifs séparés sur le même motif, c'est ce qui a produit les quatre passages.
 
+
+#### Mesure du 2026-09-14 — pourquoi la convention reste en chemin RELATIF
+
+Le résiduel ci-dessus vient du fait que `core.hooksPath scripts/hooks` est **relatif** : git charge le
+hook lui-même depuis le worktree courant. La question « un chemin **absolu** fermerait-il le
+résiduel ? » a été **mesurée**, par exécution, quatre fois (deux hooks × deux formes de chemin), avec
+vrais `git push` et `git merge`. **Elle est tranchée : on reste en relatif.** Voici pourquoi, en
+détail — c'est le détail qui fait le garde-fou.
+
+1. **L'absolu FERME bien le vecteur worktree.** Sous relatif, le hook hostile s'exécute et le gate est
+   contourné (payload poussé sur `main` sans tag) ; sous absolu, le hook légitime s'exécute et bloque,
+   le hostile ne tire pas. Les témoins hostiles ont été **vérifiés capables de tirer** (déclenchés à la
+   main après coup) : leur silence était une attaque déjouée, pas un témoin cassé.
+2. **Mais le geste d'armement est PIÉGÉ.** Un chemin absolu n'étant pas écrivable littéralement dans
+   une instruction générique, la seule forme portable le dérive du dépôt courant. Or `core.hooksPath`
+   est **partagé par tous les worktrees** : lancée depuis un worktree hostile, la commande épingle le
+   **dépôt entier** sur cet arbre — le hook hostile s'exécute alors **même pour un push fait depuis le
+   dépôt principal**. Le vecteur est rouvert **en pire**.
+3. **Et il MEURT EN SILENCE.** Dépôt renommé ou déplacé, worktree supprimé : le chemin devient faux et
+   git ne dit **rien**. Mesuré : push vers `main` sans tag → accepté, exit 0, sortie vide, aucune
+   mention de « hook », tous les témoins muets. **Une garde qu'on croit active et qui ne l'est plus.**
+4. **Il ne ferme pas tout.** L'absolu vise l'arbre de travail principal : si le dépôt **principal** est
+   lui-même basculé sur la branche hostile, le hook hostile s'exécute quand même.
+
+> **Le relatif échoue bruyamment et sous deux préconditions délibérées (worktree hostile ET hook armé
+> volontairement) ; l'absolu échoue silencieusement et tout seul. Entre les deux, on préfère l'échec
+> qui se voit.**
+
+**Ne « répare » pas ce résiduel en basculant sur un chemin absolu** : ce serait installer un
+désarmement silencieux **en croyant durcir la sécurité** — le motif même que la Phase 39 a combattu
+(un mécanisme qui a l'air correct et ne peut pas rendre rouge), déplacé d'un cran, dans le correctif
+censé le fermer.
+
 ## Performance Bottlenecks
 
 Rien de bloquant identifié à l'échelle actuelle (registres de labs de quelques centaines
