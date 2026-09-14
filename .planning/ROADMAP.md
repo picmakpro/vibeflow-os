@@ -78,6 +78,7 @@
 - [x] Phase 35: Ré-armement worktree (conditionnelle) — CLOSE 2026-08-26, option A (pas de ré-armement)
 - [x] Phase 37: Portabilité multi-runtime — spike (Codex, OpenCode, Kimi) (completed 2026-08-28 — spike + étude livrés, décisions rendues ; suite → Phase 38)
 - [x] Phase 38: Portabilité multi-runtime — livraison (canal d'install, migration de lab, adaptateur) (exécutée 2026-08-29, **mesurée 2026-08-30** sur clé API — **critère 2 PROUVÉ sur Codex** : profondeur ≥ 2 constatée EN BASE (`thread_spawn_edges`, `root→vf-dev-manager→vf-coder`), 3/3 sur les **4 critères réels** ; le **critère 5 est SANS OBJET sous clé API** (vert à vide, jamais « atteint ») et le **critère 4 est plus faible que son libellé** (`--output-schema` non propagé aux sous-agents, dette D-38-S). **kimi-code n'est plus un inconnu déclaré** : I-1 **31/31**, I-2 `disallowedTools` bloque (0/4 contre 3/3 au contrôle positif), I-3 hooks déclenchés 3/3, `vf-internal` **sans équivalent** (Pattern 12 non tenu, déclaré par le gate de fidélité). **Critère 1 toujours partiel** : hooks non portés, perte déclarée. Coûts : Codex 1,01 $, kimi ~0,018 $. **SHIPPÉE v2.59.0 le 2026-08-31** (Samuel a autorisé le ship après revue ; PR + tag + release GitHub) — test bout-en-bout install **et** usage refait sur Codex (délégation de rôle → code réel) ET Kimi (`--agent-file` → code + rapport typé) le 2026-08-31, manifeste `.codex-plugin/` natif ajouté. Preuves : `38-MESURE-CODEX-CRITERE-2.md`, `38-MESURE-KIMI.md`)
+- [x] Phase 39: Workstreams — partition du planning et collaboration concurrente (cadrée 2026-09-09, exécutée 2026-09-10, 3 plans clos avec SUMMARY, revue ×3 + audit infra + juge frais sur le diff de correction ; **SHIPPÉE v2.60.0 le 2026-09-14 — PR #62** (conductor v1.35.0 : `check-divergence.sh` S2/S4/S5 + suite 17 cas dont 3 mutants, hook `post-merge` opt-in ancré sur `--git-common-dir` après RCE démontrée, étape CI ; dev-orchestrator v2.20.4 : dispatch `--ws` explicite ; `PART-01..09` gravées, `GSDA-19` superseded, ADR-069 amendé). Hotfix PR #61 regroupé dans la même release (arbitrage Samuel, AskUserQuestion session principale, 2026-09-14). **Dépôt volontairement NON partitionné** — partition réelle = geste humain séparé, déclencheur D-02 en STATE § Decisions. Réserves : premier run CI distant observé sur la PR #62 seulement ; le clone jetable prouve un mécanisme, pas un usage concurrent réel)
 
 <details>
 <summary>✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04</summary>
@@ -442,7 +443,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 ✅ (R&D, shippée v2.28.0)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 ✅ (code complet, release en attente de validation humaine)** ; **14 ✅ (indépendante)** ; **15 ✅ (shippée v2.40.0) → 16 ✅ (shippée v2.41.0)** ; **17 ✅ (indépendante de 16, terminée et vérifiée — release en attente de validation humaine) → 18 inscrite (dépend de 17)** ; **19 ✅ (2026-07-28, ADR-058) → 20 ✅ (mergée dans `main` le 2026-07-31, PR #21, release `v2.44.0`)** — ce merge **satisfait** la dépendance « Phase 20 requise » de 21, 22 et 23 ; **21 ✅ (mergée le 2026-07-31, PR #22, release `v2.45.0`) + 22 ✅ (mergée le 2026-07-31, PR #23)** — les deux livrées par la mission `reprise-p21-p22`, sans fichier commun ; leur clôture **lève la dépendance** de 23 → **23 inscrite**, périmètre partagé sur `vf-dev-manager.md` / `intent-routing.md` (arbitré le 2026-07-31 : on ne planifie pas contre une base qui bouge ; l'arbitrage des étages de revue écrit par la 21 fait autorité) → **24 inscrite (dépendance doctrinale de 23, aucun fichier commun ; son lot MESURE est déjà rendu)** → **25 inscrite : après 24** (son volet G1 pose un gate sur `plugin/*/agents/*.md`, les fichiers mêmes que M3/`effort:` et A2/`agent_skills` éditent) **et dépendante de 23** (son volet G2 insère un étage dans `discuss → plan`, dont la voie unique d'invocation est arbitrée en 23) ; **milestone fiabilite-v1.0 (2026-08-15)** : **30 → 31 (strictement séquentielles — mêmes fichiers `_internal/`) → 32 → 33 (adjacentes — heartbeat partagé, WTCH après LOCK) → 18 (héritée — livrée avant clôture ; sa RFC part en Phase 30) → 34 → 25 (héritée — avant-dernière, après tout ajout d'agents)** ; **35 flottante conditionnelle** (gsd-core > 1.10.0 releasé ET installé), jamais bloquante
+1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ → 5 ✅ ; 6 ✅ indépendant → 7 ✅ → 8 ✅ ; **9 ✅ (R&D, shippée v2.28.0)** ; **10 🚧 → 11 🚧 (GATE : 11 conditionné au GO de 10)** ; **12 ✅ → 13 ✅ (code complet, release en attente de validation humaine)** ; **14 ✅ (indépendante)** ; **15 ✅ (shippée v2.40.0) → 16 ✅ (shippée v2.41.0)** ; **17 ✅ (indépendante de 16, terminée et vérifiée — release en attente de validation humaine) → 18 inscrite (dépend de 17)** ; **19 ✅ (2026-07-28, ADR-058) → 20 ✅ (mergée dans `main` le 2026-07-31, PR #21, release `v2.44.0`)** — ce merge **satisfait** la dépendance « Phase 20 requise » de 21, 22 et 23 ; **21 ✅ (mergée le 2026-07-31, PR #22, release `v2.45.0`) + 22 ✅ (mergée le 2026-07-31, PR #23)** — les deux livrées par la mission `reprise-p21-p22`, sans fichier commun ; leur clôture **lève la dépendance** de 23 → **23 inscrite**, périmètre partagé sur `vf-dev-manager.md` / `intent-routing.md` (arbitré le 2026-07-31 : on ne planifie pas contre une base qui bouge ; l'arbitrage des étages de revue écrit par la 21 fait autorité) → **24 inscrite (dépendance doctrinale de 23, aucun fichier commun ; son lot MESURE est déjà rendu)** → **25 inscrite : après 24** (son volet G1 pose un gate sur `plugin/*/agents/*.md`, les fichiers mêmes que M3/`effort:` et A2/`agent_skills` éditent) **et dépendante de 23** (son volet G2 insère un étage dans `discuss → plan`, dont la voie unique d'invocation est arbitrée en 23) ; **milestone fiabilite-v1.0 (2026-08-15)** : **30 → 31 (strictement séquentielles — mêmes fichiers `_internal/`) → 32 → 33 (adjacentes — heartbeat partagé, WTCH après LOCK) → 18 (héritée — livrée avant clôture ; sa RFC part en Phase 30) → 34 → 25 (héritée — avant-dernière, après tout ajout d'agents)** ; **35 flottante conditionnelle** (gsd-core > 1.10.0 releasé ET installé), jamais bloquante ; **37 ✅ (spike, 2026-08-28) → 38 ✅ (shippée `v2.59.0` le 2026-08-31)** ; **39 inscrite le 2026-09-09** — aucune dépendance technique de code avec 34 ni 25, mais **condition dure ADR-069 : aucune partition tant qu'une phase est en vol** ; son rang dans la file (avant ou après 34/25) reste à trancher
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -483,6 +484,7 @@ Plans:
 | 35. Ré-armement worktree (conditionnelle) | fiabilite-v1.0 | 0/0 | Flottante — précondition externe NON satisfaite au 2026-08-15 (npm latest = 1.10.0) ; jamais bloquante | — |
 | 37. Portabilité multi-runtime — spike | fiabilite-v1.0 | — | Complete — spike de mesure sans plan : DISCUSS + SPIKE-REPORT + ETUDE-CANAL-ET-MIGRATION (3 tours de revue adversariale), décisions rendues le 2026-08-28, branche `feat/phase-37-spike-portabilite-multi-runtime` non mergée | 2026-08-28 |
 | 38. Portabilité multi-runtime — livraison | fiabilite-v1.0 | 0/0 | Not started — cadrage factuel = livrables de la 37 ; 6 lots candidats, go/no-go adaptateur à trancher au cadrage | — |
+| 39. Workstreams — partition du planning et collaboration concurrente | fiabilite-v1.0 | 0/0 | Not started — inscrite le 2026-09-09 ; adoption tranchée le 2026-08-04 mais jamais outillée (la 24 n'a livré que les gardes) ; ordonnancement vs 34/25 à trancher | — |
 
 <details>
 <summary>✅ agentique-v1.0 — Durcissement du moteur d'équipes agentique (Phases 15→29, 18 et 25 reportées) — SHIPPED 2026-08-15</summary>
@@ -492,7 +494,7 @@ Snapshots : `.planning/milestones/agentique-v1.0-*`. Détails : `MILESTONES.md`.
 
 </details>
 
-## 🚧 Milestone fiabilite-v1.0 — « ce qui survit » (Phases 30-35 + 18 et 25 héritées)
+## 🚧 Milestone fiabilite-v1.0 — « ce qui survit » (Phases 30-35, 37-39 + 18 et 25 héritées)
 
 **Milestone Goal :** fermer les dettes de gouvernance nées d'incidents réels du milestone précédent
 (deux contournements du driver-lock, un stall silencieux de 18 h, la dérive du ledger re-constatée à
@@ -1241,3 +1243,127 @@ hériterait exactement le piège en ciseaux que ce lot ferme (scalaire replié -
 `gsd-core`). **Déclencheur de reprise** : le prochain geste touchant l'instanciation de labs
 (`vf-new-lab`), qui devra d'abord mesurer ce que ce workflow fait réellement de ce bloc — copie
 machine ou lecture agentique — avant de décider de la forme à lui donner.
+
+### Phase 39: Workstreams — partition du planning et collaboration concurrente
+
+> **Chantier d'adoption, pas de décision.** L'**adoption** des workstreams a été tranchée par Samuel
+> le **2026-08-04** (arbitrage Phase 24, zone 5, *contre* la recommandation « refuser + remontée
+> amont ») — verbatim : « je veux coller au max à ce que fait GSD, je préfère jeter des IronLaw
+> outdated que de sacrifier l'efficience ». La Phase 24 a livré les **gardes**
+> (`workstream-policy.sh`, `check-workstream-pointer.sh`, la doctrine
+> `plugin/dev-orchestrator/references/workstreams.md`, **ADR-069**, `GSDA-13`→`GSDA-19` closes) —
+> **mais jamais l'adoption** : au 2026-09-09, **aucun lab n'est partitionné et aucun agent `vf-*` ne
+> passe `--ws`**. Ne plus dire « intégré à la Phase 24 » : le chantier réel est cette phase, créée
+> sur arbitrage humain le **2026-08-30**, inscrite au ROADMAP le **2026-09-09**.
+>
+> **Périmètre arrêté (2026-08-30)** : **adoption + filet de détection de divergence**, précédés
+> d'une **recherche sur le fonctionnement réel de GSD** ; cible **multi-sessions ET multi-humains** ;
+> **shim de redirection écarté**.
+
+**Goal**: Le planning est réellement partitionnable en workstreams — plusieurs sessions et plusieurs
+humains travaillent en parallèle sur des feuilles de route disjointes — et toute divergence est
+**détectée bruyamment** au lieu d'être subie en silence.
+
+**Depends on**: aucune dépendance technique de code avec les Phases 34 et 25 ; son rang dans la file
+du milestone reste à trancher. **Condition dure conservée d'ADR-069 : aucune partition tant qu'une
+phase est en vol** — c'est une condition d'exécution, pas une dépendance de phase.
+
+**Requirements**: **Famille `PART-01`→`PART-09`** (**définie** au cadrage le 2026-09-09 ; **gravure
+au ledger `REQUIREMENTS.md` = livrable non encore exécuté du plan `39-02-PLAN.md`, tâche 1** — au
+2026-09-10, `REQUIREMENTS.md` ne contient **aucune** entrée `PART-` : vérifié par trois méthodes
+indépendantes, `grep -c`, `awk`, comptage de fichiers ouverts) — **`PART`, pas `WSTR`** (arbitrage de lisibilité, `39-CONTEXT.md` D-07 : voisinage
+avec `WKTR`/`WTCH`). **Correction de la dérivation** qui a précédé ce choix : les préfixes occupés de
+`REQUIREMENTS.md` sont **40**, pas 42 — le « 42 » comptait deux faux positifs, `STATUT-BLOC-3` lu
+comme un `BLOC-3` et les chemins de dossier de phase `VFDO-xx`. Le même biais explique le « 36 »
+d'une date antérieure (34 réels + les deux mêmes). **Et le ledger ne suffit pas à dériver l'espace
+de noms** : la famille `SIG-01`→`SIG-06` (Phase 17) est livrée, citée dans les PLAN/SUMMARY et
+gravée dans des en-têtes de scripts, mais **absente des deux ledgers** — vivant et archivé. Espace
+réellement occupé : **41 familles**. Un préfixe suggéré par un document de cadrage n'est **jamais**
+un préfixe libre tant que l'espace de noms n'a pas été dérivé (précédent `PORT-xx`, Phase 38). `GSDA-13`→`GSDA-19` sont **closes** : elles portent les gardes, **pas** l'adoption — ne pas
+les rouvrir.
+
+**Success Criteria** (what must be TRUE):
+
+  1. Le fonctionnement réel des workstreams dans le `gsd-core` **installé** est **mesuré, pas lu** —
+     en particulier le **niveau 4** de résolution du pointeur (`.planning/active-workstream`
+     consulté quand la session n'a jamais posé le sien), que `references/workstream-flag.md` décrit
+     comme préservant l'isolation. Un descripteur amont n'est **pas** une preuve.
+
+  2. La **non-composabilité du pointeur avec ADR-064** (« un écrivain = un worktree ») est
+     **tranchée par la mesure** : soit refermée par le niveau 4, soit **déclarée comme limite
+     datée**. Elle n'est jamais laissée implicite. *(risque (c) d'ADR-069)*
+
+  3. Au moins un dépôt est **réellement partitionné**, et les agents `vf-*` **passent `--ws`** — la
+     couverture VF est prouvée **par exécution**, jamais par frontmatter. Les gates restent **verts
+     dans l'arbre non partitionné** (non-régression) **et** le deviennent dans l'arbre partitionné.
+
+  4. Le **filet de détection de divergence** existe et est **bruyant** : le split-brain mesuré en
+     Phase 24 (dossier de phase orphelin après merge, `git merge-tree` en **exit 0**, Git ne signale
+     rien) est **détecté**, pas subi. *(risque (d) d'ADR-069)*
+
+  5. Le comportement de `/gsd-pr-branch` sur un dépôt partitionné est **traité sur la mesure du
+     jour, pas sur la formulation de 2026-08-04**. Le risque (b) d'ADR-069 (« `pr-branch.md:235-236`
+     reclasse `.planning/workstreams/<nom>/STATE.md` en *transient → EXCLUDED*, les commits de
+     feuille de route disparaissent **silencieusement** des branches de PR ») a **muté** sur
+     `gsd-core` 1.13.0 — **vérifié le 2026-09-09** : les deux regex canoniques sont désormais
+     ancrées à la racine (`FORBIDDEN_RE="^\.planning/(phases|quick|research|…)/"`,
+     `STRUCTURAL_RE="^\.planning/(STATE|ROADMAP|…)\.md$"`, `pr-branch.md:250-270`), et le mode par
+     défaut **préserve et signale** explicitement ce qui est sous `.planning/workstreams/` (bloc
+     `$OTHER`). **Les trois conséquences ont été mesurées au cadrage, workflow EXÉCUTÉ sur un dépôt
+     partitionné jetable — verdict : deux vraies, une fausse à moitié.**
+     **(i) FAUSSE À MOITIÉ, et c'est le fait le plus important de la phase.** Le silence est levé au
+     niveau **chemin** (bloc `$OTHER`), mais il **subsiste au niveau COMMIT** :
+     `.planning/workstreams/<nom>/ROADMAP.md` **ne matche pas** `STRUCTURAL_RE` (ancré
+     `^\.planning/ROADMAP\.md$`), donc un commit qui ne touche **que** la feuille de route d'un
+     workstream sort à `NON_PLANNING=0, STRUCTURAL=0` → classé « transient planning commit » →
+     **EXCLU DANS LES DEUX MODES**, et il n'apparaît dans aucun rapport (il n'est jamais dans le
+     diff, seulement dans un compteur anonyme). **Le commit de feuille de route d'un workstream
+     disparaît donc toujours silencieusement** : le risque (b) n'a pas disparu, il a **migré** du
+     filtre de chemin vers la **classification de commit**.
+     **(ii) VRAIE**, mesurée — mais uniquement via les **commits mixtes** (code + planning de
+     workstream), qui sont le cas nominal du travail réel.
+     **(iii) VRAIE**, mesurée. *(risque (b) d'ADR-069 — re-mesuré deux fois : ne replanifier ni
+     contre le libellé de 2026-08-04, ni contre celui de l'inscription au ROADMAP)*
+
+  6. La **couverture amont** est **re-mesurée à la date du cadrage** et la remontée `GSDA-19` est
+     **postée ou explicitement abandonnée avec trace**. *(risque (a) d'ADR-069)*
+     **Libellé superseded par D-04 le 2026-09-09** (`39-CONTEXT.md`) : ni « postée » ni « abandonnée »
+     ne décrit l'état visé — le geste attendu est **rédigée, prête à poster, avec trace explicite
+     qu'elle n'est PAS postée** (dépôt réservé au geste humain de Samuel, ADR-031). L'angle porte
+     désormais sur `PART-06`, `GSDA-19` elle-même est superseded en place (corps préservé).
+
+**Mesure de première main du 2026-09-09, RE-MESURÉE ET CORRIGÉE au cadrage**
+(`@opengsd/gsd-core` **1.13.0** installé, **89** workflows racine — `*.md` à profondeur 1 sous
+`workflows/`) :
+
+- Le relevé « **7 conscients** » est un comptage **lexical** (le mot `workstream` présent). Au
+  critère dont se réclame `GSDA-19` — « sait résoudre un scope », donc `--ws` compris — c'est
+  **9 / 89**. L'écart est nominatif : `plan-review-convergence.md` et `verify-work.md` parsent et
+  assignent `--ws` **sans jamais écrire le mot** ; à l'inverse `health.md` et `pr-branch.md` ne
+  comptent que par de la **prose**. **43** chemins `.planning/` en dur (stable), **39** aveugles au
+  critère `--ws`.
+- **« La couverture amont n'a pas bougé en cinq semaines » est vraie par accident** : la phrase
+  compare un comptage lexical de 2026-09-09 à un autre critère de 2026-08-04. Les ensembles, eux,
+  ont bougé. **Ne pas graver « couverture figée » comme une propriété stable.**
+- **L'amont n'est pas immobile** : trois correctifs de workstream **fermés les 7-8 septembre 2026**
+  (`#4455` chemins racine lus/écrits après résolution du workstream, `#4456` `--ws` non propagé par
+  `new-milestone`, `#4225` `phase.add` ignore `--ws`) — mais **non distribués** : 1.13.0 est publiée
+  le 2026-09-06. La couverture bougera mécaniquement à la prochaine release.
+
+**Le fait qui commande réellement le périmètre n'est pas le comptage** : huit workflows du cœur de
+chaîne (`discuss-phase`, `plan-phase`, `execute-phase`, `progress`, `ship`, `quick`,
+`resume-project`, `validate-phase`) **interpolent `${GSD_WS}` dans leur texte de routage sans jamais
+l'assigner** — la « propagation de routage » amont est une convention de **prompt**, pas un câblage
+machine : elle tient si l'agent substitue, elle casse **en silence** sinon. C'est cela que le lab
+doit combler, pour la version installée.
+
+**Plans**: 3 plans (3 waves — 39-02 dépend de 39-01, 39-03 dépend de 39-01 et 39-02, corrigé 2026-09-10 : coupling C12/C13)
+
+Plans:
+- [x] 39-01-PLAN.md — Divergence-detection net (S2+S4+S5), opt-in `post-merge` hook, mutation-red proof (tracer)
+- [x] 39-02-PLAN.md — `PART-01..09` ledger family, `GSDA-19` re-worded + drafted upstream issue, ADR-069 dated amendment (D-09/D-10)
+- [x] 39-03-PLAN.md — Clone-jetable proof of `--ws` coverage (D-08), D-02/D-06 dated triggers inscribed
+
+Partition réelle de `vibeflow-os` : geste séparé, gaté humain, postérieur à cette phase —
+déclencheur de reprise daté en `.planning/STATE.md` § Decisions (D-02, inscrit par le plan 39-03).
+Confirmé par le plan 39-03 (§Task 2, 2026-09-10) — présence non dupliquée vérifiée.

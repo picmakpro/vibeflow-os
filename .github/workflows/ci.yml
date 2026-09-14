@@ -619,6 +619,68 @@ jobs:
           if [ "$fail" -ne 0 ]; then exit 1; fi
           echo "== gates workstream VERTS : la partition est vue, elle est discriminante, et la racine n'a pas bougé =="
 
+      - name: check-divergence.sh en CI (C17, 2026-09-10) — mutation rouge sur fixture divergente, pas seulement présence du gate
+        # POURQUOI CETTE ÉTAPE EXISTE (arbitrage Samuel, 2026-09-10, C17 revisité — plan 39-01,
+        # Task 3). Le hook `post-merge` (plan 39-01, Task 1) est opt-in et LOCAL — il ne tourne
+        # JAMAIS sur une PR fusionnée depuis GitHub, la voie de fusion DOMINANTE de ce dépôt. Un
+        # gate correct mais qui ne se déclenche jamais sur le cas qui compte est exactement le mode
+        # d'échec « sûr mais inerte » d'ADR-059 (la raison pour laquelle `isolation: worktree` est
+        # restée désarmée après la Phase 35) — ce dépôt a déjà payé une fois pour un mécanisme
+        # juste-mais-inerte, il ne paie pas deux fois. `check-divergence.sh` lui-même est inchangé ;
+        # seule son EXPOSITION en CI est neuve.
+        #
+        # Étape à part, jamais fusionnée dans l'étape précédente : un échec ici se lit sans
+        # ambiguïté comme « check-divergence » dans le journal CI, pas noyé dans le tally d'un autre
+        # step.
+        run: |
+          set -eu
+
+          fail=0
+          note() { echo "::error::check-divergence CI : $1"; fail=$((fail + 1)); }
+
+          FIX="$(mktemp -d)"
+          trap 'rm -rf "$FIX"' EXIT
+
+          # --- 1. Fixture PROPRE, partitionnée, un seul numéro de phase enregistré ---------------
+          mkdir -p "$FIX/.planning/workstreams/alpha/phases/VFDO-05-x-registered"
+          echo stub > "$FIX/.planning/workstreams/alpha/phases/VFDO-05-x-registered/PLAN.md"
+          printf '%s\n' "### Phase 05: registered" > "$FIX/.planning/workstreams/alpha/ROADMAP.md"
+          printf '%s\n' "---" "progress:" "  completed_phases: 0" "---" > "$FIX/.planning/workstreams/alpha/STATE.md"
+
+          # check-divergence.sh exige un dépôt git (--show-toplevel) — même contrainte que
+          # check-state-integrity.sh dans l'étape précédente.
+          git -C "$FIX" init -q
+          git -C "$FIX" add .planning
+          git -C "$FIX" -c user.email=ci@vibeflow.invalid -c user.name=CI -c commit.gpgsign=false \
+            commit -q -m "fixture-saine"
+
+          rc=0
+          out="$(bash plugin/conductor/scripts/check-divergence.sh --path "$FIX" 2>&1)" || rc=$?
+          echo "== 1/3 fixture propre : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 0 ] || note "1/3 fixture propre : rc=$rc, attendu 0 (conforme)"
+
+          # --- 2. MUTATION EN PLACE de la MÊME fixture (jamais reconstruite) : deuxième dossier ---
+          #        partageant le même préfixe numérique — le shape orphan/S2 déjà prouvé au Task 1.
+          mkdir -p "$FIX/.planning/workstreams/alpha/phases/VFDO-05-y-orphan"
+          echo stub > "$FIX/.planning/workstreams/alpha/phases/VFDO-05-y-orphan/PLAN.md"
+
+          rc=0
+          out="$(bash plugin/conductor/scripts/check-divergence.sh --path "$FIX" 2>&1)" || rc=$?
+          echo "== 2/3 fixture MUTÉE (même arbre, dossier dupliqué ajouté) : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 1 ] || note "2/3 fixture mutée : rc=$rc, attendu 1 (S2, divergence détectée) — le step ne serait pas discriminant en CI réelle non plus"
+
+          rm -rf "$FIX"
+
+          # --- 3. Non-régression racine : ce dépôt, aujourd'hui non partitionné, reste silencieux --
+          rc=0
+          out="$(bash plugin/conductor/scripts/check-divergence.sh --path . 2>&1)" || rc=$?
+          echo "== 3/3 racine (checkout CI, non partitionné) : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 3 ] || note "3/3 racine : rc=$rc, attendu 3 (silence, dépôt non partitionné)"
+
+          echo "== BILAN check-divergence CI : $fail écart(s) sur 3 verdicts (propre, mutation rouge, racine) =="
+          if [ "$fail" -ne 0 ]; then exit 1; fi
+          echo "== check-divergence.sh VERT en CI : le flip 0 → 1 sur mutation réelle est prouvé, la racine n'a pas bougé =="
+
       - name: check-release-tag (main uniquement — VERSION doit être taggée et poussée)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         # GH_TOKEN requis : sans lui le gh du runner échoue en auth et le gate lisait cet

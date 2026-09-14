@@ -41,3 +41,32 @@ lieu de relation, vert à vide, piège de l'infinitif, critère vert avant écri
 répètent d'un plan à l'autre parce que les plans ont été écrits dans la même passe. L'amendement
 qui suit se fait par `gsd-planner` en mode **chirurgical** — lui interdire explicitement de
 régénérer le plan, sinon il détruit le travail déjà validé.
+
+
+**Le cas le plus net, mesuré le 2026-09-09 (Phase 39) : MÊME outil, MÊMES plans, 0 bloquant contre
+5.** Le `vf-coder` qui venait d'écrire les trois plans a lancé `gsd-plan-checker` lui-même et rendu
+« VERIFICATION PASSED, 0 blocker, 1 warning advisory ». Relancé par le manager **en contexte neuf**,
+sur les mêmes fichiers au même commit, le même agent a rendu **5 bloquants et 6 warnings** — et un
+second juge indépendant (traçabilité/falsifiabilité) a confirmé les mêmes trois défauts majeurs par
+d'autres chemins de mesure.
+
+Les bloquants n'étaient pas des jugements de goût, mais des **spécifications écrites contre une
+arborescence imaginaire** : la clé d'extraction du filet de divergence (`^([0-9]+…)-`) ne matchait
+**aucun** des 10 dossiers de phase du dépôt (tous en `VFDO-NN-slug`), le signal de cardinalité
+rougissait sur un arbre **sain** (12 en-têtes de ROADMAP pour 10 dossiers, l'écart étant la
+convention d'archivage permanente du dépôt), et la fixture de preuve commitait des dossiers
+**vides** — que git ne versionne pas — rendant le critère d'acceptation inatteignable quelle que
+soit la qualité du code.
+
+**Why:** le producteur ne relit pas ses plans contre le disque, il les relit contre l'intention
+qu'il vient de former. Le contexte producteur porte la justification (« cette ancre matche les
+formes `05-` et `02.1-` de ce repo ») **et** l'erreur, si bien que le vérificateur qui partage ce
+contexte valide la justification au lieu de la mesurer. Un juge frais n'a que le disque.
+
+**How to apply:** ne jamais accepter un plan-check **lancé par l'agent qui a écrit le plan** comme
+tenant lieu du nœud `plancheck` du plan de bataille — le relancer en contexte neuf, systématiquement.
+Deux juges valent mieux qu'un quand le coût d'erreur est asymétrique : ici le second a trouvé, par
+un autre chemin, que le run de preuve exportait la variable d'environnement qui **masquait** le
+défaut qu'il prétendait mesurer. Fusionner et dédupliquer AVANT de rouvrir — un seul `reopen`, un
+seul mandat de correction ciblée. Voir [[revue-obligatoire-cout-erreur-asymetrique]] et
+[[descripteur-gsd-core-non-probant]].

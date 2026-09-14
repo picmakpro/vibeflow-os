@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# post-merge — Filet de divergence : après une fusion, détecte le split-brain de workstream
+# (signature S2+S4+S5, `plugin/conductor/scripts/check-divergence.sh`). Opt-in, jamais armé par
+# défaut. Activation, une seule fois :
+#   git config core.hooksPath scripts/hooks
+#
+# post-merge ne peut PAS annuler la fusion (git ignore son code de sortie pour cela, à la
+# différence de `pre-push`) : son rôle est d'être BRUYANT, pas de bloquer. Le branchement
+# EXPLICITE sur le code de sortie de `check-divergence.sh` est donc obligatoire — un `||` nu sur
+# le code brut crierait « divergence » sur exit 3 (SILENCE, dépôt non partitionné) ou exit 2 (non
+# vérifiable), c'est-à-dire sur CHAQUE fusion ordinaire de ce dépôt aujourd'hui non partitionné,
+# dès l'armement du hook.
+#
+# RÉSOLUTION DE L'EXÉCUTABLE (arbitrage Samuel, AskUserQuestion session principale, 2026-09-10) :
+# `check-divergence.sh` est résolu depuis le dépôt PRINCIPAL (`git rev-parse --git-common-dir`,
+# stable à travers `git worktree add`), JAMAIS depuis `--show-toplevel` du répertoire de travail
+# courant. Un `git worktree add` sur une branche hostile fait pointer `--show-toplevel` sur un
+# arbre entièrement contrôlé par l'attaquant ; y résoudre le script exécuté serait un candidat RCE
+# (mesuré par exécution réelle : une copie malveillante de `check-divergence.sh` posée dans un tel
+# worktree s'exécute au premier merge). `--git-common-dir` reste ancré sur le `.git` du dépôt
+# d'origine quel que soit le worktree courant — c'est LUI la source de confiance, pas `$0` : sous
+# `core.hooksPath` RELATIF (la convention documentée ci-dessus), git résout aussi le hook lui-même
+# depuis le worktree courant, donc `dirname "$0"` pointerait tout autant vers l'arbre hostile
+# (vérifié par exécution réelle : un vrai `git merge` dans un worktree hostile invoque le
+# `post-merge` ET le `check-divergence.sh` DU worktree, dans les deux cas). Seul `--git-common-dir`
+# échappe à ce biais. Le répertoire INSPECTÉ (`--path`), lui, reste `--show-toplevel` : c'est bien
+# le worktree courant qu'on veut auditer, seul l'exécutable change de source.
+set -uo pipefail
+main_root="$(cd "$(git rev-parse --git-common-dir)/.." && pwd)"
+root="$(git rev-parse --show-toplevel)"
+rc=0
+bash "$main_root/plugin/conductor/scripts/check-divergence.sh" --path "$root" || rc=$?
+
+case "$rc" in
+  1)
+    echo "[post-merge] divergence de workstream détectée après fusion (voir ci-dessus)." >&2
+    exit 1
+    ;;
+  0|3)
+    exit 0
+    ;;
+  *)
+    echo "[post-merge] check-divergence.sh non vérifiable/usage (rc=$rc) — ne bloque pas" >&2
+    exit 0
+    ;;
+esac

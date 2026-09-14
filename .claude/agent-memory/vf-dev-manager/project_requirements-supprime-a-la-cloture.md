@@ -35,3 +35,16 @@ Piège de vocabulaire associé : « capability » est **déjà pris** sur ce rep
 (`plugin/conductor/skills/vf-new-lab/references/capability-manifest.md:11` — « une capacité = un
 skill à créer », IDs `CAP-01…`), dans un repo qui a ADR-057 et `check-overlaps.sh` pour interdire
 exactement ça.
+
+**Preuve vivante trouvée le 2026-09-09** (dérivation d'espace de noms, cadrage Phase 39) : la
+famille **`SIG-01`→`SIG-06`** (Phase 17, jalon `agentique-v1.0`) est **livrée**, citée dans les
+`*-PLAN.md` et `*-SUMMARY.md` (`requirements-completed: [SIG-01, SIG-04]`), gravée jusque dans des
+en-têtes de scripts distribués (`check-dev-bootstrap.sh:2` — `(SIG-01)`) — et **absente des DEUX
+ledgers**, le vivant `.planning/REQUIREMENTS.md` **et** l'archive
+`.planning/milestones/agentique-v1.0-REQUIREMENTS.md` (`grep -c 'SIG-0'` → 0 et 0).
+
+**How to apply (complément)** : ne jamais dériver un espace de noms d'exigences depuis
+`REQUIREMENTS.md` seul — le ledger est **incomplet par construction**, pas seulement fragile. La
+dérivation doit balayer `.planning/` **et** `plugin/` (les scripts livrés portent des IDs dans
+leurs en-têtes). Sur ce dépôt au 2026-09-09 : 40 préfixes dans le ledger, **41 familles réellement
+occupées**. Voir [[prefixe-exigences-suggere-par-roadmap-deja-pris]].

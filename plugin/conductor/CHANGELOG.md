@@ -1,5 +1,46 @@
 # Changelog — conductor
 
+## [v1.35.0] — 2026-09-14 (Phase 39 — filet de détection de divergence de workstream, PART-04)
+
+**Minor** (nouveau script, nouvelle suite, nouveau signal observable) :
+
+- **`scripts/check-divergence.sh`** (neuf, 334 lignes) : filet de détection du **split-brain de
+  workstream** — une fusion sans conflit textuel dont le résultat est structurellement incohérent.
+  Mesuré au cadrage (`.planning/research/2026-09-09-phase-39-workstreams-mesures-de-cadrage.md`
+  §8-9) : `git merge`/`merge-tree` fusionnent ce cas **en silence**, et les trois gates existants
+  (`check-workstream-pointer.sh`, `check-state-integrity.sh`, `workstream-policy.sh`) rendent tous
+  « conforme » sur un tel arbre. Trois signaux distincts : **S2** (deux dossiers de phase du même
+  compartiment partagent un préfixe numérique), **S4a/S4b** (dossiers orphelins non documentés par
+  le `ROADMAP.md` du compartiment / `completed_phases` dépassant le nombre de dossiers), **S5**
+  (numéro de phase d'un compartiment réapparaissant en `### Phase N` du `ROADMAP.md` racine).
+  Codes de sortie tous énumérés : `0` conforme, `1` divergence, `2` **non vérifiable** (jamais un 0
+  de complaisance — un `mktemp` en échec rendait « conforme » sur un dépôt divergé avant la
+  correction post-revue), `3` silence (`.planning/workstreams/` absent — l'état nominal de tout lab
+  non partitionné, ce dépôt compris), `64` usage. Les préfixes numériques sont normalisés en base
+  10 explicite (`$((10#$n))`) avant toute comparaison : `08`/`09` sont des numéros de phase
+  ordinaires que `$((08))` fait échouer (bash 3.2.57). Aucun lien symbolique suivi, même posture que
+  `workstream-policy.sh`.
+- **`scripts/tests/test-check-divergence.sh`** (neuve) : **17 cas**, dont **3 mutants** — 10 cas à la
+  livraison du plan 39-01 (fixtures orphan / roadmap-conflict / rootonly / silence, mutants MUT-1
+  et MUT-2), puis +7 le 2026-09-14 (`fb83d4f` : cinq cas sur la sortie `2` — `mktemp` en échec ou
+  rendant un chemin inexistant, `workstream-policy.sh` introuvable, `--path` hors dépôt git,
+  `workstreams/` lien symbolique —, un cas de normalisation base 10 `08-a`/`8-b`, et MUT-3 ;
+  5 mutations survivantes tuées, chaque mutant vérifié muté par `cmp` sur la ligne visée, rouge sur
+  l'original ET vert à tort sur le mutant).
+  Un mutant qui échouait pour la mauvaise raison (dépendance sœur absente, `rc=2` accepté par une
+  assertion trop permissive) a été rendu opposable en correction post-revue.
+- **Consommateurs, hors module** : `scripts/hooks/post-merge` à la racine du dépôt (**opt-in**,
+  `git config core.hooksPath scripts/hooks`, jamais armé par défaut ; bruyant, ne bloque jamais un
+  merge ; exécutable résolu depuis `git rev-parse --git-common-dir`, jamais depuis le worktree
+  courant — un candidat RCE par worktree hostile a été **démontré** par exécution réelle avant
+  d'être fermé sur ce hook, arbitrage Samuel, AskUserQuestion session principale, 2026-09-10) et
+  l'étape dédiée du job CI `gates` (fixture partitionnée saine → `0`, mutée en place → `1`).
+- **`README.md`** : compte de scripts re-dérivé **26** (« 20 » était déjà faux avant la phase, 5
+  scripts non catalogués signalés, hors mandat), suites **27**.
+- Non-régression : `check-mission-invariants.sh` reste `rc=3` (SAIN), `check-state-integrity.sh`
+  `rc=0`, `check-divergence.sh --path .` rend `3` sur ce dépôt non partitionné, `check-version-sync.sh`
+  `rc=0` (77 suites).
+
 ## [v1.34.8] — 2026-08-30 (Phase 38 — correction ciblée : preuve générative des six angles morts du prédicat description:)
 
 **Patch** :

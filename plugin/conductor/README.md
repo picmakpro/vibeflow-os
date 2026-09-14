@@ -6,7 +6,7 @@
 > et de migration. Module **mandatory** : posé d'office à chaque install, c'est lui qui porte les
 > gates machine (hooks) et le noyau d'orchestration d'équipe réutilisé par tous les autres modules.
 
-**Type** : `agent + skills + scripts + references` · **Version** : v1.34.8 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
+**Type** : `agent + skills + scripts + references` · **Version** : v1.35.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
 
 > `skill-creator` est une dépendance **dure** depuis ADR-047 : c'est le canal unique de création de
 > skills, invoqué par `vf-new-lab` en fan-out (Phase 5) et exigé par le Gate C. Le conductor étant
@@ -83,12 +83,14 @@ première instanciation non-dev) et les **bundles métier** (business-pilot, con
   --hook` (**advisory**, Phase 32 : lecteur générique des marqueurs de santé du parc, silence
   nominal à 0 octet, une ligne si un garde s'est dégradé récemment).
 
-## Scripts (20) — par famille
+## Scripts (26) — par famille
 
-*(Compte re-dérivé au 2026-08-17 : `find plugin/conductor/scripts -maxdepth 1 -type f -name
-'*.sh' | wc -l`. Ce compte était déjà faux avant la Phase 32 — mesuré « 14 scripts » à la
-re-validation externe du 2026-08-17 pour 18 réels ; la phase ajoute encore `guard-driver-lock.sh`
-et `check-guard-health.sh` (+2) au-dessus de cet écart préexistant.)*
+*(Compte re-dérivé au 2026-09-10 : `find plugin/conductor/scripts -maxdepth 1 -type f -name
+'*.sh' | wc -l` → 26. Le compte « 20 » datait du 2026-08-17 et était déjà faux avant la Phase 39 —
+la phase ajoute `check-divergence.sh` (+1) au-dessus d'un écart préexistant de 5 scripts non
+répertoriés ci-dessous (`check-artifact-fidelity.sh`, `check-description-fidelity.sh`,
+`notify.sh`, `runtime-registry.sh`, `verify-runtime-reversibility.sh`), hors périmètre de cette
+correction — non catalogués ici faute de mandat pour le faire correctement.)*
 
 **Gates machine (`check-*`)** :
 - `check-agents.sh` — lint de conformité native des agents (ADR-044) : frontmatter, champs requis,
@@ -114,6 +116,14 @@ et `check-guard-health.sh` (+2) au-dessus de cet écart préexistant.)*
 - `check-guard-health.sh` — lecteur générique `SessionStart` des marqueurs de santé écrits par
   `vf_guard_unavailable` (tout le parc de gardes, pas seulement le lock) : fail-open bruyant plutôt
   que silencieux (Phase 32, QUAL-01).
+- `check-divergence.sh` — filet de détection de divergence de workstream (Phase 39) : signature
+  S2 + S4(a) + S4(b) + S5 (numéro de phase dupliqué dans un compartiment, cardinalité
+  dossiers/entrées de feuille de route/compteurs, fuite d'une phase de compartiment vers la
+  racine). Quatre codes de sortie : `0` conforme, `1` divergence, `2` non vérifiable, `3` silence
+  (dépôt non partitionné). Consommé par `scripts/hooks/post-merge` à la racine du dépôt (**opt-in**,
+  `git config core.hooksPath scripts/hooks`, jamais armé par défaut, n'interrompt jamais un merge)
+  et par le job CI `gates` (preuve locale par bascule de mutation — aucun run GitHub Actions réel
+  observé à ce jour, rien n'ayant encore été poussé). Doctrine : `dev-orchestrator/references/workstreams.md` §4.
 
 **Team-kernel** : `dag.sh` (plan de bataille persistant, frontière `ready`), `driver-lock.sh`
 (verrou de mission atomique par `mkdir`, battement séparé de la lease, verbes `takeover`/`reclaim`
@@ -128,10 +138,12 @@ SessionStart), `vf-update-run.sh` (re-matérialise les modules depuis le cache p
 ADR-042) et `generate-agent-commands.sh` (une commande slash d'incarnation par agent posé — saute
 les workers `vf-internal: true`, Pattern 12).
 
-**Tests** : 21 suites sous `scripts/tests/` (une par script critique + `test-conductor.sh`,
-`test-vf-new-lab.sh`, `test-vf-update.sh`, `test-doc-and-commands.sh`). *(Compte re-dérivé :
-`find plugin/conductor/scripts/tests -type f -name 'test-*.sh' | wc -l` ; « 19 suites » était déjà
-faux avant cette annexe notifications.)*
+**Tests** : 27 suites sous `scripts/tests/` (une par script critique + `test-conductor.sh`,
+`test-vf-new-lab.sh`, `test-vf-update.sh`, `test-doc-and-commands.sh`, `test-check-divergence.sh`
+neuve en Phase 39, 17 cas dont 3 mutants — 10 cas à la livraison du plan 39-01, +7 le
+2026-09-14 pour couvrir la sortie `2` et la normalisation base 10, tuant 5 mutations survivantes). *(Compte re-dérivé au 2026-09-10 :
+`find plugin/conductor/scripts/tests -maxdepth 1 -type f -name 'test-*.sh' | wc -l` → 27 ; « 21
+suites » était déjà faux avant la Phase 39.)*
 
 ## Contenu du module
 
@@ -144,7 +156,7 @@ conductor/
     vf-calibrate/SKILL.md          # propagation update + migration
     vf-update/SKILL.md             # mise à jour plugin + modules
     vf-notify/SKILL.md             # toggle notifications OS (opt-in, D-33-H)
-  scripts/                         # 20 scripts (familles ci-dessus) + tests/ (21 suites)
+  scripts/                         # 26 scripts (familles ci-dessus) + tests/ (27 suites)
   references/
     team-kernel.md                 # contrat du noyau d'équipe (manager/workers/juges)
     contracts.md                   # escalade sous-agents → conductor
