@@ -136,6 +136,80 @@ if [ "$rc" -eq 0 ] && ! printf '%s' "$out" | grep -qE 'S2 :|S4\(a\)|S4\(b\)|S5 :
   ok "8 S4(b) completed_phases=1 < 2 dossiers → exit 0 (état normal en cours, garde de non-régression)"
 else ko "8 S4(b) less-than" "rc=$rc out=[$out]"; fi
 
+# === Sortie 2 (« non vérifiable ») — NON COUVERTE avant ce lot. Cinq voies mesurées, chacune ======
+# asserte le code 2 précisément (jamais « != 0 »), pour fermer les mutations M5/M6/M7/M8/M4 qui
+# dégradent silencieusement ces gardes vers 0 (faux vert) ou 3 (faux silence).
+
+run_with_path() { # <path> <path_prefix> — même contrat que run(), PATH préfixé pour intercepter mktemp
+  local path="$1" prefix="$2"
+  env -u GSD_WORKSTREAM -u VF_WORKSTREAM -u VF_WORKSTREAM_PLANNING_DIR \
+    PATH="$prefix:$PATH" \
+    bash "$TARGET" --path "$path" 2>&1
+}
+
+# === Cas 9 — M5 : `mktemp -d` échoue (rend un code non nul, rien sur stdout) → exit 2 ==============
+D="$(mk_git_root c9)"
+mkdir -p "$D/.planning/workstreams/mk1/phases/01-un"
+FAKEBIN9="$TMP/fakebin-mktemp-fail"; mkdir -p "$FAKEBIN9"
+printf '%s\n' '#!/usr/bin/env bash' 'exit 1' > "$FAKEBIN9/mktemp"
+chmod +x "$FAKEBIN9/mktemp"
+out="$(run_with_path "$D" "$FAKEBIN9")"; rc=$?
+if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -qF 'mktemp -d a échoué'; then
+  ok "9 mktemp -d échoue → exit 2 (non vérifiable)"
+else ko "9 mktemp échoue" "rc=$rc (attendu 2) out=[$out]"; fi
+
+# === Cas 10 — M6 : `mktemp -d` réussit mais rend un chemin qui n'existe pas → exit 2 ===============
+D="$(mk_git_root c10)"
+mkdir -p "$D/.planning/workstreams/mk2/phases/01-un"
+FAKEBIN10="$TMP/fakebin-mktemp-badpath"; mkdir -p "$FAKEBIN10"
+printf '%s\n' '#!/usr/bin/env bash' 'echo "/inexistant-check-divergence-$$"' 'exit 0' > "$FAKEBIN10/mktemp"
+chmod +x "$FAKEBIN10/mktemp"
+out="$(run_with_path "$D" "$FAKEBIN10")"; rc=$?
+if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -qF 'dossier temporaire introuvable après mktemp'; then
+  ok "10 mktemp -d rend un chemin inexistant → exit 2 (non vérifiable)"
+else ko "10 mktemp chemin inexistant" "rc=$rc (attendu 2) out=[$out]"; fi
+
+# === Cas 11 — M7 : workstream-policy.sh introuvable (script isolé, aucune des deux voies de résolution
+# relative ne mène à un fichier lisible) → exit 2 ====================================================
+ISOD="$TMP/isolated-script"; mkdir -p "$ISOD"
+cp "$SCRIPT" "$ISOD/check-divergence.sh"
+D="$(mk_git_root c11)"
+mkdir -p "$D/.planning/workstreams/mk3/phases/01-un"
+_target_save="$TARGET"; TARGET="$ISOD/check-divergence.sh"
+out="$(run "$D")"; rc=$?
+TARGET="$_target_save"
+if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -qF 'workstream-policy.sh introuvable'; then
+  ok "11 workstream-policy.sh introuvable (script isolé) → exit 2 (non vérifiable)"
+else ko "11 policy introuvable" "rc=$rc (attendu 2) out=[$out]"; fi
+
+# === Cas 12 — M8 : --path pointe hors d'un dépôt git → exit 2 ======================================
+D="$TMP/c12-nogit"
+mkdir -p "$D/.planning/workstreams/mk4/phases/01-un"
+out="$(run "$D")"; rc=$?
+if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -qF "hors d'un dépôt git"; then
+  ok "12 --path hors dépôt git → exit 2 (non vérifiable)"
+else ko "12 hors dépôt git" "rc=$rc (attendu 2) out=[$out]"; fi
+
+# === Cas 13 — M4 : `.planning/workstreams` est un lien symbolique → exit 2 (jamais 0 ni 3) =========
+D="$(mk_git_root c13)"
+mkdir -p "$D/.planning/real_ws_target/phases/01-un"
+ln -s "$D/.planning/real_ws_target" "$D/.planning/workstreams"
+out="$(run "$D")"; rc=$?
+if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -qF 'est un lien symbolique — refus de le suivre, non vérifiable'; then
+  ok "13 workstreams est un lien symbolique → exit 2 (non vérifiable, ni 0 ni 3)"
+else ko "13 workstreams symlink" "rc=$rc (attendu 2) out=[$out]"; fi
+
+# === Cas 14 — normalisation base 10 (D1) : « 08-a » et « 8-b » dans le MÊME compartiment doivent ====
+# être reconnus comme le MÊME numéro de phase (8) et rougir en S2. Fixture ORDINAIRE (pas de mktemp
+# ni de policy détournés) qui démontre le faux vert de M1 : `n=$((08))` échoue en base 8 sous bash,
+# une normalisation nue (sans préfixe `10#`) rendrait "8-b" et "08-a" NON dupliqués à tort.
+D="$(mk_git_root c14)"
+mkdir -p "$D/.planning/workstreams/theta/phases/08-a" "$D/.planning/workstreams/theta/phases/8-b"
+out="$(run "$D")"; rc=$?
+if [ "$rc" -eq 1 ] && printf '%s' "$out" | grep -qF 'S2' && printf '%s' "$out" | grep -qF '08-a' && printf '%s' "$out" | grep -qF '8-b'; then
+  ok "14 normalisation base 10 : 08-a et 8-b dupliquent le numéro 8 → exit 1"
+else ko "14 normalisation base 10 (08-a/8-b)" "rc=$rc (attendu 1) out=[$out]"; fi
+
 echo ""
 echo "== mutants =="
 
@@ -195,6 +269,43 @@ else
     ok "MUT-2 détection S2 neutralisée (cmp : script bien muté) : la fixture orphan reste (à tort) VERTE sur le mutant (rc=$rc_mut), et ROUGIT sur l'original (rc=$rc_orig)"
   else
     ko "MUT-2 la fixture orphan doit rougir sur l'original et rester verte (à tort) sur le mutant" "rc_mutant=$rc_mut (attendu 0) rc_original=$rc_orig (attendu 1)"
+  fi
+fi
+
+# === MUT-3 — M1 : mutation du SCRIPT, normalisation base-10 dégradée (`n=$((10#$int))` -> `n=$((int))`)
+# Cible la ligne de CODE exécutée (pas le commentaire d'en-tête qui cite le même motif entre
+# backticks) : awk repère la ligne EXACTE `  n=$((10#$int))`, hors toute ligne commençant par `#`.
+# La fixture 08-a/8-b (cas 14) rougit sur l'original ; ce mutant doit la faire passer au vert
+# À TORT — c'est le faux vert que l'en-tête du script qualifie de « bloquant, pas un style ».
+cat > "$MUTD/neutralise-normalize.awk" <<'AWKEOF'
+{
+  if (!fait && $0 !~ /^#/ && index($0, "n=$((10#$int))") > 0) {
+    sub(/n=\$\(\(10#\$int\)\)/, "n=$((int))")
+    fait = 1
+  }
+  print
+}
+AWKEOF
+MUTANT3="$MUTD/check-divergence.mut3.sh"
+awk -f "$MUTD/neutralise-normalize.awk" "$SCRIPT" > "$MUTANT3"
+
+D="$(mk_git_root mut3)"
+mkdir -p "$D/.planning/workstreams/theta/phases/08-a" "$D/.planning/workstreams/theta/phases/8-b"
+if cmp -s "$MUTANT3" "$SCRIPT"; then
+  ko "MUT-3 normalisation base-10 dégradée" "la mutation n'a RIEN changé (motif introuvable) — mutant NON OPPOSABLE, pas mutant satisfait"
+elif ! bash -n "$MUTANT3" 2>/dev/null; then
+  ko "MUT-3 normalisation base-10 dégradée" "le mutant n'est pas un script valide : il rougirait pour la mauvaise raison"
+elif ! grep -qxF '  n=$((int))' "$MUTANT3"; then
+  ko "MUT-3 normalisation base-10 dégradée" "la ligne de CODE (146) n'a pas été atteinte — la mutation a pu frapper autre chose (commentaire, etc.)"
+else
+  TARGET="$MUTANT3"
+  run "$D" >/dev/null 2>&1; rc_mut3=$?
+  TARGET="$SCRIPT"
+  run "$D" >/dev/null 2>&1; rc_orig3=$?
+  if [ "$rc_mut3" -eq 0 ] && [ "$rc_orig3" -eq 1 ]; then
+    ok "MUT-3 normalisation base-10 dégradée (cmp : ligne de code bien mutée) : la fixture 08-a/8-b reste (à tort) VERTE sur le mutant (rc=$rc_mut3), et ROUGIT sur l'original (rc=$rc_orig3)"
+  else
+    ko "MUT-3 la fixture 08-a/8-b doit rougir sur l'original et rester verte (à tort) sur le mutant" "rc_mutant=$rc_mut3 (attendu 0) rc_original=$rc_orig3 (attendu 1)"
   fi
 fi
 
