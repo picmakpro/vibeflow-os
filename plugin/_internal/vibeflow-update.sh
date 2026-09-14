@@ -1683,6 +1683,113 @@ record_codex_runtime_if_applicable() {
   return 0
 }
 
+# _uw_node <mode> — calqué ligne pour ligne sur _rr_node (runtime-registry.sh l. 108-176) :
+# lecture JSON.parse/fs.readFileSync dans un try, écriture ATOMIQUE tmp+rename, jamais un état
+# par défaut fabriqué sur un fichier cassé (JSON imparsable → message stderr + exit 2). Mode
+# "check" rend un jeton ASCII unique sur stdout (jamais d'espace) : "deja-conforme" si la clé est
+# déjà présente dans `workflow` (quelle que soit sa valeur — l'engine ne repose jamais une clé
+# que l'opérateur a fixée lui-même), "ecriture-necessaire" si `workflow` est absent ou n'a pas la
+# clé, "forme-inattendue" si `workflow` existe mais n'est ni un objet ni null-safe (tableau,
+# scalaire). Mode "write" étend la section existante sans la remplacer (Object.assign sur une
+# copie), préserve l'ordre et les autres clés racines, écrit `false` (booléen).
+_uw_node() {
+  local mode="$1"
+  node -e '
+const fs = require("fs");
+const [mode, configPath] = process.argv.slice(1);
+
+let config;
+try {
+  config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+} catch (e) {
+  process.stderr.write("[use-worktrees] JSON imparsable : " + configPath + " (" + e.message + ")\n");
+  process.exit(2);
+}
+
+const KEY = "use_worktrees";
+const hasWorkflow = config !== null && typeof config === "object" && !Array.isArray(config)
+  && Object.prototype.hasOwnProperty.call(config, "workflow");
+const workflow = hasWorkflow ? config.workflow : undefined;
+const workflowIsObject = typeof workflow === "object" && workflow !== null && !Array.isArray(workflow);
+
+if (hasWorkflow && !workflowIsObject) {
+  if (mode === "check") process.stdout.write("forme-inattendue\n");
+  process.exit(0);
+}
+
+if (mode === "check") {
+  if (hasWorkflow && Object.prototype.hasOwnProperty.call(workflow, KEY)) {
+    process.stdout.write("deja-conforme\n");
+  } else {
+    process.stdout.write("ecriture-necessaire\n");
+  }
+  process.exit(0);
+}
+
+if (mode === "write") {
+  const next = Object.assign({}, config);
+  const nextWorkflow = Object.assign({}, workflowIsObject ? workflow : {});
+  nextWorkflow[KEY] = false;
+  next.workflow = nextWorkflow;
+  const tmpPath = configPath + ".uw-tmp." + process.pid;
+  fs.writeFileSync(tmpPath, JSON.stringify(next, null, 2) + "\n");
+  fs.renameSync(tmpPath, configPath);
+  process.exit(0);
+}
+' "$mode" ".planning/config.json"
+}
+
+# disable_worktrees_if_root_not_git — best-effort, appelée juste après
+# record_codex_runtime_if_applicable en fin de install_module() ET update_module(). gsd-core
+# 1.13.0/1.14.0 résout `dispatch-isolation` en `harness-worktree` SANS jamais vérifier l'existence
+# d'un `.git`, `worktree.base-check` répond `no-head` sans dégrader, et le hook
+# `gsd-agent-isolation-guard.js` finit par refuser tout `Agent(gsd-executor)` dès que le sentinel
+# `.gsd/dispatch-isolation-sentinel.json` dépasse 10 minutes — 4 blocages par jour mesurés le
+# 2026-09-14 sur un lab multi-repos (`.planning/` à la racine, repos git en dessous, façon
+# Scroll-Off). Poser `workflow.use_worktrees=false` fait résoudre `none` des deux côtés (vérifié
+# en simulation). Issue amont : open-gsd/gsd-core#4734.
+#
+# Seul le code de sortie **128** de `git rev-parse --is-inside-work-tree` (« not a git
+# repository », mesuré le 2026-09-14) fait foi : c'est la SEULE réponse DÉFINITIVE de git. Un
+# binaire absent (127), un timeout ou un rc inconnu sont des absences de réponse — et une absence
+# de réponse ne justifie jamais une écriture. Contrairement à sa voisine, ne prend aucun argument :
+# elle ne dépend d'aucun module.
+disable_worktrees_if_root_not_git() {
+  vf_dry_run && return 0
+  [ -f ".planning/config.json" ] || return 0
+  command -v node >/dev/null 2>&1 || return 0
+
+  local rc=0
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 128 ] || return 0
+
+  local state
+  state="$(_uw_node check)" || return 0
+  [ "$state" = "ecriture-necessaire" ] || return 0
+
+  # TGT-05 (fuite cwd vs TARGET_ROOT, identique à record_codex_runtime_if_applicable ci-dessus,
+  # l. 1652-1675). Le `.planning/config.json` visé est TOUJOURS celui du cwd par conception ;
+  # sous --target vers une cible HORS de l'arbre du repo courant, écrire dans ce fichier
+  # muterait en silence le projet de l'opérateur alors qu'il visait ailleurs — refusé pour cette
+  # seule raison. Placé APRÈS toutes les autres gardes : ne journalise que quand une écriture
+  # aurait réellement été tentée.
+  if [ -n "$VF_TARGET_OVERRIDE" ]; then
+    local _uw_cwd_phys
+    _uw_cwd_phys="$(pwd -P)" || return 0
+    case "$TARGET_ROOT" in
+      "$_uw_cwd_phys"/*|"$_uw_cwd_phys") ;;
+      *)
+        log "  [use-worktrees] --target ($TARGET_ROOT) sort de l'arbre du repo — .planning/config.json (cwd) non modifié"
+        return 0
+        ;;
+    esac
+  fi
+
+  _uw_node write || return 0
+  log "  [use-worktrees] racine du lab non-git (git rev-parse rc=128) → worktrees impossibles → workflow.use_worktrees=false posé dans .planning/config.json (dispatch séquentiel, cf. open-gsd/gsd-core#4734)"
+  return 0
+}
+
 scripts_prefix_for_scope() {
   # Chemins LITTÉRAUX dans settings.json, valables pour la forme SHELL uniquement (c'est le
   # shell qui exécute la commande qui les expanse). Pour la forme exec (`args`), merge-hooks.sh
@@ -2338,6 +2445,8 @@ install_module() {
   # le chemin d'install réel (grep -c 'coexistence' = 0 mesuré le 2026-08-29). Best-effort,
   # silence total si runtime non-codex/registre absent (cf. record_codex_runtime_if_applicable).
   record_codex_runtime_if_applicable "$mod" "$module_dir"
+  # use_worktrees=false auto sur lab à racine non-git (#4734 amont) : cf. disable_worktrees_if_root_not_git.
+  disable_worktrees_if_root_not_git
   # Coexistence sans hooks (MIGR-05, 38-06) : MÊME gate, AU MÊME endroit qu'au `status` (juste
   # après la bannière [fidelity]) — un opérateur qui installe voit la coexistence déclarée sans
   # second rapport séparé. Best-effort, silence si le gate/registre sont absents.
@@ -3028,6 +3137,9 @@ update_module() {
   # Écriture du registre de runtime (CODEX-B6, 38-07) : 2e couture, symétrique — cf.
   # record_codex_runtime_if_applicable, DOIT précéder toute relecture de coexistence-report.
   record_codex_runtime_if_applicable "$mod" "$CACHE_DIR/$mod"
+  # use_worktrees=false auto sur lab à racine non-git (#4734 amont) : dernier geste de la fonction,
+  # symétrique du point d'appel d'install_module — cf. disable_worktrees_if_root_not_git.
+  disable_worktrees_if_root_not_git
 }
 
 # ---------- Main ----------

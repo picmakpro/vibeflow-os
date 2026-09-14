@@ -76,6 +76,30 @@ vers sonnet (dégradation de la qualité de plan sans signal).
 4. Refus → ne rien écrire, journaliser la proposition déclinée (pas de re-proposition en boucle
    à chaque `vf-calibrate` — une fois par session suffit).
 
+## 2quater. Ce que l'engine écrit de lui-même dans `.planning/config.json`
+
+L'engine (`vibeflow-update.sh`) a **deux** écritures automatiques dans `.planning/config.json`,
+sans passer par la doctrine « détecter → proposer → validation humaine » (ADR-031) : l'enregistrement
+du runtime actif (`record_codex_runtime_if_applicable`, déjà en place) et, depuis le lot #4734,
+`workflow.use_worktrees = false` sur un lab à racine non-git
+(`disable_worktrees_if_root_not_git`). Ce sont les **seules** exceptions du parc — justifiées
+parce qu'elles ne font que rendre **explicite** un fait de l'environnement que le lab ne peut pas
+contredire (le runtime qui exécute l'install, l'existence ou non d'un `.git` à la racine), jamais
+un choix de conception que l'opérateur pourrait vouloir arbitrer autrement.
+
+**`use_worktrees = false`** s'applique sous trois conditions cumulées : `.planning/config.json`
+présent au cwd, `git rev-parse --is-inside-work-tree` rend le code **128** (la seule réponse
+DÉFINITIVE de git — binaire absent, timeout ou code inconnu ne comptent jamais comme un « non »),
+et la clé n'est pas déjà présente dans `workflow` (quelle que soit sa valeur). Un opérateur qui
+veut le réglage inverse n'a qu'à poser la clé lui-même à `true` — l'engine ne la repose **jamais**
+une fois la valeur présente et différente de l'attendu.
+
+**Cas d'usage nommé** : le workspace multi-repos façon `Scroll-Off` (`.planning/` à la racine,
+plusieurs dépôts git en dessous, aucun `.git` au niveau du lab). Sans ce réglage, gsd-core
+1.13.0/1.14.0 résout `dispatch-isolation` en `harness-worktree` sans jamais vérifier l'existence
+d'un `.git`, bloquant le dispatch d'exécutants. Détail et issue amont :
+[open-gsd/gsd-core#4734](https://github.com/open-gsd/gsd-core/issues/4734).
+
 ## 3. Surfaçage opt-in à l'ouverture de session (façon GSD)
 
 Pour que l'utilisateur **voie** qu'une mise à jour le concerne (comme GSD le montrait dans le repo),

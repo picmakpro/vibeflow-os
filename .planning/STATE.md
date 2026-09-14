@@ -118,7 +118,7 @@ par commande parce que l'une pouvait supprimer la phase :
 **Correction au chiffrage du STUDY §7.3** : l'analogue `check-doc-drift.sh` fait aujourd'hui
 **167 l.** (et non 153) et son test **278 l.** (et non 232) — ratio **1,66×**, pas 1,5×. Un gate de
 100-150 l. demande donc ~170-250 l. de tests.
-Last activity: 2026-08-17 — clôture réelle de la Phase 33 (release `v2.56.0`) puis hygiène d'état.
+Last activity: 2026-09-14 — quick 260914-n3e : use_worktrees=false auto sur lab à racine non-git (vibeflow-update.sh), issue amont open-gsd/gsd-core#4734.
 
 **Phase 33 CLOSE ET PUBLIÉE** — vérifié machine le 2026-08-17 :
 
@@ -1012,6 +1012,7 @@ Recent decisions affecting current work:
 | 260815-tl6 | Snapshot hebdo traffic/clones GitHub (script + workflow cron + branche traffic-data) avec clones ajustés hors jobs CI | 2026-08-15 | `73363c1` | [260815-tl6-snapshot-hebdo-traffic-clones-github-ave](./quick/260815-tl6-snapshot-hebdo-traffic-clones-github-ave/) |
 | 260815-wnk | Capture étude « AI Agents in Depth » × VibeFlow (rapport recherche + entrée backlog milestone candidat) | 2026-08-15 | `f920b09` | [260815-wnk-capture-etude-ai-agent-book](./quick/260815-wnk-capture-etude-ai-agent-book/) |
 | 20260907-win | WIN-PATHCONV II — `$HOME` en forme Windows native écrivait des chemins de hooks mixtes (`C:\Users\x/.claude/scripts`) : normalisation POSIX à l'install + 3e marque du garde-fou + T26/T26b/T26c — release v2.59.1 | 2026-09-07 | `6ed1f76` | [20260907-win-pathconv-ii-home-backslash](./quick/20260907-win-pathconv-ii-home-backslash/) |
+| 260914-n3e | use_worktrees=false auto sur lab à racine non-git (vibeflow-update.sh, install + update) : le guard d'isolation gsd-core bloquait tout gsd-executor sur un lab multi-repos dès que le sentinel dépassait 10 min — issue amont open-gsd/gsd-core#4734, T53a–T53g, non releasé | 2026-09-14 | `30cef6a` | [260914-n3e-use-worktrees-false-auto-sur-lab-racine-](./quick/260914-n3e-use-worktrees-false-auto-sur-lab-racine-/) |
 
 ## Deferred Items
 

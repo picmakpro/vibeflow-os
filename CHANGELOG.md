@@ -5,6 +5,39 @@ extrait récent et pointent ici). Chaque module a par ailleurs son propre `CHANG
 sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 (`scripts/check-release-tag.sh`).
 
+## Non releasé
+
+*Titre volontairement SANS crochets : `scripts/bump.sh` insère le squelette de la prochaine
+release au-dessus de la première ligne qui commence par `## [` — une section « non releasé »
+entre crochets se retrouverait publiée SOUS la version suivante.*
+
+**Un lab à racine non-git bloquait le dispatch d'exécutants quatre fois par jour.**
+
+- **Mécanisme amont mesuré le 2026-09-14** : gsd-core 1.13.0/1.14.0 résout `dispatch-isolation` en
+  `harness-worktree` sans jamais vérifier l'existence d'un `.git` ; `worktree.base-check` répond
+  `no-head` sans dégrader ; le hook `gsd-agent-isolation-guard.js` finit par refuser tout
+  `Agent(gsd-executor)` dès que le sentinel `.gsd/dispatch-isolation-sentinel.json` dépasse 10
+  minutes — mesuré 4 blocages par jour sur un lab multi-repos façon `Scroll-Off`
+  (`.planning/` à la racine, dépôts git en dessous).
+- **Ce que l'engine pose désormais seul** : `workflow.use_worktrees = false` dans
+  `.planning/config.json`, sous trois conditions cumulées — (1) `.planning/config.json` présent au
+  cwd, (2) `git rev-parse --is-inside-work-tree` rend le code **128** (« not a git repository »,
+  la seule réponse DÉFINITIVE de git), (3) la clé n'est pas déjà présente (l'engine ne la repose
+  jamais si l'opérateur l'a fixée lui-même, quelle que soit sa valeur).
+- **Quatre garde-fous** : silence total sous `--dry-run` ; idempotence stricte (aucune
+  re-sérialisation si la clé est déjà conforme) ; garde TGT-05 (`--target` hors de l'arbre du cwd →
+  aucune écriture, refus journalisé) ; silence sur tout code de sortie git autre que 128 (binaire
+  absent, timeout, code inconnu — une absence de réponse ne devient jamais une écriture).
+- **Discriminance prouvée par mutation** (jouée puis restaurée) : comparaison du code de sortie git
+  inversée → le cas racine-git rougit ; remplacement de la section `workflow` par un écrasement pur
+  → le cas d'extension rougit seul ; garde TGT-05 supprimée → le cas de refus hors-arbre rougit.
+  Suite `test-vibeflow-update.sh` : 71 OK / 0 KO avant le lot, 78 OK / 0 KO / 0 SKIP après (sept cas
+  neufs).
+- Issue amont : [open-gsd/gsd-core#4734](https://github.com/open-gsd/gsd-core/issues/4734).
+
+*Aucun bump de version dans ce lot — la release reste un geste humain gaté (CLAUDE.md racine,
+ADR-031).*
+
 ## [v2.59.2] — 2026-09-08
 
 **La grammaire CLI de Codex était supposée, pas mesurée — l'install automatique ne pouvait pas
