@@ -118,7 +118,7 @@ par commande parce que l'une pouvait supprimer la phase :
 **Correction au chiffrage du STUDY §7.3** : l'analogue `check-doc-drift.sh` fait aujourd'hui
 **167 l.** (et non 153) et son test **278 l.** (et non 232) — ratio **1,66×**, pas 1,5×. Un gate de
 100-150 l. demande donc ~170-250 l. de tests.
-Last activity: 2026-09-14 — quick 260914-n3e : use_worktrees=false auto sur lab à racine non-git (vibeflow-update.sh), issue amont open-gsd/gsd-core#4734.
+Last activity: 2026-09-14 — deux faits distincts, fusionnés depuis `origin/main` (merge `5efe8d3`) : (1) Phase 39 (Workstreams) exécutée sur cette branche, plans 39-01/39-02/39-03 clos avec SUMMARY.md (dernier commit `c7cb20f`, 2026-09-14) ; (2) quick 260914-n3e — use_worktrees=false auto sur lab à racine non-git (vibeflow-update.sh), issue amont open-gsd/gsd-core#4734 (commit `30cef6a`, 2026-09-14).
 
 **Phase 33 CLOSE ET PUBLIÉE** — vérifié machine le 2026-08-17 :
 
