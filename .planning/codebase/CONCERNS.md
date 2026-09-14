@@ -260,47 +260,58 @@ capturées au backlog — voir Tech Debt.
 - Current mitigation: source contrôlée (cache = contenu du repo publié).
 - Recommendations: garde ceinture-bretelles excluant `*.env*` / `*secret*` des copies.
 
-**Candidat RCE par `git worktree` hostile — mitigé sur `pre-push` ET `post-merge`** — Sévérité : **MEDIUM** — **MITIGÉ le 2026-09-10**
+**Candidat RCE par `git worktree` hostile — RÉDUIT, PAS FERMÉ (`pre-push` ET `post-merge`)** — Sévérité : **MEDIUM** — **RÉDUIT le 2026-09-10, résiduel OUVERT constaté le 2026-09-14**
 - Risk: un hook git qui résout le script qu'il exécute via `git rev-parse --show-toplevel` fait
   résoudre ce chemin sur l'arbre du **worktree courant** — un `git worktree add` sur une branche
   hostile peut donc faire exécuter au hook une copie du script entièrement contrôlée par
   l'attaquant. Une dette de sécurité qui n'existe que dans la mémoire d'un agent n'est pas une
   dette suivie, c'est une dette oubliée avec un délai : ce constat était noté côté mémoire d'agent
   seulement (`.claude/agent-memory/vf-coder/project_pre-push-candidat-rce-non-corrige.md`), jamais
-  ici. Deux occurrences, désormais les deux fermées :
-  - `scripts/hooks/post-merge` : **MITIGÉ le 2026-09-10** (arbitrage Samuel, AskUserQuestion
-    session principale) — résout `plugin/conductor/scripts/check-divergence.sh` via
+  ici.
+- **Ce qui EST fermé** — le script APPELÉ par le hook ne peut plus venir d'un arbre hostile,
+  prouvé par exécution réelle sur les deux hooks :
+  - `scripts/hooks/post-merge` : résout `plugin/conductor/scripts/check-divergence.sh` via
     `git rev-parse --git-common-dir` (ancré sur le dépôt principal, stable à travers
-    `git worktree add`), plus jamais via `--show-toplevel`. Prouvé par exécution réelle : une copie
-    malveillante de `check-divergence.sh` posée dans un worktree hostile ne s'exécute plus au merge
-    — seule la copie du dépôt principal s'exécute. Le raisonnement retenu : hériter une dette
-    catalogée et l'écrire volontairement dans du code neuf ne sont pas le même geste — le vecteur
-    est connu au moment où la ligne s'écrit.
-  - `scripts/hooks/pre-push` : **MITIGÉ le 2026-09-10** (arbitrage Samuel, AskUserQuestion session
-    principale — nouvel arbitrage, revenant sur l'ouverture du 2026-09-10 initial une fois le
-    vecteur démontré par exécution réelle sur ce hook précis : worktree hostile + `git merge` réel +
-    copie malveillante de `check-release-tag.sh` → témoin créé). Même mécanisme que `post-merge` :
-    résout `scripts/check-release-tag.sh` via `main_root="$(cd "$(git rev-parse
-    --git-common-dir)/.." && pwd)"`, plus jamais via `root="$(git rev-parse --show-toplevel)"`.
-    **Le piège mesuré à ne pas retomber dedans** : dériver l'exécutable depuis l'emplacement du
-    hook (`dirname "$0"`) ne suffit PAS. Sous `core.hooksPath` **relatif** (la convention de ce
-    dépôt), git résout aussi le **hook lui-même** depuis le worktree courant — vérifié par un vrai
-    `git push` depuis un worktree hostile rebasé sur la version corrigée du hook : c'est bien
-    `scripts/hooks/pre-push` du worktree hostile qui s'exécute, pas celui du dépôt principal. Seul
-    `--git-common-dir`, qui reste ancré sur le `.git` du dépôt d'origine quel que soit le worktree
-    courant, échappe à ce biais. Prouvé par exécution réelle (dépôt jetable + remote bare local) :
-    avant correctif, une copie malveillante de `check-release-tag.sh` posée dans le worktree
-    hostile crée un fichier témoin au `git push` ; après correctif, seule la copie du dépôt
-    principal s'exécute (aucun témoin), et le hook continue de bloquer un push vers `main` sans tag
-    de release et de laisser passer un push conforme ou vers une branche non-`main`.
-- Files: `scripts/hooks/pre-push` (mitigé), `scripts/hooks/post-merge` (mitigé) ;
+    `git worktree add`), plus jamais via `--show-toplevel`. Prouvé : une copie malveillante de
+    `check-divergence.sh` posée dans un worktree hostile ne s'exécute plus au merge — seule la
+    copie du dépôt principal s'exécute.
+  - `scripts/hooks/pre-push` : résout `scripts/check-release-tag.sh` via `main_root="$(cd "$(git
+    rev-parse --git-common-dir)/.." && pwd)"`, plus jamais via `root="$(git rev-parse
+    --show-toplevel)"`. Prouvé (dépôt jetable + remote bare local) : avant correctif, une copie
+    malveillante de `check-release-tag.sh` posée dans le worktree hostile crée un fichier témoin
+    au `git push` ; après correctif, seule la copie du dépôt principal s'exécute (aucun témoin).
+  - Le raisonnement retenu pour ce périmètre : hériter une dette cataloguée et l'écrire
+    volontairement dans du code neuf ne sont pas le même geste — le vecteur est connu au moment où
+    la ligne s'écrit.
+- **Ce qui reste OUVERT — le hook lui-même, sous `core.hooksPath` relatif** : la mitigation
+  ci-dessus protège le script que le hook *appelle*, pas le hook. Or sous `core.hooksPath
+  scripts/hooks` — la convention **documentée de ce dépôt**, en chemin **relatif** — git résout
+  aussi le **hook lui-même** depuis le worktree courant, pas depuis le dépôt principal. Dériver
+  l'exécutable depuis l'emplacement du hook (`dirname "$0"`) ne suffit donc pas non plus : le
+  chemin du hook est déjà celui du worktree hostile avant même que son contenu ne s'exécute.
+  **Scénario résiduel démontré par un juge** (vrai `push` et vrai `merge`, pas une lecture de
+  code) : un worktree hostile fournit son propre `pre-push` ou `post-merge` — n'importe quel
+  contenu, y compris un hook qui ne fait rien — et c'est **ce hook-là** qui s'exécute au lieu de
+  celui du dépôt principal. Le gate est donc **entièrement contourné**, quel que soit le contenu
+  du hook légitime : push accepté sans tag de release, témoin créé confirmant l'exécution du hook
+  hostile plutôt que celui du dépôt. Seul `--git-common-dir` (déjà utilisé pour résoudre le script
+  appelé) échappe à ce biais, mais il ne protège que la résolution *interne au corps du hook* — il
+  n'a aucune prise sur *quel fichier hook* git choisit d'exécuter en premier lieu.
+  **Motif de la décision, à retenir tel quel : une entrée de sécurité qui surpromet est pire
+  qu'une entrée qui manque — elle éteint la vigilance.**
+- Files: `scripts/hooks/pre-push` (script appelé fermé, hook lui-même ouvert),
+  `scripts/hooks/post-merge` (idem) ;
   `.planning/phases/VFDO-39-workstreams-partition-du-planning-et-collaboration-concurren/39-01-PLAN.md`
   (registre STRIDE, T-39-01)
-- Current mitigation: les deux hooks résolvent désormais l'exécutable via `--git-common-dir` —
-  voir le détail par hook ci-dessus.
+- Current mitigation: les deux hooks résolvent l'exécutable **qu'ils appellent** via
+  `--git-common-dir` — voir le détail par hook ci-dessus. Aucune mitigation ne couvre encore la
+  résolution du **hook lui-même** sous `core.hooksPath` relatif.
 - Recommendations: si un futur hook de ce dépôt résout un script tiers à exécuter, appliquer le
-  même patron dès l'écriture (`--git-common-dir`, jamais `--show-toplevel` ni `dirname "$0"`) —
-  le vecteur est désormais documenté, pas seulement connu.
+  même patron dès l'écriture (`--git-common-dir`, jamais `--show-toplevel` ni `dirname "$0"`) — le
+  vecteur est désormais documenté, pas seulement connu. Le résiduel (résolution du hook lui-même)
+  n'est PAS traité ici : un chemin **absolu** pour `core.hooksPath` fermerait potentiellement ce
+  vecteur, mais changer la convention d'armement documentée de ce dépôt est une décision humaine,
+  pas un correctif de routine — hors périmètre de cette entrée.
 
 **Le verrou de driver est déclaratif, pas contraignant** — Sévérité : **HIGH** — **RÉSOLU le 2026-08-17 (Phase 32)**
 - Risk (état au constat, 2026-07-27) : `driver-lock.sh` n'empêchait techniquement rien : aucun hook ni
