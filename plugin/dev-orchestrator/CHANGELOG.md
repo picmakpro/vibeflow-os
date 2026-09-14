@@ -1,5 +1,27 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.20.4] — 2026-09-14 (Phase 39 — doctrine workstreams : dispatch explicite par compartiment, traçabilité des arbitrages)
+
+**Patch** (doctrine et gabarit de dispatch, aucun script modifié) :
+
+- **`agents/vf-dev-manager.md`** (250/250 lignes, plafond ADR-029 tenu) : deux résolutions de
+  workstream distinctes, jamais confondues — le manager exporte `GSD_WORKSTREAM` et passe `--ws`
+  pour SA résolution ; **chaque worker dispatché reçoit `--ws <nom>` explicitement dans sa propre
+  commande**, jamais par héritage d'un export qui n'isole rien entre workers lancés dans le même
+  shell (même `CLAUDE_CODE_SESSION_ID`, D-10 ouverte). `GSD_SESSION_KEY` distinct par mandat dès
+  que ≥ 2 workers concurrents visent des compartiments différents (D-05, discipline VF-side).
+- **`references/mission-flow.md`** : rappel de partition au point de dispatch — dès que ≥ 2 `vf-*`
+  concurrents tournent sur des scopes disjoints de `vibeflow-os`, la partition réelle du dépôt se
+  repose (déclencheur D-02, `.planning/STATE.md` § Decisions, inscrit par le plan 39-03).
+- **`references/workstreams.md`** §4 : précision datée (ADR-069, amendement 2026-09-09) — le
+  `ROADMAP.md` d'un compartiment n'est structurel pour `pr-branch` **ni au niveau chemin ni au
+  niveau commit** (exclu en silence dans les deux modes `pr_strict`) ; le complément mécanique
+  (`scripts/hooks/post-merge` + `check-divergence.sh`, conductor v1.35.0) est nommé, le geste manuel
+  reste le repli sur un dépôt non armé.
+- **`references/mission-contracts.md`** : section « Traçabilité des arbitrages humains dans les
+  commits » — un manager qui relaie un arbitrage dans un mandat transmet **le canal et la date**
+  (règle canonique dans le `CLAUDE.md` racine, adoptée le 2026-09-10 sur le commit `8fc4b45`).
+
 ## [v2.20.3] — 2026-08-30 (Phase 38 — description de frontmatter YAML strict, plan 38-08)
 
 **Patch** :

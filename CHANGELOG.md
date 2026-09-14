@@ -11,7 +11,67 @@ sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 release au-dessus de la première ligne qui commence par `## [` — une section « non releasé »
 entre crochets se retrouverait publiée SOUS la version suivante.*
 
-**Un lab à racine non-git bloquait le dispatch d'exécutants quatre fois par jour.**
+*Rien pour l'instant.*
+
+## [v2.60.0] — 2026-09-14
+
+**Un merge sans conflit textuel peut faire diverger la numérotation des phases d'un workstream —
+et rien, ni git ni les trois gates existants, ne le disait.** Phase 39 (Workstreams — partition du
+planning et collaboration concurrente, PART-01..09) : le filet de détection existe désormais, la
+famille d'exigences est gravée, l'adoption des workstreams est prouvée sur clone jetable — et le
+dépôt lui-même reste **volontairement non partitionné**. La release regroupe aussi le hotfix
+`use_worktrees=false` sur lab à racine non-git (PR #61), sur décision de groupage (arbitrage
+Samuel, AskUserQuestion session principale, 2026-09-14).
+
+- **Filet de divergence — conductor v1.35.0** : `plugin/conductor/scripts/check-divergence.sh`
+  (neuf) couvre les trois variantes de split-brain mesurées au cadrage — **S2** (deux dossiers de
+  phase d'un même compartiment sur le même numéro), **S4a/S4b** (dossiers orphelins non documentés
+  par le `ROADMAP.md` du compartiment, `completed_phases` supérieur au nombre de dossiers), **S5**
+  (numéro d'un compartiment qui fuit dans le `ROADMAP.md` racine). Codes de sortie tous énumérés,
+  dont `2` **non vérifiable** (jamais un 0 de complaisance) et `3` **silence** (dépôt non
+  partitionné — l'état de ce dépôt et de tout lab ordinaire). Suite `test-check-divergence.sh` :
+  **17 cas dont 3 mutants**, chaque mutant vérifié muté par `cmp`, rouge sur l'original et vert à
+  tort sur le mutant. Deux consommateurs : le hook `scripts/hooks/post-merge` (**opt-in**,
+  `git config core.hooksPath scripts/hooks`, bruyant, ne bloque jamais un merge) et une étape
+  dédiée du job CI `gates` (fixture partitionnée saine → `0`, mutée en place → `1`) — parce qu'un
+  hook local ne tourne jamais sur une PR fusionnée depuis GitHub, la voie dominante de ce dépôt,
+  et qu'un gate « sûr mais inerte » est le mode d'échec déjà payé en ADR-059.
+- **Sécurité — une RCE démontrée avant d'être fermée** : l'audit infra a relevé que le hook neuf
+  résolvait son exécutable depuis le worktree courant ; un `git worktree add` sur une branche
+  hostile puis un vrai `git merge` a **exécuté la copie hostile** (fichier témoin créé). Le hook
+  s'ancre désormais sur `git rev-parse --git-common-dir` — le mécanisme prescrit (résoudre depuis
+  `$0`) s'est révélé insuffisant à la mesure, sous `core.hooksPath` relatif git résout aussi le hook
+  depuis le worktree. Arbitrage Samuel (AskUserQuestion session principale, 2026-09-10) : mitiger le
+  hook **neuf** seulement, `pre-push` hérité assumé et consigné ; `.planning/codebase/CONCERNS.md`
+  porte le finding comme **réduit, pas fermé** (basculer `core.hooksPath` en absolu a été mesuré et
+  ne ferme pas le résiduel).
+- **Famille `PART-01..09`** gravée au ledger, `GSDA-19` **superseded** par `PART-06` (identifiant
+  neuf, statut d'origine intact), **amendement daté d'ADR-069** (risque (b) de `pr-branch` migré au
+  niveau commit — le `ROADMAP.md` d'un compartiment est exclu en silence dans les deux modes
+  `pr_strict` —, D-10 rouverte en équipe, couverture amont re-mesurée 9/89 sur gsd-core 1.13.0).
+  Issue amont `init-progress` **rédigée, jamais postée** (`.planning/upstream/`, envoi gaté humain).
+- **Doctrine de dispatch — dev-orchestrator v2.20.4** : chaque worker reçoit `--ws <nom>`
+  explicitement dans sa commande, jamais par héritage d'un export qui n'isole rien dans un même
+  shell ; `GSD_SESSION_KEY` distinct par mandat concurrent ; rappel du déclencheur de partition D-02
+  au point de dispatch de `mission-flow.md`. Convention de **traçabilité des arbitrages** dans les
+  commits (canal + date), adoptée le 2026-09-10 sur le commit `8fc4b45` — `CLAUDE.md` racine et
+  `mission-contracts.md`.
+- **Preuve d'adoption sur clone jetable** (plan 39-03) : trois empreintes mutuellement distinctes,
+  deux workers concurrents sur deux compartiments, gates verts dans le clone partitionné et
+  non-régression sur l'arbre réel. **Preuve de mécanisme, pas d'usage** : ce dépôt n'est pas
+  partitionné, sa partition réelle est un geste humain séparé, postérieur (déclencheur D-02 en
+  `.planning/STATE.md` § Decisions).
+- **Quatorze occurrences d'un même défaut**, toutes trouvées par exécution, aucune à la relecture :
+  un mécanisme qui a l'air correct et **ne peut pas rendre rouge** — clé d'extraction sans dossier
+  cible, fixture de dossiers vides que git ne versionne pas, mutant échouant pour la mauvaise
+  raison, gate rendant « conforme » sur `mktemp` en échec, jusqu'à `check-agents.sh` cité comme
+  preuve alors qu'il inspecte un dossier absent de ce dépôt. Consigné dans
+  `.planning/missions/2026-09-10-phase-39-workstreams-cadrage-et-plan.md`.
+- **Réserves déclarées** : aucun run CI distant observé avant cette PR (l'étape a été prouvée
+  localement, extraite du YAML et rejouée) ; le diff de correction post-revue incluant la
+  mitigation de sécurité a été vérifié par exécution, puis jugé par un juge frais.
+
+**Hotfix regroupé — Un lab à racine non-git bloquait le dispatch d'exécutants quatre fois par jour.**
 
 - **Mécanisme amont mesuré le 2026-09-14** : gsd-core 1.13.0/1.14.0 résout `dispatch-isolation` en
   `harness-worktree` sans jamais vérifier l'existence d'un `.git` ; `worktree.base-check` répond
@@ -34,9 +94,6 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
   Suite `test-vibeflow-update.sh` : 71 OK / 0 KO avant le lot, 78 OK / 0 KO / 0 SKIP après (sept cas
   neufs).
 - Issue amont : [open-gsd/gsd-core#4734](https://github.com/open-gsd/gsd-core/issues/4734).
-
-*Aucun bump de version dans ce lot — la release reste un geste humain gaté (CLAUDE.md racine,
-ADR-031).*
 
 ## [v2.59.2] — 2026-09-08
 

@@ -6,7 +6,7 @@
 > et de migration. Module **mandatory** : posé d'office à chaque install, c'est lui qui porte les
 > gates machine (hooks) et le noyau d'orchestration d'équipe réutilisé par tous les autres modules.
 
-**Type** : `agent + skills + scripts + references` · **Version** : v1.34.8 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
+**Type** : `agent + skills + scripts + references` · **Version** : v1.35.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
 
 > `skill-creator` est une dépendance **dure** depuis ADR-047 : c'est le canal unique de création de
 > skills, invoqué par `vf-new-lab` en fan-out (Phase 5) et exigé par le Gate C. Le conductor étant
@@ -140,7 +140,8 @@ les workers `vf-internal: true`, Pattern 12).
 
 **Tests** : 27 suites sous `scripts/tests/` (une par script critique + `test-conductor.sh`,
 `test-vf-new-lab.sh`, `test-vf-update.sh`, `test-doc-and-commands.sh`, `test-check-divergence.sh`
-neuve en Phase 39, 10 cas dont 2 mutants). *(Compte re-dérivé au 2026-09-10 :
+neuve en Phase 39, 17 cas dont 3 mutants — 10 cas à la livraison du plan 39-01, +7 le
+2026-09-14 pour couvrir la sortie `2` et la normalisation base 10, tuant 5 mutations survivantes). *(Compte re-dérivé au 2026-09-10 :
 `find plugin/conductor/scripts/tests -maxdepth 1 -type f -name 'test-*.sh' | wc -l` → 27 ; « 21
 suites » était déjà faux avant la Phase 39.)*
 
