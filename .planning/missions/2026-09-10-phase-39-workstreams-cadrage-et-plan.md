@@ -211,3 +211,77 @@ Finding consolidé dans `.planning/codebase/CONCERNS.md` : **ouvert** sur `pre-p
    de phase du dépôt, à traiter à la clôture.
 5. **Preuve de mécanisme ≠ preuve d'usage** : le clone établit que le mécanisme marche, pas qu'un
    usage concurrent réel tient. Écrit tel quel dans les livrables.
+
+
+---
+
+# PARTIE III — ÉTAT DE REPRISE (2026-09-14)
+
+> **Écrit pour quelqu'un qui reprendra ce dossier sans le contexte de la session d'origine.**
+
+## Où en est-on exactement
+
+La Phase 39 est **exécutée, revue, corrigée et vérifiée**. **41 commits locaux** sur la branche
+`feat/phase-39-workstreams`, **rien n'est poussé**, aucune PR, aucun bump de `VERSION`, aucun tag.
+
+**Le ship n'attend aucun travail technique de cette phase.** Il attend un **hotfix produit par une
+session parallèle**, que Samuel a décidé d'intégrer à la **même release** (arbitrage Samuel,
+AskUserQuestion session principale, 2026-09-14). C'est un choix de **groupage de release**, pas un
+report technique.
+
+## Gates au moment de la mise en attente — tous verts, valeurs mesurées
+
+| Gate | Valeur | Sens |
+|---|---|---|
+| `bash scripts/check-version-sync.sh` | **0** | 77 suites réelles = 77 annoncées dans les deux README |
+| `plugin/conductor/scripts/check-agents.sh` | **0** | agents conformes |
+| `plugin/conductor/scripts/check-mission-invariants.sh` | **3** | SAIN (3 est le seul « vérifié conforme ») |
+| `plugin/conductor/scripts/tests/test-check-divergence.sh` | **0** | **17/17**, mutants inclus |
+| `plugin/conductor/scripts/check-state-integrity.sh` | **0** | conforme |
+| `plugin/conductor/scripts/check-divergence.sh --path .` | **3** | silence — dépôt **non partitionné**, attendu |
+| `.planning/workstreams/` | **absent** | arbre de travail jamais partitionné (arbitrage A′) |
+| arbre de travail | **propre** | aucun fichier suivi modifié |
+| driver-lock | **relâché** | `{"present": false}` |
+
+## Les deux réserves connues, inchangées
+
+1. **Aucun run CI distant n'a été observé.** L'étape CI a été prouvée **localement** (extraite du YAML
+   et rejouée, verte sur le script réel, rouge contre un mutant). La CI ne se prononcera qu'à la
+   première poussée.
+2. **Le clone jetable prouve un MÉCANISME, pas un usage concurrent réel.** Ce dépôt n'est pas
+   partitionné et sa partition réelle reste un geste humain postérieur (déclencheur D-02, inscrit dans
+   `.planning/STATE.md` § Decisions et rappelé au point de dispatch dans `mission-flow.md`).
+
+## CHECKLIST DE REPRISE — trois pièges à l'intégration du hotfix
+
+1. **Le compteur de suites se rouvre en silence.** `check-version-sync.sh` compare le nombre réel de
+   `*/tests/test-*.sh` aux deux README. **Si le hotfix ajoute ou retire une suite, le gate redevient
+   rouge** — c'est exactement le bloquant fermé le 2026-09-14, et il ne s'annonce pas. **Re-dériver le
+   compte soi-même** après intégration (en Python ou `find`+`awk`, jamais un `grep` piped qui tronque)
+   — ne jamais reprendre le chiffre d'un rapport antérieur, celui-ci compris.
+2. **Rejouer TOUS les gates après intégration**, pas seulement ceux que le diff du hotfix semble
+   toucher. Un vert mesuré **avant** fusion ne dit rien de l'après.
+3. **Vérifier le driver-lock avant tout checkout dans l'arbre principal** :
+   `plugin/conductor/scripts/driver-lock.sh status`. Une autre session écrivait dans ce dépôt au
+   moment de la mise en attente. Si le lock est tenu par un tiers → **worktree**, jamais un checkout
+   dans l'arbre principal. Ne pas supposer que l'arbre est à soi parce qu'il l'était une heure plus tôt.
+
+## Ce qui reste fermé, quoi qu'il arrive
+
+- **Aucun `/gsd-ship`** sans geste humain explicite — à chaque fois, sans exception.
+- **Aucune partition réelle de `vibeflow-os`** : geste séparé, gaté humain, postérieur à la clôture.
+- **Aucun dépôt de l'issue `GSDA-19`** chez OpenGSD : elle est **rédigée** dans
+  `.planning/upstream/2026-09-09-init-progress-project-md-not-resolved-under-workstream.md`, Samuel
+  poste.
+- **Ne pas « réparer » le résiduel de sécurité en basculant `core.hooksPath` sur un chemin absolu** —
+  la mesure et son raisonnement sont dans `.planning/codebase/CONCERNS.md`.
+
+## Hors périmètre, signalé et non traité
+
+`plugin/validator/README.md` annonce **249 lignes** pour un fichier d'agent introuvable au chemin
+attendu. Dérive d'un autre module, antérieure à cette phase.
+
+## Au moment du ship, deux dettes se règlent d'elles-mêmes
+
+- L'entrée de `plugin/conductor/CHANGELOG.md` : sa convention lie une entrée à un **bump de version**.
+- La ligne d'historique des deux README racine, indexée sur le `VERSION` taggé.
