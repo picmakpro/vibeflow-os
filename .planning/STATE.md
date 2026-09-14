@@ -109,7 +109,7 @@ par commande parce que l'une pouvait supprimer la phase :
 **Correction au chiffrage du STUDY §7.3** : l'analogue `check-doc-drift.sh` fait aujourd'hui
 **167 l.** (et non 153) et son test **278 l.** (et non 232) — ratio **1,66×**, pas 1,5×. Un gate de
 100-150 l. demande donc ~170-250 l. de tests.
-Last activity: 2026-09-14 — Phase 39 shipped - PR 62 - v2.60.0 (bump `4255c49`, conductor v1.35.0, dev-orchestrator v2.20.4, hotfix PR #61 regroupé) ; en amont du ship, deux faits distincts fusionnés depuis `origin/main` (merge `5efe8d3`) : (1) Phase 39 (Workstreams) exécutée sur cette branche, plans 39-01/39-02/39-03 clos avec SUMMARY.md (dernier commit `c7cb20f`, 2026-09-14) ; (2) quick 260914-n3e — use_worktrees=false auto sur lab à racine non-git (vibeflow-update.sh), issue amont open-gsd/gsd-core#4734 (commit `30cef6a`, 2026-09-14).
+Last activity: 2026-09-14 — Phases 34 et 25 CADRÉES en parallèle (branche `feat/cadrage-phases-34-25`, commits `87d40c3` et `d7f0719`, 11 arbitrages Samuel par AskUserQuestion session principale ; 25 reste dépendante de la 34 pour la calibration, D-06) ; plus tôt le même jour, Phase 39 shipped - PR 62 - v2.60.0 (bump `4255c49`, conductor v1.35.0, dev-orchestrator v2.20.4, hotfix PR #61 regroupé) ; en amont du ship, deux faits distincts fusionnés depuis `origin/main` (merge `5efe8d3`) : (1) Phase 39 (Workstreams) exécutée sur cette branche, plans 39-01/39-02/39-03 clos avec SUMMARY.md (dernier commit `c7cb20f`, 2026-09-14) ; (2) quick 260914-n3e — use_worktrees=false auto sur lab à racine non-git (vibeflow-update.sh), issue amont open-gsd/gsd-core#4734 (commit `30cef6a`, 2026-09-14).
 
 **Phase 33 CLOSE ET PUBLIÉE** — vérifié machine le 2026-08-17 :
 
@@ -1156,17 +1156,18 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-**Resume file:** .planning/missions/2026-09-10-phase-39-workstreams-cadrage-et-plan.md (Parties III et IV : état de reprise, checklist des pièges d'intégration, correction sur `check-agents.sh`)
+**Resume file:** .planning/phases/VFDO-34-gaps-agency-agents-cadrage-skill-installer/34-CONTEXT.md (et `.planning/phases/VFDO-25-budget-d-instructions-et-tage-d-alignement-court/25-CONTEXT.md`)
 
 Last session: 2026-09-14
-Stopped at: Phase 39 shipped - PR 62 - v2.60.0 — tag annoté + release GitHub posés après merge, `check-release-tag.sh --remote` ✓ attendu comme gate final.
+Stopped at: Phases 34 et 25 cadrées (CONTEXT.md + DISCUSSION-LOG.md commités sur `feat/cadrage-phases-34-25`), aucune planifiée. Phase 39 shipped - PR 62 - v2.60.0 plus tôt le même jour.
 
-**Reprendre par** : le prochain cadrage du milestone fiabilite-v1.0 — restent **Phase 34** (gaps agency-agents & cadrage skill-installer, AGTS/SKIL) et **Phase 25** (budget d'instructions, après la 34). Aucun geste technique en attente sur la Phase 39.
+**Reprendre par** : `/gsd-plan-phase 34` (run mobile de sortie d'expérimental sur Scroll-Off en première vague, spike SKIL en parallèle, audit AGTS-01). La Phase 25 peut être planifiée dès maintenant, mais sa **calibration** (baselines, armement) est un **checkpoint bloquant** jusqu'à la clôture de la 34 (25-CONTEXT D-06). `current_phase` du frontmatter reste 39 : le gate `check-state-integrity` interdit toute décroissance, et aucune des deux phases n'est démarrée.
 
 **Ce qui reste fermé, quoi qu'il arrive** :
-- **Aucune partition réelle de `vibeflow-os`** sans geste humain explicite — déclencheur D-02 (§ Decisions, 2026-09-10) : la question se repose dès que ≥ 2 `vf-*` concurrents tournent sur des scopes disjoints de ce dépôt.
-- **Issue amont `init-progress` NON ENVOYÉE** — rédigée dans `.planning/upstream/2026-09-09-init-progress-project-md-not-resolved-under-workstream.md`, Samuel poste.
-- **Ne pas « réparer » le résiduel de sécurité `pre-push` en basculant `core.hooksPath` sur un chemin absolu** — mesuré inopérant, raisonnement dans `.planning/codebase/CONCERNS.md`.
-- **`check-agents.sh` rend 0 à vide sur ce dépôt** (`.claude/agents` absent) — ne jamais le citer comme preuve de conformité des agents sources ; la couverture vient de `test-dev-orchestrator.sh` (T35 (e), discriminante par mutation).
+- **Aucune partition réelle de `vibeflow-os`** sans geste humain explicite — déclencheur D-02 (§ Decisions, 2026-09-10).
+- **Issue amont `init-progress` NON ENVOYÉE** — `.planning/upstream/2026-09-09-init-progress-project-md-not-resolved-under-workstream.md`, Samuel poste.
+- **Ne pas « réparer » le résiduel de sécurité `pre-push` en basculant `core.hooksPath` sur un chemin absolu** — mesuré inopérant, `.planning/codebase/CONCERNS.md`.
+- **`check-agents.sh` rend 0 à vide sur ce dépôt** et **ne mesure aucune ligne** (fait vérifié le 2026-09-14, à corriger dans `plugin/conductor/README.md:95-99` par la Phase 25) — ne jamais le citer comme preuve de densité ni de conformité des agents sources.
+- **Aucun agent neuf en Phase 34** hors `web-test-team` sur run mobile vert (34-CONTEXT D-01/D-05).
 
-**Piège de reprise qui a servi** : re-dériver le compteur de suites des README soi-même (`find plugin scripts -path '*/tests/test-*.sh'`) après toute fusion — jamais reprendre le chiffre d'un rapport antérieur.
+**Piège de reprise qui a servi** : la liste de gates d'un rapport n'est jamais la référence — rejouer les commandes du job CI `gates` (`grep -n "run: bash" .github/workflows/ci.yml`) avant tout push.
