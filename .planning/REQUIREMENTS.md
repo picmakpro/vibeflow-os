@@ -849,15 +849,15 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | AGTS-01 | Phase 34 | Pending |
 | AGTS-02 | Phase 34 | Pending — conditionnée à la sortie d'expérimental de mobile-test |
 | QUAL-01 | Transverse — Phases 30, 31, 32, 33, 18, 25, 35 | Pending — satisfait sur les phases 30, 31 et 32 livrées (30/31 : 3 issues + mutation rouge prouvée ; 32 : amendé à **4** issues par D-32-QUAL — PASS/DENY/imparsable-silencieux/indisponible-BRUYANT — les 4 couvertes, cf. `32-RELIQUATS.md` §5) ; **non déclenché sur la Phase 35** (2026-08-26, option A) — aucun gate ni comparateur neuf n'y naît, donc rien à satisfaire ; reste à tenir sur 33, 18, 25 |
-| PART-01 | Phase 39 | Planned — plan 39-02 |
-| PART-02 | Phase 39 | Planned — plan 39-02 |
-| PART-03 | Phase 39 | Planned — plan 39-03 |
-| PART-04 | Phase 39 | Planned — plan 39-01 |
-| PART-05 | Phase 39 | Planned — plan 39-02 |
-| PART-06 | Phase 39 | Planned — plan 39-02 |
-| PART-07 | Phase 39 | Planned — plan 39-03 |
-| PART-08 | Phase 39 | Planned — plan 39-03 |
-| PART-09 | Phase 39 | Planned — plan 39-03 |
+| PART-01 | Phase 39 | Done — plan 39-02 — shipped v2.60.0 (PR #62, 2026-09-14) |
+| PART-02 | Phase 39 | Done — plan 39-02 — shipped v2.60.0 (PR #62, 2026-09-14) |
+| PART-03 | Phase 39 | Done — plan 39-03 — shipped v2.60.0 (PR #62, 2026-09-14) |
+| PART-04 | Phase 39 | Done — plan 39-01 — shipped v2.60.0 (PR #62, 2026-09-14) |
+| PART-05 | Phase 39 | Done — plan 39-02 — shipped v2.60.0 (PR #62, 2026-09-14) |
+| PART-06 | Phase 39 | Done — plan 39-02 — shipped v2.60.0 (PR #62, 2026-09-14) |
+| PART-07 | Phase 39 | Done — plan 39-03 — shipped v2.60.0 (PR #62, 2026-09-14) |
+| PART-08 | Phase 39 | Done — plan 39-03 — shipped v2.60.0 (PR #62, 2026-09-14) |
+| PART-09 | Phase 39 | Done — plan 39-03 — shipped v2.60.0 (PR #62, 2026-09-14) |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -1005,14 +1005,14 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 > famille existe bien dans le dépôt, elle est seulement non recensée dans les deux ledgers de
 > traçabilité (celui-ci et ADR.md).
 
-- [ ] **PART-01**: Le **niveau 4** de résolution du pointeur de workstream
+- [x] **PART-01**: Le **niveau 4** de résolution du pointeur de workstream
   (`.planning/active-workstream` consulté quand la session courante n'a jamais posé le sien) est
   **mesuré par exécution sur dépôt jetable**, jamais lu sur un descripteur amont —
   `active-workstream-store.cjs:286-290`, reproduit recherche
   `2026-09-09-phase-39-workstreams-mesures-de-cadrage.md` §2 : héritage confirmé (`SESS-B` sans
   marker → `active: null`, avec marker → `active: default`), isolation d'un pointeur déjà posé
   jamais franchie (même périmé), auto-nettoyage confirmé. *(Critère de succès 1)*
-- [ ] **PART-02**: La **non-composabilité du pointeur avec ADR-064** est **tranchée par la
+- [x] **PART-02**: La **non-composabilité du pointeur avec ADR-064** est **tranchée par la
   mesure**, jamais laissée implicite (D-10, recherche §3) : **refermée** entre deux sessions Claude
   Code distinctes (deux worktrees, deux process, isolation parfaite — cas A/B) ; **OUVERTE** pour
   le modèle d'équipe VibeFlow — tous les sous-agents d'une session héritent du même
@@ -1020,14 +1020,14 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   sur des worktrees différents leur fait partager un seul pointeur, dernier `set` gagnant.
   Déclarée comme **limite datée du 2026-09-09** dans l'amendement d'ADR-069, jamais comme un fait
   résolu. *(Critère de succès 2)*
-- [ ] **PART-03**: Au moins un dépôt — un **clone jetable de `vibeflow-os`**, histoire réelle, hors
+- [x] **PART-03**: Au moins un dépôt — un **clone jetable de `vibeflow-os`**, histoire réelle, hors
   de l'arbre de travail (D-01) — est réellement partitionné et **TOUS** les agents `vf-*`
   dispatchés dans le run de preuve passent `--ws` **explicitement, sans exception** (D-08,
   insatisfaisable à vide). Les gates (`check-workstream-pointer.sh`, `check-state-integrity.sh`,
   `check-divergence.sh`) restent **verts** dans l'arbre non partitionné (non-régression, mesurée
   sur le dépôt vivant) **et** le deviennent dans le clone partitionné. Preuve par exécution, jamais
   par inspection de frontmatter. *(Critère de succès 3)*
-- [ ] **PART-04**: Le **filet de détection de divergence** existe et est **bruyant** — signature
+- [x] **PART-04**: Le **filet de détection de divergence** existe et est **bruyant** — signature
   **S2 + S4 + S5** (numéro de phase dupliqué / cardinalité dossiers↔ROADMAP↔STATE incohérente /
   fuite de niveau au ROADMAP racine), branché **post-merge** (jamais `SessionStart`, D-12),
   **opt-in** (`git config core.hooksPath scripts/hooks`, jamais armé par défaut — précédent #38)
@@ -1038,7 +1038,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   détecte les deux variantes silencieuses (`git merge-tree`/`git merge` exit 0, Git ne signalant
   rien) et reste muet sur le cas nominal non divergé ; discriminance du script lui-même prouvée par
   mutation, **à la fois localement et en CI**. *(Critère de succès 4)*
-- [ ] **PART-05**: Le comportement de `/gsd-pr-branch` sur un dépôt partitionné est traité **sur la
+- [x] **PART-05**: Le comportement de `/gsd-pr-branch` sur un dépôt partitionné est traité **sur la
   mesure du 2026-09-09**, pas sur le libellé du 2026-08-04 (D-09, recherche §7) — le risque (b)
   d'ADR-069 a **MIGRÉ** : le silence est levé au niveau **chemin** (bloc `$OTHER`,
   `pr-branch.md:410`) mais **subsiste au niveau COMMIT** (`.planning/workstreams/<nom>/ROADMAP.md`
@@ -1050,24 +1050,24 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   `pr-branch.md` (Iron Law 2 révisée interdit toujours le fork d'une capacité du moteur),
   mitigation = geste de vérification explicite existant (`workstreams.md` §4(b)) étendu pour nommer
   le niveau commit. *(Critère de succès 5)*
-- [ ] **PART-06**: La **couverture amont** est **re-mesurée à la date du cadrage** (K2 = 9/89 =
+- [x] **PART-06**: La **couverture amont** est **re-mesurée à la date du cadrage** (K2 = 9/89 =
   10,1 %, 39 aveugles — contre 7/91 = 7,7 %, 42 aveugles au 2026-08-04 ; corpus, critère et
   commande re-dérivés en ré-exécutant le script d'ADR-069 §Méthode, jamais recopiés) et la
   remontée `GSDA-19` est **rédigée** (D-04, angle bug de comportement) et **prête à poster**, avec
   trace explicite qu'elle n'est **PAS postée** (geste humain réservé, ADR-031) — jamais un abandon
   silencieux. *(Critère de succès 6)*
-- [ ] **PART-07**: La preuve de partition ne s'exécute **JAMAIS** sur l'arbre de travail de
+- [x] **PART-07**: La preuve de partition ne s'exécute **JAMAIS** sur l'arbre de travail de
   `vibeflow-os` pendant la Phase 39 — uniquement sur un **clone jetable**, hors de l'arbre, portant
   l'histoire réelle du dépôt, détruit en fin de mission (D-01). Tout SUMMARY issu de cette preuve
   porte explicitement la nuance : preuve de **mécanisme**, jamais d'usage concurrent réel sur le
   dépôt vivant (D-03). La condition dure d'ADR-069 (« aucune partition tant qu'une phase est en
   vol ») n'est ni révisée ni contournée.
-- [ ] **PART-08**: La **partition réelle de `vibeflow-os`** est inscrite comme un **geste séparé,
+- [x] **PART-08**: La **partition réelle de `vibeflow-os`** est inscrite comme un **geste séparé,
   gaté humain, postérieur à la clôture de la Phase 39**, jamais exécutée par cette phase — avec un
   **déclencheur de reprise daté** porté au ROADMAP et au STATE (D-02), au même patron que les
   déclencheurs déjà en vigueur dans ce dépôt (`WKTR-03`, le déclencheur objectif d'ADR-069 :
   objectif, sans échéance calendaire).
-- [ ] **PART-09**: VF passe **`--ws` explicitement** sur ses propres appels `gsd_run` (agents
+- [x] **PART-09**: VF passe **`--ws` explicitement** sur ses propres appels `gsd_run` (agents
   `vf-*`, sections déjà déclarées de `vf-coder.md:43-51` et `vf-dev-manager.md:31-34`, **plus le
   gabarit de dispatch de `vf-dev-manager.md` amendé par la Tâche 4 de ce même plan pour exiger un
   `GSD_SESSION_KEY` distinct par mandat concurrent — correction 2026-09-10, C4**), **observé par
@@ -1098,4 +1098,4 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 
 ---
 *Requirements defined: 2026-06-04*
-*Last updated: 2026-09-09 — Phase 39 (Workstreams — partition du planning et collaboration concurrente) : 9 exigences neuves en une famille (PART-01..09), dérivées du cadrage `39-CONTEXT.md` et de la recherche `2026-09-09-phase-39-workstreams-mesures-de-cadrage.md`, préfixe `PART` vérifié libre par `comm` (D-07, 41 familles réellement occupées incluant `SIG-01..06` hors ledger) ; `GSDA-19` superseded par `PART-06` (corps préservé, angle bug de comportement porté par `PART-06`, D-04), `GSDA-13..19` closes non rouvertes ; précédent : 2026-08-28 — Phase 38 (Portabilité multi-runtime, livraison) : 22 exigences neuves en 6 familles (FIDE-01/02, RUNT-01/02, ROLL-01..05, TGT-01..04, ADPT-01..04, MIGR-01..05), dérivées du cadrage `38-CONTEXT.md`, 0 collision avec `PORT-xx` (Phase 30, vérifié par commande) ; ADPT-02/03 levées en session réelle par le nœud `probe-codex` le même jour (tirets confirmés inoffensifs, fork_turns sans effet sur le modèle) — plans mis à jour en conséquence ; précédent : 2026-08-15 — roadmap fiabilite-v1.0 posée : traçabilité mappée aux phases 30-35 + 18/25 héritées (30 IDs, 0 orphelin) ; précédent : ajout milestone fiabilite-v1.0 (26 exigences en 9 familles, audit d utilite prealable, Out of Scope motive) ; precedent : ajout Phase 29 (ICMD-01..12, distillation des gains ICM G1/G2/G3/G5) ; précédent : 2026-07-26 — remise à l'heure post-audit (Phase 12 annotée post-bascule v2.33.0, Phase 13 redéfinie sans verbe, Phase 14 = v2.30.0, milestones 2-3 shipped) ; précédent : 2026-07-25 — ajout Phase 14 au Milestone 6 (ALTI-01→05 : frontière d'altitude planning-core / moteur GSD, ADR-055)*
+*Last updated: 2026-09-14 — Phase 39 SHIPPÉE v2.60.0 (PR #62) : PART-01..09 cochées, statuts de traçabilité passés à Done ; précédent : 2026-09-09 — Phase 39 (Workstreams — partition du planning et collaboration concurrente) : 9 exigences neuves en une famille (PART-01..09), dérivées du cadrage `39-CONTEXT.md` et de la recherche `2026-09-09-phase-39-workstreams-mesures-de-cadrage.md`, préfixe `PART` vérifié libre par `comm` (D-07, 41 familles réellement occupées incluant `SIG-01..06` hors ledger) ; `GSDA-19` superseded par `PART-06` (corps préservé, angle bug de comportement porté par `PART-06`, D-04), `GSDA-13..19` closes non rouvertes ; précédent : 2026-08-28 — Phase 38 (Portabilité multi-runtime, livraison) : 22 exigences neuves en 6 familles (FIDE-01/02, RUNT-01/02, ROLL-01..05, TGT-01..04, ADPT-01..04, MIGR-01..05), dérivées du cadrage `38-CONTEXT.md`, 0 collision avec `PORT-xx` (Phase 30, vérifié par commande) ; ADPT-02/03 levées en session réelle par le nœud `probe-codex` le même jour (tirets confirmés inoffensifs, fork_turns sans effet sur le modèle) — plans mis à jour en conséquence ; précédent : 2026-08-15 — roadmap fiabilite-v1.0 posée : traçabilité mappée aux phases 30-35 + 18/25 héritées (30 IDs, 0 orphelin) ; précédent : ajout milestone fiabilite-v1.0 (26 exigences en 9 familles, audit d utilite prealable, Out of Scope motive) ; precedent : ajout Phase 29 (ICMD-01..12, distillation des gains ICM G1/G2/G3/G5) ; précédent : 2026-07-26 — remise à l'heure post-audit (Phase 12 annotée post-bascule v2.33.0, Phase 13 redéfinie sans verbe, Phase 14 = v2.30.0, milestones 2-3 shipped) ; précédent : 2026-07-25 — ajout Phase 14 au Milestone 6 (ALTI-01→05 : frontière d'altitude planning-core / moteur GSD, ADR-055)*

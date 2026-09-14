@@ -2,43 +2,34 @@
 gsd_state_version: 1.0
 milestone: fiabilite-v1.0
 milestone_name: « ce qui survit »
-current_phase: 38
-current_phase_name: Portabilité multi-runtime — livraison (canal d'install, migration de lab, adaptateur)
+current_phase: 39
+current_phase_name: Workstreams — partition du planning et collaboration concurrente
 status: completed
 stopped_at: >-
-  Phase 38 **exécutée puis MESURÉE** (2026-08-30, clé API posée par Samuel). **Critère 2 PROUVÉ sur
-  Codex** : profondeur ≥ 2 constatée EN BASE (`thread_spawn_edges`, chaînes
-  `root→vf-dev-manager→vf-coder`), 3/3 sur les **4 critères réels** — le **critère 5 est SANS OBJET
-  sous clé API** (le mode d'échec cherché ne peut structurellement pas survenir : vert à vide, jamais
-  « atteint ») et le **critère 4 est plus faible que son libellé** (`--output-schema` ne se propage
-  pas aux sous-agents, dette D-38-S). **kimi-code n'est plus un inconnu déclaré** : I-1 **31/31**
-  (deux sondes indépendantes, `comm` vide dans les deux sens, contrôle négatif prouvant que la sonde
-  sait dire non), I-2 `disallowedTools` **bloque réellement** (0/4 contre 3/3 au contrôle positif,
-  réserve : le trou Bash reste ouvert), I-3 hooks **déclenchés 3/3**, et `vf-internal` **sans
-  équivalent** — les 19 workers internes sont publiquement invocables, le Pattern 12 est une garantie
-  de frontmatter et non de runtime, désormais **déclarée par le gate de fidélité**. **Critère 1
-  toujours partiel** : hooks non portés, perte déclarée. §7 Codex : la **lecture** du canal hooks
-  projet est tranchée (gatée par le trust du PROJET), l'**exécution** reste un **inconnu déclaré**
-  (0/3 sans contrôle positif montable = artefact, pas preuve de fermeture). Coûts : Codex **1,01 $**
-  sur 9,50, kimi **~0,018 $**. Non-régression : **77 suites, 76 vertes** (la rouge est préexistante,
-  rouge aussi au commit de base, hors périmètre CI). **SHIPPÉE v2.59.0 le 2026-08-31** — Samuel a
-  autorisé le ship après revue ; bump racine, PR, tag annoté et release GitHub. Test bout-en-bout
-  install+usage refait le 2026-08-31 sur Codex (délégation de rôle → code réel) et Kimi
-  (`--agent-file` → code + rapport typé), manifeste `.codex-plugin/` natif ajouté.
-last_updated: "2026-08-30T00:00:00.000Z"
-last_activity: 2026-08-30
+  Phase 39 shipped - PR 62 - v2.60.0 (2026-09-14). Exécutée 2026-09-10 (3 plans, SUMMARY sur disque),
+  revue ×3 + audit infra + juge frais sur le diff de correction post-revue (mitigation de sécurité
+  incluse), hotfix PR #61 fusionné sans conflit (`5efe8d3`) et regroupé dans la même release sur
+  arbitrage Samuel (AskUserQuestion session principale, 2026-09-14). Ship autorisé par Samuel
+  (AskUserQuestion session principale, 2026-09-14) après reprise de session et rejeu des huit gates.
+  Livré : conductor v1.35.0 (`check-divergence.sh` S2/S4a/S4b/S5, suite 17 cas dont 3 mutants, hook
+  `post-merge` opt-in ancré `--git-common-dir`, étape CI), dev-orchestrator v2.20.4 (dispatch `--ws`
+  explicite, traçabilité des arbitrages), `PART-01..09` gravées et cochées, `GSDA-19` superseded,
+  ADR-069 amendé. **Dépôt volontairement NON partitionné** (D-02 = déclencheur de reprise, § Decisions).
+  Réserves inchangées : premier run CI distant observé sur la PR #62 seulement ; le clone jetable
+  prouve un mécanisme, pas un usage concurrent réel. Issue amont `init-progress` rédigée, jamais postée.
+last_updated: "2026-09-14T00:00:00.000Z"
+last_activity: 2026-09-14
 last_activity_desc: >-
-  Clôture documentaire de la Phase 38 (mission d'équipe, worktree isolé — une autre session
-  travaillait dans l'arbre principal). `38-02-SUMMARY.md` écrit sur pièces et déclaré comme
-  rédigé après coup ; ROADMAP : 7 plans cochés, `38-07` ajouté, statut de phase écrit sans
-  arrondi (`[~]`, pas « complete ») ; STATE : compteurs +7 plans, Session Continuity pointant le
-  runbook de mesure et les deux gestes humains en attente. Aucune modification de code.
+  Ship de la Phase 39 en v2.60.0 (PR #62) : bump racine + conductor v1.35.0 + dev-orchestrator
+  v2.20.4, entrée CHANGELOG absorbant la section « Non releasé » (hotfix PR #61), historique des deux
+  README, clôture ROADMAP/REQUIREMENTS/STATE. Tag annoté et release GitHub posés après merge
+  (`check-release-tag.sh --remote` en gate final).
 progress:
-  total_phases: 10
-  completed_phases: 7
-  total_plans: 38
-  completed_plans: 38
-  percent: 70
+  total_phases: 11
+  completed_phases: 8
+  total_plans: 41
+  completed_plans: 41
+  percent: 73
 ---
 
 # Project State
@@ -118,7 +109,7 @@ par commande parce que l'une pouvait supprimer la phase :
 **Correction au chiffrage du STUDY §7.3** : l'analogue `check-doc-drift.sh` fait aujourd'hui
 **167 l.** (et non 153) et son test **278 l.** (et non 232) — ratio **1,66×**, pas 1,5×. Un gate de
 100-150 l. demande donc ~170-250 l. de tests.
-Last activity: 2026-09-14 — deux faits distincts, fusionnés depuis `origin/main` (merge `5efe8d3`) : (1) Phase 39 (Workstreams) exécutée sur cette branche, plans 39-01/39-02/39-03 clos avec SUMMARY.md (dernier commit `c7cb20f`, 2026-09-14) ; (2) quick 260914-n3e — use_worktrees=false auto sur lab à racine non-git (vibeflow-update.sh), issue amont open-gsd/gsd-core#4734 (commit `30cef6a`, 2026-09-14).
+Last activity: 2026-09-14 — Phase 39 shipped - PR 62 - v2.60.0 (bump `4255c49`, conductor v1.35.0, dev-orchestrator v2.20.4, hotfix PR #61 regroupé) ; en amont du ship, deux faits distincts fusionnés depuis `origin/main` (merge `5efe8d3`) : (1) Phase 39 (Workstreams) exécutée sur cette branche, plans 39-01/39-02/39-03 clos avec SUMMARY.md (dernier commit `c7cb20f`, 2026-09-14) ; (2) quick 260914-n3e — use_worktrees=false auto sur lab à racine non-git (vibeflow-update.sh), issue amont open-gsd/gsd-core#4734 (commit `30cef6a`, 2026-09-14).
 
 **Phase 33 CLOSE ET PUBLIÉE** — vérifié machine le 2026-08-17 :
 
@@ -1165,29 +1156,17 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-**Resume file:** .planning/phases/VFDO-38-portabilit-multi-runtime-livraison-canal-d-install-migration/38-RUNBOOK-MESURE-CODEX.md
+**Resume file:** .planning/missions/2026-09-10-phase-39-workstreams-cadrage-et-plan.md (Parties III et IV : état de reprise, checklist des pièges d'intégration, correction sur `check-agents.sh`)
 
-Last session: 2026-08-29T00:00:00.000Z
-Stopped at: Phase 38 exécutée ET mesurée — critère 2 prouvé, kimi mesuré, rien de shippé
-Reprendre par : **la revue de branche par Samuel, puis les gestes de livraison**. Le runbook
-`38-RUNBOOK-MESURE-CODEX.md` a été **exécuté le 2026-08-30** et son objet est atteint — il reste utile
-comme protocole de re-mesure, plus comme tâche en attente. Les preuves sont dans
-`38-MESURE-CODEX-CRITERE-2.md` et `38-MESURE-KIMI.md` ; le rapport de mission
-`.planning/missions/2026-08-29-phase-38-portabilite-multi-runtime.md` porte la séance complète.
+Last session: 2026-09-14
+Stopped at: Phase 39 shipped - PR 62 - v2.60.0 — tag annoté + release GitHub posés après merge, `check-release-tag.sh --remote` ✓ attendu comme gate final.
 
-**Ne pas écrire « vérifié » à la place de Samuel** — les documents écrivent les preuves, il écrit le
-statut.
+**Reprendre par** : le prochain cadrage du milestone fiabilite-v1.0 — restent **Phase 34** (gaps agency-agents & cadrage skill-installer, AGTS/SKIL) et **Phase 25** (budget d'instructions, après la 34). Aucun geste technique en attente sur la Phase 39.
 
-**Deux gestes humains en attente** (ni l'un ni l'autre n'est automatisable côté agent) :
+**Ce qui reste fermé, quoi qu'il arrive** :
+- **Aucune partition réelle de `vibeflow-os`** sans geste humain explicite — déclencheur D-02 (§ Decisions, 2026-09-10) : la question se repose dès que ≥ 2 `vf-*` concurrents tournent sur des scopes disjoints de ce dépôt.
+- **Issue amont `init-progress` NON ENVOYÉE** — rédigée dans `.planning/upstream/2026-09-09-init-progress-project-md-not-resolved-under-workstream.md`, Samuel poste.
+- **Ne pas « réparer » le résiduel de sécurité `pre-push` en basculant `core.hooksPath` sur un chemin absolu** — mesuré inopérant, raisonnement dans `.planning/codebase/CONCERNS.md`.
+- **`check-agents.sh` rend 0 à vide sur ce dépôt** (`.claude/agents` absent) — ne jamais le citer comme preuve de conformité des agents sources ; la couverture vient de `test-dev-orchestrator.sh` (T35 (e), discriminante par mutation).
 
-1. ~~**Auth kimi-code**~~ — **FAIT** (clé API posée par Samuel le 2026-08-30). kimi-code est
-   désormais **mesuré**, plus un inconnu déclaré : I-1 31/31, I-2 et I-3 verts. Le credential a été
-   manipulé sous le régime option B (copie vers un banc sous scratchpad, jamais ouverte, écrasée
-   3 passes puis supprimée, home réel vérifié intact) et **rien n'a été écrit chez Samuel**.
-2. **Issue amont gsd-core NON ENVOYÉE** — rédigée dans
-   `.planning/phases/VFDO-38-portabilit-multi-runtime-livraison-canal-d-install-migration/38-UPSTREAM-GSD-CORE-ISSUE.md`
-   (5 points mesurés, dont le `split(",")` qui déchire `Agent(a, b, c)` avec des dégâts **opposés** sur
-   OpenCode et kimi-code). Tout envoi externe est validé par Samuel — le fichier attend, il ne part pas seul.
-
-Puis, quand Samuel a vu la chose marcher : revue de branche, PR, bump racine, tag et release
-(`feat/phase-38-portabilite-multi-runtime`, ~90 commits, `VERSION` racine encore v2.58.1).
+**Piège de reprise qui a servi** : re-dériver le compteur de suites des README soi-même (`find plugin scripts -path '*/tests/test-*.sh'`) après toute fusion — jamais reprendre le chiffre d'un rapport antérieur.
