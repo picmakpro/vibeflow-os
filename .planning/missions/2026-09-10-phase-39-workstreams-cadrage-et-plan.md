@@ -285,3 +285,61 @@ attendu. Dérive d'un autre module, antérieure à cette phase.
 
 - L'entrée de `plugin/conductor/CHANGELOG.md` : sa convention lie une entrée à un **bump de version**.
 - La ligne d'historique des deux README racine, indexée sur le `VERSION` taggé.
+
+
+---
+
+# PARTIE IV — INTÉGRATION DU HOTFIX (2026-09-14)
+
+`origin/main` fusionné dans `feat/phase-39-workstreams` — merge **`5efe8d3`** (absorbe `63676c7`,
+PR #61 : `use_worktrees=false` auto sur lab à racine non-git, quick `260914-n3e`, issue amont
+`open-gsd/gsd-core#4734`). **Aucun conflit git.** Rien n'est poussé.
+
+## Le piège du compteur ne s'est pas déclenché — et c'est mesuré, pas supposé
+
+`plugin/_internal/tests/test-vibeflow-update.sh` est **modifié**, pas créé. Compte re-dérivé après
+fusion : **77 suites**, `check-version-sync` → **0**. La checklist de reprise a fonctionné.
+
+## Le piège de contenu, lui, s'est bien déclenché
+
+Le merge textuel a remplacé `Last activity` par le **seul** fait du quick, effaçant la Phase 39 — qui
+n'y figurait d'ailleurs **pas non plus avant** la fusion (le champ était resté au 2026-08-17, la phase
+ne l'avait jamais mis à jour). Réconcilié en **`1e3c237`** : la ligne porte désormais **les deux
+faits** avec leurs commits. **`merge-tree` à 0 n'a rien dit de tout cela** — c'est exactement le mode
+d'échec que cette phase a outillé.
+
+## Gates après fusion — valeurs mesurées
+
+| Gate | Valeur |
+|---|---|
+| `scripts/check-version-sync.sh` | **0** (77 suites = 77 annoncées) |
+| `check-mission-invariants.sh` | **3** — SAIN |
+| `tests/test-check-divergence.sh` | **0** — 17/17 |
+| `plugin/_internal/tests/test-vibeflow-update.sh` | **0** — 78 OK / 0 KO (la suite du hotfix passe ici aussi) |
+| `check-state-integrity.sh` | **0** |
+| `check-divergence.sh --path .` | **3** — silence, dépôt non partitionné |
+| `.planning/workstreams/` | **absent** |
+| `### Decisions` de `STATE.md` | **6/6 intactes** |
+| arbre de travail | **propre** |
+
+## ⚠ CORRECTION D'UNE ERREUR DE CE RAPPORT — `check-agents.sh` est un VERT À VIDE ici
+
+Les parties précédentes citent `check-agents.sh → 0` comme gate attestant la conformité des agents.
+**C'est faux sur ce dépôt.** Le script inspecte `.claude/agents`, **dossier qui n'existe pas ici** ;
+il imprime « aucun agent — rien à vérifier » et sort **0**. Les **4** agents sources vivent dans
+`plugin/dev-orchestrator/agents/` et **ne sont pas couverts par lui**.
+
+C'est un comportement **connu et voulu** (le script vise le scope *installé*, pas les sources), pas un
+défaut neuf — mais un `0` de sa part **ne prouve rien** sur ce dépôt et ne doit pas être cité comme
+tel. La couverture réelle des agents sources vient d'ailleurs : `plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh`
+(`T31-G`, `T35 (d)`, `T35 (e)` — cette dernière **discriminante par mutation** sur le plafond ADR-029).
+
+**Quatorzième occurrence du motif de cette phase** — un mécanisme qui a l'air correct et ne peut pas
+rendre rouge —, et elle vivait dans ma propre liste de gates depuis le début.
+
+## Reste ouvert pour le ship
+
+- **`CHANGELOG.md` § « Non releasé » ne décrit que le hotfix**, pas la Phase 39. Volontairement **non
+  comblé** : la note de release se produit au **bump**, geste humain. À traiter au ship.
+- Réserves inchangées : aucun run CI distant observé ; le clone prouve un **mécanisme**, pas un usage
+  concurrent réel.
