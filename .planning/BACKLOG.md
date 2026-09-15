@@ -394,18 +394,21 @@ Limites, `plugin/mobile-test-team/README.md` § Limites) n'est donc pas atteinte
 exigences, et sa reprise est conditionnée au déclencheur ci-dessous.
 
 **Pourquoi différé :** la règle absolue du mandat de ce run interdit toute retentative dès la
-détection d'un écran de login inattendu. Départager la cause (session authentifiée réellement
-perdue vs bug de robustesse de `fetchRenewToken`) exige une vérification humaine directe
-(Keychain du simulateur, disponibilité du backend `api.scrolloff.com`) hors du périmètre outillé
-de ce run.
+détection d'un écran de login inattendu. La cause (session authentifiée perdue vs bug de
+robustesse de `fetchRenewToken`) est un sujet **du projet Scroll-Off**, pas de VibeFlow.
 
-**Déclencheur de resurgence :** renvoi nommé, jamais paraphrasé (une paraphrase diverge, un
-renvoi non) — voir
-`.planning/phases/VFDO-34-gaps-agency-agents-cadrage-skill-installer/34-RUN-MOBILE.md`
-§ `## Déclencheur de reprise` pour le cadrage complet, la condition de reprise datée, et la
-précision de l'arbitrage Samuel du 2026-09-15 (canal : AskUserQuestion session principale) sur
-qui tranche l'ambiguïté (a) session perdue vs (b) robustesse de `fetchRenewToken` — explicitement
-à la charge de Samuel, aucun agent ne la tranche à sa place.
+**Scroll-Off exclu du périmètre VibeFlow** (arbitrage Samuel, session principale, 2026-09-15 :
+« ça n'a rien à voir ») : ce dépôt ne porte plus aucune vérification, aucun déclencheur ni
+aucune action à faire sur Scroll-Off (Keychain du simulateur, backend, commit Metro). La trace
+`34-RUN-MOBILE.md` reste une **archive** du run joué, non réécrite.
+
+**Déclencheur de reprise :** un lab mobile Expo/React Native **désigné explicitement par Samuel,
+hors Scroll-Off**, avec une session reproductible sans intervention humaine — ou Scroll-Off
+re-désigné par un arbitrage explicite. Tant qu'aucun lab n'est désigné, AGTS-02 reste reportée
+avec trace (D-05), sa case décochée au ledger, et `web-test-team` non construite. Le protocole
+de sortie d'expérimental (`plugin/mobile-test/README.md` § Limites,
+`plugin/mobile-test-team/README.md` § Limites) et la doctrine « prérequis manquant = arrêt
+propre, jamais d'installation à la volée » (34-CONTEXT D-05) restent inchangés.
 
 ## check-agents.sh ne couvre que les chemins auto-déclarés par un protocole de spike, pas l'état réel du disque
 **Capturé :** 2026-09-15 (audit de la mission Phase 34, arbitrage Samuel, AskUserQuestion session

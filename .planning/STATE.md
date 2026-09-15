@@ -221,9 +221,9 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
   maintenue gravée, zéro ligne de code d'installeur) ; AGTS-01 clos sans création d'agent (les six
   refus restent refusés jusqu'à preuve nouvelle nommée) ; les plans 34-04/34-05 (conditionnels au
   run vert) clos en no-op tracé, `web-test-team` non construite. **Ce qui reste ouvert** : AGTS-02
-  **reportée avec trace** (D-05), déclencheur de reprise daté au BACKLOG — vérification humaine du
-  Keychain du simulateur `8BD53E84-B5BF-482A-8FE5-6A9980555951` et de la disponibilité du backend
-  Scroll-Off, geste explicitement à la charge de Samuel ; un angle mort structurel trouvé en audit
+  **reportée avec trace** (D-05), déclencheur de reprise au BACKLOG — **Scroll-Off exclu du périmètre
+  VibeFlow** (arbitrage Samuel, session principale, 2026-09-15) : reprise sur un lab mobile à
+  désigner explicitement, hors Scroll-Off ; un angle mort structurel trouvé en audit
   de mission (le gate de nettoyage du spike SKIL-01 ne vérifiait que des chemins auto-déclarés, pas
   l'état réel du disque) est entré au BACKLOG comme item daté avec sa preuve, le plan 34-02 restant
   une archive exécutée non modifiée. Ship (PR/tag/release) reste un geste humain non posé par cette
@@ -570,7 +570,10 @@ Recent decisions affecting current work:
      perdue vs (b) robustesse de `fetchRenewToken` reste explicitement à la charge de Samuel, aucun
      agent ne tranche à sa place — vérification manuelle du Keychain du simulateur
      `8BD53E84-B5BF-482A-8FE5-6A9980555951` et de la disponibilité du backend Scroll-Off requise
-     avant tout nouveau run.
+     avant tout nouveau run. **Amendé le 2026-09-15 (arbitrage Samuel, session principale) :
+     Scroll-Off est exclu du périmètre VibeFlow** — la vérification Keychain/backend est l'affaire
+     du projet Scroll-Off, plus un déclencheur de ce dépôt ; la reprise d'AGTS-02 se fera sur un lab
+     mobile désigné explicitement, hors Scroll-Off (BACKLOG § AGTS-02).
   5. **AGTS-02, retour du commit de fix Metro dans `Scroll-Off/frontend`** (arbitrage Samuel,
      AskUserQuestion session principale, 2026-09-15) : `git reset --hard` du seul commit de fix
      (réel et sourcé mais insuffisant à sortir le run du rouge), aucun push — détail
@@ -1284,7 +1287,7 @@ Recent decisions affecting current work:
 **Resume file:** .planning/phases/VFDO-34-gaps-agency-agents-cadrage-skill-installer/34-CONTEXT.md (et `.planning/phases/VFDO-40-vibeflow-head-head-of-minds-du-dev-orchestrator/40-CONTEXT.md`, `.planning/phases/VFDO-25-budget-d-instructions-et-tage-d-alignement-court/25-CONTEXT.md`)
 
 Last session: 2026-09-15
-Stopped at: **Phase 34 EXÉCUTÉE et MERGÉE** (PR #66, merge `bf34d49`, 2026-09-15 — 3 verdicts rendus, 4 gates humains relayés, AGTS-02 reportée : vérification Keychain + backend Scroll-Off par Samuel avant reprise) puis **Phase 25 PLANIFIÉE** (recherche `eb6aa3d`, D-06 bis + D-01 bis amendés, 4 plans `f7a057f` + révision `2773e37`, checker PASSED, couverture 8/8, gap-analysis 10/10). Next : exécution 25 par `vf-dev-manager` (vagues 1-3, arrêt au checkpoint 25-04) — demande Samuel, session principale, 2026-09-15.
+Stopped at: **Phase 34 EXÉCUTÉE et MERGÉE** (PR #66, merge `bf34d49`, 2026-09-15 — 3 verdicts rendus, 4 gates humains relayés, AGTS-02 reportée ; Scroll-Off exclu du périmètre VibeFlow le 2026-09-15, reprise sur un lab mobile à désigner) puis **Phase 25 PLANIFIÉE** (recherche `eb6aa3d`, D-06 bis + D-01 bis amendés, 4 plans `f7a057f` + révision `2773e37`, checker PASSED, couverture 8/8, gap-analysis 10/10). Next : exécution 25 par `vf-dev-manager` (vagues 1-3, arrêt au checkpoint 25-04) — demande Samuel, session principale, 2026-09-15.
 
 **Reprendre par** : mission `vf-dev-manager` sur la Phase 25 (vagues 1-3, checkpoint 25-04 bloquant jusqu'à la 40) — puis `/gsd-plan-phase 40`, puis calibration 25-04 dans une seconde PR.
 

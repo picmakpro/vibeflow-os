@@ -7,8 +7,11 @@
 
 **Version** : v1.3.4
 **Type** : agent-only
-**Densité** : `AGENT.md` = 249 lignes — le plafond ADR-029 est ≤ 250 : le module est **à 1 ligne
-du plafond**, tout ajout passe par un délestage préalable.
+**Densité** : `AGENT.md` = **250 lignes** — le plafond ADR-029 est ≤ 250 : le module est **au
+plafond, marge zéro** (mesuré le 2026-09-15, `awk 'END{print NR}'`, concordant avec le CHANGELOG
+« 250/250 » — le « 249 » affiché jusqu'ici était faux), tout ajout passe par un délestage
+préalable ; dès l'armement du ratchet `check-instruction-budget.sh` (Phase 25, plan 25-04), une
+ligne de plus rend la CI rouge.
 **Iron Law** : *« Détecter et signaler. Ne jamais corriger sans validation humaine. »* (ADR-031)
 
 ---
