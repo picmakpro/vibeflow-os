@@ -101,10 +101,10 @@ $ rm -rf .../scratchpad/skil01/skil01-probe-plugin
 $ rm -f ~/.claude/agents/skil01-probe-agent.md
 ```
 
-## Chemins nettoyés et preuve de leur absence — PARTIEL, corrigé après revue
+## Chemins nettoyés et preuve de leur absence — historique complet en deux passages
 
-Nettoyage effectivement retiré et prouvé (les deux seuls chemins que le protocole avait lui-même
-listés à leur création) :
+**Premier passage (fin tâche 2).** Nettoyage effectivement retiré et prouvé, mais borné par sa
+propre liste (les deux seuls chemins que le protocole avait lui-même listés à leur création) :
 
 - `/Users/samuel/.claude/agents/skil01-probe-agent.md` → `test -e` négatif après suppression
   (`AGENT ABSENT`)
@@ -113,20 +113,22 @@ listés à leur création) :
 - `claude plugin list | grep -i skil01` → vide (`PLUGIN ABSENT FROM LIST`)
 - `claude plugin marketplace list | grep -i skil01` → vide (`MARKETPLACE ABSENT FROM LIST`)
 
-Preuve automatisée (bloc `<automated>` tâche 2) : un script Node relit chaque ligne
-`- chemin supprimé : ` de `34-SPIKE-SKIL.md` (2 lignes) et vérifie par `fs.existsSync` qu'aucun
-des chemins n'existe plus — exit 0. **Mais** cette preuve est bornée par sa propre liste, elle ne
-constate que ce qu'on lui a soumis. Une recherche élargie (`find ~/.claude -iname "*skil01*"`,
-rejouée en correction le 2026-09-15) trouve **trois résidus survivants**, non retirés :
+Preuve automatisée (bloc `<automated>` tâche 2) : script Node relisant chaque ligne
+`- chemin supprimé : ` (2 lignes) et vérifiant par `fs.existsSync` — exit 0. Cette preuve ne
+constatait que ce qu'on lui avait soumis. Une recherche élargie en correction
+(`find ~/.claude -iname "*skil01*"`, 2026-09-15) a trouvé **trois résidus non listés, non
+retirés** : le cache disque du plugin jetable
+(`~/.claude/plugins/cache/skil01-probe-marketplace/`), une entrée orpheline de compteur d'usage
+dans `~/.claude.json`, et les transcripts de session (`~/.claude/projects/.../scratchpad-skil01/`).
 
-- `~/.claude/plugins/cache/skil01-probe-marketplace/` — cache disque du plugin jetable (`claude
-  plugin uninstall`/`marketplace remove` vident les registres actifs, pas ce cache)
-- `~/.claude.json` — entrée orpheline de compteur d'usage `skil01-probe-plugin:skil01-probe-skill`
-- `~/.claude/projects/-private-tmp-...-scratchpad-skil01/` — transcripts de session (2 `.jsonl`)
-
-Documentés en détail dans `34-SPIKE-SKIL.md` § « Nettoyage » → « Résidus NON nettoyés ». Ils ne
-sont PAS supprimés par ce plan : la purge d'un chemin hors dépôt sur la machine de Samuel est son
-arbitrage, pas un geste que ce spike s'autorise.
+**Second passage — purge sur arbitrage.** Arbitrage Samuel, AskUserQuestion session principale,
+2026-09-15 : purge des deux premiers résidus, le troisième (transcripts) volontairement laissé
+intact. Cache disque retiré (`rm -rf`, recontrôle avant/après des 9 autres marketplaces/plugins,
+tous intacts). `~/.claude.json` édité par plage de lignes ciblée (jamais un re-dump), sauvegarde
+horodatée AVANT écriture, JSON validé après coup, diff contre la sauvegarde montrant une seule
+entrée disparue (4 lignes) et rien d'autre. Re-constat final :
+`find ~/.claude -iname "*skil01*"` ne rend plus que le dossier de transcripts. Détail intégral
+(commandes, diffs, recontrôles) dans `34-SPIKE-SKIL.md` § « Nettoyage ».
 
 ## Scope project
 
@@ -172,3 +174,10 @@ Chaque tâche a été committée atomiquement, message en français, pathspec ex
 1. **Tâche 1 : contrôle négatif** — `c67d8945baaef335b7cab2ed2905f454f30302ad` (docs)
 2. **Tâche 2 : cas cible A, nettoyage prouvé** — `81dcc037d8b0b1de6abef352f4abfafb4751259a` (docs)
 3. **Tâche 3 : verdict NO-GO rédigé** — `24652cf000cf722edde46db2582963f911808e3b` (docs)
+4. **Tâche 4 : SUMMARY** — `9145c9a9c9b64995a48193042cd6623552b26b6c` (docs)
+
+**Corrections ciblées post-revue** (défauts remontés par audit de jointure, même journée) :
+
+5. **Défaut 1 + 2a : compte exact d'agents, honnêteté du nettoyage** — `743b3a3ce93f62f23c6d63583e79ac336d4e2a09` (docs, `34-SPIKE-SKIL.md`)
+6. **Défaut 2a reporté au SUMMARY** — `719eb9863cba66e720b8a048bab14252e201b8b2` (docs, `34-02-SUMMARY.md`)
+7. **Défaut 2b : purge sur arbitrage Samuel, re-constat prouvé** — `9448461e0ef25c98c07ac6dbb1b09d9ab6473cb0` (docs, `34-SPIKE-SKIL.md`)
