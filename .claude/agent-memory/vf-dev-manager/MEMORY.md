@@ -48,7 +48,7 @@
 - [Coût de portage : payload ≫ engine](project_cout-portage-payload-vs-engine.md) — 1050 réfs `.claude/` sur 198 fichiers livrés ; un `--target` sans réécriture de contenu est inerte
 - [Préfixe d'exigences suggéré par le ROADMAP déjà pris](project_prefixe-exigences-suggere-par-roadmap-deja-pris.md) — PORT-xx proposé pour la 38 collisionne avec PORT-01..05 vivant ; dériver l'espace de noms, 36 préfixes occupés
 - [Mesure juste, attribution fausse](feedback_mesure-juste-attribution-fausse.md) — le rejet `[a-z0-9_]+` visait le task_name, pas le nom de rôle : 31 correspondances évitées, « par construction » = marqueur du défaut
-- [Joignabilité asymétrique manager↔worker](project_joignabilite-asymetrique-manager-worker.md) — je peux réveiller un worker (contexte intact), il ne peut PAS me joindre : exiger le retour d'Agent dans chaque mandat
+- [Joignabilité asymétrique manager↔worker](project_joignabilite-asymetrique-manager-worker.md) — le réveil atteint le worker mais ne l'autorise pas : il ne peut pas m'authentifier et refuse tout ordre qui vaut autorisation
 - [`timeout` absent : faux zéro silencieux](project_timeout-absent-faux-zero.md) — `timeout`/`gtimeout` absents du poste ; une boucle qui les utilise rend 0/N sans erreur. Un `0/N` est un artefact jusqu'à preuve du contraire
 - [Non-régression complète = geste de manager](feedback_non-regression-complete-est-un-geste-de-manager.md) — 4 workers enlisés en une mission ; le worker rejoue les siennes, le manager la découverte complète
 - [Cascade de résolution par fausse analogie](project_cascade-de-resolution-par-fausse-analogie.md) — « cascade identique à X » = signal d'alarme ; 2 cas en une phase, dont un qui désactivait toute la capacité livrée
@@ -64,3 +64,6 @@
 - [Rapport intérimaire, boucle encore vivante](feedback_rapport-interimaire-boucle-encore-vivante.md) — « je rapporte quand ça finit » = le worker a fini ; réveiller, et comparer les ensembles par `comm`, pas les nombres
 - [`find` proxifié tronque par intermittence](project_find-proxifie-tronque-par-intermittence.md) — 21 sur 78 chez un agent, 78 chez moi à la même minute : un rejeu juste ne disculpe pas la mesure d'à côté
 - [Heredoc dé-indenté = vert silencieux](project_heredoc-desindente-vert-silencieux.md) — rejouer un `run: |` de ci.yml sans dé-indenter : exit 0, zéro sortie, aucune commande exécutée
+- [Trailer d'attribution jamais depuis le brief](feedback_trailer-attribution-jamais-depuis-le-brief.md) — chaque sous-agent pose le trailer de SA config ; relayer celui du brief fabrique une attribution invérifiable
+- [Lot qui ajoute un champ neuf = vert à vide](feedback_lot-qui-ajoute-un-champ-neuf-n-a-aucun-gate.md) — aucune suite existante ne peut asserter du neuf ; exiger une sonde scopée, rouge avant / verte après
+- [Constat du juge vérifié, correction non vérifiée](feedback_constat-du-juge-verifie-correction-non-verifiee.md) — relayer le constat + la propriété, jamais la commande suggérée : la mienne aurait rendu un garde rouge en permanence
