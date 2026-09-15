@@ -25,7 +25,9 @@ tech-stack:
 key-files:
   created:
     - plugin/conductor/scripts/check-instruction-budget.sh
-  modified: []
+  modified:
+    - "plugin/conductor/scripts/check-instruction-budget.sh — correction ciblée post-revue (F1/F2/F3,
+      commit cca219b)"
 
 key-decisions:
   - "D-01 bis appliqué : le comptage d'instructions porte sur le BODY seul (frontmatter exclu par
@@ -77,6 +79,37 @@ sortie sont chacun atteints sur fixture jetable.**
 - Tâche 3 (contrat de sortie complet, 10 cas fixture) → `== bilan contrat : 0 ecart(s) ==`, exit 0.
 - `git status --short plugin` → seul `plugin/conductor/scripts/check-instruction-budget.sh` en
   untracked/staged, aucun autre fichier sous `plugin/` touché.
+
+## Correction ciblée post-revue vague 1 (commit `cca219b`)
+
+Trois défauts confirmés par exécution sur fixtures (revue) ont été corrigés en direct, sans
+réouverture de cycle ni élargissement de périmètre :
+
+- **F1 (bloquant)** : le côté BASELINE des comparaisons (`bl_lines`/`bl_instr`) n'était jamais
+  passé au garde numérique `case ... *[!0-9]*)` déjà appliqué au côté courant — sous
+  `set -uo pipefail` sans `-e`, une comparaison `[ … -gt … ]` sur donnée non numérique laissait
+  `verdict` à son initialisation `"OK"` et le code de sortie à `0`. Prouvé rouge→vert sur 4
+  vecteurs : valeur non numérique, colonne manquante, CRLF résiduel, clé de baseline dupliquée
+  (ce dernier fermé en reprenant le garde-fou déjà existant de `check-divergence.sh` S2,
+  `cnt[$1]++`, jamais réinventé).
+- **F2 (majeur)** : `frontmatter_state()`/`body_only()` reconnaissaient une paire de `---`
+  n'importe où dans le fichier — un fichier SANS frontmatter réel mais portant deux `---` isolés
+  dans le corps voyait le contenu entre les deux exclu du comptage en silence. Fix : le premier
+  `---` n'ouvre le frontmatter que s'il est à `NR==1`.
+- **F3 (majeur)** : `SANS_BASELINE_COUNT` n'était incrémenté que sur le verdict affiché
+  `SANS-BASELINE`, jamais sur `DEPASSEMENT-ADR029` — un fichier > 250 lignes sans entrée de
+  baseline rendait `1` au lieu du `2` exigé par le contrat de baseline incomplet des `must_haves`.
+  Fix : le compteur suit `has_baseline==0`, indépendamment du verdict affiché.
+
+Chaque correction a été prouvée avec un témoin rouge (script d'origine, commit `393b022`, sur
+fixture `mktemp -d`) puis un vert (script corrigé), avant rejeu sans régression des trois blocs
+`<verify>` des tâches 1/2/3 (`TRACER-OK`, `FORMES-OK`, `0 ecart(s)`). Aucun garde desserré : les
+trois corrections resserrent des angles morts, n'élargissent aucune tolérance.
+
+Trois findings `no-op` de la revue et de l'audit portés hors de cette correction, vers le rapport
+de mission : puce `+ ` non reconnue (hors périmètre littéral du plan), portabilité GNU non
+exerçable sur ce poste (renvoyée à la CI Linux, plan 25-03), évasion de mesure par bloc de code
+fenced (design assumé, à inscrire au BACKLOG en 25-03).
 
 ## Hors périmètre de ce plan (D-06 bis, différé)
 
