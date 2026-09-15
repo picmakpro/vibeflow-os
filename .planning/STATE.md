@@ -25,8 +25,10 @@ stopped_at: >-
   Phase 34 est documenté dans `## Current Position` et `### Roadmap Evolution` ci-dessous, jamais
   perdu — seul ce pointeur numérique reste sur sa valeur la plus haute atteinte.**
   **Note (2026-09-15, clôture documentaire Phase 25) : mêmes raisons — `current_phase` reste à 39**
-  bien que la Phase 25 ait ses vagues 1-3 vertes sur `feat/phase-25-budget-instructions` (14 commits
-  depuis `5583d3e` — 10 d'exécution jusqu'à `6638804`, 4 de la présente clôture documentaire).
+  bien que la Phase 25 ait ses vagues 1-3 vertes sur `feat/phase-25-budget-instructions` (exécution
+  des trois plans de `5583d3e` à `6638804`, puis clôture documentaire et ses correctifs au-delà —
+  décompte volontairement non chiffré ici : un total écrit DANS le fichier qu'il compte est faux dès
+  le commit qui le porte, défaut constaté puis fermé le 2026-09-15).
   **Aucune PR ouverte, aucun ratchet armé** : ni
   `.planning/.instruction-budget-armed` ni `.planning/instruction-budget-baselines.tsv` n'existent.
   Le plan 25-04 (calibration) reste un checkpoint bloquant-humain, précondition « Phase 40 livrée »
