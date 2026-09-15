@@ -13,6 +13,70 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 
 *Rien pour l'instant.*
 
+## [v2.62.0] — 2026-09-15
+
+**Le plafond de 250 lignes d'ADR-029 est machine-enforced pour la première fois — et une charge
+d'instructions est publiée par fichier d'agent, à côté.** Phase 25 (budget d'instructions,
+BUDG-01/02) vagues 1-3, et Phase 34 (gaps agency-agents, cadrage skill-installer, AGTS-01/02,
+SKIL-01) livrée en trois verdicts écrits. Cinquante commits depuis v2.61.0 (PR #66 et #67, plus
+la planification des deux phases sur `main`).
+
+- **Gate de budget d'instructions — conductor v1.37.0** :
+  `plugin/conductor/scripts/check-instruction-budget.sh` (neuf) mesure et publie, pour chacun
+  des 31 fichiers d'agents distribués (`plugin/*/agents/*.md`, `plugin/*/AGENT.md`, découverte
+  non vide assertée), **lignes** et **instructions** (marqueurs normatifs FR+EN + puces
+  impératives sous un titre de règles, **body seul, hors frontmatter** — D-01 bis, arbitrage
+  Samuel, AskUserQuestion session principale, 2026-09-15). Cinq codes de sortie tous énumérés :
+  `0` armé conforme · `1` dépassement de baseline ou du plafond absolu de 250 lignes (prime
+  toujours) · `2` non vérifiable (découverte vide, frontmatter jamais refermé, baseline corrompue
+  ou dupliquée — jamais un vert) · `3` non armé, rapport imprimé intégralement, jamais bloquant ·
+  `64` usage. Suite de **30 cas** avec 4 mutants tués par `cmp` et un témoin global ; étape CI du
+  job `gates` qui porte **sa propre preuve de discrimination** sur fixture armée (`0` → `1` par
+  mutation réelle, `2` sur découverte vide, `3` sur sentinelle retirée) avant de juger le dépôt.
+  La revue de la vague 1 a rouvert sur un **bloquant réel** : une baseline corrompue rendait
+  `exit 0` (valeurs jamais validées comme entiers, comparaison muette sous `pipefail` sans `-e`)
+  — quatre vecteurs fermés, six témoins rouge → vert devenus cas de non-régression.
+- **Ratchet volontairement NON armé** : ni sentinelle `.planning/.instruction-budget-armed` ni
+  baseline. La calibration (plan 25-04, one-way) attend la livraison de la **Phase 40**
+  (`vibeflow-head`, qui réécrit `plugin/dev-orchestrator/AGENT.md`) — D-06 bis, arbitrage Samuel
+  2026-09-15. Un lecteur ne doit pas croire le ratchet armé. Deux fichiers sont déjà à 250/250
+  (`vf-dev-manager.md`, `plugin/validator/AGENT.md`) : marge zéro à l'armement.
+- **Phase 34 — trois verdicts, zéro agent créé** : **AGTS-01** rendue (`34-AUDIT-AGTS.md`,
+  matrice `agency-agents` re-mesurée, verdict par gap adossé à la règle de preuve du milestone,
+  Testing « reporter », tous les autres « refuser » avec la preuve manquante nommée) ;
+  **SKIL-01 NO-GO** one-way (`34-SPIKE-SKIL.md`, spike à contrôle négatif : le canal `/plugin`
+  natif atteint déjà les sous-agents, aucun trou à combler — item backlog du 2026-06-04 clos) ;
+  **AGTS-02 reportée avec trace** (`34-RUN-MOBILE.md`, run réel Maestro sur Scroll-Off :
+  `PIPELINE: VERT` / `EQUIPE: ROUGE` = run ROUGE, 6/10 flows rouges après un cycle de fix ;
+  `mobile-test` et `mobile-test-team` restent expérimentaux, `web-test-team` NON construite ;
+  déclencheur de reprise = vérification humaine du Keychain du simulateur et du backend).
+  Quatre gates humains relayés, aucun franchi par repli.
+- **Gouvernance** : Phase 40 (`vibeflow-head`, head of minds du dev-orchestrator) inscrite et
+  cadrée (PR #65, 16 arbitrages, spec `docs/superpowers/specs/2026-09-15-vibeflow-head-design.md`)
+  ; dépendance de la Phase 25 amendée « Phase 34 et Phase 40 » ; catalogue conductor corrigé
+  (`check-agents.sh` ne mesure ni lignes ni instructions) ; note datée sous ADR-029 ; dettes au
+  BACKLOG (budgets `SKILL.md`/bootstrap, `main` sans protection de branche → phase dédiée à
+  inscrire, `25-SECURITY.md` à la clôture, README validator « 249 » faux pour 250).
+- **Leçons de mission consignées** : un plan écrit avant les faits n'est pas une source mesurée ;
+  un gate cassé par la mission se distingue d'une dette héritée par la base de la mission ;
+  `state.planned-phase` et `record-session` de gsd-tools réécrivent `STATE.md` (ADR-063).
+
+## [v2.61.0] — 2026-09-15
+
+**Un moteur gsd-core périmé restait invisible à `/vf-update`.** *(Entrée reconstituée le
+2026-09-15 avec la release v2.62.0 : le tag et la release GitHub v2.61.0 existaient, l'entrée
+CHANGELOG racine manquait — les deux README la portaient déjà.)* Un poste en
+`@opengsd/gsd-core` 1.13.0 alors que 1.14.0 était publié était « GSD déjà présent (skip) » pour
+toujours : `ensure-deps.sh` ne lisait jamais le `VERSION` installé, et le gate de présence ne
+compare aucun numéro par doctrine (piège legacy 1.42.3, qui reste vrai). La fraîcheur se décide
+désormais dans le script qui porte déjà le plafond `^1` : la référence est la dernière version
+**publiée** satisfaisant `^1`. `ensure-deps.sh --check-engine-update` (lecture seule, exit 0 +
+`[gsd-outdated]` seulement si périmé, silence sinon — réseau KO compris) et `--upgrade-engine`
+(relance `npx` uniquement sur une version lisible et strictement inférieure, semver jamais
+lexical, indécidable ≠ périmé). `/vf-update` propose la mise à jour comme une ligne confirmée
+indépendamment du plugin et des modules (ADR-031). Onze cas rouges avant le fix, 199/199 après ;
+détection prouvée sur poste réel (dev-orchestrator v2.21.0, conductor v1.36.0). PR #64.
+
 ## [v2.60.0] — 2026-09-14
 
 **Un merge sans conflit textuel peut faire diverger la numérotation des phases d'un workstream —
