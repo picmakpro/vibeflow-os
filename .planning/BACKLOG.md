@@ -443,3 +443,26 @@ qui doit être durci au prochain protocole du même genre.
 **Déclencheur de resurgence :** prochain plan qui pose un gate de nettoyage automatisé pour un
 protocole jetable (spike, sonde, plugin de mesure, agent de sonde) — reprendre cet item avant
 d'écrire ce gate, pas après.
+
+## Budget des SKILL.md et du bootstrap — sans enforcement machine (différé de la Phase 25, 2026-09-15)
+
+**Capturé :** 2026-09-15, clôture de la première PR de la Phase 25 (mandat vf-coder, plan 25-03).
+Hors périmètre de BUDG-01 (D-03) — la phase a délibérément limité sa portée aux agents distribués.
+
+**Le défaut :** ADR-029 borne aussi les `SKILL.md` à 500 lignes et le bootstrap à 2000 tokens, mais
+aucun gate distribué ne mesure ni l'un ni l'autre — `plugin/conductor/scripts/check-instruction-budget.sh`
+ne couvre que `plugin/*/agents/*.md` et `plugin/*/AGENT.md` (glob à un seul niveau, D-03).
+
+**Déclencheur de reprise :** le gate `check-instruction-budget.sh` existe désormais et son contrat
+de mesure (lignes du fichier entier + instructions du body, ratchet par sentinelle) est prouvé.
+Étendre sa découverte à un second corpus (`SKILL.md`) est une **modification de portée**, pas une
+reconstruction — reprendre ce script comme socle plutôt qu'en écrire un nouveau.
+
+**Écarté, et non différé :** la métrique en tokens estimés pour le budget du bootstrap (piste F3,
+`25-CONTEXT.md`) — à ne rouvrir que sur un incident lié à la **taille** du bootstrap plutôt qu'à son
+adhérence à la charte de densité.
+
+**Remédiation, pas ici :** l'abaissement des fichiers d'agents distribués les plus chargés (mesurés
+`SANS-BASELINE` au rejeu du 2026-09-15, ex. `plugin/dev-orchestrator/agents/vf-dev-manager.md` à
+250 lignes) est un geste ultérieur, par lot, chacun abaissant une baseline dans son propre commit —
+jamais un livrable de cette phase, et jamais une réécriture « pour passer » le gate.
