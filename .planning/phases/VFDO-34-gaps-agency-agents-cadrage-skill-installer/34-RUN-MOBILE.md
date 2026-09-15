@@ -24,7 +24,7 @@ visée (`plugin/mobile-test/README.md` § Limites, `plugin/mobile-test-team/READ
 
 ## Environnement mesuré
 
-- Maestro CLI : **2.6.1** (`/Users/samuel/.maestro/bin/maestro`)
+- Maestro CLI : **2.6.1** (`~/.maestro/bin/maestro`)
 - JDK : **OpenJDK 17.0.19** (Homebrew)
 - Node.js : **v26.5.0**
 - Lab : `~/Documents/dev/Scroll-Off/frontend` (dépôt git DISTINCT, non gouverné par `vibeflow-os`)
@@ -60,8 +60,8 @@ Deux simulateurs distincts portent le nom « iPhone 17 Pro » :
 
 | UDID | Runtime | App installée (`get_app_container`) | Conteneur data — date de création (top-level) |
 |------|---------|----------------------------------------|-------------------------------------------------|
-| `48100F83-6AD7-4E46-918F-5390DF87F797` | iOS 26.4 | Oui — `/Users/.../Containers/Bundle/Application/F138AD7D-.../ScrollOff.app` | **2026-09-12 13:05:12** |
-| `8BD53E84-B5BF-482A-8FE5-6A9980555951` | iOS 26.2 | Oui — `/Users/.../Containers/Bundle/Application/12EFE89E-.../ScrollOff.app` | **2026-08-19 16:25:02** |
+| `48100F83-6AD7-4E46-918F-5390DF87F797` | iOS 26.4 | Oui — `~/Library/.../Containers/Bundle/Application/F138AD7D-.../ScrollOff.app` | **2026-09-12 13:05:12** |
+| `8BD53E84-B5BF-482A-8FE5-6A9980555951` | iOS 26.2 | Oui — `~/Library/.../Containers/Bundle/Application/12EFE89E-.../ScrollOff.app` | **2026-08-19 16:25:02** |
 
 Les **deux** candidats portent l'app installée (hypothèse A1 de `34-RESEARCH.md` prise en défaut,
 comme anticipé Open Question 1) — départage nécessaire.
