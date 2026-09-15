@@ -382,8 +382,7 @@ Validation JSON après coup :
 $ python3 -c "import json; json.load(open('/Users/samuel/.claude.json')); print('VALID JSON AFTER')"
 VALID JSON AFTER
 ```
-Diff complet contre la sauvegarde (une seule entrée disparue, rien d'autre — 5506 → 5502 lignes,
-4 lignes de différence, un seul hunk) :
+Diff textuel observé au moment de l'édition (5506 → 5502 lignes) :
 ```
 $ diff ~/.claude.json.bak-20260915-032715 ~/.claude.json
 4976,4979d4975
@@ -392,6 +391,37 @@ $ diff ~/.claude.json.bak-20260915-032715 ~/.claude.json
 <       "usageCount": 1,
 <       "lastUsedAt": 1789433600869
 ```
+
+**Ce diff textuel seul ne suffit PAS à conclure « rien d'autre »** — `~/.claude.json` est réécrit en
+continu par Claude Code pendant la session (télémétrie), donc un diff pris à un instant peut rater
+ce qu'un instant suivant révèle. La preuve qui tient est une **comparaison structurelle clé par
+clé**, pas un comptage de lignes :
+
+```
+$ python3 -c "
+import json
+a = json.load(open('/Users/samuel/.claude.json.bak-20260915-032715'))
+b = json.load(open('/Users/samuel/.claude.json'))
+ka, kb = set(a.keys()), set(b.keys())
+print('keys A:', len(ka), 'keys B:', len(kb))
+print('added:', kb - ka)
+print('removed:', ka - kb)
+print('differing-value keys:', [k for k in ka & kb if a[k] != b[k]])
+"
+keys A: 103 keys B: 103
+added: set()
+removed: set()
+differing-value keys: ['promptQueueUseCount', 'skillUsage']
+```
+
+103 clés de premier niveau identiques des deux côtés, aucune ajoutée ni retirée. Deux clés
+diffèrent en VALEUR, pas une : `skillUsage` (l'entrée `skil01-probe-plugin:skil01-probe-skill`
+retirée — c'est la seule suppression imputable à la purge) et `promptQueueUseCount`, un compteur
+global de télémétrie que Claude Code incrémente en continu pendant la session — pas un effet de
+cette édition. Sa valeur exacte n'est délibérément PAS consignée ici : elle serait déjà fausse à
+la lecture suivante (mesuré à 3990 lors d'un premier relevé, 3993 quelques minutes plus tard, sans
+qu'aucune édition n'ait eu lieu entre les deux) — même piège que les autres faits d'état périssables
+déjà corrigés dans cette note, évité ici en NE figeant pas le nombre.
 
 **Re-constat final** — la même sonde élargie qui avait trouvé l'angle mort, rejouée après purge :
 
