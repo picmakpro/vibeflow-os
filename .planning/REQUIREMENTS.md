@@ -1079,6 +1079,51 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   distribués en 1.13.0) remplace toute veille à seuil chiffré (D-06) — inscrite en note de
   STATE.md, jamais comme un seuil figé.
 
+### vibeflow-head — head of minds du dev-orchestrator (Phase 40)
+> Dérivé au cadrage le 2026-09-15 (`40-CONTEXT.md`, D-01..D-18, seize arbitrages Samuel —
+> AskUserQuestion session principale). Préfixe `HEAD` vérifié libre par grep exhaustif sur ce
+> ledger (0 occurrence avant cette entrée, re-confirmé par `40-RESEARCH.md`).
+
+- [x] **HEAD-01**: L'échelle d'allocation (quick / debug / execute / manager, sens unique,
+  `SEUIL_EQUIPE` inchangé) vit dans `head-governance.md`, renvoyée — jamais dupliquée — par
+  `AGENT.md`, `intent-routing.md` et `skills/vf-auto/SKILL.md` (D-01, D-02, D-04, D-09).
+  **Preuve** : `AGENT.md` (5 renvois à `head-governance.md`, lignes 53/72/148/150/157/209),
+  `skills/vf-auto/SKILL.md` (1 renvoi, ligne 28) et `intent-routing.md` (1 renvoi, ligne 15,
+  ajouté dans l'encadré de tête — table de routage inchangée) renvoient tous les trois. Fermée
+  par correction ciblée hors lot du DAG de mission (2026-09-15) : la table de routage elle-même
+  n'a pas bougé (T3 de `test-dev-orchestrator.sh` reste à son plancher).
+- [x] **HEAD-02**: `check-mission-exit.sh` existe avec ses codes de sortie (3 sain / 0 manque(s)
+  nommé(s) / 4 indéterminé / 64 outillage illisible), ses contrôles E1-E6 (D-07), sa suite de
+  tests et sa **mutation rouge prouvée** (QUAL-01) ; le head ne rejoue qu'un gate dont la preuve
+  manque au rapport, jamais un étage entier, jamais la revue (D-03, D-05, D-06, D-08, D-10 à D-12,
+  D-14). **Preuve** : `plugin/dev-orchestrator/scripts/check-mission-exit.sh` (459 lignes, codes
+  `exit 3`/`exit 0`/`exit 4`/`exit 64` présents, marqueurs `# E1` à `# E6` aux lignes
+  155/196/213/260/321/338) ; `scripts/tests/test-check-mission-exit.sh` rejouée le 2026-09-15 :
+  **23/23 cas, 0 KO**, dont les cas 19a/19b (garde D-11, mutation détectée sur copie mutée,
+  original non détecté) et 21/22 (discrimination des deux causes d'E1) ; module
+  `dev-orchestrator` bumpé **v2.22.0**.
+- [x] **HEAD-03**: Le rapport de mission porte le bloc de preuves E6 `{commande, exit_code, sha}`
+  par verdict et un décompte de coût à trois lignes (minds dispatchés, tours consommés, gates
+  rejoués), relayés — jamais recalculés — dans `mission-contracts.md` §Rapport de mission et
+  `agents/vf-dev-manager.md` (D-05, D-13, D-15). Le manager ne fait que RELAYER : les preuves sont
+  ÉMISES par les trois workers qui rendent un verdict (`agents/vf-coder.md` verdict `recette`,
+  `agents/vf-reviewer.md` verdict `revue`, `agents/vf-auditer.md` verdict `audit`), câblés par le
+  lot `40-05` (amendement D-19, 2026-09-15, option b). **Preuve** :
+  `mission-contracts.md:300` porte `## Contrat de preuves E6 (verdict → head)` ;
+  `vf-coder.md`/`vf-reviewer.md`/`vf-auditer.md` émettent le champ `preuves` (8 occurrences
+  combinées de `exit_code`/`preuves`, vérifié `grep -c`) ; `vf-dev-manager.md:244-246` relaie
+  (« jamais recalculés ni agrégés en statistique de ton cru ») en restant à **250/250 lignes**
+  (ADR-029, compensation stricte).
+- [x] **HEAD-04**: Aucun alias `vibeflow-dev` ne survit dans `plugin/` hors CHANGELOG — vérifié par
+  un test du module qui **peut rendre rouge** (mutation prouvée) ; le skill `vf-dev` conserve son
+  nom et incarne `vibeflow-head` (D-17), zéro agent neuf, kernel intact (D-04, D-16, D-18).
+  **Preuve** : `grep -rl vibeflow-dev plugin/` (hors CHANGELOG) → 0 fichier (2026-09-15) ; garde
+  **T36** dans `test-dev-orchestrator.sh` (motif assemblé à l'exécution, jamais écrit en clair —
+  sinon le gate se balaierait lui-même) avec fixture de mutation discriminante (T36(c) : détecte
+  l'alias dans un fichier ordinaire, l'exempte dans un `CHANGELOG.md`, les deux dans la même
+  fixture) ; diff nul vérifié sur `team-kernel.md`, `driver-lock.sh`, `dag.sh`,
+  `guard-driver-lock.sh`.
+
 ### Transverse
 - [ ] **QUAL-01**: Tout nouveau gate du milestone naît avec ses trois issues (PASS / FAIL / imparsable BRUYANT) et sa mutation rouge prouvée
 
@@ -1098,4 +1143,12 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 
 ---
 *Requirements defined: 2026-06-04*
-*Last updated: 2026-09-14 — Phase 39 SHIPPÉE v2.60.0 (PR #62) : PART-01..09 cochées, statuts de traçabilité passés à Done ; précédent : 2026-09-09 — Phase 39 (Workstreams — partition du planning et collaboration concurrente) : 9 exigences neuves en une famille (PART-01..09), dérivées du cadrage `39-CONTEXT.md` et de la recherche `2026-09-09-phase-39-workstreams-mesures-de-cadrage.md`, préfixe `PART` vérifié libre par `comm` (D-07, 41 familles réellement occupées incluant `SIG-01..06` hors ledger) ; `GSDA-19` superseded par `PART-06` (corps préservé, angle bug de comportement porté par `PART-06`, D-04), `GSDA-13..19` closes non rouvertes ; précédent : 2026-08-28 — Phase 38 (Portabilité multi-runtime, livraison) : 22 exigences neuves en 6 familles (FIDE-01/02, RUNT-01/02, ROLL-01..05, TGT-01..04, ADPT-01..04, MIGR-01..05), dérivées du cadrage `38-CONTEXT.md`, 0 collision avec `PORT-xx` (Phase 30, vérifié par commande) ; ADPT-02/03 levées en session réelle par le nœud `probe-codex` le même jour (tirets confirmés inoffensifs, fork_turns sans effet sur le modèle) — plans mis à jour en conséquence ; précédent : 2026-08-15 — roadmap fiabilite-v1.0 posée : traçabilité mappée aux phases 30-35 + 18/25 héritées (30 IDs, 0 orphelin) ; précédent : ajout milestone fiabilite-v1.0 (26 exigences en 9 familles, audit d utilite prealable, Out of Scope motive) ; precedent : ajout Phase 29 (ICMD-01..12, distillation des gains ICM G1/G2/G3/G5) ; précédent : 2026-07-26 — remise à l'heure post-audit (Phase 12 annotée post-bascule v2.33.0, Phase 13 redéfinie sans verbe, Phase 14 = v2.30.0, milestones 2-3 shipped) ; précédent : 2026-07-25 — ajout Phase 14 au Milestone 6 (ALTI-01→05 : frontière d'altitude planning-core / moteur GSD, ADR-055)*
+*Last updated: 2026-09-15 — Phase 40 EXÉCUTÉE (clôture documentaire) : HEAD-02, HEAD-03, HEAD-04
+cochées avec preuve sur pièce (`check-mission-exit.sh` 23/23 cas + 6 mutations, contrat de preuves
+E6 + ses trois émetteurs, garde anti-alias T36 avec mutation discriminante) ; **HEAD-01 laissée
+ouverte** — `intent-routing.md`, nommé par l'exigence, ne renvoie jamais à `head-governance.md`
+(0 occurrence, jamais touché par un lot `40-0x` en ce sens) ; précédent : 2026-09-15 — Phase 40
+(vibeflow-head — head of minds du dev-orchestrator) : 4 exigences neuves en une famille
+(HEAD-01..04), dérivées du cadrage `40-CONTEXT.md` (D-01..D-18, seize arbitrages Samuel), préfixe
+`HEAD` vérifié libre par grep exhaustif ; QUAL-01 transverse s'applique de plein droit (HEAD-02
+fait naître un gate) ; précédent : 2026-09-14 — Phase 39 SHIPPÉE v2.60.0 (PR #62) : PART-01..09 cochées, statuts de traçabilité passés à Done ; précédent : 2026-09-09 — Phase 39 (Workstreams — partition du planning et collaboration concurrente) : 9 exigences neuves en une famille (PART-01..09), dérivées du cadrage `39-CONTEXT.md` et de la recherche `2026-09-09-phase-39-workstreams-mesures-de-cadrage.md`, préfixe `PART` vérifié libre par `comm` (D-07, 41 familles réellement occupées incluant `SIG-01..06` hors ledger) ; `GSDA-19` superseded par `PART-06` (corps préservé, angle bug de comportement porté par `PART-06`, D-04), `GSDA-13..19` closes non rouvertes ; précédent : 2026-08-28 — Phase 38 (Portabilité multi-runtime, livraison) : 22 exigences neuves en 6 familles (FIDE-01/02, RUNT-01/02, ROLL-01..05, TGT-01..04, ADPT-01..04, MIGR-01..05), dérivées du cadrage `38-CONTEXT.md`, 0 collision avec `PORT-xx` (Phase 30, vérifié par commande) ; ADPT-02/03 levées en session réelle par le nœud `probe-codex` le même jour (tirets confirmés inoffensifs, fork_turns sans effet sur le modèle) — plans mis à jour en conséquence ; précédent : 2026-08-15 — roadmap fiabilite-v1.0 posée : traçabilité mappée aux phases 30-35 + 18/25 héritées (30 IDs, 0 orphelin) ; précédent : ajout milestone fiabilite-v1.0 (26 exigences en 9 familles, audit d utilite prealable, Out of Scope motive) ; precedent : ajout Phase 29 (ICMD-01..12, distillation des gains ICM G1/G2/G3/G5) ; précédent : 2026-07-26 — remise à l'heure post-audit (Phase 12 annotée post-bascule v2.33.0, Phase 13 redéfinie sans verbe, Phase 14 = v2.30.0, milestones 2-3 shipped) ; précédent : 2026-07-25 — ajout Phase 14 au Milestone 6 (ALTI-01→05 : frontière d'altitude planning-core / moteur GSD, ADR-055)*

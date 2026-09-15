@@ -28,11 +28,11 @@ humain. Il ne concurrence donc aucun producteur, et GSD n'offre aucun équivalen
 ## Table de redirection — intention → brique GSD
 
 Sur un lab dev, ces intentions **ne sont pas traitées** par `vf-planning`. Elles partent à la
-brique GSD correspondante (directement, ou via l'agent `vibeflow-dev` qui détecte l'intention).
+brique GSD correspondante (directement, ou via l'agent `vibeflow-head` qui détecte l'intention).
 
 | L'utilisateur demande | Rediriger vers |
 |---|---|
-| démarrer le projet, poser la charte, faire la feuille de route, lister les exigences | le démarrage de projet : `gsd-new-project` (garde-fou first-use de l'agent `vibeflow-dev`) |
+| démarrer le projet, poser la charte, faire la feuille de route, lister les exigences | le démarrage de projet : `gsd-new-project` (garde-fou first-use de l'agent `vibeflow-head`) |
 | où en est-on, statut, avancement, la suite, next | `gsd-progress` |
 | cadrer une étape, découper, préparer le sprint, planifier la feature | cadrage + plan : `gsd-discuss-phase` puis `gsd-plan-phase` |
 | comprendre le code existant, cartographier, « c'est quoi ce repo » | `gsd-map-codebase` |
@@ -40,7 +40,7 @@ brique GSD correspondante (directement, ou via l'agent `vibeflow-dev` qui détec
 | vérifier la santé du `.planning/`, réparer une incohérence | `gsd-health` |
 
 Les skills `gsd-*` sont l'interface directe du moteur de planning dev ; sur une intention ambiguë,
-l'agent `vibeflow-dev` tranche via la carte canonique
+l'agent `vibeflow-head` tranche via la carte canonique
 (chemin d'install D7 : `.claude/agents/dev-orchestrator-references/intent-routing.md`).
 
 ## Ce que `vf-planning` fait encore sur un lab dev

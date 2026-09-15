@@ -589,3 +589,45 @@ bloque donc pas `/gsd-ship` aujourd'hui. Le précédent d'un accept tracé est �
 `24-SECURITY.md` et `27-SECURITY.md` (archivés sous `.planning/milestones/agentique-v1.0-phases/`).
 
 **Déclencheur de reprise** : livraison du plan 25-04, avant la clôture de la Phase 25.
+
+## `check-overlaps.sh` : `present()` aveugle à un agent local installé sous son nom de fichier canonique — DIFFÉRÉ
+
+**Capturé :** 2026-09-15, hygiène documentaire de clôture de la Phase 40 (mandat vf-coder). Faiblesse
+**préexistante** — non introduite par cette phase, non corrigée ici (« un garde ne se desserre
+jamais dans le commit qu'il autorise »).
+
+**Le défaut :** `present()` (`plugin/conductor/scripts/check-overlaps.sh:72-87`) résout un agent
+local par correspondance de nom de fichier : `[ -f "$AGENTS_DIR/$ref.md" ] && return 0`. Sur un lab
+**installé**, l'agent routeur du dev-orchestrator est posé sous `agents/dev-orchestrator.md` — un
+nom de fichier stable, indépendant du nom sous lequel l'agent s'incarne (`vibeflow-head` depuis la
+Phase 40, `vibeflow-dev` avant). La frontière ADR-057 entre deux front doors potentiellement
+concurrentes (`vibeflow-head` et `gsd-next`, la front door GSD pour qui n'a pas d'agent routeur)
+est donc **déjà muette en lab réel** : `present()` ne peut pas la détecter par ce chemin de
+résolution.
+
+**Piste de fix :** résoudre `present()` par le **nom** déclaré dans le frontmatter de l'agent
+(`name:`), pas par le nom de fichier — même logique que la garde anti-alias T36 de la Phase 40
+(motif assemblé, jamais un chemin en dur). La preuve devra être un cas où le nom de fichier et le
+nom incarné divergent, rouge avant/vert après.
+
+**Déclencheur de reprise :** un incident réel de recouvrement de front doors en lab installé, ou un
+prochain audit `check-overlaps.sh`.
+
+## `test-scaffold-docs.sh` cas 22 fige en dur le nombre de références d'un module — DIFFÉRÉ
+
+**Capturé :** 2026-09-15, hygiène documentaire de clôture de la Phase 40 (mandat vf-coder).
+Fragilité de conception à traiter, pas un bug de la Phase 40.
+
+**Le défaut :** le cas 22 de `plugin/conductor/scripts/tests/test-scaffold-docs.sh` compare le
+compte de références d'un module à une valeur numérique écrite en dur dans le test. Cette valeur
+a dû être corrigée de 11 à 12 dans la PR de la Phase 40 (ajout du renvoi vers
+`head-governance.md`). Le cas **cassera à chaque référence ajoutée** au module concerné — toute
+future documentation qui enrichit ses renvois fera rougir ce cas sans rapport avec son objet réel
+(vérifier qu'un scaffold de doc a des références, pas en compter un nombre exact figé).
+
+**Piste de fix :** remplacer l'égalité stricte par une borne basse (« au moins N références »),
+ou dériver N par une commande à l'exécution plutôt que par un littéral écrit dans le test — même
+principe que les leçons `check-overlaps.sh` / `check-instruction-budget.sh` : un nombre transmis
+se re-dérive, il ne se fige jamais dans le test qui le vérifie.
+
+**Déclencheur de reprise :** le prochain cas où ce test casse sur un ajout légitime de référence.

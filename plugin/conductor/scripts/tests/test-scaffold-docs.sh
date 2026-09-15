@@ -272,20 +272,20 @@ else
   ko "forme du stub _index.md : table Fichier/Résumé présente" "grep -c=$n, attendu >= 1"
 fi
 
-# Cas 22 — application réelle : plugin/dev-orchestrator/references/_index.md liste les 11 fichiers
+# Cas 22 — application réelle : plugin/dev-orchestrator/references/_index.md liste les 12 fichiers
 # markdown du dossier réel du dépôt, avec un résumé d'une ligne chacun, et ne se liste pas.
 REPO_ROOT="$(cd "$(dirname "$SCRIPT")/../../.." && pwd)"
 REAL_INDEX="$REPO_ROOT/plugin/dev-orchestrator/references/_index.md"
 if [ -f "$REAL_INDEX" ]; then
   nrows="$(grep -cE '^\| \[' "$REAL_INDEX" || true)"
   selflist="$(grep -c '_index.md' "$REAL_INDEX" || true)"
-  if [ "$nrows" -eq 11 ] && [ "$selflist" -eq 0 ]; then
-    ok "application réelle : _index.md de dev-orchestrator/references (11 lignes, pas d'auto-listage)"
+  if [ "$nrows" -eq 12 ] && [ "$selflist" -eq 0 ]; then
+    ok "application réelle : _index.md de dev-orchestrator/references (12 lignes, pas d'auto-listage)"
   else
-    ko "application réelle : _index.md de dev-orchestrator/references (11 lignes, pas d'auto-listage)" "nrows=$nrows, selflist=$selflist"
+    ko "application réelle : _index.md de dev-orchestrator/references (12 lignes, pas d'auto-listage)" "nrows=$nrows, selflist=$selflist"
   fi
 else
-  ko "application réelle : _index.md de dev-orchestrator/references (11 lignes, pas d'auto-listage)" "fichier absent : $REAL_INDEX"
+  ko "application réelle : _index.md de dev-orchestrator/references (12 lignes, pas d'auto-listage)" "fichier absent : $REAL_INDEX"
 fi
 
 # ============================================================================

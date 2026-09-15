@@ -59,3 +59,17 @@ fortuit sortent tous deux en `1` ; (b) fait tourner un **témoin** qui devrait p
 que la fixture fournit **toutes** les dépendances du chemin testé (`env -i` est un piège :
 il retire `node`, `python3`, tout). Et pour une cascade de détection, isoler à **un seul**
 candidat — sinon on mesure la priorité, pas la détection.
+
+**Troisième variante — le rouge n'est pas ATTRIBUÉ au cas visé (Phase 40, 2026-09-15).**
+Une mutation qui n'assertionne que `exit != 0` prouve « la SUITE est rouge », jamais « le cas T-visé
+est rouge ». Si un cas voisin attrape le mutant, l'assertion passe et le cas visé peut être
+**vacant** (mal câblé, borné sur la mauvaise racine) sans que rien ne le signale. Trouvé par le
+plan-checker sur le plan du test anti-alias de la Phase 40, AVANT exécution — trou latent, pas
+encore actif (aucun cas existant n'attrapait la chaîne injectée), et gratuit à fermer.
+
+**How to apply :** dans tout mandat de mutation, exiger le **témoin nominatif** en plus du code de
+sortie — capturer la sortie (`out="$(… 2>&1)"; mut=$?`) et conjoindre `printf '%s' "$out" | grep -q
+'✗ <NOM_DU_CAS>'`. Le code de sortie dit qu'il y a un rouge ; seul le nom dit **lequel**. Corollaire :
+une fixture qui prouve la *fonction* de détection ne prouve jamais son *branchement* sur la vraie
+racine — ce sont deux preuves distinctes, il en faut deux.
+Voir `.claude/agent-memory/vf-reviewer/feedback_mutant-sibling-dependency-masks-vacuity.md`.

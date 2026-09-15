@@ -24,6 +24,9 @@ cette mission contient ne serait-ce qu'une feature/un fix dev ? » Oui → dev. 
 
 ### Taille (mission dev/mixte) — moteur direct ou équipe
 
+Cet aiguillage applique, au cas de la mission autonome, la règle d'échelle générale définie dans
+`dev-orchestrator-references/head-governance.md` §1 — c'est là qu'elle vit, pas ici.
+
 Détermine N = étapes restantes ciblées (`gsd-tools roadmap analyze` — étapes non complètes
 dans le périmètre demandé). Applique le seuil canonique `SEUIL_EQUIPE` (défini dans
 `references/mission-contracts.md`, installé sous

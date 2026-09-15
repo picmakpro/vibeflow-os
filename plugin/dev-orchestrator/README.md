@@ -1,13 +1,13 @@
 # dev-orchestrator — Orchestrateur de développement (VFDO)
 
 > Module VibeFlow qui pilote le cycle de développement en **modèle agentique** : un agent
-> `vibeflow-dev` qui détecte l'intention en langage naturel et invoque **directement** les
+> `vibeflow-head` qui détecte l'intention en langage naturel et invoque **directement** les
 > briques gsd-*/superpowers installées, une **équipe de mission** (manager + workers) pour le
 > multi-étapes, **2 skills** (`vf-auto`, `vf-dev`) et une **carte d'intention unique**. Plus de
 > façade de verbes : GSD est l'interface directe du quotidien, l'agent est l'entrée
 > conversationnelle optionnelle.
 
-**Version** : v2.21.0
+**Version** : v2.22.0
 **Type** : agent + équipe d'agents + 2 skills + scripts
 
 ---
@@ -19,7 +19,7 @@ pipeline de développement complet. Le modèle est agentique, pas une couche de 
 
 1. **Les briques gsd-*** se déclenchent nativement sur leurs propres descriptions — c'est le
    cas courant, sans intermédiaire.
-2. **L'agent `vibeflow-dev`** (`AGENT.md`) — l'entrée conversationnelle : détecte l'intention
+2. **L'agent `vibeflow-head`** (`AGENT.md`) — l'entrée conversationnelle : détecte l'intention
    (y compris floue ou composite), invoque directement la brique outillée qui la porte, propose
    **LE next step** depuis la feuille de route après chaque geste fermé, déclenche l'**hygiène
    documentaire** aux bons moments (specs, STATE/ROADMAP, registres — jamais au fil de l'eau)
@@ -40,7 +40,7 @@ S'y ajoutent :
 - **2 skills survivants** (`skills/`) — logique réelle, pas façade :
   - `vf-auto` : porte d'autonomie — seuil `SEUIL_EQUIPE`, aiguillage `gsd-autonomous` inline
     vs équipe de mission.
-  - `vf-dev` : point d'entrée générique — incarne l'agent `vibeflow-dev` (3 lignes, aucune
+  - `vf-dev` : point d'entrée générique — incarne l'agent `vibeflow-head` (3 lignes, aucune
     table dupliquée).
 - **Scripts** (`scripts/`) — bootstrap, indexation et kernel d'orchestration :
   - `ensure-deps.sh` : auto-install non-interactif et **idempotent** de GSD + Superpowers
@@ -71,7 +71,7 @@ S'y ajoutent :
 
 ```
 dev-orchestrator/
-├── AGENT.md                       # agent vibeflow-dev (≤250L, dense)
+├── AGENT.md                       # agent vibeflow-head (≤250L, dense)
 ├── agents/                        # équipe de mission
 │   ├── vf-dev-manager.md          # manager de mission — exposé (opus)
 │   ├── vf-coder.md                # worker interne (vf-internal: true, sonnet)
@@ -92,17 +92,20 @@ dev-orchestrator/
 │   ├── requirements-survival-detect.sh # primitive sourcée : vf_ledger_state + vf_ledger_classify (Phase 18)
 │   ├── check-requirements-survival.sh  # signal survie du ledger, LEDG-02 (Phase 18)
 │   ├── restore-requirements-ledger.sh  # rattrapage roll-forward, LEDG-01 (Phase 18)
+│   ├── check-mission-exit.sh      # gate de sortie de mission, E1-E6, 3/0/4/64 (Phase 40)
 │   └── tests/                     # suites de vérification
 │       ├── test-check-dev-bootstrap.sh
 │       ├── test-check-doc-drift.sh
 │       ├── test-check-requirements-survival.sh
-│       └── test-restore-requirements-ledger.sh
+│       ├── test-restore-requirements-ledger.sh
+│       └── test-check-mission-exit.sh  # 22+ cas, 6 mutations rouges (Phase 40, QUAL-01)
 └── references/                    # doctrine + index chargés on-demand par les agents
     ├── intent-routing.md           # carte intention → brique (SEULE source de routage)
     ├── GSD-PIPELINE.md             # ordre canonique du cycle + model profiles
     ├── gsd-skills-index.md         # auto-généré (NE PAS ÉDITER)
     ├── mission-contracts.md        # Brief / Digest / Rapport de mission + SEUIL_EQUIPE
     ├── mission-flow.md             # lock + DAG + rapports typés (ADR-053)
+    ├── head-governance.md          # échelle d'allocation, séquencement, gate de sortie (Phase 40)
     ├── ingestion-flow.md           # ingestion BRDG-01/03, chargée on-demand
     ├── docs-flow.md                # sortie doc DOCF-01/04, chargée on-demand (Phase 22)
     └── autonomous-guardrails.md    # garde-fous des boucles autonomes
@@ -146,7 +149,7 @@ L'installeur pose, de bout en bout :
 ### Langage naturel (recommandé)
 
 L'utilisateur parle normalement ; les briques gsd-* se déclenchent nativement, ou l'agent
-`vibeflow-dev` détecte l'intention et invoque la brique :
+`vibeflow-head` détecte l'intention et invoque la brique :
 
 | Vous dites… | Brique invoquée (coulisse) |
 |---|---|
@@ -260,6 +263,23 @@ Couvre les axes de la bascule agentique (spec 2026-07-25) plus les acquis :
   `vf-design-manager`, `dev-orchestrator` + `design-orchestrator`) : nœud `docs` agrégé posé en
   fin de mission par chacun, quatre déclencheurs testés un par un, `SKIP` si le module design est
   hors du périmètre scanné.
+- **T36** (HEAD-04, QUAL-01, Phase 40) — garde anti-alias : l'ancien nom d'agent routeur ne
+  réapparaît jamais sous `plugin/` (hors `CHANGELOG.md`, archive datée exemptée), motif assemblé
+  à l'exécution (jamais un grep littéral de son propre nom — un gate qui balaie le dépôt ne se
+  balaie jamais lui-même), mutation prouvant à la fois la détection dans un fichier ordinaire ET
+  l'exemption effective du `CHANGELOG.md`.
+
+```bash
+bash dev-orchestrator/scripts/tests/test-check-mission-exit.sh
+```
+
+- **`test-check-mission-exit.sh`** (HEAD-02, QUAL-01, Phase 40) — 23 cas (re-dérivés par
+  exécution : `bash .../test-check-mission-exit.sh 2>&1 | tail -1`), dont les six mutations de
+  fixture E1 à E6 (une par contrôle, chacune assertant le code de sortie ET le nom du contrôle
+  dans la sortie), la discrimination machine sain/manque/indéterminé, le cas E6-tableau-de-preuves
+  vide, la lecture seule du dépôt inspecté (D-10), la garde D-11 (aucune sous-commande mutante du
+  verrou) prouvée par mutation du script lui-même, et les deux causes d'indétermination E1
+  départagées (cascade non résolue vs `driver-lock.sh` absent).
 
 Exit 0 si tout passe (les SKIP, ex. GSD absent, ne font pas échouer la suite).
 
@@ -303,7 +323,7 @@ Exit 0 si tout passe (les SKIP, ex. GSD absent, ne font pas échouer la suite).
   portée à 18 noms.
 - **v2.2.1** — échappatoire ADR-031 fermée : l'ingestion remonte nominativement à l'humain
   depuis `vf-dev-manager` aussi (jamais déclenchée en mission sans confirmation).
-- **v2.2.0** — câblage de l'ingestion (BRDG-01/BRDG-03) dans `vibeflow-dev` : doctrine
+- **v2.2.0** — câblage de l'ingestion (BRDG-01/BRDG-03) dans l'agent routeur du module (renommé `vibeflow-head` en Phase 40) : doctrine
   `references/ingestion-flow.md` (découverte, manifest, délégation `gsd-ingest-docs`/
   `gsd-import`, garde-fous BLOCKER/ADR-031/mode merge/cap 50), proposée comme next step en fin
   de cadrage.

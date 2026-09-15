@@ -79,7 +79,7 @@
 - [x] Phase 37: Portabilité multi-runtime — spike (Codex, OpenCode, Kimi) (completed 2026-08-28 — spike + étude livrés, décisions rendues ; suite → Phase 38)
 - [x] Phase 38: Portabilité multi-runtime — livraison (canal d'install, migration de lab, adaptateur) (exécutée 2026-08-29, **mesurée 2026-08-30** sur clé API — **critère 2 PROUVÉ sur Codex** : profondeur ≥ 2 constatée EN BASE (`thread_spawn_edges`, `root→vf-dev-manager→vf-coder`), 3/3 sur les **4 critères réels** ; le **critère 5 est SANS OBJET sous clé API** (vert à vide, jamais « atteint ») et le **critère 4 est plus faible que son libellé** (`--output-schema` non propagé aux sous-agents, dette D-38-S). **kimi-code n'est plus un inconnu déclaré** : I-1 **31/31**, I-2 `disallowedTools` bloque (0/4 contre 3/3 au contrôle positif), I-3 hooks déclenchés 3/3, `vf-internal` **sans équivalent** (Pattern 12 non tenu, déclaré par le gate de fidélité). **Critère 1 toujours partiel** : hooks non portés, perte déclarée. Coûts : Codex 1,01 $, kimi ~0,018 $. **SHIPPÉE v2.59.0 le 2026-08-31** (Samuel a autorisé le ship après revue ; PR + tag + release GitHub) — test bout-en-bout install **et** usage refait sur Codex (délégation de rôle → code réel) ET Kimi (`--agent-file` → code + rapport typé) le 2026-08-31, manifeste `.codex-plugin/` natif ajouté. Preuves : `38-MESURE-CODEX-CRITERE-2.md`, `38-MESURE-KIMI.md`)
 - [x] Phase 39: Workstreams — partition du planning et collaboration concurrente (cadrée 2026-09-09, exécutée 2026-09-10, 3 plans clos avec SUMMARY, revue ×3 + audit infra + juge frais sur le diff de correction ; **SHIPPÉE v2.60.0 le 2026-09-14 — PR #62** (conductor v1.35.0 : `check-divergence.sh` S2/S4/S5 + suite 17 cas dont 3 mutants, hook `post-merge` opt-in ancré sur `--git-common-dir` après RCE démontrée, étape CI ; dev-orchestrator v2.20.4 : dispatch `--ws` explicite ; `PART-01..09` gravées, `GSDA-19` superseded, ADR-069 amendé). Hotfix PR #61 regroupé dans la même release (arbitrage Samuel, AskUserQuestion session principale, 2026-09-14). **Dépôt volontairement NON partitionné** — partition réelle = geste humain séparé, déclencheur D-02 en STATE § Decisions. Réserves : premier run CI distant observé sur la PR #62 seulement ; le clone jetable prouve un mécanisme, pas un usage concurrent réel)
-- [ ] Phase 40: vibeflow-head — head of minds du dev-orchestrator (inscrite 2026-09-15, spec `docs/superpowers/specs/2026-09-15-vibeflow-head-design.md` ; séquencée après la 34, AVANT la 25)
+- [x] Phase 40: vibeflow-head — head of minds du dev-orchestrator (exécutée le 2026-09-15 sur `feat/phase-40-vibeflow-head` — `vibeflow-dev` renommé `vibeflow-head`, 5 plans/3 vagues, zéro agent neuf, kernel intact (diff nul), renommage sur 22 chemins + garde anti-alias T36 (mutation prouvée), `head-governance.md` neuf, `check-mission-exit.sh` E1-E6 codes 3/0/4/64 (23/23 cas, 6 mutations rouges), contrat de preuves E6 + ses trois émetteurs (D-19, amendement post-cadrage), racine bumpée v2.63.0, `dev-orchestrator` v2.22.0 — **PR, tag et release GitHub restent des gestes humains non posés à cette date**. **HEAD-01 partiellement close** — `intent-routing.md` jamais mis à jour pour renvoyer à `head-governance.md`, laissée ouverte au ledger, détail `40-SUMMARY.md`)
 - [ ] Phase 41: Posture de protection du dépôt (inscrite 2026-09-15, arbitrage Samuel AskUserQuestion session principale ; cahier des charges au BACKLOG ; séquencée après la 40 ET la calibration 25-04)
 
 <details>
@@ -1444,9 +1444,11 @@ que ses équipes coûtent.
 **Depends on**: Phase 34 (zéro agent neuf — renommage + extension ; le head est le dernier
 mouvement du corpus d'agents avant la calibration du budget d'instructions : la Phase 25 se
 calibre sur le corpus **post-40**).
-**Requirements**: TBD — candidates à poser au cadrage : HEAD-01 (échelle d'allocation), HEAD-02
-(gate de sortie `check-mission-exit.sh`), HEAD-03 (économie : décompte par mission, interdits de
-re-travail), HEAD-04 (renommage sans alias survivant).
+**Requirements**: HEAD-01 (échelle d'allocation), HEAD-02 (gate de sortie
+`check-mission-exit.sh`), HEAD-03 (économie : preuves E6 + décompte par mission), HEAD-04
+(renommage sans alias survivant) — ledgerisées le 2026-09-15 dans `.planning/REQUIREMENTS.md`,
+mappées aux 5 plans ci-dessous (0 non-mappé — HEAD-03 se mappe désormais à `40-02` ET `40-05`,
+amendement D-19).
 **Success Criteria** (what must be TRUE):
 
   1. Aucun alias `vibeflow-dev` ne survit dans `plugin/` hors CHANGELOG — vérifié par un test du
@@ -1468,7 +1470,16 @@ re-travail), HEAD-04 (renommage sans alias survivant).
   5. Release taggée : bump **minor** du module `dev-orchestrator` et de la racine, gate
      `check-release-tag.sh --remote` ✓.
 
-**Plans**: TBD
+**Plans:** 5 plans — 3 vagues, mappés un pour un aux 5 lots du DAG de mission (L1, L2, L4, L3, L5).
+Le lot L5 est né d'un amendement post-cadrage (D-19, 2026-09-15, option b) : `40-02` pose le
+contrat de preuves E6, mais aucun des trois workers ne l'émettait avant `40-05`.
+
+Plans:
+- [x] 40-01-PLAN.md — lot L1 `exec-rename` (vague 1) : renommage des 22 fichiers + garde anti-alias T36 avec mutation prouvée (HEAD-04)
+- [x] 40-02-PLAN.md — lot L2 `exec-e6` (vague 2) : contrat de preuves E6 + décompte de mission, à budget de lignes constant (HEAD-03)
+- [x] 40-03-PLAN.md — lot L4 `exec-doctrine` (vague 2, parallèle à L2) : `head-governance.md` + AGENT.md restructuré ≤ 250 lignes + renvois des skills (HEAD-01)
+- [x] 40-04-PLAN.md — lot L3 `exec-gate` (vague 3, dépend de L2 et L4) : `check-mission-exit.sh` E1-E6 + suite à 6 mutations rouges + clôture de module (HEAD-02, HEAD-04)
+- [x] 40-05-PLAN.md — lot L5 `exec-workers` (vague 3, parallèle à L3, dépend de L2) : émission du champ `preuves` E6 dans `vf-coder.md`, `vf-reviewer.md`, `vf-auditer.md` (HEAD-03, D-19)
 
 ### Phase 41: Posture de protection du dépôt
 

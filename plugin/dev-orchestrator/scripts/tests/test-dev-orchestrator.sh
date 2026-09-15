@@ -1294,8 +1294,8 @@ for skill_md in "$MOD"/skills/vf-*/SKILL.md; do
   # Extrait toutes les cibles référencées dans le corps : gsd-X, agents d'équipe.
   targets=$("$GREP" -Eo 'gsd-[a-z0-9-]+' "$skill_md" | sort -u)
   if [ -z "$targets" ]; then
-    # vf-dev = incarnation de l'agent vibeflow-dev → cible agent acceptée.
-    if "$GREP" -Eq 'vibeflow-dev|vf-dev-manager' "$skill_md"; then
+    # vf-dev = incarnation de l'agent vibeflow-head → cible agent acceptée.
+    if "$GREP" -Eq 'vibeflow-head|vf-dev-manager' "$skill_md"; then
       checked=$((checked+1))
       continue
     fi
@@ -6518,6 +6518,61 @@ else
 fi
 rm -rf "$T35_TMPDIR"
 [ "$t35_ok" -eq 1 ] && ok "T35 : câblage --ws/GSD_WORKSTREAM gardé PAR AGENT (jamais sur la paire) et plafond ADR-029 tenu, les deux prouvés détectables par mutation"
+
+# ---------------------------------------------------------------------------
+# T36 (HEAD-04, QUAL-01) — garde anti-alias : l'ancien nom d'agent routeur ne revient pas
+# ---------------------------------------------------------------------------
+# L'agent routeur a été renommé en Phase 40 (D-04, D-17) : son ancien nom ne doit JAMAIS
+# réapparaître sous plugin/, hors CHANGELOG.md (archive datée, exemptée). Le motif est ASSEMBLÉ
+# à l'exécution, jamais écrit en clair ici : un grep littéral de l'ancien nom sur CE fichier
+# balaierait sa propre définition et se rendrait aveugle à lui-même (piège mesuré : « un gate qui
+# balaie le dépôt se balaie lui-même »). Frontière de non-mot en fin de motif — même raison que
+# vf-dev ≠ vf-dev-manager (cf. DELETED_RE plus haut) : une sous-chaîne nue n'est pas un nom.
+T36_OLD_HEAD="vibeflow"
+T36_OLD_TAIL="dev"
+T36_OLD_AGENT_NAME="${T36_OLD_HEAD}-${T36_OLD_TAIL}"
+T36_OLD_AGENT_RE="${T36_OLD_AGENT_NAME}([^a-z0-9-]|\$)"
+
+# « <racine> » -> imprime les fichiers fautifs (hors CHANGELOG.md), vide sinon. Fonction de
+# portée FICHIER, jamais un sous-shell de bloc (même règle que deleted_hits()).
+t36_alias_hits() {
+  find "$1" -type f 2>/dev/null | while IFS= read -r t36_f; do
+    [ "$(basename "$t36_f")" = "CHANGELOG.md" ] && continue
+    "$GREP" -lE "$T36_OLD_AGENT_RE" "$t36_f" 2>/dev/null
+  done
+}
+
+# (a) Portée et disponibilité : T36 n'a de sens que sur l'arbre source. En lab installé, il
+# n'existe pas d'arbre plugin/ — jamais un `ok` silencieux sur un arbre absent.
+if [ -d "$REPO/conductor" ] && [ -d "$REPO/dev-orchestrator" ] && [ -d "$REPO/_internal" ]; then
+
+  # (b) Cas nominal.
+  t36_hits="$(t36_alias_hits "$REPO")"
+  if [ -z "$t36_hits" ]; then
+    ok "T36 (b) : aucun alias de l'ancien nom d'agent routeur sous plugin/ (hors CHANGELOG.md)"
+  else
+    ko "T36 (b) : alias résiduel — $(echo "$t36_hits" | head -3 | tr '\n' ' ')"
+  fi
+
+  # (c) Mutation, permanente et interne à la suite (QUAL-01) : la fixture prouve DEUX propriétés
+  # dans la même assertion — détection dans un fichier ordinaire ET exemption effective d'un
+  # CHANGELOG.md, jamais un laissez-passer généralisé.
+  T36_FIXDIR="$(mktemp -d)"; vf_tmp_track "$T36_FIXDIR"
+  mkdir -p "$T36_FIXDIR/archive" "$T36_FIXDIR/vif"
+  echo "$T36_OLD_AGENT_NAME" > "$T36_FIXDIR/archive/CHANGELOG.md"
+  echo "$T36_OLD_AGENT_NAME" > "$T36_FIXDIR/vif/doctrine.md"
+  t36_fix_hits="$(t36_alias_hits "$T36_FIXDIR")"
+  if [ -z "$t36_fix_hits" ]; then
+    ko "T36 (c) : mutant NON OPPOSABLE — la fixture ne rend rien, la garde ne sait pas rendre rouge"
+  elif echo "$t36_fix_hits" | "$GREP" -q "vif/doctrine.md" && ! echo "$t36_fix_hits" | "$GREP" -q "archive/CHANGELOG.md"; then
+    ok "T36 (c) (DISCRIMINANT) : vif/doctrine.md détecté, archive/CHANGELOG.md exempté — les deux propriétés tiennent dans la même fixture"
+  else
+    ko "T36 (c) : détection incorrecte sur la fixture — $t36_fix_hits"
+  fi
+  rm -rf "$T36_FIXDIR"
+else
+  skip "T36 : arbre plugin/ absent sous \$REPO (conductor/dev-orchestrator/_internal introuvables — cas source-only)"
+fi
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="

@@ -106,3 +106,17 @@ mandat a invoqué `gsd-execute-phase`, ajoute `"verdicts": {…}` — champ opti
 typé, trois sous-champs `code_review`/`nyquist`/`secure` recopiés **verbatim** depuis les hooks
 déjà rendus par le moteur (`absent` si un verdict n'a pas été vu passer, jamais `pass` par défaut) ;
 absent du bloc entier si ton mandat n'a pas invoqué le skill d'exécution.
+
+**`preuves`** (contrat détaillé : `mission-contracts.md` §Contrat de preuves E6 (verdict → head)) :
+ajoute `"preuves": [...]` — champ optionnel frère du bloc typé, tableau plat d'objets
+`{verdict, commande, exit_code, sha}`. Ton verdict `recette` provient du moteur GSD
+(`gsd-execute-phase`) — un hook que tu ne rejoues jamais toi-même : marque-le par défaut
+`{"verdict": "recette", "preuve": "amont"}`. N'émets le triplet complet que si tu as
+personnellement capturé, via `Bash`, une commande directement rejouable et son exit code — `sha`
+est alors le HEAD de la branche au moment du verdict, jamais recalculé ou approximé.
+Application littérale de D-05 (arbitrage Samuel, AskUserQuestion session principale, 2026-09-15,
+option b) : pour chaque sous-champ non `absent` du paragraphe `verdicts` (`code_review`, `nyquist`,
+`secure`), ajoute aussi dans `preuves` une entrée `{"verdict": "gate:<nom>", "preuve": "amont"}` —
+un hook du moteur relayé verbatim, jamais rejoué, jamais de commande ni d'exit code inventés.
+Relayé verbatim, jamais recalculé, jamais agrégé — même règle que `estimate`/`actuals`, le bloc de
+checkpoint amont et le paragraphe `verdicts`.
