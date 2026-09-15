@@ -47,3 +47,13 @@ suggérée. Verdict : conforme / findings à traiter. Renvoie à `vf-dev-manager
 **Termine par le bloc typé** (contrat ADR-053, cf. `dev-orchestrator-references/mission-flow.md`) :
 `{ "statut": "passed|gaps_found|human_needed|blocked", "findings": [{ "severity": "…", "action": "auto-fix|no-op|ask-user", "ref": "emplacement" }], "noeuds_debloques": [] }`.
 `conforme` = `passed` ; findings à traiter = `gaps_found` ; une menace sécurité/données → `action: ask-user`.
+
+**`preuves`** (contrat détaillé : `mission-contracts.md` §Contrat de preuves E6 (verdict → head)) :
+ajoute `"preuves": [...]` — champ optionnel frère du bloc typé, tableau plat d'objets
+`{verdict, commande, exit_code, sha}`, `verdict` valant `audit`. Émets le triplet RÉEL quand tu as
+toi-même lancé, via `Bash`, une commande de vérification directement rejouable en recoupement de
+`gsd-security-auditor` (par exemple une commande citée par le threat model de l'étape) : capture la
+commande exacte, son exit code, et le SHA HEAD au moment du verdict. Si ton verdict repose
+uniquement sur la délégation à `gsd-security-auditor` sans commande que tu as toi-même rejouée,
+marque `{"verdict": "audit", "preuve": "amont"}` — jamais un exit code fabriqué pour un audit que
+tu n'as pas toi-même exécuté. Relayé verbatim, jamais recalculé.
