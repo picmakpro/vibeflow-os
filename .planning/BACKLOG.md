@@ -255,21 +255,31 @@ réels non-`gsd-*`, hors périmètre de cet item). Sans le flag (`--no-third-par
 erreurs `gsd-*` réapparaissent (169 lignes ✗/⚠) — confirme que c'est bien le flag qui ferme le
 faux positif, pas une coïncidence de version.
 
-## Skill-installer global (multi-agents)
-**Capturé :** 2026-06-04 · **À explorer :** après le milestone « Install UX »
+## Skill-installer global (multi-agents) — CLOS
 
-Étendre l'approche d'install à toggles (plugin + skill `/vibeflow-install`) à l'**installation
-de skills globaux disponibles pour tous les agents** — un « skill-installer » générique :
-choisir des skills (pas seulement des modules VibeFlow) et les rendre disponibles globalement à
-l'ensemble des agents, via la même UX à toggles + scope.
+**Capturé :** 2026-06-04 · **Clos :** 2026-09-15 (Phase 34, spike SKIL-01, `34-SPIKE-SKIL.md`) ·
+**Origine de la clôture :** déclencheur consommé le 2026-06-05, dormi 7 semaines, réduit à un
+cadrage go/no-go par le milestone.
 
-**Pourquoi différé :** chantier distinct du milestone Install UX (qui cible la distribution des
-modules VibeFlow). À reprendre une fois l'engine scope-aware + le skill `/vibeflow-install` livrés
-(ils en seront la fondation réutilisable).
+**Clos le 2026-09-15** (verdict NO-GO, arbitrage Samuel, AskUserQuestion session principale,
+2026-09-15).
 
-**Déclencheur de resurgence :** clôture du milestone « Install UX » — **atteint le 2026-06-05**
-(constaté le 2026-07-26 : l'item a dormi 7 semaines avec son déclencheur consommé). À ré-arbitrer
-explicitement : reprendre, re-différer avec un nouveau déclencheur, ou abandonner.
+**Ce qui a fermé l'item (2026-09-15).** Spike mesuré par exécution (pas par lecture de doc) :
+un sous-agent doté de l'outil `Skill` découvre déjà, sans rien d'autre, un skill posé par le
+canal `/plugin` natif en scope user (`CAS-A: ATTEINT`, sentinelle obtenue littéralement ;
+contrôle négatif `ECHEC`, appareil de mesure validé). Le différenciateur de F8 (« rendre les
+skills disponibles à tous les agents ») n'existe plus techniquement au niveau du canal — voir
+`34-SPIKE-SKIL.md` § « Canal vs architecture » pour la distinction complète avec la question,
+distincte et hors périmètre, de savoir si tous les agents VF ont l'outil `Skill` (non, 18/25 ne
+l'ont pas — dont 17 workers `vf-internal: true` cloisonnés Pattern 12 et 1 orchestrateur exposé
+non cloisonné, `vf-test-orchestrator` — choix d'architecture, pas un trou de canal). Zéro ligne
+de code
+d'installeur écrite (D-09). Renvoi : `.planning/phases/VFDO-34-gaps-agency-agents-cadrage-skill-installer/34-SPIKE-SKIL.md`.
+
+Historique d'origine (2026-06-04), pour mémoire : étendre l'approche d'install à toggles
+(plugin + skill `/vibeflow-install`) à l'**installation de skills globaux disponibles pour tous
+les agents** — un « skill-installer » générique. Clôturé sur mesure : le canal `/plugin` natif
+atteint déjà cet objectif, sans second système à construire.
 
 ## Template d'agent installable s'appuyant sur dev-orchestrator
 **Capturé :** 2026-06-06 · **À explorer :** quand un besoin réel d'agent de domaine apparaît
@@ -349,4 +359,87 @@ périmètre avant tout code.
 de l'élargissement de périmètre, à arbitrer selon la stratégie produit.
 
 **Déclencheur de resurgence :** décision d'élargir VibeFlow (test web dans la chaîne dev, ou
-ouverture à des labs non-dev Sales/Support/Paid).
+ouverture à des labs non-dev Sales/Support/Paid) — six des onze divisions désormais `refuser`
+faute de preuve D-02 (voir bloc du 2026-09-15 ci-dessous) : leur déclencheur précis est la
+découverte d'un incident documenté, d'une demande externe ou d'un bug récurrent nommé sur l'une
+d'elles, pas une simple décision d'élargir dans l'abstrait. `web-test-team` (Testing) reste
+`reporter`, sur la dépendance AGTS-02 déjà suivie au ROADMAP (Phase 34).
+
+**Verdict par gap — 2026-09-15 (Phase 34, audit AGTS-01, `34-AUDIT-AGTS.md`).** Matrice
+re-mesurée contre le parc réel de `plugin/` (31 fichiers, corpus mesuré identique à la matrice
+d'origine ci-dessus) : Engineering / Design / Project Management / Marketing-Content restent
+`sans objet` (déjà couverts) ; Testing (`web-test-team`) est `reporter`, sur dépendance à
+AGTS-02 déjà suivie au ROADMAP, pas re-arbitrée ici ; les six divisions restantes (Security,
+Sales, Product, Paid Media, Support, Spatial/Game/Healthcare/GIS/Academic) sont `refuser` faute
+de preuve au sens de la règle de preuve du milestone (D-02) — le ❌/🟡 du catalogue seul ne
+suffit pas, il faut un incident documenté, une demande externe ou un bug récurrent, et aucun des
+six n'en a un. Zéro agent créé, zéro persona importée (D-01). Détail des six refus, gap par gap,
+et condition exacte de réouverture : `34-AUDIT-AGTS.md` §§ « Gaps refusés » et « Limite de la
+recherche de preuve ». Aucun item BACKLOG distinct créé par cette note (zéro verdict `combler`,
+`34-AUDIT-AGTS.md` § « Items backlog à créer »).
+
+## AGTS-02 — sortie d'expérimental de `mobile-test`(-team) : REPORTÉE avec trace
+
+**Capturé :** 2026-09-15 (Phase 34, run réel piloté par l'équipe, `34-RUN-MOBILE.md`) ·
+**À explorer :** dès que le déclencheur de reprise ci-dessous est levé
+
+**Cadrage.** Premier run réel joué le 2026-09-15 sur `Scroll-Off/frontend` (iOS, cible
+`8BD53E84-B5BF-482A-8FE5-6A9980555951`) : chapeau `> **Statut** : ROUGE` (`PIPELINE: VERT` — la
+mécanique du module fonctionne — mais `EQUIPE: ROUGE` — 6/10 flows restent en échec après un
+cycle de fix réel, dont un signal d'alarme absolu sur `lot5_scrolls_scale_native_header` : écran
+de login affiché au lieu de l'écran natif attendu, arrêt immédiat sans retentative, conformément
+au mandat). La condition de sortie du statut expérimental (`plugin/mobile-test/README.md` §
+Limites, `plugin/mobile-test-team/README.md` § Limites) n'est donc pas atteinte. AGTS-02 est
+**reportée**, jamais abandonnée en silence (D-05) : sa case reste décochée au ledger des
+exigences, et sa reprise est conditionnée au déclencheur ci-dessous.
+
+**Pourquoi différé :** la règle absolue du mandat de ce run interdit toute retentative dès la
+détection d'un écran de login inattendu. Départager la cause (session authentifiée réellement
+perdue vs bug de robustesse de `fetchRenewToken`) exige une vérification humaine directe
+(Keychain du simulateur, disponibilité du backend `api.scrolloff.com`) hors du périmètre outillé
+de ce run.
+
+**Déclencheur de resurgence :** renvoi nommé, jamais paraphrasé (une paraphrase diverge, un
+renvoi non) — voir
+`.planning/phases/VFDO-34-gaps-agency-agents-cadrage-skill-installer/34-RUN-MOBILE.md`
+§ `## Déclencheur de reprise` pour le cadrage complet, la condition de reprise datée, et la
+précision de l'arbitrage Samuel du 2026-09-15 (canal : AskUserQuestion session principale) sur
+qui tranche l'ambiguïté (a) session perdue vs (b) robustesse de `fetchRenewToken` — explicitement
+à la charge de Samuel, aucun agent ne la tranche à sa place.
+
+## check-agents.sh ne couvre que les chemins auto-déclarés par un protocole de spike, pas l'état réel du disque
+**Capturé :** 2026-09-15 (audit de la mission Phase 34, arbitrage Samuel, AskUserQuestion session
+principale, 2026-09-15) · **À explorer :** prochain durcissement de gate touchant au nettoyage
+d'un protocole jetable (spike, sonde, plugin de mesure)
+
+**Constat.** Le gate automatisé de nettoyage du spike SKIL-01 (`34-02-PLAN.md:237`, bloc
+`<automated>` de la tâche 2, référencé par `34-VALIDATION.md:55`) ne vérifie que les chemins
+**auto-déclarés par le protocole lui-même** (la liste « chemin supprimé : … » construite au fur
+et à mesure de la pose), jamais l'état réel du disque. Ce gate est passé **VERT** (commit
+`81dcc03`) alors que **trois résidus** subsistaient après la clôture initiale du spike : le cache
+disque du plugin sous `~/.claude/plugins/cache/`, une entrée orpheline dans `~/.claude.json`, et
+les transcripts de session sous `~/.claude/projects/`. Ils n'ont été trouvés que par une
+recherche élargie (`find ~/.claude -iname "*skil01*"`), hors protocole — détail complet et
+preuve machine : `34-SPIKE-SKIL.md` §§ « Résidus trouvés après le premier passage » et
+« Purge ».
+
+**Pourquoi c'est une dette structurelle, pas un incident clos.** Le résidu de ce spike précis a
+été purgé (deux gestes distincts, un troisième laissé intact sur arbitrage explicite de Samuel —
+voir `34-SPIKE-SKIL.md` § « Purge »). Mais le **gate lui-même** reste le même patron qu'avant :
+une liste auto-déclarée n'est pas une vérification, elle ne peut par construction jamais
+constater ce qu'elle n'a pas elle-même énuméré (« une preuve incapable de rendre rouge »). Un
+futur protocole du même patron (spike jetable, sonde, plugin de mesure) repasserait vert avec le
+même trou.
+
+**Forme attendue du correctif :** une vérification de nettoyage par **recherche élargie de
+l'état réel du disque** (cache plugins, `~/.claude.json`, registres) — jamais une liste
+auto-déclarée par le protocole qu'elle est censée vérifier — avec **mutation rouge prouvée** (un
+résidu injecté hors de la liste auto-déclarée doit faire échouer le gate).
+
+**Pourquoi différé :** le plan 34-02 reste une archive exécutée non modifiée (arbitrage explicite
+de Samuel, même canal et date) — ce n'est pas ce plan-là qui se corrige, c'est le patron de gate
+qui doit être durci au prochain protocole du même genre.
+
+**Déclencheur de resurgence :** prochain plan qui pose un gate de nettoyage automatisé pour un
+protocole jetable (spike, sonde, plugin de mesure, agent de sonde) — reprendre cet item avant
+d'écrire ce gate, pas après.
