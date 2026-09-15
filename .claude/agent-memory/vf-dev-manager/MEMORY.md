@@ -57,3 +57,7 @@
 - [Description frontmatter : contrainte en ciseaux](project_description-frontmatter-contrainte-en-ciseaux.md) — mono-ligne pour gsd-core, YAML valide pour kimi : seul le scalaire GUILLEMETÉ satisfait les deux ; replier en `>` rouvre le défaut d'en face
 - [Exception de gate = exemption](feedback_exception-de-gate-devient-exemption.md) — `PASS 0 violation, 3 exceptions` pendant qu'un rôle est injoignable : l'exception doit porter sur la forme, jamais sur la propriété
 - [Pointeur workstream partagé par les sous-agents](project_pointeur-workstream-partage-par-les-sous-agents.md) — même session id que le parent : un seul pointeur pour l'équipe, le dernier `set` gagne ; scoper par `--ws` explicite
+- [Registre d'agents résolu au démarrage](project_registre-agents-resolu-au-demarrage.md) — un artefact posé en mission est invisible aux dispatches internes ; les workers contournent en `claude` CLI frais avec bypassPermissions
+- [Rouge à cause bénigne en cache une seconde](feedback_rouge-a-cause-benigne-en-cache-une-seconde.md) — « faux positif connu » = le worker a arrêté de chercher ; le gras Markdown casse toute sonde ancrée en début de ligne
+- [« Pré-existant » mesuré contre la mauvaise ancre](feedback_preexistant-mesure-contre-la-mauvaise-ancre.md) — le worker prend SON point d'entrée ; seul le manager a le SHA de base et peut trancher hérité vs introduit par nous
+- [Heredoc dé-indenté = vert silencieux](project_heredoc-desindente-vert-silencieux.md) — rejouer un `run: |` de ci.yml sans dé-indenter : exit 0, zéro sortie, aucune commande exécutée
