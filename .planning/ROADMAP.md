@@ -1475,11 +1475,11 @@ Le lot L5 est né d'un amendement post-cadrage (D-19, 2026-09-15, option b) : `4
 contrat de preuves E6, mais aucun des trois workers ne l'émettait avant `40-05`.
 
 Plans:
-- [ ] 40-01-PLAN.md — lot L1 `exec-rename` (vague 1) : renommage des 22 fichiers + garde anti-alias T36 avec mutation prouvée (HEAD-04)
-- [ ] 40-02-PLAN.md — lot L2 `exec-e6` (vague 2) : contrat de preuves E6 + décompte de mission, à budget de lignes constant (HEAD-03)
-- [ ] 40-03-PLAN.md — lot L4 `exec-doctrine` (vague 2, parallèle à L2) : `head-governance.md` + AGENT.md restructuré ≤ 250 lignes + renvois des skills (HEAD-01)
-- [ ] 40-04-PLAN.md — lot L3 `exec-gate` (vague 3, dépend de L2 et L4) : `check-mission-exit.sh` E1-E6 + suite à 6 mutations rouges + clôture de module (HEAD-02, HEAD-04)
-- [ ] 40-05-PLAN.md — lot L5 `exec-workers` (vague 3, parallèle à L3, dépend de L2) : émission du champ `preuves` E6 dans `vf-coder.md`, `vf-reviewer.md`, `vf-auditer.md` (HEAD-03, D-19)
+- [x] 40-01-PLAN.md — lot L1 `exec-rename` (vague 1) : renommage des 22 fichiers + garde anti-alias T36 avec mutation prouvée (HEAD-04)
+- [x] 40-02-PLAN.md — lot L2 `exec-e6` (vague 2) : contrat de preuves E6 + décompte de mission, à budget de lignes constant (HEAD-03)
+- [x] 40-03-PLAN.md — lot L4 `exec-doctrine` (vague 2, parallèle à L2) : `head-governance.md` + AGENT.md restructuré ≤ 250 lignes + renvois des skills (HEAD-01)
+- [x] 40-04-PLAN.md — lot L3 `exec-gate` (vague 3, dépend de L2 et L4) : `check-mission-exit.sh` E1-E6 + suite à 6 mutations rouges + clôture de module (HEAD-02, HEAD-04)
+- [x] 40-05-PLAN.md — lot L5 `exec-workers` (vague 3, parallèle à L3, dépend de L2) : émission du champ `preuves` E6 dans `vf-coder.md`, `vf-reviewer.md`, `vf-auditer.md` (HEAD-03, D-19)
 
 ### Phase 41: Posture de protection du dépôt
 
