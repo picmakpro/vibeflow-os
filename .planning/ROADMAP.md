@@ -1447,7 +1447,8 @@ calibre sur le corpus **post-40**).
 **Requirements**: HEAD-01 (échelle d'allocation), HEAD-02 (gate de sortie
 `check-mission-exit.sh`), HEAD-03 (économie : preuves E6 + décompte par mission), HEAD-04
 (renommage sans alias survivant) — ledgerisées le 2026-09-15 dans `.planning/REQUIREMENTS.md`,
-mappées aux 4 plans ci-dessous (0 non-mappé).
+mappées aux 5 plans ci-dessous (0 non-mappé — HEAD-03 se mappe désormais à `40-02` ET `40-05`,
+amendement D-19).
 **Success Criteria** (what must be TRUE):
 
   1. Aucun alias `vibeflow-dev` ne survit dans `plugin/` hors CHANGELOG — vérifié par un test du
@@ -1469,13 +1470,16 @@ mappées aux 4 plans ci-dessous (0 non-mappé).
   5. Release taggée : bump **minor** du module `dev-orchestrator` et de la racine, gate
      `check-release-tag.sh --remote` ✓.
 
-**Plans:** 4 plans — 3 vagues, mappés un pour un aux 4 lots du DAG de mission (L1, L2, L4, L3).
+**Plans:** 5 plans — 3 vagues, mappés un pour un aux 5 lots du DAG de mission (L1, L2, L4, L3, L5).
+Le lot L5 est né d'un amendement post-cadrage (D-19, 2026-09-15, option b) : `40-02` pose le
+contrat de preuves E6, mais aucun des trois workers ne l'émettait avant `40-05`.
 
 Plans:
 - [ ] 40-01-PLAN.md — lot L1 `exec-rename` (vague 1) : renommage des 22 fichiers + garde anti-alias T36 avec mutation prouvée (HEAD-04)
 - [ ] 40-02-PLAN.md — lot L2 `exec-e6` (vague 2) : contrat de preuves E6 + décompte de mission, à budget de lignes constant (HEAD-03)
 - [ ] 40-03-PLAN.md — lot L4 `exec-doctrine` (vague 2, parallèle à L2) : `head-governance.md` + AGENT.md restructuré ≤ 250 lignes + renvois des skills (HEAD-01)
-- [ ] 40-04-PLAN.md — lot L3 `exec-gate` (vague 3) : `check-mission-exit.sh` E1-E6 + suite à 6 mutations rouges + clôture de module (HEAD-02, HEAD-04)
+- [ ] 40-04-PLAN.md — lot L3 `exec-gate` (vague 3, dépend de L2 et L4) : `check-mission-exit.sh` E1-E6 + suite à 6 mutations rouges + clôture de module (HEAD-02, HEAD-04)
+- [ ] 40-05-PLAN.md — lot L5 `exec-workers` (vague 3, parallèle à L3, dépend de L2) : émission du champ `preuves` E6 dans `vf-coder.md`, `vf-reviewer.md`, `vf-auditer.md` (HEAD-03, D-19)
 
 ### Phase 41: Posture de protection du dépôt
 
