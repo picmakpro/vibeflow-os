@@ -101,7 +101,10 @@ $ rm -rf .../scratchpad/skil01/skil01-probe-plugin
 $ rm -f ~/.claude/agents/skil01-probe-agent.md
 ```
 
-## Chemins nettoyés et preuve de leur absence
+## Chemins nettoyés et preuve de leur absence — PARTIEL, corrigé après revue
+
+Nettoyage effectivement retiré et prouvé (les deux seuls chemins que le protocole avait lui-même
+listés à leur création) :
 
 - `/Users/samuel/.claude/agents/skil01-probe-agent.md` → `test -e` négatif après suppression
   (`AGENT ABSENT`)
@@ -110,9 +113,20 @@ $ rm -f ~/.claude/agents/skil01-probe-agent.md
 - `claude plugin list | grep -i skil01` → vide (`PLUGIN ABSENT FROM LIST`)
 - `claude plugin marketplace list | grep -i skil01` → vide (`MARKETPLACE ABSENT FROM LIST`)
 
-Preuve automatisée supplémentaire (bloc `<automated>` tâche 2) : un script Node relit chaque ligne
+Preuve automatisée (bloc `<automated>` tâche 2) : un script Node relit chaque ligne
 `- chemin supprimé : ` de `34-SPIKE-SKIL.md` (2 lignes) et vérifie par `fs.existsSync` qu'aucun
-des chemins n'existe plus — exit 0.
+des chemins n'existe plus — exit 0. **Mais** cette preuve est bornée par sa propre liste, elle ne
+constate que ce qu'on lui a soumis. Une recherche élargie (`find ~/.claude -iname "*skil01*"`,
+rejouée en correction le 2026-09-15) trouve **trois résidus survivants**, non retirés :
+
+- `~/.claude/plugins/cache/skil01-probe-marketplace/` — cache disque du plugin jetable (`claude
+  plugin uninstall`/`marketplace remove` vident les registres actifs, pas ce cache)
+- `~/.claude.json` — entrée orpheline de compteur d'usage `skil01-probe-plugin:skil01-probe-skill`
+- `~/.claude/projects/-private-tmp-...-scratchpad-skil01/` — transcripts de session (2 `.jsonl`)
+
+Documentés en détail dans `34-SPIKE-SKIL.md` § « Nettoyage » → « Résidus NON nettoyés ». Ils ne
+sont PAS supprimés par ce plan : la purge d'un chemin hors dépôt sur la machine de Samuel est son
+arbitrage, pas un geste que ce spike s'autorise.
 
 ## Scope project
 
