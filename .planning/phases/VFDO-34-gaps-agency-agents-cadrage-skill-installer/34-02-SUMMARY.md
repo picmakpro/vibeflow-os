@@ -125,10 +125,14 @@ dans `~/.claude.json`, et les transcripts de session (`~/.claude/projects/.../sc
 2026-09-15 : purge des deux premiers résidus, le troisième (transcripts) volontairement laissé
 intact. Cache disque retiré (`rm -rf`, recontrôle avant/après des 9 autres marketplaces/plugins,
 tous intacts). `~/.claude.json` édité par plage de lignes ciblée (jamais un re-dump), sauvegarde
-horodatée AVANT écriture, JSON validé après coup, diff contre la sauvegarde montrant une seule
-entrée disparue (4 lignes) et rien d'autre. Re-constat final :
+horodatée AVANT écriture, JSON validé après coup. Preuve retenue : une comparaison **structurelle**
+clé par clé (pas un diff textuel — le fichier est réécrit en continu par la télémétrie de la
+session) — 103 clés de premier niveau identiques des deux côtés, deux valeurs diffèrent :
+`skillUsage` (l'entrée `skil01` retirée, seule suppression imputable à la purge) et
+`promptQueueUseCount` (compteur global de télémétrie incrémenté en continu, sans lien avec
+l'édition, valeur volontairement non figée ici). Re-constat final :
 `find ~/.claude -iname "*skil01*"` ne rend plus que le dossier de transcripts. Détail intégral
-(commandes, diffs, recontrôles) dans `34-SPIKE-SKIL.md` § « Nettoyage ».
+(commandes, comparaison structurelle, recontrôles) dans `34-SPIKE-SKIL.md` § « Nettoyage ».
 
 ## Scope project
 
