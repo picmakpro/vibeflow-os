@@ -1,7 +1,7 @@
 # Phase 25: Budget d'instructions - Context
 
 **Gathered:** 2026-09-14
-**Status:** Ready for planning — la **calibration** (valeurs de baseline) n'est exécutable qu'après la clôture de la Phase 34 (D-06)
+**Status:** Ready for planning — la **calibration** (valeurs de baseline) n'est exécutable qu'après la clôture de la Phase 34 (D-06, close le 2026-09-15) **et la livraison de la Phase 40** (D-06 bis, 2026-09-15)
 
 <domain>
 ## Phase Boundary
@@ -86,6 +86,19 @@ lot groupé puis une question de bouclage. Ils sont **verrouillés** — ne pas 
   trois issues, mutation rouge, câblage CI en mode non armé, README) peut s'exécuter avant. —
   **Reversibility:** one-way — graver les baselines sur un corpus qui bouge ensuite rendrait la
   publication fausse dès la première hausse ; c'est le motif même de la dépendance.
+
+### Amendement daté — séquencement avec la Phase 40 (2026-09-15)
+- **D-06 bis (arbitrage Samuel, AskUserQuestion session principale, 2026-09-15) :** la Phase 34 est
+  close et mergée (PR #66) **sans aucun agent créé** — mais la **Phase 40** (inscrite le 2026-09-15,
+  `40-CONTEXT.md`) réécrit `plugin/dev-orchestrator/AGENT.md` (renommage `vibeflow-head` +
+  extension de rôle), donc change les lignes et les instructions d'un fichier du corpus. Décision :
+  **tout construire maintenant** (script, suite, trois issues, mutation rouge, câblage CI en mode
+  non armé, README, note ADR-029) dans une première PR ; la **tâche de calibration** (mesure du
+  corpus, gravure des baselines, armement de la sentinelle) reste un **checkpoint bloquant** où le
+  manager de mission s'arrête et rend son rapport — elle s'exécute dans une **seconde PR, après la
+  livraison de la Phase 40**. La dépendance ROADMAP « Phase 34 **et Phase 40** » (amendée le
+  2026-09-15) est la source. — **Reversibility:** reversible — calibrer plus tôt reste possible sur
+  arbitrage humain nommé, au prix d'une baseline à remonter à la 40.
 
 ### QUAL-01 (transverse, critère de chaque gate du milestone)
 - Le gate naît avec ses **trois issues** — PASS / FAIL / **imparsable BRUYANT** (un frontmatter
