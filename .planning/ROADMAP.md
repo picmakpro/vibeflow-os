@@ -906,11 +906,22 @@ fichiers disjoints ; 34-04 et 34-05 sont **conditionnels** au run vert et se clo
 sinon).
 
 Plans:
+**Wave 1**
+
 - [ ] 34-01-PLAN.md — AGTS-02 : run réel de sortie d'expérimental sur `Scroll-Off/frontend` (iOS), trace `34-RUN-MOBILE.md` à deux verdicts (PIPELINE, EQUIPE)
 - [ ] 34-02-PLAN.md — SKIL-01 : spike mesuré à contrôle négatif sur le canal natif `/plugin`, verdict `34-SPIKE-SKIL.md` (checkpoint bloquant-humain, NO-GO one-way)
 - [ ] 34-03-PLAN.md — AGTS-01 : note d'audit `34-AUDIT-AGTS.md`, matrice re-mesurée et verdict par gap adossé à la règle de preuve
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 34-04-PLAN.md — *(conditionnel au run vert)* sortie du statut expérimental de `mobile-test` et `mobile-test-team`, propagée au manuel
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 34-05-PLAN.md — *(conditionnel au run vert)* construction de `web-test-team` sur le moule prouvé, compteurs de catalogue re-dérivés
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 34-06-PLAN.md — ledger et clôture : BACKLOG, REQUIREMENTS, PROJECT, STATE, ROADMAP, cohérence note ↔ case vérifiée par machine
 
 ### Phase 25: Budget d'instructions
@@ -1085,6 +1096,7 @@ de mesure est documentée avec sa nuance dans `DISCUSS.md`.
 **Plans**: aucun — spike de mesure, pas de plan d'exécution.
 
 **Décisions humaines rendues le 2026-08-28** (à la lecture des livrables) :
+
 - **Phase 38 à part** pour le canal d'install et la migration de lab (option recommandée par
   l'étude, §Proposition de cadrage) — voir la section Phase 38 ci-dessous.
 - **Superpowers** : révisé sur prémisse démentie (le catalogue est déjà multi-runtime, 8 manifestes) —
@@ -1110,6 +1122,7 @@ factuel de cette phase — aucun chiffre n'est à re-mesurer, mais aucun descrip
 preuve (un sur trois démenti en exécution : `maxDepth`).
 
 **Lots candidats** (issus de l'étude, à confirmer au cadrage — `gsd-discuss-phase 38`) :
+
 1. **Gate de fidélité** — compter par cible les champs perdus (`model`/`memory`/`tools`/
    `disallowedTools`/`vf-internal`/allowlist, `description`) et les marqueurs morts (`.claude`, `Task(`) ;
    bannière d'install qui déclare le périmètre réellement actif. Première brique : sans elle, toute
@@ -1219,6 +1232,7 @@ simples) ne traverse les deux consommateurs (parseur YAML strict, reproduction `
 l'identique. Non touchés par ce lot (le mandat interdit de modifier le texte), déclarés en
 exception nommée dans `plugin/conductor/scripts/check-description-fidelity.sh`, avec pour chacun
 l'état réel mesuré :
+
   - `plugin/consolidator/SKILL.md` — **tronqué par un commentaire YAML** : la description contient
     ` #Ligne`, que PyYAML interprète comme le début d'un commentaire sur un scalaire plain (valeur
     désérialisée tronquée à `... colonne`), alors que la regex `gsd-core` garde la ligne entière.
@@ -1372,6 +1386,7 @@ doit combler, pour la version installée.
 **Plans**: 3 plans (3 waves — 39-02 dépend de 39-01, 39-03 dépend de 39-01 et 39-02, corrigé 2026-09-10 : coupling C12/C13)
 
 Plans:
+
 - [x] 39-01-PLAN.md — Divergence-detection net (S2+S4+S5), opt-in `post-merge` hook, mutation-red proof (tracer)
 - [x] 39-02-PLAN.md — `PART-01..09` ledger family, `GSDA-19` re-worded + drafted upstream issue, ADR-069 dated amendment (D-09/D-10)
 - [x] 39-03-PLAN.md — Clone-jetable proof of `--ws` coverage (D-08), D-02/D-06 dated triggers inscribed

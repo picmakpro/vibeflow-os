@@ -27,7 +27,7 @@ last_activity_desc: >-
 progress:
   total_phases: 11
   completed_phases: 8
-  total_plans: 41
+  total_plans: 47
   completed_plans: 41
   percent: 73
 ---
@@ -71,7 +71,7 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 ## Current Position
 
-Phase: **18** (Survie du ledger d'exigences à la clôture de jalon) — **LIVRÉE le 2026-08-18**,
+Phase: **34** (Gaps agency-agents & cadrage skill-installer) — **PLANIFIÉE le 2026-09-15** (6 plans, 4 vagues, vérifiés PASSED sans bloqueur ni avertissement) — prête à exécuter en mission d'équipe. Précédente : 18 livrée le 2026-08-18, 39 shippée v2.60.0 le 2026-09-14.
 3 plans exécutés (`18-01-SUMMARY.md` LEDG-02, `18-02-SUMMARY.md` LEDG-01, `18-03-SUMMARY.md`
 doctrine D-18-14 + bump module `dev-orchestrator` v2.18.0 → v2.19.0), 12/12 suites vertes,
 branche `feat/phase-18-survie-ledger-exigences`. **Non shippée** — PR, tag et release restent des
@@ -1172,9 +1172,9 @@ Recent decisions affecting current work:
 **Resume file:** .planning/phases/VFDO-34-gaps-agency-agents-cadrage-skill-installer/34-CONTEXT.md (et `.planning/phases/VFDO-40-vibeflow-head-head-of-minds-du-dev-orchestrator/40-CONTEXT.md`, `.planning/phases/VFDO-25-budget-d-instructions-et-tage-d-alignement-court/25-CONTEXT.md`)
 
 Last session: 2026-09-15
-Stopped at: Phase 40 (`vibeflow-head`, head of minds) inscrite ET cadrée (spec d'entrée + CONTEXT.md + DISCUSSION-LOG.md sur `feat/cadrage-phase-40`, 16 arbitrages Samuel du 2026-09-15). Phases 34 et 25 cadrées la veille, aucune des trois planifiée. v2.61.0 releasée plus tôt le même jour (PR #64).
+Stopped at: **Phase 34 PLANIFIÉE** (2026-09-15, PR #65 de cadrage de la 40 mergée le même jour) — recherche `34-RESEARCH.md`, patterns, validation, 6 plans `34-01..06` en 4 vagues (vague 1 = trois volets à périmètres disjoints ; 34-04 et 34-05 conditionnels au run mobile VERT ; 34-06 ledger), plan-checker PASSED, couverture décisions 11/11, exigences 3/3. Commits `cba0da5`, `ce6cf93`, `423aa62` sur `main`. Next : exécution par `vf-dev-manager` en mode superviser (demande Samuel, session principale, 2026-09-15).
 
-**Reprendre par** : `/gsd-plan-phase 34` — puis `/gsd-plan-phase 40` (dépend de la 34 : zéro agent neuf, et la 25 se calibre sur le corpus post-40 — dépendance de la 25 amendée le 2026-09-15) (run mobile de sortie d'expérimental sur Scroll-Off en première vague, spike SKIL en parallèle, audit AGTS-01). La Phase 25 peut être planifiée dès maintenant, mais sa **calibration** (baselines, armement) est un **checkpoint bloquant** jusqu'à la clôture de la 34 (25-CONTEXT D-06). `current_phase` du frontmatter reste 39 : le gate `check-state-integrity` interdit toute décroissance, et aucune des deux phases n'est démarrée.
+**Reprendre par** : `/gsd-execute-phase 34` via `Task(vf-dev-manager)` (brief : périmètre 34, mode superviser, design off) — puis `/gsd-plan-phase 40` (dépend de la 34 : zéro agent neuf, et la 25 se calibre sur le corpus post-40 — dépendance de la 25 amendée le 2026-09-15) (run mobile de sortie d'expérimental sur Scroll-Off en première vague, spike SKIL en parallèle, audit AGTS-01). La Phase 25 peut être planifiée dès maintenant, mais sa **calibration** (baselines, armement) est un **checkpoint bloquant** jusqu'à la clôture de la 34 (25-CONTEXT D-06). `current_phase` du frontmatter reste 39 : le gate `check-state-integrity` interdit toute décroissance, et aucune des deux phases n'est démarrée.
 
 **Ce qui reste fermé, quoi qu'il arrive** :
 - **Aucune partition réelle de `vibeflow-os`** sans geste humain explicite — déclencheur D-02 (§ Decisions, 2026-09-10).
