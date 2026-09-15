@@ -1079,6 +1079,27 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   distribués en 1.13.0) remplace toute veille à seuil chiffré (D-06) — inscrite en note de
   STATE.md, jamais comme un seuil figé.
 
+### vibeflow-head — head of minds du dev-orchestrator (Phase 40)
+> Dérivé au cadrage le 2026-09-15 (`40-CONTEXT.md`, D-01..D-18, seize arbitrages Samuel —
+> AskUserQuestion session principale). Préfixe `HEAD` vérifié libre par grep exhaustif sur ce
+> ledger (0 occurrence avant cette entrée, re-confirmé par `40-RESEARCH.md`).
+
+- [ ] **HEAD-01**: L'échelle d'allocation (quick / debug / execute / manager, sens unique,
+  `SEUIL_EQUIPE` inchangé) vit dans `head-governance.md`, renvoyée — jamais dupliquée — par
+  `AGENT.md`, `intent-routing.md` et `skills/vf-auto/SKILL.md` (D-01, D-02, D-04, D-09)
+- [ ] **HEAD-02**: `check-mission-exit.sh` existe avec ses codes de sortie (3 sain / 0 manque(s)
+  nommé(s) / 4 indéterminé / 64 outillage illisible), ses contrôles E1-E6 (D-07), sa suite de
+  tests et sa **mutation rouge prouvée** (QUAL-01) ; le head ne rejoue qu'un gate dont la preuve
+  manque au rapport, jamais un étage entier, jamais la revue (D-03, D-05, D-06, D-08, D-10 à D-12,
+  D-14)
+- [ ] **HEAD-03**: Le rapport de mission porte le bloc de preuves E6 `{commande, exit_code, sha}`
+  par verdict et un décompte de coût à trois lignes (minds dispatchés, tours consommés, gates
+  rejoués), relayés — jamais recalculés — dans `mission-contracts.md` §Rapport de mission et
+  `agents/vf-dev-manager.md` (D-05, D-13, D-15)
+- [ ] **HEAD-04**: Aucun alias `vibeflow-dev` ne survit dans `plugin/` hors CHANGELOG — vérifié par
+  un test du module qui **peut rendre rouge** (mutation prouvée) ; le skill `vf-dev` conserve son
+  nom et incarne `vibeflow-head` (D-17), zéro agent neuf, kernel intact (D-04, D-16, D-18)
+
 ### Transverse
 - [ ] **QUAL-01**: Tout nouveau gate du milestone naît avec ses trois issues (PASS / FAIL / imparsable BRUYANT) et sa mutation rouge prouvée
 
@@ -1098,4 +1119,4 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 
 ---
 *Requirements defined: 2026-06-04*
-*Last updated: 2026-09-14 — Phase 39 SHIPPÉE v2.60.0 (PR #62) : PART-01..09 cochées, statuts de traçabilité passés à Done ; précédent : 2026-09-09 — Phase 39 (Workstreams — partition du planning et collaboration concurrente) : 9 exigences neuves en une famille (PART-01..09), dérivées du cadrage `39-CONTEXT.md` et de la recherche `2026-09-09-phase-39-workstreams-mesures-de-cadrage.md`, préfixe `PART` vérifié libre par `comm` (D-07, 41 familles réellement occupées incluant `SIG-01..06` hors ledger) ; `GSDA-19` superseded par `PART-06` (corps préservé, angle bug de comportement porté par `PART-06`, D-04), `GSDA-13..19` closes non rouvertes ; précédent : 2026-08-28 — Phase 38 (Portabilité multi-runtime, livraison) : 22 exigences neuves en 6 familles (FIDE-01/02, RUNT-01/02, ROLL-01..05, TGT-01..04, ADPT-01..04, MIGR-01..05), dérivées du cadrage `38-CONTEXT.md`, 0 collision avec `PORT-xx` (Phase 30, vérifié par commande) ; ADPT-02/03 levées en session réelle par le nœud `probe-codex` le même jour (tirets confirmés inoffensifs, fork_turns sans effet sur le modèle) — plans mis à jour en conséquence ; précédent : 2026-08-15 — roadmap fiabilite-v1.0 posée : traçabilité mappée aux phases 30-35 + 18/25 héritées (30 IDs, 0 orphelin) ; précédent : ajout milestone fiabilite-v1.0 (26 exigences en 9 familles, audit d utilite prealable, Out of Scope motive) ; precedent : ajout Phase 29 (ICMD-01..12, distillation des gains ICM G1/G2/G3/G5) ; précédent : 2026-07-26 — remise à l'heure post-audit (Phase 12 annotée post-bascule v2.33.0, Phase 13 redéfinie sans verbe, Phase 14 = v2.30.0, milestones 2-3 shipped) ; précédent : 2026-07-25 — ajout Phase 14 au Milestone 6 (ALTI-01→05 : frontière d'altitude planning-core / moteur GSD, ADR-055)*
+*Last updated: 2026-09-15 — Phase 40 (vibeflow-head — head of minds du dev-orchestrator) : 4 exigences neuves en une famille (HEAD-01..04), dérivées du cadrage `40-CONTEXT.md` (D-01..D-18, seize arbitrages Samuel), préfixe `HEAD` vérifié libre par grep exhaustif ; QUAL-01 transverse s'applique de plein droit (HEAD-02 fait naître un gate) ; précédent : 2026-09-14 — Phase 39 SHIPPÉE v2.60.0 (PR #62) : PART-01..09 cochées, statuts de traçabilité passés à Done ; précédent : 2026-09-09 — Phase 39 (Workstreams — partition du planning et collaboration concurrente) : 9 exigences neuves en une famille (PART-01..09), dérivées du cadrage `39-CONTEXT.md` et de la recherche `2026-09-09-phase-39-workstreams-mesures-de-cadrage.md`, préfixe `PART` vérifié libre par `comm` (D-07, 41 familles réellement occupées incluant `SIG-01..06` hors ledger) ; `GSDA-19` superseded par `PART-06` (corps préservé, angle bug de comportement porté par `PART-06`, D-04), `GSDA-13..19` closes non rouvertes ; précédent : 2026-08-28 — Phase 38 (Portabilité multi-runtime, livraison) : 22 exigences neuves en 6 familles (FIDE-01/02, RUNT-01/02, ROLL-01..05, TGT-01..04, ADPT-01..04, MIGR-01..05), dérivées du cadrage `38-CONTEXT.md`, 0 collision avec `PORT-xx` (Phase 30, vérifié par commande) ; ADPT-02/03 levées en session réelle par le nœud `probe-codex` le même jour (tirets confirmés inoffensifs, fork_turns sans effet sur le modèle) — plans mis à jour en conséquence ; précédent : 2026-08-15 — roadmap fiabilite-v1.0 posée : traçabilité mappée aux phases 30-35 + 18/25 héritées (30 IDs, 0 orphelin) ; précédent : ajout milestone fiabilite-v1.0 (26 exigences en 9 familles, audit d utilite prealable, Out of Scope motive) ; precedent : ajout Phase 29 (ICMD-01..12, distillation des gains ICM G1/G2/G3/G5) ; précédent : 2026-07-26 — remise à l'heure post-audit (Phase 12 annotée post-bascule v2.33.0, Phase 13 redéfinie sans verbe, Phase 14 = v2.30.0, milestones 2-3 shipped) ; précédent : 2026-07-25 — ajout Phase 14 au Milestone 6 (ALTI-01→05 : frontière d'altitude planning-core / moteur GSD, ADR-055)*
