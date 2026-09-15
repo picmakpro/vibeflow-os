@@ -908,21 +908,28 @@ sinon).
 Plans:
 **Wave 1**
 
-- [ ] 34-01-PLAN.md — AGTS-02 : run réel de sortie d'expérimental sur `Scroll-Off/frontend` (iOS), trace `34-RUN-MOBILE.md` à deux verdicts (PIPELINE, EQUIPE)
-- [ ] 34-02-PLAN.md — SKIL-01 : spike mesuré à contrôle négatif sur le canal natif `/plugin`, verdict `34-SPIKE-SKIL.md` (checkpoint bloquant-humain, NO-GO one-way)
-- [ ] 34-03-PLAN.md — AGTS-01 : note d'audit `34-AUDIT-AGTS.md`, matrice re-mesurée et verdict par gap adossé à la règle de preuve
+- [x] 34-01-PLAN.md — AGTS-02 : run réel de sortie d'expérimental sur `Scroll-Off/frontend` (iOS), trace `34-RUN-MOBILE.md` à deux verdicts (PIPELINE, EQUIPE) — exécuté, chapeau ROUGE (`PIPELINE: VERT` / `EQUIPE: ROUGE`)
+- [x] 34-02-PLAN.md — SKIL-01 : spike mesuré à contrôle négatif sur le canal natif `/plugin`, verdict `34-SPIKE-SKIL.md` (checkpoint bloquant-humain, NO-GO one-way) — exécuté, verdict NO-GO
+- [x] 34-03-PLAN.md — AGTS-01 : note d'audit `34-AUDIT-AGTS.md`, matrice re-mesurée et verdict par gap adossé à la règle de preuve — exécuté, verdict par gap rendu (six refusés, un reporté)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 34-04-PLAN.md — *(conditionnel au run vert)* sortie du statut expérimental de `mobile-test` et `mobile-test-team`, propagée au manuel
+- [x] 34-04-PLAN.md — *(conditionnel au run vert)* sortie du statut expérimental de `mobile-test` et `mobile-test-team`, propagée au manuel — **no-op tracé** : précondition machine (run vert) non satisfaite, AGTS-02 reportée
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 34-05-PLAN.md — *(conditionnel au run vert)* construction de `web-test-team` sur le moule prouvé, compteurs de catalogue re-dérivés
+- [x] 34-05-PLAN.md — *(conditionnel au run vert)* construction de `web-test-team` sur le moule prouvé, compteurs de catalogue re-dérivés — **no-op tracé** : même précondition non satisfaite, comparaison structurelle (pas un diff textuel) documentée
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 34-06-PLAN.md — ledger et clôture : BACKLOG, REQUIREMENTS, PROJECT, STATE, ROADMAP, cohérence note ↔ case vérifiée par machine
+- [x] 34-06-PLAN.md — ledger et clôture : BACKLOG, REQUIREMENTS, PROJECT, STATE, ROADMAP, cohérence note ↔ case vérifiée par machine — exécuté
+
+**Résultat de la Phase 34 (2026-09-15).** Trois verdicts rendus sur pièces, zéro agent créé, zéro
+code d'installeur : AGTS-01 close avec verdict par gap (`34-AUDIT-AGTS.md`) ; SKIL-01 close en
+NO-GO (`34-SPIKE-SKIL.md`) ; AGTS-02 **reportée avec trace**, run réel ROUGE
+(`34-RUN-MOBILE.md`), déclencheur de reprise daté au BACKLOG — la sortie d'expérimental de
+`mobile-test`(-team) et la construction de `web-test-team` restent non atteintes. Aucune PR, aucun
+tag, aucune release posés par cette phase (gestes humains gatés).
 
 ### Phase 25: Budget d'instructions
 
