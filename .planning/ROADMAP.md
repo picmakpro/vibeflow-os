@@ -1444,9 +1444,10 @@ que ses équipes coûtent.
 **Depends on**: Phase 34 (zéro agent neuf — renommage + extension ; le head est le dernier
 mouvement du corpus d'agents avant la calibration du budget d'instructions : la Phase 25 se
 calibre sur le corpus **post-40**).
-**Requirements**: TBD — candidates à poser au cadrage : HEAD-01 (échelle d'allocation), HEAD-02
-(gate de sortie `check-mission-exit.sh`), HEAD-03 (économie : décompte par mission, interdits de
-re-travail), HEAD-04 (renommage sans alias survivant).
+**Requirements**: HEAD-01 (échelle d'allocation), HEAD-02 (gate de sortie
+`check-mission-exit.sh`), HEAD-03 (économie : preuves E6 + décompte par mission), HEAD-04
+(renommage sans alias survivant) — ledgerisées le 2026-09-15 dans `.planning/REQUIREMENTS.md`,
+mappées aux 4 plans ci-dessous (0 non-mappé).
 **Success Criteria** (what must be TRUE):
 
   1. Aucun alias `vibeflow-dev` ne survit dans `plugin/` hors CHANGELOG — vérifié par un test du
@@ -1468,7 +1469,13 @@ re-travail), HEAD-04 (renommage sans alias survivant).
   5. Release taggée : bump **minor** du module `dev-orchestrator` et de la racine, gate
      `check-release-tag.sh --remote` ✓.
 
-**Plans**: TBD
+**Plans:** 4 plans — 3 vagues, mappés un pour un aux 4 lots du DAG de mission (L1, L2, L4, L3).
+
+Plans:
+- [ ] 40-01-PLAN.md — lot L1 `exec-rename` (vague 1) : renommage des 22 fichiers + garde anti-alias T36 avec mutation prouvée (HEAD-04)
+- [ ] 40-02-PLAN.md — lot L2 `exec-e6` (vague 2) : contrat de preuves E6 + décompte de mission, à budget de lignes constant (HEAD-03)
+- [ ] 40-03-PLAN.md — lot L4 `exec-doctrine` (vague 2, parallèle à L2) : `head-governance.md` + AGENT.md restructuré ≤ 250 lignes + renvois des skills (HEAD-01)
+- [ ] 40-04-PLAN.md — lot L3 `exec-gate` (vague 3) : `check-mission-exit.sh` E1-E6 + suite à 6 mutations rouges + clôture de module (HEAD-02, HEAD-04)
 
 ### Phase 41: Posture de protection du dépôt
 
