@@ -297,6 +297,48 @@ machine** — la variante outillée a été explicitement écartée à l'adoptio
 arbitrage dans un mandat de worker transmet aussi le canal et la date, pour que le worker puisse les
 reprendre.
 
+## Contrat de preuves E6 (verdict → head)
+
+Un vert du manager n'est accepté par le head que s'il porte une **preuve machine** (D-03). Le head
+ne rejoue QUE le gate dont la preuve manque — jamais un étage entier, jamais la revue.
+
+Le bloc typé de `vf-coder` (Pattern C, `mission-flow.md`) gagne un champ **optionnel** frère de
+`statut`/`findings`/`noeuds_debloques`/`gate`/`verdicts` : `preuves`, un **tableau PLAT** d'objets
+— pas un objet par type de verdict, `verdict` sert de discriminant. Chaque élément porte :
+
+```
+{ "verdict": "recette|revue|audit|gate:<nom>", "commande": "…", "exit_code": 0, "sha": "…" }
+```
+
+**Le cas du verdict relayé** : un verdict qui n'a pas de commande rejouable — typiquement un hook
+du moteur GSD relayé verbatim — porte `verdict` et `preuve` valant `amont`, **à la place** du
+triplet, et **n'est JAMAIS rejoué** (D-05). N'invente jamais une commande pour un tel verdict.
+**Distinguo à ne jamais confondre** : `preuve` au singulier est cette marque de substitution ;
+`preuves` au pluriel est le tableau qui la contient.
+
+Trois règles non négociables, à ne jamais affaiblir en les retranscrivant :
+
+- **`commande` est la commande CANONIQUE** que ce type de verdict porte — la suite de tests du
+  module concerné, `check-agents.sh --strict`, etc. — **jamais une liste locale, jamais le job
+  `gates` complet de `ci.yml`** (D-12, leçon « liste de gates ≠ référence »).
+- **`sha` est le HEAD de la branche AU MOMENT où le verdict a été rendu** — un verdict PASS sur un
+  SHA vaut tant que le HEAD de la branche est ce SHA, et cesse de valoir au commit suivant (D-15).
+- **Relayé verbatim, jamais recalculé, jamais agrégé, aucun arrondi flatteur** — même règle que
+  `estimate`/`actuals`.
+
+**L'ancrage machine sur disque.** Le rapport DÉTAILLÉ écrit sous `.planning/missions/` porte une
+section de titre `## Preuves E6` contenant UN bloc clôturé de langage `json` dont l'objet racine a
+la clé `preuves`, portant le même tableau, verbatim. C'est cette section — et elle seule — que le
+gate de sortie lit pour son contrôle E6 : c'est un CONTRAT entre deux fichiers, pas une convention
+de rédaction.
+
+**L'absence n'est jamais un vert** (D-06) : section absente, bloc absent, JSON illisible ou tableau
+vide rendent le contrôle **indéterminé**, jamais conforme.
+
+**La conduite du head**, en une ligne de renvoi, jamais recopiée ici : une seule preuve manquante se
+rejoue ; deux ou plus signalent que le contrat n'a pas été appliqué — mandat de clôture ciblée au
+manager et source consignée pour amendement (D-14). Doctrine complète : `head-governance.md` §3.
+
 ## Rapport de mission (manager → main)
 
 Retour **compact**. Le détail vit sur disque, pas dans la conversation.
@@ -309,6 +351,9 @@ RAPPORT DE MISSION
 - Décisions prises en autonomie (et par quel panel)
 - Blocages & points nécessitant l'utilisateur
 - Décompte (si bloqué) : tours consommés par boucle + findings non résolus — recopié verbatim, jamais recalculé
+- Décompte (mission), minds dispatchés : <n> — compté sur les mandats émis, jamais estimé
+- Décompte (mission), tours consommés : <n> — recopié verbatim des blocs typés, jamais recalculé
+- Décompte (mission), gates rejoués (E6) : <n> — vaut 0 à la remise du rapport, complété par le head après le gate de sortie
 - Rapport détaillé : <chemin du fichier écrit sur disque>
 ```
 
