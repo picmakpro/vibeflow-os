@@ -492,3 +492,48 @@ réel — aucun `trap ... EXIT INT TERM` ne protège la séquence.
 
 **Déclencheur de reprise :** prochaine révision des scripts de vérification de plan qui manipulent
 un fichier réel par écrasement temporaire — durcir par `trap` à cette occasion, pas avant.
+
+## Dérive documentaire et fragilité latente révélées par le gate de budget d'instructions — DIFFÉRÉ (2026-09-15)
+
+**Capturé :** 2026-09-15, clôture documentaire de la Phase 25 (mandat vf-coder), quatre constats
+remontés par les juges de cette mission — aucun corrigé ici, tous hors du périmètre déclaré de la
+phase (`plugin/validator/`, `.planning/codebase/` et la doctrine de `CONVENTIONS.md` ne sont pas
+dans les fichiers livrés par cette phase).
+
+1. **`plugin/validator/README.md:10` affirme « `AGENT.md` = 249 lignes — à 1 ligne du plafond ».
+   Mesure réelle : 250** (concordante par `awk 'END{print NR}'` et `wc -l`). La marge est **zéro**,
+   pas une. Le `CHANGELOG.md` du même module dit juste (« reste à 250/250 »), seul le README ment.
+   `.planning/codebase/CONCERNS.md:79-82` porte le même 249 mais explicitement daté du 2026-07-26 —
+   honnête comme relevé d'époque, pas une erreur.
+   **Échéance dure : avant l'armement du ratchet en Phase 40** — sans correction, une seule ligne
+   ajoutée à `plugin/validator/AGENT.md` fera passer le gate au rouge alors que le README affirmera
+   encore qu'il reste de la marge.
+2. **`.planning/codebase/CONVENTIONS.md:56`** décrit des codes de sortie « normalisés » (`2` =
+   erreur d'usage, `3` = INDÉTERMINÉ) que `check-instruction-budget.sh` inverse délibérément
+   (`64` usage, `2` indéterminé, `3` = ratchet non armé — le script cite nommément cette ligne dans
+   son en-tête comme la convention dont il s'écarte). C'est désormais le **troisième** gate à
+   dévier de cette ligne : « normalisés » ne décrit plus le parc réel.
+3. **`.planning/codebase/TESTING.md`** : ligne 98, « les gates suivent **tous** le contrat F13 »
+   est faux (trois gates dévient, cf. point 2) ; lignes 29-32, la liste du job `gates` compte 3
+   puces pour **10 étapes réelles** (sept manquaient déjà avant cette phase, `check-instruction-budget`
+   en ajoute une dixième).
+4. **Fragilité latente dans `.github/workflows/ci.yml`, étape `check-instruction-budget`, bloc 1**
+   (preuve de discrimination sur fixture) : l'affectation `I="$(bash "$S" --path "$FIX" … | awk
+   …)"` s'exécute avant que la baseline de la fixture existe, donc `rc=2` à ce point précis. Sous
+   le shell réellement utilisé par GitHub Actions pour cette étape (`bash -e {0}`, **sans**
+   `pipefail`), c'est inoffensif et l'étape reste verte — mesuré. Mais si une future édition ajoute
+   `shell: bash` en tête d'étape (donc `-eo pipefail` par défaut de ce runtime), l'affectation
+   hériterait de `rc=2`, `set -e` tuerait l'étape immédiatement : **exit 2, zéro ligne de sortie,
+   aucun diagnostic**. Durcissement suggéré : capturer explicitement le code de retour de cette
+   affectation. **Ne PAS ajouter `|| true`** — le plan de la Phase 25 l'interdit formellement sur
+   une mesure (le gate doit pouvoir rendre rouge, jamais se replier en silence).
+
+**Pourquoi non corrigé ici :** `CONVENTIONS.md` relève de la doctrine transverse du repo (pas d'un
+gate d'une phase) ; `plugin/validator/` et `.planning/codebase/` sont hors du périmètre déclaré de
+la Phase 25 (budget d'instructions), qui s'est délibérément limitée à `plugin/conductor/scripts/`,
+`.github/workflows/ci.yml` et ses propres traces documentaires.
+
+**Déclencheur de reprise :** le point 1 avant l'armement du ratchet en Phase 40 (dur) ; les points
+2-3 à la prochaine révision de `CONVENTIONS.md`/`TESTING.md` ou dès qu'un quatrième gate dévie du
+patron F13/codes normalisés ; le point 4 à la prochaine édition de l'étape CI concernée, ou plus
+tôt si quelqu'un ajoute `shell: bash` à une étape du job `gates`.
