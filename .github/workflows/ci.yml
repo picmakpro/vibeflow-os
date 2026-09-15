@@ -368,6 +368,116 @@ jobs:
         # un gate qui n'a pas pu regarder n'est pas un gate vert.
         run: bash scripts/check-machine-paths.sh
 
+      - name: check-instruction-budget (BUDG-01/02, ADR-029 machine-enforced)
+        # POURQUOI CE GATE EXISTE. Jusqu'à cette phase, aucun gate distribué ne mesurait le
+        # plafond de 250 lignes des agents hors du module dev-orchestrator (D-05,
+        # `test-dev-orchestrator.sh` T3/T5, mono-module), et aucun gate ne mesurait la charge
+        # d'instructions du tout. Le gate est en RATCHET (D-04) : il n'est bloquant qu'une fois
+        # la sentinelle `.planning/.instruction-budget-armed` posée, ce qui n'est PAS le cas à ce
+        # stade (D-06 bis — la calibration attend la livraison de la Phase 40). Une étape qui se
+        # contenterait de constater l'avertissement sur ce dépôt non armé serait verte par
+        # construction pendant des mois — exactement le mode d'échec « sûr mais inerte » d'ADR-059
+        # que ce dépôt a déjà payé. La preuve de discrimination ci-dessous, sur une fixture
+        # jetable armée, existe pour que cette étape prouve elle-même qu'elle sait encore rendre
+        # rouge, patron `check-divergence.sh en CI` (Phase 39, plus bas dans ce même job).
+        run: |
+          set -eu
+
+          fail=0
+          note() { echo "::error::check-instruction-budget CI : $1"; fail=$((fail + 1)); }
+
+          S="plugin/conductor/scripts/check-instruction-budget.sh"
+
+          # --- Bloc 1 — preuve de discrimination sur fixture jetable, armée --------------------
+          FIX="$(mktemp -d)"
+          trap 'rm -rf "$FIX"' EXIT
+
+          mkdir -p "$FIX/plugin/demo/agents" "$FIX/.planning"
+          cat > "$FIX/plugin/demo/agents/a.md" <<'AGENTEOF'
+          ---
+          name: d
+          ---
+          ## Iron Laws
+          - Le lock est verifie avant tout checkout.
+          AGENTEOF
+          : > "$FIX/.planning/.instruction-budget-armed"
+
+          L="$(awk 'END{print NR}' "$FIX/plugin/demo/agents/a.md")"
+          I="$(bash "$S" --path "$FIX" 2>/dev/null | awk -F'|' '/^plugin\/demo\/agents\/a\.md /{gsub(/[[:space:]]/,"",$4); print $4}')"
+          printf 'plugin/demo/agents/a.md\t%s\t%s\n' "$L" "$I" > "$FIX/.planning/instruction-budget-baselines.tsv"
+
+          # 1/4 fixture conforme, armée → attendu 0
+          rc=0
+          out="$(bash "$S" --path "$FIX" 2>&1)" || rc=$?
+          echo "== 1/4 fixture armée conforme : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 0 ] || note "1/4 fixture conforme : rc=$rc, attendu 0"
+
+          # 2/4 MÊME fixture, mutée en place → attendu 1 (le basculement qui prouve la discrimination)
+          printf '%s\n' '- Une regle de plus qui DOIT compter.' >> "$FIX/plugin/demo/agents/a.md"
+          rc=0
+          out="$(bash "$S" --path "$FIX" 2>&1)" || rc=$?
+          echo "== 2/4 fixture MUTÉE (même arbre, une règle ajoutée) : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 1 ] || note "2/4 fixture mutée : rc=$rc, attendu 1 (basculement 0 → 1) — l'étape ne serait pas discriminante en CI réelle non plus"
+
+          # 3/4 même fixture, sentinelle retirée, rien d'autre changé → attendu 3 (le ratchet)
+          rm -f "$FIX/.planning/.instruction-budget-armed"
+          rc=0
+          out="$(bash "$S" --path "$FIX" 2>&1)" || rc=$?
+          echo "== 3/4 sentinelle retirée : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 3 ] || note "3/4 sentinelle retirée : rc=$rc, attendu 3 (ratchet non armé)"
+
+          # 4/4 répertoire vide → attendu 2 (découverte vide, jamais un vert)
+          VIDE="$FIX/vide"
+          mkdir -p "$VIDE"
+          rc=0
+          out="$(bash "$S" --path "$VIDE" 2>&1)" || rc=$?
+          echo "== 4/4 découverte vide : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 2 ] || note "4/4 découverte vide : rc=$rc, attendu 2 (non vérifiable, jamais un vert)"
+
+          rm -rf "$FIX"
+
+          echo "== BILAN preuve fixture : $fail écart(s) sur 4 verdicts (conforme, mutation, ratchet, vide) =="
+          if [ "$fail" -ne 0 ]; then exit 1; fi
+          echo "== check-instruction-budget DISCRIMINANT en CI : le flip 0 → 1 sur mutation réelle est prouvé =="
+
+          # --- Bloc 2 — dépôt réel, cascade de résolution exercée telle qu'elle tourne en réel -
+          armed=0
+          [ -f ".planning/.instruction-budget-armed" ] && armed=1
+
+          rc=0
+          out="$(bash "$S" 2>&1)" || rc=$?
+          echo "== dépôt réel (checkout CI, sentinelle armée=$armed) : rc=$rc =="; printf '%s\n' "$out"
+
+          if [ "$armed" -eq 0 ]; then
+            case "$rc" in
+              3)
+                echo "::warning::check-instruction-budget : ratchet NON ARMÉ (sentinelle absente) — budget d'instructions non bloquant tant que la calibration de la Phase 40 n'a pas livré la sentinelle"
+                ;;
+              *)
+                echo "::error::check-instruction-budget : sentinelle absente mais code=$rc (attendu 3) — le ratchet se serait inversé ou le gate serait devenu incapable de se prononcer"
+                exit 1
+                ;;
+            esac
+          else
+            case "$rc" in
+              0)
+                echo "== check-instruction-budget : gate armé et conforme =="
+                ;;
+              1)
+                echo "::error::check-instruction-budget : dépassement de baseline détecté sur le dépôt réel armé"
+                exit 1
+                ;;
+              2)
+                echo "::error::check-instruction-budget : découverte vide ou entrée non vérifiable sur le dépôt réel armé"
+                exit 1
+                ;;
+              *)
+                echo "::error::check-instruction-budget : sentinelle présente mais code=$rc — le gate se croirait non armé alors qu'il ne l'est pas"
+                exit 1
+                ;;
+            esac
+          fi
+
       - name: Gates workstream-aware sur un arbre RÉELLEMENT partitionné (fixture jetable) + non-régression racine
         # POURQUOI CETTE ÉTAPE EXISTE (plan 24-09, exigence GSDA-17). Les trois gates rendus
         # workstream-aware au plan 24-04 et le gate de pointeur créé au plan 24-05 sont tous VERTS

@@ -443,3 +443,146 @@ qui doit être durci au prochain protocole du même genre.
 **Déclencheur de resurgence :** prochain plan qui pose un gate de nettoyage automatisé pour un
 protocole jetable (spike, sonde, plugin de mesure, agent de sonde) — reprendre cet item avant
 d'écrire ce gate, pas après.
+
+## Budget des SKILL.md et du bootstrap — sans enforcement machine (différé de la Phase 25, 2026-09-15)
+
+**Capturé :** 2026-09-15, clôture de la première PR de la Phase 25 (mandat vf-coder, plan 25-03).
+Hors périmètre de BUDG-01 (D-03) — la phase a délibérément limité sa portée aux agents distribués.
+
+**Le défaut :** ADR-029 borne aussi les `SKILL.md` à 500 lignes et le bootstrap à 2000 tokens, mais
+aucun gate distribué ne mesure ni l'un ni l'autre — `plugin/conductor/scripts/check-instruction-budget.sh`
+ne couvre que `plugin/*/agents/*.md` et `plugin/*/AGENT.md` (glob à un seul niveau, D-03).
+
+**Déclencheur de reprise :** le gate `check-instruction-budget.sh` existe désormais et son contrat
+de mesure (lignes du fichier entier + instructions du body, ratchet par sentinelle) est prouvé.
+Étendre sa découverte à un second corpus (`SKILL.md`) est une **modification de portée**, pas une
+reconstruction — reprendre ce script comme socle plutôt qu'en écrire un nouveau.
+
+**Écarté, et non différé :** la métrique en tokens estimés pour le budget du bootstrap (piste F3,
+`25-CONTEXT.md`) — à ne rouvrir que sur un incident lié à la **taille** du bootstrap plutôt qu'à son
+adhérence à la charte de densité.
+
+**Remédiation, pas ici :** l'abaissement des fichiers d'agents distribués les plus chargés (mesurés
+`SANS-BASELINE` au rejeu du 2026-09-15, ex. `plugin/dev-orchestrator/agents/vf-dev-manager.md` à
+250 lignes) est un geste ultérieur, par lot, chacun abaissant une baseline dans son propre commit —
+jamais un livrable de cette phase, et jamais une réécriture « pour passer » le gate.
+
+## Évasion de mesure du budget d'instructions par bloc de code fenced — DIFFÉRÉ (2026-09-15)
+
+**Capturé :** 2026-09-15, audit de la mission d'exécution du plan 25-03 (mandat vf-coder), au-delà
+du périmètre de ce plan (déviation déclarée minimale, non corrigée ici).
+
+**Le défaut :** `count_instructions()` de `plugin/conductor/scripts/check-instruction-budget.sh`
+exclut délibérément le contenu situé entre triples backticks (design assumé, documenté en tête de
+fonction) — une instruction impérative citée à l'intérieur d'un bloc de code échappe donc au
+ratchet. Hors registre STRIDE actuel de ce script.
+
+**Déclencheur de reprise :** un incident constatant qu'une règle a été déplacée dans un bloc de
+code pour échapper au comptage.
+
+## Blocs `<verify><automated>` de plan qui écrasent un script réel sans `trap` — DIFFÉRÉ (2026-09-15)
+
+**Capturé :** 2026-09-15, audit de la mission d'exécution du plan 25-03 (mandat vf-coder), au-delà
+du périmètre de ce plan (déviation déclarée minimale, non corrigée ici).
+
+**Le défaut :** le bloc `<verify><automated>` de la tâche 1 de `25-02-PLAN.md:154` fait
+`cp`/écrasement/`mv` du gate réel `check-instruction-budget.sh` sans filet de restauration. Une
+interruption entre l'écrasement et la restauration laisse un stub de 27 octets à la place du gate
+réel — aucun `trap ... EXIT INT TERM` ne protège la séquence.
+
+**Déclencheur de reprise :** prochaine révision des scripts de vérification de plan qui manipulent
+un fichier réel par écrasement temporaire — durcir par `trap` à cette occasion, pas avant.
+
+## Dérive documentaire et fragilité latente révélées par le gate de budget d'instructions — DIFFÉRÉ (2026-09-15)
+
+**Capturé :** 2026-09-15, clôture documentaire de la Phase 25 (mandat vf-coder), quatre constats
+remontés par les juges de cette mission — aucun corrigé ici, tous hors du périmètre déclaré de la
+phase (`plugin/validator/`, `.planning/codebase/` et la doctrine de `CONVENTIONS.md` ne sont pas
+dans les fichiers livrés par cette phase).
+
+1. **`plugin/validator/README.md:10` affirme « `AGENT.md` = 249 lignes — à 1 ligne du plafond ».
+   Mesure réelle : 250** (concordante par `awk 'END{print NR}'` et `wc -l`). La marge est **zéro**,
+   pas une. Le `CHANGELOG.md` du même module dit juste (« reste à 250/250 »), seul le README ment.
+   `.planning/codebase/CONCERNS.md:79-82` porte le même 249 mais explicitement daté du 2026-07-26 —
+   honnête comme relevé d'époque, pas une erreur.
+   **Échéance dure : avant l'armement du ratchet en Phase 40** — sans correction, une seule ligne
+   ajoutée à `plugin/validator/AGENT.md` fera passer le gate au rouge alors que le README affirmera
+   encore qu'il reste de la marge.
+2. **`.planning/codebase/CONVENTIONS.md:56`** décrit des codes de sortie « normalisés » (`2` =
+   erreur d'usage, `3` = INDÉTERMINÉ) que `check-instruction-budget.sh` inverse délibérément
+   (`64` usage, `2` indéterminé, `3` = ratchet non armé — le script cite nommément cette ligne dans
+   son en-tête comme la convention dont il s'écarte). C'est désormais le **troisième** gate à
+   dévier de cette ligne : « normalisés » ne décrit plus le parc réel.
+3. **`.planning/codebase/TESTING.md`** : ligne 98, « les gates suivent **tous** le contrat F13 »
+   est faux (trois gates dévient, cf. point 2) ; lignes 29-32, la liste du job `gates` compte 3
+   puces pour **10 étapes réelles** (sept manquaient déjà avant cette phase, `check-instruction-budget`
+   en ajoute une dixième).
+4. **Fragilité latente dans `.github/workflows/ci.yml`, étape `check-instruction-budget`, bloc 1**
+   (preuve de discrimination sur fixture) : l'affectation `I="$(bash "$S" --path "$FIX" … | awk
+   …)"` s'exécute avant que la baseline de la fixture existe, donc `rc=2` à ce point précis. Sous
+   le shell réellement utilisé par GitHub Actions pour cette étape (`bash -e {0}`, **sans**
+   `pipefail`), c'est inoffensif et l'étape reste verte — mesuré. Mais si une future édition ajoute
+   `shell: bash` en tête d'étape (donc `-eo pipefail` par défaut de ce runtime), l'affectation
+   hériterait de `rc=2`, `set -e` tuerait l'étape immédiatement : **exit 2, zéro ligne de sortie,
+   aucun diagnostic**. Durcissement suggéré : capturer explicitement le code de retour de cette
+   affectation. **Ne PAS ajouter `|| true`** — le plan de la Phase 25 l'interdit formellement sur
+   une mesure (le gate doit pouvoir rendre rouge, jamais se replier en silence).
+
+**Pourquoi non corrigé ici :** `CONVENTIONS.md` relève de la doctrine transverse du repo (pas d'un
+gate d'une phase) ; `plugin/validator/` et `.planning/codebase/` sont hors du périmètre déclaré de
+la Phase 25 (budget d'instructions), qui s'est délibérément limitée à `plugin/conductor/scripts/`,
+`.github/workflows/ci.yml` et ses propres traces documentaires.
+
+**Déclencheur de reprise :** le point 1 avant l'armement du ratchet en Phase 40 (dur) ; les points
+2-3 à la prochaine révision de `CONVENTIONS.md`/`TESTING.md` ou dès qu'un quatrième gate dévie du
+patron F13/codes normalisés ; le point 4 à la prochaine édition de l'étape CI concernée, ou plus
+tôt si quelqu'un ajoute `shell: bash` à une étape du job `gates`.
+
+## Posture de protection de `main` — TRANCHÉ : phase dédiée à inscrire (2026-09-15)
+
+**Décision** : arbitrage Samuel, AskUserQuestion session principale, 2026-09-15 — ouvrir une **phase
+dédiée « posture de protection du dépôt »** (prochain numéro libre, 41). L'inscription au ROADMAP est
+faite par la session principale **après le merge de la PR #67**, délibérément, pour ne pas créer de
+conflit sur `ROADMAP.md` avec la branche de la Phase 25. Le présent item est la trace côté branche ;
+il cesse d'être un `human_needed` et devient le cahier des charges de cette phase.
+
+**Constat mesuré** (audit de la vague 3, Phase 25) : `gh api repos/picmakpro/vibeflow-os/rulesets`
+rend `[]`, et l'endpoint de protection classique rend 404 avec des permissions `push:true,
+admin:false` — cohérent avec « aucune protection configurée », pas avec un refus d'accès. `main`
+n'est donc protégée par rien.
+
+**Conséquence** : **tout gate in-repo de ce dépôt est neutralisable depuis la PR qu'il juge.** Une
+même PR peut modifier un gate, sa suite de tests et l'étape CI qui l'invoque. Le cas est concret pour
+la Phase 25 (`check-instruction-budget.sh` + `test-check-instruction-budget.sh` + l'étape du job
+`gates`), mais le risque est **structurel et antérieur** : il vaut identiquement pour
+`check-divergence.sh`, `check-agents.sh`, `check-version-sync.sh` et tous les autres. Aucun threat ID
+du registre STRIDE de la Phase 25 ne le nomme — il dépasse le périmètre d'une phase de gate.
+
+**Forme attendue** : un ruleset exigeant la **CI verte avant merge** sur `main`. À poser **dans une
+phase à part, jamais au passage d'une mission** : changer les règles du merge pendant qu'une PR est
+ouverte modifierait les conditions de cette PR en cours de route.
+
+**Points à instruire dans la phase 41** : interaction avec la discipline de release du `CLAUDE.md`
+(le gate `check-release-tag` est déjà `main`-only et échoue par construction au merge, rerun requis
+après le tag) ; sort du hook `pre-push` optionnel (`scripts/hooks`) ; effet sur les hotfix urgents.
+
+**Déclencheur de reprise** : inscription au ROADMAP par la session principale après le merge de
+la PR #67.
+
+## T-25-SC — journal de sécurité de la Phase 25 : TRANCHÉ, geste de clôture (2026-09-15)
+
+**Décision** : arbitrage Samuel, AskUserQuestion session principale, 2026-09-15 — le `25-SECURITY.md`
+est produit **à la clôture de la phase, après le plan 25-04**, par `/gsd-secure-phase` sur la phase
+**complète**, une fois la calibration livrée (donc après la Phase 40). Ce n'est pas une dette
+oubliée : c'est un geste de clôture daté et attendu.
+
+**Pourquoi pas maintenant** : la Phase 25 n'est pas close — 3 plans sur 4 sont livrés, `25-04`
+(calibration, gravure des baselines, armement de la sentinelle) reste un checkpoint bloquant-humain.
+Un journal produit sur une phase à moitié livrée serait à refaire.
+
+**Contexte** : T-25-SC (chaîne d'approvisionnement) est classé `accept` dans le registre STRIDE de la
+phase. Le lab a `security_enforcement: true` / `security_block_on: "high"` ; T-25-SC est `low`, il ne
+bloque donc pas `/gsd-ship` aujourd'hui. Le précédent d'un accept tracé est établi par
+`24-SECURITY.md` et `27-SECURITY.md` (archivés sous `.planning/milestones/agentique-v1.0-phases/`).
+
+**Déclencheur de reprise** : livraison du plan 25-04, avant la clôture de la Phase 25.

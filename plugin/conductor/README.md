@@ -6,7 +6,7 @@
 > et de migration. Module **mandatory** : posé d'office à chaque install, c'est lui qui porte les
 > gates machine (hooks) et le noyau d'orchestration d'équipe réutilisé par tous les autres modules.
 
-**Type** : `agent + skills + scripts + references` · **Version** : v1.36.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
+**Type** : `agent + skills + scripts + references` · **Version** : v1.37.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
 
 > `skill-creator` est une dépendance **dure** depuis ADR-047 : c'est le canal unique de création de
 > skills, invoqué par `vf-new-lab` en fan-out (Phase 5) et exigé par le Gate C. Le conductor étant
@@ -83,20 +83,23 @@ première instanciation non-dev) et les **bundles métier** (business-pilot, con
   --hook` (**advisory**, Phase 32 : lecteur générique des marqueurs de santé du parc, silence
   nominal à 0 octet, une ligne si un garde s'est dégradé récemment).
 
-## Scripts (26) — par famille
+## Scripts (27) — par famille
 
-*(Compte re-dérivé au 2026-09-10 : `find plugin/conductor/scripts -maxdepth 1 -type f -name
-'*.sh' | wc -l` → 26. Le compte « 20 » datait du 2026-08-17 et était déjà faux avant la Phase 39 —
-la phase ajoute `check-divergence.sh` (+1) au-dessus d'un écart préexistant de 5 scripts non
-répertoriés ci-dessous (`check-artifact-fidelity.sh`, `check-description-fidelity.sh`,
-`notify.sh`, `runtime-registry.sh`, `verify-runtime-reversibility.sh`), hors périmètre de cette
-correction — non catalogués ici faute de mandat pour le faire correctement.)*
+*(Compte re-dérivé au 2026-09-15 : `find plugin/conductor/scripts -maxdepth 1 -type f -name
+'*.sh' | awk 'END{print NR}'` → 27, croisé par `git ls-files`. Le compte « 26 » datait du
+2026-09-10 et gagne `check-instruction-budget.sh` (+1, Phase 25) au-dessus d'un écart préexistant
+de 5 scripts non répertoriés ci-dessous (`check-artifact-fidelity.sh`,
+`check-description-fidelity.sh`, `notify.sh`, `runtime-registry.sh`,
+`verify-runtime-reversibility.sh`), hors périmètre de cette correction — non catalogués ici faute
+de mandat pour le faire correctement.)*
 
 **Gates machine (`check-*`)** :
 - `check-agents.sh` — lint de conformité native des agents (ADR-044) : frontmatter, champs requis,
-  skills déclarés existants, budget de préchargement, `vf-internal`, et depuis la Phase 16 le
-  contenu du champ `tools:`/`disallowedTools:` (syntaxe des allowlists `Agent(...)`/`Task(...)`,
-  noms d'outils, résolution graduée des noms d'agents avec préfixes tiers).
+  skills déclarés existants, `vf-internal`, et depuis la Phase 16 le contenu du champ
+  `tools:`/`disallowedTools:` (syntaxe des allowlists `Agent(...)`/`Task(...)`, noms d'outils,
+  résolution graduée des noms d'agents avec préfixes tiers). Il ne mesure ni lignes ni charge
+  d'instructions (contrat réel `check-agents.sh:23-77`) : cette capacité est celle de
+  `check-instruction-budget.sh`, entrée propre ci-dessous (D-05, corrigé Phase 25).
 - `guard-agent-write.sh` — enforcement du gate ci-dessus à l'écriture (hook Write).
 - `check-debug-research.sh` — phase de recherche documentaire avant debug dans les briques de
   dépannage (ADR-045).
@@ -124,6 +127,15 @@ correction — non catalogués ici faute de mandat pour le faire correctement.)*
   `git config core.hooksPath scripts/hooks`, jamais armé par défaut, n'interrompt jamais un merge)
   et par le job CI `gates` (preuve locale par bascule de mutation — aucun run GitHub Actions réel
   observé à ce jour, rien n'ayant encore été poussé). Doctrine : `dev-orchestrator/references/workstreams.md` §4.
+- `check-instruction-budget.sh` — mesure et publie, par fichier d'agent distribué
+  (`plugin/*/agents/*.md` et `plugin/*/AGENT.md`), deux métriques : lignes du fichier entier et
+  instructions du body (Phase 25, BUDG-01/02, ADR-029). Ratchet par sentinelle versionnée
+  `.planning/.instruction-budget-armed`, LUE seulement, jamais écrite. Cinq codes de sortie :
+  `0` armé et conforme, `1` armé avec dépassement de baseline ou du plafond de 250 lignes, `2` non
+  vérifiable (découverte vide, fichier imparsable, contrat de baseline incohérent), `3` non armé
+  (rapport imprimé, jamais bloquant), `64` erreur d'usage. Consommé par le job CI `gates`
+  (avertissement en mode non armé, blocage en mode armé). **La sentinelle n'est pas posée à ce
+  stade** : aucune baseline n'est encore gravée, la calibration attend la livraison de la Phase 40.
 
 **Team-kernel** : `dag.sh` (plan de bataille persistant, frontière `ready`), `driver-lock.sh`
 (verrou de mission atomique par `mkdir`, battement séparé de la lease, verbes `takeover`/`reclaim`

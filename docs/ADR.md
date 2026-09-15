@@ -64,6 +64,16 @@
 > CHANGELOG des modules et `docs/superpowers/specs/`. **ADR-031 ne désigne QUE la validation
 > humaine** — l'ancien second emploi (« vigilance support runtime ») est ADR-056.
 
+> **ADR-029 : enforcement machine à partir de la Phase 25 (2026-09-15)** — le plafond de lignes
+> des agents distribués et leur charge d'instructions sont désormais mesurés et publiés par
+> `plugin/conductor/scripts/check-instruction-budget.sh`. Le ratchet est armé par la sentinelle
+> `.planning/.instruction-budget-armed`, **NON POSÉE à cette date** — la calibration (baseline
+> gravée, sentinelle posée) attend la livraison de la Phase 40. État antérieur : seule la suite
+> mono-module `plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh` (T3/T5) enforçait
+> le plafond de lignes, et rien ne mesurait la charge d'instructions. L'entrée d'index ci-dessus
+> n'est ni réécrite, ni renumérotée, ni complétée par cette note (même discipline que la note
+> `ADR-065`).
+
 ---
 
 ## ADR-046 : Équipe manager de mission — arborescence à contexte minimal
