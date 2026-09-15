@@ -17,19 +17,27 @@ stopped_at: >-
   ADR-069 amendé. **Dépôt volontairement NON partitionné** (D-02 = déclencheur de reprise, § Decisions).
   Réserves inchangées : premier run CI distant observé sur la PR #62 seulement ; le clone jetable
   prouve un mécanisme, pas un usage concurrent réel. Issue amont `init-progress` rédigée, jamais postée.
+  **Note (2026-09-15, plan 34-06) : `current_phase` reste intentionnellement à 39 malgré l'exécution
+  complète et la ledgerisation de la Phase 34 (numérotée AVANT 39 dans le ROADMAP, exécutée APRÈS) —
+  même précédent que la Phase 23 (§ Roadmap Evolution du 2026-08-04) : ce champ, gaté en
+  anti-régression par `check-state-integrity.sh`, ne peut décroître au sein du même jalon ; il suit
+  la progression numérique séquentielle, pas le dernier geste chronologique. Le travail réel de la
+  Phase 34 est documenté dans `## Current Position` et `### Roadmap Evolution` ci-dessous, jamais
+  perdu — seul ce pointeur numérique reste sur sa valeur la plus haute atteinte.**
 last_updated: "2026-09-15T00:00:00.000Z"
-last_activity: 2026-09-14
+last_activity: 2026-09-15
 last_activity_desc: >-
-  Ship de la Phase 39 en v2.60.0 (PR #62) : bump racine + conductor v1.35.0 + dev-orchestrator
-  v2.20.4, entrée CHANGELOG absorbant la section « Non releasé » (hotfix PR #61), historique des deux
-  README, clôture ROADMAP/REQUIREMENTS/STATE. Tag annoté et release GitHub posés après merge
-  (`check-release-tag.sh --remote` en gate final).
+  Consolidation du ledger de la Phase 34 (plan 34-06) : trois verdicts transcrits sur pièces au
+  BACKLOG/REQUIREMENTS/PROJECT, un item BACKLOG structurel daté ajouté (gate de nettoyage du spike
+  SKIL-01 borné à une liste auto-déclarée, pas à l'état réel du disque), compteurs de `progress`
+  re-dérivés par comptage réel (jamais recopiés), `check-state-integrity.sh` et
+  `check-machine-paths.sh` rejoués en gate.
 progress:
   total_phases: 11
-  completed_phases: 8
-  total_plans: 41
-  completed_plans: 41
-  percent: 73
+  completed_phases: 9
+  total_plans: 51
+  completed_plans: 51
+  percent: 82
 ---
 
 # Project State
@@ -71,7 +79,15 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 ## Current Position
 
-Phase: **18** (Survie du ledger d'exigences à la clôture de jalon) — **LIVRÉE le 2026-08-18**,
+Phase: **34** (Gaps agency-agents & cadrage skill-installer) — **EXÉCUTÉE ET LEDGERISÉE le
+2026-09-15** (6/6 plans, SUMMARY sur disque, ledger consolidé par 34-06). Trois verdicts rendus
+sur pièces : AGTS-01 close avec verdict par gap (`34-AUDIT-AGTS.md`), SKIL-01 close en NO-GO
+(`34-SPIKE-SKIL.md`), AGTS-02 **reportée avec trace** (`34-RUN-MOBILE.md`, chapeau ROUGE) — la
+sortie d'expérimental de `mobile-test`(-team) reste non atteinte, `web-test-team` non construite.
+Aucune PR, aucun tag, aucune release posés par cette phase (gestes humains gatés). Prochain
+geste : ship (humain) de la Phase 34, ou cadrage de la Phase 25 (dépendante de la clôture de la
+34, D-06 de la Phase 39) ou de la Phase 40. Précédente : 18 livrée le 2026-08-18, 39 shippée
+v2.60.0 le 2026-09-14.
 3 plans exécutés (`18-01-SUMMARY.md` LEDG-02, `18-02-SUMMARY.md` LEDG-01, `18-03-SUMMARY.md`
 doctrine D-18-14 + bump module `dev-orchestrator` v2.18.0 → v2.19.0), 12/12 suites vertes,
 branche `feat/phase-18-survie-ledger-exigences`. **Non shippée** — PR, tag et release restent des
@@ -176,6 +192,27 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 
 ### Roadmap Evolution
 
+- 2026-09-15 : **Phase 34 exécutée et ledgerisée — trois verdicts rendus sur pièces, aucun code
+  d'agent ni d'installeur.** 6/6 plans clos, SUMMARY sur disque. **Ce qui a été mesuré** :
+  AGTS-01 — matrice division→module re-mesurée contre le parc réel (31 fichiers distribués), six
+  gaps `refuser` faute de preuve au sens D-02 (Security, Sales, Product, Paid Media, Support,
+  verticales niche), un gap `reporter` (`web-test-team`, Testing, sur dépendance à AGTS-02) —
+  détail `34-AUDIT-AGTS.md`. SKIL-01 — spike à contrôle négatif : le canal `/plugin` natif atteint
+  DÉJÀ un sous-agent doté de l'outil `Skill` (`CAS-A: ATTEINT`) — détail `34-SPIKE-SKIL.md`. AGTS-02
+  — premier run réel de `mobile-test`(-team) sur `Scroll-Off/frontend` (iOS), piloté par l'équipe
+  (`vf-test-orchestrator` réel, 2 cycles) — `PIPELINE: VERT` / `EQUIPE: ROUGE`, signal d'alarme
+  absolu sur un flow authentifié — détail `34-RUN-MOBILE.md`. **Ce qui a été tranché** : SKIL-01
+  clos NO-GO (item BACKLOG du 2026-06-04 clos, anti-feature « marketplace de skills maison »
+  maintenue gravée, zéro ligne de code d'installeur) ; AGTS-01 clos sans création d'agent (les six
+  refus restent refusés jusqu'à preuve nouvelle nommée) ; les plans 34-04/34-05 (conditionnels au
+  run vert) clos en no-op tracé, `web-test-team` non construite. **Ce qui reste ouvert** : AGTS-02
+  **reportée avec trace** (D-05), déclencheur de reprise daté au BACKLOG — vérification humaine du
+  Keychain du simulateur `8BD53E84-B5BF-482A-8FE5-6A9980555951` et de la disponibilité du backend
+  Scroll-Off, geste explicitement à la charge de Samuel ; un angle mort structurel trouvé en audit
+  de mission (le gate de nettoyage du spike SKIL-01 ne vérifiait que des chemins auto-déclarés, pas
+  l'état réel du disque) est entré au BACKLOG comme item daté avec sa preuve, le plan 34-02 restant
+  une archive exécutée non modifiée. Ship (PR/tag/release) reste un geste humain non posé par cette
+  phase.
 - 2026-09-15 : **Phase 40 inscrite au ROADMAP — `vibeflow-head`, head of minds du
   dev-orchestrator** (demande de Samuel, session principale). Conception cadrée le même jour, spec
   d'entrée `docs/superpowers/specs/2026-09-15-vibeflow-head-design.md` ; quatre arbitrages
@@ -467,6 +504,33 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
+
+- **2026-09-15 — Phase 34, arbitrages de clôture des trois verdicts.** Tous rendus par Samuel,
+  canal AskUserQuestion session principale, date 2026-09-15 :
+  1. **SKIL-01, verdict NO-GO** (arbitrage Samuel, AskUserQuestion session principale, 2026-09-15) :
+     le canal `/plugin` natif atteint déjà un sous-agent doté de `Skill`, un trou mesuré n'existe
+     pas — one-way, item BACKLOG du 2026-06-04 clos.
+  2. **SKIL-01, vecteur de mesure jugé acceptable** (arbitrage Samuel, AskUserQuestion session
+     principale, 2026-09-15) : le process `claude` CLI frais (`--permission-mode bypassPermissions`)
+     suffit à la mesure, aucune relance ni mesure complémentaire de scope project demandée.
+  3. **SKIL-01, purge des résidus post-spike** (arbitrage Samuel, AskUserQuestion session
+     principale, 2026-09-15) : autorise la purge du cache disque du plugin et de l'entrée orpheline
+     de `~/.claude.json` ; les transcripts de session sont explicitement laissés intacts, choix
+     consigné, pas un oubli.
+  4. **AGTS-02, run ROUGE — pas de sortie d'expérimental** (arbitrage Samuel, AskUserQuestion
+     session principale, 2026-09-15) : AGTS-02 reste reportée avec trace ; le départage (a) session
+     perdue vs (b) robustesse de `fetchRenewToken` reste explicitement à la charge de Samuel, aucun
+     agent ne tranche à sa place — vérification manuelle du Keychain du simulateur
+     `8BD53E84-B5BF-482A-8FE5-6A9980555951` et de la disponibilité du backend Scroll-Off requise
+     avant tout nouveau run.
+  5. **AGTS-02, retour du commit de fix Metro dans `Scroll-Off/frontend`** (arbitrage Samuel,
+     AskUserQuestion session principale, 2026-09-15) : `git reset --hard` du seul commit de fix
+     (réel et sourcé mais insuffisant à sortir le run du rouge), aucun push — détail
+     `34-RUN-MOBILE.md` § « Effets de bord de l'arbitrage Samuel ».
+  6. **Item BACKLOG structurel du gate de nettoyage du spike SKIL-01** (arbitrage Samuel,
+     AskUserQuestion session principale, 2026-09-15) : entre au BACKLOG comme item daté avec sa
+     preuve (dette structurelle, pas un incident clos) ; le plan 34-02 reste une archive exécutée
+     non modifiée.
 
 - **2026-09-10 — Déclencheur de reprise — partition réelle de vibeflow-os (D-02, condition de RAPPEL
   corrigée le 2026-09-10).** L'**acte** de partitionner reste gaté humain, SUR DEMANDE EXPLICITE de
@@ -1172,9 +1236,9 @@ Recent decisions affecting current work:
 **Resume file:** .planning/phases/VFDO-34-gaps-agency-agents-cadrage-skill-installer/34-CONTEXT.md (et `.planning/phases/VFDO-40-vibeflow-head-head-of-minds-du-dev-orchestrator/40-CONTEXT.md`, `.planning/phases/VFDO-25-budget-d-instructions-et-tage-d-alignement-court/25-CONTEXT.md`)
 
 Last session: 2026-09-15
-Stopped at: Phase 40 (`vibeflow-head`, head of minds) inscrite ET cadrée (spec d'entrée + CONTEXT.md + DISCUSSION-LOG.md sur `feat/cadrage-phase-40`, 16 arbitrages Samuel du 2026-09-15). Phases 34 et 25 cadrées la veille, aucune des trois planifiée. v2.61.0 releasée plus tôt le même jour (PR #64).
+Stopped at: **Phase 34 PLANIFIÉE** (2026-09-15, PR #65 de cadrage de la 40 mergée le même jour) — recherche `34-RESEARCH.md`, patterns, validation, 6 plans `34-01..06` en 4 vagues (vague 1 = trois volets à périmètres disjoints ; 34-04 et 34-05 conditionnels au run mobile VERT ; 34-06 ledger), plan-checker PASSED, couverture décisions 11/11, exigences 3/3. Commits `cba0da5`, `ce6cf93`, `423aa62` sur `main`. Next : exécution par `vf-dev-manager` en mode superviser (demande Samuel, session principale, 2026-09-15).
 
-**Reprendre par** : `/gsd-plan-phase 34` — puis `/gsd-plan-phase 40` (dépend de la 34 : zéro agent neuf, et la 25 se calibre sur le corpus post-40 — dépendance de la 25 amendée le 2026-09-15) (run mobile de sortie d'expérimental sur Scroll-Off en première vague, spike SKIL en parallèle, audit AGTS-01). La Phase 25 peut être planifiée dès maintenant, mais sa **calibration** (baselines, armement) est un **checkpoint bloquant** jusqu'à la clôture de la 34 (25-CONTEXT D-06). `current_phase` du frontmatter reste 39 : le gate `check-state-integrity` interdit toute décroissance, et aucune des deux phases n'est démarrée.
+**Reprendre par** : `/gsd-execute-phase 34` via `Task(vf-dev-manager)` (brief : périmètre 34, mode superviser, design off) — puis `/gsd-plan-phase 40` (dépend de la 34 : zéro agent neuf, et la 25 se calibre sur le corpus post-40 — dépendance de la 25 amendée le 2026-09-15) (run mobile de sortie d'expérimental sur Scroll-Off en première vague, spike SKIL en parallèle, audit AGTS-01). La Phase 25 peut être planifiée dès maintenant, mais sa **calibration** (baselines, armement) est un **checkpoint bloquant** jusqu'à la clôture de la 34 (25-CONTEXT D-06). `current_phase` du frontmatter reste 39 : le gate `check-state-integrity` interdit toute décroissance, et aucune des deux phases n'est démarrée.
 
 **Ce qui reste fermé, quoi qu'il arrive** :
 - **Aucune partition réelle de `vibeflow-os`** sans geste humain explicite — déclencheur D-02 (§ Decisions, 2026-09-10).
