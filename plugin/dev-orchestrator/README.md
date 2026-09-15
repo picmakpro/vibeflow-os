@@ -1,7 +1,7 @@
 # dev-orchestrator — Orchestrateur de développement (VFDO)
 
 > Module VibeFlow qui pilote le cycle de développement en **modèle agentique** : un agent
-> `vibeflow-dev` qui détecte l'intention en langage naturel et invoque **directement** les
+> `vibeflow-head` qui détecte l'intention en langage naturel et invoque **directement** les
 > briques gsd-*/superpowers installées, une **équipe de mission** (manager + workers) pour le
 > multi-étapes, **2 skills** (`vf-auto`, `vf-dev`) et une **carte d'intention unique**. Plus de
 > façade de verbes : GSD est l'interface directe du quotidien, l'agent est l'entrée
@@ -19,7 +19,7 @@ pipeline de développement complet. Le modèle est agentique, pas une couche de 
 
 1. **Les briques gsd-*** se déclenchent nativement sur leurs propres descriptions — c'est le
    cas courant, sans intermédiaire.
-2. **L'agent `vibeflow-dev`** (`AGENT.md`) — l'entrée conversationnelle : détecte l'intention
+2. **L'agent `vibeflow-head`** (`AGENT.md`) — l'entrée conversationnelle : détecte l'intention
    (y compris floue ou composite), invoque directement la brique outillée qui la porte, propose
    **LE next step** depuis la feuille de route après chaque geste fermé, déclenche l'**hygiène
    documentaire** aux bons moments (specs, STATE/ROADMAP, registres — jamais au fil de l'eau)
@@ -40,7 +40,7 @@ S'y ajoutent :
 - **2 skills survivants** (`skills/`) — logique réelle, pas façade :
   - `vf-auto` : porte d'autonomie — seuil `SEUIL_EQUIPE`, aiguillage `gsd-autonomous` inline
     vs équipe de mission.
-  - `vf-dev` : point d'entrée générique — incarne l'agent `vibeflow-dev` (3 lignes, aucune
+  - `vf-dev` : point d'entrée générique — incarne l'agent `vibeflow-head` (3 lignes, aucune
     table dupliquée).
 - **Scripts** (`scripts/`) — bootstrap, indexation et kernel d'orchestration :
   - `ensure-deps.sh` : auto-install non-interactif et **idempotent** de GSD + Superpowers
@@ -71,7 +71,7 @@ S'y ajoutent :
 
 ```
 dev-orchestrator/
-├── AGENT.md                       # agent vibeflow-dev (≤250L, dense)
+├── AGENT.md                       # agent vibeflow-head (≤250L, dense)
 ├── agents/                        # équipe de mission
 │   ├── vf-dev-manager.md          # manager de mission — exposé (opus)
 │   ├── vf-coder.md                # worker interne (vf-internal: true, sonnet)
@@ -146,7 +146,7 @@ L'installeur pose, de bout en bout :
 ### Langage naturel (recommandé)
 
 L'utilisateur parle normalement ; les briques gsd-* se déclenchent nativement, ou l'agent
-`vibeflow-dev` détecte l'intention et invoque la brique :
+`vibeflow-head` détecte l'intention et invoque la brique :
 
 | Vous dites… | Brique invoquée (coulisse) |
 |---|---|
@@ -303,7 +303,7 @@ Exit 0 si tout passe (les SKIP, ex. GSD absent, ne font pas échouer la suite).
   portée à 18 noms.
 - **v2.2.1** — échappatoire ADR-031 fermée : l'ingestion remonte nominativement à l'humain
   depuis `vf-dev-manager` aussi (jamais déclenchée en mission sans confirmation).
-- **v2.2.0** — câblage de l'ingestion (BRDG-01/BRDG-03) dans `vibeflow-dev` : doctrine
+- **v2.2.0** — câblage de l'ingestion (BRDG-01/BRDG-03) dans l'agent routeur du module (renommé `vibeflow-head` en Phase 40) : doctrine
   `references/ingestion-flow.md` (découverte, manifest, délégation `gsd-ingest-docs`/
   `gsd-import`, garde-fous BLOCKER/ADR-031/mode merge/cap 50), proposée comme next step en fin
   de cadrage.

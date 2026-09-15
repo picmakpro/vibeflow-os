@@ -64,7 +64,7 @@ mobile-test|gsd-verify-work|mobile-test = preuve sur cible mobile réelle (simul
 gsd-explore|superpowers:brainstorming|brainstorming = concevoir une idée avant d'implémenter ; gsd-explore = exploration socratique et routage d'idée
 consolidator|gsd-mempalace-capture|consolidator = canon mémoire de lab (in-repo, machine-enforced, ADR-052) ; mempalace = opt-in, exige MemPalace, mémorise des artefacts de phase GSD via le loop-bus interne — non activé, non répliqué
 consolidator|gsd-mempalace-recall|consolidator = canon mémoire de lab (in-repo, machine-enforced, ADR-052) ; mempalace = opt-in, exige MemPalace, mémorise des artefacts de phase GSD via le loop-bus interne — non activé, non répliqué
-vibeflow-dev|gsd-next|vibeflow-dev = front door unique du lab (agent routeur) ; gsd-next = front door de GSD pour qui n'a pas d'agent routeur — ne jamais router gsd-next (empilerait deux routeurs, ADR-057)
+vibeflow-head|gsd-next|vibeflow-head = front door unique du lab (agent routeur) ; gsd-next = front door de GSD pour qui n'a pas d'agent routeur — ne jamais router gsd-next (empilerait deux routeurs, ADR-057)
 EOF
 )
 

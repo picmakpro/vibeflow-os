@@ -43,7 +43,7 @@ and **every token has a job** (sonnet workers, digests, on-demand loading, paral
 
 ## 🔁 The dev cycle — spec-driven
 
-Say _"add Google auth"_: the `vibeflow-dev` agent detects the intent and runs the GSD pipeline —
+Say _"add Google auth"_: the `vibeflow-head` agent detects the intent and runs the GSD pipeline —
 scoping, verified plan, atomic execution, read-only judges — leaving an artifact on disk at
 every step, so the context can die without the project losing ground.
 

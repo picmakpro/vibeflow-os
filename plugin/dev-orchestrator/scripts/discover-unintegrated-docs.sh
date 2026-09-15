@@ -3,7 +3,7 @@
 #                                  de route ? (BRDG-02)
 #
 # Rôle (ADR-055 §3) : répondre au FAIT, jamais au métier. Ce script ne dit PAS si un document est
-# un ADR, une SPEC, un PRD ou un DOC — ça reste du jugement porté par l'agent (vibeflow-dev, plan
+# un ADR, une SPEC, un PRD ou un DOC — ça reste du jugement porté par l'agent (vibeflow-head, plan
 # 13-02). Il dit seulement : « ce document existe sous docs/superpowers/{specs,plans}/, et aucun
 # registre ne le cite » — et à quel GRAIN il appartient (spec | plan).
 #

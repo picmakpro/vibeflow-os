@@ -6,7 +6,7 @@
 > façade vf-*, modèle agentique).
 >
 > **Chargement on-demand** — comme `GSD-PIPELINE.md` et `mission-contracts.md`, ce fichier n'est
-> **pas** chargé en session normale. Les agents (`vibeflow-dev`, `vf-dev-manager`) le consultent
+> **pas** chargé en session normale. Les agents (`vibeflow-head`, `vf-dev-manager`) le consultent
 > quand une intention ne tombe pas manifestement dans un geste connu. Coût contexte nul sinon.
 >
 > Chemin d'install (D7) : `.claude/agents/dev-orchestrator-references/intent-routing.md`
@@ -165,7 +165,7 @@ l'index ; ajouter un skill interne sans le router fait échouer la suite) :
    design (`vf-design` → agent `vibeflow-design`), pas par cette carte.
 4. **Non routé — une seule voix (ADR-057)** : `gsd-next` et `gsd-mempalace-capture` /
    `gsd-mempalace-recall` sont **délibérément absents** de toute table de routage.
-   - `gsd-next` est la front door de GSD pour qui n'a pas d'agent routeur ; `vibeflow-dev` EST
+   - `gsd-next` est la front door de GSD pour qui n'a pas d'agent routeur ; `vibeflow-head` EST
      déjà la front door de ce lab — router `gsd-next` empilerait deux routeurs (la couche que la
      bascule agentique v2.33.0 a supprimée). Voir `check-overlaps.sh`.
    - `gsd-mempalace-capture`/`gsd-mempalace-recall` mémorisent des artefacts de phase GSD

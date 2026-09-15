@@ -21,7 +21,7 @@ paths:
 > Rule **path-scopée** : se charge automatiquement dès qu'on touche du code applicatif ou un
 > manifeste de dépendances. Sur un projet sans ces chemins, elle reste dormante.
 > Principe VibeFlow : *enforcement > prose*. L'application **active** (au moment où l'on part
-> dépanner) est portée par le skill `vf-debug`, l'agent `vibeflow-dev` et, en boucle autonome,
+> dépanner) est portée par le skill `vf-debug`, l'agent `vibeflow-head` et, en boucle autonome,
 > l'agent `vf-test-orchestrator`. Cette rule est le filet path-scopé ; elle **référence** ces
 > briques sans dupliquer leur logique.
 
@@ -85,5 +85,5 @@ Chaque piste **cite sa source** (lien issue, numéro de version, page de doc).
 - `reference/content/methodology/patterns/05-regles.md` (mécanique de rule auto-scopée).
 - `dev-orchestrator` → `references/autonomous-guardrails.md` (garde-fou 1 anti-thrash, garde-fou 6
   recherche-doc).
-- Skill `vf-debug` · agent `vibeflow-dev` · agent `vf-test-orchestrator` · worker `vf-app-fixer`.
+- Skill `vf-debug` · agent `vibeflow-head` · agent `vf-test-orchestrator` · worker `vf-app-fixer`.
 - Template debugger : `reference/content/methodology/templates/skills/debugger/SKILL.md` (Phase 0).
