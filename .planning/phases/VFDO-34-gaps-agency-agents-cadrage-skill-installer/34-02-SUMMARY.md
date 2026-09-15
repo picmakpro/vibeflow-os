@@ -106,7 +106,7 @@ $ rm -f ~/.claude/agents/skil01-probe-agent.md
 **Premier passage (fin tâche 2).** Nettoyage effectivement retiré et prouvé, mais borné par sa
 propre liste (les deux seuls chemins que le protocole avait lui-même listés à leur création) :
 
-- `/Users/samuel/.claude/agents/skil01-probe-agent.md` → `test -e` négatif après suppression
+- `~/.claude/agents/skil01-probe-agent.md` → `test -e` négatif après suppression
   (`AGENT ABSENT`)
 - `/private/tmp/claude-501/.../scratchpad/skil01/skil01-probe-plugin` → `test -e` négatif après
   suppression (`REPO ABSENT`)

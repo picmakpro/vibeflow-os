@@ -89,7 +89,7 @@ appel CLI, pas un dispatch interne à cette session.
 
 ```
 $ which claude && claude --version
-/Users/samuel/.local/bin/claude
+/Users/samuel/.local/bin/claude  <!-- vf-allow-machine-path : sortie verbatim de `which`, non anonymisée -->
 2.1.271 (Claude Code)
 
 $ claude plugin --help
@@ -109,12 +109,14 @@ $ rtk proxy find ~/.claude/skills -iname "*skil01*"
 (sortie vide)
 exit=0
 
-$ rtk proxy grep -ril "skil01-probe-nonexistant" /Users/samuel/Documents/dev/vibeflow-os/.claude/skills/
-grep: /Users/samuel/Documents/dev/vibeflow-os/.claude/skills/: No such file or directory
+$ rtk proxy grep -ril "skil01-probe-nonexistant" .claude/skills/
+grep: .claude/skills/: No such file or directory
 exit=2
 ```
-Le dossier de skills PROJET n'existe même pas dans `vibeflow-os` (`.claude/` existe, `.claude/skills/`
-non) : absence garantie par construction, pas seulement par recherche vide.
+(Chemin rendu relatif à la racine du dépôt — cwd était déjà la racine de `vibeflow-os` au moment
+de l'exécution ; même résultat, rejouable sur un autre poste.) Le dossier de skills PROJET n'existe
+même pas dans `vibeflow-os` (`.claude/` existe, `.claude/skills/` non) : absence garantie par
+construction, pas seulement par recherche vide.
 
 ```
 $ rtk proxy grep -ril "skil01-probe-nonexistant" ~/.claude/plugins/
@@ -275,7 +277,7 @@ resterait strictement du câblage (D-09), jamais une nouvelle logique de copie.
 Liste construite AU FUR ET À MESURE de la pose (dès la création de chaque artefact), pas
 reconstituée en fin de plan.
 
-- chemin supprimé : /Users/samuel/.claude/agents/skil01-probe-agent.md
+- chemin supprimé : ~/.claude/agents/skil01-probe-agent.md
 - chemin supprimé : /private/tmp/claude-501/-Users-samuel-Documents-dev-vibeflow-os/db082daa-75e4-4a05-bfb1-575528ffda73/scratchpad/skil01/skil01-probe-plugin
 
 Preuve d'absence, machine, après nettoyage :
@@ -308,10 +310,10 @@ plus loin et trouve ce que la liste ci-dessus ne couvrait pas :
 
 ```
 $ find ~/.claude -iname "*skil01*"
-/Users/samuel/.claude/plugins/cache/skil01-probe-marketplace
-/Users/samuel/.claude/plugins/cache/skil01-probe-marketplace/skil01-probe-plugin
-/Users/samuel/.claude/plugins/cache/skil01-probe-marketplace/skil01-probe-plugin/0.0.1/skills/skil01-probe-skill
-/Users/samuel/.claude/projects/-private-tmp-claude-501--Users-samuel-Documents-dev-vibeflow-os-db082daa-75e4-4a05-bfb1-575528ffda73-scratchpad-skil01
+/Users/samuel/.claude/plugins/cache/skil01-probe-marketplace  <!-- vf-allow-machine-path : sortie verbatim de `find` -->
+/Users/samuel/.claude/plugins/cache/skil01-probe-marketplace/skil01-probe-plugin  <!-- vf-allow-machine-path : sortie verbatim de `find` -->
+/Users/samuel/.claude/plugins/cache/skil01-probe-marketplace/skil01-probe-plugin/0.0.1/skills/skil01-probe-skill  <!-- vf-allow-machine-path : sortie verbatim de `find` -->
+/Users/samuel/.claude/projects/-private-tmp-claude-501--Users-samuel-Documents-dev-vibeflow-os-db082daa-75e4-4a05-bfb1-575528ffda73-scratchpad-skil01  <!-- vf-allow-machine-path : sortie verbatim de `find` -->
 ```
 
 ### Résidus trouvés après le premier passage — l'angle mort de la première preuve
@@ -379,7 +381,7 @@ entrée de l'objet) :
 
 Validation JSON après coup :
 ```
-$ python3 -c "import json; json.load(open('/Users/samuel/.claude.json')); print('VALID JSON AFTER')"
+$ python3 -c "import json; json.load(open('/Users/<user>/.claude.json')); print('VALID JSON AFTER')"
 VALID JSON AFTER
 ```
 Diff textuel observé au moment de l'édition (5506 → 5502 lignes) :
@@ -400,8 +402,8 @@ clé**, pas un comptage de lignes :
 ```
 $ python3 -c "
 import json
-a = json.load(open('/Users/samuel/.claude.json.bak-20260915-032715'))
-b = json.load(open('/Users/samuel/.claude.json'))
+a = json.load(open('/Users/<user>/.claude.json.bak-20260915-032715'))
+b = json.load(open('/Users/<user>/.claude.json'))
 ka, kb = set(a.keys()), set(b.keys())
 print('keys A:', len(ka), 'keys B:', len(kb))
 print('added:', kb - ka)
@@ -427,7 +429,7 @@ déjà corrigés dans cette note, évité ici en NE figeant pas le nombre.
 
 ```
 $ find ~/.claude -iname "*skil01*"
-/Users/samuel/.claude/projects/-private-tmp-claude-501--Users-samuel-Documents-dev-vibeflow-os-db082daa-75e4-4a05-bfb1-575528ffda73-scratchpad-skil01
+/Users/samuel/.claude/projects/-private-tmp-claude-501--Users-samuel-Documents-dev-vibeflow-os-db082daa-75e4-4a05-bfb1-575528ffda73-scratchpad-skil01  <!-- vf-allow-machine-path : sortie verbatim de `find` -->
 ```
 
 Un seul résultat : les transcripts de session, laissés intacts sur arbitrage explicite (ci-dessus).
