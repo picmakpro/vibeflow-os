@@ -63,10 +63,14 @@ Les six vecteurs sont devenus des **cas nommés de non-régression** dans la sui
 
 **Piège évité** : `manual/*/07-*/les-gates-machine.md` affirme que le plafond n'est pas vérifié « dans ton lab » — **reste VRAI** (le gate globe `plugin/*/agents/*.md`, absent d'un lab ; aucun hook ne le câble). Le « corriger » l'aurait rendu faux.
 
-## `human_needed` — remontés par `SendMessage(main)`, sans réponse à la clôture
+## Arbitrages — remontés par `SendMessage(main)`, **tranchés par Samuel le 2026-09-15**
 
-1. **`main` sans protection de branche** (`gh api rulesets` → `[]`) : le gate est neutralisable depuis la PR qu'il juge. Structurel, pré-existant. Recommandation : tracer, ne pas poser de ruleset en fin de mission (cela changerait les règles du merge en cours).
-2. **T-25-SC accepté sans `25-SECURITY.md`** (précédents : `24-SECURITY.md`, `27-SECURITY.md`). `low`. Recommandation : produire à la clôture de phase, pas sur une phase à moitié livrée.
+Les deux points sont sortis de `human_needed`. Arbitrage Samuel, AskUserQuestion session principale, 2026-09-15 ; consignés au BACKLOG et dans `STATE.md` § Decisions sur la branche.
+
+1. **`main` sans protection de branche** (`gh api rulesets` → `[]`, endpoint classique 404 avec `push:true, admin:false` — absence de configuration, pas un refus d'accès) : tout gate in-repo est neutralisable depuis la PR qu'il juge. Structurel et **antérieur** à cette phase, non nommé par son registre STRIDE.
+   → **Tranché : phase dédiée « posture de protection du dépôt »**, prochain numéro libre (41), inscrite au ROADMAP par la session principale **après le merge de la PR #67** — délibérément, pour ne pas créer de conflit sur `ROADMAP.md` avec cette branche. Forme attendue : ruleset exigeant la CI verte avant merge, **jamais posé au passage d'une mission**. Ma recommandation initiale (tracer sans agir) est retenue et durcie en phase à part entière.
+2. **T-25-SC accepté sans `25-SECURITY.md`** (précédents : `24-SECURITY.md`, `27-SECURITY.md`). `accept`/`low`, ne bloque pas `/gsd-ship`.
+   → **Tranché : journal produit à la clôture de la phase, après 25-04**, par `/gsd-secure-phase` sur la phase complète, une fois la calibration livrée (donc après la Phase 40). Geste de clôture **daté et attendu**, pas une dette oubliée. Conforme à ma recommandation.
 
 ## Calibration — verbatim, jamais recalculée
 
@@ -92,3 +96,5 @@ Les six vecteurs sont devenus des **cas nommés de non-régression** dans la sui
 ## Next step
 
 **`/gsd-plan-phase 40`**, puis la Phase 40 livrée. Le plan 25-04 (calibration, pose de la baseline et de la sentinelle) reste bloqué sur sa précondition machine — `name: vibeflow-head` dans `plugin/dev-orchestrator/AGENT.md` sur `main`, fausse aujourd'hui. À l'armement : traiter d'abord le `249 → 250` de `plugin/validator/README.md`.
+
+Deux gestes appartiennent à la session principale, **après le merge de la PR #67** : inscrire la phase 41 « posture de protection du dépôt » au ROADMAP (arbitrage 1 ci-dessus), et retenir `/gsd-secure-phase` comme geste de clôture de la Phase 25 une fois 25-04 livré (arbitrage 2).

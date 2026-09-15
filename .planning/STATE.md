@@ -525,6 +525,26 @@ Recent decisions affecting current work:
   les instructions impératives du **corps** d'un `AGENT.md`/`SKILL.md` seul, frontmatter exclu —
   confirmation d'un choix déjà pris au cadrage 25-01, ratifié sans changement après audit.
 
+- **2026-09-15 — Protection de branche de `main` : phase dédiée** (arbitrage Samuel, AskUserQuestion
+  session principale, 2026-09-15) : `gh api repos/picmakpro/vibeflow-os/rulesets` rend `[]` — `main`
+  n'est protégée par rien, donc **tout gate in-repo est neutralisable depuis la PR qu'il juge** (une
+  même PR peut modifier un gate, sa suite et l'étape CI qui l'invoque). Risque **structurel et
+  antérieur** à la Phase 25, non nommé par son registre STRIDE. Tranché : une **phase dédiée
+  « posture de protection du dépôt »** (prochain numéro libre, 41), inscrite au ROADMAP par la
+  session principale **après le merge de la PR #67** — délibérément, pour ne pas créer de conflit sur
+  `ROADMAP.md` avec la branche de la Phase 25. Forme attendue : ruleset exigeant la CI verte avant
+  merge, posé dans une phase à part et **jamais au passage d'une mission** (changer les règles du
+  merge pendant qu'une PR est ouverte modifierait les conditions de cette PR). Cahier des charges au
+  BACKLOG. Ce point cesse d'être un `human_needed`.
+
+- **2026-09-15 — T-25-SC : journal de sécurité en geste de clôture** (arbitrage Samuel,
+  AskUserQuestion session principale, 2026-09-15) : `25-SECURITY.md` est produit **après le plan
+  25-04**, par `/gsd-secure-phase` sur la phase complète, une fois la calibration livrée (donc après
+  la Phase 40). Motif : la phase n'est pas close (3 plans sur 4), un journal produit à mi-parcours
+  serait à refaire. T-25-SC est `accept`/`low`, il ne bloque pas `/gsd-ship` ; le précédent d'accept
+  tracé est établi par `24-SECURITY.md` et `27-SECURITY.md`. Geste de clôture **daté et attendu**,
+  pas une dette oubliée.
+
 - **2026-09-15 — Phase 25, D-06 bis (calibration reportée après la Phase 40)** (arbitrage Samuel,
   AskUserQuestion session principale, 2026-09-15) : la vague 4 (25-04, calibration : gravure des
   baselines mesurées + armement de la sentinelle) reste un checkpoint bloquant-humain — sa

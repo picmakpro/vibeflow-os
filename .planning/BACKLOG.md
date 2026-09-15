@@ -537,3 +537,52 @@ la Phase 25 (budget d'instructions), qui s'est délibérément limitée à `plug
 2-3 à la prochaine révision de `CONVENTIONS.md`/`TESTING.md` ou dès qu'un quatrième gate dévie du
 patron F13/codes normalisés ; le point 4 à la prochaine édition de l'étape CI concernée, ou plus
 tôt si quelqu'un ajoute `shell: bash` à une étape du job `gates`.
+
+## Posture de protection de `main` — TRANCHÉ : phase dédiée à inscrire (2026-09-15)
+
+**Décision** : arbitrage Samuel, AskUserQuestion session principale, 2026-09-15 — ouvrir une **phase
+dédiée « posture de protection du dépôt »** (prochain numéro libre, 41). L'inscription au ROADMAP est
+faite par la session principale **après le merge de la PR #67**, délibérément, pour ne pas créer de
+conflit sur `ROADMAP.md` avec la branche de la Phase 25. Le présent item est la trace côté branche ;
+il cesse d'être un `human_needed` et devient le cahier des charges de cette phase.
+
+**Constat mesuré** (audit de la vague 3, Phase 25) : `gh api repos/picmakpro/vibeflow-os/rulesets`
+rend `[]`, et l'endpoint de protection classique rend 404 avec des permissions `push:true,
+admin:false` — cohérent avec « aucune protection configurée », pas avec un refus d'accès. `main`
+n'est donc protégée par rien.
+
+**Conséquence** : **tout gate in-repo de ce dépôt est neutralisable depuis la PR qu'il juge.** Une
+même PR peut modifier un gate, sa suite de tests et l'étape CI qui l'invoque. Le cas est concret pour
+la Phase 25 (`check-instruction-budget.sh` + `test-check-instruction-budget.sh` + l'étape du job
+`gates`), mais le risque est **structurel et antérieur** : il vaut identiquement pour
+`check-divergence.sh`, `check-agents.sh`, `check-version-sync.sh` et tous les autres. Aucun threat ID
+du registre STRIDE de la Phase 25 ne le nomme — il dépasse le périmètre d'une phase de gate.
+
+**Forme attendue** : un ruleset exigeant la **CI verte avant merge** sur `main`. À poser **dans une
+phase à part, jamais au passage d'une mission** : changer les règles du merge pendant qu'une PR est
+ouverte modifierait les conditions de cette PR en cours de route.
+
+**Points à instruire dans la phase 41** : interaction avec la discipline de release du `CLAUDE.md`
+(le gate `check-release-tag` est déjà `main`-only et échoue par construction au merge, rerun requis
+après le tag) ; sort du hook `pre-push` optionnel (`scripts/hooks`) ; effet sur les hotfix urgents.
+
+**Déclencheur de reprise** : inscription au ROADMAP par la session principale après le merge de
+la PR #67.
+
+## T-25-SC — journal de sécurité de la Phase 25 : TRANCHÉ, geste de clôture (2026-09-15)
+
+**Décision** : arbitrage Samuel, AskUserQuestion session principale, 2026-09-15 — le `25-SECURITY.md`
+est produit **à la clôture de la phase, après le plan 25-04**, par `/gsd-secure-phase` sur la phase
+**complète**, une fois la calibration livrée (donc après la Phase 40). Ce n'est pas une dette
+oubliée : c'est un geste de clôture daté et attendu.
+
+**Pourquoi pas maintenant** : la Phase 25 n'est pas close — 3 plans sur 4 sont livrés, `25-04`
+(calibration, gravure des baselines, armement de la sentinelle) reste un checkpoint bloquant-humain.
+Un journal produit sur une phase à moitié livrée serait à refaire.
+
+**Contexte** : T-25-SC (chaîne d'approvisionnement) est classé `accept` dans le registre STRIDE de la
+phase. Le lab a `security_enforcement: true` / `security_block_on: "high"` ; T-25-SC est `low`, il ne
+bloque donc pas `/gsd-ship` aujourd'hui. Le précédent d'un accept tracé est établi par
+`24-SECURITY.md` et `27-SECURITY.md` (archivés sous `.planning/milestones/agentique-v1.0-phases/`).
+
+**Déclencheur de reprise** : livraison du plan 25-04, avant la clôture de la Phase 25.
