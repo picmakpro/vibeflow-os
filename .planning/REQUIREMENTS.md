@@ -1095,7 +1095,10 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [ ] **HEAD-03**: Le rapport de mission porte le bloc de preuves E6 `{commande, exit_code, sha}`
   par verdict et un décompte de coût à trois lignes (minds dispatchés, tours consommés, gates
   rejoués), relayés — jamais recalculés — dans `mission-contracts.md` §Rapport de mission et
-  `agents/vf-dev-manager.md` (D-05, D-13, D-15)
+  `agents/vf-dev-manager.md` (D-05, D-13, D-15). Le manager ne fait que RELAYER : les preuves sont
+  ÉMISES par les trois workers qui rendent un verdict (`agents/vf-coder.md` verdict `recette`,
+  `agents/vf-reviewer.md` verdict `revue`, `agents/vf-auditer.md` verdict `audit`), câblés par le
+  lot `40-05` (amendement D-19, 2026-09-15, option b)
 - [ ] **HEAD-04**: Aucun alias `vibeflow-dev` ne survit dans `plugin/` hors CHANGELOG — vérifié par
   un test du module qui **peut rendre rouge** (mutation prouvée) ; le skill `vf-dev` conserve son
   nom et incarne `vibeflow-head` (D-17), zéro agent neuf, kernel intact (D-04, D-16, D-18)

@@ -18,7 +18,10 @@ renommage **et** une extension de rôle, **zéro agent neuf**, **kernel intact**
 3. **Le gate de sortie** `plugin/dev-orchestrator/scripts/check-mission-exit.sh` avec ses codes de
    sortie, sa suite de tests et sa mutation rouge prouvée (QUAL-01).
 4. **Le contrat de preuves E6** dans le rapport de mission du manager (`mission-contracts.md`
-   §Rapport de mission, `vf-dev-manager.md`).
+   §Rapport de mission, `vf-dev-manager.md`) — **et ses émetteurs** : le manager ne peut relayer
+   que ce qu'il reçoit (P3), donc le périmètre inclut aussi le câblage du champ `preuves` dans les
+   trois workers qui rendent un verdict (`vf-coder.md`, `vf-reviewer.md`, `vf-auditer.md`)
+   — amendement D-19, lot `40-05`.
 5. **Le renommage sans alias survivant** dans `plugin/` (hors CHANGELOG), les deux README, et un
    test qui **peut rendre rouge** si un alias `vibeflow-dev` réapparaît.
 
@@ -125,6 +128,28 @@ neuve ; toute modification de `team-kernel.md`, `driver-lock.sh`, `dag.sh`,
   contraintes que les scripts conductor : `bash`, `jq` pour lire `driver-lock.sh status`). Aucune
   mesure Codex/Kimi ajoutée ; la marge non constatée de la 38 (aller-retour manager→worker sur
   Codex) reste ce qu'elle est, documentée, pas revendiquée.
+
+### Amendement post-cadrage (2026-09-15, plan-check du lot L2)
+- **D-19 — Un cinquième lot, `40-05` `exec-workers`, câble les ÉMETTEURS du contrat E6.** Le
+  cadrage initial (§Phase Boundary) énumérait « le manager, le gate et sa suite de tests » comme
+  périmètre du contrat de preuves — c'était incomplet, et ce périmètre le dit maintenant
+  explicitement. Constat qui a déclenché l'amendement : `grep -ic exit_code` rend **0** sur
+  `vf-coder.md`, `vf-reviewer.md`, `vf-auditer.md` **et** `vf-dev-manager.md` — aucun émetteur
+  n'existait avant `40-02`, et `40-02` lui-même ne pose que le CONTRAT (le format, dans
+  `mission-contracts.md`), pas son câblage dans les trois workers. Le manager ne peut pas
+  fabriquer une preuve qu'il n'a jamais reçue (P3 du kernel : un manager ne produit jamais, il
+  relaie) — livré tel quel, `check-mission-exit.sh` (lot L3) aurait reçu un contrat
+  structurellement vide et aurait rendu **indéterminé** sur toute mission, jamais conforme.
+  Décision de Samuel (AskUserQuestion session principale, 2026-09-15) : **option (b)** — un lot
+  dédié `40-05` `exec-workers`, `wave: 3`, `depends_on: ["40-02"]` (le contrat doit exister avant
+  qu'on l'émette), en parallèle du lot `40-04` `exec-gate` (périmètres de fichiers disjoints :
+  `40-05` ne touche à aucun fichier de `40-04`, et réciproquement). `40-05` câble `preuves` dans
+  `vf-coder.md` (verdict `recette`, marqué `preuve: amont` par défaut — hérité d'un hook moteur
+  GSD non rejouable, D-05), `vf-reviewer.md` (verdict `revue`) et `vf-auditer.md` (verdict
+  `audit`), **au format exactement défini par `40-02`**, sans en réinventer un second (ADR-030).
+  Zéro agent neuf (D-04 reste tenu — ce sont les trois workers existants qui sont amendés), kernel
+  intact. — **Reversibility:** reversible — un émetteur qui manque encore après `40-05` se rattrape
+  par un mandat de correction ciblée, sans toucher au contrat lui-même.
 
 ### Claude's Discretion
 - **Famille d'exigences** : `HEAD-01` (échelle d'allocation), `HEAD-02` (gate de sortie),
