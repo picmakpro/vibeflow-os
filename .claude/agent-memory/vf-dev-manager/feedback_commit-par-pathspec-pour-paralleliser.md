@@ -72,3 +72,20 @@ voisin peut absorber le travail.
 « corrigé immédiatement » peut être sincère ET laisser du travail hors de l'historique. Ici les
 suites étaient vertes (49/0, 7/0) **parce qu'elles lisent l'arbre de travail**, pas HEAD : le vert
 ne prouvait rien sur ce qui était commité.
+
+**Exception mesurée le 2026-09-15 (Phase 40) — le FICHIER NEUF.**
+`git commit <chemin>` **refuse** un fichier jamais suivi : `error: pathspec '<f>' did not match any
+file(s) known to git`. La consigne « jamais `git add` » n'a donc pas de solution pour un livrable
+neuf (un SUMMARY, un fichier de référence créé par le lot) et pousse le worker à improviser un
+`git add` + `commit` nu — exactement ce qu'on voulait éviter sous parallélisme.
+
+**Forme sûre, vérifiée en bac à sable** : `git add -N <fichier>` (intent-to-add, n'indexe aucun
+contenu) **puis** `git commit <fichier> -m …`. Mesuré : le commit ne porte **que** ce fichier, et
+une modification concurrente d'un fichier voisin reste **non commitée** (`M existant.txt` après
+coup). C'est la seule forme qui donne à un fichier neuf la même isolation que le pathspec donne à
+un fichier suivi.
+
+**How to apply:** écrire la règle en deux branches dans le mandat — « fichier suivi :
+`git commit <chemins> -m` · fichier neuf : `git add -N <fichier>` puis `git commit <fichier> -m`.
+Jamais `git add` nu, jamais `git commit` sans pathspec. » Une règle qui n'a pas de branche pour un
+cas courant se fait contourner, et le contournement est silencieux.
