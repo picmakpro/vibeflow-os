@@ -1,5 +1,37 @@
 # Changelog — conductor
 
+## [v1.37.0] — 2026-09-15 (Phase 25 — budget d'instructions, BUDG-01/02)
+
+**Minor** (nouveau script, nouvelle suite, nouveau signal observable, câblage CI) :
+
+- **`scripts/check-instruction-budget.sh`** (neuf, 377 lignes) : mesure et publie, par fichier
+  d'agent distribué (`plugin/*/agents/*.md` et `plugin/*/AGENT.md`, glob à un seul niveau, D-03),
+  deux métriques — lignes du fichier entier et instructions du body (marqueurs textuels D-01 +
+  puces impératives sous un titre de règles). Ratchet par sentinelle versionnée
+  `.planning/.instruction-budget-armed`, LUE seulement, jamais écrite ni générée par ce script
+  (D-04, même mécanisme que `check-requirements-survival.sh`). Cinq codes de sortie tous
+  énumérés : `0` armé et conforme, `1` armé avec dépassement de baseline ou du plafond absolu de
+  250 lignes (ADR-029, prime toujours sur une baseline plus permissive), `2` non vérifiable
+  (découverte vide, frontmatter jamais refermé, fichier illisible, entrée de baseline corrompue ou
+  dupliquée), `3` non armé (rapport imprimé intégralement, jamais bloquant — anti-feature
+  `.planning/REQUIREMENTS.md:1096`), `64` erreur d'usage.
+- **`scripts/tests/test-check-instruction-budget.sh`** (neuve, 527 lignes) : **30 cas** nommés sur
+  fixtures, dont 4 mutants rejoués et tués par la revue.
+- **`.github/workflows/ci.yml`** (job `gates`) : étape `check-instruction-budget
+  (BUDG-01/02, ADR-029 machine-enforced)` — preuve de discrimination sur fixture jetable armée
+  (basculement `0` → `1` par mutation réelle, `2` sur découverte vide, `3` sur sentinelle retirée),
+  puis dépôt réel sans surcharge d'environnement : `3` avertit sans jamais bloquer le job, `0`
+  passe, `1`/`2` échouent, tout code inattendu échoue par défaut.
+- **`README.md`** (catalogue) : entrée de catalogue propre pour `check-instruction-budget.sh` et
+  correction D-05 de la puce `check-agents.sh`, qui ne mesure ni lignes ni charge d'instructions
+  (contrat réel `check-agents.sh:23-77`) — cette capacité était attribuée à tort, elle appartient
+  désormais au nouveau gate.
+
+**Aucune baseline n'est gravée par cette version, et la sentinelle `.instruction-budget-armed`
+n'est PAS posée** : le gate tourne en mode non armé (avertissement CI, jamais de blocage) jusqu'à
+la calibration, un checkpoint séparé qui attend la livraison de la Phase 40 (D-06 bis). Un lecteur
+de cette entrée ne doit pas croire le ratchet armé.
+
 ## [v1.36.0] — 2026-09-15 (/vf-update propose la mise à jour d'un moteur gsd-core périmé)
 
 **Minor** (nouvelle branche du skill `vf-update`, aucun script conductor modifié) :
