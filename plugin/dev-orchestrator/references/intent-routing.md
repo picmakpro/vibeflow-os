@@ -10,6 +10,9 @@
 > quand une intention ne tombe pas manifestement dans un geste connu. Coût contexte nul sinon.
 >
 > Chemin d'install (D7) : `.claude/agents/dev-orchestrator-references/intent-routing.md`
+>
+> L'échelle d'allocation (quick / debug / execute / manager) est une question distincte du
+> routage — elle vit dans `head-governance.md`, jamais dupliquée ici.
 
 ---
 
