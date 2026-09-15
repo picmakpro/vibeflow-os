@@ -24,20 +24,32 @@ stopped_at: >-
   la progression numérique séquentielle, pas le dernier geste chronologique. Le travail réel de la
   Phase 34 est documenté dans `## Current Position` et `### Roadmap Evolution` ci-dessous, jamais
   perdu — seul ce pointeur numérique reste sur sa valeur la plus haute atteinte.**
+  **Note (2026-09-15, clôture documentaire Phase 25) : mêmes raisons — `current_phase` reste à 39**
+  bien que la Phase 25 ait ses vagues 1-3 vertes sur `feat/phase-25-budget-instructions` (10 commits
+  depuis `5583d3e`, dont 4 de la présente clôture). **Aucune PR ouverte, aucun ratchet armé** : ni
+  `.planning/.instruction-budget-armed` ni `.planning/instruction-budget-baselines.tsv` n'existent.
+  Le plan 25-04 (calibration) reste un checkpoint bloquant-humain, précondition « Phase 40 livrée »
+  fausse à ce jour — non préparé.
 last_updated: "2026-09-15T00:00:00.000Z"
 last_activity: 2026-09-15
 last_activity_desc: >-
-  Consolidation du ledger de la Phase 34 (plan 34-06) : trois verdicts transcrits sur pièces au
-  BACKLOG/REQUIREMENTS/PROJECT, un item BACKLOG structurel daté ajouté (gate de nettoyage du spike
-  SKIL-01 borné à une liste auto-déclarée, pas à l'état réel du disque), compteurs de `progress`
-  re-dérivés par comptage réel (jamais recopiés), `check-state-integrity.sh` et
-  `check-machine-paths.sh` rejoués en gate.
+  Clôture documentaire des vagues 1-3 de la Phase 25 (budget d'instructions), branche dédiée
+  `feat/phase-25-budget-instructions`, 4 commits (`261e42c`..`6638804`) : gate
+  `check-instruction-budget.sh` livré et rejoué (10/10 étapes du job `gates`, 78/78 suites),
+  étape CI câblée, `conductor` bumpé v1.36.0 → v1.37.0, note datée sous ADR-029, quatre items
+  BACKLOG. **Le ratchet n'est PAS armé** : ni `.planning/.instruction-budget-armed` ni
+  `.planning/instruction-budget-baselines.tsv` n'existent sur ce disque. PR pas encore ouverte
+  (geste humain). Le plan 25-04 (calibration) reste un checkpoint bloquant-humain dont la
+  précondition (Phase 40 livrée) est fausse aujourd'hui — non préparé, non coché. Un bloquant
+  trouvé par la revue au premier tour de cette mission a été fermé avant ce commit de clôture.
+  Compteurs de `progress` re-dérivés par comptage réel (jamais recopiés), `check-state-integrity.sh`
+  et `check-machine-paths.sh` rejoués en gate.
 progress:
   total_phases: 11
   completed_phases: 9
   total_plans: 55
-  completed_plans: 51
-  percent: 82
+  completed_plans: 54
+  percent: 98
 ---
 
 # Project State
@@ -504,6 +516,19 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
+
+- **2026-09-15 — Phase 25, D-01 bis (comptage body seul, ratifié)** (arbitrage Samuel,
+  AskUserQuestion session principale, 2026-09-15) : le gate `check-instruction-budget.sh` compte
+  les instructions impératives du **corps** d'un `AGENT.md`/`SKILL.md` seul, frontmatter exclu —
+  confirmation d'un choix déjà pris au cadrage 25-01, ratifié sans changement après audit.
+
+- **2026-09-15 — Phase 25, D-06 bis (calibration reportée après la Phase 40)** (arbitrage Samuel,
+  AskUserQuestion session principale, 2026-09-15) : la vague 4 (25-04, calibration : gravure des
+  baselines mesurées + armement de la sentinelle) reste un checkpoint bloquant-humain — sa
+  précondition (`plugin/dev-orchestrator/AGENT.md` porte `name: vibeflow-head` sur `main`, donc
+  Phase 40 livrée) est fausse aujourd'hui. Livraison en deux PR : les vagues 1-3 (25-01 à 25-03,
+  rien d'armé) forment la première PR, close par cette clôture documentaire ; 25-04 attend la
+  seconde PR, après la Phase 40.
 
 - **2026-09-15 — Phase 34, arbitrages de clôture des trois verdicts.** Tous rendus par Samuel,
   canal AskUserQuestion session principale, date 2026-09-15 :
