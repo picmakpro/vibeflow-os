@@ -1,6 +1,6 @@
 # Doctrine pipeline — GSD-PIPELINE.md (chargée on-demand)
 
-> Référence interne de `vibeflow-dev` et `vf-dev-manager`. Chargée à la demande (règle 1%) —
+> Référence interne de `vibeflow-head` et `vf-dev-manager`. Chargée à la demande (règle 1%) —
 > **jamais** dupliquée dans le corps des agents (charte densité, ≤250L). Source des noms de
 > skills : `gsd-skills-index.md` (même dossier d'install :
 > `.claude/agents/dev-orchestrator-references/`).
@@ -100,7 +100,7 @@ Trois rôles, trois profils (configurables via `gsd-config` / `gsd-settings`) :
 | **Executor** | modèle équilibré (sonnet) | `gsd-execute-phase` — implémentation des tasks |
 | **Checker** | modèle équilibré (sonnet) | `gsd-verify-work`, `gsd-code-review` — vérification |
 
-Les agents `vibeflow-dev` et `vf-dev-manager` tournent en `opus` (détection d'intention +
+Les agents `vibeflow-head` et `vf-dev-manager` tournent en `opus` (détection d'intention +
 pilotage) ; les workers d'équipe (`vf-coder`, `vf-reviewer`, `vf-auditer`) en `sonnet`.
 
 ---
@@ -153,7 +153,7 @@ pilotage) ; les workers d'équipe (`vf-coder`, `vf-reviewer`, `vf-auditer`) en `
 ## 8. Frontière : `model:` (agents vf-*) vs `model_profile` (sous-agents gsd-*)
 
 Deux couches indépendantes, ne pas les confondre :
-- Le frontmatter `model:` des agents `vf-*` (processus Claude Code — `vibeflow-dev`, `vf-coder`,
+- Le frontmatter `model:` des agents `vf-*` (processus Claude Code — `vibeflow-head`, `vf-coder`,
   `vf-dev-manager`…) fixe le modèle du **processus orchestrateur/worker**.
 - `model_profile` (`.planning/config.json`, défaut `balanced`) fixe le modèle des **sous-agents
   gsd-*** invoqués par ce processus (`gsd-planner`, `gsd-executor`, `gsd-verifier`…).

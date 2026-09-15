@@ -29,7 +29,7 @@ MISSION
   l'étape dans la ROADMAP, présence d'un `DESIGN.md`/UI-SPEC, nature des livrables) ; `force`
   impose les nœuds `craft:<écran>`/`critique:<écran>` même sur un cas limite ; `off` les
   interdit explicitement, quel que soit le jugement du manager. Produit par : le dispatcheur
-  (routeur `vibeflow-dev`, `vf-auto`, ou mapping langage naturel). Consommé par : `vibeflow-dev`,
+  (routeur `vibeflow-head`, `vf-auto`, ou mapping langage naturel). Consommé par : `vibeflow-head`,
   `vf-auto`, `vf-dev-manager`. **Absent → `auto`** (comportement actuel, zéro surprise).
 - **`livrable: specs|specs+implementation`** (défaut `specs`) — porté par le brief d'une
   **mission design** (`vf-design-manager`). `specs` = comportement actuel du module (aucun

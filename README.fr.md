@@ -43,7 +43,7 @@ le contexte), **rien n'est « fait » sans preuve machine** (tests, gates, juges
 
 ## 🔁 Le cycle dev — spec-driven
 
-Dis _« ajoute l'auth Google »_ : l'agent `vibeflow-dev` détecte l'intention et déroule le
+Dis _« ajoute l'auth Google »_ : l'agent `vibeflow-head` détecte l'intention et déroule le
 pipeline GSD — cadrage, plan vérifié, exécution atomique, juges read-only — en laissant un
 artefact sur disque à chaque étape, pour que le contexte puisse mourir sans que le projet
 en pâtisse.

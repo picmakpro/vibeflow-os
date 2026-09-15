@@ -183,7 +183,7 @@ fi
 # T15 — les 3 frontières mempalace/gsd-next (ADR-057) : les deux côtés présents → affichées
 reset_all
 skill "consolidator"
-agent "vibeflow-dev"
+agent "vibeflow-head"
 user_skill "gsd-mempalace-capture"
 user_skill "gsd-mempalace-recall"
 user_skill "gsd-next"
@@ -192,7 +192,7 @@ c1=$(echo "$OUT" | grep -c "gsd-mempalace-capture")
 c2=$(echo "$OUT" | grep -c "gsd-mempalace-recall")
 c3=$(echo "$OUT" | grep -c "gsd-next")
 if [ $RC -eq 0 ] && [ "$c1" -ge 1 ] && [ "$c2" -ge 1 ] && [ "$c3" -ge 1 ]; then
-  ok "T15 consolidator/vibeflow-dev ↔ mempalace/gsd-next (deux côtés présents) → 3 frontières affichées"
+  ok "T15 consolidator/vibeflow-head ↔ mempalace/gsd-next (deux côtés présents) → 3 frontières affichées"
 else
   ko "T15 (rc=$RC, capture=$c1, recall=$c2, next=$c3) : $OUT"
 fi
@@ -200,7 +200,7 @@ fi
 # T16 — un seul côté présent pour chaque paire mempalace/gsd-next → aucune frontière affichée
 reset_all
 skill "consolidator"
-agent "vibeflow-dev"
+agent "vibeflow-head"
 OUT="$(run_check 2>&1)"; RC=$?
 if [ $RC -eq 0 ] && ! echo "$OUT" | grep -q "gsd-mempalace-capture" \
    && ! echo "$OUT" | grep -q "gsd-mempalace-recall" \

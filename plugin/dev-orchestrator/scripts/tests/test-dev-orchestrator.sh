@@ -1294,8 +1294,8 @@ for skill_md in "$MOD"/skills/vf-*/SKILL.md; do
   # Extrait toutes les cibles référencées dans le corps : gsd-X, agents d'équipe.
   targets=$("$GREP" -Eo 'gsd-[a-z0-9-]+' "$skill_md" | sort -u)
   if [ -z "$targets" ]; then
-    # vf-dev = incarnation de l'agent vibeflow-dev → cible agent acceptée.
-    if "$GREP" -Eq 'vibeflow-dev|vf-dev-manager' "$skill_md"; then
+    # vf-dev = incarnation de l'agent vibeflow-head → cible agent acceptée.
+    if "$GREP" -Eq 'vibeflow-head|vf-dev-manager' "$skill_md"; then
       checked=$((checked+1))
       continue
     fi
