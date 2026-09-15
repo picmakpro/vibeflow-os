@@ -406,6 +406,14 @@ suffi à faire sortir le run du rouge et que le run est de toute façon reporté
   par la tâche 1 de ce plan).
 - **Non touché** : aucun flow `.maestro`, aucun run relancé, aucun rebuild, aucune désinstallation
   du simulateur.
+- **Second worktree constaté, non touché** : `git worktree list` (rejoué depuis
+  `Scroll-Off/frontend`) révèle un worktree préexistant `~/Documents/dev/Scroll-Off/frontend-device`
+  (HEAD détaché `22374d7`). Élément de datation qui établit son antériorité au run : mtime du
+  dossier `frontend-device` = **2026-09-14 12:34:48**, mtime de son `.git` =
+  **2026-09-14 12:19:30** — tous deux antérieurs au premier geste mesuré de ce run
+  (`2026-09-15T00:53:51Z`, cf. `## Dispatch`). Ce worktree n'a fait l'objet d'aucune commande de
+  ce plan (ni `run`, ni `reset`, ni aucune écriture) — c'est une absence vérifiée par une commande
+  rejouable, pas une absence supposée faute d'avoir cherché.
 
 ## Périmètre
 

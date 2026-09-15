@@ -53,7 +53,7 @@ interdictions dures verbatim. A dispatché en retour deux workers réels (`vf-te
 ```
 statut: gaps_found
 verdicts: PIPELINE=VERT EQUIPE=ROUGE CHAPEAU=ROUGE
-sha_commit: (aucun commit vibeflow-os produit par ce plan — voir Codes de sortie ci-dessous)
+sha_commit: 30c9b04 (vibeflow-os, dernier en date à la clôture — voir § Fichiers touchés pour l'historique complet des commits produits sur ce nœud)
 findings:
   - severite: critique
     description: "lot5_scrolls_scale_native_header affiche l'écran de login au lieu de l'écran natif attendu (Cycle 2) — signal d'alarme absolu, cause non départagée (perte réelle de session vs bug de robustesse fetchRenewToken sur échec réseau)"
@@ -111,18 +111,33 @@ la boucle par une règle de sécurité absolue plutôt que par épuisement de bu
 - `.planning/phases/VFDO-34-gaps-agency-agents-cadrage-skill-installer/34-RUN-MOBILE.md` (nouveau)
 - `.planning/phases/VFDO-34-gaps-agency-agents-cadrage-skill-installer/34-01-SUMMARY.md` (nouveau, ce fichier)
 - Aucun autre fichier — confirmé par `git diff --quiet <SHA base> -- plugin scripts docs manual .github README.md README.fr.md` (exit 0).
-- **Aucun commit créé dans `vibeflow-os`** par ce plan (les deux fichiers ci-dessus restent non
-  commités à la fin de cette exécution — aucune instruction du mandat ne demandait de committer
-  dans ce dépôt pour ce plan).
+- **Commits créés dans `vibeflow-os`** sur ces deux fichiers, au fil des corrections demandées
+  après la première clôture de ce nœud : `8edf9d5` (trace initiale du run), `30c9b04` (effets de
+  bord des arbitrages Samuel), et toute correction postérieure à la rédaction de cette ligne —
+  se référer à `git log --oneline -- .planning/phases/VFDO-34-.../34-RUN-MOBILE.md
+  .planning/phases/VFDO-34-.../34-01-SUMMARY.md` pour l'état courant plutôt qu'à une liste figée
+  ici, qui périmerait au prochain correctif.
 
 **`~/Documents/dev/Scroll-Off/frontend`** (dépôt git DISTINCT) :
 - `.vibeflow/mobile-test.json` (nouveau, config projet, non commité — hors `files_modified` de
   `vibeflow-os` par construction)
 - `test-runs/2026-09-15-0254.md`, `test-runs/2026-09-15-0254/`, `test-runs/2026-09-15-0259.md`,
   `test-runs/2026-09-15-0259/` (nouveaux, rapports + artefacts de run, non commités)
-- Commit `4679f8d` (`fix(metro): exclure les fichiers de test du bundle app`) — sur la branche
-  `feat/mv`, par `vf-app-fixer`, message conforme à la convention Scroll-Off (aucune mention
-  IA/attribution), non pushé.
+- **Fix Metro — deux temps, état courant re-dérivé du disque à la clôture de ce plan (pas recopié
+  d'une version antérieure de ce résumé) :**
+  1. *Pendant le run* (fait historique, explique le cycle de fix) : `vf-app-fixer` a committé
+     `4679f8d` (`fix(metro): exclure les fichiers de test du bundle app`) sur la branche réelle
+     `feat/mvp05-ergonomie-ios` (pas `feat/mv`, abrégé par erreur dans un échange intermédiaire),
+     message conforme à la convention Scroll-Off (aucune mention IA/attribution), jamais pushé.
+     Ce fix a réellement éliminé l'overlay « jest doesn't exist » (vérifié Cycle 2), sans suffire à
+     faire sortir le run du rouge (cause externe réseau/backend + signal d'alarme non résolus).
+  2. *Après le run, sur arbitrage* (arbitrage Samuel, AskUserQuestion session principale,
+     2026-09-15) : `git reset --hard 56efc9e` exécuté dans `Scroll-Off/frontend` — `4679f8d` n'est
+     plus ancêtre de `HEAD` (objet git encore présent mais dangling, non garbage-collecté),
+     `metro.config.js` est revenu à son contenu d'avant le fix (confirmé par lecture directe :
+     plus de `resolver.blockList`). **État courant à la clôture de ce plan :**
+     `HEAD` de `feat/mvp05-ergonomie-ios` = `56efc9e` — le fix Metro NE TIENT PLUS. Détail complet
+     dans `34-RUN-MOBILE.md` § Effets de bord de l'arbitrage Samuel.
 - Fichiers untracked préexistants et NON touchés par ce plan, listés pour ne pas être confondus
   avec un effet de bord de cette exécution : `.claude/`, `CLAUDE.local.md`,
   `docs/audit-scope-prestation.md`, `docs/deploiement-tests-debug.md`,
