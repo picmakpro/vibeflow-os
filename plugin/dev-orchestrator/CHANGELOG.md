@@ -1,5 +1,40 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.22.0] — 2026-09-15 (Phase 40 — vibeflow-head, gate de sortie de mission, contrat de preuves E6)
+
+**Minor** (nouvelle capacité — head of minds, aucune régression sur l'existant) :
+
+- **Renommage sans alias survivant (HEAD-04)** : l'agent routeur `vibeflow-dev` devient
+  `vibeflow-head` — 22 fichiers renommés/réécrits, garde anti-alias `T36` (motif assemblé à
+  l'exécution, jamais un grep littéral de son propre nom) avec mutation prouvant à la fois la
+  détection ET l'exemption du `CHANGELOG.md`.
+- **Contrat de preuves E6 (HEAD-03)** : `references/mission-contracts.md` §Contrat de preuves E6
+  — chaque verdict du rapport de mission porte sa commande, son code de sortie et son SHA (ou la
+  marque `amont` pour un verdict relayé, jamais rejoué) ; décompte de mission ajouté au rapport
+  compact, à budget de lignes constant.
+- **Gouvernance de sortie (HEAD-01)** : `references/head-governance.md` — échelle d'allocation à
+  sens unique (quick/debug/execute/manager), séquencement selon les dépendances de la feuille de
+  route, contrat de sortie et économie de mission, chargée on-demand (ADR-030, une seule voix) ;
+  `AGENT.md` restructuré ≤ 250 lignes (ADR-029) en renvoi condensé.
+- **`scripts/check-mission-exit.sh` (HEAD-02)** : gate de sortie de mission — six contrôles E1
+  (verrou de driver relâché, lecture seule D-11) à E6 (chaque verdict porte sa preuve, lu sur le
+  rapport détaillé écrit sur disque), quatre codes de sortie 3 sain / 0 manque nommé /
+  4 indéterminé / 64 outillage illisible, précédence explicite 64 > 4 > 0 > 3 (D-06 : un contrôle
+  sans source de vérité rend le verdict global indéterminé, jamais un vert par défaut). Cascade
+  de résolution des scripts frères de `mission-flow.md`, sentinelle `dag.sh`, résolue relativement
+  à la racine passée en argument (testabilité sur fixture jetable). Suite
+  `scripts/tests/test-check-mission-exit.sh` : 23 cas, dont les six mutations de fixture E1-E6
+  (QUAL-01, chacune assertant le code ET le nom du contrôle), le cas E6-tableau-de-preuves vide,
+  la discrimination machine sain/manque/indéterminé, la preuve de lecture seule du dépôt inspecté
+  (D-10), la garde D-11 prouvée par mutation du script lui-même, et les deux causes
+  d'indétermination E1 départagées (cascade non résolue vs `driver-lock.sh` absent) — plus une
+  mutation structurelle exécutée en `<verify>` (excision chirurgicale de chacun des six blocs
+  `# >>> Ex`/`# <<< Ex`, rejeu de la suite complète, restauration), qui prouve que chacun des six
+  contrôles contribue réellement au verdict.
+- **Périmètre hors mission, assumé (D-16)** : le bump de la racine, le tag annoté et la release
+  GitHub restent le geste humain de livraison, gaté par Samuel après revue de la PR — aucun des
+  trois n'est joué par cette version.
+
 ## [v2.21.0] — 2026-09-15 (moteur gsd-core périmé : détecté et mis à jour sous autorisation)
 
 **Minor** (nouvelle capacité de `scripts/ensure-deps.sh`, aucun changement du chemin par défaut) :
