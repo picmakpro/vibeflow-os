@@ -364,6 +364,49 @@ backend pour la configuration exacte du build de recette — reprendre AGTS-02 a
 confirmé (session détruite), un nouveau code à 6 chiffres devra être consommé manuellement par un
 humain avant toute reprise — ce geste n'est délégable à aucun agent.
 
+**Précision (arbitrage Samuel, AskUserQuestion session principale, 2026-09-15) :** le départage
+(a) session perdue vs (b) robustesse de `fetchRenewToken` reste **explicitement à la charge de
+Samuel** — une vérification manuelle du Keychain du simulateur
+`8BD53E84-B5BF-482A-8FE5-6A9980555951` et de la disponibilité du backend Scroll-Off, suivie d'un
+run rejoué. Aucun agent ne tranche cette ambiguïté à sa place.
+
+## Effets de bord de l'arbitrage Samuel (2026-09-15)
+
+**Arbitrage 1** (arbitrage Samuel, AskUserQuestion session principale, 2026-09-15) : le run
+n'autorise pas la sortie du statut expérimental — AGTS-02 reste reportée avec sa trace. Sans effet
+sur cette note : c'est exactement ce que le chapeau `> **Statut** : ROUGE` et les verdicts
+`PIPELINE: VERT` / `EQUIPE: ROUGE` déjà consignés ci-dessus établissaient.
+
+**Arbitrage 2** (arbitrage Samuel, AskUserQuestion session principale, 2026-09-15) : défaire le
+commit de fix Metro dans `Scroll-Off/frontend`, puisque ce fix, bien que réel et sourcé, n'a pas
+suffi à faire sortir le run du rouge et que le run est de toute façon reporté (Arbitrage 1).
+
+- **Constat avant action** (`rtk proxy git -C .../Scroll-Off/frontend log --oneline -3` et
+  `show --stat 4679f8d`) : `4679f8d` était bien le sommet de la branche réelle
+  `feat/mvp05-ergonomie-ios` (pas littéralement `feat/mv`, nom abrégé dans l'échange), contenait
+  **exactement un fichier** (`metro.config.js`, 6 lignes ajoutées), et l'arbre était propre par
+  ailleurs (`git diff --quiet HEAD` → exit 0 ; seuls des fichiers non suivis préexistants,
+  `.vibeflow/`, `test-runs/`, et des fichiers du lab sans rapport avec ce plan).
+- **Geste posé** : `git reset --hard 56efc9e` (reset local du seul commit — choisi plutôt qu'un
+  `git revert` car les deux conditions du cas « le moins destructeur » étaient réunies : commit au
+  sommet, arbre propre par ailleurs). Aucun `push`.
+- **SHA résultant et état final de la branche** (`git log --oneline -3` après coup) :
+  ```
+  56efc9e fix(ios-home): recreer la vue du sablier au retour au premier plan
+  c76eb22 chore(ios): declarer la conformite export dans l Info.plist committe
+  3bd8613 fix(ios-selection): persister les champs de selection en attente dans le registre
+  ```
+  `metro.config.js` est revenu à son contenu d'avant le fix (confirmé par lecture directe du
+  fichier après le reset — plus de `resolver.blockList`).
+- **Conservé, et pourquoi** (préparation projet, arbitrage de Samuel — pas défait) :
+  `~/Documents/dev/Scroll-Off/frontend/.vibeflow/mobile-test.json` (config projet du module
+  `mobile-test`) et `workflow.use_worktrees: false` dans
+  `~/Documents/dev/Scroll-Off/.planning/config.json` (guard isolation du lab). Les deux confirmés
+  intacts après le reset (relecture directe des deux fichiers, valeurs identiques à celles posées
+  par la tâche 1 de ce plan).
+- **Non touché** : aucun flow `.maestro`, aucun run relancé, aucun rebuild, aucune désinstallation
+  du simulateur.
+
 ## Périmètre
 
 SHA de base : 7e504ade15730ab3db38c6cb7bacd5b1f95ebb0f
@@ -377,6 +420,9 @@ scanné par ce diff (c'est le sens du scope choisi).
 Aucun secret n'a été recopié dans ce document (le contenu de `.env` de `Scroll-Off/frontend` n'a
 jamais été lu — accès bloqué par une garde de sécurité de l'environnement d'exécution ; seul le
 domaine public `api.scrolloff.com`, déjà cité dans `.maestro/README.md` du lab, a été mentionné).
-Aucun arbitrage humain n'a été invoqué dans ce document — toutes les décisions consignées ci-dessus
-(UDID retenu, scope de la garde, arrêt sur signal d'alarme) sont des applications directes de
-règles déjà écrites dans le mandat et le plan, pas des arbitrages nouveaux.
+
+Les décisions prises pendant l'exécution du run (UDID retenu, scope de la garde, arrêt sur signal
+d'alarme) sont des applications directes de règles déjà écrites dans le mandat et le plan, pas des
+arbitrages nouveaux. Deux arbitrages humains ont en revanche été invoqués **après** ce run, pour
+décider de sa suite : voir `## Effets de bord de l'arbitrage Samuel (2026-09-15)` — chacun porte
+son canal et sa date (arbitrage Samuel, AskUserQuestion session principale, 2026-09-15).
