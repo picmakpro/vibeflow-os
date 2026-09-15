@@ -67,3 +67,13 @@ continuer. Renvoie au manager qui t'a dispatché EN DIRECT (`vf-dev-manager`, ou
 **Termine par le bloc typé** (contrat ADR-053, cf. `dev-orchestrator-references/mission-flow.md`) :
 `{ "statut": "passed|gaps_found|human_needed|blocked", "findings": [{ "severity": "bloquant|majeur|mineur", "action": "auto-fix|no-op|ask-user", "ref": "fichier:ligne" }], "noeuds_debloques": [] }`.
 `passed` = PASS ; un correctif requis = `gaps_found` ; un finding qui défie l'intention/la sécurité → `action: ask-user`.
+
+**`preuves`** (contrat détaillé : `mission-contracts.md` §Contrat de preuves E6 (verdict → head)) :
+ajoute `"preuves": [...]` — champ optionnel frère du bloc typé, tableau plat d'objets
+`{verdict, commande, exit_code, sha}`, `verdict` valant `revue` pour ton verdict propre. Émets le
+triplet RÉEL quand tu as toi-même lancé, via `Bash` ou l'outillage MCP (`clean`, `build_sim`,
+`test_sim`), une vérification directement rejouable : capture la commande exacte, son exit code,
+et le SHA HEAD du diff revu au moment du verdict. Si ton verdict repose uniquement sur la lecture
+et la délégation à `gsd-code-reviewer`, sans étape outillée de compilation/test, marque
+`{"verdict": "revue", "preuve": "amont"}` — jamais un exit code fabriqué pour un contrôle que tu
+n'as pas toi-même exécuté. Relayé verbatim, jamais recalculé.
