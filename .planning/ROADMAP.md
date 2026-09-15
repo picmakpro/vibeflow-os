@@ -965,7 +965,30 @@ inscrit le 2026-09-15).
 
 **Transverse (QUAL-01)** : le gate budget naît avec ses trois issues (un agent imparsable est
 BRUYANT, jamais compté vert) et sa mutation rouge prouvée.
-**Plans**: TBD
+
+**Plans**: 4 plans, 4 vagues — périmètres de fichiers disjoints, chaîne strictement séquentielle
+(le gate, puis sa suite, puis son exposition, puis sa calibration). **Livraison en DEUX PR**
+(25-CONTEXT D-06 bis, arbitrage Samuel, AskUserQuestion session principale, 2026-09-15) : les plans
+25-01 à 25-03 forment la première PR, où **rien n'est armé** ; le plan 25-04 est un **checkpoint
+bloquant** dont la précondition est machine-vérifiable (`plugin/dev-orchestrator/AGENT.md` porte
+`name: vibeflow-head` sur `main`, donc Phase 40 livrée) et s'exécute dans une **seconde PR**.
+
+Plans:
+**Wave 1**
+
+- [ ] 25-01-PLAN.md — le gate `check-instruction-budget.sh` : tranche verticale sur le corpus réel (tableau intégral, exit 3), formes normatives de D-01 (puce sous titre de règles, titres et blocs fenced exclus, dédoublonnage), contrat de sortie à cinq codes dont le plafond ADR-029 absolu
+
+**Wave 2** *(bloquée sur la vague 1)*
+
+- [ ] 25-02-PLAN.md — la suite `test-check-instruction-budget.sh` : trois issues QUAL-01 sur fixtures jetables, trois arêtes BUDG-02, quatre mutants vérifiés par `cmp` (une métrique = un mutant), témoin de rougeur de la suite elle-même
+
+**Wave 3** *(bloquée sur la vague 2)*
+
+- [ ] 25-03-PLAN.md — exposition et traces : étape CI dans le job `gates` (avertissement non bloquant + preuve de discrimination sur fixture), catalogue conductor corrigé (D-05), bump `conductor` v1.37.0, compteurs des README re-dérivés, note datée sous ADR-029, dettes au BACKLOG — **fin de la première PR**
+
+**Wave 4** *(bloquée sur la Phase 40, checkpoint bloquant — seconde PR)*
+
+- [ ] 25-04-PLAN.md — calibration : checkpoint humain one-way, gravure des baselines mesurées par le script livré, armement de la sentinelle dans le même commit, publication des valeurs réelles, clôture du ledger (BUDG-01, BUDG-02, QUAL-01)
 
 ### Phase 35: Ré-armement worktree (conditionnelle) — CLOSE 2026-08-26
 
