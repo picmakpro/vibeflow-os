@@ -60,4 +60,7 @@
 - [Registre d'agents résolu au démarrage](project_registre-agents-resolu-au-demarrage.md) — un artefact posé en mission est invisible aux dispatches internes ; les workers contournent en `claude` CLI frais avec bypassPermissions
 - [Rouge à cause bénigne en cache une seconde](feedback_rouge-a-cause-benigne-en-cache-une-seconde.md) — « faux positif connu » = le worker a arrêté de chercher ; le gras Markdown casse toute sonde ancrée en début de ligne
 - [« Pré-existant » mesuré contre la mauvaise ancre](feedback_preexistant-mesure-contre-la-mauvaise-ancre.md) — le worker prend SON point d'entrée ; seul le manager a le SHA de base et peut trancher hérité vs introduit par nous
+- [Rejeu CI avec le mauvais shell](feedback_rejeu-ci-avec-le-mauvais-shell.md) — `-eo pipefail` là où GitHub met `bash -e {0}` : exit 2 + zéro sortie sur une étape saine, rouge entièrement fabriqué
+- [Rapport intérimaire, boucle encore vivante](feedback_rapport-interimaire-boucle-encore-vivante.md) — « je rapporte quand ça finit » = le worker a fini ; réveiller, et comparer les ensembles par `comm`, pas les nombres
+- [`find` proxifié tronque par intermittence](project_find-proxifie-tronque-par-intermittence.md) — 21 sur 78 chez un agent, 78 chez moi à la même minute : un rejeu juste ne disculpe pas la mesure d'à côté
 - [Heredoc dé-indenté = vert silencieux](project_heredoc-desindente-vert-silencieux.md) — rejouer un `run: |` de ci.yml sans dé-indenter : exit 0, zéro sortie, aucune commande exécutée
