@@ -47,6 +47,14 @@ lot groupé puis une question de bouclage. Ils sont **verrouillés** — ne pas 
   **Reversibility:** costly — les baselines sont un contrat publié (README, CHANGELOG) ; une
   remontée demanderait un arbitrage humain consigné.
 
+- **D-01 bis — ratification datée (arbitrage Samuel, AskUserQuestion session principale,
+  2026-09-15) :** le comptage est **body seul, hors frontmatter YAML**, à la lettre de D-01. Les
+  chiffres cités en D-03 (463 instructions, 44 pour `vf-dev-manager.md`) venaient d'un comptage
+  brut incluant le frontmatter (les champs `description:` portent eux-mêmes des marqueurs) ; la
+  mesure body-only de `25-RESEARCH.md` donne **433 / 43**. Le plan `25-01` implémente le texte,
+  pas le chiffre — hypothèse signalée #1 du plan, **ratifiée** ; le checkpoint de calibration
+  (`25-04`) n'a plus à la reposer. — **Reversibility:** costly après gravure (D-02).
+
 ### Portée
 - **D-03:** **Agents distribués seulement** : les fichiers `plugin/*/agents/*.md` (25 au
   2026-09-14) et `plugin/*/AGENT.md` (6), soit **31 fichiers, 3 603 lignes, 463 lignes
