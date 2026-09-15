@@ -218,8 +218,10 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
   `check-mission-exit.sh` (459 l., codes 3/0/4/64, contrôles E1-E6, 23/23 cas dont 6 mutations
   rouges) ; contrat de preuves E6 dans `mission-contracts.md` et ses trois émetteurs
   (`vf-coder.md`, `vf-reviewer.md`, `vf-auditer.md`) relayés par `vf-dev-manager.md` (250/250 l.
-  tenu par compensation). Module `dev-orchestrator` bumpé **v2.22.0**, racine **v2.63.0** (tag +
-  release GitHub, `check-release-tag.sh --remote` ✓). **Écart trouvé à la clôture documentaire** :
+  tenu par compensation). Module `dev-orchestrator` bumpé **v2.22.0**, racine **v2.63.0**
+  (`VERSION`/`plugin.json`/`marketplace.json`/`codex-plugin.json` + les 2 README) — **PR, tag et
+  release GitHub restent des gestes humains non posés à cette date**, `feat/phase-40-vibeflow-head`
+  toujours branche de travail. **Écart trouvé à la clôture documentaire** :
   la liste nominative de `40-CONTEXT.md` §« Autres citations du nom » était incomplète (le compte
   22 était juste, pas la liste — détail : `40-SUMMARY.md`). **HEAD-01 reste partiellement close** :
   `intent-routing.md`, nommé par l'exigence comme devant renvoyer à `head-governance.md`, n'a
