@@ -207,6 +207,17 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 
 ### Roadmap Evolution
 
+- 2026-09-15 : **Phase 41 inscrite au ROADMAP — posture de protection du dépôt** (arbitrage
+  Samuel, AskUserQuestion session principale, 2026-09-15 ; inscription faite **après le merge de
+  la PR #67**, comme prévu, pour ne pas croiser la branche de la Phase 25). Origine : finding de
+  l'audit de la vague 3 de la Phase 25 — `gh api …/rulesets` rend `[]`, tout gate in-repo est
+  neutralisable depuis la PR qu'il juge. Numéro **41 vérifié à la main** avant `phase.add` (rendu
+  juste, un seul hunk en fin de fichier, aucune ligne parasite cette fois ; la ligne de liste du
+  milestone a dû être ajoutée à la main ; slug outil `VFDO-41-posture-de-protection-du-d-p-t`,
+  accents perdus comme pour 37/38). Famille candidate `PROT-01..03` (préfixe libre au ledger) à
+  ledgeriser au cadrage. Séquencée **après la 40 et la calibration 25-04** — aucune règle de merge
+  ne change tant que ces deux PR sont en vol. Cahier des charges : BACKLOG § « Posture de
+  protection de `main` — TRANCHÉ ».
 - 2026-09-15 : **Phase 34 exécutée et ledgerisée — trois verdicts rendus sur pièces, aucun code
   d'agent ni d'installeur.** 6/6 plans clos, SUMMARY sur disque. **Ce qui a été mesuré** :
   AGTS-01 — matrice division→module re-mesurée contre le parc réel (31 fichiers distribués), six
@@ -1289,7 +1300,7 @@ Recent decisions affecting current work:
 Last session: 2026-09-15
 Stopped at: **Phase 34 EXÉCUTÉE et MERGÉE** (PR #66, merge `bf34d49`, 2026-09-15 — 3 verdicts rendus, 4 gates humains relayés, AGTS-02 reportée ; Scroll-Off exclu du périmètre VibeFlow le 2026-09-15, reprise sur un lab mobile à désigner) puis **Phase 25 PLANIFIÉE** (recherche `eb6aa3d`, D-06 bis + D-01 bis amendés, 4 plans `f7a057f` + révision `2773e37`, checker PASSED, couverture 8/8, gap-analysis 10/10). Next : exécution 25 par `vf-dev-manager` (vagues 1-3, arrêt au checkpoint 25-04) — demande Samuel, session principale, 2026-09-15.
 
-**Reprendre par** : mission `vf-dev-manager` sur la Phase 25 (vagues 1-3, checkpoint 25-04 bloquant jusqu'à la 40) — puis `/gsd-plan-phase 40`, puis calibration 25-04 dans une seconde PR.
+**Reprendre par** : mission `vf-dev-manager` sur la Phase 25 (vagues 1-3, checkpoint 25-04 bloquant jusqu'à la 40) — puis `/gsd-plan-phase 40`, puis calibration 25-04 dans une seconde PR, **puis** cadrage de la Phase 41 (posture de protection du dépôt) — jamais avant que les PR de la 40 et de 25-04 soient mergées.
 
 **Ce qui reste fermé, quoi qu'il arrive** :
 - **Aucune partition réelle de `vibeflow-os`** sans geste humain explicite — déclencheur D-02 (§ Decisions, 2026-09-10).

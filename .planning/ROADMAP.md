@@ -80,6 +80,7 @@
 - [x] Phase 38: Portabilité multi-runtime — livraison (canal d'install, migration de lab, adaptateur) (exécutée 2026-08-29, **mesurée 2026-08-30** sur clé API — **critère 2 PROUVÉ sur Codex** : profondeur ≥ 2 constatée EN BASE (`thread_spawn_edges`, `root→vf-dev-manager→vf-coder`), 3/3 sur les **4 critères réels** ; le **critère 5 est SANS OBJET sous clé API** (vert à vide, jamais « atteint ») et le **critère 4 est plus faible que son libellé** (`--output-schema` non propagé aux sous-agents, dette D-38-S). **kimi-code n'est plus un inconnu déclaré** : I-1 **31/31**, I-2 `disallowedTools` bloque (0/4 contre 3/3 au contrôle positif), I-3 hooks déclenchés 3/3, `vf-internal` **sans équivalent** (Pattern 12 non tenu, déclaré par le gate de fidélité). **Critère 1 toujours partiel** : hooks non portés, perte déclarée. Coûts : Codex 1,01 $, kimi ~0,018 $. **SHIPPÉE v2.59.0 le 2026-08-31** (Samuel a autorisé le ship après revue ; PR + tag + release GitHub) — test bout-en-bout install **et** usage refait sur Codex (délégation de rôle → code réel) ET Kimi (`--agent-file` → code + rapport typé) le 2026-08-31, manifeste `.codex-plugin/` natif ajouté. Preuves : `38-MESURE-CODEX-CRITERE-2.md`, `38-MESURE-KIMI.md`)
 - [x] Phase 39: Workstreams — partition du planning et collaboration concurrente (cadrée 2026-09-09, exécutée 2026-09-10, 3 plans clos avec SUMMARY, revue ×3 + audit infra + juge frais sur le diff de correction ; **SHIPPÉE v2.60.0 le 2026-09-14 — PR #62** (conductor v1.35.0 : `check-divergence.sh` S2/S4/S5 + suite 17 cas dont 3 mutants, hook `post-merge` opt-in ancré sur `--git-common-dir` après RCE démontrée, étape CI ; dev-orchestrator v2.20.4 : dispatch `--ws` explicite ; `PART-01..09` gravées, `GSDA-19` superseded, ADR-069 amendé). Hotfix PR #61 regroupé dans la même release (arbitrage Samuel, AskUserQuestion session principale, 2026-09-14). **Dépôt volontairement NON partitionné** — partition réelle = geste humain séparé, déclencheur D-02 en STATE § Decisions. Réserves : premier run CI distant observé sur la PR #62 seulement ; le clone jetable prouve un mécanisme, pas un usage concurrent réel)
 - [ ] Phase 40: vibeflow-head — head of minds du dev-orchestrator (inscrite 2026-09-15, spec `docs/superpowers/specs/2026-09-15-vibeflow-head-design.md` ; séquencée après la 34, AVANT la 25)
+- [ ] Phase 41: Posture de protection du dépôt (inscrite 2026-09-15, arbitrage Samuel AskUserQuestion session principale ; cahier des charges au BACKLOG ; séquencée après la 40 ET la calibration 25-04)
 
 <details>
 <summary>✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04</summary>
@@ -1466,5 +1467,47 @@ re-travail), HEAD-04 (renommage sans alias survivant).
 
   5. Release taggée : bump **minor** du module `dev-orchestrator` et de la racine, gate
      `check-release-tag.sh --remote` ✓.
+
+**Plans**: TBD
+
+### Phase 41: Posture de protection du dépôt
+
+> **Origine** : finding de l'audit de mission de la Phase 25 (vague 3, 2026-09-15) —
+> `gh api repos/picmakpro/vibeflow-os/rulesets` rend `[]` : `main` n'est protégée par rien, donc
+> **tout gate in-repo est neutralisable depuis la PR qu'il juge** (une même PR peut modifier un
+> gate, sa suite de tests et l'étape CI qui l'invoque). Risque structurel et antérieur à la 25,
+> nommé par aucun threat ID de son registre STRIDE. Décision Samuel (AskUserQuestion session
+> principale, 2026-09-15) : **ouvrir une phase dédiée** plutôt que poser un ruleset au passage
+> d'une mission — changer les règles du merge pendant qu'une PR est ouverte modifierait les
+> conditions de cette PR en cours de route. Cahier des charges : `BACKLOG.md` § « Posture de
+> protection de `main` — TRANCHÉ : phase dédiée à inscrire (2026-09-15) ».
+
+**Goal**: La branche `main` est protégée par une règle machine — CI verte requise avant merge —
+sans casser le flux de release existant (bump → merge → tag annoté → release GitHub) ni les
+hotfix urgents.
+**Depends on**: aucune dépendance de code. Séquencée **après la Phase 40 et la calibration 25-04** :
+les deux PR en attente ne doivent pas changer de règles de merge en vol — même raison qui a fait
+différer cette inscription après le merge de la PR #67.
+**Requirements**: TBD — famille candidate `PROT-` (préfixe libre au ledger, vérifié le
+2026-09-15), à ledgeriser au cadrage : PROT-01 (ruleset posé et prouvé), PROT-02 (compatibilité
+avec la discipline de release du `CLAUDE.md` — `check-release-tag` `main`-only qui échoue par
+construction au merge et se rejoue après le tag, tag et release GitHub post-merge, sort du hook
+`pre-push` optionnel de `scripts/hooks`), PROT-03 (politique hotfix documentée).
+**Success Criteria** (what must be TRUE):
+
+  1. `gh api repos/picmakpro/vibeflow-os/rulesets` ne rend plus `[]` : un ruleset actif sur
+     `main` exige le statut CI vert avant merge (PROT-01).
+
+  2. Une PR dont la CI est rouge **ne peut pas être mergée** — prouvé par un essai réel tracé
+     (PR jetable, tentative de merge refusée, référence de la PR dans le SUMMARY), jamais par
+     la seule lecture de la configuration (PROT-01).
+
+  3. Le flux de release est rejoué vert sous la nouvelle règle : bump → PR → merge → tag annoté
+     → release GitHub → `bash scripts/check-release-tag.sh --remote` ✓ ; la politique hotfix
+     (ce qui peut contourner quoi, avec quelle trace) est écrite, emplacement tranché au cadrage
+     (PROT-02, PROT-03).
+
+  4. QUAL-01 s'applique si un gate naît (mutation rouge prouvée) ; sinon la phase n'en crée
+     aucun et le dit.
 
 **Plans**: TBD
