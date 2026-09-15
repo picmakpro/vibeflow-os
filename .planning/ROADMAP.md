@@ -472,7 +472,7 @@ Plans:
 | 22. Hygiène documentaire — doctrine de sortie | — | 3/3 | Complete — **mergée dans `main`** (PR #23, `474c3eb`), `dev-orchestrator` v2.9.0 + `design-orchestrator` v1.4.0 | 2026-07-31 |
 | 23. Couplage explicite au moteur GSD | agentique-v1.0 | 8/8 | Complete — 8 SUMMARYs sur disque | 2026-08-04 |
 | 24. Activation et mesure du moteur GSD | agentique-v1.0 | 12/12 | Complete — 12 SUMMARYs sur disque | 2026-08-04 |
-| 25. Budget d'instructions | fiabilite-v1.0 | 0/0 | Not started — héritée, périmètre réduit à BUDG-01/02 (G2/BUDG-03 différé) ; après la Phase 34 | — |
+| 25. Budget d'instructions | fiabilite-v1.0 | 3/4 | In progress — première PR (25-01 à 25-03) prête, ratchet non armé ; 25-04 (calibration) attend la Phase 40 | 2026-09-15 |
 | 26. Manuel utilisateur VibeFlow (manual/) | gsd-alignement | — | Complete (PR #28) | 2026-08-02 |
 | 27. Parallélisation d'exécution — granulaire, simple, sans collision | gsd-alignement | 6/6 | Complete (PR #35) — spike `claude_orchestration` refusé par écrit | 2026-08-10 |
 | 28. Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur | agentique-v1.0 | 3/3 | Complete — PR #42, release `v2.52.0`, CI main verte, gate + `lab-frais-arme` livrés | 2026-08-15 |
@@ -976,15 +976,15 @@ bloquant** dont la précondition est machine-vérifiable (`plugin/dev-orchestrat
 Plans:
 **Wave 1**
 
-- [ ] 25-01-PLAN.md — le gate `check-instruction-budget.sh` : tranche verticale sur le corpus réel (tableau intégral, exit 3), formes normatives de D-01 (puce sous titre de règles, titres et blocs fenced exclus, dédoublonnage), contrat de sortie à cinq codes dont le plafond ADR-029 absolu
+- [x] 25-01-PLAN.md — le gate `check-instruction-budget.sh` : tranche verticale sur le corpus réel (tableau intégral, exit 3), formes normatives de D-01 (puce sous titre de règles, titres et blocs fenced exclus, dédoublonnage), contrat de sortie à cinq codes dont le plafond ADR-029 absolu
 
 **Wave 2** *(bloquée sur la vague 1)*
 
-- [ ] 25-02-PLAN.md — la suite `test-check-instruction-budget.sh` : trois issues QUAL-01 sur fixtures jetables, trois arêtes BUDG-02, quatre mutants vérifiés par `cmp` (une métrique = un mutant), témoin de rougeur de la suite elle-même
+- [x] 25-02-PLAN.md — la suite `test-check-instruction-budget.sh` : trois issues QUAL-01 sur fixtures jetables, trois arêtes BUDG-02, quatre mutants vérifiés par `cmp` (une métrique = un mutant), témoin de rougeur de la suite elle-même
 
 **Wave 3** *(bloquée sur la vague 2)*
 
-- [ ] 25-03-PLAN.md — exposition et traces : étape CI dans le job `gates` (avertissement non bloquant + preuve de discrimination sur fixture), catalogue conductor corrigé (D-05), bump `conductor` v1.37.0, compteurs des README re-dérivés, note datée sous ADR-029, dettes au BACKLOG — **fin de la première PR**
+- [x] 25-03-PLAN.md — exposition et traces : étape CI dans le job `gates` (avertissement non bloquant + preuve de discrimination sur fixture), catalogue conductor corrigé (D-05), bump `conductor` v1.37.0, compteurs des README re-dérivés, note datée sous ADR-029, dettes au BACKLOG — **fin de la première PR**
 
 **Wave 4** *(bloquée sur la Phase 40, checkpoint bloquant — seconde PR)*
 

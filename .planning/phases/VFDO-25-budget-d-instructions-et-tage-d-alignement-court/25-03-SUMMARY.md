@@ -24,7 +24,7 @@ actuals:
   tokens: non mesurable (exécution en direct, hors gsd-execute-phase — aucun compteur de
     session à recopier)
   tasks: 3
-  commits: 3
+  commits: 4
 
 tech-stack:
   added: []
