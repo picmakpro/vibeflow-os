@@ -36,3 +36,18 @@ complète, rapporte avant/après ». Ils obéissaient. **Le défaut était dans 
 
 Voir [[non-regression-sur-la-decouverte-complete]] — la découverte complète reste **obligatoire**,
 c'est seulement **qui l'exécute** qui change.
+
+**Deuxième confirmation, Phase 40 (2026-09-15) — la revue ne remplace PAS la découverte complète.**
+Le `vf-reviewer` a rendu **PASS** sur le diff intégral (51 fichiers), en rejouant les **2** suites
+du module touché — toutes deux vertes. Le nœud de vérification, lui, a joué la **découverte
+complète** (`find plugin scripts -path '*/tests/test-*.sh'` → **79 suites**) et a trouvé le rouge :
+`plugin/conductor/scripts/tests/test-scaffold-docs.sh` cas 22 fige `nrows -eq 11` pour
+`_index.md` du module voisin ; notre lot y a ajouté une 12ᵉ référence. Échec **déterministe**, donc
+rouge en CI aussi — invisible à la revue, invisible aux suites du module touché, invisible au
+worker qui a écrit la ligne.
+**Ce qui le rend indétectable autrement** : le fichier cassé n'est PAS dans le diff (le test est
+inchangé), et le fichier modifié (`_index.md`) est parfaitement correct. Aucune relecture du diff
+ne peut voir ce couplage — seule l'exécution de l'ensemble le révèle.
+**How to apply:** faire jouer, par un nœud DISTINCT de la revue, la découverte complète des suites
+telle que la CI la fait (la commande de `ci.yml`, jamais une liste) — et traiter un PASS de revue
+comme ne disant **rien** sur les modules hors diff.
