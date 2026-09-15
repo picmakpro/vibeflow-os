@@ -466,3 +466,29 @@ adhérence à la charte de densité.
 `SANS-BASELINE` au rejeu du 2026-09-15, ex. `plugin/dev-orchestrator/agents/vf-dev-manager.md` à
 250 lignes) est un geste ultérieur, par lot, chacun abaissant une baseline dans son propre commit —
 jamais un livrable de cette phase, et jamais une réécriture « pour passer » le gate.
+
+## Évasion de mesure du budget d'instructions par bloc de code fenced — DIFFÉRÉ (2026-09-15)
+
+**Capturé :** 2026-09-15, audit de la mission d'exécution du plan 25-03 (mandat vf-coder), au-delà
+du périmètre de ce plan (déviation déclarée minimale, non corrigée ici).
+
+**Le défaut :** `count_instructions()` de `plugin/conductor/scripts/check-instruction-budget.sh`
+exclut délibérément le contenu situé entre triples backticks (design assumé, documenté en tête de
+fonction) — une instruction impérative citée à l'intérieur d'un bloc de code échappe donc au
+ratchet. Hors registre STRIDE actuel de ce script.
+
+**Déclencheur de reprise :** un incident constatant qu'une règle a été déplacée dans un bloc de
+code pour échapper au comptage.
+
+## Blocs `<verify><automated>` de plan qui écrasent un script réel sans `trap` — DIFFÉRÉ (2026-09-15)
+
+**Capturé :** 2026-09-15, audit de la mission d'exécution du plan 25-03 (mandat vf-coder), au-delà
+du périmètre de ce plan (déviation déclarée minimale, non corrigée ici).
+
+**Le défaut :** le bloc `<verify><automated>` de la tâche 1 de `25-02-PLAN.md:154` fait
+`cp`/écrasement/`mv` du gate réel `check-instruction-budget.sh` sans filet de restauration. Une
+interruption entre l'écrasement et la restauration laisse un stub de 27 octets à la place du gate
+réel — aucun `trap ... EXIT INT TERM` ne protège la séquence.
+
+**Déclencheur de reprise :** prochaine révision des scripts de vérification de plan qui manipulent
+un fichier réel par écrasement temporaire — durcir par `trap` à cette occasion, pas avant.
