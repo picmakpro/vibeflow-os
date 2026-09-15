@@ -79,7 +79,11 @@ l'intention et invoque les briques directement — plus de couche de verbes-syno
 
 ### Active
 
-- [ ] Sortie du statut expérimental de `mobile-test`(-team) : premier run réel vert tracé
+- [ ] Sortie du statut expérimental de `mobile-test`(-team) : premier run réel vert tracé —
+      **run tenté le 2026-09-15** (Phase 34, `34-RUN-MOBILE.md`), chapeau ROUGE
+      (`PIPELINE: VERT` / `EQUIPE: ROUGE` — 6/10 flows restent en échec, signal d'alarme absolu
+      sur un flow authentifié) : condition non atteinte, item reste actif, reporté avec trace
+      (déclencheur de reprise daté au BACKLOG)
 
 *(La Phase 13 / milestone `vf-routing` a shippé en `v2.37.0` ; la migration GSD / milestone
 `gsd-migration` a shippé en `v2.39.0` — tous les milestones ouverts sont clos au 2026-07-26.)*

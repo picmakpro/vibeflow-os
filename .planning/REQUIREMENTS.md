@@ -845,9 +845,9 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | WKTR-01 | Phase 35 | Requalifié 2026-08-26 — énoncé non satisfiable honnêtement : `ensure-deps.sh` ne peut pas attester une clé de settings (`worktree.baseRef`) qu'il ne doit pas écrire ; l'attester quand même serait une couverture déclarée sans couverture effective (Borne 4 de `check-capability-activation.sh`). Close sans être livré — pas une dette |
 | WKTR-02 | Phase 35 | Done (option A, 2026-08-26) — leg A **prouvé** (`2026-08-23-...md`, retour en fast-forward, dont un rejeu sur branche réellement divergente le 2026-08-26) ; leg B **mesuré** (`2026-08-26-wktr-02-leg-b-base-de-fork.md` : moteur 1.11.0, HEAD divergent sans réglage → `shouldDegrade=true`, dégradation séquentielle sûre) ; **ré-armement NON effectué, par décision humaine** (sûr mais inerte en conditions de mission — ADR-059 impose une branche dédiée, donc HEAD diverge toujours) |
 | WKTR-03 | Phase 30 | Pending — geste jour 1 (veille `npm view`, jamais le dist-tag `next`) |
-| SKIL-01 | Phase 34 | Pending — cadrage go/no-go, aucun code avant le go |
-| AGTS-01 | Phase 34 | Pending |
-| AGTS-02 | Phase 34 | Pending — conditionnée à la sortie d'expérimental de mobile-test |
+| SKIL-01 | Phase 34 | Done — cadrage rendu, verdict NO-GO, 2026-09-15 — `34-SPIKE-SKIL.md` |
+| AGTS-01 | Phase 34 | Done — verdict par gap rendu, 2026-09-15 — `34-AUDIT-AGTS.md` |
+| AGTS-02 | Phase 34 | Reportée avec trace — run réel ROUGE, 2026-09-15 — `34-RUN-MOBILE.md`, déclencheur de reprise au BACKLOG |
 | QUAL-01 | Transverse — Phases 30, 31, 32, 33, 18, 25, 35 | Pending — satisfait sur les phases 30, 31 et 32 livrées (30/31 : 3 issues + mutation rouge prouvée ; 32 : amendé à **4** issues par D-32-QUAL — PASS/DENY/imparsable-silencieux/indisponible-BRUYANT — les 4 couvertes, cf. `32-RELIQUATS.md` §5) ; **non déclenché sur la Phase 35** (2026-08-26, option A) — aucun gate ni comparateur neuf n'y naît, donc rien à satisfaire ; reste à tenir sur 33, 18, 25 |
 | PART-01 | Phase 39 | Done — plan 39-02 — shipped v2.60.0 (PR #62, 2026-09-14) |
 | PART-02 | Phase 39 | Done — plan 39-02 — shipped v2.60.0 (PR #62, 2026-09-14) |
@@ -956,11 +956,11 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [ ] **WKTR-03** *(portée par la Phase 30, hors mandat de cette clôture)*: La veille de release gsd-core est active dès le jour 1
 
 ### Skill-installer global (réduit à un cadrage)
-- [ ] **SKIL-01**: Un cadrage go/no-go répond à « que fait-il de plus que le natif `/plugin` ? » — abandon documenté si la réponse est creuse ; aucun code avant le go
+- [x] **SKIL-01**: Un cadrage go/no-go répond à « que fait-il de plus que le natif `/plugin` ? » — abandon documenté si la réponse est creuse ; aucun code avant le go — **cadrage rendu (NO-GO), 2026-09-15 : `34-SPIKE-SKIL.md`**. Règle appliquée : l'exigence demande un cadrage écrit, pas un GO — un NO-GO documenté la satisfait tout autant ; ne coche pas si le verdict avait été `MESURE INVALIDE`.
 
 ### Gaps agency-agents (réduit)
-- [ ] **AGTS-01**: Les gaps sont arbitrés en distillant la taxonomie du catalogue — jamais d'import des personas
-- [ ] **AGTS-02**: `web-test-team` est construite SI mobile-test sort du statut expérimental pendant le milestone (seule piste alignée fiabilité) ; sinon l'exigence est reportée avec trace
+- [x] **AGTS-01**: Les gaps sont arbitrés en distillant la taxonomie du catalogue — jamais d'import des personas — **verdict par gap rendu, 2026-09-15 : `34-AUDIT-AGTS.md`** (six refusés faute de preuve D-02, un reporté sur AGTS-02, zéro combler, zéro agent créé)
+- [ ] **AGTS-02**: `web-test-team` est construite SI mobile-test sort du statut expérimental pendant le milestone (seule piste alignée fiabilité) ; sinon l'exigence est reportée avec trace — **run réel joué 2026-09-15, chapeau ROUGE : `34-RUN-MOBILE.md`** (`PIPELINE: VERT` / `EQUIPE: ROUGE`) — reportée avec trace conformément à la clause de repli de l'exigence elle-même, déclencheur de reprise daté au BACKLOG
 
 ### Portabilité multi-runtime — livraison (Phase 38, prolonge le spike Phase 37)
 > Espace de noms dérivé au cadrage (38-CONTEXT.md) — `PORT-xx` est PRIS (Phase 30) et exclu.
