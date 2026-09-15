@@ -11,3 +11,6 @@ la demande appelle, invoque directement la brique outillée et propose le next s
 
 Aucune table ici — **une seule source de routage**, celle de l'agent
 (spec : `docs/superpowers/specs/2026-07-25-suppression-facade-vf-design.md`).
+
+L'agent incarné porte aussi la règle d'échelle et la gouvernance de sortie, définies dans
+`dev-orchestrator-references/head-governance.md` §1 et §3.
