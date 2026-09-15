@@ -1084,16 +1084,14 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 > AskUserQuestion session principale). Préfixe `HEAD` vérifié libre par grep exhaustif sur ce
 > ledger (0 occurrence avant cette entrée, re-confirmé par `40-RESEARCH.md`).
 
-- [ ] **HEAD-01** *(partiellement close, laissée ouverte — voir note)*: L'échelle d'allocation
-  (quick / debug / execute / manager, sens unique, `SEUIL_EQUIPE` inchangé) vit dans
-  `head-governance.md`, renvoyée — jamais dupliquée — par `AGENT.md`, `intent-routing.md` et
-  `skills/vf-auto/SKILL.md` (D-01, D-02, D-04, D-09). **Preuve partielle** : `AGENT.md` (5 renvois
-  à `head-governance.md`, lignes 53/72/148/150/157/209) et `skills/vf-auto/SKILL.md` (1 renvoi,
-  ligne 28) renvoient bien. **`intent-routing.md` ne renvoie PAS** — 0 occurrence de
-  `head-governance` dans le fichier (vérifié `grep -c`, 2026-09-15) ; c'est une pure table de
-  routage intention→brique (`gsd-quick-batch`, etc.), jamais touchée par un commit `40-0x` pour
-  y ajouter ce renvoi. Ledgerisé mais non couvert par un lot du DAG de mission — reste à câbler
-  ou à retirer de l'exigence au prochain cadrage touchant ce fichier.
+- [x] **HEAD-01**: L'échelle d'allocation (quick / debug / execute / manager, sens unique,
+  `SEUIL_EQUIPE` inchangé) vit dans `head-governance.md`, renvoyée — jamais dupliquée — par
+  `AGENT.md`, `intent-routing.md` et `skills/vf-auto/SKILL.md` (D-01, D-02, D-04, D-09).
+  **Preuve** : `AGENT.md` (5 renvois à `head-governance.md`, lignes 53/72/148/150/157/209),
+  `skills/vf-auto/SKILL.md` (1 renvoi, ligne 28) et `intent-routing.md` (1 renvoi, ligne 15,
+  ajouté dans l'encadré de tête — table de routage inchangée) renvoient tous les trois. Fermée
+  par correction ciblée hors lot du DAG de mission (2026-09-15) : la table de routage elle-même
+  n'a pas bougé (T3 de `test-dev-orchestrator.sh` reste à son plancher).
 - [x] **HEAD-02**: `check-mission-exit.sh` existe avec ses codes de sortie (3 sain / 0 manque(s)
   nommé(s) / 4 indéterminé / 64 outillage illisible), ses contrôles E1-E6 (D-07), sa suite de
   tests et sa **mutation rouge prouvée** (QUAL-01) ; le head ne rejoue qu'un gate dont la preuve
