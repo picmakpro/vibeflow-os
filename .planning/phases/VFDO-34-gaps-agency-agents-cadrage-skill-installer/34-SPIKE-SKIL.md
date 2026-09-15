@@ -314,30 +314,94 @@ $ find ~/.claude -iname "*skil01*"
 /Users/samuel/.claude/projects/-private-tmp-claude-501--Users-samuel-Documents-dev-vibeflow-os-db082daa-75e4-4a05-bfb1-575528ffda73-scratchpad-skil01
 ```
 
-### Résidus NON nettoyés — survivent sur la machine de Samuel, à son arbitrage
+### Résidus trouvés après le premier passage — l'angle mort de la première preuve
 
-Ces chemins existent ENCORE au moment de la clôture de ce spike. Ils ne sont PAS listés en
-`- chemin supprimé : ` ci-dessus (cette liste ne porte que des chemins effectivement retirés,
-jamais une intention) et ils ne sont PAS retirés par ce plan — la purge d'un chemin hors dépôt,
-sur la machine de l'utilisateur, est son arbitrage, pas un geste que ce spike s'autorise.
+Ces trois chemins existaient ENCORE au moment de la clôture initiale du spike (2026-09-15, avant
+correction). Ils n'étaient PAS listés en `- chemin supprimé : ` ci-dessus — cette liste ne porte
+que les chemins que le protocole avait lui-même énumérés à leur création, et elle ne pouvait donc
+PAS les voir. C'est exactement le motif « une preuve incapable de rendre rouge » : la vérification
+initiale validait ses propres affirmations, pas l'état réel du disque.
 
 - **`~/.claude/plugins/cache/skil01-probe-marketplace/`** (arbre complet, `SKILL.md` sentinelle
   intact) — `claude plugin uninstall` et `claude plugin marketplace remove` vident les registres
   actifs (`claude plugin list`, `claude plugin marketplace list`), mais **pas** le cache disque du
   contenu déjà téléchargé/résolu.
-- **`~/.claude.json`** — contient une entrée orpheline de compteur d'usage,
+- **`~/.claude.json`** — contenait une entrée orpheline de compteur d'usage,
   `"skil01-probe-plugin:skil01-probe-skill"` (ligne 4977 au moment de la mesure), laissée par
   l'invocation réelle du skill en tâche 2.
 - **`~/.claude/projects/-private-tmp-...-scratchpad-skil01/`** — les transcripts de session (2
   fichiers `.jsonl`) des process CLI `claude` frais dispatchés en tâches 1 et 2.
 
-Aucun de ces trois résidus n'est un skill ou un agent de PRODUCTION de l'utilisateur (aucun n'est
-sous un nom qui ne porte pas le préfixe `skil01`), donc aucune violation de la prohibition
-« ne jamais toucher un skill préexistant » — mais l'affirmation antérieure de nettoyage complet
-était trop large, et la corrige ici.
+### Purge — sur arbitrage explicite, deux gestes distincts, un résidu volontairement laissé
 
-Aucun chemin sous les préfixes `skil01-probe` ne subsiste ; rien d'autre n'a été supprimé (aucun
-skill préexistant de l'utilisateur, aucun autre marketplace ou plugin, n'a été touché).
+**Arbitrage Samuel, AskUserQuestion session principale, 2026-09-15** : autorise la purge des deux
+premiers résidus ; **le troisième (les transcripts de session) est explicitement laissé intact**
+sur décision de Samuel — ce n'est pas un oubli, c'est un choix consigné.
+
+**Geste 1 — cache disque du plugin.** Suppression du SEUL dossier
+`~/.claude/plugins/cache/skil01-probe-marketplace/` :
+
+```
+$ rm -rf ~/.claude/plugins/cache/skil01-probe-marketplace
+```
+
+Recontrôle avant/après (pas un simple constat que le sien a disparu — tous les autres) :
+`claude plugin list` : 33 entrées avant, 33 après (inchangé — le dossier de cache retiré n'était
+listé nulle part dans les registres actifs, il ne pouvait pas les affecter) ; `claude plugin
+marketplace list` : 9 avant, 9 après ; `~/.claude/plugins/cache/` : 10 dossiers avant
+(dont `skil01-probe-marketplace`), 9 après — les 9 restants (`impeccable`, `marketingskills`,
+`karpathy-skills`, `apple-bento-grid-marketplace`, `callstack-agent-skills`, `vibeflow-os`,
+`claude-code-plugins`, `ui-ux-pro-max-skill`, `claude-plugins-official`) tous encore présents,
+vérifié nommément.
+
+**Geste 2 — entrée orpheline de `~/.claude.json`.** Édition CIBLÉE, jamais un re-dump du fichier
+(5506 lignes, config globale de Samuel — un re-sérialisé aurait reformaté l'ensemble et rendu tout
+diff illisible) :
+
+```
+$ cp ~/.claude.json ~/.claude.json.bak-20260915-032715   # sauvegarde horodatée AVANT écriture
+```
+
+Suppression par édition de lignes ciblée (Python, lecture/écriture de la plage de lignes
+4976-4980 seulement : les 4 lignes de l'entrée `"skil01-probe-plugin:skil01-probe-skill": {...}`
+plus la virgule désormais pendante de l'entrée précédente `"gsd-onboard"`, devenue la dernière
+entrée de l'objet) :
+
+```diff
+     },
+-    "skil01-probe-plugin:skil01-probe-skill": {
+-      "usageCount": 1,
+-      "lastUsedAt": 1789433600869
+-    }
++    }
+   },
+```
+
+Validation JSON après coup :
+```
+$ python3 -c "import json; json.load(open('/Users/samuel/.claude.json')); print('VALID JSON AFTER')"
+VALID JSON AFTER
+```
+Diff complet contre la sauvegarde (une seule entrée disparue, rien d'autre — 5506 → 5502 lignes,
+4 lignes de différence, un seul hunk) :
+```
+$ diff ~/.claude.json.bak-20260915-032715 ~/.claude.json
+4976,4979d4975
+<     },
+<     "skil01-probe-plugin:skil01-probe-skill": {
+<       "usageCount": 1,
+<       "lastUsedAt": 1789433600869
+```
+
+**Re-constat final** — la même sonde élargie qui avait trouvé l'angle mort, rejouée après purge :
+
+```
+$ find ~/.claude -iname "*skil01*"
+/Users/samuel/.claude/projects/-private-tmp-claude-501--Users-samuel-Documents-dev-vibeflow-os-db082daa-75e4-4a05-bfb1-575528ffda73-scratchpad-skil01
+```
+
+Un seul résultat : les transcripts de session, laissés intacts sur arbitrage explicite (ci-dessus).
+Plus aucun résidu hors de ce chemin autorisé à rester.
 
 ## Canal vs architecture
 
