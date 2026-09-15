@@ -131,19 +131,27 @@ if [ "$BASELINE_ROWS" -gt 0 ]; then
 fi
 
 frontmatter_state() { # <file> -> "open" | "closed" | "none"
+  # F2 (revue vague 1) : le PREMIER '---' n'ouvre le frontmatter que s'il est a NR==1. Un fichier
+  # SANS frontmatter reel (son body est le fichier entier) ne doit jamais voir deux '---' isoles
+  # plus loin dans le corps etre pris pour une paire d'ouverture/fermeture — sinon le contenu entre
+  # les deux disparait du comptage en silence.
   awk '
-    /^---[[:space:]]*$/ { n++; if (n==2) { closed=1 }; next }
+    NR==1 && /^---[[:space:]]*$/ { started=1; infm=1; next }
+    infm && /^---[[:space:]]*$/ { infm=0; closed=1; next }
     END {
-      if (n==0) { print "none" }
-      else if (closed==1) { print "closed" }
+      if (!started) { print "none" }
+      else if (closed) { print "closed" }
       else { print "open" }
     }
   ' "$1" 2>/dev/null
 }
 
 body_only() { # <file> -> body sur stdout, frontmatter exclu (derive de check-divergence.sh)
+  # F2 : meme ancrage NR==1 que frontmatter_state() — les deux fonctions doivent s'accorder sur
+  # ce qui compte comme frontmatter, sinon l'une exclut ce que l'autre inclut.
   awk '
-    /^---[[:space:]]*$/ { n++; if (n==1) {infm=1; next}; if (n==2) {infm=0; next} }
+    NR==1 && /^---[[:space:]]*$/ { infm=1; next }
+    infm && /^---[[:space:]]*$/ { infm=0; next }
     infm { next }
     { print }
   ' "$1"
@@ -201,6 +209,15 @@ count_instructions() { # <file> -> nombre de lignes-instruction du body
   '
 }
 
+# --- F1 : cles de baseline dupliquees pour un meme chemin (garde-fou repris de check-divergence.sh
+# --- S2, check-divergence.sh:178-187, cnt[$1]++ — jamais reinvente) --------------------------------
+BASELINE_DUPKEYS="$TMPD/baseline-dupkeys"
+: > "$BASELINE_DUPKEYS"
+if [ "$BASELINE_ROWS" -gt 0 ]; then
+  awk -F'\t' '{cnt[$1]++} END{for (k in cnt) if (cnt[k] > 1) print k}' "$BASELINE_CLEAN" \
+    | LC_ALL=C sort -u > "$BASELINE_DUPKEYS"
+fi
+
 # --- Mesure + verdict, un fichier a la fois, dans l'ordre trie -----------------------------------
 REPORT="$TMPD/report"
 : > "$REPORT"
@@ -243,15 +260,38 @@ while IFS= read -r rel; do
     ''|*[!0-9]*) instr=0 ;;
   esac
 
-  bl_lines="-"; bl_instr="-"; has_baseline=0
+  # F1 (revue vague 1) : le cote BASELINE doit passer le MEME garde numerique que le cote courant
+  # (L232-239 plus haut) — sinon une baseline corrompue (non numerique, colonne manquante, CRLF
+  # residuel) laisse "verdict" a son initialisation "OK" sous set -uo pipefail sans -e, et le gate
+  # rend 0 sur donnee non verifiee. Une entree DUPLIQUEE pour le meme chemin est fermee par le MEME
+  # garde-fou que check-divergence.sh S2 (check-divergence.sh:178-187, cnt[$1]++) : detectee une
+  # fois pour tout le fichier de baseline, pas reinventee ici.
+  bl_lines="-"; bl_instr="-"; has_baseline=0; baseline_bad=0
   if [ "$BASELINE_ROWS" -gt 0 ]; then
-    entry="$(awk -F'\t' -v k="$rel" '$1==k{print $2"\t"$3; f=1} END{exit (f?0:1)}' "$BASELINE_CLEAN")"
-    entry_rc=$?
-    if [ "$entry_rc" -eq 0 ] && [ -n "$entry" ]; then
-      bl_lines="${entry%%$'\t'*}"
-      bl_instr="${entry#*$'\t'}"
-      has_baseline=1
+    if grep -Fxq "$rel" "$BASELINE_DUPKEYS" 2>/dev/null; then
+      baseline_bad=1
+    else
+      entry="$(awk -F'\t' -v k="$rel" '$1==k{print $2"\t"$3; f=1} END{exit (f?0:1)}' "$BASELINE_CLEAN")"
+      entry_rc=$?
+      if [ "$entry_rc" -eq 0 ] && [ -n "$entry" ]; then
+        bl_lines="${entry%%$'\t'*}"
+        bl_instr="${entry#*$'\t'}"
+        case "$bl_lines" in
+          ''|*[!0-9]*) baseline_bad=1 ;;
+        esac
+        case "$bl_instr" in
+          ''|*[!0-9]*) baseline_bad=1 ;;
+        esac
+        [ "$baseline_bad" -eq 0 ] && has_baseline=1
+      fi
     fi
+  fi
+
+  if [ "$baseline_bad" -eq 1 ]; then
+    printf '%s | - | - | - | - | NON-VERIFIABLE\n' "$rel" >> "$REPORT"
+    echo "[check-instruction-budget] $rel : non verifiable — entree de baseline corrompue (valeur non numerique ou cle dupliquee)" >&2
+    NONVERIF_COUNT=$((NONVERIF_COUNT + 1))
+    continue
   fi
 
   # Plafond absolu ADR-029 : prime sur TOUT le reste, y compris une baseline egale au courant —
@@ -276,8 +316,14 @@ while IFS= read -r rel; do
     fi
   fi
 
+  # F3 (revue vague 1) : SANS_BASELINE_COUNT s'incremente sur has_baseline==0 INDEPENDAMMENT du
+  # verdict affiche — sinon un fichier > 250 lignes sans entree de baseline tombe dans la branche
+  # DEPASSEMENT-ADR029 (prioritaire) et l'absence de couverture de baseline reste invisible au
+  # bilan (le contrat de must_haves exige 2, pas 1, sur ce cas).
+  if [ "$has_baseline" -eq 0 ]; then
+    SANS_BASELINE_COUNT=$((SANS_BASELINE_COUNT + 1))
+  fi
   case "$verdict" in
-    SANS-BASELINE) SANS_BASELINE_COUNT=$((SANS_BASELINE_COUNT + 1)) ;;
     DEPASSEMENT-*) OVERRUN_COUNT=$((OVERRUN_COUNT + 1)) ;;
   esac
 
