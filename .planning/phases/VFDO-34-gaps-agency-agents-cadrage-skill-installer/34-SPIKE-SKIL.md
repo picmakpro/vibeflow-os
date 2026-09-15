@@ -300,6 +300,42 @@ $ claude plugin marketplace list | grep -i skil01 || echo "MARKETPLACE ABSENT FR
 MARKETPLACE ABSENT FROM LIST
 ```
 
+Ce qui précède prouve l'absence des DEUX chemins que ce protocole avait lui-même listés au moment
+de leur création — pas plus. C'est une vérification bornée par son propre énoncé, pas par l'état
+réel du disque (« une preuve incapable de rendre rouge » : elle ne pouvait constater que ce qu'elle
+énumérait). Une recherche élargie, faite en correction (2026-09-15), rejouable par quiconque, va
+plus loin et trouve ce que la liste ci-dessus ne couvrait pas :
+
+```
+$ find ~/.claude -iname "*skil01*"
+/Users/samuel/.claude/plugins/cache/skil01-probe-marketplace
+/Users/samuel/.claude/plugins/cache/skil01-probe-marketplace/skil01-probe-plugin
+/Users/samuel/.claude/plugins/cache/skil01-probe-marketplace/skil01-probe-plugin/0.0.1/skills/skil01-probe-skill
+/Users/samuel/.claude/projects/-private-tmp-claude-501--Users-samuel-Documents-dev-vibeflow-os-db082daa-75e4-4a05-bfb1-575528ffda73-scratchpad-skil01
+```
+
+### Résidus NON nettoyés — survivent sur la machine de Samuel, à son arbitrage
+
+Ces chemins existent ENCORE au moment de la clôture de ce spike. Ils ne sont PAS listés en
+`- chemin supprimé : ` ci-dessus (cette liste ne porte que des chemins effectivement retirés,
+jamais une intention) et ils ne sont PAS retirés par ce plan — la purge d'un chemin hors dépôt,
+sur la machine de l'utilisateur, est son arbitrage, pas un geste que ce spike s'autorise.
+
+- **`~/.claude/plugins/cache/skil01-probe-marketplace/`** (arbre complet, `SKILL.md` sentinelle
+  intact) — `claude plugin uninstall` et `claude plugin marketplace remove` vident les registres
+  actifs (`claude plugin list`, `claude plugin marketplace list`), mais **pas** le cache disque du
+  contenu déjà téléchargé/résolu.
+- **`~/.claude.json`** — contient une entrée orpheline de compteur d'usage,
+  `"skil01-probe-plugin:skil01-probe-skill"` (ligne 4977 au moment de la mesure), laissée par
+  l'invocation réelle du skill en tâche 2.
+- **`~/.claude/projects/-private-tmp-...-scratchpad-skil01/`** — les transcripts de session (2
+  fichiers `.jsonl`) des process CLI `claude` frais dispatchés en tâches 1 et 2.
+
+Aucun de ces trois résidus n'est un skill ou un agent de PRODUCTION de l'utilisateur (aucun n'est
+sous un nom qui ne porte pas le préfixe `skil01`), donc aucune violation de la prohibition
+« ne jamais toucher un skill préexistant » — mais l'affirmation antérieure de nettoyage complet
+était trop large, et la corrige ici.
+
 Aucun chemin sous les préfixes `skil01-probe` ne subsiste ; rien d'autre n'a été supprimé (aucun
 skill préexistant de l'utilisateur, aucun autre marketplace ou plugin, n'a été touché).
 
@@ -315,11 +351,16 @@ différente et n'a été utilisée nulle part dans ce protocole).
 
 **(b) Une question distincte, hors périmètre de cette phase** : tous les agents VF peuvent-ils
 DÉJÀ invoquer des skills ? **Non.** Mesure locale citée par `34-RESEARCH.md` (Pitfall 5) :
-[VERIFIED: grep exécuté sur les 25 agents distribués `plugin/*/agents/*.md` le 2026-09-15] — seuls
-**7 sur 25** déclarent `Skill` dans leur frontmatter `tools:` ; les 18 restants sont tous des
-workers `vf-internal: true` (Pattern 12, cloisonnement délibéré). C'est un choix d'architecture VF
-séparé, pas un canal défaillant — et ce spike ne le referme pas : un skill-installer parfait ne
-changerait rien pour `vf-app-fixer` ou `vf-test-runner` tant que leur `tools:` n'inclut pas `Skill`.
+[VERIFIED: grep RE-DÉRIVÉ (pas recopié de `34-RESEARCH.md`) sur les 25 agents distribués
+`plugin/*/agents/*.md`, croisé `tools:`/`vf-internal:`, le 2026-09-15] — seuls **7 sur 25**
+déclarent `Skill` dans leur frontmatter `tools:` ; parmi les 18 restants, **17 sont des workers
+`vf-internal: true`** (Pattern 12, cloisonnement délibéré) et **1 ne l'est pas** —
+`plugin/mobile-test-team/agents/vf-test-orchestrator.md`, un orchestrateur exposé (dispatché par
+`vf-auto` sur projet mobile), pas un worker cloisonné. La formulation « tous » de
+`34-RESEARCH.md` § Pitfall 5 est donc **inexacte** — corrigée ici après recoupement, pas recopiée.
+C'est malgré tout un choix d'architecture VF séparé, pas un canal défaillant — et ce spike ne le
+referme pas : un skill-installer parfait ne changerait rien pour `vf-app-fixer`, `vf-test-runner`
+ou `vf-test-orchestrator` tant que leur `tools:` n'inclut pas `Skill`.
 
 **Pourquoi la distinction compte pour ce verdict précisément** : F8 (`.planning/research/FEATURES.md:209-231`,
 capturé 2026-06-04) formulait son différenciateur ainsi — « les skills d'un plugin ne sont pas
@@ -350,7 +391,9 @@ managers — CLOS », « check-agents : périmètre des agents tiers — CLOS »
 > skills disponibles à tous les agents ») n'existe plus techniquement au niveau du canal — voir
 > `34-SPIKE-SKIL.md` § « Canal vs architecture » pour la distinction complète avec la question,
 > distincte et hors périmètre, de savoir si tous les agents VF ont l'outil `Skill` (non, 18/25 ne
-> l'ont pas — choix d'architecture Pattern 12, pas un trou de canal). Zéro ligne de code
+> l'ont pas — dont 17 workers `vf-internal: true` cloisonnés Pattern 12 et 1 orchestrateur exposé
+> non cloisonné, `vf-test-orchestrator` — choix d'architecture, pas un trou de canal). Zéro ligne
+> de code
 > d'installeur écrite (D-09). Renvoi : `.planning/phases/VFDO-34-gaps-agency-agents-cadrage-skill-installer/34-SPIKE-SKIL.md`.
 
 **Dans `.planning/REQUIREMENTS.md:1093`** — l'anti-feature reste gravée telle quelle, rien à
