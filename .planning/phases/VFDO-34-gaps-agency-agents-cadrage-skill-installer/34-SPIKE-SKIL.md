@@ -1,6 +1,26 @@
 # SPIKE — Phase 34 : go/no-go SKIL-01 (skill posé par le canal `/plugin` natif atteint-il un sous-agent doté de l'outil `Skill` ?)
 
-> **Verdict** : (provisoire — posé par la tâche 3, après le checkpoint bloquant-humain)
+> **Verdict** : NO-GO
+
+**2026-09-15.** Le canal `/plugin` natif atteint DÉJÀ, sans rien d'autre, un sous-agent doté de
+l'outil `Skill` (`CONTROLE-NEGATIF: ECHEC` — mesure valide ; `CAS-A: ATTEINT` — le trou supposé
+n'existe pas). La première moitié de la conjonction D-07 (« un trou mesuré existe ») n'est pas
+remplie : le verdict s'arrête là, sans même avoir besoin de statuer sur la seconde moitié (l'engine
+peut-il le fermer). L'item BACKLOG du 2026-06-04 est clos, l'anti-feature « marketplace de skills
+maison » (`REQUIREMENTS.md:1093`) reste gravée.
+
+Traçabilité de l'arbitrage : arbitrage Samuel, AskUserQuestion session principale, 2026-09-15.
+
+Second arbitrage, même canal et même date (arbitrage Samuel, AskUserQuestion session principale,
+2026-09-15) : le vecteur de mesure employé (process `claude` CLI frais, `--permission-mode
+bypassPermissions`) est jugé acceptable pour cette mesure — aucune relance, aucune mesure
+complémentaire de scope project n'a été demandée.
+
+**Règle de composition du verdict (posée avant lecture, pour qu'un futur relecteur puisse vérifier
+lui-même la cohérence sans relancer le spike)** : un GO exige `CONTROLE-NEGATIF: ECHEC` **ET** un
+trou mesuré **ET** l'engine actuel capable de le fermer ; un `CONTROLE-NEGATIF: SUCCES` force
+mécaniquement `MESURE INVALIDE`, quel que soit le reste. Ici, `CONTROLE-NEGATIF: ECHEC` mais
+`CAS-A: ATTEINT` (pas de trou) → NO-GO.
 
 ## Périmètre
 
@@ -10,6 +30,14 @@ Seul fichier de ce dépôt modifié par ce plan : ce fichier. Tout le reste de l
 (sous-agent de sonde, plugin jetable, dépôt Git jetable) est fabriqué **hors du dépôt**
 `vibeflow-os`, sous le territoire de l'utilisateur (`~/.claude/agents/`) ou dans un dossier
 scratch de session, jamais sous `plugin/`.
+
+Preuve machine, périmètre élargi (D-09 : aucune ligne de code d'installeur, même sur GO — ici NO-GO,
+donc a fortiori) :
+
+```
+$ git diff --quiet 7e504ade15730ab3db38c6cb7bacd5b1f95ebb0f -- plugin scripts docs manual .github README.md README.fr.md
+(exit 0 — aucun de ces chemins n'a été touché par ce plan)
+```
 
 ## Protocole exécuté
 
@@ -274,3 +302,74 @@ MARKETPLACE ABSENT FROM LIST
 
 Aucun chemin sous les préfixes `skil01-probe` ne subsiste ; rien d'autre n'a été supprimé (aucun
 skill préexistant de l'utilisateur, aucun autre marketplace ou plugin, n'a été touché).
+
+## Canal vs architecture
+
+Deux questions distinctes, à ne JAMAIS confondre (Pitfall 5 de `34-RESEARCH.md`) :
+
+**(a) La question de D-07, celle que ce spike mesure** : le canal `/plugin` natif atteint-il un
+sous-agent qui A l'outil `Skill` ? **Réponse mesurée ici : OUI** (`CAS-A: ATTEINT`, sentinelle
+`SKIL01_PROBE_OK` obtenue littéralement, via une invocation namespacée `<plugin>:<skill>` par
+l'outil `Skill` — jamais une slash command auto-découverte par le canal plugin, qui est une chose
+différente et n'a été utilisée nulle part dans ce protocole).
+
+**(b) Une question distincte, hors périmètre de cette phase** : tous les agents VF peuvent-ils
+DÉJÀ invoquer des skills ? **Non.** Mesure locale citée par `34-RESEARCH.md` (Pitfall 5) :
+[VERIFIED: grep exécuté sur les 25 agents distribués `plugin/*/agents/*.md` le 2026-09-15] — seuls
+**7 sur 25** déclarent `Skill` dans leur frontmatter `tools:` ; les 18 restants sont tous des
+workers `vf-internal: true` (Pattern 12, cloisonnement délibéré). C'est un choix d'architecture VF
+séparé, pas un canal défaillant — et ce spike ne le referme pas : un skill-installer parfait ne
+changerait rien pour `vf-app-fixer` ou `vf-test-runner` tant que leur `tools:` n'inclut pas `Skill`.
+
+**Pourquoi la distinction compte pour ce verdict précisément** : F8 (`.planning/research/FEATURES.md:209-231`,
+capturé 2026-06-04) formulait son différenciateur ainsi — « les skills d'un plugin ne sont pas
+automatiquement dans le contexte des sous-agents ». La mesure (a) réfute cette formulation littérale
+pour un sous-agent qui A l'outil `Skill` : il les découvre, sans rien de plus. Ce que F8 pointait
+réellement, sans le nommer, c'est (b) — un choix d'architecture VF, pas un manque du canal natif.
+Un skill-installer ne fermerait pas (b) : fermer (b) veut dire éditer la ligne `tools:` de 18
+fichiers d'agent, pas poser des skills.
+
+## Conséquence ledger
+
+Rédaction PRÊTE À COLLER pour le plan 34-06 — 34-06 transcrit, il ne réinterprète pas.
+
+**Dans `.planning/BACKLOG.md`, item « Skill-installer global (multi-agents) » (lignes 258-273)** —
+gabarit de clôture déjà en place dans ce dépôt (cf. « Notifications de progression des agents
+managers — CLOS », « check-agents : périmètre des agents tiers — CLOS ») :
+
+> Titre à passer en `## Skill-installer global (multi-agents) — CLOS`
+>
+> **Capturé :** 2026-06-04 · **Clos :** 2026-09-15 (Phase 34, spike SKIL-01, `34-SPIKE-SKIL.md`) ·
+> **Origine de la clôture :** déclencheur consommé le 2026-06-05, dormi 7 semaines, réduit à un
+> cadrage go/no-go par le milestone.
+>
+> **Ce qui a fermé l'item (2026-09-15).** Spike mesuré par exécution (pas par lecture de doc) :
+> un sous-agent doté de l'outil `Skill` découvre déjà, sans rien d'autre, un skill posé par le
+> canal `/plugin` natif en scope user (`CAS-A: ATTEINT`, sentinelle obtenue littéralement ;
+> contrôle négatif `ECHEC`, appareil de mesure validé). Le différenciateur de F8 (« rendre les
+> skills disponibles à tous les agents ») n'existe plus techniquement au niveau du canal — voir
+> `34-SPIKE-SKIL.md` § « Canal vs architecture » pour la distinction complète avec la question,
+> distincte et hors périmètre, de savoir si tous les agents VF ont l'outil `Skill` (non, 18/25 ne
+> l'ont pas — choix d'architecture Pattern 12, pas un trou de canal). Zéro ligne de code
+> d'installeur écrite (D-09). Renvoi : `.planning/phases/VFDO-34-gaps-agency-agents-cadrage-skill-installer/34-SPIKE-SKIL.md`.
+
+**Dans `.planning/REQUIREMENTS.md:1093`** — l'anti-feature reste gravée telle quelle, rien à
+modifier : « Marketplace de skills maison / mirroring tiers — duplique `/plugin` natif → input du
+cadrage SKIL-01 » ; le renvoi `→ input du cadrage SKIL-01` peut être mis à jour en
+`→ clos NO-GO par le spike SKIL-01 (Phase 34, 2026-09-15)` par 34-06, sans changer le sens de la
+ligne.
+
+## Table de non-fiabilité des sources
+
+Pattern repris de `SPIKE-REPORT.md` (Phase 37, table de non-fiabilité des descripteurs) : chaque
+affirmation de ce rapport est marquée `[VERIFIED: <commande, date>]` (mesuré en exécution sur ce
+poste) ou `[CITED: <source, date>]` (documentation officielle, jamais suffisante seule dans ce
+dépôt — cf. mémoire de session `preuve-incapable-de-rendre-rouge`).
+
+| Affirmation | Statut |
+|---|---|
+| Le canal `/plugin` natif atteint un sous-agent doté de `Skill` | `[VERIFIED: claude --agent skil01-probe-agent -p ... → "SKIL01_PROBE_OK", 2026-09-15]` |
+| Un nom de skill absent produit un échec de découverte propre | `[VERIFIED: claude --agent skil01-probe-agent -p ... → "Unknown skill: skil01-probe-nonexistant", 2026-09-15]` |
+| « the subagent can still discover and invoke project, user, and plugin skills through the Skill tool » | `[CITED: https://code.claude.com/docs/en/sub-agents, récupéré 2026-09-15]` — point de départ tertiaire, confirmé mais jamais suffisant seul : c'est la ligne `[VERIFIED:]` ci-dessus qui tranche le verdict, pas celle-ci |
+| Seuls 7 agents distribués sur 25 ont `Skill` dans `tools:` | `[VERIFIED: grep sur les 25 fichiers `plugin/*/agents/*.md`, 2026-09-15, repris de 34-RESEARCH.md § Pitfall 5]` |
+| L'engine `vibeflow-update.sh` pose/backup/rollback/désinstalle déjà des skills bruts en scope user | `[VERIFIED: lecture de plugin/_internal/vibeflow-update.sh lignes ~2218-2229, ~2478, ~2606-2608, ~2726, 2026-09-15]` |
