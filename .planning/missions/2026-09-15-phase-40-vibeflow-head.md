@@ -9,18 +9,26 @@ plan → exec-rename → { exec-e6 ‖ exec-doctrine } ; exec-e6 → { exec-work
 (exec-gate dépend aussi d'exec-doctrine) ; → { revue ‖ verif } → bump → docs
 
 ## Preuves E6
-| verdict | commande | exit | sha |
-|---|---|---|---|
-| recette | `bash plugin/dev-orchestrator/scripts/tests/test-check-mission-exit.sh` | 0 (23 cas) | 12720ec |
-| recette | `bash plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh` | 0 (201 OK/0 KO) | 12720ec |
-| recette | découverte complète `find plugin scripts -path '*/tests/test-*.sh'` — 79 suites | 0 rouge | 12720ec |
-| revue | `vf-reviewer` sur `8be3a0d..2f0ca81` (51 fichiers) | PASS, 0 bloquant 0 majeur | 2f0ca81 |
-| gate:version-sync | `bash scripts/check-version-sync.sh` | 0 | 12720ec |
-| gate:machine-paths | `bash scripts/check-machine-paths.sh` | 0 | 12720ec |
-| gate:state-integrity | `bash plugin/conductor/scripts/check-state-integrity.sh --file .planning/STATE.md` | 0 | 12720ec |
-| gate:capability-activation | `bash plugin/dev-orchestrator/scripts/check-capability-activation.sh` | 0 | 12720ec |
-| gate:ci-gates | job `gates` de `ci.yml` rejoué commande par commande | 10 étapes, 10 vertes | 12720ec |
-| audit | étage NON dispatché — la phase ne touche ni sécurité, ni données, ni infra | preuve: amont | — |
+
+```json
+{
+  "preuves": [
+    {"verdict": "recette", "commande": "bash plugin/dev-orchestrator/scripts/tests/test-check-mission-exit.sh", "exit_code": 0, "sha": "321b61c"},
+    {"verdict": "recette", "commande": "bash plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh", "exit_code": 0, "sha": "321b61c"},
+    {"verdict": "recette", "commande": "find plugin scripts -type f -path '*/tests/test-*.sh' | while read s; do bash \"$s\"; done", "exit_code": 0, "sha": "321b61c"},
+    {"verdict": "revue", "commande": "Task(vf-reviewer) sur rtk proxy git diff 8be3a0d..2f0ca81", "exit_code": 0, "sha": "2f0ca81"},
+    {"verdict": "gate:version-sync", "commande": "bash scripts/check-version-sync.sh", "exit_code": 0, "sha": "321b61c"},
+    {"verdict": "gate:machine-paths", "commande": "bash scripts/check-machine-paths.sh", "exit_code": 0, "sha": "321b61c"},
+    {"verdict": "gate:state-integrity", "commande": "bash plugin/conductor/scripts/check-state-integrity.sh --file .planning/STATE.md", "exit_code": 0, "sha": "321b61c"},
+    {"verdict": "gate:capability-activation", "commande": "bash plugin/dev-orchestrator/scripts/check-capability-activation.sh", "exit_code": 0, "sha": "321b61c"},
+    {"verdict": "gate:ci-gates", "commande": "job `gates` de .github/workflows/ci.yml rejoue commande par commande (10 etapes)", "exit_code": 0, "sha": "2f0ca81"},
+    {"verdict": "audit", "preuve": "amont"}
+  ]
+}
+```
+
+> `audit` porte `preuve: amont` parce que l'etage n'a pas ete dispatche : la phase ne touche ni
+> securite, ni donnees sensibles, ni infra. Absence assumee et signalee, jamais un vert implicite.
 
 ## Décompte (mission)
 - Minds dispatchés : 17 (1 planner, 6 plan-checkers, 8 workers d'exécution/correction, 1 reviewer, 1 vérificateur)
