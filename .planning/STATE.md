@@ -207,6 +207,25 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 
 ### Roadmap Evolution
 
+- 2026-09-15 : **Phase 40 exécutée — `vibeflow-dev` devient `vibeflow-head`, head of minds du
+  dev-orchestrator.** 5 plans sur 3 vagues (40-01 `exec-rename`, 40-02 `exec-e6`, 40-03
+  `exec-doctrine`, 40-04 `exec-gate`, 40-05 `exec-workers` — ce dernier né d'un amendement
+  post-cadrage, D-19 ci-dessous). Renommage **et** extension de rôle, **zéro agent neuf**, kernel
+  intact (diff nul sur `team-kernel.md`, `driver-lock.sh`, `dag.sh`, `guard-driver-lock.sh`,
+  vérifié par commande). Livré : renommage sur 22 chemins + garde anti-alias T36 (mutation rouge
+  prouvée, confinée par assemblage du motif à l'exécution — un gate qui balaie le dépôt se balaie
+  lui-même) ; `head-governance.md` (126 l., neuf) ; `AGENT.md` restructuré (209/250 l.) ;
+  `check-mission-exit.sh` (459 l., codes 3/0/4/64, contrôles E1-E6, 23/23 cas dont 6 mutations
+  rouges) ; contrat de preuves E6 dans `mission-contracts.md` et ses trois émetteurs
+  (`vf-coder.md`, `vf-reviewer.md`, `vf-auditer.md`) relayés par `vf-dev-manager.md` (250/250 l.
+  tenu par compensation). Module `dev-orchestrator` bumpé **v2.22.0**, racine **v2.63.0** (tag +
+  release GitHub, `check-release-tag.sh --remote` ✓). **Écart trouvé à la clôture documentaire** :
+  la liste nominative de `40-CONTEXT.md` §« Autres citations du nom » était incomplète (le compte
+  22 était juste, pas la liste — détail : `40-SUMMARY.md`). **HEAD-01 reste partiellement close** :
+  `intent-routing.md`, nommé par l'exigence comme devant renvoyer à `head-governance.md`, n'a
+  jamais été touché en ce sens par aucun commit `40-0x` (0 occurrence de `head-governance` dans le
+  fichier, contre 5 dans `AGENT.md` et 1 dans `vf-auto/SKILL.md`) — laissée ouverte au ledger,
+  détail : `.planning/REQUIREMENTS.md` §HEAD-01.
 - 2026-09-15 : **Phase 41 inscrite au ROADMAP — posture de protection du dépôt** (arbitrage
   Samuel, AskUserQuestion session principale, 2026-09-15 ; inscription faite **après le merge de
   la PR #67**, comme prévu, pour ne pas croiser la branche de la Phase 25). Origine : finding de
@@ -530,6 +549,15 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
+
+- **2026-09-15 — Phase 40, D-19 (élargissement du périmètre aux émetteurs E6, option b)**
+  (arbitrage Samuel, AskUserQuestion session principale, 2026-09-15) : le contrat de preuves E6
+  posé par le lot 40-02 (`mission-contracts.md`) n'avait **aucun émetteur** — `grep -ic exit_code`
+  rendait **0** sur les trois workers qui rendent un verdict (`vf-coder.md`, `vf-reviewer.md`,
+  `vf-auditer.md`) **et** sur `vf-dev-manager.md` — donc le gate de sortie `check-mission-exit.sh`
+  n'aurait jamais pu rendre autre chose qu'indéterminé (code 4) sur le contrôle E6. Tranché :
+  ajout d'un cinquième lot (40-05 `exec-workers`, hors DAG de cadrage initial) qui câble le champ
+  `preuves` dans les trois agents émetteurs, HEAD-03 remappée à `40-02` **et** `40-05`.
 
 - **2026-09-15 — Phase 25, D-01 bis (comptage body seul, ratifié)** (arbitrage Samuel,
   AskUserQuestion session principale, 2026-09-15) : le gate `check-instruction-budget.sh` compte
