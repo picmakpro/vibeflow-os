@@ -421,7 +421,7 @@ de dépréciation annoncée.
 
 | Dependency | Required By | Available | Version | Fallback |
 |------------|-------------|-----------|---------|----------|
-| Maestro CLI | AGTS-02 (régression E2E) | ✓ [VERIFIED: `which maestro` → `/Users/samuel/.maestro/bin/maestro`, `maestro --version` → `2.6.1`] | 2.6.1 | — |
+| Maestro CLI | AGTS-02 (régression E2E) | ✓ [VERIFIED: `which maestro` → `~/.maestro/bin/maestro`, `maestro --version` → `2.6.1`] | 2.6.1 | — |
 | OpenJDK (requis par Maestro) | AGTS-02 | ✓ [VERIFIED: `java -version` → `openjdk 17.0.19` Homebrew] | 17.0.19 | — |
 | Node.js | AGTS-02 (exécute `mobile-test-run.mjs`) | ✓ [VERIFIED: `node --version` → `v26.5.0`] | v26.5.0 | — |
 | Xcode / `xcrun simctl` | AGTS-02 (cible iOS) | ✓ [VERIFIED: 7 simulateurs « iPhone 17… » listés, tous `Shutdown`] | — | — |
@@ -541,7 +541,7 @@ refuser, avec sa formulation) revient au plan/exécution de la phase, pas à cet
 
 | Prérequis | Statut | Preuve |
 |-----------|--------|--------|
-| `maestro` sur le PATH / résolu par cascade | PRÉSENT | `which maestro` → `/Users/samuel/.maestro/bin/maestro` ; `maestro --version` → `2.6.1` |
+| `maestro` sur le PATH / résolu par cascade | PRÉSENT | `which maestro` → `~/.maestro/bin/maestro` ; `maestro --version` → `2.6.1` |
 | JDK requis par Maestro | PRÉSENT | `java -version` → `openjdk version "17.0.19"` (Homebrew) ; `$JAVA_HOME` déjà exporté vers `/opt/homebrew/opt/openjdk@17/...` |
 | Node.js | PRÉSENT | `node --version` → `v26.5.0` |
 | Simulateur(s) iPhone 17 disponibles | PRÉSENT (7 au total, dont 2 nommés « iPhone 17 Pro ») | `xcrun simctl list devices available \| grep -i "iPhone 17"` → 7 lignes, toutes `Shutdown` |

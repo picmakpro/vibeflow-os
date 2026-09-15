@@ -901,7 +901,17 @@ conditionnée à la sortie du statut expérimental de `mobile-test` pendant le m
      abandon documenté si la réponse est creuse ; **aucun code avant le go** ; périmètre = câblage,
      pas catalogue ; collision de nom = refus (SKIL-01).
 
-**Plans**: TBD
+**Plans**: 6 plans, 4 vagues (34-01/02/03 dispatchables en parallèle en vague 1 — périmètres de
+fichiers disjoints ; 34-04 et 34-05 sont **conditionnels** au run vert et se closent en no-op tracé
+sinon).
+
+Plans:
+- [ ] 34-01-PLAN.md — AGTS-02 : run réel de sortie d'expérimental sur `Scroll-Off/frontend` (iOS), trace `34-RUN-MOBILE.md` à deux verdicts (PIPELINE, EQUIPE)
+- [ ] 34-02-PLAN.md — SKIL-01 : spike mesuré à contrôle négatif sur le canal natif `/plugin`, verdict `34-SPIKE-SKIL.md` (checkpoint bloquant-humain, NO-GO one-way)
+- [ ] 34-03-PLAN.md — AGTS-01 : note d'audit `34-AUDIT-AGTS.md`, matrice re-mesurée et verdict par gap adossé à la règle de preuve
+- [ ] 34-04-PLAN.md — *(conditionnel au run vert)* sortie du statut expérimental de `mobile-test` et `mobile-test-team`, propagée au manuel
+- [ ] 34-05-PLAN.md — *(conditionnel au run vert)* construction de `web-test-team` sur le moule prouvé, compteurs de catalogue re-dérivés
+- [ ] 34-06-PLAN.md — ledger et clôture : BACKLOG, REQUIREMENTS, PROJECT, STATE, ROADMAP, cohérence note ↔ case vérifiée par machine
 
 ### Phase 25: Budget d'instructions
 
