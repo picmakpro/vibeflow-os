@@ -6,7 +6,7 @@
 > et de migration. Module **mandatory** : posé d'office à chaque install, c'est lui qui porte les
 > gates machine (hooks) et le noyau d'orchestration d'équipe réutilisé par tous les autres modules.
 
-**Type** : `agent + skills + scripts + references` · **Version** : v1.37.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
+**Type** : `agent + skills + scripts + references` · **Version** : v1.37.1 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
 
 > `skill-creator` est une dépendance **dure** depuis ADR-047 : c'est le canal unique de création de
 > skills, invoqué par `vf-new-lab` en fan-out (Phase 5) et exigé par le Gate C. Le conductor étant
@@ -134,8 +134,10 @@ de mandat pour le faire correctement.)*
   `0` armé et conforme, `1` armé avec dépassement de baseline ou du plafond de 250 lignes, `2` non
   vérifiable (découverte vide, fichier imparsable, contrat de baseline incohérent), `3` non armé
   (rapport imprimé, jamais bloquant), `64` erreur d'usage. Consommé par le job CI `gates`
-  (avertissement en mode non armé, blocage en mode armé). **La sentinelle n'est pas posée à ce
-  stade** : aucune baseline n'est encore gravée, la calibration attend la livraison de la Phase 40.
+  (avertissement en mode non armé, blocage en mode armé). **Ratchet armé depuis le 2026-09-16**
+  (v1.37.1, plan 25-04) : 31 fichiers sous contrat, baselines gravées dans
+  `.planning/instruction-budget-baselines.tsv` (3641 lignes, 487 instructions au total). Une
+  baseline ne monte jamais sans arbitrage humain nommé avec canal et date ; elle descend librement.
 
 **Team-kernel** : `dag.sh` (plan de bataille persistant, frontière `ready`), `driver-lock.sh`
 (verrou de mission atomique par `mkdir`, battement séparé de la lease, verbes `takeover`/`reclaim`

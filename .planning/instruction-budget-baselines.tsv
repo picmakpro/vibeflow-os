@@ -1,0 +1,49 @@
+# Baselines du budget d'instructions — gate plugin/conductor/scripts/check-instruction-budget.sh
+# (BUDG-01/02, Phase 25, plan 25-04).
+#
+# Date de calibration : 2026-09-16
+# SHA de base : 892f89aac15b617f8075b9fafa71c345dd61b1b8
+# Commande de re-dérivation : bash plugin/conductor/scripts/check-instruction-budget.sh
+#   (colonnes FICHIER, LIGNES, INSTR du tableau imprimé ; mesure du script livré, jamais ad hoc)
+# Corpus : 31 fichiers (plugin/*/agents/*.md + plugin/*/AGENT.md, glob à un seul niveau, D-03) —
+#   même compte que la première PR de la phase (25-01), mesuré sur main après la Phase 40.
+# Totaux gravés : 3641 lignes, 487 instructions.
+# Définition d'instruction : body seul, hors frontmatter YAML (D-01 bis).
+# Autorisation : arbitrage Samuel, AskUserQuestion session principale (relais SendMessage), 2026-09-16.
+#
+# Doctrine du ratchet : une valeur ne MONTE jamais sans un arbitrage humain nommé avec son canal
+# et sa date. Elle DESCEND librement, dans le commit de remédiation qui la justifie. Aucune valeur
+# de lignes au-dessus de 250 (plafond ADR-029, qui prime toujours sur la baseline).
+#
+# Format : chemin<TAB>lignes<TAB>instructions, trié LC_ALL=C.
+plugin/business-pilot-bundle/agents/quality-gate-client.md	91	10
+plugin/business-pilot-bundle/agents/vf-business-commercial.md	97	17
+plugin/business-pilot-bundle/agents/vf-business-delivery.md	90	15
+plugin/business-pilot-bundle/agents/vf-business-finance.md	113	15
+plugin/business-pilot-bundle/agents/vf-business-manager.md	183	21
+plugin/conductor/AGENT.md	130	25
+plugin/content-bundle/agents/content-clarity-judge.md	82	7
+plugin/content-bundle/agents/vf-content-manager.md	151	14
+plugin/content-bundle/agents/vf-content-repurposer.md	84	9
+plugin/content-bundle/agents/vf-content-strategist.md	78	8
+plugin/content-bundle/agents/vf-content-writer.md	83	10
+plugin/design-orchestrator/AGENT.md	193	30
+plugin/design-orchestrator/agents/vf-crafter.md	77	12
+plugin/design-orchestrator/agents/vf-design-judge.md	85	8
+plugin/design-orchestrator/agents/vf-design-manager.md	192	29
+plugin/dev-orchestrator/AGENT.md	209	33
+plugin/dev-orchestrator/agents/vf-auditer.md	59	3
+plugin/dev-orchestrator/agents/vf-coder.md	122	23
+plugin/dev-orchestrator/agents/vf-dev-manager.md	250	46
+plugin/dev-orchestrator/agents/vf-reviewer.md	79	9
+plugin/growth-bundle/agents/campaign-analyst.md	111	15
+plugin/growth-bundle/agents/channel-strategist.md	87	13
+plugin/growth-bundle/agents/copywriter-sequences.md	99	14
+plugin/growth-bundle/agents/growth-quality-judge.md	84	8
+plugin/growth-bundle/agents/vf-growth-manager.md	167	24
+plugin/kpi-analyst/AGENT.md	96	13
+plugin/mobile-test-team/agents/vf-app-fixer.md	48	9
+plugin/mobile-test-team/agents/vf-test-orchestrator.md	60	8
+plugin/mobile-test-team/agents/vf-test-runner.md	56	4
+plugin/skill-creator/AGENT.md	135	18
+plugin/validator/AGENT.md	250	17
