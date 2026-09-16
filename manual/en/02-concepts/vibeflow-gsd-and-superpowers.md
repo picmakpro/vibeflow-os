@@ -47,9 +47,9 @@ reporting a GSD problem as if it came from VibeFlow, or the other way around.
 ## What VibeFlow adds on top
 
 This is the core of the product's value: saying "help me build this feature" is enough to trigger
-the entire pipeline, **without ever having to know a single GSD command**. The `vibeflow-dev` agent
-detects your natural-language intent and directly invokes whichever installed `gsd-*` and
-`superpowers:*` pieces apply — you never need to know which one. On top of that base, VibeFlow adds
+the entire pipeline, **without ever having to know a single GSD command**. The `vibeflow-head` agent
+detects your natural-language intent and launches the team that invokes whichever installed
+`gsd-*` and `superpowers:*` pieces apply — you never need to know which one. On top of that base, VibeFlow adds
 what neither GSD nor Superpowers provides on its own: a mission team (`vf-dev-manager` plus
 cloistered workers) with a driver lock and parallel dispatch, a single entry-point skill (`vf-dev`)
 instead of ten GSD commands to memorize, and a first-use guardrail that orients you before you get
@@ -63,9 +63,9 @@ project, or the lab?"
 ### A concrete example
 
 Type "help me build authentication" in a dev lab. You'll never see `gsd-discuss-phase` or
-`gsd-plan-phase` in what you type yourself — it's `vibeflow-dev` that chooses to invoke those GSD
-skills behind the scenes, depending on where the project stands (first step, resuming after a
-pause, a long mission to dispatch). The GSD command exists and works perfectly well if you know it
+`gsd-plan-phase` in what you type yourself — it's `vibeflow-head` that detects the intent and
+launches the team that chooses to invoke those GSD skills behind the scenes, depending on where
+the project stands (first step, resuming after a pause, a long mission to dispatch). The GSD command exists and works perfectly well if you know it
 and prefer typing it directly — VibeFlow doesn't hide it, it just spares you having to know it.
 
 ## Without GSD, and who updates what
@@ -73,8 +73,8 @@ and prefer typing it directly — VibeFlow doesn't hide it, it just spares you h
 **If GSD isn't installed**, the dev agent installs it itself — non-interactively, scoped to the
 same place as the rest of your lab — the moment you trigger an action that needs it. You normally
 never have to install it by hand yourself. If, for whatever reason, that auto-install fails or is
-declined, the tooled dev cycle simply doesn't fire: the `gsd-*` skills that `vibeflow-dev` tries to
-invoke don't exist yet on your machine.
+declined, the tooled dev cycle simply doesn't fire: the `gsd-*` skills that the team launched by
+`vibeflow-head` tries to invoke don't exist yet on your machine.
 
 This auto-install never triggers project creation on its own initiative — it only lays down the
 engine itself. Starting a new project stays an action you trigger explicitly, never something that

@@ -11,7 +11,7 @@ pipeline (scoping → plan → execution → proof), and **machine gates** verif
 Claude Code is the reference runtime; install and usage are also measured end to end on **Codex**
 and **kimi-code**.
 
-[![Version](https://img.shields.io/badge/version-2.63.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.63.1-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Runtimes](https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex%20%7C%20kimi--code-7c3aed)](#-install)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
@@ -43,9 +43,9 @@ and **every token has a job** (sonnet workers, digests, on-demand loading, paral
 
 ## 🔁 The dev cycle — spec-driven
 
-Say _"add Google auth"_: the `vibeflow-head` agent detects the intent and runs the GSD pipeline —
-scoping, verified plan, atomic execution, read-only judges — leaving an artifact on disk at
-every step, so the context can die without the project losing ground.
+Say _"add Google auth"_: the `vibeflow-head` agent detects the intent and dispatches the team that
+runs the GSD pipeline — scoping, verified plan, atomic execution, read-only judges — leaving an
+artifact on disk at every step, so the context can die without the project losing ground.
 
 → [The cycle, step by step](./manual/en/04-development-cycle/the-cycle-at-a-glance.md)
 
@@ -158,6 +158,7 @@ Full history: **[CHANGELOG.md](./CHANGELOG.md)**, the single canon — the table
 
 | Version | Date | Change |
 |---------|------|--------|
+| `v2.63.1` | 2026-09-16 | **Hotfix: the head governs and launches teams — it no longer invokes any `gsd-*` skill or agent itself.** `v2.63.0` had documented `vibeflow-head` as invoking `gsd-quick` / `gsd-execute-phase` directly; it now detects intent and dispatches `Task(vf-coder)` for a short, single-commit task or `Task(vf-dev-manager)`/`Task(vf-design-manager)` beyond that, `dev-orchestrator` v2.22.1. The head's intent map and `head-governance.md` §1's Mind column no longer name any `gsd-*`; `vf-coder` gains the short-task mandate dispatched directly by the head. New `T37`: no `gsd-*` in either of the head's two reference tables, detection proven discriminating by mutation. |
 | `v2.63.0` | 2026-09-15 | **`vibeflow-dev` becomes `vibeflow-head`: `AGENT.md` is now the head of minds, with a machine-enforced mission exit gate.** Phase 40 (5 batches, join review PASS), `dev-orchestrator` v2.22.0. **Shipped**: `head-governance.md` (scale rule, sequencing, exit contract, economy); the rename applied across the whole `plugin/` surface with an anti-alias guard; a proofs-of-evidence contract (E6) emitted by `vf-coder`, `vf-reviewer` and `vf-auditer` verdicts; **`check-mission-exit.sh`** (HEAD-02) — the E1-E6 mission exit gate, four exit codes (`3` unverifiable, `0` closable, `4` incomplete, `64` misuse), 30-case suite with 6 mutation-proven states. Four human gates relayed during framing, none crossed by fallback. |
 | `v2.62.0` | 2026-09-15 | **ADR-029's 250-line ceiling is machine-enforced for the first time — with an instruction load published per agent file next to it.** Phase 25 (instruction budget, BUDG-01/02) waves 1-3: `check-instruction-budget.sh` (conductor v1.37.0) measures lines and body-only normative instructions for the 31 distributed agent files, five enumerated exit codes (`2` unverifiable is never green, `3` not armed warns and never blocks), a 30-case suite with 4 `cmp`-proven mutants, and a CI step carrying its own discrimination proof on an armed fixture before judging the repo. Review reopened wave 1 on a real blocker: a corrupted baseline yielded `exit 0`. **The ratchet is deliberately NOT armed** — no sentinel, no baseline: calibration (plan 25-04, one-way) waits for Phase 40 (`vibeflow-head`), which rewrites the dev-orchestrator agent file. Phase 34 delivered its three written verdicts with zero agents created: AGTS-01 audited, **SKIL-01 NO-GO** (the native `/plugin` channel already reaches sub-agents, measured with a negative control), AGTS-02 **deferred with trace** (real Maestro run on Scroll-Off: pipeline green, team loop red — `mobile-test` stays experimental, `web-test-team` not built). Phase 40 framed (PR #65, 16 arbitrations). Four human gates relayed, none crossed by fallback. |
 | `v2.61.0` | 2026-09-15 | **An outdated gsd-core engine stayed invisible to `/vf-update`.** A machine on `@opengsd/gsd-core` 1.13.0 with 1.14.0 published was "GSD already present (skip)" forever: `ensure-deps.sh` never read the installed `VERSION`, and the presence gate compares no numbers by doctrine (the legacy 1.42.3 trap, still true). Freshness is now decided in the script that already owns the `^1` ceiling: the reference is the latest **published** version satisfying `^1`, exactly what a fresh install would resolve. `ensure-deps.sh --check-engine-update` (read-only, exit 0 + `[gsd-outdated]` only when outdated, silence otherwise — network down included) and `--upgrade-engine` (re-runs `npx` only on a readable, strictly lower version, semver never lexical, undecidable ≠ outdated). The default bootstrap path is unchanged and network-free; `/vf-update` offers the upgrade as a line confirmed independently of the plugin and modules (ADR-031). Eleven red cases before the fix, 199/199 after; detection proven on a real machine (dev-orchestrator v2.21.0, conductor v1.36.0). |

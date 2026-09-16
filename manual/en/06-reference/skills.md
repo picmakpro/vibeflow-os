@@ -35,7 +35,8 @@ session start. Updates the plugin, then the installed modules, under confirmatio
 
 ### `dev-orchestrator`
 **`vf-dev`** — "help me move forward," "drive this for me," "handle this project." The default
-development router: detects intent and invokes the right piece directly, no need to rephrase.
+development entry point: triggers `vibeflow-head`, which detects intent and dispatches the team
+that carries the right piece, no need to rephrase.
 **`vf-auto`** — "do it all," "on autopilot," "overnight," "figure it out," "I'll be back tomorrow
 morning, keep going." Chains framing → planning → execution step by step without continuous
 supervision, with autonomous-mode guardrails.

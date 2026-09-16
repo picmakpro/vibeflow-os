@@ -66,9 +66,10 @@ and reconcile the reports that come back.
 That's the question anyone asks the moment they open `plugin/*/agents/` and don't find their
 commands: out of the twenty-two shipped agents, the large majority has **no** `/<agent-name>`
 command tied to it. That's intentional, not a gap. An **internal worker** — for instance
-`vf-coder`, which writes the code for a dev step, or `quality-gate-client`, the judge of business
-deliverables — only gets dispatched by its orchestrator (`vf-dev-manager`, `vf-business-manager`…),
-never directly by you. These agents carry `vf-internal: true` in their frontmatter, precisely so
+`quality-gate-client`, the judge of business deliverables — only gets dispatched by its mission
+orchestrator (`vf-business-manager`…), never directly by you. `vf-coder` is the exception: besides
+its usual orchestrator (`vf-dev-manager`), the head (`vibeflow-head`) can also dispatch it
+directly for a short, single-commit task with no architectural impact. These agents carry `vf-internal: true` in their frontmatter, precisely so
 no public command gets generated for them: they only make sense within the mandate their
 orchestrator gives them, not used in isolation. You lose nothing by never invoking them yourself —
 that's exactly how they're meant to work.

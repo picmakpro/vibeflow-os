@@ -52,8 +52,8 @@ ou l'inverse.
 
 C'est là le cœur de la valeur du produit : dire « aide-moi à développer cette fonctionnalité »
 suffit à déclencher tout le pipeline, **sans jamais avoir à connaître une seule commande GSD**.
-L'agent `vibeflow-dev` détecte ton intention en langage naturel et invoque directement les briques
-`gsd-*` et `superpowers:*` installées — toi, tu n'as jamais besoin de savoir laquelle. Par-dessus
+L'agent `vibeflow-head` détecte ton intention en langage naturel et lance l'équipe qui invoque les
+briques `gsd-*` et `superpowers:*` installées — toi, tu n'as jamais besoin de savoir laquelle. Par-dessus
 ce socle, VibeFlow ajoute ce que ni GSD ni Superpowers ne fournissent seuls : une équipe de
 mission (`vf-dev-manager` + workers cloisonnés) avec verrou de driver et dispatch parallèle, un
 skill d'entrée unique (`vf-dev`) au lieu de dix commandes GSD à mémoriser, et un garde-fou de
@@ -67,8 +67,8 @@ l'interprétation : « est-ce que ça concerne le projet, ou le lab ? »
 ### Un exemple concret
 
 Tape « aide-moi à développer l'authentification » dans un lab dev. Tu ne verras jamais
-`gsd-discuss-phase` ni `gsd-plan-phase` dans ce que tu tapes toi-même — c'est `vibeflow-dev` qui
-choisit d'invoquer ces skills GSD en coulisse, selon où en est le projet (première étape,
+`gsd-discuss-phase` ni `gsd-plan-phase` dans ce que tu tapes toi-même — c'est `vibeflow-head` qui
+détecte l'intention et lance l'équipe qui choisit d'invoquer ces skills GSD en coulisse, selon où en est le projet (première étape,
 reprise après une pause, mission longue à dispatcher). La commande GSD existe et fonctionne très
 bien si tu la connais et préfères la taper directement — VibeFlow ne la cache pas, il te dispense
 juste de devoir la connaître.
@@ -79,7 +79,8 @@ juste de devoir la connaître.
 scopée au même endroit que le reste de ton lab — dès que tu déclenches une action qui en a besoin.
 Tu n'as normalement jamais à l'installer toi-même à la main. Si, pour une raison quelconque, cette
 auto-installation échoue ou est refusée, le cycle de dev outillé ne se déclenche simplement pas :
-les skills `gsd-*` que `vibeflow-dev` cherche à invoquer n'existent pas encore sur ta machine.
+les skills `gsd-*` que l'équipe lancée par `vibeflow-head` cherche à invoquer n'existent pas
+encore sur ta machine.
 
 Cette auto-installation ne lance jamais, de sa propre initiative, la création d'un projet — elle
 pose seulement le moteur lui-même. Démarrer un nouveau projet reste une action que tu déclenches

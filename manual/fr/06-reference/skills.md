@@ -35,9 +35,9 @@ VibeFlow pour [métier] ». Bootstrap complet d'un nouveau lab, quel que soit le
 début de session. Met à jour le plugin puis les modules installés, sous confirmation.
 
 ### `dev-orchestrator`
-**`vf-dev`** — « aide-moi à avancer », « pilote-moi ça », « occupe-toi de ce projet ». Le routeur
-de développement par défaut : détecte l'intention et invoque directement la bonne brique, sans
-demander de reformuler.
+**`vf-dev`** — « aide-moi à avancer », « pilote-moi ça », « occupe-toi de ce projet ». Le point
+d'entrée de développement par défaut : déclenche `vibeflow-head`, qui détecte l'intention et
+dispatche l'équipe qui porte la bonne brique, sans demander de reformuler.
 **`vf-auto`** — « fais tout », « en autonomie », « la nuit », « débrouille-toi », « je reviens
 demain matin, avance ». Enchaîne cadrage → plan → exécution étape après étape sans supervision
 continue, avec les garde-fous du mode autonome.
