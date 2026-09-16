@@ -208,6 +208,14 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 
 ### Roadmap Evolution
 
+- 2026-09-16 : **Phase 40.1 insérée avant la 41 — révision d'ADR-029 et du gate du budget
+  d'instructions.** Née juste après le merge de la PR #73 (ratchet armé) : le ratchet sur les
+  lignes bloque toute ligne ajoutée à n'importe quel agent. Arbitrages Samuel (AskUserQuestion
+  session principale, 2026-09-16) : plafond 300 lignes pour tous les agents, ratchet sur les
+  instructions seulement, agents en français, vraie phase GSD. Numéro 40.1 rendu par
+  `phase.insert` et vérifié (placée entre la 40 et la 41) ; STATE mis à jour à la main
+  (aucune commande `state.*`). Cadrage : `40.1-CONTEXT.md`.
+
 - 2026-09-15 : **Phase 40 exécutée — `vibeflow-dev` devient `vibeflow-head`, head of minds du
   dev-orchestrator.** 5 plans sur 3 vagues (40-01 `exec-rename`, 40-02 `exec-e6`, 40-03
   `exec-doctrine`, 40-04 `exec-gate`, 40-05 `exec-workers` — ce dernier né d'un amendement
