@@ -1,5 +1,28 @@
 # CHANGELOG — reference
 
+## [v2.5.5] — 2026-09-16 (Phase 40.1)
+
+**Patch** :
+
+- **Auditeur de densité distribué (`agent-density-auditor`) réaligné sur D-05/D-06** — `validate_gate.sh`
+  bloque désormais au-delà de 300 lignes de body (au lieu de 250) et avertit sans bloquer de 251 à
+  300 (`WARN_BODY_FROM`) ; les paliers OK/WARN/HEAVY/CRITICAL de `measure.sh` sont réalignés
+  (OK < 251, WARN 251-300, HEAVY 301-400, CRITICAL > 400) et les jetons recalculés en conséquence.
+  Le calcul du body (hors frontmatter) reste inchangé (D-06). Doctrine annexe du module
+  (`thresholds.md`, `SKILL.md`, anatomie, patterns de migration, `plan_migration.py`) réalignée sur
+  les mêmes seuils.
+- **Méthodologie et modèles de référence distribués alignés** — les tableaux de seuils (Core,
+  EXPLAINED, pattern `03-agents`), le modèle `CLAUDE-template.md`, le lexique, le guide
+  dire/ne pas dire (trio `300/500/2000`), le README client et la description du contenu de
+  `VERSION.md` énoncent désormais le plafond agent à 300 lignes de body avec avertissement non
+  bloquant dès 251. Les lignes d'historique distribuées (tableau de versions du Core, historique
+  v2.0 de `VERSION.md`) restent intactes, non réécrites.
+- **Raison du patch** — changement de valeurs sur un contrat déjà existant (le gate garde ses codes
+  de sortie et son canal d'avertissement), pas un changement de contrat : patch, comme pour
+  `validate_gate.sh` (Phase 40.1, plan 40.1-04, `40.1-CONTEXT.md`).
+- **Autorisation** : arbitrages Samuel D-01, D-05, D-06, AskUserQuestion session principale (relais
+  SendMessage), 2026-09-16.
+
 ## [v2.5.4] — 2026-08-30 (Phase 38 — description de frontmatter YAML strict, plan 38-08)
 
 **Patch** :
