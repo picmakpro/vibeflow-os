@@ -26,7 +26,7 @@ Tout est en **français** (docs, commentaires, commits, messages d'erreur).
 
 ## Densité (ADR-029) — charte machine-visée
 
-- **Agents ≤ 250 lignes, skills ≤ 500 lignes, bootstrap ≤ 2000 tokens** (règle non négociable, `CLAUDE.md` racine + `docs/ADR.md`).
+- **Agents : avertissement dès 251 lignes, bloque au-delà de 300 ; skills ≤ 500 lignes, bootstrap ≤ 2000 tokens** (règle non négociable, `CLAUDE.md` racine + `docs/ADR.md`).
 - Outillage : `plugin/software-architecture/scripts/check-file-size.sh` — seuil warn par défaut **250** (`VF_ARCH_WARN`), bloquant via `VF_ARCH_BLOCK` ; hook compagnon `guard-file-size.sh`.
 - Compat bash 3.2 exigée par ces scripts (pas de `mapfile`, cf. `check-file-size.sh:75`).
 

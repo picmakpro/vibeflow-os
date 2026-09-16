@@ -180,7 +180,7 @@ plugin/
 **Nouvel agent (dans un module existant):**
 - `plugin/<module>/agents/vf-<rôle>.md` — frontmatter natif complet (name, description, model, memory) sinon `check-agents.sh --strict` échoue en CI
 - Worker interne dispatché par un manager : ajouter `vf-internal: true` (pas de commande d'incarnation)
-- Respecter la densité ADR-029 (≤ 250 lignes)
+- Respecter la densité ADR-029 (bloque au-delà de 300 lignes, avertissement dès 251)
 
 **Nouveau script de module:**
 - `plugin/<module>/scripts/<verbe-sujet>.sh` + suite `plugin/<module>/scripts/tests/` (la CI découvre les suites — une suite vide fait échouer la découverte)

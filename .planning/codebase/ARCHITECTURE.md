@@ -211,7 +211,7 @@ l'engine — un seul scope partagé par toutes les briques d'une install (cohér
 - **Pas de runtime applicatif** : tout est bash + python3 inline (heredoc) + markdown. Portabilité Windows durcie par ADR-054 (préflight, sonde d'exécution python3, CRLF via `.gitattributes`).
 - **Source d'install = cache uniquement** : `vibeflow-update.sh sync` est un no-op — plus aucun `git clone/pull` dans le chemin d'install.
 - **Scripts installés à plat** dans `.claude/scripts/` du lab ; references sous `.claude/agents/<module>-references/`.
-- **Densité (ADR-029)** : agents ≤ 250 lignes, skills ≤ 500, bootstrap ≤ 2000 tokens.
+- **Densité (ADR-029)** : agents — avertissement dès 251 lignes, bloque au-delà de 300 ; skills ≤ 500, bootstrap ≤ 2000 tokens.
 - **Jamais de fix sans validation humaine (ADR-031)** ; escalades humaines court-circuitent toute autonomie.
 - **Un manager ne produit jamais (P3)** ; production dans les workers ; juges read-only.
 
