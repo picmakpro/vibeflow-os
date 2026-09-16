@@ -74,7 +74,7 @@
 - [x] Phase 31: Manifeste d'install + dry-run (issue #20) (completed 2026-08-16)
 - [x] Phase 32: Durcissement du driver-lock (completed 2026-08-17)
 - [x] Phase 33: Watchdog & notifications des missions (completed 2026-08-17)
-- [ ] Phase 34: Gaps agency-agents & cadrage skill-installer
+- [x] Phase 34: Gaps agency-agents & cadrage skill-installer (completed 2026-09-15 — 6/6 plans, mergée PR #66, AGTS-01 close, SKIL-01 NO-GO, AGTS-02 reportée avec trace ; pas de release)
 - [x] Phase 35: Ré-armement worktree (conditionnelle) — CLOSE 2026-08-26, option A (pas de ré-armement)
 - [x] Phase 37: Portabilité multi-runtime — spike (Codex, OpenCode, Kimi) (completed 2026-08-28 — spike + étude livrés, décisions rendues ; suite → Phase 38)
 - [x] Phase 38: Portabilité multi-runtime — livraison (canal d'install, migration de lab, adaptateur) (exécutée 2026-08-29, **mesurée 2026-08-30** sur clé API — **critère 2 PROUVÉ sur Codex** : profondeur ≥ 2 constatée EN BASE (`thread_spawn_edges`, `root→vf-dev-manager→vf-coder`), 3/3 sur les **4 critères réels** ; le **critère 5 est SANS OBJET sous clé API** (vert à vide, jamais « atteint ») et le **critère 4 est plus faible que son libellé** (`--output-schema` non propagé aux sous-agents, dette D-38-S). **kimi-code n'est plus un inconnu déclaré** : I-1 **31/31**, I-2 `disallowedTools` bloque (0/4 contre 3/3 au contrôle positif), I-3 hooks déclenchés 3/3, `vf-internal` **sans équivalent** (Pattern 12 non tenu, déclaré par le gate de fidélité). **Critère 1 toujours partiel** : hooks non portés, perte déclarée. Coûts : Codex 1,01 $, kimi ~0,018 $. **SHIPPÉE v2.59.0 le 2026-08-31** (Samuel a autorisé le ship après revue ; PR + tag + release GitHub) — test bout-en-bout install **et** usage refait sur Codex (délégation de rôle → code réel) ET Kimi (`--agent-file` → code + rapport typé) le 2026-08-31, manifeste `.codex-plugin/` natif ajouté. Preuves : `38-MESURE-CODEX-CRITERE-2.md`, `38-MESURE-KIMI.md`)
@@ -482,7 +482,7 @@ Plans:
 | 31. Manifeste d'install + dry-run (issue #20) | fiabilite-v1.0 | 8/8 | Complete — 8 SUMMARYs sur disque, module `conductor` v1.25.0, MANI-04 superseded (réponse #20 en DRAFT, jamais postée) | 2026-08-16 |
 | 32. Durcissement du driver-lock | fiabilite-v1.0 | 0/0 | Not started — son hook naît en forme exec (après 30) ; spike `reference-transaction` avant LOCK-03 | — |
 | 33. Watchdog & notifications des missions | fiabilite-v1.0 | 0/0 | Not started — heartbeat partagé avec la 32 (conçues ensemble, WTCH après LOCK) | — |
-| 34. Gaps agency-agents & cadrage skill-installer | fiabilite-v1.0 | 0/0 | Not started — après la 31 (MANI avant SKIL) ; SKIL-01 = cadrage go/no-go rattaché | — |
+| 34. Gaps agency-agents & cadrage skill-installer | fiabilite-v1.0 | 6/6 | Complete — mergée PR #66 ; AGTS-02 reportée avec trace | 2026-09-15 |
 | 35. Ré-armement worktree (conditionnelle) | fiabilite-v1.0 | 0/0 | Flottante — précondition externe NON satisfaite au 2026-08-15 (npm latest = 1.10.0) ; jamais bloquante | — |
 | 37. Portabilité multi-runtime — spike | fiabilite-v1.0 | — | Complete — spike de mesure sans plan : DISCUSS + SPIKE-REPORT + ETUDE-CANAL-ET-MIGRATION (3 tours de revue adversariale), décisions rendues le 2026-08-28, branche `feat/phase-37-spike-portabilite-multi-runtime` non mergée | 2026-08-28 |
 | 38. Portabilité multi-runtime — livraison | fiabilite-v1.0 | 0/0 | Not started — cadrage factuel = livrables de la 37 ; 6 lots candidats, go/no-go adaptateur à trancher au cadrage | — |
