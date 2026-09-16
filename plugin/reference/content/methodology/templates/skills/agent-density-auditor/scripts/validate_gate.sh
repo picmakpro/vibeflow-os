@@ -6,8 +6,10 @@
 
 set -u
 
-# Seuils ADR-029
-MAX_BODY_LINES=250
+# Seuils ADR-029 — avertissement non bloquant des 251 lignes, blocage au-dela de 300, lignes
+# hors frontmatter (D-05/D-06, Phase 40.1)
+MAX_BODY_LINES=300
+WARN_BODY_FROM=251
 MAX_DESCRIPTION_CHARS=1024
 MAX_SECTION_LINES=100
 
@@ -46,6 +48,8 @@ main() {
   # 2. Check lignes body
   if (( body_lines > MAX_BODY_LINES )); then
     err "Prompt systeme trop long : $body_lines lignes (max $MAX_BODY_LINES selon ADR-029). Lancer plan_migration.py."
+  elif (( body_lines >= WARN_BODY_FROM )); then
+    warn "Zone d'avertissement ADR-029 : $body_lines lignes body (avertissement des $WARN_BODY_FROM, bloque au-dela de $MAX_BODY_LINES) — surveiller, non bloquant"
   else
     ok "Lignes body : $body_lines / $MAX_BODY_LINES"
   fi

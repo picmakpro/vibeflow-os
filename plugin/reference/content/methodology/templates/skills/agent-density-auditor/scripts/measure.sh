@@ -9,8 +9,8 @@
 set -u
 
 # Seuils ADR-029
-THRESHOLD_OK=200
-THRESHOLD_WARN=250
+THRESHOLD_WARN_FROM=251
+THRESHOLD_HEAVY_FROM=301
 THRESHOLD_HEAVY=400
 TOKENS_PER_LINE=12  # estimation conservative
 
@@ -36,10 +36,10 @@ measure_file() {
 
   tokens_est=$(( body_lines * TOKENS_PER_LINE ))
 
-  if   (( body_lines <= THRESHOLD_OK ));    then status="OK"
-  elif (( body_lines <= THRESHOLD_WARN ));  then status="WARN"
-  elif (( body_lines <= THRESHOLD_HEAVY )); then status="HEAVY"
-  else                                            status="CRITICAL"
+  if   (( body_lines < THRESHOLD_WARN_FROM ));  then status="OK"
+  elif (( body_lines < THRESHOLD_HEAVY_FROM )); then status="WARN"
+  elif (( body_lines <= THRESHOLD_HEAVY ));     then status="HEAVY"
+  else                                                status="CRITICAL"
   fi
 
   printf "%-60s  %6d  %6d  %8d  %s\n" "$file" "$total_lines" "$body_lines" "$tokens_est" "$status"
@@ -52,8 +52,9 @@ print_header() {
 
 print_footer() {
   printf "%s\n" "------------------------------------------------------------------------------------------------------"
-  printf "Seuils ADR-029 : OK ≤%d / WARN ≤%d / HEAVY ≤%d / CRITICAL >%d (lignes hors frontmatter)\n" \
-    "$THRESHOLD_OK" "$THRESHOLD_WARN" "$THRESHOLD_HEAVY" "$THRESHOLD_HEAVY"
+  printf "Seuils ADR-029 : OK <%d / WARN %d-%d / HEAVY %d-%d / CRITICAL >%d (lignes hors frontmatter) — bloquant au-dela de %d (validate_gate.sh)\n" \
+    "$THRESHOLD_WARN_FROM" "$THRESHOLD_WARN_FROM" "$((THRESHOLD_HEAVY_FROM - 1))" \
+    "$THRESHOLD_HEAVY_FROM" "$THRESHOLD_HEAVY" "$THRESHOLD_HEAVY" "$((THRESHOLD_HEAVY_FROM - 1))"
   printf "Tokens estimes = lignes_body × %d (estimation conservative)\n" "$TOKENS_PER_LINE"
 }
 
