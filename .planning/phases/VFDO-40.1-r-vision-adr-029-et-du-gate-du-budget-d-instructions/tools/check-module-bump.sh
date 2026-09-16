@@ -76,6 +76,12 @@ fi
 VFILE="plugin/$MODULE/VERSION"
 COMMITS_FILE="$TMPD/commits"
 git -C "$ROOT" rev-list --no-merges HEAD --not "$BASE" -- "$VFILE" > "$COMMITS_FILE" 2>"$TMPD/rl.err"
+RL_RC=$?
+if [ "$RL_RC" -ne 0 ]; then
+  cat "$TMPD/rl.err" >&2
+  echo "[check-module-bump] git rev-list a echoue (rc=$RL_RC) sur la base '$BASE'" >&2
+  exit 2
+fi
 
 C="$(awk 'NR==1{print; exit}' "$COMMITS_FILE")"
 if [ -z "$C" ]; then
@@ -119,10 +125,12 @@ X="$(printf '%s' "$PARTS" | awk '{print $1}')"
 Y="$(printf '%s' "$PARTS" | awk '{print $2}')"
 Z="$(printf '%s' "$PARTS" | awk '{print $3}')"
 
+# base 10 forcee (10#) : un segment avec zero en tete ("08") est un token invalide en base
+# octale par defaut pour l'arithmetique bash ($((Z + 1))) et fait planter tout le script.
 if [ "$KIND" = "patch" ]; then
-  Z=$((Z + 1))
+  Z=$((10#$Z + 1))
 else
-  Y=$((Y + 1)); Z=0
+  Y=$((10#$Y + 1)); Z=0
 fi
 CIBLE="v${X}.${Y}.${Z}"
 
