@@ -1,5 +1,14 @@
 # CHANGELOG — content-bundle
 
+## [v2.0.9] — 2026-09-16 (Phase 40.1)
+
+**Patch** :
+
+- **Plafond ADR-029 des agents du bundle relevé à 300 lignes** — `BUNDLE.md`, les trois blueprints
+  d'agents, `registres.md` et la suite T2 (`test-content-bundle.sh`) énoncent et vérifient
+  désormais `≤300L` au lieu de `≤250L`. Autorisation : arbitrage Samuel D-01, AskUserQuestion
+  session principale (relais SendMessage), 2026-09-16.
+
 ## [v2.0.8] — 2026-08-30 (Phase 38 — description de frontmatter YAML strict, plan 38-08)
 
 **Patch** :
