@@ -1,9 +1,11 @@
 # Équipe produit VibeFlow : rôles humains, artefacts amont, état partagé (ce que BMAD nous apprend)
 
-> **Statut** : **entrée de brainstorming, rien n'est tranché.** Ce document est écrit pour être
-> challengé par VibeFlow (`superpowers:brainstorming` puis, si l'idée survit, `gsd-new-milestone`
-> ou `gsd-phase` + `gsd-discuss-phase`). Il propose, il n'inscrit rien à la feuille de route.
-> **Arbitrages** : aucun. Les hypothèses sont marquées `H-xx`, les questions ouvertes `Q-xx`.
+> **Statut** : **explorée le 2026-09-16** (session `/gsd-explore`, chaîne GSD du dépôt — pas
+> `superpowers:brainstorming`, écarté sur ce dépôt depuis le 2026-07-27). Douze arbitrages pris,
+> consignés en §11 et dans la graine `.planning/seeds/SEED-001-equipe-produit-v1.md`. Le
+> document propose toujours, il n'inscrit rien à la feuille de route : le milestone s'ouvre sur les
+> déclencheurs de la graine (25-04, Phase 41, D-02).
+> **Arbitrages** : §11 (A-01..A-12). Les hypothèses sont marquées `H-xx`, les questions ouvertes `Q-xx`.
 > **Origine** : dossier client en cours (grand compte, DSI, septembre 2026). Le client demande si
 > nous appliquons BMAD « en amont » ; certaines de ses équipes l'utilisent, d'autres non, et il n'y
 > a pas de pratique commune. Nous pratiquons le SDD. Le client final n'est pas nommé ici : ce dépôt
@@ -45,6 +47,16 @@ relu) : dépôt `bmad-code-org/BMAD-METHOD`, guides Augment Code, DEV Community,
   développeur a besoin, pour éviter la dérive entre sessions (« context-engineered development »).
 - **Modules** : BMad Builder, Test Architect, Creative Intelligence, Game Dev, BMad Loop.
 
+> **Correctif du 2026-09-16** (passe de recherche, sous-agent, dépôt `bmad-code-org/BMAD-METHOD@main`,
+> disposition admit / refute / abstain reportée dans SEED-001) : la liste ci-dessus décrit un état
+> **antérieur**. **Corrigé** : sm, qa et dev sont fusionnés dans un agent Developer unique
+> (CHANGELOG v6.3.0) ; `bmad-orchestrator` n'est plus un identifiant courant ; les quatre phases ne
+> sont plus une séquence imposée (« independent tools, not stages »,
+> `docs/plan/choose-a-planning-path.md`). **Admis** : identifiants `<module>-<agent>` (`bmm-pm`,
+> `bmm-dev`, `core-bmad-master`) ; licence MIT, marques BMad™ / BMad Method™ protégées
+> (`TRADEMARK.md`) — ne jamais nommer un module VibeFlow « BMAD ». **Non résolu** : « Solutioning »
+> comme nom de phase ; rôles `analyst`, `architect`, `ux-expert` non couverts par la passe.
+
 Ce que BMAD **ne fait pas** : plusieurs humains simultanés, contrôle de flux déterministe,
 cloisonnement outillé des agents, mémoire vivante, gates machine. C'est un cadre mono-utilisateur
 où la qualité tient à la discipline des personas.
@@ -62,7 +74,7 @@ où la qualité tient à la discipline des personas.
 | Scrum master | `vf-dev-manager` (DAG, verrou de driver, rapports typés) | existe, tenu par un agent, jamais par un humain |
 | Dev | `vf-coder` → `gsd-executor` | existe |
 | QA | `vf-reviewer`, `vf-auditer`, juges frais read-only (Pattern 12) | existe, plus dur |
-| Persona par rôle | cinq front doors (`vibeflow-head`, `-design`, `-conductor`, `-validator`, `vf-business`) | tous visibles par un seul humain |
+| Persona par rôle | six agents racine (`vibeflow-head`, `-design`, `-conductor`, `-validator`, `kpi-analyst`, `skill-creator`) + le skill `vf-business` du bundle | tous visibles par un seul humain ; kpi-analyst et skill-creator absents de la table §5.1 |
 
 **Conclusion du mapping** : la mécanique BMAD est déjà là, souvent en plus rigoureux. Ce qui
 manque n'est pas côté agents. Il manque **trois choses côté humains** :
@@ -246,8 +258,8 @@ non forké. Ce dépôt est public : aucun nom de client dans les fixtures, exemp
 
 Ne pas ouvrir avant :
 
-1. clôture de `fiabilite-v1.0` : Phase 40 (head) livrée, Phase 25 (budget d'instructions)
-   calibrée, Phase 34 tranchée ;
+1. clôture de `fiabilite-v1.0` : ~~Phase 40 (head) livrée~~ (releasée v2.63.0 le 2026-09-16),
+   plan 25-04 (budget d'instructions) gravé, Phase 41 close, ~~Phase 34 tranchée~~ (PR #66, 2026-09-15) ;
 2. **partition réelle d'un lab** (déclencheur D-02 de la Phase 39) et preuve d'usage concurrent
    réel, pas sur clone jetable ;
 3. verrou de driver par compartiment décidé (Q-07).
@@ -283,6 +295,34 @@ Milestone candidat : **`equipe-produit-v1.0`**, phases possibles, à réordonner
 | Copier BMAD au lieu de le transposer | P7, revue de licence, aucun prompt importé |
 | Ouvrir avant la partition réelle d'un lab | préconditions §8, gate humain |
 | Le besoin non-dev est une projection | Q-06 tranchée sur mesure avant toute approche C |
+
+## 11. Arbitrages — session `/gsd-explore` du 2026-09-16
+
+Tous : arbitrage Samuel, AskUserQuestion, session principale, 2026-09-16. Détail, caveats et
+disposition de la recherche dans `.planning/seeds/SEED-001-equipe-produit-v1.md`.
+
+| # | Question | Décision |
+|---|---|---|
+| A-01 | Q-06, Q-12 | Capacité produit VibeFlow, indépendante du client. Q-12 sort de la spec. |
+| A-02 | Q-01 | Trois profils au 1er jalon : `solo` (défaut, inchangé), `product` (nouveau), `dev` (existant). |
+| A-03 | Q-10, Q-05 | Lab jetable à deux clones sur une machine. Prouve le mécanisme, pas l'usage. |
+| A-04 | §5.1 vs §10 | Rôle = catalogue + contexte SessionStart + front doors conscientes du rôle. Révision de doctrine assumée : « agentique first, ouvert à la collaboration humaine » (`.planning/notes/2026-09-16-doctrine-agentique-ouverte-collaboration-humaine.md`). |
+| A-05 | front door | `vibeflow-product` nouvelle front door **et** `vibeflow-head` qui lit le rôle pour rediriger. |
+| A-06 | Q-03 | H-04 confirmée : `PROJECT.md` + `REQUIREMENTS.md`, gabarit produit. `BRIEF.md` seul fichier nouveau. |
+| A-07 | Q-04 | Remplace H-05 : une phase ajoutée par product ou head est **proposée** jusqu'à validation par un dev, auto-validée en solo. Marqueur + `check-phase-validation.sh` + refus des managers. Pas de hook bloquant. |
+| A-08 | H-05 | Gate architecture **séparé**, assemblé sur `software-architecture` + GSD (`gsd-map-codebase`, `gsd-graphify`). À écrire : aucun script existant ne rend rouge (RQ-EP-04). |
+| A-09 | Q-07 | Verrou par compartiment **avant**, dans D-02. Précondition héritée, pas refaite. |
+| A-10 | Q-11 renversée | Aligner le vocabulaire des rôles sur BMAD par renommage (ancien nom supprimé, anti-alias, migration one-way), **sauf « manager »**. Caveat : BMAD a fusionné sm/qa/dev (§1 correctif) — à re-trancher au cadrage sur la doc courante. |
+| A-11 | Q-02 | Rôle au poste, fichier local non versionné. Jamais `user.email` → rôle (dépôt public). |
+| A-12 | §8 | Graine SEED-001, déclencheur = 25-04 **et** Phase 41 **et** D-02. |
+
+Fermées par doctrine : Q-08 (reprendre G2 du rapport ICM du 2026-08-15). Ouvertes : Q-09 (`proposable:
+false` jusqu'à preuve, défaut probable) et RQ-EP-01..06 dans `.planning/research/questions.md`.
+
+**Corrections de la revue à froid intégrées** : chaîne de cadrage (en-tête), comptage des front doors
+(§2), préconditions périmées (§8), gate « le head refuse `gsd-phase add` » infaisable tel quel (un agent
+n'intercepte pas un skill invoqué par l'humain → A-07), `.planning/codebase/ARCHITECTURE.md` est
+descriptif (as-is), pas décisionnel → A-08 ne le promeut pas.
 
 ---
 
