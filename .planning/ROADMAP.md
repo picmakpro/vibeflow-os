@@ -1505,10 +1505,10 @@ Plans:
 > **instructions seulement** ; agents **en français**, aucune traduction ; **vraie phase GSD**,
 > insérée avant la 41. Cadrage : `40.1-CONTEXT.md`.
 
-**Goal:** Un agent peut grandir en lignes jusqu'à 300 sans reformulation forcée, tandis que toute
+**Goal:** Un agent peut grandir en lignes jusqu'à 300 sans reformulation forcée (avertissement non bloquant dès 251), tandis que toute
 instruction ajoutée reste bloquée sans arbitrage nommé — et le plafond de 300 est le même partout
 où ADR-029 est énoncée ou mesurée.
-**Requirements**: BUDG-04, BUDG-05 (à ledgeriser au plan) ; transverse QUAL-01
+**Requirements**: BUDG-04, BUDG-05
 **Depends on:** Phase 25 (gate armé, PR #73 mergée) et Phase 40. Séquencée **avant la Phase 41** :
 changer le gate une fois `main` protégée ferait passer cette PR sous la nouvelle règle de merge.
 **Success Criteria** (what must be TRUE):
