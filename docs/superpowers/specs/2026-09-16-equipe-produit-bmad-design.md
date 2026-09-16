@@ -312,7 +312,7 @@ disposition de la recherche dans `.planning/seeds/SEED-001-equipe-produit-v1.md`
 | A-07 | Q-04 | Remplace H-05 : une phase ajoutée par product ou head est **proposée** jusqu'à validation par un dev, auto-validée en solo. Marqueur + `check-phase-validation.sh` + refus des managers. Pas de hook bloquant. |
 | A-08 | H-05 | Gate architecture **séparé**, assemblé sur `software-architecture` + GSD (`gsd-map-codebase`, `gsd-graphify`). À écrire : aucun script existant ne rend rouge (RQ-EP-04). |
 | A-09 | Q-07 | Verrou par compartiment **avant**, dans D-02. Précondition héritée, pas refaite. |
-| A-10 | Q-11 renversée | Aligner le vocabulaire des rôles sur BMAD par renommage (ancien nom supprimé, anti-alias, migration one-way), **sauf « manager »**. Caveat : BMAD a fusionné sm/qa/dev (§1 correctif) — à re-trancher au cadrage sur la doc courante. |
+| A-10 | Q-11 renversée | **Révisé le 2026-09-16** (arbitrage Samuel, message session principale, après recherche) : suivre la dernière recommandation BMAD (sm/qa/dev fusionnés en un Developer, v6.3.0) = **garder l'existant**, head + manager + workers cloisonnés sont déjà cette consolidation. Aucun renommage côté dev. Seul le vocabulaire du rôle product s'aligne sur les noms BMAD courants, vérifiés au cadrage. |
 | A-11 | Q-02 | Rôle au poste, fichier local non versionné. Jamais `user.email` → rôle (dépôt public). |
 | A-12 | §8 | Graine SEED-001, déclencheur = 25-04 **et** Phase 41 **et** D-02. |
 

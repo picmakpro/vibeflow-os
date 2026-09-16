@@ -21,11 +21,14 @@ Elle est **amendée** sur deux points, arbitrage Samuel (AskUserQuestion, sessio
    `vf-coder` quand le poste est product). Ce n'est pas une couche de synonymes : aucun verbe nouveau,
    le même agent lit un contexte de plus. Formulation retenue : **agentique first, ouvert à la
    collaboration humaine**.
-2. **Le vocabulaire des rôles s'aligne sur BMAD par renommage, jamais par alias.** Un renommage
-   remplace un nom (l'ancien disparaît, test anti-alias, migration one-way des labs via
-   `/vf-calibrate`). Un alias en ajoute un et recrée la façade enterrée en v2.33.0. Exception nommée par
-   Samuel : **« manager » reste « manager »** — « scrum master » évoque la cohésion d'équipe, pas
-   l'exécution réelle du kanban et de la feuille de route qu'un `vf-dev-manager` pilote.
+2. **Le vocabulaire ne se renomme pas côté dev.** Arbitrage initial de la session : aligner les noms de
+   rôles sur BMAD par renommage, jamais par alias, « manager » conservé. **Révisé le même jour**
+   (arbitrage Samuel, message session principale, 2026-09-16, après la passe de recherche) : BMAD a
+   lui-même fusionné scrum master, QA et dev dans un seul Developer (v6.3.0). On suit cette dernière
+   recommandation en **gardant l'existant** : head + manager + workers cloisonnés sont déjà cette
+   consolidation, en plus rigoureux (Pattern 12). Aucun renommage, aucune migration de labs. Seul le
+   rôle product nouveau prend les noms BMAD courants, vérifiés au cadrage. La règle « renommage sans
+   alias » reste la doctrine si un renommage devait un jour s'imposer (précédent Phase 40).
 
 ## Ce que ça touche
 
@@ -34,9 +37,8 @@ Elle est **amendée** sur deux points, arbitrage Samuel (AskUserQuestion, sessio
   rétroactif, soit ancrer l'amendement dans la spec du 2026-07-25.
 - ADR-053 (un manager, un verrou de driver) : inchangé par cette note ; l'amendement « un manager par
   compartiment » reste porté par la phase D-02 de partition réelle d'un lab (spec head §6).
-- Précédent immédiat : la Phase 40 a renommé `vibeflow-dev` → `vibeflow-head` avec test anti-alias.
-  C'est le moule de tout renommage BMAD à venir (coût réel : engine, manifestes, tests, mémoire
-  per-projet, labs installés).
+- Précédent : la Phase 40 a renommé `vibeflow-dev` → `vibeflow-head` avec test anti-alias. Ce serait
+  le moule d'un renommage s'il s'imposait ; l'arbitrage révisé n'en prévoit aucun.
 
 ## Ce que ça ne change pas
 
