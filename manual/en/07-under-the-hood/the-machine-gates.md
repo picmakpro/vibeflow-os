@@ -55,12 +55,12 @@ might otherwise mistake for a whim:
 - **The 300-line code threshold**, already covered in the table above, with its warning at 250 lines
   before the hard block.
 
-**Not to overpromise:** the charter recommending agents themselves stay under 250 lines is **not**
-today automatically checked by a gate installed by default in your lab — it's documented doctrine,
-applied through human vigilance and review, not a blocking script. A template exists in the
-methodology library for anyone who wants to set up that check themselves; it isn't installed by
-default. Saying so plainly here avoids leading you to believe in a guarantee that doesn't yet exist
-by default.
+**Not to overpromise:** the charter recommends keeping an agent at 300 lines at most, with a
+warning from 251. Agents distributed by VibeFlow are **measured** in the CI of the distribution
+repository since v2.62.0 (`check-instruction-budget.sh`); blocking — cap exceeded, or an instruction
+added without a named decision — has been active in that CI since the ratchet was armed (PR #73).
+In **your** lab, however, the charter is checked by no gate installed by default: a template (the
+density auditor) exists in the methodology library, but it isn't installed.
 
 ### A concrete example: the Iron Law refusal
 

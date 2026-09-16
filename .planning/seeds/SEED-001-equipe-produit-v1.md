@@ -85,7 +85,7 @@ Milestone, 4 à 5 phases (spec §8 : A rôles de poste, B bundle produit, C gate
 phases, D collaboration deux clones, E décision sur l'approche C plateforme). Refonte de l'installeur
 (`roles` dans `module.json`, `VF_ROLE`, filtre du catalogue), un bundle sur le moule
 `business-pilot-bundle`, deux scripts de gate, renommages avec migration de labs. Aucun nouvel agent
-> 250 lignes ; tout passe `check-agents.sh --strict`.
+> 300 lignes ; tout passe `check-agents.sh --strict`.
 
 ## Sources locales
 
