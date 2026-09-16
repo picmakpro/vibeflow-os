@@ -19,7 +19,7 @@
   v2.0 de `VERSION.md`) restent intactes, non réécrites.
 - **Raison du patch** — changement de valeurs sur un contrat déjà existant (le gate garde ses codes
   de sortie et son canal d'avertissement), pas un changement de contrat : patch, comme pour
-  `validate_gate.sh` (Phase 40.1, plan 40.1-04, `40.1-CONTEXT.md`).
+  `validate_gate.sh` (Phase 40.1, plan 40.1-05, `40.1-CONTEXT.md`).
 - **Autorisation** : arbitrages Samuel D-01, D-05, D-06, AskUserQuestion session principale (relais
   SendMessage), 2026-09-16.
 
