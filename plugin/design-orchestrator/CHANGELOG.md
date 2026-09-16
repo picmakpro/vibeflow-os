@@ -1,5 +1,14 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.5.7] — 2026-09-16 (Phase 40.1)
+
+**Patch** — aucune logique du module ne change ; seuils de densité codés en dur relevés.
+
+- **`scripts/tests/test-design-orchestrator.sh`** : T1 (agents d'équipe) et T7 (AGENT.md du
+  module) relevés de 250 à 300 lignes — plafond ADR-029 révisé. Assertions binaires (≤300),
+  sans réplication de la zone d'avertissement (251-300). Autorisation : arbitrage Samuel D-01,
+  AskUserQuestion session principale (relais SendMessage), 2026-09-16.
+
 ## [v1.5.6] — 2026-09-08 (grammaire Codex mesurée — attente de test réécrite)
 
 **Patch** — aucune logique du module ne change ; seule l'attente de `T9h` est corrigée.
