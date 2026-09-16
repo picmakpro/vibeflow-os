@@ -1,0 +1,287 @@
+{
+  "nodes": [
+    {
+      "id": "mesure-pointeur",
+      "step": "mesurer la resolution du pointeur de workstream (niveaux 1-4) et sa composabilite avec ADR-064",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "/private/tmp/claude-501/-Users-samuel-Documents-dev-vibeflow-os/a4e2551e-26b2-459d-a2ae-ccfbbf9ff27d/scratchpad/ws-probe-pointer/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "mesure-couverture",
+      "step": "re-mesurer la couverture amont workstreams a la date du cadrage + statut de la remontee GSDA-19",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "/private/tmp/claude-501/-Users-samuel-Documents-dev-vibeflow-os/a4e2551e-26b2-459d-a2ae-ccfbbf9ff27d/scratchpad/ws-probe-couverture/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "mesure-prbranch",
+      "step": "mesurer pr-branch sur depot partitionne + reproduire le split-brain de la Phase 24",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "/private/tmp/claude-501/-Users-samuel-Documents-dev-vibeflow-os/a4e2551e-26b2-459d-a2ae-ccfbbf9ff27d/scratchpad/ws-probe-prbranch/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "derive-prefixe",
+      "step": "deriver l espace de noms d exigences (WSTR-xx) contre REQUIREMENTS.md",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "/private/tmp/claude-501/-Users-samuel-Documents-dev-vibeflow-os/a4e2551e-26b2-459d-a2ae-ccfbbf9ff27d/scratchpad/ws-probe-prefixe/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage",
+      "step": "escalade groupee a Samuel : paradoxe d auto-application + arbitrages issus des mesures",
+      "stage": "",
+      "deps": [
+        "mesure-pointeur",
+        "mesure-couverture",
+        "mesure-prbranch",
+        "derive-prefixe"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "discuss",
+      "step": "cadrage gsd-discuss-phase 39",
+      "stage": "",
+      "deps": [
+        "arbitrage"
+      ],
+      "scope": [
+        ".planning/phases/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plan",
+      "step": "plan gsd-plan-phase 39",
+      "stage": "",
+      "deps": [
+        "discuss"
+      ],
+      "scope": [
+        ".planning/phases/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck",
+      "step": "re-validation lecture seule des plans",
+      "stage": "",
+      "deps": [
+        "plan"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-plans",
+      "step": "correction pre-execution des plans (majeur + mineurs + justification de preuve)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-39-**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-39-01",
+      "step": "executer 39-01 : filet de divergence + hook + cablage CI",
+      "stage": "",
+      "deps": [
+        "fix-plans"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/check-divergence.sh",
+        "plugin/conductor/scripts/tests/**",
+        "scripts/hooks/**",
+        ".github/workflows/ci.yml"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-39-02",
+      "step": "executer 39-02 : famille PART, GSDA-19 superseded, amendement ADR-069, gabarit de dispatch",
+      "stage": "",
+      "deps": [
+        "fix-plans"
+      ],
+      "scope": [
+        ".planning/REQUIREMENTS.md",
+        "docs/ADR.md",
+        "plugin/dev-orchestrator/references/workstreams.md",
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-39-01",
+      "step": "revue du diff 39-01",
+      "stage": "",
+      "deps": [
+        "exec-39-01"
+      ],
+      "scope": [],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "audit-39-01",
+      "step": "audit infra du 39-01 (hook git + CI)",
+      "stage": "",
+      "deps": [
+        "exec-39-01"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-39-02",
+      "step": "revue du diff 39-02",
+      "stage": "",
+      "deps": [
+        "exec-39-02"
+      ],
+      "scope": [],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "exec-39-03",
+      "step": "executer 39-03 : preuve sur clone jetable + declencheur de reprise",
+      "stage": "",
+      "deps": [
+        "exec-39-01",
+        "exec-39-02"
+      ],
+      "scope": [
+        ".planning/STATE.md",
+        ".planning/ROADMAP.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-39-03",
+      "step": "revue du diff 39-03",
+      "stage": "",
+      "deps": [
+        "exec-39-03"
+      ],
+      "scope": [],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire, un seul noeud en fin de mission",
+      "stage": "",
+      "deps": [
+        "exec-39-01",
+        "exec-39-02",
+        "exec-39-03"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "summary-39-01",
+      "step": "produire le SUMMARY manquant du plan 39-01",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-39-**/39-01-SUMMARY.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-d02",
+      "step": "ancrer le declencheur de reprise D-02 la ou sa condition se rencontre",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/dev-orchestrator/references/**",
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-prepush",
+      "step": "mitiger pre-push (vecteur demontre) + mettre a jour CONCERNS",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "scripts/hooks/pre-push",
+        ".planning/codebase/CONCERNS.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "juge-diff-correction",
+      "step": "juge frais executant sur tout le diff de correction, securite incluse",
+      "stage": "",
+      "deps": [
+        "fix-prepush"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-compteurs",
+      "step": "bloquant compteur README + affirmations fausses + CONCERNS ramene a la verite",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "README.md",
+        "README.fr.md",
+        ".planning/codebase/CONCERNS.md",
+        ".planning/phases/VFDO-39-**",
+        ".planning/missions/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "mesure-hookspath",
+      "step": "mesurer si core.hooksPath absolu ferme le vecteur residuel",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "/private/tmp/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "couverture-sortie2",
+      "step": "lot cible : couvrir la sortie 2 et tuer les 5 mutations survivantes",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/conductor/scripts/tests/test-check-divergence.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "merge-hotfix",
+      "step": "fusionner origin/main (hotfix PR 61) et reconcilier STATE",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/STATE.md",
+        "CHANGELOG.md"
+      ],
+      "status": "done"
+    }
+  ]
+}

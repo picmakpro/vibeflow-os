@@ -1,0 +1,128 @@
+{
+  "nodes": [
+    {
+      "id": "recon-api",
+      "step": "Q1 — surface runtime gsd-core reellement appelable (publique vs interne)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "~/.claude/gsd-core/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "recon-vf",
+      "step": "Q2/Q3/Q5/Q6 — inventaire de ce qui est specifiquement VibeFlow a porter",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "recon-rt",
+      "step": "Q4/4b — Codex MultiAgentV2, frictions nommees, escalade humaine hors Claude (web)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage",
+      "step": "Arbitrage humain — profondeur du spike (pose seule vs pose+execution)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "pose-reelle",
+      "step": "Constat sur disque — pose reelle d'artefacts VF vers codex/opencode/kimi-code en TARGET_ROOT jetable",
+      "stage": "",
+      "deps": [
+        "recon-api",
+        "recon-vf"
+      ],
+      "scope": [
+        "SCRATCHPAD"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "discuss-37",
+      "step": "Cadrage GSD phase 37 (DISCUSS.md) informe par les mesures",
+      "stage": "",
+      "deps": [
+        "pose-reelle",
+        "recon-rt",
+        "arbitrage",
+        "codex-exec"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-37-portabilit-multi-runtime-spike-codex-opencode-kimi/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-37",
+      "step": "Rapport de spike + recommandation go/no-go (verdict en 2 morceaux) + finding sur la fiabilite du registre",
+      "stage": "",
+      "deps": [
+        "discuss-37"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-37-portabilit-multi-runtime-spike-codex-opencode-kimi/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-37",
+      "step": "Revue du livrable de spike (verifiabilite des affirmations)",
+      "stage": "",
+      "deps": [
+        "exec-37"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-37-portabilit-multi-runtime-spike-codex-opencode-kimi/**"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "docs",
+      "step": "Hygiene documentaire — STATE/ROADMAP/ledger",
+      "stage": "",
+      "deps": [
+        "exec-37",
+        "revue-37"
+      ],
+      "scope": [
+        ".planning/STATE.md",
+        ".planning/ROADMAP.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "codex-install",
+      "step": "Install Codex CLI + auth OpenAI (GESTE HUMAIN — Samuel)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "codex-exec",
+      "step": "Niveau 2 — Codex 0.150.1 REEL : (0) PROFONDEUR — un subagent codex peut-il lui-meme spawn ? (le no-go repose sur maxDepth:1, valeur d'un descripteur gsd-core deja pris en defaut 2x) ; (1) exposition #27331 compte ChatGPT ; (2) contrat de rapport sur spawn/wait ; (3) hide_spawn_agent_metadata=false",
+      "stage": "",
+      "deps": [
+        "codex-install",
+        "pose-reelle"
+      ],
+      "scope": [
+        "SCRATCHPAD"
+      ],
+      "status": "done"
+    }
+  ]
+}

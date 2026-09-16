@@ -1,0 +1,322 @@
+{
+  "nodes": [
+    {
+      "id": "spike-refx",
+      "step": "spike git reference-transaction : couverture checkout, capacite d'abort",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "(scratch)"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "repro",
+      "step": "rejeu des 2 contournements reels comme cas de test",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "(scratch)"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "inv",
+      "step": "inventaire terrain : driver-lock.sh, merge-hooks exec, gate regle 4, suites conductor",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "(lecture seule)"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "discuss",
+      "step": "cadrage Phase 32 (32-CONTEXT.md)",
+      "stage": "",
+      "deps": [
+        "spike-refx",
+        "repro",
+        "inv"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-32-*/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plan",
+      "step": "plans de phase 32 (gsd-plan-phase)",
+      "stage": "",
+      "deps": [
+        "discuss"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-32-*/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck",
+      "step": "re-validation EXTERNE des plans (gsd-plan-checker frais)",
+      "stage": "",
+      "deps": [
+        "plan"
+      ],
+      "scope": [
+        "(lecture seule)"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "inv2",
+      "step": "contrat PreToolUse + liaison session<->owner (invariant aux 2 arbitrages)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "(lecture seule)"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "mesure-f2",
+      "step": "mesurer si --resume / clear changent le session_id (F2, bloquant pour la liaison session<->owner)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "(scratch)"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck2",
+      "step": "re-validation externe #2 des plans corriges (7 plans)",
+      "stage": "",
+      "deps": [
+        "plan"
+      ],
+      "scope": [
+        "(lecture seule)"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plan-fix2",
+      "step": "correction #2 des plans (2 bloquants nes du 32-07 + 5 findings)",
+      "stage": "",
+      "deps": [
+        "plancheck2"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-32-*/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-01",
+      "step": "32-01 : refus stale, champs additifs (driver-lock.sh)",
+      "stage": "",
+      "deps": [
+        "plan-fix2"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/driver-lock.sh",
+        "plugin/conductor/scripts/tests/test-driver-lock.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-02",
+      "step": "32-02 : takeover/reclaim + hint + trap + garde legacy",
+      "stage": "",
+      "deps": [
+        "exec-01"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/driver-lock.sh",
+        "plugin/conductor/scripts/tests/test-driver-lock.sh",
+        ".gitignore"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-03",
+      "step": "32-03 : guard PreToolUse (Bash + Write|Edit)",
+      "stage": "",
+      "deps": [
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/guard-driver-lock.sh",
+        "plugin/conductor/hooks/hooks.json",
+        "docs/HOOKS-CONTRAT-SORTIE.md",
+        "README.md",
+        "README.fr.md",
+        "plugin/_internal/tests/test-vf-portable.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-04",
+      "step": "32-04 : team-kernel.md, source canonique du jeton de fence",
+      "stage": "",
+      "deps": [
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/conductor/references/team-kernel.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-w3",
+      "step": "revue de lot : driver-lock (32-01/02) + guard (32-03/04)",
+      "stage": "",
+      "deps": [
+        "exec-03",
+        "exec-04"
+      ],
+      "scope": [
+        "(lecture seule)"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "audit-guard",
+      "step": "audit du guard : contournements, fail-open, surface",
+      "stage": "",
+      "deps": [
+        "exec-03"
+      ],
+      "scope": [
+        "(lecture seule)"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-07",
+      "step": "32-07 : doctrine des 5 managers + Fence + bumps",
+      "stage": "",
+      "deps": [
+        "exec-04"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/**",
+        "plugin/design-orchestrator/**",
+        "plugin/content-bundle/**",
+        "plugin/business-pilot-bundle/**",
+        "plugin/growth-bundle/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-05",
+      "step": "32-05 : hook doctor SessionStart generique (ABANDONNABLE)",
+      "stage": "",
+      "deps": [
+        "exec-03"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/check-guard-health.sh",
+        "plugin/conductor/hooks/hooks.json",
+        "docs/HOOKS-CONTRAT-SORTIE.md",
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-w4",
+      "step": "revue de lot : 32-05 + 32-07",
+      "stage": "",
+      "deps": [
+        "exec-05",
+        "exec-07"
+      ],
+      "scope": [
+        "(lecture seule)"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-06",
+      "step": "32-06 : cloture, bilan 62 suites, CHANGELOG",
+      "stage": "",
+      "deps": [
+        "revue-w3",
+        "revue-w4"
+      ],
+      "scope": [
+        "plugin/conductor/VERSION",
+        "plugin/conductor/CHANGELOG.md",
+        "plugin/conductor/README.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire de fin de mission",
+      "stage": "",
+      "deps": [
+        "exec-06"
+      ],
+      "scope": [
+        ".planning/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-t32",
+      "step": "graver la reproduction ciblee de la course a deux etages (mutation (b) non couverte par T32)",
+      "stage": "",
+      "deps": [
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/tests/test-driver-lock.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "verif-w3",
+      "step": "verification goal-backward des vagues 1-3",
+      "stage": "",
+      "deps": [
+        "exec-03",
+        "exec-04"
+      ],
+      "scope": [
+        "(lecture seule)"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-lot3",
+      "step": "correctifs fusionnes des 3 juges (heredoc, trap recover, sanitize, segmentation, observabilite)",
+      "stage": "",
+      "deps": [
+        "verif-w3"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/guard-driver-lock.sh",
+        "plugin/conductor/scripts/driver-lock.sh",
+        "plugin/conductor/scripts/tests/",
+        "plugin/conductor/references/team-kernel.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-stat",
+      "step": "ordre stat GNU-first dans check-guard-health (anti-motif deja corrige 2x)",
+      "stage": "",
+      "deps": [
+        "revue-w4"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/check-guard-health.sh",
+        "plugin/conductor/scripts/tests/test-check-guard-health.sh"
+      ],
+      "status": "done"
+    }
+  ]
+}

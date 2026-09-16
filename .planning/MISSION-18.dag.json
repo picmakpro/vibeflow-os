@@ -1,0 +1,72 @@
+{
+  "nodes": [
+    {
+      "id": "plan-18",
+      "step": "Phase 18 — planification (PLAN.md par vague)",
+      "stage": "plan",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-18-survie-du-ledger-d-exigences-la-cl-ture-de-jalon/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-18",
+      "step": "Phase 18 — re-validation goal-backward des plans",
+      "stage": "plan",
+      "deps": [
+        "plan-18"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-18-survie-du-ledger-d-exigences-la-cl-ture-de-jalon/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-18",
+      "step": "Phase 18 — execution des plans (gate + rattrapage + doctrine + armement)",
+      "stage": "exec",
+      "deps": [
+        "plancheck-18"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/",
+        ".planning/phases/VFDO-18-survie-du-ledger-d-exigences-la-cl-ture-de-jalon/"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "revue-18",
+      "step": "Phase 18 — revue de code du diff complet",
+      "stage": "revue",
+      "deps": [
+        "exec-18"
+      ],
+      "scope": [],
+      "status": "blocked",
+      "review_regime": "full"
+    },
+    {
+      "id": "audit-18",
+      "step": "Phase 18 — audit infra/securite (hook SessionStart, ecriture de fichiers)",
+      "stage": "audit",
+      "deps": [
+        "exec-18"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire (surface publique du module + STATE/ROADMAP)",
+      "stage": "docs",
+      "deps": [
+        "exec-18",
+        "revue-18",
+        "audit-18"
+      ],
+      "scope": [],
+      "status": "blocked"
+    }
+  ]
+}

@@ -1,0 +1,196 @@
+{
+  "nodes": [
+    {
+      "id": "rech-moteur",
+      "step": "[LIVRE avant la pause — rapport : 31-RECHERCHE-moteur.md] Explore read-only : anatomie de vibeflow-update.sh (fonctions, TOUS les points d ecriture disque, resolution TARGET_ROOT/scope, chemins install/update/calibrate/remove, conventions de log), contrat merge-hooks.sh post-Phase-30, inventaire _internal/, infra de tests + compteur N suites des README, mecanisme d enumeration des fichiers d un module",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/_internal/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "discuss",
+      "step": "Cadrage 31-CONTEXT.md — geste du manager, mode auto documente (Claude s Discretion trace)",
+      "stage": "",
+      "deps": [
+        "rech-moteur"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-31-*/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plan",
+      "step": "Pipeline gsd-plan-phase (researcher -> planner -> plan-checker) via vf-coder",
+      "stage": "",
+      "deps": [
+        "discuss"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-31-*/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck",
+      "step": "Re-validation externe des plans (lecon Phase 30 : 5 faux verts)",
+      "stage": "",
+      "deps": [
+        "plan"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-31-*/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec",
+      "step": "Execution par vagues (nœuds exec-NN a eclater APRES le plan)",
+      "stage": "",
+      "deps": [
+        "plancheck"
+      ],
+      "scope": [
+        "plugin/_internal/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue",
+      "step": "vf-reviewer EN DIRECT sur le diff moteur (systematique)",
+      "stage": "",
+      "deps": [
+        "exec"
+      ],
+      "scope": [
+        "plugin/_internal/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "verif",
+      "step": "gsd-verifier goal-backward sur les 4 criteres de succes",
+      "stage": "",
+      "deps": [
+        "exec"
+      ],
+      "scope": [
+        "plugin/_internal/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "issue20-draft",
+      "step": "MANI-04 : DRAFT du commentaire de livraison issue #20 sur disque — JAMAIS poste (gate humain nocturne)",
+      "stage": "",
+      "deps": [
+        "verif"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-31-*/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "Hygiene documentaire unique : STATE/ROADMAP/SUMMARY + compteurs README si suites nees + WINDOWS.md si deviation",
+      "stage": "",
+      "deps": [
+        "revue",
+        "verif"
+      ],
+      "scope": [
+        ".planning/**",
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-01",
+      "step": "31-01 tracer manifeste + suite",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-02",
+      "step": "31-02 mode plan merge-hooks",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-03",
+      "step": "31-03 migration des sites",
+      "stage": "",
+      "deps": [
+        "exec-01"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-04",
+      "step": "31-04 flag --dry-run",
+      "stage": "",
+      "deps": [
+        "exec-02",
+        "exec-03"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-05",
+      "step": "31-05 convergence MANI-03",
+      "stage": "",
+      "deps": [
+        "exec-04"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-06",
+      "step": "31-06 skills consommateurs",
+      "stage": "",
+      "deps": [
+        "exec-04"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-07",
+      "step": "31-07 uninstall lit le manifeste",
+      "stage": "",
+      "deps": [
+        "exec-05"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-08",
+      "step": "31-08 draft issue20 + bilan",
+      "stage": "",
+      "deps": [
+        "exec-01",
+        "exec-02",
+        "exec-03",
+        "exec-04",
+        "exec-05",
+        "exec-06",
+        "exec-07"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

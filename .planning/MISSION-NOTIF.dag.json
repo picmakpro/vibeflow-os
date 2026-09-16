@@ -1,0 +1,123 @@
+{
+  "nodes": [
+    {
+      "id": "spike-push",
+      "step": "Spike PushNotification : disponibilité réelle, API, contextes, dégradation",
+      "stage": "research",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "recon",
+      "step": "Carte réelle : notify.sh, dag.sh, hooks, suites, skill stop-notify, points d'accroche jalons",
+      "stage": "research",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "discuss",
+      "step": "Cadrage : trancher défaut opt-in, forme du toggle, vecteur jalons",
+      "stage": "discuss",
+      "deps": [
+        "spike-push",
+        "recon"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plan",
+      "step": "Plan d'exécution détaillé",
+      "stage": "plan",
+      "deps": [
+        "discuss"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plancheck",
+      "step": "Plancheck externe (lecture seule)",
+      "stage": "plan",
+      "deps": [
+        "plan"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-33-06",
+      "step": "Exécution 33-06 — gate opt-in notify.sh + skill/commande /vf-notify + tests + bump conductor",
+      "stage": "execute",
+      "deps": [
+        "plancheck"
+      ],
+      "scope": [
+        "plugin/conductor/**",
+        "plugin/commands/vf-notify.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-33-07",
+      "step": "Exécution 33-07 — Pattern H (doctrine jalons) + bump dev-orchestrator",
+      "stage": "execute",
+      "deps": [
+        "plancheck"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue",
+      "step": "Revue vf-reviewer en direct",
+      "stage": "review",
+      "deps": [
+        "exec-33-06",
+        "exec-33-07"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "verify",
+      "step": "Vérification gsd-verifier + non-régression suites complètes",
+      "stage": "verify",
+      "deps": [
+        "exec-33-06",
+        "exec-33-07"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "Hygiène documentaire (CHANGELOG, README module, STATE, BACKLOG)",
+      "stage": "docs",
+      "deps": [
+        "revue",
+        "verify"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "amend-wtch03",
+      "step": "Annexe Phase 33 : amendement daté WTCH-03 (33-CONTEXT + REQUIREMENTS + ROADMAP)",
+      "stage": "docs",
+      "deps": [
+        "discuss"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-33-watchdog-notifications-des-missions/33-CONTEXT.md",
+        ".planning/REQUIREMENTS.md",
+        ".planning/ROADMAP.md"
+      ],
+      "status": "done"
+    }
+  ]
+}

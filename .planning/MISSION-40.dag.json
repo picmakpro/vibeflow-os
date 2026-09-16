@@ -1,0 +1,141 @@
+{
+  "nodes": [
+    {
+      "id": "plan",
+      "step": "gsd-plan-phase 40 + amendement des plans (option b)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-40-*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-rename",
+      "step": "L1/40-01 renommage + test anti-alias T36 (temoin nominatif)",
+      "stage": "",
+      "deps": [
+        "plan"
+      ],
+      "scope": [
+        "plugin/**",
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-e6",
+      "step": "L2/40-02 contrat E6 + decompte de cout (mission-contracts.md, vf-dev-manager.md)",
+      "stage": "",
+      "deps": [
+        "exec-rename"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/references/mission-contracts.md",
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-doctrine",
+      "step": "L4/40-03 head-governance.md + AGENT.md <=250 + renvois skills",
+      "stage": "",
+      "deps": [
+        "exec-rename"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/AGENT.md",
+        "plugin/dev-orchestrator/references/head-governance.md",
+        "plugin/dev-orchestrator/references/_index.md",
+        "plugin/dev-orchestrator/skills/vf-dev/SKILL.md",
+        "plugin/dev-orchestrator/skills/vf-auto/SKILL.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-workers",
+      "step": "40-05 emetteurs E6 (option b, arbitrage Samuel 2026-09-15)",
+      "stage": "",
+      "deps": [
+        "exec-e6"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/agents/vf-coder.md",
+        "plugin/dev-orchestrator/agents/vf-reviewer.md",
+        "plugin/dev-orchestrator/agents/vf-auditer.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-gate",
+      "step": "L3/40-04 check-mission-exit.sh + tests + mutation + cloture MODULE",
+      "stage": "",
+      "deps": [
+        "exec-e6",
+        "exec-doctrine"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/check-mission-exit.sh",
+        "plugin/dev-orchestrator/scripts/tests/test-check-mission-exit.sh",
+        "plugin/dev-orchestrator/VERSION",
+        "plugin/dev-orchestrator/module.json",
+        "plugin/dev-orchestrator/README.md",
+        "plugin/dev-orchestrator/CHANGELOG.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue",
+      "step": "revue de jointure sur le diff complet",
+      "stage": "",
+      "deps": [
+        "exec-gate",
+        "exec-workers"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "verif",
+      "step": "rejeu job 'gates' de ci.yml commande par commande + suites de tests",
+      "stage": "",
+      "deps": [
+        "exec-gate",
+        "exec-workers"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "bump",
+      "step": "bump RACINE seule (VERSION, plugin.json, marketplace.json, 2 README)",
+      "stage": "",
+      "deps": [
+        "revue",
+        "verif"
+      ],
+      "scope": [
+        "VERSION",
+        "plugin/.claude-plugin/plugin.json",
+        ".claude-plugin/marketplace.json",
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "STATE.md + ROADMAP (edition manuelle) + ecart de liste 40-CONTEXT",
+      "stage": "",
+      "deps": [
+        "bump"
+      ],
+      "scope": [
+        ".planning/STATE.md",
+        ".planning/ROADMAP.md"
+      ],
+      "status": "done"
+    }
+  ]
+}

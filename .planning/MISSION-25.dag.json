@@ -1,0 +1,165 @@
+{
+  "nodes": [
+    {
+      "id": "exec-01",
+      "step": "plan 25-01 — gate check-instruction-budget.sh",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/conductor/scripts/check-instruction-budget.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-01",
+      "step": "revue du diff 25-01",
+      "stage": "",
+      "deps": [
+        "exec-01"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/check-instruction-budget.sh"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "audit-01",
+      "step": "audit 25-01 (gate infra, surcharges env)",
+      "stage": "",
+      "deps": [
+        "exec-01"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/check-instruction-budget.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-02",
+      "step": "plan 25-02 — suite de tests + 4 mutants",
+      "stage": "",
+      "deps": [
+        "revue-01",
+        "audit-01"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/tests/test-check-instruction-budget.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-02",
+      "step": "revue du diff 25-02",
+      "stage": "",
+      "deps": [
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/tests/test-check-instruction-budget.sh"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "audit-02",
+      "step": "audit 25-02 (fixtures, isolation mktemp)",
+      "stage": "",
+      "deps": [
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/tests/test-check-instruction-budget.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-03",
+      "step": "plan 25-03 — CI + doc + bump conductor minor",
+      "stage": "",
+      "deps": [
+        "revue-02",
+        "audit-02"
+      ],
+      "scope": [
+        ".github/workflows/ci.yml",
+        "plugin/conductor/README.md",
+        "plugin/conductor/VERSION",
+        "plugin/conductor/module.json",
+        "plugin/conductor/CHANGELOG.md",
+        "README.md",
+        "README.fr.md",
+        "docs/ADR.md",
+        ".planning/BACKLOG.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-03",
+      "step": "revue du diff 25-03",
+      "stage": "",
+      "deps": [
+        "exec-03"
+      ],
+      "scope": [
+        ".github/workflows/ci.yml",
+        "plugin/conductor/README.md",
+        "plugin/conductor/CHANGELOG.md",
+        "README.md",
+        "README.fr.md",
+        "docs/ADR.md",
+        ".planning/BACKLOG.md"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "audit-03",
+      "step": "audit 25-03 (etape CI, codes de sortie, discrimination)",
+      "stage": "",
+      "deps": [
+        "exec-03"
+      ],
+      "scope": [
+        ".github/workflows/ci.yml"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire — verification read-only des compteurs re-derives",
+      "stage": "",
+      "deps": [
+        "revue-03",
+        "audit-03"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "gates-final",
+      "step": "rejeu integral du job gates + decouverte complete des suites",
+      "stage": "",
+      "deps": [
+        "revue-03",
+        "audit-03"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "pr",
+      "step": "STATE/ROADMAP + ouverture PR (jamais de merge)",
+      "stage": "",
+      "deps": [
+        "docs",
+        "gates-final"
+      ],
+      "scope": [
+        ".planning/STATE.md",
+        ".planning/ROADMAP.md"
+      ],
+      "status": "done"
+    }
+  ]
+}
