@@ -22,8 +22,10 @@
 #   check-instruction-budget.sh [--path <dir>]
 #
 # Exit codes (contrat interne, tous enumeres, aucun implicite — patron check-divergence.sh) :
-#   0  = ARME et aucun depassement (conforme)
-#   1  = ARME et au moins un depassement de baseline (lignes, instructions, ou plafond ADR-029)
+#   0  = ARME et aucun depassement (peut porter un verdict AVERTISSEMENT-ADR029 non bloquant,
+#        des 251 lignes, ou LIGNES-EN-HAUSSE informatif)
+#   1  = ARME et au moins un depassement (instruction au-dessus de sa baseline par fichier,
+#        ou plafond ADR-029 a 300 lignes)
 #   2  = NON VERIFIABLE — decouverte vide, fichier imparsable, ou contrat de baseline incoherent ;
 #        toujours bloquant, arme ou non
 #   3  = NON ARME — rapport imprime integralement, jamais bloquant (D-04, avertissement audible,
@@ -65,12 +67,17 @@ PLANNING_DIR="${VF_BUDGET_PLANNING_DIR:-$ROOT/.planning}"
 SENTINEL="$PLANNING_DIR/.instruction-budget-armed"
 BASELINE="${VF_BUDGET_BASELINE_FILE:-$PLANNING_DIR/instruction-budget-baselines.tsv}"
 
-# Plafond ADR-029 (charte de densite : agents <= 250 lignes). Arme par la MEME sentinelle que la
-# baseline (D-05) : la limite effective de lignes d'un fichier est le plus petit de sa baseline et
-# de cette constante. Une baseline de lignes superieure a 250 ne peut jamais legaliser un
-# depassement par simple mesure — voir verdict DEPASSEMENT-ADR029 plus bas, qui prime toujours sur
-# la comparaison a la baseline.
-VF_BUDGET_LINE_CAP=250
+# Plafond ADR-029 revise en Phase 40.1 (arbitrages Samuel D-01/D-05, AskUserQuestion session
+# principale, relais SendMessage, 2026-09-16) : avertissement des VF_BUDGET_LINE_WARN_FROM lignes
+# (non bloquant), blocage au-dela de VF_BUDGET_LINE_CAP lignes — toujours le FICHIER ENTIER (D-06).
+# La limite n'est plus "le plus petit de la baseline et du plafond" : c'est desormais le plafond
+# seul qui bloque ; la colonne lignes de la baseline est LUE et PUBLIEE dans le rapport mais n'est
+# plus JAMAIS comparee pour decider du code de sortie (D-02, D-H6 — seul le ratchet d'instructions
+# reste comparatif, voir plus bas). Une baseline de lignes superieure au plafond ne peut jamais
+# legaliser un depassement — voir verdict DEPASSEMENT-ADR029 plus bas, qui prime toujours sur tout
+# le reste, y compris l'avertissement.
+VF_BUDGET_LINE_CAP=300
+VF_BUDGET_LINE_WARN_FROM=251
 
 # Marqueurs D-01, verses au gate tels quels, insensibles a la casse (tolower() cote awk).
 MARKER_RE='jamais|toujours|ne .* pas|doit|must|never|always|interdit|obligatoire'
@@ -225,6 +232,7 @@ REPORT="$TMPD/report"
 NONVERIF_COUNT=0
 SANS_BASELINE_COUNT=0
 OVERRUN_COUNT=0
+WARN_COUNT=0
 
 while IFS= read -r rel; do
   [ -n "$rel" ] || continue
@@ -295,29 +303,36 @@ while IFS= read -r rel; do
   fi
 
   # Plafond absolu ADR-029 : prime sur TOUT le reste, y compris une baseline egale au courant —
-  # une baseline de lignes > 250 ne legalise jamais le depassement par simple mesure (D-05).
+  # une baseline de lignes superieure au plafond ne legalise jamais le depassement par simple
+  # mesure (D-05). Le ratchet ne compare plus JAMAIS la colonne lignes pour decider du rc (D-02,
+  # D-H6) : elle reste lue et publiee dans le rapport, informative seulement (LIGNES-EN-HAUSSE).
   verdict="OK"
   if [ "$lines" -gt "$VF_BUDGET_LINE_CAP" ]; then
     verdict="DEPASSEMENT-ADR029"
   elif [ "$has_baseline" -eq 0 ]; then
     verdict="SANS-BASELINE"
   else
-    line_over=0; instr_over=0
-    [ "$lines" -gt "$bl_lines" ] && line_over=1
+    instr_over=0
     [ "$instr" -gt "$bl_instr" ] && instr_over=1
-    if [ "$line_over" -eq 1 ] && [ "$instr_over" -eq 1 ]; then
-      verdict="DEPASSEMENT-LIGNES+INSTR"
-    elif [ "$line_over" -eq 1 ]; then
-      verdict="DEPASSEMENT-LIGNES"
-    elif [ "$instr_over" -eq 1 ]; then
+    if [ "$instr_over" -eq 1 ]; then
       verdict="DEPASSEMENT-INSTR"
-    elif [ "$lines" -lt "$bl_lines" ] || [ "$instr" -lt "$bl_instr" ]; then
+    elif [ "$instr" -lt "$bl_instr" ]; then
       verdict="MARGE"
     fi
+    # Ligne informative UNIQUE (ancre de MUT-2) : la hausse de lignes ne bloque jamais, elle
+    # s'affiche seulement en suffixe du verdict deja pose ci-dessus (D-02/D-H6).
+    [ "$lines" -gt "$bl_lines" ] && verdict="${verdict}+LIGNES-EN-HAUSSE"
+  fi
+
+  # Avertissement ADR-029 (D-05, non bloquant) : zone haute avant le plafond, hors le cas ou le
+  # plafond est deja depasse (DEPASSEMENT-ADR029 prime toujours et n'accumule pas d'avertissement).
+  if [ "$verdict" != "DEPASSEMENT-ADR029" ] && [ "$lines" -ge "$VF_BUDGET_LINE_WARN_FROM" ] && [ "$lines" -le "$VF_BUDGET_LINE_CAP" ]; then
+    verdict="${verdict}+AVERTISSEMENT-ADR029"
+    WARN_COUNT=$((WARN_COUNT + 1))
   fi
 
   # F3 (revue vague 1) : SANS_BASELINE_COUNT s'incremente sur has_baseline==0 INDEPENDAMMENT du
-  # verdict affiche — sinon un fichier > 250 lignes sans entree de baseline tombe dans la branche
+  # verdict affiche — sinon un fichier au-dela du plafond sans entree de baseline tombe dans la branche
   # DEPASSEMENT-ADR029 (prioritaire) et l'absence de couverture de baseline reste invisible au
   # bilan (le contrat de must_haves exige 2, pas 1, sur ce cas).
   if [ "$has_baseline" -eq 0 ]; then
@@ -371,7 +386,7 @@ echo "[check-instruction-budget] sentinelle : $SENTINEL ($sentinel_state)"
 echo "[check-instruction-budget] baseline : $BASELINE ($baseline_state)"
 printf 'FICHIER | LIGNES | BL-LIGNES | INSTR | BL-INSTR | VERDICT\n'
 cat "$REPORT"
-printf 'BILAN : %s fichier(s), %s depassement(s), %s non verifiable(s), arme=%s, code=%s\n' \
-  "$FOUND" "$OVERRUN_COUNT" "$NONVERIF_COUNT" "$armed_label" "$RC"
+printf 'BILAN : %s fichier(s), %s depassement(s), %s avertissement(s) ADR-029, %s non verifiable(s), arme=%s, code=%s\n' \
+  "$FOUND" "$OVERRUN_COUNT" "$WARN_COUNT" "$NONVERIF_COUNT" "$armed_label" "$RC"
 
 exit "$RC"

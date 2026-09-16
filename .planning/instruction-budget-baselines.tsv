@@ -12,8 +12,9 @@
 # Autorisation : arbitrage Samuel, AskUserQuestion session principale (relais SendMessage), 2026-09-16.
 #
 # Doctrine du ratchet : une valeur ne MONTE jamais sans un arbitrage humain nommé avec son canal
-# et sa date. Elle DESCEND librement, dans le commit de remédiation qui la justifie. Aucune valeur
-# de lignes au-dessus de 250 (plafond ADR-029, qui prime toujours sur la baseline).
+# et sa date. Elle DESCEND librement, dans le commit de remédiation qui la justifie. La colonne
+# lignes est publiée mais jamais comparée pour le rc (Phase 40.1, D-02/D-H6) ; le plafond ADR-029
+# (bloque au-delà de 300 lignes, fichier entier, D-06) prime toujours sur la baseline.
 #
 # Format : chemin<TAB>lignes<TAB>instructions, trié LC_ALL=C.
 plugin/business-pilot-bundle/agents/quality-gate-client.md	91	10
