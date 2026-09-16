@@ -1,5 +1,15 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.22.2] — 2026-09-16 (Phase 40.1)
+
+**Patch** (correctif de gate, aucune nouvelle capacité) :
+
+- Seuils de densité des tests T3, T5, T8, T22, T31-G, T35 relevés au plafond ADR-029 de
+  300 lignes (assertions binaires ; l'avertissement dès 251 relève du gate du dépôt) ;
+- README et GSD-PIPELINE.md alignés sur le nouveau plafond ;
+- Autorisation : arbitrage Samuel D-01, AskUserQuestion session principale (relais
+  SendMessage), 2026-09-16.
+
 ## [v2.22.1] — 2026-09-16 (hotfix v2.63.1 — le head gouverne, il ne fait plus le geste GSD)
 
 **Patch** (correctif de doctrine, aucune nouvelle capacité) :
