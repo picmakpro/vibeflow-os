@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # test-check-module-bump.sh — fixtures jetables pour phase-base.sh et check-module-bump.sh.
-# Cas B1-B15 (voir 40.1-02-PLAN.md, Task 1). Sortie: "== resultat : N ok, M ko ==".
+# Cas B1-B15 (voir 40.1-02-PLAN.md, Task 1), plus B16-B17 (correction ciblee du 2026-09-17,
+# constats revue et audit de la mission d'execution 40.1 : rc de git rev-list, arithmetique base 10
+# sur un segment de version avec zero en tete). Sortie: "== resultat : N ok, M ko ==".
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -173,6 +175,38 @@ pb_case B14 0 "$c1" --main-ref origin/main
 g update-ref -d refs/heads/main
 g update-ref refs/remotes/origin/main "$c2"
 pb_case B15 0 "$c2"
+
+# --- B16 : git rev-list echoue sur une base cassee (stub phase-base.sh), attendu rc=2 --------------
+R="$(mkbase)"
+bump_commit "$R" v1.2.4 "## [v1.2.4] — d (Phase 40.1)" "bump: v1.2.4" 1
+SCRATCH16="$(mktemp -d)"
+cp "$CMB" "$SCRATCH16/check-module-bump.sh"
+cat > "$SCRATCH16/phase-base.sh" <<'EOF'
+#!/usr/bin/env bash
+echo "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+exit 0
+EOF
+chmod +x "$SCRATCH16/phase-base.sh" "$SCRATCH16/check-module-bump.sh"
+rc16=0; LAST_OUT="$(bash "$SCRATCH16/check-module-bump.sh" m patch --root "$R" 2>&1)" && rc16=0 || rc16=$?
+[ "$rc16" -eq 2 ] && v=ok || v=ko
+report B16 "$v" "git rev-list echoue sur une base invalide (stub phase-base.sh), attendu rc=2, obtenu rc=$rc16 : $LAST_OUT"
+
+# --- B17 : segment de version avec zero en tete ("08") ne doit pas planter en base octale -----------
+R="$(mktemp -d)"
+git -C "$R" -c user.name=t -c user.email=t@t.co init -q -b main
+mkdir -p "$R/plugin/m"
+printf 'v1.2.08\n' > "$R/plugin/m/VERSION"
+printf '{\n  "name": "m",\n  "version": "v1.2.08"\n}\n' > "$R/plugin/m/module.json"
+printf '# Changelog — m\n\n## [v1.2.08] — base\n' > "$R/plugin/m/CHANGELOG.md"
+printf '**Version** : v1.2.08\n' > "$R/plugin/m/README.md"
+git -C "$R" add -A
+git -C "$R" -c user.name=t -c user.email=t@t.co commit -q -m "base v1.2.08"
+git -C "$R" checkout -q -b w
+bump_commit "$R" v1.2.9 "## [v1.2.9] — d (Phase 40.1)" "bump: v1.2.9" 1
+rc17=0; rc_of "$R" m patch --main-ref main || rc17=$?
+case "$LAST_OUT" in *"v1.2.08 → v1.2.9"*) msg17_ok=1 ;; *) msg17_ok=0 ;; esac
+[ "$rc17" -eq 0 ] && [ "$msg17_ok" -eq 1 ] && v=ok || v=ko
+report B17 "$v" "segment de version avec zero en tete (08), attendu rc=0 sans crash arithmetique, obtenu rc=$rc17 : $LAST_OUT"
 
 echo "== resultat : $OK ok, $KO ko =="
 [ "$KO" -eq 0 ]
