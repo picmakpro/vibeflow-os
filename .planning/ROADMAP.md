@@ -65,7 +65,7 @@
 - [x] Phase 22: Hygiène documentaire — doctrine de sortie et captation d'intention (completed 2026-07-31)
 - [x] Phase 23: Couplage explicite au moteur GSD — capabilities, flags et voie unique
 - [x] Phase 24: Activation et mesure du moteur GSD — capacités dormantes et faits de runtime (completed 2026-08-05, PR #34)
-- [ ] Phase 25: Budget d'instructions
+- [x] Phase 25: Budget d'instructions (completed 2026-09-16 — ratchet armé, 31 fichiers sous contrat, conductor v1.37.1 ; seconde PR pas encore ouverte)
 - [x] Phase 26: Manuel utilisateur VibeFlow (manual/) (completed 2026-08-02)
 - [x] Phase 27: Parallélisation d'exécution — granulaire, simple, sans collision d'écriture (completed 2026-08-06)
 - [x] Phase 28: Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur (completed 2026-08-15)
@@ -473,7 +473,7 @@ Plans:
 | 22. Hygiène documentaire — doctrine de sortie | — | 3/3 | Complete — **mergée dans `main`** (PR #23, `474c3eb`), `dev-orchestrator` v2.9.0 + `design-orchestrator` v1.4.0 | 2026-07-31 |
 | 23. Couplage explicite au moteur GSD | agentique-v1.0 | 8/8 | Complete — 8 SUMMARYs sur disque | 2026-08-04 |
 | 24. Activation et mesure du moteur GSD | agentique-v1.0 | 12/12 | Complete — 12 SUMMARYs sur disque | 2026-08-04 |
-| 25. Budget d'instructions | fiabilite-v1.0 | 3/4 | In progress — première PR (25-01 à 25-03) prête, ratchet non armé ; 25-04 (calibration) attend la Phase 40 | 2026-09-15 |
+| 25. Budget d'instructions | fiabilite-v1.0 | 4/4 | Complete — première PR (25-01 à 25-03) mergée v2.62.0 ; 25-04 exécutée (ratchet armé), seconde PR à ouvrir | 2026-09-16 |
 | 26. Manuel utilisateur VibeFlow (manual/) | gsd-alignement | — | Complete (PR #28) | 2026-08-02 |
 | 27. Parallélisation d'exécution — granulaire, simple, sans collision | gsd-alignement | 6/6 | Complete (PR #35) — spike `claude_orchestration` refusé par écrit | 2026-08-10 |
 | 28. Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur | agentique-v1.0 | 3/3 | Complete — PR #42, release `v2.52.0`, CI main verte, gate + `lab-frais-arme` livrés | 2026-08-15 |
@@ -989,7 +989,18 @@ Plans:
 
 **Wave 4** *(bloquée sur la Phase 40, checkpoint bloquant — seconde PR)*
 
-- [ ] 25-04-PLAN.md — calibration : checkpoint humain one-way, gravure des baselines mesurées par le script livré, armement de la sentinelle dans le même commit, publication des valeurs réelles, clôture du ledger (BUDG-01, BUDG-02, QUAL-01)
+- [x] 25-04-PLAN.md — calibration : checkpoint humain one-way, gravure des baselines mesurées par le script livré, armement de la sentinelle dans le même commit, publication des valeurs réelles, clôture du ledger (BUDG-01, BUDG-02, QUAL-01) — exécuté le 2026-09-16 : checkpoint tranché A (arbitrage Samuel, AskUserQuestion session principale (relais SendMessage), 2026-09-16), 31 baselines gravées, sentinelle armée, gate armé rend 0
+
+**Résultat de la Phase 25 (2026-09-16).** Le ratchet du budget d'instructions est **armé depuis le
+2026-09-16** : `check-instruction-budget.sh` bloque le job CI `gates` sur tout dépassement, pour
+**31 fichiers** d'agents distribués sous contrat (3641 lignes, 487 instructions gravées dans
+`.planning/instruction-budget-baselines.tsv`, conductor v1.37.1). Deux fichiers sont au plafond
+exact de 250 lignes (`vf-dev-manager.md`, `validator/AGENT.md`), accepté par Samuel au checkpoint.
+Livrée en **deux PR** (D-06 bis) : la première (25-01 à 25-03, v2.62.0) posait le gate sans rien
+armer, la seconde (25-04) calibre sur le corpus final du milestone, après les Phases 34 et 40 —
+ne jamais graver sur un corpus qui bouge. **Hors périmètre, explicitement** : la remédiation des
+fichiers les plus chargés, le budget des SKILL.md et du bootstrap, BUDG-03 (étage d'alignement
+court, différé).
 
 ### Phase 35: Ré-armement worktree (conditionnelle) — CLOSE 2026-08-26
 
