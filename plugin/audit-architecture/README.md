@@ -85,7 +85,7 @@ traçables (ex : `CLA-XXX`), règle de refus portée par l'agent terminal, limit
   la structure cible et combler les trous.
 - **Scan de lab** (via `/vf-audit` / `vibeflow-validator`) — énumérer les process, reconstituer
   leur structure d'audit actuelle, différer avec la cible, reporter les trous par sévérité.
-- **Matérialiser une structure validée** — générer auditeurs (≤ 250 L, ADR-029), formats de
+- **Matérialiser une structure validée** — générer auditeurs (≤ 300 L, ADR-029), formats de
   verdict, règle de refus dans l'agent terminal, anti-boucle avec escalade.
 
 ---
