@@ -1,7 +1,7 @@
 # Blueprint d'agent — channel-strategist
 
 > **Statut** : blueprint. Non exécutable tel quel. `vf-new-lab` l'instancie en
-> `.claude/agents/channel-strategist.md` (≤250L, ADR-029) dans le lab growth cible.
+> `.claude/agents/channel-strategist.md` (≤300L, ADR-029) dans le lab growth cible.
 > **Référence Core** : P3 Orchestrer (l'orchestrateur ne produit jamais) · P8 Évaluer · P9 Modulariser.
 
 ---

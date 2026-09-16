@@ -1,7 +1,7 @@
 # Blueprint d'agent — copywriter-sequences
 
 > **Statut** : blueprint. Non exécutable tel quel. `vf-new-lab` l'instancie en
-> `.claude/agents/copywriter-sequences.md` (≤250L, ADR-029) dans le lab growth cible.
+> `.claude/agents/copywriter-sequences.md` (≤300L, ADR-029) dans le lab growth cible.
 > **Référence Core** : P4 Clarifier · P5 Vérifier en boucle · P7 Transposer · P9 Modulariser.
 
 ---
