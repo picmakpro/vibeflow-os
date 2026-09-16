@@ -18,7 +18,7 @@ Frontmatter (lignes 1-N, hors decompte ADR-029)
 # References                   (3-5 L : pointers vers _reference/ et skills)
 ─────────────────────────────────────────
 Total cible : 80-200L
-Max ADR-029  : 250L
+Max ADR-029  : 300L (avertissement des 251)
 ```
 
 ## Frontmatter etendu (ADR-030)
@@ -202,7 +202,7 @@ Avant de valider un agent, verifier :
 - [ ] Skills disponibles en table claire
 - [ ] Escalation explicite (conditions de remontee)
 - [ ] References vers `_reference/` et DECISIONS
-- [ ] Total body ≤ 250 lignes (validate_gate.sh exit 0)
+- [ ] Total body : bloque au-dela de 300 lignes (validate_gate.sh exit 0 jusqu'a 300)
 
 ## References
 

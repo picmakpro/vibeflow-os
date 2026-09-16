@@ -5,7 +5,7 @@
 ## Decision tree
 
 ```
-Tu vois du contenu dans un agent qui le rend > 250L ?
+Tu vois du contenu dans un agent qui le rend > 300L ?
 ├── C'est une checklist / liste de regles / tableau statique ?
 │   └── → _reference/<agent>-knowledge.md
 ├── C'est une procedure reutilisable (≥50L) entre plusieurs agents ?
@@ -168,7 +168,7 @@ skills:
 
 ## Workflow recommande
 
-1. `bash scripts/measure.sh .claude/agents/` → identifier les agents > 250L
+1. `bash scripts/measure.sh .claude/agents/` → identifier les agents > 300L
 2. Pour chaque agent en depassement :
    - `python3 scripts/plan_migration.py .claude/agents/<agent>.md > /tmp/plan-<agent>.md`
    - Lire le plan, ajuster si certaines sections sont mal classees
