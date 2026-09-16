@@ -1529,11 +1529,21 @@ changer le gate une fois `main` protégée ferait passer cette PR sous la nouvel
   4. QUAL-01 : toute comparaison modifiée ou supprimée a sa mutation rouge prouvée ; la suite du gate
      reste à trois issues.
 
-**Plans:** 0 plans — cadrage d'abord (`40.1-CONTEXT.md`), puis `/gsd-plan-phase 40.1`
+**Plans:** 11 plans en 4 vagues
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 40.1 to break down)
+- [ ] 40.1-01-PLAN.md — W0 outillage de preuve (vague 1) : recensement versionné et ses contrôles négatifs, rejeu CI extrait de `ci.yml`, preuve des suites de modules
+- [ ] 40.1-02-PLAN.md — gate du budget (vague 2) : plafond 300, avertissement dès 251, ratchet d'instructions seul, suite (MUT-2 remplacé, MUT-5/6/7), étape CI à sept bascules, conductor v1.38.0
+- [ ] 40.1-03-PLAN.md — auditeur de densité distribué (vague 2) : bloque au-delà de 300, avertit dès 251, paliers réalignés, preuve et mutants
+- [ ] 40.1-04-PLAN.md — méthodologie et modèles de référence (vague 3, après 03) : alignement, reference v2.5.5
+- [ ] 40.1-05-PLAN.md — suites dev-orchestrator et design-orchestrator à 300 (vague 2), v2.22.1 et v1.5.7
+- [ ] 40.1-06-PLAN.md — business-pilot-bundle (vague 2), v2.0.9
+- [ ] 40.1-07-PLAN.md — content-bundle (vague 2), v2.0.9
+- [ ] 40.1-08-PLAN.md — growth-bundle (vague 2), v2.0.9
+- [ ] 40.1-09-PLAN.md — validator, kpi-analyst, audit-architecture (vague 2), v1.3.5, v1.0.6, v1.0.3
+- [ ] 40.1-10-PLAN.md — doctrine du dépôt (vague 2) : CLAUDE.md, amendement daté d'ADR-029, planning vivant, manuel FR/EN, seed
+- [ ] 40.1-11-PLAN.md — clôture (vague 4) : recensement nul, contrôles négatifs, rejeu tests+gates, invariants, ledger
 
 ### Phase 41: Posture de protection du dépôt
 
