@@ -4,7 +4,7 @@
 > dérive silencieusement s'il n'a pas de structure d'audit multi-couches — ce méta-skill la
 > **dérive** depuis le brief, puis la **force**.
 
-> **Type** : single-skill + references · **Version** : v1.0.2 · **Dépend de** : aucun (module autonome)
+> **Type** : single-skill + references · **Version** : v1.0.3 · **Dépend de** : aucun (module autonome)
 > **ADR** : ADR-036 (Doctrine Audit Architecture)
 
 ---

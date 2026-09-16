@@ -1,5 +1,14 @@
 # Changelog — audit-architecture
 
+## [v1.0.3] — 2026-09-16 (Phase 40.1)
+
+**Patch** :
+
+- **Taille cible des auditeurs générés alignée sur le plafond ADR-029 de 300 lignes** —
+  `SKILL.md` et `README.md` déclarent désormais `≤ 300 L` (était `≤ 250 L`), remplacement de
+  valeur seul. Autorisation : arbitrage Samuel D-01, AskUserQuestion session principale (relais
+  SendMessage), 2026-09-16.
+
 ## [v1.0.2] — 2026-07-26
 
 ### Modifié
