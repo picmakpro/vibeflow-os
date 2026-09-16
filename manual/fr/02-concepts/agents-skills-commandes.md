@@ -67,9 +67,11 @@ planifier, distribuer et reconcilier les rapports qui reviennent.
 
 C'est la question que se pose quiconque ouvre `plugin/*/agents/` sans y retrouver ses commandes :
 sur les vingt-deux agents livrés, la grande majorité n'a **aucune** commande `/<nom-agent>`
-associée. C'est voulu, pas un manque. Un **worker interne** — par exemple `vf-coder`, qui écrit le
-code d'une étape de dev, ou `quality-gate-client`, le juge des livrables business — n'est dispatché
-que par son orchestrateur (`vf-dev-manager`, `vf-business-manager`…), jamais directement par toi.
+associée. C'est voulu, pas un manque. Un **worker interne** — par exemple `quality-gate-client`,
+le juge des livrables business — n'est dispatché que par son orchestrateur de mission
+(`vf-business-manager`…), jamais directement par toi. `vf-coder` fait exception : en plus de son
+orchestrateur habituel (`vf-dev-manager`), le head (`vibeflow-head`) peut aussi le dispatcher en
+direct pour une tâche courte, sans impact archi.
 Ces agents portent `vf-internal: true` dans leur frontmatter, précisément pour qu'aucune commande
 publique ne soit générée pour eux : ils n'ont de sens que dans le mandat que leur donne leur
 orchestrateur, pas en usage isolé. Tu ne perds rien en ne les invoquant jamais toi-même — c'est

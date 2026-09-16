@@ -1,9 +1,10 @@
 # Ingestion-flow — doctrine du pont spec/plan → feuille de route (BRDG-01/BRDG-03)
 
 > Source de vérité de la capacité d'ingestion : comment `vibeflow-head` détecte qu'une spec ou un
-> plan écrit(e) reste orpheline de la feuille de route, comment il construit le manifest attendu
-> par le moteur, et à quelles conditions il délègue — sans jamais réimplémenter ni contourner les
-> gates natifs de `gsd-ingest-docs`/`gsd-import`. Chargée **on-demand** par `vibeflow-head`, comme
+> plan écrit(e) reste orpheline de la feuille de route, comment il confirme le manifest attendu
+> par le moteur, et à quelles conditions il délègue à l'équipe mandatée — le geste
+> `gsd-ingest-docs`/`gsd-import` lui-même est exécuté par elle, jamais par le head en direct (A1,
+> `head-governance.md`). Chargée **on-demand** par `vibeflow-head`, comme
 > `mission-flow.md` et `GSD-PIPELINE.md` — coût contexte nul le reste du temps. Le **fait outillé**
 > (quels documents sont non intégrés, à quel grain) est produit par `discover-unintegrated-docs.sh`
 > (phase 13, plan 13-01) : ce fichier ne le redéfinit pas, il documente comment l'interpréter et ce

@@ -5,6 +5,11 @@ description: "Utiliser quand l'utilisateur délègue l'enchaînement complet **s
 
 # vf-auto — Mode autonome
 
+**D3** : invoqué EN DIRECT par l'utilisateur, ce skill garde son moteur direct (`gsd-autonomous`,
+mission courte). Dispatché PAR `vibeflow-head` (mission « fais tout / en autonomie »), le head
+route toujours vers l'équipe (`Task(vf-dev-manager)`, ou `Task(vf-design-manager)` sur le pilote
+unique design ci-dessous) — il ne déroule jamais lui-même le moteur direct dans son propre contexte.
+
 ## Étape 0 — Aiguillage : quel pilote, puis moteur direct ou équipe
 
 ### Pilote unique (D-11) — AVANT tout calcul de taille

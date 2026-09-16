@@ -20,7 +20,8 @@ X," you want the skills page, not this one.
 **Family** says how the agent enters the picture: *face* means you can invoke it directly, by name
 or with a sentence that falls in its domain. *Manager* means it's never invoked directly — it's
 autonomous mode or a domain router that deploys it once the size of the work justifies it.
-*Worker* means it's never invocable at all, dispatched only by a manager with a precise mandate.
+*Worker* means it's never invocable at all, dispatched only by a manager with a precise mandate —
+except `vf-coder`, which the head (`vibeflow-head`) can also dispatch directly for a short task.
 Scanning the Family column top to bottom before reading any single row is usually the fastest way
 to tell whether a given agent is one you could ever talk to directly.
 
@@ -65,7 +66,7 @@ reverse link — module by module, rather than agent by agent.
 | `vf-test-runner` | mobile-test-team | worker | sonnet | Writes and runs the Maestro flows for a mobile regression. |
 | `vibeflow-conductor` | conductor | face | opus | Lab guardian: create, install/remove a module, verify, migrate. |
 | `vibeflow-design` | design-orchestrator | face | opus | Art director: drives the whole design cycle in plain language. |
-| `vibeflow-dev` | dev-orchestrator | face | opus | Dev router: detects intent, invokes the matching piece. |
+| `vibeflow-head` | dev-orchestrator | face | opus | Head of minds for dev: detects intent, dispatches the team that carries the piece. |
 | `vibeflow-kpi-analyst` | kpi-analyst | face | sonnet | Deduces and publishes the lab's real business metrics. |
 | `vibeflow-validator` | validator | face | opus | Orchestrates the lab's 5 methodology-compliance audits. |
 
@@ -76,9 +77,10 @@ Keep this name in mind if you compare two "manager" agents and their models diff
 inconsistency, it's the mission's actual scope that varies from one domain to another.
 
 A last useful marker: every "worker" agent in this table explicitly declares, in its own file,
-that it's internal and dispatched only by a manager. That's never a naming convention guessed from
-the outside — it's written in black and white in each of them, and it's exactly why no
-incarnation command gets generated for them.
+that it's internal and dispatched only by an authorized dispatcher — a mission manager, or for
+`vf-coder` alone, also the head (`vibeflow-head`) for a short task. That's never a naming
+convention guessed from the outside — it's written in black and white in each of them, and it's
+exactly why no incarnation command gets generated for them.
 
 ## Where this list comes from
 

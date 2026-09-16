@@ -13,6 +13,11 @@
 >
 > L'échelle d'allocation (quick / debug / execute / manager) est une question distincte du
 > routage — elle vit dans `head-governance.md`, jamais dupliquée ici.
+>
+> **Pour le head (A1, `head-governance.md`)** : la colonne de droite nomme le geste que **l'équipe
+> dispatchée** exécute une fois mandatée — jamais un geste que le head invoquerait lui-même. Cette
+> table garde ses noms `gsd-*` intacts (référence factuelle T14) ; seule leur qualité d'exécutant
+> change selon qui lit la ligne.
 
 ---
 
@@ -31,10 +36,12 @@ l'inverse : on n'édite pas l'index pour faire tomber une couverture juste.
 
 ## Comment router
 
-1. **Une intention → une brique.** Chercher la formulation dans les tables, invoquer la brique de
-   la colonne de droite (Skill pour un skill, Task pour un agent). Les skills gsd-* se déclenchent
-   aussi nativement sur leurs propres descriptions — cette carte sert quand l'intention est
-   ambiguë, quand plusieurs briques semblent candidates, ou en pilotage agentique (mission).
+1. **Une intention → une brique.** Chercher la formulation dans les tables. Le head **dispatche
+   l'équipe** qui porte la brique de la colonne de droite (jamais la brique `gsd-*` en direct, A1) ;
+   une équipe (`vf-dev-manager`, `vf-coder`) invoque directement le Skill ou l'agent de la colonne.
+   Les skills gsd-* se déclenchent aussi nativement sur leurs propres descriptions — cette carte
+   sert quand l'intention est ambiguë, quand plusieurs briques semblent candidates, ou en pilotage
+   agentique (mission).
 2. **Rien ne correspond ?** Poser une question courte plutôt que de deviner (heuristique 5 de
    `AGENT.md`). Ne jamais inventer une brique qui n'existe pas (vérifier l'index).
 3. **Fermer la boucle** : après le geste, proposer le next step depuis `ROADMAP`/`STATE`.

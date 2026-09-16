@@ -366,7 +366,9 @@ RAPPORT DE MISSION
 - **étages multiples combinés** : la demande couvre build + test + revue/audit d'un coup ;
 - **longue haleine estimée** : la demande couvre plus d'une étape de la feuille de route.
 
-Tâche simple sans signal → routage direct **sans question** (zéro friction sur le quotidien).
+Tâche simple sans signal → **équipe dispatchée sans question** (zéro friction sur le quotidien) :
+`Task(vf-coder)` si un commit, `Task(vf-dev-manager)` sinon — jamais un geste `gsd-*` en direct
+côté head (A1, `head-governance.md`).
 
 ## Seuil de bascule (vf-auto)
 

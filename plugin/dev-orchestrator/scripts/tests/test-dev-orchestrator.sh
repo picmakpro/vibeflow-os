@@ -75,6 +75,10 @@
 #         traite les quatre familles, porte la ligne rouge --force (jamais mission, jamais
 #         autonome) et la frontière vibeflow-os, câble --verify-only/--force dans la carte
 #         d'intention ; AGENT.md et intent-routing.md y renvoient.
+#   T37 — Hotfix v2.63.1 (head-gouverne, A1/A2) : la Carte d'intention d'AGENT.md et la table
+#         §1 de head-governance.md ne portent AUCUN `gsd-*` dans leur colonne d'équipe/Mind
+#         (le geste gsd-* reste celui de l'équipe dispatchée), vf-coder.md nomme vibeflow-head
+#         comme dispatcheur possible, et la détection est prouvée DISCRIMINANTE par mutation.
 #
 # Historique de numérotation : T3/T12/T13/T14 ont changé de sémantique à la v2.0.0 (les
 # anciens tests de collision de descriptions, de préséance et de synchro de la table vf-dev
@@ -6573,6 +6577,111 @@ if [ -d "$REPO/conductor" ] && [ -d "$REPO/dev-orchestrator" ] && [ -d "$REPO/_i
 else
   skip "T36 : arbre plugin/ absent sous \$REPO (conductor/dev-orchestrator/_internal introuvables — cas source-only)"
 fi
+
+# ---------------------------------------------------------------------------
+# T37 (hotfix v2.63.1, A1/A2) — le head GOUVERNE et LANCE des équipes, il n'invoque JAMAIS un
+# skill/agent gsd-* lui-même : la Carte d'intention d'AGENT.md et la table §1 de
+# head-governance.md ne doivent porter AUCUN `gsd-*` dans leur colonne d'équipe/Mind (le geste
+# gsd-* reste celui que l'équipe dispatchée exécute une fois mandatée).
+# ---------------------------------------------------------------------------
+t37_ok=1
+T37_AGENT="$MOD/AGENT.md"
+T37_GOV="$MOD/references/head-governance.md"
+T37_CODER="$MOD/agents/vf-coder.md"
+
+# Extrait la section depuis la première ligne matchant <start_re> jusqu'au prochain titre "## "
+# (exclu). Fonction de portée FICHIER, jamais un sous-shell de bloc (même règle que T35/T36).
+t37_section() { # <file> <start_re>
+  awk -v start="$2" '
+    $0 ~ start { flag=1 }
+    flag && /^## / && $0 !~ start { exit }
+    flag { print }
+  ' "$1"
+}
+
+# stdin = section -> vrai (exit 0) si une ligne de TABLE DE DONNÉES (hors en-tête, hors
+# séparateur) porte "gsd-" dans la colonne visée. col="" => ligne entière ; col=N => Nᵉ champ
+# `|`-séparé (le split par "|" laisse un champ vide en tête, donc N=3 = 2ᵉ colonne visible,
+# conforme au mandat "3ᵉ colonne `|`-séparée" pour un tableau à 3 colonnes visibles).
+t37_table_has_gsd() { # <col ou "">
+  awk -v col="$1" '
+    /^\|/ {
+      s=$0; gsub(/[|:\- ]/,"",s)
+      if (s=="") next
+      seen++
+      if (seen==1) next
+      if (col=="") { chk=$0 } else { n=split($0,a,"|"); chk=a[col+0] }
+      if (tolower(chk) ~ /gsd-/) { print $0; found=1 }
+    }
+    END { exit (found ? 0 : 1) }
+  '
+}
+
+# (a) AGENT.md — Carte d'intention (2 colonnes visibles : Intention | Équipe) : ligne entière.
+if [ ! -f "$T37_AGENT" ]; then
+  ko "T37 (a) : $T37_AGENT introuvable"; t37_ok=0
+else
+  t37a_section="$(t37_section "$T37_AGENT" '^## Carte d.intention')"
+  t37a_lines="$(printf '%s\n' "$t37a_section" | awk 'END{print NR}')"
+  if [ "$t37a_lines" -lt 10 ]; then
+    ko "T37 (a) : section Carte d'intention à $t37a_lines ligne(s) (< 10) — anti vert-à-vide"; t37_ok=0
+  elif t37a_hit="$(printf '%s\n' "$t37a_section" | t37_table_has_gsd "")"; then
+    ko "T37 (a) : Carte d'intention porte encore un gsd-* — $t37a_hit"; t37_ok=0
+  else
+    ok "T37 (a) : Carte d'intention d'AGENT.md ($t37a_lines lignes) sans aucun gsd-*"
+  fi
+fi
+
+# (b) head-governance.md — §1, colonne Mind (3ᵉ champ `|`-séparé).
+if [ ! -f "$T37_GOV" ]; then
+  ko "T37 (b) : $T37_GOV introuvable"; t37_ok=0
+else
+  t37b_section="$(t37_section "$T37_GOV" '^## 1\.')"
+  t37b_lines="$(printf '%s\n' "$t37b_section" | awk 'END{print NR}')"
+  if [ "$t37b_lines" -lt 6 ]; then
+    ko "T37 (b) : section §1 à $t37b_lines ligne(s) (< 6) — anti vert-à-vide"; t37_ok=0
+  elif t37b_hit="$(printf '%s\n' "$t37b_section" | t37_table_has_gsd 3)"; then
+    ko "T37 (b) : colonne Mind de head-governance.md §1 porte encore un gsd-* — $t37b_hit"; t37_ok=0
+  else
+    ok "T37 (b) : colonne Mind de head-governance.md §1 ($t37b_lines lignes) sans aucun gsd-*"
+  fi
+fi
+
+# (c) vf-coder.md nomme vibeflow-head comme dispatcheur possible (mandat tâche courte, A2).
+if [ ! -f "$T37_CODER" ]; then
+  ko "T37 (c) : $T37_CODER introuvable"; t37_ok=0
+elif "$GREP" -q '^description:.*vibeflow-head' "$T37_CODER"; then
+  ok "T37 (c) : vf-coder.md nomme vibeflow-head dans sa description"
+else
+  ko "T37 (c) : vf-coder.md ne nomme pas vibeflow-head dans sa description"; t37_ok=0
+fi
+
+# (d) DISCRIMINANT par mutation : réinjecter une ligne gsd-quick dans des COPIES temporaires et
+# vérifier que la MÊME fonction de détection rend ko dessus, avec la trace de la ligne détectée.
+T37_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T37_TMPDIR"
+if [ -f "$T37_AGENT" ]; then
+  t37d_agent_mut="$T37_TMPDIR/AGENT-mutant.md"
+  awk '{ print } /^\| Intention \| Équipe \|/ { print "| petite tâche | `gsd-quick` |" }' "$T37_AGENT" > "$t37d_agent_mut"
+  t37d_agent_sec="$(t37_section "$t37d_agent_mut" '^## Carte d.intention')"
+  if t37d_agent_hit="$(printf '%s\n' "$t37d_agent_sec" | t37_table_has_gsd "")"; then
+    ok "T37 (d, AGENT.md) (DISCRIMINANT) : ligne réinjectée détectée — $t37d_agent_hit"
+  else
+    ko "T37 (d, AGENT.md) NON DISCRIMINANTE : la ligne gsd-quick réinjectée n'est pas détectée"; t37_ok=0
+  fi
+fi
+if [ -f "$T37_GOV" ]; then
+  t37d_gov_mut="$T37_TMPDIR/head-governance-mutant.md"
+  awk '{ print } /^\| Travail \| Mind \| Condition \|/ { print "| un commit | `gsd-quick` | trivial |" }' "$T37_GOV" > "$t37d_gov_mut"
+  t37d_gov_sec="$(t37_section "$t37d_gov_mut" '^## 1\.')"
+  if t37d_gov_hit="$(printf '%s\n' "$t37d_gov_sec" | t37_table_has_gsd 3)"; then
+    ok "T37 (d, head-governance.md) (DISCRIMINANT) : ligne réinjectée détectée — $t37d_gov_hit"
+  else
+    ko "T37 (d, head-governance.md) NON DISCRIMINANTE : la ligne gsd-quick réinjectée n'est pas détectée"; t37_ok=0
+  fi
+fi
+rm -rf "$T37_TMPDIR"
+
+[ "$t37_ok" -eq 1 ] && ok "T37 : le head ne route plus vers un gsd-* en direct dans ses deux tables de référence, détection prouvée discriminante par mutation"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="

@@ -22,9 +22,9 @@ domaine.
 - **`vibeflow-conductor`** — le gardien du lab. Créer un lab, installer ou retirer un module,
   vérifier la conformité, recaler après une mise à jour. Tout ce qui touche la configuration du lab
   lui-même passe par lui.
-- **`vibeflow-dev`** — le routeur de développement. Il détecte ce que ta phrase appelle et invoque
-  la brique correspondante. C'est l'interlocuteur par défaut de tout le
-  [cycle de dev](../04-cycle-de-dev/le-cycle-en-bref.md).
+- **`vibeflow-head`** — le head of minds du développement. Il détecte ce que ta phrase appelle et
+  dispatche l'équipe qui porte la brique correspondante. C'est l'interlocuteur par défaut de tout
+  le [cycle de dev](../04-cycle-de-dev/le-cycle-en-bref.md).
 - **`vibeflow-design`** — le même rôle pour le design et l'UI, de la direction artistique au détail
   de spacing.
 - **`vibeflow-validator`** — l'auditeur. Il orchestre plusieurs audits complémentaires et te propose

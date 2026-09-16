@@ -21,7 +21,9 @@ le skill invoque ensuite pour faire le travail. Si tu cherches « comment décle
 **Famille** dit comment l'agent entre en jeu : *face* = tu peux l'invoquer directement, par son nom
 ou par une phrase qui relève de son domaine. *Manager* = jamais invoqué directement, c'est le mode
 autonome ou un routeur de domaine qui le déploie quand la taille du travail le justifie. *Worker* =
-jamais invocable du tout, dispatché uniquement par un manager avec un mandat précis. Parcourir la
+jamais invocable du tout, dispatché uniquement par un manager avec un mandat précis — sauf
+`vf-coder`, que le head (`vibeflow-head`) peut aussi dispatcher en direct pour une tâche courte.
+Parcourir la
 colonne Famille de haut en bas avant de lire une ligne isolée est en général le moyen le plus rapide
 de savoir si un agent donné fait partie de ceux à qui tu peux parler directement.
 
@@ -67,7 +69,7 @@ plutôt qu'agent par agent.
 | `vf-test-runner` | mobile-test-team | worker | sonnet | Écrit et lance les flows Maestro d'une régression mobile. |
 | `vibeflow-conductor` | conductor | face | opus | Gardien du lab : créer, installer/retirer un module, vérifier, migrer. |
 | `vibeflow-design` | design-orchestrator | face | opus | Directeur artistique : pilote tout le cycle design en langage naturel. |
-| `vibeflow-dev` | dev-orchestrator | face | opus | Routeur de développement : détecte l'intention, invoque la brique. |
+| `vibeflow-head` | dev-orchestrator | face | opus | Head of minds du dev : détecte l'intention, dispatche l'équipe qui porte la brique. |
 | `vibeflow-kpi-analyst` | kpi-analyst | face | sonnet | Déduit et publie les vrais indicateurs métier du lab. |
 | `vibeflow-validator` | validator | face | opus | Orchestre les 5 audits de conformité méthodologique du lab. |
 
@@ -79,9 +81,11 @@ ce n'est jamais une incohérence, c'est le périmètre réel de la mission qui v
 l'autre.
 
 Un dernier repère utile : tous les agents « worker » de cette table déclarent explicitement, dans
-leur propre fichier, qu'ils sont internes et dispatchés uniquement par un manager. Ce n'est jamais
-une convention de nommage devinée depuis l'extérieur — c'est écrit noir sur blanc dans chacun
-d'eux, et c'est ce qui fait qu'aucune commande d'incarnation n'est générée pour eux.
+leur propre fichier, qu'ils sont internes et dispatchés uniquement par un dispatcheur autorisé —
+un manager de mission, ou pour `vf-coder` seul, aussi le head (`vibeflow-head`) pour une tâche
+courte. Ce n'est jamais une convention de nommage devinée depuis l'extérieur — c'est écrit noir sur
+blanc dans chacun d'eux, et c'est ce qui fait qu'aucune commande d'incarnation n'est générée pour
+eux.
 
 ## D'où vient cette liste
 

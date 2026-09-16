@@ -1,5 +1,41 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.22.1] — 2026-09-16 (hotfix v2.63.1 — le head gouverne, il ne fait plus le geste GSD)
+
+**Patch** (correctif de doctrine, aucune nouvelle capacité) :
+
+- **Le head ne gouverne plus en invoquant lui-même un skill ou un agent `gsd-*` (A1)** :
+  `AGENT.md` documentait à tort `vibeflow-head` comme invoquant `gsd-quick` /
+  `gsd-execute-phase`… en direct — arbitrage Samuel, AskUserQuestion session principale,
+  2026-09-16. Le head détecte l'intention et dispatche l'équipe qui la porte : `Task(vf-coder)`
+  pour une tâche courte (un commit, sans impact archi), `Task(vf-dev-manager)` /
+  `Task(vf-design-manager)` au-delà (A2). La Carte d'intention d'`AGENT.md` et la colonne Mind de
+  `head-governance.md` §1 ne nomment plus aucun `gsd-*` ; `intent-routing.md`,
+  `mission-contracts.md`, `GSD-PIPELINE.md`, `docs-flow.md` et `ingestion-flow.md` précisent que
+  les gestes `gsd-*` qu'ils citent restent ceux de l'équipe mandatée, jamais du head lui-même.
+- **`vf-coder.md`** ajoute le mandat « tâche courte » dispatché directement par le head, et
+  généralise ses renvois d'escalade au dispatcheur (head ou manager selon qui l'a mandaté).
+- **`vf-dev` et `vf-auto`** (skills) portent la même doctrine — plus de mention d'invocation
+  directe d'un skill `gsd-*` par le head.
+- **`test-dev-orchestrator.sh`** : nouveau `T37` — aucun `gsd-*` dans les deux tables de
+  référence du head, `vf-coder.md` nomme `vibeflow-head`, détection prouvée DISCRIMINANTE par
+  mutation (réinjection d'une ligne `gsd-quick`) dans les deux fichiers. `T37(a)` confirmé
+  ROUGE sur l'`AGENT.md` pré-hotfix (12 occurrences de `gsd-*` détectées).
+- **Correction ciblée post-revue sur `AGENT.md`** (3 findings) : Iron Laws 1 et 2 nomment
+  désormais l'équipe comme destinataire de la délégation ; le §Next steps annote l'audit
+  read-only comme « porté par l'équipe » ; le §Garde-fous conserve intégralement la garantie
+  ADR-031 avec l'exécutant devenu l'équipe mandatée par le head, jamais « je lance ». Budget
+  ADR-029 inchangé : 209 lignes / 33 instructions (armé, marge zéro).
+- **Correctif ciblé (option a) — chemin court head → `vf-coder` sans revue séparée** : la revue
+  avait relevé qu'aucun mécanisme de relecture n'existait sur ce chemin (`vf-reviewer` n'étant
+  dispatché que par un manager) — arbitrage Samuel, AskUserQuestion session principale,
+  2026-09-16, option (a). Sur un mandat « tâche courte », `vf-coder` lance désormais TOUJOURS
+  `gsd-quick --validate` (`gsd-quick-batch --validate` si ≥ 2 items) : plan-checking ≤ 2
+  itérations + vérification post-exécution par `gsd-verifier` sert de vérification outillée du
+  chemin court. `vf-coder.md` (§Entrée, §Retour) et `head-governance.md` (§1, colonne Condition,
+  jamais Mind) documentent la distinction avec le cycle d'étape (manager → `vf-reviewer`,
+  inchangé). Budget ADR-029 inchangé : 122 lignes / 21 instructions (armé, marge 2 instructions).
+
 ## [v2.22.0] — 2026-09-15 (Phase 40 — vibeflow-head, gate de sortie de mission, contrat de preuves E6)
 
 **Minor** (nouvelle capacité — head of minds, aucune régression sur l'existant) :

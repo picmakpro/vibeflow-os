@@ -1,9 +1,9 @@
 # Docs-flow — doctrine de sortie documentaire (DOCF-01 → DOCF-04)
 
-> Source de vérité de la sortie documentaire : comment `vibeflow-head` distingue les quatre familles
-> documentaires que GSD outille séparément, ce que chacune maintient, et sous quel régime de
-> confirmation elle se déclenche — sans jamais réimplémenter ni contourner les gates natifs des
-> moteurs `gsd-*` qu'elle délègue. Chargée **on-demand** par `vibeflow-head`, comme `mission-flow.md`
+> Source de vérité de la sortie documentaire : comment `vibeflow-head` **détecte** les quatre
+> familles documentaires que GSD outille séparément et **confirme** le régime applicable — le
+> geste `gsd-*` lui-même est exécuté par l'équipe mandatée (`vf-dev-manager`), jamais par le head
+> en direct (A1, `head-governance.md`). Chargée **on-demand** par `vibeflow-head`, comme `mission-flow.md`
 > et `GSD-PIPELINE.md` — coût contexte nul le reste du temps. Le **fait outillé** sous-jacent
 > (N commits de code sans commit de doc) est produit par `check-doc-drift.sh` : ce fichier ne le
 > redéfinit pas, il documente comment l'interpréter et ce qu'on en fait.
