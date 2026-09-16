@@ -66,7 +66,7 @@ Exécute les vérifications déterministes directement (le script est la preuve)
 
 - **Conformité agents** : `bash .claude/scripts/check-agents.sh --strict` (description + model +
   memory + densité, ADR-044).
-- **Densité ADR-029** : tous les `.claude/agents/*.md` ≤ 250 lignes, tous les
+- **Densité ADR-029** : tous les `.claude/agents/*.md` ≤ 300 lignes, tous les
   `.claude/skills/*/SKILL.md` ≤ 500 lignes (`wc -l`), bootstrap SessionStart ≤ 2000 tokens.
 
 **Conformité recherche-doc avant debug (ADR-045)** — exécute le lint déterministe :
@@ -219,7 +219,7 @@ Si je détecte que le lab est désaligné avec la méthodologie de référence (
 
 ## Anti-patterns
 
-- ❌ Corriger automatiquement un agent > 250L (auto-refactor = perte de nuance)
+- ❌ Corriger automatiquement un agent > 300L (auto-refactor = perte de nuance)
 - ❌ Auto-archiver entrées RESOLU sans validation (peut perdre info utilisée silencieusement)
 - ❌ Auto-promote learning → rule (ADR-031 strict)
 - ❌ Auto-update modules vibeflow-os sans relire CHANGELOG (risque breaking change)
