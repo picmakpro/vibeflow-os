@@ -1,0 +1,315 @@
+{
+  "nodes": [
+    {
+      "id": "exec-01",
+      "step": "40.1-01 outillage de preuve",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/check-no-live-250.sh",
+        ".planning/phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/test-check-no-live-250.sh",
+        ".planning/phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/controle-negatif-reel.sh",
+        ".planning/phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/replay-ci-jobs.sh",
+        ".planning/phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/prove-density-suites.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-02",
+      "step": "40.1-02 base, bump, invariants",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/phase-base.sh",
+        ".planning/phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/check-module-bump.sh",
+        ".planning/phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/test-check-module-bump.sh",
+        ".planning/phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/check-phase-invariants.sh",
+        ".planning/phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/test-check-phase-invariants.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-03",
+      "step": "40.1-03 gate+suite+CI",
+      "stage": "",
+      "deps": [
+        "exec-01",
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/check-instruction-budget.sh",
+        "plugin/conductor/scripts/tests/test-check-instruction-budget.sh",
+        ".github/workflows/ci.yml",
+        ".planning/instruction-budget-baselines.tsv",
+        ".planning/phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/prove-ci-budget-step.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-05",
+      "step": "40.1-05 auditeur densite",
+      "stage": "",
+      "deps": [
+        "exec-01",
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/reference/content/methodology/templates/skills/agent-density-auditor/**",
+        ".planning/phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/prove-auditor-gate.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-07",
+      "step": "40.1-07 dev-orchestrator suite",
+      "stage": "",
+      "deps": [
+        "exec-01",
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh",
+        "plugin/dev-orchestrator/README.md",
+        "plugin/dev-orchestrator/references/GSD-PIPELINE.md",
+        "plugin/dev-orchestrator/VERSION",
+        "plugin/dev-orchestrator/module.json",
+        "plugin/dev-orchestrator/CHANGELOG.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-08",
+      "step": "40.1-08 business-pilot-bundle",
+      "stage": "",
+      "deps": [
+        "exec-01",
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/business-pilot-bundle/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-09",
+      "step": "40.1-09 content-bundle",
+      "stage": "",
+      "deps": [
+        "exec-01",
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/content-bundle/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-10",
+      "step": "40.1-10 growth-bundle",
+      "stage": "",
+      "deps": [
+        "exec-01",
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/growth-bundle/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-11",
+      "step": "40.1-11 validator",
+      "stage": "",
+      "deps": [
+        "exec-01",
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/validator/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-12",
+      "step": "40.1-12 kpi-analyst+audit-architecture",
+      "stage": "",
+      "deps": [
+        "exec-01",
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/kpi-analyst/**",
+        "plugin/audit-architecture/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-13",
+      "step": "40.1-13 doctrine, manuel, seed",
+      "stage": "",
+      "deps": [
+        "exec-01",
+        "exec-02"
+      ],
+      "scope": [
+        "CLAUDE.md",
+        "docs/ADR.md",
+        ".planning/PROJECT.md",
+        ".planning/codebase/**",
+        "manual/fr/07-sous-le-capot/les-gates-machine.md",
+        "manual/en/07-under-the-hood/the-machine-gates.md",
+        ".planning/seeds/SEED-001-equipe-produit-v1.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-15",
+      "step": "40.1-15 design-orchestrator suite",
+      "stage": "",
+      "deps": [
+        "exec-01",
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/design-orchestrator/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-04",
+      "step": "40.1-04 conductor enonces+bump",
+      "stage": "",
+      "deps": [
+        "exec-02",
+        "exec-03",
+        "exec-05",
+        "exec-12"
+      ],
+      "scope": [
+        "plugin/conductor/README.md",
+        "plugin/conductor/AGENT.md",
+        "plugin/conductor/references/contracts.md",
+        "plugin/conductor/skills/vf-new-lab/SKILL.md",
+        "plugin/conductor/VERSION",
+        "plugin/conductor/module.json",
+        "plugin/conductor/CHANGELOG.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-06",
+      "step": "40.1-06 methodologie reference+bump",
+      "stage": "",
+      "deps": [
+        "exec-02",
+        "exec-05"
+      ],
+      "scope": [
+        "plugin/reference/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-14",
+      "step": "40.1-14 cloture",
+      "stage": "",
+      "deps": [
+        "exec-01",
+        "exec-02",
+        "exec-03",
+        "exec-04",
+        "exec-05",
+        "exec-06",
+        "exec-07",
+        "exec-08",
+        "exec-09",
+        "exec-10",
+        "exec-11",
+        "exec-12",
+        "exec-13",
+        "exec-15"
+      ],
+      "scope": [
+        ".planning/REQUIREMENTS.md",
+        ".planning/BACKLOG.md",
+        ".planning/phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/40.1-VALIDATION.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-40.1",
+      "step": "revue vf-reviewer diff joint",
+      "stage": "",
+      "deps": [
+        "exec-14"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "audit-40.1",
+      "step": "audit vf-auditer gate CI",
+      "stage": "",
+      "deps": [
+        "exec-14"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "verif-40.1",
+      "step": "verification phase + non-regression complete",
+      "stage": "",
+      "deps": [
+        "exec-14"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire audit read-only",
+      "stage": "",
+      "deps": [
+        "revue-40.1",
+        "audit-40.1",
+        "verif-40.1"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ship",
+      "step": "push + PR",
+      "stage": "",
+      "deps": [
+        "docs"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "fix-02",
+      "step": "correction ciblee outils 40.1-02 (revue+audit+cloture)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/check-phase-invariants.sh",
+        ".planning/phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/test-check-phase-invariants.sh",
+        ".planning/phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/check-module-bump.sh",
+        ".planning/phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/test-check-module-bump.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-14b",
+      "step": "40.1-14 reprise Task 2-3",
+      "stage": "",
+      "deps": [
+        "fix-02"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}
