@@ -86,6 +86,6 @@ Le socle `.planning/` fonctionne seul ; le pont est **dormant** (les décisions 
 `vf-new-lab` inscrit en `DECISIONS` (`DEC-001`) la décision de design du bundle :
 
 > **DEC-001 — Condensation 6 rôles éditoriaux → 3 agents + gate de clarté matérialisé comme couche
-> `audit-architecture` (pas un agent).** Justification : densité (ADR-029, agents ≤250L, une
+> `audit-architecture` (pas un agent).** Justification : densité (ADR-029, agents ≤300L, une
 > responsabilité par agent) ; le contrôle de clarté est une **évaluation** (P8) — donc une couche
 > d'audit à verdict bloquant, pas un acteur. Statut : Validée.

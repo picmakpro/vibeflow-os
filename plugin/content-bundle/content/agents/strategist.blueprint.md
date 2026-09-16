@@ -1,6 +1,6 @@
 # BLUEPRINT — `strategist` (stratège éditorial)
 
-> Spécification **prête à instancier** par `vf-new-lab`. À transformer en agent natif `≤250L` dans
+> Spécification **prête à instancier** par `vf-new-lab`. À transformer en agent natif `≤300L` dans
 > `.claude/agents/strategist.md` du lab (charte densité **ADR-029** : savoir en skills injectés via
 > `skills:`, jamais inliné). Pattern : `business-agent` paramétré pour le métier *content*.
 
