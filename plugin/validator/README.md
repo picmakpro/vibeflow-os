@@ -5,7 +5,7 @@
 > process, synthèse — pour garantir qu'un lab reste fidèle à la méthodologie VibeFlow malgré
 > l'évolution Anthropic, l'append-only des registres et la dette inévitable.
 
-**Version** : v1.3.4
+**Version** : v1.3.5
 **Type** : agent-only
 **Densité** : `AGENT.md` a une marge de **50 lignes** sous le plafond ADR-029 révisé en Phase 40.1 (bloque au-delà de 300, avertissement dès 251 ; arbitrages Samuel D-01/D-05, AskUserQuestion
 session principale, 2026-09-16), mesure du 2026-09-15 par `awk 'END{print NR}'`. La prochaine
