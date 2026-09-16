@@ -1529,23 +1529,24 @@ changer le gate une fois `main` protégée ferait passer cette PR sous la nouvel
   4. QUAL-01 : toute comparaison modifiée ou supprimée a sa mutation rouge prouvée ; la suite du gate
      reste à trois issues.
 
-**Plans:** 14 plans en 4 vagues (révision 1 du 2026-09-16)
+**Plans:** 15 plans en 4 vagues (révision 2 du 2026-09-16)
 
 Plans:
 
 - [ ] 40.1-01-PLAN.md — W0 (vague 1) : recensement versionné et ses contrôles négatifs, rejeu CI extrait de `ci.yml`, preuve des suites de modules
-- [ ] 40.1-02-PLAN.md — W0 (vague 1) : outils de bump dérivé et d'invariants de clôture imputés aux commits de phase
+- [ ] 40.1-02-PLAN.md — W0 (vague 1) : base de branche dérivée, bump dérivé, invariants de clôture imputés à tout commit propre à la branche
 - [ ] 40.1-03-PLAN.md — gate du budget (vague 2), commit atomique : plafond 300, avertissement dès 251, ratchet d'instructions seul, suite (MUT-2 remplacé, MUT-5/6/7), étape CI à sept bascules
 - [ ] 40.1-04-PLAN.md — module conductor (vague 3, après 03, 05, 12) : énoncés alignés, bump minor dérivé
 - [ ] 40.1-05-PLAN.md — auditeur de densité distribué (vague 2) : bloque au-delà de 300, avertit dès 251, preuve et mutants
 - [ ] 40.1-06-PLAN.md — méthodologie de référence (vague 3, après 05) : alignement, bump patch dérivé
-- [ ] 40.1-07-PLAN.md — suites dev-orchestrator et design-orchestrator (vague 2, base contenant le hotfix v2.63.1), bumps patch dérivés
+- [ ] 40.1-07-PLAN.md — suite dev-orchestrator (vague 2, base contenant le hotfix v2.63.1), bump patch dérivé
 - [ ] 40.1-08-PLAN.md — business-pilot-bundle (vague 2), bump patch dérivé
 - [ ] 40.1-09-PLAN.md — content-bundle (vague 2), bump patch dérivé
 - [ ] 40.1-10-PLAN.md — growth-bundle (vague 2), bump patch dérivé
 - [ ] 40.1-11-PLAN.md — validator (vague 2), bump patch dérivé
 - [ ] 40.1-12-PLAN.md — kpi-analyst et audit-architecture (vague 2), bumps patch dérivés
-- [ ] 40.1-13-PLAN.md — doctrine du dépôt (vague 2) : CLAUDE.md, amendement daté d'ADR-029, planning vivant, manuel FR/EN, seed
+- [ ] 40.1-13-PLAN.md — doctrine du dépôt (vague 2) : CLAUDE.md, amendement daté d'ADR-029, planning vivant, manuel FR/EN (énoncé indépendant de l'ordre des releases), seed
+- [ ] 40.1-15-PLAN.md — suite design-orchestrator (vague 2), bump patch dérivé
 - [ ] 40.1-14-PLAN.md — clôture (vague 4, base contenant le hotfix) : recensement nul, contrôles négatifs, rejeu tests+gates, invariants, bumps, ledger
 
 ### Phase 41: Posture de protection du dépôt
