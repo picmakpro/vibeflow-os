@@ -5,6 +5,11 @@
 > missions, contrôler la sortie d'un manager sur témoin machine, compter ce que ça coûte. Écrite
 > pour être **déplaçable** : rien ici ne vaut spécifiquement pour `dev-orchestrator` plutôt que
 > pour un head cross-métier hypothétique (écarté par D-01, hors périmètre du jour).
+>
+> **A1** : le head GOUVERNE et lance des équipes — il n'invoque JAMAIS lui-même un skill ni un
+> agent `gsd-*`. La colonne « Mind » ci-dessous nomme toujours l'équipe dispatchée
+> (`Task(vf-coder)`, `Task(vf-dev-manager)`, …), jamais un geste `gsd-*` exécuté en direct par le
+> head : ce geste est celui que l'équipe porte une fois mandatée.
 
 ---
 
@@ -16,9 +21,9 @@ de route au motif que ça se passe bien.
 
 | Travail | Mind | Condition |
 |---|---|---|
-| un commit, pas d'impact archi | `gsd-quick` (`gsd-quick-batch` ≥ 2 items) | trivial |
-| bug / crash | recherche doc (ADR-045) **puis** `gsd-debug` | le head porte la recherche web, les workers cloisonnés ne l'ont pas |
-| une étape unique déjà planifiée | `gsd-execute-phase` direct | N = 1, aucun signal de durée |
+| un commit, pas d'impact archi | `Task(vf-coder)` | trivial (mandat « tâche courte », le head dispatche directement) |
+| bug / crash | recherche doc (ADR-045) **puis** `Task(vf-coder)` (correctif d'un commit) ou `Task(vf-dev-manager)` (au-delà) | le head porte la recherche web, les workers cloisonnés ne l'ont pas |
+| une étape unique planifiée, ou tout geste au-delà d'un commit | `Task(vf-dev-manager)` | N = 1, aucun signal de durée |
 | N ≥ `SEUIL_EQUIPE` ou signal de durée ou étages combinés | `Task(vf-dev-manager)` | seuil et signaux : voir ci-dessous |
 | mission design pure (zéro feature) | `Task(vf-design-manager)` | binaire, jamais une dominante calculée |
 | projet mobile, vérification réelle | `vf-test-orchestrator` | via le manager, ou direct sous `vf-auto` |

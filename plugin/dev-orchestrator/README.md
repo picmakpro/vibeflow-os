@@ -1,11 +1,12 @@
 # dev-orchestrator — Orchestrateur de développement (VFDO)
 
 > Module VibeFlow qui pilote le cycle de développement en **modèle agentique** : un agent
-> `vibeflow-head` qui détecte l'intention en langage naturel et invoque **directement** les
-> briques gsd-*/superpowers installées, une **équipe de mission** (manager + workers) pour le
-> multi-étapes, **2 skills** (`vf-auto`, `vf-dev`) et une **carte d'intention unique**. Plus de
-> façade de verbes : GSD est l'interface directe du quotidien, l'agent est l'entrée
-> conversationnelle optionnelle.
+> `vibeflow-head` qui détecte l'intention en langage naturel, **gouverne et lance** l'équipe
+> qui porte les briques gsd-*/superpowers installées (`Task(vf-coder)` pour une tâche courte,
+> `Task(vf-dev-manager)` au-delà — jamais un skill `gsd-*` en direct), une **équipe de mission**
+> (manager + workers) pour le multi-étapes, **2 skills** (`vf-auto`, `vf-dev`) et une **carte
+> d'intention unique**. Plus de façade de verbes : GSD est l'interface directe des équipes,
+> l'agent est l'entrée conversationnelle optionnelle.
 
 **Version** : v2.22.0
 **Type** : agent + équipe d'agents + 2 skills + scripts
@@ -20,8 +21,9 @@ pipeline de développement complet. Le modèle est agentique, pas une couche de 
 1. **Les briques gsd-*** se déclenchent nativement sur leurs propres descriptions — c'est le
    cas courant, sans intermédiaire.
 2. **L'agent `vibeflow-head`** (`AGENT.md`) — l'entrée conversationnelle : détecte l'intention
-   (y compris floue ou composite), invoque directement la brique outillée qui la porte, propose
-   **LE next step** depuis la feuille de route après chaque geste fermé, déclenche l'**hygiène
+   (y compris floue ou composite), **gouverne et lance l'équipe** qui porte le geste (jamais un
+   skill `gsd-*` en direct), propose **LE next step** depuis la feuille de route après chaque
+   geste fermé, déclenche l'**hygiène
    documentaire** aux bons moments (specs, STATE/ROADMAP, registres — jamais au fil de l'eau)
    et applique le **garde-fou first-use** (projet non initialisé → proposer la cartographie
    puis `gsd-new-project` sur confirmation explicite, jamais en autonomie).
@@ -149,21 +151,22 @@ L'installeur pose, de bout en bout :
 ### Langage naturel (recommandé)
 
 L'utilisateur parle normalement ; les briques gsd-* se déclenchent nativement, ou l'agent
-`vibeflow-head` détecte l'intention et invoque la brique :
+`vibeflow-head` détecte l'intention, **gouverne et lance l'équipe** qui porte le geste (jamais un
+skill `gsd-*` en direct côté head) :
 
-| Vous dites… | Brique invoquée (coulisse) |
+| Vous dites… | Équipe dispatchée (le geste `gsd-*` est le sien) |
 |---|---|
-| « démarre un projet » (confirmation explicite) | `gsd-new-project` (après le garde-fou first-use) |
-| « cartographie le code », « c'est quoi ce repo ? » | `gsd-map-codebase` |
+| « démarre un projet » (confirmation explicite) | `Task(vf-dev-manager)` → `gsd-new-project` (après le garde-fou first-use) |
+| « cartographie le code », « c'est quoi ce repo ? » | `Task(vf-dev-manager)` → `gsd-map-codebase` |
 | « réfléchis à… », « et si on… » | superpowers `brainstorming` / `gsd-explore` |
-| « planifie », « cadre cette feature » | `gsd-discuss-phase` puis `gsd-plan-phase` |
-| « code ça », « implémente la feature X » | `gsd-execute-phase` (trivial : `gsd-quick`) |
-| « teste », « ça marche ? » | `gsd-verify-work` |
-| « relis », « regarde ce diff » | `gsd-code-review` |
-| « ça plante », « débugge » | `gsd-debug` (recherche doc d'abord — ADR-045) |
-| « fais tout en autonomie » | skill `vf-auto` |
-| « livre », « crée une PR » | `gsd-ship` |
-| « on est où ? », « la suite » | `gsd-progress` + next step proposé |
+| « planifie », « cadre cette feature » | `Task(vf-dev-manager)` → `gsd-discuss-phase` puis `gsd-plan-phase` |
+| « code ça », « implémente la feature X » | `Task(vf-dev-manager)` → `gsd-execute-phase` (trivial : `Task(vf-coder)` → `gsd-quick`) |
+| « teste », « ça marche ? » | `Task(vf-dev-manager)` → `gsd-verify-work` |
+| « relis », « regarde ce diff » | `Task(vf-dev-manager)` → `gsd-code-review` |
+| « ça plante », « débugge » | recherche doc d'abord (ADR-045) puis `Task(vf-coder)`/`Task(vf-dev-manager)` → `gsd-debug` |
+| « fais tout en autonomie » | skill `vf-auto` → `Task(vf-dev-manager)` (ou moteur direct si invoqué par l'utilisateur) |
+| « livre », « crée une PR » | `Task(vf-dev-manager)` → `gsd-ship` |
+| « on est où ? », « la suite » | lecture ROADMAP/STATE par le head + next step proposé |
 
 La carte exhaustive (~65 gestes, familles amont/construction/qualité/cycle de
 vie/contexte/design/mission) : `references/intent-routing.md`.

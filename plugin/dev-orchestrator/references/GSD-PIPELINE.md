@@ -5,9 +5,11 @@
 > skills : `gsd-skills-index.md` (même dossier d'install :
 > `.claude/agents/dev-orchestrator-references/`).
 >
-> **Vocabulaire** : les briques gsd-* sont l'interface directe (modèle agentique, spec
-> 2026-07-25). Leur nom peut apparaître dans les échanges — la clarté prime sur la traduction ;
-> rester pédagogue (« la recette » et `gsd-verify-work` peuvent coexister dans une phrase).
+> **Vocabulaire** : les briques gsd-* sont l'interface directe des **équipes** dispatchées
+> (`vf-dev-manager`, `vf-coder`) — jamais du head, qui gouverne et lance ces équipes sans les
+> invoquer lui-même (A1, `head-governance.md`). Leur nom peut apparaître dans les échanges — la
+> clarté prime sur la traduction ; rester pédagogue (« la recette » et `gsd-verify-work` peuvent
+> coexister dans une phrase).
 
 ---
 
@@ -110,8 +112,9 @@ pilotage) ; les workers d'équipe (`vf-coder`, `vf-reviewer`, `vf-auditer`) en `
 - **`gsd-new-project` est interactif** (BOOT-04) : il pose de nombreuses questions et écrit
   PROJECT.md. **Jamais lancé seul / en autonomie.** Le proposer uniquement sur confirmation
   explicite de l'utilisateur (« je veux démarrer un nouveau projet »).
-- **Toujours déléguer** : les agents ne réimplémentent jamais la logique d'une brique — ils
-  détectent l'intention et invoquent la brique outillée qui la porte.
+- **Toujours déléguer** : les agents ne réimplémentent jamais la logique d'une brique. Une équipe
+  (`vf-dev-manager`, `vf-coder`) détecte l'intention et invoque la brique outillée qui la porte ;
+  le head, lui, détecte et dispatche l'équipe — il n'invoque jamais un `gsd-*` en direct (A1).
 - **Action structurante** : clarifier (P4) avant, vérifier (P5) après. Pas de raccourci sur
   `gsd-verify-work` / `gsd-code-review` pour une feature non triviale.
 - **Fermer la boucle** : après chaque geste, proposer LE next step depuis `ROADMAP`/`STATE`
