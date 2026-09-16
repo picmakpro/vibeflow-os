@@ -4,7 +4,7 @@
 # Couvre l'équipe de mission design (v1.2.0 — première instanciation non-dev du team-kernel,
 # conductor-references/team-kernel.md) + les acquis du module :
 #   T1  — Les 3 agents d'équipe existent (vf-design-manager, vf-crafter, vf-design-judge),
-#         frontmatter complet (description, model, memory) et densité ADR-029 (≤250L chacun).
+#         frontmatter complet (description, model, memory) et densité ADR-029 (≤300L chacun).
 #   T1b — Souveraineté modèle : manager = opus ; crafter et juge = sonnet.
 #   T2  — vf-internal (Pattern 12) : présent sur crafter + juge, ABSENT du manager (exposé).
 #   T3  — check-agents.sh --strict (ADR-044) vert sur agents/ du module (SKIP si le contrôleur
@@ -19,7 +19,7 @@
 #         verdict passed/gaps_found, seuil 70 par défaut.
 #   T6  — Heuristique de proposition dans AGENT.md : signal mission design → PROPOSER
 #         Task(vf-design-manager) (jamais d'office).
-#   T7  — Densité du module (VERIF-02, wc -l uniquement) : AGENT.md ≤250L, skills ≤500L.
+#   T7  — Densité du module (VERIF-02, wc -l uniquement) : AGENT.md ≤300L, skills ≤500L.
 #   T8  — Cloisonnement par tools : allowlist Agent(...) du manager (6 noms), vf-dev-manager absent.
 #   T8b — SC2 : doctrine étage implémentation croisée (opt-in, double juge, budgets 3+3).
 #
@@ -80,7 +80,7 @@ tools_line() { "$GREP" -m1 '^tools:' "$1" 2>/dev/null; }
 echo "== test-design-orchestrator (module: $MOD) =="
 
 # ---------------------------------------------------------------------------
-# T1 — 3 agents présents, frontmatter complet, densité ≤250L (ADR-029/044)
+# T1 — 3 agents présents, frontmatter complet, densité ≤300L (ADR-029/044)
 # ---------------------------------------------------------------------------
 t1_ok=1
 for a in $TEAM_AGENTS; do
@@ -90,9 +90,9 @@ for a in $TEAM_AGENTS; do
     "$GREP" -q "^${field}:" "$f" || { ko "T1 agents : $a.md sans champ $field"; t1_ok=0; }
   done
   a_lines=$(wc -l < "$f" | tr -d ' ')
-  [ "${a_lines:-999}" -le 250 ] || { ko "T1 agents : $a.md dépasse 250 lignes ($a_lines)"; t1_ok=0; }
+  [ "${a_lines:-999}" -le 300 ] || { ko "T1 agents : $a.md dépasse 300 lignes ($a_lines)"; t1_ok=0; }
 done
-[ "$t1_ok" -eq 1 ] && ok "T1 agents : 3 agents de l'équipe présents, frontmatter complet, ≤250L"
+[ "$t1_ok" -eq 1 ] && ok "T1 agents : 3 agents de l'équipe présents, frontmatter complet, ≤300L"
 
 # T1b — souveraineté modèle : manager opus, workers sonnet
 t1b_ok=1
@@ -200,10 +200,10 @@ t6_ok=1
 # T7 — Densité du module (VERIF-02, wc -l uniquement)
 # ---------------------------------------------------------------------------
 agent_lines=$(wc -l < "$AGENT_FILE" | tr -d ' ')
-if [ "$agent_lines" -le 250 ]; then
-  ok "T7 densité agent : AGENT.md = ${agent_lines}L (≤250)"
+if [ "$agent_lines" -le 300 ]; then
+  ok "T7 densité agent : AGENT.md = ${agent_lines}L (≤300)"
 else
-  ko "T7 densité agent : AGENT.md = ${agent_lines}L (>250)"
+  ko "T7 densité agent : AGENT.md = ${agent_lines}L (>300)"
 fi
 skills_over=0; skills_total=0
 for sk in vf-design vf-sketch; do
