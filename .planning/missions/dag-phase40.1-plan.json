@@ -1,0 +1,32 @@
+{
+  "nodes": [
+    {
+      "id": "census",
+      "step": "recensement 250 re-derive (lecture seule)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plan",
+      "step": "plans 40.1 (gsd-plan-phase, plan seul)",
+      "stage": "",
+      "deps": [
+        "census"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "check",
+      "step": "plan-checker frais",
+      "stage": "",
+      "deps": [
+        "plan"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

@@ -215,6 +215,12 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
   instructions seulement, agents en français, vraie phase GSD. Numéro 40.1 rendu par
   `phase.insert` et vérifié (placée entre la 40 et la 41) ; STATE mis à jour à la main
   (aucune commande `state.*`). Cadrage : `40.1-CONTEXT.md`.
+  **Planifiée le 2026-09-16** (mission vf-dev-manager, planification seule, go de la session
+  principale du 2026-09-16) : 15 plans en 4 vagues, commits `2f65cb2` → `f1b2be5` → `868cb04`.
+  Checker frais ×3 : 3 bloquants au tour 1, 1 au tour 2, 0 au tour 3 (4 warnings consignés au
+  rapport de mission). Le recensement réel du plafond compte 113 lignes vivantes dans 56 fichiers, là où
+  `git grep -w 250` en donnait bien moins (forme `250L` manquée). L'exécution suppose le hotfix
+  v2.63.1 mergé dans la base (précondition des plans 07 et 14). Rien n'est exécuté.
 
 - 2026-09-15 : **Phase 40 exécutée — `vibeflow-dev` devient `vibeflow-head`, head of minds du
   dev-orchestrator.** 5 plans sur 3 vagues (40-01 `exec-rename`, 40-02 `exec-e6`, 40-03
