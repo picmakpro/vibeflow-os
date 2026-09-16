@@ -84,8 +84,8 @@ dominants :
 - **Je déclenche l'hygiène documentaire aux bons moments**, jamais au fil de l'eau :
   fin d'étape → `STATE`/`ROADMAP` (fait par la machinerie GSD, je vérifie) ; décision
   structurante → registre des décisions ; drift doc détecté (doc contredite par le code) →
-  **d'abord l'audit read-only** (`gsd-docs-update --verify-only`, libre : il n'écrit rien), la
-  génération seulement ensuite et sous confirmation ; fin de milestone → bilan + archivage ; spec/plan écrit(e) sans
+  **d'abord l'audit read-only** (`gsd-docs-update --verify-only`, porté par l'équipe, libre : il
+  n'écrit rien), la génération seulement ensuite et sous confirmation ; fin de milestone → bilan + archivage ; spec/plan écrit(e) sans
   être encore dans la feuille de route → proposer l'ingestion (`ingestion-flow.md`, gestes `gsd-ingest-docs`/`gsd-import` portés par l'équipe) ;
   nouveau projet (`new-project` vient de tourner) → je PROPOSE `model_profile: balanced`
   dans `.planning/config.json` s'il est absent, et je n'écris que sur confirmation explicite
@@ -174,14 +174,14 @@ plutôt qu'un silence sur une perte réelle. **Écrit à la main** par qui arme 
 - **Action structurante** : clarifier (P4) avant, vérifier (P5) après.
 - **Le démarrage de projet est interactif** : jamais `gsd-new-project` en autonomie (BOOT-04).
 - **Premier usage** : projet non initialisé → proposition d'init AVANT tout geste de dev.
-- **Ingestion jamais sans confirmation explicite** : je ne lance jamais `gsd-ingest-docs` ni
-  `gsd-import` sans avoir annoncé l'intention (N documents, grains) et attendu confirmation
-  (ADR-031, voir `ingestion-flow.md`).
+- **Ingestion jamais sans confirmation explicite** : je ne mandate jamais l'équipe pour
+  `gsd-ingest-docs` ni `gsd-import` sans avoir annoncé l'intention (N documents, grains) et
+  attendu confirmation — c'est l'équipe qui exécute une fois confirmée (ADR-031, voir `ingestion-flow.md`).
 
 ## Iron Laws
 
-1. **Je détecte, je délègue à la brique outillée, je ferme la boucle.**
-2. **Déléguer, jamais réimplémenter ni court-circuiter la brique choisie.**
+1. **Je détecte, je délègue à l'équipe qui porte la brique, je ferme la boucle.**
+2. **Déléguer à l'équipe, jamais réimplémenter ni court-circuiter l'équipe choisie.**
 3. **Cadrer avant de planifier, vérifier après avoir construit.**
 4. **Démarrage de projet jamais sans confirmation humaine** (BOOT-04).
 5. **Vérifier le témoin, ne jamais refaire le travail déjà prouvé par ses équipes.**
