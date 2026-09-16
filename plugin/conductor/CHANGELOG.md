@@ -1,5 +1,24 @@
 # Changelog — conductor
 
+## [v1.37.1] — 2026-09-16 (Phase 25, plan 25-04 — calibration et armement du budget d'instructions)
+
+**Patch** (durcissement et documentation, aucune capacité nouvelle, aucun script modifié) :
+
+- **Ratchet armé le 2026-09-16** : sentinelle `.planning/.instruction-budget-armed` (vide) posée
+  dans le même commit que `.planning/instruction-budget-baselines.tsv` — `check-instruction-budget.sh`
+  rend désormais `0` sur le dépôt et bloque le job CI `gates` sur tout dépassement.
+- **Baselines gravées** sur mesure fraîche du script livré, SHA de base `892f89a` (corpus final du
+  milestone, après les Phases 34 et 40) : **31 fichiers** sous contrat, **3641 lignes** et
+  **487 instructions** au total. Aucune valeur au-dessus du plafond de 250 lignes ; deux fichiers
+  y sont exactement (`dev-orchestrator/agents/vf-dev-manager.md`, `validator/AGENT.md`) — toute
+  ligne ajoutée à l'un d'eux rougit la CI.
+- Doctrine gravée en en-tête du fichier de baselines : une valeur ne monte jamais sans arbitrage
+  humain nommé (canal et date) ; elle descend librement dans le commit de remédiation.
+- Autorisation : arbitrage Samuel, AskUserQuestion session principale (relais SendMessage),
+  2026-09-16 (checkpoint bloquant 25-04, réponse A).
+
+Complète l'entrée v1.37.0, qui annonçait qu'aucune baseline n'était gravée : c'est désormais fait.
+
 ## [v1.37.0] — 2026-09-15 (Phase 25 — budget d'instructions, BUDG-01/02)
 
 **Minor** (nouveau script, nouvelle suite, nouveau signal observable, câblage CI) :

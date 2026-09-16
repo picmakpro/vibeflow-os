@@ -33,26 +33,25 @@ stopped_at: >-
   `.planning/.instruction-budget-armed` ni `.planning/instruction-budget-baselines.tsv` n'existent.
   Le plan 25-04 (calibration) reste un checkpoint bloquant-humain, précondition « Phase 40 livrée »
   fausse à ce jour — non préparé.
-last_updated: "2026-09-15T00:00:00.000Z"
-last_activity: 2026-09-15
+  **Note (2026-09-16, plan 25-04) : `current_phase` reste à 39 pour la même raison (anti-régression
+  ADR-063). Le ratchet du budget d'instructions EST désormais armé** — `check-instruction-budget`
+  armé le 2026-09-16, `.planning/.instruction-budget-armed` et `.planning/instruction-budget-baselines.tsv`
+  existent ; la phrase précédente « aucun ratchet armé » décrit l'état du 2026-09-15.
+last_updated: "2026-09-16T00:00:00.000Z"
+last_activity: 2026-09-16
 last_activity_desc: >-
-  Clôture documentaire des vagues 1-3 de la Phase 25 (budget d'instructions), branche dédiée
-  `feat/phase-25-budget-instructions`, 4 commits (`261e42c`..`6638804`) : gate
-  `check-instruction-budget.sh` livré et rejoué (10/10 étapes du job `gates`, 78/78 suites),
-  étape CI câblée, `conductor` bumpé v1.36.0 → v1.37.0, note datée sous ADR-029, quatre items
-  BACKLOG. **Le ratchet n'est PAS armé** : ni `.planning/.instruction-budget-armed` ni
-  `.planning/instruction-budget-baselines.tsv` n'existent sur ce disque. PR pas encore ouverte
-  (geste humain). Le plan 25-04 (calibration) reste un checkpoint bloquant-humain dont la
-  précondition (Phase 40 livrée) est fausse aujourd'hui — non préparé, non coché. Un bloquant
-  trouvé par la revue au premier tour de cette mission a été fermé avant ce commit de clôture.
-  Compteurs de `progress` re-dérivés par comptage réel (jamais recopiés), `check-state-integrity.sh`
-  et `check-machine-paths.sh` rejoués en gate.
+  Plan 25-04 exécuté sur `feat/phase-25-04-calibration` : checkpoint bloquant tranché A (arbitrage
+  Samuel, AskUserQuestion session principale (relais SendMessage), 2026-09-16), baselines de
+  `check-instruction-budget.sh` gravées sur 31 fichiers et sentinelle armée dans le même commit,
+  gate armé rendant 0, conductor v1.37.1, BUDG-01/02 cochés, QUAL-01 tenu sur la 25. Compteurs de
+  `progress` avancés du seul delta de ce plan (+1 plan, +1 phase), pas re-dérivés. PR, tag et
+  release non posés (gestes humains).
 progress:
   total_phases: 11
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 55
-  completed_plans: 54
-  percent: 82
+  completed_plans: 55
+  percent: 91
 ---
 
 # Project State
@@ -94,7 +93,9 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 ## Current Position
 
-Phase: **25** (Budget d'instructions) — **PLANIFIÉE le 2026-09-15** (4 plans, 4 vagues, plan-checker PASSED après une révision ciblée D-01 bis) — vagues 1-3 exécutables en mission, vague 4 (calibration) = checkpoint bloquant jusqu'à la livraison de la Phase 40. Phase 34 mergée le même jour (PR #66) : AGTS-01 close, SKIL-01 NO-GO, AGTS-02 reportée avec trace.
+Phase: **25** (Budget d'instructions) — **COMPLÈTE le 2026-09-16** : plan 25-04 exécuté sur `feat/phase-25-04-calibration`, ratchet `check-instruction-budget` armé (31 fichiers, conductor v1.37.1), BUDG-01/02 cochés. Seconde PR de la phase à ouvrir (geste humain). Next : cadrage de la Phase 41 (posture de protection du dépôt) après merge de cette PR.
+
+Précédemment (2026-09-15) : Phase **25** (Budget d'instructions) — **PLANIFIÉE le 2026-09-15** (4 plans, 4 vagues, plan-checker PASSED après une révision ciblée D-01 bis) — vagues 1-3 exécutables en mission, vague 4 (calibration) = checkpoint bloquant jusqu'à la livraison de la Phase 40. Phase 34 mergée le même jour (PR #66) : AGTS-01 close, SKIL-01 NO-GO, AGTS-02 reportée avec trace.
 2026-09-15** (6/6 plans, SUMMARY sur disque, ledger consolidé par 34-06). Trois verdicts rendus
 sur pièces : AGTS-01 close avec verdict par gap (`34-AUDIT-AGTS.md`), SKIL-01 close en NO-GO
 (`34-SPIKE-SKIL.md`), AGTS-02 **reportée avec trace** (`34-RUN-MOBILE.md`, chapeau ROUGE) — la
@@ -1327,16 +1328,19 @@ Recent decisions affecting current work:
 
 **Resume file:** .planning/phases/VFDO-34-gaps-agency-agents-cadrage-skill-installer/34-CONTEXT.md (et `.planning/phases/VFDO-40-vibeflow-head-head-of-minds-du-dev-orchestrator/40-CONTEXT.md`, `.planning/phases/VFDO-25-budget-d-instructions-et-tage-d-alignement-court/25-CONTEXT.md`)
 
-Last session: 2026-09-15
+Last session: 2026-09-16 — plan 25-04 exécuté (ratchet du budget d'instructions armé), branche `feat/phase-25-04-calibration`, PR non ouverte.
+
+Previous session: 2026-09-15
 Stopped at: **Phase 34 EXÉCUTÉE et MERGÉE** (PR #66, merge `bf34d49`, 2026-09-15 — 3 verdicts rendus, 4 gates humains relayés, AGTS-02 reportée ; Scroll-Off exclu du périmètre VibeFlow le 2026-09-15, reprise sur un lab mobile à désigner) puis **Phase 25 PLANIFIÉE** (recherche `eb6aa3d`, D-06 bis + D-01 bis amendés, 4 plans `f7a057f` + révision `2773e37`, checker PASSED, couverture 8/8, gap-analysis 10/10). Next : exécution 25 par `vf-dev-manager` (vagues 1-3, arrêt au checkpoint 25-04) — demande Samuel, session principale, 2026-09-15.
 
 **Reprendre par** : mission `vf-dev-manager` sur la Phase 25 (vagues 1-3, checkpoint 25-04 bloquant jusqu'à la 40) — puis `/gsd-plan-phase 40`, puis calibration 25-04 dans une seconde PR, **puis** cadrage de la Phase 41 (posture de protection du dépôt) — jamais avant que les PR de la 40 et de 25-04 soient mergées.
 
 **Ce qui reste fermé, quoi qu'il arrive** :
+- **Budget d'instructions armé depuis le 2026-09-16** (`check-instruction-budget.sh`) : une baseline de `.planning/instruction-budget-baselines.tsv` ne remonte jamais sans arbitrage humain nommé avec canal et date ; elle descend librement dans le commit de remédiation.
 - **Aucune partition réelle de `vibeflow-os`** sans geste humain explicite — déclencheur D-02 (§ Decisions, 2026-09-10).
 - **Issue amont `init-progress` NON ENVOYÉE** — `.planning/upstream/2026-09-09-init-progress-project-md-not-resolved-under-workstream.md`, Samuel poste.
 - **Ne pas « réparer » le résiduel de sécurité `pre-push` en basculant `core.hooksPath` sur un chemin absolu** — mesuré inopérant, `.planning/codebase/CONCERNS.md`.
-- **`check-agents.sh` rend 0 à vide sur ce dépôt** et **ne mesure aucune ligne** (fait vérifié le 2026-09-14, à corriger dans `plugin/conductor/README.md:95-99` par la Phase 25) — ne jamais le citer comme preuve de densité ni de conformité des agents sources.
+- **`check-agents.sh` rend 0 à vide sur ce dépôt** et **ne mesure aucune ligne** (fait vérifié le 2026-09-14, catalogue corrigé par la Phase 25) — ne jamais le citer comme preuve de densité ni de conformité des agents sources. **La mesure existe désormais ailleurs** : `check-instruction-budget.sh` (lignes et instructions, armé le 2026-09-16).
 - **Aucun agent neuf en Phase 34** hors `web-test-team` sur run mobile vert (34-CONTEXT D-01/D-05).
 
 **Piège de reprise qui a servi** : la liste de gates d'un rapport n'est jamais la référence — rejouer les commandes du job CI `gates` (`grep -n "run: bash" .github/workflows/ci.yml`) avant tout push.

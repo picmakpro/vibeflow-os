@@ -65,7 +65,7 @@
 - [x] Phase 22: Hygiène documentaire — doctrine de sortie et captation d'intention (completed 2026-07-31)
 - [x] Phase 23: Couplage explicite au moteur GSD — capabilities, flags et voie unique
 - [x] Phase 24: Activation et mesure du moteur GSD — capacités dormantes et faits de runtime (completed 2026-08-05, PR #34)
-- [ ] Phase 25: Budget d'instructions
+- [x] Phase 25: Budget d'instructions (completed 2026-09-16 — ratchet armé, 31 fichiers sous contrat, conductor v1.37.1 ; seconde PR pas encore ouverte)
 - [x] Phase 26: Manuel utilisateur VibeFlow (manual/) (completed 2026-08-02)
 - [x] Phase 27: Parallélisation d'exécution — granulaire, simple, sans collision d'écriture (completed 2026-08-06)
 - [x] Phase 28: Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur (completed 2026-08-15)
@@ -74,7 +74,7 @@
 - [x] Phase 31: Manifeste d'install + dry-run (issue #20) (completed 2026-08-16)
 - [x] Phase 32: Durcissement du driver-lock (completed 2026-08-17)
 - [x] Phase 33: Watchdog & notifications des missions (completed 2026-08-17)
-- [ ] Phase 34: Gaps agency-agents & cadrage skill-installer
+- [x] Phase 34: Gaps agency-agents & cadrage skill-installer (completed 2026-09-15 — 6/6 plans, mergée PR #66, AGTS-01 close, SKIL-01 NO-GO, AGTS-02 reportée avec trace ; pas de release)
 - [x] Phase 35: Ré-armement worktree (conditionnelle) — CLOSE 2026-08-26, option A (pas de ré-armement)
 - [x] Phase 37: Portabilité multi-runtime — spike (Codex, OpenCode, Kimi) (completed 2026-08-28 — spike + étude livrés, décisions rendues ; suite → Phase 38)
 - [x] Phase 38: Portabilité multi-runtime — livraison (canal d'install, migration de lab, adaptateur) (exécutée 2026-08-29, **mesurée 2026-08-30** sur clé API — **critère 2 PROUVÉ sur Codex** : profondeur ≥ 2 constatée EN BASE (`thread_spawn_edges`, `root→vf-dev-manager→vf-coder`), 3/3 sur les **4 critères réels** ; le **critère 5 est SANS OBJET sous clé API** (vert à vide, jamais « atteint ») et le **critère 4 est plus faible que son libellé** (`--output-schema` non propagé aux sous-agents, dette D-38-S). **kimi-code n'est plus un inconnu déclaré** : I-1 **31/31**, I-2 `disallowedTools` bloque (0/4 contre 3/3 au contrôle positif), I-3 hooks déclenchés 3/3, `vf-internal` **sans équivalent** (Pattern 12 non tenu, déclaré par le gate de fidélité). **Critère 1 toujours partiel** : hooks non portés, perte déclarée. Coûts : Codex 1,01 $, kimi ~0,018 $. **SHIPPÉE v2.59.0 le 2026-08-31** (Samuel a autorisé le ship après revue ; PR + tag + release GitHub) — test bout-en-bout install **et** usage refait sur Codex (délégation de rôle → code réel) ET Kimi (`--agent-file` → code + rapport typé) le 2026-08-31, manifeste `.codex-plugin/` natif ajouté. Preuves : `38-MESURE-CODEX-CRITERE-2.md`, `38-MESURE-KIMI.md`)
@@ -473,7 +473,7 @@ Plans:
 | 22. Hygiène documentaire — doctrine de sortie | — | 3/3 | Complete — **mergée dans `main`** (PR #23, `474c3eb`), `dev-orchestrator` v2.9.0 + `design-orchestrator` v1.4.0 | 2026-07-31 |
 | 23. Couplage explicite au moteur GSD | agentique-v1.0 | 8/8 | Complete — 8 SUMMARYs sur disque | 2026-08-04 |
 | 24. Activation et mesure du moteur GSD | agentique-v1.0 | 12/12 | Complete — 12 SUMMARYs sur disque | 2026-08-04 |
-| 25. Budget d'instructions | fiabilite-v1.0 | 3/4 | In progress — première PR (25-01 à 25-03) prête, ratchet non armé ; 25-04 (calibration) attend la Phase 40 | 2026-09-15 |
+| 25. Budget d'instructions | fiabilite-v1.0 | 4/4 | Complete — première PR (25-01 à 25-03) mergée v2.62.0 ; 25-04 exécutée (ratchet armé), seconde PR à ouvrir | 2026-09-16 |
 | 26. Manuel utilisateur VibeFlow (manual/) | gsd-alignement | — | Complete (PR #28) | 2026-08-02 |
 | 27. Parallélisation d'exécution — granulaire, simple, sans collision | gsd-alignement | 6/6 | Complete (PR #35) — spike `claude_orchestration` refusé par écrit | 2026-08-10 |
 | 28. Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur | agentique-v1.0 | 3/3 | Complete — PR #42, release `v2.52.0`, CI main verte, gate + `lab-frais-arme` livrés | 2026-08-15 |
@@ -482,7 +482,7 @@ Plans:
 | 31. Manifeste d'install + dry-run (issue #20) | fiabilite-v1.0 | 8/8 | Complete — 8 SUMMARYs sur disque, module `conductor` v1.25.0, MANI-04 superseded (réponse #20 en DRAFT, jamais postée) | 2026-08-16 |
 | 32. Durcissement du driver-lock | fiabilite-v1.0 | 0/0 | Not started — son hook naît en forme exec (après 30) ; spike `reference-transaction` avant LOCK-03 | — |
 | 33. Watchdog & notifications des missions | fiabilite-v1.0 | 0/0 | Not started — heartbeat partagé avec la 32 (conçues ensemble, WTCH après LOCK) | — |
-| 34. Gaps agency-agents & cadrage skill-installer | fiabilite-v1.0 | 0/0 | Not started — après la 31 (MANI avant SKIL) ; SKIL-01 = cadrage go/no-go rattaché | — |
+| 34. Gaps agency-agents & cadrage skill-installer | fiabilite-v1.0 | 6/6 | Complete — mergée PR #66 ; AGTS-02 reportée avec trace | 2026-09-15 |
 | 35. Ré-armement worktree (conditionnelle) | fiabilite-v1.0 | 0/0 | Flottante — précondition externe NON satisfaite au 2026-08-15 (npm latest = 1.10.0) ; jamais bloquante | — |
 | 37. Portabilité multi-runtime — spike | fiabilite-v1.0 | — | Complete — spike de mesure sans plan : DISCUSS + SPIKE-REPORT + ETUDE-CANAL-ET-MIGRATION (3 tours de revue adversariale), décisions rendues le 2026-08-28, branche `feat/phase-37-spike-portabilite-multi-runtime` non mergée | 2026-08-28 |
 | 38. Portabilité multi-runtime — livraison | fiabilite-v1.0 | 0/0 | Not started — cadrage factuel = livrables de la 37 ; 6 lots candidats, go/no-go adaptateur à trancher au cadrage | — |
@@ -989,7 +989,18 @@ Plans:
 
 **Wave 4** *(bloquée sur la Phase 40, checkpoint bloquant — seconde PR)*
 
-- [ ] 25-04-PLAN.md — calibration : checkpoint humain one-way, gravure des baselines mesurées par le script livré, armement de la sentinelle dans le même commit, publication des valeurs réelles, clôture du ledger (BUDG-01, BUDG-02, QUAL-01)
+- [x] 25-04-PLAN.md — calibration : checkpoint humain one-way, gravure des baselines mesurées par le script livré, armement de la sentinelle dans le même commit, publication des valeurs réelles, clôture du ledger (BUDG-01, BUDG-02, QUAL-01) — exécuté le 2026-09-16 : checkpoint tranché A (arbitrage Samuel, AskUserQuestion session principale (relais SendMessage), 2026-09-16), 31 baselines gravées, sentinelle armée, gate armé rend 0
+
+**Résultat de la Phase 25 (2026-09-16).** Le ratchet du budget d'instructions est **armé depuis le
+2026-09-16** : `check-instruction-budget.sh` bloque le job CI `gates` sur tout dépassement, pour
+**31 fichiers** d'agents distribués sous contrat (3641 lignes, 487 instructions gravées dans
+`.planning/instruction-budget-baselines.tsv`, conductor v1.37.1). Deux fichiers sont au plafond
+exact de 250 lignes (`vf-dev-manager.md`, `validator/AGENT.md`), accepté par Samuel au checkpoint.
+Livrée en **deux PR** (D-06 bis) : la première (25-01 à 25-03, v2.62.0) posait le gate sans rien
+armer, la seconde (25-04) calibre sur le corpus final du milestone, après les Phases 34 et 40 —
+ne jamais graver sur un corpus qui bouge. **Hors périmètre, explicitement** : la remédiation des
+fichiers les plus chargés, le budget des SKILL.md et du bootstrap, BUDG-03 (étage d'alignement
+court, différé).
 
 ### Phase 35: Ré-armement worktree (conditionnelle) — CLOSE 2026-08-26
 
