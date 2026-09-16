@@ -6,7 +6,7 @@
 #
 #   T1  — Les 5 agents de l'équipe existent, frontmatter complet (description/model/memory),
 #         name = nom de fichier.
-#   T2  — Densité ADR-029 mesurée par wc -l UNIQUEMENT : agents ≤250L, skill ≤500L.
+#   T2  — Densité ADR-029 mesurée par wc -l UNIQUEMENT : agents ≤300L, skill ≤500L.
 #   T3  — check-agents.sh --strict (ADR-044) vert sur plugin/business-pilot-bundle/agents
 #         (SKIP si le contrôleur du conductor est introuvable dans la disposition courante).
 #   T4  — Le gate est read-only : quality-gate-client sans Write ni Edit dans tools,
@@ -79,7 +79,7 @@ for a in $TEAM; do
   f="$MOD/agents/$a.md"
   [ -f "$f" ] || continue
   n=$(wc -l < "$f" | tr -d ' ')
-  [ "${n:-999}" -le 250 ] || { ko "T2 densité : $a.md = ${n}L (>250)"; t2_ok=0; }
+  [ "${n:-999}" -le 300 ] || { ko "T2 densité : $a.md = ${n}L (>300)"; t2_ok=0; }
 done
 if [ -f "$SKILL" ]; then
   n=$(wc -l < "$SKILL" | tr -d ' ')
@@ -87,7 +87,7 @@ if [ -f "$SKILL" ]; then
 else
   ko "T2 densité : $SKILL introuvable"; t2_ok=0
 fi
-[ "$t2_ok" -eq 1 ] && ok "T2 densité : agents ≤250L, skill ≤500L (ADR-029)"
+[ "$t2_ok" -eq 1 ] && ok "T2 densité : agents ≤300L, skill ≤500L (ADR-029)"
 
 # ---------------------------------------------------------------------------
 # T3 — check-agents.sh --strict (ADR-044)

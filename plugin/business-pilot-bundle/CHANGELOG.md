@@ -1,5 +1,14 @@
 # CHANGELOG — business-pilot-bundle
 
+## [v2.0.9] — 2026-09-16 (Phase 40.1)
+
+**Patch** :
+
+- **Plafond ADR-029 des agents du bundle relevé à 300 lignes** — `BUNDLE.md`, les trois blueprints
+  (commercial, delivery, finance) et la suite T2 (`test-business-pilot-bundle.sh`) énoncent et
+  testent désormais 300 lignes au lieu de 250. Autorisation : arbitrage Samuel D-01,
+  AskUserQuestion session principale (relais SendMessage), 2026-09-16.
+
 ## [v2.0.8] — 2026-08-30 (Phase 38 — description de frontmatter YAML strict, plan 38-08)
 
 **Patch** :
