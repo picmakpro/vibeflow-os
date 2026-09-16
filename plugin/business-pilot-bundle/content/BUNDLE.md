@@ -61,7 +61,7 @@ Le lab parle le langage de l'opérateur, pas le jargon dev :
 
 ## 5. Les 3 agents métier
 
-Chacun s'instancie en agent natif **≤ 250 lignes** (ADR-029) ; le savoir est **déporté en `skills:`**
+Chacun s'instancie en agent natif **≤ 300 lignes** (ADR-029) ; le savoir est **déporté en `skills:`**
 (jamais inliné). Spécification complète : `content/agents/<agent>.blueprint.md`.
 
 | Agent | Rôle (1 ligne) | Modèle |
@@ -102,7 +102,7 @@ Chacun s'instancie en agent natif **≤ 250 lignes** (ADR-029) ; le savoir est *
 - **P5 Vérifier en boucle** — gate de vérif avant tout livrable client (rule path-scopée, voir §8).
 - **P7 Transposer, pas copier** — vocabulaire métier natif (§4), registres restent canon.
 - **P8 Évaluer** — EVAL systématique sur pricing/prévisions (finance), audit bloquant via `audit-architecture`.
-- **P9 Modulariser** — chaque agent ≤ 250L, savoir en skills, une responsabilité par agent.
+- **P9 Modulariser** — chaque agent ≤ 300L, savoir en skills, une responsabilité par agent.
 
 ## 8. Garde-fous spécifiques métier
 
@@ -132,7 +132,7 @@ Chacun s'instancie en agent natif **≤ 250 lignes** (ADR-029) ; le savoir est *
 3. **Instancier les 3 agents** — pour chaque `content/agents/*.blueprint.md`, créer un agent natif
    dans `.claude/agents/` du lab :
    - frontmatter cible du blueprint (`name`, `description`, `model`, `memory: project`, `skills: [...]`) — sans `description` l'agent n'est JAMAIS auto-routé ; conformité vérifiée par `check-agents.sh` (ADR-044) ;
-   - corps **≤ 250 lignes** (ADR-029) — savoir déporté en skills, jamais inliné ;
+   - corps **≤ 300 lignes** (ADR-029) — savoir déporté en skills, jamais inliné ;
    - les **skills déclarés** sont créés **via `skill-creator`** s'ils n'existent pas (ne pas inventer
      un nom de skill sans le matérialiser).
 
@@ -160,6 +160,6 @@ Chacun s'instancie en agent natif **≤ 250 lignes** (ADR-029) ; le savoir est *
    filet câblé, et **la première action métier** en vocabulaire du lab
    (ex. « ouvre ton premier Sprint stratégique : qualifie le pipeline »).
 
-> **Critère de lab “fini”** : `.planning/` + extension `business/` + 3 agents ≤250L + 5 registres
+> **Critère de lab “fini”** : `.planning/` + extension `business/` + 3 agents ≤300L + 5 registres
 > indexés + `vibeflow-validator` + `audit-architecture` câblés + orchestration déléguée au conductor
 > + version stampée. Si un seul de ces éléments manque → le lab n'est pas livrable.
