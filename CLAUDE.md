@@ -48,7 +48,7 @@ correctif / doc / durcissement → **patch**. Le tag reprend **exactement** la v
 
 ## Conventions transverses
 
-- **Densité** (ADR-029) : agents ≤ 250 lignes, skills ≤ 500, bootstrap ≤ 2000 tokens.
+- **Densité** (ADR-029) : agents — avertissement dès 251 lignes, bloque au-delà de 300 ; skills ≤ 500, bootstrap ≤ 2000 tokens.
 - **Jamais de fix sans validation humaine** (ADR-031).
 - **Agents natifs machine-enforced** (ADR-044) : tout agent posé passe `plugin/conductor/scripts/check-agents.sh`
   (description + model + memory requis). Un worker **interne** (dispatché uniquement par un
