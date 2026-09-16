@@ -216,11 +216,11 @@ VibeFlow definit donc trois seuils universels (charte de densite, ADR-029 Lab) :
 
 | Composant | Seuil dur | Justification |
 |-----------|-----------|---------------|
-| **Body d'un agent** (`.md` body apres frontmatter) | **≤ 250 lignes** | Au-dela, l'agent perd la coherence de son mandat |
+| **Body d'un agent** (`.md` body apres frontmatter) | **≤ 300 lignes (avertissement des 251)** | Au-dela, l'agent perd la coherence de son mandat |
 | **Body d'un skill** (`SKILL.md`) | **≤ 500 lignes** | Au-dela, on bascule en sous-documents charges a la demande (Progressive Disclosure) |
 | **Bootstrap charge au SessionStart** | **≤ 2000 tokens** | Au-dela, le contexte initial est deja trop lourd avant tout travail |
 
-**Test simple** : si un agent depasse 250 lignes, il y a probablement 2 agents melanges, ou du savoir qui devrait etre dans un skill, ou des conventions qui devraient etre dans des regles.
+**Test simple** : si un agent depasse 300 lignes, il y a probablement 2 agents melanges, ou du savoir qui devrait etre dans un skill, ou des conventions qui devraient etre dans des regles.
 
 ### 3.3bis  -  Architecture skills natif (v4.1)
 
