@@ -30,7 +30,7 @@ Quand tu construis ton systeme propre (ex: `~/MonFlow/`), tu y restes. **Tu ne c
 | Dossier | Contenu |
 |---------|---------|
 | `methodology/` | Les 9 principes + 5 registres + philosophie + sections v4.1/v4.2 (densité agents, skills natif, méta-procédures, halt conditions, P9 modularisation) |
-| `methodology/templates/` | Squelettes vides a recopier dans ton systeme (9 agents ≤ 250L, 5 docs, 7 memory, 5 triggers, 1 rule, 5 skills) |
+| `methodology/templates/` | Squelettes vides a recopier dans ton systeme (9 agents ≤ 300L, 5 docs, 7 memory, 5 triggers, 1 rule, 5 skills) |
 | `methodology/patterns/` | **12 patterns architecturaux universels** avec exemples fictifs (vs 8 en v1.1) — nouveaux : 09 meta-procedures, 10 plan-review adversarial, 11 halt-conditions, 12 cloisonnement par outils |
 | `methodology/vocabulary/` | Lexique VibeFlow enrichi v4.1 (+16 termes) + dire/ne pas dire (+12 entrees) + mapping forks |
 | `examples/` | 1 exemple fictif de mini-systeme complet (PetitsCoursFlow — Sophie K., professeure de musique) |
@@ -98,7 +98,7 @@ Ouvre `examples/PetitsCoursFlow/`. C'est un mini-systeme fictif d'une professeur
 
 Saut majeur depuis v1.1 (alignement Core v4.0 → **v4.1**). 7 zones d'enrichissement methodologique :
 
-1. **Charte de densite agents** (≤ 250 lignes body) — preuve empirique : un agent trop dense hallucine plus (context rot mesurable dès 80K tokens cumulés)
+1. **Charte de densite agents** (bloque au-delà de 300 lignes body, avertissement dès 251) — preuve empirique : un agent trop dense hallucine plus (context rot mesurable dès 80K tokens cumulés)
 2. **Architecture skills natif Claude Code** — `skills:` flat dans frontmatter (préchargement auto) + skills on-demand via description match (1% Rule)
 3. **Garde-fou meta runtime** — toute convention frontmatter doit être vérifiée dans la doc officielle AVANT d'être actée (incident : invention d'un champ non-lu silencieusement)
 4. **Pattern Adversarial Plan-Review** — 2 agents distincts en sessions fraîches + Judge si divergence (anti-echo-chamber)
