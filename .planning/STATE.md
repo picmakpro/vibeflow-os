@@ -216,18 +216,23 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
   `phase.insert` et vérifié (placée entre la 40 et la 41) ; STATE mis à jour à la main
   (aucune commande `state.*`). Cadrage : `40.1-CONTEXT.md`.
   **Planifiée le 2026-09-16** (mission vf-dev-manager, planification seule, go de la session
-  principale du 2026-09-16) : 15 plans en 4 vagues, commits `2f65cb2` → `f1b2be5` → `868cb04`.
+  principale du 2026-09-16) : 15 plans en 4 vagues, commits `4ebb1ec` → `ef2075f` → `6f4778b` (SHA après rebase).
   Checker frais ×3 : 3 bloquants au tour 1, 1 au tour 2, 0 au tour 3 (4 warnings consignés au
   rapport de mission). Le recensement réel du plafond compte 113 lignes vivantes dans 56 fichiers, là où
-  `git grep -w 250` en donnait bien moins (forme `250L` manquée). L'exécution suppose le hotfix
+  `git grep -w` sur la valeur de l'ancien plafond en donnait bien moins (forme suffixée par `L` manquée). L'exécution suppose le hotfix
   v2.63.1 mergé dans la base (précondition des plans 07 et 14). Rien n'est exécuté.
   **Correction ciblée le 2026-09-16** (arbitrage Samuel « correction ciblée d'abord », AskUserQuestion
-  session principale, 2026-09-16) : W-A à W-D fermés en 3 tours, commits `2d319e9` → `c6fcef1` →
-  `46e6266`, un checker neuf à chaque tour. La précondition hotfix est désormais une Task 0 machine
+  session principale, 2026-09-16) : W-A à W-D fermés en 3 tours, commits `2e34613` → `b1d133b` →
+  `b11aba8` (SHA après rebase), un checker neuf à chaque tour. La précondition hotfix est désormais une Task 0 machine
   en tête de 01, 02, 07 et 14 (même arbitrage : l'exécution attend le merge du hotfix dans main).
-  Reste un bloquant sur le plan 13 T3 : une phrase collée avant le paragraphe du manuel échappe à
-  la comparaison. Décision (paragraphe ou section) remontée à la session principale. Branche non
-  rebasée sur `origin/main` (61d80bf, qui contient le hotfix). Rien n'est exécuté.
+  Le checker du tour 3 a laissé un bloquant sur le plan 13 T3 : une phrase collée avant le
+  paragraphe du manuel échappait à la comparaison. Arbitrage Samuel, option (b), AskUserQuestion
+  session principale, 2026-09-16 : la comparaison porte sur la section entière. Branche rebasée
+  sans conflit sur `origin/main` 61d80bf (hotfix v2.63.1 inclus), `main` local avancé en
+  fast-forward. Tour 4 (`1954949`) : checker frais, Task 0 de 01/02/07/14 rc 0 sur la branche
+  rebasée, mutants du plan 13 tous rc 1. Son seul bloquant, une ligne de ce fichier citant
+  l'ancien plafond, est reformulé à la main : recensement 114 lignes, identique à main.
+  **Phase prête à exécuter, feu vert de Samuel requis.** Rien n'est exécuté.
 
 - 2026-09-15 : **Phase 40 exécutée — `vibeflow-dev` devient `vibeflow-head`, head of minds du
   dev-orchestrator.** 5 plans sur 3 vagues (40-01 `exec-rename`, 40-02 `exec-e6`, 40-03
