@@ -1,7 +1,7 @@
 # Doctrine pipeline — GSD-PIPELINE.md (chargée on-demand)
 
 > Référence interne de `vibeflow-head` et `vf-dev-manager`. Chargée à la demande (règle 1%) —
-> **jamais** dupliquée dans le corps des agents (charte densité, ≤250L). Source des noms de
+> **jamais** dupliquée dans le corps des agents (charte densité, ≤300L). Source des noms de
 > skills : `gsd-skills-index.md` (même dossier d'install :
 > `.claude/agents/dev-orchestrator-references/`).
 >
