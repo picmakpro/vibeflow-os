@@ -131,7 +131,8 @@ de mandat pour le faire correctement.)*
   (`plugin/*/agents/*.md` et `plugin/*/AGENT.md`), deux métriques : lignes du fichier entier et
   instructions du body (Phase 25, BUDG-01/02, ADR-029). Ratchet par sentinelle versionnée
   `.planning/.instruction-budget-armed`, LUE seulement, jamais écrite. Cinq codes de sortie :
-  `0` armé et conforme, `1` armé avec dépassement de baseline ou du plafond de 300 lignes, `2` non
+  `0` armé et conforme, `1` armé avec dépassement de la baseline d'instructions ou du plafond de
+  300 lignes, `2` non
   vérifiable (découverte vide, fichier imparsable, contrat de baseline incohérent), `3` non armé
   (rapport imprimé, jamais bloquant), `64` erreur d'usage. Consommé par le job CI `gates`
   (avertissement en mode non armé, blocage en mode armé). Le verdict `AVERTISSEMENT-ADR029` signale

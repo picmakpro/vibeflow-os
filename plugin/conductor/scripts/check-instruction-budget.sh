@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # check-instruction-budget.sh — mesure et publie, par fichier d'agent distribue, deux metriques
-# (lignes du fichier entier, instructions du body) comparees a une baseline en ratchet
-# (BUDG-01, BUDG-02, ADR-029).
+# (lignes du fichier entier, instructions du body). Seules les instructions sont comparees a une
+# baseline en ratchet par fichier ; les lignes sont bornees par le plafond ADR-029 (avertissement
+# des le seuil bas, blocage au-dela du plafond), la colonne lignes de la baseline restant
+# informative, jamais comparee (BUDG-01, BUDG-02, ADR-029).
 #
 # Role (ADR-031) : ce gate CONSTATE un depassement de baseline ou de plafond ; il ne reecrit,
 # reformate ni allege JAMAIS un fichier d'agent, et il n'ecrit ni la sentinelle ni la baseline —
