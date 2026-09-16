@@ -17,6 +17,11 @@
 #             2 = pas un depot git, aucune ref main resolue, ou gate introuvable.
 set -uo pipefail
 
+# Traitement octet-sur : l'awk de macOS (towc) plante sur les caracteres multi-octets (≤, accents)
+# hors locale C ("towc: multibyte conversion failure"), ce qui masquait la cause reelle derriere un
+# message d'outillage illisible. Toute lecture de ligne (git diff, awk) se fait donc sous LC_ALL=C.
+export LC_ALL=C
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PHASE_BASE="$SCRIPT_DIR/phase-base.sh"
 
@@ -24,6 +29,7 @@ MAIN_REF=""
 MIN_AGENTS=3
 GATE_ARG=""
 ROOT=""
+OLD_CEILING=250
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -39,10 +45,17 @@ while [ "$#" -gt 0 ]; do
     --root)
       [ "$#" -ge 2 ] || { echo "[check-phase-invariants] --root necessite une valeur" >&2; exit 2; }
       ROOT="$2"; shift 2 ;;
+    --old-ceiling)
+      [ "$#" -ge 2 ] || { echo "[check-phase-invariants] --old-ceiling necessite une valeur" >&2; exit 2; }
+      OLD_CEILING="$2"; shift 2 ;;
     -h|--help) grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *) echo "[check-phase-invariants] argument inconnu : $1" >&2; exit 2 ;;
   esac
 done
+
+case "$OLD_CEILING" in
+  ''|*[!0-9]*) echo "[check-phase-invariants] --old-ceiling doit etre un entier positif : $OLD_CEILING" >&2; exit 2 ;;
+esac
 
 if [ -z "$ROOT" ]; then
   ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
@@ -82,7 +95,15 @@ fi
 NONMERGES="$TMPD/nonmerges"
 MERGES="$TMPD/merges"
 git -C "$ROOT" rev-list --no-merges HEAD --not "$BASE" > "$NONMERGES" 2>"$TMPD/rl1.err"
+RL1_RC=$?
 git -C "$ROOT" rev-list --merges HEAD --not "$BASE" > "$MERGES" 2>"$TMPD/rl2.err"
+RL2_RC=$?
+if [ "$RL1_RC" -ne 0 ] || [ "$RL2_RC" -ne 0 ]; then
+  cat "$TMPD/rl1.err" >&2
+  cat "$TMPD/rl2.err" >&2
+  echo "[check-phase-invariants] git rev-list a echoue (non-merges rc=$RL1_RC, merges rc=$RL2_RC) sur la base '$BASE'" >&2
+  exit 2
+fi
 
 # --- classification des chemins, en awk (jamais grep) --------------------------------------------
 IS_GUARDED_AWK='
@@ -163,24 +184,35 @@ if [ "$I1_TOUCHED" -eq 0 ]; then
   trace I1 - "aucun commit propre ne touche la baseline"
 fi
 
-# --- I2 : chaque ligne d'agent modifiee est un remplacement de valeur pur (ancienne -> 300) -----
+# --- I2 : chaque ligne d'agent modifiee est un remplacement de valeur pur (ancien plafond -> 300).
+# swap() ne remplace QUE les nombres (frontiere de nombre) dont la VALEUR egale l'ancien plafond
+# (parametre --old-ceiling, defaut 250) ; tout autre nombre isole (un compteur "2 approbations",
+# le "029" d'un identifiant "ADR-029"...) doit rester identique cote ligne retiree. Une ligne n'est
+# un remplacement pur que si au moins une telle substitution a eu lieu (NO_REPLACEMENT sinon).
 cat > "$TMPD/pair.awk" <<'AWKEOF'
-function swap(s,    i,n,ch,start,len,prevch,nxtch,boundary_ok,out) {
+function swap(s, old,    i,n,ch,start,len,prevch,nxtch,boundary_ok,tok,out) {
   out = ""
   i = 1
   n = length(s)
+  REPL = 0
   while (i <= n) {
     ch = substr(s, i, 1)
     if (ch ~ /[0-9]/) {
       start = i
       while (i <= n && substr(s, i, 1) ~ /[0-9]/) i++
       len = i - start
+      tok = substr(s, start, len)
       prevch = (start > 1) ? substr(s, start - 1, 1) : ""
       nxtch = (i <= n) ? substr(s, i, 1) : ""
       boundary_ok = 1
       if (prevch ~ /[0-9.]/) boundary_ok = 0
       if (nxtch ~ /[0-9]/) boundary_ok = 0
-      if (boundary_ok) { out = out "300" } else { out = out substr(s, start, len) }
+      if (boundary_ok && (tok + 0) == old) {
+        out = out "300"
+        REPL++
+      } else {
+        out = out tok
+      }
     } else {
       out = out ch
       i++
@@ -188,18 +220,19 @@ function swap(s,    i,n,ch,start,len,prevch,nxtch,boundary_ok,out) {
   }
   return out
 }
-BEGIN { nr = 0; na = 0 }
+BEGIN { nr = 0; na = 0; old_ceiling = (old_ceiling == "" ? 250 : old_ceiling + 0) }
 /^diff --git/ { next }
 /^--- / { next }
 /^\+\+\+ / { next }
 /^@@/ { next }
-/^-/ { nr++; removed[nr] = swap(substr($0, 2)); next }
+/^-/ { nr++; removed[nr] = swap(substr($0, 2), old_ceiling); repl[nr] = REPL; next }
 /^\+/ { na++; added[na] = substr($0, 2); next }
 END {
   if (nr != na) { print "COUNT_MISMATCH " nr " " na; exit }
   bad = 0
   for (k = 1; k <= nr; k++) {
     if (removed[k] != added[k]) { print "LINE_MISMATCH " k; bad = 1 }
+    else if (repl[k] < 1) { print "NO_REPLACEMENT " k; bad = 1 }
   }
   if (!bad) print "PASS"
 }
@@ -218,7 +251,14 @@ for c in "${NM_COMMITS[@]:-}"; do
     [ -n "$ap" ] || continue
     DIFFF="$TMPD/diff-$c-$(printf '%s' "$ap" | tr '/' '_')"
     git -C "$ROOT" diff -U0 "$c^" "$c" -- "$ap" > "$DIFFF" 2>/dev/null
-    RES="$(awk -f "$TMPD/pair.awk" "$DIFFF")"
+    AWKERR="$TMPD/pair-err-$c-$(printf '%s' "$ap" | tr '/' '_')"
+    RES="$(awk -v old_ceiling="$OLD_CEILING" -f "$TMPD/pair.awk" "$DIFFF" 2>"$AWKERR")"
+    AWK_RC=$?
+    if [ "$AWK_RC" -ne 0 ]; then
+      cat "$AWKERR" >&2
+      echo "[check-phase-invariants] awk a echoue (rc=$AWK_RC) sur $ap (commit $c) : erreur d'outillage, jamais un verdict metier" >&2
+      exit 2
+    fi
     case "$RES" in
       PASS) printf '%s\n' "$ap" >> "$AGENT_FILES_RAW" ;;
       "")   I2_OK=0; trace I2 "$c" "$ap : aucune ligne de diff exploitable" ;;
