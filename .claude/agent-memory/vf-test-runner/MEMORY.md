@@ -1,0 +1,1 @@
+- [Scroll-Off — lot failures ≠ perte de session](project_scrolloff-lot-failures-not-auth-loss.md) — screenshots montrent réseau (fetchCurrentUser AxiosError) et overlay Metro jest.mock, pas de login screen

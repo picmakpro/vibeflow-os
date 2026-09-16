@@ -1,0 +1,248 @@
+{
+  "nodes": [
+    {
+      "id": "exec-30-01",
+      "step": "30-01 moteur merge-hooks args + bash absolu + routage par scope (addendum 1)",
+      "stage": "build",
+      "deps": [],
+      "scope": [
+        "plugin/_internal/merge-hooks.sh",
+        "plugin/software-architecture/hooks/hooks.json",
+        "plugin/_internal/tests/test-merge-hooks.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-30-02",
+      "step": "30-02 draft RFC upstream (post GATE humain)",
+      "stage": "build",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-30-portabilit-windows-ii/30-RFC-UPSTREAM.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-30-03",
+      "step": "30-03 veille gsd-core >1.10.0",
+      "stage": "build",
+      "deps": [],
+      "scope": [
+        "scripts/check-gsd-core-update.sh",
+        "scripts/tests/test-check-gsd-core-update.sh",
+        ".planning/phases/VFDO-30-portabilit-windows-ii/30-VEILLE-GSD-CORE.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-30-01",
+      "step": "revue 30-01 (moteur, risque haut)",
+      "stage": "review",
+      "deps": [
+        "exec-30-01"
+      ],
+      "scope": [
+        "plugin/_internal/merge-hooks.sh"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "exec-30-04",
+      "step": "30-04 inventaire 25 entrees + codes de sortie dev",
+      "stage": "build",
+      "deps": [
+        "exec-30-01"
+      ],
+      "scope": [
+        "docs/HOOKS-CONTRAT-SORTIE.md",
+        "docs/superpowers/specs/2026-08-02-portabilite-windows-ii-design.md",
+        "plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh",
+        "plugin/dev-orchestrator/scripts/discover-unintegrated-docs.sh",
+        "plugin/dev-orchestrator/scripts/check-doc-drift.sh",
+        "plugin/dev-orchestrator/scripts/check-gsd-config.sh",
+        "plugin/dev-orchestrator/scripts/tests/test-hook-exit-contract.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-30-05",
+      "step": "30-05 lib vf-portable.sh + 3 PYBIN",
+      "stage": "build",
+      "deps": [
+        "exec-30-01"
+      ],
+      "scope": [
+        "plugin/_internal/lib/vf-portable.sh",
+        "plugin/_internal/vibeflow-update.sh",
+        "plugin/_internal/tests/test-vf-portable.sh",
+        "plugin/software-architecture/scripts/guard-file-size.sh",
+        "plugin/dev-orchestrator/scripts/inject-mcp-tools.sh",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh",
+        ".planning/phases/VFDO-30-portabilit-windows-ii/30-RELIQUATS.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-30-05",
+      "step": "revue 30-05 (lib partagee, contrat PR29)",
+      "stage": "review",
+      "deps": [
+        "exec-30-05"
+      ],
+      "scope": [
+        "plugin/_internal/lib/vf-portable.sh"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "exec-30-06",
+      "step": "30-06 parc gouvernance (20 fichiers)",
+      "stage": "build",
+      "deps": [
+        "exec-30-04"
+      ],
+      "scope": [
+        "plugin/conductor/",
+        "plugin/consolidator/",
+        "plugin/planning-core/",
+        "plugin/infrastructure-audit/",
+        "scripts/tests/test-hook-exit-parc.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-30-07",
+      "step": "30-07 fragments dev forme exec + ADR",
+      "stage": "build",
+      "deps": [
+        "exec-30-01",
+        "exec-30-04",
+        "exec-30-05"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/hooks/hooks.json",
+        "plugin/_internal/tests/test-vibeflow-update.sh",
+        "docs/ADR.md",
+        "plugin/dev-orchestrator/VERSION",
+        "plugin/dev-orchestrator/module.json",
+        "plugin/dev-orchestrator/CHANGELOG.md",
+        "plugin/dev-orchestrator/README.md",
+        "plugin/software-architecture/VERSION",
+        "plugin/software-architecture/module.json",
+        "plugin/software-architecture/CHANGELOG.md",
+        "plugin/software-architecture/README.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-30-0607",
+      "step": "revue jointure 30-06+30-07 (parc 31 fichiers)",
+      "stage": "review",
+      "deps": [
+        "exec-30-06",
+        "exec-30-07"
+      ],
+      "scope": [
+        "plugin/"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "exec-30-09",
+      "step": "30-09 ADDENDUM hook SessionStart de verification des chemins absolus (26e entree)",
+      "stage": "build",
+      "deps": [
+        "exec-30-06",
+        "exec-30-07"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/check-hook-paths.sh",
+        "plugin/dev-orchestrator/hooks/hooks.json",
+        "docs/HOOKS-CONTRAT-SORTIE.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-30-09",
+      "step": "revue 30-09 (addendum, bootstrap bash nu)",
+      "stage": "review",
+      "deps": [
+        "exec-30-09"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/check-hook-paths.sh"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "exec-30-08",
+      "step": "30-08 preuve CI lab frais (push GATE humain)",
+      "stage": "build",
+      "deps": [
+        "exec-30-09"
+      ],
+      "scope": [
+        ".github/workflows/ci.yml",
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "verif-phase",
+      "step": "verification goal-backward de la phase",
+      "stage": "verify",
+      "deps": [
+        "exec-30-08",
+        "revue-30-01",
+        "revue-30-05",
+        "revue-30-0607",
+        "revue-30-09"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire (STATE/ROADMAP + surface publique)",
+      "stage": "docs",
+      "deps": [
+        "verif-phase"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-30-04",
+      "step": "revue 30-04 (contrat de sortie, 4 scripts SessionStart)",
+      "stage": "review",
+      "deps": [
+        "exec-30-04"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "solde-30",
+      "step": "solde: BOM, reliquats ADR-071/T12, SUMMARY 30-02+30-07",
+      "stage": "build",
+      "deps": [
+        "exec-30-09",
+        "exec-30-08"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/check-hook-paths.sh",
+        "docs/ADR.md",
+        "plugin/_internal/tests/test-vf-portable.sh"
+      ],
+      "status": "done"
+    }
+  ]
+}

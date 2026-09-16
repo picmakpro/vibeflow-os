@@ -1,0 +1,117 @@
+{
+  "nodes": [
+    {
+      "id": "canal-runtimes",
+      "step": "A1 — codex/opencode/kimi-code ont-ils un gestionnaire d'extensions ? + ce que le marketplace Claude rend gratuitement",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "canal-npm",
+      "step": "A2 — precedent npm gsd-core : ce que ca coute, resout, impose",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "~/.claude/gsd-core/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "lab-frontiere",
+      "step": "B1 — frontiere agnostique/Claude-specifique d'un lab reel : fuites .claude dans .planning, hooks, memoire",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/**",
+        ".claude/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "lab-migration",
+      "step": "B2 — bascule vs coexistence, reversibilite, /vf-update vs vf-migrate, host-runtime-detection",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/_internal/**",
+        "plugin/conductor/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "redaction",
+      "step": "Document d'etude + proposition de cadrage (phase 38 / extension 37 / repli dans l'adaptateur)",
+      "stage": "",
+      "deps": [
+        "canal-runtimes",
+        "canal-npm",
+        "lab-frontiere",
+        "lab-migration",
+        "codex-marketplace",
+        "superpowers"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-37-portabilit-multi-runtime-spike-codex-opencode-kimi/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue",
+      "step": "Revue adversariale du document d'etude",
+      "stage": "",
+      "deps": [
+        "redaction",
+        "redaction-memoire"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-37-portabilit-multi-runtime-spike-codex-opencode-kimi/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "codex-marketplace",
+      "step": "A1b — test REEL codex plugin marketplace add sur clone jetable : source.path non conventionnel accepte ? refus lisible ou pose partielle ?",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "SCRATCHPAD"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "superpowers",
+      "step": "A1c — inventaire de la dependance superpowers : quels skills, depuis quels fichiers, combien d'appels + cout des 3 options",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "memoire-norme",
+      "step": "B7 — norme memory: par runtime, test symlink reel, mecanisme de liaison selon le mode d'install",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "SCRATCHPAD"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "redaction-memoire",
+      "step": "Section propre 'memoire d'agent' ajoutee au document d'etude",
+      "stage": "",
+      "deps": [
+        "redaction",
+        "memoire-norme"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-37-portabilit-multi-runtime-spike-codex-opencode-kimi/**"
+      ],
+      "status": "done"
+    }
+  ]
+}

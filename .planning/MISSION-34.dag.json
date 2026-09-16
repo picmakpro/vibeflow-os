@@ -1,0 +1,143 @@
+{
+  "nodes": [
+    {
+      "id": "exec-34-01",
+      "step": "run mobile reel (AGTS-02)",
+      "stage": "build",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-34-gaps-agency-agents-cadrage-skill-installer/34-RUN-MOBILE.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-34-02",
+      "step": "spike SKIL-01 (go/no-go)",
+      "stage": "build",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-34-gaps-agency-agents-cadrage-skill-installer/34-SPIKE-SKIL.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-34-03",
+      "step": "audit gaps agency-agents (AGTS-01)",
+      "stage": "build",
+      "deps": [],
+      "scope": [
+        ".planning/phases/VFDO-34-gaps-agency-agents-cadrage-skill-installer/34-AUDIT-AGTS.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-w1",
+      "step": "revue de jointure vague 1",
+      "stage": "review",
+      "deps": [
+        "exec-34-01",
+        "exec-34-02",
+        "exec-34-03"
+      ],
+      "scope": [],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "audit-w1",
+      "step": "audit territoire utilisateur + cross-repo (34-01/34-02)",
+      "stage": "audit",
+      "deps": [
+        "exec-34-01",
+        "exec-34-02"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-34-04",
+      "step": "sortie statut experimental mobile-test (conditionnel run VERT)",
+      "stage": "build",
+      "deps": [
+        "revue-w1",
+        "audit-w1"
+      ],
+      "scope": [
+        "plugin/mobile-test/**",
+        "plugin/mobile-test-team/**",
+        "manual/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-34-05",
+      "step": "construction web-test-team (conditionnel 34-04)",
+      "stage": "build",
+      "deps": [
+        "exec-34-04"
+      ],
+      "scope": [
+        "plugin/web-test-team/**",
+        "README.md",
+        "README.fr.md",
+        "manual/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-w23",
+      "step": "revue vagues 2-3",
+      "stage": "review",
+      "deps": [
+        "exec-34-04",
+        "exec-34-05"
+      ],
+      "scope": [],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "exec-34-06",
+      "step": "consolidation ledger + STATE/ROADMAP",
+      "stage": "build",
+      "deps": [
+        "revue-w23"
+      ],
+      "scope": [
+        ".planning/BACKLOG.md",
+        ".planning/REQUIREMENTS.md",
+        ".planning/PROJECT.md",
+        ".planning/STATE.md",
+        ".planning/ROADMAP.md",
+        ".planning/phases/VFDO-34-gaps-agency-agents-cadrage-skill-installer/34-06-BASE.sha"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-w4",
+      "step": "revue consolidation",
+      "stage": "review",
+      "deps": [
+        "exec-34-06"
+      ],
+      "scope": [],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire (fin de mission)",
+      "stage": "docs",
+      "deps": [
+        "exec-34-01",
+        "exec-34-02",
+        "exec-34-03",
+        "exec-34-04",
+        "exec-34-05",
+        "exec-34-06"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

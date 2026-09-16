@@ -1,0 +1,198 @@
+{
+  "nodes": [
+    {
+      "id": "mesure-baseref",
+      "step": "WKTR-02 rejoué NON dégénéré : le worktree fork-t-il depuis le HEAD courant ou la branche par défaut ? (leg B de #38)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "cadrage",
+      "step": "35-CONTEXT.md — cadrage porté par le manager (Pattern F)",
+      "stage": "",
+      "deps": [
+        "mesure-baseref"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-35-*/35-CONTEXT.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plan",
+      "step": "plans d'exécution 35-NN-PLAN.md",
+      "stage": "",
+      "deps": [
+        "cadrage"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-35-*/35-*-PLAN.md"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "plancheck",
+      "step": "re-validation des plans avant exécution",
+      "stage": "",
+      "deps": [
+        "plan"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-qual01",
+      "step": "QUAL-01 : sonde de précondition (releasé ET installé) + comparateur semver, née testée — 3 issues dont imparsable=BRUYANT + mutation rouge",
+      "stage": "",
+      "deps": [
+        "plancheck"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/check-worktree-precondition.sh",
+        "plugin/dev-orchestrator/scripts/tests/test-check-worktree-precondition.sh"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-gate",
+      "step": "levée conditionnelle du palier dur check-agents.sh:547-571 + test de discriminance isolation:worktree + commentaire T44 périmé",
+      "stage": "",
+      "deps": [
+        "plancheck"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/check-agents.sh",
+        "plugin/conductor/scripts/tests/test-check-agents.sh"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-wktr01",
+      "step": "WKTR-01 : # vf-provides: worktree-baseref porté par ensure-deps.sh (attestation réelle) + extension du plancher lab-frais-arme",
+      "stage": "",
+      "deps": [
+        "exec-qual01"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/scripts/ensure-deps.sh",
+        ".github/workflows/ci.yml",
+        "plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-rearm",
+      "step": "ré-armement des 13 agents écrivains non-managers : vf-requires: worktree-baseref + isolation: worktree",
+      "stage": "",
+      "deps": [
+        "exec-gate",
+        "exec-wktr01"
+      ],
+      "scope": [
+        "plugin/*/agents/*.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-doctrine",
+      "step": "doctrine de ré-armement : team-kernel.md + contrainte commandes composées (un seul verbe git par Bash, Write/Edit)",
+      "stage": "",
+      "deps": [
+        "exec-gate"
+      ],
+      "scope": [
+        "plugin/conductor/references/team-kernel.md",
+        "plugin/dev-orchestrator/references/mission-flow.md",
+        "plugin/dev-orchestrator/references/mission-contracts.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "revue",
+      "step": "revue de premier rang du diff complet",
+      "stage": "",
+      "deps": [
+        "exec-rearm",
+        "exec-doctrine"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "audit",
+      "step": "audit : gates partagés + zone de risque MISSION-INVARIANTS (check-*.sh, agents managers)",
+      "stage": "",
+      "deps": [
+        "exec-rearm",
+        "exec-doctrine"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "docs",
+      "step": "hygiène documentaire finale (STATE/ROADMAP/REQUIREMENTS/CHANGELOG)",
+      "stage": "",
+      "deps": [
+        "exec-rearm",
+        "exec-doctrine",
+        "exec-wktr01",
+        "exec-qual01"
+      ],
+      "scope": [
+        ".planning/STATE.md",
+        ".planning/ROADMAP.md",
+        ".planning/REQUIREMENTS.md",
+        "CHANGELOG.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "fix-rouges",
+      "step": "deux gates ROUGES préexistants sur main : chemin machine versionné (doc WKTR-02) + index capabilities dérivé (gsd-core 1.11.0)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/research/2026-08-23-wktr-02-preuve-retour-commits-worktree.md",
+        "plugin/dev-orchestrator/references/gsd-capabilities-index.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "retrait-baseref",
+      "step": "retrait de worktree.baseRef head du settings.local.json (arbitrage Samuel)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".claude/settings.local.json"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "cloture-a",
+      "step": "Option A : amendement de la preuve dégénérée + requalification WKTR-01/02 au ledger + motif de maintien des deux gates + ROADMAP/STATE",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/research/2026-08-23-wktr-02-preuve-retour-commits-worktree.md",
+        ".planning/REQUIREMENTS.md",
+        ".planning/ROADMAP.md",
+        ".planning/STATE.md",
+        "plugin/conductor/references/team-kernel.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-a",
+      "step": "revue de premier rang du diff complet de la mission",
+      "stage": "",
+      "deps": [
+        "cloture-a"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

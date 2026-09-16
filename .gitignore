@@ -58,3 +58,10 @@ __pycache__/
 # liens de mutex de reprise, liens temporaires de bascule, et le journal
 # d'événements .events.log ajouté en Phase 32).
 .planning/DRIVER.lock*
+
+# État runtime local du moteur GSD, jamais versionné (E2 de check-mission-exit.sh :
+# un non suivi non ignoré rend l'arbre sale — arbitrage Samuel, session principale,
+# 2026-09-16). `.gsd/` porte la sentinelle de dispatch-isolation (périme en 10 min) ;
+# `.planning/state.json` est la projection générée par gsd-core depuis STATE.md/ROADMAP.md.
+.gsd/
+.planning/state.json
