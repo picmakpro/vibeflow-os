@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # test-check-phase-invariants.sh — fixtures jetables pour check-phase-invariants.sh.
-# Cas V1-V13 (voir 40.1-02-PLAN.md, Task 2). Sortie: "== resultat : N ok, M ko ==".
+# Cas V1-V13 (voir 40.1-02-PLAN.md, Task 2), plus V14-V17 (correction ciblee du 2026-09-17,
+# constats revue et audit de la mission d'execution 40.1 : swap() restreint a l'ancien plafond,
+# LC_ALL=C, rc de git rev-list). Sortie: "== resultat : N ok, M ko ==".
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -210,6 +212,135 @@ rc=0; run_cpi "$R12" || rc=$?
 case "$LAST_OUT" in *"I3=ko"*) i3_ko=1 ;; *) i3_ko=0 ;; esac
 [ "$rc" -eq 1 ] && [ "$i3_ko" -eq 1 ] && v=ok || v=ko
 report V12 "$v" "baseline sous-estimee (hausse), attendu rc=1 I3=ko, obtenu rc=$rc"
+
+# new_agent_repo_unicode -> comme new_agent_repo, mais l'agent 'a' porte une ligne accentuee avec un
+# "≤" multi-octets et un identifiant "ADR-029" (constat 2 : awk plante sous macOS hors LC_ALL=C sur
+# ce type de contenu ; constat 1 : sans restriction a l'ancienne valeur du plafond, le "029" de
+# "ADR-029" serait lui aussi swappe en 300, provoquant un LINE_MISMATCH sur une ligne pourtant
+# inchangee).
+new_agent_repo_unicode() {
+  local r
+  r="$(mktemp -d)"
+  git -C "$r" -c user.name=t -c user.email=t@t.co init -q -b main
+  printf 'v0.0.1\n' > "$r/VERSION"
+  mkdir -p "$r/plugin/a" "$r/plugin/b" "$r/plugin/c/agents" "$r/plugin/conductor/scripts" "$r/.planning"
+  {
+    printf '# Agent Test\n\n## Regles\n\n'
+    printf -- '- agents \xe2\x89\xa4 250 lignes (ADR-029)\n'
+    printf -- '- ligne neutre de contenu\n'
+  } > "$r/plugin/a/AGENT.md"
+  agent_content "250 lignes" > "$r/plugin/b/AGENT.md"
+  agent_content "250 lignes" > "$r/plugin/c/agents/x.md"
+  cp "$REAL_GATE" "$r/plugin/conductor/scripts/check-instruction-budget.sh"
+  chmod +x "$r/plugin/conductor/scripts/check-instruction-budget.sh"
+  git -C "$r" add -A
+  git -C "$r" -c user.name=t -c user.email=t@t.co commit -q -m "base agents unicode"
+
+  local mout
+  mout="$(bash "$r/plugin/conductor/scripts/check-instruction-budget.sh" --path "$r" 2>/dev/null)"
+  local bl="$r/.planning/instruction-budget-baselines.tsv"
+  : > "$bl"
+  local rel lines instr
+  for rel in plugin/a/AGENT.md plugin/b/AGENT.md plugin/c/agents/x.md; do
+    lines="$(printf '%s\n' "$mout" | awk -F' \\| ' -v f="$rel" '$1==f{print $2; exit}')"
+    instr="$(printf '%s\n' "$mout" | awk -F' \\| ' -v f="$rel" '$1==f{print $4; exit}')"
+    printf '%s\t%s\t%s\n' "$rel" "$lines" "$instr" >> "$bl"
+  done
+  : > "$r/.planning/.instruction-budget-armed"
+  git -C "$r" add -A
+  git -C "$r" -c user.name=t -c user.email=t@t.co commit -q -m "baseline + sentinelle"
+  git -C "$r" checkout -q -b w
+  printf '%s\n' "$r"
+}
+
+# new_agent_repo_approvals -> comme new_agent_repo, mais l'agent 'a' porte en plus une ligne
+# "au moins 2 approbations requises" : un nombre isole SANS RAPPORT avec le plafond ADR-029, utilise
+# pour prouver que swap() ne remplace plus N'IMPORTE QUEL nombre par 300 (constat 1).
+new_agent_repo_approvals() {
+  local r
+  r="$(mktemp -d)"
+  git -C "$r" -c user.name=t -c user.email=t@t.co init -q -b main
+  printf 'v0.0.1\n' > "$r/VERSION"
+  mkdir -p "$r/plugin/a" "$r/plugin/b" "$r/plugin/c/agents" "$r/plugin/conductor/scripts" "$r/.planning"
+  printf '# Agent Test\n\n## Regles\n\n- agents <= 250 lignes\n- au moins 2 approbations requises\n' > "$r/plugin/a/AGENT.md"
+  agent_content "250 lignes" > "$r/plugin/b/AGENT.md"
+  agent_content "250 lignes" > "$r/plugin/c/agents/x.md"
+  cp "$REAL_GATE" "$r/plugin/conductor/scripts/check-instruction-budget.sh"
+  chmod +x "$r/plugin/conductor/scripts/check-instruction-budget.sh"
+  git -C "$r" add -A
+  git -C "$r" -c user.name=t -c user.email=t@t.co commit -q -m "base agents approvals"
+
+  local mout
+  mout="$(bash "$r/plugin/conductor/scripts/check-instruction-budget.sh" --path "$r" 2>/dev/null)"
+  local bl="$r/.planning/instruction-budget-baselines.tsv"
+  : > "$bl"
+  local rel lines instr
+  for rel in plugin/a/AGENT.md plugin/b/AGENT.md plugin/c/agents/x.md; do
+    lines="$(printf '%s\n' "$mout" | awk -F' \\| ' -v f="$rel" '$1==f{print $2; exit}')"
+    instr="$(printf '%s\n' "$mout" | awk -F' \\| ' -v f="$rel" '$1==f{print $4; exit}')"
+    printf '%s\t%s\t%s\n' "$rel" "$lines" "$instr" >> "$bl"
+  done
+  : > "$r/.planning/.instruction-budget-armed"
+  git -C "$r" add -A
+  git -C "$r" -c user.name=t -c user.email=t@t.co commit -q -m "baseline + sentinelle"
+  git -C "$r" checkout -q -b w
+  printf '%s\n' "$r"
+}
+
+# --- V14 : ligne accentuee (≤) avec identifiant "ADR-029" + remplacement legitime, attendu PASS -----
+R14="$(new_agent_repo_unicode)"
+touch_baseline_comment "$R14"
+sed -i.bak 's/250 lignes/300 lignes/' "$R14/plugin/a/AGENT.md" && rm -f "$R14/plugin/a/AGENT.md.bak"
+sed -i.bak 's/<= 250 lignes/<= 300 lignes/' "$R14/plugin/b/AGENT.md" && rm -f "$R14/plugin/b/AGENT.md.bak"
+sed -i.bak 's/<= 250 lignes/<= 300 lignes/' "$R14/plugin/c/agents/x.md" && rm -f "$R14/plugin/c/agents/x.md.bak"
+git -C "$R14" add -A
+git -C "$R14" -c user.name=t -c user.email=t@t.co commit -q -m "feat: adr-029 plafond 300 (unicode)"
+rc=0; run_cpi "$R14" || rc=$?
+case "$LAST_OUT" in *"fichiers=3"*) fn_ok=1 ;; *) fn_ok=0 ;; esac
+[ "$rc" -eq 0 ] && [ "$fn_ok" -eq 1 ] && v=ok || v=ko
+report V14 "$v" "ligne accentuee (≤) + ADR-029 non swappe + remplacement legitime, attendu rc=0 fichiers=3, obtenu rc=$rc : $(printf '%s' "$LAST_OUT" | awk '/^INVARIANTS/')"
+
+# --- V15 : un AUTRE nombre devient 300 (2 approbations -> 300), a cote d'un remplacement legitime ---
+R15="$(new_agent_repo_approvals)"
+touch_baseline_comment "$R15"
+sed -i.bak 's/<= 250 lignes/<= 300 lignes/; s/au moins 2 approbations requises/au moins 300 approbations requises/' "$R15/plugin/a/AGENT.md" && rm -f "$R15/plugin/a/AGENT.md.bak"
+sed -i.bak 's/<= 250 lignes/<= 300 lignes/' "$R15/plugin/b/AGENT.md" && rm -f "$R15/plugin/b/AGENT.md.bak"
+sed -i.bak 's/<= 250 lignes/<= 300 lignes/' "$R15/plugin/c/agents/x.md" && rm -f "$R15/plugin/c/agents/x.md.bak"
+git -C "$R15" add -A
+git -C "$R15" -c user.name=t -c user.email=t@t.co commit -q -m "feat: adr-029 plafond 300 + approbations falsifiees"
+rc=0; run_cpi "$R15" || rc=$?
+case "$LAST_OUT" in *"I2=ko"*) i2_ko=1 ;; *) i2_ko=0 ;; esac
+[ "$rc" -eq 1 ] && [ "$i2_ko" -eq 1 ] && v=ok || v=ko
+report V15 "$v" "nombre sans rapport (2 approbations) devient 300 malgre un remplacement legitime a cote, attendu rc=1 I2=ko, obtenu rc=$rc"
+
+# --- V16 : l'ancien plafond devient autre chose que 300 (301) -------------------------------------
+R16="$(new_agent_repo)"
+touch_baseline_comment "$R16"
+sed -i.bak 's/<= 250 lignes/<= 301 lignes/' "$R16/plugin/a/AGENT.md" && rm -f "$R16/plugin/a/AGENT.md.bak"
+sed -i.bak 's/<= 250 lignes/<= 300 lignes/' "$R16/plugin/b/AGENT.md" && rm -f "$R16/plugin/b/AGENT.md.bak"
+sed -i.bak 's/<= 250 lignes/<= 300 lignes/' "$R16/plugin/c/agents/x.md" && rm -f "$R16/plugin/c/agents/x.md.bak"
+git -C "$R16" add -A
+git -C "$R16" -c user.name=t -c user.email=t@t.co commit -q -m "feat: plafond errone a 301"
+rc=0; run_cpi "$R16" || rc=$?
+case "$LAST_OUT" in *"I2=ko"*) i2_ko=1 ;; *) i2_ko=0 ;; esac
+[ "$rc" -eq 1 ] && [ "$i2_ko" -eq 1 ] && v=ok || v=ko
+report V16 "$v" "ancien plafond remplace par 301 (pas 300), attendu rc=1 I2=ko, obtenu rc=$rc"
+
+# --- V17 : ref cassee (stub phase-base.sh renvoie une base inexistante), attendu rc=2 ----------------
+R17="$(new_agent_repo)"
+touch_baseline_comment "$R17"
+bump_three_agents "$R17"
+SCRATCH17="$(mktemp -d)"
+cp "$CPI" "$SCRATCH17/check-phase-invariants.sh"
+cat > "$SCRATCH17/phase-base.sh" <<'EOF'
+#!/usr/bin/env bash
+echo "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+exit 0
+EOF
+chmod +x "$SCRATCH17/phase-base.sh" "$SCRATCH17/check-phase-invariants.sh"
+rc=0; LAST_OUT="$(bash "$SCRATCH17/check-phase-invariants.sh" --root "$R17" 2>&1)" && rc=0 || rc=$?
+[ "$rc" -eq 2 ] && v=ok || v=ko
+report V17 "$v" "ref cassee (stub phase-base.sh renvoie une base inexistante), attendu rc=2, obtenu rc=$rc : $LAST_OUT"
 
 # --- V13 : agent non touche par la branche, baseline SUR-estimee (marge) ---------------------------
 R13="$(new_agent_repo plugin/c/agents/x.md 1)"
