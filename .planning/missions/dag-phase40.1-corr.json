@@ -1,0 +1,32 @@
+{
+  "nodes": [
+    {
+      "id": "fix",
+      "step": "correction ciblée W-A..W-D (plans 02,07,13,14)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "check",
+      "step": "plan-checker frais",
+      "stage": "",
+      "deps": [
+        "fix"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "close",
+      "step": "E6 + STATE + commit",
+      "stage": "",
+      "deps": [
+        "check"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

@@ -221,6 +221,13 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
   rapport de mission). Le recensement réel du plafond compte 113 lignes vivantes dans 56 fichiers, là où
   `git grep -w 250` en donnait bien moins (forme `250L` manquée). L'exécution suppose le hotfix
   v2.63.1 mergé dans la base (précondition des plans 07 et 14). Rien n'est exécuté.
+  **Correction ciblée le 2026-09-16** (arbitrage Samuel « correction ciblée d'abord », AskUserQuestion
+  session principale, 2026-09-16) : W-A à W-D fermés en 3 tours, commits `2d319e9` → `c6fcef1` →
+  `46e6266`, un checker neuf à chaque tour. La précondition hotfix est désormais une Task 0 machine
+  en tête de 01, 02, 07 et 14 (même arbitrage : l'exécution attend le merge du hotfix dans main).
+  Reste un bloquant sur le plan 13 T3 : une phrase collée avant le paragraphe du manuel échappe à
+  la comparaison. Décision (paragraphe ou section) remontée à la session principale. Branche non
+  rebasée sur `origin/main` (61d80bf, qui contient le hotfix). Rien n'est exécuté.
 
 - 2026-09-15 : **Phase 40 exécutée — `vibeflow-dev` devient `vibeflow-head`, head of minds du
   dev-orchestrator.** 5 plans sur 3 vagues (40-01 `exec-rename`, 40-02 `exec-e6`, 40-03
