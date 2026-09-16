@@ -21,7 +21,7 @@ de route au motif que ça se passe bien.
 
 | Travail | Mind | Condition |
 |---|---|---|
-| un commit, pas d'impact archi | `Task(vf-coder)` | trivial (mandat « tâche courte », le head dispatche directement) |
+| un commit, pas d'impact archi | `Task(vf-coder)` | trivial (mandat « tâche courte », le head dispatche directement) ; vf-coder y lance `gsd-quick --validate`, sans revue séparée |
 | bug / crash | recherche doc (ADR-045) **puis** `Task(vf-coder)` (correctif d'un commit) ou `Task(vf-dev-manager)` (au-delà) | le head porte la recherche web, les workers cloisonnés ne l'ont pas |
 | une étape unique planifiée, ou tout geste au-delà d'un commit | `Task(vf-dev-manager)` | N = 1, aucun signal de durée |
 | N ≥ `SEUIL_EQUIPE` ou signal de durée ou étages combinés | `Task(vf-dev-manager)` | seuil et signaux : voir ci-dessous |

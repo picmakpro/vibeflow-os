@@ -21,9 +21,9 @@ Une étape (numéro + objectif + critères de succès), fournie par `vf-dev-mana
 implémentation d'une mission design (`vf-design-manager`, opt-in `livrable:
 specs+implementation`), ton entrée devient la **spec du crafter** (chemin sur disque pointé par
 le digest) — pas la ROADMAP : c'est le **manager** qui cadre (`gsd-discuss-phase`) sur cette spec,
-ton entrée à toi reste la spec. **Mandat tâche courte** (dispatché par `vibeflow-head`, un commit,
-pas d'impact archi) : skill `gsd-quick` (`gsd-quick-batch` si ≥ 2 items), commit atomique, rapport
-typé renvoyé au head.
+ton entrée à toi reste la spec. **Mandat tâche courte** (dispatché par `vibeflow-head`, un
+commit, pas d'impact archi) : skill `gsd-quick --validate` (`gsd-quick-batch --validate` si ≥ 2
+items) — vérification outillée de ce chemin (plan-checking + `gsd-verifier`), sans revue séparée.
 
 ## Le cycle (délégation)
 
@@ -39,8 +39,7 @@ Enchaîne les sous-phases en déléguant à la machinerie existante :
    §Pattern E. Si la revue signale des manques, le manager te redispatche un mandat de
    **correction CIBLÉE** (les findings remontés, rien d'autre) — jamais un nouveau cycle complet.
 
-Si une sous-phase est déjà faite (CONTEXT ou PLAN existants dans `.planning/phases/<étape>/`),
-ne la refais pas : reprends où c'est pertinent.
+Si une sous-phase est déjà faite (CONTEXT ou PLAN existants dans `.planning/phases/<étape>/`), ne la refais pas : reprends où c'est pertinent.
 
 ## Compartiment de planning — passer `--ws`, ne jamais présumer
 
@@ -76,7 +75,8 @@ creuser. Tu ne pars en debug empirique QUE si la recherche n'a rien donné.
 Renvoie au dispatcheur qui a mandaté (`vibeflow-head` sur une tâche courte, `vf-dev-manager`, ou
 `vf-design-manager` en étage implémentation) : sous-phases exécutées, commits produits (SHA),
 fichiers touchés, et tout point nécessitant une décision (zone grise) ou l'attention de
-l'utilisateur. Aucun verdict de revue : il vient désormais de `vf-reviewer`, dispatché en direct par le manager.
+l'utilisateur. Deux mandats : cycle d'étape (manager) → revue par `vf-reviewer` en direct,
+inchangé ; tâche courte (head) → verdict relayé de `gsd-quick --validate` (`gsd-verifier`), sans revue séparée.
 
 **Termine par le bloc typé** (contrat ADR-053, cf. `dev-orchestrator-references/mission-flow.md`) :
 `{ "statut": "passed|gaps_found|human_needed|blocked", "findings": [{ "severity": "…", "action": "auto-fix|no-op|ask-user", "ref": "fichier:ligne" }], "noeuds_debloques": ["<id DAG>"] }`.

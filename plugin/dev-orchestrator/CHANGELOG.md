@@ -26,6 +26,15 @@
   read-only comme « porté par l'équipe » ; le §Garde-fous conserve intégralement la garantie
   ADR-031 avec l'exécutant devenu l'équipe mandatée par le head, jamais « je lance ». Budget
   ADR-029 inchangé : 209 lignes / 33 instructions (armé, marge zéro).
+- **Correctif ciblé (option a) — chemin court head → `vf-coder` sans revue séparée** : la revue
+  avait relevé qu'aucun mécanisme de relecture n'existait sur ce chemin (`vf-reviewer` n'étant
+  dispatché que par un manager) — arbitrage Samuel, AskUserQuestion session principale,
+  2026-09-16, option (a). Sur un mandat « tâche courte », `vf-coder` lance désormais TOUJOURS
+  `gsd-quick --validate` (`gsd-quick-batch --validate` si ≥ 2 items) : plan-checking ≤ 2
+  itérations + vérification post-exécution par `gsd-verifier` sert de vérification outillée du
+  chemin court. `vf-coder.md` (§Entrée, §Retour) et `head-governance.md` (§1, colonne Condition,
+  jamais Mind) documentent la distinction avec le cycle d'étape (manager → `vf-reviewer`,
+  inchangé). Budget ADR-029 inchangé : 122 lignes / 21 instructions (armé, marge 2 instructions).
 
 ## [v2.22.0] — 2026-09-15 (Phase 40 — vibeflow-head, gate de sortie de mission, contrat de preuves E6)
 
