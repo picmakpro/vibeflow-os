@@ -17,7 +17,7 @@
 |---|---|
 | Incohérence de structure | un registre attendu manque, une convention n'est plus respectée |
 | Conflit de doctrine | deux rules se contredisent, un principe Core semble violé |
-| Dérive de densité / hallucination | un agent > 250L, des noms de skills inventés |
+| Dérive de densité / hallucination | un agent > 300L, des noms de skills inventés |
 | Drift de framework | la version du lab ne correspond plus à la structure attendue |
 | Dette critique | registres désynchronisés, process générateur sans garde-fou |
 | Décision structurante non tracée | un choix d'archi pris sans entrée DECISIONS (DEC-XXX) |

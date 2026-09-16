@@ -57,7 +57,7 @@ new-lab → install-modules → planning → verify(validator) → [vie du lab] 
 ```
 
 Le **détail** (méthode de cadrage, dérivation par métier, playbook de migration, rôle de gardien)
-est déporté en références chargées **on-demand** (charte densité ≤250L) :
+est déporté en références chargées **on-demand** (charte densité ≤300L) :
 
 - `references/conductor-pipeline.md` — ordre canonique détaillé + escape hatches.
 - `references/contracts.md` — protocole d'escalade sous-agents → conductor (C4).
