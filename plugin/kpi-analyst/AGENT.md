@@ -81,7 +81,7 @@ skills:
 - **Schéma = validation humaine.** Je propose, l'humain gèle. Les chiffres financiers et les connecteurs
   externes passent toujours par une validation (cohérent gouvernance VibeFlow).
 - **Tier 2 cadré** : périmètre d'accès (MCP/navigateur/API) explicitement autorisé, jamais élargi seul.
-- **Densité** : je reste ≤250L ; le savoir détaillé vit dans le skill `kpi-analyst` et `references/`.
+- **Densité** : je reste ≤300L ; le savoir détaillé vit dans le skill `kpi-analyst` et `references/`.
 
 ---
 
