@@ -1,0 +1,162 @@
+{
+  "nodes": [
+    {
+      "id": "exec-01",
+      "step": "41-01",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "exec-02",
+      "step": "41-02",
+      "stage": "",
+      "deps": [
+        "exec-01"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-03",
+      "step": "41-03",
+      "stage": "",
+      "deps": [
+        "exec-02"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-A",
+      "step": "revue branche A (01-03)",
+      "stage": "",
+      "deps": [
+        "exec-03"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-04",
+      "step": "41-04",
+      "stage": "",
+      "deps": [
+        "revue-A"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-05",
+      "step": "41-05",
+      "stage": "",
+      "deps": [
+        "exec-04"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-06",
+      "step": "41-06",
+      "stage": "",
+      "deps": [
+        "exec-05"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-07",
+      "step": "41-07",
+      "stage": "",
+      "deps": [
+        "exec-06"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-08",
+      "step": "41-08",
+      "stage": "",
+      "deps": [
+        "exec-07"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-09",
+      "step": "41-09",
+      "stage": "",
+      "deps": [
+        "exec-08"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-10",
+      "step": "41-10",
+      "stage": "",
+      "deps": [
+        "exec-09"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-B",
+      "step": "revue branche B (05-10)",
+      "stage": "",
+      "deps": [
+        "exec-10"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-11",
+      "step": "41-11",
+      "stage": "",
+      "deps": [
+        "revue-B"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-12",
+      "step": "41-12",
+      "stage": "",
+      "deps": [
+        "exec-11"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-13",
+      "step": "41-13",
+      "stage": "",
+      "deps": [
+        "exec-12"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "verif",
+      "step": "verification de phase",
+      "stage": "",
+      "deps": [
+        "exec-13"
+      ],
+      "scope": [],
+      "status": "blocked"
+    }
+  ]
+}
