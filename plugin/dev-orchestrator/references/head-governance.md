@@ -108,8 +108,12 @@ Quatre codes de sortie, et une conduite par code :
 - **outillage illisible** : escalade humaine.
 
 **Cas `blocked` + `cause: "profondeur"`** (B2, `mission-contracts.md` §Retour « bloqué :
-profondeur ») — ce n'est **pas un cinquième code** : le contrat canonique garde ses quatre
-statuts, et celui-ci reste `"statut": "blocked"` (jamais `human_needed`). Un `vf-coder` a
+profondeur ») — ce n'est **pas un cinquième code** parmi les quatre codes de sortie du gate
+ci-dessus (sain / manque(s) nommé(s) / indéterminé / outillage illisible) : ceux-ci restent au
+nombre de quatre. Ce cas relève d'une taxonomie distincte, celle du contrat canonique Pattern C
+(`mission-contracts.md`), dont le rapport typé garde lui aussi ses quatre statuts
+(`passed|gaps_found|human_needed|blocked`) — et celui-ci reste `"statut": "blocked"` (jamais
+`human_needed`). Un `vf-coder` a
 constaté l'outil `Agent` absent et rendu son mandat intact via son manager. Le head **ne
 redispatche jamais au même niveau** (ce qui reproduirait la même profondeur) et ne code jamais à
 sa place (ADR-031) : il relance le mandat **depuis la session principale**, au niveau où l'outil

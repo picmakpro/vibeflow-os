@@ -1406,33 +1406,53 @@ fi
 #   manager 1, `vf-coder` 2, briques GSD 3 → la nouvelle distribution des profondeurs visees
 #   descripteur verbatim (7 champs) → le fait de runtime brut reste recopie tel quel (non reinterprete)
 T76_KERNEL="$(cd "$SCRIPTS_DIR/.." && pwd)/references/team-kernel.md"
+
+# Detection FACTORISEE en fonction (patron T38 t38a_gate/t38d_affirmative_hits,
+# test-dev-orchestrator.sh:6706 et 6778) : c'est la MEME boucle qui sert au controle primaire
+# de T76 et a la preuve de discriminance par mutation plus bas — une regression de la boucle
+# reelle rougit forcement le sous-test de mutation, plus de tautologie grep-contre-grep sur un
+# grep -v independant qui n'exerce jamais la detection reelle (revue hotfix v2.63.2).
+t76_detect() { # <file> -> imprime les litteraux/champs manquants entre crochets (vide = complet)
+  local f="$1" manquants="" lit
+  for lit in "PÉRIMÉE" "2026-09-17" "profondeur 3" "manager 1, \`vf-coder\` 2, briques GSD 3" \
+             "2026-08-04" "1.9.1"; do
+    grep -qF "$lit" "$f" || manquants="$manquants [$lit]"
+  done
+  # les 7 champs du descripteur, recopies verbatim (fait de runtime brut, non reinterprete)
+  for lit in "namedDispatch: true" "nested: true" "maxDepth: 5" "background: true" \
+             "backgroundDispatch: false" "subagentToolkit: \"full\"" "isolation: \"harness-worktree\""; do
+    grep -qF "$lit" "$f" || manquants="$manquants [$lit]"
+  done
+  printf '%s' "$manquants"
+}
+
 if [ ! -f "$T76_KERNEL" ]; then
   ko "T76 team-kernel.md introuvable ($T76_KERNEL) — anti 'vert a vide'"
 else
-  T76_MANQUANTS=""
-  for lit in "PÉRIMÉE" "2026-09-17" "profondeur 3" "manager 1, \`vf-coder\` 2, briques GSD 3" \
-             "2026-08-04" "1.9.1"; do
-    grep -qF "$lit" "$T76_KERNEL" || T76_MANQUANTS="$T76_MANQUANTS [$lit]"
-  done
-  # les 7 champs du descripteur, recopies verbatim (fait de runtime brut, non reinterprete)
-  for champ in "namedDispatch: true" "nested: true" "maxDepth: 5" "background: true" \
-               "backgroundDispatch: false" "subagentToolkit: \"full\"" "isolation: \"harness-worktree\""; do
-    grep -qF "$champ" "$T76_KERNEL" || T76_MANQUANTS="$T76_MANQUANTS [$champ]"
-  done
+  T76_MANQUANTS="$(t76_detect "$T76_KERNEL")"
   if [ -z "$T76_MANQUANTS" ]; then
     ok "T76 team-kernel.md : lecture 2026-08-04 marquee PERIMEE par la mesure du 2026-09-17 (Agent/Task absents a la profondeur 3, profondeurs visees manager 1/vf-coder 2/briques GSD 3), descripteur verbatim (7 champs) toujours recopie"
   else
     ko "T76 team-kernel.md — litteraux manquants :$T76_MANQUANTS"
   fi
 
-  # DISCRIMINANT par mutation, permanente et interne a la suite : retirer la mention de la
-  # profondeur 3 sur une COPIE temporaire doit rendre la meme detection rouge.
+  # DISCRIMINANT par mutation : t76_detect() ELLE-MEME (pas un grep parallele independant) doit
+  # rougir quand "profondeur 3" disparait du fichier sonde, et le motif du rouge doit etre CE
+  # litteral precis (assertion sur le contenu de la liste des manquants, pas juste "non vide").
   T76_MUT="$(mktemp)"
   grep -v "profondeur 3" "$T76_KERNEL" > "$T76_MUT"
-  if grep -qF "profondeur 3" "$T76_MUT"; then
-    ko "T76 (mutation) NON DISCRIMINANTE : la ligne 'profondeur 3' retiree reste detectee sur le mutant"
+  if cmp -s "$T76_MUT" "$T76_KERNEL"; then
+    ko "T76 (mutation) NON OPPOSABLE : mutant identique au fichier reel (cmp) — 'profondeur 3' introuvable sur une ligne isolee"
   else
-    ok "T76 (mutation) (DISCRIMINANT) : mutant sans 'profondeur 3' rendu rouge par la meme detection"
+    T76_MUT_MANQUANTS="$(t76_detect "$T76_MUT")"
+    case "$T76_MUT_MANQUANTS" in
+      *"[profondeur 3]"*)
+        ok "T76 (mutation) (DISCRIMINANT) : t76_detect() rendue rouge sur le mutant, motif = [profondeur 3] (manquants :$T76_MUT_MANQUANTS)"
+        ;;
+      *)
+        ko "T76 (mutation) NON DISCRIMINANTE : t76_detect() sur le mutant ne signale pas [profondeur 3] (obtenu :$T76_MUT_MANQUANTS)"
+        ;;
+    esac
   fi
   rm -f "$T76_MUT"
 fi
