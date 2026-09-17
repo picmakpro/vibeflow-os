@@ -57,10 +57,13 @@ might otherwise mistake for a whim:
 
 **Not to overpromise:** the charter recommends keeping an agent at 300 lines at most, with a
 warning from 251. Agents distributed by VibeFlow are **measured** in the CI of the distribution
-repository since v2.62.0 (`check-instruction-budget.sh`); blocking — cap exceeded, or an instruction
-added without a named decision — has been active in that CI since the ratchet was armed (PR #73).
-In **your** lab, however, the charter is checked by no gate installed by default: a template (the
-density auditor) exists in the methodology library, but it isn't installed.
+repository since v2.62.0 (`check-instruction-budget.sh`); blocking has been active in that CI
+since the ratchet was armed (PR #73), but its scope changed along the way: between the arming and
+the gate's revision (PR #76), it blocked any overrun of lines **and** instructions, cap set at 250
+lines; since that revision, it only blocks instructions added without a named decision, cap
+raised to 300 lines with a non-blocking warning from 251. In **your** lab, however, the charter is
+checked by no gate installed by default: a template (the density auditor) exists in the
+methodology library, but it isn't installed.
 
 ### A concrete example: the Iron Law refusal
 

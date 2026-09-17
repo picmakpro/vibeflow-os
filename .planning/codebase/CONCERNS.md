@@ -76,13 +76,20 @@
 - Fix approach: supprimer `docs/reference/` ou le réduire à un pointeur vers le module ; sinon gate
   d'identité dans la CI.
 
-**`validator/AGENT.md` à 249/250 lignes (plafond ADR-029)** — Sévérité : **MEDIUM**
-- Issue: l'agent est à 1 ligne du plafond densité. Tout ajout (nouveau contrôle Phase 4, nouvelle
-  escalade) exige d'abord un délestage vers `references/` ou une skill.
-- Files: `plugin/validator/AGENT.md` (249 lignes, `wc -l` du 2026-07-26)
-- Impact: chaque évolution du validator devient une opération de refactoring, pas un simple ajout.
-- Fix approach: délester préventivement les sections les plus verbeuses vers
-  `plugin/validator/references/` avant la prochaine évolution. Même famille :
+**`validator/AGENT.md` à 249/250 lignes (plafond ADR-029)** — **RÉSOLU (Phase 40.1, PR #76)**
+- Issue d'origine: l'agent était à 1 ligne de l'ancien plafond ADR-029 (250 lignes, seuil unique et
+  bloquant). Tout ajout (nouveau contrôle Phase 4, nouvelle escalade) exigeait d'abord un
+  délestage vers `references/` ou une skill.
+- Ce qui a changé: la Phase 40.1 (arbitrages Samuel D-01/D-05, AskUserQuestion session principale,
+  2026-09-16) a révisé le plafond ADR-029 — avertissement non bloquant dès 251 lignes, blocage
+  seulement au-delà de 300 lignes (`plugin/conductor/scripts/check-instruction-budget.sh`, gate
+  machine-enforced). `plugin/validator/AGENT.md` fait aujourd'hui **250 lignes** (`wc -l` vérifié le
+  2026-09-17) : sous le seuil d'avertissement, avec 50 lignes de marge avant celui-ci et 50 de plus
+  avant le plafond bloquant. Le risque de refactoring forcé par le seul comptage de lignes est levé.
+- Fix approach résiduel: aucun impératif immédiat. Si le fichier approche à nouveau 251 lignes,
+  même remède qu'avant (délestage vers `plugin/validator/references/`) — le ratchet d'instructions
+  du même gate reste, lui, comparatif et peut se déclencher indépendamment du seuil de lignes.
+  Famille voisine, non couverte par cette révision (budget skills, pas agents) :
   `plugin/skill-creator/skills/skill-creator/SKILL.md` à 485/500 lignes.
 
 **Résolution des `requires[]` opt-in seulement** — Sévérité : **MEDIUM**
