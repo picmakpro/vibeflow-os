@@ -6761,47 +6761,55 @@ else
   ko "T38 (c) : vf-dev-manager.md ne porte plus la conduite sur cause: \"profondeur\""; t38_ok=0
 fi
 
-# (d) Aucune prescription AFFIRMATIVE de dispatch du head en Task, dans les 4 fichiers. Une
-# formulation NÉGATIVE légitime existe partout (« jamais dispatché [...] Task(vibeflow-head) »),
-# donc la détection ne peut pas se contenter d'un grep du littéral `Task(vibeflow-head)` — elle
-# doit distinguer l'affirmatif du négatif SANS pouvoir être contournée en reformulant la négation
-# ailleurs dans le fichier (piège du grep -v global). Stratégie à deux niveaux, tous deux
-# imprimés dans la trace :
-#   1. Deux tournures affirmatives CONNUES (celles qui existaient avant le fix B1) sont toujours
-#      fautives, quel que soit le contexte : « Invocable via Task » et « Incarne (ou dispatche
-#      via Task) » — leur seule présence PORTE l'injonction, une négation plus loin dans le
-#      fichier ne l'annule pas rétroactivement.
-#   2. Toute ligne contenant le littéral `Task(vibeflow-head)` doit porter elle-même (même
-#      ligne) un marqueur de négation (jamais/pas) — pas seulement le fichier en général. Ce
-#      couplage ligne-à-ligne empêche l'échappatoire "une négation en tête de fichier couvre tout
-#      le document".
-# Portée de la négation SCOPÉE À LA CLAUSE (hotfix v2.63.2, PR #79 — finding 1 de revue, jumeau
-# synchronisé de t10_affirmative_hits dans test-design-orchestrator.sh) : une négation ailleurs
-# sur la ligne (autre clause) ne doit ni neutraliser une occurrence affirmative du littéral, ni —
-# inversement — une reformulation légitime de la négation (« pas de dispatch ») échapper à la
-# détection faute de correspondre au littéral figé « pas dispatch ». La fenêtre est bornée au
-# texte qui précède le littéral, jusqu'au dernier séparateur de clause (`,;:.` ou les mots
-# « mais »/« puis ») — pas toute la ligne. Littéraux de négation : '\<jamais\>\|\<pas\>' (synchro
-# fixe avec T10_NEG_RE, vérifiée machine en T10 (d) de test-design-orchestrator.sh).
+# (d) Aucune prescription AFFIRMATIVE de dispatch du head en Task, dans les 4 fichiers. Monde
+# fermé (hotfix v2.63.2, tour 3 — abandon de l'analyse de négation en langue naturelle) :
+#   Tour 1 : négation cherchée sur la ligne entière — une négation dans une autre clause masquait
+#   une occurrence affirmative.
+#   Tour 2 (commit `7bbaeea`) : négation bornée à une fenêtre de clause (séparateurs de
+#   ponctuation et « mais »/« puis » entre espaces, portable sed BSD/GNU).
+#   Tour 3 (revue) : nouvelles repros. L'expansion `%%` coupe à la 1re occurrence du littéral ;
+#   « Mais » et « JAMAIS » en capitales passent ; une négation d'une autre clause sans séparateur
+#   passe ; « n'est pas de dispatch » neutralise à tort une vraie prescription. Chaque patch a
+#   fermé des cas et en a rouvert d'autres : on abandonne donc l'analyse de négation.
+# Mécanique retenue : par fichier, nombre d'occurrences non chevauchantes du littéral
+# `Task(vibeflow-head)` (t38_count_literal, awk + index() en boucle) moins la somme des
+# occurrences de chaque forme de T38_CANON_FORMS. Seules ces formes CANONIQUES exactes, énumérées
+# dans une liste courte, échappent à la détection — une forme canonique ne blanchit qu'une seule
+# occurrence. Conséquence assumée : toute nouvelle tournure négative qui cite le littéral est
+# détectée tant que sa forme exacte n'est pas ajoutée à la liste. Ajouter une forme devient un
+# diff relu, pas une heuristique.
+# Jumeau `t10_affirmative_hits`/`t10_count_literal` dans test-design-orchestrator.sh — le corps de
+# comptage y est vérifié identique caractère pour caractère par T10 (d).
+T38_CANON_FORMS=(
+  'jamais dispatché lui-même comme sous-agent (`Task(vibeflow-head)`)'
+)
+
+t38_count_literal() { # <file> <literal> -> imprime le nombre d'occurrences non chevauchantes
+  local f="$1" lit="$2"
+  [ -f "$f" ] || { printf '0'; return; }
+  awk -v lit="$lit" '
+    { line = $0; start = 1; n = length(lit)
+      while (1) {
+        idx = index(substr(line, start), lit)
+        if (idx == 0) break
+        count++
+        start = start + idx + n - 1
+      }
+    }
+    END { print count + 0 }
+  ' "$f"
+}
+
 t38d_affirmative_hits() { # <file>
   local f="$1" hits=""
   hits="$("$GREP" -n 'Invocable via Task\|Incarne (ou dispatche via Task)' "$f" 2>/dev/null)"
-  local head_lines
-  head_lines="$("$GREP" -n -F -- 'Task(vibeflow-head)' "$f" 2>/dev/null)"
-  if [ -n "$head_lines" ]; then
-    local t38d_line
-    while IFS= read -r t38d_line; do
-      [ -n "$t38d_line" ] || continue
-      local t38d_content="${t38d_line#*:}"
-      local t38d_before="${t38d_content%%"Task(vibeflow-head)"*}"
-      local t38d_window
-      t38d_window="$(printf '%s' "$t38d_before" | sed -E 's/.*(,|;|:|\.| mais | puis )//')"
-      if ! printf '%s' "$t38d_window" | "$GREP" -q '\<jamais\>\|\<pas\>'; then
-        hits="$(printf '%s\n%s' "$hits" "$t38d_line")"
-      fi
-    done <<T38D_HEADLINES
-$head_lines
-T38D_HEADLINES
+  local task_count canon_total=0 t38d_forme
+  task_count="$(t38_count_literal "$f" 'Task(vibeflow-head)')"
+  for t38d_forme in "${T38_CANON_FORMS[@]}"; do
+    canon_total=$((canon_total + $(t38_count_literal "$f" "$t38d_forme")))
+  done
+  if [ $((task_count - canon_total)) -gt 0 ]; then
+    hits="$(printf '%s\n%s' "$hits" "$("$GREP" -n -F -- 'Task(vibeflow-head)' "$f" 2>/dev/null)")"
   fi
   printf '%s' "$hits" | sed '/^$/d'
 }
@@ -6900,45 +6908,63 @@ if [ -f "$T38_VFDEV" ]; then
   fi
 fi
 
-# (e.5) DISCRIMINANT — repro relecteur (hotfix v2.63.2, PR #79, finding 1, faux négatif) : la
-# négation « jamais » porte sur une clause DISTINCTE (séparée par « mais ») de celle qui contient
-# Task(vibeflow-head) ; la seconde clause reste affirmative et DOIT être détectée — une négation
-# scopée à la ligne entière la masquait à tort avant ce fix. Équivalent vibeflow-head de T10 (c.6)
-# dans test-design-orchestrator.sh.
-t38e_clause_pos="$T38_TMPDIR/synthetic-clause-mais.md"
-echo "Le crafter n'est jamais dispatché seul, mais le manager lance Task(vibeflow-head) chaque nuit." > "$t38e_clause_pos"
-t38e_clause_hit="$(t38d_affirmative_hits "$t38e_clause_pos")"
-if [ -n "$t38e_clause_hit" ]; then
-  ok "T38 (e.5) (DISCRIMINANT) : négation « jamais » d'une clause distincte (« mais ») ne masque plus la détection dans l'autre clause — $(printf '%s' "$t38e_clause_hit" | head -1)"
+# (e.5) DISCRIMINANT — 6 repros de contournement du tour 3 (revue), toutes NON canoniques : le
+# monde fermé ne blanchit qu'une forme EXACTE de T38_CANON_FORMS, donc chacune de ces tournures
+# (capitales, absence de séparateur, reformulation de la négation, clause voisine) reste détectée.
+# Fichiers `synthetic-closed-<k>.md` sous $T38_TMPDIR, un par phrase.
+T38_E5_PHRASES=(
+  "On dit jamais Task(vibeflow-head), pourtant le manager appelle bel et bien Task(vibeflow-head) chaque nuit."
+  "on ne fait jamais ca Mais on lance quand meme Task(vibeflow-head) chaque nuit"
+  "on ne fait JAMAIS ca mais on lance quand meme Task(vibeflow-head) chaque nuit"
+  "Le crafter n'est jamais dispatché seul, mais le manager lance Task(vibeflow-head) chaque nuit."
+  "vibeflow-head n'est pas de dispatch via Task(vibeflow-head)."
+  "le manager attend jamais bien longtemps puis dispatche Task(vibeflow-head) sans discuter."
+)
+t38e5_k=0
+for t38e5_phrase in "${T38_E5_PHRASES[@]}"; do
+  t38e5_k=$((t38e5_k + 1))
+  t38e5_file="$T38_TMPDIR/synthetic-closed-$t38e5_k.md"
+  printf '%s\n' "$t38e5_phrase" > "$t38e5_file"
+  t38e5_hit="$(t38d_affirmative_hits "$t38e5_file")"
+  if [ -n "$t38e5_hit" ]; then
+    ok "T38 (e.5.$t38e5_k) (DISCRIMINANT) : phrase non canonique détectée — $(printf '%s' "$t38e5_hit" | head -1)"
+  else
+    ko "T38 (e.5.$t38e5_k) NON DISCRIMINANTE : phrase non canonique non détectée — « $t38e5_phrase »"; t38_ok=0
+  fi
+done
+
+# (e.6) CONTRE-ÉPREUVE — la forme canonique SEULE, construite depuis T38_CANON_FORMS (jamais
+# retapée), reste non détectée (1 − 1 = 0).
+t38e6_file="$T38_TMPDIR/synthetic-canon-seule.md"
+printf '%s\n' "vibeflow-head est incarné en session principale — ${T38_CANON_FORMS[0]}." > "$t38e6_file"
+t38e6_hit="$(t38d_affirmative_hits "$t38e6_file")"
+if [ -z "$t38e6_hit" ]; then
+  ok "T38 (e.6) (CONTRE-ÉPREUVE) : forme canonique seule non détectée (1 − 1 = 0)"
 else
-  ko "T38 (e.5) NON DISCRIMINANTE : la négation d'une clause voisine masque encore la détection"; t38_ok=0
+  ko "T38 (e.6) : faux positif — forme canonique seule détectée — $(printf '%s' "$t38e6_hit" | head -1)"; t38_ok=0
 fi
 
-# (e.6) CONTRE-ÉPREUVE — repro relecteur (hotfix v2.63.2, PR #79, finding 1, faux positif) :
-# « n'est pas de dispatch » (négation légitime de la MÊME clause, reformulée sans coller au
-# littéral figé « pas dispatch ») doit rester non détectée. Équivalent vibeflow-head de T10 (c.7).
-t38e_pasdispatch_neg="$T38_TMPDIR/synthetic-pas-de-dispatch.md"
-echo "vibeflow-head n'est pas de dispatch via Task(vibeflow-head)." > "$t38e_pasdispatch_neg"
-t38e_pasdispatch_hit="$(t38d_affirmative_hits "$t38e_pasdispatch_neg")"
-if [ -z "$t38e_pasdispatch_hit" ]; then
-  ok "T38 (e.6) (CONTRE-ÉPREUVE) : « n'est pas de dispatch via Task(vibeflow-head) » reste non détecté (négation même clause)"
+# (e.7) DISCRIMINANT — forme canonique ET occurrence affirmative sur la MÊME ligne : la forme ne
+# blanchit qu'une seule occurrence, la seconde doit être détectée (2 − 1 = 1).
+t38e7_file="$T38_TMPDIR/synthetic-canon-plus-affirmatif.md"
+printf '%s\n' "${T38_CANON_FORMS[0]} mais aussi via Task(vibeflow-head) en direct." > "$t38e7_file"
+t38e7_hit="$(t38d_affirmative_hits "$t38e7_file")"
+if [ -n "$t38e7_hit" ]; then
+  ok "T38 (e.7) (DISCRIMINANT) : forme canonique + occurrence affirmative sur la même ligne détectée (2 − 1 = 1) — $(printf '%s' "$t38e7_hit" | head -1)"
 else
-  ko "T38 (e.6) : faux positif — « n'est pas de dispatch via Task(vibeflow-head) » déclenche la détection — $(printf '%s' "$t38e_pasdispatch_hit" | head -1)"; t38_ok=0
+  t38e7_line="$(cat "$t38e7_file")"
+  ko "T38 (e.7) NON DISCRIMINANTE : forme canonique + occurrence affirmative non détectée — « $t38e7_line »"; t38_ok=0
 fi
 
-# (e.7) DISCRIMINANT — isole la branche « mais »/« puis » du séparateur de clause SANS virgule
-# voisine (constat de revue sur (e.5) : la virgule y coupait déjà la clause, la branche mot
-# n'était jamais seule décisive). Équivalent vibeflow-head de T10 (c.8).
-t38e_mais_sansv="$T38_TMPDIR/synthetic-mais-sans-virgule.md"
-echo "on dit jamais dispatché ainsi mais on lance quand meme Task(vibeflow-head) chaque nuit." > "$t38e_mais_sansv"
-t38e_mais_sansv_hit="$(t38d_affirmative_hits "$t38e_mais_sansv")"
-t38e_puis_sansv="$T38_TMPDIR/synthetic-puis-sans-virgule.md"
-echo "le manager attend jamais bien longtemps puis dispatche Task(vibeflow-head) sans discuter." > "$t38e_puis_sansv"
-t38e_puis_sansv_hit="$(t38d_affirmative_hits "$t38e_puis_sansv")"
-if [ -n "$t38e_mais_sansv_hit" ] && [ -n "$t38e_puis_sansv_hit" ]; then
-  ok "T38 (e.7) (DISCRIMINANT) : « mais »/« puis » isolent seuls la clause affirmative sans virgule voisine"
+# (e.8) CONTRE-ÉPREUVE — deux formes canoniques sur la MÊME ligne : chacune blanchit sa propre
+# occurrence, aucune ne reste (2 − 2 = 0).
+t38e8_file="$T38_TMPDIR/synthetic-canon-deux-fois.md"
+printf '%s\n' "${T38_CANON_FORMS[0]} ${T38_CANON_FORMS[0]}" > "$t38e8_file"
+t38e8_hit="$(t38d_affirmative_hits "$t38e8_file")"
+if [ -z "$t38e8_hit" ]; then
+  ok "T38 (e.8) (CONTRE-ÉPREUVE) : deux formes canoniques sur la même ligne non détectées (2 − 2 = 0)"
 else
-  ko "T38 (e.7) NON DISCRIMINANTE : sans virgule, « mais »(=[$t38e_mais_sansv_hit])/« puis »(=[$t38e_puis_sansv_hit]) ne suffisent plus à couper la clause"; t38_ok=0
+  ko "T38 (e.8) : faux positif — deux formes canoniques détectées — $(printf '%s' "$t38e8_hit" | head -1)"; t38_ok=0
 fi
 
 rm -rf "$T38_TMPDIR"

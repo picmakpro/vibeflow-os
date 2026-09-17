@@ -15,7 +15,8 @@ principale, 2026-09-17.
   déléguer — jamais dispatché en Task, même renvoi (symétrique de `vf-dev/SKILL.md`).
 - **`scripts/tests/test-design-orchestrator.sh`** : T10 — mêmes littéraux que T38 de
   `test-dev-orchestrator.sh` (synchro vérifiée machine), discriminants par mutation permanents,
-  contre-épreuve sur la négation légitime.
+  comptage en monde fermé où seules des formes négatives canoniques exactes échappent à la
+  détection.
 
 ## [v1.5.7] — 2026-09-16 (Phase 40.1)
 

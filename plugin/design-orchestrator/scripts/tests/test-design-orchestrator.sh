@@ -814,47 +814,54 @@ fi
 # ---------------------------------------------------------------------------
 # T10 — B1 étendu à vibeflow-design (quick 260917-ldp) : le head design n'est plus présenté
 #       nulle part comme dispatchable en Task ; mêmes littéraux de détection que T38 (d) de
-#       test-dev-orchestrator.sh (synchro vérifiée machine, cf. (d) en tâche 2), discriminants
-#       par mutation et contre-épreuve sur la négation légitime (cf. (c) en tâche 2).
+#       test-dev-orchestrator.sh (synchro vérifiée machine, cf. (d) plus bas), discriminants par
+#       mutation permanents. Monde fermé, comptage par formes canoniques (hotfix v2.63.2, tour 3)
+#       — même historique et même motif d'abandon de l'analyse de négation que le commentaire
+#       jumeau de T38 (d) dans test-dev-orchestrator.sh.
 # ---------------------------------------------------------------------------
 
-# Mêmes littéraux BRE que t38d_affirmative_hits (test-dev-orchestrator.sh), repris caractère
-# pour caractère — seul T10_TASK_LIT change de nom de head (vibeflow-design au lieu de
-# vibeflow-head). La synchro de T10_AFFIRM_RE/T10_NEG_RE avec T38 est vérifiée machine en (d).
+# Mêmes littéraux que t38d_affirmative_hits (test-dev-orchestrator.sh), repris caractère pour
+# caractère — seul T10_TASK_LIT change de nom de head (vibeflow-design au lieu de vibeflow-head).
+# La synchro de T10_AFFIRM_RE avec T38 ET la mécanique de comptage (corps de fonction) sont
+# vérifiées machine en (d).
 #
-# Portée de la négation SCOPÉE À LA CLAUSE (hotfix v2.63.2, PR #79 — finding 1 de revue) : une
-# négation ailleurs sur la ligne (autre clause) ne doit ni neutraliser une occurrence affirmative
-# du littéral, ni — inversement — une reformulation légitime de la négation (« pas de dispatch »)
-# échapper à la détection faute de correspondre au littéral figé « pas dispatch ». La fenêtre est
-# bornée au texte qui précède le littéral, jusqu'au dernier séparateur de clause (`,;:.` ou les
-# mots « mais »/« puis ») — pas toute la ligne.
+# Monde fermé : par fichier, nombre d'occurrences non chevauchantes du littéral
+# `Task(vibeflow-design)` (t10_count_literal, même corps que t38_count_literal) moins la somme
+# des occurrences de chaque forme de T10_CANON_FORMS. Seules ces formes CANONIQUES exactes
+# échappent à la détection — une forme canonique ne blanchit qu'une seule occurrence. Plus aucune
+# analyse de négation en langue naturelle (abandon tour 3, cf. T38 (d) pour l'historique complet).
 T10_AFFIRM_RE='Invocable via Task\|Incarne (ou dispatche via Task)'
-T10_NEG_RE='\<jamais\>\|\<pas\>'
 T10_TASK_LIT="Task(vibeflow-design)"
+T10_CANON_FORMS=(
+  'jamais dispatché lui-même comme sous-agent (`Task(vibeflow-design)`)'
+)
 
-# Même structure à deux niveaux que t38d_affirmative_hits, paramétrée par les trois variables
-# ci-dessus au lieu de littéraux en dur. Le couplage n'est plus ligne-à-ligne mais clause-à-clause :
-# pour chaque ligne portant le littéral, on isole la fenêtre qui précède l'occurrence (bornée par
-# le dernier séparateur de clause) et on n'y cherche T10_NEG_RE QUE dans cette fenêtre.
+t10_count_literal() { # <file> <literal> -> imprime le nombre d'occurrences non chevauchantes
+  local f="$1" lit="$2"
+  [ -f "$f" ] || { printf '0'; return; }
+  awk -v lit="$lit" '
+    { line = $0; start = 1; n = length(lit)
+      while (1) {
+        idx = index(substr(line, start), lit)
+        if (idx == 0) break
+        count++
+        start = start + idx + n - 1
+      }
+    }
+    END { print count + 0 }
+  ' "$f"
+}
+
 t10_affirmative_hits() { # <file>
   local f="$1" hits=""
   hits="$("$GREP" -n "$T10_AFFIRM_RE" "$f" 2>/dev/null)"
-  local task_lines
-  task_lines="$("$GREP" -n -F -- "$T10_TASK_LIT" "$f" 2>/dev/null)"
-  if [ -n "$task_lines" ]; then
-    local t10_line
-    while IFS= read -r t10_line; do
-      [ -n "$t10_line" ] || continue
-      local t10_content="${t10_line#*:}"
-      local t10_before="${t10_content%%"$T10_TASK_LIT"*}"
-      local t10_window
-      t10_window="$(printf '%s' "$t10_before" | sed -E 's/.*(,|;|:|\.| mais | puis )//')"
-      if ! printf '%s' "$t10_window" | "$GREP" -q "$T10_NEG_RE"; then
-        hits="$(printf '%s\n%s' "$hits" "$t10_line")"
-      fi
-    done <<T10_TASKLINES
-$task_lines
-T10_TASKLINES
+  local task_count canon_total=0 t10_forme
+  task_count="$(t10_count_literal "$f" "$T10_TASK_LIT")"
+  for t10_forme in "${T10_CANON_FORMS[@]}"; do
+    canon_total=$((canon_total + $(t10_count_literal "$f" "$t10_forme")))
+  done
+  if [ $((task_count - canon_total)) -gt 0 ]; then
+    hits="$(printf '%s\n%s' "$hits" "$("$GREP" -n -F -- "$T10_TASK_LIT" "$f" 2>/dev/null)")"
   fi
   printf '%s' "$hits" | sed '/^$/d'
 }
@@ -933,20 +940,29 @@ if [ -f "$T10_SKILL" ]; then
   fi
 fi
 
-# (c.3) couplage ligne à ligne du niveau 2 : une ligne synthétique où le head dispatche
-# Task(vibeflow-design) SANS négation est détectée ; une ligne synthétique qui dit que
-# vibeflow-design n'est JAMAIS lancé via Task(vibeflow-design) ne l'est pas.
-t10c3_pos="$T10_TMPDIR/synthetic-positive.md"
-echo "le head dispatche Task(vibeflow-design) pour chaque phase de design." > "$t10c3_pos"
-t10c3_pos_hit="$(t10_affirmative_hits "$t10c3_pos")"
-t10c3_neg="$T10_TMPDIR/synthetic-negative.md"
-echo "vibeflow-design n'est jamais lancé via Task(vibeflow-design)." > "$t10c3_neg"
-t10c3_neg_hit="$(t10_affirmative_hits "$t10c3_neg")"
-if [ -n "$t10c3_pos_hit" ] && [ -z "$t10c3_neg_hit" ]; then
-  ok "T10 (c.3) (DISCRIMINANT) : Task(vibeflow-design) sans négation détecté, avec négation « jamais » non détecté (couplage ligne à ligne)"
-else
-  ko "T10 (c.3) NON DISCRIMINANTE : couplage ligne à ligne défaillant (positif=[$t10c3_pos_hit] négatif=[$t10c3_neg_hit])"; t10_ok=0
-fi
+# (c.3.1) à (c.3.6) DISCRIMINANT — mêmes 6 repros de contournement du tour 3 que T38 (e.5.1-6)
+# dans test-dev-orchestrator.sh, vibeflow-design remplaçant vibeflow-head partout (y compris en
+# tête de la phrase 5). Fichiers `synthetic-closed-<k>.md` sous $T10_TMPDIR.
+T10_C3_PHRASES=(
+  "On dit jamais Task(vibeflow-design), pourtant le manager appelle bel et bien Task(vibeflow-design) chaque nuit."
+  "on ne fait jamais ca Mais on lance quand meme Task(vibeflow-design) chaque nuit"
+  "on ne fait JAMAIS ca mais on lance quand meme Task(vibeflow-design) chaque nuit"
+  "Le crafter n'est jamais dispatché seul, mais le manager lance Task(vibeflow-design) chaque nuit."
+  "vibeflow-design n'est pas de dispatch via Task(vibeflow-design)."
+  "le manager attend jamais bien longtemps puis dispatche Task(vibeflow-design) sans discuter."
+)
+t10c3_k=0
+for t10c3_phrase in "${T10_C3_PHRASES[@]}"; do
+  t10c3_k=$((t10c3_k + 1))
+  t10c3_file="$T10_TMPDIR/synthetic-closed-$t10c3_k.md"
+  printf '%s\n' "$t10c3_phrase" > "$t10c3_file"
+  t10c3_hit="$(t10_affirmative_hits "$t10c3_file")"
+  if [ -n "$t10c3_hit" ]; then
+    ok "T10 (c.3.$t10c3_k) (DISCRIMINANT) : phrase non canonique détectée — $(printf '%s' "$t10c3_hit" | head -1)"
+  else
+    ko "T10 (c.3.$t10c3_k) NON DISCRIMINANTE : phrase non canonique non détectée — « $t10c3_phrase »"; t10_ok=0
+  fi
+done
 
 # (c.4) copie d'AGENT_FILE où « jamais dispatch » devient « toujours dispatch » — t10_desc_ok
 # doit rejeter la description mutée.
@@ -958,12 +974,15 @@ else
   ko "T10 (c.4) NON DISCRIMINANTE : mutant « toujours dispatch » reste accepté par t10_desc_ok"; t10_ok=0
 fi
 
-# (c.5) CONTRE-ÉPREUVE : SKILL réel et une négation légitime synthétique ne déclenchent aucune
-# détection — aucun faux positif sur la formulation qui doit rester en place. Le cas AGENT_FILE
-# réel n'est PAS revérifié ici : ce serait un second appel de la même fonction pure sur le même
-# fichier que (a) — tautologique, puisqu'une fonction pure rend le même résultat à chaque appel.
-# Si (a) a déjà trouvé une vraie prescription affirmative sur AGENT_FILE, elle est déjà remontée
-# là-bas ; (c.5) ne rejoue que des entrées DIFFÉRENTES (SKILL, ligne synthétique).
+# (c.5) CONTRE-ÉPREUVE : SKILL réel et une phrase négative synthétique SANS le littéral
+# `Task(vibeflow-design)` ne déclenchent aucune détection — en monde fermé, cette phrase ne prouve
+# plus qu'une négation en langue naturelle est tolérée (il n'y a plus d'analyse de négation),
+# seulement qu'une phrase négative dépourvue du littéral n'est pas détectée (0 occurrence à
+# blanchir). Le cas AGENT_FILE réel n'est PAS revérifié ici : ce serait un second appel de la
+# même fonction pure sur le même fichier que (a) — tautologique, puisqu'une fonction pure rend le
+# même résultat à chaque appel. Si (a) a déjà trouvé une vraie prescription affirmative sur
+# AGENT_FILE, elle est déjà remontée là-bas ; (c.5) ne rejoue que des entrées DIFFÉRENTES (SKILL,
+# ligne synthétique).
 t10c5_ok=1
 if [ -f "$T10_SKILL" ] && [ -z "${t10b_hit:-}" ] && [ -n "$(t10_affirmative_hits "$T10_SKILL")" ]; then
   ko "T10 (c.5) : faux positif — le SKILL réel déclenche la détection"; t10c5_ok=0
@@ -971,72 +990,65 @@ fi
 t10c5_synth="$T10_TMPDIR/synthetic-legit-negation.md"
 echo "vibeflow-design n'est jamais dispatché lui-même en Task." > "$t10c5_synth"
 if [ -n "$(t10_affirmative_hits "$t10c5_synth")" ]; then
-  ko "T10 (c.5) : faux positif — la ligne synthétique de négation légitime déclenche la détection"; t10c5_ok=0
+  ko "T10 (c.5) : faux positif — la phrase négative synthétique sans le littéral déclenche la détection"; t10c5_ok=0
 fi
 if [ "$t10c5_ok" -eq 1 ]; then
-  ok "T10 (c.5) (CONTRE-ÉPREUVE) : SKILL réel et négation légitime synthétique ne déclenchent aucune détection"
+  ok "T10 (c.5) (CONTRE-ÉPREUVE) : SKILL réel et phrase négative synthétique sans le littéral ne déclenchent aucune détection"
 else
   t10_ok=0
 fi
 
-# (c.6) DISCRIMINANT — repro relecteur (hotfix v2.63.2, PR #79, finding 1, faux négatif) : la
-# négation « jamais » porte sur une clause DISTINCTE (séparée par « mais ») de celle qui contient
-# Task(vibeflow-design) ; la seconde clause reste affirmative et DOIT être détectée — une négation
-# scopée à la ligne entière la masquait à tort avant ce fix.
-t10c6_pos="$T10_TMPDIR/synthetic-clause-mais.md"
-echo "Le crafter n'est jamais dispatché seul, mais le manager lance Task(vibeflow-design) chaque nuit." > "$t10c6_pos"
-t10c6_hit="$(t10_affirmative_hits "$t10c6_pos")"
-if [ -n "$t10c6_hit" ]; then
-  ok "T10 (c.6) (DISCRIMINANT) : négation « jamais » d'une clause distincte (« mais ») ne masque plus la détection dans l'autre clause — $(printf '%s' "$t10c6_hit" | head -1)"
+# (c.6) CONTRE-ÉPREUVE — jumeau de T38 (e.6) : la forme canonique SEULE, construite depuis
+# T10_CANON_FORMS (jamais retapée), reste non détectée (1 − 1 = 0).
+t10c6_file="$T10_TMPDIR/synthetic-canon-seule.md"
+printf '%s\n' "vibeflow-design est incarné en session principale — ${T10_CANON_FORMS[0]}." > "$t10c6_file"
+t10c6_hit="$(t10_affirmative_hits "$t10c6_file")"
+if [ -z "$t10c6_hit" ]; then
+  ok "T10 (c.6) (CONTRE-ÉPREUVE) : forme canonique seule non détectée (1 − 1 = 0)"
 else
-  ko "T10 (c.6) NON DISCRIMINANTE : la négation d'une clause voisine masque encore la détection"; t10_ok=0
+  ko "T10 (c.6) : faux positif — forme canonique seule détectée — $(printf '%s' "$t10c6_hit" | head -1)"; t10_ok=0
 fi
 
-# (c.7) CONTRE-ÉPREUVE — repro relecteur (hotfix v2.63.2, PR #79, finding 1, faux positif) :
-# « n'est pas de dispatch » (négation légitime de la MÊME clause, reformulée sans coller au
-# littéral figé « pas dispatch ») doit rester non détectée — un faux positif se produisait avant
-# ce fix faute de correspondre exactement au littéral.
-t10c7_neg="$T10_TMPDIR/synthetic-pas-de-dispatch.md"
-echo "vibeflow-design n'est pas de dispatch via Task(vibeflow-design)." > "$t10c7_neg"
-t10c7_hit="$(t10_affirmative_hits "$t10c7_neg")"
-if [ -z "$t10c7_hit" ]; then
-  ok "T10 (c.7) (CONTRE-ÉPREUVE) : « n'est pas de dispatch via Task(vibeflow-design) » reste non détecté (négation même clause)"
+# (c.7) DISCRIMINANT — jumeau de T38 (e.7) : forme canonique ET occurrence affirmative sur la
+# MÊME ligne : la forme ne blanchit qu'une seule occurrence, la seconde doit être détectée
+# (2 − 1 = 1).
+t10c7_file="$T10_TMPDIR/synthetic-canon-plus-affirmatif.md"
+printf '%s\n' "${T10_CANON_FORMS[0]} mais aussi via Task(vibeflow-design) en direct." > "$t10c7_file"
+t10c7_hit="$(t10_affirmative_hits "$t10c7_file")"
+if [ -n "$t10c7_hit" ]; then
+  ok "T10 (c.7) (DISCRIMINANT) : forme canonique + occurrence affirmative sur la même ligne détectée (2 − 1 = 1) — $(printf '%s' "$t10c7_hit" | head -1)"
 else
-  ko "T10 (c.7) : faux positif — « n'est pas de dispatch via Task(vibeflow-design) » déclenche la détection — $(printf '%s' "$t10c7_hit" | head -1)"; t10_ok=0
+  t10c7_line="$(cat "$t10c7_file")"
+  ko "T10 (c.7) NON DISCRIMINANTE : forme canonique + occurrence affirmative non détectée — « $t10c7_line »"; t10_ok=0
 fi
 
-# (c.8) DISCRIMINANT — isole la branche « mais »/« puis » du séparateur de clause SANS virgule
-# voisine (constat de revue sur (c.6) : la virgule y coupait déjà la clause, la branche mot
-# n'était jamais seule décisive). Sans virgule dans le texte, seule la présence explicite de
-# « mais »/« puis » comme séparateur peut isoler la clause affirmative de la négation qui précède.
-t10c8_mais="$T10_TMPDIR/synthetic-mais-sans-virgule.md"
-echo "on dit jamais dispatché ainsi mais on lance quand meme Task(vibeflow-design) chaque nuit." > "$t10c8_mais"
-t10c8_mais_hit="$(t10_affirmative_hits "$t10c8_mais")"
-t10c8_puis="$T10_TMPDIR/synthetic-puis-sans-virgule.md"
-echo "le manager attend jamais bien longtemps puis dispatche Task(vibeflow-design) sans discuter." > "$t10c8_puis"
-t10c8_puis_hit="$(t10_affirmative_hits "$t10c8_puis")"
-if [ -n "$t10c8_mais_hit" ] && [ -n "$t10c8_puis_hit" ]; then
-  ok "T10 (c.8) (DISCRIMINANT) : « mais »/« puis » isolent seuls la clause affirmative sans virgule voisine"
+# (c.8) CONTRE-ÉPREUVE — jumeau de T38 (e.8) : deux formes canoniques sur la MÊME ligne : chacune
+# blanchit sa propre occurrence, aucune ne reste (2 − 2 = 0).
+t10c8_file="$T10_TMPDIR/synthetic-canon-deux-fois.md"
+printf '%s\n' "${T10_CANON_FORMS[0]} ${T10_CANON_FORMS[0]}" > "$t10c8_file"
+t10c8_hit="$(t10_affirmative_hits "$t10c8_file")"
+if [ -z "$t10c8_hit" ]; then
+  ok "T10 (c.8) (CONTRE-ÉPREUVE) : deux formes canoniques sur la même ligne non détectées (2 − 2 = 0)"
 else
-  ko "T10 (c.8) NON DISCRIMINANTE : sans virgule, « mais »(=[$t10c8_mais_hit])/« puis »(=[$t10c8_puis_hit]) ne suffisent plus à couper la clause"; t10_ok=0
+  ko "T10 (c.8) : faux positif — deux formes canoniques détectées — $(printf '%s' "$t10c8_hit" | head -1)"; t10_ok=0
 fi
 
-# (d) Synchro des littéraux avec T38 (d) de test-dev-orchestrator.sh (lecture seule, SKIP si
-# absente — disposition lab). Ce couplage rend « même motif que T38 » vérifiable au lieu de
-# déclaré ; il ne crée aucune dépendance d'exécution du module (T9e ne vise que
-# ensure-design-deps.sh).
+# (d) Synchro des littéraux ET de la mécanique de comptage avec T38 de test-dev-orchestrator.sh
+# (lecture seule, SKIP si absente — disposition lab). Ce couplage rend « même motif et même
+# mécanique que T38 » vérifiable au lieu de déclaré ; il ne crée aucune dépendance d'exécution du
+# module (T9e ne vise que ensure-design-deps.sh).
 T10_DEV_SUITE="$REPO/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
 if [ ! -f "$T10_DEV_SUITE" ]; then
   skip "T10 (d) : $T10_DEV_SUITE introuvable (disposition lab)"
 else
-  if "$GREP" -qF -- "$T10_AFFIRM_RE" "$T10_DEV_SUITE" && "$GREP" -qF -- "$T10_NEG_RE" "$T10_DEV_SUITE"; then
-    ok "T10 (d) : T10_AFFIRM_RE et T10_NEG_RE trouvés en chaîne fixe dans test-dev-orchestrator.sh — littéraux synchronisés avec T38"
+  if "$GREP" -qF -- "$T10_AFFIRM_RE" "$T10_DEV_SUITE"; then
+    ok "T10 (d) : T10_AFFIRM_RE trouvé en chaîne fixe dans test-dev-orchestrator.sh — littéral affirmatif synchronisé avec T38"
   else
     ko "T10 (d) : littéral divergé de T38 dans test-dev-orchestrator.sh"; t10_ok=0
   fi
 
-  # Témoins DISCRIMINANTS : une copie de la suite dev dont le littéral est altéré ne doit plus
-  # matcher T10_AFFIRM_RE / T10_NEG_RE.
+  # Témoin DISCRIMINANT : une copie de la suite dev dont le littéral est altéré ne doit plus
+  # matcher T10_AFFIRM_RE.
   t10d_mut1="$T10_TMPDIR/dev-suite-mutant-invocable.md"
   sed 's/Invocable via Task/Invocable via Tache/' "$T10_DEV_SUITE" > "$t10d_mut1"
   if "$GREP" -qF -- "$T10_AFFIRM_RE" "$t10d_mut1"; then
@@ -1045,18 +1057,37 @@ else
     ok "T10 (d) (DISCRIMINANT) : le mutant « Invocable via Tache » n'est plus trouvé par T10_AFFIRM_RE"
   fi
 
-  t10d_mut2="$T10_TMPDIR/dev-suite-mutant-negre.md"
-  sed 's/jamais/jamaisZ/g' "$T10_DEV_SUITE" > "$t10d_mut2"
-  if "$GREP" -qF -- "$T10_NEG_RE" "$t10d_mut2"; then
-    ko "T10 (d) NON DISCRIMINANTE : le mutant « jamaisZ » reste détecté OK par T10_NEG_RE"; t10_ok=0
+  # Synchro de la mécanique de comptage : le corps de t38_count_literal (dev) et de
+  # t10_count_literal (design, extrait de $0 — convention de résolution ligne 56) doivent être
+  # identiques caractère pour caractère. Garde anti vert-à-vide : deux extractions vides ne sont
+  # jamais jugées identiques.
+  t10d_body_dev="$(sed -n '/^t38_count_literal() {/,/^}/p' "$T10_DEV_SUITE" | tail -n +2)"
+  t10d_body_design="$(sed -n '/^t10_count_literal() {/,/^}/p' "$0" | tail -n +2)"
+  if [ -z "$t10d_body_dev" ] || [ -z "$t10d_body_design" ]; then
+    ko "T10 (d) : extraction vide (dev=$(printf '%s' "$t10d_body_dev" | wc -l | tr -d ' ') lignes, design=$(printf '%s' "$t10d_body_design" | wc -l | tr -d ' ') lignes) — la synchro ne peut pas se prononcer"; t10_ok=0
+  elif [ "$t10d_body_dev" = "$t10d_body_design" ]; then
+    ok "T10 (d) : corps de t38_count_literal (dev) et t10_count_literal (design) identiques caractère pour caractère — mécanique de comptage synchronisée"
   else
-    ok "T10 (d) (DISCRIMINANT) : le mutant « jamaisZ » n'est plus trouvé par T10_NEG_RE"
+    ko "T10 (d) : mécanique de comptage divergée entre t38_count_literal et t10_count_literal"; t10_ok=0
+  fi
+
+  # Témoin DISCRIMINANT sur COPIE, jamais sur le fichier réel : une mutation « count + 0 » ->
+  # « count + 1 » dans la suite dev doit rendre le corps muté différent du corps design.
+  t10d_mut_count="$T10_TMPDIR/dev-suite-mutant-count.sh"
+  sed 's/count + 0/count + 1/' "$T10_DEV_SUITE" > "$t10d_mut_count"
+  t10d_body_mut="$(sed -n '/^t38_count_literal() {/,/^}/p' "$t10d_mut_count" | tail -n +2)"
+  if [ -z "$t10d_body_mut" ] || [ "$t10d_body_mut" = "$t10d_body_dev" ]; then
+    ko "T10 (d) : mutation « count + 1 » sans effet sur le corps extrait — témoin inopérant"; t10_ok=0
+  elif [ "$t10d_body_mut" = "$t10d_body_design" ]; then
+    ko "T10 (d) NON DISCRIMINANTE : le corps muté « count + 1 » reste jugé identique"; t10_ok=0
+  else
+    ok "T10 (d) (DISCRIMINANT) : le corps muté « count + 1 » n'est plus jugé identique au corps design"
   fi
 fi
 
 rm -rf "$T10_TMPDIR"
 
-[ "$t10_ok" -eq 1 ] && ok "T10 : B1 étendu à vibeflow-design (AGENT.md + vf-design/SKILL.md), mêmes littéraux que T38 (synchro vérifiée), discriminants par mutation, contre-épreuve"
+[ "$t10_ok" -eq 1 ] && ok "T10 : B1 étendu à vibeflow-design (AGENT.md + vf-design/SKILL.md), mêmes littéraux et même mécanique de comptage que T38 (synchro vérifiée), discriminants par mutation, contre-épreuve"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
