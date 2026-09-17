@@ -11,7 +11,19 @@ sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 release au-dessus de la première ligne qui commence par `## [` — une section « non releasé »
 entre crochets se retrouverait publiée SOUS la version suivante.*
 
-*Rien pour l'instant.*
+- **G-1 (PROT-04, QUAL-01) — garde de hausse de baseline sans arbitrage cité** —
+  `scripts/check-baseline-arbitrage.sh` + sa suite `scripts/tests/test-check-baseline-arbitrage.sh`
+  (neuf mutants opposables) + une étape à six bascules de fixture dans le job `gates` de
+  `.github/workflows/ci.yml`. Garde deux objets : une valeur de la colonne INSTRUCTIONS de
+  `.planning/instruction-budget-baselines.tsv` qui MONTE, et une sentinelle
+  `.planning/.*-armed` qui est NEUTRALISÉE (supprimée, ou vidée) — dans les deux cas, exige une
+  citation d'arbitrage conforme (mot-clé, canal, date) dans le commit non-merge propre à la
+  branche qui porte le changement. LIMITE DE FOND : cette garde vit dans le dépôt — la PR
+  qu'elle juge peut la modifier (elle, sa suite, son étape CI) et rester verte ; elle rend
+  visible et trace, elle ne verrouille rien. Traite O-3 du `25-SECURITY.md` faute d'accès admin
+  sur ce dépôt (option (a)) : O-3 passe à « signalée et tracée », jamais « fermée ».
+  `scripts/` est l'outillage du dépôt, pas un module distribué — aucun bump de module dû. Autorisation :
+  arbitrage Samuel, AskUserQuestion session principale, 2026-09-17.
 
 ## [v2.63.2] — 2026-09-17
 

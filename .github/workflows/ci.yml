@@ -876,11 +876,14 @@ jobs:
         # construction si elle perdait sa capacité à discriminer — la bascule isolée ci-dessous, sur
         # dépôt jetable reconstruit à chaque fois, existe pour que cette étape prouve elle-même
         # qu'elle sait encore rendre rouge, patron `check-instruction-budget` (plus haut dans ce même
-        # job). Complétée à SIX bascules au plan 41-14 Task 3.
+        # job). SIX bascules isolées, chacune sur un dépôt jetable reconstruit depuis zéro par
+        # write_base() — une seule mutation à la fois, jamais cumulée (plan 41-14 Task 3).
         run: |
           set -eu
 
           S="scripts/check-baseline-arbitrage.sh"
+          fail=0
+          note() { echo "::error::check-baseline-arbitrage CI : $1"; fail=$((fail + 1)); }
 
           # --- Résolution de la ref de référence pour le journal, remédiation nommée si absente -----
           REF=""
@@ -894,38 +897,128 @@ jobs:
           fi
           echo "== check-baseline-arbitrage : ref de référence pour le journal = $REF =="
 
-          # --- Bascule ISOLÉE sur dépôt jetable, reconstruit depuis zéro -----------------------------
+          # --- Bloc 1 — SIX bascules ISOLÉES sur dépôt jetable, chacune reconstruite depuis zéro ----
           FIX="$(mktemp -d)"
           trap 'rm -rf "$FIX"' EXIT
 
-          git init -q -b main "$FIX"
-          mkdir -p "$FIX/.planning"
-          {
-            printf '%s\n' '# baseline de fixture CI'
-            printf 'demo/a.md\t10\t5\n'
-          } > "$FIX/.planning/instruction-budget-baselines.tsv"
-          git -C "$FIX" -c user.name=CI -c user.email=ci@vibeflow.invalid -c commit.gpgsign=false add -A
-          git -C "$FIX" -c user.name=CI -c user.email=ci@vibeflow.invalid -c commit.gpgsign=false commit -q -m "fixture: état initial"
-          FIXBASE="$(git -C "$FIX" rev-parse HEAD)"
-          {
-            printf '%s\n' '# baseline de fixture CI'
-            printf 'demo/a.md\t10\t9\n'
-          } > "$FIX/.planning/instruction-budget-baselines.tsv"
-          git -C "$FIX" -c user.name=CI -c user.email=ci@vibeflow.invalid -c commit.gpgsign=false add -A
-          git -C "$FIX" -c user.name=CI -c user.email=ci@vibeflow.invalid -c commit.gpgsign=false commit -q -m "hausse instructions sans citation"
+          git_id() { git -C "$FIX" -c user.name=CI -c user.email=ci@vibeflow.invalid -c commit.gpgsign=false "$@"; }
 
+          write_base() {
+            rm -rf "$FIX"
+            mkdir -p "$FIX/.planning" "$FIX/demo"
+            git init -q -b main "$FIX"
+            {
+              printf '%s\n' '# baseline de fixture CI'
+              printf 'demo/a.md\t10\t5\n'
+            } > "$FIX/.planning/instruction-budget-baselines.tsv"
+            : > "$FIX/.planning/.instruction-budget-armed"
+            printf 'contenu a\n' > "$FIX/demo/a.md"
+            git_id add -A
+            git_id commit -q -m "fixture: état initial"
+          }
+
+          # 1/6 dépôt conforme, plage non vide → attendu 0
+          write_base
+          B1="$(git_id rev-parse HEAD)"
+          git_id commit -q --allow-empty -m "chore: rien ne change"
           rc=0
-          out="$(bash "$S" --root "$FIX" --base-ref "$FIXBASE" 2>&1)" || rc=$?
-          echo "== bascule fixture (hausse sans citation) : rc=$rc =="; printf '%s\n' "$out"
-          if [ "$rc" -ne 1 ]; then
-            echo "::error::check-baseline-arbitrage CI : bascule fixture rc=$rc, attendu 1"
-            exit 1
-          fi
+          out="$(bash "$S" --root "$FIX" --base-ref "$B1" 2>&1)" || rc=$?
+          echo "== 1/6 fixture conforme : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 0 ] || note "1/6 fixture conforme : rc=$rc, attendu 0"
+
+          # 2/6 hausse d'INSTRUCTIONS sans citation → attendu 1, HAUSSE-SANS-ARBITRAGE
+          write_base
+          B2="$(git_id rev-parse HEAD)"
+          { printf '%s\n' '# baseline de fixture CI'; printf 'demo/a.md\t10\t9\n'; } > "$FIX/.planning/instruction-budget-baselines.tsv"
+          git_id add -A
+          git_id commit -q -m "hausse instructions sans citation"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$B2" 2>&1)" || rc=$?
+          echo "== 2/6 hausse instructions sans citation : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *HAUSSE-SANS-ARBITRAGE*) has=1 ;; esac
+          if [ "$rc" -ne 1 ] || [ "$has" -ne 1 ]; then note "2/6 hausse instructions sans citation : rc=$rc (attendu 1), HAUSSE-SANS-ARBITRAGE=$has (attendu 1)"; fi
+
+          # 3/6 hausse de la seule colonne LIGNES, sans citation → attendu 0, AVERTISSEMENT-LIGNES-EN-HAUSSE,
+          #     jamais de verdict de hausse bloquante (D-02/D-H6 : colonne informative)
+          write_base
+          B3="$(git_id rev-parse HEAD)"
+          { printf '%s\n' '# baseline de fixture CI'; printf 'demo/a.md\t15\t5\n'; } > "$FIX/.planning/instruction-budget-baselines.tsv"
+          git_id add -A
+          git_id commit -q -m "hausse lignes seule sans citation"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$B3" 2>&1)" || rc=$?
+          echo "== 3/6 hausse lignes seule : rc=$rc =="; printf '%s\n' "$out"
+          hasw=0; case "$out" in *AVERTISSEMENT-LIGNES-EN-HAUSSE*) hasw=1 ;; esac
+          hasb=0; case "$out" in *HAUSSE-SANS-ARBITRAGE*|*HAUSSE-NON-IMPUTABLE*) hasb=1 ;; esac
+          if [ "$rc" -ne 0 ] || [ "$hasw" -ne 1 ] || [ "$hasb" -ne 0 ]; then note "3/6 hausse lignes seule : rc=$rc (attendu 0), AVERTISSEMENT-LIGNES-EN-HAUSSE=$hasw (attendu 1), verdict bloquant présent=$hasb (attendu 0)"; fi
+
+          # 4/6 sentinelle .planning/.instruction-budget-armed supprimée sans citation → attendu 1,
+          #     SENTINELLE-NEUTRALISEE
+          write_base
+          B4="$(git_id rev-parse HEAD)"
+          rm -f "$FIX/.planning/.instruction-budget-armed"
+          git_id add -A
+          git_id commit -q -m "retire la sentinelle armed sans citation"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$B4" 2>&1)" || rc=$?
+          echo "== 4/6 sentinelle retirée : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *SENTINELLE-NEUTRALISEE*) has=1 ;; esac
+          if [ "$rc" -ne 1 ] || [ "$has" -ne 1 ]; then note "4/6 sentinelle retirée : rc=$rc (attendu 1), SENTINELLE-NEUTRALISEE=$has (attendu 1)"; fi
+
+          # 5/6 ligne de baseline retirée, TROIS volets comptés comme UNE bascule (règle finale du
+          #     manager, 2026-09-17) : cible présente sans citation → 1 ; cible présente avec
+          #     citation conforme → 0 ; cible également disparue de l'arbre → 0
+          write_base
+          B5A="$(git_id rev-parse HEAD)"
+          printf '%s\n' '# baseline de fixture CI' > "$FIX/.planning/instruction-budget-baselines.tsv"
+          git_id add -A
+          git_id commit -q -m "retire a.md de la baseline sans citation, fichier reste"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$B5A" 2>&1)" || rc=$?
+          echo "== 5a/6 ligne retirée, cible présente, sans citation : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *LIGNE-RETIREE-CIBLE-PRESENTE-SANS-ARBITRAGE*) has=1 ;; esac
+          if [ "$rc" -ne 1 ] || [ "$has" -ne 1 ]; then note "5a/6 ligne retirée cible présente sans citation : rc=$rc (attendu 1), verdict=$has (attendu 1)"; fi
+
+          write_base
+          B5B="$(git_id rev-parse HEAD)"
+          printf '%s\n' '# baseline de fixture CI' > "$FIX/.planning/instruction-budget-baselines.tsv"
+          git_id add -A
+          MSG5B="$(printf '%s\n\n%s\n' 'retire a.md de la baseline, fichier conservé' 'arbitrage Samuel, AskUserQuestion session principale, 2026-09-17')"
+          git_id commit -q -m "$MSG5B"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$B5B" 2>&1)" || rc=$?
+          echo "== 5b/6 ligne retirée, cible présente, avec citation : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *AVERTISSEMENT-LIGNE-RETIREE-ARBITREE*) has=1 ;; esac
+          if [ "$rc" -ne 0 ] || [ "$has" -ne 1 ]; then note "5b/6 ligne retirée cible présente avec citation : rc=$rc (attendu 0), verdict=$has (attendu 1)"; fi
+
+          write_base
+          B5C="$(git_id rev-parse HEAD)"
+          printf '%s\n' '# baseline de fixture CI' > "$FIX/.planning/instruction-budget-baselines.tsv"
+          rm -f "$FIX/demo/a.md"
+          git_id add -A
+          git_id commit -q -m "retire a.md de la baseline et du dépôt, sans citation (cible disparue)"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$B5C" 2>&1)" || rc=$?
+          echo "== 5c/6 ligne retirée, cible disparue : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *AVERTISSEMENT-LIGNE-RETIREE-CIBLE-DISPARUE*) has=1 ;; esac
+          if [ "$rc" -ne 0 ] || [ "$has" -ne 1 ]; then note "5c/6 ligne retirée cible disparue : rc=$rc (attendu 0), verdict=$has (attendu 1)"; fi
+
+          # 6/6 --base-ref égal à HEAD → attendu 3, PLAGE-VIDE
+          write_base
+          H6="$(git_id rev-parse HEAD)"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$H6" 2>&1)" || rc=$?
+          echo "== 6/6 base-ref égal à HEAD : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *PLAGE-VIDE*) has=1 ;; esac
+          if [ "$rc" -ne 3 ] || [ "$has" -ne 1 ]; then note "6/6 base-ref égal à HEAD : rc=$rc (attendu 3), PLAGE-VIDE=$has (attendu 1)"; fi
+
           rm -rf "$FIX"
 
-          echo "== check-baseline-arbitrage DISCRIMINANT en CI : la bascule isolée est prouvée =="
+          echo "== BILAN preuve fixture : $fail écart(s) sur 6 verdicts =="
+          if [ "$fail" -ne 0 ]; then exit 1; fi
+          echo "== check-baseline-arbitrage DISCRIMINANT en CI : les six bascules isolées sont prouvées, dont la colonne lignes non bloquante et les trois volets du retrait de ligne =="
 
-          # --- Mesure du dépôt réel -------------------------------------------------------------------
+          # --- Bloc 2 — Mesure du dépôt réel ------------------------------------------------------
           rc=0
           out="$(bash "$S" 2>&1)" || rc=$?
           echo "== dépôt réel : rc=$rc =="; printf '%s\n' "$out"
