@@ -17,10 +17,14 @@ Conséquence concrète mesurée en Phase 15 : `vf-dev-manager` dispatche lui-mê
 aucun de ces noms n'apparaît dans son prompt.
 
 **Why:** une allowlist `Agent(...)` construite en lisant seulement le prompt de l'agent et ses
-`references/` rate systématiquement cette couche. Un agent absent de l'allowlist voit son dispatch
-refusé **sans erreur visible** : l'audit de milestone rend un verdict amputé, l'ingestion s'arrête
-avant la synthèse, la re-validation de plan ne se fait pas. Le coût d'erreur est asymétrique et
-silencieux — c'est la pire combinaison.
+`references/` rate systématiquement cette couche. **Correction (mesure du 2026-09-17,
+`team-kernel.md` §Marge de profondeur de dispatch) : un agent absent de l'allowlist n'est PAS
+refusé au runtime — le dispatch part quand même** ; l'allowlist reste un contrat déclaré,
+lint-vérifié par `check-agents.sh --strict`, pas un mur d'exécution. Le risque réel d'un
+recensement incomplet n'est donc pas un refus silencieux mais une **documentation fausse** du
+frontmatter (mandat/permissions mal décrits au lecteur) — coût de lisibilité, pas de panne
+fonctionnelle. Le mur d'exécution réel est la **profondeur de dispatch** (absence des outils
+`Agent`/`Task` à la profondeur 3), pas l'allowlist.
 
 **How to apply:** tout recensement de dispatches se fait à trois niveaux — (1) corps de l'agent,
 (2) `references/` chargées on-demand, (3) **agents nommés par chaque skill invoquée**, à vérifier
