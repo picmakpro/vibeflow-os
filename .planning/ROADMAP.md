@@ -1593,4 +1593,21 @@ ADR-072), PROT-04 (O-3 « gardée par défaut + tracée » : CODEOWNERS `@picmak
   4. QUAL-01 s'applique si un gate naît (mutation rouge prouvée) ; sinon la phase n'en crée
      aucun et le dit.
 
-**Plans**: TBD
+**Plans:** 13 plans en 13 vagues séquentielles (planifiés le 2026-09-17, vérificateur frais 3 tours ;
+`REGLES_MAIN_FORCE_PUSH_SUPPRESSION` en attente d'arbitrage, 41-01 rouge tant qu'elle n'est pas fixée)
+
+Plans:
+
+- [ ] 41-01-PLAN.md — fermeture de #29 (humain), `actor_id` du rôle write mesuré par sonde, JSON des deux rulesets
+- [ ] 41-02-PLAN.md — `.github/CODEOWNERS` étroit, ledger PROT-01..04 non cochés
+- [ ] 41-03-PLAN.md — ADR-072 (contournement et hotfix), amendement d'ADR-059, `CLAUDE.md`
+- [ ] 41-04-PLAN.md — rejeu des gates, PR de la phase mergée avant toute pose (humain)
+- [ ] 41-05-PLAN.md — pose des rulesets par `picmakpro` (humain), critère 1, mesure M-2
+- [ ] 41-06-PLAN.md — preuve de la revue code owner (baseline comprise), refus sans contournement
+- [ ] 41-07-PLAN.md — PR rouge jetable : mesure M-1, refus, fermeture sans merge
+- [ ] 41-08-PLAN.md — contournement réel et trace dans les rule suites, mesure M-3
+- [ ] 41-09-PLAN.md — refus du push direct, mesure M-4 (tag de test)
+- [ ] 41-10-PLAN.md — doctrine post-preuves (O-3 « gardée par défaut + tracée », BACKLOG, ADR-072)
+- [ ] 41-11-PLAN.md — bump dérivé d'`origin/main` sur la branche B, entrée sur `main` sans contournement (humain)
+- [ ] 41-12-PLAN.md — tag, release GitHub, `check-release-tag --remote`, invariants de phase (humain)
+- [ ] 41-13-PLAN.md — clôture : ledger coché, SUMMARY, artefacts post-merge par PR

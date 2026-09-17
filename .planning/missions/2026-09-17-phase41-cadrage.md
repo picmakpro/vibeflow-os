@@ -85,3 +85,33 @@ exacts sur disque et API.
 ## Décompte
 
 Mandats émis : 2 (1 chercheur, 1 juge frais). Tours de correction : 1 (manager, sur le CONTEXT).
+
+## Suite — planification (même jour)
+
+Relais de la session principale (SendMessage), arbitrages Samuel, AskUserQuestion session
+principale, 2026-09-17 : P-1 reformuler le critère 2 (D-09), P-2 ne rien restreindre (D-10), puis
+planifier. Verrou repris (`vf-dev-manager-41-plan`), DAG `dag-phase41-plan.json`.
+
+- `gsd-planner` : 11 plans en 9 vagues, puis 13 plans en 13 vagues séquentielles après révisions.
+- Vérificateur de plans frais, un agent neuf par tour :
+  - tour 1 : ISSUES_FOUND, 1 bloquant (M-2/M-3 sans checkpoint de décision), 9 avertissements ;
+  - tour 2 : ISSUES_FOUND, 1 bloquant de fond (force push et suppression de `main` non arbitrés),
+    3 avertissements ;
+  - tour 3 : ISSUES_FOUND, 0 bloquant, 3 avertissements (faux vert du ledger sur coupure de ligne,
+    consigne 41-05 dépendante d'une variante, traçabilité d'arbitrage non couverte) — corrigés de
+    façon ciblée, **non re-vérifiés** (budget de 3 tours atteint).
+- Décisions du manager en cours de planification : `dismiss_stale_reviews_on_push` au défaut
+  `false` (aucun arbitrage ne couvre `true`) ; sonde `actor_id` désactivée avant le merge de la PR
+  de la phase, troisième PR de clôture, amendement d'ADR-059 limité à ce dépôt, contournement réel
+  porté sur des checks en cours : validés comme techniques.
+- Escalade : question force push / suppression de `main` relayée par SendMessage le 2026-09-17,
+  sans réponse à la clôture de la mission → `REGLES_MAIN_FORCE_PUSH_SUPPRESSION:
+  EN_ATTENTE_ARBITRAGE` dans 41-01, vérifications rouges par construction tant qu'elle n'est pas
+  fixée avec canal et date.
+- Remontée hors zone : `plugin/dev-orchestrator/references/mission-contracts.md:116` exempte le
+  « travail conversationnel direct » de la règle de branche, contraire à D-03 sur ce dépôt mais
+  couvert par la primauté du `CLAUDE.md` (l.145) ; rien planifié (hotfix v2.63.2 en cours).
+- Constat annexe : ADR-071 n'a pas de ligne dans l'index de `docs/ADR.md`.
+
+Mandats émis (planification) : 1 planificateur (1 création + 3 révisions par réveil), 3
+vérificateurs frais.
