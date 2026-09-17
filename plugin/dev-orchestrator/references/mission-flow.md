@@ -257,7 +257,9 @@ d'une ligne que huit plans restants auraient crevée ; rien de son sens n'a boug
   halte de nœud, jamais de mission**, le laisser `blocked`/`failed`, ne poursuivre QUE les nœuds
   indépendants, consigner la question au rapport · `gaps_found` → `dag.sh reopen` + UNE relance de
   comblement via `vf-coder`, puis si les manques persistent : consigner et arbitrer · `blocked` →
-  laisser le nœud `blocked`, traiter la dépendance. Findings `action: auto-fix` → repartent à
+  laisser le nœud `blocked`, traiter la dépendance — sauf `cause: "profondeur"` (`mission-contracts.md`
+  §Retour « bloqué : profondeur ») : remonter le mandat intact, jamais coder à sa place ni
+  redispatcher au même niveau. Findings `action: auto-fix` → repartent à
   `vf-coder` (jamais corrigés par le manager) ; `no-op` ignorés.
 - **Blocage** (étage en échec répété) : 3 options — réessayer l'étage · sauter l'étape (documenté)
   · arrêter la mission (rapport partiel). En mode **autonome** : trancher via panel ; en mode

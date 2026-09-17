@@ -6,9 +6,11 @@ description: "Utiliser quand l'utilisateur délègue l'enchaînement complet **s
 # vf-auto — Mode autonome
 
 **D3** : invoqué EN DIRECT par l'utilisateur, ce skill garde son moteur direct (`gsd-autonomous`,
-mission courte). Dispatché PAR `vibeflow-head` (mission « fais tout / en autonomie »), le head
-route toujours vers l'équipe (`Task(vf-dev-manager)`, ou `Task(vf-design-manager)` sur le pilote
-unique design ci-dessous) — il ne déroule jamais lui-même le moteur direct dans son propre contexte.
+mission courte). Dispatché PAR `vibeflow-head` — **incarné en session principale, jamais en Task**
+(B1, `head-governance.md` préambule) — (mission « fais tout / en autonomie »), le head route
+toujours vers l'équipe (`Task(vf-dev-manager)`, ou `Task(vf-design-manager)` sur le pilote unique
+design ci-dessous) : le manager ainsi dispatché est à la **profondeur 1**. Le head ne déroule
+jamais lui-même le moteur direct dans son propre contexte.
 
 ## Étape 0 — Aiguillage : quel pilote, puis moteur direct ou équipe
 
@@ -40,8 +42,10 @@ dans le périmètre demandé). Applique le seuil canonique `SEUIL_EQUIPE` (défi
 - **N < SEUIL_EQUIPE ET aucun signal de durée** (« la nuit », « débrouille-toi jusqu'au bout »,
   longue absence) → **moteur direct** : poursuis ce skill ci-dessous (mission courte, moins chère).
 - **N ≥ SEUIL_EQUIPE OU signal de durée** → **équipe** : dispatche l'agent `vf-dev-manager`
-  (outil Task) avec le brief de mission du contrat, puis NE poursuis PAS ce skill — le manager
-  tient la boucle et rend le rapport de mission. Le signal de durée GAGNE en cas d'ambiguïté.
+  (outil Task, depuis la session principale où le head est incarné — le manager dispatché se
+  trouve à la **profondeur 1**) avec le brief de mission du contrat, puis NE poursuis PAS ce
+  skill — le manager tient la boucle et rend le rapport de mission. Le signal de durée GAGNE en
+  cas d'ambiguïté.
 
 Annonce le choix en une ligne (« mission courte, traitement direct » / « mission longue,
 je déploie l'équipe »).
