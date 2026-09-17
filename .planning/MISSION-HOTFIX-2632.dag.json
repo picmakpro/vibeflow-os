@@ -68,6 +68,48 @@
       ],
       "scope": [],
       "status": "done"
+    },
+    {
+      "id": "exec-b1-design",
+      "step": "B1 etendu a vibeflow-design",
+      "stage": "",
+      "deps": [
+        "pr"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-design",
+      "step": "revue diff design",
+      "stage": "",
+      "deps": [
+        "exec-b1-design"
+      ],
+      "scope": [],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "gates-design",
+      "step": "rejeu gates",
+      "stage": "",
+      "deps": [
+        "exec-b1-design"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "push-design",
+      "step": "push PR 79",
+      "stage": "",
+      "deps": [
+        "revue-design",
+        "gates-design"
+      ],
+      "scope": [],
+      "status": "done"
     }
   ]
 }
