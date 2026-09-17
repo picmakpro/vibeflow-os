@@ -863,6 +863,81 @@ jobs:
           if [ "$fail" -ne 0 ]; then exit 1; fi
           echo "== check-divergence.sh VERT en CI : le flip 0 → 1 sur mutation réelle est prouvé, la racine n'a pas bougé =="
 
+      - name: check-baseline-arbitrage (G-1, PROT-04 — hausse de baseline sans arbitrage cité)
+        # POURQUOI CETTE ÉTAPE EXISTE. G-1 traite O-3 du `25-SECURITY.md` (T-25-16, restée
+        # procédurale) faute d'accès admin sur ce dépôt (option (a), arbitrage Samuel,
+        # AskUserQuestion session principale, 2026-09-17) : elle rend visible et trace toute hausse
+        # de la colonne INSTRUCTIONS de `.planning/instruction-budget-baselines.tsv`, ou toute
+        # neutralisation d'une sentinelle `.planning/.*-armed`, sans citation d'arbitrage conforme
+        # dans le commit qui porte le changement. LIMITE DE FOND : la garde vit dans le dépôt — la PR
+        # qu'elle juge peut la modifier (elle, sa suite, cette étape) et rester verte. Elle rend
+        # visible et trace, elle ne verrouille rien ; O-3 devient « signalée et tracée », jamais
+        # « fermée ». Une étape qui se contenterait de mesurer le dépôt réel serait verte par
+        # construction si elle perdait sa capacité à discriminer — la bascule isolée ci-dessous, sur
+        # dépôt jetable reconstruit à chaque fois, existe pour que cette étape prouve elle-même
+        # qu'elle sait encore rendre rouge, patron `check-instruction-budget` (plus haut dans ce même
+        # job). Complétée à SIX bascules au plan 41-14 Task 3.
+        run: |
+          set -eu
+
+          S="scripts/check-baseline-arbitrage.sh"
+
+          # --- Résolution de la ref de référence pour le journal, remédiation nommée si absente -----
+          REF=""
+          for r in refs/remotes/origin/main origin/main refs/heads/main main; do
+            if git rev-parse --verify -q "${r}^{commit}" >/dev/null 2>&1; then REF="$r"; break; fi
+          done
+          if [ -z "$REF" ]; then
+            echo "::warning::check-baseline-arbitrage CI : aucune ref main résoluble localement, git fetch origin main (remédiation nommée, jamais un repli silencieux)"
+            git fetch origin main:refs/remotes/origin/main
+            REF="refs/remotes/origin/main"
+          fi
+          echo "== check-baseline-arbitrage : ref de référence pour le journal = $REF =="
+
+          # --- Bascule ISOLÉE sur dépôt jetable, reconstruit depuis zéro -----------------------------
+          FIX="$(mktemp -d)"
+          trap 'rm -rf "$FIX"' EXIT
+
+          git init -q -b main "$FIX"
+          mkdir -p "$FIX/.planning"
+          {
+            printf '%s\n' '# baseline de fixture CI'
+            printf 'demo/a.md\t10\t5\n'
+          } > "$FIX/.planning/instruction-budget-baselines.tsv"
+          git -C "$FIX" -c user.name=CI -c user.email=ci@vibeflow.invalid -c commit.gpgsign=false add -A
+          git -C "$FIX" -c user.name=CI -c user.email=ci@vibeflow.invalid -c commit.gpgsign=false commit -q -m "fixture: état initial"
+          FIXBASE="$(git -C "$FIX" rev-parse HEAD)"
+          {
+            printf '%s\n' '# baseline de fixture CI'
+            printf 'demo/a.md\t10\t9\n'
+          } > "$FIX/.planning/instruction-budget-baselines.tsv"
+          git -C "$FIX" -c user.name=CI -c user.email=ci@vibeflow.invalid -c commit.gpgsign=false add -A
+          git -C "$FIX" -c user.name=CI -c user.email=ci@vibeflow.invalid -c commit.gpgsign=false commit -q -m "hausse instructions sans citation"
+
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$FIXBASE" 2>&1)" || rc=$?
+          echo "== bascule fixture (hausse sans citation) : rc=$rc =="; printf '%s\n' "$out"
+          if [ "$rc" -ne 1 ]; then
+            echo "::error::check-baseline-arbitrage CI : bascule fixture rc=$rc, attendu 1"
+            exit 1
+          fi
+          rm -rf "$FIX"
+
+          echo "== check-baseline-arbitrage DISCRIMINANT en CI : la bascule isolée est prouvée =="
+
+          # --- Mesure du dépôt réel -------------------------------------------------------------------
+          rc=0
+          out="$(bash "$S" 2>&1)" || rc=$?
+          echo "== dépôt réel : rc=$rc =="; printf '%s\n' "$out"
+          case "$rc" in
+            0|3) : ;;
+            *)
+              verdict="$(printf '%s\n' "$out" | tail -1)"
+              echo "::error::check-baseline-arbitrage : dépôt réel rc=$rc — verdict : $verdict"
+              exit 1
+              ;;
+          esac
+
       - name: check-release-tag (main uniquement — VERSION doit être taggée et poussée)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         # GH_TOKEN requis : sans lui le gh du runner échoue en auth et le gate lisait cet
