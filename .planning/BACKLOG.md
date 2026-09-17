@@ -566,6 +566,10 @@ Plans concernés : 41-01 (Task 2 et 3), 41-04 à 41-09, et la partie « sous la 
 geste posé par le détenteur de `picmakpro` sous dictée). Ce jour-là, la posture visée est déjà
 écrite : `41-CONTEXT.md` § Arbitrages, et les plans différés se rejouent dans l'ordre.
 
+**Demande en cours depuis le 2026-09-17** : Samuel demande au détenteur du compte `picmakpro` soit
+l'**accès admin**, soit le **transfert du dépôt**. Consigné, non traité par la phase. Le volet
+différé reprend à la première des deux réponses ; d'ici là, aucune garde côté serveur n'existe.
+
 **Ce qui reste faisable sans admin** (à arbitrer avec le nouveau périmètre de la Phase 41) : gardes
 in-repo visibles et tracées — baseline du budget d'instructions, modification d'un gate ou de
 `ci.yml`, détection après coup d'un push direct, durcissement du hook `pre-push`. **Limite de fond,
