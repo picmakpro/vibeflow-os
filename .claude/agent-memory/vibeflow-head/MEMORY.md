@@ -1,0 +1,1 @@
+- [Rejeu CI gates en bash -e, extraction en rtk proxy](rejeu-ci-gates-bash-e.md) — pas de pipefail sans shell: explicite ; rtk corrompt les extractions (25-04, 2026-09-16)
