@@ -16,7 +16,27 @@
         "plan"
       ],
       "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revise-1",
+      "step": "revision tour 1",
+      "stage": "",
+      "deps": [
+        "check-1"
+      ],
+      "scope": [],
       "status": "running"
+    },
+    {
+      "id": "check-2",
+      "step": "plan-checker frais tour 2",
+      "stage": "",
+      "deps": [
+        "revise-1"
+      ],
+      "scope": [],
+      "status": "blocked"
     }
   ]
 }
