@@ -6775,17 +6775,33 @@ fi
 #      ligne) un marqueur de négation (jamais/pas) — pas seulement le fichier en général. Ce
 #      couplage ligne-à-ligne empêche l'échappatoire "une négation en tête de fichier couvre tout
 #      le document".
+# Portée de la négation SCOPÉE À LA CLAUSE (hotfix v2.63.2, PR #79 — finding 1 de revue, jumeau
+# synchronisé de t10_affirmative_hits dans test-design-orchestrator.sh) : une négation ailleurs
+# sur la ligne (autre clause) ne doit ni neutraliser une occurrence affirmative du littéral, ni —
+# inversement — une reformulation légitime de la négation (« pas de dispatch ») échapper à la
+# détection faute de correspondre au littéral figé « pas dispatch ». La fenêtre est bornée au
+# texte qui précède le littéral, jusqu'au dernier séparateur de clause (`,;:.` ou les mots
+# « mais »/« puis ») — pas toute la ligne. Littéraux de négation : '\<jamais\>\|\<pas\>' (synchro
+# fixe avec T10_NEG_RE, vérifiée machine en T10 (d) de test-design-orchestrator.sh).
 t38d_affirmative_hits() { # <file>
   local f="$1" hits=""
   hits="$("$GREP" -n 'Invocable via Task\|Incarne (ou dispatche via Task)' "$f" 2>/dev/null)"
   local head_lines
-  head_lines="$("$GREP" -n 'Task(vibeflow-head)' "$f" 2>/dev/null)"
+  head_lines="$("$GREP" -n -F -- 'Task(vibeflow-head)' "$f" 2>/dev/null)"
   if [ -n "$head_lines" ]; then
-    local unnegated
-    unnegated="$(printf '%s\n' "$head_lines" | "$GREP" -vi 'jamais\|pas dispatch')"
-    if [ -n "$unnegated" ]; then
-      hits="$(printf '%s\n%s' "$hits" "$unnegated")"
-    fi
+    local t38d_line
+    while IFS= read -r t38d_line; do
+      [ -n "$t38d_line" ] || continue
+      local t38d_content="${t38d_line#*:}"
+      local t38d_before="${t38d_content%%"Task(vibeflow-head)"*}"
+      local t38d_window
+      t38d_window="$(printf '%s' "$t38d_before" | sed -E 's/.*(,|;|:|\.| mais | puis )//')"
+      if ! printf '%s' "$t38d_window" | "$GREP" -q '\<jamais\>\|\<pas\>'; then
+        hits="$(printf '%s\n%s' "$hits" "$t38d_line")"
+      fi
+    done <<T38D_HEADLINES
+$head_lines
+T38D_HEADLINES
   fi
   printf '%s' "$hits" | sed '/^$/d'
 }
@@ -6818,6 +6834,7 @@ fi
 # affirmatif dans une COPIE temporaire et vérifier que la même fonction de détection rend rouge,
 # avec la ligne détectée en trace.
 T38_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T38_TMPDIR"
+[ -d "$T38_TMPDIR" ] || { ko "T38 (e) : mktemp -d a échoué, impossible de construire les mutants de contre-épreuve"; t38_ok=0; }
 
 # (e.1) vf-coder.md — retirer le contrôle d'entrée (motif (a)).
 if [ -f "$T38_CODER" ]; then
@@ -6882,6 +6899,48 @@ if [ -f "$T38_VFDEV" ]; then
     ko "T38 (e.4c) : faux positif — la formulation négative légitime de vf-dev/SKILL.md déclenche la détection"; t38_ok=0
   fi
 fi
+
+# (e.5) DISCRIMINANT — repro relecteur (hotfix v2.63.2, PR #79, finding 1, faux négatif) : la
+# négation « jamais » porte sur une clause DISTINCTE (séparée par « mais ») de celle qui contient
+# Task(vibeflow-head) ; la seconde clause reste affirmative et DOIT être détectée — une négation
+# scopée à la ligne entière la masquait à tort avant ce fix. Équivalent vibeflow-head de T10 (c.6)
+# dans test-design-orchestrator.sh.
+t38e_clause_pos="$T38_TMPDIR/synthetic-clause-mais.md"
+echo "Le crafter n'est jamais dispatché seul, mais le manager lance Task(vibeflow-head) chaque nuit." > "$t38e_clause_pos"
+t38e_clause_hit="$(t38d_affirmative_hits "$t38e_clause_pos")"
+if [ -n "$t38e_clause_hit" ]; then
+  ok "T38 (e.5) (DISCRIMINANT) : négation « jamais » d'une clause distincte (« mais ») ne masque plus la détection dans l'autre clause — $(printf '%s' "$t38e_clause_hit" | head -1)"
+else
+  ko "T38 (e.5) NON DISCRIMINANTE : la négation d'une clause voisine masque encore la détection"; t38_ok=0
+fi
+
+# (e.6) CONTRE-ÉPREUVE — repro relecteur (hotfix v2.63.2, PR #79, finding 1, faux positif) :
+# « n'est pas de dispatch » (négation légitime de la MÊME clause, reformulée sans coller au
+# littéral figé « pas dispatch ») doit rester non détectée. Équivalent vibeflow-head de T10 (c.7).
+t38e_pasdispatch_neg="$T38_TMPDIR/synthetic-pas-de-dispatch.md"
+echo "vibeflow-head n'est pas de dispatch via Task(vibeflow-head)." > "$t38e_pasdispatch_neg"
+t38e_pasdispatch_hit="$(t38d_affirmative_hits "$t38e_pasdispatch_neg")"
+if [ -z "$t38e_pasdispatch_hit" ]; then
+  ok "T38 (e.6) (CONTRE-ÉPREUVE) : « n'est pas de dispatch via Task(vibeflow-head) » reste non détecté (négation même clause)"
+else
+  ko "T38 (e.6) : faux positif — « n'est pas de dispatch via Task(vibeflow-head) » déclenche la détection — $(printf '%s' "$t38e_pasdispatch_hit" | head -1)"; t38_ok=0
+fi
+
+# (e.7) DISCRIMINANT — isole la branche « mais »/« puis » du séparateur de clause SANS virgule
+# voisine (constat de revue sur (e.5) : la virgule y coupait déjà la clause, la branche mot
+# n'était jamais seule décisive). Équivalent vibeflow-head de T10 (c.8).
+t38e_mais_sansv="$T38_TMPDIR/synthetic-mais-sans-virgule.md"
+echo "on dit jamais dispatché ainsi mais on lance quand meme Task(vibeflow-head) chaque nuit." > "$t38e_mais_sansv"
+t38e_mais_sansv_hit="$(t38d_affirmative_hits "$t38e_mais_sansv")"
+t38e_puis_sansv="$T38_TMPDIR/synthetic-puis-sans-virgule.md"
+echo "le manager attend jamais bien longtemps puis dispatche Task(vibeflow-head) sans discuter." > "$t38e_puis_sansv"
+t38e_puis_sansv_hit="$(t38d_affirmative_hits "$t38e_puis_sansv")"
+if [ -n "$t38e_mais_sansv_hit" ] && [ -n "$t38e_puis_sansv_hit" ]; then
+  ok "T38 (e.7) (DISCRIMINANT) : « mais »/« puis » isolent seuls la clause affirmative sans virgule voisine"
+else
+  ko "T38 (e.7) NON DISCRIMINANTE : sans virgule, « mais »(=[$t38e_mais_sansv_hit])/« puis »(=[$t38e_puis_sansv_hit]) ne suffisent plus à couper la clause"; t38_ok=0
+fi
+
 rm -rf "$T38_TMPDIR"
 
 [ "$t38_ok" -eq 1 ] && ok "T38 : contrôle de profondeur (B1/B2) présent sur les 4 fichiers de doctrine, détection prouvée discriminante par mutation"

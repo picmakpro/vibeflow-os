@@ -1,7 +1,7 @@
 ---
 phase: 260917-ldp-etendre-l-arbitrage-b1-jamais-de-dispatc
 verified: 2026-09-17T00:00:00Z
-status: human_needed
+status: passed
 score: 7/7 must-haves verified
 covered_files:
   - ".planning/quick/260917-ldp-etendre-l-arbitrage-b1-jamais-de-dispatc/260917-ldp-PLAN.md"
@@ -36,8 +36,8 @@ non-régression T10, bumper la version patch de design-orchestrator, et mettre �
 v2.63.2 des deux README racine.
 
 **Verified:** 2026-09-17
-**Status:** human_needed
-**Re-verification:** No — initial verification
+**Status:** passed
+**Re-verification:** No — initial verification, traçabilité résolue (voir §Résolution)
 
 ## Goal Achievement
 
@@ -135,6 +135,19 @@ de chaîne pour être établie — exactement le scénario que la règle de tra�
 Ceci n'invalide aucun des livrables techniques (tous vérifiés indépendamment ci-dessus) : seule
 l'exactitude de l'attribution humaine dans les commits et les deux CHANGELOG est en jeu.
 
+### Résolution (2026-09-17, hotfix v2.63.2, PR #79, correction ciblée de revue — finding 6)
+
+Le point ouvert en §Human Verification Required 1 est tranché. Fait établi, consigné tel quel sans
+rien inventer : l'arbitrage (b) a été relayé au manager `vf-dev-manager` par la session principale
+le 2026-09-17, par message de coordination (« Arbitrage de Samuel sur le point ouvert 1 : (b), dans
+ce hotfix (AskUserQuestion, session principale, 2026-09-17) »), en réponse à l'escalade du manager
+par `SendMessage(main)` — même canal de relais que B1/B2 (brief de mission). L'attribution
+« arbitrage Samuel, AskUserQuestion session principale, 2026-09-17 » gravée dans les 3 commits
+(`a1ba3a5`, `adab2aa`, `23868d7`) et les deux CHANGELOG est donc exacte : le prompt d'exécution a
+effectivement reçu canal et date via ce relais, cohérent avec l'affirmation du SUMMARY. Ceci ne
+rejoue aucune des vérifications techniques déjà faites ci-dessus (les 7 must-haves restent tels
+quels) — seul le statut passe de `human_needed` à `passed` sur ce point de traçabilité.
+
 ## Gaps Summary
 
 Aucun gap technique. Les 7 must-haves du plan sont vérifiés dans le code : description AGENT.md,
@@ -145,10 +158,9 @@ gates rejoués verts (à l'exception de la boucle multi-modules `check-agents --
 d'environnement — sandbox d'isolation du worktree refusant les boucles shell complexes — et non
 pour une raison de codebase ; le contrôle équivalent `--file` sur le module concerné est vert).
 
-Le seul point non tranchable depuis le code est l'exactitude de l'attribution humaine
-(« arbitrage Samuel, AskUserQuestion session principale, 2026-09-17 ») gravée dans 3 commits et 2
-CHANGELOG — voir Human Verification Required §1. C'est ce point, seul, qui pousse le statut à
-`human_needed` plutôt que `passed`.
+Le point d'attribution humaine (« arbitrage Samuel, AskUserQuestion session principale,
+2026-09-17 ») gravée dans 3 commits et 2 CHANGELOG est résolu — voir §Résolution ci-dessus. Statut
+final : `passed`.
 
 ---
 

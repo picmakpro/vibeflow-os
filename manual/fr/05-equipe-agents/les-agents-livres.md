@@ -28,7 +28,8 @@ domaine.
   (via `/vf-dev`), jamais lancé comme sous-agent : un sous-agent de troisième niveau n'a plus
   d'outil pour lancer des agents.
 - **`vibeflow-design`** — le même rôle pour le design et l'UI, de la direction artistique au détail
-  de spacing.
+  de spacing. Il tourne lui aussi dans ta session principale (via `/vf-design`), jamais lancé
+  comme sous-agent.
 - **`vibeflow-validator`** — l'auditeur. Il orchestre plusieurs audits complémentaires et te propose
   des remédiations, sans jamais les appliquer seul.
 - **`vibeflow-kpi-analyst`** — les indicateurs réels du lab, extraits de façon déterministe.

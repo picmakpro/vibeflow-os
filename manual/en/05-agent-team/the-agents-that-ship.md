@@ -27,7 +27,7 @@ either by naming it, or simply by phrasing a request that falls in its domain.
   session (via `/vf-dev`), never launched as a subagent: a third-level subagent no longer has a
   tool to launch agents.
 - **`vibeflow-design`** — the same role for design and UI, from art direction down to a spacing
-  detail.
+  detail. It also runs in your main session (via `/vf-design`), never launched as a subagent.
 - **`vibeflow-validator`** — the auditor. It orchestrates several complementary audits and proposes
   remediations, never applying them on its own.
 - **`vibeflow-kpi-analyst`** — the lab's real indicators, extracted deterministically.
