@@ -150,6 +150,17 @@ arbitrages Samuel, AskUserQuestion session principale, 2026-09-17"
 out="$(run "$D" --base-ref "$B")"; rc=$?
 [ "$rc" -eq 0 ] && ok "PASS hausse avec citation 'arbitrages' pluriel -> rc 0" || ko "PASS hausse avec citation pluriel" "rc=0" "rc=$rc :: $out"
 
+# --- PASS 6 : sentinelle deja vide (0 octet) SUPPRIMEE avec citation conforme -> rc 0 (regression : -----
+# --- la premiere version du culprit-walk exigeait une taille prealable non nulle, donc ne trouvait ------
+# --- jamais le commit fautif pour une sentinelle DEJA vide -> citation jamais lue -> rc1 a tort) --------
+D="$(mk_repo pass6)"; B="$(base_of "$D")"
+rm -f "$D/.planning/.instruction-budget-armed"
+commit_avec "$D" "chore: retire la sentinelle armed (deja vide) AVEC citation
+
+arbitrage Samuel, AskUserQuestion session principale, 2026-09-17"
+out="$(run "$D" --base-ref "$B")"; rc=$?
+[ "$rc" -eq 0 ] && ok "PASS sentinelle deja vide, supprimee avec citation conforme -> rc 0" || ko "PASS sentinelle deja vide supprimee avec citation" "rc=0" "rc=$rc :: $out"
+
 echo "== test-check-baseline-arbitrage : FAIL =="
 
 # --- FAIL 1 : hausse INSTRUCTIONS sans citation ---------------------------------------------------------

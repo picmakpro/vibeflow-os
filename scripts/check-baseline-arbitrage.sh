@@ -396,15 +396,20 @@ printf '%s\n' "$SENTINEL_PATHS" | while IFS= read -r sp; do
     culprit=""
     for c in $NONMERGE_LIST; do
       prev_exists=0; git cat-file -e "${c}^:${sp}" 2>/dev/null && prev_exists=1
-      prev_size="$(git cat-file -s "${c}^:${sp}" 2>/dev/null || echo 0)"
       cur_exists=0; git cat-file -e "${c}:${sp}" 2>/dev/null && cur_exists=1
-      cur_size="$(git cat-file -s "${c}:${sp}" 2>/dev/null || echo 0)"
-      if [ "$prev_exists" -eq 1 ] && [ "${prev_size:-0}" -gt 0 ]; then
-        if [ "$cur_exists" -eq 0 ] || [ "${cur_size:-0}" -eq 0 ]; then
-          culprit="$c"
-          break
-        fi
-      fi
+      case "$status" in
+        D|R*)
+          # disparition (existence uniquement) : le contenu prealable, vide ou non, n'entre pas en jeu.
+          if [ "$prev_exists" -eq 1 ] && [ "$cur_exists" -eq 0 ]; then culprit="$c"; break; fi
+          ;;
+        M)
+          prev_size="$(git cat-file -s "${c}^:${sp}" 2>/dev/null || echo 0)"
+          cur_size="$(git cat-file -s "${c}:${sp}" 2>/dev/null || echo 0)"
+          if [ "$prev_exists" -eq 1 ] && [ "${prev_size:-0}" -gt 0 ]; then
+            if [ "$cur_exists" -eq 0 ] || [ "${cur_size:-0}" -eq 0 ]; then culprit="$c"; break; fi
+          fi
+          ;;
+      esac
     done
     sentinel_citation_ok=0
     if [ -n "$culprit" ]; then
