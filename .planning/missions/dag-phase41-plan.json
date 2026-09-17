@@ -46,7 +46,7 @@
         "check-2"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "check-3",
@@ -56,7 +56,7 @@
         "revise-2"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     }
   ]
 }
