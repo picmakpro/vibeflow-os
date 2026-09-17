@@ -1,21 +1,57 @@
 ---
-gsd_state_version: "1.0"
+gsd_state_version: 1.0
 milestone: fiabilite-v1.0
-milestone_name: « ce qui survit » — Phases 30-35 + Phases 18 et 25 héritées —
+milestone_name: « ce qui survit »
+current_phase: 39
 current_phase_name: Workstreams — partition du planning et collaboration concurrente
 status: completed
-stopped_at: "Phase 39 shipped - PR 62 - v2.60.0 (2026-09-14). Exécutée 2026-09-10 (3 plans, SUMMARY sur disque), revue ×3 + audit infra + juge frais sur le diff de correction post-revue (mitigation de sécurité incluse), hotfix PR #61 fusionné sans conflit (`5efe8d3`) et regroupé dans la même release sur arbitrage Samuel (AskUserQuestion session principale, 2026-09-14). Ship autorisé par Samuel (AskUserQuestion session principale, 2026-09-14) après reprise de session et rejeu des huit gates. Livré : conductor v1.35.0 (`check-divergence.sh` S2/S4a/S4b/S5, suite 17 cas dont 3 mutants, hook `post-merge` opt-in ancré `--git-common-dir`, étape CI), dev-orchestrator v2.20.4 (dispatch `--ws` explicite, traçabilité des arbitrages), `PART-01..09` gravées et cochées, `GSDA-19` superseded, ADR-069 amendé. **Dépôt volontairement NON partitionné** (D-02 = déclencheur de reprise, § Decisions). Réserves inchangées : premier run CI distant observé sur la PR #62 seulement ; le clone jetable prouve un mécanisme, pas un usage concurrent réel. Issue amont `init-progress` rédigée, jamais postée. **Note (2026-09-15, plan 34-06) : `current_phase` reste intentionnellement à 39 malgré l'exécution complète et la ledgerisation de la Phase 34 (numérotée AVANT 39 dans le ROADMAP, exécutée APRÈS) — même précédent que la Phase 23 (§ Roadmap Evolution du 2026-08-04) : ce champ, gaté en anti-régression par `check-state-integrity.sh`, ne peut décroître au sein du même jalon ; il suit la progression numérique séquentielle, pas le dernier geste chronologique. Le travail réel de la Phase 34 est documenté dans `## Current Position` et `### Roadmap Evolution` ci-dessous, jamais perdu — seul ce pointeur numérique reste sur sa valeur la plus haute atteinte.** **Note (2026-09-15, clôture documentaire Phase 25) : mêmes raisons — `current_phase` reste à 39** bien que la Phase 25 ait ses vagues 1-3 vertes sur `feat/phase-25-budget-instructions` (exécution des trois plans de `5583d3e` à `6638804`, puis clôture documentaire et ses correctifs au-delà — décompte volontairement non chiffré ici : un total écrit DANS le fichier qu'il compte est faux dès le commit qui le porte, défaut constaté puis fermé le 2026-09-15). **Aucune PR ouverte, aucun ratchet armé** : ni `.planning/.instruction-budget-armed` ni `.planning/instruction-budget-baselines.tsv` n'existent. Le plan 25-04 (calibration) reste un checkpoint bloquant-humain, précondition « Phase 40 livrée » fausse à ce jour — non préparé. **Note (2026-09-16, plan 25-04) : `current_phase` reste à 39 pour la même raison (anti-régression ADR-063). Le ratchet du budget d'instructions EST désormais armé** — `check-instruction-budget` armé le 2026-09-16, `.planning/.instruction-budget-armed` et `.planning/instruction-budget-baselines.tsv` existent ; la phrase précédente « aucun ratchet armé » décrit l'état du 2026-09-15."
+stopped_at: >-
+  Phase 39 shipped - PR 62 - v2.60.0 (2026-09-14). Exécutée 2026-09-10 (3 plans, SUMMARY sur disque),
+  revue ×3 + audit infra + juge frais sur le diff de correction post-revue (mitigation de sécurité
+  incluse), hotfix PR #61 fusionné sans conflit (`5efe8d3`) et regroupé dans la même release sur
+  arbitrage Samuel (AskUserQuestion session principale, 2026-09-14). Ship autorisé par Samuel
+  (AskUserQuestion session principale, 2026-09-14) après reprise de session et rejeu des huit gates.
+  Livré : conductor v1.35.0 (`check-divergence.sh` S2/S4a/S4b/S5, suite 17 cas dont 3 mutants, hook
+  `post-merge` opt-in ancré `--git-common-dir`, étape CI), dev-orchestrator v2.20.4 (dispatch `--ws`
+  explicite, traçabilité des arbitrages), `PART-01..09` gravées et cochées, `GSDA-19` superseded,
+  ADR-069 amendé. **Dépôt volontairement NON partitionné** (D-02 = déclencheur de reprise, § Decisions).
+  Réserves inchangées : premier run CI distant observé sur la PR #62 seulement ; le clone jetable
+  prouve un mécanisme, pas un usage concurrent réel. Issue amont `init-progress` rédigée, jamais postée.
+  **Note (2026-09-15, plan 34-06) : `current_phase` reste intentionnellement à 39 malgré l'exécution
+  complète et la ledgerisation de la Phase 34 (numérotée AVANT 39 dans le ROADMAP, exécutée APRÈS) —
+  même précédent que la Phase 23 (§ Roadmap Evolution du 2026-08-04) : ce champ, gaté en
+  anti-régression par `check-state-integrity.sh`, ne peut décroître au sein du même jalon ; il suit
+  la progression numérique séquentielle, pas le dernier geste chronologique. Le travail réel de la
+  Phase 34 est documenté dans `## Current Position` et `### Roadmap Evolution` ci-dessous, jamais
+  perdu — seul ce pointeur numérique reste sur sa valeur la plus haute atteinte.**
+  **Note (2026-09-15, clôture documentaire Phase 25) : mêmes raisons — `current_phase` reste à 39**
+  bien que la Phase 25 ait ses vagues 1-3 vertes sur `feat/phase-25-budget-instructions` (exécution
+  des trois plans de `5583d3e` à `6638804`, puis clôture documentaire et ses correctifs au-delà —
+  décompte volontairement non chiffré ici : un total écrit DANS le fichier qu'il compte est faux dès
+  le commit qui le porte, défaut constaté puis fermé le 2026-09-15).
+  **Aucune PR ouverte, aucun ratchet armé** : ni
+  `.planning/.instruction-budget-armed` ni `.planning/instruction-budget-baselines.tsv` n'existent.
+  Le plan 25-04 (calibration) reste un checkpoint bloquant-humain, précondition « Phase 40 livrée »
+  fausse à ce jour — non préparé.
+  **Note (2026-09-16, plan 25-04) : `current_phase` reste à 39 pour la même raison (anti-régression
+  ADR-063). Le ratchet du budget d'instructions EST désormais armé** — `check-instruction-budget`
+  armé le 2026-09-16, `.planning/.instruction-budget-armed` et `.planning/instruction-budget-baselines.tsv`
+  existent ; la phrase précédente « aucun ratchet armé » décrit l'état du 2026-09-15.
 last_updated: "2026-09-17T14:07:54.440Z"
 last_activity: 2026-09-17
-last_activity_desc: "Phase 40.1 exécutée sur `feat/phase-40.1-revision-adr-029-budget` (mission vf-dev-manager, go de Samuel, AskUserQuestion session principale, 2026-09-16) : 15 plans en 4 vagues, plafond des agents 300 lignes avec avertissement dès 251, ratchet du gate sur les instructions seules, dix modules bumpés, BUDG-04 et BUDG-05 cochés. Revue et audit en direct, vérification de phase passed. Compteurs de `progress` avancés du seul delta de la phase (+1 phase, +15 plans), pas re-dérivés. PR ouverte, ni merge, ni tag, ni release."
-state_head: 23868d784136a4f7d8bfdce5395a420de6daf542
+last_activity_desc: >-
+  Phase 40.1 exécutée sur `feat/phase-40.1-revision-adr-029-budget` (mission vf-dev-manager, go de
+  Samuel, AskUserQuestion session principale, 2026-09-16) : 15 plans en 4 vagues, plafond des agents
+  300 lignes avec avertissement dès 251, ratchet du gate sur les instructions seules, dix modules
+  bumpés, BUDG-04 et BUDG-05 cochés. Revue et audit en direct, vérification de phase passed. Compteurs
+  de `progress` avancés du seul delta de la phase (+1 phase, +15 plans), pas re-dérivés. PR ouverte,
+  ni merge, ni tag, ni release.
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 70
   completed_plans: 70
   percent: 92
-current_phase: 39
 ---
 
 # Project State
@@ -99,7 +135,6 @@ Status: phase_complete
 
 **Vérifications conduites avant le cadrage** — deux conditions d'invalidation du STUDY §8, jouées
 par commande parce que l'une pouvait supprimer la phase :
-
 - **D1 non satisfaite** — `complete-milestone.md:433,501` supprime toujours sans condition en
   gsd-core **1.10.0**. La phase garde sa raison d'être.
 - **D3 non satisfaite** — RFC `open-gsd/gsd-core#3556` **OPEN**, réponse amont du 2026-08-15 avec
@@ -1319,7 +1354,6 @@ Recent decisions affecting current work:
 | 260914-n3e | use_worktrees=false auto sur lab à racine non-git (vibeflow-update.sh, install + update) : le guard d'isolation gsd-core bloquait tout gsd-executor sur un lab multi-repos dès que le sentinel dépassait 10 min — issue amont open-gsd/gsd-core#4734, T53a–T53g, non releasé | 2026-09-14 | `30cef6a` | [260914-n3e-use-worktrees-false-auto-sur-lab-racine-](./quick/260914-n3e-use-worktrees-false-auto-sur-lab-racine-/) |
 | 260917-gyy | Hotfix v2.63.2 doctrine: aligner vf-coder.md, vf-dev-manager.md, mission-contracts.md, team-kernel.md et la memoire vf-dev-manager sur le constat mesure de profondeur de spawn (arbitrages B1/B2) | 2026-09-17 | 746bde0 | [260917-gyy-hotfix-v2-63-2-doctrine-aligner-vf-coder](./quick/260917-gyy-hotfix-v2-63-2-doctrine-aligner-vf-coder/) |
 | 260917-ihf | Alignement B1: le head n'est jamais dispatché en Task — AGENT.md, head-governance.md, mission-flow.md, vf-dev/SKILL.md, vf-auto/SKILL.md, Pattern 12 (allowlist = contrat déclaré) et la memoire vf-dev-manager | 2026-09-17 | 2b428f6 | [260917-ihf-alignement-b1-le-head-n-est-jamais-dispa](./quick/260917-ihf-alignement-b1-le-head-n-est-jamais-dispa/) |
-| 260917-ldp | x | 2026-09-17 | 23868d7 | [260917-ldp-etendre-l-arbitrage-b1-jamais-de-dispatc](./quick/260917-ldp-etendre-l-arbitrage-b1-jamais-de-dispatc/) |
 | 260917-ldp | Étendre B1 (le head n'est jamais dispatché en Task) de vibeflow-head à vibeflow-design : AGENT.md (description alignée sur le patron de vibeflow-head), skills/vf-design/SKILL.md (le verbe incarne l'agent), T10 dans test-design-orchestrator.sh (mêmes littéraux que T38, synchro vérifiée, discriminants par mutation, contre-épreuve), design-orchestrator v1.5.7 → v1.5.8, entrée v2.63.2 des README et CHANGELOG racine enrichie | 2026-09-17 | 23868d7 | [260917-ldp-etendre-l-arbitrage-b1-jamais-de-dispatc](./quick/260917-ldp-etendre-l-arbitrage-b1-jamais-de-dispatc/) |
 
 ## Deferred Items
@@ -1344,7 +1378,6 @@ Stopped at: **Phase 34 EXÉCUTÉE et MERGÉE** (PR #66, merge `bf34d49`, 2026-09
 **Reprendre par** : merge (humain) de la PR de la Phase 40.1, puis cadrage de la Phase 41 (posture de protection du dépôt, O-3 inclus). Points ouverts de la 40.1 : `.planning/codebase/CONCERNS.md:79-85` périmé (hors plans, à arbitrer) ; phrase « blocage actif depuis l'armement (PR #73) » du manuel FR/EN, bloc canonique arbitré, à trancher par Samuel.
 
 **Ce qui reste fermé, quoi qu'il arrive** :
-
 - **Budget d'instructions armé depuis le 2026-09-16** (`check-instruction-budget.sh`) : une baseline de `.planning/instruction-budget-baselines.tsv` ne remonte jamais sans arbitrage humain nommé avec canal et date ; elle descend librement dans le commit de remédiation.
 - **Aucune partition réelle de `vibeflow-os`** sans geste humain explicite — déclencheur D-02 (§ Decisions, 2026-09-10).
 - **Issue amont `init-progress` NON ENVOYÉE** — `.planning/upstream/2026-09-09-init-progress-project-md-not-resolved-under-workstream.md`, Samuel poste.
