@@ -40,12 +40,11 @@ stopped_at: >-
 last_updated: "2026-09-17T15:52:00.000Z"
 last_activity: 2026-09-17
 last_activity_desc: >-
-  Phase 40.1 exécutée sur `feat/phase-40.1-revision-adr-029-budget` (mission vf-dev-manager, go de
-  Samuel, AskUserQuestion session principale, 2026-09-16) : 15 plans en 4 vagues, plafond des agents
-  300 lignes avec avertissement dès 251, ratchet du gate sur les instructions seules, dix modules
-  bumpés, BUDG-04 et BUDG-05 cochés. Revue et audit en direct, vérification de phase passed. Compteurs
-  de `progress` avancés du seul delta de la phase (+1 phase, +15 plans), pas re-dérivés. PR ouverte,
-  ni merge, ni tag, ni release.
+  Phase 41 cadrée sur `feat/phase-41-protection-depot` (mission vf-dev-manager, go de Samuel,
+  AskUserQuestion session principale, 2026-09-17) : `41-CONTEXT.md` Ready for planning, arbitrages
+  D-01 à D-08 (AskUserQuestion session principale, 2026-09-17), décisions du manager D-M1 à D-M14,
+  points P-1 (reformulation du critère 2) et P-2 (méthodes de merge) à ratifier. Aucune
+  configuration GitHub modifiée, aucun push. Compteurs de `progress` inchangés (cadrage seul).
 progress:
   total_phases: 12
   completed_phases: 11
@@ -1370,14 +1369,14 @@ Recent decisions affecting current work:
 
 **Resume file:** .planning/phases/VFDO-34-gaps-agency-agents-cadrage-skill-installer/34-CONTEXT.md (et `.planning/phases/VFDO-40-vibeflow-head-head-of-minds-du-dev-orchestrator/40-CONTEXT.md`, `.planning/phases/VFDO-25-budget-d-instructions-et-tage-d-alignement-court/25-CONTEXT.md`)
 
-Last session: 2026-09-17 — Phase 40.1 exécutée, PR ouverte.
+Last session: 2026-09-17 — Phase 41 cadrée (CONTEXT Ready for planning). Avant : Phase 40.1 exécutée, PR ouverte.
 
 Previous-previous session: 2026-09-16 — plan 25-04 exécuté (ratchet du budget d'instructions armé), branche `feat/phase-25-04-calibration`, PR non ouverte.
 
 Previous session: 2026-09-15
 Stopped at: **Phase 34 EXÉCUTÉE et MERGÉE** (PR #66, merge `bf34d49`, 2026-09-15 — 3 verdicts rendus, 4 gates humains relayés, AGTS-02 reportée ; Scroll-Off exclu du périmètre VibeFlow le 2026-09-15, reprise sur un lab mobile à désigner) puis **Phase 25 PLANIFIÉE** (recherche `eb6aa3d`, D-06 bis + D-01 bis amendés, 4 plans `f7a057f` + révision `2773e37`, checker PASSED, couverture 8/8, gap-analysis 10/10). Next : exécution 25 par `vf-dev-manager` (vagues 1-3, arrêt au checkpoint 25-04) — demande Samuel, session principale, 2026-09-15.
 
-**Reprendre par** : merge (humain) de la PR de la Phase 40.1, puis cadrage de la Phase 41 (posture de protection du dépôt, O-3 inclus). Points ouverts de la 40.1 : `.planning/codebase/CONCERNS.md:79-85` périmé (hors plans, à arbitrer) ; phrase « blocage actif depuis l'armement (PR #73) » du manuel FR/EN, bloc canonique arbitré, à trancher par Samuel.
+**Reprendre par** : ratification de P-1 et P-2 du `41-CONTEXT.md` par Samuel, puis `/gsd-plan-phase 41` (Phase 41 cadrée le 2026-09-17 sur `feat/phase-41-protection-depot`, branche non poussée). Points ouverts de la 40.1 : `.planning/codebase/CONCERNS.md:79-85` périmé (hors plans, à arbitrer) ; phrase « blocage actif depuis l'armement (PR #73) » du manuel FR/EN, bloc canonique arbitré, à trancher par Samuel.
 
 **Ce qui reste fermé, quoi qu'il arrive** :
 - **Budget d'instructions armé depuis le 2026-09-16** (`check-instruction-budget.sh`) : une baseline de `.planning/instruction-budget-baselines.tsv` ne remonte jamais sans arbitrage humain nommé avec canal et date ; elle descend librement dans le commit de remédiation.
