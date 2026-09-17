@@ -1,7 +1,7 @@
 # Phase 41: Posture de protection du dépôt - Context
 
 **Gathered:** 2026-09-17
-**Status:** Ready for planning — D-01 à D-10 verrouillés (arbitrages Samuel, AskUserQuestion session principale, 2026-09-17) ; D-M1 à D-M14 décisions du manager ; P-1 et P-2 ratifiés (D-09, D-10)
+**Status:** PRÉMISSE RENVERSÉE le 2026-09-17 — exécution ARRÊTÉE après 41-01 Task 1. Aucun droit admin dans cette session : D-01 à D-08 sont **suspendus**, les plans qui en dépendent sont **différés en attente d'accès** (§ Prémisse renversée). Un périmètre sans admin est à cadrer et à arbitrer — proposition relayée à la session principale le 2026-09-17.
 
 <domain>
 ## Phase Boundary
@@ -29,6 +29,45 @@ toutes les PR ouvertes). Le dépôt n'en porte que la **source versionnée**, la
 </domain>
 
 <facts>
+## Prémisse renversée — 2026-09-17 (à lire AVANT tout le reste)
+
+Arbitrage et constat Samuel, AskUserQuestion session principale, 2026-09-17, relayés au manager par
+SendMessage le même jour :
+
+1. **`picmakpro` n'est pas un compte de Samuel** : c'est le compte d'un **tiers**. La réponse
+   consignée en **D-01** (« opéré par Samuel en personne », même canal, 2026-09-17) était **fausse**.
+   **Personne, dans cette session, ne peut poser un ruleset** : `gh api repos/picmakpro/vibeflow-os
+   --jq .permissions` rend `admin: false, maintain: false, push: true` (mesuré le 2026-09-17, deux
+   fois, par la session principale puis par le manager).
+2. **Conséquence sur les décisions** : **D-01 à D-08 sont SUSPENDUS** — non annulés, non rouverts :
+   ils décrivent une posture qui exige un accès **admin** que personne n'a ici. Ils reprennent vie
+   **tel quels** le jour où cet accès existe. **D-09** (libellé du critère 2) et **D-10** (méthodes de
+   merge libres) ne dépendent pas de l'admin et **restent valides**.
+3. **Décision de recadrage** (même canal, même date) : la phase garde ce qui est faisable avec le
+   seul droit `push` ; tout ce qui exige l'admin est **différé dans une phase séparée, en attente
+   d'accès**, sans rien perdre.
+4. **Correction d'un fait faux, mesuré le 2026-09-17** : l'identité gh de la machine a été rapportée
+   comme `Samuel-Learnity` par `gh auth status` (libellé local du compte dans la configuration gh)
+   et comme `samuel-neveugall` par `gh api user`. **La source autoritative est l'API** :
+   `gh api user` rend `login: samuel-neveugall`, `id: 151974738` — le même identifiant que le
+   collaborateur `write` du dépôt ; `gh api users/Samuel-Learnity` rend **404**, ce nom n'existe pas
+   sur GitHub (libellé périmé, compte renommé). La Task 1 de 41-01 ne s'était donc **pas** trompée
+   d'identité ; c'est le libellé de `gh auth status` qui ment. Toute vérification d'identité doit
+   passer par `gh api user`, jamais par `gh auth status`.
+
+### Plans différés (accès admin requis) — rien n'est perdu
+
+Différés tels quels, à reprendre sans réécriture le jour d'un accès admin : **41-01 Task 2 et
+Task 3** (fermeture de #29, sonde d'`actor_id`, sources JSON), **41-04** (merge de la PR de la
+phase sous la nouvelle règle), **41-05** (pose des rulesets, M-2), **41-06** (revue code owner),
+**41-07** (M-1), **41-08** (contournement tracé, M-3), **41-09** (push direct refusé, M-4),
+**41-11 à 41-13** dans leur partie « rejeu du flux de release sous la règle ». Le travail déjà
+fait et commité : `41-PREUVES.md` avec `CONTEXTES-CHECKS` (les 4 contextes de checks relevés sur
+les check runs 15368 d'`origin/main` 5238cba, égaux à `ci.yml`).
+
+**Critères de succès 1, 2 et 3 du ROADMAP : inatteignables sans admin.** Ils ne sont pas réécrits
+ici : leur sort est arbitré avec le nouveau périmètre.
+
 ## Constats mesurés au cadrage (2026-09-17, lecture seule)
 
 Tous par `gh api` GET / `gh run` depuis le compte `samuel-neveugall`, sauf mention.
@@ -126,7 +165,14 @@ Ce qui borne l'espace des options — détail et URL dans le rapport de recherch
 - `gh pr merge --admin` : ce qu'il contourne exactement sous un ruleset n'est **pas documenté** —
   à mesurer, jamais à supposer.
 
-### Arbitrages verrouillés — NE PAS ROUVRIR
+### Arbitrages D-01 à D-08 — SUSPENDUS depuis le 2026-09-17 (voir § Prémisse renversée)
+
+Ils restent écrits tels quels ci-dessous : ils sont la posture visée, applicable dès qu'un accès
+admin existe. Ils ne gouvernent **aucun** travail dans le périmètre sans admin. **D-09 et D-10
+restent actifs.** D-01 est en outre **factuellement faux** (`picmakpro` est un tiers) : ne plus le
+citer comme fait, seulement comme décision historique datée.
+
+### Arbitrages verrouillés — NE PAS ROUVRIR (suspendus pour D-01 à D-08)
 
 Arbitrages Samuel, **AskUserQuestion session principale, 2026-09-17**, relayés au manager par
 SendMessage le même jour, consignés tels quels. Questions posées par le manager en un seul message
@@ -154,7 +200,7 @@ SendMessage le même jour, consignés tels quels. Questions posées par le manag
 - **D-08 (Q-7)** — **#78 est déjà mergée** (`7cb542e`, constat de la session principale). **Fermer
   #29 avant la pose, puis poser.**
 
-### Conséquences de D-02 — écrites telles quelles, ne pas les adoucir
+### Conséquences de D-02 — écrites telles quelles, ne pas les adoucir (suspendues avec D-02)
 
 - **Rien n'est « fermé » par cette phase, tout est « gardé par défaut + tracé ».** Le bypass `write`
   s'applique à **toutes** les règles du ruleset de branche, **revue code owner comprise**. Un compte
@@ -194,6 +240,11 @@ Libellés d'origine des deux points, conservés pour trace :
   et #72 sont entrées par rebase) et demande un arbitrage.
 
 ### Décisions du manager (vf-dev-manager, 2026-09-17 — techniques, contestables par Samuel)
+
+**Portée après la prémisse renversée** : D-M1, D-M4 à D-M8, D-M12, D-M13 concernent la pose d'un
+ruleset — **suspendues** avec D-01..D-08. D-M2, D-M3, D-M9 (hook `pre-push`), D-M10 (ADR-072 et
+`CLAUDE.md`), D-M11 (aucun gate créé) et D-M14 (gestes externes = checkpoints humains) restent
+utilisables par un périmètre sans admin.
 
 Prises sur pièce (constats et doc ci-dessus). D-M1 à D-M11 ont été transmises à la session
 principale avec les questions le 2026-09-17 ; D-M7, D-M9 révisées et D-M12 à D-M14 ajoutées après

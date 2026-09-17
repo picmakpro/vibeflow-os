@@ -1593,8 +1593,19 @@ ADR-072), PROT-04 (O-3 « gardée par défaut + tracée » : CODEOWNERS `@picmak
   4. QUAL-01 s'applique si un gate naît (mutation rouge prouvée) ; sinon la phase n'en crée
      aucun et le dit.
 
-**Plans:** 13 plans en 13 vagues séquentielles (planifiés le 2026-09-17, vérificateur frais 3 tours ;
-`REGLES_MAIN_FORCE_PUSH_SUPPRESSION` en attente d'arbitrage, 41-01 rouge tant qu'elle n'est pas fixée)
+> **PRÉMISSE RENVERSÉE le 2026-09-17** (constat et arbitrage Samuel, AskUserQuestion session
+> principale, 2026-09-17) : le compte `picmakpro`, seul admin, appartient à un **tiers** ;
+> `permissions` du dépôt = `admin: false, maintain: false, push: true`. **Aucun ruleset ne peut être
+> posé dans cette session.** Les critères de succès 1, 2 et 3 ci-dessus sont **inatteignables sans
+> accès admin** ; les décisions D-01 à D-08 du `41-CONTEXT.md` sont **suspendues** et les plans
+> 41-01 (T2/T3), 41-04 à 41-09 et la partie « sous la règle » de 41-11 à 41-13 sont **différés en
+> attente d'accès** (`BACKLOG.md` § « Protection de `main` côté GitHub — DIFFÉRÉ »). L'exécution a
+> été arrêtée après 41-01 Task 1 (registre `41-PREUVES.md` conservé). Un **périmètre sans admin**
+> (gardes in-repo visibles et tracées) est proposé à l'arbitrage — il remplacera les critères de
+> succès de cette phase une fois tranché.
+
+**Plans:** 13 plans en 13 vagues séquentielles (planifiés le 2026-09-17, vérificateur frais 3 tours),
+dont 10 **différés faute d'accès admin** ; seul 41-01 Task 1 est livré
 
 Plans:
 
