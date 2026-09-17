@@ -1,7 +1,7 @@
 # Phase 41: Posture de protection du dépôt - Context
 
 **Gathered:** 2026-09-17
-**Status:** Ready for planning — D-01 à D-08 verrouillés (arbitrages Samuel, AskUserQuestion session principale, 2026-09-17) ; D-M1 à D-M14 décisions du manager ; P-1 et P-2 à ratifier, sans bloquer la planification
+**Status:** Ready for planning — D-01 à D-10 verrouillés (arbitrages Samuel, AskUserQuestion session principale, 2026-09-17) ; D-M1 à D-M14 décisions du manager ; P-1 et P-2 ratifiés (D-09, D-10)
 
 <domain>
 ## Phase Boundary
@@ -174,7 +174,17 @@ SendMessage le même jour, consignés tels quels. Questions posées par le manag
   couvre aussi l'admin **n'est pas documenté** (recherche du 2026-09-17) — à **mesurer** à la pose,
   jamais supposé. Sans effet sur la sûreté : l'admin peut de toute façon désactiver un ruleset.
 
-### Points ouverts à ratifier (ne bloquent pas la planification)
+### Points P-1 et P-2 — RATIFIÉS
+
+Arbitrages Samuel, AskUserQuestion session principale, 2026-09-17 (second relais SendMessage) :
+
+- **D-09 (P-1)** — Critère de succès 2 reformulé au ROADMAP : « une PR rouge est refusée par
+  défaut ; la contourner demande un geste explicite et laisse une trace dans GitHub ». Preuve en
+  deux temps, comme prévu par D-M7.
+- **D-10 (P-2)** — **Ne rien restreindre** : merge, squash et rebase restent autorisés
+  (`allowed_merge_methods` aux trois méthodes).
+
+Libellés d'origine des deux points, conservés pour trace :
 
 - **P-1** — Reformulation du critère de succès 2 de la Phase 41 au ROADMAP, conséquence mécanique
   de D-02 (ci-dessus). Le manager ne modifie pas les critères de succès sans feu vert ; la
