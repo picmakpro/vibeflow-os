@@ -40,6 +40,11 @@
 #         appelle bien `--quiet` SANS rediriger stderr — sinon les étapes manuelles disparaissent
 #         et l'install redevient silencieuse, exactement ce que cette tâche ferme.
 #
+# T10 — B1 étendu à vibeflow-design (quick 260917-ldp) : AGENT.md + vf-design/SKILL.md disent
+#       l'incarnation, jamais un dispatch en Task ; mêmes littéraux de détection que T38 (d) de
+#       test-dev-orchestrator.sh (synchro vérifiée machine), discriminants par mutation et
+#       contre-épreuve sur la négation légitime.
+#
 # Convention : asserts numérotés, helpers ok()/ko()/skip(), exit 0 si tout passe (SKIP non
 # bloquant), exit 1 si au moins un KO. Calqué sur test-dev-orchestrator.sh (pattern du repo).
 #
@@ -863,6 +868,137 @@ elif ! t10_desc_ok "$AGENT_FILE"; then
 else
   ok "T10 (a) : $AGENT_FILE — aucune prescription affirmative, description dit l'incarnation, jamais dispatch, renvoi Marge de profondeur de dispatch"
 fi
+
+# (b) Corps de vf-design/SKILL.md : incarnation sans dispatch en Task, renvoi team-kernel.md —
+# symétrique de vf-dev/SKILL.md. SKIP si le skill est absent de la disposition courante.
+T10_SKILL="$MOD/skills/vf-design/SKILL.md"
+if [ ! -f "$T10_SKILL" ]; then
+  skip "T10 (b) : $T10_SKILL introuvable"
+else
+  t10b_hit="$(t10_affirmative_hits "$T10_SKILL")"
+  if [ -n "$t10b_hit" ]; then
+    ko "T10 (b) : prescription affirmative de dispatch de vibeflow-design en Task dans $T10_SKILL — $(printf '%s' "$t10b_hit" | head -1)"
+    t10_ok=0
+  elif ! "$GREP" -qi 'incarn' "$T10_SKILL" || ! "$GREP" -q 'jamais dispatch' "$T10_SKILL" || ! "$GREP" -q 'Marge de profondeur de dispatch' "$T10_SKILL"; then
+    ko "T10 (b) : $T10_SKILL ne dit pas à la fois incarn/jamais dispatch/Marge de profondeur de dispatch"
+    t10_ok=0
+  else
+    ok "T10 (b) : $T10_SKILL — aucune prescription affirmative, dit l'incarnation, jamais dispatch, renvoi Marge de profondeur de dispatch"
+  fi
+fi
+
+# (c) DISCRIMINANTS par mutation, permanents et internes à la suite — sur le patron de T38 (e).
+T10_TMPDIR="$(mktemp -d)"
+
+# (c.1) copie d'AGENT_FILE : la tournure affirmative est réinjectée en fin de la ligne
+# ^description: seule — la négation légitime reste sur la même ligne, ce qui prouve qu'une
+# négation voisine n'annule pas la tournure affirmative.
+t10c1_mut="$T10_TMPDIR/agent-mutant-invocable.md"
+awk '{ if ($0 ~ /^description:/) { print $0 " Invocable via Task, en autonomie, ou par vibeflow-head." } else { print } }' "$AGENT_FILE" > "$t10c1_mut"
+t10c1_hit="$(t10_affirmative_hits "$t10c1_mut")"
+if [ -n "$t10c1_hit" ] && printf '%s' "$t10c1_hit" | "$GREP" -q 'Invocable via Task'; then
+  ok "T10 (c.1) (DISCRIMINANT) : réinjection « Invocable via Task » en fin de ligne description détectée — $(printf '%s' "$t10c1_hit" | head -1)"
+else
+  ko "T10 (c.1) NON DISCRIMINANTE : la tournure affirmative réinjectée en fin de ligne description n'est pas détectée"; t10_ok=0
+fi
+
+# (c.2) copie du SKILL : réinjecte la tournure affirmative légitime d'origine en tête de fichier.
+if [ -f "$T10_SKILL" ]; then
+  t10c2_mut="$T10_TMPDIR/skill-mutant-incarne.md"
+  { echo "Incarne (ou dispatche via Task) l'agent vibeflow-design"; cat "$T10_SKILL"; } > "$t10c2_mut"
+  t10c2_hit="$(t10_affirmative_hits "$t10c2_mut")"
+  if [ -n "$t10c2_hit" ]; then
+    ok "T10 (c.2) (DISCRIMINANT) : réinjection « Incarne (ou dispatche via Task) » dans le SKILL détectée — $(printf '%s' "$t10c2_hit" | head -1)"
+  else
+    ko "T10 (c.2) NON DISCRIMINANTE : la tournure affirmative réinjectée dans le SKILL n'est pas détectée"; t10_ok=0
+  fi
+fi
+
+# (c.3) couplage ligne à ligne du niveau 2 : une ligne synthétique où le head dispatche
+# Task(vibeflow-design) SANS négation est détectée ; une ligne synthétique qui dit que
+# vibeflow-design n'est JAMAIS lancé via Task(vibeflow-design) ne l'est pas.
+t10c3_pos="$T10_TMPDIR/synthetic-positive.md"
+echo "le head dispatche Task(vibeflow-design) pour chaque phase de design." > "$t10c3_pos"
+t10c3_pos_hit="$(t10_affirmative_hits "$t10c3_pos")"
+t10c3_neg="$T10_TMPDIR/synthetic-negative.md"
+echo "vibeflow-design n'est jamais lancé via Task(vibeflow-design)." > "$t10c3_neg"
+t10c3_neg_hit="$(t10_affirmative_hits "$t10c3_neg")"
+if [ -n "$t10c3_pos_hit" ] && [ -z "$t10c3_neg_hit" ]; then
+  ok "T10 (c.3) (DISCRIMINANT) : Task(vibeflow-design) sans négation détecté, avec négation « jamais » non détecté (couplage ligne à ligne)"
+else
+  ko "T10 (c.3) NON DISCRIMINANTE : couplage ligne à ligne défaillant (positif=[$t10c3_pos_hit] négatif=[$t10c3_neg_hit])"; t10_ok=0
+fi
+
+# (c.4) copie d'AGENT_FILE où « jamais dispatch » devient « toujours dispatch » — t10_desc_ok
+# doit rejeter la description mutée.
+t10c4_mut="$T10_TMPDIR/agent-mutant-toujours.md"
+sed 's/jamais dispatch/toujours dispatch/' "$AGENT_FILE" > "$t10c4_mut"
+if ! t10_desc_ok "$t10c4_mut"; then
+  ok "T10 (c.4) (DISCRIMINANT) : mutant « toujours dispatch » rejeté par t10_desc_ok"
+else
+  ko "T10 (c.4) NON DISCRIMINANTE : mutant « toujours dispatch » reste accepté par t10_desc_ok"; t10_ok=0
+fi
+
+# (c.5) CONTRE-ÉPREUVE : AGENT_FILE réel, SKILL réel et une négation légitime synthétique ne
+# déclenchent aucune détection — aucun faux positif sur la formulation qui doit rester en place.
+# Réutilise $t10a_hit/$t10b_hit (déjà calculés en (a)/(b)) plutôt qu'un second appel indépendant :
+# si (a) ou (b) a déjà trouvé une vraie prescription affirmative sur le fichier réel, ce n'est PAS
+# un faux positif à re-signaler ici (même fait, déjà couvert par (a)/(b) — sinon la preuve de
+# mutation sur le fichier réel produirait deux KO pour une seule cause).
+t10c5_ok=1
+if [ -z "$t10a_hit" ] && [ -n "$(t10_affirmative_hits "$AGENT_FILE")" ]; then
+  ko "T10 (c.5) : faux positif — AGENT_FILE réel déclenche la détection"; t10c5_ok=0
+fi
+if [ -f "$T10_SKILL" ] && [ -z "${t10b_hit:-}" ] && [ -n "$(t10_affirmative_hits "$T10_SKILL")" ]; then
+  ko "T10 (c.5) : faux positif — le SKILL réel déclenche la détection"; t10c5_ok=0
+fi
+t10c5_synth="$T10_TMPDIR/synthetic-legit-negation.md"
+echo "vibeflow-design n'est jamais dispatché lui-même en Task." > "$t10c5_synth"
+if [ -n "$(t10_affirmative_hits "$t10c5_synth")" ]; then
+  ko "T10 (c.5) : faux positif — la ligne synthétique de négation légitime déclenche la détection"; t10c5_ok=0
+fi
+if [ "$t10c5_ok" -eq 1 ]; then
+  ok "T10 (c.5) (CONTRE-ÉPREUVE) : AGENT_FILE réel, SKILL réel et négation légitime synthétique ne déclenchent aucune détection"
+else
+  t10_ok=0
+fi
+
+# (d) Synchro des littéraux avec T38 (d) de test-dev-orchestrator.sh (lecture seule, SKIP si
+# absente — disposition lab). Ce couplage rend « même motif que T38 » vérifiable au lieu de
+# déclaré ; il ne crée aucune dépendance d'exécution du module (T9e ne vise que
+# ensure-design-deps.sh).
+T10_DEV_SUITE="$REPO/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh"
+if [ ! -f "$T10_DEV_SUITE" ]; then
+  skip "T10 (d) : $T10_DEV_SUITE introuvable (disposition lab)"
+else
+  if "$GREP" -qF -- "$T10_AFFIRM_RE" "$T10_DEV_SUITE" && "$GREP" -qF -- "$T10_NEG_RE" "$T10_DEV_SUITE"; then
+    ok "T10 (d) : T10_AFFIRM_RE et T10_NEG_RE trouvés en chaîne fixe dans test-dev-orchestrator.sh — littéraux synchronisés avec T38"
+  else
+    ko "T10 (d) : littéral divergé de T38 dans test-dev-orchestrator.sh"; t10_ok=0
+  fi
+
+  # Témoins DISCRIMINANTS : une copie de la suite dev dont le littéral est altéré ne doit plus
+  # matcher T10_AFFIRM_RE / T10_NEG_RE.
+  t10d_mut1="$T10_TMPDIR/dev-suite-mutant-invocable.md"
+  sed 's/Invocable via Task/Invocable via Tache/' "$T10_DEV_SUITE" > "$t10d_mut1"
+  if "$GREP" -qF -- "$T10_AFFIRM_RE" "$t10d_mut1"; then
+    ko "T10 (d) NON DISCRIMINANTE : le mutant « Invocable via Tache » reste détecté OK par T10_AFFIRM_RE"; t10_ok=0
+  else
+    ok "T10 (d) (DISCRIMINANT) : le mutant « Invocable via Tache » n'est plus trouvé par T10_AFFIRM_RE"
+  fi
+
+  t10d_mut2="$T10_TMPDIR/dev-suite-mutant-pasdispatch.md"
+  sed 's/pas dispatch/pas lance/' "$T10_DEV_SUITE" > "$t10d_mut2"
+  if "$GREP" -qF -- "$T10_NEG_RE" "$t10d_mut2"; then
+    ko "T10 (d) NON DISCRIMINANTE : le mutant « pas lance » reste détecté OK par T10_NEG_RE"; t10_ok=0
+  else
+    ok "T10 (d) (DISCRIMINANT) : le mutant « pas lance » n'est plus trouvé par T10_NEG_RE"
+  fi
+fi
+
+rm -rf "$T10_TMPDIR"
+
+[ "$t10_ok" -eq 1 ] && ok "T10 : B1 étendu à vibeflow-design (AGENT.md + vf-design/SKILL.md), mêmes littéraux que T38 (synchro vérifiée), discriminants par mutation, contre-épreuve"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
