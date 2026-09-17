@@ -70,4 +70,6 @@
 - [Profondeur 3 sans outil Agent](project_vf-coder-ne-peut-pas-planifier.md) — limite runtime, pas l'allowlist ; head en session principale (B1/B2)
 - [Ma prose entre dans le recensement](feedback_prose-du-manager-entre-dans-le-recensement.md) — une ligne de STATE citant l'ancien plafond a rougi la clôture 40.1 : décrire le motif, jamais le recopier
 - [Arbre partagé : stash et refs](feedback_arbre-partage-stash-et-refs.md) — interdire stash/checkout/reset ET branch -f aux juges aussi : un audit « lecture seule » a déplacé main pour tout le dépôt
+- [Harness worktree : scripts non suivis refusés](project_harness-worktree-refuse-scripts-non-suivis.md) — rejouer la CI par `replay-ci-jobs.sh` suivi (40.1), jamais un extrait maison
+- [Périmètre strict contredit gsd-quick](feedback_mandat-perimetre-strict-contredit-gsd-quick.md) — 2 vf-coder sur 4 ont sauté B2 : autoriser les artefacts quick dans le mandat, exiger quick_id au retour
 - [Rejeu long : nohup détaché](project_rejeu-long-detache-nohup.md) — un run_in_background du manager meurt en fin de tour ; deux rejeux dans un worktree fabriquent un rouge
