@@ -8,7 +8,7 @@
 > d'intention unique**. Plus de façade de verbes : GSD est l'interface directe des équipes,
 > l'agent est l'entrée conversationnelle optionnelle.
 
-**Version** : v2.22.2
+**Version** : v2.22.3
 **Type** : agent + équipe d'agents + 2 skills + scripts
 
 ---
