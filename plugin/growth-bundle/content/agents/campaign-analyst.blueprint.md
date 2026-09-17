@@ -1,7 +1,7 @@
 # Blueprint d'agent — campaign-analyst
 
 > **Statut** : blueprint. Non exécutable tel quel. `vf-new-lab` l'instancie en
-> `.claude/agents/campaign-analyst.md` (≤250L, ADR-029) dans le lab growth cible.
+> `.claude/agents/campaign-analyst.md` (≤300L, ADR-029) dans le lab growth cible.
 > **Référence Core** : P1 Capitaliser · P5 Vérifier en boucle · P8 Évaluer · P9 Modulariser.
 
 ---

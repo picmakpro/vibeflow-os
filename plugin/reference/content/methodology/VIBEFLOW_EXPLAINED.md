@@ -266,7 +266,7 @@ C'est exactement ce qui se passe pour les agents IA. Au-dela d'un certain volume
 
 La consequence pratique : VibeFlow v4.1 impose trois plafonds simples pour eviter la derive.
 
-- Un agent (sa "fiche de poste") ne depasse pas **250 lignes**.
+- Un agent (sa "fiche de poste") ne depasse pas **300 lignes** (avertissement des 251).
 - Un skill (une "base de connaissances") ne depasse pas **500 lignes**.
 - Le "kit de demarrage" charge en debut de session ne depasse pas **2000 tokens** (environ 1500 mots).
 

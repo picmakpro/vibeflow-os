@@ -9,11 +9,18 @@
 # BRUYANT (imparsable, exit 2). Le cas BRUYANT est exercé par une fixture SYNTHÉTIQUE : aucun des
 # 31 fichiers du corpus réel n'a de frontmatter cassé aujourd'hui (25-RESEARCH.md:560-572).
 #
-# Quatre mutants OPPOSABLES vérifiés par cmp (D-05 : les DEUX métriques ont chacune le leur) :
+# Révision Phase 40.1 (arbitrages Samuel D-01/D-02/D-05/D-07, AskUserQuestion session principale,
+# relais SendMessage, 2026-09-16) : le ratchet ne bloque plus QUE les instructions (par fichier,
+# D-07) ; le plafond ADR-029 passe à 300 lignes (PLAFOND) avec un avertissement non bloquant dès
+# 251 (BORNE_AVERT). La colonne lignes de la baseline reste lue et publiée, jamais comparée pour
+# le rc (D-02, D-H6). Sept mutants OPPOSABLES vérifiés par cmp :
 #   - MUT-1 neutralise la comparaison de la métrique INSTRUCTIONS à sa baseline.
-#   - MUT-2 neutralise la comparaison de la métrique LIGNES à sa baseline.
+#   - MUT-2 (remplacé) ré-introduit la comparaison des LIGNES comme verdict bloquant.
 #   - MUT-3 force la lecture de la sentinelle à « non armé » (ARMED reste 0 même sentinelle posée).
 #   - MUT-4 neutralise la détection du frontmatter jamais refermé (imparsable).
+#   - MUT-5 fait tomber l'avertissement de zone dans un libellé bloquant (DEPASSEMENT-*).
+#   - MUT-6 décale le plafond d'un cran (`-gt` → `-ge`).
+#   - MUT-7 décale le bord bas de la zone d'avertissement d'un cran (`-ge` → `-gt`).
 # Chaque mutant est refusé (test en échec) s'il n'a rien changé (cmp -s identique à l'original) ou
 # si bash -n échoue sur lui — un mutant non opposable est un échec, pas un succès.
 #
@@ -29,6 +36,13 @@ set -uo pipefail
 
 SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/check-instruction-budget.sh"
 TARGET="$SCRIPT"
+
+# Constantes locales de la suite (Phase 40.1) — TOUTES les tailles de fixture de bord se dérivent
+# de ces deux valeurs, jamais d'un littéral de l'ancien plafond (constat B1 du checker, révision
+# 1 : un littéral ici rougirait le recensement BUDG-04, l'outil qui traque les énoncés vivants de
+# l'ancienne charte de densité).
+BORNE_AVERT=251
+PLAFOND=300
 
 PASS=0; FAIL=0
 ok() { echo "  ✓ $1"; PASS=$((PASS+1)); }
@@ -86,17 +100,27 @@ std_agent() {
     'Le manager DOIT valider chaque etape.'
 }
 
-# gen_251 <path> — génère un fichier de 251 lignes : frontmatter 3 lignes + 248 lignes de corps
-# sans aucun marqueur textuel (instr=0 par construction, seule la métrique LIGNES est en jeu ici).
-gen_251() {
+# gen_lines <path> <total> — génère un fichier de <total> lignes exactement : frontmatter 3
+# lignes + (total - 3) lignes de corps sans aucun marqueur textuel (instr=0 par construction,
+# seule la métrique LIGNES est en jeu ici). Affirme la taille obtenue par awk avant de rendre la
+# main (Pitfall 2 : une fixture qui ne dépasse plus ce qu'elle prétend dépasser est un ko tracé).
+gen_lines() {
+  local path="$1" total="$2"
   {
     printf '%s\n' '---' 'name: demo-cap' '---'
+    local body=$((total - 3))
     local i=1
-    while [ "$i" -le 248 ]; do
+    while [ "$i" -le "$body" ]; do
       printf 'Ligne de corps numero %s, sans marqueur textuel.\n' "$i"
       i=$((i + 1))
     done
-  } > "$1"
+  } > "$path"
+  local got
+  got=$(awk 'END{print NR}' "$path")
+  if [ "$got" -ne "$total" ]; then
+    echo "  ✗ FIXTURE — gen_lines $path $total a produit $got lignes" >&2
+    exit 1
+  fi
 }
 
 # Reproduction EXACTE des fixtures de contrôle du plan 25-01 (verify de la tâche 2) : INSTR=4 et
@@ -173,14 +197,20 @@ out="$(run "$D")"; rc=$?
 has=0; case "$out" in *"DEPASSEMENT-INSTR"*) has=1 ;; esac
 if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ]; then ok "issue QUAL-01 FAIL (instructions) — baseline abaissee d'une unite → rc 1, DEPASSEMENT-INSTR"; else ko "issue QUAL-01 FAIL (instructions) — baseline abaissee d'une unite → rc 1, DEPASSEMENT-INSTR" "rc=1 verdict DEPASSEMENT-INSTR" "rc=$rc out=[$out]"; fi
 
-# --- Issue FAIL (lignes) : baseline lignes abaissée d'une unité → rc 1, DEPASSEMENT-LIGNES -------
-D="$(mk_root fail-lignes)"
+# --- BUDG-05 : lignes en hausse SANS instruction, sous le plafond → rc 0, OK+LIGNES-EN-HAUSSE, ---
+# --- jamais DEPASSEMENT (D-02/D-H6 : la colonne lignes n'est plus jamais comparee pour le rc) ----
+D="$(mk_root budg05-lignes-hausse)"
 std_agent "$D"
 w_armed "$D"
 printf 'plugin/demo/agents/a.md\t3\t1\n' | w_baseline "$D"
 out="$(run "$D")"; rc=$?
-has=0; case "$out" in *"DEPASSEMENT-LIGNES"*) has=1 ;; esac
-if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ]; then ok "issue QUAL-01 FAIL (lignes) — baseline abaissee d'une unite → rc 1, DEPASSEMENT-LIGNES"; else ko "issue QUAL-01 FAIL (lignes) — baseline abaissee d'une unite → rc 1, DEPASSEMENT-LIGNES" "rc=1 verdict DEPASSEMENT-LIGNES" "rc=$rc out=[$out]"; fi
+has=0; case "$out" in *"plugin/demo/agents/a.md | 4 | 3 | 1 | 1 | OK+LIGNES-EN-HAUSSE"*) has=1 ;; esac
+nodep=1; case "$out" in *"DEPASSEMENT"*) nodep=0 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ] && [ "$nodep" -eq 1 ]; then
+  ok "BUDG-05 — lignes en hausse sans instruction, sous le plafond → rc 0, OK+LIGNES-EN-HAUSSE, jamais DEPASSEMENT"
+else
+  ko "BUDG-05 — lignes en hausse sans instruction, sous le plafond → rc 0, OK+LIGNES-EN-HAUSSE, jamais DEPASSEMENT" "rc=0, ligne OK+LIGNES-EN-HAUSSE, aucun DEPASSEMENT" "rc=$rc out=[$out]"
+fi
 
 # --- Issue BRUYANT (1/2) : frontmatter ouvert jamais refermé → rc 2, NON-VERIFIABLE, stderr nomme
 # --- le chemin --------------------------------------------------------------------------------
@@ -258,15 +288,66 @@ printf 'plugin/demo/agents/a.md\t4\t1\nplugin/demo/agents/ghost.md\t10\t2\n' | w
 out="$(run "$D")"; rc=$?
 if [ "$rc" -eq 2 ]; then ok "vide (d) — fixture armee avec une entree de baseline orpheline → rc 2"; else ko "vide (d) — fixture armee avec une entree de baseline orpheline → rc 2" "rc=2" "rc=$rc out=[$out]"; fi
 
-# --- plafond absolu ADR029 : fichier 251 lignes ET baseline de lignes = 251 → rc 1, la baseline ---
-# --- ne legalise jamais un depassement du plafond -------------------------------------------------
+# --- plafond absolu ADR029 : fichier PLAFOND+1 lignes ET baseline de lignes egale → rc 1, la ------
+# --- baseline ne legalise jamais un depassement du plafond ----------------------------------------
 D="$(mk_root plafond-adr029)"
-gen_251 "$D/plugin/demo/agents/big.md"
+gen_lines "$D/plugin/demo/agents/big.md" "$((PLAFOND + 1))"
 w_armed "$D"
-printf 'plugin/demo/agents/big.md\t251\t0\n' | w_baseline "$D"
+printf 'plugin/demo/agents/big.md\t%s\t0\n' "$((PLAFOND + 1))" | w_baseline "$D"
 out="$(run "$D")"; rc=$?
 has=0; case "$out" in *"plugin/demo/agents/big.md"*"DEPASSEMENT-ADR029"*) has=1 ;; esac
-if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ]; then ok "plafond absolu ADR029 — 251 lignes, baseline egale a 251 → rc 1, DEPASSEMENT-ADR029 (la baseline ne prime jamais sur le plafond)"; else ko "plafond absolu ADR029 — 251 lignes, baseline egale a 251 → rc 1, DEPASSEMENT-ADR029 (la baseline ne prime jamais sur le plafond)" "rc=1, ligne DEPASSEMENT-ADR029" "rc=$rc out=[$out]"; fi
+noav=1; case "$out" in *"AVERTISSEMENT-ADR029"*) noav=0 ;; esac
+if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ] && [ "$noav" -eq 1 ]; then ok "plafond absolu ADR029 — PLAFOND+1 lignes, baseline egale → rc 1, DEPASSEMENT-ADR029 seul (la baseline ne prime jamais sur le plafond, pas d'avertissement accumule)"; else ko "plafond absolu ADR029 — PLAFOND+1 lignes, baseline egale → rc 1, DEPASSEMENT-ADR029 seul" "rc=1, ligne DEPASSEMENT-ADR029, jamais AVERTISSEMENT-ADR029" "rc=$rc out=[$out]"; fi
+
+# --- sous-zone : taille BORNE_AVERT-1 → rc 0, aucun avertissement --------------------------------
+D="$(mk_root sous-zone-avert)"
+gen_lines "$D/plugin/demo/agents/a.md" "$((BORNE_AVERT - 1))"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t%s\t0\n' "$((BORNE_AVERT - 1))" | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+noav=1; case "$out" in *"AVERTISSEMENT-ADR029"*) noav=0 ;; esac
+if [ "$rc" -eq 0 ] && [ "$noav" -eq 1 ]; then ok "sous-zone — taille BORNE_AVERT-1 → rc 0, aucun AVERTISSEMENT-ADR029"; else ko "sous-zone — taille BORNE_AVERT-1 → rc 0, aucun AVERTISSEMENT-ADR029" "rc=0, aucun AVERTISSEMENT-ADR029" "rc=$rc out=[$out]"; fi
+
+# --- bord d'avertissement : taille BORNE_AVERT → rc 0, AVERTISSEMENT-ADR029 ----------------------
+D="$(mk_root bord-avert)"
+gen_lines "$D/plugin/demo/agents/a.md" "$BORNE_AVERT"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t%s\t0\n' "$BORNE_AVERT" | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"AVERTISSEMENT-ADR029"*) has=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then ok "bord d'avertissement — taille BORNE_AVERT → rc 0, AVERTISSEMENT-ADR029"; else ko "bord d'avertissement — taille BORNE_AVERT → rc 0, AVERTISSEMENT-ADR029" "rc=0, AVERTISSEMENT-ADR029 present" "rc=$rc out=[$out]"; fi
+
+# --- 260 lignes, baseline lignes 4 (hausse) → rc 0, LIGNES-EN-HAUSSE ET AVERTISSEMENT-ADR029 ------
+D="$(mk_root zone-260-hausse)"
+gen_lines "$D/plugin/demo/agents/a.md" 260
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t0\n' | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+hasl=0; case "$out" in *"LIGNES-EN-HAUSSE"*) hasl=1 ;; esac
+hasa=0; case "$out" in *"AVERTISSEMENT-ADR029"*) hasa=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$hasl" -eq 1 ] && [ "$hasa" -eq 1 ]; then ok "260 lignes, baseline lignes 4 → rc 0, LIGNES-EN-HAUSSE ET AVERTISSEMENT-ADR029"; else ko "260 lignes, baseline lignes 4 → rc 0, LIGNES-EN-HAUSSE ET AVERTISSEMENT-ADR029" "rc=0, LIGNES-EN-HAUSSE et AVERTISSEMENT-ADR029" "rc=$rc out=[$out]"; fi
+
+# --- PLAFOND lignes → rc 0, AVERTISSEMENT-ADR029 (bord haut de la zone, encore non bloquant) ------
+D="$(mk_root zone-plafond-avert)"
+gen_lines "$D/plugin/demo/agents/a.md" "$PLAFOND"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t%s\t0\n' "$PLAFOND" | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"AVERTISSEMENT-ADR029"*) has=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then ok "PLAFOND lignes → rc 0, AVERTISSEMENT-ADR029 (bord haut de la zone)"; else ko "PLAFOND lignes → rc 0, AVERTISSEMENT-ADR029 (bord haut de la zone)" "rc=0, AVERTISSEMENT-ADR029 present" "rc=$rc out=[$out]"; fi
+
+# --- instruction ajoutee a un fichier de 260 lignes → rc 1, DEPASSEMENT-INSTR --------------------
+# --- (259 lignes neutres via gen_lines + une ligne d'instruction ajoutee = 260 lignes, INSTR=1) ---
+D="$(mk_root instr-sur-260)"
+gen_lines "$D/plugin/demo/agents/a.md" 259
+printf '%s\n' 'Le manager DOIT valider cette ligne de plus.' >> "$D/plugin/demo/agents/a.md"
+got260=$(awk 'END{print NR}' "$D/plugin/demo/agents/a.md")
+[ "$got260" -eq 260 ] || { echo "  ✗ FIXTURE — instr-sur-260 a produit $got260 lignes" >&2; exit 1; }
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t260\t0\n' | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"DEPASSEMENT-INSTR"*) has=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ]; then ok "instruction ajoutee a un fichier de 260 lignes (baseline instr=0, courant=1) → rc 1, DEPASSEMENT-INSTR"; else ko "instruction ajoutee a un fichier de 260 lignes (baseline instr=0, courant=1) → rc 1, DEPASSEMENT-INSTR" "rc=1, DEPASSEMENT-INSTR" "rc=$rc out=[$out]"; fi
 
 # --- ordre : trois fichiers dont les noms se trient differemment selon la locale — deux executions
 # --- rendent le meme cksum, l'ordre des lignes suit LC_ALL=C sort (Banana < Cherry < apple) -------
@@ -379,15 +460,15 @@ out="$(run "$D")"; rc=$?
 i2=$(printf '%s\n' "$out" | awk -F'|' '/^plugin\/demo\/agents\/f2-fausse-frontmatter\.md /{gsub(/[[:space:]]/,"",$4); print $4}')
 if [ "$i2" = "1" ]; then ok "F2 non-regression — deux '---' isoles dans un fichier SANS frontmatter reel → contenu COMPTE (INSTR=1), jamais exclu en silence"; else ko "F2 non-regression — deux '---' isoles dans un fichier SANS frontmatter reel → contenu COMPTE (INSTR=1), jamais exclu en silence" "INSTR=1" "INSTR=$i2 rc=$rc out=[$out]"; fi
 
-# --- F3 : fichier > 250 lignes ET sans entree de baseline, mode arme → rc 2 (contrat de couverture
-# --- incomplete), PAS 1 (avant : DEPASSEMENT-ADR029 masquait SANS-BASELINE et rendait 1) ----------
+# --- F3 : fichier > PLAFOND lignes ET sans entree de baseline, mode arme → rc 2 (contrat de -------
+# --- couverture incomplete), PAS 1 (avant : DEPASSEMENT-ADR029 masquait SANS-BASELINE et rendait 1)
 D="$(mk_root f3-sans-baseline-armee)"
 std_agent "$D"
-gen_251 "$D/plugin/demo/agents/big.md"
+gen_lines "$D/plugin/demo/agents/big.md" "$((PLAFOND + 1))"
 w_armed "$D"
 printf 'plugin/demo/agents/a.md\t4\t1\n' | w_baseline "$D"
 out="$(run "$D")"; rc=$?
-if [ "$rc" -eq 2 ]; then ok "F3 non-regression — fichier >250 lignes SANS entree de baseline, mode arme → rc 2 (jamais 1, DEPASSEMENT-ADR029 ne masque plus SANS-BASELINE)"; else ko "F3 non-regression — fichier >250 lignes SANS entree de baseline, mode arme → rc 2 (jamais 1, DEPASSEMENT-ADR029 ne masque plus SANS-BASELINE)" "rc=2" "rc=$rc out=[$out]"; fi
+if [ "$rc" -eq 2 ]; then ok "F3 non-regression — fichier >PLAFOND lignes SANS entree de baseline, mode arme → rc 2 (jamais 1, DEPASSEMENT-ADR029 ne masque plus SANS-BASELINE)"; else ko "F3 non-regression — fichier >PLAFOND lignes SANS entree de baseline, mode arme → rc 2 (jamais 1, DEPASSEMENT-ADR029 ne masque plus SANS-BASELINE)" "rc=2" "rc=$rc out=[$out]"; fi
 
 # --- Contrôle négatif A : baseline legitime a zero-padding initial ("007") → reste OK, rc 0 -------
 # --- (jamais un 2 de complaisance ; verifie aussi l'evaluation arithmetique bash sur "007" — tous
@@ -446,25 +527,26 @@ else
   fi
 fi
 
-# --- MUT-2 : neutralise la comparaison de la metrique LIGNES a sa baseline ------------------------
-MUT2_OLD='    [ "$lines" -gt "$bl_lines" ] && line_over=1'
-MUT2_NEW='    [ "0" -eq "1" ] && line_over=1'
+# --- MUT-2 (REMPLACE, Phase 40.1) : re-introduit la comparaison des LIGNES comme verdict bloquant,
+# --- alors que D-02/D-H6 exigent qu'elle reste purement informative --------------------------------
+MUT2_OLD='    [ "$lines" -gt "$bl_lines" ] && verdict="${verdict}+LIGNES-EN-HAUSSE"'
+MUT2_NEW='    [ "$lines" -gt "$bl_lines" ] && verdict="DEPASSEMENT-LIGNES"'
 awk -v old="$MUT2_OLD" -v new="$MUT2_NEW" '{ if ($0 == old) { print new } else { print } }' "$SCRIPT" > "$MUTD/mut2-lignes.sh"
 D="$(mk_root mut2)"
 std_agent "$D"
 w_armed "$D"
 printf 'plugin/demo/agents/a.md\t3\t1\n' | w_baseline "$D"
 if cmp -s "$MUTD/mut2-lignes.sh" "$SCRIPT"; then
-  ko "MUT-2 comparaison LIGNES neutralisee" "mutation differente de l'original (cmp)" "mutant identique a l'original — NON OPPOSABLE"
+  ko "MUT-2 comparaison LIGNES re-introduite comme bloquante" "mutation differente de l'original (cmp)" "mutant identique a l'original — NON OPPOSABLE"
 elif ! bash -n "$MUTD/mut2-lignes.sh" 2>/dev/null; then
-  ko "MUT-2 comparaison LIGNES neutralisee" "bash -n OK sur le mutant" "syntaxe invalide — pas une preuve"
+  ko "MUT-2 comparaison LIGNES re-introduite comme bloquante" "bash -n OK sur le mutant" "syntaxe invalide — pas une preuve"
 else
   TARGET="$MUTD/mut2-lignes.sh"; run "$D" >/dev/null 2>&1; rc_mut=$?
   TARGET="$SCRIPT"; run "$D" >/dev/null 2>&1; rc_orig=$?
-  if [ "$rc_mut" -eq 0 ] && [ "$rc_orig" -eq 1 ]; then
-    ok "MUT-2 comparaison LIGNES neutralisee (cmp confirme la mutation, bash -n OK) : fixture en depassement de lignes reste (a tort) VERTE sur le mutant (rc=$rc_mut), ROUGE sur l'original (rc=$rc_orig)"
+  if [ "$rc_mut" -eq 1 ] && [ "$rc_orig" -eq 0 ]; then
+    ok "MUT-2 comparaison LIGNES re-introduite comme bloquante (cmp confirme la mutation, bash -n OK) : fixture lignes en hausse sans instruction devient (a tort) ROUGE sur le mutant (rc=$rc_mut), VERTE sur l'original (rc=$rc_orig)"
   else
-    ko "MUT-2 comparaison LIGNES neutralisee" "rc_mutant=0 rc_original=1" "rc_mutant=$rc_mut rc_original=$rc_orig"
+    ko "MUT-2 comparaison LIGNES re-introduite comme bloquante" "rc_mutant=1 rc_original=0" "rc_mutant=$rc_mut rc_original=$rc_orig"
   fi
 fi
 
@@ -510,6 +592,74 @@ else
     ok "MUT-4 detection du frontmatter imparsable neutralisee (cmp confirme la mutation, bash -n OK) : le fichier a frontmatter jamais referme n'est plus NON-VERIFIABLE (rc_mutant=$rc_mut, different de 2), original ROUGE (rc=$rc_orig)"
   else
     ko "MUT-4 detection du frontmatter imparsable neutralisee" "rc_mutant different de 2, rc_original=2" "rc_mutant=$rc_mut rc_original=$rc_orig"
+  fi
+fi
+
+# --- MUT-5 : fait tomber l'avertissement de zone dans un libellé bloquant (DEPASSEMENT-*) ---------
+MUT5_OLD='    verdict="${verdict}+AVERTISSEMENT-ADR029"'
+MUT5_NEW='    verdict="DEPASSEMENT-AVERTISSEMENT"'
+awk -v old="$MUT5_OLD" -v new="$MUT5_NEW" '{ if ($0 == old) { print new } else { print } }' "$SCRIPT" > "$MUTD/mut5-avertissement.sh"
+D="$(mk_root mut5)"
+gen_lines "$D/plugin/demo/agents/a.md" 260
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t260\t0\n' | w_baseline "$D"
+if cmp -s "$MUTD/mut5-avertissement.sh" "$SCRIPT"; then
+  ko "MUT-5 avertissement de zone rendu bloquant" "mutation differente de l'original (cmp)" "mutant identique a l'original — NON OPPOSABLE"
+elif ! bash -n "$MUTD/mut5-avertissement.sh" 2>/dev/null; then
+  ko "MUT-5 avertissement de zone rendu bloquant" "bash -n OK sur le mutant" "syntaxe invalide — pas une preuve"
+else
+  TARGET="$MUTD/mut5-avertissement.sh"; run "$D" >/dev/null 2>&1; rc_mut=$?
+  TARGET="$SCRIPT"; run "$D" >/dev/null 2>&1; rc_orig=$?
+  if [ "$rc_mut" -eq 1 ] && [ "$rc_orig" -eq 0 ]; then
+    ok "MUT-5 avertissement de zone rendu bloquant (cmp confirme la mutation, bash -n OK) : fixture 260/260/0 devient (a tort) ROUGE sur le mutant (rc=$rc_mut), VERTE sur l'original (rc=$rc_orig)"
+  else
+    ko "MUT-5 avertissement de zone rendu bloquant" "rc_mutant=1 rc_original=0" "rc_mutant=$rc_mut rc_original=$rc_orig"
+  fi
+fi
+
+# --- MUT-6 : decale le plafond d'un cran ("-gt" -> "-ge") ------------------------------------------
+MUT6_OLD='  if [ "$lines" -gt "$VF_BUDGET_LINE_CAP" ]; then'
+MUT6_NEW='  if [ "$lines" -ge "$VF_BUDGET_LINE_CAP" ]; then'
+awk -v old="$MUT6_OLD" -v new="$MUT6_NEW" '{ if ($0 == old) { print new } else { print } }' "$SCRIPT" > "$MUTD/mut6-plafond.sh"
+D="$(mk_root mut6)"
+gen_lines "$D/plugin/demo/agents/a.md" "$PLAFOND"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t%s\t0\n' "$PLAFOND" | w_baseline "$D"
+if cmp -s "$MUTD/mut6-plafond.sh" "$SCRIPT"; then
+  ko "MUT-6 plafond decale d'un cran" "mutation differente de l'original (cmp)" "mutant identique a l'original — NON OPPOSABLE"
+elif ! bash -n "$MUTD/mut6-plafond.sh" 2>/dev/null; then
+  ko "MUT-6 plafond decale d'un cran" "bash -n OK sur le mutant" "syntaxe invalide — pas une preuve"
+else
+  TARGET="$MUTD/mut6-plafond.sh"; run "$D" >/dev/null 2>&1; rc_mut=$?
+  TARGET="$SCRIPT"; run "$D" >/dev/null 2>&1; rc_orig=$?
+  if [ "$rc_mut" -eq 1 ] && [ "$rc_orig" -eq 0 ]; then
+    ok "MUT-6 plafond decale d'un cran (cmp confirme la mutation, bash -n OK) : fixture PLAFOND/PLAFOND/0 devient (a tort) ROUGE sur le mutant (rc=$rc_mut), VERTE sur l'original (rc=$rc_orig)"
+  else
+    ko "MUT-6 plafond decale d'un cran" "rc_mutant=1 rc_original=0" "rc_mutant=$rc_mut rc_original=$rc_orig"
+  fi
+fi
+
+# --- MUT-7 : decale le bord bas de la zone d'avertissement d'un cran ("-ge" -> "-gt") --------------
+MUT7_OLD='  if [ "$verdict" != "DEPASSEMENT-ADR029" ] && [ "$lines" -ge "$VF_BUDGET_LINE_WARN_FROM" ] && [ "$lines" -le "$VF_BUDGET_LINE_CAP" ]; then'
+MUT7_NEW='  if [ "$verdict" != "DEPASSEMENT-ADR029" ] && [ "$lines" -gt "$VF_BUDGET_LINE_WARN_FROM" ] && [ "$lines" -le "$VF_BUDGET_LINE_CAP" ]; then'
+awk -v old="$MUT7_OLD" -v new="$MUT7_NEW" '{ if ($0 == old) { print new } else { print } }' "$SCRIPT" > "$MUTD/mut7-bord-avert.sh"
+D="$(mk_root mut7)"
+gen_lines "$D/plugin/demo/agents/a.md" "$BORNE_AVERT"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t%s\t0\n' "$BORNE_AVERT" | w_baseline "$D"
+if cmp -s "$MUTD/mut7-bord-avert.sh" "$SCRIPT"; then
+  ko "MUT-7 bord bas de la zone d'avertissement decale" "mutation differente de l'original (cmp)" "mutant identique a l'original — NON OPPOSABLE"
+elif ! bash -n "$MUTD/mut7-bord-avert.sh" 2>/dev/null; then
+  ko "MUT-7 bord bas de la zone d'avertissement decale" "bash -n OK sur le mutant" "syntaxe invalide — pas une preuve"
+else
+  TARGET="$MUTD/mut7-bord-avert.sh"; out_mut="$(run "$D")"; rc_mut=$?
+  TARGET="$SCRIPT"; out_orig="$(run "$D")"; rc_orig=$?
+  av_mut=0; case "$out_mut" in *"AVERTISSEMENT-ADR029"*) av_mut=1 ;; esac
+  av_orig=0; case "$out_orig" in *"AVERTISSEMENT-ADR029"*) av_orig=1 ;; esac
+  if [ "$rc_mut" -eq 0 ] && [ "$rc_orig" -eq 0 ] && [ "$av_mut" -eq 0 ] && [ "$av_orig" -eq 1 ]; then
+    ok "MUT-7 bord bas de la zone d'avertissement decale (cmp confirme la mutation, bash -n OK) : fixture BORNE_AVERT/BORNE_AVERT/0 perd (a tort) AVERTISSEMENT-ADR029 sur le mutant, le porte sur l'original"
+  else
+    ko "MUT-7 bord bas de la zone d'avertissement decale" "rc_mutant=0 rc_original=0, AVERTISSEMENT-ADR029 absent du mutant, present dans l'original" "rc_mutant=$rc_mut rc_original=$rc_orig av_mut=$av_mut av_orig=$av_orig"
   fi
 fi
 

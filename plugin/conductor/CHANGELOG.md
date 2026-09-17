@@ -1,5 +1,25 @@
 # Changelog — conductor
 
+## [v1.38.0] — 2026-09-16 (Phase 40.1 — révision ADR-029 et du gate du budget d'instructions)
+
+**Minor** (contrat observable du gate modifié — règle de numérotation appliquée à toute la
+phase : un changement de sémantique de code de sortie, de vocabulaire des verdicts ou de format
+de rapport est une capacité, donc minor) :
+
+- Plafond ADR-029 passé de 250 à **300 lignes** ; un agent entre 251 et 300 lignes déclenche
+  désormais un avertissement **non bloquant**, sans changer le code de sortie du gate.
+- Ratchet de `check-instruction-budget.sh` restreint aux **instructions**, par fichier : la
+  colonne lignes de la baseline reste publiée dans le rapport mais n'est plus comparée.
+- Étape CI du budget découpée en **sept bascules isolées** (ferme l'écart O-1) ; les commentaires
+  qu'elle produit portent sur l'état réel du dépôt, jamais un texte figé (ferme l'écart O-2).
+- Mutant MUT-2 remplacé, mutants MUT-5/6/7 ajoutés à la preuve du gate ; aucune valeur de
+  baseline `.planning/instruction-budget-baselines.tsv` modifiée par cette phase.
+- Énoncés vivants du module alignés sur 300 : README (codes de sortie, verdict
+  `AVERTISSEMENT-ADR029`), AGENT.md, `references/contracts.md`, `skills/vf-new-lab/SKILL.md` —
+  remplacement de valeur seul, aucun agent ni skill réécrit.
+- Autorisation : arbitrages Samuel D-01, D-02, D-05, D-06, D-07, AskUserQuestion session
+  principale (relais SendMessage), 2026-09-16.
+
 ## [v1.37.1] — 2026-09-16 (Phase 25, plan 25-04 — calibration et armement du budget d'instructions)
 
 **Patch** (durcissement et documentation, aucune capacité nouvelle, aucun script modifié) :

@@ -87,7 +87,7 @@
 | Adversarial Plan-Review | "Review du plan" | "Review du plan" peut etre auto-review (echo chamber). Adversarial = explicitement 2 agents distincts en sessions fraiches. |
 | HALT-X declenche | "Echec" / "Bug" | HALT = arret structure avec escalation. Echec/bug = sans protocole de reprise. |
 | Convention fantome | "Convention deprecated" | Fantome = jamais executee (illusion). Deprecated = a existe puis abandonnee. |
-| Charte de densite | "Limite de taille" | Charte = trio de seuils universels (250/500/2000) justifies par context rot. "Limite" sans justification empirique = arbitraire. |
+| Charte de densite | "Limite de taille" | Charte = trio de seuils universels (300/500/2000) justifies par context rot. "Limite" sans justification empirique = arbitraire. |
 | Context rot | "Le modele oublie" | Context rot = phenomene empirique mesure (Chroma 2025). "Oublier" est anthropomorphique. |
 | Garde-fou meta runtime | "Best practice" frontmatter | Garde-fou = discipline de verification avant invention. "Best practice" sans test = opinion. |
 | Iteration cap | "Boucle infinie" | Cap = limite explicite (typiquement 3). Boucle infinie = absence de limite = anti-pattern. |

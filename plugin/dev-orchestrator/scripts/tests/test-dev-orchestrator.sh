@@ -25,7 +25,7 @@
 #         rien à comparer — pas de .mcp.json) ne lève JAMAIS d'alarme ensure-deps, seulement un log
 #         informatif — vérifié dans le même chaînage RÉEL que T2m, en discriminant le canal
 #         ("[ensure-deps] ERROR:") du texte enfant cité (qui porte légitimement son propre "ERROR:").
-#   T3  — AGENT.md : ≤250L, table d'intentions fournie (≥11 lignes NL) et AUCUNE référence
+#   T3  — AGENT.md : ≤300L, table d'intentions fournie (≥11 lignes NL) et AUCUNE référence
 #         à un verbe supprimé (la façade des 29 verbes est morte — elle ne ressuscite pas).
 #   T4  — Chaque skill du module mappe vers une cible existante (aucun orphelin) :
 #         gsd-X vérifié contre gsd-skills-index.md (fixture de secours si index vide).
@@ -33,7 +33,7 @@
 #         (Phase 11, 11-02 — migré vers gsd-tools).
 #   T4c — Renommage de la whitelist T4 effectif : gsd-tools référencé par vf-auto/SKILL.md
 #         et accepté sans orphelin (pas un simple ajout à côté de l'ancien nom).
-#   T5  — Densité (VERIF-02) MESURÉE PAR wc -l UNIQUEMENT : AGENT.md ≤250L, skills ≤500L.
+#   T5  — Densité (VERIF-02) MESURÉE PAR wc -l UNIQUEMENT : AGENT.md ≤300L, skills ≤500L.
 #         (NE PAS appeler le contrôleur de taille générique qui ignore les .md.)
 #   T6  — Install end-to-end via vibeflow-update.sh (best-effort, SKIP si non réalisable).
 #         Vérifie aussi que la façade n'est PAS réinstallée (ni rule de préséance, ni
@@ -1237,7 +1237,7 @@ SH
 fi
 
 # ---------------------------------------------------------------------------
-# T3 — AGENT.md : ≤250L, table d'intentions fournie, zéro verbe supprimé
+# T3 — AGENT.md : ≤300L, table d'intentions fournie, zéro verbe supprimé
 # ---------------------------------------------------------------------------
 # v2.0.0 : la table de l'agent route une intention vers une BRIQUE gsd directe (plus de
 # colonne verbe). La couverture se mesure sur les lignes d'intentions NL ; la régression
@@ -1250,10 +1250,10 @@ intent_lines=$("$GREP" -E '^\|' "$AGENT_FILE" \
 agent_deleted="$(deleted_hits "$AGENT_FILE")"
 
 t3_ok=1
-[ "$agent_lines" -le 250 ] || { ko "T3 agent : AGENT.md = ${agent_lines}L (>250)"; t3_ok=0; }
+[ "$agent_lines" -le 300 ] || { ko "T3 agent : AGENT.md = ${agent_lines}L (>300)"; t3_ok=0; }
 [ "${intent_lines:-0}" -ge 11 ] || { ko "T3 agent : $intent_lines ligne(s) d'intentions NL (<11)"; t3_ok=0; }
 [ -z "$agent_deleted" ] || { ko "T3 agent : AGENT.md référence un verbe supprimé — $agent_deleted"; t3_ok=0; }
-[ "$t3_ok" -eq 1 ] && ok "T3 agent : ${agent_lines}L (≤250), $intent_lines intentions NL (≥11), aucun verbe supprimé"
+[ "$t3_ok" -eq 1 ] && ok "T3 agent : ${agent_lines}L (≤300), $intent_lines intentions NL (≥11), aucun verbe supprimé"
 
 # ---------------------------------------------------------------------------
 # T4 — Mapping des skills non orphelin (robuste à un index vide via fixture)
@@ -1361,10 +1361,10 @@ fi
 # ---------------------------------------------------------------------------
 # T5 — Densité par wc -l UNIQUEMENT (jamais le contrôleur de taille générique sur .md)
 # ---------------------------------------------------------------------------
-if [ "$agent_lines" -le 250 ]; then
-  ok "T5 densité agent : AGENT.md = ${agent_lines}L (≤250)"
+if [ "$agent_lines" -le 300 ]; then
+  ok "T5 densité agent : AGENT.md = ${agent_lines}L (≤300)"
 else
-  ko "T5 densité agent : AGENT.md = ${agent_lines}L (>250)"
+  ko "T5 densité agent : AGENT.md = ${agent_lines}L (>300)"
 fi
 
 skills_over=0
@@ -1450,9 +1450,9 @@ for a in $TEAM_AGENTS; do
     "$GREP" -q "^${field}:" "$f" || { ko "T8 agents : $a.md sans champ $field"; t8_ok=0; }
   done
   a_lines=$(wc -l < "$f" | tr -d ' ')
-  [ "${a_lines:-999}" -le 250 ] || { ko "T8 agents : $a.md dépasse 250 lignes ($a_lines)"; t8_ok=0; }
+  [ "${a_lines:-999}" -le 300 ] || { ko "T8 agents : $a.md dépasse 300 lignes ($a_lines)"; t8_ok=0; }
 done
-[ "$t8_ok" -eq 1 ] && ok "T8 agents : 4 agents de l'équipe présents, frontmatter complet, ≤250L"
+[ "$t8_ok" -eq 1 ] && ok "T8 agents : 4 agents de l'équipe présents, frontmatter complet, ≤300L"
 
 # T8b — vf-internal : présent sur les 3 workers, absent du manager (Pattern 12)
 t8b_ok=1
@@ -2457,7 +2457,7 @@ else
   [ "${ctx_rows:-0}" -ge 8 ] || { ko "T22 captation : §Contexte & session porte $ctx_rows lignes de table, plancher 8"; t22_ok=0; }
   # Non-régression de densité (ADR-029) sur l'agent conversationnel.
   agent_lines=$(wc -l < "$AGENT_FILE" | tr -d ' ')
-  [ "$agent_lines" -le 250 ] || { ko "T22 captation : AGENT.md à $agent_lines lignes, plafond ADR-029 = 250"; t22_ok=0; }
+  [ "$agent_lines" -le 300 ] || { ko "T22 captation : AGENT.md à $agent_lines lignes, plafond ADR-029 = 300"; t22_ok=0; }
   [ "$t22_ok" -eq 1 ] && ok "T22 docs-flow : doctrine complète (4 familles, --verify-only, ADR-031, ligne rouge --force, frontière vibeflow-os, ## Interdits), captation des 2 régimes + désambiguïsation routées, AGENT.md ($agent_lines l.) et intent-routing.md ($ctx_rows lignes de table) y renvoient"
 fi
 
@@ -6226,10 +6226,10 @@ fi
 # assertion G : densité ADR-029 — vf-dev-manager.md reste sous le plafond (wc -l < FICHIER est
 # cassé sur au moins un poste de dev de ce module : awk 'END{print NR}' est la mesure fiable).
 t31_wc="$(awk 'END{print NR}' "$T31_DEVMGR")"
-if [ "$t31_wc" -le 250 ]; then
-  ok "T31-G : vf-dev-manager.md reste sous le plafond ADR-029 ($t31_wc/250 lignes)"
+if [ "$t31_wc" -le 300 ]; then
+  ok "T31-G : vf-dev-manager.md reste sous le plafond ADR-029 ($t31_wc/300 lignes)"
 else
-  ko "T31-G : vf-dev-manager.md dépasse le plafond ADR-029 ($t31_wc/250 lignes)"; t31_ok=0
+  ko "T31-G : vf-dev-manager.md dépasse le plafond ADR-029 ($t31_wc/300 lignes)"; t31_ok=0
 fi
 
 [ "$t31_ok" -eq 1 ] && ok "T31 : budget de tours UNIQUE et partagé par ÉTAPE (le grain, pas une liste fermée de boucles), décompte complet à l'épuisement, invisibilité amont du coût interne du moteur nommée, valeur du budget inchangée (D-25), discriminance prouvée par mutation"
@@ -6453,7 +6453,7 @@ fi
 # VERTE quand l'un des deux perd sa mention — c'est le mode d'erreur « existence au lieu de
 # relation ». Les mutations (b) et (c) le prouvent en frappant les deux fichiers SÉPARÉMENT.
 T35_AGENTS="vf-coder vf-dev-manager"
-T35_PLAFOND=250
+T35_PLAFOND=300
 t35_ok=1
 
 t35_agent_cable() { # <fichier agent> -> 0 si mention ET renvoi présents

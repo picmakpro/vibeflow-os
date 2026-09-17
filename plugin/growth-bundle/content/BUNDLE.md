@@ -72,7 +72,7 @@ l'enjeu de vérification machine d'un projet de code. Le socle `.planning/` pos�
 | **copywriter-sequences** | sonnet | Rédige/itère les séquences & créatives **par canal**, ancré sur l'ICP **local** + offres activées ; variantes A/B, zéro slop IA ; range tout dans `growth/channels/<canal>/`. **Ne décide pas l'allocation.** |
 | **campaign-analyst** | sonnet | Renseigne METRICS par canal, calcule CAC/ROAS, tient EXPERIMENTS (verdict GO/ITERATE/KILL), remonte LEARNINGS **par canal** (tag-canal obligatoire). **N'invente jamais de métrique.** |
 
-> Chaque agent est conçu pour s'instancier **≤250L** (ADR-029) : le savoir détaillé est déporté dans
+> Chaque agent est conçu pour s'instancier **≤300L** (ADR-029) : le savoir détaillé est déporté dans
 > des **skills injectés via `skills:`** (à créer via `skill-creator`), jamais inliné dans l'agent.
 > **Le validator n'est PAS un agent de ce bundle** : il est fourni par le module `validator`.
 
@@ -108,7 +108,7 @@ l'enjeu de vérification machine d'un projet de code. Le socle `.planning/` pos�
 5. **Registres mémoire** — pose les 5 registres canon (DECISIONS / LEARNINGS / BLOCKERS / JOURNAL /
    EVALS) selon `content/registres.md` (chacun démarre par un index tableau).
 6. **Instanciation des agents** — pour CHAQUE blueprint de `content/agents/`, crée
-   `.claude/agents/<nom>.md` ≤250L : recopie le frontmatter cible (name/description/model/memory/skills — gate `check-agents.sh`, ADR-044), la
+   `.claude/agents/<nom>.md` ≤300L : recopie le frontmatter cible (name/description/model/memory/skills — gate `check-agents.sh`, ADR-044), la
    Mission, le Workflow et les Contraintes ; **crée les skills déclarés via `skill-creator`** s'ils
    n'existent pas (le savoir ne s'inline pas dans l'agent — ADR-029).
 7. **Câblage des auditeurs (filet obligatoire)** — installe/active l'agent `vibeflow-validator` et

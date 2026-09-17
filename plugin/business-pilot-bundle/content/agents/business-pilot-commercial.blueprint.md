@@ -1,7 +1,7 @@
 # BLUEPRINT — agent `business-pilot-commercial`
 
 > Spécification **prête à instancier** par `vf-new-lab` en un agent natif Claude Code dans
-> `.claude/agents/business-pilot-commercial.md` du lab. Conçu pour tenir **≤ 250 lignes** une fois
+> `.claude/agents/business-pilot-commercial.md` du lab. Conçu pour tenir **≤ 300 lignes** une fois
 > posé (charte densité ADR-029) : le savoir est **déporté en `skills:`**, jamais inliné ici.
 > Pattern de base : *business-agent* paramétré.
 

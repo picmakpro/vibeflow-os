@@ -1,6 +1,6 @@
 ---
 name: agent-density-auditor
-description: Audit, plan migration, applique et garde la densite des prompts systeme d'agents Claude Code selon la charte VibeFlow ADR-029 (Agent ≤250L / SKILL.md ≤500L / Bootstrap SessionStart ≤2000 tokens). Use this skill whenever the user mentions agent density, agent too long, heavy agent, prompt size, agent refactoring, agent diet, "reduire prompt systeme", "couper un agent", "alleger agent", OR whenever creating/editing files in `.claude/agents/*.md`, OR whenever auditing a VibeFlow / DevFlow project, OR when the user invokes `/vf-audit`, OR when Initializer generates new agents and needs a validation gate. Even if the user doesn't say "density" explicitly, trigger if they show a long agent file (>250 lines) or ask why an agent "hallucinates" / "drifts" — density bloat is the most common root cause per ADR-029.
+description: Audit, plan migration, applique et garde la densite des prompts systeme d'agents Claude Code selon la charte VibeFlow ADR-029 (Agent ≤300L / SKILL.md ≤500L / Bootstrap SessionStart ≤2000 tokens). Use this skill whenever the user mentions agent density, agent too long, heavy agent, prompt size, agent refactoring, agent diet, "reduire prompt systeme", "couper un agent", "alleger agent", OR whenever creating/editing files in `.claude/agents/*.md`, OR whenever auditing a VibeFlow / DevFlow project, OR when the user invokes `/vf-audit`, OR when Initializer generates new agents and needs a validation gate. Even if the user doesn't say "density" explicitly, trigger if they show a long agent file (>300 lines) or ask why an agent "hallucinates" / "drifts" — density bloat is the most common root cause per ADR-029.
 model: sonnet
 ---
 
@@ -8,7 +8,7 @@ model: sonnet
 
 ## Mission
 
-Garantir que les prompts systeme d'agents Claude Code dans tout projet VibeFlow (Lab, methodology templates, projets derives) respectent la **charte de densite ADR-029** : Agent ≤ 250 lignes, SKILL.md ≤ 500 lignes, Bootstrap SessionStart ≤ 2000 tokens. La sur-densite est empiriquement liee aux hallucinations et au context rot (Chroma 2025, Anthropic). Ce skill outille la mesure, la planification de migration et la validation continue.
+Garantir que les prompts systeme d'agents Claude Code dans tout projet VibeFlow (Lab, methodology templates, projets derives) respectent la **charte de densite ADR-029** : Agent avertissement des 251 lignes, bloque au-dela de 300, SKILL.md ≤ 500 lignes, Bootstrap SessionStart ≤ 2000 tokens. La sur-densite est empiriquement liee aux hallucinations et au context rot (Chroma 2025, Anthropic). Ce skill outille la mesure, la planification de migration et la validation continue.
 
 ## Quand utiliser ce skill
 
@@ -31,7 +31,7 @@ Quatre modes selon le besoin :
 
 Ces seuils sont **non negociables**. Toute violation doit etre tracee dans `.claude/memory/BLOCKERS.md` si conservee, sinon refactoree.
 
-1. **Agent ≤ 250 lignes** (hors frontmatter). Source : reverse-engineering Claude Code + Superpowers v5.1 (152K stars).
+1. **Agent : avertissement des 251 lignes, bloque au-dela de 300** (hors frontmatter). Source : reverse-engineering Claude Code + Superpowers v5.1 (152K stars).
 2. **SKILL.md ≤ 500 lignes**. Source : Anthropic officiel (skill authoring guidelines).
 3. **Bootstrap SessionStart ≤ 2000 tokens**. Source : Superpowers v5.1 (ADR-021).
 4. **Description frontmatter ≤ 1024 caracteres**. Source : runtime Claude Code.
@@ -57,7 +57,7 @@ Detail complet avec exemple : voir `references/agent_anatomy.md`.
 
 ## Patterns d'extraction
 
-Quand un agent depasse 250L, l'extraction se decide par categorie de contenu :
+Quand un agent depasse 300L, l'extraction se decide par categorie de contenu :
 
 | Si tu vois dans l'agent | Deplacer vers | Pourquoi |
 |------------------------|---------------|----------|
@@ -96,10 +96,10 @@ PATH                       LINES  BODY   TOKENS_EST  STATUS
 ```
 
 Classification :
-- ≤ 200L → `OK`
-- 201-250L → `WARN` (marge faible)
-- 251-400L → `HEAVY` (refacto recommandee)
-- > 400L → `CRITICAL` (refacto obligatoire)
+- < 251L → `OK`
+- 251-300L → `WARN` (avertissement, non bloquant)
+- 301-400L → `HEAVY` (bloque)
+- > 400L → `CRITICAL` (bloque)
 
 ### Mode plan — Planifier la migration
 
@@ -131,7 +131,7 @@ echo $?  # 0 = conforme, 1 = violation
 ```
 
 Verifications :
-- Lignes hors frontmatter ≤ 250
+- Lignes hors frontmatter : bloque au-dela de 300, warning des 251
 - Frontmatter contient `description` ≤ 1024 caracteres
 - Frontmatter utilise `skills:` natif Claude Code (ADR-031) — pas de champ invente (`bootstrap_skills`, `on_demand_skills` deprecated)
 - Aucune section unique > 100 lignes (signal extraction necessaire)

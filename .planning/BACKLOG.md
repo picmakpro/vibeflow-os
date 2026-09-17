@@ -541,6 +541,13 @@ la Phase 25 (budget d'instructions), qui s'est délibérément limitée à `plug
 patron F13/codes normalisés ; le point 4 à la prochaine édition de l'étape CI concernée, ou plus
 tôt si quelqu'un ajoute `shell: bash` à une étape du job `gates`.
 
+**Statut partiel (2026-09-17, Phase 40.1) :**
+- point 1 fermé par le plan 40.1-11 (README `plugin/validator/` réécrit, marge exacte sous le
+  plafond révisé) ;
+- point 4 fermé par le plan 40.1-03 (mesure de la fixture de l'étape CI à code capturé, sans
+  `|| true`) ;
+- points 2 et 3 inchangés, toujours différés.
+
 ## Posture de protection de `main` — TRANCHÉ : phase dédiée à inscrire (2026-09-15)
 
 **Décision** : arbitrage Samuel, AskUserQuestion session principale, 2026-09-15 — ouvrir une **phase

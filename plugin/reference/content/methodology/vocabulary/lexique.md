@@ -100,7 +100,7 @@
 
 | Terme | Definition |
 |-------|-----------|
-| **Charte de densite** | Trio de seuils universels pour eviter le context rot : Agent ≤ 250L body, SKILL.md ≤ 500L body, Bootstrap ≤ 2000 tokens. Reference ADR-029 Lab. |
+| **Charte de densite** | Trio de seuils universels pour eviter le context rot : Agent ≤ 300L body (avertissement des 251), SKILL.md ≤ 500L body, Bootstrap ≤ 2000 tokens. Reference ADR-029 Lab. |
 | **Bootstrap-skill** | Skill preloade automatiquement au SessionStart via `bootstrap.md`. Reflexe inne du systeme, jamais sollicite explicitement (ex: `verification-before-completion`). |
 | **On-demand skill** | Skill charge a la demande, soit a l'invocation d'un agent (frontmatter `skills:`), soit au runtime par match de description (1% Rule). Specialiste appele quand le contexte le justifie. |
 | **1% Rule** | Anthropic : si une situation correspond meme a 1% au theme d'un skill, l'invoquer. Mieux vaut sur-trigger que d'ignorer. |

@@ -49,7 +49,7 @@
 
 | ID | Titre canonique |
 |----|-----------------|
-| ADR-029 | Charte densité : agents ≤ 250 lignes, skills ≤ 500, bootstrap ≤ 2000 tokens |
+| ADR-029 | Charte densité : agents — avertissement dès 251 lignes, bloque au-delà de 300 (amendée le 2026-09-16) ; skills ≤ 500, bootstrap ≤ 2000 tokens |
 | ADR-030 | Architecture skills (révisée) : déléguer aux skills outillés, ne jamais réimplémenter |
 | ADR-031 | Jamais de fix / suppression / matérialisation sans validation humaine |
 | ADR-032 | Consolidation mémoire : registres indexés, 4 piliers (indexation / archivage / fusion / promotion) |
@@ -67,12 +67,20 @@
 > **ADR-029 : enforcement machine à partir de la Phase 25 (2026-09-15)** — le plafond de lignes
 > des agents distribués et leur charge d'instructions sont désormais mesurés et publiés par
 > `plugin/conductor/scripts/check-instruction-budget.sh`. Le ratchet est armé par la sentinelle
-> `.planning/.instruction-budget-armed`, **NON POSÉE à cette date** — la calibration (baseline
-> gravée, sentinelle posée) attend la livraison de la Phase 40. État antérieur : seule la suite
-> mono-module `plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh` (T3/T5) enforçait
-> le plafond de lignes, et rien ne mesurait la charge d'instructions. L'entrée d'index ci-dessus
-> n'est ni réécrite, ni renumérotée, ni complétée par cette note (même discipline que la note
-> `ADR-065`).
+> `.planning/.instruction-budget-armed`, **posée le 2026-09-16** (commit `a7f414a`, plan 25-04)
+> après la livraison de la Phase 40. État antérieur : seule la suite mono-module
+> `plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh` (T3/T5) enforçait le plafond
+> de lignes, et rien ne mesurait la charge d'instructions. L'entrée d'index ci-dessus n'est ni
+> réécrite, ni renumérotée, ni complétée par cette note (même discipline que la note `ADR-065`).
+
+> **ADR-029 : amendement du 2026-09-16 (Phase 40.1)** — le plafond des agents est relevé à 300
+> lignes, avec avertissement non bloquant dès 251 (arbitrages Samuel D-01 et D-05, AskUserQuestion
+> session principale, relais SendMessage, 2026-09-16). Chaque outil garde sa propre mesure :
+> fichier entier pour `check-instruction-budget.sh`, body pour l'auditeur de densité distribué
+> (D-06). Le ratchet ne bloque désormais que les instructions, par fichier — une hausse de
+> baseline exige un arbitrage nommé, avec canal et date (D-02, D-07). La colonne lignes de la
+> baseline est publiée, jamais comparée (D-H6). La définition canonique ci-dessus est amendée en
+> conséquence ; l'ancien plafond reste lisible dans le CHANGELOG conductor. Aucune ADR nouvelle.
 
 ---
 

@@ -6,7 +6,7 @@
 
 | Element | Seuil | Source | Sanction |
 |---------|-------|--------|----------|
-| **Agent (prompt systeme)** | ≤ 250 lignes (hors frontmatter) | Reverse-eng Claude Code + Superpowers v5.1 | Bloquant (gate) |
+| **Agent (prompt systeme)** | avertissement des 251 lignes, bloque au-dela de 300 (hors frontmatter) | Reverse-eng Claude Code + Superpowers v5.1 | Bloquant (gate) au-dela de 300, warning des 251 |
 | **SKILL.md** | ≤ 500 lignes | Anthropic officiel (skill authoring) | Bloquant (gate) |
 | **Bootstrap SessionStart** | ≤ 2000 tokens cumules | Superpowers v5.1 (ADR-021) | Warning (a refondre) |
 | **Description frontmatter** | ≤ 1024 caracteres | Runtime Claude Code | Bloquant (gate) |
@@ -16,10 +16,10 @@
 
 | Statut | Plage (lignes body) | Tokens estimes (×12) | Action |
 |--------|---------------------|----------------------|--------|
-| `OK` | ≤ 200 | ≤ 2400 | Conforme — surveillance passive |
-| `WARN` | 201 - 250 | 2412 - 3000 | Marge faible — surveiller croissance |
-| `HEAVY` | 251 - 400 | 3012 - 4800 | Refacto recommandee — plan_migration.py |
-| `CRITICAL` | > 400 | > 4800 | Refacto obligatoire — gate bloque |
+| `OK` | < 251 | < 3012 | Conforme — surveillance passive |
+| `WARN` | 251 - 300 | 3012 - 3600 | Zone d'avertissement — non bloquant, surveiller la croissance |
+| `HEAVY` | 301 - 400 | 3612 - 4800 | Bloque (gate) — plan_migration.py |
+| `CRITICAL` | > 400 | > 4800 | Bloque (gate) — refacto obligatoire |
 
 ## Sources et justifications
 

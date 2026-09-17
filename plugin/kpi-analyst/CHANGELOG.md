@@ -1,5 +1,13 @@
 # CHANGELOG — kpi-analyst
 
+## [v1.0.6] — 2026-09-16 (Phase 40.1)
+
+**Patch** :
+
+- **Auto-description de densité alignée sur le plafond ADR-029 de 300 lignes** — `AGENT.md` déclare
+  désormais `≤300L` (était `≤250L`), remplacement de valeur seul. Autorisation : arbitrage Samuel
+  D-01, AskUserQuestion session principale (relais SendMessage), 2026-09-16.
+
 ## [v1.0.5] — 2026-08-30 (Phase 38 — description de frontmatter YAML strict, plan 38-08)
 
 **Patch** :

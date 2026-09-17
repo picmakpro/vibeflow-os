@@ -1,0 +1,60 @@
+{
+  "nodes": [
+    {
+      "id": "fix",
+      "step": "correction ciblée W-A..W-D (plans 02,07,13,14)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "check",
+      "step": "plan-checker frais",
+      "stage": "",
+      "deps": [
+        "fix"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "close",
+      "step": "E6 + STATE + commit",
+      "stage": "",
+      "deps": [
+        "check"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix4",
+      "step": "tour 4 plan 13 F1/F2 (section entière)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "check4",
+      "step": "checker frais tour 4 + tâches 0",
+      "stage": "",
+      "deps": [
+        "fix4"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "close4",
+      "step": "clôture tour 4",
+      "stage": "",
+      "deps": [
+        "check4"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

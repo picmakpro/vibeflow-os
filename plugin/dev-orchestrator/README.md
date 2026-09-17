@@ -8,7 +8,7 @@
 > d'intention unique**. Plus de façade de verbes : GSD est l'interface directe des équipes,
 > l'agent est l'entrée conversationnelle optionnelle.
 
-**Version** : v2.22.1
+**Version** : v2.22.2
 **Type** : agent + équipe d'agents + 2 skills + scripts
 
 ---
@@ -73,7 +73,7 @@ S'y ajoutent :
 
 ```
 dev-orchestrator/
-├── AGENT.md                       # agent vibeflow-head (≤250L, dense)
+├── AGENT.md                       # agent vibeflow-head (≤300L, dense)
 ├── agents/                        # équipe de mission
 │   ├── vf-dev-manager.md          # manager de mission — exposé (opus)
 │   ├── vf-coder.md                # worker interne (vf-internal: true, sonnet)
@@ -219,7 +219,7 @@ Couvre les axes de la bascule agentique (spec 2026-07-25) plus les acquis :
   verbe supprimé** (la façade des 29 verbes est morte, elle ne doit pas ressusciter).
 - **T4** — aucune cible orpheline dans les skills (index disque ou fixture canonique — la
   fixture garde la suite verte **aussi sans chaîne interne installée**, CI comprise).
-- **T5** — densité par `wc -l` : `AGENT.md` ≤250L, skills ≤500L.
+- **T5** — densité par `wc -l` : `AGENT.md` ≤300L, skills ≤500L.
 - **T6** — install end-to-end via `vibeflow-update.sh` (best-effort, SKIP sinon).
 - **T7** — garde-fou first-use présent dans `AGENT.md` (FIRST-01/FIRST-02, BOOT-04).
 - **T8/T8b/T8c** — équipe de mission : 4 agents conformes (frontmatter, densité,

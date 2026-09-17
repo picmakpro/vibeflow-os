@@ -26,7 +26,7 @@ import sys
 from dataclasses import dataclass, field
 
 # Seuils ADR-029
-THRESHOLD_AGENT_LINES = 250
+THRESHOLD_AGENT_LINES = 300
 SECTION_SKILL_THRESHOLD = 50  # lignes mini pour suggerer skill on-demand
 SECTION_BIG_THRESHOLD = 100   # lignes au-dela : extraction quasi obligatoire
 
@@ -235,7 +235,7 @@ def render_plan(agent_path: str, sections: list[Section], body_lines: int) -> st
     out.append("   - Ajouter les nouveaux skills crees a la liste `skills:` (liste plate)")
     out.append("   - Ne PAS utiliser `bootstrap_skills` ou `on_demand_skills` (deprecated ADR-031, ignores par Claude Code)")
     out.append("   - Les skills universels (safe-execute, verification-before-completion, dette-detector, when-stuck) sont charges via SessionStart hook — ne pas les declarer ici")
-    out.append("5. Re-lancer `measure.sh` pour valider la conformite ≤ 250L")
+    out.append("5. Re-lancer `measure.sh` pour valider la conformite : bloque au-dela de 300L, avertissement des 251")
     out.append(f"6. Re-lancer `validate_gate.sh` pour confirmer (exit 0 attendu)")
     out.append("")
     out.append("---")

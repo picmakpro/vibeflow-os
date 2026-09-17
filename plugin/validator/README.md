@@ -5,13 +5,12 @@
 > process, synthèse — pour garantir qu'un lab reste fidèle à la méthodologie VibeFlow malgré
 > l'évolution Anthropic, l'append-only des registres et la dette inévitable.
 
-**Version** : v1.3.4
+**Version** : v1.3.5
 **Type** : agent-only
-**Densité** : `AGENT.md` = **250 lignes** — le plafond ADR-029 est ≤ 250 : le module est **au
-plafond, marge zéro** (mesuré le 2026-09-15, `awk 'END{print NR}'`, concordant avec le CHANGELOG
-« 250/250 » — le « 249 » affiché jusqu'ici était faux), tout ajout passe par un délestage
-préalable ; dès l'armement du ratchet `check-instruction-budget.sh` (Phase 25, plan 25-04), une
-ligne de plus rend la CI rouge.
+**Densité** : `AGENT.md` a une marge de **50 lignes** sous le plafond ADR-029 révisé en Phase 40.1 (bloque au-delà de 300, avertissement dès 251 ; arbitrages Samuel D-01/D-05, AskUserQuestion
+session principale, 2026-09-16), mesure du 2026-09-15 par `awk 'END{print NR}'`. La prochaine
+ligne ajoutée déclenche l'avertissement non bloquant du gate `check-instruction-budget.sh` ; une
+instruction ajoutée reste bloquée sans arbitrage nommé (ratchet d'instructions par fichier).
 **Iron Law** : *« Détecter et signaler. Ne jamais corriger sans validation humaine. »* (ADR-031)
 
 ---
@@ -20,7 +19,7 @@ ligne de plus rend la CI rouge.
 
 Sans agent garant, la dette s'accumule silencieusement :
 
-- Agents qui dépassent 250 lignes (perte de focus, ADR-029)
+- Agents qui dépassent 300 lignes (perte de focus, ADR-029)
 - Agents non conformes ADR-044 (description / model / memory manquants)
 - Registres mémoire qui explosent (pollution contexte)
 - Hooks deprecated qui ne s'exécutent plus (régression silencieuse)
@@ -99,7 +98,7 @@ Rapport `reports/validator/YYYY-MM-DD-validator.md` avec :
 | Phase | Délégué à | Quoi |
 |-------|-----------|------|
 | 1 | skill `infrastructure-audit` (`audit-infra.sh`) | Version Claude Code, hooks valides, scripts intègres, drift snapshot — **bloquant** si ERROR |
-| 2 | scripts `check-agents.sh --strict` + `check-debug-research.sh` | Conformité agents (ADR-044), densité ADR-029 (agents ≤ 250L, skills ≤ 500L, bootstrap ≤ 2000 tokens), recherche-doc avant debug (ADR-045) |
+| 2 | scripts `check-agents.sh --strict` + `check-debug-research.sh` | Conformité agents (ADR-044), densité ADR-029 (agents : bloque au-delà de 300L, avertissement dès 251 ; skills ≤ 500L, bootstrap ≤ 2000 tokens), recherche-doc avant debug (ADR-045) |
 | 3 | grille des 7 signaux + `consolidator --audit` + `detect-planning-debt.sh` | Dette documentaire, cohérence index ↔ body des registres, 8e signal dette de planning (advisory, ADR-040) |
 | 4 | skill `audit-architecture` (mode scan) | Architecture d'audit des process générateurs (ADR-036) — **opt-in selon profil**, sautée en `leger` |
 | 5 | _synthèse_ | Score renormalisé + status + actions recommandées |

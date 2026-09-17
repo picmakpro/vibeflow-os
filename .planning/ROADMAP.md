@@ -80,6 +80,7 @@
 - [x] Phase 38: Portabilité multi-runtime — livraison (canal d'install, migration de lab, adaptateur) (exécutée 2026-08-29, **mesurée 2026-08-30** sur clé API — **critère 2 PROUVÉ sur Codex** : profondeur ≥ 2 constatée EN BASE (`thread_spawn_edges`, `root→vf-dev-manager→vf-coder`), 3/3 sur les **4 critères réels** ; le **critère 5 est SANS OBJET sous clé API** (vert à vide, jamais « atteint ») et le **critère 4 est plus faible que son libellé** (`--output-schema` non propagé aux sous-agents, dette D-38-S). **kimi-code n'est plus un inconnu déclaré** : I-1 **31/31**, I-2 `disallowedTools` bloque (0/4 contre 3/3 au contrôle positif), I-3 hooks déclenchés 3/3, `vf-internal` **sans équivalent** (Pattern 12 non tenu, déclaré par le gate de fidélité). **Critère 1 toujours partiel** : hooks non portés, perte déclarée. Coûts : Codex 1,01 $, kimi ~0,018 $. **SHIPPÉE v2.59.0 le 2026-08-31** (Samuel a autorisé le ship après revue ; PR + tag + release GitHub) — test bout-en-bout install **et** usage refait sur Codex (délégation de rôle → code réel) ET Kimi (`--agent-file` → code + rapport typé) le 2026-08-31, manifeste `.codex-plugin/` natif ajouté. Preuves : `38-MESURE-CODEX-CRITERE-2.md`, `38-MESURE-KIMI.md`)
 - [x] Phase 39: Workstreams — partition du planning et collaboration concurrente (cadrée 2026-09-09, exécutée 2026-09-10, 3 plans clos avec SUMMARY, revue ×3 + audit infra + juge frais sur le diff de correction ; **SHIPPÉE v2.60.0 le 2026-09-14 — PR #62** (conductor v1.35.0 : `check-divergence.sh` S2/S4/S5 + suite 17 cas dont 3 mutants, hook `post-merge` opt-in ancré sur `--git-common-dir` après RCE démontrée, étape CI ; dev-orchestrator v2.20.4 : dispatch `--ws` explicite ; `PART-01..09` gravées, `GSDA-19` superseded, ADR-069 amendé). Hotfix PR #61 regroupé dans la même release (arbitrage Samuel, AskUserQuestion session principale, 2026-09-14). **Dépôt volontairement NON partitionné** — partition réelle = geste humain séparé, déclencheur D-02 en STATE § Decisions. Réserves : premier run CI distant observé sur la PR #62 seulement ; le clone jetable prouve un mécanisme, pas un usage concurrent réel)
 - [x] Phase 40: vibeflow-head — head of minds du dev-orchestrator (exécutée le 2026-09-15 sur `feat/phase-40-vibeflow-head` — `vibeflow-dev` renommé `vibeflow-head`, 5 plans/3 vagues, zéro agent neuf, kernel intact (diff nul), renommage sur 22 chemins + garde anti-alias T36 (mutation prouvée), `head-governance.md` neuf, `check-mission-exit.sh` E1-E6 codes 3/0/4/64 (23/23 cas, 6 mutations rouges), contrat de preuves E6 + ses trois émetteurs (D-19, amendement post-cadrage), racine bumpée v2.63.0, `dev-orchestrator` v2.22.0 — **PR, tag et release GitHub restent des gestes humains non posés à cette date**. **HEAD-01 partiellement close** — `intent-routing.md` jamais mis à jour pour renvoyer à `head-governance.md`, laissée ouverte au ledger, détail `40-SUMMARY.md`)
+- [x] Phase 40.1: Révision ADR-029 et du gate du budget d'instructions (INSERTED 2026-09-16 — plafond 300 lignes, ratchet sur les instructions seules ; arbitrages Samuel AskUserQuestion session principale ; avant la 41)
 - [ ] Phase 41: Posture de protection du dépôt (inscrite 2026-09-15, arbitrage Samuel AskUserQuestion session principale ; cahier des charges au BACKLOG ; séquencée après la 40 ET la calibration 25-04)
 
 <details>
@@ -1486,11 +1487,67 @@ Le lot L5 est né d'un amendement post-cadrage (D-19, 2026-09-15, option b) : `4
 contrat de preuves E6, mais aucun des trois workers ne l'émettait avant `40-05`.
 
 Plans:
+
 - [x] 40-01-PLAN.md — lot L1 `exec-rename` (vague 1) : renommage des 22 fichiers + garde anti-alias T36 avec mutation prouvée (HEAD-04)
 - [x] 40-02-PLAN.md — lot L2 `exec-e6` (vague 2) : contrat de preuves E6 + décompte de mission, à budget de lignes constant (HEAD-03)
 - [x] 40-03-PLAN.md — lot L4 `exec-doctrine` (vague 2, parallèle à L2) : `head-governance.md` + AGENT.md restructuré ≤ 250 lignes + renvois des skills (HEAD-01)
 - [x] 40-04-PLAN.md — lot L3 `exec-gate` (vague 3, dépend de L2 et L4) : `check-mission-exit.sh` E1-E6 + suite à 6 mutations rouges + clôture de module (HEAD-02, HEAD-04)
 - [x] 40-05-PLAN.md — lot L5 `exec-workers` (vague 3, parallèle à L3, dépend de L2) : émission du champ `preuves` E6 dans `vf-coder.md`, `vf-reviewer.md`, `vf-auditer.md` (HEAD-03, D-19)
+
+### Phase 40.1: Révision ADR-029 et du gate du budget d'instructions (INSERTED)
+
+> **Origine** (2026-09-16, juste après le merge de la PR #73 qui arme le ratchet) : le gate
+> `check-instruction-budget.sh` compare **lignes ET instructions** à une baseline égale à la taille
+> actuelle (`check-instruction-budget.sh:303-313`) — toute ligne ajoutée à **n'importe lequel** des
+> 31 agents rougit la CI, et deux fichiers sont au plafond de 250. Samuel ne veut pas que
+> l'expérience se dégrade par des reformulations forcées. Arbitrages (AskUserQuestion session
+> principale, 2026-09-16) : plafond ADR-029 à **300 lignes pour tous les agents** ; ratchet sur les
+> **instructions seulement** ; agents **en français**, aucune traduction ; **vraie phase GSD**,
+> insérée avant la 41. Cadrage : `40.1-CONTEXT.md`.
+
+**Goal:** Un agent peut grandir en lignes jusqu'à 300 sans reformulation forcée (avertissement non bloquant dès 251), tandis que toute
+instruction ajoutée reste bloquée sans arbitrage nommé — et le plafond de 300 est le même partout
+où ADR-029 est énoncée ou mesurée.
+**Requirements**: BUDG-04, BUDG-05
+**Depends on:** Phase 25 (gate armé, PR #73 mergée) et Phase 40. Séquencée **avant la Phase 41** :
+changer le gate une fois `main` protégée ferait passer cette PR sous la nouvelle règle de merge.
+**Success Criteria** (what must be TRUE):
+
+  1. Le plafond ADR-029 vaut **300 lignes** pour tous les agents, partout où il est énoncé ou
+     mesuré (gate, étape CI, suites de modules, auditeur de densité distribué, modèles et
+     méthodologie de référence, `CLAUDE.md`, `docs/ADR.md`, manuel) — un recensement machine ne
+     trouve plus aucun « 250 » vivant rattaché à la charte des agents (BUDG-04).
+
+  2. Le gate armé rend **0** quand un agent gagne des lignes sans gagner d'instruction et sous 300 ;
+     il rend **1** sur une instruction ajoutée et sur un fichier à 301 lignes — prouvé sur fixture
+     dans l'étape CI elle-même, pas seulement dans la suite (BUDG-05, ferme l'observation O-1 du
+     `25-SECURITY.md`).
+
+  3. Les commentaires de l'étape CI décrivent l'état réel du ratchet (O-2) ; la baseline et le
+     CHANGELOG publient la nouvelle doctrine ; les agents restent en français.
+
+  4. QUAL-01 : toute comparaison modifiée ou supprimée a sa mutation rouge prouvée ; la suite du gate
+     reste à trois issues.
+
+**Plans:** 15 plans en 4 vagues (révision 2 du 2026-09-16)
+
+Plans:
+
+- [x] 40.1-01-PLAN.md — W0 (vague 1) : recensement versionné et ses contrôles négatifs, rejeu CI extrait de `ci.yml`, preuve des suites de modules
+- [x] 40.1-02-PLAN.md — W0 (vague 1) : base de branche dérivée, bump dérivé, invariants de clôture imputés à tout commit propre à la branche
+- [x] 40.1-03-PLAN.md — gate du budget (vague 2), commit atomique : plafond 300, avertissement dès 251, ratchet d'instructions seul, suite (MUT-2 remplacé, MUT-5/6/7), étape CI à sept bascules
+- [x] 40.1-04-PLAN.md — module conductor (vague 3, après 03, 05, 12) : énoncés alignés, bump minor dérivé
+- [x] 40.1-05-PLAN.md — auditeur de densité distribué (vague 2) : bloque au-delà de 300, avertit dès 251, preuve et mutants
+- [x] 40.1-06-PLAN.md — méthodologie de référence (vague 3, après 05) : alignement, bump patch dérivé
+- [x] 40.1-07-PLAN.md — suite dev-orchestrator (vague 2, base contenant le hotfix v2.63.1), bump patch dérivé
+- [x] 40.1-08-PLAN.md — business-pilot-bundle (vague 2), bump patch dérivé
+- [x] 40.1-09-PLAN.md — content-bundle (vague 2), bump patch dérivé
+- [x] 40.1-10-PLAN.md — growth-bundle (vague 2), bump patch dérivé
+- [x] 40.1-11-PLAN.md — validator (vague 2), bump patch dérivé
+- [x] 40.1-12-PLAN.md — kpi-analyst et audit-architecture (vague 2), bumps patch dérivés
+- [x] 40.1-13-PLAN.md — doctrine du dépôt (vague 2) : CLAUDE.md, amendement daté d'ADR-029, planning vivant, manuel FR/EN (énoncé indépendant de l'ordre des releases), seed
+- [x] 40.1-15-PLAN.md — suite design-orchestrator (vague 2), bump patch dérivé
+- [x] 40.1-14-PLAN.md — clôture (vague 4, base contenant le hotfix) : recensement nul, contrôles négatifs, rejeu tests+gates, invariants, bumps, ledger
 
 ### Phase 41: Posture de protection du dépôt
 

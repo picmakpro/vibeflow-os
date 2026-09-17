@@ -9,7 +9,7 @@
 - 3 documents methodologiques fondateurs (CORE v4.2 — 9 principes P1-P9, PHILOSOPHY, EXPLAINED)
 - **12 patterns architecturaux universels** (vs 8 en v1.1) avec exemples fictifs : ajout des patterns 09 (meta-procedures), 10 (plan-review adversarial), 11 (halt-conditions), 12 (cloisonnement par outils)
 - 1 lexique VibeFlow enrichi (+16 termes v4.1) + 1 guide dire/ne pas dire (+12 entrees v4.1) + 1 mapping forks
-- **42 fichiers de templates generiques** (9 agents ≤ 250L + 1 reference, 5 docs, 7 memory, 5 triggers, 1 rule) + **5 skills** (vs 1 en v1.1) : debugger, agent-density-auditor, safe-execute, metier-orchestration, skill-creator (pointeur vers le module canonique)
+- **42 fichiers de templates generiques** (9 agents ≤ 300L + 1 reference, 5 docs, 7 memory, 5 triggers, 1 rule) + **5 skills** (vs 1 en v1.1) : debugger, agent-density-auditor, safe-execute, metier-orchestration, skill-creator (pointeur vers le module canonique)
 - 1 exemple fictif complet : PetitsCoursFlow (Sophie K., professeure de musique)
 - README client + licence d'usage personnel
 

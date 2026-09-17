@@ -111,7 +111,7 @@ Comment trancher script vs juge : `references/enforcement-spectrum.md`. Comment 
 
 Concevoir ne suffit pas. Le skill produit des **artefacts qui rendent l'audit non-contournable** :
 
-1. **Les auditeurs** — un agent par couche qualitative (`.claude/agents/<dimension>-auditor.md`), ou un script par couche déterministe (`.claude/scripts/`). Chaque auditeur ≤ 250 L (ADR-029) ; sa rubric détaillée part en `references/`.
+1. **Les auditeurs** — un agent par couche qualitative (`.claude/agents/<dimension>-auditor.md`), ou un script par couche déterministe (`.claude/scripts/`). Chaque auditeur ≤ 300 L (ADR-029) ; sa rubric détaillée part en `references/`.
 2. **Les formats de verdict** — un ID traçable par couche (ex : `CLA-XXX`, `HUM-XXX`, `VIS-XXX`) avec en-tête obligatoire + table de critères, déclaré dans `contracts.md`.
 3. **Les règles de refus** — la règle bloquante non-négociable, écrite là où elle est *exécutée* : *« l'agent publisher/deployer/déposeur REFUSE de finaliser sans verdict VALIDE de la couche X »*. Inscrite dans `CLAUDE.md` ou une rule, et **incarnée par l'agent terminal** (celui qui franchit le point de non-retour).
 4. **L'anti-boucle** — max N allers-retours créateur↔auditeur, puis escalade (ex : « 3e REJETE → escalade au stratège/humain »).

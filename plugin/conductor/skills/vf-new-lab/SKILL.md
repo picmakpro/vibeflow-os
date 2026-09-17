@@ -239,7 +239,7 @@ Dériver puis poser (déléguer, ne pas réinventer) :
      (index-first) et sa Phase 7 le met à jour → cohérent avec les hooks planning-core (Patch C).
    > **Seuil** : **< 2 agents métier** (lab mono-agent) → pas d'orchestrateur (surcoût inutile, l'unique
    > agent est l'exécutant). **Métier = code** → ce rôle est déjà tenu par `dev-orchestrator` (ADR-046) :
-   > **ne pas doubler**. L'orchestrateur métier respecte P3 (ne produit jamais) et ADR-029 (≤250L).
+   > **ne pas doubler**. L'orchestrateur métier respecte P3 (ne produit jamais) et ADR-029 (≤300L).
 6. **Garde-fous** — `vibeflow-validator` + `audit-architecture` (auditeurs toujours présents).
 7. **Commandes d'incarnation (ADR-042)** — balayer **tous** les agents posés :
    `VF_TARGET_ROOT=<.claude> bash .claude/scripts/generate-agent-commands.sh` (cascade : sinon

@@ -107,11 +107,11 @@ Trois seuils universels s'appliquent :
 
 | Composant | Plafond | Pourquoi |
 |-----------|---------|----------|
-| Body d'un agent (apres frontmatter) | **≤ 250 lignes** | Au-dela, l'agent perd la coherence de son mandat |
+| Body d'un agent (apres frontmatter) | **≤ 300 lignes (avertissement des 251)** | Au-dela, l'agent perd la coherence de son mandat |
 | Body d'un skill | **≤ 500 lignes** | Au-dela, on bascule en sous-documents charges a la demande |
 | Bootstrap charge au SessionStart | **≤ 2000 tokens** | Au-dela, le contexte initial est deja trop lourd |
 
-Si un agent depasse 250 lignes : probablement 2 agents melanges, ou du savoir qui devrait etre dans un skill, ou des conventions qui devraient etre dans des regles. **Re-decouper, pas allonger**.
+Si un agent depasse 300 lignes : probablement 2 agents melanges, ou du savoir qui devrait etre dans un skill, ou des conventions qui devraient etre dans des regles. **Re-decouper, pas allonger**.
 
 ### Frontmatter natif et architecture skills (v4.1)
 

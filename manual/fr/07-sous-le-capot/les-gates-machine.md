@@ -58,12 +58,12 @@ explique un refus que tu pourrais prendre pour un caprice :
 - **Le seuil des 300 lignes de code**, déjà couvert dans le tableau ci-dessus, avec son
   avertissement à 250 lignes avant le blocage ferme.
 
-**À ne pas surpromettre :** la charte qui recommande de garder un agent lui-même sous 250 lignes
-n'est aujourd'hui **pas** vérifiée automatiquement par un gate posé par défaut dans ton lab — c'est
-une doctrine documentée, appliquée par vigilance humaine et par revue, pas par un script bloquant.
-Un gabarit existe dans la bibliothèque méthodologique pour qui veut se doter de ce contrôle
-lui-même ; il n'est pas installé par défaut. Le dire clairement ici évite de te faire croire à une
-garantie qui n'existe pas encore par défaut.
+**À ne pas surpromettre :** la charte recommande de garder un agent à 300 lignes au plus, avec un
+avertissement dès 251. Les agents distribués par VibeFlow sont **mesurés** dans la CI du dépôt de
+distribution depuis v2.62.0 (`check-instruction-budget.sh`) ; le blocage — plafond dépassé, ou
+instruction ajoutée sans arbitrage — est actif dans cette CI depuis l'armement du ratchet (PR #73).
+Dans **ton** lab, en revanche, la charte n'est vérifiée par aucun gate posé par défaut : un gabarit
+(l'auditeur de densité) existe dans la bibliothèque méthodologique, mais il n'est pas installé.
 
 ### Un exemple concret : le refus de l'Iron Law
 

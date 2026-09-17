@@ -68,7 +68,7 @@ Le lab parle le métier, jamais le jargon dev. Les agents et les artefacts emplo
 
 ## 5. Les 3 agents métier
 
-Tous **`model: sonnet`**, `memory: project`, conçus pour s'instancier **≤250L** (charte **ADR-029** :
+Tous **`model: sonnet`**, `memory: project`, conçus pour s'instancier **≤300L** (charte **ADR-029** :
 savoir déporté en skills via frontmatter `skills:`, jamais inliné). Blueprints complets dans
 `agents/`.
 
@@ -131,7 +131,7 @@ Source canonique : module `reference` (`VIBEFLOW_CORE.md`). Le lab applique :
 - **P7 Transposer pas copier** — vocabulaire métier natif (§4), zéro forme dev.
 - **P8 Évaluer** — `audit-architecture` matérialise le gate de clarté (verdict bloquant) ; verdicts en
   EVALS.
-- **P9 Modulariser** — chaque agent ≤250L, une responsabilité par agent, savoir en skills injectés.
+- **P9 Modulariser** — chaque agent ≤300L, une responsabilité par agent, savoir en skills injectés.
 
 ---
 
@@ -164,10 +164,10 @@ ROADMAP exprimée en **campagnes**, REQUIREMENTS en exigences éditoriales (ton,
 Selon `registres.md` : `DECISIONS.md`, `LEARNINGS.md`, `BLOCKERS.md`, `JOURNAL.md`, `EVALS.md`
 (depuis `reference` si installé). Chacun **commence par un index tableau**.
 
-### Étape 5 — Instancier les 3 agents (≤250L chacun)
+### Étape 5 — Instancier les 3 agents (≤300L chacun)
 Pour chaque blueprint de `agents/` :
 1. Lire le frontmatter cible (name, description, model, memory:project, skills:[...]) — les recopier TOUS (gate `check-agents.sh`, ADR-044).
-2. Créer l'agent natif dans `.claude/agents/<name>.md` du lab, **≤250L** (passer
+2. Créer l'agent natif dans `.claude/agents/<name>.md` du lab, **≤300L** (passer
    `agent-density-auditor` en gate si disponible).
 3. Si un skill déclaré n'existe pas encore, le **créer via `skill-creator`** (ne PAS inliner le savoir
    dans l'agent — ADR-029). Les skills déclarés par les blueprints sont à créer, pas fournis ici.

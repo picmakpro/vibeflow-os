@@ -113,7 +113,7 @@ l'intention et invoque les briques directement — plus de couche de verbes-syno
 
 - **Tech stack** : Bash portable (ADR-054 : Windows ok, pas de jq/grep -P/sed -i obligatoires)
   + Markdown (agents/skills/references) + JSON (manifestes, hooks).
-- **Densité (ADR-029)** : agents ≤ 250 L, skills ≤ 500 L, bootstrap ≤ 2000 tokens.
+- **Densité (ADR-029)** : agents — avertissement dès 251 lignes, bloque au-delà de 300 ; skills ≤ 500 L, bootstrap ≤ 2000 tokens.
 - **Agents natifs machine-enforced (ADR-044)** : `check-agents.sh` (description + model +
   memory requis, `vf-internal` pour les workers).
 - **Jamais de fix sans validation humaine (ADR-031)** — la vigilance runtime est ADR-056.

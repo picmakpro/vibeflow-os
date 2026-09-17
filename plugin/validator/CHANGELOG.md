@@ -1,5 +1,20 @@
 # CHANGELOG — validator
 
+## [v1.3.5] — 2026-09-16 (Phase 40.1)
+
+**Patch** :
+
+- **Charte de densité contrôlée relevée à 300 lignes** — `AGENT.md` cite désormais le plafond
+  ADR-029 révisé (bloque au-delà de 300, avertissement dès 251) aux deux endroits où il énonçait
+  l'ancien seuil (règle de densité, anti-pattern) ; remplacement de valeur seul, aucune ligne ni
+  instruction ajoutée ou retirée.
+- **Note de marge du README réécrite** — l'en-tête affirmait une marge zéro sous 250 (fausse
+  d'une ligne depuis le 2026-09-15) ; elle affiche désormais une marge de 50 lignes sous le
+  nouveau plafond, en fait daté. Ferme sur le fond le point 1 de l'item BACKLOG « Dérive
+  documentaire et fragilité latente… ».
+- **Autorisation** : arbitrages Samuel D-01/D-05, AskUserQuestion session principale (relais
+  SendMessage), 2026-09-16.
+
 ## [v1.3.4] — 2026-08-30 (Phase 38 — description de frontmatter YAML strict, plan 38-08)
 
 **Patch** :

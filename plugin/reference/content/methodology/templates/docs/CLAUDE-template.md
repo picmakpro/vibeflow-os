@@ -7,7 +7,7 @@ Tu suis la methodologie **VibeFlow Core v4.1 : Native Intelligence Architecture*
 
 ## CONFORMITE METHODOLOGIQUE v4.1
 
-- **ADR-029 (densite prompts)** : Agent ≤ 250 lignes (body), SKILL.md ≤ 500 lignes, Bootstrap SessionStart ≤ 2000 tokens. La sur-densite est empiriquement liee aux hallucinations (Chroma 2025, Anthropic).
+- **ADR-029 (densite prompts)** : Agent : avertissement des 251 lignes, bloque au-dela de 300 (body), SKILL.md ≤ 500 lignes, Bootstrap SessionStart ≤ 2000 tokens. La sur-densite est empiriquement liee aux hallucinations (Chroma 2025, Anthropic).
 - **ADR-030 (lead pur orchestrateur)** : le Lead n'a pas de bootstrap contextuel — l'expertise vit dans les sub-agents et Gardiens qu'il invoque.
 - **ADR-056 (frontmatter natif)** : utiliser exclusivement `skills:` (convention Claude Code native). Les champs `bootstrap_skills` / `on_demand_skills` sont deprecated et ne doivent JAMAIS apparaitre dans un frontmatter.
 
@@ -146,4 +146,4 @@ La documentation detaillee des MCP doit etre dans des rules contextuelles (`.cla
 | Pattern reutilisable decouvert | → LEARNINGS |
 | Nouveau service externe | → VENDORS |
 | Output IA evaluable (sprint, decision quantitative, livrable client) | → EVALS (P8, frequence min 1/sprint, ADR-017) |
-| Agent depasse 250L | → invoquer `agent-density-auditor` mode `plan` |
+| Agent depasse 300L | → invoquer `agent-density-auditor` mode `plan` |

@@ -37,21 +37,21 @@ stopped_at: >-
   ADR-063). Le ratchet du budget d'instructions EST désormais armé** — `check-instruction-budget`
   armé le 2026-09-16, `.planning/.instruction-budget-armed` et `.planning/instruction-budget-baselines.tsv`
   existent ; la phrase précédente « aucun ratchet armé » décrit l'état du 2026-09-15.
-last_updated: "2026-09-16T00:00:00.000Z"
-last_activity: 2026-09-16
+last_updated: "2026-09-17T00:00:00.000Z"
+last_activity: 2026-09-17
 last_activity_desc: >-
-  Plan 25-04 exécuté sur `feat/phase-25-04-calibration` : checkpoint bloquant tranché A (arbitrage
-  Samuel, AskUserQuestion session principale (relais SendMessage), 2026-09-16), baselines de
-  `check-instruction-budget.sh` gravées sur 31 fichiers et sentinelle armée dans le même commit,
-  gate armé rendant 0, conductor v1.37.1, BUDG-01/02 cochés, QUAL-01 tenu sur la 25. Compteurs de
-  `progress` avancés du seul delta de ce plan (+1 plan, +1 phase), pas re-dérivés. PR, tag et
-  release non posés (gestes humains).
+  Phase 40.1 exécutée sur `feat/phase-40.1-revision-adr-029-budget` (mission vf-dev-manager, go de
+  Samuel, AskUserQuestion session principale, 2026-09-16) : 15 plans en 4 vagues, plafond des agents
+  300 lignes avec avertissement dès 251, ratchet du gate sur les instructions seules, dix modules
+  bumpés, BUDG-04 et BUDG-05 cochés. Revue et audit en direct, vérification de phase passed. Compteurs
+  de `progress` avancés du seul delta de la phase (+1 phase, +15 plans), pas re-dérivés. PR ouverte,
+  ni merge, ni tag, ni release.
 progress:
-  total_phases: 11
-  completed_phases: 10
-  total_plans: 55
-  completed_plans: 55
-  percent: 91
+  total_phases: 12
+  completed_phases: 11
+  total_plans: 70
+  completed_plans: 70
+  percent: 92
 ---
 
 # Project State
@@ -93,7 +93,9 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 ## Current Position
 
-Phase: **25** (Budget d'instructions) — **COMPLÈTE le 2026-09-16** : plan 25-04 exécuté sur `feat/phase-25-04-calibration`, ratchet `check-instruction-budget` armé (31 fichiers, conductor v1.37.1), BUDG-01/02 cochés. Seconde PR de la phase à ouvrir (geste humain). Next : cadrage de la Phase 41 (posture de protection du dépôt) après merge de cette PR.
+Phase: **40.1** (Révision ADR-029 et du gate du budget d'instructions) — **EXÉCUTÉE le 2026-09-17** sur `feat/phase-40.1-revision-adr-029-budget` : 15/15 plans, SUMMARY et `40.1-VERIFICATION.md` (passed) sur disque, BUDG-04/05 cochés. PR vers main ouverte ; merge, tag et release restent des gestes humains. Next : merge de la PR, puis cadrage de la Phase 41 (posture de protection du dépôt).
+
+Précédemment (2026-09-16) : Phase: **25** (Budget d'instructions) — **COMPLÈTE le 2026-09-16** : plan 25-04 exécuté sur `feat/phase-25-04-calibration`, ratchet `check-instruction-budget` armé (31 fichiers, conductor v1.37.1), BUDG-01/02 cochés. Seconde PR de la phase à ouvrir (geste humain). Next : cadrage de la Phase 41 (posture de protection du dépôt) après merge de cette PR.
 
 Précédemment (2026-09-15) : Phase **25** (Budget d'instructions) — **PLANIFIÉE le 2026-09-15** (4 plans, 4 vagues, plan-checker PASSED après une révision ciblée D-01 bis) — vagues 1-3 exécutables en mission, vague 4 (calibration) = checkpoint bloquant jusqu'à la livraison de la Phase 40. Phase 34 mergée le même jour (PR #66) : AGTS-01 close, SKIL-01 NO-GO, AGTS-02 reportée avec trace.
 2026-09-15** (6/6 plans, SUMMARY sur disque, ledger consolidé par 34-06). Trois verdicts rendus
@@ -207,6 +209,41 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 ## Accumulated Context
 
 ### Roadmap Evolution
+
+- 2026-09-16 : **Phase 40.1 insérée avant la 41 — révision d'ADR-029 et du gate du budget
+  d'instructions.** Née juste après le merge de la PR #73 (ratchet armé) : le ratchet sur les
+  lignes bloque toute ligne ajoutée à n'importe quel agent. Arbitrages Samuel (AskUserQuestion
+  session principale, 2026-09-16) : plafond 300 lignes pour tous les agents, ratchet sur les
+  instructions seulement, agents en français, vraie phase GSD. Numéro 40.1 rendu par
+  `phase.insert` et vérifié (placée entre la 40 et la 41) ; STATE mis à jour à la main
+  (aucune commande `state.*`). Cadrage : `40.1-CONTEXT.md`.
+  **Planifiée le 2026-09-16** (mission vf-dev-manager, planification seule, go de la session
+  principale du 2026-09-16) : 15 plans en 4 vagues, commits `4ebb1ec` → `ef2075f` → `6f4778b` (SHA après rebase).
+  Checker frais ×3 : 3 bloquants au tour 1, 1 au tour 2, 0 au tour 3 (4 warnings consignés au
+  rapport de mission). Le recensement réel du plafond compte 113 lignes vivantes dans 56 fichiers, là où
+  `git grep -w` sur la valeur de l'ancien plafond en donnait bien moins (forme suffixée par `L` manquée). L'exécution suppose le hotfix
+  v2.63.1 mergé dans la base (précondition des plans 07 et 14). Rien n'est exécuté.
+  **Correction ciblée le 2026-09-16** (arbitrage Samuel « correction ciblée d'abord », AskUserQuestion
+  session principale, 2026-09-16) : W-A à W-D fermés en 3 tours, commits `2e34613` → `b1d133b` →
+  `b11aba8` (SHA après rebase), un checker neuf à chaque tour. La précondition hotfix est désormais une Task 0 machine
+  en tête de 01, 02, 07 et 14 (même arbitrage : l'exécution attend le merge du hotfix dans main).
+  Le checker du tour 3 a laissé un bloquant sur le plan 13 T3 : une phrase collée avant le
+  paragraphe du manuel échappait à la comparaison. Arbitrage Samuel, option (b), AskUserQuestion
+  session principale, 2026-09-16 : la comparaison porte sur la section entière. Branche rebasée
+  sans conflit sur `origin/main` 61d80bf (hotfix v2.63.1 inclus), `main` local avancé en
+  fast-forward. Tour 4 (`1954949`) : checker frais, Task 0 de 01/02/07/14 rc 0 sur la branche
+  rebasée, mutants du plan 13 tous rc 1. Son seul bloquant, une ligne de ce fichier citant
+  l'ancien plafond, est reformulé à la main : recensement 114 lignes, identique à main.
+  **Phase prête à exécuter, feu vert de Samuel requis.** Rien n'est exécuté.
+  **Exécutée le 2026-09-17** (mission vf-dev-manager, go de Samuel, AskUserQuestion session
+  principale, 2026-09-16) : vagues 1 à 4, dix lots en parallèle en vague 2 dans le même arbre (commits
+  par chemin). Revue vf-reviewer : correctifs requis sur l'outillage de preuve seul (I2 de
+  `check-phase-invariants.sh` substituait tout nombre, faux rouge et faux vert possibles ; locale awk ;
+  rc de `git rev-list` ; arithmétique octale), corrigés et prouvés par mutant. Audit vf-auditer :
+  surface CI SECURED. Vérification de phase passed (4 critères). Incidents consignés dans
+  `40.1-VALIDATION.md` : stash/pop de lots voisins sans perte, rejeu concurrent qui a fabriqué un faux
+  rouge, ref `main` déplacée par l'audit puis restaurée sur origin/main. Rapport :
+  `.planning/missions/2026-09-17-phase-40.1-execution.md`.
 
 - 2026-09-15 : **Phase 40 exécutée — `vibeflow-dev` devient `vibeflow-head`, head of minds du
   dev-orchestrator.** 5 plans sur 3 vagues (40-01 `exec-rename`, 40-02 `exec-e6`, 40-03
@@ -1328,12 +1365,14 @@ Recent decisions affecting current work:
 
 **Resume file:** .planning/phases/VFDO-34-gaps-agency-agents-cadrage-skill-installer/34-CONTEXT.md (et `.planning/phases/VFDO-40-vibeflow-head-head-of-minds-du-dev-orchestrator/40-CONTEXT.md`, `.planning/phases/VFDO-25-budget-d-instructions-et-tage-d-alignement-court/25-CONTEXT.md`)
 
-Last session: 2026-09-16 — plan 25-04 exécuté (ratchet du budget d'instructions armé), branche `feat/phase-25-04-calibration`, PR non ouverte.
+Last session: 2026-09-17 — Phase 40.1 exécutée, PR ouverte.
+
+Previous-previous session: 2026-09-16 — plan 25-04 exécuté (ratchet du budget d'instructions armé), branche `feat/phase-25-04-calibration`, PR non ouverte.
 
 Previous session: 2026-09-15
 Stopped at: **Phase 34 EXÉCUTÉE et MERGÉE** (PR #66, merge `bf34d49`, 2026-09-15 — 3 verdicts rendus, 4 gates humains relayés, AGTS-02 reportée ; Scroll-Off exclu du périmètre VibeFlow le 2026-09-15, reprise sur un lab mobile à désigner) puis **Phase 25 PLANIFIÉE** (recherche `eb6aa3d`, D-06 bis + D-01 bis amendés, 4 plans `f7a057f` + révision `2773e37`, checker PASSED, couverture 8/8, gap-analysis 10/10). Next : exécution 25 par `vf-dev-manager` (vagues 1-3, arrêt au checkpoint 25-04) — demande Samuel, session principale, 2026-09-15.
 
-**Reprendre par** : mission `vf-dev-manager` sur la Phase 25 (vagues 1-3, checkpoint 25-04 bloquant jusqu'à la 40) — puis `/gsd-plan-phase 40`, puis calibration 25-04 dans une seconde PR, **puis** cadrage de la Phase 41 (posture de protection du dépôt) — jamais avant que les PR de la 40 et de 25-04 soient mergées.
+**Reprendre par** : merge (humain) de la PR de la Phase 40.1, puis cadrage de la Phase 41 (posture de protection du dépôt, O-3 inclus). Points ouverts de la 40.1 : `.planning/codebase/CONCERNS.md:79-85` périmé (hors plans, à arbitrer) ; phrase « blocage actif depuis l'armement (PR #73) » du manuel FR/EN, bloc canonique arbitré, à trancher par Samuel.
 
 **Ce qui reste fermé, quoi qu'il arrive** :
 - **Budget d'instructions armé depuis le 2026-09-16** (`check-instruction-budget.sh`) : une baseline de `.planning/instruction-budget-baselines.tsv` ne remonte jamais sans arbitrage humain nommé avec canal et date ; elle descend librement dans le commit de remédiation.
