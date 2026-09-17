@@ -26,7 +26,7 @@
         "check-1"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "check-2",
@@ -34,6 +34,26 @@
       "stage": "",
       "deps": [
         "revise-1"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revise-2",
+      "step": "revision tour 2",
+      "stage": "",
+      "deps": [
+        "check-2"
+      ],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "check-3",
+      "step": "plan-checker frais tour 3",
+      "stage": "",
+      "deps": [
+        "revise-2"
       ],
       "scope": [],
       "status": "blocked"
