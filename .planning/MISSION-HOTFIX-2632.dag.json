@@ -1,0 +1,73 @@
+{
+  "nodes": [
+    {
+      "id": "exec-b2-coder",
+      "step": "B2 vf-coder, manager, kernel, contrats, memoire",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-b1-head",
+      "step": "B1 head incarne",
+      "stage": "",
+      "deps": [
+        "exec-b2-coder"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-tests",
+      "step": "test discriminant et mutation",
+      "stage": "",
+      "deps": [
+        "exec-b1-head"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-release",
+      "step": "bump v2.63.2",
+      "stage": "",
+      "deps": [
+        "exec-tests"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue",
+      "step": "revue diff complet",
+      "stage": "",
+      "deps": [
+        "exec-release"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "gates",
+      "step": "rejeu gates CI",
+      "stage": "",
+      "deps": [
+        "exec-release"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "pr",
+      "step": "push et PR",
+      "stage": "",
+      "deps": [
+        "revue",
+        "gates"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}
