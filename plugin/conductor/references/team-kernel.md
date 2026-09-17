@@ -20,7 +20,7 @@
 | **Rapports typés** (Pattern C) | `{ statut: passed\|gaps_found\|human_needed\|blocked, findings[{severity, action: auto-fix\|no-op\|ask-user, ref}], noeuds_debloques[] }` | fin de l'interprétation de prose ; escalade humaine impérative sur `ask-user` |
 | **Halt conditions** | 5 codes (P11) : boucle sans progrès · action destructive · ressource manquante · budget épuisé · drift de scope | l'humain arbitre en 30 s sur un message structuré |
 | **Digest de mission** | ≤ 30 lignes injectées dans chaque mandat (le disque fait foi) | amortit les relectures de contexte par étage |
-| **Cloisonnement par tools** (P12) | juges via `disallowedTools: Write, Edit` (contrainte runtime, Phase 20 — pas une simple absence dans `tools:`) ; la plupart des workers sans Task ; allowlist `Agent(...)` sur les managers ; `vf-internal: true` | anti-triche vérifié par un gate transverse, PAS par les suites de test de chaque module (aucune n'y touche) : `check-agents.sh --strict`, qui linte le contenu de `tools:` (syntaxe des allowlists `Agent(...)`/`Task(...)`) en plus du frontmatter (ADR-044, Phase 16) et exige `disallowedTools: Write, Edit` sur tout agent `memory:` sans Write/Edit déclaré — passé par la CI sur les 6 dossiers `plugin/*/agents` (découverte non vide, monde clos) et à l'écriture par le hook `guard-agent-write.sh` ; les deux mécanismes sont eux-mêmes testés par la suite **conductor** (`test-check-agents.sh`, `test-guard-agent-write.sh`). C'est un CONTRAT documenté, pas un cloisonnement runtime : le runtime n'applique la liste de noms entre parenthèses qu'en incarnation fenêtre principale (`claude --agent`), jamais pour un agent dispatché en sous-agent (doc officielle sub-agents). Le garant machine réel de « un seul manager actif » est le verrou de driver, pas l'allowlist (cf. « Étages croisés » ci-dessous) |
+| **Cloisonnement par tools** (P12) | juges via `disallowedTools: Write, Edit` (contrainte runtime, Phase 20 — pas une simple absence dans `tools:`) ; la plupart des workers sans Task ; allowlist `Agent(...)` sur les managers ; `vf-internal: true` | anti-triche vérifié par un gate transverse, PAS par les suites de test de chaque module (aucune n'y touche) : `check-agents.sh --strict`, qui linte le contenu de `tools:` (syntaxe des allowlists `Agent(...)`/`Task(...)`) en plus du frontmatter (ADR-044, Phase 16) et exige `disallowedTools: Write, Edit` sur tout agent `memory:` sans Write/Edit déclaré — passé par la CI sur les 6 dossiers `plugin/*/agents` (découverte non vide, monde clos) et à l'écriture par le hook `guard-agent-write.sh` ; les deux mécanismes sont eux-mêmes testés par la suite **conductor** (`test-check-agents.sh`, `test-guard-agent-write.sh`). C'est un CONTRAT documenté, pas un cloisonnement runtime : le runtime n'applique la liste de noms entre parenthèses qu'en incarnation fenêtre principale (`claude --agent`), jamais pour un agent dispatché en sous-agent (doc officielle sub-agents ; **confirmé par mesure le 2026-09-17** : `vf-coder` a lancé des agents absents de sa liste). La vraie limite d'exécution est ailleurs : les outils `Agent` et `Task` sont **absents à la profondeur 3** — limite observée, non documentée par Anthropic, qui peut changer avec une version de Claude Code (§Marge de profondeur de dispatch ci-dessous). Le garant machine réel de « un seul manager actif » est le verrou de driver, pas l'allowlist (cf. « Étages croisés » ci-dessous) |
 | **Écart déclaré ↔ runtime** (sens fermeture) | un outil **PRÉSENT** dans le champ `tools:` déclaré peut être **ABSENT** au runtime une fois l'agent dispatché en sous-agent | cas établi et daté : un agent déclarait `AskUserQuestion` mais ne le recevait pas en dispatch sous-agent, ce qui a gelé une mission — filet de repli : le besoin humain remonte dans le rapport typé, il n'est **jamais** auto-répondu en silence (patron `vf-coder.md`) |
 | **Dispatch nommé** (hypothèse datée, jamais construite en mécanisme) | `Agent(...)`/`Task` natif Claude Code, allowlists des managers | tient tant que VibeFlow reste Claude-Code-exclusif (`mission-contracts.md` §Seuil de bascule D5(a)) : chaque rôle nommé (`vf-coder`, `vf-reviewer`…) est résolu par un runtime à dispatch nommé. **Mesuré le 2026-08-29 (Phase 38) sur `@moonshot-ai/kimi-code@0.39.1` réellement installé, le descripteur `namedDispatch: false` de kimi-code — et donc la ligne précédente de cette référence — est PÉRIMÉ** : le schéma de profil d'agent porte `subagents: array(string())`, `delegatableSubagents(callerProfileName)` résout par nom, et `load()` fusionne les agent-files du disque (`userRoots`/`extraRoots`/`projectRoots`/`pluginRoots`, priorités `plugin:5 < user:10 < extra:20 < project:30 < explicit:40`) dans une Map clé=nom — kimi-code enregistre bien des sous-agents nommés custom, via `Agent` et `AgentSwarm`. **Périmé par la suite de la même Phase 38** : l'installeur cible désormais aussi Codex
 (`--target`, `plugin/_internal/runtime-cli-dispatch.sh`) — install fonctionnelle, agents
@@ -34,7 +34,7 @@ et `disallowedTools` est inerte / l'allowlist `Agent(...)` déchiquetée sur Ope
 | **Namespace de branche des worktrees d'exécuteur** (recoupement vérifié conforme, Phase 21) | `gsd-worktree-path-guard.js` (hook `PreToolUse`, `~/.claude/hooks/`) | l'amont 1.9.0 a élargi son motif d'allow-list à `^(worktree-)?agent-[A-Za-z0-9._/-]+$` (#1995 — accepte `agent-<id>` **et** l'ancien `worktree-agent-<id>`) : vérifié sur pièce le 2026-07-31, déjà présent dans le hook installé, aucun défaut. Le nouveau cas d'échec `{committed: false, reason: 'staging_failed' \| 'staging_timeout'}` (#2608) est entièrement interne à `gsd-executor` amont — aucune logique de retry VibeFlow ne l'enveloppe, le seul retry documenté porte sur l'étage entier (`vf-dev-manager.md` §Contrôle de flux), jamais sur un `git add` individuel. Rien à câbler, constat écrit ici pour survivre au prochain delta amont (détail : `21-02-SUMMARY.md` §Constat changement 4) |
 | **Joignabilité worker → sous-agent** (mesuré Phase 38, 2026-08-28) | `SendMessage` dans le `tools:` d'un worker qui dispatche lui-même des sous-agents | un worker qui spawne un sous-agent doit pouvoir le CORRIGER en cours d'exécution — sinon une correction reçue en vol force un redispatch en agent frais (perte de contexte) plutôt qu'une reprise, et deux exécutions concurrentes peuvent atterrir sur le même fichier. Fix appliqué à `vf-coder` (commit `7c1443b`). **L'asymétrie reste structurelle, pas un bug à corriger davantage** : un manager RÉVEILLE un worker par `SendMessage` (contexte intact) ; un worker, lui, ne résout PAS le nom de son manager depuis son étage — son retour passe par le rapport typé (bloc `Agent`), jamais par `SendMessage` vers le haut. Corollaire de pilotage : ne jamais concevoir un protocole où le worker DOIT initier un échange — une question sans réponse dans les hypothèses documentées se **termine** et se rend en `action: ask-user` ; c'est le tour de boucle qui est le canal, pas un message spontané |
 
-### Marge de profondeur de dispatch (mesuré le 2026-08-04, `@opengsd/gsd-core` 1.9.1)
+### Marge de profondeur de dispatch (descripteur lu le 2026-08-04, `@opengsd/gsd-core` 1.9.1 — mesure du 2026-09-17)
 
 Le descripteur `claude.runtime.hostIntegration.dispatch` du runtime `claude`, recopié verbatim —
 **inchangé depuis la 1.9.0** :
@@ -44,22 +44,34 @@ namedDispatch: true · nested: true · maxDepth: 5 · background: true
 backgroundDispatch: false · subagentToolkit: "full" · isolation: "harness-worktree"
 ```
 
-**Ce que nous en consommons** : la chaîne la plus profonde du kernel —
-`vf-dev-manager` → `vf-coder` → agent `gsd-*` — occupe **3 niveaux sur 5**.
-Il reste donc deux niveaux de marge.
+**Lecture du 2026-08-04 — PÉRIMÉE par la mesure du 2026-09-17.** Sur la foi de `maxDepth: 5`, on
+écrivait que la chaîne la plus profonde du kernel — `vf-dev-manager` → `vf-coder` → agent `gsd-*` —
+occupait 3 niveaux sur 5 et laissait « deux niveaux de marge », donc qu'un worker pouvait
+dispatcher un **sous-worker** à n'importe quel étage. Un descripteur n'est pas une preuve.
 
-**Ce que cette marge autorise** (c'est une permission, pas une simple observation) : un worker peut
-légitimement dispatcher un **sous-worker** sans franchir la limite du runtime. Un mandat qui a
-besoin d'un étage de délégation supplémentaire n'a pas à être réarchitecturé pour l'éviter, ni
-remonté au manager au seul motif de la profondeur. **Ce fait clôt la question du nesting** ouverte à
-l'ouverture de l'audit de la Phase 24 — elle n'a plus à être reposée.
+**Ce que la sonde mesure** (session principale, 2026-09-17) : aux profondeurs 1 et 2, l'outil
+`Agent` est visible et un lancement est accepté ; à la profondeur 3, `Agent` et `Task` sont
+**absents**, quel que soit le type d'agent (`ToolSearch` `select:Agent,Task` → « No matching
+deferred tools found. »). Un agent de profondeur 3 ne lance donc rien : la marge réelle au-delà de
+la chaîne ci-dessus est **nulle**. Limite **observée, non documentée par Anthropic** — elle peut
+changer avec une version de Claude Code ; une nouvelle sonde la re-mesure, jamais une relecture du
+descripteur. Incident fondateur : Phase 40.1, head dispatché en `Task` (1) → `vf-dev-manager` (2) →
+`vf-coder` (3), sans outil de lancement.
 
-**Sa borne, en revanche, est stricte** : la marge est une permission de **profondeur**, jamais une
-permission de contourner la **voie unique d'invocation** (GSDC-05, Phase 23 — les briques de cycle
-s'invoquent par leur skill, jamais par dispatch direct d'un agent nu) ni le **cloisonnement des
-allowlists** `Agent(...)` (P12, ci-dessus). Deux niveaux disponibles ne rendent licite aucun
-chemin que la doctrine interdit par ailleurs — en particulier `manager → worker → manager`, que le
-verrou de driver refuse quelle que soit la profondeur restante.
+**Ce qui en découle** (arbitrages Samuel B1/B2, AskUserQuestion session principale, 2026-09-17) :
+le head est incarné dans la session principale (via `/vf-dev`), jamais dispatché en `Task` —
+profondeurs visées : manager 1, `vf-coder` 2, briques GSD 3. Un **sous-worker** reste licite
+depuis la profondeur 2 au plus. Un worker qui constate l'outil `Agent` absent rend `blocked` +
+`cause: "profondeur"`, mandat intact, sans rien produire à la main :
+`dev-orchestrator-references/mission-contracts.md` §Retour « bloqué : profondeur ». La question du
+nesting, close en Phase 24 sur la foi du descripteur, est rouverte et tranchée par ces arbitrages.
+
+**Sa borne reste stricte** : la profondeur disponible ne rend licite aucun contournement de la
+**voie unique d'invocation** (GSDC-05, Phase 23 — les briques de cycle s'invoquent par leur skill,
+jamais par dispatch direct d'un agent nu), ni du **contrat déclaré des allowlists** `Agent(...)`
+(P12, ci-dessus — un contrat lint-vérifié, pas un mur d'exécution). Aucun chemin que la doctrine
+interdit par ailleurs ne devient licite — en particulier `manager → worker → manager`, que le
+verrou de driver refuse quelle que soit la profondeur.
 
 ### Étage de parallélisme réellement effectif (mesuré le 2026-07-31, sondes horodatées)
 
@@ -107,7 +119,7 @@ celle du moteur : **elle reste, pour l'instant, la seule qui parallélise réell
   restaurer le parallélisme intra-étape est un **opt-in explicite**, jamais un défaut.
 
 Protocole complet, trois configurations, horodatages bruts et réserves de la mesure (la profondeur
-2 → 3 n'a pas été mesurée) : `.planning/missions/2026-07-31-mesure-m2-dispatch-parallele.md` du
+2 → 3 n'y a pas été mesurée — elle l'a été le 2026-09-17, §Marge de profondeur de dispatch) : `.planning/missions/2026-07-31-mesure-m2-dispatch-parallele.md` du
 dépôt VibeFlow. **Renvoi, pas copie** — les chiffres ne se recopient pas d'ici, ils se relisent
 là-bas.
 

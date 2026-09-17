@@ -129,7 +129,7 @@ une étape sécurité le garde) :
 1. **Build** — `vf-coder` (Task) : cycle cadrage → plan → exécution (3 étapes — la revue n'en
    fait plus partie, voir point 2).
 2. **Revue** — `vf-reviewer` (Task) dispatché **EN DIRECT**, jamais via `vf-coder` : nœud
-   `revue-N` (deps=build) posé **systématiquement**, sans condition. Protocole complet (boucle de
+   `revue-N` (deps=build) posé **systématiquement**, sans condition (D-10/D-11). Protocole complet (boucle de
    correction ciblée, gradation par risque, revue de jointure sur lots parallèles, garde-fou de
    comblement) : `dev-orchestrator-references/mission-flow.md` §Pattern E — ne pas le reformuler
    ici.
@@ -144,11 +144,9 @@ une étape sécurité le garde) :
    correctifs — jamais un reopen par juge. Budget de tours **partagé par étape** avec la boucle de
    revue (point 2), pas doublé — détail : `mission-flow.md` §Pattern E §6.
 
-Entre les étages : un compte rendu qui révèle une décision → panel. Le nœud `revue-N` est
-désormais posé et piloté par le manager EN DIRECT pour chaque étape — la règle qui le lui
-interdisait est réécrite, pas contournée (D-10/D-11, §Pattern E). Des correctifs remontés par la
+Entre les étages : un compte rendu qui révèle une décision → panel. Des correctifs remontés par la
 revue ou l'audit → renvoyés à `vf-coder` en mandat de **correction CIBLÉE**, jamais un cycle
-complet, jamais corrigés par toi.
+complet ni corrigés par toi.
 
 ## Étage design croisé (mission dev)
 
@@ -174,6 +172,8 @@ embarque la DA en 3-5 lignes. Doctrine complète :
   Applique-la telle quelle — ne la reformule JAMAIS ici (ADR-030, une seule voix).
 - **Worker coupé** (réseau, interruption) : constate le DISQUE, **réveille** l'agent via son `agentId`,
   ne redispatche qu'en dernier recours — `mission-flow.md` §Pattern G, ne pas reformuler ici.
+- **Worker `blocked` + `cause: "profondeur"`** (`vf-coder` sans outil `Agent` ; contrat : `mission-contracts.md` §Retour « bloqué : profondeur ») : ni codé par toi, ni redispatché au même niveau — c'est le niveau de dispatch qui est en cause, pas le worker (arbitrage Samuel B1, AskUserQuestion session principale, 2026-09-17 : manager 1, `vf-coder` 2, briques GSD 3).
+  Remonte le mandat intact pour relance au bon niveau — `SendMessage(to: "main")`, sinon ton bloc typé `blocked` + `cause` + `mandat` ; jamais de brique GSD dispatchée en direct à sa place (voie unique, `GSD-PIPELINE.md` §9 ; P3).
 - **Entre les étapes** : relis `.planning/ROADMAP.md` (étapes insérées en cours de route) et
   `.planning/STATE.md` (blockers). Marque chaque étape finie (STATE + case ROADMAP).
 - **Fin de milestone** (toutes étapes vertes ET périmètre = milestone complète) : enchaîne

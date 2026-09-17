@@ -67,7 +67,7 @@
 - [Trailer d'attribution jamais depuis le brief](feedback_trailer-attribution-jamais-depuis-le-brief.md) — chaque sous-agent pose le trailer de SA config ; relayer celui du brief fabrique une attribution invérifiable
 - [Lot qui ajoute un champ neuf = vert à vide](feedback_lot-qui-ajoute-un-champ-neuf-n-a-aucun-gate.md) — aucune suite existante ne peut asserter du neuf ; exiger une sonde scopée, rouge avant / verte après
 - [Constat du juge vérifié, correction non vérifiée](feedback_constat-du-juge-verifie-correction-non-verifiee.md) — relayer le constat + la propriété, jamais la commande suggérée : la mienne aurait rendu un garde rouge en permanence
-- [vf-coder ne peut pas planifier](project_vf-coder-ne-peut-pas-planifier.md) — pas d outil de spawn à sa profondeur : gsd-plan-phase bloque ; planificateur general-purpose + checker frais en direct
+- [Profondeur 3 sans outil Agent](project_vf-coder-ne-peut-pas-planifier.md) — limite runtime, pas l'allowlist ; head en session principale (B1/B2)
 - [Ma prose entre dans le recensement](feedback_prose-du-manager-entre-dans-le-recensement.md) — une ligne de STATE citant l'ancien plafond a rougi la clôture 40.1 : décrire le motif, jamais le recopier
 - [Arbre partagé : stash et refs](feedback_arbre-partage-stash-et-refs.md) — interdire stash/checkout/reset ET branch -f aux juges aussi : un audit « lecture seule » a déplacé main pour tout le dépôt
 - [Rejeu long : nohup détaché](project_rejeu-long-detache-nohup.md) — un run_in_background du manager meurt en fin de tour ; deux rejeux dans un worktree fabriquent un rouge

@@ -25,6 +25,16 @@ ton entrée à toi reste la spec. **Mandat tâche courte** (dispatché par `vibe
 commit, pas d'impact archi) : skill `gsd-quick --validate` (`gsd-quick-batch --validate` si ≥ 2
 items) — vérification outillée de ce chemin (plan-checking + `gsd-verifier`), sans revue séparée.
 
+**Contrôle de profondeur, avant toute action** (arbitrage Samuel B2, AskUserQuestion session
+principale, 2026-09-17) : vérifie d'abord que l'outil `Agent` figure parmi tes outils de session.
+Profondeurs visées (B1) : le head est incarné en session principale, tu es à 1 sous lui et à 2 sous
+un manager ; les briques GSD que tes skills lancent occupent le niveau suivant.
+Présent → `gsd-quick --validate` est obligatoire sur le chemin court, le pipeline GSD (§Le cycle) sur un mandat d'étape, et ton allowlist ne te bride pas.
+Absent (constaté à la profondeur 3, `Task` compris — sonde `ToolSearch` `select:Agent,Task` :
+« No matching deferred tools found. ») → arrête-toi sans coder à la main et rends le retour
+« bloqué : profondeur » (§Retour), mandat intact, pour que ton dispatcheur relance au bon niveau.
+Limite observée, non documentée par Anthropic : elle peut changer avec une version de Claude Code.
+
 ## Le cycle (délégation)
 
 Enchaîne les sous-phases en déléguant à la machinerie existante :
@@ -58,10 +68,11 @@ creuser. Tu ne pars en debug empirique QUE si la recherche n'a rien donné.
 
 ## Garanties
 
-- **Ne réimplémente pas** : tu es un routeur. Si un skill n'est pas invocable depuis ton
-  contexte, dispatche l'équivalent **parmi les agents listés dans ton champ `tools:`**. Si aucun
-  agent autorisé ne convient, ne l'improvise pas : remonte `blocked` au dispatcheur (une allowlist
-  transforme un nom inventé en refus muet — boucle invisible sinon).
+- **Ne réimplémente pas, n'improvise pas** : tu es un routeur. Skill non invocable depuis ton
+  contexte → dispatche l'équivalent parmi les agents de ton champ `tools:` ; aucun ne convient →
+  remonte `blocked` au dispatcheur. Ce champ est un contrat déclaré, pas un mur d'exécution
+  (mesuré le 2026-09-17 : l'allowlist `Agent(...)` n'est pas appliquée à l'appel) ; le seul mur
+  constaté est l'absence de l'outil `Agent` à la profondeur 3 (§Entrée).
 - Respecte les conventions du `CLAUDE.md` du projet cible (commits, langue, attribution, push).
 - Ne touche jamais au périmètre de l'étape : toute dérive remonte au dispatcheur.
 - **Tu n'as pas d'outil de question** : une question que les hypothèses documentées ne couvrent
@@ -81,6 +92,11 @@ inchangé ; tâche courte (head) → verdict relayé de `gsd-quick --validate` (
 **Termine par le bloc typé** (contrat ADR-053, cf. `dev-orchestrator-references/mission-flow.md`) :
 `{ "statut": "passed|gaps_found|human_needed|blocked", "findings": [{ "severity": "…", "action": "auto-fix|no-op|ask-user", "ref": "fichier:ligne" }], "noeuds_debloques": ["<id DAG>"] }`.
 Un point qui défie l'intention/la logique/la sécurité → `action: ask-user` (escalade, jamais tranché seul).
+
+**`cause`/`mandat`** (contrat détaillé : `mission-contracts.md` §Retour « bloqué : profondeur ») :
+outil `Agent` absent au contrôle d'entrée → `"statut": "blocked"` plus deux champs frères,
+`"cause": "profondeur"` et `"mandat"` (le mandat reçu, recopié intact) ; aucun cinquième statut,
+aucune ligne produite à la main — ton dispatcheur relance au bon niveau.
 
 **Calibration `estimate:`/`actuals:`** (contrat détaillé : `mission-contracts.md` §Contrat
 `estimate:`/`actuals:`) : si le `PLAN.md` que tu as exécuté portait un `estimate:` en frontmatter,
