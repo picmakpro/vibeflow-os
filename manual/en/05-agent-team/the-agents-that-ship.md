@@ -23,7 +23,9 @@ either by naming it, or simply by phrasing a request that falls in its domain.
   goes through it.
 - **`vibeflow-head`** — the head of minds for development. It detects what your sentence calls for
   and dispatches the team that carries the matching brick. It's the default interlocutor for the
-  whole [dev cycle](../04-development-cycle/the-cycle-at-a-glance.md).
+  whole [dev cycle](../04-development-cycle/the-cycle-at-a-glance.md). It runs in your main
+  session (via `/vf-dev`), never launched as a subagent: a third-level subagent no longer has a
+  tool to launch agents.
 - **`vibeflow-design`** — the same role for design and UI, from art direction down to a spacing
   detail.
 - **`vibeflow-validator`** — the auditor. It orchestrates several complementary audits and proposes

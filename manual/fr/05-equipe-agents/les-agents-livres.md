@@ -24,7 +24,9 @@ domaine.
   lui-même passe par lui.
 - **`vibeflow-head`** — le head of minds du développement. Il détecte ce que ta phrase appelle et
   dispatche l'équipe qui porte la brique correspondante. C'est l'interlocuteur par défaut de tout
-  le [cycle de dev](../04-cycle-de-dev/le-cycle-en-bref.md).
+  le [cycle de dev](../04-cycle-de-dev/le-cycle-en-bref.md). Il tourne dans ta session principale
+  (via `/vf-dev`), jamais lancé comme sous-agent : un sous-agent de troisième niveau n'a plus
+  d'outil pour lancer des agents.
 - **`vibeflow-design`** — le même rôle pour le design et l'UI, de la direction artistique au détail
   de spacing.
 - **`vibeflow-validator`** — l'auditeur. Il orchestre plusieurs audits complémentaires et te propose
