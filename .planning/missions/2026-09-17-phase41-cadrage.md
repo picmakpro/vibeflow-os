@@ -115,3 +115,20 @@ planifier. Verrou repris (`vf-dev-manager-41-plan`), DAG `dag-phase41-plan.json`
 
 Mandats émis (planification) : 1 planificateur (1 création + 3 révisions par réveil), 3
 vérificateurs frais.
+
+## Arbitrage force push / suppression et vérification finale (même jour)
+
+Arbitrage Samuel, AskUserQuestion session principale, 2026-09-17, relayé par SendMessage : (a)
+inclure l'interdiction du force push et de la suppression de `main`. Variante fixée à `INCLUSES`
+dans 41-01, variante (b) retirée partout (`1b66377`).
+
+Vérificateur de plans frais, tour unique demandé par la session principale : `ISSUES_FOUND`, **0
+bloquant**, 1 avertissement, 1 info. Arbitrage appliqué conforme ; corrections du tour 3 prouvées
+sur copies mutées (faux vert du ledger fermé, message sans canal ni date rouge, date en dur rouge) ;
+110 vérifications `bash -n` OK, 13/13 plans structurellement valides, rien sous `plugin/`.
+
+**Dette déclarée, non corrigée (pas de 5e tour)** : la vérification « arbitrage cité » des
+messages de commit (13 plans) et des corps de PR (41-04, 41-06, 41-07, 41-12) passe si un message
+cite plusieurs clés `*-DECISION` et qu'une seule porte son canal et sa date (faux vert mesuré) ; la
+mention n'est pas bornée au segment de sa clé. Conduite à l'exécution : un commit ou corps de PR ne
+cite **qu'une** clé de décision à la fois, et la revue de chaque plan relit canal et date à l'œil.
