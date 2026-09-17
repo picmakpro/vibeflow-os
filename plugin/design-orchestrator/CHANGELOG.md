@@ -1,5 +1,22 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.5.8] — 2026-09-17 (hotfix v2.63.2 — B1 étendu à vibeflow-design)
+
+**Patch** — aucune logique de routage ne change ; la doctrine d'invocation du head design rejoint
+B1 (« un head n'est jamais dispatché en Task »), déjà appliquée à `vibeflow-head`. Origine
+factuelle : finding F3 de la tâche rapide 260917-ihf. Arbitrage Samuel, AskUserQuestion session
+principale, 2026-09-17.
+
+- **`AGENT.md`** : description frontmatter alignée sur le patron de `vibeflow-head` — incarné en
+  session principale (via `/vf-design`) ou en autonomie, jamais dispatché lui-même en Task, renvoi
+  `team-kernel.md` §Marge de profondeur de dispatch. Corps intouché, budget d'instructions inchangé
+  (193 lignes / 30 instructions).
+- **`skills/vf-design/SKILL.md`** : le verbe incarne l'agent `vibeflow-design` au lieu de lui
+  déléguer — jamais dispatché en Task, même renvoi (symétrique de `vf-dev/SKILL.md`).
+- **`scripts/tests/test-design-orchestrator.sh`** : T10 — mêmes littéraux que T38 de
+  `test-dev-orchestrator.sh` (synchro vérifiée machine), discriminants par mutation permanents,
+  contre-épreuve sur la négation légitime.
+
 ## [v1.5.7] — 2026-09-16 (Phase 40.1)
 
 **Patch** — aucune logique du module ne change ; seuils de densité codés en dur relevés.
