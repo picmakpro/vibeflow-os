@@ -807,5 +807,63 @@ SH
 fi
 
 # ---------------------------------------------------------------------------
+# T10 — B1 étendu à vibeflow-design (quick 260917-ldp) : le head design n'est plus présenté
+#       nulle part comme dispatchable en Task ; mêmes littéraux de détection que T38 (d) de
+#       test-dev-orchestrator.sh (synchro vérifiée machine, cf. (d) en tâche 2), discriminants
+#       par mutation et contre-épreuve sur la négation légitime (cf. (c) en tâche 2).
+# ---------------------------------------------------------------------------
+
+# Mêmes littéraux BRE que t38d_affirmative_hits (test-dev-orchestrator.sh), repris caractère
+# pour caractère — seul T10_TASK_LIT change de nom de head (vibeflow-design au lieu de
+# vibeflow-head). La synchro de T10_AFFIRM_RE/T10_NEG_RE avec T38 est vérifiée machine en (d).
+T10_AFFIRM_RE='Invocable via Task\|Incarne (ou dispatche via Task)'
+T10_NEG_RE='jamais\|pas dispatch'
+T10_TASK_LIT="Task(vibeflow-design)"
+
+# Même structure à deux niveaux que t38d_affirmative_hits, paramétrée par les trois variables
+# ci-dessus au lieu de littéraux en dur.
+t10_affirmative_hits() { # <file>
+  local f="$1" hits=""
+  hits="$("$GREP" -n "$T10_AFFIRM_RE" "$f" 2>/dev/null)"
+  local task_lines
+  task_lines="$("$GREP" -n "$T10_TASK_LIT" "$f" 2>/dev/null)"
+  if [ -n "$task_lines" ]; then
+    local unnegated
+    unnegated="$(printf '%s\n' "$task_lines" | "$GREP" -vi "$T10_NEG_RE")"
+    if [ -n "$unnegated" ]; then
+      hits="$(printf '%s\n%s' "$hits" "$unnegated")"
+    fi
+  fi
+  printf '%s' "$hits" | sed '/^$/d'
+}
+
+# La ligne ^description: seule porte l'assertion positive — le body contient déjà « incarner »
+# (l. 103), une assertion sur tout le fichier serait verte à vide (known_traps).
+t10_desc_ok() { # <file>
+  local f="$1" desc
+  desc="$("$GREP" -m1 '^description:' "$f" 2>/dev/null)"
+  [ -n "$desc" ] || return 1
+  printf '%s' "$desc" | "$GREP" -qi 'incarn' || return 1
+  printf '%s' "$desc" | "$GREP" -q 'jamais dispatch' || return 1
+  printf '%s' "$desc" | "$GREP" -q 'Marge de profondeur de dispatch' || return 1
+  return 0
+}
+
+t10_ok=1
+
+# (a) Aucune prescription affirmative de dispatch de vibeflow-design en Task dans AGENT.md ; la
+# description frontmatter dit l'incarnation, le refus du dispatch et le renvoi team-kernel.md.
+t10a_hit="$(t10_affirmative_hits "$AGENT_FILE")"
+if [ -n "$t10a_hit" ]; then
+  ko "T10 (a) : prescription affirmative de dispatch de vibeflow-design en Task dans $AGENT_FILE — $(printf '%s' "$t10a_hit" | head -1)"
+  t10_ok=0
+elif ! t10_desc_ok "$AGENT_FILE"; then
+  ko "T10 (a) : la description frontmatter de $AGENT_FILE ne dit pas à la fois incarn/jamais dispatch/Marge de profondeur de dispatch"
+  t10_ok=0
+else
+  ok "T10 (a) : $AGENT_FILE — aucune prescription affirmative, description dit l'incarnation, jamais dispatch, renvoi Marge de profondeur de dispatch"
+fi
+
+# ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
 [ "$fail" -eq 0 ]
